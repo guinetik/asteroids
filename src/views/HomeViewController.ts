@@ -86,7 +86,7 @@ export class HomeViewController implements Tickable {
 
     // Space-time grid on the XZ equator plane — warped by gravity
     this.spaceTimeGrid = new SpaceTimeGrid()
-    this.spaceTimeGrid.addSource({ x: 0, z: 0, mass: 5 }) // sun at origin
+    this.spaceTimeGrid.addSource({ x: 0, z: 0, mass: 1.0 }) // sun = 1 solar mass
     this.sceneManager.addToScene(this.spaceTimeGrid.mesh)
     this.tickHandler.register(this.spaceTimeGrid, TICK_PRIORITY_ANIMATION)
 

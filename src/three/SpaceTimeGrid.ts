@@ -6,17 +6,26 @@ const GRID_RESOLUTION = 80
 const GRID_COLOR = 0x333366
 const GRID_OPACITY = 0.4
 
-/** Gaussian well parameters — ported from gcanvas spacetime demo */
-const WELL_DEPTH = 75
-const WELL_WIDTH = 4.0
+/**
+ * Gaussian well parameters — ported from gcanvas spacetime demo.
+ * VISUAL_DEPTH_SCALE controls how dramatically mass warps the grid.
+ * Real spacetime curvature is imperceptible at solar system scale,
+ * so we exaggerate while preserving correct mass ratios between bodies.
+ */
+const VISUAL_DEPTH_SCALE = 40
+const VISUAL_WIDTH_SCALE = 60
 const WELL_PULSE_SPEED = 1.5
 const WELL_PULSE_AMOUNT = 0.08
-const GRID_SCALE = 15
 
-interface GravitySource {
+/**
+ * Mass in solar masses (M☉). Real ratios between bodies:
+ * Sun = 1.0, Jupiter = 0.000955, Saturn = 0.000286, Earth = 0.000003
+ * The visual deformation uses sqrt(mass) so even small planets show some effect.
+ */
+export interface GravitySource {
   x: number
   z: number
-  mass: number
+  mass: number // in solar masses (M☉)
 }
 
 /**
@@ -80,8 +89,8 @@ export class SpaceTimeGrid implements Tickable {
       const dz = z - source.z
       const rSquared = dx * dx + dz * dz
 
-      const sigma = WELL_WIDTH * Math.sqrt(source.mass) * GRID_SCALE
-      const baseAmplitude = WELL_DEPTH * Math.sqrt(source.mass)
+      const sigma = VISUAL_WIDTH_SCALE * Math.sqrt(source.mass)
+      const baseAmplitude = VISUAL_DEPTH_SCALE * Math.sqrt(source.mass)
 
       const pulse = 1 + WELL_PULSE_AMOUNT * Math.sin(this.time * WELL_PULSE_SPEED)
       const amplitude = baseAmplitude * pulse
