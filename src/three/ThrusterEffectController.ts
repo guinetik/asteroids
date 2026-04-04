@@ -23,6 +23,17 @@ const NOZZLE_OFFSETS = [
 const PUSH_FORCE = 20
 const FAR_AWAY = 99999
 
+// RCS wingtip attitude thrusters
+const RCS_PARTICLE_COUNT = 50
+const RCS_SPAWN_RATE = 40
+const RCS_LIFETIME = 0.2 // seconds — short puffs
+const RCS_SPREAD = 1.5
+const RCS_SIZE = 2
+const RCS_COLOR = new THREE.Color(0xccddff) // white-ish, like oxygen venting
+const RCS_PUSH_FORCE = 8
+const LEFT_WINGTIP = new THREE.Vector3(2, 0, -4.5) // front-left wing
+const RIGHT_WINGTIP = new THREE.Vector3(2, 0, 4.5)  // front-right wing
+
 /** Internal particle state for the pool-based particle system. */
 interface Particle {
   alive: boolean
@@ -43,21 +54,26 @@ interface Particle {
 export class ThrusterEffectController implements Tickable {
   readonly thrustPoints: THREE.Points
   readonly brakePoints: THREE.Points
+  readonly rcsPoints: THREE.Points
 
   private thrustParticles: Particle[]
   private brakeParticles: Particle[]
+  private rcsParticles: Particle[]
   private thrustSpawnAccumulator = 0
   private brakeSpawnAccumulator = 0
+  private rcsSpawnAccumulator = 0
   private readonly shuttle: ShuttleController
 
   constructor(shuttle: ShuttleController) {
     this.shuttle = shuttle
 
-    this.thrustParticles = this.createParticlePool()
-    this.brakeParticles = this.createParticlePool()
+    this.thrustParticles = this.createParticlePool(PARTICLE_COUNT)
+    this.brakeParticles = this.createParticlePool(PARTICLE_COUNT)
+    this.rcsParticles = this.createParticlePool(RCS_PARTICLE_COUNT)
 
-    this.thrustPoints = this.createPoints(THRUST_COLOR)
-    this.brakePoints = this.createPoints(BRAKE_COLOR)
+    this.thrustPoints = this.createPoints(THRUST_COLOR, PARTICLE_COUNT, PARTICLE_SIZE)
+    this.brakePoints = this.createPoints(BRAKE_COLOR, PARTICLE_COUNT, PARTICLE_SIZE)
+    this.rcsPoints = this.createPoints(RCS_COLOR, RCS_PARTICLE_COUNT, RCS_SIZE)
   }
 
   tick(dt: number): void {
@@ -86,8 +102,27 @@ export class ThrusterEffectController implements Tickable {
       this.brakeSpawnAccumulator = 0
     }
 
-    this.updateParticles(this.thrustParticles, this.thrustPoints, dt)
-    this.updateParticles(this.brakeParticles, this.brakePoints, dt)
+    // RCS wingtip puffs when yawing
+    const isYawingLeft = this.shuttle.isYawingLeft
+    const isYawingRight = this.shuttle.isYawingRight
+    if (isYawingLeft || isYawingRight) {
+      this.rcsSpawnAccumulator += RCS_SPAWN_RATE * dt
+      while (this.rcsSpawnAccumulator >= 1) {
+        // Yaw left = push from right wingtip, yaw right = push from left
+        const wingtip = isYawingLeft ? RIGHT_WINGTIP : LEFT_WINGTIP
+        const pushDir = isYawingLeft
+          ? new THREE.Vector3(0, 0, -RCS_PUSH_FORCE)
+          : new THREE.Vector3(0, 0, RCS_PUSH_FORCE)
+        this.spawnRcsParticle(wingtip, pushDir)
+        this.rcsSpawnAccumulator -= 1
+      }
+    } else {
+      this.rcsSpawnAccumulator = 0
+    }
+
+    this.updateParticles(this.thrustParticles, this.thrustPoints, dt, PARTICLE_LIFETIME)
+    this.updateParticles(this.brakeParticles, this.brakePoints, dt, PARTICLE_LIFETIME)
+    this.updateParticles(this.rcsParticles, this.rcsPoints, dt, RCS_LIFETIME)
   }
 
   dispose(): void {
@@ -95,10 +130,12 @@ export class ThrusterEffectController implements Tickable {
     ;(this.thrustPoints.material as THREE.PointsMaterial).dispose()
     this.brakePoints.geometry.dispose()
     ;(this.brakePoints.material as THREE.PointsMaterial).dispose()
+    this.rcsPoints.geometry.dispose()
+    ;(this.rcsPoints.material as THREE.PointsMaterial).dispose()
   }
 
-  private createParticlePool(): Particle[] {
-    return Array.from({ length: PARTICLE_COUNT }, () => ({
+  private createParticlePool(count: number): Particle[] {
+    return Array.from({ length: count }, () => ({
       alive: false,
       age: 0,
       position: new THREE.Vector3(),
@@ -106,14 +143,14 @@ export class ThrusterEffectController implements Tickable {
     }))
   }
 
-  private createPoints(color: THREE.Color): THREE.Points {
-    const positions = new Float32Array(PARTICLE_COUNT * 3)
+  private createPoints(color: THREE.Color, count: number, size: number): THREE.Points {
+    const positions = new Float32Array(count * 3)
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
 
     const material = new THREE.PointsMaterial({
       color,
-      size: PARTICLE_SIZE,
+      size,
       sizeAttenuation: false,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
@@ -124,6 +161,26 @@ export class ThrusterEffectController implements Tickable {
     const points = new THREE.Points(geometry, material)
     points.frustumCulled = false
     return points
+  }
+
+  private spawnRcsParticle(wingtip: THREE.Vector3, pushDir: THREE.Vector3): void {
+    const particle = this.rcsParticles.find((p) => !p.alive)
+    if (!particle) return
+
+    particle.alive = true
+    particle.age = 0
+
+    const worldOffset = wingtip.clone().applyQuaternion(this.shuttle.group.quaternion)
+    particle.position.copy(this.shuttle.position).add(worldOffset)
+
+    particle.velocity.set(
+      (Math.random() - 0.5) * RCS_SPREAD,
+      (Math.random() - 0.5) * RCS_SPREAD,
+      (Math.random() - 0.5) * RCS_SPREAD,
+    )
+
+    const worldPush = pushDir.clone().applyQuaternion(this.shuttle.group.quaternion)
+    particle.velocity.add(worldPush)
   }
 
   private spawnParticle(pool: Particle[], offset: THREE.Vector3, spread: number): void {
@@ -148,7 +205,7 @@ export class ThrusterEffectController implements Tickable {
     particle.velocity.add(pushDir)
   }
 
-  private updateParticles(pool: Particle[], points: THREE.Points, dt: number): void {
+  private updateParticles(pool: Particle[], points: THREE.Points, dt: number, lifetime: number): void {
     const posAttr = points.geometry.getAttribute('position') as THREE.BufferAttribute
     const positions = posAttr.array as Float32Array
 
@@ -164,7 +221,7 @@ export class ThrusterEffectController implements Tickable {
       }
 
       p.age += dt
-      if (p.age >= PARTICLE_LIFETIME) {
+      if (p.age >= lifetime) {
         p.alive = false
         positions[i3] = FAR_AWAY
         positions[i3 + 1] = FAR_AWAY
