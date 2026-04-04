@@ -76,17 +76,17 @@ export class ShuttleController implements Tickable {
     const DOOR_HALF_WIDTH = 53.5 // half of door Y extent (raw model units)
 
     if (this.doorPortNode) {
-      // Move node origin to hinge edge (Y=0), offset children to compensate
-      this.doorPortNode.position.y = -DOOR_HALF_WIDTH
+      // Move node origin to hinge edge (inner/centerline side)
+      this.doorPortNode.position.y = DOOR_HALF_WIDTH
       this.doorPortNode.children.forEach((child) => {
-        child.position.y += DOOR_HALF_WIDTH
+        child.position.y -= DOOR_HALF_WIDTH
       })
     }
 
     if (this.doorStbNode) {
-      this.doorStbNode.position.y = DOOR_HALF_WIDTH
+      this.doorStbNode.position.y = -DOOR_HALF_WIDTH
       this.doorStbNode.children.forEach((child) => {
-        child.position.y -= DOOR_HALF_WIDTH
+        child.position.y += DOOR_HALF_WIDTH
       })
     }
 
