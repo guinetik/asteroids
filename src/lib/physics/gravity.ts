@@ -12,7 +12,7 @@
  * Real G = 6.674e-11 m³/(kg·s²). Exaggerated so solar-mass
  * bodies produce meaningful acceleration at game distances.
  */
-const GRAVITY_CONSTANT = 5000
+const GRAVITY_CONSTANT = 50000
 
 /** Minimum distance to prevent infinite force at center */
 const MIN_GRAVITY_DISTANCE = 15
@@ -102,12 +102,12 @@ export function gravityAt(
 
   const radius = influenceRadius(mass)
 
-  // Zero pull outside influence radius
-  const t = Math.max(0, 1 - dist / radius)
-  // Quadratic ease-in: noticeable pull inside the ring, strong near center
-  const ramp = t * t
+  // Zero pull outside influence radius, full 1/r² inside
+  if (dist >= radius) {
+    return { ax: 0, az: 0 }
+  }
 
-  const forceMag = (GRAVITY_CONSTANT * mass * ramp) / (dist * dist)
+  const forceMag = (GRAVITY_CONSTANT * mass) / (dist * dist)
   const nx = dx / dist
   const nz = dz / dist
 
