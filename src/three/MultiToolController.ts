@@ -109,9 +109,12 @@ export class MultiToolController implements Tickable {
     const ledColor = new THREE.Color(color)
     for (const mesh of this.ledMeshes) {
       const mat = mesh.material as THREE.MeshStandardMaterial
+      // Clear any texture maps that would override the emissive
+      mat.map = null
+      mat.emissiveMap = null
       mat.color.set(0x000000)
       mat.emissive.copy(ledColor)
-      mat.emissiveIntensity = 1.0
+      mat.emissiveIntensity = 1.5
       mat.needsUpdate = true
     }
   }

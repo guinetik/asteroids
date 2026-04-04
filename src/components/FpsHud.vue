@@ -30,7 +30,7 @@ const O2_COLOR_LOW = '#ef4444'
 
 const MODE_LABELS: Record<string, { key: string; label: string; color: string }> = {
   drill: { key: '1', label: 'DRL', color: '#3b82f6' },
-  weapon: { key: '2', label: 'LAS', color: '#ef4444' },
+  weapon: { key: '2', label: 'LAS', color: '#ff00ff' },
   heal: { key: '3', label: 'MED', color: '#22c55e' },
 }
 

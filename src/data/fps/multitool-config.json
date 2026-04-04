@@ -1,7 +1,7 @@
 {
   "modes": {
     "drill": { "label": "DRL", "color": "#3b82f6", "trigger": "hold" },
-    "weapon": { "label": "LAS", "color": "#ef4444", "trigger": "auto", "fireRate": 5 },
+    "weapon": { "label": "LAS", "color": "#ff00ff", "trigger": "auto", "fireRate": 5 },
     "heal": { "label": "MED", "color": "#22c55e", "trigger": "click" }
   },
   "ads": {
