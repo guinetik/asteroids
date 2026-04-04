@@ -22,7 +22,8 @@ const ONE_SHOT_PRIORITY = TICK_PRIORITY_INPUT + 1
 const AMBIENT_LIGHT_INTENSITY = 0.3
 const SUN_LIGHT_INTENSITY = 3
 const SUN_LIGHT_DISTANCE = 5000
-const SHUTTLE_ORBIT_DISTANCE = 300
+const SPAWN_MIN_RADIUS = 200
+const SPAWN_MAX_RADIUS = 800
 
 /**
  * Bridges Vue lifecycle to the game loop and Three.js scene.
@@ -91,7 +92,13 @@ export class HomeViewController implements Tickable {
       this.shuttleController.addGravityWell(body)
     }
     await this.shuttleController.load()
-    this.shuttleController.group.position.set(SHUTTLE_ORBIT_DISTANCE, 0, 0)
+    const spawnAngle = Math.random() * Math.PI * 2
+    const spawnRadius = SPAWN_MIN_RADIUS + Math.random() * (SPAWN_MAX_RADIUS - SPAWN_MIN_RADIUS)
+    this.shuttleController.group.position.set(
+      Math.cos(spawnAngle) * spawnRadius,
+      0,
+      Math.sin(spawnAngle) * spawnRadius,
+    )
     this.sceneManager.addToScene(this.shuttleController.group)
     this.sceneManager.setShuttleRef(this.shuttleController.group)
     this.tickHandler.register(this.shuttleController, TICK_PRIORITY_PHYSICS)
