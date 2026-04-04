@@ -8,6 +8,7 @@
  */
 import * as THREE from 'three'
 import type { Planet, OrbitalElements } from '@/lib/planets/types'
+import type { GravitySource } from '@/lib/physics/gravity'
 import { orbitalPosition3D } from '@/lib/planets/orbit'
 import {
   ORBIT_SCALE,
@@ -39,9 +40,12 @@ interface MoonEntry {
 /**
  * Manages a planet, its moons, optional ring, and orbit lines.
  */
-export class PlanetSystemController {
+export class PlanetSystemController implements GravitySource {
   /** The moving group (planet + moons + ring). */
   readonly group: THREE.Group
+
+  /** Mass in solar masses (M☉). */
+  readonly mass: number
 
   /** Orbit lines for the planet and moons (added to scene root, not the group). */
   readonly orbitLines: THREE.LineLoop[]
@@ -54,6 +58,7 @@ export class PlanetSystemController {
 
   constructor(planet: Planet) {
     this.planet = planet
+    this.mass = planet.mass
     this.group = new THREE.Group()
     this.orbitLines = []
 
@@ -102,6 +107,14 @@ export class PlanetSystemController {
     // Set initial position
     const initialPos = orbitalPosition3D(this.scaledOrbit, 0)
     this.group.position.set(initialPos.x, initialPos.z, initialPos.y)
+  }
+
+  getWorldX(): number {
+    return this.group.position.x
+  }
+
+  getWorldZ(): number {
+    return this.group.position.z
   }
 
   tick(dt: number, simTime: number): void {

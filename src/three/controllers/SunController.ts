@@ -6,6 +6,7 @@
  * @spec docs/superpowers/specs/2026-04-04-map-view-design.md
  */
 import type { SunData } from '@/lib/planets/types'
+import type { GravitySource } from '@/lib/physics/gravity'
 import { ROTATION_SPEED_DIVISOR } from '@/lib/planets/constants'
 import { createSunMesh, type SunMeshResult } from '@/three/meshes/createSunMesh'
 import type * as THREE from 'three'
@@ -17,13 +18,17 @@ const SHADER_TIME_DIVISOR = 365.25
  * Manages the sun mesh, point light, and corona sprite.
  * Updates rotation and shader time each frame.
  */
-export class SunController {
+export class SunController implements GravitySource {
+  /** Mass in solar masses (M☉). Always 1.0. */
+  readonly mass: number
+
   private readonly sunResult: SunMeshResult
   private readonly rotationSpeed: number
 
   constructor(sunData: SunData) {
     this.sunResult = createSunMesh(sunData)
     this.rotationSpeed = sunData.rotationSpeed
+    this.mass = sunData.mass
   }
 
   /** The sun's scene group (mesh + light + corona). */
@@ -34,6 +39,14 @@ export class SunController {
   /** The sun's point light. */
   get light(): THREE.PointLight {
     return this.sunResult.light
+  }
+
+  getWorldX(): number {
+    return this.sunResult.group.position.x
+  }
+
+  getWorldZ(): number {
+    return this.sunResult.group.position.z
   }
 
   tick(dt: number, simTime: number): void {

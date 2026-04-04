@@ -129,15 +129,18 @@ export class MapViewController implements Tickable {
     // Update gravity sources on the space-time grid
     if (this.spaceTimeGrid) {
       this.spaceTimeGrid.clearSources()
-      // Sun at origin
-      this.spaceTimeGrid.addSource({ x: 0, z: 0, mass: SUN.mass })
-      // Planets at their current positions
-      for (let i = 0; i < this.planetControllers.length; i++) {
-        const pos = this.planetControllers[i]!.group.position
+      if (this.sunController) {
         this.spaceTimeGrid.addSource({
-          x: pos.x,
-          z: pos.z,
-          mass: PLANETS[i]!.mass,
+          x: this.sunController.getWorldX(),
+          z: this.sunController.getWorldZ(),
+          mass: this.sunController.mass,
+        })
+      }
+      for (const controller of this.planetControllers) {
+        this.spaceTimeGrid.addSource({
+          x: controller.getWorldX(),
+          z: controller.getWorldZ(),
+          mass: controller.mass,
         })
       }
       this.spaceTimeGrid.tick(dt)
