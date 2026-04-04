@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { VibePortal } from '../portal'
 
 function setSearch(search: string) {
@@ -9,6 +9,8 @@ function setSearch(search: string) {
 }
 
 describe('VibePortal', () => {
+  beforeEach(() => setSearch(''))
+
   describe('arrival parsing', () => {
     it('parses all known params', () => {
       setSearch(

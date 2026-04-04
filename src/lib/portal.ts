@@ -58,21 +58,19 @@ export class VibePortal {
       return Number.isNaN(num) ? undefined : num
     }
 
+    const numericValues: Record<string, number | undefined> = {}
+    for (const key of NUMERIC_PARAMS) {
+      numericValues[key] = getNumber(key)
+    }
+
     return {
       portal: searchParams.get('portal') === 'true',
       ref: get('ref'),
       username: get('username'),
       color: get('color'),
-      speed: getNumber('speed'),
-      speed_x: getNumber('speed_x'),
-      speed_y: getNumber('speed_y'),
-      speed_z: getNumber('speed_z'),
-      rotation_x: getNumber('rotation_x'),
-      rotation_y: getNumber('rotation_y'),
-      rotation_z: getNumber('rotation_z'),
       avatar_url: get('avatar_url'),
       team: get('team'),
-      hp: getNumber('hp'),
-    }
+      ...numericValues,
+    } as VibeJamParams
   }
 }
