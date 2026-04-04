@@ -19,6 +19,11 @@ const MODEL_SCALE = 0.01
  */
 const MODEL_ROTATION_X = -Math.PI / 2
 
+/** Engine nozzle position in raw model coordinates (pre-scale). */
+const ENG_POSITION_X = -650
+const ENG_POSITION_Y = 0
+const ENG_POSITION_Z = 100
+
 const DOOR_OPEN_ANGLE = Math.PI * 0.6 // ~108 degrees, payload bay doors open wide
 const DOOR_ANIM_SPEED = 2 // radians per second
 
@@ -183,24 +188,20 @@ export class ShuttleController implements Tickable {
   }
 
   private placeNozzles(scene: THREE.Object3D): void {
-    // Place eng nozzle detail at the engine plate (shutlayer_16 — the 3 SSME bells)
-    const enginePlate = this.findNode(scene, 'shutlayer_16')
     const engNode = this.findNode(scene, 'eng')
     const rcsNode = this.findNode(scene, 'rcs')
 
-    if (engNode && enginePlate) {
-      // Compute engine plate center in world space, then convert
-      // to eng node's parent local space
-      scene.updateWorldMatrix(true, true)
-      const box = new THREE.Box3().setFromObject(enginePlate)
-      const center = box.getCenter(new THREE.Vector3())
-      if (engNode.parent) {
-        engNode.parent.worldToLocal(center)
-      }
-      engNode.position.copy(center)
-      console.log('[Nozzle] eng placed at local:', center)
-    } else if (engNode) {
-      engNode.visible = false
+    // The eng node lives under <3DSRoot>_2 which has its own axis transform.
+    // Rather than fighting coordinate conversions, attach eng directly to the
+    // main scene root and position in raw model coordinates.
+    // Engine plate (shutlayer_16) is at the rear: X ≈ -650, Y ≈ 0, Z ≈ 100
+    if (engNode) {
+      const engParent = engNode.parent
+      if (engParent) engParent.remove(engNode)
+      scene.add(engNode)
+      engNode.position.set(ENG_POSITION_X, ENG_POSITION_Y, ENG_POSITION_Z)
+      engNode.rotation.set(0, 0, 0)
+      engNode.scale.set(1, 1, 1)
     }
 
     // Hide RCS for now — needs separate OMS pod alignment
