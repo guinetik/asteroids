@@ -12,7 +12,7 @@ const PARTICLE_SIZE = 4
 const THRUST_COLOR = new THREE.Color(0xff8800)
 const BRAKE_COLOR = new THREE.Color(0x4488ff)
 const THRUST_OFFSET = new THREE.Vector3(-7, 0, 0) // engine nozzles: rear of shuttle (-X)
-const BRAKE_OFFSET = new THREE.Vector3(7, 0, 0) // dampener: in front of shuttle nose (+X)
+const BRAKE_OFFSET = new THREE.Vector3(-7, 0, 0) // dampener: same nozzles, blue retro-thrust
 const PUSH_FORCE = 20
 const FAR_AWAY = 99999
 
