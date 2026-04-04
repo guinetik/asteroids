@@ -64,7 +64,7 @@ export class FpsCamera implements Tickable {
 
   constructor(config: FpsCameraConfig) {
     this.config = config
-    this.camera = new THREE.PerspectiveCamera(config.fov, 1, 0.1, 5000)
+    this.camera = new THREE.PerspectiveCamera(config.fov, 1, 0.01, 5000)
   }
 
   /** Set the player entity to follow. */

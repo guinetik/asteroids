@@ -114,7 +114,7 @@ export class FpsViewController implements Tickable {
 
     // Multi-tool — FPS weapon fixture on camera
     this.multiTool = new MultiToolController()
-    await this.multiTool.load(this.fpsCamera.camera)
+    await this.multiTool.load(this.fpsCamera.camera, this.sceneManager.scene)
 
     // Death handler — reset scene
     this.playerController.onDeath = () => {
@@ -143,7 +143,11 @@ export class FpsViewController implements Tickable {
         this.playerController.speed,
         this.playerController.body.velocityY,
       )
-      this.multiTool?.setSpeed(this.playerController.speed)
+      this.multiTool?.setState(
+        this.playerController.speed,
+        this.inputManager!.isActionActive('sprint'),
+        this.playerController.grounded,
+      )
     }
 
     if (this.playerController && this.onTelemetry) {

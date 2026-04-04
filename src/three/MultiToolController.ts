@@ -16,11 +16,11 @@ import { loadGLB } from './loadGLB'
 const MODEL_PATH = '/models/multitool.glb'
 
 /** Position offset from camera origin (right, down, forward). */
-const OFFSET_X = 0.4
-const OFFSET_Y = -0.35
-const OFFSET_Z = -0.6
+const OFFSET_X = 0.3
+const OFFSET_Y = -0.5
+const OFFSET_Z = -0.8
 
-const MODEL_SCALE = 0.008
+const MODEL_SCALE = 0.01
 
 /** Idle sway amplitude (radians). */
 const IDLE_SWAY_AMP = 0.008
@@ -31,6 +31,13 @@ const IDLE_SWAY_SPEED = 1.5
 const MOVE_BOB_AMP = 0.012
 /** Movement bob speed multiplier. */
 const MOVE_BOB_SPEED = 10
+
+/** Sprint holster tilt — pitch down (radians). */
+const SPRINT_TILT = 0.35
+/** Jump tilt — pitch up (radians). */
+const JUMP_TILT = -0.25
+/** How fast tilt lerps (per second). */
+const TILT_LERP_SPEED = 8
 
 /**
  * FPS weapon fixture — loads multi-tool GLB and attaches to camera.
@@ -44,33 +51,54 @@ export class MultiToolController implements Tickable {
   private camera: THREE.PerspectiveCamera | null = null
   private time = 0
   private lateralSpeed = 0
+  private sprinting = false
+  private grounded = true
+  private tilt = 0
 
   /**
    * Load the multi-tool model and attach to the FPS camera.
    *
    * @param camera - The FPS camera to parent the tool to
    */
-  async load(camera: THREE.PerspectiveCamera): Promise<void> {
+  /**
+   * Load the multi-tool model. Added to the scene in world space,
+   * then manually positioned relative to camera each frame in tick().
+   *
+   * @param camera - The FPS camera to follow
+   * @param scene - The Three.js scene to add the model to
+   */
+  async load(camera: THREE.PerspectiveCamera, scene: THREE.Scene): Promise<void> {
     this.camera = camera
     this.model = await loadGLB(MODEL_PATH)
     this.model.scale.setScalar(MODEL_SCALE)
-    this.model.position.set(OFFSET_X, OFFSET_Y, OFFSET_Z)
-    this.model.rotation.set(0, -Math.PI / 2, 0)
-    camera.add(this.model)
+    this.model.traverse((child) => {
+      child.frustumCulled = false
+    })
+    scene.add(this.model)
   }
 
   /**
-   * Feed current lateral speed for movement bob.
+   * Feed current player state for movement bob and holster tilt.
    *
    * @param speed - Player's XZ speed magnitude
+   * @param sprinting - Whether the player is sprinting
+   * @param grounded - Whether the player is on the ground
    */
-  setSpeed(speed: number): void {
+  setState(speed: number, sprinting: boolean, grounded: boolean): void {
     this.lateralSpeed = speed
+    this.sprinting = sprinting
+    this.grounded = grounded
   }
 
+  private readonly offset = new THREE.Vector3()
+
   tick(dt: number): void {
-    if (!this.model) return
+    if (!this.model || !this.camera) return
     this.time += dt
+
+    // Holster tilt — sprint tilts down, jump tilts up
+    const targetTilt = this.sprinting ? SPRINT_TILT : (!this.grounded ? JUMP_TILT : 0)
+    this.tilt += (targetTilt - this.tilt) * Math.min(1, TILT_LERP_SPEED * dt)
 
     // Idle sway — gentle rotation even when standing still
     const swayX = Math.sin(this.time * IDLE_SWAY_SPEED) * IDLE_SWAY_AMP
@@ -82,17 +110,21 @@ export class MultiToolController implements Tickable {
     const bobY = Math.sin(bobPhase) * MOVE_BOB_AMP * bobScale
     const bobX = Math.cos(bobPhase * 0.5) * MOVE_BOB_AMP * bobScale * 0.5
 
-    this.model.position.set(
-      OFFSET_X + bobX,
-      OFFSET_Y + bobY,
-      OFFSET_Z,
-    )
-    this.model.rotation.set(swayX, 0, swayZ)
+    // Position in camera-local space, then transform to world
+    this.offset.set(OFFSET_X + bobX, OFFSET_Y + bobY, OFFSET_Z)
+    this.offset.applyQuaternion(this.camera.quaternion)
+    this.model.position.copy(this.camera.position).add(this.offset)
+
+    // Rotation: camera rotation + sway
+    this.model.quaternion.copy(this.camera.quaternion)
+    this.model.rotateX(swayX + this.tilt)
+    this.model.rotateY(-Math.PI / 2)
+    this.model.rotateZ(swayZ)
   }
 
   dispose(): void {
-    if (this.model && this.camera) {
-      this.camera.remove(this.model)
+    if (this.model) {
+      this.model.parent?.remove(this.model)
     }
   }
 }
