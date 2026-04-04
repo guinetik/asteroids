@@ -20,9 +20,9 @@ const MODEL_SCALE = 0.01
 const MODEL_ROTATION_X = -Math.PI / 2
 
 /** Engine nozzle position in raw model coordinates (pre-scale). */
-const ENG_POSITION_X = -580
+const ENG_POSITION_X = -610
 const ENG_POSITION_Y = 0
-const ENG_POSITION_Z = 100
+const ENG_POSITION_Z = 60
 
 const DOOR_OPEN_ANGLE = Math.PI * 0.6 // ~108 degrees, payload bay doors open wide
 const DOOR_ANIM_SPEED = 2 // radians per second
