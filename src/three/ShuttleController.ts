@@ -34,8 +34,8 @@ const DOOR_ANIM_SPEED = 2 // radians per second
 
 const THRUST_FORCE = 20
 const BRAKE_FACTOR = 0.95
-const YAW_TORQUE = 2 // angular acceleration per second
-const YAW_MAX_SPEED = 3 // max angular velocity
+const YAW_TORQUE = 0.8 // angular acceleration per second
+const YAW_MAX_SPEED = 2 // max angular velocity
 const YAW_DAMPING = 0.97 // gentle angular friction per frame
 const MAX_SPEED = 80
 
