@@ -45,8 +45,8 @@ export class ShuttleController implements Tickable {
   private doorProgress = 0 // 0 = closed, 1 = open
   private doorPortNode: THREE.Object3D | null = null
   private doorStbNode: THREE.Object3D | null = null
-  private doorPortClosedRotZ = 0
-  private doorStbClosedRotZ = 0
+  private doorPortClosedRotX = 0
+  private doorStbClosedRotX = 0
   private velocity = new THREE.Vector3()
   private currentBank = 0
   private readonly inputManager: InputManager
@@ -70,8 +70,8 @@ export class ShuttleController implements Tickable {
     // Find door nodes for programmatic animation
     this.doorPortNode = this.findNode(gltf.scene, 'door-prt')
     this.doorStbNode = this.findNode(gltf.scene, 'door-stb')
-    if (this.doorPortNode) this.doorPortClosedRotZ = this.doorPortNode.rotation.z
-    if (this.doorStbNode) this.doorStbClosedRotZ = this.doorStbNode.rotation.z
+    if (this.doorPortNode) this.doorPortClosedRotX = this.doorPortNode.rotation.x
+    if (this.doorStbNode) this.doorStbClosedRotX = this.doorStbNode.rotation.x
 
     this.placeNozzles(gltf.scene)
 
@@ -127,13 +127,12 @@ export class ShuttleController implements Tickable {
 
     const angle = this.doorProgress * DOOR_OPEN_ANGLE
 
-    // Port door rotates around local X axis (hinge along nose-to-tail)
+    // Doors hinge along X axis (nose-to-tail in model space)
     if (this.doorPortNode) {
-      this.doorPortNode.rotation.z = this.doorPortClosedRotZ + angle
+      this.doorPortNode.rotation.x = this.doorPortClosedRotX + angle
     }
-    // Starboard door rotates the opposite direction
     if (this.doorStbNode) {
-      this.doorStbNode.rotation.z = this.doorStbClosedRotZ - angle
+      this.doorStbNode.rotation.x = this.doorStbClosedRotX - angle
     }
   }
 
