@@ -133,9 +133,9 @@ export class MultiToolController implements Tickable {
     const swayX = Math.sin(this.time * IDLE_SWAY_SPEED) * IDLE_SWAY_AMP
     const swayZ = Math.cos(this.time * IDLE_SWAY_SPEED * 0.7) * IDLE_SWAY_AMP
 
-    // Movement bob — oscillate position when walking
+    // Movement bob — only when grounded (floating = steady gun)
     const bobPhase = this.time * MOVE_BOB_SPEED
-    const bobScale = Math.min(1, this.lateralSpeed * 0.1)
+    const bobScale = this.grounded ? Math.min(1, this.lateralSpeed * 0.1) : 0
     const bobY = Math.sin(bobPhase) * MOVE_BOB_AMP * bobScale
     const bobX = Math.cos(bobPhase * 0.5) * MOVE_BOB_AMP * bobScale * 0.5
 
