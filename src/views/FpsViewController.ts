@@ -25,6 +25,7 @@ import { TerrainGrid } from '@/three/TerrainGrid'
 import { generateTerrain } from '@/lib/terrain/terrainGenerator'
 import type { SurfaceFeatures } from '@/lib/asteroids/types'
 import { AmbientLight, DirectionalLight } from 'three'
+import { MultiToolController } from '@/three/MultiToolController'
 import playerConfigJson from '@/data/fps/player-config.json'
 
 const AMBIENT_LIGHT_INTENSITY = 0.4
@@ -58,6 +59,7 @@ export class FpsViewController implements Tickable {
   private fpsCamera: FpsCamera | null = null
   private playerController: FpsPlayerController | null = null
   private terrainGrid: TerrainGrid | null = null
+  private multiTool: MultiToolController | null = null
 
   /** Called each frame with player telemetry for HUD display. */
   onTelemetry: ((telemetry: FpsTelemetry) => void) | null = null
@@ -110,6 +112,10 @@ export class FpsViewController implements Tickable {
     // Use FpsCamera's perspective camera for rendering
     this.sceneManager.setActiveCamera(this.fpsCamera.camera)
 
+    // Multi-tool — FPS weapon fixture on camera
+    this.multiTool = new MultiToolController()
+    await this.multiTool.load(this.fpsCamera.camera)
+
     // Death handler — reset scene
     this.playerController.onDeath = () => {
       window.location.reload()
@@ -118,6 +124,7 @@ export class FpsViewController implements Tickable {
     // Register tick order
     this.tickHandler.register(this.playerController, TICK_PRIORITY_PHYSICS)
     this.tickHandler.register(this.fpsCamera, TICK_PRIORITY_RENDER - 2)
+    this.tickHandler.register(this.multiTool, TICK_PRIORITY_RENDER - 2)
     this.tickHandler.register(this, TICK_PRIORITY_RENDER - 1)
     this.tickHandler.register(this.sceneManager, TICK_PRIORITY_RENDER)
 
@@ -130,12 +137,13 @@ export class FpsViewController implements Tickable {
   }
 
   tick(_dt: number): void {
-    // Feed player velocity to camera for bob/wobble
+    // Feed player velocity to camera and multi-tool for bob/wobble
     if (this.playerController && this.fpsCamera) {
       this.fpsCamera.setVelocity(
         this.playerController.speed,
         this.playerController.body.velocityY,
       )
+      this.multiTool?.setSpeed(this.playerController.speed)
     }
 
     if (this.playerController && this.onTelemetry) {
@@ -188,6 +196,7 @@ export class FpsViewController implements Tickable {
 
   dispose(): void {
     this.gameLoop?.stop()
+    this.multiTool?.dispose()
     this.playerController?.dispose()
     this.fpsCamera?.dispose()
     this.terrainGrid?.dispose()
