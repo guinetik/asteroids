@@ -24,9 +24,9 @@ const MODEL_ROTATION_X = -Math.PI / 2
  * 3 SSME nozzles arranged in a triangle: one top-center, two bottom-sides.
  */
 const ENG_POSITIONS: [number, number, number][] = [
-  [-540, 0, 80],     // top center
-  [-540, -60, -40],  // bottom left
-  [-540, 60, -40],   // bottom right
+  [-520, 0, 80],     // top center
+  [-520, -60, -40],  // bottom left
+  [-520, 60, -40],   // bottom right
 ]
 
 const DOOR_OPEN_ANGLE = Math.PI * 0.6 // ~108 degrees, payload bay doors open wide
