@@ -11,6 +11,7 @@ const CAMERA_INITIAL_POSITION = new THREE.Vector3(180, 30, 0)
 const IDLE_CAM_OFFSET = new THREE.Vector3(-120, 30, 0)
 const IDLE_CAM_LERP_SPEED = 2
 const IDLE_TIMEOUT_S = 1.5 // seconds of no mouse before auto-returning
+const MIN_CAMERA_Y = 15 // never go below this — keeps grid visible below horizon
 
 /**
  * Three.js scene orchestrator — creates renderer, camera, and controls.
@@ -84,6 +85,7 @@ export class SceneManager implements Tickable {
         const offset = this.camera.position.clone().sub(this.controls.target)
         this.controls.target.copy(shuttlePos)
         this.camera.position.copy(shuttlePos).add(offset)
+        this.clampCameraHeight()
       } else {
         this.mouseIdleTimer += dt
 
@@ -93,6 +95,9 @@ export class SceneManager implements Tickable {
             .applyQuaternion(this.shuttleRef.quaternion)
           const targetCamPos = shuttlePos.clone().add(idleOffset)
 
+          // Ensure target stays above grid
+          targetCamPos.y = Math.max(targetCamPos.y, MIN_CAMERA_Y)
+
           this.camera.position.lerp(targetCamPos, IDLE_CAM_LERP_SPEED * dt)
           this.controls.target.lerp(shuttlePos, IDLE_CAM_LERP_SPEED * dt)
         } else {
@@ -100,6 +105,7 @@ export class SceneManager implements Tickable {
           const offset = this.camera.position.clone().sub(this.controls.target)
           this.controls.target.copy(shuttlePos)
           this.camera.position.copy(shuttlePos).add(offset)
+          this.clampCameraHeight()
         }
       }
     }
@@ -116,6 +122,12 @@ export class SceneManager implements Tickable {
     this.renderer.dispose()
     if (this.container) {
       this.container.removeChild(this.renderer.domElement)
+    }
+  }
+
+  private clampCameraHeight(): void {
+    if (this.camera.position.y < MIN_CAMERA_Y) {
+      this.camera.position.y = MIN_CAMERA_Y
     }
   }
 
