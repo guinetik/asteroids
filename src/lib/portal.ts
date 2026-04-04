@@ -27,3 +27,52 @@ export interface VibeJamParams {
   team?: string
   hp?: number
 }
+
+export class VibePortal {
+  public readonly arrival: VibeJamParams
+  public readonly isArrival: boolean
+  public readonly params: Map<string, string>
+
+  constructor() {
+    const searchParams = new URLSearchParams(window.location.search)
+
+    this.params = new Map<string, string>()
+    for (const [key, value] of searchParams) {
+      this.params.set(key, value)
+    }
+
+    this.arrival = VibePortal.parseParams(searchParams)
+    this.isArrival = this.arrival.portal
+  }
+
+  private static parseParams(searchParams: URLSearchParams): VibeJamParams {
+    const get = (key: string): string | undefined => {
+      const value = searchParams.get(key)
+      return value === null ? undefined : value
+    }
+
+    const getNumber = (key: string): number | undefined => {
+      const raw = get(key)
+      if (raw === undefined) return undefined
+      const num = Number(raw)
+      return Number.isNaN(num) ? undefined : num
+    }
+
+    return {
+      portal: searchParams.get('portal') === 'true',
+      ref: get('ref'),
+      username: get('username'),
+      color: get('color'),
+      speed: getNumber('speed'),
+      speed_x: getNumber('speed_x'),
+      speed_y: getNumber('speed_y'),
+      speed_z: getNumber('speed_z'),
+      rotation_x: getNumber('rotation_x'),
+      rotation_y: getNumber('rotation_y'),
+      rotation_z: getNumber('rotation_z'),
+      avatar_url: get('avatar_url'),
+      team: get('team'),
+      hp: getNumber('hp'),
+    }
+  }
+}
