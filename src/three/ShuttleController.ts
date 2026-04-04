@@ -12,11 +12,9 @@ const DRACO_DECODER_PATH = '/node_modules/three/examples/jsm/libs/draco/'
 const MODEL_SCALE = 0.01
 
 /**
- * Correction rotation to align the shuttle for Three.js.
- * The model arrives with nose along -Z and top along +Y.
- * Rotate 180 deg around Y to flip nose from -Z to +Z (Three.js forward).
+ * The model's nose points along -Z natively (standard glTF forward).
+ * No correction rotation needed — movement uses -Z as forward instead.
  */
-const MODEL_ROTATION_Y = Math.PI
 
 const SHUTTLE_ANIMATION_NAME = 'shutAction'
 
@@ -59,7 +57,6 @@ export class ShuttleController implements Tickable {
 
     const gltf = await gltfLoader.loadAsync(SHUTTLE_MODEL_PATH)
     gltf.scene.scale.setScalar(MODEL_SCALE)
-    gltf.scene.rotation.y = MODEL_ROTATION_Y
     this.group.add(gltf.scene)
 
     this.mixer = new THREE.AnimationMixer(gltf.scene)
@@ -153,8 +150,8 @@ export class ShuttleController implements Tickable {
       this.group.rotateZ(-ROLL_SPEED * dt)
     }
 
-    // Thrust (W) — accelerate along forward direction
-    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.group.quaternion)
+    // Thrust (W) — accelerate along forward direction (model nose is -Z)
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.group.quaternion)
     if (input.isActionActive('thrust')) {
       this.velocity.addScaledVector(forward, THRUST_FORCE * dt)
     }

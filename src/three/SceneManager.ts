@@ -6,9 +6,9 @@ const CAMERA_FOV = 60
 const CAMERA_NEAR = 0.1
 const CAMERA_FAR = 50000
 const CAMERA_INITIAL_OFFSET = new THREE.Vector3(0, 20, 30)
-const CHASE_CAM_OFFSET = new THREE.Vector3(0, 12, -30)
+const CHASE_CAM_OFFSET = new THREE.Vector3(0, 12, 30) // behind shuttle (nose is -Z)
 const CHASE_CAM_LERP_SPEED = 4
-const CHASE_CAM_LOOK_AHEAD = 15 // look slightly ahead of the shuttle
+const CHASE_CAM_LOOK_AHEAD = -15 // look ahead toward -Z
 
 /**
  * Three.js scene orchestrator — creates renderer, camera, and controls.
