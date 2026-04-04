@@ -1,5 +1,6 @@
 import type { Tickable } from './Tickable'
 
+/** Internal entry pairing a tickable with its dispatch priority. */
 interface TickEntry {
   tickable: Tickable
   priority: number

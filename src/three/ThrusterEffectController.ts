@@ -1,4 +1,3 @@
-// src/three/ThrusterEffectController.ts
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 import type { ShuttleController } from './ShuttleController'
@@ -16,6 +15,7 @@ const THRUST_OFFSET = new THREE.Vector3(0, 0, -2) // behind shuttle
 const BRAKE_OFFSET = new THREE.Vector3(0, 0, 2) // in front of shuttle
 const PUSH_FORCE = 3
 
+/** Internal particle state for the pool-based particle system. */
 interface Particle {
   alive: boolean
   age: number
