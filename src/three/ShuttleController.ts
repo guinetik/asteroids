@@ -6,6 +6,7 @@ import type { Tickable } from '@/lib/Tickable'
 import type { InputManager } from '@/lib/InputManager'
 import type { SpaceTimeGrid } from './SpaceTimeGrid'
 import { checkEventHorizon, type GravitySource } from '@/lib/physics/gravity'
+import { ThrusterSystem } from '@/lib/physics/thrusterSystem'
 
 /** Any object that can exert gravity on the shuttle */
 interface GravityWell {
@@ -76,6 +77,7 @@ export class ShuttleController implements Tickable {
   private spaceTimeGrid: SpaceTimeGrid | null = null
   private readonly gravityWells: GravityWell[] = []
   private readonly gravitySources: GravitySource[] = []
+  readonly thrusterSystem = new ThrusterSystem()
   private isDead = false
   private deathTarget: THREE.Vector3 | null = null
   private deathSpeed = 0
@@ -125,19 +127,19 @@ export class ShuttleController implements Tickable {
   }
 
   get isThrusting(): boolean {
-    return this.inputManager.isActionActive('thrust')
+    return this.inputManager.isActionActive('thrust') && this.thrusterSystem.canFire('thrust')
   }
 
   get isBraking(): boolean {
-    return this.inputManager.isActionActive('brake')
+    return this.inputManager.isActionActive('brake') && this.thrusterSystem.canFire('brake')
   }
 
   get isYawingLeft(): boolean {
-    return this.inputManager.isActionActive('yawLeft')
+    return this.inputManager.isActionActive('yawLeft') && this.thrusterSystem.canFire('rcs')
   }
 
   get isYawingRight(): boolean {
-    return this.inputManager.isActionActive('yawRight')
+    return this.inputManager.isActionActive('yawRight') && this.thrusterSystem.canFire('rcs')
   }
 
   get speed(): number {
@@ -243,7 +245,7 @@ export class ShuttleController implements Tickable {
     this.group.rotateX(dt * 3)
   }
 
-  private respawn(): void {
+  respawn(): void {
     this.isDead = false
     this.deathTarget = null
     this.velocity.set(0, 0, 0)
@@ -260,13 +262,11 @@ export class ShuttleController implements Tickable {
   }
 
   private updateMovement(dt: number): void {
-    const input = this.inputManager
-
     // Yaw (A/D) — apply angular torque, builds up angular velocity
-    if (input.isActionActive('yawLeft')) {
+    if (this.isYawingLeft) {
       this.angularVelocity += YAW_TORQUE * dt
     }
-    if (input.isActionActive('yawRight')) {
+    if (this.isYawingRight) {
       this.angularVelocity -= YAW_TORQUE * dt
     }
 
@@ -283,12 +283,12 @@ export class ShuttleController implements Tickable {
     const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(this.group.quaternion)
     forward.y = 0 // flatten to XZ plane
     forward.normalize()
-    if (input.isActionActive('thrust')) {
+    if (this.isThrusting) {
       this.velocity.addScaledVector(forward, THRUST_FORCE * dt)
     }
 
     // Brake (S) — inertia dampener, weaker deeper in gravity wells
-    if (input.isActionActive('brake')) {
+    if (this.isBraking) {
       const depth = Math.abs(this.group.position.y)
       const effectiveBrake = Math.min(1, BRAKE_FACTOR + depth * BRAKE_DEPTH_PENALTY)
       this.velocity.multiplyScalar(effectiveBrake)
@@ -305,7 +305,7 @@ export class ShuttleController implements Tickable {
 
     // Clamp thrust-only speed, but allow gravity to push beyond
     const currentSpeed = this.velocity.length()
-    if (input.isActionActive('thrust') && currentSpeed > MAX_THRUST_SPEED) {
+    if (this.isThrusting && currentSpeed > MAX_THRUST_SPEED) {
       this.velocity.setLength(MAX_THRUST_SPEED)
     } else if (currentSpeed > MAX_GRAVITY_SPEED) {
       this.velocity.setLength(MAX_GRAVITY_SPEED)
@@ -321,6 +321,12 @@ export class ShuttleController implements Tickable {
     } else {
       this.group.position.y = 0
     }
+
+    this.thrusterSystem.tick(dt, {
+      thrust: this.isThrusting,
+      brake: this.isBraking,
+      rcs: this.isYawingLeft || this.isYawingRight,
+    })
   }
 
   private placeNozzles(scene: THREE.Object3D): void {
