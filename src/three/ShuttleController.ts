@@ -24,7 +24,7 @@ const MODEL_ROTATION_X = -Math.PI / 2
  * 3 SSME nozzles arranged in a triangle: one top-center, two bottom-sides.
  */
 const ENG_POSITIONS: [number, number, number][] = [
-  [-500, 0, 60],     // top center
+  [-500, 0, 80],     // top center
   [-500, -60, -40],  // bottom left
   [-500, 60, -40],   // bottom right
 ]
