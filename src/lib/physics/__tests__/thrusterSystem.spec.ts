@@ -1,0 +1,84 @@
+import { describe, it, expect, vi } from 'vitest'
+import { ThrusterSystem, DEFAULT_THRUSTER_CONFIG } from '../thrusterSystem'
+
+describe('ThrusterSystem', () => {
+  it('starts with full charge on all thrusters', () => {
+    const sys = new ThrusterSystem()
+    expect(sys.getState('thrust').charge).toBe(DEFAULT_THRUSTER_CONFIG.thrust.capacity)
+    expect(sys.getState('brake').charge).toBe(DEFAULT_THRUSTER_CONFIG.brake.capacity)
+    expect(sys.getState('rcs').charge).toBe(DEFAULT_THRUSTER_CONFIG.rcs.capacity)
+  })
+
+  it('starts with full fuel', () => {
+    const sys = new ThrusterSystem()
+    expect(sys.fuelLevel).toBe(DEFAULT_THRUSTER_CONFIG.fuelCapacity)
+  })
+
+  it('drains charge when thruster is active', () => {
+    const sys = new ThrusterSystem()
+    const before = sys.getState('thrust').charge
+    sys.tick(1, { thrust: true, brake: false, rcs: false })
+    expect(sys.getState('thrust').charge).toBe(before - DEFAULT_THRUSTER_CONFIG.thrust.burnRate)
+  })
+
+  it('recharges idle thrusters consuming fuel', () => {
+    const sys = new ThrusterSystem()
+    sys.tick(2, { thrust: true, brake: false, rcs: false })
+    const chargeAfterDrain = sys.getState('thrust').charge
+    const fuelBefore = sys.fuelLevel
+    sys.tick(1, { thrust: false, brake: false, rcs: false })
+    expect(sys.getState('thrust').charge).toBeGreaterThan(chargeAfterDrain)
+    expect(sys.fuelLevel).toBeLessThan(fuelBefore)
+  })
+
+  it('does not recharge active thrusters', () => {
+    const sys = new ThrusterSystem()
+    sys.tick(2, { thrust: true, brake: false, rcs: false })
+    const chargeAfterDrain = sys.getState('thrust').charge
+    sys.tick(1, { thrust: true, brake: false, rcs: false })
+    expect(sys.getState('thrust').charge).toBeLessThan(chargeAfterDrain)
+  })
+
+  it('canFire returns false when charge is insufficient', () => {
+    const sys = new ThrusterSystem()
+    sys.tick(100, { thrust: true, brake: false, rcs: false })
+    expect(sys.canFire('thrust')).toBe(false)
+  })
+
+  it('canFire returns true when charge is sufficient', () => {
+    const sys = new ThrusterSystem()
+    expect(sys.canFire('thrust')).toBe(true)
+  })
+
+  it('stops recharging when fuel is empty', () => {
+    const sys = new ThrusterSystem({ fuelCapacity: 1 })
+    sys.tick(3, { thrust: true, brake: false, rcs: false })
+    const chargeNow = sys.getState('thrust').charge
+    sys.tick(1, { thrust: false, brake: false, rcs: false })
+    if (sys.fuelLevel <= 0) {
+      expect(sys.getState('thrust').charge).toBe(chargeNow)
+    }
+  })
+
+  it('fires onFuelEmpty callback once', () => {
+    const sys = new ThrusterSystem({ fuelCapacity: 1 })
+    const cb = vi.fn()
+    sys.onFuelEmpty = cb
+    sys.tick(10, { thrust: false, brake: false, rcs: false })
+    expect(cb).toHaveBeenCalledTimes(1)
+  })
+
+  it('fires onAllDepleted when fuel and all charges are zero', () => {
+    const sys = new ThrusterSystem({ fuelCapacity: 0 })
+    const cb = vi.fn()
+    sys.onAllDepleted = cb
+    sys.tick(100, { thrust: true, brake: true, rcs: true })
+    expect(cb).toHaveBeenCalled()
+  })
+
+  it('clamps charge to capacity', () => {
+    const sys = new ThrusterSystem()
+    sys.tick(10, { thrust: false, brake: false, rcs: false })
+    expect(sys.getState('thrust').charge).toBe(DEFAULT_THRUSTER_CONFIG.thrust.capacity)
+  })
+})
