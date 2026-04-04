@@ -56,9 +56,6 @@ export class ThrusterEffectController implements Tickable {
   tick(dt: number): void {
     const isThrusting = this.shuttle.isThrusting
     const isBraking = this.shuttle.isBraking
-    if (isThrusting || isBraking) {
-      console.log('[Thruster] thrust:', isThrusting, 'brake:', isBraking, 'pos:', this.shuttle.position.toArray())
-    }
 
     if (isThrusting) {
       this.thrustSpawnAccumulator += THRUST_SPAWN_RATE * dt
@@ -86,9 +83,9 @@ export class ThrusterEffectController implements Tickable {
 
   dispose(): void {
     this.thrustPoints.geometry.dispose()
-    ;(this.thrustPoints.material as THREE.PointsMaterial).dispose()
+    ;(this.thrustPoints.material as THREE.ShaderMaterial).dispose()
     this.brakePoints.geometry.dispose()
-    ;(this.brakePoints.material as THREE.PointsMaterial).dispose()
+    ;(this.brakePoints.material as THREE.ShaderMaterial).dispose()
   }
 
   private createParticlePool(): Particle[] {
@@ -102,17 +99,36 @@ export class ThrusterEffectController implements Tickable {
 
   private createPoints(color: THREE.Color): THREE.Points {
     const positions = new Float32Array(PARTICLE_COUNT * 3)
+    const sizes = new Float32Array(PARTICLE_COUNT)
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1))
 
-    const material = new THREE.PointsMaterial({
-      color,
-      size: PARTICLE_SIZE,
-      sizeAttenuation: false,
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        color: { value: color },
+      },
+      vertexShader: `
+        attribute float size;
+        void main() {
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = size;
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 color;
+        void main() {
+          // Soft circle falloff
+          float dist = length(gl_PointCoord - vec2(0.5));
+          if (dist > 0.5) discard;
+          float alpha = 1.0 - smoothstep(0.2, 0.5, dist);
+          gl_FragColor = vec4(color, alpha);
+        }
+      `,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       transparent: true,
-      opacity: 0.9,
     })
 
     return new THREE.Points(geometry, material)
@@ -142,17 +158,19 @@ export class ThrusterEffectController implements Tickable {
 
   private updateParticles(pool: Particle[], points: THREE.Points, dt: number): void {
     const posAttr = points.geometry.getAttribute('position') as THREE.BufferAttribute
+    const sizeAttr = points.geometry.getAttribute('size') as THREE.BufferAttribute
     const positions = posAttr.array as Float32Array
+    const sizes = sizeAttr.array as Float32Array
 
     for (let i = 0; i < pool.length; i++) {
       const p = pool[i]!
       const i3 = i * 3
 
       if (!p.alive) {
-        // Park dead particles far off-screen
         positions[i3] = FAR_AWAY
         positions[i3 + 1] = FAR_AWAY
         positions[i3 + 2] = FAR_AWAY
+        sizes[i] = 0
         continue
       }
 
@@ -162,8 +180,13 @@ export class ThrusterEffectController implements Tickable {
         positions[i3] = FAR_AWAY
         positions[i3 + 1] = FAR_AWAY
         positions[i3 + 2] = FAR_AWAY
+        sizes[i] = 0
         continue
       }
+
+      // Fade out: full size at birth, zero at death
+      const life = 1 - p.age / PARTICLE_LIFETIME
+      sizes[i] = PARTICLE_SIZE * life
 
       p.position.addScaledVector(p.velocity, dt)
       positions[i3] = p.position.x
@@ -172,5 +195,6 @@ export class ThrusterEffectController implements Tickable {
     }
 
     posAttr.needsUpdate = true
+    sizeAttr.needsUpdate = true
   }
 }
