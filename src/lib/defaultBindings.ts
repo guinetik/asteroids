@@ -26,3 +26,13 @@ export const LANDER_BINDINGS: Record<string, string[]> = {
   rcsDescend: ['KeyC'],
   rcsAscend: ['ShiftLeft'],
 }
+
+/** FPS on-foot key bindings */
+export const FPS_BINDINGS: Record<string, string[]> = {
+  moveForward: ['KeyW'],
+  moveBack: ['KeyS'],
+  moveLeft: ['KeyA'],
+  moveRight: ['KeyD'],
+  jump: ['Space'],
+  sprint: ['ShiftLeft'],
+}

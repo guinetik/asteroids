@@ -1,0 +1,37 @@
+{
+  "movement": {
+    "moveThrust": 12.0,
+    "sprintMultiplier": 2.0,
+    "groundFriction": 8.0,
+    "airFriction": 0.3,
+    "maxSpeed": 8.0,
+    "maxSprintSpeed": 16.0,
+    "jumpForce": 6.0,
+    "gravity": 1.2
+  },
+  "o2": {
+    "fuelCapacity": 100,
+    "baseDrainRate": 1.5,
+    "deathTimerSeconds": 30,
+    "thrusters": {
+      "sprint": {
+        "capacity": 50,
+        "burnRate": 25,
+        "rechargeRate": 15,
+        "fuelCostPerRecharge": 0.8
+      },
+      "jump": {
+        "capacity": 10,
+        "burnRate": 10,
+        "rechargeRate": 8,
+        "fuelCostPerRecharge": 0.3
+      }
+    }
+  },
+  "camera": {
+    "eyeHeight": 1.7,
+    "sensitivity": 0.002,
+    "pitchClamp": 1.48,
+    "fov": 75
+  }
+}
