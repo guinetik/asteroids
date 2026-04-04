@@ -62,10 +62,18 @@ export class FpsCamera implements Tickable {
   private terrainSlope = 0
   private terrainPitch = 0
   private terrainRoll = 0
+  private _aiming = false
+  private currentFov: number
+  private baseFov: number
+  private targetFov: number
+  private adsZoomSpeed = 8
 
   constructor(config: FpsCameraConfig) {
     this.config = config
     this.camera = new THREE.PerspectiveCamera(config.fov, 1, 0.01, 5000)
+    this.baseFov = config.fov
+    this.currentFov = config.fov
+    this.targetFov = config.fov
   }
 
   /** Set the player entity to follow. */
@@ -117,6 +125,19 @@ export class FpsCamera implements Tickable {
     this.terrainSlope = terrainSlope
   }
 
+  /**
+   * Toggle ADS (aim down sights) zoom.
+   *
+   * @param aiming - Whether player is aiming
+   * @param fovMultiplier - FOV multiplier when aiming (e.g. 0.85)
+   * @param zoomSpeed - Lerp speed for FOV transition
+   */
+  setAiming(aiming: boolean, fovMultiplier = 0.85, zoomSpeed = 8): void {
+    this._aiming = aiming
+    this.targetFov = aiming ? this.baseFov * fovMultiplier : this.baseFov
+    this.adsZoomSpeed = zoomSpeed
+  }
+
   /** Update camera aspect ratio on window resize. */
   resize(width: number, height: number): void {
     this.camera.aspect = width / height
@@ -125,6 +146,16 @@ export class FpsCamera implements Tickable {
 
   tick(dt: number): void {
     if (!this.target) return
+
+    // ADS FOV zoom
+    if (this.currentFov !== this.targetFov) {
+      this.currentFov += (this.targetFov - this.currentFov) * Math.min(1, this.adsZoomSpeed * dt)
+      if (Math.abs(this.currentFov - this.targetFov) < 0.01) {
+        this.currentFov = this.targetFov
+      }
+      this.camera.fov = this.currentFov
+      this.camera.updateProjectionMatrix()
+    }
 
     // Roll wobble — proportional to speed AND terrain roughness
     // Flat ground = minimal wobble, rough terrain = more wobble
