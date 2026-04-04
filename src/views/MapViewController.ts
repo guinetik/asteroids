@@ -68,9 +68,13 @@ export class MapViewController implements Tickable {
     this.sunController = new SunController(SUN)
     scene.add(this.sunController.group)
 
-    // Planets
+    // Planets — Jupiter and Saturn start at opposite sides
+    const INITIAL_PHASES: Record<string, number> = {
+      jupiter: 0,
+      saturn: 0.5,
+    }
     for (const planet of PLANETS) {
-      const controller = new PlanetSystemController(planet)
+      const controller = new PlanetSystemController(planet, INITIAL_PHASES[planet.id])
       scene.add(controller.group)
       for (const line of controller.orbitLines) {
         scene.add(line)
@@ -90,7 +94,7 @@ export class MapViewController implements Tickable {
     const kuiperOuterEdge = 2400 * ORBIT_SCALE
     const gridSize = kuiperOuterEdge * 2.2
     const gridDepthScale = 10   // Well depth scale (Sun = 10 units deep)
-    const gridWidthScale = 8    // Well width scale (Sun sigma = 8 units)
+    const gridWidthScale = 12   // Well width scale — wider so Uranus/Neptune wells are visible
     const gridMassExponent = 0.2 // Compress mass range so planets are visible (vs 0.5 = sqrt)
     this.spaceTimeGrid = new SpaceTimeGrid(gridSize, 200, gridDepthScale, gridWidthScale, gridMassExponent)
     scene.add(this.spaceTimeGrid.mesh)

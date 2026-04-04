@@ -56,7 +56,12 @@ export class PlanetSystemController implements GravitySource {
   private readonly moonEntries: MoonEntry[] = []
   private readonly ringUniforms: Record<string, THREE.IUniform> | null = null
 
-  constructor(planet: Planet) {
+  /**
+   * @param planet - Planet definition from the catalog
+   * @param initialPhase - Optional starting position as fraction of orbit (0-1).
+   *   0 = periapsis, 0.5 = opposite side. If omitted, randomized.
+   */
+  constructor(planet: Planet, initialPhase?: number) {
     this.planet = planet
     this.mass = planet.mass
     this.group = new THREE.Group()
@@ -67,7 +72,8 @@ export class PlanetSystemController implements GravitySource {
     this.group.add(this.planetMesh.mesh)
 
     // Scale orbit for scene
-    const epoch = -Math.random() * planet.orbit.period
+    const phase = initialPhase ?? Math.random()
+    const epoch = -phase * planet.orbit.period
     this.scaledOrbit = {
       ...planet.orbit,
       semiMajorAxis: planet.orbit.semiMajorAxis * ORBIT_SCALE,
