@@ -251,9 +251,14 @@ export class FpsViewController implements Tickable {
     // Prevent context menu on right-click
     canvas.addEventListener('contextmenu', (e) => e.preventDefault())
 
-    // Pointer lock change
+    // Pointer lock change — reset mouse state on unlock
     const onLockChange = (): void => {
       const locked = document.pointerLockElement === canvas
+      if (!locked) {
+        this.leftMouseDown = false
+        this.leftMouseJustPressed = false
+        this.rightMouseDown = false
+      }
       this.onPointerLockChange?.(locked)
     }
     document.addEventListener('pointerlockchange', onLockChange)
