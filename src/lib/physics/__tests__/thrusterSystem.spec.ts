@@ -60,9 +60,8 @@ describe('ThrusterSystem', () => {
     sys.tick(3, { thrust: true, brake: false, rcs: false })
     const chargeNow = sys.getState('thrust').charge
     sys.tick(1, { thrust: false, brake: false, rcs: false })
-    if (sys.fuelLevel <= 0) {
-      expect(sys.getState('thrust').charge).toBe(chargeNow)
-    }
+    expect(sys.fuelLevel).toBe(0)
+    expect(sys.getState('thrust').charge).toBe(chargeNow)
   })
 
   it('fires onFuelEmpty callback once', () => {
