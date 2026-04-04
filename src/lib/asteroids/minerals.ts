@@ -1,5 +1,18 @@
+/**
+ * Mineral visual property lookup.
+ *
+ * Maps real mineral names to PBR-friendly visual properties (color,
+ * metalness, roughness, emissive). The procedural generator blends
+ * these weighted by composition percentages to produce final surface
+ * materials.
+ *
+ * @author guinetik
+ * @date 2026-04-03
+ * @spec docs/superpowers/specs/2026-04-03-asteroid-data-model-design.md
+ */
 import type { MineralVisual } from './types'
 
+/** Visual properties for all known minerals across the 5 asteroid biomes. */
 export const MINERAL_VISUALS: Record<string, MineralVisual> = {
   'Hydrated Silicates': { color: [0.25, 0.28, 0.22], metalness: 0.05, roughness: 0.9, emissive: false },
   Magnetite: { color: [0.05, 0.05, 0.05], metalness: 0.4, roughness: 0.6, emissive: false },
