@@ -162,16 +162,23 @@ export class MultiToolController implements Tickable {
   fire(): void {
     if (!this.camera || !this.scene) return
 
-    // Direction: camera forward (where crosshair points)
-    const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion)
+    // Aim point: far along camera forward (where crosshair points)
+    const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion)
+    const aimPoint = this.camera.position.clone().addScaledVector(camForward, BOLT_SPEED)
 
     // Origin: muzzle world position
     const origin = new THREE.Vector3()
     if (this.muzzleNode) {
       this.muzzleNode.getWorldPosition(origin)
     } else {
-      origin.copy(this.camera.position).add(direction.clone().multiplyScalar(0.5))
+      origin.copy(this.camera.position)
+      const camDown = new THREE.Vector3(0, -1, 0).applyQuaternion(this.camera.quaternion)
+      origin.addScaledVector(camForward, 0.6)
+      origin.addScaledVector(camDown, 0.15)
     }
+
+    // Direction: from muzzle toward the aim point (converges on crosshair)
+    const direction = aimPoint.sub(origin).normalize()
 
     // Create bolt mesh — elongated box for that blaster look
     const geometry = new THREE.BoxGeometry(BOLT_WIDTH, BOLT_WIDTH, BOLT_LENGTH)
@@ -182,7 +189,7 @@ export class MultiToolController implements Tickable {
     })
     const bolt = new THREE.Mesh(geometry, material)
     bolt.position.copy(origin)
-    bolt.quaternion.copy(this.camera.quaternion)
+    bolt.lookAt(origin.clone().add(direction))
     bolt.frustumCulled = false
     this.scene.add(bolt)
 
