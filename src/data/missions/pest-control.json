@@ -1,0 +1,14 @@
+{
+  "id": "pest_control",
+  "name": "Pest Control",
+  "description": "Bug infestation reported. Clear all nests before mining operations can resume.",
+  "minDifficulty": 2,
+  "maxDifficulty": 10,
+  "objectiveSlots": [
+    { "type": "exterminate", "weight": 1, "params": { "type": "exterminate", "nestCount": { "min": 1, "max": 2 }, "swarmSize": { "min": 3, "max": 6 }, "spitterChance": 0.0 }, "reward": { "min": 800, "max": 2000 } },
+    { "type": "exterminate", "weight": 0.8, "params": { "type": "exterminate", "nestCount": { "min": 2, "max": 4 }, "swarmSize": { "min": 5, "max": 8 }, "spitterChance": 0.3 }, "reward": { "min": 1500, "max": 3000 } },
+    { "type": "exterminate", "weight": 0.5, "params": { "type": "exterminate", "nestCount": { "min": 3, "max": 5 }, "swarmSize": { "min": 6, "max": 10 }, "spitterChance": 0.5 }, "reward": { "min": 2000, "max": 3500 } },
+    { "type": "exterminate", "weight": 0.3, "params": { "type": "exterminate", "nestCount": { "min": 4, "max": 5 }, "swarmSize": { "min": 8, "max": 12 }, "spitterChance": 0.8 }, "reward": { "min": 3000, "max": 4000 } }
+  ],
+  "completionBonus": { "min": 500, "max": 2500 }
+}

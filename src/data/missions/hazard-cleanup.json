@@ -1,0 +1,14 @@
+{
+  "id": "hazard_cleanup",
+  "name": "Hazard Cleanup",
+  "description": "Mining site overrun. Clear hostile fauna, then extract resources from secured deposits.",
+  "minDifficulty": 3,
+  "maxDifficulty": 10,
+  "objectiveSlots": [
+    { "type": "exterminate", "weight": 1, "params": { "type": "exterminate", "nestCount": { "min": 1, "max": 3 }, "swarmSize": { "min": 3, "max": 8 }, "spitterChance": 0.2 }, "reward": { "min": 800, "max": 2500 } },
+    { "type": "exterminate", "weight": 0.5, "params": { "type": "exterminate", "nestCount": { "min": 2, "max": 4 }, "swarmSize": { "min": 5, "max": 10 }, "spitterChance": 0.5 }, "reward": { "min": 1200, "max": 3000 } },
+    { "type": "gather", "weight": 1, "params": { "type": "gather", "resourceAmount": { "min": 80, "max": 250 } }, "reward": { "min": 600, "max": 2000 } },
+    { "type": "gather", "weight": 0.5, "params": { "type": "gather", "resourceAmount": { "min": 150, "max": 400 } }, "reward": { "min": 1000, "max": 2500 } }
+  ],
+  "completionBonus": { "min": 600, "max": 3500 }
+}

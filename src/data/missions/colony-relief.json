@@ -1,0 +1,15 @@
+{
+  "id": "colony_relief",
+  "name": "Colony Relief",
+  "description": "Colony under siege. Neutralize infestation and extract surviving personnel. Expect heavy resistance.",
+  "minDifficulty": 5,
+  "maxDifficulty": 10,
+  "objectiveSlots": [
+    { "type": "exterminate", "weight": 1, "params": { "type": "exterminate", "nestCount": { "min": 2, "max": 4 }, "swarmSize": { "min": 5, "max": 10 }, "spitterChance": 0.4 }, "reward": { "min": 1200, "max": 3000 } },
+    { "type": "exterminate", "weight": 0.7, "params": { "type": "exterminate", "nestCount": { "min": 3, "max": 5 }, "swarmSize": { "min": 8, "max": 12 }, "spitterChance": 0.7 }, "reward": { "min": 2000, "max": 4000 } },
+    { "type": "exterminate", "weight": 0.4, "params": { "type": "exterminate", "nestCount": { "min": 4, "max": 5 }, "swarmSize": { "min": 10, "max": 12 }, "spitterChance": 0.8 }, "reward": { "min": 3000, "max": 4000 } },
+    { "type": "rescue", "weight": 1, "params": { "type": "rescue", "colonistCount": { "min": 1, "max": 3 }, "oxygenTime": { "min": 90, "max": 40 }, "guardedChance": 0.5 }, "reward": { "min": 1500, "max": 4000 } },
+    { "type": "rescue", "weight": 0.5, "params": { "type": "rescue", "colonistCount": { "min": 2, "max": 4 }, "oxygenTime": { "min": 60, "max": 30 }, "guardedChance": 0.7 }, "reward": { "min": 3000, "max": 5000 } }
+  ],
+  "completionBonus": { "min": 1000, "max": 5000 }
+}
