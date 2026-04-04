@@ -40,18 +40,21 @@ export class PortalBoundary {
     this.material = new THREE.LineBasicMaterial({
       color: WALL_COLOR,
       transparent: true,
-      opacity: 0,
+      opacity: WALL_MAX_OPACITY, // TODO: restore proximity fade after testing
     })
 
     const geometry = this.createGridGeometry(width, height)
     this.mesh = new THREE.LineSegments(geometry, this.material)
 
     // Position and orient the wall
+    // Geometry is built on the XY plane (width along local X, height along Y).
+    // X-axis walls (east/west) need local X → world Z, so rotate 90° around Y.
+    // Z-axis walls (north/south) span along world X naturally, no rotation.
     if (axis === 'x') {
       this.mesh.position.set(position, 0, 0)
+      this.mesh.rotation.y = Math.PI / 2
     } else {
       this.mesh.position.set(0, 0, position)
-      this.mesh.rotation.y = Math.PI / 2
     }
   }
 
