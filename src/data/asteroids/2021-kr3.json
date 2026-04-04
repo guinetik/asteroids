@@ -1,0 +1,47 @@
+{
+  "id": "kr3",
+  "name": "2021 KR₃",
+  "designation": "2021 KR₃",
+  "type": "Volcanic (silicate-iron)",
+  "biome": "volcanic",
+  "description": "A geologically active body with ongoing volcanic outgassing, likely heated by tidal interactions or residual radioactive decay. Its surface is a hellscape of basaltic lava flows, sulfur deposits, and glowing calderas.",
+  "composition": [
+    { "name": "Basaltic Lava", "percentage": 35 },
+    { "name": "Sulfur Deposits", "formula": "S", "percentage": 20 },
+    { "name": "Iron Oxide", "formula": "Fe2O3", "percentage": 18 },
+    { "name": "Pyroxene", "formula": "(Mg,Fe)SiO3", "percentage": 12 },
+    { "name": "Volcanic Glass", "percentage": 10 },
+    { "name": "Magnetite", "formula": "Fe3O4", "percentage": 5 }
+  ],
+  "shape": {
+    "dimensions": [310, 290, 275],
+    "elongation": 1.13,
+    "lobeCount": 1,
+    "irregularity": 0.45
+  },
+  "surface": {
+    "craterDensity": 0.45,
+    "craterMaxScale": 0.35,
+    "boulderDensity": 0.1,
+    "ridgeFrequency": 0.85,
+    "roughness": 0.8,
+    "dustCoverage": 0.1
+  },
+  "visual": {
+    "albedo": 0.09,
+    "baseColor": [0.12, 0.04, 0.02],
+    "accentColor": [0.9, 0.6, 0.05],
+    "emissive": true,
+    "emissiveColor": [0.95, 0.3, 0.02],
+    "emissiveIntensity": 0.6,
+    "metalness": 0.12,
+    "roughnessMap": 0.85
+  },
+  "physical": {
+    "mass": 6.1e10,
+    "density": 2800,
+    "surfaceGravity": 8e-6,
+    "rotationPeriod": 6.2,
+    "surfaceTemperature": 450
+  }
+}

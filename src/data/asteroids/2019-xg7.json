@@ -1,0 +1,45 @@
+{
+  "id": "xg7",
+  "name": "2019 XG₇",
+  "designation": "2019 XG₇",
+  "type": "Icy (cometary)",
+  "biome": "icy",
+  "description": "An anomalous icy body in a highly eccentric orbit, likely a captured cometary fragment. Its surface is a fractured shell of water ice laced with salt deposits and organic residue, resembling a miniature Europa.",
+  "composition": [
+    { "name": "Water Ice", "formula": "H2O", "percentage": 45 },
+    { "name": "Carbon Dioxide Ice", "formula": "CO2", "percentage": 15 },
+    { "name": "Silicate Dust", "percentage": 15 },
+    { "name": "Ammonia Hydrate", "formula": "NH3·H2O", "percentage": 10 },
+    { "name": "Sodium Chloride", "formula": "NaCl", "percentage": 8 },
+    { "name": "Organic Compounds", "percentage": 7 }
+  ],
+  "shape": {
+    "dimensions": [180, 170, 120],
+    "elongation": 1.5,
+    "lobeCount": 1,
+    "irregularity": 0.25
+  },
+  "surface": {
+    "craterDensity": 0.15,
+    "craterMaxScale": 0.1,
+    "boulderDensity": 0.0,
+    "ridgeFrequency": 0.8,
+    "roughness": 0.25,
+    "dustCoverage": 0.85
+  },
+  "visual": {
+    "albedo": 0.67,
+    "baseColor": [0.8, 0.88, 0.95],
+    "accentColor": [0.65, 0.6, 0.5],
+    "emissive": false,
+    "metalness": 0.0,
+    "roughnessMap": 0.2
+  },
+  "physical": {
+    "mass": 2.5e9,
+    "density": 1100,
+    "surfaceGravity": 3e-6,
+    "rotationPeriod": 8.5,
+    "surfaceTemperature": 110
+  }
+}
