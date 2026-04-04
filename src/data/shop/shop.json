@@ -1,0 +1,17 @@
+{
+  "listings": [
+    { "itemId": "fuel-cell", "buyPrice": 50 }
+  ],
+  "sellPrices": [
+    { "itemId": "olivine", "sellPrice": 3 },
+    { "itemId": "magnetite", "sellPrice": 5 },
+    { "itemId": "iron-sulfides", "sellPrice": 4 },
+    { "itemId": "carbonates", "sellPrice": 3 },
+    { "itemId": "organic-compounds", "sellPrice": 8 },
+    { "itemId": "hydrated-silicates", "sellPrice": 4 },
+    { "itemId": "pyroxene", "sellPrice": 3 },
+    { "itemId": "plagioclase-feldspar", "sellPrice": 4 },
+    { "itemId": "iron-nickel-alloy", "sellPrice": 12 },
+    { "itemId": "water-ice", "sellPrice": 6 }
+  ]
+}
