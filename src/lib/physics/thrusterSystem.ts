@@ -44,8 +44,8 @@ export type ShuttleThrusterName = 'thrust' | 'brake' | 'rcs'
 /** Default config matching the original shuttle tuning. */
 export const DEFAULT_SHUTTLE_CONFIG: ThrusterSystemConfig<ShuttleThrusterName> = {
   thrusters: {
-    thrust: { capacity: 100, burnRate: 44, rechargeRate: 7.5, fuelCostPerRecharge: 0.5 },
-    brake: { capacity: 60, burnRate: 80, rechargeRate: 3, fuelCostPerRecharge: 0.6 },
+    thrust: { capacity: 100, burnRate: 45, rechargeRate: 15, fuelCostPerRecharge: 0.5 },
+    brake: { capacity: 60, burnRate: 60, rechargeRate: 5, fuelCostPerRecharge: 0.6 },
     rcs: { capacity: 60, burnRate: 8, rechargeRate: 5, fuelCostPerRecharge: 0.2 },
   },
   fuelCapacity: 500,
