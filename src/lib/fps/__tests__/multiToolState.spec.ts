@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { MultiToolState } from '../multiToolState'
-import type { MultiToolMode, MultiToolConfig } from '../multiToolState'
+import type { MultiToolConfig } from '../multiToolState'
 import multiToolConfigJson from '@/data/fps/multitool-config.json'
 
 function createState(): MultiToolState {

@@ -18,8 +18,6 @@ import { ThrusterSystem } from '@/lib/physics/thrusterSystem'
 import type { ThrusterSystemConfig } from '@/lib/physics/thrusterSystem'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 
-/** How long a jump press is buffered (seconds). */
-const JUMP_BUFFER_TIME = 0.2
 /** How long after leaving the ground the player can still jump (coyote time). */
 const COYOTE_TIME = 0.15
 /** Extra vertical boost multiplier when sprint-jumping. */
