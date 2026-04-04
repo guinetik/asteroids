@@ -31,8 +31,8 @@ const RCS_SPREAD = 1.5
 const RCS_SIZE = 2
 const RCS_COLOR = new THREE.Color(0xccddff) // white-ish, like oxygen venting
 const RCS_PUSH_FORCE = 8
-const LEFT_WINGTIP = new THREE.Vector3(2, 0, -4.5) // front-left wing
-const RIGHT_WINGTIP = new THREE.Vector3(2, 0, 4.5)  // front-right wing
+const LEFT_WINGTIP = new THREE.Vector3(-3, 0, -5) // rear-left wingtip
+const RIGHT_WINGTIP = new THREE.Vector3(-3, 0, 5)  // rear-right wingtip
 
 /** Internal particle state for the pool-based particle system. */
 interface Particle {
@@ -108,11 +108,12 @@ export class ThrusterEffectController implements Tickable {
     if (isYawingLeft || isYawingRight) {
       this.rcsSpawnAccumulator += RCS_SPAWN_RATE * dt
       while (this.rcsSpawnAccumulator >= 1) {
-        // Yaw left = push from right wingtip, yaw right = push from left
+        // Yaw left = fire from right wingtip outward (+Z)
+        // Yaw right = fire from left wingtip outward (-Z)
         const wingtip = isYawingLeft ? RIGHT_WINGTIP : LEFT_WINGTIP
         const pushDir = isYawingLeft
-          ? new THREE.Vector3(0, 0, -RCS_PUSH_FORCE)
-          : new THREE.Vector3(0, 0, RCS_PUSH_FORCE)
+          ? new THREE.Vector3(0, 0, RCS_PUSH_FORCE)
+          : new THREE.Vector3(0, 0, -RCS_PUSH_FORCE)
         this.spawnRcsParticle(wingtip, pushDir)
         this.rcsSpawnAccumulator -= 1
       }
