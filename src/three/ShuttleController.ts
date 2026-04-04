@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
 import type { Tickable } from '@/lib/Tickable'
 import type { InputManager } from '@/lib/InputManager'
+import type { SpaceTimeGrid } from './SpaceTimeGrid'
 
 const SHUTTLE_MODEL_PATH = '/models/shuttle.glb'
 const DRACO_DECODER_PATH = '/node_modules/three/examples/jsm/libs/draco/'
@@ -59,9 +60,14 @@ export class ShuttleController implements Tickable {
   private velocity = new THREE.Vector3()
   private angularVelocity = 0
   private readonly inputManager: InputManager
+  private spaceTimeGrid: SpaceTimeGrid | null = null
 
   constructor(inputManager: InputManager) {
     this.inputManager = inputManager
+  }
+
+  setSpaceTimeGrid(grid: SpaceTimeGrid): void {
+    this.spaceTimeGrid = grid
   }
 
   async load(): Promise<void> {
@@ -202,9 +208,16 @@ export class ShuttleController implements Tickable {
       this.velocity.setLength(MAX_SPEED)
     }
 
-    // Apply velocity and lock Y position
+    // Apply velocity and follow spacetime geometry
     this.group.position.addScaledVector(this.velocity, dt)
-    this.group.position.y = 0
+    if (this.spaceTimeGrid) {
+      this.group.position.y = -this.spaceTimeGrid.getDepthAt(
+        this.group.position.x,
+        this.group.position.z,
+      )
+    } else {
+      this.group.position.y = 0
+    }
   }
 
   private placeNozzles(scene: THREE.Object3D): void {

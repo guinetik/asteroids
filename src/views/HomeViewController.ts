@@ -98,6 +98,7 @@ export class HomeViewController implements Tickable {
 
     // Shuttle — start at orbital distance from the sun
     this.shuttleController = new ShuttleController(this.inputManager)
+    this.shuttleController.setSpaceTimeGrid(this.spaceTimeGrid)
     await this.shuttleController.load()
     this.shuttleController.group.position.set(SHUTTLE_ORBIT_DISTANCE, 0, 0)
     this.sceneManager.addToScene(this.shuttleController.group)

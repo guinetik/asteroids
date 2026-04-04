@@ -72,7 +72,7 @@ export class SpaceTimeGrid implements Tickable {
    * More mass = wider and deeper well (sqrt scaling).
    * Includes subtle pulsing animation.
    */
-  private calculateWellDepth(x: number, z: number): number {
+  getDepthAt(x: number, z: number): number {
     let totalDepth = 0
 
     for (const source of this.sources) {
@@ -102,7 +102,7 @@ export class SpaceTimeGrid implements Tickable {
 
       // Deform Y downward based on gravitational well
       positions[i] = x
-      positions[i + 1] = -this.calculateWellDepth(x, z)
+      positions[i + 1] = -this.getDepthAt(x, z)
       positions[i + 2] = z
     }
 
