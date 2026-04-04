@@ -19,6 +19,14 @@ const MODEL_PATH = '/models/multitool.glb'
 /** Node names for the status LEDs that change color per mode. */
 const LED_NODE_NAMES = partsJson.statusLeds.map((led) => led.nodeName)
 
+/** Node name for the front LED (muzzle / beam origin). */
+const MUZZLE_NODE_NAME = 'pistol_led_front'
+
+/** Maximum beam range (world units). */
+const BEAM_RANGE = 500
+/** How long the beam line stays visible (seconds). */
+const BEAM_LIFETIME = 0.08
+
 /** Position offset from camera origin (right, down, forward). */
 const OFFSET_X = 0.35
 const OFFSET_Y = -0.45
@@ -61,6 +69,11 @@ export class MultiToolController implements Tickable {
   private model: THREE.Group | null = null
   private camera: THREE.PerspectiveCamera | null = null
   private readonly ledMeshes: THREE.Mesh[] = []
+  private scene: THREE.Scene | null = null
+  private muzzleNode: THREE.Object3D | null = null
+  private beamLine: THREE.Line | null = null
+  private beamTimer = 0
+  private beamColor = new THREE.Color('#ff00ff')
   private time = 0
   private lateralSpeed = 0
   private sprinting = false
@@ -85,14 +98,17 @@ export class MultiToolController implements Tickable {
    */
   async load(camera: THREE.PerspectiveCamera, scene: THREE.Scene): Promise<void> {
     this.camera = camera
+    this.scene = scene
     this.model = await loadGLB(MODEL_PATH)
     this.model.scale.setScalar(MODEL_SCALE)
     this.model.traverse((child) => {
       child.frustumCulled = false
       if (child instanceof THREE.Mesh && LED_NODE_NAMES.includes(child.name)) {
-        // Clone material so LED tinting doesn't bleed to other meshes
         child.material = (child.material as THREE.MeshStandardMaterial).clone()
         this.ledMeshes.push(child)
+      }
+      if (child.name === MUZZLE_NODE_NAME) {
+        this.muzzleNode = child
       }
     })
     scene.add(this.model)
@@ -122,6 +138,7 @@ export class MultiToolController implements Tickable {
    * @param color - Hex color string (e.g. "#3b82f6")
    */
   setMode(color: string): void {
+    this.beamColor.set(color)
     const ledColor = new THREE.Color(color)
     for (const mesh of this.ledMeshes) {
       const mat = mesh.material as THREE.MeshStandardMaterial
@@ -133,6 +150,46 @@ export class MultiToolController implements Tickable {
       mat.emissiveIntensity = 1.5
       mat.needsUpdate = true
     }
+  }
+
+  /**
+   * Fire the weapon — spawns a beam line from the camera center to the crosshair target.
+   * Beam fires along camera forward, not from the muzzle, so it hits where the crosshair points.
+   */
+  fire(): void {
+    if (!this.camera || !this.scene) return
+
+    // Remove old beam
+    if (this.beamLine) {
+      this.scene.remove(this.beamLine)
+      this.beamLine.geometry.dispose()
+      ;(this.beamLine.material as THREE.LineBasicMaterial).dispose()
+      this.beamLine = null
+    }
+
+    // Beam origin: muzzle world position (or camera position fallback)
+    const origin = new THREE.Vector3()
+    if (this.muzzleNode) {
+      this.muzzleNode.getWorldPosition(origin)
+    } else {
+      origin.copy(this.camera.position)
+    }
+
+    // Beam end: camera forward * range
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion)
+    const end = this.camera.position.clone().add(forward.multiplyScalar(BEAM_RANGE))
+
+    // Create beam line
+    const geometry = new THREE.BufferGeometry().setFromPoints([origin, end])
+    const material = new THREE.LineBasicMaterial({
+      color: this.beamColor,
+      transparent: true,
+      opacity: 0.8,
+    })
+    this.beamLine = new THREE.Line(geometry, material)
+    this.beamLine.frustumCulled = false
+    this.scene.add(this.beamLine)
+    this.beamTimer = BEAM_LIFETIME
   }
 
   private readonly offset = new THREE.Vector3()
@@ -176,6 +233,17 @@ export class MultiToolController implements Tickable {
     this.model.rotateX(swayX + this.tilt)
     this.model.rotateY(-Math.PI / 2)
     this.model.rotateZ(swayZ)
+
+    // Beam lifetime
+    if (this.beamLine && this.scene) {
+      this.beamTimer -= dt
+      if (this.beamTimer <= 0) {
+        this.scene.remove(this.beamLine)
+        this.beamLine.geometry.dispose()
+        ;(this.beamLine.material as THREE.LineBasicMaterial).dispose()
+        this.beamLine = null
+      }
+    }
   }
 
   dispose(): void {
