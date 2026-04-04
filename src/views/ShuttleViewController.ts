@@ -19,6 +19,8 @@ import { StarFieldController } from '@/three/StarFieldController'
 import { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
 import { CelestialBody } from '@/three/CelestialBody'
 import { AmbientLight, PointLight, Vector3 } from 'three'
+import { VibePortal } from '@/lib/portal'
+import { PortalWormhole } from '@/three/PortalWormhole'
 
 const ONE_SHOT_PRIORITY = TICK_PRIORITY_INPUT + 1
 const AMBIENT_LIGHT_INTENSITY = 0.3
@@ -26,6 +28,8 @@ const SUN_LIGHT_INTENSITY = 3
 const SUN_LIGHT_DISTANCE = 10000
 const SPAWN_MIN_RADIUS = 400
 const SPAWN_MAX_RADIUS = 1500
+const PORTAL_SPAWN_RADIUS = 150
+const PORTAL_DEFAULT_EJECT_SPEED = 40
 
 /**
  * Bridges Vue lifecycle to the game loop and Three.js scene.
@@ -46,6 +50,7 @@ export class ShuttleViewController implements Tickable {
   private starFieldController: StarFieldController | null = null
   private spaceTimeGrid: SpaceTimeGrid | null = null
   private celestialBodies: CelestialBody[] = []
+  private portalWormhole: PortalWormhole | null = null
 
   /** Called each frame with full shuttle telemetry for HUD display */
   onTelemetry: ((telemetry: ShuttleTelemetry) => void) | null = null
@@ -104,13 +109,53 @@ export class ShuttleViewController implements Tickable {
     this.shuttleController.thrusterSystem.onAllDepleted = () => {
       this.shuttleController?.respawn()
     }
-    const spawnAngle = Math.random() * Math.PI * 2
-    const spawnRadius = SPAWN_MIN_RADIUS + Math.random() * (SPAWN_MAX_RADIUS - SPAWN_MIN_RADIUS)
-    this.shuttleController.group.position.set(
-      Math.cos(spawnAngle) * spawnRadius,
-      0,
-      Math.sin(spawnAngle) * spawnRadius,
-    )
+    // Portal arrival or normal spawn
+    const portal = new VibePortal()
+    if (portal.isArrival && this.spaceTimeGrid) {
+      const angle = Math.random() * Math.PI * 2
+      const wormholePos = new Vector3(
+        Math.cos(angle) * PORTAL_SPAWN_RADIUS,
+        0,
+        Math.sin(angle) * PORTAL_SPAWN_RADIUS,
+      )
+
+      this.portalWormhole = new PortalWormhole(wormholePos, this.spaceTimeGrid)
+      this.sceneManager.addToScene(this.portalWormhole.group)
+      this.tickHandler.register(this.portalWormhole, TICK_PRIORITY_ANIMATION)
+
+      // Position shuttle at wormhole peak
+      this.shuttleController.group.position.copy(wormholePos)
+
+      // Eject away from the sun (origin)
+      const awayDir = wormholePos.clone().normalize()
+      const ejectVelocity = portal.arrival.speed_x !== undefined
+        && portal.arrival.speed_z !== undefined
+        ? new Vector3(portal.arrival.speed_x, 0, portal.arrival.speed_z)
+        : awayDir.clone().multiplyScalar(portal.arrival.speed ?? PORTAL_DEFAULT_EJECT_SPEED)
+      this.shuttleController.setVelocity(ejectVelocity)
+
+      // Point shuttle away from sun
+      this.shuttleController.group.rotation.y = Math.atan2(awayDir.z, awayDir.x)
+
+      // Trigger pulse → collapse
+      this.portalWormhole.eject()
+      this.portalWormhole.onDone = () => {
+        if (this.portalWormhole) {
+          this.tickHandler?.unregister(this.portalWormhole)
+          this.portalWormhole.dispose()
+          this.sceneManager?.removeFromScene(this.portalWormhole.group)
+          this.portalWormhole = null
+        }
+      }
+    } else {
+      const spawnAngle = Math.random() * Math.PI * 2
+      const spawnRadius = SPAWN_MIN_RADIUS + Math.random() * (SPAWN_MAX_RADIUS - SPAWN_MIN_RADIUS)
+      this.shuttleController.group.position.set(
+        Math.cos(spawnAngle) * spawnRadius,
+        0,
+        Math.sin(spawnAngle) * spawnRadius,
+      )
+    }
     this.sceneManager.addToScene(this.shuttleController.group)
     this.vehicleCamera.setTarget(this.shuttleController.group)
     this.tickHandler.register(this.shuttleController, TICK_PRIORITY_PHYSICS)
@@ -156,6 +201,7 @@ export class ShuttleViewController implements Tickable {
   dispose(): void {
     this.gameLoop?.stop()
     this.thrusterController?.dispose()
+    this.portalWormhole?.dispose()
     this.shuttleController?.dispose()
     this.starFieldController?.dispose()
     this.spaceTimeGrid?.dispose()
