@@ -1,42 +1,20 @@
 <!-- src/views/HomeView.vue -->
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
-import { HomeViewController } from './HomeViewController'
-import ShuttleHud from '@/components/ShuttleHud.vue'
-import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
-
-const container = ref<HTMLElement>()
-const viewController = new HomeViewController()
-const telemetry = reactive<ShuttleTelemetry>({
-  speed: 0,
-  heading: 0,
-  posX: 0,
-  posZ: 0,
-  fuelLevel: 0,
-  fuelCapacity: 0,
-  thrustCharge: 0,
-  thrustCapacity: 0,
-  brakeCharge: 0,
-  brakeCapacity: 0,
-  rcsCharge: 0,
-  rcsCapacity: 0,
-})
-
-onMounted(async () => {
-  if (container.value) {
-    viewController.onTelemetry = (t) => {
-      Object.assign(telemetry, t)
-    }
-    await viewController.init(container.value)
-  }
-})
-
-onUnmounted(() => {
-  viewController.dispose()
-})
+import { RouterLink } from 'vue-router'
 </script>
 
 <template>
-  <div ref="container" class="scene-container"></div>
-  <ShuttleHud :telemetry="telemetry" />
+  <div
+    class="min-h-screen w-screen bg-black text-green-400 font-mono flex flex-col items-center justify-center gap-10"
+  >
+    <h1 class="text-2xl tracking-[0.35em] uppercase text-green-400/90" style="text-shadow: 0 0 8px rgba(0, 255, 0, 0.35)">
+      Asteroids
+    </h1>
+    <RouterLink
+      to="/map"
+      class="px-10 py-3 border border-green-400/55 rounded-sm uppercase tracking-widest text-sm hover:bg-green-400/10 hover:border-green-400/80 transition-colors"
+    >
+      Play
+    </RouterLink>
+  </div>
 </template>

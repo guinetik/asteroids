@@ -1,4 +1,4 @@
-// src/views/HomeViewController.ts
+// src/views/ShuttleViewController.ts
 import type { Tickable } from '@/lib/Tickable'
 import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
 import { GameLoop } from '@/lib/GameLoop'
@@ -34,7 +34,7 @@ const SPAWN_MAX_RADIUS = 1500
  * @date 2026-04-04
  * @spec docs/superpowers/specs/2026-04-04-shuttle-scene-design.md
  */
-export class HomeViewController implements Tickable {
+export class ShuttleViewController implements Tickable {
   private gameLoop: GameLoop | null = null
   private tickHandler: TickHandler | null = null
   private inputManager: InputManager | null = null
