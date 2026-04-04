@@ -12,9 +12,12 @@ const DRACO_DECODER_PATH = '/node_modules/three/examples/jsm/libs/draco/'
 const MODEL_SCALE = 0.01
 
 /**
- * The model's nose points along -Z natively (standard glTF forward).
- * No correction rotation needed — movement uses -Z as forward instead.
+ * Model orientation correction for top-down view.
+ * Raw model: X=nose-to-tail (14.7), Y=wingspan (9.4), Z=height (5.5).
+ * We need the shuttle flat on XZ plane with tail fin pointing up (+Y).
+ * Rotate -90 deg around X to swap Y↔Z, so wingspan goes to Z and height to Y.
  */
+const MODEL_ROTATION_X = -Math.PI / 2
 
 const SHUTTLE_ANIMATION_NAME = 'shutAction'
 
@@ -57,7 +60,25 @@ export class ShuttleController implements Tickable {
 
     const gltf = await gltfLoader.loadAsync(SHUTTLE_MODEL_PATH)
     gltf.scene.scale.setScalar(MODEL_SCALE)
+    gltf.scene.rotation.x = MODEL_ROTATION_X
     this.group.add(gltf.scene)
+
+    // Debug: dump model info to find correct orientation
+    const box = new THREE.Box3().setFromObject(gltf.scene)
+    const size = box.getSize(new THREE.Vector3())
+    console.log('[ShuttleController] bbox size (scaled):', size)
+    console.log('[ShuttleController] bbox min:', box.min, 'max:', box.max)
+    // Log first few child names and their transforms
+    let count = 0
+    gltf.scene.traverse((child) => {
+      if (count < 5) {
+        console.log(`[ShuttleController] node "${child.name}"`,
+          'pos:', child.position.toArray(),
+          'rot:', [child.rotation.x, child.rotation.y, child.rotation.z].map((r) => (r * 180 / Math.PI).toFixed(1)),
+        )
+        count++
+      }
+    })
 
     this.mixer = new THREE.AnimationMixer(gltf.scene)
 
@@ -150,8 +171,8 @@ export class ShuttleController implements Tickable {
       this.group.rotateZ(-ROLL_SPEED * dt)
     }
 
-    // Thrust (W) — accelerate along forward direction (model nose is -Z)
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.group.quaternion)
+    // Thrust (W) — accelerate along forward direction (nose is +X after rotation)
+    const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(this.group.quaternion)
     if (input.isActionActive('thrust')) {
       this.velocity.addScaledVector(forward, THRUST_FORCE * dt)
     }
