@@ -15,13 +15,12 @@ import { LANDER_BINDINGS } from '@/lib/defaultBindings'
 import {
   TICK_PRIORITY_INPUT,
   TICK_PRIORITY_PHYSICS,
-  TICK_PRIORITY_ANIMATION,
   TICK_PRIORITY_RENDER,
 } from '@/lib/tickPriorities'
 import { SceneManager } from '@/three/SceneManager'
 import { VehicleCamera, LANDER_CAMERA_CONFIG } from '@/three/VehicleCamera'
 import { LanderController } from '@/three/LanderController'
-import { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
+import { TerrainGrid } from '@/three/TerrainGrid'
 import { AmbientLight, DirectionalLight } from 'three'
 
 const AMBIENT_LIGHT_INTENSITY = 0.6
@@ -44,7 +43,7 @@ export class LanderViewController implements Tickable {
   private sceneManager: SceneManager | null = null
   private vehicleCamera: VehicleCamera | null = null
   private landerController: LanderController | null = null
-  private spaceTimeGrid: SpaceTimeGrid | null = null
+  private terrainGrid: TerrainGrid | null = null
 
   /** Called each frame with lander telemetry for HUD display */
   onTelemetry: ((telemetry: LanderTelemetry) => void) | null = null
@@ -63,10 +62,9 @@ export class LanderViewController implements Tickable {
     this.tickHandler.register(this.vehicleCamera, TICK_PRIORITY_RENDER - 1)
     this.tickHandler.register(this.sceneManager, TICK_PRIORITY_RENDER)
 
-    // Flat spacetime grid — no gravity sources
-    this.spaceTimeGrid = new SpaceTimeGrid(GRID_SIZE)
-    this.sceneManager.addToScene(this.spaceTimeGrid.mesh)
-    this.tickHandler.register(this.spaceTimeGrid, TICK_PRIORITY_ANIMATION)
+    // Procedural asteroid terrain
+    this.terrainGrid = new TerrainGrid(GRID_SIZE)
+    this.sceneManager.addToScene(this.terrainGrid.mesh)
 
     // Lighting — directional sun + ambient fill
     const ambientLight = new AmbientLight(0xffffff, AMBIENT_LIGHT_INTENSITY)
@@ -109,7 +107,7 @@ export class LanderViewController implements Tickable {
   dispose(): void {
     this.gameLoop?.stop()
     this.landerController?.dispose()
-    this.spaceTimeGrid?.dispose()
+    this.terrainGrid?.dispose()
     this.vehicleCamera?.dispose()
     this.sceneManager?.dispose()
     this.inputManager?.dispose()
