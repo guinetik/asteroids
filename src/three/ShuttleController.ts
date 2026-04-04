@@ -14,7 +14,8 @@ interface GravityWell {
 
 const SPAWN_MIN_RADIUS = 200
 const SPAWN_MAX_RADIUS = 800
-const DEATH_PULL_SPEED = 50 // how fast you get sucked in after crossing horizon
+const DEATH_PULL_ACCELERATION = 30 // accelerates as it falls in
+const DEATH_MAX_PULL_SPEED = 120
 
 const SHUTTLE_MODEL_PATH = '/models/shuttle.glb'
 const DRACO_DECODER_PATH = '/node_modules/three/examples/jsm/libs/draco/'
@@ -44,8 +45,8 @@ const DOOR_OPEN_ANGLE = Math.PI * 0.6 // ~108 degrees, payload bay doors open wi
 const DOOR_ANIM_SPEED = 2 // radians per second
 
 const THRUST_FORCE = 20
-const BRAKE_FACTOR = 0.95
-const BRAKE_DEPTH_PENALTY = 0.005 // brake effectiveness lost per unit of well depth
+const BRAKE_FACTOR = 0.93
+const BRAKE_DEPTH_PENALTY = 0.002 // brake effectiveness lost per unit of well depth
 const YAW_TORQUE = 2.5 // angular acceleration per second
 const YAW_MAX_SPEED = 3.5 // max angular velocity
 const YAW_DAMPING = 0.98 // gentle angular friction per frame
@@ -76,6 +77,7 @@ export class ShuttleController implements Tickable {
   private readonly gravitySources: GravitySource[] = []
   private isDead = false
   private deathTarget: THREE.Vector3 | null = null
+  private deathSpeed = 0
 
   constructor(inputManager: InputManager) {
     this.inputManager = inputManager
@@ -200,30 +202,34 @@ export class ShuttleController implements Tickable {
     )
     if (hit) {
       this.isDead = true
-      this.deathTarget = new THREE.Vector3(hit.getWorldX(), this.group.position.y, hit.getWorldZ())
+      this.deathTarget = new THREE.Vector3(hit.getWorldX(), 0, hit.getWorldZ())
       this.velocity.set(0, 0, 0)
       this.angularVelocity = 0
+      this.deathSpeed = 20
     }
   }
 
   private updateDeath(dt: number): void {
     if (!this.deathTarget) return
 
-    // Pull toward the body center
+    // Pull toward the body center — accelerating
     const dir = this.deathTarget.clone().sub(this.group.position)
     dir.y = 0
     const dist = dir.length()
 
-    if (dist < 2) {
+    if (dist < 5) {
       // Reached center — respawn
       this.respawn()
       return
     }
 
-    dir.normalize()
-    this.group.position.addScaledVector(dir, DEATH_PULL_SPEED * dt)
+    // Accelerate as we fall deeper
+    this.deathSpeed = Math.min(this.deathSpeed + DEATH_PULL_ACCELERATION * dt, DEATH_MAX_PULL_SPEED)
 
-    // Follow grid Y while being pulled in
+    dir.normalize()
+    this.group.position.addScaledVector(dir, this.deathSpeed * dt)
+
+    // Follow spacetime curvature — sinking into the well
     if (this.spaceTimeGrid) {
       this.group.position.y = -this.spaceTimeGrid.getDepthAt(
         this.group.position.x,
@@ -231,8 +237,9 @@ export class ShuttleController implements Tickable {
       )
     }
 
-    // Spin while dying
-    this.group.rotateY(dt * 10)
+    // Tumble: spin on Y and tilt nose down on X
+    this.group.rotateY(dt * 8)
+    this.group.rotateX(dt * 3)
   }
 
   private respawn(): void {
