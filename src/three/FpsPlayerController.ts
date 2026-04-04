@@ -22,6 +22,8 @@ import type { Heightmap } from '@/lib/terrain/heightmap'
 const JUMP_BUFFER_TIME = 0.2
 /** How long after leaving the ground the player can still jump (coyote time). */
 const COYOTE_TIME = 0.15
+/** Extra vertical boost multiplier when sprint-jumping. */
+const SPRINT_JUMP_BOOST = 1.3
 
 /** Thruster names for the player's O2 power system. */
 export type FpsThrusterName = 'sprint' | 'jump'
@@ -196,7 +198,8 @@ export class FpsPlayerController implements Tickable {
     const jumpHeld = this.inputManager.isActionActive('jump')
     const canJump = jumpHeld && this.coyoteTimer > 0 && this.thrusterSystem.canFire('jump')
     if (canJump) {
-      this.body.impulse(this.config.movement.jumpForce)
+      const jumpBoost = isSprinting ? SPRINT_JUMP_BOOST : 1
+      this.body.impulse(this.config.movement.jumpForce * jumpBoost)
       this.body.grounded = false
       this.coyoteTimer = 0
     }
