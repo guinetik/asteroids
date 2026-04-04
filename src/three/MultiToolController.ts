@@ -12,8 +12,12 @@
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 import { loadGLB } from './loadGLB'
+import partsJson from '@/data/multitool/identified-parts.json'
 
 const MODEL_PATH = '/models/multitool.glb'
+
+/** Node names for the status LEDs that change color per mode. */
+const LED_NODE_NAMES = partsJson.statusLeds.map((led) => led.nodeName)
 
 /** Position offset from camera origin (right, down, forward). */
 const OFFSET_X = 0.35
@@ -49,6 +53,7 @@ const TILT_LERP_SPEED = 8
 export class MultiToolController implements Tickable {
   private model: THREE.Group | null = null
   private camera: THREE.PerspectiveCamera | null = null
+  private readonly ledMeshes: THREE.Mesh[] = []
   private time = 0
   private lateralSpeed = 0
   private sprinting = false
@@ -73,6 +78,9 @@ export class MultiToolController implements Tickable {
     this.model.scale.setScalar(MODEL_SCALE)
     this.model.traverse((child) => {
       child.frustumCulled = false
+      if (child instanceof THREE.Mesh && LED_NODE_NAMES.includes(child.name)) {
+        this.ledMeshes.push(child)
+      }
     })
     scene.add(this.model)
   }
@@ -96,15 +104,14 @@ export class MultiToolController implements Tickable {
    * @param color - Hex color string (e.g. "#3b82f6")
    */
   setMode(color: string): void {
-    if (!this.model) return
-    const emissiveColor = new THREE.Color(color)
-    this.model.traverse((child) => {
-      if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
-        child.material.emissive.copy(emissiveColor)
-        child.material.emissiveIntensity = 0.15
-        child.material.needsUpdate = true
+    const ledColor = new THREE.Color(color)
+    for (const mesh of this.ledMeshes) {
+      if (mesh.material instanceof THREE.MeshStandardMaterial) {
+        mesh.material.emissive.copy(ledColor)
+        mesh.material.emissiveIntensity = 1.0
+        mesh.material.needsUpdate = true
       }
-    })
+    }
   }
 
   private readonly offset = new THREE.Vector3()
