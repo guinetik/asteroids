@@ -11,8 +11,6 @@ export const DEFAULT_BINDINGS: Record<string, string[]> = {
   brake: ['KeyS'],
   yawLeft: ['KeyA'],
   yawRight: ['KeyD'],
-  rollLeft: ['KeyQ'],
-  rollRight: ['KeyE'],
   toggleDoors: ['KeyF'],
   toggleCamera: ['KeyC'],
 }

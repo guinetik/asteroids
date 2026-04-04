@@ -20,6 +20,7 @@ import {
   Mesh,
   SphereGeometry,
   MeshBasicMaterial,
+  GridHelper,
   AdditiveBlending,
   BackSide,
 } from 'three'
@@ -31,6 +32,10 @@ const SUN_LIGHT_DISTANCE = 5000
 const SUN_RADIUS = 50
 const SUN_GLOW_RADIUS = 65
 const SHUTTLE_ORBIT_DISTANCE = 300
+const GRID_SIZE = 2000
+const GRID_DIVISIONS = 40
+const GRID_COLOR_CENTER = 0x333366
+const GRID_COLOR_LINE = 0x1a1a33
 
 /**
  * Bridges Vue lifecycle to the game loop and Three.js scene.
@@ -82,6 +87,10 @@ export class HomeViewController implements Tickable {
     const glow = new Mesh(glowGeo, glowMat)
     this.sceneManager.addToScene(glow)
 
+    // Space-time grid on the XZ equator plane
+    const grid = new GridHelper(GRID_SIZE, GRID_DIVISIONS, GRID_COLOR_CENTER, GRID_COLOR_LINE)
+    this.sceneManager.addToScene(grid)
+
     // Lighting — point light from sun + dim ambient
     const ambientLight = new AmbientLight(0xffffff, AMBIENT_LIGHT_INTENSITY)
     const sunLight = new PointLight(0xffffee, SUN_LIGHT_INTENSITY, SUN_LIGHT_DISTANCE)
@@ -113,9 +122,6 @@ export class HomeViewController implements Tickable {
   tick(_dt: number): void {
     if (this.inputManager?.wasActionPressed('toggleDoors')) {
       this.shuttleController?.toggleDoors()
-    }
-    if (this.inputManager?.wasActionPressed('toggleCamera')) {
-      this.sceneManager?.toggleCamera()
     }
   }
 

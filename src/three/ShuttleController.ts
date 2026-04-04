@@ -35,9 +35,6 @@ const DOOR_ANIM_SPEED = 2 // radians per second
 const THRUST_FORCE = 20
 const BRAKE_FACTOR = 0.95
 const YAW_SPEED = 1.5
-const ROLL_SPEED = 2
-const BANK_ANGLE = 0.4 // radians — how far the ship tilts when yawing
-const BANK_LERP_SPEED = 4 // how fast the ship banks/unbanks
 const MAX_SPEED = 80
 
 /**
@@ -58,7 +55,6 @@ export class ShuttleController implements Tickable {
   private doorPortClosedRotX = 0
   private doorStbClosedRotX = 0
   private velocity = new THREE.Vector3()
-  private currentBank = 0
   private readonly inputManager: InputManager
 
   constructor(inputManager: InputManager) {
@@ -149,31 +145,18 @@ export class ShuttleController implements Tickable {
   private updateMovement(dt: number): void {
     const input = this.inputManager
 
-    // Yaw (A/D) — turn left/right
-    let targetBank = 0
+    // Yaw (A/D) — turn left/right around Y axis
     if (input.isActionActive('yawLeft')) {
       this.group.rotateY(YAW_SPEED * dt)
-      targetBank = BANK_ANGLE
     }
     if (input.isActionActive('yawRight')) {
       this.group.rotateY(-YAW_SPEED * dt)
-      targetBank = -BANK_ANGLE
     }
 
-    // Bank (visual tilt into turns) — lerp toward target
-    this.currentBank += (targetBank - this.currentBank) * BANK_LERP_SPEED * dt
-    this.group.rotation.z = this.currentBank
-
-    // Roll (Q/E)
-    if (input.isActionActive('rollLeft')) {
-      this.group.rotateZ(ROLL_SPEED * dt)
-    }
-    if (input.isActionActive('rollRight')) {
-      this.group.rotateZ(-ROLL_SPEED * dt)
-    }
-
-    // Thrust (W) — accelerate along forward direction (nose is +X after rotation)
+    // Thrust (W) — accelerate along forward on XZ plane (nose is +X after rotation)
     const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(this.group.quaternion)
+    forward.y = 0 // flatten to XZ plane
+    forward.normalize()
     if (input.isActionActive('thrust')) {
       this.velocity.addScaledVector(forward, THRUST_FORCE * dt)
     }
@@ -183,13 +166,17 @@ export class ShuttleController implements Tickable {
       this.velocity.multiplyScalar(BRAKE_FACTOR)
     }
 
+    // Lock velocity to XZ plane
+    this.velocity.y = 0
+
     // Clamp speed
     if (this.velocity.length() > MAX_SPEED) {
       this.velocity.setLength(MAX_SPEED)
     }
 
-    // Apply velocity
+    // Apply velocity and lock Y position
     this.group.position.addScaledVector(this.velocity, dt)
+    this.group.position.y = 0
   }
 
   private placeNozzles(scene: THREE.Object3D): void {

@@ -5,11 +5,7 @@ import type { Tickable } from '@/lib/Tickable'
 const CAMERA_FOV = 60
 const CAMERA_NEAR = 0.1
 const CAMERA_FAR = 50000
-const CAMERA_INITIAL_HEIGHT = 200
-const CHASE_CAM_LERP_SPEED = 4
-const ZOOM_SPEED = 0.1
-const MIN_HEIGHT = 30
-const MAX_HEIGHT = 2000
+const CAMERA_INITIAL_POSITION = new THREE.Vector3(300, 200, 300)
 
 /**
  * Three.js scene orchestrator — creates renderer, camera, and controls.
@@ -26,15 +22,12 @@ export class SceneManager implements Tickable {
   readonly controls: OrbitControls
 
   private container: HTMLElement | null = null
-  private chaseMode = false
-  private shuttleRef: THREE.Object3D | null = null
-  private cameraHeight = CAMERA_INITIAL_HEIGHT
 
   constructor() {
     this.scene = new THREE.Scene()
 
     this.camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, CAMERA_NEAR, CAMERA_FAR)
-    this.camera.position.set(0, CAMERA_INITIAL_HEIGHT, 0)
+    this.camera.position.copy(CAMERA_INITIAL_POSITION)
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true })
     this.renderer.setClearColor(0x000000)
@@ -42,10 +35,9 @@ export class SceneManager implements Tickable {
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true
-    this.controls.enabled = true // orbit controls active
+    this.controls.dampingFactor = 0.1
 
     window.addEventListener('resize', this.onResize)
-    window.addEventListener('wheel', this.onWheel, { passive: false })
   }
 
   mount(container: HTMLElement): void {
@@ -58,12 +50,8 @@ export class SceneManager implements Tickable {
   }
 
   setShuttleRef(object: THREE.Object3D): void {
-    this.shuttleRef = object
-  }
-
-  toggleCamera(): void {
-    this.chaseMode = !this.chaseMode
-    this.controls.enabled = !this.chaseMode
+    // Point orbit controls at the shuttle initially
+    this.controls.target.copy(object.position)
   }
 
   addToScene(object: THREE.Object3D): void {
@@ -74,42 +62,18 @@ export class SceneManager implements Tickable {
     this.scene.remove(object)
   }
 
-  tick(dt: number): void {
-    if (this.shuttleRef) {
-      const shuttlePos = this.shuttleRef.position
-
-      if (this.chaseMode) {
-        // Top-down: camera directly above shuttle, looking straight down
-        const targetPos = shuttlePos.clone()
-        targetPos.y += this.cameraHeight
-        this.camera.position.lerp(targetPos, CHASE_CAM_LERP_SPEED * dt)
-        this.camera.lookAt(shuttlePos)
-      } else {
-        this.controls.target.copy(shuttlePos)
-        this.controls.update()
-      }
-    } else {
-      this.controls.update()
-    }
-
+  tick(_dt: number): void {
+    this.controls.update()
     this.renderer.render(this.scene, this.camera)
   }
 
   dispose(): void {
     window.removeEventListener('resize', this.onResize)
-    window.removeEventListener('wheel', this.onWheel)
     this.controls.dispose()
     this.renderer.dispose()
     if (this.container) {
       this.container.removeChild(this.renderer.domElement)
     }
-  }
-
-  private onWheel = (e: WheelEvent): void => {
-    if (!this.chaseMode) return
-    e.preventDefault()
-    const zoomDelta = 1 + Math.sign(e.deltaY) * ZOOM_SPEED
-    this.cameraHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, this.cameraHeight * zoomDelta))
   }
 
   private onResize = (): void => {
