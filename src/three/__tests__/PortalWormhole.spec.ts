@@ -32,9 +32,11 @@ describe('PortalWormhole', () => {
     const pos = new THREE.Vector3(100, 0, 50)
     new PortalWormhole(pos, grid)
     expect(grid.sources).toHaveLength(1)
-    expect(grid.sources[0].mass).toBeLessThan(0)
-    expect(grid.sources[0].x).toBe(100)
-    expect(grid.sources[0].z).toBe(50)
+     
+    const src = grid.sources[0]!
+    expect(src.mass).toBeLessThan(0)
+    expect(src.x).toBe(100)
+    expect(src.z).toBe(50)
   })
 
   it('transitions idle → ejecting → collapsing → done', () => {
@@ -58,20 +60,23 @@ describe('PortalWormhole', () => {
   it('lerps grid source mass to zero during collapse', () => {
     const grid = createMockGrid()
     const wormhole = new PortalWormhole(new THREE.Vector3(0, 0, 0), grid)
-    const initialMass = grid.sources[0].mass
+     
+    const initialMass = grid.sources[0]!.mass
 
     wormhole.eject()
     wormhole.tick(0.35) // finish pulse → collapsing
 
     // Halfway through collapse
     wormhole.tick(1.5)
-    const midMass = grid.sources[0].mass
+     
+    const midMass = grid.sources[0]!.mass
     expect(Math.abs(midMass)).toBeLessThan(Math.abs(initialMass))
     expect(Math.abs(midMass)).toBeGreaterThan(0)
 
     // Finish collapse
     wormhole.tick(1.6)
-    expect(grid.sources[0].mass).toBe(0)
+     
+    expect(grid.sources[0]!.mass).toBe(0)
   })
 
   it('calls onDone callback when collapse finishes', () => {
