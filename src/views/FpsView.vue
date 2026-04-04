@@ -45,19 +45,9 @@ function resumeLock() {
   <FpsHud :telemetry="telemetry" />
   <div
     v-if="!pointerLocked"
-    class="fps-lock-overlay"
+    class="fixed inset-0 flex items-center justify-center bg-black/60 cursor-pointer z-50"
     @click="resumeLock"
   >
-    <span class="fps-lock-overlay__text">Click to resume</span>
+    <span class="text-lg text-white/80 font-mono tracking-widest uppercase">Click to resume</span>
   </div>
 </template>
-
-<style>
-.fps-lock-overlay {
-  @apply fixed inset-0 flex items-center justify-center bg-black/60 cursor-pointer z-50;
-}
-
-.fps-lock-overlay__text {
-  @apply text-lg text-white/80 font-mono tracking-widest uppercase;
-}
-</style>
