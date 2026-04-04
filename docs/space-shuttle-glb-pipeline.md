@@ -113,6 +113,28 @@ Run **`inspect`** on the merged file, then apply transforms as needed:
 
 **Three.js r183:** use `DRACOLoader` + `MeshoptDecoder` if you emit those extensions. Test in browser after compression.
 
+### Size optimization (`shuttle.glb`)
+
+Your merged shuttle is already **Draco**-compressed and uses **WebP** for many materials, but **`gltf-transform inspect`** often shows **pairs** of images (WebP + JPEG) where the **JPEG has zero material instances**—leftovers from the Blender export. Those unused images still sit in the GLB and cost **hundreds of KB to ~1 MB+**.
+
+| Step | Command | Effect | Risk |
+|------|---------|--------|------|
+| **Prune (do this first)** | `gltf-transform prune public/models/shuttle.glb public/models/shuttle.glb` | Drops **unreferenced** textures, materials, accessors. In a typical merged shuttle this can cut file size **roughly in half** (e.g. ~2.7 MB → ~1.3 MB) by removing duplicate JPEGs. | **Low** — only removes unused data. |
+| **Dedup** | `gltf-transform dedup …` then `prune` | Shares identical buffers/accessors. | Low |
+| **Smaller textures** | `gltf-transform resize --width 512 --height 512 …` (or 256) before/after prune | Less VRAM and smaller file if you accept blurrier decals. | Visual |
+| **Full optimize** | `gltf-transform optimize input.glb output.glb --texture-compress webp` | One pipeline: dedup, weld, simplify, **meshopt**, texture recompress, etc. Can reach **sub‑MB** sizes. | **Higher** — may **merge/simplify** meshes; switches **Draco → EXT_meshopt_compression** and adds **KHR_mesh_quantization**. You must wire **`MeshoptDecoder`** in Three.js (and drop or keep `DRACOLoader` depending on output). **Check the model in the viewer.** |
+
+**Practical recipe (safe):** run **`prune`** on a copy, compare in your scene, then replace `shuttle.glb` when happy. Reserve **`optimize`** for when you are ready to change loaders and visually QA the result.
+
+```bash
+bunx gltf-transform prune public/models/shuttle.glb public/models/shuttle-smaller.glb
+# Inspect size, then swap filenames or replace in place once verified.
+```
+
+```bash
+bun run models:shuttle:prune
+```
+
 ### 4. Python option
 
 For parity, you can drive the **same** CLI from Python (`subprocess`) or use **`pygltflib`** to read/write JSON + buffers—lower-level, more code for merge + animation bookkeeping. For this project, **Node + glTF Transform** is the path of least resistance.
