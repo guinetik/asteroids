@@ -111,6 +111,14 @@ export class ShuttleController implements Tickable {
     return this.inputManager.isActionActive('yawRight')
   }
 
+  get speed(): number {
+    return this.velocity.length()
+  }
+
+  get heading(): number {
+    return this.group.rotation.y
+  }
+
   tick(dt: number): void {
     this.updateMovement(dt)
     this.updateDoors(dt)
