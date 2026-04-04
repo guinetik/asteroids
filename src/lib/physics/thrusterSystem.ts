@@ -19,8 +19,8 @@ export interface ThrusterState {
 }
 
 export const DEFAULT_THRUSTER_CONFIG: ThrusterSystemConfig = {
-  thrust: { capacity: 100, burnRate: 22, rechargeRate: 7.5, fuelCostPerRecharge: 0.5 },
-  brake: { capacity: 60, burnRate: 40, rechargeRate: 3, fuelCostPerRecharge: 0.6 },
+  thrust: { capacity: 100, burnRate: 44, rechargeRate: 7.5, fuelCostPerRecharge: 0.5 },
+  brake: { capacity: 60, burnRate: 80, rechargeRate: 3, fuelCostPerRecharge: 0.6 },
   rcs: { capacity: 60, burnRate: 8, rechargeRate: 5, fuelCostPerRecharge: 0.2 },
   fuelCapacity: 500,
 }
