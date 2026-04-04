@@ -10,6 +10,15 @@
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 
+/** Maximum roll wobble from lateral movement (radians). */
+const MAX_ROLL_WOBBLE = 0.04
+/** How fast roll wobble lerps toward target (per second). */
+const ROLL_LERP_SPEED = 6
+/** Vertical bob amplitude from Y velocity (units per unit velocity). */
+const BOB_AMPLITUDE = 0.08
+/** How fast bob lerps (per second). */
+const BOB_LERP_SPEED = 8
+
 /** Tuning knobs for the FPS camera. */
 export interface FpsCameraConfig {
   /** Vertical offset above player origin (meters). */
@@ -42,6 +51,10 @@ export class FpsCamera implements Tickable {
   private readonly config: FpsCameraConfig
   private target: THREE.Object3D | null = null
   private readonly euler = new THREE.Euler(0, 0, 0, 'YXZ')
+  private roll = 0
+  private bobOffset = 0
+  private lateralSpeed = 0
+  private verticalVelocity = 0
 
   constructor(config: FpsCameraConfig) {
     this.config = config
@@ -84,24 +97,44 @@ export class FpsCamera implements Tickable {
     ).normalize()
   }
 
+  /**
+   * Feed player velocity for camera bob and roll wobble.
+   *
+   * @param lateralSpeed - XZ speed magnitude
+   * @param velocityY - Vertical velocity (positive = up)
+   */
+  setVelocity(lateralSpeed: number, velocityY: number): void {
+    this.lateralSpeed = lateralSpeed
+    this.verticalVelocity = velocityY
+  }
+
   /** Update camera aspect ratio on window resize. */
   resize(width: number, height: number): void {
     this.camera.aspect = width / height
     this.camera.updateProjectionMatrix()
   }
 
-  tick(_dt: number): void {
+  tick(dt: number): void {
     if (!this.target) return
 
-    // Position at target + eye height
+    // Roll wobble from lateral speed — lean into movement
+    const targetRoll = -Math.sin(this.yaw * 2 + performance.now() * 0.003)
+      * this.lateralSpeed * MAX_ROLL_WOBBLE * 0.05
+    this.roll += (targetRoll - this.roll) * Math.min(1, ROLL_LERP_SPEED * dt)
+
+    // Vertical bob from Y velocity — camera dips/rises with hops
+    const targetBob = this.verticalVelocity * BOB_AMPLITUDE
+    this.bobOffset += (targetBob - this.bobOffset) * Math.min(1, BOB_LERP_SPEED * dt)
+
+    // Position at target + eye height + bob
     this.camera.position.set(
       this.target.position.x,
-      this.target.position.y + this.config.eyeHeight,
+      this.target.position.y + this.config.eyeHeight + this.bobOffset,
       this.target.position.z,
     )
 
-    // Apply yaw + pitch rotation
-    this.euler.set(this.pitch, this.yaw, 0)
+    // Apply yaw + pitch + roll rotation
+    this.euler.set(this.pitch, this.yaw, this.roll)
     this.camera.quaternion.setFromEuler(this.euler)
   }
 

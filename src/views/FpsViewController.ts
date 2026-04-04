@@ -130,6 +130,14 @@ export class FpsViewController implements Tickable {
   }
 
   tick(_dt: number): void {
+    // Feed player velocity to camera for bob/wobble
+    if (this.playerController && this.fpsCamera) {
+      this.fpsCamera.setVelocity(
+        this.playerController.speed,
+        this.playerController.body.velocityY,
+      )
+    }
+
     if (this.playerController && this.onTelemetry) {
       const ts = this.playerController.thrusterSystem
       this.onTelemetry({

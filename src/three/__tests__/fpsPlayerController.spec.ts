@@ -85,17 +85,19 @@ describe('FpsPlayerController', () => {
 
   it('death timer starts when o2 is empty', () => {
     const { ctrl } = createController()
-    // Drain all O2 (baseDrainRate=1.5/s, fuelCapacity=100 => empties ~tick 67)
-    for (let i = 0; i < 75; i++) ctrl.tick(1.0)
+    // Drain all O2 — use large dt to exhaust quickly regardless of config
+    for (let i = 0; i < 500; i++) ctrl.tick(1.0)
     expect(ctrl.o2Level).toBe(0)
     expect(ctrl.deathTimer).not.toBeNull()
   })
 
   it('death timer counts down to zero', () => {
     const { ctrl } = createController()
-    // Drain O2 but leave timer with room to count down further
-    for (let i = 0; i < 75; i++) ctrl.tick(1.0)
+    // Drain O2 with small steps to stop right after it empties
+    while (ctrl.o2Level > 0) ctrl.tick(0.1)
+    expect(ctrl.deathTimer).not.toBeNull()
     const timer = ctrl.deathTimer!
+    expect(timer).toBeGreaterThan(0)
     ctrl.tick(1.0)
     expect(ctrl.deathTimer!).toBeLessThan(timer)
   })
