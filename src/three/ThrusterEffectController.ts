@@ -11,8 +11,8 @@ const BRAKE_SPREAD = 3
 const PARTICLE_SIZE = 0.5
 const THRUST_COLOR = new THREE.Color(0xff8800)
 const BRAKE_COLOR = new THREE.Color(0x4488ff)
-const THRUST_OFFSET = new THREE.Vector3(0, 0, 8) // behind shuttle (nose is -Z)
-const BRAKE_OFFSET = new THREE.Vector3(0, 0, -8) // in front of shuttle
+const THRUST_OFFSET = new THREE.Vector3(0, -1, 5) // engine nozzles: rear of shuttle, slightly below center
+const BRAKE_OFFSET = new THREE.Vector3(0, 0, -6) // dampener: in front of shuttle nose
 const PUSH_FORCE = 10
 
 /** Internal particle state for the pool-based particle system. */
