@@ -20,7 +20,7 @@ const MODEL_SCALE = 0.01
 const MODEL_ROTATION_X = -Math.PI / 2
 
 /** Engine nozzle position in raw model coordinates (pre-scale). */
-const ENG_POSITION_X = -530
+const ENG_POSITION_X = -500
 const ENG_POSITION_Y = 0
 const ENG_POSITION_Z = 60
 
