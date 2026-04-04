@@ -54,10 +54,10 @@ function resumeLock() {
 
 <style>
 .fps-lock-overlay {
-  @apply(fixed inset-0 flex items-center justify-center bg-black/60 cursor-pointer z-50);
+  @apply fixed inset-0 flex items-center justify-center bg-black/60 cursor-pointer z-50;
 }
 
 .fps-lock-overlay__text {
-  @apply(text-lg text-white/80 font-mono tracking-widest uppercase);
+  @apply text-lg text-white/80 font-mono tracking-widest uppercase;
 }
 </style>
