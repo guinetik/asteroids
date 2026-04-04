@@ -11,6 +11,14 @@ const DRACO_DECODER_PATH = '/node_modules/three/examples/jsm/libs/draco/'
 /** NASA model is in centimeters (~1400 units across). Scale to meters. */
 const MODEL_SCALE = 0.01
 
+/**
+ * The Blender export has X=wingspan, Y=nose-to-tail, Z=up.
+ * Three.js Y-up loader converts Z-up to Y-up, so the model arrives with
+ * nose along -Z and top along +Y. We rotate -90 deg around X to make
+ * the nose point along +Z (Three.js forward) and top along +Y.
+ */
+const MODEL_ROTATION_X = -Math.PI / 2
+
 const SHUTTLE_ANIMATION_NAME = 'shutAction'
 
 const THRUST_FORCE = 20
@@ -52,6 +60,7 @@ export class ShuttleController implements Tickable {
 
     const gltf = await gltfLoader.loadAsync(SHUTTLE_MODEL_PATH)
     gltf.scene.scale.setScalar(MODEL_SCALE)
+    gltf.scene.rotation.x = MODEL_ROTATION_X
     this.group.add(gltf.scene)
 
     this.mixer = new THREE.AnimationMixer(gltf.scene)
