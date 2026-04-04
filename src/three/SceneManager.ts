@@ -5,8 +5,8 @@ import type { Tickable } from '@/lib/Tickable'
 const CAMERA_FOV = 60
 const CAMERA_NEAR = 0.1
 const CAMERA_FAR = 50000
-const CAMERA_INITIAL_OFFSET = new THREE.Vector3(0, 60, 0)
-const CHASE_CAM_OFFSET = new THREE.Vector3(0, 50, 0) // directly above the shuttle
+const CAMERA_INITIAL_OFFSET = new THREE.Vector3(0, 500, 0)
+const CHASE_CAM_OFFSET = new THREE.Vector3(0, 500, 0) // top-down, high enough to see the sun
 const CHASE_CAM_LERP_SPEED = 4
 
 /**
