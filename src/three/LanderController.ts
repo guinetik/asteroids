@@ -14,6 +14,7 @@ import type { Tickable } from '@/lib/Tickable'
 import type { InputManager } from '@/lib/InputManager'
 import { loadGLB } from './loadGLB'
 import { PlatformerBody } from '@/lib/physics/platformerBody'
+import { ThrusterSystem, type ThrusterSystemConfig } from '@/lib/physics/thrusterSystem'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import { ParticleEmitter } from './ParticleEmitter'
 
@@ -32,7 +33,19 @@ const GAMEPLAY_GRAVITY = 3.0
  * Main engine thrust — intentionally weak relative to gravity.
  * You need to hold Space and build up velocity to climb.
  */
-const MAIN_ENGINE_THRUST = 3.5
+const MAIN_ENGINE_THRUST = 5.5
+
+/** Lander thruster groups: main engine (red) and RCS (white) */
+export type LanderThrusterName = 'mainEngine' | 'rcs'
+
+/** Lander thruster config — shared fuel tank */
+const LANDER_THRUSTER_CONFIG: ThrusterSystemConfig<LanderThrusterName> = {
+  thrusters: {
+    mainEngine: { capacity: 80, burnRate: 32.4, rechargeRate: 8.4, fuelCostPerRecharge: 0.8 },
+    rcs: { capacity: 60, burnRate: 12, rechargeRate: 8, fuelCostPerRecharge: 0.3 },
+  },
+  fuelCapacity: 400,
+}
 
 /** Node name for the main descent engine bell in the GLB */
 const MAIN_ENGINE_NODE = 'Thruster_Lunar Lander_0'
@@ -105,6 +118,11 @@ const RCS_LATERAL_FORCE = 4
 const TILT_MAX_ANGLE = 0.3 // ~17 degrees max tilt
 const LIFTOFF_BOOST = 2.0
 const LIFTOFF_BOOST_DURATION = 1.0
+const RCS_LIFTOFF_BOOST = 3.0
+/** Surface normal Y must be above this to count as "flat" for full liftoff boost */
+const FLAT_GROUND_THRESHOLD = 0.95
+/** Boost multiplier when launching from a slope */
+const SLOPE_LIFTOFF_PENALTY = 0.5
 const TILT_LERP_SPEED = 3 // how fast the lander tilts toward target
 const TILT_RETURN_SPEED = 2.5 // how fast it returns to upright
 const GROUND_TILT_LERP_SPEED = 4 // how fast the lander conforms to terrain slope
@@ -119,6 +137,7 @@ const GROUND_TILT_LERP_SPEED = 4 // how fast the lander conforms to terrain slop
 export class LanderController implements Tickable {
   readonly group = new THREE.Group()
   readonly body = new PlatformerBody({ gravity: GAMEPLAY_GRAVITY })
+  readonly thrusterSystem = new ThrusterSystem<LanderThrusterName>(LANDER_THRUSTER_CONFIG)
   readonly flameEmitter: ParticleEmitter
 
   /** One emitter per RCS nozzle, keyed by node name */
@@ -203,14 +222,28 @@ export class LanderController implements Tickable {
   }
 
   get isMainEngineActive(): boolean {
-    return this.inputManager.isActionActive('mainEngine')
+    return this.inputManager.isActionActive('mainEngine') && this.thrusterSystem.canFire('mainEngine')
+  }
+
+  /** Whether any RCS action is currently firing and has charge. */
+  private get isAnyRcsActive(): boolean {
+    if (!this.thrusterSystem.canFire('rcs')) return false
+    return (
+      this.inputManager.isActionActive('rcsLeft') ||
+      this.inputManager.isActionActive('rcsRight') ||
+      this.inputManager.isActionActive('rcsFore') ||
+      this.inputManager.isActionActive('rcsAft') ||
+      this.inputManager.isActionActive('rcsAscend') ||
+      this.inputManager.isActionActive('rcsDescend')
+    )
   }
 
   tick(dt: number): void {
     // Main engine — thrust along lander's local up axis
     if (this.isMainEngineActive) {
       const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.quaternion)
-      const boost = this.liftoffBoostTimer > 0 ? LIFTOFF_BOOST : 1
+      const slopePenalty = this.getLiftoffSlopePenalty()
+      const boost = this.liftoffBoostTimer > 0 ? LIFTOFF_BOOST * slopePenalty : 1
       const thrust = MAIN_ENGINE_THRUST * dt * boost
       this.body.impulse(localUp.y * thrust)
       this.lateralVelocity.x += localUp.x * thrust
@@ -220,10 +253,12 @@ export class LanderController implements Tickable {
       this.flameSpawnAccumulator = 0
     }
 
-    // RCS ascend boost — also follows local up
-    if (!this.body.grounded && this.inputManager.isActionActive('rcsAscend')) {
+    // RCS ascend boost — works from ground (big boost) and air
+    if (this.inputManager.isActionActive('rcsAscend') && this.thrusterSystem.canFire('rcs')) {
       const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.quaternion)
-      const thrust = RCS_ASCEND_THRUST * dt
+      const slopePenalty = this.getLiftoffSlopePenalty()
+      const boost = this.liftoffBoostTimer > 0 ? RCS_LIFTOFF_BOOST * slopePenalty : 1
+      const thrust = RCS_ASCEND_THRUST * dt * boost
       this.body.impulse(localUp.y * thrust)
       this.lateralVelocity.x += localUp.x * thrust
       this.lateralVelocity.z += localUp.z * thrust
@@ -251,6 +286,12 @@ export class LanderController implements Tickable {
       this.liftoffBoostTimer -= dt
     }
 
+    // Thruster charge/fuel system
+    this.thrusterSystem.tick(dt, {
+      mainEngine: this.isMainEngineActive,
+      rcs: this.isAnyRcsActive,
+    })
+
     // Update all emitters
     this.flameEmitter.tick(dt)
     for (const emitter of this.rcsEmitters.values()) {
@@ -275,11 +316,19 @@ export class LanderController implements Tickable {
     })
   }
 
+  /** Returns 1.0 on flat ground, SLOPE_LIFTOFF_PENALTY on slopes */
+  private getLiftoffSlopePenalty(): number {
+    if (!this.heightmap) return 1
+    const n = this.heightmap.normalAt(this.group.position.x, this.group.position.z)
+    return n.y >= FLAT_GROUND_THRESHOLD ? 1 : SLOPE_LIFTOFF_PENALTY
+  }
+
   private tickLateralMovement(dt: number): void {
     if (this.body.grounded) {
       this.lateralVelocity.set(0, 0, 0)
       return
     }
+    if (!this.thrusterSystem.canFire('rcs')) return
 
     // RCS lateral force — camera faces -X, so:
     //   A = -Z, D = +Z, W = -X (toward camera), S = +X (away)

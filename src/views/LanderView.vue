@@ -12,6 +12,12 @@ const telemetry = reactive<LanderTelemetry>({
   velocityY: 0,
   posX: 0,
   posZ: 0,
+  fuelLevel: 0,
+  fuelCapacity: 0,
+  mainEngineCharge: 0,
+  mainEngineCapacity: 0,
+  rcsCharge: 0,
+  rcsCapacity: 0,
 })
 
 onMounted(async () => {

@@ -115,11 +115,18 @@ export class LanderViewController implements Tickable {
 
   tick(_dt: number): void {
     if (this.landerController && this.onTelemetry) {
+      const ts = this.landerController.thrusterSystem
       this.onTelemetry({
         altitude: this.landerController.position.y,
         velocityY: this.landerController.body.velocityY,
         posX: this.landerController.position.x,
         posZ: this.landerController.position.z,
+        fuelLevel: ts.fuelLevel,
+        fuelCapacity: ts.fuelCapacity,
+        mainEngineCharge: ts.getState('mainEngine').charge,
+        mainEngineCapacity: ts.getState('mainEngine').capacity,
+        rcsCharge: ts.getState('rcs').charge,
+        rcsCapacity: ts.getState('rcs').capacity,
       })
     }
   }
