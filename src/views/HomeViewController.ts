@@ -76,6 +76,7 @@ export class HomeViewController implements Tickable {
     this.celestialBodies.push(sun)
     this.sceneManager.addToScene(sun.group)
     this.spaceTimeGrid.addSource({ x: 0, z: 0, mass: sun.mass })
+    sun.setSpaceTimeGrid(this.spaceTimeGrid)
 
     // Lighting — point light from sun + dim ambient
     const ambientLight = new AmbientLight(0xffffff, AMBIENT_LIGHT_INTENSITY)

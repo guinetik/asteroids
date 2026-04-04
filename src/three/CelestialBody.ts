@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import type { SpaceTimeGrid } from './SpaceTimeGrid'
 
 /**
  * Gravitational constant scaled for game units.
@@ -15,7 +16,7 @@ const MIN_GRAVITY_DISTANCE = 15
  * Radius at which gravity becomes "significant" for the shuttle.
  * Used for the visual danger ring. Scales with sqrt(mass).
  */
-const GRAVITY_INFLUENCE_SCALE = 250
+const GRAVITY_INFLUENCE_SCALE = 400
 const INFLUENCE_RING_SEGMENTS = 64
 
 /**
@@ -64,6 +65,7 @@ export class CelestialBody implements GravityWell {
   private readonly bodyMesh: THREE.Mesh
   private readonly glowMesh: THREE.Mesh
   private readonly influenceRing: THREE.LineLoop
+  private spaceTimeGrid: SpaceTimeGrid | null = null
 
   constructor(config: CelestialBodyConfig) {
     this.name = config.name
@@ -88,24 +90,18 @@ export class CelestialBody implements GravityWell {
     this.glowMesh = new THREE.Mesh(glowGeo, glowMat)
     this.group.add(this.glowMesh)
 
-    // Gravity influence ring — red circle on the XZ plane
+    // Gravity influence ring — red circle that follows the grid curvature
     this.influenceRadius = GRAVITY_INFLUENCE_SCALE * Math.sqrt(config.mass)
-    const ringPoints: THREE.Vector3[] = []
-    for (let i = 0; i <= INFLUENCE_RING_SEGMENTS; i++) {
-      const angle = (i / INFLUENCE_RING_SEGMENTS) * Math.PI * 2
-      ringPoints.push(new THREE.Vector3(
-        Math.cos(angle) * this.influenceRadius,
-        0.5, // slightly above grid to stay visible
-        Math.sin(angle) * this.influenceRadius,
-      ))
-    }
-    const ringGeo = new THREE.BufferGeometry().setFromPoints(ringPoints)
+    const ringPositions = new Float32Array((INFLUENCE_RING_SEGMENTS + 1) * 3)
+    const ringGeo = new THREE.BufferGeometry()
+    ringGeo.setAttribute('position', new THREE.BufferAttribute(ringPositions, 3))
     const ringMat = new THREE.LineBasicMaterial({
       color: 0xff2222,
       transparent: true,
       opacity: 0.5,
     })
     this.influenceRing = new THREE.LineLoop(ringGeo, ringMat)
+    this.influenceRing.frustumCulled = false
     this.group.add(this.influenceRing)
 
     this.group.position.copy(config.position)
@@ -113,6 +109,34 @@ export class CelestialBody implements GravityWell {
 
   get position(): THREE.Vector3 {
     return this.group.position
+  }
+
+  setSpaceTimeGrid(grid: SpaceTimeGrid): void {
+    this.spaceTimeGrid = grid
+    this.updateInfluenceRing()
+  }
+
+  updateInfluenceRing(): void {
+    const posAttr = this.influenceRing.geometry.getAttribute('position') as THREE.BufferAttribute
+    const positions = posAttr.array as Float32Array
+    const cx = this.position.x
+    const cz = this.position.z
+
+    for (let i = 0; i <= INFLUENCE_RING_SEGMENTS; i++) {
+      const angle = (i / INFLUENCE_RING_SEGMENTS) * Math.PI * 2
+      const wx = cx + Math.cos(angle) * this.influenceRadius
+      const wz = cz + Math.sin(angle) * this.influenceRadius
+      const wy = this.spaceTimeGrid
+        ? -this.spaceTimeGrid.getDepthAt(wx, wz) + 0.5
+        : 0.5
+
+      // Positions are relative to group (which is at cx, cy, cz)
+      positions[i * 3] = Math.cos(angle) * this.influenceRadius
+      positions[i * 3 + 1] = wy - this.position.y
+      positions[i * 3 + 2] = Math.sin(angle) * this.influenceRadius
+    }
+
+    posAttr.needsUpdate = true
   }
 
   getGravityAt(pos: THREE.Vector3): THREE.Vector3 {
