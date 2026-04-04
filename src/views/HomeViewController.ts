@@ -14,13 +14,13 @@ import { SceneManager } from '@/three/SceneManager'
 import { ShuttleController } from '@/three/ShuttleController'
 import { ThrusterEffectController } from '@/three/ThrusterEffectController'
 import { StarFieldController } from '@/three/StarFieldController'
+import { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
 import {
   AmbientLight,
   PointLight,
   Mesh,
   SphereGeometry,
   MeshBasicMaterial,
-  GridHelper,
   AdditiveBlending,
   BackSide,
 } from 'three'
@@ -32,10 +32,6 @@ const SUN_LIGHT_DISTANCE = 5000
 const SUN_RADIUS = 50
 const SUN_GLOW_RADIUS = 65
 const SHUTTLE_ORBIT_DISTANCE = 300
-const GRID_SIZE = 2000
-const GRID_DIVISIONS = 40
-const GRID_COLOR_CENTER = 0x333366
-const GRID_COLOR_LINE = 0x1a1a33
 
 /**
  * Bridges Vue lifecycle to the game loop and Three.js scene.
@@ -53,6 +49,7 @@ export class HomeViewController implements Tickable {
   private shuttleController: ShuttleController | null = null
   private thrusterController: ThrusterEffectController | null = null
   private starFieldController: StarFieldController | null = null
+  private spaceTimeGrid: SpaceTimeGrid | null = null
 
   async init(container: HTMLElement): Promise<void> {
     // Core systems
@@ -88,8 +85,8 @@ export class HomeViewController implements Tickable {
     this.sceneManager.addToScene(glow)
 
     // Space-time grid on the XZ equator plane
-    const grid = new GridHelper(GRID_SIZE, GRID_DIVISIONS, GRID_COLOR_CENTER, GRID_COLOR_LINE)
-    this.sceneManager.addToScene(grid)
+    this.spaceTimeGrid = new SpaceTimeGrid()
+    this.sceneManager.addToScene(this.spaceTimeGrid.grid)
 
     // Lighting — point light from sun + dim ambient
     const ambientLight = new AmbientLight(0xffffff, AMBIENT_LIGHT_INTENSITY)
@@ -131,6 +128,7 @@ export class HomeViewController implements Tickable {
     this.thrusterController?.dispose()
     this.shuttleController?.dispose()
     this.starFieldController?.dispose()
+    this.spaceTimeGrid?.dispose()
     this.sceneManager?.dispose()
     this.inputManager?.dispose()
   }
