@@ -49,6 +49,7 @@ const THRUST_FORCE = 12
 const BRAKE_FACTOR = 0.93
 const BRAKE_DEPTH_PENALTY = 0.002 // brake effectiveness lost per unit of well depth
 const YAW_TORQUE = 2.5 // angular acceleration per second
+const YAW_LATERAL_FORCE = 2 // small lateral push from RCS gas (no combustion)
 const YAW_MAX_SPEED = 3.5 // max angular velocity
 const YAW_DAMPING = 0.98 // gentle angular friction per frame
 const MAX_THRUST_SPEED = 60 // max speed from player thrust alone
@@ -278,6 +279,17 @@ export class ShuttleController implements Tickable {
 
     // Apply angular velocity
     this.group.rotateY(this.angularVelocity * dt)
+
+    // RCS lateral push — gas thrusters nudge velocity sideways
+    const right = new THREE.Vector3(0, 0, 1).applyQuaternion(this.group.quaternion)
+    right.y = 0
+    right.normalize()
+    if (this.isYawingLeft) {
+      this.velocity.addScaledVector(right, -YAW_LATERAL_FORCE * dt)
+    }
+    if (this.isYawingRight) {
+      this.velocity.addScaledVector(right, YAW_LATERAL_FORCE * dt)
+    }
 
     // Thrust (W) — accelerate along forward on XZ plane (nose is +X after rotation)
     const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(this.group.quaternion)
