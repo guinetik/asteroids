@@ -133,8 +133,8 @@ export class ThrusterEffectController implements Tickable {
       (Math.random() - 0.5) * spread,
     )
 
-    // Add shuttle-relative push direction
-    const pushDir = offset.clone().normalize().multiplyScalar(-PUSH_FORCE)
+    // Always push particles out the back of the shuttle (-X in local space)
+    const pushDir = new THREE.Vector3(-PUSH_FORCE, 0, 0)
     pushDir.applyQuaternion(this.shuttle.group.quaternion)
     particle.velocity.add(pushDir)
   }
