@@ -1,0 +1,70 @@
+{
+  "description": "Multitool pistol parts keyed for VFX, UI, and tooling. Node names match Three.js Object3D.name after loading public/models/multitool.glb. meshIndex values refer to glTF mesh array order in that file; re-run extraction if the GLB is rebuilt and ordering changes.",
+  "sourceGlb": "/models/multitool.glb",
+  "orientation": {
+    "front": "pistol_led_front faces the muzzle / forward tool end.",
+    "backLeds": "pistal_led_back_left and pistol_led_back_right sit on the rear grip (Blender export uses pistal_ on the left LED node name)."
+  },
+  "statusLeds": [
+    {
+      "id": "led_back_left",
+      "nodeName": "pistal_led_back_left",
+      "meshIndex": 0,
+      "meshName": "pistol001_02 - Default_0.002",
+      "role": "status_led_grip_rear_left"
+    },
+    {
+      "id": "led_back_right",
+      "nodeName": "pistol_led_back_right",
+      "meshIndex": 2,
+      "meshName": "pistol001_02 - Default_0.001",
+      "role": "status_led_grip_rear_right"
+    },
+    {
+      "id": "led_front",
+      "nodeName": "pistol_led_front",
+      "meshIndex": 3,
+      "meshName": "pistol001_02 - Default_0.003",
+      "role": "status_led_forward"
+    }
+  ],
+  "powerIndicators": [
+    {
+      "id": "power_indicator_1",
+      "nodeName": "pistol_power_indicator_1",
+      "meshIndex": 4,
+      "meshName": "pistol001_02 - Default_0.006",
+      "role": "ammo_or_charge_segment"
+    },
+    {
+      "id": "power_indicator_2",
+      "nodeName": "pistol_power_indicator_2",
+      "meshIndex": 5,
+      "meshName": "pistol001_02 - Default_0.007",
+      "role": "ammo_or_charge_segment"
+    }
+  ],
+  "controls": [
+    {
+      "id": "trigger",
+      "nodeName": "pistol_trigger",
+      "meshIndex": 6,
+      "meshName": "pistol001_02 - Default_0.005",
+      "role": "primary_trigger_mesh"
+    },
+    {
+      "id": "trigger_lock",
+      "nodeName": "pistol_trigger_lock",
+      "meshIndex": 7,
+      "meshName": "pistol001_02 - Default_0.004",
+      "role": "trigger_safety_or_lock"
+    }
+  ],
+  "body": {
+    "id": "body",
+    "nodeName": "pistol_body",
+    "meshIndex": 1,
+    "meshName": "pistol001_02 - Default_0",
+    "role": "main_grip_and_frame_decimated_in_pipeline"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "description": "Lunar lander parts keyed for VFX, UI, and tooling. Node names match Three.js Object3D.name after loading public/models/lander.glb.",
+  "sourceGlb": "/models/lander.glb",
+  "orientation": {
+    "front": "Stairs / ladder side (hatch). Fore = toward this side; Aft = opposite.",
+    "rcsQuads": "FL = front-left, FR = front-right, BL = back-left, BR = back-right (viewed from above, front = ladder)."
+  },
+  "antenna": [
+    {
+      "id": "antenna_front",
+      "nodeName": "Antenna Front",
+      "meshIndex": 0,
+      "meshName": "Antennas_Lunar Lander_0.001",
+      "role": "primary_forward_dish"
+    },
+    {
+      "id": "antennas_side_cluster",
+      "nodeName": "Antennas Side_Lunar Lander_0",
+      "meshIndex": 2,
+      "meshName": "Antennas Side_Lunar Lander_0",
+      "role": "side_antenna_assembly"
+    }
+  ],
+  "rcsThrusters": [
+    { "id": "rcs_fl_up", "nodeName": "RCS_FL_Up", "meshIndex": 20, "meshName": "Thrusters_Lunar Lander_0.008" },
+    { "id": "rcs_fl_down", "nodeName": "RCS_FL_Down", "meshIndex": 18, "meshName": "Thrusters_Lunar Lander_0.007" },
+    { "id": "rcs_fl_fore", "nodeName": "RCS_FL_Fore", "meshIndex": 19, "meshName": "Thrusters_Lunar Lander_0.006" },
+    { "id": "rcs_fl_aft", "nodeName": "RCS_FL_Aft", "meshIndex": 17, "meshName": "Thrusters_Lunar Lander_0.005" },
+    { "id": "rcs_fr_up", "nodeName": "RCS_FR_Up", "meshIndex": 24, "meshName": "Thrusters_Lunar Lander_0.012" },
+    { "id": "rcs_fr_down", "nodeName": "RCS_FR_Down", "meshIndex": 22, "meshName": "Thrusters_Lunar Lander_0.011" },
+    { "id": "rcs_fr_fore", "nodeName": "RCS_FR_Fore", "meshIndex": 23, "meshName": "Thrusters_Lunar Lander_0.009" },
+    { "id": "rcs_fr_aft", "nodeName": "RCS_FR_Aft", "meshIndex": 21, "meshName": "Thrusters_Lunar Lander_0.010" },
+    { "id": "rcs_bl_up", "nodeName": "RCS_BL_Up", "meshIndex": 12, "meshName": "Thrusters_Lunar Lander_0.004" },
+    { "id": "rcs_bl_down", "nodeName": "RCS_BL_Down", "meshIndex": 10, "meshName": "Thrusters_Lunar Lander_0.003" },
+    { "id": "rcs_bl_fore", "nodeName": "RCS_BL_Fore", "meshIndex": 11, "meshName": "Thrusters_Lunar Lander_0.002" },
+    { "id": "rcs_bl_aft", "nodeName": "RCS_BL_Aft", "meshIndex": 9, "meshName": "Thrusters_Lunar Lander_0.001" },
+    { "id": "rcs_br_up", "nodeName": "RCS_BR_Up", "meshIndex": 16, "meshName": "Thrusters_Lunar Lander_0.013" },
+    { "id": "rcs_br_down", "nodeName": "RCS_BR_Down", "meshIndex": 14, "meshName": "Thrusters_Lunar Lander_0.015" },
+    { "id": "rcs_br_fore", "nodeName": "RCS_BR_Fore", "meshIndex": 15, "meshName": "Thrusters_Lunar Lander_0.016" },
+    { "id": "rcs_br_aft", "nodeName": "RCS_BR_Aft", "meshIndex": 13, "meshName": "Thrusters_Lunar Lander_0.014" }
+  ],
+  "rcsScaffolding": {
+    "id": "rcs_scaffolding",
+    "nodeName": "RCS_Scaffolding",
+    "meshIndex": 25,
+    "meshName": "Thrusters_Lunar Lander_0",
+    "role": "shared_thruster_frame_not_a_nozzle_emitter"
+  },
+  "mainDescentEngine": {
+    "id": "main_descent_engine",
+    "nodeName": "Thruster_Lunar Lander_0",
+    "meshIndex": 8,
+    "meshName": "Thruster_Lunar Lander_0",
+    "role": "large_center_bell"
+  }
+}
