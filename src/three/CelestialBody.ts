@@ -143,8 +143,14 @@ export class CelestialBody implements GravityWell {
     const direction = new THREE.Vector3().subVectors(this.position, pos)
     // Only XZ plane — no vertical pull
     direction.y = 0
-    const distSq = Math.max(direction.lengthSq(), MIN_GRAVITY_DISTANCE * MIN_GRAVITY_DISTANCE)
-    const forceMag = (GRAVITY_CONSTANT * this.mass) / distSq
+    const dist = Math.max(direction.length(), MIN_GRAVITY_DISTANCE)
+
+    // Smooth ramp: no pull outside influence radius, full 1/r² inside
+    const t = Math.max(0, 1 - dist / this.influenceRadius)
+    // Cubic ease-in so pull is gentle at the edge, aggressive near center
+    const ramp = t * t * t
+
+    const forceMag = (GRAVITY_CONSTANT * this.mass * ramp) / (dist * dist)
     return direction.normalize().multiplyScalar(forceMag)
   }
 
