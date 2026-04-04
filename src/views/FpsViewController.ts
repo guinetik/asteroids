@@ -25,6 +25,7 @@ import { TerrainGrid } from '@/three/TerrainGrid'
 import { generateTerrain } from '@/lib/terrain/terrainGenerator'
 import type { SurfaceFeatures } from '@/lib/asteroids/types'
 import { AmbientLight, DirectionalLight } from 'three'
+import { Heightmap } from '@/lib/terrain/heightmap'
 import { MultiToolController } from '@/three/MultiToolController'
 import playerConfigJson from '@/data/fps/player-config.json'
 
@@ -79,12 +80,15 @@ export class FpsViewController implements Tickable {
     this.sceneManager = new SceneManager()
     this.sceneManager.mount(container)
 
-    // Terrain
-    const heightmap = generateTerrain(TEST_SURFACE, {
-      seed: TERRAIN_SEED,
-      resolution: TERRAIN_RESOLUTION,
-      worldSize: GRID_SIZE,
-    })
+    // Terrain — ?flat=true for a flat testing surface
+    const flat = new URLSearchParams(window.location.search).has('flat')
+    const heightmap = flat
+      ? new Heightmap(TERRAIN_RESOLUTION, GRID_SIZE)
+      : generateTerrain(TEST_SURFACE, {
+          seed: TERRAIN_SEED,
+          resolution: TERRAIN_RESOLUTION,
+          worldSize: GRID_SIZE,
+        })
     this.terrainGrid = new TerrainGrid(heightmap)
     this.sceneManager.addToScene(this.terrainGrid.mesh)
 
