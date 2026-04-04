@@ -27,6 +27,13 @@ import { ORBIT_SCALE } from '@/lib/planets/constants'
 const TICK_PRIORITY_COMPOSIT = TICK_PRIORITY_RENDER - 1
 
 /**
+ * Minimum mass (M☉) for a planet to contribute to the space-time grid.
+ * Below this, the gravity well is sub-pixel. Filters out terrestrials
+ * and dwarf planets, keeping Sun + Jupiter/Saturn/Uranus/Neptune.
+ */
+const GRID_MASS_THRESHOLD = 1e-5
+
+/**
  * Bridges Vue lifecycle to the map scene.
  */
 export class MapViewController implements Tickable {
@@ -82,8 +89,8 @@ export class MapViewController implements Tickable {
     // Space-time grid (gravity well visualization)
     const kuiperOuterEdge = 2400 * ORBIT_SCALE
     const gridSize = kuiperOuterEdge * 2.2
-    const gridDepthScale = 10  // Well depth scale (Sun = 10 units deep)
-    const gridWidthScale = 8   // Well width scale (Sun sigma = 8 units)
+    const gridDepthScale = 10   // Well depth scale (Sun = 10 units deep)
+    const gridWidthScale = 8    // Well width scale (Sun sigma = 8 units)
     const gridMassExponent = 0.2 // Compress mass range so planets are visible (vs 0.5 = sqrt)
     this.spaceTimeGrid = new SpaceTimeGrid(gridSize, 200, gridDepthScale, gridWidthScale, gridMassExponent)
     scene.add(this.spaceTimeGrid.mesh)
@@ -137,7 +144,9 @@ export class MapViewController implements Tickable {
           mass: this.sunController.mass,
         })
       }
+      // Only gas/ice giants have enough mass to visibly warp the grid
       for (const controller of this.planetControllers) {
+        if (controller.mass < GRID_MASS_THRESHOLD) continue
         this.spaceTimeGrid.addSource({
           x: controller.getWorldX(),
           z: controller.getWorldZ(),
