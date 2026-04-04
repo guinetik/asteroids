@@ -19,10 +19,15 @@ const MODEL_SCALE = 0.01
  */
 const MODEL_ROTATION_X = -Math.PI / 2
 
-/** Engine nozzle position in raw model coordinates (pre-scale). */
-const ENG_POSITION_X = -500
-const ENG_POSITION_Y = 0
-const ENG_POSITION_Z = 60
+/**
+ * Engine nozzle positions in raw model coordinates (pre-scale).
+ * 3 SSME nozzles arranged in a triangle: one top-center, two bottom-sides.
+ */
+const ENG_POSITIONS: [number, number, number][] = [
+  [-500, 0, 100],    // top center
+  [-500, -60, 40],   // bottom left
+  [-500, 60, 40],    // bottom right
+]
 
 const DOOR_OPEN_ANGLE = Math.PI * 0.6 // ~108 degrees, payload bay doors open wide
 const DOOR_ANIM_SPEED = 2 // radians per second
@@ -196,24 +201,18 @@ export class ShuttleController implements Tickable {
     // main scene root and position in raw model coordinates.
     // Engine plate (shutlayer_16) is at the rear: X ≈ -650, Y ≈ 0, Z ≈ 100
     if (engNode) {
+      // Remove from original parent (under <3DSRoot>_2)
       const engParent = engNode.parent
       if (engParent) engParent.remove(engNode)
-      scene.add(engNode)
-      engNode.position.set(ENG_POSITION_X, ENG_POSITION_Y, ENG_POSITION_Z)
-      engNode.rotation.set(0, 0, 0)
-      engNode.scale.set(1, 1, 1)
 
-      // Debug: log eng children to understand nozzle structure
-      console.log('[Eng] children:', engNode.children.map((c) => c.name))
-      engNode.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          const box = new THREE.Box3().setFromObject(child)
-          const size = box.getSize(new THREE.Vector3())
-          const center = box.getCenter(new THREE.Vector3())
-          const mats = Array.isArray(child.material) ? child.material : [child.material]
-          console.log(`[Eng mesh] "${child.name}" mat=[${mats.map((m: THREE.Material) => m.name)}] center:`, center, 'size:', size)
-        }
-      })
+      // Place 3 copies in the triangle SSME arrangement
+      for (const [x, y, z] of ENG_POSITIONS) {
+        const nozzle = engNode.clone()
+        nozzle.position.set(x, y, z)
+        nozzle.rotation.set(0, 0, 0)
+        nozzle.scale.set(1, 1, 1)
+        scene.add(nozzle)
+      }
     }
 
     // Hide RCS for now — needs separate OMS pod alignment
