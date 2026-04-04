@@ -44,6 +44,9 @@ export class HomeViewController implements Tickable {
   private spaceTimeGrid: SpaceTimeGrid | null = null
   private celestialBodies: CelestialBody[] = []
 
+  /** Called each frame with (speed, heading) for HUD display */
+  onTelemetry: ((speed: number, heading: number) => void) | null = null
+
   async init(container: HTMLElement): Promise<void> {
     // Core systems
     this.inputManager = new InputManager(DEFAULT_BINDINGS)
@@ -121,6 +124,9 @@ export class HomeViewController implements Tickable {
   tick(_dt: number): void {
     if (this.inputManager?.wasActionPressed('toggleDoors')) {
       this.shuttleController?.toggleDoors()
+    }
+    if (this.shuttleController && this.onTelemetry) {
+      this.onTelemetry(this.shuttleController.speed, this.shuttleController.heading)
     }
   }
 
