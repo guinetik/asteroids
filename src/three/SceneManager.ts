@@ -26,7 +26,7 @@ export class SceneManager implements Tickable {
   readonly controls: OrbitControls
 
   private container: HTMLElement | null = null
-  private chaseMode = true
+  private chaseMode = false
   private shuttleRef: THREE.Object3D | null = null
   private cameraHeight = CAMERA_INITIAL_HEIGHT
 
@@ -42,7 +42,7 @@ export class SceneManager implements Tickable {
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true
-    this.controls.enabled = false // chase cam is default
+    this.controls.enabled = true // orbit controls active
 
     window.addEventListener('resize', this.onResize)
     window.addEventListener('wheel', this.onWheel, { passive: false })
