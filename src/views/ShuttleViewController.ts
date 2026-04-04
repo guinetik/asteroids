@@ -20,6 +20,8 @@ import { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
 import { CelestialBody } from '@/three/CelestialBody'
 import { AmbientLight, PointLight, Vector3 } from 'three'
 import { PortalArrivalSequence } from '@/three/PortalArrivalSequence'
+import { PortalBoundarySystem } from '@/three/PortalBoundarySystem'
+import { VibePortal } from '@/lib/portal'
 
 const ONE_SHOT_PRIORITY = TICK_PRIORITY_INPUT + 1
 const AMBIENT_LIGHT_INTENSITY = 0.3
@@ -48,6 +50,7 @@ export class ShuttleViewController implements Tickable {
   private spaceTimeGrid: SpaceTimeGrid | null = null
   private celestialBodies: CelestialBody[] = []
   private portalArrival: PortalArrivalSequence | null = null
+  private boundarySystem: PortalBoundarySystem | null = null
 
   /** Called each frame with full shuttle telemetry for HUD display */
   onTelemetry: ((telemetry: ShuttleTelemetry) => void) | null = null
@@ -132,6 +135,23 @@ export class ShuttleViewController implements Tickable {
     this.vehicleCamera.setTarget(this.shuttleController.group)
     this.tickHandler.register(this.shuttleController, TICK_PRIORITY_PHYSICS)
 
+    // Outbound portal walls at grid edges
+    this.boundarySystem = new PortalBoundarySystem(
+      4000,
+      this.shuttleController.group.position,
+      () => ({
+        speed: this.shuttleController?.speed,
+        rotation_y: this.shuttleController?.heading,
+      }),
+    )
+    for (const wall of this.boundarySystem.walls) {
+      this.sceneManager.addToScene(wall)
+    }
+    this.tickHandler.register(this.boundarySystem, TICK_PRIORITY_ANIMATION)
+    this.boundarySystem.onDepart = (state) => {
+      new VibePortal().depart(state as Record<string, string | number>)
+    }
+
     // Thruster effects
     this.thrusterController = new ThrusterEffectController(this.shuttleController)
     this.sceneManager.addToScene(this.thrusterController.thrustPoints)
@@ -174,6 +194,7 @@ export class ShuttleViewController implements Tickable {
     this.gameLoop?.stop()
     this.thrusterController?.dispose()
     this.portalArrival?.dispose()
+    this.boundarySystem?.dispose()
     this.shuttleController?.dispose()
     this.starFieldController?.dispose()
     this.spaceTimeGrid?.dispose()
