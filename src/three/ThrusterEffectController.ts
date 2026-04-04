@@ -14,6 +14,7 @@ const BRAKE_COLOR = new THREE.Color(0x4488ff)
 const THRUST_OFFSET = new THREE.Vector3(-7, 0, 0) // engine nozzles: rear of shuttle (-X)
 const BRAKE_OFFSET = new THREE.Vector3(7, 0, 0) // dampener: in front of shuttle nose (+X)
 const PUSH_FORCE = 20
+const FAR_AWAY = 99999
 
 /** Internal particle state for the pool-based particle system. */
 interface Particle {
@@ -55,6 +56,9 @@ export class ThrusterEffectController implements Tickable {
   tick(dt: number): void {
     const isThrusting = this.shuttle.isThrusting
     const isBraking = this.shuttle.isBraking
+    if (isThrusting || isBraking) {
+      console.log('[Thruster] thrust:', isThrusting, 'brake:', isBraking, 'pos:', this.shuttle.position.toArray())
+    }
 
     if (isThrusting) {
       this.thrustSpawnAccumulator += THRUST_SPAWN_RATE * dt
@@ -141,31 +145,31 @@ export class ThrusterEffectController implements Tickable {
 
     for (let i = 0; i < pool.length; i++) {
       const p = pool[i]!
+      const i3 = i * 3
+
       if (!p.alive) {
-        positions[i * 3] = 0
-        positions[i * 3 + 1] = 0
-        positions[i * 3 + 2] = 0
+        // Park dead particles far off-screen
+        positions[i3] = FAR_AWAY
+        positions[i3 + 1] = FAR_AWAY
+        positions[i3 + 2] = FAR_AWAY
         continue
       }
 
       p.age += dt
       if (p.age >= PARTICLE_LIFETIME) {
         p.alive = false
-        positions[i * 3] = 0
-        positions[i * 3 + 1] = 0
-        positions[i * 3 + 2] = 0
+        positions[i3] = FAR_AWAY
+        positions[i3 + 1] = FAR_AWAY
+        positions[i3 + 2] = FAR_AWAY
         continue
       }
 
       p.position.addScaledVector(p.velocity, dt)
-      positions[i * 3] = p.position.x
-      positions[i * 3 + 1] = p.position.y
-      positions[i * 3 + 2] = p.position.z
+      positions[i3] = p.position.x
+      positions[i3 + 1] = p.position.y
+      positions[i3 + 2] = p.position.z
     }
 
     posAttr.needsUpdate = true
-
-    const aliveCount = pool.filter((p) => p.alive).length
-    ;(points.material as THREE.PointsMaterial).opacity = aliveCount > 0 ? 0.8 : 0
   }
 }
