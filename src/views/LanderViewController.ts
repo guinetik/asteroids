@@ -18,6 +18,7 @@ import {
   TICK_PRIORITY_RENDER,
 } from '@/lib/tickPriorities'
 import { SceneManager } from '@/three/SceneManager'
+import { VehicleCamera, LANDER_CAMERA_CONFIG } from '@/three/VehicleCamera'
 import { LanderController } from '@/three/LanderController'
 import { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
 import { AmbientLight, DirectionalLight } from 'three'
@@ -40,6 +41,7 @@ export class LanderViewController implements Tickable {
   private tickHandler: TickHandler | null = null
   private inputManager: InputManager | null = null
   private sceneManager: SceneManager | null = null
+  private vehicleCamera: VehicleCamera | null = null
   private landerController: LanderController | null = null
   private spaceTimeGrid: SpaceTimeGrid | null = null
 
@@ -49,9 +51,12 @@ export class LanderViewController implements Tickable {
     this.tickHandler = new TickHandler()
     this.tickHandler.register(this.inputManager, TICK_PRIORITY_INPUT)
 
-    // Scene
+    // Scene + camera
     this.sceneManager = new SceneManager()
     this.sceneManager.mount(container)
+    this.vehicleCamera = new VehicleCamera(LANDER_CAMERA_CONFIG, this.sceneManager.renderer.domElement)
+    this.sceneManager.setCamera(this.vehicleCamera)
+    this.tickHandler.register(this.vehicleCamera, TICK_PRIORITY_RENDER - 1)
     this.tickHandler.register(this.sceneManager, TICK_PRIORITY_RENDER)
 
     // Flat spacetime grid — no gravity sources
@@ -72,7 +77,7 @@ export class LanderViewController implements Tickable {
     this.landerController.group.position.y = SPAWN_HEIGHT
     this.sceneManager.addToScene(this.landerController.group)
     this.sceneManager.addToScene(this.landerController.flameEmitter.points)
-    this.sceneManager.setShuttleRef(this.landerController.group)
+    this.vehicleCamera.setTarget(this.landerController.group)
     this.tickHandler.register(this.landerController, TICK_PRIORITY_PHYSICS)
 
     // Start the loop
@@ -88,6 +93,7 @@ export class LanderViewController implements Tickable {
     this.gameLoop?.stop()
     this.landerController?.dispose()
     this.spaceTimeGrid?.dispose()
+    this.vehicleCamera?.dispose()
     this.sceneManager?.dispose()
     this.inputManager?.dispose()
   }

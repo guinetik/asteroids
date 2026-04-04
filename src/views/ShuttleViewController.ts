@@ -12,6 +12,7 @@ import {
   TICK_PRIORITY_RENDER,
 } from '@/lib/tickPriorities'
 import { SceneManager } from '@/three/SceneManager'
+import { VehicleCamera, SHUTTLE_CAMERA_CONFIG } from '@/three/VehicleCamera'
 import { ShuttleController } from '@/three/ShuttleController'
 import { ThrusterEffectController } from '@/three/ThrusterEffectController'
 import { StarFieldController } from '@/three/StarFieldController'
@@ -39,6 +40,7 @@ export class ShuttleViewController implements Tickable {
   private tickHandler: TickHandler | null = null
   private inputManager: InputManager | null = null
   private sceneManager: SceneManager | null = null
+  private vehicleCamera: VehicleCamera | null = null
   private shuttleController: ShuttleController | null = null
   private thrusterController: ThrusterEffectController | null = null
   private starFieldController: StarFieldController | null = null
@@ -54,9 +56,12 @@ export class ShuttleViewController implements Tickable {
     this.tickHandler = new TickHandler()
     this.tickHandler.register(this.inputManager, TICK_PRIORITY_INPUT)
 
-    // Scene
+    // Scene + camera
     this.sceneManager = new SceneManager()
     this.sceneManager.mount(container)
+    this.vehicleCamera = new VehicleCamera(SHUTTLE_CAMERA_CONFIG, this.sceneManager.renderer.domElement)
+    this.sceneManager.setCamera(this.vehicleCamera)
+    this.tickHandler.register(this.vehicleCamera, TICK_PRIORITY_RENDER - 1)
     this.tickHandler.register(this.sceneManager, TICK_PRIORITY_RENDER)
 
     // Stars
@@ -107,7 +112,7 @@ export class ShuttleViewController implements Tickable {
       Math.sin(spawnAngle) * spawnRadius,
     )
     this.sceneManager.addToScene(this.shuttleController.group)
-    this.sceneManager.setShuttleRef(this.shuttleController.group)
+    this.vehicleCamera.setTarget(this.shuttleController.group)
     this.tickHandler.register(this.shuttleController, TICK_PRIORITY_PHYSICS)
 
     // Thruster effects
@@ -155,6 +160,7 @@ export class ShuttleViewController implements Tickable {
     this.starFieldController?.dispose()
     this.spaceTimeGrid?.dispose()
     for (const body of this.celestialBodies) body.dispose()
+    this.vehicleCamera?.dispose()
     this.sceneManager?.dispose()
     this.inputManager?.dispose()
   }
