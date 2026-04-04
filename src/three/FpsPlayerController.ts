@@ -100,8 +100,6 @@ export class FpsPlayerController implements Tickable {
   private readonly heightmap: Heightmap
   private readonly lateralVelocity = new THREE.Vector3()
   private _deathTimer: number | null = null
-  /** Jump input buffer — time remaining to honor a jump press. */
-  private jumpBuffer = 0
   /** Coyote timer — time since last grounded, allows late jumps. */
   private coyoteTimer = 0
 
@@ -194,24 +192,19 @@ export class FpsPlayerController implements Tickable {
       this.coyoteTimer = Math.max(0, this.coyoteTimer - dt)
     }
 
-    // --- Input-driven jump (buffered + coyote) ---
-    if (this.inputManager.wasActionPressed('jump')) {
-      this.jumpBuffer = JUMP_BUFFER_TIME
-    }
-    this.jumpBuffer = Math.max(0, this.jumpBuffer - dt)
-    const canJump = this.jumpBuffer > 0 && this.coyoteTimer > 0
-    const jumpPressed = canJump && this.thrusterSystem.canFire('jump')
-    if (jumpPressed) {
+    // --- Input-driven jump (hold to auto-hop) ---
+    const jumpHeld = this.inputManager.isActionActive('jump')
+    const canJump = jumpHeld && this.coyoteTimer > 0 && this.thrusterSystem.canFire('jump')
+    if (canJump) {
       this.body.impulse(this.config.movement.jumpForce)
       this.body.grounded = false
       this.coyoteTimer = 0
-      this.jumpBuffer = 0
     }
 
     // --- Thruster system tick (recharge / drain) ---
     this.thrusterSystem.tick(dt, {
       sprint: isSprinting,
-      jump: jumpPressed,
+      jump: canJump,
     })
 
     // --- Base O2 drain (breathing) ---
