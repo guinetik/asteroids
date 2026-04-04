@@ -15,8 +15,10 @@ const SHUTTLE_ANIMATION_NAME = 'shutAction'
 
 const THRUST_FORCE = 20
 const BRAKE_FACTOR = 0.95
-const STRAFE_FORCE = 15
-const YAW_SPEED = 2
+const YAW_SPEED = 1.5
+const ROLL_SPEED = 2
+const BANK_ANGLE = 0.4 // radians — how far the ship tilts when yawing
+const BANK_LERP_SPEED = 4 // how fast the ship banks/unbanks
 const MAX_SPEED = 80
 
 /**
@@ -34,6 +36,7 @@ export class ShuttleController implements Tickable {
   private doorAction: THREE.AnimationAction | null = null
   private doorsOpen = false
   private velocity = new THREE.Vector3()
+  private currentBank = 0
   private readonly inputManager: InputManager
 
   constructor(inputManager: InputManager) {
@@ -118,33 +121,39 @@ export class ShuttleController implements Tickable {
 
   private updateMovement(dt: number): void {
     const input = this.inputManager
-    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.group.quaternion)
-    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.group.quaternion)
 
-    // Yaw
+    // Yaw (A/D) — turn left/right
+    let targetBank = 0
     if (input.isActionActive('yawLeft')) {
       this.group.rotateY(YAW_SPEED * dt)
+      targetBank = BANK_ANGLE
     }
     if (input.isActionActive('yawRight')) {
       this.group.rotateY(-YAW_SPEED * dt)
+      targetBank = -BANK_ANGLE
     }
 
-    // Thrust
+    // Bank (visual tilt into turns) — lerp toward target
+    this.currentBank += (targetBank - this.currentBank) * BANK_LERP_SPEED * dt
+    this.group.rotation.z = this.currentBank
+
+    // Roll (Q/E)
+    if (input.isActionActive('rollLeft')) {
+      this.group.rotateZ(ROLL_SPEED * dt)
+    }
+    if (input.isActionActive('rollRight')) {
+      this.group.rotateZ(-ROLL_SPEED * dt)
+    }
+
+    // Thrust (W) — accelerate along forward direction
+    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.group.quaternion)
     if (input.isActionActive('thrust')) {
       this.velocity.addScaledVector(forward, THRUST_FORCE * dt)
     }
 
-    // Brake (inertia dampener)
+    // Brake (S) — inertia dampener
     if (input.isActionActive('brake')) {
       this.velocity.multiplyScalar(BRAKE_FACTOR)
-    }
-
-    // Strafe
-    if (input.isActionActive('strafeLeft')) {
-      this.velocity.addScaledVector(right, -STRAFE_FORCE * dt)
-    }
-    if (input.isActionActive('strafeRight')) {
-      this.velocity.addScaledVector(right, STRAFE_FORCE * dt)
     }
 
     // Clamp speed

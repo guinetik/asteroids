@@ -6,8 +6,9 @@ const CAMERA_FOV = 60
 const CAMERA_NEAR = 0.1
 const CAMERA_FAR = 50000
 const CAMERA_INITIAL_OFFSET = new THREE.Vector3(0, 20, 30)
-const CHASE_CAM_OFFSET = new THREE.Vector3(0, 12, -20)
-const CHASE_CAM_LERP_SPEED = 5
+const CHASE_CAM_OFFSET = new THREE.Vector3(0, 8, -25)
+const CHASE_CAM_LERP_SPEED = 4
+const CHASE_CAM_LOOK_AHEAD = 10 // look slightly ahead of the shuttle
 
 /**
  * Three.js scene orchestrator — creates renderer, camera, and controls.
@@ -24,7 +25,7 @@ export class SceneManager implements Tickable {
   readonly controls: OrbitControls
 
   private container: HTMLElement | null = null
-  private chaseMode = false
+  private chaseMode = true
   private shuttleRef: THREE.Object3D | null = null
 
   constructor() {
@@ -39,6 +40,7 @@ export class SceneManager implements Tickable {
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true
+    this.controls.enabled = false // chase cam is default
 
     window.addEventListener('resize', this.onResize)
   }
@@ -77,7 +79,11 @@ export class SceneManager implements Tickable {
         const offset = CHASE_CAM_OFFSET.clone().applyQuaternion(this.shuttleRef.quaternion)
         const targetPos = shuttlePos.clone().add(offset)
         this.camera.position.lerp(targetPos, CHASE_CAM_LERP_SPEED * dt)
-        this.camera.lookAt(shuttlePos)
+        // Look slightly ahead of the shuttle for a better flight feel
+        const lookAhead = new THREE.Vector3(0, 0, CHASE_CAM_LOOK_AHEAD)
+          .applyQuaternion(this.shuttleRef.quaternion)
+          .add(shuttlePos)
+        this.camera.lookAt(lookAhead)
       } else {
         this.controls.target.copy(shuttlePos)
         this.controls.update()

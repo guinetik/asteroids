@@ -9,10 +9,10 @@
 export const DEFAULT_BINDINGS: Record<string, string[]> = {
   thrust: ['KeyW'],
   brake: ['KeyS'],
-  strafeLeft: ['KeyA'],
-  strafeRight: ['KeyD'],
-  yawLeft: ['KeyQ'],
-  yawRight: ['KeyE'],
+  yawLeft: ['KeyA'],
+  yawRight: ['KeyD'],
+  rollLeft: ['KeyQ'],
+  rollRight: ['KeyE'],
   toggleDoors: ['KeyF'],
   toggleCamera: ['KeyC'],
 }
