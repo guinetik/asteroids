@@ -129,10 +129,10 @@ export class ShuttleController implements Tickable {
 
     // Doors hinge along X axis (nose-to-tail in model space)
     if (this.doorPortNode) {
-      this.doorPortNode.rotation.x = this.doorPortClosedRotX + angle
+      this.doorPortNode.rotation.x = this.doorPortClosedRotX - angle
     }
     if (this.doorStbNode) {
-      this.doorStbNode.rotation.x = this.doorStbClosedRotX - angle
+      this.doorStbNode.rotation.x = this.doorStbClosedRotX + angle
     }
   }
 
