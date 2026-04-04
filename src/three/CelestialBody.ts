@@ -6,10 +6,17 @@ import * as THREE from 'three'
  * so that solar-mass bodies produce meaningful acceleration
  * on the shuttle at game-scale distances.
  */
-const GRAVITY_CONSTANT = 800
+const GRAVITY_CONSTANT = 3000
 
 /** Minimum distance to prevent infinite force at center */
-const MIN_GRAVITY_DISTANCE = 10
+const MIN_GRAVITY_DISTANCE = 15
+
+/**
+ * Radius at which gravity becomes "significant" for the shuttle.
+ * Used for the visual danger ring. Scales with sqrt(mass).
+ */
+const GRAVITY_INFLUENCE_SCALE = 250
+const INFLUENCE_RING_SEGMENTS = 64
 
 /**
  * Interface for any object that exerts gravitational pull.
@@ -53,8 +60,10 @@ export class CelestialBody implements GravityWell {
   readonly name: string
   readonly mass: number
   readonly group = new THREE.Group()
+  readonly influenceRadius: number
   private readonly bodyMesh: THREE.Mesh
   private readonly glowMesh: THREE.Mesh
+  private readonly influenceRing: THREE.LineLoop
 
   constructor(config: CelestialBodyConfig) {
     this.name = config.name
@@ -79,6 +88,26 @@ export class CelestialBody implements GravityWell {
     this.glowMesh = new THREE.Mesh(glowGeo, glowMat)
     this.group.add(this.glowMesh)
 
+    // Gravity influence ring — red circle on the XZ plane
+    this.influenceRadius = GRAVITY_INFLUENCE_SCALE * Math.sqrt(config.mass)
+    const ringPoints: THREE.Vector3[] = []
+    for (let i = 0; i <= INFLUENCE_RING_SEGMENTS; i++) {
+      const angle = (i / INFLUENCE_RING_SEGMENTS) * Math.PI * 2
+      ringPoints.push(new THREE.Vector3(
+        Math.cos(angle) * this.influenceRadius,
+        0.5, // slightly above grid to stay visible
+        Math.sin(angle) * this.influenceRadius,
+      ))
+    }
+    const ringGeo = new THREE.BufferGeometry().setFromPoints(ringPoints)
+    const ringMat = new THREE.LineBasicMaterial({
+      color: 0xff2222,
+      transparent: true,
+      opacity: 0.5,
+    })
+    this.influenceRing = new THREE.LineLoop(ringGeo, ringMat)
+    this.group.add(this.influenceRing)
+
     this.group.position.copy(config.position)
   }
 
@@ -100,5 +129,7 @@ export class CelestialBody implements GravityWell {
     ;(this.bodyMesh.material as THREE.MeshBasicMaterial).dispose()
     this.glowMesh.geometry.dispose()
     ;(this.glowMesh.material as THREE.MeshBasicMaterial).dispose()
+    this.influenceRing.geometry.dispose()
+    ;(this.influenceRing.material as THREE.LineBasicMaterial).dispose()
   }
 }
