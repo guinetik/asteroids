@@ -10,49 +10,51 @@ describe('ITEM_CATALOG', () => {
   })
 
   it('all items have valid category', () => {
-    for (const [id, item] of Object.entries(ITEM_CATALOG)) {
-      expect(VALID_CATEGORIES.has(item.category), `${id} has invalid category`).toBe(true)
+    for (const [_id, item] of Object.entries(ITEM_CATALOG)) {
+      expect(VALID_CATEGORIES.has(item.category)).toBe(true)
     }
   })
 
   it('all items have positive weightPerUnit', () => {
-    for (const [id, item] of Object.entries(ITEM_CATALOG)) {
-      expect(item.weightPerUnit, `${id} weightPerUnit`).toBeGreaterThan(0)
+    for (const [_id, item] of Object.entries(ITEM_CATALOG)) {
+      expect(item.weightPerUnit).toBeGreaterThan(0)
     }
   })
 
   it('all items have positive maxStack', () => {
-    for (const [id, item] of Object.entries(ITEM_CATALOG)) {
-      expect(item.maxStack, `${id} maxStack`).toBeGreaterThan(0)
+    for (const [_id, item] of Object.entries(ITEM_CATALOG)) {
+      expect(item.maxStack).toBeGreaterThan(0)
     }
   })
 
   it('all items have non-empty label and description', () => {
-    for (const [id, item] of Object.entries(ITEM_CATALOG)) {
-      expect(item.label, `${id} label`).toBeTruthy()
-      expect(item.description, `${id} description`).toBeTruthy()
+    for (const [_id, item] of Object.entries(ITEM_CATALOG)) {
+      expect(item.label).toBeTruthy()
+      expect(item.description).toBeTruthy()
     }
   })
 
   it('all item IDs match their catalog key', () => {
     for (const [key, item] of Object.entries(ITEM_CATALOG)) {
-      expect(item.id, `key ${key} does not match item.id`).toBe(key)
+      expect(item.id).toBe(key)
     }
   })
 
   it('equipment and upgrades have maxStack of 1', () => {
-    for (const [id, item] of Object.entries(ITEM_CATALOG)) {
-      if (item.category === 'equipment' || item.category === 'upgrade') {
-        expect(item.maxStack, `${id} should have maxStack 1`).toBe(1)
-      }
+    const nonStackable = Object.values(ITEM_CATALOG).filter(
+      (item) => item.category === 'equipment' || item.category === 'upgrade',
+    )
+    for (const item of nonStackable) {
+      expect(item.maxStack).toBe(1)
     }
   })
 
   it('all minerals are sellable', () => {
-    for (const [id, item] of Object.entries(ITEM_CATALOG)) {
-      if (item.category === 'mineral') {
-        expect(item.sellable, `mineral ${id} should be sellable`).toBe(true)
-      }
+    const minerals = Object.values(ITEM_CATALOG).filter(
+      (item) => item.category === 'mineral',
+    )
+    for (const item of minerals) {
+      expect(item.sellable).toBe(true)
     }
   })
 })
