@@ -69,7 +69,7 @@ export class SpaceTimeGrid implements Tickable {
     this.massExponent = massExponent
     // Deform every Nth frame. Higher resolution grids can skip more frames.
     // Gravity wells move at orbital speed so even 1fps deformation looks smooth.
-    this.updateInterval = gridResolution > 150 ? 6 : gridResolution > 100 ? 3 : 1
+    this.updateInterval = gridResolution > 150 ? 2 : gridResolution > 100 ? 2 : 1
     this.geometry = this.createGridGeometry()
     const posAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute
     this.basePositions = new Float32Array(posAttr.array as Float32Array)

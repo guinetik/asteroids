@@ -50,7 +50,8 @@ const BRAKE_DEPTH_PENALTY = 0.002 // brake effectiveness lost per unit of well d
 const YAW_TORQUE = 2.5 // angular acceleration per second
 const YAW_MAX_SPEED = 3.5 // max angular velocity
 const YAW_DAMPING = 0.98 // gentle angular friction per frame
-const MAX_SPEED = 60
+const MAX_THRUST_SPEED = 60 // max speed from player thrust alone
+const MAX_GRAVITY_SPEED = 150 // gravity can push you way past thrust max
 
 /**
  * Controls the shuttle model — loading, door animation, movement, and nozzle placement.
@@ -302,9 +303,12 @@ export class ShuttleController implements Tickable {
     // Lock velocity to XZ plane
     this.velocity.y = 0
 
-    // Clamp speed
-    if (this.velocity.length() > MAX_SPEED) {
-      this.velocity.setLength(MAX_SPEED)
+    // Clamp thrust-only speed, but allow gravity to push beyond
+    const currentSpeed = this.velocity.length()
+    if (input.isActionActive('thrust') && currentSpeed > MAX_THRUST_SPEED) {
+      this.velocity.setLength(MAX_THRUST_SPEED)
+    } else if (currentSpeed > MAX_GRAVITY_SPEED) {
+      this.velocity.setLength(MAX_GRAVITY_SPEED)
     }
 
     // Apply velocity and follow spacetime geometry
