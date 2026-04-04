@@ -74,6 +74,12 @@ export class ShuttleController implements Tickable {
   private doorPortClosedRotX = 0
   private doorStbClosedRotX = 0
   private velocity = new THREE.Vector3()
+
+  /** Inject an external velocity (e.g. portal ejection). */
+  setVelocity(v: THREE.Vector3): void {
+    this.velocity.copy(v)
+  }
+
   private angularVelocity = 0
   private readonly inputManager: InputManager
   private spaceTimeGrid: SpaceTimeGrid | null = null
