@@ -183,8 +183,19 @@ export class ShuttleController implements Tickable {
   }
 
   private placeNozzles(scene: THREE.Object3D): void {
-    // Hide eng/rcs nodes — they sit at origin (inside the shuttle) and
-    // need manual alignment that isn't possible without a DCC reference.
+    // Log all mesh material names to find OMS pod references
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        const mats = Array.isArray(child.material) ? child.material : [child.material]
+        const matNames = mats.map((m: THREE.Material) => m.name).filter(Boolean)
+        if (matNames.some((n: string) => n.toLowerCase().includes('oms') || n.toLowerCase().includes('rcs'))) {
+          const pos = new THREE.Vector3()
+          child.getWorldPosition(pos)
+          console.log(`[Nozzle] node="${child.name}" materials=[${matNames.join(', ')}] worldPos:`, pos)
+        }
+      }
+    })
+
     const engNode = this.findNode(scene, 'eng')
     const rcsNode = this.findNode(scene, 'rcs')
     if (engNode) engNode.visible = false
