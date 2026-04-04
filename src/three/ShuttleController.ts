@@ -9,6 +9,7 @@ import { checkEventHorizon, type GravitySource } from '@/lib/physics/gravity'
 import { ThrusterSystem, DEFAULT_SHUTTLE_CONFIG } from '@/lib/physics/thrusterSystem'
 import type { ShuttleThrusterName } from '@/lib/physics/thrusterSystem'
 import { loadGLB } from './loadGLB'
+import { FuelTank } from './FuelTank'
 import type { PortalVehicle } from './PortalArrivalSequence'
 
 /** Any object that can exert gravity on the shuttle */
@@ -52,7 +53,7 @@ const LANDER_MODEL_PATH = '/models/lander.glb'
 /** Scale the lander to fit inside the cargo bay (in raw shuttle cm space) */
 const CARGO_LANDER_SCALE = 30
 /** Position inside the bay — raw model coords (cm), pre-rotation: X=nose-tail, Y=wingspan, Z=height */
-const CARGO_LANDER_OFFSET = new THREE.Vector3(-285, 0, 20)
+const CARGO_LANDER_OFFSET = new THREE.Vector3(-320, 0, 20)
 
 const THRUST_FORCE = 12
 const BRAKE_FACTOR = 0.93
@@ -114,8 +115,10 @@ export class ShuttleController implements Tickable, PortalVehicle {
   private isDead = false
   private deathTarget: THREE.Vector3 | null = null
   private deathSpeed = 0
-  private fuelIndicator: THREE.Mesh | null = null
-  private fuelIndicatorFullLength = 0
+  private landerFuelTank: FuelTank | null = null
+  private shuttleFuelTank: FuelTank | null = null
+  private cargoLight: THREE.PointLight | null = null
+  private readonly cargoWallLights: THREE.PointLight[] = []
 
   constructor(inputManager: InputManager) {
     this.inputManager = inputManager
@@ -150,42 +153,42 @@ export class ShuttleController implements Tickable, PortalVehicle {
 
     this.placeNozzles(gltf.scene)
 
-    // Fuel tank cylinder in the mid-bay
-    const tankRadius = 80
-    const tankLength = 180
-    const tankGeo = new THREE.CylinderGeometry(tankRadius, tankRadius, tankLength, 16)
-    const tankMat = new THREE.MeshStandardMaterial({
-      color: 0xcccccc,
-      metalness: 0.8,
-      roughness: 0.3,
-      transparent: true,
-      opacity: 0.3,
+    // Cargo bay fuel tanks: lander fuel (static display) + shuttle fuel (live)
+    const landerTankLength = 120
+    const shuttleTankLength = 220
+    const tankGap = 20
+    this.landerFuelTank = new FuelTank({
+      radius: 80,
+      length: landerTankLength,
+      position: new THREE.Vector3(-125, 0, 15),
+      color: 0xcc6633,
     })
-    const tank = new THREE.Mesh(tankGeo, tankMat)
-    tank.position.set(-40, 0, 15)
-    tank.rotation.z = Math.PI / 2
-    gltf.scene.add(tank)
+    gltf.scene.add(this.landerFuelTank.group)
 
-    // Fuel level indicator — glowing inner cylinder
-    const indicatorRadius = tankRadius * 0.7
-    const indicatorGeo = new THREE.CylinderGeometry(indicatorRadius, indicatorRadius, tankLength - 10, 16)
-    const indicatorMat = new THREE.MeshBasicMaterial({
-      color: 0x00ff88,
-      transparent: true,
-      opacity: 0.8,
-      depthTest: false,
+    this.shuttleFuelTank = new FuelTank({
+      radius: 80,
+      length: shuttleTankLength,
+      position: new THREE.Vector3(-85 + landerTankLength + tankGap, 0, 15),
+      color: 0x999999,
     })
-    this.fuelIndicator = new THREE.Mesh(indicatorGeo, indicatorMat)
-    // Same position as tank but in game-space (after MODEL_SCALE and rotation)
-    // Tank is at (-40, 0, 15) in raw cm, after 0.01 scale and -90° X rotation:
-    //   X stays: -40 * 0.01 = -0.4
-    //   Y (from Z): 15 * 0.01 = 0.15
-    //   Z (from -Y): 0
-    this.fuelIndicator.position.copy(tank.position)
-    this.fuelIndicator.rotation.z = Math.PI / 2
-    this.fuelIndicator.renderOrder = 1
-    this.fuelIndicatorFullLength = tankLength - 10
-    gltf.scene.add(this.fuelIndicator)
+    gltf.scene.add(this.shuttleFuelTank.group)
+
+    // Cargo bay interior lights — only on when doors open
+    // Main light: between the two fuel tanks
+    this.cargoLight = new THREE.PointLight(0xffeedd, 0, 800)
+    this.cargoLight.position.set(-60, 0, 150)
+    gltf.scene.add(this.cargoLight)
+
+    // Wing wall lights: at the fuselage-thruster bulkhead, port and starboard
+    const wallLightL = new THREE.PointLight(0xffeedd, 0, 400)
+    wallLightL.position.set(-420, -200, 100)
+    gltf.scene.add(wallLightL)
+    this.cargoWallLights.push(wallLightL)
+
+    const wallLightR = new THREE.PointLight(0xffeedd, 0, 400)
+    wallLightR.position.set(-420, 200, 100)
+    gltf.scene.add(wallLightR)
+    this.cargoWallLights.push(wallLightR)
 
     // Load lander model into the cargo bay
     const landerScene = await loadGLB(LANDER_MODEL_PATH)
@@ -279,25 +282,30 @@ export class ShuttleController implements Tickable, PortalVehicle {
   }
 
   private updateFuelIndicator(): void {
-    if (!this.fuelIndicator) return
+    const doorsOpen = this.doorProgress > 0.1
 
-    // Only visible when doors are open
-    this.fuelIndicator.visible = this.doorProgress > 0.1
+    // Cargo lights fade in/out with doors
+    if (this.cargoLight) {
+      this.cargoLight.intensity = this.doorProgress * 2
+    }
+    for (const light of this.cargoWallLights) {
+      light.intensity = this.doorProgress * 1.5
+    }
 
-    if (!this.fuelIndicator.visible) return
+    // Lander fuel — always full (static cargo indicator)
+    if (this.landerFuelTank) {
+      this.landerFuelTank.setVisible(doorsOpen)
+      this.landerFuelTank.update(1.0)
+    }
 
-    const ratio = this.thrusterSystem.fuelCapacity > 0
-      ? this.thrusterSystem.fuelLevel / this.thrusterSystem.fuelCapacity
-      : 0
-
-    // Scale Y (which is length after rotation) to match fuel level
-    this.fuelIndicator.scale.y = Math.max(0.01, ratio)
-
-    // Color: green → yellow → red
-    const mat = this.fuelIndicator.material as THREE.MeshBasicMaterial
-    const r = ratio < 0.5 ? 1 : 1 - (ratio - 0.5) * 2
-    const g = ratio > 0.5 ? 1 : ratio * 2
-    mat.color.setRGB(r, g, 0.2)
+    // Shuttle fuel — live from thruster system
+    if (this.shuttleFuelTank) {
+      this.shuttleFuelTank.setVisible(doorsOpen)
+      const ratio = this.thrusterSystem.fuelCapacity > 0
+        ? this.thrusterSystem.fuelLevel / this.thrusterSystem.fuelCapacity
+        : 0
+      this.shuttleFuelTank.update(ratio)
+    }
   }
 
   private checkDeath(): void {
