@@ -2,7 +2,7 @@
   "movement": {
     "moveThrust": 35.0,
     "sprintMultiplier": 2.0,
-    "groundFriction": 6.0,
+    "groundFriction": 25.0,
     "airFriction": 0.2,
     "maxSpeed": 20.0,
     "maxSprintSpeed": 40.0,

@@ -51,6 +51,7 @@ export class FpsCamera implements Tickable {
   private readonly config: FpsCameraConfig
   private target: THREE.Object3D | null = null
   private readonly euler = new THREE.Euler(0, 0, 0, 'YXZ')
+  private readonly lookQuat = new THREE.Quaternion()
   private roll = 0
   private bobOffset = 0
   private lateralSpeed = 0
@@ -133,9 +134,10 @@ export class FpsCamera implements Tickable {
       this.target.position.z,
     )
 
-    // Apply yaw + pitch + roll rotation
+    // Compose terrain tilt (from player group) with mouse look + roll
     this.euler.set(this.pitch, this.yaw, this.roll)
-    this.camera.quaternion.setFromEuler(this.euler)
+    this.lookQuat.setFromEuler(this.euler)
+    this.camera.quaternion.copy(this.target.quaternion).multiply(this.lookQuat)
   }
 
   dispose(): void {
