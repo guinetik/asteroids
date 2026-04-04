@@ -47,6 +47,8 @@ export class SpaceTimeGrid implements Tickable {
   private readonly basePositions: Float32Array
   private readonly sources: GravitySource[] = []
   private time = 0
+  private frameCounter = 0
+  private readonly updateInterval: number
   private readonly gridSize: number
   private readonly gridResolution: number
   private readonly depthScale: number
@@ -65,6 +67,8 @@ export class SpaceTimeGrid implements Tickable {
     this.depthScale = depthScale
     this.widthScale = widthScale
     this.massExponent = massExponent
+    // Deform every Nth frame. Higher resolution grids can skip more frames.
+    this.updateInterval = gridResolution > 150 ? 4 : gridResolution > 100 ? 2 : 1
     this.geometry = this.createGridGeometry()
     const posAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute
     this.basePositions = new Float32Array(posAttr.array as Float32Array)
@@ -88,7 +92,11 @@ export class SpaceTimeGrid implements Tickable {
 
   tick(dt: number): void {
     this.time += dt
-    this.deformGrid()
+    this.frameCounter++
+    if (this.frameCounter >= this.updateInterval) {
+      this.frameCounter = 0
+      this.deformGrid()
+    }
   }
 
   dispose(): void {
