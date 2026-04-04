@@ -91,4 +91,24 @@ describe('ThrusterSystem', () => {
     sys.tick(10, { thrust: false, brake: false, rcs: false })
     expect(sys.getState('thrust').charge).toBe(DEFAULT_THRUSTER_CONFIG.thrust.capacity)
   })
+
+  it('consumeFuel drains fuel from the shared tank', () => {
+    const sys = createShuttleSystem()
+    const before = sys.fuelLevel
+    sys.consumeFuel(50)
+    expect(sys.fuelLevel).toBe(before - 50)
+  })
+
+  it('consumeFuel clamps fuel to zero', () => {
+    const sys = createShuttleSystem()
+    sys.consumeFuel(999999)
+    expect(sys.fuelLevel).toBe(0)
+  })
+
+  it('consumeFuel does not go negative', () => {
+    const sys = createShuttleSystem()
+    sys.consumeFuel(999999)
+    sys.consumeFuel(10)
+    expect(sys.fuelLevel).toBe(0)
+  })
 })

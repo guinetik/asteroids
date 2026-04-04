@@ -139,6 +139,16 @@ export class ThrusterSystem<T extends string = ShuttleThrusterName> {
   }
 
   /**
+   * Drain fuel directly from the shared tank (e.g. base O2 consumption).
+   * Clamps to zero — will not go negative.
+   *
+   * @param amount - Fuel units to consume
+   */
+  consumeFuel(amount: number): void {
+    this.fuel = Math.max(0, this.fuel - amount)
+  }
+
+  /**
    * Advance one frame. Active thrusters drain charge; idle thrusters recharge from fuel.
    *
    * @param dt - Delta time in seconds
