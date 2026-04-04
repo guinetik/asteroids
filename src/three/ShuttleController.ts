@@ -8,6 +8,7 @@ import type { SpaceTimeGrid } from './SpaceTimeGrid'
 import { checkEventHorizon, type GravitySource } from '@/lib/physics/gravity'
 import { ThrusterSystem, DEFAULT_SHUTTLE_CONFIG } from '@/lib/physics/thrusterSystem'
 import type { ShuttleThrusterName } from '@/lib/physics/thrusterSystem'
+import type { PortalVehicle } from './PortalArrivalSequence'
 
 /** Any object that can exert gravity on the shuttle */
 interface GravityWell {
@@ -64,7 +65,7 @@ const MAX_GRAVITY_SPEED = 150 // gravity can push you way past thrust max
  * @date 2026-04-04
  * @spec docs/superpowers/specs/2026-04-04-shuttle-scene-design.md
  */
-export class ShuttleController implements Tickable {
+export class ShuttleController implements Tickable, PortalVehicle {
   readonly group = new THREE.Group()
 
   private doorsOpen = false

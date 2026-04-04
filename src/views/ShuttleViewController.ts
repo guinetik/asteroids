@@ -19,8 +19,7 @@ import { StarFieldController } from '@/three/StarFieldController'
 import { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
 import { CelestialBody } from '@/three/CelestialBody'
 import { AmbientLight, PointLight, Vector3 } from 'three'
-import { VibePortal } from '@/lib/portal'
-import { PortalWormhole } from '@/three/PortalWormhole'
+import { PortalArrivalSequence } from '@/three/PortalArrivalSequence'
 
 const ONE_SHOT_PRIORITY = TICK_PRIORITY_INPUT + 1
 const AMBIENT_LIGHT_INTENSITY = 0.3
@@ -28,8 +27,6 @@ const SUN_LIGHT_INTENSITY = 3
 const SUN_LIGHT_DISTANCE = 10000
 const SPAWN_MIN_RADIUS = 400
 const SPAWN_MAX_RADIUS = 1500
-const PORTAL_SPAWN_RADIUS = 450
-const PORTAL_DEFAULT_EJECT_SPEED = 40
 
 /**
  * Bridges Vue lifecycle to the game loop and Three.js scene.
@@ -50,7 +47,7 @@ export class ShuttleViewController implements Tickable {
   private starFieldController: StarFieldController | null = null
   private spaceTimeGrid: SpaceTimeGrid | null = null
   private celestialBodies: CelestialBody[] = []
-  private portalWormhole: PortalWormhole | null = null
+  private portalArrival: PortalArrivalSequence | null = null
 
   /** Called each frame with full shuttle telemetry for HUD display */
   onTelemetry: ((telemetry: ShuttleTelemetry) => void) | null = null
@@ -110,50 +107,19 @@ export class ShuttleViewController implements Tickable {
       this.shuttleController?.respawn()
     }
     // Portal arrival or normal spawn
-    const portal = new VibePortal()
-    if (portal.isArrival && this.spaceTimeGrid) {
-      const angle = Math.random() * Math.PI * 2
-      const wormholePos = new Vector3(
-        Math.cos(angle) * PORTAL_SPAWN_RADIUS,
-        0,
-        Math.sin(angle) * PORTAL_SPAWN_RADIUS,
-      )
-
-      this.portalWormhole = new PortalWormhole(wormholePos, this.spaceTimeGrid)
-      this.sceneManager.addToScene(this.portalWormhole.group)
-      this.tickHandler.register(this.portalWormhole, TICK_PRIORITY_ANIMATION)
-
-      // Freeze shuttle at wormhole center during summoning, ignore grid Y until collapse ends
-      this.shuttleController.group.position.set(wormholePos.x, 0, wormholePos.z)
-      this.shuttleController.freeze()
-      this.shuttleController.setIgnoreGridY(true)
-
-      // Random heading — not aimed at the sun
-      this.shuttleController.group.rotation.y = Math.random() * Math.PI * 2
-
-      // Summon → eject: unfreeze and push forward along shuttle's nose direction
-      this.portalWormhole.onEject = () => {
-        this.shuttleController?.unfreeze()
-        const forward = new Vector3(1, 0, 0)
-          .applyQuaternion(this.shuttleController!.group.quaternion)
-        forward.y = 0
-        forward.normalize()
-        const speed = portal.arrival.speed ?? PORTAL_DEFAULT_EJECT_SPEED
-        this.shuttleController?.setVelocity(forward.multiplyScalar(speed))
-      }
-
-      // Start summoning → pulse → collapse sequence
-      this.portalWormhole.eject()
-      this.portalWormhole.onDone = () => {
-        this.shuttleController?.setIgnoreGridY(false)
-        if (this.portalWormhole) {
-          this.tickHandler?.unregister(this.portalWormhole)
-          this.portalWormhole.dispose()
-          this.sceneManager?.removeFromScene(this.portalWormhole.group)
-          this.portalWormhole = null
-        }
-      }
-    } else {
+    this.portalArrival = new PortalArrivalSequence()
+    const arrived = this.portalArrival.tryArrive(
+      this.shuttleController,
+      this.spaceTimeGrid,
+      {
+        addToScene: (obj) => this.sceneManager!.addToScene(obj),
+        removeFromScene: (obj) => this.sceneManager!.removeFromScene(obj),
+        registerTick: (t, p) => this.tickHandler!.register(t, p),
+        unregisterTick: (t) => this.tickHandler!.unregister(t),
+      },
+      TICK_PRIORITY_ANIMATION,
+    )
+    if (!arrived) {
       const spawnAngle = Math.random() * Math.PI * 2
       const spawnRadius = SPAWN_MIN_RADIUS + Math.random() * (SPAWN_MAX_RADIUS - SPAWN_MIN_RADIUS)
       this.shuttleController.group.position.set(
@@ -207,7 +173,7 @@ export class ShuttleViewController implements Tickable {
   dispose(): void {
     this.gameLoop?.stop()
     this.thrusterController?.dispose()
-    this.portalWormhole?.dispose()
+    this.portalArrival?.dispose()
     this.shuttleController?.dispose()
     this.starFieldController?.dispose()
     this.spaceTimeGrid?.dispose()
