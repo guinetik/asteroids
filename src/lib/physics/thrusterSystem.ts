@@ -44,7 +44,7 @@ export type ShuttleThrusterName = 'thrust' | 'brake' | 'rcs'
 /** Default config matching the original shuttle tuning. */
 export const DEFAULT_SHUTTLE_CONFIG: ThrusterSystemConfig<ShuttleThrusterName> = {
   thrusters: {
-    thrust: { capacity: 100, burnRate: 45, rechargeRate: 15, fuelCostPerRecharge: 0.5 },
+    thrust: { capacity: 100, burnRate: 54, rechargeRate: 21, fuelCostPerRecharge: 0.5 },
     brake: { capacity: 60, burnRate: 60, rechargeRate: 5, fuelCostPerRecharge: 0.6 },
     rcs: { capacity: 60, burnRate: 8, rechargeRate: 5, fuelCostPerRecharge: 0.2 },
   },
@@ -153,13 +153,11 @@ export class ThrusterSystem<T extends string = ShuttleThrusterName> {
       if (active[name]) {
         this.charges[name] = Math.max(0, this.charges[name] - cfg.burnRate * dt)
       } else {
-        if (this.fuel > 0) {
+        if (this.fuel > 0 && this.charges[name] < cfg.capacity) {
           const fuelCost = cfg.rechargeRate * dt * cfg.fuelCostPerRecharge
           const actualFuelUsed = Math.min(fuelCost, this.fuel)
-          if (this.charges[name] < cfg.capacity) {
-            const actualRecharge = actualFuelUsed / cfg.fuelCostPerRecharge
-            this.charges[name] = Math.min(cfg.capacity, this.charges[name] + actualRecharge)
-          }
+          const actualRecharge = actualFuelUsed / cfg.fuelCostPerRecharge
+          this.charges[name] = Math.min(cfg.capacity, this.charges[name] + actualRecharge)
           this.fuel = Math.max(0, this.fuel - actualFuelUsed)
         }
       }

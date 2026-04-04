@@ -57,10 +57,14 @@ describe('ThrusterSystem', () => {
 
   it('stops recharging when fuel is empty', () => {
     const sys = createShuttleSystem({ fuelCapacity: 1 })
-    sys.tick(3, { thrust: true, brake: false, rcs: false })
-    const chargeNow = sys.getState('thrust').charge
-    sys.tick(1, { thrust: false, brake: false, rcs: false })
+    // Drain charge first so recharge actually consumes fuel
+    sys.tick(3, { thrust: true, brake: true, rcs: true })
+    // Now let it try to recharge — should exhaust the tiny fuel tank
+    sys.tick(10, { thrust: false, brake: false, rcs: false })
     expect(sys.fuelLevel).toBe(0)
+    const chargeNow = sys.getState('thrust').charge
+    // With no fuel left, charge should not increase further
+    sys.tick(1, { thrust: false, brake: false, rcs: false })
     expect(sys.getState('thrust').charge).toBe(chargeNow)
   })
 
@@ -68,6 +72,8 @@ describe('ThrusterSystem', () => {
     const sys = createShuttleSystem({ fuelCapacity: 1 })
     const cb = vi.fn()
     sys.onFuelEmpty = cb
+    // Drain charge so recharge consumes the tiny fuel tank
+    sys.tick(3, { thrust: true, brake: true, rcs: true })
     sys.tick(10, { thrust: false, brake: false, rcs: false })
     expect(cb).toHaveBeenCalledTimes(1)
   })

@@ -31,7 +31,7 @@ export interface VehicleCameraConfig {
 export const SHUTTLE_CAMERA_CONFIG: VehicleCameraConfig = {
   idleOffset: new THREE.Vector3(-80, 40, 0),
   lerpSpeed: 5,
-  idleTimeout: 1.0,
+  idleTimeout: 10,
   minY: 15,
   fov: 60,
 }

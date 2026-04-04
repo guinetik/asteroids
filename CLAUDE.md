@@ -60,6 +60,18 @@ Two linters with distinct responsibilities:
 
 `bun lint` runs both in sequence (oxlint first, then eslint).
 
+## Power System (Thrusters & Fuel)
+
+Every vehicle shares the same `ThrusterSystem<T>` pattern (`src/lib/physics/thrusterSystem.ts`):
+
+- **Shared fuel pool.** One fuel tank per vehicle. All thrusters draw from it.
+- **Thrusters have charge.** Each thruster group has its own charge bar (capacity, burn rate).
+- **Recharge costs fuel.** When a thruster is idle and below full charge, it recharges — consuming fuel from the shared pool. Full charge = zero fuel drain.
+- **No fuel = no recharge.** When the tank is empty, thrusters can only spend remaining charge.
+- **Every power system in the game follows this pattern.** Weapons, shields, mining lasers — all will use `ThrusterSystem<T>` with their own named groups and a shared fuel pool.
+
+Tuning levers per thruster group: `capacity`, `burnRate` (charge/s while firing), `rechargeRate` (charge/s while idle), `fuelCostPerRecharge` (fuel per unit of charge recovered).
+
 ## TSDoc Format
 
 Every exported function, class, interface, type alias, and constant must have a TSDoc comment. Enforced by ESLint's `jsdoc/require-jsdoc` rule (warns, does not block builds). Every interface property gets a doc comment explaining what it is, valid ranges, and real examples.

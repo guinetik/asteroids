@@ -114,6 +114,8 @@ export class ShuttleController implements Tickable, PortalVehicle {
   private isDead = false
   private deathTarget: THREE.Vector3 | null = null
   private deathSpeed = 0
+  private fuelIndicator: THREE.Mesh | null = null
+  private fuelIndicatorFullLength = 0
 
   constructor(inputManager: InputManager) {
     this.inputManager = inputManager
@@ -147,6 +149,43 @@ export class ShuttleController implements Tickable, PortalVehicle {
     if (this.doorStbNode) this.doorStbClosedRotX = this.doorStbNode.rotation.x
 
     this.placeNozzles(gltf.scene)
+
+    // Fuel tank cylinder in the mid-bay
+    const tankRadius = 80
+    const tankLength = 180
+    const tankGeo = new THREE.CylinderGeometry(tankRadius, tankRadius, tankLength, 16)
+    const tankMat = new THREE.MeshStandardMaterial({
+      color: 0xcccccc,
+      metalness: 0.8,
+      roughness: 0.3,
+      transparent: true,
+      opacity: 0.3,
+    })
+    const tank = new THREE.Mesh(tankGeo, tankMat)
+    tank.position.set(-40, 0, 15)
+    tank.rotation.z = Math.PI / 2
+    gltf.scene.add(tank)
+
+    // Fuel level indicator — glowing inner cylinder
+    const indicatorRadius = tankRadius * 0.7
+    const indicatorGeo = new THREE.CylinderGeometry(indicatorRadius, indicatorRadius, tankLength - 10, 16)
+    const indicatorMat = new THREE.MeshBasicMaterial({
+      color: 0x00ff88,
+      transparent: true,
+      opacity: 0.8,
+      depthTest: false,
+    })
+    this.fuelIndicator = new THREE.Mesh(indicatorGeo, indicatorMat)
+    // Same position as tank but in game-space (after MODEL_SCALE and rotation)
+    // Tank is at (-40, 0, 15) in raw cm, after 0.01 scale and -90° X rotation:
+    //   X stays: -40 * 0.01 = -0.4
+    //   Y (from Z): 15 * 0.01 = 0.15
+    //   Z (from -Y): 0
+    this.fuelIndicator.position.copy(tank.position)
+    this.fuelIndicator.rotation.z = Math.PI / 2
+    this.fuelIndicator.renderOrder = 1
+    this.fuelIndicatorFullLength = tankLength - 10
+    gltf.scene.add(this.fuelIndicator)
 
     // Load lander model into the cargo bay
     const landerScene = await loadGLB(LANDER_MODEL_PATH)
@@ -198,6 +237,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
     }
     this.updateMovement(dt)
     this.updateDoors(dt)
+    this.updateFuelIndicator()
     this.checkDeath()
   }
 
@@ -236,6 +276,28 @@ export class ShuttleController implements Tickable, PortalVehicle {
     if (this.doorStbNode) {
       this.doorStbNode.rotation.x = this.doorStbClosedRotX + angle
     }
+  }
+
+  private updateFuelIndicator(): void {
+    if (!this.fuelIndicator) return
+
+    // Only visible when doors are open
+    this.fuelIndicator.visible = this.doorProgress > 0.1
+
+    if (!this.fuelIndicator.visible) return
+
+    const ratio = this.thrusterSystem.fuelCapacity > 0
+      ? this.thrusterSystem.fuelLevel / this.thrusterSystem.fuelCapacity
+      : 0
+
+    // Scale Y (which is length after rotation) to match fuel level
+    this.fuelIndicator.scale.y = Math.max(0.01, ratio)
+
+    // Color: green → yellow → red
+    const mat = this.fuelIndicator.material as THREE.MeshBasicMaterial
+    const r = ratio < 0.5 ? 1 : 1 - (ratio - 0.5) * 2
+    const g = ratio > 0.5 ? 1 : ratio * 2
+    mat.color.setRGB(r, g, 0.2)
   }
 
   private checkDeath(): void {
