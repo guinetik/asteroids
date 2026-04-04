@@ -40,6 +40,13 @@ const MOVE_BOB_SPEED = 10
 const SPRINT_TILT = 0.35
 /** Jump tilt — barrel tilts up from inertia (radians). */
 const JUMP_TILT = 0.3
+
+/** ADS offset — gun moves to center screen. */
+const ADS_OFFSET_X = 0.0
+const ADS_OFFSET_Y = -0.35
+const ADS_OFFSET_Z = -0.50
+/** How fast the gun lerps to ADS position (per second). */
+const ADS_LERP_SPEED = 12
 /** How fast tilt lerps (per second). */
 const TILT_LERP_SPEED = 8
 
@@ -58,7 +65,11 @@ export class MultiToolController implements Tickable {
   private lateralSpeed = 0
   private sprinting = false
   private grounded = true
+  private aiming = false
   private tilt = 0
+  private currentOffsetX = OFFSET_X
+  private currentOffsetY = OFFSET_Y
+  private currentOffsetZ = OFFSET_Z
 
   /**
    * Load the multi-tool model and attach to the FPS camera.
@@ -100,6 +111,11 @@ export class MultiToolController implements Tickable {
     this.grounded = grounded
   }
 
+  /** Set ADS state — gun moves to center screen when aiming. */
+  setAiming(aiming: boolean): void {
+    this.aiming = aiming
+  }
+
   /**
    * Tint the model mesh to reflect the active tool mode.
    *
@@ -125,22 +141,33 @@ export class MultiToolController implements Tickable {
     if (!this.model || !this.camera) return
     this.time += dt
 
-    // Holster tilt — sprint tilts down, jump tilts up
-    const targetTilt = this.sprinting ? SPRINT_TILT : (!this.grounded ? JUMP_TILT : 0)
+    // Lerp offset between hip and ADS positions
+    const targetX = this.aiming ? ADS_OFFSET_X : OFFSET_X
+    const targetY = this.aiming ? ADS_OFFSET_Y : OFFSET_Y
+    const targetZ = this.aiming ? ADS_OFFSET_Z : OFFSET_Z
+    const lerpFactor = Math.min(1, ADS_LERP_SPEED * dt)
+    this.currentOffsetX += (targetX - this.currentOffsetX) * lerpFactor
+    this.currentOffsetY += (targetY - this.currentOffsetY) * lerpFactor
+    this.currentOffsetZ += (targetZ - this.currentOffsetZ) * lerpFactor
+
+    // Holster tilt — sprint tilts down, jump tilts up, suppressed while ADS
+    const targetTilt = this.aiming ? 0
+      : (this.sprinting ? SPRINT_TILT : (!this.grounded ? JUMP_TILT : 0))
     this.tilt += (targetTilt - this.tilt) * Math.min(1, TILT_LERP_SPEED * dt)
 
-    // Idle sway — gentle rotation even when standing still
-    const swayX = Math.sin(this.time * IDLE_SWAY_SPEED) * IDLE_SWAY_AMP
-    const swayZ = Math.cos(this.time * IDLE_SWAY_SPEED * 0.7) * IDLE_SWAY_AMP
+    // Idle sway — suppressed while ADS
+    const swayScale = this.aiming ? 0.1 : 1
+    const swayX = Math.sin(this.time * IDLE_SWAY_SPEED) * IDLE_SWAY_AMP * swayScale
+    const swayZ = Math.cos(this.time * IDLE_SWAY_SPEED * 0.7) * IDLE_SWAY_AMP * swayScale
 
-    // Movement bob — only when grounded (floating = steady gun)
+    // Movement bob — only when grounded and not ADS
     const bobPhase = this.time * MOVE_BOB_SPEED
-    const bobScale = this.grounded ? Math.min(1, this.lateralSpeed * 0.1) : 0
+    const bobScale = (this.grounded && !this.aiming) ? Math.min(1, this.lateralSpeed * 0.1) : 0
     const bobY = Math.sin(bobPhase) * MOVE_BOB_AMP * bobScale
     const bobX = Math.cos(bobPhase * 0.5) * MOVE_BOB_AMP * bobScale * 0.5
 
     // Position in camera-local space, then transform to world
-    this.offset.set(OFFSET_X + bobX, OFFSET_Y + bobY, OFFSET_Z)
+    this.offset.set(this.currentOffsetX + bobX, this.currentOffsetY + bobY, this.currentOffsetZ)
     this.offset.applyQuaternion(this.camera.quaternion)
     this.model.position.copy(this.camera.position).add(this.offset)
 

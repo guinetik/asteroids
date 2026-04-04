@@ -169,6 +169,7 @@ export class FpsViewController implements Tickable {
     // --- Sync tool visuals ---
     if (this.multiToolState && this.multiTool) {
       this.multiTool.setMode(this.multiToolState.modeConfig.color)
+      this.multiTool.setAiming(this.multiToolState.aiming)
     }
 
     // --- ADS camera zoom ---
