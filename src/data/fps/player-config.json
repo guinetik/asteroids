@@ -7,7 +7,7 @@
     "maxSpeed": 20.0,
     "maxSprintSpeed": 40.0,
     "jumpForce": 8.0,
-    "gravity": 1.2
+    "gravity": 4.0
   },
   "o2": {
     "fuelCapacity": 100,

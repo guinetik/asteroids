@@ -206,45 +206,73 @@ export class FpsPlayerController implements Tickable {
       this._deathTimer = null
     }
 
-    // --- Lateral movement (thrust-based) ---
+    // --- Lateral movement ---
     const forward = this.camera.getForwardXZ()
     const right = this.camera.getRightXZ()
-    const thrustMag = mv.moveThrust * (isSprinting ? mv.sprintMultiplier : 1)
-
-    if (this.inputManager.isActionActive('moveForward')) {
-      this.lateralVelocity.x += forward.x * thrustMag * dt
-      this.lateralVelocity.z += forward.y * thrustMag * dt
-    }
-    if (this.inputManager.isActionActive('moveBack')) {
-      this.lateralVelocity.x -= forward.x * thrustMag * dt
-      this.lateralVelocity.z -= forward.y * thrustMag * dt
-    }
-    if (this.inputManager.isActionActive('moveLeft')) {
-      this.lateralVelocity.x -= right.x * thrustMag * dt
-      this.lateralVelocity.z -= right.y * thrustMag * dt
-    }
-    if (this.inputManager.isActionActive('moveRight')) {
-      this.lateralVelocity.x += right.x * thrustMag * dt
-      this.lateralVelocity.z += right.y * thrustMag * dt
-    }
-
-    // --- Friction ---
-    const friction = this.body.grounded ? mv.groundFriction : mv.airFriction
-    const speed = this.speed
-    if (speed > 0) {
-      const drop = friction * dt
-      const factor = Math.max(0, speed - drop) / speed
-      this.lateralVelocity.x *= factor
-      this.lateralVelocity.z *= factor
-    }
-
-    // --- Speed clamp ---
     const maxSpd = isSprinting ? mv.maxSprintSpeed : mv.maxSpeed
-    const currentSpeed = this.speed
-    if (currentSpeed > maxSpd) {
-      const scale = maxSpd / currentSpeed
-      this.lateralVelocity.x *= scale
-      this.lateralVelocity.z *= scale
+
+    if (this.body.grounded) {
+      // Grounded: instant velocity toward input direction (responsive walking)
+      let wishX = 0
+      let wishZ = 0
+      if (this.inputManager.isActionActive('moveForward')) {
+        wishX += forward.x; wishZ += forward.y
+      }
+      if (this.inputManager.isActionActive('moveBack')) {
+        wishX -= forward.x; wishZ -= forward.y
+      }
+      if (this.inputManager.isActionActive('moveLeft')) {
+        wishX -= right.x; wishZ -= right.y
+      }
+      if (this.inputManager.isActionActive('moveRight')) {
+        wishX += right.x; wishZ += right.y
+      }
+      const wishLen = Math.sqrt(wishX * wishX + wishZ * wishZ)
+      if (wishLen > 0) {
+        // Normalize and scale to target speed
+        this.lateralVelocity.x = (wishX / wishLen) * maxSpd
+        this.lateralVelocity.z = (wishZ / wishLen) * maxSpd
+      } else {
+        // No input: stop immediately on ground
+        this.lateralVelocity.x = 0
+        this.lateralVelocity.z = 0
+      }
+    } else {
+      // Airborne: thrust-based (committal, floaty)
+      const thrustMag = mv.moveThrust * (isSprinting ? mv.sprintMultiplier : 1)
+      if (this.inputManager.isActionActive('moveForward')) {
+        this.lateralVelocity.x += forward.x * thrustMag * dt
+        this.lateralVelocity.z += forward.y * thrustMag * dt
+      }
+      if (this.inputManager.isActionActive('moveBack')) {
+        this.lateralVelocity.x -= forward.x * thrustMag * dt
+        this.lateralVelocity.z -= forward.y * thrustMag * dt
+      }
+      if (this.inputManager.isActionActive('moveLeft')) {
+        this.lateralVelocity.x -= right.x * thrustMag * dt
+        this.lateralVelocity.z -= right.y * thrustMag * dt
+      }
+      if (this.inputManager.isActionActive('moveRight')) {
+        this.lateralVelocity.x += right.x * thrustMag * dt
+        this.lateralVelocity.z += right.y * thrustMag * dt
+      }
+
+      // Air friction (weak — commit to your jump)
+      const speed = this.speed
+      if (speed > 0) {
+        const drop = mv.airFriction * dt
+        const factor = Math.max(0, speed - drop) / speed
+        this.lateralVelocity.x *= factor
+        this.lateralVelocity.z *= factor
+      }
+
+      // Speed clamp in air
+      const currentSpeed = this.speed
+      if (currentSpeed > maxSpd) {
+        const scale = maxSpd / currentSpeed
+        this.lateralVelocity.x *= scale
+        this.lateralVelocity.z *= scale
+      }
     }
 
     // --- Apply lateral velocity ---
