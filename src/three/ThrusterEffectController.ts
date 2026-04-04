@@ -108,10 +108,11 @@ export class ThrusterEffectController implements Tickable {
     const material = new THREE.PointsMaterial({
       color,
       size: PARTICLE_SIZE,
+      sizeAttenuation: false,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.9,
     })
 
     return new THREE.Points(geometry, material)
