@@ -41,9 +41,9 @@ const DOOR_ANIM_SPEED = 2 // radians per second
 const THRUST_FORCE = 20
 const BRAKE_FACTOR = 0.95
 const BRAKE_DEPTH_PENALTY = 0.005 // brake effectiveness lost per unit of well depth
-const YAW_TORQUE = 0.8 // angular acceleration per second
-const YAW_MAX_SPEED = 2 // max angular velocity
-const YAW_DAMPING = 0.97 // gentle angular friction per frame
+const YAW_TORQUE = 2.5 // angular acceleration per second
+const YAW_MAX_SPEED = 3.5 // max angular velocity
+const YAW_DAMPING = 0.98 // gentle angular friction per frame
 const MAX_SPEED = 80
 
 /**
