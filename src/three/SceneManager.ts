@@ -7,8 +7,8 @@ const CAMERA_NEAR = 0.1
 const CAMERA_FAR = 50000
 const CAMERA_INITIAL_POSITION = new THREE.Vector3(300, 200, 300)
 
-/** Default 3rd-person offset: behind and above the shuttle */
-const IDLE_CAM_OFFSET = new THREE.Vector3(-20, 50, 0)
+/** Default 3rd-person offset: behind, above, and tilted to see ahead */
+const IDLE_CAM_OFFSET = new THREE.Vector3(-80, 120, 0)
 const IDLE_CAM_LERP_SPEED = 2
 const IDLE_TIMEOUT_S = 1.5 // seconds of no mouse before auto-returning
 
