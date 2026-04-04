@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { TickHandler } from '../TickHandler'
 import type { Tickable } from '../Tickable'
 
-function makeTickable(): Tickable & { tick: ReturnType<typeof vi.fn> } {
+function makeTickable(): Tickable {
   return { tick: vi.fn() }
 }
 
