@@ -103,6 +103,8 @@ const ALL_RCS_NODES = [...new Set(Object.values(RCS_ACTION_MAP).flatMap((a) => a
 /** RCS lateral movement — tilt + push */
 const RCS_LATERAL_FORCE = 4
 const TILT_MAX_ANGLE = 0.3 // ~17 degrees max tilt
+const LIFTOFF_BOOST = 2.0
+const LIFTOFF_BOOST_DURATION = 1.0
 const TILT_LERP_SPEED = 3 // how fast the lander tilts toward target
 const TILT_RETURN_SPEED = 2.5 // how fast it returns to upright
 const GROUND_TILT_LERP_SPEED = 4 // how fast the lander conforms to terrain slope
@@ -139,6 +141,7 @@ export class LanderController implements Tickable {
   private readonly rcsLocalPositions = new Map<string, THREE.Vector3>()
   private readonly rcsSpawnAccumulators = new Map<string, number>()
   private readonly rcsWorldPos = new THREE.Vector3()
+  private liftoffBoostTimer = 0
 
   constructor(inputManager: InputManager) {
     this.inputManager = inputManager
@@ -204,17 +207,26 @@ export class LanderController implements Tickable {
   }
 
   tick(dt: number): void {
-    // Main engine
+    // Main engine — thrust along lander's local up axis
     if (this.isMainEngineActive) {
-      this.body.impulse(MAIN_ENGINE_THRUST * dt)
+      const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.quaternion)
+      const boost = this.liftoffBoostTimer > 0 ? LIFTOFF_BOOST : 1
+      const thrust = MAIN_ENGINE_THRUST * dt * boost
+      this.body.impulse(localUp.y * thrust)
+      this.lateralVelocity.x += localUp.x * thrust
+      this.lateralVelocity.z += localUp.z * thrust
       this.spawnFlame(dt)
     } else {
       this.flameSpawnAccumulator = 0
     }
 
-    // RCS ascend boost (airborne only)
+    // RCS ascend boost — also follows local up
     if (!this.body.grounded && this.inputManager.isActionActive('rcsAscend')) {
-      this.body.impulse(RCS_ASCEND_THRUST * dt)
+      const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.quaternion)
+      const thrust = RCS_ASCEND_THRUST * dt
+      this.body.impulse(localUp.y * thrust)
+      this.lateralVelocity.x += localUp.x * thrust
+      this.lateralVelocity.z += localUp.z * thrust
     }
 
     // RCS emitters + lateral movement
@@ -231,6 +243,13 @@ export class LanderController implements Tickable {
     // Apply lateral velocity (XZ only)
     this.group.position.x += this.lateralVelocity.x * dt
     this.group.position.z += this.lateralVelocity.z * dt
+
+    // Liftoff boost timer: starts when leaving ground, counts down
+    if (this.body.grounded) {
+      this.liftoffBoostTimer = LIFTOFF_BOOST_DURATION
+    } else if (this.liftoffBoostTimer > 0) {
+      this.liftoffBoostTimer -= dt
+    }
 
     // Update all emitters
     this.flameEmitter.tick(dt)
