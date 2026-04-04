@@ -5,19 +5,17 @@ import type { Tickable } from '@/lib/Tickable'
 const CAMERA_FOV = 60
 const CAMERA_NEAR = 0.1
 const CAMERA_FAR = 50000
-const CAMERA_INITIAL_POSITION = new THREE.Vector3(180, 30, 0)
 
-/** Default 3rd-person offset: behind, above, and tilted to see ahead */
-const IDLE_CAM_OFFSET = new THREE.Vector3(-120, 30, 0)
-const IDLE_CAM_LERP_SPEED = 2
-const IDLE_TIMEOUT_S = 1.5 // seconds of no mouse before auto-returning
-const MIN_CAMERA_Y = 15 // never go below this — keeps grid visible below horizon
+/** Default 3rd-person offset: behind and above the shuttle */
+const IDLE_CAM_OFFSET = new THREE.Vector3(-80, 40, 0)
+const IDLE_CAM_LERP_SPEED = 5
+const IDLE_TIMEOUT_S = 1.0 // seconds after mouse release before auto-returning
+const MIN_CAMERA_Y = 15
 
 /**
  * Three.js scene orchestrator — creates renderer, camera, and controls.
- * Implements Tickable to render each frame via the game loop.
- * Camera follows the shuttle and returns to 3rd-person idle position
- * when the mouse is not being used.
+ * Orbit target is always locked to the shuttle (ship stays centered).
+ * Camera position returns to idle 3rd-person when mouse is released.
  *
  * @author guinetik
  * @date 2026-04-04
@@ -33,12 +31,12 @@ export class SceneManager implements Tickable {
   private shuttleRef: THREE.Object3D | null = null
   private mouseIdleTimer = 0
   private isMouseActive = false
+  private lastShuttlePos = new THREE.Vector3()
 
   constructor() {
     this.scene = new THREE.Scene()
 
     this.camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, CAMERA_NEAR, CAMERA_FAR)
-    this.camera.position.copy(CAMERA_INITIAL_POSITION)
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true })
     this.renderer.setClearColor(0x000000)
@@ -65,7 +63,13 @@ export class SceneManager implements Tickable {
 
   setShuttleRef(object: THREE.Object3D): void {
     this.shuttleRef = object
+    this.lastShuttlePos.copy(object.position)
     this.controls.target.copy(object.position)
+
+    // Set initial camera to idle position
+    const idleOffset = IDLE_CAM_OFFSET.clone().applyQuaternion(object.quaternion)
+    this.camera.position.copy(object.position).add(idleOffset)
+    this.camera.position.y = Math.max(this.camera.position.y, MIN_CAMERA_Y)
   }
 
   addToScene(object: THREE.Object3D): void {
@@ -80,33 +84,33 @@ export class SceneManager implements Tickable {
     if (this.shuttleRef) {
       const shuttlePos = this.shuttleRef.position
 
-      if (this.isMouseActive) {
-        // User is controlling camera — just follow the shuttle
-        const offset = this.camera.position.clone().sub(this.controls.target)
-        this.controls.target.copy(shuttlePos)
-        this.camera.position.copy(shuttlePos).add(offset)
-        this.clampCameraHeight()
-      } else {
+      // How much the shuttle moved this frame
+      const delta = shuttlePos.clone().sub(this.lastShuttlePos)
+      this.lastShuttlePos.copy(shuttlePos)
+
+      // Always keep orbit target on the shuttle — ship stays centered
+      this.controls.target.copy(shuttlePos)
+
+      // Move camera by the same delta so it tracks the shuttle
+      this.camera.position.add(delta)
+
+      if (!this.isMouseActive) {
         this.mouseIdleTimer += dt
 
         if (this.mouseIdleTimer > IDLE_TIMEOUT_S) {
-          // Smoothly return to 3rd-person idle position behind shuttle
+          // Smoothly return to idle position behind shuttle
           const idleOffset = IDLE_CAM_OFFSET.clone()
             .applyQuaternion(this.shuttleRef.quaternion)
           const targetCamPos = shuttlePos.clone().add(idleOffset)
-
-          // Ensure target stays above grid
           targetCamPos.y = Math.max(targetCamPos.y, MIN_CAMERA_Y)
 
           this.camera.position.lerp(targetCamPos, IDLE_CAM_LERP_SPEED * dt)
-          this.controls.target.lerp(shuttlePos, IDLE_CAM_LERP_SPEED * dt)
-        } else {
-          // Still in cooldown — keep following
-          const offset = this.camera.position.clone().sub(this.controls.target)
-          this.controls.target.copy(shuttlePos)
-          this.camera.position.copy(shuttlePos).add(offset)
-          this.clampCameraHeight()
         }
+      }
+
+      // Always clamp
+      if (this.camera.position.y < MIN_CAMERA_Y) {
+        this.camera.position.y = MIN_CAMERA_Y
       }
     }
 
@@ -122,12 +126,6 @@ export class SceneManager implements Tickable {
     this.renderer.dispose()
     if (this.container) {
       this.container.removeChild(this.renderer.domElement)
-    }
-  }
-
-  private clampCameraHeight(): void {
-    if (this.camera.position.y < MIN_CAMERA_Y) {
-      this.camera.position.y = MIN_CAMERA_Y
     }
   }
 
