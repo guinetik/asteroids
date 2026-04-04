@@ -9,8 +9,52 @@
   @apply w-screen h-screen overflow-hidden;
 }
 
-.hud {
-  @apply fixed bottom-4 left-4 flex gap-4 font-mono text-sm text-green-400 pointer-events-none;
+.shuttle-hud {
+  @apply fixed inset-0 pointer-events-none font-mono text-xs text-green-400;
   text-shadow: 0 0 4px rgba(0, 255, 0, 0.5);
+}
+
+.hud-position {
+  @apply absolute top-4 left-1/2 -translate-x-1/2;
+}
+
+.hud-fuel {
+  @apply absolute top-4 left-4 flex items-center gap-2;
+}
+
+.hud-fuel-label {
+  @apply text-green-400;
+}
+
+.hud-fuel-track {
+  @apply w-32 h-3 bg-gray-800 rounded-sm overflow-hidden;
+}
+
+.hud-fuel-fill {
+  @apply h-full transition-all duration-200;
+}
+
+.hud-readouts {
+  @apply absolute bottom-4 left-4 flex flex-col gap-1;
+}
+
+.hud-gauges {
+  @apply absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-3 items-end;
+}
+
+.hud-gauge {
+  @apply flex flex-col items-center gap-1;
+}
+
+.hud-gauge-track {
+  @apply w-4 h-16 bg-gray-800 rounded-sm overflow-hidden flex flex-col justify-end;
+}
+
+.hud-gauge-fill {
+  @apply w-full transition-all duration-100;
+}
+
+.hud-gauge-label {
+  @apply text-green-400;
 }
 
