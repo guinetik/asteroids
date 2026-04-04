@@ -32,19 +32,22 @@ describe('PortalWormhole', () => {
     const pos = new THREE.Vector3(100, 0, 50)
     new PortalWormhole(pos, grid)
     expect(grid.sources).toHaveLength(1)
-     
+
     const src = grid.sources[0]!
     expect(src.mass).toBeLessThan(0)
     expect(src.x).toBe(100)
     expect(src.z).toBe(50)
   })
 
-  it('transitions idle → ejecting → collapsing → done', () => {
+  it('transitions idle → summoning → ejecting → collapsing → done', () => {
     const grid = createMockGrid()
     const wormhole = new PortalWormhole(new THREE.Vector3(0, 0, 0), grid)
 
-    // Trigger ejection
     wormhole.eject()
+    expect(wormhole.state).toBe('summoning')
+
+    // Tick through summoning (0.5s)
+    wormhole.tick(0.55)
     expect(wormhole.state).toBe('ejecting')
 
     // Tick through the pulse duration (0.3s)
@@ -57,25 +60,39 @@ describe('PortalWormhole', () => {
     expect(wormhole.isDone).toBe(true)
   })
 
+  it('fires onEject callback when summoning ends', () => {
+    const grid = createMockGrid()
+    const wormhole = new PortalWormhole(new THREE.Vector3(0, 0, 0), grid)
+    const onEject = vi.fn()
+    wormhole.onEject = onEject
+
+    wormhole.eject()
+    expect(onEject).not.toHaveBeenCalled()
+
+    wormhole.tick(0.55) // summoning done
+    expect(onEject).toHaveBeenCalledOnce()
+  })
+
   it('lerps grid source mass to zero during collapse', () => {
     const grid = createMockGrid()
     const wormhole = new PortalWormhole(new THREE.Vector3(0, 0, 0), grid)
-     
+
     const initialMass = grid.sources[0]!.mass
 
     wormhole.eject()
-    wormhole.tick(0.35) // finish pulse → collapsing
+    wormhole.tick(0.55) // summoning done
+    wormhole.tick(0.35) // pulse done → collapsing
 
     // Halfway through collapse
     wormhole.tick(1.5)
-     
+
     const midMass = grid.sources[0]!.mass
     expect(Math.abs(midMass)).toBeLessThan(Math.abs(initialMass))
     expect(Math.abs(midMass)).toBeGreaterThan(0)
 
     // Finish collapse
     wormhole.tick(1.6)
-     
+
     expect(grid.sources[0]!.mass).toBe(0)
   })
 
@@ -86,6 +103,7 @@ describe('PortalWormhole', () => {
     wormhole.onDone = onDone
 
     wormhole.eject()
+    wormhole.tick(0.55) // summoning
     wormhole.tick(0.35) // pulse done
     wormhole.tick(3.1) // collapse done
     expect(onDone).toHaveBeenCalledOnce()
@@ -98,7 +116,8 @@ describe('PortalWormhole', () => {
     wormhole.onDone = onDone
 
     wormhole.eject()
-    wormhole.tick(0.35)
+    wormhole.tick(0.55) // summoning
+    wormhole.tick(0.35) // pulse
     wormhole.tick(3.1) // done
     wormhole.tick(1.0) // extra tick — should not fire onDone again
     expect(onDone).toHaveBeenCalledOnce()

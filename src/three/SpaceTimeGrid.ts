@@ -119,7 +119,7 @@ export class SpaceTimeGrid implements Tickable {
       const dz = z - source.z
       const rSquared = dx * dx + dz * dz
 
-      const massFactor = Math.pow(source.mass, this.massExponent)
+      const massFactor = Math.sign(source.mass) * Math.pow(Math.abs(source.mass), this.massExponent)
       const sigma = this.widthScale * massFactor
       const baseAmplitude = this.depthScale * massFactor
 

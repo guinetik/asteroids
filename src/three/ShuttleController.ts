@@ -74,10 +74,27 @@ export class ShuttleController implements Tickable {
   private doorPortClosedRotX = 0
   private doorStbClosedRotX = 0
   private velocity = new THREE.Vector3()
+  private frozen = false
+  private ignoreGridY = false
 
   /** Inject an external velocity (e.g. portal ejection). */
   setVelocity(v: THREE.Vector3): void {
     this.velocity.copy(v)
+  }
+
+  /** Freeze the shuttle — skips movement updates (used during portal summoning). */
+  freeze(): void {
+    this.frozen = true
+  }
+
+  /** Unfreeze the shuttle — resumes normal movement. */
+  unfreeze(): void {
+    this.frozen = false
+  }
+
+  /** Lock Y to 0, ignoring spacetime grid deformation (used during portal collapse). */
+  setIgnoreGridY(ignore: boolean): void {
+    this.ignoreGridY = ignore
   }
 
   private angularVelocity = 0
@@ -159,6 +176,7 @@ export class ShuttleController implements Tickable {
   }
 
   tick(dt: number): void {
+    if (this.frozen) return
     if (this.isDead) {
       this.updateDeath(dt)
       return
@@ -332,7 +350,9 @@ export class ShuttleController implements Tickable {
 
     // Apply velocity and follow spacetime geometry
     this.group.position.addScaledVector(this.velocity, dt)
-    if (this.spaceTimeGrid) {
+    if (this.ignoreGridY) {
+      this.group.position.y = 0
+    } else if (this.spaceTimeGrid) {
       this.group.position.y = -this.spaceTimeGrid.getDepthAt(
         this.group.position.x,
         this.group.position.z,

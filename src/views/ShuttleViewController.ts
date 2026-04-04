@@ -28,7 +28,7 @@ const SUN_LIGHT_INTENSITY = 3
 const SUN_LIGHT_DISTANCE = 10000
 const SPAWN_MIN_RADIUS = 400
 const SPAWN_MAX_RADIUS = 1500
-const PORTAL_SPAWN_RADIUS = 150
+const PORTAL_SPAWN_RADIUS = 450
 const PORTAL_DEFAULT_EJECT_SPEED = 40
 
 /**
@@ -123,23 +123,29 @@ export class ShuttleViewController implements Tickable {
       this.sceneManager.addToScene(this.portalWormhole.group)
       this.tickHandler.register(this.portalWormhole, TICK_PRIORITY_ANIMATION)
 
-      // Position shuttle at wormhole peak
-      this.shuttleController.group.position.copy(wormholePos)
+      // Freeze shuttle at wormhole center during summoning, ignore grid Y until collapse ends
+      this.shuttleController.group.position.set(wormholePos.x, 0, wormholePos.z)
+      this.shuttleController.freeze()
+      this.shuttleController.setIgnoreGridY(true)
 
-      // Eject away from the sun (origin)
-      const awayDir = wormholePos.clone().normalize()
-      const ejectVelocity = portal.arrival.speed_x !== undefined
-        && portal.arrival.speed_z !== undefined
-        ? new Vector3(portal.arrival.speed_x, 0, portal.arrival.speed_z)
-        : awayDir.clone().multiplyScalar(portal.arrival.speed ?? PORTAL_DEFAULT_EJECT_SPEED)
-      this.shuttleController.setVelocity(ejectVelocity)
+      // Random heading — not aimed at the sun
+      this.shuttleController.group.rotation.y = Math.random() * Math.PI * 2
 
-      // Point shuttle away from sun
-      this.shuttleController.group.rotation.y = Math.atan2(awayDir.z, awayDir.x)
+      // Summon → eject: unfreeze and push forward along shuttle's nose direction
+      this.portalWormhole.onEject = () => {
+        this.shuttleController?.unfreeze()
+        const forward = new Vector3(1, 0, 0)
+          .applyQuaternion(this.shuttleController!.group.quaternion)
+        forward.y = 0
+        forward.normalize()
+        const speed = portal.arrival.speed ?? PORTAL_DEFAULT_EJECT_SPEED
+        this.shuttleController?.setVelocity(forward.multiplyScalar(speed))
+      }
 
-      // Trigger pulse → collapse
+      // Start summoning → pulse → collapse sequence
       this.portalWormhole.eject()
       this.portalWormhole.onDone = () => {
+        this.shuttleController?.setIgnoreGridY(false)
         if (this.portalWormhole) {
           this.tickHandler?.unregister(this.portalWormhole)
           this.portalWormhole.dispose()

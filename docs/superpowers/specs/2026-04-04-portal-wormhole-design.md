@@ -26,7 +26,7 @@ When the shuttle exits, the glow mesh scales up briefly (1.5x over ~0.3 seconds)
 
 ## Placement
 
-Fixed position near the sun at a short radius (~150 units from origin). This places it inside the shuttle's normal spawn range (400–1500 units) and close enough that the sun's gravity is immediately felt after ejection. The angular position is randomized each time.
+Fixed position near the sun at a radius of ~450 units from origin — just outside the gravity influence ring (400 units for mass=1.0). Must not spawn inside the influence or event horizon zones. Close enough that the sun's gravity is immediately felt after ejection. The angular position is randomized each time.
 
 ## Arrival Flow
 

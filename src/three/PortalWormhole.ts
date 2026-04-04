@@ -10,7 +10,7 @@ import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 
 /** Wormhole lifecycle states. */
-export type WormholeState = 'idle' | 'ejecting' | 'collapsing' | 'done'
+export type WormholeState = 'idle' | 'summoning' | 'ejecting' | 'collapsing' | 'done'
 
 /** Minimal grid interface — avoids importing the full SpaceTimeGrid class. */
 export interface GridSource {
@@ -32,6 +32,9 @@ const GLOW_SCALE = 2.0
 
 /** Base opacity of the glow sphere. */
 const GLOW_OPACITY = 0.25
+
+/** Duration of the summoning hold before ejection in seconds. */
+const SUMMON_DURATION = 0.5
 
 /** Duration of the ejection pulse animation in seconds. */
 const PULSE_DURATION = 0.3
@@ -78,6 +81,8 @@ export class PortalWormhole implements Tickable {
   /** Elapsed time within the current phase. */
   private phaseTimer = 0
 
+  /** Fired once when summoning ends and shuttle should receive velocity. */
+  onEject: (() => void) | null = null
   /** Fired once when collapse finishes. Assign before calling {@link eject}. */
   onDone: (() => void) | null = null
 
@@ -138,7 +143,7 @@ export class PortalWormhole implements Tickable {
    */
   eject(): void {
     if (this.currentState !== 'idle') return
-    this.currentState = 'ejecting'
+    this.currentState = 'summoning'
     this.phaseTimer = 0
   }
 
@@ -151,7 +156,9 @@ export class PortalWormhole implements Tickable {
 
     this.phaseTimer += dt
 
-    if (this.currentState === 'ejecting') {
+    if (this.currentState === 'summoning') {
+      this.tickSummoning()
+    } else if (this.currentState === 'ejecting') {
       this.tickEjecting()
     } else if (this.currentState === 'collapsing') {
       this.tickCollapsing()
@@ -167,6 +174,15 @@ export class PortalWormhole implements Tickable {
     ;(this.bodyMesh.material as THREE.MeshBasicMaterial).dispose()
     this.glowMesh.geometry.dispose()
     ;(this.glowMesh.material as THREE.MeshBasicMaterial).dispose()
+  }
+
+  /** Hold the shuttle at the portal for a brief summoning moment. */
+  private tickSummoning(): void {
+    if (this.phaseTimer >= SUMMON_DURATION) {
+      this.currentState = 'ejecting'
+      this.phaseTimer = 0
+      this.onEject?.()
+    }
   }
 
   /** Animate the ejection pulse — scales glow up then resets, then transitions. */
