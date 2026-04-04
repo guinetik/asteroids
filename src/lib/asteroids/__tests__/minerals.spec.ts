@@ -3,17 +3,17 @@ import { MINERAL_VISUALS } from '../minerals'
 
 describe('MINERAL_VISUALS', () => {
   it('has valid visual properties for all minerals', () => {
-    for (const [name, visual] of Object.entries(MINERAL_VISUALS)) {
+    for (const [_name, visual] of Object.entries(MINERAL_VISUALS)) {
       expect(visual.color).toHaveLength(3)
       for (const channel of visual.color) {
-        expect(channel, `${name} color channel`).toBeGreaterThanOrEqual(0)
-        expect(channel, `${name} color channel`).toBeLessThanOrEqual(1)
+        expect(channel).toBeGreaterThanOrEqual(0)
+        expect(channel).toBeLessThanOrEqual(1)
       }
-      expect(visual.metalness, `${name} metalness`).toBeGreaterThanOrEqual(0)
-      expect(visual.metalness, `${name} metalness`).toBeLessThanOrEqual(1)
-      expect(visual.roughness, `${name} roughness`).toBeGreaterThanOrEqual(0)
-      expect(visual.roughness, `${name} roughness`).toBeLessThanOrEqual(1)
-      expect(typeof visual.emissive, `${name} emissive`).toBe('boolean')
+      expect(visual.metalness).toBeGreaterThanOrEqual(0)
+      expect(visual.metalness).toBeLessThanOrEqual(1)
+      expect(visual.roughness).toBeGreaterThanOrEqual(0)
+      expect(visual.roughness).toBeLessThanOrEqual(1)
+      expect(typeof visual.emissive).toBe('boolean')
     }
   })
 
@@ -39,8 +39,8 @@ describe('MINERAL_VISUALS', () => {
     const nonEmissive = Object.entries(MINERAL_VISUALS).filter(
       ([name]) => name !== 'Basaltic Lava',
     )
-    for (const [name, visual] of nonEmissive) {
-      expect(visual.emissive, `${name} should not be emissive`).toBe(false)
+    for (const [_name, visual] of nonEmissive) {
+      expect(visual.emissive).toBe(false)
     }
   })
 
@@ -68,7 +68,7 @@ describe('MINERAL_VISUALS', () => {
       'Volcanic Glass',
     ]
     for (const mineral of requiredMinerals) {
-      expect(MINERAL_VISUALS[mineral], `missing mineral: ${mineral}`).toBeDefined()
+      expect(MINERAL_VISUALS[mineral]).toBeDefined()
     }
   })
 })

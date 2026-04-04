@@ -101,13 +101,16 @@ describe('ASTEROID_CATALOG', () => {
       expect(ch).toBeGreaterThanOrEqual(0)
       expect(ch).toBeLessThanOrEqual(1)
     }
-    if (v.emissive) {
-      expect(v.emissiveColor).toBeDefined()
-      expect(v.emissiveIntensity).toBeDefined()
-      for (const ch of v.emissiveColor!) {
-        expect(ch).toBeGreaterThanOrEqual(0)
-        expect(ch).toBeLessThanOrEqual(1)
-      }
+  })
+
+  it('volcanic asteroid kr3 has valid emissive properties', () => {
+    const v = ASTEROID_CATALOG.find((a) => a.id === 'kr3')!.visual
+    expect(v.emissive).toBe(true)
+    expect(v.emissiveColor).toBeDefined()
+    expect(v.emissiveIntensity).toBeDefined()
+    for (const ch of v.emissiveColor!) {
+      expect(ch).toBeGreaterThanOrEqual(0)
+      expect(ch).toBeLessThanOrEqual(1)
     }
   })
 
@@ -135,10 +138,7 @@ describe('ASTEROID_CATALOG', () => {
   ])('asteroid "%s" minerals all exist in MINERAL_VISUALS', (id) => {
     const asteroid = ASTEROID_CATALOG.find((a) => a.id === id)!
     for (const mineral of asteroid.composition) {
-      expect(
-        MINERAL_VISUALS[mineral.name],
-        `mineral "${mineral.name}" missing from MINERAL_VISUALS`,
-      ).toBeDefined()
+      expect(MINERAL_VISUALS[mineral.name]).toBeDefined()
     }
   })
 })
