@@ -8,7 +8,8 @@ Set up a Three.js scene with the NASA shuttle model, keyboard-driven flight cont
 
 ```
 src/three/SceneManager.ts          — renderer, camera, controls, animation loop, resize handling
-src/three/ShuttleController.ts     — model loading, animation mixer, movement/physics
+src/three/ShuttleController.ts     — model loading, animation mixer, movement/physics, nozzle placement
+src/three/ThrusterEffectController.ts — particle effects for thrust (orange) and brake (blue)
 src/three/StarFieldController.ts   — particle star background
 src/views/HomeView.vue             — default route, canvas mount point, minimal template
 src/views/HomeViewController.ts    — bridges Vue lifecycle to SceneManager (init/dispose)
@@ -74,6 +75,40 @@ Physics-lite model:
 
 All numeric values as named constants at the top of the file.
 
+### Nozzle Placement (eng.glb / rcs.glb)
+
+The merged `shuttle.glb` includes `eng` and `rcs` nodes from the separate nozzle files, but they are **not positioned** — they sit at origin with no translation into the orbiter's frame.
+
+Per `docs/space-shuttle-glb-pipeline.md`, the approach is:
+
+1. After loading, traverse the scene graph to find nodes named `eng` and `rcs`
+2. Find the OMS pod reference nodes on the main orbiter (names containing `OMS` and `back`)
+3. Use `getWorldPosition()` on the OMS pod nodes to determine where the nozzles should sit
+4. Reparent nozzle nodes to the OMS pod nodes via `attach()`, adjusting position/rotation until they align with the aft pod faces
+5. Fine-tune offset constants until visual alignment is correct (iterative — values stored as named constants)
+
+The nozzles are the visual anchor for thruster effects.
+
+### Thruster Effects (ThrusterEffectController)
+
+Particle-based visual feedback for thrust and braking, attached to the shuttle's aft.
+
+**Thrust effect (W key held):**
+- Orange/yellow particles emitting from the `eng` nozzle positions, trailing behind the shuttle
+- Particles spawn at nozzle position, inherit shuttle velocity + random spread, fade out over ~0.5s
+- Intensity scales with current thrust (more particles when accelerating)
+
+**Brake effect (S key held):**
+- Blue glowing particles emitting from the shuttle's front/sides — a futuristic inertia dampener look
+- Cooler, more diffuse spread than thrust. Particles radiate outward from the shuttle body
+- Blue color (#4488ff range), slight glow via additive blending
+
+**Implementation:**
+- Pool of `THREE.Points` or small particle system per effect
+- Each frame: spawn new particles if active, update positions, fade alpha, recycle dead particles
+- `PointsMaterial` with `blending: AdditiveBlending`, `depthWrite: false`, `transparent: true`
+- Named constants for: particle count, spawn rate, lifetime, spread, colors, sizes
+
 ### Input Handling
 
 - `KeyboardController` or inline key tracking (Set of currently pressed keys)
@@ -124,3 +159,4 @@ No new dependencies needed. DRACOLoader ships with Three.js.
 - Collision detection
 - Sound
 - Procedural door animation fallback (using baked clips only)
+- RCS thruster effects (only main engine thrust and brake dampener for now)
