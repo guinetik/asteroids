@@ -95,7 +95,7 @@ export class AsteroidBeltController {
     this.group.add(this.instancedMesh)
   }
 
-  tick(dt: number, simTime: number): void {
+  tick(dt: number, _simTime: number): void {
     // Slow orbital drift
     this.group.rotation.y += this.orbitalSpeed * dt
 
