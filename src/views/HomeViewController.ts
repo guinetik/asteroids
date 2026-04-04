@@ -21,9 +21,9 @@ import { AmbientLight, PointLight, Vector3 } from 'three'
 const ONE_SHOT_PRIORITY = TICK_PRIORITY_INPUT + 1
 const AMBIENT_LIGHT_INTENSITY = 0.3
 const SUN_LIGHT_INTENSITY = 3
-const SUN_LIGHT_DISTANCE = 5000
-const SPAWN_MIN_RADIUS = 200
-const SPAWN_MAX_RADIUS = 800
+const SUN_LIGHT_DISTANCE = 10000
+const SPAWN_MIN_RADIUS = 400
+const SPAWN_MAX_RADIUS = 1500
 
 /**
  * Bridges Vue lifecycle to the game loop and Three.js scene.

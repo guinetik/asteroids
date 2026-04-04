@@ -12,8 +12,8 @@ interface GravityWell {
   getGravityAt(position: THREE.Vector3): THREE.Vector3
 }
 
-const SPAWN_MIN_RADIUS = 200
-const SPAWN_MAX_RADIUS = 800
+const SPAWN_MIN_RADIUS = 400
+const SPAWN_MAX_RADIUS = 1500
 const DEATH_PULL_ACCELERATION = 30 // accelerates as it falls in
 const DEATH_MAX_PULL_SPEED = 120
 
@@ -44,13 +44,13 @@ const ENG_POSITIONS: [number, number, number][] = [
 const DOOR_OPEN_ANGLE = Math.PI * 0.6 // ~108 degrees, payload bay doors open wide
 const DOOR_ANIM_SPEED = 2 // radians per second
 
-const THRUST_FORCE = 20
+const THRUST_FORCE = 12
 const BRAKE_FACTOR = 0.93
 const BRAKE_DEPTH_PENALTY = 0.002 // brake effectiveness lost per unit of well depth
 const YAW_TORQUE = 2.5 // angular acceleration per second
 const YAW_MAX_SPEED = 3.5 // max angular velocity
 const YAW_DAMPING = 0.98 // gentle angular friction per frame
-const MAX_SPEED = 80
+const MAX_SPEED = 60
 
 /**
  * Controls the shuttle model — loading, door animation, movement, and nozzle placement.
