@@ -183,36 +183,12 @@ export class ShuttleController implements Tickable {
   }
 
   private placeNozzles(scene: THREE.Object3D): void {
+    // Hide eng/rcs nodes — they sit at origin (inside the shuttle) and
+    // need manual alignment that isn't possible without a DCC reference.
     const engNode = this.findNode(scene, 'eng')
     const rcsNode = this.findNode(scene, 'rcs')
-
-    // Log available node names for debugging nozzle placement
-    const omsBackNodes: THREE.Object3D[] = []
-    scene.traverse((child) => {
-      if (child.name.includes('OMS') && child.name.toLowerCase().includes('back')) {
-        omsBackNodes.push(child)
-      }
-    })
-
-    // World positions must be computed after the scene graph is
-    // fully assembled and the MODEL_SCALE is applied to the root.
-    // updateWorldMatrix ensures transforms are current.
-    scene.updateWorldMatrix(true, true)
-
-    if (omsBackNodes.length > 0 && engNode) {
-      const targetPos = new THREE.Vector3()
-      omsBackNodes[0]!.getWorldPosition(targetPos)
-      // Convert world pos back to eng's parent local space
-      engNode.parent?.worldToLocal(targetPos)
-      engNode.position.copy(targetPos)
-    }
-
-    if (omsBackNodes.length > 1 && rcsNode) {
-      const targetPos = new THREE.Vector3()
-      omsBackNodes[1]!.getWorldPosition(targetPos)
-      rcsNode.parent?.worldToLocal(targetPos)
-      rcsNode.position.copy(targetPos)
-    }
+    if (engNode) engNode.visible = false
+    if (rcsNode) rcsNode.visible = false
   }
 
   private findNode(root: THREE.Object3D, name: string): THREE.Object3D | null {
