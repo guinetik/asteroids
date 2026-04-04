@@ -14,14 +14,23 @@ import { SceneManager } from '@/three/SceneManager'
 import { ShuttleController } from '@/three/ShuttleController'
 import { ThrusterEffectController } from '@/three/ThrusterEffectController'
 import { StarFieldController } from '@/three/StarFieldController'
-import { AmbientLight, DirectionalLight } from 'three'
+import {
+  AmbientLight,
+  PointLight,
+  Mesh,
+  SphereGeometry,
+  MeshBasicMaterial,
+  AdditiveBlending,
+  BackSide,
+} from 'three'
 
 const ONE_SHOT_PRIORITY = TICK_PRIORITY_INPUT + 1
-const AMBIENT_LIGHT_INTENSITY = 1
-const DIR_LIGHT_INTENSITY = 2
-const DIR_LIGHT_X = 5
-const DIR_LIGHT_Y = 10
-const DIR_LIGHT_Z = 5
+const AMBIENT_LIGHT_INTENSITY = 0.3
+const SUN_LIGHT_INTENSITY = 3
+const SUN_LIGHT_DISTANCE = 5000
+const SUN_RADIUS = 50
+const SUN_GLOW_RADIUS = 65
+const SHUTTLE_ORBIT_DISTANCE = 300
 
 /**
  * Bridges Vue lifecycle to the game loop and Three.js scene.
@@ -55,16 +64,34 @@ export class HomeViewController implements Tickable {
     this.starFieldController = new StarFieldController()
     this.sceneManager.addToScene(this.starFieldController.points)
 
-    // Lighting
-    const ambientLight = new AmbientLight(0xffffff, AMBIENT_LIGHT_INTENSITY)
-    const dirLight = new DirectionalLight(0xffffff, DIR_LIGHT_INTENSITY)
-    dirLight.position.set(DIR_LIGHT_X, DIR_LIGHT_Y, DIR_LIGHT_Z)
-    this.sceneManager.addToScene(ambientLight)
-    this.sceneManager.addToScene(dirLight)
+    // Sun (at origin)
+    const sunGeo = new SphereGeometry(SUN_RADIUS, 32, 32)
+    const sunMat = new MeshBasicMaterial({ color: 0xffcc00 })
+    const sun = new Mesh(sunGeo, sunMat)
+    this.sceneManager.addToScene(sun)
 
-    // Shuttle
+    // Sun glow
+    const glowGeo = new SphereGeometry(SUN_GLOW_RADIUS, 32, 32)
+    const glowMat = new MeshBasicMaterial({
+      color: 0xff8800,
+      transparent: true,
+      opacity: 0.15,
+      blending: AdditiveBlending,
+      side: BackSide,
+    })
+    const glow = new Mesh(glowGeo, glowMat)
+    this.sceneManager.addToScene(glow)
+
+    // Lighting — point light from sun + dim ambient
+    const ambientLight = new AmbientLight(0xffffff, AMBIENT_LIGHT_INTENSITY)
+    const sunLight = new PointLight(0xffffee, SUN_LIGHT_INTENSITY, SUN_LIGHT_DISTANCE)
+    this.sceneManager.addToScene(ambientLight)
+    this.sceneManager.addToScene(sunLight)
+
+    // Shuttle — start at orbital distance from the sun
     this.shuttleController = new ShuttleController(this.inputManager)
     await this.shuttleController.load()
+    this.shuttleController.group.position.set(SHUTTLE_ORBIT_DISTANCE, 0, 0)
     this.sceneManager.addToScene(this.shuttleController.group)
     this.sceneManager.setShuttleRef(this.shuttleController.group)
     this.tickHandler.register(this.shuttleController, TICK_PRIORITY_PHYSICS)
