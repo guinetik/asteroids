@@ -84,9 +84,11 @@ export class HomeViewController implements Tickable {
     const glow = new Mesh(glowGeo, glowMat)
     this.sceneManager.addToScene(glow)
 
-    // Space-time grid on the XZ equator plane
+    // Space-time grid on the XZ equator plane — warped by gravity
     this.spaceTimeGrid = new SpaceTimeGrid()
-    this.sceneManager.addToScene(this.spaceTimeGrid.grid)
+    this.spaceTimeGrid.addSource({ x: 0, z: 0, mass: 5 }) // sun at origin
+    this.sceneManager.addToScene(this.spaceTimeGrid.mesh)
+    this.tickHandler.register(this.spaceTimeGrid, TICK_PRIORITY_ANIMATION)
 
     // Lighting — point light from sun + dim ambient
     const ambientLight = new AmbientLight(0xffffff, AMBIENT_LIGHT_INTENSITY)
