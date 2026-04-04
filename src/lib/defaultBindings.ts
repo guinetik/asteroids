@@ -19,4 +19,8 @@ export const DEFAULT_BINDINGS: Record<string, string[]> = {
 /** Lander key bindings */
 export const LANDER_BINDINGS: Record<string, string[]> = {
   mainEngine: ['Space'],
+  rcsLeft: ['KeyA'],
+  rcsRight: ['KeyD'],
+  rcsFore: ['KeyW'],
+  rcsAft: ['KeyS'],
 }

@@ -77,6 +77,9 @@ export class LanderViewController implements Tickable {
     this.landerController.group.position.y = SPAWN_HEIGHT
     this.sceneManager.addToScene(this.landerController.group)
     this.sceneManager.addToScene(this.landerController.flameEmitter.points)
+    for (const emitter of this.landerController.rcsEmitters.values()) {
+      this.sceneManager.addToScene(emitter.points)
+    }
     this.vehicleCamera.setTarget(this.landerController.group)
     this.tickHandler.register(this.landerController, TICK_PRIORITY_PHYSICS)
 

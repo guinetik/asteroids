@@ -1,9 +1,9 @@
 /**
- * Controls the lunar lander model — loading, platformer gravity, and main engine thrust.
+ * Controls the lunar lander model — loading, platformer gravity, main engine,
+ * and RCS thruster particle emitters.
  *
  * The main descent engine ("Thruster_Lunar Lander_0") fires upward against
- * Moon-level gravity. It requires sustained acceleration to gain lift —
- * you have to commit to the burn.
+ * Moon-level gravity. RCS thrusters emit white puffs on WASD input.
  *
  * @author guinetik
  * @date 2026-04-04
@@ -27,14 +27,13 @@ const FLOOR_Y = 0
 /**
  * Main engine thrust — intentionally weak relative to gravity.
  * You need to hold Space and build up velocity to climb.
- * At 2.4 vs 1.62 gravity, net upward accel is only ~0.78 units/s².
  */
 const MAIN_ENGINE_THRUST = 3.5
 
 /** Node name for the main descent engine bell in the GLB */
 const MAIN_ENGINE_NODE = 'Thruster_Lunar Lander_0'
 
-/** Particle emitter config for the main engine flame */
+/** Main engine flame emitter config */
 const FLAME_POOL_SIZE = 300
 const FLAME_COLOR = new THREE.Color(0xff6600)
 const FLAME_SIZE = 6
@@ -42,12 +41,52 @@ const FLAME_LIFETIME = 1.0
 const FLAME_SPREAD = 5
 const FLAME_PUSH_FORCE = 22
 const FLAME_SPAWN_RATE = 160
-
-/** Offset emit point upward from the nozzle tip to the nozzle mouth */
 const FLAME_EMIT_Y_OFFSET = 8
 
+/** RCS emitter config — white puffs, smaller and shorter than main flame */
+const RCS_POOL_SIZE = 30
+const RCS_COLOR = new THREE.Color(0xccddff)
+const RCS_SIZE = 3
+const RCS_LIFETIME = 0.25
+const RCS_SPREAD = 2
+const RCS_PUSH_FORCE = 10
+const RCS_SPAWN_RATE = 50
+
 /**
- * Controls the lunar lander model — gravity, main engine, and flame VFX.
+ * Which RCS nodes fire for each input action.
+ * Exhaust particles push in the direction of movement (visual feedback).
+ * Camera faces -X (from front/stairs side), so from camera's POV:
+ *   left/right = ±Z, forward/back = ±X
+ *
+ * A (rcsLeft)  → exhaust goes -Z (left from camera)
+ * D (rcsRight) → exhaust goes +Z (right from camera)
+ * W (rcsFore)  → exhaust goes -X (toward camera = forward)
+ * S (rcsAft)   → exhaust goes +X (away from camera = backward)
+ */
+const RCS_ACTION_MAP: Record<string, { nodes: string[]; pushLocal: THREE.Vector3 }> = {
+  rcsLeft: {
+    nodes: ['RCS_FL_Aft', 'RCS_BL_Aft'],
+    pushLocal: new THREE.Vector3(0, 0, -RCS_PUSH_FORCE),
+  },
+  rcsRight: {
+    nodes: ['RCS_FR_Aft', 'RCS_BR_Aft'],
+    pushLocal: new THREE.Vector3(0, 0, RCS_PUSH_FORCE),
+  },
+  rcsFore: {
+    nodes: ['RCS_FR_Fore', 'RCS_FL_Fore'],
+    pushLocal: new THREE.Vector3(RCS_PUSH_FORCE, 0, 0),
+  },
+  rcsAft: {
+    nodes: ['RCS_BL_Fore', 'RCS_BR_Fore'],
+    pushLocal: new THREE.Vector3(-RCS_PUSH_FORCE, 0, 0),
+  },
+}
+
+/** All unique RCS node names across all actions */
+const ALL_RCS_NODES = [...new Set(Object.values(RCS_ACTION_MAP).flatMap((a) => a.nodes))]
+
+/**
+ * Controls the lunar lander — gravity, main engine, and RCS emitters.
  *
  * @author guinetik
  * @date 2026-04-04
@@ -58,10 +97,18 @@ export class LanderController implements Tickable {
   readonly body = new PlatformerBody({ gravity: GRAVITY_MOON })
   readonly flameEmitter: ParticleEmitter
 
+  /** One emitter per RCS nozzle, keyed by node name */
+  readonly rcsEmitters = new Map<string, ParticleEmitter>()
+
   private readonly inputManager: InputManager
   private mainEngineWorldPos = new THREE.Vector3()
   private mainEngineLocalPos = new THREE.Vector3()
   private flameSpawnAccumulator = 0
+
+  /** Local-space positions of each RCS nozzle, keyed by node name */
+  private readonly rcsLocalPositions = new Map<string, THREE.Vector3>()
+  private readonly rcsSpawnAccumulators = new Map<string, number>()
+  private readonly rcsWorldPos = new THREE.Vector3()
 
   constructor(inputManager: InputManager) {
     this.inputManager = inputManager
@@ -73,6 +120,19 @@ export class LanderController implements Tickable {
       lifetime: FLAME_LIFETIME,
       spread: FLAME_SPREAD,
     })
+
+    // Create one emitter per RCS nozzle
+    for (const nodeName of ALL_RCS_NODES) {
+      const emitter = new ParticleEmitter({
+        poolSize: RCS_POOL_SIZE,
+        color: RCS_COLOR,
+        size: RCS_SIZE,
+        lifetime: RCS_LIFETIME,
+        spread: RCS_SPREAD,
+      })
+      this.rcsEmitters.set(nodeName, emitter)
+      this.rcsSpawnAccumulators.set(nodeName, 0)
+    }
   }
 
   async load(): Promise<void> {
@@ -80,12 +140,23 @@ export class LanderController implements Tickable {
     scene.scale.setScalar(MODEL_SCALE)
     this.group.add(scene)
 
-    // Find main engine node and read its local position for particle emission
+    // Main engine position
     const engineNode = this.findNode(scene, MAIN_ENGINE_NODE)
     if (engineNode) {
-      // Position is in model coords — scale to game units
       const pos = engineNode.position
       this.mainEngineLocalPos.set(pos.x * MODEL_SCALE, pos.y * MODEL_SCALE, pos.z * MODEL_SCALE)
+    }
+
+    // RCS nozzle positions
+    for (const nodeName of ALL_RCS_NODES) {
+      const node = this.findNode(scene, nodeName)
+      if (node) {
+        const pos = node.position
+        this.rcsLocalPositions.set(
+          nodeName,
+          new THREE.Vector3(pos.x * MODEL_SCALE, pos.y * MODEL_SCALE, pos.z * MODEL_SCALE),
+        )
+      }
     }
   }
 
@@ -98,7 +169,7 @@ export class LanderController implements Tickable {
   }
 
   tick(dt: number): void {
-    // Main engine fights gravity
+    // Main engine
     if (this.isMainEngineActive) {
       this.body.impulse(MAIN_ENGINE_THRUST * dt)
       this.spawnFlame(dt)
@@ -106,15 +177,24 @@ export class LanderController implements Tickable {
       this.flameSpawnAccumulator = 0
     }
 
+    // RCS emitters
+    this.tickRcs(dt)
+
     // Platformer gravity + ground collision
     this.group.position.y = this.body.tick(dt, this.group.position.y, FLOOR_Y)
 
-    // Update flame particles
+    // Update all emitters
     this.flameEmitter.tick(dt)
+    for (const emitter of this.rcsEmitters.values()) {
+      emitter.tick(dt)
+    }
   }
 
   dispose(): void {
     this.flameEmitter.dispose()
+    for (const emitter of this.rcsEmitters.values()) {
+      emitter.dispose()
+    }
     this.group.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         child.geometry.dispose()
@@ -127,16 +207,65 @@ export class LanderController implements Tickable {
     })
   }
 
+  private tickRcs(dt: number): void {
+    // Track which nodes are active this frame
+    const activeNodes = new Set<string>()
+
+    for (const [action, mapping] of Object.entries(RCS_ACTION_MAP)) {
+      if (!this.inputManager.isActionActive(action)) continue
+      for (const nodeName of mapping.nodes) {
+        activeNodes.add(nodeName)
+      }
+    }
+
+    for (const nodeName of ALL_RCS_NODES) {
+      if (activeNodes.has(nodeName)) {
+        const localPos = this.rcsLocalPositions.get(nodeName)
+        if (!localPos) continue
+
+        const acc = (this.rcsSpawnAccumulators.get(nodeName) ?? 0) + RCS_SPAWN_RATE * dt
+        this.rcsSpawnAccumulators.set(nodeName, acc)
+
+        // World position of this nozzle
+        this.rcsWorldPos.copy(localPos)
+          .applyQuaternion(this.group.quaternion)
+          .add(this.group.position)
+
+        // Find push direction for this node's action
+        const pushLocal = this.getPushForNode(nodeName)
+        const pushWorld = pushLocal.clone().applyQuaternion(this.group.quaternion)
+
+        const emitter = this.rcsEmitters.get(nodeName)!
+        let remaining = this.rcsSpawnAccumulators.get(nodeName)!
+        while (remaining >= 1) {
+          emitter.emit(this.rcsWorldPos, pushWorld)
+          remaining -= 1
+        }
+        this.rcsSpawnAccumulators.set(nodeName, remaining)
+      } else {
+        this.rcsSpawnAccumulators.set(nodeName, 0)
+      }
+    }
+  }
+
+  /** Look up which action owns this node and return its push direction */
+  private getPushForNode(nodeName: string): THREE.Vector3 {
+    for (const mapping of Object.values(RCS_ACTION_MAP)) {
+      if (mapping.nodes.includes(nodeName)) {
+        return mapping.pushLocal
+      }
+    }
+    return new THREE.Vector3()
+  }
+
   private spawnFlame(dt: number): void {
     this.flameSpawnAccumulator += FLAME_SPAWN_RATE * dt
 
-    // Engine position in world space — emit from nozzle mouth, not tip
     this.mainEngineWorldPos.copy(this.mainEngineLocalPos)
     this.mainEngineWorldPos.y += FLAME_EMIT_Y_OFFSET
     this.mainEngineWorldPos.applyQuaternion(this.group.quaternion)
       .add(this.group.position)
 
-    // Push particles downward (engine fires down, flame goes down)
     const pushDir = new THREE.Vector3(0, -FLAME_PUSH_FORCE, 0)
 
     while (this.flameSpawnAccumulator >= 1) {
