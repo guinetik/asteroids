@@ -70,8 +70,21 @@ export class ShuttleController implements Tickable {
     // Find door nodes for programmatic animation
     this.doorPortNode = this.findNode(gltf.scene, 'door-prt')
     this.doorStbNode = this.findNode(gltf.scene, 'door-stb')
-    if (this.doorPortNode) this.doorPortClosedRotX = this.doorPortNode.rotation.x
-    if (this.doorStbNode) this.doorStbClosedRotX = this.doorStbNode.rotation.x
+    if (this.doorPortNode) {
+      this.doorPortClosedRotX = this.doorPortNode.rotation.x
+      // Log door geometry bounds to find hinge offset
+      const box = new THREE.Box3().setFromObject(this.doorPortNode)
+      const size = box.getSize(new THREE.Vector3())
+      const center = box.getCenter(new THREE.Vector3())
+      console.log('[Door port] size:', size, 'center:', center, 'pos:', this.doorPortNode.position.toArray())
+    }
+    if (this.doorStbNode) {
+      this.doorStbClosedRotX = this.doorStbNode.rotation.x
+      const box = new THREE.Box3().setFromObject(this.doorStbNode)
+      const size = box.getSize(new THREE.Vector3())
+      const center = box.getCenter(new THREE.Vector3())
+      console.log('[Door stb] size:', size, 'center:', center, 'pos:', this.doorStbNode.position.toArray())
+    }
 
     this.placeNozzles(gltf.scene)
 
