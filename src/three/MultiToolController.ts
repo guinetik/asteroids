@@ -79,6 +79,8 @@ export class MultiToolController implements Tickable {
     this.model.traverse((child) => {
       child.frustumCulled = false
       if (child instanceof THREE.Mesh && LED_NODE_NAMES.includes(child.name)) {
+        // Clone material so LED tinting doesn't bleed to other meshes
+        child.material = (child.material as THREE.MeshStandardMaterial).clone()
         this.ledMeshes.push(child)
       }
     })
@@ -106,11 +108,11 @@ export class MultiToolController implements Tickable {
   setMode(color: string): void {
     const ledColor = new THREE.Color(color)
     for (const mesh of this.ledMeshes) {
-      if (mesh.material instanceof THREE.MeshStandardMaterial) {
-        mesh.material.emissive.copy(ledColor)
-        mesh.material.emissiveIntensity = 1.0
-        mesh.material.needsUpdate = true
-      }
+      const mat = mesh.material as THREE.MeshStandardMaterial
+      mat.color.set(0x000000)
+      mat.emissive.copy(ledColor)
+      mat.emissiveIntensity = 1.0
+      mat.needsUpdate = true
     }
   }
 
