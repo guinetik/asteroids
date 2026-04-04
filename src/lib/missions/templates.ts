@@ -8,7 +8,7 @@
  * @date 2026-04-03
  * @spec docs/superpowers/specs/2026-04-03-mission-templates-design.md
  */
-import type { MissionTemplate } from './types'
+import type { MissionTemplate, MissionRegion } from './types'
 
 import miningContractData from '@/data/missions/mining-contract.json'
 import pestControlData from '@/data/missions/pest-control.json'
@@ -35,4 +35,17 @@ export function getTemplatesForDifficulty(difficulty: number): MissionTemplate[]
   return MISSION_TEMPLATES.filter(
     (t) => t.minDifficulty <= difficulty && t.maxDifficulty >= difficulty,
   )
+}
+
+/** Get the region for a mission at a given difficulty level. */
+export function getRegionForDifficulty(
+  template: MissionTemplate,
+  difficulty: number,
+): MissionRegion | undefined {
+  for (const [region, [min, max]] of Object.entries(template.regionByDifficulty)) {
+    if (difficulty >= min && difficulty <= max) {
+      return region as MissionRegion
+    }
+  }
+  return undefined
 }

@@ -10,5 +10,10 @@
     { "type": "exterminate", "weight": 0.5, "params": { "type": "exterminate", "nestCount": { "min": 3, "max": 5 }, "swarmSize": { "min": 6, "max": 10 }, "spitterChance": 0.5 }, "reward": { "min": 2000, "max": 3500 } },
     { "type": "exterminate", "weight": 0.3, "params": { "type": "exterminate", "nestCount": { "min": 4, "max": 5 }, "swarmSize": { "min": 8, "max": 12 }, "spitterChance": 0.8 }, "reward": { "min": 3000, "max": 4000 } }
   ],
-  "completionBonus": { "min": 500, "max": 2500 }
+  "completionBonus": { "min": 500, "max": 2500 },
+  "regionByDifficulty": {
+    "near-earth": [2, 4],
+    "asteroid-belt": [5, 7],
+    "kuiper-belt": [8, 10]
+  }
 }

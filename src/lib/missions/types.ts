@@ -14,6 +14,9 @@
 /** The three objective types a mission can contain. */
 export type ObjectiveType = 'gather' | 'exterminate' | 'rescue'
 
+/** Solar system region where missions spawn. Determines fuel cost and distance. */
+export type MissionRegion = 'near-earth' | 'asteroid-belt' | 'kuiper-belt'
+
 /** A min/max range for procedural generation. Generator interpolates based on difficulty. */
 export interface NumberRange {
   /** Lower bound (or upper bound for inverted ranges like oxygenTime). */
@@ -88,4 +91,6 @@ export interface MissionTemplate {
   objectiveSlots: ObjectiveSlot[]
   /** Credit bonus range awarded for completing ALL objectives in the mission. */
   completionBonus: NumberRange
+  /** Maps region to [minDifficulty, maxDifficulty] range. Determines where the asteroid spawns based on mission difficulty. */
+  regionByDifficulty: Record<MissionRegion, [number, number]>
 }

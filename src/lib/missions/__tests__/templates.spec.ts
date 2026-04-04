@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { MISSION_TEMPLATES, getTemplateById, getTemplatesForDifficulty } from '../templates'
+import { MISSION_TEMPLATES, getTemplateById, getTemplatesForDifficulty, getRegionForDifficulty } from '../templates'
 
 const VALID_TYPES = new Set(['gather', 'exterminate', 'rescue'])
 const DIFFICULTY_MIN = 1
@@ -129,6 +129,25 @@ describe('MISSION_TEMPLATES', () => {
       expect(params.guardedChance).toBeLessThanOrEqual(1)
     }
   })
+  const VALID_REGIONS = new Set(['near-earth', 'asteroid-belt', 'kuiper-belt'])
+
+  it.each([
+    ['mining_contract'],
+    ['pest_control'],
+    ['search_and_rescue'],
+    ['hazard_cleanup'],
+    ['colony_relief'],
+  ])('template "%s" has valid regionByDifficulty', (id) => {
+    const t = MISSION_TEMPLATES.find((t) => t.id === id)!
+    expect(t.regionByDifficulty).toBeDefined()
+
+    for (const [region, [min, max]] of Object.entries(t.regionByDifficulty)) {
+      expect(VALID_REGIONS.has(region)).toBe(true)
+      expect(min).toBeGreaterThanOrEqual(t.minDifficulty)
+      expect(max).toBeLessThanOrEqual(t.maxDifficulty)
+      expect(min).toBeLessThanOrEqual(max)
+    }
+  })
 })
 
 describe('getTemplateById', () => {
@@ -158,5 +177,27 @@ describe('getTemplatesForDifficulty', () => {
   it('returns all templates at difficulty 10', () => {
     const templates = getTemplatesForDifficulty(10)
     expect(templates).toHaveLength(5)
+  })
+})
+
+describe('getRegionForDifficulty', () => {
+  it('returns near-earth for mining_contract at difficulty 1', () => {
+    const t = getTemplateById('mining_contract')!
+    expect(getRegionForDifficulty(t, 1)).toBe('near-earth')
+  })
+
+  it('returns asteroid-belt for mining_contract at difficulty 5', () => {
+    const t = getTemplateById('mining_contract')!
+    expect(getRegionForDifficulty(t, 5)).toBe('asteroid-belt')
+  })
+
+  it('returns kuiper-belt for mining_contract at difficulty 9', () => {
+    const t = getTemplateById('mining_contract')!
+    expect(getRegionForDifficulty(t, 9)).toBe('kuiper-belt')
+  })
+
+  it('returns undefined for difficulty outside template range', () => {
+    const t = getTemplateById('colony_relief')!
+    expect(getRegionForDifficulty(t, 1)).toBeUndefined()
   })
 })

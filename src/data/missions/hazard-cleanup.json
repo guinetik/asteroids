@@ -10,5 +10,10 @@
     { "type": "gather", "weight": 1, "params": { "type": "gather", "resourceAmount": { "min": 80, "max": 250 } }, "reward": { "min": 600, "max": 2000 } },
     { "type": "gather", "weight": 0.5, "params": { "type": "gather", "resourceAmount": { "min": 150, "max": 400 } }, "reward": { "min": 1000, "max": 2500 } }
   ],
-  "completionBonus": { "min": 600, "max": 3500 }
+  "completionBonus": { "min": 600, "max": 3500 },
+  "regionByDifficulty": {
+    "near-earth": [3, 5],
+    "asteroid-belt": [6, 8],
+    "kuiper-belt": [9, 10]
+  }
 }
