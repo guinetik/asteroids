@@ -27,7 +27,10 @@ import type { SurfaceFeatures } from '@/lib/asteroids/types'
 import { AmbientLight, DirectionalLight } from 'three'
 import { Heightmap } from '@/lib/terrain/heightmap'
 import { MultiToolController } from '@/three/MultiToolController'
+import { MultiToolState } from '@/lib/fps/multiToolState'
+import type { MultiToolConfig } from '@/lib/fps/multiToolState'
 import playerConfigJson from '@/data/fps/player-config.json'
+import multiToolConfigJson from '@/data/fps/multitool-config.json'
 
 const AMBIENT_LIGHT_INTENSITY = 0.4
 const DIR_LIGHT_INTENSITY = 1.2
@@ -62,6 +65,10 @@ export class FpsViewController implements Tickable {
   private terrainGrid: TerrainGrid | null = null
   private heightmap: Heightmap | null = null
   private multiTool: MultiToolController | null = null
+  private multiToolState: MultiToolState | null = null
+  private leftMouseDown = false
+  private leftMouseJustPressed = false
+  private rightMouseDown = false
 
   /** Called each frame with player telemetry for HUD display. */
   onTelemetry: ((telemetry: FpsTelemetry) => void) | null = null
@@ -122,6 +129,9 @@ export class FpsViewController implements Tickable {
     this.multiTool = new MultiToolController()
     await this.multiTool.load(this.fpsCamera.camera, this.sceneManager.scene)
 
+    // Multi-tool state
+    this.multiToolState = new MultiToolState(multiToolConfigJson as MultiToolConfig)
+
     // Death handler — reset scene
     this.playerController.onDeath = () => {
       window.location.reload()
@@ -129,6 +139,7 @@ export class FpsViewController implements Tickable {
 
     // Register tick order
     this.tickHandler.register(this.playerController, TICK_PRIORITY_PHYSICS)
+    this.tickHandler.register(this.multiToolState, TICK_PRIORITY_PHYSICS + 1)
     this.tickHandler.register(this.fpsCamera, TICK_PRIORITY_RENDER - 2)
     this.tickHandler.register(this.multiTool, TICK_PRIORITY_RENDER - 2)
     this.tickHandler.register(this, TICK_PRIORITY_RENDER - 1)
@@ -143,6 +154,33 @@ export class FpsViewController implements Tickable {
   }
 
   tick(_dt: number): void {
+    // --- Tool keybinds ---
+    if (this.inputManager && this.multiToolState) {
+      if (this.inputManager.wasActionPressed('toolDrill')) this.multiToolState.setMode('drill')
+      if (this.inputManager.wasActionPressed('toolWeapon')) this.multiToolState.setMode('weapon')
+      if (this.inputManager.wasActionPressed('toolHeal')) this.multiToolState.setMode('heal')
+
+      // Feed mouse state to tool
+      this.multiToolState.setAiming(this.rightMouseDown)
+      this.multiToolState.setInput(this.leftMouseDown, this.leftMouseJustPressed)
+      this.leftMouseJustPressed = false
+    }
+
+    // --- Sync tool visuals ---
+    if (this.multiToolState && this.multiTool) {
+      this.multiTool.setMode(this.multiToolState.modeConfig.color)
+    }
+
+    // --- ADS camera zoom ---
+    if (this.multiToolState && this.fpsCamera) {
+      const ads = this.multiToolState.adsConfig
+      this.fpsCamera.setAiming(
+        this.multiToolState.aiming,
+        ads.fovMultiplier,
+        ads.zoomSpeed,
+      )
+    }
+
     // Feed player velocity to camera and multi-tool for bob/wobble
     if (this.playerController && this.fpsCamera) {
       const pos = this.playerController.group.position
@@ -169,9 +207,9 @@ export class FpsViewController implements Tickable {
         speed: this.playerController.speed,
         grounded: this.playerController.grounded,
         deathTimer: this.playerController.deathTimer,
-        activeMode: 'drill',
-        aiming: false,
-        isFiring: false,
+        activeMode: this.multiToolState?.mode ?? 'drill',
+        aiming: this.multiToolState?.aiming ?? false,
+        isFiring: this.multiToolState?.isFiring ?? false,
       })
     }
   }
@@ -191,6 +229,25 @@ export class FpsViewController implements Tickable {
       }
     }
     document.addEventListener('mousemove', onMouseMove)
+
+    // Mouse buttons → tool state
+    const onMouseDown = (e: MouseEvent): void => {
+      if (document.pointerLockElement !== canvas) return
+      if (e.button === 0) {
+        this.leftMouseDown = true
+        this.leftMouseJustPressed = true
+      }
+      if (e.button === 2) this.rightMouseDown = true
+    }
+    const onMouseUp = (e: MouseEvent): void => {
+      if (e.button === 0) this.leftMouseDown = false
+      if (e.button === 2) this.rightMouseDown = false
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    document.addEventListener('mouseup', onMouseUp)
+
+    // Prevent context menu on right-click
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault())
 
     // Pointer lock change
     const onLockChange = (): void => {
