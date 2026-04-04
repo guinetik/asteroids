@@ -23,4 +23,6 @@ export const LANDER_BINDINGS: Record<string, string[]> = {
   rcsRight: ['KeyD'],
   rcsFore: ['KeyW'],
   rcsAft: ['KeyS'],
+  rcsDescend: ['KeyC'],
+  rcsAscend: ['ShiftLeft'],
 }

@@ -80,6 +80,14 @@ const RCS_ACTION_MAP: Record<string, { nodes: string[]; pushLocal: THREE.Vector3
     nodes: ['RCS_BL_Fore', 'RCS_BR_Fore'],
     pushLocal: new THREE.Vector3(-RCS_PUSH_FORCE, 0, 0),
   },
+  rcsDescend: {
+    nodes: ['RCS_FL_Up', 'RCS_BL_Up', 'RCS_BR_Up', 'RCS_FR_Up'],
+    pushLocal: new THREE.Vector3(0, RCS_PUSH_FORCE, 0),
+  },
+  rcsAscend: {
+    nodes: ['RCS_FL_Down', 'RCS_BL_Down', 'RCS_BR_Down', 'RCS_FR_Down'],
+    pushLocal: new THREE.Vector3(0, -RCS_PUSH_FORCE, 0),
+  },
 }
 
 /** All unique RCS node names across all actions */
