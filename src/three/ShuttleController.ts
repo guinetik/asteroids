@@ -10,6 +10,7 @@ import { ThrusterSystem, DEFAULT_SHUTTLE_CONFIG } from '@/lib/physics/thrusterSy
 import type { ShuttleThrusterName } from '@/lib/physics/thrusterSystem'
 import { loadGLB } from './loadGLB'
 import { FuelTank } from './FuelTank'
+import { HabitatModule } from './HabitatModule'
 import type { PortalVehicle } from './PortalArrivalSequence'
 
 /** Any object that can exert gravity on the shuttle */
@@ -119,6 +120,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
   private shuttleFuelTank: FuelTank | null = null
   private cargoLight: THREE.PointLight | null = null
   private readonly cargoWallLights: THREE.PointLight[] = []
+  private habitat: HabitatModule | null = null
 
   constructor(inputManager: InputManager) {
     this.inputManager = inputManager
@@ -172,6 +174,16 @@ export class ShuttleController implements Tickable, PortalVehicle {
       color: 0x999999,
     })
     gltf.scene.add(this.shuttleFuelTank.group)
+
+    // Habitat module — glass tube between cockpit and shuttle fuel tank
+    const habitatLength = 260
+    this.habitat = new HabitatModule({
+      radius: 80,
+      length: habitatLength,
+      position: new THREE.Vector3(290, 0, 15),
+    })
+    this.habitat.setVisible(false)
+    gltf.scene.add(this.habitat.group)
 
     // Cargo bay interior lights — only on when doors open
     // Main light: between the two fuel tanks
@@ -290,6 +302,10 @@ export class ShuttleController implements Tickable, PortalVehicle {
     }
     for (const light of this.cargoWallLights) {
       light.intensity = this.doorProgress * 1.5
+    }
+
+    if (this.habitat) {
+      this.habitat.setVisible(doorsOpen)
     }
 
     // Lander fuel — always full (static cargo indicator)
