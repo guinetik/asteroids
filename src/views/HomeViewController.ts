@@ -1,5 +1,6 @@
 // src/views/HomeViewController.ts
 import type { Tickable } from '@/lib/Tickable'
+import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'
@@ -44,8 +45,8 @@ export class HomeViewController implements Tickable {
   private spaceTimeGrid: SpaceTimeGrid | null = null
   private celestialBodies: CelestialBody[] = []
 
-  /** Called each frame with (speed, heading) for HUD display */
-  onTelemetry: ((speed: number, heading: number) => void) | null = null
+  /** Called each frame with full shuttle telemetry for HUD display */
+  onTelemetry: ((telemetry: ShuttleTelemetry) => void) | null = null
 
   async init(container: HTMLElement): Promise<void> {
     // Core systems
@@ -95,6 +96,9 @@ export class HomeViewController implements Tickable {
       this.shuttleController.addGravityWell(body)
     }
     await this.shuttleController.load()
+    this.shuttleController.thrusterSystem.onAllDepleted = () => {
+      this.shuttleController?.respawn()
+    }
     const spawnAngle = Math.random() * Math.PI * 2
     const spawnRadius = SPAWN_MIN_RADIUS + Math.random() * (SPAWN_MAX_RADIUS - SPAWN_MIN_RADIUS)
     this.shuttleController.group.position.set(
@@ -126,7 +130,21 @@ export class HomeViewController implements Tickable {
       this.shuttleController?.toggleDoors()
     }
     if (this.shuttleController && this.onTelemetry) {
-      this.onTelemetry(this.shuttleController.speed, this.shuttleController.heading)
+      const ts = this.shuttleController.thrusterSystem
+      this.onTelemetry({
+        speed: this.shuttleController.speed,
+        heading: this.shuttleController.heading,
+        posX: this.shuttleController.position.x,
+        posZ: this.shuttleController.position.z,
+        fuelLevel: ts.fuelLevel,
+        fuelCapacity: ts.fuelCapacity,
+        thrustCharge: ts.getState('thrust').charge,
+        thrustCapacity: ts.getState('thrust').capacity,
+        brakeCharge: ts.getState('brake').charge,
+        brakeCapacity: ts.getState('brake').capacity,
+        rcsCharge: ts.getState('rcs').charge,
+        rcsCapacity: ts.getState('rcs').capacity,
+      })
     }
   }
 
