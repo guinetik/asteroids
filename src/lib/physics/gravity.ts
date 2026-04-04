@@ -12,7 +12,7 @@
  * Real G = 6.674e-11 m³/(kg·s²). Exaggerated so solar-mass
  * bodies produce meaningful acceleration at game distances.
  */
-const GRAVITY_CONSTANT = 50000
+const GRAVITY_CONSTANT = 500000
 
 /** Minimum distance to prevent infinite force at center */
 const MIN_GRAVITY_DISTANCE = 15
