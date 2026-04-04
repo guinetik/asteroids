@@ -22,6 +22,7 @@ export class SceneManager implements Tickable {
   readonly controls: OrbitControls
 
   private container: HTMLElement | null = null
+  private shuttleRef: THREE.Object3D | null = null
 
   constructor() {
     this.scene = new THREE.Scene()
@@ -50,7 +51,7 @@ export class SceneManager implements Tickable {
   }
 
   setShuttleRef(object: THREE.Object3D): void {
-    // Point orbit controls at the shuttle initially
+    this.shuttleRef = object
     this.controls.target.copy(object.position)
   }
 
@@ -63,6 +64,13 @@ export class SceneManager implements Tickable {
   }
 
   tick(_dt: number): void {
+    // Camera follows the shuttle — orbit target tracks its position
+    if (this.shuttleRef) {
+      const offset = this.camera.position.clone().sub(this.controls.target)
+      this.controls.target.copy(this.shuttleRef.position)
+      this.camera.position.copy(this.shuttleRef.position).add(offset)
+    }
+
     this.controls.update()
     this.renderer.render(this.scene, this.camera)
   }
