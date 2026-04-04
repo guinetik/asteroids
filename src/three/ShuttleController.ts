@@ -8,6 +8,7 @@ import type { SpaceTimeGrid } from './SpaceTimeGrid'
 import { checkEventHorizon, type GravitySource } from '@/lib/physics/gravity'
 import { ThrusterSystem, DEFAULT_SHUTTLE_CONFIG } from '@/lib/physics/thrusterSystem'
 import type { ShuttleThrusterName } from '@/lib/physics/thrusterSystem'
+import { loadGLB } from './loadGLB'
 import type { PortalVehicle } from './PortalArrivalSequence'
 
 /** Any object that can exert gravity on the shuttle */
@@ -46,6 +47,12 @@ const ENG_POSITIONS: [number, number, number][] = [
 
 const DOOR_OPEN_ANGLE = Math.PI * 0.6 // ~108 degrees, payload bay doors open wide
 const DOOR_ANIM_SPEED = 2 // radians per second
+
+const LANDER_MODEL_PATH = '/models/lander.glb'
+/** Scale the lander to fit inside the cargo bay (in raw shuttle cm space) */
+const CARGO_LANDER_SCALE = 30
+/** Position inside the bay — raw model coords (cm), pre-rotation: X=nose-tail, Y=wingspan, Z=height */
+const CARGO_LANDER_OFFSET = new THREE.Vector3(-285, 0, 20)
 
 const THRUST_FORCE = 12
 const BRAKE_FACTOR = 0.93
@@ -140,6 +147,13 @@ export class ShuttleController implements Tickable, PortalVehicle {
     if (this.doorStbNode) this.doorStbClosedRotX = this.doorStbNode.rotation.x
 
     this.placeNozzles(gltf.scene)
+
+    // Load lander model into the cargo bay
+    const landerScene = await loadGLB(LANDER_MODEL_PATH)
+    landerScene.scale.setScalar(CARGO_LANDER_SCALE)
+    landerScene.position.copy(CARGO_LANDER_OFFSET)
+    landerScene.rotation.set(0, 0, -Math.PI / 2)
+    gltf.scene.add(landerScene)
 
     dracoLoader.dispose()
   }
