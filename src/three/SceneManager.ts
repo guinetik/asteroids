@@ -5,10 +5,9 @@ import type { Tickable } from '@/lib/Tickable'
 const CAMERA_FOV = 60
 const CAMERA_NEAR = 0.1
 const CAMERA_FAR = 50000
-const CAMERA_INITIAL_OFFSET = new THREE.Vector3(0, 20, 30)
-const CHASE_CAM_OFFSET = new THREE.Vector3(0, 12, 30) // behind shuttle (nose is -Z)
+const CAMERA_INITIAL_OFFSET = new THREE.Vector3(0, 60, 0)
+const CHASE_CAM_OFFSET = new THREE.Vector3(0, 50, 0) // directly above the shuttle
 const CHASE_CAM_LERP_SPEED = 4
-const CHASE_CAM_LOOK_AHEAD = -15 // look ahead toward -Z
 
 /**
  * Three.js scene orchestrator — creates renderer, camera, and controls.
@@ -76,14 +75,10 @@ export class SceneManager implements Tickable {
       const shuttlePos = this.shuttleRef.position
 
       if (this.chaseMode) {
-        const offset = CHASE_CAM_OFFSET.clone().applyQuaternion(this.shuttleRef.quaternion)
-        const targetPos = shuttlePos.clone().add(offset)
+        // Top-down: camera directly above shuttle, looking straight down
+        const targetPos = shuttlePos.clone().add(CHASE_CAM_OFFSET)
         this.camera.position.lerp(targetPos, CHASE_CAM_LERP_SPEED * dt)
-        // Look slightly ahead of the shuttle for a better flight feel
-        const lookAhead = new THREE.Vector3(0, 0, CHASE_CAM_LOOK_AHEAD)
-          .applyQuaternion(this.shuttleRef.quaternion)
-          .add(shuttlePos)
-        this.camera.lookAt(lookAhead)
+        this.camera.lookAt(shuttlePos)
       } else {
         this.controls.target.copy(shuttlePos)
         this.controls.update()
