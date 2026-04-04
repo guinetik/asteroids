@@ -5,7 +5,11 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
 import type { Tickable } from '@/lib/Tickable'
 import type { InputManager } from '@/lib/InputManager'
 import type { SpaceTimeGrid } from './SpaceTimeGrid'
-import type { GravityWell } from './CelestialBody'
+
+/** Any object that can exert gravity on the shuttle */
+interface GravityWell {
+  getGravityAt(position: THREE.Vector3): THREE.Vector3
+}
 
 const SHUTTLE_MODEL_PATH = '/models/shuttle.glb'
 const DRACO_DECODER_PATH = '/node_modules/three/examples/jsm/libs/draco/'
