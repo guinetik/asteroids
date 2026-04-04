@@ -61,6 +61,7 @@ interface PlanetJSON {
   readonly displayRadius: number
   readonly axialTilt: number
   readonly rotationSpeed: number
+  readonly mass: number
   readonly shader: ShaderConfig
   readonly ring?: RingConfig
   readonly moons: readonly MoonJSON[]
@@ -145,6 +146,7 @@ function convertPlanet(p: PlanetJSON): Planet {
     displayRadius: p.displayRadius,
     axialTilt: p.axialTilt * DEG,
     rotationSpeed: p.rotationSpeed,
+    mass: p.mass,
     shader: p.shader,
     ...(p.ring !== undefined ? { ring: p.ring } : {}),
     moons: p.moons.map(convertMoon),

@@ -108,6 +108,8 @@ export interface Planet {
   readonly rotationSpeed: number
   /** Axial tilt in radians (converted from degrees by catalog). */
   readonly axialTilt: number
+  /** Mass in solar masses (M☉). Earth ~3.00e-6, Jupiter ~9.55e-4. */
+  readonly mass: number
 }
 
 /** Solar data — the central star. */
@@ -120,6 +122,8 @@ export interface SunData {
   readonly shader: ShaderConfig
   /** Rotation speed factor for animation. */
   readonly rotationSpeed: number
+  /** Mass in solar masses (M☉). Always 1.0 for the Sun. */
+  readonly mass: number
 }
 
 /** A resonance gap in an asteroid belt caused by Jupiter's gravity. */
