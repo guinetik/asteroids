@@ -90,6 +90,23 @@ export class MultiToolController implements Tickable {
     this.grounded = grounded
   }
 
+  /**
+   * Tint the model mesh to reflect the active tool mode.
+   *
+   * @param color - Hex color string (e.g. "#3b82f6")
+   */
+  setMode(color: string): void {
+    if (!this.model) return
+    const emissiveColor = new THREE.Color(color)
+    this.model.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+        child.material.emissive.copy(emissiveColor)
+        child.material.emissiveIntensity = 0.15
+        child.material.needsUpdate = true
+      }
+    })
+  }
+
   private readonly offset = new THREE.Vector3()
 
   tick(dt: number): void {
