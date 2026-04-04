@@ -16,11 +16,11 @@ import { loadGLB } from './loadGLB'
 const MODEL_PATH = '/models/multitool.glb'
 
 /** Position offset from camera origin (right, down, forward). */
-const OFFSET_X = 0.35
-const OFFSET_Y = -0.3
-const OFFSET_Z = -0.5
+const OFFSET_X = 0.4
+const OFFSET_Y = -0.35
+const OFFSET_Z = -0.6
 
-const MODEL_SCALE = 0.15
+const MODEL_SCALE = 0.008
 
 /** Idle sway amplitude (radians). */
 const IDLE_SWAY_AMP = 0.008
@@ -55,6 +55,7 @@ export class MultiToolController implements Tickable {
     this.model = await loadGLB(MODEL_PATH)
     this.model.scale.setScalar(MODEL_SCALE)
     this.model.position.set(OFFSET_X, OFFSET_Y, OFFSET_Z)
+    this.model.rotation.set(0, -Math.PI / 2, 0)
     camera.add(this.model)
   }
 
