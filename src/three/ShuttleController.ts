@@ -43,8 +43,8 @@ export class ShuttleController implements Tickable {
 
   private doorsOpen = false
   private doorProgress = 0 // 0 = closed, 1 = open
-  private doorPortPivot: THREE.Group | null = null
-  private doorStbPivot: THREE.Group | null = null
+  private doorPortNode: THREE.Object3D | null = null
+  private doorStbNode: THREE.Object3D | null = null
   private velocity = new THREE.Vector3()
   private currentBank = 0
   private readonly inputManager: InputManager
@@ -65,24 +65,29 @@ export class ShuttleController implements Tickable {
     gltf.scene.rotation.x = MODEL_ROTATION_X
     this.group.add(gltf.scene)
 
-    // Create pivot groups at the hinge edge so doors swing like a book
-    // Door geometry: Y width ~107, port center Y=+53.5, stb center Y=-53.5
-    // Hinge is at the inner edge (Y=0, fuselage centerline)
-    const doorPortNode = this.findNode(gltf.scene, 'door-prt')
-    const doorStbNode = this.findNode(gltf.scene, 'door-stb')
+    // Set up doors for hinge-edge rotation
+    // Door geometry center is at Y=±53.5 with width 107
+    // Hinge edge is at Y=0 (fuselage centerline)
+    // We shift the door node position to the hinge, then offset all
+    // children back so geometry stays in place but rotates from the edge
+    this.doorPortNode = this.findNode(gltf.scene, 'door-prt')
+    this.doorStbNode = this.findNode(gltf.scene, 'door-stb')
 
-    if (doorPortNode && doorPortNode.parent) {
-      this.doorPortPivot = new THREE.Group()
-      this.doorPortPivot.position.set(0, 0, 0) // hinge at centerline
-      doorPortNode.parent.add(this.doorPortPivot)
-      this.doorPortPivot.attach(doorPortNode) // reparent, preserving world transform
+    const DOOR_HALF_WIDTH = 53.5 // half of door Y extent (raw model units)
+
+    if (this.doorPortNode) {
+      // Move node origin to hinge edge (Y=0), offset children to compensate
+      this.doorPortNode.position.y = -DOOR_HALF_WIDTH
+      this.doorPortNode.children.forEach((child) => {
+        child.position.y += DOOR_HALF_WIDTH
+      })
     }
 
-    if (doorStbNode && doorStbNode.parent) {
-      this.doorStbPivot = new THREE.Group()
-      this.doorStbPivot.position.set(0, 0, 0) // hinge at centerline
-      doorStbNode.parent.add(this.doorStbPivot)
-      this.doorStbPivot.attach(doorStbNode)
+    if (this.doorStbNode) {
+      this.doorStbNode.position.y = DOOR_HALF_WIDTH
+      this.doorStbNode.children.forEach((child) => {
+        child.position.y -= DOOR_HALF_WIDTH
+      })
     }
 
     this.placeNozzles(gltf.scene)
@@ -139,12 +144,12 @@ export class ShuttleController implements Tickable {
 
     const angle = this.doorProgress * DOOR_OPEN_ANGLE
 
-    // Rotate pivot groups — doors hinge along X (nose-to-tail)
-    if (this.doorPortPivot) {
-      this.doorPortPivot.rotation.x = -angle
+    // Rotate door nodes from hinge edge along X (nose-to-tail)
+    if (this.doorPortNode) {
+      this.doorPortNode.rotation.x = -angle
     }
-    if (this.doorStbPivot) {
-      this.doorStbPivot.rotation.x = angle
+    if (this.doorStbNode) {
+      this.doorStbNode.rotation.x = angle
     }
   }
 
