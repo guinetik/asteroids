@@ -17,7 +17,8 @@
     "models:shuttle:merge": "node scripts/merge-shuttle-glb.mjs",
     "models:shuttle:inspect": "gltf-transform inspect \"public/models/Space Shuttle (D).glb\"",
     "models:shuttle:prune": "gltf-transform prune \"public/models/shuttle.glb\" \"public/models/shuttle.pruned.glb\"",
-    "models:lander:build": "node scripts/optimize-lander-glb.mjs"
+    "models:lander:build": "node scripts/optimize-lander-glb.mjs",
+    "models:asteroids:build": "gltf-transform optimize \"3d/asteroids.glb\" \"public/models/asteroids.glb\" --join false --texture-compress webp --texture-size 2048 --simplify-ratio 0.58 --simplify-error 0.001 --meshopt-level high"
   },
   "dependencies": {
     "pinia": "^3.0.4",
