@@ -63,30 +63,17 @@ export class ShuttleController implements Tickable {
     gltf.scene.rotation.x = MODEL_ROTATION_X
     this.group.add(gltf.scene)
 
-    // Debug: dump model info to find correct orientation
-    const box = new THREE.Box3().setFromObject(gltf.scene)
-    const size = box.getSize(new THREE.Vector3())
-    console.log('[ShuttleController] bbox size (scaled):', size)
-    console.log('[ShuttleController] bbox min:', box.min, 'max:', box.max)
-    // Log first few child names and their transforms
-    let count = 0
-    gltf.scene.traverse((child) => {
-      if (count < 5) {
-        console.log(`[ShuttleController] node "${child.name}"`,
-          'pos:', child.position.toArray(),
-          'rot:', [child.rotation.x, child.rotation.y, child.rotation.z].map((r) => (r * 180 / Math.PI).toFixed(1)),
-        )
-        count++
-      }
-    })
-
     this.mixer = new THREE.AnimationMixer(gltf.scene)
 
+    console.log('[ShuttleController] animations:', gltf.animations.map((c) => c.name))
     const doorClip = gltf.animations.find((clip) => clip.name === SHUTTLE_ANIMATION_NAME)
     if (doorClip) {
+      console.log('[ShuttleController] door clip found:', doorClip.name, 'duration:', doorClip.duration)
       this.doorAction = this.mixer.clipAction(doorClip)
       this.doorAction.clampWhenFinished = true
       this.doorAction.loop = THREE.LoopOnce
+    } else {
+      console.warn('[ShuttleController] door animation not found, available:', gltf.animations.map((c) => c.name))
     }
 
     this.placeNozzles(gltf.scene)
