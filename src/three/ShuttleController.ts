@@ -5,6 +5,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
 import type { Tickable } from '@/lib/Tickable'
 import type { InputManager } from '@/lib/InputManager'
 import type { SpaceTimeGrid } from './SpaceTimeGrid'
+import type { GravityWell } from './CelestialBody'
 
 const SHUTTLE_MODEL_PATH = '/models/shuttle.glb'
 const DRACO_DECODER_PATH = '/node_modules/three/examples/jsm/libs/draco/'
@@ -61,6 +62,7 @@ export class ShuttleController implements Tickable {
   private angularVelocity = 0
   private readonly inputManager: InputManager
   private spaceTimeGrid: SpaceTimeGrid | null = null
+  private readonly gravityWells: GravityWell[] = []
 
   constructor(inputManager: InputManager) {
     this.inputManager = inputManager
@@ -68,6 +70,10 @@ export class ShuttleController implements Tickable {
 
   setSpaceTimeGrid(grid: SpaceTimeGrid): void {
     this.spaceTimeGrid = grid
+  }
+
+  addGravityWell(well: GravityWell): void {
+    this.gravityWells.push(well)
   }
 
   async load(): Promise<void> {
@@ -198,6 +204,12 @@ export class ShuttleController implements Tickable {
     // Brake (S) — inertia dampener
     if (input.isActionActive('brake')) {
       this.velocity.multiplyScalar(BRAKE_FACTOR)
+    }
+
+    // Gravitational pull from all wells
+    for (const well of this.gravityWells) {
+      const gravity = well.getGravityAt(this.group.position)
+      this.velocity.addScaledVector(gravity, dt)
     }
 
     // Lock velocity to XZ plane

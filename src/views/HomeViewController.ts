@@ -15,22 +15,13 @@ import { ShuttleController } from '@/three/ShuttleController'
 import { ThrusterEffectController } from '@/three/ThrusterEffectController'
 import { StarFieldController } from '@/three/StarFieldController'
 import { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
-import {
-  AmbientLight,
-  PointLight,
-  Mesh,
-  SphereGeometry,
-  MeshBasicMaterial,
-  AdditiveBlending,
-  BackSide,
-} from 'three'
+import { CelestialBody } from '@/three/CelestialBody'
+import { AmbientLight, PointLight, Vector3 } from 'three'
 
 const ONE_SHOT_PRIORITY = TICK_PRIORITY_INPUT + 1
 const AMBIENT_LIGHT_INTENSITY = 0.3
 const SUN_LIGHT_INTENSITY = 3
 const SUN_LIGHT_DISTANCE = 5000
-const SUN_RADIUS = 50
-const SUN_GLOW_RADIUS = 65
 const SHUTTLE_ORBIT_DISTANCE = 300
 
 /**
@@ -50,6 +41,7 @@ export class HomeViewController implements Tickable {
   private thrusterController: ThrusterEffectController | null = null
   private starFieldController: StarFieldController | null = null
   private spaceTimeGrid: SpaceTimeGrid | null = null
+  private celestialBodies: CelestialBody[] = []
 
   async init(container: HTMLElement): Promise<void> {
     // Core systems
@@ -66,29 +58,24 @@ export class HomeViewController implements Tickable {
     this.starFieldController = new StarFieldController()
     this.sceneManager.addToScene(this.starFieldController.points)
 
-    // Sun (at origin)
-    const sunGeo = new SphereGeometry(SUN_RADIUS, 32, 32)
-    const sunMat = new MeshBasicMaterial({ color: 0xffcc00 })
-    const sun = new Mesh(sunGeo, sunMat)
-    this.sceneManager.addToScene(sun)
-
-    // Sun glow
-    const glowGeo = new SphereGeometry(SUN_GLOW_RADIUS, 32, 32)
-    const glowMat = new MeshBasicMaterial({
-      color: 0xff8800,
-      transparent: true,
-      opacity: 0.15,
-      blending: AdditiveBlending,
-      side: BackSide,
-    })
-    const glow = new Mesh(glowGeo, glowMat)
-    this.sceneManager.addToScene(glow)
-
     // Space-time grid on the XZ equator plane — warped by gravity
     this.spaceTimeGrid = new SpaceTimeGrid()
-    this.spaceTimeGrid.addSource({ x: 0, z: 0, mass: 1.0 }) // sun = 1 solar mass
     this.sceneManager.addToScene(this.spaceTimeGrid.mesh)
     this.tickHandler.register(this.spaceTimeGrid, TICK_PRIORITY_ANIMATION)
+
+    // Sun
+    const sun = new CelestialBody({
+      name: 'Sun',
+      mass: 1.0,
+      radius: 50,
+      color: 0xffcc00,
+      glowColor: 0xff8800,
+      glowScale: 1.3,
+      position: new Vector3(0, 0, 0),
+    })
+    this.celestialBodies.push(sun)
+    this.sceneManager.addToScene(sun.group)
+    this.spaceTimeGrid.addSource({ x: 0, z: 0, mass: sun.mass })
 
     // Lighting — point light from sun + dim ambient
     const ambientLight = new AmbientLight(0xffffff, AMBIENT_LIGHT_INTENSITY)
@@ -99,6 +86,9 @@ export class HomeViewController implements Tickable {
     // Shuttle — start at orbital distance from the sun
     this.shuttleController = new ShuttleController(this.inputManager)
     this.shuttleController.setSpaceTimeGrid(this.spaceTimeGrid)
+    for (const body of this.celestialBodies) {
+      this.shuttleController.addGravityWell(body)
+    }
     await this.shuttleController.load()
     this.shuttleController.group.position.set(SHUTTLE_ORBIT_DISTANCE, 0, 0)
     this.sceneManager.addToScene(this.shuttleController.group)
@@ -132,6 +122,7 @@ export class HomeViewController implements Tickable {
     this.shuttleController?.dispose()
     this.starFieldController?.dispose()
     this.spaceTimeGrid?.dispose()
+    for (const body of this.celestialBodies) body.dispose()
     this.sceneManager?.dispose()
     this.inputManager?.dispose()
   }
