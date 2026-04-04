@@ -52,14 +52,15 @@ void main() {
     }
 
     // --- Dynamic sun lighting + soft deep-space fill ---
-    vec3 worldPosition = (modelMatrix * vec4(vModelPosition, 1.0)).xyz;
-    vec3 worldNormal = normalize((modelMatrix * vec4(vModelNormal, 0.0)).xyz);
-    vec3 lightDir = normalize(-worldPosition);
+    // Compute sun direction in view space (sun is at world origin)
+    vec3 normalView = normalize(vViewNormal);
+    vec3 sunViewPos = (viewMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+    vec3 lightDir = normalize(sunViewPos - vViewPosition);
 
-    float sunDiffuse = max(0.0, dot(worldNormal, lightDir));
-    float sunWrap = max(0.0, dot(worldNormal, lightDir) * 0.5 + 0.5);
+    float sunDiffuse = max(0.0, dot(normalView, lightDir));
+    float sunWrap = max(0.0, dot(normalView, lightDir) * 0.5 + 0.5);
     float starFill = 0.30;
-    float backFill = pow(max(0.0, dot(worldNormal, -lightDir)), 2.0) * 0.14;
+    float backFill = pow(max(0.0, dot(normalView, -lightDir)), 2.0) * 0.14;
 
     vec3 sunLight = vec3(1.0, 0.96, 0.9) * mix(0.24, 1.0, sunDiffuse);
     vec3 spaceLight = vec3(0.24, 0.30, 0.42) * (starFill + sunWrap * 0.14 + backFill);
