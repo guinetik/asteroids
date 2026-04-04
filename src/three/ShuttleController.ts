@@ -34,7 +34,8 @@ const DOOR_ANIM_SPEED = 2 // radians per second
 
 const THRUST_FORCE = 20
 const BRAKE_FACTOR = 0.95
-const YAW_SPEED = 1.5
+const YAW_TORQUE = 1.5 // angular acceleration per second
+const YAW_MAX_SPEED = 3 // max angular velocity
 const MAX_SPEED = 80
 
 /**
@@ -55,6 +56,7 @@ export class ShuttleController implements Tickable {
   private doorPortClosedRotX = 0
   private doorStbClosedRotX = 0
   private velocity = new THREE.Vector3()
+  private angularVelocity = 0
   private readonly inputManager: InputManager
 
   constructor(inputManager: InputManager) {
@@ -153,13 +155,19 @@ export class ShuttleController implements Tickable {
   private updateMovement(dt: number): void {
     const input = this.inputManager
 
-    // Yaw (A/D) — turn left/right around Y axis
+    // Yaw (A/D) — apply angular torque, builds up angular velocity
     if (input.isActionActive('yawLeft')) {
-      this.group.rotateY(YAW_SPEED * dt)
+      this.angularVelocity += YAW_TORQUE * dt
     }
     if (input.isActionActive('yawRight')) {
-      this.group.rotateY(-YAW_SPEED * dt)
+      this.angularVelocity -= YAW_TORQUE * dt
     }
+
+    // Clamp angular velocity
+    this.angularVelocity = Math.max(-YAW_MAX_SPEED, Math.min(YAW_MAX_SPEED, this.angularVelocity))
+
+    // Apply angular velocity (no friction — true space, must counter-thrust to stop spinning)
+    this.group.rotateY(this.angularVelocity * dt)
 
     // Thrust (W) — accelerate along forward on XZ plane (nose is +X after rotation)
     const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(this.group.quaternion)
