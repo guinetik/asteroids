@@ -22,10 +22,14 @@ const LED_NODE_NAMES = partsJson.statusLeds.map((led) => led.nodeName)
 /** Node name for the front LED (muzzle / beam origin). */
 const MUZZLE_NODE_NAME = 'pistol_led_front'
 
-/** Maximum beam range (world units). */
-const BEAM_RANGE = 500
-/** How long the beam line stays visible (seconds). */
-const BEAM_LIFETIME = 0.08
+/** Bolt projectile speed (units/s). */
+const BOLT_SPEED = 200
+/** Bolt length (units). */
+const BOLT_LENGTH = 2.0
+/** Bolt width (units). */
+const BOLT_WIDTH = 0.08
+/** Max bolt lifetime before removal (seconds). */
+const BOLT_MAX_LIFETIME = 3.0
 
 /** Position offset from camera origin (right, down, forward). */
 const OFFSET_X = 0.35
@@ -71,9 +75,8 @@ export class MultiToolController implements Tickable {
   private readonly ledMeshes: THREE.Mesh[] = []
   private scene: THREE.Scene | null = null
   private muzzleNode: THREE.Object3D | null = null
-  private beamLine: THREE.Line | null = null
-  private beamTimer = 0
-  private beamColor = new THREE.Color('#ff00ff')
+  private readonly bolts: { mesh: THREE.Mesh; velocity: THREE.Vector3; age: number }[] = []
+  private boltColor = new THREE.Color('#ff00ff')
   private time = 0
   private lateralSpeed = 0
   private sprinting = false
@@ -138,7 +141,7 @@ export class MultiToolController implements Tickable {
    * @param color - Hex color string (e.g. "#3b82f6")
    */
   setMode(color: string): void {
-    this.beamColor.set(color)
+    this.boltColor.set(color)
     const ledColor = new THREE.Color(color)
     for (const mesh of this.ledMeshes) {
       const mat = mesh.material as THREE.MeshStandardMaterial
@@ -153,43 +156,41 @@ export class MultiToolController implements Tickable {
   }
 
   /**
-   * Fire the weapon — spawns a beam line from the camera center to the crosshair target.
-   * Beam fires along camera forward, not from the muzzle, so it hits where the crosshair points.
+   * Fire a bolt projectile from the muzzle along camera forward.
+   * The bolt is a glowing elongated mesh that travels through space.
    */
   fire(): void {
     if (!this.camera || !this.scene) return
 
-    // Remove old beam
-    if (this.beamLine) {
-      this.scene.remove(this.beamLine)
-      this.beamLine.geometry.dispose()
-      ;(this.beamLine.material as THREE.LineBasicMaterial).dispose()
-      this.beamLine = null
-    }
+    // Direction: camera forward (where crosshair points)
+    const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion)
 
-    // Beam origin: muzzle world position (or camera position fallback)
+    // Origin: muzzle world position
     const origin = new THREE.Vector3()
     if (this.muzzleNode) {
       this.muzzleNode.getWorldPosition(origin)
     } else {
-      origin.copy(this.camera.position)
+      origin.copy(this.camera.position).add(direction.clone().multiplyScalar(0.5))
     }
 
-    // Beam end: camera forward * range
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion)
-    const end = this.camera.position.clone().add(forward.multiplyScalar(BEAM_RANGE))
-
-    // Create beam line
-    const geometry = new THREE.BufferGeometry().setFromPoints([origin, end])
-    const material = new THREE.LineBasicMaterial({
-      color: this.beamColor,
+    // Create bolt mesh — elongated box for that blaster look
+    const geometry = new THREE.BoxGeometry(BOLT_WIDTH, BOLT_WIDTH, BOLT_LENGTH)
+    const material = new THREE.MeshBasicMaterial({
+      color: this.boltColor,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.9,
     })
-    this.beamLine = new THREE.Line(geometry, material)
-    this.beamLine.frustumCulled = false
-    this.scene.add(this.beamLine)
-    this.beamTimer = BEAM_LIFETIME
+    const bolt = new THREE.Mesh(geometry, material)
+    bolt.position.copy(origin)
+    bolt.quaternion.copy(this.camera.quaternion)
+    bolt.frustumCulled = false
+    this.scene.add(bolt)
+
+    this.bolts.push({
+      mesh: bolt,
+      velocity: direction.multiplyScalar(BOLT_SPEED),
+      age: 0,
+    })
   }
 
   private readonly offset = new THREE.Vector3()
@@ -234,19 +235,28 @@ export class MultiToolController implements Tickable {
     this.model.rotateY(-Math.PI / 2)
     this.model.rotateZ(swayZ)
 
-    // Beam lifetime
-    if (this.beamLine && this.scene) {
-      this.beamTimer -= dt
-      if (this.beamTimer <= 0) {
-        this.scene.remove(this.beamLine)
-        this.beamLine.geometry.dispose()
-        ;(this.beamLine.material as THREE.LineBasicMaterial).dispose()
-        this.beamLine = null
+    // Update bolt projectiles
+    for (let i = this.bolts.length - 1; i >= 0; i--) {
+      const bolt = this.bolts[i]!
+      bolt.age += dt
+      bolt.mesh.position.addScaledVector(bolt.velocity, dt)
+
+      if (bolt.age >= BOLT_MAX_LIFETIME) {
+        this.scene?.remove(bolt.mesh)
+        bolt.mesh.geometry.dispose()
+        ;(bolt.mesh.material as THREE.MeshBasicMaterial).dispose()
+        this.bolts.splice(i, 1)
       }
     }
   }
 
   dispose(): void {
+    for (const bolt of this.bolts) {
+      this.scene?.remove(bolt.mesh)
+      bolt.mesh.geometry.dispose()
+      ;(bolt.mesh.material as THREE.MeshBasicMaterial).dispose()
+    }
+    this.bolts.length = 0
     if (this.model) {
       this.model.parent?.remove(this.model)
     }
