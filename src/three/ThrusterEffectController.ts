@@ -83,9 +83,9 @@ export class ThrusterEffectController implements Tickable {
 
   dispose(): void {
     this.thrustPoints.geometry.dispose()
-    ;(this.thrustPoints.material as THREE.ShaderMaterial).dispose()
+    ;(this.thrustPoints.material as THREE.PointsMaterial).dispose()
     this.brakePoints.geometry.dispose()
-    ;(this.brakePoints.material as THREE.ShaderMaterial).dispose()
+    ;(this.brakePoints.material as THREE.PointsMaterial).dispose()
   }
 
   private createParticlePool(): Particle[] {
@@ -99,37 +99,22 @@ export class ThrusterEffectController implements Tickable {
 
   private createPoints(color: THREE.Color): THREE.Points {
     const positions = new Float32Array(PARTICLE_COUNT * 3)
-    const sizes = new Float32Array(PARTICLE_COUNT)
+    const colors = new Float32Array(PARTICLE_COUNT * 3)
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1))
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
 
-    const material = new THREE.ShaderMaterial({
-      uniforms: {
-        color: { value: color },
-      },
-      vertexShader: `
-        attribute float size;
-        void main() {
-          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          gl_PointSize = size;
-          gl_Position = projectionMatrix * mvPosition;
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 color;
-        void main() {
-          // Soft circle falloff
-          float dist = length(gl_PointCoord - vec2(0.5));
-          if (dist > 0.5) discard;
-          float alpha = 1.0 - smoothstep(0.2, 0.5, dist);
-          gl_FragColor = vec4(color, alpha);
-        }
-      `,
+    const material = new THREE.PointsMaterial({
+      size: PARTICLE_SIZE,
+      sizeAttenuation: false,
+      vertexColors: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       transparent: true,
     })
+
+    // Store base color for fade calculations
+    ;(material as THREE.PointsMaterial & { _baseColor: THREE.Color })._baseColor = color
 
     return new THREE.Points(geometry, material)
   }
@@ -158,9 +143,10 @@ export class ThrusterEffectController implements Tickable {
 
   private updateParticles(pool: Particle[], points: THREE.Points, dt: number): void {
     const posAttr = points.geometry.getAttribute('position') as THREE.BufferAttribute
-    const sizeAttr = points.geometry.getAttribute('size') as THREE.BufferAttribute
+    const colorAttr = points.geometry.getAttribute('color') as THREE.BufferAttribute
     const positions = posAttr.array as Float32Array
-    const sizes = sizeAttr.array as Float32Array
+    const colors = colorAttr.array as Float32Array
+    const baseColor = (points.material as THREE.PointsMaterial & { _baseColor: THREE.Color })._baseColor
 
     for (let i = 0; i < pool.length; i++) {
       const p = pool[i]!
@@ -170,7 +156,9 @@ export class ThrusterEffectController implements Tickable {
         positions[i3] = FAR_AWAY
         positions[i3 + 1] = FAR_AWAY
         positions[i3 + 2] = FAR_AWAY
-        sizes[i] = 0
+        colors[i3] = 0
+        colors[i3 + 1] = 0
+        colors[i3 + 2] = 0
         continue
       }
 
@@ -180,13 +168,17 @@ export class ThrusterEffectController implements Tickable {
         positions[i3] = FAR_AWAY
         positions[i3 + 1] = FAR_AWAY
         positions[i3 + 2] = FAR_AWAY
-        sizes[i] = 0
+        colors[i3] = 0
+        colors[i3 + 1] = 0
+        colors[i3 + 2] = 0
         continue
       }
 
-      // Fade out: full size at birth, zero at death
+      // Fade color from full brightness to black over lifetime
       const life = 1 - p.age / PARTICLE_LIFETIME
-      sizes[i] = PARTICLE_SIZE * life
+      colors[i3] = baseColor.r * life
+      colors[i3 + 1] = baseColor.g * life
+      colors[i3 + 2] = baseColor.b * life
 
       p.position.addScaledVector(p.velocity, dt)
       positions[i3] = p.position.x
@@ -195,6 +187,6 @@ export class ThrusterEffectController implements Tickable {
     }
 
     posAttr.needsUpdate = true
-    sizeAttr.needsUpdate = true
+    colorAttr.needsUpdate = true
   }
 }
