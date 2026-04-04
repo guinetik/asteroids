@@ -53,13 +53,13 @@ describe('PLANETS', () => {
 
   it('no planet has a "prose" property', () => {
     for (const planet of PLANETS) {
-      expect((planet as Record<string, unknown>)['prose']).toBeUndefined()
+      expect((planet as unknown as Record<string, unknown>)['prose']).toBeUndefined()
     }
   })
 
   it('no planet has a "useModel" property', () => {
     for (const planet of PLANETS) {
-      expect((planet as Record<string, unknown>)['useModel']).toBeUndefined()
+      expect((planet as unknown as Record<string, unknown>)['useModel']).toBeUndefined()
     }
   })
 
@@ -119,7 +119,7 @@ describe('ASTEROID_BELTS', () => {
 
   it('no belt has a "glbFile" property', () => {
     for (const belt of ASTEROID_BELTS) {
-      expect((belt as Record<string, unknown>)['glbFile']).toBeUndefined()
+      expect((belt as unknown as Record<string, unknown>)['glbFile']).toBeUndefined()
     }
   })
 })
@@ -132,6 +132,6 @@ describe('getPlanet', () => {
   })
 
   it('throws for an unknown id', () => {
-    expect(() => getPlanet('unknown-planet')).toThrow()
+    expect(() => getPlanet('unknown-planet')).toThrow('Unknown planet id: "unknown-planet"')
   })
 })
