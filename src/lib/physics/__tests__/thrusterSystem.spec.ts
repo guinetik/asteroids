@@ -38,9 +38,10 @@ describe('ThrusterSystem', () => {
 
   it('does not recharge active thrusters', () => {
     const sys = createShuttleSystem()
-    sys.tick(2, { thrust: true, brake: false, rcs: false })
+    sys.tick(0.5, { thrust: true, brake: false, rcs: false })
     const chargeAfterDrain = sys.getState('thrust').charge
-    sys.tick(1, { thrust: true, brake: false, rcs: false })
+    expect(chargeAfterDrain).toBeGreaterThan(0)
+    sys.tick(0.5, { thrust: true, brake: false, rcs: false })
     expect(sys.getState('thrust').charge).toBeLessThan(chargeAfterDrain)
   })
 
