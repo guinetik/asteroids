@@ -45,6 +45,25 @@ export class VibePortal {
     this.isArrival = this.arrival.portal
   }
 
+  returnToOrigin(state?: Partial<VibeJamParams> & Record<string, string | number>): boolean {
+    const ref = this.arrival.ref
+    if (!ref) return false
+
+    const baseUrl = ref.startsWith('http://') || ref.startsWith('https://') ? ref : `https://${ref}`
+    const url = new URL(baseUrl)
+    url.searchParams.set('portal', 'true')
+
+    if (state) {
+      for (const [key, value] of Object.entries(state)) {
+        if (key === 'portal') continue
+        url.searchParams.set(key, String(value))
+      }
+    }
+
+    window.location.href = url.toString()
+    return true
+  }
+
   depart(state: Partial<VibeJamParams> & Record<string, string | number>): void {
     const url = new URL(VIBE_JAM_PORTAL_URL)
     url.searchParams.set('portal', 'true')

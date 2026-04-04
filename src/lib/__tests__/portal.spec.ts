@@ -125,4 +125,59 @@ describe('VibePortal', () => {
       expect(url.searchParams.get('username')).toBe('player one&two')
     })
   })
+
+  describe('returnToOrigin', () => {
+    it('navigates back to ref and returns true', () => {
+      setSearch('?portal=true&ref=othergame.com')
+      const portal = new VibePortal()
+      const result = portal.returnToOrigin({ username: 'player1', speed: 3 })
+
+      expect(result).toBe(true)
+      const url = new URL(window.location.href)
+      expect(url.origin).toBe('https://othergame.com')
+      expect(url.searchParams.get('portal')).toBe('true')
+      expect(url.searchParams.get('username')).toBe('player1')
+      expect(url.searchParams.get('speed')).toBe('3')
+    })
+
+    it('returns false when no ref is present', () => {
+      setSearch('?portal=true')
+      const portal = new VibePortal()
+      const hrefBefore = window.location.href
+      const result = portal.returnToOrigin({ username: 'player1' })
+
+      expect(result).toBe(false)
+      expect(window.location.href).toBe(hrefBefore)
+    })
+
+    it('prepends https:// when ref has no protocol', () => {
+      setSearch('?portal=true&ref=othergame.com')
+      const portal = new VibePortal()
+      portal.returnToOrigin()
+
+      const url = new URL(window.location.href)
+      expect(url.protocol).toBe('https:')
+      expect(url.host).toBe('othergame.com')
+    })
+
+    it('preserves protocol when ref already has one', () => {
+      setSearch('?portal=true&ref=https://othergame.com')
+      const portal = new VibePortal()
+      portal.returnToOrigin()
+
+      const url = new URL(window.location.href)
+      expect(url.protocol).toBe('https:')
+      expect(url.host).toBe('othergame.com')
+    })
+
+    it('works with no state argument', () => {
+      setSearch('?portal=true&ref=othergame.com')
+      const portal = new VibePortal()
+      const result = portal.returnToOrigin()
+
+      expect(result).toBe(true)
+      const url = new URL(window.location.href)
+      expect(url.searchParams.get('portal')).toBe('true')
+    })
+  })
 })
