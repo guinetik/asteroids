@@ -1,0 +1,45 @@
+{
+  "id": "itokawa",
+  "name": "Itokawa",
+  "designation": "25143 Itokawa",
+  "type": "Siliceous (S-type)",
+  "biome": "sandy",
+  "description": "A peanut-shaped near-Earth asteroid visited by JAXA's Hayabusa mission. Its surface features two distinct terrains: the smooth Muses Sea lowland and rugged boulder-strewn highlands.",
+  "composition": [
+    { "name": "Olivine", "formula": "(Mg,Fe)2SiO4", "percentage": 38 },
+    { "name": "Pyroxene", "formula": "(Mg,Fe)SiO3", "percentage": 30 },
+    { "name": "Plagioclase Feldspar", "formula": "(Na,Ca)(Al,Si)4O8", "percentage": 14 },
+    { "name": "Iron Sulfides", "formula": "FeS", "percentage": 8 },
+    { "name": "Iron-Nickel Alloy", "formula": "Fe-Ni", "percentage": 6 },
+    { "name": "Magnetite", "formula": "Fe3O4", "percentage": 4 }
+  ],
+  "shape": {
+    "dimensions": [535, 209, 294],
+    "elongation": 2.56,
+    "lobeCount": 2,
+    "irregularity": 0.75
+  },
+  "surface": {
+    "craterDensity": 0.2,
+    "craterMaxScale": 0.15,
+    "boulderDensity": 0.5,
+    "ridgeFrequency": 0.2,
+    "roughness": 0.5,
+    "dustCoverage": 0.3
+  },
+  "visual": {
+    "albedo": 0.53,
+    "baseColor": [0.5, 0.48, 0.38],
+    "accentColor": [0.6, 0.55, 0.4],
+    "emissive": false,
+    "metalness": 0.1,
+    "roughnessMap": 0.65
+  },
+  "physical": {
+    "mass": 3.51e10,
+    "density": 1950,
+    "surfaceGravity": 1e-5,
+    "rotationPeriod": 12.13,
+    "surfaceTemperature": 206
+  }
+}

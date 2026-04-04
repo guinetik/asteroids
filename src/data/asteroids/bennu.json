@@ -1,0 +1,45 @@
+{
+  "id": "bennu",
+  "name": "Bennu",
+  "designation": "101955 Bennu",
+  "type": "Carbonaceous (C-type)",
+  "biome": "rocky",
+  "description": "A near-Earth carbonaceous asteroid studied by NASA's OSIRIS-REx mission. Its surface is an ancient rubble pile covered in boulders, with minerals dating back to the early solar system.",
+  "composition": [
+    { "name": "Hydrated Silicates", "formula": "Mg3Si2O5(OH)4", "percentage": 42 },
+    { "name": "Magnetite", "formula": "Fe3O4", "percentage": 18 },
+    { "name": "Organic Compounds", "percentage": 12 },
+    { "name": "Iron Sulfides", "formula": "FeS", "percentage": 10 },
+    { "name": "Carbonates", "formula": "CaCO3", "percentage": 10 },
+    { "name": "Olivine", "formula": "(Mg,Fe)2SiO4", "percentage": 8 }
+  ],
+  "shape": {
+    "dimensions": [262.5, 262.5, 249.5],
+    "elongation": 1.05,
+    "lobeCount": 1,
+    "irregularity": 0.4
+  },
+  "surface": {
+    "craterDensity": 0.7,
+    "craterMaxScale": 0.3,
+    "boulderDensity": 0.85,
+    "ridgeFrequency": 0.3,
+    "roughness": 0.8,
+    "dustCoverage": 0.2
+  },
+  "visual": {
+    "albedo": 0.044,
+    "baseColor": [0.15, 0.13, 0.1],
+    "accentColor": [0.2, 0.18, 0.12],
+    "emissive": false,
+    "metalness": 0.15,
+    "roughnessMap": 0.9
+  },
+  "physical": {
+    "mass": 7.329e10,
+    "density": 1190,
+    "surfaceGravity": 6e-6,
+    "rotationPeriod": 4.3,
+    "surfaceTemperature": 250
+  }
+}

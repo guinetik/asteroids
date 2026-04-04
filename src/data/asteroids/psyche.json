@@ -1,0 +1,45 @@
+{
+  "id": "psyche",
+  "name": "Psyche",
+  "designation": "16 Psyche",
+  "type": "Metallic (M-type)",
+  "biome": "metallic",
+  "description": "One of the most massive objects in the asteroid belt, believed to be the exposed iron-nickel core of a protoplanet. Its metallic surface gleams with a silvery luster scarred by ancient impacts.",
+  "composition": [
+    { "name": "Iron-Nickel Alloy", "formula": "Fe-Ni", "percentage": 55 },
+    { "name": "Enstatite", "formula": "MgSiO3", "percentage": 15 },
+    { "name": "Troilite", "formula": "FeS", "percentage": 12 },
+    { "name": "Olivine", "formula": "(Mg,Fe)2SiO4", "percentage": 8 },
+    { "name": "Pyroxene", "formula": "(Mg,Fe)SiO3", "percentage": 6 },
+    { "name": "Magnetite", "formula": "Fe3O4", "percentage": 4 }
+  ],
+  "shape": {
+    "dimensions": [279000, 232000, 189000],
+    "elongation": 1.48,
+    "lobeCount": 1,
+    "irregularity": 0.3
+  },
+  "surface": {
+    "craterDensity": 0.75,
+    "craterMaxScale": 0.25,
+    "boulderDensity": 0.15,
+    "ridgeFrequency": 0.6,
+    "roughness": 0.35,
+    "dustCoverage": 0.1
+  },
+  "visual": {
+    "albedo": 0.15,
+    "baseColor": [0.6, 0.6, 0.62],
+    "accentColor": [0.5, 0.4, 0.25],
+    "emissive": false,
+    "metalness": 0.75,
+    "roughnessMap": 0.35
+  },
+  "physical": {
+    "mass": 2.29e22,
+    "density": 3400,
+    "surfaceGravity": 0.14,
+    "rotationPeriod": 4.196,
+    "surfaceTemperature": 256
+  }
+}
