@@ -170,6 +170,7 @@ export class FpsViewController implements Tickable {
     if (this.multiToolState && this.multiTool) {
       this.multiTool.setMode(this.multiToolState.modeConfig.color)
       this.multiTool.setAiming(this.multiToolState.aiming)
+      this.playerController?.setAiming(this.multiToolState.aiming)
     }
 
     // --- ADS camera zoom ---

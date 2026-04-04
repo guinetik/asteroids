@@ -22,6 +22,10 @@ import type { Heightmap } from '@/lib/terrain/heightmap'
 const COYOTE_TIME = 0.15
 /** Extra vertical boost multiplier when sprint-jumping. */
 const SPRINT_JUMP_BOOST = 1.3
+/** Strafe speed multiplier relative to forward speed. */
+const STRAFE_SPEED_SCALE = 0.9
+/** Strafe speed multiplier while ADS. */
+const ADS_STRAFE_SPEED_SCALE = 0.8
 
 /** Thruster names for the player's O2 power system. */
 export type FpsThrusterName = 'sprint' | 'jump'
@@ -100,6 +104,7 @@ export class FpsPlayerController implements Tickable {
   private readonly heightmap: Heightmap
   private readonly lateralVelocity = new THREE.Vector3()
   private _deathTimer: number | null = null
+  private _aiming = false
   /** Coyote timer — time since last grounded, allows late jumps. */
   private coyoteTimer = 0
 
@@ -159,6 +164,11 @@ export class FpsPlayerController implements Tickable {
    * @param x - X velocity to add (units/s)
    * @param z - Z velocity to add (units/s)
    */
+  /** Set ADS state — affects strafe speed. */
+  setAiming(aiming: boolean): void {
+    this._aiming = aiming
+  }
+
   applyLateralImpulse(x: number, z: number): void {
     this.lateralVelocity.x += x
     this.lateralVelocity.z += z
@@ -233,6 +243,7 @@ export class FpsPlayerController implements Tickable {
 
     if (this.body.grounded) {
       // Grounded: instant velocity toward input direction (responsive walking)
+      const strafe = this._aiming ? ADS_STRAFE_SPEED_SCALE : STRAFE_SPEED_SCALE
       let wishX = 0
       let wishZ = 0
       if (this.inputManager.isActionActive('moveForward')) {
@@ -242,10 +253,10 @@ export class FpsPlayerController implements Tickable {
         wishX -= forward.x; wishZ -= forward.y
       }
       if (this.inputManager.isActionActive('moveLeft')) {
-        wishX -= right.x; wishZ -= right.y
+        wishX -= right.x * strafe; wishZ -= right.y * strafe
       }
       if (this.inputManager.isActionActive('moveRight')) {
-        wishX += right.x; wishZ += right.y
+        wishX += right.x * strafe; wishZ += right.y * strafe
       }
       const wishLen = Math.sqrt(wishX * wishX + wishZ * wishZ)
       if (wishLen > 0) {

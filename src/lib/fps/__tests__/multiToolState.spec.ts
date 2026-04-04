@@ -172,7 +172,7 @@ describe('MultiToolState', () => {
     state.setMode('weapon')
     const cfg = state.modeConfig
     expect(cfg.label).toBe('LAS')
-    expect(cfg.color).toBe('#ef4444')
+    expect(cfg.color).toBe('#ff00ff')
     expect(cfg.trigger).toBe('auto')
   })
 })
