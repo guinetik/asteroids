@@ -61,7 +61,7 @@ export class FpsCamera implements Tickable {
    */
   applyMouseDelta(dx: number, dy: number): void {
     this.yaw -= dx * this.config.sensitivity
-    this.pitch += dy * this.config.sensitivity
+    this.pitch -= dy * this.config.sensitivity
     this.pitch = Math.max(
       -this.config.pitchClamp,
       Math.min(this.config.pitchClamp, this.pitch),

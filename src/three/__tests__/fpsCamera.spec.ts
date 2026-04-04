@@ -43,7 +43,7 @@ describe('FpsCamera', () => {
   it('pitch is clamped to pitchClamp', () => {
     cam.applyMouseDelta(0, -99999)
     cam.tick(0.016)
-    expect(cam.pitch).toBeCloseTo(-TEST_CONFIG.pitchClamp, 1)
+    expect(cam.pitch).toBeCloseTo(TEST_CONFIG.pitchClamp, 1)
   })
 
   it('getForwardXZ returns unit vector on XZ plane', () => {
