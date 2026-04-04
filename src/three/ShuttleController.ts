@@ -34,8 +34,9 @@ const DOOR_ANIM_SPEED = 2 // radians per second
 
 const THRUST_FORCE = 20
 const BRAKE_FACTOR = 0.95
-const YAW_TORQUE = 1.5 // angular acceleration per second
+const YAW_TORQUE = 2 // angular acceleration per second
 const YAW_MAX_SPEED = 3 // max angular velocity
+const YAW_DAMPING = 0.97 // gentle angular friction per frame
 const MAX_SPEED = 80
 
 /**
@@ -163,10 +164,13 @@ export class ShuttleController implements Tickable {
       this.angularVelocity -= YAW_TORQUE * dt
     }
 
+    // Gentle damping so it doesn't spin forever
+    this.angularVelocity *= YAW_DAMPING
+
     // Clamp angular velocity
     this.angularVelocity = Math.max(-YAW_MAX_SPEED, Math.min(YAW_MAX_SPEED, this.angularVelocity))
 
-    // Apply angular velocity (no friction — true space, must counter-thrust to stop spinning)
+    // Apply angular velocity
     this.group.rotateY(this.angularVelocity * dt)
 
     // Thrust (W) — accelerate along forward on XZ plane (nose is +X after rotation)

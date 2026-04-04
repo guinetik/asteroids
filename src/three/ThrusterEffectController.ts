@@ -31,8 +31,8 @@ const RCS_SPREAD = 1.5
 const RCS_SIZE = 2
 const RCS_COLOR = new THREE.Color(0xccddff) // white-ish, like oxygen venting
 const RCS_PUSH_FORCE = 8
-const LEFT_WINGTIP = new THREE.Vector3(-3, 0, -5) // rear-left wingtip
-const RIGHT_WINGTIP = new THREE.Vector3(-3, 0, 5)  // rear-right wingtip
+const LEFT_WINGTIP = new THREE.Vector3(-4, -0.5, -3.5) // rear-left wingtip, lower
+const RIGHT_WINGTIP = new THREE.Vector3(-4, -0.5, 3.5)  // rear-right wingtip, lower
 
 /** Internal particle state for the pool-based particle system. */
 interface Particle {
