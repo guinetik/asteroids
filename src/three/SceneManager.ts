@@ -24,6 +24,8 @@ export class SceneManager implements Tickable {
 
   private container: HTMLElement | null = null
   private vehicleCamera: VehicleCamera | null = null
+  /** Direct camera for scenes that don't use VehicleCamera (e.g. FPS). */
+  private directCamera: THREE.PerspectiveCamera | null = null
 
   constructor() {
     this.scene = new THREE.Scene()
@@ -51,6 +53,16 @@ export class SceneManager implements Tickable {
     }
   }
 
+  /** Set a raw perspective camera for rendering (FPS mode). */
+  setActiveCamera(camera: THREE.PerspectiveCamera): void {
+    this.directCamera = camera
+    if (this.container) {
+      const { clientWidth, clientHeight } = this.container
+      camera.aspect = clientWidth / clientHeight
+      camera.updateProjectionMatrix()
+    }
+  }
+
   addToScene(object: THREE.Object3D): void {
     this.scene.add(object)
   }
@@ -60,8 +72,9 @@ export class SceneManager implements Tickable {
   }
 
   tick(_dt: number): void {
-    if (this.vehicleCamera) {
-      this.renderer.render(this.scene, this.vehicleCamera.camera)
+    const cam = this.directCamera ?? this.vehicleCamera?.camera
+    if (cam) {
+      this.renderer.render(this.scene, cam)
     }
   }
 
@@ -78,5 +91,9 @@ export class SceneManager implements Tickable {
     const { clientWidth, clientHeight } = this.container
     this.renderer.setSize(clientWidth, clientHeight)
     this.vehicleCamera?.resize(clientWidth, clientHeight)
+    if (this.directCamera) {
+      this.directCamera.aspect = clientWidth / clientHeight
+      this.directCamera.updateProjectionMatrix()
+    }
   }
 }
