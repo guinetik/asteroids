@@ -45,6 +45,8 @@ export class ShuttleController implements Tickable {
   private doorProgress = 0 // 0 = closed, 1 = open
   private doorPortNode: THREE.Object3D | null = null
   private doorStbNode: THREE.Object3D | null = null
+  private doorPortClosedRotX = 0
+  private doorStbClosedRotX = 0
   private velocity = new THREE.Vector3()
   private currentBank = 0
   private readonly inputManager: InputManager
@@ -65,30 +67,11 @@ export class ShuttleController implements Tickable {
     gltf.scene.rotation.x = MODEL_ROTATION_X
     this.group.add(gltf.scene)
 
-    // Set up doors for hinge-edge rotation
-    // Door geometry center is at Y=±53.5 with width 107
-    // Hinge edge is at Y=0 (fuselage centerline)
-    // We shift the door node position to the hinge, then offset all
-    // children back so geometry stays in place but rotates from the edge
+    // Find door nodes for programmatic animation
     this.doorPortNode = this.findNode(gltf.scene, 'door-prt')
     this.doorStbNode = this.findNode(gltf.scene, 'door-stb')
-
-    const DOOR_HALF_WIDTH = 53.5 // half of door Y extent (raw model units)
-
-    if (this.doorPortNode) {
-      // Hinge at centerline (inner edge)
-      this.doorPortNode.position.y = DOOR_HALF_WIDTH
-      this.doorPortNode.children.forEach((child) => {
-        child.position.y -= DOOR_HALF_WIDTH
-      })
-    }
-
-    if (this.doorStbNode) {
-      this.doorStbNode.position.y = -DOOR_HALF_WIDTH
-      this.doorStbNode.children.forEach((child) => {
-        child.position.y += DOOR_HALF_WIDTH
-      })
-    }
+    if (this.doorPortNode) this.doorPortClosedRotX = this.doorPortNode.rotation.x
+    if (this.doorStbNode) this.doorStbClosedRotX = this.doorStbNode.rotation.x
 
     this.placeNozzles(gltf.scene)
 
@@ -144,12 +127,12 @@ export class ShuttleController implements Tickable {
 
     const angle = this.doorProgress * DOOR_OPEN_ANGLE
 
-    // Rotate door nodes from hinge edge along X (nose-to-tail)
+    // Doors hinge along X axis (nose-to-tail in model space)
     if (this.doorPortNode) {
-      this.doorPortNode.rotation.x = angle
+      this.doorPortNode.rotation.x = this.doorPortClosedRotX - angle
     }
     if (this.doorStbNode) {
-      this.doorStbNode.rotation.x = -angle
+      this.doorStbNode.rotation.x = this.doorStbClosedRotX + angle
     }
   }
 
