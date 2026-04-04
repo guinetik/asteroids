@@ -19,7 +19,9 @@ import type { ThrusterSystemConfig } from '@/lib/physics/thrusterSystem'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 
 /** How long a jump press is buffered (seconds). */
-const JUMP_BUFFER_TIME = 0.15
+const JUMP_BUFFER_TIME = 0.2
+/** How long after leaving the ground the player can still jump (coyote time). */
+const COYOTE_TIME = 0.15
 
 /** Thruster names for the player's O2 power system. */
 export type FpsThrusterName = 'sprint' | 'jump'
@@ -100,6 +102,8 @@ export class FpsPlayerController implements Tickable {
   private _deathTimer: number | null = null
   /** Jump input buffer — time remaining to honor a jump press. */
   private jumpBuffer = 0
+  /** Coyote timer — time since last grounded, allows late jumps. */
+  private coyoteTimer = 0
 
   /** Fired when death timer expires. */
   onDeath: (() => void) | null = null
@@ -183,14 +187,24 @@ export class FpsPlayerController implements Tickable {
     const isSprinting =
       this.inputManager.isActionActive('sprint') && this.thrusterSystem.canFire('sprint')
 
-    // --- Input-driven jump (buffered) ---
+    // --- Coyote time — track how long since last grounded ---
+    if (this.body.grounded) {
+      this.coyoteTimer = COYOTE_TIME
+    } else {
+      this.coyoteTimer = Math.max(0, this.coyoteTimer - dt)
+    }
+
+    // --- Input-driven jump (buffered + coyote) ---
     if (this.inputManager.wasActionPressed('jump')) {
       this.jumpBuffer = JUMP_BUFFER_TIME
     }
     this.jumpBuffer = Math.max(0, this.jumpBuffer - dt)
-    const jumpPressed = this.jumpBuffer > 0 && this.body.grounded
+    const canJump = this.jumpBuffer > 0 && this.coyoteTimer > 0
+    const jumpPressed = canJump && this.thrusterSystem.canFire('jump')
     if (jumpPressed) {
-      this.jump()
+      this.body.impulse(this.config.movement.jumpForce)
+      this.body.grounded = false
+      this.coyoteTimer = 0
       this.jumpBuffer = 0
     }
 
