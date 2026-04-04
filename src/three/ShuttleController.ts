@@ -12,12 +12,11 @@ const DRACO_DECODER_PATH = '/node_modules/three/examples/jsm/libs/draco/'
 const MODEL_SCALE = 0.01
 
 /**
- * The Blender export has X=wingspan, Y=nose-to-tail, Z=up.
- * Three.js Y-up loader converts Z-up to Y-up, so the model arrives with
- * nose along -Z and top along +Y. We rotate -90 deg around X to make
- * the nose point along +Z (Three.js forward) and top along +Y.
+ * Correction rotation to align the shuttle nose with +Z (Three.js forward).
+ * The merged GLB arrives with the nose along +X after Y-up conversion.
+ * Rotate -90 deg around Y so +X becomes +Z.
  */
-const MODEL_ROTATION_X = -Math.PI / 2
+const MODEL_ROTATION_Y = -Math.PI / 2
 
 const SHUTTLE_ANIMATION_NAME = 'shutAction'
 
@@ -60,7 +59,7 @@ export class ShuttleController implements Tickable {
 
     const gltf = await gltfLoader.loadAsync(SHUTTLE_MODEL_PATH)
     gltf.scene.scale.setScalar(MODEL_SCALE)
-    gltf.scene.rotation.x = MODEL_ROTATION_X
+    gltf.scene.rotation.y = MODEL_ROTATION_Y
     this.group.add(gltf.scene)
 
     this.mixer = new THREE.AnimationMixer(gltf.scene)
