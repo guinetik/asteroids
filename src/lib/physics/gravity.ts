@@ -20,6 +20,9 @@ const MIN_GRAVITY_DISTANCE = 15
 /** Influence radius scale — how far gravity reaches visually. Scales with sqrt(mass). */
 const INFLUENCE_RADIUS_SCALE = 400
 
+/** Event horizon scale — point of no return. Scales with sqrt(mass). */
+const EVENT_HORIZON_SCALE = 350
+
 /**
  * Any object that has mass and position can be a gravity source.
  * This is the minimal contract — no rendering, no Three.js.
@@ -44,6 +47,34 @@ export interface GravityVector {
  */
 export function influenceRadius(mass: number): number {
   return INFLUENCE_RADIUS_SCALE * Math.sqrt(mass)
+}
+
+/**
+ * Event horizon radius — point of no return.
+ * Inspired by Schwarzschild radius rs = 2GM/c², scaled for gameplay.
+ */
+export function eventHorizonRadius(mass: number): number {
+  return EVENT_HORIZON_SCALE * Math.sqrt(mass)
+}
+
+/**
+ * Check if a point has crossed any source's event horizon.
+ * Returns the first source crossed, or null.
+ */
+export function checkEventHorizon(
+  sources: GravitySource[],
+  px: number,
+  pz: number,
+): GravitySource | null {
+  for (const source of sources) {
+    const dx = source.getWorldX() - px
+    const dz = source.getWorldZ() - pz
+    const dist = Math.sqrt(dx * dx + dz * dz)
+    if (dist < eventHorizonRadius(source.mass)) {
+      return source
+    }
+  }
+  return null
 }
 
 /**

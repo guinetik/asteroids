@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { gravityAt, influenceRadius, type GravitySource } from '@/lib/physics/gravity'
+import { gravityAt, influenceRadius, eventHorizonRadius, type GravitySource } from '@/lib/physics/gravity'
 import { GravityRing } from './GravityRing'
 import type { SpaceTimeGrid } from './SpaceTimeGrid'
 
@@ -28,6 +28,7 @@ export class CelestialBody implements GravitySource {
   readonly mass: number
   readonly group = new THREE.Group()
   readonly gravityRing: GravityRing
+  readonly horizonRing: GravityRing
 
   private readonly bodyMesh: THREE.Mesh
   private readonly glowMesh: THREE.Mesh
@@ -55,9 +56,13 @@ export class CelestialBody implements GravitySource {
     this.glowMesh = new THREE.Mesh(glowGeo, glowMat)
     this.group.add(this.glowMesh)
 
-    // Gravity influence ring
+    // Gravity influence ring (red — pull starts here)
     this.gravityRing = new GravityRing(influenceRadius(config.mass))
     this.group.add(this.gravityRing.ring)
+
+    // Event horizon ring (orange — point of no return)
+    this.horizonRing = new GravityRing(eventHorizonRadius(config.mass), 0xff6600, 0.8)
+    this.group.add(this.horizonRing.ring)
 
     this.group.position.copy(config.position)
   }
@@ -78,6 +83,8 @@ export class CelestialBody implements GravitySource {
   setSpaceTimeGrid(grid: SpaceTimeGrid): void {
     this.gravityRing.setSpaceTimeGrid(grid)
     this.gravityRing.update(this.position.x, this.position.y, this.position.z)
+    this.horizonRing.setSpaceTimeGrid(grid)
+    this.horizonRing.update(this.position.x, this.position.y, this.position.z)
   }
 
   /**
@@ -95,5 +102,6 @@ export class CelestialBody implements GravitySource {
     this.glowMesh.geometry.dispose()
     ;(this.glowMesh.material as THREE.MeshBasicMaterial).dispose()
     this.gravityRing.dispose()
+    this.horizonRing.dispose()
   }
 }

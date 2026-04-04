@@ -2,13 +2,13 @@ import * as THREE from 'three'
 import type { SpaceTimeGrid } from './SpaceTimeGrid'
 
 const RING_SEGMENTS = 64
-const RING_COLOR = 0xff2222
-const RING_OPACITY = 0.5
+const DEFAULT_RING_COLOR = 0xff2222
+const DEFAULT_RING_OPACITY = 0.5
 
 /**
- * Visual ring showing the gravity influence radius of a body.
+ * Visual ring showing a radius around a body.
  * Follows the spacetime grid curvature so it sits on the well surface.
- * Pluggable — attach to any Object3D that has gravity.
+ * Pluggable — attach to any Object3D. Used for influence and event horizon rings.
  *
  * @author guinetik
  * @date 2026-04-04
@@ -19,7 +19,7 @@ export class GravityRing {
   private readonly radius: number
   private spaceTimeGrid: SpaceTimeGrid | null = null
 
-  constructor(radius: number) {
+  constructor(radius: number, color = DEFAULT_RING_COLOR, opacity = DEFAULT_RING_OPACITY) {
     this.radius = radius
 
     const positions = new Float32Array((RING_SEGMENTS + 1) * 3)
@@ -27,9 +27,9 @@ export class GravityRing {
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
 
     const material = new THREE.LineBasicMaterial({
-      color: RING_COLOR,
+      color,
       transparent: true,
-      opacity: RING_OPACITY,
+      opacity,
     })
 
     this.ring = new THREE.LineLoop(geometry, material)

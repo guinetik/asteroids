@@ -5,11 +5,16 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
 import type { Tickable } from '@/lib/Tickable'
 import type { InputManager } from '@/lib/InputManager'
 import type { SpaceTimeGrid } from './SpaceTimeGrid'
+import { checkEventHorizon, type GravitySource } from '@/lib/physics/gravity'
 
 /** Any object that can exert gravity on the shuttle */
 interface GravityWell {
   getGravityAt(position: THREE.Vector3): THREE.Vector3
 }
+
+const SPAWN_MIN_RADIUS = 200
+const SPAWN_MAX_RADIUS = 800
+const DEATH_PULL_SPEED = 50 // how fast you get sucked in after crossing horizon
 
 const SHUTTLE_MODEL_PATH = '/models/shuttle.glb'
 const DRACO_DECODER_PATH = '/node_modules/three/examples/jsm/libs/draco/'
@@ -68,6 +73,9 @@ export class ShuttleController implements Tickable {
   private readonly inputManager: InputManager
   private spaceTimeGrid: SpaceTimeGrid | null = null
   private readonly gravityWells: GravityWell[] = []
+  private readonly gravitySources: GravitySource[] = []
+  private isDead = false
+  private deathTarget: THREE.Vector3 | null = null
 
   constructor(inputManager: InputManager) {
     this.inputManager = inputManager
@@ -77,8 +85,9 @@ export class ShuttleController implements Tickable {
     this.spaceTimeGrid = grid
   }
 
-  addGravityWell(well: GravityWell): void {
+  addGravityWell(well: GravityWell & GravitySource): void {
     this.gravityWells.push(well)
+    this.gravitySources.push(well)
   }
 
   async load(): Promise<void> {
@@ -137,8 +146,13 @@ export class ShuttleController implements Tickable {
   }
 
   tick(dt: number): void {
+    if (this.isDead) {
+      this.updateDeath(dt)
+      return
+    }
     this.updateMovement(dt)
     this.updateDoors(dt)
+    this.checkDeath()
   }
 
   dispose(): void {
@@ -176,6 +190,65 @@ export class ShuttleController implements Tickable {
     if (this.doorStbNode) {
       this.doorStbNode.rotation.x = this.doorStbClosedRotX + angle
     }
+  }
+
+  private checkDeath(): void {
+    const hit = checkEventHorizon(
+      this.gravitySources,
+      this.group.position.x,
+      this.group.position.z,
+    )
+    if (hit) {
+      this.isDead = true
+      this.deathTarget = new THREE.Vector3(hit.getWorldX(), this.group.position.y, hit.getWorldZ())
+      this.velocity.set(0, 0, 0)
+      this.angularVelocity = 0
+    }
+  }
+
+  private updateDeath(dt: number): void {
+    if (!this.deathTarget) return
+
+    // Pull toward the body center
+    const dir = this.deathTarget.clone().sub(this.group.position)
+    dir.y = 0
+    const dist = dir.length()
+
+    if (dist < 2) {
+      // Reached center — respawn
+      this.respawn()
+      return
+    }
+
+    dir.normalize()
+    this.group.position.addScaledVector(dir, DEATH_PULL_SPEED * dt)
+
+    // Follow grid Y while being pulled in
+    if (this.spaceTimeGrid) {
+      this.group.position.y = -this.spaceTimeGrid.getDepthAt(
+        this.group.position.x,
+        this.group.position.z,
+      )
+    }
+
+    // Spin while dying
+    this.group.rotateY(dt * 10)
+  }
+
+  private respawn(): void {
+    this.isDead = false
+    this.deathTarget = null
+    this.velocity.set(0, 0, 0)
+    this.angularVelocity = 0
+
+    const angle = Math.random() * Math.PI * 2
+    const radius = SPAWN_MIN_RADIUS + Math.random() * (SPAWN_MAX_RADIUS - SPAWN_MIN_RADIUS)
+    this.group.position.set(
+      Math.cos(angle) * radius,
+      0,
+      Math.sin(angle) * radius,
+    )
+    this.group.rotation.set(0, Math.random() * Math.PI * 2, 0)
   }
 
   private updateMovement(dt: number): void {
