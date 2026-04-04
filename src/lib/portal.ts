@@ -45,6 +45,19 @@ export class VibePortal {
     this.isArrival = this.arrival.portal
   }
 
+  depart(state: Partial<VibeJamParams> & Record<string, string | number>): void {
+    const url = new URL(VIBE_JAM_PORTAL_URL)
+    url.searchParams.set('portal', 'true')
+    url.searchParams.set('ref', window.location.host)
+
+    for (const [key, value] of Object.entries(state)) {
+      if (key === 'portal') continue
+      url.searchParams.set(key, String(value))
+    }
+
+    window.location.href = url.toString()
+  }
+
   private static parseParams(searchParams: URLSearchParams): VibeJamParams {
     const get = (key: string): string | undefined => {
       const value = searchParams.get(key)

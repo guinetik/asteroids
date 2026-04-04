@@ -81,4 +81,48 @@ describe('VibePortal', () => {
       expect(portal.arrival.color).toBe('red')
     })
   })
+
+  describe('depart', () => {
+    it('navigates to jam portal with player state', () => {
+      setSearch('')
+      const portal = new VibePortal()
+      portal.depart({ username: 'player1', color: 'red', speed: 5 })
+
+      const url = new URL(window.location.href)
+      expect(url.origin + url.pathname).toBe('https://jam.pieter.com/portal/2026')
+      expect(url.searchParams.get('portal')).toBe('true')
+      expect(url.searchParams.get('ref')).toBe('mygame.com')
+      expect(url.searchParams.get('username')).toBe('player1')
+      expect(url.searchParams.get('color')).toBe('red')
+      expect(url.searchParams.get('speed')).toBe('5')
+    })
+
+    it('departs with minimal state', () => {
+      setSearch('')
+      const portal = new VibePortal()
+      portal.depart({})
+
+      const url = new URL(window.location.href)
+      expect(url.searchParams.get('portal')).toBe('true')
+      expect(url.searchParams.get('ref')).toBe('mygame.com')
+    })
+
+    it('passes through custom params', () => {
+      setSearch('')
+      const portal = new VibePortal()
+      portal.depart({ username: 'p1', custom_thing: 'hello' })
+
+      const url = new URL(window.location.href)
+      expect(url.searchParams.get('custom_thing')).toBe('hello')
+    })
+
+    it('encodes special characters', () => {
+      setSearch('')
+      const portal = new VibePortal()
+      portal.depart({ username: 'player one&two' })
+
+      const url = new URL(window.location.href)
+      expect(url.searchParams.get('username')).toBe('player one&two')
+    })
+  })
 })
