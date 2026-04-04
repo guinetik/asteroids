@@ -1,8 +1,8 @@
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 
-const GRID_SIZE = 2000
-const GRID_RESOLUTION = 80
+const DEFAULT_GRID_SIZE = 2000
+const DEFAULT_GRID_RESOLUTION = 80
 const GRID_COLOR = 0x333366
 const GRID_OPACITY = 0.4
 
@@ -12,8 +12,8 @@ const GRID_OPACITY = 0.4
  * Real spacetime curvature is imperceptible at solar system scale,
  * so we exaggerate while preserving correct mass ratios between bodies.
  */
-const VISUAL_DEPTH_SCALE = 80
-const VISUAL_WIDTH_SCALE = 120
+const DEFAULT_VISUAL_DEPTH_SCALE = 80
+const DEFAULT_VISUAL_WIDTH_SCALE = 120
 const WELL_PULSE_SPEED = 1.5
 const WELL_PULSE_AMOUNT = 0.08
 
@@ -46,8 +46,21 @@ export class SpaceTimeGrid implements Tickable {
   private readonly basePositions: Float32Array
   private readonly sources: GravitySource[] = []
   private time = 0
+  private readonly gridSize: number
+  private readonly gridResolution: number
+  private readonly depthScale: number
+  private readonly widthScale: number
 
-  constructor() {
+  constructor(
+    gridSize = DEFAULT_GRID_SIZE,
+    gridResolution = DEFAULT_GRID_RESOLUTION,
+    depthScale = DEFAULT_VISUAL_DEPTH_SCALE,
+    widthScale = DEFAULT_VISUAL_WIDTH_SCALE,
+  ) {
+    this.gridSize = gridSize
+    this.gridResolution = gridResolution
+    this.depthScale = depthScale
+    this.widthScale = widthScale
     this.geometry = this.createGridGeometry()
     const posAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute
     this.basePositions = new Float32Array(posAttr.array as Float32Array)
@@ -63,6 +76,10 @@ export class SpaceTimeGrid implements Tickable {
 
   addSource(source: GravitySource): void {
     this.sources.push(source)
+  }
+
+  clearSources(): void {
+    this.sources.length = 0
   }
 
   tick(dt: number): void {
@@ -89,8 +106,8 @@ export class SpaceTimeGrid implements Tickable {
       const dz = z - source.z
       const rSquared = dx * dx + dz * dz
 
-      const sigma = VISUAL_WIDTH_SCALE * Math.sqrt(source.mass)
-      const baseAmplitude = VISUAL_DEPTH_SCALE * Math.sqrt(source.mass)
+      const sigma = this.widthScale * Math.sqrt(source.mass)
+      const baseAmplitude = this.depthScale * Math.sqrt(source.mass)
 
       const pulse = 1 + WELL_PULSE_AMOUNT * Math.sin(this.time * WELL_PULSE_SPEED)
       const amplitude = baseAmplitude * pulse
@@ -123,14 +140,14 @@ export class SpaceTimeGrid implements Tickable {
    * Creates both horizontal and vertical lines as LineSegments pairs.
    */
   private createGridGeometry(): THREE.BufferGeometry {
-    const halfSize = GRID_SIZE / 2
-    const step = GRID_SIZE / GRID_RESOLUTION
+    const halfSize = this.gridSize / 2
+    const step = this.gridSize / this.gridResolution
     const vertices: number[] = []
 
     // Lines along X (rows)
-    for (let i = 0; i <= GRID_RESOLUTION; i++) {
+    for (let i = 0; i <= this.gridResolution; i++) {
       const z = -halfSize + i * step
-      for (let j = 0; j < GRID_RESOLUTION; j++) {
+      for (let j = 0; j < this.gridResolution; j++) {
         const x1 = -halfSize + j * step
         const x2 = x1 + step
         vertices.push(x1, 0, z, x2, 0, z)
@@ -138,9 +155,9 @@ export class SpaceTimeGrid implements Tickable {
     }
 
     // Lines along Z (columns)
-    for (let i = 0; i <= GRID_RESOLUTION; i++) {
+    for (let i = 0; i <= this.gridResolution; i++) {
       const x = -halfSize + i * step
-      for (let j = 0; j < GRID_RESOLUTION; j++) {
+      for (let j = 0; j < this.gridResolution; j++) {
         const z1 = -halfSize + j * step
         const z2 = z1 + step
         vertices.push(x, 0, z1, x, 0, z2)

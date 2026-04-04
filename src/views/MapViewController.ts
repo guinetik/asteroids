@@ -20,6 +20,8 @@ import { StarFieldController } from '@/three/StarFieldController'
 import { SunController } from '@/three/controllers/SunController'
 import { PlanetSystemController } from '@/three/controllers/PlanetSystemController'
 import { AsteroidBeltController } from '@/three/controllers/AsteroidBeltController'
+import { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
+import { ORBIT_SCALE } from '@/lib/planets/constants'
 
 /** Tick priority for the compositor (runs after animation, before render). */
 const TICK_PRIORITY_COMPOSIT = TICK_PRIORITY_RENDER - 1
@@ -35,6 +37,7 @@ export class MapViewController implements Tickable {
   private sunController: SunController | null = null
   private planetControllers: PlanetSystemController[] = []
   private beltControllers: AsteroidBeltController[] = []
+  private spaceTimeGrid: SpaceTimeGrid | null = null
   private simTime = 0
   private resizeHandler: (() => void) | null = null
 
@@ -76,6 +79,14 @@ export class MapViewController implements Tickable {
       this.beltControllers.push(controller)
     }
 
+    // Space-time grid (gravity well visualization)
+    const kuiperOuterEdge = 2400 * ORBIT_SCALE
+    const gridSize = kuiperOuterEdge * 2.2
+    const gridDepthScale = 3   // Sun well depth in scene units
+    const gridWidthScale = 10  // Sun well sigma in scene units
+    this.spaceTimeGrid = new SpaceTimeGrid(gridSize, 100, gridDepthScale, gridWidthScale)
+    scene.add(this.spaceTimeGrid.mesh)
+
     // Register tick: this controller drives simTime and passes to children
     this.tickHandler.register(this, TICK_PRIORITY_ANIMATION)
 
@@ -114,6 +125,23 @@ export class MapViewController implements Tickable {
     for (const controller of this.beltControllers) {
       controller.tick(dt, this.simTime)
     }
+
+    // Update gravity sources on the space-time grid
+    if (this.spaceTimeGrid) {
+      this.spaceTimeGrid.clearSources()
+      // Sun at origin
+      this.spaceTimeGrid.addSource({ x: 0, z: 0, mass: SUN.mass })
+      // Planets at their current positions
+      for (let i = 0; i < this.planetControllers.length; i++) {
+        const pos = this.planetControllers[i]!.group.position
+        this.spaceTimeGrid.addSource({
+          x: pos.x,
+          z: pos.z,
+          mass: PLANETS[i]!.mass,
+        })
+      }
+      this.spaceTimeGrid.tick(dt)
+    }
   }
 
   dispose(): void {
@@ -126,6 +154,7 @@ export class MapViewController implements Tickable {
     // Dispose controllers
     for (const controller of this.beltControllers) controller.dispose()
     for (const controller of this.planetControllers) controller.dispose()
+    this.spaceTimeGrid?.dispose()
     this.sunController?.dispose()
     this.starField?.dispose()
 
