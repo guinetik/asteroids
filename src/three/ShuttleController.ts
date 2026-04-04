@@ -65,16 +65,12 @@ export class ShuttleController implements Tickable {
 
     this.mixer = new THREE.AnimationMixer(gltf.scene)
 
-    console.log('[ShuttleController] animations:', gltf.animations.map((c) => c.name))
-    const doorClip = gltf.animations.find((clip) => clip.name === SHUTTLE_ANIMATION_NAME)
-    if (doorClip) {
-      console.log('[ShuttleController] door clip found:', doorClip.name, 'duration:', doorClip.duration)
-      this.doorAction = this.mixer.clipAction(doorClip)
-      this.doorAction.clampWhenFinished = true
-      this.doorAction.loop = THREE.LoopOnce
-    } else {
-      console.warn('[ShuttleController] door animation not found, available:', gltf.animations.map((c) => c.name))
-    }
+    // Log all node names to find door meshes
+    const nodeNames: string[] = []
+    gltf.scene.traverse((child) => {
+      nodeNames.push(child.name)
+    })
+    console.log('[ShuttleController] all nodes:', nodeNames)
 
     this.placeNozzles(gltf.scene)
 
