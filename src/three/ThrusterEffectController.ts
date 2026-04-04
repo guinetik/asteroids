@@ -112,7 +112,9 @@ export class ThrusterEffectController implements Tickable {
       opacity: 0.9,
     })
 
-    return new THREE.Points(geometry, material)
+    const points = new THREE.Points(geometry, material)
+    points.frustumCulled = false
+    return points
   }
 
   private spawnParticle(pool: Particle[], offset: THREE.Vector3, spread: number): void {
