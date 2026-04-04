@@ -23,9 +23,7 @@ const COMPOSITION_SUM = 100
 function validateAsteroid(data: AsteroidDefinition): AsteroidDefinition {
   const sum = data.composition.reduce((acc, m) => acc + m.percentage, 0)
   if (sum !== COMPOSITION_SUM) {
-    throw new Error(
-      `Asteroid "${data.id}" composition sums to ${sum}, expected ${COMPOSITION_SUM}`,
-    )
+    throw new Error(`Asteroid "${data.id}" composition sums to ${sum}, expected ${COMPOSITION_SUM}`)
   }
   return data
 }

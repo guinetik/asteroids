@@ -78,31 +78,55 @@ describe('MISSION_TEMPLATES', () => {
     ['search_and_rescue'],
     ['hazard_cleanup'],
     ['colony_relief'],
-  ])('template "%s" has valid scalable params', (id) => {
+  ])('template "%s" gather slots have valid params', (id) => {
     const t = MISSION_TEMPLATES.find((t) => t.id === id)!
+    const gatherSlots = t.objectiveSlots.filter((s) => s.params.type === 'gather')
 
-    for (const slot of t.objectiveSlots) {
-      if (slot.params.type === 'gather') {
-        expect(slot.params.resourceAmount.min).toBeGreaterThan(0)
-        expect(slot.params.resourceAmount.min).toBeLessThanOrEqual(
-          slot.params.resourceAmount.max,
-        )
-      } else if (slot.params.type === 'exterminate') {
-        expect(slot.params.nestCount.min).toBeGreaterThan(0)
-        expect(slot.params.nestCount.min).toBeLessThanOrEqual(slot.params.nestCount.max)
-        expect(slot.params.swarmSize.min).toBeGreaterThan(0)
-        expect(slot.params.swarmSize.min).toBeLessThanOrEqual(slot.params.swarmSize.max)
-        expect(slot.params.spitterChance).toBeGreaterThanOrEqual(0)
-        expect(slot.params.spitterChance).toBeLessThanOrEqual(1)
-      } else if (slot.params.type === 'rescue') {
-        expect(slot.params.colonistCount.min).toBeGreaterThan(0)
-        expect(slot.params.colonistCount.min).toBeLessThanOrEqual(
-          slot.params.colonistCount.max,
-        )
-        expect(slot.params.oxygenTime.min).toBeGreaterThan(slot.params.oxygenTime.max)
-        expect(slot.params.guardedChance).toBeGreaterThanOrEqual(0)
-        expect(slot.params.guardedChance).toBeLessThanOrEqual(1)
-      }
+    for (const slot of gatherSlots) {
+      const params = slot.params as import('../types').GatherScalableParams
+      expect(params.resourceAmount.min).toBeGreaterThan(0)
+      expect(params.resourceAmount.min).toBeLessThanOrEqual(params.resourceAmount.max)
+    }
+  })
+
+  it.each([
+    ['mining_contract'],
+    ['pest_control'],
+    ['search_and_rescue'],
+    ['hazard_cleanup'],
+    ['colony_relief'],
+  ])('template "%s" exterminate slots have valid params', (id) => {
+    const t = MISSION_TEMPLATES.find((t) => t.id === id)!
+    const extSlots = t.objectiveSlots.filter((s) => s.params.type === 'exterminate')
+
+    for (const slot of extSlots) {
+      const params = slot.params as import('../types').ExterminateScalableParams
+      expect(params.nestCount.min).toBeGreaterThan(0)
+      expect(params.nestCount.min).toBeLessThanOrEqual(params.nestCount.max)
+      expect(params.swarmSize.min).toBeGreaterThan(0)
+      expect(params.swarmSize.min).toBeLessThanOrEqual(params.swarmSize.max)
+      expect(params.spitterChance).toBeGreaterThanOrEqual(0)
+      expect(params.spitterChance).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it.each([
+    ['mining_contract'],
+    ['pest_control'],
+    ['search_and_rescue'],
+    ['hazard_cleanup'],
+    ['colony_relief'],
+  ])('template "%s" rescue slots have valid params', (id) => {
+    const t = MISSION_TEMPLATES.find((t) => t.id === id)!
+    const rescueSlots = t.objectiveSlots.filter((s) => s.params.type === 'rescue')
+
+    for (const slot of rescueSlots) {
+      const params = slot.params as import('../types').RescueScalableParams
+      expect(params.colonistCount.min).toBeGreaterThan(0)
+      expect(params.colonistCount.min).toBeLessThanOrEqual(params.colonistCount.max)
+      expect(params.oxygenTime.min).toBeGreaterThan(params.oxygenTime.max)
+      expect(params.guardedChance).toBeGreaterThanOrEqual(0)
+      expect(params.guardedChance).toBeLessThanOrEqual(1)
     }
   })
 })

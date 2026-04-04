@@ -36,9 +36,7 @@ describe('MINERAL_VISUALS', () => {
   })
 
   it('non-emissive minerals have emissive === false', () => {
-    const nonEmissive = Object.entries(MINERAL_VISUALS).filter(
-      ([name]) => name !== 'Basaltic Lava',
-    )
+    const nonEmissive = Object.entries(MINERAL_VISUALS).filter(([name]) => name !== 'Basaltic Lava')
     for (const [_name, visual] of nonEmissive) {
       expect(visual.emissive).toBe(false)
     }
