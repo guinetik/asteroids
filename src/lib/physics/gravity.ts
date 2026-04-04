@@ -21,7 +21,7 @@ const MIN_GRAVITY_DISTANCE = 15
 const INFLUENCE_RADIUS_SCALE = 400
 
 /** Event horizon scale — point of no return. Scales with sqrt(mass). */
-const EVENT_HORIZON_SCALE = 350
+const EVENT_HORIZON_SCALE = 230
 
 /**
  * Any object that has mass and position can be a gravity source.
