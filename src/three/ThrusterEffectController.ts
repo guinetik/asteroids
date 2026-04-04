@@ -5,7 +5,7 @@ import type { ShuttleController } from './ShuttleController'
 const PARTICLE_COUNT = 300
 const THRUST_SPAWN_RATE = 100 // particles per second
 const BRAKE_SPAWN_RATE = 80
-const PARTICLE_LIFETIME = 0.6 // seconds
+const PARTICLE_LIFETIME = 0.3 // seconds
 const THRUST_SPREAD = 3
 const BRAKE_SPREAD = 5
 const PARTICLE_SIZE = 4
@@ -99,22 +99,18 @@ export class ThrusterEffectController implements Tickable {
 
   private createPoints(color: THREE.Color): THREE.Points {
     const positions = new Float32Array(PARTICLE_COUNT * 3)
-    const colors = new Float32Array(PARTICLE_COUNT * 3)
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
 
     const material = new THREE.PointsMaterial({
+      color,
       size: PARTICLE_SIZE,
       sizeAttenuation: false,
-      vertexColors: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       transparent: true,
+      opacity: 0.9,
     })
-
-    // Store base color for fade calculations
-    ;(material as THREE.PointsMaterial & { _baseColor: THREE.Color })._baseColor = color
 
     return new THREE.Points(geometry, material)
   }
@@ -143,10 +139,7 @@ export class ThrusterEffectController implements Tickable {
 
   private updateParticles(pool: Particle[], points: THREE.Points, dt: number): void {
     const posAttr = points.geometry.getAttribute('position') as THREE.BufferAttribute
-    const colorAttr = points.geometry.getAttribute('color') as THREE.BufferAttribute
     const positions = posAttr.array as Float32Array
-    const colors = colorAttr.array as Float32Array
-    const baseColor = (points.material as THREE.PointsMaterial & { _baseColor: THREE.Color })._baseColor
 
     for (let i = 0; i < pool.length; i++) {
       const p = pool[i]!
@@ -156,9 +149,6 @@ export class ThrusterEffectController implements Tickable {
         positions[i3] = FAR_AWAY
         positions[i3 + 1] = FAR_AWAY
         positions[i3 + 2] = FAR_AWAY
-        colors[i3] = 0
-        colors[i3 + 1] = 0
-        colors[i3 + 2] = 0
         continue
       }
 
@@ -168,17 +158,8 @@ export class ThrusterEffectController implements Tickable {
         positions[i3] = FAR_AWAY
         positions[i3 + 1] = FAR_AWAY
         positions[i3 + 2] = FAR_AWAY
-        colors[i3] = 0
-        colors[i3 + 1] = 0
-        colors[i3 + 2] = 0
         continue
       }
-
-      // Fade color from full brightness to black over lifetime
-      const life = 1 - p.age / PARTICLE_LIFETIME
-      colors[i3] = baseColor.r * life
-      colors[i3 + 1] = baseColor.g * life
-      colors[i3 + 2] = baseColor.b * life
 
       p.position.addScaledVector(p.velocity, dt)
       positions[i3] = p.position.x
@@ -187,6 +168,5 @@ export class ThrusterEffectController implements Tickable {
     }
 
     posAttr.needsUpdate = true
-    colorAttr.needsUpdate = true
   }
 }
