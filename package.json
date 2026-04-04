@@ -16,7 +16,8 @@
     "format": "prettier --write --experimental-cli src/",
     "models:shuttle:merge": "node scripts/merge-shuttle-glb.mjs",
     "models:shuttle:inspect": "gltf-transform inspect \"public/models/Space Shuttle (D).glb\"",
-    "models:shuttle:prune": "gltf-transform prune \"public/models/shuttle.glb\" \"public/models/shuttle.pruned.glb\""
+    "models:shuttle:prune": "gltf-transform prune \"public/models/shuttle.glb\" \"public/models/shuttle.pruned.glb\"",
+    "models:lander:build": "node scripts/optimize-lander-glb.mjs"
   },
   "dependencies": {
     "pinia": "^3.0.4",
