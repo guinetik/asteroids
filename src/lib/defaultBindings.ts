@@ -35,4 +35,7 @@ export const FPS_BINDINGS: Record<string, string[]> = {
   moveRight: ['KeyD'],
   jump: ['Space'],
   sprint: ['ShiftLeft'],
+  toolDrill: ['Digit1'],
+  toolWeapon: ['Digit2'],
+  toolHeal: ['Digit3'],
 }
