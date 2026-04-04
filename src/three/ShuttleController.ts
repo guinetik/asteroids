@@ -183,23 +183,38 @@ export class ShuttleController implements Tickable {
   }
 
   private placeNozzles(scene: THREE.Object3D): void {
-    // Log all mesh material names to find OMS pod references
+    // Find OMS pod back meshes by material name to get geometry center positions
+    const omsTargets: { name: string; center: THREE.Vector3 }[] = []
     scene.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         const mats = Array.isArray(child.material) ? child.material : [child.material]
-        const matNames = mats.map((m: THREE.Material) => m.name).filter(Boolean)
-        if (matNames.some((n: string) => n.toLowerCase().includes('oms') || n.toLowerCase().includes('rcs'))) {
-          const pos = new THREE.Vector3()
-          child.getWorldPosition(pos)
-          console.log(`[Nozzle] node="${child.name}" materials=[${matNames.join(', ')}] worldPos:`, pos)
+        const matNames = mats.map((m: THREE.Material) => m.name)
+        if (matNames.some((n: string) => n.includes('OMS pod') && n.includes('back'))) {
+          const box = new THREE.Box3().setFromObject(child)
+          const center = box.getCenter(new THREE.Vector3())
+          console.log(`[Nozzle] "${matNames.join()}" bbox center:`, center, 'size:', box.getSize(new THREE.Vector3()))
+          omsTargets.push({ name: matNames.join(), center })
         }
       }
     })
 
     const engNode = this.findNode(scene, 'eng')
     const rcsNode = this.findNode(scene, 'rcs')
-    if (engNode) engNode.visible = false
-    if (rcsNode) rcsNode.visible = false
+
+    // Place eng/rcs at OMS pod back centers (in raw model space, pre-scale)
+    if (engNode && omsTargets.length > 0) {
+      engNode.position.copy(omsTargets[0]!.center)
+      console.log('[Nozzle] placed eng at:', omsTargets[0]!.center)
+    } else if (engNode) {
+      engNode.visible = false
+    }
+
+    if (rcsNode && omsTargets.length > 1) {
+      rcsNode.position.copy(omsTargets[1]!.center)
+      console.log('[Nozzle] placed rcs at:', omsTargets[1]!.center)
+    } else if (rcsNode) {
+      rcsNode.visible = false
+    }
   }
 
   private findNode(root: THREE.Object3D, name: string): THREE.Object3D | null {
