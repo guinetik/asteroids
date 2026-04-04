@@ -2,18 +2,18 @@ import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 import type { ShuttleController } from './ShuttleController'
 
-const PARTICLE_COUNT = 200
-const THRUST_SPAWN_RATE = 80 // particles per second
-const BRAKE_SPAWN_RATE = 60
-const PARTICLE_LIFETIME = 0.5 // seconds
-const THRUST_SPREAD = 0.5
-const BRAKE_SPREAD = 1.5
-const PARTICLE_SIZE = 0.3
+const PARTICLE_COUNT = 300
+const THRUST_SPAWN_RATE = 100 // particles per second
+const BRAKE_SPAWN_RATE = 80
+const PARTICLE_LIFETIME = 0.6 // seconds
+const THRUST_SPREAD = 1
+const BRAKE_SPREAD = 3
+const PARTICLE_SIZE = 0.5
 const THRUST_COLOR = new THREE.Color(0xff8800)
 const BRAKE_COLOR = new THREE.Color(0x4488ff)
-const THRUST_OFFSET = new THREE.Vector3(0, 0, -2) // behind shuttle
-const BRAKE_OFFSET = new THREE.Vector3(0, 0, 2) // in front of shuttle
-const PUSH_FORCE = 3
+const THRUST_OFFSET = new THREE.Vector3(0, 0, -8) // behind shuttle (scaled model ~14 units long)
+const BRAKE_OFFSET = new THREE.Vector3(0, 0, 8) // in front of shuttle
+const PUSH_FORCE = 10
 
 /** Internal particle state for the pool-based particle system. */
 interface Particle {

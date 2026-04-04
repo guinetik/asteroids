@@ -1,8 +1,8 @@
 import * as THREE from 'three'
 
-const STAR_COUNT = 2000
-const STAR_SPHERE_RADIUS = 500
-const STAR_SIZE = 1.5
+const STAR_COUNT = 3000
+const STAR_SPHERE_RADIUS = 10000
+const STAR_SIZE = 3
 
 /**
  * Static particle star background rendered as a sphere of random points.

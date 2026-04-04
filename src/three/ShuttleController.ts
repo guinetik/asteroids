@@ -8,13 +8,16 @@ import type { InputManager } from '@/lib/InputManager'
 const SHUTTLE_MODEL_PATH = '/models/shuttle.glb'
 const DRACO_DECODER_PATH = '/node_modules/three/examples/jsm/libs/draco/'
 
+/** NASA model is in centimeters (~1400 units across). Scale to meters. */
+const MODEL_SCALE = 0.01
+
 const SHUTTLE_ANIMATION_NAME = 'shutAction'
 
-const THRUST_FORCE = 8
+const THRUST_FORCE = 20
 const BRAKE_FACTOR = 0.95
-const STRAFE_FORCE = 6
+const STRAFE_FORCE = 15
 const YAW_SPEED = 2
-const MAX_SPEED = 30
+const MAX_SPEED = 80
 
 /**
  * Controls the shuttle model — loading, door animation, movement, and nozzle placement.
@@ -45,6 +48,7 @@ export class ShuttleController implements Tickable {
     gltfLoader.setDRACOLoader(dracoLoader)
 
     const gltf = await gltfLoader.loadAsync(SHUTTLE_MODEL_PATH)
+    gltf.scene.scale.setScalar(MODEL_SCALE)
     this.group.add(gltf.scene)
 
     this.mixer = new THREE.AnimationMixer(gltf.scene)
@@ -156,6 +160,7 @@ export class ShuttleController implements Tickable {
     const engNode = this.findNode(scene, 'eng')
     const rcsNode = this.findNode(scene, 'rcs')
 
+    // Log available node names for debugging nozzle placement
     const omsBackNodes: THREE.Object3D[] = []
     scene.traverse((child) => {
       if (child.name.includes('OMS') && child.name.toLowerCase().includes('back')) {
@@ -163,15 +168,23 @@ export class ShuttleController implements Tickable {
       }
     })
 
+    // World positions must be computed after the scene graph is
+    // fully assembled and the MODEL_SCALE is applied to the root.
+    // updateWorldMatrix ensures transforms are current.
+    scene.updateWorldMatrix(true, true)
+
     if (omsBackNodes.length > 0 && engNode) {
       const targetPos = new THREE.Vector3()
       omsBackNodes[0]!.getWorldPosition(targetPos)
+      // Convert world pos back to eng's parent local space
+      engNode.parent?.worldToLocal(targetPos)
       engNode.position.copy(targetPos)
     }
 
     if (omsBackNodes.length > 1 && rcsNode) {
       const targetPos = new THREE.Vector3()
       omsBackNodes[1]!.getWorldPosition(targetPos)
+      rcsNode.parent?.worldToLocal(targetPos)
       rcsNode.position.copy(targetPos)
     }
   }

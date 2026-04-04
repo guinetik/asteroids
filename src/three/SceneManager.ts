@@ -4,9 +4,9 @@ import type { Tickable } from '@/lib/Tickable'
 
 const CAMERA_FOV = 60
 const CAMERA_NEAR = 0.1
-const CAMERA_FAR = 2000
-const CAMERA_INITIAL_OFFSET = new THREE.Vector3(0, 15, 20)
-const CHASE_CAM_OFFSET = new THREE.Vector3(0, 10, -15)
+const CAMERA_FAR = 50000
+const CAMERA_INITIAL_OFFSET = new THREE.Vector3(0, 20, 30)
+const CHASE_CAM_OFFSET = new THREE.Vector3(0, 12, -20)
 const CHASE_CAM_LERP_SPEED = 5
 
 /**
