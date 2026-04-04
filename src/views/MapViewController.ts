@@ -68,9 +68,10 @@ export class MapViewController implements Tickable {
       this.planetControllers.push(controller)
     }
 
-    // Asteroid belts
-    for (const belt of ASTEROID_BELTS) {
-      const controller = new AsteroidBeltController(belt)
+    // Asteroid belts (async — GLB loading)
+    const beltPromises = ASTEROID_BELTS.map((belt) => AsteroidBeltController.create(belt))
+    const belts = await Promise.all(beltPromises)
+    for (const controller of belts) {
       scene.add(controller.group)
       this.beltControllers.push(controller)
     }

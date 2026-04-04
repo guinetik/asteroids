@@ -1,6 +1,9 @@
 /**
- * Renders an asteroid belt as an InstancedMesh of small icosahedrons.
- * Distributes particles with power-law sizing and Kirkwood gap rejection.
+ * Renders an asteroid belt as InstancedMeshes using GLB model geometry.
+ *
+ * Loads asteroid shapes from a GLB file, distributes instances with
+ * power-law sizing, Rayleigh vertical spread, and Kirkwood gap
+ * rejection sampling. Animates orbital drift and per-instance tumble.
  *
  * @author guinetik
  * @date 2026-04-04
@@ -9,126 +12,244 @@
 import * as THREE from 'three'
 import type { AsteroidBelt } from '@/lib/planets/types'
 import { ORBIT_SCALE } from '@/lib/planets/constants'
+import { loadGLB, fixMaterials } from '@/three/loadGLB'
 
-/** Per-instance data for tumble animation. */
-interface ParticleData {
-  axis: THREE.Vector3
-  speed: number
+/** GLB file used for asteroid geometry (both belts share this). */
+const ASTEROID_GLB = '/models/asteroids.glb'
+
+/** Per-geometry instance tracking for tumble animation. */
+interface InstanceData {
+  mesh: THREE.InstancedMesh
+  baseMatrices: THREE.Matrix4[]
+  tumbleAxes: THREE.Vector3[]
+  tumbleSpeeds: number[]
 }
 
 /**
- * Instanced asteroid belt with Kirkwood gap rejection sampling.
+ * Extract all Mesh geometries from a loaded GLB scene.
+ * Returns pairs of [geometry, material] for each unique mesh found.
+ */
+function extractGeometries(
+  glbScene: THREE.Group,
+): { geometry: THREE.BufferGeometry; material: THREE.Material }[] {
+  const results: { geometry: THREE.BufferGeometry; material: THREE.Material }[] = []
+  glbScene.traverse((child) => {
+    if (child instanceof THREE.Mesh && child.geometry) {
+      results.push({
+        geometry: child.geometry.clone(),
+        material: (Array.isArray(child.material) ? child.material[0]! : child.material).clone(),
+      })
+    }
+  })
+  return results
+}
+
+/**
+ * Compute density at a normalized belt position (0=inner, 1=outer).
+ * Returns 0-1 where Kirkwood gaps reduce density via Gaussian falloff.
+ */
+function beltDensity(
+  normalizedPos: number,
+  gaps: readonly { position: number; width: number }[],
+): number {
+  let density = 1.0
+  for (const gap of gaps) {
+    const dist = (normalizedPos - gap.position) / gap.width
+    density *= 1.0 - Math.exp(-0.5 * dist * dist)
+  }
+  return density
+}
+
+/**
+ * Sample a radius within the belt using rejection sampling for Kirkwood gaps.
+ */
+function sampleRadius(
+  innerRadius: number,
+  outerRadius: number,
+  gaps: readonly { position: number; width: number }[],
+): number {
+  const range = outerRadius - innerRadius
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const r = innerRadius + Math.random() * range
+    const normalized = (r - innerRadius) / range
+    const density = beltDensity(normalized, gaps)
+    if (Math.random() < density) return r
+  }
+  return innerRadius + Math.random() * range
+}
+
+/**
+ * Sample a scale using power-law distribution.
+ * Higher exponent = more small asteroids.
+ */
+function sampleScale(sizeRange: readonly [number, number], exponent: number): number {
+  return sizeRange[0] + (sizeRange[1] - sizeRange[0]) * Math.pow(Math.random(), exponent)
+}
+
+/**
+ * Sample a Y offset using Rayleigh distribution (toroidal vertical spread).
+ * Most asteroids cluster near the ecliptic plane with a natural tail.
+ */
+function sampleYOffset(thicknessDeg: number): number {
+  const sigma = thicknessDeg * (Math.PI / 180)
+  const rayleigh = sigma * Math.sqrt(-2 * Math.log(1 - Math.random()))
+  return rayleigh * (Math.random() < 0.5 ? 1 : -1)
+}
+
+/**
+ * Instanced asteroid belt with GLB-based geometry and Kirkwood gap rejection.
  */
 export class AsteroidBeltController {
   readonly group: THREE.Group
-  private readonly instancedMesh: THREE.InstancedMesh
-  private readonly particles: ParticleData[] = []
-  private readonly orbitalSpeed: number
-  private readonly tmpMatrix = new THREE.Matrix4()
-  private readonly tmpQuat = new THREE.Quaternion()
+  private instanceDataList: InstanceData[] = []
+  private orbitalSpeed: number
 
-  constructor(belt: AsteroidBelt) {
+  // Reusable objects for tick
+  private readonly tumbleQuat = new THREE.Quaternion()
+  private readonly tumbleMatrix = new THREE.Matrix4()
+  private readonly composedMatrix = new THREE.Matrix4()
+
+  private constructor(belt: AsteroidBelt) {
     this.group = new THREE.Group()
+    this.group.name = belt.id
     this.orbitalSpeed = belt.orbitalSpeed
+  }
 
-    const geometry = new THREE.IcosahedronGeometry(1, 0)
-    const material = new THREE.MeshStandardMaterial({
-      color: 0x666666,
-      roughness: 0.9,
-      metalness: 0.1,
-      emissive: belt.emissiveColor
-        ? new THREE.Color(belt.emissiveColor[0], belt.emissiveColor[1], belt.emissiveColor[2])
-        : new THREE.Color(0x000000),
-      emissiveIntensity: belt.emissiveColor ? 0.3 : 0,
-    })
+  /**
+   * Create an asteroid belt controller asynchronously.
+   * Loads the GLB model and distributes instances.
+   *
+   * @param belt - Asteroid belt definition from the catalog
+   * @returns The initialized controller
+   */
+  static async create(belt: AsteroidBelt): Promise<AsteroidBeltController> {
+    const controller = new AsteroidBeltController(belt)
 
-    const count = belt.maxParticles
-    this.instancedMesh = new THREE.InstancedMesh(geometry, material, count)
+    // Load GLB
+    const glbScene = await loadGLB(ASTEROID_GLB)
+    fixMaterials(glbScene)
+    const extracted = extractGeometries(glbScene)
 
-    const innerR = belt.innerRadius * ORBIT_SCALE
-    const outerR = belt.outerRadius * ORBIT_SCALE
-    const [minSize, maxSize] = belt.sizeRange
+    if (extracted.length === 0) {
+      console.warn(`No meshes found in ${ASTEROID_GLB}`)
+      return controller
+    }
+
+    // Distribute particles across geometries
+    const numGeometries = extracted.length
+    const perGeometry = Math.floor(belt.maxParticles / numGeometries)
+    const remainder = belt.maxParticles % numGeometries
+
+    // Reusable math objects for setup
+    const position = new THREE.Vector3()
+    const rotation = new THREE.Euler()
+    const quaternion = new THREE.Quaternion()
+    const scale = new THREE.Vector3()
     const matrix = new THREE.Matrix4()
 
-    for (let i = 0; i < count; i++) {
-      // Radius with Kirkwood gap rejection
-      let radius: number
-      let attempts = 0
-      do {
-        radius = innerR + Math.random() * (outerR - innerR)
-        attempts++
-      } while (attempts < 20 && this.isInGap(radius, innerR, outerR, belt))
+    for (let gi = 0; gi < numGeometries; gi++) {
+      const { geometry, material } = extracted[gi]!
+      const count = perGeometry + (gi < remainder ? 1 : 0)
+      if (count === 0) continue
 
-      // Angle
-      const angle = Math.random() * Math.PI * 2
+      // Tune material for asteroid rendering
+      if (material instanceof THREE.MeshStandardMaterial) {
+        material.roughness = Math.max(material.roughness, 0.9)
+        material.metalness = Math.min(material.metalness, 0.1)
+        const ec = belt.emissiveColor ?? [0.06, 0.05, 0.04]
+        material.emissive = new THREE.Color(ec[0], ec[1], ec[2])
+        material.emissiveIntensity = 0.5
+      }
 
-      // Vertical spread (Gaussian-like via Box-Muller)
-      const u1 = Math.random()
-      const u2 = Math.random()
-      const gaussY = Math.sqrt(-2 * Math.log(Math.max(u1, 1e-10))) * Math.cos(2 * Math.PI * u2)
-      const height = gaussY * belt.thickness * ORBIT_SCALE * 0.3
+      const instancedMesh = new THREE.InstancedMesh(geometry, material, count)
+      instancedMesh.frustumCulled = false
 
-      // Size (power-law distribution)
-      const sizeT = Math.pow(Math.random(), belt.sizeExponent)
-      const size = (minSize + sizeT * (maxSize - minSize)) * ORBIT_SCALE
+      const baseMatrices: THREE.Matrix4[] = []
+      const tumbleAxes: THREE.Vector3[] = []
+      const tumbleSpeeds: number[] = []
 
-      // Position
-      const x = radius * Math.cos(angle)
-      const z = radius * Math.sin(angle)
+      for (let i = 0; i < count; i++) {
+        // Radius with Kirkwood gap rejection
+        const r = sampleRadius(belt.innerRadius, belt.outerRadius, belt.kirkwoodGaps) * ORBIT_SCALE
 
-      matrix.makeScale(size, size, size)
-      matrix.setPosition(x, height, z)
-      this.instancedMesh.setMatrixAt(i, matrix)
+        // Random angle
+        const angle = Math.random() * Math.PI * 2
 
-      // Tumble data
-      this.particles.push({
-        axis: new THREE.Vector3(
-          Math.random() - 0.5,
-          Math.random() - 0.5,
-          Math.random() - 0.5,
-        ).normalize(),
-        speed: (Math.random() * 0.5 + 0.5) * belt.tumbleSpeed,
+        // Y offset (toroidal spread)
+        const y = sampleYOffset(belt.thickness) * ORBIT_SCALE * belt.innerRadius
+
+        position.set(Math.cos(angle) * r, y, Math.sin(angle) * r)
+
+        // Scale (power law)
+        const s = sampleScale(belt.sizeRange, belt.sizeExponent)
+        scale.set(s, s, s)
+
+        // Random rotation
+        rotation.set(
+          Math.random() * Math.PI * 2,
+          Math.random() * Math.PI * 2,
+          Math.random() * Math.PI * 2,
+        )
+        quaternion.setFromEuler(rotation)
+
+        // Build base matrix
+        matrix.compose(position, quaternion, scale)
+        const baseMatrix = matrix.clone()
+        baseMatrices.push(baseMatrix)
+
+        // Tumble axis + speed
+        tumbleAxes.push(
+          new THREE.Vector3(
+            Math.random() - 0.5,
+            Math.random() - 0.5,
+            Math.random() - 0.5,
+          ).normalize(),
+        )
+        tumbleSpeeds.push((0.5 + Math.random()) * belt.tumbleSpeed)
+
+        instancedMesh.setMatrixAt(i, baseMatrix)
+      }
+
+      instancedMesh.instanceMatrix.needsUpdate = true
+      controller.group.add(instancedMesh)
+
+      controller.instanceDataList.push({
+        mesh: instancedMesh,
+        baseMatrices,
+        tumbleAxes,
+        tumbleSpeeds,
       })
     }
 
-    this.instancedMesh.instanceMatrix.needsUpdate = true
-    this.group.add(this.instancedMesh)
+    return controller
   }
 
-  tick(dt: number, _simTime: number): void {
+  tick(dt: number, simTime: number): void {
     // Slow orbital drift
-    this.group.rotation.y += this.orbitalSpeed * dt
+    this.group.rotation.y += dt * this.orbitalSpeed
 
     // Per-instance tumble
-    for (let i = 0; i < this.particles.length; i++) {
-      const p = this.particles[i]!
-      this.instancedMesh.getMatrixAt(i, this.tmpMatrix)
-      const pos = new THREE.Vector3()
-      const scale = new THREE.Vector3()
-      this.tmpMatrix.decompose(pos, this.tmpQuat, scale)
-      this.tmpQuat.multiply(
-        new THREE.Quaternion().setFromAxisAngle(p.axis, p.speed * dt),
-      )
-      this.tmpMatrix.compose(pos, this.tmpQuat, scale)
-      this.instancedMesh.setMatrixAt(i, this.tmpMatrix)
+    for (const data of this.instanceDataList) {
+      for (let i = 0; i < data.mesh.count; i++) {
+        const angle = simTime * data.tumbleSpeeds[i]!
+        this.tumbleQuat.setFromAxisAngle(data.tumbleAxes[i]!, angle)
+        this.tumbleMatrix.makeRotationFromQuaternion(this.tumbleQuat)
+        this.composedMatrix.multiplyMatrices(data.baseMatrices[i]!, this.tumbleMatrix)
+        data.mesh.setMatrixAt(i, this.composedMatrix)
+      }
+      data.mesh.instanceMatrix.needsUpdate = true
     }
-
-    this.instancedMesh.instanceMatrix.needsUpdate = true
   }
 
   dispose(): void {
-    this.instancedMesh.geometry.dispose()
-    ;(this.instancedMesh.material as THREE.Material).dispose()
-  }
-
-  private isInGap(radius: number, innerR: number, outerR: number, belt: AsteroidBelt): boolean {
-    const normalized = (radius - innerR) / (outerR - innerR)
-    for (const gap of belt.kirkwoodGaps) {
-      const halfWidth = gap.width / 2
-      if (normalized >= gap.position - halfWidth && normalized <= gap.position + halfWidth) {
-        return true
+    for (const data of this.instanceDataList) {
+      data.mesh.geometry.dispose()
+      const mat = data.mesh.material
+      if (Array.isArray(mat)) {
+        mat.forEach((m) => m.dispose())
+      } else {
+        mat.dispose()
       }
     }
-    return false
   }
 }
