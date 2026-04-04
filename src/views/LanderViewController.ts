@@ -7,6 +7,7 @@
  * @spec docs/asteroid-lander-gdd.md
  */
 import type { Tickable } from '@/lib/Tickable'
+import type { LanderTelemetry } from '@/components/LanderHud.vue'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'
@@ -44,6 +45,9 @@ export class LanderViewController implements Tickable {
   private vehicleCamera: VehicleCamera | null = null
   private landerController: LanderController | null = null
   private spaceTimeGrid: SpaceTimeGrid | null = null
+
+  /** Called each frame with lander telemetry for HUD display */
+  onTelemetry: ((telemetry: LanderTelemetry) => void) | null = null
 
   async init(container: HTMLElement): Promise<void> {
     // Core systems
@@ -83,13 +87,23 @@ export class LanderViewController implements Tickable {
     this.vehicleCamera.setTarget(this.landerController.group)
     this.tickHandler.register(this.landerController, TICK_PRIORITY_PHYSICS)
 
+    // Telemetry bridge (runs just after input)
+    this.tickHandler.register(this, TICK_PRIORITY_INPUT + 1)
+
     // Start the loop
     this.gameLoop = new GameLoop(this.tickHandler)
     this.gameLoop.start()
   }
 
   tick(_dt: number): void {
-    // Telemetry will be wired once thruster system is built
+    if (this.landerController && this.onTelemetry) {
+      this.onTelemetry({
+        altitude: this.landerController.position.y,
+        velocityY: this.landerController.body.velocityY,
+        posX: this.landerController.position.x,
+        posZ: this.landerController.position.z,
+      })
+    }
   }
 
   dispose(): void {

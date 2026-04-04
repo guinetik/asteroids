@@ -58,3 +58,12 @@
   @apply text-green-400;
 }
 
+.lander-hud {
+  @apply fixed top-4 left-4 pointer-events-none font-mono text-xs text-green-400 flex flex-col gap-1;
+  text-shadow: 0 0 4px rgba(0, 255, 0, 0.5);
+}
+
+.hud-readout {
+  @apply text-green-400;
+}
+

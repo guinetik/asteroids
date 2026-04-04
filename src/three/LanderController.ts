@@ -13,7 +13,7 @@ import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 import type { InputManager } from '@/lib/InputManager'
 import { loadGLB } from './loadGLB'
-import { PlatformerBody, GRAVITY_MOON } from '@/lib/physics/platformerBody'
+import { PlatformerBody } from '@/lib/physics/platformerBody'
 import { ParticleEmitter } from './ParticleEmitter'
 
 const LANDER_MODEL_PATH = '/models/lander.glb'
@@ -24,6 +24,9 @@ const MODEL_SCALE = 5
 /** Ground level — the flat spacetime grid sits at Y = 0 */
 const FLOOR_Y = 0
 
+/** Gameplay gravity — harsher than Moon (1.62) but friendlier than Earth (9.81) */
+const GAMEPLAY_GRAVITY = 3.0
+
 /**
  * Main engine thrust — intentionally weak relative to gravity.
  * You need to hold Space and build up velocity to climb.
@@ -32,6 +35,9 @@ const MAIN_ENGINE_THRUST = 3.5
 
 /** Node name for the main descent engine bell in the GLB */
 const MAIN_ENGINE_NODE = 'Thruster_Lunar Lander_0'
+
+/** RCS ascend thrust — smaller boost than main engine */
+const RCS_ASCEND_THRUST = 3.14
 
 /** Main engine flame emitter config */
 const FLAME_POOL_SIZE = 300
@@ -93,6 +99,12 @@ const RCS_ACTION_MAP: Record<string, { nodes: string[]; pushLocal: THREE.Vector3
 /** All unique RCS node names across all actions */
 const ALL_RCS_NODES = [...new Set(Object.values(RCS_ACTION_MAP).flatMap((a) => a.nodes))]
 
+/** RCS lateral movement — tilt + push */
+const RCS_LATERAL_FORCE = 4
+const TILT_MAX_ANGLE = 0.3 // ~17 degrees max tilt
+const TILT_LERP_SPEED = 3 // how fast the lander tilts toward target
+const TILT_RETURN_SPEED = 2.5 // how fast it returns to upright
+
 /**
  * Controls the lunar lander — gravity, main engine, and RCS emitters.
  *
@@ -102,7 +114,7 @@ const ALL_RCS_NODES = [...new Set(Object.values(RCS_ACTION_MAP).flatMap((a) => a
  */
 export class LanderController implements Tickable {
   readonly group = new THREE.Group()
-  readonly body = new PlatformerBody({ gravity: GRAVITY_MOON })
+  readonly body = new PlatformerBody({ gravity: GAMEPLAY_GRAVITY })
   readonly flameEmitter: ParticleEmitter
 
   /** One emitter per RCS nozzle, keyed by node name */
@@ -112,6 +124,13 @@ export class LanderController implements Tickable {
   private mainEngineWorldPos = new THREE.Vector3()
   private mainEngineLocalPos = new THREE.Vector3()
   private flameSpawnAccumulator = 0
+
+  /** Lateral velocity on the XZ plane from RCS thrusters */
+  private lateralVelocity = new THREE.Vector3()
+
+  /** Current visual tilt angles (X = A/D roll, Z = W/S pitch) */
+  private tiltX = 0
+  private tiltZ = 0
 
   /** Local-space positions of each RCS nozzle, keyed by node name */
   private readonly rcsLocalPositions = new Map<string, THREE.Vector3>()
@@ -185,11 +204,22 @@ export class LanderController implements Tickable {
       this.flameSpawnAccumulator = 0
     }
 
-    // RCS emitters
+    // RCS ascend boost (airborne only)
+    if (!this.body.grounded && this.inputManager.isActionActive('rcsAscend')) {
+      this.body.impulse(RCS_ASCEND_THRUST * dt)
+    }
+
+    // RCS emitters + lateral movement
     this.tickRcs(dt)
+    this.tickLateralMovement(dt)
+    this.tickTilt(dt)
 
     // Platformer gravity + ground collision
     this.group.position.y = this.body.tick(dt, this.group.position.y, FLOOR_Y)
+
+    // Apply lateral velocity (XZ only)
+    this.group.position.x += this.lateralVelocity.x * dt
+    this.group.position.z += this.lateralVelocity.z * dt
 
     // Update all emitters
     this.flameEmitter.tick(dt)
@@ -215,12 +245,59 @@ export class LanderController implements Tickable {
     })
   }
 
+  private tickLateralMovement(dt: number): void {
+    if (this.body.grounded) {
+      this.lateralVelocity.set(0, 0, 0)
+      return
+    }
+
+    // RCS lateral force — camera faces -X, so:
+    //   A = -Z, D = +Z, W = -X (toward camera), S = +X (away)
+    let forceX = 0
+    let forceZ = 0
+
+    if (this.inputManager.isActionActive('rcsLeft')) forceZ += RCS_LATERAL_FORCE
+    if (this.inputManager.isActionActive('rcsRight')) forceZ -= RCS_LATERAL_FORCE
+    if (this.inputManager.isActionActive('rcsFore')) forceX -= RCS_LATERAL_FORCE
+    if (this.inputManager.isActionActive('rcsAft')) forceX += RCS_LATERAL_FORCE
+
+    this.lateralVelocity.x += forceX * dt
+    this.lateralVelocity.z += forceZ * dt
+  }
+
+  private tickTilt(dt: number): void {
+    // Target tilt angles based on input (only when airborne)
+    let targetTiltX = 0
+    let targetTiltZ = 0
+
+    if (!this.body.grounded) {
+      if (this.inputManager.isActionActive('rcsLeft')) targetTiltX += TILT_MAX_ANGLE
+      if (this.inputManager.isActionActive('rcsRight')) targetTiltX -= TILT_MAX_ANGLE
+      if (this.inputManager.isActionActive('rcsFore')) targetTiltZ += TILT_MAX_ANGLE
+      if (this.inputManager.isActionActive('rcsAft')) targetTiltZ -= TILT_MAX_ANGLE
+    }
+
+    // Lerp toward target or back to upright
+    const hasInput = targetTiltX !== 0 || targetTiltZ !== 0
+    const speed = hasInput ? TILT_LERP_SPEED : TILT_RETURN_SPEED
+    this.tiltX += (targetTiltX - this.tiltX) * speed * dt
+    this.tiltZ += (targetTiltZ - this.tiltZ) * speed * dt
+
+    // Apply tilt to the group rotation (preserve Y heading)
+    this.group.rotation.x = this.tiltX
+    this.group.rotation.z = this.tiltZ
+  }
+
   private tickRcs(dt: number): void {
     // Track which nodes are active this frame
     const activeNodes = new Set<string>()
 
+    /** These RCS actions only work in the air */
+    const AIRBORNE_ONLY_ACTIONS = new Set(['rcsLeft', 'rcsRight', 'rcsFore', 'rcsAft', 'rcsAscend'])
+
     for (const [action, mapping] of Object.entries(RCS_ACTION_MAP)) {
       if (!this.inputManager.isActionActive(action)) continue
+      if (AIRBORNE_ONLY_ACTIONS.has(action) && this.body.grounded) continue
       for (const nodeName of mapping.nodes) {
         activeNodes.add(nodeName)
       }
