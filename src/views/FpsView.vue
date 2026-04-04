@@ -17,6 +17,9 @@ const telemetry = reactive<FpsTelemetry>({
   speed: 0,
   grounded: false,
   deathTimer: null,
+  activeMode: 'drill',
+  aiming: false,
+  isFiring: false,
 })
 
 onMounted(async () => {

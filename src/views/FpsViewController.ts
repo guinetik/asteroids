@@ -169,6 +169,9 @@ export class FpsViewController implements Tickable {
         speed: this.playerController.speed,
         grounded: this.playerController.grounded,
         deathTimer: this.playerController.deathTimer,
+        activeMode: 'drill',
+        aiming: false,
+        isFiring: false,
       })
     }
   }
