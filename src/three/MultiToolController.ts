@@ -34,8 +34,8 @@ const MOVE_BOB_SPEED = 10
 
 /** Sprint holster tilt — pitch down (radians). */
 const SPRINT_TILT = 0.35
-/** Jump tilt — pitch up (radians). */
-const JUMP_TILT = -0.25
+/** Jump tilt — barrel tilts up from inertia (radians). */
+const JUMP_TILT = 0.3
 /** How fast tilt lerps (per second). */
 const TILT_LERP_SPEED = 8
 

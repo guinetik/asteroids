@@ -59,6 +59,7 @@ export class FpsCamera implements Tickable {
   private bobOffset = 0
   private lateralSpeed = 0
   private verticalVelocity = 0
+  private terrainSlope = 0
   private terrainPitch = 0
   private terrainRoll = 0
 
@@ -104,14 +105,16 @@ export class FpsCamera implements Tickable {
   }
 
   /**
-   * Feed player velocity for camera bob and roll wobble.
+   * Feed player velocity and terrain info for camera bob and roll wobble.
    *
    * @param lateralSpeed - XZ speed magnitude
    * @param velocityY - Vertical velocity (positive = up)
+   * @param terrainSlope - Terrain slope at player position (0 = flat, higher = steeper)
    */
-  setVelocity(lateralSpeed: number, velocityY: number): void {
+  setVelocity(lateralSpeed: number, velocityY: number, terrainSlope = 0): void {
     this.lateralSpeed = lateralSpeed
     this.verticalVelocity = velocityY
+    this.terrainSlope = terrainSlope
   }
 
   /** Update camera aspect ratio on window resize. */
@@ -123,9 +126,11 @@ export class FpsCamera implements Tickable {
   tick(dt: number): void {
     if (!this.target) return
 
-    // Roll wobble from lateral speed — lean into movement
+    // Roll wobble — proportional to speed AND terrain roughness
+    // Flat ground = minimal wobble, rough terrain = more wobble
+    const slopeFactor = Math.min(1, this.terrainSlope * 3)
     const targetRoll = -Math.sin(this.yaw * 2 + performance.now() * 0.003)
-      * this.lateralSpeed * MAX_ROLL_WOBBLE * 0.05
+      * this.lateralSpeed * MAX_ROLL_WOBBLE * 0.05 * slopeFactor
     this.roll += (targetRoll - this.roll) * Math.min(1, ROLL_LERP_SPEED * dt)
 
     // Vertical bob from Y velocity — camera dips/rises with hops

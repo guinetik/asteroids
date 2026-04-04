@@ -60,6 +60,7 @@ export class FpsViewController implements Tickable {
   private fpsCamera: FpsCamera | null = null
   private playerController: FpsPlayerController | null = null
   private terrainGrid: TerrainGrid | null = null
+  private heightmap: Heightmap | null = null
   private multiTool: MultiToolController | null = null
 
   /** Called each frame with player telemetry for HUD display. */
@@ -89,6 +90,7 @@ export class FpsViewController implements Tickable {
           resolution: TERRAIN_RESOLUTION,
           worldSize: GRID_SIZE,
         })
+    this.heightmap = heightmap
     this.terrainGrid = new TerrainGrid(heightmap)
     this.sceneManager.addToScene(this.terrainGrid.mesh)
 
@@ -143,9 +145,12 @@ export class FpsViewController implements Tickable {
   tick(_dt: number): void {
     // Feed player velocity to camera and multi-tool for bob/wobble
     if (this.playerController && this.fpsCamera) {
+      const pos = this.playerController.group.position
+      const slope = this.heightmap?.slopeAt(pos.x, pos.z) ?? 0
       this.fpsCamera.setVelocity(
         this.playerController.speed,
         this.playerController.body.velocityY,
+        slope,
       )
       this.multiTool?.setState(
         this.playerController.speed,
