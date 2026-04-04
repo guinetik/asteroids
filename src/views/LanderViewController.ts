@@ -21,12 +21,26 @@ import { SceneManager } from '@/three/SceneManager'
 import { VehicleCamera, LANDER_CAMERA_CONFIG } from '@/three/VehicleCamera'
 import { LanderController } from '@/three/LanderController'
 import { TerrainGrid } from '@/three/TerrainGrid'
+import { generateTerrain } from '@/lib/terrain/terrainGenerator'
+import type { SurfaceFeatures } from '@/lib/asteroids/types'
 import { AmbientLight, DirectionalLight } from 'three'
 
 const AMBIENT_LIGHT_INTENSITY = 0.6
 const DIR_LIGHT_INTENSITY = 1.5
 const GRID_SIZE = 2000
 const SPAWN_HEIGHT = 80
+const TERRAIN_SEED = 42
+const TERRAIN_RESOLUTION = 128
+
+/** Temporary test surface — will come from asteroid data later */
+const TEST_SURFACE: SurfaceFeatures = {
+  craterDensity: 0.7,
+  craterMaxScale: 0.3,
+  boulderDensity: 0.5,
+  ridgeFrequency: 0.3,
+  roughness: 0.8,
+  dustCoverage: 0.2,
+}
 
 /**
  * Bridges Vue lifecycle to the lander demo scene.
@@ -62,8 +76,13 @@ export class LanderViewController implements Tickable {
     this.tickHandler.register(this.vehicleCamera, TICK_PRIORITY_RENDER - 1)
     this.tickHandler.register(this.sceneManager, TICK_PRIORITY_RENDER)
 
-    // Procedural asteroid terrain
-    this.terrainGrid = new TerrainGrid(GRID_SIZE)
+    // Procedural asteroid terrain from SurfaceFeatures
+    const heightmap = generateTerrain(TEST_SURFACE, {
+      seed: TERRAIN_SEED,
+      resolution: TERRAIN_RESOLUTION,
+      worldSize: GRID_SIZE,
+    })
+    this.terrainGrid = new TerrainGrid(heightmap)
     this.sceneManager.addToScene(this.terrainGrid.mesh)
 
     // Lighting — directional sun + ambient fill
