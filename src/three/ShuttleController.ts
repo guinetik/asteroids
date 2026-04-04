@@ -189,9 +189,16 @@ export class ShuttleController implements Tickable {
     const rcsNode = this.findNode(scene, 'rcs')
 
     if (engNode && enginePlate) {
+      // Compute engine plate center in world space, then convert
+      // to eng node's parent local space
+      scene.updateWorldMatrix(true, true)
       const box = new THREE.Box3().setFromObject(enginePlate)
       const center = box.getCenter(new THREE.Vector3())
+      if (engNode.parent) {
+        engNode.parent.worldToLocal(center)
+      }
       engNode.position.copy(center)
+      console.log('[Nozzle] eng placed at local:', center)
     } else if (engNode) {
       engNode.visible = false
     }
