@@ -1,0 +1,11 @@
+@import 'tailwindcss';
+
+/*
+ * Reusable utility classes via @apply.
+ * Add project-wide custom classes here — keep .vue files free of rogue CSS.
+ */
+
+.scene-container {
+  @apply w-screen h-screen overflow-hidden;
+}
+
