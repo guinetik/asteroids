@@ -5,9 +5,11 @@ import type { Tickable } from '@/lib/Tickable'
 const CAMERA_FOV = 60
 const CAMERA_NEAR = 0.1
 const CAMERA_FAR = 50000
-const CAMERA_INITIAL_OFFSET = new THREE.Vector3(0, 500, 0)
-const CHASE_CAM_OFFSET = new THREE.Vector3(0, 500, 0) // top-down, high enough to see the sun
+const CAMERA_INITIAL_HEIGHT = 200
 const CHASE_CAM_LERP_SPEED = 4
+const ZOOM_SPEED = 0.1
+const MIN_HEIGHT = 30
+const MAX_HEIGHT = 2000
 
 /**
  * Three.js scene orchestrator — creates renderer, camera, and controls.
@@ -26,12 +28,13 @@ export class SceneManager implements Tickable {
   private container: HTMLElement | null = null
   private chaseMode = true
   private shuttleRef: THREE.Object3D | null = null
+  private cameraHeight = CAMERA_INITIAL_HEIGHT
 
   constructor() {
     this.scene = new THREE.Scene()
 
     this.camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, CAMERA_NEAR, CAMERA_FAR)
-    this.camera.position.copy(CAMERA_INITIAL_OFFSET)
+    this.camera.position.set(0, CAMERA_INITIAL_HEIGHT, 0)
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true })
     this.renderer.setClearColor(0x000000)
@@ -42,6 +45,7 @@ export class SceneManager implements Tickable {
     this.controls.enabled = false // chase cam is default
 
     window.addEventListener('resize', this.onResize)
+    window.addEventListener('wheel', this.onWheel, { passive: false })
   }
 
   mount(container: HTMLElement): void {
@@ -76,7 +80,8 @@ export class SceneManager implements Tickable {
 
       if (this.chaseMode) {
         // Top-down: camera directly above shuttle, looking straight down
-        const targetPos = shuttlePos.clone().add(CHASE_CAM_OFFSET)
+        const targetPos = shuttlePos.clone()
+        targetPos.y += this.cameraHeight
         this.camera.position.lerp(targetPos, CHASE_CAM_LERP_SPEED * dt)
         this.camera.lookAt(shuttlePos)
       } else {
@@ -92,11 +97,19 @@ export class SceneManager implements Tickable {
 
   dispose(): void {
     window.removeEventListener('resize', this.onResize)
+    window.removeEventListener('wheel', this.onWheel)
     this.controls.dispose()
     this.renderer.dispose()
     if (this.container) {
       this.container.removeChild(this.renderer.domElement)
     }
+  }
+
+  private onWheel = (e: WheelEvent): void => {
+    if (!this.chaseMode) return
+    e.preventDefault()
+    const zoomDelta = 1 + Math.sign(e.deltaY) * ZOOM_SPEED
+    this.cameraHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, this.cameraHeight * zoomDelta))
   }
 
   private onResize = (): void => {
