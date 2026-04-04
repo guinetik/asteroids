@@ -6,7 +6,8 @@ import type { Tickable } from '@/lib/Tickable'
 import type { InputManager } from '@/lib/InputManager'
 import type { SpaceTimeGrid } from './SpaceTimeGrid'
 import { checkEventHorizon, type GravitySource } from '@/lib/physics/gravity'
-import { ThrusterSystem } from '@/lib/physics/thrusterSystem'
+import { ThrusterSystem, DEFAULT_SHUTTLE_CONFIG } from '@/lib/physics/thrusterSystem'
+import type { ShuttleThrusterName } from '@/lib/physics/thrusterSystem'
 
 /** Any object that can exert gravity on the shuttle */
 interface GravityWell {
@@ -78,7 +79,7 @@ export class ShuttleController implements Tickable {
   private spaceTimeGrid: SpaceTimeGrid | null = null
   private readonly gravityWells: GravityWell[] = []
   private readonly gravitySources: GravitySource[] = []
-  readonly thrusterSystem = new ThrusterSystem()
+  readonly thrusterSystem = new ThrusterSystem<ShuttleThrusterName>(DEFAULT_SHUTTLE_CONFIG)
   private isDead = false
   private deathTarget: THREE.Vector3 | null = null
   private deathSpeed = 0

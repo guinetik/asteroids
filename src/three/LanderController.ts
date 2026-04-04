@@ -1,6 +1,9 @@
 /**
- * Controls the lunar lander model — loading, movement, and thruster physics.
- * Simplified flight model for flat-grid testing (no gravity wells).
+ * Controls the lunar lander model — loading, platformer gravity, and main engine thrust.
+ *
+ * The main descent engine ("Thruster_Lunar Lander_0") fires upward against
+ * Moon-level gravity. It requires sustained acceleration to gain lift —
+ * you have to commit to the burn.
  *
  * @author guinetik
  * @date 2026-04-04
@@ -9,26 +12,42 @@
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 import type { InputManager } from '@/lib/InputManager'
-import type { SpaceTimeGrid } from './SpaceTimeGrid'
-import { ThrusterSystem } from '@/lib/physics/thrusterSystem'
 import { loadGLB } from './loadGLB'
+import { PlatformerBody, GRAVITY_MOON } from '@/lib/physics/platformerBody'
+import { ParticleEmitter } from './ParticleEmitter'
 
 const LANDER_MODEL_PATH = '/models/lander.glb'
 
 /** Lander model scale — adjust to match game units */
 const MODEL_SCALE = 5
 
-const THRUST_FORCE = 10
-const BRAKE_FACTOR = 0.94
-const YAW_TORQUE = 2.5
-const YAW_LATERAL_FORCE = 2
-const YAW_MAX_SPEED = 3.5
-const YAW_DAMPING = 0.98
-const MAX_THRUST_SPEED = 50
+/** Ground level — the flat spacetime grid sits at Y = 0 */
+const FLOOR_Y = 0
 
 /**
- * Controls the lunar lander model — loading, movement, and thruster physics.
- * Implements Tickable for per-frame physics and animation updates.
+ * Main engine thrust — intentionally weak relative to gravity.
+ * You need to hold Space and build up velocity to climb.
+ * At 2.4 vs 1.62 gravity, net upward accel is only ~0.78 units/s².
+ */
+const MAIN_ENGINE_THRUST = 3.5
+
+/** Node name for the main descent engine bell in the GLB */
+const MAIN_ENGINE_NODE = 'Thruster_Lunar Lander_0'
+
+/** Particle emitter config for the main engine flame */
+const FLAME_POOL_SIZE = 300
+const FLAME_COLOR = new THREE.Color(0xff6600)
+const FLAME_SIZE = 6
+const FLAME_LIFETIME = 1.0
+const FLAME_SPREAD = 5
+const FLAME_PUSH_FORCE = 22
+const FLAME_SPAWN_RATE = 160
+
+/** Offset emit point upward from the nozzle tip to the nozzle mouth */
+const FLAME_EMIT_Y_OFFSET = 8
+
+/**
+ * Controls the lunar lander model — gravity, main engine, and flame VFX.
  *
  * @author guinetik
  * @date 2026-04-04
@@ -36,60 +55,66 @@ const MAX_THRUST_SPEED = 50
  */
 export class LanderController implements Tickable {
   readonly group = new THREE.Group()
+  readonly body = new PlatformerBody({ gravity: GRAVITY_MOON })
+  readonly flameEmitter: ParticleEmitter
 
-  private velocity = new THREE.Vector3()
-  private angularVelocity = 0
   private readonly inputManager: InputManager
-  private spaceTimeGrid: SpaceTimeGrid | null = null
-  readonly thrusterSystem = new ThrusterSystem()
+  private mainEngineWorldPos = new THREE.Vector3()
+  private mainEngineLocalPos = new THREE.Vector3()
+  private flameSpawnAccumulator = 0
 
   constructor(inputManager: InputManager) {
     this.inputManager = inputManager
-  }
 
-  setSpaceTimeGrid(grid: SpaceTimeGrid): void {
-    this.spaceTimeGrid = grid
+    this.flameEmitter = new ParticleEmitter({
+      poolSize: FLAME_POOL_SIZE,
+      color: FLAME_COLOR,
+      size: FLAME_SIZE,
+      lifetime: FLAME_LIFETIME,
+      spread: FLAME_SPREAD,
+    })
   }
 
   async load(): Promise<void> {
     const scene = await loadGLB(LANDER_MODEL_PATH)
     scene.scale.setScalar(MODEL_SCALE)
     this.group.add(scene)
+
+    // Find main engine node and read its local position for particle emission
+    const engineNode = this.findNode(scene, MAIN_ENGINE_NODE)
+    if (engineNode) {
+      // Position is in model coords — scale to game units
+      const pos = engineNode.position
+      this.mainEngineLocalPos.set(pos.x * MODEL_SCALE, pos.y * MODEL_SCALE, pos.z * MODEL_SCALE)
+    }
   }
 
   get position(): THREE.Vector3 {
     return this.group.position
   }
 
-  get isThrusting(): boolean {
-    return this.inputManager.isActionActive('thrust') && this.thrusterSystem.canFire('thrust')
-  }
-
-  get isBraking(): boolean {
-    return this.inputManager.isActionActive('brake') && this.thrusterSystem.canFire('brake')
-  }
-
-  get isYawingLeft(): boolean {
-    return this.inputManager.isActionActive('yawLeft') && this.thrusterSystem.canFire('rcs')
-  }
-
-  get isYawingRight(): boolean {
-    return this.inputManager.isActionActive('yawRight') && this.thrusterSystem.canFire('rcs')
-  }
-
-  get speed(): number {
-    return this.velocity.length()
-  }
-
-  get heading(): number {
-    return this.group.rotation.y
+  get isMainEngineActive(): boolean {
+    return this.inputManager.isActionActive('mainEngine')
   }
 
   tick(dt: number): void {
-    this.updateMovement(dt)
+    // Main engine fights gravity
+    if (this.isMainEngineActive) {
+      this.body.impulse(MAIN_ENGINE_THRUST * dt)
+      this.spawnFlame(dt)
+    } else {
+      this.flameSpawnAccumulator = 0
+    }
+
+    // Platformer gravity + ground collision
+    this.group.position.y = this.body.tick(dt, this.group.position.y, FLOOR_Y)
+
+    // Update flame particles
+    this.flameEmitter.tick(dt)
   }
 
   dispose(): void {
+    this.flameEmitter.dispose()
     this.group.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         child.geometry.dispose()
@@ -102,67 +127,31 @@ export class LanderController implements Tickable {
     })
   }
 
-  private updateMovement(dt: number): void {
-    // Yaw (A/D)
-    if (this.isYawingLeft) {
-      this.angularVelocity += YAW_TORQUE * dt
-    }
-    if (this.isYawingRight) {
-      this.angularVelocity -= YAW_TORQUE * dt
-    }
+  private spawnFlame(dt: number): void {
+    this.flameSpawnAccumulator += FLAME_SPAWN_RATE * dt
 
-    this.angularVelocity *= YAW_DAMPING
-    this.angularVelocity = Math.max(-YAW_MAX_SPEED, Math.min(YAW_MAX_SPEED, this.angularVelocity))
-    this.group.rotateY(this.angularVelocity * dt)
+    // Engine position in world space — emit from nozzle mouth, not tip
+    this.mainEngineWorldPos.copy(this.mainEngineLocalPos)
+    this.mainEngineWorldPos.y += FLAME_EMIT_Y_OFFSET
+    this.mainEngineWorldPos.applyQuaternion(this.group.quaternion)
+      .add(this.group.position)
 
-    // RCS lateral push
-    const right = new THREE.Vector3(0, 0, 1).applyQuaternion(this.group.quaternion)
-    right.y = 0
-    right.normalize()
-    if (this.isYawingLeft) {
-      this.velocity.addScaledVector(right, -YAW_LATERAL_FORCE * dt)
+    // Push particles downward (engine fires down, flame goes down)
+    const pushDir = new THREE.Vector3(0, -FLAME_PUSH_FORCE, 0)
+
+    while (this.flameSpawnAccumulator >= 1) {
+      this.flameEmitter.emit(this.mainEngineWorldPos, pushDir)
+      this.flameSpawnAccumulator -= 1
     }
-    if (this.isYawingRight) {
-      this.velocity.addScaledVector(right, YAW_LATERAL_FORCE * dt)
-    }
+  }
 
-    // Thrust (W)
-    const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(this.group.quaternion)
-    forward.y = 0
-    forward.normalize()
-    if (this.isThrusting) {
-      this.velocity.addScaledVector(forward, THRUST_FORCE * dt)
-    }
-
-    // Brake (S)
-    if (this.isBraking) {
-      this.velocity.multiplyScalar(BRAKE_FACTOR)
-    }
-
-    // Lock to XZ plane
-    this.velocity.y = 0
-
-    // Clamp speed
-    const currentSpeed = this.velocity.length()
-    if (currentSpeed > MAX_THRUST_SPEED) {
-      this.velocity.setLength(MAX_THRUST_SPEED)
-    }
-
-    // Apply velocity
-    this.group.position.addScaledVector(this.velocity, dt)
-    if (this.spaceTimeGrid) {
-      this.group.position.y = -this.spaceTimeGrid.getDepthAt(
-        this.group.position.x,
-        this.group.position.z,
-      )
-    } else {
-      this.group.position.y = 0
-    }
-
-    this.thrusterSystem.tick(dt, {
-      thrust: this.isThrusting,
-      brake: this.isBraking,
-      rcs: this.isYawingLeft || this.isYawingRight,
+  private findNode(root: THREE.Object3D, name: string): THREE.Object3D | null {
+    let found: THREE.Object3D | null = null
+    root.traverse((child) => {
+      if (child.name === name && !found) {
+        found = child
+      }
     })
+    return found
   }
 }

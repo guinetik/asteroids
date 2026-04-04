@@ -7,11 +7,10 @@
  * @spec docs/asteroid-lander-gdd.md
  */
 import type { Tickable } from '@/lib/Tickable'
-import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'
-import { DEFAULT_BINDINGS } from '@/lib/defaultBindings'
+import { LANDER_BINDINGS } from '@/lib/defaultBindings'
 import {
   TICK_PRIORITY_INPUT,
   TICK_PRIORITY_PHYSICS,
@@ -23,10 +22,10 @@ import { LanderController } from '@/three/LanderController'
 import { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
 import { AmbientLight, DirectionalLight } from 'three'
 
-const ONE_SHOT_PRIORITY = TICK_PRIORITY_INPUT + 1
 const AMBIENT_LIGHT_INTENSITY = 0.6
 const DIR_LIGHT_INTENSITY = 1.5
 const GRID_SIZE = 2000
+const SPAWN_HEIGHT = 80
 
 /**
  * Bridges Vue lifecycle to the lander demo scene.
@@ -44,12 +43,9 @@ export class LanderViewController implements Tickable {
   private landerController: LanderController | null = null
   private spaceTimeGrid: SpaceTimeGrid | null = null
 
-  /** Called each frame with lander telemetry for HUD display */
-  onTelemetry: ((telemetry: ShuttleTelemetry) => void) | null = null
-
   async init(container: HTMLElement): Promise<void> {
     // Core systems
-    this.inputManager = new InputManager(DEFAULT_BINDINGS)
+    this.inputManager = new InputManager(LANDER_BINDINGS)
     this.tickHandler = new TickHandler()
     this.tickHandler.register(this.inputManager, TICK_PRIORITY_INPUT)
 
@@ -70,16 +66,14 @@ export class LanderViewController implements Tickable {
     this.sceneManager.addToScene(ambientLight)
     this.sceneManager.addToScene(dirLight)
 
-    // Lander — start at origin
+    // Lander — spawn above the grid so gravity is visible
     this.landerController = new LanderController(this.inputManager)
-    this.landerController.setSpaceTimeGrid(this.spaceTimeGrid)
     await this.landerController.load()
+    this.landerController.group.position.y = SPAWN_HEIGHT
     this.sceneManager.addToScene(this.landerController.group)
+    this.sceneManager.addToScene(this.landerController.flameEmitter.points)
     this.sceneManager.setShuttleRef(this.landerController.group)
     this.tickHandler.register(this.landerController, TICK_PRIORITY_PHYSICS)
-
-    // One-shot action bridge
-    this.tickHandler.register(this, ONE_SHOT_PRIORITY)
 
     // Start the loop
     this.gameLoop = new GameLoop(this.tickHandler)
@@ -87,23 +81,7 @@ export class LanderViewController implements Tickable {
   }
 
   tick(_dt: number): void {
-    if (this.landerController && this.onTelemetry) {
-      const ts = this.landerController.thrusterSystem
-      this.onTelemetry({
-        speed: this.landerController.speed,
-        heading: this.landerController.heading,
-        posX: this.landerController.position.x,
-        posZ: this.landerController.position.z,
-        fuelLevel: ts.fuelLevel,
-        fuelCapacity: ts.fuelCapacity,
-        thrustCharge: ts.getState('thrust').charge,
-        thrustCapacity: ts.getState('thrust').capacity,
-        brakeCharge: ts.getState('brake').charge,
-        brakeCapacity: ts.getState('brake').capacity,
-        rcsCharge: ts.getState('rcs').charge,
-        rcsCapacity: ts.getState('rcs').capacity,
-      })
-    }
+    // Telemetry will be wired once thruster system is built
   }
 
   dispose(): void {

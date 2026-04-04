@@ -6,6 +6,7 @@
  * @date 2026-04-04
  * @spec docs/superpowers/specs/2026-04-04-shuttle-scene-design.md
  */
+/** Shuttle key bindings */
 export const DEFAULT_BINDINGS: Record<string, string[]> = {
   thrust: ['KeyW'],
   brake: ['KeyS'],
@@ -13,4 +14,9 @@ export const DEFAULT_BINDINGS: Record<string, string[]> = {
   yawRight: ['KeyD'],
   toggleDoors: ['KeyF'],
   toggleCamera: ['KeyC'],
+}
+
+/** Lander key bindings */
+export const LANDER_BINDINGS: Record<string, string[]> = {
+  mainEngine: ['Space'],
 }
