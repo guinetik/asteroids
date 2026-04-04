@@ -5,7 +5,7 @@ import type { Tickable } from '@/lib/Tickable'
 const CAMERA_FOV = 60
 const CAMERA_NEAR = 0.1
 const CAMERA_FAR = 50000
-const CAMERA_INITIAL_POSITION = new THREE.Vector3(300, 200, 300)
+const CAMERA_INITIAL_POSITION = new THREE.Vector3(180, 30, 0)
 
 /** Default 3rd-person offset: behind, above, and tilted to see ahead */
 const IDLE_CAM_OFFSET = new THREE.Vector3(-120, 30, 0)
