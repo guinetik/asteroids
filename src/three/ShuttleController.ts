@@ -202,6 +202,18 @@ export class ShuttleController implements Tickable {
       engNode.position.set(ENG_POSITION_X, ENG_POSITION_Y, ENG_POSITION_Z)
       engNode.rotation.set(0, 0, 0)
       engNode.scale.set(1, 1, 1)
+
+      // Debug: log eng children to understand nozzle structure
+      console.log('[Eng] children:', engNode.children.map((c) => c.name))
+      engNode.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          const box = new THREE.Box3().setFromObject(child)
+          const size = box.getSize(new THREE.Vector3())
+          const center = box.getCenter(new THREE.Vector3())
+          const mats = Array.isArray(child.material) ? child.material : [child.material]
+          console.log(`[Eng mesh] "${child.name}" mat=[${mats.map((m: THREE.Material) => m.name)}] center:`, center, 'size:', size)
+        }
+      })
     }
 
     // Hide RCS for now — needs separate OMS pod alignment
