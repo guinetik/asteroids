@@ -105,6 +105,7 @@ const RCS_LATERAL_FORCE = 4
 const TILT_MAX_ANGLE = 0.3 // ~17 degrees max tilt
 const TILT_LERP_SPEED = 3 // how fast the lander tilts toward target
 const TILT_RETURN_SPEED = 2.5 // how fast it returns to upright
+const GROUND_TILT_LERP_SPEED = 4 // how fast the lander conforms to terrain slope
 
 /**
  * Controls the lunar lander — gravity, main engine, and RCS emitters.
@@ -276,24 +277,32 @@ export class LanderController implements Tickable {
   }
 
   private tickTilt(dt: number): void {
-    // Target tilt angles based on input (only when airborne)
     let targetTiltX = 0
     let targetTiltZ = 0
+    let speed: number
 
-    if (!this.body.grounded) {
+    if (this.body.grounded && this.heightmap) {
+      // Grounded: conform to terrain slope via surface normal
+      const n = this.heightmap.normalAt(this.group.position.x, this.group.position.z)
+      // Normal (nx, ny, nz) → tilt angles:
+      //   tiltX (roll around X) = atan2(nz, ny) — slope along Z axis
+      //   tiltZ (pitch around Z) = atan2(-nx, ny) — slope along X axis
+      targetTiltX = Math.atan2(n.z, n.y)
+      targetTiltZ = Math.atan2(-n.x, n.y)
+      speed = GROUND_TILT_LERP_SPEED
+    } else {
+      // Airborne: RCS input drives tilt
       if (this.inputManager.isActionActive('rcsLeft')) targetTiltX += TILT_MAX_ANGLE
       if (this.inputManager.isActionActive('rcsRight')) targetTiltX -= TILT_MAX_ANGLE
       if (this.inputManager.isActionActive('rcsFore')) targetTiltZ += TILT_MAX_ANGLE
       if (this.inputManager.isActionActive('rcsAft')) targetTiltZ -= TILT_MAX_ANGLE
+      const hasInput = targetTiltX !== 0 || targetTiltZ !== 0
+      speed = hasInput ? TILT_LERP_SPEED : TILT_RETURN_SPEED
     }
 
-    // Lerp toward target or back to upright
-    const hasInput = targetTiltX !== 0 || targetTiltZ !== 0
-    const speed = hasInput ? TILT_LERP_SPEED : TILT_RETURN_SPEED
     this.tiltX += (targetTiltX - this.tiltX) * speed * dt
     this.tiltZ += (targetTiltZ - this.tiltZ) * speed * dt
 
-    // Apply tilt to the group rotation (preserve Y heading)
     this.group.rotation.x = this.tiltX
     this.group.rotation.z = this.tiltZ
   }
