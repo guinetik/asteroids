@@ -14,6 +14,7 @@ const GRID_OPACITY = 0.4
  */
 const DEFAULT_VISUAL_DEPTH_SCALE = 160
 const DEFAULT_VISUAL_WIDTH_SCALE = 200
+const DEFAULT_MASS_EXPONENT = 0.5
 const WELL_PULSE_SPEED = 1.5
 const WELL_PULSE_AMOUNT = 0.08
 
@@ -50,17 +51,20 @@ export class SpaceTimeGrid implements Tickable {
   private readonly gridResolution: number
   private readonly depthScale: number
   private readonly widthScale: number
+  private readonly massExponent: number
 
   constructor(
     gridSize = DEFAULT_GRID_SIZE,
     gridResolution = DEFAULT_GRID_RESOLUTION,
     depthScale = DEFAULT_VISUAL_DEPTH_SCALE,
     widthScale = DEFAULT_VISUAL_WIDTH_SCALE,
+    massExponent = DEFAULT_MASS_EXPONENT,
   ) {
     this.gridSize = gridSize
     this.gridResolution = gridResolution
     this.depthScale = depthScale
     this.widthScale = widthScale
+    this.massExponent = massExponent
     this.geometry = this.createGridGeometry()
     const posAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute
     this.basePositions = new Float32Array(posAttr.array as Float32Array)
@@ -95,7 +99,7 @@ export class SpaceTimeGrid implements Tickable {
   /**
    * Gaussian well depth at a point.
    * depth = A * exp(-r²/2σ²)
-   * More mass = wider and deeper well (sqrt scaling).
+   * More mass = wider and deeper well (pow(mass, exponent) scaling).
    * Includes subtle pulsing animation.
    */
   getDepthAt(x: number, z: number): number {
@@ -106,8 +110,9 @@ export class SpaceTimeGrid implements Tickable {
       const dz = z - source.z
       const rSquared = dx * dx + dz * dz
 
-      const sigma = this.widthScale * Math.sqrt(source.mass)
-      const baseAmplitude = this.depthScale * Math.sqrt(source.mass)
+      const massFactor = Math.pow(source.mass, this.massExponent)
+      const sigma = this.widthScale * massFactor
+      const baseAmplitude = this.depthScale * massFactor
 
       const pulse = 1 + WELL_PULSE_AMOUNT * Math.sin(this.time * WELL_PULSE_SPEED)
       const amplitude = baseAmplitude * pulse

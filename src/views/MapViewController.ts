@@ -82,9 +82,10 @@ export class MapViewController implements Tickable {
     // Space-time grid (gravity well visualization)
     const kuiperOuterEdge = 2400 * ORBIT_SCALE
     const gridSize = kuiperOuterEdge * 2.2
-    const gridDepthScale = 13  // Sun well depth in scene units (~8% of grid size)
-    const gridWidthScale = 16  // Sun well sigma in scene units (~10% of grid size)
-    this.spaceTimeGrid = new SpaceTimeGrid(gridSize, 100, gridDepthScale, gridWidthScale)
+    const gridDepthScale = 10  // Well depth scale (Sun = 10 units deep)
+    const gridWidthScale = 8   // Well width scale (Sun sigma = 8 units)
+    const gridMassExponent = 0.2 // Compress mass range so planets are visible (vs 0.5 = sqrt)
+    this.spaceTimeGrid = new SpaceTimeGrid(gridSize, 200, gridDepthScale, gridWidthScale, gridMassExponent)
     scene.add(this.spaceTimeGrid.mesh)
 
     // Register tick: this controller drives simTime and passes to children
