@@ -12,8 +12,8 @@ const GRID_OPACITY = 0.4
  * Real spacetime curvature is imperceptible at solar system scale,
  * so we exaggerate while preserving correct mass ratios between bodies.
  */
-const VISUAL_DEPTH_SCALE = 40
-const VISUAL_WIDTH_SCALE = 60
+const VISUAL_DEPTH_SCALE = 80
+const VISUAL_WIDTH_SCALE = 120
 const WELL_PULSE_SPEED = 1.5
 const WELL_PULSE_AMOUNT = 0.08
 
