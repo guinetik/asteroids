@@ -14,6 +14,7 @@ import type { Tickable } from '@/lib/Tickable'
 import type { InputManager } from '@/lib/InputManager'
 import { loadGLB } from './loadGLB'
 import { PlatformerBody } from '@/lib/physics/platformerBody'
+import type { Heightmap } from '@/lib/terrain/heightmap'
 import { ParticleEmitter } from './ParticleEmitter'
 
 const LANDER_MODEL_PATH = '/models/lander.glb'
@@ -21,8 +22,8 @@ const LANDER_MODEL_PATH = '/models/lander.glb'
 /** Lander model scale — adjust to match game units */
 const MODEL_SCALE = 5
 
-/** Ground level — the flat spacetime grid sits at Y = 0 */
-const FLOOR_Y = 0
+/** Fallback ground level when no heightmap is set */
+const DEFAULT_FLOOR_Y = 0
 
 /** Gameplay gravity — harsher than Moon (1.62) but friendlier than Earth (9.81) */
 const GAMEPLAY_GRAVITY = 3.0
@@ -121,6 +122,7 @@ export class LanderController implements Tickable {
   readonly rcsEmitters = new Map<string, ParticleEmitter>()
 
   private readonly inputManager: InputManager
+  private heightmap: Heightmap | null = null
   private mainEngineWorldPos = new THREE.Vector3()
   private mainEngineLocalPos = new THREE.Vector3()
   private flameSpawnAccumulator = 0
@@ -187,6 +189,11 @@ export class LanderController implements Tickable {
     }
   }
 
+  /** Set terrain heightmap for ground collision. */
+  setHeightmap(hm: Heightmap): void {
+    this.heightmap = hm
+  }
+
   get position(): THREE.Vector3 {
     return this.group.position
   }
@@ -214,8 +221,11 @@ export class LanderController implements Tickable {
     this.tickLateralMovement(dt)
     this.tickTilt(dt)
 
-    // Platformer gravity + ground collision
-    this.group.position.y = this.body.tick(dt, this.group.position.y, FLOOR_Y)
+    // Platformer gravity + ground collision against terrain
+    const floorY = this.heightmap
+      ? this.heightmap.heightAt(this.group.position.x, this.group.position.z)
+      : DEFAULT_FLOOR_Y
+    this.group.position.y = this.body.tick(dt, this.group.position.y, floorY)
 
     // Apply lateral velocity (XZ only)
     this.group.position.x += this.lateralVelocity.x * dt

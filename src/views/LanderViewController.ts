@@ -94,6 +94,7 @@ export class LanderViewController implements Tickable {
 
     // Lander — spawn above the grid so gravity is visible
     this.landerController = new LanderController(this.inputManager)
+    this.landerController.setHeightmap(heightmap)
     await this.landerController.load()
     this.landerController.group.position.y = SPAWN_HEIGHT
     this.sceneManager.addToScene(this.landerController.group)
