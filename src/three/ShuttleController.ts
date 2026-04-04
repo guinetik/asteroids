@@ -19,7 +19,8 @@ const MODEL_SCALE = 0.01
  */
 const MODEL_ROTATION_X = -Math.PI / 2
 
-const SHUTTLE_ANIMATION_NAME = 'shutAction'
+const DOOR_OPEN_ANGLE = Math.PI * 0.6 // ~108 degrees, payload bay doors open wide
+const DOOR_ANIM_SPEED = 2 // radians per second
 
 const THRUST_FORCE = 20
 const BRAKE_FACTOR = 0.95
@@ -40,9 +41,12 @@ const MAX_SPEED = 80
 export class ShuttleController implements Tickable {
   readonly group = new THREE.Group()
 
-  private mixer: THREE.AnimationMixer | null = null
-  private doorAction: THREE.AnimationAction | null = null
   private doorsOpen = false
+  private doorProgress = 0 // 0 = closed, 1 = open
+  private doorPortNode: THREE.Object3D | null = null
+  private doorStbNode: THREE.Object3D | null = null
+  private doorPortClosedRotZ = 0
+  private doorStbClosedRotZ = 0
   private velocity = new THREE.Vector3()
   private currentBank = 0
   private readonly inputManager: InputManager
@@ -63,14 +67,11 @@ export class ShuttleController implements Tickable {
     gltf.scene.rotation.x = MODEL_ROTATION_X
     this.group.add(gltf.scene)
 
-    this.mixer = new THREE.AnimationMixer(gltf.scene)
-
-    // Log all node names to find door meshes
-    const nodeNames: string[] = []
-    gltf.scene.traverse((child) => {
-      nodeNames.push(child.name)
-    })
-    console.log('[ShuttleController] all nodes:', nodeNames)
+    // Find door nodes for programmatic animation
+    this.doorPortNode = this.findNode(gltf.scene, 'door-prt')
+    this.doorStbNode = this.findNode(gltf.scene, 'door-stb')
+    if (this.doorPortNode) this.doorPortClosedRotZ = this.doorPortNode.rotation.z
+    if (this.doorStbNode) this.doorStbClosedRotZ = this.doorStbNode.rotation.z
 
     this.placeNozzles(gltf.scene)
 
@@ -78,22 +79,6 @@ export class ShuttleController implements Tickable {
   }
 
   toggleDoors(): void {
-    if (!this.doorAction) return
-
-    if (this.doorsOpen) {
-      this.doorAction.timeScale = -1
-      this.doorAction.paused = false
-      if (this.doorAction.time === 0) {
-        this.doorAction.time = this.doorAction.getClip().duration
-      }
-      this.doorAction.play()
-    } else {
-      this.doorAction.timeScale = 1
-      this.doorAction.paused = false
-      this.doorAction.reset()
-      this.doorAction.play()
-    }
-
     this.doorsOpen = !this.doorsOpen
   }
 
@@ -111,11 +96,10 @@ export class ShuttleController implements Tickable {
 
   tick(dt: number): void {
     this.updateMovement(dt)
-    this.mixer?.update(dt)
+    this.updateDoors(dt)
   }
 
   dispose(): void {
-    this.mixer?.stopAllAction()
     this.group.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         child.geometry.dispose()
@@ -126,6 +110,31 @@ export class ShuttleController implements Tickable {
         }
       }
     })
+  }
+
+  private updateDoors(dt: number): void {
+    const target = this.doorsOpen ? 1 : 0
+    const diff = target - this.doorProgress
+    if (Math.abs(diff) < 0.001) {
+      this.doorProgress = target
+      return
+    }
+
+    const step = Math.sign(diff) * DOOR_ANIM_SPEED * dt
+    this.doorProgress = Math.abs(step) > Math.abs(diff)
+      ? target
+      : this.doorProgress + step
+
+    const angle = this.doorProgress * DOOR_OPEN_ANGLE
+
+    // Port door rotates around local X axis (hinge along nose-to-tail)
+    if (this.doorPortNode) {
+      this.doorPortNode.rotation.z = this.doorPortClosedRotZ + angle
+    }
+    // Starboard door rotates the opposite direction
+    if (this.doorStbNode) {
+      this.doorStbNode.rotation.z = this.doorStbClosedRotZ - angle
+    }
   }
 
   private updateMovement(dt: number): void {
