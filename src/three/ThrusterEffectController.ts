@@ -11,8 +11,15 @@ const BRAKE_SPREAD = 5
 const PARTICLE_SIZE = 4
 const THRUST_COLOR = new THREE.Color(0xff8800)
 const BRAKE_COLOR = new THREE.Color(0x4488ff)
-const THRUST_OFFSET = new THREE.Vector3(-7, 0, 0) // engine nozzles: rear of shuttle (-X)
-const BRAKE_OFFSET = new THREE.Vector3(-7, 0, 0) // dampener: same nozzles, blue retro-thrust
+/**
+ * 3 nozzle emit points matching ShuttleController ENG_POSITIONS * MODEL_SCALE.
+ * After the -90deg X rotation: raw Y becomes -Z, raw Z becomes Y in world.
+ */
+const NOZZLE_OFFSETS = [
+  new THREE.Vector3(-5.1, 0.72, 0),    // top center
+  new THREE.Vector3(-5.1, -0.46, -0.52), // bottom left
+  new THREE.Vector3(-5.1, -0.46, 0.52),  // bottom right
+]
 const PUSH_FORCE = 20
 const FAR_AWAY = 99999
 
@@ -60,7 +67,8 @@ export class ThrusterEffectController implements Tickable {
     if (isThrusting) {
       this.thrustSpawnAccumulator += THRUST_SPAWN_RATE * dt
       while (this.thrustSpawnAccumulator >= 1) {
-        this.spawnParticle(this.thrustParticles, THRUST_OFFSET, THRUST_SPREAD)
+        const nozzle = NOZZLE_OFFSETS[Math.floor(Math.random() * NOZZLE_OFFSETS.length)]!
+        this.spawnParticle(this.thrustParticles, nozzle, THRUST_SPREAD)
         this.thrustSpawnAccumulator -= 1
       }
     } else {
@@ -70,7 +78,8 @@ export class ThrusterEffectController implements Tickable {
     if (isBraking) {
       this.brakeSpawnAccumulator += BRAKE_SPAWN_RATE * dt
       while (this.brakeSpawnAccumulator >= 1) {
-        this.spawnParticle(this.brakeParticles, BRAKE_OFFSET, BRAKE_SPREAD)
+        const nozzle = NOZZLE_OFFSETS[Math.floor(Math.random() * NOZZLE_OFFSETS.length)]!
+        this.spawnParticle(this.brakeParticles, nozzle, BRAKE_SPREAD)
         this.brakeSpawnAccumulator -= 1
       }
     } else {
