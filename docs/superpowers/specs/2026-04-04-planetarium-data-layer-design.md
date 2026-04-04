@@ -302,7 +302,7 @@ Hardcoded lookup tables for all 9 planets + Pluto:
 - `REAL_ROTATION_HOURS` — sidereal rotation periods (negative = retrograde)
 - `REAL_MASS_EARTH` — mass in Earth masses
 - `REAL_RADIUS_KM` — equatorial radius in km
-- `SPEED_OF_LIGHT_AU_PER_MIN = 0.002004`
+- `SPEED_OF_LIGHT_AU_PER_MIN = 0.12023` (1 AU / 8.317 min)
 
 ### `computeTelemetry(planetId, orbit, simTime) => TelemetryData`
 

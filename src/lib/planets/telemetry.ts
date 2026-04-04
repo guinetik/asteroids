@@ -34,6 +34,7 @@ const REAL_AU: Record<string, number> = {
   venus: 0.723,
   earth: 1.0,
   mars: 1.524,
+  ceres: 2.767,
   jupiter: 5.203,
   saturn: 9.537,
   uranus: 19.191,
@@ -47,6 +48,7 @@ const REAL_PERIOD_DAYS: Record<string, number> = {
   venus: 224.7,
   earth: 365.25,
   mars: 686.97,
+  ceres: 1681.63,
   jupiter: 4332.59,
   saturn: 10759.22,
   uranus: 30688.5,
@@ -63,6 +65,7 @@ const REAL_ROTATION_HOURS: Record<string, number> = {
   venus: -5832.5,
   earth: 23.934,
   mars: 24.623,
+  ceres: 9.074,
   jupiter: 9.925,
   saturn: 10.656,
   uranus: -17.24,
@@ -76,6 +79,7 @@ const REAL_MASS_EARTH: Record<string, number> = {
   venus: 0.815,
   earth: 1.0,
   mars: 0.107,
+  ceres: 0.00016,
   jupiter: 317.8,
   saturn: 95.16,
   uranus: 14.54,
@@ -89,6 +93,7 @@ const REAL_RADIUS_KM: Record<string, number> = {
   venus: 6051.8,
   earth: 6371.0,
   mars: 3389.5,
+  ceres: 473,
   jupiter: 69911,
   saturn: 58232,
   uranus: 25362,
@@ -166,46 +171,46 @@ function toSparkline(values: number[]): string {
  */
 export interface TelemetryData {
   /** Planet mass relative to Earth (1.0 = Earth). */
-  massEarths: number
+  readonly massEarths: number
   /** Equatorial radius in kilometres. */
-  radiusKm: number
+  readonly radiusKm: number
   /** Current heliocentric distance in astronomical units. */
-  solarDistanceAU: number
+  readonly solarDistanceAU: number
   /** Instantaneous orbital speed in km/s derived from the vis-viva equation. */
-  orbitalVelocityKmS: number
+  readonly orbitalVelocityKmS: number
   /** True anomaly ν in degrees, normalised to [0, 360). */
-  trueAnomalyDeg: number
+  readonly trueAnomalyDeg: number
   /** Mean anomaly M in degrees, normalised to [0, 360). */
-  meanAnomalyDeg: number
+  readonly meanAnomalyDeg: number
   /**
    * Apparent local solar time on the sub-solar meridian as `HH:MM:SS`.
    * Based on the planet's sidereal rotation period and the current true anomaly.
    */
-  localSolarTime: string
+  readonly localSolarTime: string
   /** One-way light travel time from the Sun to the planet, in minutes. */
-  lightTravelMin: number
+  readonly lightTravelMin: number
   /** Orbital period taken directly from the real data table, in Earth days. */
-  orbitalPeriodDays: number
+  readonly orbitalPeriodDays: number
   /**
    * Phase angle in degrees — equal to the true anomaly in degrees.
    * [0, 360)
    */
-  phaseAngleDeg: number
+  readonly phaseAngleDeg: number
   /**
    * Orbit progress encoded as `{p:NN}` where NN is the mean anomaly as a
    * percentage of a full orbit (0–100).
    */
-  orbitProgressPie: string
+  readonly orbitProgressPie: string
   /**
    * Sparkline of recent orbital velocity samples, encoded as `{l:v1,v2,...}`
    * with values scaled to 0–100.
    */
-  velocitySparkline: string
+  readonly velocitySparkline: string
   /**
    * Sparkline of recent heliocentric distance samples, encoded as
    * `{l:v1,v2,...}` with values scaled to 0–100.
    */
-  distanceSparkline: string
+  readonly distanceSparkline: string
 }
 
 /**
