@@ -18,6 +18,10 @@ const ROLL_LERP_SPEED = 6
 const BOB_AMPLITUDE = 0.08
 /** How fast bob lerps (per second). */
 const BOB_LERP_SPEED = 8
+/** How much terrain tilt feeds into camera (0 = none, 1 = full). */
+const TERRAIN_TILT_FACTOR = 0.15
+/** How fast terrain tilt lerps (per second). */
+const TERRAIN_TILT_LERP_SPEED = 4
 
 /** Tuning knobs for the FPS camera. */
 export interface FpsCameraConfig {
@@ -51,11 +55,12 @@ export class FpsCamera implements Tickable {
   private readonly config: FpsCameraConfig
   private target: THREE.Object3D | null = null
   private readonly euler = new THREE.Euler(0, 0, 0, 'YXZ')
-  private readonly lookQuat = new THREE.Quaternion()
   private roll = 0
   private bobOffset = 0
   private lateralSpeed = 0
   private verticalVelocity = 0
+  private terrainPitch = 0
+  private terrainRoll = 0
 
   constructor(config: FpsCameraConfig) {
     this.config = config
@@ -134,10 +139,21 @@ export class FpsCamera implements Tickable {
       this.target.position.z,
     )
 
-    // Compose terrain tilt (from player group) with mouse look + roll
-    this.euler.set(this.pitch, this.yaw, this.roll)
-    this.lookQuat.setFromEuler(this.euler)
-    this.camera.quaternion.copy(this.target.quaternion).multiply(this.lookQuat)
+    // Subtle terrain tilt — lerp toward a fraction of the player's terrain rotation
+    const targetTerrainPitch = this.target.rotation.x * TERRAIN_TILT_FACTOR
+    const targetTerrainRoll = this.target.rotation.z * TERRAIN_TILT_FACTOR
+    this.terrainPitch += (targetTerrainPitch - this.terrainPitch)
+      * Math.min(1, TERRAIN_TILT_LERP_SPEED * dt)
+    this.terrainRoll += (targetTerrainRoll - this.terrainRoll)
+      * Math.min(1, TERRAIN_TILT_LERP_SPEED * dt)
+
+    // Apply yaw + pitch + roll + terrain tilt
+    this.euler.set(
+      this.pitch + this.terrainPitch,
+      this.yaw,
+      this.roll + this.terrainRoll,
+    )
+    this.camera.quaternion.setFromEuler(this.euler)
   }
 
   dispose(): void {
