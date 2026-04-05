@@ -158,6 +158,14 @@ export class ThrusterSystem<T extends string = ShuttleThrusterName> {
     this.fuel = Math.min(this.config.fuelCapacity, this.fuel + amount)
   }
 
+  /** Restore fuel and all thruster charges to full capacity. */
+  refuel(): void {
+    this.fuel = this.config.fuelCapacity
+    for (const name of this.thrusterNames) {
+      this.charges[name] = this.config.thrusters[name].capacity
+    }
+  }
+
   /**
    * Advance one frame. Active thrusters drain charge; idle thrusters recharge from fuel.
    *

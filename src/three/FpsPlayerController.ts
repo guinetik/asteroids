@@ -164,6 +164,12 @@ export class FpsPlayerController implements Tickable {
    * @param x - X velocity to add (units/s)
    * @param z - Z velocity to add (units/s)
    */
+  /** Restore O2, stamina, and clear death timer (e.g. returning to lander). */
+  replenish(): void {
+    this.thrusterSystem.refuel()
+    this._deathTimer = null
+  }
+
   /** Set ADS state — affects strafe speed. */
   setAiming(aiming: boolean): void {
     this._aiming = aiming

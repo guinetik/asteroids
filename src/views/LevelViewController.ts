@@ -363,6 +363,9 @@ export class LevelViewController implements Tickable {
   }
 
   private exitEva(): void {
+    // Replenish O2 and stamina (back in lander, connected to life support)
+    this.playerController!.replenish()
+
     // Hide EVA visuals
     this.playerController!.group.visible = false
     this.multiTool!.setVisible(false)
