@@ -68,7 +68,7 @@ export class MultiToolController implements Tickable {
   private model: THREE.Group | null = null
   private camera: THREE.PerspectiveCamera | null = null
   private readonly ledMeshes: THREE.Mesh[] = []
-  private readonly powerIndicators: { node: THREE.Object3D; cylinder: THREE.Mesh }[] = []
+  private readonly powerIndicators: { node: THREE.Object3D; cylinder: THREE.Mesh; baseZ: number; slideZ: number }[] = []
   private triggerLock: THREE.Object3D | null = null
   private lockBaseX = 0
   private lockBaseZ = 0
@@ -122,6 +122,9 @@ export class MultiToolController implements Tickable {
         const cylGeo = new THREE.CylinderGeometry(
           POWER_CYLINDER_RADIUS, POWER_CYLINDER_RADIUS, POWER_CYLINDER_HEIGHT, 8,
         )
+        // Shift pivot to bottom, rotate so cylinder grows along Z (gun's visual vertical)
+        cylGeo.translate(0, POWER_CYLINDER_HEIGHT / 2, 0)
+        cylGeo.rotateX(Math.PI / 2)
         const cylMat = new THREE.MeshBasicMaterial({
           color: 0x00ff00,
           transparent: true,
@@ -129,7 +132,7 @@ export class MultiToolController implements Tickable {
         })
         const cylinder = new THREE.Mesh(cylGeo, cylMat)
         child.add(cylinder)
-        this.powerIndicators.push({ node: child, cylinder })
+        this.powerIndicators.push({ node: child, cylinder, baseZ: child.position.z, slideZ: 0 })
       }
     })
     scene.add(this.model)
@@ -262,10 +265,10 @@ export class MultiToolController implements Tickable {
       this.triggerLock.position.z = this.lockBaseZ + this.lockZSlide
     }
 
-    // Power indicators — scale Y and color based on RTG level
-    for (const { cylinder } of this.powerIndicators) {
-      const mat = cylinder.material as THREE.MeshBasicMaterial
-      cylinder.scale.y = Math.max(0.05, this.rtgRatio)
+    // Power indicators — scale + color based on RTG level, slide out during ADS
+    for (const indicator of this.powerIndicators) {
+      const mat = indicator.cylinder.material as THREE.MeshBasicMaterial
+      indicator.cylinder.scale.z = Math.max(0.05, this.rtgRatio)
       if (this.rtgRatio > 0.5) {
         mat.color.setHex(0x00ff00)
       } else if (this.rtgRatio > 0.2) {
@@ -273,6 +276,10 @@ export class MultiToolController implements Tickable {
       } else {
         mat.color.setHex(0xff0000)
       }
+      // Slide sideways during ADS so indicators are visible while zoomed
+      const targetZ = this.aiming ? 4.0 : 0
+      indicator.slideZ += (targetZ - indicator.slideZ) * Math.min(1, 8 * dt)
+      indicator.node.position.z = indicator.baseZ + indicator.slideZ
     }
   }
 
