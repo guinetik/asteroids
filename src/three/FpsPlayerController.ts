@@ -158,6 +158,11 @@ export class FpsPlayerController implements Tickable {
     return this._deathTimer
   }
 
+  /** Total death timer duration in seconds (for progress calculation). */
+  get deathTimerTotal(): number {
+    return this.config.o2.deathTimerSeconds
+  }
+
   /**
    * Apply a lateral impulse directly to velocity (for testing / external forces).
    *

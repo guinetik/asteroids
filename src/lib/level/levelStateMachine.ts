@@ -9,10 +9,13 @@
 import { StateMachine } from '@/lib/stateMachine'
 
 /** All possible states for an asteroid level. */
-export type LevelState = 'arrival' | 'lander' | 'eva' | 'exfil' | 'complete' | 'failed'
+export type LevelState = 'arrival' | 'lander' | 'eva' | 'dead' | 'exfil' | 'complete' | 'failed'
 
 /** Duration of the arrival cutscene in seconds. */
 export const ARRIVAL_DURATION = 3.0
+
+/** Seconds to hold on the death screen before redirecting. */
+export const DEAD_SCREEN_DURATION = 3.0
 
 /** Distance threshold for entering the lander on foot (world units). */
 export const LANDER_INTERACT_RANGE = 15
@@ -61,7 +64,12 @@ export function createLevelStateMachine(
             target: 'lander',
             guard: () => isNearLander(),
           },
+          die: 'dead',
         },
+      },
+      dead: {
+        duration: DEAD_SCREEN_DURATION,
+        next: 'failed',
       },
       exfil: {},
       complete: {},

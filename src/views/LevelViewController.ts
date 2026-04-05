@@ -131,6 +131,9 @@ export class LevelViewController implements Tickable {
   /** Called each frame during EVA state with FPS telemetry. */
   onFpsTelemetry: ((telemetry: FpsTelemetry) => void) | null = null
 
+  /** Called each frame with death fade opacity (0 = clear, 1 = black). */
+  onDeathFade: ((opacity: number) => void) | null = null
+
   /** Initialise all systems and start the game loop. */
   async init(container: HTMLElement): Promise<void> {
     const playerConfig = playerConfigJson as FpsPlayerConfig
@@ -200,6 +203,9 @@ export class LevelViewController implements Tickable {
       this.heightmap,
     )
     this.playerController.group.visible = false
+    this.playerController.onDeath = () => {
+      this.stateMachine?.trigger('die')
+    }
     this.sceneManager.addToScene(this.playerController.group)
 
     // ── Multi-tool ──────────────────────────────────────────────
@@ -270,6 +276,12 @@ export class LevelViewController implements Tickable {
         break
       case 'eva':
         this.enterEva()
+        break
+      case 'dead':
+        this.enterDead()
+        break
+      case 'failed':
+        this.enterFailed()
         break
     }
   }
@@ -391,6 +403,22 @@ export class LevelViewController implements Tickable {
   }
 
   // ═══════════════════════════════════════════════════════════════
+  // Dead / Failed states
+  // ═══════════════════════════════════════════════════════════════
+
+  private enterDead(): void {
+    // Full black fade
+    this.onDeathFade?.(1)
+  }
+
+  private enterFailed(): void {
+    // Navigate to map after a beat
+    import('@/router').then(({ default: router }) => {
+      router.push('/map')
+    })
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // Per-frame tick
   // ═══════════════════════════════════════════════════════════════
 
@@ -411,6 +439,15 @@ export class LevelViewController implements Tickable {
     // EVA: feed inputs to tool + camera
     if (this.stateMachine?.is('eva')) {
       this.tickEva(dt)
+
+      // Death fade — opacity ramps from 0 to 1 over the death timer
+      if (this.playerController?.deathTimer !== null) {
+        const total = this.playerController!.deathTimerTotal
+        const remaining = this.playerController!.deathTimer!
+        this.onDeathFade?.(1 - remaining / total)
+      } else {
+        this.onDeathFade?.(0)
+      }
     }
 
     // Broadcast state info for HUD

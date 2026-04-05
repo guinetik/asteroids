@@ -11,6 +11,7 @@ const container = ref<HTMLElement>()
 const viewController = new LevelViewController()
 const letterboxVisible = ref(true)
 const stateInfo = reactive({ state: '', grounded: false })
+const deathFade = ref(0)
 
 const landerTelemetry = reactive<LanderTelemetry>({
   altitude: 0,
@@ -54,6 +55,9 @@ onMounted(async () => {
     viewController.onFpsTelemetry = (t) => {
       Object.assign(fpsTelemetry, t)
     }
+    viewController.onDeathFade = (opacity) => {
+      deathFade.value = opacity
+    }
     await viewController.init(container.value)
   }
 })
@@ -81,6 +85,11 @@ onUnmounted(() => {
   >
     <span class="exit-prompt__text">EXIT (F)</span>
   </div>
+  <div
+    v-if="deathFade > 0"
+    class="death-fade"
+    :style="{ opacity: deathFade }"
+  />
 </template>
 
 <style>
@@ -120,5 +129,12 @@ onUnmounted(() => {
   background: rgba(0, 0, 0, 0.5);
   padding: 0.4rem 1.2rem;
   border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.death-fade {
+  position: fixed;
+  inset: 0;
+  background: black;
+  z-index: 50;
+  pointer-events: none;
 }
 </style>
