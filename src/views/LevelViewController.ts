@@ -440,9 +440,7 @@ export class LevelViewController implements Tickable {
     this.leftMouseJustPressed = false
     this.rightMouseDown = false
 
-    // Full black + death message
-    this.onDeathFade?.(1)
-    this.onDeathMessage?.(true)
+    // Fade + message are driven by the dead state tick, not set here
   }
 
   private enterFailed(): void {
@@ -488,12 +486,26 @@ export class LevelViewController implements Tickable {
       }
     }
 
-    // Dead: pitch camera toward ground
+    // Dead: camera drops, screen fades, message appears
     if (this.stateMachine?.is('dead') && this.fpsCamera) {
-      const DEATH_PITCH_SPEED = 0.8
-      const DEATH_PITCH_TARGET = -1.2 // ~70 degrees down
+      const DEATH_PITCH_SPEED = 1.2
+      const DEATH_PITCH_TARGET = -1.4 // ~80 degrees down
+      const FADE_DURATION = 2.0 // seconds to full black
+      const MESSAGE_DELAY = 1.5 // seconds before showing YOU DIED
+
+      // Camera drops
       if (this.fpsCamera.pitch > DEATH_PITCH_TARGET) {
         this.fpsCamera.pitch -= DEATH_PITCH_SPEED * dt
+      }
+
+      // Gradual fade to black
+      const elapsed = this.stateMachine.stateTime
+      const fadeProgress = Math.min(1, elapsed / FADE_DURATION)
+      this.onDeathFade?.(fadeProgress)
+
+      // Show message after delay
+      if (elapsed >= MESSAGE_DELAY) {
+        this.onDeathMessage?.(true)
       }
     }
 
