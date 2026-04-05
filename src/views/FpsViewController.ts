@@ -95,6 +95,9 @@ export class FpsViewController implements Tickable {
   /** Called each frame with damage flash opacity (0 = clear, >0 = red vignette). */
   onDamageFlash: ((opacity: number) => void) | null = null
 
+  /** Called on contact damage with screen-space angle (radians, 0 = top). */
+  onDamageDirection: ((angle: number) => void) | null = null
+
   private damageFlashTimer = 0
 
   async init(container: HTMLElement): Promise<void> {
@@ -204,7 +207,7 @@ export class FpsViewController implements Tickable {
     // Enemies — ?enemies=true spawns bacteriophages around the player
     if (params.has('enemies')) {
       this.enemyDirector = new EnemyDirector()
-      this.enemyDirector.onContactDamage = (_handle, damage) => {
+      this.enemyDirector.onContactDamage = (handle, damage) => {
         this.playerController?.takeDamage(damage)
         this.damageFlashTimer = DAMAGE_FLASH_DURATION
         // Camera flinch — random pitch/yaw jolt
@@ -213,6 +216,12 @@ export class FpsViewController implements Tickable {
             (Math.random() - 0.5) * DAMAGE_FLINCH_STRENGTH,
             -Math.random() * DAMAGE_FLINCH_STRENGTH,
           )
+          // Directional indicator — angle from player facing to enemy
+          const pp = this.playerController!.group.position
+          const ep = handle.enemy.position
+          const worldAngle = Math.atan2(ep.x - pp.x, ep.z - pp.z)
+          const relAngle = worldAngle - this.fpsCamera.yaw
+          this.onDamageDirection?.(relAngle)
         }
       }
       this.tickHandler.register(this.enemyDirector, TICK_PRIORITY_PHYSICS + 4)
