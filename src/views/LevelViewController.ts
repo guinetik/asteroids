@@ -476,11 +476,17 @@ export class LevelViewController implements Tickable {
     if (this.stateMachine?.is('eva')) {
       this.tickEva(dt)
 
-      // Death fade — opacity ramps as HP drops (starts fading below 50% HP)
+      // Hypoxia visual — fade + pulse when O2 is empty and HP is draining
+      const o2Empty = this.playerController!.o2Level <= 0
       const hpRatio = this.playerController!.hp / this.playerController!.maxHp
-      if (hpRatio < 0.5) {
-        // Map 0.5→0 HP ratio to 0→1 opacity
-        this.onDeathFade?.(1 - hpRatio * 2)
+      if (o2Empty) {
+        // Base fade from HP loss (0% HP → 0.7 opacity, 100% HP → 0)
+        const baseFade = (1 - hpRatio) * 0.7
+        // Breathing pulse that gets faster as HP drops
+        const pulseSpeed = 2 + (1 - hpRatio) * 4 // 2 Hz at full HP → 6 Hz near death
+        const pulse = Math.sin(performance.now() * 0.001 * pulseSpeed * Math.PI * 2)
+        const pulseAmount = 0.08 + (1 - hpRatio) * 0.12 // subtle at first, stronger near death
+        this.onDeathFade?.(Math.min(1, baseFade + pulse * pulseAmount))
       } else {
         this.onDeathFade?.(0)
       }
