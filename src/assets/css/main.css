@@ -139,3 +139,24 @@
   50% { opacity: 0.5; }
 }
 
+.death-overlay {
+  @apply fixed inset-0 z-50 flex flex-col items-center justify-center;
+  background: rgba(0, 0, 0, 0.6);
+  animation: death-fade-in 1s ease-out;
+}
+
+.death-overlay-cause {
+  @apply text-red-500 text-4xl font-bold font-mono tracking-widest uppercase;
+  text-shadow: 0 0 20px rgba(239, 68, 68, 0.8), 0 0 40px rgba(239, 68, 68, 0.4);
+}
+
+.death-overlay-restart {
+  @apply mt-8 px-8 py-3 border border-red-500 text-red-400 font-mono text-lg uppercase tracking-wider cursor-pointer;
+  @apply hover:bg-red-500/20 transition-colors;
+}
+
+@keyframes death-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+

@@ -25,8 +25,8 @@ describe('OrbitCaptureSystem', () => {
   let bodyB: CaptureBody
 
   beforeEach(() => {
-    // displayRadius=0.1 → captureRadius = max(0.1*50*8, 1.0) = 40
-    // displayRadius=0.1 → orbitRadius   = max(0.1*50*1.8, 0.5) = 9
+    // displayRadius=0.1 → captureRadius = max(0.1*80*20, 1.0) = 160
+    // displayRadius=0.1 → orbitRadius   = max(0.1*80*1.8, 0.5) = 14.4
     bodyA = makeBody('Alpha', 0, 0, 0.1)
     bodyB = makeBody('Beta', 1000, 0, 0.1)
     system = new OrbitCaptureSystem([bodyA, bodyB])
@@ -36,13 +36,13 @@ describe('OrbitCaptureSystem', () => {
 
   describe('findNearestInRange', () => {
     it('returns null when shuttle is out of capture range of all bodies', () => {
-      // captureRadius for 0.1 display = 40. Position at 500 from Alpha (at origin)
+      // captureRadius for 0.1 display = 160. Position at 500 from Alpha (at origin)
       const result = system.findNearestInRange(500, 0)
       expect(result).toBeNull()
     })
 
     it('returns the body when shuttle is within capture range', () => {
-      // Within 40 units of Alpha at (0,0)
+      // Within 160 units of Alpha at (0,0)
       const result = system.findNearestInRange(20, 0)
       expect(result).not.toBeNull()
       expect(result!.name).toBe('Alpha')
@@ -51,7 +51,7 @@ describe('OrbitCaptureSystem', () => {
     it('returns the closest body when multiple bodies are in range', () => {
       // Place both bodies close together
       const closeBodyA = makeBody('Close Alpha', 0, 0, 0.1)
-      const closeBodyB = makeBody('Close Beta', 30, 0, 0.1) // 30 units away, within 40 capture radius
+      const closeBodyB = makeBody('Close Beta', 30, 0, 0.1) // 30 units away, within 160 capture radius
       const sys = new OrbitCaptureSystem([closeBodyA, closeBodyB])
       // Shuttle at (25, 0) — 25 from Alpha, 5 from Beta → Beta is closer
       const result = sys.findNearestInRange(25, 0)
@@ -94,23 +94,23 @@ describe('OrbitCaptureSystem', () => {
     it('transitions approaching -> orbiting when shuttle is at orbit radius', () => {
       system.beginCapture(20, 0)
       expect(system.state).toBe('approaching')
-      // orbitRadius = 15. Place shuttle exactly at orbitRadius from Alpha (at 0,0).
-      // 15 * 1.0 = 15, within 15% tolerance: [12.75, 17.25]
-      const arrived = system.checkArrival(9, 0)
+      // orbitRadius = 14.4. Place shuttle at orbitRadius from Alpha (at 0,0).
+      // Within 15% tolerance: [12.24, 16.56]
+      const arrived = system.checkArrival(14.4, 0)
       expect(arrived).toBe(true)
       expect(system.state).toBe('orbiting')
     })
 
     it('does not arrive when shuttle is too far from orbit radius', () => {
       system.beginCapture(20, 0)
-      // 40 units away — orbit radius is 15, far outside tolerance
-      const arrived = system.checkArrival(40, 0)
+      // 100 units away — orbit radius is 14.4, far outside tolerance
+      const arrived = system.checkArrival(100, 0)
       expect(arrived).toBe(false)
       expect(system.state).toBe('approaching')
     })
 
     it('does nothing when state is free', () => {
-      const arrived = system.checkArrival(9, 0)
+      const arrived = system.checkArrival(14.4, 0)
       expect(arrived).toBe(false)
       expect(system.state).toBe('free')
     })
@@ -121,7 +121,7 @@ describe('OrbitCaptureSystem', () => {
   describe('launchSlingshot', () => {
     it('returns a velocity and transitions orbiting -> free', () => {
       system.beginCapture(20, 0)
-      system.checkArrival(9, 0)
+      system.checkArrival(14.4, 0)
       expect(system.state).toBe('orbiting')
 
       const vel = system.launchSlingshot(0, 0.016)
@@ -132,7 +132,7 @@ describe('OrbitCaptureSystem', () => {
 
     it('returns non-zero slingshot speed', () => {
       system.beginCapture(20, 0)
-      system.checkArrival(9, 0)
+      system.checkArrival(14.4, 0)
       // Tick orbit a bit to build up planet delta tracking
       system.tickOrbit(0.016)
       system.tickOrbit(0.016)
@@ -147,7 +147,7 @@ describe('OrbitCaptureSystem', () => {
   describe('tickOrbit', () => {
     it('returns orbit position offset from planet center while orbiting', () => {
       system.beginCapture(20, 0)
-      system.checkArrival(9, 0)
+      system.checkArrival(14.4, 0)
       const pos = system.tickOrbit(0.016)
       expect(pos).not.toBeNull()
       expect(pos).toHaveProperty('x')

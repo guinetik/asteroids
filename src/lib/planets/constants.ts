@@ -11,10 +11,10 @@
  */
 
 /** Scale factor: scene orbit units to Three.js world units. */
-export const ORBIT_SCALE = 0.1
+export const ORBIT_SCALE = 0.5
 
 /** Scale factor: body display sizes. Sun radius ~1.375, Earth ~0.385. */
-export const SIZE_SCALE = 50.0
+export const SIZE_SCALE = 80.0
 
 /** Default simulation speed multiplier. */
 export const DEFAULT_TIME_SCALE = 5.0

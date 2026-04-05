@@ -5,6 +5,7 @@ import { MapViewController } from './MapViewController'
 import ShuttleHud from '@/components/ShuttleHud.vue'
 import OrbitPrompt from '@/components/OrbitPrompt.vue'
 import GravityWarning from '@/components/GravityWarning.vue'
+import DeathOverlay from '@/components/DeathOverlay.vue'
 import type { ShuttleTelemetry, GravityWarningState } from '@/lib/ShuttleTelemetry'
 import type { OrbitHudState } from '@/lib/orbitCapture'
 
@@ -37,6 +38,8 @@ const gravityWarning = reactive<GravityWarningState>({
   bodyName: null,
   visible: false,
 })
+const deathVisible = ref(false)
+const deathCause = ref('')
 
 onMounted(async () => {
   if (container.value) {
@@ -49,6 +52,10 @@ onMounted(async () => {
     viewController.onGravityWarning = (w) => {
       Object.assign(gravityWarning, w)
     }
+    viewController.onDeathOverlay = (visible, cause) => {
+      deathVisible.value = visible
+      deathCause.value = cause
+    }
     await viewController.init(container.value)
   }
 })
@@ -56,6 +63,10 @@ onMounted(async () => {
 onUnmounted(() => {
   viewController.dispose()
 })
+
+function handleRestart() {
+  viewController.restart()
+}
 </script>
 
 <template>
@@ -63,4 +74,5 @@ onUnmounted(() => {
   <ShuttleHud :telemetry="telemetry" />
   <OrbitPrompt :orbitState="orbitState" />
   <GravityWarning :warning="gravityWarning" />
+  <DeathOverlay :visible="deathVisible" :cause="deathCause" @restart="handleRestart" />
 </template>

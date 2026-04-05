@@ -69,7 +69,7 @@ const GRID_MASS_THRESHOLD = 1e-5
 const MAP_SHUTTLE_SCALE = 0.01
 
 /** Offset behind Earth so the shuttle doesn't overlap the planet mesh. */
-const SPAWN_OFFSET_BEHIND_EARTH = 1.5
+const SPAWN_OFFSET_BEHIND_EARTH = 7.5
 
 /** Duration in seconds for the approach animation lerp. */
 const APPROACH_DURATION = 1.5
@@ -163,6 +163,9 @@ export class MapViewController implements Tickable {
   /** Called each frame with gravity warning state for HUD. */
   onGravityWarning: ((state: GravityWarningState) => void) | null = null
 
+  /** Called when shuttle dies — shows death overlay. */
+  onDeathOverlay: ((visible: boolean, cause: string) => void) | null = null
+
   async init(container: HTMLElement): Promise<void> {
     // Create canvas
     const canvas = document.createElement('canvas')
@@ -249,7 +252,7 @@ export class MapViewController implements Tickable {
     }
 
     this.shuttleController.onDeath = () => {
-      this.respawnAtEarth()
+      this.onDeathOverlay?.(true, 'Solar Radiation')
     }
 
     await this.shuttleController.load()
@@ -721,6 +724,13 @@ export class MapViewController implements Tickable {
    * Compute gravity proximity for a single source (0 = at influence edge, 1 = at event horizon).
    * Returns 0 if outside influence radius.
    */
+  /** Reset shuttle after death — clear death state, place into Earth orbit. */
+  /** Called by Vue when the player clicks Restart on the death overlay. */
+  restart(): void {
+    this.respawnAtEarth()
+    this.onDeathOverlay?.(false, '')
+  }
+
   /** Reset shuttle after death — clear death state, place into Earth orbit. */
   private respawnAtEarth(): void {
     if (!this.shuttleController || !this.orbitSystem) return
