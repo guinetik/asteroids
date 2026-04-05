@@ -274,6 +274,10 @@ export class MapViewController implements Tickable {
       )
     }
 
+    // Render shuttle after Sun corona so opaque shuttle pixels overwrite additive glow
+    this.shuttleController.group.traverse((child) => {
+      child.renderOrder = 10
+    })
     scene.add(this.shuttleController.group)
     this.vehicleCamera.setTarget(this.shuttleController.group)
     this.tickHandler.register(this.shuttleController, TICK_PRIORITY_PHYSICS)
