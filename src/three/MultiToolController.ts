@@ -139,6 +139,11 @@ export class MultiToolController implements Tickable {
     scene.add(this.model)
   }
 
+  /** Show or hide the multi-tool model. */
+  setVisible(visible: boolean): void {
+    if (this.model) this.model.visible = visible
+  }
+
   /**
    * Feed current player state for movement bob and holster tilt.
    *

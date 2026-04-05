@@ -196,11 +196,13 @@ export class LevelViewController implements Tickable {
       playerConfig,
       this.heightmap,
     )
+    this.playerController.group.visible = false
     this.sceneManager.addToScene(this.playerController.group)
 
     // ── Multi-tool ──────────────────────────────────────────────
     this.multiTool = new MultiToolController()
     await this.multiTool.load(this.fpsCamera.camera, this.sceneManager.scene)
+    this.multiTool.setVisible(false)
     this.multiToolState = new MultiToolState(multiToolConfigJson as MultiToolConfig)
 
     // ── Projectile system + particles ───────────────────────────
@@ -335,6 +337,10 @@ export class LevelViewController implements Tickable {
       landerPos.z,
     )
 
+    // Show EVA visuals
+    this.playerController!.group.visible = true
+    this.multiTool!.setVisible(true)
+
     // Register EVA tickables
     this.tickHandler!.register(this.playerController!, TICK_PRIORITY_PHYSICS)
     this.tickHandler!.register(this.multiToolState!, TICK_PRIORITY_PHYSICS + 1)
@@ -354,6 +360,10 @@ export class LevelViewController implements Tickable {
   }
 
   private exitEva(): void {
+    // Hide EVA visuals
+    this.playerController!.group.visible = false
+    this.multiTool!.setVisible(false)
+
     // Unregister EVA tickables
     this.tickHandler!.unregister(this.playerController!)
     this.tickHandler!.unregister(this.multiToolState!)
