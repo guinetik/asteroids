@@ -22,7 +22,7 @@ const LEG_SEGMENTS = 12
 const HIT_FLASH_DURATION = 0.08
 const HIT_RECOIL_DURATION = 0.25
 const HIT_RECOIL_INTENSITY = 0.15
-const DEATH_DELAY_MS = 300
+const DEATH_ANIM_DURATION = 1.2
 
 /**
  * Y offset from group origin to body center (in world units).
@@ -100,12 +100,17 @@ export class BacteriophageController implements Tickable {
   private flashTimer = 0
   private recoilTimer = 0
   private dead = false
+  private deathTimer = 0
   private disposed = false
 
   /** Current visual state — set by VC from director output. */
   isMoving = false
   /** Current agitation state — set by VC from director output. */
   isAgitated = false
+  /** True once the death animation has fully completed. */
+  get deathComplete(): boolean {
+    return this.dead && this.deathTimer >= DEATH_ANIM_DURATION
+  }
 
   constructor(enemy: Enemy) {
     this.enemy = enemy
@@ -272,6 +277,12 @@ export class BacteriophageController implements Tickable {
     this.elapsed += dt
     const t = this.elapsed + this.timeOffset
 
+    // --- Death animation (overrides normal animation) ---
+    if (this.dead) {
+      this.tickDeath(dt, t)
+      return
+    }
+
     // --- Body animation ---
     if (this.isMoving) {
       this.bodyGroup.position.y = 0.8 + Math.sin(t * 8) * 0.03
@@ -316,6 +327,75 @@ export class BacteriophageController implements Tickable {
     }
   }
 
+  /**
+   * Animated death — legs curl inward progressively, body sinks and tilts,
+   * core flickers, whole thing shrinks and fades out.
+   */
+  private tickDeath(dt: number, t: number): void {
+    this.deathTimer += dt
+    const progress = Math.min(1, this.deathTimer / DEATH_ANIM_DURATION)
+
+    // Ease-in curve for organic collapse
+    const ease = progress * progress
+
+    // --- Body sinks + tilts over ---
+    this.bodyGroup.position.y = 0.8 * (1 - ease)
+    this.bodyGroup.rotation.x = ease * 1.2 + Math.sin(t * 15) * 0.1 * (1 - ease)
+    this.bodyGroup.rotation.z = ease * 0.4 + Math.sin(t * 12) * 0.08 * (1 - ease)
+
+    // --- Legs curl inward progressively ---
+    for (const leg of this.legs) {
+      const cx = Math.cos(leg.angle)
+      const cz = Math.sin(leg.angle)
+
+      // Interpolate from current rest pose to collapsed
+      const legSpread = 1.2 * (1 - ease) // legs pull inward
+      const legHeight = 0.8 * (1 - ease) // hip drops
+      const footDrop = -0.3 * ease // feet curl under
+
+      const hip = new THREE.Vector3(cx * 0.3, legHeight, cz * 0.3)
+      const knee = new THREE.Vector3(
+        cx * (0.3 + legSpread * 0.4),
+        legHeight * 0.5 + Math.sin(t * 8 + leg.phase) * 0.03 * (1 - ease),
+        cz * (0.3 + legSpread * 0.4),
+      )
+      const foot = new THREE.Vector3(
+        cx * legSpread,
+        footDrop,
+        cz * legSpread,
+      )
+
+      const curve = new THREE.QuadraticBezierCurve3(hip, knee, foot)
+      leg.mesh.geometry.dispose()
+      leg.mesh.geometry = new THREE.TubeGeometry(curve, LEG_SEGMENTS, LEG_TUBE_RADIUS, 4, false)
+    }
+
+    // --- Reset head flash during death ---
+    if (this.flashTimer > 0) {
+      this.flashTimer -= dt
+      if (this.flashTimer <= 0) {
+        this.head.material = headMat
+      }
+    }
+
+    // --- Core flickers and dies ---
+    const flicker = Math.random() > progress ? 1 : 0
+    this.core.scale.setScalar((1 - ease) * flicker)
+    this.light.intensity = (1 - ease) * 2 * flicker
+
+    // --- Whole group shrinks in the final third ---
+    if (progress > 0.6) {
+      const shrinkProgress = (progress - 0.6) / 0.4
+      const scale = PHAGE_SCALE * (1 - shrinkProgress * 0.6)
+      this.group.scale.setScalar(scale)
+    }
+
+    // --- Remove from scene when animation completes ---
+    if (progress >= 1) {
+      this.group.removeFromParent()
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // Hit / death
   // ═══════════════════════════════════════════════════════════════
@@ -327,29 +407,12 @@ export class BacteriophageController implements Tickable {
     this.head.material = flashMat
   }
 
-  /** Death animation — collapse legs, flash core, remove after delay. */
+  /** Trigger death — animation is driven by tickDeath(). */
   private die(): void {
     this.dead = true
-
-    // Collapse legs inward
-    for (const leg of this.legs) {
-      const curve = new THREE.QuadraticBezierCurve3(
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, 0.1, 0),
-        new THREE.Vector3(0, -0.2, 0),
-      )
-      leg.mesh.geometry.dispose()
-      leg.mesh.geometry = new THREE.TubeGeometry(curve, LEG_SEGMENTS, LEG_TUBE_RADIUS, 4, false)
-    }
-
-    // Flash core + light spike
-    this.core.material = flashMat
-    this.light.intensity = 2
-
-    // Remove from scene after brief delay
-    setTimeout(() => {
-      this.group.removeFromParent()
-    }, DEATH_DELAY_MS)
+    this.deathTimer = 0
+    this.flashTimer = HIT_FLASH_DURATION
+    this.head.material = flashMat
   }
 
   /** Clean up all geometry and materials. */

@@ -247,14 +247,12 @@ export class FpsViewController implements Tickable {
       this.projectileSystem!.onEnemyHit = (enemy, pos) => {
         existingOnEnemyHit?.call(this.projectileSystem, enemy, pos)
         // Find matching controller and flash it
-        for (const [id, ctrl] of this.enemyControllers) {
+        for (const [, ctrl] of this.enemyControllers) {
           if (ctrl.enemy === enemy) {
             ctrl.flash()
             if (!enemy.alive) {
-              // Enemy died — clean up
-              this.tickHandler!.unregister(ctrl)
+              // Stop further projectile hits — death anim handles cleanup
               this.projectileSystem!.removeEnemy(enemy)
-              this.enemyControllers.delete(id)
             }
             break
           }
@@ -342,9 +340,19 @@ export class FpsViewController implements Tickable {
       this.enemyDirector.setPlayerPosition(pp.x, pp.y, pp.z)
 
       for (const handle of this.enemyDirector.enemies) {
-        if (!handle.enemy.alive) continue
         const ctrl = this.enemyControllers.get(handle.id)
         if (!ctrl) continue
+
+        // Clean up controllers that finished their death animation
+        if (ctrl.deathComplete) {
+          this.tickHandler!.unregister(ctrl)
+          this.enemyControllers.delete(handle.id)
+          this.enemyDirector!.despawn(handle)
+          continue
+        }
+
+        // Dead enemies keep ticking (death anim) but don't sync position
+        if (!handle.enemy.alive) continue
 
         // Sync visual state from behavior
         ctrl.isMoving = handle.lastOutput.isMoving
