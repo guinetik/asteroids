@@ -44,19 +44,19 @@ export class SceneManager implements Tickable {
     container.appendChild(this.renderer.domElement)
   }
 
-  /** Connect a vehicle camera for rendering. */
-  setCamera(camera: VehicleCamera): void {
+  /** Connect a vehicle camera for rendering. Pass null to clear. */
+  setCamera(camera: VehicleCamera | null): void {
     this.vehicleCamera = camera
-    if (this.container) {
+    if (camera && this.container) {
       const { clientWidth, clientHeight } = this.container
       camera.resize(clientWidth, clientHeight)
     }
   }
 
-  /** Set a raw perspective camera for rendering (FPS mode). */
-  setActiveCamera(camera: THREE.PerspectiveCamera): void {
+  /** Set a raw perspective camera for rendering (FPS mode). Pass null to clear. */
+  setActiveCamera(camera: THREE.PerspectiveCamera | null): void {
     this.directCamera = camera
-    if (this.container) {
+    if (camera && this.container) {
       const { clientWidth, clientHeight } = this.container
       camera.aspect = clientWidth / clientHeight
       camera.updateProjectionMatrix()
