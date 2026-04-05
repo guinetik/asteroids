@@ -77,6 +77,9 @@ const APPROACH_DURATION = 1.5
 /** Seconds to fully charge slingshot (0 → 1). */
 const SLINGSHOT_CHARGE_TIME = 2.0
 
+/** Seconds without fuel in free flight before game over (adrift). */
+const ADRIFT_TIMEOUT = 60
+
 /** Maximum arrow length at full charge (in shuttle local space, pre-scale). */
 const ARROW_MAX_LENGTH = 300
 const ARROW_COLOR_SAFE = 0x00ffff
@@ -153,6 +156,7 @@ export class MapViewController implements Tickable {
   private portalArrival: PortalArrivalSequence | null = null
   private boundarySystem: PortalBoundarySystem | null = null
   private gravityPass: ShaderPass | null = null
+  private adriftTimer = 0
 
   /** Called each frame with full shuttle telemetry for HUD display. */
   onTelemetry: ((telemetry: ShuttleTelemetry) => void) | null = null
@@ -581,6 +585,22 @@ export class MapViewController implements Tickable {
       this.onOrbitState(hudState)
     }
 
+    // Adrift check — 60s with no fuel in free flight = game over
+    if (this.shuttleController && !this.shuttleController.dead) {
+      const orbitState = this.orbitSystem?.state ?? 'free'
+      const hasFuel = this.shuttleController.thrusterSystem.fuelLevel > 0
+      if (orbitState === 'free' && !hasFuel) {
+        this.adriftTimer += dt
+        if (this.adriftTimer >= ADRIFT_TIMEOUT) {
+          this.vehicleCamera?.setConfig(MAP_DEATH_CAMERA_CONFIG)
+          this.onDeathOverlay?.(true, 'Adrift')
+          this.shuttleController.freeze()
+        }
+      } else {
+        this.adriftTimer = 0
+      }
+    }
+
     // Gravity proximity — VFX distortion + HUD warning
     // Only active in free flight (not during orbit capture)
     if (this.shuttleController && this.gravityPass) {
@@ -782,6 +802,7 @@ export class MapViewController implements Tickable {
     this.slingshotCharge = 0
     this.hideLaunchArrow()
     this.yRecovery = false
+    this.adriftTimer = 0
   }
 
   /**
