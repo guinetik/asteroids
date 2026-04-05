@@ -34,7 +34,7 @@ const DUMMY_CONFIG: EnemyConfig = {
 export class TargetDummyController implements Tickable {
   readonly group = new THREE.Group()
   readonly enemy: Enemy
-  private readonly material: THREE.MeshBasicMaterial
+  private readonly material: THREE.LineBasicMaterial
   private readonly baseColor = new THREE.Color(0xcccccc)
   private flashTimer = 0
   private dead = false
@@ -45,29 +45,31 @@ export class TargetDummyController implements Tickable {
     this.enemy.position.copy(position)
     this.enemy.position.y = position.y + TARGET_HEIGHT / 2
 
-    // Target board — flat box
-    const geometry = new THREE.BoxGeometry(TARGET_SIZE, TARGET_HEIGHT, 0.15)
-    this.material = new THREE.MeshBasicMaterial({ color: this.baseColor, side: THREE.DoubleSide })
-    const board = new THREE.Mesh(geometry, this.material)
+    // Target board — wireframe square (black edges, no fill)
+    const boardGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(TARGET_SIZE, TARGET_HEIGHT, 0.05))
+    this.material = new THREE.LineBasicMaterial({ color: this.baseColor })
+    const board = new THREE.LineSegments(boardGeo, this.material)
     this.group.add(board)
 
-    // Bullseye rings — concentric circles on the front face
-    const ringColors = [0xff0000, 0xffffff, 0xff0000, 0xffffff, 0xff0000]
+    // Bullseye rings — wireframe circles, alternating colors
+    const ringColors = [0xff4444, 0xffaa00, 0xff4444, 0xffaa00, 0xff4444]
     const ringRadii = [1.2, 0.95, 0.7, 0.45, 0.2]
     for (let i = 0; i < ringRadii.length; i++) {
-      const ring = new THREE.Mesh(
-        new THREE.CircleGeometry(ringRadii[i]!, 16),
-        new THREE.MeshBasicMaterial({ color: ringColors[i]!, side: THREE.DoubleSide }),
+      const ringGeo = new THREE.EdgesGeometry(new THREE.CircleGeometry(ringRadii[i]!, 24))
+      const ring = new THREE.LineSegments(
+        ringGeo,
+        new THREE.LineBasicMaterial({ color: ringColors[i]! }),
       )
-      ring.position.z = 0.08
+      ring.position.z = 0.03
       ring.position.y = 0.3
       this.group.add(ring)
     }
 
-    // Post/stand
-    const post = new THREE.Mesh(
-      new THREE.BoxGeometry(0.15, TARGET_HEIGHT, 0.15),
-      new THREE.MeshBasicMaterial({ color: 0x665544 }),
+    // Post — wireframe pole
+    const postGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(0.1, TARGET_HEIGHT, 0.1))
+    const post = new THREE.LineSegments(
+      postGeo,
+      new THREE.LineBasicMaterial({ color: 0x665544 }),
     )
     post.position.y = -TARGET_HEIGHT / 2
     this.group.add(post)
@@ -108,7 +110,7 @@ export class TargetDummyController implements Tickable {
 
   dispose(): void {
     this.group.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
+      if (child instanceof THREE.Mesh || child instanceof THREE.LineSegments) {
         child.geometry.dispose()
         ;(child.material as THREE.Material).dispose()
       }
