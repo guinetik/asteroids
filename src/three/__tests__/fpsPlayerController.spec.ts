@@ -83,23 +83,24 @@ describe('FpsPlayerController', () => {
     expect(ctrl.o2Level).toBeLessThan(before)
   })
 
-  it('death timer starts when o2 is empty', () => {
+  it('hypoxia drains HP when o2 is empty', () => {
     const { ctrl } = createController()
-    // Drain all O2 — use large dt to exhaust quickly regardless of config
+    const initialHp = ctrl.hp
+    // Drain all O2
     for (let i = 0; i < 500; i++) ctrl.tick(1.0)
     expect(ctrl.o2Level).toBe(0)
-    expect(ctrl.deathTimer).not.toBeNull()
+    expect(ctrl.hp).toBeLessThan(initialHp)
   })
 
-  it('death timer counts down to zero', () => {
+  it('death fires when HP reaches zero from hypoxia', () => {
     const { ctrl } = createController()
-    // Drain O2 with small steps to stop right after it empties
-    while (ctrl.o2Level > 0) ctrl.tick(0.1)
-    expect(ctrl.deathTimer).not.toBeNull()
-    const timer = ctrl.deathTimer!
-    expect(timer).toBeGreaterThan(0)
-    ctrl.tick(1.0)
-    expect(ctrl.deathTimer!).toBeLessThan(timer)
+    let died = false
+    ctrl.onDeath = () => { died = true }
+    // Drain O2 then keep ticking until HP hits 0
+    for (let i = 0; i < 1000; i++) ctrl.tick(1.0)
+    expect(ctrl.hp).toBe(0)
+    expect(ctrl.isDead).toBe(true)
+    expect(died).toBe(true)
   })
 
   it('ground friction decelerates lateral velocity', () => {

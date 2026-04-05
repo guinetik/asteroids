@@ -50,7 +50,7 @@ const JUMP_TILT = 0.3
 
 /** ADS offset — gun moves to center screen. */
 const ADS_OFFSET_X = 0.0
-const ADS_OFFSET_Y = -0.3
+const ADS_OFFSET_Y = -0.35
 const ADS_OFFSET_Z = -0.50
 /** How fast the gun lerps to ADS position (per second). */
 const ADS_LERP_SPEED = 12

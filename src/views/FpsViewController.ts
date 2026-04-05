@@ -264,13 +264,14 @@ export class FpsViewController implements Tickable {
     if (this.playerController && this.onTelemetry) {
       const ts = this.playerController.thrusterSystem
       this.onTelemetry({
+        hp: this.playerController.hp,
+        maxHp: this.playerController.maxHp,
         o2Level: this.playerController.o2Level,
         o2Capacity: this.playerController.o2Capacity,
         sprintCharge: ts.getState('sprint').charge,
         sprintCapacity: ts.getState('sprint').capacity,
         speed: this.playerController.speed,
         grounded: this.playerController.grounded,
-        deathTimer: this.playerController.deathTimer,
         activeMode: this.multiToolState?.mode ?? 'drill',
         aiming: this.multiToolState?.aiming ?? false,
         isFiring: this.multiToolState?.isFiring ?? false,

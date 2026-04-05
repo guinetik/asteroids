@@ -1,4 +1,8 @@
 {
+  "health": {
+    "maxHp": 100,
+    "hypoxiaDamagePerSecond": 1
+  },
   "movement": {
     "moveThrust": 35.0,
     "sprintMultiplier": 2.0,

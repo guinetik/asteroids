@@ -2,6 +2,10 @@
 <script setup lang="ts">
 /** Telemetry data from FpsPlayerController for HUD display. */
 export interface FpsTelemetry {
+  /** Current hit points */
+  hp: number
+  /** Maximum hit points */
+  maxHp: number
   /** Current O2 remaining */
   o2Level: number
   /** Maximum O2 capacity */
@@ -14,8 +18,6 @@ export interface FpsTelemetry {
   speed: number
   /** Whether player is on the ground */
   grounded: boolean
-  /** Death timer seconds remaining, or null if not active */
-  deathTimer: number | null
   /** Active multi-tool mode */
   activeMode: 'drill' | 'weapon' | 'heal'
   /** Whether player is aiming (ADS) */
@@ -58,8 +60,20 @@ function modeColor(): string {
 
 <template>
   <div class="fixed inset-0 pointer-events-none font-mono text-white/90">
-    <!-- O2 Bar -->
+    <!-- Health Bar -->
     <div class="absolute top-4 left-4 flex items-center gap-2">
+      <span class="text-xs tracking-widest uppercase text-red-400/80 w-8">HP</span>
+      <div class="w-40 h-3 bg-white/10 rounded-sm overflow-hidden">
+        <div
+          class="h-full bg-red-500 transition-all duration-100"
+          :style="{ width: pct(telemetry.hp, telemetry.maxHp) + '%' }"
+        />
+      </div>
+      <span class="text-xs text-white/60 w-8 text-right">{{ Math.ceil(telemetry.hp) }}</span>
+    </div>
+
+    <!-- O2 Bar -->
+    <div class="absolute top-12 left-4 flex items-center gap-2">
       <span class="text-xs tracking-widest uppercase text-white/60 w-8">O2</span>
       <div class="w-40 h-3 bg-white/10 rounded-sm overflow-hidden">
         <div
@@ -71,7 +85,7 @@ function modeColor(): string {
     </div>
 
     <!-- Sprint Bar -->
-    <div class="absolute top-12 left-4 flex items-center gap-2">
+    <div class="absolute top-20 left-4 flex items-center gap-2">
       <span class="text-xs tracking-widest uppercase text-white/60 w-8">STA</span>
       <div class="w-32 h-2 bg-white/10 rounded-sm overflow-hidden">
         <div
@@ -82,7 +96,7 @@ function modeColor(): string {
     </div>
 
     <!-- RTG Bar -->
-    <div class="absolute top-[4.5rem] left-4 flex items-center gap-2">
+    <div class="absolute top-[6.5rem] left-4 flex items-center gap-2">
       <span class="text-xs tracking-widest uppercase text-yellow-400/60 w-8">RTG</span>
       <div class="w-32 h-2 bg-white/10 rounded-sm overflow-hidden">
         <div
@@ -121,13 +135,6 @@ function modeColor(): string {
       <span class="text-xs text-white/60 w-8 text-right">{{ telemetry.speed.toFixed(1) }}</span>
     </div>
 
-    <!-- Death Timer -->
-    <div
-      v-if="telemetry.deathTimer !== null"
-      class="absolute top-1/3 left-1/2 -translate-x-1/2 text-4xl text-red-500 animate-pulse tracking-widest"
-    >
-      {{ Math.ceil(telemetry.deathTimer) }}s
-    </div>
 
     <!-- Action Bar -->
     <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1">

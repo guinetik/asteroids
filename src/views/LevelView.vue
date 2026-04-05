@@ -27,13 +27,14 @@ const landerTelemetry = reactive<LanderTelemetry>({
 })
 
 const fpsTelemetry = reactive<FpsTelemetry>({
+  hp: 100,
+  maxHp: 100,
   o2Level: 100,
   o2Capacity: 100,
   sprintCharge: 50,
   sprintCapacity: 50,
   speed: 0,
   grounded: false,
-  deathTimer: null,
   activeMode: 'drill',
   aiming: false,
   isFiring: false,

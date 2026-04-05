@@ -32,6 +32,13 @@ export type FpsThrusterName = 'sprint' | 'jump'
 
 /** Shape of the player-config.json file. */
 export interface FpsPlayerConfig {
+  /** Health system configuration. */
+  health: {
+    /** Maximum hit points. */
+    maxHp: number
+    /** HP lost per second while O2 is empty. */
+    hypoxiaDamagePerSecond: number
+  }
   /** Lateral movement tuning. */
   movement: {
     /** Thrust magnitude applied per frame while moving (units/s²). */
@@ -103,12 +110,13 @@ export class FpsPlayerController implements Tickable {
   private readonly config: FpsPlayerConfig
   private readonly heightmap: Heightmap
   private readonly lateralVelocity = new THREE.Vector3()
-  private _deathTimer: number | null = null
+  private _hp: number
+  private _dead = false
   private _aiming = false
   /** Coyote timer — time since last grounded, allows late jumps. */
   private coyoteTimer = 0
 
-  /** Fired when death timer expires. */
+  /** Fired when health reaches zero. */
   onDeath: (() => void) | null = null
 
   constructor(
@@ -122,6 +130,7 @@ export class FpsPlayerController implements Tickable {
     this.config = config
     this.heightmap = heightmap
 
+    this._hp = config.health.maxHp
     this.body = new PlatformerBody({ gravity: config.movement.gravity })
 
     const tsConfig: ThrusterSystemConfig<FpsThrusterName> = {
@@ -153,14 +162,19 @@ export class FpsPlayerController implements Tickable {
     return Math.sqrt(vx * vx + vz * vz)
   }
 
-  /** Death timer seconds remaining, or null if not active. */
-  get deathTimer(): number | null {
-    return this._deathTimer
+  /** Current hit points. */
+  get hp(): number {
+    return this._hp
   }
 
-  /** Total death timer duration in seconds (for progress calculation). */
-  get deathTimerTotal(): number {
-    return this.config.o2.deathTimerSeconds
+  /** Maximum hit points. */
+  get maxHp(): number {
+    return this.config.health.maxHp
+  }
+
+  /** Whether the player is dead. */
+  get isDead(): boolean {
+    return this._dead
   }
 
   /**
@@ -169,10 +183,25 @@ export class FpsPlayerController implements Tickable {
    * @param x - X velocity to add (units/s)
    * @param z - Z velocity to add (units/s)
    */
-  /** Restore O2, stamina, and clear death timer (e.g. returning to lander). */
+  /**
+   * Apply damage to the player. Fires onDeath when HP reaches zero.
+   *
+   * @param amount - HP to subtract
+   */
+  takeDamage(amount: number): void {
+    if (this._dead) return
+    this._hp = Math.max(0, this._hp - amount)
+    if (this._hp <= 0) {
+      this._dead = true
+      this.onDeath?.()
+    }
+  }
+
+  /** Restore O2, stamina, and health (e.g. returning to lander). */
   replenish(): void {
     this.thrusterSystem.refuel()
-    this._deathTimer = null
+    this._hp = this.config.health.maxHp
+    this._dead = false
   }
 
   /** Set ADS state — affects strafe speed. */
@@ -232,19 +261,9 @@ export class FpsPlayerController implements Tickable {
     // --- Base O2 drain (breathing) ---
     this.thrusterSystem.consumeFuel(this.config.o2.baseDrainRate * dt)
 
-    // --- Death timer ---
-    if (this.thrusterSystem.isFuelEmpty) {
-      if (this._deathTimer === null) {
-        this._deathTimer = this.config.o2.deathTimerSeconds
-      }
-      this._deathTimer -= dt
-      if (this._deathTimer <= 0) {
-        this._deathTimer = 0
-        this.onDeath?.()
-      }
-    } else if (this._deathTimer !== null) {
-      // O2 restored — cancel timer
-      this._deathTimer = null
+    // --- Hypoxia: no O2 → lose HP ---
+    if (this.thrusterSystem.isFuelEmpty && !this._dead) {
+      this.takeDamage(this.config.health.hypoxiaDamagePerSecond * dt)
     }
 
     // --- Lateral movement ---

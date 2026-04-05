@@ -248,6 +248,15 @@ export class LevelViewController implements Tickable {
     // ── Arrival state starts with lander physics + cinematic cam ─
     this.enterArrival()
 
+    // ── Dev tools ────────────────────────────────────────────────
+    ;(window as unknown as Record<string, unknown>).AsteroidDev = {
+      takeDamage: (amount = 10) => this.playerController?.takeDamage(amount),
+      heal: () => {
+        this.playerController?.replenish()
+      },
+      kill: () => this.playerController?.takeDamage(999),
+    }
+
     // ── Start ───────────────────────────────────────────────────
     this.gameLoop = new GameLoop(this.tickHandler)
     this.gameLoop.start()
@@ -440,11 +449,11 @@ export class LevelViewController implements Tickable {
     if (this.stateMachine?.is('eva')) {
       this.tickEva(dt)
 
-      // Death fade — opacity ramps from 0 to 1 over the death timer
-      if (this.playerController?.deathTimer !== null) {
-        const total = this.playerController!.deathTimerTotal
-        const remaining = this.playerController!.deathTimer!
-        this.onDeathFade?.(1 - remaining / total)
+      // Death fade — opacity ramps as HP drops (starts fading below 50% HP)
+      const hpRatio = this.playerController!.hp / this.playerController!.maxHp
+      if (hpRatio < 0.5) {
+        // Map 0.5→0 HP ratio to 0→1 opacity
+        this.onDeathFade?.(1 - hpRatio * 2)
       } else {
         this.onDeathFade?.(0)
       }
@@ -478,13 +487,14 @@ export class LevelViewController implements Tickable {
       if (currentState === 'eva' && this.onFpsTelemetry && this.playerController) {
         const ts = this.playerController.thrusterSystem
         this.onFpsTelemetry({
+          hp: this.playerController.hp,
+          maxHp: this.playerController.maxHp,
           o2Level: this.playerController.o2Level,
           o2Capacity: this.playerController.o2Capacity,
           sprintCharge: ts.getState('sprint').charge,
           sprintCapacity: ts.getState('sprint').capacity,
           speed: this.playerController.speed,
           grounded: this.playerController.grounded,
-          deathTimer: this.playerController.deathTimer,
           activeMode: this.multiToolState?.mode ?? 'drill',
           aiming: this.multiToolState?.aiming ?? false,
           isFiring: this.multiToolState?.isFiring ?? false,
