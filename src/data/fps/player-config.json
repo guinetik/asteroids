@@ -29,7 +29,7 @@
     }
   },
   "camera": {
-    "eyeHeight": 1.7,
+    "eyeHeight": 2.8,
     "sensitivity": 0.002,
     "pitchClamp": 1.48,
     "fov": 75
