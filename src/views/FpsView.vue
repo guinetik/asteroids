@@ -13,6 +13,8 @@ const damageDir = ref<number | null>(null)
 const damageDirTimer = ref(0)
 
 const DAMAGE_DIR_DURATION = 0.6
+const SLICE_COUNT = 12
+const SLICE_ANGLE = (Math.PI * 2) / SLICE_COUNT
 
 let lastRaf = 0
 function tickDamageDir() {
@@ -33,39 +35,103 @@ requestAnimationFrame((t) => {
 })
 
 /**
- * Compute the damage vignette background.
- * Base: centered radial vignette (always present during flash).
- * Directional: gradient biased toward the damage source — the red
- * edge is thicker on the side the hit came from.
+ * Build 12 pizza-slice SVG paths arranged in a ring.
+ * Each slice is a wedge from innerRadius to outerRadius.
+ * The center is hollow (masked by the inner circle gap).
  */
-const damageBackground = computed(() => {
-  if (damageFlash.value <= 0 && damageDir.value === null) return 'none'
+const OUTER_R = 500
+const INNER_R = 220
+const CX = 500
+const CY = 500
 
-  const layers: string[] = []
-  const baseAlpha = damageFlash.value * 0.5
+interface SlicePath {
+  d: string
+  index: number
+}
 
-  // Directional layer — shift gradient center away from the hit direction
-  // so the red is thickest on the side the damage came from.
-  if (damageDir.value !== null) {
-    const dirAlpha = (damageDirTimer.value / DAMAGE_DIR_DURATION) * 0.7
-    // angle: 0 = ahead, PI/2 = right, PI = behind, -PI/2 = left
-    // CSS percentages: shift gradient center opposite the damage direction
-    const angle = damageDir.value + Math.PI // flip to point toward source
-    const shiftX = 50 + Math.sin(angle) * 45 // 5%–95% range
-    const shiftY = 50 + Math.cos(angle) * 45
-    layers.push(
-      `radial-gradient(ellipse at ${shiftX}% ${shiftY}%, transparent 20%, rgba(255, 0, 0, ${dirAlpha}) 100%)`,
-    )
+const slicePaths = computed<SlicePath[]>(() => {
+  const paths: SlicePath[] = []
+  for (let i = 0; i < SLICE_COUNT; i++) {
+    // Slice i covers angle range [startAngle, endAngle]
+    // 0 = top of screen (12 o'clock), clockwise
+    const startAngle = i * SLICE_ANGLE - Math.PI / 2
+    const endAngle = (i + 1) * SLICE_ANGLE - Math.PI / 2
+
+    const cos1 = Math.cos(startAngle)
+    const sin1 = Math.sin(startAngle)
+    const cos2 = Math.cos(endAngle)
+    const sin2 = Math.sin(endAngle)
+
+    // Outer arc points
+    const ox1 = CX + cos1 * OUTER_R
+    const oy1 = CY + sin1 * OUTER_R
+    const ox2 = CX + cos2 * OUTER_R
+    const oy2 = CY + sin2 * OUTER_R
+
+    // Inner arc points
+    const ix1 = CX + cos1 * INNER_R
+    const iy1 = CY + sin1 * INNER_R
+    const ix2 = CX + cos2 * INNER_R
+    const iy2 = CY + sin2 * INNER_R
+
+    // SVG path: outer arc → line to inner → inner arc back → close
+    const d = [
+      `M ${ox1} ${oy1}`,
+      `A ${OUTER_R} ${OUTER_R} 0 0 1 ${ox2} ${oy2}`,
+      `L ${ix2} ${iy2}`,
+      `A ${INNER_R} ${INNER_R} 0 0 0 ${ix1} ${iy1}`,
+      'Z',
+    ].join(' ')
+
+    paths.push({ d, index: i })
+  }
+  return paths
+})
+
+/**
+ * Compute opacity for each slice based on damage direction.
+ * The slice aligned with the damage source gets full intensity,
+ * neighbors get partial, rest get nothing.
+ */
+function sliceOpacity(sliceIndex: number): number {
+  if (damageDir.value === null) return 0
+
+  const fadeProgress = damageDirTimer.value / DAMAGE_DIR_DURATION
+
+  // Normalize damage angle to [0, 2PI] — 0 = ahead/top
+  // damageDir is relative angle where 0 = ahead, positive = right
+  // We need to flip it to point toward the source (+ PI)
+  let hitAngle = damageDir.value + Math.PI
+  // Normalize to [0, 2PI]
+  hitAngle = ((hitAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)
+
+  // Which slice does this angle fall in?
+  const sliceCenterAngle = (sliceIndex + 0.5) * SLICE_ANGLE
+
+  // Angular distance between slice center and hit angle
+  let delta = Math.abs(hitAngle - sliceCenterAngle)
+  if (delta > Math.PI) delta = Math.PI * 2 - delta
+
+  // Primary slice: full intensity. Neighbors: falloff.
+  // 1 slice away = 0.4, 2 slices away = 0.1, beyond = 0
+  const slicesDist = delta / SLICE_ANGLE
+  let intensity = 0
+  if (slicesDist < 0.5) {
+    intensity = 1.0
+  } else if (slicesDist < 1.5) {
+    intensity = 0.4
+  } else if (slicesDist < 2.5) {
+    intensity = 0.1
   }
 
-  // Base vignette layer — always centered
-  if (baseAlpha > 0) {
-    layers.push(
-      `radial-gradient(ellipse at center, transparent 40%, rgba(255, 0, 0, ${baseAlpha}))`,
-    )
-  }
+  return intensity * fadeProgress * 0.85
+}
 
-  return layers.join(', ')
+/** Base vignette — low opacity, centered, always during flash. */
+const baseVignette = computed(() => {
+  if (damageFlash.value <= 0) return 'none'
+  const alpha = damageFlash.value * 0.35
+  return `radial-gradient(ellipse at center, transparent 50%, rgba(255, 0, 0, ${alpha}))`
 })
 
 const telemetry = reactive<FpsTelemetry>({
@@ -115,11 +181,26 @@ function resumeLock() {
 <template>
   <div ref="container" class="scene-container"></div>
   <FpsHud :telemetry="telemetry" />
+  <!-- Base damage vignette — faint red ring -->
   <div
-    v-if="damageFlash > 0 || damageDir !== null"
+    v-if="damageFlash > 0"
     class="fixed inset-0 pointer-events-none z-45"
-    :style="{ background: damageBackground }"
+    :style="{ background: baseVignette }"
   />
+  <!-- Directional damage ring — pizza slices around screen edge -->
+  <svg
+    v-if="damageDir !== null"
+    class="damage-ring"
+    viewBox="0 0 1000 1000"
+    preserveAspectRatio="none"
+  >
+    <path
+      v-for="slice in slicePaths"
+      :key="slice.index"
+      :d="slice.d"
+      :fill="`rgba(255, 20, 20, ${sliceOpacity(slice.index)})`"
+    />
+  </svg>
   <div
     v-if="!pointerLocked"
     class="fixed inset-0 flex items-center justify-center bg-black/60 cursor-pointer z-50"
@@ -128,3 +209,14 @@ function resumeLock() {
     <span class="text-lg text-white/80 font-mono tracking-widest uppercase">Click to resume</span>
   </div>
 </template>
+
+<style>
+.damage-ring {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 45;
+  pointer-events: none;
+}
+</style>
