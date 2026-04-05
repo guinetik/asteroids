@@ -24,12 +24,34 @@ const INFLUENCE_RADIUS_SCALE = 400
 const EVENT_HORIZON_SCALE = 230
 
 /**
+ * Optional tuning overrides for gravity calculations.
+ * When omitted, functions use the module-level defaults
+ * (calibrated for the shuttle scene).
+ *
+ * @author guinetik
+ * @date 2026-04-05
+ */
+export interface GravityConfig {
+  /** Gravitational constant (default 500000) */
+  gravityConstant: number
+  /** Minimum distance to prevent infinite force (default 15) */
+  minDistance: number
+  /** Influence radius multiplier on sqrt(mass) (default 400) */
+  influenceScale: number
+  /** Event horizon radius multiplier on sqrt(mass) (default 230) */
+  eventHorizonScale: number
+}
+
+/**
  * Any object that has mass and position can be a gravity source.
  * This is the minimal contract — no rendering, no Three.js.
  */
 export interface GravitySource {
-  readonly mass: number // solar masses (M☉)
+  /** Mass in solar masses (M☉) */
+  readonly mass: number
+  /** World X position */
   getWorldX(): number
+  /** World Z position */
   getWorldZ(): number
 }
 
@@ -37,40 +59,56 @@ export interface GravitySource {
  * Computed gravity pull result in the XZ plane.
  */
 export interface GravityVector {
-  ax: number // acceleration X
-  az: number // acceleration Z
+  /** Acceleration along the X axis */
+  ax: number
+  /** Acceleration along the Z axis */
+  az: number
 }
 
 /**
  * Calculate the influence radius for a body of given mass.
  * This is where gravity becomes "significant" for gameplay.
+ *
+ * @param mass - Body mass in solar masses
+ * @param config - Optional config overrides; uses module defaults when omitted
  */
-export function influenceRadius(mass: number): number {
-  return INFLUENCE_RADIUS_SCALE * Math.sqrt(mass)
+export function influenceRadius(mass: number, config?: GravityConfig): number {
+  const scale = config?.influenceScale ?? INFLUENCE_RADIUS_SCALE
+  return scale * Math.sqrt(mass)
 }
 
 /**
  * Event horizon radius — point of no return.
  * Inspired by Schwarzschild radius rs = 2GM/c², scaled for gameplay.
+ *
+ * @param mass - Body mass in solar masses
+ * @param config - Optional config overrides; uses module defaults when omitted
  */
-export function eventHorizonRadius(mass: number): number {
-  return EVENT_HORIZON_SCALE * Math.sqrt(mass)
+export function eventHorizonRadius(mass: number, config?: GravityConfig): number {
+  const scale = config?.eventHorizonScale ?? EVENT_HORIZON_SCALE
+  return scale * Math.sqrt(mass)
 }
 
 /**
  * Check if a point has crossed any source's event horizon.
  * Returns the first source crossed, or null.
+ *
+ * @param sources - Array of gravity sources to test
+ * @param px - Query point X
+ * @param pz - Query point Z
+ * @param config - Optional config overrides; uses module defaults when omitted
  */
 export function checkEventHorizon(
   sources: GravitySource[],
   px: number,
   pz: number,
+  config?: GravityConfig,
 ): GravitySource | null {
   for (const source of sources) {
     const dx = source.getWorldX() - px
     const dz = source.getWorldZ() - pz
     const dist = Math.sqrt(dx * dx + dz * dz)
-    if (dist < eventHorizonRadius(source.mass)) {
+    if (dist < eventHorizonRadius(source.mass, config)) {
       return source
     }
   }
@@ -87,6 +125,7 @@ export function checkEventHorizon(
  * @param mass - Source mass in solar masses
  * @param px - Query point X
  * @param pz - Query point Z
+ * @param config - Optional config overrides; uses module defaults when omitted
  * @returns Acceleration vector pointing toward the source
  */
 export function gravityAt(
@@ -95,38 +134,52 @@ export function gravityAt(
   mass: number,
   px: number,
   pz: number,
+  config?: GravityConfig,
 ): GravityVector {
+  const minDist = config?.minDistance ?? MIN_GRAVITY_DISTANCE
+  const G = config?.gravityConstant ?? GRAVITY_CONSTANT
+
   const dx = sourceX - px
   const dz = sourceZ - pz
-  const dist = Math.max(Math.sqrt(dx * dx + dz * dz), MIN_GRAVITY_DISTANCE)
+  const rawDist = Math.sqrt(dx * dx + dz * dz)
+  const clampedDist = Math.max(rawDist, minDist)
 
-  const radius = influenceRadius(mass)
+  const radius = influenceRadius(mass, config)
 
   // Zero pull outside influence radius, full 1/r² inside
-  if (dist >= radius) {
+  if (clampedDist >= radius) {
     return { ax: 0, az: 0 }
   }
 
-  const forceMag = (GRAVITY_CONSTANT * mass) / (dist * dist)
-  const nx = dx / dist
-  const nz = dz / dist
+  const forceMag = (G * mass) / (clampedDist * clampedDist)
+
+  // Normalize direction using rawDist; fall back to clampedDist if source and point coincide
+  const normDist = rawDist > 0 ? rawDist : clampedDist
+  const nx = dx / normDist
+  const nz = dz / normDist
 
   return { ax: nx * forceMag, az: nz * forceMag }
 }
 
 /**
  * Sum gravitational acceleration from multiple sources at a point.
+ *
+ * @param sources - Array of gravity sources
+ * @param px - Query point X
+ * @param pz - Query point Z
+ * @param config - Optional config overrides; uses module defaults when omitted
  */
 export function totalGravityAt(
   sources: GravitySource[],
   px: number,
   pz: number,
+  config?: GravityConfig,
 ): GravityVector {
   let ax = 0
   let az = 0
 
   for (const source of sources) {
-    const g = gravityAt(source.getWorldX(), source.getWorldZ(), source.mass, px, pz)
+    const g = gravityAt(source.getWorldX(), source.getWorldZ(), source.mass, px, pz, config)
     ax += g.ax
     az += g.az
   }
