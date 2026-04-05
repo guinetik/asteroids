@@ -41,6 +41,7 @@ const WANDER_PAUSE_MAX = 3.0
 const WEAVE_AMPLITUDE = 0.25
 const WEAVE_FREQUENCY = 1.5
 
+/** Internal state for aggro behavior — idle wander or chase player. */
 type AggroState = 'idle' | 'chase'
 
 /**

@@ -59,6 +59,7 @@ const headGeo = new THREE.IcosahedronGeometry(0.4, 0)
 const coreGeo = new THREE.TorusKnotGeometry(0.12, 0.02, 64, 4)
 const ringGeo = new THREE.TorusGeometry(0.32, 0.02, 4, 8)
 
+/** Per-leg state for animation — mesh, radial angle, and gait phase offset. */
 interface LegData {
   mesh: THREE.Mesh
   angle: number

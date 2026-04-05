@@ -36,7 +36,6 @@ import { TargetDummyController } from '@/three/TargetDummyController'
 import playerConfigJson from '@/data/fps/player-config.json'
 import multiToolConfigJson from '@/data/fps/multitool-config.json'
 import { EnemyDirector } from '@/lib/fps/enemyDirector'
-import type { EnemyHandle } from '@/lib/fps/enemyDirector'
 import { BacteriophageController } from '@/three/BacteriophageController'
 
 const AMBIENT_LIGHT_INTENSITY = 0.4
