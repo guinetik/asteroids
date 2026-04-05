@@ -4,7 +4,8 @@ import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { MapViewController } from './MapViewController'
 import ShuttleHud from '@/components/ShuttleHud.vue'
 import OrbitPrompt from '@/components/OrbitPrompt.vue'
-import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
+import GravityWarning from '@/components/GravityWarning.vue'
+import type { ShuttleTelemetry, GravityWarningState } from '@/lib/ShuttleTelemetry'
 import type { OrbitHudState } from '@/lib/orbitCapture'
 
 const container = ref<HTMLElement>()
@@ -31,6 +32,11 @@ const orbitState = reactive<OrbitHudState>({
   chargeLevel: 0,
   inspectMode: false,
 })
+const gravityWarning = reactive<GravityWarningState>({
+  proximity: 0,
+  bodyName: null,
+  visible: false,
+})
 
 onMounted(async () => {
   if (container.value) {
@@ -39,6 +45,9 @@ onMounted(async () => {
     }
     viewController.onOrbitState = (s) => {
       Object.assign(orbitState, s)
+    }
+    viewController.onGravityWarning = (w) => {
+      Object.assign(gravityWarning, w)
     }
     await viewController.init(container.value)
   }
@@ -53,4 +62,5 @@ onUnmounted(() => {
   <div ref="container" class="scene-container"></div>
   <ShuttleHud :telemetry="telemetry" />
   <OrbitPrompt :orbitState="orbitState" />
+  <GravityWarning :warning="gravityWarning" />
 </template>

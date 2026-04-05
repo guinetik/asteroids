@@ -13,7 +13,7 @@
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import type { Tickable } from '@/lib/Tickable'
-import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
+import type { ShuttleTelemetry, GravityWarningState } from '@/lib/ShuttleTelemetry'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'
@@ -34,7 +34,7 @@ import { AsteroidBeltController } from '@/three/controllers/AsteroidBeltControll
 import { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
 import * as THREE from 'three'
 import { OrbitCaptureSystem, type OrbitHudState } from '@/lib/orbitCapture'
-import { gravityAt, type GravityConfig } from '@/lib/physics/gravity'
+import { gravityAt, influenceRadius, eventHorizonRadius, type GravityConfig } from '@/lib/physics/gravity'
 import type { GravityWell } from '@/three/ShuttleController'
 import type { GravitySource } from '@/lib/physics/gravity'
 import { ShuttleController, MAP_PHYSICS } from '@/three/ShuttleController'
@@ -44,6 +44,8 @@ import { VehicleCamera, MAP_CAMERA_CONFIG, MAP_ORBIT_CAMERA_CONFIG, MAP_INSPECT_
 import orbitConfig from '@/data/shuttle/orbit-capture.json'
 import { PortalArrivalSequence } from '@/three/PortalArrivalSequence'
 import { PortalBoundarySystem } from '@/three/PortalBoundarySystem'
+import { createGravityDistortionPass } from '@/three/GravityDistortionPass'
+import type { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { VibePortal } from '@/lib/portal'
 
 /** Tick priority for the compositor (runs after animation, before render). */
@@ -150,12 +152,16 @@ export class MapViewController implements Tickable {
   private inspectMode = false
   private portalArrival: PortalArrivalSequence | null = null
   private boundarySystem: PortalBoundarySystem | null = null
+  private gravityPass: ShaderPass | null = null
 
   /** Called each frame with full shuttle telemetry for HUD display. */
   onTelemetry: ((telemetry: ShuttleTelemetry) => void) | null = null
 
   /** Called each frame with orbit-capture HUD state. */
   onOrbitState: ((state: OrbitHudState) => void) | null = null
+
+  /** Called each frame with gravity warning state for HUD. */
+  onGravityWarning: ((state: GravityWarningState) => void) | null = null
 
   async init(container: HTMLElement): Promise<void> {
     // Create canvas
@@ -343,6 +349,13 @@ export class MapViewController implements Tickable {
       tick: (dt: number) => this.tickOrrery(dt),
     }
     this.tickHandler.register(orreryTickable, TICK_PRIORITY_ANIMATION)
+
+    // --- Gravity distortion post-processing ---
+    this.gravityPass = createGravityDistortionPass(
+      mapGravityData.lensStrength,
+      mapGravityData.chromStrength,
+    )
+    this.sceneObjects.composer.addPass(this.gravityPass)
 
     // --- Compositor: renders via EffectComposer ---
     const compositorTickable: Tickable = {
@@ -560,6 +573,74 @@ export class MapViewController implements Tickable {
       hudState.inspectMode = this.inspectMode
       this.onOrbitState(hudState)
     }
+
+    // Gravity proximity — VFX distortion + HUD warning
+    // Only active in free flight (not during orbit capture)
+    if (this.shuttleController && this.gravityPass) {
+      const orbitState = this.orbitSystem?.state ?? 'free'
+      if (orbitState === 'free' && !this.shuttleController.dead) {
+        const px = this.shuttleController.position.x
+        const pz = this.shuttleController.position.z
+        let maxProximity = 0
+        let nearestSourceX = 0
+        let nearestSourceZ = 0
+        let nearestName: string | null = null
+
+        // Check Sun
+        if (this.sunController) {
+          const prox = this.computeProximity(
+            this.sunController.getWorldX(),
+            this.sunController.getWorldZ(),
+            this.sunController.mass,
+            px, pz,
+          )
+          if (prox > maxProximity) {
+            maxProximity = prox
+            nearestSourceX = this.sunController.getWorldX()
+            nearestSourceZ = this.sunController.getWorldZ()
+            nearestName = 'Sun'
+          }
+        }
+
+        // Check planets
+        for (let i = 0; i < this.planetControllers.length; i++) {
+          const c = this.planetControllers[i]!
+          const prox = this.computeProximity(c.getWorldX(), c.getWorldZ(), c.mass, px, pz)
+          if (prox > maxProximity) {
+            maxProximity = prox
+            nearestSourceX = c.getWorldX()
+            nearestSourceZ = c.getWorldZ()
+            nearestName = PLANETS[i]?.name ?? null
+          }
+        }
+
+        // Update shader uniforms
+        this.gravityPass.uniforms.proximity!.value = maxProximity
+        if (maxProximity > 0 && this.vehicleCamera) {
+          const sourceWorld = new THREE.Vector3(nearestSourceX, 0, nearestSourceZ)
+          const projected = sourceWorld.project(this.vehicleCamera.camera)
+          this.gravityPass.uniforms.sourceUV!.value.set(
+            (projected.x + 1) * 0.5,
+            (projected.y + 1) * 0.5,
+          )
+        }
+
+        // Emit HUD warning
+        if (this.onGravityWarning) {
+          this.onGravityWarning({
+            proximity: maxProximity,
+            bodyName: nearestName,
+            visible: maxProximity > 0,
+          })
+        }
+      } else {
+        // Not in free state or dead — clear effects
+        this.gravityPass.uniforms.proximity!.value = 0
+        if (this.onGravityWarning) {
+          this.onGravityWarning({ proximity: 0, bodyName: null, visible: false })
+        }
+      }
+    }
   }
 
   /**
@@ -635,6 +716,23 @@ export class MapViewController implements Tickable {
         }
       }
     }
+  }
+
+  /**
+   * Compute gravity proximity for a single source (0 = at influence edge, 1 = at event horizon).
+   * Returns 0 if outside influence radius.
+   */
+  private computeProximity(
+    sourceX: number, sourceZ: number, mass: number,
+    px: number, pz: number,
+  ): number {
+    const dx = sourceX - px
+    const dz = sourceZ - pz
+    const dist = Math.sqrt(dx * dx + dz * dz)
+    const influence = influenceRadius(mass, MAP_GRAVITY_CONFIG)
+    const horizon = eventHorizonRadius(mass, MAP_GRAVITY_CONFIG)
+    if (dist >= influence) return 0
+    return Math.min(1, 1 - (dist - horizon) / (influence - horizon))
   }
 
   /** Returns true if the shuttle is aiming toward the captured planet. */
