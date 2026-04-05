@@ -241,8 +241,8 @@ export class MapViewController implements Tickable {
     // --- Space-time grid (gravity well visualization) ---
     const kuiperOuterEdge = 2400 * ORBIT_SCALE
     const gridSize = kuiperOuterEdge * 2.2
-    const gridDepthScale = 40
-    const gridWidthScale = 150
+    const gridDepthScale = 80
+    const gridWidthScale = 40
     const gridMassExponent = 0.2
     this.spaceTimeGrid = new SpaceTimeGrid(gridSize, 400, gridDepthScale, gridWidthScale, gridMassExponent)
     scene.add(this.spaceTimeGrid.mesh)
