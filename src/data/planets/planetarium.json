@@ -1,7 +1,7 @@
 {
   "sun": {
     "name": "Sun",
-    "displayRadius": 0.045,
+    "displayRadius": 0.15,
     "rotationSpeed": 0.2474,
     "mass": 1,
     "shader": {
