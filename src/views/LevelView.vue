@@ -1,16 +1,20 @@
 <!-- src/views/LevelView.vue -->
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { LevelViewController } from './LevelViewController'
 
 const container = ref<HTMLElement>()
 const viewController = new LevelViewController()
 const letterboxVisible = ref(true)
+const stateInfo = reactive({ state: '', grounded: false })
 
 onMounted(async () => {
   if (container.value) {
     viewController.onLetterbox = (visible) => {
       letterboxVisible.value = visible
+    }
+    viewController.onStateInfo = (info) => {
+      Object.assign(stateInfo, info)
     }
     await viewController.init(container.value)
   }
@@ -31,6 +35,12 @@ onUnmounted(() => {
     class="letterbox-bar letterbox-bar--bottom"
     :class="{ 'letterbox-bar--hidden': !letterboxVisible }"
   />
+  <div
+    v-if="stateInfo.state === 'lander' && stateInfo.grounded"
+    class="exit-prompt"
+  >
+    <span class="exit-prompt__text">EXIT (F)</span>
+  </div>
 </template>
 
 <style>
@@ -52,5 +62,23 @@ onUnmounted(() => {
 }
 .letterbox-bar--hidden {
   height: 0;
+}
+.exit-prompt {
+  position: fixed;
+  bottom: 15%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  pointer-events: none;
+}
+.exit-prompt__text {
+  font-family: monospace;
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.8);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 0.4rem 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 </style>

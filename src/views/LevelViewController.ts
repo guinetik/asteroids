@@ -119,6 +119,9 @@ export class LevelViewController implements Tickable {
   /** Called when letterbox visibility should change. */
   onLetterbox: ((visible: boolean) => void) | null = null
 
+  /** Called each frame with current state info for HUD prompts. */
+  onStateInfo: ((info: { state: string; grounded: boolean }) => void) | null = null
+
   /** Initialise all systems and start the game loop. */
   async init(container: HTMLElement): Promise<void> {
     const playerConfig = playerConfigJson as FpsPlayerConfig
@@ -270,6 +273,9 @@ export class LevelViewController implements Tickable {
     this.sceneManager!.setActiveCamera(this.arrivalCamera!)
     this.updateArrivalCamera()
 
+    // Disable orbit controls during arrival
+    this.vehicleCamera!.controls.enabled = false
+
     // Letterbox
     this.onLetterbox?.(true)
   }
@@ -297,6 +303,7 @@ export class LevelViewController implements Tickable {
   private enterLander(): void {
     this.tickHandler!.register(this.landerController!, TICK_PRIORITY_PHYSICS)
     this.tickHandler!.register(this.vehicleCamera!, TICK_PRIORITY_RENDER - 2)
+    this.vehicleCamera!.controls.enabled = true
     this.sceneManager!.setCamera(this.vehicleCamera!)
     this.sceneManager!.setActiveCamera(null)
   }
@@ -304,6 +311,7 @@ export class LevelViewController implements Tickable {
   private exitLander(): void {
     this.tickHandler!.unregister(this.landerController!)
     this.tickHandler!.unregister(this.vehicleCamera!)
+    this.vehicleCamera!.controls.enabled = false
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -364,10 +372,11 @@ export class LevelViewController implements Tickable {
 
   /** Per-frame update — dispatches F key triggers and mode-specific logic. */
   tick(dt: number): void {
-    // F key → state triggers
+    // F key → state triggers (only one can succeed per press)
     if (this.inputManager?.wasActionPressed('interact') && this.stateMachine) {
-      this.stateMachine.trigger('exitVehicle')
-      this.stateMachine.trigger('enterVehicle')
+      if (!this.stateMachine.trigger('exitVehicle')) {
+        this.stateMachine.trigger('enterVehicle')
+      }
     }
 
     // Arrival: track lander with cinematic camera
@@ -378,6 +387,14 @@ export class LevelViewController implements Tickable {
     // EVA: feed inputs to tool + camera
     if (this.stateMachine?.is('eva')) {
       this.tickEva(dt)
+    }
+
+    // Broadcast state info for HUD
+    if (this.onStateInfo && this.stateMachine) {
+      this.onStateInfo({
+        state: this.stateMachine.state ?? '',
+        grounded: this.landerController?.body.grounded ?? false,
+      })
     }
   }
 
