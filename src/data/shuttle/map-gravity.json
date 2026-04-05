@@ -1,8 +1,8 @@
 {
-  "gravityConstant": 0.08,
+  "gravityConstant": 0.5,
   "minDistance": 0.3,
-  "influenceScale": 8,
-  "eventHorizonScale": 1.2,
+  "influenceScale": 80,
+  "eventHorizonScale": 8,
   "lensStrength": 0.08,
   "chromStrength": 0.015
 }
