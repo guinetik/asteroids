@@ -194,11 +194,20 @@ function resumeLock() {
     viewBox="0 0 1000 1000"
     preserveAspectRatio="none"
   >
+    <defs>
+      <radialGradient id="sliceGrad" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="rgb(255, 20, 20)" stop-opacity="0" />
+        <stop offset="44%" stop-color="rgb(255, 20, 20)" stop-opacity="0" />
+        <stop offset="60%" stop-color="rgb(255, 20, 20)" stop-opacity="0.6" />
+        <stop offset="100%" stop-color="rgb(255, 20, 20)" stop-opacity="1" />
+      </radialGradient>
+    </defs>
     <path
       v-for="slice in slicePaths"
       :key="slice.index"
       :d="slice.d"
-      :fill="`rgba(255, 20, 20, ${sliceOpacity(slice.index)})`"
+      fill="url(#sliceGrad)"
+      :opacity="sliceOpacity(slice.index)"
     />
   </svg>
   <div
