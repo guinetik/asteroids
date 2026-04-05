@@ -77,7 +77,7 @@ Implements `Tickable` (tick calls update logic).
 
 **File:** `src/lib/TickHandler.ts`
 
-Add `unregister(tickable: Tickable): void` — removes a tickable from the priority list. Required for swapping lander/EVA systems without destroying them.
+`unregister(tickable: Tickable): void` already exists. No changes needed.
 
 ---
 
