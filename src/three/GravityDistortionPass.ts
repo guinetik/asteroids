@@ -50,9 +50,15 @@ export function createGravityDistortionPass(
       uniform float chromStrength;
       varying vec2 vUv;
 
+      // Linear → sRGB conversion (this pass is last in the chain)
+      vec3 linearToSRGB(vec3 c) {
+        return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c));
+      }
+
       void main() {
         if (proximity < ${PROXIMITY_EPSILON.toFixed(4)}) {
-          gl_FragColor = texture2D(tDiffuse, vUv);
+          vec4 texel = texture2D(tDiffuse, vUv);
+          gl_FragColor = vec4(linearToSRGB(texel.rgb), texel.a);
           return;
         }
 
@@ -73,7 +79,7 @@ export function createGravityDistortionPass(
         float g = texture2D(tDiffuse, lensedUV).g;
         float b = texture2D(tDiffuse, lensedUV - chromDir * chromAmount).b;
 
-        gl_FragColor = vec4(r, g, b, 1.0);
+        gl_FragColor = vec4(linearToSRGB(vec3(r, g, b)), 1.0);
       }
     `,
   }
