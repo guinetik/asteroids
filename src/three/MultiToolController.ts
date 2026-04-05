@@ -23,7 +23,7 @@ import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
 
 /** Position offset from camera origin (right, down, forward). */
 const OFFSET_X = 0.35
-const OFFSET_Y = -0.45
+const OFFSET_Y = -0.5
 const OFFSET_Z = -0.70
 
 const MODEL_SCALE = 0.01
@@ -63,9 +63,12 @@ export class MultiToolController implements Tickable {
   private model: THREE.Group | null = null
   private camera: THREE.PerspectiveCamera | null = null
   private readonly ledMeshes: THREE.Mesh[] = []
+  private triggerLock: THREE.Object3D | null = null
+  private lockRotation = 0
   private scene: THREE.Scene | null = null
   private projectileSystem: ProjectileSystem | null = null
   private boltColor = new THREE.Color('#ff00ff')
+  private currentMode = 'drill'
   private time = 0
   private lateralSpeed = 0
   private sprinting = false
@@ -99,6 +102,9 @@ export class MultiToolController implements Tickable {
         child.material = (child.material as THREE.MeshStandardMaterial).clone()
         this.ledMeshes.push(child)
       }
+      if (child.name === 'pistol_trigger_lock') {
+        this.triggerLock = child
+      }
     })
     scene.add(this.model)
   }
@@ -131,7 +137,8 @@ export class MultiToolController implements Tickable {
    *
    * @param color - Hex color string (e.g. "#3b82f6")
    */
-  setMode(color: string): void {
+  setMode(color: string, mode = 'drill'): void {
+    this.currentMode = mode
     this.boltColor.set(color)
     const ledColor = new THREE.Color(color)
     for (const mesh of this.ledMeshes) {
@@ -210,6 +217,14 @@ export class MultiToolController implements Tickable {
     this.model.rotateX(swayX + this.tilt)
     this.model.rotateY(-Math.PI / 2)
     this.model.rotateZ(swayZ)
+
+    // Trigger lock — unlocked only when drill selected + stationary
+    if (this.triggerLock) {
+      const unlocked = this.currentMode === 'drill' && this.lateralSpeed < 0.1
+      const targetLockRot = unlocked ? -0.5 : 0
+      this.lockRotation += (targetLockRot - this.lockRotation) * Math.min(1, 8 * dt)
+      this.triggerLock.rotation.x = this.lockRotation
+    }
   }
 
   dispose(): void {

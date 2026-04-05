@@ -55,6 +55,7 @@ export class MultiToolState implements Tickable {
   private _isFiring = false
   private _mouseDown = false
   private _mouseJustPressed = false
+  private _speed = 0
   private autoTimer = 0
   private readonly config: MultiToolConfig
 
@@ -109,11 +110,22 @@ export class MultiToolState implements Tickable {
     this._mouseJustPressed = mouseJustPressed
   }
 
+  /** Feed player speed for drill safety lock. */
+  setSpeed(speed: number): void {
+    this._speed = speed
+  }
+
   /** Advance trigger logic by one frame. */
   tick(dt: number): void {
     this._isFiring = false
 
     if (!this._aiming) {
+      this.autoTimer = 0
+      return
+    }
+
+    // Drill safety lock — cannot fire while moving
+    if (this._mode === 'drill' && this._speed > 0.1) {
       this.autoTimer = 0
       return
     }

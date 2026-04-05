@@ -185,15 +185,16 @@ export class FpsViewController implements Tickable {
       if (this.inputManager.wasActionPressed('toolWeapon')) this.multiToolState.setMode('weapon')
       if (this.inputManager.wasActionPressed('toolHeal')) this.multiToolState.setMode('heal')
 
-      // Feed mouse state to tool
+      // Feed mouse state + speed to tool
       this.multiToolState.setAiming(this.rightMouseDown)
       this.multiToolState.setInput(this.leftMouseDown, this.leftMouseJustPressed)
+      this.multiToolState.setSpeed(this.playerController?.speed ?? 0)
       this.leftMouseJustPressed = false
     }
 
     // --- Sync tool visuals ---
     if (this.multiToolState && this.multiTool) {
-      this.multiTool.setMode(this.multiToolState.modeConfig.color)
+      this.multiTool.setMode(this.multiToolState.modeConfig.color, this.multiToolState.mode)
       this.multiTool.setAiming(this.multiToolState.aiming)
       this.playerController?.setAiming(this.multiToolState.aiming)
       if (this.multiToolState.isFiring) {
