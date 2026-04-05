@@ -19,3 +19,13 @@ export interface ShuttleTelemetry {
   rcsCharge: number
   rcsCapacity: number
 }
+
+/** Gravity danger state pushed to the HUD each frame. */
+export interface GravityWarningState {
+  /** 0 = safe (outside influence), 1 = at event horizon */
+  proximity: number
+  /** Name of the nearest massive body, or null if none */
+  bodyName: string | null
+  /** Whether the warning is visible (proximity > 0) */
+  visible: boolean
+}

@@ -112,3 +112,30 @@
   to { opacity: 1; transform: translate(-50%, 0); }
 }
 
+.gravity-warning {
+  @apply absolute top-12 left-1/2 -translate-x-1/2 text-center font-mono pointer-events-none;
+  @apply transition-opacity duration-300;
+}
+
+.gravity-warning-caution {
+  @apply text-yellow-400 text-xs opacity-60;
+  text-shadow: 0 0 4px rgba(234, 179, 8, 0.4);
+}
+
+.gravity-warning-danger {
+  @apply text-orange-400 text-sm font-bold;
+  text-shadow: 0 0 6px rgba(251, 146, 60, 0.6);
+  animation: gravity-pulse 1.2s ease-in-out infinite;
+}
+
+.gravity-warning-critical {
+  @apply text-red-500 text-base font-bold;
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
+  animation: gravity-pulse 0.5s ease-in-out infinite;
+}
+
+@keyframes gravity-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
