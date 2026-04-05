@@ -460,6 +460,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
     this.angularVelocity = 0
     this._slingshotSpeed = 0
     this.group.rotation.set(0, this.group.rotation.y, 0)
+    this.thrusterSystem.refuel()
   }
 
   respawn(): void {
