@@ -35,7 +35,7 @@ export class TerrainMesh implements Tickable {
     this.heightmap = heightmap
 
     const size = heightmap.worldSize
-    const segments = Math.min(heightmap.resolution - 1, 256)
+    const segments = Math.min(heightmap.resolution - 1, 512)
 
     // PlaneGeometry on XZ — Three.js creates it on XY, so we rotate
     this.geometry = new THREE.PlaneGeometry(size, size, segments, segments)

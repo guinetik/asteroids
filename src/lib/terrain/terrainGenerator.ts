@@ -312,7 +312,7 @@ function flatZoneProtection(worldX: number, worldZ: number, flatZones: FlatZone[
 // ---------------------------------------------------------------------------
 
 /** Default flat zone radius for landing/objective areas (world units). */
-const FLAT_ZONE_RADIUS = 80
+const FLAT_ZONE_RADIUS = 300
 
 /** Minimum distance between flat zone centres as a fraction of worldSize. */
 const FLAT_ZONE_MIN_SPACING_FRACTION = 0.25
