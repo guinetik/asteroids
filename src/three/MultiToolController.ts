@@ -23,7 +23,7 @@ import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
 
 /** Position offset from camera origin (right, down, forward). */
 const OFFSET_X = 0.35
-const OFFSET_Y = -0.5
+const OFFSET_Y = -0.35
 const OFFSET_Z = -0.70
 
 const MODEL_SCALE = 0.01
@@ -64,11 +64,11 @@ export class MultiToolController implements Tickable {
   private camera: THREE.PerspectiveCamera | null = null
   private readonly ledMeshes: THREE.Mesh[] = []
   private triggerLock: THREE.Object3D | null = null
-  private lockRotation = 0
+  private lockSlide = 0
+  private currentMode = 'drill'
   private scene: THREE.Scene | null = null
   private projectileSystem: ProjectileSystem | null = null
   private boltColor = new THREE.Color('#ff00ff')
-  private currentMode = 'drill'
   private time = 0
   private lateralSpeed = 0
   private sprinting = false
@@ -218,12 +218,12 @@ export class MultiToolController implements Tickable {
     this.model.rotateY(-Math.PI / 2)
     this.model.rotateZ(swayZ)
 
-    // Trigger lock — unlocked only when drill selected + stationary
+    // Trigger lock — slides back (Z+) when drill selected + stationary
     if (this.triggerLock) {
       const unlocked = this.currentMode === 'drill' && this.lateralSpeed < 0.1
-      const targetLockRot = unlocked ? -0.5 : 0
-      this.lockRotation += (targetLockRot - this.lockRotation) * Math.min(1, 8 * dt)
-      this.triggerLock.rotation.x = this.lockRotation
+      const targetZ = unlocked ? 0.4 : 0
+      this.lockSlide += (targetZ - this.lockSlide) * Math.min(1, 8 * dt)
+      this.triggerLock.position.z = this.lockSlide
     }
   }
 
