@@ -19,17 +19,7 @@ const MODEL_PATH = '/models/multitool.glb'
 /** Node names for the status LEDs that change color per mode. */
 const LED_NODE_NAMES = partsJson.statusLeds.map((led) => led.nodeName)
 
-/** Node name for the front LED (muzzle / beam origin). */
-const MUZZLE_NODE_NAME = 'pistol_led_front'
-
-/** Bolt projectile speed (units/s). */
-const BOLT_SPEED = 200
-/** Bolt length (units). */
-const BOLT_LENGTH = 6.0
-/** Bolt width (units). */
-const BOLT_WIDTH = 0.04
-/** Max bolt lifetime before removal (seconds). */
-const BOLT_MAX_LIFETIME = 4.0
+import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
 
 /** Position offset from camera origin (right, down, forward). */
 const OFFSET_X = 0.35
@@ -74,8 +64,7 @@ export class MultiToolController implements Tickable {
   private camera: THREE.PerspectiveCamera | null = null
   private readonly ledMeshes: THREE.Mesh[] = []
   private scene: THREE.Scene | null = null
-  private muzzleNode: THREE.Object3D | null = null
-  private readonly bolts: { mesh: THREE.Mesh; velocity: THREE.Vector3; age: number }[] = []
+  private projectileSystem: ProjectileSystem | null = null
   private boltColor = new THREE.Color('#ff00ff')
   private time = 0
   private lateralSpeed = 0
@@ -110,9 +99,6 @@ export class MultiToolController implements Tickable {
         child.material = (child.material as THREE.MeshStandardMaterial).clone()
         this.ledMeshes.push(child)
       }
-      if (child.name === MUZZLE_NODE_NAME) {
-        this.muzzleNode = child
-      }
     })
     scene.add(this.model)
   }
@@ -133,6 +119,11 @@ export class MultiToolController implements Tickable {
   /** Set ADS state — gun moves to center screen when aiming. */
   setAiming(aiming: boolean): void {
     this.aiming = aiming
+  }
+
+  /** Connect the projectile system for firing. */
+  setProjectileSystem(system: ProjectileSystem): void {
+    this.projectileSystem = system
   }
 
   /**
@@ -156,83 +147,26 @@ export class MultiToolController implements Tickable {
   }
 
   /**
-   * Fire a bolt projectile from the muzzle along camera forward.
-   * The bolt is a glowing elongated mesh that travels through space.
+   * Fire a bolt projectile from the gun barrel toward the crosshair.
+   * Delegates to ProjectileSystem for lifecycle and collision.
    */
   fire(): void {
-    if (!this.camera || !this.scene) return
+    if (!this.camera || !this.projectileSystem) return
 
     // Aim point: far along camera forward (where crosshair points)
     const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion)
-    const aimPoint = this.camera.position.clone().addScaledVector(camForward, BOLT_SPEED)
+    const aimPoint = this.camera.position.clone().addScaledVector(camForward, 500)
 
-    // Origin: gun barrel tip in camera-local space, transformed to world
-    // Matches the visual gun position (OFFSET_X/Y/Z) but pushed forward to the barrel
+    // Origin: barrel tip in camera space
     const origin = this.camera.position.clone()
-    const camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion)
     const camDown = new THREE.Vector3(0, -1, 0).applyQuaternion(this.camera.quaternion)
     origin.addScaledVector(camForward, 1.8)
     origin.addScaledVector(camDown, 0.15)
 
-    // Direction: from muzzle toward the aim point (converges on crosshair)
+    // Direction: from barrel toward aim point (converges on crosshair)
     const direction = aimPoint.sub(origin).normalize()
 
-    // Create bolt — cylinder with glowing shader for blaster beam look
-    const geometry = new THREE.CylinderGeometry(BOLT_WIDTH, BOLT_WIDTH, BOLT_LENGTH, 6, 1, false)
-    // Rotate geometry so cylinder length aligns with Z (lookAt direction)
-    geometry.rotateX(Math.PI / 2)
-
-    const material = new THREE.ShaderMaterial({
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      uniforms: {
-        uColor: { value: this.boltColor.clone() },
-        uTime: { value: 0 },
-      },
-      vertexShader: /* glsl */ `
-        uniform float uTime;
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          // Scale up slightly over time so distant bolts stay visible
-          float scale = 1.0 + uTime * 0.3;
-          vec3 scaled = position * vec3(scale, scale, 1.0);
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(scaled, 1.0);
-        }
-      `,
-      fragmentShader: /* glsl */ `
-        uniform vec3 uColor;
-        uniform float uTime;
-        varying vec2 vUv;
-        void main() {
-          // Tight bright core, saturated color — no white wash
-          float dist = abs(vUv.x - 0.5) * 2.0;
-          float core = smoothstep(1.0, 0.1, dist);
-          // Thin white center line, rest is pure color
-          float whiteLine = smoothstep(0.3, 0.0, dist);
-          vec3 col = mix(uColor * 1.5, vec3(1.0), whiteLine * 0.4);
-          // Taper at head and tail
-          float taper = smoothstep(0.0, 0.15, vUv.y) * smoothstep(1.0, 0.85, vUv.y);
-          float alpha = core * taper;
-          // Subtle energy pulse
-          alpha *= 0.9 + 0.1 * sin(uTime * 50.0 + vUv.y * 20.0);
-          gl_FragColor = vec4(col, alpha);
-        }
-      `,
-    })
-
-    const bolt = new THREE.Mesh(geometry, material)
-    bolt.position.copy(origin)
-    bolt.lookAt(origin.clone().add(direction))
-    bolt.frustumCulled = false
-    this.scene.add(bolt)
-
-    this.bolts.push({
-      mesh: bolt,
-      velocity: direction.multiplyScalar(BOLT_SPEED),
-      age: 0,
-    })
+    this.projectileSystem.spawn(origin, direction, this.boltColor)
   }
 
   private readonly offset = new THREE.Vector3()
@@ -276,35 +210,9 @@ export class MultiToolController implements Tickable {
     this.model.rotateX(swayX + this.tilt)
     this.model.rotateY(-Math.PI / 2)
     this.model.rotateZ(swayZ)
-
-    // Update bolt projectiles
-    for (let i = this.bolts.length - 1; i >= 0; i--) {
-      const bolt = this.bolts[i]!
-      bolt.age += dt
-      bolt.mesh.position.addScaledVector(bolt.velocity, dt)
-
-      // Feed time uniform for flicker
-      const mat = bolt.mesh.material as THREE.ShaderMaterial
-      if (mat.uniforms['uTime']) {
-        mat.uniforms['uTime'].value = bolt.age
-      }
-
-      if (bolt.age >= BOLT_MAX_LIFETIME) {
-        this.scene?.remove(bolt.mesh)
-        bolt.mesh.geometry.dispose()
-        mat.dispose()
-        this.bolts.splice(i, 1)
-      }
-    }
   }
 
   dispose(): void {
-    for (const bolt of this.bolts) {
-      this.scene?.remove(bolt.mesh)
-      bolt.mesh.geometry.dispose()
-      ;(bolt.mesh.material as THREE.ShaderMaterial).dispose()
-    }
-    this.bolts.length = 0
     if (this.model) {
       this.model.parent?.remove(this.model)
     }

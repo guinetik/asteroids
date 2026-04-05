@@ -24,11 +24,13 @@ import type { FpsPlayerConfig } from '@/three/FpsPlayerController'
 import { TerrainGrid } from '@/three/TerrainGrid'
 import { generateTerrain } from '@/lib/terrain/terrainGenerator'
 import type { SurfaceFeatures } from '@/lib/asteroids/types'
-import { AmbientLight, DirectionalLight } from 'three'
+import { AmbientLight, DirectionalLight, Color, Vector3 } from 'three'
 import { Heightmap } from '@/lib/terrain/heightmap'
 import { MultiToolController } from '@/three/MultiToolController'
 import { MultiToolState } from '@/lib/fps/multiToolState'
 import type { MultiToolConfig } from '@/lib/fps/multiToolState'
+import { ProjectileSystem } from '@/lib/fps/projectileSystem'
+import { ParticleEmitter } from '@/three/ParticleEmitter'
 import playerConfigJson from '@/data/fps/player-config.json'
 import multiToolConfigJson from '@/data/fps/multitool-config.json'
 
@@ -66,6 +68,8 @@ export class FpsViewController implements Tickable {
   private heightmap: Heightmap | null = null
   private multiTool: MultiToolController | null = null
   private multiToolState: MultiToolState | null = null
+  private projectileSystem: ProjectileSystem | null = null
+  private impactEmitter: ParticleEmitter | null = null
   private leftMouseDown = false
   private leftMouseJustPressed = false
   private rightMouseDown = false
@@ -132,6 +136,25 @@ export class FpsViewController implements Tickable {
     // Multi-tool state
     this.multiToolState = new MultiToolState(multiToolConfigJson as MultiToolConfig)
 
+    // Projectile system + impact particles
+    this.projectileSystem = new ProjectileSystem(this.sceneManager.scene, heightmap)
+    this.impactEmitter = new ParticleEmitter({
+      poolSize: 64,
+      color: new Color(0xffaa44),
+      size: 3,
+      lifetime: 0.4,
+      spread: 15,
+      opacity: 0.8,
+    })
+    this.sceneManager.addToScene(this.impactEmitter.points)
+    this.projectileSystem.onImpact = (pos) => {
+      const up = new Vector3(0, 1, 0)
+      for (let i = 0; i < 8; i++) {
+        this.impactEmitter!.emit(pos, up.clone().multiplyScalar(5))
+      }
+    }
+    this.multiTool.setProjectileSystem(this.projectileSystem)
+
     // Death handler — reset scene
     this.playerController.onDeath = () => {
       window.location.reload()
@@ -140,6 +163,8 @@ export class FpsViewController implements Tickable {
     // Register tick order
     this.tickHandler.register(this.playerController, TICK_PRIORITY_PHYSICS)
     this.tickHandler.register(this.multiToolState, TICK_PRIORITY_PHYSICS + 1)
+    this.tickHandler.register(this.projectileSystem, TICK_PRIORITY_PHYSICS + 2)
+    this.tickHandler.register(this.impactEmitter, TICK_PRIORITY_PHYSICS + 3)
     this.tickHandler.register(this.fpsCamera, TICK_PRIORITY_RENDER - 2)
     this.tickHandler.register(this.multiTool, TICK_PRIORITY_RENDER - 2)
     this.tickHandler.register(this, TICK_PRIORITY_RENDER - 1)
@@ -279,6 +304,8 @@ export class FpsViewController implements Tickable {
 
   dispose(): void {
     this.gameLoop?.stop()
+    this.projectileSystem?.dispose()
+    this.impactEmitter?.dispose()
     this.multiTool?.dispose()
     this.playerController?.dispose()
     this.fpsCamera?.dispose()
