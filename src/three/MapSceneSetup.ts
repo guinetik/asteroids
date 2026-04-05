@@ -20,7 +20,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 const BACKGROUND_COLOR = 0x000000
 const CAMERA_FOV = 50
 const CAMERA_NEAR = 0.1
-const CAMERA_FAR = 500
+const CAMERA_FAR = 50000
 const CAMERA_INITIAL_POSITION_Y = 3
 const CAMERA_INITIAL_POSITION_Z = 20
 const TONE_MAPPING_EXPOSURE = 1.35

@@ -45,6 +45,15 @@ export const LANDER_CAMERA_CONFIG: VehicleCameraConfig = {
   fov: 60,
 }
 
+/** Map preset: close orbit for map-scale shuttle (~0.7 units long). */
+export const MAP_CAMERA_CONFIG: VehicleCameraConfig = {
+  idleOffset: new THREE.Vector3(-6, 4, 0),
+  lerpSpeed: 3,
+  idleTimeout: 5,
+  minY: 0.5,
+  fov: 50,
+}
+
 /**
  * 3rd-person camera that tracks a vehicle with orbit controls.
  * Mouse interaction overrides the idle position; releasing the mouse
