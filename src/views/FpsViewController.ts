@@ -35,6 +35,9 @@ import { ParticleEmitter } from '@/three/ParticleEmitter'
 import { TargetDummyController } from '@/three/TargetDummyController'
 import playerConfigJson from '@/data/fps/player-config.json'
 import multiToolConfigJson from '@/data/fps/multitool-config.json'
+import { EnemyDirector } from '@/lib/fps/enemyDirector'
+import type { EnemyHandle } from '@/lib/fps/enemyDirector'
+import { BacteriophageController } from '@/three/BacteriophageController'
 
 const AMBIENT_LIGHT_INTENSITY = 0.4
 const DIR_LIGHT_INTENSITY = 1.2
@@ -42,6 +45,9 @@ const GRID_SIZE = 2000
 const TERRAIN_SEED = 77
 const TERRAIN_RESOLUTION = 128
 const SPAWN_HEIGHT = 5
+const ENEMY_SPAWN_COUNT = 8
+const ENEMY_SPAWN_RADIUS = 80
+const ENEMY_MIN_SPAWN_DISTANCE = 20
 
 const TEST_SURFACE: SurfaceFeatures = {
   craterDensity: 0.5,
@@ -73,6 +79,8 @@ export class FpsViewController implements Tickable {
   private projectileSystem: ProjectileSystem | null = null
   private impactEmitter: ParticleEmitter | null = null
   private readonly targetDummies: TargetDummyController[] = []
+  private enemyDirector: EnemyDirector | null = null
+  private readonly enemyControllers = new Map<number, BacteriophageController>()
   private leftMouseDown = false
   private leftMouseJustPressed = false
   private rightMouseDown = false
@@ -187,6 +195,50 @@ export class FpsViewController implements Tickable {
       }
     }
 
+    // Enemies — ?enemies=true spawns bacteriophages around the player
+    if (params.has('enemies')) {
+      this.enemyDirector = new EnemyDirector()
+      this.enemyDirector.onContactDamage = (_handle, damage) => {
+        this.playerController?.takeDamage(damage)
+      }
+      this.tickHandler.register(this.enemyDirector, TICK_PRIORITY_PHYSICS + 4)
+
+      for (let i = 0; i < ENEMY_SPAWN_COUNT; i++) {
+        const angle = (i / ENEMY_SPAWN_COUNT) * Math.PI * 2
+        const radius = ENEMY_MIN_SPAWN_DISTANCE + Math.random() * (ENEMY_SPAWN_RADIUS - ENEMY_MIN_SPAWN_DISTANCE)
+        const x = Math.cos(angle) * radius
+        const z = Math.sin(angle) * radius
+        const y = heightmap.heightAt(x, z)
+
+        const handle = this.enemyDirector.spawn('bacteriophage', x, y, z)
+        const controller = new BacteriophageController(handle.enemy)
+        controller.group.position.set(x, y, z)
+        this.sceneManager.addToScene(controller.group)
+        this.projectileSystem!.addEnemy(handle.enemy)
+        this.tickHandler.register(controller, TICK_PRIORITY_ANIMATION)
+        this.enemyControllers.set(handle.id, controller)
+      }
+
+      // Enemy hit → flash + particles (extend existing onEnemyHit)
+      const existingOnEnemyHit = this.projectileSystem!.onEnemyHit
+      this.projectileSystem!.onEnemyHit = (enemy, pos) => {
+        existingOnEnemyHit?.call(this.projectileSystem, enemy, pos)
+        // Find matching controller and flash it
+        for (const [id, ctrl] of this.enemyControllers) {
+          if (ctrl.enemy === enemy) {
+            ctrl.flash()
+            if (!enemy.alive) {
+              // Enemy died — clean up
+              this.tickHandler!.unregister(ctrl)
+              this.projectileSystem!.removeEnemy(enemy)
+              this.enemyControllers.delete(id)
+            }
+            break
+          }
+        }
+      }
+    }
+
     // Death handler — reset scene
     this.playerController.onDeath = () => {
       window.location.reload()
@@ -259,6 +311,39 @@ export class FpsViewController implements Tickable {
         this.inputManager!.isActionActive('sprint'),
         this.playerController.grounded,
       )
+    }
+
+    // --- Enemy sync ---
+    if (this.enemyDirector && this.playerController) {
+      const pp = this.playerController.group.position
+      this.enemyDirector.setPlayerPosition(pp.x, pp.y, pp.z)
+
+      for (const handle of this.enemyDirector.enemies) {
+        if (!handle.enemy.alive) continue
+        const ctrl = this.enemyControllers.get(handle.id)
+        if (!ctrl) continue
+
+        // Sync visual state from behavior
+        ctrl.isMoving = handle.lastOutput.isMoving
+        ctrl.isAgitated = handle.lastOutput.isAgitated
+
+        // Sync position from domain → visual
+        ctrl.group.position.x = handle.enemy.position.x
+        ctrl.group.position.z = handle.enemy.position.z
+
+        // Clamp Y to terrain
+        ctrl.group.position.y = this.heightmap?.heightAt(
+          handle.enemy.position.x,
+          handle.enemy.position.z,
+        ) ?? 0
+        handle.enemy.position.y = ctrl.group.position.y
+
+        // Face movement direction
+        if (handle.lastOutput.isMoving) {
+          const dir = handle.lastOutput.moveDir
+          ctrl.group.rotation.y = Math.atan2(dir.x, dir.z)
+        }
+      }
     }
 
     if (this.playerController && this.onTelemetry) {
@@ -342,6 +427,9 @@ export class FpsViewController implements Tickable {
   dispose(): void {
     this.gameLoop?.stop()
     for (const dummy of this.targetDummies) dummy.dispose()
+    for (const ctrl of this.enemyControllers.values()) ctrl.dispose()
+    this.enemyControllers.clear()
+    this.enemyDirector?.despawnAll()
     this.projectileSystem?.dispose()
     this.impactEmitter?.dispose()
     this.multiTool?.dispose()
