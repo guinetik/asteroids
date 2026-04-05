@@ -1,0 +1,15 @@
+{
+  "bacteriophage": {
+    "maxHp": 75,
+    "hitRadius": 1.5,
+    "speed": 8,
+    "aggroRadius": 40,
+    "leashRadius": 60,
+    "agitateRadius": 10,
+    "wanderRadius": 15,
+    "wanderSpeed": 2,
+    "contactDamage": 15,
+    "contactRadius": 2.0,
+    "contactCooldown": 1.0
+  }
+}

@@ -63,3 +63,24 @@ export class Enemy {
     }
   }
 }
+
+/** Output from an enemy behavior tick — drives movement and visual state. */
+export interface EnemyBehaviorOutput {
+  /** Normalized movement direction on the XZ plane (zero = idle). */
+  moveDir: { x: number; z: number }
+  /** Whether the enemy is actively moving. */
+  isMoving: boolean
+  /** Whether the enemy is chasing the player (vs idle wander). */
+  isChasing: boolean
+  /** Whether the enemy is agitated (close to player). */
+  isAgitated: boolean
+}
+
+/**
+ * Behavior interface — pluggable AI for enemies.
+ * The director calls tick() each frame and applies the output.
+ */
+export interface EnemyBehavior {
+  /** Compute movement intent for this frame. */
+  tick(dt: number, enemyX: number, enemyZ: number, playerX: number, playerZ: number): EnemyBehaviorOutput
+}
