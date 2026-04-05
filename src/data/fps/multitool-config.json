@@ -14,9 +14,9 @@
     "burstMax": 1.2,
     "burstAmount": 8,
     "thrusters": {
-      "drill": { "capacity": 30, "burnRate": 15, "rechargeRate": 10, "fuelCostPerRecharge": 0.5 },
-      "weapon": { "capacity": 20, "burnRate": 20, "rechargeRate": 8, "fuelCostPerRecharge": 0.6 },
-      "heal": { "capacity": 25, "burnRate": 12, "rechargeRate": 10, "fuelCostPerRecharge": 0.4 }
+      "drill": { "capacity": 30, "burnRate": 60, "rechargeRate": 10, "fuelCostPerRecharge": 2.0 },
+      "weapon": { "capacity": 20, "burnRate": 40, "rechargeRate": 8, "fuelCostPerRecharge": 1.2 },
+      "heal": { "capacity": 25, "burnRate": 24, "rechargeRate": 10, "fuelCostPerRecharge": 0.8 }
     }
   }
 }
