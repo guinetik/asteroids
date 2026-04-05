@@ -7,5 +7,16 @@
   "ads": {
     "fovMultiplier": 0.85,
     "zoomSpeed": 8
+  },
+  "rtg": {
+    "fuelCapacity": 80,
+    "burstMin": 0.3,
+    "burstMax": 1.2,
+    "burstAmount": 8,
+    "thrusters": {
+      "drill": { "capacity": 30, "burnRate": 15, "rechargeRate": 10, "fuelCostPerRecharge": 0.5 },
+      "weapon": { "capacity": 20, "burnRate": 20, "rechargeRate": 8, "fuelCostPerRecharge": 0.6 },
+      "heal": { "capacity": 25, "burnRate": 12, "rechargeRate": 10, "fuelCostPerRecharge": 0.4 }
+    }
   }
 }

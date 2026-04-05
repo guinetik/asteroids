@@ -22,6 +22,10 @@ export interface FpsTelemetry {
   aiming: boolean
   /** Whether tool fired this frame */
   isFiring: boolean
+  /** RTG fuel level */
+  rtgLevel: number
+  /** RTG fuel capacity */
+  rtgCapacity: number
 }
 
 const O2_COLOR_HIGH = '#3b82f6'
@@ -73,6 +77,17 @@ function modeColor(): string {
         <div
           class="h-full bg-green-400/80 transition-all duration-100"
           :style="{ width: pct(telemetry.sprintCharge, telemetry.sprintCapacity) + '%' }"
+        />
+      </div>
+    </div>
+
+    <!-- RTG Bar -->
+    <div class="absolute top-[4.5rem] left-4 flex items-center gap-2">
+      <span class="text-xs tracking-widest uppercase text-yellow-400/60 w-8">RTG</span>
+      <div class="w-32 h-2 bg-white/10 rounded-sm overflow-hidden">
+        <div
+          class="h-full bg-yellow-400/80 transition-all duration-75"
+          :style="{ width: pct(telemetry.rtgLevel, telemetry.rtgCapacity) + '%' }"
         />
       </div>
     </div>

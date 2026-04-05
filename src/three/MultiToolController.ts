@@ -18,6 +18,11 @@ const MODEL_PATH = '/models/multitool.glb'
 
 /** Node names for the status LEDs that change color per mode. */
 const LED_NODE_NAMES = partsJson.statusLeds.map((led) => led.nodeName)
+/** Node names for the power indicator slots. */
+const POWER_NODE_NAMES = partsJson.powerIndicators.map((p) => p.nodeName)
+/** Power indicator cylinder dimensions (model space). */
+const POWER_CYLINDER_RADIUS = 0.4
+const POWER_CYLINDER_HEIGHT = 1.5
 
 import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
 
@@ -63,6 +68,7 @@ export class MultiToolController implements Tickable {
   private model: THREE.Group | null = null
   private camera: THREE.PerspectiveCamera | null = null
   private readonly ledMeshes: THREE.Mesh[] = []
+  private readonly powerIndicators: { node: THREE.Object3D; cylinder: THREE.Mesh }[] = []
   private triggerLock: THREE.Object3D | null = null
   private lockBaseX = 0
   private lockBaseZ = 0
@@ -72,6 +78,7 @@ export class MultiToolController implements Tickable {
   private scene: THREE.Scene | null = null
   private projectileSystem: ProjectileSystem | null = null
   private boltColor = new THREE.Color('#ff00ff')
+  private rtgRatio = 1
   private time = 0
   private lateralSpeed = 0
   private sprinting = false
@@ -110,6 +117,20 @@ export class MultiToolController implements Tickable {
         this.lockBaseX = child.position.x
         this.lockBaseZ = child.position.z
       }
+      if (POWER_NODE_NAMES.includes(child.name)) {
+        // Add a small glowing cylinder at the indicator position
+        const cylGeo = new THREE.CylinderGeometry(
+          POWER_CYLINDER_RADIUS, POWER_CYLINDER_RADIUS, POWER_CYLINDER_HEIGHT, 8,
+        )
+        const cylMat = new THREE.MeshBasicMaterial({
+          color: 0x00ff00,
+          transparent: true,
+          opacity: 0.8,
+        })
+        const cylinder = new THREE.Mesh(cylGeo, cylMat)
+        child.add(cylinder)
+        this.powerIndicators.push({ node: child, cylinder })
+      }
     })
     scene.add(this.model)
   }
@@ -130,6 +151,11 @@ export class MultiToolController implements Tickable {
   /** Set ADS state — gun moves to center screen when aiming. */
   setAiming(aiming: boolean): void {
     this.aiming = aiming
+  }
+
+  /** Update RTG fuel ratio (0–1) for diegetic power indicators. */
+  setRtgLevel(ratio: number): void {
+    this.rtgRatio = ratio
   }
 
   /** Connect the projectile system for firing. */
@@ -234,6 +260,19 @@ export class MultiToolController implements Tickable {
       const targetZ = this.aiming ? 4.0 : 0
       this.lockZSlide += (targetZ - this.lockZSlide) * Math.min(1, 8 * dt)
       this.triggerLock.position.z = this.lockBaseZ + this.lockZSlide
+    }
+
+    // Power indicators — scale Y and color based on RTG level
+    for (const { cylinder } of this.powerIndicators) {
+      const mat = cylinder.material as THREE.MeshBasicMaterial
+      cylinder.scale.y = Math.max(0.05, this.rtgRatio)
+      if (this.rtgRatio > 0.5) {
+        mat.color.setHex(0x00ff00)
+      } else if (this.rtgRatio > 0.2) {
+        mat.color.setHex(0xffaa00)
+      } else {
+        mat.color.setHex(0xff0000)
+      }
     }
   }
 

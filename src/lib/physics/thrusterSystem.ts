@@ -149,6 +149,16 @@ export class ThrusterSystem<T extends string = ShuttleThrusterName> {
   }
 
   /**
+   * Add fuel to the shared tank (e.g. RTG decay burst).
+   * Clamps to capacity.
+   *
+   * @param amount - Fuel units to add
+   */
+  addFuel(amount: number): void {
+    this.fuel = Math.min(this.config.fuelCapacity, this.fuel + amount)
+  }
+
+  /**
    * Advance one frame. Active thrusters drain charge; idle thrusters recharge from fuel.
    *
    * @param dt - Delta time in seconds

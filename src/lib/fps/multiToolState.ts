@@ -10,6 +10,8 @@
  * @spec docs/superpowers/specs/2026-04-04-multitool-switching-design.md
  */
 import type { Tickable } from '@/lib/Tickable'
+import { ThrusterSystem } from '@/lib/physics/thrusterSystem'
+import type { ThrusterSystemConfig } from '@/lib/physics/thrusterSystem'
 
 /** Available multi-tool modes. */
 export type MultiToolMode = 'drill' | 'weapon' | 'heal'
@@ -29,6 +31,25 @@ export interface ModeConfig {
   fireRate?: number
 }
 
+/** RTG configuration. */
+export interface RtgConfig {
+  /** RTG fuel pool capacity. */
+  fuelCapacity: number
+  /** Minimum seconds between decay bursts. */
+  burstMin: number
+  /** Maximum seconds between decay bursts. */
+  burstMax: number
+  /** Fuel added per burst. */
+  burstAmount: number
+  /** Per-mode thruster configs. */
+  thrusters: Record<MultiToolMode, {
+    capacity: number
+    burnRate: number
+    rechargeRate: number
+    fuelCostPerRecharge: number
+  }>
+}
+
 /** Shape of multitool-config.json. */
 export interface MultiToolConfig {
   /** Per-mode configuration. */
@@ -40,6 +61,8 @@ export interface MultiToolConfig {
     /** How fast FOV lerps to target (per second). */
     zoomSpeed: number
   }
+  /** RTG power system configuration. */
+  rtg: RtgConfig
 }
 
 /**
@@ -59,8 +82,24 @@ export class MultiToolState implements Tickable {
   private autoTimer = 0
   private readonly config: MultiToolConfig
 
+  /** RTG-powered thruster system for tool energy. */
+  readonly thrusterSystem: ThrusterSystem<MultiToolMode>
+  /** Time until next RTG decay burst. */
+  private rtgBurstTimer: number
+  private readonly rtgConfig: RtgConfig
+
   constructor(config: MultiToolConfig) {
     this.config = config
+    this.rtgConfig = config.rtg
+
+    const tsConfig: ThrusterSystemConfig<MultiToolMode> = {
+      fuelCapacity: config.rtg.fuelCapacity,
+      thrusters: config.rtg.thrusters,
+    }
+    this.thrusterSystem = new ThrusterSystem<MultiToolMode>(tsConfig)
+
+    // First burst comes quickly
+    this.rtgBurstTimer = config.rtg.burstMin
   }
 
   /** Current active mode. */
@@ -86,6 +125,26 @@ export class MultiToolState implements Tickable {
   /** ADS configuration. */
   get adsConfig(): MultiToolConfig['ads'] {
     return this.config.ads
+  }
+
+  /** Current RTG fuel level. */
+  get rtgLevel(): number {
+    return this.thrusterSystem.fuelLevel
+  }
+
+  /** RTG fuel capacity. */
+  get rtgCapacity(): number {
+    return this.thrusterSystem.fuelCapacity
+  }
+
+  /** Current active mode's charge level. */
+  get modeCharge(): number {
+    return this.thrusterSystem.getState(this._mode).charge
+  }
+
+  /** Current active mode's charge capacity. */
+  get modeChargeCapacity(): number {
+    return this.thrusterSystem.getState(this._mode).capacity
   }
 
   /** Switch active mode. */
@@ -115,52 +174,66 @@ export class MultiToolState implements Tickable {
     this._speed = speed
   }
 
-  /** Advance trigger logic by one frame. */
+  /** Advance trigger logic, RTG decay, and thruster system by one frame. */
   tick(dt: number): void {
     this._isFiring = false
 
-    if (!this._aiming) {
-      this.autoTimer = 0
-      return
+    // --- RTG stochastic recharge ---
+    this.rtgBurstTimer -= dt
+    if (this.rtgBurstTimer <= 0) {
+      // Decay burst — dump fuel into the pool
+      this.thrusterSystem.addFuel(this.rtgConfig.burstAmount)
+      // Schedule next burst at random interval
+      this.rtgBurstTimer = this.rtgConfig.burstMin +
+        Math.random() * (this.rtgConfig.burstMax - this.rtgConfig.burstMin)
     }
 
-    // Drill safety lock — cannot fire while moving
-    if (this._mode === 'drill' && this._speed > 0.1) {
-      this.autoTimer = 0
-      return
-    }
+    // --- Determine firing intent ---
+    let wantsFire = false
 
-    const cfg = this.config.modes[this._mode]
+    if (this._aiming && !(this._mode === 'drill' && this._speed > 0.1)) {
+      const cfg = this.config.modes[this._mode]
 
-    switch (cfg.trigger) {
-      case 'hold':
-        this._isFiring = this._mouseDown
-        break
+      switch (cfg.trigger) {
+        case 'hold':
+          wantsFire = this._mouseDown
+          break
 
-      case 'auto': {
-        if (this._mouseDown) {
-          if (this._mouseJustPressed) {
-            // First press always fires immediately
-            this._isFiring = true
-            this.autoTimer = 0
-          } else {
-            const interval = 1 / (cfg.fireRate ?? 1)
-            this.autoTimer += dt
-            if (this.autoTimer >= interval) {
-              this._isFiring = true
-              this.autoTimer -= interval
+        case 'auto': {
+          if (this._mouseDown) {
+            if (this._mouseJustPressed) {
+              wantsFire = true
+              this.autoTimer = 0
+            } else {
+              const interval = 1 / (cfg.fireRate ?? 1)
+              this.autoTimer += dt
+              if (this.autoTimer >= interval) {
+                wantsFire = true
+                this.autoTimer -= interval
+              }
             }
+          } else {
+            this.autoTimer = 0
           }
-        } else {
-          this.autoTimer = 0
+          break
         }
-        break
-      }
 
-      case 'click':
-        this._isFiring = this._mouseJustPressed
-        break
+        case 'click':
+          wantsFire = this._mouseJustPressed
+          break
+      }
     }
+
+    // --- Gate on charge ---
+    const canFire = wantsFire && this.thrusterSystem.canFire(this._mode)
+    this._isFiring = canFire
+
+    // --- Thruster system tick — active mode drains when firing ---
+    this.thrusterSystem.tick(dt, {
+      drill: this._isFiring && this._mode === 'drill',
+      weapon: this._isFiring && this._mode === 'weapon',
+      heal: this._isFiring && this._mode === 'heal',
+    })
 
     if (this._isFiring) {
       console.log(`[MultiTool] fire: ${this._mode}`)

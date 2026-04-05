@@ -228,6 +228,7 @@ export class FpsViewController implements Tickable {
     if (this.multiToolState && this.multiTool) {
       this.multiTool.setMode(this.multiToolState.modeConfig.color, this.multiToolState.mode)
       this.multiTool.setAiming(this.multiToolState.aiming)
+      this.multiTool.setRtgLevel(this.multiToolState.rtgLevel / this.multiToolState.rtgCapacity)
       this.playerController?.setAiming(this.multiToolState.aiming)
       if (this.multiToolState.isFiring) {
         this.multiTool.fire()
@@ -273,6 +274,8 @@ export class FpsViewController implements Tickable {
         activeMode: this.multiToolState?.mode ?? 'drill',
         aiming: this.multiToolState?.aiming ?? false,
         isFiring: this.multiToolState?.isFiring ?? false,
+        rtgLevel: this.multiToolState?.rtgLevel ?? 0,
+        rtgCapacity: this.multiToolState?.rtgCapacity ?? 1,
       })
     }
   }
