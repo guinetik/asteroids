@@ -25,8 +25,8 @@ import { LanderController } from '@/three/LanderController'
 import { FpsPlayerController } from '@/three/FpsPlayerController'
 import type { FpsPlayerConfig } from '@/three/FpsPlayerController'
 import { FpsCamera } from '@/three/FpsCamera'
-import { TerrainGrid } from '@/three/TerrainGrid'
-import { generateTerrain } from '@/lib/terrain/terrainGenerator'
+import { TerrainMesh } from '@/three/TerrainMesh'
+import { generateTerrain, generateFlatZones } from '@/lib/terrain/terrainGenerator'
 import type { SurfaceFeatures } from '@/lib/asteroids/types'
 import { Heightmap } from '@/lib/terrain/heightmap'
 import { MultiToolController } from '@/three/MultiToolController'
@@ -52,9 +52,10 @@ import multiToolConfigJson from '@/data/fps/multitool-config.json'
 // ── Scene constants ─────────────────────────────────────────────
 const AMBIENT_LIGHT_INTENSITY = 0.6
 const DIR_LIGHT_INTENSITY = 1.5
-const GRID_SIZE = 2000
+const GRID_SIZE = 6000
 const TERRAIN_SEED = 42
-const TERRAIN_RESOLUTION = 128
+const TERRAIN_RESOLUTION = 256
+const FLAT_ZONE_COUNT = 3
 
 const LANDER_SPAWN_HEIGHT = 300
 const EVA_SPAWN_OFFSET_X = 8
@@ -63,7 +64,7 @@ const EVA_SPAWN_OFFSET_X = 8
 const ARRIVAL_CAM_OFFSET = new Vector3(80, 30, 60)
 const ARRIVAL_CAM_FOV = 50
 const ARRIVAL_CAM_NEAR = 0.1
-const ARRIVAL_CAM_FAR = 5000
+const ARRIVAL_CAM_FAR = 15000
 
 /** Test surface features — will come from asteroid data later. */
 const TEST_SURFACE: SurfaceFeatures = {
@@ -89,7 +90,7 @@ export class LevelViewController implements Tickable {
   private inputManager: InputManager | null = null
   private sceneManager: SceneManager | null = null
   private heightmap: Heightmap | null = null
-  private terrainGrid: TerrainGrid | null = null
+  private terrainMesh: TerrainMesh | null = null
   private stateMachine: StateMachine<LevelState> | null = null
 
   // ── Lander ───────────────────────────────────────────────────
@@ -145,15 +146,17 @@ export class LevelViewController implements Tickable {
 
     // ── Terrain ─────────────────────────────────────────────────
     const flat = new URLSearchParams(window.location.search).has('flat')
+    const flatZones = generateFlatZones(FLAT_ZONE_COUNT, GRID_SIZE, TERRAIN_SEED)
     this.heightmap = flat
       ? new Heightmap(TERRAIN_RESOLUTION, GRID_SIZE)
       : generateTerrain(TEST_SURFACE, {
           seed: TERRAIN_SEED,
           resolution: TERRAIN_RESOLUTION,
           worldSize: GRID_SIZE,
+          flatZones,
         })
-    this.terrainGrid = new TerrainGrid(this.heightmap)
-    this.sceneManager.addToScene(this.terrainGrid.mesh)
+    this.terrainMesh = new TerrainMesh(this.heightmap)
+    this.sceneManager.addToScene(this.terrainMesh.mesh)
 
     // ── Lighting ────────────────────────────────────────────────
     const ambient = new AmbientLight(0xffffff, AMBIENT_LIGHT_INTENSITY)
@@ -605,7 +608,7 @@ export class LevelViewController implements Tickable {
     this.playerController?.dispose()
     this.fpsCamera?.dispose()
     this.landerController?.dispose()
-    this.terrainGrid?.dispose()
+    this.terrainMesh?.dispose()
     this.vehicleCamera?.dispose()
     this.sceneManager?.dispose()
     this.inputManager?.dispose()

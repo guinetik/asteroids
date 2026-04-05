@@ -88,6 +88,19 @@ function seededRandom(seed: number): () => number {
 // ---------------------------------------------------------------------------
 
 /**
+ * A circular flat zone protected from terrain deformation.
+ * Used as landing pads / objective areas.
+ */
+export interface FlatZone {
+  /** Centre X in world coordinates. */
+  x: number
+  /** Centre Z in world coordinates. */
+  z: number
+  /** Radius in world units — area inside is flattened. */
+  radius: number
+}
+
+/**
  * Options controlling terrain generation resolution and seeding.
  */
 export interface TerrainGenOptions {
@@ -97,6 +110,8 @@ export interface TerrainGenOptions {
   resolution: number
   /** World-space size in meters. Grid spans −worldSize/2 to +worldSize/2. */
   worldSize: number
+  /** Circular zones that remain flat (no craters, ridges, or noise deformation). */
+  flatZones?: FlatZone[]
 }
 
 // ---------------------------------------------------------------------------
@@ -258,9 +273,100 @@ function applyRidge(
   }
 }
 
+/**
+ * Returns a protection mask for flat zones. Value 0 = fully protected,
+ * 1 = no protection. Smooth blend at edges via cosine falloff.
+ *
+ * @param worldX - World X coordinate
+ * @param worldZ - World Z coordinate
+ * @param flatZones - Array of flat zone definitions
+ * @returns Protection factor (0 = flat, 1 = normal terrain)
+ */
+function flatZoneProtection(worldX: number, worldZ: number, flatZones: FlatZone[]): number {
+  const BLEND_FRACTION = 0.3 // outer 30% of radius blends smoothly
+  let minProtection = 1
+
+  for (const zone of flatZones) {
+    const dx = worldX - zone.x
+    const dz = worldZ - zone.z
+    const dist = Math.sqrt(dx * dx + dz * dz)
+
+    if (dist >= zone.radius) continue
+
+    const blendStart = zone.radius * (1 - BLEND_FRACTION)
+    if (dist <= blendStart) {
+      return 0 // fully protected
+    }
+
+    // Smooth blend from protected to normal
+    const t = (dist - blendStart) / (zone.radius - blendStart)
+    const protection = t * t * (3 - 2 * t) // smoothstep
+    minProtection = Math.min(minProtection, protection)
+  }
+
+  return minProtection
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
+
+/** Default flat zone radius for landing/objective areas (world units). */
+const FLAT_ZONE_RADIUS = 80
+
+/** Minimum distance between flat zone centres as a fraction of worldSize. */
+const FLAT_ZONE_MIN_SPACING_FRACTION = 0.25
+
+/** Margin from world edge for flat zone placement as a fraction of worldSize. */
+const FLAT_ZONE_EDGE_MARGIN_FRACTION = 0.15
+
+/**
+ * Pick N well-spread random points on the terrain for flat zones.
+ * Uses rejection sampling to ensure minimum spacing.
+ *
+ * @param count - Number of zones to place.
+ * @param worldSize - World extent in meters.
+ * @param seed - RNG seed (uses its own stream to avoid perturbing terrain).
+ * @param radius - Flat zone radius in world units.
+ * @returns Array of FlatZone definitions.
+ */
+export function generateFlatZones(
+  count: number,
+  worldSize: number,
+  seed: number,
+  radius = FLAT_ZONE_RADIUS,
+): FlatZone[] {
+  const rng = seededRandom(seed + 9999) // offset seed to avoid correlation with terrain
+  const half = worldSize / 2
+  const margin = worldSize * FLAT_ZONE_EDGE_MARGIN_FRACTION
+  const minSpacing = worldSize * FLAT_ZONE_MIN_SPACING_FRACTION
+  const minSpacingSq = minSpacing * minSpacing
+  const zones: FlatZone[] = []
+  const maxAttempts = 200
+
+  for (let placed = 0; placed < count && placed < maxAttempts; ) {
+    const x = -half + margin + rng() * (worldSize - 2 * margin)
+    const z = -half + margin + rng() * (worldSize - 2 * margin)
+
+    // Check spacing against already-placed zones
+    let tooClose = false
+    for (const existing of zones) {
+      const dx = x - existing.x
+      const dz = z - existing.z
+      if (dx * dx + dz * dz < minSpacingSq) {
+        tooClose = true
+        break
+      }
+    }
+
+    if (!tooClose) {
+      zones.push({ x, z, radius })
+      placed++
+    }
+  }
+
+  return zones
+}
 
 /**
  * Generates a procedural heightmap from surface feature parameters.
@@ -336,6 +442,42 @@ export function generateTerrain(surface: SurfaceFeatures, options: TerrainGenOpt
     const z1 = z0 + Math.sin(angle) * lengthCells
     const ridgeHeight = RIDGE_BASE_HEIGHT * (0.5 + rng() * 0.5) * (0.3 + surface.ridgeFrequency * 0.7)
     applyRidge(hm.grid, resolution, worldSize, noise, x0, z0, x1, z1, ridgeHeight, halfWidthCells)
+  }
+
+  // -------------------------------------------------------------------------
+  // Pass 4: Flat zones — lerp protected areas toward their centre height
+  // -------------------------------------------------------------------------
+  const flatZones = options.flatZones ?? []
+  if (flatZones.length > 0) {
+    // Sample centre height for each zone
+    const centreHeights = flatZones.map((z) => hm.heightAt(z.x, z.z))
+
+    for (let gz = 0; gz < resolution; gz++) {
+      for (let gx = 0; gx < resolution; gx++) {
+        const wx = -worldSize / 2 + gx * cellSize
+        const wz = -worldSize / 2 + gz * cellSize
+        const protection = flatZoneProtection(wx, wz, flatZones)
+
+        if (protection < 1) {
+          // Find which zone this cell is closest to
+          let bestDist = Infinity
+          let flatHeight = 0
+          for (let i = 0; i < flatZones.length; i++) {
+            const dx = wx - flatZones[i]!.x
+            const dz = wz - flatZones[i]!.z
+            const dist = dx * dx + dz * dz
+            if (dist < bestDist) {
+              bestDist = dist
+              flatHeight = centreHeights[i]!
+            }
+          }
+
+          const idx = gz * resolution + gx
+          const current = hm.grid[idx]!
+          hm.grid[idx] = flatHeight + (current - flatHeight) * protection
+        }
+      }
+    }
   }
 
   return hm
