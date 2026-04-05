@@ -80,6 +80,9 @@ const SLINGSHOT_CHARGE_TIME = 2.0
 /** Seconds without fuel in free flight before game over (adrift). */
 const ADRIFT_TIMEOUT = 60
 
+/** Fuel units restored per second while orbiting Earth. */
+const EARTH_REFUEL_RATE = 50
+
 /** Maximum arrow length at full charge (in shuttle local space, pre-scale). */
 const ARROW_MAX_LENGTH = 300
 const ARROW_COLOR_SAFE = 0x00ffff
@@ -734,6 +737,10 @@ export class MapViewController implements Tickable {
         brake: false,
         rcs: yawLeft || yawRight,
       })
+      // Refuel while orbiting Earth
+      if (this.orbitSystem.target?.name === 'Earth') {
+        this.shuttleController.thrusterSystem.addFuel(EARTH_REFUEL_RATE * dt)
+      }
       if (this.orbitSystem.target && this.vehicleCamera) {
         const bx = this.orbitSystem.target.getWorldX()
         const bz = this.orbitSystem.target.getWorldZ()
