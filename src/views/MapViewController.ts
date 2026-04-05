@@ -236,7 +236,7 @@ export class MapViewController implements Tickable {
     const gridDepthScale = 20
     const gridWidthScale = 12
     const gridMassExponent = 0.2
-    this.spaceTimeGrid = new SpaceTimeGrid(gridSize, 200, gridDepthScale, gridWidthScale, gridMassExponent)
+    this.spaceTimeGrid = new SpaceTimeGrid(gridSize, 500, gridDepthScale, gridWidthScale, gridMassExponent)
     scene.add(this.spaceTimeGrid.mesh)
 
     // --- Shuttle (player character) ---
