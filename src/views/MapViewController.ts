@@ -34,7 +34,11 @@ import { AsteroidBeltController } from '@/three/controllers/AsteroidBeltControll
 import { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
 import * as THREE from 'three'
 import { OrbitCaptureSystem, type OrbitHudState } from '@/lib/orbitCapture'
+import { gravityAt, type GravityConfig } from '@/lib/physics/gravity'
+import type { GravityWell } from '@/three/ShuttleController'
+import type { GravitySource } from '@/lib/physics/gravity'
 import { ShuttleController, MAP_PHYSICS } from '@/three/ShuttleController'
+import mapGravityData from '@/data/shuttle/map-gravity.json'
 import { ThrusterEffectController } from '@/three/ThrusterEffectController'
 import { VehicleCamera, MAP_CAMERA_CONFIG, MAP_ORBIT_CAMERA_CONFIG, MAP_INSPECT_CAMERA_CONFIG } from '@/three/VehicleCamera'
 import orbitConfig from '@/data/shuttle/orbit-capture.json'
@@ -88,6 +92,30 @@ const ORBIT_RING_COLOR = 0x00ccff
 const ORBIT_RING_OPACITY = 0.4
 const ORBIT_RING_DASH_SIZE = 0.3
 const ORBIT_RING_GAP_SIZE = 0.2
+
+/** Map-scale gravity tuning loaded from JSON. */
+const MAP_GRAVITY_CONFIG: GravityConfig = {
+  gravityConstant: mapGravityData.gravityConstant,
+  minDistance: mapGravityData.minDistance,
+  influenceScale: mapGravityData.influenceScale,
+  eventHorizonScale: mapGravityData.eventHorizonScale,
+}
+
+/**
+ * Wraps a GravitySource into a GravityWell that ShuttleController can consume,
+ * using map-scale gravity config.
+ */
+function makeGravityWell(source: GravitySource, config: GravityConfig): GravityWell & GravitySource {
+  return {
+    mass: source.mass,
+    getWorldX: () => source.getWorldX(),
+    getWorldZ: () => source.getWorldZ(),
+    getGravityAt(pos: THREE.Vector3): THREE.Vector3 {
+      const g = gravityAt(source.getWorldX(), source.getWorldZ(), source.mass, pos.x, pos.z, config)
+      return new THREE.Vector3(g.ax, 0, g.az)
+    },
+  }
+}
 
 /**
  * Bridges Vue lifecycle to the map scene with player shuttle.
@@ -203,8 +231,22 @@ export class MapViewController implements Tickable {
     scene.add(this.spaceTimeGrid.mesh)
 
     // --- Shuttle (player character) ---
-    this.shuttleController = new ShuttleController(this.inputManager, MAP_PHYSICS)
+    this.shuttleController = new ShuttleController(this.inputManager, MAP_PHYSICS, MAP_GRAVITY_CONFIG)
     this.shuttleController.setSpaceTimeGrid(this.spaceTimeGrid)
+
+    // Register gravity wells — Sun + all planets
+    if (this.sunController) {
+      this.shuttleController.addGravityWell(makeGravityWell(this.sunController, MAP_GRAVITY_CONFIG))
+    }
+    for (const controller of this.planetControllers) {
+      this.shuttleController.addGravityWell(makeGravityWell(controller, MAP_GRAVITY_CONFIG))
+    }
+
+    this.shuttleController.onDeath = () => {
+      // Placeholder — orbit-capture system will handle respawn into Earth orbit
+      console.log('[MapView] shuttle died to gravity')
+    }
+
     await this.shuttleController.load()
     this.shuttleController.group.scale.setScalar(MAP_SHUTTLE_SCALE)
 
@@ -431,10 +473,12 @@ export class MapViewController implements Tickable {
 
     // After slingshot, lerp Y back to 0
     if (this.yRecovery && this.shuttleController) {
+      this.shuttleController.setIgnoreGridY(true)
       const y = this.shuttleController.group.position.y
       if (Math.abs(y) < 0.01) {
         this.shuttleController.group.position.y = 0
         this.yRecovery = false
+        this.shuttleController.setIgnoreGridY(false)
       } else {
         this.shuttleController.group.position.y = y * (1 - 3 * dt)
       }
