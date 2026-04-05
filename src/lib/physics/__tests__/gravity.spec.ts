@@ -4,6 +4,7 @@ import {
   eventHorizonRadius,
   gravityAt,
   checkEventHorizon,
+  totalGravityAt,
   type GravityConfig,
   type GravitySource,
 } from '../gravity'
@@ -82,5 +83,14 @@ describe('gravity with custom GravityConfig', () => {
     const source: GravitySource = { mass: 1, getWorldX: () => 0, getWorldZ: () => 0 }
     expect(checkEventHorizon([source], 2, 0, MAP_CONFIG)).toBeNull()
     expect(checkEventHorizon([source], 1, 0, MAP_CONFIG)).toBe(source)
+  })
+
+  it('totalGravityAt sums multiple sources with config', () => {
+    const s1: GravitySource = { mass: 1, getWorldX: () => -3, getWorldZ: () => 0 }
+    const s2: GravitySource = { mass: 1, getWorldX: () => 3, getWorldZ: () => 0 }
+    // Point at origin — two equal sources on opposite sides cancel out
+    const g = totalGravityAt([s1, s2], 0, 0, MAP_CONFIG)
+    expect(g.ax).toBeCloseTo(0, 4)
+    expect(g.az).toBeCloseTo(0, 4)
   })
 })
