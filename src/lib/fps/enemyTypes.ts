@@ -33,6 +33,18 @@ export interface EnemyTypeConfig {
   contactRadius: number
   /** Cooldown between contact damage ticks (seconds). */
   contactCooldown: number
+  /** Preferred engagement distance (ranged enemies hold here). 0 = melee. */
+  preferredRange: number
+  /** Minimum distance — backs away if player is closer. 0 = no retreat. */
+  minRange: number
+  /** Projectile speed (units/s). 0 = no projectile. */
+  projectileSpeed: number
+  /** Damage per projectile hit. */
+  projectileDamage: number
+  /** Shots per second. */
+  fireRate: number
+  /** Hover height above terrain. 0 = ground unit. */
+  floatHeight: number
 }
 
 /** All enemy type configs keyed by type name. */

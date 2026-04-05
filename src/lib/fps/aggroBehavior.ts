@@ -111,7 +111,7 @@ export class AggroBehavior implements EnemyBehavior {
     distToPlayer: number,
   ): EnemyBehaviorOutput {
     if (distToPlayer < 0.01) {
-      return { moveDir: { x: 0, z: 0 }, isMoving: false, isChasing: true, isAgitated: true }
+      return { moveDir: { x: 0, z: 0 }, isMoving: false, isChasing: true, isAgitated: true, wantsToFire: false }
     }
 
     const invDist = 1 / distToPlayer
@@ -134,7 +134,7 @@ export class AggroBehavior implements EnemyBehavior {
 
     const isAgitated = distToPlayer < this.config.agitateRadius
 
-    return { moveDir: { x: dirX, z: dirZ }, isMoving: true, isChasing: true, isAgitated }
+    return { moveDir: { x: dirX, z: dirZ }, isMoving: true, isChasing: true, isAgitated, wantsToFire: false }
   }
 
   private tickIdle(
@@ -145,7 +145,7 @@ export class AggroBehavior implements EnemyBehavior {
     // Pause between wander targets
     if (this.wanderPause > 0) {
       this.wanderPause -= dt
-      return { moveDir: { x: 0, z: 0 }, isMoving: false, isChasing: false, isAgitated: false }
+      return { moveDir: { x: 0, z: 0 }, isMoving: false, isChasing: false, isAgitated: false, wantsToFire: false }
     }
 
     const wx = this.wanderTargetX - enemyX
@@ -156,7 +156,7 @@ export class AggroBehavior implements EnemyBehavior {
     if (wanderDist < WANDER_ARRIVE_THRESHOLD) {
       this.wanderPause = WANDER_PAUSE_MIN + Math.random() * (WANDER_PAUSE_MAX - WANDER_PAUSE_MIN)
       this.pickWanderTarget()
-      return { moveDir: { x: 0, z: 0 }, isMoving: false, isChasing: false, isAgitated: false }
+      return { moveDir: { x: 0, z: 0 }, isMoving: false, isChasing: false, isAgitated: false, wantsToFire: false }
     }
 
     // Move toward wander target
@@ -166,6 +166,7 @@ export class AggroBehavior implements EnemyBehavior {
       isMoving: true,
       isChasing: false,
       isAgitated: false,
+      wantsToFire: false,
     }
   }
 

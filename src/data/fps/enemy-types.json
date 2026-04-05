@@ -10,6 +10,31 @@
     "wanderSpeed": 2,
     "contactDamage": 15,
     "contactRadius": 2.0,
-    "contactCooldown": 1.0
+    "contactCooldown": 1.0,
+    "preferredRange": 0,
+    "minRange": 0,
+    "projectileSpeed": 0,
+    "projectileDamage": 0,
+    "fireRate": 0,
+    "floatHeight": 0
+  },
+  "spire": {
+    "maxHp": 50,
+    "hitRadius": 2.0,
+    "speed": 4,
+    "aggroRadius": 50,
+    "leashRadius": 70,
+    "agitateRadius": 25,
+    "wanderRadius": 10,
+    "wanderSpeed": 1.5,
+    "contactDamage": 0,
+    "contactRadius": 0,
+    "contactCooldown": 0,
+    "preferredRange": 25,
+    "minRange": 12,
+    "projectileSpeed": 30,
+    "projectileDamage": 10,
+    "fireRate": 0.5,
+    "floatHeight": 6
   }
 }

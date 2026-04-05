@@ -74,6 +74,8 @@ export interface EnemyBehaviorOutput {
   isChasing: boolean
   /** Whether the enemy is agitated (close to player). */
   isAgitated: boolean
+  /** Whether the enemy wants to fire a projectile this frame. */
+  wantsToFire: boolean
 }
 
 /**

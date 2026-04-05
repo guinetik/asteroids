@@ -92,7 +92,7 @@ export class EnemyDirector implements Tickable {
       behavior,
       type,
       config,
-      lastOutput: { moveDir: { x: 0, z: 0 }, isMoving: false, isChasing: false, isAgitated: false },
+      lastOutput: { moveDir: { x: 0, z: 0 }, isMoving: false, isChasing: false, isAgitated: false, wantsToFire: false },
       contactCooldown: 0,
     }
 
