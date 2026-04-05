@@ -15,6 +15,7 @@ import { FPS_BINDINGS } from '@/lib/defaultBindings'
 import {
   TICK_PRIORITY_INPUT,
   TICK_PRIORITY_PHYSICS,
+  TICK_PRIORITY_ANIMATION,
   TICK_PRIORITY_RENDER,
 } from '@/lib/tickPriorities'
 import { SceneManager } from '@/three/SceneManager'
@@ -31,6 +32,7 @@ import { MultiToolState } from '@/lib/fps/multiToolState'
 import type { MultiToolConfig } from '@/lib/fps/multiToolState'
 import { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
+import { TargetDummyController } from '@/three/TargetDummyController'
 import playerConfigJson from '@/data/fps/player-config.json'
 import multiToolConfigJson from '@/data/fps/multitool-config.json'
 
@@ -70,6 +72,7 @@ export class FpsViewController implements Tickable {
   private multiToolState: MultiToolState | null = null
   private projectileSystem: ProjectileSystem | null = null
   private impactEmitter: ParticleEmitter | null = null
+  private readonly targetDummies: TargetDummyController[] = []
   private leftMouseDown = false
   private leftMouseJustPressed = false
   private rightMouseDown = false
@@ -154,6 +157,35 @@ export class FpsViewController implements Tickable {
       }
     }
     this.multiTool.setProjectileSystem(this.projectileSystem)
+
+    // Target dummies — ?targets=true spawns 10 around the player
+    const params = new URLSearchParams(window.location.search)
+    if (params.has('targets')) {
+      const count = 10
+      const radius = 30
+      for (let i = 0; i < count; i++) {
+        const angle = (i / count) * Math.PI * 2
+        const x = Math.cos(angle) * radius
+        const z = Math.sin(angle) * radius
+        const y = heightmap.heightAt(x, z)
+        const dummy = new TargetDummyController(new Vector3(x, y, z))
+        dummy.group.lookAt(0, y, 0) // face center
+        this.targetDummies.push(dummy)
+        this.sceneManager.addToScene(dummy.group)
+        this.projectileSystem.addEnemy(dummy.enemy)
+        this.tickHandler.register(dummy, TICK_PRIORITY_ANIMATION)
+      }
+    }
+
+    // Enemy hit → flash + particles
+    this.projectileSystem.onEnemyHit = (enemy, pos) => {
+      const dummy = this.targetDummies.find((d) => d.enemy === enemy)
+      dummy?.flash()
+      const up = new Vector3(0, 1, 0)
+      for (let i = 0; i < 12; i++) {
+        this.impactEmitter!.emit(pos, up.clone().multiplyScalar(8))
+      }
+    }
 
     // Death handler — reset scene
     this.playerController.onDeath = () => {
@@ -305,6 +337,7 @@ export class FpsViewController implements Tickable {
 
   dispose(): void {
     this.gameLoop?.stop()
+    for (const dummy of this.targetDummies) dummy.dispose()
     this.projectileSystem?.dispose()
     this.impactEmitter?.dispose()
     this.multiTool?.dispose()

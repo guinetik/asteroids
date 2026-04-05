@@ -12,6 +12,7 @@
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 import type { Heightmap } from '@/lib/terrain/heightmap'
+import type { Enemy } from './enemy'
 
 /** Bolt projectile speed (units/s). */
 const BOLT_SPEED = 200
@@ -23,6 +24,8 @@ const BOLT_WIDTH = 0.04
 const BOLT_MAX_LIFETIME = 4.0
 /** Terrain collision margin — bolt Y vs floor Y. */
 const TERRAIN_HIT_MARGIN = 0.5
+/** Damage per bolt hit. */
+const BOLT_DAMAGE = 25
 
 /** Internal projectile state. */
 interface Projectile {
@@ -42,13 +45,27 @@ export class ProjectileSystem implements Tickable {
   private readonly projectiles: Projectile[] = []
   private readonly scene: THREE.Scene
   private readonly heightmap: Heightmap
+  private readonly enemies: Enemy[] = []
 
   /** Called when a projectile hits terrain. Position is the impact point. */
   onImpact: ((position: THREE.Vector3) => void) | null = null
+  /** Called when a projectile hits an enemy. */
+  onEnemyHit: ((enemy: Enemy, position: THREE.Vector3) => void) | null = null
 
   constructor(scene: THREE.Scene, heightmap: Heightmap) {
     this.scene = scene
     this.heightmap = heightmap
+  }
+
+  /** Register an enemy for projectile collision checks. */
+  addEnemy(enemy: Enemy): void {
+    this.enemies.push(enemy)
+  }
+
+  /** Remove an enemy from collision checks. */
+  removeEnemy(enemy: Enemy): void {
+    const idx = this.enemies.indexOf(enemy)
+    if (idx >= 0) this.enemies.splice(idx, 1)
   }
 
   /**
@@ -122,14 +139,28 @@ export class ProjectileSystem implements Tickable {
         mat.uniforms['uTime'].value = p.age
       }
 
-      // Terrain collision
       const pos = p.mesh.position
+
+      // Enemy collision — sphere check against each alive enemy
+      let hitEnemy = false
+      for (const enemy of this.enemies) {
+        if (!enemy.alive) continue
+        const dist = pos.distanceTo(enemy.position)
+        if (dist <= enemy.hitRadius) {
+          enemy.takeDamage(BOLT_DAMAGE)
+          this.onEnemyHit?.(enemy, pos.clone())
+          hitEnemy = true
+          break
+        }
+      }
+
+      // Terrain collision
       const floorY = this.heightmap.heightAt(pos.x, pos.z)
       const hitTerrain = pos.y <= floorY + TERRAIN_HIT_MARGIN
 
       // Remove on hit or timeout
-      if (hitTerrain || p.age >= BOLT_MAX_LIFETIME) {
-        if (hitTerrain) {
+      if (hitEnemy || hitTerrain || p.age >= BOLT_MAX_LIFETIME) {
+        if (hitTerrain || hitEnemy) {
           this.onImpact?.(pos.clone())
         }
         this.removeProjectile(i)
