@@ -6,7 +6,6 @@ const props = defineProps<{
 }>()
 
 /** Proximity tier thresholds. */
-const CAUTION_THRESHOLD = 0
 const DANGER_THRESHOLD = 0.3
 const CRITICAL_THRESHOLD = 0.7
 
