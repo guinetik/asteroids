@@ -1,5 +1,5 @@
 {
-  "gravityConstant": 0.5,
+  "gravityConstant": 450,
   "minDistance": 0.3,
   "influenceScale": 50,
   "eventHorizonScale": 15,
