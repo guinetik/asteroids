@@ -278,7 +278,8 @@ export class LevelViewController implements Tickable {
         this.exitLander()
         break
       case 'eva':
-        this.exitEva()
+        // Don't run normal exitEva when dying — enterDead handles its own cleanup
+        if (current !== 'dead') this.exitEva()
         break
     }
 
@@ -419,12 +420,13 @@ export class LevelViewController implements Tickable {
   // ═══════════════════════════════════════════════════════════════
 
   private enterDead(): void {
-    // Unregister player physics — stop movement but keep camera
+    // Stop player movement but keep fpsCamera ticking for the death pitch-down
     this.tickHandler!.unregister(this.playerController!)
     this.tickHandler!.unregister(this.multiToolState!)
     this.tickHandler!.unregister(this.projectileSystem!)
     this.tickHandler!.unregister(this.impactEmitter!)
     this.tickHandler!.unregister(this.multiTool!)
+    // NOTE: fpsCamera stays registered — it renders the death camera drop
 
     // Hide the gun
     this.multiTool!.setVisible(false)
@@ -434,14 +436,21 @@ export class LevelViewController implements Tickable {
       document.exitPointerLock()
     }
     this.teardownPointerLock()
+    this.leftMouseDown = false
+    this.leftMouseJustPressed = false
+    this.rightMouseDown = false
 
-    // Show death message
+    // Full black + death message
+    this.onDeathFade?.(1)
     this.onDeathMessage?.(true)
   }
 
   private enterFailed(): void {
-    // Hide death message, navigate home
-    this.onDeathMessage?.(false)
+    // Clean up remaining EVA systems
+    this.tickHandler!.unregister(this.fpsCamera!)
+    this.playerController!.group.visible = false
+
+    // Navigate home
     import('@/router').then(({ default: router }) => {
       router.push('/')
     })
