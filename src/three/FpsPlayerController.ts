@@ -233,7 +233,9 @@ export class FpsPlayerController implements Tickable {
   tick(dt: number): void {
     const mv = this.config.movement
     const isSprinting =
-      this.inputManager.isActionActive('sprint') && this.thrusterSystem.canFire('sprint')
+      this.body.grounded &&
+      this.inputManager.isActionActive('sprint') &&
+      this.thrusterSystem.canFire('sprint')
 
     // --- Coyote time — track how long since last grounded ---
     if (this.body.grounded) {
@@ -299,26 +301,9 @@ export class FpsPlayerController implements Tickable {
         this.lateralVelocity.z = 0
       }
     } else {
-      // Airborne: thrust-based (committal, floaty)
-      const thrustMag = mv.moveThrust * (isSprinting ? mv.sprintMultiplier : 1)
-      if (this.inputManager.isActionActive('moveForward')) {
-        this.lateralVelocity.x += forward.x * thrustMag * dt
-        this.lateralVelocity.z += forward.y * thrustMag * dt
-      }
-      if (this.inputManager.isActionActive('moveBack')) {
-        this.lateralVelocity.x -= forward.x * thrustMag * dt
-        this.lateralVelocity.z -= forward.y * thrustMag * dt
-      }
-      if (this.inputManager.isActionActive('moveLeft')) {
-        this.lateralVelocity.x -= right.x * thrustMag * dt
-        this.lateralVelocity.z -= right.y * thrustMag * dt
-      }
-      if (this.inputManager.isActionActive('moveRight')) {
-        this.lateralVelocity.x += right.x * thrustMag * dt
-        this.lateralVelocity.z += right.y * thrustMag * dt
-      }
+      // Airborne: no input — commit to your jump trajectory
 
-      // Air friction (weak — commit to your jump)
+      // Air friction (weak — momentum carries)
       const speed = this.speed
       if (speed > 0) {
         const drop = mv.airFriction * dt
