@@ -3,6 +3,7 @@ import HomeView from '@/views/HomeView.vue'
 import ShuttleView from '@/views/ShuttleView.vue'
 import LanderView from '@/views/LanderView.vue'
 import FpsView from '@/views/FpsView.vue'
+import LevelView from '@/views/LevelView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -31,6 +32,11 @@ const router = createRouter({
       path: '/fps',
       name: 'fps',
       component: FpsView,
+    },
+    {
+      path: '/level',
+      name: 'level',
+      component: LevelView,
     },
   ],
 })
