@@ -127,10 +127,15 @@ export class ProjectileSystem implements Tickable {
     })
   }
 
+  private readonly _prevPos = new THREE.Vector3()
+
   tick(dt: number): void {
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i]!
       p.age += dt
+
+      // Save previous position for swept collision
+      this._prevPos.copy(p.mesh.position)
       p.mesh.position.addScaledVector(p.velocity, dt)
 
       // Feed time uniform
@@ -141,12 +146,11 @@ export class ProjectileSystem implements Tickable {
 
       const pos = p.mesh.position
 
-      // Enemy collision — sphere check against each alive enemy
+      // Enemy collision — ray segment check (prevents tunneling)
       let hitEnemy = false
       for (const enemy of this.enemies) {
         if (!enemy.alive) continue
-        const dist = pos.distanceTo(enemy.position)
-        if (dist <= enemy.hitRadius) {
+        if (this.rayHitsSphere(this._prevPos, pos, enemy.position, enemy.hitRadius)) {
           enemy.takeDamage(BOLT_DAMAGE)
           this.onEnemyHit?.(enemy, pos.clone())
           hitEnemy = true
@@ -166,6 +170,30 @@ export class ProjectileSystem implements Tickable {
         this.removeProjectile(i)
       }
     }
+  }
+
+  /**
+   * Check if a line segment (from → to) passes within radius of a sphere center.
+   * Closest-point-on-segment approach — handles fast projectiles that skip past targets.
+   */
+  private rayHitsSphere(from: THREE.Vector3, to: THREE.Vector3, center: THREE.Vector3, radius: number): boolean {
+    const dx = to.x - from.x
+    const dy = to.y - from.y
+    const dz = to.z - from.z
+    const fx = from.x - center.x
+    const fy = from.y - center.y
+    const fz = from.z - center.z
+    const segLenSq = dx * dx + dy * dy + dz * dz
+    if (segLenSq === 0) {
+      return fx * fx + fy * fy + fz * fz <= radius * radius
+    }
+    // Project center onto segment, clamp to [0, 1]
+    let t = -(fx * dx + fy * dy + fz * dz) / segLenSq
+    t = Math.max(0, Math.min(1, t))
+    const closestX = from.x + t * dx - center.x
+    const closestY = from.y + t * dy - center.y
+    const closestZ = from.z + t * dz - center.z
+    return closestX * closestX + closestY * closestY + closestZ * closestZ <= radius * radius
   }
 
   private removeProjectile(index: number): void {
