@@ -15,7 +15,7 @@ export type LevelState = 'arrival' | 'lander' | 'eva' | 'dead' | 'exfil' | 'comp
 export const ARRIVAL_DURATION = 3.0
 
 /** Seconds to hold on the death screen before redirecting. */
-export const DEAD_SCREEN_DURATION = 3.0
+export const DEAD_SCREEN_DURATION = 5.0
 
 /** Distance threshold for entering the lander on foot (world units). */
 export const LANDER_INTERACT_RANGE = 15

@@ -12,6 +12,7 @@ const viewController = new LevelViewController()
 const letterboxVisible = ref(true)
 const stateInfo = reactive({ state: '', grounded: false })
 const deathFade = ref(0)
+const deathMessage = ref(false)
 
 const landerTelemetry = reactive<LanderTelemetry>({
   altitude: 0,
@@ -59,6 +60,9 @@ onMounted(async () => {
     viewController.onDeathFade = (opacity) => {
       deathFade.value = opacity
     }
+    viewController.onDeathMessage = (visible) => {
+      deathMessage.value = visible
+    }
     await viewController.init(container.value)
   }
 })
@@ -91,6 +95,9 @@ onUnmounted(() => {
     class="death-fade"
     :style="{ opacity: deathFade }"
   />
+  <div v-if="deathMessage" class="death-message">
+    <span class="death-message__text">YOU DIED</span>
+  </div>
 </template>
 
 <style>
@@ -137,5 +144,26 @@ onUnmounted(() => {
   background: black;
   z-index: 50;
   pointer-events: none;
+}
+.death-message {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+  pointer-events: none;
+}
+.death-message__text {
+  font-family: monospace;
+  font-size: 3rem;
+  color: #ef4444;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  animation: death-pulse 2s ease-in-out infinite;
+}
+@keyframes death-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
 </style>

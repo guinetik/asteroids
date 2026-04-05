@@ -134,6 +134,9 @@ export class LevelViewController implements Tickable {
   /** Called each frame with death fade opacity (0 = clear, 1 = black). */
   onDeathFade: ((opacity: number) => void) | null = null
 
+  /** Called when player dies — show death message. */
+  onDeathMessage: ((visible: boolean) => void) | null = null
+
   /** Initialise all systems and start the game loop. */
   async init(container: HTMLElement): Promise<void> {
     const playerConfig = playerConfigJson as FpsPlayerConfig
@@ -416,14 +419,31 @@ export class LevelViewController implements Tickable {
   // ═══════════════════════════════════════════════════════════════
 
   private enterDead(): void {
-    // Full black fade
-    this.onDeathFade?.(1)
+    // Unregister player physics — stop movement but keep camera
+    this.tickHandler!.unregister(this.playerController!)
+    this.tickHandler!.unregister(this.multiToolState!)
+    this.tickHandler!.unregister(this.projectileSystem!)
+    this.tickHandler!.unregister(this.impactEmitter!)
+    this.tickHandler!.unregister(this.multiTool!)
+
+    // Hide the gun
+    this.multiTool!.setVisible(false)
+
+    // Release pointer lock
+    if (document.pointerLockElement) {
+      document.exitPointerLock()
+    }
+    this.teardownPointerLock()
+
+    // Show death message
+    this.onDeathMessage?.(true)
   }
 
   private enterFailed(): void {
-    // Navigate to map after a beat
+    // Hide death message, navigate home
+    this.onDeathMessage?.(false)
     import('@/router').then(({ default: router }) => {
-      router.push('/map')
+      router.push('/')
     })
   }
 
@@ -456,6 +476,15 @@ export class LevelViewController implements Tickable {
         this.onDeathFade?.(1 - hpRatio * 2)
       } else {
         this.onDeathFade?.(0)
+      }
+    }
+
+    // Dead: pitch camera toward ground
+    if (this.stateMachine?.is('dead') && this.fpsCamera) {
+      const DEATH_PITCH_SPEED = 0.8
+      const DEATH_PITCH_TARGET = -1.2 // ~70 degrees down
+      if (this.fpsCamera.pitch > DEATH_PITCH_TARGET) {
+        this.fpsCamera.pitch -= DEATH_PITCH_SPEED * dt
       }
     }
 
