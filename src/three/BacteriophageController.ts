@@ -20,6 +20,8 @@ const LEG_TUBE_RADIUS = 0.025
 const LEG_SEGMENTS = 12
 
 const HIT_FLASH_DURATION = 0.08
+const HIT_RECOIL_DURATION = 0.25
+const HIT_RECOIL_INTENSITY = 0.15
 const DEATH_DELAY_MS = 300
 
 /**
@@ -50,7 +52,7 @@ const headMat = new THREE.MeshPhysicalMaterial({
   metalness: 0.3,
 })
 
-const flashMat = new THREE.MeshBasicMaterial({ color: 0xffffff })
+const flashMat = new THREE.MeshBasicMaterial({ color: 0xff00ff })
 
 const coreMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc })
 
@@ -96,6 +98,7 @@ export class BacteriophageController implements Tickable {
   private elapsed = 0
   private readonly timeOffset: number
   private flashTimer = 0
+  private recoilTimer = 0
   private dead = false
   private disposed = false
 
@@ -280,6 +283,15 @@ export class BacteriophageController implements Tickable {
       this.bodyGroup.rotation.x = Math.sin(t * 0.5) * 0.01
     }
 
+    // --- Hit recoil — jolt body on impact ---
+    if (this.recoilTimer > 0) {
+      this.recoilTimer -= dt
+      const intensity = (this.recoilTimer / HIT_RECOIL_DURATION) * HIT_RECOIL_INTENSITY
+      this.bodyGroup.position.y += Math.sin(t * 40) * intensity
+      this.bodyGroup.rotation.z += Math.sin(t * 35) * intensity * 2
+      this.bodyGroup.rotation.x += Math.cos(t * 30) * intensity * 1.5
+    }
+
     // --- DNA core spin + pulse ---
     this.core.rotation.y += 0.02
     const coreScale = 1 + Math.sin(t * 2) * 0.1
@@ -308,9 +320,10 @@ export class BacteriophageController implements Tickable {
   // Hit / death
   // ═══════════════════════════════════════════════════════════════
 
-  /** Flash head white on hit — called by VC when projectile connects. */
+  /** Flash head magenta + body recoil on hit — called by VC when projectile connects. */
   flash(): void {
     this.flashTimer = HIT_FLASH_DURATION
+    this.recoilTimer = HIT_RECOIL_DURATION
     this.head.material = flashMat
   }
 
