@@ -25,11 +25,11 @@ const MUZZLE_NODE_NAME = 'pistol_led_front'
 /** Bolt projectile speed (units/s). */
 const BOLT_SPEED = 200
 /** Bolt length (units). */
-const BOLT_LENGTH = 2.0
+const BOLT_LENGTH = 4.0
 /** Bolt width (units). */
-const BOLT_WIDTH = 0.08
+const BOLT_WIDTH = 0.06
 /** Max bolt lifetime before removal (seconds). */
-const BOLT_MAX_LIFETIME = 3.0
+const BOLT_MAX_LIFETIME = 4.0
 
 /** Position offset from camera origin (right, down, forward). */
 const OFFSET_X = 0.35
@@ -166,27 +166,56 @@ export class MultiToolController implements Tickable {
     const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion)
     const aimPoint = this.camera.position.clone().addScaledVector(camForward, BOLT_SPEED)
 
-    // Origin: muzzle world position
-    const origin = new THREE.Vector3()
-    if (this.muzzleNode) {
-      this.muzzleNode.getWorldPosition(origin)
-    } else {
-      origin.copy(this.camera.position)
-      const camDown = new THREE.Vector3(0, -1, 0).applyQuaternion(this.camera.quaternion)
-      origin.addScaledVector(camForward, 0.6)
-      origin.addScaledVector(camDown, 0.15)
-    }
+    // Origin: gun barrel tip in camera-local space, transformed to world
+    // Matches the visual gun position (OFFSET_X/Y/Z) but pushed forward to the barrel
+    const origin = this.camera.position.clone()
+    const camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion)
+    const camDown = new THREE.Vector3(0, -1, 0).applyQuaternion(this.camera.quaternion)
+    origin.addScaledVector(camForward, 1.0)
+    origin.addScaledVector(camDown, 0.2)
 
     // Direction: from muzzle toward the aim point (converges on crosshair)
     const direction = aimPoint.sub(origin).normalize()
 
-    // Create bolt mesh — elongated box for that blaster look
-    const geometry = new THREE.BoxGeometry(BOLT_WIDTH, BOLT_WIDTH, BOLT_LENGTH)
-    const material = new THREE.MeshBasicMaterial({
-      color: this.boltColor,
+    // Create bolt — cylinder with glowing shader for blaster beam look
+    const geometry = new THREE.CylinderGeometry(BOLT_WIDTH, BOLT_WIDTH, BOLT_LENGTH, 6, 1, false)
+    // Rotate geometry so cylinder length aligns with Z (lookAt direction)
+    geometry.rotateX(Math.PI / 2)
+
+    const material = new THREE.ShaderMaterial({
       transparent: true,
-      opacity: 0.9,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      uniforms: {
+        uColor: { value: this.boltColor.clone() },
+        uTime: { value: 0 },
+      },
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform vec3 uColor;
+        uniform float uTime;
+        varying vec2 vUv;
+        void main() {
+          // Hot white core fading to colored edge
+          float dist = abs(vUv.x - 0.5) * 2.0;
+          float core = smoothstep(1.0, 0.2, dist);
+          vec3 col = mix(uColor, vec3(1.0), core * 0.7);
+          // Taper at ends
+          float taper = smoothstep(0.0, 0.1, vUv.y) * smoothstep(1.0, 0.9, vUv.y);
+          float alpha = core * taper * 0.9;
+          // Subtle flicker
+          alpha *= 0.85 + 0.15 * sin(uTime * 40.0 + vUv.y * 10.0);
+          gl_FragColor = vec4(col, alpha);
+        }
+      `,
     })
+
     const bolt = new THREE.Mesh(geometry, material)
     bolt.position.copy(origin)
     bolt.lookAt(origin.clone().add(direction))
@@ -248,10 +277,16 @@ export class MultiToolController implements Tickable {
       bolt.age += dt
       bolt.mesh.position.addScaledVector(bolt.velocity, dt)
 
+      // Feed time uniform for flicker
+      const mat = bolt.mesh.material as THREE.ShaderMaterial
+      if (mat.uniforms['uTime']) {
+        mat.uniforms['uTime'].value = bolt.age
+      }
+
       if (bolt.age >= BOLT_MAX_LIFETIME) {
         this.scene?.remove(bolt.mesh)
         bolt.mesh.geometry.dispose()
-        ;(bolt.mesh.material as THREE.MeshBasicMaterial).dispose()
+        mat.dispose()
         this.bolts.splice(i, 1)
       }
     }
@@ -261,7 +296,7 @@ export class MultiToolController implements Tickable {
     for (const bolt of this.bolts) {
       this.scene?.remove(bolt.mesh)
       bolt.mesh.geometry.dispose()
-      ;(bolt.mesh.material as THREE.MeshBasicMaterial).dispose()
+      ;(bolt.mesh.material as THREE.ShaderMaterial).dispose()
     }
     this.bolts.length = 0
     if (this.model) {
