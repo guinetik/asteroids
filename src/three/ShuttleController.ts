@@ -12,11 +12,41 @@ import { loadGLB } from './loadGLB'
 import { FuelTank } from './FuelTank'
 import { HabitatModule } from './HabitatModule'
 import type { PortalVehicle } from './PortalArrivalSequence'
+import shuttlePhysicsData from '@/data/shuttle/shuttle-physics.json'
+import orbitConfig from '@/data/shuttle/orbit-capture.json'
 
 /** Any object that can exert gravity on the shuttle */
 interface GravityWell {
   getGravityAt(position: THREE.Vector3): THREE.Vector3
 }
+
+/** Tuning knobs for shuttle flight physics. Loaded from shuttle-physics.json. */
+export interface ShuttlePhysicsConfig {
+  /** Forward acceleration per second */
+  thrustForce: number
+  /** Velocity multiplier while braking (0–1, lower = stronger brake) */
+  brakeFactor: number
+  /** Brake effectiveness lost per unit of gravity well depth */
+  brakeDepthPenalty: number
+  /** Angular acceleration (rad/s²) */
+  yawTorque: number
+  /** Lateral RCS push force */
+  yawLateralForce: number
+  /** Maximum angular velocity (rad/s) */
+  yawMaxSpeed: number
+  /** Angular velocity damping per frame (0–1) */
+  yawDamping: number
+  /** Speed cap from player thrust alone */
+  maxThrustSpeed: number
+  /** Absolute speed cap (gravity can exceed thrust cap up to this) */
+  maxGravitySpeed: number
+}
+
+/** Default physics for the shuttle scene. */
+export const SHUTTLE_PHYSICS: ShuttlePhysicsConfig = shuttlePhysicsData.shuttle as ShuttlePhysicsConfig
+
+/** Scaled-down physics for the map scene (solar system hub). */
+export const MAP_PHYSICS: ShuttlePhysicsConfig = shuttlePhysicsData.map as ShuttlePhysicsConfig
 
 const SPAWN_MIN_RADIUS = 400
 const SPAWN_MAX_RADIUS = 1500
@@ -55,16 +85,6 @@ const LANDER_MODEL_PATH = '/models/lander.glb'
 const CARGO_LANDER_SCALE = 30
 /** Position inside the bay — raw model coords (cm), pre-rotation: X=nose-tail, Y=wingspan, Z=height */
 const CARGO_LANDER_OFFSET = new THREE.Vector3(-320, 0, 20)
-
-const THRUST_FORCE = 12
-const BRAKE_FACTOR = 0.93
-const BRAKE_DEPTH_PENALTY = 0.002 // brake effectiveness lost per unit of well depth
-const YAW_TORQUE = 2.5 // angular acceleration per second
-const YAW_LATERAL_FORCE = 2 // small lateral push from RCS gas (no combustion)
-const YAW_MAX_SPEED = 3.5 // max angular velocity
-const YAW_DAMPING = 0.98 // gentle angular friction per frame
-const MAX_THRUST_SPEED = 60 // max speed from player thrust alone
-const MAX_GRAVITY_SPEED = 150 // gravity can push you way past thrust max
 
 /**
  * Controls the shuttle model — loading, door animation, movement, and nozzle placement.
@@ -107,6 +127,23 @@ export class ShuttleController implements Tickable, PortalVehicle {
     this.ignoreGridY = ignore
   }
 
+  /** Enable or disable player input (autopilot takeover during approach). */
+  setInputEnabled(enabled: boolean): void {
+    this._inputEnabled = enabled
+  }
+
+  /** Whether player input is currently enabled. */
+  get inputEnabled(): boolean {
+    return this._inputEnabled
+  }
+
+  /** Set slingshot speed protection — speed won't be clamped below this. */
+  setSlingshotSpeed(speed: number): void {
+    this._slingshotSpeed = speed
+  }
+
+  private _inputEnabled = true
+  private _slingshotSpeed = 0
   private angularVelocity = 0
   private readonly inputManager: InputManager
   private spaceTimeGrid: SpaceTimeGrid | null = null
@@ -121,9 +158,11 @@ export class ShuttleController implements Tickable, PortalVehicle {
   private cargoLight: THREE.PointLight | null = null
   private readonly cargoWallLights: THREE.PointLight[] = []
   private habitat: HabitatModule | null = null
+  private readonly physics: ShuttlePhysicsConfig
 
-  constructor(inputManager: InputManager) {
+  constructor(inputManager: InputManager, physics: ShuttlePhysicsConfig = SHUTTLE_PHYSICS) {
     this.inputManager = inputManager
+    this.physics = physics
   }
 
   setSpaceTimeGrid(grid: SpaceTimeGrid): void {
@@ -186,18 +225,24 @@ export class ShuttleController implements Tickable, PortalVehicle {
     gltf.scene.add(this.habitat.group)
 
     // Cargo bay interior lights — only on when doors open
+    // Ranges are in raw model space; group scale shrinks them automatically
+    // since lights are children of the scaled gltf.scene.
+    const scale = this.group.scale.x
+    const mainRange = 800 * scale
+    const wallRange = 400 * scale
+
     // Main light: between the two fuel tanks
-    this.cargoLight = new THREE.PointLight(0xffeedd, 0, 800)
+    this.cargoLight = new THREE.PointLight(0xffeedd, 0, mainRange)
     this.cargoLight.position.set(-60, 0, 150)
     gltf.scene.add(this.cargoLight)
 
     // Wing wall lights: at the fuselage-thruster bulkhead, port and starboard
-    const wallLightL = new THREE.PointLight(0xffeedd, 0, 400)
+    const wallLightL = new THREE.PointLight(0xffeedd, 0, wallRange)
     wallLightL.position.set(-420, -200, 100)
     gltf.scene.add(wallLightL)
     this.cargoWallLights.push(wallLightL)
 
-    const wallLightR = new THREE.PointLight(0xffeedd, 0, 400)
+    const wallLightR = new THREE.PointLight(0xffeedd, 0, wallRange)
     wallLightR.position.set(-420, 200, 100)
     gltf.scene.add(wallLightR)
     this.cargoWallLights.push(wallLightR)
@@ -221,19 +266,19 @@ export class ShuttleController implements Tickable, PortalVehicle {
   }
 
   get isThrusting(): boolean {
-    return this.inputManager.isActionActive('thrust') && this.thrusterSystem.canFire('thrust')
+    return this._inputEnabled && this.inputManager.isActionActive('thrust') && this.thrusterSystem.canFire('thrust')
   }
 
   get isBraking(): boolean {
-    return this.inputManager.isActionActive('brake') && this.thrusterSystem.canFire('brake')
+    return this._inputEnabled && this.inputManager.isActionActive('brake') && this.thrusterSystem.canFire('brake')
   }
 
   get isYawingLeft(): boolean {
-    return this.inputManager.isActionActive('yawLeft') && this.thrusterSystem.canFire('rcs')
+    return this._inputEnabled && this.inputManager.isActionActive('yawLeft') && this.thrusterSystem.canFire('rcs')
   }
 
   get isYawingRight(): boolean {
-    return this.inputManager.isActionActive('yawRight') && this.thrusterSystem.canFire('rcs')
+    return this._inputEnabled && this.inputManager.isActionActive('yawRight') && this.thrusterSystem.canFire('rcs')
   }
 
   get speed(): number {
@@ -242,6 +287,11 @@ export class ShuttleController implements Tickable, PortalVehicle {
 
   get heading(): number {
     return this.group.rotation.y
+  }
+
+  /** Current velocity vector (read-only copy for external systems). */
+  get currentVelocity(): THREE.Vector3 {
+    return this.velocity.clone()
   }
 
   tick(dt: number): void {
@@ -296,12 +346,14 @@ export class ShuttleController implements Tickable, PortalVehicle {
   private updateFuelIndicator(): void {
     const doorsOpen = this.doorProgress > 0.1
 
-    // Cargo lights fade in/out with doors
+    // Cargo lights fade in/out with doors — scale intensity by group scale
+    // so lights don't overpower the scene at small scales (e.g. map view)
+    const lightScale = this.group.scale.x
     if (this.cargoLight) {
-      this.cargoLight.intensity = this.doorProgress * 2
+      this.cargoLight.intensity = this.doorProgress * 2 * lightScale
     }
     for (const light of this.cargoWallLights) {
-      light.intensity = this.doorProgress * 1.5
+      light.intensity = this.doorProgress * 1.5 * lightScale
     }
 
     if (this.habitat) {
@@ -389,19 +441,21 @@ export class ShuttleController implements Tickable, PortalVehicle {
   }
 
   private updateMovement(dt: number): void {
+    const p = this.physics
+
     // Yaw (A/D) — apply angular torque, builds up angular velocity
     if (this.isYawingLeft) {
-      this.angularVelocity += YAW_TORQUE * dt
+      this.angularVelocity += p.yawTorque * dt
     }
     if (this.isYawingRight) {
-      this.angularVelocity -= YAW_TORQUE * dt
+      this.angularVelocity -= p.yawTorque * dt
     }
 
     // Gentle damping so it doesn't spin forever
-    this.angularVelocity *= YAW_DAMPING
+    this.angularVelocity *= p.yawDamping
 
     // Clamp angular velocity
-    this.angularVelocity = Math.max(-YAW_MAX_SPEED, Math.min(YAW_MAX_SPEED, this.angularVelocity))
+    this.angularVelocity = Math.max(-p.yawMaxSpeed, Math.min(p.yawMaxSpeed, this.angularVelocity))
 
     // Apply angular velocity
     this.group.rotateY(this.angularVelocity * dt)
@@ -411,10 +465,10 @@ export class ShuttleController implements Tickable, PortalVehicle {
     right.y = 0
     right.normalize()
     if (this.isYawingLeft) {
-      this.velocity.addScaledVector(right, -YAW_LATERAL_FORCE * dt)
+      this.velocity.addScaledVector(right, -p.yawLateralForce * dt)
     }
     if (this.isYawingRight) {
-      this.velocity.addScaledVector(right, YAW_LATERAL_FORCE * dt)
+      this.velocity.addScaledVector(right, p.yawLateralForce * dt)
     }
 
     // Thrust (W) — accelerate along forward on XZ plane (nose is +X after rotation)
@@ -422,13 +476,13 @@ export class ShuttleController implements Tickable, PortalVehicle {
     forward.y = 0 // flatten to XZ plane
     forward.normalize()
     if (this.isThrusting) {
-      this.velocity.addScaledVector(forward, THRUST_FORCE * dt)
+      this.velocity.addScaledVector(forward, p.thrustForce * dt)
     }
 
     // Brake (S) — inertia dampener, weaker deeper in gravity wells
     if (this.isBraking) {
       const depth = Math.abs(this.group.position.y)
-      const effectiveBrake = Math.min(1, BRAKE_FACTOR + depth * BRAKE_DEPTH_PENALTY)
+      const effectiveBrake = Math.min(1, p.brakeFactor + depth * p.brakeDepthPenalty)
       this.velocity.multiplyScalar(effectiveBrake)
     }
 
@@ -441,12 +495,24 @@ export class ShuttleController implements Tickable, PortalVehicle {
     // Lock velocity to XZ plane
     this.velocity.y = 0
 
-    // Clamp thrust-only speed, but allow gravity to push beyond
+    // Decay slingshot speed protection
+    if (this._slingshotSpeed > p.maxThrustSpeed) {
+      const excess = this._slingshotSpeed - p.maxThrustSpeed
+      this._slingshotSpeed -= excess * orbitConfig.slingshotDecayRate * dt
+    }
+
+    // Clamp thrust-only speed, but allow gravity and slingshot to push beyond
     const currentSpeed = this.velocity.length()
-    if (this.isThrusting && currentSpeed > MAX_THRUST_SPEED) {
-      this.velocity.setLength(MAX_THRUST_SPEED)
-    } else if (currentSpeed > MAX_GRAVITY_SPEED) {
-      this.velocity.setLength(MAX_GRAVITY_SPEED)
+    if (this.isBraking) {
+      // Braking cancels slingshot protection
+      this._slingshotSpeed = 0
+    }
+    if (this._slingshotSpeed > p.maxThrustSpeed && currentSpeed <= this._slingshotSpeed) {
+      // Slingshot protection — don't clamp
+    } else if (this.isThrusting && currentSpeed > p.maxThrustSpeed) {
+      this.velocity.setLength(p.maxThrustSpeed)
+    } else if (currentSpeed > p.maxGravitySpeed) {
+      this.velocity.setLength(p.maxGravitySpeed)
     }
 
     // Apply velocity and follow spacetime geometry
