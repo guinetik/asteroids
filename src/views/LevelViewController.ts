@@ -32,6 +32,8 @@ import { Heightmap } from '@/lib/terrain/heightmap'
 import { MultiToolController } from '@/three/MultiToolController'
 import { MultiToolState } from '@/lib/fps/multiToolState'
 import type { MultiToolConfig } from '@/lib/fps/multiToolState'
+import type { LanderTelemetry } from '@/components/LanderHud.vue'
+import type { FpsTelemetry } from '@/components/FpsHud.vue'
 import { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
 import { createLevelStateMachine, LANDER_INTERACT_RANGE } from '@/lib/level/levelStateMachine'
@@ -119,8 +121,14 @@ export class LevelViewController implements Tickable {
   /** Called when letterbox visibility should change. */
   onLetterbox: ((visible: boolean) => void) | null = null
 
-  /** Called each frame with current state info for HUD prompts. */
+  /** Called each frame with current state + grounded for HUD prompts. */
   onStateInfo: ((info: { state: string; grounded: boolean }) => void) | null = null
+
+  /** Called each frame during lander state with lander telemetry. */
+  onLanderTelemetry: ((telemetry: LanderTelemetry) => void) | null = null
+
+  /** Called each frame during EVA state with FPS telemetry. */
+  onFpsTelemetry: ((telemetry: FpsTelemetry) => void) | null = null
 
   /** Initialise all systems and start the game loop. */
   async init(container: HTMLElement): Promise<void> {
@@ -390,11 +398,47 @@ export class LevelViewController implements Tickable {
     }
 
     // Broadcast state info for HUD
-    if (this.onStateInfo && this.stateMachine) {
-      this.onStateInfo({
-        state: this.stateMachine.state ?? '',
-        grounded: this.landerController?.body.grounded ?? false,
-      })
+    if (this.stateMachine) {
+      const currentState = this.stateMachine.state ?? ''
+      const grounded = this.landerController?.body.grounded ?? false
+
+      this.onStateInfo?.({ state: currentState, grounded })
+
+      // Lander telemetry
+      if (currentState === 'lander' && this.onLanderTelemetry && this.landerController) {
+        const ts = this.landerController.thrusterSystem
+        this.onLanderTelemetry({
+          altitude: this.landerController.position.y,
+          velocityY: this.landerController.body.velocityY,
+          posX: this.landerController.position.x,
+          posZ: this.landerController.position.z,
+          fuelLevel: ts.fuelLevel,
+          fuelCapacity: ts.fuelCapacity,
+          mainEngineCharge: ts.getState('mainEngine').charge,
+          mainEngineCapacity: ts.getState('mainEngine').capacity,
+          rcsCharge: ts.getState('rcs').charge,
+          rcsCapacity: ts.getState('rcs').capacity,
+        })
+      }
+
+      // FPS telemetry
+      if (currentState === 'eva' && this.onFpsTelemetry && this.playerController) {
+        const ts = this.playerController.thrusterSystem
+        this.onFpsTelemetry({
+          o2Level: this.playerController.o2Level,
+          o2Capacity: this.playerController.o2Capacity,
+          sprintCharge: ts.getState('sprint').charge,
+          sprintCapacity: ts.getState('sprint').capacity,
+          speed: this.playerController.speed,
+          grounded: this.playerController.grounded,
+          deathTimer: this.playerController.deathTimer,
+          activeMode: this.multiToolState?.mode ?? 'drill',
+          aiming: this.multiToolState?.aiming ?? false,
+          isFiring: this.multiToolState?.isFiring ?? false,
+          rtgLevel: this.multiToolState?.rtgLevel ?? 0,
+          rtgCapacity: this.multiToolState?.rtgCapacity ?? 1,
+        })
+      }
     }
   }
 

@@ -2,11 +2,43 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { LevelViewController } from './LevelViewController'
+import LanderHud from '@/components/LanderHud.vue'
+import FpsHud from '@/components/FpsHud.vue'
+import type { LanderTelemetry } from '@/components/LanderHud.vue'
+import type { FpsTelemetry } from '@/components/FpsHud.vue'
 
 const container = ref<HTMLElement>()
 const viewController = new LevelViewController()
 const letterboxVisible = ref(true)
 const stateInfo = reactive({ state: '', grounded: false })
+
+const landerTelemetry = reactive<LanderTelemetry>({
+  altitude: 0,
+  velocityY: 0,
+  posX: 0,
+  posZ: 0,
+  fuelLevel: 0,
+  fuelCapacity: 0,
+  mainEngineCharge: 0,
+  mainEngineCapacity: 0,
+  rcsCharge: 0,
+  rcsCapacity: 0,
+})
+
+const fpsTelemetry = reactive<FpsTelemetry>({
+  o2Level: 100,
+  o2Capacity: 100,
+  sprintCharge: 50,
+  sprintCapacity: 50,
+  speed: 0,
+  grounded: false,
+  deathTimer: null,
+  activeMode: 'drill',
+  aiming: false,
+  isFiring: false,
+  rtgLevel: 80,
+  rtgCapacity: 80,
+})
 
 onMounted(async () => {
   if (container.value) {
@@ -15,6 +47,12 @@ onMounted(async () => {
     }
     viewController.onStateInfo = (info) => {
       Object.assign(stateInfo, info)
+    }
+    viewController.onLanderTelemetry = (t) => {
+      Object.assign(landerTelemetry, t)
+    }
+    viewController.onFpsTelemetry = (t) => {
+      Object.assign(fpsTelemetry, t)
     }
     await viewController.init(container.value)
   }
@@ -35,6 +73,8 @@ onUnmounted(() => {
     class="letterbox-bar letterbox-bar--bottom"
     :class="{ 'letterbox-bar--hidden': !letterboxVisible }"
   />
+  <LanderHud v-if="stateInfo.state === 'lander'" :telemetry="landerTelemetry" />
+  <FpsHud v-if="stateInfo.state === 'eva'" :telemetry="fpsTelemetry" />
   <div
     v-if="stateInfo.state === 'lander' && stateInfo.grounded"
     class="exit-prompt"
