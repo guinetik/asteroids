@@ -5,7 +5,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
 import type { Tickable } from '@/lib/Tickable'
 import type { InputManager } from '@/lib/InputManager'
 import type { SpaceTimeGrid } from './SpaceTimeGrid'
-import { checkEventHorizon, type GravitySource } from '@/lib/physics/gravity'
+import { checkEventHorizon, type GravitySource, type GravityConfig } from '@/lib/physics/gravity'
 import { ThrusterSystem, DEFAULT_SHUTTLE_CONFIG } from '@/lib/physics/thrusterSystem'
 import type { ShuttleThrusterName } from '@/lib/physics/thrusterSystem'
 import { loadGLB } from './loadGLB'
@@ -16,7 +16,7 @@ import shuttlePhysicsData from '@/data/shuttle/shuttle-physics.json'
 import orbitConfig from '@/data/shuttle/orbit-capture.json'
 
 /** Any object that can exert gravity on the shuttle */
-interface GravityWell {
+export interface GravityWell {
   getGravityAt(position: THREE.Vector3): THREE.Vector3
 }
 
@@ -159,10 +159,16 @@ export class ShuttleController implements Tickable, PortalVehicle {
   private readonly cargoWallLights: THREE.PointLight[] = []
   private habitat: HabitatModule | null = null
   private readonly physics: ShuttlePhysicsConfig
+  private readonly gravityConfig: GravityConfig | undefined
 
-  constructor(inputManager: InputManager, physics: ShuttlePhysicsConfig = SHUTTLE_PHYSICS) {
+  constructor(
+    inputManager: InputManager,
+    physics: ShuttlePhysicsConfig = SHUTTLE_PHYSICS,
+    gravityConfig?: GravityConfig,
+  ) {
     this.inputManager = inputManager
     this.physics = physics
+    this.gravityConfig = gravityConfig
   }
 
   setSpaceTimeGrid(grid: SpaceTimeGrid): void {
@@ -277,6 +283,8 @@ export class ShuttleController implements Tickable, PortalVehicle {
   orbitYawLeft = false
   /** Set by orbit system to drive RCS VFX while input is disabled. */
   orbitYawRight = false
+  /** Called when death animation completes. Falls back to respawn() if not set. */
+  onDeath: (() => void) | null = null
 
   get isYawingLeft(): boolean {
     return this.orbitYawLeft
@@ -299,6 +307,11 @@ export class ShuttleController implements Tickable, PortalVehicle {
   /** Current velocity vector (read-only copy for external systems). */
   get currentVelocity(): THREE.Vector3 {
     return this.velocity.clone()
+  }
+
+  /** Whether the shuttle is in the death animation. */
+  get dead(): boolean {
+    return this.isDead
   }
 
   tick(dt: number): void {
@@ -391,6 +404,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
       this.gravitySources,
       this.group.position.x,
       this.group.position.z,
+      this.gravityConfig,
     )
     if (hit) {
       this.isDead = true
@@ -410,8 +424,11 @@ export class ShuttleController implements Tickable, PortalVehicle {
     const dist = dir.length()
 
     if (dist < 5) {
-      // Reached center — respawn
-      this.respawn()
+      if (this.onDeath) {
+        this.onDeath()
+      } else {
+        this.respawn()
+      }
       return
     }
 
