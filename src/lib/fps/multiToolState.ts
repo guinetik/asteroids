@@ -73,7 +73,7 @@ export interface MultiToolConfig {
  * @spec docs/superpowers/specs/2026-04-04-multitool-switching-design.md
  */
 export class MultiToolState implements Tickable {
-  private _mode: MultiToolMode = 'drill'
+  private _mode: MultiToolMode = 'weapon'
   private _aiming = false
   private _isFiring = false
   private _mouseDown = false

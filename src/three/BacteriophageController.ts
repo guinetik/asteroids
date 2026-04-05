@@ -22,25 +22,32 @@ const LEG_SEGMENTS = 12
 const HIT_FLASH_DURATION = 0.08
 const DEATH_DELAY_MS = 300
 
+/**
+ * Y offset from group origin to body center (in world units).
+ * Used by the VC to position the hit-detection sphere at the torso,
+ * not at ground level. Value = bodyGroup.y (0.8) * PHAGE_SCALE.
+ */
+export const PHAGE_HIT_CENTER_Y = 0.8 * PHAGE_SCALE
+
 // ── Shared materials (reused across all phage instances) ────────
-const darkMetal = new THREE.MeshStandardMaterial({
-  color: 0x1a1a1a,
-  metalness: 0.8,
-  roughness: 0.3,
+const siliconMetal = new THREE.MeshStandardMaterial({
+  color: 0x667788,
+  metalness: 0.6,
+  roughness: 0.35,
 })
 
 const neckMat = new THREE.MeshStandardMaterial({
-  color: 0x1a1a1a,
-  emissive: 0x0a2a2a,
-  emissiveIntensity: 0.3,
+  color: 0x556677,
+  emissive: 0x0a3a3a,
+  emissiveIntensity: 0.4,
 })
 
 const headMat = new THREE.MeshPhysicalMaterial({
-  color: 0xffffff,
+  color: 0xddeeff,
   transparent: true,
-  opacity: 0.3,
-  roughness: 0.1,
-  metalness: 0.2,
+  opacity: 0.35,
+  roughness: 0.05,
+  metalness: 0.3,
 })
 
 const flashMat = new THREE.MeshBasicMaterial({ color: 0xffffff })
@@ -48,9 +55,11 @@ const flashMat = new THREE.MeshBasicMaterial({ color: 0xffffff })
 const coreMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc })
 
 const legMat = new THREE.MeshStandardMaterial({
-  color: 0x1a1a1a,
-  metalness: 0.8,
-  roughness: 0.3,
+  color: 0x556677,
+  emissive: 0x112233,
+  emissiveIntensity: 0.2,
+  metalness: 0.6,
+  roughness: 0.4,
 })
 
 // ── Shared geometries ───────────────────────────────────────────
@@ -119,19 +128,19 @@ export class BacteriophageController implements Tickable {
 
   private buildBody(): void {
     // Baseplate
-    const base = new THREE.Mesh(baseGeo, darkMetal)
+    const base = new THREE.Mesh(baseGeo, siliconMetal)
     base.position.y = -0.05
     this.bodyGroup.add(base)
 
     // Ring around baseplate
-    const ring = new THREE.Mesh(ringGeo, darkMetal)
+    const ring = new THREE.Mesh(ringGeo, siliconMetal)
     ring.rotation.x = Math.PI / 2
     ring.position.y = -0.05
     this.bodyGroup.add(ring)
 
     // Trunk connector
     const trunkGeo = new THREE.CylinderGeometry(0.18, 0.28, 0.35, 8)
-    const trunk = new THREE.Mesh(trunkGeo, darkMetal)
+    const trunk = new THREE.Mesh(trunkGeo, siliconMetal)
     trunk.position.y = 0.15
     this.bodyGroup.add(trunk)
 
@@ -338,7 +347,7 @@ export class BacteriophageController implements Tickable {
         child.geometry.dispose()
         // Only dispose instance-owned materials (not shared statics)
         if (
-          child.material !== darkMetal &&
+          child.material !== siliconMetal &&
           child.material !== neckMat &&
           child.material !== headMat &&
           child.material !== coreMat &&

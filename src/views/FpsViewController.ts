@@ -36,7 +36,7 @@ import { TargetDummyController } from '@/three/TargetDummyController'
 import playerConfigJson from '@/data/fps/player-config.json'
 import multiToolConfigJson from '@/data/fps/multitool-config.json'
 import { EnemyDirector } from '@/lib/fps/enemyDirector'
-import { BacteriophageController } from '@/three/BacteriophageController'
+import { BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/BacteriophageController'
 
 const AMBIENT_LIGHT_INTENSITY = 0.4
 const DIR_LIGHT_INTENSITY = 1.2
@@ -330,12 +330,13 @@ export class FpsViewController implements Tickable {
         ctrl.group.position.x = handle.enemy.position.x
         ctrl.group.position.z = handle.enemy.position.z
 
-        // Clamp Y to terrain
-        ctrl.group.position.y = this.heightmap?.heightAt(
+        // Clamp Y to terrain — hit sphere centered at body, not ground
+        const groundY = this.heightmap?.heightAt(
           handle.enemy.position.x,
           handle.enemy.position.z,
         ) ?? 0
-        handle.enemy.position.y = ctrl.group.position.y
+        ctrl.group.position.y = groundY
+        handle.enemy.position.y = groundY + PHAGE_HIT_CENTER_Y
 
         // Face movement direction
         if (handle.lastOutput.isMoving) {

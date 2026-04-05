@@ -36,7 +36,7 @@ const fpsTelemetry = reactive<FpsTelemetry>({
   sprintCapacity: 50,
   speed: 0,
   grounded: false,
-  activeMode: 'drill',
+  activeMode: 'weapon',
   aiming: false,
   isFiring: false,
   rtgLevel: 80,

@@ -14,8 +14,8 @@ describe('MultiToolState', () => {
     state = createState()
   })
 
-  it('defaults to drill mode', () => {
-    expect(state.mode).toBe('drill')
+  it('defaults to weapon mode', () => {
+    expect(state.mode).toBe('weapon')
   })
 
   it('switches mode via setMode', () => {
