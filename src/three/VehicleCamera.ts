@@ -45,13 +45,22 @@ export const LANDER_CAMERA_CONFIG: VehicleCameraConfig = {
   fov: 60,
 }
 
-/** Map preset: close orbit for map-scale shuttle (~0.7 units long). */
+/** Map preset: same proportions as shuttle cam, scaled for ~0.14 unit ship. */
 export const MAP_CAMERA_CONFIG: VehicleCameraConfig = {
-  idleOffset: new THREE.Vector3(-6, 4, 0),
-  lerpSpeed: 3,
-  idleTimeout: 5,
-  minY: 0.5,
-  fov: 50,
+  idleOffset: new THREE.Vector3(-0.8, 0.4, 0),
+  lerpSpeed: 5,
+  idleTimeout: 10,
+  minY: 0.1,
+  fov: 60,
+}
+
+/** Map orbit preset: pulled back above planet to show full orbit circle. */
+export const MAP_ORBIT_CAMERA_CONFIG: VehicleCameraConfig = {
+  idleOffset: new THREE.Vector3(0, 8, 0),
+  lerpSpeed: 2,
+  idleTimeout: 999,
+  minY: 1,
+  fov: 60,
 }
 
 /**
@@ -67,7 +76,7 @@ export class VehicleCamera implements Tickable {
   readonly camera: THREE.PerspectiveCamera
   readonly controls: OrbitControls
 
-  private readonly config: VehicleCameraConfig
+  private config: VehicleCameraConfig
   private target: THREE.Object3D | null = null
   private mouseIdleTimer = 0
   private isMouseActive = false
@@ -100,6 +109,13 @@ export class VehicleCamera implements Tickable {
   /** Update aspect ratio on resize. */
   resize(width: number, height: number): void {
     this.camera.aspect = width / height
+    this.camera.updateProjectionMatrix()
+  }
+
+  /** Smoothly transition to a new camera config. The offset lerps over time. */
+  setConfig(config: VehicleCameraConfig): void {
+    this.config = config
+    this.camera.fov = config.fov
     this.camera.updateProjectionMatrix()
   }
 
