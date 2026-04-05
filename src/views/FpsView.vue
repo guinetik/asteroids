@@ -47,6 +47,10 @@ const CY = 500
 interface SlicePath {
   d: string
   index: number
+  gradX1: number
+  gradY1: number
+  gradX2: number
+  gradY2: number
 }
 
 const slicePaths = computed<SlicePath[]>(() => {
@@ -83,7 +87,14 @@ const slicePaths = computed<SlicePath[]>(() => {
       'Z',
     ].join(' ')
 
-    paths.push({ d, index: i })
+    // Linear gradient direction: center → outward along slice midpoint
+    const midAngle = (startAngle + endAngle) / 2
+    const gradX1 = 50 // start at center
+    const gradY1 = 50
+    const gradX2 = 50 + Math.cos(midAngle) * 50 // end at edge
+    const gradY2 = 50 + Math.sin(midAngle) * 50
+
+    paths.push({ d, index: i, gradX1, gradY1, gradX2, gradY2 })
   }
   return paths
 })
@@ -195,18 +206,25 @@ function resumeLock() {
     preserveAspectRatio="none"
   >
     <defs>
-      <radialGradient id="sliceGrad" cx="50%" cy="50%" r="50%">
+      <linearGradient
+        v-for="slice in slicePaths"
+        :id="`sliceGrad${slice.index}`"
+        :key="`g${slice.index}`"
+        :x1="`${slice.gradX1}%`"
+        :y1="`${slice.gradY1}%`"
+        :x2="`${slice.gradX2}%`"
+        :y2="`${slice.gradY2}%`"
+      >
         <stop offset="0%" stop-color="rgb(255, 20, 20)" stop-opacity="0" />
-        <stop offset="44%" stop-color="rgb(255, 20, 20)" stop-opacity="0" />
-        <stop offset="60%" stop-color="rgb(255, 20, 20)" stop-opacity="0.6" />
+        <stop offset="50%" stop-color="rgb(255, 20, 20)" stop-opacity="0.3" />
         <stop offset="100%" stop-color="rgb(255, 20, 20)" stop-opacity="1" />
-      </radialGradient>
+      </linearGradient>
     </defs>
     <path
       v-for="slice in slicePaths"
       :key="slice.index"
       :d="slice.d"
-      fill="url(#sliceGrad)"
+      :fill="`url(#sliceGrad${slice.index})`"
       :opacity="sliceOpacity(slice.index)"
     />
   </svg>
