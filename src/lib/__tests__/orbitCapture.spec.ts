@@ -26,7 +26,7 @@ describe('OrbitCaptureSystem', () => {
 
   beforeEach(() => {
     // displayRadius=0.1 → captureRadius = max(0.1*50*8, 1.0) = 40
-    // displayRadius=0.1 → orbitRadius   = max(0.1*50*3, 0.5) = 15
+    // displayRadius=0.1 → orbitRadius   = max(0.1*50*1.8, 0.5) = 9
     bodyA = makeBody('Alpha', 0, 0, 0.1)
     bodyB = makeBody('Beta', 1000, 0, 0.1)
     system = new OrbitCaptureSystem([bodyA, bodyB])
@@ -96,7 +96,7 @@ describe('OrbitCaptureSystem', () => {
       expect(system.state).toBe('approaching')
       // orbitRadius = 15. Place shuttle exactly at orbitRadius from Alpha (at 0,0).
       // 15 * 1.0 = 15, within 15% tolerance: [12.75, 17.25]
-      const arrived = system.checkArrival(15, 0)
+      const arrived = system.checkArrival(9, 0)
       expect(arrived).toBe(true)
       expect(system.state).toBe('orbiting')
     })
@@ -110,7 +110,7 @@ describe('OrbitCaptureSystem', () => {
     })
 
     it('does nothing when state is free', () => {
-      const arrived = system.checkArrival(15, 0)
+      const arrived = system.checkArrival(9, 0)
       expect(arrived).toBe(false)
       expect(system.state).toBe('free')
     })
@@ -121,7 +121,7 @@ describe('OrbitCaptureSystem', () => {
   describe('launchSlingshot', () => {
     it('returns a velocity and transitions orbiting -> free', () => {
       system.beginCapture(20, 0)
-      system.checkArrival(15, 0)
+      system.checkArrival(9, 0)
       expect(system.state).toBe('orbiting')
 
       const vel = system.launchSlingshot(0, 0.016)
@@ -132,7 +132,7 @@ describe('OrbitCaptureSystem', () => {
 
     it('returns non-zero slingshot speed', () => {
       system.beginCapture(20, 0)
-      system.checkArrival(15, 0)
+      system.checkArrival(9, 0)
       // Tick orbit a bit to build up planet delta tracking
       system.tickOrbit(0.016)
       system.tickOrbit(0.016)
@@ -147,7 +147,7 @@ describe('OrbitCaptureSystem', () => {
   describe('tickOrbit', () => {
     it('returns orbit position offset from planet center while orbiting', () => {
       system.beginCapture(20, 0)
-      system.checkArrival(15, 0)
+      system.checkArrival(9, 0)
       const pos = system.tickOrbit(0.016)
       expect(pos).not.toBeNull()
       expect(pos).toHaveProperty('x')

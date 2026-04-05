@@ -76,6 +76,10 @@ export interface OrbitHudState {
   orbitalSpeed: number
   /** Estimated exit speed after a slingshot launch. */
   slingshotSpeed: number
+  /** Slingshot charge level 0–1 while E is held during orbit. */
+  chargeLevel: number
+  /** True when cargo inspect mode is active — hides orbit prompts. */
+  inspectMode: boolean
 }
 
 // ─── Internal precomputed body data ─────────────────────────────────────────
@@ -200,6 +204,11 @@ export class OrbitCaptureSystem {
    * Exposed so the caller can read the planet's live world position (e.g. to
    * aim the camera at the planet centre during orbit).
    */
+  /** Orbit radius of the current target body, or 0 if no target. */
+  get targetOrbitRadius(): number {
+    return this.targetData?.orbitRadius ?? 0
+  }
+
   get target(): CaptureBody | null {
     return this.targetData?.body ?? null
   }
@@ -348,7 +357,7 @@ export class OrbitCaptureSystem {
     this.prevPlanetZ = bz
 
     this.orbitAngle +=
-      (orbitConfig.orbitAngularSpeed / this.targetData.orbitRadius) * dt
+      (orbitConfig.orbitVisualSpeed / this.targetData.orbitRadius) * dt
 
     return {
       x: bx + Math.cos(this.orbitAngle) * this.targetData.orbitRadius,
@@ -373,20 +382,12 @@ export class OrbitCaptureSystem {
    * @param dt - Delta time for the current frame, used to normalise planet velocity.
    * @returns `{vx, vz}` exit velocity in world units per second.
    */
-  launchSlingshot(facingAngle: number, dt: number): Vel2 {
-    const orbitalSpeed = orbitConfig.orbitAngularSpeed
+  launchSlingshot(facingAngle: number, _dt: number): Vel2 {
+    const speed = orbitConfig.orbitLaunchSpeed
 
-    let planetVx = 0
-    let planetVz = 0
-    if (this.targetData && dt > 0) {
-      const bx = this.targetData.body.getWorldX()
-      const bz = this.targetData.body.getWorldZ()
-      planetVx = (bx - this.prevPlanetX) / dt
-      planetVz = (bz - this.prevPlanetZ) / dt
-    }
-
-    const vx = Math.cos(facingAngle) * orbitalSpeed + planetVx
-    const vz = Math.sin(facingAngle) * orbitalSpeed + planetVz
+    // Simple: launch in the direction the shuttle is facing at launch speed
+    const vx = Math.cos(facingAngle) * speed
+    const vz = -Math.sin(facingAngle) * speed
 
     this.fsm.trigger('launch')
     this.targetData = null
@@ -409,13 +410,27 @@ export class OrbitCaptureSystem {
    */
   getHudState(px: number, pz: number): OrbitHudState {
     const nearest = this.findNearestInRange(px, pz)
-    const orbitalSpeed = this.targetData ? orbitConfig.orbitAngularSpeed : 0
-    const slingshotSpeed = orbitalSpeed
+    // Show target body name when approaching/orbiting, nearest when free
+    const bodyName = this.targetData?.body.name ?? nearest?.name ?? null
+    // Linear orbital speed = angular speed. Larger planets = larger orbit radius = more distance
+    // covered per revolution, but angular speed is constant, so linear speed = orbitLaunchSpeed.
+    // To differentiate: include planet velocity estimate from prevPlanet tracking.
+    let orbitalSpeed = 0
+    if (this.targetData) {
+      const baseSpeed = orbitConfig.orbitLaunchSpeed
+      const planetVel = Math.sqrt(
+        (this.targetData.body.getWorldX() - this.prevPlanetX) ** 2
+        + (this.targetData.body.getWorldZ() - this.prevPlanetZ) ** 2,
+      )
+      orbitalSpeed = baseSpeed + planetVel
+    }
     return {
       state: this.state,
-      nearestBodyName: nearest?.name ?? null,
+      nearestBodyName: bodyName,
       orbitalSpeed,
-      slingshotSpeed,
+      slingshotSpeed: orbitalSpeed,
+      chargeLevel: 0,
+      inspectMode: false,
     }
   }
 }

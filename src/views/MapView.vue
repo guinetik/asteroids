@@ -28,6 +28,8 @@ const orbitState = reactive<OrbitHudState>({
   nearestBodyName: null,
   orbitalSpeed: 0,
   slingshotSpeed: 0,
+  chargeLevel: 0,
+  inspectMode: false,
 })
 
 onMounted(async () => {

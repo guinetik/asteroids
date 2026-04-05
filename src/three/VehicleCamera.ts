@@ -25,6 +25,8 @@ export interface VehicleCameraConfig {
   minY: number
   /** Perspective FOV in degrees */
   fov: number
+  /** Maximum orbit controls zoom distance (0 = unlimited) */
+  maxDistance?: number
 }
 
 /** Shuttle preset: behind and above, looking at the nose. */
@@ -50,17 +52,28 @@ export const MAP_CAMERA_CONFIG: VehicleCameraConfig = {
   idleOffset: new THREE.Vector3(-0.8, 0.4, 0),
   lerpSpeed: 5,
   idleTimeout: 10,
-  minY: 0.1,
+  minY: -Infinity,
   fov: 60,
+}
+
+/** Map inspect preset: top-down on shuttle for cargo/menu view. */
+export const MAP_INSPECT_CAMERA_CONFIG: VehicleCameraConfig = {
+  idleOffset: new THREE.Vector3(0, 0.5, 0),
+  lerpSpeed: 5,
+  idleTimeout: 0,
+  minY: -Infinity,
+  fov: 50,
+  maxDistance: 1,
 }
 
 /** Map orbit preset: pulled back above planet to show full orbit circle. */
 export const MAP_ORBIT_CAMERA_CONFIG: VehicleCameraConfig = {
-  idleOffset: new THREE.Vector3(0, 8, 0),
+  idleOffset: new THREE.Vector3(0, 10, 0),
   lerpSpeed: 2,
   idleTimeout: 999,
   minY: 1,
   fov: 60,
+  maxDistance: 15,
 }
 
 /**
@@ -112,11 +125,15 @@ export class VehicleCamera implements Tickable {
     this.camera.updateProjectionMatrix()
   }
 
-  /** Smoothly transition to a new camera config. The offset lerps over time. */
+  /** Transition to a new camera config. Resets idle timer so the offset lerps immediately. */
   setConfig(config: VehicleCameraConfig): void {
     this.config = config
     this.camera.fov = config.fov
     this.camera.updateProjectionMatrix()
+    this.controls.maxDistance = config.maxDistance ?? Infinity
+    // Force idle lerp to start immediately
+    this.mouseIdleTimer = config.idleTimeout + 1
+    this.isMouseActive = false
   }
 
   tick(dt: number): void {

@@ -1,0 +1,24 @@
+{
+  "shuttle": {
+    "thrustForce": 12,
+    "brakeFactor": 0.93,
+    "brakeDepthPenalty": 0.002,
+    "yawTorque": 2.5,
+    "yawLateralForce": 2,
+    "yawMaxSpeed": 3.5,
+    "yawDamping": 0.98,
+    "maxThrustSpeed": 60,
+    "maxGravitySpeed": 150
+  },
+  "map": {
+    "thrustForce": 0.4,
+    "brakeFactor": 0.93,
+    "brakeDepthPenalty": 0.002,
+    "yawTorque": 1.5,
+    "yawLateralForce": 0.08,
+    "yawMaxSpeed": 2.0,
+    "yawDamping": 0.98,
+    "maxThrustSpeed": 2,
+    "maxGravitySpeed": 5
+  }
+}

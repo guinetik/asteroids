@@ -273,12 +273,19 @@ export class ShuttleController implements Tickable, PortalVehicle {
     return this._inputEnabled && this.inputManager.isActionActive('brake') && this.thrusterSystem.canFire('brake')
   }
 
+  /** Set by orbit system to drive RCS VFX while input is disabled. */
+  orbitYawLeft = false
+  /** Set by orbit system to drive RCS VFX while input is disabled. */
+  orbitYawRight = false
+
   get isYawingLeft(): boolean {
-    return this._inputEnabled && this.inputManager.isActionActive('yawLeft') && this.thrusterSystem.canFire('rcs')
+    return this.orbitYawLeft
+      || (this._inputEnabled && this.inputManager.isActionActive('yawLeft') && this.thrusterSystem.canFire('rcs'))
   }
 
   get isYawingRight(): boolean {
-    return this._inputEnabled && this.inputManager.isActionActive('yawRight') && this.thrusterSystem.canFire('rcs')
+    return this.orbitYawRight
+      || (this._inputEnabled && this.inputManager.isActionActive('yawRight') && this.thrusterSystem.canFire('rcs'))
   }
 
   get speed(): number {
@@ -295,14 +302,15 @@ export class ShuttleController implements Tickable, PortalVehicle {
   }
 
   tick(dt: number): void {
+    // Doors and fuel indicators always update (even while frozen/orbiting)
+    this.updateDoors(dt)
+    this.updateFuelIndicator()
     if (this.frozen) return
     if (this.isDead) {
       this.updateDeath(dt)
       return
     }
     this.updateMovement(dt)
-    this.updateDoors(dt)
-    this.updateFuelIndicator()
     this.checkDeath()
   }
 
@@ -346,14 +354,16 @@ export class ShuttleController implements Tickable, PortalVehicle {
   private updateFuelIndicator(): void {
     const doorsOpen = this.doorProgress > 0.1
 
-    // Cargo lights fade in/out with doors — scale intensity by group scale
-    // so lights don't overpower the scene at small scales (e.g. map view)
-    const lightScale = this.group.scale.x
+    // Cargo lights fade in/out with doors — scale intensity by group scale squared
+    // so lights don't overpower the scene at small scales (e.g. map view with bloom)
+    // Cargo lights — disabled at small scales (map view with bloom overpowers them)
+    const s = this.group.scale.x
+    const lightsEnabled = s >= 0.5
     if (this.cargoLight) {
-      this.cargoLight.intensity = this.doorProgress * 2 * lightScale
+      this.cargoLight.intensity = lightsEnabled ? this.doorProgress * 2 : 0
     }
     for (const light of this.cargoWallLights) {
-      light.intensity = this.doorProgress * 1.5 * lightScale
+      light.intensity = lightsEnabled ? this.doorProgress * 1.5 : 0
     }
 
     if (this.habitat) {

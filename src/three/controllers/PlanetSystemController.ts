@@ -29,7 +29,7 @@ const SHADER_TIME_DIVISOR = 365.25
  * Moon orbits in the JSON are in the same pixel units as planet displayRadii,
  * so they scale with SIZE_SCALE and are divided by this to fit the scene.
  */
-const MOON_ORBIT_SCALE_DIVISOR = 550
+const MOON_ORBIT_SCALE_DIVISOR = 350
 
 /** Internal moon tracking. */
 interface MoonEntry {

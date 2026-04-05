@@ -11,11 +11,11 @@ import type { Tickable } from '@/lib/Tickable'
 import type { VibeJamParams } from '@/lib/portal'
 import { PortalBoundary } from './PortalBoundary'
 
-/** Distance from a wall at which it begins to fade in. */
-const WALL_VISIBILITY_DISTANCE = 500
+/** Fraction of the grid half-size at which walls begin to fade in. */
+const WALL_VISIBILITY_FRACTION = 0.25
 
 /** Height of each boundary wall in world units. */
-const WALL_HEIGHT = 200
+const WALL_HEIGHT = 20
 
 /**
  * Outbound portal boundary system.
@@ -67,7 +67,7 @@ export class PortalBoundarySystem implements Tickable {
           ? Math.abs(this.shuttlePosition.x - boundary.wallPosition)
           : Math.abs(this.shuttlePosition.z - boundary.wallPosition)
 
-      boundary.updateOpacity(distance, WALL_VISIBILITY_DISTANCE)
+      boundary.updateOpacity(distance, this.halfSize * WALL_VISIBILITY_FRACTION)
     }
 
     // Check crossing on both axes

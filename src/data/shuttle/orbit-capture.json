@@ -1,9 +1,10 @@
 {
-  "captureMultiplier": 8,
-  "orbitMultiplier": 3,
+  "captureMultiplier": 20,
+  "orbitMultiplier": 1.8,
   "minOrbitRadius": 0.5,
   "minCaptureRadius": 1.0,
   "approachThrustFactor": 0.8,
-  "orbitAngularSpeed": 1.5,
+  "orbitVisualSpeed": 0.4,
+  "orbitLaunchSpeed": 1.65,
   "slingshotDecayRate": 0.1
 }

@@ -15,9 +15,9 @@ import type { Tickable } from '@/lib/Tickable'
 import type { ShuttleController } from './ShuttleController'
 import { ParticleEmitter } from './ParticleEmitter'
 
-const THRUST_SPAWN_RATE = 100
-const BRAKE_SPAWN_RATE = 80
-const RCS_SPAWN_RATE = 40
+const THRUST_SPAWN_RATE = 500
+const BRAKE_SPAWN_RATE = 400
+const RCS_SPAWN_RATE = 120
 
 /**
  * 3 nozzle emit points matching ShuttleController ENG_POSITIONS * MODEL_SCALE.
@@ -59,28 +59,31 @@ export class ThrusterEffectController implements Tickable {
   constructor(shuttle: ShuttleController) {
     this.shuttle = shuttle
 
+    // Scale spread and particle size so VFX match the shuttle's visual scale
+    const s = shuttle.group.scale.x
+
     this.thrustEmitter = new ParticleEmitter({
-      poolSize: 300,
+      poolSize: 1000,
       color: new THREE.Color(0xff8800),
-      size: 4,
+      size: Math.max(5, 4 * s),
       lifetime: 0.3,
-      spread: 3,
+      spread: 3 * s,
     })
 
     this.brakeEmitter = new ParticleEmitter({
-      poolSize: 300,
+      poolSize: 1000,
       color: new THREE.Color(0x4488ff),
-      size: 4,
+      size: Math.max(5, 4 * s),
       lifetime: 0.3,
-      spread: 5,
+      spread: 5 * s,
     })
 
     this.rcsEmitter = new ParticleEmitter({
-      poolSize: 50,
+      poolSize: 200,
       color: new THREE.Color(0xccddff),
-      size: 2,
+      size: Math.max(3, 2 * s),
       lifetime: 0.2,
-      spread: 1.5,
+      spread: 1.5 * s,
     })
 
     this.thrustPoints = this.thrustEmitter.points
@@ -89,13 +92,16 @@ export class ThrusterEffectController implements Tickable {
   }
 
   tick(dt: number): void {
+    const scale = this.shuttle.group.scale.x
+
     if (this.shuttle.isThrusting) {
       this.thrustSpawnAccumulator += THRUST_SPAWN_RATE * dt
       while (this.thrustSpawnAccumulator >= 1) {
         const nozzle = NOZZLE_OFFSETS[Math.floor(Math.random() * NOZZLE_OFFSETS.length)]!
-        const worldPos = nozzle.clone().applyQuaternion(this.shuttle.group.quaternion)
+        const worldPos = nozzle.clone().multiplyScalar(scale)
+          .applyQuaternion(this.shuttle.group.quaternion)
           .add(this.shuttle.position)
-        const pushDir = new THREE.Vector3(-PUSH_FORCE, 0, 0)
+        const pushDir = new THREE.Vector3(-PUSH_FORCE * scale, 0, 0)
           .applyQuaternion(this.shuttle.group.quaternion)
         this.thrustEmitter.emit(worldPos, pushDir)
         this.thrustSpawnAccumulator -= 1
@@ -108,9 +114,10 @@ export class ThrusterEffectController implements Tickable {
       this.brakeSpawnAccumulator += BRAKE_SPAWN_RATE * dt
       while (this.brakeSpawnAccumulator >= 1) {
         const nozzle = NOZZLE_OFFSETS[Math.floor(Math.random() * NOZZLE_OFFSETS.length)]!
-        const worldPos = nozzle.clone().applyQuaternion(this.shuttle.group.quaternion)
+        const worldPos = nozzle.clone().multiplyScalar(scale)
+          .applyQuaternion(this.shuttle.group.quaternion)
           .add(this.shuttle.position)
-        const pushDir = new THREE.Vector3(-PUSH_FORCE, 0, 0)
+        const pushDir = new THREE.Vector3(-PUSH_FORCE * scale, 0, 0)
           .applyQuaternion(this.shuttle.group.quaternion)
         this.brakeEmitter.emit(worldPos, pushDir)
         this.brakeSpawnAccumulator -= 1
@@ -125,11 +132,13 @@ export class ThrusterEffectController implements Tickable {
       this.rcsSpawnAccumulator += RCS_SPAWN_RATE * dt
       while (this.rcsSpawnAccumulator >= 1) {
         const wingtip = isYawingLeft ? RIGHT_WINGTIP : LEFT_WINGTIP
-        const worldPos = wingtip.clone().applyQuaternion(this.shuttle.group.quaternion)
+        const worldPos = wingtip.clone().multiplyScalar(scale)
+          .applyQuaternion(this.shuttle.group.quaternion)
           .add(this.shuttle.position)
+        const pushForce = RCS_PUSH_FORCE * scale
         const push = isYawingLeft
-          ? new THREE.Vector3(0, 0, RCS_PUSH_FORCE)
-          : new THREE.Vector3(0, 0, -RCS_PUSH_FORCE)
+          ? new THREE.Vector3(0, 0, pushForce)
+          : new THREE.Vector3(0, 0, -pushForce)
         const worldPush = push.applyQuaternion(this.shuttle.group.quaternion)
         this.rcsEmitter.emit(worldPos, worldPush)
         this.rcsSpawnAccumulator -= 1

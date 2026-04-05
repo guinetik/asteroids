@@ -11,6 +11,7 @@
  * @spec docs/superpowers/specs/2026-04-05-map-shuttle-player-design.md
  */
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import type { Tickable } from '@/lib/Tickable'
 import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
 import { GameLoop } from '@/lib/GameLoop'
@@ -35,7 +36,11 @@ import * as THREE from 'three'
 import { OrbitCaptureSystem, type OrbitHudState } from '@/lib/orbitCapture'
 import { ShuttleController, MAP_PHYSICS } from '@/three/ShuttleController'
 import { ThrusterEffectController } from '@/three/ThrusterEffectController'
-import { VehicleCamera, MAP_CAMERA_CONFIG, MAP_ORBIT_CAMERA_CONFIG } from '@/three/VehicleCamera'
+import { VehicleCamera, MAP_CAMERA_CONFIG, MAP_ORBIT_CAMERA_CONFIG, MAP_INSPECT_CAMERA_CONFIG } from '@/three/VehicleCamera'
+import orbitConfig from '@/data/shuttle/orbit-capture.json'
+import { PortalArrivalSequence } from '@/three/PortalArrivalSequence'
+import { PortalBoundarySystem } from '@/three/PortalBoundarySystem'
+import { VibePortal } from '@/lib/portal'
 
 /** Tick priority for the compositor (runs after animation, before render). */
 const TICK_PRIORITY_COMPOSIT = TICK_PRIORITY_RENDER - 1
@@ -59,6 +64,30 @@ const MAP_SHUTTLE_SCALE = 0.01
 
 /** Offset behind Earth so the shuttle doesn't overlap the planet mesh. */
 const SPAWN_OFFSET_BEHIND_EARTH = 1.5
+
+/** Duration in seconds for the approach animation lerp. */
+const APPROACH_DURATION = 1.5
+
+/** Seconds to fully charge slingshot (0 → 1). */
+const SLINGSHOT_CHARGE_TIME = 2.0
+
+/** Maximum arrow length at full charge (in shuttle local space, pre-scale). */
+const ARROW_MAX_LENGTH = 300
+const ARROW_COLOR_SAFE = 0x00ffff
+const ARROW_COLOR_BLOCKED = 0xff3333
+const ARROW_HEAD_LENGTH = 40
+const ARROW_HEAD_WIDTH = 20
+/** If forward dot (shuttle→planet) > this, aim is blocked (pointing at planet). */
+const AIM_BLOCK_THRESHOLD = 0.3
+
+/** Number of segments for the dashed orbit ring. */
+const ORBIT_RING_SEGMENTS = 64
+
+/** Orbit ring visual style. */
+const ORBIT_RING_COLOR = 0x00ccff
+const ORBIT_RING_OPACITY = 0.4
+const ORBIT_RING_DASH_SIZE = 0.3
+const ORBIT_RING_GAP_SIZE = 0.2
 
 /**
  * Bridges Vue lifecycle to the map scene with player shuttle.
@@ -84,6 +113,15 @@ export class MapViewController implements Tickable {
   private resizeHandler: (() => void) | null = null
 
   private orbitSystem: OrbitCaptureSystem | null = null
+  private orbitRing: THREE.LineLoop | null = null
+  private approachStartPos: THREE.Vector3 | null = null
+  private approachProgress = 0
+  private yRecovery = false
+  private slingshotCharge = 0
+  private launchArrow: THREE.ArrowHelper | null = null
+  private inspectMode = false
+  private portalArrival: PortalArrivalSequence | null = null
+  private boundarySystem: PortalBoundarySystem | null = null
 
   /** Called each frame with full shuttle telemetry for HUD display. */
   onTelemetry: ((telemetry: ShuttleTelemetry) => void) | null = null
@@ -158,7 +196,7 @@ export class MapViewController implements Tickable {
     // --- Space-time grid (gravity well visualization) ---
     const kuiperOuterEdge = 2400 * ORBIT_SCALE
     const gridSize = kuiperOuterEdge * 2.2
-    const gridDepthScale = 2
+    const gridDepthScale = 4
     const gridWidthScale = 12
     const gridMassExponent = 0.2
     this.spaceTimeGrid = new SpaceTimeGrid(gridSize, 200, gridDepthScale, gridWidthScale, gridMassExponent)
@@ -166,7 +204,7 @@ export class MapViewController implements Tickable {
 
     // --- Shuttle (player character) ---
     this.shuttleController = new ShuttleController(this.inputManager, MAP_PHYSICS)
-    // No grid attachment or gravity wells — map is a free-roam hub, shuttle stays at Y=0
+    this.shuttleController.setSpaceTimeGrid(this.spaceTimeGrid)
     await this.shuttleController.load()
     this.shuttleController.group.scale.setScalar(MAP_SHUTTLE_SCALE)
 
@@ -205,6 +243,56 @@ export class MapViewController implements Tickable {
     }))
     this.orbitSystem = new OrbitCaptureSystem(captureBodies)
 
+    // Portal arrival or default Earth orbit
+    this.portalArrival = new PortalArrivalSequence()
+    const arrived = this.portalArrival.tryArrive(
+      this.shuttleController,
+      this.spaceTimeGrid,
+      {
+        addToScene: (obj) => scene.add(obj),
+        removeFromScene: (obj) => scene.remove(obj),
+        registerTick: (t, p) => this.tickHandler!.register(t, p),
+        unregisterTick: (t) => this.tickHandler!.unregister(t),
+      },
+      TICK_PRIORITY_ANIMATION,
+    )
+    if (!arrived && earthController) {
+      const ex = earthController.getWorldX()
+      const ez = earthController.getWorldZ()
+      this.orbitSystem.beginCapture(ex + 1, ez)
+      const orbitR = this.orbitSystem.targetOrbitRadius
+      this.shuttleController.group.position.set(ex + orbitR, 0, ez)
+      this.orbitSystem.checkArrival(ex + orbitR, ez)
+      // Face away from Earth — default slingshot direction is outward
+      const awayAngle = Math.atan2(-ez, (ex + orbitR) - ex)
+      this.shuttleController.group.rotation.set(0, awayAngle, 0)
+      this.shuttleController.freeze()
+      this.shuttleController.setInputEnabled(false)
+      this.vehicleCamera.setConfig(MAP_ORBIT_CAMERA_CONFIG)
+      this.showOrbitRing(orbitR)
+      if (this.orbitRing) {
+        this.orbitRing.position.set(ex, 0, ez)
+      }
+    }
+
+    // --- Portal boundary walls at grid edges ---
+    const boundarySize = kuiperOuterEdge * 2.2
+    this.boundarySystem = new PortalBoundarySystem(
+      boundarySize,
+      this.shuttleController.group.position,
+      () => ({
+        speed: this.shuttleController?.speed,
+        rotation_y: this.shuttleController?.heading,
+      }),
+    )
+    for (const wall of this.boundarySystem.walls) {
+      scene.add(wall)
+    }
+    this.tickHandler.register(this.boundarySystem, TICK_PRIORITY_ANIMATION)
+    this.boundarySystem.onDepart = (state) => {
+      new VibePortal().depart(state as Record<string, string | number>)
+    }
+
     // One-shot action bridge (doors toggle, telemetry)
     this.tickHandler.register(this, ONE_SHOT_PRIORITY)
 
@@ -240,83 +328,162 @@ export class MapViewController implements Tickable {
    * One-shot actions, orbit state machine, and telemetry emission (runs just after input).
    */
   tick(dt: number): void {
-    // Door toggle
+    // Door toggle + inspect mode (F key zooms camera tight on shuttle)
     if (this.inputManager?.wasActionPressed('toggleDoors')) {
       this.shuttleController?.toggleDoors()
+      this.inspectMode = !this.inspectMode
+      const bloomPass = this.sceneObjects?.composer.passes.find(
+        (p) => p instanceof UnrealBloomPass,
+      ) as UnrealBloomPass | undefined
+      if (this.inspectMode) {
+        this.vehicleCamera?.setConfig(MAP_INSPECT_CAMERA_CONFIG)
+        if (this.vehicleCamera) {
+          this.vehicleCamera.controls.enableZoom = false
+        }
+        if (bloomPass) {
+          bloomPass.threshold = 1.5
+          bloomPass.strength = 0.2
+        }
+      } else {
+        const isOrbiting = this.orbitSystem?.state === 'orbiting'
+        this.vehicleCamera?.setConfig(isOrbiting ? MAP_ORBIT_CAMERA_CONFIG : MAP_CAMERA_CONFIG)
+        if (this.vehicleCamera) {
+          this.vehicleCamera.controls.enableZoom = true
+        }
+        if (bloomPass) {
+          bloomPass.threshold = 0.45
+          bloomPass.strength = 0.72
+        }
+      }
     }
 
-    // Orbit action (E key)
-    if (this.inputManager?.wasActionPressed('orbitAction') && this.orbitSystem && this.shuttleController) {
+    // Orbit action (E key) — press to capture/cancel, hold to charge slingshot
+    if (this.orbitSystem && this.shuttleController && this.inputManager) {
       const state = this.orbitSystem.state
-      if (state === 'free') {
+      const ePressed = this.inputManager.wasActionPressed('orbitAction')
+      const eHeld = this.inputManager.isActionActive('orbitAction')
+
+      // Free → press E to capture
+      if (state === 'free' && ePressed) {
         const px = this.shuttleController.position.x
         const pz = this.shuttleController.position.z
         if (this.orbitSystem.beginCapture(px, pz)) {
+          this.approachStartPos = new THREE.Vector3(px, 0, pz)
+          this.approachProgress = 0
+
+          this.shuttleController.freeze()
           this.shuttleController.setInputEnabled(false)
           this.vehicleCamera?.setConfig(MAP_ORBIT_CAMERA_CONFIG)
+          this.showOrbitRing(this.orbitSystem.targetOrbitRadius)
         }
-      } else if (state === 'approaching') {
+      }
+
+      // Approaching → press E to cancel
+      if (state === 'approaching' && ePressed) {
         this.orbitSystem.cancelApproach()
+        this.approachStartPos = null
+        this.shuttleController.unfreeze()
         this.shuttleController.setInputEnabled(true)
         this.vehicleCamera?.setConfig(MAP_CAMERA_CONFIG)
-      } else if (state === 'orbiting') {
-        const heading = this.shuttleController.heading
-        const result = this.orbitSystem.launchSlingshot(heading, dt)
-        if (result) {
+        this.hideOrbitRing()
+      }
+
+      // Orbiting → hold E to charge, release to launch
+      if (state === 'orbiting') {
+        if (eHeld) {
+          this.slingshotCharge = Math.min(1, this.slingshotCharge + dt / SLINGSHOT_CHARGE_TIME)
+          this.updateLaunchArrow()
+        } else if (this.slingshotCharge > 0 && !this.isAimingAtPlanet()) {
+          // E released — launch in aimed direction (blocked if aiming at planet)
+          const forward = new THREE.Vector3(1, 0, 0)
+            .applyQuaternion(this.shuttleController.group.quaternion)
+          forward.y = 0
+          forward.normalize()
+          const speed = orbitConfig.orbitLaunchSpeed * this.slingshotCharge
+          const vel = forward.multiplyScalar(speed)
+          this.orbitSystem.launchSlingshot(0, dt)
           this.shuttleController.unfreeze()
-          this.shuttleController.setVelocity(new THREE.Vector3(result.vx, 0, result.vz))
-          this.shuttleController.setSlingshotSpeed(
-            Math.sqrt(result.vx * result.vx + result.vz * result.vz),
-          )
           this.shuttleController.setInputEnabled(true)
+          this.shuttleController.orbitYawLeft = false
+          this.shuttleController.orbitYawRight = false
+          this.shuttleController.setVelocity(vel)
+          this.shuttleController.setSlingshotSpeed(speed)
+          // Launch costs fuel proportional to charge
+          this.shuttleController.thrusterSystem.consumeFuel(
+            this.slingshotCharge * this.shuttleController.thrusterSystem.fuelCapacity * 0.1,
+          )
+
           this.vehicleCamera?.setConfig(MAP_CAMERA_CONFIG)
           if (this.vehicleCamera) {
             this.vehicleCamera.controls.target.copy(this.shuttleController.position)
           }
+          this.hideOrbitRing()
+          this.hideLaunchArrow()
+          this.slingshotCharge = 0
+          this.yRecovery = true
+        } else if (!eHeld && this.slingshotCharge > 0) {
+          // Released while aiming at planet — reset charge
+          this.slingshotCharge = 0
+          this.hideLaunchArrow()
         }
       }
     }
 
-    // Orbit approach autopilot
-    if (this.orbitSystem?.state === 'approaching' && this.shuttleController) {
-      const px = this.shuttleController.position.x
-      const pz = this.shuttleController.position.z
+    // After slingshot, lerp Y back to 0
+    if (this.yRecovery && this.shuttleController) {
+      const y = this.shuttleController.group.position.y
+      if (Math.abs(y) < 0.01) {
+        this.shuttleController.group.position.y = 0
+        this.yRecovery = false
+      } else {
+        this.shuttleController.group.position.y = y * (1 - 3 * dt)
+      }
+    }
+
+    // Orbit approach — animated lerp toward orbit insertion point
+    if (this.orbitSystem?.state === 'approaching' && this.shuttleController && this.approachStartPos) {
+      this.approachProgress = Math.min(1, this.approachProgress + dt / APPROACH_DURATION)
+      // Ease-out curve for smooth deceleration
+      const t = 1 - Math.pow(1 - this.approachProgress, 3)
+
+      // Target point on orbit circle tracks the moving planet
       const target = this.orbitSystem.getApproachTarget()
       if (target) {
-        const dx = target.x - px
-        const dz = target.z - pz
-        const targetAngle = Math.atan2(-dz, dx)
-        this.shuttleController.group.rotation.y = targetAngle
-        // Apply thrust toward target
-        const dist = Math.sqrt(dx * dx + dz * dz)
-        if (dist > 0.01) {
-          const speed = Math.min(this.shuttleController.speed + 0.5 * dt, 2.0)
-          const vel = new THREE.Vector3(dx, 0, dz).normalize().multiplyScalar(speed)
-          this.shuttleController.setVelocity(vel)
+        const x = this.approachStartPos.x + (target.x - this.approachStartPos.x) * t
+        const z = this.approachStartPos.z + (target.z - this.approachStartPos.z) * t
+        this.shuttleController.group.position.set(x, 0, z)
+
+        // Face toward the planet during approach
+        const body = this.orbitSystem.target
+        if (body) {
+          const dx = body.getWorldX() - x
+          const dz = body.getWorldZ() - z
+          this.shuttleController.group.rotation.y = Math.atan2(-dz, dx)
         }
       }
-      this.orbitSystem.checkArrival(px, pz)
-    }
 
-    // If approach just transitioned to orbiting, freeze the shuttle in place
-    if (this.orbitSystem?.state === 'orbiting' && this.shuttleController && !this.shuttleController.inputEnabled) {
-      if (this.shuttleController.speed > 0) {
-        this.shuttleController.setVelocity(new THREE.Vector3(0, 0, 0))
-        this.shuttleController.freeze()
+      // Ring follows planet during approach
+      if (this.orbitRing && this.orbitSystem.target) {
+        this.orbitRing.position.set(
+          this.orbitSystem.target.getWorldX(), 0,
+          this.orbitSystem.target.getWorldZ(),
+        )
       }
-    }
 
-    // Orbit position driving
-    if (this.orbitSystem?.state === 'orbiting' && this.shuttleController) {
-      const pos = this.orbitSystem.tickOrbit(dt)
-      if (pos) {
-        this.shuttleController.group.position.set(pos.x, 0, pos.z)
-      }
-      // Camera targets planet center during orbit
-      if (this.orbitSystem.target && this.vehicleCamera) {
-        const bx = this.orbitSystem.target.getWorldX()
-        const bz = this.orbitSystem.target.getWorldZ()
-        this.vehicleCamera.controls.target.set(bx, 0, bz)
+      // Arrive when lerp completes
+      if (this.approachProgress >= 1) {
+        const px = this.shuttleController.position.x
+        const pz = this.shuttleController.position.z
+        this.orbitSystem.checkArrival(px, pz)
+        this.approachStartPos = null
+
+        // Face away from planet — default launch direction is outward
+        if (this.orbitSystem.target) {
+          const bx = this.orbitSystem.target.getWorldX()
+          const bz = this.orbitSystem.target.getWorldZ()
+          const awayAngle = Math.atan2(-(pz - bz), px - bx)
+          this.shuttleController.group.rotation.set(0, awayAngle, 0)
+        }
       }
     }
 
@@ -341,12 +508,13 @@ export class MapViewController implements Tickable {
 
     // Orbit HUD state
     if (this.orbitSystem && this.shuttleController && this.onOrbitState) {
-      this.onOrbitState(
-        this.orbitSystem.getHudState(
-          this.shuttleController.position.x,
-          this.shuttleController.position.z,
-        ),
+      const hudState = this.orbitSystem.getHudState(
+        this.shuttleController.position.x,
+        this.shuttleController.position.z,
       )
+      hudState.chargeLevel = this.slingshotCharge
+      hudState.inspectMode = this.inspectMode
+      this.onOrbitState(hudState)
     }
   }
 
@@ -385,9 +553,128 @@ export class MapViewController implements Tickable {
       }
       this.spaceTimeGrid.tick(dt)
     }
+
+    // Orbit position driving — runs AFTER planets move to avoid jitter
+    if (this.orbitSystem?.state === 'orbiting' && this.shuttleController && this.inputManager) {
+      const pos = this.orbitSystem.tickOrbit(dt)
+      const planetY = this.orbitSystem.target
+        ? this.planetControllers.find((_c, i) =>
+          PLANETS[i]?.name === this.orbitSystem!.target?.name)?.group.position.y ?? 0
+        : 0
+      if (pos) {
+        this.shuttleController.group.position.set(pos.x, planetY, pos.z)
+      }
+      // A/D yaw — input is disabled so read InputManager directly and set orbit flags for VFX
+      const yawLeft = this.inputManager.isActionActive('yawLeft')
+        && this.shuttleController.thrusterSystem.canFire('rcs')
+      const yawRight = this.inputManager.isActionActive('yawRight')
+        && this.shuttleController.thrusterSystem.canFire('rcs')
+      this.shuttleController.orbitYawLeft = yawLeft
+      this.shuttleController.orbitYawRight = yawRight
+      if (yawLeft) {
+        this.shuttleController.group.rotateY(MAP_PHYSICS.yawTorque * dt)
+      }
+      if (yawRight) {
+        this.shuttleController.group.rotateY(-MAP_PHYSICS.yawTorque * dt)
+      }
+      this.shuttleController.thrusterSystem.tick(dt, {
+        thrust: false,
+        brake: false,
+        rcs: yawLeft || yawRight,
+      })
+      if (this.orbitSystem.target && this.vehicleCamera) {
+        const bx = this.orbitSystem.target.getWorldX()
+        const bz = this.orbitSystem.target.getWorldZ()
+        this.vehicleCamera.controls.target.set(bx, planetY, bz)
+        if (this.orbitRing) {
+          this.orbitRing.position.set(bx, planetY, bz)
+        }
+      }
+    }
+  }
+
+  /** Returns true if the shuttle is aiming toward the captured planet. */
+  private isAimingAtPlanet(): boolean {
+    if (!this.shuttleController || !this.orbitSystem?.target) return false
+    const forward = new THREE.Vector3(1, 0, 0)
+      .applyQuaternion(this.shuttleController.group.quaternion)
+    forward.y = 0
+    forward.normalize()
+    const toPlanet = new THREE.Vector3(
+      this.orbitSystem.target.getWorldX() - this.shuttleController.position.x,
+      0,
+      this.orbitSystem.target.getWorldZ() - this.shuttleController.position.z,
+    ).normalize()
+    return forward.dot(toPlanet) > AIM_BLOCK_THRESHOLD
+  }
+
+  /** Update the slingshot direction arrow length based on charge. */
+  private updateLaunchArrow(): void {
+    if (!this.shuttleController) return
+    if (!this.launchArrow) {
+      // Create once as child of shuttle — local +X = forward, tracks automatically
+      this.launchArrow = new THREE.ArrowHelper(
+        new THREE.Vector3(1, 0, 0),
+        new THREE.Vector3(0, 0, 0),
+        ARROW_MAX_LENGTH,
+        ARROW_COLOR_SAFE,
+        ARROW_HEAD_LENGTH,
+        ARROW_HEAD_WIDTH,
+      )
+      this.shuttleController.group.add(this.launchArrow)
+    }
+    // Scale length with charge, color red if aiming at planet
+    const blocked = this.isAimingAtPlanet()
+    this.launchArrow.setColor(new THREE.Color(blocked ? ARROW_COLOR_BLOCKED : ARROW_COLOR_SAFE))
+    this.launchArrow.setLength(
+      ARROW_MAX_LENGTH * this.slingshotCharge,
+      ARROW_HEAD_LENGTH * this.slingshotCharge,
+      ARROW_HEAD_WIDTH * this.slingshotCharge,
+    )
+  }
+
+  /** Remove the launch arrow from shuttle group. */
+  private hideLaunchArrow(): void {
+    if (this.launchArrow && this.shuttleController) {
+      this.shuttleController.group.remove(this.launchArrow)
+      this.launchArrow.dispose()
+      this.launchArrow = null
+    }
+  }
+
+  /** Create a dashed circle ring at the given radius and add to scene. */
+  private showOrbitRing(radius: number): void {
+    this.hideOrbitRing()
+    const points: THREE.Vector3[] = []
+    for (let i = 0; i <= ORBIT_RING_SEGMENTS; i++) {
+      const angle = (i / ORBIT_RING_SEGMENTS) * Math.PI * 2
+      points.push(new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius))
+    }
+    const geometry = new THREE.BufferGeometry().setFromPoints(points)
+    const material = new THREE.LineDashedMaterial({
+      color: ORBIT_RING_COLOR,
+      transparent: true,
+      opacity: ORBIT_RING_OPACITY,
+      dashSize: ORBIT_RING_DASH_SIZE,
+      gapSize: ORBIT_RING_GAP_SIZE,
+    })
+    this.orbitRing = new THREE.LineLoop(geometry, material)
+    this.orbitRing.computeLineDistances()
+    this.sceneObjects?.scene.add(this.orbitRing)
+  }
+
+  /** Remove the orbit ring from scene. */
+  private hideOrbitRing(): void {
+    if (this.orbitRing) {
+      this.sceneObjects?.scene.remove(this.orbitRing)
+      this.orbitRing.geometry.dispose()
+      ;(this.orbitRing.material as THREE.LineDashedMaterial).dispose()
+      this.orbitRing = null
+    }
   }
 
   dispose(): void {
+    this.hideOrbitRing()
     this.gameLoop?.stop()
 
     if (this.resizeHandler) {
@@ -395,6 +682,8 @@ export class MapViewController implements Tickable {
     }
 
     // Dispose controllers
+    this.portalArrival?.dispose()
+    this.boundarySystem?.dispose()
     this.thrusterController?.dispose()
     this.shuttleController?.dispose()
     for (const controller of this.beltControllers) controller.dispose()
