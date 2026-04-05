@@ -49,6 +49,7 @@ const ENEMY_SPAWN_RADIUS = 80
 const ENEMY_MIN_SPAWN_DISTANCE = 20
 const DAMAGE_FLASH_DURATION = 0.3
 const DAMAGE_FLINCH_STRENGTH = 80
+const CONTACT_KNOCKBACK = 12
 
 const TEST_SURFACE: SurfaceFeatures = {
   craterDensity: 0.5,
@@ -210,15 +211,28 @@ export class FpsViewController implements Tickable {
       this.enemyDirector.onContactDamage = (handle, damage) => {
         this.playerController?.takeDamage(damage)
         this.damageFlashTimer = DAMAGE_FLASH_DURATION
+
+        const pp = this.playerController!.group.position
+        const ep = handle.enemy.position
+
+        // Knockback — push player away from enemy
+        const dx = pp.x - ep.x
+        const dz = pp.z - ep.z
+        const dist = Math.sqrt(dx * dx + dz * dz)
+        if (dist > 0.01) {
+          this.playerController!.applyLateralImpulse(
+            (dx / dist) * CONTACT_KNOCKBACK,
+            (dz / dist) * CONTACT_KNOCKBACK,
+          )
+        }
+
         // Camera flinch — random pitch/yaw jolt
         if (this.fpsCamera) {
           this.fpsCamera.applyMouseDelta(
             (Math.random() - 0.5) * DAMAGE_FLINCH_STRENGTH,
             -Math.random() * DAMAGE_FLINCH_STRENGTH,
           )
-          // Directional indicator — angle from player facing to enemy
-          const pp = this.playerController!.group.position
-          const ep = handle.enemy.position
+          // Directional indicator
           const worldAngle = Math.atan2(ep.x - pp.x, ep.z - pp.z)
           const relAngle = worldAngle - this.fpsCamera.yaw
           this.onDamageDirection?.(relAngle)
