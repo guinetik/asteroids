@@ -25,9 +25,9 @@ const MUZZLE_NODE_NAME = 'pistol_led_front'
 /** Bolt projectile speed (units/s). */
 const BOLT_SPEED = 200
 /** Bolt length (units). */
-const BOLT_LENGTH = 4.0
+const BOLT_LENGTH = 6.0
 /** Bolt width (units). */
-const BOLT_WIDTH = 0.06
+const BOLT_WIDTH = 0.04
 /** Max bolt lifetime before removal (seconds). */
 const BOLT_MAX_LIFETIME = 4.0
 
@@ -171,8 +171,8 @@ export class MultiToolController implements Tickable {
     const origin = this.camera.position.clone()
     const camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion)
     const camDown = new THREE.Vector3(0, -1, 0).applyQuaternion(this.camera.quaternion)
-    origin.addScaledVector(camForward, 1.0)
-    origin.addScaledVector(camDown, 0.2)
+    origin.addScaledVector(camForward, 1.8)
+    origin.addScaledVector(camDown, 0.15)
 
     // Direction: from muzzle toward the aim point (converges on crosshair)
     const direction = aimPoint.sub(origin).normalize()
@@ -191,10 +191,14 @@ export class MultiToolController implements Tickable {
         uTime: { value: 0 },
       },
       vertexShader: /* glsl */ `
+        uniform float uTime;
         varying vec2 vUv;
         void main() {
           vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          // Scale up slightly over time so distant bolts stay visible
+          float scale = 1.0 + uTime * 0.3;
+          vec3 scaled = position * vec3(scale, scale, 1.0);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(scaled, 1.0);
         }
       `,
       fragmentShader: /* glsl */ `
@@ -202,15 +206,17 @@ export class MultiToolController implements Tickable {
         uniform float uTime;
         varying vec2 vUv;
         void main() {
-          // Hot white core fading to colored edge
+          // Tight bright core, saturated color — no white wash
           float dist = abs(vUv.x - 0.5) * 2.0;
-          float core = smoothstep(1.0, 0.2, dist);
-          vec3 col = mix(uColor, vec3(1.0), core * 0.7);
-          // Taper at ends
-          float taper = smoothstep(0.0, 0.1, vUv.y) * smoothstep(1.0, 0.9, vUv.y);
-          float alpha = core * taper * 0.9;
-          // Subtle flicker
-          alpha *= 0.85 + 0.15 * sin(uTime * 40.0 + vUv.y * 10.0);
+          float core = smoothstep(1.0, 0.1, dist);
+          // Thin white center line, rest is pure color
+          float whiteLine = smoothstep(0.3, 0.0, dist);
+          vec3 col = mix(uColor * 1.5, vec3(1.0), whiteLine * 0.4);
+          // Taper at head and tail
+          float taper = smoothstep(0.0, 0.15, vUv.y) * smoothstep(1.0, 0.85, vUv.y);
+          float alpha = core * taper;
+          // Subtle energy pulse
+          alpha *= 0.9 + 0.1 * sin(uTime * 50.0 + vUv.y * 20.0);
           gl_FragColor = vec4(col, alpha);
         }
       `,
