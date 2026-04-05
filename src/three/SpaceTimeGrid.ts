@@ -46,6 +46,7 @@ export class SpaceTimeGrid implements Tickable {
   private readonly geometry: THREE.BufferGeometry
   private readonly basePositions: Float32Array
   private readonly sources: GravitySource[] = []
+  private readonly staticSources: GravitySource[] = []
   private time = 0
   private frameCounter = 0
   private readonly updateInterval: number
@@ -87,6 +88,11 @@ export class SpaceTimeGrid implements Tickable {
     this.sources.push(source)
   }
 
+  /** Add a source that persists across clearSources() calls (e.g. the Sun). */
+  addStaticSource(source: GravitySource): void {
+    this.staticSources.push(source)
+  }
+
   clearSources(): void {
     this.sources.length = 0
   }
@@ -113,20 +119,21 @@ export class SpaceTimeGrid implements Tickable {
    */
   getDepthAt(x: number, z: number): number {
     let totalDepth = 0
+    const pulse = 1 + WELL_PULSE_AMOUNT * Math.sin(this.time * WELL_PULSE_SPEED)
 
-    for (const source of this.sources) {
-      const dx = x - source.x
-      const dz = z - source.z
-      const rSquared = dx * dx + dz * dz
+    for (let s = 0; s < 2; s++) {
+      const arr = s === 0 ? this.staticSources : this.sources
+      for (const source of arr) {
+        const dx = x - source.x
+        const dz = z - source.z
+        const rSquared = dx * dx + dz * dz
 
-      const massFactor = Math.sign(source.mass) * Math.pow(Math.abs(source.mass), this.massExponent)
-      const sigma = this.widthScale * massFactor
-      const baseAmplitude = this.depthScale * massFactor
+        const massFactor = Math.sign(source.mass) * Math.pow(Math.abs(source.mass), this.massExponent)
+        const sigma = this.widthScale * massFactor
+        const amplitude = this.depthScale * massFactor * pulse
 
-      const pulse = 1 + WELL_PULSE_AMOUNT * Math.sin(this.time * WELL_PULSE_SPEED)
-      const amplitude = baseAmplitude * pulse
-
-      totalDepth += amplitude * Math.exp(-rSquared / (2 * sigma * sigma))
+        totalDepth += amplitude * Math.exp(-rSquared / (2 * sigma * sigma))
+      }
     }
 
     return totalDepth

@@ -59,7 +59,8 @@ const ONE_SHOT_PRIORITY = TICK_PRIORITY_INPUT + 1
  * Below this, the gravity well is sub-pixel. Filters out terrestrials
  * and dwarf planets, keeping Sun + Jupiter/Saturn/Uranus/Neptune.
  */
-const GRID_MASS_THRESHOLD = 1e-5
+/** Only Jupiter (9.55e-4) and Saturn (2.86e-4) deform the grid. */
+const GRID_MASS_THRESHOLD = 1e-4
 
 /**
  * Visual scale for the shuttle in the map view.
@@ -243,8 +244,11 @@ export class MapViewController implements Tickable {
     const gridDepthScale = 40
     const gridWidthScale = 150
     const gridMassExponent = 0.2
-    this.spaceTimeGrid = new SpaceTimeGrid(gridSize, 200, gridDepthScale, gridWidthScale, gridMassExponent)
+    this.spaceTimeGrid = new SpaceTimeGrid(gridSize, 400, gridDepthScale, gridWidthScale, gridMassExponent)
     scene.add(this.spaceTimeGrid.mesh)
+
+    // Sun is static — add once, never cleared
+    this.spaceTimeGrid.addStaticSource({ x: 0, z: 0, mass: SUN.mass })
 
     // --- Shuttle (player character) ---
     this.shuttleController = new ShuttleController(this.inputManager, MAP_PHYSICS, MAP_GRAVITY_CONFIG)
@@ -691,14 +695,9 @@ export class MapViewController implements Tickable {
     }
 
     if (this.spaceTimeGrid) {
+      // Only re-add moving planets that are massive enough (Jupiter, Saturn, etc.)
+      // Sun is a static source — added once at init
       this.spaceTimeGrid.clearSources()
-      if (this.sunController) {
-        this.spaceTimeGrid.addSource({
-          x: this.sunController.getWorldX(),
-          z: this.sunController.getWorldZ(),
-          mass: this.sunController.mass,
-        })
-      }
       for (const controller of this.planetControllers) {
         if (controller.mass < GRID_MASS_THRESHOLD) continue
         this.spaceTimeGrid.addSource({
