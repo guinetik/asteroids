@@ -249,8 +249,7 @@ export class MapViewController implements Tickable {
     }
 
     this.shuttleController.onDeath = () => {
-      // Placeholder — orbit-capture system will handle respawn into Earth orbit
-      console.log('[MapView] shuttle died to gravity')
+      this.respawnAtEarth()
     }
 
     await this.shuttleController.load()
@@ -716,6 +715,58 @@ export class MapViewController implements Tickable {
         }
       }
     }
+  }
+
+  /**
+   * Compute gravity proximity for a single source (0 = at influence edge, 1 = at event horizon).
+   * Returns 0 if outside influence radius.
+   */
+  /** Reset shuttle after death — clear death state, place into Earth orbit. */
+  private respawnAtEarth(): void {
+    if (!this.shuttleController || !this.orbitSystem) return
+
+    // Clear death state
+    this.shuttleController.resetDeath()
+    this.shuttleController.freeze()
+    this.shuttleController.setInputEnabled(false)
+
+    // Return orbit system to free state
+    if (this.orbitSystem.state === 'approaching') {
+      this.orbitSystem.cancelApproach()
+    } else if (this.orbitSystem.state === 'orbiting') {
+      this.orbitSystem.launchSlingshot(0, 0)
+    }
+
+    // Find Earth
+    const earthIndex = PLANETS.findIndex((p) => p.id === 'earth')
+    const earthController = this.planetControllers[earthIndex]
+    if (!earthController) return
+
+    const ex = earthController.getWorldX()
+    const ez = earthController.getWorldZ()
+
+    // Force into Earth orbit (same pattern as init)
+    this.orbitSystem.beginCapture(ex + 1, ez)
+    const orbitR = this.orbitSystem.targetOrbitRadius
+    this.shuttleController.group.position.set(ex + orbitR, 0, ez)
+    this.orbitSystem.checkArrival(ex + orbitR, ez)
+
+    // Face away from Earth
+    const awayAngle = Math.atan2(-ez, orbitR)
+    this.shuttleController.group.rotation.set(0, awayAngle, 0)
+
+    // Camera + orbit ring
+    this.vehicleCamera?.setConfig(MAP_ORBIT_CAMERA_CONFIG)
+    this.vehicleCamera?.setTarget(this.shuttleController.group)
+    this.showOrbitRing(orbitR)
+    if (this.orbitRing) {
+      this.orbitRing.position.set(ex, 0, ez)
+    }
+
+    // Reset slingshot state
+    this.slingshotCharge = 0
+    this.hideLaunchArrow()
+    this.yRecovery = false
   }
 
   /**

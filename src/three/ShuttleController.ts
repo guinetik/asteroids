@@ -451,6 +451,17 @@ export class ShuttleController implements Tickable, PortalVehicle {
     this.group.rotateX(dt * 3)
   }
 
+  /** Clear death state without repositioning. Caller handles placement. */
+  resetDeath(): void {
+    this.isDead = false
+    this.deathTarget = null
+    this.deathSpeed = 0
+    this.velocity.set(0, 0, 0)
+    this.angularVelocity = 0
+    this._slingshotSpeed = 0
+    this.group.rotation.set(0, this.group.rotation.y, 0)
+  }
+
   respawn(): void {
     this.isDead = false
     this.deathTarget = null
