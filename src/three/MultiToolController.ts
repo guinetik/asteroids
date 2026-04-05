@@ -23,7 +23,7 @@ import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
 
 /** Position offset from camera origin (right, down, forward). */
 const OFFSET_X = 0.35
-const OFFSET_Y = -0.35
+const OFFSET_Y = -0.45
 const OFFSET_Z = -0.70
 
 const MODEL_SCALE = 0.01
