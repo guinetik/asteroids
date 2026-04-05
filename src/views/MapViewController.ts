@@ -244,7 +244,7 @@ export class MapViewController implements Tickable {
     const gridDepthScale = 80
     const gridWidthScale = 40
     const gridMassExponent = 0.2
-    this.spaceTimeGrid = new SpaceTimeGrid(gridSize, 400, gridDepthScale, gridWidthScale, gridMassExponent)
+    this.spaceTimeGrid = new SpaceTimeGrid(gridSize, 200, gridDepthScale, gridWidthScale, gridMassExponent)
     scene.add(this.spaceTimeGrid.mesh)
 
     // Sun is static — add once, never cleared
