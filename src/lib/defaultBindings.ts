@@ -39,3 +39,27 @@ export const FPS_BINDINGS: Record<string, string[]> = {
   toolWeapon: ['Digit2'],
   toolHeal: ['Digit3'],
 }
+
+/** Level bindings — combines lander + FPS + interact (F key). */
+export const LEVEL_BINDINGS: Record<string, string[]> = {
+  // Lander controls
+  mainEngine: ['Space'],
+  rcsLeft: ['KeyA'],
+  rcsRight: ['KeyD'],
+  rcsFore: ['KeyW'],
+  rcsAft: ['KeyS'],
+  rcsDescend: ['KeyC'],
+  rcsAscend: ['ShiftLeft'],
+  // FPS controls
+  moveForward: ['KeyW'],
+  moveBack: ['KeyS'],
+  moveLeft: ['KeyA'],
+  moveRight: ['KeyD'],
+  jump: ['Space'],
+  sprint: ['ShiftLeft'],
+  toolDrill: ['Digit1'],
+  toolWeapon: ['Digit2'],
+  toolHeal: ['Digit3'],
+  // Shared
+  interact: ['KeyF'],
+}
