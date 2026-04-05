@@ -50,7 +50,7 @@ const JUMP_TILT = 0.3
 
 /** ADS offset — gun moves to center screen. */
 const ADS_OFFSET_X = 0.0
-const ADS_OFFSET_Y = -0.35
+const ADS_OFFSET_Y = -0.3
 const ADS_OFFSET_Z = -0.50
 /** How fast the gun lerps to ADS position (per second). */
 const ADS_LERP_SPEED = 12
@@ -131,6 +131,7 @@ export class MultiToolController implements Tickable {
           opacity: 0.8,
         })
         const cylinder = new THREE.Mesh(cylGeo, cylMat)
+        cylinder.position.z = -1.0
         child.add(cylinder)
         this.powerIndicators.push({ node: child, cylinder, baseZ: child.position.z, slideZ: 0 })
       }
@@ -277,7 +278,7 @@ export class MultiToolController implements Tickable {
         mat.color.setHex(0xff0000)
       }
       // Slide sideways during ADS so indicators are visible while zoomed
-      const targetZ = this.aiming ? 4.0 : 0
+      const targetZ = this.aiming ? 1.0 : 0
       indicator.slideZ += (targetZ - indicator.slideZ) * Math.min(1, 8 * dt)
       indicator.node.position.z = indicator.baseZ + indicator.slideZ
     }
