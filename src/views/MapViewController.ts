@@ -40,7 +40,7 @@ import type { GravitySource } from '@/lib/physics/gravity'
 import { ShuttleController, MAP_PHYSICS } from '@/three/ShuttleController'
 import mapGravityData from '@/data/shuttle/map-gravity.json'
 import { ThrusterEffectController } from '@/three/ThrusterEffectController'
-import { VehicleCamera, MAP_CAMERA_CONFIG, MAP_ORBIT_CAMERA_CONFIG, MAP_INSPECT_CAMERA_CONFIG } from '@/three/VehicleCamera'
+import { VehicleCamera, MAP_CAMERA_CONFIG, MAP_ORBIT_CAMERA_CONFIG, MAP_INSPECT_CAMERA_CONFIG, MAP_DEATH_CAMERA_CONFIG } from '@/three/VehicleCamera'
 import orbitConfig from '@/data/shuttle/orbit-capture.json'
 import { PortalArrivalSequence } from '@/three/PortalArrivalSequence'
 import { PortalBoundarySystem } from '@/three/PortalBoundarySystem'
@@ -252,6 +252,7 @@ export class MapViewController implements Tickable {
     }
 
     this.shuttleController.onDeath = () => {
+      this.vehicleCamera?.setConfig(MAP_DEATH_CAMERA_CONFIG)
       this.onDeathOverlay?.(true, 'Solar Radiation')
     }
 

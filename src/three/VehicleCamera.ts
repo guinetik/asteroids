@@ -56,6 +56,15 @@ export const MAP_CAMERA_CONFIG: VehicleCameraConfig = {
   fov: 60,
 }
 
+/** Map death preset: pulls back and up from last shuttle position. */
+export const MAP_DEATH_CAMERA_CONFIG: VehicleCameraConfig = {
+  idleOffset: new THREE.Vector3(-3, 2, 0),
+  lerpSpeed: 1.5,
+  idleTimeout: 0,
+  minY: -Infinity,
+  fov: 60,
+}
+
 /** Map inspect preset: top-down on shuttle for cargo/menu view. */
 export const MAP_INSPECT_CAMERA_CONFIG: VehicleCameraConfig = {
   idleOffset: new THREE.Vector3(0, 0.5, 0),
