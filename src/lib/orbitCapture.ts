@@ -194,6 +194,16 @@ export class OrbitCaptureSystem {
     return this.fsm.state ?? 'free'
   }
 
+  /**
+   * The currently targeted {@link CaptureBody}, or `null` when in `free` state.
+   *
+   * Exposed so the caller can read the planet's live world position (e.g. to
+   * aim the camera at the planet centre during orbit).
+   */
+  get target(): CaptureBody | null {
+    return this.targetData?.body ?? null
+  }
+
   // ─── Proximity detection ──────────────────────────────────────────────────
 
   /**

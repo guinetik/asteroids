@@ -31,8 +31,11 @@ import { SunController } from '@/three/controllers/SunController'
 import { PlanetSystemController } from '@/three/controllers/PlanetSystemController'
 import { AsteroidBeltController } from '@/three/controllers/AsteroidBeltController'
 import { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
-import { ShuttleController } from '@/three/ShuttleController'
-import { VehicleCamera, MAP_CAMERA_CONFIG } from '@/three/VehicleCamera'
+import * as THREE from 'three'
+import { OrbitCaptureSystem, type OrbitHudState } from '@/lib/orbitCapture'
+import { ShuttleController, MAP_PHYSICS } from '@/three/ShuttleController'
+import { ThrusterEffectController } from '@/three/ThrusterEffectController'
+import { VehicleCamera, MAP_CAMERA_CONFIG, MAP_ORBIT_CAMERA_CONFIG } from '@/three/VehicleCamera'
 
 /** Tick priority for the compositor (runs after animation, before render). */
 const TICK_PRIORITY_COMPOSIT = TICK_PRIORITY_RENDER - 1
@@ -49,13 +52,13 @@ const GRID_MASS_THRESHOLD = 1e-5
 
 /**
  * Visual scale for the shuttle in the map view.
- * The shuttle model is ~14 units at default scale; this brings it to ~0.7 units,
- * comparable to planet display radii.
+ * The shuttle model is ~14 units at default scale; this brings it to ~0.14 units,
+ * smaller than most planet display radii but clearly visible.
  */
-const MAP_SHUTTLE_SCALE = 0.05
+const MAP_SHUTTLE_SCALE = 0.01
 
-/** Spawn the shuttle near Earth's orbit distance (~300 scene-AU * ORBIT_SCALE). */
-const SPAWN_ORBIT_RADIUS = 300 * ORBIT_SCALE
+/** Offset behind Earth so the shuttle doesn't overlap the planet mesh. */
+const SPAWN_OFFSET_BEHIND_EARTH = 1.5
 
 /**
  * Bridges Vue lifecycle to the map scene with player shuttle.
@@ -71,6 +74,7 @@ export class MapViewController implements Tickable {
   private sceneObjects: MapSceneObjects | null = null
   private vehicleCamera: VehicleCamera | null = null
   private shuttleController: ShuttleController | null = null
+  private thrusterController: ThrusterEffectController | null = null
   private starField: StarFieldController | null = null
   private sunController: SunController | null = null
   private planetControllers: PlanetSystemController[] = []
@@ -79,8 +83,13 @@ export class MapViewController implements Tickable {
   private simTime = 0
   private resizeHandler: (() => void) | null = null
 
+  private orbitSystem: OrbitCaptureSystem | null = null
+
   /** Called each frame with full shuttle telemetry for HUD display. */
   onTelemetry: ((telemetry: ShuttleTelemetry) => void) | null = null
+
+  /** Called each frame with orbit-capture HUD state. */
+  onOrbitState: ((state: OrbitHudState) => void) | null = null
 
   async init(container: HTMLElement): Promise<void> {
     // Create canvas
@@ -149,30 +158,52 @@ export class MapViewController implements Tickable {
     // --- Space-time grid (gravity well visualization) ---
     const kuiperOuterEdge = 2400 * ORBIT_SCALE
     const gridSize = kuiperOuterEdge * 2.2
-    const gridDepthScale = 10
+    const gridDepthScale = 2
     const gridWidthScale = 12
     const gridMassExponent = 0.2
     this.spaceTimeGrid = new SpaceTimeGrid(gridSize, 200, gridDepthScale, gridWidthScale, gridMassExponent)
     scene.add(this.spaceTimeGrid.mesh)
 
     // --- Shuttle (player character) ---
-    this.shuttleController = new ShuttleController(this.inputManager)
-    this.shuttleController.setSpaceTimeGrid(this.spaceTimeGrid)
-    // No gravity wells — map is a free-roam hub, gravity is visual only
+    this.shuttleController = new ShuttleController(this.inputManager, MAP_PHYSICS)
+    // No grid attachment or gravity wells — map is a free-roam hub, shuttle stays at Y=0
     await this.shuttleController.load()
     this.shuttleController.group.scale.setScalar(MAP_SHUTTLE_SCALE)
 
-    // Spawn near Earth's orbit at a random angle
-    const spawnAngle = Math.random() * Math.PI * 2
-    this.shuttleController.group.position.set(
-      Math.cos(spawnAngle) * SPAWN_ORBIT_RADIUS,
-      0,
-      Math.sin(spawnAngle) * SPAWN_ORBIT_RADIUS,
-    )
+    // Spawn next to Earth — find its controller by matching PLANETS order
+    const earthIndex = PLANETS.findIndex((p) => p.id === 'earth')
+    const earthController = this.planetControllers[earthIndex]
+    if (earthController) {
+      const ex = earthController.getWorldX()
+      const ez = earthController.getWorldZ()
+      // Place slightly behind Earth (away from the Sun)
+      const awayFromSun = Math.atan2(ez, ex)
+      this.shuttleController.group.position.set(
+        ex + Math.cos(awayFromSun) * SPAWN_OFFSET_BEHIND_EARTH,
+        0,
+        ez + Math.sin(awayFromSun) * SPAWN_OFFSET_BEHIND_EARTH,
+      )
+    }
 
     scene.add(this.shuttleController.group)
     this.vehicleCamera.setTarget(this.shuttleController.group)
     this.tickHandler.register(this.shuttleController, TICK_PRIORITY_PHYSICS)
+
+    // Thruster effects (scale-aware — offsets and push forces adapt to group scale)
+    this.thrusterController = new ThrusterEffectController(this.shuttleController)
+    scene.add(this.thrusterController.thrustPoints)
+    scene.add(this.thrusterController.brakePoints)
+    scene.add(this.thrusterController.rcsPoints)
+    this.tickHandler.register(this.thrusterController, TICK_PRIORITY_ANIMATION)
+
+    // --- Orbit capture system ---
+    const captureBodies = PLANETS.map((planet, i) => ({
+      name: planet.name,
+      displayRadius: planet.displayRadius,
+      getWorldX: () => this.planetControllers[i]!.getWorldX(),
+      getWorldZ: () => this.planetControllers[i]!.getWorldZ(),
+    }))
+    this.orbitSystem = new OrbitCaptureSystem(captureBodies)
 
     // One-shot action bridge (doors toggle, telemetry)
     this.tickHandler.register(this, ONE_SHOT_PRIORITY)
@@ -206,12 +237,90 @@ export class MapViewController implements Tickable {
   }
 
   /**
-   * One-shot actions and telemetry emission (runs just after input).
+   * One-shot actions, orbit state machine, and telemetry emission (runs just after input).
    */
-  tick(_dt: number): void {
+  tick(dt: number): void {
+    // Door toggle
     if (this.inputManager?.wasActionPressed('toggleDoors')) {
       this.shuttleController?.toggleDoors()
     }
+
+    // Orbit action (E key)
+    if (this.inputManager?.wasActionPressed('orbitAction') && this.orbitSystem && this.shuttleController) {
+      const state = this.orbitSystem.state
+      if (state === 'free') {
+        const px = this.shuttleController.position.x
+        const pz = this.shuttleController.position.z
+        if (this.orbitSystem.beginCapture(px, pz)) {
+          this.shuttleController.setInputEnabled(false)
+          this.vehicleCamera?.setConfig(MAP_ORBIT_CAMERA_CONFIG)
+        }
+      } else if (state === 'approaching') {
+        this.orbitSystem.cancelApproach()
+        this.shuttleController.setInputEnabled(true)
+        this.vehicleCamera?.setConfig(MAP_CAMERA_CONFIG)
+      } else if (state === 'orbiting') {
+        const heading = this.shuttleController.heading
+        const result = this.orbitSystem.launchSlingshot(heading, dt)
+        if (result) {
+          this.shuttleController.unfreeze()
+          this.shuttleController.setVelocity(new THREE.Vector3(result.vx, 0, result.vz))
+          this.shuttleController.setSlingshotSpeed(
+            Math.sqrt(result.vx * result.vx + result.vz * result.vz),
+          )
+          this.shuttleController.setInputEnabled(true)
+          this.vehicleCamera?.setConfig(MAP_CAMERA_CONFIG)
+          if (this.vehicleCamera) {
+            this.vehicleCamera.controls.target.copy(this.shuttleController.position)
+          }
+        }
+      }
+    }
+
+    // Orbit approach autopilot
+    if (this.orbitSystem?.state === 'approaching' && this.shuttleController) {
+      const px = this.shuttleController.position.x
+      const pz = this.shuttleController.position.z
+      const target = this.orbitSystem.getApproachTarget()
+      if (target) {
+        const dx = target.x - px
+        const dz = target.z - pz
+        const targetAngle = Math.atan2(-dz, dx)
+        this.shuttleController.group.rotation.y = targetAngle
+        // Apply thrust toward target
+        const dist = Math.sqrt(dx * dx + dz * dz)
+        if (dist > 0.01) {
+          const speed = Math.min(this.shuttleController.speed + 0.5 * dt, 2.0)
+          const vel = new THREE.Vector3(dx, 0, dz).normalize().multiplyScalar(speed)
+          this.shuttleController.setVelocity(vel)
+        }
+      }
+      this.orbitSystem.checkArrival(px, pz)
+    }
+
+    // If approach just transitioned to orbiting, freeze the shuttle in place
+    if (this.orbitSystem?.state === 'orbiting' && this.shuttleController && !this.shuttleController.inputEnabled) {
+      if (this.shuttleController.speed > 0) {
+        this.shuttleController.setVelocity(new THREE.Vector3(0, 0, 0))
+        this.shuttleController.freeze()
+      }
+    }
+
+    // Orbit position driving
+    if (this.orbitSystem?.state === 'orbiting' && this.shuttleController) {
+      const pos = this.orbitSystem.tickOrbit(dt)
+      if (pos) {
+        this.shuttleController.group.position.set(pos.x, 0, pos.z)
+      }
+      // Camera targets planet center during orbit
+      if (this.orbitSystem.target && this.vehicleCamera) {
+        const bx = this.orbitSystem.target.getWorldX()
+        const bz = this.orbitSystem.target.getWorldZ()
+        this.vehicleCamera.controls.target.set(bx, 0, bz)
+      }
+    }
+
+    // Telemetry
     if (this.shuttleController && this.onTelemetry) {
       const ts = this.shuttleController.thrusterSystem
       this.onTelemetry({
@@ -228,6 +337,16 @@ export class MapViewController implements Tickable {
         rcsCharge: ts.getState('rcs').charge,
         rcsCapacity: ts.getState('rcs').capacity,
       })
+    }
+
+    // Orbit HUD state
+    if (this.orbitSystem && this.shuttleController && this.onOrbitState) {
+      this.onOrbitState(
+        this.orbitSystem.getHudState(
+          this.shuttleController.position.x,
+          this.shuttleController.position.z,
+        ),
+      )
     }
   }
 
@@ -276,6 +395,7 @@ export class MapViewController implements Tickable {
     }
 
     // Dispose controllers
+    this.thrusterController?.dispose()
     this.shuttleController?.dispose()
     for (const controller of this.beltControllers) controller.dispose()
     for (const controller of this.planetControllers) controller.dispose()

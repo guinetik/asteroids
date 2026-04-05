@@ -3,7 +3,9 @@
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { MapViewController } from './MapViewController'
 import ShuttleHud from '@/components/ShuttleHud.vue'
+import OrbitPrompt from '@/components/OrbitPrompt.vue'
 import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
+import type { OrbitHudState } from '@/lib/orbitCapture'
 
 const container = ref<HTMLElement>()
 const viewController = new MapViewController()
@@ -21,11 +23,20 @@ const telemetry = reactive<ShuttleTelemetry>({
   rcsCharge: 0,
   rcsCapacity: 0,
 })
+const orbitState = reactive<OrbitHudState>({
+  state: 'free',
+  nearestBodyName: null,
+  orbitalSpeed: 0,
+  slingshotSpeed: 0,
+})
 
 onMounted(async () => {
   if (container.value) {
     viewController.onTelemetry = (t) => {
       Object.assign(telemetry, t)
+    }
+    viewController.onOrbitState = (s) => {
+      Object.assign(orbitState, s)
     }
     await viewController.init(container.value)
   }
@@ -39,4 +50,5 @@ onUnmounted(() => {
 <template>
   <div ref="container" class="scene-container"></div>
   <ShuttleHud :telemetry="telemetry" />
+  <OrbitPrompt :orbitState="orbitState" />
 </template>
