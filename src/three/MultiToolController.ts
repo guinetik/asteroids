@@ -64,7 +64,10 @@ export class MultiToolController implements Tickable {
   private camera: THREE.PerspectiveCamera | null = null
   private readonly ledMeshes: THREE.Mesh[] = []
   private triggerLock: THREE.Object3D | null = null
+  private lockBaseX = 0
+  private lockBaseZ = 0
   private lockSlide = 0
+  private lockZSlide = 0
   private currentMode = 'drill'
   private scene: THREE.Scene | null = null
   private projectileSystem: ProjectileSystem | null = null
@@ -104,6 +107,8 @@ export class MultiToolController implements Tickable {
       }
       if (child.name === 'pistol_trigger_lock') {
         this.triggerLock = child
+        this.lockBaseX = child.position.x
+        this.lockBaseZ = child.position.z
       }
     })
     scene.add(this.model)
@@ -218,12 +223,17 @@ export class MultiToolController implements Tickable {
     this.model.rotateY(-Math.PI / 2)
     this.model.rotateZ(swayZ)
 
-    // Trigger lock — slides back (Z+) when drill selected + stationary
+    // Trigger lock — slides back toward player when drill + stationary
+    // In ADS: also shifts sideways (Z) so lock is visible while zoomed
     if (this.triggerLock) {
       const unlocked = this.currentMode === 'drill' && this.lateralSpeed < 0.1
-      const targetZ = unlocked ? 0.4 : 0
-      this.lockSlide += (targetZ - this.lockSlide) * Math.min(1, 8 * dt)
-      this.triggerLock.position.z = this.lockSlide
+      const targetSlide = unlocked ? 4.0 : 0
+      this.lockSlide += (targetSlide - this.lockSlide) * Math.min(1, 8 * dt)
+      this.triggerLock.position.x = this.lockBaseX + this.lockSlide
+
+      const targetZ = this.aiming ? 4.0 : 0
+      this.lockZSlide += (targetZ - this.lockZSlide) * Math.min(1, 8 * dt)
+      this.triggerLock.position.z = this.lockBaseZ + this.lockZSlide
     }
   }
 
