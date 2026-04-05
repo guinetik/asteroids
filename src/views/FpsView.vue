@@ -39,8 +39,11 @@ requestAnimationFrame((t) => {
  * Each slice is a wedge from innerRadius to outerRadius.
  * The center is hollow (masked by the inner circle gap).
  */
-const OUTER_R = 500
-const INNER_R = 220
+// Outer radius overshoots the viewBox so slices cover screen corners
+// on any aspect ratio. Inner radius stays proportionally smaller for
+// a generous clear center area.
+const OUTER_R = 720
+const INNER_R = 280
 const CX = 500
 const CY = 500
 
@@ -203,7 +206,7 @@ function resumeLock() {
     v-if="damageDir !== null"
     class="damage-ring"
     viewBox="0 0 1000 1000"
-    preserveAspectRatio="none"
+    preserveAspectRatio="xMidYMid slice"
   >
     <defs>
       <linearGradient
