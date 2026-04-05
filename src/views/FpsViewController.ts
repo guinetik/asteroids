@@ -47,6 +47,8 @@ const SPAWN_HEIGHT = 5
 const ENEMY_SPAWN_COUNT = 8
 const ENEMY_SPAWN_RADIUS = 80
 const ENEMY_MIN_SPAWN_DISTANCE = 20
+const DAMAGE_FLASH_DURATION = 0.3
+const DAMAGE_FLINCH_STRENGTH = 80
 
 const TEST_SURFACE: SurfaceFeatures = {
   craterDensity: 0.5,
@@ -89,6 +91,11 @@ export class FpsViewController implements Tickable {
 
   /** Called when pointer lock state changes. */
   onPointerLockChange: ((locked: boolean) => void) | null = null
+
+  /** Called each frame with damage flash opacity (0 = clear, >0 = red vignette). */
+  onDamageFlash: ((opacity: number) => void) | null = null
+
+  private damageFlashTimer = 0
 
   async init(container: HTMLElement): Promise<void> {
     const config = playerConfigJson as FpsPlayerConfig
@@ -199,6 +206,14 @@ export class FpsViewController implements Tickable {
       this.enemyDirector = new EnemyDirector()
       this.enemyDirector.onContactDamage = (_handle, damage) => {
         this.playerController?.takeDamage(damage)
+        this.damageFlashTimer = DAMAGE_FLASH_DURATION
+        // Camera flinch — random pitch/yaw jolt
+        if (this.fpsCamera) {
+          this.fpsCamera.applyMouseDelta(
+            (Math.random() - 0.5) * DAMAGE_FLINCH_STRENGTH,
+            -Math.random() * DAMAGE_FLINCH_STRENGTH,
+          )
+        }
       }
       this.tickHandler.register(this.enemyDirector, TICK_PRIORITY_PHYSICS + 4)
 
@@ -344,6 +359,14 @@ export class FpsViewController implements Tickable {
           ctrl.group.rotation.y = Math.atan2(dir.x, dir.z)
         }
       }
+    }
+
+    // --- Damage flash decay ---
+    if (this.damageFlashTimer > 0) {
+      this.damageFlashTimer -= _dt
+      this.onDamageFlash?.(Math.max(0, this.damageFlashTimer / DAMAGE_FLASH_DURATION))
+    } else {
+      this.onDamageFlash?.(0)
     }
 
     if (this.playerController && this.onTelemetry) {

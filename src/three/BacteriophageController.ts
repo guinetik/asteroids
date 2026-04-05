@@ -57,10 +57,10 @@ const flashMat = new THREE.MeshBasicMaterial({ color: 0xff00ff })
 const coreMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc })
 
 const legMat = new THREE.MeshStandardMaterial({
-  color: 0x556677,
-  emissive: 0x112233,
-  emissiveIntensity: 0.2,
-  metalness: 0.6,
+  color: 0x334455,
+  emissive: 0x00ffaa,
+  emissiveIntensity: 0.8,
+  metalness: 0.5,
   roughness: 0.4,
 })
 

@@ -8,6 +8,7 @@ import type { FpsTelemetry } from '@/components/FpsHud.vue'
 const container = ref<HTMLElement>()
 const viewController = new FpsViewController()
 const pointerLocked = ref(true)
+const damageFlash = ref(0)
 
 const telemetry = reactive<FpsTelemetry>({
   hp: 100,
@@ -33,6 +34,9 @@ onMounted(async () => {
     viewController.onPointerLockChange = (locked) => {
       pointerLocked.value = locked
     }
+    viewController.onDamageFlash = (opacity) => {
+      damageFlash.value = opacity
+    }
     await viewController.init(container.value)
   }
 })
@@ -49,6 +53,11 @@ function resumeLock() {
 <template>
   <div ref="container" class="scene-container"></div>
   <FpsHud :telemetry="telemetry" />
+  <div
+    v-if="damageFlash > 0"
+    class="fixed inset-0 pointer-events-none z-45"
+    :style="{ background: `radial-gradient(ellipse at center, transparent 40%, rgba(255, 0, 0, ${damageFlash * 0.6}))` }"
+  />
   <div
     v-if="!pointerLocked"
     class="fixed inset-0 flex items-center justify-center bg-black/60 cursor-pointer z-50"
