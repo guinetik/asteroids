@@ -99,19 +99,8 @@ function modeColor(): string {
       </div>
     </div>
 
-    <!-- RTG Bar -->
+    <!-- Mode Charge Bar (active tool's clip) -->
     <div class="absolute top-[6.5rem] left-4 flex items-center gap-2">
-      <span class="text-xs tracking-widest uppercase text-yellow-400/60 w-8">RTG</span>
-      <div class="w-32 h-2 bg-white/10 rounded-sm overflow-hidden">
-        <div
-          class="h-full bg-yellow-400/80 transition-all duration-75"
-          :style="{ width: pct(telemetry.rtgLevel, telemetry.rtgCapacity) + '%' }"
-        />
-      </div>
-    </div>
-
-    <!-- Mode Charge Bar -->
-    <div class="absolute top-[8.5rem] left-4 flex items-center gap-2">
       <span class="text-xs tracking-widest uppercase w-8" :style="{ color: modeColor() + '99' }">
         {{ telemetry.activeMode === 'weapon' ? 'LAS' : telemetry.activeMode === 'drill' ? 'DRL' : 'MED' }}
       </span>
@@ -122,6 +111,17 @@ function modeColor(): string {
             width: pct(telemetry.modeCharge, telemetry.modeCapacity) + '%',
             backgroundColor: modeColor() + 'cc',
           }"
+        />
+      </div>
+    </div>
+
+    <!-- RTG Bar (shared fuel) -->
+    <div class="absolute top-[8.5rem] left-4 flex items-center gap-2">
+      <span class="text-xs tracking-widest uppercase text-yellow-400/60 w-8">RTG</span>
+      <div class="w-32 h-2 bg-white/10 rounded-sm overflow-hidden">
+        <div
+          class="h-full bg-yellow-400/80 transition-all duration-75"
+          :style="{ width: pct(telemetry.rtgLevel, telemetry.rtgCapacity) + '%' }"
         />
       </div>
     </div>
