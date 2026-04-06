@@ -86,9 +86,9 @@ function handleRestart() {
 
 <template>
   <div ref="container" class="scene-container"></div>
-  <ShuttleHud :telemetry="telemetry" />
-  <OrbitPrompt :orbitState="orbitState" />
-  <GravityWarning :warning="gravityWarning" />
-  <DeathOverlay :visible="deathVisible" :cause="deathCause" @restart="handleRestart" />
+  <ShuttleHud v-show="!mapOverlay.visible" :telemetry="telemetry" />
+  <OrbitPrompt v-show="!mapOverlay.visible" :orbitState="orbitState" />
+  <GravityWarning v-show="!mapOverlay.visible" :warning="gravityWarning" />
+  <DeathOverlay v-show="!mapOverlay.visible" :visible="deathVisible" :cause="deathCause" @restart="handleRestart" />
   <MapOverlay :overlay="mapOverlay" />
 </template>
