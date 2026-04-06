@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { MAP_INTRO_CINEMATIC_DURATION, MapIntroState } from '../mapIntroState'
+import {
+  MAP_INTRO_CAPTION_LANDER_OPERATOR,
+  MAP_INTRO_CAPTION_SOLAR_SYSTEM,
+  MAP_INTRO_CAPTION_SPACE_RACE,
+  MAP_INTRO_CINEMATIC_DURATION,
+  MAP_INTRO_CINEMATIC_HERO_HOLD_END,
+  MAP_INTRO_CINEMATIC_HERO_HOLD_START,
+  MapIntroState,
+  mapIntroCaptionForEasedProgress,
+} from '../mapIntroState'
 
 describe('MapIntroState', () => {
   it('starts inactive', () => {
@@ -62,5 +71,34 @@ describe('MapIntroState', () => {
 
     expect(state.phase).toBe('interactive')
     expect(state.controlsLocked).toBe(false)
+  })
+
+  it('shows the three cinematic captions in order by eased progress', () => {
+    expect(mapIntroCaptionForEasedProgress(0)).toBe(MAP_INTRO_CAPTION_SOLAR_SYSTEM)
+    expect(mapIntroCaptionForEasedProgress(MAP_INTRO_CINEMATIC_HERO_HOLD_START - 0.01)).toBe(
+      MAP_INTRO_CAPTION_SOLAR_SYSTEM,
+    )
+    expect(mapIntroCaptionForEasedProgress(MAP_INTRO_CINEMATIC_HERO_HOLD_START)).toBe(
+      MAP_INTRO_CAPTION_SPACE_RACE,
+    )
+    expect(mapIntroCaptionForEasedProgress(MAP_INTRO_CINEMATIC_HERO_HOLD_END - 0.01)).toBe(
+      MAP_INTRO_CAPTION_SPACE_RACE,
+    )
+    expect(mapIntroCaptionForEasedProgress(MAP_INTRO_CINEMATIC_HERO_HOLD_END)).toBe(
+      MAP_INTRO_CAPTION_LANDER_OPERATOR,
+    )
+    expect(mapIntroCaptionForEasedProgress(1)).toBe(MAP_INTRO_CAPTION_LANDER_OPERATOR)
+  })
+
+  it('exposes the current cinematic caption on uiState during the zoom phase', () => {
+    const state = new MapIntroState()
+
+    state.start()
+
+    expect(state.uiState.cinematicCaption).toBe(MAP_INTRO_CAPTION_SOLAR_SYSTEM)
+
+    state.skip()
+
+    expect(state.uiState.cinematicCaption).toBe('')
   })
 })

@@ -24,6 +24,7 @@ import { createInventory } from '@/lib/inventory/inventory'
 import { shipMessageSystem } from '@/lib/messages/runtime'
 import type { ActiveShipMessage } from '@/lib/messages/messageTypes'
 import type { MapIntroUiState } from '@/lib/mapIntroState'
+import type { MapViewLayerToggleState } from './MapViewController'
 import type {
   ShuttleTelemetry,
   GravityWarningState,
@@ -43,6 +44,7 @@ const mapIntro = reactive<MapIntroUiState>({
   messagePromptVisible: false,
   messageDialogVisible: false,
   controlsLocked: false,
+  cinematicCaption: '',
 })
 
 function refreshActiveMessage(): void {
@@ -189,6 +191,11 @@ onMounted(async () => {
     }
     viewController.onMapIntro = (state) => {
       Object.assign(mapIntro, state)
+    }
+    viewController.onMapViewLayerToggles = (state: MapViewLayerToggleState) => {
+      orbitsVisible.value = state.orbitsVisible
+      gridVisible.value = state.gridVisible
+      ambientVisible.value = state.ambientVisible
     }
     viewController.onMessageUpdate = () => {
       refreshActiveMessage()
@@ -359,6 +366,9 @@ function dockedPlanetId(): string | null {
     class="map-intro-letterbox map-intro-letterbox--bottom"
     :class="{ 'map-intro-letterbox--hidden': !mapIntro.letterboxVisible }"
   />
+  <p v-show="mapIntro.cinematicCaption" class="map-intro-cinematic-caption">
+    {{ mapIntro.cinematicCaption }}
+  </p>
   <ShuttleHud
     v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
     :telemetry="telemetry"

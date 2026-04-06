@@ -9,8 +9,43 @@
  * @spec docs/superpowers/specs/2026-04-05-startup-message-system-design.md
  */
 
-/** Duration in seconds for the opening cinematic zoom. */
-export const MAP_INTRO_CINEMATIC_DURATION = 7
+import { easeInOutCubic } from '@/lib/math/easing'
+
+/** Duration in seconds for the opening cinematic zoom (three camera beats: approach, hold, handoff). */
+export const MAP_INTRO_CINEMATIC_DURATION = 14
+
+/** End of the wide solar-system title-card beat (eased intro progress; keep in sync with map intro camera). */
+export const MAP_INTRO_CINEMATIC_HERO_HOLD_START = 0.38
+
+/** End of the hero hold beat before orbit-camera handoff (eased intro progress). */
+export const MAP_INTRO_CINEMATIC_HERO_HOLD_END = 0.82
+
+/** Title line: establishing wide shot. */
+export const MAP_INTRO_CAPTION_SOLAR_SYSTEM = 'SOLAR SYSTEM, 2299 AD.'
+
+/** Title line: approach / Earth context. */
+export const MAP_INTRO_CAPTION_SPACE_RACE =
+  'A NEW SPACE RACE IS BORN OUT OF REFURBISHED 21ST CENTURY TECH.'
+
+/** Title line: final beat before message prompt. */
+export const MAP_INTRO_CAPTION_LANDER_OPERATOR =
+  'A RETIRED LANDER OPERATOR JUST ACQUIRED A REFURBISHED SPACE SHUTTLE.'
+
+/**
+ * Resolves the lower-third title line for a given eased intro progress value
+ * (same easing domain as the map intro camera’s three beats).
+ *
+ * @param easedProgress - Eased 0–1 timeline (same cubic ease as the intro camera).
+ * @returns One of the three caption strings.
+ *
+ * @author guinetik
+ * @date 2026-04-06
+ */
+export function mapIntroCaptionForEasedProgress(easedProgress: number): string {
+  if (easedProgress < MAP_INTRO_CINEMATIC_HERO_HOLD_START) return MAP_INTRO_CAPTION_SOLAR_SYSTEM
+  if (easedProgress < MAP_INTRO_CINEMATIC_HERO_HOLD_END) return MAP_INTRO_CAPTION_SPACE_RACE
+  return MAP_INTRO_CAPTION_LANDER_OPERATOR
+}
 
 /** Phases of the map intro flow. */
 export type MapIntroPhase =
@@ -32,6 +67,8 @@ export interface MapIntroUiState {
   messageDialogVisible: boolean
   /** Whether normal map controls should remain locked. */
   controlsLocked: boolean
+  /** Lower-third title line during `cinematic_zoom`; empty otherwise. */
+  cinematicCaption: string
 }
 
 /**
@@ -110,12 +147,18 @@ export class MapIntroState {
 
   /** Current UI snapshot for Vue. */
   get uiState(): MapIntroUiState {
+    const cinematicCaption =
+      this.phase === 'cinematic_zoom'
+        ? mapIntroCaptionForEasedProgress(easeInOutCubic(this.cinematicProgress))
+        : ''
+
     return {
       phase: this.phase,
       letterboxVisible: this.controlsLocked,
       messagePromptVisible: this.phase === 'awaiting_message_open',
       messageDialogVisible: this.phase === 'reading_message',
       controlsLocked: this.controlsLocked,
+      cinematicCaption,
     }
   }
 }

@@ -65,7 +65,12 @@ import { createGravityDistortionPass } from '@/three/GravityDistortionPass'
 import type { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { VibePortal } from '@/lib/portal'
 import { MapState } from '@/lib/mapState'
-import { MapIntroState, type MapIntroUiState } from '@/lib/mapIntroState'
+import {
+  MapIntroState,
+  MAP_INTRO_CINEMATIC_HERO_HOLD_END,
+  MAP_INTRO_CINEMATIC_HERO_HOLD_START,
+  type MapIntroUiState,
+} from '@/lib/mapIntroState'
 import { MapCamera, easeInOut } from '@/three/MapCamera'
 import { findNearestBodies, formatDistance, type MapBody } from '@/lib/mapProjection'
 import type { MapOverlayState } from '@/lib/ShuttleTelemetry'
@@ -120,6 +125,21 @@ import {
 import type { ShuttleMissionBoard, ActiveShuttleMission } from '@/lib/missions/types'
 import { getGatherItemForPlanet } from '@/lib/missions/planetOrbitalConfig'
 import '@/lib/missions/missionMaterials'
+
+/**
+ * Orbit / grid / debris toggle snapshot for syncing the map HUD after intro suppression.
+ *
+ * @author guinetik
+ * @date 2026-04-06
+ */
+export interface MapViewLayerToggleState {
+  /** Planet orbit lines visible. */
+  orbitsVisible: boolean
+  /** Space-time fabric grid visible. */
+  gridVisible: boolean
+  /** User debris toggle (ambient layers); meshes may still be hidden while orbiting. */
+  ambientVisible: boolean
+}
 
 type EmissiveMaterial =
   | THREE.MeshLambertMaterial
@@ -315,8 +335,6 @@ const MAP_INTRO_CAMERA_START_FOV = 32
 const MAP_INTRO_HERO_OFFSET = new THREE.Vector3(-24, 6, 14)
 const MAP_INTRO_HERO_LOOK_AT_OFFSET = new THREE.Vector3(0, 1.5, 0)
 const MAP_INTRO_HERO_FOV = 42
-const MAP_INTRO_HERO_HOLD_START = 0.38
-const MAP_INTRO_HERO_HOLD_END = 0.82
 const EARTH_DEPARTURE_MESSAGE_DISTANCE = 12
 const EARTH_DEPARTURE_MIN_HISTORY_POINTS = 3
 const VENUS_ORBIT_WARNING_DISTANCE = 1.5
@@ -409,6 +427,9 @@ export class MapViewController implements Tickable {
   /** Whether the space-time fabric grid is currently visible. */
   private gridVisible = true
 
+  /** Saved layer toggles while the opening intro suppresses orbit lines / fabric / debris. */
+  private introLayerRestore: MapViewLayerToggleState | null = null
+
   /** Current shuttle display scale, lerped each frame toward the screen-size target. */
   private currentShuttleScale = MAP_SHUTTLE_SCALE
 
@@ -441,6 +462,9 @@ export class MapViewController implements Tickable {
 
   /** Called when the opening map intro UI should update. */
   onMapIntro: ((state: MapIntroUiState) => void) | null = null
+
+  /** Called when orbit / fabric / debris toggles change (including intro restore). */
+  onMapViewLayerToggles: ((state: MapViewLayerToggleState) => void) | null = null
 
   /** Called each frame with full shuttle telemetry for HUD display. */
   onTelemetry: ((telemetry: ShuttleTelemetry) => void) | null = null
@@ -797,6 +821,9 @@ export class MapViewController implements Tickable {
     // --- Compositor: renders via EffectComposer ---
     const compositorTickable: Tickable = {
       tick: () => {
+        // Intro / startup camera must sync after orrery (animation) and VehicleCamera tick, or the
+        // render camera lags planets by a frame and Earth appears to twitch (angle jitter).
+        this.tickStartupIntroCamera()
         this.sceneObjects!.composer.render()
       },
     }
@@ -819,6 +846,7 @@ export class MapViewController implements Tickable {
     DevConsole.register('MapView', {
       skipIntro: () => {
         this.mapIntro.skip()
+        this.restoreIntroMapLayers()
         this.emitIntroUiState()
       },
       getShuttlePosition: () => {
@@ -865,7 +893,7 @@ export class MapViewController implements Tickable {
    */
   tick(dt: number): void {
     this.mapIntro.tick(dt)
-    this.tickStartupIntroCamera()
+    this.syncIntroOrbitControlsEnabled()
     this.emitIntroUiState()
     const introLocked = this.mapIntro.controlsLocked
 
@@ -1547,16 +1575,78 @@ export class MapViewController implements Tickable {
   }
 
   /**
+   * Sets planet / moon orbit line visibility without using the public toggle.
+   *
+   * @param visible - Whether orbit lines should render.
+   */
+  private applyOrbitsVisible(visible: boolean): void {
+    this.orbitsVisible = visible
+    for (const controller of this.planetControllers) {
+      for (const line of controller.orbitLines) {
+        line.visible = visible
+      }
+    }
+  }
+
+  /**
+   * Sets space-time fabric visibility and refreshes deform when enabling.
+   *
+   * @param visible - Whether the grid mesh should render.
+   */
+  private applyGridVisible(visible: boolean): void {
+    this.gridVisible = visible
+    if (this.spaceTimeGrid) {
+      this.spaceTimeGrid.mesh.visible = visible
+      if (visible) {
+        this.syncSpaceTimeGridVisualBudget()
+        this.spaceTimeGrid.forceFullVisualDeform()
+      }
+    }
+  }
+
+  /**
+   * Hides orbits, fabric, and debris for the opening cinematic; remembers prior toggles.
+   */
+  private suppressIntroMapLayers(): void {
+    if (this.introLayerRestore !== null) return
+    this.introLayerRestore = {
+      orbitsVisible: this.orbitsVisible,
+      gridVisible: this.gridVisible,
+      ambientVisible: this.ambientSpace?.isVisible ?? true,
+    }
+    this.applyOrbitsVisible(false)
+    this.applyGridVisible(false)
+    this.ambientSpace?.setMapIntroSuppressed(true)
+    this.emitMapViewLayerToggles()
+  }
+
+  /**
+   * Restores orbit / fabric / debris after intro completes or is skipped from dev tools.
+   */
+  private restoreIntroMapLayers(): void {
+    if (this.introLayerRestore === null) return
+    const saved = this.introLayerRestore
+    this.introLayerRestore = null
+    this.applyOrbitsVisible(saved.orbitsVisible)
+    this.applyGridVisible(saved.gridVisible)
+    this.ambientSpace?.setMapIntroSuppressed(false)
+    this.emitMapViewLayerToggles()
+  }
+
+  private emitMapViewLayerToggles(): void {
+    this.onMapViewLayerToggles?.({
+      orbitsVisible: this.orbitsVisible,
+      gridVisible: this.gridVisible,
+      ambientVisible: this.ambientSpace?.isVisible ?? true,
+    })
+  }
+
+  /**
    * Toggles the visibility of all planet and moon orbit lines.
    * Returns the new visibility state so the Vue layer can update button appearance.
    */
   toggleOrbits(): boolean {
-    this.orbitsVisible = !this.orbitsVisible
-    for (const controller of this.planetControllers) {
-      for (const line of controller.orbitLines) {
-        line.visible = this.orbitsVisible
-      }
-    }
+    this.applyOrbitsVisible(!this.orbitsVisible)
     return this.orbitsVisible
   }
 
@@ -1565,14 +1655,7 @@ export class MapViewController implements Tickable {
    * Returns the new visibility state so the Vue layer can update button appearance.
    */
   toggleSpaceTimeGrid(): boolean {
-    this.gridVisible = !this.gridVisible
-    if (this.spaceTimeGrid) {
-      this.spaceTimeGrid.mesh.visible = this.gridVisible
-      if (this.gridVisible) {
-        this.syncSpaceTimeGridVisualBudget()
-        this.spaceTimeGrid.forceFullVisualDeform()
-      }
-    }
+    this.applyGridVisible(!this.gridVisible)
     return this.gridVisible
   }
 
@@ -2619,6 +2702,7 @@ export class MapViewController implements Tickable {
       this.vehicleCamera.controls.enabled = true
     }
 
+    this.restoreIntroMapLayers()
     this.emitIntroUiState()
   }
 
@@ -2632,6 +2716,7 @@ export class MapViewController implements Tickable {
     }
 
     this.mapIntro.start()
+    this.suppressIntroMapLayers()
     this.vehicleCamera.controls.enabled = false
     this.vehicleCamera.setConfig(MAP_ORBIT_CAMERA_CONFIG)
     if (this.introCamera) {
@@ -2643,7 +2728,25 @@ export class MapViewController implements Tickable {
     this.emitIntroUiState()
   }
 
-  /** Animate from the system overview shot into the live orbit camera. */
+  /**
+   * During intro, orbit drag is allowed only on the “new message” prompt so the player can
+   * look around; it stays off for the cinematic and the message reader dialog.
+   */
+  private syncIntroOrbitControlsEnabled(): void {
+    if (!this.vehicleCamera) return
+    if (!this.mapIntro.controlsLocked) return
+
+    const allowOrbit = this.mapIntro.phase === 'awaiting_message_open'
+    this.vehicleCamera.controls.enabled = allowOrbit
+  }
+
+  /**
+   * Animate from the system overview shot into the live orbit camera, and choose `renderPass.camera`.
+   *
+   * **Call site:** runs from the compositor tick immediately before `composer.render()`, after
+   * {@link TICK_PRIORITY_ANIMATION} (orrery) and {@link VehicleCamera.tick} so Earth and the orbit
+   * camera stay in the same frame.
+   */
   private tickStartupIntroCamera(): void {
     if (
       !this.sceneObjects ||
@@ -2666,8 +2769,8 @@ export class MapViewController implements Tickable {
         .clone()
         .add(MAP_INTRO_HERO_LOOK_AT_OFFSET)
 
-      if (progress < MAP_INTRO_HERO_HOLD_START) {
-        const heroProgress = easeInOut(progress / MAP_INTRO_HERO_HOLD_START)
+      if (progress < MAP_INTRO_CINEMATIC_HERO_HOLD_START) {
+        const heroProgress = easeInOut(progress / MAP_INTRO_CINEMATIC_HERO_HOLD_START)
         const currentTarget = new THREE.Vector3().lerpVectors(
           MAP_INTRO_CAMERA_START_TARGET,
           heroTarget,
@@ -2689,7 +2792,7 @@ export class MapViewController implements Tickable {
         return
       }
 
-      if (progress < MAP_INTRO_HERO_HOLD_END) {
+      if (progress < MAP_INTRO_CINEMATIC_HERO_HOLD_END) {
         this.introCamera.position.copy(heroPosition)
         this.introCamera.fov = MAP_INTRO_HERO_FOV
         this.introCamera.updateProjectionMatrix()
@@ -2699,7 +2802,7 @@ export class MapViewController implements Tickable {
       }
 
       const orbitProgress = easeInOut(
-        (progress - MAP_INTRO_HERO_HOLD_END) / (1 - MAP_INTRO_HERO_HOLD_END),
+        (progress - MAP_INTRO_CINEMATIC_HERO_HOLD_END) / (1 - MAP_INTRO_CINEMATIC_HERO_HOLD_END),
       )
       const currentTarget = new THREE.Vector3().lerpVectors(heroTarget, targetLookAt, orbitProgress)
 

@@ -375,24 +375,46 @@ body {
 /* --- Ship Message Dialog --- */
 
 .ship-message-dialog {
-  @apply absolute inset-0 z-40 flex items-center justify-center bg-slate-950/55 px-6 py-8 backdrop-blur-sm;
+  @apply fixed inset-0 z-40 flex items-center justify-center overflow-hidden overscroll-none bg-slate-950/55 px-4 py-6 backdrop-blur-sm sm:px-6 sm:py-8;
 }
 
 .ship-message-card {
-  @apply w-full max-w-4xl overflow-hidden rounded-2xl border border-cyan-400/25 bg-slate-950/90 text-slate-100 shadow-2xl;
+  @apply flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-cyan-400/25 bg-slate-950/90 text-slate-100 shadow-2xl;
   box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.08), 0 30px 80px rgba(2, 6, 23, 0.7);
+  max-height: min(88dvh, 720px);
+}
+
+@media (min-width: 768px) {
+  .ship-message-card {
+    max-height: min(90dvh, 820px);
+  }
+}
+
+@media (min-width: 1024px) {
+  .ship-message-card {
+    max-height: min(92dvh, 900px);
+  }
 }
 
 .ship-message-card__chrome {
-  @apply flex items-center justify-between border-b border-white/10 bg-white/5 px-5 py-3 font-mono text-[11px] uppercase tracking-[0.28em] text-cyan-200/80;
+  @apply flex shrink-0 items-center justify-between border-b border-white/10 bg-white/5 px-5 py-3 font-mono text-[11px] uppercase tracking-[0.28em] text-cyan-200/80;
 }
 
 .ship-message-card__body {
-  @apply grid gap-0 lg:grid-cols-[18rem_minmax(0,1fr)];
+  @apply grid min-h-0 flex-1 gap-0 overflow-hidden;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+@media (min-width: 1024px) {
+  .ship-message-card__body {
+    grid-template-columns: 18rem minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
 }
 
 .ship-message-card__meta {
-  @apply border-b border-white/10 bg-white/3 p-5 lg:border-b-0 lg:border-r;
+  @apply min-h-0 border-b border-white/10 bg-white/3 p-5 lg:border-b-0 lg:border-r;
 }
 
 .ship-message-card__meta-row {
@@ -408,19 +430,39 @@ body {
 }
 
 .ship-message-card__content {
-  @apply flex min-h-112 flex-col;
+  @apply flex min-h-0 min-w-0 flex-col overflow-hidden;
 }
 
 .ship-message-card__subject {
-  @apply border-b border-white/10 px-6 py-5 text-2xl font-semibold tracking-tight text-white;
+  @apply shrink-0 border-b border-white/10 px-6 py-5 text-xl font-semibold tracking-tight text-white sm:text-2xl;
 }
 
 .ship-message-card__copy {
-  @apply flex-1 space-y-4 px-6 py-5 text-[15px] leading-7 text-slate-200;
+  @apply min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 py-5 text-[15px] leading-7 text-slate-200;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 211, 238, 0.4) rgba(15, 23, 42, 0.55);
+}
+
+.ship-message-card__copy::-webkit-scrollbar {
+  width: 7px;
+}
+
+.ship-message-card__copy::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.55);
+  border-radius: 9999px;
+}
+
+.ship-message-card__copy::-webkit-scrollbar-thumb {
+  background: rgba(34, 211, 238, 0.35);
+  border-radius: 9999px;
+}
+
+.ship-message-card__copy::-webkit-scrollbar-thumb:hover {
+  background: rgba(34, 211, 238, 0.55);
 }
 
 .ship-message-card__footer {
-  @apply flex items-center justify-between border-t border-white/10 px-6 py-4;
+  @apply flex shrink-0 items-center justify-between border-t border-white/10 px-6 py-4;
 }
 
 .ship-message-card__hint {
@@ -437,9 +479,14 @@ body {
 
 /* --- Map Intro Cutscene --- */
 
+:root {
+  /* Match .map-intro-letterbox height — used to stack UI just below the top bar. */
+  --map-intro-letterbox-height: 12%;
+}
+
 .map-intro-letterbox {
   @apply fixed left-0 right-0 z-30 bg-black transition-all duration-700 ease-in-out;
-  height: 12%;
+  height: var(--map-intro-letterbox-height);
   pointer-events: none;
 }
 
@@ -455,8 +502,13 @@ body {
   height: 0;
 }
 
+.map-intro-cinematic-caption {
+  @apply pointer-events-none fixed bottom-[14%] left-0 right-0 z-[32] mx-auto max-w-3xl px-8 text-center font-mono text-sm font-medium uppercase leading-snug tracking-[0.18em] text-cyan-100/95 drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] md:text-base md:tracking-[0.22em];
+}
+
 .map-intro-message-prompt {
-  @apply fixed inset-x-0 top-1/2 z-40 flex -translate-y-1/2 justify-center px-6;
+  @apply fixed inset-x-0 z-40 flex justify-center px-6;
+  top: calc(var(--map-intro-letterbox-height) + 0.75rem);
 }
 
 .map-intro-message-prompt__button {

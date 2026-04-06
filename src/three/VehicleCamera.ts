@@ -93,14 +93,23 @@ export const MAP_INSPECT_CAMERA_CONFIG: VehicleCameraConfig = {
   maxDistance: 0.5,
 }
 
-/** Map orbit preset: pulled back above planet to show full orbit circle. */
+/** Orbit map: camera height above shuttle in local space (smaller = tighter on ship). */
+const MAP_ORBIT_CAMERA_IDLE_OFFSET_Y = 6
+
+/** Orbit map default vertical FOV (degrees); lower reads as more zoomed-in. */
+const MAP_ORBIT_CAMERA_FOV = 50
+
+/** Orbit map max orbit-controls zoom distance (world units). */
+const MAP_ORBIT_CAMERA_MAX_DISTANCE = 12
+
+/** Map orbit preset: above shuttle for planet orbit; tuned closer than full-system view. */
 export const MAP_ORBIT_CAMERA_CONFIG: VehicleCameraConfig = {
-  idleOffset: new THREE.Vector3(0, 10, 0),
+  idleOffset: new THREE.Vector3(0, MAP_ORBIT_CAMERA_IDLE_OFFSET_Y, 0),
   lerpSpeed: 2,
   idleTimeout: 999,
   minY: 1,
-  fov: 60,
-  maxDistance: 15,
+  fov: MAP_ORBIT_CAMERA_FOV,
+  maxDistance: MAP_ORBIT_CAMERA_MAX_DISTANCE,
 }
 
 /**

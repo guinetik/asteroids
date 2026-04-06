@@ -11,6 +11,7 @@
  */
 import * as THREE from 'three'
 import mapOverlayData from '@/data/shuttle/map-overlay.json'
+import { easeInOutCubic } from '@/lib/math/easing'
 
 /** Frustum bounds for an orthographic camera. */
 export interface FrustumBounds {
@@ -66,7 +67,7 @@ export function lerpFrustum(initial: number, final_: number, t: number): number 
  * @returns Eased output 0–1
  */
 export function easeInOut(t: number): number {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+  return easeInOutCubic(t)
 }
 
 /**
