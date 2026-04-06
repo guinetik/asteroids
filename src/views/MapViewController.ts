@@ -1828,6 +1828,17 @@ export class MapViewController implements Tickable {
     this.onMissionOverlay?.(true, mission, canFit)
   }
 
+  /** Enter the habitat interior (called by Vue OrbitPrompt click). */
+  enterHabitat(): void {
+    if (!this.shuttleController || !this.sceneObjects) return
+    if (this.habitatState.isActive) return
+    if (!this.inspectMode) {
+      this.shuttleController.toggleDoors()
+      this.inspectMode = true
+    }
+    this.habitatState.enter()
+  }
+
   /** Buy a trade good from the shop. */
   shopBuyTradeGood(slotIndex: number, quantity: number): void {
     if (!this.shopSession) return
