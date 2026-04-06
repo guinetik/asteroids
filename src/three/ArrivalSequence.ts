@@ -315,11 +315,11 @@ export class ArrivalSequence {
     // Scale up to gameplay proportions (lander fits inside cargo bay)
     this.shuttleGroup.scale.setScalar(SHUTTLE_PARKED_SCALE)
 
-    // Shuttle model is ~14 units at scale 1. At scale 15 it's ~210 units.
-    // Position high enough that the bottom clears the terrain.
+    // Position well above the terrain. The shuttle is flipped so the cargo bay
+    // (originally on top) now faces down. Needs enough clearance for the lander to fly up into it.
     this.shuttleGroup.position.set(
       this.landerSpawnTarget.x,
-      hoverHeight + SHUTTLE_PARKED_SCALE * 8,
+      hoverHeight + 250,
       this.landerSpawnTarget.z,
     )
     // Flipped upside down — cargo bay faces the asteroid surface, doors open
