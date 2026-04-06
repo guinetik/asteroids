@@ -73,7 +73,7 @@ const MAP_SHUTTLE_SCALE = 0.01
 const SPAWN_OFFSET_BEHIND_EARTH = 7.5
 
 /** Max Y displacement from spacetime curvature (±). */
-const CURVATURE_Y_MAX = 5
+const CURVATURE_Y_MAX = 50
 
 /** How much grid slope affects shuttle speed (multiplier on slope value). */
 const CURVATURE_SPEED_FACTOR = 0.3
@@ -250,7 +250,7 @@ export class MapViewController implements Tickable {
     const gridDepthScale = 80
     const gridWidthScale = 40
     const gridMassExponent = 0.2
-    this.spaceTimeGrid = new SpaceTimeGrid(gridSize, 200, gridDepthScale, gridWidthScale, gridMassExponent)
+    this.spaceTimeGrid = new SpaceTimeGrid(gridSize, 250, gridDepthScale, gridWidthScale, gridMassExponent)
     scene.add(this.spaceTimeGrid.mesh)
 
     // Sun is static — add once, never cleared
@@ -536,7 +536,7 @@ export class MapViewController implements Tickable {
 
       // Y displacement — normalized grid depth clamped to ±CURVATURE_Y_MAX
       const rawDepth = this.spaceTimeGrid.getDepthAt(px, pz)
-      const clampedY = Math.max(-CURVATURE_Y_MAX, Math.min(CURVATURE_Y_MAX, -rawDepth * 0.1))
+      const clampedY = Math.max(-CURVATURE_Y_MAX, Math.min(CURVATURE_Y_MAX, -rawDepth))
       this.shuttleController.group.position.y = clampedY
 
       // Slope speed modifier — downhill accelerates, uphill decelerates
