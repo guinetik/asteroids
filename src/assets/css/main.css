@@ -604,3 +604,19 @@ body {
 .shuttle-control-footer {
   @apply flex items-center border-t border-white/10 px-5 py-3;
 }
+
+/* Credits Badge HUD */
+.credits-badge {
+  @apply fixed top-4 right-4 z-30 flex items-center gap-2
+         rounded-lg border border-cyan-400/30 bg-slate-950/80
+         px-4 py-2 font-mono text-sm text-cyan-300 shadow-lg
+         pointer-events-none;
+}
+
+.credits-badge__icon {
+  @apply text-cyan-500 font-bold text-xs;
+}
+
+.credits-badge__value {
+  @apply tabular-nums;
+}
