@@ -158,4 +158,101 @@ export interface ShuttleMissionBoard {
   restockTimer: RestockTimer | null
   /** All active missions the player has accepted. */
   activeMissions: ActiveShuttleMission[]
+  /** Currently offered asteroid mission (null if restocking). */
+  offeredAsteroidMission: GeneratedAsteroidMission | null
+  /** The one active asteroid mission (null if none accepted). */
+  activeAsteroidMission: GeneratedAsteroidMission | null
+  /** Restock timer for asteroid missions. */
+  asteroidRestockTimer: RestockTimer | null
+}
+
+// ---------------------------------------------------------------------------
+// Asteroid Missions — giver-driven, belt/kuiper waypoint missions
+// ---------------------------------------------------------------------------
+
+/** A mission giver — character or organization that offers asteroid missions. */
+export interface MissionGiver {
+  /** Unique giver id, e.g. "jay". */
+  id: string
+  /** Display name, e.g. "Jay Mercer". */
+  name: string
+  /** Title or role, e.g. "Senior Hauler". */
+  title: string
+  /** Which objective types this giver offers. */
+  objectiveTypes: ObjectiveType[]
+  /** Minimum difficulty (1-10) this giver operates at. */
+  minDifficulty: number
+  /** Maximum difficulty (1-10) this giver operates at. */
+  maxDifficulty: number
+  /** The mission templates this giver can offer. */
+  missions: MissionGiverTemplate[]
+}
+
+/** A mission template within a giver's manifest. */
+export interface MissionGiverTemplate {
+  /** Unique template id, e.g. "jay_mineral_survey". */
+  id: string
+  /** Display name. */
+  name: string
+  /** Flavor text from the giver. */
+  briefing: string
+  /** Objective slots with scalable params. */
+  objectiveSlots: ObjectiveSlot[]
+  /** Credit bonus range for completing all objectives. */
+  completionBonus: NumberRange
+  /** Maps region to difficulty range. */
+  regionByDifficulty: Partial<Record<MissionRegion, [number, number]>>
+}
+
+/** Concrete rolled objective values for a generated mission. */
+export interface ConcreteObjective {
+  /** Objective type. */
+  type: ObjectiveType
+  /** For gather: kg to collect. */
+  resourceAmount?: number
+  /** For exterminate: nest count. */
+  nestCount?: number
+  /** For exterminate: swarm size per nest. */
+  swarmSize?: number
+  /** For exterminate: whether spitters are present. */
+  hasSpitters?: boolean
+  /** For rescue: colonist count. */
+  colonistCount?: number
+  /** For rescue: seconds of oxygen. */
+  oxygenTime?: number
+  /** For rescue: whether site is guarded. */
+  isGuarded?: boolean
+  /** Credit reward for this objective. */
+  reward: number
+}
+
+/** Status of an asteroid mission. */
+export type AsteroidMissionStatus = 'available' | 'accepted' | 'in-transit'
+
+/** A fully generated asteroid mission ready for play. */
+export interface GeneratedAsteroidMission {
+  /** Unique instance id (templateId + timestamp). */
+  id: string
+  /** Giver id. */
+  giverId: string
+  /** Giver display name. */
+  giverName: string
+  /** Template id. */
+  templateId: string
+  /** Mission display name. */
+  name: string
+  /** Flavor text from the giver. */
+  briefing: string
+  /** Rolled difficulty (1-10). */
+  difficulty: number
+  /** Belt region where waypoint spawns. */
+  region: MissionRegion
+  /** Concrete objectives with rolled values. */
+  objectives: ConcreteObjective[]
+  /** Total credits: sum of objective rewards + completion bonus. */
+  totalReward: number
+  /** Waypoint world position. */
+  waypoint: { worldX: number; worldZ: number }
+  /** Current status. */
+  status: AsteroidMissionStatus
 }
