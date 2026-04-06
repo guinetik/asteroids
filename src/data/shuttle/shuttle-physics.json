@@ -8,7 +8,12 @@
     "yawMaxSpeed": 3.5,
     "yawDamping": 0.98,
     "maxThrustSpeed": 60,
-    "maxGravitySpeed": 150
+    "maxGravitySpeed": 150,
+    "thrustAlignMinMultiplier": 0.55,
+    "thrustAlignMaxMultiplier": 1.08,
+    "rcsAlignMinMultiplier": 0.62,
+    "rcsAlignMaxMultiplier": 1.12,
+    "speedExcessReturnRate": 0.42
   },
   "map": {
     "thrustForce": 0.4,
@@ -19,6 +24,12 @@
     "yawMaxSpeed": 2.0,
     "yawDamping": 0.98,
     "maxThrustSpeed": 2,
-    "maxGravitySpeed": 5
+    "speedReturnEquilibriumSpeed": 2.9,
+    "maxGravitySpeed": 5,
+    "thrustAlignMinMultiplier": 0.45,
+    "thrustAlignMaxMultiplier": 1.0,
+    "rcsAlignMinMultiplier": 0.48,
+    "rcsAlignMaxMultiplier": 1.08,
+    "speedExcessReturnRate": 0.95
   }
 }
