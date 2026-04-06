@@ -73,7 +73,7 @@ const SHUTTLE_CINEMATIC_SCALE = 1.0
 const SHUTTLE_PARKED_SCALE = 15
 
 /** Absolute Y altitude for the parked shuttle (above lander spawn height of 600). */
-const LANDER_PARK_ALTITUDE = 1000
+const LANDER_PARK_ALTITUDE = 875
 
 /** Lander fall gravity after detach (world units/sec²). */
 const LANDER_FALL_GRAVITY = 3.0
