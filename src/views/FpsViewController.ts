@@ -401,6 +401,7 @@ export class FpsViewController implements Tickable {
       this.multiTool.setMode(this.multiToolState.modeConfig.color, this.multiToolState.mode)
       this.multiTool.setAiming(this.multiToolState.aiming)
       this.multiTool.setRtgLevel(this.multiToolState.rtgLevel / this.multiToolState.rtgCapacity)
+      this.multiTool.setModeChargeLevel(this.multiToolState.modeCharge / this.multiToolState.modeChargeCapacity)
       this.playerController?.setAiming(this.multiToolState.aiming)
       if (this.multiToolState.isFiring) {
         this.multiTool.fire()

@@ -79,6 +79,7 @@ export class MultiToolController implements Tickable {
   private projectileSystem: ProjectileSystem | null = null
   private boltColor = new THREE.Color('#ff00ff')
   private rtgRatio = 1
+  private modeChargeRatio = 1
   private time = 0
   private lateralSpeed = 0
   private sprinting = false
@@ -162,9 +163,14 @@ export class MultiToolController implements Tickable {
     this.aiming = aiming
   }
 
-  /** Update RTG fuel ratio (0–1) for diegetic power indicators. */
+  /** Update RTG fuel ratio (0–1) for the RTG power indicator. */
   setRtgLevel(ratio: number): void {
     this.rtgRatio = ratio
+  }
+
+  /** Update active mode charge ratio (0–1) for the mode power indicator. */
+  setModeChargeLevel(ratio: number): void {
+    this.modeChargeRatio = ratio
   }
 
   /** Connect the projectile system for firing. */
@@ -271,17 +277,21 @@ export class MultiToolController implements Tickable {
       this.triggerLock.position.z = this.lockBaseZ + this.lockZSlide
     }
 
-    // Power indicators — scale + color based on RTG level, slide out during ADS
-    for (const indicator of this.powerIndicators) {
+    // Power indicators — indicator 1 = mode charge, indicator 2 = RTG
+    for (let i = 0; i < this.powerIndicators.length; i++) {
+      const indicator = this.powerIndicators[i]!
       const mat = indicator.cylinder.material as THREE.MeshBasicMaterial
-      indicator.cylinder.scale.z = Math.max(0.05, this.rtgRatio)
-      if (this.rtgRatio > 0.5) {
-        mat.color.setHex(0x00ff00)
-      } else if (this.rtgRatio > 0.2) {
+      const ratio = i === 0 ? this.modeChargeRatio : this.rtgRatio
+
+      indicator.cylinder.scale.z = Math.max(0.05, ratio)
+      if (ratio > 0.5) {
+        mat.color.setHex(i === 0 ? 0x00ccff : 0x00ff00)
+      } else if (ratio > 0.2) {
         mat.color.setHex(0xffaa00)
       } else {
         mat.color.setHex(0xff0000)
       }
+
       // Slide sideways during ADS so indicators are visible while zoomed
       const targetZ = this.aiming ? 1.0 : 0
       indicator.slideZ += (targetZ - indicator.slideZ) * Math.min(1, 8 * dt)
