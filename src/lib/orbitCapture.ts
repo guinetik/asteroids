@@ -38,6 +38,14 @@ export interface CaptureBody {
    * Typical range: 0.05 (small moon) – 1.5 (gas giant).
    */
   readonly displayRadius: number
+  /** Optional absolute capture radius override in world units. */
+  readonly captureRadiusOverride?: number
+  /** Optional absolute orbit radius override in world units. */
+  readonly orbitRadiusOverride?: number
+  /** Relative capture-range multiplier. `1` = default interaction distance. */
+  readonly captureRadiusMultiplier?: number
+  /** Relative orbit/slingshot speed multiplier. `1` = baseline planet speed. */
+  readonly orbitalSpeedMultiplier?: number
   /** Returns the body's current X position in world space. */
   getWorldX(): number
   /** Returns the body's current Z position in world space (depth axis). */
@@ -103,6 +111,14 @@ interface BodyData {
    * `max(displayRadius * SIZE_SCALE * orbitMultiplier, minOrbitRadius)`
    */
   orbitRadius: number
+  /** Optional absolute capture radius override. */
+  captureRadiusOverride?: number
+  /** Optional absolute orbit radius override. */
+  orbitRadiusOverride?: number
+  /** Relative capture-range multiplier for this body. */
+  captureRadiusMultiplier: number
+  /** Relative orbit/slingshot speed multiplier for this body. */
+  orbitalSpeedMultiplier: number
 }
 
 // ─── Module-level constants ───────────────────────────────────────────────────
@@ -162,11 +178,18 @@ export class OrbitCaptureSystem {
   constructor(bodies: CaptureBody[]) {
     this.bodyData = bodies.map((body) => {
       const captureRadius = Math.max(
-        body.displayRadius * SIZE_SCALE * orbitConfig.captureMultiplier,
+        body.captureRadiusOverride
+          ?? (
+            body.displayRadius
+            * SIZE_SCALE
+            * orbitConfig.captureMultiplier
+            * (body.captureRadiusMultiplier ?? 1)
+          ),
         orbitConfig.minCaptureRadius,
       )
       const orbitRadius = Math.max(
-        body.displayRadius * SIZE_SCALE * orbitConfig.orbitMultiplier,
+        body.orbitRadiusOverride
+          ?? (body.displayRadius * SIZE_SCALE * orbitConfig.orbitMultiplier),
         orbitConfig.minOrbitRadius,
       )
       return {
@@ -174,6 +197,10 @@ export class OrbitCaptureSystem {
         captureRadius,
         captureRadiusSq: captureRadius * captureRadius,
         orbitRadius,
+        captureRadiusOverride: body.captureRadiusOverride,
+        orbitRadiusOverride: body.orbitRadiusOverride,
+        captureRadiusMultiplier: body.captureRadiusMultiplier ?? 1,
+        orbitalSpeedMultiplier: body.orbitalSpeedMultiplier ?? 1,
       }
     })
 
@@ -357,7 +384,11 @@ export class OrbitCaptureSystem {
     this.prevPlanetZ = bz
 
     this.orbitAngle +=
-      (orbitConfig.orbitVisualSpeed / this.targetData.orbitRadius) * dt
+      (
+        orbitConfig.orbitVisualSpeed
+        * this.targetData.orbitalSpeedMultiplier
+        / this.targetData.orbitRadius
+      ) * dt
 
     return {
       x: bx + Math.cos(this.orbitAngle) * this.targetData.orbitRadius,
@@ -370,24 +401,33 @@ export class OrbitCaptureSystem {
   /**
    * Computes the slingshot exit velocity and transitions `orbiting → free`.
    *
-   * Exit velocity = orbital tangent velocity at `facingAngle` + planet's
-   * frame-to-frame velocity (so the shuttle inherits the planet's motion).
-   *
-   * Orbital linear speed = `orbitAngularSpeed` (the angular rate times the
-   * orbit radius cancels, leaving a constant tangential speed equal to the
-   * configured angular speed).
+   * Exit velocity always follows the player's aimed facing direction.
+   * The captured body's frame velocity contributes a prograde speed bonus
+   * along that aimed direction, but never rotates the exit vector away
+   * from the launch arrow.
    *
    * @param facingAngle - The shuttle's aimed direction in radians (XZ plane,
    *   0 = +X axis, increasing counter-clockwise).
    * @param dt - Delta time for the current frame, used to normalise planet velocity.
    * @returns `{vx, vz}` exit velocity in world units per second.
    */
-  launchSlingshot(facingAngle: number, _dt: number): Vel2 {
-    const speed = orbitConfig.orbitLaunchSpeed
+  launchSlingshot(facingAngle: number, dt: number): Vel2 {
+    const speedMultiplier = this.targetData?.orbitalSpeedMultiplier ?? 1
+    const aimX = Math.cos(facingAngle)
+    const aimZ = -Math.sin(facingAngle)
 
-    // Simple: launch in the direction the shuttle is facing at launch speed
-    const vx = Math.cos(facingAngle) * speed
-    const vz = -Math.sin(facingAngle) * speed
+    let planetVx = 0
+    let planetVz = 0
+    if (this.targetData && dt > 0) {
+      planetVx = (this.targetData.body.getWorldX() - this.prevPlanetX) / dt
+      planetVz = (this.targetData.body.getWorldZ() - this.prevPlanetZ) / dt
+    }
+
+    const progradeBoost = aimX * planetVx + aimZ * planetVz
+    const baseSpeed = orbitConfig.orbitLaunchSpeed * speedMultiplier
+    const speed = Math.max(baseSpeed, baseSpeed + progradeBoost)
+    const vx = aimX * speed
+    const vz = aimZ * speed
 
     this.fsm.trigger('launch')
     this.targetData = null
@@ -417,7 +457,7 @@ export class OrbitCaptureSystem {
     // To differentiate: include planet velocity estimate from prevPlanet tracking.
     let orbitalSpeed = 0
     if (this.targetData) {
-      const baseSpeed = orbitConfig.orbitLaunchSpeed
+      const baseSpeed = orbitConfig.orbitLaunchSpeed * this.targetData.orbitalSpeedMultiplier
       const planetVel = Math.sqrt(
         (this.targetData.body.getWorldX() - this.prevPlanetX) ** 2
         + (this.targetData.body.getWorldZ() - this.prevPlanetZ) ** 2,

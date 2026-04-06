@@ -41,6 +41,7 @@ import { ShuttleController, MAP_PHYSICS } from '@/three/ShuttleController'
 import mapGravityData from '@/data/shuttle/map-gravity.json'
 import { ThrusterEffectController } from '@/three/ThrusterEffectController'
 import { VehicleCamera, MAP_CAMERA_CONFIG, MAP_ORBIT_CAMERA_CONFIG, MAP_INSPECT_CAMERA_CONFIG, MAP_DEATH_CAMERA_CONFIG } from '@/three/VehicleCamera'
+import { buildSlingshotChargeCameraConfig } from '@/three/slingshotChargeCamera'
 import orbitConfig from '@/data/shuttle/orbit-capture.json'
 import { PortalArrivalSequence } from '@/three/PortalArrivalSequence'
 import { PortalBoundarySystem } from '@/three/PortalBoundarySystem'
@@ -48,11 +49,22 @@ import { createGravityDistortionPass } from '@/three/GravityDistortionPass'
 import type { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { VibePortal } from '@/lib/portal'
 import { MapState } from '@/lib/mapState'
+import { MapIntroState, type MapIntroUiState } from '@/lib/mapIntroState'
 import { MapCamera, easeInOut } from '@/three/MapCamera'
 import { findNearestBodies, formatDistance, type MapBody } from '@/lib/mapProjection'
 import type { MapOverlayState } from '@/lib/ShuttleTelemetry'
+import { computeRelativeOrbitalSpeedMultiplier } from '@/lib/orbitSpeedProfile'
 import { canReleaseSlingshot } from '@/lib/slingshotLaunchPolicy'
+import {
+  appendWorldLinePoint,
+  shouldRecordWorldLinePoint,
+  type WorldLineHistoryPoint,
+} from '@/lib/worldLineHistory'
 import mapOverlayData from '@/data/shuttle/map-overlay.json'
+import { shipMessageSystem } from '@/lib/messages/runtime'
+import { isMainThrusterSpentForMessage } from '@/lib/messages/tutorialTriggers'
+import { DevConsole } from '@/lib/devConsole'
+import { AmbientSpaceController } from '@/three/AmbientSpaceController'
 
 /** Tick priority for the compositor (runs after animation, before render). */
 const TICK_PRIORITY_COMPOSIT = TICK_PRIORITY_RENDER - 1
@@ -75,6 +87,23 @@ const GRID_MASS_THRESHOLD = 1e-4
  */
 const MAP_SHUTTLE_SCALE = 0.01
 
+/**
+ * Approximate bounding size of the shuttle model in local (unscaled) units.
+ * Used with the constant-screen-size formula to prevent the shuttle from
+ * disappearing when the camera is pulled far back.
+ */
+const MAP_SHUTTLE_BASE_SIZE = 14
+
+/**
+ * Minimum apparent size of the shuttle as a fraction of screen height.
+ * When the shuttle would appear smaller than this, the scale is boosted
+ * so it stays readable as a navigation marker at any zoom level.
+ */
+const MAP_SHUTTLE_MIN_APPARENT_SIZE = 0.012
+
+/** How fast the shuttle scale lerps toward its target (per second). */
+const MAP_SHUTTLE_SCALE_LERP = 8
+
 /** Offset behind Earth so the shuttle doesn't overlap the planet mesh. */
 const SPAWN_OFFSET_BEHIND_EARTH = 7.5
 
@@ -93,6 +122,15 @@ const ADRIFT_TIMEOUT = 60
 
 /** Fuel units restored per second while orbiting Earth. */
 const EARTH_REFUEL_RATE = 50
+
+/** The Sun supports a much faster orbital lane than planets. */
+const SUN_ORBIT_SPEED_MULTIPLIER = 12
+
+/** The Sun should be orbitable without advertising capture across the whole inner system. */
+const SUN_CAPTURE_RADIUS_MULTIPLIER = 0.2
+
+/** Earth defines the baseline orbital lane speed multiplier of 1. */
+const EARTH_PLANET_ID = 'earth'
 
 /** Maximum arrow length at full charge (in shuttle local space, pre-scale). */
 const ARROW_MAX_LENGTH = 300
@@ -119,6 +157,22 @@ const MAP_GRAVITY_CONFIG: GravityConfig = {
   influenceScale: mapGravityData.influenceScale,
   eventHorizonScale: mapGravityData.eventHorizonScale,
 }
+
+/** The Sun orbit lane should sit on the relativity bump radius. */
+const SUN_BUMP_ORBIT_RADIUS = influenceRadius(SUN.mass, MAP_GRAVITY_CONFIG)
+
+/** Opening cutscene starts with a wide solar-system establishing shot. */
+const MAP_INTRO_CAMERA_START_POSITION = new THREE.Vector3(0, 320, 900)
+const MAP_INTRO_CAMERA_START_TARGET = new THREE.Vector3(0, 0, 0)
+const MAP_INTRO_CAMERA_START_FOV = 32
+const MAP_INTRO_HERO_OFFSET = new THREE.Vector3(-24, 6, 14)
+const MAP_INTRO_HERO_LOOK_AT_OFFSET = new THREE.Vector3(0, 1.5, 0)
+const MAP_INTRO_HERO_FOV = 42
+const MAP_INTRO_HERO_HOLD_START = 0.38
+const MAP_INTRO_HERO_HOLD_END = 0.82
+const EARTH_DEPARTURE_MESSAGE_DISTANCE = 12
+const EARTH_DEPARTURE_MIN_HISTORY_POINTS = 3
+const VENUS_ORBIT_WARNING_DISTANCE = 1.5
 
 /**
  * Wraps a GravitySource into a GravityWell that ShuttleController can consume,
@@ -149,6 +203,7 @@ export class MapViewController implements Tickable {
   private inputManager: InputManager | null = null
   private sceneObjects: MapSceneObjects | null = null
   private vehicleCamera: VehicleCamera | null = null
+  private introCamera: THREE.PerspectiveCamera | null = null
   private shuttleController: ShuttleController | null = null
   private thrusterController: ThrusterEffectController | null = null
   private starField: StarFieldController | null = null
@@ -172,10 +227,30 @@ export class MapViewController implements Tickable {
   private gravityPass: ShaderPass | null = null
   private adriftTimer = 0
   private mapState = new MapState()
+  private mapIntro = new MapIntroState()
   private mapCamera: MapCamera | null = null
+  private worldLineHistory: WorldLineHistoryPoint[] = []
+  private didDispatchEarthDistanceMessage = false
+  private didDispatchMainThrusterMessage = false
+  private didDispatchVenusOrbitMessage = false
+
+  /** Ambient debris/cloud/comet particle field anchored to the shuttle. */
+  private ambientSpace: AmbientSpaceController | null = null
+
+  /** Whether planet orbit lines are currently visible. */
+  private orbitsVisible = true
+
+  /** Whether the space-time fabric grid is currently visible. */
+  private gridVisible = true
+
+  /** Current shuttle display scale, lerped each frame toward the screen-size target. */
+  private currentShuttleScale = MAP_SHUTTLE_SCALE
 
   /** Called when map overlay state changes for Vue HUD. */
   onMapOverlay: ((state: MapOverlayState) => void) | null = null
+
+  /** Called when the opening map intro UI should update. */
+  onMapIntro: ((state: MapIntroUiState) => void) | null = null
 
   /** Called each frame with full shuttle telemetry for HUD display. */
   onTelemetry: ((telemetry: ShuttleTelemetry) => void) | null = null
@@ -188,6 +263,9 @@ export class MapViewController implements Tickable {
 
   /** Called when shuttle dies — shows death overlay. */
   onDeathOverlay: ((visible: boolean, cause: string) => void) | null = null
+
+  /** Called when the ship-message queue changes and Vue should refresh. */
+  onMessageUpdate: (() => void) | null = null
 
   async init(container: HTMLElement): Promise<void> {
     // Create canvas
@@ -216,6 +294,16 @@ export class MapViewController implements Tickable {
     }
     scene.remove(oldCamera)
     scene.add(this.vehicleCamera.camera)
+
+    this.introCamera = new THREE.PerspectiveCamera(
+      MAP_INTRO_CAMERA_START_FOV,
+      canvas.clientWidth / canvas.clientHeight,
+      0.1,
+      50000,
+    )
+    this.introCamera.position.copy(MAP_INTRO_CAMERA_START_POSITION)
+    this.introCamera.lookAt(MAP_INTRO_CAMERA_START_TARGET)
+    scene.add(this.introCamera)
 
     // --- Map overlay camera (ortho, created once, used when M pressed) ---
     this.mapCamera = new MapCamera()
@@ -319,13 +407,32 @@ export class MapViewController implements Tickable {
     scene.add(this.thrusterController.rcsPoints)
     this.tickHandler.register(this.thrusterController, TICK_PRIORITY_ANIMATION)
 
+    // --- Ambient space (dust, rocks, gas clouds, comets) ---
+    this.ambientSpace = new AmbientSpaceController(scene)
+    this.ambientSpace.attach(this.shuttleController.group)
+    this.tickHandler.register(this.ambientSpace, TICK_PRIORITY_ANIMATION)
+
     // --- Orbit capture system ---
-    const captureBodies = PLANETS.map((planet, i) => ({
+    const earthOrbit = PLANETS.find((planet) => planet.id === EARTH_PLANET_ID)?.orbit ?? PLANETS[0]!.orbit
+    const captureBodies = [
+      {
+        name: SUN.name,
+        displayRadius: SUN.displayRadius,
+        captureRadiusOverride: SUN_BUMP_ORBIT_RADIUS,
+        orbitRadiusOverride: SUN_BUMP_ORBIT_RADIUS,
+        captureRadiusMultiplier: SUN_CAPTURE_RADIUS_MULTIPLIER,
+        orbitalSpeedMultiplier: SUN_ORBIT_SPEED_MULTIPLIER,
+        getWorldX: () => this.sunController!.getWorldX(),
+        getWorldZ: () => this.sunController!.getWorldZ(),
+      },
+      ...PLANETS.map((planet, i) => ({
       name: planet.name,
       displayRadius: planet.displayRadius,
+        orbitalSpeedMultiplier: computeRelativeOrbitalSpeedMultiplier(planet.orbit, earthOrbit),
       getWorldX: () => this.planetControllers[i]!.getWorldX(),
       getWorldZ: () => this.planetControllers[i]!.getWorldZ(),
-    }))
+      })),
+    ]
     this.orbitSystem = new OrbitCaptureSystem(captureBodies)
 
     // Portal arrival or default Earth orbit
@@ -358,7 +465,15 @@ export class MapViewController implements Tickable {
       if (this.orbitRing) {
         this.orbitRing.position.set(ex, 0, ez)
       }
+
+      shipMessageSystem.notifyTrigger('map_start_earth_orbit')
+      this.emitMessageUpdate()
+      this.beginStartupIntro()
+    } else {
+      this.mapIntro.skip()
+      this.emitIntroUiState()
     }
+    this.resetWorldLineHistory()
 
     // --- Portal boundary walls at grid edges ---
     const boundarySize = kuiperOuterEdge * 2.2
@@ -407,9 +522,37 @@ export class MapViewController implements Tickable {
       if (this.sceneObjects) {
         handleMapResize(this.sceneObjects)
         this.vehicleCamera?.resize(window.innerWidth, window.innerHeight)
+        if (this.introCamera) {
+          this.introCamera.aspect = window.innerWidth / window.innerHeight
+          this.introCamera.updateProjectionMatrix()
+        }
       }
     }
     window.addEventListener('resize', this.resizeHandler)
+
+    // --- Dev tools ---
+    DevConsole.register('MapView', {
+      skipIntro: () => {
+        this.mapIntro.skip()
+        this.emitIntroUiState()
+      },
+      getShuttlePosition: () => {
+        const pos = this.shuttleController?.group.position
+        if (pos) console.info(`[MapView] Shuttle: x=${pos.x.toFixed(1)} y=${pos.y.toFixed(1)} z=${pos.z.toFixed(1)}`)
+      },
+      teleportToSun: () => {
+        if (this.sunController && this.shuttleController) {
+          this.shuttleController.group.position.set(
+            this.sunController.getWorldX() + 50,
+            0,
+            this.sunController.getWorldZ(),
+          )
+        }
+      },
+      toggleOrbits: () => this.toggleOrbits(),
+      toggleSpaceTimeGrid: () => this.toggleSpaceTimeGrid(),
+      toggleAmbient: () => this.toggleAmbient(),
+    })
 
     // Start
     this.gameLoop = new GameLoop(this.tickHandler)
@@ -420,8 +563,13 @@ export class MapViewController implements Tickable {
    * One-shot actions, orbit state machine, and telemetry emission (runs just after input).
    */
   tick(dt: number): void {
+    this.mapIntro.tick(dt)
+    this.tickStartupIntroCamera()
+    this.emitIntroUiState()
+    const introLocked = this.mapIntro.controlsLocked
+
     // Map toggle (M key) — opens/closes tactical map
-    if (this.inputManager?.wasActionPressed('toggleMap')) {
+    if (!introLocked && this.inputManager?.wasActionPressed('toggleMap')) {
       if (!this.mapState.isOpen) {
         // Guard: block during death or orbit approach
         const orbitState = this.orbitSystem?.state ?? 'free'
@@ -436,7 +584,11 @@ export class MapViewController implements Tickable {
     }
 
     // Also close on Escape
-    if (this.inputManager?.wasActionPressed('closeMap') && this.mapState.phase === 'open') {
+    if (
+      !introLocked
+      && this.inputManager?.wasActionPressed('closeMap')
+      && this.mapState.phase === 'open'
+    ) {
       this.mapState.close()
     }
 
@@ -451,6 +603,10 @@ export class MapViewController implements Tickable {
       }
 
       // Skip all gameplay logic while map is open
+      return
+    }
+
+    if (introLocked) {
       return
     }
 
@@ -518,24 +674,32 @@ export class MapViewController implements Tickable {
       if (state === 'orbiting') {
         if (eHeld) {
           this.slingshotCharge = Math.min(1, this.slingshotCharge + dt / SLINGSHOT_CHARGE_TIME)
+          this.vehicleCamera?.setConfig(buildSlingshotChargeCameraConfig(this.slingshotCharge))
           this.updateLaunchArrow()
         } else if (this.slingshotCharge > 0) {
           const trajectoryBlocked = this.isAimingAtPlanet()
           if (!canReleaseSlingshot(this.slingshotCharge, trajectoryBlocked)) {
             this.slingshotCharge = 0
+            this.vehicleCamera?.setConfig(MAP_ORBIT_CAMERA_CONFIG)
             this.hideLaunchArrow()
           } else {
             const heading = this.shuttleController.group.rotation.y
             const launchVelocity = this.orbitSystem.launchSlingshot(heading, dt)
             const vel = new THREE.Vector3(launchVelocity.vx, 0, launchVelocity.vz)
-            const speed = Math.sqrt(launchVelocity.vx ** 2 + launchVelocity.vz ** 2)
+            const finalSpeed = Math.sqrt(launchVelocity.vx ** 2 + launchVelocity.vz ** 2)
+            const burstSpeed = this.shuttleController.beginSlingshotBurst(
+              finalSpeed,
+              orbitConfig.slingshotBurstMultiplier,
+              orbitConfig.slingshotSettleDuration,
+            )
+            vel.setLength(burstSpeed)
 
             this.shuttleController.unfreeze()
-            this.shuttleController.setInputEnabled(true)
             this.shuttleController.orbitYawLeft = false
             this.shuttleController.orbitYawRight = false
             this.shuttleController.setVelocity(vel)
-            this.shuttleController.setSlingshotSpeed(speed)
+            this.shuttleController.setSlingshotSpeed(burstSpeed)
+            this.shuttleController.triggerSlingshotLaunchFx(orbitConfig.slingshotLaunchFxDuration)
 
             // Launch costs are still tied to the committed full-charge release.
             this.shuttleController.thrusterSystem.consumeFuel(
@@ -682,6 +846,15 @@ export class MapViewController implements Tickable {
       this.onOrbitState(hudState)
     }
 
+    // Constant-screen-size shuttle scale — keeps the ship visible when zoomed out
+    this.tickShuttleScale(dt)
+
+    // Ambient particles are only active during free flight, not orbit/approach
+    if (this.ambientSpace) {
+      const orbitState = this.orbitSystem?.state ?? 'free'
+      this.ambientSpace.setActive(orbitState === 'free')
+    }
+
     // Adrift check — 60s with no fuel in free flight = game over
     if (this.shuttleController && !this.shuttleController.dead) {
       const orbitState = this.orbitSystem?.state ?? 'free'
@@ -812,9 +985,11 @@ export class MapViewController implements Tickable {
         this.shuttleController.group.position.set(pos.x, planetY, pos.z)
       }
       // A/D yaw — input is disabled so read InputManager directly and set orbit flags for VFX
-      const yawLeft = this.inputManager.isActionActive('yawLeft')
+      const yawLeft = !this.mapIntro.controlsLocked
+        && this.inputManager.isActionActive('yawLeft')
         && this.shuttleController.thrusterSystem.canFire('rcs')
-      const yawRight = this.inputManager.isActionActive('yawRight')
+      const yawRight = !this.mapIntro.controlsLocked
+        && this.inputManager.isActionActive('yawRight')
         && this.shuttleController.thrusterSystem.canFire('rcs')
       this.shuttleController.orbitYawLeft = yawLeft
       this.shuttleController.orbitYawRight = yawRight
@@ -842,6 +1017,9 @@ export class MapViewController implements Tickable {
         }
       }
     }
+
+    this.recordWorldLinePoint()
+    this.triggerRuntimeMessages()
   }
 
   /**
@@ -853,6 +1031,68 @@ export class MapViewController implements Tickable {
   restart(): void {
     this.respawnAtEarth()
     this.onDeathOverlay?.(false, '')
+  }
+
+  /**
+   * Toggles the visibility of all planet and moon orbit lines.
+   * Returns the new visibility state so the Vue layer can update button appearance.
+   */
+  toggleOrbits(): boolean {
+    this.orbitsVisible = !this.orbitsVisible
+    for (const controller of this.planetControllers) {
+      for (const line of controller.orbitLines) {
+        line.visible = this.orbitsVisible
+      }
+    }
+    return this.orbitsVisible
+  }
+
+  /**
+   * Toggles the visibility of the space-time fabric grid mesh.
+   * Returns the new visibility state so the Vue layer can update button appearance.
+   */
+  toggleSpaceTimeGrid(): boolean {
+    this.gridVisible = !this.gridVisible
+    if (this.spaceTimeGrid) {
+      this.spaceTimeGrid.mesh.visible = this.gridVisible
+    }
+    return this.gridVisible
+  }
+
+  /**
+   * Toggles all ambient space particle layers (dust, rocks, clouds, comets).
+   * Returns the new visibility state so the Vue layer can update button appearance.
+   */
+  toggleAmbient(): boolean {
+    if (!this.ambientSpace) return true
+    return this.ambientSpace.toggle()
+  }
+
+  /**
+   * Maintains a minimum apparent screen size for the shuttle model so it
+   * remains visible as a navigation marker when the camera is pulled far back.
+   *
+   * Uses the constant-screen-size formula:
+   *   requiredScale = (MIN_APPARENT_SIZE * 2 * dist * tan(fov/2)) / BASE_SIZE
+   *
+   * The actual scale is lerped toward the target each frame to avoid a
+   * visible pop at the transition distance.
+   */
+  private tickShuttleScale(dt: number): void {
+    if (!this.shuttleController || !this.vehicleCamera) return
+    const dist = this.vehicleCamera.camera.position.distanceTo(
+      this.shuttleController.group.position,
+    )
+    const halfFovRad = THREE.MathUtils.degToRad(this.vehicleCamera.camera.fov / 2)
+    const minWorldSize = MAP_SHUTTLE_MIN_APPARENT_SIZE * 2 * dist * Math.tan(halfFovRad)
+    const requiredScale = minWorldSize / MAP_SHUTTLE_BASE_SIZE
+    const targetScale = Math.max(MAP_SHUTTLE_SCALE, requiredScale)
+    this.currentShuttleScale = THREE.MathUtils.lerp(
+      this.currentShuttleScale,
+      targetScale,
+      Math.min(1, MAP_SHUTTLE_SCALE_LERP * dt),
+    )
+    this.shuttleController.group.scale.setScalar(this.currentShuttleScale)
   }
 
   /** Reset shuttle after death — clear death state, place into Earth orbit. */
@@ -902,6 +1142,7 @@ export class MapViewController implements Tickable {
     this.hideLaunchArrow()
     this.yRecovery = false
     this.adriftTimer = 0
+    this.resetWorldLineHistory()
   }
 
   /**
@@ -1064,7 +1305,17 @@ export class MapViewController implements Tickable {
       this.emitMapOverlay()
     } else {
       // During transitions, hide overlay
-      this.onMapOverlay?.({ visible: false, labels: [], shipX: 0, shipY: 0, headingDeg: 0, speed: 0, distances: [], gravityRings: [] })
+      this.onMapOverlay?.({
+        visible: false,
+        labels: [],
+        shipX: 0,
+        shipY: 0,
+        headingDeg: 0,
+        speed: 0,
+        distances: [],
+        gravityRings: [],
+        trajectoryPoints: [],
+      })
     }
 
     // No explicit render needed — the compositor tickable runs after this and calls composer.render()
@@ -1085,7 +1336,9 @@ export class MapViewController implements Tickable {
     const orbitState = this.orbitSystem?.state ?? 'free'
     if (orbitState === 'free') {
       this.shuttleController.unfreeze()
-      this.shuttleController.setInputEnabled(true)
+      if (!this.shuttleController.slingshotBurstActive) {
+        this.shuttleController.setInputEnabled(true)
+      }
     }
     // If orbiting, shuttle stays frozen but input stays disabled (orbit manages this)
 
@@ -1097,7 +1350,63 @@ export class MapViewController implements Tickable {
     }
 
     // Hide overlay
-    this.onMapOverlay?.({ visible: false, labels: [], shipX: 0, shipY: 0, headingDeg: 0, speed: 0, distances: [], gravityRings: [] })
+    this.onMapOverlay?.({
+      visible: false,
+      labels: [],
+      shipX: 0,
+      shipY: 0,
+      headingDeg: 0,
+      speed: 0,
+      distances: [],
+      gravityRings: [],
+      trajectoryPoints: [],
+    })
+  }
+
+  /** Build projected persistent world-line points for the tactical map. */
+  private buildWorldLineTrajectory() {
+    if (!this.mapCamera || !this.shuttleController || this.shuttleController.dead) {
+      return []
+    }
+
+    const currentPoint = {
+      x: this.shuttleController.position.x,
+      z: this.shuttleController.position.z,
+    }
+    const lastPoint = this.worldLineHistory[this.worldLineHistory.length - 1]
+    const points = lastPoint && lastPoint.x === currentPoint.x && lastPoint.z === currentPoint.z
+      ? this.worldLineHistory
+      : [...this.worldLineHistory, currentPoint]
+
+    return points.map((sample) => {
+      const projected = this.mapCamera!.projectToScreen(new THREE.Vector3(sample.x, 0, sample.z))
+      return {
+        screenX: projected.x * 100,
+        screenY: projected.y * 100,
+      }
+    })
+  }
+
+  /** Record the current ship position into the persistent sampled world line. */
+  private recordWorldLinePoint(): void {
+    if (!this.shuttleController) return
+    const orbitState = this.orbitSystem?.state ?? 'free'
+    if (!shouldRecordWorldLinePoint(orbitState, this.shuttleController.dead)) return
+
+    this.worldLineHistory = appendWorldLinePoint(
+      this.worldLineHistory,
+      {
+        x: this.shuttleController.position.x,
+        z: this.shuttleController.position.z,
+      },
+      mapOverlayData.worldLineSampleDistance,
+    )
+  }
+
+  /** Reset the world line at the start of a new run and seed it with the current ship position. */
+  private resetWorldLineHistory(): void {
+    this.worldLineHistory = []
+    this.recordWorldLinePoint()
   }
 
   /** Compute and emit the full map overlay state for the Vue HUD. */
@@ -1180,6 +1489,8 @@ export class MapViewController implements Tickable {
         }
       })
 
+    const trajectoryPoints = this.buildWorldLineTrajectory()
+
     this.onMapOverlay({
       visible: true,
       labels,
@@ -1189,10 +1500,227 @@ export class MapViewController implements Tickable {
       speed: this.shuttleController.speed,
       distances,
       gravityRings,
+      trajectoryPoints,
     })
   }
 
+  /** Open the startup ship message from the centered intro CTA. */
+  openIntroMessage(): void {
+    if (this.mapIntro.openMessage()) {
+      this.emitIntroUiState()
+    }
+  }
+
+  /** Complete the startup intro and hand control over to the player. */
+  completeIntroMessage(): void {
+    if (!this.mapIntro.completeMessage()) return
+
+    if (this.vehicleCamera) {
+      this.vehicleCamera.controls.enabled = true
+    }
+
+    this.emitIntroUiState()
+  }
+
+  /** Start the opening cutscene only when an active startup message exists. */
+  private beginStartupIntro(): void {
+    const activeMessage = shipMessageSystem.getActiveMessage()
+    if (!activeMessage || !this.vehicleCamera) {
+      this.mapIntro.skip()
+      this.emitIntroUiState()
+      return
+    }
+
+    this.mapIntro.start()
+    this.vehicleCamera.controls.enabled = false
+    this.vehicleCamera.setConfig(MAP_ORBIT_CAMERA_CONFIG)
+    if (this.introCamera) {
+      this.introCamera.position.copy(MAP_INTRO_CAMERA_START_POSITION)
+      this.introCamera.lookAt(MAP_INTRO_CAMERA_START_TARGET)
+      this.introCamera.fov = MAP_INTRO_CAMERA_START_FOV
+      this.introCamera.updateProjectionMatrix()
+    }
+    this.emitIntroUiState()
+  }
+
+  /** Animate from the system overview shot into the live orbit camera. */
+  private tickStartupIntroCamera(): void {
+    if (
+      !this.sceneObjects
+      || !this.vehicleCamera
+      || !this.introCamera
+      || !this.shuttleController
+      || this.mapState.isOpen
+    ) return
+
+    const renderPass = this.sceneObjects.composer.passes[0] as RenderPass
+    if (this.mapIntro.phase === 'cinematic_zoom') {
+      const progress = easeInOut(this.mapIntro.cinematicProgress)
+      const targetPosition = this.vehicleCamera.camera.position
+      const targetLookAt = this.vehicleCamera.controls.target
+      const heroPosition = this.shuttleController.group.position.clone().add(
+        MAP_INTRO_HERO_OFFSET.clone().applyQuaternion(this.shuttleController.group.quaternion),
+      )
+      const heroTarget = this.shuttleController.group.position.clone().add(MAP_INTRO_HERO_LOOK_AT_OFFSET)
+
+      if (progress < MAP_INTRO_HERO_HOLD_START) {
+        const heroProgress = easeInOut(progress / MAP_INTRO_HERO_HOLD_START)
+        const currentTarget = new THREE.Vector3().lerpVectors(
+          MAP_INTRO_CAMERA_START_TARGET,
+          heroTarget,
+          heroProgress,
+        )
+        this.introCamera.position.lerpVectors(
+          MAP_INTRO_CAMERA_START_POSITION,
+          heroPosition,
+          heroProgress,
+        )
+        this.introCamera.fov = THREE.MathUtils.lerp(
+          MAP_INTRO_CAMERA_START_FOV,
+          MAP_INTRO_HERO_FOV,
+          heroProgress,
+        )
+        this.introCamera.updateProjectionMatrix()
+        this.introCamera.lookAt(currentTarget)
+        renderPass.camera = this.introCamera
+        return
+      }
+
+      if (progress < MAP_INTRO_HERO_HOLD_END) {
+        this.introCamera.position.copy(heroPosition)
+        this.introCamera.fov = MAP_INTRO_HERO_FOV
+        this.introCamera.updateProjectionMatrix()
+        this.introCamera.lookAt(heroTarget)
+        renderPass.camera = this.introCamera
+        return
+      }
+
+      const orbitProgress = easeInOut(
+        (progress - MAP_INTRO_HERO_HOLD_END) / (1 - MAP_INTRO_HERO_HOLD_END),
+      )
+      const currentTarget = new THREE.Vector3().lerpVectors(
+        heroTarget,
+        targetLookAt,
+        orbitProgress,
+      )
+
+      this.introCamera.position.lerpVectors(
+        heroPosition,
+        targetPosition,
+        orbitProgress,
+      )
+      this.introCamera.fov = THREE.MathUtils.lerp(
+        MAP_INTRO_HERO_FOV,
+        this.vehicleCamera.camera.fov,
+        orbitProgress,
+      )
+      this.introCamera.updateProjectionMatrix()
+      this.introCamera.lookAt(currentTarget)
+      renderPass.camera = this.introCamera
+      return
+    }
+
+    if (this.mapIntro.controlsLocked) {
+      this.introCamera.position.copy(this.vehicleCamera.camera.position)
+      this.introCamera.quaternion.copy(this.vehicleCamera.camera.quaternion)
+      this.introCamera.fov = this.vehicleCamera.camera.fov
+      this.introCamera.updateProjectionMatrix()
+      renderPass.camera = this.introCamera
+      return
+    }
+
+    renderPass.camera = this.vehicleCamera.camera
+  }
+
+  /** Push the current intro UI state to Vue. */
+  private emitIntroUiState(): void {
+    this.onMapIntro?.(this.mapIntro.uiState)
+  }
+
+  /** Notify Vue that a new ship message may have entered the queue. */
+  private emitMessageUpdate(): void {
+    this.onMessageUpdate?.()
+  }
+
+  /** Dispatch one-time gameplay tutorial messages from map-state conditions. */
+  private triggerRuntimeMessages(): void {
+    this.triggerEarthDistanceMessage()
+    this.triggerMainThrusterMessage()
+    this.triggerVenusOrbitMessage()
+  }
+
+  /** Fire Jay's navigation note after the player has meaningfully left Earth. */
+  private triggerEarthDistanceMessage(): void {
+    if (
+      this.didDispatchEarthDistanceMessage
+      || this.worldLineHistory.length < EARTH_DEPARTURE_MIN_HISTORY_POINTS
+    ) {
+      return
+    }
+
+    const earthDistance = this.getDistanceToPlanet('earth')
+    if (earthDistance === null || earthDistance < EARTH_DEPARTURE_MESSAGE_DISTANCE) return
+
+    this.didDispatchEarthDistanceMessage = true
+    shipMessageSystem.notifyTrigger('map_leave_earth_distance')
+    this.emitMessageUpdate()
+  }
+
+  /** Fire Jay's fuel-management note after the red thrust bar is fully spent once. */
+  private triggerMainThrusterMessage(): void {
+    if (this.didDispatchMainThrusterMessage || !this.shuttleController) return
+
+    const thrustState = this.shuttleController.thrusterSystem.getState('thrust')
+    const canFireThrust = this.shuttleController.thrusterSystem.canFire('thrust')
+    if (!isMainThrusterSpentForMessage(thrustState, canFireThrust)) return
+
+    this.didDispatchMainThrusterMessage = true
+    shipMessageSystem.notifyTrigger('map_main_thruster_depleted')
+    this.emitMessageUpdate()
+  }
+
+  /** Fire Jay's heat warning when the shuttle comes close to the Venus orbit line. */
+  private triggerVenusOrbitMessage(): void {
+    if (this.didDispatchVenusOrbitMessage || !this.shuttleController) return
+
+    const venusController = this.getPlanetControllerById('venus')
+    if (!venusController) return
+
+    const venusOrbitRadius = Math.sqrt(
+      venusController.getWorldX() ** 2 + venusController.getWorldZ() ** 2,
+    )
+    const shipSolarDistance = Math.sqrt(
+      this.shuttleController.position.x ** 2 + this.shuttleController.position.z ** 2,
+    )
+
+    if (Math.abs(shipSolarDistance - venusOrbitRadius) > VENUS_ORBIT_WARNING_DISTANCE) return
+
+    this.didDispatchVenusOrbitMessage = true
+    shipMessageSystem.notifyTrigger('map_venus_orbit_warning')
+    this.emitMessageUpdate()
+  }
+
+  /** Return the current world distance from the shuttle to a named planet. */
+  private getDistanceToPlanet(planetId: string): number | null {
+    if (!this.shuttleController) return null
+
+    const controller = this.getPlanetControllerById(planetId)
+    if (!controller) return null
+
+    const dx = controller.getWorldX() - this.shuttleController.position.x
+    const dz = controller.getWorldZ() - this.shuttleController.position.z
+    return Math.sqrt(dx * dx + dz * dz)
+  }
+
+  /** Look up a live planet controller by catalog id. */
+  private getPlanetControllerById(planetId: string): PlanetSystemController | null {
+    const index = PLANETS.findIndex((planet) => planet.id === planetId)
+    return index >= 0 ? this.planetControllers[index] ?? null : null
+  }
+
   dispose(): void {
+    DevConsole.unregister('MapView')
+    this.ambientSpace?.dispose()
     this.hideOrbitRing()
     this.gameLoop?.stop()
 

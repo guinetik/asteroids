@@ -74,6 +74,14 @@ export interface MapGravityRing {
   horizonRadius: number
 }
 
+/** Screen-projected point along the persistent ship world line. */
+export interface MapTrajectoryPoint {
+  /** Sample screen X (%) */
+  screenX: number
+  /** Sample screen Y (%) */
+  screenY: number
+}
+
 /** Full state for the map overlay HUD. */
 export interface MapOverlayState {
   /** Whether the overlay is visible */
@@ -92,4 +100,6 @@ export interface MapOverlayState {
   distances: MapDistanceLine[]
   /** Gravity influence + event horizon rings */
   gravityRings: MapGravityRing[]
+  /** Persistent run-long world line in screen space */
+  trajectoryPoints: MapTrajectoryPoint[]
 }

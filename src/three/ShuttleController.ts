@@ -14,6 +14,7 @@ import { HabitatModule } from './HabitatModule'
 import type { PortalVehicle } from './PortalArrivalSequence'
 import shuttlePhysicsData from '@/data/shuttle/shuttle-physics.json'
 import orbitConfig from '@/data/shuttle/orbit-capture.json'
+import { getSlingshotSettleSpeed } from '@/lib/slingshotBurstProfile'
 
 /** Any object that can exert gravity on the shuttle */
 export interface GravityWell {
@@ -137,13 +138,58 @@ export class ShuttleController implements Tickable, PortalVehicle {
     return this._inputEnabled
   }
 
+  /** True while the slingshot burst is settling and input remains locked. */
+  get slingshotBurstActive(): boolean {
+    return this._slingshotSettleDuration > 0
+      && this._slingshotSettleElapsed < this._slingshotSettleDuration
+  }
+
+  /** True while the post-launch burst VFX should keep emitting. */
+  get slingshotLaunchFxActive(): boolean {
+    return this._slingshotLaunchFxRemaining > 0
+  }
+
   /** Set slingshot speed protection — speed won't be clamped below this. */
   setSlingshotSpeed(speed: number): void {
     this._slingshotSpeed = speed
   }
 
+  /**
+   * Begin a locked slingshot burst that decays to the stable lane speed.
+   *
+   * @param finalSpeed - Stable post-settle speed.
+   * @param burstMultiplier - Immediate burst multiplier applied at launch.
+   * @param settleDuration - Seconds to decay from burst to final speed.
+   * @returns Immediate launch speed.
+   */
+  beginSlingshotBurst(finalSpeed: number, burstMultiplier: number, settleDuration: number): number {
+    this._slingshotBurstSpeed = finalSpeed * Math.max(1, burstMultiplier)
+    this._slingshotFinalSpeed = finalSpeed
+    this._slingshotSettleDuration = Math.max(0, settleDuration)
+    this._slingshotSettleElapsed = 0
+    this._slingshotSpeed = this._slingshotSettleDuration > 0
+      ? this._slingshotBurstSpeed
+      : this._slingshotFinalSpeed
+    this._inputEnabled = this._slingshotSettleDuration <= 0
+    return this._slingshotSpeed
+  }
+
+  /**
+   * Trigger a short-lived post-launch thruster burst effect.
+   *
+   * @param duration - Time in seconds to keep the launch VFX active.
+   */
+  triggerSlingshotLaunchFx(duration: number): void {
+    this._slingshotLaunchFxRemaining = Math.max(0, duration)
+  }
+
   private _inputEnabled = true
   private _slingshotSpeed = 0
+  private _slingshotBurstSpeed = 0
+  private _slingshotFinalSpeed = 0
+  private _slingshotSettleDuration = 0
+  private _slingshotSettleElapsed = 0
+  private _slingshotLaunchFxRemaining = 0
   private angularVelocity = 0
   private readonly inputManager: InputManager
   private spaceTimeGrid: SpaceTimeGrid | null = null
@@ -450,6 +496,11 @@ export class ShuttleController implements Tickable, PortalVehicle {
     this.velocity.set(0, 0, 0)
     this.angularVelocity = 0
     this._slingshotSpeed = 0
+    this._slingshotBurstSpeed = 0
+    this._slingshotFinalSpeed = 0
+    this._slingshotSettleDuration = 0
+    this._slingshotSettleElapsed = 0
+    this._slingshotLaunchFxRemaining = 0
     this.group.rotation.set(0, this.group.rotation.y, 0)
     this.thrusterSystem.refuel()
   }
@@ -459,6 +510,12 @@ export class ShuttleController implements Tickable, PortalVehicle {
     this.deathTarget = null
     this.velocity.set(0, 0, 0)
     this.angularVelocity = 0
+    this._slingshotSpeed = 0
+    this._slingshotBurstSpeed = 0
+    this._slingshotFinalSpeed = 0
+    this._slingshotSettleDuration = 0
+    this._slingshotSettleElapsed = 0
+    this._slingshotLaunchFxRemaining = 0
 
     const angle = Math.random() * Math.PI * 2
     const radius = SPAWN_MIN_RADIUS + Math.random() * (SPAWN_MAX_RADIUS - SPAWN_MIN_RADIUS)
@@ -525,8 +582,32 @@ export class ShuttleController implements Tickable, PortalVehicle {
     // Lock velocity to XZ plane
     this.velocity.y = 0
 
+    this._slingshotLaunchFxRemaining = Math.max(0, this._slingshotLaunchFxRemaining - dt)
+
+    if (this.slingshotBurstActive) {
+      this._slingshotSettleElapsed = Math.min(
+        this._slingshotSettleElapsed + dt,
+        this._slingshotSettleDuration,
+      )
+      const targetSpeed = getSlingshotSettleSpeed(
+        this._slingshotBurstSpeed,
+        this._slingshotFinalSpeed,
+        this._slingshotSettleDuration,
+        this._slingshotSettleElapsed,
+      )
+      const currentSpeed = this.velocity.length()
+      this._slingshotSpeed = targetSpeed
+      if (currentSpeed > targetSpeed && currentSpeed > 0) {
+        this.velocity.setLength(targetSpeed)
+      }
+      if (!this.slingshotBurstActive) {
+        this._inputEnabled = true
+        this._slingshotSpeed = this._slingshotFinalSpeed
+      }
+    }
+
     // Decay slingshot speed protection
-    if (this._slingshotSpeed > p.maxThrustSpeed) {
+    if (!this.slingshotBurstActive && this._slingshotSpeed > p.maxThrustSpeed) {
       const excess = this._slingshotSpeed - p.maxThrustSpeed
       this._slingshotSpeed -= excess * orbitConfig.slingshotDecayRate * dt
     }

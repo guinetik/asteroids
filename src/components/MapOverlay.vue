@@ -1,16 +1,36 @@
 <!-- src/components/MapOverlay.vue -->
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import type { MapOverlayState } from '@/lib/ShuttleTelemetry'
 
 const props = defineProps<{
   overlay: MapOverlayState
 }>()
 
+/** Whether the persistent world-line trail is drawn. */
+const worldLineVisible = ref(true)
+
+/** Toggle world-line visibility. */
+function toggleWorldLine(): void {
+  worldLineVisible.value = !worldLineVisible.value
+}
+
 /** Bodies that already have a route line — don't duplicate the distance label. */
 const routeBodyNames = computed(() =>
   new Set(props.overlay.distances.map((d) => d.name)),
 )
+
+/** Consecutive line segments for the persistent world-line polyline. */
+const trajectorySegments = computed(() => {
+  const points = props.overlay.trajectoryPoints
+
+  return points.slice(0, -1).map((point, index) => ({
+    x1: point.screenX,
+    y1: point.screenY,
+    x2: points[index + 1]!.screenX,
+    y2: points[index + 1]!.screenY,
+  }))
+})
 </script>
 
 <template>
@@ -43,6 +63,15 @@ const routeBodyNames = computed(() =>
 
     <!-- Distance lines (SVG) -->
     <svg class="map-distance-svg">
+      <g v-if="worldLineVisible" v-for="(segment, index) in trajectorySegments" :key="'traj-' + index">
+        <line
+          :x1="segment.x1 + '%'"
+          :y1="segment.y1 + '%'"
+          :x2="segment.x2 + '%'"
+          :y2="segment.y2 + '%'"
+          class="map-trajectory-line"
+        />
+      </g>
       <g v-for="line in overlay.distances" :key="'dist-' + line.name">
         <line
           :x1="line.shipX + '%'"
@@ -73,21 +102,34 @@ const routeBodyNames = computed(() =>
       <span v-if="!routeBodyNames.has(label.name)" class="map-label-distance">{{ label.distance }}</span>
     </div>
 
-    <!-- Ship marker + heading arrow -->
+    <!-- Ship marker silhouette -->
     <div
       class="map-ship-marker"
       :style="{ left: overlay.shipX + '%', top: overlay.shipY + '%' }"
     >
-      <div class="map-ship-icon" />
       <div
-        v-if="overlay.speed > 0.01"
-        class="map-heading-arrow"
+        class="map-ship-rotator"
         :style="{ transform: 'rotate(' + overlay.headingDeg + 'deg)' }"
-      />
+      >
+        <div class="map-ship-icon" />
+      </div>
     </div>
 
     <!-- MAP label -->
     <div class="map-title">TACTICAL MAP</div>
     <div class="map-hint">Press M or ESC to close</div>
+
+    <!-- Bottom-right overlay controls -->
+    <div class="map-overlay-controls">
+      <button
+        type="button"
+        class="map-toggle-btn"
+        :class="worldLineVisible ? 'map-toggle-btn--active' : 'map-toggle-btn--inactive'"
+        @click="toggleWorldLine"
+      >
+        <span class="map-toggle-btn__dot" />
+        World Line
+      </button>
+    </div>
   </div>
 </template>

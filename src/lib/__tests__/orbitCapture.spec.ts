@@ -10,12 +10,47 @@ import { OrbitCaptureSystem } from '../orbitCapture'
 import type { CaptureBody } from '../orbitCapture'
 
 /** Creates a mock CaptureBody at the given world position. */
-function makeBody(name: string, x: number, z: number, displayRadius = 0.1): CaptureBody {
+function makeBody(
+  name: string,
+  x: number,
+  z: number,
+  displayRadius = 0.1,
+  orbitalSpeedMultiplier = 1,
+  captureRadiusMultiplier = 1,
+  captureRadiusOverride?: number,
+  orbitRadiusOverride?: number,
+): CaptureBody {
   return {
     name,
     displayRadius,
+    orbitalSpeedMultiplier,
+    captureRadiusMultiplier,
+    captureRadiusOverride,
+    orbitRadiusOverride,
     getWorldX: () => x,
     getWorldZ: () => z,
+  }
+}
+
+/** Creates a mock CaptureBody whose world position can change over time. */
+function makeMovingBody(
+  name: string,
+  position: { x: number; z: number },
+  displayRadius = 0.1,
+  orbitalSpeedMultiplier = 1,
+  captureRadiusMultiplier = 1,
+  captureRadiusOverride?: number,
+  orbitRadiusOverride?: number,
+): CaptureBody {
+  return {
+    name,
+    displayRadius,
+    orbitalSpeedMultiplier,
+    captureRadiusMultiplier,
+    captureRadiusOverride,
+    orbitRadiusOverride,
+    getWorldX: () => position.x,
+    getWorldZ: () => position.z,
   }
 }
 
@@ -74,6 +109,26 @@ describe('OrbitCaptureSystem', () => {
       const captured = system.beginCapture(500, 0)
       expect(captured).toBe(false)
       expect(system.state).toBe('free')
+    })
+
+    it('supports per-body capture range overrides', () => {
+      const sunLikeBody = makeBody('Sun', 0, 0, 0.15, 1, 0.2)
+      const inRangeSystem = new OrbitCaptureSystem([sunLikeBody])
+      const outOfRangeSystem = new OrbitCaptureSystem([sunLikeBody])
+
+      expect(inRangeSystem.beginCapture(30, 0)).toBe(true)
+      expect(outOfRangeSystem.beginCapture(50, 0)).toBe(false)
+    })
+
+    it('supports explicit capture and orbit radii for special bodies', () => {
+      const sunLaneBody = makeBody('Sun', 0, 0, 0.15, 12, 1, 50, 50)
+      const captureSystem = new OrbitCaptureSystem([sunLaneBody])
+      const missSystem = new OrbitCaptureSystem([sunLaneBody])
+
+      expect(captureSystem.beginCapture(49, 0)).toBe(true)
+      expect(missSystem.beginCapture(51, 0)).toBe(false)
+      expect(captureSystem.checkArrival(50, 0)).toBe(true)
+      expect(captureSystem.targetOrbitRadius).toBeCloseTo(50, 5)
     })
   })
 
@@ -139,6 +194,82 @@ describe('OrbitCaptureSystem', () => {
       const vel = system.launchSlingshot(0, 0.016)
       const speed = Math.sqrt(vel.vx * vel.vx + vel.vz * vel.vz)
       expect(speed).toBeGreaterThan(0)
+    })
+
+    it('launches at the full baseline speed when the body is stationary', () => {
+      system.beginCapture(20, 0)
+      system.checkArrival(14.4, 0)
+
+      const vel = system.launchSlingshot(0, 0.016)
+      const speed = Math.sqrt(vel.vx * vel.vx + vel.vz * vel.vz)
+
+      expect(speed).toBeCloseTo(2.5, 5)
+    })
+
+    it('adds a prograde speed bonus without changing the aimed direction', () => {
+      const position = { x: 0, z: 0 }
+      const movingBody = makeMovingBody('Gamma', position, 0.1)
+      const movingSystem = new OrbitCaptureSystem([movingBody])
+
+      movingSystem.beginCapture(20, 0)
+      movingSystem.checkArrival(14.4, 0)
+      movingSystem.tickOrbit(0.5)
+
+      position.x = 1.5
+
+      const vel = movingSystem.launchSlingshot(0, 0.5)
+
+      expect(vel.vx).toBeCloseTo(5.5, 5)
+      expect(vel.vz).toBeCloseTo(0, 5)
+    })
+
+    it('keeps the launch on the arrow direction when planet motion is perpendicular', () => {
+      const position = { x: 0, z: 0 }
+      const movingBody = makeMovingBody('Gamma', position, 0.1)
+      const movingSystem = new OrbitCaptureSystem([movingBody])
+
+      movingSystem.beginCapture(20, 0)
+      movingSystem.checkArrival(14.4, 0)
+      movingSystem.tickOrbit(0.5)
+
+      position.x = 1.5
+
+      const vel = movingSystem.launchSlingshot(Math.PI / 2, 0.5)
+
+      expect(vel.vx).toBeCloseTo(0, 5)
+      expect(vel.vz).toBeCloseTo(-2.5, 5)
+    })
+
+    it('keeps at least the baseline speed when aiming opposite the planet motion', () => {
+      const position = { x: 0, z: 0 }
+      const movingBody = makeMovingBody('Gamma', position, 0.1)
+      const movingSystem = new OrbitCaptureSystem([movingBody])
+
+      movingSystem.beginCapture(20, 0)
+      movingSystem.checkArrival(14.4, 0)
+      movingSystem.tickOrbit(0.5)
+
+      position.x = 1.5
+
+      const vel = movingSystem.launchSlingshot(Math.PI, 0.5)
+
+      expect(vel.vx).toBeCloseTo(-2.5, 5)
+      expect(vel.vz).toBeCloseTo(0, 5)
+    })
+
+    it('scales orbit and launch speed for high-speed bodies like the sun', () => {
+      const sunBody = makeBody('Sun', 0, 0, 0.15, 12)
+      const sunSystem = new OrbitCaptureSystem([sunBody])
+
+      expect(sunSystem.beginCapture(20, 0)).toBe(true)
+      expect(sunSystem.checkArrival(21.6, 0)).toBe(true)
+
+      const hud = sunSystem.getHudState(21.6, 0)
+      const vel = sunSystem.launchSlingshot(0, 0.016)
+      const speed = Math.sqrt(vel.vx * vel.vx + vel.vz * vel.vz)
+
+      expect(hud.orbitalSpeed).toBeCloseTo(30, 5)
+      expect(speed).toBeCloseTo(30, 5)
     })
   })
 

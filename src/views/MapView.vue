@@ -7,11 +7,63 @@ import OrbitPrompt from '@/components/OrbitPrompt.vue'
 import GravityWarning from '@/components/GravityWarning.vue'
 import DeathOverlay from '@/components/DeathOverlay.vue'
 import MapOverlay from '@/components/MapOverlay.vue'
+import ShipMessageDialog from '@/components/ShipMessageDialog.vue'
+import { shipMessageSystem } from '@/lib/messages/runtime'
+import type { ActiveShipMessage } from '@/lib/messages/messageTypes'
+import type { MapIntroUiState } from '@/lib/mapIntroState'
 import type { ShuttleTelemetry, GravityWarningState, MapOverlayState } from '@/lib/ShuttleTelemetry'
 import type { OrbitHudState } from '@/lib/orbitCapture'
 
 const container = ref<HTMLElement>()
 const viewController = new MapViewController()
+const activeMessage = ref<ActiveShipMessage | null>(null)
+const pendingMessageCount = ref(0)
+const messageDialogVisible = ref(false)
+const mapIntro = reactive<MapIntroUiState>({
+  phase: 'inactive',
+  letterboxVisible: false,
+  messagePromptVisible: false,
+  messageDialogVisible: false,
+  controlsLocked: false,
+})
+
+function refreshActiveMessage(): void {
+  activeMessage.value = shipMessageSystem.getActiveMessage()
+  pendingMessageCount.value = shipMessageSystem.getPendingMessageCount()
+  if (!activeMessage.value) {
+    messageDialogVisible.value = false
+  }
+}
+
+function openMessage(): void {
+  if (activeMessage.value?.status === 'pending') {
+    shipMessageSystem.markShown(activeMessage.value.id)
+  }
+
+  if (mapIntro.controlsLocked) {
+    viewController.openIntroMessage()
+  } else {
+    messageDialogVisible.value = true
+  }
+
+  refreshActiveMessage()
+}
+
+function dismissActiveMessage(): void {
+  if (!activeMessage.value) return
+  shipMessageSystem.dismiss(activeMessage.value.id)
+  if (mapIntro.controlsLocked) {
+    viewController.completeIntroMessage()
+  }
+  messageDialogVisible.value = false
+  refreshActiveMessage()
+}
+
+function messagePromptLabel(): string {
+  return pendingMessageCount.value === 1
+    ? 'You have 1 new message'
+    : `You have ${pendingMessageCount.value} new messages`
+}
 const telemetry = reactive<ShuttleTelemetry>({
   speed: 0,
   heading: 0,
@@ -42,6 +94,9 @@ const gravityWarning = reactive<GravityWarningState>({
 })
 const deathVisible = ref(false)
 const deathCause = ref('')
+const orbitsVisible = ref(true)
+const gridVisible = ref(true)
+const ambientVisible = ref(true)
 const mapOverlay = reactive<MapOverlayState>({
   visible: false,
   labels: [],
@@ -51,6 +106,7 @@ const mapOverlay = reactive<MapOverlayState>({
   speed: 0,
   distances: [],
   gravityRings: [],
+  trajectoryPoints: [],
 })
 
 onMounted(async () => {
@@ -71,7 +127,14 @@ onMounted(async () => {
     viewController.onMapOverlay = (s) => {
       Object.assign(mapOverlay, s)
     }
+    viewController.onMapIntro = (state) => {
+      Object.assign(mapIntro, state)
+    }
+    viewController.onMessageUpdate = () => {
+      refreshActiveMessage()
+    }
     await viewController.init(container.value)
+    refreshActiveMessage()
   }
 })
 
@@ -82,13 +145,93 @@ onUnmounted(() => {
 function handleRestart() {
   viewController.restart()
 }
+
+function handleToggleOrbits() {
+  orbitsVisible.value = viewController.toggleOrbits()
+}
+
+function handleToggleGrid() {
+  gridVisible.value = viewController.toggleSpaceTimeGrid()
+}
+
+function handleToggleAmbient() {
+  ambientVisible.value = viewController.toggleAmbient()
+}
 </script>
 
 <template>
   <div ref="container" class="scene-container"></div>
-  <ShuttleHud v-show="!mapOverlay.visible" :telemetry="telemetry" />
-  <OrbitPrompt v-show="!mapOverlay.visible" :orbitState="orbitState" />
-  <GravityWarning v-show="!mapOverlay.visible" :warning="gravityWarning" />
-  <DeathOverlay v-show="!mapOverlay.visible" :visible="deathVisible" :cause="deathCause" @restart="handleRestart" />
+  <div
+    class="map-intro-letterbox map-intro-letterbox--top"
+    :class="{ 'map-intro-letterbox--hidden': !mapIntro.letterboxVisible }"
+  />
+  <div
+    class="map-intro-letterbox map-intro-letterbox--bottom"
+    :class="{ 'map-intro-letterbox--hidden': !mapIntro.letterboxVisible }"
+  />
+  <ShuttleHud v-show="!mapOverlay.visible && !mapIntro.controlsLocked" :telemetry="telemetry" />
+  <OrbitPrompt v-show="!mapOverlay.visible && !mapIntro.controlsLocked" :orbitState="orbitState" />
+  <GravityWarning v-show="!mapOverlay.visible && !mapIntro.controlsLocked" :warning="gravityWarning" />
+  <DeathOverlay
+    v-show="!mapOverlay.visible && !mapIntro.controlsLocked"
+    :visible="deathVisible"
+    :cause="deathCause"
+    @restart="handleRestart"
+  />
   <MapOverlay :overlay="mapOverlay" />
+  <div v-if="mapIntro.messagePromptVisible && activeMessage" class="map-intro-message-prompt">
+    <button
+      type="button"
+      class="map-intro-message-prompt__button"
+      @click="openMessage"
+    >
+      {{ messagePromptLabel() }}
+    </button>
+  </div>
+  <div
+    v-else-if="!mapIntro.controlsLocked && pendingMessageCount > 0 && activeMessage && !messageDialogVisible"
+    class="map-message-notice"
+  >
+    <button
+      type="button"
+      class="map-message-notice__button"
+      @click="openMessage"
+    >
+      {{ messagePromptLabel() }}
+    </button>
+  </div>
+  <ShipMessageDialog
+    v-if="activeMessage && (mapIntro.messageDialogVisible || messageDialogVisible)"
+    :message="activeMessage"
+    @dismiss="dismissActiveMessage"
+  />
+  <div v-show="!mapOverlay.visible && !mapIntro.controlsLocked" class="map-view-toggles">
+    <button
+      type="button"
+      class="map-toggle-btn"
+      :class="orbitsVisible ? 'map-toggle-btn--active' : 'map-toggle-btn--inactive'"
+      @click="handleToggleOrbits"
+    >
+      <span class="map-toggle-btn__dot" />
+      Orbits
+    </button>
+    <button
+      type="button"
+      class="map-toggle-btn"
+      :class="gridVisible ? 'map-toggle-btn--active' : 'map-toggle-btn--inactive'"
+      @click="handleToggleGrid"
+    >
+      <span class="map-toggle-btn__dot" />
+      Space Fabric
+    </button>
+    <button
+      type="button"
+      class="map-toggle-btn"
+      :class="ambientVisible ? 'map-toggle-btn--active' : 'map-toggle-btn--inactive'"
+      @click="handleToggleAmbient"
+    >
+      <span class="map-toggle-btn__dot" />
+      Debris
+    </button>
+  </div>
 </template>

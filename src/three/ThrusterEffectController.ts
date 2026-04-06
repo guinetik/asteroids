@@ -1,8 +1,9 @@
 /**
- * Particle-based visual feedback for shuttle thrust, braking, and RCS.
+ * Visual feedback for shuttle thrust, braking, and RCS.
  * Orange particles trail from engines during thrust,
  * blue particles radiate during inertia dampening,
- * white puffs at wingtips for yaw RCS.
+ * white puffs at wingtips for yaw RCS,
+ * and rear-engine idle sprites flicker while fuel is available.
  *
  * Delegates particle management to {@link ParticleEmitter}.
  *
@@ -14,6 +15,8 @@ import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 import type { ShuttleController } from './ShuttleController'
 import { ParticleEmitter } from './ParticleEmitter'
+import { getIdleThrusterSpritePulse } from './idleThrusterSpritePulse'
+import { resolveThrusterEffectState } from './thrusterEffectState'
 
 const THRUST_SPAWN_RATE = 500
 const BRAKE_SPAWN_RATE = 400
@@ -33,6 +36,12 @@ const PUSH_FORCE = 20
 const RCS_PUSH_FORCE = 8
 const LEFT_WINGTIP = new THREE.Vector3(-4, -1.2, -4.5)
 const RIGHT_WINGTIP = new THREE.Vector3(-4, -1.2, 4.5)
+const IDLE_THRUSTER_SPRITE_SIZE = 1.4
+const IDLE_THRUSTER_SPRITE_X_OFFSET = -0.34
+const IDLE_THRUSTER_SPRITE_DEPTH_BIAS = -0.02
+const IDLE_THRUSTER_TEXTURE_SIZE = 64
+const IDLE_THRUSTER_COLOR_CORE = '#fff5cc'
+const IDLE_THRUSTER_COLOR_EDGE = '#ff9a1f'
 
 /**
  * Shuttle-specific thruster VFX controller.
@@ -48,12 +57,14 @@ export class ThrusterEffectController implements Tickable {
   readonly brakePoints: THREE.Points
   readonly rcsPoints: THREE.Points
 
+  private readonly idleThrusterSprites: THREE.Sprite[] = []
   private readonly thrustEmitter: ParticleEmitter
   private readonly brakeEmitter: ParticleEmitter
   private readonly rcsEmitter: ParticleEmitter
   private thrustSpawnAccumulator = 0
   private brakeSpawnAccumulator = 0
   private rcsSpawnAccumulator = 0
+  private elapsedTime = 0
   private readonly shuttle: ShuttleController
 
   constructor(shuttle: ShuttleController) {
@@ -89,12 +100,39 @@ export class ThrusterEffectController implements Tickable {
     this.thrustPoints = this.thrustEmitter.points
     this.brakePoints = this.brakeEmitter.points
     this.rcsPoints = this.rcsEmitter.points
+
+    const idleThrusterTexture = createIdleThrusterTexture()
+    for (const nozzle of NOZZLE_OFFSETS) {
+      const material = new THREE.SpriteMaterial({
+        map: idleThrusterTexture,
+        color: new THREE.Color(IDLE_THRUSTER_COLOR_EDGE),
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+      const sprite = new THREE.Sprite(material)
+      sprite.position.copy(nozzle)
+      sprite.position.x += IDLE_THRUSTER_SPRITE_X_OFFSET
+      sprite.position.y += IDLE_THRUSTER_SPRITE_DEPTH_BIAS
+      sprite.visible = false
+      sprite.scale.setScalar(IDLE_THRUSTER_SPRITE_SIZE)
+      this.shuttle.group.add(sprite)
+      this.idleThrusterSprites.push(sprite)
+    }
   }
 
   tick(dt: number): void {
+    this.elapsedTime += dt
     const scale = this.shuttle.group.scale.x
+    const effectState = resolveThrusterEffectState(
+      this.shuttle.isThrusting,
+      this.shuttle.isBraking,
+      this.shuttle.thrusterSystem.fuelLevel > 0 && !this.shuttle.dead,
+      this.shuttle.slingshotLaunchFxActive,
+    )
 
-    if (this.shuttle.isThrusting) {
+    if (effectState.emitThrust) {
       this.thrustSpawnAccumulator += THRUST_SPAWN_RATE * dt
       while (this.thrustSpawnAccumulator >= 1) {
         const nozzle = NOZZLE_OFFSETS[Math.floor(Math.random() * NOZZLE_OFFSETS.length)]!
@@ -110,7 +148,7 @@ export class ThrusterEffectController implements Tickable {
       this.thrustSpawnAccumulator = 0
     }
 
-    if (this.shuttle.isBraking) {
+    if (effectState.emitBrake) {
       this.brakeSpawnAccumulator += BRAKE_SPAWN_RATE * dt
       while (this.brakeSpawnAccumulator >= 1) {
         const nozzle = NOZZLE_OFFSETS[Math.floor(Math.random() * NOZZLE_OFFSETS.length)]!
@@ -147,14 +185,61 @@ export class ThrusterEffectController implements Tickable {
       this.rcsSpawnAccumulator = 0
     }
 
+    this.updateIdleThrusterSprites(effectState.emitIdleThrust)
     this.thrustEmitter.tick(dt)
     this.brakeEmitter.tick(dt)
     this.rcsEmitter.tick(dt)
   }
 
   dispose(): void {
+    for (const sprite of this.idleThrusterSprites) {
+      this.shuttle.group.remove(sprite)
+      ;(sprite.material as THREE.SpriteMaterial).map?.dispose()
+      ;(sprite.material as THREE.SpriteMaterial).dispose()
+    }
     this.thrustEmitter.dispose()
     this.brakeEmitter.dispose()
     this.rcsEmitter.dispose()
   }
+
+  private updateIdleThrusterSprites(active: boolean): void {
+    if (!active) {
+      for (const sprite of this.idleThrusterSprites) {
+        sprite.visible = false
+      }
+      return
+    }
+
+    const pulse = getIdleThrusterSpritePulse(this.elapsedTime)
+    for (const sprite of this.idleThrusterSprites) {
+      const material = sprite.material as THREE.SpriteMaterial
+      sprite.visible = true
+      sprite.scale.setScalar(IDLE_THRUSTER_SPRITE_SIZE * pulse.scale)
+      material.opacity = pulse.opacity
+    }
+  }
+}
+
+function createIdleThrusterTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas')
+  canvas.width = IDLE_THRUSTER_TEXTURE_SIZE
+  canvas.height = IDLE_THRUSTER_TEXTURE_SIZE
+
+  const context = canvas.getContext('2d')
+  if (!context) {
+    throw new Error('Unable to create idle thruster sprite texture.')
+  }
+
+  const center = IDLE_THRUSTER_TEXTURE_SIZE / 2
+  const gradient = context.createRadialGradient(center, center, 0, center, center, center)
+  gradient.addColorStop(0, IDLE_THRUSTER_COLOR_CORE)
+  gradient.addColorStop(0.45, IDLE_THRUSTER_COLOR_EDGE)
+  gradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
+
+  context.fillStyle = gradient
+  context.fillRect(0, 0, IDLE_THRUSTER_TEXTURE_SIZE, IDLE_THRUSTER_TEXTURE_SIZE)
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.needsUpdate = true
+  return texture
 }

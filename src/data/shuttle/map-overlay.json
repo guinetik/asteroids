@@ -8,5 +8,6 @@
   "nearestBodyCount": 3,
   "influenceMassThreshold": 0.00001,
   "shipMarkerSize": 24,
-  "headingArrowScale": 80
+  "headingArrowScale": 80,
+  "worldLineSampleDistance": 4
 }
