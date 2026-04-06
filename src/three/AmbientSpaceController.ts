@@ -809,6 +809,8 @@ export class AmbientSpaceController implements Tickable {
   private visible = true
   /** Scene-driven suppression — false during orbit/approach modes. */
   private active = true
+  /** Opening map intro / cutscene — hides debris without changing the user toggle. */
+  private mapIntroSuppressed = false
 
   constructor(scene: THREE.Scene) {
     this.dustLayer = new AmbientLayer({
@@ -864,7 +866,7 @@ export class AmbientSpaceController implements Tickable {
   }
 
   tick(dt: number): void {
-    if (!this.shuttle || !this.visible || !this.active) return
+    if (!this.shuttle || !this.visible || !this.active || this.mapIntroSuppressed) return
     this.dustLayer.tick(dt, this.shuttle)
     this.rockLayer.tick(dt, this.shuttle)
     const cameraQuat = this.camera?.quaternion ?? new THREE.Quaternion()
@@ -884,11 +886,19 @@ export class AmbientSpaceController implements Tickable {
   setActive(active: boolean): void {
     if (this.active === active) return
     this.active = active
-    const shouldShow = this.visible && this.active
-    this.dustLayer.setVisible(shouldShow)
-    this.rockLayer.setVisible(shouldShow)
-    this.cloudLayer.setVisible(shouldShow)
-    this.cometLayer.setVisible(shouldShow)
+    this.applyAmbientLayerVisibility()
+  }
+
+  /**
+   * Map intro cutscene: force all ambient layers off regardless of orbit mode.
+   * Does not change {@link toggle} state; clears when set to `false`.
+   *
+   * @param suppressed - `true` during the cinematic / locked intro flow.
+   */
+  setMapIntroSuppressed(suppressed: boolean): void {
+    if (this.mapIntroSuppressed === suppressed) return
+    this.mapIntroSuppressed = suppressed
+    this.applyAmbientLayerVisibility()
   }
 
   /**
@@ -897,12 +907,17 @@ export class AmbientSpaceController implements Tickable {
    */
   toggle(): boolean {
     this.visible = !this.visible
-    const shouldShow = this.visible && this.active
+    this.applyAmbientLayerVisibility()
+    return this.visible
+  }
+
+  /** Updates mesh visibility from user toggle, orbit {@link setActive}, and intro suppression. */
+  private applyAmbientLayerVisibility(): void {
+    const shouldShow = this.visible && this.active && !this.mapIntroSuppressed
     this.dustLayer.setVisible(shouldShow)
     this.rockLayer.setVisible(shouldShow)
     this.cloudLayer.setVisible(shouldShow)
     this.cometLayer.setVisible(shouldShow)
-    return this.visible
   }
 
   /** Whether the ambient field is currently visible (user toggle only). */
