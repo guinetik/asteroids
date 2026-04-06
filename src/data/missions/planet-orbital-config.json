@@ -1,0 +1,10 @@
+[
+  { "planetId": "mercury", "gatherItem": "probe-telemetry", "minigameType": "probe-deploy" },
+  { "planetId": "venus", "gatherItem": "venusian-gas", "minigameType": "gas-collection" },
+  { "planetId": "earth", "gatherItem": "cargo-container", "minigameType": "logistics" },
+  { "planetId": "mars", "gatherItem": "methane-sample", "minigameType": "chemistry" },
+  { "planetId": "jupiter", "gatherItem": "jovian-hydrogen", "minigameType": "gas-collection" },
+  { "planetId": "saturn", "gatherItem": "ring-ice", "minigameType": "ice-harvest" },
+  { "planetId": "uranus", "gatherItem": "magnetic-field-data", "minigameType": "probe-deploy" },
+  { "planetId": "neptune", "gatherItem": "solar-alignment-data", "minigameType": "maintenance" }
+]
