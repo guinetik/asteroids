@@ -620,3 +620,173 @@ body {
 .credits-badge__value {
   @apply tabular-nums;
 }
+
+/* Shop Button */
+.shop-button-container {
+  @apply fixed bottom-24 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2;
+}
+
+.shop-button {
+  @apply flex flex-col items-center rounded-lg border border-amber-400/30
+         bg-slate-950/80 px-5 py-2 font-mono text-sm shadow-lg
+         hover:bg-amber-400/10 transition-colors cursor-pointer;
+}
+
+.shop-button__label {
+  @apply text-amber-300 font-bold text-xs uppercase tracking-wider;
+}
+
+.shop-button__planet {
+  @apply text-slate-300 text-xs;
+}
+
+.shop-button__hint {
+  @apply rounded border border-white/10 bg-slate-800/80
+         px-1.5 py-0.5 text-[10px] font-mono text-slate-500;
+}
+
+/* Inventory Table */
+.inventory-table {
+  @apply flex flex-col gap-1;
+}
+
+.inventory-table__empty {
+  @apply py-6 text-center text-sm text-slate-500 italic;
+}
+
+.inventory-table__grid {
+  @apply flex flex-col gap-1;
+}
+
+.inventory-table__row {
+  @apply flex items-center gap-3 rounded-lg border border-white/5
+         bg-white/5 px-3 py-2;
+}
+
+.inventory-table__icon-cell {
+  @apply shrink-0;
+}
+
+.inventory-table__icon-placeholder {
+  @apply flex h-8 w-8 items-center justify-center rounded
+         bg-slate-700 text-xs font-bold text-slate-300;
+}
+
+.inventory-table__info {
+  @apply flex flex-1 flex-col;
+}
+
+.inventory-table__name {
+  @apply text-sm text-slate-100;
+}
+
+.inventory-table__meta {
+  @apply text-xs text-slate-500;
+}
+
+.inventory-table__demand {
+  @apply flex gap-0.5;
+}
+
+.inventory-table__pip {
+  @apply h-2 w-2 rounded-full;
+}
+
+.inventory-table__pip--active {
+  @apply bg-cyan-400;
+}
+
+.inventory-table__pip--inactive {
+  @apply bg-slate-700;
+}
+
+.inventory-table__sell-btn {
+  @apply shrink-0 rounded border border-cyan-400/30 bg-cyan-400/10
+         px-3 py-1 text-xs font-mono text-cyan-300
+         hover:bg-cyan-400/20 transition-colors cursor-pointer;
+}
+
+/* Planet Shop Dialog */
+.planet-shop-overlay {
+  @apply fixed inset-0 z-50 flex items-center justify-center
+         bg-slate-950/60 px-6 py-8 backdrop-blur-sm;
+}
+
+.planet-shop-card {
+  @apply flex w-full max-w-6xl flex-col overflow-hidden rounded-2xl
+         border border-amber-400/25 bg-slate-950/95 text-slate-100 shadow-2xl;
+  max-height: 85vh;
+}
+
+.planet-shop-header {
+  @apply flex items-center justify-between border-b border-white/10
+         bg-white/5 px-5 py-3 font-mono text-[11px] uppercase
+         tracking-widest text-slate-400;
+}
+
+.planet-shop-header__title {
+  @apply text-amber-300;
+}
+
+.planet-shop-header__credits {
+  @apply text-cyan-300;
+}
+
+.planet-shop-body {
+  @apply grid grid-cols-2 gap-4 overflow-y-auto p-5;
+}
+
+.planet-shop-column {
+  @apply flex flex-col gap-2;
+}
+
+.planet-shop-column__title {
+  @apply font-mono text-xs uppercase tracking-wider text-slate-500
+         border-b border-white/5 pb-1 mb-1;
+}
+
+.planet-shop-item {
+  @apply flex items-center gap-3 rounded-lg border border-white/5
+         bg-white/5 px-3 py-2;
+}
+
+.planet-shop-item--sold-out {
+  @apply opacity-40;
+}
+
+.planet-shop-item__icon-placeholder {
+  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded
+         bg-slate-700 text-sm font-bold text-slate-300;
+}
+
+.planet-shop-item__info {
+  @apply flex flex-1 flex-col gap-0.5;
+}
+
+.planet-shop-item__name {
+  @apply text-sm text-slate-100;
+}
+
+.planet-shop-item__desc {
+  @apply text-xs text-slate-500 line-clamp-2;
+}
+
+.planet-shop-item__stock {
+  @apply text-xs text-slate-400;
+}
+
+.planet-shop-item__price {
+  @apply shrink-0 font-mono text-sm text-amber-300;
+}
+
+.planet-shop-item__buy-btn {
+  @apply shrink-0 rounded border border-amber-400/30 bg-amber-400/10
+         px-3 py-1 text-xs font-mono text-amber-300
+         hover:bg-amber-400/20 transition-colors cursor-pointer
+         disabled:opacity-30 disabled:cursor-not-allowed;
+}
+
+.planet-shop-restock {
+  @apply rounded border border-amber-400/20 bg-amber-400/5
+         px-3 py-2 text-center text-xs font-mono text-amber-400;
+}
