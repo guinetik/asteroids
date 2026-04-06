@@ -26,7 +26,10 @@ const ANOMALY_LINE_WHITE_ABS_WEIGHT = 0.65
 const DEFAULT_VISUAL_DEPTH_SCALE = 160
 const DEFAULT_VISUAL_WIDTH_SCALE = 200
 const DEFAULT_MASS_EXPONENT = 0.5
+/** Rad/s — only applied to moving wells; static sources (e.g. Sun) stay steady. */
 const WELL_PULSE_SPEED = 1.5
+
+/** Peak fractional amplitude swing for moving wells only. */
 const WELL_PULSE_AMOUNT = 0.08
 
 /**
@@ -246,14 +249,15 @@ export class SpaceTimeGrid implements Tickable {
    * Gaussian well depth at a point.
    * depth = A * exp(-r²/2σ²)
    * More mass = wider and deeper well (pow(mass, exponent) scaling).
-   * Includes subtle pulsing animation.
+   * Moving bodies use a subtle amplitude pulse; static sources (Sun) do not.
    */
   getDepthAt(x: number, z: number): number {
     let totalDepth = 0
-    const pulse = 1 + WELL_PULSE_AMOUNT * Math.sin(this.time * WELL_PULSE_SPEED)
+    const movingPulse = 1 + WELL_PULSE_AMOUNT * Math.sin(this.time * WELL_PULSE_SPEED)
 
     for (let s = 0; s < 2; s++) {
       const arr = s === 0 ? this.staticSources : this.sources
+      const amplitudePulse = s === 0 ? 1 : movingPulse
       for (const source of arr) {
         const dx = x - source.x
         const dz = z - source.z
@@ -263,7 +267,7 @@ export class SpaceTimeGrid implements Tickable {
         const depthMul = source.wellDepthMultiplier ?? 1
         const massFactor = Math.sign(source.mass) * Math.pow(Math.abs(source.mass), this.massExponent)
         const sigma = this.widthScale * massFactor * widthMul
-        const amplitude = this.depthScale * massFactor * pulse * depthMul
+        const amplitude = this.depthScale * massFactor * amplitudePulse * depthMul
 
         totalDepth += amplitude * Math.exp(-rSquared / (2 * sigma * sigma))
       }
@@ -277,7 +281,7 @@ export class SpaceTimeGrid implements Tickable {
    */
   private getFabricAnomalyDepthAt(x: number, z: number): number {
     let depth = 0
-    const pulse = 1 + WELL_PULSE_AMOUNT * Math.sin(this.time * WELL_PULSE_SPEED)
+    const movingPulse = 1 + WELL_PULSE_AMOUNT * Math.sin(this.time * WELL_PULSE_SPEED)
 
     for (const source of this.sources) {
       if (!source.isFabricAnomaly) {
@@ -290,7 +294,7 @@ export class SpaceTimeGrid implements Tickable {
       const depthMul = source.wellDepthMultiplier ?? 1
       const massFactor = Math.sign(source.mass) * Math.pow(Math.abs(source.mass), this.massExponent)
       const sigma = this.widthScale * massFactor * widthMul
-      const amplitude = this.depthScale * massFactor * pulse * depthMul
+      const amplitude = this.depthScale * massFactor * movingPulse * depthMul
       depth += amplitude * Math.exp(-rSquared / (2 * sigma * sigma))
     }
 
@@ -311,10 +315,11 @@ export class SpaceTimeGrid implements Tickable {
     // Analytical gradient of the Gaussian: ∂depth/∂x = depth * (sx - x) / σ²
     let gradX = 0
     let gradZ = 0
-    const pulse = 1 + WELL_PULSE_AMOUNT * Math.sin(this.time * WELL_PULSE_SPEED)
+    const movingPulse = 1 + WELL_PULSE_AMOUNT * Math.sin(this.time * WELL_PULSE_SPEED)
 
     for (let s = 0; s < 2; s++) {
       const arr = s === 0 ? this.staticSources : this.sources
+      const amplitudePulse = s === 0 ? 1 : movingPulse
       for (const source of arr) {
         const dx = x - source.x
         const dz = z - source.z
@@ -325,7 +330,7 @@ export class SpaceTimeGrid implements Tickable {
         const massFactor = Math.sign(source.mass) * Math.pow(Math.abs(source.mass), this.massExponent)
         const sigma = this.widthScale * massFactor * widthMul
         const sigmaSq = sigma * sigma
-        const amplitude = this.depthScale * massFactor * pulse * depthMul
+        const amplitude = this.depthScale * massFactor * amplitudePulse * depthMul
         const depth = amplitude * Math.exp(-rSquared / (2 * sigmaSq))
 
         // Gradient points toward the source (downhill into the well)
