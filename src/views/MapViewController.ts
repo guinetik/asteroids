@@ -72,6 +72,12 @@ const MAP_SHUTTLE_SCALE = 0.01
 /** Offset behind Earth so the shuttle doesn't overlap the planet mesh. */
 const SPAWN_OFFSET_BEHIND_EARTH = 7.5
 
+/** Max Y displacement from spacetime curvature (±). */
+const CURVATURE_Y_MAX = 5
+
+/** How much grid slope affects shuttle speed (multiplier on slope value). */
+const CURVATURE_SPEED_FACTOR = 0.3
+
 /** Duration in seconds for the approach animation lerp. */
 const APPROACH_DURATION = 1.5
 
@@ -513,6 +519,38 @@ export class MapViewController implements Tickable {
         this.shuttleController.setIgnoreGridY(false)
       } else {
         this.shuttleController.group.position.y = y * (1 - 3 * dt)
+      }
+    }
+
+    // Spacetime curvature effects — local Y displacement + slope speed modifier
+    // Only in free flight, not during orbit capture or yRecovery
+    if (
+      this.shuttleController
+      && this.spaceTimeGrid
+      && !this.yRecovery
+      && !this.shuttleController.dead
+      && (this.orbitSystem?.state ?? 'free') === 'free'
+    ) {
+      const px = this.shuttleController.position.x
+      const pz = this.shuttleController.position.z
+
+      // Y displacement — normalized grid depth clamped to ±CURVATURE_Y_MAX
+      const rawDepth = this.spaceTimeGrid.getDepthAt(px, pz)
+      const clampedY = Math.max(-CURVATURE_Y_MAX, Math.min(CURVATURE_Y_MAX, -rawDepth * 0.1))
+      this.shuttleController.group.position.y = clampedY
+
+      // Slope speed modifier — downhill accelerates, uphill decelerates
+      const vel = this.shuttleController.currentVelocity
+      const speed = vel.length()
+      if (speed > 0.01) {
+        const dirX = vel.x / speed
+        const dirZ = vel.z / speed
+        const slope = this.spaceTimeGrid.getSlopeAt(px, pz, dirX, dirZ)
+        // Positive slope = moving downhill = speed boost
+        const speedDelta = slope * CURVATURE_SPEED_FACTOR * dt
+        const newSpeed = Math.max(0, speed + speedDelta)
+        vel.setLength(newSpeed)
+        this.shuttleController.setVelocity(vel)
       }
     }
 

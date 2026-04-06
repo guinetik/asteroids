@@ -139,6 +139,45 @@ export class SpaceTimeGrid implements Tickable {
     return totalDepth
   }
 
+  /**
+   * Directional slope of the gravity well at a point.
+   * Returns how much depth changes per unit distance in the given direction.
+   * Positive = going downhill (toward a well), negative = going uphill (away).
+   *
+   * @param x - World X position
+   * @param z - World Z position
+   * @param dirX - Normalized movement direction X
+   * @param dirZ - Normalized movement direction Z
+   */
+  getSlopeAt(x: number, z: number, dirX: number, dirZ: number): number {
+    // Analytical gradient of the Gaussian: ∂depth/∂x = depth * (sx - x) / σ²
+    let gradX = 0
+    let gradZ = 0
+    const pulse = 1 + WELL_PULSE_AMOUNT * Math.sin(this.time * WELL_PULSE_SPEED)
+
+    for (let s = 0; s < 2; s++) {
+      const arr = s === 0 ? this.staticSources : this.sources
+      for (const source of arr) {
+        const dx = x - source.x
+        const dz = z - source.z
+        const rSquared = dx * dx + dz * dz
+
+        const massFactor = Math.sign(source.mass) * Math.pow(Math.abs(source.mass), this.massExponent)
+        const sigma = this.widthScale * massFactor
+        const sigmaSq = sigma * sigma
+        const amplitude = this.depthScale * massFactor * pulse
+        const depth = amplitude * Math.exp(-rSquared / (2 * sigmaSq))
+
+        // Gradient points toward the source (downhill into the well)
+        gradX += depth * -dx / sigmaSq
+        gradZ += depth * -dz / sigmaSq
+      }
+    }
+
+    // Dot with movement direction: positive = moving downhill
+    return gradX * dirX + gradZ * dirZ
+  }
+
   private deformGrid(): void {
     const posAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute
     const positions = posAttr.array as Float32Array
