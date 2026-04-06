@@ -12,6 +12,7 @@ import type { Tickable } from '@/lib/Tickable'
 import type { EnemyBehavior, EnemyBehaviorOutput } from './enemy'
 import { Enemy } from './enemy'
 import { AggroBehavior } from './aggroBehavior'
+import { RangedBehavior } from './rangedBehavior'
 import { getEnemyTypeConfig } from './enemyTypes'
 import type { EnemyTypeConfig } from './enemyTypes'
 
@@ -77,14 +78,26 @@ export class EnemyDirector implements Tickable {
     const enemy = new Enemy({ maxHp: config.maxHp, hitRadius: config.hitRadius })
     enemy.position.set(x, y, z)
 
-    const behavior = new AggroBehavior({
-      aggroRadius: config.aggroRadius,
-      leashRadius: config.leashRadius,
-      agitateRadius: config.agitateRadius,
-      wanderRadius: config.wanderRadius,
-      wanderSpeed: config.wanderSpeed,
-      speed: config.speed,
-    })
+    const behavior = config.preferredRange > 0
+      ? new RangedBehavior({
+          aggroRadius: config.aggroRadius,
+          leashRadius: config.leashRadius,
+          agitateRadius: config.agitateRadius,
+          wanderRadius: config.wanderRadius,
+          wanderSpeed: config.wanderSpeed,
+          speed: config.speed,
+          preferredRange: config.preferredRange,
+          minRange: config.minRange,
+          fireRate: config.fireRate,
+        })
+      : new AggroBehavior({
+          aggroRadius: config.aggroRadius,
+          leashRadius: config.leashRadius,
+          agitateRadius: config.agitateRadius,
+          wanderRadius: config.wanderRadius,
+          wanderSpeed: config.wanderSpeed,
+          speed: config.speed,
+        })
 
     const handle: EnemyHandle = {
       id: this.nextId++,
