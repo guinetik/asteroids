@@ -99,6 +99,7 @@ import {
   RESERVE_FUEL_ID,
   LANDER_FUEL_ID,
   LANDER_FUEL_COST,
+  REPAIR_COST,
 } from '@/lib/shop/shopSession'
 import type { ShopSession } from '@/lib/shop/tradeTypes'
 import { tickDemandTimer, resetDemand } from '@/lib/shop/planetDemand'
@@ -1653,6 +1654,19 @@ export class MapViewController implements Tickable {
     this.playerProfile = updated
     this.playerInventory = addResult.inventory
     this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
+    this.onCreditsUpdate?.(this.playerProfile.credits)
+  }
+
+  /** Repair hull to 100% (Earth only, 250 credits). */
+  shopRepairHull(): void {
+    if (!this.shipHealth) return
+    const updated = spendCredits(this.playerProfile, REPAIR_COST)
+    if (!updated) return
+    this.playerProfile = updated
+    this.shipHealth.repairFull()
+    if (this.shopSession) {
+      this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
+    }
     this.onCreditsUpdate?.(this.playerProfile.credits)
   }
 

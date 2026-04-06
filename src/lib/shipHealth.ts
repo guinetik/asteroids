@@ -180,6 +180,11 @@ export class ShipHealth {
     }
   }
 
+  /** Restore HP to maximum (full hull repair). */
+  repairFull(): void {
+    this._hp = this.config.maxHp
+  }
+
   /** Reset HP and temperature to initial values. */
   reset(): void {
     this._hp = this.config.maxHp

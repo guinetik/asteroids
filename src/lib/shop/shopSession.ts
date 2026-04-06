@@ -47,6 +47,9 @@ export const LANDER_FUEL_ID = 'fuel-cell'
 /** Lander fuel cost in credits. */
 export const LANDER_FUEL_COST = 75
 
+/** Hull repair cost in credits (Earth only). */
+export const REPAIR_COST = 250
+
 /**
  * Pick 3 random trade goods from a planet's 5-item pool.
  * Returns them as TradeGoodSlots with randomized stock.

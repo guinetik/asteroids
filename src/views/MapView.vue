@@ -267,6 +267,10 @@ function handleShopBuyLanderFuel() {
   viewController.shopBuyLanderFuel()
 }
 
+function handleRepairHull() {
+  viewController.shopRepairHull()
+}
+
 function handleUseFuelCell() {
   viewController.useFuelCell()
 }
@@ -382,6 +386,7 @@ function handleUseFuelCell() {
     @refuel="handleShopRefuel"
     @buy-reserve-fuel="handleShopBuyReserveFuel"
     @buy-lander-fuel="handleShopBuyLanderFuel"
+    @repair-hull="handleRepairHull"
   />
   <div v-if="habitatActive && habitatPrompt && !shuttleControlVisible" class="habitat-prompt">
     <span class="orbit-prompt-action">{{ habitatPrompt }}</span>
