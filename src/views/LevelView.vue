@@ -197,24 +197,26 @@ onUnmounted(() => {
   );
 }
 
-/* Helmet visor frame — EVA only, rounded border with subtle tint */
+/* Helmet visor frame — EVA only, rounded viewport with opaque corners */
 .helmet-visor {
   position: fixed;
   inset: 0;
   z-index: 6;
   pointer-events: none;
-  border: 3px solid rgba(60, 80, 100, 0.15);
+  border: 2px solid rgba(80, 100, 120, 0.2);
   border-radius: 20% / 12%;
+  /* Large outer shadow fills the corners outside the rounded border with black */
   box-shadow:
-    inset 0 0 80px rgba(0, 10, 30, 0.5),
-    inset 0 0 200px rgba(0, 5, 15, 0.3);
-  /* Subtle blue-green glass tint at edges */
+    0 0 0 9999px rgba(0, 0, 0, 0.95),
+    inset 0 0 60px rgba(0, 10, 30, 0.5),
+    inset 0 0 150px rgba(0, 5, 15, 0.25);
+  /* Subtle glass tint at visor edges */
   background: radial-gradient(
     ellipse at center,
     transparent 0%,
-    transparent 60%,
-    rgba(20, 40, 60, 0.08) 85%,
-    rgba(10, 30, 50, 0.15) 100%
+    transparent 65%,
+    rgba(20, 40, 60, 0.06) 85%,
+    rgba(10, 30, 50, 0.12) 100%
   );
 }
 </style>
