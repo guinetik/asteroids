@@ -304,14 +304,14 @@ export class ArrivalSequence {
     this.fallingLander?.removeFromParent()
     this.fallingLander = null
 
-    // Position shuttle above where the lander was detached, level orientation
+    // Position shuttle above where the lander was detached
     this.shuttleGroup.position.set(
       this.landerWorldPos.x,
       this.landerWorldPos.y + hoverHeight,
       this.landerWorldPos.z,
     )
-    // Level orientation: nose along +Z
-    this.shuttleGroup.rotation.set(0, -Math.PI / 2, 0)
+    // Stay flipped (cargo bay facing down) — lighter belly visible from below
+    this.shuttleGroup.rotation.set(Math.PI, -Math.PI / 2, 0, 'YXZ')
 
     // Close doors
     this.doorProgress = 0
@@ -321,6 +321,11 @@ export class ArrivalSequence {
     for (const sprite of this.thrusterSprites) {
       sprite.visible = false
     }
+
+    // Add a subtle navigation light so the shuttle is visible against the dark sky
+    const navLight = new THREE.PointLight(0x4488cc, 2, 300)
+    navLight.position.set(0, -5, 0)
+    this.shuttleGroup.add(navLight)
   }
 
   /** Remove shuttle and falling lander from scene entirely. */

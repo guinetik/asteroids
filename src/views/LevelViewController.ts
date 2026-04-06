@@ -73,7 +73,7 @@ const SPAWN_POSITION_RANGE = 2000
 const EVA_SPAWN_OFFSET_X = 8
 
 /** Shuttle hovers this high above the lander detach point after arrival. */
-const SHUTTLE_HOVER_HEIGHT = 200
+const SHUTTLE_HOVER_HEIGHT = 80
 
 /** Test surface features — will come from asteroid data later. */
 const TEST_SURFACE: SurfaceFeatures = {
