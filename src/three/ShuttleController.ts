@@ -93,6 +93,14 @@ const DEATH_MAX_PULL_SPEED = 120
  */
 const SHUTTLE_VELOCITY_ALIGN_EPSILON = 1e-4
 
+/**
+ * Slingshot speed protection compares planar speed to the internal slingshot floor. Without slack,
+ * float noise or ordering vs. the settle ramp can drop protection for a frame; map mode then applies
+ * {@link ShuttlePhysicsConfig.maxGravitySpeed} (5) and a fast
+ * {@link ShuttlePhysicsConfig.speedExcessReturnRate}, collapsing a high burst to the gravity cap.
+ */
+const SLINGSHOT_PROTECT_SPEED_EPSILON = 0.02
+
 const SHUTTLE_MODEL_PATH = '/models/shuttle.glb'
 const DRACO_DECODER_PATH = '/node_modules/three/examples/jsm/libs/draco/'
 
@@ -719,7 +727,9 @@ export class ShuttleController implements Tickable, PortalVehicle {
 
     const currentSpeed = this.velocity.length()
     const slingshotProtected =
-      this._slingshotSpeed > p.maxThrustSpeed && currentSpeed <= this._slingshotSpeed
+      this.slingshotBurstActive ||
+      (this._slingshotSpeed > p.maxThrustSpeed &&
+        currentSpeed <= this._slingshotSpeed + SLINGSHOT_PROTECT_SPEED_EPSILON)
 
     const cruiseEquilibrium =
       p.speedReturnEquilibriumSpeed === undefined

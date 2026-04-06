@@ -41,6 +41,12 @@ export interface VehicleCameraConfig {
  */
 const SHUTTLE_MAP_CHASE_RETURN_IDLE_SECONDS = 10
 
+/**
+ * Map hub free flight: return to default chase sooner than the full shuttle scene so manual
+ * orbit does not fight thrust for as long while driving.
+ */
+const MAP_FREE_FLIGHT_CAMERA_CHASE_IDLE_SECONDS = 3
+
 /** Shuttle preset: behind and above, looking at the nose. */
 export const SHUTTLE_CAMERA_CONFIG: VehicleCameraConfig = {
   idleOffset: new THREE.Vector3(-80, 40, 0),
@@ -63,7 +69,7 @@ export const LANDER_CAMERA_CONFIG: VehicleCameraConfig = {
 export const MAP_CAMERA_CONFIG: VehicleCameraConfig = {
   idleOffset: new THREE.Vector3(-0.8, 0.4, 0),
   lerpSpeed: 5,
-  idleTimeout: SHUTTLE_MAP_CHASE_RETURN_IDLE_SECONDS,
+  idleTimeout: MAP_FREE_FLIGHT_CAMERA_CHASE_IDLE_SECONDS,
   minY: -Infinity,
   fov: 60,
 }
@@ -101,7 +107,9 @@ export const MAP_ORBIT_CAMERA_CONFIG: VehicleCameraConfig = {
  * 3rd-person camera that tracks a vehicle with orbit controls.
  * Manual orbit is kept until the player stops dragging for {@link VehicleCameraConfig.idleTimeout}
  * seconds, then the camera eases to the default chase offset. When {@link setShipYawCoupling} is
- * enabled (default), ship yaw also rotates the camera offset between idle and chase.
+ * enabled (default), the camera–target offset rotates with the target's full orientation delta each
+ * frame (not only Euler Y), matching chase framing. Orbit drag inertia is cleared on pointer end so
+ * damped azimuth/polar deltas do not keep drifting while the ship accelerates.
  *
  * @author guinetik
  * @date 2026-04-04
@@ -116,10 +124,12 @@ export class VehicleCamera implements Tickable {
   private mouseIdleTimer = 0
   private isMouseActive = false
   private lastTargetPos = new THREE.Vector3()
-  /** Last ship yaw (Y rotation) — used to swing the camera with heading changes. */
-  private lastTargetYaw = 0
+  /** Previous target orientation — drives camera-offset rotation when coupling is on. */
+  private readonly lastTargetQuat = new THREE.Quaternion()
+  private readonly quatDeltaScratch = new THREE.Quaternion()
+  private readonly quatInvScratch = new THREE.Quaternion()
   private readonly scratchOffset = new THREE.Vector3()
-  private readonly worldUp = new THREE.Vector3(0, 1, 0)
+  private readonly frameDelta = new THREE.Vector3()
   /**
    * When true, ship Y rotation swings the camera–target offset (e.g. free flight).
    * When false, yaw changes are absorbed so manual orbit framing is unchanged (e.g. planet orbit).
@@ -143,7 +153,7 @@ export class VehicleCamera implements Tickable {
   setTarget(object: THREE.Object3D): void {
     this.target = object
     this.lastTargetPos.copy(object.position)
-    this.lastTargetYaw = object.rotation.y
+    this.lastTargetQuat.copy(object.quaternion)
     this.controls.target.copy(object.position)
 
     const idleOffset = this.config.idleOffset.clone().applyQuaternion(object.quaternion)
@@ -158,7 +168,7 @@ export class VehicleCamera implements Tickable {
   }
 
   /**
-   * Enables or disables rotating the camera offset with the target’s yaw (heading).
+   * Enables or disables rotating the camera offset with the target’s orientation each frame.
    *
    * @param enabled - `true` for driving/free flight; `false` when the scene pins the view
    *   (e.g. planetary orbit so A/D only aims the shuttle).
@@ -177,7 +187,7 @@ export class VehicleCamera implements Tickable {
     this.mouseIdleTimer = config.idleTimeout + 1
     this.isMouseActive = false
     if (this.target) {
-      this.lastTargetYaw = this.target.rotation.y
+      this.lastTargetQuat.copy(this.target.quaternion)
     }
   }
 
@@ -204,24 +214,26 @@ export class VehicleCamera implements Tickable {
     const targetPos = this.target.position
 
     // Track vehicle movement delta
-    const delta = targetPos.clone().sub(this.lastTargetPos)
+    this.frameDelta.subVectors(targetPos, this.lastTargetPos)
     this.lastTargetPos.copy(targetPos)
 
     // Keep orbit target on the vehicle
     this.controls.target.copy(targetPos)
 
     // Move camera by the same delta
-    this.camera.position.add(delta)
+    this.camera.position.add(this.frameDelta)
 
-    // Optionally orbit camera offset with ship yaw (disabled e.g. during planet orbit capture).
-    const yaw = this.target.rotation.y
-    const yawDelta = Math.atan2(Math.sin(yaw - this.lastTargetYaw), Math.cos(yaw - this.lastTargetYaw))
-    if (this.shipYawCouplingEnabled && Math.abs(yawDelta) > 1e-8) {
+    // Optionally rotate camera–target offset with the target’s orientation delta (e.g. free
+    // flight). Euler-Y–only rotation diverges from chase framing that uses the full quaternion.
+    const q = this.target.quaternion
+    if (this.shipYawCouplingEnabled) {
+      this.quatInvScratch.copy(this.lastTargetQuat).invert()
+      this.quatDeltaScratch.copy(q).multiply(this.quatInvScratch)
       this.scratchOffset.copy(this.camera.position).sub(targetPos)
-      this.scratchOffset.applyAxisAngle(this.worldUp, yawDelta)
+      this.scratchOffset.applyQuaternion(this.quatDeltaScratch)
       this.camera.position.copy(targetPos).add(this.scratchOffset)
     }
-    this.lastTargetYaw = yaw
+    this.lastTargetQuat.copy(q)
 
     // After enough time without orbit-drag, ease to default chase framing
     if (!this.isMouseActive) {
@@ -259,5 +271,19 @@ export class VehicleCamera implements Tickable {
   private onControlEnd = (): void => {
     this.isMouseActive = false
     this.mouseIdleTimer = 0
+    this.clearOrbitInternalInertia()
+  }
+
+  /**
+   * Zeros OrbitControls’ internal damped rotation/pan payloads so post-drag inertia does not keep
+   * twisting the view while the vehicle translates.
+   */
+  private clearOrbitInternalInertia(): void {
+    const c = this.controls as unknown as {
+      _sphericalDelta: THREE.Spherical
+      _panOffset: THREE.Vector3
+    }
+    c._sphericalDelta.set(0, 0, 0)
+    c._panOffset.set(0, 0, 0)
   }
 }

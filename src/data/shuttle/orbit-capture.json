@@ -6,7 +6,7 @@
   "approachThrustFactor": 0.8,
   "orbitVisualSpeed": 0.2,
   "orbitLaunchSpeed": 2.5,
-  "slingshotBurstMultiplier": 10,
+  "slingshotBurstMultiplier": 5,
   "slingshotSettleDuration": 3,
   "slingshotLaunchFxDuration": 0.85,
   "slingshotDecayRate": 0.0001
