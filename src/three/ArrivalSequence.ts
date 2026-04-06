@@ -315,17 +315,18 @@ export class ArrivalSequence {
     // Scale up to gameplay proportions (lander fits inside cargo bay)
     this.shuttleGroup.scale.setScalar(SHUTTLE_PARKED_SCALE)
 
-    // Position directly above the original lander spawn XZ, at hover height
+    // Shuttle model is ~14 units at scale 1. At scale 15 it's ~210 units.
+    // Position high enough that the bottom clears the terrain.
     this.shuttleGroup.position.set(
       this.landerSpawnTarget.x,
-      hoverHeight,
+      hoverHeight + SHUTTLE_PARKED_SCALE * 8,
       this.landerSpawnTarget.z,
     )
-    // Right-side up so the lighter belly faces down toward the player
-    this.shuttleGroup.rotation.set(0, -Math.PI / 2, 0)
+    // Flipped upside down — cargo bay faces the asteroid surface, doors open
+    this.shuttleGroup.rotation.set(Math.PI, -Math.PI / 2, 0, 'YXZ')
 
-    // Close doors
-    this.doorProgress = 0
+    // Open cargo bay doors
+    this.doorProgress = 1
     this.updateDoorRotation()
 
     // Hide thruster sprites (parked, not thrusting)
