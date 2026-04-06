@@ -55,14 +55,15 @@ defineProps<{
       </g>
     </svg>
 
-    <!-- Planet labels -->
+    <!-- Planet indicators + labels -->
     <div
       v-for="label in overlay.labels"
       :key="'label-' + label.name"
-      class="map-label"
+      class="map-body-indicator"
       :style="{ left: label.screenX + '%', top: label.screenY + '%' }"
     >
-      {{ label.name }}
+      <div class="map-body-dot" />
+      <span class="map-label">{{ label.name }}</span>
     </div>
 
     <!-- Ship marker + heading arrow -->
@@ -70,7 +71,7 @@ defineProps<{
       class="map-ship-marker"
       :style="{ left: overlay.shipX + '%', top: overlay.shipY + '%' }"
     >
-      <div class="map-ship-reticle" />
+      <div class="map-ship-icon" />
       <div
         v-if="overlay.speed > 0.01"
         class="map-heading-arrow"

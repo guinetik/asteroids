@@ -178,9 +178,24 @@
   @apply absolute inset-0 pointer-events-none z-10;
 }
 
+.map-body-indicator {
+  @apply absolute pointer-events-none;
+  transform: translate(-50%, -50%);
+}
+
+.map-body-dot {
+  @apply rounded-full bg-cyan-400;
+  width: 8px;
+  height: 8px;
+  box-shadow: 0 0 6px rgba(34, 211, 238, 0.6);
+}
+
 .map-label {
-  @apply absolute font-mono text-xs text-cyan-300 opacity-80 pointer-events-none;
-  transform: translate(-50%, -150%);
+  @apply font-mono text-xs text-cyan-300 opacity-80 whitespace-nowrap;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: -18px;
   text-shadow: 0 0 4px rgba(34, 211, 238, 0.5);
 }
 
@@ -189,13 +204,14 @@
   transform: translate(-50%, -50%);
 }
 
-.map-ship-reticle {
-  @apply border-2 border-cyan-400 rounded-full;
-  width: 24px;
-  height: 24px;
-  transform: translate(-50%, -50%);
+.map-ship-icon {
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 14px solid rgb(52, 211, 153);
+  filter: drop-shadow(0 0 6px rgba(52, 211, 153, 0.8));
   animation: map-pulse 1.5s ease-in-out infinite;
-  box-shadow: 0 0 8px rgba(34, 211, 238, 0.6);
 }
 
 .map-heading-arrow {
