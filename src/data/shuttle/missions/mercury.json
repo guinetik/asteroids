@@ -1,0 +1,29 @@
+{
+  "planetId": "mercury",
+  "missions": [
+    {
+      "id": "mercury_venus_gas_harvest",
+      "name": "Venus Cloud Harvest",
+      "description": "Mercury's chemical plants need Venusian gas for heat-resistant alloy production.",
+      "targetPlanet": "venus",
+      "gatherQuantity": 6,
+      "reward": 320
+    },
+    {
+      "id": "mercury_earth_cargo",
+      "name": "Earth Equipment Pickup",
+      "description": "New solar furnace components are waiting at Earth's orbital dock.",
+      "targetPlanet": "earth",
+      "gatherQuantity": 2,
+      "reward": 250
+    },
+    {
+      "id": "mercury_mars_methane_fuel",
+      "name": "Martian Methane Fuel Run",
+      "description": "Mercury mining rigs burn methane for backup power. Collect from Mars.",
+      "targetPlanet": "mars",
+      "gatherQuantity": 5,
+      "reward": 350
+    }
+  ]
+}

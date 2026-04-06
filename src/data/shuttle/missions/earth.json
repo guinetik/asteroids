@@ -1,0 +1,29 @@
+{
+  "planetId": "earth",
+  "missions": [
+    {
+      "id": "earth_venus_gas_science",
+      "name": "Venus Atmospheric Survey",
+      "description": "The science division needs gas samples from Venus's upper atmosphere for climate modeling.",
+      "targetPlanet": "venus",
+      "gatherQuantity": 5,
+      "reward": 300
+    },
+    {
+      "id": "earth_mars_methane",
+      "name": "Martian Methane Analysis",
+      "description": "Exobiology lab requests methane samples from the Martian subsurface for biomarker analysis.",
+      "targetPlanet": "mars",
+      "gatherQuantity": 3,
+      "reward": 250
+    },
+    {
+      "id": "earth_mercury_probe",
+      "name": "Mercury Probe Deployment",
+      "description": "Deploy a thermal probe into Mercury's orbit and return the telemetry data.",
+      "targetPlanet": "mercury",
+      "gatherQuantity": 1,
+      "reward": 400
+    }
+  ]
+}

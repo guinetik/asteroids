@@ -1,0 +1,29 @@
+{
+  "planetId": "saturn",
+  "missions": [
+    {
+      "id": "saturn_jupiter_hydrogen",
+      "name": "Jovian Hydrogen Extraction",
+      "description": "Saturn's orbital habitats need metallic hydrogen for their fusion cores.",
+      "targetPlanet": "jupiter",
+      "gatherQuantity": 3,
+      "reward": 420
+    },
+    {
+      "id": "saturn_uranus_mag_data",
+      "name": "Uranus Magnetosphere Survey",
+      "description": "Researchers studying Saturn's rings need Uranus magnetic field data for comparison.",
+      "targetPlanet": "uranus",
+      "gatherQuantity": 2,
+      "reward": 500
+    },
+    {
+      "id": "saturn_earth_cargo",
+      "name": "Earth Supply Chain",
+      "description": "Long-range supply run to Earth orbit. Premium pay for the distance.",
+      "targetPlanet": "earth",
+      "gatherQuantity": 2,
+      "reward": 600
+    }
+  ]
+}

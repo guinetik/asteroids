@@ -1,0 +1,29 @@
+{
+  "planetId": "neptune",
+  "missions": [
+    {
+      "id": "neptune_uranus_mag_survey",
+      "name": "Uranus Magnetic Survey",
+      "description": "Deploy magnetosphere probes at Uranus. Data needed for Neptune's shield generators.",
+      "targetPlanet": "uranus",
+      "gatherQuantity": 3,
+      "reward": 500
+    },
+    {
+      "id": "neptune_saturn_ring_samples",
+      "name": "Saturn Ring Sample Collection",
+      "description": "Collect ring ice for Neptune's water reclamation program.",
+      "targetPlanet": "saturn",
+      "gatherQuantity": 4,
+      "reward": 550
+    },
+    {
+      "id": "neptune_earth_resupply",
+      "name": "Deep Space Resupply",
+      "description": "Maximum-range supply run to Earth. The longest haul in the system.",
+      "targetPlanet": "earth",
+      "gatherQuantity": 2,
+      "reward": 750
+    }
+  ]
+}

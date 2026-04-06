@@ -1,0 +1,29 @@
+{
+  "planetId": "mars",
+  "missions": [
+    {
+      "id": "mars_venus_acid_reagents",
+      "name": "Venusian Acid Reagents",
+      "description": "Martian foundries need sulfuric compounds for ore processing. Collect atmospheric gas from Venus.",
+      "targetPlanet": "venus",
+      "gatherQuantity": 4,
+      "reward": 280
+    },
+    {
+      "id": "mars_earth_cargo_pickup",
+      "name": "Earth Supply Run",
+      "description": "Pick up a shipment of bioculture starters from Earth's orbital warehouse.",
+      "targetPlanet": "earth",
+      "gatherQuantity": 2,
+      "reward": 200
+    },
+    {
+      "id": "mars_jupiter_hydrogen",
+      "name": "Jovian Hydrogen Haul",
+      "description": "The fusion reactor needs metallic hydrogen from Jupiter. Hazard pay included.",
+      "targetPlanet": "jupiter",
+      "gatherQuantity": 3,
+      "reward": 500
+    }
+  ]
+}

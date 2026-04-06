@@ -1,0 +1,29 @@
+{
+  "planetId": "jupiter",
+  "missions": [
+    {
+      "id": "jupiter_saturn_ice",
+      "name": "Saturn Ring Ice Collection",
+      "description": "Jupiter station needs pristine ice from Saturn's rings for coolant production.",
+      "targetPlanet": "saturn",
+      "gatherQuantity": 4,
+      "reward": 450
+    },
+    {
+      "id": "jupiter_mars_methane",
+      "name": "Martian Methane for Refineries",
+      "description": "Jupiter's atmospheric refineries use methane as a catalyst. Collect from Mars.",
+      "targetPlanet": "mars",
+      "gatherQuantity": 5,
+      "reward": 400
+    },
+    {
+      "id": "jupiter_earth_supplies",
+      "name": "Earth Resupply Mission",
+      "description": "Long-haul cargo pickup from Earth. The crew needs fresh supplies.",
+      "targetPlanet": "earth",
+      "gatherQuantity": 3,
+      "reward": 550
+    }
+  ]
+}
