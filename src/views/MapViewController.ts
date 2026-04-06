@@ -72,17 +72,9 @@ const MAP_SHUTTLE_SCALE = 0.01
 /** Offset behind Earth so the shuttle doesn't overlap the planet mesh. */
 const SPAWN_OFFSET_BEHIND_EARTH = 7.5
 
-/** Max Y displacement from spacetime curvature (±). */
-const CURVATURE_Y_MAX = 250
-
 /** How much grid slope affects shuttle speed (multiplier on slope value). */
 const CURVATURE_SPEED_FACTOR = 0.3
 
-/** Max pitch angle (radians) from curvature slope. */
-const CURVATURE_MAX_PITCH = 0.3
-
-/** How fast pitch/roll lerps toward target (units/s). */
-const CURVATURE_TILT_LERP = 3
 
 /** Duration in seconds for the approach animation lerp. */
 const APPROACH_DURATION = 1.5
@@ -173,8 +165,6 @@ export class MapViewController implements Tickable {
   private boundarySystem: PortalBoundarySystem | null = null
   private gravityPass: ShaderPass | null = null
   private adriftTimer = 0
-  private curvaturePitch = 0
-  private curvatureRoll = 0
 
   /** Called each frame with full shuttle telemetry for HUD display. */
   onTelemetry: ((telemetry: ShuttleTelemetry) => void) | null = null
@@ -542,42 +532,19 @@ export class MapViewController implements Tickable {
       const px = this.shuttleController.position.x
       const pz = this.shuttleController.position.z
 
-      // Y displacement — normalized grid depth clamped to ±CURVATURE_Y_MAX
-      const rawDepth = this.spaceTimeGrid.getDepthAt(px, pz)
-      const clampedY = Math.max(-CURVATURE_Y_MAX, Math.min(CURVATURE_Y_MAX, -rawDepth))
-      this.shuttleController.group.position.y = clampedY
-
-      // Slope speed modifier + ship tilt
+      // Slope speed modifier — downhill accelerates, uphill decelerates
       const vel = this.shuttleController.currentVelocity
       const speed = vel.length()
       if (speed > 0.01) {
         const dirX = vel.x / speed
         const dirZ = vel.z / speed
         const slope = this.spaceTimeGrid.getSlopeAt(px, pz, dirX, dirZ)
-
         // Positive slope = moving downhill = speed boost
         const speedDelta = slope * CURVATURE_SPEED_FACTOR * dt
         const newSpeed = Math.max(0, speed + speedDelta)
         vel.setLength(newSpeed)
         this.shuttleController.setVelocity(vel)
-
-        // Pitch — nose down when going downhill, nose up when climbing
-        const targetPitch = Math.max(-CURVATURE_MAX_PITCH, Math.min(CURVATURE_MAX_PITCH, slope * 0.5))
-        this.curvaturePitch += (targetPitch - this.curvaturePitch) * CURVATURE_TILT_LERP * dt
-
-        // Roll — tilt into lateral slope (perpendicular to movement)
-        const lateralSlope = this.spaceTimeGrid.getSlopeAt(px, pz, -dirZ, dirX)
-        const targetRoll = Math.max(-CURVATURE_MAX_PITCH, Math.min(CURVATURE_MAX_PITCH, lateralSlope * 0.3))
-        this.curvatureRoll += (targetRoll - this.curvatureRoll) * CURVATURE_TILT_LERP * dt
-      } else {
-        // Lerp back to flat when stationary
-        this.curvaturePitch += (0 - this.curvaturePitch) * CURVATURE_TILT_LERP * dt
-        this.curvatureRoll += (0 - this.curvatureRoll) * CURVATURE_TILT_LERP * dt
       }
-
-      // Apply pitch/roll without touching yaw (Y rotation is owned by ShuttleController)
-      this.shuttleController.group.rotation.x = this.curvaturePitch
-      this.shuttleController.group.rotation.z = this.curvatureRoll
     }
 
     // Orbit approach — animated lerp toward orbit insertion point
