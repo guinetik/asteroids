@@ -35,7 +35,7 @@ describe('createProfile', () => {
     const profile = createProfile('Trucker Joe')
 
     expect(profile.name).toBe('Trucker Joe')
-    expect(profile.credits).toBe(0)
+    expect(profile.credits).toBe(1000)
     expect(profile.completedMissionCount).toBe(0)
     expect(profile.visitedAsteroids).toEqual({})
   })
@@ -77,7 +77,7 @@ describe('saveProfile / loadProfile', () => {
     const loaded = loadProfile()
 
     expect(loaded).toEqual(updated)
-    expect(loaded!.credits).toBe(500)
+    expect(loaded!.credits).toBe(1500)
     expect(loaded!.completedMissionCount).toBe(1)
     expect(loaded!.visitedAsteroids).toEqual({ bennu: 1 })
   })
@@ -86,22 +86,22 @@ describe('saveProfile / loadProfile', () => {
 describe('addCredits', () => {
   it('adds credits to profile', () => {
     const profile = createProfile('Joe')
-    const updated = addCredits(profile, 1000)
+    const updated = addCredits(profile, 500)
 
-    expect(updated.credits).toBe(1000)
+    expect(updated.credits).toBe(1500)
   })
 
   it('does not mutate the original profile', () => {
     const profile = createProfile('Joe')
-    addCredits(profile, 1000)
+    addCredits(profile, 500)
 
-    expect(profile.credits).toBe(0)
+    expect(profile.credits).toBe(1000)
   })
 })
 
 describe('spendCredits', () => {
   it('deducts credits when sufficient balance', () => {
-    const profile = addCredits(createProfile('Joe'), 1000)
+    const profile = createProfile('Joe')
     const updated = spendCredits(profile, 300)
 
     expect(updated).not.toBeNull()
@@ -109,22 +109,22 @@ describe('spendCredits', () => {
   })
 
   it('returns null when insufficient credits', () => {
-    const profile = addCredits(createProfile('Joe'), 100)
-    const updated = spendCredits(profile, 200)
+    const profile = createProfile('Joe')
+    const updated = spendCredits(profile, 1500)
 
     expect(updated).toBeNull()
   })
 
   it('succeeds with exact balance (0 remaining)', () => {
-    const profile = addCredits(createProfile('Joe'), 500)
-    const updated = spendCredits(profile, 500)
+    const profile = createProfile('Joe')
+    const updated = spendCredits(profile, 1000)
 
     expect(updated).not.toBeNull()
     expect(updated!.credits).toBe(0)
   })
 
   it('does not mutate the original profile', () => {
-    const profile = addCredits(createProfile('Joe'), 1000)
+    const profile = createProfile('Joe')
     spendCredits(profile, 300)
 
     expect(profile.credits).toBe(1000)

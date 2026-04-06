@@ -15,11 +15,14 @@ import type { PlayerProfile } from './types'
 /** localStorage key for the player profile. */
 export const PROFILE_STORAGE_KEY = 'asteroid-lander-profile'
 
-/** Create a fresh profile with zero progress. */
+/** Starting credits for a new player. */
+const STARTING_CREDITS = 1000
+
+/** Create a fresh profile with starting credits. */
 export function createProfile(name: string): PlayerProfile {
   return {
     name,
-    credits: 0,
+    credits: STARTING_CREDITS,
     completedMissionCount: 0,
     visitedAsteroids: {},
   }

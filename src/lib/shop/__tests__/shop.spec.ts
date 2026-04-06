@@ -1,54 +1,54 @@
 import { describe, it, expect } from 'vitest'
 import { buyItem, sellItem } from '../shop'
-import { createProfile, addCredits } from '@/lib/player/profile'
+import { createProfile, addCredits, spendCredits as spendCreditsFromProfile } from '@/lib/player/profile'
 import { createInventory, addItem } from '@/lib/inventory/inventory'
 
 describe('buyItem', () => {
   it('buys 1 fuel cell: credits debited, item added', () => {
-    const profile = addCredits(createProfile('Joe'), 500)
+    const profile = createProfile('Joe')
     const inventory = createInventory()
     const result = buyItem(profile, inventory, 'fuel-cell', 1)
 
     expect(result.ok).toBe(true)
-    expect(result.profile.credits).toBe(450)
+    expect(result.profile.credits).toBe(950)
     expect(result.inventory.stacks).toHaveLength(1)
     expect(result.inventory.stacks[0]!.itemId).toBe('fuel-cell')
     expect(result.inventory.stacks[0]!.quantity).toBe(1)
   })
 
   it('buys multiple fuel cells: correct total cost', () => {
-    const profile = addCredits(createProfile('Joe'), 500)
+    const profile = createProfile('Joe')
     const inventory = createInventory()
     const result = buyItem(profile, inventory, 'fuel-cell', 3)
 
     expect(result.ok).toBe(true)
-    expect(result.profile.credits).toBe(350)
+    expect(result.profile.credits).toBe(850)
     expect(result.inventory.stacks[0]!.quantity).toBe(3)
   })
 
   it('fails with insufficient credits', () => {
-    const profile = addCredits(createProfile('Joe'), 40)
+    const profile = spendCreditsFromProfile(createProfile('Joe'), 990)!
     const inventory = createInventory()
     const result = buyItem(profile, inventory, 'fuel-cell', 1)
 
     expect(result.ok).toBe(false)
     expect(result.reason).toContain('credits')
-    expect(result.profile.credits).toBe(40)
+    expect(result.profile.credits).toBe(10)
     expect(result.inventory.stacks).toHaveLength(0)
   })
 
   it('fails when inventory is full — credits NOT debited', () => {
-    const profile = addCredits(createProfile('Joe'), 500)
+    const profile = createProfile('Joe')
     const inventory = createInventory(1, 9999)
     const fullInventory = addItem(inventory, 'olivine', 1).inventory
     const result = buyItem(profile, fullInventory, 'fuel-cell', 1)
 
     expect(result.ok).toBe(false)
-    expect(result.profile.credits).toBe(500)
+    expect(result.profile.credits).toBe(1000)
   })
 
   it('fails for item not in shop listings', () => {
-    const profile = addCredits(createProfile('Joe'), 500)
+    const profile = createProfile('Joe')
     const inventory = createInventory()
     const result = buyItem(profile, inventory, 'olivine', 1)
 
@@ -57,11 +57,11 @@ describe('buyItem', () => {
   })
 
   it('does not mutate original profile or inventory', () => {
-    const profile = addCredits(createProfile('Joe'), 500)
+    const profile = createProfile('Joe')
     const inventory = createInventory()
     buyItem(profile, inventory, 'fuel-cell', 1)
 
-    expect(profile.credits).toBe(500)
+    expect(profile.credits).toBe(1000)
     expect(inventory.stacks).toHaveLength(0)
   })
 })
@@ -73,7 +73,7 @@ describe('sellItem', () => {
     const result = sellItem(profile, inventory, 'olivine', 10)
 
     expect(result.ok).toBe(true)
-    expect(result.profile.credits).toBe(30)
+    expect(result.profile.credits).toBe(1030)
     expect(result.inventory.stacks[0]!.quantity).toBe(40)
   })
 
@@ -83,7 +83,7 @@ describe('sellItem', () => {
     const result = sellItem(profile, inventory, 'iron-nickel-alloy', 5)
 
     expect(result.ok).toBe(true)
-    expect(result.profile.credits).toBe(60)
+    expect(result.profile.credits).toBe(1060)
   })
 
   it('fails when item not in inventory', () => {
@@ -92,7 +92,7 @@ describe('sellItem', () => {
     const result = sellItem(profile, inventory, 'olivine', 1)
 
     expect(result.ok).toBe(false)
-    expect(result.profile.credits).toBe(0)
+    expect(result.profile.credits).toBe(1000)
   })
 
   it('fails when selling more than available', () => {
@@ -117,7 +117,7 @@ describe('sellItem', () => {
     const inventory = addItem(createInventory(), 'olivine', 50).inventory
     sellItem(profile, inventory, 'olivine', 10)
 
-    expect(profile.credits).toBe(0)
+    expect(profile.credits).toBe(1000)
     expect(inventory.stacks[0]!.quantity).toBe(50)
   })
 })

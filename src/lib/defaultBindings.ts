@@ -17,6 +17,7 @@ export const DEFAULT_BINDINGS: Record<string, string[]> = {
   orbitAction: ['KeyE'],
   toggleMap: ['KeyM'],
   focusHabitat: ['KeyH'],
+  shopAction: ['KeyB'],
   closeMap: ['Escape'],
 }
 
