@@ -28,6 +28,10 @@ export interface FpsTelemetry {
   rtgLevel: number
   /** RTG fuel capacity */
   rtgCapacity: number
+  /** Active mode charge level */
+  modeCharge: number
+  /** Active mode charge capacity */
+  modeCapacity: number
 }
 
 const O2_COLOR_HIGH = '#3b82f6'
@@ -102,6 +106,22 @@ function modeColor(): string {
         <div
           class="h-full bg-yellow-400/80 transition-all duration-75"
           :style="{ width: pct(telemetry.rtgLevel, telemetry.rtgCapacity) + '%' }"
+        />
+      </div>
+    </div>
+
+    <!-- Mode Charge Bar -->
+    <div class="absolute top-[8.5rem] left-4 flex items-center gap-2">
+      <span class="text-xs tracking-widest uppercase w-8" :style="{ color: modeColor() + '99' }">
+        {{ telemetry.activeMode === 'weapon' ? 'LAS' : telemetry.activeMode === 'drill' ? 'DRL' : 'MED' }}
+      </span>
+      <div class="w-32 h-2 bg-white/10 rounded-sm overflow-hidden">
+        <div
+          class="h-full transition-all duration-75"
+          :style="{
+            width: pct(telemetry.modeCharge, telemetry.modeCapacity) + '%',
+            backgroundColor: modeColor() + 'cc',
+          }"
         />
       </div>
     </div>

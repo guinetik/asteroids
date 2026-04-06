@@ -560,6 +560,8 @@ export class FpsViewController implements Tickable {
         isFiring: this.multiToolState?.isFiring ?? false,
         rtgLevel: this.multiToolState?.rtgLevel ?? 0,
         rtgCapacity: this.multiToolState?.rtgCapacity ?? 1,
+        modeCharge: this.multiToolState?.modeCharge ?? 0,
+        modeCapacity: this.multiToolState?.modeChargeCapacity ?? 1,
       })
     }
   }
