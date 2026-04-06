@@ -59,7 +59,10 @@ const FLAME_COLOR = new THREE.Color(0xff6600)
 const FLAME_SIZE = 6
 const FLAME_LIFETIME = 1.0
 const FLAME_SPREAD = 5
-const FLAME_PUSH_FORCE = 22
+/** Base downward push for flame particles. */
+const FLAME_PUSH_FORCE = 30
+/** Extra push added per unit of fall speed so flames stay below the lander. */
+const FLAME_VELOCITY_COMPENSATION = 1.5
 const FLAME_SPAWN_RATE = 160
 const FLAME_EMIT_Y_OFFSET = 8
 
@@ -438,7 +441,11 @@ export class LanderController implements Tickable {
     this.mainEngineWorldPos.applyQuaternion(this.group.quaternion)
       .add(this.group.position)
 
-    const pushDir = new THREE.Vector3(0, -FLAME_PUSH_FORCE, 0)
+    // Push particles down harder when the lander is falling fast,
+    // so flames always visually exit below the nozzle
+    const fallSpeed = Math.max(0, -this.body.velocityY)
+    const push = FLAME_PUSH_FORCE + fallSpeed * FLAME_VELOCITY_COMPENSATION
+    const pushDir = new THREE.Vector3(0, -push, 0)
 
     while (this.flameSpawnAccumulator >= 1) {
       this.flameEmitter.emit(this.mainEngineWorldPos, pushDir)
