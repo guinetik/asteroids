@@ -105,9 +105,21 @@ import type { ShopSession } from '@/lib/shop/tradeTypes'
 import { tickDemandTimer, resetDemand } from '@/lib/shop/planetDemand'
 import { createProfile, spendCredits } from '@/lib/player/profile'
 import type { PlayerProfile } from '@/lib/player/types'
-import { createInventory, addItem, getStack, consumeItem } from '@/lib/inventory/inventory'
+import { createInventory, addItem, getStack, consumeItem, canFitItem } from '@/lib/inventory/inventory'
 import type { Inventory } from '@/lib/inventory/types'
 import '@/lib/shop/tradeGoods'
+import {
+  createMissionBoard,
+  offerMission,
+  acceptMission,
+  completeMission,
+  deliverMission,
+  tickMissionBoard,
+  getActiveMissionsForPlanet,
+} from '@/lib/missions/shuttleMissionSession'
+import type { ShuttleMissionBoard, ActiveShuttleMission } from '@/lib/missions/types'
+import { getGatherItemForPlanet } from '@/lib/missions/planetOrbitalConfig'
+import '@/lib/missions/missionMaterials'
 
 type EmissiveMaterial =
   | THREE.MeshLambertMaterial
@@ -368,6 +380,9 @@ export class MapViewController implements Tickable {
   private habitatScene: HabitatInteriorScene | null = null
   private shopSession: ShopSession | null = null
   private shopDialogOpen = false
+  private missionBoard: ShuttleMissionBoard = createMissionBoard()
+  private missionOverlayOpen = false
+  private missionButtonVisible = false
   private playerProfile: PlayerProfile = createProfile('Pilot')
   private playerInventory: Inventory = createInventory()
   private portalArrival: PortalArrivalSequence | null = null
@@ -418,6 +433,9 @@ export class MapViewController implements Tickable {
 
   private readonly _reticleVelPlanar = new THREE.Vector3()
 
+  /** World-space shuttle position reused for asteroid belt nearby tumble (avoid per-frame alloc). */
+  private readonly _beltShuttleWorldScratch = new THREE.Vector3()
+
   /** Called when map overlay state changes for Vue HUD. */
   onMapOverlay: ((state: MapOverlayState) => void) | null = null
 
@@ -458,6 +476,15 @@ export class MapViewController implements Tickable {
   onCreditsUpdate: ((credits: number) => void) | null = null
   /** Fired when fuel cell count changes (for HUD refuel button). */
   onFuelCellCount: ((count: number) => void) | null = null
+
+  /** Called when mission button visibility changes in OrbitPrompt. */
+  onMissionButton: ((visible: boolean, planetName: string) => void) | null = null
+
+  /** Called when the mission minigame overlay should open/close. */
+  onMissionOverlay: ((visible: boolean, mission: ActiveShuttleMission | null, canFit: boolean) => void) | null = null
+
+  /** Called when the mission board state changes (for shuttle control terminal). */
+  onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null = null
 
   async init(container: HTMLElement): Promise<void> {
     // Create canvas
@@ -1064,6 +1091,33 @@ export class MapViewController implements Tickable {
       }
     }
 
+    // Mission action (I key) — open mission overlay while orbiting
+    if (
+      this.inputManager?.wasActionPressed('missionAction') &&
+      this.orbitSystem?.state === 'orbiting' &&
+      this.missionButtonVisible
+    ) {
+      if (this.missionOverlayOpen) {
+        this.missionOverlayOpen = false
+        this.onMissionOverlay?.(false, null, false)
+      } else {
+        const targetName = this.orbitSystem?.target?.name ?? null
+        const planet = targetName ? PLANETS.find((p) => p.name === targetName) : null
+        if (planet) {
+          const missions = getActiveMissionsForPlanet(this.missionBoard, planet.id)
+          if (missions.length > 0) {
+            const mission = missions[0]!
+            const gatherItem = getGatherItemForPlanet(planet.id)
+            const canFit = gatherItem
+              ? canFitItem(this.playerInventory, gatherItem, mission.template.gatherQuantity)
+              : false
+            this.missionOverlayOpen = true
+            this.onMissionOverlay?.(true, mission, canFit)
+          }
+        }
+      }
+    }
+
     // After slingshot, lerp Y back to 0
     if (this.yRecovery && this.shuttleController) {
       this.shuttleController.setIgnoreGridY(true)
@@ -1373,8 +1427,11 @@ export class MapViewController implements Tickable {
       }
     }
 
+    const shuttleWorldForBelts: THREE.Vector3 | null = this.shuttleController
+      ? this.shuttleController.group.getWorldPosition(this._beltShuttleWorldScratch)
+      : null
     for (const controller of this.beltControllers) {
-      controller.tick(dt, this.simTime)
+      controller.tick(dt, this.simTime, shuttleWorldForBelts)
     }
 
     const shuttleX = this.shuttleController?.group.position.x ?? 0
@@ -1456,6 +1513,8 @@ export class MapViewController implements Tickable {
         }
       }
       this.updateShopSession()
+      this.updateMissionState()
+      this.missionBoard = tickMissionBoard(this.missionBoard, dt)
     }
 
     // Shop session restock tick
@@ -1567,6 +1626,7 @@ export class MapViewController implements Tickable {
       const planet = PLANETS.find((p) => p.name === targetName)
       if (planet) {
         this.shopSession = createShopSession(planet.id)
+        this.offerMissionAtPlanet(planet.id)
         this.onShopButton?.(true, targetName)
         this.onCreditsUpdate?.(this.playerProfile.credits)
       } else {
@@ -1581,6 +1641,31 @@ export class MapViewController implements Tickable {
     }
   }
 
+  /** Update mission button visibility based on orbit state. */
+  private updateMissionState(): void {
+    const orbitState = this.orbitSystem?.state ?? 'free'
+    const targetName = this.orbitSystem?.target?.name ?? null
+
+    if (orbitState === 'orbiting' && targetName) {
+      const planet = PLANETS.find((p) => p.name === targetName)
+      if (planet) {
+        const activeMissions = getActiveMissionsForPlanet(this.missionBoard, planet.id)
+        const hasActiveMission = activeMissions.length > 0
+        if (hasActiveMission !== this.missionButtonVisible) {
+          this.missionButtonVisible = hasActiveMission
+          this.onMissionButton?.(hasActiveMission, targetName)
+        }
+      }
+    } else if (this.missionButtonVisible) {
+      this.missionButtonVisible = false
+      this.onMissionButton?.(false, '')
+      if (this.missionOverlayOpen) {
+        this.missionOverlayOpen = false
+        this.onMissionOverlay?.(false, null, false)
+      }
+    }
+  }
+
   /** Open the shop dialog (called by Vue ShopButton click). */
   openShop(): void {
     if (this.shopSession) {
@@ -1592,6 +1677,63 @@ export class MapViewController implements Tickable {
   /** Close the shop dialog (called by Vue). */
   closeShop(): void {
     this.shopDialogOpen = false
+  }
+
+  /** Offer a mission when docking at a planet. */
+  offerMissionAtPlanet(planetId: string): void {
+    if (!this.missionBoard.offeredMission) {
+      this.missionBoard = offerMission(this.missionBoard, planetId)
+      this.onMissionBoardUpdate?.(this.missionBoard)
+    }
+  }
+
+  /** Accept the offered mission (from shuttle control UI). */
+  missionAccept(): void {
+    this.missionBoard = acceptMission(this.missionBoard)
+    this.onMissionBoardUpdate?.(this.missionBoard)
+  }
+
+  /** Complete the mission minigame (from overlay UI). */
+  missionComplete(missionId: string): void {
+    const result = completeMission(this.missionBoard, missionId, this.playerInventory)
+    if (result.ok) {
+      this.missionBoard = result.board
+      this.playerInventory = result.inventory
+      this.missionOverlayOpen = false
+      this.onMissionOverlay?.(false, null, false)
+      this.onMissionBoardUpdate?.(this.missionBoard)
+      this.onShopState?.(this.shopSession ?? null, this.playerProfile, this.playerInventory)
+    }
+  }
+
+  /** Deliver a completed mission (from shuttle control UI). */
+  missionDeliver(missionId: string): void {
+    const result = deliverMission(this.missionBoard, missionId, this.playerProfile, this.playerInventory)
+    if (result.ok) {
+      this.missionBoard = result.board
+      this.playerProfile = result.profile
+      this.playerInventory = result.inventory
+      this.onMissionBoardUpdate?.(this.missionBoard)
+      this.onCreditsUpdate?.(this.playerProfile.credits)
+      this.onShopState?.(this.shopSession ?? null, this.playerProfile, this.playerInventory)
+    }
+  }
+
+  /** Open the mission overlay (called by Vue OrbitPrompt click). */
+  openMissionOverlay(): void {
+    if (!this.missionButtonVisible || this.missionOverlayOpen) return
+    const targetName = this.orbitSystem?.target?.name ?? null
+    const planet = targetName ? PLANETS.find((p) => p.name === targetName) : null
+    if (!planet) return
+    const missions = getActiveMissionsForPlanet(this.missionBoard, planet.id)
+    if (missions.length === 0) return
+    const mission = missions[0]!
+    const gatherItem = getGatherItemForPlanet(planet.id)
+    const canFit = gatherItem
+      ? canFitItem(this.playerInventory, gatherItem, mission.template.gatherQuantity)
+      : false
+    this.missionOverlayOpen = true
+    this.onMissionOverlay?.(true, mission, canFit)
   }
 
   /** Buy a trade good from the shop. */
