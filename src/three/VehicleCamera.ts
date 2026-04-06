@@ -2,8 +2,9 @@
  * Configurable 3rd-person camera that tracks a vehicle.
  *
  * Extracted from SceneManager so each scene can define its own camera
- * behavior. Orbit target stays locked to the vehicle; camera smoothly
- * returns to an idle offset when the mouse is released.
+ * behavior. Orbit target stays locked to the vehicle; in free flight,
+ * ship yaw swings the camera offset so the view turns with heading (optional).
+ * After idle time without orbit-drag the camera eases to the default chase offset.
  *
  * @author guinetik
  * @date 2026-04-04
@@ -19,7 +20,12 @@ export interface VehicleCameraConfig {
   idleOffset: THREE.Vector3
   /** How fast the camera lerps back to idle (units/s) */
   lerpSpeed: number
-  /** Seconds of mouse inactivity before returning to idle */
+  /**
+   * Seconds without orbit-drag before lerping to the default {@link idleOffset} chase framing.
+   * While below this threshold, manual orbit angle is kept; ship-yaw coupling is controlled by
+   * {@link VehicleCamera.setShipYawCoupling}.
+   * Use `0` to always use chase framing whenever not dragging.
+   */
   idleTimeout: number
   /** Camera never goes below this Y */
   minY: number
@@ -29,11 +35,17 @@ export interface VehicleCameraConfig {
   maxDistance?: number
 }
 
+/**
+ * After orbit-drag ends, wait this many seconds (camera-only idle) before easing back to
+ * default behind-ship framing. Ship yaw still swings the view during this window.
+ */
+const SHUTTLE_MAP_CHASE_RETURN_IDLE_SECONDS = 10
+
 /** Shuttle preset: behind and above, looking at the nose. */
 export const SHUTTLE_CAMERA_CONFIG: VehicleCameraConfig = {
   idleOffset: new THREE.Vector3(-80, 40, 0),
   lerpSpeed: 5,
-  idleTimeout: 10,
+  idleTimeout: SHUTTLE_MAP_CHASE_RETURN_IDLE_SECONDS,
   minY: 15,
   fov: 60,
 }
@@ -51,7 +63,7 @@ export const LANDER_CAMERA_CONFIG: VehicleCameraConfig = {
 export const MAP_CAMERA_CONFIG: VehicleCameraConfig = {
   idleOffset: new THREE.Vector3(-0.8, 0.4, 0),
   lerpSpeed: 5,
-  idleTimeout: 10,
+  idleTimeout: SHUTTLE_MAP_CHASE_RETURN_IDLE_SECONDS,
   minY: -Infinity,
   fov: 60,
 }
@@ -87,8 +99,9 @@ export const MAP_ORBIT_CAMERA_CONFIG: VehicleCameraConfig = {
 
 /**
  * 3rd-person camera that tracks a vehicle with orbit controls.
- * Mouse interaction overrides the idle position; releasing the mouse
- * smoothly returns the camera to its configured offset.
+ * Manual orbit is kept until the player stops dragging for {@link VehicleCameraConfig.idleTimeout}
+ * seconds, then the camera eases to the default chase offset. When {@link setShipYawCoupling} is
+ * enabled (default), ship yaw also rotates the camera offset between idle and chase.
  *
  * @author guinetik
  * @date 2026-04-04
@@ -103,6 +116,15 @@ export class VehicleCamera implements Tickable {
   private mouseIdleTimer = 0
   private isMouseActive = false
   private lastTargetPos = new THREE.Vector3()
+  /** Last ship yaw (Y rotation) — used to swing the camera with heading changes. */
+  private lastTargetYaw = 0
+  private readonly scratchOffset = new THREE.Vector3()
+  private readonly worldUp = new THREE.Vector3(0, 1, 0)
+  /**
+   * When true, ship Y rotation swings the camera–target offset (e.g. free flight).
+   * When false, yaw changes are absorbed so manual orbit framing is unchanged (e.g. planet orbit).
+   */
+  private shipYawCouplingEnabled = true
 
   constructor(config: VehicleCameraConfig, domElement: HTMLElement) {
     this.config = config
@@ -121,6 +143,7 @@ export class VehicleCamera implements Tickable {
   setTarget(object: THREE.Object3D): void {
     this.target = object
     this.lastTargetPos.copy(object.position)
+    this.lastTargetYaw = object.rotation.y
     this.controls.target.copy(object.position)
 
     const idleOffset = this.config.idleOffset.clone().applyQuaternion(object.quaternion)
@@ -134,6 +157,16 @@ export class VehicleCamera implements Tickable {
     this.camera.updateProjectionMatrix()
   }
 
+  /**
+   * Enables or disables rotating the camera offset with the target’s yaw (heading).
+   *
+   * @param enabled - `true` for driving/free flight; `false` when the scene pins the view
+   *   (e.g. planetary orbit so A/D only aims the shuttle).
+   */
+  setShipYawCoupling(enabled: boolean): void {
+    this.shipYawCouplingEnabled = enabled
+  }
+
   /** Transition to a new camera config. Resets idle timer so the offset lerps immediately. */
   setConfig(config: VehicleCameraConfig): void {
     this.config = config
@@ -143,6 +176,9 @@ export class VehicleCamera implements Tickable {
     // Force idle lerp to start immediately
     this.mouseIdleTimer = config.idleTimeout + 1
     this.isMouseActive = false
+    if (this.target) {
+      this.lastTargetYaw = this.target.rotation.y
+    }
   }
 
   tick(dt: number): void {
@@ -160,7 +196,17 @@ export class VehicleCamera implements Tickable {
     // Move camera by the same delta
     this.camera.position.add(delta)
 
-    // Return to idle offset when mouse is released
+    // Optionally orbit camera offset with ship yaw (disabled e.g. during planet orbit capture).
+    const yaw = this.target.rotation.y
+    const yawDelta = Math.atan2(Math.sin(yaw - this.lastTargetYaw), Math.cos(yaw - this.lastTargetYaw))
+    if (this.shipYawCouplingEnabled && Math.abs(yawDelta) > 1e-8) {
+      this.scratchOffset.copy(this.camera.position).sub(targetPos)
+      this.scratchOffset.applyAxisAngle(this.worldUp, yawDelta)
+      this.camera.position.copy(targetPos).add(this.scratchOffset)
+    }
+    this.lastTargetYaw = yaw
+
+    // After enough time without orbit-drag, ease to default chase framing
     if (!this.isMouseActive) {
       this.mouseIdleTimer += dt
 
