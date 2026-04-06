@@ -314,7 +314,7 @@ function handleShopBuyReserveFuel() {
     :message="activeMessage"
     @dismiss="dismissActiveMessage"
   />
-  <div v-show="!mapOverlay.visible && !mapIntro.controlsLocked" class="map-view-toggles">
+  <div v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" class="map-view-toggles">
     <button
       type="button"
       class="map-toggle-btn"
@@ -352,7 +352,7 @@ function handleShopBuyReserveFuel() {
     :credits="playerCredits"
   />
   <ShopButton
-    v-if="shopButtonVisible && !shopDialogVisible && !shuttleControlVisible"
+    v-if="shopButtonVisible && !shopDialogVisible && !shuttleControlVisible && !habitatActive"
     :planet-name="shopButtonPlanet"
     @open="openShop"
   />
