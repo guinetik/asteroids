@@ -47,6 +47,11 @@ import { PortalBoundarySystem } from '@/three/PortalBoundarySystem'
 import { createGravityDistortionPass } from '@/three/GravityDistortionPass'
 import type { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { VibePortal } from '@/lib/portal'
+import { MapState } from '@/lib/mapState'
+import { MapCamera, easeInOut } from '@/three/MapCamera'
+import { findNearestBodies, formatDistance, type MapBody } from '@/lib/mapProjection'
+import type { MapOverlayState } from '@/lib/ShuttleTelemetry'
+import mapOverlayData from '@/data/shuttle/map-overlay.json'
 
 /** Tick priority for the compositor (runs after animation, before render). */
 const TICK_PRIORITY_COMPOSIT = TICK_PRIORITY_RENDER - 1
@@ -165,6 +170,11 @@ export class MapViewController implements Tickable {
   private boundarySystem: PortalBoundarySystem | null = null
   private gravityPass: ShaderPass | null = null
   private adriftTimer = 0
+  private mapState = new MapState()
+  private mapCamera: MapCamera | null = null
+
+  /** Called when map overlay state changes for Vue HUD. */
+  onMapOverlay: ((state: MapOverlayState) => void) | null = null
 
   /** Called each frame with full shuttle telemetry for HUD display. */
   onTelemetry: ((telemetry: ShuttleTelemetry) => void) | null = null
@@ -205,6 +215,10 @@ export class MapViewController implements Tickable {
     }
     scene.remove(oldCamera)
     scene.add(this.vehicleCamera.camera)
+
+    // --- Map overlay camera (ortho, created once, used when M pressed) ---
+    this.mapCamera = new MapCamera()
+    scene.add(this.mapCamera.camera)
 
     // Swap the EffectComposer's render pass to use the vehicle camera
     const renderPass = this.sceneObjects.composer.passes[0] as RenderPass
@@ -405,6 +419,40 @@ export class MapViewController implements Tickable {
    * One-shot actions, orbit state machine, and telemetry emission (runs just after input).
    */
   tick(dt: number): void {
+    // Map toggle (M key) — opens/closes tactical map
+    if (this.inputManager?.wasActionPressed('toggleMap')) {
+      if (!this.mapState.isOpen) {
+        // Guard: block during death or orbit approach
+        const orbitState = this.orbitSystem?.state ?? 'free'
+        const isDead = this.shuttleController?.dead ?? false
+        if (!isDead && orbitState !== 'approaching') {
+          this.mapState.open()
+          this.onOpenMap()
+        }
+      } else if (this.mapState.phase === 'open') {
+        this.mapState.close()
+      }
+    }
+
+    // Also close on Escape
+    if (this.inputManager?.wasActionPressed('closeMap') && this.mapState.phase === 'open') {
+      this.mapState.close()
+    }
+
+    // Tick map transition
+    if (this.mapState.isOpen) {
+      this.mapState.tick(dt)
+      this.tickMapTransition()
+
+      // When closing completes, restore flying state
+      if (this.mapState.phase === 'closed') {
+        this.onCloseMap()
+      }
+
+      // Skip all gameplay logic while map is open
+      return
+    }
+
     // Door toggle + inspect mode (F key zooms camera tight on shuttle)
     if (this.inputManager?.wasActionPressed('toggleDoors')) {
       this.shuttleController?.toggleDoors()
@@ -722,6 +770,9 @@ export class MapViewController implements Tickable {
    * Advance the orrery simulation and update gravity grid sources.
    */
   private tickOrrery(dt: number): void {
+    // Pause simulation while map is open
+    if (this.mapState.isOpen) return
+
     this.simTime += dt * DEFAULT_TIME_SCALE
 
     this.sunController?.tick(dt, this.simTime)
@@ -964,6 +1015,165 @@ export class MapViewController implements Tickable {
     }
   }
 
+  /** Called when the map first opens. Freezes everything, positions ortho camera. */
+  private onOpenMap(): void {
+    if (!this.shuttleController || !this.mapCamera) return
+
+    // Freeze shuttle — no physics, no thrusters, no fuel
+    this.shuttleController.freeze()
+    this.shuttleController.setInputEnabled(false)
+
+    // Disable OrbitControls
+    if (this.vehicleCamera) {
+      this.vehicleCamera.controls.enabled = false
+    }
+
+    // Position ortho camera above ship
+    const px = this.shuttleController.position.x
+    const pz = this.shuttleController.position.z
+    const aspect = window.innerWidth / window.innerHeight
+    this.mapCamera.positionAboveShip(px, pz, aspect)
+  }
+
+  /** Runs each frame while map is opening/open/closing — updates camera transition and overlay. */
+  private tickMapTransition(): void {
+    if (!this.mapCamera || !this.sceneObjects) return
+
+    const progress = easeInOut(this.mapState.progress)
+    const aspect = window.innerWidth / window.innerHeight
+
+    // Update ortho frustum based on transition progress
+    this.mapCamera.updateTransition(progress, aspect)
+
+    // Swap render camera to ortho during map phases
+    const renderPass = this.sceneObjects.composer.passes[0] as RenderPass
+    if (this.mapState.phase === 'opening' || this.mapState.phase === 'open') {
+      renderPass.camera = this.mapCamera.camera
+    }
+
+    // Emit overlay state when fully open
+    if (this.mapState.phase === 'open') {
+      this.emitMapOverlay()
+    } else {
+      // During transitions, hide overlay
+      this.onMapOverlay?.({ visible: false, labels: [], shipX: 0, shipY: 0, headingDeg: 0, speed: 0, distances: [], gravityRings: [] })
+    }
+
+    // No explicit render needed — the compositor tickable runs after this and calls composer.render()
+  }
+
+  /** Called when closing transition completes — restore flying state. */
+  private onCloseMap(): void {
+    if (!this.shuttleController || !this.sceneObjects) return
+
+    // Swap render camera back to perspective
+    const renderPass = this.sceneObjects.composer.passes[0] as RenderPass
+    if (this.vehicleCamera) {
+      renderPass.camera = this.vehicleCamera.camera
+      this.vehicleCamera.controls.enabled = true
+    }
+
+    // Check if we were orbiting before map opened — restore appropriate state
+    const orbitState = this.orbitSystem?.state ?? 'free'
+    if (orbitState === 'free') {
+      this.shuttleController.unfreeze()
+      this.shuttleController.setInputEnabled(true)
+    }
+    // If orbiting, shuttle stays frozen but input stays disabled (orbit manages this)
+
+    // Hide overlay
+    this.onMapOverlay?.({ visible: false, labels: [], shipX: 0, shipY: 0, headingDeg: 0, speed: 0, distances: [], gravityRings: [] })
+  }
+
+  /** Compute and emit the full map overlay state for the Vue HUD. */
+  private emitMapOverlay(): void {
+    if (!this.mapCamera || !this.shuttleController || !this.onMapOverlay) return
+
+    const px = this.shuttleController.position.x
+    const pz = this.shuttleController.position.z
+
+    // Build body list from Sun + planets
+    const bodies: MapBody[] = []
+    if (this.sunController) {
+      bodies.push({
+        name: 'Sun',
+        x: this.sunController.getWorldX(),
+        z: this.sunController.getWorldZ(),
+        mass: this.sunController.mass,
+      })
+    }
+    for (let i = 0; i < this.planetControllers.length; i++) {
+      const c = this.planetControllers[i]!
+      bodies.push({
+        name: PLANETS[i]?.name ?? '',
+        x: c.getWorldX(),
+        z: c.getWorldZ(),
+        mass: c.mass,
+      })
+    }
+
+    // Project ship position
+    const shipScreen = this.mapCamera.projectToScreen(
+      new THREE.Vector3(px, 0, pz),
+    )
+
+    // Project body labels
+    const labels = bodies.map((b) => {
+      const screen = this.mapCamera!.projectToScreen(new THREE.Vector3(b.x, 0, b.z))
+      return { name: b.name, screenX: screen.x * 100, screenY: screen.y * 100 }
+    })
+
+    // Nearest bodies for distance lines
+    const nearest = findNearestBodies(px, pz, bodies, mapOverlayData.nearestBodyCount)
+    const distances = nearest.map((b) => {
+      const bodyScreen = this.mapCamera!.projectToScreen(new THREE.Vector3(b.x, 0, b.z))
+      return {
+        name: b.name,
+        shipX: shipScreen.x * 100,
+        shipY: shipScreen.y * 100,
+        bodyX: bodyScreen.x * 100,
+        bodyY: bodyScreen.y * 100,
+        distance: formatDistance(b.distance),
+      }
+    })
+
+    // Heading arrow — convert heading to CSS rotation degrees
+    const heading = this.shuttleController.heading
+    const headingDeg = -(heading * 180 / Math.PI) + 90
+
+    // Gravity rings — project influence and event horizon radii to screen %
+    const gravityRings = bodies
+      .filter((b) => b.mass >= mapOverlayData.influenceMassThreshold)
+      .map((b) => {
+        const center = this.mapCamera!.projectToScreen(new THREE.Vector3(b.x, 0, b.z))
+        const infR = influenceRadius(b.mass, MAP_GRAVITY_CONFIG)
+        const horR = eventHorizonRadius(b.mass, MAP_GRAVITY_CONFIG)
+
+        // Project radius: offset point vs center to get screen-space radius
+        const edgeInf = this.mapCamera!.projectToScreen(new THREE.Vector3(b.x + infR, 0, b.z))
+        const edgeHor = this.mapCamera!.projectToScreen(new THREE.Vector3(b.x + horR, 0, b.z))
+
+        return {
+          name: b.name,
+          centerX: center.x * 100,
+          centerY: center.y * 100,
+          influenceRadius: Math.abs(edgeInf.x - center.x) * 100,
+          horizonRadius: Math.abs(edgeHor.x - center.x) * 100,
+        }
+      })
+
+    this.onMapOverlay({
+      visible: true,
+      labels,
+      shipX: shipScreen.x * 100,
+      shipY: shipScreen.y * 100,
+      headingDeg,
+      speed: this.shuttleController.speed,
+      distances,
+      gravityRings,
+    })
+  }
+
   dispose(): void {
     this.hideOrbitRing()
     this.gameLoop?.stop()
@@ -984,6 +1194,7 @@ export class MapViewController implements Tickable {
     this.starField?.dispose()
 
     // Dispose camera and scene
+    this.mapCamera = null
     this.vehicleCamera?.dispose()
     this.inputManager?.dispose()
     if (this.sceneObjects) {
