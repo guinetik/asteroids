@@ -141,6 +141,8 @@ export class ArrivalSequence {
       landerSpawnTarget.z - APPROACH_START_DISTANCE,
     )
     this.shuttleGroup.position.copy(this.shuttleStartPos)
+    // Nose along +X in model space; rotate -90° Y so nose points +Z (travel direction)
+    this.shuttleGroup.rotation.y = -Math.PI / 2
   }
 
   /** Load the shuttle model and set up internal structure. */
@@ -271,14 +273,17 @@ export class ArrivalSequence {
     const t = Math.min(1, this.phaseElapsed / PHASE_FLIP_DURATION)
     const eased = this.easeInOut(t)
 
-    this.shuttleGroup.rotation.y = eased * Math.PI
+    // Pitch 180° — nose goes over tail. Base Y rotation stays at -90° (nose along +Z).
+    // Rotate around local X axis for a pitch-over maneuver.
+    this.shuttleGroup.rotation.set(eased * Math.PI, -Math.PI / 2, 0, 'YXZ')
 
+    // Camera orbits to the side to show the flip
     const angle = eased * Math.PI * 0.5
     const camDist = 100
     this.camera.position.set(
       this.shuttleGroup.position.x + Math.sin(angle) * camDist,
       this.shuttleGroup.position.y + 20,
-      this.shuttleGroup.position.z - Math.cos(angle) * camDist,
+      this.shuttleGroup.position.z + Math.cos(angle) * camDist * 0.3,
     )
     this.camera.lookAt(this.shuttleGroup.position)
 
