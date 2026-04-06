@@ -1,8 +1,8 @@
 {
   "maxHp": 100,
   "healRate": 10,
-  "hotBoundary": 65,
-  "coldBoundary": 450,
+  "hotBoundary": 140,
+  "coldBoundary": 400,
   "tempDriftRate": 15,
   "damageThreshold": 60,
   "maxTempDamage": 15,
