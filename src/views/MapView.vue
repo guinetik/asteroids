@@ -241,8 +241,6 @@ function openShop() {
 
 function closeShop() {
   shopDialogVisible.value = false
-  const canvas = document.querySelector('canvas')
-  canvas?.requestPointerLock()
 }
 
 function handleShopBuyTradeGood(slotIndex: number, quantity: number) {
