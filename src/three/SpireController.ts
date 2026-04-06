@@ -28,11 +28,14 @@ const SPIKE_GRAVITY = 0.003
 
 // ── Floaty drift constants ──────────────────────────────────────
 /** How fast the spire lerps toward its target position (lower = floatier). */
-const DRIFT_SMOOTHING = 2.0
-/** Lateral sway amplitude while drifting. */
-const DRIFT_SWAY_AMPLITUDE = 0.8
-/** Lateral sway frequency. */
-const DRIFT_SWAY_FREQUENCY = 0.6
+const DRIFT_SMOOTHING = 1.5
+/** Horizontal sway amplitude (world units). */
+const DRIFT_SWAY_X = 1.5
+const DRIFT_SWAY_Z = 1.2
+/** Vertical float amplitude (world units, on top of bob). */
+const DRIFT_FLOAT_Y = 0.8
+/** Sway frequency multiplier. */
+const DRIFT_SWAY_FREQ = 0.5
 
 /**
  * Y offset from group origin to body center (in world units).
@@ -260,15 +263,16 @@ export class SpireController implements Tickable {
       return
     }
 
-    // --- Floaty drift — lerp toward target position with sway ---
+    // --- Floaty drift — lerp toward target + oscillating offset ---
     const lerpFactor = 1 - Math.exp(-DRIFT_SMOOTHING * dt)
-    this.group.position.x += (this.targetPosition.x - this.group.position.x) * lerpFactor
-    this.group.position.z += (this.targetPosition.z - this.group.position.z) * lerpFactor
-    this.group.position.y += (this.targetPosition.y - this.group.position.y) * lerpFactor
+    // Oscillating offsets — sine waves at different frequencies for organic float
+    const swayX = Math.sin(t * DRIFT_SWAY_FREQ) * DRIFT_SWAY_X
+    const swayZ = Math.cos(t * DRIFT_SWAY_FREQ * 0.7 + 1.5) * DRIFT_SWAY_Z
+    const floatY = Math.sin(t * DRIFT_SWAY_FREQ * 0.4 + 0.8) * DRIFT_FLOAT_Y
 
-    // Lateral sway — gentle figure-8 drift
-    this.group.position.x += Math.sin(t * DRIFT_SWAY_FREQUENCY) * DRIFT_SWAY_AMPLITUDE * dt
-    this.group.position.z += Math.cos(t * DRIFT_SWAY_FREQUENCY * 0.7 + 1.5) * DRIFT_SWAY_AMPLITUDE * dt
+    this.group.position.x += (this.targetPosition.x + swayX - this.group.position.x) * lerpFactor
+    this.group.position.z += (this.targetPosition.z + swayZ - this.group.position.z) * lerpFactor
+    this.group.position.y += (this.targetPosition.y + floatY - this.group.position.y) * lerpFactor
 
     // --- Body rotation ---
     this.group.rotation.y += this.isAgitated ? 0.015 : 0.004
