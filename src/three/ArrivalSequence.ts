@@ -72,6 +72,9 @@ const SHUTTLE_CINEMATIC_SCALE = 1.0
  */
 const SHUTTLE_PARKED_SCALE = 15
 
+/** Absolute Y altitude for the parked shuttle (must clear terrain + be reachable by lander). */
+const LANDER_PARK_ALTITUDE = 800
+
 /** Lander fall gravity after detach (world units/sec²). */
 const LANDER_FALL_GRAVITY = 3.0
 
@@ -306,24 +309,21 @@ export class ArrivalSequence {
    * Removes the falling cinematic lander but keeps the shuttle in the scene.
    * Call after sequence completes to leave the shuttle visible from below.
    *
-   * @param hoverHeight - Altitude above the lander detach point.
    */
-  parkShuttle(hoverHeight: number): void {
+  parkShuttle(): void {
     this.fallingLander?.removeFromParent()
     this.fallingLander = null
 
     // Scale up to gameplay proportions (lander fits inside cargo bay)
     this.shuttleGroup.scale.setScalar(SHUTTLE_PARKED_SCALE)
 
-    // Position well above the terrain. The shuttle is flipped so the cargo bay
-    // (originally on top) now faces down. Needs enough clearance for the lander to fly up into it.
+    // Position well above the terrain. At scale 15 the shuttle is ~210 units tall.
+    // Must be high enough to clear terrain AND be above the lander at all times.
     this.shuttleGroup.position.set(
       this.landerSpawnTarget.x,
-      500,
+      LANDER_PARK_ALTITUDE,
       this.landerSpawnTarget.z,
     )
-    // eslint-disable-next-line no-console
-    console.log('[ArrivalSequence] parkShuttle called — pos:', this.shuttleGroup.position.y, 'scale:', SHUTTLE_PARKED_SCALE)
     // Flipped upside down — cargo bay faces the asteroid surface, doors open
     this.shuttleGroup.rotation.set(Math.PI, -Math.PI / 2, 0, 'YXZ')
 
