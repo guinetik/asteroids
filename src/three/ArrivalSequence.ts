@@ -319,9 +319,11 @@ export class ArrivalSequence {
     // (originally on top) now faces down. Needs enough clearance for the lander to fly up into it.
     this.shuttleGroup.position.set(
       this.landerSpawnTarget.x,
-      hoverHeight + 250,
+      500,
       this.landerSpawnTarget.z,
     )
+    // eslint-disable-next-line no-console
+    console.log('[ArrivalSequence] parkShuttle called — pos:', this.shuttleGroup.position.y, 'scale:', SHUTTLE_PARKED_SCALE)
     // Flipped upside down — cargo bay faces the asteroid surface, doors open
     this.shuttleGroup.rotation.set(Math.PI, -Math.PI / 2, 0, 'YXZ')
 
