@@ -271,7 +271,7 @@ export class MapViewController implements Tickable {
 
     this.shuttleController.onDeath = () => {
       this.vehicleCamera?.setConfig(MAP_DEATH_CAMERA_CONFIG)
-      this.onDeathOverlay?.(true, 'Solar Radiation')
+      this.onDeathOverlay?.(true, 'Crashed Into The Sun')
     }
 
     await this.shuttleController.load()
