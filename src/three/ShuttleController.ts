@@ -15,6 +15,7 @@ import type { PortalVehicle } from './PortalArrivalSequence'
 import shuttlePhysicsData from '@/data/shuttle/shuttle-physics.json'
 import orbitConfig from '@/data/shuttle/orbit-capture.json'
 import { getSlingshotSettleSpeed } from '@/lib/slingshotBurstProfile'
+import { getCurrentShuttleThrusterEfficiencyModifiers } from '@/lib/upgrades'
 
 /** Any object that can exert gravity on the shuttle */
 export interface GravityWell {
@@ -313,6 +314,13 @@ export class ShuttleController implements Tickable, PortalVehicle {
     this.habitat.setVisible(false)
     gltf.scene.add(this.habitat.group)
 
+    // Load furniture into the habitat (async, non-blocking)
+    this.habitat.loadFurniture({
+      radius: 80,
+      length: habitatLength,
+      position: new THREE.Vector3(290, 0, 15),
+    })
+
     // Cargo bay interior lights — only on when doors open
     // Ranges are in raw model space; group scale shrinks them automatically
     // since lights are children of the scaled gltf.scene.
@@ -354,12 +362,17 @@ export class ShuttleController implements Tickable, PortalVehicle {
     return this.group.position
   }
 
+
   get isThrusting(): boolean {
-    return this._inputEnabled && this.inputManager.isActionActive('thrust') && this.thrusterSystem.canFire('thrust')
+    return this._inputEnabled
+      && this.inputManager.isActionActive('thrust')
+      && this.thrusterSystem.canFire('thrust', { burnRateMultiplier: this.getBurnRateMultipliers() })
   }
 
   get isBraking(): boolean {
-    return this._inputEnabled && this.inputManager.isActionActive('brake') && this.thrusterSystem.canFire('brake')
+    return this._inputEnabled
+      && this.inputManager.isActionActive('brake')
+      && this.thrusterSystem.canFire('brake', { burnRateMultiplier: this.getBurnRateMultipliers() })
   }
 
   /** Set by orbit system to drive RCS VFX while input is disabled. */
@@ -371,12 +384,20 @@ export class ShuttleController implements Tickable, PortalVehicle {
 
   get isYawingLeft(): boolean {
     return this.orbitYawLeft
-      || (this._inputEnabled && this.inputManager.isActionActive('yawLeft') && this.thrusterSystem.canFire('rcs'))
+      || (
+        this._inputEnabled
+        && this.inputManager.isActionActive('yawLeft')
+        && this.thrusterSystem.canFire('rcs', { burnRateMultiplier: this.getBurnRateMultipliers() })
+      )
   }
 
   get isYawingRight(): boolean {
     return this.orbitYawRight
-      || (this._inputEnabled && this.inputManager.isActionActive('yawRight') && this.thrusterSystem.canFire('rcs'))
+      || (
+        this._inputEnabled
+        && this.inputManager.isActionActive('yawRight')
+        && this.thrusterSystem.canFire('rcs', { burnRateMultiplier: this.getBurnRateMultipliers() })
+      )
   }
 
   get speed(): number {
@@ -716,11 +737,19 @@ export class ShuttleController implements Tickable, PortalVehicle {
       this.group.position.y = 0
     }
 
-    this.thrusterSystem.tick(dt, {
-      thrust: this.isThrusting,
-      brake: this.isBraking,
-      rcs: this.isYawingLeft || this.isYawingRight,
-    })
+    this.thrusterSystem.tick(
+      dt,
+      {
+        thrust: this.isThrusting,
+        brake: this.isBraking,
+        rcs: this.isYawingLeft || this.isYawingRight,
+      },
+      { burnRateMultiplier: this.getBurnRateMultipliers() },
+    )
+  }
+
+  private getBurnRateMultipliers(): Record<ShuttleThrusterName, number> {
+    return getCurrentShuttleThrusterEfficiencyModifiers()
   }
 
   private placeNozzles(scene: THREE.Object3D): void {

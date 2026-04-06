@@ -10,6 +10,7 @@
  * @spec docs/asteroid-lander-gdd.md
  */
 import * as THREE from 'three'
+import { loadGLB } from './loadGLB'
 
 /** Configuration for the habitat module. */
 export interface HabitatConfig {
@@ -20,6 +21,11 @@ export interface HabitatConfig {
   /** Position in parent space */
   position: THREE.Vector3
 }
+
+/** Target height for furniture models inside the cylinder. */
+const FURNITURE_TARGET_HEIGHT = 110
+/** Vertical offset — sits on the "floor" of the cylinder. */
+const FURNITURE_FLOOR_Y = -55
 
 const GLASS_COLOR = 0x88ccff
 const GLASS_OPACITY = 0.15
@@ -110,6 +116,75 @@ export class HabitatModule {
     girder.position.copy(position)
     girder.rotation.z = Math.PI / 2
     this.group.add(girder)
+  }
+
+  /**
+   * Load and place furniture models inside the habitat cylinder.
+   *
+   * Both models are auto-scaled to fit the cylinder interior
+   * and positioned in local cylinder space (pre-rotation).
+   * The cylinder is rotated z = PI/2, so its axis runs along X.
+   * In pre-rotation space: Y = cylinder axis, X/Z = cross-section.
+   *
+   * @param config - The same config used for the cylinder
+   */
+  async loadFurniture(config: HabitatConfig): Promise<void> {
+    const { position, length } = config
+    const halfLen = length / 2
+
+    const [bedModel, tableModel] = await Promise.all([
+      loadGLB('/models/bed.glb'),
+      loadGLB('/models/table.glb'),
+    ])
+
+    // --- Bed: center of the cylinder (statement piece) ---
+    const bedBox = new THREE.Box3().setFromObject(bedModel)
+    const bedSize = bedBox.getSize(new THREE.Vector3())
+    const bedMaxDim = Math.max(bedSize.x, bedSize.y, bedSize.z)
+    const bedScale = FURNITURE_TARGET_HEIGHT / bedMaxDim
+    bedModel.scale.setScalar(bedScale)
+
+    // Rotate bed: tip 90° on X, flip so mattress faces up
+    bedModel.rotation.set(Math.PI / 2, 0, 0)
+
+    // Re-measure after scale+rotation and center on origin
+    bedBox.setFromObject(bedModel)
+    const bedCenter = bedBox.getCenter(new THREE.Vector3())
+    bedModel.position.sub(bedCenter)
+
+    // Place at cylinder center, on the floor
+    // In pre-rotation space (before z=PI/2): Y = along cylinder axis
+    const bedPivot = new THREE.Group()
+    bedPivot.add(bedModel)
+    bedPivot.position.copy(position)
+    bedModel.position.z = FURNITURE_FLOOR_Y // floor of cross-section
+    bedPivot.rotation.z = Math.PI / 2 // match cylinder rotation
+    this.group.add(bedPivot)
+
+    // --- Table: back wall (tank side, negative along axis) ---
+    const tableBox = new THREE.Box3().setFromObject(tableModel)
+    const tableSize = tableBox.getSize(new THREE.Vector3())
+    const tableMaxDim = Math.max(tableSize.x, tableSize.y, tableSize.z)
+    const tableScale = (FURNITURE_TARGET_HEIGHT * 1.4) / tableMaxDim
+    tableModel.scale.setScalar(tableScale)
+
+    // Rotate table: tip 90° on X, spin 180° on Y to face front
+    tableModel.rotation.set(Math.PI / 2, Math.PI, 0)
+
+    // Re-measure after scale+rotation and center on origin
+    tableBox.setFromObject(tableModel)
+    const tableCenter = tableBox.getCenter(new THREE.Vector3())
+    tableModel.position.sub(tableCenter)
+
+    // Place against tank-side wall
+    const tablePivot = new THREE.Group()
+    tablePivot.add(tableModel)
+    tablePivot.position.copy(position)
+    tablePivot.position.x -= 100 // this moves it closer to the fuel tank
+    tablePivot.position.y += 0 // near tank wall
+    tableModel.position.z = FURNITURE_FLOOR_Y // floor of cross-section
+    tablePivot.rotation.z = Math.PI / 2 // match cylinder rotation
+    this.group.add(tablePivot)
   }
 
   /** Show or hide the habitat (e.g. when doors open/close). */

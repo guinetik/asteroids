@@ -66,6 +66,7 @@ import { isMainThrusterSpentForMessage } from '@/lib/messages/tutorialTriggers'
 import { DevConsole } from '@/lib/devConsole'
 import { AmbientSpaceController } from '@/three/AmbientSpaceController'
 import { computeShuttleBaseFuelDrain } from '@/lib/shuttleBaseFuelDrain'
+import { getCurrentShuttleThrusterEfficiencyModifiers } from '@/lib/upgrades'
 
 /** Tick priority for the compositor (runs after animation, before render). */
 const TICK_PRIORITY_COMPOSIT = TICK_PRIORITY_RENDER - 1
@@ -1019,10 +1020,14 @@ export class MapViewController implements Tickable {
       // A/D yaw — input is disabled so read InputManager directly and set orbit flags for VFX
       const yawLeft = !this.mapIntro.controlsLocked
         && this.inputManager.isActionActive('yawLeft')
-        && this.shuttleController.thrusterSystem.canFire('rcs')
+        && this.shuttleController.thrusterSystem.canFire('rcs', {
+          burnRateMultiplier: getCurrentShuttleThrusterEfficiencyModifiers(),
+        })
       const yawRight = !this.mapIntro.controlsLocked
         && this.inputManager.isActionActive('yawRight')
-        && this.shuttleController.thrusterSystem.canFire('rcs')
+        && this.shuttleController.thrusterSystem.canFire('rcs', {
+          burnRateMultiplier: getCurrentShuttleThrusterEfficiencyModifiers(),
+        })
       this.shuttleController.orbitYawLeft = yawLeft
       this.shuttleController.orbitYawRight = yawRight
       if (yawLeft) {
@@ -1031,11 +1036,15 @@ export class MapViewController implements Tickable {
       if (yawRight) {
         this.shuttleController.group.rotateY(-MAP_PHYSICS.yawTorque * dt)
       }
-      this.shuttleController.thrusterSystem.tick(dt, {
-        thrust: false,
-        brake: false,
-        rcs: yawLeft || yawRight,
-      })
+      this.shuttleController.thrusterSystem.tick(
+        dt,
+        {
+          thrust: false,
+          brake: false,
+          rcs: yawLeft || yawRight,
+        },
+        { burnRateMultiplier: getCurrentShuttleThrusterEfficiencyModifiers() },
+      )
       // Refuel while orbiting Earth
       if (this.orbitSystem.target?.name === 'Earth') {
         this.shuttleController.thrusterSystem.addFuel(EARTH_REFUEL_RATE * dt)
@@ -1805,7 +1814,9 @@ export class MapViewController implements Tickable {
     if (this.didDispatchMainThrusterMessage || !this.shuttleController) return
 
     const thrustState = this.shuttleController.thrusterSystem.getState('thrust')
-    const canFireThrust = this.shuttleController.thrusterSystem.canFire('thrust')
+    const canFireThrust = this.shuttleController.thrusterSystem.canFire('thrust', {
+      burnRateMultiplier: getCurrentShuttleThrusterEfficiencyModifiers(),
+    })
     if (!isMainThrusterSpentForMessage(thrustState, canFireThrust)) return
 
     this.didDispatchMainThrusterMessage = true
@@ -1887,4 +1898,5 @@ export class MapViewController implements Tickable {
       this.sceneObjects.renderer.dispose()
     }
   }
+
 }

@@ -67,12 +67,12 @@ export const MAP_DEATH_CAMERA_CONFIG: VehicleCameraConfig = {
 
 /** Map inspect preset: top-down on shuttle for cargo/menu view. */
 export const MAP_INSPECT_CAMERA_CONFIG: VehicleCameraConfig = {
-  idleOffset: new THREE.Vector3(0, 0.5, 0),
+  idleOffset: new THREE.Vector3(0, 0.25, 0),
   lerpSpeed: 5,
   idleTimeout: 0,
   minY: -Infinity,
-  fov: 50,
-  maxDistance: 1,
+  fov: 40,
+  maxDistance: 0.5,
 }
 
 /** Map orbit preset: pulled back above planet to show full orbit circle. */
