@@ -43,6 +43,8 @@ const PHASE_FLIP_DURATION = 2.5
 const PHASE_DOORS_DURATION = 2.5
 /** Lander detaches and drifts out. */
 const PHASE_DETACH_DURATION = 2.0
+/** Shuttle pitches back to level before departing. */
+const PHASE_UNFLIP_DURATION = 2.0
 /** Shuttle closes doors and flies away. */
 const PHASE_DEPART_DURATION = 3.0
 /** Camera transitions to follow lander. */
@@ -54,6 +56,7 @@ export const ARRIVAL_SEQUENCE_DURATION =
   PHASE_FLIP_DURATION +
   PHASE_DOORS_DURATION +
   PHASE_DETACH_DURATION +
+  PHASE_UNFLIP_DURATION +
   PHASE_DEPART_DURATION +
   PHASE_CAMERA_TRANSITION_DURATION
 
@@ -70,8 +73,21 @@ const SHUTTLE_LEVEL_SCALE = 1.0
 /** Shuttle departure acceleration (world units/sec²). */
 const SHUTTLE_DEPART_ACCELERATION = 40
 
+/** Nozzle positions in scaled model space (matches ShuttleController ENG_POSITIONS * MODEL_SCALE). */
+const NOZZLE_OFFSETS = [
+  new THREE.Vector3(-5.1, 0.72, 0),
+  new THREE.Vector3(-5.1, -0.46, -0.52),
+  new THREE.Vector3(-5.1, -0.46, 0.52),
+]
+
+/** Idle thruster sprite size (world units at shuttle scale). */
+const THRUSTER_SPRITE_SIZE = 1.4
+
+/** Thruster sprite X offset behind nozzle. */
+const THRUSTER_SPRITE_X_OFFSET = -0.34
+
 /** Timeline phase identifiers. */
-type ArrivalPhase = 'approach' | 'flip' | 'doors' | 'detach' | 'depart' | 'camera-transition' | 'done'
+type ArrivalPhase = 'approach' | 'flip' | 'doors' | 'detach' | 'unflip' | 'depart' | 'camera-transition' | 'done'
 
 /**
  * Cinematic arrival sequence for the asteroid level.
@@ -109,6 +125,8 @@ export class ArrivalSequence {
   private landerModel: THREE.Object3D | null = null
   private landerDetached = false
   private landerWorldPos = new THREE.Vector3()
+  private readonly thrusterSprites: THREE.Sprite[] = []
+  private thrusterElapsed = 0
 
   // Shuttle flight state
   private shuttleStartPos = new THREE.Vector3()
@@ -201,6 +219,49 @@ export class ArrivalSequence {
       this.shuttleStartPos.z - 400,
     )
     this.camera.lookAt(this.shuttleStartPos)
+
+    // Thruster nozzle sprites — idle glow at each engine nozzle
+    const thrusterTexture = this.createThrusterTexture()
+    for (const nozzle of NOZZLE_OFFSETS) {
+      const material = new THREE.SpriteMaterial({
+        map: thrusterTexture,
+        color: new THREE.Color(0xff9a1f),
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+      const sprite = new THREE.Sprite(material)
+      sprite.position.copy(nozzle)
+      sprite.position.x += THRUSTER_SPRITE_X_OFFSET
+      sprite.visible = false
+      sprite.scale.setScalar(THRUSTER_SPRITE_SIZE)
+      shuttleScene.add(sprite)
+      this.thrusterSprites.push(sprite)
+    }
+
+    // Place engine nozzle geometry (same as ShuttleController)
+    const engNode = this.findNode(shuttleScene, 'eng')
+    if (engNode) {
+      const engParent = engNode.parent
+      if (engParent) engParent.remove(engNode)
+      const engPositions: [number, number, number][] = [
+        [-510, 0, 72],
+        [-510, -52, -46],
+        [-510, 52, -46],
+      ]
+      for (const [x, y, z] of engPositions) {
+        const nozzle = engNode.clone()
+        nozzle.position.set(x, y, z)
+        nozzle.rotation.set(0, 0, 0)
+        nozzle.scale.set(1, 1, 1)
+        shuttleScene.add(nozzle)
+      }
+    }
+
+    // Hide RCS pods
+    const rcsNode = this.findNode(shuttleScene, 'rcs')
+    if (rcsNode) rcsNode.visible = false
   }
 
   /** Advance the sequence by dt seconds. */
@@ -209,6 +270,11 @@ export class ArrivalSequence {
 
     this.elapsed += dt
     this.phaseElapsed += dt
+
+    // Thruster sprites pulse during approach and depart
+    this.thrusterElapsed += dt
+    const thrustersActive = this.phase === 'approach' || this.phase === 'depart' || this.phase === 'unflip'
+    this.updateThrusterSprites(thrustersActive)
 
     switch (this.phase) {
       case 'approach':
@@ -222,6 +288,9 @@ export class ArrivalSequence {
         break
       case 'detach':
         this.tickDetach()
+        break
+      case 'unflip':
+        this.tickUnflip(dt)
         break
       case 'depart':
         this.tickDepart(dt)
@@ -328,6 +397,23 @@ export class ArrivalSequence {
     )
     this.camera.lookAt(this.landerWorldPos)
 
+    if (t >= 1) this.nextPhase('unflip')
+  }
+
+  private tickUnflip(dt: number): void {
+    const t = Math.min(1, this.phaseElapsed / PHASE_UNFLIP_DURATION)
+    const eased = this.easeInOut(t)
+
+    // Pitch back from 180° to 0° (unflip), keeping Y at -90°
+    this.shuttleGroup.rotation.set((1 - eased) * Math.PI, -Math.PI / 2, 0, 'YXZ')
+
+    // Close doors during unflip
+    this.doorProgress = Math.max(0, this.doorProgress - DOOR_ANIM_SPEED * dt)
+    this.updateDoorRotation()
+
+    // Camera stays watching lander area
+    this.camera.lookAt(this.landerWorldPos)
+
     if (t >= 1) this.nextPhase('depart')
   }
 
@@ -391,6 +477,41 @@ export class ArrivalSequence {
 
   private easeInOut(t: number): number {
     return t * t * (3 - 2 * t)
+  }
+
+  private updateThrusterSprites(active: boolean): void {
+    if (!active) {
+      for (const sprite of this.thrusterSprites) {
+        sprite.visible = false
+      }
+      return
+    }
+    // Pulse: scale and opacity oscillate
+    const pulse = 0.7 + 0.3 * Math.sin(this.thrusterElapsed * 12)
+    const opacity = 0.5 + 0.5 * Math.sin(this.thrusterElapsed * 8)
+    for (const sprite of this.thrusterSprites) {
+      sprite.visible = true
+      sprite.scale.setScalar(THRUSTER_SPRITE_SIZE * pulse)
+      ;(sprite.material as THREE.SpriteMaterial).opacity = opacity
+    }
+  }
+
+  private createThrusterTexture(): THREE.CanvasTexture {
+    const size = 64
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')!
+    const center = size / 2
+    const gradient = ctx.createRadialGradient(center, center, 0, center, center, center)
+    gradient.addColorStop(0, '#fff5cc')
+    gradient.addColorStop(0.45, '#ff9a1f')
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, size, size)
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.needsUpdate = true
+    return texture
   }
 
   private findNode(root: THREE.Object3D, name: string): THREE.Object3D | null {
