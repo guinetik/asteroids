@@ -15,6 +15,8 @@ export const DEFAULT_BINDINGS: Record<string, string[]> = {
   toggleDoors: ['KeyF'],
   toggleCamera: ['KeyC'],
   orbitAction: ['KeyE'],
+  toggleMap: ['KeyM'],
+  closeMap: ['Escape'],
 }
 
 /** Lander key bindings */
