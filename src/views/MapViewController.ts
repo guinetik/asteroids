@@ -1029,6 +1029,13 @@ export class MapViewController implements Tickable {
       this.vehicleCamera.controls.enabled = false
     }
 
+    // Dim the spacetime grid so labels are readable
+    if (this.spaceTimeGrid) {
+      const mat = this.spaceTimeGrid.mesh.material as THREE.LineBasicMaterial
+      mat.opacity = 0.15
+      mat.transparent = true
+    }
+
     // Position ortho camera above ship
     const px = this.shuttleController.position.x
     const pz = this.shuttleController.position.z
@@ -1081,6 +1088,13 @@ export class MapViewController implements Tickable {
       this.shuttleController.setInputEnabled(true)
     }
     // If orbiting, shuttle stays frozen but input stays disabled (orbit manages this)
+
+    // Restore grid opacity
+    if (this.spaceTimeGrid) {
+      const mat = this.spaceTimeGrid.mesh.material as THREE.LineBasicMaterial
+      mat.opacity = 1
+      mat.transparent = false
+    }
 
     // Hide overlay
     this.onMapOverlay?.({ visible: false, labels: [], shipX: 0, shipY: 0, headingDeg: 0, speed: 0, distances: [], gravityRings: [] })
