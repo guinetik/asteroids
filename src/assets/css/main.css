@@ -28,12 +28,28 @@ body {
   @apply absolute top-4 left-1/2 -translate-x-1/2;
 }
 
+.hud-hull {
+  @apply absolute top-1 left-4 flex items-center gap-2;
+}
+
+.hud-hull-label {
+  @apply text-green-400;
+}
+
+.hud-hull-track {
+  @apply w-32 h-3 bg-gray-800 rounded-sm overflow-hidden;
+}
+
+.hud-hull-fill {
+  @apply h-full transition-all duration-200;
+}
+
 .hud-fuel {
-  @apply absolute top-4 left-4 flex items-center gap-2;
+  @apply absolute top-6 left-4 flex items-center gap-2;
 }
 
 .hud-adrift-warning {
-  @apply absolute top-10 left-4 text-red-500 text-xs font-bold;
+  @apply absolute top-12 left-4 text-red-500 text-xs font-bold;
   text-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
   animation: gravity-pulse 1s ease-in-out infinite;
 }
@@ -159,6 +175,27 @@ body {
 @keyframes gravity-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+.hud-temp-gauge {
+  @apply absolute top-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 font-mono pointer-events-none;
+  animation: gravity-pulse 1.5s ease-in-out infinite;
+}
+
+.hud-temp-label {
+  @apply text-xs font-bold tracking-widest;
+}
+
+.hud-temp-track {
+  @apply w-40 h-2 bg-gray-800 rounded-full overflow-hidden;
+}
+
+.hud-temp-fill-hot {
+  @apply h-full bg-red-500 transition-all duration-300;
+}
+
+.hud-temp-fill-cold {
+  @apply h-full bg-blue-400 transition-all duration-300;
 }
 
 .death-overlay {

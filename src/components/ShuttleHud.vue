@@ -21,8 +21,23 @@ function fuelColor(level: number, capacity: number): string {
   return 'bg-red-500'
 }
 
+function hullColor(hp: number, maxHp: number): string {
+  const ratio = maxHp > 0 ? hp / maxHp : 0
+  if (ratio > 0.5) return 'bg-green-500'
+  if (ratio > 0.2) return 'bg-yellow-500'
+  return 'bg-red-500'
+}
+
 function adriftSeconds(): string {
   return Math.ceil(props.telemetry.adriftCountdown).toString()
+}
+
+function tempLabel(): string {
+  return props.telemetry.temperature > 0 ? 'OVERHEATING' : 'FREEZING'
+}
+
+function tempLabelClass(): string {
+  return props.telemetry.temperature > 0 ? 'text-red-500' : 'text-blue-400'
 }
 </script>
 
@@ -37,6 +52,37 @@ function adriftSeconds(): string {
     <!-- Adrift countdown: centered below position -->
     <div v-if="props.telemetry.adriftCountdown >= 0" class="hud-adrift-countdown">
       {{ adriftSeconds() }}s
+    </div>
+
+    <!-- Temperature gauge: below position, only when outside safe zone -->
+    <div v-if="props.telemetry.temperatureVisible" class="hud-temp-gauge">
+      <span class="hud-temp-label" :class="tempLabelClass()">
+        {{ tempLabel() }} {{ Math.abs(props.telemetry.temperature).toFixed(0) }}&deg;
+      </span>
+      <div class="hud-temp-track">
+        <div
+          v-if="props.telemetry.temperature > 0"
+          class="hud-temp-fill-hot"
+          :style="{ width: Math.abs(props.telemetry.temperature) + '%' }"
+        ></div>
+        <div
+          v-else
+          class="hud-temp-fill-cold"
+          :style="{ width: Math.abs(props.telemetry.temperature) + '%', marginLeft: 'auto' }"
+        ></div>
+      </div>
+    </div>
+
+    <!-- Top left: hull bar (above fuel) -->
+    <div class="hud-hull">
+      <span class="hud-hull-label">HULL</span>
+      <div class="hud-hull-track">
+        <div
+          class="hud-hull-fill"
+          :class="hullColor(props.telemetry.hp, props.telemetry.maxHp)"
+          :style="{ width: pct(props.telemetry.hp, props.telemetry.maxHp) + '%' }"
+        ></div>
+      </div>
     </div>
 
     <!-- Top left: fuel bar -->

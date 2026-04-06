@@ -21,6 +21,10 @@ const telemetry = reactive<ShuttleTelemetry>({
   rcsCharge: 0,
   rcsCapacity: 0,
   adriftCountdown: -1,
+  hp: 100,
+  maxHp: 100,
+  temperature: 0,
+  temperatureVisible: false,
 })
 
 onMounted(async () => {

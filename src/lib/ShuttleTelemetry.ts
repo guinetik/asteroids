@@ -20,6 +20,14 @@ export interface ShuttleTelemetry {
   rcsCapacity: number
   /** Seconds remaining before adrift game over. -1 when not adrift. */
   adriftCountdown: number
+  /** Current hull HP */
+  hp: number
+  /** Maximum hull HP */
+  maxHp: number
+  /** Temperature (-100 to +100). Positive = hot, negative = cold. */
+  temperature: number
+  /** Whether the temperature gauge should be visible */
+  temperatureVisible: boolean
 }
 
 /** Gravity danger state pushed to the HUD each frame. */

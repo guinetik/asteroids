@@ -77,6 +77,9 @@ import { isMainThrusterSpentForMessage } from '@/lib/messages/tutorialTriggers'
 import { DevConsole } from '@/lib/devConsole'
 import { AmbientSpaceController } from '@/three/AmbientSpaceController'
 import { computeShuttleBaseFuelDrain } from '@/lib/shuttleBaseFuelDrain'
+import { ShipHealth } from '@/lib/shipHealth'
+import type { ShipHealthConfig } from '@/lib/shipHealth'
+import shipHealthData from '@/data/shuttle/ship-health.json'
 import { getCurrentShuttleThrusterEfficiencyModifiers } from '@/lib/upgrades'
 import { HabitatState } from '@/lib/habitatState'
 import { HabitatInteriorScene } from '@/three/HabitatInteriorScene'
@@ -288,6 +291,7 @@ export class MapViewController implements Tickable {
   private boundarySystem: PortalBoundarySystem | null = null
   private gravityPass: ShaderPass | null = null
   private adriftTimer = 0
+  private shipHealth: ShipHealth | null = null
   private mapState = new MapState()
   private mapIntro = new MapIntroState()
   private mapCamera: MapCamera | null = null
@@ -461,6 +465,14 @@ export class MapViewController implements Tickable {
     this.shuttleController.onDeath = () => {
       this.vehicleCamera?.setConfig(MAP_DEATH_CAMERA_CONFIG)
       this.onDeathOverlay?.(true, 'Crashed Into The Sun')
+    }
+
+    // Ship health — temperature + radiation damage
+    this.shipHealth = new ShipHealth(shipHealthData as ShipHealthConfig)
+    this.shipHealth.onDeath = (cause) => {
+      this.vehicleCamera?.setConfig(MAP_DEATH_CAMERA_CONFIG)
+      this.onDeathOverlay?.(true, cause)
+      this.shuttleController?.freeze()
     }
 
     await this.shuttleController.load()
@@ -999,6 +1011,10 @@ export class MapViewController implements Tickable {
         rcsCharge: ts.getState('rcs').charge,
         rcsCapacity: ts.getState('rcs').capacity,
         adriftCountdown: this.adriftTimer > 0 ? ADRIFT_TIMEOUT - this.adriftTimer : -1,
+        hp: this.shipHealth?.hp ?? 100,
+        maxHp: this.shipHealth?.maxHp ?? 100,
+        temperature: this.shipHealth?.temperature ?? 0,
+        temperatureVisible: this.shipHealth?.temperatureVisible ?? false,
       })
     }
 
@@ -1036,6 +1052,25 @@ export class MapViewController implements Tickable {
       } else {
         this.adriftTimer = 0
       }
+    }
+
+    // Ship health — temperature drift + radiation/temp damage
+    if (this.shipHealth && this.shuttleController && !this.shuttleController.dead) {
+      const orbitState = this.orbitSystem?.state ?? 'free'
+      const px = this.shuttleController.position.x
+      const pz = this.shuttleController.position.z
+      const sunDist = Math.sqrt(px * px + pz * pz)
+      const radiationProximity = this.sunController
+        ? this.computeProximity(
+            this.sunController.getWorldX(),
+            this.sunController.getWorldZ(),
+            this.sunController.mass,
+            px, pz,
+          )
+        : 0
+      const isHealingAtEarth = orbitState === 'orbiting'
+        && this.orbitSystem?.target?.name === 'Earth'
+      this.shipHealth.tick(dt, sunDist, radiationProximity, isHealingAtEarth)
     }
 
     // Gravity proximity — VFX distortion + HUD warning
@@ -1455,6 +1490,7 @@ export class MapViewController implements Tickable {
     this.hideLaunchArrow()
     this.yRecovery = false
     this.adriftTimer = 0
+    this.shipHealth?.reset()
     this.resetWorldLineHistory()
   }
 
