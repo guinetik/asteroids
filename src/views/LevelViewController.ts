@@ -41,9 +41,11 @@ import { createLevelStateMachine, LANDER_INTERACT_RANGE } from '@/lib/level/leve
 import type { LevelState } from '@/lib/level/levelStateMachine'
 import type { StateMachine } from '@/lib/stateMachine'
 import { ArrivalSequence } from '@/three/ArrivalSequence'
+import { StarFieldController } from '@/three/StarFieldController'
 import {
   AmbientLight,
   DirectionalLight,
+  HemisphereLight,
   Color,
   Vector3,
 } from 'three'
@@ -51,8 +53,14 @@ import playerConfigJson from '@/data/fps/player-config.json'
 import multiToolConfigJson from '@/data/fps/multitool-config.json'
 
 // ── Scene constants ─────────────────────────────────────────────
-const AMBIENT_LIGHT_INTENSITY = 0.6
-const DIR_LIGHT_INTENSITY = 1.5
+/** Low ambient — most light comes from the distant sun. Foreboding. */
+const AMBIENT_LIGHT_INTENSITY = 0.15
+/** Cool-tinted ambient to simulate deep space. */
+const AMBIENT_LIGHT_COLOR = 0x334466
+/** Harsh directional sun — single dominant light source. */
+const DIR_LIGHT_INTENSITY = 1.8
+/** Slight warm tint on the sun (distant star). */
+const DIR_LIGHT_COLOR = 0xffeedd
 const GRID_SIZE = 12000
 const TERRAIN_SEED = 42
 const TERRAIN_RESOLUTION = 512
@@ -164,12 +172,19 @@ export class LevelViewController implements Tickable {
     this.terrainMesh = new TerrainMesh(this.heightmap)
     this.sceneManager.addToScene(this.terrainMesh.mesh)
 
-    // ── Lighting ────────────────────────────────────────────────
-    const ambient = new AmbientLight(0xffffff, AMBIENT_LIGHT_INTENSITY)
-    const sun = new DirectionalLight(0xffffee, DIR_LIGHT_INTENSITY)
+    // ── Starfield ────────────────────────────────────────────────
+    const starField = new StarFieldController()
+    this.sceneManager.addToScene(starField.points)
+
+    // ── Lighting — foreboding deep-space atmosphere ─────────────
+    const ambient = new AmbientLight(AMBIENT_LIGHT_COLOR, AMBIENT_LIGHT_INTENSITY)
+    const sun = new DirectionalLight(DIR_LIGHT_COLOR, DIR_LIGHT_INTENSITY)
     sun.position.set(100, 200, 50)
+    // Hemisphere fill: cold blue from below, warm from sky
+    const hemi = new HemisphereLight(0x445566, 0x111122, 0.2)
     this.sceneManager.addToScene(ambient)
     this.sceneManager.addToScene(sun)
+    this.sceneManager.addToScene(hemi)
 
     // ── Lander (created once, stays in scene) ───────────────────
     this.landerController = new LanderController(this.inputManager)

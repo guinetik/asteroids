@@ -80,6 +80,10 @@ onUnmounted(() => {
 
 <template>
   <div ref="container" class="scene-container"></div>
+  <!-- Helmet visor overlay — always visible, frames the view -->
+  <div v-if="stateInfo.state === 'eva'" class="helmet-visor" />
+  <!-- Ambient vignette — subtle darkness at edges -->
+  <div v-if="stateInfo.state !== ''" class="level-vignette" />
   <div
     class="letterbox-bar letterbox-bar--top"
     :class="{ 'letterbox-bar--hidden': !letterboxVisible }"
@@ -176,5 +180,41 @@ onUnmounted(() => {
 @keyframes death-pulse {
   0%, 100% { opacity: 0.6; }
   50% { opacity: 1; }
+}
+
+/* Always-on vignette — subtle darkness at screen edges */
+.level-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    transparent 50%,
+    rgba(0, 0, 0, 0.3) 80%,
+    rgba(0, 0, 0, 0.7) 100%
+  );
+}
+
+/* Helmet visor frame — EVA only, rounded border with subtle tint */
+.helmet-visor {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  border: 3px solid rgba(60, 80, 100, 0.15);
+  border-radius: 20% / 12%;
+  box-shadow:
+    inset 0 0 80px rgba(0, 10, 30, 0.5),
+    inset 0 0 200px rgba(0, 5, 15, 0.3);
+  /* Subtle blue-green glass tint at edges */
+  background: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    transparent 60%,
+    rgba(20, 40, 60, 0.08) 85%,
+    rgba(10, 30, 50, 0.15) 100%
+  );
 }
 </style>
