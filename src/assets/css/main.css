@@ -775,6 +775,57 @@ body {
          text-amber-300 hover:bg-amber-400/20 transition-colors cursor-pointer;
 }
 
+/* Mission Board — giver and objective details */
+.mission-board-offer__giver {
+  @apply text-xs font-mono text-amber-300/70;
+}
+
+.mission-board-offer__objective {
+  @apply text-xs font-mono text-slate-400 italic mt-1;
+}
+
+/* Mission approach prompt */
+.mission-approach-prompt {
+  @apply fixed bottom-1/4 left-1/2 -translate-x-1/2 z-30
+         pointer-events-none font-mono flex flex-col items-center gap-2
+         px-6 py-4 rounded-lg;
+  background: radial-gradient(ellipse at center, rgba(60, 30, 0, 0.85) 0%, rgba(30, 10, 0, 0.7) 100%);
+  border: 1px solid rgba(255, 180, 0, 0.3);
+  text-shadow: 0 0 8px rgba(255, 180, 0, 0.7);
+  animation: orbit-prompt-fade-in 0.3s ease-out;
+}
+
+.mission-approach-prompt__name {
+  @apply text-lg font-bold text-amber-200 tracking-widest uppercase;
+}
+
+.mission-approach-prompt__action {
+  @apply text-sm text-amber-400;
+}
+
+/* Mission waypoint label (tactical map overlay) */
+.map-waypoint-indicator {
+  @apply absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5 pointer-events-none;
+}
+
+.map-waypoint-dot {
+  @apply w-2.5 h-2.5 rounded-sm rotate-45 border border-amber-400/80 bg-amber-400/40;
+  animation: waypoint-pulse 2s ease-in-out infinite;
+}
+
+.map-waypoint-label {
+  @apply text-[10px] font-mono text-amber-300/90 whitespace-nowrap tracking-wider uppercase;
+}
+
+.map-waypoint-distance {
+  @apply text-[9px] font-mono text-amber-400/50;
+}
+
+@keyframes waypoint-pulse {
+  0%, 100% { opacity: 0.6; box-shadow: 0 0 4px rgba(255, 180, 0, 0.3); }
+  50% { opacity: 1; box-shadow: 0 0 12px rgba(255, 180, 0, 0.6); }
+}
+
 /* Mission Minigame Overlay */
 .mission-minigame-overlay {
   @apply fixed inset-0 z-50 flex items-center justify-center
