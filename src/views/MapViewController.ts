@@ -65,6 +65,7 @@ import { shipMessageSystem } from '@/lib/messages/runtime'
 import { isMainThrusterSpentForMessage } from '@/lib/messages/tutorialTriggers'
 import { DevConsole } from '@/lib/devConsole'
 import { AmbientSpaceController } from '@/three/AmbientSpaceController'
+import { computeShuttleBaseFuelDrain } from '@/lib/shuttleBaseFuelDrain'
 
 /** Tick priority for the compositor (runs after animation, before render). */
 const TICK_PRIORITY_COMPOSIT = TICK_PRIORITY_RENDER - 1
@@ -231,6 +232,7 @@ export class MapViewController implements Tickable {
   private mapCamera: MapCamera | null = null
   private worldLineHistory: WorldLineHistoryPoint[] = []
   private didDispatchEarthDistanceMessage = false
+  private didDispatchBrakeMessage = false
   private didDispatchMainThrusterMessage = false
   private didDispatchVenusOrbitMessage = false
 
@@ -245,6 +247,9 @@ export class MapViewController implements Tickable {
 
   /** Current shuttle display scale, lerped each frame toward the screen-size target. */
   private currentShuttleScale = MAP_SHUTTLE_SCALE
+
+  /** Tactical reticle sprite that fades in over the shuttle when zoomed out far. */
+  private shipReticle: THREE.Sprite | null = null
 
   /** Called when map overlay state changes for Vue HUD. */
   onMapOverlay: ((state: MapOverlayState) => void) | null = null
@@ -410,6 +415,7 @@ export class MapViewController implements Tickable {
     // --- Ambient space (dust, rocks, gas clouds, comets) ---
     this.ambientSpace = new AmbientSpaceController(scene)
     this.ambientSpace.attach(this.shuttleController.group)
+    this.ambientSpace.setCamera(this.vehicleCamera.camera)
     this.tickHandler.register(this.ambientSpace, TICK_PRIORITY_ANIMATION)
 
     // --- Orbit capture system ---
@@ -813,6 +819,13 @@ export class MapViewController implements Tickable {
           this.shuttleController.group.rotation.set(0, awayAngle, 0)
         }
       }
+    }
+
+    if (this.shuttleController && !this.shuttleController.dead) {
+      const orbitState = this.orbitSystem?.state ?? 'free'
+      this.shuttleController.thrusterSystem.consumeFuel(
+        computeShuttleBaseFuelDrain(dt, orbitState !== 'orbiting'),
+      )
     }
 
     // Telemetry
@@ -1645,6 +1658,7 @@ export class MapViewController implements Tickable {
   /** Dispatch one-time gameplay tutorial messages from map-state conditions. */
   private triggerRuntimeMessages(): void {
     this.triggerEarthDistanceMessage()
+    this.triggerBrakeMessage()
     this.triggerMainThrusterMessage()
     this.triggerVenusOrbitMessage()
   }
@@ -1663,6 +1677,16 @@ export class MapViewController implements Tickable {
 
     this.didDispatchEarthDistanceMessage = true
     shipMessageSystem.notifyTrigger('map_leave_earth_distance')
+    this.emitMessageUpdate()
+  }
+
+  /** Fire Jay's brake note after the player uses the dampeners for the first time. */
+  private triggerBrakeMessage(): void {
+    if (this.didDispatchBrakeMessage || !this.shuttleController) return
+    if (!this.shuttleController.isBraking) return
+
+    this.didDispatchBrakeMessage = true
+    shipMessageSystem.notifyTrigger('map_brake_used')
     this.emitMessageUpdate()
   }
 
