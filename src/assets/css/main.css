@@ -644,6 +644,122 @@ body {
          pointer-events-auto;
 }
 
+/* Mission Button (inside orbit prompt) */
+.orbit-prompt-mission-btn {
+  @apply mt-1 w-full rounded border border-cyan-400/30
+         bg-cyan-400/10 px-4 py-1.5 text-xs font-mono text-cyan-300
+         hover:bg-cyan-400/20 transition-colors cursor-pointer
+         pointer-events-auto;
+}
+
+/* Mission Board (shuttle control program) */
+.mission-board-section {
+  @apply mb-4;
+}
+
+.mission-board-section__heading {
+  @apply mb-2 text-xs font-mono uppercase tracking-[0.2em] text-cyan-400/60
+         border-b border-cyan-400/10 pb-1;
+}
+
+.mission-board-empty {
+  @apply text-sm text-slate-500 italic py-2;
+}
+
+.mission-board-offer {
+  @apply rounded-lg border border-cyan-400/20 bg-cyan-400/5 p-3 flex flex-col gap-1.5;
+}
+
+.mission-board-offer__name {
+  @apply text-sm font-mono font-bold text-cyan-200 uppercase tracking-wider;
+}
+
+.mission-board-offer__desc {
+  @apply text-xs text-slate-400 leading-relaxed;
+}
+
+.mission-board-offer__meta {
+  @apply flex gap-4 text-xs font-mono text-cyan-400/70 mt-1;
+}
+
+.mission-board-offer__accept-btn {
+  @apply mt-2 self-start rounded border border-green-400/40
+         bg-green-400/10 px-5 py-1.5 text-xs font-mono uppercase tracking-widest
+         text-green-300 hover:bg-green-400/20 transition-colors cursor-pointer;
+}
+
+.mission-board-active {
+  @apply rounded-lg border border-white/5 bg-white/5 p-3 mb-2
+         flex flex-col gap-1;
+}
+
+.mission-board-active__name {
+  @apply text-sm font-mono font-bold text-cyan-200 uppercase tracking-wider;
+}
+
+.mission-board-active__route {
+  @apply text-xs font-mono text-slate-400;
+}
+
+.mission-board-active__status {
+  @apply text-xs font-mono text-amber-300/80;
+}
+
+.mission-board-active__cargo {
+  @apply text-xs font-mono text-slate-500;
+}
+
+.mission-board-active__deliver-btn {
+  @apply mt-2 self-start rounded border border-amber-400/40
+         bg-amber-400/10 px-5 py-1.5 text-xs font-mono uppercase tracking-widest
+         text-amber-300 hover:bg-amber-400/20 transition-colors cursor-pointer;
+}
+
+/* Mission Minigame Overlay */
+.mission-minigame-overlay {
+  @apply fixed inset-0 z-50 flex items-center justify-center
+         bg-black/70 backdrop-blur-sm;
+}
+
+.mission-minigame-card {
+  @apply w-full max-w-md rounded-xl border border-cyan-400/20
+         bg-slate-900/95 shadow-2xl;
+}
+
+.mission-minigame-card__chrome {
+  @apply flex items-center justify-between px-4 py-2.5
+         border-b border-cyan-400/10 font-mono text-xs uppercase
+         tracking-[0.2em] text-cyan-300/70;
+}
+
+.mission-minigame-card__body {
+  @apply p-6 flex flex-col gap-3;
+}
+
+.mission-minigame-card__title {
+  @apply text-lg font-mono font-bold text-cyan-200 uppercase tracking-wider;
+}
+
+.mission-minigame-card__desc {
+  @apply text-sm text-slate-400 leading-relaxed;
+}
+
+.mission-minigame-card__details {
+  @apply text-xs font-mono text-cyan-400/70;
+}
+
+.mission-minigame-card__warning {
+  @apply text-xs font-mono text-red-400 border border-red-400/20
+         bg-red-400/5 rounded px-3 py-2;
+}
+
+.mission-minigame-card__complete-btn {
+  @apply mt-2 self-center rounded border border-green-400/40
+         bg-green-400/10 px-8 py-2 text-sm font-mono uppercase tracking-widest
+         text-green-300 hover:bg-green-400/20 transition-colors cursor-pointer
+         disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-green-400/10;
+}
+
 /* Inventory Table */
 .inventory-table {
   @apply flex flex-col gap-1;
