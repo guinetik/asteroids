@@ -1534,6 +1534,9 @@ export class MapViewController implements Tickable {
         this.shopSession = createShopSession(planet.id)
         this.onShopButton?.(true, targetName)
         this.onCreditsUpdate?.(this.playerProfile.credits)
+      } else {
+        // Non-planet body (e.g. Sun) — no shop
+        this.onShopButton?.(false, '')
       }
     } else if (orbitState !== 'orbiting' && this.shopSession) {
       this.shopSession = null
