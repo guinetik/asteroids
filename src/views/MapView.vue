@@ -166,6 +166,7 @@ const mapOverlay = reactive<MapOverlayState>({
   distances: [],
   gravityRings: [],
   trajectoryPoints: [],
+  missionWaypoint: null,
 })
 
 onMounted(async () => {

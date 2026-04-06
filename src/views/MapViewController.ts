@@ -91,7 +91,7 @@ import { computeShuttleBaseFuelDrain } from '@/lib/shuttleBaseFuelDrain'
 import { ShipHealth } from '@/lib/shipHealth'
 import type { ShipHealthConfig } from '@/lib/shipHealth'
 import shipHealthData from '@/data/shuttle/ship-health.json'
-import { getCurrentShuttleThrusterEfficiencyModifiers, getCurrentUpgradeValue } from '@/lib/upgrades'
+import { getCurrentShuttleThrusterEfficiencyModifiers, getCurrentUpgradeValue, CURRENT_PLAYER_UPGRADE_LEVELS } from '@/lib/upgrades'
 import { HabitatState } from '@/lib/habitatState'
 import { HabitatInteriorScene } from '@/three/HabitatInteriorScene'
 import {
@@ -121,9 +121,16 @@ import {
   deliverMission,
   tickMissionBoard,
   getActiveMissionsForPlanet,
+  offerAsteroidMission,
+  acceptAsteroidMission,
+  beginAsteroidMission,
+  tickAsteroidMissionBoard,
 } from '@/lib/missions/shuttleMissionSession'
-import type { ShuttleMissionBoard, ActiveShuttleMission } from '@/lib/missions/types'
+import type { ShuttleMissionBoard, ActiveShuttleMission, GeneratedAsteroidMission } from '@/lib/missions/types'
 import { getGatherItemForPlanet } from '@/lib/missions/planetOrbitalConfig'
+import { generateAsteroidMission } from '@/lib/missions/asteroidMissionGenerator'
+import { computeMissionDifficulty } from '@/lib/missions/missionDifficulty'
+import { saveActiveMission } from '@/lib/missions/missionStorage'
 import '@/lib/missions/missionMaterials'
 
 /**
@@ -248,6 +255,15 @@ const MAP_RETICLE_MIN_SPEED = 0.12
  * the wedge rotation for this frame.
  */
 const MAP_RETICLE_MIN_NDC_DELTA_SQ = 1e-10
+
+/** Distance in world units at which the "Begin Mission" prompt appears. */
+const MISSION_APPROACH_RADIUS = 15
+
+/** Apparent screen size of the waypoint marker as fraction of screen height. */
+const WAYPOINT_APPARENT_SIZE = 0.04
+
+/** Waypoint marker canvas texture size. */
+const WAYPOINT_CANVAS_SIZE = 128
 
 /** Offset behind Earth so the shuttle doesn't overlap the planet mesh. */
 const SPAWN_OFFSET_BEHIND_EARTH = 7.5
@@ -457,6 +473,11 @@ export class MapViewController implements Tickable {
   /** World-space shuttle position reused for asteroid belt nearby tumble (avoid per-frame alloc). */
   private readonly _beltShuttleWorldScratch = new THREE.Vector3()
 
+  /** THREE.Sprite for the mission waypoint marker. */
+  private waypointSprite: THREE.Sprite | null = null
+  /** Whether the shuttle is within approach range of the waypoint. */
+  private missionApproachVisible = false
+
   /** Called when map overlay state changes for Vue HUD. */
   onMapOverlay: ((state: MapOverlayState) => void) | null = null
 
@@ -515,6 +536,12 @@ export class MapViewController implements Tickable {
 
   /** Called when a mission is delivered (credits awarded). */
   onMissionDeliver: ((mission: ActiveShuttleMission | null) => void) | null = null
+
+  /** Called when the shuttle approaches/leaves a mission waypoint. */
+  onMissionApproach: ((visible: boolean, missionName: string) => void) | null = null
+
+  /** Called when the player begins an asteroid mission (E at waypoint). */
+  onBeginAsteroidMission: ((mission: GeneratedAsteroidMission) => void) | null = null
 
   async init(container: HTMLElement): Promise<void> {
     // Create canvas
@@ -1549,6 +1576,45 @@ export class MapViewController implements Tickable {
       this.updateShopSession()
       this.updateMissionState()
       this.missionBoard = tickMissionBoard(this.missionBoard, dt)
+      this.missionBoard = tickAsteroidMissionBoard(this.missionBoard, dt)
+    }
+
+    // Waypoint sprite scale + approach detection
+    this.syncWaypointSprite()
+    if (this.waypointSprite && this.vehicleCamera && this.shuttleController && this.missionBoard.activeAsteroidMission) {
+      const dist = this.vehicleCamera.camera.position.distanceTo(this.waypointSprite.position)
+      const halfFovRad = THREE.MathUtils.degToRad(this.vehicleCamera.camera.fov / 2)
+      const waypointWorld = WAYPOINT_APPARENT_SIZE * 2 * dist * Math.tan(halfFovRad)
+      this.waypointSprite.scale.setScalar(waypointWorld)
+
+      const pulse = 0.6 + 0.4 * Math.sin(this.simTime * 2)
+      ;(this.waypointSprite.material as THREE.SpriteMaterial).opacity = pulse
+
+      const sx = this.shuttleController.position.x
+      const sz = this.shuttleController.position.z
+      const wx = this.missionBoard.activeAsteroidMission.waypoint.worldX
+      const wz = this.missionBoard.activeAsteroidMission.waypoint.worldZ
+      const approachDist = Math.sqrt((sx - wx) ** 2 + (sz - wz) ** 2)
+      const inRange = approachDist < MISSION_APPROACH_RADIUS
+
+      if (inRange !== this.missionApproachVisible) {
+        this.missionApproachVisible = inRange
+        this.onMissionApproach?.(inRange, this.missionBoard.activeAsteroidMission.name)
+      }
+
+      if (
+        inRange &&
+        this.inputManager?.wasActionPressed('orbitAction') &&
+        this.orbitSystem?.state === 'free'
+      ) {
+        const mission = this.missionBoard.activeAsteroidMission
+        this.missionBoard = beginAsteroidMission(this.missionBoard)
+        saveActiveMission({ ...mission, status: 'in-transit' })
+        this.onBeginAsteroidMission?.(mission)
+      }
+    } else if (this.missionApproachVisible) {
+      this.missionApproachVisible = false
+      this.onMissionApproach?.(false, '')
     }
 
     // Shop session restock tick
@@ -1716,6 +1782,7 @@ export class MapViewController implements Tickable {
       if (planet) {
         this.shopSession = createShopSession(planet.id)
         this.offerMissionAtPlanet(planet.id)
+        this.offerAsteroidMissionFromDifficulty()
         this.onShopButton?.(true, targetName)
         this.onCreditsUpdate?.(this.playerProfile.credits)
       } else {
@@ -1779,6 +1846,22 @@ export class MapViewController implements Tickable {
   /** Accept the offered mission (from shuttle control UI). */
   missionAccept(): void {
     this.missionBoard = acceptMission(this.missionBoard)
+    this.onMissionBoardUpdate?.(this.missionBoard)
+  }
+
+  /** Generate and offer an asteroid mission based on current difficulty. */
+  offerAsteroidMissionFromDifficulty(): void {
+    if (this.missionBoard.offeredAsteroidMission || this.missionBoard.activeAsteroidMission) return
+    if (this.missionBoard.asteroidRestockTimer) return
+    const difficulty = computeMissionDifficulty(CURRENT_PLAYER_UPGRADE_LEVELS)
+    const mission = generateAsteroidMission(difficulty)
+    this.missionBoard = offerAsteroidMission(this.missionBoard, mission)
+    this.onMissionBoardUpdate?.(this.missionBoard)
+  }
+
+  /** Accept the offered asteroid mission (from shuttle control UI). */
+  asteroidMissionAccept(): void {
+    this.missionBoard = acceptAsteroidMission(this.missionBoard)
     this.onMissionBoardUpdate?.(this.missionBoard)
   }
 
@@ -1946,6 +2029,56 @@ export class MapViewController implements Tickable {
     const halfTank = this.shuttleController.thrusterSystem.fuelCapacity * 0.5
     this.shuttleController.thrusterSystem.addFuel(halfTank)
     this.emitFuelCellCount()
+  }
+
+  /** Create or destroy the waypoint sprite based on active asteroid mission. */
+  private syncWaypointSprite(): void {
+    const mission = this.missionBoard.activeAsteroidMission
+    if (mission && mission.status === 'accepted' && !this.waypointSprite && this.sceneObjects) {
+      const size = WAYPOINT_CANVAS_SIZE
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d')!
+      const cx = size / 2
+      const cy = size / 2
+      const r = 20
+
+      ctx.beginPath()
+      ctx.moveTo(cx, cy - r)
+      ctx.lineTo(cx + r, cy)
+      ctx.lineTo(cx, cy + r)
+      ctx.lineTo(cx - r, cy)
+      ctx.closePath()
+
+      ctx.shadowColor = 'rgba(255, 180, 0, 0.8)'
+      ctx.shadowBlur = 15
+      ctx.fillStyle = 'rgba(255, 180, 0, 0.6)'
+      ctx.fill()
+
+      ctx.shadowBlur = 0
+      ctx.strokeStyle = 'rgba(255, 200, 50, 0.95)'
+      ctx.lineWidth = 2
+      ctx.stroke()
+
+      const tex = new THREE.CanvasTexture(canvas)
+      tex.needsUpdate = true
+
+      const mat = new THREE.SpriteMaterial({
+        map: tex,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+
+      this.waypointSprite = new THREE.Sprite(mat)
+      this.waypointSprite.position.set(mission.waypoint.worldX, 0, mission.waypoint.worldZ)
+      this.sceneObjects.scene.add(this.waypointSprite)
+    } else if ((!mission || mission.status !== 'accepted') && this.waypointSprite) {
+      this.waypointSprite.removeFromParent()
+      this.waypointSprite = null
+    }
   }
 
   /**
@@ -2509,6 +2642,7 @@ export class MapViewController implements Tickable {
         distances: [],
         gravityRings: [],
         trajectoryPoints: [],
+        missionWaypoint: null,
       })
     }
 
@@ -2550,6 +2684,7 @@ export class MapViewController implements Tickable {
       distances: [],
       gravityRings: [],
       trajectoryPoints: [],
+      missionWaypoint: null,
     })
   }
 
@@ -2685,6 +2820,21 @@ export class MapViewController implements Tickable {
 
     const trajectoryPoints = this.buildWorldLineTrajectory()
 
+    let missionWaypoint: MapOverlayState['missionWaypoint'] = null
+    if (this.missionBoard.activeAsteroidMission?.status === 'accepted') {
+      const wp = this.missionBoard.activeAsteroidMission.waypoint
+      const wpScreen = this.mapCamera!.projectToScreen(new THREE.Vector3(wp.worldX, 0, wp.worldZ))
+      const dx = wp.worldX - px
+      const dz = wp.worldZ - pz
+      const dist = Math.sqrt(dx * dx + dz * dz)
+      missionWaypoint = {
+        screenX: wpScreen.x * 100,
+        screenY: wpScreen.y * 100,
+        name: this.missionBoard.activeAsteroidMission.name,
+        distance: formatDistance(dist),
+      }
+    }
+
     this.onMapOverlay({
       visible: true,
       labels,
@@ -2695,6 +2845,7 @@ export class MapViewController implements Tickable {
       distances,
       gravityRings,
       trajectoryPoints,
+      missionWaypoint,
     })
   }
 
