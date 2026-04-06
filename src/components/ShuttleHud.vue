@@ -20,6 +20,10 @@ function fuelColor(level: number, capacity: number): string {
   if (ratio > 0.2) return 'bg-yellow-500'
   return 'bg-red-500'
 }
+
+function adriftSeconds(): string {
+  return Math.ceil(props.telemetry.adriftCountdown).toString()
+}
 </script>
 
 <template>
@@ -28,6 +32,11 @@ function fuelColor(level: number, capacity: number): string {
     <div class="hud-position">
       X:{{ props.telemetry.posX.toFixed(0) }}
       Z:{{ props.telemetry.posZ.toFixed(0) }}
+    </div>
+
+    <!-- Adrift countdown: centered below position -->
+    <div v-if="props.telemetry.adriftCountdown >= 0" class="hud-adrift-countdown">
+      {{ adriftSeconds() }}s
     </div>
 
     <!-- Top left: fuel bar -->
@@ -40,6 +49,11 @@ function fuelColor(level: number, capacity: number): string {
           :style="{ width: pct(props.telemetry.fuelLevel, props.telemetry.fuelCapacity) + '%' }"
         ></div>
       </div>
+    </div>
+
+    <!-- Adrift warning: under fuel bar -->
+    <div v-if="props.telemetry.adriftCountdown >= 0" class="hud-adrift-warning">
+      ADRIFT — DOCK TO REFUEL
     </div>
 
     <!-- Bottom left: speed and heading -->

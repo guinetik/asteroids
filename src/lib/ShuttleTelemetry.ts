@@ -18,6 +18,8 @@ export interface ShuttleTelemetry {
   brakeCapacity: number
   rcsCharge: number
   rcsCapacity: number
+  /** Seconds remaining before adrift game over. -1 when not adrift. */
+  adriftCountdown: number
 }
 
 /** Gravity danger state pushed to the HUD each frame. */

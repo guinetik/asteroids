@@ -22,6 +22,18 @@
   @apply absolute top-4 left-4 flex items-center gap-2;
 }
 
+.hud-adrift-warning {
+  @apply absolute top-10 left-4 text-red-500 text-xs font-bold;
+  text-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+  animation: gravity-pulse 1s ease-in-out infinite;
+}
+
+.hud-adrift-countdown {
+  @apply absolute top-10 left-1/2 -translate-x-1/2 text-red-500 text-2xl font-bold font-mono;
+  text-shadow: 0 0 12px rgba(239, 68, 68, 0.8);
+  animation: gravity-pulse 1s ease-in-out infinite;
+}
+
 .hud-fuel-label {
   @apply text-green-400;
 }

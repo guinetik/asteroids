@@ -579,6 +579,7 @@ export class MapViewController implements Tickable {
         brakeCapacity: ts.getState('brake').capacity,
         rcsCharge: ts.getState('rcs').charge,
         rcsCapacity: ts.getState('rcs').capacity,
+        adriftCountdown: this.adriftTimer > 0 ? ADRIFT_TIMEOUT - this.adriftTimer : -1,
       })
     }
 

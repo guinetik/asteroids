@@ -186,6 +186,7 @@ export class ShuttleViewController implements Tickable {
         brakeCapacity: ts.getState('brake').capacity,
         rcsCharge: ts.getState('rcs').charge,
         rcsCapacity: ts.getState('rcs').capacity,
+        adriftCountdown: -1,
       })
     }
   }
