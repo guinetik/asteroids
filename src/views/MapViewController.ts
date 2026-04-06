@@ -34,13 +34,24 @@ import { AsteroidBeltController } from '@/three/controllers/AsteroidBeltControll
 import { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
 import * as THREE from 'three'
 import { OrbitCaptureSystem, type OrbitHudState } from '@/lib/orbitCapture'
-import { gravityAt, influenceRadius, eventHorizonRadius, type GravityConfig } from '@/lib/physics/gravity'
+import {
+  gravityAt,
+  influenceRadius,
+  eventHorizonRadius,
+  type GravityConfig,
+} from '@/lib/physics/gravity'
 import type { GravityWell } from '@/three/ShuttleController'
 import type { GravitySource } from '@/lib/physics/gravity'
 import { ShuttleController, MAP_PHYSICS } from '@/three/ShuttleController'
 import mapGravityData from '@/data/shuttle/map-gravity.json'
 import { ThrusterEffectController } from '@/three/ThrusterEffectController'
-import { VehicleCamera, MAP_CAMERA_CONFIG, MAP_ORBIT_CAMERA_CONFIG, MAP_INSPECT_CAMERA_CONFIG, MAP_DEATH_CAMERA_CONFIG } from '@/three/VehicleCamera'
+import {
+  VehicleCamera,
+  MAP_CAMERA_CONFIG,
+  MAP_ORBIT_CAMERA_CONFIG,
+  MAP_INSPECT_CAMERA_CONFIG,
+  MAP_DEATH_CAMERA_CONFIG,
+} from '@/three/VehicleCamera'
 import { buildSlingshotChargeCameraConfig } from '@/three/slingshotChargeCamera'
 import orbitConfig from '@/data/shuttle/orbit-capture.json'
 import { PortalArrivalSequence } from '@/three/PortalArrivalSequence'
@@ -67,6 +78,8 @@ import { DevConsole } from '@/lib/devConsole'
 import { AmbientSpaceController } from '@/three/AmbientSpaceController'
 import { computeShuttleBaseFuelDrain } from '@/lib/shuttleBaseFuelDrain'
 import { getCurrentShuttleThrusterEfficiencyModifiers } from '@/lib/upgrades'
+import { HabitatState } from '@/lib/habitatState'
+import { HabitatInteriorScene } from '@/three/HabitatInteriorScene'
 
 /** Tick priority for the compositor (runs after animation, before render). */
 const TICK_PRIORITY_COMPOSIT = TICK_PRIORITY_RENDER - 1
@@ -81,6 +94,17 @@ const ONE_SHOT_PRIORITY = TICK_PRIORITY_INPUT + 1
  */
 /** Only Jupiter (9.55e-4) and Saturn (2.86e-4) deform the grid. */
 const GRID_MASS_THRESHOLD = 1e-4
+
+/** Baseline wireframe segments per axis on the map space-time grid. */
+const MAP_SPACE_TIME_GRID_BASE_RESOLUTION = 150
+
+/** Density boost on segment count (1.5 → 50% more segments per axis vs baseline 250). */
+const MAP_SPACE_TIME_GRID_RESOLUTION_BOOST = 1.5
+
+/** Resolved segment count for the map space-time grid wireframe. */
+const MAP_SPACE_TIME_GRID_RESOLUTION = Math.round(
+  MAP_SPACE_TIME_GRID_BASE_RESOLUTION * MAP_SPACE_TIME_GRID_RESOLUTION_BOOST,
+)
 
 /**
  * Visual scale for the shuttle in the map view.
@@ -130,6 +154,17 @@ const SPAWN_OFFSET_BEHIND_EARTH = 7.5
 /** How much grid slope affects shuttle speed (multiplier on slope value). */
 const CURVATURE_SPEED_FACTOR = 0.3
 
+/**
+ * When both camera view spans (XZ at the orbit target) exceed this fraction of the
+ * grid width, the whole fabric is in view — use a cheaper deform cadence (no debunching).
+ */
+const GRID_DEFORM_WHOLE_MAP_COVERAGE = 0.82
+
+/**
+ * Multiplier on the grid’s base deform interval while the whole map is visible.
+ * Keeps low-frequency global warping smooth without touching every vertex every pass.
+ */
+const GRID_DEFORM_INTERVAL_SCALE_WHOLE_MAP = 3
 
 /** Duration in seconds for the approach animation lerp. */
 const APPROACH_DURATION = 1.5
@@ -198,7 +233,10 @@ const VENUS_ORBIT_WARNING_DISTANCE = 1.5
  * Wraps a GravitySource into a GravityWell that ShuttleController can consume,
  * using map-scale gravity config.
  */
-function makeGravityWell(source: GravitySource, config: GravityConfig): GravityWell & GravitySource {
+function makeGravityWell(
+  source: GravitySource,
+  config: GravityConfig,
+): GravityWell & GravitySource {
   return {
     mass: source.mass,
     getWorldX: () => source.getWorldX(),
@@ -231,6 +269,8 @@ export class MapViewController implements Tickable {
   private planetControllers: PlanetSystemController[] = []
   private beltControllers: AsteroidBeltController[] = []
   private spaceTimeGrid: SpaceTimeGrid | null = null
+  /** World width/depth of the map space-time grid (passed to {@link SpaceTimeGrid}). */
+  private mapGridSize = 0
   private simTime = 0
   private resizeHandler: (() => void) | null = null
 
@@ -242,6 +282,8 @@ export class MapViewController implements Tickable {
   private slingshotCharge = 0
   private launchArrow: THREE.ArrowHelper | null = null
   private inspectMode = false
+  private habitatState = new HabitatState()
+  private habitatScene: HabitatInteriorScene | null = null
   private portalArrival: PortalArrivalSequence | null = null
   private boundarySystem: PortalBoundarySystem | null = null
   private gravityPass: ShaderPass | null = null
@@ -291,6 +333,13 @@ export class MapViewController implements Tickable {
   /** Called when the ship-message queue changes and Vue should refresh. */
   onMessageUpdate: (() => void) | null = null
 
+  /** Fired when player enters/leaves habitat. */
+  onHabitatActive: ((active: boolean) => void) | null = null
+  /** Fired when the shuttle control overlay should open/close. */
+  onShuttleControl: ((visible: boolean) => void) | null = null
+  /** Fired when the habitat interaction prompt changes. */
+  onHabitatPrompt: ((prompt: string | null) => void) | null = null
+
   async init(container: HTMLElement): Promise<void> {
     // Create canvas
     const canvas = document.createElement('canvas')
@@ -339,6 +388,9 @@ export class MapViewController implements Tickable {
 
     this.tickHandler.register(this.vehicleCamera, TICK_PRIORITY_COMPOSIT - 1)
 
+    // Habitat FPS camera mouse look
+    document.addEventListener('mousemove', this.onHabitatMouseMove)
+
     // --- Starfield ---
     this.starField = new StarFieldController()
     scene.add(this.starField.points)
@@ -372,17 +424,28 @@ export class MapViewController implements Tickable {
     // --- Space-time grid (gravity well visualization) ---
     const kuiperOuterEdge = 2400 * ORBIT_SCALE
     const gridSize = kuiperOuterEdge * 2.2
+    this.mapGridSize = gridSize
     const gridDepthScale = 80
     const gridWidthScale = 40
     const gridMassExponent = 0.2
-    this.spaceTimeGrid = new SpaceTimeGrid(gridSize, 250, gridDepthScale, gridWidthScale, gridMassExponent)
+    this.spaceTimeGrid = new SpaceTimeGrid(
+      gridSize,
+      MAP_SPACE_TIME_GRID_RESOLUTION,
+      gridDepthScale,
+      gridWidthScale,
+      gridMassExponent,
+    )
     scene.add(this.spaceTimeGrid.mesh)
 
     // Sun is static — add once, never cleared
     this.spaceTimeGrid.addStaticSource({ x: 0, z: 0, mass: SUN.mass })
 
     // --- Shuttle (player character) ---
-    this.shuttleController = new ShuttleController(this.inputManager, MAP_PHYSICS, MAP_GRAVITY_CONFIG)
+    this.shuttleController = new ShuttleController(
+      this.inputManager,
+      MAP_PHYSICS,
+      MAP_GRAVITY_CONFIG,
+    )
     this.shuttleController.setSpaceTimeGrid(this.spaceTimeGrid)
 
     // Register gravity wells — Sun + all planets
@@ -439,7 +502,8 @@ export class MapViewController implements Tickable {
     this.tickHandler.register(this.ambientSpace, TICK_PRIORITY_ANIMATION)
 
     // --- Orbit capture system ---
-    const earthOrbit = PLANETS.find((planet) => planet.id === EARTH_PLANET_ID)?.orbit ?? PLANETS[0]!.orbit
+    const earthOrbit =
+      PLANETS.find((planet) => planet.id === EARTH_PLANET_ID)?.orbit ?? PLANETS[0]!.orbit
     const captureBodies = [
       {
         name: SUN.name,
@@ -452,11 +516,11 @@ export class MapViewController implements Tickable {
         getWorldZ: () => this.sunController!.getWorldZ(),
       },
       ...PLANETS.map((planet, i) => ({
-      name: planet.name,
-      displayRadius: planet.displayRadius,
+        name: planet.name,
+        displayRadius: planet.displayRadius,
         orbitalSpeedMultiplier: computeRelativeOrbitalSpeedMultiplier(planet.orbit, earthOrbit),
-      getWorldX: () => this.planetControllers[i]!.getWorldX(),
-      getWorldZ: () => this.planetControllers[i]!.getWorldZ(),
+        getWorldX: () => this.planetControllers[i]!.getWorldX(),
+        getWorldZ: () => this.planetControllers[i]!.getWorldZ(),
       })),
     ]
     this.orbitSystem = new OrbitCaptureSystem(captureBodies)
@@ -482,7 +546,7 @@ export class MapViewController implements Tickable {
       this.shuttleController.group.position.set(ex + orbitR, 0, ez)
       this.orbitSystem.checkArrival(ex + orbitR, ez)
       // Face away from Earth — default slingshot direction is outward
-      const awayAngle = Math.atan2(-ez, (ex + orbitR) - ex)
+      const awayAngle = Math.atan2(-ez, ex + orbitR - ex)
       this.shuttleController.group.rotation.set(0, awayAngle, 0)
       this.shuttleController.freeze()
       this.shuttleController.setInputEnabled(false)
@@ -564,7 +628,10 @@ export class MapViewController implements Tickable {
       },
       getShuttlePosition: () => {
         const pos = this.shuttleController?.group.position
-        if (pos) console.info(`[MapView] Shuttle: x=${pos.x.toFixed(1)} y=${pos.y.toFixed(1)} z=${pos.z.toFixed(1)}`)
+        if (pos)
+          console.info(
+            `[MapView] Shuttle: x=${pos.x.toFixed(1)} y=${pos.y.toFixed(1)} z=${pos.z.toFixed(1)}`,
+          )
       },
       teleportToSun: () => {
         if (this.sunController && this.shuttleController) {
@@ -594,6 +661,8 @@ export class MapViewController implements Tickable {
     this.emitIntroUiState()
     const introLocked = this.mapIntro.controlsLocked
 
+    this.syncVehicleCameraShipYawCoupling()
+
     // Map toggle (M key) — opens/closes tactical map
     if (!introLocked && this.inputManager?.wasActionPressed('toggleMap')) {
       if (!this.mapState.isOpen) {
@@ -611,9 +680,9 @@ export class MapViewController implements Tickable {
 
     // Also close on Escape
     if (
-      !introLocked
-      && this.inputManager?.wasActionPressed('closeMap')
-      && this.mapState.phase === 'open'
+      !introLocked &&
+      this.inputManager?.wasActionPressed('closeMap') &&
+      this.mapState.phase === 'open'
     ) {
       this.mapState.close()
     }
@@ -630,6 +699,42 @@ export class MapViewController implements Tickable {
 
       // Skip all gameplay logic while map is open
       return
+    }
+
+    // Habitat state machine
+    if (this.habitatState.isActive) {
+      const wasTrans = this.habitatState.phase === 'transitioning_in'
+      this.habitatState.tick(dt)
+
+      // Lazy-load scene on first entry
+      if (this.habitatState.phase !== 'map' && !this.habitatScene) {
+        this.ensureHabitatScene()
+      }
+
+      this.tickHabitatTransition()
+
+      // Detect transitioning_in → habitat (entry complete)
+      if (wasTrans && this.habitatState.phase === 'habitat') {
+        this.onEnterHabitat()
+      }
+
+      // When exit completes, restore map state
+      if (this.habitatState.phase === 'map') {
+        this.onExitHabitat()
+      }
+
+      // While in habitat, tick the interior scene
+      if (this.habitatState.phase === 'habitat' && this.habitatScene) {
+        this.habitatScene.tick(dt)
+
+        // Check for exit via Escape/H inside the habitat's own input
+        if (this.habitatScene.inputManager.wasActionPressed('exitHabitat')) {
+          this.habitatState.leave()
+        }
+      }
+
+      // Skip map gameplay while in habitat
+      if (this.habitatState.phase !== 'map') return
     }
 
     if (introLocked) {
@@ -662,6 +767,25 @@ export class MapViewController implements Tickable {
           bloomPass.threshold = 0.45
           bloomPass.strength = 0.72
         }
+      }
+    }
+
+    // Habitat interior (H key) — enter/exit first-person interior
+    if (
+      this.inputManager?.wasActionPressed('focusHabitat') &&
+      this.shuttleController &&
+      this.sceneObjects
+    ) {
+      if (!this.habitatState.isActive) {
+        // Enter habitat
+        if (!this.inspectMode) {
+          this.shuttleController.toggleDoors()
+          this.inspectMode = true
+        }
+        this.habitatState.enter()
+      } else if (this.habitatState.phase === 'habitat') {
+        // Leave habitat
+        this.habitatState.leave()
       }
     }
 
@@ -761,11 +885,11 @@ export class MapViewController implements Tickable {
     // Spacetime curvature effects — local Y displacement + slope speed modifier
     // Only in free flight, not during orbit capture or yRecovery
     if (
-      this.shuttleController
-      && this.spaceTimeGrid
-      && !this.yRecovery
-      && !this.shuttleController.dead
-      && (this.orbitSystem?.state ?? 'free') === 'free'
+      this.shuttleController &&
+      this.spaceTimeGrid &&
+      !this.yRecovery &&
+      !this.shuttleController.dead &&
+      (this.orbitSystem?.state ?? 'free') === 'free'
     ) {
       const px = this.shuttleController.position.x
       const pz = this.shuttleController.position.z
@@ -795,7 +919,11 @@ export class MapViewController implements Tickable {
     }
 
     // Orbit approach — animated lerp toward orbit insertion point
-    if (this.orbitSystem?.state === 'approaching' && this.shuttleController && this.approachStartPos) {
+    if (
+      this.orbitSystem?.state === 'approaching' &&
+      this.shuttleController &&
+      this.approachStartPos
+    ) {
       this.approachProgress = Math.min(1, this.approachProgress + dt / APPROACH_DURATION)
       // Ease-out curve for smooth deceleration
       const t = 1 - Math.pow(1 - this.approachProgress, 3)
@@ -819,7 +947,8 @@ export class MapViewController implements Tickable {
       // Ring follows planet during approach
       if (this.orbitRing && this.orbitSystem.target) {
         this.orbitRing.position.set(
-          this.orbitSystem.target.getWorldX(), 0,
+          this.orbitSystem.target.getWorldX(),
+          0,
           this.orbitSystem.target.getWorldZ(),
         )
       }
@@ -922,7 +1051,8 @@ export class MapViewController implements Tickable {
             this.sunController.getWorldX(),
             this.sunController.getWorldZ(),
             this.sunController.mass,
-            px, pz,
+            px,
+            pz,
           )
           if (prox > maxProximity) {
             maxProximity = prox
@@ -1004,6 +1134,7 @@ export class MapViewController implements Tickable {
           mass: controller.mass,
         })
       }
+      this.syncSpaceTimeGridVisualBudget()
       this.spaceTimeGrid.tick(dt)
     }
 
@@ -1011,21 +1142,24 @@ export class MapViewController implements Tickable {
     if (this.orbitSystem?.state === 'orbiting' && this.shuttleController && this.inputManager) {
       const pos = this.orbitSystem.tickOrbit(dt)
       const planetY = this.orbitSystem.target
-        ? this.planetControllers.find((_c, i) =>
-          PLANETS[i]?.name === this.orbitSystem!.target?.name)?.group.position.y ?? 0
+        ? (this.planetControllers.find(
+            (_c, i) => PLANETS[i]?.name === this.orbitSystem!.target?.name,
+          )?.group.position.y ?? 0)
         : 0
       if (pos) {
         this.shuttleController.group.position.set(pos.x, planetY, pos.z)
       }
       // A/D yaw — input is disabled so read InputManager directly and set orbit flags for VFX
-      const yawLeft = !this.mapIntro.controlsLocked
-        && this.inputManager.isActionActive('yawLeft')
-        && this.shuttleController.thrusterSystem.canFire('rcs', {
+      const yawLeft =
+        !this.mapIntro.controlsLocked &&
+        this.inputManager.isActionActive('yawLeft') &&
+        this.shuttleController.thrusterSystem.canFire('rcs', {
           burnRateMultiplier: getCurrentShuttleThrusterEfficiencyModifiers(),
         })
-      const yawRight = !this.mapIntro.controlsLocked
-        && this.inputManager.isActionActive('yawRight')
-        && this.shuttleController.thrusterSystem.canFire('rcs', {
+      const yawRight =
+        !this.mapIntro.controlsLocked &&
+        this.inputManager.isActionActive('yawRight') &&
+        this.shuttleController.thrusterSystem.canFire('rcs', {
           burnRateMultiplier: getCurrentShuttleThrusterEfficiencyModifiers(),
         })
       this.shuttleController.orbitYawLeft = yawLeft
@@ -1096,8 +1230,50 @@ export class MapViewController implements Tickable {
     this.gridVisible = !this.gridVisible
     if (this.spaceTimeGrid) {
       this.spaceTimeGrid.mesh.visible = this.gridVisible
+      if (this.gridVisible) {
+        this.syncSpaceTimeGridVisualBudget()
+        this.spaceTimeGrid.forceFullVisualDeform()
+      }
     }
     return this.gridVisible
+  }
+
+  /**
+   * Drives grid wireframe LOD from orbit-camera distance and FOV.
+   * Analytical shuttle depth/slope math is unchanged; only vertex deformation cost drops.
+   */
+  private syncSpaceTimeGridVisualBudget(): void {
+    if (!this.spaceTimeGrid || !this.vehicleCamera || this.mapGridSize <= 0) {
+      return
+    }
+
+    const cam = this.vehicleCamera.camera
+    const target = this.vehicleCamera.controls.target
+    const dist = cam.position.distanceTo(target)
+    if (dist < 1e-4) {
+      return
+    }
+
+    const vFovRad = THREE.MathUtils.degToRad(cam.fov)
+    const halfViewZ = dist * Math.tan(vFovRad / 2)
+    const halfViewX = halfViewZ * cam.aspect
+
+    const spanX = 2 * halfViewX
+    const spanZ = 2 * halfViewZ
+    const coversWholeMap =
+      spanX >= this.mapGridSize * GRID_DEFORM_WHOLE_MAP_COVERAGE &&
+      spanZ >= this.mapGridSize * GRID_DEFORM_WHOLE_MAP_COVERAGE
+
+    const intervalScale = coversWholeMap ? GRID_DEFORM_INTERVAL_SCALE_WHOLE_MAP : 1
+
+    this.spaceTimeGrid.setVisualDeformBudget({
+      intervalScale,
+      useSpatialCull: !coversWholeMap,
+      cullCenterX: target.x,
+      cullCenterZ: target.z,
+      cullHalfExtentX: halfViewX,
+      cullHalfExtentZ: halfViewZ,
+    })
   }
 
   /**
@@ -1282,8 +1458,11 @@ export class MapViewController implements Tickable {
    * Returns 0 if outside influence radius.
    */
   private computeProximity(
-    sourceX: number, sourceZ: number, mass: number,
-    px: number, pz: number,
+    sourceX: number,
+    sourceZ: number,
+    mass: number,
+    px: number,
+    pz: number,
   ): number {
     const dx = sourceX - px
     const dz = sourceZ - pz
@@ -1298,10 +1477,16 @@ export class MapViewController implements Tickable {
   private computeMaxProximity(px: number, pz: number): number {
     let max = 0
     if (this.sunController) {
-      max = Math.max(max, this.computeProximity(
-        this.sunController.getWorldX(), this.sunController.getWorldZ(),
-        this.sunController.mass, px, pz,
-      ))
+      max = Math.max(
+        max,
+        this.computeProximity(
+          this.sunController.getWorldX(),
+          this.sunController.getWorldZ(),
+          this.sunController.mass,
+          px,
+          pz,
+        ),
+      )
     }
     for (const c of this.planetControllers) {
       max = Math.max(max, this.computeProximity(c.getWorldX(), c.getWorldZ(), c.mass, px, pz))
@@ -1312,8 +1497,9 @@ export class MapViewController implements Tickable {
   /** Returns true if the shuttle is aiming toward the captured planet. */
   private isAimingAtPlanet(): boolean {
     if (!this.shuttleController || !this.orbitSystem?.target) return false
-    const forward = new THREE.Vector3(1, 0, 0)
-      .applyQuaternion(this.shuttleController.group.quaternion)
+    const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(
+      this.shuttleController.group.quaternion,
+    )
     forward.y = 0
     forward.normalize()
     const toPlanet = new THREE.Vector3(
@@ -1356,6 +1542,17 @@ export class MapViewController implements Tickable {
       this.launchArrow.dispose()
       this.launchArrow = null
     }
+  }
+
+  /**
+   * Rotating the shuttle with A/D should swing the chase cam only in free flight;
+   * during planet orbit capture, yaw is for aiming and must not drag the camera offset.
+   */
+  private syncVehicleCameraShipYawCoupling(): void {
+    if (!this.vehicleCamera) return
+    const orbitState = this.orbitSystem?.state ?? 'free'
+    const driving = orbitState === 'free'
+    this.vehicleCamera.setShipYawCoupling(driving)
   }
 
   /** Create a dashed circle ring at the given radius and add to scene. */
@@ -1506,9 +1703,10 @@ export class MapViewController implements Tickable {
       z: this.shuttleController.position.z,
     }
     const lastPoint = this.worldLineHistory[this.worldLineHistory.length - 1]
-    const points = lastPoint && lastPoint.x === currentPoint.x && lastPoint.z === currentPoint.z
-      ? this.worldLineHistory
-      : [...this.worldLineHistory, currentPoint]
+    const points =
+      lastPoint && lastPoint.x === currentPoint.x && lastPoint.z === currentPoint.z
+        ? this.worldLineHistory
+        : [...this.worldLineHistory, currentPoint]
 
     return points.map((sample) => {
       const projected = this.mapCamera!.projectToScreen(new THREE.Vector3(sample.x, 0, sample.z))
@@ -1569,9 +1767,7 @@ export class MapViewController implements Tickable {
     }
 
     // Project ship position
-    const shipScreen = this.mapCamera.projectToScreen(
-      new THREE.Vector3(px, 0, pz),
-    )
+    const shipScreen = this.mapCamera.projectToScreen(new THREE.Vector3(px, 0, pz))
 
     // Project body labels with distance
     const labels = bodies.map((b) => {
@@ -1579,7 +1775,12 @@ export class MapViewController implements Tickable {
       const dx = b.x - px
       const dz = b.z - pz
       const dist = Math.sqrt(dx * dx + dz * dz)
-      return { name: b.name, screenX: screen.x * 100, screenY: screen.y * 100, distance: formatDistance(dist) }
+      return {
+        name: b.name,
+        screenX: screen.x * 100,
+        screenY: screen.y * 100,
+        distance: formatDistance(dist),
+      }
     })
 
     // Nearest bodies for distance lines
@@ -1598,7 +1799,7 @@ export class MapViewController implements Tickable {
 
     // Heading arrow — convert heading to CSS rotation degrees
     const heading = this.shuttleController.heading
-    const headingDeg = -(heading * 180 / Math.PI) + 90
+    const headingDeg = -((heading * 180) / Math.PI) + 90
 
     // Gravity rings — project influence and event horizon radii to screen %
     const gravityRings = bodies
@@ -1678,22 +1879,25 @@ export class MapViewController implements Tickable {
   /** Animate from the system overview shot into the live orbit camera. */
   private tickStartupIntroCamera(): void {
     if (
-      !this.sceneObjects
-      || !this.vehicleCamera
-      || !this.introCamera
-      || !this.shuttleController
-      || this.mapState.isOpen
-    ) return
+      !this.sceneObjects ||
+      !this.vehicleCamera ||
+      !this.introCamera ||
+      !this.shuttleController ||
+      this.mapState.isOpen
+    )
+      return
 
     const renderPass = this.sceneObjects.composer.passes[0] as RenderPass
     if (this.mapIntro.phase === 'cinematic_zoom') {
       const progress = easeInOut(this.mapIntro.cinematicProgress)
       const targetPosition = this.vehicleCamera.camera.position
       const targetLookAt = this.vehicleCamera.controls.target
-      const heroPosition = this.shuttleController.group.position.clone().add(
-        MAP_INTRO_HERO_OFFSET.clone().applyQuaternion(this.shuttleController.group.quaternion),
-      )
-      const heroTarget = this.shuttleController.group.position.clone().add(MAP_INTRO_HERO_LOOK_AT_OFFSET)
+      const heroPosition = this.shuttleController.group.position
+        .clone()
+        .add(MAP_INTRO_HERO_OFFSET.clone().applyQuaternion(this.shuttleController.group.quaternion))
+      const heroTarget = this.shuttleController.group.position
+        .clone()
+        .add(MAP_INTRO_HERO_LOOK_AT_OFFSET)
 
       if (progress < MAP_INTRO_HERO_HOLD_START) {
         const heroProgress = easeInOut(progress / MAP_INTRO_HERO_HOLD_START)
@@ -1730,17 +1934,9 @@ export class MapViewController implements Tickable {
       const orbitProgress = easeInOut(
         (progress - MAP_INTRO_HERO_HOLD_END) / (1 - MAP_INTRO_HERO_HOLD_END),
       )
-      const currentTarget = new THREE.Vector3().lerpVectors(
-        heroTarget,
-        targetLookAt,
-        orbitProgress,
-      )
+      const currentTarget = new THREE.Vector3().lerpVectors(heroTarget, targetLookAt, orbitProgress)
 
-      this.introCamera.position.lerpVectors(
-        heroPosition,
-        targetPosition,
-        orbitProgress,
-      )
+      this.introCamera.position.lerpVectors(heroPosition, targetPosition, orbitProgress)
       this.introCamera.fov = THREE.MathUtils.lerp(
         MAP_INTRO_HERO_FOV,
         this.vehicleCamera.camera.fov,
@@ -1761,7 +1957,9 @@ export class MapViewController implements Tickable {
       return
     }
 
-    renderPass.camera = this.vehicleCamera.camera
+    if (!this.habitatState.isActive) {
+      renderPass.camera = this.vehicleCamera.camera
+    }
   }
 
   /** Push the current intro UI state to Vue. */
@@ -1785,8 +1983,8 @@ export class MapViewController implements Tickable {
   /** Fire Jay's navigation note after the player has meaningfully left Earth. */
   private triggerEarthDistanceMessage(): void {
     if (
-      this.didDispatchEarthDistanceMessage
-      || this.worldLineHistory.length < EARTH_DEPARTURE_MIN_HISTORY_POINTS
+      this.didDispatchEarthDistanceMessage ||
+      this.worldLineHistory.length < EARTH_DEPARTURE_MIN_HISTORY_POINTS
     ) {
       return
     }
@@ -1860,10 +2058,86 @@ export class MapViewController implements Tickable {
   /** Look up a live planet controller by catalog id. */
   private getPlanetControllerById(planetId: string): PlanetSystemController | null {
     const index = PLANETS.findIndex((planet) => planet.id === planetId)
-    return index >= 0 ? this.planetControllers[index] ?? null : null
+    return index >= 0 ? (this.planetControllers[index] ?? null) : null
+  }
+
+  /** Lazy-load the habitat interior scene on first entry. */
+  private async ensureHabitatScene(): Promise<HabitatInteriorScene> {
+    if (!this.habitatScene) {
+      this.habitatScene = new HabitatInteriorScene()
+      await this.habitatScene.load()
+      this.habitatScene.onInteract = (target) => {
+        if (target === 'table') {
+          this.onShuttleControl?.(true)
+          document.exitPointerLock()
+        }
+      }
+      this.habitatScene.onPrompt = (prompt) => {
+        this.onHabitatPrompt?.(prompt)
+      }
+    }
+    return this.habitatScene
+  }
+
+  private tickHabitatTransition(): void {
+    if (!this.sceneObjects || !this.habitatScene) return
+
+    const renderPass = this.sceneObjects.composer.passes[0] as RenderPass
+
+    if (
+      this.habitatState.phase === 'transitioning_in' ||
+      this.habitatState.phase === 'habitat' ||
+      this.habitatState.phase === 'transitioning_out'
+    ) {
+      // Swap to habitat scene for all active phases
+      ;(renderPass as { scene: THREE.Scene }).scene = this.habitatScene.getScene()
+      renderPass.camera = this.habitatScene.getCamera()
+      // Disable vehicle camera controls during habitat
+      if (this.vehicleCamera) {
+        this.vehicleCamera.controls.enabled = false
+      }
+    }
+  }
+
+  private onEnterHabitat(): void {
+    this.onHabitatActive?.(true)
+    // Request pointer lock for FPS mouse look
+    this.sceneObjects?.renderer.domElement.requestPointerLock()
+  }
+
+  private onExitHabitat(): void {
+    if (!this.sceneObjects) return
+
+    // Restore map scene + camera
+    const renderPass = this.sceneObjects.composer.passes[0] as RenderPass
+    ;(renderPass as { scene: THREE.Scene }).scene = this.sceneObjects.scene
+    if (this.vehicleCamera) {
+      renderPass.camera = this.vehicleCamera.camera
+      this.vehicleCamera.controls.enabled = true
+    }
+
+    // Close doors
+    if (this.inspectMode) {
+      this.shuttleController?.toggleDoors()
+      this.inspectMode = false
+    }
+
+    document.exitPointerLock()
+    this.onHabitatActive?.(false)
+    this.onHabitatPrompt?.(null)
+  }
+
+  /** Feed mouse deltas to the habitat FPS camera when pointer is locked. */
+  private onHabitatMouseMove = (e: MouseEvent): void => {
+    if (this.habitatState.phase !== 'habitat' || !this.habitatScene) return
+    if (!document.pointerLockElement) return
+    this.habitatScene.fpsCamera.applyMouseDelta(e.movementX, e.movementY)
   }
 
   dispose(): void {
+    document.removeEventListener('mousemove', this.onHabitatMouseMove)
+    this.habitatScene?.dispose()
+    this.habitatScene = null
     DevConsole.unregister('MapView')
     this.ambientSpace?.dispose()
     if (this.shipReticle) {
@@ -1898,5 +2172,4 @@ export class MapViewController implements Tickable {
       this.sceneObjects.renderer.dispose()
     }
   }
-
 }

@@ -8,6 +8,7 @@ import GravityWarning from '@/components/GravityWarning.vue'
 import DeathOverlay from '@/components/DeathOverlay.vue'
 import MapOverlay from '@/components/MapOverlay.vue'
 import ShipMessageDialog from '@/components/ShipMessageDialog.vue'
+import ShuttleControlOverlay from '@/components/ShuttleControlOverlay.vue'
 import { shipMessageSystem } from '@/lib/messages/runtime'
 import type { ActiveShipMessage } from '@/lib/messages/messageTypes'
 import type { MapIntroUiState } from '@/lib/mapIntroState'
@@ -92,6 +93,9 @@ const gravityWarning = reactive<GravityWarningState>({
   bodyName: null,
   visible: false,
 })
+const habitatActive = ref(false)
+const shuttleControlVisible = ref(false)
+const habitatPrompt = ref<string | null>(null)
 const deathVisible = ref(false)
 const deathCause = ref('')
 const orbitsVisible = ref(true)
@@ -133,6 +137,15 @@ onMounted(async () => {
     viewController.onMessageUpdate = () => {
       refreshActiveMessage()
     }
+    viewController.onHabitatActive = (active) => {
+      habitatActive.value = active
+    }
+    viewController.onShuttleControl = (visible) => {
+      shuttleControlVisible.value = visible
+    }
+    viewController.onHabitatPrompt = (prompt) => {
+      habitatPrompt.value = prompt
+    }
     await viewController.init(container.value)
     refreshActiveMessage()
   }
@@ -152,6 +165,12 @@ function handleToggleOrbits() {
 
 function handleToggleGrid() {
   gridVisible.value = viewController.toggleSpaceTimeGrid()
+}
+
+function closeShuttleControl() {
+  shuttleControlVisible.value = false
+  const canvas = document.querySelector('canvas')
+  canvas?.requestPointerLock()
 }
 
 function handleToggleAmbient() {
@@ -233,5 +252,12 @@ function handleToggleAmbient() {
       <span class="map-toggle-btn__dot" />
       Debris
     </button>
+  </div>
+  <ShuttleControlOverlay
+    :visible="shuttleControlVisible"
+    @close="closeShuttleControl"
+  />
+  <div v-if="habitatActive && habitatPrompt && !shuttleControlVisible" class="habitat-prompt">
+    <span class="orbit-prompt-action">{{ habitatPrompt }}</span>
   </div>
 </template>
