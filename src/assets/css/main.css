@@ -199,6 +199,16 @@
   text-shadow: 0 0 4px rgba(34, 211, 238, 0.5);
 }
 
+.map-label-distance {
+  @apply font-mono text-cyan-600 opacity-50;
+  font-size: 9px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 14px;
+  white-space: nowrap;
+}
+
 .map-ship-marker {
   @apply absolute pointer-events-none;
   transform: translate(-50%, -50%);

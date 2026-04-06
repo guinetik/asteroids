@@ -40,6 +40,8 @@ export interface MapBodyLabel {
   screenX: number
   /** Screen Y as percentage (0–100) */
   screenY: number
+  /** Formatted distance from ship */
+  distance: string
 }
 
 /** Screen-projected distance line from ship to a body. */

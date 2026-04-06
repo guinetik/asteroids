@@ -1,10 +1,16 @@
 <!-- src/components/MapOverlay.vue -->
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { MapOverlayState } from '@/lib/ShuttleTelemetry'
 
-defineProps<{
+const props = defineProps<{
   overlay: MapOverlayState
 }>()
+
+/** Bodies that already have a route line — don't duplicate the distance label. */
+const routeBodyNames = computed(() =>
+  new Set(props.overlay.distances.map((d) => d.name)),
+)
 </script>
 
 <template>
@@ -64,6 +70,7 @@ defineProps<{
     >
       <div class="map-body-dot" />
       <span class="map-label">{{ label.name }}</span>
+      <span v-if="!routeBodyNames.has(label.name)" class="map-label-distance">{{ label.distance }}</span>
     </div>
 
     <!-- Ship marker + heading arrow -->

@@ -51,6 +51,7 @@ import { MapState } from '@/lib/mapState'
 import { MapCamera, easeInOut } from '@/three/MapCamera'
 import { findNearestBodies, formatDistance, type MapBody } from '@/lib/mapProjection'
 import type { MapOverlayState } from '@/lib/ShuttleTelemetry'
+import { canReleaseSlingshot } from '@/lib/slingshotLaunchPolicy'
 import mapOverlayData from '@/data/shuttle/map-overlay.json'
 
 /** Tick priority for the compositor (runs after animation, before render). */
@@ -518,38 +519,38 @@ export class MapViewController implements Tickable {
         if (eHeld) {
           this.slingshotCharge = Math.min(1, this.slingshotCharge + dt / SLINGSHOT_CHARGE_TIME)
           this.updateLaunchArrow()
-        } else if (this.slingshotCharge > 0 && !this.isAimingAtPlanet()) {
-          // E released — launch in aimed direction (blocked if aiming at planet)
-          const forward = new THREE.Vector3(1, 0, 0)
-            .applyQuaternion(this.shuttleController.group.quaternion)
-          forward.y = 0
-          forward.normalize()
-          const speed = orbitConfig.orbitLaunchSpeed * this.slingshotCharge
-          const vel = forward.multiplyScalar(speed)
-          this.orbitSystem.launchSlingshot(0, dt)
-          this.shuttleController.unfreeze()
-          this.shuttleController.setInputEnabled(true)
-          this.shuttleController.orbitYawLeft = false
-          this.shuttleController.orbitYawRight = false
-          this.shuttleController.setVelocity(vel)
-          this.shuttleController.setSlingshotSpeed(speed)
-          // Launch costs fuel proportional to charge
-          this.shuttleController.thrusterSystem.consumeFuel(
-            this.slingshotCharge * this.shuttleController.thrusterSystem.fuelCapacity * 0.1,
-          )
+        } else if (this.slingshotCharge > 0) {
+          const trajectoryBlocked = this.isAimingAtPlanet()
+          if (!canReleaseSlingshot(this.slingshotCharge, trajectoryBlocked)) {
+            this.slingshotCharge = 0
+            this.hideLaunchArrow()
+          } else {
+            const heading = this.shuttleController.group.rotation.y
+            const launchVelocity = this.orbitSystem.launchSlingshot(heading, dt)
+            const vel = new THREE.Vector3(launchVelocity.vx, 0, launchVelocity.vz)
+            const speed = Math.sqrt(launchVelocity.vx ** 2 + launchVelocity.vz ** 2)
 
-          this.vehicleCamera?.setConfig(MAP_CAMERA_CONFIG)
-          if (this.vehicleCamera) {
-            this.vehicleCamera.controls.target.copy(this.shuttleController.position)
+            this.shuttleController.unfreeze()
+            this.shuttleController.setInputEnabled(true)
+            this.shuttleController.orbitYawLeft = false
+            this.shuttleController.orbitYawRight = false
+            this.shuttleController.setVelocity(vel)
+            this.shuttleController.setSlingshotSpeed(speed)
+
+            // Launch costs are still tied to the committed full-charge release.
+            this.shuttleController.thrusterSystem.consumeFuel(
+              this.slingshotCharge * this.shuttleController.thrusterSystem.fuelCapacity * 0.1,
+            )
+
+            this.vehicleCamera?.setConfig(MAP_CAMERA_CONFIG)
+            if (this.vehicleCamera) {
+              this.vehicleCamera.controls.target.copy(this.shuttleController.position)
+            }
+            this.hideOrbitRing()
+            this.hideLaunchArrow()
+            this.slingshotCharge = 0
+            this.yRecovery = true
           }
-          this.hideOrbitRing()
-          this.hideLaunchArrow()
-          this.slingshotCharge = 0
-          this.yRecovery = true
-        } else if (!eHeld && this.slingshotCharge > 0) {
-          // Released while aiming at planet — reset charge
-          this.slingshotCharge = 0
-          this.hideLaunchArrow()
         }
       }
     }
@@ -1117,10 +1118,13 @@ export class MapViewController implements Tickable {
       new THREE.Vector3(px, 0, pz),
     )
 
-    // Project body labels
+    // Project body labels with distance
     const labels = bodies.map((b) => {
       const screen = this.mapCamera!.projectToScreen(new THREE.Vector3(b.x, 0, b.z))
-      return { name: b.name, screenX: screen.x * 100, screenY: screen.y * 100 }
+      const dx = b.x - px
+      const dz = b.z - pz
+      const dist = Math.sqrt(dx * dx + dz * dz)
+      return { name: b.name, screenX: screen.x * 100, screenY: screen.y * 100, distance: formatDistance(dist) }
     })
 
     // Nearest bodies for distance lines
