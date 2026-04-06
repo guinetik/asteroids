@@ -129,8 +129,7 @@ export class HabitatModule {
    * @param config - The same config used for the cylinder
    */
   async loadFurniture(config: HabitatConfig): Promise<void> {
-    const { position, length } = config
-    const halfLen = length / 2
+    const { position } = config
 
     const [bedModel, tableModel] = await Promise.all([
       loadGLB('/models/bed.glb'),
