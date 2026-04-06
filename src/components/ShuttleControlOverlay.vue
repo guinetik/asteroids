@@ -19,6 +19,7 @@ const emit = defineEmits<{
   openShop: []
   acceptMission: []
   deliverMission: [missionId: string]
+  acceptAsteroidMission: []
 }>()
 
 type ControlScreen = 'shuttle' | 'missions' | 'inventory'
@@ -105,6 +106,7 @@ function onKeydown(e: KeyboardEvent) {
             :docked-planet="dockedPlanet"
             @accept-mission="$emit('acceptMission')"
             @deliver-mission="(id: string) => $emit('deliverMission', id)"
+            @accept-asteroid-mission="$emit('acceptAsteroidMission')"
           />
         </div>
       </div>

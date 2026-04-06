@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ShuttleMissionBoard, ActiveShuttleMission } from '@/lib/missions/types'
+import type { ShuttleMissionBoard, ActiveShuttleMission, GeneratedAsteroidMission, MissionRegion } from '@/lib/missions/types'
 import { getPlanetOrbitalConfig } from '@/lib/missions/planetOrbitalConfig'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 import { getPlanet } from '@/lib/planets/catalog'
@@ -12,6 +12,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   acceptMission: []
   deliverMission: [missionId: string]
+  acceptAsteroidMission: []
 }>()
 
 function targetPlanetName(planetId: string): string {
@@ -47,6 +48,27 @@ function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = Math.floor(seconds % 60)
   return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+function objectiveSummary(mission: GeneratedAsteroidMission): string {
+  const obj = mission.objectives[0]
+  if (!obj) return ''
+  switch (obj.type) {
+    case 'gather':
+      return `Gather ${obj.resourceAmount} kg of resources`
+    case 'exterminate':
+      return `Clear ${obj.nestCount} nest${obj.nestCount !== 1 ? 's' : ''}${obj.hasSpitters ? ' (spitters present)' : ''}`
+    case 'rescue':
+      return `Rescue ${obj.colonistCount} colonist${obj.colonistCount !== 1 ? 's' : ''} (${obj.oxygenTime}s oxygen)`
+  }
+}
+
+function regionLabel(region: MissionRegion): string {
+  switch (region) {
+    case 'near-earth': return 'Near-Earth'
+    case 'asteroid-belt': return 'Asteroid Belt'
+    case 'kuiper-belt': return 'Kuiper Belt'
+  }
 }
 </script>
 
@@ -119,6 +141,53 @@ function formatTime(seconds: number): string {
         >
           Deliver
         </button>
+      </div>
+    </div>
+
+    <!-- Asteroid Missions -->
+    <div class="mission-board-section">
+      <h3 class="mission-board-section__heading">Asteroid Missions</h3>
+
+      <div v-if="board?.offeredAsteroidMission && !board.activeAsteroidMission" class="mission-board-offer">
+        <div class="mission-board-offer__name">{{ board.offeredAsteroidMission.name }}</div>
+        <div class="mission-board-offer__giver">From: {{ board.offeredAsteroidMission.giverName }}</div>
+        <div class="mission-board-offer__desc">{{ board.offeredAsteroidMission.briefing }}</div>
+        <div class="mission-board-offer__meta">
+          <span>Region: {{ regionLabel(board.offeredAsteroidMission.region) }}</span>
+          <span>Reward: {{ board.offeredAsteroidMission.totalReward }} CR</span>
+        </div>
+        <div class="mission-board-offer__objective">
+          {{ objectiveSummary(board.offeredAsteroidMission) }}
+        </div>
+        <button
+          type="button"
+          class="mission-board-offer__accept-btn"
+          @click="emit('acceptAsteroidMission')"
+        >
+          Accept
+        </button>
+      </div>
+
+      <div v-else-if="board?.activeAsteroidMission" class="mission-board-active">
+        <div class="mission-board-active__name">{{ board.activeAsteroidMission.name }}</div>
+        <div class="mission-board-active__route">
+          {{ board.activeAsteroidMission.giverName }} &middot; {{ regionLabel(board.activeAsteroidMission.region) }}
+        </div>
+        <div class="mission-board-active__status">
+          {{ board.activeAsteroidMission.status === 'accepted' ? 'Navigate to waypoint' : 'In transit' }}
+        </div>
+        <div class="mission-board-active__cargo">
+          {{ objectiveSummary(board.activeAsteroidMission) }}
+          &middot; {{ board.activeAsteroidMission.totalReward }} CR
+        </div>
+      </div>
+
+      <div v-else-if="board?.asteroidRestockTimer" class="mission-board-empty">
+        Restocking in {{ formatTime(board.asteroidRestockTimer.remaining) }}
+      </div>
+
+      <div v-else class="mission-board-empty">
+        No asteroid missions available
       </div>
     </div>
   </div>
