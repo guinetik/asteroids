@@ -853,3 +853,56 @@ body {
   @apply rounded border border-amber-400/20 bg-amber-400/5
          px-3 py-2 text-center text-xs font-mono text-amber-400;
 }
+
+/* Mission Minigame Overlay */
+.mission-minigame-overlay {
+  @apply fixed inset-0 z-50 flex items-center justify-center
+         bg-slate-950/60 px-6 py-8 backdrop-blur-sm;
+}
+
+.mission-minigame-card {
+  @apply w-full max-w-2xl overflow-hidden rounded-2xl
+         border border-cyan-400/25 bg-slate-950/95 text-slate-100 shadow-2xl;
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.08),
+              0 30px 80px rgba(2, 6, 23, 0.7);
+}
+
+.mission-minigame-card__chrome {
+  @apply flex items-center justify-between border-b border-white/10
+         bg-white/5 px-5 py-3 font-mono text-[11px] uppercase
+         tracking-[0.28em] text-cyan-200/80;
+}
+
+.mission-minigame-card__body {
+  @apply flex flex-col gap-5 p-6;
+}
+
+.mission-minigame-card__title {
+  @apply text-2xl font-semibold tracking-tight text-white;
+}
+
+.mission-minigame-card__desc {
+  @apply text-[15px] leading-7 text-slate-200;
+}
+
+.mission-minigame-card__details {
+  @apply text-sm text-slate-300 border-l-2 border-cyan-400/40 pl-3;
+}
+
+.mission-minigame-card__warning {
+  @apply text-sm text-orange-400 border-l-2 border-orange-400/40 pl-3;
+}
+
+.mission-minigame-card__complete-btn {
+  @apply rounded-xl border border-cyan-300/30 bg-cyan-300/10
+         px-4 py-3 font-mono text-xs uppercase tracking-[0.24em]
+         text-cyan-100 transition-colors cursor-pointer;
+}
+
+.mission-minigame-card__complete-btn:hover:not(:disabled) {
+  @apply border-cyan-200/50 bg-cyan-200/20 text-white;
+}
+
+.mission-minigame-card__complete-btn:disabled {
+  @apply opacity-40 cursor-not-allowed;
+}
