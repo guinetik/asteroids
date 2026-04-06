@@ -31,3 +31,63 @@ export interface GravityWarningState {
   /** Whether the warning is visible (proximity > 0) */
   visible: boolean
 }
+
+/** Screen-projected position for a celestial body label. */
+export interface MapBodyLabel {
+  /** Display name */
+  name: string
+  /** Screen X as percentage (0–100) */
+  screenX: number
+  /** Screen Y as percentage (0–100) */
+  screenY: number
+}
+
+/** Screen-projected distance line from ship to a body. */
+export interface MapDistanceLine {
+  /** Display name of the body */
+  name: string
+  /** Ship screen X (%) */
+  shipX: number
+  /** Ship screen Y (%) */
+  shipY: number
+  /** Body screen X (%) */
+  bodyX: number
+  /** Body screen Y (%) */
+  bodyY: number
+  /** Formatted distance string */
+  distance: string
+}
+
+/** Screen-projected gravity ring. */
+export interface MapGravityRing {
+  /** Body display name */
+  name: string
+  /** Screen center X (%) */
+  centerX: number
+  /** Screen center Y (%) */
+  centerY: number
+  /** Influence ring radius in viewport % */
+  influenceRadius: number
+  /** Event horizon ring radius in viewport % */
+  horizonRadius: number
+}
+
+/** Full state for the map overlay HUD. */
+export interface MapOverlayState {
+  /** Whether the overlay is visible */
+  visible: boolean
+  /** Planet/Sun labels */
+  labels: MapBodyLabel[]
+  /** Ship screen position X (%) */
+  shipX: number
+  /** Ship screen position Y (%) */
+  shipY: number
+  /** Ship heading arrow direction (CSS rotation degrees) */
+  headingDeg: number
+  /** Ship speed for arrow length scaling */
+  speed: number
+  /** Distance lines to nearest bodies */
+  distances: MapDistanceLine[]
+  /** Gravity influence + event horizon rings */
+  gravityRings: MapGravityRing[]
+}
