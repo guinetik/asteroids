@@ -203,6 +203,7 @@ export class ShuttleViewController implements Tickable {
         maxHp: 100,
         temperature: 0,
         temperatureVisible: false,
+        damageIntensity: 0,
       })
     }
   }

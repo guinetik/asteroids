@@ -6,6 +6,7 @@ import ShuttleHud from '@/components/ShuttleHud.vue'
 import OrbitPrompt from '@/components/OrbitPrompt.vue'
 import GravityWarning from '@/components/GravityWarning.vue'
 import DeathOverlay from '@/components/DeathOverlay.vue'
+import DamageVignette from '@/components/DamageVignette.vue'
 import MapOverlay from '@/components/MapOverlay.vue'
 import ShipMessageDialog from '@/components/ShipMessageDialog.vue'
 import ShuttleControlOverlay from '@/components/ShuttleControlOverlay.vue'
@@ -83,6 +84,7 @@ const telemetry = reactive<ShuttleTelemetry>({
   maxHp: 100,
   temperature: 0,
   temperatureVisible: false,
+  damageIntensity: 0,
 })
 const orbitState = reactive<OrbitHudState>({
   state: 'free',
@@ -199,6 +201,7 @@ function handleToggleAmbient() {
   <ShuttleHud v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" :telemetry="telemetry" />
   <OrbitPrompt v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" :orbitState="orbitState" />
   <GravityWarning v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" :warning="gravityWarning" />
+  <DamageVignette :intensity="telemetry.damageIntensity" />
   <DeathOverlay
     v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
     :visible="deathVisible"

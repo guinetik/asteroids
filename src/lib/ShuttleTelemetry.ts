@@ -28,6 +28,8 @@ export interface ShuttleTelemetry {
   temperature: number
   /** Whether the temperature gauge should be visible */
   temperatureVisible: boolean
+  /** Current damage intensity (0 = no damage, 1 = max damage rate). Drives red vignette. */
+  damageIntensity: number
 }
 
 /** Gravity danger state pushed to the HUD each frame. */

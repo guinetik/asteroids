@@ -25,6 +25,7 @@ const telemetry = reactive<ShuttleTelemetry>({
   maxHp: 100,
   temperature: 0,
   temperatureVisible: false,
+  damageIntensity: 0,
 })
 
 onMounted(async () => {

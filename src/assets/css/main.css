@@ -198,6 +198,10 @@ body {
   @apply h-full bg-blue-400 transition-all duration-300;
 }
 
+.damage-vignette {
+  @apply fixed inset-0 w-full h-full pointer-events-none z-40;
+}
+
 .death-overlay {
   @apply fixed inset-0 z-50 flex flex-col items-center justify-center;
   background: rgba(0, 0, 0, 0.6);

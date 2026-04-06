@@ -91,12 +91,11 @@ const TICK_PRIORITY_COMPOSIT = TICK_PRIORITY_RENDER - 1
 const ONE_SHOT_PRIORITY = TICK_PRIORITY_INPUT + 1
 
 /**
- * Minimum mass (M☉) for a planet to contribute to the space-time grid.
- * Below this, the gravity well is sub-pixel. Filters out terrestrials
- * and dwarf planets, keeping Sun + Jupiter/Saturn/Uranus/Neptune.
+ * Minimum mass (M☉) for a planet to contribute to the space-time grid deformSources pass.
+ * Set low enough that Earth-scale wells show subtly; still excludes Ceres/Pluto noise
+ * (e.g. Ceres ≈ 5e-10 M☉, Pluto ≈ 7e-9 M☉ at 1e-7).
  */
-/** Only Jupiter (9.55e-4) and Saturn (2.86e-4) deform the grid. */
-const GRID_MASS_THRESHOLD = 1e-4
+const GRID_MASS_THRESHOLD = 1e-7
 
 /** Baseline wireframe segments per axis on the map space-time grid. */
 const MAP_SPACE_TIME_GRID_BASE_RESOLUTION = 150
@@ -1015,6 +1014,7 @@ export class MapViewController implements Tickable {
         maxHp: this.shipHealth?.maxHp ?? 100,
         temperature: this.shipHealth?.temperature ?? 0,
         temperatureVisible: this.shipHealth?.temperatureVisible ?? false,
+        damageIntensity: this.shipHealth?.damageIntensity ?? 0,
       })
     }
 

@@ -87,6 +87,13 @@ export class ShipHealth {
     return Math.abs(this._temperature) > this.config.displayThreshold
   }
 
+  /** Current damage intensity (0–1). Drives the red vignette overlay. */
+  get damageIntensity(): number {
+    return this._lastDamageIntensity
+  }
+
+  private _lastDamageIntensity = 0
+
   /**
    * Advance health simulation by dt seconds.
    *
@@ -150,6 +157,10 @@ export class ShipHealth {
     if (totalDamage > 0) {
       this._hp = Math.max(0, this._hp - totalDamage)
     }
+
+    // Damage intensity for vignette (normalized 0–1 by max possible DPS)
+    const maxDps = (this.config.maxTempDamage + this.config.maxRadiationDamage)
+    this._lastDamageIntensity = maxDps > 0 ? Math.min(1, (totalDamage / dt) / maxDps) : 0
 
     // Healing — only when no damage is occurring
     if (healing && totalDamage === 0) {
