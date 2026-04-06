@@ -76,9 +76,9 @@ function regionLabel(region: MissionRegion): string {
   <div class="shuttle-control-screen">
     <h2 class="shuttle-control-screen__title">Missions</h2>
 
-    <!-- Available Mission -->
+    <!-- Planetary Missions -->
     <div class="mission-board-section">
-      <h3 class="mission-board-section__heading">Available Mission</h3>
+      <h3 class="mission-board-section__heading">Planetary Missions</h3>
 
       <div v-if="!dockedPlanet" class="mission-board-empty">
         Not docked at a planet
@@ -106,41 +106,6 @@ function regionLabel(region: MissionRegion): string {
 
       <div v-else class="mission-board-empty">
         No missions available
-      </div>
-    </div>
-
-    <!-- Active Missions -->
-    <div class="mission-board-section">
-      <h3 class="mission-board-section__heading">Active Missions</h3>
-
-      <div v-if="!board || board.activeMissions.length === 0" class="mission-board-empty">
-        No active missions
-      </div>
-
-      <div
-        v-for="mission in board?.activeMissions"
-        :key="mission.template.id"
-        class="mission-board-active"
-      >
-        <div class="mission-board-active__name">{{ mission.template.name }}</div>
-        <div class="mission-board-active__route">
-          {{ targetPlanetName(mission.giverPlanet) }} &rarr; {{ targetPlanetName(mission.template.targetPlanet) }}
-        </div>
-        <div class="mission-board-active__status">
-          {{ statusLabel(mission) }}
-        </div>
-        <div class="mission-board-active__cargo">
-          {{ mission.template.gatherQuantity }}x {{ gatherItemLabel(mission) }}
-          &middot; {{ mission.template.reward }} CR
-        </div>
-        <button
-          v-if="canDeliver(mission)"
-          type="button"
-          class="mission-board-active__deliver-btn"
-          @click="emit('deliverMission', mission.template.id)"
-        >
-          Deliver
-        </button>
       </div>
     </div>
 
@@ -188,6 +153,41 @@ function regionLabel(region: MissionRegion): string {
 
       <div v-else class="mission-board-empty">
         No asteroid missions available
+      </div>
+    </div>
+
+    <!-- Active Missions -->
+    <div class="mission-board-section">
+      <h3 class="mission-board-section__heading">Active Missions</h3>
+
+      <div v-if="!board || board.activeMissions.length === 0" class="mission-board-empty">
+        No active missions
+      </div>
+
+      <div
+        v-for="mission in board?.activeMissions"
+        :key="mission.template.id"
+        class="mission-board-active"
+      >
+        <div class="mission-board-active__name">{{ mission.template.name }}</div>
+        <div class="mission-board-active__route">
+          {{ targetPlanetName(mission.giverPlanet) }} &rarr; {{ targetPlanetName(mission.template.targetPlanet) }}
+        </div>
+        <div class="mission-board-active__status">
+          {{ statusLabel(mission) }}
+        </div>
+        <div class="mission-board-active__cargo">
+          {{ mission.template.gatherQuantity }}x {{ gatherItemLabel(mission) }}
+          &middot; {{ mission.template.reward }} CR
+        </div>
+        <button
+          v-if="canDeliver(mission)"
+          type="button"
+          class="mission-board-active__deliver-btn"
+          @click="emit('deliverMission', mission.template.id)"
+        >
+          Deliver
+        </button>
       </div>
     </div>
   </div>
