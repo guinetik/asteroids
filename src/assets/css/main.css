@@ -199,7 +199,7 @@ body {
 }
 
 .damage-vignette {
-  @apply fixed inset-0 w-full h-full pointer-events-none z-40;
+  @apply fixed inset-0 w-full h-full pointer-events-none z-0;
 }
 
 .death-overlay {
