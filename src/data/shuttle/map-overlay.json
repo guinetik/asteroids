@@ -1,7 +1,7 @@
 {
-  "frustumHalfSize": 2600,
+  "frustumHalfSize": 1350,
   "frustumInitialHalfSize": 50,
-  "cameraHeight": 3000,
+  "cameraHeight": 1500,
   "openDuration": 1.0,
   "closeDuration": 0.5,
   "perspectivePhaseFraction": 0.75,
