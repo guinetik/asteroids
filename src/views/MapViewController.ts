@@ -13,7 +13,11 @@
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import type { Tickable } from '@/lib/Tickable'
-import type { ShuttleTelemetry, GravityWarningState } from '@/lib/ShuttleTelemetry'
+import type {
+  ShuttleTelemetry,
+  GravityWarningState,
+  GravitationalAnomalyHudState,
+} from '@/lib/ShuttleTelemetry'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'
@@ -335,6 +339,9 @@ export class MapViewController implements Tickable {
   /** Current shuttle display scale, lerped each frame toward the screen-size target. */
   private currentShuttleScale = MAP_SHUTTLE_SCALE
 
+  /** Increments per anomaly HUD message so Vue can re-run enter animation. */
+  private gravitationalAnomalyHudToken = 0
+
   /** Tactical reticle sprite that fades in over the shuttle when zoomed out far. */
   private shipReticle: THREE.Sprite | null = null
 
@@ -352,6 +359,9 @@ export class MapViewController implements Tickable {
 
   /** Called each frame with gravity warning state for HUD. */
   onGravityWarning: ((state: GravityWarningState) => void) | null = null
+
+  /** Nearby synthetic spacetime anomaly — brief HUD toasts on start/finish. */
+  onGravitationalAnomalyHud: ((state: GravitationalAnomalyHudState) => void) | null = null
 
   /** Called when shuttle dies — shows death overlay. */
   onDeathOverlay: ((visible: boolean, cause: string) => void) | null = null
@@ -471,6 +481,27 @@ export class MapViewController implements Tickable {
     this.gravitationalEventManager = new GravitationalEventManager({
       worldHalfExtent: gridSize / 2,
       autoSpawnEnabled: true,
+    })
+    this.gravitationalEventManager.setNearbyHudCallbacks({
+      onNearbyAnomalyStart: (d, sx, sz) => {
+        this.gravitationalAnomalyHudToken += 1
+        const dist = Math.hypot(d.x - sx, d.z - sz)
+        this.onGravitationalAnomalyHud?.({
+          visible: true,
+          token: this.gravitationalAnomalyHudToken,
+          title: 'Spacetime disturbance',
+          subtitle: `Fabric depression · ~${Math.round(dist)} u · ${d.durationSec.toFixed(1)} s drift`,
+        })
+      },
+      onNearbyAnomalyFinish: () => {
+        this.gravitationalAnomalyHudToken += 1
+        this.onGravitationalAnomalyHud?.({
+          visible: true,
+          token: this.gravitationalAnomalyHudToken,
+          title: 'Disturbance passed',
+          subtitle: 'Local grid stabilizing',
+        })
+      },
     })
 
     // --- Shuttle (player character) ---
@@ -1223,6 +1254,20 @@ export class MapViewController implements Tickable {
 
     for (const controller of this.planetControllers) {
       controller.tick(dt, this.simTime)
+    }
+
+    // Asteroid belt LOD — show fewer instances when camera is zoomed out
+    if (this.vehicleCamera) {
+      const camY = Math.abs(this.vehicleCamera.camera.position.y)
+      // Camera Y increases as user zooms out via orbit controls
+      // Close (camY < 5): full detail. Far (camY > 100): minimal
+      const lodFraction = camY < 5 ? 1.0
+        : camY < 20 ? 0.5
+        : camY < 50 ? 0.25
+        : 0.1
+      for (const controller of this.beltControllers) {
+        controller.setLodFraction(lodFraction)
+      }
     }
 
     for (const controller of this.beltControllers) {
@@ -2419,6 +2464,7 @@ export class MapViewController implements Tickable {
     this.shuttleController?.dispose()
     for (const controller of this.beltControllers) controller.dispose()
     for (const controller of this.planetControllers) controller.dispose()
+    this.gravitationalEventManager?.setNearbyHudCallbacks(null)
     this.gravitationalEventManager?.clear()
     this.gravitationalEventManager = null
     this.spaceTimeGrid?.dispose()

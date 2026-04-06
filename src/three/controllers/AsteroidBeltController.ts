@@ -17,9 +17,14 @@ import { loadGLB, fixMaterials } from '@/three/loadGLB'
 /** GLB file used for asteroid geometry (both belts share this). */
 const ASTEROID_GLB = '/models/asteroids.glb'
 
+/** Tumble update runs every Nth frame to save CPU on large belts. */
+const TUMBLE_UPDATE_INTERVAL = 4
+
 /** Per-geometry instance tracking for tumble animation. */
 interface InstanceData {
   mesh: THREE.InstancedMesh
+  /** Total allocated instances (never changes after init). */
+  maxCount: number
   baseMatrices: THREE.Matrix4[]
   tumbleAxes: THREE.Vector3[]
   tumbleSpeeds: number[]
@@ -103,6 +108,7 @@ export class AsteroidBeltController {
   readonly group: THREE.Group
   private instanceDataList: InstanceData[] = []
   private orbitalSpeed: number
+  private tumbleFrameCounter = 0
 
   // Reusable objects for tick
   private readonly tumbleQuat = new THREE.Quaternion()
@@ -215,6 +221,7 @@ export class AsteroidBeltController {
 
       controller.instanceDataList.push({
         mesh: instancedMesh,
+        maxCount: count,
         baseMatrices,
         tumbleAxes,
         tumbleSpeeds,
@@ -224,13 +231,29 @@ export class AsteroidBeltController {
     return controller
   }
 
+  /**
+   * Set the visible fraction of instances (0–1). Used for distance-based LOD.
+   * At fraction=1 all instances render; at 0.25 only 25% are shown.
+   */
+  setLodFraction(fraction: number): void {
+    const f = Math.max(0, Math.min(1, fraction))
+    for (const data of this.instanceDataList) {
+      data.mesh.count = Math.max(1, Math.round(data.maxCount * f))
+    }
+  }
+
   tick(dt: number, simTime: number): void {
     // Slow orbital drift
     this.group.rotation.y += dt * this.orbitalSpeed
 
-    // Per-instance tumble
+    // Throttled per-instance tumble
+    this.tumbleFrameCounter++
+    if (this.tumbleFrameCounter < TUMBLE_UPDATE_INTERVAL) return
+    this.tumbleFrameCounter = 0
+
     for (const data of this.instanceDataList) {
-      for (let i = 0; i < data.mesh.count; i++) {
+      const visibleCount = data.mesh.count
+      for (let i = 0; i < visibleCount; i++) {
         const angle = simTime * data.tumbleSpeeds[i]!
         this.tumbleQuat.setFromAxisAngle(data.tumbleAxes[i]!, angle)
         this.tumbleMatrix.makeRotationFromQuaternion(this.tumbleQuat)
