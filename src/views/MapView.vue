@@ -11,6 +11,14 @@ import DamageVignette from '@/components/DamageVignette.vue'
 import MapOverlay from '@/components/MapOverlay.vue'
 import ShipMessageDialog from '@/components/ShipMessageDialog.vue'
 import ShuttleControlOverlay from '@/components/ShuttleControlOverlay.vue'
+import ShopButton from '@/components/shop/ShopButton.vue'
+import PlanetShopDialog from '@/components/shop/PlanetShopDialog.vue'
+import CreditsBadge from '@/components/hud/CreditsBadge.vue'
+import type { ShopSession } from '@/lib/shop/tradeTypes'
+import type { PlayerProfile } from '@/lib/player/types'
+import type { Inventory } from '@/lib/inventory/types'
+import { createProfile } from '@/lib/player/profile'
+import { createInventory } from '@/lib/inventory/inventory'
 import { shipMessageSystem } from '@/lib/messages/runtime'
 import type { ActiveShipMessage } from '@/lib/messages/messageTypes'
 import type { MapIntroUiState } from '@/lib/mapIntroState'
@@ -120,6 +128,14 @@ const deathCause = ref('')
 const orbitsVisible = ref(true)
 const gridVisible = ref(true)
 const ambientVisible = ref(true)
+const shopButtonVisible = ref(false)
+const shopButtonPlanet = ref('')
+const shopDialogVisible = ref(false)
+const shopSession = ref<ShopSession | null>(null)
+const shopProfile = ref<PlayerProfile>(createProfile('Pilot'))
+const shopInventory = ref<Inventory>(createInventory())
+const playerCredits = ref(1000)
+
 const mapOverlay = reactive<MapOverlayState>({
   visible: false,
   labels: [],
@@ -171,6 +187,24 @@ onMounted(async () => {
     viewController.onHabitatFade = (opacity) => {
       habitatFadeOpacity.value = opacity
     }
+    viewController.onShopButton = (visible, planetName) => {
+      shopButtonVisible.value = visible
+      shopButtonPlanet.value = planetName
+      if (!visible) shopDialogVisible.value = false
+    }
+    viewController.onShopState = (session, profile, inventory) => {
+      if (session) {
+        shopSession.value = session
+        shopProfile.value = profile
+        shopInventory.value = inventory
+        shopDialogVisible.value = true
+      } else {
+        shopDialogVisible.value = false
+      }
+    }
+    viewController.onCreditsUpdate = (credits) => {
+      playerCredits.value = credits
+    }
     await viewController.init(container.value)
     refreshActiveMessage()
   }
@@ -200,6 +234,32 @@ function closeShuttleControl() {
 
 function handleToggleAmbient() {
   ambientVisible.value = viewController.toggleAmbient()
+}
+
+function openShop() {
+  viewController.openShop()
+}
+
+function closeShop() {
+  shopDialogVisible.value = false
+  const canvas = document.querySelector('canvas')
+  canvas?.requestPointerLock()
+}
+
+function handleShopBuyTradeGood(slotIndex: number, quantity: number) {
+  viewController.shopBuyTradeGood(slotIndex, quantity)
+}
+
+function handleShopSellItem(itemId: string, quantity: number) {
+  viewController.shopSellItem(itemId, quantity)
+}
+
+function handleShopRefuel() {
+  viewController.shopRefuel()
+}
+
+function handleShopBuyReserveFuel() {
+  viewController.shopBuyReserveFuel()
 }
 </script>
 
@@ -286,6 +346,26 @@ function handleToggleAmbient() {
   <ShuttleControlOverlay
     :visible="shuttleControlVisible"
     @close="closeShuttleControl"
+  />
+  <CreditsBadge
+    v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
+    :credits="playerCredits"
+  />
+  <ShopButton
+    v-if="shopButtonVisible && !shopDialogVisible && !shuttleControlVisible"
+    :planet-name="shopButtonPlanet"
+    @open="openShop"
+  />
+  <PlanetShopDialog
+    v-if="shopDialogVisible && shopSession"
+    :session="shopSession"
+    :profile="shopProfile"
+    :inventory="shopInventory"
+    @close="closeShop"
+    @buy-trade-good="handleShopBuyTradeGood"
+    @sell-item="handleShopSellItem"
+    @refuel="handleShopRefuel"
+    @buy-reserve-fuel="handleShopBuyReserveFuel"
   />
   <div v-if="habitatActive && habitatPrompt && !shuttleControlVisible" class="habitat-prompt">
     <span class="orbit-prompt-action">{{ habitatPrompt }}</span>

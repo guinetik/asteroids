@@ -89,6 +89,22 @@ import shipHealthData from '@/data/shuttle/ship-health.json'
 import { getCurrentShuttleThrusterEfficiencyModifiers, getCurrentUpgradeValue } from '@/lib/upgrades'
 import { HabitatState } from '@/lib/habitatState'
 import { HabitatInteriorScene } from '@/three/HabitatInteriorScene'
+import {
+  createShopSession,
+  tickShopSession,
+  buyTradeGood,
+  sellTradeGood,
+  REFUEL_COST,
+  RESERVE_FUEL_COST,
+  RESERVE_FUEL_ID,
+} from '@/lib/shop/shopSession'
+import type { ShopSession } from '@/lib/shop/tradeTypes'
+import { tickDemandTimer, resetDemand } from '@/lib/shop/planetDemand'
+import { createProfile, spendCredits } from '@/lib/player/profile'
+import type { PlayerProfile } from '@/lib/player/types'
+import { createInventory, addItem } from '@/lib/inventory/inventory'
+import type { Inventory } from '@/lib/inventory/types'
+import '@/lib/shop/tradeGoods'
 
 /** Tick priority for the compositor (runs after animation, before render). */
 const TICK_PRIORITY_COMPOSIT = TICK_PRIORITY_RENDER - 1
@@ -202,8 +218,6 @@ const SLINGSHOT_CHARGE_TIME = 2.0
 /** Seconds without fuel in free flight before game over (adrift). */
 const ADRIFT_TIMEOUT = 60
 
-/** Fuel units restored per second while orbiting Earth. */
-const EARTH_REFUEL_RATE = 50
 
 /** The Sun supports a much faster orbital lane than planets. */
 const SUN_ORBIT_SPEED_MULTIPLIER = 12
@@ -326,6 +340,9 @@ export class MapViewController implements Tickable {
   private inspectMode = false
   private habitatState = new HabitatState()
   private habitatScene: HabitatInteriorScene | null = null
+  private shopSession: ShopSession | null = null
+  private playerProfile: PlayerProfile = createProfile('Pilot')
+  private playerInventory: Inventory = createInventory()
   private portalArrival: PortalArrivalSequence | null = null
   private boundarySystem: PortalBoundarySystem | null = null
   private gravityPass: ShaderPass | null = null
@@ -406,6 +423,12 @@ export class MapViewController implements Tickable {
   onHabitatPrompt: ((prompt: string | null) => void) | null = null
   /** Fired with fade opacity (0 = clear, 1 = black) during habitat transitions. */
   onHabitatFade: ((opacity: number) => void) | null = null
+  /** Fired when the shop button should show/hide. */
+  onShopButton: ((visible: boolean, planetName: string) => void) | null = null
+  /** Fired when the shop dialog state changes. */
+  onShopState: ((session: ShopSession | null, profile: PlayerProfile, inventory: Inventory) => void) | null = null
+  /** Fired when credits change (for the HUD badge). */
+  onCreditsUpdate: ((credits: number) => void) | null = null
 
   async init(container: HTMLElement): Promise<void> {
     // Create canvas
@@ -997,6 +1020,15 @@ export class MapViewController implements Tickable {
       }
     }
 
+    // Shop action (B key) — toggle shop while orbiting
+    if (
+      this.inputManager?.wasActionPressed('shopAction') &&
+      this.orbitSystem?.state === 'orbiting' &&
+      this.shopSession
+    ) {
+      this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
+    }
+
     // After slingshot, lerp Y back to 0
     if (this.yRecovery && this.shuttleController) {
       this.shuttleController.setIgnoreGridY(true)
@@ -1380,10 +1412,6 @@ export class MapViewController implements Tickable {
         },
         { burnRateMultiplier: getCurrentShuttleThrusterEfficiencyModifiers() },
       )
-      // Refuel while orbiting Earth
-      if (this.orbitSystem.target?.name === 'Earth') {
-        this.shuttleController.thrusterSystem.addFuel(EARTH_REFUEL_RATE * dt)
-      }
       if (this.orbitSystem.target && this.vehicleCamera) {
         const bx = this.orbitSystem.target.getWorldX()
         const bz = this.orbitSystem.target.getWorldZ()
@@ -1392,7 +1420,16 @@ export class MapViewController implements Tickable {
           this.orbitRing.position.set(bx, planetY, bz)
         }
       }
+      this.updateShopSession()
     }
+
+    // Shop session restock tick
+    if (this.shopSession) {
+      this.shopSession = tickShopSession(this.shopSession, dt)
+    }
+
+    // Global demand variance tick
+    tickDemandTimer(dt)
 
     this.recordWorldLinePoint()
     this.triggerRuntimeMessages()
@@ -1484,6 +1521,93 @@ export class MapViewController implements Tickable {
   toggleAmbient(): boolean {
     if (!this.ambientSpace) return true
     return this.ambientSpace.toggle()
+  }
+
+  /** Create or destroy shop session based on orbit state. */
+  private updateShopSession(): void {
+    const orbitState = this.orbitSystem?.state ?? 'free'
+    const targetName = this.orbitSystem?.target?.name ?? null
+
+    if (orbitState === 'orbiting' && targetName && !this.shopSession) {
+      const planet = PLANETS.find((p) => p.name === targetName)
+      if (planet) {
+        this.shopSession = createShopSession(planet.id)
+        this.onShopButton?.(true, targetName)
+        this.onCreditsUpdate?.(this.playerProfile.credits)
+      }
+    } else if (orbitState !== 'orbiting' && this.shopSession) {
+      this.shopSession = null
+      this.onShopButton?.(false, '')
+      this.onShopState?.(null, this.playerProfile, this.playerInventory)
+    }
+  }
+
+  /** Open the shop dialog (called by Vue ShopButton click). */
+  openShop(): void {
+    if (this.shopSession) {
+      this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
+    }
+  }
+
+  /** Buy a trade good from the shop. */
+  shopBuyTradeGood(slotIndex: number, quantity: number): void {
+    if (!this.shopSession) return
+    const result = buyTradeGood(
+      this.shopSession,
+      this.playerProfile,
+      this.playerInventory,
+      slotIndex,
+      quantity,
+    )
+    if (result.ok) {
+      this.shopSession = result.session
+      this.playerProfile = result.profile
+      this.playerInventory = result.inventory
+      this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
+      this.onCreditsUpdate?.(this.playerProfile.credits)
+    }
+  }
+
+  /** Sell an item from inventory at the current planet. */
+  shopSellItem(itemId: string, quantity: number): void {
+    if (!this.shopSession) return
+    const result = sellTradeGood(
+      this.shopSession,
+      this.playerProfile,
+      this.playerInventory,
+      itemId,
+      quantity,
+    )
+    if (result.ok) {
+      this.playerProfile = result.profile
+      this.playerInventory = result.inventory
+      this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
+      this.onCreditsUpdate?.(this.playerProfile.credits)
+    }
+  }
+
+  /** Refuel the shuttle (instant, costs credits). */
+  shopRefuel(): void {
+    if (!this.shuttleController) return
+    const updated = spendCredits(this.playerProfile, REFUEL_COST)
+    if (!updated) return
+    this.playerProfile = updated
+    this.shuttleController.thrusterSystem.refuel()
+    this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
+    this.onCreditsUpdate?.(this.playerProfile.credits)
+  }
+
+  /** Buy a reserve fuel cell (inventory item). */
+  shopBuyReserveFuel(): void {
+    if (!this.shopSession) return
+    const updated = spendCredits(this.playerProfile, RESERVE_FUEL_COST)
+    if (!updated) return
+    const addResult = addItem(this.playerInventory, RESERVE_FUEL_ID, 1)
+    if (!addResult.ok) return
+    this.playerProfile = updated
+    this.playerInventory = addResult.inventory
+    this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
+    this.onCreditsUpdate?.(this.playerProfile.credits)
   }
 
   /**
@@ -1708,6 +1832,15 @@ export class MapViewController implements Tickable {
 
   private respawnAtEarth(): void {
     if (!this.shuttleController || !this.orbitSystem) return
+
+    // Reset shop and economy state
+    this.shopSession = null
+    this.playerProfile = createProfile('Pilot')
+    this.playerInventory = createInventory()
+    resetDemand()
+    this.onShopButton?.(false, '')
+    this.onShopState?.(null, this.playerProfile, this.playerInventory)
+    this.onCreditsUpdate?.(this.playerProfile.credits)
 
     // Clear death state + show shuttle again, remove ice tint
     this.shuttleController.resetDeath()
