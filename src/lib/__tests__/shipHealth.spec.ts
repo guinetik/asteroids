@@ -58,9 +58,12 @@ describe('ShipHealth', () => {
       expect(health.temperature).toBeLessThan(hotTemp)
     })
 
-    it('drifts at correct rate (tempDriftRate units/s)', () => {
-      health.tick(1, 20, 0) // hot zone, 1 second
-      expect(health.temperature).toBeCloseTo(8, 5) // tempDriftRate * dt = 8 * 1
+    it('drifts faster closer to the Sun', () => {
+      const near = new ShipHealth(config)
+      const far = new ShipHealth(config)
+      near.tick(1, 5, 0) // very close
+      far.tick(1, 35, 0) // near boundary
+      expect(near.temperature).toBeGreaterThan(far.temperature)
     })
 
     it('clamps temperature to +100 maximum', () => {
@@ -216,22 +219,21 @@ describe('ShipHealth', () => {
 
   describe('temperatureVisible', () => {
     it('is false when temp is within displayThreshold', () => {
-      // After 2 seconds in hot zone: temp = 16 < displayThreshold(20)
-      health.tick(2, 10, 0)
-      expect(health.temperature).toBeCloseTo(16, 4)
+      // Very short time near boundary — temp stays under 20
+      health.tick(0.5, 39, 0)
+      expect(Math.abs(health.temperature)).toBeLessThan(config.displayThreshold)
       expect(health.temperatureVisible).toBe(false)
     })
 
     it('is true when temp exceeds displayThreshold', () => {
-      // After 3 seconds in hot zone: temp = 24 > displayThreshold(20)
-      health.tick(3, 10, 0)
-      expect(health.temperature).toBeCloseTo(24, 4)
+      for (let i = 0; i < 5; i++) health.tick(1, 20, 0)
+      expect(health.temperature).toBeGreaterThan(config.displayThreshold)
       expect(health.temperatureVisible).toBe(true)
     })
 
     it('is true when temp is below negative displayThreshold', () => {
-      health.tick(3, 500, 0)
-      expect(health.temperature).toBeCloseTo(-24, 4)
+      for (let i = 0; i < 5; i++) health.tick(1, 500, 0)
+      expect(health.temperature).toBeLessThan(-config.displayThreshold)
       expect(health.temperatureVisible).toBe(true)
     })
   })

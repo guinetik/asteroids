@@ -98,18 +98,23 @@ export class ShipHealth {
   tick(dt: number, sunDistance: number, radiationProximity: number, healing = false): void {
     if (this._dead) return
 
-    // Temperature drift toward zone target
+    // Temperature drift toward zone target — stronger the deeper in the zone
     let targetTemp: number
+    let driftMultiplier = 1
     if (sunDistance < this.config.hotBoundary) {
       targetTemp = HOT_ZONE_TARGET
+      // Closer to Sun = faster heating (1x at boundary, up to 4x at origin)
+      driftMultiplier = 1 + 3 * (1 - sunDistance / this.config.hotBoundary)
     } else if (sunDistance > this.config.coldBoundary) {
       targetTemp = COLD_ZONE_TARGET
+      // Further from Sun = faster freezing
+      driftMultiplier = 1 + 3 * Math.min(1, (sunDistance - this.config.coldBoundary) / this.config.coldBoundary)
     } else {
       targetTemp = SAFE_ZONE_TARGET
     }
 
     const diff = targetTemp - this._temperature
-    const drift = Math.sign(diff) * Math.min(Math.abs(diff), this.config.tempDriftRate * dt)
+    const drift = Math.sign(diff) * Math.min(Math.abs(diff), this.config.tempDriftRate * driftMultiplier * dt)
     this._temperature = Math.max(MIN_TEMPERATURE, Math.min(MAX_TEMPERATURE, this._temperature + drift))
 
     // Temperature damage
