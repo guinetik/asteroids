@@ -13,6 +13,7 @@ defineProps<{
 
 const emit = defineEmits<{
   close: []
+  openShop: []
 }>()
 
 type ControlScreen = 'shuttle' | 'missions' | 'inventory'
@@ -79,6 +80,14 @@ function onKeydown(e: KeyboardEvent) {
             @click="activeScreen = screen.id"
           >
             {{ screen.label }}
+          </button>
+          <div class="shuttle-control-sidebar-divider" />
+          <button
+            type="button"
+            class="shuttle-control-nav-btn shuttle-control-nav-btn--shop"
+            @click="$emit('openShop')"
+          >
+            Shop
           </button>
         </nav>
 

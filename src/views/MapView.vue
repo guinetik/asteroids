@@ -235,6 +235,11 @@ function closeShuttleControl() {
   canvas?.requestPointerLock()
 }
 
+function openShopFromTerminal() {
+  shuttleControlVisible.value = false
+  viewController.openShop()
+}
+
 function handleToggleAmbient() {
   ambientVisible.value = viewController.toggleAmbient()
 }
@@ -370,6 +375,7 @@ function handleUseFuelCell() {
     :visible="shuttleControlVisible"
     :inventory-stacks="shopInventory.stacks"
     @close="closeShuttleControl"
+    @open-shop="openShopFromTerminal"
   />
   <CreditsBadge
     v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"

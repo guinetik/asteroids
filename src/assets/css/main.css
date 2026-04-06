@@ -596,6 +596,14 @@ body {
   @apply border border-cyan-400/20 bg-cyan-400/10 text-cyan-200;
 }
 
+.shuttle-control-nav-btn--shop {
+  @apply border border-amber-400/20 text-amber-300 hover:bg-amber-400/10;
+}
+
+.shuttle-control-sidebar-divider {
+  @apply my-1 border-t border-white/5;
+}
+
 .shuttle-control-content {
   @apply flex-1 overflow-y-auto p-6;
 }
