@@ -16,6 +16,7 @@ export const DEFAULT_BINDINGS: Record<string, string[]> = {
   toggleCamera: ['KeyC'],
   orbitAction: ['KeyE'],
   toggleMap: ['KeyM'],
+  focusHabitat: ['KeyH'],
   closeMap: ['Escape'],
 }
 
@@ -65,4 +66,14 @@ export const LEVEL_BINDINGS: Record<string, string[]> = {
   toolHeal: ['Digit3'],
   // Shared
   interact: ['KeyF'],
+}
+
+/** Habitat interior key bindings — FPS walk + interact. */
+export const HABITAT_BINDINGS: Record<string, string[]> = {
+  moveForward: ['KeyW'],
+  moveBack: ['KeyS'],
+  moveLeft: ['KeyA'],
+  moveRight: ['KeyD'],
+  interact: ['KeyF'],
+  exitHabitat: ['KeyH', 'Escape'],
 }
