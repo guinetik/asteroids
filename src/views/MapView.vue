@@ -13,6 +13,9 @@ import ShipMessageDialog from '@/components/ShipMessageDialog.vue'
 import ShuttleControlOverlay from '@/components/ShuttleControlOverlay.vue'
 import PlanetShopDialog from '@/components/shop/PlanetShopDialog.vue'
 import CreditsBadge from '@/components/hud/CreditsBadge.vue'
+import type { ShuttleMissionBoard, ActiveShuttleMission } from '@/lib/missions/types'
+import MissionMiniGameOverlay from '@/components/MissionMiniGameOverlay.vue'
+import { PLANETS } from '@/lib/planets/catalog'
 import type { ShopSession } from '@/lib/shop/tradeTypes'
 import type { PlayerProfile } from '@/lib/player/types'
 import type { Inventory } from '@/lib/inventory/types'
@@ -135,6 +138,11 @@ const shopProfile = ref<PlayerProfile>(createProfile('Pilot'))
 const shopInventory = ref<Inventory>(createInventory())
 const playerCredits = ref(1000)
 const fuelCellCount = ref(0)
+const missionButtonVisible = ref(false)
+const missionOverlayVisible = ref(false)
+const missionOverlayMission = ref<ActiveShuttleMission | null>(null)
+const missionOverlayCanFit = ref(false)
+const missionBoard = ref<ShuttleMissionBoard | null>(null)
 
 const mapOverlay = reactive<MapOverlayState>({
   visible: false,
@@ -208,6 +216,17 @@ onMounted(async () => {
     viewController.onFuelCellCount = (count) => {
       fuelCellCount.value = count
     }
+    viewController.onMissionButton = (visible, _planetName) => {
+      missionButtonVisible.value = visible
+    }
+    viewController.onMissionOverlay = (visible, mission, canFit) => {
+      missionOverlayVisible.value = visible
+      missionOverlayMission.value = mission
+      missionOverlayCanFit.value = canFit
+    }
+    viewController.onMissionBoardUpdate = (board) => {
+      missionBoard.value = board
+    }
     await viewController.init(container.value)
     refreshActiveMessage()
   }
@@ -280,6 +299,34 @@ function handleRepairHull() {
 function handleUseFuelCell() {
   viewController.useFuelCell()
 }
+
+function openMissionOverlay() {
+  viewController.openMissionOverlay()
+}
+
+function handleMissionComplete() {
+  if (missionOverlayMission.value) {
+    viewController.missionComplete(missionOverlayMission.value.template.id)
+  }
+}
+
+function closeMissionOverlay() {
+  missionOverlayVisible.value = false
+}
+
+function handleAcceptMission() {
+  viewController.missionAccept()
+}
+
+function handleDeliverMission(missionId: string) {
+  viewController.missionDeliver(missionId)
+}
+
+function dockedPlanetId(): string | null {
+  if (orbitState.state !== 'orbiting' || !orbitState.nearestBodyName) return null
+  const planet = PLANETS.find((p) => p.name === orbitState.nearestBodyName)
+  return planet?.id ?? null
+}
 </script>
 
 <template>
@@ -302,7 +349,9 @@ function handleUseFuelCell() {
     v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
     :orbitState="orbitState"
     :shop-available="shopButtonVisible && !shopDialogVisible && !shuttleControlVisible"
+    :mission-available="missionButtonVisible && !missionOverlayVisible && !shuttleControlVisible"
     @open-shop="openShop"
+    @open-mission="openMissionOverlay"
   />
   <GravityWarning v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" :warning="gravityWarning" />
   <GravitationalAnomalyHud
@@ -375,8 +424,12 @@ function handleUseFuelCell() {
   <ShuttleControlOverlay
     :visible="shuttleControlVisible"
     :inventory-stacks="shopInventory.stacks"
+    :mission-board="missionBoard"
+    :docked-planet="dockedPlanetId()"
     @close="closeShuttleControl"
     @open-shop="openShopFromTerminal"
+    @accept-mission="handleAcceptMission"
+    @deliver-mission="handleDeliverMission"
   />
   <CreditsBadge
     v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
@@ -396,6 +449,13 @@ function handleUseFuelCell() {
     @buy-reserve-fuel="handleShopBuyReserveFuel"
     @buy-lander-fuel="handleShopBuyLanderFuel"
     @repair-hull="handleRepairHull"
+  />
+  <MissionMiniGameOverlay
+    v-if="missionOverlayVisible && missionOverlayMission"
+    :mission="missionOverlayMission"
+    :can-fit-cargo="missionOverlayCanFit"
+    @complete="handleMissionComplete"
+    @close="closeMissionOverlay"
   />
   <div v-if="habitatActive && habitatPrompt && !shuttleControlVisible" class="habitat-prompt">
     <span class="orbit-prompt-action">{{ habitatPrompt }}</span>
