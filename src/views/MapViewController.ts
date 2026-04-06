@@ -1663,25 +1663,42 @@ export class MapViewController implements Tickable {
   }
 
   /** Reset shuttle after death — clear death state, place into Earth orbit. */
-  /** Unified death handler — explode ship, zoom camera, show overlay. */
+  /** Unified death handler — explode or freeze ship, zoom camera, show overlay. */
   private triggerDeath(cause: string): void {
     if (!this.shuttleController) return
 
-    // Explosion burst at shuttle position
-    if (this.explosionEmitter) {
-      const pos = this.shuttleController.position.clone()
-      for (let i = 0; i < 150; i++) {
-        const dir = new THREE.Vector3(
-          (Math.random() - 0.5) * 2,
-          Math.random() * 1.5,
-          (Math.random() - 0.5) * 2,
-        ).multiplyScalar(MAP_SHUTTLE_SCALE * 3)
-        this.explosionEmitter.emit(pos, dir)
+    const isCold = cause === 'Hull Frozen' || cause === 'Adrift'
+
+    if (isCold) {
+      // Freeze effect — tint shuttle blue/icy, keep visible
+      this.shuttleController.group.traverse((child) => {
+        if (child instanceof THREE.Mesh && child.material) {
+          const mat = child.material as THREE.MeshStandardMaterial
+          if (mat.color) {
+            mat.emissive = new THREE.Color(0x4488ff)
+            mat.emissiveIntensity = 0.6
+          }
+        }
+      })
+    } else {
+      // Explosion burst at shuttle position
+      if (this.explosionEmitter) {
+        const pos = this.shuttleController.position.clone()
+        for (let i = 0; i < 150; i++) {
+          const dir = new THREE.Vector3(
+            (Math.random() - 0.5) * 2,
+            Math.random() * 1.5,
+            (Math.random() - 0.5) * 2,
+          ).multiplyScalar(MAP_SHUTTLE_SCALE * 3)
+          this.explosionEmitter.emit(pos, dir)
+        }
       }
+      // Hide shuttle mesh
+      this.shuttleController.group.visible = false
     }
 
-    // Hide shuttle mesh
-    this.shuttleController.group.visible = false
+    // Disable all input + freeze movement
+    this.shuttleController.setInputEnabled(false)
     this.shuttleController.freeze()
 
     // Camera + overlay
@@ -1692,9 +1709,18 @@ export class MapViewController implements Tickable {
   private respawnAtEarth(): void {
     if (!this.shuttleController || !this.orbitSystem) return
 
-    // Clear death state + show shuttle again
+    // Clear death state + show shuttle again, remove ice tint
     this.shuttleController.resetDeath()
     this.shuttleController.group.visible = true
+    this.shuttleController.group.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.material) {
+        const mat = child.material as THREE.MeshStandardMaterial
+        if (mat.emissiveIntensity) {
+          mat.emissive = new THREE.Color(0x000000)
+          mat.emissiveIntensity = 0
+        }
+      }
+    })
     this.shuttleController.freeze()
     this.shuttleController.setInputEnabled(false)
 
