@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Procedural Chimera — Walker Enemy</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #000; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js",
+      "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+
+/* ============================================================
+   SCENE
+   ============================================================ */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+scene.fog = new THREE.FogExp2(0x000000, 0.015);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(12, 8, 16);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 4, 0);
+
+/* ---- LIGHTING ---- */
+scene.add(new THREE.AmbientLight(0x444444));
+scene.add(new THREE.HemisphereLight(0x223344, 0x111111, 0.5));
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+dirLight.position.set(8, 15, 10);
+scene.add(dirLight);
+
+const rimLight = new THREE.DirectionalLight(0x4466ff, 0.4);
+rimLight.position.set(-8, 5, -10);
+scene.add(rimLight);
+
+/* ---- GROUND ---- */
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(100, 100),
+  new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9 })
+);
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+scene.add(new THREE.GridHelper(100, 60, 0x2a2a2a, 0x1a1a1a));
+
+/* ============================================================
+   SHARED MATERIALS
+   ============================================================ */
+const darkMetal = new THREE.MeshStandardMaterial({
+  color: 0x1a1a1a, metalness: 0.85, roughness: 0.25,
+});
+const bodyMat = new THREE.MeshStandardMaterial({
+  color: 0x222222, metalness: 0.7, roughness: 0.3,
+  emissive: 0x0a1a1a, emissiveIntensity: 0.2,
+});
+const neckMat = new THREE.MeshStandardMaterial({
+  color: 0x1a1a1a, emissive: 0x0a2a2a, emissiveIntensity: 0.3,
+});
+const headMat = new THREE.MeshPhysicalMaterial({
+  color: 0xcc3333, transparent: true, opacity: 0.3,
+  roughness: 0.15, metalness: 0.1,
+});
+const headCoreMat = new THREE.MeshStandardMaterial({
+  color: 0x661111, emissive: 0x330000, emissiveIntensity: 0.5,
+  roughness: 0.5, metalness: 0.2,
+});
+const dnaMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc });
+const rnaMat = new THREE.MeshBasicMaterial({ color: 0xff3355 });
+const tentacleMat = new THREE.MeshStandardMaterial({
+  color: 0x993333, emissive: 0x331111, emissiveIntensity: 0.3,
+  metalness: 0.5, roughness: 0.4,
+});
+const tentacleTipMat = new THREE.MeshBasicMaterial({ color: 0xff6644 });
+const toeMat = new THREE.MeshStandardMaterial({
+  color: 0x111111, metalness: 0.9, roughness: 0.2,
+});
+
+/* ============================================================
+   CHIMERA CLASS
+   ============================================================ */
+class Chimera {
+  constructor() {
+    this.group = new THREE.Group();
+    this.bodyGroup = new THREE.Group();
+    this.legsGroup = new THREE.Group();
+    this.headGroup = new THREE.Group();
+    this.tentaclesGroup = new THREE.Group();
+
+    this.group.add(this.legsGroup);
+    this.group.add(this.bodyGroup);
+    this.group.add(this.headGroup);
+    this.group.add(this.tentaclesGroup);
+
+    this.timeOffset = Math.random() * 10;
+    this.alive = true;
+    this.walkPhase = 0;
+
+    this._buildBody();
+    this._buildLegs();
+    this._buildHead();
+    this._buildTentacles();
+
+    this.group.position.set(0, 0, 0);
+    scene.add(this.group);
+  }
+
+  /* ---- BODY: icosahedron torso + segmented spine ---- */
+  _buildBody() {
+    /* main torso */
+    this.torso = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(1.2, 1),
+      bodyMat
+    );
+    this.torso.position.y = 6.5;
+    this.bodyGroup.add(this.torso);
+
+    /* segmented spine/collar going up to head */
+    this.spineSegments = [];
+    for (let i = 0; i < 6; i++) {
+      const r = 0.35 - i * 0.03;
+      const seg = new THREE.Mesh(
+        new THREE.CylinderGeometry(r, r + 0.02, 0.15, 8),
+        neckMat
+      );
+      seg.position.y = 7.7 + i * 0.16;
+      this.bodyGroup.add(seg);
+      this.spineSegments.push(seg);
+    }
+
+    /* hip joint */
+    const hip = new THREE.Mesh(
+      new THREE.SphereGeometry(0.6, 8, 6),
+      darkMetal
+    );
+    hip.position.y = 5.3;
+    this.bodyGroup.add(hip);
+
+    /* dual cores visible through torso cracks */
+    this.dnaCore = new THREE.Mesh(
+      new THREE.TorusKnotGeometry(0.3, 0.06, 64, 4, 2, 3),
+      dnaMat
+    );
+    this.dnaCore.position.y = 6.5;
+    this.bodyGroup.add(this.dnaCore);
+
+    this.rnaCore = new THREE.Mesh(
+      new THREE.TorusKnotGeometry(0.25, 0.05, 48, 4, 3, 2),
+      rnaMat
+    );
+    this.rnaCore.position.y = 6.5;
+    this.bodyGroup.add(this.rnaCore);
+
+    /* body glow */
+    this.bodyLight = new THREE.PointLight(0x00ffcc, 0.4, 6);
+    this.bodyLight.position.y = 6.5;
+    this.bodyGroup.add(this.bodyLight);
+  }
+
+  /* ---- LEGS: two digitigrade legs ---- */
+  _buildLegs() {
+    this.legs = [];
+
+    for (let side = -1; side <= 1; side += 2) {
+      const leg = {
+        side,
+        upperMesh: null,
+        lowerMesh: null,
+        toes: [],
+        phase: side === -1 ? 0 : Math.PI,
+      };
+
+      /* upper leg bone mesh (placeholder, rebuilt each frame) */
+      leg.upperMesh = new THREE.Mesh(
+        new THREE.TubeGeometry(new THREE.LineCurve3(
+          new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, -1, 0)
+        ), 8, 0.15, 6),
+        darkMetal
+      );
+      this.legsGroup.add(leg.upperMesh);
+
+      /* lower leg bone mesh */
+      leg.lowerMesh = new THREE.Mesh(
+        new THREE.TubeGeometry(new THREE.LineCurve3(
+          new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, -1, 0)
+        ), 8, 0.12, 6),
+        darkMetal
+      );
+      this.legsGroup.add(leg.lowerMesh);
+
+      /* knee joint sphere */
+      leg.kneeSphere = new THREE.Mesh(
+        new THREE.SphereGeometry(0.18, 6, 4),
+        darkMetal
+      );
+      this.legsGroup.add(leg.kneeSphere);
+
+      /* ankle joint sphere */
+      leg.ankleSphere = new THREE.Mesh(
+        new THREE.SphereGeometry(0.14, 6, 4),
+        darkMetal
+      );
+      this.legsGroup.add(leg.ankleSphere);
+
+      /* 3 toes per foot */
+      for (let t = -1; t <= 1; t++) {
+        const toe = new THREE.Mesh(
+          new THREE.ConeGeometry(0.06, 0.5, 4),
+          toeMat
+        );
+        toe.rotation.x = Math.PI * 0.6;
+        this.legsGroup.add(toe);
+        leg.toes.push({ mesh: toe, offset: t });
+      }
+
+      this.legs.push(leg);
+    }
+  }
+
+  _computeLeg(leg, time, isMoving) {
+    const stride = isMoving ? 1.2 : 0;
+    const stepHeight = isMoving ? 1.0 : 0;
+    const speed = 3;
+    const cycle = Math.sin(time * speed + leg.phase);
+    const liftCycle = Math.max(0, cycle);
+
+    const hipX = leg.side * 0.8;
+    const hipY = 5.3;
+    const hipZ = 0;
+
+    /* foot target */
+    const footX = leg.side * 1.6;
+    const footY = liftCycle * stepHeight;
+    const footZ = isMoving ? cycle * stride : Math.sin(time * 0.5 + leg.phase) * 0.1;
+
+    /* knee: digitigrade = bends forward */
+    const kneeX = leg.side * 1.2;
+    const kneeY = 2.8 + liftCycle * 0.4;
+    const kneeZ = footZ * 0.3 - 0.6;
+
+    /* ankle */
+    const ankleX = footX;
+    const ankleY = 0.5 + footY;
+    const ankleZ = footZ * 0.8;
+
+    const hip = new THREE.Vector3(hipX, hipY, hipZ);
+    const knee = new THREE.Vector3(kneeX, kneeY, kneeZ);
+    const ankle = new THREE.Vector3(ankleX, ankleY, ankleZ);
+    const foot = new THREE.Vector3(footX, footY, footZ);
+
+    /* upper leg: hip to knee */
+    const upperCurve = new THREE.QuadraticBezierCurve3(
+      hip,
+      new THREE.Vector3((hipX + kneeX) / 2, (hipY + kneeY) / 2 + 0.3, (hipZ + kneeZ) / 2),
+      knee
+    );
+    leg.upperMesh.geometry.dispose();
+    leg.upperMesh.geometry = new THREE.TubeGeometry(upperCurve, 10, 0.15, 6, false);
+
+    /* lower leg: knee to ankle */
+    const lowerCurve = new THREE.QuadraticBezierCurve3(
+      knee,
+      new THREE.Vector3((kneeX + ankleX) / 2, (kneeY + ankleY) / 2 - 0.2, (kneeZ + ankleZ) / 2),
+      ankle
+    );
+    leg.lowerMesh.geometry.dispose();
+    leg.lowerMesh.geometry = new THREE.TubeGeometry(lowerCurve, 10, 0.12, 6, false);
+
+    /* joint spheres */
+    leg.kneeSphere.position.copy(knee);
+    leg.ankleSphere.position.copy(ankle);
+
+    /* toes */
+    for (const toe of leg.toes) {
+      toe.mesh.position.set(
+        footX + toe.offset * 0.15,
+        footY + 0.05,
+        footZ + 0.2
+      );
+      toe.mesh.rotation.z = toe.offset * 0.3;
+    }
+  }
+
+  /* ---- HEAD: corona sphere + inner core ---- */
+  _buildHead() {
+    /* outer membrane */
+    this.headMembrane = new THREE.Mesh(
+      new THREE.SphereGeometry(0.9, 16, 12),
+      headMat
+    );
+    this.headMembrane.position.y = 8.8;
+    this.headGroup.add(this.headMembrane);
+
+    /* inner core */
+    this.headCore = new THREE.Mesh(
+      new THREE.SphereGeometry(0.55, 10, 8),
+      headCoreMat
+    );
+    this.headCore.position.y = 8.8;
+    this.headGroup.add(this.headCore);
+
+    /* head glow */
+    this.headLight = new THREE.PointLight(0xff4400, 0.8, 8);
+    this.headLight.position.y = 8.8;
+    this.headGroup.add(this.headLight);
+
+    /* eye spots — two emissive patches */
+    for (let side = -1; side <= 1; side += 2) {
+      const eye = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 6, 4),
+        new THREE.MeshBasicMaterial({ color: 0xff2200 })
+      );
+      eye.position.set(side * 0.35, 8.95, 0.65);
+      this.headGroup.add(eye);
+
+      const eyeLight = new THREE.PointLight(0xff2200, 0.3, 3);
+      eyeLight.position.copy(eye.position);
+      this.headGroup.add(eyeLight);
+    }
+  }
+
+  /* ---- TENTACLES: hanging from head ---- */
+  _buildTentacles() {
+    this.tentacles = [];
+    const count = 14;
+
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const length = 2.0 + Math.random() * 2.0;
+      const segments = 6;
+
+      const tentacle = {
+        angle,
+        length,
+        segments,
+        meshes: [],
+        phase: Math.random() * Math.PI * 2,
+        /* each tentacle has unique movement character */
+        freqX: 1.5 + Math.random() * 2.5,
+        freqY: 1.0 + Math.random() * 2.0,
+        freqZ: 1.2 + Math.random() * 2.8,
+        ampBase: 0.4 + Math.random() * 0.4,
+        /* direction bias: some reach up, some out, some curl */
+        reachDir: new THREE.Vector3(
+          Math.cos(angle) * (0.5 + Math.random() * 0.5),
+          (Math.random() - 0.3) * 0.8,
+          Math.sin(angle) * (0.5 + Math.random() * 0.5)
+        ).normalize(),
+        /* curl factor: how much the tentacle spirals */
+        curl: 0.3 + Math.random() * 0.7,
+      };
+
+      for (let s = 0; s < segments; s++) {
+        const mesh = new THREE.Mesh(
+          new THREE.TubeGeometry(new THREE.LineCurve3(
+            new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, -1, 0)
+          ), 8, 0.07 - s * 0.008, 5, false),
+          s < segments - 1 ? tentacleMat : tentacleTipMat
+        );
+        this.tentaclesGroup.add(mesh);
+        tentacle.meshes.push(mesh);
+      }
+
+      this.tentacles.push(tentacle);
+    }
+  }
+
+  _computeTentacle(tent, time, isAgitated) {
+    const t = time + this.timeOffset;
+    const baseY = 8.0;
+    const attachRadius = 0.75;
+
+    /* attachment point on head surface */
+    const attachX = Math.cos(tent.angle) * attachRadius;
+    const attachZ = Math.sin(tent.angle) * attachRadius;
+
+    const agitMult = isAgitated ? 2.5 : 1.0;
+    const ampMult = isAgitated ? 2.2 : 1.0;
+
+    let prevEnd = new THREE.Vector3(attachX, baseY, attachZ);
+    const segLen = tent.length / tent.segments;
+
+    for (let s = 0; s < tent.segments; s++) {
+      /* progress along tentacle 0..1 — tips move more */
+      const progress = (s + 1) / tent.segments;
+      const tipFactor = progress * progress; /* quadratic = tips whip harder */
+
+      /* time offsets per segment for wave propagation along tentacle */
+      const tX = t * tent.freqX * agitMult + tent.phase + s * 1.2;
+      const tY = t * tent.freqY * agitMult + tent.phase * 1.7 + s * 0.9;
+      const tZ = t * tent.freqZ * agitMult + tent.phase * 0.6 + s * 1.4;
+
+      /* main reach direction + oscillating displacement */
+      const reachX = tent.reachDir.x * segLen;
+      const reachY = tent.reachDir.y * segLen;
+      const reachZ = tent.reachDir.z * segLen;
+
+      /* flailing displacement — grows with tipFactor */
+      const amp = tent.ampBase * ampMult;
+      const flailX = Math.sin(tX) * amp * (0.3 + tipFactor * 0.7)
+                    + Math.sin(tX * 2.3 + 1.0) * amp * 0.3 * tipFactor;
+      const flailY = Math.sin(tY) * amp * (0.2 + tipFactor * 0.8)
+                    + Math.cos(tY * 1.7 + 2.0) * amp * 0.4 * tipFactor;
+      const flailZ = Math.cos(tZ) * amp * (0.3 + tipFactor * 0.7)
+                    + Math.sin(tZ * 1.9 + 0.5) * amp * 0.3 * tipFactor;
+
+      /* curl: circular displacement that increases along length */
+      const curlAngle = t * 1.5 * agitMult + s * tent.curl * 1.5 + tent.phase;
+      const curlR = tent.curl * 0.3 * progress * ampMult;
+      const curlX = Math.cos(curlAngle) * curlR;
+      const curlZ = Math.sin(curlAngle) * curlR;
+
+      /* segment endpoint */
+      const segEnd = new THREE.Vector3(
+        prevEnd.x + reachX + flailX + curlX,
+        prevEnd.y + reachY + flailY - segLen * 0.15,
+        prevEnd.z + reachZ + flailZ + curlZ
+      );
+
+      /* control point for the bezier — offset for organic curvature */
+      const mid = new THREE.Vector3(
+        (prevEnd.x + segEnd.x) / 2 + Math.sin(tX * 1.3 + s) * amp * 0.4 * tipFactor,
+        (prevEnd.y + segEnd.y) / 2 + Math.cos(tY * 1.1 + s * 0.7) * amp * 0.5 * tipFactor,
+        (prevEnd.z + segEnd.z) / 2 + Math.sin(tZ * 0.9 + s * 1.1) * amp * 0.4 * tipFactor
+      );
+
+      const curve = new THREE.QuadraticBezierCurve3(prevEnd, mid, segEnd);
+      const radius = 0.07 - s * 0.008;
+
+      tent.meshes[s].geometry.dispose();
+      tent.meshes[s].geometry = new THREE.TubeGeometry(
+        curve, 8, Math.max(0.012, radius), 5, false
+      );
+
+      prevEnd = segEnd.clone();
+    }
+  }
+
+  /* ---- MAIN TICK ---- */
+  tick(time, target) {
+    if (!this.alive) return;
+
+    const t = time + this.timeOffset;
+    let isMoving = false;
+    let isAgitated = false;
+
+    /* ---- movement ---- */
+    if (target) {
+      const dir = target.clone().sub(this.group.position);
+      dir.y = 0;
+      const distSq = dir.lengthSq();
+
+      isAgitated = distSq < 100;
+
+      if (distSq > 9) {
+        isMoving = true;
+        dir.normalize();
+        this.group.position.add(dir.multiplyScalar(0.03));
+        this.group.rotation.y = Math.atan2(dir.x, dir.z);
+      }
+    }
+
+    this.walkPhase = isMoving ? this.walkPhase + 0.016 : this.walkPhase;
+
+    /* ---- legs ---- */
+    for (const leg of this.legs) {
+      this._computeLeg(leg, isMoving ? t : t * 0.3, isMoving);
+    }
+
+    /* ---- body sway ---- */
+    if (isMoving) {
+      this.bodyGroup.position.y = Math.sin(t * 3) * 0.15;
+      this.bodyGroup.rotation.z = Math.sin(t * 3) * 0.04;
+      this.bodyGroup.position.x = Math.sin(t * 1.5) * 0.08;
+    } else {
+      this.bodyGroup.position.y = Math.sin(t * 0.8) * 0.05;
+      this.bodyGroup.rotation.z = Math.sin(t * 0.5) * 0.015;
+      this.bodyGroup.position.x = 0;
+    }
+
+    /* ---- head bob ---- */
+    this.headGroup.position.y = this.bodyGroup.position.y;
+    this.headGroup.rotation.x = Math.sin(t * (isMoving ? 2 : 0.6)) * 0.06;
+    this.headGroup.rotation.z = Math.sin(t * (isMoving ? 1.5 : 0.4)) * 0.04;
+
+    /* ---- head membrane pulse ---- */
+    const breathe = isAgitated
+      ? 1 + Math.sin(t * 4) * 0.06
+      : 1 + Math.sin(t * 1.2) * 0.02;
+    this.headMembrane.scale.setScalar(breathe);
+
+    /* ---- cores rotation ---- */
+    this.dnaCore.rotation.y += 0.02;
+    this.dnaCore.rotation.x += 0.005;
+    this.rnaCore.rotation.y -= 0.015;
+    this.rnaCore.rotation.z += 0.008;
+
+    const coreScale = 1 + Math.sin(t * 2) * 0.1;
+    this.dnaCore.scale.setScalar(coreScale);
+    this.rnaCore.scale.setScalar(1 + Math.sin(t * 2.5 + 1) * 0.08);
+
+    /* ---- body light ---- */
+    this.bodyLight.intensity = 0.3 + Math.sin(t * 2) * 0.2;
+
+    /* ---- head light ---- */
+    this.headLight.intensity = isAgitated
+      ? 1.0 + Math.sin(t * 5) * 0.5
+      : 0.5 + Math.sin(t * 1.5) * 0.2;
+
+    /* ---- tentacles ---- */
+    for (const tent of this.tentacles) {
+      this._computeTentacle(tent, t, isAgitated);
+    }
+
+    /* ---- spine segments wave ---- */
+    for (let i = 0; i < this.spineSegments.length; i++) {
+      const seg = this.spineSegments[i];
+      seg.rotation.y = Math.sin(t * 2 + i * 0.5) * 0.1;
+      seg.rotation.x = Math.sin(t * 1.5 + i * 0.3) * 0.05;
+    }
+  }
+}
+
+/* ============================================================
+   SPAWN
+   ============================================================ */
+const chimera = new Chimera();
+
+/* ---- SCALE REFERENCE: player-sized cube ---- */
+const playerRef = new THREE.Mesh(
+  new THREE.BoxGeometry(0.5, 1.8, 0.5),
+  new THREE.MeshStandardMaterial({ color: 0x3366ff, transparent: true, opacity: 0.4 })
+);
+playerRef.position.set(4, 0.9, 0);
+scene.add(playerRef);
+
+const refLabel = document.createElement("div");
+refLabel.style.cssText = "position:fixed;top:16px;right:16px;color:#3366ff;font:13px monospace";
+refLabel.textContent = "Blue box = player scale (1.8m)";
+document.body.appendChild(refLabel);
+
+/* ---- TARGET ---- */
+const targetMarker = new THREE.Mesh(
+  new THREE.SphereGeometry(0.2, 8, 8),
+  new THREE.MeshBasicMaterial({ color: 0xff3333 })
+);
+targetMarker.position.set(15, 0.2, 0);
+scene.add(targetMarker);
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+window.addEventListener("click", (e) => {
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObject(ground);
+  if (hits.length > 0) {
+    targetMarker.position.copy(hits[0].point);
+    targetMarker.position.y = 0.2;
+  }
+});
+
+/* ---- INFO ---- */
+const info = document.createElement("div");
+info.style.cssText = "position:fixed;bottom:16px;left:16px;color:#666;font:13px monospace";
+info.textContent = "LEFT CLICK = move target (red dot) · Chimera walks toward it · Tentacles agitate when close";
+document.body.appendChild(info);
+
+/* ============================================================
+   LOOP
+   ============================================================ */
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  chimera.tick(t, targetMarker.position);
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+animate();
+
+/* ---- RESIZE ---- */
+window.addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

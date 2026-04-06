@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Procedural Bacteriophage</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #000; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js",
+      "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+
+/* ---- SCENE ---- */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(3, 2.5, 4);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.0, 0);
+
+/* ---- LIGHTING ---- */
+scene.add(new THREE.AmbientLight(0x888888));
+scene.add(new THREE.HemisphereLight(0x444466, 0x222222, 0.8));
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+dirLight.position.set(5, 10, 5);
+scene.add(dirLight);
+const fillLight = new THREE.DirectionalLight(0x4466ff, 0.4);
+fillLight.position.set(-5, 3, -5);
+scene.add(fillLight);
+
+/* ---- GROUND ---- */
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(50, 50),
+  new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+);
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+const grid = new THREE.GridHelper(50, 50, 0x333333, 0x222222);
+scene.add(grid);
+
+/* ---- SHARED MATERIALS (instanced across all phages) ---- */
+const darkMetal = new THREE.MeshStandardMaterial({
+  color: 0x1a1a1a,
+  metalness: 0.8,
+  roughness: 0.3,
+});
+
+const neckMat = new THREE.MeshStandardMaterial({
+  color: 0x1a1a1a,
+  emissive: 0x0a2a2a,
+  emissiveIntensity: 0.3,
+});
+
+const headMat = new THREE.MeshPhysicalMaterial({
+  color: 0xffffff,
+  transparent: true,
+  opacity: 0.3,
+  roughness: 0.1,
+  metalness: 0.2,
+});
+
+const coreMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc });
+
+const legMat = new THREE.MeshStandardMaterial({
+  color: 0x1a1a1a,
+  metalness: 0.8,
+  roughness: 0.3,
+});
+
+/* ---- SHARED GEOMETRIES ---- */
+const baseGeo = new THREE.CylinderGeometry(0.3, 0.35, 0.08, 8);
+const headGeo = new THREE.IcosahedronGeometry(0.4, 0);
+const coreGeo = new THREE.TorusKnotGeometry(0.12, 0.02, 64, 4);
+const ringGeo = new THREE.TorusGeometry(0.32, 0.02, 4, 8);
+
+/* ---- PHAGE CLASS ---- */
+class Phage {
+  constructor() {
+    this.group = new THREE.Group();
+    this.body = new THREE.Group();
+    this.legsGroup = new THREE.Group();
+    this.group.add(this.body);
+    this.group.add(this.legsGroup);
+
+    this.timeOffset = Math.random() * 10;
+    this.alive = true;
+    this.health = 3;
+    this.flashTimer = 0;
+
+    this._buildBody();
+    this._buildLegs();
+
+    /* set initial body height */
+    this.body.position.y = 0.8;
+
+    this.group.position.set(
+      (Math.random() - 0.5) * 20,
+      0,
+      (Math.random() - 0.5) * 20
+    );
+
+    scene.add(this.group);
+  }
+
+  _buildBody() {
+    /* === BASEPLATE — where legs attach === */
+    const base = new THREE.Mesh(baseGeo, darkMetal);
+    base.position.y = -0.05;
+    this.body.add(base);
+
+    /* ring around baseplate */
+    const ring = new THREE.Mesh(ringGeo, darkMetal);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = -0.05;
+    this.body.add(ring);
+
+    /* === TRUNK — the main connector cylinder === */
+    const trunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.28, 0.35, 8),
+      darkMetal
+    );
+    trunk.position.y = 0.15;
+    this.body.add(trunk);
+
+    /* === SEGMENTED COLLAR — zigzag accordion neck === */
+    for (let i = 0; i < 6; i++) {
+      const r = 0.15 + (i % 2 === 0 ? 0.05 : -0.03);
+      const seg = new THREE.Mesh(
+        new THREE.CylinderGeometry(r, r, 0.04, 8),
+        neckMat
+      );
+      seg.position.y = 0.38 + i * 0.045;
+      this.body.add(seg);
+    }
+
+    /* collar cap ring */
+    const capRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.14, 0.015, 4, 8),
+      neckMat
+    );
+    capRing.rotation.x = Math.PI / 2;
+    capRing.position.y = 0.36;
+    this.body.add(capRing);
+
+    /* === CAPSID HEAD === */
+    this.head = new THREE.Mesh(headGeo, headMat);
+    this.head.position.y = 0.75;
+    this.body.add(this.head);
+
+    /* === DNA CORE (inside head) === */
+    this.core = new THREE.Mesh(coreGeo, coreMat);
+    this.core.position.y = 0.75;
+    this.body.add(this.core);
+
+    /* === INNER POINT LIGHT === */
+    this.light = new THREE.PointLight(0x00ffcc, 0.8, 3);
+    this.light.position.y = 0.75;
+    this.body.add(this.light);
+  }
+
+  _buildLegs() {
+    this.legs = [];
+
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      /* alternating gait: even legs and odd legs are half-cycle offset */
+      const phase = (i % 2 === 0) ? 0 : Math.PI;
+
+      /* build an initial curve so the TubeGeometry has valid data */
+      const curve = this._makeLegCurve(angle, phase, 0, false);
+      const geo = new THREE.TubeGeometry(curve, 12, 0.025, 4, false);
+      const mesh = new THREE.Mesh(geo, legMat);
+
+      this.legsGroup.add(mesh);
+      this.legs.push({ mesh, angle, phase });
+    }
+  }
+
+  _makeLegCurve(angle, phase, time, isMoving) {
+    /* radial direction from center */
+    const cx = Math.cos(angle);
+    const cz = Math.sin(angle);
+    const tx = -cz;
+    const tz = cx;
+
+    /* hip stays fixed at body attachment point */
+    const hip = new THREE.Vector3(cx * 0.3, 0.8, cz * 0.3);
+
+    if (!isMoving) {
+      /* IDLE: legs planted, subtle knee twitch */
+      const foot = new THREE.Vector3(cx * 1.2, 0, cz * 1.2);
+      const knee = new THREE.Vector3(
+        cx * 0.7,
+        0.85 + Math.sin(time * 0.8 + phase) * 0.04,
+        cz * 0.7
+      );
+      return new THREE.QuadraticBezierCurve3(hip, knee, foot);
+    }
+
+    /* WALKING: full alternating tetrapod gait */
+    const speed = 8;
+    const cycle = ((time * speed + phase) % (Math.PI * 2)) / (Math.PI * 2);
+    const isSwing = cycle > 0.5;
+    const swingT = isSwing ? (cycle - 0.5) * 2 : 0;
+    const stanceT = !isSwing ? cycle * 2 : 0;
+
+    const stride = 0.25;
+
+    let footX, footZ, footY;
+    const restX = cx * 1.2;
+    const restZ = cz * 1.2;
+
+    if (isSwing) {
+      footX = restX + tx * stride * (swingT * 2 - 1);
+      footZ = restZ + tz * stride * (swingT * 2 - 1);
+      footY = Math.sin(swingT * Math.PI) * 0.35;
+    } else {
+      footX = restX + tx * stride * (1 - stanceT * 2);
+      footZ = restZ + tz * stride * (1 - stanceT * 2);
+      footY = 0;
+    }
+
+    const foot = new THREE.Vector3(footX, footY, footZ);
+
+    const kneeRadial = isSwing ? 0.65 : 0.75;
+    const kneeHeight = isSwing
+      ? 1.1 + Math.sin(swingT * Math.PI) * 0.3
+      : 0.85 + Math.sin(stanceT * Math.PI * 0.5) * 0.05;
+
+    const knee = new THREE.Vector3(
+      cx * kneeRadial + tx * (isSwing ? stride * (swingT - 0.5) : stride * (0.5 - stanceT)) * 0.5,
+      kneeHeight,
+      cz * kneeRadial + tz * (isSwing ? stride * (swingT - 0.5) : stride * (0.5 - stanceT)) * 0.5
+    );
+
+    return new THREE.QuadraticBezierCurve3(hip, knee, foot);
+  }
+
+  tick(time, target) {
+    if (!this.alive) return;
+
+    const t = time + this.timeOffset;
+    let isMoving = false;
+
+    /* ---- movement toward target ---- */
+    if (target) {
+      const dir = target.clone().sub(this.group.position);
+      dir.y = 0;
+
+      if (dir.lengthSq() > 1.0) {
+        isMoving = true;
+        dir.normalize();
+        /* weaving */
+        const side = new THREE.Vector3(-dir.z, 0, dir.x);
+        dir.add(side.multiplyScalar(Math.sin(t * 1.5) * 0.3));
+        dir.normalize();
+        this.group.position.add(dir.multiplyScalar(0.035));
+
+        /* face movement direction */
+        this.group.rotation.y = Math.atan2(dir.x, dir.z);
+      }
+    }
+
+    /* ---- body animation ---- */
+    if (isMoving) {
+      /* walking: bob and rock */
+      this.body.position.y = 0.8 + Math.sin(t * 8) * 0.03;
+      this.body.rotation.z = Math.sin(t * 8) * 0.06;
+      this.body.rotation.x = Math.sin(t * 4) * 0.03;
+    } else {
+      /* idle: slow gentle breathing */
+      this.body.position.y = 0.8 + Math.sin(t * 1.2) * 0.015;
+      this.body.rotation.z = Math.sin(t * 0.7) * 0.02;
+      this.body.rotation.x = Math.sin(t * 0.5) * 0.01;
+    }
+
+    /* ---- DNA core spin + pulse ---- */
+    this.core.rotation.y += 0.02;
+    const scale = 1 + Math.sin(t * 2) * 0.1;
+    this.core.scale.setScalar(scale);
+
+    /* ---- light pulse ---- */
+    this.light.intensity = 0.6 + Math.sin(t * 2) * 0.3;
+
+    /* ---- leg animation ---- */
+    for (const leg of this.legs) {
+      const curve = this._makeLegCurve(leg.angle, leg.phase, t, isMoving);
+      leg.mesh.geometry.dispose();
+      leg.mesh.geometry = new THREE.TubeGeometry(curve, 12, 0.025, 4, false);
+    }
+
+    /* ---- hit flash ---- */
+    if (this.flashTimer > 0) {
+      this.flashTimer -= 0.016;
+      this.head.material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    } else if (this.head.material !== headMat) {
+      this.head.material = headMat;
+    }
+  }
+
+  hit() {
+    this.health--;
+    this.flashTimer = 0.08;
+    if (this.health <= 0) this.die();
+  }
+
+  die() {
+    this.alive = false;
+    /* collapse legs inward */
+    for (const leg of this.legs) {
+      const curve = new THREE.QuadraticBezierCurve3(
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 0.1, 0),
+        new THREE.Vector3(0, -0.2, 0)
+      );
+      leg.mesh.geometry.dispose();
+      leg.mesh.geometry = new THREE.TubeGeometry(curve, 12, 0.025, 4, false);
+    }
+    /* flash and fade */
+    this.core.material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    this.light.intensity = 2;
+
+    setTimeout(() => {
+      scene.remove(this.group);
+    }, 300);
+  }
+}
+
+/* ---- SPAWN ---- */
+const phages = [];
+const phage = new Phage();
+phage.group.position.set(0, 0, 0);
+phages.push(phage);
+
+/* ---- TARGET MARKER (click to move) ---- */
+const targetMarker = new THREE.Mesh(
+  new THREE.SphereGeometry(0.1, 8, 8),
+  new THREE.MeshBasicMaterial({ color: 0xff3333 })
+);
+targetMarker.position.set(5, 0.1, 5);
+scene.add(targetMarker);
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+window.addEventListener("click", (e) => {
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObject(ground);
+  if (hits.length > 0) {
+    targetMarker.position.copy(hits[0].point);
+    targetMarker.position.y = 0.1;
+  }
+});
+
+/* ---- LOOP ---- */
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  const target = targetMarker.position;
+
+  for (const p of phages) {
+    p.tick(t, target);
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+animate();
+
+/* ---- RESIZE ---- */
+window.addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

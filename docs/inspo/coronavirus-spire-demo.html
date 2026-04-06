@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Procedural Coronavirus — Spire Enemy</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #000; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js",
+      "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+
+/* ---- SCENE ---- */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(6, 4, 8);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.5, 0);
+
+/* ---- LIGHTING ---- */
+scene.add(new THREE.AmbientLight(0x666666));
+scene.add(new THREE.HemisphereLight(0x443344, 0x222222, 0.6));
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+dirLight.position.set(5, 10, 5);
+scene.add(dirLight);
+const fillLight = new THREE.DirectionalLight(0xff4466, 0.3);
+fillLight.position.set(-5, 3, -5);
+scene.add(fillLight);
+
+/* ---- GROUND ---- */
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(50, 50),
+  new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+);
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+scene.add(new THREE.GridHelper(50, 50, 0x333333, 0x222222));
+
+/* ---- SHARED MATERIALS ---- */
+const membraneMat = new THREE.MeshPhysicalMaterial({
+  color: 0xcc4444,
+  transparent: true,
+  opacity: 0.35,
+  roughness: 0.3,
+  metalness: 0.1,
+  side: THREE.DoubleSide,
+});
+
+const membraneCoreMat = new THREE.MeshStandardMaterial({
+  color: 0x881111,
+  emissive: 0x440000,
+  emissiveIntensity: 0.4,
+  roughness: 0.6,
+  metalness: 0.2,
+});
+
+const stalkMat = new THREE.MeshStandardMaterial({
+  color: 0xddaa44,
+  emissive: 0x553300,
+  emissiveIntensity: 0.3,
+  metalness: 0.6,
+  roughness: 0.4,
+});
+
+const bulbMat = new THREE.MeshStandardMaterial({
+  color: 0xffcc44,
+  emissive: 0xff8800,
+  emissiveIntensity: 0.5,
+  metalness: 0.3,
+  roughness: 0.5,
+});
+
+const rnaMat = new THREE.MeshBasicMaterial({ color: 0xff3355 });
+
+const projectileMat = new THREE.MeshBasicMaterial({ color: 0xff6600 });
+
+/* ---- SHARED GEOMETRIES ---- */
+const stalkGeo = new THREE.CylinderGeometry(0.02, 0.03, 0.4, 4);
+const bulbGeo = new THREE.SphereGeometry(0.08, 6, 4);
+const rnaGeo = new THREE.TorusKnotGeometry(0.2, 0.04, 48, 4, 3, 2);
+const projectileGeo = new THREE.SphereGeometry(0.06, 4, 4);
+
+/* ---- FIBONACCI SPHERE DISTRIBUTION ---- */
+function fibonacciSphere(count) {
+  const points = [];
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < count; i++) {
+    const y = 1 - (i / (count - 1)) * 2;
+    const radius = Math.sqrt(1 - y * y);
+    const angle = goldenAngle * i;
+    points.push(new THREE.Vector3(
+      Math.cos(angle) * radius,
+      y,
+      Math.sin(angle) * radius
+    ));
+  }
+  return points;
+}
+
+/* ---- CORONAVIRUS / SPIRE CLASS ---- */
+class Spire {
+  constructor() {
+    this.group = new THREE.Group();
+    this.bodyGroup = new THREE.Group();
+    this.spikesGroup = new THREE.Group();
+    this.group.add(this.bodyGroup);
+    this.group.add(this.spikesGroup);
+
+    this.timeOffset = Math.random() * 10;
+    this.alive = true;
+    this.health = 5;
+    this.flashTimer = 0;
+    this.attackCooldown = 0;
+    this.projectiles = [];
+
+    this.spikeData = [];
+    this.baseRadius = 0.6;
+    this.spikeCount = 42;
+
+    this._buildBody();
+    this._buildSpikes();
+
+    this.group.position.set(
+      (Math.random() - 0.5) * 16,
+      1.5 + Math.random() * 2,
+      (Math.random() - 0.5) * 16
+    );
+
+    scene.add(this.group);
+  }
+
+  _buildBody() {
+    /* outer membrane - translucent */
+    this.membrane = new THREE.Mesh(
+      new THREE.SphereGeometry(this.baseRadius, 16, 12),
+      membraneMat
+    );
+    this.bodyGroup.add(this.membrane);
+
+    /* inner core - opaque, slightly smaller */
+    this.core = new THREE.Mesh(
+      new THREE.SphereGeometry(this.baseRadius * 0.7, 12, 8),
+      membraneCoreMat
+    );
+    this.bodyGroup.add(this.core);
+
+    /* RNA strand inside */
+    this.rna = new THREE.Mesh(rnaGeo, rnaMat);
+    this.bodyGroup.add(this.rna);
+
+    /* inner glow */
+    this.light = new THREE.PointLight(0xff4400, 0.6, 4);
+    this.bodyGroup.add(this.light);
+  }
+
+  _buildSpikes() {
+    const points = fibonacciSphere(this.spikeCount);
+
+    for (let i = 0; i < points.length; i++) {
+      const dir = points[i].clone().normalize();
+      const spikeGroup = new THREE.Group();
+
+      /* stalk */
+      const stalk = new THREE.Mesh(stalkGeo, stalkMat);
+      stalk.position.set(0, 0.2, 0);
+      spikeGroup.add(stalk);
+
+      /* bulb (receptor binding domain) */
+      const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+      bulb.position.set(0, 0.44, 0);
+      spikeGroup.add(bulb);
+
+      /* position spike on sphere surface, pointing outward */
+      const surfacePos = dir.clone().multiplyScalar(this.baseRadius);
+      spikeGroup.position.copy(surfacePos);
+
+      /* orient spike to point outward from sphere center */
+      spikeGroup.lookAt(dir.clone().multiplyScalar(this.baseRadius + 1));
+      spikeGroup.rotateX(Math.PI / 2);
+
+      this.spikesGroup.add(spikeGroup);
+      this.spikeData.push({
+        group: spikeGroup,
+        dir: dir.clone(),
+        basePos: surfacePos.clone(),
+        phase: Math.random() * Math.PI * 2,
+        bulb: bulb,
+      });
+    }
+  }
+
+  tick(time, target) {
+    if (!this.alive) return;
+
+    const t = time + this.timeOffset;
+    const distSq = target ? this.group.position.distanceToSquared(target) : Infinity;
+    const isAgitated = distSq < 64; /* within 8 units */
+    const inRange = distSq < 36; /* within 6 units — attack range */
+
+    /* ---- body rotation ---- */
+    this.group.rotation.y += isAgitated ? 0.015 : 0.004;
+    this.group.rotation.x = Math.sin(t * 0.3) * 0.1;
+
+    /* ---- floating bob ---- */
+    const baseY = this.group.position.y;
+    this.group.position.y += Math.sin(t * (isAgitated ? 2.5 : 0.8)) * 0.003;
+
+    /* ---- membrane breathing ---- */
+    const breathe = isAgitated
+      ? 1 + Math.sin(t * 4) * 0.08
+      : 1 + Math.sin(t * 1.5) * 0.03;
+    this.membrane.scale.setScalar(breathe);
+
+    /* ---- core pulse ---- */
+    const corePulse = isAgitated
+      ? 0.7 + Math.sin(t * 6) * 0.05
+      : 0.7 + Math.sin(t * 1.2) * 0.02;
+    this.core.scale.setScalar(corePulse);
+
+    /* ---- RNA spin ---- */
+    this.rna.rotation.y += isAgitated ? 0.04 : 0.01;
+    this.rna.rotation.z += 0.005;
+
+    /* ---- light pulse ---- */
+    this.light.intensity = isAgitated
+      ? 0.8 + Math.sin(t * 5) * 0.5
+      : 0.4 + Math.sin(t * 1.5) * 0.2;
+
+    /* ---- spike animation ---- */
+    for (const spike of this.spikeData) {
+      if (isAgitated) {
+        /* agitated: spikes extend outward and wobble */
+        const extend = 1 + Math.sin(t * 6 + spike.phase) * 0.15;
+        spike.group.position.copy(spike.basePos.clone().multiplyScalar(extend));
+        /* wobble the bulb */
+        spike.bulb.position.x = Math.sin(t * 8 + spike.phase) * 0.03;
+        spike.bulb.position.z = Math.cos(t * 8 + spike.phase * 1.3) * 0.03;
+      } else {
+        /* idle: gentle sway */
+        const sway = 1 + Math.sin(t * 0.8 + spike.phase) * 0.03;
+        spike.group.position.copy(spike.basePos.clone().multiplyScalar(sway));
+        spike.bulb.position.x = Math.sin(t * 1.2 + spike.phase) * 0.01;
+        spike.bulb.position.z = 0;
+      }
+    }
+
+    /* ---- attack: fire projectiles ---- */
+    this.attackCooldown -= 0.016;
+    if (inRange && target && this.attackCooldown <= 0) {
+      this._fireProjectile(target);
+      this.attackCooldown = isAgitated ? 1.2 : 2.5;
+    }
+
+    /* ---- update projectiles ---- */
+    for (let i = this.projectiles.length - 1; i >= 0; i--) {
+      const p = this.projectiles[i];
+      p.mesh.position.add(p.velocity.clone().multiplyScalar(0.016));
+      p.life -= 0.016;
+      /* fade out */
+      p.mesh.material.opacity = Math.max(0, p.life / p.maxLife);
+      if (p.life <= 0) {
+        scene.remove(p.mesh);
+        this.projectiles.splice(i, 1);
+      }
+    }
+
+    /* ---- hit flash ---- */
+    if (this.flashTimer > 0) {
+      this.flashTimer -= 0.016;
+      this.membrane.material = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.6,
+      });
+    } else if (this.membrane.material !== membraneMat) {
+      this.membrane.material = membraneMat;
+    }
+  }
+
+  _fireProjectile(target) {
+    const dir = target.clone().sub(this.group.position).normalize();
+
+    /* pick a random spike facing roughly toward target */
+    let bestSpike = this.spikeData[0];
+    let bestDot = -1;
+    for (const spike of this.spikeData) {
+      const d = spike.dir.dot(dir);
+      if (d > bestDot) {
+        bestDot = d;
+        bestSpike = spike;
+      }
+    }
+
+    /* flash the firing spike */
+    bestSpike.bulb.material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    setTimeout(() => { bestSpike.bulb.material = bulbMat; }, 100);
+
+    /* spawn projectile from spike tip */
+    const spawnPos = this.group.position.clone().add(
+      bestSpike.dir.clone().multiplyScalar(this.baseRadius + 0.5)
+    );
+
+    const mesh = new THREE.Mesh(projectileGeo, new THREE.MeshBasicMaterial({
+      color: 0xff6600,
+      transparent: true,
+      opacity: 1,
+    }));
+    mesh.position.copy(spawnPos);
+    scene.add(mesh);
+
+    /* add slight spread to direction */
+    const spread = new THREE.Vector3(
+      (Math.random() - 0.5) * 0.15,
+      (Math.random() - 0.5) * 0.15,
+      (Math.random() - 0.5) * 0.15
+    );
+
+    this.projectiles.push({
+      mesh,
+      velocity: dir.add(spread).normalize().multiplyScalar(5),
+      life: 3,
+      maxLife: 3,
+    });
+  }
+
+  hit() {
+    this.health--;
+    this.flashTimer = 0.1;
+    if (this.health <= 0) this.die();
+  }
+
+  die() {
+    this.alive = false;
+
+    /* spikes detach and fly outward */
+    for (const spike of this.spikeData) {
+      spike.velocity = spike.dir.clone().multiplyScalar(0.1 + Math.random() * 0.1);
+      spike.rotSpeed = new THREE.Vector3(
+        (Math.random() - 0.5) * 0.3,
+        (Math.random() - 0.5) * 0.3,
+        (Math.random() - 0.5) * 0.3
+      );
+    }
+
+    /* shrink core, flash RNA */
+    this.rna.material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    this.light.intensity = 3;
+
+    /* animate death over 60 frames then remove */
+    let frames = 0;
+    const deathAnim = () => {
+      frames++;
+      /* membrane shrinks */
+      const s = Math.max(0, 1 - frames / 60);
+      this.membrane.scale.setScalar(s);
+      this.core.scale.setScalar(s * 0.7);
+      this.rna.scale.setScalar(s);
+
+      /* spikes fly off */
+      for (const spike of this.spikeData) {
+        spike.group.position.add(spike.velocity);
+        spike.group.rotation.x += spike.rotSpeed.x;
+        spike.group.rotation.y += spike.rotSpeed.y;
+        spike.velocity.y -= 0.003; /* gravity */
+      }
+
+      this.light.intensity = Math.max(0, 3 - frames * 0.05);
+
+      if (frames < 60) {
+        requestAnimationFrame(deathAnim);
+      } else {
+        scene.remove(this.group);
+        /* clean up projectiles */
+        for (const p of this.projectiles) {
+          scene.remove(p.mesh);
+        }
+      }
+    };
+    deathAnim();
+  }
+}
+
+/* ---- SPAWN ---- */
+const spires = [];
+for (let i = 0; i < 5; i++) {
+  spires.push(new Spire());
+}
+
+/* ---- TARGET MARKER ---- */
+const targetMarker = new THREE.Mesh(
+  new THREE.SphereGeometry(0.15, 8, 8),
+  new THREE.MeshBasicMaterial({ color: 0x33ff33 })
+);
+targetMarker.position.set(0, 0.15, 0);
+scene.add(targetMarker);
+
+/* click to move target, right-click to damage nearest */
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+window.addEventListener("click", (e) => {
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObject(ground);
+  if (hits.length > 0) {
+    targetMarker.position.copy(hits[0].point);
+    targetMarker.position.y = 0.15;
+  }
+});
+
+window.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  /* damage nearest spire */
+  let nearest = null;
+  let nearDist = Infinity;
+  for (const s of spires) {
+    if (!s.alive) continue;
+    const d = s.group.position.distanceToSquared(targetMarker.position);
+    if (d < nearDist) {
+      nearDist = d;
+      nearest = s;
+    }
+  }
+  if (nearest) nearest.hit();
+});
+
+/* ---- INFO ---- */
+const info = document.createElement("div");
+info.style.cssText = "position:fixed;bottom:16px;left:16px;color:#666;font:13px monospace";
+info.textContent = "LEFT CLICK = move target (green dot) · RIGHT CLICK = damage nearest spire";
+document.body.appendChild(info);
+
+/* ---- LOOP ---- */
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  const target = targetMarker.position;
+
+  for (const s of spires) {
+    s.tick(t, target);
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+animate();
+
+/* ---- RESIZE ---- */
+window.addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
