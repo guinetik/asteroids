@@ -11,7 +11,7 @@
  */
 
 /** Item classification determining behavior and UI grouping. */
-export type ItemCategory = 'mineral' | 'upgrade' | 'consumable' | 'equipment' | 'trade-good'
+export type ItemCategory = 'mineral' | 'upgrade' | 'consumable' | 'equipment' | 'trade-good' | 'mission-material'
 
 /** An item definition from the JSON manifest. */
 export interface ItemDefinition {
