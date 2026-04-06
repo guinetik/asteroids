@@ -387,6 +387,8 @@ function handleUseFuelCell() {
     :session="shopSession"
     :profile="shopProfile"
     :inventory="shopInventory"
+    :fuel-full="telemetry.fuelLevel >= telemetry.fuelCapacity * 0.99"
+    :hull-full="telemetry.hp >= telemetry.maxHp"
     @close="closeShop"
     @buy-trade-good="handleShopBuyTradeGood"
     @sell-item="handleShopSellItem"

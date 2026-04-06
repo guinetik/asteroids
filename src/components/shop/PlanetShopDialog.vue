@@ -11,6 +11,8 @@ const props = defineProps<{
   session: ShopSession
   profile: PlayerProfile
   inventory: Inventory
+  fuelFull?: boolean
+  hullFull?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -96,10 +98,10 @@ function onKeydown(e: KeyboardEvent) {
               <button
                 type="button"
                 class="planet-shop-item__buy-btn planet-shop-btn--service"
-                :disabled="!canAfford(REFUEL_COST)"
+                :disabled="!canAfford(REFUEL_COST) || fuelFull"
                 @click="$emit('refuel')"
               >
-                Buy
+                {{ fuelFull ? 'Full' : 'Buy' }}
               </button>
             </div>
 
@@ -113,10 +115,10 @@ function onKeydown(e: KeyboardEvent) {
               <button
                 type="button"
                 class="planet-shop-item__buy-btn planet-shop-btn--service"
-                :disabled="!canAfford(REPAIR_COST)"
+                :disabled="!canAfford(REPAIR_COST) || hullFull"
                 @click="$emit('repairHull')"
               >
-                Buy
+                {{ hullFull ? 'Full' : 'Buy' }}
               </button>
             </div>
           </div>
