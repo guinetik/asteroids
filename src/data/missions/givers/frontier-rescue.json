@@ -1,0 +1,30 @@
+{
+  "id": "frontier-rescue",
+  "name": "Frontier Rescue",
+  "title": "Emergency Services",
+  "objectiveTypes": ["rescue"],
+  "minDifficulty": 3,
+  "maxDifficulty": 10,
+  "missions": [
+    {
+      "id": "fr_distress_signal",
+      "name": "Distress Signal",
+      "briefing": "We are picking up a distress beacon. Colonists are trapped. Clock is ticking — get in there and pull them out.",
+      "objectiveSlots": [
+        { "type": "rescue", "weight": 1, "params": { "type": "rescue", "colonistCount": { "min": 1, "max": 3 }, "oxygenTime": { "min": 120, "max": 45 }, "guardedChance": 0.2 }, "reward": { "min": 1000, "max": 3000 } }
+      ],
+      "completionBonus": { "min": 500, "max": 2000 },
+      "regionByDifficulty": { "near-earth": [3, 4], "asteroid-belt": [5, 8], "kuiper-belt": [9, 10] }
+    },
+    {
+      "id": "fr_cocoon_extraction",
+      "name": "Cocoon Extraction",
+      "briefing": "Multiple colonists cocooned in a deep nest. Hostiles confirmed. Move fast, shoot straight, bring them home alive.",
+      "objectiveSlots": [
+        { "type": "rescue", "weight": 1, "params": { "type": "rescue", "colonistCount": { "min": 2, "max": 4 }, "oxygenTime": { "min": 90, "max": 30 }, "guardedChance": 0.7 }, "reward": { "min": 2000, "max": 4000 } }
+      ],
+      "completionBonus": { "min": 800, "max": 3000 },
+      "regionByDifficulty": { "asteroid-belt": [5, 8], "kuiper-belt": [9, 10] }
+    }
+  ]
+}

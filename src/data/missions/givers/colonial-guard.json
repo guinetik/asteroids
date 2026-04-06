@@ -1,0 +1,30 @@
+{
+  "id": "colonial-guard",
+  "name": "Colonial Guard",
+  "title": "Pest Control Division",
+  "objectiveTypes": ["exterminate"],
+  "minDifficulty": 2,
+  "maxDifficulty": 10,
+  "missions": [
+    {
+      "id": "cg_nest_clearance",
+      "name": "Nest Clearance",
+      "briefing": "Bug infestation confirmed on a near-Earth rock. Clear the nests before they spread to the shipping lanes.",
+      "objectiveSlots": [
+        { "type": "exterminate", "weight": 1, "params": { "type": "exterminate", "nestCount": { "min": 1, "max": 3 }, "swarmSize": { "min": 3, "max": 8 }, "spitterChance": 0.1 }, "reward": { "min": 800, "max": 2500 } }
+      ],
+      "completionBonus": { "min": 400, "max": 1500 },
+      "regionByDifficulty": { "near-earth": [2, 4], "asteroid-belt": [5, 7], "kuiper-belt": [8, 10] }
+    },
+    {
+      "id": "cg_hive_assault",
+      "name": "Hive Assault",
+      "briefing": "This one is serious. Multiple nests, spitter escorts, the whole party. Colonial Guard wants it scorched. Hazard pay included.",
+      "objectiveSlots": [
+        { "type": "exterminate", "weight": 1, "params": { "type": "exterminate", "nestCount": { "min": 3, "max": 5 }, "swarmSize": { "min": 6, "max": 12 }, "spitterChance": 0.6 }, "reward": { "min": 2000, "max": 4000 } }
+      ],
+      "completionBonus": { "min": 800, "max": 2500 },
+      "regionByDifficulty": { "asteroid-belt": [5, 7], "kuiper-belt": [8, 10] }
+    }
+  ]
+}
