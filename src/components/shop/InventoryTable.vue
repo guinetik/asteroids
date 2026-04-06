@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import type { InventoryStack } from '@/lib/inventory/types'
 import { getItemDefinition } from '@/lib/inventory/catalog'
-import { getDesirabilityPips } from '@/lib/shop/planetDemand'
+import { getDesirabilityPips, computeSellPrice } from '@/lib/shop/planetDemand'
 
 const props = defineProps<{
   items: InventoryStack[]
@@ -21,6 +21,7 @@ interface DisplayRow {
   quantity: number
   weightKg: number
   pips: number
+  sellPrice: number
 }
 
 const rows = computed<DisplayRow[]>(() => {
@@ -30,6 +31,10 @@ const rows = computed<DisplayRow[]>(() => {
       props.mode === 'sell' && props.planetId
         ? getDesirabilityPips(props.planetId, stack.itemId)
         : 0
+    const sellPrice =
+      props.mode === 'sell' && props.planetId
+        ? computeSellPrice(props.planetId, stack.itemId)
+        : 0
     return {
       itemId: stack.itemId,
       label: def?.label ?? stack.itemId,
@@ -37,6 +42,7 @@ const rows = computed<DisplayRow[]>(() => {
       quantity: stack.quantity,
       weightKg: stack.totalWeightKg,
       pips,
+      sellPrice,
     }
   })
 
@@ -78,6 +84,7 @@ function handleSell(itemId: string) {
             :class="p <= row.pips ? 'inventory-table__pip--active' : 'inventory-table__pip--inactive'"
           />
         </div>
+        <span v-if="mode === 'sell'" class="inventory-table__price">{{ row.sellPrice }} CR</span>
         <button
           v-if="mode === 'sell'"
           type="button"
