@@ -201,7 +201,7 @@ function handleToggleAmbient() {
   <ShuttleHud v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" :telemetry="telemetry" />
   <OrbitPrompt v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" :orbitState="orbitState" />
   <GravityWarning v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" :warning="gravityWarning" />
-  <DamageVignette :intensity="telemetry.damageIntensity" />
+  <DamageVignette :intensity="telemetry.damageIntensity" :temperature="telemetry.temperature" />
   <DeathOverlay
     v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
     :visible="deathVisible"

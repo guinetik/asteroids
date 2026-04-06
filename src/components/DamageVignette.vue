@@ -1,7 +1,12 @@
 <script setup lang='ts'>
 const props = defineProps<{
   intensity: number
+  temperature: number
 }>()
+
+function vignetteColor(): string {
+  return props.temperature < 0 ? '#4488ff' : '#ff0000'
+}
 </script>
 
 <template>
@@ -13,10 +18,10 @@ const props = defineProps<{
   >
     <defs>
       <radialGradient id="dmg-vignette-grad" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="red" stop-opacity="0" />
-        <stop offset="35%" stop-color="red" stop-opacity="0" />
-        <stop offset="70%" stop-color="red" :stop-opacity="props.intensity * 0.4" />
-        <stop offset="100%" stop-color="red" :stop-opacity="props.intensity * 0.9" />
+        <stop offset="0%" :stop-color="vignetteColor()" stop-opacity="0" />
+        <stop offset="35%" :stop-color="vignetteColor()" stop-opacity="0" />
+        <stop offset="70%" :stop-color="vignetteColor()" :stop-opacity="props.intensity * 0.4" />
+        <stop offset="100%" :stop-color="vignetteColor()" :stop-opacity="props.intensity * 0.9" />
       </radialGradient>
     </defs>
     <rect x="-10" y="-10" width="120" height="120" :fill="'url(#dmg-vignette-grad)'" />
