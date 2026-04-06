@@ -26,6 +26,14 @@ const DEATH_ANIM_DURATION = 1.2
 const FIRE_FLASH_DURATION = 0.1
 const SPIKE_GRAVITY = 0.003
 
+// ── Floaty drift constants ──────────────────────────────────────
+/** How fast the spire lerps toward its target position (lower = floatier). */
+const DRIFT_SMOOTHING = 2.0
+/** Lateral sway amplitude while drifting. */
+const DRIFT_SWAY_AMPLITUDE = 0.8
+/** Lateral sway frequency. */
+const DRIFT_SWAY_FREQUENCY = 0.6
+
 /**
  * Y offset from group origin to body center (in world units).
  * Body is centered at group origin since the Spire floats.
@@ -150,6 +158,9 @@ export class SpireController implements Tickable {
   private deathTimer = 0
   private disposed = false
 
+  /** Target position the spire drifts toward — set by VC each frame. */
+  readonly targetPosition = new THREE.Vector3()
+
   /** Current visual state — set by VC from director output. */
   isMoving = false
   /** Current agitation state — set by VC from director output. */
@@ -249,13 +260,23 @@ export class SpireController implements Tickable {
       return
     }
 
+    // --- Floaty drift — lerp toward target position with sway ---
+    const lerpFactor = 1 - Math.exp(-DRIFT_SMOOTHING * dt)
+    this.group.position.x += (this.targetPosition.x - this.group.position.x) * lerpFactor
+    this.group.position.z += (this.targetPosition.z - this.group.position.z) * lerpFactor
+    this.group.position.y += (this.targetPosition.y - this.group.position.y) * lerpFactor
+
+    // Lateral sway — gentle figure-8 drift
+    this.group.position.x += Math.sin(t * DRIFT_SWAY_FREQUENCY) * DRIFT_SWAY_AMPLITUDE * dt
+    this.group.position.z += Math.cos(t * DRIFT_SWAY_FREQUENCY * 0.7 + 1.5) * DRIFT_SWAY_AMPLITUDE * dt
+
     // --- Body rotation ---
     this.group.rotation.y += this.isAgitated ? 0.015 : 0.004
     this.group.rotation.x = Math.sin(t * 0.3) * 0.1
 
     // --- Floating bob ---
     const bobSpeed = this.isAgitated ? 2.5 : 0.8
-    this.bodyGroup.position.y = Math.sin(t * bobSpeed) * 0.05
+    this.bodyGroup.position.y = Math.sin(t * bobSpeed) * 0.15
 
     // --- Hit recoil — jolt body on impact ---
     if (this.recoilTimer > 0) {

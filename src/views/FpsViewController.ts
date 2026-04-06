@@ -494,15 +494,17 @@ export class FpsViewController implements Tickable {
         ctrl.isMoving = handle.lastOutput.isMoving
         ctrl.isAgitated = handle.lastOutput.isAgitated
 
-        // Sync position — floats above terrain
-        ctrl.group.position.x = handle.enemy.position.x
-        ctrl.group.position.z = handle.enemy.position.z
+        // Set target position — controller drifts toward it smoothly
         const groundY = this.heightmap?.heightAt(
           handle.enemy.position.x,
           handle.enemy.position.z,
         ) ?? 0
-        ctrl.group.position.y = groundY + handle.config.floatHeight
-        handle.enemy.position.y = groundY + handle.config.floatHeight + SPIRE_HIT_CENTER_Y
+        ctrl.targetPosition.set(
+          handle.enemy.position.x,
+          groundY + handle.config.floatHeight,
+          handle.enemy.position.z,
+        )
+        handle.enemy.position.y = ctrl.group.position.y + SPIRE_HIT_CENTER_Y
 
         // Face player
         if (handle.lastOutput.isChasing) {
