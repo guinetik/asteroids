@@ -1,0 +1,92 @@
+{
+  "mercury": {
+    "demands": [
+      { "itemId": "cryogenic-coolants", "multiplier": 3.0 },
+      { "itemId": "luxury-foods", "multiplier": 2.0 },
+      { "itemId": "purified-water", "multiplier": 2.5 },
+      { "itemId": "frost-compounds", "multiplier": 2.5 },
+      { "itemId": "filtration-membranes", "multiplier": 1.8 }
+    ]
+  },
+  "venus": {
+    "demands": [
+      { "itemId": "radiation-shielding", "multiplier": 1.5 },
+      { "itemId": "medicine", "multiplier": 1.8 },
+      { "itemId": "construction-prefabs", "multiplier": 1.5 },
+      { "itemId": "thermal-regulators", "multiplier": 1.5 },
+      { "itemId": "drill-bits", "multiplier": 1.5 }
+    ]
+  },
+  "earth": {
+    "demands": [
+      { "itemId": "helium-3-cells", "multiplier": 2.5 },
+      { "itemId": "exotic-gems", "multiplier": 2.5 },
+      { "itemId": "void-crystals", "multiplier": 4.0 },
+      { "itemId": "ancient-artifacts", "multiplier": 3.5 },
+      { "itemId": "atmospheric-samples", "multiplier": 2.0 }
+    ]
+  },
+  "mars": {
+    "demands": [
+      { "itemId": "purified-water", "multiplier": 1.5 },
+      { "itemId": "biocultures", "multiplier": 1.5 },
+      { "itemId": "luxury-foods", "multiplier": 1.5 },
+      { "itemId": "entertainment-media", "multiplier": 1.5 },
+      { "itemId": "hydroponics-kits", "multiplier": 1.8 }
+    ]
+  },
+  "ceres": {
+    "demands": [
+      { "itemId": "iron-composites", "multiplier": 1.5 },
+      { "itemId": "resonance-instruments", "multiplier": 2.0 },
+      { "itemId": "luxury-foods", "multiplier": 1.8 },
+      { "itemId": "drill-bits", "multiplier": 1.5 },
+      { "itemId": "magnetic-coils", "multiplier": 2.0 }
+    ]
+  },
+  "jupiter": {
+    "demands": [
+      { "itemId": "entertainment-media", "multiplier": 2.0 },
+      { "itemId": "heat-resistant-alloys", "multiplier": 2.5 },
+      { "itemId": "construction-prefabs", "multiplier": 2.0 },
+      { "itemId": "textiles", "multiplier": 2.0 },
+      { "itemId": "pressure-vessels", "multiplier": 2.0 }
+    ]
+  },
+  "saturn": {
+    "demands": [
+      { "itemId": "cryogenic-coolants", "multiplier": 2.5 },
+      { "itemId": "dark-matter-sensors", "multiplier": 3.0 },
+      { "itemId": "luxury-foods", "multiplier": 2.5 },
+      { "itemId": "navigation-beacons", "multiplier": 2.5 },
+      { "itemId": "medicine", "multiplier": 2.5 }
+    ]
+  },
+  "uranus": {
+    "demands": [
+      { "itemId": "helium-3-cells", "multiplier": 3.0 },
+      { "itemId": "iron-composites", "multiplier": 2.5 },
+      { "itemId": "medicine", "multiplier": 3.0 },
+      { "itemId": "plasma-conduits", "multiplier": 2.5 },
+      { "itemId": "construction-prefabs", "multiplier": 2.5 }
+    ]
+  },
+  "neptune": {
+    "demands": [
+      { "itemId": "luxury-foods", "multiplier": 3.5 },
+      { "itemId": "construction-prefabs", "multiplier": 3.0 },
+      { "itemId": "entertainment-media", "multiplier": 3.0 },
+      { "itemId": "textiles", "multiplier": 3.0 },
+      { "itemId": "biocultures", "multiplier": 3.5 }
+    ]
+  },
+  "pluto": {
+    "demands": [
+      { "itemId": "luxury-foods", "multiplier": 4.0 },
+      { "itemId": "purified-water", "multiplier": 3.5 },
+      { "itemId": "helium-3-cells", "multiplier": 3.5 },
+      { "itemId": "medicine", "multiplier": 4.0 },
+      { "itemId": "hydroponics-kits", "multiplier": 3.5 }
+    ]
+  }
+}
