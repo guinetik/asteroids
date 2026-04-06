@@ -60,7 +60,7 @@ const APPROACH_START_DISTANCE = 2000
 /** Shuttle stops this far from the lander spawn point. */
 const APPROACH_END_DISTANCE = 60
 /** Shuttle approach altitude (Y). */
-const APPROACH_ALTITUDE = 400
+const APPROACH_ALTITUDE = 800
 /** Shuttle visual scale in the level scene. */
 const SHUTTLE_LEVEL_SCALE = 1.0
 

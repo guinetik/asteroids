@@ -53,12 +53,15 @@ import multiToolConfigJson from '@/data/fps/multitool-config.json'
 // ── Scene constants ─────────────────────────────────────────────
 const AMBIENT_LIGHT_INTENSITY = 0.6
 const DIR_LIGHT_INTENSITY = 1.5
-const GRID_SIZE = 6000
+const GRID_SIZE = 12000
 const TERRAIN_SEED = 42
 const TERRAIN_RESOLUTION = 512
 const FLAT_ZONE_COUNT = 3
 
-const LANDER_SPAWN_HEIGHT = 300
+const LANDER_SPAWN_HEIGHT = 600
+
+/** Maximum random offset from center for lander spawn position (XZ). */
+const SPAWN_POSITION_RANGE = 2000
 const EVA_SPAWN_OFFSET_X = 8
 
 /** Test surface features — will come from asteroid data later. */
@@ -172,7 +175,9 @@ export class LevelViewController implements Tickable {
     this.landerController = new LanderController(this.inputManager)
     this.landerController.setHeightmap(this.heightmap)
     await this.landerController.load()
-    this.landerController.group.position.set(0, LANDER_SPAWN_HEIGHT, 0)
+    const spawnX = (Math.random() - 0.5) * 2 * SPAWN_POSITION_RANGE
+    const spawnZ = (Math.random() - 0.5) * 2 * SPAWN_POSITION_RANGE
+    this.landerController.group.position.set(spawnX, LANDER_SPAWN_HEIGHT, spawnZ)
     this.sceneManager.addToScene(this.landerController.group)
     this.sceneManager.addToScene(this.landerController.flameEmitter.points)
     for (const emitter of this.landerController.rcsEmitters.values()) {
@@ -187,7 +192,7 @@ export class LevelViewController implements Tickable {
     this.vehicleCamera.setTarget(this.landerController.group)
 
     // ── Cinematic arrival sequence ─────────────────────────────
-    const landerSpawn = new Vector3(0, LANDER_SPAWN_HEIGHT, 0)
+    const landerSpawn = new Vector3(spawnX, LANDER_SPAWN_HEIGHT, spawnZ)
     this.arrivalSequence = new ArrivalSequence(landerSpawn)
     await this.arrivalSequence.load()
     this.sceneManager.scene.add(this.arrivalSequence.shuttleGroup)
