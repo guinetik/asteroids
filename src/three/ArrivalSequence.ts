@@ -210,9 +210,9 @@ export class ArrivalSequence {
     // Positions in raw model coords (shuttleScene is scaled by MODEL_SCALE)
     const thrusterTexture = this.createThrusterTexture()
     const engSpritePositions: [number, number, number][] = [
-      [-510 + THRUSTER_SPRITE_X_OFFSET, 72, 0],
-      [-510 + THRUSTER_SPRITE_X_OFFSET, -46, -52],
-      [-510 + THRUSTER_SPRITE_X_OFFSET, -46, 52],
+      [-510 + THRUSTER_SPRITE_X_OFFSET, 0, 72],
+      [-510 + THRUSTER_SPRITE_X_OFFSET, -52, -46],
+      [-510 + THRUSTER_SPRITE_X_OFFSET, 52, -46],
     ]
     for (const [x, y, z] of engSpritePositions) {
       const material = new THREE.SpriteMaterial({
