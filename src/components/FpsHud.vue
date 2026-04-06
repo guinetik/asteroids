@@ -64,109 +64,116 @@ function modeColor(): string {
 
 <template>
   <div class="fixed inset-0 pointer-events-none font-mono text-white/90">
-    <!-- Health Bar -->
-    <div class="absolute top-4 left-4 flex items-center gap-2">
-      <span class="text-xs tracking-widest uppercase text-red-400/80 w-8">HP</span>
-      <div class="w-40 h-3 bg-white/10 rounded-sm overflow-hidden">
-        <div
-          class="h-full bg-red-500 transition-all duration-100"
-          :style="{ width: pct(telemetry.hp, telemetry.maxHp) + '%' }"
-        />
-      </div>
-      <span class="text-xs text-white/60 w-8 text-right">{{ Math.ceil(telemetry.hp) }}</span>
+
+    <!-- ═══ TOP CENTER: Speed ═══ -->
+    <div class="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-2">
+      <span class="text-xs tracking-widest uppercase text-white/40">SPD</span>
+      <span class="text-sm tabular-nums text-white/70">{{ telemetry.speed.toFixed(1) }}</span>
     </div>
 
-    <!-- O2 Bar -->
-    <div class="absolute top-12 left-4 flex items-center gap-2">
-      <span class="text-xs tracking-widest uppercase text-white/60 w-8">O2</span>
-      <div class="w-40 h-3 bg-white/10 rounded-sm overflow-hidden">
-        <div
-          class="h-full transition-all duration-100"
-          :style="{ width: pct(telemetry.o2Level, telemetry.o2Capacity) + '%', backgroundColor: o2Color() }"
-        />
+    <!-- ═══ MIDDLE LEFT: O2 + Stamina (vertical stack) ═══ -->
+    <div class="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-3">
+      <!-- O2 -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs tracking-widest uppercase text-white/50 w-6">O2</span>
+        <div class="w-28 h-3 bg-white/10 rounded-sm overflow-hidden">
+          <div
+            class="h-full transition-all duration-100"
+            :style="{ width: pct(telemetry.o2Level, telemetry.o2Capacity) + '%', backgroundColor: o2Color() }"
+          />
+        </div>
+        <span class="text-[10px] text-white/40 w-6 text-right">{{ Math.ceil(telemetry.o2Level) }}</span>
       </div>
-      <span class="text-xs text-white/60 w-8 text-right">{{ Math.ceil(telemetry.o2Level) }}</span>
-    </div>
-
-    <!-- Sprint Bar -->
-    <div class="absolute top-20 left-4 flex items-center gap-2">
-      <span class="text-xs tracking-widest uppercase text-white/60 w-8">STA</span>
-      <div class="w-32 h-2 bg-white/10 rounded-sm overflow-hidden">
-        <div
-          class="h-full bg-green-400/80 transition-all duration-100"
-          :style="{ width: pct(telemetry.sprintCharge, telemetry.sprintCapacity) + '%' }"
-        />
+      <!-- Stamina -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs tracking-widest uppercase text-white/50 w-6">STA</span>
+        <div class="w-28 h-2 bg-white/10 rounded-sm overflow-hidden">
+          <div
+            class="h-full bg-green-400/80 transition-all duration-100"
+            :style="{ width: pct(telemetry.sprintCharge, telemetry.sprintCapacity) + '%' }"
+          />
+        </div>
       </div>
     </div>
 
-    <!-- Mode Charge Bar (active tool's clip) -->
-    <div class="absolute top-[6.5rem] left-4 flex items-center gap-2">
-      <span class="text-xs tracking-widest uppercase w-8" :style="{ color: modeColor() + '99' }">
-        {{ telemetry.activeMode === 'weapon' ? 'LAS' : telemetry.activeMode === 'drill' ? 'DRL' : 'MED' }}
-      </span>
-      <div class="w-32 h-2 bg-white/10 rounded-sm overflow-hidden">
-        <div
-          class="h-full transition-all duration-75"
-          :style="{
-            width: pct(telemetry.modeCharge, telemetry.modeCapacity) + '%',
-            backgroundColor: modeColor() + 'cc',
-          }"
-        />
-      </div>
-    </div>
-
-    <!-- RTG Bar (shared fuel) -->
-    <div class="absolute top-[8.5rem] left-4 flex items-center gap-2">
-      <span class="text-xs tracking-widest uppercase text-yellow-400/60 w-8">RTG</span>
-      <div class="w-32 h-2 bg-white/10 rounded-sm overflow-hidden">
-        <div
-          class="h-full bg-yellow-400/80 transition-all duration-75"
-          :style="{ width: pct(telemetry.rtgLevel, telemetry.rtgCapacity) + '%' }"
-        />
-      </div>
-    </div>
-
-    <!-- Per-mode Crosshair -->
+    <!-- ═══ CROSSHAIR: Center ═══ -->
     <div class="absolute inset-0 flex items-center justify-center select-none"
       :style="{ opacity: telemetry.aiming ? 1 : 0.4 }">
-      <!-- Drill: circle + cross -->
       <svg v-if="telemetry.activeMode === 'drill'" width="32" height="32" viewBox="0 0 32 32">
         <circle cx="16" cy="16" r="12" fill="none" :stroke="modeColor()" stroke-width="1.5" />
         <line x1="16" y1="8" x2="16" y2="24" :stroke="modeColor()" stroke-width="1" />
         <line x1="8" y1="16" x2="24" y2="16" :stroke="modeColor()" stroke-width="1" />
       </svg>
-      <!-- Weapon: standard cross -->
       <svg v-else-if="telemetry.activeMode === 'weapon'" width="32" height="32" viewBox="0 0 32 32">
         <line x1="16" y1="6" x2="16" y2="13" :stroke="modeColor()" stroke-width="2" />
         <line x1="16" y1="19" x2="16" y2="26" :stroke="modeColor()" stroke-width="2" />
         <line x1="6" y1="16" x2="13" y2="16" :stroke="modeColor()" stroke-width="2" />
         <line x1="19" y1="16" x2="26" y2="16" :stroke="modeColor()" stroke-width="2" />
       </svg>
-      <!-- Heal: plus -->
       <svg v-else width="32" height="32" viewBox="0 0 32 32">
         <rect x="13" y="8" width="6" height="16" rx="1" :fill="modeColor()" />
         <rect x="8" y="13" width="16" height="6" rx="1" :fill="modeColor()" />
       </svg>
     </div>
 
-    <!-- Speed -->
-    <div class="absolute bottom-4 left-4 flex items-center gap-2">
-      <span class="text-xs tracking-widest uppercase text-white/60 w-8">SPD</span>
-      <span class="text-xs text-white/60 w-8 text-right">{{ telemetry.speed.toFixed(1) }}</span>
-    </div>
+    <!-- ═══ BOTTOM CENTER: HP bar + Action Bar + flanking bars ═══ -->
+    <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
 
+      <!-- HP Bar (above toolbar) -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs tracking-widest uppercase text-red-400/80 w-6">HP</span>
+        <div class="w-36 h-3 bg-white/10 rounded-sm overflow-hidden">
+          <div
+            class="h-full bg-red-500 transition-all duration-100"
+            :style="{ width: pct(telemetry.hp, telemetry.maxHp) + '%' }"
+          />
+        </div>
+        <span class="text-[10px] text-white/40 w-6 text-right">{{ Math.ceil(telemetry.hp) }}</span>
+      </div>
 
-    <!-- Action Bar -->
-    <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1">
-      <div
-        v-for="(cfg, mode) in MODE_LABELS"
-        :key="mode"
-        class="flex items-center gap-1 px-3 py-1.5 rounded text-xs tracking-wider uppercase transition-all duration-150"
-        :class="telemetry.activeMode === mode ? 'bg-white/15' : 'bg-white/5 opacity-50'"
-        :style="telemetry.activeMode === mode ? { borderBottom: '2px solid ' + cfg.color, color: cfg.color } : {}"
-      >
-        <span class="text-white/40">{{ cfg.key }}</span>
-        <span>{{ cfg.label }}</span>
+      <!-- Toolbar row: Mode Charge | [1][2][3] | RTG -->
+      <div class="flex items-center gap-3">
+
+        <!-- Mode charge (left of toolbar) -->
+        <div class="flex items-center gap-1.5">
+          <span class="text-[10px] tracking-widest uppercase" :style="{ color: modeColor() + '80' }">
+            {{ MODE_LABELS[telemetry.activeMode]?.label }}
+          </span>
+          <div class="w-20 h-2 bg-white/10 rounded-sm overflow-hidden">
+            <div
+              class="h-full transition-all duration-75"
+              :style="{
+                width: pct(telemetry.modeCharge, telemetry.modeCapacity) + '%',
+                backgroundColor: modeColor() + 'cc',
+              }"
+            />
+          </div>
+        </div>
+
+        <!-- Action Bar [1][2][3] -->
+        <div class="flex gap-1">
+          <div
+            v-for="(cfg, mode) in MODE_LABELS"
+            :key="mode"
+            class="flex items-center gap-1 px-3 py-1.5 rounded text-xs tracking-wider uppercase transition-all duration-150"
+            :class="telemetry.activeMode === mode ? 'bg-white/15' : 'bg-white/5 opacity-50'"
+            :style="telemetry.activeMode === mode ? { borderBottom: '2px solid ' + cfg.color, color: cfg.color } : {}"
+          >
+            <span class="text-white/40">{{ cfg.key }}</span>
+            <span>{{ cfg.label }}</span>
+          </div>
+        </div>
+
+        <!-- RTG (right of toolbar) -->
+        <div class="flex items-center gap-1.5">
+          <div class="w-20 h-2 bg-white/10 rounded-sm overflow-hidden">
+            <div
+              class="h-full bg-yellow-400/80 transition-all duration-75"
+              :style="{ width: pct(telemetry.rtgLevel, telemetry.rtgCapacity) + '%' }"
+            />
+          </div>
+          <span class="text-[10px] tracking-widest uppercase text-yellow-400/50">RTG</span>
+        </div>
       </div>
     </div>
   </div>
