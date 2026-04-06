@@ -310,8 +310,8 @@ export class ArrivalSequence {
       hoverHeight,
       this.landerWorldPos.z,
     )
-    // Stay flipped (cargo bay facing down) — lighter belly visible from below
-    this.shuttleGroup.rotation.set(Math.PI, -Math.PI / 2, 0, 'YXZ')
+    // Right-side up so the lighter belly faces down toward the player
+    this.shuttleGroup.rotation.set(0, -Math.PI / 2, 0)
 
     // Close doors
     this.doorProgress = 0
@@ -322,14 +322,19 @@ export class ArrivalSequence {
       sprite.visible = false
     }
 
-    // Navigation lights so the shuttle is visible against the dark sky
-    const navLight = new THREE.PointLight(0x4488cc, 5, 500)
-    navLight.position.set(0, -5, 0)
-    this.shuttleGroup.add(navLight)
-    // Warm accent on the belly
-    const bellyLight = new THREE.PointLight(0xffeedd, 3, 400)
-    bellyLight.position.set(0, 5, 0)
-    this.shuttleGroup.add(bellyLight)
+    // Navigation lights so the shuttle is visible from the ground
+    // Light below illuminates the belly from underneath
+    const underLight = new THREE.PointLight(0x6699cc, 8, 600)
+    underLight.position.set(0, -20, 0)
+    this.shuttleGroup.add(underLight)
+    // Light above for skyline silhouette
+    const topLight = new THREE.PointLight(0xffeedd, 4, 400)
+    topLight.position.set(0, 10, 0)
+    this.shuttleGroup.add(topLight)
+    // Cargo bay interior glow (doors are closed but adds presence)
+    const cargoGlow = new THREE.PointLight(0xffaa44, 3, 300)
+    cargoGlow.position.set(-3, -2, 0)
+    this.shuttleGroup.add(cargoGlow)
   }
 
   /** Remove shuttle and falling lander from scene entirely. */
