@@ -171,6 +171,7 @@ export {
 
 export type {
   GravitationalEventFinishDetail,
+  GravitationalEventNearbyHudCallbacks,
   GravitationalEventSpawnOptions,
   GravitationalEventStartDetail,
 } from './physics/gravitationalEvent'

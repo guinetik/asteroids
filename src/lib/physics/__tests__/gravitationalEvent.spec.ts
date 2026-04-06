@@ -41,6 +41,8 @@ describe('GravitationalEvent', () => {
     expect(g.z).toBe(9)
     expect(g.mass).toBe(4e-5)
     expect(g.wellWidthMultiplier).toBe(2.5)
+    expect(g.wellDepthMultiplier).toBe(1.85)
+    expect(g.isFabricAnomaly).toBe(true)
   })
 })
 
@@ -63,5 +65,36 @@ describe('GravitationalEventManager', () => {
 
     mgr.clear()
     expect(mgr.activeCount).toBe(0)
+  })
+
+  it('invokes nearby HUD start when observer is within hud radius', async () => {
+    const { GravitationalEventManager } = await import('@/lib/physics/gravitationalEvent')
+    const onStart = vi.fn()
+    const onFinish = vi.fn()
+    const mgr = new GravitationalEventManager({
+      worldHalfExtent: 500,
+      autoSpawnEnabled: false,
+      hudNotifyRadius: 100,
+    })
+    mgr.setNearbyHudCallbacks({
+      onNearbyAnomalyStart: onStart,
+      onNearbyAnomalyFinish: onFinish,
+    })
+
+    mgr.spawnRandomInWorld({
+      x: 10,
+      z: 0,
+      speed: 0,
+      durationSec: 0.05,
+      gridMass: 2e-5,
+      wellWidthMultiplier: 2,
+    })
+
+    mgr.tick(0, 0, 0)
+    expect(onStart).toHaveBeenCalledTimes(1)
+    expect(onStart.mock.calls[0]![0]).toMatchObject({ x: 10, z: 0 })
+
+    mgr.tick(0.1, 0, 0)
+    expect(onFinish).toHaveBeenCalledTimes(1)
   })
 })

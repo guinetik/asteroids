@@ -67,10 +67,15 @@ const ANOMALY_SPEED_MIN = 35
 const ANOMALY_SPEED_MAX = 110
 
 /** Minimum synthetic mass (M☉) for the spacetime Gaussian (map uses small exponent). */
-const ANOMALY_GRID_MASS_MIN = 1.2e-5
+const ANOMALY_GRID_MASS_MIN = 2.6e-5
 
 /** Maximum synthetic mass (M☉). */
-const ANOMALY_GRID_MASS_MAX = 7e-5
+const ANOMALY_GRID_MASS_MAX = 1.35e-4
+
+/**
+ * Extra depth on the Gaussian (amplitude only) so travelling depressions read clearly.
+ */
+const ANOMALY_WELL_DEPTH_MULTIPLIER = 1.85
 
 /** Minimum σ footprint multiplier. */
 const ANOMALY_WELL_WIDTH_MULT_MIN = 2.1
@@ -92,6 +97,12 @@ const SPAWN_BOUNDS_INSET = 0.88
 
 /** Player proximity (world units): only contribute to the grid inside this radius. */
 const DEFAULT_RENDER_PROXIMITY_RADIUS = 420
+
+/**
+ * Wider than {@link DEFAULT_RENDER_PROXIMITY_RADIUS} so the HUD can warn slightly
+ * before the depression is applied to the wireframe.
+ */
+const DEFAULT_HUD_NOTIFY_RADIUS = 520
 
 let eventIdSeq = 0
 
@@ -151,6 +162,36 @@ export interface GravitationalEventManagerOptions {
   maxConcurrent?: number
   /** When true, the manager picks random spawn times in the configured interval band. */
   autoSpawnEnabled?: boolean
+  /**
+   * XZ distance (world units) from the shuttle within which nearby-HUD callbacks fire.
+   * Default is slightly wider than the grid coupling radius so the HUD can lead the effect.
+   */
+  hudNotifyRadius?: number
+}
+
+/**
+ * Optional hooks for map HUD when an anomaly starts or ends near the observer.
+ *
+ * @author guinetik
+ * @date 2026-04-06
+ */
+export interface GravitationalEventNearbyHudCallbacks {
+  /**
+   * Fired once per anomaly on its first tick if start (x,z) lies within the HUD radius.
+   */
+  onNearbyAnomalyStart?: (
+    detail: GravitationalEventStartDetail,
+    observerX: number,
+    observerZ: number,
+  ) => void
+  /**
+   * Fired when the anomaly expires if its final (x,z) lies within the HUD radius.
+   */
+  onNearbyAnomalyFinish?: (
+    detail: GravitationalEventFinishDetail,
+    observerX: number,
+    observerZ: number,
+  ) => void
 }
 
 function normalizeDir(dirX: number, dirZ: number): { dirX: number; dirZ: number } {
@@ -272,6 +313,8 @@ export class GravitationalEvent extends EventTarget {
       z: this.z,
       mass: this.gridMass,
       wellWidthMultiplier: this.wellWidthMultiplier,
+      wellDepthMultiplier: ANOMALY_WELL_DEPTH_MULTIPLIER,
+      isFabricAnomaly: true,
     }
   }
 
@@ -306,10 +349,14 @@ export class GravitationalEvent extends EventTarget {
 export class GravitationalEventManager {
   private readonly worldHalfExtent: number
   private readonly renderProximityRadius: number
+  private readonly hudNotifyRadius: number
   private readonly maxConcurrent: number
   private autoSpawnEnabled: boolean
   private autoSpawnCountdown = 0
   private readonly events: GravitationalEvent[] = []
+  private nearbyHudCallbacks: GravitationalEventNearbyHudCallbacks | null = null
+  private lastObserverX = 0
+  private lastObserverZ = 0
 
   /**
    * @param options - World bounds and LOD radius.
@@ -317,9 +364,20 @@ export class GravitationalEventManager {
   constructor(options: GravitationalEventManagerOptions) {
     this.worldHalfExtent = options.worldHalfExtent
     this.renderProximityRadius = options.renderProximityRadius ?? DEFAULT_RENDER_PROXIMITY_RADIUS
+    this.hudNotifyRadius = options.hudNotifyRadius ?? DEFAULT_HUD_NOTIFY_RADIUS
     this.maxConcurrent = options.maxConcurrent ?? MANAGER_MAX_CONCURRENT
     this.autoSpawnEnabled = options.autoSpawnEnabled ?? true
     this.resetAutoSpawnTimer()
+  }
+
+  /**
+   * Registers HUD listeners for nearby anomaly start/finish (map view).
+   * Pass `null` to detach (e.g. on dispose).
+   *
+   * @param callbacks - Handlers, or `null`.
+   */
+  setNearbyHudCallbacks(callbacks: GravitationalEventNearbyHudCallbacks | null): void {
+    this.nearbyHudCallbacks = callbacks
   }
 
   /**
@@ -346,7 +404,10 @@ export class GravitationalEventManager {
    * @param observerX - Shuttle (or camera target) X for proximity.
    * @param observerZ - Shuttle Z.
    */
-  tick(dt: number, _observerX: number, _observerZ: number): void {
+  tick(dt: number, observerX: number, observerZ: number): void {
+    this.lastObserverX = observerX
+    this.lastObserverZ = observerZ
+
     if (this.autoSpawnEnabled) {
       this.autoSpawnCountdown -= dt
       if (this.autoSpawnCountdown <= 0 && this.events.length < this.maxConcurrent) {
@@ -402,6 +463,7 @@ export class GravitationalEventManager {
       gridMass,
       wellWidthMultiplier,
     )
+    this.wireNearbyHud(ev)
     this.events.push(ev)
     return ev
   }
@@ -460,5 +522,34 @@ export class GravitationalEventManager {
       MANAGER_AUTO_SPAWN_INTERVAL_MIN,
       MANAGER_AUTO_SPAWN_INTERVAL_MAX,
     )
+  }
+
+  private wireNearbyHud(ev: GravitationalEvent): void {
+    if (!this.nearbyHudCallbacks) {
+      return
+    }
+
+    ev.addEventListener(GRAVITATIONAL_EVENT_START, (ce) => {
+      const d = (ce as CustomEvent<GravitationalEventStartDetail>).detail
+      if (!this.isWithinHudRadius(d.x, d.z)) {
+        return
+      }
+      this.nearbyHudCallbacks?.onNearbyAnomalyStart?.(d, this.lastObserverX, this.lastObserverZ)
+    })
+
+    ev.addEventListener(GRAVITATIONAL_EVENT_FINISH, (ce) => {
+      const d = (ce as CustomEvent<GravitationalEventFinishDetail>).detail
+      if (!this.isWithinHudRadius(d.x, d.z)) {
+        return
+      }
+      this.nearbyHudCallbacks?.onNearbyAnomalyFinish?.(d, this.lastObserverX, this.lastObserverZ)
+    })
+  }
+
+  private isWithinHudRadius(ax: number, az: number): boolean {
+    const dx = ax - this.lastObserverX
+    const dz = az - this.lastObserverZ
+    const r = this.hudNotifyRadius
+    return dx * dx + dz * dz <= r * r
   }
 }

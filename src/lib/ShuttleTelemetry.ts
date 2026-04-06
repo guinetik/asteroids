@@ -32,6 +32,18 @@ export interface ShuttleTelemetry {
   damageIntensity: number
 }
 
+/** Toast state for synthetic spacetime ripples near the shuttle (map view). */
+export interface GravitationalAnomalyHudState {
+  /** When false, the Vue layer may still keep a local fade-out. */
+  visible: boolean
+  /** Increment to re-trigger the banner animation for a new message. */
+  token: number
+  /** Primary line (e.g. “Spacetime disturbance”). */
+  title: string
+  /** Secondary line (distance, duration, or “stabilizing”). */
+  subtitle: string
+}
+
 /** Gravity danger state pushed to the HUD each frame. */
 export interface GravityWarningState {
   /** 0 = safe (outside influence), 1 = at event horizon */

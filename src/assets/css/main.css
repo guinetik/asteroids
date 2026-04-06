@@ -172,6 +172,38 @@ body {
   animation: gravity-pulse 0.5s ease-in-out infinite;
 }
 
+.gravitational-anomaly-hud-wrap {
+  @apply fixed top-[5.5rem] left-0 right-0 z-20 flex justify-center pointer-events-none;
+}
+
+.gravitational-anomaly-hud {
+  @apply text-center font-mono;
+  @apply px-4 py-2 rounded-sm border border-cyan-500/40 bg-slate-950/75 backdrop-blur-sm;
+  animation: anomaly-hud-in 0.45s ease-out both;
+  max-width: min(90vw, 28rem);
+}
+
+.gravitational-anomaly-hud__title {
+  @apply text-cyan-300 text-xs font-bold tracking-[0.2em] uppercase;
+  text-shadow: 0 0 8px rgba(34, 211, 238, 0.45);
+}
+
+.gravitational-anomaly-hud__subtitle {
+  @apply text-cyan-100/90 text-[11px] mt-1 leading-snug;
+  text-shadow: 0 0 6px rgba(103, 232, 249, 0.35);
+}
+
+@keyframes anomaly-hud-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes gravity-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }

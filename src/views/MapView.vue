@@ -5,6 +5,7 @@ import { MapViewController } from './MapViewController'
 import ShuttleHud from '@/components/ShuttleHud.vue'
 import OrbitPrompt from '@/components/OrbitPrompt.vue'
 import GravityWarning from '@/components/GravityWarning.vue'
+import GravitationalAnomalyHud from '@/components/GravitationalAnomalyHud.vue'
 import DeathOverlay from '@/components/DeathOverlay.vue'
 import DamageVignette from '@/components/DamageVignette.vue'
 import MapOverlay from '@/components/MapOverlay.vue'
@@ -13,7 +14,12 @@ import ShuttleControlOverlay from '@/components/ShuttleControlOverlay.vue'
 import { shipMessageSystem } from '@/lib/messages/runtime'
 import type { ActiveShipMessage } from '@/lib/messages/messageTypes'
 import type { MapIntroUiState } from '@/lib/mapIntroState'
-import type { ShuttleTelemetry, GravityWarningState, MapOverlayState } from '@/lib/ShuttleTelemetry'
+import type {
+  ShuttleTelemetry,
+  GravityWarningState,
+  GravitationalAnomalyHudState,
+  MapOverlayState,
+} from '@/lib/ShuttleTelemetry'
 import type { OrbitHudState } from '@/lib/orbitCapture'
 
 const container = ref<HTMLElement>()
@@ -99,6 +105,12 @@ const gravityWarning = reactive<GravityWarningState>({
   bodyName: null,
   visible: false,
 })
+const gravitationalAnomalyHud = reactive<GravitationalAnomalyHudState>({
+  visible: false,
+  token: 0,
+  title: '',
+  subtitle: '',
+})
 const habitatActive = ref(false)
 const shuttleControlVisible = ref(false)
 const habitatPrompt = ref<string | null>(null)
@@ -130,6 +142,9 @@ onMounted(async () => {
     }
     viewController.onGravityWarning = (w) => {
       Object.assign(gravityWarning, w)
+    }
+    viewController.onGravitationalAnomalyHud = (h) => {
+      Object.assign(gravitationalAnomalyHud, h)
     }
     viewController.onDeathOverlay = (visible, cause) => {
       deathVisible.value = visible
@@ -201,6 +216,10 @@ function handleToggleAmbient() {
   <ShuttleHud v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" :telemetry="telemetry" />
   <OrbitPrompt v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" :orbitState="orbitState" />
   <GravityWarning v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" :warning="gravityWarning" />
+  <GravitationalAnomalyHud
+    v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
+    :anomaly="gravitationalAnomalyHud"
+  />
   <DamageVignette :intensity="telemetry.damageIntensity" :temperature="telemetry.temperature" />
   <DeathOverlay
     v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"

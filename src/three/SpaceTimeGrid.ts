@@ -6,6 +6,17 @@ const DEFAULT_GRID_RESOLUTION = 80
 const GRID_COLOR = 0x333366
 const GRID_OPACITY = 0.4
 
+/** Scales how much of the local well must come from an anomaly to reach full white. */
+const ANOMALY_LINE_WHITE_FRAC_SCALE = 1.12
+
+/**
+ * Normalizes anomaly-only depth into [0,1] white blend (absolute floor so the core reads).
+ */
+const ANOMALY_LINE_WHITE_DEPTH_SCALE = 0.065
+
+/** Weight for {@link ANOMALY_LINE_WHITE_DEPTH_SCALE} term vs fractional blend. */
+const ANOMALY_LINE_WHITE_ABS_WEIGHT = 0.65
+
 /**
  * Gaussian well parameters — ported from gcanvas spacetime demo.
  * VISUAL_DEPTH_SCALE controls how dramatically mass warps the grid.
@@ -32,6 +43,15 @@ export interface GravitySource {
    * center stays the same. Default 1. Map scene uses &gt;1 for gas giants.
    */
   wellWidthMultiplier?: number
+  /**
+   * Multiplies well depth (Gaussian amplitude) only; default 1. Map anomalies use &gt;1
+   * so depressions read stronger without widening σ as much.
+   */
+  wellDepthMultiplier?: number
+  /**
+   * When true, Gaussian contribution tints the wire white where it dominates (map anomalies).
+   */
+  isFabricAnomaly?: boolean
 }
 
 /**
@@ -79,6 +99,13 @@ const SOURCE_INFLUENCE_RADIUS_MIN = 55
 /** Multiplier on Gaussian σ (via width scale) for the always-update disk around a source. */
 const SOURCE_INFLUENCE_SIGMA_MULT = 4.25
 
+function gridHexToRgbUnit(hex: number): [number, number, number] {
+  const r = ((hex >> 16) & 255) / 255
+  const g = ((hex >> 8) & 255) / 255
+  const b = (hex & 255) / 255
+  return [r, g, b]
+}
+
 /**
  * Space-time grid on the XZ plane with gravitational well deformation.
  * Vertices warp downward near massive bodies using a Gaussian profile,
@@ -110,6 +137,7 @@ export class SpaceTimeGrid implements Tickable {
   private readonly depthScale: number
   private readonly widthScale: number
   private readonly massExponent: number
+  private readonly baselineLineRgb: [number, number, number]
 
   constructor(
     gridSize = DEFAULT_GRID_SIZE,
@@ -123,6 +151,7 @@ export class SpaceTimeGrid implements Tickable {
     this.depthScale = depthScale
     this.widthScale = widthScale
     this.massExponent = massExponent
+    this.baselineLineRgb = gridHexToRgbUnit(GRID_COLOR)
     // Deform every Nth frame. Higher resolution grids can skip more frames.
     // Gravity wells move at orbital speed so even 1fps deformation looks smooth.
     this.baseUpdateInterval = gridResolution > 150 ? 4 : gridResolution > 100 ? 3 : 1
@@ -131,7 +160,8 @@ export class SpaceTimeGrid implements Tickable {
     this.basePositions = new Float32Array(posAttr.array as Float32Array)
 
     const material = new THREE.LineBasicMaterial({
-      color: GRID_COLOR,
+      vertexColors: true,
+      color: 0xffffff,
       transparent: true,
       opacity: GRID_OPACITY,
     })
@@ -150,6 +180,24 @@ export class SpaceTimeGrid implements Tickable {
 
   clearSources(): void {
     this.sources.length = 0
+  }
+
+  /**
+   * Restores default line opacity and baseline per-vertex slate tint (e.g. tactical map closed).
+   */
+  applyBaselineLineAppearance(): void {
+    const mat = this.mesh.material as THREE.LineBasicMaterial
+    mat.color.setHex(0xffffff)
+    mat.opacity = GRID_OPACITY
+    mat.transparent = true
+    mat.vertexColors = true
+
+    const colorAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute
+    const [br, bg, bb] = this.baselineLineRgb
+    for (let vi = 0; vi < colorAttr.count; vi++) {
+      colorAttr.setXYZ(vi, br, bg, bb)
+    }
+    colorAttr.needsUpdate = true
   }
 
   /**
@@ -212,15 +260,41 @@ export class SpaceTimeGrid implements Tickable {
         const rSquared = dx * dx + dz * dz
 
         const widthMul = source.wellWidthMultiplier ?? 1
+        const depthMul = source.wellDepthMultiplier ?? 1
         const massFactor = Math.sign(source.mass) * Math.pow(Math.abs(source.mass), this.massExponent)
         const sigma = this.widthScale * massFactor * widthMul
-        const amplitude = this.depthScale * massFactor * pulse
+        const amplitude = this.depthScale * massFactor * pulse * depthMul
 
         totalDepth += amplitude * Math.exp(-rSquared / (2 * sigma * sigma))
       }
     }
 
     return totalDepth
+  }
+
+  /**
+   * Depth contributed only by travelling fabric anomalies (for wire vertex tint).
+   */
+  private getFabricAnomalyDepthAt(x: number, z: number): number {
+    let depth = 0
+    const pulse = 1 + WELL_PULSE_AMOUNT * Math.sin(this.time * WELL_PULSE_SPEED)
+
+    for (const source of this.sources) {
+      if (!source.isFabricAnomaly) {
+        continue
+      }
+      const dx = x - source.x
+      const dz = z - source.z
+      const rSquared = dx * dx + dz * dz
+      const widthMul = source.wellWidthMultiplier ?? 1
+      const depthMul = source.wellDepthMultiplier ?? 1
+      const massFactor = Math.sign(source.mass) * Math.pow(Math.abs(source.mass), this.massExponent)
+      const sigma = this.widthScale * massFactor * widthMul
+      const amplitude = this.depthScale * massFactor * pulse * depthMul
+      depth += amplitude * Math.exp(-rSquared / (2 * sigma * sigma))
+    }
+
+    return depth
   }
 
   /**
@@ -247,10 +321,11 @@ export class SpaceTimeGrid implements Tickable {
         const rSquared = dx * dx + dz * dz
 
         const widthMul = source.wellWidthMultiplier ?? 1
+        const depthMul = source.wellDepthMultiplier ?? 1
         const massFactor = Math.sign(source.mass) * Math.pow(Math.abs(source.mass), this.massExponent)
         const sigma = this.widthScale * massFactor * widthMul
         const sigmaSq = sigma * sigma
-        const amplitude = this.depthScale * massFactor * pulse
+        const amplitude = this.depthScale * massFactor * pulse * depthMul
         const depth = amplitude * Math.exp(-rSquared / (2 * sigmaSq))
 
         // Gradient points toward the source (downhill into the well)
@@ -273,6 +348,8 @@ export class SpaceTimeGrid implements Tickable {
 
     const posAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute
     const positions = posAttr.array as Float32Array
+    const colorAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute
+    const [br, bg, bb] = this.baselineLineRgb
 
     const budget = this.visualBudget
     const useCull = !forceAllVertices && budget !== null && budget.useSpatialCull
@@ -300,16 +377,39 @@ export class SpaceTimeGrid implements Tickable {
       if (!doFull && useCull) {
         const inBox = Math.abs(x - cx) <= halfW && Math.abs(z - cz) <= halfH
         if (!inBox && !this.isNearGravitySource(x, z)) {
+          const viSkip = i / 3
+          colorAttr.setXYZ(viSkip, br, bg, bb)
           continue
         }
       }
 
+      const totalD = this.getDepthAt(x, z)
       positions[i] = x
-      positions[i + 1] = -this.getDepthAt(x, z)
+      positions[i + 1] = -totalD
       positions[i + 2] = z
+
+      const vi = i / 3
+      const anomD = this.getFabricAnomalyDepthAt(x, z)
+      if (anomD < 1e-10) {
+        colorAttr.setXYZ(vi, br, bg, bb)
+      } else {
+        const frac = anomD / Math.max(totalD, 1e-10)
+        const blendFromFrac = THREE.MathUtils.clamp(frac * ANOMALY_LINE_WHITE_FRAC_SCALE, 0, 1)
+        const blendFromAbs = THREE.MathUtils.clamp(
+          anomD / (this.depthScale * ANOMALY_LINE_WHITE_DEPTH_SCALE),
+          0,
+          1,
+        )
+        const blend = Math.max(blendFromFrac, blendFromAbs * ANOMALY_LINE_WHITE_ABS_WEIGHT)
+        const r = br + (1 - br) * blend
+        const g = bg + (1 - bg) * blend
+        const colB = bb + (1 - bb) * blend
+        colorAttr.setXYZ(vi, r, g, colB)
+      }
     }
 
     posAttr.needsUpdate = true
+    colorAttr.needsUpdate = true
   }
 
   /** True if (x,z) lies inside an influence disk of any current gravity source. */
@@ -321,10 +421,15 @@ export class SpaceTimeGrid implements Tickable {
         const dz = z - source.z
         const rSquared = dx * dx + dz * dz
         const widthMul = source.wellWidthMultiplier ?? 1
+        const depthMul = source.wellDepthMultiplier ?? 1
         const massFactor = Math.pow(Math.abs(source.mass), this.massExponent)
         const radius = Math.max(
           SOURCE_INFLUENCE_RADIUS_MIN,
-          SOURCE_INFLUENCE_SIGMA_MULT * this.widthScale * massFactor * widthMul,
+          SOURCE_INFLUENCE_SIGMA_MULT *
+            this.widthScale *
+            massFactor *
+            widthMul *
+            Math.sqrt(depthMul),
         )
         if (rSquared <= radius * radius) {
           return true
@@ -365,6 +470,15 @@ export class SpaceTimeGrid implements Tickable {
 
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
+    const vCount = vertices.length / 3
+    const colors = new Float32Array(vCount * 3)
+    const [r, g, b] = this.baselineLineRgb
+    for (let vi = 0; vi < vCount; vi++) {
+      colors[vi * 3] = r
+      colors[vi * 3 + 1] = g
+      colors[vi * 3 + 2] = b
+    }
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
     return geometry
   }
 }

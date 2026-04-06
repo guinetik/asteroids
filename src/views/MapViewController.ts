@@ -162,6 +162,18 @@ const MAP_RETICLE_FADE_START = 1.5
  */
 const MAP_RETICLE_FADE_END = 5.0
 
+/**
+ * Minimum planar speed (world units/s) before the reticle motion wedge appears.
+ * Keeps the pointer from jittering when nearly stopped.
+ */
+const MAP_RETICLE_MIN_SPEED = 0.12
+
+/**
+ * If projected motion direction in NDC has squared length below this, skip updating
+ * the wedge rotation for this frame.
+ */
+const MAP_RETICLE_MIN_NDC_DELTA_SQ = 1e-10
+
 /** Offset behind Earth so the shuttle doesn't overlap the planet mesh. */
 const SPAWN_OFFSET_BEHIND_EARTH = 7.5
 
@@ -342,8 +354,23 @@ export class MapViewController implements Tickable {
   /** Increments per anomaly HUD message so Vue can re-run enter animation. */
   private gravitationalAnomalyHudToken = 0
 
-  /** Tactical reticle sprite that fades in over the shuttle when zoomed out far. */
-  private shipReticle: THREE.Sprite | null = null
+  /**
+   * Root group (world position + uniform scale) for the zoom-out tactical reticle:
+   * ring marker plus a velocity wedge that spins to match on-screen motion.
+   */
+  private shipReticleGroup: THREE.Group | null = null
+
+  /** Axis ring / tick sprite; drawn once, does not rotate with velocity. */
+  private shipReticleRing: THREE.Sprite | null = null
+
+  /** Wedge sprite rotated into planar velocity direction as projected on the view. */
+  private shipReticlePointer: THREE.Sprite | null = null
+
+  private readonly _reticleProjA = new THREE.Vector3()
+
+  private readonly _reticleProjB = new THREE.Vector3()
+
+  private readonly _reticleVelPlanar = new THREE.Vector3()
 
   /** Called when map overlay state changes for Vue HUD. */
   onMapOverlay: ((state: MapOverlayState) => void) | null = null
@@ -1451,21 +1478,19 @@ export class MapViewController implements Tickable {
   }
 
   /**
-   * Creates a canvas-drawn tactical reticle sprite and adds it to the scene.
-   *
-   * The design: a thin glowing ring with four axis-aligned tick marks and a
-   * subtle outer glow halo — classic HUD targeting indicator aesthetic.
-   * Opacity starts at zero; `tickShuttleScale` drives it every frame.
+   * Builds the zoom-out tactical reticle: a static ring plus a wedge that aligns
+   * with planar velocity as seen on screen (`tickShuttleScale` updates opacity
+   * and pointer rotation each frame).
    */
   private createShipReticle(): void {
     const scene = this.sceneObjects?.scene
     if (!scene) return
 
     const size = 128
-    const canvas = document.createElement('canvas')
-    canvas.width = size
-    canvas.height = size
-    const ctx = canvas.getContext('2d')!
+    const ringCanvas = document.createElement('canvas')
+    ringCanvas.width = size
+    ringCanvas.height = size
+    const ctx = ringCanvas.getContext('2d')!
     const cx = size / 2
     const cy = size / 2
     const ringR = 46
@@ -1499,21 +1524,57 @@ export class MapViewController implements Tickable {
       ctx.stroke()
     }
 
-    const tex = new THREE.CanvasTexture(canvas)
-    tex.needsUpdate = true
+    const ringTex = new THREE.CanvasTexture(ringCanvas)
+    ringTex.needsUpdate = true
 
-    const mat = new THREE.SpriteMaterial({
-      map: tex,
+    const ringMat = new THREE.SpriteMaterial({
+      map: ringTex,
       transparent: true,
       opacity: 0,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
 
-    this.shipReticle = new THREE.Sprite(mat)
-    this.shipReticle.scale.setScalar(0.1) // overwritten every tick
-    this.shipReticle.visible = false
-    scene.add(this.shipReticle)
+    this.shipReticleRing = new THREE.Sprite(ringMat)
+
+    // Motion wedge: drawn along +canvas X so `atan2` of projected velocity in NDC maps cleanly.
+    const wedgeCanvas = document.createElement('canvas')
+    wedgeCanvas.width = size
+    wedgeCanvas.height = size
+    const wctx = wedgeCanvas.getContext('2d')!
+    const tipX = cx + 50
+    const baseX = cx + 14
+    const halfW = 13
+    wctx.beginPath()
+    wctx.moveTo(tipX, cy)
+    wctx.lineTo(baseX, cy - halfW)
+    wctx.lineTo(baseX, cy + halfW)
+    wctx.closePath()
+    wctx.fillStyle = 'rgba(0, 235, 255, 0.92)'
+    wctx.fill()
+    wctx.strokeStyle = 'rgba(255, 255, 255, 0.35)'
+    wctx.lineWidth = 1
+    wctx.stroke()
+
+    const wedgeTex = new THREE.CanvasTexture(wedgeCanvas)
+    wedgeTex.needsUpdate = true
+
+    const wedgeMat = new THREE.SpriteMaterial({
+      map: wedgeTex,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+
+    this.shipReticlePointer = new THREE.Sprite(wedgeMat)
+    this.shipReticlePointer.visible = false
+
+    this.shipReticleGroup = new THREE.Group()
+    this.shipReticleGroup.add(this.shipReticleRing)
+    this.shipReticleGroup.add(this.shipReticlePointer)
+    this.shipReticleGroup.visible = false
+    scene.add(this.shipReticleGroup)
   }
 
   /**
@@ -1543,7 +1604,7 @@ export class MapViewController implements Tickable {
     this.shuttleController.group.scale.setScalar(this.currentShuttleScale)
 
     // ── Tactical reticle ──────────────────────────────────────────────────────
-    if (this.shipReticle) {
+    if (this.shipReticleGroup && this.shipReticleRing && this.shipReticlePointer) {
       // How many times the scale has been boosted above the base value
       const overscale = this.currentShuttleScale / MAP_SHUTTLE_SCALE
       // Smoothly map overscale → [0, 1] opacity window
@@ -1555,15 +1616,39 @@ export class MapViewController implements Tickable {
       const reticleAlpha = t * t * (3 - 2 * t) // smoothstep
 
       if (reticleAlpha > 0.005) {
-        this.shipReticle.visible = true
-        // Pin world position to the shuttle every frame
-        this.shipReticle.position.copy(this.shuttleController.group.position)
-        // Constant apparent screen size: grow proportionally with camera distance
+        this.shipReticleGroup.visible = true
+        this.shipReticleGroup.position.copy(this.shuttleController.group.position)
         const reticleWorld = MAP_RETICLE_APPARENT_SIZE * 2 * dist * Math.tan(halfFovRad)
-        this.shipReticle.scale.setScalar(reticleWorld)
-        ;(this.shipReticle.material as THREE.SpriteMaterial).opacity = reticleAlpha
+        this.shipReticleGroup.scale.setScalar(reticleWorld)
+        ;(this.shipReticleRing.material as THREE.SpriteMaterial).opacity = reticleAlpha
+
+        const cam = this.vehicleCamera.camera
+        const vel = this.shuttleController.currentVelocity
+        const speed = Math.hypot(vel.x, vel.z)
+        if (speed >= MAP_RETICLE_MIN_SPEED) {
+          this._reticleVelPlanar.set(vel.x, 0, vel.z).normalize()
+          this._reticleProjA.copy(this.shuttleController.group.position).project(cam)
+          this._reticleProjB
+            .copy(this.shuttleController.group.position)
+            .add(this._reticleVelPlanar)
+            .project(cam)
+          const ndcDx = this._reticleProjB.x - this._reticleProjA.x
+          const ndcDy = this._reticleProjB.y - this._reticleProjA.y
+          if (ndcDx * ndcDx + ndcDy * ndcDy >= MAP_RETICLE_MIN_NDC_DELTA_SQ) {
+            this.shipReticlePointer.visible = true
+            ;(this.shipReticlePointer.material as THREE.SpriteMaterial).rotation = Math.atan2(
+              ndcDy,
+              ndcDx,
+            )
+            ;(this.shipReticlePointer.material as THREE.SpriteMaterial).opacity = reticleAlpha
+          } else {
+            this.shipReticlePointer.visible = false
+          }
+        } else {
+          this.shipReticlePointer.visible = false
+        }
       } else {
-        this.shipReticle.visible = false
+        this.shipReticleGroup.visible = false
       }
     }
   }
@@ -1916,12 +2001,8 @@ export class MapViewController implements Tickable {
     }
     // If orbiting, shuttle stays frozen but input stays disabled (orbit manages this)
 
-    // Restore grid opacity
-    if (this.spaceTimeGrid) {
-      const mat = this.spaceTimeGrid.mesh.material as THREE.LineBasicMaterial
-      mat.opacity = 1
-      mat.transparent = false
-    }
+    // Restore grid color/opacity (fabric stress cleared until next orrery tick)
+    this.spaceTimeGrid?.applyBaselineLineAppearance()
 
     // Hide overlay
     this.onMapOverlay?.({
@@ -2444,11 +2525,18 @@ export class MapViewController implements Tickable {
     this.habitatScene = null
     DevConsole.unregister('MapView')
     this.ambientSpace?.dispose()
-    if (this.shipReticle) {
-      ;(this.shipReticle.material as THREE.SpriteMaterial).map?.dispose()
-      this.shipReticle.material.dispose()
-      this.sceneObjects?.scene.remove(this.shipReticle)
-      this.shipReticle = null
+    if (this.shipReticleGroup) {
+      const disposeSprite = (s: THREE.Sprite) => {
+        const m = s.material as THREE.SpriteMaterial
+        m.map?.dispose()
+        m.dispose()
+      }
+      if (this.shipReticleRing) disposeSprite(this.shipReticleRing)
+      if (this.shipReticlePointer) disposeSprite(this.shipReticlePointer)
+      this.sceneObjects?.scene.remove(this.shipReticleGroup)
+      this.shipReticleGroup = null
+      this.shipReticleRing = null
+      this.shipReticlePointer = null
     }
     this.hideOrbitRing()
     this.gameLoop?.stop()
