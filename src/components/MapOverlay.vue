@@ -102,6 +102,17 @@ const trajectorySegments = computed(() => {
       <span v-if="!routeBodyNames.has(label.name)" class="map-label-distance">{{ label.distance }}</span>
     </div>
 
+    <!-- Mission waypoint indicator -->
+    <div
+      v-if="overlay.missionWaypoint"
+      class="map-waypoint-indicator"
+      :style="{ left: overlay.missionWaypoint.screenX + '%', top: overlay.missionWaypoint.screenY + '%' }"
+    >
+      <div class="map-waypoint-dot" />
+      <span class="map-waypoint-label">{{ overlay.missionWaypoint.name }}</span>
+      <span class="map-waypoint-distance">{{ overlay.missionWaypoint.distance }}</span>
+    </div>
+
     <!-- Ship marker silhouette -->
     <div
       class="map-ship-marker"
