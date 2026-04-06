@@ -486,6 +486,12 @@ export class MapViewController implements Tickable {
   /** Called when the mission board state changes (for shuttle control terminal). */
   onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null = null
 
+  /** Called when a mission minigame is completed (items gathered). */
+  onMissionComplete: ((mission: ActiveShuttleMission | null) => void) | null = null
+
+  /** Called when a mission is delivered (credits awarded). */
+  onMissionDeliver: ((mission: ActiveShuttleMission | null) => void) | null = null
+
   async init(container: HTMLElement): Promise<void> {
     // Create canvas
     const canvas = document.createElement('canvas')
@@ -1702,12 +1708,15 @@ export class MapViewController implements Tickable {
       this.missionOverlayOpen = false
       this.onMissionOverlay?.(false, null, false)
       this.onMissionBoardUpdate?.(this.missionBoard)
-      this.onShopState?.(this.shopSession ?? null, this.playerProfile, this.playerInventory)
+      this.onMissionComplete?.(result.board.activeMissions.find(
+        (m) => m.template.id === missionId,
+      ) ?? null)
     }
   }
 
   /** Deliver a completed mission (from shuttle control UI). */
   missionDeliver(missionId: string): void {
+    const mission = this.missionBoard.activeMissions.find((m) => m.template.id === missionId)
     const result = deliverMission(this.missionBoard, missionId, this.playerProfile, this.playerInventory)
     if (result.ok) {
       this.missionBoard = result.board
@@ -1715,7 +1724,7 @@ export class MapViewController implements Tickable {
       this.playerInventory = result.inventory
       this.onMissionBoardUpdate?.(this.missionBoard)
       this.onCreditsUpdate?.(this.playerProfile.credits)
-      this.onShopState?.(this.shopSession ?? null, this.playerProfile, this.playerInventory)
+      this.onMissionDeliver?.(mission ?? null)
     }
   }
 

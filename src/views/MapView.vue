@@ -143,6 +143,16 @@ const missionOverlayVisible = ref(false)
 const missionOverlayMission = ref<ActiveShuttleMission | null>(null)
 const missionOverlayCanFit = ref(false)
 const missionBoard = ref<ShuttleMissionBoard | null>(null)
+const missionNotification = ref<string | null>(null)
+let missionNotificationTimer: ReturnType<typeof setTimeout> | null = null
+
+function showMissionNotification(text: string): void {
+  missionNotification.value = text
+  if (missionNotificationTimer) clearTimeout(missionNotificationTimer)
+  missionNotificationTimer = setTimeout(() => {
+    missionNotification.value = null
+  }, 4000)
+}
 
 const mapOverlay = reactive<MapOverlayState>({
   visible: false,
@@ -226,6 +236,16 @@ onMounted(async () => {
     }
     viewController.onMissionBoardUpdate = (board) => {
       missionBoard.value = board
+    }
+    viewController.onMissionComplete = (mission) => {
+      if (mission) {
+        showMissionNotification(`Mission items collected — return to deliver`)
+      }
+    }
+    viewController.onMissionDeliver = (mission) => {
+      if (mission) {
+        showMissionNotification(`Mission complete — +${mission.template.reward} CR`)
+      }
     }
     await viewController.init(container.value)
     refreshActiveMessage()
@@ -435,6 +455,9 @@ function dockedPlanetId(): string | null {
     v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
     :credits="playerCredits"
   />
+  <div v-if="missionNotification" class="mission-notification">
+    {{ missionNotification }}
+  </div>
   <PlanetShopDialog
     v-if="shopDialogVisible && shopSession"
     :session="shopSession"
