@@ -1,0 +1,82 @@
+[
+  {
+    "id": "venusian-gas",
+    "category": "mission-material",
+    "label": "Venusian Gas",
+    "description": "Atmospheric gas samples collected from Venus's upper cloud layer.",
+    "icon": "venusian-gas.png",
+    "weightPerUnit": 3,
+    "maxStack": 20,
+    "sellable": false
+  },
+  {
+    "id": "cargo-container",
+    "category": "mission-material",
+    "label": "Cargo Container",
+    "description": "Sealed logistics crate from Earth's orbital warehouse network.",
+    "icon": "cargo-container.png",
+    "weightPerUnit": 8,
+    "maxStack": 10,
+    "sellable": false
+  },
+  {
+    "id": "methane-sample",
+    "category": "mission-material",
+    "label": "Methane Sample",
+    "description": "Pressurized methane extracted from the Martian subsurface.",
+    "icon": "methane-sample.png",
+    "weightPerUnit": 2,
+    "maxStack": 20,
+    "sellable": false
+  },
+  {
+    "id": "probe-telemetry",
+    "category": "mission-material",
+    "label": "Probe Telemetry",
+    "description": "High-density data crystal containing orbital probe sensor readings.",
+    "icon": "probe-telemetry.png",
+    "weightPerUnit": 1,
+    "maxStack": 10,
+    "sellable": false
+  },
+  {
+    "id": "jovian-hydrogen",
+    "category": "mission-material",
+    "label": "Jovian Hydrogen",
+    "description": "Metallic hydrogen scooped from Jupiter's deep atmosphere.",
+    "icon": "jovian-hydrogen.png",
+    "weightPerUnit": 4,
+    "maxStack": 15,
+    "sellable": false
+  },
+  {
+    "id": "ring-ice",
+    "category": "mission-material",
+    "label": "Ring Ice",
+    "description": "Pristine ice fragments harvested from Saturn's ring system.",
+    "icon": "ring-ice.png",
+    "weightPerUnit": 3,
+    "maxStack": 20,
+    "sellable": false
+  },
+  {
+    "id": "solar-alignment-data",
+    "category": "mission-material",
+    "label": "Solar Alignment Data",
+    "description": "Calibration telemetry from Neptune's orbital solar mirror array.",
+    "icon": "solar-alignment-data.png",
+    "weightPerUnit": 1,
+    "maxStack": 10,
+    "sellable": false
+  },
+  {
+    "id": "magnetic-field-data",
+    "category": "mission-material",
+    "label": "Magnetic Field Data",
+    "description": "Magnetosphere readings from Uranus's tilted magnetic field probes.",
+    "icon": "magnetic-field-data.png",
+    "weightPerUnit": 1,
+    "maxStack": 10,
+    "sellable": false
+  }
+]
