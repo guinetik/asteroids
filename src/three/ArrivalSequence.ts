@@ -73,18 +73,11 @@ const SHUTTLE_LEVEL_SCALE = 1.0
 /** Shuttle departure acceleration (world units/sec²). */
 const SHUTTLE_DEPART_ACCELERATION = 40
 
-/** Nozzle positions in scaled model space (matches ShuttleController ENG_POSITIONS * MODEL_SCALE). */
-const NOZZLE_OFFSETS = [
-  new THREE.Vector3(-5.1, 0.72, 0),
-  new THREE.Vector3(-5.1, -0.46, -0.52),
-  new THREE.Vector3(-5.1, -0.46, 0.52),
-]
+/** Idle thruster sprite size (in raw model space, pre MODEL_SCALE). */
+const THRUSTER_SPRITE_SIZE = 140
 
-/** Idle thruster sprite size (world units at shuttle scale). */
-const THRUSTER_SPRITE_SIZE = 1.4
-
-/** Thruster sprite X offset behind nozzle. */
-const THRUSTER_SPRITE_X_OFFSET = -0.34
+/** Thruster sprite X offset behind nozzle (raw model space). */
+const THRUSTER_SPRITE_X_OFFSET = -34
 
 /** Timeline phase identifiers. */
 type ArrivalPhase = 'approach' | 'flip' | 'doors' | 'detach' | 'unflip' | 'depart' | 'camera-transition' | 'done'
@@ -221,8 +214,14 @@ export class ArrivalSequence {
     this.camera.lookAt(this.shuttleStartPos)
 
     // Thruster nozzle sprites — idle glow at each engine nozzle
+    // Positions in raw model coords (shuttleScene is scaled by MODEL_SCALE)
     const thrusterTexture = this.createThrusterTexture()
-    for (const nozzle of NOZZLE_OFFSETS) {
+    const engSpritePositions: [number, number, number][] = [
+      [-510 + THRUSTER_SPRITE_X_OFFSET, 72, 0],
+      [-510 + THRUSTER_SPRITE_X_OFFSET, -46, -52],
+      [-510 + THRUSTER_SPRITE_X_OFFSET, -46, 52],
+    ]
+    for (const [x, y, z] of engSpritePositions) {
       const material = new THREE.SpriteMaterial({
         map: thrusterTexture,
         color: new THREE.Color(0xff9a1f),
@@ -232,8 +231,7 @@ export class ArrivalSequence {
         depthWrite: false,
       })
       const sprite = new THREE.Sprite(material)
-      sprite.position.copy(nozzle)
-      sprite.position.x += THRUSTER_SPRITE_X_OFFSET
+      sprite.position.set(x, y, z)
       sprite.visible = false
       sprite.scale.setScalar(THRUSTER_SPRITE_SIZE)
       shuttleScene.add(sprite)
