@@ -250,6 +250,7 @@ function openShop() {
 
 function closeShop() {
   shopDialogVisible.value = false
+  viewController.closeShop()
 }
 
 function handleShopBuyTradeGood(slotIndex: number, quantity: number) {

@@ -152,10 +152,10 @@ const GRID_MASS_THRESHOLD = 1e-4
  */
 const MAP_GRID_GAS_GIANT_WELL_WIDTH_MULT = 1.85
 
-/** Baseline wireframe segments per axis on the map space-time grid. */
-const MAP_SPACE_TIME_GRID_BASE_RESOLUTION = 150
+/** Baseline wireframe segments per axis on the map space-time grid (lower = faster deform pass). */
+const MAP_SPACE_TIME_GRID_BASE_RESOLUTION = 100
 
-/** Density boost on segment count (1.5 → 50% more segments per axis vs baseline 250). */
+/** Density multiplier on segment count; resolved value is `Math.round(base × boost)`. */
 const MAP_SPACE_TIME_GRID_RESOLUTION_BOOST = 1.5
 
 /** Resolved segment count for the map space-time grid wireframe. */
@@ -367,6 +367,7 @@ export class MapViewController implements Tickable {
   private habitatState = new HabitatState()
   private habitatScene: HabitatInteriorScene | null = null
   private shopSession: ShopSession | null = null
+  private shopDialogOpen = false
   private playerProfile: PlayerProfile = createProfile('Pilot')
   private playerInventory: Inventory = createInventory()
   private portalArrival: PortalArrivalSequence | null = null
@@ -1054,7 +1055,13 @@ export class MapViewController implements Tickable {
       this.orbitSystem?.state === 'orbiting' &&
       this.shopSession
     ) {
-      this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
+      if (this.shopDialogOpen) {
+        this.shopDialogOpen = false
+        this.onShopState?.(null, this.playerProfile, this.playerInventory)
+      } else {
+        this.shopDialogOpen = true
+        this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
+      }
     }
 
     // After slingshot, lerp Y back to 0
@@ -1568,6 +1575,7 @@ export class MapViewController implements Tickable {
       }
     } else if (orbitState !== 'orbiting' && this.shopSession) {
       this.shopSession = null
+      this.shopDialogOpen = false
       this.onShopButton?.(false, '')
       this.onShopState?.(null, this.playerProfile, this.playerInventory)
     }
@@ -1576,8 +1584,14 @@ export class MapViewController implements Tickable {
   /** Open the shop dialog (called by Vue ShopButton click). */
   openShop(): void {
     if (this.shopSession) {
+      this.shopDialogOpen = true
       this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
     }
+  }
+
+  /** Close the shop dialog (called by Vue). */
+  closeShop(): void {
+    this.shopDialogOpen = false
   }
 
   /** Buy a trade good from the shop. */
