@@ -544,6 +544,15 @@ export class MapViewController implements Tickable {
         vel.setLength(newSpeed)
         this.shuttleController.setVelocity(vel)
       }
+
+      // Barycenter pull on Y — as proximity increases, grid Y lerps toward 0 (body center)
+      // At proximity=0 (outside influence) → pure grid Y
+      // At proximity=1 (event horizon) → Y=0 (at the body)
+      const proximity = this.computeMaxProximity(px, pz)
+      if (proximity > 0) {
+        const gridY = this.shuttleController.group.position.y
+        this.shuttleController.group.position.y = gridY * (1 - proximity)
+      }
     }
 
     // Orbit approach — animated lerp toward orbit insertion point
@@ -858,6 +867,21 @@ export class MapViewController implements Tickable {
     const horizon = eventHorizonRadius(mass, MAP_GRAVITY_CONFIG)
     if (dist >= influence) return 0
     return Math.min(1, 1 - (dist - horizon) / (influence - horizon))
+  }
+
+  /** Max proximity across Sun + all planets at a point. */
+  private computeMaxProximity(px: number, pz: number): number {
+    let max = 0
+    if (this.sunController) {
+      max = Math.max(max, this.computeProximity(
+        this.sunController.getWorldX(), this.sunController.getWorldZ(),
+        this.sunController.mass, px, pz,
+      ))
+    }
+    for (const c of this.planetControllers) {
+      max = Math.max(max, this.computeProximity(c.getWorldX(), c.getWorldZ(), c.mass, px, pz))
+    }
+    return max
   }
 
   /** Returns true if the shuttle is aiming toward the captured planet. */
