@@ -1,8 +1,18 @@
 import * as THREE from 'three'
 
-const STAR_COUNT = 3000
-const STAR_SPHERE_RADIUS = 10000
-const STAR_SIZE = 3
+const DEFAULT_STAR_COUNT = 3000
+const DEFAULT_STAR_SPHERE_RADIUS = 10000
+const DEFAULT_STAR_SIZE = 3
+
+/** Optional config for customizing the starfield. */
+export interface StarFieldConfig {
+  /** Number of stars. Default 3000. */
+  count?: number
+  /** Radius of the star sphere. Default 10000. */
+  radius?: number
+  /** Point size. Default 3. */
+  size?: number
+}
 
 /**
  * Static particle star background rendered as a sphere of random points.
@@ -15,14 +25,17 @@ const STAR_SIZE = 3
 export class StarFieldController {
   readonly points: THREE.Points
 
-  constructor() {
-    const positions = new Float32Array(STAR_COUNT * 3)
+  constructor(config?: StarFieldConfig) {
+    const starCount = config?.count ?? DEFAULT_STAR_COUNT
+    const sphereRadius = config?.radius ?? DEFAULT_STAR_SPHERE_RADIUS
+    const starSize = config?.size ?? DEFAULT_STAR_SIZE
+    const positions = new Float32Array(starCount * 3)
 
-    for (let i = 0; i < STAR_COUNT; i++) {
+    for (let i = 0; i < starCount; i++) {
       const i3 = i * 3
       const theta = Math.random() * Math.PI * 2
       const phi = Math.acos(2 * Math.random() - 1)
-      const r = STAR_SPHERE_RADIUS * (0.8 + Math.random() * 0.2)
+      const r = sphereRadius * (0.8 + Math.random() * 0.2)
 
       positions[i3] = r * Math.sin(phi) * Math.cos(theta)
       positions[i3 + 1] = r * Math.sin(phi) * Math.sin(theta)
@@ -34,7 +47,7 @@ export class StarFieldController {
 
     const material = new THREE.PointsMaterial({
       color: 0xffffff,
-      size: STAR_SIZE,
+      size: starSize,
       sizeAttenuation: true,
       depthWrite: false,
     })

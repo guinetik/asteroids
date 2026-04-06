@@ -173,8 +173,8 @@ export class LevelViewController implements Tickable {
     this.terrainMesh = new TerrainMesh(this.heightmap)
     this.sceneManager.addToScene(this.terrainMesh.mesh)
 
-    // ── Starfield ────────────────────────────────────────────────
-    const starField = new StarFieldController()
+    // ── Starfield — denser than map scene for atmosphere ────────
+    const starField = new StarFieldController({ count: 8000, size: 4 })
     this.sceneManager.addToScene(starField.points)
 
     // ── Lighting — foreboding deep-space atmosphere ─────────────

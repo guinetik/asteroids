@@ -337,18 +337,22 @@ export class ArrivalSequence {
     }
 
     // Navigation lights so the shuttle is visible from the ground
-    // Light below illuminates the belly from underneath
-    const underLight = new THREE.PointLight(0x6699cc, 8, 600)
-    underLight.position.set(0, -20, 0)
+    // Strong underlight illuminates the belly from below
+    const underLight = new THREE.PointLight(0x6699cc, 20, 1200)
+    underLight.position.set(0, -25, 0)
     this.shuttleGroup.add(underLight)
-    // Light above for skyline silhouette
-    const topLight = new THREE.PointLight(0xffeedd, 4, 400)
-    topLight.position.set(0, 10, 0)
+    // Top light for skyline silhouette
+    const topLight = new THREE.PointLight(0xffeedd, 10, 800)
+    topLight.position.set(0, 15, 0)
     this.shuttleGroup.add(topLight)
-    // Cargo bay interior glow (doors are closed but adds presence)
-    const cargoGlow = new THREE.PointLight(0xffaa44, 3, 300)
+    // Cargo bay interior glow
+    const cargoGlow = new THREE.PointLight(0xffaa44, 8, 600)
     cargoGlow.position.set(-3, -2, 0)
     this.shuttleGroup.add(cargoGlow)
+    // Engine nozzle glow (rear)
+    const engineGlow = new THREE.PointLight(0xff6633, 6, 500)
+    engineGlow.position.set(-6, 0, 0)
+    this.shuttleGroup.add(engineGlow)
   }
 
   /** Remove shuttle and falling lander from scene entirely. */
