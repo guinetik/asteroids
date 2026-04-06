@@ -7,12 +7,13 @@
  * @spec docs/superpowers/specs/2026-04-04-level-state-machine-design.md
  */
 import { StateMachine } from '@/lib/stateMachine'
+import { ARRIVAL_SEQUENCE_DURATION } from '@/three/ArrivalSequence'
 
 /** All possible states for an asteroid level. */
 export type LevelState = 'arrival' | 'lander' | 'eva' | 'dead' | 'exfil' | 'complete' | 'failed'
 
 /** Duration of the arrival cutscene in seconds. */
-export const ARRIVAL_DURATION = 3.0
+export const ARRIVAL_DURATION = ARRIVAL_SEQUENCE_DURATION
 
 /** Seconds to hold on the death screen before redirecting. */
 export const DEAD_SCREEN_DURATION = 5.0

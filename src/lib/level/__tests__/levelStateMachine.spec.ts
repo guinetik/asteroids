@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { createLevelStateMachine } from '../levelStateMachine'
+import { createLevelStateMachine, ARRIVAL_DURATION } from '../levelStateMachine'
 
 describe('Level State Machine', () => {
   describe('arrival → lander', () => {
@@ -10,7 +10,7 @@ describe('Level State Machine', () => {
 
     it('auto-transitions to lander after ARRIVAL_DURATION seconds', () => {
       const sm = createLevelStateMachine({ onStateChange: vi.fn() })
-      sm.tick(2.9)
+      sm.tick(ARRIVAL_DURATION - 0.1)
       expect(sm.state).toBe('arrival')
       sm.tick(0.2)
       expect(sm.state).toBe('lander')
@@ -23,7 +23,7 @@ describe('Level State Machine', () => {
         onStateChange: vi.fn(),
         isLanderGrounded: () => false,
       })
-      sm.tick(3.1)
+      sm.tick(ARRIVAL_DURATION + 0.1)
       expect(sm.state).toBe('lander')
       const result = sm.trigger('exitVehicle')
       expect(result).toBe(false)
@@ -35,7 +35,7 @@ describe('Level State Machine', () => {
         onStateChange: vi.fn(),
         isLanderGrounded: () => true,
       })
-      sm.tick(3.1)
+      sm.tick(ARRIVAL_DURATION + 0.1)
       const result = sm.trigger('exitVehicle')
       expect(result).toBe(true)
       expect(sm.state).toBe('eva')
@@ -49,7 +49,7 @@ describe('Level State Machine', () => {
         isLanderGrounded: () => true,
         isPlayerNearLander: () => false,
       })
-      sm.tick(3.1)
+      sm.tick(ARRIVAL_DURATION + 0.1)
       sm.trigger('exitVehicle')
       const result = sm.trigger('enterVehicle')
       expect(result).toBe(false)
@@ -62,7 +62,7 @@ describe('Level State Machine', () => {
         isLanderGrounded: () => true,
         isPlayerNearLander: () => true,
       })
-      sm.tick(3.1)
+      sm.tick(ARRIVAL_DURATION + 0.1)
       sm.trigger('exitVehicle')
       const result = sm.trigger('enterVehicle')
       expect(result).toBe(true)
@@ -77,7 +77,7 @@ describe('Level State Machine', () => {
         isLanderGrounded: () => true,
         isPlayerNearLander: () => true,
       })
-      sm.tick(3.1)
+      sm.tick(ARRIVAL_DURATION + 0.1)
       sm.trigger('exitVehicle')
       sm.trigger('enterVehicle')
       sm.trigger('exitVehicle')
@@ -92,7 +92,7 @@ describe('Level State Machine', () => {
         onStateChange: onChange,
         isLanderGrounded: () => true,
       })
-      sm.tick(3.1)
+      sm.tick(ARRIVAL_DURATION + 0.1)
       expect(onChange).toHaveBeenCalledWith('lander', 'arrival', undefined)
     })
   })

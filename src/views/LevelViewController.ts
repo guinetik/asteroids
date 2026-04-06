@@ -40,10 +40,10 @@ import { ParticleEmitter } from '@/three/ParticleEmitter'
 import { createLevelStateMachine, LANDER_INTERACT_RANGE } from '@/lib/level/levelStateMachine'
 import type { LevelState } from '@/lib/level/levelStateMachine'
 import type { StateMachine } from '@/lib/stateMachine'
+import { ArrivalSequence } from '@/three/ArrivalSequence'
 import {
   AmbientLight,
   DirectionalLight,
-  PerspectiveCamera,
   Color,
   Vector3,
 } from 'three'
@@ -60,12 +60,6 @@ const FLAT_ZONE_COUNT = 3
 
 const LANDER_SPAWN_HEIGHT = 300
 const EVA_SPAWN_OFFSET_X = 8
-
-/** Cinematic camera offset during arrival (wide angle, side view). */
-const ARRIVAL_CAM_OFFSET = new Vector3(80, 30, 60)
-const ARRIVAL_CAM_FOV = 50
-const ARRIVAL_CAM_NEAR = 0.1
-const ARRIVAL_CAM_FAR = 15000
 
 /** Test surface features — will come from asteroid data later. */
 const TEST_SURFACE: SurfaceFeatures = {
@@ -107,7 +101,7 @@ export class LevelViewController implements Tickable {
   private impactEmitter: ParticleEmitter | null = null
 
   // ── Arrival ──────────────────────────────────────────────────
-  private arrivalCamera: PerspectiveCamera | null = null
+  private arrivalSequence: ArrivalSequence | null = null
 
   // ── Mouse state (EVA) ────────────────────────────────────────
   private leftMouseDown = false

@@ -55,10 +55,10 @@ export type GravitationalEventFinishListener = (
 ) => void
 
 /** Minimum anomaly lifetime (seconds). */
-const ANOMALY_DURATION_MIN_SEC = 5
+const ANOMALY_DURATION_MIN_SEC = 12
 
 /** Maximum anomaly lifetime (seconds). */
-const ANOMALY_DURATION_MAX_SEC = 10
+const ANOMALY_DURATION_MAX_SEC = 24
 
 /** Minimum travel speed (world units/s). */
 const ANOMALY_SPEED_MIN = 35
@@ -137,7 +137,7 @@ export interface GravitationalEventSpawnOptions {
   dirZ?: number
   /** Speed (world u/s); random if omitted. */
   speed?: number
-  /** Lifetime seconds; random in [5,10] if omitted. */
+  /** Lifetime seconds; random uniform over the module min/max duration band if omitted. */
   durationSec?: number
   /** Synthetic grid mass; random if omitted. */
   gridMass?: number
