@@ -26,6 +26,24 @@ describe('ThrusterSystem', () => {
     expect(sys.getState('thrust').charge).toBe(before - DEFAULT_THRUSTER_CONFIG.thrust.burnRate)
   })
 
+  it('applies burn rate multipliers to active thruster drain', () => {
+    const sys = createShuttleSystem()
+    const before = sys.getState('thrust').charge
+    sys.tick(1, { thrust: true, brake: false, rcs: false }, {
+      burnRateMultiplier: { thrust: 0.5 },
+    })
+    expect(sys.getState('thrust').charge).toBe(
+      before - DEFAULT_THRUSTER_CONFIG.thrust.burnRate * 0.5,
+    )
+  })
+
+  it('applies burn rate multipliers to canFire thresholds', () => {
+    const sys = createShuttleSystem()
+    sys.tick(1.84, { thrust: true, brake: false, rcs: false })
+    expect(sys.canFire('thrust')).toBe(false)
+    expect(sys.canFire('thrust', { burnRateMultiplier: { thrust: 0.25 } })).toBe(true)
+  })
+
   it('recharges idle thrusters consuming fuel', () => {
     const sys = createShuttleSystem()
     sys.tick(2, { thrust: true, brake: false, rcs: false })

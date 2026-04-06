@@ -5,9 +5,10 @@
  * @date 2026-04-05
  * @spec docs/superpowers/specs/2026-04-05-map-shuttle-player-design.md
  */
+import { getCurrentUpgradeValue } from './upgrades'
 
-/** Fuel units per second spent by passive shuttle systems. */
-export const SHUTTLE_BASE_FUEL_DRAIN_RATE = 3
+/** Upgrade id that controls passive shuttle systems drain. */
+export const SHUTTLE_FUEL_UPGRADE_ID = 'shuttleFuelUpgrade'
 
 /**
  * Compute passive shuttle fuel drain for a frame.
@@ -18,5 +19,5 @@ export const SHUTTLE_BASE_FUEL_DRAIN_RATE = 3
  */
 export function computeShuttleBaseFuelDrain(dt: number, drainEnabled: boolean): number {
   if (!drainEnabled) return 0
-  return Math.max(0, dt) * SHUTTLE_BASE_FUEL_DRAIN_RATE
+  return Math.max(0, dt) * getCurrentUpgradeValue(SHUTTLE_FUEL_UPGRADE_ID)
 }

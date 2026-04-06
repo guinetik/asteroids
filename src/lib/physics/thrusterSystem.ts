@@ -31,6 +31,12 @@ export interface ThrusterSystemConfig<T extends string = string> {
   fuelCapacity: number
 }
 
+/** Runtime multipliers that can modify per-thruster behavior without changing the base config. */
+export interface ThrusterRuntimeModifiers<T extends string = string> {
+  /** Scales charge drain while a thruster is firing. Lower means the bar lasts longer. */
+  burnRateMultiplier?: Partial<Record<T, number>>
+}
+
 /** Snapshot of a single thruster's runtime state. */
 export interface ThrusterState {
   charge: number
@@ -100,9 +106,10 @@ export class ThrusterSystem<T extends string = ShuttleThrusterName> {
   }
 
   /** Whether a thruster has enough charge for at least one frame of firing. */
-  canFire(thruster: T): boolean {
+  canFire(thruster: T, modifiers?: ThrusterRuntimeModifiers<T>): boolean {
     const cfg = this.config.thrusters[thruster]
-    return this.charges[thruster] >= cfg.burnRate * ONE_FRAME_AT_60FPS
+    const burnRateMultiplier = Math.max(0, modifiers?.burnRateMultiplier?.[thruster] ?? 1)
+    return this.charges[thruster] >= cfg.burnRate * burnRateMultiplier * ONE_FRAME_AT_60FPS
   }
 
   /** Snapshot of a single thruster's runtime state. */
@@ -172,14 +179,15 @@ export class ThrusterSystem<T extends string = ShuttleThrusterName> {
    * @param dt - Delta time in seconds
    * @param active - Which thrusters are firing this frame
    */
-  tick(dt: number, active: Record<T, boolean>): void {
+  tick(dt: number, active: Record<T, boolean>, modifiers?: ThrusterRuntimeModifiers<T>): void {
     this.activeState = { ...active }
 
     for (const name of this.thrusterNames) {
       const cfg = this.config.thrusters[name]
+      const burnRateMultiplier = Math.max(0, modifiers?.burnRateMultiplier?.[name] ?? 1)
 
       if (active[name]) {
-        this.charges[name] = Math.max(0, this.charges[name] - cfg.burnRate * dt)
+        this.charges[name] = Math.max(0, this.charges[name] - cfg.burnRate * burnRateMultiplier * dt)
       } else {
         if (this.fuel > 0 && this.charges[name] < cfg.capacity) {
           const fuelCost = cfg.rechargeRate * dt * cfg.fuelCostPerRecharge

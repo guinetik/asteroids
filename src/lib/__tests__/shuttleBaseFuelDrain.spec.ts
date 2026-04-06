@@ -6,7 +6,8 @@
  * @spec docs/superpowers/specs/2026-04-05-map-shuttle-player-design.md
  */
 import { describe, expect, it } from 'vitest'
-import { computeShuttleBaseFuelDrain, SHUTTLE_BASE_FUEL_DRAIN_RATE } from '../shuttleBaseFuelDrain'
+import { computeShuttleBaseFuelDrain, SHUTTLE_FUEL_UPGRADE_ID } from '../shuttleBaseFuelDrain'
+import { getCurrentUpgradeValue } from '../upgrades'
 
 describe('computeShuttleBaseFuelDrain', () => {
   it('drains three fuel units per second by default', () => {
@@ -21,7 +22,8 @@ describe('computeShuttleBaseFuelDrain', () => {
     expect(computeShuttleBaseFuelDrain(2, false)).toBe(0)
   })
 
-  it('exports the passive shuttle systems drain rate', () => {
-    expect(SHUTTLE_BASE_FUEL_DRAIN_RATE).toBe(3)
+  it('reads the passive shuttle systems drain rate from upgrades', () => {
+    expect(SHUTTLE_FUEL_UPGRADE_ID).toBe('shuttleFuelUpgrade')
+    expect(getCurrentUpgradeValue(SHUTTLE_FUEL_UPGRADE_ID)).toBe(3)
   })
 })
