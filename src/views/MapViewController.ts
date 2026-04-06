@@ -256,8 +256,7 @@ export class MapViewController implements Tickable {
 
     // --- Shuttle (player character) ---
     this.shuttleController = new ShuttleController(this.inputManager, MAP_PHYSICS, MAP_GRAVITY_CONFIG)
-    // Grid is visual only — shuttle stays at Y=0 in map view
-    // this.shuttleController.setSpaceTimeGrid(this.spaceTimeGrid)
+    this.shuttleController.setSpaceTimeGrid(this.spaceTimeGrid)
 
     // Register gravity wells — Sun + all planets
     if (this.sunController) {
