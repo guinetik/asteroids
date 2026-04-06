@@ -575,9 +575,9 @@ export class MapViewController implements Tickable {
         this.curvatureRoll += (0 - this.curvatureRoll) * CURVATURE_TILT_LERP * dt
       }
 
-      // Apply pitch/roll while preserving yaw
-      const yaw = this.shuttleController.group.rotation.y
-      this.shuttleController.group.rotation.set(this.curvaturePitch, yaw, this.curvatureRoll)
+      // Apply pitch/roll without touching yaw (Y rotation is owned by ShuttleController)
+      this.shuttleController.group.rotation.x = this.curvaturePitch
+      this.shuttleController.group.rotation.z = this.curvatureRoll
     }
 
     // Orbit approach — animated lerp toward orbit insertion point
