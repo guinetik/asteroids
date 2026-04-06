@@ -11,7 +11,7 @@
  */
 
 /** Item classification determining behavior and UI grouping. */
-export type ItemCategory = 'mineral' | 'upgrade' | 'consumable' | 'equipment'
+export type ItemCategory = 'mineral' | 'upgrade' | 'consumable' | 'equipment' | 'trade-good'
 
 /** An item definition from the JSON manifest. */
 export interface ItemDefinition {
@@ -23,6 +23,8 @@ export interface ItemDefinition {
   label: string
   /** Flavor text for tooltips and detail views. */
   description: string
+  /** Icon filename in public/images/items/. */
+  icon: string
   /** Fixed weight in kilograms per unit. */
   weightPerUnit: number
   /** Maximum units allowed in a single inventory slot. 1 for upgrades/equipment. */
