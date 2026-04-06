@@ -475,6 +475,16 @@ export class FpsViewController implements Tickable {
           const dir = handle.lastOutput.moveDir
           ctrl.group.rotation.y = Math.atan2(dir.x, dir.z)
         }
+
+        // Tilt body to match terrain slope
+        if (this.heightmap) {
+          const n = this.heightmap.normalAt(
+            handle.enemy.position.x,
+            handle.enemy.position.z,
+          )
+          ctrl.group.rotation.x = Math.atan2(n.z, n.y)
+          ctrl.group.rotation.z = Math.atan2(-n.x, n.y)
+        }
       }
 
       // Spire sync
