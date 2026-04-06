@@ -24,7 +24,7 @@ import {
   TICK_PRIORITY_ANIMATION,
   TICK_PRIORITY_RENDER,
 } from '@/lib/tickPriorities'
-import { DEFAULT_TIME_SCALE, ORBIT_SCALE } from '@/lib/planets/constants'
+import { DEFAULT_TIME_SCALE, ORBIT_SCALE, SIZE_SCALE } from '@/lib/planets/constants'
 import { SUN, PLANETS, ASTEROID_BELTS } from '@/lib/planets/catalog'
 import { createMapScene, handleMapResize, type MapSceneObjects } from '@/three/MapSceneSetup'
 import { StarFieldController } from '@/three/StarFieldController'
@@ -76,6 +76,7 @@ import { shipMessageSystem } from '@/lib/messages/runtime'
 import { isMainThrusterSpentForMessage } from '@/lib/messages/tutorialTriggers'
 import { DevConsole } from '@/lib/devConsole'
 import { AmbientSpaceController } from '@/three/AmbientSpaceController'
+import { GravitationalEventManager } from '@/lib/physics/gravitationalEvent'
 import { computeShuttleBaseFuelDrain } from '@/lib/shuttleBaseFuelDrain'
 import { ShipHealth } from '@/lib/shipHealth'
 import type { ShipHealthConfig } from '@/lib/shipHealth'
@@ -91,11 +92,18 @@ const TICK_PRIORITY_COMPOSIT = TICK_PRIORITY_RENDER - 1
 const ONE_SHOT_PRIORITY = TICK_PRIORITY_INPUT + 1
 
 /**
- * Minimum mass (M☉) for a planet to contribute to the space-time grid deformSources pass.
- * Set low enough that Earth-scale wells show subtly; still excludes Ceres/Pluto noise
- * (e.g. Ceres ≈ 5e-10 M☉, Pluto ≈ 7e-9 M☉ at 1e-7).
+ * Minimum mass (M☉) for a planet to contribute to the space-time grid.
+ * Below this, the gravity well is sub-pixel. Filters out terrestrials
+ * and dwarf planets, keeping Sun + Jupiter/Saturn-scale wells.
  */
-const GRID_MASS_THRESHOLD = 1e-7
+/** Only Jupiter (9.55e-4) and Saturn (2.86e-4) deform the grid (Uranus/Neptune are below 1e-4). */
+const GRID_MASS_THRESHOLD = 1e-4
+
+/**
+ * Gaussian σ multiplier for Jupiter and Saturn on the map fabric only (wider bowls;
+ * center depth unchanged). Tune for readability at solar-system scale.
+ */
+const MAP_GRID_GAS_GIANT_WELL_WIDTH_MULT = 1.85
 
 /** Baseline wireframe segments per axis on the map space-time grid. */
 const MAP_SPACE_TIME_GRID_BASE_RESOLUTION = 150
@@ -189,6 +197,19 @@ const SUN_CAPTURE_RADIUS_MULTIPLIER = 0.2
 /** Earth defines the baseline orbital lane speed multiplier of 1. */
 const EARTH_PLANET_ID = 'earth'
 
+/**
+ * Earth catalog `displayRadius` — baseline for scaling dev-warp standoff to other bodies.
+ */
+const EARTH_CATALOG_DISPLAY_RADIUS =
+  PLANETS.find((p) => p.id === EARTH_PLANET_ID)?.displayRadius ?? 0.0077
+
+/**
+ * World-space offset from a body's centre along the anti-sunward radial, scaled by catalog size.
+ */
+function mapWarpStandoffWorldUnits(displayRadius: number): number {
+  return SPAWN_OFFSET_BEHIND_EARTH * (displayRadius / EARTH_CATALOG_DISPLAY_RADIUS)
+}
+
 /** Maximum arrow length at full charge (in shuttle local space, pre-scale). */
 const ARROW_MAX_LENGTH = 300
 const ARROW_COLOR_SAFE = 0x00ffff
@@ -271,6 +292,8 @@ export class MapViewController implements Tickable {
   private planetControllers: PlanetSystemController[] = []
   private beltControllers: AsteroidBeltController[] = []
   private spaceTimeGrid: SpaceTimeGrid | null = null
+  /** Transient spacetime “depressions” that drift across the sheet near the shuttle. */
+  private gravitationalEventManager: GravitationalEventManager | null = null
   /** World width/depth of the map space-time grid (passed to {@link SpaceTimeGrid}). */
   private mapGridSize = 0
   private simTime = 0
@@ -444,6 +467,11 @@ export class MapViewController implements Tickable {
 
     // Sun is static — add once, never cleared
     this.spaceTimeGrid.addStaticSource({ x: 0, z: 0, mass: SUN.mass })
+
+    this.gravitationalEventManager = new GravitationalEventManager({
+      worldHalfExtent: gridSize / 2,
+      autoSpawnEnabled: true,
+    })
 
     // --- Shuttle (player character) ---
     this.shuttleController = new ShuttleController(
@@ -655,9 +683,22 @@ export class MapViewController implements Tickable {
           )
         }
       },
+      warp: (bodyId: string) => {
+        this.devWarpNearBody(bodyId)
+      },
       toggleOrbits: () => this.toggleOrbits(),
       toggleSpaceTimeGrid: () => this.toggleSpaceTimeGrid(),
       toggleAmbient: () => this.toggleAmbient(),
+      spawnGravitationalEvent: () => this.gravitationalEventManager?.spawnRandomInWorld() ?? null,
+      spawnGravitationalEventNearPlayer: (maxOffset = 200) => {
+        if (!this.gravitationalEventManager || !this.shuttleController) return null
+        const p = this.shuttleController.group.position
+        return this.gravitationalEventManager.spawnNear(p.x, p.z, maxOffset)
+      },
+      clearGravitationalEvents: () => this.gravitationalEventManager?.clear(),
+      setGravitationalEventAutoSpawn: (enabled: boolean) => {
+        this.gravitationalEventManager?.setAutoSpawnEnabled(Boolean(enabled))
+      },
     })
 
     // Start
@@ -1077,6 +1118,28 @@ export class MapViewController implements Tickable {
       )
     }
 
+    // Planet collision — instant death if shuttle flies into a planet mesh
+    if (this.shuttleController && !this.shuttleController.dead) {
+      const orbitState = this.orbitSystem?.state ?? 'free'
+      if (orbitState === 'free') {
+        const px = this.shuttleController.position.x
+        const pz = this.shuttleController.position.z
+        for (let i = 0; i < this.planetControllers.length; i++) {
+          const c = this.planetControllers[i]!
+          const dx = c.getWorldX() - px
+          const dz = c.getWorldZ() - pz
+          const dist = Math.sqrt(dx * dx + dz * dz)
+          const collisionRadius = PLANETS[i]!.displayRadius * SIZE_SCALE
+          if (dist < collisionRadius) {
+            this.vehicleCamera?.setConfig(MAP_DEATH_CAMERA_CONFIG)
+            this.onDeathOverlay?.(true, `Crashed Into ${PLANETS[i]!.name}`)
+            this.shuttleController.freeze()
+            return
+          }
+        }
+      }
+    }
+
     // Gravity proximity — VFX distortion + HUD warning
     // Only active in free flight (not during orbit capture)
     if (this.shuttleController && this.gravityPass) {
@@ -1166,17 +1229,30 @@ export class MapViewController implements Tickable {
       controller.tick(dt, this.simTime)
     }
 
+    const shuttleX = this.shuttleController?.group.position.x ?? 0
+    const shuttleZ = this.shuttleController?.group.position.z ?? 0
+    this.gravitationalEventManager?.tick(dt, shuttleX, shuttleZ)
+
     if (this.spaceTimeGrid) {
       // Only re-add moving planets that are massive enough (Jupiter, Saturn, etc.)
       // Sun is a static source — added once at init
       this.spaceTimeGrid.clearSources()
-      for (const controller of this.planetControllers) {
+      for (let i = 0; i < this.planetControllers.length; i++) {
+        const controller = this.planetControllers[i]!
         if (controller.mass < GRID_MASS_THRESHOLD) continue
+        const planetId = PLANETS[i]?.id
+        const gasGiantWideWell = planetId === 'jupiter' || planetId === 'saturn'
         this.spaceTimeGrid.addSource({
           x: controller.getWorldX(),
           z: controller.getWorldZ(),
           mass: controller.mass,
+          ...(gasGiantWideWell ? { wellWidthMultiplier: MAP_GRID_GAS_GIANT_WELL_WIDTH_MULT } : {}),
         })
+      }
+      if (this.gravitationalEventManager) {
+        for (const src of this.gravitationalEventManager.getGridSourcesNear(shuttleX, shuttleZ)) {
+          this.spaceTimeGrid.addSource(src)
+        }
       }
       this.syncSpaceTimeGridVisualBudget()
       this.spaceTimeGrid.tick(dt)
@@ -1629,6 +1705,85 @@ export class MapViewController implements Tickable {
       ;(this.orbitRing.material as THREE.LineDashedMaterial).dispose()
       this.orbitRing = null
     }
+  }
+
+  /**
+   * After a dev teleport, exit orbit capture UI/state so free-flight matches the new pose.
+   */
+  private prepareShuttleAfterDevWarp(): void {
+    this.orbitSystem?.resetToFreeFlight()
+    this.approachStartPos = null
+    this.slingshotCharge = 0
+    this.hideLaunchArrow()
+    this.hideOrbitRing()
+    this.shuttleController?.unfreeze()
+    this.shuttleController?.setInputEnabled(true)
+    this.vehicleCamera?.setConfig(MAP_CAMERA_CONFIG)
+    if (this.shuttleController) {
+      this.vehicleCamera?.setTarget(this.shuttleController.group)
+    }
+  }
+
+  /**
+   * Dev-console warp: move the shuttle just outside a body's current location (anti-sunward).
+   *
+   * @param bodyId - Case-insensitive catalog id: `sun` or any planet id (`earth`, `mars`, …).
+   */
+  private devWarpNearBody(bodyId: string): void {
+    const shuttle = this.shuttleController
+    if (!shuttle) {
+      console.warn('[MapView] warp: shuttle not ready')
+      return
+    }
+
+    const key = bodyId.trim().toLowerCase()
+    if (!key) {
+      console.info(
+        `[MapView] warp("earth") — ids: sun, ${PLANETS.map((p) => p.id).join(', ')}`,
+      )
+      return
+    }
+
+    this.prepareShuttleAfterDevWarp()
+    shuttle.setVelocity(new THREE.Vector3(0, 0, 0))
+
+    if (key === 'sun') {
+      if (!this.sunController) return
+      const sx = this.sunController.getWorldX()
+      const sz = this.sunController.getWorldZ()
+      const standoff = mapWarpStandoffWorldUnits(SUN.displayRadius)
+      shuttle.group.position.set(sx + standoff, 0, sz)
+      shuttle.group.rotation.set(0, 0, 0)
+      console.info(`[MapView] warp → Sun (~${standoff.toFixed(1)} u along +X)`)
+      return
+    }
+
+    const planet = PLANETS.find((p) => p.id === key)
+    if (!planet) {
+      console.warn(`[MapView] warp: unknown body "${bodyId}"`)
+      console.info(
+        `[MapView] Try: sun, ${PLANETS.map((p) => p.id).join(', ')}`,
+      )
+      return
+    }
+
+    const idx = PLANETS.indexOf(planet)
+    const ctrl = this.planetControllers[idx]
+    if (!ctrl) return
+
+    const bx = ctrl.getWorldX()
+    const bz = ctrl.getWorldZ()
+    const standoff = mapWarpStandoffWorldUnits(planet.displayRadius)
+    const awayFromSun = Math.atan2(bz, bx)
+    shuttle.group.position.set(
+      bx + Math.cos(awayFromSun) * standoff,
+      0,
+      bz + Math.sin(awayFromSun) * standoff,
+    )
+    shuttle.group.rotation.set(0, awayFromSun, 0)
+    console.info(
+      `[MapView] warp → ${planet.name} (standoff ${standoff.toFixed(1)} u; body ${bx.toFixed(1)}, ${bz.toFixed(1)})`,
+    )
   }
 
   /** Called when the map first opens. Freezes everything, positions ortho camera. */
@@ -2264,6 +2419,8 @@ export class MapViewController implements Tickable {
     this.shuttleController?.dispose()
     for (const controller of this.beltControllers) controller.dispose()
     for (const controller of this.planetControllers) controller.dispose()
+    this.gravitationalEventManager?.clear()
+    this.gravitationalEventManager = null
     this.spaceTimeGrid?.dispose()
     this.sunController?.dispose()
     this.starField?.dispose()

@@ -307,6 +307,17 @@ export class OrbitCaptureSystem {
   }
 
   /**
+   * Forces `free` flight: clears any approach or orbit target and resets the FSM.
+   *
+   * Use when the shuttle is teleported (e.g. dev warp) so capture state matches
+   * the new world position. Unlike {@link cancelApproach}, this also exits `orbiting`.
+   */
+  resetToFreeFlight(): void {
+    this.fsm.reset('free')
+    this.targetData = null
+  }
+
+  /**
    * Checks whether the shuttle has arrived at the target orbit radius.
    *
    * Arrival is defined as the shuttle's distance from the planet centre being

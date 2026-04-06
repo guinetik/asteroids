@@ -8,7 +8,12 @@
  * ```js
  * AsteroidDev.LevelView.takeDamage(25)
  * AsteroidDev.MapView.skipIntro()
+ * AsteroidDev.MapView.warp('earth')
+ * AsteroidDev.MapView.spawnGravitationalEventNearPlayer(200)
  * AsteroidDev.help()
+ *
+ * Map spacetime anomalies: import types/event names from `devConsole` or listen on
+ * each {@link GravitationalEvent} for `gravitational-event-start` / `gravitational-event-finish`.
  * ```
  *
  * Only active in development builds (`import.meta.env.DEV`). In production,
@@ -154,3 +159,18 @@ export function unregister(name: string): void {
  * ```
  */
 export const DevConsole = { register, unregister }
+
+// ─── Map gravitational anomalies (types + event names for console listeners) ───
+
+export {
+  GravitationalEvent,
+  GravitationalEventManager,
+  GRAVITATIONAL_EVENT_FINISH,
+  GRAVITATIONAL_EVENT_START,
+} from './physics/gravitationalEvent'
+
+export type {
+  GravitationalEventFinishDetail,
+  GravitationalEventSpawnOptions,
+  GravitationalEventStartDetail,
+} from './physics/gravitationalEvent'
