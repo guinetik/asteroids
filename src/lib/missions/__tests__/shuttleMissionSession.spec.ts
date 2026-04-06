@@ -8,7 +8,12 @@ import {
   tickMissionBoard,
   getActiveMissionsForPlanet,
   getDeliverableMissions,
+  offerAsteroidMission,
+  acceptAsteroidMission,
+  beginAsteroidMission,
+  tickAsteroidMissionBoard,
 } from '../shuttleMissionSession'
+import { generateAsteroidMission } from '../asteroidMissionGenerator'
 import { createProfile } from '@/lib/player/profile'
 import { createInventory } from '@/lib/inventory/inventory'
 // Side-effect: register mission materials into item catalog
@@ -207,5 +212,70 @@ describe('getDeliverableMissions', () => {
     const accepted = acceptMission(board)
     const deliverable = getDeliverableMissions(accepted, 'earth')
     expect(deliverable).toHaveLength(0)
+  })
+})
+
+describe('offerAsteroidMission', () => {
+  it('sets the offered asteroid mission', () => {
+    const board = createMissionBoard()
+    const mission = generateAsteroidMission(1)
+    const updated = offerAsteroidMission(board, mission)
+    expect(updated.offeredAsteroidMission).not.toBeNull()
+    expect(updated.offeredAsteroidMission!.id).toBe(mission.id)
+  })
+
+  it('does not offer if restock timer is running', () => {
+    let board = createMissionBoard()
+    const mission1 = generateAsteroidMission(1)
+    board = offerAsteroidMission(board, mission1)
+    board = acceptAsteroidMission(board)
+    const mission2 = generateAsteroidMission(1)
+    const updated = offerAsteroidMission(board, mission2)
+    expect(updated.offeredAsteroidMission).toBeNull()
+  })
+})
+
+describe('acceptAsteroidMission', () => {
+  it('moves offered to active with accepted status', () => {
+    let board = createMissionBoard()
+    const mission = generateAsteroidMission(1)
+    board = offerAsteroidMission(board, mission)
+    const updated = acceptAsteroidMission(board)
+    expect(updated.offeredAsteroidMission).toBeNull()
+    expect(updated.activeAsteroidMission).not.toBeNull()
+    expect(updated.activeAsteroidMission!.status).toBe('accepted')
+    expect(updated.asteroidRestockTimer).not.toBeNull()
+  })
+})
+
+describe('beginAsteroidMission', () => {
+  it('sets status to in-transit', () => {
+    let board = createMissionBoard()
+    const mission = generateAsteroidMission(1)
+    board = offerAsteroidMission(board, mission)
+    board = acceptAsteroidMission(board)
+    const updated = beginAsteroidMission(board)
+    expect(updated.activeAsteroidMission!.status).toBe('in-transit')
+  })
+})
+
+describe('tickAsteroidMissionBoard', () => {
+  it('decrements asteroid restock timer', () => {
+    let board = createMissionBoard()
+    const mission = generateAsteroidMission(1)
+    board = offerAsteroidMission(board, mission)
+    board = acceptAsteroidMission(board)
+    const remaining = board.asteroidRestockTimer!.remaining
+    const ticked = tickAsteroidMissionBoard(board, 10)
+    expect(ticked.asteroidRestockTimer!.remaining).toBeCloseTo(remaining - 10)
+  })
+
+  it('clears timer when expired', () => {
+    let board = createMissionBoard()
+    const mission = generateAsteroidMission(1)
+    board = offerAsteroidMission(board, mission)
+    board = acceptAsteroidMission(board)
+    const ticked = tickAsteroidMissionBoard(board, 999)
+    expect(ticked.asteroidRestockTimer).toBeNull()
   })
 })

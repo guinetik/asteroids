@@ -9,7 +9,7 @@
  * @date 2026-04-06
  * @spec docs/superpowers/specs/2026-04-06-shuttle-missions-design.md
  */
-import type { ShuttleMissionBoard, ActiveShuttleMission } from './types'
+import type { ShuttleMissionBoard, ActiveShuttleMission, GeneratedAsteroidMission } from './types'
 import type { PlayerProfile } from '@/lib/player/types'
 import type { Inventory } from '@/lib/inventory/types'
 import { getMissionPool } from './shuttleMissionPools'
@@ -43,6 +43,9 @@ export function createMissionBoard(): ShuttleMissionBoard {
     offeringPlanet: null,
     restockTimer: null,
     activeMissions: [],
+    offeredAsteroidMission: null,
+    activeAsteroidMission: null,
+    asteroidRestockTimer: null,
   }
 }
 
@@ -270,4 +273,73 @@ export function getDeliverableMissions(
   return board.activeMissions.filter(
     (m) => m.giverPlanet === planetId && m.status === 'ready-to-deliver',
   )
+}
+
+/**
+ * Set the offered asteroid mission on the board.
+ * Does nothing if a restock timer is running.
+ *
+ * @param board - Current board state.
+ * @param mission - Generated asteroid mission to offer.
+ * @returns Updated board.
+ */
+export function offerAsteroidMission(
+  board: ShuttleMissionBoard,
+  mission: GeneratedAsteroidMission,
+): ShuttleMissionBoard {
+  if (board.asteroidRestockTimer) return board
+  return { ...board, offeredAsteroidMission: mission }
+}
+
+/**
+ * Accept the offered asteroid mission. Moves it to active and starts restock timer.
+ *
+ * @param board - Current board state.
+ * @returns Updated board.
+ */
+export function acceptAsteroidMission(board: ShuttleMissionBoard): ShuttleMissionBoard {
+  if (!board.offeredAsteroidMission) return board
+
+  const total = randomRestockDuration()
+  return {
+    ...board,
+    offeredAsteroidMission: null,
+    activeAsteroidMission: { ...board.offeredAsteroidMission, status: 'accepted' },
+    asteroidRestockTimer: { remaining: total, total },
+  }
+}
+
+/**
+ * Mark the active asteroid mission as in-transit (player pressed E at waypoint).
+ *
+ * @param board - Current board state.
+ * @returns Updated board.
+ */
+export function beginAsteroidMission(board: ShuttleMissionBoard): ShuttleMissionBoard {
+  if (!board.activeAsteroidMission || board.activeAsteroidMission.status !== 'accepted') return board
+  return {
+    ...board,
+    activeAsteroidMission: { ...board.activeAsteroidMission, status: 'in-transit' },
+  }
+}
+
+/**
+ * Tick the asteroid mission restock timer.
+ *
+ * @param board - Current board state.
+ * @param dt - Delta time in seconds.
+ * @returns Updated board.
+ */
+export function tickAsteroidMissionBoard(board: ShuttleMissionBoard, dt: number): ShuttleMissionBoard {
+  if (!board.asteroidRestockTimer) return board
+
+  const remaining = board.asteroidRestockTimer.remaining - dt
+  if (remaining <= 0) {
+    return { ...board, asteroidRestockTimer: null }
+  }
+
+  return {
+    ...board,
+    asteroidRestockTimer: { ...board.asteroidRestockTimer, remaining },
+  }
 }
