@@ -1,6 +1,7 @@
 // src/views/ShuttleViewController.ts
 import type { Tickable } from '@/lib/Tickable'
 import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
+import { DevConsole } from '@/lib/devConsole'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'
@@ -22,6 +23,7 @@ import { AmbientLight, PointLight, Vector3 } from 'three'
 import { PortalArrivalSequence } from '@/three/PortalArrivalSequence'
 import { PortalBoundarySystem } from '@/three/PortalBoundarySystem'
 import { VibePortal } from '@/lib/portal'
+import { computeShuttleBaseFuelDrain } from '@/lib/shuttleBaseFuelDrain'
 
 const ONE_SHOT_PRIORITY = TICK_PRIORITY_INPUT + 1
 const AMBIENT_LIGHT_INTENSITY = 0.3
@@ -162,14 +164,24 @@ export class ShuttleViewController implements Tickable {
     // One-shot action bridge (runs just after input)
     this.tickHandler.register(this, ONE_SHOT_PRIORITY)
 
+    // --- Dev tools ---
+    DevConsole.register('ShuttleView', {
+      toggleDoors: () => this.shuttleController?.toggleDoors(),
+      freeze: () => this.shuttleController?.freeze(),
+      unfreeze: () => this.shuttleController?.unfreeze(),
+    })
+
     // Start the loop
     this.gameLoop = new GameLoop(this.tickHandler)
     this.gameLoop.start()
   }
 
-  tick(_dt: number): void {
+  tick(dt: number): void {
     if (this.inputManager?.wasActionPressed('toggleDoors')) {
       this.shuttleController?.toggleDoors()
+    }
+    if (this.shuttleController && !this.shuttleController.dead) {
+      this.shuttleController.thrusterSystem.consumeFuel(computeShuttleBaseFuelDrain(dt, true))
     }
     if (this.shuttleController && this.onTelemetry) {
       const ts = this.shuttleController.thrusterSystem
@@ -192,6 +204,7 @@ export class ShuttleViewController implements Tickable {
   }
 
   dispose(): void {
+    DevConsole.unregister('ShuttleView')
     this.gameLoop?.stop()
     this.thrusterController?.dispose()
     this.portalArrival?.dispose()

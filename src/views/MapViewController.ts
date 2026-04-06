@@ -105,6 +105,24 @@ const MAP_SHUTTLE_MIN_APPARENT_SIZE = 0.012
 /** How fast the shuttle scale lerps toward its target (per second). */
 const MAP_SHUTTLE_SCALE_LERP = 8
 
+/**
+ * Fixed apparent size of the tactical reticle as a fraction of screen height.
+ * The reticle's world-space scale is recalculated every frame to maintain this.
+ */
+const MAP_RETICLE_APPARENT_SIZE = 0.06
+
+/**
+ * Shuttle overscale multiplier at which the reticle begins fading in.
+ * Below this factor the shuttle model is still clearly visible on its own.
+ */
+const MAP_RETICLE_FADE_START = 1.5
+
+/**
+ * Shuttle overscale multiplier at which the reticle reaches full opacity.
+ * Above this the shuttle is so small only the reticle marks its position.
+ */
+const MAP_RETICLE_FADE_END = 5.0
+
 /** Offset behind Earth so the shuttle doesn't overlap the planet mesh. */
 const SPAWN_OFFSET_BEHIND_EARTH = 7.5
 
@@ -381,6 +399,7 @@ export class MapViewController implements Tickable {
 
     await this.shuttleController.load()
     this.shuttleController.group.scale.setScalar(MAP_SHUTTLE_SCALE)
+    this.createShipReticle()
 
     // Spawn next to Earth — find its controller by matching PLANETS order
     const earthIndex = PLANETS.findIndex((p) => p.id === 'earth')
@@ -1082,6 +1101,72 @@ export class MapViewController implements Tickable {
   }
 
   /**
+   * Creates a canvas-drawn tactical reticle sprite and adds it to the scene.
+   *
+   * The design: a thin glowing ring with four axis-aligned tick marks and a
+   * subtle outer glow halo — classic HUD targeting indicator aesthetic.
+   * Opacity starts at zero; `tickShuttleScale` drives it every frame.
+   */
+  private createShipReticle(): void {
+    const scene = this.sceneObjects?.scene
+    if (!scene) return
+
+    const size = 128
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')!
+    const cx = size / 2
+    const cy = size / 2
+    const ringR = 46
+    const tickInner = 53
+    const tickOuter = 63
+
+    // Outer soft glow halo
+    ctx.beginPath()
+    ctx.arc(cx, cy, ringR + 5, 0, Math.PI * 2)
+    ctx.strokeStyle = 'rgba(0, 210, 255, 0.18)'
+    ctx.lineWidth = 10
+    ctx.stroke()
+
+    // Main ring
+    ctx.beginPath()
+    ctx.arc(cx, cy, ringR, 0, Math.PI * 2)
+    ctx.strokeStyle = 'rgba(0, 230, 255, 0.9)'
+    ctx.lineWidth = 2
+    ctx.stroke()
+
+    // Four axis tick marks outside the ring
+    for (let i = 0; i < 4; i++) {
+      const angle = (i * Math.PI) / 2
+      const cos = Math.cos(angle)
+      const sin = Math.sin(angle)
+      ctx.beginPath()
+      ctx.moveTo(cx + cos * tickInner, cy + sin * tickInner)
+      ctx.lineTo(cx + cos * tickOuter, cy + sin * tickOuter)
+      ctx.strokeStyle = 'rgba(0, 230, 255, 0.95)'
+      ctx.lineWidth = 2
+      ctx.stroke()
+    }
+
+    const tex = new THREE.CanvasTexture(canvas)
+    tex.needsUpdate = true
+
+    const mat = new THREE.SpriteMaterial({
+      map: tex,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+
+    this.shipReticle = new THREE.Sprite(mat)
+    this.shipReticle.scale.setScalar(0.1) // overwritten every tick
+    this.shipReticle.visible = false
+    scene.add(this.shipReticle)
+  }
+
+  /**
    * Maintains a minimum apparent screen size for the shuttle model so it
    * remains visible as a navigation marker when the camera is pulled far back.
    *
@@ -1106,6 +1191,31 @@ export class MapViewController implements Tickable {
       Math.min(1, MAP_SHUTTLE_SCALE_LERP * dt),
     )
     this.shuttleController.group.scale.setScalar(this.currentShuttleScale)
+
+    // ── Tactical reticle ──────────────────────────────────────────────────────
+    if (this.shipReticle) {
+      // How many times the scale has been boosted above the base value
+      const overscale = this.currentShuttleScale / MAP_SHUTTLE_SCALE
+      // Smoothly map overscale → [0, 1] opacity window
+      const t = THREE.MathUtils.clamp(
+        (overscale - MAP_RETICLE_FADE_START) / (MAP_RETICLE_FADE_END - MAP_RETICLE_FADE_START),
+        0,
+        1,
+      )
+      const reticleAlpha = t * t * (3 - 2 * t) // smoothstep
+
+      if (reticleAlpha > 0.005) {
+        this.shipReticle.visible = true
+        // Pin world position to the shuttle every frame
+        this.shipReticle.position.copy(this.shuttleController.group.position)
+        // Constant apparent screen size: grow proportionally with camera distance
+        const reticleWorld = MAP_RETICLE_APPARENT_SIZE * 2 * dist * Math.tan(halfFovRad)
+        this.shipReticle.scale.setScalar(reticleWorld)
+        ;(this.shipReticle.material as THREE.SpriteMaterial).opacity = reticleAlpha
+      } else {
+        this.shipReticle.visible = false
+      }
+    }
   }
 
   /** Reset shuttle after death — clear death state, place into Earth orbit. */
@@ -1745,6 +1855,12 @@ export class MapViewController implements Tickable {
   dispose(): void {
     DevConsole.unregister('MapView')
     this.ambientSpace?.dispose()
+    if (this.shipReticle) {
+      ;(this.shipReticle.material as THREE.SpriteMaterial).map?.dispose()
+      this.shipReticle.material.dispose()
+      this.sceneObjects?.scene.remove(this.shipReticle)
+      this.shipReticle = null
+    }
     this.hideOrbitRing()
     this.gameLoop?.stop()
 

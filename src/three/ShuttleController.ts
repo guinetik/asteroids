@@ -37,10 +37,42 @@ export interface ShuttlePhysicsConfig {
   yawMaxSpeed: number
   /** Angular velocity damping per frame (0–1) */
   yawDamping: number
-  /** Speed cap from player thrust alone */
+  /**
+   * Reference speed for slingshot decay / protection — not a hard cap while thrusting.
+   */
   maxThrustSpeed: number
   /** Absolute speed cap (gravity can exceed thrust cap up to this) */
   maxGravitySpeed: number
+  /**
+   * Main-engine thrust multiplier when velocity is perpendicular to the nose on the XZ plane
+   * (or backward) — penalizes turn-and-burn. Near-stationary uses max multiplier instead.
+   */
+  thrustAlignMinMultiplier: number
+  /**
+   * Main-engine thrust multiplier when velocity aligns with nose forward (drift angle 0).
+   * Values above 1 give a small on-heading boost.
+   */
+  thrustAlignMaxMultiplier: number
+  /**
+   * RCS lateral multiplier when planar velocity is perpendicular to the push direction
+   * (no sideways drift along that jet). Strafe-yaw is weaker; fighting or aiding sideways
+   * motion is stronger.
+   */
+  rcsAlignMinMultiplier: number
+  /**
+   * RCS lateral multiplier when planar velocity is parallel to the active RCS push axis
+   * (|velocitŷ · pushDir| → 1).
+   */
+  rcsAlignMaxMultiplier: number
+  /**
+   * Per-second rate at which speed **above** the cruise equilibrium decays exponentially
+   * toward it (preserves heading). Set to 0 to disable. Skipped under slingshot speed protection.
+   */
+  speedExcessReturnRate: number
+  /**
+   * Cruise speed maneuvering bleeds back toward. Defaults to {@link maxThrustSpeed} when omitted.
+   */
+  speedReturnEquilibriumSpeed?: number
 }
 
 /** Default physics for the shuttle scene. */
@@ -53,6 +85,11 @@ const SPAWN_MIN_RADIUS = 400
 const SPAWN_MAX_RADIUS = 1500
 const DEATH_PULL_ACCELERATION = 30 // accelerates as it falls in
 const DEATH_MAX_PULL_SPEED = 120
+
+/**
+ * Below this planar speed we treat velocity as undefined for thrust alignment (full max multiplier).
+ */
+const SHUTTLE_VELOCITY_ALIGN_EPSILON = 1e-4
 
 const SHUTTLE_MODEL_PATH = '/models/shuttle.glb'
 const DRACO_DECODER_PATH = '/node_modules/three/examples/jsm/libs/draco/'
@@ -547,23 +584,49 @@ export class ShuttleController implements Tickable, PortalVehicle {
     // Apply angular velocity
     this.group.rotateY(this.angularVelocity * dt)
 
-    // RCS lateral push — gas thrusters nudge velocity sideways
+    // RCS lateral push — scaled by how much planar velocity lies along the jet (|v̂·pushDir|)
     const right = new THREE.Vector3(0, 0, 1).applyQuaternion(this.group.quaternion)
     right.y = 0
     right.normalize()
+    const applyRcsAlongRight = (pushSign: number): void => {
+      let mult = p.rcsAlignMaxMultiplier
+      const vxr = this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z
+      if (vxr > SHUTTLE_VELOCITY_ALIGN_EPSILON * SHUTTLE_VELOCITY_ALIGN_EPSILON) {
+        const spd = Math.sqrt(vxr)
+        const along = (pushSign * this.velocity.dot(right)) / spd
+        const alongAbs = Math.min(1, Math.abs(along))
+        mult = THREE.MathUtils.lerp(
+          p.rcsAlignMinMultiplier,
+          p.rcsAlignMaxMultiplier,
+          alongAbs,
+        )
+      }
+      this.velocity.addScaledVector(right, pushSign * p.yawLateralForce * mult * dt)
+    }
     if (this.isYawingLeft) {
-      this.velocity.addScaledVector(right, -p.yawLateralForce * dt)
+      applyRcsAlongRight(-1)
     }
     if (this.isYawingRight) {
-      this.velocity.addScaledVector(right, p.yawLateralForce * dt)
+      applyRcsAlongRight(1)
     }
 
-    // Thrust (W) — accelerate along forward on XZ plane (nose is +X after rotation)
+    // Thrust (W) — vector acceleration along nose; efficiency scales with velocity vs nose alignment
     const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(this.group.quaternion)
-    forward.y = 0 // flatten to XZ plane
+    forward.y = 0
     forward.normalize()
     if (this.isThrusting) {
-      this.velocity.addScaledVector(forward, p.thrustForce * dt)
+      const speedSq = this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z
+      let thrustMultiplier = p.thrustAlignMaxMultiplier
+      if (speedSq > SHUTTLE_VELOCITY_ALIGN_EPSILON * SHUTTLE_VELOCITY_ALIGN_EPSILON) {
+        const speed = Math.sqrt(speedSq)
+        const forwardAlign = Math.max(0, Math.min(1, this.velocity.dot(forward) / speed))
+        thrustMultiplier = THREE.MathUtils.lerp(
+          p.thrustAlignMinMultiplier,
+          p.thrustAlignMaxMultiplier,
+          forwardAlign,
+        )
+      }
+      this.velocity.addScaledVector(forward, p.thrustForce * thrustMultiplier * dt)
     }
 
     // Brake (S) — inertia dampener, weaker deeper in gravity wells
@@ -612,17 +675,31 @@ export class ShuttleController implements Tickable, PortalVehicle {
       this._slingshotSpeed -= excess * orbitConfig.slingshotDecayRate * dt
     }
 
-    // Clamp thrust-only speed, but allow gravity and slingshot to push beyond
-    const currentSpeed = this.velocity.length()
     if (this.isBraking) {
       // Braking cancels slingshot protection
       this._slingshotSpeed = 0
     }
-    if (this._slingshotSpeed > p.maxThrustSpeed && currentSpeed <= this._slingshotSpeed) {
-      // Slingshot protection — don't clamp
-    } else if (this.isThrusting && currentSpeed > p.maxThrustSpeed) {
-      this.velocity.setLength(p.maxThrustSpeed)
-    } else if (currentSpeed > p.maxGravitySpeed) {
+
+    const currentSpeed = this.velocity.length()
+    const slingshotProtected =
+      this._slingshotSpeed > p.maxThrustSpeed && currentSpeed <= this._slingshotSpeed
+
+    const cruiseEquilibrium =
+      p.speedReturnEquilibriumSpeed === undefined
+        ? p.maxThrustSpeed
+        : p.speedReturnEquilibriumSpeed
+
+    // Bleed maneuver / thrust overshoot back toward cruise without snapping heading
+    if (!slingshotProtected && p.speedExcessReturnRate > 0 && cruiseEquilibrium >= 0) {
+      const spd = this.velocity.length()
+      if (spd > cruiseEquilibrium + SHUTTLE_VELOCITY_ALIGN_EPSILON) {
+        const excess = spd - cruiseEquilibrium
+        const newSpd = cruiseEquilibrium + excess * Math.exp(-p.speedExcessReturnRate * dt)
+        this.velocity.multiplyScalar(newSpd / spd)
+      }
+    }
+
+    if (!slingshotProtected && this.velocity.length() > p.maxGravitySpeed) {
       this.velocity.setLength(p.maxGravitySpeed)
     }
 
