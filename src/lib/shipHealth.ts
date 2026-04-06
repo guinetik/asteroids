@@ -158,9 +158,15 @@ export class ShipHealth {
       this._hp = Math.max(0, this._hp - totalDamage)
     }
 
-    // Damage intensity for vignette (normalized 0–1 by max possible DPS)
-    const maxDps = (this.config.maxTempDamage + this.config.maxRadiationDamage)
-    this._lastDamageIntensity = maxDps > 0 ? Math.min(1, (totalDamage / dt) / maxDps) : 0
+    // Damage intensity for vignette — starts at displayThreshold, maxes at 100
+    const absTemp2 = Math.abs(this._temperature)
+    const tempIntensity = absTemp2 > this.config.displayThreshold
+      ? (absTemp2 - this.config.displayThreshold) / (MAX_TEMPERATURE - this.config.displayThreshold)
+      : 0
+    const radIntensity = radiationProximity > this.config.radiationThreshold
+      ? (radiationProximity - this.config.radiationThreshold) / (1 - this.config.radiationThreshold)
+      : 0
+    this._lastDamageIntensity = Math.min(1, Math.max(tempIntensity, radIntensity))
 
     // Healing — only when no damage is occurring
     if (healing && totalDamage === 0) {
