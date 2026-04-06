@@ -5,6 +5,16 @@
  * Add project-wide custom classes here — keep .vue files free of rogue CSS.
  */
 
+@theme {
+  --font-sans: 'Datatype', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Datatype', ui-monospace, monospace;
+}
+
+html,
+body {
+  font-family: 'Datatype', ui-sans-serif, system-ui, sans-serif;
+}
+
 .scene-container {
   @apply w-screen h-screen overflow-hidden;
 }

@@ -131,7 +131,7 @@ onUnmounted(() => {
   pointer-events: none;
 }
 .exit-prompt__text {
-  font-family: monospace;
+  font-family: 'Datatype', ui-monospace, monospace;
   font-size: 1.1rem;
   color: rgba(255, 255, 255, 0.8);
   letter-spacing: 0.15em;
@@ -157,7 +157,7 @@ onUnmounted(() => {
   pointer-events: none;
 }
 .death-message__text {
-  font-family: monospace;
+  font-family: 'Datatype', ui-monospace, monospace;
   font-size: 3rem;
   color: #ef4444;
   letter-spacing: 0.3em;
