@@ -37,6 +37,9 @@ import playerConfigJson from '@/data/fps/player-config.json'
 import multiToolConfigJson from '@/data/fps/multitool-config.json'
 import { EnemyDirector } from '@/lib/fps/enemyDirector'
 import { BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/BacteriophageController'
+import { EnemyProjectileSystem } from '@/lib/fps/enemyProjectileSystem'
+import { SpireController, SPIRE_HIT_CENTER_Y } from '@/three/SpireController'
+import { EnemyProjectileMesh } from '@/three/EnemyProjectileMesh'
 
 const AMBIENT_LIGHT_INTENSITY = 0.4
 const DIR_LIGHT_INTENSITY = 1.2
@@ -50,6 +53,9 @@ const ENEMY_MIN_SPAWN_DISTANCE = 20
 const DAMAGE_FLASH_DURATION = 0.3
 const DAMAGE_FLINCH_STRENGTH = 80
 const CONTACT_KNOCKBACK = 12
+const SPIRE_SPAWN_COUNT = 4
+const SPIRE_SPAWN_RADIUS = 100
+const SPIRE_MIN_SPAWN_DISTANCE = 40
 
 const TEST_SURFACE: SurfaceFeatures = {
   craterDensity: 0.5,
@@ -83,6 +89,9 @@ export class FpsViewController implements Tickable {
   private readonly targetDummies: TargetDummyController[] = []
   private enemyDirector: EnemyDirector | null = null
   private readonly enemyControllers = new Map<number, BacteriophageController>()
+  private enemyProjectileSystem: EnemyProjectileSystem | null = null
+  private readonly spireControllers = new Map<number, SpireController>()
+  private readonly enemyProjectileMeshes = new Map<number, EnemyProjectileMesh>()
   private leftMouseDown = false
   private leftMouseJustPressed = false
   private rightMouseDown = false
@@ -240,6 +249,55 @@ export class FpsViewController implements Tickable {
       }
       this.tickHandler.register(this.enemyDirector, TICK_PRIORITY_PHYSICS + 4)
 
+      // Enemy projectile system
+      this.enemyProjectileSystem = new EnemyProjectileSystem()
+      this.tickHandler.register(this.enemyProjectileSystem, TICK_PRIORITY_PHYSICS + 5)
+
+      this.enemyProjectileSystem.onPlayerHit = (damage, sourceX, sourceZ) => {
+        this.playerController?.takeDamage(damage)
+        this.damageFlashTimer = DAMAGE_FLASH_DURATION
+        const pp = this.playerController!.group.position
+        // Knockback away from projectile source
+        const dx = pp.x - sourceX
+        const dz = pp.z - sourceZ
+        const dist = Math.sqrt(dx * dx + dz * dz)
+        if (dist > 0.01) {
+          this.playerController!.applyLateralImpulse(
+            (dx / dist) * CONTACT_KNOCKBACK,
+            (dz / dist) * CONTACT_KNOCKBACK,
+          )
+        }
+        // Directional indicator
+        if (this.fpsCamera) {
+          this.fpsCamera.applyMouseDelta(
+            (Math.random() - 0.5) * DAMAGE_FLINCH_STRENGTH,
+            -Math.random() * DAMAGE_FLINCH_STRENGTH,
+          )
+          const worldAngle = Math.atan2(sourceX - pp.x, sourceZ - pp.z)
+          const relAngle = worldAngle - this.fpsCamera.yaw
+          this.onDamageDirection?.(relAngle)
+        }
+      }
+
+      // Visual mesh lifecycle for enemy projectiles
+      this.enemyProjectileSystem.onProjectileMove = (id, x, y, z) => {
+        let mesh = this.enemyProjectileMeshes.get(id)
+        if (!mesh) {
+          mesh = new EnemyProjectileMesh()
+          this.sceneManager!.addToScene(mesh.group)
+          this.enemyProjectileMeshes.set(id, mesh)
+        }
+        mesh.setPosition(x, y, z)
+      }
+
+      this.enemyProjectileSystem.onProjectileRemoved = (id) => {
+        const mesh = this.enemyProjectileMeshes.get(id)
+        if (mesh) {
+          mesh.dispose()
+          this.enemyProjectileMeshes.delete(id)
+        }
+      }
+
       for (let i = 0; i < ENEMY_SPAWN_COUNT; i++) {
         const angle = (i / ENEMY_SPAWN_COUNT) * Math.PI * 2
         const radius = ENEMY_MIN_SPAWN_DISTANCE + Math.random() * (ENEMY_SPAWN_RADIUS - ENEMY_MIN_SPAWN_DISTANCE)
@@ -271,6 +329,33 @@ export class FpsViewController implements Tickable {
             break
           }
         }
+        // Check spire controllers
+        for (const [, ctrl] of this.spireControllers) {
+          if (ctrl.enemy === enemy) {
+            ctrl.flash()
+            if (!enemy.alive) {
+              this.projectileSystem!.removeEnemy(enemy)
+            }
+            break
+          }
+        }
+      }
+
+      // Spawn spires
+      for (let i = 0; i < SPIRE_SPAWN_COUNT; i++) {
+        const angle = (i / SPIRE_SPAWN_COUNT) * Math.PI * 2 + Math.PI / 4
+        const radius = SPIRE_MIN_SPAWN_DISTANCE + Math.random() * (SPIRE_SPAWN_RADIUS - SPIRE_MIN_SPAWN_DISTANCE)
+        const x = Math.cos(angle) * radius
+        const z = Math.sin(angle) * radius
+        const groundY = heightmap.heightAt(x, z)
+
+        const handle = this.enemyDirector.spawn('spire', x, groundY, z)
+        const controller = new SpireController(handle.enemy)
+        controller.group.position.set(x, groundY + handle.config.floatHeight, z)
+        this.sceneManager.addToScene(controller.group)
+        this.projectileSystem!.addEnemy(handle.enemy)
+        this.tickHandler.register(controller, TICK_PRIORITY_ANIMATION)
+        this.spireControllers.set(handle.id, controller)
       }
     }
 
@@ -390,6 +475,63 @@ export class FpsViewController implements Tickable {
           ctrl.group.rotation.y = Math.atan2(dir.x, dir.z)
         }
       }
+
+      // Spire sync
+      for (const handle of this.enemyDirector.enemies) {
+        const ctrl = this.spireControllers.get(handle.id)
+        if (!ctrl) continue
+
+        // Clean up dead spires
+        if (ctrl.deathComplete) {
+          this.tickHandler!.unregister(ctrl)
+          this.spireControllers.delete(handle.id)
+          this.enemyDirector!.despawn(handle)
+          continue
+        }
+
+        if (!handle.enemy.alive) continue
+
+        ctrl.isMoving = handle.lastOutput.isMoving
+        ctrl.isAgitated = handle.lastOutput.isAgitated
+
+        // Sync position — floats above terrain
+        ctrl.group.position.x = handle.enemy.position.x
+        ctrl.group.position.z = handle.enemy.position.z
+        const groundY = this.heightmap?.heightAt(
+          handle.enemy.position.x,
+          handle.enemy.position.z,
+        ) ?? 0
+        ctrl.group.position.y = groundY + handle.config.floatHeight
+        handle.enemy.position.y = groundY + handle.config.floatHeight + SPIRE_HIT_CENTER_Y
+
+        // Face player
+        if (handle.lastOutput.isChasing) {
+          const dx = pp.x - handle.enemy.position.x
+          const dz = pp.z - handle.enemy.position.z
+          ctrl.group.rotation.y = Math.atan2(dx, dz)
+        }
+
+        // Fire projectile
+        if (handle.lastOutput.wantsToFire && this.enemyProjectileSystem) {
+          const ep = handle.enemy.position
+          const dx = pp.x - ep.x
+          const dy = pp.y - ep.y
+          const dz = pp.z - ep.z
+          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
+          if (dist > 0.01) {
+            this.enemyProjectileSystem.spawn(
+              ep.x, ep.y, ep.z,
+              dx / dist, dy / dist, dz / dist,
+              handle.config.projectileSpeed,
+              handle.config.projectileDamage,
+            )
+            ctrl.fireFlash(pp.x, pp.z)
+          }
+        }
+      }
+
+      // Feed player position to enemy projectile system
+      this.enemyProjectileSystem?.setPlayerPosition(pp.x, pp.y, pp.z)
     }
 
     // --- Damage flash decay ---
@@ -481,6 +623,11 @@ export class FpsViewController implements Tickable {
   dispose(): void {
     this.gameLoop?.stop()
     for (const dummy of this.targetDummies) dummy.dispose()
+    for (const ctrl of this.spireControllers.values()) ctrl.dispose()
+    this.spireControllers.clear()
+    for (const mesh of this.enemyProjectileMeshes.values()) mesh.dispose()
+    this.enemyProjectileMeshes.clear()
+    this.enemyProjectileSystem?.dispose()
     for (const ctrl of this.enemyControllers.values()) ctrl.dispose()
     this.enemyControllers.clear()
     this.enemyDirector?.despawnAll()
