@@ -147,6 +147,8 @@ const missionOverlayCanFit = ref(false)
 const missionBoard = ref<ShuttleMissionBoard | null>(null)
 const missionNotification = ref<string | null>(null)
 let missionNotificationTimer: ReturnType<typeof setTimeout> | null = null
+const missionApproachVisible = ref(false)
+const missionApproachName = ref('')
 
 function showMissionNotification(text: string): void {
   missionNotification.value = text
@@ -255,6 +257,15 @@ onMounted(async () => {
         showMissionNotification(`Mission complete — +${mission.template.reward} CR`)
       }
     }
+    viewController.onMissionApproach = (visible, missionName) => {
+      missionApproachVisible.value = visible
+      missionApproachName.value = missionName
+    }
+    viewController.onBeginAsteroidMission = () => {
+      import('@/router').then((mod) => {
+        mod.default.push('/level')
+      })
+    }
     await viewController.init(container.value)
     refreshActiveMessage()
   }
@@ -344,6 +355,10 @@ function closeMissionOverlay() {
 
 function handleAcceptMission() {
   viewController.missionAccept()
+}
+
+function handleAcceptAsteroidMission() {
+  viewController.asteroidMissionAccept()
 }
 
 function handleDeliverMission(missionId: string) {
@@ -462,6 +477,7 @@ function dockedPlanetId(): string | null {
     @open-shop="openShopFromTerminal"
     @accept-mission="handleAcceptMission"
     @deliver-mission="handleDeliverMission"
+    @accept-asteroid-mission="handleAcceptAsteroidMission"
   />
   <CreditsBadge
     v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
@@ -469,6 +485,10 @@ function dockedPlanetId(): string | null {
   />
   <div v-if="missionNotification" class="mission-notification">
     {{ missionNotification }}
+  </div>
+  <div v-if="missionApproachVisible" class="mission-approach-prompt">
+    <span class="mission-approach-prompt__name">{{ missionApproachName }}</span>
+    <span class="mission-approach-prompt__action">E  Begin Mission</span>
   </div>
   <PlanetShopDialog
     v-if="shopDialogVisible && shopSession"
