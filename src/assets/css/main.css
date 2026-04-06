@@ -175,7 +175,7 @@
 /* --- Map Overlay --- */
 
 .map-overlay {
-  @apply absolute inset-0 pointer-events-none z-10;
+  @apply absolute inset-0 pointer-events-none z-10 overflow-hidden;
 }
 
 .map-body-indicator {
