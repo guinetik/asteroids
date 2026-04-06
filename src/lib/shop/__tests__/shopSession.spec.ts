@@ -4,10 +4,8 @@ import {
   tickShopSession,
   buyTradeGood,
   sellTradeGood,
-  REFUEL_COST,
-  RESERVE_FUEL_COST,
 } from '../shopSession'
-import { createProfile, addCredits } from '@/lib/player/profile'
+import { createProfile } from '@/lib/player/profile'
 import { createInventory, addItem } from '@/lib/inventory/inventory'
 import { resetDemand } from '../planetDemand'
 // Side-effect: register trade goods into item catalog

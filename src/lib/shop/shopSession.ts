@@ -8,7 +8,7 @@
  * @date 2026-04-06
  * @spec docs/superpowers/specs/2026-04-06-planet-shop-system-design.md
  */
-import type { ShopSession, TradeGoodSlot, RestockTimer } from './tradeTypes'
+import type { ShopSession, TradeGoodSlot } from './tradeTypes'
 import type { PlayerProfile } from '@/lib/player/types'
 import type { Inventory } from '@/lib/inventory/types'
 import type { ShopResult } from './types'

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buyItem, sellItem } from '../shop'
-import { createProfile, addCredits, spendCredits as spendCreditsFromProfile } from '@/lib/player/profile'
+import { createProfile, spendCredits as spendCreditsFromProfile } from '@/lib/player/profile'
 import { createInventory, addItem } from '@/lib/inventory/inventory'
 
 describe('buyItem', () => {

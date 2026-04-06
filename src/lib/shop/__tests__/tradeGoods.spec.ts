@@ -11,20 +11,20 @@ describe('TRADE_GOODS', () => {
   it('every planet has exactly 5 goods', () => {
     for (const planetId of PLANET_IDS) {
       const goods = getTradeGoodsByPlanet(planetId)
-      expect(goods.length, `${planetId} should have 5 goods`).toBe(5)
+      expect(goods.length).toBe(5)
     }
   })
 
   it('all trade goods have positive base prices', () => {
     for (const tg of Object.values(TRADE_GOODS)) {
-      expect(tg.basePrice, `${tg.id} basePrice`).toBeGreaterThan(0)
+      expect(tg.basePrice).toBeGreaterThan(0)
     }
   })
 
   it('all trade goods are registered in the item catalog', () => {
     for (const tg of Object.values(TRADE_GOODS)) {
       const item = getItemDefinition(tg.id)
-      expect(item, `${tg.id} should be in item catalog`).toBeDefined()
+      expect(item).toBeDefined()
       expect(item!.category).toBe('trade-good')
       expect(item!.sellable).toBe(true)
     }
