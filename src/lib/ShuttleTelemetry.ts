@@ -124,4 +124,6 @@ export interface MapOverlayState {
   gravityRings: MapGravityRing[]
   /** Persistent run-long world line in screen space */
   trajectoryPoints: MapTrajectoryPoint[]
+  /** Mission waypoint projected to screen, if an active asteroid mission exists. */
+  missionWaypoint: { screenX: number; screenY: number; name: string; distance: string } | null
 }
