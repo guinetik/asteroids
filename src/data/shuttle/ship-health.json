@@ -1,0 +1,12 @@
+{
+  "maxHp": 100,
+  "healRate": 10,
+  "hotBoundary": 40,
+  "coldBoundary": 350,
+  "tempDriftRate": 8,
+  "damageThreshold": 60,
+  "maxTempDamage": 5,
+  "radiationThreshold": 0.3,
+  "maxRadiationDamage": 15,
+  "displayThreshold": 20
+}
