@@ -1701,9 +1701,6 @@ export class MapViewController implements Tickable {
     const halfTank = this.shuttleController.thrusterSystem.fuelCapacity * 0.5
     this.shuttleController.thrusterSystem.addFuel(halfTank)
     this.emitFuelCellCount()
-    if (this.shopSession) {
-      this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
-    }
   }
 
   /**
