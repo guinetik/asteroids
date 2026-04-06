@@ -49,6 +49,7 @@ import type { GravitySource } from '@/lib/physics/gravity'
 import { ShuttleController, MAP_PHYSICS } from '@/three/ShuttleController'
 import mapGravityData from '@/data/shuttle/map-gravity.json'
 import { ThrusterEffectController } from '@/three/ThrusterEffectController'
+import { ParticleEmitter } from '@/three/ParticleEmitter'
 import {
   VehicleCamera,
   MAP_CAMERA_CONFIG,
@@ -330,6 +331,7 @@ export class MapViewController implements Tickable {
   private gravityPass: ShaderPass | null = null
   private adriftTimer = 0
   private shipHealth: ShipHealth | null = null
+  private explosionEmitter: ParticleEmitter | null = null
   private mapState = new MapState()
   private mapIntro = new MapIntroState()
   private mapCamera: MapCamera | null = null
@@ -548,16 +550,13 @@ export class MapViewController implements Tickable {
     }
 
     this.shuttleController.onDeath = () => {
-      this.vehicleCamera?.setConfig(MAP_DEATH_CAMERA_CONFIG)
-      this.onDeathOverlay?.(true, 'Crashed Into The Sun')
+      this.triggerDeath('Crashed Into The Sun')
     }
 
     // Ship health — temperature + radiation damage
     this.shipHealth = new ShipHealth(shipHealthData as ShipHealthConfig)
     this.shipHealth.onDeath = (cause) => {
-      this.vehicleCamera?.setConfig(MAP_DEATH_CAMERA_CONFIG)
-      this.onDeathOverlay?.(true, cause)
-      this.shuttleController?.freeze()
+      this.triggerDeath(cause)
     }
 
     await this.shuttleController.load()
@@ -593,6 +592,18 @@ export class MapViewController implements Tickable {
     scene.add(this.thrusterController.brakePoints)
     scene.add(this.thrusterController.rcsPoints)
     this.tickHandler.register(this.thrusterController, TICK_PRIORITY_ANIMATION)
+
+    // Explosion particle emitter — shared for all death types
+    this.explosionEmitter = new ParticleEmitter({
+      poolSize: 200,
+      color: new THREE.Color(0xff6622),
+      size: Math.max(1, 6 * MAP_SHUTTLE_SCALE),
+      lifetime: 1.5,
+      spread: 8 * MAP_SHUTTLE_SCALE,
+      opacity: 0.9,
+    })
+    scene.add(this.explosionEmitter.points)
+    this.tickHandler.register(this.explosionEmitter, TICK_PRIORITY_ANIMATION)
 
     // --- Ambient space (dust, rocks, gas clouds, comets) ---
     this.ambientSpace = new AmbientSpaceController(scene)
@@ -939,7 +950,9 @@ export class MapViewController implements Tickable {
       if (state === 'orbiting') {
         if (eHeld) {
           this.slingshotCharge = Math.min(1, this.slingshotCharge + dt / SLINGSHOT_CHARGE_TIME)
-          this.vehicleCamera?.setConfig(buildSlingshotChargeCameraConfig(this.slingshotCharge))
+          this.vehicleCamera?.applyConfigTuning(
+            buildSlingshotChargeCameraConfig(this.slingshotCharge),
+          )
           this.updateLaunchArrow()
         } else if (this.slingshotCharge > 0) {
           const trajectoryBlocked = this.isAimingAtPlanet()
@@ -1144,9 +1157,7 @@ export class MapViewController implements Tickable {
       if (orbitState === 'free' && !hasFuel) {
         this.adriftTimer += dt
         if (this.adriftTimer >= ADRIFT_TIMEOUT) {
-          this.vehicleCamera?.setConfig(MAP_DEATH_CAMERA_CONFIG)
-          this.onDeathOverlay?.(true, 'Adrift')
-          this.shuttleController.freeze()
+          this.triggerDeath('Adrift')
         }
       } else {
         this.adriftTimer = 0
@@ -1189,9 +1200,7 @@ export class MapViewController implements Tickable {
           const dist = Math.sqrt(dx * dx + dz * dz)
           const collisionRadius = PLANETS[i]!.displayRadius * SIZE_SCALE
           if (dist < collisionRadius) {
-            this.vehicleCamera?.setConfig(MAP_DEATH_CAMERA_CONFIG)
-            this.onDeathOverlay?.(true, `Crashed Into ${PLANETS[i]!.name}`)
-            this.shuttleController.freeze()
+            this.triggerDeath(`Crashed Into ${PLANETS[i]!.name}`)
             return
           }
         }
@@ -1654,11 +1663,38 @@ export class MapViewController implements Tickable {
   }
 
   /** Reset shuttle after death — clear death state, place into Earth orbit. */
+  /** Unified death handler — explode ship, zoom camera, show overlay. */
+  private triggerDeath(cause: string): void {
+    if (!this.shuttleController) return
+
+    // Explosion burst at shuttle position
+    if (this.explosionEmitter) {
+      const pos = this.shuttleController.position.clone()
+      for (let i = 0; i < 150; i++) {
+        const dir = new THREE.Vector3(
+          (Math.random() - 0.5) * 2,
+          Math.random() * 1.5,
+          (Math.random() - 0.5) * 2,
+        ).multiplyScalar(MAP_SHUTTLE_SCALE * 3)
+        this.explosionEmitter.emit(pos, dir)
+      }
+    }
+
+    // Hide shuttle mesh
+    this.shuttleController.group.visible = false
+    this.shuttleController.freeze()
+
+    // Camera + overlay
+    this.vehicleCamera?.setConfig(MAP_DEATH_CAMERA_CONFIG)
+    this.onDeathOverlay?.(true, cause)
+  }
+
   private respawnAtEarth(): void {
     if (!this.shuttleController || !this.orbitSystem) return
 
-    // Clear death state
+    // Clear death state + show shuttle again
     this.shuttleController.resetDeath()
+    this.shuttleController.group.visible = true
     this.shuttleController.freeze()
     this.shuttleController.setInputEnabled(false)
 
