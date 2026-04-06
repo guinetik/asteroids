@@ -37,10 +37,10 @@ describe('buildSlingshotChargeCameraConfig', () => {
     const config = buildSlingshotChargeCameraConfig(0.5)
 
     expect(config.idleOffset.x).toBeCloseTo(-0.7, 5)
-    expect(config.idleOffset.y).toBeCloseTo(5.35, 5)
+    expect(config.idleOffset.y).toBeCloseTo(3.35, 5)
     expect(config.idleOffset.z).toBeCloseTo(0, 5)
-    expect(config.fov).toBeCloseTo(54, 5)
-    expect(config.maxDistance).toBeCloseTo(9, 5)
+    expect(config.fov).toBeCloseTo(49, 5)
+    expect(config.maxDistance).toBeCloseTo(7.5, 5)
   })
 
   it('clamps charge outside the valid range', () => {
