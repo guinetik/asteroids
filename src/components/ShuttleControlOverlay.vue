@@ -2,6 +2,7 @@
 import type { Component } from 'vue'
 import { computed, ref } from 'vue'
 import type { InventoryStack } from '@/lib/inventory/types'
+import type { ShuttleMissionBoard } from '@/lib/missions/types'
 import ShuttleControlProgramInventory from './shuttle-control/ShuttleControlProgramInventory.vue'
 import ShuttleControlProgramMissions from './shuttle-control/ShuttleControlProgramMissions.vue'
 import ShuttleControlProgramShuttle from './shuttle-control/ShuttleControlProgramShuttle.vue'
@@ -9,11 +10,15 @@ import ShuttleControlProgramShuttle from './shuttle-control/ShuttleControlProgra
 defineProps<{
   visible: boolean
   inventoryStacks?: InventoryStack[]
+  missionBoard?: ShuttleMissionBoard | null
+  dockedPlanet?: string | null
 }>()
 
 const emit = defineEmits<{
   close: []
   openShop: []
+  acceptMission: []
+  deliverMission: [missionId: string]
 }>()
 
 type ControlScreen = 'shuttle' | 'missions' | 'inventory'
@@ -93,7 +98,14 @@ function onKeydown(e: KeyboardEvent) {
 
         <!-- Right content area -->
         <div class="shuttle-control-content">
-          <component :is="activeProgram" :inventory-stacks="inventoryStacks" />
+          <component
+            :is="activeProgram"
+            :inventory-stacks="inventoryStacks"
+            :board="missionBoard"
+            :docked-planet="dockedPlanet"
+            @accept-mission="$emit('acceptMission')"
+            @deliver-mission="(id: string) => $emit('deliverMission', id)"
+          />
         </div>
       </div>
 
