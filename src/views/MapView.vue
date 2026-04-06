@@ -134,6 +134,7 @@ const shopSession = ref<ShopSession | null>(null)
 const shopProfile = ref<PlayerProfile>(createProfile('Pilot'))
 const shopInventory = ref<Inventory>(createInventory())
 const playerCredits = ref(1000)
+const fuelCellCount = ref(0)
 
 const mapOverlay = reactive<MapOverlayState>({
   visible: false,
@@ -204,6 +205,9 @@ onMounted(async () => {
     viewController.onCreditsUpdate = (credits) => {
       playerCredits.value = credits
     }
+    viewController.onFuelCellCount = (count) => {
+      fuelCellCount.value = count
+    }
     await viewController.init(container.value)
     refreshActiveMessage()
   }
@@ -258,6 +262,10 @@ function handleShopRefuel() {
 function handleShopBuyReserveFuel() {
   viewController.shopBuyReserveFuel()
 }
+
+function handleUseFuelCell() {
+  viewController.useFuelCell()
+}
 </script>
 
 <template>
@@ -270,7 +278,12 @@ function handleShopBuyReserveFuel() {
     class="map-intro-letterbox map-intro-letterbox--bottom"
     :class="{ 'map-intro-letterbox--hidden': !mapIntro.letterboxVisible }"
   />
-  <ShuttleHud v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" :telemetry="telemetry" />
+  <ShuttleHud
+    v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
+    :telemetry="telemetry"
+    :fuel-cell-count="fuelCellCount"
+    @use-fuel-cell="handleUseFuelCell"
+  />
   <OrbitPrompt
     v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
     :orbitState="orbitState"

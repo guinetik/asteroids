@@ -3,6 +3,11 @@ import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
 
 const props = defineProps<{
   telemetry: ShuttleTelemetry
+  fuelCellCount?: number
+}>()
+
+const emit = defineEmits<{
+  useFuelCell: []
 }>()
 
 function formatHeading(rad: number): string {
@@ -96,6 +101,16 @@ function tempLabelClass(): string {
         ></div>
       </div>
     </div>
+
+    <!-- Refuel button: beside fuel bar when low and have fuel cells -->
+    <button
+      v-if="(fuelCellCount ?? 0) > 0 && pct(props.telemetry.fuelLevel, props.telemetry.fuelCapacity) < 80"
+      type="button"
+      class="hud-refuel-btn"
+      @click="emit('useFuelCell')"
+    >
+      REFUEL ({{ fuelCellCount }})
+    </button>
 
     <!-- Adrift warning: under fuel bar -->
     <div v-if="props.telemetry.adriftCountdown >= 0" class="hud-adrift-warning">

@@ -102,9 +102,32 @@ import type { ShopSession } from '@/lib/shop/tradeTypes'
 import { tickDemandTimer, resetDemand } from '@/lib/shop/planetDemand'
 import { createProfile, spendCredits } from '@/lib/player/profile'
 import type { PlayerProfile } from '@/lib/player/types'
-import { createInventory, addItem } from '@/lib/inventory/inventory'
+import { createInventory, addItem, getStack, consumeItem } from '@/lib/inventory/inventory'
 import type { Inventory } from '@/lib/inventory/types'
 import '@/lib/shop/tradeGoods'
+
+type EmissiveMaterial =
+  | THREE.MeshLambertMaterial
+  | THREE.MeshPhongMaterial
+  | THREE.MeshStandardMaterial
+  | THREE.MeshPhysicalMaterial
+  | THREE.MeshToonMaterial
+
+/**
+ * Whether a material exposes emissive controls.
+ *
+ * @param material - Material attached to a shuttle mesh
+ * @returns True when the material supports emissive tinting
+ */
+function isEmissiveMaterial(material: THREE.Material): material is EmissiveMaterial {
+  return (
+    material instanceof THREE.MeshLambertMaterial ||
+    material instanceof THREE.MeshPhongMaterial ||
+    material instanceof THREE.MeshStandardMaterial ||
+    material instanceof THREE.MeshPhysicalMaterial ||
+    material instanceof THREE.MeshToonMaterial
+  )
+}
 
 /** Tick priority for the compositor (runs after animation, before render). */
 const TICK_PRIORITY_COMPOSIT = TICK_PRIORITY_RENDER - 1
@@ -429,6 +452,8 @@ export class MapViewController implements Tickable {
   onShopState: ((session: ShopSession | null, profile: PlayerProfile, inventory: Inventory) => void) | null = null
   /** Fired when credits change (for the HUD badge). */
   onCreditsUpdate: ((credits: number) => void) | null = null
+  /** Fired when fuel cell count changes (for HUD refuel button). */
+  onFuelCellCount: ((count: number) => void) | null = null
 
   async init(container: HTMLElement): Promise<void> {
     // Create canvas
@@ -1568,6 +1593,7 @@ export class MapViewController implements Tickable {
       this.playerInventory = result.inventory
       this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
       this.onCreditsUpdate?.(this.playerProfile.credits)
+      this.emitFuelCellCount()
     }
   }
 
@@ -1586,6 +1612,7 @@ export class MapViewController implements Tickable {
       this.playerInventory = result.inventory
       this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
       this.onCreditsUpdate?.(this.playerProfile.credits)
+      this.emitFuelCellCount()
     }
   }
 
@@ -1611,6 +1638,29 @@ export class MapViewController implements Tickable {
     this.playerInventory = addResult.inventory
     this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
     this.onCreditsUpdate?.(this.playerProfile.credits)
+    this.emitFuelCellCount()
+  }
+
+  /** Emit the current fuel cell count to the Vue HUD. */
+  private emitFuelCellCount(): void {
+    const stack = getStack(this.playerInventory, RESERVE_FUEL_ID)
+    this.onFuelCellCount?.(stack?.quantity ?? 0)
+  }
+
+  /** Consume a fuel cell from inventory and restore 50% fuel. */
+  useFuelCell(): void {
+    if (!this.shuttleController) return
+    const stack = getStack(this.playerInventory, RESERVE_FUEL_ID)
+    if (!stack || stack.quantity <= 0) return
+    const result = consumeItem(this.playerInventory, RESERVE_FUEL_ID, 1)
+    if (!result.ok) return
+    this.playerInventory = result.inventory
+    const halfTank = this.shuttleController.thrusterSystem.fuelCapacity * 0.5
+    this.shuttleController.thrusterSystem.addFuel(halfTank)
+    this.emitFuelCellCount()
+    if (this.shopSession) {
+      this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
+    }
   }
 
   /**
@@ -1800,10 +1850,11 @@ export class MapViewController implements Tickable {
       // Freeze effect — tint shuttle blue/icy, keep visible
       this.shuttleController.group.traverse((child) => {
         if (child instanceof THREE.Mesh && child.material) {
-          const mat = child.material as THREE.MeshStandardMaterial
-          if (mat.color) {
-            mat.emissive = new THREE.Color(0x4488ff)
-            mat.emissiveIntensity = 0.6
+          const materials = Array.isArray(child.material) ? child.material : [child.material]
+          for (const material of materials) {
+            if (!isEmissiveMaterial(material)) continue
+            material.emissive.set(0x4488ff)
+            material.emissiveIntensity = 0.6
           }
         }
       })
@@ -1850,10 +1901,11 @@ export class MapViewController implements Tickable {
     this.shuttleController.group.visible = true
     this.shuttleController.group.traverse((child) => {
       if (child instanceof THREE.Mesh && child.material) {
-        const mat = child.material as THREE.MeshStandardMaterial
-        if (mat.emissiveIntensity) {
-          mat.emissive = new THREE.Color(0x000000)
-          mat.emissiveIntensity = 0
+        const materials = Array.isArray(child.material) ? child.material : [child.material]
+        for (const material of materials) {
+          if (!isEmissiveMaterial(material) || material.emissiveIntensity <= 0) continue
+          material.emissive.set(0x000000)
+          material.emissiveIntensity = 0
         }
       }
     })

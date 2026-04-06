@@ -48,6 +48,13 @@ body {
   @apply absolute top-6 left-4 flex items-center gap-2;
 }
 
+.hud-refuel-btn {
+  @apply absolute top-5 left-44 rounded border border-amber-400/30
+         bg-amber-400/10 px-2 py-0.5 text-[10px] font-mono text-amber-300
+         hover:bg-amber-400/20 transition-colors cursor-pointer
+         pointer-events-auto;
+}
+
 .hud-adrift-warning {
   @apply absolute top-12 left-4 text-red-500 text-xs font-bold;
   text-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
