@@ -41,14 +41,10 @@ const PHASE_APPROACH_DURATION = 6.0
 const PHASE_FLIP_DURATION = 2.5
 /** Doors open, brief pause. */
 const PHASE_DOORS_DURATION = 2.5
-/** Lander detaches and drifts out. */
-const PHASE_DETACH_DURATION = 2.0
-/** Shuttle pitches back to level before departing. */
-const PHASE_UNFLIP_DURATION = 2.0
-/** Shuttle closes doors and flies away. */
-const PHASE_DEPART_DURATION = 3.0
-/** Camera transitions to follow lander. */
-const PHASE_CAMERA_TRANSITION_DURATION = 1.5
+/** Lander detaches, falls with gravity, camera follows. */
+const PHASE_DETACH_DURATION = 3.0
+/** Fade to black while lander falls. */
+const PHASE_FADEOUT_DURATION = 1.5
 
 /** Total sequence duration. */
 export const ARRIVAL_SEQUENCE_DURATION =
@@ -56,9 +52,7 @@ export const ARRIVAL_SEQUENCE_DURATION =
   PHASE_FLIP_DURATION +
   PHASE_DOORS_DURATION +
   PHASE_DETACH_DURATION +
-  PHASE_UNFLIP_DURATION +
-  PHASE_DEPART_DURATION +
-  PHASE_CAMERA_TRANSITION_DURATION
+  PHASE_FADEOUT_DURATION
 
 // ── Approach path ───────────────────────────────────────────────
 /** Shuttle starts this far from the asteroid (world units). */
@@ -70,8 +64,8 @@ const APPROACH_ALTITUDE = 400
 /** Shuttle visual scale in the level scene. */
 const SHUTTLE_LEVEL_SCALE = 1.0
 
-/** Shuttle departure acceleration (world units/sec²). */
-const SHUTTLE_DEPART_ACCELERATION = 40
+/** Lander fall gravity after detach (world units/sec²). */
+const LANDER_FALL_GRAVITY = 3.0
 
 /** Idle thruster sprite size (in raw model space, pre MODEL_SCALE). */
 const THRUSTER_SPRITE_SIZE = 140
@@ -80,7 +74,7 @@ const THRUSTER_SPRITE_SIZE = 140
 const THRUSTER_SPRITE_X_OFFSET = -34
 
 /** Timeline phase identifiers. */
-type ArrivalPhase = 'approach' | 'flip' | 'doors' | 'detach' | 'unflip' | 'depart' | 'camera-transition' | 'done'
+type ArrivalPhase = 'approach' | 'flip' | 'doors' | 'detach' | 'fadeout' | 'done'
 
 /**
  * Cinematic arrival sequence for the asteroid level.
@@ -118,22 +112,21 @@ export class ArrivalSequence {
   private landerModel: THREE.Object3D | null = null
   private landerDetached = false
   private landerWorldPos = new THREE.Vector3()
+  private landerFallSpeed = 0
   private readonly thrusterSprites: THREE.Sprite[] = []
   private thrusterElapsed = 0
+  /** The detached lander group in scene space (for falling animation). */
+  private fallingLander: THREE.Object3D | null = null
 
   // Shuttle flight state
   private shuttleStartPos = new THREE.Vector3()
   private shuttleEndPos = new THREE.Vector3()
-  private departSpeed = 0
-
-  // Camera state
-  private cameraStartPos = new THREE.Vector3()
-  private cameraStartTarget = new THREE.Vector3()
-  private cameraEndPos = new THREE.Vector3()
-  private cameraEndTarget = new THREE.Vector3()
 
   /** Called when the lander detaches — passes world position for LanderController placement. */
   onLanderDetach: ((position: THREE.Vector3) => void) | null = null
+
+  /** Called each frame with fade opacity (0 = clear, 1 = black). */
+  onFadeOut: ((opacity: number) => void) | null = null
 
   /** Called when the full sequence completes. */
   onComplete: (() => void) | null = null
@@ -271,8 +264,15 @@ export class ArrivalSequence {
 
     // Thruster sprites pulse during approach and depart
     this.thrusterElapsed += dt
-    const thrustersActive = this.phase === 'approach' || this.phase === 'depart' || this.phase === 'unflip'
+    const thrustersActive = this.phase === 'approach'
     this.updateThrusterSprites(thrustersActive)
+
+    // Falling lander gravity (continues through fadeout)
+    if (this.fallingLander) {
+      this.landerFallSpeed += LANDER_FALL_GRAVITY * dt
+      this.fallingLander.position.y -= this.landerFallSpeed * dt
+      this.landerWorldPos.copy(this.fallingLander.position)
+    }
 
     switch (this.phase) {
       case 'approach':
@@ -287,20 +287,16 @@ export class ArrivalSequence {
       case 'detach':
         this.tickDetach()
         break
-      case 'unflip':
-        this.tickUnflip(dt)
-        break
-      case 'depart':
-        this.tickDepart(dt)
-        break
-      case 'camera-transition':
-        this.tickCameraTransition()
+      case 'fadeout':
+        this.tickFadeout()
         break
     }
   }
 
-  /** Remove shuttle from scene. Call after sequence completes. */
+  /** Remove shuttle and falling lander from scene. Call after sequence completes. */
   dispose(): void {
+    this.fallingLander?.removeFromParent()
+    this.fallingLander = null
     this.shuttleGroup.removeFromParent()
     this.shuttleGroup.traverse((child) => {
       if (child instanceof THREE.Mesh) {
@@ -379,76 +375,49 @@ export class ArrivalSequence {
     const t = Math.min(1, this.phaseElapsed / PHASE_DETACH_DURATION)
 
     if (!this.landerDetached && this.landerModel) {
+      // Get lander world transform before reparenting
       const worldPos = new THREE.Vector3()
       this.landerModel.getWorldPosition(worldPos)
+      const worldScale = new THREE.Vector3()
+      this.landerModel.getWorldScale(worldScale)
 
+      // Reparent lander to the scene root so it falls independently
       this.landerModel.removeFromParent()
+      this.landerModel.position.copy(worldPos)
+      this.landerModel.scale.copy(worldScale)
+      this.landerModel.rotation.set(0, 0, 0)
+      this.shuttleGroup.parent?.add(this.landerModel)
+
+      this.fallingLander = this.landerModel
       this.landerWorldPos.copy(worldPos)
       this.landerDetached = true
       this.onLanderDetach?.(worldPos)
     }
 
+    // Camera follows the falling lander
     this.camera.position.set(
-      this.landerWorldPos.x + 40,
-      this.landerWorldPos.y + 20,
-      this.landerWorldPos.z + 30,
+      this.landerWorldPos.x + 30,
+      this.landerWorldPos.y + 15,
+      this.landerWorldPos.z + 25,
     )
     this.camera.lookAt(this.landerWorldPos)
 
-    if (t >= 1) this.nextPhase('unflip')
+    if (t >= 1) this.nextPhase('fadeout')
   }
 
-  private tickUnflip(dt: number): void {
-    const t = Math.min(1, this.phaseElapsed / PHASE_UNFLIP_DURATION)
-    const eased = this.easeInOut(t)
+  private tickFadeout(): void {
+    const t = Math.min(1, this.phaseElapsed / PHASE_FADEOUT_DURATION)
 
-    // Pitch back from 180° to 0° (unflip), keeping Y at -90°
-    this.shuttleGroup.rotation.set((1 - eased) * Math.PI, -Math.PI / 2, 0, 'YXZ')
+    // Fade to black
+    this.onFadeOut?.(t)
 
-    // Close doors during unflip
-    this.doorProgress = Math.max(0, this.doorProgress - DOOR_ANIM_SPEED * dt)
-    this.updateDoorRotation()
-
-    // Camera stays watching lander area
+    // Camera continues following the falling lander
+    this.camera.position.set(
+      this.landerWorldPos.x + 30,
+      this.landerWorldPos.y + 15,
+      this.landerWorldPos.z + 25,
+    )
     this.camera.lookAt(this.landerWorldPos)
-
-    if (t >= 1) this.nextPhase('depart')
-  }
-
-  private tickDepart(dt: number): void {
-    const t = Math.min(1, this.phaseElapsed / PHASE_DEPART_DURATION)
-
-    this.doorProgress = Math.max(0, this.doorProgress - DOOR_ANIM_SPEED * dt)
-    this.updateDoorRotation()
-
-    this.departSpeed += SHUTTLE_DEPART_ACCELERATION * dt
-    const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(this.shuttleGroup.quaternion)
-    forward.normalize()
-    this.shuttleGroup.position.addScaledVector(forward, this.departSpeed * dt)
-    this.shuttleGroup.position.y += this.departSpeed * 0.3 * dt
-
-    this.camera.lookAt(this.landerWorldPos)
-
-    if (t >= 1) {
-      this.cameraStartPos.copy(this.camera.position)
-      this.cameraStartTarget.copy(this.landerWorldPos)
-      this.cameraEndPos.set(
-        this.landerWorldPos.x + 80,
-        this.landerWorldPos.y + 30,
-        this.landerWorldPos.z + 60,
-      )
-      this.cameraEndTarget.copy(this.landerWorldPos)
-      this.nextPhase('camera-transition')
-    }
-  }
-
-  private tickCameraTransition(): void {
-    const t = Math.min(1, this.phaseElapsed / PHASE_CAMERA_TRANSITION_DURATION)
-    const eased = this.easeInOut(t)
-
-    this.camera.position.lerpVectors(this.cameraStartPos, this.cameraEndPos, eased)
-    const target = new THREE.Vector3().lerpVectors(this.cameraStartTarget, this.cameraEndTarget, eased)
-    this.camera.lookAt(target)
 
     if (t >= 1) {
       this.phase = 'done'

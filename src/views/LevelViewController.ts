@@ -131,6 +131,8 @@ export class LevelViewController implements Tickable {
 
   /** Called when player dies — show death message. */
   onDeathMessage: ((visible: boolean) => void) | null = null
+  /** Arrival fade to black (0 = clear, 1 = full black). */
+  onArrivalFade: ((opacity: number) => void) | null = null
 
   /** Initialise all systems and start the game loop. */
   async init(container: HTMLElement): Promise<void> {
@@ -193,13 +195,22 @@ export class LevelViewController implements Tickable {
     this.arrivalSequence.onLanderDetach = (position) => {
       if (this.landerController) {
         this.landerController.group.position.copy(position)
-        this.landerController.group.visible = true
       }
+    }
+
+    this.arrivalSequence.onFadeOut = (opacity) => {
+      this.onArrivalFade?.(opacity)
     }
 
     this.arrivalSequence.onComplete = () => {
       this.arrivalSequence?.dispose()
       this.arrivalSequence = null
+      // Show the gameplay lander at the spawn height (it will fall with physics)
+      if (this.landerController) {
+        this.landerController.group.visible = true
+      }
+      // Clear the fade
+      this.onArrivalFade?.(0)
     }
 
     // ── FPS camera ──────────────────────────────────────────────

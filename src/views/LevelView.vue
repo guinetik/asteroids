@@ -13,6 +13,7 @@ const letterboxVisible = ref(true)
 const stateInfo = reactive({ state: '', grounded: false })
 const deathFade = ref(0)
 const deathMessage = ref(false)
+const arrivalFade = ref(0)
 
 const landerTelemetry = reactive<LanderTelemetry>({
   altitude: 0,
@@ -65,6 +66,9 @@ onMounted(async () => {
     viewController.onDeathMessage = (visible) => {
       deathMessage.value = visible
     }
+    viewController.onArrivalFade = (opacity) => {
+      arrivalFade.value = opacity
+    }
     await viewController.init(container.value)
   }
 })
@@ -92,6 +96,11 @@ onUnmounted(() => {
   >
     <span class="exit-prompt__text">EXIT (F)</span>
   </div>
+  <div
+    v-if="arrivalFade > 0"
+    class="death-fade"
+    :style="{ opacity: arrivalFade }"
+  />
   <div
     v-if="deathFade > 0"
     class="death-fade"
