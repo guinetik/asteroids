@@ -71,28 +71,28 @@ function modeColor(): string {
       <span class="text-sm tabular-nums text-white/70">{{ telemetry.speed.toFixed(1) }}</span>
     </div>
 
-    <!-- ═══ MIDDLE LEFT: O2 + Stamina (vertical stack) ═══ -->
-    <div class="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-3">
-      <!-- O2 -->
-      <div class="flex items-center gap-2">
-        <span class="text-xs tracking-widest uppercase text-white/50 w-6">O2</span>
-        <div class="w-28 h-3 bg-white/10 rounded-sm overflow-hidden">
+    <!-- ═══ MIDDLE LEFT: O2 + Stamina (vertical bars) ═══ -->
+    <div class="absolute left-6 top-1/2 -translate-y-1/2 flex gap-2 items-end">
+      <!-- O2 vertical bar -->
+      <div class="flex flex-col items-center gap-1">
+        <span class="text-[10px] text-white/40">{{ Math.ceil(telemetry.o2Level) }}</span>
+        <div class="w-3 h-28 bg-white/10 rounded-sm overflow-hidden flex flex-col-reverse">
           <div
-            class="h-full transition-all duration-100"
-            :style="{ width: pct(telemetry.o2Level, telemetry.o2Capacity) + '%', backgroundColor: o2Color() }"
+            class="w-full transition-all duration-100 rounded-sm"
+            :style="{ height: pct(telemetry.o2Level, telemetry.o2Capacity) + '%', backgroundColor: o2Color() }"
           />
         </div>
-        <span class="text-[10px] text-white/40 w-6 text-right">{{ Math.ceil(telemetry.o2Level) }}</span>
+        <span class="text-[10px] tracking-widest uppercase text-white/50">O2</span>
       </div>
-      <!-- Stamina -->
-      <div class="flex items-center gap-2">
-        <span class="text-xs tracking-widest uppercase text-white/50 w-6">STA</span>
-        <div class="w-28 h-2 bg-white/10 rounded-sm overflow-hidden">
+      <!-- Stamina vertical bar -->
+      <div class="flex flex-col items-center gap-1">
+        <div class="w-3 h-24 bg-white/10 rounded-sm overflow-hidden flex flex-col-reverse">
           <div
-            class="h-full bg-green-400/80 transition-all duration-100"
-            :style="{ width: pct(telemetry.sprintCharge, telemetry.sprintCapacity) + '%' }"
+            class="w-full bg-green-400/80 transition-all duration-100 rounded-sm"
+            :style="{ height: pct(telemetry.sprintCharge, telemetry.sprintCapacity) + '%' }"
           />
         </div>
+        <span class="text-[10px] tracking-widest uppercase text-white/50">STA</span>
       </div>
     </div>
 
