@@ -1,6 +1,10 @@
 <template>
   <div class="shuttle-control-screen">
     <h2 class="shuttle-control-screen__title">Inventory</h2>
-    <p class="shuttle-control-screen__placeholder">Inventory management program</p>
+    <InventoryTable :items="[]" mode="view" />
   </div>
 </template>
+
+<script setup lang="ts">
+import InventoryTable from '@/components/shop/InventoryTable.vue'
+</script>
