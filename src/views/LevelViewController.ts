@@ -10,6 +10,7 @@
  * @spec docs/superpowers/specs/2026-04-04-level-state-machine-design.md
  */
 import type { Tickable } from '@/lib/Tickable'
+import { DevConsole } from '@/lib/devConsole'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'
@@ -252,13 +253,11 @@ export class LevelViewController implements Tickable {
     this.enterArrival()
 
     // ── Dev tools ────────────────────────────────────────────────
-    ;(window as unknown as Record<string, unknown>).AsteroidDev = {
+    DevConsole.register('LevelView', {
       takeDamage: (amount = 10) => this.playerController?.takeDamage(amount),
-      heal: () => {
-        this.playerController?.replenish()
-      },
+      heal: () => this.playerController?.replenish(),
       kill: () => this.playerController?.takeDamage(999),
-    }
+    })
 
     // ── Start ───────────────────────────────────────────────────
     this.gameLoop = new GameLoop(this.tickHandler)
@@ -709,6 +708,7 @@ export class LevelViewController implements Tickable {
 
   /** Tear down all systems and stop the game loop. */
   dispose(): void {
+    DevConsole.unregister('LevelView')
     this.gameLoop?.stop()
     this.teardownPointerLock()
     this.projectileSystem?.dispose()

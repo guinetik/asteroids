@@ -8,6 +8,7 @@
  */
 import type { Tickable } from '@/lib/Tickable'
 import type { FpsTelemetry } from '@/components/FpsHud.vue'
+import { DevConsole } from '@/lib/devConsole'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'
@@ -377,6 +378,13 @@ export class FpsViewController implements Tickable {
     // Pointer lock
     this.setupPointerLock()
 
+    // --- Dev tools ---
+    DevConsole.register('FpsView', {
+      takeDamage: (amount = 10) => this.playerController?.takeDamage(amount),
+      heal: () => this.playerController?.replenish(),
+      kill: () => this.playerController?.takeDamage(999),
+    })
+
     // Start
     this.gameLoop = new GameLoop(this.tickHandler)
     this.gameLoop.start()
@@ -636,6 +644,7 @@ export class FpsViewController implements Tickable {
   }
 
   dispose(): void {
+    DevConsole.unregister('FpsView')
     this.gameLoop?.stop()
     for (const dummy of this.targetDummies) dummy.dispose()
     for (const ctrl of this.spireControllers.values()) ctrl.dispose()
