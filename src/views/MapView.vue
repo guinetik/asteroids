@@ -216,7 +216,7 @@ onMounted(async () => {
     viewController.onFuelCellCount = (count) => {
       fuelCellCount.value = count
     }
-    viewController.onMissionButton = (visible, _planetName) => {
+    viewController.onMissionButton = (visible) => {
       missionButtonVisible.value = visible
     }
     viewController.onMissionOverlay = (visible, mission, canFit) => {
