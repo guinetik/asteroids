@@ -4,6 +4,12 @@ import type { OrbitHudState } from '@/lib/orbitCapture'
 
 const props = defineProps<{
   orbitState: OrbitHudState
+  shopAvailable?: boolean
+  shopPlanet?: string
+}>()
+
+const emit = defineEmits<{
+  openShop: []
 }>()
 
 const visible = computed(() => {
@@ -55,5 +61,13 @@ const details = computed(() => {
     <div v-if="isCharging" class="orbit-prompt-bar">
       <div class="orbit-prompt-bar-fill" :style="{ width: (props.orbitState.chargeLevel * 100) + '%' }"></div>
     </div>
+    <button
+      v-if="shopAvailable && orbitState.state === 'orbiting'"
+      type="button"
+      class="orbit-prompt-shop-btn"
+      @click="emit('openShop')"
+    >
+      B  Shop
+    </button>
   </div>
 </template>

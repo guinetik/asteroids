@@ -11,7 +11,6 @@ import DamageVignette from '@/components/DamageVignette.vue'
 import MapOverlay from '@/components/MapOverlay.vue'
 import ShipMessageDialog from '@/components/ShipMessageDialog.vue'
 import ShuttleControlOverlay from '@/components/ShuttleControlOverlay.vue'
-import ShopButton from '@/components/shop/ShopButton.vue'
 import PlanetShopDialog from '@/components/shop/PlanetShopDialog.vue'
 import CreditsBadge from '@/components/hud/CreditsBadge.vue'
 import type { ShopSession } from '@/lib/shop/tradeTypes'
@@ -274,7 +273,12 @@ function handleShopBuyReserveFuel() {
     :class="{ 'map-intro-letterbox--hidden': !mapIntro.letterboxVisible }"
   />
   <ShuttleHud v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" :telemetry="telemetry" />
-  <OrbitPrompt v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" :orbitState="orbitState" />
+  <OrbitPrompt
+    v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
+    :orbitState="orbitState"
+    :shop-available="shopButtonVisible && !shopDialogVisible && !shuttleControlVisible"
+    @open-shop="openShop"
+  />
   <GravityWarning v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" :warning="gravityWarning" />
   <GravitationalAnomalyHud
     v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
@@ -350,11 +354,6 @@ function handleShopBuyReserveFuel() {
   <CreditsBadge
     v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
     :credits="playerCredits"
-  />
-  <ShopButton
-    v-if="shopButtonVisible && !shopDialogVisible && !shuttleControlVisible && !habitatActive"
-    :planet-name="shopButtonPlanet"
-    @open="openShop"
   />
   <PlanetShopDialog
     v-if="shopDialogVisible && shopSession"
