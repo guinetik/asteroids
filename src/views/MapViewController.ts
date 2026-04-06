@@ -73,7 +73,7 @@ const MAP_SHUTTLE_SCALE = 0.01
 const SPAWN_OFFSET_BEHIND_EARTH = 7.5
 
 /** Max Y displacement from spacetime curvature (±). */
-const CURVATURE_Y_MAX = 50
+const CURVATURE_Y_MAX = 250
 
 /** How much grid slope affects shuttle speed (multiplier on slope value). */
 const CURVATURE_SPEED_FACTOR = 0.3
