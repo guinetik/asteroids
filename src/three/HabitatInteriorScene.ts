@@ -46,7 +46,7 @@ const FLOOR_Y = 0
 /** Player movement speed (world units per second). */
 const MOVE_SPEED = 6
 /** Minimum distance between player centre and cylinder wall. */
-const COLLISION_MARGIN = 0.5
+const COLLISION_MARGIN = 1.5
 /** Distance within which the player can interact with the table. */
 const INTERACT_DISTANCE = 2.5
 
@@ -59,11 +59,11 @@ const HABITAT_PITCH_CLAMP = Math.PI / 3
 /** Vertical field of view for the FPS camera (degrees). */
 const HABITAT_FOV = 70
 /** Intensity of the warm point light inside the habitat. */
-const INTERIOR_LIGHT_INTENSITY = 1.5
+const INTERIOR_LIGHT_INTENSITY = 1.0
 /** Maximum range of the interior point light (world units). */
-const INTERIOR_LIGHT_RANGE = 20
+const INTERIOR_LIGHT_RANGE = 25
 /** Intensity of the ambient fill light. */
-const AMBIENT_INTENSITY = 0.4
+const AMBIENT_INTENSITY = 0.6
 /** Intensity of the exterior directional rim light. */
 const EXTERIOR_LIGHT_INTENSITY = 0.3
 /** How far inside the cylinder radius the girder rings sit. */
@@ -73,7 +73,7 @@ const STAR_POINT_SIZE = 0.8
 /** Floor width as a multiple of the cylinder radius. */
 const FLOOR_WIDTH_FACTOR = 1.8
 /** Distance between the table and the cylinder end-cap (world units). */
-const TABLE_WALL_INSET = 2
+const TABLE_WALL_INSET = 5
 
 /** FPS camera configuration for the habitat interior. */
 const HABITAT_CAMERA_CONFIG: FpsCameraConfig = {
@@ -132,7 +132,7 @@ export class HabitatInteriorScene {
   private loaded = false
 
   /** Cached spawn for {@link getSpawnPosition}. */
-  private spawnYaw = Math.PI
+  private spawnYaw = 0
 
   constructor() {
     this.scene = new THREE.Scene()
@@ -197,7 +197,7 @@ export class HabitatInteriorScene {
     // Scale so the longest dimension ≈ 2 world units
     const BED_TARGET_SIZE = 2
     bedModel.scale.setScalar(BED_TARGET_SIZE / bedMaxDim)
-    bedModel.rotation.set(Math.PI / 2, 0, 0)
+    bedModel.rotation.y = Math.PI // face toward the base
 
     // Re-centre after scale + rotation
     bedBox.setFromObject(bedModel)
@@ -215,9 +215,9 @@ export class HabitatInteriorScene {
     const tableBox = new THREE.Box3().setFromObject(tableModel)
     const tableSize = tableBox.getSize(new THREE.Vector3())
     const tableMaxDim = Math.max(tableSize.x, tableSize.y, tableSize.z)
-    const TABLE_TARGET_SIZE = 2
+    const TABLE_TARGET_SIZE = 3.5
     tableModel.scale.setScalar(TABLE_TARGET_SIZE / tableMaxDim)
-    tableModel.rotation.set(Math.PI / 2, Math.PI, 0)
+    tableModel.rotation.set(Math.PI, 0, Math.PI) // X flips front, Z flips upright
 
     // Re-centre after scale + rotation
     tableBox.setFromObject(tableModel)
@@ -232,6 +232,18 @@ export class HabitatInteriorScene {
     tableBox.setFromObject(tableModel)
     const tableMin = tableBox.min.y
     tableModel.position.y -= tableMin - FLOOR_Y
+
+    // Tame the emissive LEDs on the table model
+    tableModel.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.material) {
+        const mats = Array.isArray(child.material) ? child.material : [child.material]
+        for (const mat of mats) {
+          if (mat instanceof THREE.MeshStandardMaterial && mat.emissiveIntensity > 0) {
+            mat.emissiveIntensity = Math.min(mat.emissiveIntensity, 0.7)
+          }
+        }
+      }
+    })
 
     this.scene.add(tableModel)
 
@@ -272,16 +284,13 @@ export class HabitatInteriorScene {
   // Private builders
   // -------------------------------------------------------------------------
 
-  /** Build the glass cylinder shell, end-cap, and girder wireframe. */
+  /** Build the cylinder shell: glass top half, metallic bottom half, end-caps, and girders. */
   private buildCylinder(): void {
-    // Glass shell — open-ended, axis along Z after PI/2 X rotation
+    // Top half — transparent glass canopy
     const glassGeo = new THREE.CylinderGeometry(
-      CYLINDER_RADIUS,
-      CYLINDER_RADIUS,
-      CYLINDER_LENGTH,
-      CYLINDER_RADIAL_SEGMENTS,
-      1,
-      true,
+      CYLINDER_RADIUS, CYLINDER_RADIUS, CYLINDER_LENGTH,
+      CYLINDER_RADIAL_SEGMENTS, 1, true,
+      Math.PI / 2, Math.PI,
     )
     const glassMat = new THREE.MeshPhysicalMaterial({
       color: GLASS_COLOR,
@@ -293,10 +302,26 @@ export class HabitatInteriorScene {
       depthWrite: false,
     })
     const glass = new THREE.Mesh(glassGeo, glassMat)
-    // Rotate so the cylinder axis runs along Z; lift centre to y = CYLINDER_RADIUS
     glass.rotation.x = Math.PI / 2
     glass.position.y = CYLINDER_RADIUS
     this.scene.add(glass)
+
+    // Bottom half — opaque metallic hull
+    const hullGeo = new THREE.CylinderGeometry(
+      CYLINDER_RADIUS, CYLINDER_RADIUS, CYLINDER_LENGTH,
+      CYLINDER_RADIAL_SEGMENTS, 1, true,
+      -Math.PI / 2, Math.PI,
+    )
+    const hullMat = new THREE.MeshStandardMaterial({
+      color: 0xcccccc,
+      metalness: 0.5,
+      roughness: 0.3,
+      side: THREE.DoubleSide,
+    })
+    const hull = new THREE.Mesh(hullGeo, hullMat)
+    hull.rotation.x = Math.PI / 2
+    hull.position.y = CYLINDER_RADIUS
+    this.scene.add(hull)
 
     // End-cap (back wall at negative Z)
     const capGeo = new THREE.CircleGeometry(CYLINDER_RADIUS, CYLINDER_RADIAL_SEGMENTS)
@@ -306,11 +331,16 @@ export class HabitatInteriorScene {
       roughness: 0.4,
       side: THREE.DoubleSide,
     })
-    const cap = new THREE.Mesh(capGeo, capMat)
-    cap.position.set(0, CYLINDER_RADIUS, -CYLINDER_LENGTH / 2)
-    // Face outward along Z
-    cap.rotation.y = Math.PI
-    this.scene.add(cap)
+    // Back cap (tank side, -Z)
+    const capBack = new THREE.Mesh(capGeo, capMat)
+    capBack.position.set(0, CYLINDER_RADIUS, -CYLINDER_LENGTH / 2)
+    this.scene.add(capBack)
+
+    // Front cap (cockpit side, +Z)
+    const capFront = new THREE.Mesh(capGeo.clone(), capMat.clone())
+    capFront.position.set(0, CYLINDER_RADIUS, CYLINDER_LENGTH / 2)
+    capFront.rotation.y = Math.PI
+    this.scene.add(capFront)
 
     this.buildGirders()
   }
@@ -357,31 +387,38 @@ export class HabitatInteriorScene {
     this.scene.add(girder)
   }
 
-  /** Set up interior lighting: warm point, ambient fill, directional rim. */
+  /** Set up interior lighting: warm point near bed, ambient fill, cool rim from cockpit end. */
   private buildLighting(): void {
+    // Main light — centered over the bed area (+Z side)
     const point = new THREE.PointLight(0xffeedd, INTERIOR_LIGHT_INTENSITY, INTERIOR_LIGHT_RANGE)
-    point.position.set(0, CYLINDER_RADIUS * 1.5, 0)
+    point.position.set(0, CYLINDER_RADIUS * 1.5, CYLINDER_LENGTH / 6)
     this.scene.add(point)
 
     const ambient = new THREE.AmbientLight(0x334466, AMBIENT_INTENSITY)
     this.scene.add(ambient)
 
+    // Cool rim from the cockpit end — away from the table
     const directional = new THREE.DirectionalLight(0x6688cc, EXTERIOR_LIGHT_INTENSITY)
-    directional.position.set(0, CYLINDER_RADIUS * 2, -CYLINDER_LENGTH / 4)
+    directional.position.set(0, CYLINDER_RADIUS * 2, CYLINDER_LENGTH / 2)
     this.scene.add(directional)
   }
 
-  /** Scatter 2000 stars on a large sphere around the scene. */
+  /** Scatter stars on a large sphere, rejecting any that fall inside the cylinder. */
   private buildStarfield(): void {
-    const positions = new Float32Array(STAR_COUNT * 3)
+    const verts: number[] = []
+    const minDist = CYLINDER_RADIUS * 3
     for (let i = 0; i < STAR_COUNT; i++) {
-      // Uniform sphere surface sampling
       const theta = Math.random() * Math.PI * 2
       const phi = Math.acos(2 * Math.random() - 1)
-      positions[i * 3] = STAR_SPHERE_RADIUS * Math.sin(phi) * Math.cos(theta)
-      positions[i * 3 + 1] = CYLINDER_RADIUS + STAR_SPHERE_RADIUS * Math.cos(phi)
-      positions[i * 3 + 2] = STAR_SPHERE_RADIUS * Math.sin(phi) * Math.sin(theta)
+      const x = STAR_SPHERE_RADIUS * Math.sin(phi) * Math.cos(theta)
+      const y = CYLINDER_RADIUS + STAR_SPHERE_RADIUS * Math.cos(phi)
+      const z = STAR_SPHERE_RADIUS * Math.sin(phi) * Math.sin(theta)
+      // Skip stars too close to the cylinder center
+      const distXY = Math.sqrt(x * x + (y - CYLINDER_RADIUS) * (y - CYLINDER_RADIUS))
+      if (distXY < minDist && Math.abs(z) < CYLINDER_LENGTH) continue
+      verts.push(x, y, z)
     }
+    const positions = new Float32Array(verts)
     const starGeo = new THREE.BufferGeometry()
     starGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
     const starMat = new THREE.PointsMaterial({

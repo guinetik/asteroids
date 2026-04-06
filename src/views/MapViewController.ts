@@ -339,6 +339,8 @@ export class MapViewController implements Tickable {
   onShuttleControl: ((visible: boolean) => void) | null = null
   /** Fired when the habitat interaction prompt changes. */
   onHabitatPrompt: ((prompt: string | null) => void) | null = null
+  /** Fired with fade opacity (0 = clear, 1 = black) during habitat transitions. */
+  onHabitatFade: ((opacity: number) => void) | null = null
 
   async init(container: HTMLElement): Promise<void> {
     // Create canvas
@@ -664,7 +666,7 @@ export class MapViewController implements Tickable {
     this.syncVehicleCameraShipYawCoupling()
 
     // Map toggle (M key) — opens/closes tactical map
-    if (!introLocked && this.inputManager?.wasActionPressed('toggleMap')) {
+    if (!introLocked && !this.habitatState.isActive && this.inputManager?.wasActionPressed('toggleMap')) {
       if (!this.mapState.isOpen) {
         // Guard: block during death or orbit approach
         const orbitState = this.orbitSystem?.state ?? 'free'
@@ -703,7 +705,7 @@ export class MapViewController implements Tickable {
 
     // Habitat state machine
     if (this.habitatState.isActive) {
-      const wasTrans = this.habitatState.phase === 'transitioning_in'
+      const prevPhase = this.habitatState.phase
       this.habitatState.tick(dt)
 
       // Lazy-load scene on first entry
@@ -713,8 +715,8 @@ export class MapViewController implements Tickable {
 
       this.tickHabitatTransition()
 
-      // Detect transitioning_in → habitat (entry complete)
-      if (wasTrans && this.habitatState.phase === 'habitat') {
+      // Detect waking_up → habitat (wake-up complete, give player control)
+      if (prevPhase === 'waking_up' && this.habitatState.phase === 'habitat') {
         this.onEnterHabitat()
       }
 
@@ -732,6 +734,9 @@ export class MapViewController implements Tickable {
           this.habitatState.leave()
         }
       }
+
+      // Emit fade overlay state
+      this.onHabitatFade?.(this.getHabitatFadeOpacity())
 
       // Skip map gameplay while in habitat
       if (this.habitatState.phase !== 'map') return
@@ -2084,25 +2089,74 @@ export class MapViewController implements Tickable {
 
     const renderPass = this.sceneObjects.composer.passes[0] as RenderPass
 
-    if (
-      this.habitatState.phase === 'transitioning_in' ||
-      this.habitatState.phase === 'habitat' ||
-      this.habitatState.phase === 'transitioning_out'
-    ) {
-      // Swap to habitat scene for all active phases
-      ;(renderPass as { scene: THREE.Scene }).scene = this.habitatScene.getScene()
-      renderPass.camera = this.habitatScene.getCamera()
-      // Disable vehicle camera controls during habitat
+    const phase = this.habitatState.phase
+    if (phase === 'transitioning_in') {
+      // During fade-out, keep rendering the map scene — the fade overlay covers it
       if (this.vehicleCamera) {
         this.vehicleCamera.controls.enabled = false
       }
+    } else if (phase === 'waking_up' || phase === 'habitat' || phase === 'transitioning_out') {
+      // Swap to habitat scene
+      ;(renderPass as { scene: THREE.Scene }).scene = this.habitatScene.getScene()
+      renderPass.camera = this.habitatScene.getCamera()
+      if (this.vehicleCamera) {
+        this.vehicleCamera.controls.enabled = false
+      }
+
+      // During waking_up: animate camera from lying on bed (looking up) to standing
+      if (phase === 'waking_up') {
+        const t = easeInOut(this.habitatState.progress)
+        const cam = this.habitatScene.fpsCamera
+        const spawn = this.habitatScene.getSpawnPosition()
+        // Keep yaw locked toward the table during wake-up
+        cam.yaw = spawn.yaw
+        // Start pitch looking straight up (-PI/2), lerp to 0 (level)
+        const START_PITCH = -Math.PI / 2
+        cam.pitch = START_PITCH * (1 - t)
+        // Eye height rises from floor to standing
+        const lyingHeight = 0.5
+        const standingHeight = spawn.position.y
+        cam.camera.position.y = lyingHeight + (standingHeight - lyingHeight) * t
+        // Manually update camera quaternion so the animation renders correctly
+        cam.tick(0)
+      }
     }
+  }
+
+  /** Compute the fade overlay opacity based on habitat state. */
+  private getHabitatFadeOpacity(): number {
+    const phase = this.habitatState.phase
+    const p = this.habitatState.progress
+    if (phase === 'transitioning_in') {
+      // Fade to black as we transition in
+      return easeInOut(p)
+    }
+    if (phase === 'waking_up') {
+      // Fade from black as we wake up (first 40% of wake-up)
+      const fadeProgress = Math.min(1, p / 0.4)
+      return 1 - easeInOut(fadeProgress)
+    }
+    if (phase === 'transitioning_out') {
+      // Fade to black, then clear
+      if (p > 0.5) {
+        // First half: fade to black
+        return easeInOut((1 - p) / 0.5)
+      }
+      // Second half: fade from black (back to map)
+      return easeInOut(p / 0.5)
+    }
+    return 0
   }
 
   private onEnterHabitat(): void {
     this.onHabitatActive?.(true)
     // Request pointer lock for FPS mouse look
-    this.sceneObjects?.renderer.domElement.requestPointerLock()
+    const el = this.sceneObjects?.renderer.domElement
+    if (el) {
+      el.requestPointerLock()
+      // Re-acquire pointer lock on click (e.g. after alt-tab)
+      el.addEventListener('click', this.onHabitatClick)
+    }
   }
 
   private onExitHabitat(): void {
@@ -2122,9 +2176,18 @@ export class MapViewController implements Tickable {
       this.inspectMode = false
     }
 
+    this.sceneObjects?.renderer.domElement.removeEventListener('click', this.onHabitatClick)
     document.exitPointerLock()
+    this.onShuttleControl?.(false)
     this.onHabitatActive?.(false)
     this.onHabitatPrompt?.(null)
+  }
+
+  /** Re-acquire pointer lock after losing it (e.g. alt-tab). */
+  private onHabitatClick = (): void => {
+    if (this.habitatState.phase !== 'habitat') return
+    if (document.pointerLockElement) return
+    this.sceneObjects?.renderer.domElement.requestPointerLock()
   }
 
   /** Feed mouse deltas to the habitat FPS camera when pointer is locked. */
@@ -2136,6 +2199,7 @@ export class MapViewController implements Tickable {
 
   dispose(): void {
     document.removeEventListener('mousemove', this.onHabitatMouseMove)
+    this.sceneObjects?.renderer.domElement.removeEventListener('click', this.onHabitatClick)
     this.habitatScene?.dispose()
     this.habitatScene = null
     DevConsole.unregister('MapView')

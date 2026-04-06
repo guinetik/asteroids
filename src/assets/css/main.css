@@ -453,3 +453,81 @@ body {
          rounded-lg border border-cyan-400/25 bg-slate-950/80 px-4 py-2
          font-mono text-sm uppercase tracking-widest text-cyan-200/80;
 }
+
+.habitat-fade {
+  @apply pointer-events-none fixed inset-0 z-50 bg-black;
+}
+
+/* Shuttle Control Terminal */
+.shuttle-control-overlay {
+  @apply fixed inset-0 z-40 flex items-center justify-center
+         bg-slate-950/55 px-6 py-8 backdrop-blur-sm;
+}
+
+.shuttle-control-card {
+  @apply flex w-full max-w-5xl flex-col overflow-hidden rounded-2xl
+         border border-cyan-400/25 bg-slate-950/95 text-slate-100 shadow-2xl;
+  max-height: 80vh;
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.08),
+              0 30px 80px rgba(2, 6, 23, 0.7);
+}
+
+.shuttle-control-chrome {
+  @apply flex items-center justify-between border-b border-white/10
+         bg-white/5 px-5 py-3 font-mono text-[11px] uppercase
+         tracking-[0.28em] text-cyan-200/80;
+}
+
+.shuttle-control-header {
+  @apply flex gap-6 px-5 py-2 font-mono text-[10px] uppercase
+         tracking-[0.2em] text-slate-400;
+}
+
+.shuttle-control-header__item {
+  @apply flex gap-1.5;
+}
+
+.shuttle-control-header__value {
+  @apply text-cyan-300/70;
+}
+
+.shuttle-control-divider {
+  @apply h-px bg-white/10;
+}
+
+.shuttle-control-body {
+  @apply flex flex-1 overflow-hidden;
+}
+
+.shuttle-control-sidebar {
+  @apply flex w-44 flex-col gap-1 border-r border-white/10 bg-white/3 p-3;
+}
+
+.shuttle-control-nav-btn {
+  @apply w-full rounded-lg px-3 py-2 text-left font-mono text-xs uppercase
+         tracking-[0.2em] text-slate-400 transition-colors;
+}
+
+.shuttle-control-nav-btn:hover {
+  @apply bg-white/5 text-slate-200;
+}
+
+.shuttle-control-nav-btn--active {
+  @apply border border-cyan-400/20 bg-cyan-400/10 text-cyan-200;
+}
+
+.shuttle-control-content {
+  @apply flex-1 overflow-y-auto p-6;
+}
+
+.shuttle-control-screen__title {
+  @apply mb-3 font-mono text-sm uppercase tracking-[0.28em] text-cyan-200/80;
+}
+
+.shuttle-control-screen__placeholder {
+  @apply text-sm text-slate-500;
+}
+
+.shuttle-control-footer {
+  @apply flex items-center border-t border-white/10 px-5 py-3;
+}

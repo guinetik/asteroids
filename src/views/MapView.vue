@@ -96,6 +96,7 @@ const gravityWarning = reactive<GravityWarningState>({
 const habitatActive = ref(false)
 const shuttleControlVisible = ref(false)
 const habitatPrompt = ref<string | null>(null)
+const habitatFadeOpacity = ref(0)
 const deathVisible = ref(false)
 const deathCause = ref('')
 const orbitsVisible = ref(true)
@@ -146,6 +147,9 @@ onMounted(async () => {
     viewController.onHabitatPrompt = (prompt) => {
       habitatPrompt.value = prompt
     }
+    viewController.onHabitatFade = (opacity) => {
+      habitatFadeOpacity.value = opacity
+    }
     await viewController.init(container.value)
     refreshActiveMessage()
   }
@@ -188,11 +192,11 @@ function handleToggleAmbient() {
     class="map-intro-letterbox map-intro-letterbox--bottom"
     :class="{ 'map-intro-letterbox--hidden': !mapIntro.letterboxVisible }"
   />
-  <ShuttleHud v-show="!mapOverlay.visible && !mapIntro.controlsLocked" :telemetry="telemetry" />
-  <OrbitPrompt v-show="!mapOverlay.visible && !mapIntro.controlsLocked" :orbitState="orbitState" />
-  <GravityWarning v-show="!mapOverlay.visible && !mapIntro.controlsLocked" :warning="gravityWarning" />
+  <ShuttleHud v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" :telemetry="telemetry" />
+  <OrbitPrompt v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" :orbitState="orbitState" />
+  <GravityWarning v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" :warning="gravityWarning" />
   <DeathOverlay
-    v-show="!mapOverlay.visible && !mapIntro.controlsLocked"
+    v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
     :visible="deathVisible"
     :cause="deathCause"
     @restart="handleRestart"
@@ -260,4 +264,9 @@ function handleToggleAmbient() {
   <div v-if="habitatActive && habitatPrompt && !shuttleControlVisible" class="habitat-prompt">
     <span class="orbit-prompt-action">{{ habitatPrompt }}</span>
   </div>
+  <div
+    v-if="habitatFadeOpacity > 0"
+    class="habitat-fade"
+    :style="{ opacity: habitatFadeOpacity }"
+  />
 </template>
