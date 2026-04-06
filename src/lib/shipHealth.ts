@@ -94,8 +94,17 @@ export class ShipHealth {
    * @param sunDistance - Distance from the Sun in world units
    * @param radiationProximity - Gravity proximity to Sun (0–1)
    * @param healing - Whether the ship is healing (e.g. Earth orbit)
+   * @param heatResistance - Multiplier on hot-zone drift rate (0–1, lower = more resistant)
+   * @param heatArmor - Multiplier on heat damage (0–1, lower = less damage)
    */
-  tick(dt: number, sunDistance: number, radiationProximity: number, healing = false): void {
+  tick(
+    dt: number,
+    sunDistance: number,
+    radiationProximity: number,
+    healing = false,
+    heatResistance = 1,
+    heatArmor = 1,
+  ): void {
     if (this._dead) return
 
     // Temperature drift toward zone target — stronger the deeper in the zone
@@ -114,7 +123,8 @@ export class ShipHealth {
     }
 
     const diff = targetTemp - this._temperature
-    const drift = Math.sign(diff) * Math.min(Math.abs(diff), this.config.tempDriftRate * driftMultiplier * dt)
+    const resistanceFactor = targetTemp > 0 ? heatResistance : 1 // only applies to hot zone
+    const drift = Math.sign(diff) * Math.min(Math.abs(diff), this.config.tempDriftRate * driftMultiplier * resistanceFactor * dt)
     this._temperature = Math.max(MIN_TEMPERATURE, Math.min(MAX_TEMPERATURE, this._temperature + drift))
 
     // Temperature damage
@@ -122,7 +132,8 @@ export class ShipHealth {
     const absTemp = Math.abs(this._temperature)
     if (absTemp > this.config.damageThreshold) {
       const ratio = (absTemp - this.config.damageThreshold) / (MAX_TEMPERATURE - this.config.damageThreshold)
-      tempDamage = ratio * this.config.maxTempDamage * dt
+      const armorFactor = this._temperature > 0 ? heatArmor : 1 // only applies to heat damage
+      tempDamage = ratio * this.config.maxTempDamage * armorFactor * dt
     }
 
     // Radiation damage

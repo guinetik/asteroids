@@ -47,6 +47,16 @@ export const UPGRADE_DEFINITIONS = {
     maxLevel: 3,
     valuesByLevel: [1, 0.75, 0.5, 0.25],
   },
+  heatShieldResistance: {
+    id: 'heatShieldResistance',
+    maxLevel: 3,
+    valuesByLevel: [1, 0.7, 0.45, 0.25],
+  },
+  heatShieldArmor: {
+    id: 'heatShieldArmor',
+    maxLevel: 3,
+    valuesByLevel: [1, 0.65, 0.35, 0.15],
+  },
 } as const satisfies Record<string, NumericUpgradeDefinition>
 
 /**
@@ -63,6 +73,8 @@ export const CURRENT_PLAYER_UPGRADE_LEVELS: UpgradeLevels = {
   shuttleBoosterEfficiencyUpgrade: 0,
   shuttleBrakeEfficiencyUpgrade: 0,
   shuttleThrustersEfficiencyUpgrade: 0,
+  heatShieldResistance: 0,
+  heatShieldArmor: 0,
 }
 
 /**

@@ -80,7 +80,7 @@ import { computeShuttleBaseFuelDrain } from '@/lib/shuttleBaseFuelDrain'
 import { ShipHealth } from '@/lib/shipHealth'
 import type { ShipHealthConfig } from '@/lib/shipHealth'
 import shipHealthData from '@/data/shuttle/ship-health.json'
-import { getCurrentShuttleThrusterEfficiencyModifiers } from '@/lib/upgrades'
+import { getCurrentShuttleThrusterEfficiencyModifiers, getCurrentUpgradeValue } from '@/lib/upgrades'
 import { HabitatState } from '@/lib/habitatState'
 import { HabitatInteriorScene } from '@/three/HabitatInteriorScene'
 
@@ -1070,7 +1070,11 @@ export class MapViewController implements Tickable {
         : 0
       const isHealingAtEarth = orbitState === 'orbiting'
         && this.orbitSystem?.target?.name === 'Earth'
-      this.shipHealth.tick(dt, sunDist, radiationProximity, isHealingAtEarth)
+      this.shipHealth.tick(
+        dt, sunDist, radiationProximity, isHealingAtEarth,
+        getCurrentUpgradeValue('heatShieldResistance'),
+        getCurrentUpgradeValue('heatShieldArmor'),
+      )
     }
 
     // Gravity proximity — VFX distortion + HUD warning
