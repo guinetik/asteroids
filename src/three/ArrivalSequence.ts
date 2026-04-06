@@ -9,13 +9,12 @@
  * @date 2026-04-06
  */
 import * as THREE from 'three'
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
-import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
+import { loadGLB } from './loadGLB'
 import { FuelTank } from './FuelTank'
 import { HabitatModule } from './HabitatModule'
 
 const SHUTTLE_MODEL_PATH = '/models/shuttle.glb'
-const DRACO_DECODER_PATH = '/node_modules/three/examples/jsm/libs/draco/'
+const LANDER_MODEL_PATH = '/models/lander.glb'
 
 /** NASA model is in centimeters. Scale to meters. */
 const MODEL_SCALE = 0.01
@@ -146,20 +145,15 @@ export class ArrivalSequence {
 
   /** Load the shuttle model and set up internal structure. */
   async load(): Promise<void> {
-    const dracoLoader = new DRACOLoader()
-    dracoLoader.setDecoderPath(DRACO_DECODER_PATH)
-    const gltfLoader = new GLTFLoader()
-    gltfLoader.setDRACOLoader(dracoLoader)
-
-    const gltf = await gltfLoader.loadAsync(SHUTTLE_MODEL_PATH)
-    gltf.scene.scale.setScalar(MODEL_SCALE)
-    gltf.scene.rotation.x = MODEL_ROTATION_X
-    this.shuttleGroup.add(gltf.scene)
+    const shuttleScene = await loadGLB(SHUTTLE_MODEL_PATH)
+    shuttleScene.scale.setScalar(MODEL_SCALE)
+    shuttleScene.rotation.x = MODEL_ROTATION_X
+    this.shuttleGroup.add(shuttleScene)
     this.shuttleGroup.scale.setScalar(SHUTTLE_LEVEL_SCALE)
 
     // Find door nodes
-    this.doorPortNode = this.findNode(gltf.scene, 'door-prt')
-    this.doorStbNode = this.findNode(gltf.scene, 'door-stb')
+    this.doorPortNode = this.findNode(shuttleScene, 'door-prt')
+    this.doorStbNode = this.findNode(shuttleScene, 'door-stb')
     if (this.doorPortNode) this.doorPortClosedRotX = this.doorPortNode.rotation.x
     if (this.doorStbNode) this.doorStbClosedRotX = this.doorStbNode.rotation.x
 
@@ -171,7 +165,7 @@ export class ArrivalSequence {
       color: 0xcc6633,
     })
     landerTank.update(1.0)
-    gltf.scene.add(landerTank.group)
+    shuttleScene.add(landerTank.group)
 
     const shuttleTank = new FuelTank({
       radius: 80,
@@ -180,7 +174,7 @@ export class ArrivalSequence {
       color: 0x999999,
     })
     shuttleTank.update(1.0)
-    gltf.scene.add(shuttleTank.group)
+    shuttleScene.add(shuttleTank.group)
 
     // Habitat module (cosmetic)
     const habitat = new HabitatModule({
@@ -189,17 +183,14 @@ export class ArrivalSequence {
       position: new THREE.Vector3(290, 0, 15),
     })
     habitat.setVisible(true)
-    gltf.scene.add(habitat.group)
+    shuttleScene.add(habitat.group)
 
     // Lander inside cargo bay
-    const landerGltf = await gltfLoader.loadAsync('/models/lander.glb')
-    this.landerModel = landerGltf.scene
+    this.landerModel = await loadGLB(LANDER_MODEL_PATH)
     this.landerModel.scale.setScalar(CARGO_LANDER_SCALE)
     this.landerModel.position.copy(CARGO_LANDER_OFFSET)
     this.landerModel.rotation.set(0, 0, -Math.PI / 2)
-    gltf.scene.add(this.landerModel)
-
-    dracoLoader.dispose()
+    shuttleScene.add(this.landerModel)
 
     // Initial camera: behind and above the shuttle
     this.camera.position.set(
