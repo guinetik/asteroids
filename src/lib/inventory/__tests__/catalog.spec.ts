@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { ITEM_CATALOG, getItemDefinition, getItemsByCategory } from '../catalog'
 import type { ItemCategory } from '../types'
 
-const VALID_CATEGORIES = new Set<ItemCategory>(['mineral', 'upgrade', 'consumable', 'equipment'])
+const VALID_CATEGORIES = new Set<ItemCategory>(['mineral', 'upgrade', 'consumable', 'equipment', 'trade-good'])
 
 describe('ITEM_CATALOG', () => {
-  it('contains 21 items', () => {
-    expect(Object.keys(ITEM_CATALOG)).toHaveLength(21)
+  it('contains 22 items', () => {
+    expect(Object.keys(ITEM_CATALOG)).toHaveLength(22)
   })
 
   it('all items have valid category', () => {
@@ -83,7 +83,7 @@ describe('getItemsByCategory', () => {
 
   it('returns only consumables for consumable category', () => {
     const consumables = getItemsByCategory('consumable')
-    expect(consumables.length).toBe(4)
+    expect(consumables.length).toBe(5)
     for (const item of consumables) {
       expect(item.category).toBe('consumable')
     }

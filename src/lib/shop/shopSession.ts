@@ -35,11 +35,17 @@ const CHEAP_THRESHOLD = 50
 /** Refuel cost in credits. */
 export const REFUEL_COST = 100
 
-/** Reserve fuel item id (existing fuel-cell). */
-export const RESERVE_FUEL_ID = 'fuel-cell'
+/** Reserve shuttle fuel item id. */
+export const RESERVE_FUEL_ID = 'shuttle-fuel-cell'
 
 /** Reserve fuel cost in credits. */
 export const RESERVE_FUEL_COST = 50
+
+/** Lander fuel item id. */
+export const LANDER_FUEL_ID = 'fuel-cell'
+
+/** Lander fuel cost in credits. */
+export const LANDER_FUEL_COST = 75
 
 /**
  * Pick 3 random trade goods from a planet's 5-item pool.

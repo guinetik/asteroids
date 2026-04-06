@@ -107,7 +107,7 @@ function tempLabelClass(): string {
       v-if="(fuelCellCount ?? 0) > 0 && pct(props.telemetry.fuelLevel, props.telemetry.fuelCapacity) < 80"
       type="button"
       class="hud-refuel-btn"
-      @click="emit('useFuelCell')"
+      @click.stop="emit('useFuelCell')"
     >
       REFUEL ({{ fuelCellCount }})
     </button>

@@ -37,7 +37,7 @@ describe('SHOP_CATALOG', () => {
 
 describe('getBuyPrice', () => {
   it('returns correct price for fuel-cell', () => {
-    expect(getBuyPrice('fuel-cell')).toBe(50)
+    expect(getBuyPrice('fuel-cell')).toBe(75)
   })
 
   it('returns undefined for unlisted item', () => {

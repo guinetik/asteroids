@@ -4,7 +4,7 @@ import type { ShopSession, TradeGoodSlot } from '@/lib/shop/tradeTypes'
 import type { PlayerProfile } from '@/lib/player/types'
 import type { Inventory } from '@/lib/inventory/types'
 import { getTradeGood } from '@/lib/shop/tradeGoods'
-import { REFUEL_COST, RESERVE_FUEL_COST } from '@/lib/shop/shopSession'
+import { REFUEL_COST, RESERVE_FUEL_COST, LANDER_FUEL_COST } from '@/lib/shop/shopSession'
 import InventoryTable from './InventoryTable.vue'
 
 const props = defineProps<{
@@ -19,6 +19,7 @@ const emit = defineEmits<{
   sellItem: [itemId: string, quantity: number]
   refuel: []
   buyReserveFuel: []
+  buyLanderFuel: []
 }>()
 
 const planetName = computed(() => {
@@ -98,12 +99,12 @@ function onKeydown(e: KeyboardEvent) {
             </button>
           </div>
 
-          <!-- Reserve fuel -->
+          <!-- Reserve shuttle fuel -->
           <div class="planet-shop-item">
-            <div class="planet-shop-item__icon-placeholder">R</div>
+            <div class="planet-shop-item__icon-placeholder">S</div>
             <div class="planet-shop-item__info">
-              <span class="planet-shop-item__name">Reserve Fuel Cell</span>
-              <span class="planet-shop-item__desc">Hydrogen fuel cell stored in cargo for later use.</span>
+              <span class="planet-shop-item__name">Shuttle Fuel Cell</span>
+              <span class="planet-shop-item__desc">Compact fusion cell. Restores half the shuttle fuel tank when consumed in flight.</span>
             </div>
             <span class="planet-shop-item__price">{{ RESERVE_FUEL_COST }} CR</span>
             <button
@@ -111,6 +112,24 @@ function onKeydown(e: KeyboardEvent) {
               class="planet-shop-item__buy-btn"
               :disabled="!canAfford(RESERVE_FUEL_COST)"
               @click="$emit('buyReserveFuel')"
+            >
+              Buy
+            </button>
+          </div>
+
+          <!-- Lander fuel -->
+          <div class="planet-shop-item">
+            <div class="planet-shop-item__icon-placeholder">L</div>
+            <div class="planet-shop-item__info">
+              <span class="planet-shop-item__name">Lander Fuel Cell</span>
+              <span class="planet-shop-item__desc">Hydrogen fuel cell for the lander's neutron thrusters. One full burn cycle per cell.</span>
+            </div>
+            <span class="planet-shop-item__price">{{ LANDER_FUEL_COST }} CR</span>
+            <button
+              type="button"
+              class="planet-shop-item__buy-btn"
+              :disabled="!canAfford(LANDER_FUEL_COST)"
+              @click="$emit('buyLanderFuel')"
             >
               Buy
             </button>

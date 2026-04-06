@@ -1,6 +1,7 @@
 {
   "listings": [
-    { "itemId": "fuel-cell", "buyPrice": 50 }
+    { "itemId": "shuttle-fuel-cell", "buyPrice": 50 },
+    { "itemId": "fuel-cell", "buyPrice": 75 }
   ],
   "sellPrices": [
     { "itemId": "olivine", "sellPrice": 3 },

@@ -97,6 +97,8 @@ import {
   REFUEL_COST,
   RESERVE_FUEL_COST,
   RESERVE_FUEL_ID,
+  LANDER_FUEL_ID,
+  LANDER_FUEL_COST,
 } from '@/lib/shop/shopSession'
 import type { ShopSession } from '@/lib/shop/tradeTypes'
 import { tickDemandTimer, resetDemand } from '@/lib/shop/planetDemand'
@@ -1639,6 +1641,19 @@ export class MapViewController implements Tickable {
     this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
     this.onCreditsUpdate?.(this.playerProfile.credits)
     this.emitFuelCellCount()
+  }
+
+  /** Buy a lander fuel cell (inventory item). */
+  shopBuyLanderFuel(): void {
+    if (!this.shopSession) return
+    const updated = spendCredits(this.playerProfile, LANDER_FUEL_COST)
+    if (!updated) return
+    const addResult = addItem(this.playerInventory, LANDER_FUEL_ID, 1)
+    if (!addResult.ok) return
+    this.playerProfile = updated
+    this.playerInventory = addResult.inventory
+    this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
+    this.onCreditsUpdate?.(this.playerProfile.credits)
   }
 
   /** Emit the current fuel cell count to the Vue HUD. */

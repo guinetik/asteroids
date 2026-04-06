@@ -10,7 +10,7 @@ describe('buyItem', () => {
     const result = buyItem(profile, inventory, 'fuel-cell', 1)
 
     expect(result.ok).toBe(true)
-    expect(result.profile.credits).toBe(950)
+    expect(result.profile.credits).toBe(925)
     expect(result.inventory.stacks).toHaveLength(1)
     expect(result.inventory.stacks[0]!.itemId).toBe('fuel-cell')
     expect(result.inventory.stacks[0]!.quantity).toBe(1)
@@ -22,7 +22,7 @@ describe('buyItem', () => {
     const result = buyItem(profile, inventory, 'fuel-cell', 3)
 
     expect(result.ok).toBe(true)
-    expect(result.profile.credits).toBe(850)
+    expect(result.profile.credits).toBe(775)
     expect(result.inventory.stacks[0]!.quantity).toBe(3)
   })
 
