@@ -418,9 +418,8 @@ export class ShuttleController implements Tickable, PortalVehicle {
   private updateDeath(dt: number): void {
     if (!this.deathTarget) return
 
-    // Pull toward the body center — accelerating
+    // Pull toward the body center in 3D — rise up out of the well toward the body
     const dir = this.deathTarget.clone().sub(this.group.position)
-    dir.y = 0
     const dist = dir.length()
 
     if (dist < 5) {
@@ -432,19 +431,11 @@ export class ShuttleController implements Tickable, PortalVehicle {
       return
     }
 
-    // Accelerate as we fall deeper
+    // Accelerate as we fall in
     this.deathSpeed = Math.min(this.deathSpeed + DEATH_PULL_ACCELERATION * dt, DEATH_MAX_PULL_SPEED)
 
     dir.normalize()
     this.group.position.addScaledVector(dir, this.deathSpeed * dt)
-
-    // Follow spacetime curvature — sinking into the well
-    if (this.spaceTimeGrid) {
-      this.group.position.y = -this.spaceTimeGrid.getDepthAt(
-        this.group.position.x,
-        this.group.position.z,
-      )
-    }
 
     // Tumble: spin on Y and tilt nose down on X
     this.group.rotateY(dt * 8)
