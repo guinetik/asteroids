@@ -11,6 +11,8 @@
  * @spec docs/superpowers/specs/2026-04-03-mission-templates-design.md
  */
 
+import type { RestockTimer } from '@/lib/shop/tradeTypes'
+
 /** The three objective types a mission can contain. */
 export type ObjectiveType = 'gather' | 'exterminate' | 'rescue'
 
@@ -93,4 +95,67 @@ export interface MissionTemplate {
   completionBonus: NumberRange
   /** Maps region to [minDifficulty, maxDifficulty] range. Determines where the asteroid spawns based on mission difficulty. */
   regionByDifficulty: Record<MissionRegion, [number, number]>
+}
+
+// ---------------------------------------------------------------------------
+// Shuttle Missions — planet-to-planet orbital tasks
+// ---------------------------------------------------------------------------
+
+/** A shuttle mission template from JSON — one entry in a planet's pool. */
+export interface ShuttleMissionTemplate {
+  /** Unique key, e.g. "earth_venus_gas_science". */
+  id: string
+  /** Display name for the mission board. */
+  name: string
+  /** Flavor text describing the mission. */
+  description: string
+  /** Planet id the player must travel to. */
+  targetPlanet: string
+  /** Number of items to gather at the target planet. */
+  gatherQuantity: number
+  /** Credits awarded on delivery. */
+  reward: number
+}
+
+/** A planet's full shuttle mission pool loaded from JSON. */
+export interface ShuttleMissionPool {
+  /** Planet id that offers these missions. */
+  planetId: string
+  /** The 3 missions in this planet's pool. */
+  missions: ShuttleMissionTemplate[]
+}
+
+/** Planet orbital config — what a planet produces when visited for a mission. */
+export interface PlanetOrbitalConfig {
+  /** Planet id. */
+  planetId: string
+  /** Item id gathered at this planet (e.g. "venusian-gas"). */
+  gatherItem: string
+  /** Minigame type (ignored until minigames are implemented). */
+  minigameType: string
+}
+
+/** Status of an active shuttle mission. */
+export type ShuttleMissionStatus = 'active' | 'ready-to-deliver'
+
+/** A mission the player has accepted and is working on. */
+export interface ActiveShuttleMission {
+  /** The original template. */
+  template: ShuttleMissionTemplate
+  /** Planet id where the mission was accepted and must be delivered. */
+  giverPlanet: string
+  /** Current mission status. */
+  status: ShuttleMissionStatus
+}
+
+/** The mission board state for the shuttle control terminal. */
+export interface ShuttleMissionBoard {
+  /** Currently offered mission at the docked planet (null if restocking or not docked). */
+  offeredMission: ShuttleMissionTemplate | null
+  /** Which planet is offering (null if not docked). */
+  offeringPlanet: string | null
+  /** Restock timer — counts down after a mission is taken. */
+  restockTimer: RestockTimer | null
+  /** All active missions the player has accepted. */
+  activeMissions: ActiveShuttleMission[]
 }
