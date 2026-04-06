@@ -304,10 +304,10 @@ export class ArrivalSequence {
     this.fallingLander?.removeFromParent()
     this.fallingLander = null
 
-    // Position shuttle above where the lander was detached
+    // Position shuttle at hover height above terrain (not relative to detach altitude)
     this.shuttleGroup.position.set(
       this.landerWorldPos.x,
-      this.landerWorldPos.y + hoverHeight,
+      hoverHeight,
       this.landerWorldPos.z,
     )
     // Stay flipped (cargo bay facing down) — lighter belly visible from below
@@ -322,10 +322,14 @@ export class ArrivalSequence {
       sprite.visible = false
     }
 
-    // Add a subtle navigation light so the shuttle is visible against the dark sky
-    const navLight = new THREE.PointLight(0x4488cc, 2, 300)
+    // Navigation lights so the shuttle is visible against the dark sky
+    const navLight = new THREE.PointLight(0x4488cc, 5, 500)
     navLight.position.set(0, -5, 0)
     this.shuttleGroup.add(navLight)
+    // Warm accent on the belly
+    const bellyLight = new THREE.PointLight(0xffeedd, 3, 400)
+    bellyLight.position.set(0, 5, 0)
+    this.shuttleGroup.add(bellyLight)
   }
 
   /** Remove shuttle and falling lander from scene entirely. */
