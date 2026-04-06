@@ -30,10 +30,10 @@ const DEFAULT_FLOOR_Y = 0
 const GAMEPLAY_GRAVITY = 3.0
 
 /**
- * Main engine thrust — intentionally weak relative to gravity.
- * You need to hold Space and build up velocity to climb.
+ * Main engine thrust — strong enough to hover and climb comfortably.
+ * TWR ~2.5 at gravity 3.0 gives responsive vertical control.
  */
-const MAIN_ENGINE_THRUST = 5.5
+const MAIN_ENGINE_THRUST = 7.5
 
 /** Lander thruster groups: main engine (red) and RCS (white) */
 export type LanderThrusterName = 'mainEngine' | 'rcs'
@@ -41,10 +41,10 @@ export type LanderThrusterName = 'mainEngine' | 'rcs'
 /** Lander thruster config — shared fuel tank */
 const LANDER_THRUSTER_CONFIG: ThrusterSystemConfig<LanderThrusterName> = {
   thrusters: {
-    mainEngine: { capacity: 80, burnRate: 32.4, rechargeRate: 8.4, fuelCostPerRecharge: 0.8 },
-    rcs: { capacity: 60, burnRate: 12, rechargeRate: 8, fuelCostPerRecharge: 0.3 },
+    mainEngine: { capacity: 100, burnRate: 24, rechargeRate: 10, fuelCostPerRecharge: 0.6 },
+    rcs: { capacity: 80, burnRate: 10, rechargeRate: 9, fuelCostPerRecharge: 0.25 },
   },
-  fuelCapacity: 400,
+  fuelCapacity: 500,
 }
 
 /** Node name for the main descent engine bell in the GLB */
