@@ -184,11 +184,23 @@ export class LevelViewController implements Tickable {
     )
     this.vehicleCamera.setTarget(this.landerController.group)
 
-    // ── Arrival camera (cinematic) ──────────────────────────────
-    const aspect = container.clientWidth / container.clientHeight
-    this.arrivalCamera = new PerspectiveCamera(
-      ARRIVAL_CAM_FOV, aspect, ARRIVAL_CAM_NEAR, ARRIVAL_CAM_FAR,
-    )
+    // ── Cinematic arrival sequence ─────────────────────────────
+    const landerSpawn = new Vector3(0, LANDER_SPAWN_HEIGHT, 0)
+    this.arrivalSequence = new ArrivalSequence(landerSpawn)
+    await this.arrivalSequence.load()
+    this.sceneManager.scene.add(this.arrivalSequence.shuttleGroup)
+
+    this.arrivalSequence.onLanderDetach = (position) => {
+      if (this.landerController) {
+        this.landerController.group.position.copy(position)
+        this.landerController.group.visible = true
+      }
+    }
+
+    this.arrivalSequence.onComplete = () => {
+      this.arrivalSequence?.dispose()
+      this.arrivalSequence = null
+    }
 
     // ── FPS camera ──────────────────────────────────────────────
     this.fpsCamera = new FpsCamera(playerConfig.camera)
@@ -297,12 +309,15 @@ export class LevelViewController implements Tickable {
   // ═══════════════════════════════════════════════════════════════
 
   private enterArrival(): void {
-    // Lander physics active (gravity pulls it down) but no player input
-    this.tickHandler!.register(this.landerController!, TICK_PRIORITY_PHYSICS)
+    // Hide the gameplay lander — the shuttle's cargo lander is visible during the cinematic
+    if (this.landerController) {
+      this.landerController.group.visible = false
+    }
 
-    // Cinematic camera
-    this.sceneManager!.setActiveCamera(this.arrivalCamera!)
-    this.updateArrivalCamera()
+    // Use the arrival sequence camera
+    if (this.arrivalSequence) {
+      this.sceneManager!.setActiveCamera(this.arrivalSequence.camera)
+    }
 
     // Disable orbit controls during arrival
     this.vehicleCamera!.controls.enabled = false
@@ -312,19 +327,13 @@ export class LevelViewController implements Tickable {
   }
 
   private exitArrival(): void {
-    // Unregister lander from tick — enterLander will re-register it
-    this.tickHandler!.unregister(this.landerController!)
+    // Show the lander for gameplay
+    if (this.landerController) {
+      this.landerController.group.visible = true
+    }
 
-    // Letterbox starts closing (CSS transition handles animation)
+    // Letterbox starts closing
     this.onLetterbox?.(false)
-  }
-
-  /** Position the arrival camera to look at the lander from a cinematic angle. */
-  private updateArrivalCamera(): void {
-    if (!this.arrivalCamera || !this.landerController) return
-    const landerPos = this.landerController.group.position
-    this.arrivalCamera.position.copy(landerPos).add(ARRIVAL_CAM_OFFSET)
-    this.arrivalCamera.lookAt(landerPos)
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -453,16 +462,16 @@ export class LevelViewController implements Tickable {
 
   /** Per-frame update — dispatches F key triggers and mode-specific logic. */
   tick(dt: number): void {
+    // Tick arrival sequence if active
+    if (this.arrivalSequence) {
+      this.arrivalSequence.tick(dt)
+    }
+
     // F key → state triggers (only one can succeed per press)
     if (this.inputManager?.wasActionPressed('interact') && this.stateMachine) {
       if (!this.stateMachine.trigger('exitVehicle')) {
         this.stateMachine.trigger('enterVehicle')
       }
-    }
-
-    // Arrival: track lander with cinematic camera
-    if (this.stateMachine?.is('arrival')) {
-      this.updateArrivalCamera()
     }
 
     // EVA: feed inputs to tool + camera
@@ -710,6 +719,7 @@ export class LevelViewController implements Tickable {
     this.multiTool?.dispose()
     this.playerController?.dispose()
     this.fpsCamera?.dispose()
+    this.arrivalSequence?.dispose()
     this.landerController?.dispose()
     this.terrainMesh?.dispose()
     this.vehicleCamera?.dispose()
