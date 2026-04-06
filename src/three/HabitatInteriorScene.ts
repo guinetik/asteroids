@@ -50,12 +50,37 @@ const COLLISION_MARGIN = 0.5
 /** Distance within which the player can interact with the table. */
 const INTERACT_DISTANCE = 2.5
 
+/** Eye height of the FPS camera above the floor (world units). */
+const HABITAT_EYE_HEIGHT = 1.7
+/** Mouse sensitivity for the FPS camera (radians per pixel). */
+const HABITAT_SENSITIVITY = 0.002
+/** Maximum up/down pitch angle of the FPS camera (radians). */
+const HABITAT_PITCH_CLAMP = Math.PI / 3
+/** Vertical field of view for the FPS camera (degrees). */
+const HABITAT_FOV = 70
+/** Intensity of the warm point light inside the habitat. */
+const INTERIOR_LIGHT_INTENSITY = 1.5
+/** Maximum range of the interior point light (world units). */
+const INTERIOR_LIGHT_RANGE = 20
+/** Intensity of the ambient fill light. */
+const AMBIENT_INTENSITY = 0.4
+/** Intensity of the exterior directional rim light. */
+const EXTERIOR_LIGHT_INTENSITY = 0.3
+/** How far inside the cylinder radius the girder rings sit. */
+const GIRDER_INSET = 0.05
+/** Render size of each star point (world units, with sizeAttenuation). */
+const STAR_POINT_SIZE = 0.8
+/** Floor width as a multiple of the cylinder radius. */
+const FLOOR_WIDTH_FACTOR = 1.8
+/** Distance between the table and the cylinder end-cap (world units). */
+const TABLE_WALL_INSET = 2
+
 /** FPS camera configuration for the habitat interior. */
 const HABITAT_CAMERA_CONFIG: FpsCameraConfig = {
-  eyeHeight: 1.7,
-  sensitivity: 0.002,
-  pitchClamp: Math.PI / 3,
-  fov: 70,
+  eyeHeight: HABITAT_EYE_HEIGHT,
+  sensitivity: HABITAT_SENSITIVITY,
+  pitchClamp: HABITAT_PITCH_CLAMP,
+  fov: HABITAT_FOV,
 }
 
 // ---------------------------------------------------------------------------
@@ -200,7 +225,7 @@ export class HabitatInteriorScene {
     tableModel.position.sub(tableCenter)
 
     // Place near the back wall (negative Z end of the cylinder)
-    const TABLE_Z = -CYLINDER_LENGTH / 2 + 2
+    const TABLE_Z = -CYLINDER_LENGTH / 2 + TABLE_WALL_INSET
     tableModel.position.z = TABLE_Z
 
     // Drop to floor
@@ -231,13 +256,14 @@ export class HabitatInteriorScene {
     this.inputManager.dispose()
     this.fpsCamera.dispose()
     this.scene.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
+      if (
+        child instanceof THREE.Mesh ||
+        child instanceof THREE.Points ||
+        child instanceof THREE.LineSegments
+      ) {
         child.geometry.dispose()
-        if (Array.isArray(child.material)) {
-          child.material.forEach((m) => m.dispose())
-        } else {
-          child.material.dispose()
-        }
+        const mats = Array.isArray(child.material) ? child.material : [child.material]
+        mats.forEach((m) => m.dispose())
       }
     })
   }
@@ -293,7 +319,7 @@ export class HabitatInteriorScene {
   private buildGirders(): void {
     const verts: number[] = []
     // Slightly inside the glass shell
-    const r = CYLINDER_RADIUS - 0.05
+    const r = CYLINDER_RADIUS - GIRDER_INSET
     const halfLen = CYLINDER_LENGTH / 2
 
     // Horizontal full-circle arcs at each height step
@@ -333,14 +359,14 @@ export class HabitatInteriorScene {
 
   /** Set up interior lighting: warm point, ambient fill, directional rim. */
   private buildLighting(): void {
-    const point = new THREE.PointLight(0xffeedd, 1.5, 20)
+    const point = new THREE.PointLight(0xffeedd, INTERIOR_LIGHT_INTENSITY, INTERIOR_LIGHT_RANGE)
     point.position.set(0, CYLINDER_RADIUS * 1.5, 0)
     this.scene.add(point)
 
-    const ambient = new THREE.AmbientLight(0x334466, 0.4)
+    const ambient = new THREE.AmbientLight(0x334466, AMBIENT_INTENSITY)
     this.scene.add(ambient)
 
-    const directional = new THREE.DirectionalLight(0x6688cc, 0.3)
+    const directional = new THREE.DirectionalLight(0x6688cc, EXTERIOR_LIGHT_INTENSITY)
     directional.position.set(0, CYLINDER_RADIUS * 2, -CYLINDER_LENGTH / 4)
     this.scene.add(directional)
   }
@@ -360,7 +386,7 @@ export class HabitatInteriorScene {
     starGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
     const starMat = new THREE.PointsMaterial({
       color: 0xffffff,
-      size: 0.8,
+      size: STAR_POINT_SIZE,
       sizeAttenuation: true,
     })
     this.scene.add(new THREE.Points(starGeo, starMat))
@@ -368,7 +394,7 @@ export class HabitatInteriorScene {
 
   /** Add a dark floor plane along the bottom of the cylinder. */
   private buildFloor(): void {
-    const floorGeo = new THREE.PlaneGeometry(CYLINDER_RADIUS * 1.8, CYLINDER_LENGTH)
+    const floorGeo = new THREE.PlaneGeometry(CYLINDER_RADIUS * FLOOR_WIDTH_FACTOR, CYLINDER_LENGTH)
     const floorMat = new THREE.MeshStandardMaterial({
       color: 0x1a2233,
       roughness: 0.9,
