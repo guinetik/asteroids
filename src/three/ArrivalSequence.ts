@@ -71,7 +71,7 @@ const LANDER_FALL_GRAVITY = 3.0
 const THRUSTER_SPRITE_SIZE = 140
 
 /** Thruster sprite X offset behind nozzle (raw model space). */
-const THRUSTER_SPRITE_X_OFFSET = -34
+const THRUSTER_SPRITE_X_OFFSET = -80
 
 /** Timeline phase identifiers. */
 type ArrivalPhase = 'approach' | 'flip' | 'doors' | 'detach' | 'fadeout' | 'done'
