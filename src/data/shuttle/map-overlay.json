@@ -1,0 +1,12 @@
+{
+  "frustumHalfSize": 2600,
+  "frustumInitialHalfSize": 50,
+  "cameraHeight": 3000,
+  "openDuration": 1.0,
+  "closeDuration": 0.5,
+  "perspectivePhaseFraction": 0.75,
+  "nearestBodyCount": 3,
+  "influenceMassThreshold": 0.00001,
+  "shipMarkerSize": 24,
+  "headingArrowScale": 80
+}
