@@ -61,8 +61,16 @@ const APPROACH_START_DISTANCE = 2000
 const APPROACH_END_DISTANCE = 60
 /** Shuttle approach altitude (Y). */
 const APPROACH_ALTITUDE = 800
-/** Shuttle visual scale in the level scene. */
-const SHUTTLE_LEVEL_SCALE = 1.0
+/** Shuttle scale during the cinematic approach (small, seen from distance). */
+const SHUTTLE_CINEMATIC_SCALE = 1.0
+
+/**
+ * Shuttle scale when parked hovering — large enough that the gameplay lander
+ * (MODEL_SCALE=5) looks like it fits inside the cargo bay.
+ * The cargo lander inside the shuttle is at CARGO_LANDER_SCALE=30 in 0.01 model space,
+ * so the shuttle needs to be ~500x its cinematic scale to match gameplay proportions.
+ */
+const SHUTTLE_PARKED_SCALE = 15
 
 /** Lander fall gravity after detach (world units/sec²). */
 const LANDER_FALL_GRAVITY = 3.0
@@ -155,7 +163,7 @@ export class ArrivalSequence {
     shuttleScene.scale.setScalar(MODEL_SCALE)
     shuttleScene.rotation.x = MODEL_ROTATION_X
     this.shuttleGroup.add(shuttleScene)
-    this.shuttleGroup.scale.setScalar(SHUTTLE_LEVEL_SCALE)
+    this.shuttleGroup.scale.setScalar(SHUTTLE_CINEMATIC_SCALE)
 
     // Find door nodes
     this.doorPortNode = this.findNode(shuttleScene, 'door-prt')
@@ -304,11 +312,14 @@ export class ArrivalSequence {
     this.fallingLander?.removeFromParent()
     this.fallingLander = null
 
-    // Position shuttle at hover height above terrain (not relative to detach altitude)
+    // Scale up to gameplay proportions (lander fits inside cargo bay)
+    this.shuttleGroup.scale.setScalar(SHUTTLE_PARKED_SCALE)
+
+    // Position directly above the original lander spawn XZ, at hover height
     this.shuttleGroup.position.set(
-      this.landerWorldPos.x,
+      this.landerSpawnTarget.x,
       hoverHeight,
-      this.landerWorldPos.z,
+      this.landerSpawnTarget.z,
     )
     // Right-side up so the lighter belly faces down toward the player
     this.shuttleGroup.rotation.set(0, -Math.PI / 2, 0)
