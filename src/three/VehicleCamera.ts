@@ -181,6 +181,23 @@ export class VehicleCamera implements Tickable {
     }
   }
 
+  /**
+   * Applies orbit/zoom/FOV tuning without resetting manual orbit-drag state.
+   *
+   * Used when a value (e.g. slingshot charge) updates every frame: a full {@link setConfig} would
+   * clear `isMouseActive` and force the chase lerp, which fights OrbitControls pitch and feels
+   * like vertical look is disabled.
+   *
+   * @param config - New tuning values; {@link idleOffset} and {@link idleTimeout} still affect
+   *   chase behavior when the player is not dragging, but ongoing drags are preserved.
+   */
+  applyConfigTuning(config: VehicleCameraConfig): void {
+    this.config = config
+    this.camera.fov = config.fov
+    this.camera.updateProjectionMatrix()
+    this.controls.maxDistance = config.maxDistance ?? Infinity
+  }
+
   tick(dt: number): void {
     if (!this.target) return
 

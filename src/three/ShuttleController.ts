@@ -15,6 +15,7 @@ import type { PortalVehicle } from './PortalArrivalSequence'
 import shuttlePhysicsData from '@/data/shuttle/shuttle-physics.json'
 import orbitConfig from '@/data/shuttle/orbit-capture.json'
 import { getSlingshotSettleSpeed } from '@/lib/slingshotBurstProfile'
+import { getSlingshotAutoAlignYaw, getVelocityHeading } from '@/lib/slingshotAutoAlign'
 import { getCurrentShuttleThrusterEfficiencyModifiers } from '@/lib/upgrades'
 
 /** Any object that can exert gravity on the shuttle */
@@ -208,6 +209,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
     this._slingshotSpeed = this._slingshotSettleDuration > 0
       ? this._slingshotBurstSpeed
       : this._slingshotFinalSpeed
+    this.angularVelocity = 0
     this._inputEnabled = this._slingshotSettleDuration <= 0
     return this._slingshotSpeed
   }
@@ -683,6 +685,20 @@ export class ShuttleController implements Tickable, PortalVehicle {
       this._slingshotSpeed = targetSpeed
       if (currentSpeed > targetSpeed && currentSpeed > 0) {
         this.velocity.setLength(targetSpeed)
+      }
+      const targetYaw = getVelocityHeading(this.velocity.x, this.velocity.z)
+      if (targetYaw !== null) {
+        const remainingAlignTime = Math.max(
+          SHUTTLE_VELOCITY_ALIGN_EPSILON,
+          this._slingshotSettleDuration - this._slingshotSettleElapsed,
+        )
+        this.group.rotation.y = getSlingshotAutoAlignYaw(
+          this.group.rotation.y,
+          targetYaw,
+          dt,
+          remainingAlignTime,
+        )
+        this.angularVelocity = 0
       }
       if (!this.slingshotBurstActive) {
         this._inputEnabled = true
