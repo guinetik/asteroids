@@ -17,7 +17,7 @@ export const ORBIT_SCALE = 0.5
 export const SIZE_SCALE = 80.0
 
 /** Default simulation speed multiplier. */
-export const DEFAULT_TIME_SCALE = 5.0
+export const DEFAULT_TIME_SCALE = 2.0
 
 /** Divisor applied to rotation speed for animation damping. */
 export const ROTATION_SPEED_DIVISOR = 20.0
