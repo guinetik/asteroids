@@ -27,7 +27,57 @@ export interface GravitySource {
   x: number
   z: number
   mass: number // in solar masses (M☉)
+  /**
+   * Multiplies Gaussian σ (well radius on the sheet) for this source only; depth at the
+   * center stays the same. Default 1. Map scene uses &gt;1 for gas giants.
+   */
+  wellWidthMultiplier?: number
 }
+
+/**
+ * Per-frame tuning for wireframe deformation (map view passes camera-derived bounds).
+ * Analytical {@link SpaceTimeGrid.getDepthAt} / {@link SpaceTimeGrid.getSlopeAt} ignore this;
+ * only the line-mesh vertex pass uses it.
+ *
+ * @author guinetik
+ * @date 2026-04-06
+ * @spec docs/superpowers/specs/2026-04-04-shuttle-scene-design.md
+ */
+export interface SpaceTimeGridVisualDeformBudget {
+  /**
+   * Multiplies the resolution-based deform interval (integer, ≥1).
+   * Use >1 when the camera is far (whole grid visible) to skip redundant work.
+   */
+  intervalScale: number
+  /**
+   * When true, only vertices inside the XZ cull rectangle (plus gravity wells) are
+   * updated each pass; outer vertices are occasionally refreshed on a slower cycle.
+   */
+  useSpatialCull: boolean
+  /** Center X of the view cull rectangle in world space. */
+  cullCenterX: number
+  /** Center Z of the view cull rectangle in world space. */
+  cullCenterZ: number
+  /** Half-width in X of the cull rectangle (before margin). */
+  cullHalfExtentX: number
+  /** Half-depth in Z of the cull rectangle (before margin). */
+  cullHalfExtentZ: number
+}
+
+/** Expands the cull box so edge lines are less likely to “detach” from the frustum. */
+const DEFORM_CULL_MARGIN = 1.22
+
+/**
+ * While spatial culling is on, run a full-grid deform every N deform passes so distant
+ * wire does not stay stale if the camera or bodies change.
+ */
+const FULL_DEFORM_REFRESH_INTERVAL = 56
+
+/** Minimum world radius around a body that always receives deform updates when culling. */
+const SOURCE_INFLUENCE_RADIUS_MIN = 55
+
+/** Multiplier on Gaussian σ (via width scale) for the always-update disk around a source. */
+const SOURCE_INFLUENCE_SIGMA_MULT = 4.25
 
 /**
  * Space-time grid on the XZ plane with gravitational well deformation.
@@ -49,7 +99,12 @@ export class SpaceTimeGrid implements Tickable {
   private readonly staticSources: GravitySource[] = []
   private time = 0
   private frameCounter = 0
-  private readonly updateInterval: number
+  /** Base deform cadence from resolution (see constructor). */
+  private readonly baseUpdateInterval: number
+  /** Integer ≥1 — set from {@link SpaceTimeGrid.setVisualDeformBudget}. */
+  private intervalScaleEffective = 1
+  private visualBudget: SpaceTimeGridVisualDeformBudget | null = null
+  private spatialCullPassCounter = 0
   private readonly gridSize: number
   private readonly gridResolution: number
   private readonly depthScale: number
@@ -70,7 +125,7 @@ export class SpaceTimeGrid implements Tickable {
     this.massExponent = massExponent
     // Deform every Nth frame. Higher resolution grids can skip more frames.
     // Gravity wells move at orbital speed so even 1fps deformation looks smooth.
-    this.updateInterval = gridResolution > 150 ? 4 : gridResolution > 100 ? 3 : 1
+    this.baseUpdateInterval = gridResolution > 150 ? 4 : gridResolution > 100 ? 3 : 1
     this.geometry = this.createGridGeometry()
     const posAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute
     this.basePositions = new Float32Array(posAttr.array as Float32Array)
@@ -97,12 +152,40 @@ export class SpaceTimeGrid implements Tickable {
     this.sources.length = 0
   }
 
+  /**
+   * Sets how aggressively the wireframe vertex pass skips work (map view).
+   * Pass `null` to restore defaults (full grid, minimum interval).
+   *
+   * @param budget - Camera-driven LOD, or `null` for shuttle / other scenes.
+   */
+  setVisualDeformBudget(budget: SpaceTimeGridVisualDeformBudget | null): void {
+    this.visualBudget = budget
+    this.intervalScaleEffective =
+      budget === null ? 1 : Math.max(1, Math.ceil(budget.intervalScale))
+  }
+
+  /**
+   * Rebuilds all line vertices immediately (e.g. grid toggled visible).
+   */
+  forceFullVisualDeform(): void {
+    this.frameCounter = 0
+    this.spatialCullPassCounter = 0
+    if (this.mesh.visible) {
+      this.deformGrid(true)
+    }
+  }
+
   tick(dt: number): void {
     this.time += dt
+    if (!this.mesh.visible) {
+      return
+    }
+
     this.frameCounter++
-    if (this.frameCounter >= this.updateInterval) {
+    const threshold = this.baseUpdateInterval * this.intervalScaleEffective
+    if (this.frameCounter >= threshold) {
       this.frameCounter = 0
-      this.deformGrid()
+      this.deformGrid(false)
     }
   }
 
@@ -128,8 +211,9 @@ export class SpaceTimeGrid implements Tickable {
         const dz = z - source.z
         const rSquared = dx * dx + dz * dz
 
+        const widthMul = source.wellWidthMultiplier ?? 1
         const massFactor = Math.sign(source.mass) * Math.pow(Math.abs(source.mass), this.massExponent)
-        const sigma = this.widthScale * massFactor
+        const sigma = this.widthScale * massFactor * widthMul
         const amplitude = this.depthScale * massFactor * pulse
 
         totalDepth += amplitude * Math.exp(-rSquared / (2 * sigma * sigma))
@@ -162,8 +246,9 @@ export class SpaceTimeGrid implements Tickable {
         const dz = z - source.z
         const rSquared = dx * dx + dz * dz
 
+        const widthMul = source.wellWidthMultiplier ?? 1
         const massFactor = Math.sign(source.mass) * Math.pow(Math.abs(source.mass), this.massExponent)
-        const sigma = this.widthScale * massFactor
+        const sigma = this.widthScale * massFactor * widthMul
         const sigmaSq = sigma * sigma
         const amplitude = this.depthScale * massFactor * pulse
         const depth = amplitude * Math.exp(-rSquared / (2 * sigmaSq))
@@ -178,21 +263,75 @@ export class SpaceTimeGrid implements Tickable {
     return gradX * dirX + gradZ * dirZ
   }
 
-  private deformGrid(): void {
+  /**
+   * @param forceAllVertices - When true, ignores spatial cull (full refresh).
+   */
+  private deformGrid(forceAllVertices: boolean): void {
+    if (!this.mesh.visible) {
+      return
+    }
+
     const posAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute
     const positions = posAttr.array as Float32Array
+
+    const budget = this.visualBudget
+    const useCull = !forceAllVertices && budget !== null && budget.useSpatialCull
+    let doFull = forceAllVertices || !useCull
+
+    if (useCull) {
+      this.spatialCullPassCounter++
+      if (this.spatialCullPassCounter >= FULL_DEFORM_REFRESH_INTERVAL) {
+        this.spatialCullPassCounter = 0
+        doFull = true
+      }
+    }
+
+    const halfW =
+      budget === null ? 0 : Math.max(0, budget.cullHalfExtentX) * DEFORM_CULL_MARGIN
+    const halfH =
+      budget === null ? 0 : Math.max(0, budget.cullHalfExtentZ) * DEFORM_CULL_MARGIN
+    const cx = budget?.cullCenterX ?? 0
+    const cz = budget?.cullCenterZ ?? 0
 
     for (let i = 0; i < positions.length; i += 3) {
       const x = this.basePositions[i]!
       const z = this.basePositions[i + 2]!
 
-      // Deform Y downward based on gravitational well
+      if (!doFull && useCull) {
+        const inBox = Math.abs(x - cx) <= halfW && Math.abs(z - cz) <= halfH
+        if (!inBox && !this.isNearGravitySource(x, z)) {
+          continue
+        }
+      }
+
       positions[i] = x
       positions[i + 1] = -this.getDepthAt(x, z)
       positions[i + 2] = z
     }
 
     posAttr.needsUpdate = true
+  }
+
+  /** True if (x,z) lies inside an influence disk of any current gravity source. */
+  private isNearGravitySource(x: number, z: number): boolean {
+    for (let s = 0; s < 2; s++) {
+      const arr = s === 0 ? this.staticSources : this.sources
+      for (const source of arr) {
+        const dx = x - source.x
+        const dz = z - source.z
+        const rSquared = dx * dx + dz * dz
+        const widthMul = source.wellWidthMultiplier ?? 1
+        const massFactor = Math.pow(Math.abs(source.mass), this.massExponent)
+        const radius = Math.max(
+          SOURCE_INFLUENCE_RADIUS_MIN,
+          SOURCE_INFLUENCE_SIGMA_MULT * this.widthScale * massFactor * widthMul,
+        )
+        if (rSquared <= radius * radius) {
+          return true
+        }
+      }
+    }
+    return false
   }
 
   /**
