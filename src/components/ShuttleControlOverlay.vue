@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 import { computed, ref } from 'vue'
+import type { InventoryStack } from '@/lib/inventory/types'
 import ShuttleControlProgramInventory from './shuttle-control/ShuttleControlProgramInventory.vue'
 import ShuttleControlProgramMissions from './shuttle-control/ShuttleControlProgramMissions.vue'
 import ShuttleControlProgramShuttle from './shuttle-control/ShuttleControlProgramShuttle.vue'
 
 defineProps<{
   visible: boolean
+  inventoryStacks?: InventoryStack[]
 }>()
 
 const emit = defineEmits<{
@@ -82,7 +84,7 @@ function onKeydown(e: KeyboardEvent) {
 
         <!-- Right content area -->
         <div class="shuttle-control-content">
-          <component :is="activeProgram" />
+          <component :is="activeProgram" :inventory-stacks="inventoryStacks" />
         </div>
       </div>
 

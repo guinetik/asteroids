@@ -347,6 +347,7 @@ function handleShopBuyReserveFuel() {
   </div>
   <ShuttleControlOverlay
     :visible="shuttleControlVisible"
+    :inventory-stacks="shopInventory.stacks"
     @close="closeShuttleControl"
   />
   <CreditsBadge
