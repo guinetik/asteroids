@@ -6,10 +6,12 @@ const props = defineProps<{
   orbitState: OrbitHudState
   shopAvailable?: boolean
   shopPlanet?: string
+  missionAvailable?: boolean
 }>()
 
 const emit = defineEmits<{
   openShop: []
+  openMission: []
 }>()
 
 const visible = computed(() => {
@@ -68,6 +70,14 @@ const details = computed(() => {
       @click="emit('openShop')"
     >
       B  Shop
+    </button>
+    <button
+      v-if="missionAvailable && orbitState.state === 'orbiting'"
+      type="button"
+      class="orbit-prompt-mission-btn"
+      @click="emit('openMission')"
+    >
+      I  Mission
     </button>
   </div>
 </template>
