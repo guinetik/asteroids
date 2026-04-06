@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import type { Component } from 'vue'
+import { computed, ref } from 'vue'
+import ShuttleControlProgramInventory from './shuttle-control/ShuttleControlProgramInventory.vue'
+import ShuttleControlProgramMissions from './shuttle-control/ShuttleControlProgramMissions.vue'
+import ShuttleControlProgramShuttle from './shuttle-control/ShuttleControlProgramShuttle.vue'
 
 defineProps<{
   visible: boolean
@@ -12,6 +16,14 @@ const emit = defineEmits<{
 type ControlScreen = 'shuttle' | 'missions' | 'inventory'
 
 const activeScreen = ref<ControlScreen>('shuttle')
+
+const programByScreen: Record<ControlScreen, Component> = {
+  shuttle: ShuttleControlProgramShuttle,
+  missions: ShuttleControlProgramMissions,
+  inventory: ShuttleControlProgramInventory,
+}
+
+const activeProgram = computed(() => programByScreen[activeScreen.value])
 
 const screens: { id: ControlScreen; label: string }[] = [
   { id: 'shuttle', label: 'Shuttle' },
@@ -70,18 +82,7 @@ function onKeydown(e: KeyboardEvent) {
 
         <!-- Right content area -->
         <div class="shuttle-control-content">
-          <div v-if="activeScreen === 'shuttle'" class="shuttle-control-screen">
-            <h2 class="shuttle-control-screen__title">Shuttle</h2>
-            <p class="shuttle-control-screen__placeholder">Shuttle management program</p>
-          </div>
-          <div v-else-if="activeScreen === 'missions'" class="shuttle-control-screen">
-            <h2 class="shuttle-control-screen__title">Missions</h2>
-            <p class="shuttle-control-screen__placeholder">Mission control program</p>
-          </div>
-          <div v-else-if="activeScreen === 'inventory'" class="shuttle-control-screen">
-            <h2 class="shuttle-control-screen__title">Inventory</h2>
-            <p class="shuttle-control-screen__placeholder">Inventory management program</p>
-          </div>
+          <component :is="activeProgram" />
         </div>
       </div>
 
