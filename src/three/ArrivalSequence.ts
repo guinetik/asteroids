@@ -36,7 +36,7 @@ const CARGO_LANDER_OFFSET = new THREE.Vector3(-320, 0, 20)
 
 // ── Timeline phase durations (seconds) ──────────────────────────
 /** Shuttle approaches from distance. */
-const PHASE_APPROACH_DURATION = 4.0
+const PHASE_APPROACH_DURATION = 6.0
 /** Shuttle rotates 180° (flip maneuver). */
 const PHASE_FLIP_DURATION = 2.5
 /** Doors open, brief pause. */
@@ -59,7 +59,7 @@ export const ARRIVAL_SEQUENCE_DURATION =
 
 // ── Approach path ───────────────────────────────────────────────
 /** Shuttle starts this far from the asteroid (world units). */
-const APPROACH_START_DISTANCE = 800
+const APPROACH_START_DISTANCE = 2000
 /** Shuttle stops this far from the lander spawn point. */
 const APPROACH_END_DISTANCE = 60
 /** Shuttle approach altitude (Y). */
@@ -192,11 +192,11 @@ export class ArrivalSequence {
     this.landerModel.rotation.set(0, 0, -Math.PI / 2)
     shuttleScene.add(this.landerModel)
 
-    // Initial camera: behind and above the shuttle
+    // Initial camera: wide establishing shot, far behind and above the shuttle
     this.camera.position.set(
-      this.shuttleStartPos.x,
-      this.shuttleStartPos.y + 30,
-      this.shuttleStartPos.z - 120,
+      this.shuttleStartPos.x + 80,
+      this.shuttleStartPos.y + 100,
+      this.shuttleStartPos.z - 400,
     )
     this.camera.lookAt(this.shuttleStartPos)
   }
@@ -253,10 +253,14 @@ export class ArrivalSequence {
 
     this.shuttleGroup.position.lerpVectors(this.shuttleStartPos, this.shuttleEndPos, eased)
 
+    // Camera starts wide and far, pulls in as shuttle approaches
+    const camDistance = THREE.MathUtils.lerp(400, 80, eased)
+    const camHeight = THREE.MathUtils.lerp(100, 25, eased)
+    const camSide = THREE.MathUtils.lerp(80, 20, eased)
     this.camera.position.set(
-      this.shuttleGroup.position.x + 20,
-      this.shuttleGroup.position.y + 25,
-      this.shuttleGroup.position.z - 80,
+      this.shuttleGroup.position.x + camSide,
+      this.shuttleGroup.position.y + camHeight,
+      this.shuttleGroup.position.z - camDistance,
     )
     this.camera.lookAt(this.shuttleGroup.position)
 
