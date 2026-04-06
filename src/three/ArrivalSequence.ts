@@ -293,7 +293,37 @@ export class ArrivalSequence {
     }
   }
 
-  /** Remove shuttle and falling lander from scene. Call after sequence completes. */
+  /**
+   * Park the shuttle hovering above the lander position.
+   * Removes the falling cinematic lander but keeps the shuttle in the scene.
+   * Call after sequence completes to leave the shuttle visible from below.
+   *
+   * @param hoverHeight - Altitude above the lander detach point.
+   */
+  parkShuttle(hoverHeight: number): void {
+    this.fallingLander?.removeFromParent()
+    this.fallingLander = null
+
+    // Position shuttle above where the lander was detached, level orientation
+    this.shuttleGroup.position.set(
+      this.landerWorldPos.x,
+      this.landerWorldPos.y + hoverHeight,
+      this.landerWorldPos.z,
+    )
+    // Level orientation: nose along +Z
+    this.shuttleGroup.rotation.set(0, -Math.PI / 2, 0)
+
+    // Close doors
+    this.doorProgress = 0
+    this.updateDoorRotation()
+
+    // Hide thruster sprites (parked, not thrusting)
+    for (const sprite of this.thrusterSprites) {
+      sprite.visible = false
+    }
+  }
+
+  /** Remove shuttle and falling lander from scene entirely. */
   dispose(): void {
     this.fallingLander?.removeFromParent()
     this.fallingLander = null

@@ -72,6 +72,9 @@ const LANDER_SPAWN_HEIGHT = 600
 const SPAWN_POSITION_RANGE = 2000
 const EVA_SPAWN_OFFSET_X = 8
 
+/** Shuttle hovers this high above the lander detach point after arrival. */
+const SHUTTLE_HOVER_HEIGHT = 200
+
 /** Test surface features — will come from asteroid data later. */
 const TEST_SURFACE: SurfaceFeatures = {
   craterDensity: 0.7,
@@ -223,8 +226,8 @@ export class LevelViewController implements Tickable {
     }
 
     this.arrivalSequence.onComplete = () => {
-      this.arrivalSequence?.dispose()
-      this.arrivalSequence = null
+      // Park the shuttle hovering above the landing zone (visible from ground)
+      this.arrivalSequence?.parkShuttle(SHUTTLE_HOVER_HEIGHT)
       // Show the gameplay lander at the spawn height (it will fall with physics)
       if (this.landerController) {
         this.landerController.group.visible = true
