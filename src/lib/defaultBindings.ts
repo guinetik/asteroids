@@ -31,6 +31,8 @@ export const LANDER_BINDINGS: Record<string, string[]> = {
   rcsAft: ['KeyS'],
   rcsDescend: ['KeyC'],
   rcsAscend: ['ShiftLeft'],
+  yawLeft: ['KeyQ'],
+  yawRight: ['KeyE'],
 }
 
 /** FPS on-foot key bindings */
@@ -56,6 +58,8 @@ export const LEVEL_BINDINGS: Record<string, string[]> = {
   rcsAft: ['KeyS'],
   rcsDescend: ['KeyC'],
   rcsAscend: ['ShiftLeft'],
+  yawLeft: ['KeyQ'],
+  yawRight: ['KeyE'],
   // FPS controls
   moveForward: ['KeyW'],
   moveBack: ['KeyS'],

@@ -42,7 +42,7 @@ export type LanderThrusterName = 'mainEngine' | 'rcs'
 const LANDER_THRUSTER_CONFIG: ThrusterSystemConfig<LanderThrusterName> = {
   thrusters: {
     mainEngine: { capacity: 120, burnRate: 18, rechargeRate: 14, fuelCostPerRecharge: 0.4 },
-    rcs: { capacity: 80, burnRate: 10, rechargeRate: 9, fuelCostPerRecharge: 0.25 },
+    rcs: { capacity: 80, burnRate: 5, rechargeRate: 9, fuelCostPerRecharge: 0.12 },
   },
   fuelCapacity: 600,
 }
@@ -74,6 +74,34 @@ const RCS_LIFETIME = 0.25
 const RCS_SPREAD = 2
 const RCS_PUSH_FORCE = 10
 const RCS_SPAWN_RATE = 50
+
+/** Lander floodlights mounted near the front legs to illuminate the terrain below. */
+const FLOODLIGHT_COLOR = 0xf4f7ff
+const FLOODLIGHT_INTENSITY = 62
+const FLOODLIGHT_DISTANCE = 260
+const FLOODLIGHT_ANGLE = Math.PI * 0.22
+const FLOODLIGHT_PENUMBRA = 0.88
+const FLOODLIGHT_DECAY = 1.35
+const FLOODLIGHT_MOUNT_INSET = 0.6
+const FLOODLIGHT_AIM_DISTANCE = 220
+const FLOODLIGHT_OUTWARD_ANGLE = Math.PI * 0.22
+const FLOODLIGHT_FORWARD_ANGLE = Math.PI * 0.14
+const FLOODLIGHT_SHADOW_MAP_SIZE = 512
+const FLOODLIGHT_SHADOW_BIAS = -0.0008
+
+/** Small fill light so the lander hull stays legible in darkness. */
+const BODY_FILL_LIGHT_COLOR = 0xf4f7ff
+const BODY_FILL_LIGHT_INTENSITY = 3.4
+const BODY_FILL_LIGHT_DISTANCE = 110
+const BODY_FILL_LIGHT_Y_OFFSET = 10
+
+/** Visible beam volume so the floodlights read even before they hit terrain. */
+const FLOODLIGHT_CONE_LENGTH = 220
+const FLOODLIGHT_CONE_RADIUS = 60
+const FLOODLIGHT_CONE_BASE_OPACITY = 0.032
+
+/** Use the downward-facing RCS nodes as light mounts. */
+const FLOODLIGHT_MOUNT_NODES = ['RCS_FL_Down', 'RCS_BL_Down', 'RCS_BR_Down', 'RCS_FR_Down'] as const
 
 /**
  * Which RCS nodes fire for each input action.
@@ -117,7 +145,7 @@ const RCS_ACTION_MAP: Record<string, { nodes: string[]; pushLocal: THREE.Vector3
 const ALL_RCS_NODES = [...new Set(Object.values(RCS_ACTION_MAP).flatMap((a) => a.nodes))]
 
 /** RCS lateral movement — tilt + push */
-const RCS_LATERAL_FORCE = 4
+const RCS_LATERAL_FORCE = 14
 const TILT_MAX_ANGLE = 0.3 // ~17 degrees max tilt
 const LIFTOFF_BOOST = 2.0
 const LIFTOFF_BOOST_DURATION = 1.0
@@ -129,6 +157,15 @@ const SLOPE_LIFTOFF_PENALTY = 0.5
 const TILT_LERP_SPEED = 3 // how fast the lander tilts toward target
 const TILT_RETURN_SPEED = 2.5 // how fast it returns to upright
 const GROUND_TILT_LERP_SPEED = 4 // how fast the lander conforms to terrain slope
+/** Yaw rotation speed in radians per second (gyroscope). */
+const YAW_SPEED = 0.6
+/** How quickly C key damps lateral velocity (fraction per second, 0-1). */
+const RETRO_BRAKE_DAMPING = 3.0
+
+/** Reusable temp objects for quaternion-based rotation. */
+const _yAxis = new THREE.Vector3(0, 1, 0)
+const _qTilt = new THREE.Quaternion()
+const _euler = new THREE.Euler()
 
 /** Maximum safe landing speed (abs velocityY) — no damage below this. */
 const SAFE_LANDING_SPEED = 8.0
@@ -157,6 +194,13 @@ export class LanderController implements Tickable {
   readonly body = new PlatformerBody({ gravity: GAMEPLAY_GRAVITY })
   readonly thrusterSystem = new ThrusterSystem<LanderThrusterName>(LANDER_THRUSTER_CONFIG)
   readonly flameEmitter: ParticleEmitter
+  readonly floodlights: THREE.SpotLight[] = []
+  readonly bodyFillLight = new THREE.PointLight(
+    BODY_FILL_LIGHT_COLOR,
+    BODY_FILL_LIGHT_INTENSITY,
+    BODY_FILL_LIGHT_DISTANCE,
+  )
+  readonly floodlightCones: THREE.Mesh[] = []
 
   /** One emitter per RCS nozzle, keyed by node name */
   readonly rcsEmitters = new Map<string, ParticleEmitter>()
@@ -174,9 +218,29 @@ export class LanderController implements Tickable {
   private tiltX = 0
   private tiltZ = 0
 
+  /** Current yaw angle (Y rotation, Q/E gyroscope). */
+  private yaw = 0
+
   /** Local-space positions of each RCS nozzle, keyed by node name */
   private readonly rcsLocalPositions = new Map<string, THREE.Vector3>()
   private readonly rcsSpawnAccumulators = new Map<string, number>()
+  private readonly floodlightTargets: THREE.Object3D[] = []
+  private readonly floodlightConeGeometry = new THREE.CylinderGeometry(
+    0,
+    FLOODLIGHT_CONE_RADIUS,
+    FLOODLIGHT_CONE_LENGTH,
+    24,
+    1,
+    true,
+  )
+  private readonly floodlightConeMaterial = new THREE.MeshBasicMaterial({
+    color: FLOODLIGHT_COLOR,
+    transparent: true,
+    opacity: FLOODLIGHT_CONE_BASE_OPACITY,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  })
   private readonly rcsWorldPos = new THREE.Vector3()
   private liftoffBoostTimer = 0
 
@@ -207,6 +271,8 @@ export class LanderController implements Tickable {
 
   constructor(inputManager: InputManager) {
     this.inputManager = inputManager
+    this.bodyFillLight.position.set(0, BODY_FILL_LIGHT_Y_OFFSET, 0)
+    this.group.add(this.bodyFillLight)
 
     this.flameEmitter = new ParticleEmitter({
       poolSize: FLAME_POOL_SIZE,
@@ -253,6 +319,8 @@ export class LanderController implements Tickable {
         )
       }
     }
+
+    this.createFloodlights()
   }
 
   /** Apply damage to the lander. Fires onDeath when HP reaches 0. */
@@ -272,6 +340,7 @@ export class LanderController implements Tickable {
     this.lateralVelocity.set(0, 0, 0)
     this.tiltX = 0
     this.tiltZ = 0
+    this.yaw = 0
     this.group.rotation.set(0, 0, 0)
     this.wasGrounded = false
     this.liftoffBoostTimer = 0
@@ -383,8 +452,15 @@ export class LanderController implements Tickable {
     for (const emitter of this.rcsEmitters.values()) {
       emitter.dispose()
     }
+    for (const floodlight of this.floodlights) {
+      floodlight.shadow.map?.dispose()
+      floodlight.dispose()
+    }
+    this.floodlightConeGeometry.dispose()
+    this.floodlightConeMaterial.dispose()
     this.group.traverse((child) => {
       if (child instanceof THREE.Mesh) {
+        if (this.floodlightCones.includes(child)) return
         child.geometry.dispose()
         if (Array.isArray(child.material)) {
           child.material.forEach((m) => m.dispose())
@@ -409,18 +485,27 @@ export class LanderController implements Tickable {
     }
     if (!this.thrusterSystem.canFire('rcs')) return
 
-    // RCS lateral force — camera faces -X, so:
-    //   A = -Z, D = +Z, W = -X (toward camera), S = +X (away)
-    let forceX = 0
-    let forceZ = 0
+    // RCS lateral force — rotated by yaw (camera couples to lander orientation)
+    let localX = 0
+    let localZ = 0
 
-    if (this.inputManager.isActionActive('rcsLeft')) forceZ += RCS_LATERAL_FORCE
-    if (this.inputManager.isActionActive('rcsRight')) forceZ -= RCS_LATERAL_FORCE
-    if (this.inputManager.isActionActive('rcsFore')) forceX -= RCS_LATERAL_FORCE
-    if (this.inputManager.isActionActive('rcsAft')) forceX += RCS_LATERAL_FORCE
+    if (this.inputManager.isActionActive('rcsLeft')) localZ += RCS_LATERAL_FORCE
+    if (this.inputManager.isActionActive('rcsRight')) localZ -= RCS_LATERAL_FORCE
+    if (this.inputManager.isActionActive('rcsFore')) localX -= RCS_LATERAL_FORCE
+    if (this.inputManager.isActionActive('rcsAft')) localX += RCS_LATERAL_FORCE
 
-    this.lateralVelocity.x += forceX * dt
-    this.lateralVelocity.z += forceZ * dt
+    // Rotate by yaw so thrust matches screen directions
+    const cosY = Math.cos(this.yaw)
+    const sinY = Math.sin(this.yaw)
+    this.lateralVelocity.x += (localX * cosY + localZ * sinY) * dt
+    this.lateralVelocity.z += (-localX * sinY + localZ * cosY) * dt
+
+    // C (rcsDescend) doubles as retro-brake — damps lateral velocity
+    if (this.inputManager.isActionActive('rcsDescend')) {
+      const damping = 1 - RETRO_BRAKE_DAMPING * dt
+      this.lateralVelocity.x *= damping
+      this.lateralVelocity.z *= damping
+    }
   }
 
   private tickTilt(dt: number): void {
@@ -450,8 +535,16 @@ export class LanderController implements Tickable {
     this.tiltX += (targetTiltX - this.tiltX) * speed * dt
     this.tiltZ += (targetTiltZ - this.tiltZ) * speed * dt
 
-    this.group.rotation.x = this.tiltX
-    this.group.rotation.z = this.tiltZ
+    // Yaw — gyroscope rotation (works airborne and grounded)
+    if (this.inputManager.isActionActive('yawLeft')) this.yaw += YAW_SPEED * dt
+    if (this.inputManager.isActionActive('yawRight')) this.yaw -= YAW_SPEED * dt
+
+    // Build rotation: yaw first, then tilt relative to yaw
+    // This ensures tilt directions stay consistent with lander heading
+    const q = this.group.quaternion
+    q.setFromAxisAngle(_yAxis, this.yaw)
+    _qTilt.setFromEuler(_euler.set(this.tiltX, 0, this.tiltZ))
+    q.multiply(_qTilt)
   }
 
   private tickRcs(dt: number): void {
@@ -526,6 +619,59 @@ export class LanderController implements Tickable {
     while (this.flameSpawnAccumulator >= 1) {
       this.flameEmitter.emit(this.mainEngineWorldPos, pushDir)
       this.flameSpawnAccumulator -= 1
+    }
+  }
+
+  private createFloodlights(): void {
+    for (const nodeName of FLOODLIGHT_MOUNT_NODES) {
+      const mount = this.rcsLocalPositions.get(nodeName)
+      if (!mount) continue
+
+      const side = Math.sign(mount.x) || 1
+      const forward = Math.sign(mount.z) || 1
+      const origin = mount.clone()
+      origin.x *= FLOODLIGHT_MOUNT_INSET
+      origin.z *= FLOODLIGHT_MOUNT_INSET
+      const floodlight = new THREE.SpotLight(
+        FLOODLIGHT_COLOR,
+        FLOODLIGHT_INTENSITY,
+        FLOODLIGHT_DISTANCE,
+        FLOODLIGHT_ANGLE,
+        FLOODLIGHT_PENUMBRA,
+        FLOODLIGHT_DECAY,
+      )
+      floodlight.position.copy(origin)
+      floodlight.castShadow = false
+      floodlight.shadow.mapSize.set(FLOODLIGHT_SHADOW_MAP_SIZE, FLOODLIGHT_SHADOW_MAP_SIZE)
+      floodlight.shadow.bias = FLOODLIGHT_SHADOW_BIAS
+
+      const target = new THREE.Object3D()
+      const outward = Math.sin(FLOODLIGHT_OUTWARD_ANGLE) * FLOODLIGHT_AIM_DISTANCE
+      const forwardOffset = Math.sin(FLOODLIGHT_FORWARD_ANGLE) * FLOODLIGHT_AIM_DISTANCE
+      const downward = Math.cos(FLOODLIGHT_OUTWARD_ANGLE)
+        * Math.cos(FLOODLIGHT_FORWARD_ANGLE)
+        * FLOODLIGHT_AIM_DISTANCE
+      target.position.set(
+        origin.x + side * outward,
+        origin.y - downward,
+        origin.z + forward * forwardOffset,
+      )
+
+      floodlight.target = target
+
+      const cone = new THREE.Mesh(this.floodlightConeGeometry, this.floodlightConeMaterial)
+      const beamDirection = target.position.clone().sub(floodlight.position).normalize()
+      cone.position.copy(floodlight.position).add(target.position).multiplyScalar(0.5)
+      cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), beamDirection)
+      cone.renderOrder = 1
+
+      this.group.add(floodlight)
+      this.group.add(target)
+      this.group.add(cone)
+
+      this.floodlights.push(floodlight)
+      this.floodlightCones.push(cone)
+      this.floodlightTargets.push(target)
     }
   }
 

@@ -12,7 +12,7 @@
 import * as THREE from 'three'
 
 /** Beam height in world units — tall enough to see from lander altitude. */
-const BEAM_HEIGHT = 80
+const BEAM_HEIGHT = 900
 
 /** Beam core cylinder radius. */
 const BEAM_CORE_RADIUS = 1.5
@@ -117,7 +117,7 @@ function createMarkerMesh(color: number = MARKER_COLOR): THREE.Group {
   })
   const diamond = new THREE.Mesh(diamondGeo, diamondMat)
   diamond.name = 'diamond'
-  diamond.position.y = BEAM_HEIGHT + 4
+  diamond.position.y = BEAM_HEIGHT + 40
   group.add(diamond)
 
   return group
@@ -213,7 +213,7 @@ export function updateWaypointMarkers(elapsed: number): void {
     const diamond = marker.group.getObjectByName('diamond') as THREE.Mesh | undefined
     if (diamond) {
       diamond.rotation.y = elapsed * 2
-      diamond.position.y = BEAM_HEIGHT + 4 + Math.sin(elapsed * 2) * 2
+      diamond.position.y = BEAM_HEIGHT + 40 + Math.sin(elapsed * 2) * 2
     }
   }
 }

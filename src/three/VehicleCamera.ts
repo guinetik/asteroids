@@ -63,6 +63,7 @@ export const LANDER_CAMERA_CONFIG: VehicleCameraConfig = {
   idleTimeout: 1.0,
   minY: 5,
   fov: 60,
+  maxDistance: 200,
 }
 
 /** Map preset: same proportions as shuttle cam, scaled for ~0.14 unit ship. */

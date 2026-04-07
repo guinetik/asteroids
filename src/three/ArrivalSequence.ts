@@ -95,6 +95,22 @@ const SHUTTLE_PARKED_SCALE = 15
 /** Absolute Y altitude for the parked shuttle (above lander spawn height of 600). */
 const LANDER_PARK_ALTITUDE = 875
 
+/** Centerline exfil floodlight so the parked shuttle reads from the ground. */
+const EXFIL_FLOODLIGHT_COLOR = 0xf4f7ff
+const EXFIL_FLOODLIGHT_INTENSITY = 72
+const EXFIL_FLOODLIGHT_DISTANCE = 900
+const EXFIL_FLOODLIGHT_ANGLE = Math.PI * 0.16
+const EXFIL_FLOODLIGHT_PENUMBRA = 0.9
+const EXFIL_FLOODLIGHT_DECAY = 1.35
+const EXFIL_FLOODLIGHT_X_OFFSET = -3
+const EXFIL_FLOODLIGHT_Y_OFFSET = 0
+const EXFIL_FLOODLIGHT_TARGET_Y = 260
+const EXFIL_FLOODLIGHT_SHADOW_MAP_SIZE = 512
+const EXFIL_FLOODLIGHT_SHADOW_BIAS = -0.0008
+const EXFIL_FLOODLIGHT_CONE_RADIUS = 32
+const EXFIL_FLOODLIGHT_CONE_LENGTH = 260
+const EXFIL_FLOODLIGHT_CONE_OPACITY = 0.018
+
 /** Lander fall gravity after detach (world units/sec²). */
 const LANDER_FALL_GRAVITY = 3.0
 
@@ -152,6 +168,9 @@ export class ArrivalSequence {
   private thrusterElapsed = 0
   /** The detached lander group in scene space (for falling animation). */
   private fallingLander: THREE.Object3D | null = null
+  private exfilFloodlight: THREE.SpotLight | null = null
+  private exfilFloodlightTarget: THREE.Object3D | null = null
+  private exfilFloodlightCone: THREE.Mesh | null = null
 
   // Shuttle flight state
   private shuttleStartPos = new THREE.Vector3()
@@ -253,6 +272,8 @@ export class ArrivalSequence {
         child.castShadow = true
       }
     })
+
+    this.ensureExfilFloodlight()
 
     // Initial camera: wide establishing shot, far behind and above the shuttle
     this.camera.position.set(
@@ -364,6 +385,7 @@ export class ArrivalSequence {
    *
    */
   parkShuttle(): void {
+    this.phase = 'done'
     this.fallingLander?.removeFromParent()
     this.fallingLander = null
 
@@ -413,6 +435,17 @@ export class ArrivalSequence {
   dispose(): void {
     this.fallingLander?.removeFromParent()
     this.fallingLander = null
+    this.exfilFloodlight?.shadow.map?.dispose()
+    this.exfilFloodlight?.dispose()
+    if (this.exfilFloodlightCone) {
+      this.exfilFloodlightCone.geometry.dispose()
+      const material = this.exfilFloodlightCone.material
+      if (Array.isArray(material)) {
+        material.forEach((m) => m.dispose())
+      } else {
+        material.dispose()
+      }
+    }
     this.shuttleGroup.removeFromParent()
     this.shuttleGroup.traverse((child) => {
       if (child instanceof THREE.Mesh) {
@@ -761,6 +794,7 @@ export class ArrivalSequence {
     if (this.doorStbNode) {
       this.doorStbNode.rotation.x = this.doorStbClosedRotX + angle
     }
+    this.updateExfilFloodlightVisibility()
   }
 
   private easeInOut(t: number): number {
@@ -782,6 +816,66 @@ export class ArrivalSequence {
       sprite.scale.setScalar(THRUSTER_SPRITE_SIZE * pulse)
       ;(sprite.material as THREE.SpriteMaterial).opacity = opacity
     }
+  }
+
+  private ensureExfilFloodlight(): void {
+    if (this.exfilFloodlight) return
+
+    const floodlight = new THREE.SpotLight(
+      EXFIL_FLOODLIGHT_COLOR,
+      EXFIL_FLOODLIGHT_INTENSITY,
+      EXFIL_FLOODLIGHT_DISTANCE,
+      EXFIL_FLOODLIGHT_ANGLE,
+      EXFIL_FLOODLIGHT_PENUMBRA,
+      EXFIL_FLOODLIGHT_DECAY,
+    )
+    floodlight.position.set(EXFIL_FLOODLIGHT_X_OFFSET, EXFIL_FLOODLIGHT_Y_OFFSET, 0)
+    floodlight.castShadow = true
+    floodlight.shadow.mapSize.set(EXFIL_FLOODLIGHT_SHADOW_MAP_SIZE, EXFIL_FLOODLIGHT_SHADOW_MAP_SIZE)
+    floodlight.shadow.bias = EXFIL_FLOODLIGHT_SHADOW_BIAS
+
+    const target = new THREE.Object3D()
+    target.position.set(EXFIL_FLOODLIGHT_X_OFFSET, EXFIL_FLOODLIGHT_TARGET_Y, 0)
+    floodlight.target = target
+
+    const coneGeometry = new THREE.CylinderGeometry(
+      0,
+      EXFIL_FLOODLIGHT_CONE_RADIUS,
+      EXFIL_FLOODLIGHT_CONE_LENGTH,
+      24,
+      1,
+      true,
+    )
+    coneGeometry.translate(0, -EXFIL_FLOODLIGHT_CONE_LENGTH * 0.5, 0)
+    const coneMaterial = new THREE.MeshBasicMaterial({
+      color: EXFIL_FLOODLIGHT_COLOR,
+      transparent: true,
+      opacity: EXFIL_FLOODLIGHT_CONE_OPACITY,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    })
+    const cone = new THREE.Mesh(coneGeometry, coneMaterial)
+    const beamDirection = target.position.clone().sub(floodlight.position).normalize()
+    cone.position.copy(floodlight.position)
+    cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), beamDirection)
+    cone.renderOrder = 1
+
+    this.shuttleGroup.add(floodlight)
+    this.shuttleGroup.add(target)
+    this.shuttleGroup.add(cone)
+
+    this.exfilFloodlight = floodlight
+    this.exfilFloodlightTarget = target
+    this.exfilFloodlightCone = cone
+    this.updateExfilFloodlightVisibility()
+  }
+
+  private updateExfilFloodlightVisibility(): void {
+    const visible = this.doorProgress > 0.02
+    if (this.exfilFloodlight) this.exfilFloodlight.visible = visible
+    if (this.exfilFloodlightTarget) this.exfilFloodlightTarget.visible = visible
+    if (this.exfilFloodlightCone) this.exfilFloodlightCone.visible = visible
   }
 
   private createThrusterTexture(): THREE.CanvasTexture {
