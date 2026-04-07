@@ -62,6 +62,7 @@ import orbitConfig from '@/data/shuttle/orbit-capture.json'
 import { PortalArrivalSequence } from '@/three/PortalArrivalSequence'
 import { PortalBoundarySystem } from '@/three/PortalBoundarySystem'
 import { createGravityDistortionPass } from '@/three/GravityDistortionPass'
+import { createSlingshotSpeedPass } from '@/three/SlingshotSpeedPass'
 import type { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { VibePortal } from '@/lib/portal'
 import { MapState } from '@/lib/mapState'
@@ -183,7 +184,7 @@ const ONE_SHOT_PRIORITY = TICK_PRIORITY_INPUT + 1
  * and dwarf planets, keeping Sun + Jupiter/Saturn-scale wells.
  */
 /** Only Jupiter (9.55e-4) and Saturn (2.86e-4) deform the grid (Uranus/Neptune are below 1e-4). */
-const GRID_MASS_THRESHOLD = 1e-4
+const GRID_MASS_THRESHOLD = 1.0
 
 /**
  * Gaussian σ multiplier for Jupiter and Saturn on the map fabric only (wider bowls;
@@ -192,7 +193,7 @@ const GRID_MASS_THRESHOLD = 1e-4
 const MAP_GRID_GAS_GIANT_WELL_WIDTH_MULT = 1.85
 
 /** Baseline wireframe segments per axis on the map space-time grid (lower = faster deform pass). */
-const MAP_SPACE_TIME_GRID_BASE_RESOLUTION = 100
+const MAP_SPACE_TIME_GRID_BASE_RESOLUTION = 200
 
 /** Density multiplier on segment count; resolved value is `Math.round(base × boost)`. */
 const MAP_SPACE_TIME_GRID_RESOLUTION_BOOST = 1.5
@@ -435,6 +436,7 @@ export class MapViewController implements Tickable {
   private portalArrival: PortalArrivalSequence | null = null
   private boundarySystem: PortalBoundarySystem | null = null
   private gravityPass: ShaderPass | null = null
+  private slingshotSpeedPass: ShaderPass | null = null
   private adriftTimer = 0
   private shipHealth: ShipHealth | null = null
   private explosionEmitter: ParticleEmitter | null = null
@@ -853,6 +855,9 @@ export class MapViewController implements Tickable {
       mapGravityData.chromStrength,
     )
     this.sceneObjects.composer.addPass(this.gravityPass)
+
+    this.slingshotSpeedPass = createSlingshotSpeedPass()
+    this.sceneObjects.composer.addPass(this.slingshotSpeedPass)
 
     // --- Compositor: renders via EffectComposer ---
     const compositorTickable: Tickable = {
@@ -1493,6 +1498,18 @@ export class MapViewController implements Tickable {
         if (this.onGravityWarning) {
           this.onGravityWarning({ proximity: 0, bodyName: null, visible: false })
         }
+      }
+    }
+
+    // Slingshot speed lines — ramp down as burst settles
+    if (this.slingshotSpeedPass && this.shuttleController) {
+      if (this.shuttleController.slingshotBurstActive) {
+        const progress = this.shuttleController.slingshotBurstProgress
+        // Full intensity at launch, fade out as progress approaches 1
+        this.slingshotSpeedPass.uniforms.intensity!.value = 1 - progress
+        this.slingshotSpeedPass.uniforms.time!.value += dt
+      } else {
+        this.slingshotSpeedPass.uniforms.intensity!.value = 0
       }
     }
   }

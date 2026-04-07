@@ -196,6 +196,12 @@ export class ShuttleController implements Tickable, PortalVehicle {
     return this._slingshotLaunchFxRemaining > 0
   }
 
+  /** Slingshot burst progress from 0 (just launched) to 1 (settle complete). */
+  get slingshotBurstProgress(): number {
+    if (this._slingshotSettleDuration <= 0) return 0
+    return Math.min(1, this._slingshotSettleElapsed / this._slingshotSettleDuration)
+  }
+
   /** Set slingshot speed protection — speed won't be clamped below this. */
   setSlingshotSpeed(speed: number): void {
     this._slingshotSpeed = speed
