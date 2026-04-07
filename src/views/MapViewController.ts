@@ -1505,8 +1505,8 @@ export class MapViewController implements Tickable {
     if (this.slingshotSpeedPass && this.shuttleController) {
       if (this.shuttleController.slingshotBurstActive) {
         const progress = this.shuttleController.slingshotBurstProgress
-        // Ramp up quickly in first 20%, hold, then fade out in last 40%
-        const rampUp = Math.min(1, progress / 0.2)
+        // Ramp up in first 5%, hold, then fade out in last 40%
+        const rampUp = Math.min(1, progress / 0.05)
         const fadeOut = progress < 0.6 ? 1.0 : 1 - (progress - 0.6) / 0.4
         this.slingshotSpeedPass.uniforms.intensity!.value = rampUp * fadeOut
         this.slingshotSpeedPass.uniforms.time!.value += dt
