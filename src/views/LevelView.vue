@@ -1,6 +1,6 @@
 <!-- src/views/LevelView.vue -->
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { LevelViewController } from './LevelViewController'
 import LanderHud from '@/components/LanderHud.vue'
 import FpsHud from '@/components/FpsHud.vue'
@@ -17,6 +17,27 @@ const deathMessage = ref(false)
 const arrivalFade = ref(0)
 const deathOverlayVisible = ref(false)
 const deathOverlayCause = ref('')
+
+/** Landing warnings — only active when descending in lander state. */
+const WARN_SPEED = 3.0
+const SAFE_SPEED = 5.0
+const WARN_ANGLE = 0.1
+const SAFE_ANGLE = 0.175
+
+const descentWarning = computed(() => {
+  if (stateInfo.state !== 'lander' || landerTelemetry.grounded || landerTelemetry.velocityY >= 0) return 'safe'
+  const speed = Math.abs(landerTelemetry.velocityY)
+  if (speed >= SAFE_SPEED) return 'danger'
+  if (speed >= WARN_SPEED) return 'warn'
+  return 'safe'
+})
+
+const attitudeWarning = computed(() => {
+  if (stateInfo.state !== 'lander' || landerTelemetry.grounded) return 'safe'
+  if (landerTelemetry.tiltAngle >= SAFE_ANGLE) return 'danger'
+  if (landerTelemetry.tiltAngle >= WARN_ANGLE) return 'warn'
+  return 'safe'
+})
 
 const landerTelemetry = reactive<LanderTelemetry>({
   altitude: 0,
@@ -109,6 +130,23 @@ onUnmounted(() => {
   />
   <LanderHud v-if="stateInfo.state === 'lander'" :telemetry="landerTelemetry" />
   <FpsHud v-if="stateInfo.state === 'eva'" :telemetry="fpsTelemetry" />
+  <!-- Landing warnings — center screen, impossible to miss -->
+  <div v-if="descentWarning !== 'safe' || attitudeWarning !== 'safe'" class="landing-warnings">
+    <div
+      v-if="descentWarning !== 'safe'"
+      class="landing-warning"
+      :class="descentWarning === 'danger' ? 'landing-warning--danger' : 'landing-warning--warn'"
+    >
+      DESCENT RATE
+    </div>
+    <div
+      v-if="attitudeWarning !== 'safe'"
+      class="landing-warning"
+      :class="attitudeWarning === 'danger' ? 'landing-warning--danger' : 'landing-warning--warn'"
+    >
+      ATTITUDE
+    </div>
+  </div>
   <div
     v-if="stateInfo.state === 'lander' && stateInfo.grounded"
     class="exit-prompt"
@@ -206,6 +244,46 @@ onUnmounted(() => {
 @keyframes death-pulse {
   0%, 100% { opacity: 0.6; }
   50% { opacity: 1; }
+}
+
+/* Landing warnings — centered, large, impossible to miss */
+.landing-warnings {
+  position: fixed;
+  top: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 35;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+.landing-warning {
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 1.6rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 0.3rem 1.5rem;
+  border: 2px solid;
+}
+.landing-warning--warn {
+  color: #eab308;
+  border-color: rgba(234, 179, 8, 0.4);
+  background: rgba(234, 179, 8, 0.1);
+  text-shadow: 0 0 8px rgba(234, 179, 8, 0.5);
+  animation: warning-blink 1s ease-in-out infinite;
+}
+.landing-warning--danger {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.5);
+  background: rgba(239, 68, 68, 0.15);
+  text-shadow: 0 0 12px rgba(239, 68, 68, 0.7);
+  animation: warning-blink 0.4s ease-in-out infinite;
+}
+@keyframes warning-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 /* Always-on vignette — subtle darkness at screen edges */
