@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import type { GravitationalAnomalyHudState } from '@/lib/ShuttleTelemetry'
+import { Timer, type TimerHandle } from '@/lib/Timer'
 
 const props = defineProps<{
   anomaly: GravitationalAnomalyHudState
@@ -10,7 +11,7 @@ const props = defineProps<{
 const DISPLAY_SECONDS = 4.8
 
 const showLocal = ref(false)
-let hideTimer: ReturnType<typeof setTimeout> | undefined
+let hideTimer: TimerHandle | undefined
 
 watch(
   () => props.anomaly.token,
@@ -18,14 +19,12 @@ watch(
     const hasCopy = props.anomaly.title.trim().length > 0
     if (!props.anomaly.visible || !hasCopy) {
       showLocal.value = false
-      if (hideTimer !== undefined) clearTimeout(hideTimer)
+      if (hideTimer !== undefined) Timer.cancel(hideTimer)
       return
     }
     showLocal.value = true
-    if (hideTimer !== undefined) clearTimeout(hideTimer)
-    hideTimer = setTimeout(() => {
-      showLocal.value = false
-    }, DISPLAY_SECONDS * 1000)
+    if (hideTimer !== undefined) Timer.cancel(hideTimer)
+    hideTimer = Timer.after(DISPLAY_SECONDS, () => { showLocal.value = false })
   },
 )
 </script>
