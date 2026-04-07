@@ -1,5 +1,7 @@
 <!-- src/components/LanderHud.vue -->
 <script setup lang="ts">
+export type LandingWarningLevel = 'safe' | 'warn' | 'danger'
+
 export interface LanderTelemetry {
   altitude: number
   velocityY: number
@@ -15,6 +17,15 @@ export interface LanderTelemetry {
   maxHp: number
   tiltAngle: number
   grounded: boolean
+  descentWarning: LandingWarningLevel
+  attitudeWarning: LandingWarningLevel
+  landingSafety: LandingWarningLevel
+  /** Survey timer remaining in seconds (null if no active survey). */
+  surveyTimeRemaining: number | null
+  /** Number of probes collected (null if no active survey). */
+  surveyProbesCollected: number | null
+  /** Total probes to collect (null if no active survey). */
+  surveyProbesTotal: number | null
 }
 
 const props = defineProps<{
@@ -30,6 +41,18 @@ function fuelColor(level: number, capacity: number): string {
   if (ratio > 0.5) return 'bg-green-500'
   if (ratio > 0.2) return 'bg-yellow-500'
   return 'bg-red-500'
+}
+
+function formatTimer(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+function timerColor(seconds: number): string {
+  if (seconds <= 15) return 'text-red-500'
+  if (seconds <= 30) return 'text-yellow-500'
+  return 'text-green-400'
 }
 </script>
 
@@ -83,6 +106,16 @@ function fuelColor(level: number, capacity: number): string {
           ></div>
         </div>
         <span class="hud-gauge-label">RCS</span>
+      </div>
+    </div>
+
+    <!-- Survey overlay -->
+    <div v-if="props.telemetry.surveyTimeRemaining !== null" class="survey-hud">
+      <div class="survey-timer" :class="timerColor(props.telemetry.surveyTimeRemaining ?? 0)">
+        {{ formatTimer(props.telemetry.surveyTimeRemaining ?? 0) }}
+      </div>
+      <div class="survey-probes">
+        {{ props.telemetry.surveyProbesCollected ?? 0 }}/{{ props.telemetry.surveyProbesTotal ?? 0 }} PROBES
       </div>
     </div>
   </div>

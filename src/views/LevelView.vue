@@ -21,6 +21,7 @@ const arrivalFade = ref(0)
 const deathOverlayVisible = ref(false)
 const deathOverlayCause = ref('')
 const showMap = ref(false)
+const terminalPrompt = ref<string | null>(null)
 const mapCanvas = ref<HTMLCanvasElement | null>(null)
 const playerX = ref(0)
 const playerZ = ref(0)
@@ -30,28 +31,16 @@ const OBJECTIVE_COLORS: Record<string, string> = {
   gather: '#66ffee',
   exterminate: '#ff4444',
   rescue: '#ffcc44',
+  survey: '#00ffcc',
 }
 
-/** Landing warnings — only active when descending in lander state. */
-const WARN_SPEED = 5.0
-const SAFE_SPEED = 8.0
-const WARN_ANGLE = 0.17
-const SAFE_ANGLE = 0.26
+const descentWarning = computed(() =>
+  stateInfo.state === 'lander' ? landerTelemetry.descentWarning : 'safe',
+)
 
-const descentWarning = computed(() => {
-  if (stateInfo.state !== 'lander' || landerTelemetry.grounded || landerTelemetry.velocityY >= 0) return 'safe'
-  const speed = Math.abs(landerTelemetry.velocityY)
-  if (speed >= SAFE_SPEED) return 'danger'
-  if (speed >= WARN_SPEED) return 'warn'
-  return 'safe'
-})
-
-const attitudeWarning = computed(() => {
-  if (stateInfo.state !== 'lander' || landerTelemetry.grounded) return 'safe'
-  if (landerTelemetry.tiltAngle >= SAFE_ANGLE) return 'danger'
-  if (landerTelemetry.tiltAngle >= WARN_ANGLE) return 'warn'
-  return 'safe'
-})
+const attitudeWarning = computed(() =>
+  stateInfo.state === 'lander' ? landerTelemetry.attitudeWarning : 'safe',
+)
 
 const landerTelemetry = reactive<LanderTelemetry>({
   altitude: 0,
@@ -68,6 +57,12 @@ const landerTelemetry = reactive<LanderTelemetry>({
   maxHp: 100,
   tiltAngle: 0,
   grounded: false,
+  descentWarning: 'safe',
+  attitudeWarning: 'safe',
+  landingSafety: 'safe',
+  surveyTimeRemaining: null,
+  surveyProbesCollected: null,
+  surveyProbesTotal: null,
 })
 
 const fpsTelemetry = reactive<FpsTelemetry>({
@@ -116,6 +111,9 @@ onMounted(async () => {
     viewController.onDeathOverlay = (visible, cause) => {
       deathOverlayVisible.value = visible
       deathOverlayCause.value = cause
+    }
+    viewController.onTerminalPrompt = (text) => {
+      terminalPrompt.value = text
     }
     viewController.onMapCanvas = (canvas) => {
       mapCanvas.value = canvas
@@ -204,6 +202,12 @@ onUnmounted(() => {
     <span class="exit-prompt__text">EXIT (F)</span>
   </div>
   <div
+    v-if="terminalPrompt"
+    class="exit-prompt"
+  >
+    <span class="exit-prompt__text exit-prompt__text--terminal">{{ terminalPrompt }}</span>
+  </div>
+  <div
     v-if="stateInfo.canExfil"
     class="exit-prompt"
   >
@@ -267,6 +271,11 @@ onUnmounted(() => {
   padding: 0.4rem 1.2rem;
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
+.exit-prompt__text--terminal {
+  border-color: rgba(0, 255, 204, 0.5);
+  color: rgba(0, 255, 204, 0.9);
+  text-shadow: 0 0 8px rgba(0, 255, 204, 0.5);
+}
 .death-fade {
   position: fixed;
   inset: 0;
@@ -299,7 +308,7 @@ onUnmounted(() => {
 /* Landing warnings — centered, large, impossible to miss */
 .landing-warnings {
   position: fixed;
-  top: 20%;
+  top: max(1.5rem, env(safe-area-inset-top, 0px) + 1rem);
   left: 50%;
   transform: translateX(-50%);
   z-index: 35;

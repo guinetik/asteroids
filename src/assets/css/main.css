@@ -1211,3 +1211,16 @@ body {
 .mission-minigame-card__complete-btn:disabled {
   @apply opacity-40 cursor-not-allowed;
 }
+
+/* Survey HUD — timer + probe count overlay during active surveys */
+.survey-hud {
+  @apply fixed top-4 right-4 z-30 flex flex-col items-end gap-1 pointer-events-none;
+}
+.survey-timer {
+  @apply font-mono text-3xl tracking-widest;
+  font-family: 'Datatype', ui-monospace, monospace;
+}
+.survey-probes {
+  @apply font-mono text-sm tracking-wider text-cyan-400;
+  font-family: 'Datatype', ui-monospace, monospace;
+}
