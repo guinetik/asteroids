@@ -29,6 +29,7 @@ const announceVisible = ref(false)
 const announceAsteroid = ref('')
 const announceMission = ref('')
 const objCompleteVisible = ref(false)
+const objCompleteLabel = ref('')
 const trackerVisible = ref(false)
 const trackerObjectives = ref<TrackerObjective[]>([])
 const trackerAsteroid = ref('')
@@ -132,7 +133,10 @@ onMounted(async () => {
     }
     viewController.onObjectiveComplete = (index) => {
       const obj = trackerObjectives.value.find((o) => o.id === `obj-${index}`)
-      if (obj) obj.complete = true
+      if (obj) {
+        obj.complete = true
+        objCompleteLabel.value = obj.label
+      }
       objCompleteVisible.value = true
       setTimeout(() => { objCompleteVisible.value = false }, 5000)
     }
@@ -201,7 +205,7 @@ onUnmounted(() => {
   <MissionAnnouncement
     :visible="objCompleteVisible"
     asteroid-name="OBJECTIVE COMPLETE"
-    :mission-name="trackerAsteroid"
+    :mission-name="objCompleteLabel"
   />
   <MissionTracker
     v-if="trackerVisible && (stateInfo.state === 'lander' || stateInfo.state === 'eva')"
