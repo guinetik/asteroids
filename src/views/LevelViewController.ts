@@ -550,6 +550,16 @@ export class LevelViewController implements Tickable {
       this.arrivalSequence.tick(dt)
     }
 
+    // ESC → skip arrival cinematic
+    if (this.inputManager?.wasActionPressed('skipCinematic') && this.stateMachine?.is('arrival')) {
+      this.arrivalSequence?.parkShuttle()
+      if (this.landerController) {
+        this.landerController.group.visible = true
+      }
+      this.onArrivalFade?.(0)
+      this.stateMachine.setState('lander' as LevelState)
+    }
+
     // F key → state triggers (only one can succeed per press)
     if (this.inputManager?.wasActionPressed('interact') && this.stateMachine) {
       if (!this.stateMachine.trigger('exfiltrate')) {

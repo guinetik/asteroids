@@ -68,6 +68,7 @@ export const LEVEL_BINDINGS: Record<string, string[]> = {
   toolHeal: ['Digit3'],
   // Shared
   interact: ['KeyF'],
+  skipCinematic: ['Escape'],
 }
 
 /** Habitat interior key bindings — FPS walk + interact. */
