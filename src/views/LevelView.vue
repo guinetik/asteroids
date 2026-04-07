@@ -4,6 +4,7 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { LevelViewController } from './LevelViewController'
 import LanderHud from '@/components/LanderHud.vue'
 import FpsHud from '@/components/FpsHud.vue'
+import FpsCompass from '@/components/FpsCompass.vue'
 import DeathOverlay from '@/components/DeathOverlay.vue'
 import type { LanderTelemetry } from '@/components/LanderHud.vue'
 import type { FpsTelemetry } from '@/components/FpsHud.vue'
@@ -72,6 +73,8 @@ const fpsTelemetry = reactive<FpsTelemetry>({
   rtgCapacity: 80,
   modeCharge: 20,
   modeCapacity: 20,
+  headingRad: 0,
+  objectives: [],
 })
 
 onMounted(async () => {
@@ -128,6 +131,11 @@ onUnmounted(() => {
   />
   <LanderHud v-if="stateInfo.state === 'lander'" :telemetry="landerTelemetry" />
   <FpsHud v-if="stateInfo.state === 'eva'" :telemetry="fpsTelemetry" />
+  <FpsCompass
+    v-if="stateInfo.state === 'eva'"
+    :heading-rad="fpsTelemetry.headingRad"
+    :objectives="fpsTelemetry.objectives"
+  />
   <!-- Landing warnings — center screen, impossible to miss -->
   <div v-if="descentWarning !== 'safe' || attitudeWarning !== 'safe'" class="landing-warnings">
     <div

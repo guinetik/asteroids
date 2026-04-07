@@ -581,6 +581,8 @@ export class FpsViewController implements Tickable {
         rtgCapacity: this.multiToolState?.rtgCapacity ?? 1,
         modeCharge: this.multiToolState?.modeCharge ?? 0,
         modeCapacity: this.multiToolState?.modeChargeCapacity ?? 1,
+        headingRad: this.fpsCamera?.camera.rotation.y ?? 0,
+        objectives: [],
       })
     }
   }

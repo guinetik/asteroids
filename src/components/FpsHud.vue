@@ -1,5 +1,17 @@
 <!-- src/components/FpsHud.vue -->
 <script setup lang="ts">
+/** Objective marker for compass display. */
+export interface CompassObjective {
+  /** Unique id. */
+  id: string
+  /** Short label (e.g. "GATHER", "EXTERMINATE"). */
+  label: string
+  /** Relative bearing to player heading in degrees (-180 to 180). */
+  relativeDeg: number
+  /** Objective type for color-coding. */
+  type: 'gather' | 'exterminate' | 'rescue'
+}
+
 /** Telemetry data from FpsPlayerController for HUD display. */
 export interface FpsTelemetry {
   /** Current hit points */
@@ -32,6 +44,10 @@ export interface FpsTelemetry {
   modeCharge: number
   /** Active mode charge capacity */
   modeCapacity: number
+  /** Player camera Y rotation in radians. */
+  headingRad: number
+  /** Active objectives for compass display. */
+  objectives: CompassObjective[]
 }
 
 const O2_COLOR_HIGH = '#3b82f6'

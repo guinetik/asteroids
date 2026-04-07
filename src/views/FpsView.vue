@@ -164,6 +164,8 @@ const telemetry = reactive<FpsTelemetry>({
   rtgCapacity: 80,
   modeCharge: 20,
   modeCapacity: 20,
+  headingRad: 0,
+  objectives: [],
 })
 
 onMounted(async () => {

@@ -33,13 +33,14 @@ import { getAsteroidById, ASTEROID_CATALOG } from '@/lib/asteroids/catalog'
 import type { AsteroidDefinition } from '@/lib/asteroids/types'
 import { loadActiveMission } from '@/lib/missions/missionStorage'
 import { LEVEL_GRID_SIZE, generateAsteroidMission } from '@/lib/missions/asteroidMissionGenerator'
-import type { GeneratedAsteroidMission } from '@/lib/missions/types'
+import type { GeneratedAsteroidMission, ConcreteObjective } from '@/lib/missions/types'
 import { Heightmap } from '@/lib/terrain/heightmap'
 import { MultiToolController } from '@/three/MultiToolController'
 import { MultiToolState } from '@/lib/fps/multiToolState'
 import type { MultiToolConfig } from '@/lib/fps/multiToolState'
 import type { LanderTelemetry } from '@/components/LanderHud.vue'
-import type { FpsTelemetry } from '@/components/FpsHud.vue'
+import type { FpsTelemetry, CompassObjective } from '@/components/FpsHud.vue'
+import { headingRadToCompassDeg, worldBearingDegTo, signedRelativeBearingDeg } from '@/lib/math/bearing'
 import { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
 import { createLevelStateMachine, LANDER_INTERACT_RANGE, EXFIL_PROXIMITY_RANGE } from '@/lib/level/levelStateMachine'
@@ -162,6 +163,7 @@ export class LevelViewController implements Tickable {
 
   // ── Mission ─────────────────────────────────────────────────
   private mission: GeneratedAsteroidMission | null = null
+  private missionObjectives: ConcreteObjective[] = []
 
   // ── Elapsed time (seconds) ──────────────────────────────────
   private elapsed = 0
@@ -216,6 +218,7 @@ export class LevelViewController implements Tickable {
     // ── Asteroid data ────────────────────────────────────────────
     const { asteroid, seed, mission } = resolveLevelContext()
     this.mission = mission
+    this.missionObjectives = mission.objectives
 
     // ── Terrain ─────────────────────────────────────────────────
     const flat = new URLSearchParams(window.location.search).has('flat')
@@ -830,6 +833,18 @@ export class LevelViewController implements Tickable {
       // FPS telemetry
       if (currentState === 'eva' && this.onFpsTelemetry && this.playerController) {
         const ts = this.playerController.thrusterSystem
+        const headingRad = this.fpsCamera!.camera.rotation.y
+        const playerPos = this.playerController.group.position
+        const compassHeading = headingRadToCompassDeg(headingRad)
+        const objectives: CompassObjective[] = this.missionObjectives.map((obj, i) => ({
+          id: `obj-${i}`,
+          label: obj.type.toUpperCase(),
+          relativeDeg: signedRelativeBearingDeg(
+            compassHeading,
+            worldBearingDegTo(playerPos.x, playerPos.z, obj.x, obj.z),
+          ),
+          type: obj.type,
+        }))
         this.onFpsTelemetry({
           hp: this.playerController.hp,
           maxHp: this.playerController.maxHp,
@@ -846,6 +861,8 @@ export class LevelViewController implements Tickable {
           rtgCapacity: this.multiToolState?.rtgCapacity ?? 1,
           modeCharge: this.multiToolState?.modeCharge ?? 0,
           modeCapacity: this.multiToolState?.modeChargeCapacity ?? 1,
+          headingRad,
+          objectives,
         })
       }
     }
