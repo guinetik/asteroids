@@ -10,6 +10,8 @@
  * @spec docs/superpowers/specs/2026-04-03-asteroid-data-model-design.md
  */
 
+import type { AsteroidLighting } from '@/three/atmosphere/AtmosphereContext'
+
 /** A single mineral in an asteroid's composition breakdown. */
 export interface MineralEntry {
   /** Display name shown in mission briefing, e.g. "Hydrated Silicates" */
@@ -106,6 +108,8 @@ export interface AsteroidDefinition {
   visual: VisualProperties
   /** Real-world physics constants. */
   physical: PhysicalProperties
+  /** Per-asteroid lighting direction, color, and intensity for the level scene. */
+  lighting: AsteroidLighting
 }
 
 /** Visual properties for a mineral, used to blend surface materials from composition data. */

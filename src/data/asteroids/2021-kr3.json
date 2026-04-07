@@ -43,5 +43,12 @@
     "surfaceGravity": 8e-6,
     "rotationPeriod": 6.2,
     "surfaceTemperature": 450
+  },
+  "lighting": {
+    "sunAzimuth": 80,
+    "sunElevation": 10,
+    "sunColor": [0.85, 0.9, 1.0],
+    "sunIntensity": 1.0,
+    "ambientIntensity": 0.1
   }
 }
