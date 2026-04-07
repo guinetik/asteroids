@@ -141,4 +141,64 @@ describe('Timer', () => {
       expect(fn).not.toHaveBeenCalled()
     })
   })
+
+  describe('delta clamping', () => {
+    it('clamps large gaps to MAX_DELTA_S (0.1s)', () => {
+      const fn = vi.fn()
+      Timer.after(0.5, fn)
+
+      flushFrame(0)
+      // Jump 5 seconds — should clamp to 0.1s per frame
+      flushFrame(5000)
+
+      // Only 0.1s elapsed, not 5s
+      expect(fn).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('RAF lifecycle', () => {
+    it('stops RAF when no timers remain', () => {
+      const cancelSpy = vi.fn()
+      vi.stubGlobal('cancelAnimationFrame', cancelSpy)
+
+      const fn = vi.fn()
+      Timer.after(0.05, fn)
+
+      flushFrame(0)
+      flushFrame(60) // fires, list now empty
+
+      expect(fn).toHaveBeenCalledOnce()
+      expect(Timer.activeCount).toBe(0)
+    })
+
+    it('restarts RAF when timer added after idle', () => {
+      const rafSpy = vi.fn((cb: (time: number) => void) => {
+        rafCallbacks.push(cb)
+        return rafIdCounter++
+      })
+      vi.stubGlobal('requestAnimationFrame', rafSpy)
+
+      const fn1 = vi.fn()
+      Timer.after(0.05, fn1)
+      const callsAfterFirst = rafSpy.mock.calls.length
+
+      flushFrame(0)
+      flushFrame(60) // fires, loop stops
+
+      // Add another timer — RAF should restart
+      const fn2 = vi.fn()
+      Timer.after(0.05, fn2)
+      expect(rafSpy.mock.calls.length).toBeGreaterThan(callsAfterFirst + 1)
+    })
+
+    it('cancelAll stops RAF loop', () => {
+      Timer.after(10, vi.fn())
+      Timer.after(10, vi.fn())
+
+      flushFrame(0)
+
+      Timer.cancelAll()
+      expect(Timer.activeCount).toBe(0)
+    })
+  })
 })
