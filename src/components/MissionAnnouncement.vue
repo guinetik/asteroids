@@ -15,6 +15,10 @@ const props = defineProps<{
   visible: boolean
 }>()
 
+const emit = defineEmits<{
+  dismissed: []
+}>()
+
 const phase = ref<'closed' | 'opening' | 'open' | 'closing'>('closed')
 const removed = ref(false)
 
@@ -28,6 +32,7 @@ watch(() => props.visible, async (val) => {
       phase.value = 'closing'
       setTimeout(() => {
         removed.value = true
+        emit('dismissed')
       }, CLOSE_DURATION)
     }, HOLD_DURATION)
   }, OPEN_DURATION)

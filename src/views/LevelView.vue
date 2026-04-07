@@ -29,6 +29,7 @@ const announceVisible = ref(false)
 const announceAsteroid = ref('')
 const announceMission = ref('')
 const objCompleteVisible = ref(false)
+const trackerVisible = ref(false)
 const trackerObjectives = ref<TrackerObjective[]>([])
 const trackerAsteroid = ref('')
 const trackerMission = ref('')
@@ -195,6 +196,7 @@ onUnmounted(() => {
     :visible="announceVisible"
     :asteroid-name="announceAsteroid"
     :mission-name="announceMission"
+    @dismissed="trackerVisible = true"
   />
   <MissionAnnouncement
     :visible="objCompleteVisible"
@@ -202,7 +204,7 @@ onUnmounted(() => {
     :mission-name="trackerAsteroid"
   />
   <MissionTracker
-    v-if="stateInfo.state === 'lander' || stateInfo.state === 'eva'"
+    v-if="trackerVisible && (stateInfo.state === 'lander' || stateInfo.state === 'eva')"
     :asteroid-name="trackerAsteroid"
     :mission-name="trackerMission"
     :objectives="trackerObjectives"
