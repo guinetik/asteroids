@@ -493,7 +493,7 @@ export class OrbitCaptureSystem {
     }
 
     const progradeBoost = aimX * planetVx + aimZ * planetVz
-    const baseSpeed = orbitConfig.orbitLaunchSpeed * speedMultiplier
+    const baseSpeed = orbitConfig.orbitLaunchSpeed * Math.max(1, speedMultiplier)
     const speed = Math.max(baseSpeed, baseSpeed + progradeBoost)
     const vx = aimX * speed
     const vz = aimZ * speed
