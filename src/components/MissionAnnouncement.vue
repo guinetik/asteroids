@@ -50,16 +50,30 @@ defineExpose({ startTimer })
 .mission-announcement {
   position: fixed;
   top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
   z-index: 45;
   pointer-events: none;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.6rem;
+  padding: 2rem 0;
   opacity: 1;
   transition: opacity 1.5s ease-out;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(0, 255, 204, 0.04) 20%,
+    rgba(0, 255, 204, 0.08) 50%,
+    rgba(0, 255, 204, 0.04) 80%,
+    transparent
+  );
+  border-top: 1px solid rgba(0, 255, 204, 0.15);
+  border-bottom: 1px solid rgba(0, 255, 204, 0.15);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 .mission-announcement--fading {
   opacity: 0;
@@ -69,7 +83,7 @@ defineExpose({ startTimer })
   font-size: 1rem;
   letter-spacing: 0.4em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(0, 255, 204, 0.6);
 }
 .announce-divider {
   width: 12rem;
@@ -86,7 +100,7 @@ defineExpose({ startTimer })
   font-size: 2.2rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(0, 255, 204, 0.9);
   text-shadow:
     0 0 20px rgba(0, 255, 204, 0.4),
     0 0 40px rgba(0, 255, 204, 0.15);
