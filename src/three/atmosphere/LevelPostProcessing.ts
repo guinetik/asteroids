@@ -1,0 +1,193 @@
+/**
+ * Post-processing pipeline for the level scene.
+ *
+ * Cold, clinical tone: subtle bloom on emissives, desaturated color grade
+ * with cool shadow tint, mild chromatic aberration, vignette, and FXAA.
+ *
+ * @author guinetik
+ * @date 2026-04-06
+ * @spec docs/superpowers/specs/2026-04-06-atmosphere-effects-design.md
+ */
+import * as THREE from 'three'
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
+import { FXAAShader } from 'three/addons/shaders/FXAAShader.js'
+import { VignetteShader } from 'three/addons/shaders/VignetteShader.js'
+
+// ── Bloom ──
+/** Bloom intensity. Low — only bright emissives glow. */
+const BLOOM_STRENGTH = 0.4
+/** Bloom spread radius. */
+const BLOOM_RADIUS = 0.4
+/** Minimum brightness for bloom. Only engine flames / lights bloom. */
+const BLOOM_THRESHOLD = 0.75
+
+// ── Color grade ──
+/** How much to desaturate the image (0 = none, 1 = full grayscale). */
+const DESATURATION = 0.15
+/** Cool blue tint blended into shadow regions. */
+const SHADOW_TINT_R = 0.6
+const SHADOW_TINT_G = 0.7
+const SHADOW_TINT_B = 0.9
+/** Contrast S-curve intensity (1.0 = neutral). */
+const CONTRAST = 1.15
+
+// ── Chromatic aberration ──
+/** Base CA offset. Very subtle. */
+const CA_AMOUNT = 0.002
+
+// ── Vignette ──
+const VIGNETTE_OFFSET = 0.95
+const VIGNETTE_DARKNESS = 1.0
+
+/**
+ * Custom color-grade shader: desaturation + cool shadow tint + contrast.
+ */
+const ColorGradeShader = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    desaturation: { value: DESATURATION },
+    shadowTint: { value: new THREE.Vector3(SHADOW_TINT_R, SHADOW_TINT_G, SHADOW_TINT_B) },
+    contrast: { value: CONTRAST },
+  },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    uniform float desaturation;
+    uniform vec3 shadowTint;
+    uniform float contrast;
+    varying vec2 vUv;
+
+    void main() {
+      vec4 tex = texture2D(tDiffuse, vUv);
+      vec3 color = tex.rgb;
+
+      // Desaturate
+      float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+      color = mix(color, vec3(luma), desaturation);
+
+      // Cool shadow tint — blend toward shadowTint in dark regions
+      float shadowMask = 1.0 - smoothstep(0.0, 0.3, luma);
+      color = mix(color, color * shadowTint, shadowMask * 0.4);
+
+      // Contrast S-curve
+      color = clamp((color - 0.5) * contrast + 0.5, 0.0, 1.0);
+
+      gl_FragColor = vec4(color, tex.a);
+    }
+  `,
+}
+
+/**
+ * Custom chromatic aberration shader — radial RGB split from center.
+ */
+const ChromaticAberrationShader = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    amount: { value: CA_AMOUNT },
+  },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    uniform float amount;
+    varying vec2 vUv;
+
+    void main() {
+      vec2 dir = vUv - 0.5;
+      float dist = length(dir);
+      float r = texture2D(tDiffuse, vUv - dir * amount * dist).r;
+      float g = texture2D(tDiffuse, vUv).g;
+      float b = texture2D(tDiffuse, vUv + dir * amount * dist).b;
+      gl_FragColor = vec4(r, g, b, 1.0);
+    }
+  `,
+}
+
+/**
+ * Manages the EffectComposer pipeline for the level scene.
+ * Call {@link render} each frame instead of `renderer.render()`.
+ */
+export class LevelPostProcessing {
+  private readonly composer: EffectComposer
+  private readonly fxaaPass: ShaderPass
+  private readonly bloomPass: UnrealBloomPass
+
+  constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
+    this.composer = new EffectComposer(renderer)
+
+    // 1. Render scene
+    this.composer.addPass(new RenderPass(scene, camera))
+
+    // 2. Bloom
+    const size = renderer.getSize(new THREE.Vector2())
+    this.bloomPass = new UnrealBloomPass(size, BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD)
+    this.composer.addPass(this.bloomPass)
+
+    // 3. Color grade
+    this.composer.addPass(new ShaderPass(ColorGradeShader))
+
+    // 4. Chromatic aberration
+    this.composer.addPass(new ShaderPass(ChromaticAberrationShader))
+
+    // 5. Vignette
+    const vignettePass = new ShaderPass(VignetteShader)
+    vignettePass.uniforms['offset']!.value = VIGNETTE_OFFSET
+    vignettePass.uniforms['darkness']!.value = VIGNETTE_DARKNESS
+    this.composer.addPass(vignettePass)
+
+    // 6. FXAA (last)
+    this.fxaaPass = new ShaderPass(FXAAShader)
+    this.updateFxaaResolution(renderer)
+    this.composer.addPass(this.fxaaPass)
+  }
+
+  /** Call this instead of renderer.render(). */
+  render(): void {
+    this.composer.render()
+  }
+
+  /** Update the render pass camera (e.g. when switching lander ↔ FPS). */
+  setCamera(camera: THREE.Camera): void {
+    const renderPass = this.composer.passes[0] as RenderPass
+    renderPass.camera = camera
+  }
+
+  /** Must be called on window resize. */
+  resize(width: number, height: number): void {
+    this.composer.setSize(width, height)
+    this.bloomPass.resolution.set(width, height)
+    const pixelRatio = this.composer.renderer.getPixelRatio()
+    this.fxaaPass.material.uniforms['resolution']!.value.set(
+      1 / (width * pixelRatio),
+      1 / (height * pixelRatio),
+    )
+  }
+
+  /** Release GPU resources. */
+  dispose(): void {
+    this.composer.dispose()
+  }
+
+  private updateFxaaResolution(renderer: THREE.WebGLRenderer): void {
+    const size = renderer.getSize(new THREE.Vector2())
+    const pixelRatio = renderer.getPixelRatio()
+    this.fxaaPass.material.uniforms['resolution']!.value.set(
+      1 / (size.x * pixelRatio),
+      1 / (size.y * pixelRatio),
+    )
+  }
+}
