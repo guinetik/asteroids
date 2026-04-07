@@ -19,10 +19,10 @@ const deathOverlayVisible = ref(false)
 const deathOverlayCause = ref('')
 
 /** Landing warnings — only active when descending in lander state. */
-const WARN_SPEED = 3.0
-const SAFE_SPEED = 5.0
-const WARN_ANGLE = 0.1
-const SAFE_ANGLE = 0.175
+const WARN_SPEED = 5.0
+const SAFE_SPEED = 8.0
+const WARN_ANGLE = 0.17
+const SAFE_ANGLE = 0.26
 
 const descentWarning = computed(() => {
   if (stateInfo.state !== 'lander' || landerTelemetry.grounded || landerTelemetry.velocityY >= 0) return 'safe'

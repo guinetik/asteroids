@@ -131,16 +131,16 @@ const TILT_RETURN_SPEED = 2.5 // how fast it returns to upright
 const GROUND_TILT_LERP_SPEED = 4 // how fast the lander conforms to terrain slope
 
 /** Maximum safe landing speed (abs velocityY) — no damage below this. */
-const SAFE_LANDING_SPEED = 5.0
+const SAFE_LANDING_SPEED = 8.0
 
-/** Maximum safe landing angle (combined tilt magnitude, radians ~10°). */
-const SAFE_LANDING_ANGLE = 0.175
+/** Maximum safe landing angle (combined tilt magnitude, radians ~15°). */
+const SAFE_LANDING_ANGLE = 0.26
 
 /** HP damage per unit of excess landing speed. */
-const SPEED_DAMAGE_MULTIPLIER = 3.0
+const SPEED_DAMAGE_MULTIPLIER = 2.0
 
 /** HP damage per radian of excess landing tilt. */
-const ANGLE_DAMAGE_MULTIPLIER = 40.0
+const ANGLE_DAMAGE_MULTIPLIER = 25.0
 
 /** Lander starting and maximum HP. */
 const LANDER_MAX_HP = 100
