@@ -242,6 +242,8 @@ export class LevelViewController implements Tickable {
   // ── Mission ─────────────────────────────────────────────────
   private mission: GeneratedAsteroidMission | null = null
   private missionObjectives: ConcreteObjective[] = []
+  private asteroidName = ''
+  private missionAnnounced = false
 
   /** Survey runtime states — one per survey objective. */
   private surveyStates: SurveyRuntimeState[] = []
@@ -288,6 +290,9 @@ export class LevelViewController implements Tickable {
   /** Called to show/hide the death overlay with a cause message. */
   onDeathOverlay: ((visible: boolean, cause: string) => void) | null = null
 
+  /** Called once when gameplay starts (after arrival) with asteroid name + mission name. */
+  onMissionAnnounce: ((asteroidName: string, missionName: string) => void) | null = null
+
   /** Called once with the minimap canvas after terrain generation. */
   onMapCanvas: ((canvas: HTMLCanvasElement) => void) | null = null
 
@@ -311,6 +316,7 @@ export class LevelViewController implements Tickable {
     const { asteroid, seed, mission } = resolveLevelContext()
     this.mission = mission
     this.missionObjectives = mission.objectives
+    this.asteroidName = asteroid.name
 
     // ── Terrain ─────────────────────────────────────────────────
     const flat = new URLSearchParams(window.location.search).has('flat')
@@ -660,6 +666,12 @@ export class LevelViewController implements Tickable {
     this.sceneManager!.setActiveCamera(null)
     if (this.postProcessing && this.vehicleCamera) {
       this.postProcessing.setCamera(this.vehicleCamera.camera)
+    }
+
+    // Mission announcement — first lander entry only (after arrival cutscene)
+    if (!this.missionAnnounced && this.mission) {
+      this.missionAnnounced = true
+      this.onMissionAnnounce?.(this.asteroidName, this.mission.name)
     }
   }
 

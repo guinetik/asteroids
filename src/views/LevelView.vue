@@ -3,6 +3,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { LevelViewController } from './LevelViewController'
 import LanderHud from '@/components/LanderHud.vue'
+import MissionAnnouncement from '@/components/MissionAnnouncement.vue'
 import FpsHud from '@/components/FpsHud.vue'
 import FpsCompass from '@/components/FpsCompass.vue'
 import DeathOverlay from '@/components/DeathOverlay.vue'
@@ -22,6 +23,9 @@ const deathOverlayVisible = ref(false)
 const deathOverlayCause = ref('')
 const showMap = ref(false)
 const terminalPrompt = ref<string | null>(null)
+const announceVisible = ref(false)
+const announceAsteroid = ref('')
+const announceMission = ref('')
 const mapCanvas = ref<HTMLCanvasElement | null>(null)
 const playerX = ref(0)
 const playerZ = ref(0)
@@ -112,6 +116,11 @@ onMounted(async () => {
       deathOverlayVisible.value = visible
       deathOverlayCause.value = cause
     }
+    viewController.onMissionAnnounce = (asteroid, mission) => {
+      announceAsteroid.value = asteroid
+      announceMission.value = mission
+      announceVisible.value = true
+    }
     viewController.onTerminalPrompt = (text) => {
       terminalPrompt.value = text
     }
@@ -162,6 +171,11 @@ onUnmounted(() => {
   <div
     class="letterbox-bar letterbox-bar--bottom"
     :class="{ 'letterbox-bar--hidden': !letterboxVisible }"
+  />
+  <MissionAnnouncement
+    :visible="announceVisible"
+    :asteroid-name="announceAsteroid"
+    :mission-name="announceMission"
   />
   <LanderHud v-if="stateInfo.state === 'lander'" :telemetry="landerTelemetry" />
   <FpsHud v-if="stateInfo.state === 'eva'" :telemetry="fpsTelemetry" />
