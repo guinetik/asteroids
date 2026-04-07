@@ -16,12 +16,12 @@
     "speedExcessReturnRate": 0.42
   },
   "map": {
-    "thrustForce": 0.48,
+    "thrustForce": 0.5,
     "brakeFactor": 0.93,
     "brakeDepthPenalty": 0.002,
-    "yawTorque": 1.8,
-    "yawLateralForce": 0.19,
-    "yawMaxSpeed": 2.4,
+    "yawTorque": 2,
+    "yawLateralForce": 0.2,
+    "yawMaxSpeed": 2.5,
     "yawDamping": 0.98,
     "maxThrustSpeed": 2,
     "speedReturnEquilibriumSpeed": 2.9,
