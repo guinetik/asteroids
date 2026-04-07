@@ -49,6 +49,7 @@ import type { GravitySource } from '@/lib/physics/gravity'
 import { ShuttleController, MAP_PHYSICS } from '@/three/ShuttleController'
 import mapGravityData from '@/data/shuttle/map-gravity.json'
 import { ThrusterEffectController } from '@/three/ThrusterEffectController'
+import { TemperatureEffectController } from '@/three/TemperatureEffectController'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
 import {
   VehicleCamera,
@@ -402,6 +403,7 @@ export class MapViewController implements Tickable {
   private introCamera: THREE.PerspectiveCamera | null = null
   private shuttleController: ShuttleController | null = null
   private thrusterController: ThrusterEffectController | null = null
+  private temperatureEffects: TemperatureEffectController | null = null
   private starField: StarFieldController | null = null
   private sunController: SunController | null = null
   private planetControllers: PlanetSystemController[] = []
@@ -605,7 +607,7 @@ export class MapViewController implements Tickable {
     document.addEventListener('mousemove', this.onHabitatMouseMove)
 
     // --- Starfield ---
-    this.starField = new StarFieldController()
+    this.starField = new StarFieldController({ count: 4000, radius: 40000, size: 1.5 })
     scene.add(this.starField.points)
 
     // --- Sun ---
@@ -738,6 +740,12 @@ export class MapViewController implements Tickable {
     scene.add(this.thrusterController.brakePoints)
     scene.add(this.thrusterController.rcsPoints)
     this.tickHandler.register(this.thrusterController, TICK_PRIORITY_ANIMATION)
+
+    // Temperature VFX — fire/frost on hull (children of shuttle so they move with it)
+    this.temperatureEffects = new TemperatureEffectController()
+    this.shuttleController.group.add(this.temperatureEffects.fireEmitter.points)
+    this.shuttleController.group.add(this.temperatureEffects.frostEmitter.points)
+    this.tickHandler.register(this.temperatureEffects, TICK_PRIORITY_ANIMATION)
 
     // Explosion particle emitter — shared for all death types
     this.explosionEmitter = new ParticleEmitter({
@@ -1410,6 +1418,7 @@ export class MapViewController implements Tickable {
         getCurrentUpgradeValue('shuttleHeatResistance'),
         getCurrentUpgradeValue('shuttleHull'),
       )
+      this.temperatureEffects?.setTemperature(this.shipHealth.temperature)
     }
 
     // Planet collision — instant death if shuttle flies into a planet mesh
@@ -3306,6 +3315,7 @@ export class MapViewController implements Tickable {
     this.portalArrival?.dispose()
     this.boundarySystem?.dispose()
     this.thrusterController?.dispose()
+    this.temperatureEffects?.dispose()
     this.shuttleController?.dispose()
     for (const controller of this.beltControllers) controller.dispose()
     for (const controller of this.planetControllers) controller.dispose()

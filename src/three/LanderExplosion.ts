@@ -10,13 +10,15 @@ import { ParticleEmitter } from './ParticleEmitter'
 import type { Tickable } from '@/lib/Tickable'
 
 /** Minimum particles for a low-speed crash. */
-const MIN_PARTICLES = 16
+const MIN_PARTICLES = 8
 /** Maximum particles for a terminal-velocity crash. */
-const MAX_PARTICLES = 64
+const MAX_PARTICLES = 160
 /** Speed at which explosion is at full intensity. */
 const MAX_IMPACT_SPEED = 20
-/** Explosion burst force. */
-const BURST_FORCE = 30
+/** Minimum burst force (gentle bump). */
+const BURST_FORCE_MIN = 6
+/** Maximum burst force (destruction). */
+const BURST_FORCE_MAX = 35
 
 /**
  * Crash explosion — emits fire + debris particles scaled to impact speed.
@@ -34,19 +36,19 @@ export class LanderExplosion implements Tickable {
   constructor() {
     this.fireEmitter = new ParticleEmitter({
       poolSize: MAX_PARTICLES,
-      color: new Color(0xff6600),
-      size: 8,
-      lifetime: 1.5,
-      spread: 40,
-      opacity: 0.9,
+      color: new Color(0xffaa44),
+      size: 3,
+      lifetime: 0.8,
+      spread: 12,
+      opacity: 0.7,
     })
     this.debrisEmitter = new ParticleEmitter({
       poolSize: MAX_PARTICLES,
-      color: new Color(0x888888),
-      size: 4,
-      lifetime: 1.5,
-      spread: 40,
-      opacity: 0.6,
+      color: new Color(0x666666),
+      size: 2,
+      lifetime: 1.2,
+      spread: 8,
+      opacity: 0.4,
     })
   }
 
@@ -58,29 +60,33 @@ export class LanderExplosion implements Tickable {
    */
   explode(position: Vector3, impactSpeed: number): void {
     const ratio = Math.min(1, impactSpeed / MAX_IMPACT_SPEED)
-    const count = Math.round(MIN_PARTICLES + (MAX_PARTICLES - MIN_PARTICLES) * ratio)
-    const force = BURST_FORCE * (0.5 + ratio * 0.5)
+    const count = Math.round(MIN_PARTICLES + (MAX_PARTICLES - MIN_PARTICLES) * ratio * ratio)
+    const force = BURST_FORCE_MIN + (BURST_FORCE_MAX - BURST_FORCE_MIN) * ratio
+    /** Higher elevation spread for violent impacts — debris goes everywhere. */
+    const elevationRange = 0.3 + ratio * 0.5
 
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2
-      const elevation = Math.random() * Math.PI * 0.5
+      const elevation = Math.random() * Math.PI * elevationRange
+      const particleForce = force * (0.4 + Math.random() * 0.6)
       const dir = new Vector3(
         Math.cos(angle) * Math.cos(elevation),
         Math.sin(elevation),
         Math.sin(angle) * Math.cos(elevation),
-      ).multiplyScalar(force)
+      ).multiplyScalar(particleForce)
       this.fireEmitter.emit(position, dir)
     }
 
-    const debrisCount = Math.round(count * 0.5)
+    const debrisCount = Math.round(count * (0.3 + ratio * 0.4))
     for (let i = 0; i < debrisCount; i++) {
       const angle = Math.random() * Math.PI * 2
-      const elevation = Math.random() * Math.PI * 0.4
+      const elevation = Math.random() * Math.PI * elevationRange * 0.8
+      const particleForce = force * (0.3 + Math.random() * 0.5)
       const dir = new Vector3(
         Math.cos(angle) * Math.cos(elevation),
         Math.sin(elevation),
         Math.sin(angle) * Math.cos(elevation),
-      ).multiplyScalar(force * 0.6)
+      ).multiplyScalar(particleForce)
       this.debrisEmitter.emit(position, dir)
     }
   }

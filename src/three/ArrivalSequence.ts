@@ -227,6 +227,18 @@ export class ArrivalSequence {
     const shuttleScene = this.shuttleScene
     this.shuttleGroup.scale.setScalar(SHUTTLE_CINEMATIC_SCALE)
 
+    // Fill lights attached to shuttle — keeps hull readable after flip
+    // Model is ~14 units across (1400cm * MODEL_SCALE 0.01), so lights must be close
+    const cinematicFill = new THREE.PointLight(0xddeeff, 30, 60)
+    cinematicFill.position.set(0, 12, 0)
+    this.shuttleGroup.add(cinematicFill)
+    const cinematicBelow = new THREE.PointLight(0xffeedd, 20, 50)
+    cinematicBelow.position.set(0, -10, 0)
+    this.shuttleGroup.add(cinematicBelow)
+    const cinematicRim = new THREE.PointLight(0xffeedd, 15, 50)
+    cinematicRim.position.set(-15, 0, 0)
+    this.shuttleGroup.add(cinematicRim)
+
     // Find door nodes
     this.doorPortNode = this.findNode(shuttleScene, 'door-prt')
     this.doorStbNode = this.findNode(shuttleScene, 'door-stb')
@@ -388,6 +400,9 @@ export class ArrivalSequence {
     this.phase = 'done'
     this.fallingLander?.removeFromParent()
     this.fallingLander = null
+    if (this.landerModel) {
+      this.landerModel.visible = false
+    }
 
     // Scale up to gameplay proportions (lander fits inside cargo bay)
     this.shuttleGroup.scale.setScalar(SHUTTLE_PARKED_SCALE)
@@ -589,6 +604,7 @@ export class ArrivalSequence {
     // Animate lander in world space (scene root), then reparent into cargo bay at the end.
     // This mirrors the arrival detach in reverse.
     if (this.landerModel && this.shuttleScene) {
+      this.landerModel.visible = true
       this.exfilLanderStartPos.copy(landerPosition)
       // Target: cargo bay position in world space
       // Cargo bay is at model X=-320, which at scale 15*0.01 = ~48 units toward nozzles.
@@ -830,7 +846,7 @@ export class ArrivalSequence {
       EXFIL_FLOODLIGHT_DECAY,
     )
     floodlight.position.set(EXFIL_FLOODLIGHT_X_OFFSET, EXFIL_FLOODLIGHT_Y_OFFSET, 0)
-    floodlight.castShadow = true
+    floodlight.castShadow = false
     floodlight.shadow.mapSize.set(EXFIL_FLOODLIGHT_SHADOW_MAP_SIZE, EXFIL_FLOODLIGHT_SHADOW_MAP_SIZE)
     floodlight.shadow.bias = EXFIL_FLOODLIGHT_SHADOW_BIAS
 
@@ -859,6 +875,8 @@ export class ArrivalSequence {
     const beamDirection = target.position.clone().sub(floodlight.position).normalize()
     cone.position.copy(floodlight.position)
     cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), beamDirection)
+    cone.castShadow = false
+    cone.receiveShadow = false
     cone.renderOrder = 1
 
     this.shuttleGroup.add(floodlight)

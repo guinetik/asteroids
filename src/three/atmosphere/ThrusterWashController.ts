@@ -26,27 +26,27 @@ const SCORCH_ALTITUDE = 20
 const WASH_FULL_ALTITUDE = 5
 
 // ── Dust particles ──
-const DUST_POOL_SIZE = 300
-const DUST_PARTICLE_SIZE = 6
-const DUST_LIFETIME = 1.2
-const DUST_SPREAD = 3
-const DUST_OPACITY = 0.8
+const DUST_POOL_SIZE = 200
+const DUST_PARTICLE_SIZE = 2.5
+const DUST_LIFETIME = 0.8
+const DUST_SPREAD = 1.5
+const DUST_OPACITY = 0.35
 /** Max spawn rate (particles/sec) at closest altitude. */
-const DUST_MAX_SPAWN_RATE = 200
+const DUST_MAX_SPAWN_RATE = 120
 /** Minimum spawn rate at WASH_MAX_ALTITUDE. */
-const DUST_MIN_SPAWN_RATE = 40
+const DUST_MIN_SPAWN_RATE = 20
 /** Radial speed multiplier for outward push. */
-const DUST_RADIAL_SPEED = 50
+const DUST_RADIAL_SPEED = 35
 
 // ── Wash light ──
-const WASH_LIGHT_COLOR = 0xff8844
-const WASH_LIGHT_MAX_INTENSITY = 6
-const WASH_LIGHT_ANGLE = Math.PI / 6
-const WASH_LIGHT_PENUMBRA = 0.5
-const WASH_LIGHT_DISTANCE = 80
+const WASH_LIGHT_COLOR = 0xffaa66
+const WASH_LIGHT_MAX_INTENSITY = 3
+const WASH_LIGHT_ANGLE = Math.PI / 8
+const WASH_LIGHT_PENUMBRA = 0.7
+const WASH_LIGHT_DISTANCE = 60
 
 // ── Scorch glow ──
-const SCORCH_RADIUS = 15
+const SCORCH_RADIUS = 12
 const SCORCH_SEGMENTS = 32
 /** Seconds for scorch to fade out after engines cut. */
 const SCORCH_FADE_DURATION = 1.0
@@ -113,6 +113,7 @@ export class ThrusterWashController {
   private scorchIntensity = 0
   private dustSpawnAccumulator = 0
   private elapsedTime = 0
+  private readonly _zFace = new THREE.Vector3(0, 0, 1)
 
   constructor(baseColor: [number, number, number]) {
     // ── Dust emitter ──
@@ -154,7 +155,6 @@ export class ThrusterWashController {
       baseColor[2] * 0.5,
     )
     this.scorchMesh = new THREE.Mesh(scorchGeo, scorchMat)
-    this.scorchMesh.rotation.x = -Math.PI / 2 // lay flat on XZ plane
     this.scorchMesh.visible = false
   }
 
@@ -228,7 +228,9 @@ export class ThrusterWashController {
     }
     this.scorchMesh.visible = this.scorchIntensity > 0.01
     if (this.scorchMesh.visible) {
-      this.scorchMesh.position.set(landerPosition.x, groundY + 0.1, landerPosition.z)
+      this.scorchMesh.position.set(landerPosition.x, groundY + 0.15, landerPosition.z)
+      // Orient disc to terrain slope
+      this.scorchMesh.quaternion.setFromUnitVectors(this._zFace, ctx.groundNormal)
       const mat = this.scorchMesh.material
       mat.uniforms['intensity']!.value = this.scorchIntensity * intensity
       mat.uniforms['time']!.value = this.elapsedTime

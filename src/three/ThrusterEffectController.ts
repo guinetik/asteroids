@@ -18,9 +18,9 @@ import { ParticleEmitter } from './ParticleEmitter'
 import { getIdleThrusterSpritePulse } from './idleThrusterSpritePulse'
 import { resolveThrusterEffectState } from './thrusterEffectState'
 
-const THRUST_SPAWN_RATE = 500
-const BRAKE_SPAWN_RATE = 400
-const RCS_SPAWN_RATE = 120
+const THRUST_SPAWN_RATE = 800
+const BRAKE_SPAWN_RATE = 600
+const RCS_SPAWN_RATE = 250
 
 /**
  * 3 nozzle emit points matching ShuttleController ENG_POSITIONS * MODEL_SCALE.
@@ -74,27 +74,34 @@ export class ThrusterEffectController implements Tickable {
     const s = shuttle.group.scale.x
 
     this.thrustEmitter = new ParticleEmitter({
-      poolSize: 1000,
-      color: new THREE.Color(0xff8800),
-      size: Math.max(5, 4 * s),
-      lifetime: 0.3,
-      spread: 3 * s,
+      poolSize: 1500,
+      color: new THREE.Color(0xffcc66),
+      size: Math.max(6, 6 * s),
+      lifetime: 0.5,
+      spread: 2 * s,
+      opacity: 0.9,
+      sizeGrowth: 1.8,
     })
 
     this.brakeEmitter = new ParticleEmitter({
-      poolSize: 1000,
+      poolSize: 1500,
       color: new THREE.Color(0x4488ff),
-      size: Math.max(5, 4 * s),
-      lifetime: 0.3,
-      spread: 5 * s,
+      size: Math.max(5, 5 * s),
+      lifetime: 0.45,
+      spread: 3 * s,
+      opacity: 0.7,
+      sizeGrowth: 2.0,
     })
 
     this.rcsEmitter = new ParticleEmitter({
-      poolSize: 200,
-      color: new THREE.Color(0xccddff),
-      size: Math.max(3, 2 * s),
-      lifetime: 0.2,
+      poolSize: 400,
+      color: new THREE.Color(0xddeeff),
+      size: Math.max(3, 2.5 * s),
+      lifetime: 0.5,
       spread: 1.5 * s,
+      opacity: 0.6,
+      soft: true,
+      sizeGrowth: 2.5,
     })
 
     this.thrustPoints = this.thrustEmitter.points

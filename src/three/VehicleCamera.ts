@@ -63,7 +63,7 @@ export const LANDER_CAMERA_CONFIG: VehicleCameraConfig = {
   idleTimeout: 1.0,
   minY: 5,
   fov: 60,
-  maxDistance: 200,
+  maxDistance: 145,
 }
 
 /** Map preset: same proportions as shuttle cam, scaled for ~0.14 unit ship. */
@@ -146,6 +146,11 @@ export class VehicleCamera implements Tickable {
    */
   private shipYawCouplingEnabled = true
 
+  /** Camera shake state. */
+  private shakeIntensity = 0
+  private shakeDecay = 0
+  private readonly shakeOffset = new THREE.Vector3()
+
   constructor(config: VehicleCameraConfig, domElement: HTMLElement) {
     this.config = config
 
@@ -154,6 +159,7 @@ export class VehicleCamera implements Tickable {
     this.controls = new OrbitControls(this.camera, domElement)
     this.controls.enableDamping = true
     this.controls.dampingFactor = 0.1
+    this.controls.maxDistance = config.maxDistance ?? Infinity
 
     this.controls.addEventListener('start', this.onControlStart)
     this.controls.addEventListener('end', this.onControlEnd)
@@ -218,6 +224,17 @@ export class VehicleCamera implements Tickable {
     this.controls.maxDistance = config.maxDistance ?? Infinity
   }
 
+  /**
+   * Trigger a camera shake proportional to intensity.
+   *
+   * @param intensity - Shake magnitude in world units (e.g. 2 = gentle bump, 8 = hard crash).
+   * @param duration - How long the shake lasts in seconds.
+   */
+  shake(intensity: number, duration: number): void {
+    this.shakeIntensity = intensity
+    this.shakeDecay = duration > 0 ? intensity / duration : 0
+  }
+
   tick(dt: number): void {
     if (!this.target) return
 
@@ -262,6 +279,20 @@ export class VehicleCamera implements Tickable {
     // Always clamp
     if (this.camera.position.y < this.config.minY) {
       this.camera.position.y = this.config.minY
+    }
+
+    // Camera shake — random offset that decays over time
+    if (this.shakeIntensity > 0) {
+      // Remove previous frame's offset
+      this.camera.position.sub(this.shakeOffset)
+      // Compute new random offset
+      this.shakeOffset.set(
+        (Math.random() - 0.5) * 2 * this.shakeIntensity,
+        (Math.random() - 0.5) * 2 * this.shakeIntensity,
+        (Math.random() - 0.5) * 2 * this.shakeIntensity,
+      )
+      this.camera.position.add(this.shakeOffset)
+      this.shakeIntensity = Math.max(0, this.shakeIntensity - this.shakeDecay * dt)
     }
 
     this.controls.update()

@@ -72,7 +72,7 @@ export class ShuttleViewController implements Tickable {
     this.tickHandler.register(this.sceneManager, TICK_PRIORITY_RENDER)
 
     // Stars
-    this.starFieldController = new StarFieldController()
+    this.starFieldController = new StarFieldController({ count: 4000, radius: 40000, size: 1.5 })
     this.sceneManager.addToScene(this.starFieldController.points)
 
     // Space-time grid on the XZ equator plane — warped by gravity

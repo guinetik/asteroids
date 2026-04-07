@@ -21,9 +21,9 @@ import type { AtmosphereContext } from './AtmosphereContext'
 const DRIFT_BASE_COUNT = 120
 /** Minimum particles even on low-dust asteroids. */
 const DRIFT_MIN_COUNT = 30
-const DRIFT_PARTICLE_SIZE = 1.5
-const DRIFT_LIFETIME = 8
-const DRIFT_OPACITY = 0.2
+const DRIFT_PARTICLE_SIZE = 1.0
+const DRIFT_LIFETIME = 6
+const DRIFT_OPACITY = 0.12
 const DRIFT_SPREAD = 0.5
 /** Half-size of the volume box around the camera. */
 const DRIFT_VOLUME_HALF = 80

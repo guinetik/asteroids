@@ -14,9 +14,11 @@ import type { Tickable } from '@/lib/Tickable'
 import type { InputManager } from '@/lib/InputManager'
 import { loadGLB } from './loadGLB'
 import { PlatformerBody } from '@/lib/physics/platformerBody'
+import { CollisionWorld } from '@/lib/physics/worldCollision'
 import { ThrusterSystem, type ThrusterSystemConfig } from '@/lib/physics/thrusterSystem'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import { ParticleEmitter } from './ParticleEmitter'
+import { WarningBeacon } from './WarningBeacon'
 
 const LANDER_MODEL_PATH = '/models/lander.glb'
 
@@ -48,32 +50,38 @@ const LANDER_THRUSTER_CONFIG: ThrusterSystemConfig<LanderThrusterName> = {
 }
 
 /** Node name for the main descent engine bell in the GLB */
-const MAIN_ENGINE_NODE = 'Thruster_Lunar Lander_0'
+const MAIN_ENGINE_NODE = 'Thruster_Lunar_Lander_0'
 
 /** RCS ascend thrust — smaller boost than main engine */
 const RCS_ASCEND_THRUST = 3.14
 
 /** Main engine flame emitter config */
-const FLAME_POOL_SIZE = 300
-const FLAME_COLOR = new THREE.Color(0xff6600)
+const FLAME_POOL_SIZE = 500
+const FLAME_COLOR = new THREE.Color(0xffcc66)
 const FLAME_SIZE = 6
-const FLAME_LIFETIME = 1.0
-const FLAME_SPREAD = 5
+const FLAME_LIFETIME = 0.5
+const FLAME_SPREAD = 2
 /** Base downward push for flame particles. */
 const FLAME_PUSH_FORCE = 30
 /** Extra push added per unit of fall speed so flames stay below the lander. */
 const FLAME_VELOCITY_COMPENSATION = 1.5
-const FLAME_SPAWN_RATE = 160
-const FLAME_EMIT_Y_OFFSET = 8
+const FLAME_SPAWN_RATE = 300
+const FLAME_EMIT_Y_OFFSET = 4
+
+/** Nozzle glow sprite — always-on idle glow at the engine bell. */
+const NOZZLE_GLOW_SIZE = 8
+const NOZZLE_GLOW_TEXTURE_SIZE = 64
+const NOZZLE_GLOW_COLOR_CORE = '#fff5cc'
+const NOZZLE_GLOW_COLOR_EDGE = '#ff9a1f'
 
 /** RCS emitter config — white puffs, smaller and shorter than main flame */
-const RCS_POOL_SIZE = 30
-const RCS_COLOR = new THREE.Color(0xccddff)
-const RCS_SIZE = 3
-const RCS_LIFETIME = 0.25
-const RCS_SPREAD = 2
+const RCS_POOL_SIZE = 120
+const RCS_COLOR = new THREE.Color(0xddeeff)
+const RCS_SIZE = 1.2
+const RCS_LIFETIME = 0.5
+const RCS_SPREAD = 1.5
 const RCS_PUSH_FORCE = 10
-const RCS_SPAWN_RATE = 50
+const RCS_SPAWN_RATE = 250
 
 /** Lander floodlights mounted near the front legs to illuminate the terrain below. */
 const FLOODLIGHT_COLOR = 0xf4f7ff
@@ -94,6 +102,16 @@ const BODY_FILL_LIGHT_COLOR = 0xf4f7ff
 const BODY_FILL_LIGHT_INTENSITY = 3.4
 const BODY_FILL_LIGHT_DISTANCE = 110
 const BODY_FILL_LIGHT_Y_OFFSET = 10
+
+/** Roof-mounted warning beacon centered above the lander chassis. */
+const TOP_BEACON_Y_OFFSET = 22
+const TOP_BEACON_LIGHT_INTENSITY = 24
+const TOP_BEACON_LIGHT_DISTANCE = 140
+const TOP_BEACON_GLOW_INTENSITY = 7
+const TOP_BEACON_GLOW_DISTANCE = 210
+const TOP_BEACON_SAFE_COLOR = 0x22c55e
+const TOP_BEACON_WARN_COLOR = 0xeab308
+const TOP_BEACON_DANGER_COLOR = 0xef4444
 
 /** Visible beam volume so the floodlights read even before they hit terrain. */
 const FLOODLIGHT_CONE_LENGTH = 220
@@ -155,7 +173,7 @@ const FLAT_GROUND_THRESHOLD = 0.95
 /** Boost multiplier when launching from a slope */
 const SLOPE_LIFTOFF_PENALTY = 0.5
 const TILT_LERP_SPEED = 3 // how fast the lander tilts toward target
-const TILT_RETURN_SPEED = 2.5 // how fast it returns to upright
+const TILT_RETURN_SPEED = 6 // how fast it returns to upright
 const GROUND_TILT_LERP_SPEED = 4 // how fast the lander conforms to terrain slope
 /** Yaw rotation speed in radians per second (gyroscope). */
 const YAW_SPEED = 0.6
@@ -166,11 +184,23 @@ const RETRO_BRAKE_DAMPING = 3.0
 const _yAxis = new THREE.Vector3(0, 1, 0)
 const _qTilt = new THREE.Quaternion()
 const _euler = new THREE.Euler()
+const _qYaw = new THREE.Quaternion()
+const _sampleOffset = new THREE.Vector3()
+const _sampleWorld = new THREE.Vector3()
+
+interface TerrainSupportSample {
+  height: number
+  normal: { x: number; y: number; z: number }
+  colliderId: string | null
+  hasSupport: boolean
+}
 
 /** Maximum safe landing speed (abs velocityY) — no damage below this. */
+const WARN_LANDING_SPEED = 5.0
 const SAFE_LANDING_SPEED = 8.0
 
 /** Maximum safe landing angle (combined tilt magnitude, radians ~15°). */
+const WARN_LANDING_ANGLE = 0.17
 const SAFE_LANDING_ANGLE = 0.26
 
 /** HP damage per unit of excess landing speed. */
@@ -181,6 +211,23 @@ const ANGLE_DAMAGE_MULTIPLIER = 25.0
 
 /** Lander starting and maximum HP. */
 const LANDER_MAX_HP = 100
+const LANDING_APPROACH_BUFFER_ALTITUDE = 22
+const LANDING_APPROACH_REACTION_TIME = 2.8
+const LANDING_APPROACH_MIN_DESCENT_SPEED = 1.0
+const LANDING_APPROACH_MAX_ALTITUDE = 150
+const LANDING_BRAKING_DECELERATION = Math.max(0.01, MAIN_ENGINE_THRUST - GAMEPLAY_GRAVITY)
+const LANDER_SUPPORT_SAMPLE_RADIUS = 9
+const LANDER_SUPPORT_SAMPLE_DIAGONAL = LANDER_SUPPORT_SAMPLE_RADIUS * 0.72
+const LANDER_SUPPORT_CONTACT_SAMPLE_COUNT = 3
+const LANDER_COLLISION_RADIUS = 8.5
+const LANDER_COLLISION_SUBSTEP_DISTANCE = 2
+const LANDER_COLLISION_SKIN_WIDTH = 0.1
+const LANDER_COLLISION_BOTTOM_OFFSET = 2
+const LANDER_COLLISION_TOP_OFFSET = 18
+const LANDER_SUPPORT_MAX_STEP_UP = 6
+const LANDER_COLLIDER_ID = 'lander'
+
+export type LandingWarningLevel = 'safe' | 'warn' | 'danger'
 
 /**
  * Controls the lunar lander — gravity, main engine, and RCS emitters.
@@ -194,12 +241,24 @@ export class LanderController implements Tickable {
   readonly body = new PlatformerBody({ gravity: GAMEPLAY_GRAVITY })
   readonly thrusterSystem = new ThrusterSystem<LanderThrusterName>(LANDER_THRUSTER_CONFIG)
   readonly flameEmitter: ParticleEmitter
+  readonly nozzleGlow: THREE.Sprite
   readonly floodlights: THREE.SpotLight[] = []
   readonly bodyFillLight = new THREE.PointLight(
     BODY_FILL_LIGHT_COLOR,
     BODY_FILL_LIGHT_INTENSITY,
     BODY_FILL_LIGHT_DISTANCE,
   )
+  readonly topWarningBeacon = new WarningBeacon({
+    lightIntensity: TOP_BEACON_LIGHT_INTENSITY,
+    lightDistance: TOP_BEACON_LIGHT_DISTANCE,
+    glowIntensity: TOP_BEACON_GLOW_INTENSITY,
+    glowDistance: TOP_BEACON_GLOW_DISTANCE,
+    baseRadius: 1.35,
+    baseHeight: 0.58,
+    mastRadius: 0.24,
+    mastHeight: 1.08,
+    lensRadius: 0.54,
+  })
   readonly floodlightCones: THREE.Mesh[] = []
 
   /** One emitter per RCS nozzle, keyed by node name */
@@ -207,6 +266,7 @@ export class LanderController implements Tickable {
 
   private readonly inputManager: InputManager
   private heightmap: Heightmap | null = null
+  private collisionWorld: CollisionWorld | null = null
   private mainEngineWorldPos = new THREE.Vector3()
   private mainEngineLocalPos = new THREE.Vector3()
   private flameSpawnAccumulator = 0
@@ -220,6 +280,8 @@ export class LanderController implements Tickable {
 
   /** Current yaw angle (Y rotation, Q/E gyroscope). */
   private yaw = 0
+  private nozzleGlowTime = 0
+  private engineMesh: THREE.Mesh | null = null
 
   /** Local-space positions of each RCS nozzle, keyed by node name */
   private readonly rcsLocalPositions = new Map<string, THREE.Vector3>()
@@ -260,6 +322,49 @@ export class LanderController implements Tickable {
     return Math.sqrt(this.tiltX * this.tiltX + this.tiltZ * this.tiltZ)
   }
 
+  get altitudeAboveGround(): number {
+    const support = this.sampleTerrainSupport()
+    if (!support.hasSupport) return Infinity
+    const groundY = support.height
+    return Math.max(0, this.group.position.y - groundY)
+  }
+
+  get isLandingApproachActive(): boolean {
+    if (this.body.grounded) return false
+    const descentRate = -this.body.velocityY
+    if (descentRate < LANDING_APPROACH_MIN_DESCENT_SPEED) return false
+
+    const brakingDistance = (descentRate * descentRate) / (2 * LANDING_BRAKING_DECELERATION)
+    const reactionDistance = descentRate * LANDING_APPROACH_REACTION_TIME
+    const warningAltitude = Math.min(
+      LANDING_APPROACH_MAX_ALTITUDE,
+      LANDING_APPROACH_BUFFER_ALTITUDE + brakingDistance + reactionDistance,
+    )
+
+    return this.altitudeAboveGround <= warningAltitude
+  }
+
+  get descentWarningLevel(): LandingWarningLevel {
+    if (!this.isLandingApproachActive) return 'safe'
+    const speed = Math.abs(this.body.velocityY)
+    if (speed >= SAFE_LANDING_SPEED) return 'danger'
+    if (speed >= WARN_LANDING_SPEED) return 'warn'
+    return 'safe'
+  }
+
+  get attitudeWarningLevel(): LandingWarningLevel {
+    if (!this.isLandingApproachActive) return 'safe'
+    if (this.tiltAngle >= SAFE_LANDING_ANGLE) return 'danger'
+    if (this.tiltAngle >= WARN_LANDING_ANGLE) return 'warn'
+    return 'safe'
+  }
+
+  get landingSafetyLevel(): LandingWarningLevel {
+    if (this.descentWarningLevel === 'danger' || this.attitudeWarningLevel === 'danger') return 'danger'
+    if (this.descentWarningLevel === 'warn' || this.attitudeWarningLevel === 'warn') return 'warn'
+    return 'safe'
+  }
+
   /** Tracks whether lander was grounded last frame. */
   private wasGrounded = false
 
@@ -269,10 +374,19 @@ export class LanderController implements Tickable {
   /** Called when HP reaches 0. */
   onDeath: (() => void) | null = null
 
+  /** Called when the lander fuel tank is depleted. */
+  onFuelEmpty: (() => void) | null = null
+
   constructor(inputManager: InputManager) {
     this.inputManager = inputManager
+    this.thrusterSystem.onFuelEmpty = () => {
+      this.onFuelEmpty?.()
+    }
     this.bodyFillLight.position.set(0, BODY_FILL_LIGHT_Y_OFFSET, 0)
+    this.topWarningBeacon.group.position.set(0, TOP_BEACON_Y_OFFSET, 0)
     this.group.add(this.bodyFillLight)
+    this.group.add(this.topWarningBeacon.group)
+    this.updateWarningBeacon()
 
     this.flameEmitter = new ParticleEmitter({
       poolSize: FLAME_POOL_SIZE,
@@ -280,7 +394,22 @@ export class LanderController implements Tickable {
       size: FLAME_SIZE,
       lifetime: FLAME_LIFETIME,
       spread: FLAME_SPREAD,
+      sizeAttenuation: true,
+      sizeGrowth: 1.8,
     })
+
+    // Nozzle glow sprite — always-on idle glow at the engine bell
+    const nozzleTexture = createNozzleGlowTexture()
+    this.nozzleGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: nozzleTexture,
+      color: new THREE.Color(NOZZLE_GLOW_COLOR_EDGE),
+      transparent: true,
+      opacity: 0.6,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }))
+    this.nozzleGlow.scale.setScalar(NOZZLE_GLOW_SIZE)
+    this.group.add(this.nozzleGlow)
 
     // Create one emitter per RCS nozzle
     for (const nodeName of ALL_RCS_NODES) {
@@ -290,6 +419,9 @@ export class LanderController implements Tickable {
         size: RCS_SIZE,
         lifetime: RCS_LIFETIME,
         spread: RCS_SPREAD,
+        sizeAttenuation: true,
+        soft: true,
+        sizeGrowth: 2.5,
       })
       this.rcsEmitters.set(nodeName, emitter)
       this.rcsSpawnAccumulators.set(nodeName, 0)
@@ -304,8 +436,27 @@ export class LanderController implements Tickable {
     // Main engine position
     const engineNode = this.findNode(scene, MAIN_ENGINE_NODE)
     if (engineNode) {
-      const pos = engineNode.position
-      this.mainEngineLocalPos.set(pos.x * MODEL_SCALE, pos.y * MODEL_SCALE, pos.z * MODEL_SCALE)
+      // Get position in group-local space (scene is child of group, scaled by MODEL_SCALE)
+      const localPos = new THREE.Vector3()
+      engineNode.getWorldPosition(localPos)
+      // worldToLocal accounts for group position/rotation, but at load time group is at origin
+      this.group.worldToLocal(localPos)
+      this.mainEngineLocalPos.copy(localPos)
+      // Position nozzle glow just below the engine bell
+      this.nozzleGlow.position.set(localPos.x, localPos.y - 2, localPos.z)
+      // Store engine mesh for emissive glow when firing
+      // Clone the material so we don't affect other meshes sharing it
+      if (engineNode instanceof THREE.Mesh) {
+        engineNode.material = (engineNode.material as THREE.Material).clone()
+        this.engineMesh = engineNode
+      } else {
+        engineNode.traverse((child) => {
+          if (child instanceof THREE.Mesh && !this.engineMesh) {
+            child.material = (child.material as THREE.Material).clone()
+            this.engineMesh = child
+          }
+        })
+      }
     }
 
     // RCS nozzle positions
@@ -335,6 +486,8 @@ export class LanderController implements Tickable {
   resetForRespawn(position: THREE.Vector3): void {
     this.group.position.copy(position)
     this.group.visible = true
+    this._hp = LANDER_MAX_HP
+    this.thrusterSystem.refuel()
     this.body.velocityY = 0
     this.body.grounded = false
     this.lateralVelocity.set(0, 0, 0)
@@ -344,11 +497,16 @@ export class LanderController implements Tickable {
     this.group.rotation.set(0, 0, 0)
     this.wasGrounded = false
     this.liftoffBoostTimer = 0
+    this.updateWarningBeacon()
   }
 
   /** Set terrain heightmap for ground collision. */
   setHeightmap(hm: Heightmap): void {
     this.heightmap = hm
+  }
+
+  setCollisionWorld(collisionWorld: CollisionWorld | null): void {
+    this.collisionWorld = collisionWorld
   }
 
   get position(): THREE.Vector3 {
@@ -373,6 +531,9 @@ export class LanderController implements Tickable {
   }
 
   tick(dt: number): void {
+    // Update tilt + yaw first so quaternion is current for thrust direction and flame
+    this.tickTilt(dt)
+
     // Main engine — thrust along lander's local up axis
     if (this.isMainEngineActive) {
       const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.quaternion)
@@ -401,12 +562,9 @@ export class LanderController implements Tickable {
     // RCS emitters + lateral movement
     this.tickRcs(dt)
     this.tickLateralMovement(dt)
-    this.tickTilt(dt)
 
     // Platformer gravity + ground collision against terrain
-    const floorY = this.heightmap
-      ? this.heightmap.heightAt(this.group.position.x, this.group.position.z)
-      : DEFAULT_FLOOR_Y
+    const floorY = this.sampleTerrainSupport().height
     this.group.position.y = this.body.tick(dt, this.group.position.y, floorY)
 
     // Detect landing transition (airborne → grounded) and evaluate safety
@@ -423,9 +581,32 @@ export class LanderController implements Tickable {
     }
     this.wasGrounded = this.body.grounded
 
-    // Apply lateral velocity (XZ only)
-    this.group.position.x += this.lateralVelocity.x * dt
-    this.group.position.z += this.lateralVelocity.z * dt
+    // Apply lateral velocity (XZ only), blocking against solid world colliders.
+    if (this.collisionWorld) {
+      const move = this.collisionWorld.moveDiscXZ(
+        this.group.position,
+        this.lateralVelocity.x * dt,
+        this.lateralVelocity.z * dt,
+        this.group.position.y - LANDER_COLLISION_BOTTOM_OFFSET,
+        this.group.position.y + LANDER_COLLISION_TOP_OFFSET,
+        {
+          radius: LANDER_COLLISION_RADIUS,
+          skinWidth: LANDER_COLLISION_SKIN_WIDTH,
+          substepDistance: LANDER_COLLISION_SUBSTEP_DISTANCE,
+        },
+        LANDER_COLLIDER_ID,
+      )
+      this.group.position.x = move.x
+      this.group.position.z = move.z
+
+      if (move.blocked) {
+        this.lateralVelocity.x = 0
+        this.lateralVelocity.z = 0
+      }
+    } else {
+      this.group.position.x += this.lateralVelocity.x * dt
+      this.group.position.z += this.lateralVelocity.z * dt
+    }
 
     // Liftoff boost timer: starts when leaving ground, counts down
     if (this.body.grounded) {
@@ -440,6 +621,37 @@ export class LanderController implements Tickable {
       rcs: this.isAnyRcsActive,
     })
 
+    this.updateWarningBeacon()
+
+    // Nozzle glow pulse — brighter when engine is firing
+    this.nozzleGlowTime += dt
+    const glowMat = this.nozzleGlow.material as THREE.SpriteMaterial
+    if (this.isMainEngineActive) {
+      const pulse = 0.7 + 0.3 * Math.sin(this.nozzleGlowTime * 12)
+      glowMat.opacity = pulse
+      this.nozzleGlow.scale.setScalar(NOZZLE_GLOW_SIZE * (1.0 + 0.3 * Math.sin(this.nozzleGlowTime * 8)))
+      // Warm emissive ramp-up on nozzle mesh
+      if (this.engineMesh) {
+        const mat = this.engineMesh.material as THREE.MeshStandardMaterial
+        if (mat.emissive) {
+          mat.emissive.set(0xcc4400)
+          // Ramp up gradually, max 0.8
+          mat.emissiveIntensity = Math.min(0.8, (mat.emissiveIntensity || 0) + dt * 1.5)
+        }
+      }
+    } else {
+      const idlePulse = 0.3 + 0.15 * Math.sin(this.nozzleGlowTime * 4)
+      glowMat.opacity = idlePulse
+      this.nozzleGlow.scale.setScalar(NOZZLE_GLOW_SIZE * 0.7)
+      // Cool down emissive
+      if (this.engineMesh) {
+        const mat = this.engineMesh.material as THREE.MeshStandardMaterial
+        if (mat.emissive && mat.emissiveIntensity > 0) {
+          mat.emissiveIntensity = Math.max(0, mat.emissiveIntensity - dt * 1.5)
+        }
+      }
+    }
+
     // Update all emitters
     this.flameEmitter.tick(dt)
     for (const emitter of this.rcsEmitters.values()) {
@@ -449,6 +661,8 @@ export class LanderController implements Tickable {
 
   dispose(): void {
     this.flameEmitter.dispose()
+    ;(this.nozzleGlow.material as THREE.SpriteMaterial).map?.dispose()
+    ;(this.nozzleGlow.material as THREE.SpriteMaterial).dispose()
     for (const emitter of this.rcsEmitters.values()) {
       emitter.dispose()
     }
@@ -456,11 +670,13 @@ export class LanderController implements Tickable {
       floodlight.shadow.map?.dispose()
       floodlight.dispose()
     }
+    this.topWarningBeacon.dispose()
     this.floodlightConeGeometry.dispose()
     this.floodlightConeMaterial.dispose()
     this.group.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         if (this.floodlightCones.includes(child)) return
+        if (this.topWarningBeacon.meshes.includes(child)) return
         child.geometry.dispose()
         if (Array.isArray(child.material)) {
           child.material.forEach((m) => m.dispose())
@@ -473,9 +689,22 @@ export class LanderController implements Tickable {
 
   /** Returns 1.0 on flat ground, SLOPE_LIFTOFF_PENALTY on slopes */
   private getLiftoffSlopePenalty(): number {
-    if (!this.heightmap) return 1
-    const n = this.heightmap.normalAt(this.group.position.x, this.group.position.z)
+    const n = this.sampleTerrainSupport().normal
     return n.y >= FLAT_GROUND_THRESHOLD ? 1 : SLOPE_LIFTOFF_PENALTY
+  }
+
+  private updateWarningBeacon(): void {
+    switch (this.landingSafetyLevel) {
+      case 'danger':
+        this.topWarningBeacon.setColor(TOP_BEACON_DANGER_COLOR)
+        break
+      case 'warn':
+        this.topWarningBeacon.setColor(TOP_BEACON_WARN_COLOR)
+        break
+      default:
+        this.topWarningBeacon.setColor(TOP_BEACON_SAFE_COLOR)
+        break
+    }
   }
 
   private tickLateralMovement(dt: number): void {
@@ -515,7 +744,7 @@ export class LanderController implements Tickable {
 
     if (this.body.grounded && this.heightmap) {
       // Grounded: conform to terrain slope via surface normal
-      const n = this.heightmap.normalAt(this.group.position.x, this.group.position.z)
+      const n = this.sampleTerrainSupport().normal
       // Normal (nx, ny, nz) → tilt angles:
       //   tiltX (roll around X) = atan2(nz, ny) — slope along Z axis
       //   tiltZ (pitch around Z) = atan2(-nx, ny) — slope along X axis
@@ -535,9 +764,15 @@ export class LanderController implements Tickable {
     this.tiltX += (targetTiltX - this.tiltX) * speed * dt
     this.tiltZ += (targetTiltZ - this.tiltZ) * speed * dt
 
-    // Yaw — gyroscope rotation (works airborne and grounded)
-    if (this.inputManager.isActionActive('yawLeft')) this.yaw += YAW_SPEED * dt
-    if (this.inputManager.isActionActive('yawRight')) this.yaw -= YAW_SPEED * dt
+    // Snap to target when close enough to avoid residual drift
+    if (Math.abs(this.tiltX - targetTiltX) < 0.005) this.tiltX = targetTiltX
+    if (Math.abs(this.tiltZ - targetTiltZ) < 0.005) this.tiltZ = targetTiltZ
+
+    // Yaw — gyroscope rotation (airborne only)
+    if (!this.body.grounded) {
+      if (this.inputManager.isActionActive('yawLeft')) this.yaw += YAW_SPEED * dt
+      if (this.inputManager.isActionActive('yawRight')) this.yaw -= YAW_SPEED * dt
+    }
 
     // Build rotation: yaw first, then tilt relative to yaw
     // This ensures tilt directions stay consistent with lander heading
@@ -545,6 +780,102 @@ export class LanderController implements Tickable {
     q.setFromAxisAngle(_yAxis, this.yaw)
     _qTilt.setFromEuler(_euler.set(this.tiltX, 0, this.tiltZ))
     q.multiply(_qTilt)
+  }
+
+  private sampleTerrainSupport(): TerrainSupportSample {
+    if (!this.heightmap) {
+      return { height: DEFAULT_FLOOR_Y, normal: { x: 0, y: 1, z: 0 }, colliderId: null, hasSupport: true }
+    }
+
+    const sampleOffsets = [
+      [0, 0],
+      [LANDER_SUPPORT_SAMPLE_RADIUS, 0],
+      [-LANDER_SUPPORT_SAMPLE_RADIUS, 0],
+      [0, LANDER_SUPPORT_SAMPLE_RADIUS],
+      [0, -LANDER_SUPPORT_SAMPLE_RADIUS],
+      [LANDER_SUPPORT_SAMPLE_DIAGONAL, LANDER_SUPPORT_SAMPLE_DIAGONAL],
+      [LANDER_SUPPORT_SAMPLE_DIAGONAL, -LANDER_SUPPORT_SAMPLE_DIAGONAL],
+      [-LANDER_SUPPORT_SAMPLE_DIAGONAL, LANDER_SUPPORT_SAMPLE_DIAGONAL],
+      [-LANDER_SUPPORT_SAMPLE_DIAGONAL, -LANDER_SUPPORT_SAMPLE_DIAGONAL],
+    ] as const
+
+    _qYaw.setFromAxisAngle(_yAxis, this.yaw)
+
+    const sampledHeights: number[] = []
+    let normalX = 0
+    let normalY = 0
+    let normalZ = 0
+    let sampledCount = 0
+
+    for (const [offsetX, offsetZ] of sampleOffsets) {
+      _sampleOffset.set(offsetX, 0, offsetZ).applyQuaternion(_qYaw)
+      _sampleWorld.set(
+        this.group.position.x + _sampleOffset.x,
+        this.group.position.y,
+        this.group.position.z + _sampleOffset.z,
+      )
+
+      const sampleHeight = this.heightmap.tryHeightAt(_sampleWorld.x, _sampleWorld.z)
+      if (sampleHeight == null) continue
+      const sampleNormal = this.heightmap.normalAt(_sampleWorld.x, _sampleWorld.z)
+
+      sampledCount += 1
+      sampledHeights.push(sampleHeight)
+      normalX += sampleNormal.x
+      normalY += sampleNormal.y
+      normalZ += sampleNormal.z
+    }
+
+    if (sampledCount === 0) {
+      return {
+        height: -Infinity,
+        normal: { x: 0, y: 1, z: 0 },
+        colliderId: null,
+        hasSupport: false,
+      }
+    }
+
+    sampledHeights.sort((a, b) => b - a)
+    const contactCount = Math.min(LANDER_SUPPORT_CONTACT_SAMPLE_COUNT, sampledHeights.length)
+    const contactHeight =
+      sampledHeights.slice(0, contactCount).reduce((sum, height) => sum + height, 0) / Math.max(1, contactCount)
+
+    let supportHeight = contactHeight
+    let supportNormal: { x: number; y: number; z: number }
+    const normalLength = Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ)
+    if (normalLength <= 1e-5) {
+      supportNormal = { x: 0, y: 1, z: 0 }
+    } else {
+      supportNormal = {
+        x: normalX / normalLength,
+        y: normalY / normalLength,
+        z: normalZ / normalLength,
+      }
+    }
+
+    let colliderId: string | null = null
+    if (this.collisionWorld) {
+      const colliderSupport = this.collisionWorld.getHighestSupportUnderDisc(
+        this.group.position.x,
+        this.group.position.z,
+        supportHeight - 1,
+        this.group.position.y + LANDER_SUPPORT_MAX_STEP_UP,
+        LANDER_COLLISION_RADIUS,
+        LANDER_COLLIDER_ID,
+      )
+      if (colliderSupport.height > supportHeight) {
+        supportHeight = colliderSupport.height
+        supportNormal = colliderSupport.normal
+        colliderId = colliderSupport.colliderId
+      }
+    }
+
+    return {
+      height: supportHeight,
+      normal: supportNormal,
+      colliderId,
+      hasSupport: true,
+    }
   }
 
   private tickRcs(dt: number): void {
@@ -605,16 +936,22 @@ export class LanderController implements Tickable {
   private spawnFlame(dt: number): void {
     this.flameSpawnAccumulator += FLAME_SPAWN_RATE * dt
 
-    this.mainEngineWorldPos.copy(this.mainEngineLocalPos)
-    this.mainEngineWorldPos.y += FLAME_EMIT_Y_OFFSET
-    this.mainEngineWorldPos.applyQuaternion(this.group.quaternion)
-      .add(this.group.position)
+    // Emit from directly below the ship center, tucked up near the hull
+    this.mainEngineWorldPos.set(
+      this.group.position.x,
+      this.group.position.y + this.mainEngineLocalPos.y + FLAME_EMIT_Y_OFFSET,
+      this.group.position.z,
+    )
 
-    // Push particles down harder when the lander is falling fast,
-    // so flames always visually exit below the nozzle
+    // Push particles straight down + inherit lateral velocity so
+    // the flame stays under the ship as it drifts
     const fallSpeed = Math.max(0, -this.body.velocityY)
     const push = FLAME_PUSH_FORCE + fallSpeed * FLAME_VELOCITY_COMPENSATION
-    const pushDir = new THREE.Vector3(0, -push, 0)
+    const pushDir = new THREE.Vector3(
+      this.lateralVelocity.x,
+      -push,
+      this.lateralVelocity.z,
+    )
 
     while (this.flameSpawnAccumulator >= 1) {
       this.flameEmitter.emit(this.mainEngineWorldPos, pushDir)
@@ -663,6 +1000,8 @@ export class LanderController implements Tickable {
       const beamDirection = target.position.clone().sub(floodlight.position).normalize()
       cone.position.copy(floodlight.position).add(target.position).multiplyScalar(0.5)
       cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), beamDirection)
+      cone.castShadow = false
+      cone.receiveShadow = false
       cone.renderOrder = 1
 
       this.group.add(floodlight)
@@ -684,4 +1023,26 @@ export class LanderController implements Tickable {
     })
     return found
   }
+}
+
+/** Teardrop nozzle glow — bright point at top fading down like a flame lick. */
+function createNozzleGlowTexture(): THREE.CanvasTexture {
+  const size = NOZZLE_GLOW_TEXTURE_SIZE
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')!
+  const cx = size / 2
+  // Bright core near the top (nozzle throat), fading downward
+  const coreY = size * 0.2
+  const gradient = ctx.createRadialGradient(cx, coreY, 0, cx, coreY, size * 0.8)
+  gradient.addColorStop(0, NOZZLE_GLOW_COLOR_CORE)
+  gradient.addColorStop(0.2, NOZZLE_GLOW_COLOR_EDGE)
+  gradient.addColorStop(0.6, 'rgba(255, 154, 31, 0.15)')
+  gradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
+  ctx.fillStyle = gradient
+  ctx.fillRect(0, 0, size, size)
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.needsUpdate = true
+  return texture
 }
