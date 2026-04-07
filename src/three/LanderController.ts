@@ -130,6 +130,21 @@ const TILT_LERP_SPEED = 3 // how fast the lander tilts toward target
 const TILT_RETURN_SPEED = 2.5 // how fast it returns to upright
 const GROUND_TILT_LERP_SPEED = 4 // how fast the lander conforms to terrain slope
 
+/** Maximum safe landing speed (abs velocityY) — no damage below this. */
+const SAFE_LANDING_SPEED = 5.0
+
+/** Maximum safe landing angle (combined tilt magnitude, radians ~10°). */
+const SAFE_LANDING_ANGLE = 0.175
+
+/** HP damage per unit of excess landing speed. */
+const SPEED_DAMAGE_MULTIPLIER = 3.0
+
+/** HP damage per radian of excess landing tilt. */
+const ANGLE_DAMAGE_MULTIPLIER = 40.0
+
+/** Lander starting and maximum HP. */
+const LANDER_MAX_HP = 100
+
 /**
  * Controls the lunar lander — gravity, main engine, and RCS emitters.
  *
@@ -164,6 +179,26 @@ export class LanderController implements Tickable {
   private readonly rcsSpawnAccumulators = new Map<string, number>()
   private readonly rcsWorldPos = new THREE.Vector3()
   private liftoffBoostTimer = 0
+
+  /** Current lander hit points. */
+  private _hp = LANDER_MAX_HP
+
+  /** Maximum lander hit points. */
+  readonly maxHp = LANDER_MAX_HP
+
+  /** Current HP (read-only). */
+  get hp(): number {
+    return this._hp
+  }
+
+  /** Tracks whether lander was grounded last frame. */
+  private wasGrounded = false
+
+  /** Called on hard landing with damage dealt and impact speed. */
+  onCrash: ((damage: number, impactSpeed: number) => void) | null = null
+
+  /** Called when HP reaches 0. */
+  onDeath: (() => void) | null = null
 
   constructor(inputManager: InputManager) {
     this.inputManager = inputManager
@@ -213,6 +248,28 @@ export class LanderController implements Tickable {
         )
       }
     }
+  }
+
+  /** Apply damage to the lander. Fires onDeath when HP reaches 0. */
+  takeDamage(amount: number): void {
+    this._hp = Math.max(0, this._hp - amount)
+    if (this._hp <= 0) {
+      this.onDeath?.()
+    }
+  }
+
+  /** Reset lander state for repositioning. */
+  resetForRespawn(position: THREE.Vector3): void {
+    this.group.position.copy(position)
+    this.group.visible = true
+    this.body.velocityY = 0
+    this.body.grounded = false
+    this.lateralVelocity.set(0, 0, 0)
+    this.tiltX = 0
+    this.tiltZ = 0
+    this.group.rotation.set(0, 0, 0)
+    this.wasGrounded = false
+    this.liftoffBoostTimer = 0
   }
 
   /** Set terrain heightmap for ground collision. */
@@ -277,6 +334,20 @@ export class LanderController implements Tickable {
       ? this.heightmap.heightAt(this.group.position.x, this.group.position.z)
       : DEFAULT_FLOOR_Y
     this.group.position.y = this.body.tick(dt, this.group.position.y, floorY)
+
+    // Detect landing transition (airborne → grounded) and evaluate safety
+    if (this.body.grounded && !this.wasGrounded) {
+      const impactSpeed = Math.abs(this.body.impactVelocityY)
+      const impactAngle = Math.sqrt(this.tiltX * this.tiltX + this.tiltZ * this.tiltZ)
+      const speedExcess = Math.max(0, impactSpeed - SAFE_LANDING_SPEED)
+      const angleExcess = Math.max(0, impactAngle - SAFE_LANDING_ANGLE)
+      const damage = speedExcess * SPEED_DAMAGE_MULTIPLIER + angleExcess * ANGLE_DAMAGE_MULTIPLIER
+      if (damage > 0) {
+        this.takeDamage(damage)
+        this.onCrash?.(damage, impactSpeed)
+      }
+    }
+    this.wasGrounded = this.body.grounded
 
     // Apply lateral velocity (XZ only)
     this.group.position.x += this.lateralVelocity.x * dt
