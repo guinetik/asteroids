@@ -40,14 +40,31 @@ const PROBE_LIGHT_DISTANCE = 40
 /** Number of particles emitted on collection. */
 const COLLECT_PARTICLE_COUNT = 12
 
+/** Seconds between each probe launching from the terminal. */
+const LAUNCH_STAGGER_INTERVAL = 0.4
+
+/** Seconds each probe takes to fly from terminal to target. */
+const LAUNCH_FLIGHT_DURATION = 1.5
+
+/** Scale at launch origin (grows to 1.0 during flight). */
+const LAUNCH_START_SCALE = 0.2
+
 /** Tracked probe state. */
 interface ProbeEntry {
   /** Three.js group (diamond mesh + light). */
   group: THREE.Group
-  /** Original spawn Y for bob calculation. */
+  /** Target world position. */
+  target: THREE.Vector3
+  /** Original spawn Y for bob calculation (set after arrival). */
   baseY: number
   /** Whether this probe has been collected. */
   collected: boolean
+  /** Whether the probe has arrived at its target. */
+  arrived: boolean
+  /** Launch delay in seconds (staggered per probe). */
+  launchDelay: number
+  /** Time elapsed since this probe started flying (negative = waiting). */
+  flightTime: number
 }
 
 /**
@@ -61,6 +78,7 @@ export class SurveyProbeController implements Tickable {
   private readonly scene: THREE.Scene
   private elapsed = 0
   private collectedCount = 0
+  private readonly origin = new THREE.Vector3()
 
   /** Particle emitter for collection bursts. */
   readonly collectEmitter: ParticleEmitter
@@ -80,6 +98,11 @@ export class SurveyProbeController implements Tickable {
     return this.probes.length > 0 && this.collected === this.probes.length
   }
 
+  /** True when all probes have finished their launch animation. */
+  get allArrived(): boolean {
+    return this.probes.length > 0 && this.probes.every((p) => p.arrived)
+  }
+
   /** Callback fired when a probe is collected. Receives the probe index. */
   onCollect: ((index: number) => void) | null = null
 
@@ -97,12 +120,21 @@ export class SurveyProbeController implements Tickable {
   }
 
   /**
-   * Spawn probes at the given world positions.
+   * Spawn probes with a staggered launch animation from a terminal origin.
    *
-   * @param positions - Array of world-space positions for each probe.
+   * Probes start hidden at the origin, then launch one by one toward
+   * their target positions. They become collectible only after arriving.
+   *
+   * @param positions - Array of world-space target positions for each probe.
+   * @param terminalPosition - World-space position of the survey terminal (launch origin).
    */
-  spawn(positions: THREE.Vector3[]): void {
-    for (const pos of positions) {
+  spawn(positions: THREE.Vector3[], terminalPosition: THREE.Vector3): void {
+    this.origin.copy(terminalPosition)
+    // Raise the origin slightly above the terminal top
+    this.origin.y += 4
+
+    for (let i = 0; i < positions.length; i++) {
+      const pos = positions[i]!
       const group = new THREE.Group()
 
       // Diamond mesh — wireframe octahedron
@@ -120,19 +152,26 @@ export class SurveyProbeController implements Tickable {
       const light = new THREE.PointLight(PROBE_COLOR, PROBE_LIGHT_INTENSITY, PROBE_LIGHT_DISTANCE)
       group.add(light)
 
-      group.position.copy(pos)
+      // Start at terminal, hidden until launch delay elapses
+      group.position.copy(this.origin)
+      group.scale.setScalar(LAUNCH_START_SCALE)
+      group.visible = false
       this.scene.add(group)
 
       this.probes.push({
         group,
+        target: pos.clone(),
         baseY: pos.y,
         collected: false,
+        arrived: false,
+        launchDelay: i * LAUNCH_STAGGER_INTERVAL,
+        flightTime: 0,
       })
     }
   }
 
   /**
-   * Per-frame update — animate probes and check collection.
+   * Per-frame update — launch animation, idle animation, particle emitter.
    *
    * @param dt - Delta time in seconds.
    */
@@ -144,7 +183,47 @@ export class SurveyProbeController implements Tickable {
       const probe = this.probes[i]!
       if (probe.collected) continue
 
-      // Animate — rotate + bob
+      // Launch sequence
+      if (!probe.arrived) {
+        probe.flightTime += dt
+        const flyElapsed = probe.flightTime - probe.launchDelay
+
+        if (flyElapsed < 0) {
+          // Still waiting for stagger
+          continue
+        }
+
+        // Show probe once its turn comes
+        probe.group.visible = true
+
+        const t = Math.min(1, flyElapsed / LAUNCH_FLIGHT_DURATION)
+        // Ease-out cubic for smooth deceleration
+        const ease = 1 - Math.pow(1 - t, 3)
+
+        // Lerp position from origin to target
+        probe.group.position.lerpVectors(this.origin, probe.target, ease)
+
+        // Scale up from small to full
+        const scale = LAUNCH_START_SCALE + (1 - LAUNCH_START_SCALE) * ease
+        probe.group.scale.setScalar(scale)
+
+        // Spin fast during flight
+        probe.group.rotation.y = flyElapsed * ROTATION_SPEED * 4
+
+        if (t >= 1) {
+          probe.arrived = true
+          probe.group.position.copy(probe.target)
+          probe.group.scale.setScalar(1)
+          // Small arrival burst
+          const up = new THREE.Vector3(0, 1, 0)
+          for (let j = 0; j < 4; j++) {
+            this.collectEmitter.emit(probe.group.position, up.clone().multiplyScalar(3))
+          }
+        }
+        continue
+      }
+
+      // Idle animation — rotate + bob
       probe.group.rotation.y = this.elapsed * ROTATION_SPEED
       probe.group.position.y = probe.baseY + Math.sin(this.elapsed * BOB_SPEED) * BOB_AMPLITUDE
     }
@@ -152,6 +231,7 @@ export class SurveyProbeController implements Tickable {
 
   /**
    * Check lander proximity against all uncollected probes.
+   * Only checks probes that have arrived at their target.
    * Call this each frame during lander state with the current lander position.
    *
    * @param landerPos - Current lander world position.
@@ -159,7 +239,7 @@ export class SurveyProbeController implements Tickable {
   checkCollection(landerPos: THREE.Vector3): void {
     for (let i = 0; i < this.probes.length; i++) {
       const probe = this.probes[i]!
-      if (probe.collected) continue
+      if (probe.collected || !probe.arrived) continue
 
       const dx = landerPos.x - probe.group.position.x
       const dy = landerPos.y - probe.group.position.y

@@ -1245,7 +1245,7 @@ export class LevelViewController implements Tickable {
     })
 
     survey.probeController = new SurveyProbeController(this.sceneManager!.scene)
-    survey.probeController.spawn(positions)
+    survey.probeController.spawn(positions, survey.terminal.position)
     this.tickHandler!.register(survey.probeController, TICK_PRIORITY_PHYSICS + 4)
 
     this.onTerminalPrompt?.(null)
