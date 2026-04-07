@@ -23,7 +23,22 @@ export function getVelocityHeading(vx: number, vz: number): number | null {
 }
 
 /**
+ * Normalize an angle into the range (-π, π].
+ *
+ * @param a - Angle in radians.
+ * @returns Equivalent angle in (-π, π].
+ */
+function wrapAngle(a: number): number {
+  a = a % (2 * Math.PI)
+  if (a > Math.PI) a -= 2 * Math.PI
+  if (a <= -Math.PI) a += 2 * Math.PI
+  return a
+}
+
+/**
  * Resolve slingshot auto-align yaw for the current frame.
+ * Interpolates along the shortest rotational path to avoid flipping
+ * when the target crosses the ±π boundary.
  *
  * @param currentYaw - Current shuttle yaw.
  * @param targetYaw - Current target yaw from travel direction.
@@ -37,8 +52,8 @@ export function getSlingshotAutoAlignYaw(
   dt: number,
   remainingTime: number,
 ): number {
-  void currentYaw
-  void dt
   if (remainingTime <= 0) return targetYaw
-  return targetYaw
+  const diff = wrapAngle(targetYaw - currentYaw)
+  const t = Math.min(1, dt / remainingTime)
+  return wrapAngle(currentYaw + diff * t)
 }
