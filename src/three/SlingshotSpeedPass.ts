@@ -70,18 +70,11 @@ export function createSlingshotSpeedPass(): ShaderPass {
         // Only show in outer region, fade from center
         float radialFade = smoothstep(0.05, 0.35, dist);
 
-        // Screen wash — lift the whole image toward white at high intensity
-        float wash = intensity * 0.25;
-        vec3 washed = color.rgb + wash * (1.0 - color.rgb);
+        // Pure additive light — streaks emit light on top of the scene
+        float streakIntensity = streak * radialFade * intensity * 0.7;
+        vec3 streakColor = vec3(0.7, 0.95, 1.0);
 
-        // Streak layer — screen blend so bright areas blow out to white
-        float streakIntensity = streak * radialFade * intensity * 0.5;
-        vec3 streakColor = vec3(0.8, 0.95, 1.0);
-        vec3 streakLayer = streakColor * streakIntensity;
-        // Screen blend: 1 - (1 - a) * (1 - b)
-        vec3 blended = 1.0 - (1.0 - washed) * (1.0 - streakLayer);
-
-        gl_FragColor = vec4(blended, color.a);
+        gl_FragColor = vec4(color.rgb + streakColor * streakIntensity, color.a);
       }
     `,
   }
