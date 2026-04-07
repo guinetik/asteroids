@@ -58,12 +58,12 @@ export function createSlingshotSpeedPass(): ShaderPass {
 
         // Sparse long radial lines — like hyperspace streaks
         // Quantize angle into ~200 slots, but only ~30 are "lit"
-        float slotCount = 200.0;
+        float slotCount = 500.0;
         float slot = floor(angle * slotCount / 6.2831853);
         float slotRand = hash(slot * 127.1);
 
-        // Only ~15% of slots produce a line (sparse)
-        float lineMask = step(0.85, slotRand);
+        // ~60% of slots produce a line
+        float lineMask = step(0.4, slotRand);
 
         // Each line has its own brightness and slight width variation
         float lineAngle = slot / slotCount * 6.2831853;
@@ -81,7 +81,7 @@ export function createSlingshotSpeedPass(): ShaderPass {
         // Brightness varies per line: some bright white, some dimmer cyan
         float brightness = (0.5 + 0.5 * hash(slot * 31.7)) * shimmer;
 
-        float lineIntensity = lineMask * lineFalloff * radialFade * brightness * intensity * 0.6;
+        float lineIntensity = lineMask * lineFalloff * radialFade * brightness * intensity * 1.2;
 
         // Cyan-white color: brighter lines tend whiter
         vec3 lineColor = mix(vec3(0.3, 0.8, 1.0), vec3(0.85, 0.95, 1.0), brightness);
