@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add crash detection on landing (speed + angle thresholds), scaled explosion VFX, 3-life system with HUD icons, and respawn-at-shuttle mechanics.
+**Goal:** Add HP to the lander with damage on hard landings proportional to impact speed/angle, explosion VFX, and game over on destruction.
 
-**Architecture:** `LanderController` captures pre-landing velocity/tilt and fires `onCrash`/`onLand` callbacks. `LevelViewController` tracks lives, manages the `crashed` state, spawns a `LanderExplosion`, and handles respawn. State machine gets a new `crashed` state with conditional next (respawn vs fail).
+**Architecture:** `PlatformerBody` captures impact velocity. `LanderController` gets HP + damage + crash callbacks. `LanderExplosion` provides scaled VFX. `LevelViewController` wires explosion and death→failed transition. HUD shows HP bar.
 
 **Tech Stack:** TypeScript, Three.js, Vue 3
 
@@ -12,86 +12,124 @@
 
 ---
 
-### Task 1: Add Landing Detection to LanderController
+### Task 1: Add Impact Velocity Capture to PlatformerBody
 
 **Files:**
-- Modify: `src/three/LanderController.ts`
 - Modify: `src/lib/physics/platformerBody.ts`
 
-The crash check must capture `velocityY` *before* `PlatformerBody.tick()` zeroes it on ground contact. We add a `wasGrounded` tracker to detect the grounded transition frame.
+- [ ] **Step 1: Add impactVelocityY field**
 
-- [ ] **Step 1: Add pre-landing velocity capture to PlatformerBody**
-
-In `src/lib/physics/platformerBody.ts`, add a field to expose the impact velocity:
+After line 42 (`velocityY = 0`), add:
 
 ```ts
 /** Vertical velocity at the moment of the last ground contact (always <= 0). */
 impactVelocityY = 0
 ```
 
-Update the ground collision block in `tick()` (line 75) to capture velocity before zeroing:
+- [ ] **Step 2: Capture velocity before zeroing in tick()**
+
+In the ground collision block (line 75), change:
 
 ```ts
-// Ground collision
+if (newY <= floorY) {
+  newY = floorY
+  this.velocityY = 0
+  this.grounded = true
+}
+```
+
+To:
+
+```ts
 if (newY <= floorY) {
   newY = floorY
   this.impactVelocityY = this.velocityY
   this.velocityY = 0
   this.grounded = true
-} else {
-  this.grounded = false
 }
 ```
 
-- [ ] **Step 2: Add crash detection constants and callbacks to LanderController**
+- [ ] **Step 3: Run type-check**
 
-In `src/three/LanderController.ts`, add constants after line 131:
+Run: `bun run type-check`
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/lib/physics/platformerBody.ts
+git commit -m "feat(physics): capture impact velocity on ground contact"
+```
+
+---
+
+### Task 2: Add HP and Crash Detection to LanderController
+
+**Files:**
+- Modify: `src/three/LanderController.ts`
+
+- [ ] **Step 1: Add crash constants**
+
+After `GROUND_TILT_LERP_SPEED` (line 131), add:
 
 ```ts
-/** Maximum safe landing speed (abs velocityY) in units/s. */
+/** Maximum safe landing speed (abs velocityY) — no damage below this. */
 const SAFE_LANDING_SPEED = 5.0
 
-/** Maximum safe landing angle (combined tilt magnitude) in radians (~10 degrees). */
+/** Maximum safe landing angle (combined tilt magnitude, radians ~10°). */
 const SAFE_LANDING_ANGLE = 0.175
+
+/** HP damage per unit of excess landing speed. */
+const SPEED_DAMAGE_MULTIPLIER = 3.0
+
+/** HP damage per radian of excess landing tilt. */
+const ANGLE_DAMAGE_MULTIPLIER = 40.0
+
+/** Lander starting and maximum HP. */
+const LANDER_MAX_HP = 100
 ```
 
-Add callbacks and tracking fields to the class (after `liftoffBoostTimer` around line 166):
+- [ ] **Step 2: Add HP fields, callbacks, and wasGrounded tracker**
+
+Add to the class after `liftoffBoostTimer` (line 166):
 
 ```ts
-/** Tracks whether lander was grounded last frame (for transition detection). */
+/** Current lander hit points. */
+private _hp = LANDER_MAX_HP
+
+/** Maximum lander hit points. */
+readonly maxHp = LANDER_MAX_HP
+
+/** Current HP (read-only). */
+get hp(): number {
+  return this._hp
+}
+
+/** Tracks whether lander was grounded last frame. */
 private wasGrounded = false
 
-/** Called on crash landing with impact speed and tilt angle. */
-onCrash: ((impactSpeed: number, impactAngle: number) => void) | null = null
+/** Called on hard landing with damage dealt and impact speed. */
+onCrash: ((damage: number, impactSpeed: number) => void) | null = null
 
-/** Called on safe landing. */
-onLand: (() => void) | null = null
+/** Called when HP reaches 0. */
+onDeath: (() => void) | null = null
 ```
 
-- [ ] **Step 3: Add landing evaluation logic to tick()**
-
-In `tick()`, after the `this.group.position.y = this.body.tick(...)` line (line 279), add the landing transition check:
+- [ ] **Step 3: Add takeDamage method**
 
 ```ts
-// Detect landing transition (airborne → grounded)
-if (this.body.grounded && !this.wasGrounded) {
-  const impactSpeed = Math.abs(this.body.impactVelocityY)
-  const impactAngle = Math.sqrt(this.tiltX * this.tiltX + this.tiltZ * this.tiltZ)
-  if (impactSpeed > SAFE_LANDING_SPEED || impactAngle > SAFE_LANDING_ANGLE) {
-    this.onCrash?.(impactSpeed, impactAngle)
-  } else {
-    this.onLand?.()
+/** Apply damage to the lander. Fires onDeath when HP reaches 0. */
+takeDamage(amount: number): void {
+  this._hp = Math.max(0, this._hp - amount)
+  if (this._hp <= 0) {
+    this.onDeath?.()
   }
 }
-this.wasGrounded = this.body.grounded
 ```
 
-- [ ] **Step 4: Add a reset method for respawn**
-
-Add to `LanderController`:
+- [ ] **Step 4: Add resetForRespawn method**
 
 ```ts
-/** Reset lander state for respawn after a crash. */
+/** Reset lander state for repositioning (e.g. after exfil setup). */
 resetForRespawn(position: THREE.Vector3): void {
   this.group.position.copy(position)
   this.group.visible = true
@@ -106,28 +144,45 @@ resetForRespawn(position: THREE.Vector3): void {
 }
 ```
 
-- [ ] **Step 5: Run type-check**
+- [ ] **Step 5: Add landing evaluation in tick()**
+
+After `this.group.position.y = this.body.tick(dt, this.group.position.y, floorY)` (line 279), add:
+
+```ts
+// Detect landing transition (airborne → grounded) and evaluate safety
+if (this.body.grounded && !this.wasGrounded) {
+  const impactSpeed = Math.abs(this.body.impactVelocityY)
+  const impactAngle = Math.sqrt(this.tiltX * this.tiltX + this.tiltZ * this.tiltZ)
+  const speedExcess = Math.max(0, impactSpeed - SAFE_LANDING_SPEED)
+  const angleExcess = Math.max(0, impactAngle - SAFE_LANDING_ANGLE)
+  const damage = speedExcess * SPEED_DAMAGE_MULTIPLIER + angleExcess * ANGLE_DAMAGE_MULTIPLIER
+  if (damage > 0) {
+    this.takeDamage(damage)
+    this.onCrash?.(damage, impactSpeed)
+  }
+}
+this.wasGrounded = this.body.grounded
+```
+
+- [ ] **Step 6: Run type-check**
 
 Run: `bun run type-check`
-Expected: No errors.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/three/LanderController.ts src/lib/physics/platformerBody.ts
-git commit -m "feat(lander): add crash detection on landing — speed and angle thresholds"
+git add src/three/LanderController.ts
+git commit -m "feat(lander): add HP system with crash damage on hard landings"
 ```
 
 ---
 
-### Task 2: Create LanderExplosion VFX Controller
+### Task 3: Create LanderExplosion VFX
 
 **Files:**
 - Create: `src/three/LanderExplosion.ts`
 
 - [ ] **Step 1: Create the explosion controller**
-
-Create `src/three/LanderExplosion.ts`:
 
 ```ts
 /**
@@ -147,28 +202,20 @@ const MIN_PARTICLES = 16
 const MAX_PARTICLES = 64
 /** Speed at which explosion is at full intensity. */
 const MAX_IMPACT_SPEED = 20
-/** Minimum particle spread radius. */
-const MIN_SPREAD = 10
-/** Maximum particle spread radius. */
-const MAX_SPREAD = 40
-/** Minimum particle lifetime. */
-const MIN_LIFETIME = 0.5
-/** Maximum particle lifetime. */
-const MAX_LIFETIME = 1.5
-/** Explosion push force (outward burst). */
+/** Explosion burst force. */
 const BURST_FORCE = 30
 
 /**
- * Crash explosion — emits a burst of particles scaled to impact speed.
- * Create one per level, reuse via `explode()`.
+ * Crash explosion — emits fire + debris particles scaled to impact speed.
+ * Create once per level, call `explode()` on each hard landing.
  *
  * @author guinetik
  * @date 2026-04-06
  */
 export class LanderExplosion implements Tickable {
-  /** Fire/debris emitter. */
+  /** Fire/sparks emitter (orange). */
   readonly fireEmitter: ParticleEmitter
-  /** Debris/smoke emitter. */
+  /** Debris emitter (grey). */
   readonly debrisEmitter: ParticleEmitter
 
   constructor() {
@@ -176,16 +223,16 @@ export class LanderExplosion implements Tickable {
       poolSize: MAX_PARTICLES,
       color: new Color(0xff6600),
       size: 8,
-      lifetime: MAX_LIFETIME,
-      spread: MAX_SPREAD,
+      lifetime: 1.5,
+      spread: 40,
       opacity: 0.9,
     })
     this.debrisEmitter = new ParticleEmitter({
       poolSize: MAX_PARTICLES,
       color: new Color(0x888888),
       size: 4,
-      lifetime: MAX_LIFETIME,
-      spread: MAX_SPREAD,
+      lifetime: 1.5,
+      spread: 40,
       opacity: 0.6,
     })
   }
@@ -199,23 +246,19 @@ export class LanderExplosion implements Tickable {
   explode(position: Vector3, impactSpeed: number): void {
     const ratio = Math.min(1, impactSpeed / MAX_IMPACT_SPEED)
     const count = Math.round(MIN_PARTICLES + (MAX_PARTICLES - MIN_PARTICLES) * ratio)
-    const spread = MIN_SPREAD + (MAX_SPREAD - MIN_SPREAD) * ratio
     const force = BURST_FORCE * (0.5 + ratio * 0.5)
 
     for (let i = 0; i < count; i++) {
-      // Random direction in a hemisphere (upward burst)
       const angle = Math.random() * Math.PI * 2
       const elevation = Math.random() * Math.PI * 0.5
       const dir = new Vector3(
-        Math.cos(angle) * Math.cos(elevation) * spread / MAX_SPREAD,
+        Math.cos(angle) * Math.cos(elevation),
         Math.sin(elevation),
-        Math.sin(angle) * Math.cos(elevation) * spread / MAX_SPREAD,
+        Math.sin(angle) * Math.cos(elevation),
       ).multiplyScalar(force)
-
       this.fireEmitter.emit(position, dir)
     }
 
-    // Debris — fewer, slower, darker
     const debrisCount = Math.round(count * 0.5)
     for (let i = 0; i < debrisCount; i++) {
       const angle = Math.random() * Math.PI * 2
@@ -225,7 +268,6 @@ export class LanderExplosion implements Tickable {
         Math.sin(elevation),
         Math.sin(angle) * Math.cos(elevation),
       ).multiplyScalar(force * 0.6)
-
       this.debrisEmitter.emit(position, dir)
     }
   }
@@ -247,159 +289,40 @@ export class LanderExplosion implements Tickable {
 - [ ] **Step 2: Run type-check**
 
 Run: `bun run type-check`
-Expected: No errors.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add src/three/LanderExplosion.ts
-git commit -m "feat(vfx): add LanderExplosion — impact-scaled particle burst"
+git commit -m "feat(vfx): add LanderExplosion — impact-scaled fire and debris burst"
 ```
 
 ---
 
-### Task 3: Add `crashed` State to Level State Machine
-
-**Files:**
-- Modify: `src/lib/level/levelStateMachine.ts`
-- Modify: `src/lib/__tests__/levelStateMachine.spec.ts`
-
-- [ ] **Step 1: Write failing tests**
-
-Add to `src/lib/__tests__/levelStateMachine.spec.ts`:
-
-```ts
-describe('crashed state', () => {
-  /** Helper to get a state machine into lander state. */
-  function toLanderState(overrides?: Partial<LevelStateMachineOptions>) {
-    const sm = createLevelStateMachine({
-      onStateChange: vi.fn(),
-      isLanderGrounded: () => true,
-      ...overrides,
-    })
-    sm.tick(ARRIVAL_DURATION + 0.1)
-    expect(sm.state).toBe('lander')
-    return sm
-  }
-
-  it('transitions lander → crashed on crash trigger', () => {
-    const sm = toLanderState()
-    expect(sm.trigger('crash')).toBe(true)
-    expect(sm.state).toBe('crashed')
-  })
-
-  it('auto-transitions crashed → lander after CRASH_DURATION', () => {
-    const sm = toLanderState()
-    sm.trigger('crash')
-    sm.tick(CRASH_DURATION + 0.1)
-    expect(sm.state).toBe('lander')
-  })
-})
-```
-
-Add `CRASH_DURATION` to the import line:
-
-```ts
-import { createLevelStateMachine, ARRIVAL_DURATION, EXFIL_SEQUENCE_DURATION, CRASH_DURATION } from '@/lib/level/levelStateMachine'
-import type { LevelStateMachineOptions } from '@/lib/level/levelStateMachine'
-```
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-Run: `bun test:unit src/lib/__tests__/levelStateMachine.spec.ts`
-Expected: FAIL — `CRASH_DURATION` not exported, `crash` trigger not defined.
-
-- [ ] **Step 3: Implement crashed state**
-
-In `src/lib/level/levelStateMachine.ts`:
-
-1. Add `'crashed'` to `LevelState` type:
-
-```ts
-export type LevelState = 'arrival' | 'lander' | 'eva' | 'dead' | 'crashed' | 'exfil' | 'complete' | 'failed'
-```
-
-2. Add constants:
-
-```ts
-/** Seconds on the crash screen before respawn/fail. */
-export const CRASH_DURATION = 3.0
-
-/** Maximum safe landing speed (abs velocityY) in units/s. */
-export const SAFE_LANDING_SPEED = 5.0
-
-/** Starting lives for a level. */
-export const STARTING_LIVES = 3
-```
-
-3. Add `crash` trigger to `lander` state and `crashed` state definition:
-
-```ts
-lander: {
-  on: {
-    exitVehicle: {
-      target: 'eva',
-      guard: () => isGrounded(),
-    },
-    exfiltrate: {
-      target: 'exfil',
-      guard: () => isNearShuttle() && hasEva(),
-    },
-    crash: 'crashed',
-  },
-},
-```
-
-```ts
-crashed: {
-  duration: CRASH_DURATION,
-  next: 'lander',
-},
-```
-
-Note: The `crashed → lander` auto-transition is the default path. `LevelViewController` will intercept via `onStateChange` to redirect to `failed` when lives run out — it calls `setState('failed')` which overrides the auto-transition.
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-Run: `bun test:unit src/lib/__tests__/levelStateMachine.spec.ts`
-Expected: All tests PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add src/lib/level/levelStateMachine.ts src/lib/__tests__/levelStateMachine.spec.ts
-git commit -m "feat(level): add crashed state — crash trigger, 3s duration, auto-respawn"
-```
-
----
-
-### Task 4: Wire Crash Mechanics into LevelViewController
+### Task 4: Wire Crash into LevelViewController and HUD
 
 **Files:**
 - Modify: `src/views/LevelViewController.ts`
+- Modify: `src/components/LanderHud.vue`
+- Modify: `src/views/LevelView.vue`
 
-- [ ] **Step 1: Add imports and fields**
+- [ ] **Step 1: Add imports and fields to LevelViewController**
 
-Add imports:
+Add import:
 
 ```ts
-import { CRASH_DURATION, STARTING_LIVES } from '@/lib/level/levelStateMachine'
 import { LanderExplosion } from '@/three/LanderExplosion'
 ```
 
-Add fields after `hasExitedVehicle`:
+Add field after `hasExitedVehicle`:
 
 ```ts
-// ── Crash / lives tracking ────────────────────────────────────
-private livesRemaining = STARTING_LIVES
 private landerExplosion: LanderExplosion | null = null
-/** Lander spawn position (above shuttle) for respawn. */
-private landerSpawnPos = new Vector3()
 ```
 
-- [ ] **Step 2: Create explosion system in init()**
+- [ ] **Step 2: Create explosion in init()**
 
-After the projectile/impact emitter setup (around line 275), add:
+After the impact emitter setup (after `this.multiTool.setProjectileSystem(this.projectileSystem)`, around line 277), add:
 
 ```ts
 // ── Lander explosion VFX ───────────────────────────────────────
@@ -408,244 +331,110 @@ this.sceneManager.addToScene(this.landerExplosion.fireEmitter.points)
 this.sceneManager.addToScene(this.landerExplosion.debrisEmitter.points)
 ```
 
-After the lander spawn position is set (line 196–197, `this.landerController.group.position.set(spawnX, ...)`), store it:
+- [ ] **Step 3: Wire onCrash and onDeath on LanderController**
+
+After the lander is loaded and positioned (after `this.landerController.group.position.set(...)`, around line 197), add:
 
 ```ts
-this.landerSpawnPos.set(spawnX, LANDER_SPAWN_HEIGHT, spawnZ)
-```
-
-- [ ] **Step 3: Wire onCrash callback on LanderController**
-
-After `this.landerController` is created and loaded (around line 197), add:
-
-```ts
-this.landerController.onCrash = () => {
-  this.stateMachine?.trigger('crash')
+this.landerController.onCrash = (damage, impactSpeed) => {
+  this.landerExplosion!.explode(this.landerController!.group.position.clone(), impactSpeed)
 }
-```
 
-- [ ] **Step 4: Add enterCrashed() and handle respawn**
-
-```ts
-private enterCrashed(): void {
-  // Explode at lander position
-  const crashPos = this.landerController!.group.position.clone()
-  const impactSpeed = Math.abs(this.landerController!.body.impactVelocityY)
-  this.landerExplosion!.explode(crashPos, impactSpeed)
-
-  // Hide lander
+this.landerController.onDeath = () => {
+  // Maximum explosion
+  this.landerExplosion!.explode(this.landerController!.group.position.clone(), 20)
   this.landerController!.group.visible = false
-
-  // Unregister lander physics (stop movement during crash screen)
-  this.tickHandler!.unregister(this.landerController!)
-  this.tickHandler!.unregister(this.vehicleCamera!)
-
-  // Register explosion emitter for ticking
-  this.tickHandler!.register(this.landerExplosion!, TICK_PRIORITY_PHYSICS + 3)
-
-  // Deduct life
-  this.livesRemaining -= 1
-}
-
-private exitCrashed(): void {
-  // Stop ticking explosion
-  this.tickHandler!.unregister(this.landerExplosion!)
-
-  if (this.livesRemaining <= 0) {
-    // No lives left — will transition to failed
-    return
-  }
-
-  // Respawn lander at shuttle
-  this.landerController!.resetForRespawn(this.landerSpawnPos)
-  this.tickHandler!.register(this.landerController!, TICK_PRIORITY_PHYSICS)
-  this.tickHandler!.register(this.vehicleCamera!, TICK_PRIORITY_RENDER - 2)
-  this.vehicleCamera!.controls.enabled = true
-  this.sceneManager!.setCamera(this.vehicleCamera!)
-  this.sceneManager!.setActiveCamera(null)
+  this.stateMachine?.setState('failed' as LevelState)
 }
 ```
 
-- [ ] **Step 5: Wire crashed into onStateTransition()**
+- [ ] **Step 4: Register explosion for ticking in enterLander()**
 
-In the `switch (_previous)` block, add:
-
-```ts
-case 'crashed':
-  this.exitCrashed()
-  break
-```
-
-In the `switch (current)` block, add:
+In `enterLander()`, add after the existing register calls:
 
 ```ts
-case 'crashed':
-  this.enterCrashed()
-  break
+this.tickHandler!.register(this.landerExplosion!, TICK_PRIORITY_PHYSICS + 3)
 ```
 
-- [ ] **Step 6: Intercept crashed→lander when no lives remain**
-
-In `onStateTransition`, at the top of the method (before the switch blocks), add:
+In `exitLander()`, add:
 
 ```ts
-// Override crashed → lander when out of lives
-if (current === 'lander' && _previous === 'crashed' && this.livesRemaining <= 0) {
-  this.stateMachine!.setState('failed' as LevelState)
-  return
-}
+this.tickHandler!.unregister(this.landerExplosion!)
 ```
 
-- [ ] **Step 7: Add crash fade to tick()**
+- [ ] **Step 5: Add hp/maxHp to lander telemetry broadcast**
 
-In the `tick()` method, after the dead state block, add:
+In the tick lander telemetry section, add to the telemetry object:
 
 ```ts
-// Crashed: fade to black during crash screen
-if (this.stateMachine?.is('crashed')) {
-  const elapsed = this.stateMachine.stateTime
-  const fadeProgress = Math.min(1, elapsed / (CRASH_DURATION * 0.5))
-  this.onDeathFade?.(fadeProgress)
-} else if (!this.stateMachine?.is('dead') && !this.stateMachine?.is('eva')) {
-  // Clear fade when not in crash/dead/eva-hypoxia
-  this.onDeathFade?.(0)
-}
+hp: this.landerController.hp,
+maxHp: this.landerController.maxHp,
 ```
 
-Note: Be careful not to conflict with the existing hypoxia fade in the EVA block or the dead state fade. The existing `this.onDeathFade?.(0)` in the EVA block already handles clearing for EVA. Add this crash fade check only for the `crashed` state specifically.
+- [ ] **Step 6: Add dev console commands**
 
-- [ ] **Step 8: Add lives to lander telemetry broadcast**
-
-In the tick lander telemetry section, add `lives` to the telemetry object:
+In the DevConsole.register block, add:
 
 ```ts
-lives: this.livesRemaining,
+landerDamage: (amount = 20) => this.landerController?.takeDamage(amount),
+landerDestroy: () => this.landerController?.takeDamage(999),
 ```
 
-- [ ] **Step 9: Dispose explosion**
+- [ ] **Step 7: Dispose explosion in dispose()**
 
-In `dispose()`, add before `this.landerController?.dispose()`:
+Add before `this.landerController?.dispose()`:
 
 ```ts
 this.landerExplosion?.dispose()
 ```
 
-- [ ] **Step 10: Add dev console crash command**
+- [ ] **Step 8: Add hp/maxHp to LanderTelemetry and LanderHud**
 
-In the DevConsole.register block, add:
+In `src/components/LanderHud.vue`, add to the `LanderTelemetry` interface:
 
 ```ts
-crash: () => this.stateMachine?.trigger('crash'),
+hp: number
+maxHp: number
 ```
 
-- [ ] **Step 11: Run type-check**
+Add HP bar to the template, after the fuel bar section:
+
+```html
+<!-- HP bar -->
+<div class="lander-hud-fuel">
+  <span class="hud-readout">HULL</span>
+  <div class="hud-fuel-track">
+    <div
+      class="hud-fuel-fill"
+      :class="fuelColor(props.telemetry.hp, props.telemetry.maxHp)"
+      :style="{ width: pct(props.telemetry.hp, props.telemetry.maxHp) + '%' }"
+    ></div>
+  </div>
+</div>
+```
+
+This reuses the existing `fuelColor` helper (green > 50%, yellow > 20%, red below) and `hud-fuel-track` styles.
+
+- [ ] **Step 9: Update LevelView.vue telemetry reactive**
+
+In `src/views/LevelView.vue`, add to the `landerTelemetry` reactive:
+
+```ts
+hp: 100,
+maxHp: 100,
+```
+
+- [ ] **Step 10: Run type-check**
 
 Run: `bun run type-check`
-Expected: No errors.
+
+- [ ] **Step 11: Run tests**
+
+Run: `bun test:unit`
 
 - [ ] **Step 12: Commit**
 
 ```bash
-git add src/views/LevelViewController.ts
-git commit -m "feat(level): wire crash mechanics — explosion VFX, lives, respawn at shuttle"
-```
-
----
-
-### Task 5: Add Lives Display to Lander HUD
-
-**Files:**
-- Modify: `src/components/LanderHud.vue`
-
-- [ ] **Step 1: Add lives to LanderTelemetry**
-
-In the `LanderTelemetry` interface, add:
-
-```ts
-lives: number
-```
-
-- [ ] **Step 2: Add lives icons to the template**
-
-After the readouts section (after the `posX/posZ` readout div), add:
-
-```html
-<!-- Lives -->
-<div class="lander-lives">
-  <span v-for="i in props.telemetry.lives" :key="i" class="lander-life-icon">▲</span>
-</div>
-```
-
-The `▲` triangle resembles a lander silhouette. Simple and effective.
-
-- [ ] **Step 3: Update LevelView.vue telemetry reactive**
-
-In `src/views/LevelView.vue`, add `lives: 3` to the `landerTelemetry` reactive object:
-
-```ts
-const landerTelemetry = reactive<LanderTelemetry>({
-  altitude: 0,
-  velocityY: 0,
-  posX: 0,
-  posZ: 0,
-  fuelLevel: 0,
-  fuelCapacity: 0,
-  mainEngineCharge: 0,
-  mainEngineCapacity: 0,
-  rcsCharge: 0,
-  rcsCapacity: 0,
-  lives: 3,
-})
-```
-
-- [ ] **Step 4: Run type-check**
-
-Run: `bun run type-check`
-Expected: No errors.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add src/components/LanderHud.vue src/views/LevelView.vue
-git commit -m "feat(hud): show lives as lander silhouette icons in lander HUD"
-```
-
----
-
-### Task 6: Type-check, Lint, and Verify
-
-**Files:**
-- All modified files
-
-- [ ] **Step 1: Run type-check**
-
-Run: `bun run type-check`
-Expected: No errors.
-
-- [ ] **Step 2: Run linter**
-
-Run: `bun lint`
-Expected: No new errors.
-
-- [ ] **Step 3: Run tests**
-
-Run: `bun test:unit`
-Expected: All tests pass including the new crashed state tests.
-
-- [ ] **Step 4: Manual smoke test**
-
-Run: `bun dev` and verify:
-1. Land gently (VEL < 5, level) → safe landing, can exit vehicle
-2. Come in fast (VEL > 5) → crash explosion, fade to black, respawn at shuttle altitude
-3. Come in tilted (> 10°) → same crash behavior
-4. Crash intensity scales — fast crash = big explosion, slow crash = small
-5. Lives icons show in lander HUD, decrease on each crash
-6. Third crash → failed state, redirect to `/`
-7. DevConsole `LevelView.crash()` triggers crash from any lander state
-
-- [ ] **Step 5: Final commit if any fixes needed**
-
-```bash
-git add -A
-git commit -m "fix(level): address lint and type issues from crash mechanics"
+git add src/views/LevelViewController.ts src/components/LanderHud.vue src/views/LevelView.vue
+git commit -m "feat(level): wire lander crash — explosion VFX, HP bar, death → failed"
 ```
