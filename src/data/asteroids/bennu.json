@@ -44,9 +44,9 @@
   },
   "lighting": {
     "sunAzimuth": 45,
-    "sunElevation": 25,
+    "sunElevation": 35,
     "sunColor": [1.0, 0.93, 0.82],
-    "sunIntensity": 1.6,
-    "ambientIntensity": 0.15
+    "sunIntensity": 3.0,
+    "ambientIntensity": 0.6
   }
 }

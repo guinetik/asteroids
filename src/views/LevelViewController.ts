@@ -28,7 +28,11 @@ import type { FpsPlayerConfig } from '@/three/FpsPlayerController'
 import { FpsCamera } from '@/three/FpsCamera'
 import { TerrainMesh } from '@/three/TerrainMesh'
 import { generateTerrain, generateFlatZones } from '@/lib/terrain/terrainGenerator'
-import type { SurfaceFeatures } from '@/lib/asteroids/types'
+import { getAsteroidById, ASTEROID_CATALOG } from '@/lib/asteroids/catalog'
+import type { AsteroidDefinition } from '@/lib/asteroids/types'
+import { loadActiveMission } from '@/lib/missions/missionStorage'
+import { generateAsteroidMission } from '@/lib/missions/asteroidMissionGenerator'
+import type { GeneratedAsteroidMission } from '@/lib/missions/types'
 import { Heightmap } from '@/lib/terrain/heightmap'
 import { MultiToolController } from '@/three/MultiToolController'
 import { MultiToolState } from '@/lib/fps/multiToolState'
@@ -49,7 +53,7 @@ import {
   Vector3,
 } from 'three'
 import { createAtmosphereContext } from '@/three/atmosphere/AtmosphereContext'
-import type { AtmosphereContext, AsteroidLighting } from '@/three/atmosphere/AtmosphereContext'
+import type { AtmosphereContext } from '@/three/atmosphere/AtmosphereContext'
 import { LevelLightingRig } from '@/three/atmosphere/LevelLightingRig'
 import { LevelPostProcessing } from '@/three/atmosphere/LevelPostProcessing'
 import { ThrusterWashController } from '@/three/atmosphere/ThrusterWashController'
@@ -59,7 +63,6 @@ import multiToolConfigJson from '@/data/fps/multitool-config.json'
 
 // ── Scene constants ─────────────────────────────────────────────
 const GRID_SIZE = 12000
-const TERRAIN_SEED = 42
 const TERRAIN_RESOLUTION = 512
 const FLAT_ZONE_COUNT = 3
 
@@ -70,23 +73,46 @@ const SPAWN_POSITION_RANGE = 2000
 const EVA_SPAWN_OFFSET_X = 8
 
 
-/** Test surface features — will come from asteroid data later. */
-const TEST_SURFACE: SurfaceFeatures = {
-  craterDensity: 0.7,
-  craterMaxScale: 0.3,
-  boulderDensity: 0.5,
-  ridgeFrequency: 0.3,
-  roughness: 0.8,
-  dustCoverage: 0.2,
+/** Default asteroid when no mission is active. */
+const DEFAULT_ASTEROID_ID = 'bennu'
+
+/** Simple string hash to derive a numeric seed from a mission id. */
+function hashSeed(str: string): number {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) | 0
+  }
+  return Math.abs(hash)
 }
 
-/** Test lighting — will come from asteroid JSON data later. */
-const TEST_LIGHTING: AsteroidLighting = {
-  sunAzimuth: 45,
-  sunElevation: 25,
-  sunColor: [1.0, 0.93, 0.82],
-  sunIntensity: 2.5,
-  ambientIntensity: 0.5,
+/** Resolved level context — asteroid definition + terrain seed. */
+interface LevelContext {
+  asteroid: AsteroidDefinition
+  seed: number
+}
+
+/**
+ * Resolve the asteroid and terrain seed for the current level.
+ * Priority: ?asteroidId= URL param (generates ad-hoc mission) > active mission > Bennu fallback.
+ */
+function resolveLevelContext(): LevelContext {
+  const params = new URLSearchParams(window.location.search)
+  const paramId = params.get('asteroidId')
+
+  let mission: GeneratedAsteroidMission | null = null
+
+  if (paramId) {
+    mission = generateAsteroidMission(5)
+    mission.asteroidId = paramId
+  } else {
+    mission = loadActiveMission()
+  }
+
+  const asteroidId = mission?.asteroidId ?? DEFAULT_ASTEROID_ID
+  const asteroid = getAsteroidById(asteroidId) ?? ASTEROID_CATALOG[0]!
+  const seed = mission ? hashSeed(mission.id) : hashSeed(DEFAULT_ASTEROID_ID)
+
+  return { asteroid, seed }
 }
 
 /**
@@ -180,13 +206,16 @@ export class LevelViewController implements Tickable {
     this.sceneManager = new SceneManager()
     this.sceneManager.mount(container)
 
+    // ── Asteroid data ────────────────────────────────────────────
+    const { asteroid, seed } = resolveLevelContext()
+
     // ── Terrain ─────────────────────────────────────────────────
     const flat = new URLSearchParams(window.location.search).has('flat')
-    const flatZones = generateFlatZones(FLAT_ZONE_COUNT, GRID_SIZE, TERRAIN_SEED)
+    const flatZones = generateFlatZones(FLAT_ZONE_COUNT, GRID_SIZE, seed)
     this.heightmap = flat
       ? new Heightmap(TERRAIN_RESOLUTION, GRID_SIZE)
-      : generateTerrain(TEST_SURFACE, {
-          seed: TERRAIN_SEED,
+      : generateTerrain(asteroid.surface, {
+          seed,
           resolution: TERRAIN_RESOLUTION,
           worldSize: GRID_SIZE,
           flatZones,
@@ -200,11 +229,11 @@ export class LevelViewController implements Tickable {
     this.sceneManager.addToScene(starField.points)
 
     // ── Atmosphere context (per-asteroid config) ───────────────
-    this.atmosphereCtx = createAtmosphereContext(TEST_LIGHTING, {
-      dustCoverage: TEST_SURFACE.dustCoverage,
-      albedo: 0.044,
-      biome: 'rocky',
-      baseColor: [0.15, 0.13, 0.1],
+    this.atmosphereCtx = createAtmosphereContext(asteroid.lighting, {
+      dustCoverage: asteroid.surface.dustCoverage,
+      albedo: asteroid.visual.albedo,
+      biome: asteroid.biome,
+      baseColor: asteroid.visual.baseColor,
     })
 
     // ── Lighting rig (replaces hardcoded lights) ───────────────

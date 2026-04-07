@@ -20,6 +20,30 @@ import type {
 import { getGiversForDifficulty } from './giverCatalog'
 import { ASTEROID_BELTS } from '@/lib/planets/catalog'
 import { ORBIT_SCALE } from '@/lib/planets/constants'
+import difficultyMap from '@/data/asteroids/difficulty-map.json'
+
+/** Entry from the difficulty-map JSON. */
+interface DifficultyMapEntry {
+  asteroidId: string
+  minDifficulty: number
+  maxDifficulty: number
+}
+
+/**
+ * Pick a random asteroid template that fits the given difficulty.
+ *
+ * @param difficulty - Mission difficulty (1-10).
+ * @returns Asteroid id from the catalog.
+ */
+export function pickAsteroidForDifficulty(difficulty: number): string {
+  const entries = (difficultyMap as DifficultyMapEntry[]).filter(
+    (e) => difficulty >= e.minDifficulty && difficulty <= e.maxDifficulty,
+  )
+  if (entries.length === 0) {
+    return (difficultyMap as DifficultyMapEntry[])[0]!.asteroidId
+  }
+  return entries[Math.floor(Math.random() * entries.length)]!.asteroidId
+}
 
 /** Earth's approximate semi-major axis in catalog units. */
 const NEAR_EARTH_INNER_RADIUS = 200
@@ -168,8 +192,11 @@ export function generateAsteroidMission(difficulty: number): GeneratedAsteroidMi
 
   const waypoint = generateWaypointInRegion(pick.region)
 
+  const asteroidId = pickAsteroidForDifficulty(difficulty)
+
   return {
     id: `${pick.template.id}_${Date.now()}`,
+    asteroidId,
     giverId: pick.giver.id,
     giverName: pick.giver.name,
     templateId: pick.template.id,

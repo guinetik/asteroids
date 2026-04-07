@@ -9,6 +9,7 @@ import type { GeneratedAsteroidMission } from '../types'
 
 const MOCK_MISSION: GeneratedAsteroidMission = {
   id: 'test_mission_123',
+  asteroidId: 'bennu',
   giverId: 'jay',
   giverName: 'Jay Mercer',
   templateId: 'jay_mineral_survey',

@@ -233,6 +233,8 @@ export type AsteroidMissionStatus = 'available' | 'accepted' | 'in-transit'
 export interface GeneratedAsteroidMission {
   /** Unique instance id (templateId + timestamp). */
   id: string
+  /** Asteroid template id from the catalog, e.g. "bennu", "kr3". Drives terrain and visuals. */
+  asteroidId: string
   /** Giver id. */
   giverId: string
   /** Giver display name. */
