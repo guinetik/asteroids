@@ -191,6 +191,11 @@ export class LanderController implements Tickable {
     return this._hp
   }
 
+  /** Combined tilt magnitude in radians (0 = perfectly upright). */
+  get tiltAngle(): number {
+    return Math.sqrt(this.tiltX * this.tiltX + this.tiltZ * this.tiltZ)
+  }
+
   /** Tracks whether lander was grounded last frame. */
   private wasGrounded = false
 

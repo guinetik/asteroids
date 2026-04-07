@@ -678,6 +678,8 @@ export class LevelViewController implements Tickable {
           rcsCapacity: ts.getState('rcs').capacity,
           hp: this.landerController.hp,
           maxHp: this.landerController.maxHp,
+          tiltAngle: this.landerController.tiltAngle,
+          grounded: this.landerController.body.grounded,
         })
       }
 

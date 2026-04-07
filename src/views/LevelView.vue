@@ -31,6 +31,8 @@ const landerTelemetry = reactive<LanderTelemetry>({
   rcsCapacity: 0,
   hp: 100,
   maxHp: 100,
+  tiltAngle: 0,
+  grounded: false,
 })
 
 const fpsTelemetry = reactive<FpsTelemetry>({
