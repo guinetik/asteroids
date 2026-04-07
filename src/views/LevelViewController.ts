@@ -1211,7 +1211,7 @@ export class LevelViewController implements Tickable {
     const currentState = this.stateMachine?.state ?? ''
 
     for (const survey of this.surveyStates) {
-      if (survey.status === 'delivered' || survey.status === 'failed') continue
+      if (survey.status === 'delivered') continue
 
       // Timer countdown when active
       if (survey.status === 'active') {
@@ -1219,6 +1219,7 @@ export class LevelViewController implements Tickable {
         if (survey.timeRemaining <= 0) {
           survey.timeRemaining = 0
           survey.status = 'failed'
+          this.cleanupSurveyProbes(survey)
           continue
         }
 
@@ -1242,6 +1243,11 @@ export class LevelViewController implements Tickable {
             if (this.inputManager?.wasActionPressed('interact')) {
               this.activateSurvey(survey)
             }
+          } else if (survey.status === 'failed') {
+            this.onTerminalPrompt?.('[F] RETRY GRAVITOMETRIC SURVEY')
+            if (this.inputManager?.wasActionPressed('interact')) {
+              this.activateSurvey(survey)
+            }
           } else if (survey.status === 'active' && survey.probeController?.allCollected) {
             this.onTerminalPrompt?.('[F] DELIVER CALIBRATION DATA')
             if (this.inputManager?.wasActionPressed('interact')) {
@@ -1257,7 +1263,7 @@ export class LevelViewController implements Tickable {
     // Clear prompt if no terminal is in range
     if (currentState === 'eva' && this.playerController) {
       const nearAny = this.surveyStates.some((s) => {
-        if (s.status === 'delivered' || s.status === 'failed') return false
+        if (s.status === 'delivered') return false
         const playerPos = this.playerController!.group.position
         const dx = playerPos.x - s.terminal.position.x
         const dz = playerPos.z - s.terminal.position.z
@@ -1267,8 +1273,20 @@ export class LevelViewController implements Tickable {
     }
   }
 
-  /** Activate a survey — spawn probes, refuel lander, start timer. */
+  /** Remove probes and unregister the probe controller for a survey. */
+  private cleanupSurveyProbes(survey: SurveyRuntimeState): void {
+    if (survey.probeController) {
+      this.tickHandler?.unregister(survey.probeController)
+      survey.probeController.dispose()
+      survey.probeController = null
+    }
+  }
+
+  /** Activate (or restart) a survey — spawn probes, refuel lander, start timer. */
   private activateSurvey(survey: SurveyRuntimeState): void {
+    // Clean up previous attempt if retrying
+    this.cleanupSurveyProbes(survey)
+
     const obj = this.missionObjectives[survey.objectiveIndex]!
     survey.status = 'active'
     survey.timeRemaining = obj.timeLimit ?? 90
@@ -1320,7 +1338,7 @@ export class LevelViewController implements Tickable {
     if (!this.playerController || this.stateMachine?.state !== 'eva') return false
     const playerPos = this.playerController.group.position
     return this.surveyStates.some((s) => {
-      if (s.status === 'delivered' || s.status === 'failed') return false
+      if (s.status === 'delivered') return false
       const dx = playerPos.x - s.terminal.position.x
       const dz = playerPos.z - s.terminal.position.z
       return Math.sqrt(dx * dx + dz * dz) <= TERMINAL_INTERACT_RANGE

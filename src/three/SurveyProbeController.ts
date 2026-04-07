@@ -35,10 +35,10 @@ const PROBE_COLOR = 0x00ffcc
 const COLLECT_PARTICLE_COUNT = 12
 
 /** Seconds between each probe launching from the terminal. */
-const LAUNCH_STAGGER_INTERVAL = 0.4
+const LAUNCH_STAGGER_INTERVAL = 1.0
 
 /** Seconds each probe takes to fly from terminal to target. */
-const LAUNCH_FLIGHT_DURATION = 1.5
+const LAUNCH_FLIGHT_DURATION = 3.0
 
 /** Scale at launch origin (grows to 1.0 during flight). */
 const LAUNCH_START_SCALE = 0.2
