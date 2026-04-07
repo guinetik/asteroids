@@ -6,6 +6,8 @@ import LanderHud from '@/components/LanderHud.vue'
 import FpsHud from '@/components/FpsHud.vue'
 import FpsCompass from '@/components/FpsCompass.vue'
 import DeathOverlay from '@/components/DeathOverlay.vue'
+import LevelMinimap from '@/components/LevelMinimap.vue'
+import type { MapMarker } from '@/components/LevelMinimap.vue'
 import type { LanderTelemetry } from '@/components/LanderHud.vue'
 import type { FpsTelemetry } from '@/components/FpsHud.vue'
 
@@ -18,6 +20,17 @@ const deathMessage = ref(false)
 const arrivalFade = ref(0)
 const deathOverlayVisible = ref(false)
 const deathOverlayCause = ref('')
+const showMap = ref(false)
+const mapCanvas = ref<HTMLCanvasElement | null>(null)
+const playerX = ref(0)
+const playerZ = ref(0)
+const mapMarkers = ref<MapMarker[]>([])
+
+const OBJECTIVE_COLORS: Record<string, string> = {
+  gather: '#66ffee',
+  exterminate: '#ff4444',
+  rescue: '#ffcc44',
+}
 
 /** Landing warnings — only active when descending in lander state. */
 const WARN_SPEED = 5.0
@@ -104,7 +117,30 @@ onMounted(async () => {
       deathOverlayVisible.value = visible
       deathOverlayCause.value = cause
     }
+    viewController.onMapCanvas = (canvas) => {
+      mapCanvas.value = canvas
+    }
+    viewController.onPlayerPosition = (x, z) => {
+      playerX.value = x
+      playerZ.value = z
+    }
     await viewController.init(container.value)
+
+    // Map markers from mission objectives
+    const mission = viewController.getMission()
+    if (mission) {
+      mapMarkers.value = mission.objectives.map((obj, i) => ({
+        id: `obj-${i}`,
+        x: obj.x,
+        z: obj.z,
+        color: OBJECTIVE_COLORS[obj.type] ?? '#66ffee',
+        label: obj.type.toUpperCase(),
+      }))
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyM') showMap.value = !showMap.value
+    })
   }
 })
 
@@ -135,6 +171,14 @@ onUnmounted(() => {
     v-if="stateInfo.state === 'eva'"
     :heading-rad="fpsTelemetry.headingRad"
     :objectives="fpsTelemetry.objectives"
+  />
+  <LevelMinimap
+    v-if="showMap"
+    :map-canvas="mapCanvas"
+    :player-x="playerX"
+    :player-z="playerZ"
+    :grid-size="12000"
+    :markers="mapMarkers"
   />
   <!-- Landing warnings — center screen, impossible to miss -->
   <div v-if="descentWarning !== 'safe' || attitudeWarning !== 'safe'" class="landing-warnings">

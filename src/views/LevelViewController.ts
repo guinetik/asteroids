@@ -65,6 +65,7 @@ import {
   updateWaypointMarkers,
   clearWaypointMarkers,
 } from '@/three/WaypointMarkers'
+import { generateMapCanvas } from '@/lib/terrain/mapColors'
 import playerConfigJson from '@/data/fps/player-config.json'
 import multiToolConfigJson from '@/data/fps/multitool-config.json'
 
@@ -202,6 +203,12 @@ export class LevelViewController implements Tickable {
   /** Called to show/hide the death overlay with a cause message. */
   onDeathOverlay: ((visible: boolean, cause: string) => void) | null = null
 
+  /** Called once with the minimap canvas after terrain generation. */
+  onMapCanvas: ((canvas: HTMLCanvasElement) => void) | null = null
+
+  /** Called each frame with player world position for minimap. */
+  onPlayerPosition: ((x: number, z: number) => void) | null = null
+
   /** Initialise all systems and start the game loop. */
   async init(container: HTMLElement): Promise<void> {
     const playerConfig = playerConfigJson as FpsPlayerConfig
@@ -245,6 +252,10 @@ export class LevelViewController implements Tickable {
       const groundY = this.heightmap.heightAt(obj.x, obj.z)
       addWaypointMarker(`obj-${i}`, obj.x, obj.z, groundY, this.sceneManager!.scene)
     }
+
+    // ── Minimap canvas ─────────────────────────────────────────
+    const mapCanvas = generateMapCanvas(this.heightmap!.grid, TERRAIN_RESOLUTION)
+    this.onMapCanvas?.(mapCanvas)
 
     // ── Starfield ────────────────────────────────────────────────
     const starField = new StarFieldController({ count: 2000, size: 1.5 })
@@ -828,6 +839,7 @@ export class LevelViewController implements Tickable {
           tiltAngle: this.landerController.tiltAngle,
           grounded: this.landerController.body.grounded,
         })
+        this.onPlayerPosition?.(this.landerController!.group.position.x, this.landerController!.group.position.z)
       }
 
       // FPS telemetry
@@ -864,6 +876,7 @@ export class LevelViewController implements Tickable {
           headingRad,
           objectives,
         })
+        this.onPlayerPosition?.(this.playerController!.group.position.x, this.playerController!.group.position.z)
       }
     }
   }

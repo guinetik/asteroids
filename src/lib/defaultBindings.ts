@@ -69,6 +69,7 @@ export const LEVEL_BINDINGS: Record<string, string[]> = {
   // Shared
   interact: ['KeyF'],
   skipCinematic: ['Escape'],
+  toggleMap: ['KeyM'],
 }
 
 /** Habitat interior key bindings — FPS walk + interact. */
