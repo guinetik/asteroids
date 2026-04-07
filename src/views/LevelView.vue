@@ -1,6 +1,7 @@
 <!-- src/views/LevelView.vue -->
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { Timer } from '@/lib/Timer'
 import { LevelViewController } from './LevelViewController'
 import LanderHud from '@/components/LanderHud.vue'
 import MissionAnnouncement from '@/components/MissionAnnouncement.vue'
@@ -145,7 +146,7 @@ onMounted(async () => {
         objCompleteLabel.value = obj.label
       }
       objCompleteVisible.value = true
-      setTimeout(() => { objCompleteVisible.value = false }, 5000)
+      Timer.after(5, () => { objCompleteVisible.value = false })
     }
     viewController.onMissionComplete = () => {
       missionCompleteVisible.value = true
