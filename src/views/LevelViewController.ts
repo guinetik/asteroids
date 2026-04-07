@@ -352,12 +352,7 @@ export class LevelViewController implements Tickable {
           i, obj, this.sceneManager!.scene, this.heightmap!, missionSeed,
         )
         minigame.onPrompt = (text) => this.onTerminalPrompt?.(text)
-        minigame.onComplete = (idx) => {
-          this.onObjectiveComplete?.(idx)
-          if (this.allObjectivesComplete()) {
-            this.onMissionComplete?.()
-          }
-        }
+        minigame.onComplete = (idx) => this.onObjectiveComplete?.(idx)
         minigame.onStepChange = (idx, steps) => this.onStepChange?.(idx, steps)
         minigame.onRefuel = () => this.landerController?.thrusterSystem.refuel()
         minigame.onRegisterTickable = (t) => this.tickHandler!.register(t, TICK_PRIORITY_PHYSICS + 4)
@@ -521,7 +516,7 @@ export class LevelViewController implements Tickable {
       isLanderGrounded: () => this.landerController?.body.grounded ?? false,
       isPlayerNearLander: () => this.isPlayerNearLander(),
       isLanderNearShuttle: () => this.isLanderNearShuttle(),
-      hasCompletedEva: () => this.hasExitedVehicle && this.allObjectivesComplete(),
+      hasCompletedEva: () => this.hasExitedVehicle,
     })
 
     // ── Always-active tickables ─────────────────────────────────
@@ -807,6 +802,11 @@ export class LevelViewController implements Tickable {
   // ═══════════════════════════════════════════════════════════════
 
   private enterExfil(): void {
+    // Fire mission complete if all objectives done
+    if (this.allObjectivesComplete()) {
+      this.onMissionComplete?.()
+    }
+
     // Unregister lander tickables
     this.tickHandler!.unregister(this.landerController!)
     this.tickHandler!.unregister(this.vehicleCamera!)
