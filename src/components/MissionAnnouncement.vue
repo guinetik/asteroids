@@ -1,6 +1,6 @@
 <!-- src/components/MissionAnnouncement.vue -->
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 
 /** Duration in ms for the stripe to expand open. */
 const OPEN_DURATION = 600
@@ -18,8 +18,9 @@ const props = defineProps<{
 const phase = ref<'closed' | 'opening' | 'open' | 'closing'>('closed')
 const removed = ref(false)
 
-watch(() => props.visible, (val) => {
+watch(() => props.visible, async (val) => {
   if (!val) return
+  await nextTick()
   phase.value = 'opening'
   setTimeout(() => {
     phase.value = 'open'
