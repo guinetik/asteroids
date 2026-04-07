@@ -10,7 +10,7 @@ import type { FpsTelemetry } from '@/components/FpsHud.vue'
 const container = ref<HTMLElement>()
 const viewController = new LevelViewController()
 const letterboxVisible = ref(true)
-const stateInfo = reactive({ state: '', grounded: false })
+const stateInfo = reactive({ state: '', grounded: false, canExfil: false })
 const deathFade = ref(0)
 const deathMessage = ref(false)
 const arrivalFade = ref(0)
@@ -99,6 +99,12 @@ onUnmounted(() => {
     class="exit-prompt"
   >
     <span class="exit-prompt__text">EXIT (F)</span>
+  </div>
+  <div
+    v-if="stateInfo.canExfil"
+    class="exit-prompt"
+  >
+    <span class="exit-prompt__text">EXFILTRATE (F)</span>
   </div>
   <div
     v-if="arrivalFade > 0"
