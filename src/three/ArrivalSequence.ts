@@ -200,6 +200,11 @@ export class ArrivalSequence {
     this.shuttleScene.scale.setScalar(MODEL_SCALE)
     this.shuttleScene.rotation.x = MODEL_ROTATION_X
     this.shuttleGroup.add(this.shuttleScene)
+    this.shuttleScene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        child.castShadow = true
+      }
+    })
     const shuttleScene = this.shuttleScene
     this.shuttleGroup.scale.setScalar(SHUTTLE_CINEMATIC_SCALE)
 
@@ -243,6 +248,11 @@ export class ArrivalSequence {
     this.landerModel.position.copy(CARGO_LANDER_OFFSET)
     this.landerModel.rotation.set(0, 0, -Math.PI / 2)
     shuttleScene.add(this.landerModel)
+    this.landerModel.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        child.castShadow = true
+      }
+    })
 
     // Initial camera: wide establishing shot, far behind and above the shuttle
     this.camera.position.set(
