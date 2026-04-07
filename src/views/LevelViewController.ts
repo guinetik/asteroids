@@ -143,27 +143,54 @@ interface LevelContext {
   mission: GeneratedAsteroidMission
 }
 
+/** Maximum attempts to generate a mission matching the requested type. */
+const MISSION_TYPE_RETRY_LIMIT = 20
+
 /**
  * Resolve the asteroid and terrain seed for the current level.
  * Priority: ?asteroidId= URL param (generates ad-hoc mission) > active mission > fallback.
+ * Optional ?mission= param forces a specific objective type (e.g. ?mission=survey).
  */
 function resolveLevelContext(): LevelContext {
   const params = new URLSearchParams(window.location.search)
   const paramId = params.get('asteroidId')
+  const missionType = params.get('mission')
 
   let mission: GeneratedAsteroidMission
 
   if (paramId) {
-    mission = generateAsteroidMission(5)
+    mission = generateMissionWithType(5, missionType)
     mission.asteroidId = paramId
   } else {
-    mission = loadActiveMission() ?? generateAsteroidMission(5)
+    mission = loadActiveMission() ?? generateMissionWithType(5, missionType)
   }
 
   const asteroid = getAsteroidById(mission.asteroidId) ?? ASTEROID_CATALOG[0]!
   const seed = hashSeed(mission.id)
 
   return { asteroid, seed, mission }
+}
+
+/**
+ * Generate a mission, optionally forcing a specific objective type.
+ * Retries until a mission with the requested type is found.
+ *
+ * @param difficulty - Mission difficulty (1-10).
+ * @param type - Optional objective type to require (e.g. 'survey').
+ * @returns Generated mission.
+ */
+function generateMissionWithType(
+  difficulty: number,
+  type: string | null,
+): GeneratedAsteroidMission {
+  if (!type) return generateAsteroidMission(difficulty)
+
+  for (let i = 0; i < MISSION_TYPE_RETRY_LIMIT; i++) {
+    const mission = generateAsteroidMission(difficulty)
+    if (mission.objectives.some((o) => o.type === type)) return mission
+  }
+  // Fallback — return whatever was generated
+  return generateAsteroidMission(difficulty)
 }
 
 /**
