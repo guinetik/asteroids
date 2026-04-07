@@ -127,6 +127,8 @@ export class LanderViewController implements Tickable {
         mainEngineCapacity: ts.getState('mainEngine').capacity,
         rcsCharge: ts.getState('rcs').charge,
         rcsCapacity: ts.getState('rcs').capacity,
+        hp: this.landerController.hp,
+        maxHp: this.landerController.maxHp,
       })
     }
   }

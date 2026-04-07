@@ -41,6 +41,7 @@ import { createLevelStateMachine, LANDER_INTERACT_RANGE, EXFIL_PROXIMITY_RANGE }
 import type { LevelState } from '@/lib/level/levelStateMachine'
 import type { StateMachine } from '@/lib/stateMachine'
 import { ArrivalSequence } from '@/three/ArrivalSequence'
+import { LanderExplosion } from '@/three/LanderExplosion'
 import { StarFieldController } from '@/three/StarFieldController'
 import {
   AmbientLight,
@@ -117,6 +118,7 @@ export class LevelViewController implements Tickable {
 
   // ── Exfil tracking ────────────────────────────────────────────
   private hasExitedVehicle = false
+  private landerExplosion: LanderExplosion | null = null
 
   // ── Mouse state (EVA) ────────────────────────────────────────
   private leftMouseDown = false
@@ -197,6 +199,17 @@ export class LevelViewController implements Tickable {
     const spawnX = (Math.random() - 0.5) * 2 * SPAWN_POSITION_RANGE
     const spawnZ = (Math.random() - 0.5) * 2 * SPAWN_POSITION_RANGE
     this.landerController.group.position.set(spawnX, LANDER_SPAWN_HEIGHT, spawnZ)
+
+    this.landerController.onCrash = (_damage, impactSpeed) => {
+      this.landerExplosion!.explode(this.landerController!.group.position.clone(), impactSpeed)
+    }
+
+    this.landerController.onDeath = () => {
+      this.landerExplosion!.explode(this.landerController!.group.position.clone(), 20)
+      this.landerController!.group.visible = false
+      this.stateMachine?.setState('failed' as LevelState)
+    }
+
     this.sceneManager.addToScene(this.landerController.group)
     this.sceneManager.addToScene(this.landerController.flameEmitter.points)
     for (const emitter of this.landerController.rcsEmitters.values()) {
@@ -278,6 +291,11 @@ export class LevelViewController implements Tickable {
     }
     this.multiTool.setProjectileSystem(this.projectileSystem)
 
+    // ── Lander explosion VFX ───────────────────────────────────────
+    this.landerExplosion = new LanderExplosion()
+    this.sceneManager.addToScene(this.landerExplosion.fireEmitter.points)
+    this.sceneManager.addToScene(this.landerExplosion.debrisEmitter.points)
+
     // ── State machine ───────────────────────────────────────────
     this.stateMachine = createLevelStateMachine({
       onStateChange: (current, previous) => this.onStateTransition(current, previous),
@@ -300,6 +318,8 @@ export class LevelViewController implements Tickable {
       takeDamage: (amount = 10) => this.playerController?.takeDamage(amount),
       heal: () => this.playerController?.replenish(),
       kill: () => this.playerController?.takeDamage(999),
+      landerDamage: (amount = 20) => this.landerController?.takeDamage(amount),
+      landerDestroy: () => this.landerController?.takeDamage(999),
       exfil: () => {
         this.hasExitedVehicle = true
         this.stateMachine?.setState('exfil' as LevelState)
@@ -390,6 +410,7 @@ export class LevelViewController implements Tickable {
   private enterLander(): void {
     this.tickHandler!.register(this.landerController!, TICK_PRIORITY_PHYSICS)
     this.tickHandler!.register(this.vehicleCamera!, TICK_PRIORITY_RENDER - 2)
+    this.tickHandler!.register(this.landerExplosion!, TICK_PRIORITY_PHYSICS + 3)
     this.vehicleCamera!.controls.enabled = true
     this.sceneManager!.setCamera(this.vehicleCamera!)
     this.sceneManager!.setActiveCamera(null)
@@ -398,6 +419,7 @@ export class LevelViewController implements Tickable {
   private exitLander(): void {
     this.tickHandler!.unregister(this.landerController!)
     this.tickHandler!.unregister(this.vehicleCamera!)
+    this.tickHandler!.unregister(this.landerExplosion!)
     this.vehicleCamera!.controls.enabled = false
   }
 
@@ -638,6 +660,8 @@ export class LevelViewController implements Tickable {
           mainEngineCapacity: ts.getState('mainEngine').capacity,
           rcsCharge: ts.getState('rcs').charge,
           rcsCapacity: ts.getState('rcs').capacity,
+          hp: this.landerController.hp,
+          maxHp: this.landerController.maxHp,
         })
       }
 
@@ -828,6 +852,7 @@ export class LevelViewController implements Tickable {
     this.playerController?.dispose()
     this.fpsCamera?.dispose()
     this.arrivalSequence?.dispose()
+    this.landerExplosion?.dispose()
     this.landerController?.dispose()
     this.terrainMesh?.dispose()
     this.vehicleCamera?.dispose()

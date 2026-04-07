@@ -11,6 +11,8 @@ export interface LanderTelemetry {
   mainEngineCapacity: number
   rcsCharge: number
   rcsCapacity: number
+  hp: number
+  maxHp: number
 }
 
 const props = defineProps<{
@@ -44,6 +46,18 @@ function fuelColor(level: number, capacity: number): string {
           class="hud-fuel-fill"
           :class="fuelColor(props.telemetry.fuelLevel, props.telemetry.fuelCapacity)"
           :style="{ width: pct(props.telemetry.fuelLevel, props.telemetry.fuelCapacity) + '%' }"
+        ></div>
+      </div>
+    </div>
+
+    <!-- Hull HP bar -->
+    <div class="lander-hud-fuel">
+      <span class="hud-readout">HULL</span>
+      <div class="hud-fuel-track">
+        <div
+          class="hud-fuel-fill"
+          :class="fuelColor(props.telemetry.hp, props.telemetry.maxHp)"
+          :style="{ width: pct(props.telemetry.hp, props.telemetry.maxHp) + '%' }"
         ></div>
       </div>
     </div>
