@@ -1126,7 +1126,12 @@ export class MapViewController implements Tickable {
             this.vehicleCamera?.setConfig(MAP_ORBIT_CAMERA_CONFIG)
             this.hideLaunchArrow()
           } else {
-            const heading = this.shuttleController.group.rotation.y
+            // Derive heading from the actual quaternion forward, not Euler rotation.y —
+            // repeated rotateY() during orbit can cause Euler decomposition to diverge
+            // from the visual forward (which the arrow child uses correctly).
+            const fwd = new THREE.Vector3(1, 0, 0)
+              .applyQuaternion(this.shuttleController.group.quaternion)
+            const heading = Math.atan2(-fwd.z, fwd.x)
             const launchVelocity = this.orbitSystem.launchSlingshot(heading, dt)
             const vel = new THREE.Vector3(launchVelocity.vx, 0, launchVelocity.vz)
             const finalSpeed = Math.sqrt(launchVelocity.vx ** 2 + launchVelocity.vz ** 2)
