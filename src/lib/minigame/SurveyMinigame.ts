@@ -10,7 +10,7 @@
  */
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
-import type { MiniGame, MiniGameStatus, MiniGameContext, MiniGameEvents } from './MiniGame'
+import type { MiniGame, MiniGameStatus, MiniGameContext, MiniGameEvents, MiniGameStep } from './MiniGame'
 import type { ConcreteObjective } from '@/lib/missions/types'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import { TerminalModel, TERMINAL_INTERACT_RANGE } from '@/three/TerminalModel'
@@ -36,6 +36,14 @@ export class SurveyMinigame implements MiniGame, MiniGameEvents {
   private _timeRemaining: number
   private _isPlayerNear = false
 
+  /** Step definitions — updated each frame to reflect current state. */
+  private readonly _steps: MiniGameStep[] = [
+    { label: 'Locate the terminal', complete: false, active: true },
+    { label: 'Begin the survey', complete: false, active: false },
+    { label: 'Collect the probes', complete: false, active: false },
+    { label: 'Deliver the data', complete: false, active: false },
+  ]
+
   private readonly terminal: TerminalModel
   private probeController: SurveyProbeController | null = null
   private readonly scene: THREE.Scene
@@ -55,6 +63,7 @@ export class SurveyMinigame implements MiniGame, MiniGameEvents {
   // ── MiniGameEvents ──────────────────────────────────────────
   onPrompt: ((text: string | null) => void) | null = null
   onComplete: ((objectiveIndex: number) => void) | null = null
+  onStepChange: ((objectiveIndex: number, steps: readonly MiniGameStep[]) => void) | null = null
 
   /** Current minigame status. */
   get status(): MiniGameStatus {
@@ -79,6 +88,11 @@ export class SurveyMinigame implements MiniGame, MiniGameEvents {
   /** Total probes (null if no probe controller). */
   get progressTotal(): number | null {
     return this.probeController ? this.probeController.total : null
+  }
+
+  /** Ordered steps for the tracker HUD. */
+  get steps(): readonly MiniGameStep[] {
+    return this._steps
   }
 
   /** The terminal model (for scene access). */
@@ -141,6 +155,7 @@ export class SurveyMinigame implements MiniGame, MiniGameEvents {
 
       if (dist <= TERMINAL_INTERACT_RANGE) {
         this._isPlayerNear = true
+        this.advanceStep(0) // Located the terminal
 
         if (this._status === 'idle') {
           this.onPrompt?.('[F] BEGIN GRAVITOMETRIC SURVEY')
@@ -154,11 +169,40 @@ export class SurveyMinigame implements MiniGame, MiniGameEvents {
         }
       }
     }
+
+    // Step 2: track probe collection progress
+    if (this._status === 'active' && this.probeController?.allCollected) {
+      this.advanceStep(2)
+    }
+  }
+
+  /** Mark a step complete and activate the next one. */
+  private advanceStep(index: number): void {
+    const step = this._steps[index]
+    if (!step || step.complete) return
+    step.complete = true
+    step.active = false
+    // Activate the next incomplete step
+    const next = this._steps.find((s) => !s.complete)
+    if (next) next.active = true
+    this.onStepChange?.(this.objectiveIndex, this._steps)
+  }
+
+  /** Reset all steps to initial state (for retry). */
+  private resetSteps(): void {
+    for (const step of this._steps) {
+      step.complete = false
+      step.active = false
+    }
+    this._steps[0]!.active = true
   }
 
   /** Start or restart the survey. */
   private activate(): void {
     this.cleanupProbes()
+    this.resetSteps()
+    this.advanceStep(0) // Already at terminal
+    this.advanceStep(1) // Just started
 
     this._status = 'active'
     this._timeRemaining = this.objective.timeLimit ?? DEFAULT_TIME_LIMIT
@@ -186,6 +230,7 @@ export class SurveyMinigame implements MiniGame, MiniGameEvents {
 
   /** Deliver collected data — objective complete. */
   private deliver(): void {
+    this.advanceStep(3)
     this._status = 'completed'
     this.onPrompt?.(null)
     this.onComplete?.(this.objectiveIndex)

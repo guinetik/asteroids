@@ -32,6 +32,18 @@ export interface MiniGameEvents {
   onPrompt: ((text: string | null) => void) | null
   /** Objective completed. */
   onComplete: ((objectiveIndex: number) => void) | null
+  /** A step advanced — pass updated steps for reactivity. */
+  onStepChange: ((objectiveIndex: number, steps: readonly MiniGameStep[]) => void) | null
+}
+
+/** A single step in a minigame's progression. */
+export interface MiniGameStep {
+  /** Step label shown in the tracker. */
+  label: string
+  /** Whether this step is complete. */
+  complete: boolean
+  /** Whether this is the currently active step. */
+  active: boolean
 }
 
 /**
@@ -53,6 +65,8 @@ export interface MiniGame {
   readonly progressCurrent: number | null
   /** Progress denominator (e.g. total probes). Null if not applicable. */
   readonly progressTotal: number | null
+  /** Ordered steps for the tracker HUD. */
+  readonly steps: readonly MiniGameStep[]
 
   /** Per-frame update. */
   tick(dt: number, ctx: MiniGameContext): void

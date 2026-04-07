@@ -67,7 +67,7 @@ import {
   clearWaypointMarkers,
 } from '@/three/WaypointMarkers'
 import { generateMapCanvas } from '@/lib/terrain/mapColors'
-import type { MiniGame, MiniGameContext } from '@/lib/minigame/MiniGame'
+import type { MiniGame, MiniGameContext, MiniGameStep } from '@/lib/minigame/MiniGame'
 import { SurveyMinigame } from '@/lib/minigame/SurveyMinigame'
 import playerConfigJson from '@/data/fps/player-config.json'
 import multiToolConfigJson from '@/data/fps/multitool-config.json'
@@ -284,6 +284,9 @@ export class LevelViewController implements Tickable {
   /** Called when an objective is completed. */
   onObjectiveComplete: ((objectiveIndex: number) => void) | null = null
 
+  /** Called when a minigame step advances. */
+  onStepChange: ((objectiveIndex: number, steps: readonly MiniGameStep[]) => void) | null = null
+
   /** Called once with the minimap canvas after terrain generation. */
   onMapCanvas: ((canvas: HTMLCanvasElement) => void) | null = null
 
@@ -347,6 +350,7 @@ export class LevelViewController implements Tickable {
         )
         minigame.onPrompt = (text) => this.onTerminalPrompt?.(text)
         minigame.onComplete = (idx) => this.onObjectiveComplete?.(idx)
+        minigame.onStepChange = (idx, steps) => this.onStepChange?.(idx, steps)
         minigame.onRefuel = () => this.landerController?.thrusterSystem.refuel()
         minigame.onRegisterTickable = (t) => this.tickHandler!.register(t, TICK_PRIORITY_PHYSICS + 4)
         minigame.onUnregisterTickable = (t) => this.tickHandler?.unregister(t)
@@ -783,6 +787,11 @@ export class LevelViewController implements Tickable {
   /** Get the resolved mission (for UI to read objectives). */
   getMission(): GeneratedAsteroidMission | null {
     return this.mission
+  }
+
+  /** Get the minigame for a given objective index (for step tracking). */
+  getMinigame(objectiveIndex: number): MiniGame | undefined {
+    return this.minigames.find((mg) => mg.objectiveIndex === objectiveIndex)
   }
 
   // ═══════════════════════════════════════════════════════════════

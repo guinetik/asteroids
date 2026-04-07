@@ -131,6 +131,12 @@ onMounted(async () => {
       trackerAsteroid.value = asteroid
       trackerMission.value = mission
     }
+    viewController.onStepChange = (index, steps) => {
+      const obj = trackerObjectives.value.find((o) => o.id === `obj-${index}`)
+      if (obj) {
+        obj.steps = [...steps.map((s) => ({ ...s }))]
+      }
+    }
     viewController.onObjectiveComplete = (index) => {
       const obj = trackerObjectives.value.find((o) => o.id === `obj-${index}`)
       if (obj) {
@@ -162,11 +168,15 @@ onMounted(async () => {
         color: OBJECTIVE_COLORS[obj.type] ?? '#66ffee',
         label: obj.type.toUpperCase(),
       }))
-      trackerObjectives.value = mission.objectives.map((obj, i) => ({
-        id: `obj-${i}`,
-        label: obj.type.toUpperCase(),
-        complete: false,
-      }))
+      trackerObjectives.value = mission.objectives.map((obj, i) => {
+        const mg = viewController.getMinigame(i)
+        return {
+          id: `obj-${i}`,
+          label: obj.type.toUpperCase(),
+          complete: false,
+          steps: mg?.steps ?? [],
+        }
+      })
     }
 
     window.addEventListener('keydown', (e) => {

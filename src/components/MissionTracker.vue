@@ -1,5 +1,6 @@
 <!-- src/components/MissionTracker.vue -->
 <script setup lang="ts">
+import type { MiniGameStep } from '@/lib/minigame/MiniGame'
 
 /** Objective display entry for the tracker. */
 export interface TrackerObjective {
@@ -9,6 +10,8 @@ export interface TrackerObjective {
   label: string
   /** Whether this objective is complete. */
   complete: boolean
+  /** Steps for this objective (from minigame). */
+  steps: readonly MiniGameStep[]
 }
 
 defineProps<{
@@ -28,11 +31,31 @@ defineProps<{
       <div
         v-for="obj in objectives"
         :key="obj.id"
-        class="tracker-objective"
-        :class="{ 'tracker-objective--complete': obj.complete }"
+        class="tracker-objective-group"
       >
-        <span class="tracker-check">{{ obj.complete ? '\u2713' : '\u25CB' }}</span>
-        <span class="tracker-label">{{ obj.label }}</span>
+        <div
+          class="tracker-objective"
+          :class="{ 'tracker-objective--complete': obj.complete }"
+        >
+          <span class="tracker-check">{{ obj.complete ? '\u2713' : '\u25CB' }}</span>
+          <span class="tracker-label">{{ obj.label }}</span>
+        </div>
+        <!-- Steps: show completed + current active, hide future -->
+        <div v-if="!obj.complete && obj.steps.length > 0" class="tracker-steps">
+          <div
+            v-for="(step, si) in obj.steps"
+            :key="si"
+            v-show="step.complete || step.active"
+            class="tracker-step"
+            :class="{
+              'tracker-step--complete': step.complete,
+              'tracker-step--active': step.active,
+            }"
+          >
+            <span class="tracker-step-icon">{{ step.complete ? '\u2713' : '\u203A' }}</span>
+            <span class="tracker-step-label">{{ step.label }}</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -79,7 +102,12 @@ defineProps<{
 .tracker-objectives {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.4rem;
+}
+.tracker-objective-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
 }
 .tracker-objective {
   display: flex;
@@ -90,7 +118,7 @@ defineProps<{
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.6);
-  transition: color 0.3s, opacity 0.3s;
+  transition: color 0.3s;
 }
 .tracker-objective--complete {
   color: rgba(0, 255, 204, 0.5);
@@ -104,6 +132,37 @@ defineProps<{
   color: rgba(0, 255, 204, 0.6);
 }
 .tracker-objective--complete .tracker-check {
+  color: rgba(0, 255, 204, 0.9);
+}
+.tracker-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-left: 1.2rem;
+  border-left: 1px solid rgba(0, 255, 204, 0.1);
+  margin-left: 0.35rem;
+}
+.tracker-step {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.3);
+  transition: color 0.3s;
+}
+.tracker-step--active {
+  color: rgba(255, 255, 255, 0.8);
+}
+.tracker-step--complete {
+  color: rgba(0, 255, 204, 0.4);
+}
+.tracker-step-icon {
+  font-size: 0.7rem;
+  color: rgba(0, 255, 204, 0.5);
+}
+.tracker-step--active .tracker-step-icon {
   color: rgba(0, 255, 204, 0.9);
 }
 </style>
