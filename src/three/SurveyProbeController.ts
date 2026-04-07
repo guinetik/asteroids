@@ -60,13 +60,14 @@ export class SurveyProbeController implements Tickable {
   private readonly probes: ProbeEntry[] = []
   private readonly scene: THREE.Scene
   private elapsed = 0
+  private collectedCount = 0
 
   /** Particle emitter for collection bursts. */
   readonly collectEmitter: ParticleEmitter
 
   /** Number of probes collected so far. */
   get collected(): number {
-    return this.probes.filter((p) => p.collected).length
+    return this.collectedCount
   }
 
   /** Total probe count. */
@@ -167,6 +168,7 @@ export class SurveyProbeController implements Tickable {
 
       if (dist <= COLLECT_RANGE) {
         probe.collected = true
+        this.collectedCount++
         probe.group.visible = false
 
         // Particle burst

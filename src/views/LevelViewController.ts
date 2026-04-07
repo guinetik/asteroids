@@ -349,11 +349,11 @@ export class LevelViewController implements Tickable {
     this.lightingRig = new LevelLightingRig(this.atmosphereCtx)
     this.lightingRig.addToScene(this.sceneManager.scene)
 
-      // ── Lander (created once, stays in scene) ───────────────────
-      this.landerController = new LanderController(this.inputManager)
-      this.landerController.setHeightmap(this.heightmap)
-      this.landerController.setCollisionWorld(this.collisionWorld)
-      await this.landerController.load()
+    // ── Lander (created once, stays in scene) ───────────────────
+    this.landerController = new LanderController(this.inputManager)
+    this.landerController.setHeightmap(this.heightmap)
+    this.landerController.setCollisionWorld(this.collisionWorld)
+    await this.landerController.load()
     this.landerController.group.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         child.castShadow = true
@@ -1168,11 +1168,6 @@ export class LevelViewController implements Tickable {
     for (const survey of this.surveyStates) {
       if (survey.status === 'delivered' || survey.status === 'failed') continue
 
-      // Tick probe controller if active
-      if (survey.probeController) {
-        survey.probeController.tick(dt)
-      }
-
       // Timer countdown when active
       if (survey.status === 'active') {
         survey.timeRemaining -= dt
@@ -1198,12 +1193,12 @@ export class LevelViewController implements Tickable {
 
         if (dist <= TERMINAL_INTERACT_RANGE) {
           if (survey.status === 'idle') {
-            this.onTerminalPrompt?.('[E] BEGIN GRAVITOMETRIC SURVEY')
+            this.onTerminalPrompt?.('[F] BEGIN GRAVITOMETRIC SURVEY')
             if (this.inputManager?.wasActionPressed('interact')) {
               this.activateSurvey(survey)
             }
           } else if (survey.status === 'active' && survey.probeController?.allCollected) {
-            this.onTerminalPrompt?.('[E] DELIVER CALIBRATION DATA')
+            this.onTerminalPrompt?.('[F] DELIVER CALIBRATION DATA')
             if (this.inputManager?.wasActionPressed('interact')) {
               survey.status = 'delivered'
               this.onTerminalPrompt?.(null)
@@ -1291,23 +1286,23 @@ export class LevelViewController implements Tickable {
 
     this.clearCollisionRegistrations()
 
-      this.collisionCleanup.push(
-        this.collisionWorld.addCollider(
-          {
-            id: LANDER_COLLIDER_ID,
-            ...this.createLocalAabbCollider(this.landerController.group, LANDER_COLLIDER_MIN, LANDER_COLLIDER_MAX),
-          },
-        ),
-      )
+    this.collisionCleanup.push(
+      this.collisionWorld.addCollider(
+        {
+          id: LANDER_COLLIDER_ID,
+          ...this.createLocalAabbCollider(this.landerController.group, LANDER_COLLIDER_MIN, LANDER_COLLIDER_MAX),
+        },
+      ),
+    )
 
-      this.collisionCleanup.push(
-        this.collisionWorld.addCollider(
-          {
-            id: SHUTTLE_COLLIDER_ID,
-            ...this.createLocalAabbCollider(this.arrivalSequence.shuttleGroup, SHUTTLE_COLLIDER_MIN, SHUTTLE_COLLIDER_MAX),
-          },
-        ),
-      )
+    this.collisionCleanup.push(
+      this.collisionWorld.addCollider(
+        {
+          id: SHUTTLE_COLLIDER_ID,
+          ...this.createLocalAabbCollider(this.arrivalSequence.shuttleGroup, SHUTTLE_COLLIDER_MIN, SHUTTLE_COLLIDER_MAX),
+        },
+      ),
+    )
   }
 
   private clearCollisionRegistrations(): void {
