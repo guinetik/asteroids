@@ -935,7 +935,10 @@ export class LevelViewController implements Tickable {
     }
 
     // Animate waypoint beams
-    updateWaypointMarkers(this.elapsed)
+    const activePos = this.stateMachine?.is('eva')
+      ? this.playerController?.group.position
+      : this.landerController?.position
+    updateWaypointMarkers(this.elapsed, activePos?.x, activePos?.z)
 
     // ESC → skip arrival cinematic
     if (this.inputManager?.wasActionPressed('skipCinematic') && this.stateMachine?.is('arrival')) {

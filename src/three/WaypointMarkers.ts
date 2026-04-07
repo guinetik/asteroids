@@ -29,6 +29,12 @@ const RING_TUBE = 0.6
 /** Default marker color — cyan energy. */
 const MARKER_COLOR = 0x66ffee
 
+/** Distance at which the marker starts fading (world units). */
+const FADE_START_DISTANCE = 300
+
+/** Distance at which the marker is fully faded (world units). */
+const FADE_END_DISTANCE = 80
+
 /** Tracked marker entry. */
 interface WaypointMarker {
   /** Unique objective id. */
@@ -186,34 +192,49 @@ export function clearWaypointMarkers(scene: THREE.Scene): void {
 
 /**
  * Animate all markers. Call each frame with elapsed scene time.
- * Pulses the ring, modulates beam opacity, and rotates the diamond.
+ * Pulses the ring, modulates beam opacity, rotates the diamond,
+ * and fades markers when the player is nearby.
  *
  * @param elapsed - Total elapsed time in seconds.
+ * @param playerX - Player world X position (for proximity fade).
+ * @param playerZ - Player world Z position (for proximity fade).
  */
-export function updateWaypointMarkers(elapsed: number): void {
+export function updateWaypointMarkers(elapsed: number, playerX?: number, playerZ?: number): void {
   const pulse = 0.5 + 0.5 * Math.sin(elapsed * 3)
   for (const marker of markers) {
+    // Proximity fade — fully visible far away, fades when close
+    let proximity = 1
+    if (playerX !== undefined && playerZ !== undefined) {
+      const dx = marker.group.position.x - playerX
+      const dz = marker.group.position.z - playerZ
+      const dist = Math.sqrt(dx * dx + dz * dz)
+      if (dist < FADE_START_DISTANCE) {
+        proximity = Math.max(0, (dist - FADE_END_DISTANCE) / (FADE_START_DISTANCE - FADE_END_DISTANCE))
+      }
+    }
+
     const ring = marker.group.getObjectByName('ring') as THREE.Mesh | undefined
     if (ring) {
       ring.scale.setScalar(0.9 + pulse * 0.2)
-      ;(ring.material as THREE.MeshBasicMaterial).opacity = 0.4 + pulse * 0.4
+      ;(ring.material as THREE.MeshBasicMaterial).opacity = (0.4 + pulse * 0.4) * proximity
     }
 
     const beamCore = marker.group.getObjectByName('beamCore') as THREE.Mesh | undefined
     if (beamCore) {
-      ;(beamCore.material as THREE.MeshBasicMaterial).opacity = 0.55 + pulse * 0.22
+      ;(beamCore.material as THREE.MeshBasicMaterial).opacity = (0.55 + pulse * 0.22) * proximity
     }
 
     const beamGlow = marker.group.getObjectByName('beamGlow') as THREE.Mesh | undefined
     if (beamGlow) {
       beamGlow.scale.setScalar(0.95 + pulse * 0.1)
-      ;(beamGlow.material as THREE.MeshBasicMaterial).opacity = 0.16 + pulse * 0.12
+      ;(beamGlow.material as THREE.MeshBasicMaterial).opacity = (0.16 + pulse * 0.12) * proximity
     }
 
     const diamond = marker.group.getObjectByName('diamond') as THREE.Mesh | undefined
     if (diamond) {
       diamond.rotation.y = elapsed * 2
       diamond.position.y = BEAM_HEIGHT + 40 + Math.sin(elapsed * 2) * 2
+      ;(diamond.material as THREE.MeshBasicMaterial).opacity = 0.9 * proximity
     }
   }
 }

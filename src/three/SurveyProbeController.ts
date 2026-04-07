@@ -31,12 +31,6 @@ const BOB_SPEED = 2.0
 /** Probe wireframe color — holographic teal. */
 const PROBE_COLOR = 0x00ffcc
 
-/** Point light intensity per probe. */
-const PROBE_LIGHT_INTENSITY = 8
-
-/** Point light range per probe. */
-const PROBE_LIGHT_DISTANCE = 40
-
 /** Number of particles emitted on collection. */
 const COLLECT_PARTICLE_COUNT = 12
 
@@ -144,13 +138,11 @@ export class SurveyProbeController implements Tickable {
         wireframe: true,
         transparent: true,
         opacity: 0.85,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
       })
       const mesh = new THREE.Mesh(geo, mat)
       group.add(mesh)
-
-      // Point light for visibility
-      const light = new THREE.PointLight(PROBE_COLOR, PROBE_LIGHT_INTENSITY, PROBE_LIGHT_DISTANCE)
-      group.add(light)
 
       // Start at terminal, hidden until launch delay elapses
       group.position.copy(this.origin)
