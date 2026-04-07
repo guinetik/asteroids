@@ -2,96 +2,100 @@
 
 **Author:** guinetik  
 **Date:** 2026-04-06  
-**Status:** Approved
+**Status:** Approved (v2 — replaces lives system with HP damage)
 
 ## Overview
 
-Landing the lander requires controlled descent — too fast or too tilted and the lander crashes. Crashes cost a life and respawn the player at the shuttle. Out of lives means level failure. Crash explosions scale in intensity with impact speed.
+The lander gets an HP bar like the player and shuttle already have. Hard landings deal damage proportional to impact speed and angle. HP reaches 0 = lander explodes = game over (stranded on asteroid with no way back to shuttle). Future: repair services in orbit gameplay.
 
 ## Landing Validation
 
-On ground contact (the frame `PlatformerBody` sets `grounded = true`), check two conditions:
+On ground contact (the frame `PlatformerBody` sets `grounded = true`), evaluate landing quality:
 
-- **Safe speed**: `|velocityY| <= 5.0` units/s at the moment of contact
-- **Safe angle**: combined tilt magnitude `<= 0.175 rad` (~10 degrees) from vertical
+- **Safe speed**: `|velocityY| <= 5.0` units/s — no damage
+- **Safe angle**: combined tilt `<= 0.175 rad` (~10 degrees) — no damage
 
-Combined tilt magnitude: `Math.sqrt(tiltX * tiltX + tiltZ * tiltZ)`
+If either exceeds the threshold, compute damage proportional to the excess:
 
-If either condition fails, the landing is a crash. The check must happen *before* `PlatformerBody` zeroes `velocityY` — capture the pre-landing velocity.
+```
+speedExcess = max(0, |velocityY| - SAFE_LANDING_SPEED)
+angleExcess = max(0, combinedTilt - SAFE_LANDING_ANGLE)
+damage = speedExcess * SPEED_DAMAGE_MULTIPLIER + angleExcess * ANGLE_DAMAGE_MULTIPLIER
+```
 
-## Crash Response Sequence
+## Lander HP
 
-1. **Capture impact data** — record `impactSpeed = Math.abs(velocityY)` and tilt at moment of contact
-2. **Hide lander mesh** — `group.visible = false` immediately
-3. **Explosion VFX** — particle burst at impact position, intensity scales with `impactSpeed`:
-   - Particle count: `lerp(16, 64, speedRatio)` where `speedRatio = clamp(impactSpeed / 20, 0, 1)`
-   - Spread radius: `lerp(10, 40, speedRatio)`
-   - Particle lifetime: `lerp(0.5, 1.5, speedRatio)`
-   - Color: orange/yellow core, fading to grey (debris)
-4. **Screen shake** — amplitude proportional to `impactSpeed`
-5. **Fade to black** — over 1.5 seconds
-6. **Deduct life** — `livesRemaining -= 1`
-7. **Respawn or fail** — after ~3 seconds total crash duration:
-   - If `livesRemaining > 0`: respawn lander at LANDER_SPAWN_HEIGHT (600) directly above shuttle (original spawn XZ), transition back to `lander` state
-   - If `livesRemaining <= 0`: transition to `failed` state (redirect to `/`)
+- **Max HP**: 100 (matching player and shuttle convention)
+- **Starting HP**: 100
+- **Damage**: Applied on each hard landing via `takeDamage(amount)`
+- **No healing**: HP does not regenerate during a level (future: repair in orbit)
+- **HP display**: Shown in lander HUD as a bar (like fuel bar)
 
-## Lives System
+## Crash (HP = 0)
 
-- **Starting lives**: 3
-- **Display**: Lander silhouette icons in the lander HUD (top area)
-- **Loss**: One life per crash
-- **No recovery**: Lives cannot be regained during a level
+When lander HP reaches 0:
+
+1. **Explosion VFX** — particle burst at impact, intensity at maximum
+2. **Lander mesh hidden**
+3. **Fade to black**
+4. **Game over** — trigger `failed` state, show death overlay with cause "Lander Destroyed", redirect to `/`
+
+No respawn, no lives. The lander was your only way back to the shuttle — you're stranded.
+
+## Explosion VFX
+
+Particle burst on every hard landing (not just fatal ones), scaled to damage dealt:
+
+- Low damage: small spark burst
+- High damage: large fireball + debris
+- Fatal (HP=0): maximum intensity explosion
+
+Uses `ParticleEmitter` — fire emitter (orange) + debris emitter (grey).
 
 ## State Machine Changes
 
-Add `crashed` state to `LevelState`:
+No new states needed. Crash death uses the existing `failed` state:
 
-```
-lander → crashed    (on crash detection, no trigger — detected in LanderController)
-crashed → lander    (auto-advance after CRASH_DURATION if lives > 0)
-crashed → failed    (auto-advance after CRASH_DURATION if lives <= 0)
-```
+- `lander` state: `LanderController` detects hard landing, fires `onCrash(damage)`
+- `LevelViewController` applies damage, checks HP
+- If HP <= 0: trigger existing `failed` state flow
 
-The `crashed` state uses `duration: 3.0` with a conditional `next` — `LevelViewController` decides the target based on remaining lives.
+The `crashed` state from the previous plan is NOT needed — damage is instant, no respawn delay.
 
 ## Architecture
 
-### Crash Detection — `LanderController`
+### LanderController
 
-The controller already tracks `body.velocityY`, `tiltX`, and `tiltZ`. Add a pre-landing velocity capture:
+- Add `hp` / `maxHp` fields (100/100)
+- Add `takeDamage(amount)` method (same pattern as `FpsPlayerController`)
+- Add `onCrash` callback: `(damage: number, impactSpeed: number) => void`
+- Add `onDeath` callback: `() => void` — fired when HP reaches 0
+- Capture pre-landing `velocityY` before `PlatformerBody` zeroes it (via `impactVelocityY` on the body)
+- Evaluate landing on grounded transition frame
 
-- Each frame while airborne, store `lastAirborneVelocityY` and `lastAirborneTilt`
-- On the frame `body.grounded` transitions from `false` to `true`, evaluate landing safety
-- Fire callback: `onCrash(impactSpeed: number, impactAngle: number)` if unsafe
-- Fire callback: `onLand()` if safe (for future use — sound effects, dust, etc.)
+### LanderExplosion (new file: `src/three/LanderExplosion.ts`)
 
-### Explosion VFX — `LanderExplosion` in `src/three/`
+- Fire + debris `ParticleEmitter` pair
+- `explode(position, impactSpeed)` — scales particle count/spread/force with speed
+- Reusable — called on every hard landing, not just fatal ones
 
-New controller that creates a scaled particle burst:
+### LevelViewController
 
-- Constructor takes `ParticleEmitter` reference (reuse the existing one or a dedicated crash emitter)
-- `explode(position: Vector3, impactSpeed: number)` — emits particles scaled to speed
-- Uses the existing `ParticleEmitter` pattern from the projectile impact system
+- Wire `onCrash`: spawn explosion VFX (every hard landing)
+- Wire `onDeath`: hide lander, maximum explosion, transition to `failed`
+- Add explosion emitters to scene
 
-### Lives Tracking — `LevelViewController`
+### Lander HUD
 
-- New field: `livesRemaining = 3` (constant: `STARTING_LIVES = 3`)
-- On crash callback: decrement lives, trigger `crashed` state, spawn explosion
-- On `crashed` state exit: check lives to decide respawn vs fail
-- Respawn: reset lander position to spawn point, make visible, transition to `lander`
-
-### HUD — `LanderHud.vue`
-
-- Extend `LanderTelemetry` with `lives: number`
-- Render lander silhouette icons (small SVG or unicode) for each remaining life
-- Icons disappear as lives are spent
+- Add `hp` and `maxHp` to `LanderTelemetry`
+- Render HP bar in `LanderHud.vue`
 
 ## Constants
 
 | Name | Value | Purpose |
 |------|-------|---------|
-| `SAFE_LANDING_SPEED` | 5.0 | Max abs(velocityY) for safe landing |
-| `SAFE_LANDING_ANGLE` | 0.175 | Max combined tilt (rad, ~10 degrees) |
-| `CRASH_DURATION` | 3.0 | Seconds on crash screen before respawn/fail |
-| `STARTING_LIVES` | 3 | Lives at level start |
-| `CRASH_FADE_DURATION` | 1.5 | Seconds for fade to black after crash |
+| `SAFE_LANDING_SPEED` | 5.0 | Max safe abs(velocityY) |
+| `SAFE_LANDING_ANGLE` | 0.175 | Max safe combined tilt (rad, ~10°) |
+| `SPEED_DAMAGE_MULTIPLIER` | 3.0 | HP damage per unit of excess speed |
+| `ANGLE_DAMAGE_MULTIPLIER` | 40.0 | HP damage per radian of excess tilt |
+| `LANDER_MAX_HP` | 100 | Starting/max HP |
