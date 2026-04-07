@@ -30,7 +30,7 @@ watch(() => props.visible, (val) => {
       }, CLOSE_DURATION)
     }, HOLD_DURATION)
   }, OPEN_DURATION)
-})
+}, { immediate: true })
 </script>
 
 <template>
