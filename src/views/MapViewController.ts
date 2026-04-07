@@ -2253,7 +2253,8 @@ export class MapViewController implements Tickable {
 
         const vel = this.shuttleController.currentVelocity
         const speed = Math.hypot(vel.x, vel.z)
-        if (speed >= MAP_RETICLE_MIN_SPEED) {
+        const isFreeFlight = this.orbitSystem?.state === 'free'
+        if (isFreeFlight && speed >= MAP_RETICLE_MIN_SPEED) {
           // World-space velocity heading: atan2(x, z) gives angle from +Z axis
           const worldHeading = Math.atan2(vel.x, vel.z)
           // Camera azimuthal angle from OrbitControls
