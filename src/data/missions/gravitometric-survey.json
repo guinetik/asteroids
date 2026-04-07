@@ -1,0 +1,25 @@
+{
+  "id": "gravitometric-survey",
+  "name": "Gravitometric Survey",
+  "description": "Deploy and calibrate gravitometric sensor probes in low orbit above an asteroid surface.",
+  "minDifficulty": 1,
+  "maxDifficulty": 10,
+  "objectiveSlots": [
+    {
+      "type": "survey",
+      "weight": 1.0,
+      "params": {
+        "type": "survey",
+        "probeCount": { "min": 3, "max": 10 },
+        "timeLimit": { "min": 90, "max": 45 }
+      },
+      "reward": { "min": 200, "max": 800 }
+    }
+  ],
+  "completionBonus": { "min": 100, "max": 400 },
+  "regionByDifficulty": {
+    "near-earth": [1, 3],
+    "asteroid-belt": [4, 7],
+    "kuiper-belt": [8, 10]
+  }
+}

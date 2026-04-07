@@ -2,7 +2,7 @@
   "id": "jay",
   "name": "Jay Mercer",
   "title": "Senior Hauler",
-  "objectiveTypes": ["gather"],
+  "objectiveTypes": ["gather", "survey"],
   "minDifficulty": 1,
   "maxDifficulty": 5,
   "missions": [
@@ -25,6 +25,25 @@
       ],
       "completionBonus": { "min": 200, "max": 500 },
       "regionByDifficulty": { "asteroid-belt": [3, 5] }
+    },
+    {
+      "id": "jay_grav_survey",
+      "name": "Gravitometric Survey",
+      "briefing": "Science division needs gravitometric readings from the surface. Land near the beacon, calibrate the probes they drop, and bring back the data. Quick job if you fly clean.",
+      "objectiveSlots": [
+        {
+          "type": "survey",
+          "weight": 1.0,
+          "params": {
+            "type": "survey",
+            "probeCount": { "min": 3, "max": 8 },
+            "timeLimit": { "min": 90, "max": 50 }
+          },
+          "reward": { "min": 200, "max": 600 }
+        }
+      ],
+      "completionBonus": { "min": 100, "max": 300 },
+      "regionByDifficulty": { "near-earth": [1, 2], "asteroid-belt": [3, 5] }
     }
   ]
 }
