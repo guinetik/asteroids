@@ -2171,8 +2171,8 @@ export class MapViewController implements Tickable {
     wedgeCanvas.width = size
     wedgeCanvas.height = size
     const wctx = wedgeCanvas.getContext('2d')!
-    const tipX = cx + 50
-    const baseX = cx + 14
+    const tipX = cx + 62
+    const baseX = cx + 34
     const halfW = 13
     wctx.beginPath()
     wctx.moveTo(tipX, cy)
