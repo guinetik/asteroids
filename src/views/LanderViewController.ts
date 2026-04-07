@@ -117,7 +117,7 @@ export class LanderViewController implements Tickable {
     if (this.landerController && this.onTelemetry) {
       const ts = this.landerController.thrusterSystem
       this.onTelemetry({
-        altitude: this.landerController.position.y,
+        altitude: this.landerController.altitudeAboveGround,
         velocityY: this.landerController.body.velocityY,
         posX: this.landerController.position.x,
         posZ: this.landerController.position.z,
@@ -131,6 +131,12 @@ export class LanderViewController implements Tickable {
         maxHp: this.landerController.maxHp,
         tiltAngle: this.landerController.tiltAngle,
         grounded: this.landerController.body.grounded,
+        descentWarning: this.landerController.descentWarningLevel,
+        attitudeWarning: this.landerController.attitudeWarningLevel,
+        landingSafety: this.landerController.landingSafetyLevel,
+        surveyTimeRemaining: null,
+        surveyProbesCollected: null,
+        surveyProbesTotal: null,
       })
     }
   }

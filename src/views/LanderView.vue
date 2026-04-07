@@ -22,6 +22,12 @@ const telemetry = reactive<LanderTelemetry>({
   maxHp: 100,
   tiltAngle: 0,
   grounded: false,
+  descentWarning: 'safe',
+  attitudeWarning: 'safe',
+  landingSafety: 'safe',
+  surveyTimeRemaining: null,
+  surveyProbesCollected: null,
+  surveyProbesTotal: null,
 })
 
 onMounted(async () => {
