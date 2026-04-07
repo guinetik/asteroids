@@ -328,6 +328,15 @@ const ORBIT_RING_OPACITY = 0.4
 const ORBIT_RING_DASH_SIZE = 0.3
 const ORBIT_RING_GAP_SIZE = 0.2
 
+/**
+ * Preview zone is this multiple of the body's capture radius.
+ * The orbit ring appears dimmed when the ship is within this range and heading toward the body.
+ */
+const ORBIT_PREVIEW_MULTIPLIER = 2.0
+
+/** Opacity of the preview orbit ring (dimmer than the captured ring at 0.4). */
+const ORBIT_PREVIEW_OPACITY = 0.3
+
 /** Map-scale gravity tuning loaded from JSON. */
 const MAP_GRAVITY_CONFIG: GravityConfig = {
   gravityConstant: mapGravityData.gravityConstant,
@@ -399,6 +408,8 @@ export class MapViewController implements Tickable {
 
   private orbitSystem: OrbitCaptureSystem | null = null
   private orbitRing: THREE.LineLoop | null = null
+  /** True when the orbit ring is showing a preview (dimmed, pre-capture). */
+  private orbitRingIsPreview = false
   private approachStartPos: THREE.Vector3 | null = null
   private approachProgress = 0
   private yRecovery = false
@@ -1051,6 +1062,29 @@ export class MapViewController implements Tickable {
       const ePressed = this.inputManager.wasActionPressed('orbitAction')
       const eHeld = this.inputManager.isActionActive('orbitAction')
 
+      // Preview orbit ring — show dimmed ring when heading toward a body in preview range
+      if (state === 'free' && this.shuttleController) {
+        const vel = this.shuttleController.currentVelocity
+        const preview = this.orbitSystem.getNearestPreviewBody(
+          this.shuttleController.position.x,
+          this.shuttleController.position.z,
+          vel.x,
+          vel.z,
+          ORBIT_PREVIEW_MULTIPLIER,
+        )
+        if (preview) {
+          if (!this.orbitRingIsPreview) {
+            this.showOrbitRing(preview.orbitRadius, ORBIT_PREVIEW_OPACITY)
+            this.orbitRingIsPreview = true
+          }
+          if (this.orbitRing) {
+            this.orbitRing.position.set(preview.worldX, 0, preview.worldZ)
+          }
+        } else if (this.orbitRingIsPreview) {
+          this.hideOrbitRing()
+        }
+      }
+
       // Free → press E to capture
       if (state === 'free' && ePressed) {
         const px = this.shuttleController.position.x
@@ -1063,6 +1097,7 @@ export class MapViewController implements Tickable {
           this.shuttleController.setInputEnabled(false)
           this.vehicleCamera?.setConfig(MAP_ORBIT_CAMERA_CONFIG)
           this.showOrbitRing(this.orbitSystem.targetOrbitRadius)
+          this.orbitRingIsPreview = false
         }
       }
 
@@ -2456,7 +2491,7 @@ export class MapViewController implements Tickable {
   }
 
   /** Create a dashed circle ring at the given radius and add to scene. */
-  private showOrbitRing(radius: number): void {
+  private showOrbitRing(radius: number, opacity = ORBIT_RING_OPACITY): void {
     this.hideOrbitRing()
     const points: THREE.Vector3[] = []
     for (let i = 0; i <= ORBIT_RING_SEGMENTS; i++) {
@@ -2467,7 +2502,7 @@ export class MapViewController implements Tickable {
     const material = new THREE.LineDashedMaterial({
       color: ORBIT_RING_COLOR,
       transparent: true,
-      opacity: ORBIT_RING_OPACITY,
+      opacity,
       dashSize: ORBIT_RING_DASH_SIZE,
       gapSize: ORBIT_RING_GAP_SIZE,
     })
@@ -2484,6 +2519,7 @@ export class MapViewController implements Tickable {
       ;(this.orbitRing.material as THREE.LineDashedMaterial).dispose()
       this.orbitRing = null
     }
+    this.orbitRingIsPreview = false
   }
 
   /**
