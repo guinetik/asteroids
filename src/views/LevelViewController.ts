@@ -37,7 +37,7 @@ import type { LanderTelemetry } from '@/components/LanderHud.vue'
 import type { FpsTelemetry } from '@/components/FpsHud.vue'
 import { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
-import { createLevelStateMachine, LANDER_INTERACT_RANGE } from '@/lib/level/levelStateMachine'
+import { createLevelStateMachine, LANDER_INTERACT_RANGE, EXFIL_PROXIMITY_RANGE } from '@/lib/level/levelStateMachine'
 import type { LevelState } from '@/lib/level/levelStateMachine'
 import type { StateMachine } from '@/lib/stateMachine'
 import { ArrivalSequence } from '@/three/ArrivalSequence'
@@ -115,6 +115,9 @@ export class LevelViewController implements Tickable {
   // ── Arrival ──────────────────────────────────────────────────
   private arrivalSequence: ArrivalSequence | null = null
 
+  // ── Exfil tracking ────────────────────────────────────────────
+  private hasExitedVehicle = false
+
   // ── Mouse state (EVA) ────────────────────────────────────────
   private leftMouseDown = false
   private leftMouseJustPressed = false
@@ -129,8 +132,8 @@ export class LevelViewController implements Tickable {
   /** Called when letterbox visibility should change. */
   onLetterbox: ((visible: boolean) => void) | null = null
 
-  /** Called each frame with current state + grounded for HUD prompts. */
-  onStateInfo: ((info: { state: string; grounded: boolean }) => void) | null = null
+  /** Called each frame with current state + grounded + canExfil for HUD prompts. */
+  onStateInfo: ((info: { state: string; grounded: boolean; canExfil: boolean }) => void) | null = null
 
   /** Called each frame during lander state with lander telemetry. */
   onLanderTelemetry: ((telemetry: LanderTelemetry) => void) | null = null
@@ -280,6 +283,8 @@ export class LevelViewController implements Tickable {
       onStateChange: (current, previous) => this.onStateTransition(current, previous),
       isLanderGrounded: () => this.landerController?.body.grounded ?? false,
       isPlayerNearLander: () => this.isPlayerNearLander(),
+      isLanderNearShuttle: () => this.isLanderNearShuttle(),
+      hasCompletedEva: () => this.hasExitedVehicle,
     })
 
     // ── Always-active tickables ─────────────────────────────────
@@ -332,6 +337,12 @@ export class LevelViewController implements Tickable {
         break
       case 'failed':
         this.enterFailed()
+        break
+      case 'exfil':
+        this.enterExfil()
+        break
+      case 'complete':
+        this.enterComplete()
         break
     }
   }
@@ -391,6 +402,7 @@ export class LevelViewController implements Tickable {
   // ═══════════════════════════════════════════════════════════════
 
   private enterEva(): void {
+    this.hasExitedVehicle = true
     // Position player at lander + offset
     const landerPos = this.landerController!.group.position
     this.playerController!.group.position.set(
@@ -489,6 +501,41 @@ export class LevelViewController implements Tickable {
   }
 
   // ═══════════════════════════════════════════════════════════════
+  // Exfil / Complete states
+  // ═══════════════════════════════════════════════════════════════
+
+  private enterExfil(): void {
+    // Unregister lander tickables
+    this.tickHandler!.unregister(this.landerController!)
+    this.tickHandler!.unregister(this.vehicleCamera!)
+    this.vehicleCamera!.controls.enabled = false
+
+    // Hide the gameplay lander
+    this.landerController!.group.visible = false
+
+    // Letterbox for cinematic framing
+    this.onLetterbox?.(true)
+
+    // Switch to cinematic camera
+    this.sceneManager!.setActiveCamera(this.arrivalSequence!.camera)
+    this.sceneManager!.setCamera(null)
+
+    // Start reverse cutscene
+    this.arrivalSequence!.playExfil(this.landerController!.group.position)
+
+    this.arrivalSequence!.onFadeOut = (opacity) => {
+      this.onArrivalFade?.(opacity)
+    }
+  }
+
+  private enterComplete(): void {
+    // Navigate to star map
+    import('@/router').then(({ default: router }) => {
+      router.push('/map')
+    })
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // Per-frame tick
   // ═══════════════════════════════════════════════════════════════
 
@@ -501,8 +548,10 @@ export class LevelViewController implements Tickable {
 
     // F key → state triggers (only one can succeed per press)
     if (this.inputManager?.wasActionPressed('interact') && this.stateMachine) {
-      if (!this.stateMachine.trigger('exitVehicle')) {
-        this.stateMachine.trigger('enterVehicle')
+      if (!this.stateMachine.trigger('exfiltrate')) {
+        if (!this.stateMachine.trigger('exitVehicle')) {
+          this.stateMachine.trigger('enterVehicle')
+        }
       }
     }
 
@@ -554,7 +603,12 @@ export class LevelViewController implements Tickable {
       const currentState = this.stateMachine.state ?? ''
       const grounded = this.landerController?.body.grounded ?? false
 
-      this.onStateInfo?.({ state: currentState, grounded })
+      const canExfil =
+        currentState === 'lander' &&
+        this.hasExitedVehicle &&
+        this.isLanderNearShuttle()
+
+      this.onStateInfo?.({ state: currentState, grounded, canExfil })
 
       // Lander telemetry
       if (currentState === 'lander' && this.onLanderTelemetry && this.landerController) {
@@ -662,6 +716,14 @@ export class LevelViewController implements Tickable {
     const dx = playerPos.x - landerPos.x
     const dz = playerPos.z - landerPos.z
     return Math.sqrt(dx * dx + dz * dz) <= LANDER_INTERACT_RANGE
+  }
+
+  /** Check if the lander is within exfil range of the parked shuttle. */
+  private isLanderNearShuttle(): boolean {
+    if (!this.landerController || !this.arrivalSequence) return false
+    const landerY = this.landerController.position.y
+    const shuttleY = this.arrivalSequence.shuttleGroup.position.y
+    return Math.abs(landerY - shuttleY) <= EXFIL_PROXIMITY_RANGE
   }
 
   // ═══════════════════════════════════════════════════════════════
