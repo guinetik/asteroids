@@ -54,6 +54,26 @@ export const ARRIVAL_SEQUENCE_DURATION =
   PHASE_DETACH_DURATION +
   PHASE_FADEOUT_DURATION
 
+// ── Exfil phase durations (seconds) — reverse of arrival ────────
+/** Lander rises into cargo bay. */
+const EXFIL_DOCK_DURATION = 3.0
+/** Cargo doors close. */
+const EXFIL_DOORS_DURATION = 2.0
+/** Shuttle flips 180° back upright. */
+const EXFIL_FLIP_DURATION = 2.5
+/** Shuttle accelerates away. */
+const EXFIL_DEPART_DURATION = 4.0
+/** Fade to black. */
+const EXFIL_FADEOUT_DURATION = 1.5
+
+/** Total exfil cutscene duration (must match levelStateMachine). */
+export const EXFIL_SEQUENCE_DURATION =
+  EXFIL_DOCK_DURATION +
+  EXFIL_DOORS_DURATION +
+  EXFIL_FLIP_DURATION +
+  EXFIL_DEPART_DURATION +
+  EXFIL_FADEOUT_DURATION
+
 // ── Approach path ───────────────────────────────────────────────
 /** Shuttle starts this far from the asteroid (world units). */
 const APPROACH_START_DISTANCE = 2000
@@ -86,6 +106,9 @@ const THRUSTER_SPRITE_X_OFFSET = -80
 
 /** Timeline phase identifiers. */
 type ArrivalPhase = 'approach' | 'flip' | 'doors' | 'detach' | 'fadeout' | 'done'
+
+/** Exfil (reverse departure) phase identifiers. */
+type ExfilPhase = 'dock' | 'closeDoors' | 'flipBack' | 'depart' | 'exfilFadeout' | 'done'
 
 /**
  * Cinematic arrival sequence for the asteroid level.
@@ -132,6 +155,14 @@ export class ArrivalSequence {
   // Shuttle flight state
   private shuttleStartPos = new THREE.Vector3()
   private shuttleEndPos = new THREE.Vector3()
+
+  // Exfil state
+  private exfilPhase: ExfilPhase | null = null
+  private exfilPhaseElapsed = 0
+  private exfilLanderStartY = 0
+  private exfilLanderTargetY = 0
+  private exfilDepartStartPos = new THREE.Vector3()
+  private exfilDepartEndPos = new THREE.Vector3()
 
   /** Called when the lander detaches — passes world position for LanderController placement. */
   onLanderDetach: ((position: THREE.Vector3) => void) | null = null
@@ -268,6 +299,14 @@ export class ArrivalSequence {
 
   /** Advance the sequence by dt seconds. */
   tick(dt: number): void {
+    // Exfil sequence (separate from arrival)
+    if (this.exfilPhase && this.exfilPhase !== 'done') {
+      this.exfilPhaseElapsed += dt
+      this.thrusterElapsed += dt
+      this.tickExfilPhase()
+      return
+    }
+
     if (this.phase === 'done') return
 
     this.elapsed += dt
@@ -485,6 +524,195 @@ export class ArrivalSequence {
       this.phase = 'done'
       this.onComplete?.()
     }
+  }
+
+  // ── Exfil (reverse departure) ─────────────────────────────────
+
+  /**
+   * Start the exfil reverse cutscene. The lander docks back into the cargo bay,
+   * doors close, shuttle flips upright, and departs.
+   *
+   * @param landerPosition - current world position of the gameplay lander
+   */
+  playExfil(landerPosition: THREE.Vector3): void {
+    this.exfilPhase = 'dock'
+    this.exfilPhaseElapsed = 0
+
+    // Store lander vertical travel
+    this.exfilLanderStartY = landerPosition.y
+    this.exfilLanderTargetY = LANDER_PARK_ALTITUDE
+
+    // Re-use landerModel — reparent to scene root at gameplay position with gameplay scale
+    if (this.landerModel) {
+      this.landerModel.removeFromParent()
+      this.landerModel.position.copy(landerPosition)
+      this.landerModel.scale.setScalar(5)
+      this.landerModel.rotation.set(0, 0, 0)
+      this.shuttleGroup.parent?.add(this.landerModel)
+      this.fallingLander = this.landerModel
+    }
+
+    // Departure path: start at current shuttle position, end far away
+    this.exfilDepartStartPos.copy(this.shuttleGroup.position)
+    this.exfilDepartEndPos.set(
+      this.shuttleGroup.position.x,
+      this.shuttleGroup.position.y + 500,
+      this.shuttleGroup.position.z - APPROACH_START_DISTANCE,
+    )
+
+    // Initial camera: below the shuttle looking up at the docking lander
+    this.camera.position.set(
+      this.shuttleGroup.position.x + 40,
+      this.shuttleGroup.position.y - 60,
+      this.shuttleGroup.position.z + 30,
+    )
+    this.camera.lookAt(this.shuttleGroup.position)
+
+    // Hide thruster sprites initially
+    for (const sprite of this.thrusterSprites) {
+      sprite.visible = false
+    }
+  }
+
+  /** Dispatch to the current exfil phase ticker. */
+  private tickExfilPhase(): void {
+    switch (this.exfilPhase) {
+      case 'dock':
+        this.tickExfilDock()
+        break
+      case 'closeDoors':
+        this.tickExfilCloseDoors()
+        break
+      case 'flipBack':
+        this.tickExfilFlip()
+        break
+      case 'depart':
+        this.tickExfilDepart()
+        break
+      case 'exfilFadeout':
+        this.tickExfilFadeout()
+        break
+    }
+  }
+
+  /** Lander rises into the cargo bay. */
+  private tickExfilDock(): void {
+    const t = Math.min(1, this.exfilPhaseElapsed / EXFIL_DOCK_DURATION)
+    const eased = this.easeInOut(t)
+
+    if (this.fallingLander) {
+      this.fallingLander.position.y = THREE.MathUtils.lerp(
+        this.exfilLanderStartY,
+        this.exfilLanderTargetY,
+        eased,
+      )
+
+      // Camera tracks the rising lander
+      this.camera.position.set(
+        this.fallingLander.position.x + 40,
+        this.fallingLander.position.y - 30,
+        this.fallingLander.position.z + 30,
+      )
+      this.camera.lookAt(this.fallingLander.position)
+    }
+
+    if (t >= 1) {
+      // Remove detached lander from scene (it is now "inside" the shuttle)
+      this.fallingLander?.removeFromParent()
+      this.fallingLander = null
+      this.nextExfilPhase('closeDoors')
+    }
+  }
+
+  /** Cargo doors close (doorProgress 1 → 0). */
+  private tickExfilCloseDoors(): void {
+    const t = Math.min(1, this.exfilPhaseElapsed / EXFIL_DOORS_DURATION)
+    const eased = this.easeInOut(t)
+
+    this.doorProgress = 1 - eased
+    this.updateDoorRotation()
+
+    // Camera watches the belly as doors close
+    const camTarget = this.shuttleGroup.position.clone()
+    camTarget.y -= 10
+    this.camera.position.set(
+      this.shuttleGroup.position.x + 60,
+      this.shuttleGroup.position.y - 5,
+      this.shuttleGroup.position.z + 40,
+    )
+    this.camera.lookAt(camTarget)
+
+    if (t >= 1) this.nextExfilPhase('flipBack')
+  }
+
+  /** Shuttle flips 180° from upside-down back to upright. */
+  private tickExfilFlip(): void {
+    const t = Math.min(1, this.exfilPhaseElapsed / EXFIL_FLIP_DURATION)
+    const eased = this.easeInOut(t)
+
+    // Rotation.x goes from Math.PI (upside-down) to 0 (upright)
+    const pitchAngle = THREE.MathUtils.lerp(Math.PI, 0, eased)
+    this.shuttleGroup.rotation.set(pitchAngle, -Math.PI / 2, 0, 'YXZ')
+
+    // Camera orbits around the shuttle during flip
+    const angle = eased * Math.PI * 0.5
+    const camDist = 120
+    this.camera.position.set(
+      this.shuttleGroup.position.x + Math.sin(angle) * camDist,
+      this.shuttleGroup.position.y + 30,
+      this.shuttleGroup.position.z + Math.cos(angle) * camDist * 0.3,
+    )
+    this.camera.lookAt(this.shuttleGroup.position)
+
+    if (t >= 1) this.nextExfilPhase('depart')
+  }
+
+  /** Shuttle accelerates away from the asteroid. */
+  private tickExfilDepart(): void {
+    const t = Math.min(1, this.exfilPhaseElapsed / EXFIL_DEPART_DURATION)
+    const eased = this.easeInOut(t)
+
+    this.shuttleGroup.position.lerpVectors(
+      this.exfilDepartStartPos,
+      this.exfilDepartEndPos,
+      eased,
+    )
+
+    // Enable thruster sprites during departure
+    this.updateThrusterSprites(true)
+
+    // Camera pulls back watching the shuttle shrink into the distance
+    const camPullBack = THREE.MathUtils.lerp(100, 400, eased)
+    const camHeight = THREE.MathUtils.lerp(30, 120, eased)
+    this.camera.position.set(
+      this.shuttleGroup.position.x + 40,
+      this.shuttleGroup.position.y + camHeight,
+      this.shuttleGroup.position.z + camPullBack,
+    )
+    this.camera.lookAt(this.shuttleGroup.position)
+
+    if (t >= 1) {
+      this.updateThrusterSprites(false)
+      this.nextExfilPhase('exfilFadeout')
+    }
+  }
+
+  /** Fade to black and complete the exfil sequence. */
+  private tickExfilFadeout(): void {
+    const t = Math.min(1, this.exfilPhaseElapsed / EXFIL_FADEOUT_DURATION)
+
+    this.onFadeOut?.(t)
+
+    if (t >= 1) {
+      this.exfilPhase = 'done'
+      this.onComplete?.()
+    }
+  }
+
+  /** Advance to the next exfil phase. */
+  private nextExfilPhase(next: ExfilPhase): void {
+    this.exfilPhase = next
+    this.exfilPhaseElapsed = 0
   }
 
   // ── Helpers ───────────────────────────────────────────────────
