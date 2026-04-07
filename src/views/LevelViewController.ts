@@ -141,7 +141,6 @@ function resolveLevelContext(): LevelContext {
   const paramId = params.get('asteroidId')
   const missionType = params.get('mission')
   const difficulty = Math.max(1, Math.min(10, Number(params.get('difficulty')) || 5))
-  console.log(`[Level] difficulty=${difficulty} asteroidId=${paramId} mission=${missionType}`)
 
   let mission: GeneratedAsteroidMission
 
@@ -152,7 +151,6 @@ function resolveLevelContext(): LevelContext {
     mission = loadActiveMission() ?? generateMissionWithType(difficulty, missionType)
   }
 
-  console.log(`[Level] mission: ${mission.name} (diff ${mission.difficulty})`, mission.objectives.map(o => `${o.type}: probes=${o.probeCount} time=${o.timeLimit}`))
   const asteroid = getAsteroidById(mission.asteroidId) ?? ASTEROID_CATALOG[0]!
   const seed = hashSeed(mission.id)
 
