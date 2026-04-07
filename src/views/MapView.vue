@@ -22,6 +22,7 @@ import type { Inventory } from '@/lib/inventory/types'
 import { createProfile } from '@/lib/player/profile'
 import { createInventory } from '@/lib/inventory/inventory'
 import { shipMessageSystem } from '@/lib/messages/runtime'
+import { Timer, type TimerHandle } from '@/lib/Timer'
 import type { ActiveShipMessage } from '@/lib/messages/messageTypes'
 import type { MapIntroUiState } from '@/lib/mapIntroState'
 import type { MapViewLayerToggleState } from './MapViewController'
@@ -146,16 +147,16 @@ const missionOverlayMission = ref<ActiveShuttleMission | null>(null)
 const missionOverlayCanFit = ref(false)
 const missionBoard = ref<ShuttleMissionBoard | null>(null)
 const missionNotification = ref<string | null>(null)
-let missionNotificationTimer: ReturnType<typeof setTimeout> | null = null
+let missionNotificationTimer: TimerHandle | null = null
 const missionApproachVisible = ref(false)
 const missionApproachName = ref('')
 
 function showMissionNotification(text: string): void {
   missionNotification.value = text
-  if (missionNotificationTimer) clearTimeout(missionNotificationTimer)
-  missionNotificationTimer = setTimeout(() => {
+  if (missionNotificationTimer) Timer.cancel(missionNotificationTimer)
+  missionNotificationTimer = Timer.after(4, () => {
     missionNotification.value = null
-  }, 4000)
+  })
 }
 
 const mapOverlay = reactive<MapOverlayState>({
