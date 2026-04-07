@@ -155,14 +155,15 @@ function resolveLevelContext(): LevelContext {
   const params = new URLSearchParams(window.location.search)
   const paramId = params.get('asteroidId')
   const missionType = params.get('mission')
+  const difficulty = Math.max(1, Math.min(10, Number(params.get('difficulty')) || 5))
 
   let mission: GeneratedAsteroidMission
 
   if (paramId) {
-    mission = generateMissionWithType(5, missionType)
+    mission = generateMissionWithType(difficulty, missionType)
     mission.asteroidId = paramId
   } else {
-    mission = loadActiveMission() ?? generateMissionWithType(5, missionType)
+    mission = loadActiveMission() ?? generateMissionWithType(difficulty, missionType)
   }
 
   const asteroid = getAsteroidById(mission.asteroidId) ?? ASTEROID_CATALOG[0]!
