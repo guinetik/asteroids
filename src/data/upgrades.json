@@ -1,0 +1,236 @@
+[
+  {
+    "id": "shuttleThrusterEfficiency",
+    "category": "shuttle",
+    "label": "Thruster Efficiency",
+    "description": "Optimized fuel injectors reduce thruster fuel consumption.",
+    "baseCost": 500,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 0.75, 0.5, 0.25]
+  },
+  {
+    "id": "shuttleThrusterCharge",
+    "category": "shuttle",
+    "label": "Thruster Charge",
+    "description": "Improved capacitors accelerate thruster recharge rate.",
+    "baseCost": 500,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 1.5, 2.0, 2.5]
+  },
+  {
+    "id": "shuttleThrusterSpeed",
+    "category": "shuttle",
+    "label": "Thruster Speed",
+    "description": "Overclocked thrust nozzles increase top boost speed.",
+    "baseCost": 750,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 1.25, 1.5, 1.75]
+  },
+  {
+    "id": "shuttleSystemsEfficiency",
+    "category": "shuttle",
+    "label": "Efficient Systems",
+    "description": "Low-power avionics reduce passive fuel drain.",
+    "baseCost": 600,
+    "maxLevel": 3,
+    "valuesByLevel": [3.0, 2.0, 1.0, 0.0]
+  },
+  {
+    "id": "shuttleHull",
+    "category": "shuttle",
+    "label": "Hull Upgrade",
+    "description": "Reinforced hull plating absorbs more impact damage.",
+    "baseCost": 1000,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 1.35, 1.65, 2.0]
+  },
+  {
+    "id": "shuttleHeatResistance",
+    "category": "shuttle",
+    "label": "Heat Shield",
+    "description": "Ablative coating reduces thermal damage near stars.",
+    "baseCost": 5000,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 0.7, 0.45, 0.25]
+  },
+  {
+    "id": "shuttleFreezeResistance",
+    "category": "shuttle",
+    "label": "Cryo Insulation",
+    "description": "Thermal lining resists cryogenic damage in deep space.",
+    "baseCost": 5000,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 0.7, 0.45, 0.25]
+  },
+  {
+    "id": "shuttleRadiationResistance",
+    "category": "shuttle",
+    "label": "Radiation Shielding",
+    "description": "Lead-lined compartments deflect ionizing radiation.",
+    "baseCost": 6000,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 0.7, 0.45, 0.25]
+  },
+  {
+    "id": "shuttleCargoBay",
+    "category": "shuttle",
+    "label": "Cargo Bay Expansion",
+    "description": "Modular cargo frame increases carrying capacity.",
+    "baseCost": 1500,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 1.35, 1.65, 2.0]
+  },
+  {
+    "id": "shuttleFuelCapacity",
+    "category": "shuttle",
+    "label": "Fuel Tank Expansion",
+    "description": "Auxiliary fuel bladder extends operational range.",
+    "baseCost": 1200,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 1.35, 1.65, 2.0]
+  },
+  {
+    "id": "shuttleScienceStation",
+    "category": "shuttle",
+    "label": "Science Station",
+    "description": "Onboard lab boosts CR earnings on mission completion.",
+    "baseCost": 2000,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 1.25, 1.5, 1.75]
+  },
+  {
+    "id": "landerThrusterEfficiency",
+    "category": "lander",
+    "label": "Thruster Efficiency",
+    "description": "Refined propellant mix lowers fuel burn per thrust.",
+    "baseCost": 500,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 0.75, 0.5, 0.25]
+  },
+  {
+    "id": "landerThrusterCharge",
+    "category": "lander",
+    "label": "Thruster Charge",
+    "description": "Faster thruster recharge between burn cycles.",
+    "baseCost": 500,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 1.5, 2.0, 2.5]
+  },
+  {
+    "id": "landerThrusterSpeed",
+    "category": "lander",
+    "label": "Thruster Power",
+    "description": "Upgraded engine bells deliver more thrust force.",
+    "baseCost": 750,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 1.25, 1.5, 1.75]
+  },
+  {
+    "id": "landerHull",
+    "category": "lander",
+    "label": "Hull Upgrade",
+    "description": "Impact-resistant frame survives harder landings.",
+    "baseCost": 5000,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 1.35, 1.65, 2.0]
+  },
+  {
+    "id": "landerFuelCapacity",
+    "category": "lander",
+    "label": "Fuel Tank Expansion",
+    "description": "Extended fuel reservoir for longer surface operations.",
+    "baseCost": 1000,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 1.35, 1.65, 2.0]
+  },
+  {
+    "id": "multitoolEfficiency",
+    "category": "multitool",
+    "label": "Instrument Efficiency",
+    "description": "Power-saving circuits reduce RTG fuel consumption.",
+    "baseCost": 600,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 0.75, 0.5, 0.25]
+  },
+  {
+    "id": "multitoolDamage",
+    "category": "multitool",
+    "label": "Damage Output",
+    "description": "Amplified emitter deals more damage to targets.",
+    "baseCost": 1000,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 1.35, 1.65, 2.0]
+  },
+  {
+    "id": "multitoolRtgCapacity",
+    "category": "multitool",
+    "label": "RTG Capacity",
+    "description": "Larger radioisotope core stores more charge.",
+    "baseCost": 1200,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 1.35, 1.65, 2.0]
+  },
+  {
+    "id": "multitoolRtgCharge",
+    "category": "multitool",
+    "label": "RTG Charge Boost",
+    "description": "Each random charge pickup restores more energy.",
+    "baseCost": 800,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 1.35, 1.65, 2.0]
+  },
+  {
+    "id": "multitoolScience",
+    "category": "multitool",
+    "label": "Science Upgrade",
+    "description": "Enhanced sensors boost CR earnings on mission completion.",
+    "baseCost": 2000,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 1.25, 1.5, 1.75]
+  },
+  {
+    "id": "suitArmor",
+    "category": "suit",
+    "label": "Suit Armor",
+    "description": "Hardened exosuit plating increases hit points.",
+    "baseCost": 1500,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 1.35, 1.65, 2.0]
+  },
+  {
+    "id": "suitStaminaCapacity",
+    "category": "suit",
+    "label": "Stamina Capacity",
+    "description": "Muscle-assist servos extend sprint duration.",
+    "baseCost": 600,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 1.35, 1.65, 2.0]
+  },
+  {
+    "id": "suitStaminaEfficiency",
+    "category": "suit",
+    "label": "Stamina Efficiency",
+    "description": "Efficient rebreather uses less O2 to recharge stamina.",
+    "baseCost": 800,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 0.75, 0.5, 0.25]
+  },
+  {
+    "id": "suitO2Capacity",
+    "category": "suit",
+    "label": "O2 Capacity",
+    "description": "High-pressure tanks carry more breathable oxygen.",
+    "baseCost": 5000,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 1.35, 1.65, 2.0]
+  },
+  {
+    "id": "suitMobility",
+    "category": "suit",
+    "label": "Mobility Upgrade",
+    "description": "Low-friction joints improve walk speed, sprint speed, and jump distance.",
+    "baseCost": 1000,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 1.15, 1.35, 1.5]
+  }
+]
