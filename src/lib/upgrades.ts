@@ -1,93 +1,82 @@
 /**
- * Generic numeric upgrade definitions and value resolution.
+ * Data-driven upgrade definitions and value resolution.
+ *
+ * Loads 26 upgrade definitions from JSON across 4 categories
+ * (shuttle, lander, multitool, suit). Each upgrade has levels 0-3
+ * with numeric values and linear cost scaling.
  *
  * @author guinetik
- * @date 2026-04-05
- * @spec docs/superpowers/specs/2026-04-05-map-shuttle-player-design.md
+ * @date 2026-04-07
+ * @spec docs/superpowers/specs/2026-04-07-upgrade-system-design.md
  */
+import upgradesData from '@/data/upgrades.json'
 
-/**
- * Numeric upgrade definition keyed by level.
- */
+/** Upgrade category for UI grouping. */
+export type UpgradeCategory = 'shuttle' | 'lander' | 'multitool' | 'suit'
+
+/** A single upgrade definition loaded from JSON. */
 export interface NumericUpgradeDefinition {
-  /** Unique upgrade id used by gameplay systems. */
+  /** Unique upgrade key used by gameplay systems. */
   id: string
+  /** Category for UI grouping. */
+  category: UpgradeCategory
+  /** Display name. */
+  label: string
+  /** One-line effect description. */
+  description: string
+  /** CR cost for level 1. Levels 2+ cost baseCost × level. */
+  baseCost: number
   /** Highest supported upgrade level. */
   maxLevel: number
-  /** Value for each level from 0..maxLevel. */
+  /** Numeric value at each level from 0..maxLevel. */
   valuesByLevel: readonly number[]
 }
 
-/**
- * Runtime player upgrade levels keyed by upgrade id.
- */
+/** Valid upgrade IDs derived from the JSON data. */
+export type UpgradeId =
+  | 'shuttleThrusterEfficiency'
+  | 'shuttleThrusterCharge'
+  | 'shuttleThrusterSpeed'
+  | 'shuttleSystemsEfficiency'
+  | 'shuttleHull'
+  | 'shuttleHeatResistance'
+  | 'shuttleFreezeResistance'
+  | 'shuttleRadiationResistance'
+  | 'shuttleCargoBay'
+  | 'shuttleFuelCapacity'
+  | 'shuttleScienceStation'
+  | 'landerThrusterEfficiency'
+  | 'landerThrusterCharge'
+  | 'landerThrusterSpeed'
+  | 'landerHull'
+  | 'landerFuelCapacity'
+  | 'multitoolEfficiency'
+  | 'multitoolDamage'
+  | 'multitoolRtgCapacity'
+  | 'multitoolRtgCharge'
+  | 'multitoolScience'
+  | 'suitArmor'
+  | 'suitStaminaCapacity'
+  | 'suitStaminaEfficiency'
+  | 'suitO2Capacity'
+  | 'suitMobility'
+
+/** Runtime player upgrade levels keyed by upgrade id. */
 export type UpgradeLevels = Partial<Record<UpgradeId, number>>
 
-/**
- * Generic catalog of numeric upgrades.
- */
-export const UPGRADE_DEFINITIONS = {
-  shuttleFuelUpgrade: {
-    id: 'shuttleFuelUpgrade',
-    maxLevel: 3,
-    valuesByLevel: [3, 2, 1, 0],
-  },
-  shuttleBoosterEfficiencyUpgrade: {
-    id: 'shuttleBoosterEfficiencyUpgrade',
-    maxLevel: 3,
-    valuesByLevel: [1, 0.75, 0.5, 0.25],
-  },
-  shuttleBrakeEfficiencyUpgrade: {
-    id: 'shuttleBrakeEfficiencyUpgrade',
-    maxLevel: 3,
-    valuesByLevel: [1, 0.75, 0.5, 0.25],
-  },
-  shuttleThrustersEfficiencyUpgrade: {
-    id: 'shuttleThrustersEfficiencyUpgrade',
-    maxLevel: 3,
-    valuesByLevel: [1, 0.75, 0.5, 0.25],
-  },
-  heatShieldResistance: {
-    id: 'heatShieldResistance',
-    maxLevel: 3,
-    valuesByLevel: [1, 0.7, 0.45, 0.25],
-  },
-  heatShieldArmor: {
-    id: 'heatShieldArmor',
-    maxLevel: 3,
-    valuesByLevel: [1, 0.65, 0.35, 0.15],
-  },
-} as const satisfies Record<string, NumericUpgradeDefinition>
+/** Build the keyed catalog from the JSON array. */
+const definitions = upgradesData as unknown as NumericUpgradeDefinition[]
 
-/**
- * Valid gameplay upgrade ids.
- */
-export type UpgradeId = keyof typeof UPGRADE_DEFINITIONS
+/** All upgrade definitions keyed by id for O(1) lookup. */
+export const UPGRADE_DEFINITIONS: Record<UpgradeId, NumericUpgradeDefinition> =
+  Object.fromEntries(definitions.map((d) => [d.id, d])) as Record<UpgradeId, NumericUpgradeDefinition>
 
 /**
  * Current player upgrade levels.
- * The player starts with no obtained upgrades, so all systems default to level 0.
+ * All start at 0 — no purchase flow yet.
  */
-export const CURRENT_PLAYER_UPGRADE_LEVELS: UpgradeLevels = {
-  shuttleFuelUpgrade: 0,
-  shuttleBoosterEfficiencyUpgrade: 0,
-  shuttleBrakeEfficiencyUpgrade: 0,
-  shuttleThrustersEfficiencyUpgrade: 0,
-  heatShieldResistance: 0,
-  heatShieldArmor: 0,
-}
-
-/**
- * Burn-rate multipliers for shuttle thruster bars.
- */
-export interface ShuttleThrusterEfficiencyModifiers {
-  /** Red booster bar drain multiplier. */
-  thrust: number
-  /** Blue brake bar drain multiplier. */
-  brake: number
-  /** White RCS bar drain multiplier. */
-  rcs: number
-}
+export const CURRENT_PLAYER_UPGRADE_LEVELS: Record<UpgradeId, number> =
+  Object.fromEntries(definitions.map((d) => [d.id, 0])) as Record<UpgradeId, number>
 
 /**
  * Resolve a numeric upgrade value from arbitrary runtime levels.
@@ -114,7 +103,40 @@ export function getCurrentUpgradeValue(upgradeId: UpgradeId): number {
 }
 
 /**
+ * Compute the CR cost to purchase a specific upgrade level.
+ *
+ * @param upgradeId - Upgrade to price.
+ * @param level - Target level (1, 2, or 3). Level 0 is free (default).
+ * @returns CR cost for the requested level.
+ */
+export function getUpgradeCost(upgradeId: UpgradeId, level: number): number {
+  if (level <= 0) return 0
+  return UPGRADE_DEFINITIONS[upgradeId].baseCost * level
+}
+
+/**
+ * Get all upgrade definitions in a given category.
+ *
+ * @param category - Category to filter by.
+ * @returns Array of matching upgrade definitions.
+ */
+export function getUpgradesByCategory(category: UpgradeCategory): NumericUpgradeDefinition[] {
+  return definitions.filter((d) => d.category === category)
+}
+
+/** Burn-rate multipliers for shuttle thruster bars. */
+export interface ShuttleThrusterEfficiencyModifiers {
+  /** Red booster bar drain multiplier. */
+  thrust: number
+  /** Blue brake bar drain multiplier. */
+  brake: number
+  /** White RCS bar drain multiplier. */
+  rcs: number
+}
+
+/**
  * Resolve shuttle thruster burn-rate multipliers from arbitrary upgrade levels.
+ * All three groups share the single `shuttleThrusterEfficiency` upgrade.
  *
  * @param levels - Runtime upgrade level state.
  * @returns Burn-rate multipliers for shuttle thrusters.
@@ -122,11 +144,8 @@ export function getCurrentUpgradeValue(upgradeId: UpgradeId): number {
 export function getShuttleThrusterEfficiencyModifiers(
   levels: UpgradeLevels,
 ): ShuttleThrusterEfficiencyModifiers {
-  return {
-    thrust: getUpgradeValue('shuttleBoosterEfficiencyUpgrade', levels),
-    brake: getUpgradeValue('shuttleBrakeEfficiencyUpgrade', levels),
-    rcs: getUpgradeValue('shuttleThrustersEfficiencyUpgrade', levels),
-  }
+  const m = getUpgradeValue('shuttleThrusterEfficiency', levels)
+  return { thrust: m, brake: m, rcs: m }
 }
 
 /**
