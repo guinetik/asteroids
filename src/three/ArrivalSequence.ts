@@ -138,6 +138,7 @@ export class ArrivalSequence {
   private phaseElapsed = 0
 
   // Model nodes
+  private shuttleScene: THREE.Object3D | null = null
   private doorPortNode: THREE.Object3D | null = null
   private doorStbNode: THREE.Object3D | null = null
   private doorPortClosedRotX = 0
@@ -159,8 +160,10 @@ export class ArrivalSequence {
   // Exfil state
   private exfilPhase: ExfilPhase | null = null
   private exfilPhaseElapsed = 0
-  private exfilLanderStartY = 0
-  private exfilLanderTargetY = 0
+  /** Lander start world position (gameplay lander pos). */
+  private exfilLanderStartPos = new THREE.Vector3()
+  /** Lander target world position (cargo bay opening). */
+  private exfilLanderTargetPos = new THREE.Vector3()
   private exfilDepartStartPos = new THREE.Vector3()
   private exfilDepartEndPos = new THREE.Vector3()
 
@@ -193,10 +196,11 @@ export class ArrivalSequence {
 
   /** Load the shuttle model and set up internal structure. */
   async load(): Promise<void> {
-    const shuttleScene = await loadGLB(SHUTTLE_MODEL_PATH)
-    shuttleScene.scale.setScalar(MODEL_SCALE)
-    shuttleScene.rotation.x = MODEL_ROTATION_X
-    this.shuttleGroup.add(shuttleScene)
+    this.shuttleScene = await loadGLB(SHUTTLE_MODEL_PATH)
+    this.shuttleScene.scale.setScalar(MODEL_SCALE)
+    this.shuttleScene.rotation.x = MODEL_ROTATION_X
+    this.shuttleGroup.add(this.shuttleScene)
+    const shuttleScene = this.shuttleScene
     this.shuttleGroup.scale.setScalar(SHUTTLE_CINEMATIC_SCALE)
 
     // Find door nodes
@@ -538,12 +542,18 @@ export class ArrivalSequence {
     this.exfilPhase = 'dock'
     this.exfilPhaseElapsed = 0
 
-    // Store lander vertical travel
-    this.exfilLanderStartY = landerPosition.y
-    this.exfilLanderTargetY = LANDER_PARK_ALTITUDE
+    // Animate lander in world space (scene root), then reparent into cargo bay at the end.
+    // This mirrors the arrival detach in reverse.
+    if (this.landerModel && this.shuttleScene) {
+      this.exfilLanderStartPos.copy(landerPosition)
+      // Target: cargo bay position in world space
+      // Cargo bay is at model X=-320, which at scale 15*0.01 = ~48 units toward nozzles.
+      // Model -X maps to world -Z with the shuttle's YXZ rotation.
+      const cargoBayOffsetZ = CARGO_LANDER_OFFSET.x * MODEL_SCALE * SHUTTLE_PARKED_SCALE
+      this.exfilLanderTargetPos.copy(this.shuttleGroup.position)
+      this.exfilLanderTargetPos.z += cargoBayOffsetZ
 
-    // Re-use landerModel — reparent to scene root at gameplay position with gameplay scale
-    if (this.landerModel) {
+      // Place lander in scene root at gameplay position — feet pointing down (6 o'clock)
       this.landerModel.removeFromParent()
       this.landerModel.position.copy(landerPosition)
       this.landerModel.scale.setScalar(5)
@@ -552,19 +562,19 @@ export class ArrivalSequence {
       this.fallingLander = this.landerModel
     }
 
-    // Departure path: start at current shuttle position, end far away
+    // Departure path: start at current shuttle position, fly forward (+Z) and up
     this.exfilDepartStartPos.copy(this.shuttleGroup.position)
     this.exfilDepartEndPos.set(
       this.shuttleGroup.position.x,
       this.shuttleGroup.position.y + 500,
-      this.shuttleGroup.position.z - APPROACH_START_DISTANCE,
+      this.shuttleGroup.position.z + APPROACH_START_DISTANCE,
     )
 
-    // Initial camera: below the shuttle looking up at the docking lander
+    // Initial camera: below and far enough to frame the shuttle at scale 15
     this.camera.position.set(
-      this.shuttleGroup.position.x + 40,
-      this.shuttleGroup.position.y - 60,
-      this.shuttleGroup.position.z + 30,
+      this.shuttleGroup.position.x + 200,
+      this.shuttleGroup.position.y - 150,
+      this.shuttleGroup.position.z + 250,
     )
     this.camera.lookAt(this.shuttleGroup.position)
 
@@ -595,31 +605,41 @@ export class ArrivalSequence {
     }
   }
 
-  /** Lander rises into the cargo bay. */
+  /** Lander rises toward the cargo bay in world space, then reparents into shuttle. */
   private tickExfilDock(): void {
     const t = Math.min(1, this.exfilPhaseElapsed / EXFIL_DOCK_DURATION)
     const eased = this.easeInOut(t)
 
     if (this.fallingLander) {
-      this.fallingLander.position.y = THREE.MathUtils.lerp(
-        this.exfilLanderStartY,
-        this.exfilLanderTargetY,
+      // Lerp world position from gameplay lander toward shuttle
+      this.fallingLander.position.lerpVectors(
+        this.exfilLanderStartPos,
+        this.exfilLanderTargetPos,
         eased,
       )
-
-      // Camera tracks the rising lander
-      this.camera.position.set(
-        this.fallingLander.position.x + 40,
-        this.fallingLander.position.y - 30,
-        this.fallingLander.position.z + 30,
-      )
-      this.camera.lookAt(this.fallingLander.position)
+      // Rotate from 6 o'clock (feet down) to 3 o'clock (feet toward nozzles)
+      // Feet start at -Y (down), need to end pointing toward nozzles (+Z) → rotate around X
+      this.fallingLander.rotation.x = THREE.MathUtils.lerp(0, Math.PI / 2, eased)
     }
 
+    // Camera tracks from a wide angle
+    this.camera.position.set(
+      this.shuttleGroup.position.x + 200,
+      this.shuttleGroup.position.y - 80,
+      this.shuttleGroup.position.z + 250,
+    )
+    this.camera.lookAt(this.shuttleGroup.position)
+
     if (t >= 1) {
-      // Remove detached lander from scene (it is now "inside" the shuttle)
-      this.fallingLander?.removeFromParent()
-      this.fallingLander = null
+      // Reparent lander into shuttleScene at cargo bay position (matching original load())
+      if (this.fallingLander && this.shuttleScene) {
+        this.fallingLander.removeFromParent()
+        this.fallingLander.position.copy(CARGO_LANDER_OFFSET)
+        this.fallingLander.scale.setScalar(CARGO_LANDER_SCALE)
+        this.fallingLander.rotation.set(0, 0, -Math.PI / 2)
+        this.shuttleScene.add(this.fallingLander)
+        this.fallingLander = null
+      }
       this.nextExfilPhase('closeDoors')
     }
   }
@@ -632,13 +652,13 @@ export class ArrivalSequence {
     this.doorProgress = 1 - eased
     this.updateDoorRotation()
 
-    // Camera watches the belly as doors close
+    // Camera watches the belly as doors close — wide enough for scale 15
     const camTarget = this.shuttleGroup.position.clone()
-    camTarget.y -= 10
+    camTarget.y -= 20
     this.camera.position.set(
-      this.shuttleGroup.position.x + 60,
-      this.shuttleGroup.position.y - 5,
-      this.shuttleGroup.position.z + 40,
+      this.shuttleGroup.position.x + 200,
+      this.shuttleGroup.position.y - 40,
+      this.shuttleGroup.position.z + 180,
     )
     this.camera.lookAt(camTarget)
 
@@ -654,13 +674,13 @@ export class ArrivalSequence {
     const pitchAngle = THREE.MathUtils.lerp(Math.PI, 0, eased)
     this.shuttleGroup.rotation.set(pitchAngle, -Math.PI / 2, 0, 'YXZ')
 
-    // Camera orbits around the shuttle during flip
+    // Camera orbits around the shuttle during flip — wide framing
     const angle = eased * Math.PI * 0.5
-    const camDist = 120
+    const camDist = 400
     this.camera.position.set(
       this.shuttleGroup.position.x + Math.sin(angle) * camDist,
-      this.shuttleGroup.position.y + 30,
-      this.shuttleGroup.position.z + Math.cos(angle) * camDist * 0.3,
+      this.shuttleGroup.position.y + 100,
+      this.shuttleGroup.position.z + Math.cos(angle) * camDist * 0.5,
     )
     this.camera.lookAt(this.shuttleGroup.position)
 
@@ -681,13 +701,13 @@ export class ArrivalSequence {
     // Enable thruster sprites during departure
     this.updateThrusterSprites(true)
 
-    // Camera pulls back watching the shuttle shrink into the distance
-    const camPullBack = THREE.MathUtils.lerp(100, 400, eased)
-    const camHeight = THREE.MathUtils.lerp(30, 120, eased)
+    // Camera stays behind watching the shuttle fly away into +Z
+    const camBehind = THREE.MathUtils.lerp(300, 600, eased)
+    const camHeight = THREE.MathUtils.lerp(80, 200, eased)
     this.camera.position.set(
-      this.shuttleGroup.position.x + 40,
+      this.shuttleGroup.position.x,
       this.shuttleGroup.position.y + camHeight,
-      this.shuttleGroup.position.z + camPullBack,
+      this.shuttleGroup.position.z - camBehind,
     )
     this.camera.lookAt(this.shuttleGroup.position)
 

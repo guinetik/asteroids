@@ -300,6 +300,10 @@ export class LevelViewController implements Tickable {
       takeDamage: (amount = 10) => this.playerController?.takeDamage(amount),
       heal: () => this.playerController?.replenish(),
       kill: () => this.playerController?.takeDamage(999),
+      exfil: () => {
+        this.hasExitedVehicle = true
+        this.stateMachine?.setState('exfil' as LevelState)
+      },
     })
 
     // ── Start ───────────────────────────────────────────────────
