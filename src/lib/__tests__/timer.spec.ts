@@ -64,4 +64,81 @@ describe('Timer', () => {
       expect(fn).toHaveBeenCalledOnce()
     })
   })
+
+  describe('cancel', () => {
+    it('prevents callback from firing', () => {
+      const fn = vi.fn()
+      const handle = Timer.after(0.1, fn)
+
+      flushFrame(0)
+      Timer.cancel(handle)
+      flushFrame(200)
+
+      expect(fn).not.toHaveBeenCalled()
+    })
+
+    it('does not affect other timers', () => {
+      const fn1 = vi.fn()
+      const fn2 = vi.fn()
+      const h1 = Timer.after(0.05, fn1)
+      Timer.after(0.05, fn2)
+
+      flushFrame(0)
+      Timer.cancel(h1)
+      flushFrame(60)
+
+      expect(fn1).not.toHaveBeenCalled()
+      expect(fn2).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('sequence', () => {
+    it('fires steps in order with correct delays', () => {
+      const order: number[] = []
+      Timer.sequence([
+        { delay: 0.05, fn: () => order.push(1) },
+        { delay: 0.05, fn: () => order.push(2) },
+        { delay: 0.05, fn: () => order.push(3) },
+      ])
+
+      flushFrame(0)
+      flushFrame(60)   // 0.06s → step 1 fires
+      expect(order).toEqual([1])
+
+      flushFrame(120)  // 0.06s after step 1 → step 2 fires
+      expect(order).toEqual([1, 2])
+
+      flushFrame(180)  // 0.06s after step 2 → step 3 fires
+      expect(order).toEqual([1, 2, 3])
+    })
+
+    it('cancel stops the entire chain', () => {
+      const order: number[] = []
+      const handle = Timer.sequence([
+        { delay: 0.05, fn: () => order.push(1) },
+        { delay: 0.05, fn: () => order.push(2) },
+      ])
+
+      flushFrame(0)
+      flushFrame(60)  // step 1 fires
+      Timer.cancel(handle)
+      flushFrame(120) // step 2 should NOT fire
+
+      expect(order).toEqual([1])
+    })
+
+    it('cancel before any step fires prevents all steps', () => {
+      const fn = vi.fn()
+      const handle = Timer.sequence([
+        { delay: 0.1, fn },
+        { delay: 0.1, fn },
+      ])
+
+      flushFrame(0)
+      Timer.cancel(handle)
+      flushFrame(300)
+
+      expect(fn).not.toHaveBeenCalled()
+    })
+  })
 })
