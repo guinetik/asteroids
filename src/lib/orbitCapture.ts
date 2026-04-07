@@ -240,6 +240,64 @@ export class OrbitCaptureSystem {
     return this.targetData?.body ?? null
   }
 
+  /**
+   * Returns the nearest body within a preview range when the ship is heading toward it.
+   * Used to show a dimmed orbit ring before capture triggers.
+   *
+   * @param shipX - Ship world X position.
+   * @param shipZ - Ship world Z position.
+   * @param velX - Ship velocity X component.
+   * @param velZ - Ship velocity Z component.
+   * @param previewMultiplier - Preview zone is this × capture radius.
+   * @returns Body name, world position, and orbit radius — or null.
+   */
+  getNearestPreviewBody(
+    shipX: number,
+    shipZ: number,
+    velX: number,
+    velZ: number,
+    previewMultiplier: number,
+  ): { name: string; worldX: number; worldZ: number; orbitRadius: number } | null {
+    if (this.state !== 'free') return null
+
+    const speed = Math.sqrt(velX * velX + velZ * velZ)
+    if (speed < 1e-6) return null
+
+    const nvx = velX / speed
+    const nvz = velZ / speed
+
+    let nearest: BodyData | null = null
+    let nearestDistSq = Infinity
+
+    for (const bd of this.bodyData) {
+      const bx = bd.body.getWorldX()
+      const bz = bd.body.getWorldZ()
+      const dx = bx - shipX
+      const dz = bz - shipZ
+      const distSq = dx * dx + dz * dz
+      const previewRadius = bd.captureRadius * previewMultiplier
+      if (distSq > previewRadius * previewRadius) continue
+
+      // Check heading: dot(normalize(vel), normalize(toBody)) > 0.3
+      const dist = Math.sqrt(distSq)
+      const dot = (nvx * dx + nvz * dz) / dist
+      if (dot <= 0.3) continue
+
+      if (distSq < nearestDistSq) {
+        nearestDistSq = distSq
+        nearest = bd
+      }
+    }
+
+    if (!nearest) return null
+    return {
+      name: nearest.body.name,
+      worldX: nearest.body.getWorldX(),
+      worldZ: nearest.body.getWorldZ(),
+      orbitRadius: nearest.orbitRadius,
+    }
+  }
+
   // ─── Proximity detection ──────────────────────────────────────────────────
 
   /**

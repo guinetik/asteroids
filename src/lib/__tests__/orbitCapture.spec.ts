@@ -329,3 +329,56 @@ describe('OrbitCaptureSystem', () => {
     })
   })
 })
+
+describe('OrbitCaptureSystem.getNearestPreviewBody', () => {
+  // captureRadiusOverride=30 → previewRadius(2x)=60
+  // Planet at X=100. Ship at X=60 → dist=40 (inside preview, outside capture).
+  // Ship at X=0  → dist=100 (outside preview).
+  const bodies = [
+    {
+      name: 'TestPlanet',
+      displayRadius: 1,
+      captureRadiusOverride: 30,
+      getWorldX: () => 100,
+      getWorldZ: () => 0,
+    },
+  ]
+
+  it('returns body data when ship is within preview range and heading toward it', () => {
+    const system = new OrbitCaptureSystem(bodies)
+    // Ship at (60, 0) heading right toward planet at (100, 0)
+    // velocity pointing +X (toward planet)
+    const result = system.getNearestPreviewBody(60, 0, 1, 0, 2.0)
+    expect(result).not.toBeNull()
+    expect(result!.name).toBe('TestPlanet')
+    expect(result!.orbitRadius).toBeGreaterThan(0)
+  })
+
+  it('returns null when ship is outside preview range', () => {
+    const system = new OrbitCaptureSystem(bodies)
+    // Ship at (0, 0) — far from planet at (100, 0)
+    const result = system.getNearestPreviewBody(0, 0, 1, 0, 2.0)
+    expect(result).toBeNull()
+  })
+
+  it('returns null when ship is heading away from the body', () => {
+    const system = new OrbitCaptureSystem(bodies)
+    // Ship at (60, 0), velocity pointing -X (away from planet)
+    const result = system.getNearestPreviewBody(60, 0, -1, 0, 2.0)
+    expect(result).toBeNull()
+  })
+
+  it('returns null when ship speed is near zero', () => {
+    const system = new OrbitCaptureSystem(bodies)
+    const result = system.getNearestPreviewBody(60, 0, 0, 0, 2.0)
+    expect(result).toBeNull()
+  })
+
+  it('returns null when already captured', () => {
+    const system = new OrbitCaptureSystem(bodies)
+    // Begin capture first — ship must be within capture radius
+    system.beginCapture(100, 0)
+    const result = system.getNearestPreviewBody(60, 0, 1, 0, 2.0)
+    expect(result).toBeNull()
+  })
+})
