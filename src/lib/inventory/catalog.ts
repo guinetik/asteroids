@@ -12,7 +12,7 @@ import type { ItemDefinition, ItemCategory } from './types'
 
 import itemsData from '@/data/inventory/items.json'
 
-const VALID_CATEGORIES = new Set<string>(['mineral', 'upgrade', 'consumable', 'equipment', 'trade-good', 'mission-material'])
+const VALID_CATEGORIES = new Set<string>(['mineral', 'consumable', 'equipment', 'trade-good', 'mission-material'])
 
 function validateItem(item: ItemDefinition): ItemDefinition {
   if (!item.id || !item.label || !item.description || !item.icon) {

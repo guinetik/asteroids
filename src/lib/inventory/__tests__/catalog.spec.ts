@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { ITEM_CATALOG, getItemDefinition, getItemsByCategory } from '../catalog'
 import type { ItemCategory } from '../types'
 
-const VALID_CATEGORIES = new Set<ItemCategory>(['mineral', 'upgrade', 'consumable', 'equipment', 'trade-good'])
+const VALID_CATEGORIES = new Set<ItemCategory>(['mineral', 'consumable', 'equipment', 'trade-good'])
 
 describe('ITEM_CATALOG', () => {
-  it('contains 22 items', () => {
-    expect(Object.keys(ITEM_CATALOG)).toHaveLength(22)
+  it('contains 18 items', () => {
+    expect(Object.keys(ITEM_CATALOG)).toHaveLength(18)
   })
 
   it('all items have valid category', () => {
@@ -40,9 +40,9 @@ describe('ITEM_CATALOG', () => {
     }
   })
 
-  it('equipment and upgrades have maxStack of 1', () => {
+  it('equipment has maxStack of 1', () => {
     const nonStackable = Object.values(ITEM_CATALOG).filter(
-      (item) => item.category === 'equipment' || item.category === 'upgrade',
+      (item) => item.category === 'equipment',
     )
     for (const item of nonStackable) {
       expect(item.maxStack).toBe(1)
@@ -97,11 +97,4 @@ describe('getItemsByCategory', () => {
     }
   })
 
-  it('returns only upgrades for upgrade category', () => {
-    const upgrades = getItemsByCategory('upgrade')
-    expect(upgrades.length).toBe(4)
-    for (const item of upgrades) {
-      expect(item.category).toBe('upgrade')
-    }
-  })
 })
