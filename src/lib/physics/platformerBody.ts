@@ -41,6 +41,9 @@ export class PlatformerBody {
   /** Current vertical velocity (positive = up, negative = down) */
   velocityY = 0
 
+  /** Vertical velocity at the moment of the last ground contact (always <= 0). */
+  impactVelocityY = 0
+
   /** Whether the body is currently resting on the ground */
   grounded = false
 
@@ -74,6 +77,7 @@ export class PlatformerBody {
     // Ground collision
     if (newY <= floorY) {
       newY = floorY
+      this.impactVelocityY = this.velocityY
       this.velocityY = 0
       this.grounded = true
     } else {
