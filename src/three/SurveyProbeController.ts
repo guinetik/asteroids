@@ -14,13 +14,13 @@ import type { Tickable } from '@/lib/Tickable'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
 
 /** Diamond radius in world units. */
-const PROBE_RADIUS = 3
+const PROBE_RADIUS = 5
 
 /** Collection trigger distance (lander center to probe center). */
-const COLLECT_RANGE = 15
+const COLLECT_RANGE = 30
 
 /** Rotation speed in radians per second. */
-const ROTATION_SPEED = 1.0
+const ROTATION_SPEED = 1.5
 
 /** Vertical bob amplitude in world units. */
 const BOB_AMPLITUDE = 0.5
@@ -32,7 +32,7 @@ const BOB_SPEED = 2.0
 const PROBE_COLOR = 0x00ffcc
 
 /** Number of particles emitted on collection. */
-const COLLECT_PARTICLE_COUNT = 12
+const COLLECT_PARTICLE_COUNT = 24
 
 /** Seconds between each probe launching from the terminal. */
 const LAUNCH_STAGGER_INTERVAL = 0.8
@@ -116,12 +116,12 @@ export class SurveyProbeController implements Tickable {
   constructor(scene: THREE.Scene) {
     this.scene = scene
     this.collectEmitter = new ParticleEmitter({
-      poolSize: 64,
+      poolSize: 128,
       color: new THREE.Color(PROBE_COLOR),
-      size: 2.5,
-      lifetime: 0.6,
-      spread: 12,
-      opacity: 0.9,
+      size: 5,
+      lifetime: 1.0,
+      spread: 25,
+      opacity: 1.0,
     })
     scene.add(this.collectEmitter.points)
   }
@@ -270,10 +270,14 @@ export class SurveyProbeController implements Tickable {
         this.collectedCount++
         probe.group.visible = false
 
-        // Particle burst
-        const up = new THREE.Vector3(0, 1, 0)
+        // Particle burst — radial explosion
         for (let j = 0; j < COLLECT_PARTICLE_COUNT; j++) {
-          this.collectEmitter.emit(probe.group.position, up.clone().multiplyScalar(5))
+          const dir = new THREE.Vector3(
+            (Math.random() - 0.5) * 2,
+            Math.random() * 0.5 + 0.5,
+            (Math.random() - 0.5) * 2,
+          ).normalize().multiplyScalar(12)
+          this.collectEmitter.emit(probe.group.position, dir)
         }
 
         this.onCollect?.(i)
