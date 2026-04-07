@@ -67,9 +67,8 @@ import {
   clearWaypointMarkers,
 } from '@/three/WaypointMarkers'
 import { generateMapCanvas } from '@/lib/terrain/mapColors'
-import { TerminalModel, TERMINAL_INTERACT_RANGE } from '@/three/TerminalModel'
-import { SurveyProbeController } from '@/three/SurveyProbeController'
-import { generateProbePositions } from '@/lib/survey/probePositions'
+import type { MiniGame, MiniGameContext } from '@/lib/minigame/MiniGame'
+import { SurveyMinigame } from '@/lib/minigame/SurveyMinigame'
 import playerConfigJson from '@/data/fps/player-config.json'
 import multiToolConfigJson from '@/data/fps/multitool-config.json'
 
@@ -120,20 +119,6 @@ function offsetGameplayLanderSpawn(position: Vector3): Vector3 {
     LANDER_GAMEPLAY_START_OFFSET_Y,
     0,
   ))
-}
-
-/** Runtime state for a single survey objective. */
-interface SurveyRuntimeState {
-  /** Index into missionObjectives array. */
-  objectiveIndex: number
-  /** Current phase. */
-  status: 'idle' | 'active' | 'delivered' | 'failed'
-  /** Terminal model placed at flat zone. */
-  terminal: TerminalModel
-  /** Probe controller (created on activation). */
-  probeController: SurveyProbeController | null
-  /** Time remaining in seconds (set on activation). */
-  timeRemaining: number
 }
 
 /** Resolved level context — asteroid definition + terrain seed + mission. */
@@ -248,8 +233,8 @@ export class LevelViewController implements Tickable {
   private asteroidName = ''
   private missionAnnounced = false
 
-  /** Survey runtime states — one per survey objective. */
-  private surveyStates: SurveyRuntimeState[] = []
+  /** Active minigames — one per objective that has a minigame. */
+  private minigames: MiniGame[] = []
 
   /** Called each frame during EVA with terminal prompt text (null to hide). */
   onTerminalPrompt: ((text: string | null) => void) | null = null
@@ -352,21 +337,21 @@ export class LevelViewController implements Tickable {
     }
 
 
-    // ── Survey terminals ───────────────────────────────────────
+    // ── Objective minigames ──────────────────────────────────────
+    const missionSeed = hashSeed(mission.id)
     for (let i = 0; i < mission.objectives.length; i++) {
       const obj = mission.objectives[i]!
-      if (obj.type !== 'survey') continue
-      const surveyGroundY = this.heightmap!.heightAt(obj.x, obj.z)
-      const terminal = new TerminalModel()
-      terminal.placeAt(obj.x + 5, surveyGroundY, obj.z)
-      this.sceneManager!.addToScene(terminal.group)
-      this.surveyStates.push({
-        objectiveIndex: i,
-        status: 'idle',
-        terminal,
-        probeController: null,
-        timeRemaining: obj.timeLimit ?? 90,
-      })
+      if (obj.type === 'survey') {
+        const minigame = new SurveyMinigame(
+          i, obj, this.sceneManager!.scene, this.heightmap!, missionSeed,
+        )
+        minigame.onPrompt = (text) => this.onTerminalPrompt?.(text)
+        minigame.onComplete = (idx) => this.onObjectiveComplete?.(idx)
+        minigame.onRefuel = () => this.landerController?.thrusterSystem.refuel()
+        minigame.onRegisterTickable = (t) => this.tickHandler!.register(t, TICK_PRIORITY_PHYSICS + 4)
+        minigame.onUnregisterTickable = (t) => this.tickHandler?.unregister(t)
+        this.minigames.push(minigame)
+      }
     }
     // ── Minimap canvas ─────────────────────────────────────────
     const mapCanvas = generateMapCanvas(this.heightmap!.grid, TERRAIN_RESOLUTION)
@@ -960,7 +945,7 @@ export class LevelViewController implements Tickable {
     // F key → state triggers (only one can succeed per press)
     if (this.inputManager?.wasActionPressed('interact') && this.stateMachine && !this.landerDestroyed) {
       // Skip state-machine triggers if player is near a survey terminal (terminal handles F key)
-      const nearTerminal = this.isPlayerNearSurveyTerminal()
+      const nearTerminal = this.isPlayerNearMinigameInteraction()
       if (!nearTerminal) {
         if (!this.stateMachine.trigger('exfiltrate')) {
           if (!this.stateMachine.trigger('exitVehicle')) {
@@ -991,7 +976,7 @@ export class LevelViewController implements Tickable {
     }
 
     this.enforceLanderAltitudeCeiling()
-    this.tickSurveys(dt)
+    this.tickMinigames(dt)
 
     // Dead: camera drops, screen fades, message appears
     if (this.stateMachine?.is('dead') && this.fpsCamera) {
@@ -1094,9 +1079,9 @@ export class LevelViewController implements Tickable {
           descentWarning: this.landerController.descentWarningLevel,
           attitudeWarning: this.landerController.attitudeWarningLevel,
           landingSafety: this.landerController.landingSafetyLevel,
-          surveyTimeRemaining: this.getActiveSurveyTimeRemaining(),
-          surveyProbesCollected: this.getActiveSurveyProbesCollected(),
-          surveyProbesTotal: this.getActiveSurveyProbesTotal(),
+          surveyTimeRemaining: this.getActiveMinigame()?.timeRemaining ?? null,
+          surveyProbesCollected: this.getActiveMinigame()?.progressCurrent ?? null,
+          surveyProbesTotal: this.getActiveMinigame()?.progressTotal ?? null,
         })
         this.onPlayerPosition?.(this.landerController!.group.position.x, this.landerController!.group.position.z)
       }
@@ -1209,143 +1194,42 @@ export class LevelViewController implements Tickable {
   }
 
 
-  /** Per-frame survey logic — timer countdown, probe collection, terminal interaction. */
-  private tickSurveys(dt: number): void {
-    const currentState = this.stateMachine?.state ?? ''
-
-    for (const survey of this.surveyStates) {
-      if (survey.status === 'delivered') continue
-
-      // Timer countdown when active
-      if (survey.status === 'active') {
-        survey.timeRemaining -= dt
-        if (survey.timeRemaining <= 0) {
-          survey.timeRemaining = 0
-          survey.status = 'failed'
-          this.cleanupSurveyProbes(survey)
-          continue
-        }
-
-        // Check probe collection while in lander
-        if (currentState === 'lander' && this.landerController && survey.probeController) {
-          survey.probeController.checkCollection(this.landerController.position)
-        }
-      }
-
-      // Terminal interaction during EVA
-      if (currentState === 'eva' && this.playerController) {
-        const playerPos = this.playerController.group.position
-        const termPos = survey.terminal.position
-        const dx = playerPos.x - termPos.x
-        const dz = playerPos.z - termPos.z
-        const dist = Math.sqrt(dx * dx + dz * dz)
-
-        if (dist <= TERMINAL_INTERACT_RANGE) {
-          if (survey.status === 'idle') {
-            this.onTerminalPrompt?.('[F] BEGIN GRAVITOMETRIC SURVEY')
-            if (this.inputManager?.wasActionPressed('interact')) {
-              this.activateSurvey(survey)
-            }
-          } else if (survey.status === 'failed') {
-            this.onTerminalPrompt?.('[F] RETRY GRAVITOMETRIC SURVEY')
-            if (this.inputManager?.wasActionPressed('interact')) {
-              this.activateSurvey(survey)
-            }
-          } else if (survey.status === 'active' && survey.probeController?.allCollected) {
-            this.onTerminalPrompt?.('[F] DELIVER CALIBRATION DATA')
-            if (this.inputManager?.wasActionPressed('interact')) {
-              survey.status = 'delivered'
-              this.onTerminalPrompt?.(null)
-              this.onObjectiveComplete?.(survey.objectiveIndex)
-            }
-          }
-        }
-      }
+  /** Per-frame minigame logic — delegates to each minigame instance. */
+  private tickMinigames(dt: number): void {
+    const ctx = this.buildMinigameContext()
+    for (const mg of this.minigames) {
+      mg.tick(dt, ctx)
     }
 
-    // Clear prompt if no terminal is in range
-    if (currentState === 'eva' && this.playerController) {
-      const nearAny = this.surveyStates.some((s) => {
-        if (s.status === 'delivered') return false
-        const playerPos = this.playerController!.group.position
-        const dx = playerPos.x - s.terminal.position.x
-        const dz = playerPos.z - s.terminal.position.z
-        return Math.sqrt(dx * dx + dz * dz) <= TERMINAL_INTERACT_RANGE
-      })
-      if (!nearAny) this.onTerminalPrompt?.(null)
+    // Clear prompt if no minigame interaction is in range
+    if (ctx.levelState === 'eva' && !this.minigames.some((mg) => mg.isPlayerNearInteraction)) {
+      this.onTerminalPrompt?.(null)
     }
   }
 
-  /** Remove probes and unregister the probe controller for a survey. */
-  private cleanupSurveyProbes(survey: SurveyRuntimeState): void {
-    if (survey.probeController) {
-      this.tickHandler?.unregister(survey.probeController)
-      survey.probeController.dispose()
-      survey.probeController = null
+  /** Build the context object passed to minigames each frame. */
+  private buildMinigameContext(): MiniGameContext {
+    const state = this.stateMachine?.state ?? ''
+    const lander = this.landerController
+    const player = this.playerController
+    return {
+      levelState: state,
+      landerPosition: lander ? { x: lander.position.x, y: lander.position.y, z: lander.position.z } : null,
+      playerPosition: state === 'eva' && player
+        ? { x: player.group.position.x, y: player.group.position.y, z: player.group.position.z }
+        : null,
+      interactPressed: this.inputManager?.wasActionPressed('interact') ?? false,
     }
   }
 
-  /** Activate (or restart) a survey — spawn probes, refuel lander, start timer. */
-  private activateSurvey(survey: SurveyRuntimeState): void {
-    // Clean up previous attempt if retrying
-    this.cleanupSurveyProbes(survey)
-
-    const obj = this.missionObjectives[survey.objectiveIndex]!
-    survey.status = 'active'
-    survey.timeRemaining = obj.timeLimit ?? 90
-
-    // Refuel the lander
-    this.landerController?.thrusterSystem.refuel()
-
-    // Generate and spawn probes
-    const seed = hashSeed(this.mission!.id) + survey.objectiveIndex
-    const probePositions = generateProbePositions(
-      obj.probeCount ?? 5,
-      obj.x,
-      obj.z,
-      seed,
-    )
-    // Convert to Three.js vectors and add ground height
-    const positions = probePositions.map((p) => {
-      const groundY = this.heightmap?.heightAt(p.x, p.z) ?? 0
-      return new Vector3(p.x, groundY + p.y, p.z)
-    })
-
-    survey.probeController = new SurveyProbeController(this.sceneManager!.scene)
-    survey.probeController.spawn(positions, survey.terminal.position)
-    this.tickHandler!.register(survey.probeController, TICK_PRIORITY_PHYSICS + 4)
-
-    this.onTerminalPrompt?.(null)
+  /** Get the first active minigame (for HUD telemetry). */
+  private getActiveMinigame(): MiniGame | undefined {
+    return this.minigames.find((mg) => mg.status === 'active')
   }
 
-  /** Get remaining time for the first active survey (null if none). */
-  private getActiveSurveyTimeRemaining(): number | null {
-    const active = this.surveyStates.find((s) => s.status === 'active')
-    return active ? active.timeRemaining : null
-  }
-
-  /** Get collected probes for the first active survey (null if none). */
-  private getActiveSurveyProbesCollected(): number | null {
-    const active = this.surveyStates.find((s) => s.status === 'active')
-    return active?.probeController ? active.probeController.collected : null
-  }
-
-  /** Get total probes for the first active survey (null if none). */
-  private getActiveSurveyProbesTotal(): number | null {
-    const active = this.surveyStates.find((s) => s.status === 'active')
-    return active?.probeController ? active.probeController.total : null
-  }
-
-  /** Check if the EVA player is within interact range of any survey terminal. */
-  private isPlayerNearSurveyTerminal(): boolean {
-    if (!this.playerController || this.stateMachine?.state !== 'eva') return false
-    const playerPos = this.playerController.group.position
-    return this.surveyStates.some((s) => {
-      if (s.status === 'delivered') return false
-      const dx = playerPos.x - s.terminal.position.x
-      const dz = playerPos.z - s.terminal.position.z
-      return Math.sqrt(dx * dx + dz * dz) <= TERMINAL_INTERACT_RANGE
-    })
+  /** Check if the EVA player is near any minigame interaction point. */
+  private isPlayerNearMinigameInteraction(): boolean {
+    return this.minigames.some((mg) => mg.isPlayerNearInteraction)
   }
 
   private registerLevelColliders(): void {
@@ -1554,14 +1438,10 @@ export class LevelViewController implements Tickable {
   dispose(): void {
     DevConsole.unregister('LevelView')
     if (this.sceneManager) clearWaypointMarkers(this.sceneManager.scene)
-    for (const survey of this.surveyStates) {
-      survey.terminal.dispose()
-      if (survey.probeController) {
-        this.tickHandler?.unregister(survey.probeController)
-        survey.probeController.dispose()
-      }
+    for (const mg of this.minigames) {
+      mg.dispose()
     }
-    this.surveyStates.length = 0
+    this.minigames.length = 0
     this.gameLoop?.stop()
     this.teardownPointerLock()
     this.clearCollisionRegistrations()
