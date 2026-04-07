@@ -72,8 +72,12 @@ export function createSlingshotSpeedPass(): ShaderPass {
         float lineWidth = 0.003 + slotRand * 0.004;
         float lineFalloff = smoothstep(lineWidth, 0.0, angleDiff);
 
-        // Lines grow from center outward, fade in from ~10% radius
-        float radialFade = smoothstep(0.05, 0.15, dist);
+        // Lines grow inward from edges toward center as intensity increases.
+        // At intensity=1 (launch), lines reach close to center.
+        // At intensity=0.5, lines only fill outer half.
+        // innerEdge moves from 0.7 (low intensity) down to 0.05 (full intensity).
+        float innerEdge = mix(0.7, 0.05, intensity);
+        float radialFade = smoothstep(innerEdge, innerEdge + 0.1, dist);
 
         // Slight shimmer per line — breathing brightness
         float shimmer = 0.7 + 0.3 * sin(time * 3.0 + slotRand * 20.0);
