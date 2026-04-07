@@ -297,6 +297,13 @@ const SUN_CAPTURE_RADIUS_MULTIPLIER = 0.2
 /** Earth defines the baseline orbital lane speed multiplier of 1. */
 const EARTH_PLANET_ID = 'earth'
 
+/** Per-planet slingshot speed overrides for gameplay balance. */
+const SLINGSHOT_SPEED_OVERRIDES: Record<string, number> = {
+  mars: 1.2,
+  neptune: 1.5,
+  pluto: 1.5,
+}
+
 /**
  * Earth catalog `displayRadius` — baseline for scaling dev-warp standoff to other bodies.
  */
@@ -765,7 +772,8 @@ export class MapViewController implements Tickable {
       ...PLANETS.map((planet, i) => ({
         name: planet.name,
         displayRadius: planet.displayRadius,
-        orbitalSpeedMultiplier: computeRelativeOrbitalSpeedMultiplier(planet.orbit, earthOrbit),
+        orbitalSpeedMultiplier: SLINGSHOT_SPEED_OVERRIDES[planet.id]
+          ?? computeRelativeOrbitalSpeedMultiplier(planet.orbit, earthOrbit),
         getWorldX: () => this.planetControllers[i]!.getWorldX(),
         getWorldZ: () => this.planetControllers[i]!.getWorldZ(),
       })),
