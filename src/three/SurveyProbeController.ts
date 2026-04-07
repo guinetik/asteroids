@@ -35,13 +35,25 @@ const PROBE_COLOR = 0x00ffcc
 const COLLECT_PARTICLE_COUNT = 12
 
 /** Seconds between each probe launching from the terminal. */
-const LAUNCH_STAGGER_INTERVAL = 1.0
+const LAUNCH_STAGGER_INTERVAL = 0.8
 
-/** Seconds each probe takes to fly from terminal to target. */
-const LAUNCH_FLIGHT_DURATION = 3.0
+/** Seconds the probe rises above the terminal and spins. */
+const LAUNCH_HOVER_DURATION = 1.5
 
-/** Scale at launch origin (grows to 1.0 during flight). */
+/** Height above terminal the probe rises to before departing. */
+const LAUNCH_HOVER_HEIGHT = 20
+
+/** Seconds the probe arcs from hover point to target. */
+const LAUNCH_ARC_DURATION = 2.5
+
+/** How high the bezier control point sits above the midpoint (world units). */
+const LAUNCH_ARC_HEIGHT = 120
+
+/** Scale at launch origin (grows to 1.0 during hover). */
 const LAUNCH_START_SCALE = 0.2
+
+/** Fast spin speed during launch (rad/s). */
+const LAUNCH_SPIN_SPEED = 8.0
 
 /** Tracked probe state. */
 interface ProbeEntry {
@@ -73,6 +85,7 @@ export class SurveyProbeController implements Tickable {
   private elapsed = 0
   private collectedCount = 0
   private readonly origin = new THREE.Vector3()
+  private readonly hoverPoint = new THREE.Vector3()
 
   /** Particle emitter for collection bursts. */
   readonly collectEmitter: ParticleEmitter
@@ -126,6 +139,8 @@ export class SurveyProbeController implements Tickable {
     this.origin.copy(terminalPosition)
     // Raise the origin slightly above the terminal top
     this.origin.y += 4
+    this.hoverPoint.copy(this.origin)
+    this.hoverPoint.y += LAUNCH_HOVER_HEIGHT
 
     for (let i = 0; i < positions.length; i++) {
       const pos = positions[i]!
@@ -175,38 +190,50 @@ export class SurveyProbeController implements Tickable {
       const probe = this.probes[i]!
       if (probe.collected) continue
 
-      // Launch sequence
+      // Launch sequence — two phases: hover rise, then bezier arc
       if (!probe.arrived) {
         probe.flightTime += dt
-        const flyElapsed = probe.flightTime - probe.launchDelay
+        const elapsed = probe.flightTime - probe.launchDelay
 
-        if (flyElapsed < 0) {
-          // Still waiting for stagger
-          continue
-        }
+        if (elapsed < 0) continue
 
-        // Show probe once its turn comes
         probe.group.visible = true
+        probe.group.rotation.y = elapsed * LAUNCH_SPIN_SPEED
 
-        const t = Math.min(1, flyElapsed / LAUNCH_FLIGHT_DURATION)
-        // Ease-out cubic for smooth deceleration
-        const ease = 1 - Math.pow(1 - t, 3)
+        const hoverPoint = this.hoverPoint
+        const totalDuration = LAUNCH_HOVER_DURATION + LAUNCH_ARC_DURATION
 
-        // Lerp position from origin to target
-        probe.group.position.lerpVectors(this.origin, probe.target, ease)
+        if (elapsed < LAUNCH_HOVER_DURATION) {
+          // Phase 1: rise from terminal to hover point, scale up
+          const t = elapsed / LAUNCH_HOVER_DURATION
+          const ease = 1 - Math.pow(1 - t, 2)
+          probe.group.position.lerpVectors(this.origin, hoverPoint, ease)
+          const scale = LAUNCH_START_SCALE + (1 - LAUNCH_START_SCALE) * ease
+          probe.group.scale.setScalar(scale)
+        } else if (elapsed < totalDuration) {
+          // Phase 2: cubic bezier arc from hover to target
+          const arcElapsed = elapsed - LAUNCH_HOVER_DURATION
+          const t = Math.min(1, arcElapsed / LAUNCH_ARC_DURATION)
+          const ease = t * t * (3 - 2 * t) // smoothstep
 
-        // Scale up from small to full
-        const scale = LAUNCH_START_SCALE + (1 - LAUNCH_START_SCALE) * ease
-        probe.group.scale.setScalar(scale)
+          // Control point: midpoint between hover and target, raised high
+          const midX = (hoverPoint.x + probe.target.x) * 0.5
+          const midY = Math.max(hoverPoint.y, probe.target.y) + LAUNCH_ARC_HEIGHT
+          const midZ = (hoverPoint.z + probe.target.z) * 0.5
 
-        // Spin fast during flight
-        probe.group.rotation.y = flyElapsed * ROTATION_SPEED * 4
-
-        if (t >= 1) {
+          // Quadratic bezier: B(t) = (1-t)^2*P0 + 2(1-t)t*P1 + t^2*P2
+          const inv = 1 - ease
+          probe.group.position.set(
+            inv * inv * hoverPoint.x + 2 * inv * ease * midX + ease * ease * probe.target.x,
+            inv * inv * hoverPoint.y + 2 * inv * ease * midY + ease * ease * probe.target.y,
+            inv * inv * hoverPoint.z + 2 * inv * ease * midZ + ease * ease * probe.target.z,
+          )
+          probe.group.scale.setScalar(1)
+        } else {
+          // Arrived
           probe.arrived = true
           probe.group.position.copy(probe.target)
           probe.group.scale.setScalar(1)
-          // Small arrival burst
           const up = new THREE.Vector3(0, 1, 0)
           for (let j = 0; j < 4; j++) {
             this.collectEmitter.emit(probe.group.position, up.clone().multiplyScalar(3))
