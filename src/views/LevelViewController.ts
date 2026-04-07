@@ -259,7 +259,7 @@ export class LevelViewController implements Tickable {
   onLetterbox: ((visible: boolean) => void) | null = null
 
   /** Called each frame with current state + grounded + canExfil for HUD prompts. */
-  onStateInfo: ((info: { state: string; grounded: boolean; canExfil: boolean }) => void) | null = null
+  onStateInfo: ((info: { state: string; grounded: boolean; canExfil: boolean; canEnterLander: boolean }) => void) | null = null
 
   /** Called each frame during lander state with lander telemetry. */
   onLanderTelemetry: ((telemetry: LanderTelemetry) => void) | null = null
@@ -961,13 +961,9 @@ export class LevelViewController implements Tickable {
 
     // F key → state triggers (only one can succeed per press)
     if (this.inputManager?.wasActionPressed('interact') && this.stateMachine && !this.landerDestroyed) {
-      // Skip state-machine triggers if player is near a survey terminal (terminal handles F key)
-      const nearTerminal = this.isPlayerNearMinigameInteraction()
-      if (!nearTerminal) {
-        if (!this.stateMachine.trigger('exfiltrate')) {
-          if (!this.stateMachine.trigger('exitVehicle')) {
-            this.stateMachine.trigger('enterVehicle')
-          }
+      if (!this.stateMachine.trigger('exfiltrate')) {
+        if (!this.stateMachine.trigger('exitVehicle')) {
+          this.stateMachine.trigger('enterVehicle')
         }
       }
     }
@@ -1073,7 +1069,11 @@ export class LevelViewController implements Tickable {
         this.hasExitedVehicle &&
         this.isLanderNearShuttle()
 
-      this.onStateInfo?.({ state: currentState, grounded, canExfil })
+      const canEnterLander =
+        currentState === 'eva' &&
+        this.isPlayerNearLander()
+
+      this.onStateInfo?.({ state: currentState, grounded, canExfil, canEnterLander })
 
       // Lander telemetry
       if (currentState === 'lander' && this.onLanderTelemetry && this.landerController) {
@@ -1236,6 +1236,7 @@ export class LevelViewController implements Tickable {
         ? { x: player.group.position.x, y: player.group.position.y, z: player.group.position.z }
         : null,
       interactPressed: this.inputManager?.wasActionPressed('interact') ?? false,
+      terminalInteractPressed: this.inputManager?.wasActionPressed('terminalInteract') ?? false,
     }
   }
 
@@ -1248,11 +1249,6 @@ export class LevelViewController implements Tickable {
   private allObjectivesComplete(): boolean {
     if (this.minigames.length === 0) return false
     return this.minigames.every((mg) => mg.status === 'completed')
-  }
-
-  /** Check if the EVA player is near any minigame interaction point. */
-  private isPlayerNearMinigameInteraction(): boolean {
-    return this.minigames.some((mg) => mg.isPlayerNearInteraction)
   }
 
   private registerLevelColliders(): void {

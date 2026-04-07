@@ -22,8 +22,10 @@ export interface MiniGameContext {
   landerPosition: { x: number; y: number; z: number } | null
   /** EVA player world position (null if not in EVA). */
   playerPosition: { x: number; y: number; z: number } | null
-  /** Whether the interact key was just pressed this frame. */
+  /** Whether the interact key (F) was just pressed this frame. */
   interactPressed: boolean
+  /** Whether the terminal interact key (E) was just pressed this frame. */
+  terminalInteractPressed: boolean
 }
 
 /** Events a minigame can emit. */

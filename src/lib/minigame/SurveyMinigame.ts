@@ -158,14 +158,14 @@ export class SurveyMinigame implements MiniGame, MiniGameEvents {
         this.advanceStep(0) // Located the terminal
 
         if (this._status === 'idle') {
-          this.onPrompt?.('[F] BEGIN GRAVITOMETRIC SURVEY')
-          if (ctx.interactPressed) this.activate()
+          this.onPrompt?.('[E] BEGIN GRAVITOMETRIC SURVEY')
+          if (ctx.terminalInteractPressed) this.activate()
         } else if (this._status === 'failed') {
-          this.onPrompt?.('[F] RETRY GRAVITOMETRIC SURVEY')
-          if (ctx.interactPressed) this.activate()
+          this.onPrompt?.('[E] RETRY GRAVITOMETRIC SURVEY')
+          if (ctx.terminalInteractPressed) this.activate()
         } else if (this._status === 'active' && this.probeController?.allCollected) {
-          this.onPrompt?.('[F] DELIVER CALIBRATION DATA')
-          if (ctx.interactPressed) this.deliver()
+          this.onPrompt?.('[E] DELIVER CALIBRATION DATA')
+          if (ctx.terminalInteractPressed) this.deliver()
         }
       }
     }
