@@ -21,6 +21,12 @@ export const DEAD_SCREEN_DURATION = 5.0
 /** Distance threshold for entering the lander on foot (world units). */
 export const LANDER_INTERACT_RANGE = 15
 
+/** Total exfil cutscene duration in seconds. */
+export const EXFIL_SEQUENCE_DURATION = 13.0
+
+/** Vertical distance (world units) to shuttle that enables exfil. */
+export const EXFIL_PROXIMITY_RANGE = 100
+
 /** Options for creating the level state machine. */
 export interface LevelStateMachineOptions {
   /** Called on every state transition. */
@@ -29,6 +35,10 @@ export interface LevelStateMachineOptions {
   isLanderGrounded?: () => boolean
   /** Guard: is the player within interact range of the lander? Defaults to () => false. */
   isPlayerNearLander?: () => boolean
+  /** Guard: is the lander within exfil range of the shuttle? Defaults to () => false. */
+  isLanderNearShuttle?: () => boolean
+  /** Guard: has the player completed at least one EVA? Defaults to () => false. */
+  hasCompletedEva?: () => boolean
 }
 
 /**
@@ -43,6 +53,8 @@ export function createLevelStateMachine(
 ): StateMachine<LevelState> {
   const isGrounded = options.isLanderGrounded ?? (() => false)
   const isNearLander = options.isPlayerNearLander ?? (() => false)
+  const isNearShuttle = options.isLanderNearShuttle ?? (() => false)
+  const hasEva = options.hasCompletedEva ?? (() => false)
 
   const sm = new StateMachine<LevelState>({
     initial: 'arrival',
@@ -56,6 +68,10 @@ export function createLevelStateMachine(
           exitVehicle: {
             target: 'eva',
             guard: () => isGrounded(),
+          },
+          exfiltrate: {
+            target: 'exfil',
+            guard: () => isNearShuttle() && hasEva(),
           },
         },
       },
@@ -72,7 +88,10 @@ export function createLevelStateMachine(
         duration: DEAD_SCREEN_DURATION,
         next: 'failed',
       },
-      exfil: {},
+      exfil: {
+        duration: EXFIL_SEQUENCE_DURATION,
+        next: 'complete',
+      },
       complete: {},
       failed: {},
     },
