@@ -3,7 +3,9 @@ import {
   generateAsteroidMission,
   generateWaypointInRegion,
   interpolateRange,
+  objectiveCountForDifficulty,
   rollObjective,
+  LEVEL_GRID_SIZE,
 } from '../asteroidMissionGenerator'
 
 describe('interpolateRange', () => {
@@ -100,6 +102,27 @@ describe('generateWaypointInRegion', () => {
   })
 })
 
+describe('objectiveCountForDifficulty', () => {
+  it('returns 1 for difficulty 1-3', () => {
+    expect(objectiveCountForDifficulty(1)).toBe(1)
+    expect(objectiveCountForDifficulty(2)).toBe(1)
+    expect(objectiveCountForDifficulty(3)).toBe(1)
+  })
+
+  it('returns 2 for difficulty 4-6', () => {
+    expect(objectiveCountForDifficulty(4)).toBe(2)
+    expect(objectiveCountForDifficulty(5)).toBe(2)
+    expect(objectiveCountForDifficulty(6)).toBe(2)
+  })
+
+  it('returns 3 for difficulty 7-10', () => {
+    expect(objectiveCountForDifficulty(7)).toBe(3)
+    expect(objectiveCountForDifficulty(8)).toBe(3)
+    expect(objectiveCountForDifficulty(9)).toBe(3)
+    expect(objectiveCountForDifficulty(10)).toBe(3)
+  })
+})
+
 describe('generateAsteroidMission', () => {
   it('generates a valid mission at difficulty 1', () => {
     const mission = generateAsteroidMission(1)
@@ -130,5 +153,28 @@ describe('generateAsteroidMission', () => {
   it('region matches difficulty tier', () => {
     const easyMission = generateAsteroidMission(1)
     expect(easyMission.region).toBe('near-earth')
+  })
+
+  it('produces objectives with valid x/z positions within grid bounds', () => {
+    const halfGrid = LEVEL_GRID_SIZE / 2
+    for (let d = 1; d <= 10; d++) {
+      const mission = generateAsteroidMission(d)
+      for (const obj of mission.objectives) {
+        expect(obj.x).toBeGreaterThanOrEqual(-halfGrid)
+        expect(obj.x).toBeLessThanOrEqual(halfGrid)
+        expect(obj.z).toBeGreaterThanOrEqual(-halfGrid)
+        expect(obj.z).toBeLessThanOrEqual(halfGrid)
+      }
+    }
+  })
+
+  it('scales objective count by difficulty (clamped to available slots)', () => {
+    const easy = generateAsteroidMission(1)
+    expect(easy.objectives.length).toBe(1)
+
+    const hard = generateAsteroidMission(8)
+    // Count is min(objectiveCountForDifficulty, template slots)
+    expect(hard.objectives.length).toBeGreaterThanOrEqual(1)
+    expect(hard.objectives.length).toBeLessThanOrEqual(objectiveCountForDifficulty(8))
   })
 })

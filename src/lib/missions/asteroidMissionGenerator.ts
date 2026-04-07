@@ -20,7 +20,42 @@ import type {
 import { getGiversForDifficulty } from './giverCatalog'
 import { ASTEROID_BELTS } from '@/lib/planets/catalog'
 import { ORBIT_SCALE } from '@/lib/planets/constants'
+import { generateFlatZones } from '@/lib/terrain/terrainGenerator'
 import difficultyMap from '@/data/asteroids/difficulty-map.json'
+
+/** Simple string hash to derive a numeric seed. */
+function hashSeed(str: string): number {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) | 0
+  }
+  return Math.abs(hash)
+}
+
+/** Level terrain grid size — shared with LevelViewController. */
+export const LEVEL_GRID_SIZE = 12000
+
+/** Objective count bands by difficulty. */
+const OBJECTIVE_COUNT_BY_DIFFICULTY: [number, number, number][] = [
+  [1, 3, 1],
+  [4, 6, 2],
+  [7, 10, 3],
+]
+
+/**
+ * Determine number of objectives based on mission difficulty.
+ *
+ * @author guinetik
+ * @date 2026-04-07
+ * @param difficulty - Mission difficulty (1-10).
+ * @returns Number of objectives (1-3).
+ */
+export function objectiveCountForDifficulty(difficulty: number): number {
+  for (const [min, max, count] of OBJECTIVE_COUNT_BY_DIFFICULTY) {
+    if (difficulty >= min && difficulty <= max) return count
+  }
+  return 1
+}
 
 /** Entry from the difficulty-map JSON. */
 interface DifficultyMapEntry {
@@ -77,12 +112,16 @@ export function rollObjective(slot: ObjectiveSlot, difficulty: number): Concrete
     case 'gather':
       return {
         type: 'gather',
+        x: 0,
+        z: 0,
         resourceAmount: interpolateRange(slot.params.resourceAmount, difficulty),
         reward,
       }
     case 'exterminate':
       return {
         type: 'exterminate',
+        x: 0,
+        z: 0,
         nestCount: interpolateRange(slot.params.nestCount, difficulty),
         swarmSize: interpolateRange(slot.params.swarmSize, difficulty),
         hasSpitters: Math.random() < slot.params.spitterChance,
@@ -91,6 +130,8 @@ export function rollObjective(slot: ObjectiveSlot, difficulty: number): Concrete
     case 'rescue':
       return {
         type: 'rescue',
+        x: 0,
+        z: 0,
         colonistCount: interpolateRange(slot.params.colonistCount, difficulty),
         oxygenTime: interpolateRange(slot.params.oxygenTime, difficulty),
         isGuarded: Math.random() < slot.params.guardedChance,
@@ -185,17 +226,28 @@ export function generateAsteroidMission(difficulty: number): GeneratedAsteroidMi
   }
 
   const pick = candidates[Math.floor(Math.random() * candidates.length)]!
-  const slot = pick.template.objectiveSlots[0]!
-  const objective = rollObjective(slot, difficulty)
+  const missionId = `${pick.template.id}_${Date.now()}`
+  const count = objectiveCountForDifficulty(difficulty)
+  const slots = [...pick.template.objectiveSlots]
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, count)
+  const objectives = slots.map((s) => rollObjective(s, difficulty))
+
+  const zones = generateFlatZones(objectives.length, LEVEL_GRID_SIZE, hashSeed(missionId))
+  for (let i = 0; i < objectives.length; i++) {
+    objectives[i]!.x = zones[i]!.x
+    objectives[i]!.z = zones[i]!.z
+  }
+
   const completionBonus = interpolateRange(pick.template.completionBonus, difficulty)
-  const totalReward = objective.reward + completionBonus
+  const totalReward = objectives.reduce((sum, o) => sum + o.reward, 0) + completionBonus
 
   const waypoint = generateWaypointInRegion(pick.region)
 
   const asteroidId = pickAsteroidForDifficulty(difficulty)
 
   return {
-    id: `${pick.template.id}_${Date.now()}`,
+    id: missionId,
     asteroidId,
     giverId: pick.giver.id,
     giverName: pick.giver.name,
@@ -204,7 +256,7 @@ export function generateAsteroidMission(difficulty: number): GeneratedAsteroidMi
     briefing: pick.template.briefing,
     difficulty,
     region: pick.region,
-    objectives: [objective],
+    objectives,
     totalReward,
     waypoint,
     status: 'available',

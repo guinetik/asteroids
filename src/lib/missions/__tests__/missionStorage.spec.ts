@@ -17,7 +17,7 @@ const MOCK_MISSION: GeneratedAsteroidMission = {
   briefing: 'Test briefing',
   difficulty: 3,
   region: 'near-earth',
-  objectives: [{ type: 'gather', resourceAmount: 75, reward: 450 }],
+  objectives: [{ type: 'gather', resourceAmount: 75, reward: 450, x: 0, z: 0 }],
   totalReward: 550,
   waypoint: { worldX: 100, worldZ: 50 },
   status: 'accepted',

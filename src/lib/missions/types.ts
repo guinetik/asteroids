@@ -208,6 +208,10 @@ export interface MissionGiverTemplate {
 export interface ConcreteObjective {
   /** Objective type. */
   type: ObjectiveType
+  /** World-space X position (flat zone center). */
+  x: number
+  /** World-space Z position (flat zone center). */
+  z: number
   /** For gather: kg to collect. */
   resourceAmount?: number
   /** For exterminate: nest count. */
