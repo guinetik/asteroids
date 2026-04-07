@@ -284,6 +284,9 @@ export class LevelViewController implements Tickable {
   /** Called when an objective is completed. */
   onObjectiveComplete: ((objectiveIndex: number) => void) | null = null
 
+  /** Called when all objectives are complete — mission success. */
+  onMissionComplete: (() => void) | null = null
+
   /** Called when a minigame step advances. */
   onStepChange: ((objectiveIndex: number, steps: readonly MiniGameStep[]) => void) | null = null
 
@@ -349,7 +352,12 @@ export class LevelViewController implements Tickable {
           i, obj, this.sceneManager!.scene, this.heightmap!, missionSeed,
         )
         minigame.onPrompt = (text) => this.onTerminalPrompt?.(text)
-        minigame.onComplete = (idx) => this.onObjectiveComplete?.(idx)
+        minigame.onComplete = (idx) => {
+          this.onObjectiveComplete?.(idx)
+          if (this.allObjectivesComplete()) {
+            this.onMissionComplete?.()
+          }
+        }
         minigame.onStepChange = (idx, steps) => this.onStepChange?.(idx, steps)
         minigame.onRefuel = () => this.landerController?.thrusterSystem.refuel()
         minigame.onRegisterTickable = (t) => this.tickHandler!.register(t, TICK_PRIORITY_PHYSICS + 4)
@@ -513,7 +521,7 @@ export class LevelViewController implements Tickable {
       isLanderGrounded: () => this.landerController?.body.grounded ?? false,
       isPlayerNearLander: () => this.isPlayerNearLander(),
       isLanderNearShuttle: () => this.isLanderNearShuttle(),
-      hasCompletedEva: () => this.hasExitedVehicle,
+      hasCompletedEva: () => this.hasExitedVehicle && this.allObjectivesComplete(),
     })
 
     // ── Always-active tickables ─────────────────────────────────
@@ -1234,6 +1242,12 @@ export class LevelViewController implements Tickable {
   /** Get the first active minigame (for HUD telemetry). */
   private getActiveMinigame(): MiniGame | undefined {
     return this.minigames.find((mg) => mg.status === 'active')
+  }
+
+  /** Check if all mission objectives with minigames are complete. */
+  private allObjectivesComplete(): boolean {
+    if (this.minigames.length === 0) return false
+    return this.minigames.every((mg) => mg.status === 'completed')
   }
 
   /** Check if the EVA player is near any minigame interaction point. */

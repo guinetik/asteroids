@@ -30,6 +30,7 @@ const announceAsteroid = ref('')
 const announceMission = ref('')
 const objCompleteVisible = ref(false)
 const objCompleteLabel = ref('')
+const missionCompleteVisible = ref(false)
 const trackerVisible = ref(false)
 const trackerObjectives = ref<TrackerObjective[]>([])
 const trackerAsteroid = ref('')
@@ -146,6 +147,9 @@ onMounted(async () => {
       objCompleteVisible.value = true
       setTimeout(() => { objCompleteVisible.value = false }, 5000)
     }
+    viewController.onMissionComplete = () => {
+      missionCompleteVisible.value = true
+    }
     viewController.onTerminalPrompt = (text) => {
       terminalPrompt.value = text
     }
@@ -216,6 +220,11 @@ onUnmounted(() => {
     :visible="objCompleteVisible"
     asteroid-name="OBJECTIVE COMPLETE"
     :mission-name="objCompleteLabel"
+  />
+  <MissionAnnouncement
+    :visible="missionCompleteVisible"
+    asteroid-name="MISSION COMPLETE"
+    :mission-name="trackerMission"
   />
   <MissionTracker
     v-if="trackerVisible && (stateInfo.state === 'lander' || stateInfo.state === 'eva')"
