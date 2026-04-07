@@ -26,6 +26,10 @@ export class SceneManager implements Tickable {
   private vehicleCamera: VehicleCamera | null = null
   /** Direct camera for scenes that don't use VehicleCamera (e.g. FPS). */
   private directCamera: THREE.PerspectiveCamera | null = null
+  /** External render callback — when set, tick() calls this instead of renderer.render(). */
+  renderOverride: (() => void) | null = null
+  /** Called on resize so external systems (post-processing) can update. */
+  onResizeCallback: ((width: number, height: number) => void) | null = null
 
   constructor() {
     this.scene = new THREE.Scene()
@@ -33,6 +37,8 @@ export class SceneManager implements Tickable {
     this.renderer = new THREE.WebGLRenderer({ antialias: true })
     this.renderer.setClearColor(0x000000)
     this.renderer.setPixelRatio(window.devicePixelRatio)
+    this.renderer.shadowMap.enabled = true
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
 
     window.addEventListener('resize', this.onResize)
   }
@@ -72,6 +78,10 @@ export class SceneManager implements Tickable {
   }
 
   tick(_dt: number): void {
+    if (this.renderOverride) {
+      this.renderOverride()
+      return
+    }
     const cam = this.directCamera ?? this.vehicleCamera?.camera
     if (cam) {
       this.renderer.render(this.scene, cam)
@@ -95,5 +105,6 @@ export class SceneManager implements Tickable {
       this.directCamera.aspect = clientWidth / clientHeight
       this.directCamera.updateProjectionMatrix()
     }
+    this.onResizeCallback?.(clientWidth, clientHeight)
   }
 }

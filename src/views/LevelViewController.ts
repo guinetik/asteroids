@@ -43,25 +43,21 @@ import type { StateMachine } from '@/lib/stateMachine'
 import { ArrivalSequence } from '@/three/ArrivalSequence'
 import { LanderExplosion } from '@/three/LanderExplosion'
 import { StarFieldController } from '@/three/StarFieldController'
+import * as THREE from 'three'
 import {
-  AmbientLight,
-  DirectionalLight,
-  HemisphereLight,
   Color,
   Vector3,
 } from 'three'
+import { createAtmosphereContext } from '@/three/atmosphere/AtmosphereContext'
+import type { AtmosphereContext, AsteroidLighting } from '@/three/atmosphere/AtmosphereContext'
+import { LevelLightingRig } from '@/three/atmosphere/LevelLightingRig'
+import { LevelPostProcessing } from '@/three/atmosphere/LevelPostProcessing'
+import { ThrusterWashController } from '@/three/atmosphere/ThrusterWashController'
+import { SurfaceDustController } from '@/three/atmosphere/SurfaceDustController'
 import playerConfigJson from '@/data/fps/player-config.json'
 import multiToolConfigJson from '@/data/fps/multitool-config.json'
 
 // ── Scene constants ─────────────────────────────────────────────
-/** Low ambient — most light comes from the distant sun. Foreboding. */
-const AMBIENT_LIGHT_INTENSITY = 0.15
-/** Cool-tinted ambient to simulate deep space. */
-const AMBIENT_LIGHT_COLOR = 0x334466
-/** Harsh directional sun — single dominant light source. */
-const DIR_LIGHT_INTENSITY = 1.8
-/** Slight warm tint on the sun (distant star). */
-const DIR_LIGHT_COLOR = 0xffeedd
 const GRID_SIZE = 12000
 const TERRAIN_SEED = 42
 const TERRAIN_RESOLUTION = 512
@@ -82,6 +78,15 @@ const TEST_SURFACE: SurfaceFeatures = {
   ridgeFrequency: 0.3,
   roughness: 0.8,
   dustCoverage: 0.2,
+}
+
+/** Test lighting — will come from asteroid JSON data later. */
+const TEST_LIGHTING: AsteroidLighting = {
+  sunAzimuth: 45,
+  sunElevation: 25,
+  sunColor: [1.0, 0.93, 0.82],
+  sunIntensity: 1.6,
+  ambientIntensity: 0.15,
 }
 
 /**
@@ -120,6 +125,13 @@ export class LevelViewController implements Tickable {
   private hasExitedVehicle = false
   private landerDestroyed = false
   private landerExplosion: LanderExplosion | null = null
+
+  // ── Atmosphere ──────────────────────────────────────────────
+  private atmosphereCtx: AtmosphereContext | null = null
+  private lightingRig: LevelLightingRig | null = null
+  private postProcessing: LevelPostProcessing | null = null
+  private thrusterWash: ThrusterWashController | null = null
+  private surfaceDust: SurfaceDustController | null = null
 
   // ── Mouse state (EVA) ────────────────────────────────────────
   private leftMouseDown = false
@@ -181,25 +193,33 @@ export class LevelViewController implements Tickable {
         })
     this.terrainMesh = new TerrainMesh(this.heightmap)
     this.sceneManager.addToScene(this.terrainMesh.mesh)
+    this.terrainMesh.mesh.receiveShadow = true
 
     // ── Starfield — denser than map scene for atmosphere ────────
     const starField = new StarFieldController({ count: 8000, size: 4 })
     this.sceneManager.addToScene(starField.points)
 
-    // ── Lighting — foreboding deep-space atmosphere ─────────────
-    const ambient = new AmbientLight(AMBIENT_LIGHT_COLOR, AMBIENT_LIGHT_INTENSITY)
-    const sun = new DirectionalLight(DIR_LIGHT_COLOR, DIR_LIGHT_INTENSITY)
-    sun.position.set(100, 200, 50)
-    // Hemisphere fill: cold blue from below, warm from sky
-    const hemi = new HemisphereLight(0x445566, 0x111122, 0.2)
-    this.sceneManager.addToScene(ambient)
-    this.sceneManager.addToScene(sun)
-    this.sceneManager.addToScene(hemi)
+    // ── Atmosphere context (per-asteroid config) ───────────────
+    this.atmosphereCtx = createAtmosphereContext(TEST_LIGHTING, {
+      dustCoverage: TEST_SURFACE.dustCoverage,
+      albedo: 0.044,
+      biome: 'rocky',
+      baseColor: [0.15, 0.13, 0.1],
+    })
+
+    // ── Lighting rig (replaces hardcoded lights) ───────────────
+    this.lightingRig = new LevelLightingRig(this.atmosphereCtx)
+    this.lightingRig.addToScene(this.sceneManager.scene)
 
     // ── Lander (created once, stays in scene) ───────────────────
     this.landerController = new LanderController(this.inputManager)
     this.landerController.setHeightmap(this.heightmap)
     await this.landerController.load()
+    this.landerController.group.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        child.castShadow = true
+      }
+    })
     const spawnX = (Math.random() - 0.5) * 2 * SPAWN_POSITION_RANGE
     const spawnZ = (Math.random() - 0.5) * 2 * SPAWN_POSITION_RANGE
     this.landerController.group.position.set(spawnX, LANDER_SPAWN_HEIGHT, spawnZ)
@@ -223,6 +243,14 @@ export class LevelViewController implements Tickable {
     for (const emitter of this.landerController.rcsEmitters.values()) {
       this.sceneManager.addToScene(emitter.points)
     }
+
+    // ── Thruster wash (needs lander loaded) ────────────────────
+    this.thrusterWash = new ThrusterWashController(this.atmosphereCtx!.baseColor)
+    this.thrusterWash.addToScene(this.sceneManager.scene)
+
+    // ── Surface dust (ambient drift + footstep puffs) ──────────
+    this.surfaceDust = new SurfaceDustController(this.atmosphereCtx!)
+    this.surfaceDust.addToScene(this.sceneManager.scene)
 
     // ── Vehicle camera (lander 3rd person) ──────────────────────
     this.vehicleCamera = new VehicleCamera(
@@ -334,6 +362,18 @@ export class LevelViewController implements Tickable {
       },
     })
 
+    // ── Post-processing (wraps renderer) ───────────────────────
+    const initialCam = this.vehicleCamera?.camera ?? this.fpsCamera?.camera
+    if (initialCam) {
+      this.postProcessing = new LevelPostProcessing(
+        this.sceneManager.renderer,
+        this.sceneManager.scene,
+        initialCam,
+      )
+      this.sceneManager.renderOverride = () => this.postProcessing!.render()
+      this.sceneManager.onResizeCallback = (w, h) => this.postProcessing!.resize(w, h)
+    }
+
     // ── Start ───────────────────────────────────────────────────
     this.gameLoop = new GameLoop(this.tickHandler)
     this.gameLoop.start()
@@ -422,6 +462,9 @@ export class LevelViewController implements Tickable {
     this.vehicleCamera!.controls.enabled = true
     this.sceneManager!.setCamera(this.vehicleCamera!)
     this.sceneManager!.setActiveCamera(null)
+    if (this.postProcessing && this.vehicleCamera) {
+      this.postProcessing.setCamera(this.vehicleCamera.camera)
+    }
   }
 
   private exitLander(): void {
@@ -461,6 +504,9 @@ export class LevelViewController implements Tickable {
     this.fpsCamera!.setTarget(this.playerController!.group)
     this.sceneManager!.setActiveCamera(this.fpsCamera!.camera)
     this.sceneManager!.setCamera(null)
+    if (this.postProcessing && this.fpsCamera) {
+      this.postProcessing.setCamera(this.fpsCamera.camera)
+    }
 
     // Pointer lock
     this.setupPointerLock()
@@ -648,6 +694,42 @@ export class LevelViewController implements Tickable {
       if (elapsed >= MESSAGE_DELAY) {
         this.onDeathMessage?.(true)
       }
+    }
+
+    // ── Atmosphere context update ──────────────────────────────
+    if (this.atmosphereCtx) {
+      const lander = this.landerController
+      const player = this.playerController
+      const currentState = this.stateMachine?.state ?? ''
+
+      if (lander) {
+        const groundH = this.heightmap?.heightAt(lander.position.x, lander.position.z) ?? 0
+        this.atmosphereCtx.landerAltitude = Math.max(0, lander.position.y - groundH)
+        this.atmosphereCtx.landerThrust = lander.isMainEngineActive ? 1 : 0
+        this.atmosphereCtx.landerVelocityY = lander.body.velocityY
+        this.atmosphereCtx.landerGrounded = lander.body.grounded
+        this.atmosphereCtx.landerPosition.copy(lander.position)
+      }
+
+      if (player) {
+        this.atmosphereCtx.playerSpeed = player.speed
+        this.atmosphereCtx.playerGrounded = player.grounded
+        this.atmosphereCtx.playerPosition.copy(player.group.position)
+      }
+
+      this.atmosphereCtx.activeMode = currentState === 'eva' ? 'eva'
+        : currentState === 'lander' ? 'lander'
+        : 'cinematic'
+
+      // Update ground normal
+      const activePos = currentState === 'eva' ? player?.group.position : lander?.position
+      if (activePos && this.heightmap) {
+        const n = this.heightmap.normalAt(activePos.x, activePos.z)
+        this.atmosphereCtx.groundNormal.set(n.x, n.y, n.z)
+      }
+
+      this.thrusterWash?.update(this.atmosphereCtx, dt)
+      this.surfaceDust?.update(this.atmosphereCtx, dt)
     }
 
     // Broadcast state info for HUD
@@ -873,6 +955,10 @@ export class LevelViewController implements Tickable {
     this.landerExplosion?.dispose()
     this.landerController?.dispose()
     this.terrainMesh?.dispose()
+    this.thrusterWash?.dispose()
+    this.surfaceDust?.dispose()
+    this.lightingRig?.dispose()
+    this.postProcessing?.dispose()
     this.vehicleCamera?.dispose()
     this.sceneManager?.dispose()
     this.inputManager?.dispose()

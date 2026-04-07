@@ -118,8 +118,6 @@ onUnmounted(() => {
   <div ref="container" class="scene-container"></div>
   <!-- Helmet visor overlay — always visible, frames the view -->
   <div v-if="stateInfo.state === 'eva'" class="helmet-visor" />
-  <!-- Ambient vignette — subtle darkness at edges -->
-  <div v-if="stateInfo.state !== ''" class="level-vignette" />
   <div
     class="letterbox-bar letterbox-bar--top"
     :class="{ 'letterbox-bar--hidden': !letterboxVisible }"
@@ -284,21 +282,6 @@ onUnmounted(() => {
 @keyframes warning-blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
-}
-
-/* Always-on vignette — subtle darkness at screen edges */
-.level-vignette {
-  position: fixed;
-  inset: 0;
-  z-index: 5;
-  pointer-events: none;
-  background: radial-gradient(
-    ellipse at center,
-    transparent 0%,
-    transparent 50%,
-    rgba(0, 0, 0, 0.3) 80%,
-    rgba(0, 0, 0, 0.7) 100%
-  );
 }
 
 /* Helmet visor frame — EVA only, rounded viewport with opaque corners */
