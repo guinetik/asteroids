@@ -40,7 +40,6 @@ export function createSlingshotSpeedPass(): ShaderPass {
       uniform float time;
       varying vec2 vUv;
 
-      // Hash-based pseudo-random for streak pattern
       float hash(float n) {
         return fract(sin(n) * 43758.5453);
       }
@@ -53,28 +52,41 @@ export function createSlingshotSpeedPass(): ShaderPass {
           return;
         }
 
-        // Radial distance from center
         vec2 center = vUv - 0.5;
         float dist = length(center);
         float angle = atan(center.y, center.x);
 
-        // Radial streaks: use angle to create discrete rays
-        float rays = 80.0;
-        float rayAngle = floor(angle * rays / 6.2831853) / rays * 6.2831853;
-        float rayHash = hash(rayAngle * 100.0 + 1.0);
+        // Sparse long radial lines — like hyperspace streaks
+        // Quantize angle into ~200 slots, but only ~30 are "lit"
+        float slotCount = 200.0;
+        float slot = floor(angle * slotCount / 6.2831853);
+        float slotRand = hash(slot * 127.1);
 
-        // Animate streaks outward
-        float streak = fract(dist * 3.0 - time * 2.0 + rayHash);
-        streak = smoothstep(0.0, 0.3, streak) * smoothstep(1.0, 0.7, streak);
+        // Only ~15% of slots produce a line (sparse)
+        float lineMask = step(0.85, slotRand);
 
-        // Only show in outer region, fade from center
-        float radialFade = smoothstep(0.05, 0.35, dist);
+        // Each line has its own brightness and slight width variation
+        float lineAngle = slot / slotCount * 6.2831853;
+        float angleDiff = abs(angle - lineAngle);
+        // Thin lines — sharp falloff from the line center
+        float lineWidth = 0.003 + slotRand * 0.004;
+        float lineFalloff = smoothstep(lineWidth, 0.0, angleDiff);
 
-        // Pure additive light — streaks emit light on top of the scene
-        float streakIntensity = streak * radialFade * intensity * 0.7;
-        vec3 streakColor = vec3(0.7, 0.95, 1.0);
+        // Lines grow from center outward, fade in from ~10% radius
+        float radialFade = smoothstep(0.05, 0.15, dist);
 
-        gl_FragColor = vec4(color.rgb + streakColor * streakIntensity, color.a);
+        // Slight shimmer per line — breathing brightness
+        float shimmer = 0.7 + 0.3 * sin(time * 3.0 + slotRand * 20.0);
+
+        // Brightness varies per line: some bright white, some dimmer cyan
+        float brightness = (0.5 + 0.5 * hash(slot * 31.7)) * shimmer;
+
+        float lineIntensity = lineMask * lineFalloff * radialFade * brightness * intensity * 0.6;
+
+        // Cyan-white color: brighter lines tend whiter
+        vec3 lineColor = mix(vec3(0.3, 0.8, 1.0), vec3(0.85, 0.95, 1.0), brightness);
+
+        gl_FragColor = vec4(color.rgb + lineColor * lineIntensity, color.a);
       }
     `,
   }
