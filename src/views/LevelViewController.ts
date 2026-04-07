@@ -27,11 +27,12 @@ import { FpsPlayerController } from '@/three/FpsPlayerController'
 import type { FpsPlayerConfig } from '@/three/FpsPlayerController'
 import { FpsCamera } from '@/three/FpsCamera'
 import { TerrainMesh } from '@/three/TerrainMesh'
-import { generateTerrain, generateFlatZones } from '@/lib/terrain/terrainGenerator'
+import { generateTerrain, FLAT_ZONE_RADIUS } from '@/lib/terrain/terrainGenerator'
+import type { FlatZone } from '@/lib/terrain/terrainGenerator'
 import { getAsteroidById, ASTEROID_CATALOG } from '@/lib/asteroids/catalog'
 import type { AsteroidDefinition } from '@/lib/asteroids/types'
 import { loadActiveMission } from '@/lib/missions/missionStorage'
-import { generateAsteroidMission } from '@/lib/missions/asteroidMissionGenerator'
+import { LEVEL_GRID_SIZE, generateAsteroidMission } from '@/lib/missions/asteroidMissionGenerator'
 import type { GeneratedAsteroidMission } from '@/lib/missions/types'
 import { Heightmap } from '@/lib/terrain/heightmap'
 import { MultiToolController } from '@/three/MultiToolController'
@@ -58,13 +59,16 @@ import { LevelLightingRig } from '@/three/atmosphere/LevelLightingRig'
 import { LevelPostProcessing } from '@/three/atmosphere/LevelPostProcessing'
 import { ThrusterWashController } from '@/three/atmosphere/ThrusterWashController'
 import { SurfaceDustController } from '@/three/atmosphere/SurfaceDustController'
+import {
+  addWaypointMarker,
+  updateWaypointMarkers,
+  clearWaypointMarkers,
+} from '@/three/WaypointMarkers'
 import playerConfigJson from '@/data/fps/player-config.json'
 import multiToolConfigJson from '@/data/fps/multitool-config.json'
 
 // ── Scene constants ─────────────────────────────────────────────
-const GRID_SIZE = 12000
 const TERRAIN_RESOLUTION = 512
-const FLAT_ZONE_COUNT = 3
 
 const LANDER_SPAWN_HEIGHT = 600
 
@@ -72,9 +76,6 @@ const LANDER_SPAWN_HEIGHT = 600
 const SPAWN_POSITION_RANGE = 2000
 const EVA_SPAWN_OFFSET_X = 8
 
-
-/** Default asteroid when no mission is active. */
-const DEFAULT_ASTEROID_ID = 'bennu'
 
 /** Simple string hash to derive a numeric seed from a mission id. */
 function hashSeed(str: string): number {
@@ -85,34 +86,34 @@ function hashSeed(str: string): number {
   return Math.abs(hash)
 }
 
-/** Resolved level context — asteroid definition + terrain seed. */
+/** Resolved level context — asteroid definition + terrain seed + mission. */
 interface LevelContext {
   asteroid: AsteroidDefinition
   seed: number
+  mission: GeneratedAsteroidMission
 }
 
 /**
  * Resolve the asteroid and terrain seed for the current level.
- * Priority: ?asteroidId= URL param (generates ad-hoc mission) > active mission > Bennu fallback.
+ * Priority: ?asteroidId= URL param (generates ad-hoc mission) > active mission > fallback.
  */
 function resolveLevelContext(): LevelContext {
   const params = new URLSearchParams(window.location.search)
   const paramId = params.get('asteroidId')
 
-  let mission: GeneratedAsteroidMission | null = null
+  let mission: GeneratedAsteroidMission
 
   if (paramId) {
     mission = generateAsteroidMission(5)
     mission.asteroidId = paramId
   } else {
-    mission = loadActiveMission()
+    mission = loadActiveMission() ?? generateAsteroidMission(5)
   }
 
-  const asteroidId = mission?.asteroidId ?? DEFAULT_ASTEROID_ID
-  const asteroid = getAsteroidById(asteroidId) ?? ASTEROID_CATALOG[0]!
-  const seed = mission ? hashSeed(mission.id) : hashSeed(DEFAULT_ASTEROID_ID)
+  const asteroid = getAsteroidById(mission.asteroidId) ?? ASTEROID_CATALOG[0]!
+  const seed = hashSeed(mission.id)
 
-  return { asteroid, seed }
+  return { asteroid, seed, mission }
 }
 
 /**
@@ -158,6 +159,12 @@ export class LevelViewController implements Tickable {
   private postProcessing: LevelPostProcessing | null = null
   private thrusterWash: ThrusterWashController | null = null
   private surfaceDust: SurfaceDustController | null = null
+
+  // ── Mission ─────────────────────────────────────────────────
+  private mission: GeneratedAsteroidMission | null = null
+
+  // ── Elapsed time (seconds) ──────────────────────────────────
+  private elapsed = 0
 
   // ── Mouse state (EVA) ────────────────────────────────────────
   private leftMouseDown = false
@@ -207,22 +214,34 @@ export class LevelViewController implements Tickable {
     this.sceneManager.mount(container)
 
     // ── Asteroid data ────────────────────────────────────────────
-    const { asteroid, seed } = resolveLevelContext()
+    const { asteroid, seed, mission } = resolveLevelContext()
+    this.mission = mission
 
     // ── Terrain ─────────────────────────────────────────────────
     const flat = new URLSearchParams(window.location.search).has('flat')
-    const flatZones = generateFlatZones(FLAT_ZONE_COUNT, GRID_SIZE, seed)
+    const flatZones: FlatZone[] = mission.objectives.map((obj) => ({
+      x: obj.x,
+      z: obj.z,
+      radius: FLAT_ZONE_RADIUS,
+    }))
     this.heightmap = flat
-      ? new Heightmap(TERRAIN_RESOLUTION, GRID_SIZE)
+      ? new Heightmap(TERRAIN_RESOLUTION, LEVEL_GRID_SIZE)
       : generateTerrain(asteroid.surface, {
           seed,
           resolution: TERRAIN_RESOLUTION,
-          worldSize: GRID_SIZE,
+          worldSize: LEVEL_GRID_SIZE,
           flatZones,
         })
     this.terrainMesh = new TerrainMesh(this.heightmap)
     this.sceneManager.addToScene(this.terrainMesh.mesh)
     this.terrainMesh.mesh.receiveShadow = true
+
+    // ── Objective waypoint markers ──────────────────────────────
+    for (let i = 0; i < mission.objectives.length; i++) {
+      const obj = mission.objectives[i]!
+      const groundY = this.heightmap.heightAt(obj.x, obj.z)
+      addWaypointMarker(`obj-${i}`, obj.x, obj.z, groundY, this.sceneManager!.scene)
+    }
 
     // ── Starfield ────────────────────────────────────────────────
     const starField = new StarFieldController({ count: 2000, size: 1.5 })
@@ -621,6 +640,11 @@ export class LevelViewController implements Tickable {
     })
   }
 
+  /** Get the resolved mission (for UI to read objectives). */
+  getMission(): GeneratedAsteroidMission | null {
+    return this.mission
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // Exfil / Complete states
   // ═══════════════════════════════════════════════════════════════
@@ -662,10 +686,15 @@ export class LevelViewController implements Tickable {
 
   /** Per-frame update — dispatches F key triggers and mode-specific logic. */
   tick(dt: number): void {
+    this.elapsed += dt
+
     // Tick arrival sequence if active
     if (this.arrivalSequence) {
       this.arrivalSequence.tick(dt)
     }
+
+    // Animate waypoint beams
+    updateWaypointMarkers(this.elapsed)
 
     // ESC → skip arrival cinematic
     if (this.inputManager?.wasActionPressed('skipCinematic') && this.stateMachine?.is('arrival')) {
@@ -977,6 +1006,7 @@ export class LevelViewController implements Tickable {
   /** Tear down all systems and stop the game loop. */
   dispose(): void {
     DevConsole.unregister('LevelView')
+    if (this.sceneManager) clearWaypointMarkers(this.sceneManager.scene)
     this.gameLoop?.stop()
     this.teardownPointerLock()
     this.projectileSystem?.dispose()
