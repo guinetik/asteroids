@@ -20,7 +20,7 @@ body {
 }
 
 .shuttle-hud {
-  @apply fixed inset-0 pointer-events-none font-mono text-xs text-green-400;
+  @apply fixed inset-0 pointer-events-none font-mono text-xs text-green-400 z-20;
   text-shadow: 0 0 4px rgba(0, 255, 0, 0.5);
 }
 
@@ -121,8 +121,12 @@ body {
 }
 
 .orbit-prompt {
-  @apply fixed top-1/4 left-1/2 -translate-x-1/2 pointer-events-none font-mono flex flex-col items-center gap-2 px-6 py-4 rounded-lg;
-  background: radial-gradient(ellipse at center, rgba(0, 30, 60, 0.85) 0%, rgba(0, 10, 30, 0.7) 100%);
+  @apply fixed top-1/4 left-1/2 -translate-x-1/2 pointer-events-none font-mono flex flex-col items-center gap-2 px-6 py-4 rounded-lg z-20;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 30, 60, 0.85) 0%,
+    rgba(0, 10, 30, 0.7) 100%
+  );
   border: 1px solid rgba(0, 200, 255, 0.3);
   text-shadow: 0 0 8px rgba(0, 200, 255, 0.7);
   animation: orbit-prompt-fade-in 0.3s ease-out;
@@ -153,8 +157,14 @@ body {
 }
 
 @keyframes orbit-prompt-fade-in {
-  from { opacity: 0; transform: translate(-50%, 8px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 .gravity-warning {
@@ -212,8 +222,13 @@ body {
 }
 
 @keyframes gravity-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .hud-temp-gauge {
@@ -238,7 +253,7 @@ body {
 }
 
 .damage-vignette {
-  @apply fixed inset-0 w-full h-full pointer-events-none z-0;
+  @apply fixed inset-0 w-full h-full pointer-events-none z-10;
 }
 
 .death-overlay {
@@ -249,7 +264,9 @@ body {
 
 .death-overlay-cause {
   @apply text-red-500 text-4xl font-bold font-mono tracking-widest uppercase;
-  text-shadow: 0 0 20px rgba(239, 68, 68, 0.8), 0 0 40px rgba(239, 68, 68, 0.4);
+  text-shadow:
+    0 0 20px rgba(239, 68, 68, 0.8),
+    0 0 40px rgba(239, 68, 68, 0.4);
 }
 
 .death-overlay-restart {
@@ -258,8 +275,12 @@ body {
 }
 
 @keyframes death-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* --- Map Overlay --- */
@@ -368,8 +389,15 @@ body {
 }
 
 @keyframes map-pulse {
-  0%, 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  50% { opacity: 0.5; transform: translate(-50%, -50%) scale(1.3); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: translate(-50%, -50%) scale(1.3);
+  }
 }
 
 /* --- Ship Message Dialog --- */
@@ -380,7 +408,9 @@ body {
 
 .ship-message-card {
   @apply flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-cyan-400/25 bg-slate-950/90 text-slate-100 shadow-2xl;
-  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.08), 0 30px 80px rgba(2, 6, 23, 0.7);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.08),
+    0 30px 80px rgba(2, 6, 23, 0.7);
   max-height: min(88dvh, 720px);
 }
 
@@ -513,7 +543,9 @@ body {
 
 .map-intro-message-prompt__button {
   @apply rounded-full border border-cyan-300/30 bg-slate-950/85 px-6 py-3 font-mono text-sm uppercase tracking-[0.26em] text-cyan-100 transition-colors;
-  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.08), 0 12px 32px rgba(2, 6, 23, 0.6);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.08),
+    0 12px 32px rgba(2, 6, 23, 0.6);
 }
 
 .map-intro-message-prompt__button:hover {
@@ -526,7 +558,9 @@ body {
 
 .map-message-notice__button {
   @apply rounded-full border border-cyan-300/25 bg-slate-950/80 px-4 py-2 font-mono text-xs uppercase tracking-[0.22em] text-cyan-100 transition-colors;
-  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.08), 0 10px 24px rgba(2, 6, 23, 0.45);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.08),
+    0 10px 24px rgba(2, 6, 23, 0.45);
 }
 
 .map-message-notice__button:hover {
@@ -536,7 +570,7 @@ body {
 /* --- Map View Toggle Controls (bottom-right) --- */
 
 .map-view-toggles {
-  @apply fixed bottom-6 right-6 z-20 flex flex-col gap-2 pointer-events-auto;
+  @apply fixed bottom-10 right-2 z-20 flex flex-col gap-2 pointer-events-auto;
 }
 
 .map-toggle-btn {
@@ -600,8 +634,9 @@ body {
   @apply flex w-full max-w-5xl flex-col overflow-hidden rounded-2xl
          border border-cyan-400/25 bg-slate-950/95 text-slate-100 shadow-2xl;
   max-height: 80vh;
-  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.08),
-              0 30px 80px rgba(2, 6, 23, 0.7);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.08),
+    0 30px 80px rgba(2, 6, 23, 0.7);
 }
 
 .shuttle-control-chrome {
@@ -789,7 +824,11 @@ body {
   @apply fixed bottom-1/4 left-1/2 -translate-x-1/2 z-30
          pointer-events-none font-mono flex flex-col items-center gap-2
          px-6 py-4 rounded-lg;
-  background: radial-gradient(ellipse at center, rgba(60, 30, 0, 0.85) 0%, rgba(30, 10, 0, 0.7) 100%);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(60, 30, 0, 0.85) 0%,
+    rgba(30, 10, 0, 0.7) 100%
+  );
   border: 1px solid rgba(255, 180, 0, 0.3);
   text-shadow: 0 0 8px rgba(255, 180, 0, 0.7);
   animation: orbit-prompt-fade-in 0.3s ease-out;
@@ -822,8 +861,15 @@ body {
 }
 
 @keyframes waypoint-pulse {
-  0%, 100% { opacity: 0.6; box-shadow: 0 0 4px rgba(255, 180, 0, 0.3); }
-  50% { opacity: 1; box-shadow: 0 0 12px rgba(255, 180, 0, 0.6); }
+  0%,
+  100% {
+    opacity: 0.6;
+    box-shadow: 0 0 4px rgba(255, 180, 0, 0.3);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 12px rgba(255, 180, 0, 0.6);
+  }
 }
 
 /* Mission Minigame Overlay */
@@ -877,17 +923,29 @@ body {
          rounded border border-cyan-400/30 bg-slate-900/90
          px-6 py-3 font-mono text-sm text-cyan-200 tracking-wider
          pointer-events-none;
-  animation: mission-notify-in 0.3s ease-out, mission-notify-out 0.5s ease-in 3.5s forwards;
+  animation:
+    mission-notify-in 0.3s ease-out,
+    mission-notify-out 0.5s ease-in 3.5s forwards;
 }
 
 @keyframes mission-notify-in {
-  from { opacity: 0; transform: translate(-50%, -12px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+  from {
+    opacity: 0;
+    transform: translate(-50%, -12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 @keyframes mission-notify-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 /* Inventory Table */
@@ -1109,8 +1167,9 @@ body {
 .mission-minigame-card {
   @apply w-full max-w-2xl overflow-hidden rounded-2xl
          border border-cyan-400/25 bg-slate-950/95 text-slate-100 shadow-2xl;
-  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.08),
-              0 30px 80px rgba(2, 6, 23, 0.7);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.08),
+    0 30px 80px rgba(2, 6, 23, 0.7);
 }
 
 .mission-minigame-card__chrome {
