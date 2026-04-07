@@ -236,13 +236,13 @@ const MAP_RETICLE_APPARENT_SIZE = 0.06
  * Shuttle overscale multiplier at which the reticle begins fading in.
  * Below this factor the shuttle model is still clearly visible on its own.
  */
-const MAP_RETICLE_FADE_START = 1.5
+const MAP_RETICLE_FADE_START = 0.8
 
 /**
  * Shuttle overscale multiplier at which the reticle reaches full opacity.
  * Above this the shuttle is so small only the reticle marks its position.
  */
-const MAP_RETICLE_FADE_END = 5.0
+const MAP_RETICLE_FADE_END = 2.0
 
 /**
  * Minimum planar speed (world units/s) before the reticle motion wedge appears.
@@ -250,11 +250,6 @@ const MAP_RETICLE_FADE_END = 5.0
  */
 const MAP_RETICLE_MIN_SPEED = 0.12
 
-/**
- * If projected motion direction in NDC has squared length below this, skip updating
- * the wedge rotation for this frame.
- */
-const MAP_RETICLE_MIN_NDC_DELTA_SQ = 1e-10
 
 /** Distance in world units at which the "Begin Mission" prompt appears. */
 const MISSION_APPROACH_RADIUS = 15
@@ -464,11 +459,6 @@ export class MapViewController implements Tickable {
   /** Wedge sprite rotated into planar velocity direction as projected on the view. */
   private shipReticlePointer: THREE.Sprite | null = null
 
-  private readonly _reticleProjA = new THREE.Vector3()
-
-  private readonly _reticleProjB = new THREE.Vector3()
-
-  private readonly _reticleVelPlanar = new THREE.Vector3()
 
   /** World-space shuttle position reused for asteroid belt nearby tumble (avoid per-frame alloc). */
   private readonly _beltShuttleWorldScratch = new THREE.Vector3()
@@ -2226,28 +2216,19 @@ export class MapViewController implements Tickable {
         this.shipReticleGroup.scale.setScalar(reticleWorld)
         ;(this.shipReticleRing.material as THREE.SpriteMaterial).opacity = reticleAlpha
 
-        const cam = this.vehicleCamera.camera
         const vel = this.shuttleController.currentVelocity
         const speed = Math.hypot(vel.x, vel.z)
         if (speed >= MAP_RETICLE_MIN_SPEED) {
-          this._reticleVelPlanar.set(vel.x, 0, vel.z).normalize()
-          this._reticleProjA.copy(this.shuttleController.group.position).project(cam)
-          this._reticleProjB
-            .copy(this.shuttleController.group.position)
-            .add(this._reticleVelPlanar)
-            .project(cam)
-          const ndcDx = this._reticleProjB.x - this._reticleProjA.x
-          const ndcDy = this._reticleProjB.y - this._reticleProjA.y
-          if (ndcDx * ndcDx + ndcDy * ndcDy >= MAP_RETICLE_MIN_NDC_DELTA_SQ) {
-            this.shipReticlePointer.visible = true
-            ;(this.shipReticlePointer.material as THREE.SpriteMaterial).rotation = Math.atan2(
-              ndcDy,
-              ndcDx,
-            )
-            ;(this.shipReticlePointer.material as THREE.SpriteMaterial).opacity = reticleAlpha
-          } else {
-            this.shipReticlePointer.visible = false
-          }
+          // World-space velocity heading: atan2(x, z) gives angle from +Z axis
+          const worldHeading = Math.atan2(vel.x, vel.z)
+          // Camera azimuthal angle from OrbitControls
+          const camAzimuth = this.vehicleCamera!.controls.getAzimuthalAngle()
+          // Sprite rotation is screen-space: offset world heading by camera azimuth
+          // and rotate 90° so the wedge (drawn along +X in canvas) points correctly
+          const spriteAngle = worldHeading - camAzimuth - Math.PI / 2
+          this.shipReticlePointer.visible = true
+          ;(this.shipReticlePointer.material as THREE.SpriteMaterial).rotation = spriteAngle
+          ;(this.shipReticlePointer.material as THREE.SpriteMaterial).opacity = reticleAlpha
         } else {
           this.shipReticlePointer.visible = false
         }
