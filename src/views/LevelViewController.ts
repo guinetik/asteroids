@@ -118,6 +118,7 @@ export class LevelViewController implements Tickable {
 
   // ── Exfil tracking ────────────────────────────────────────────
   private hasExitedVehicle = false
+  private landerDestroyed = false
   private landerExplosion: LanderExplosion | null = null
 
   // ── Mouse state (EVA) ────────────────────────────────────────
@@ -208,8 +209,11 @@ export class LevelViewController implements Tickable {
     }
 
     this.landerController.onDeath = () => {
+      this.landerDestroyed = true
       this.landerExplosion!.explode(this.landerController!.group.position.clone(), 20)
       this.landerController!.group.visible = false
+      // Stop lander physics/input — no more thrusting an invisible wreck
+      this.tickHandler!.unregister(this.landerController!)
       // Keep the camera running so the player sees the explosion
       this.onDeathOverlay?.(true, 'Lander Destroyed')
     }
@@ -595,7 +599,7 @@ export class LevelViewController implements Tickable {
     }
 
     // F key → state triggers (only one can succeed per press)
-    if (this.inputManager?.wasActionPressed('interact') && this.stateMachine) {
+    if (this.inputManager?.wasActionPressed('interact') && this.stateMachine && !this.landerDestroyed) {
       if (!this.stateMachine.trigger('exfiltrate')) {
         if (!this.stateMachine.trigger('exitVehicle')) {
           this.stateMachine.trigger('enterVehicle')
