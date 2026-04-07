@@ -1214,7 +1214,8 @@ body {
 
 /* Survey HUD — timer + probe count overlay during active surveys */
 .survey-hud {
-  @apply fixed top-4 right-4 z-30 flex flex-col items-end gap-1 pointer-events-none;
+  @apply fixed top-4 left-1/2 z-30 flex flex-col items-center gap-1 pointer-events-none;
+  transform: translateX(-50%);
 }
 .survey-timer {
   @apply font-mono text-3xl tracking-widest;
