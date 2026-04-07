@@ -8,7 +8,7 @@
 import { getCurrentUpgradeValue } from './upgrades'
 
 /** Upgrade id that controls passive shuttle systems drain. */
-export const SHUTTLE_FUEL_UPGRADE_ID = 'shuttleFuelUpgrade'
+export const SHUTTLE_FUEL_UPGRADE_ID = 'shuttleSystemsEfficiency'
 
 /**
  * Compute passive shuttle fuel drain for a frame.

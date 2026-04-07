@@ -23,7 +23,7 @@ describe('computeShuttleBaseFuelDrain', () => {
   })
 
   it('reads the passive shuttle systems drain rate from upgrades', () => {
-    expect(SHUTTLE_FUEL_UPGRADE_ID).toBe('shuttleFuelUpgrade')
+    expect(SHUTTLE_FUEL_UPGRADE_ID).toBe('shuttleSystemsEfficiency')
     expect(getCurrentUpgradeValue(SHUTTLE_FUEL_UPGRADE_ID)).toBe(3)
   })
 })

@@ -1407,8 +1407,8 @@ export class MapViewController implements Tickable {
         && this.orbitSystem?.target?.name === 'Earth'
       this.shipHealth.tick(
         dt, sunDist, radiationProximity, isHealingAtEarth,
-        getCurrentUpgradeValue('heatShieldResistance'),
-        getCurrentUpgradeValue('heatShieldArmor'),
+        getCurrentUpgradeValue('shuttleHeatResistance'),
+        getCurrentUpgradeValue('shuttleHull'),
       )
     }
 
