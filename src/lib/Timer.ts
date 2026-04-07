@@ -29,6 +29,8 @@ interface TimerEntry {
   fn: () => void
   /** Next entry in a sequence chain (undefined for standalone timers). */
   next?: TimerEntry
+  /** Root handle for sequence cancellation — matches the head entry's id. */
+  headId: number
 }
 
 /** Monotonically increasing handle counter. */
@@ -99,7 +101,7 @@ export class Timer {
    */
   static after(delaySec: number, fn: () => void): TimerHandle {
     const id = nextId++
-    active.push({ id, elapsed: 0, delay: delaySec, fn })
+    active.push({ id, elapsed: 0, delay: delaySec, fn, headId: id })
     ensureRunning()
     return id
   }
@@ -109,13 +111,39 @@ export class Timer {
    * @param handle - the handle returned by {@link Timer.after} or {@link Timer.sequence}
    */
   static cancel(handle: TimerHandle): void {
-    const idx = active.findIndex((e) => e.id === handle)
+    const idx = active.findIndex((e) => e.id === handle || e.headId === handle)
     if (idx !== -1) active.splice(idx, 1)
     if (active.length === 0 && rafId !== 0) {
       cancelAnimationFrame(rafId)
       rafId = 0
       lastTime = -1
     }
+  }
+
+  /**
+   * Fire a sequence of steps in order, each waiting its own delay after the previous completes.
+   * @param steps - array of `{ delay, fn }` pairs executed in order
+   * @returns handle that cancels the entire chain via {@link Timer.cancel}
+   */
+  static sequence(steps: ReadonlyArray<{ delay: number; fn: () => void }>): TimerHandle {
+    if (steps.length === 0) return -1
+    const headId = nextId++
+    let tail: TimerEntry | undefined
+    for (let i = steps.length - 1; i >= 0; i--) {
+      const step = steps[i]!
+      const entry: TimerEntry = {
+        id: i === 0 ? headId : nextId++,
+        elapsed: 0,
+        delay: step.delay,
+        fn: step.fn,
+        next: tail,
+        headId,
+      }
+      tail = entry
+    }
+    active.push(tail!)
+    ensureRunning()
+    return headId
   }
 
   /**
