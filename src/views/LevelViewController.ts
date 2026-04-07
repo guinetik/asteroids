@@ -151,6 +151,9 @@ export class LevelViewController implements Tickable {
   /** Arrival fade to black (0 = clear, 1 = full black). */
   onArrivalFade: ((opacity: number) => void) | null = null
 
+  /** Called to show/hide the death overlay with a cause message. */
+  onDeathOverlay: ((visible: boolean, cause: string) => void) | null = null
+
   /** Initialise all systems and start the game loop. */
   async init(container: HTMLElement): Promise<void> {
     const playerConfig = playerConfigJson as FpsPlayerConfig
@@ -207,7 +210,8 @@ export class LevelViewController implements Tickable {
     this.landerController.onDeath = () => {
       this.landerExplosion!.explode(this.landerController!.group.position.clone(), 20)
       this.landerController!.group.visible = false
-      this.stateMachine?.setState('failed' as LevelState)
+      // Keep the camera running so the player sees the explosion
+      this.onDeathOverlay?.(true, 'Lander Destroyed')
     }
 
     this.sceneManager.addToScene(this.landerController.group)
@@ -521,6 +525,14 @@ export class LevelViewController implements Tickable {
     this.playerController!.group.visible = false
 
     // Navigate home
+    import('@/router').then(({ default: router }) => {
+      router.push('/')
+    })
+  }
+
+  /** Called from the death overlay restart button. */
+  restart(): void {
+    this.onDeathOverlay?.(false, '')
     import('@/router').then(({ default: router }) => {
       router.push('/')
     })

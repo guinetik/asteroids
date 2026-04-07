@@ -4,6 +4,7 @@ import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { LevelViewController } from './LevelViewController'
 import LanderHud from '@/components/LanderHud.vue'
 import FpsHud from '@/components/FpsHud.vue'
+import DeathOverlay from '@/components/DeathOverlay.vue'
 import type { LanderTelemetry } from '@/components/LanderHud.vue'
 import type { FpsTelemetry } from '@/components/FpsHud.vue'
 
@@ -14,6 +15,8 @@ const stateInfo = reactive({ state: '', grounded: false, canExfil: false })
 const deathFade = ref(0)
 const deathMessage = ref(false)
 const arrivalFade = ref(0)
+const deathOverlayVisible = ref(false)
+const deathOverlayCause = ref('')
 
 const landerTelemetry = reactive<LanderTelemetry>({
   altitude: 0,
@@ -71,9 +74,17 @@ onMounted(async () => {
     viewController.onArrivalFade = (opacity) => {
       arrivalFade.value = opacity
     }
+    viewController.onDeathOverlay = (visible, cause) => {
+      deathOverlayVisible.value = visible
+      deathOverlayCause.value = cause
+    }
     await viewController.init(container.value)
   }
 })
+
+function handleRestart() {
+  viewController.restart()
+}
 
 onUnmounted(() => {
   viewController.dispose()
@@ -121,6 +132,11 @@ onUnmounted(() => {
   <div v-if="deathMessage" class="death-message">
     <span class="death-message__text">YOU DIED</span>
   </div>
+  <DeathOverlay
+    :visible="deathOverlayVisible"
+    :cause="deathOverlayCause"
+    @restart="handleRestart"
+  />
 </template>
 
 <style>
