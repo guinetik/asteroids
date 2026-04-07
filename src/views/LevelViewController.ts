@@ -293,6 +293,9 @@ export class LevelViewController implements Tickable {
   /** Called once when gameplay starts (after arrival) with asteroid name + mission name. */
   onMissionAnnounce: ((asteroidName: string, missionName: string) => void) | null = null
 
+  /** Called when an objective is completed. */
+  onObjectiveComplete: ((objectiveIndex: number) => void) | null = null
+
   /** Called once with the minimap canvas after terrain generation. */
   onMapCanvas: ((canvas: HTMLCanvasElement) => void) | null = null
 
@@ -1241,6 +1244,7 @@ export class LevelViewController implements Tickable {
             if (this.inputManager?.wasActionPressed('interact')) {
               survey.status = 'delivered'
               this.onTerminalPrompt?.(null)
+              this.onObjectiveComplete?.(survey.objectiveIndex)
             }
           }
         }

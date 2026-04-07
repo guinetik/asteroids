@@ -4,6 +4,8 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { LevelViewController } from './LevelViewController'
 import LanderHud from '@/components/LanderHud.vue'
 import MissionAnnouncement from '@/components/MissionAnnouncement.vue'
+import MissionTracker from '@/components/MissionTracker.vue'
+import type { TrackerObjective } from '@/components/MissionTracker.vue'
 import FpsHud from '@/components/FpsHud.vue'
 import FpsCompass from '@/components/FpsCompass.vue'
 import DeathOverlay from '@/components/DeathOverlay.vue'
@@ -26,6 +28,10 @@ const terminalPrompt = ref<string | null>(null)
 const announceVisible = ref(false)
 const announceAsteroid = ref('')
 const announceMission = ref('')
+const objCompleteVisible = ref(false)
+const trackerObjectives = ref<TrackerObjective[]>([])
+const trackerAsteroid = ref('')
+const trackerMission = ref('')
 const mapCanvas = ref<HTMLCanvasElement | null>(null)
 const playerX = ref(0)
 const playerZ = ref(0)
@@ -120,6 +126,14 @@ onMounted(async () => {
       announceAsteroid.value = asteroid
       announceMission.value = mission
       announceVisible.value = true
+      trackerAsteroid.value = asteroid
+      trackerMission.value = mission
+    }
+    viewController.onObjectiveComplete = (index) => {
+      const obj = trackerObjectives.value.find((o) => o.id === `obj-${index}`)
+      if (obj) obj.complete = true
+      objCompleteVisible.value = true
+      setTimeout(() => { objCompleteVisible.value = false }, 5000)
     }
     viewController.onTerminalPrompt = (text) => {
       terminalPrompt.value = text
@@ -133,7 +147,7 @@ onMounted(async () => {
     }
     await viewController.init(container.value)
 
-    // Map markers from mission objectives
+    // Map markers + tracker from mission objectives
     const mission = viewController.getMission()
     if (mission) {
       mapMarkers.value = mission.objectives.map((obj, i) => ({
@@ -142,6 +156,11 @@ onMounted(async () => {
         z: obj.z,
         color: OBJECTIVE_COLORS[obj.type] ?? '#66ffee',
         label: obj.type.toUpperCase(),
+      }))
+      trackerObjectives.value = mission.objectives.map((obj, i) => ({
+        id: `obj-${i}`,
+        label: obj.type.toUpperCase(),
+        complete: false,
       }))
     }
 
@@ -176,6 +195,17 @@ onUnmounted(() => {
     :visible="announceVisible"
     :asteroid-name="announceAsteroid"
     :mission-name="announceMission"
+  />
+  <MissionAnnouncement
+    :visible="objCompleteVisible"
+    asteroid-name="OBJECTIVE COMPLETE"
+    :mission-name="trackerAsteroid"
+  />
+  <MissionTracker
+    v-if="stateInfo.state === 'lander' || stateInfo.state === 'eva'"
+    :asteroid-name="trackerAsteroid"
+    :mission-name="trackerMission"
+    :objectives="trackerObjectives"
   />
   <LanderHud v-if="stateInfo.state === 'lander'" :telemetry="landerTelemetry" />
   <FpsHud v-if="stateInfo.state === 'eva'" :telemetry="fpsTelemetry" />
