@@ -1,0 +1,78 @@
+/**
+ * Data-driven lighting rig for asteroid levels.
+ *
+ * Creates sun (shadow-mapped), hemisphere fill, and rim lights
+ * from per-asteroid AtmosphereContext config. Replaces hardcoded
+ * lights that were previously created in LevelViewController.
+ *
+ * @author guinetik
+ * @date 2026-04-06
+ * @spec docs/superpowers/specs/2026-04-06-atmosphere-effects-design.md
+ */
+import * as THREE from 'three'
+import type { AtmosphereContext } from './AtmosphereContext'
+
+/** Shadow map resolution in pixels (width and height). */
+const SHADOW_MAP_SIZE = 2048
+/** Shadow camera frustum half-size — covers the terrain area. */
+const SHADOW_FRUSTUM = 3000
+/** Shadow bias to prevent acne on terrain. */
+const SHADOW_BIAS = -0.0005
+/** Rim light intensity — subtle backlight to separate silhouettes. */
+const RIM_INTENSITY = 0.1
+/** Rim light cool-blue tint. */
+const RIM_COLOR = 0x6688cc
+/** Distance to place the directional light source from origin. */
+const SUN_DISTANCE = 500
+
+/**
+ * Manages the three-light rig (sun + fill + rim) for the level scene.
+ * Sun light casts shadows; fill and rim do not.
+ */
+export class LevelLightingRig {
+  /** Shadow-mapped directional sun light. */
+  readonly sun: THREE.DirectionalLight
+  /** Hemisphere fill light (sky + ground colors). */
+  readonly fill: THREE.HemisphereLight
+  /** Rim/back light opposite the sun for silhouette separation. */
+  readonly rim: THREE.DirectionalLight
+
+  constructor(ctx: AtmosphereContext) {
+    // ── Sun ──
+    this.sun = new THREE.DirectionalLight(ctx.sunColor, ctx.sunIntensity)
+    this.sun.position.copy(ctx.sunDirection).multiplyScalar(SUN_DISTANCE)
+    this.sun.castShadow = true
+    this.sun.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE)
+    this.sun.shadow.camera.left = -SHADOW_FRUSTUM
+    this.sun.shadow.camera.right = SHADOW_FRUSTUM
+    this.sun.shadow.camera.top = SHADOW_FRUSTUM
+    this.sun.shadow.camera.bottom = -SHADOW_FRUSTUM
+    this.sun.shadow.camera.near = 1
+    this.sun.shadow.camera.far = SUN_DISTANCE * 2
+    this.sun.shadow.bias = SHADOW_BIAS
+
+    // ── Fill — hemisphere with desaturated sun color ──
+    const skyColor = ctx.sunColor.clone().multiplyScalar(0.4)
+    const groundColor = new THREE.Color(ctx.baseColor[0], ctx.baseColor[1], ctx.baseColor[2]).multiplyScalar(0.15)
+    this.fill = new THREE.HemisphereLight(skyColor, groundColor, ctx.ambientIntensity)
+
+    // ── Rim — opposite sun direction, cool blue ──
+    this.rim = new THREE.DirectionalLight(RIM_COLOR, RIM_INTENSITY)
+    this.rim.position.copy(ctx.sunDirection).multiplyScalar(-SUN_DISTANCE)
+  }
+
+  /** Add all lights to the scene. */
+  addToScene(scene: THREE.Scene): void {
+    scene.add(this.sun)
+    scene.add(this.fill)
+    scene.add(this.rim)
+  }
+
+  /** Remove all lights and dispose shadow map. */
+  dispose(): void {
+    this.sun.shadow.map?.dispose()
+    this.sun.dispose()
+    this.fill.dispose()
+    this.rim.dispose()
+  }
+}
