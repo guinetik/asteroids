@@ -16,7 +16,6 @@ import {
   getShuttleThrusterEfficiencyModifiers,
   getCurrentShuttleThrusterEfficiencyModifiers,
 } from '../upgrades'
-import type { UpgradeId } from '../upgrades'
 
 /** Total number of upgrades defined in the JSON. */
 const EXPECTED_UPGRADE_COUNT = 26
