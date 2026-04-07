@@ -20,16 +20,16 @@
     "brakeFactor": 0.93,
     "brakeDepthPenalty": 0.002,
     "yawTorque": 1.5,
-    "yawLateralForce": 0.08,
+    "yawLateralForce": 0.16,
     "yawMaxSpeed": 2.0,
     "yawDamping": 0.98,
     "maxThrustSpeed": 2,
     "speedReturnEquilibriumSpeed": 2.9,
     "maxGravitySpeed": 5,
-    "thrustAlignMinMultiplier": 0.45,
-    "thrustAlignMaxMultiplier": 1.0,
-    "rcsAlignMinMultiplier": 0.48,
+    "thrustAlignMinMultiplier": 0.72,
+    "thrustAlignMaxMultiplier": 1.05,
+    "rcsAlignMinMultiplier": 0.72,
     "rcsAlignMaxMultiplier": 1.08,
-    "speedExcessReturnRate": 0.95
+    "speedExcessReturnRate": 0.35
   }
 }
