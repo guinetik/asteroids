@@ -168,8 +168,11 @@ export class ThrusterSystem<T extends string = ShuttleThrusterName> {
   /** Restore fuel and all thruster charges to full capacity. */
   refuel(): void {
     this.fuel = this.config.fuelCapacity
+    this.fuelEmptyFired = false
+    this.allDepletedFired = false
     for (const name of this.thrusterNames) {
       this.charges[name] = this.config.thrusters[name].capacity
+      this.activeState[name] = false
     }
   }
 

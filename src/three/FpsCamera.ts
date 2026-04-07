@@ -23,6 +23,21 @@ const TERRAIN_TILT_FACTOR = 0.15
 /** How fast terrain tilt lerps (per second). */
 const TERRAIN_TILT_LERP_SPEED = 4
 
+/** Helmet light to keep the immediate look direction readable in EVA. */
+const HELMET_LIGHT_COLOR = 0xf4f7ff
+const HELMET_LIGHT_INTENSITY = 110
+const HELMET_LIGHT_DISTANCE = 240
+const HELMET_LIGHT_ANGLE = Math.PI * 0.16
+const HELMET_LIGHT_PENUMBRA = 0.9
+const HELMET_LIGHT_DECAY = 1.35
+const HELMET_LIGHT_X_OFFSET = -0.18
+const HELMET_LIGHT_Y_OFFSET = 0.22
+const HELMET_LIGHT_Z_OFFSET = -0.08
+const HELMET_LIGHT_TARGET_DISTANCE = 180
+const HELMET_LIGHT_CONE_RADIUS = 20
+const HELMET_LIGHT_CONE_LENGTH = 180
+const HELMET_LIGHT_CONE_OPACITY = 0.035
+
 /** Tuning knobs for the FPS camera. */
 export interface FpsCameraConfig {
   /** Vertical offset above player origin (meters). */
@@ -46,6 +61,10 @@ export interface FpsCameraConfig {
  */
 export class FpsCamera implements Tickable {
   readonly camera: THREE.PerspectiveCamera
+  readonly helmetLightRig: THREE.Group
+  readonly helmetLight: THREE.SpotLight
+  readonly helmetLightTarget: THREE.Object3D
+  readonly helmetLightCone: THREE.Mesh
 
   /** Current yaw angle in radians (horizontal rotation). */
   yaw = 0
@@ -74,6 +93,51 @@ export class FpsCamera implements Tickable {
     this.baseFov = config.fov
     this.currentFov = config.fov
     this.targetFov = config.fov
+    this.helmetLightRig = new THREE.Group()
+
+    this.helmetLight = new THREE.SpotLight(
+      HELMET_LIGHT_COLOR,
+      HELMET_LIGHT_INTENSITY,
+      HELMET_LIGHT_DISTANCE,
+      HELMET_LIGHT_ANGLE,
+      HELMET_LIGHT_PENUMBRA,
+      HELMET_LIGHT_DECAY,
+    )
+    this.helmetLight.position.set(
+      HELMET_LIGHT_X_OFFSET,
+      HELMET_LIGHT_Y_OFFSET,
+      HELMET_LIGHT_Z_OFFSET,
+    )
+
+    this.helmetLightTarget = new THREE.Object3D()
+    this.helmetLightTarget.position.set(0, 0, -HELMET_LIGHT_TARGET_DISTANCE)
+    this.helmetLight.target = this.helmetLightTarget
+
+    const coneGeometry = new THREE.CylinderGeometry(
+      0,
+      HELMET_LIGHT_CONE_RADIUS,
+      HELMET_LIGHT_CONE_LENGTH,
+      20,
+      1,
+      true,
+    )
+    coneGeometry.translate(0, -HELMET_LIGHT_CONE_LENGTH * 0.5, 0)
+    const coneMaterial = new THREE.MeshBasicMaterial({
+      color: HELMET_LIGHT_COLOR,
+      transparent: true,
+      opacity: HELMET_LIGHT_CONE_OPACITY,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    })
+    this.helmetLightCone = new THREE.Mesh(coneGeometry, coneMaterial)
+    this.helmetLightCone.position.copy(this.helmetLight.position)
+    this.helmetLightCone.renderOrder = 1
+
+    this.helmetLightRig.add(this.helmetLight)
+    this.helmetLightRig.add(this.helmetLightTarget)
+    this.helmetLightRig.add(this.helmetLightCone)
+    this.helmetLightRig.visible = false
   }
 
   /** Set the player entity to follow. */
@@ -190,9 +254,21 @@ export class FpsCamera implements Tickable {
       this.roll + this.terrainRoll,
     )
     this.camera.quaternion.setFromEuler(this.euler)
+    this.helmetLightRig.position.copy(this.camera.position)
+    this.helmetLightRig.quaternion.copy(this.camera.quaternion)
+
+    const beamDirection = this.helmetLightTarget.position.clone().sub(this.helmetLight.position).normalize()
+    this.helmetLightCone.position.copy(this.helmetLight.position)
+    this.helmetLightCone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), beamDirection)
   }
 
   dispose(): void {
-    // No event listeners owned — pointer lock managed by ViewController
+    this.helmetLight.dispose()
+    this.helmetLightCone.geometry.dispose()
+    if (Array.isArray(this.helmetLightCone.material)) {
+      this.helmetLightCone.material.forEach((m) => m.dispose())
+    } else {
+      this.helmetLightCone.material.dispose()
+    }
   }
 }

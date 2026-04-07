@@ -59,6 +59,22 @@ export class Heightmap {
     return this.grid[gz * this.resolution + gx]!
   }
 
+  /** Whether world coordinates are inside the interpolated terrain domain. */
+  contains(x: number, z: number): boolean {
+    const half = this.worldSize / 2
+    const gx = ((x + half) / this.worldSize) * (this.resolution - 1)
+    const gz = ((z + half) / this.worldSize) * (this.resolution - 1)
+    const ix = Math.floor(gx)
+    const iz = Math.floor(gz)
+    return ix >= 0 && ix < this.resolution - 1 && iz >= 0 && iz < this.resolution - 1
+  }
+
+  /** Bilinear-interpolated height at world coordinates, or null when outside bounds. */
+  tryHeightAt(x: number, z: number): number | null {
+    if (!this.contains(x, z)) return null
+    return this.heightAt(x, z)
+  }
+
   /** Bilinear-interpolated height at world coordinates. */
   heightAt(x: number, z: number): number {
     const half = this.worldSize / 2

@@ -17,6 +17,7 @@ import { PlatformerBody } from '@/lib/physics/platformerBody'
 import { ThrusterSystem } from '@/lib/physics/thrusterSystem'
 import type { ThrusterSystemConfig } from '@/lib/physics/thrusterSystem'
 import type { Heightmap } from '@/lib/terrain/heightmap'
+import { CollisionWorld, type CharacterCollisionConfig } from '@/lib/physics/worldCollision'
 
 /** How long after leaving the ground the player can still jump (coyote time). */
 const COYOTE_TIME = 0.15
@@ -26,6 +27,14 @@ const SPRINT_JUMP_BOOST = 1.3
 const STRAFE_SPEED_SCALE = 0.9
 /** Strafe speed multiplier while ADS. */
 const ADS_STRAFE_SPEED_SCALE = 0.8
+const PLAYER_COLLISION_CONFIG: CharacterCollisionConfig = {
+  radius: 0.65,
+  maxStepHeight: 0.9,
+  maxClimbAngleRad: Math.PI * 0.34,
+  substepDistance: 0.35,
+  skinWidth: 0.05,
+  airborneClearance: 0.45,
+}
 
 /** Thruster names for the player's O2 power system. */
 export type FpsThrusterName = 'sprint' | 'jump'
@@ -108,7 +117,7 @@ export class FpsPlayerController implements Tickable {
   private readonly inputManager: InputManager
   private readonly camera: FpsCamera
   private readonly config: FpsPlayerConfig
-  private readonly heightmap: Heightmap
+  private readonly collisionWorld: CollisionWorld
   private readonly lateralVelocity = new THREE.Vector3()
   private _hp: number
   private _dead = false
@@ -124,11 +133,12 @@ export class FpsPlayerController implements Tickable {
     camera: FpsCamera,
     config: FpsPlayerConfig,
     heightmap: Heightmap,
+    collisionWorld?: CollisionWorld,
   ) {
     this.inputManager = inputManager
     this.camera = camera
     this.config = config
-    this.heightmap = heightmap
+    this.collisionWorld = collisionWorld ?? new CollisionWorld(heightmap)
 
     this._hp = config.health.maxHp
     this.body = new PlatformerBody({ gravity: config.movement.gravity })
@@ -322,16 +332,24 @@ export class FpsPlayerController implements Tickable {
     }
 
     // --- Apply lateral velocity ---
-    this.group.position.x += this.lateralVelocity.x * dt
-    this.group.position.z += this.lateralVelocity.z * dt
+    const horizontalMove = this.collisionWorld.moveCharacterXZ(
+      this.group.position,
+      this.lateralVelocity.x * dt,
+      this.lateralVelocity.z * dt,
+      this.group.position.y,
+      this.group.position.y + this.config.camera.eyeHeight,
+      PLAYER_COLLISION_CONFIG,
+    )
+    this.group.position.x = horizontalMove.x
+    this.group.position.z = horizontalMove.z
 
     // --- Gravity + grounding ---
-    const floorY = this.heightmap.heightAt(this.group.position.x, this.group.position.z)
+    const floorY = this.collisionWorld.getGroundHeightOrNull(this.group.position.x, this.group.position.z) ?? -Infinity
     this.group.position.y = this.body.tick(dt, this.group.position.y, floorY)
 
     // --- Terrain conforming (align up to surface normal when grounded) ---
     if (this.body.grounded) {
-      const n = this.heightmap.normalAt(this.group.position.x, this.group.position.z)
+      const n = this.collisionWorld.getGroundNormal(this.group.position.x, this.group.position.z)
       const tiltX = Math.atan2(n.z, n.y)
       const tiltZ = Math.atan2(-n.x, n.y)
       this.group.rotation.set(tiltX, this.group.rotation.y, tiltZ)
