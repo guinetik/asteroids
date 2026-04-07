@@ -13,8 +13,8 @@
 
 import type { RestockTimer } from '@/lib/shop/tradeTypes'
 
-/** The three objective types a mission can contain. */
-export type ObjectiveType = 'gather' | 'exterminate' | 'rescue'
+/** The four objective types a mission can contain. */
+export type ObjectiveType = 'gather' | 'exterminate' | 'rescue' | 'survey'
 
 /** Solar system region where missions spawn. Determines fuel cost and distance. */
 export type MissionRegion = 'near-earth' | 'asteroid-belt' | 'kuiper-belt'
@@ -59,11 +59,22 @@ export interface RescueScalableParams {
   guardedChance: number
 }
 
+/** Scalable params for SURVEY objectives. */
+export interface SurveyScalableParams {
+  /** Discriminator for the union type. */
+  type: 'survey'
+  /** Number of gravitometric probes to calibrate. Scales up with difficulty. */
+  probeCount: NumberRange
+  /** Seconds to collect all probes. INVERTED: decreases with difficulty (easy=90s, hard=45s). */
+  timeLimit: NumberRange
+}
+
 /** Union of all objective-specific scalable parameters. */
 export type ScalableParams =
   | GatherScalableParams
   | ExterminateScalableParams
   | RescueScalableParams
+  | SurveyScalableParams
 
 /** A slot in a mission template that the generator fills with a concrete objective. */
 export interface ObjectiveSlot {
@@ -226,6 +237,10 @@ export interface ConcreteObjective {
   oxygenTime?: number
   /** For rescue: whether site is guarded. */
   isGuarded?: boolean
+  /** For survey: number of probes to calibrate. */
+  probeCount?: number
+  /** For survey: time limit in seconds. */
+  timeLimit?: number
   /** Credit reward for this objective. */
   reward: number
 }

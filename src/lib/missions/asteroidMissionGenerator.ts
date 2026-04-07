@@ -137,6 +137,15 @@ export function rollObjective(slot: ObjectiveSlot, difficulty: number): Concrete
         isGuarded: Math.random() < slot.params.guardedChance,
         reward,
       }
+    case 'survey':
+      return {
+        type: 'survey',
+        x: 0,
+        z: 0,
+        probeCount: interpolateRange(slot.params.probeCount, difficulty),
+        timeLimit: interpolateRange(slot.params.timeLimit, difficulty),
+        reward,
+      }
   }
 }
 

@@ -60,6 +60,8 @@ function objectiveSummary(mission: GeneratedAsteroidMission): string {
       return `Clear ${obj.nestCount} nest${obj.nestCount !== 1 ? 's' : ''}${obj.hasSpitters ? ' (spitters present)' : ''}`
     case 'rescue':
       return `Rescue ${obj.colonistCount} colonist${obj.colonistCount !== 1 ? 's' : ''} (${obj.oxygenTime}s oxygen)`
+    case 'survey':
+      return `Calibrate ${obj.probeCount} gravitometric probe${obj.probeCount !== 1 ? 's' : ''} (${obj.timeLimit}s)`
   }
 }
 

@@ -76,6 +76,27 @@ describe('rollObjective', () => {
     expect(obj.oxygenTime).toBeGreaterThanOrEqual(45)
     expect(typeof obj.isGuarded).toBe('boolean')
   })
+
+  it('rolls survey objective with concrete values', () => {
+    const slot = {
+      type: 'survey' as const,
+      weight: 1,
+      params: {
+        type: 'survey' as const,
+        probeCount: { min: 3, max: 10 },
+        timeLimit: { min: 90, max: 45 },
+      },
+      reward: { min: 200, max: 800 },
+    }
+    const obj = rollObjective(slot, 5)
+    expect(obj.type).toBe('survey')
+    expect(obj.probeCount).toBeGreaterThanOrEqual(3)
+    expect(obj.probeCount).toBeLessThanOrEqual(10)
+    expect(obj.timeLimit).toBeGreaterThanOrEqual(45)
+    expect(obj.timeLimit).toBeLessThanOrEqual(90)
+    expect(obj.reward).toBeGreaterThanOrEqual(200)
+    expect(obj.reward).toBeLessThanOrEqual(800)
+  })
 })
 
 describe('generateWaypointInRegion', () => {
