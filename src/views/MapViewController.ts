@@ -2250,7 +2250,8 @@ export class MapViewController implements Tickable {
         this.shipReticleGroup.position.copy(this.shuttleController.group.position)
         const reticleWorld = MAP_RETICLE_APPARENT_SIZE * 2 * dist * Math.tan(halfFovRad)
         this.shipReticleGroup.scale.setScalar(reticleWorld)
-        ;(this.shipReticleRing.material as THREE.SpriteMaterial).opacity = reticleAlpha
+        // Hide the ring — only the velocity wedge pointer is useful
+        this.shipReticleRing.visible = false
 
         const vel = this.shuttleController.currentVelocity
         const speed = Math.hypot(vel.x, vel.z)
