@@ -67,6 +67,10 @@ export class ParticleEmitter implements Tickable {
     }))
 
     const positions = new Float32Array(config.poolSize * 3)
+    // Initialize all particles at the dead position so they don't render at origin
+    for (let i = 0; i < positions.length; i++) {
+      positions[i] = 99999
+    }
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
 

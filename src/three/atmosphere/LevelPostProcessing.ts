@@ -18,11 +18,11 @@ import { VignetteShader } from 'three/addons/shaders/VignetteShader.js'
 
 // ── Bloom ──
 /** Bloom intensity. Low — only bright emissives glow. */
-const BLOOM_STRENGTH = 0.4
+const BLOOM_STRENGTH = 0.3
 /** Bloom spread radius. */
-const BLOOM_RADIUS = 0.4
+const BLOOM_RADIUS = 0.3
 /** Minimum brightness for bloom. Only engine flames / lights bloom. */
-const BLOOM_THRESHOLD = 0.75
+const BLOOM_THRESHOLD = 0.9
 
 // ── Color grade ──
 /** How much to desaturate the image (0 = none, 1 = full grayscale). */
@@ -32,15 +32,15 @@ const SHADOW_TINT_R = 0.6
 const SHADOW_TINT_G = 0.7
 const SHADOW_TINT_B = 0.9
 /** Contrast S-curve intensity (1.0 = neutral). */
-const CONTRAST = 1.15
+const CONTRAST = 1.05
 
 // ── Chromatic aberration ──
-/** Base CA offset. Very subtle. */
-const CA_AMOUNT = 0.002
+/** Base CA offset. Very subtle — too high and stars turn magenta from RGB split. */
+const CA_AMOUNT = 0.0005
 
 // ── Vignette ──
-const VIGNETTE_OFFSET = 0.95
-const VIGNETTE_DARKNESS = 1.0
+const VIGNETTE_OFFSET = 1.2
+const VIGNETTE_DARKNESS = 0.6
 
 /**
  * Custom color-grade shader: desaturation + cool shadow tint + contrast.

@@ -19,7 +19,7 @@ const SHADOW_FRUSTUM = 3000
 /** Shadow bias to prevent acne on terrain. */
 const SHADOW_BIAS = -0.0005
 /** Rim light intensity — subtle backlight to separate silhouettes. */
-const RIM_INTENSITY = 0.1
+const RIM_INTENSITY = 0.3
 /** Rim light cool-blue tint. */
 const RIM_COLOR = 0x6688cc
 /** Distance to place the directional light source from origin. */
@@ -52,8 +52,8 @@ export class LevelLightingRig {
     this.sun.shadow.bias = SHADOW_BIAS
 
     // ── Fill — hemisphere with desaturated sun color ──
-    const skyColor = ctx.sunColor.clone().multiplyScalar(0.4)
-    const groundColor = new THREE.Color(ctx.baseColor[0], ctx.baseColor[1], ctx.baseColor[2]).multiplyScalar(0.15)
+    const skyColor = ctx.sunColor.clone().multiplyScalar(0.7)
+    const groundColor = new THREE.Color(ctx.baseColor[0], ctx.baseColor[1], ctx.baseColor[2]).multiplyScalar(0.3)
     this.fill = new THREE.HemisphereLight(skyColor, groundColor, ctx.ambientIntensity)
 
     // ── Rim — opposite sun direction, cool blue ──

@@ -85,8 +85,8 @@ const TEST_LIGHTING: AsteroidLighting = {
   sunAzimuth: 45,
   sunElevation: 25,
   sunColor: [1.0, 0.93, 0.82],
-  sunIntensity: 1.6,
-  ambientIntensity: 0.15,
+  sunIntensity: 2.5,
+  ambientIntensity: 0.5,
 }
 
 /**
@@ -195,8 +195,8 @@ export class LevelViewController implements Tickable {
     this.sceneManager.addToScene(this.terrainMesh.mesh)
     this.terrainMesh.mesh.receiveShadow = true
 
-    // ── Starfield — denser than map scene for atmosphere ────────
-    const starField = new StarFieldController({ count: 8000, size: 4 })
+    // ── Starfield ────────────────────────────────────────────────
+    const starField = new StarFieldController({ count: 2000, size: 1.5 })
     this.sceneManager.addToScene(starField.points)
 
     // ── Atmosphere context (per-asteroid config) ───────────────
@@ -370,7 +370,11 @@ export class LevelViewController implements Tickable {
         this.sceneManager.scene,
         initialCam,
       )
-      this.sceneManager.renderOverride = () => this.postProcessing!.render()
+      this.sceneManager.renderOverride = () => {
+        const cam = this.sceneManager!.activeCamera
+        if (cam) this.postProcessing!.setCamera(cam)
+        this.postProcessing!.render()
+      }
       this.sceneManager.onResizeCallback = (w, h) => this.postProcessing!.resize(w, h)
     }
 

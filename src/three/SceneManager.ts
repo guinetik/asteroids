@@ -38,7 +38,7 @@ export class SceneManager implements Tickable {
     this.renderer.setClearColor(0x000000)
     this.renderer.setPixelRatio(window.devicePixelRatio)
     this.renderer.shadowMap.enabled = true
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    this.renderer.shadowMap.type = THREE.PCFShadowMap
 
     window.addEventListener('resize', this.onResize)
   }
@@ -67,6 +67,11 @@ export class SceneManager implements Tickable {
       camera.aspect = clientWidth / clientHeight
       camera.updateProjectionMatrix()
     }
+  }
+
+  /** Returns whichever camera is currently active (direct or vehicle). */
+  get activeCamera(): THREE.PerspectiveCamera | null {
+    return this.directCamera ?? this.vehicleCamera?.camera ?? null
   }
 
   addToScene(object: THREE.Object3D): void {

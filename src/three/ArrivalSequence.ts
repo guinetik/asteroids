@@ -406,6 +406,7 @@ export class ArrivalSequence {
     const engineGlow = new THREE.PointLight(0xff6633, 6, 500)
     engineGlow.position.set(-6, 0, 0)
     this.shuttleGroup.add(engineGlow)
+
   }
 
   /** Remove shuttle and falling lander from scene entirely. */

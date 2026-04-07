@@ -48,7 +48,7 @@ export class StarFieldController {
     const material = new THREE.PointsMaterial({
       color: 0xffffff,
       size: starSize,
-      sizeAttenuation: true,
+      sizeAttenuation: false,
       depthWrite: false,
     })
 

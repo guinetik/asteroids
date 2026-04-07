@@ -26,27 +26,27 @@ const SCORCH_ALTITUDE = 20
 const WASH_FULL_ALTITUDE = 5
 
 // ── Dust particles ──
-const DUST_POOL_SIZE = 200
-const DUST_PARTICLE_SIZE = 3
-const DUST_LIFETIME = 0.8
-const DUST_SPREAD = 2
-const DUST_OPACITY = 0.6
+const DUST_POOL_SIZE = 300
+const DUST_PARTICLE_SIZE = 6
+const DUST_LIFETIME = 1.2
+const DUST_SPREAD = 3
+const DUST_OPACITY = 0.8
 /** Max spawn rate (particles/sec) at closest altitude. */
-const DUST_MAX_SPAWN_RATE = 120
+const DUST_MAX_SPAWN_RATE = 200
 /** Minimum spawn rate at WASH_MAX_ALTITUDE. */
-const DUST_MIN_SPAWN_RATE = 20
+const DUST_MIN_SPAWN_RATE = 40
 /** Radial speed multiplier for outward push. */
-const DUST_RADIAL_SPEED = 40
+const DUST_RADIAL_SPEED = 50
 
 // ── Wash light ──
 const WASH_LIGHT_COLOR = 0xff8844
-const WASH_LIGHT_MAX_INTENSITY = 3
+const WASH_LIGHT_MAX_INTENSITY = 6
 const WASH_LIGHT_ANGLE = Math.PI / 6
 const WASH_LIGHT_PENUMBRA = 0.5
 const WASH_LIGHT_DISTANCE = 80
 
 // ── Scorch glow ──
-const SCORCH_RADIUS = 10
+const SCORCH_RADIUS = 15
 const SCORCH_SEGMENTS = 32
 /** Seconds for scorch to fade out after engines cut. */
 const SCORCH_FADE_DURATION = 1.0
@@ -135,6 +135,7 @@ export class ThrusterWashController {
       WASH_LIGHT_PENUMBRA,
     )
     this.washLight.castShadow = false
+    this.washLight.visible = false
 
     // ── Scorch disc ──
     const scorchGeo = new THREE.CircleGeometry(SCORCH_RADIUS, SCORCH_SEGMENTS)
@@ -211,9 +212,12 @@ export class ThrusterWashController {
     }
 
     // ── Wash light ──
+    this.washLight.visible = intensity > 0.01
     this.washLight.intensity = intensity * WASH_LIGHT_MAX_INTENSITY
-    this.washLight.position.set(landerPosition.x, landerPosition.y, landerPosition.z)
-    this.washLight.target.position.set(landerPosition.x, groundY, landerPosition.z)
+    if (this.washLight.visible) {
+      this.washLight.position.set(landerPosition.x, landerPosition.y, landerPosition.z)
+      this.washLight.target.position.set(landerPosition.x, groundY, landerPosition.z)
+    }
 
     // ── Scorch glow ──
     const scorchActive = active && landerAltitude < SCORCH_ALTITUDE
