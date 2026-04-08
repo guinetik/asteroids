@@ -35,6 +35,8 @@ export interface ThrusterSystemConfig<T extends string = string> {
 export interface ThrusterRuntimeModifiers<T extends string = string> {
   /** Scales charge drain while a thruster is firing. Lower means the bar lasts longer. */
   burnRateMultiplier?: Partial<Record<T, number>>
+  /** Scales the recharge rate while a thruster is idle. Higher means charge refills faster. */
+  rechargeRateMultiplier?: Partial<Record<T, number>>
 }
 
 /** Snapshot of a single thruster's runtime state. */
@@ -193,7 +195,8 @@ export class ThrusterSystem<T extends string = ShuttleThrusterName> {
         this.charges[name] = Math.max(0, this.charges[name] - cfg.burnRate * burnRateMultiplier * dt)
       } else {
         if (this.fuel > 0 && this.charges[name] < cfg.capacity) {
-          const fuelCost = cfg.rechargeRate * dt * cfg.fuelCostPerRecharge
+          const rechargeMultiplier = Math.max(0, modifiers?.rechargeRateMultiplier?.[name] ?? 1)
+          const fuelCost = Math.max(0, cfg.rechargeRate * rechargeMultiplier * dt * cfg.fuelCostPerRecharge)
           const actualFuelUsed = Math.min(fuelCost, this.fuel)
           const actualRecharge = actualFuelUsed / cfg.fuelCostPerRecharge
           this.charges[name] = Math.min(cfg.capacity, this.charges[name] + actualRecharge)

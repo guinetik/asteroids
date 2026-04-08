@@ -143,6 +143,47 @@ describe('ShipHealth', () => {
     })
   })
 
+  describe('coldResistance upgrade', () => {
+    it('reduces cold-zone drift rate when coldResistance < 1', () => {
+      const resistant = new ShipHealth(config)
+      const normal = new ShipHealth(config)
+      // coldResistance=0.5 → half drift rate in cold zone
+      resistant.tick(1, 500, 0, false, 1, 1, 0.5)
+      normal.tick(1, 500, 0, false, 1, 1, 1)
+      // resistant ship should be less cold (closer to 0)
+      expect(resistant.temperature).toBeGreaterThan(normal.temperature)
+    })
+
+    it('applies no cold drift reduction when coldResistance=1 (default)', () => {
+      const a = new ShipHealth(config)
+      const b = new ShipHealth(config)
+      a.tick(1, 500, 0)
+      b.tick(1, 500, 0, false, 1, 1, 1)
+      expect(a.temperature).toBeCloseTo(b.temperature, 10)
+    })
+  })
+
+  describe('radiationArmor upgrade', () => {
+    it('halves radiation damage when radiationArmor=0.5', () => {
+      const armored = new ShipHealth(config)
+      const normal = new ShipHealth(config)
+      // proximity=1, dt=1: normal damage = maxRadiationDamage * 1 = 15
+      // armored damage = 15 * 0.5 = 7.5
+      armored.tick(1, 100, 1, false, 1, 1, 1, 0.5)
+      normal.tick(1, 100, 1)
+      expect(armored.hp).toBeGreaterThan(normal.hp)
+      expect(armored.hp).toBeCloseTo(100 - 7.5, 5)
+    })
+
+    it('applies full radiation damage when radiationArmor=1 (default)', () => {
+      const a = new ShipHealth(config)
+      const b = new ShipHealth(config)
+      a.tick(1, 100, 1)
+      b.tick(1, 100, 1, false, 1, 1, 1, 1)
+      expect(a.hp).toBeCloseTo(b.hp, 10)
+    })
+  })
+
   describe('healing', () => {
     it('restores HP when healing=true and no damage is occurring', () => {
       // Manually damage first

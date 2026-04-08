@@ -48,6 +48,7 @@ export class ProjectileSystem implements Tickable {
   private readonly scene: THREE.Scene
   private readonly heightmap: Heightmap
   private readonly enemies: Enemy[] = []
+  private damageMultiplier = 1
   private static readonly boltGeometry = (() => {
     const geometry = new THREE.CylinderGeometry(BOLT_WIDTH, BOLT_WIDTH, BOLT_LENGTH, 6, 1, false)
     geometry.rotateX(Math.PI / 2)
@@ -67,6 +68,16 @@ export class ProjectileSystem implements Tickable {
   /** Register an enemy for projectile collision checks. */
   addEnemy(enemy: Enemy): void {
     this.enemies.push(enemy)
+  }
+
+  /**
+   * Set the damage multiplier applied to every bolt hit.
+   * A multiplier of 1 is base damage; values above 1 increase damage.
+   *
+   * @param multiplier - Damage scale factor (e.g. 1.35 for +35% damage).
+   */
+  setDamageMultiplier(multiplier: number): void {
+    this.damageMultiplier = multiplier
   }
 
   /** Remove an enemy from collision checks. */
@@ -126,7 +137,7 @@ export class ProjectileSystem implements Tickable {
       for (const enemy of this.enemies) {
         if (!enemy.alive) continue
         if (this.rayHitsSphere(this._prevPos, pos, enemy.position, enemy.hitRadius)) {
-          enemy.takeDamage(BOLT_DAMAGE)
+          enemy.takeDamage(BOLT_DAMAGE * this.damageMultiplier)
           this.onEnemyHit?.(enemy, pos.clone())
           hitEnemy = true
           break

@@ -22,7 +22,6 @@ import {
 import { SceneManager } from '@/three/SceneManager'
 import { FpsCamera } from '@/three/FpsCamera'
 import { FpsPlayerController } from '@/three/FpsPlayerController'
-import type { FpsPlayerConfig } from '@/three/FpsPlayerController'
 import { TerrainGrid } from '@/three/TerrainGrid'
 import { generateTerrain } from '@/lib/terrain/terrainGenerator'
 import type { SurfaceFeatures } from '@/lib/asteroids/types'
@@ -30,12 +29,12 @@ import { AmbientLight, DirectionalLight, Color, Vector3 } from 'three'
 import { Heightmap } from '@/lib/terrain/heightmap'
 import { MultiToolController } from '@/three/MultiToolController'
 import { MultiToolState } from '@/lib/fps/multiToolState'
-import type { MultiToolConfig } from '@/lib/fps/multiToolState'
 import { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
 import { TargetDummyController } from '@/three/TargetDummyController'
-import playerConfigJson from '@/data/fps/player-config.json'
-import multiToolConfigJson from '@/data/fps/multitool-config.json'
+import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
+import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
+import { getCurrentUpgradeValue } from '@/lib/upgrades'
 import { EnemyDirector } from '@/lib/fps/enemyDirector'
 import { BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/BacteriophageController'
 import { EnemyProjectileSystem } from '@/lib/fps/enemyProjectileSystem'
@@ -117,7 +116,7 @@ export class FpsViewController implements Tickable {
   private damageFlashTimer = 0
 
   async init(container: HTMLElement): Promise<void> {
-    const config = playerConfigJson as FpsPlayerConfig
+    const config = buildFpsPlayerConfig()
 
     // Input
     this.inputManager = new InputManager(FPS_BINDINGS)
@@ -170,10 +169,11 @@ export class FpsViewController implements Tickable {
     await this.multiTool.load(this.fpsCamera.camera, this.sceneManager.scene)
 
     // Multi-tool state
-    this.multiToolState = new MultiToolState(multiToolConfigJson as MultiToolConfig)
+    this.multiToolState = new MultiToolState(buildMultiToolConfig())
 
     // Projectile system + impact particles
     this.projectileSystem = new ProjectileSystem(this.sceneManager.scene, heightmap)
+    this.projectileSystem.setDamageMultiplier(getCurrentUpgradeValue('multitoolDamage'))
     this.impactEmitter = new ParticleEmitter({
       poolSize: 64,
       color: new Color(0xffaa44),

@@ -16,7 +16,11 @@ import shuttlePhysicsData from '@/data/shuttle/shuttle-physics.json'
 import orbitConfig from '@/data/shuttle/orbit-capture.json'
 import { getSlingshotSettleSpeed } from '@/lib/slingshotBurstProfile'
 import { getSlingshotAutoAlignYaw, getVelocityHeading } from '@/lib/slingshotAutoAlign'
-import { getCurrentShuttleThrusterEfficiencyModifiers } from '@/lib/upgrades'
+import {
+  getCurrentShuttleThrusterEfficiencyModifiers,
+  getCurrentShuttleThrusterChargeModifiers,
+  getCurrentUpgradeValue,
+} from '@/lib/upgrades'
 
 /** Any object that can exert gravity on the shuttle */
 export interface GravityWell {
@@ -249,7 +253,10 @@ export class ShuttleController implements Tickable, PortalVehicle {
   private spaceTimeGrid: SpaceTimeGrid | null = null
   private readonly gravityWells: GravityWell[] = []
   private readonly gravitySources: GravitySource[] = []
-  readonly thrusterSystem = new ThrusterSystem<ShuttleThrusterName>(DEFAULT_SHUTTLE_CONFIG)
+  readonly thrusterSystem = new ThrusterSystem<ShuttleThrusterName>({
+    ...DEFAULT_SHUTTLE_CONFIG,
+    fuelCapacity: DEFAULT_SHUTTLE_CONFIG.fuelCapacity * getCurrentUpgradeValue('shuttleFuelCapacity'),
+  })
   private isDead = false
   private deathTarget: THREE.Vector3 | null = null
   private deathSpeed = 0
@@ -382,13 +389,13 @@ export class ShuttleController implements Tickable, PortalVehicle {
   get isThrusting(): boolean {
     return this._inputEnabled
       && this.inputManager.isActionActive('thrust')
-      && this.thrusterSystem.canFire('thrust', { burnRateMultiplier: this.getBurnRateMultipliers() })
+      && this.thrusterSystem.canFire('thrust', this.getModifiers())
   }
 
   get isBraking(): boolean {
     return this._inputEnabled
       && this.inputManager.isActionActive('brake')
-      && this.thrusterSystem.canFire('brake', { burnRateMultiplier: this.getBurnRateMultipliers() })
+      && this.thrusterSystem.canFire('brake', this.getModifiers())
   }
 
   /** Set by orbit system to drive RCS VFX while input is disabled. */
@@ -403,7 +410,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
       || (
         this._inputEnabled
         && this.inputManager.isActionActive('yawLeft')
-        && this.thrusterSystem.canFire('rcs', { burnRateMultiplier: this.getBurnRateMultipliers() })
+        && this.thrusterSystem.canFire('rcs', this.getModifiers())
       )
   }
 
@@ -412,7 +419,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
       || (
         this._inputEnabled
         && this.inputManager.isActionActive('yawRight')
-        && this.thrusterSystem.canFire('rcs', { burnRateMultiplier: this.getBurnRateMultipliers() })
+        && this.thrusterSystem.canFire('rcs', this.getModifiers())
       )
   }
 
@@ -663,7 +670,10 @@ export class ShuttleController implements Tickable, PortalVehicle {
           forwardAlign,
         )
       }
-      this.velocity.addScaledVector(forward, p.thrustForce * thrustMultiplier * dt)
+      this.velocity.addScaledVector(
+        forward,
+        p.thrustForce * getCurrentUpgradeValue('shuttleThrusterSpeed') * thrustMultiplier * dt,
+      )
     }
 
     // Brake (S) — inertia dampener, weaker deeper in gravity wells
@@ -776,12 +786,18 @@ export class ShuttleController implements Tickable, PortalVehicle {
         brake: this.isBraking,
         rcs: this.isYawingLeft || this.isYawingRight,
       },
-      { burnRateMultiplier: this.getBurnRateMultipliers() },
+      this.getModifiers(),
     )
   }
 
-  private getBurnRateMultipliers(): Record<ShuttleThrusterName, number> {
-    return getCurrentShuttleThrusterEfficiencyModifiers()
+  private getModifiers(): {
+    burnRateMultiplier: Record<ShuttleThrusterName, number>
+    rechargeRateMultiplier: Record<ShuttleThrusterName, number>
+  } {
+    return {
+      burnRateMultiplier: getCurrentShuttleThrusterEfficiencyModifiers(),
+      rechargeRateMultiplier: getCurrentShuttleThrusterChargeModifiers(),
+    }
   }
 
   private placeNozzles(scene: THREE.Object3D): void {

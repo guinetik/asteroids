@@ -24,7 +24,6 @@ import { SceneManager } from '@/three/SceneManager'
 import { VehicleCamera, LANDER_CAMERA_CONFIG } from '@/three/VehicleCamera'
 import { LanderController } from '@/three/LanderController'
 import { FpsPlayerController } from '@/three/FpsPlayerController'
-import type { FpsPlayerConfig } from '@/three/FpsPlayerController'
 import { FpsCamera } from '@/three/FpsCamera'
 import { TerrainMesh } from '@/three/TerrainMesh'
 import { generateTerrain, FLAT_ZONE_RADIUS } from '@/lib/terrain/terrainGenerator'
@@ -37,7 +36,6 @@ import type { GeneratedAsteroidMission, ConcreteObjective } from '@/lib/missions
 import { Heightmap } from '@/lib/terrain/heightmap'
 import { MultiToolController } from '@/three/MultiToolController'
 import { MultiToolState } from '@/lib/fps/multiToolState'
-import type { MultiToolConfig } from '@/lib/fps/multiToolState'
 import { CollisionWorld } from '@/lib/physics/worldCollision'
 import type { LanderTelemetry } from '@/components/LanderHud.vue'
 import type { FpsTelemetry, CompassObjective } from '@/components/FpsHud.vue'
@@ -71,8 +69,9 @@ import { generateMapCanvas } from '@/lib/terrain/mapColors'
 import type { MiniGame, MiniGameContext, MiniGameStep } from '@/lib/minigame/MiniGame'
 import { SurveyMinigame } from '@/lib/minigame/SurveyMinigame'
 import { ExterminateMinigame } from '@/lib/minigame/ExterminateMinigame'
-import playerConfigJson from '@/data/fps/player-config.json'
-import multiToolConfigJson from '@/data/fps/multitool-config.json'
+import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
+import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
+import { getCurrentUpgradeValue } from '@/lib/upgrades'
 
 // ── Scene constants ─────────────────────────────────────────────
 const TERRAIN_RESOLUTION = 512
@@ -299,7 +298,7 @@ export class LevelViewController implements Tickable {
 
   /** Initialise all systems and start the game loop. */
   async init(container: HTMLElement): Promise<void> {
-    const playerConfig = playerConfigJson as FpsPlayerConfig
+    const playerConfig = buildFpsPlayerConfig()
 
     // ── Input + tick handler ────────────────────────────────────
     this.inputManager = new InputManager(LEVEL_BINDINGS)
@@ -468,10 +467,11 @@ export class LevelViewController implements Tickable {
     this.multiTool = new MultiToolController()
     await this.multiTool.load(this.fpsCamera.camera, this.sceneManager.scene)
     this.multiTool.setVisible(false)
-    this.multiToolState = new MultiToolState(multiToolConfigJson as MultiToolConfig)
+    this.multiToolState = new MultiToolState(buildMultiToolConfig())
 
     // ── Projectile system + particles ───────────────────────────
     this.projectileSystem = new ProjectileSystem(this.sceneManager.scene, this.heightmap)
+    this.projectileSystem.setDamageMultiplier(getCurrentUpgradeValue('multitoolDamage'))
     this.impactEmitter = new ParticleEmitter({
       poolSize: 64,
       color: new Color(0xffaa44),
@@ -845,6 +845,7 @@ export class LevelViewController implements Tickable {
 
   private enterExfil(): void {
     // Fire mission complete if all objectives done
+    // TODO: apply multitoolScience multiplier when FPS mission CR reward system is implemented
     if (this.allObjectivesComplete()) {
       this.onMissionComplete?.()
     }

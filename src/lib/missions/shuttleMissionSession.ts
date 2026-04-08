@@ -182,6 +182,7 @@ export function completeMission(
  * @param missionId - ID of the mission to deliver.
  * @param profile - Player profile.
  * @param inventory - Player inventory.
+ * @param rewardMultiplier - Optional multiplier applied to the CR reward (default 1).
  * @returns Result with updated board, profile, and inventory.
  */
 export function deliverMission(
@@ -189,6 +190,7 @@ export function deliverMission(
   missionId: string,
   profile: PlayerProfile,
   inventory: Inventory,
+  rewardMultiplier = 1,
 ): DeliverMissionResult {
   const idx = board.activeMissions.findIndex((m) => m.template.id === missionId)
   if (idx === -1) {
@@ -210,7 +212,7 @@ export function deliverMission(
     return { ok: false, board, profile, inventory, reason: removeResult.reason }
   }
 
-  const updatedProfile = addCredits(profile, mission.template.reward)
+  const updatedProfile = addCredits(profile, Math.round(mission.template.reward * rewardMultiplier))
   const updatedMissions = board.activeMissions.filter((_, i) => i !== idx)
 
   return {

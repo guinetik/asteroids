@@ -15,10 +15,15 @@ import type { InputManager } from '@/lib/InputManager'
 import { loadGLB } from './loadGLB'
 import { PlatformerBody } from '@/lib/physics/platformerBody'
 import { CollisionWorld } from '@/lib/physics/worldCollision'
-import { ThrusterSystem, type ThrusterSystemConfig } from '@/lib/physics/thrusterSystem'
+import {
+  ThrusterSystem,
+  type ThrusterRuntimeModifiers,
+  type ThrusterSystemConfig,
+} from '@/lib/physics/thrusterSystem'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import { ParticleEmitter } from './ParticleEmitter'
 import { WarningBeacon } from './WarningBeacon'
+import { getCurrentUpgradeValue } from '@/lib/upgrades'
 
 const LANDER_MODEL_PATH = '/models/lander.glb'
 
@@ -205,8 +210,8 @@ const SPEED_DAMAGE_MULTIPLIER = 2.0
 /** HP damage per radian of excess landing tilt. */
 const ANGLE_DAMAGE_MULTIPLIER = 25.0
 
-/** Lander starting and maximum HP. */
-const LANDER_MAX_HP = 100
+/** Base lander hull integrity before upgrade scaling. */
+const LANDER_BASE_HP = 100
 const LANDING_APPROACH_BUFFER_ALTITUDE = 22
 const LANDING_APPROACH_REACTION_TIME = 2.8
 const LANDING_APPROACH_MIN_DESCENT_SPEED = 1.0
@@ -235,7 +240,8 @@ export type LandingWarningLevel = 'safe' | 'warn' | 'danger'
 export class LanderController implements Tickable {
   readonly group = new THREE.Group()
   readonly body = new PlatformerBody({ gravity: GAMEPLAY_GRAVITY })
-  readonly thrusterSystem = new ThrusterSystem<LanderThrusterName>(LANDER_THRUSTER_CONFIG)
+  /** Thruster charge/fuel system, with fuel capacity scaled by the landerFuelCapacity upgrade. */
+  readonly thrusterSystem: ThrusterSystem<LanderThrusterName>
   readonly flameEmitter: ParticleEmitter
   readonly nozzleGlow: THREE.Sprite
   readonly floodlights: THREE.SpotLight[] = []
@@ -285,15 +291,20 @@ export class LanderController implements Tickable {
   private readonly rcsWorldPos = new THREE.Vector3()
   private liftoffBoostTimer = 0
 
-  /** Current lander hit points. */
-  private _hp = LANDER_MAX_HP
+  /** Current hull integrity (0–maxHp). */
+  private _hp: number
 
-  /** Maximum lander hit points. */
-  readonly maxHp = LANDER_MAX_HP
+  /** Maximum hull integrity, scaled by the landerHull upgrade. */
+  readonly maxHp: number
 
   /** Current HP (read-only). */
   get hp(): number {
     return this._hp
+  }
+
+  /** Whether the hull has been destroyed. */
+  get isHullDead(): boolean {
+    return this._hp <= 0
   }
 
   /** Combined tilt magnitude in radians (0 = perfectly upright). */
@@ -358,6 +369,12 @@ export class LanderController implements Tickable {
 
   constructor(inputManager: InputManager) {
     this.inputManager = inputManager
+    this.thrusterSystem = new ThrusterSystem<LanderThrusterName>({
+      ...LANDER_THRUSTER_CONFIG,
+      fuelCapacity: LANDER_THRUSTER_CONFIG.fuelCapacity * getCurrentUpgradeValue('landerFuelCapacity'),
+    })
+    this.maxHp = LANDER_BASE_HP * getCurrentUpgradeValue('landerHull')
+    this._hp = this.maxHp
     this.thrusterSystem.onFuelEmpty = () => {
       this.onFuelEmpty?.()
     }
@@ -461,11 +478,16 @@ export class LanderController implements Tickable {
     }
   }
 
+  /** Restore hull to full integrity (called when returning to shuttle). */
+  repairHull(): void {
+    this._hp = this.maxHp
+  }
+
   /** Reset lander state for repositioning. */
   resetForRespawn(position: THREE.Vector3): void {
     this.group.position.copy(position)
     this.group.visible = true
-    this._hp = LANDER_MAX_HP
+    this._hp = this.maxHp
     this.thrusterSystem.refuel()
     this.body.velocityY = 0
     this.body.grounded = false
@@ -493,12 +515,15 @@ export class LanderController implements Tickable {
   }
 
   get isMainEngineActive(): boolean {
-    return this.inputManager.isActionActive('mainEngine') && this.thrusterSystem.canFire('mainEngine')
+    return (
+      this.inputManager.isActionActive('mainEngine')
+      && this.thrusterSystem.canFire('mainEngine', this.landerBurnRateModifiers())
+    )
   }
 
   /** Whether any RCS action is currently firing and has charge. */
   private get isAnyRcsActive(): boolean {
-    if (!this.thrusterSystem.canFire('rcs')) return false
+    if (!this.thrusterSystem.canFire('rcs', this.landerBurnRateModifiers())) return false
     return (
       this.inputManager.isActionActive('rcsLeft') ||
       this.inputManager.isActionActive('rcsRight') ||
@@ -518,7 +543,7 @@ export class LanderController implements Tickable {
       const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.quaternion)
       const slopePenalty = this.getLiftoffSlopePenalty()
       const boost = this.liftoffBoostTimer > 0 ? LIFTOFF_BOOST * slopePenalty : 1
-      const thrust = MAIN_ENGINE_THRUST * dt * boost
+      const thrust = MAIN_ENGINE_THRUST * getCurrentUpgradeValue('landerThrusterSpeed') * dt * boost
       this.body.impulse(localUp.y * thrust)
       this.lateralVelocity.x += localUp.x * thrust
       this.lateralVelocity.z += localUp.z * thrust
@@ -528,7 +553,10 @@ export class LanderController implements Tickable {
     }
 
     // RCS ascend boost — works from ground (big boost) and air
-    if (this.inputManager.isActionActive('rcsAscend') && this.thrusterSystem.canFire('rcs')) {
+    if (
+      this.inputManager.isActionActive('rcsAscend')
+      && this.thrusterSystem.canFire('rcs', this.landerBurnRateModifiers())
+    ) {
       const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.quaternion)
       const slopePenalty = this.getLiftoffSlopePenalty()
       const boost = this.liftoffBoostTimer > 0 ? RCS_LIFTOFF_BOOST * slopePenalty : 1
@@ -594,11 +622,21 @@ export class LanderController implements Tickable {
       this.liftoffBoostTimer -= dt
     }
 
-    // Thruster charge/fuel system
-    this.thrusterSystem.tick(dt, {
-      mainEngine: this.isMainEngineActive,
-      rcs: this.isAnyRcsActive,
-    })
+    // Thruster charge/fuel system — efficiency/charge upgrades applied as runtime modifiers
+    this.thrusterSystem.tick(
+      dt,
+      {
+        mainEngine: this.isMainEngineActive,
+        rcs: this.isAnyRcsActive,
+      },
+      {
+        ...this.landerBurnRateModifiers(),
+        rechargeRateMultiplier: {
+          mainEngine: getCurrentUpgradeValue('landerThrusterCharge'),
+          rcs: getCurrentUpgradeValue('landerThrusterCharge'),
+        },
+      },
+    )
 
     this.updateWarningBeacon()
 
@@ -663,6 +701,20 @@ export class LanderController implements Tickable {
     })
   }
 
+  /**
+   * Burn rate multipliers from `landerThrusterEfficiency`, aligned with `thrusterSystem.tick()` drain
+   * so `canFire()` uses the same effective per-frame burn as actual charge loss.
+   */
+  private landerBurnRateModifiers(): ThrusterRuntimeModifiers<LanderThrusterName> {
+    const efficiency = getCurrentUpgradeValue('landerThrusterEfficiency')
+    return {
+      burnRateMultiplier: {
+        mainEngine: efficiency,
+        rcs: efficiency,
+      },
+    }
+  }
+
   /** Returns 1.0 on flat ground, SLOPE_LIFTOFF_PENALTY on slopes */
   private getLiftoffSlopePenalty(): number {
     const n = this.sampleTerrainSupport().normal
@@ -688,7 +740,7 @@ export class LanderController implements Tickable {
       this.lateralVelocity.set(0, 0, 0)
       return
     }
-    if (!this.thrusterSystem.canFire('rcs')) return
+    if (!this.thrusterSystem.canFire('rcs', this.landerBurnRateModifiers())) return
 
     // RCS lateral force — rotated by yaw (camera couples to lander orientation)
     let localX = 0

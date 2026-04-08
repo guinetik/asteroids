@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
-import { ThrusterSystem, DEFAULT_SHUTTLE_CONFIG, DEFAULT_THRUSTER_CONFIG } from '../thrusterSystem'
-import type { ShuttleThrusterName } from '../thrusterSystem'
+import {
+  ThrusterSystem,
+  DEFAULT_SHUTTLE_CONFIG,
+  DEFAULT_THRUSTER_CONFIG,
+} from '../thrusterSystem'
+import type { ShuttleThrusterName, ThrusterRuntimeModifiers } from '../thrusterSystem'
 
 function createShuttleSystem(overrides: Partial<typeof DEFAULT_SHUTTLE_CONFIG> = {}) {
   return new ThrusterSystem<ShuttleThrusterName>({ ...DEFAULT_SHUTTLE_CONFIG, ...overrides })
@@ -52,6 +56,66 @@ describe('ThrusterSystem', () => {
     sys.tick(1, { thrust: false, brake: false, rcs: false })
     expect(sys.getState('thrust').charge).toBeGreaterThan(chargeAfterDrain)
     expect(sys.fuelLevel).toBeLessThan(fuelBefore)
+  })
+
+  it('rechargeRateMultiplier 2.0 recharges twice as fast as default', () => {
+    const thrustCfg = DEFAULT_THRUSTER_CONFIG.thrust
+    const dt = 1
+    const sysDefault = createShuttleSystem()
+    sysDefault.tick(1, { thrust: true, brake: false, rcs: false })
+    const chargeAfterDrain = sysDefault.getState('thrust').charge
+    sysDefault.tick(dt, { thrust: false, brake: false, rcs: false })
+    const gainDefault = sysDefault.getState('thrust').charge - chargeAfterDrain
+
+    const sysDouble = createShuttleSystem()
+    sysDouble.tick(1, { thrust: true, brake: false, rcs: false })
+    expect(sysDouble.getState('thrust').charge).toBe(chargeAfterDrain)
+    sysDouble.tick(dt, { thrust: false, brake: false, rcs: false }, {
+      rechargeRateMultiplier: { thrust: 2 },
+    })
+    const gainDouble = sysDouble.getState('thrust').charge - chargeAfterDrain
+
+    expect(gainDouble).toBeCloseTo(thrustCfg.rechargeRate * dt * 2, 10)
+    expect(gainDouble).toBeCloseTo(gainDefault * 2, 10)
+  })
+
+  it('rechargeRateMultiplier 0.5 recharges half as fast as default', () => {
+    const thrustCfg = DEFAULT_THRUSTER_CONFIG.thrust
+    const dt = 1
+    const sysDefault = createShuttleSystem()
+    sysDefault.tick(1, { thrust: true, brake: false, rcs: false })
+    const chargeAfterDrain = sysDefault.getState('thrust').charge
+    sysDefault.tick(dt, { thrust: false, brake: false, rcs: false })
+    const gainDefault = sysDefault.getState('thrust').charge - chargeAfterDrain
+
+    const sysHalf = createShuttleSystem()
+    sysHalf.tick(1, { thrust: true, brake: false, rcs: false })
+    expect(sysHalf.getState('thrust').charge).toBe(chargeAfterDrain)
+    sysHalf.tick(dt, { thrust: false, brake: false, rcs: false }, {
+      rechargeRateMultiplier: { thrust: 0.5 },
+    })
+    const gainHalf = sysHalf.getState('thrust').charge - chargeAfterDrain
+
+    expect(gainHalf).toBeCloseTo(thrustCfg.rechargeRate * dt * 0.5, 10)
+    expect(gainHalf).toBeCloseTo(gainDefault * 0.5, 10)
+  })
+
+  it('omitting rechargeRateMultiplier matches explicit 1.0', () => {
+    const runIdleRechargeTick = (
+      modifiers?: ThrusterRuntimeModifiers<ShuttleThrusterName>,
+    ) => {
+      const sys = createShuttleSystem()
+      sys.tick(1, { thrust: true, brake: false, rcs: false })
+      sys.tick(1, { thrust: false, brake: false, rcs: false }, modifiers)
+      return {
+        thrustCharge: sys.getState('thrust').charge,
+        fuelLevel: sys.fuelLevel,
+      }
+    }
+
+    const omitted = runIdleRechargeTick()
+    const explicitOne = runIdleRechargeTick({ rechargeRateMultiplier: { thrust: 1 } })
+    expect(explicitOne).toEqual(omitted)
   })
 
   it('does not recharge active thrusters', () => {
