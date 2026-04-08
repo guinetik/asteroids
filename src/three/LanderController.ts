@@ -84,24 +84,24 @@ const RCS_PUSH_FORCE = 10
 const RCS_SPAWN_RATE = 250
 
 /** Lander floodlights mounted near the front legs to illuminate the terrain below. */
-const FLOODLIGHT_COLOR = 0xf4f7ff
-const FLOODLIGHT_INTENSITY = 62
-const FLOODLIGHT_DISTANCE = 260
-const FLOODLIGHT_ANGLE = Math.PI * 0.22
-const FLOODLIGHT_PENUMBRA = 0.88
-const FLOODLIGHT_DECAY = 1.35
+const FLOODLIGHT_COLOR = 0xeef2ff
+const FLOODLIGHT_INTENSITY = 120
+const FLOODLIGHT_DISTANCE = 400
+const FLOODLIGHT_ANGLE = Math.PI * 0.28
+const FLOODLIGHT_PENUMBRA = 0.95
+const FLOODLIGHT_DECAY = 1.2
 const FLOODLIGHT_MOUNT_INSET = 0.6
-const FLOODLIGHT_AIM_DISTANCE = 220
-const FLOODLIGHT_OUTWARD_ANGLE = Math.PI * 0.22
-const FLOODLIGHT_FORWARD_ANGLE = Math.PI * 0.14
+const FLOODLIGHT_AIM_DISTANCE = 180
+const FLOODLIGHT_OUTWARD_ANGLE = Math.PI * 0.15
+const FLOODLIGHT_FORWARD_ANGLE = Math.PI * 0.1
 const FLOODLIGHT_SHADOW_MAP_SIZE = 512
 const FLOODLIGHT_SHADOW_BIAS = -0.0008
 
 /** Small fill light so the lander hull stays legible in darkness. */
-const BODY_FILL_LIGHT_COLOR = 0xf4f7ff
-const BODY_FILL_LIGHT_INTENSITY = 3.4
-const BODY_FILL_LIGHT_DISTANCE = 110
-const BODY_FILL_LIGHT_Y_OFFSET = 10
+const BODY_FILL_LIGHT_COLOR = 0xdde4f0
+const BODY_FILL_LIGHT_INTENSITY = 12
+const BODY_FILL_LIGHT_DISTANCE = 200
+const BODY_FILL_LIGHT_Y_OFFSET = 15
 
 /** Roof-mounted warning beacon centered above the lander chassis. */
 const TOP_BEACON_Y_OFFSET = 22
@@ -113,10 +113,6 @@ const TOP_BEACON_SAFE_COLOR = 0x22c55e
 const TOP_BEACON_WARN_COLOR = 0xeab308
 const TOP_BEACON_DANGER_COLOR = 0xef4444
 
-/** Visible beam volume so the floodlights read even before they hit terrain. */
-const FLOODLIGHT_CONE_LENGTH = 220
-const FLOODLIGHT_CONE_RADIUS = 60
-const FLOODLIGHT_CONE_BASE_OPACITY = 0.032
 
 /** Use the downward-facing RCS nodes as light mounts. */
 const FLOODLIGHT_MOUNT_NODES = ['RCS_FL_Down', 'RCS_BL_Down', 'RCS_BR_Down', 'RCS_FR_Down'] as const
@@ -259,7 +255,6 @@ export class LanderController implements Tickable {
     mastHeight: 1.08,
     lensRadius: 0.54,
   })
-  readonly floodlightCones: THREE.Mesh[] = []
 
   /** One emitter per RCS nozzle, keyed by node name */
   readonly rcsEmitters = new Map<string, ParticleEmitter>()
@@ -287,22 +282,6 @@ export class LanderController implements Tickable {
   private readonly rcsLocalPositions = new Map<string, THREE.Vector3>()
   private readonly rcsSpawnAccumulators = new Map<string, number>()
   private readonly floodlightTargets: THREE.Object3D[] = []
-  private readonly floodlightConeGeometry = new THREE.CylinderGeometry(
-    0,
-    FLOODLIGHT_CONE_RADIUS,
-    FLOODLIGHT_CONE_LENGTH,
-    24,
-    1,
-    true,
-  )
-  private readonly floodlightConeMaterial = new THREE.MeshBasicMaterial({
-    color: FLOODLIGHT_COLOR,
-    transparent: true,
-    opacity: FLOODLIGHT_CONE_BASE_OPACITY,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    side: THREE.DoubleSide,
-  })
   private readonly rcsWorldPos = new THREE.Vector3()
   private liftoffBoostTimer = 0
 
@@ -671,11 +650,8 @@ export class LanderController implements Tickable {
       floodlight.dispose()
     }
     this.topWarningBeacon.dispose()
-    this.floodlightConeGeometry.dispose()
-    this.floodlightConeMaterial.dispose()
     this.group.traverse((child) => {
       if (child instanceof THREE.Mesh) {
-        if (this.floodlightCones.includes(child)) return
         if (this.topWarningBeacon.meshes.includes(child)) return
         child.geometry.dispose()
         if (Array.isArray(child.material)) {
@@ -996,20 +972,10 @@ export class LanderController implements Tickable {
 
       floodlight.target = target
 
-      const cone = new THREE.Mesh(this.floodlightConeGeometry, this.floodlightConeMaterial)
-      const beamDirection = target.position.clone().sub(floodlight.position).normalize()
-      cone.position.copy(floodlight.position).add(target.position).multiplyScalar(0.5)
-      cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), beamDirection)
-      cone.castShadow = false
-      cone.receiveShadow = false
-      cone.renderOrder = 1
-
       this.group.add(floodlight)
       this.group.add(target)
-      this.group.add(cone)
 
       this.floodlights.push(floodlight)
-      this.floodlightCones.push(cone)
       this.floodlightTargets.push(target)
     }
   }
