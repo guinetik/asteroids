@@ -25,6 +25,7 @@ const POWER_CYLINDER_RADIUS = 0.4
 const POWER_CYLINDER_HEIGHT = 1.5
 
 import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
+import type { MultiToolMode } from '@/lib/fps/multiToolState'
 
 /** Position offset from camera origin (right, down, forward). */
 const OFFSET_X = 0.35
@@ -78,6 +79,8 @@ export class MultiToolController implements Tickable {
   private scene: THREE.Scene | null = null
   private projectileSystem: ProjectileSystem | null = null
   private boltColor = new THREE.Color('#ff00ff')
+  /** Passed to {@link ProjectileSystem.spawn} for damage vs heal resolution. */
+  private boltKind: MultiToolMode = 'weapon'
   private rtgRatio = 1
   private modeChargeRatio = 1
   private time = 0
@@ -182,9 +185,11 @@ export class MultiToolController implements Tickable {
    * Tint the model mesh to reflect the active tool mode.
    *
    * @param color - Hex color string (e.g. "#3b82f6")
+   * @param mode - Drives bolt collision behavior when firing
    */
-  setMode(color: string, mode = 'drill'): void {
+  setMode(color: string, mode: MultiToolMode = 'drill'): void {
     this.currentMode = mode
+    this.boltKind = mode
     this.boltColor.set(color)
     const ledColor = new THREE.Color(color)
     for (const mesh of this.ledMeshes) {
@@ -219,7 +224,7 @@ export class MultiToolController implements Tickable {
     // Direction: from barrel toward aim point (converges on crosshair)
     const direction = aimPoint.sub(origin).normalize()
 
-    this.projectileSystem.spawn(origin, direction, this.boltColor)
+    this.projectileSystem.spawn(origin, direction, this.boltColor, this.boltKind)
   }
 
   private readonly offset = new THREE.Vector3()

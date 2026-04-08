@@ -235,8 +235,5 @@ export class MultiToolState implements Tickable {
       heal: this._isFiring && this._mode === 'heal',
     })
 
-    if (this._isFiring) {
-      console.log(`[MultiTool] fire: ${this._mode}`)
-    }
   }
 }

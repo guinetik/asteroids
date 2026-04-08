@@ -9,7 +9,7 @@
     "zoomSpeed": 8
   },
   "rtg": {
-    "fuelCapacity": 80,
+    "fuelCapacity": 240,
     "burstMin": 0.3,
     "burstMax": 1.2,
     "burstAmount": 8,

@@ -1,4 +1,12 @@
 <!-- src/views/FpsView.vue -->
+<!--
+  URL query flags (handled in FpsViewController.init):
+  - flat — flat terrain
+  - targets — target dummies in a ring
+  - enemies — full enemy demo
+  - hostages — spawn hostage.glb props (optional count: ?hostages=5; default 3)
+  - viruses — spawn virus.glb props (optional count: ?viruses=4; default 3)
+-->
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { FpsViewController } from './FpsViewController'
@@ -160,8 +168,8 @@ const telemetry = reactive<FpsTelemetry>({
   activeMode: 'weapon',
   aiming: false,
   isFiring: false,
-  rtgLevel: 80,
-  rtgCapacity: 80,
+  rtgLevel: 240,
+  rtgCapacity: 240,
   modeCharge: 20,
   modeCapacity: 20,
   headingRad: 0,

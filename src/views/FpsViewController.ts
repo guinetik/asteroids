@@ -41,6 +41,8 @@ import { EnemyProjectileSystem } from '@/lib/fps/enemyProjectileSystem'
 import { SpireController, SPIRE_HIT_CENTER_Y } from '@/three/SpireController'
 import { EnemyProjectileMesh } from '@/three/EnemyProjectileMesh'
 import { ChimeraWalkerController, CHIMERA_HIT_CENTER_Y } from '@/three/ChimeraWalkerController'
+import { FpsHostageController } from '@/three/FpsHostageController'
+import { VirusModel } from '@/three/VirusModel'
 
 const AMBIENT_LIGHT_INTENSITY = 0.4
 const DIR_LIGHT_INTENSITY = 1.2
@@ -60,6 +62,41 @@ const SPIRE_MIN_SPAWN_DISTANCE = 40
 const CHIMERA_SPAWN_COUNT = 3
 const CHIMERA_SPAWN_RADIUS = 90
 const CHIMERA_MIN_SPAWN_DISTANCE = 32
+
+/** Upper bound for `?hostages=` / `?viruses=` counts (URL safety). */
+const DEBUG_PROP_SPAWN_CAP = 24
+/** Default count when the query key is present without a numeric value. */
+const DEBUG_HOSTAGE_SPAWN_DEFAULT = 3
+const DEBUG_VIRUS_SPAWN_DEFAULT = 3
+/** Ring placement for debug hostages (world units from origin). */
+const DEBUG_HOSTAGE_SPAWN_RADIUS = 52
+/** Ring placement for debug viruses — slightly tighter so rings read as distinct. */
+const DEBUG_VIRUS_SPAWN_RADIUS = 24
+
+/**
+ * Read an optional non-negative spawn count from the URL (`?key`, `?key=true`, or `?key=12`).
+ *
+ * @param params - Current location search params
+ * @param key - Query key (e.g. `hostages`)
+ * @param defaultWhenPresent - Count when the flag is set but not numeric
+ * @returns `undefined` if the key is absent; otherwise a clamped integer
+ */
+function parseDebugPropCount(
+  params: URLSearchParams,
+  key: string,
+  defaultWhenPresent: number,
+): number | undefined {
+  if (!params.has(key)) return undefined
+  const raw = params.get(key)
+  if (raw === null || raw === '' || raw.toLowerCase() === 'true') {
+    return Math.min(defaultWhenPresent, DEBUG_PROP_SPAWN_CAP)
+  }
+  const n = Number.parseInt(raw, 10)
+  if (!Number.isFinite(n) || n < 0) {
+    return Math.min(defaultWhenPresent, DEBUG_PROP_SPAWN_CAP)
+  }
+  return Math.min(n, DEBUG_PROP_SPAWN_CAP)
+}
 
 const TEST_SURFACE: SurfaceFeatures = {
   craterDensity: 0.5,
@@ -97,6 +134,10 @@ export class FpsViewController implements Tickable {
   private readonly spireControllers = new Map<number, SpireController>()
   private readonly chimeraControllers = new Map<number, ChimeraWalkerController>()
   private readonly enemyProjectileMeshes = new Map<number, EnemyProjectileMesh>()
+  /** Rescue NPCs when `?hostages` is set — HP, bars, projectile registration. */
+  private fpsHostageController: FpsHostageController | null = null
+  /** GLB props from `?viruses` — disposed on teardown. */
+  private readonly debugVirusModels: VirusModel[] = []
   private leftMouseDown = false
   private leftMouseJustPressed = false
   private rightMouseDown = false
@@ -210,6 +251,40 @@ export class FpsViewController implements Tickable {
       }
     }
 
+    // Debug props — ?hostages[=n] and/or ?viruses[=n] (default counts when flag only)
+    const hostageSpawnCount = parseDebugPropCount(
+      params,
+      'hostages',
+      DEBUG_HOSTAGE_SPAWN_DEFAULT,
+    )
+    const virusSpawnCount = parseDebugPropCount(params, 'viruses', DEBUG_VIRUS_SPAWN_DEFAULT)
+    const wantHostages = hostageSpawnCount !== undefined && hostageSpawnCount > 0
+    const wantViruses = virusSpawnCount !== undefined && virusSpawnCount > 0
+    if (wantViruses) {
+      await VirusModel.preload()
+    }
+    if (wantHostages && hostageSpawnCount !== undefined) {
+      this.fpsHostageController = new FpsHostageController(
+        this.sceneManager.scene,
+        heightmap,
+      )
+      this.fpsHostageController.setProjectileSystem(this.projectileSystem)
+      await this.fpsHostageController.spawnRing(hostageSpawnCount, DEBUG_HOSTAGE_SPAWN_RADIUS)
+    }
+    if (wantViruses && virusSpawnCount !== undefined) {
+      for (let i = 0; i < virusSpawnCount; i++) {
+        const angle = (i / virusSpawnCount) * Math.PI * 2 + Math.PI / virusSpawnCount
+        const x = Math.cos(angle) * DEBUG_VIRUS_SPAWN_RADIUS
+        const z = Math.sin(angle) * DEBUG_VIRUS_SPAWN_RADIUS
+        const y = heightmap.heightAt(x, z)
+        const virus = await VirusModel.create()
+        virus.placeAt(x, y, z)
+        virus.setYaw(Math.atan2(-x, -z))
+        this.debugVirusModels.push(virus)
+        this.sceneManager.addToScene(virus.group)
+      }
+    }
+
     // Enemy hit → flash + particles
     this.projectileSystem.onEnemyHit = (enemy, pos) => {
       const dummy = this.targetDummies.find((d) => d.enemy === enemy)
@@ -220,9 +295,32 @@ export class FpsViewController implements Tickable {
       }
     }
 
+    this.projectileSystem.onHostageBolt = (hostage, pos, effect) => {
+      if (effect === 'heal') {
+        this.fpsHostageController?.notifyHealed(hostage)
+        const up = new Vector3(0, 1, 0)
+        for (let i = 0; i < 10; i++) {
+          this.impactEmitter!.emit(pos, up.clone().multiplyScalar(6))
+        }
+      } else {
+        this.fpsHostageController?.notifyDamaged(hostage)
+        const up = new Vector3(0, 1, 0)
+        for (let i = 0; i < 8; i++) {
+          this.impactEmitter!.emit(pos, up.clone().multiplyScalar(7))
+        }
+      }
+    }
+
     // Enemies — ?enemies=true spawns bacteriophages around the player
     if (params.has('enemies')) {
       this.enemyDirector = new EnemyDirector()
+      this.enemyDirector.setHostageTargets(
+        this.fpsHostageController?.getHostageEntitiesForDirector() ?? [],
+      )
+
+      this.enemyDirector.onHostageContactDamage = (_handle, hostage, _damage) => {
+        this.fpsHostageController?.notifyDamaged(hostage)
+      }
       this.enemyDirector.onContactDamage = (handle, damage) => {
         this.playerController?.takeDamage(damage)
         this.damageFlashTimer = DAMAGE_FLASH_DURATION
@@ -258,6 +356,19 @@ export class FpsViewController implements Tickable {
       // Enemy projectile system
       this.enemyProjectileSystem = new EnemyProjectileSystem()
       this.tickHandler.register(this.enemyProjectileSystem, TICK_PRIORITY_PHYSICS + 5)
+
+      this.fpsHostageController?.setEnemyProjectileSystem(this.enemyProjectileSystem)
+
+      this.enemyProjectileSystem.onHostageHit = (hostage, _damage, _sourceX, _sourceZ) => {
+        this.fpsHostageController?.notifyDamaged(hostage)
+        const up = new Vector3(0, 1, 0)
+        for (let i = 0; i < 8; i++) {
+          this.impactEmitter!.emit(
+            new Vector3(hostage.position.x, hostage.hitCenterWorldY, hostage.position.z),
+            up.clone().multiplyScalar(5),
+          )
+        }
+      }
 
       this.enemyProjectileSystem.onPlayerHit = (damage, sourceX, sourceZ) => {
         this.playerController?.takeDamage(damage)
@@ -398,6 +509,9 @@ export class FpsViewController implements Tickable {
 
     // Register tick order
     this.tickHandler.register(this.playerController, TICK_PRIORITY_PHYSICS)
+    if (this.fpsHostageController) {
+      this.tickHandler.register(this.fpsHostageController, TICK_PRIORITY_PHYSICS + 3)
+    }
     this.tickHandler.register(this.multiToolState, TICK_PRIORITY_PHYSICS + 1)
     this.tickHandler.register(this.projectileSystem, TICK_PRIORITY_PHYSICS + 2)
     this.tickHandler.register(this.impactEmitter, TICK_PRIORITY_PHYSICS + 3)
@@ -556,19 +670,23 @@ export class FpsViewController implements Tickable {
         )
         handle.enemy.position.y = ctrl.group.position.y + SPIRE_HIT_CENTER_Y
 
-        // Face player
+        const aimX = handle.lastOutput.aimTargetX
+        const aimY = handle.lastOutput.aimTargetY
+        const aimZ = handle.lastOutput.aimTargetZ
+
+        // Face aim target (player or hostage)
         if (handle.lastOutput.isChasing) {
-          const dx = pp.x - handle.enemy.position.x
-          const dz = pp.z - handle.enemy.position.z
+          const dx = aimX - handle.enemy.position.x
+          const dz = aimZ - handle.enemy.position.z
           ctrl.group.rotation.y = Math.atan2(dx, dz)
         }
 
         // Fire projectile
         if (handle.lastOutput.wantsToFire && this.enemyProjectileSystem) {
           const ep = handle.enemy.position
-          const dx = pp.x - ep.x
-          const dy = pp.y - ep.y
-          const dz = pp.z - ep.z
+          const dx = aimX - ep.x
+          const dy = aimY - ep.y
+          const dz = aimZ - ep.z
           const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
           if (dist > 0.01) {
             this.enemyProjectileSystem.spawn(
@@ -577,7 +695,7 @@ export class FpsViewController implements Tickable {
               handle.config.projectileSpeed,
               handle.config.projectileDamage,
             )
-            ctrl.fireFlash(pp.x, pp.z)
+            ctrl.fireFlash(aimX, aimZ)
           }
         }
       }
@@ -722,6 +840,10 @@ export class FpsViewController implements Tickable {
     DevConsole.unregister('FpsView')
     this.gameLoop?.stop()
     for (const dummy of this.targetDummies) dummy.dispose()
+    this.fpsHostageController?.dispose()
+    this.fpsHostageController = null
+    for (const m of this.debugVirusModels) m.dispose()
+    this.debugVirusModels.length = 0
     for (const ctrl of this.spireControllers.values()) ctrl.dispose()
     this.spireControllers.clear()
     for (const ctrl of this.chimeraControllers.values()) ctrl.dispose()

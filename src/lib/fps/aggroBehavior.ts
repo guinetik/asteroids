@@ -13,6 +13,8 @@
  * @spec docs/superpowers/specs/2026-04-05-enemy-system-design.md
  */
 import type { EnemyBehavior, EnemyBehaviorOutput } from './enemy'
+import type { ChaseTargetSite } from './chaseTargeting'
+import { distSqXZ, pickNearestChaseSiteXZ } from './chaseTargeting'
 
 /** Configuration for aggro behavior — sourced from EnemyTypeConfig. */
 export interface AggroBehaviorConfig {
@@ -74,7 +76,9 @@ export class AggroBehavior implements EnemyBehavior {
     enemyX: number,
     enemyZ: number,
     playerX: number,
+    playerY: number,
     playerZ: number,
+    hostageSites: ReadonlyArray<ChaseTargetSite>,
   ): EnemyBehaviorOutput {
     this.elapsed += dt
 
@@ -86,35 +90,49 @@ export class AggroBehavior implements EnemyBehavior {
       this.pickWanderTarget()
     }
 
-    const dx = playerX - enemyX
-    const dz = playerZ - enemyZ
-    const distToPlayer = Math.sqrt(dx * dx + dz * dz)
+    const nearest = pickNearestChaseSiteXZ(
+      enemyX, enemyZ, playerX, playerY, playerZ, hostageSites,
+    )
+    const distToNearest = Math.sqrt(distSqXZ(enemyX, enemyZ, nearest.x, nearest.z))
 
     // --- State transitions ---
-    if (this.state === 'idle' && distToPlayer < this.config.aggroRadius) {
+    if (this.state === 'idle' && distToNearest < this.config.aggroRadius) {
       this.state = 'chase'
-    } else if (this.state === 'chase' && distToPlayer > this.config.leashRadius) {
+    } else if (this.state === 'chase' && distToNearest > this.config.leashRadius) {
       this.state = 'idle'
       this.pickWanderTarget()
     }
 
     // --- Behavior ---
     if (this.state === 'chase') {
-      return this.tickChase(dx, dz, distToPlayer)
+      return this.tickChase(enemyX, enemyZ, nearest, distToNearest)
     }
-    return this.tickIdle(dt, enemyX, enemyZ)
+    return this.tickIdle(dt, enemyX, enemyZ, playerX, playerY, playerZ)
   }
 
   private tickChase(
-    dx: number,
-    dz: number,
-    distToPlayer: number,
+    enemyX: number,
+    enemyZ: number,
+    nearest: ChaseTargetSite,
+    distToNearest: number,
   ): EnemyBehaviorOutput {
-    if (distToPlayer < 0.01) {
-      return { moveDir: { x: 0, z: 0 }, isMoving: false, isChasing: true, isAgitated: true, wantsToFire: false }
+    const dx = nearest.x - enemyX
+    const dz = nearest.z - enemyZ
+
+    if (distToNearest < 0.01) {
+      return {
+        moveDir: { x: 0, z: 0 },
+        isMoving: false,
+        isChasing: true,
+        isAgitated: true,
+        wantsToFire: false,
+        aimTargetX: nearest.x,
+        aimTargetY: nearest.y,
+        aimTargetZ: nearest.z,
+      }
     }
 
-    const invDist = 1 / distToPlayer
+    const invDist = 1 / distToNearest
     let dirX = dx * invDist
     let dirZ = dz * invDist
 
@@ -132,20 +150,41 @@ export class AggroBehavior implements EnemyBehavior {
       dirZ /= len
     }
 
-    const isAgitated = distToPlayer < this.config.agitateRadius
+    const isAgitated = distToNearest < this.config.agitateRadius
 
-    return { moveDir: { x: dirX, z: dirZ }, isMoving: true, isChasing: true, isAgitated, wantsToFire: false }
+    return {
+      moveDir: { x: dirX, z: dirZ },
+      isMoving: true,
+      isChasing: true,
+      isAgitated,
+      wantsToFire: false,
+      aimTargetX: nearest.x,
+      aimTargetY: nearest.y,
+      aimTargetZ: nearest.z,
+    }
   }
 
   private tickIdle(
     dt: number,
     enemyX: number,
     enemyZ: number,
+    playerX: number,
+    playerY: number,
+    playerZ: number,
   ): EnemyBehaviorOutput {
     // Pause between wander targets
     if (this.wanderPause > 0) {
       this.wanderPause -= dt
-      return { moveDir: { x: 0, z: 0 }, isMoving: false, isChasing: false, isAgitated: false, wantsToFire: false }
+      return {
+        moveDir: { x: 0, z: 0 },
+        isMoving: false,
+        isChasing: false,
+        isAgitated: false,
+        wantsToFire: false,
+        aimTargetX: playerX,
+        aimTargetY: playerY,
+        aimTargetZ: playerZ,
+      }
     }
 
     const wx = this.wanderTargetX - enemyX
@@ -156,7 +195,16 @@ export class AggroBehavior implements EnemyBehavior {
     if (wanderDist < WANDER_ARRIVE_THRESHOLD) {
       this.wanderPause = WANDER_PAUSE_MIN + Math.random() * (WANDER_PAUSE_MAX - WANDER_PAUSE_MIN)
       this.pickWanderTarget()
-      return { moveDir: { x: 0, z: 0 }, isMoving: false, isChasing: false, isAgitated: false, wantsToFire: false }
+      return {
+        moveDir: { x: 0, z: 0 },
+        isMoving: false,
+        isChasing: false,
+        isAgitated: false,
+        wantsToFire: false,
+        aimTargetX: playerX,
+        aimTargetY: playerY,
+        aimTargetZ: playerZ,
+      }
     }
 
     // Move toward wander target
@@ -167,6 +215,9 @@ export class AggroBehavior implements EnemyBehavior {
       isChasing: false,
       isAgitated: false,
       wantsToFire: false,
+      aimTargetX: playerX,
+      aimTargetY: playerY,
+      aimTargetZ: playerZ,
     }
   }
 

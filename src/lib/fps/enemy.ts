@@ -10,6 +10,7 @@
  * @spec docs/asteroid-lander-gdd-v03.md
  */
 import * as THREE from 'three'
+import type { ChaseTargetSite } from './chaseTargeting'
 
 /** Configuration for spawning an enemy. */
 export interface EnemyConfig {
@@ -76,6 +77,12 @@ export interface EnemyBehaviorOutput {
   isAgitated: boolean
   /** Whether the enemy wants to fire a projectile this frame. */
   wantsToFire: boolean
+  /** World X to face and aim ranged attacks toward. */
+  aimTargetX: number
+  /** World Y to face and aim ranged attacks toward. */
+  aimTargetY: number
+  /** World Z to face and aim ranged attacks toward. */
+  aimTargetZ: number
 }
 
 /**
@@ -83,6 +90,18 @@ export interface EnemyBehaviorOutput {
  * The director calls tick() each frame and applies the output.
  */
 export interface EnemyBehavior {
-  /** Compute movement intent for this frame. */
-  tick(dt: number, enemyX: number, enemyZ: number, playerX: number, playerZ: number): EnemyBehaviorOutput
+  /**
+   * Compute movement intent for this frame.
+   *
+   * @param hostageSites - Alive hostage positions for shared aggro (may be empty)
+   */
+  tick(
+    dt: number,
+    enemyX: number,
+    enemyZ: number,
+    playerX: number,
+    playerY: number,
+    playerZ: number,
+    hostageSites: ReadonlyArray<ChaseTargetSite>,
+  ): EnemyBehaviorOutput
 }

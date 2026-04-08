@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { MultiToolState } from '../multiToolState'
 import type { MultiToolConfig } from '../multiToolState'
 import multiToolConfigJson from '@/data/fps/multitool-config.json'
@@ -152,18 +152,6 @@ describe('MultiToolState', () => {
     state.setInput(false, false)
     state.tick(0.016)
     expect(state.isFiring).toBe(false)
-  })
-
-  // --- Console log on fire ---
-
-  it('logs to console when firing', () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => {})
-    state.setMode('weapon')
-    state.setAiming(true)
-    state.setInput(true, true)
-    state.tick(0.016)
-    expect(spy).toHaveBeenCalledWith('[MultiTool] fire: weapon')
-    spy.mockRestore()
   })
 
   // --- Config access ---

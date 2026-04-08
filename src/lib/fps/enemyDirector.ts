@@ -15,6 +15,8 @@ import { AggroBehavior } from './aggroBehavior'
 import { RangedBehavior } from './rangedBehavior'
 import { getEnemyTypeConfig } from './enemyTypes'
 import type { EnemyTypeConfig } from './enemyTypes'
+import type { Hostage } from './hostage'
+import type { ChaseTargetSite } from './chaseTargeting'
 
 /** Handle returned by spawn — used by the VC to bridge domain ↔ visuals. */
 export interface EnemyHandle {
@@ -41,15 +43,41 @@ export interface EnemyHandle {
  * @date 2026-04-05
  * @spec docs/superpowers/specs/2026-04-05-enemy-system-design.md
  */
+const EMPTY_HOSTAGES: readonly Hostage[] = []
+
+/** Default behavior output before the first tick fills aim targets. */
+const INITIAL_BEHAVIOR_OUTPUT: EnemyBehaviorOutput = {
+  moveDir: { x: 0, z: 0 },
+  isMoving: false,
+  isChasing: false,
+  isAgitated: false,
+  wantsToFire: false,
+  aimTargetX: 0,
+  aimTargetY: 0,
+  aimTargetZ: 0,
+}
+
 export class EnemyDirector implements Tickable {
   private readonly handles: EnemyHandle[] = []
   private nextId = 1
   private playerX = 0
   private playerY = 0
   private playerZ = 0
+  private hostageEntities: readonly Hostage[] = EMPTY_HOSTAGES
+  /** Rebuilt each tick from {@link hostageEntities} — passed to behaviors. */
+  private readonly chaseSiteScratch: ChaseTargetSite[] = []
 
   /** Fired when an enemy touches the player. */
   onContactDamage: ((handle: EnemyHandle, damage: number) => void) | null = null
+
+  /**
+   * Fired when an enemy touches a hostage (player was not in contact range).
+   *
+   * @param handle - Aggressor enemy
+   * @param hostage - Damaged hostage entity
+   * @param damage - Contact damage amount from enemy config
+   */
+  onHostageContactDamage: ((handle: EnemyHandle, hostage: Hostage, damage: number) => void) | null = null
 
   /** All currently tracked enemy handles (alive and dead). */
   get enemies(): readonly EnemyHandle[] {
@@ -61,6 +89,16 @@ export class EnemyDirector implements Tickable {
     this.playerX = x
     this.playerY = y
     this.playerZ = z
+  }
+
+  /**
+   * Alive hostages for aggro, ranged aim, and melee contact against rescue targets.
+   * Pass empty when the level has no hostages.
+   *
+   * @param hostages - Domain entities whose positions are read each tick
+   */
+  setHostageTargets(hostages: readonly Hostage[]): void {
+    this.hostageEntities = hostages
   }
 
   /**
@@ -105,7 +143,7 @@ export class EnemyDirector implements Tickable {
       behavior,
       type,
       config,
-      lastOutput: { moveDir: { x: 0, z: 0 }, isMoving: false, isChasing: false, isAgitated: false, wantsToFire: false },
+      lastOutput: { ...INITIAL_BEHAVIOR_OUTPUT },
       contactCooldown: 0,
     }
 
@@ -126,6 +164,16 @@ export class EnemyDirector implements Tickable {
 
   /** @inheritdoc */
   tick(dt: number): void {
+    this.chaseSiteScratch.length = 0
+    for (const h of this.hostageEntities) {
+      if (!h.alive) continue
+      this.chaseSiteScratch.push({
+        x: h.position.x,
+        y: h.hitCenterWorldY,
+        z: h.position.z,
+      })
+    }
+
     for (const handle of this.handles) {
       if (!handle.enemy.alive) continue
 
@@ -135,7 +183,9 @@ export class EnemyDirector implements Tickable {
         handle.enemy.position.x,
         handle.enemy.position.z,
         this.playerX,
+        this.playerY,
         this.playerZ,
+        this.chaseSiteScratch,
       )
       handle.lastOutput = output
 
@@ -149,7 +199,7 @@ export class EnemyDirector implements Tickable {
         handle.enemy.position.z += output.moveDir.z * speed * dt
       }
 
-      // Contact damage
+      // Contact damage — player first, then nearest alive hostage
       handle.contactCooldown = Math.max(0, handle.contactCooldown - dt)
       if (handle.contactCooldown <= 0) {
         const cx = handle.enemy.position.x - this.playerX
@@ -159,6 +209,20 @@ export class EnemyDirector implements Tickable {
         if (contactDist <= handle.config.contactRadius) {
           this.onContactDamage?.(handle, handle.config.contactDamage)
           handle.contactCooldown = handle.config.contactCooldown
+        } else {
+          for (const hostage of this.hostageEntities) {
+            if (!hostage.alive) continue
+            const tcx = handle.enemy.position.x - hostage.position.x
+            const tcy = handle.enemy.position.y - hostage.hitCenterWorldY
+            const tcz = handle.enemy.position.z - hostage.position.z
+            const hostageContactDist = Math.sqrt(tcx * tcx + tcy * tcy + tcz * tcz)
+            if (hostageContactDist <= handle.config.contactRadius) {
+              hostage.takeDamage(handle.config.contactDamage)
+              this.onHostageContactDamage?.(handle, hostage, handle.config.contactDamage)
+              handle.contactCooldown = handle.config.contactCooldown
+              break
+            }
+          }
         }
       }
     }

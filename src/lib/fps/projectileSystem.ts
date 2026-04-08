@@ -4,6 +4,8 @@
  * Pure game logic — owns projectile state and Three.js meshes. Checks
  * terrain collision via heightmap each frame. Calls onImpact when a
  * projectile hits terrain so the ViewController can spawn particles.
+ * Combat bolts pick the **nearest** hit along each step among enemies; **weapon**
+ * (LAS) bolts also target hostages (friendly fire). **Drill** does not damage hostages.
  *
  * @author guinetik
  * @date 2026-04-04
@@ -13,6 +15,8 @@ import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import type { Enemy } from './enemy'
+import type { Hostage } from './hostage'
+import type { MultiToolMode } from './multiToolState'
 
 /** Bolt projectile speed (units/s). */
 const BOLT_SPEED = 200
@@ -24,8 +28,11 @@ const BOLT_WIDTH = 0.04
 const BOLT_MAX_LIFETIME = 4.0
 /** Terrain collision margin — bolt Y vs floor Y. */
 const TERRAIN_HIT_MARGIN = 0.5
-/** Damage per bolt hit. */
+/** Damage per weapon/drill bolt hit on enemies; weapon bolts also damage hostages (friendly fire). */
 const BOLT_DAMAGE = 25
+
+/** HP restored when a med bolt hits a hostage. */
+const HEAL_BOLT_AMOUNT = 25
 
 /** Internal projectile state. */
 interface Projectile {
@@ -33,6 +40,8 @@ interface Projectile {
   material: THREE.ShaderMaterial
   velocity: THREE.Vector3
   age: number
+  /** Which multi-tool mode spawned this bolt — drives damage vs heal. */
+  boltKind: MultiToolMode
 }
 
 /**
@@ -48,7 +57,9 @@ export class ProjectileSystem implements Tickable {
   private readonly scene: THREE.Scene
   private readonly heightmap: Heightmap
   private readonly enemies: Enemy[] = []
+  private readonly hostages: Hostage[] = []
   private damageMultiplier = 1
+  private readonly _hostageCenter = new THREE.Vector3()
   private static readonly boltGeometry = (() => {
     const geometry = new THREE.CylinderGeometry(BOLT_WIDTH, BOLT_WIDTH, BOLT_LENGTH, 6, 1, false)
     geometry.rotateX(Math.PI / 2)
@@ -59,6 +70,19 @@ export class ProjectileSystem implements Tickable {
   onImpact: ((position: THREE.Vector3) => void) | null = null
   /** Called when a projectile hits an enemy. */
   onEnemyHit: ((enemy: Enemy, position: THREE.Vector3) => void) | null = null
+
+  /**
+   * Called when a player bolt hits a hostage — damage (weapon/drill) or heal (med).
+   *
+   * @param hostage - Hit hostage
+   * @param position - Impact position in world space
+   * @param effect - Whether the bolt hurt or healed
+   */
+  onHostageBolt: ((
+    hostage: Hostage,
+    position: THREE.Vector3,
+    effect: 'damage' | 'heal',
+  ) => void) | null = null
 
   constructor(scene: THREE.Scene, heightmap: Heightmap) {
     this.scene = scene
@@ -86,14 +110,31 @@ export class ProjectileSystem implements Tickable {
     if (idx >= 0) this.enemies.splice(idx, 1)
   }
 
+  /** Register a hostage for bolt collision (weapon friendly fire + med heal; not drill). */
+  addHostage(hostage: Hostage): void {
+    this.hostages.push(hostage)
+  }
+
+  /** Remove a hostage from collision checks (e.g. after death). */
+  removeHostage(hostage: Hostage): void {
+    const idx = this.hostages.indexOf(hostage)
+    if (idx >= 0) this.hostages.splice(idx, 1)
+  }
+
   /**
    * Spawn a bolt projectile.
    *
    * @param origin - World-space spawn position
    * @param direction - Normalized travel direction
    * @param color - Bolt color
+   * @param boltKind - Active multi-tool mode for this shot
    */
-  spawn(origin: THREE.Vector3, direction: THREE.Vector3, color: THREE.Color): void {
+  spawn(
+    origin: THREE.Vector3,
+    direction: THREE.Vector3,
+    color: THREE.Color,
+    boltKind: MultiToolMode,
+  ): void {
     const projectile = this.pool.pop() ?? this.createProjectile()
     const mesh = projectile.mesh
     const material = projectile.material
@@ -110,6 +151,7 @@ export class ProjectileSystem implements Tickable {
       material,
       velocity: direction.clone().multiplyScalar(BOLT_SPEED),
       age: 0,
+      boltKind,
     })
   }
 
@@ -132,15 +174,27 @@ export class ProjectileSystem implements Tickable {
 
       const pos = p.mesh.position
 
-      // Enemy collision — ray segment check (prevents tunneling)
+      // Med bolts: only hostages (closest along segment). Weapon/drill: enemies; weapon also contests hostages (friendly fire) with closest-hit wins.
       let hitEnemy = false
-      for (const enemy of this.enemies) {
-        if (!enemy.alive) continue
-        if (this.rayHitsSphere(this._prevPos, pos, enemy.position, enemy.hitRadius)) {
-          enemy.takeDamage(BOLT_DAMAGE * this.damageMultiplier)
-          this.onEnemyHit?.(enemy, pos.clone())
+      let hitHostage = false
+
+      if (p.boltKind === 'heal') {
+        const healHit = this.closestHostageHealHit(this._prevPos, pos)
+        if (healHit) {
+          healHit.hostage.heal(HEAL_BOLT_AMOUNT)
+          this.onHostageBolt?.(healHit.hostage, pos.clone(), 'heal')
+          hitHostage = true
+        }
+      } else {
+        const combatHit = this.closestCombatBoltHit(this._prevPos, pos, p.boltKind)
+        if (combatHit?.kind === 'enemy') {
+          combatHit.enemy.takeDamage(BOLT_DAMAGE * this.damageMultiplier)
+          this.onEnemyHit?.(combatHit.enemy, pos.clone())
           hitEnemy = true
-          break
+        } else if (combatHit?.kind === 'hostage') {
+          combatHit.hostage.takeDamage(BOLT_DAMAGE * this.damageMultiplier)
+          this.onHostageBolt?.(combatHit.hostage, pos.clone(), 'damage')
+          hitHostage = true
         }
       }
 
@@ -149,8 +203,8 @@ export class ProjectileSystem implements Tickable {
       const hitTerrain = pos.y <= floorY + TERRAIN_HIT_MARGIN
 
       // Remove on hit or timeout
-      if (hitEnemy || hitTerrain || p.age >= BOLT_MAX_LIFETIME) {
-        if (hitTerrain || hitEnemy) {
+      if (hitEnemy || hitHostage || hitTerrain || p.age >= BOLT_MAX_LIFETIME) {
+        if (hitTerrain || hitEnemy || hitHostage) {
           this.onImpact?.(pos.clone())
         }
         this.removeProjectile(i)
@@ -159,27 +213,139 @@ export class ProjectileSystem implements Tickable {
   }
 
   /**
-   * Check if a line segment (from → to) passes within radius of a sphere center.
-   * Closest-point-on-segment approach — handles fast projectiles that skip past targets.
+   * Smallest parameter t in [0, 1] where the segment from→to enters the sphere, or 0 if `from` is already inside.
+   * Returns null if the segment does not intersect the sphere.
    */
-  private rayHitsSphere(from: THREE.Vector3, to: THREE.Vector3, center: THREE.Vector3, radius: number): boolean {
+  private segmentEnterSphereT(
+    from: THREE.Vector3,
+    to: THREE.Vector3,
+    cx: number,
+    cy: number,
+    cz: number,
+    radius: number,
+  ): number | null {
     const dx = to.x - from.x
     const dy = to.y - from.y
     const dz = to.z - from.z
-    const fx = from.x - center.x
-    const fy = from.y - center.y
-    const fz = from.z - center.z
-    const segLenSq = dx * dx + dy * dy + dz * dz
-    if (segLenSq === 0) {
-      return fx * fx + fy * fy + fz * fz <= radius * radius
+    const fx = from.x - cx
+    const fy = from.y - cy
+    const fz = from.z - cz
+
+    const distStartSq = fx * fx + fy * fy + fz * fz
+    const rSq = radius * radius
+    if (distStartSq <= rSq) {
+      return 0
     }
-    // Project center onto segment, clamp to [0, 1]
-    let t = -(fx * dx + fy * dy + fz * dz) / segLenSq
-    t = Math.max(0, Math.min(1, t))
-    const closestX = from.x + t * dx - center.x
-    const closestY = from.y + t * dy - center.y
-    const closestZ = from.z + t * dz - center.z
-    return closestX * closestX + closestY * closestY + closestZ * closestZ <= radius * radius
+
+    const a = dx * dx + dy * dy + dz * dz
+    const SEGMENT_LEN_EPS_SQ = 1e-16
+    if (a < SEGMENT_LEN_EPS_SQ) {
+      return null
+    }
+
+    const b = 2 * (fx * dx + fy * dy + fz * dz)
+    const c = distStartSq - rSq
+    const discriminant = b * b - 4 * a * c
+    if (discriminant < 0) {
+      return null
+    }
+
+    const sqrtD = Math.sqrt(discriminant)
+    const t0 = (-b - sqrtD) / (2 * a)
+    const t1 = (-b + sqrtD) / (2 * a)
+    let best: number | null = null
+    if (t0 >= 0 && t0 <= 1 && (best === null || t0 < best)) {
+      best = t0
+    }
+    if (t1 >= 0 && t1 <= 1 && (best === null || t1 < best)) {
+      best = t1
+    }
+    return best
+  }
+
+  /**
+   * Closest hostage along the segment for a med bolt (heal).
+   *
+   * @param from - Segment start (previous projectile position)
+   * @param to - Segment end (current projectile position)
+   */
+  private closestHostageHealHit(
+    from: THREE.Vector3,
+    to: THREE.Vector3,
+  ): { hostage: Hostage; t: number } | null {
+    let best: { hostage: Hostage; t: number } | null = null
+    for (const hostage of this.hostages) {
+      if (!hostage.alive) continue
+      hostage.hitCenter(this._hostageCenter)
+      const t = this.segmentEnterSphereT(
+        from,
+        to,
+        this._hostageCenter.x,
+        this._hostageCenter.y,
+        this._hostageCenter.z,
+        hostage.hitRadius,
+      )
+      if (t !== null && (best === null || t < best.t)) {
+        best = { hostage, t }
+      }
+    }
+    return best
+  }
+
+  /**
+   * Closest hit among enemies (weapon + drill) and hostages (weapon only — LAS friendly fire).
+   *
+   * @param from - Segment start
+   * @param to - Segment end
+   * @param boltKind - `weapon` checks hostages; `drill` does not damage hostages
+   */
+  private closestCombatBoltHit(
+    from: THREE.Vector3,
+    to: THREE.Vector3,
+    boltKind: MultiToolMode,
+  ):
+    | { kind: 'enemy'; enemy: Enemy; t: number }
+    | { kind: 'hostage'; hostage: Hostage; t: number }
+    | null {
+    let best:
+      | { kind: 'enemy'; enemy: Enemy; t: number }
+      | { kind: 'hostage'; hostage: Hostage; t: number }
+      | null = null
+
+    for (const enemy of this.enemies) {
+      if (!enemy.alive) continue
+      const t = this.segmentEnterSphereT(
+        from,
+        to,
+        enemy.position.x,
+        enemy.position.y,
+        enemy.position.z,
+        enemy.hitRadius,
+      )
+      if (t !== null && (best === null || t < best.t)) {
+        best = { kind: 'enemy', enemy, t }
+      }
+    }
+
+    if (boltKind === 'weapon') {
+      for (const hostage of this.hostages) {
+        if (!hostage.alive) continue
+        hostage.hitCenter(this._hostageCenter)
+        const t = this.segmentEnterSphereT(
+          from,
+          to,
+          this._hostageCenter.x,
+          this._hostageCenter.y,
+          this._hostageCenter.z,
+          hostage.hitRadius,
+        )
+        if (t !== null && (best === null || t < best.t)) {
+          best = { kind: 'hostage', hostage, t }
+        }
+      }
+    }
+
+    return best
   }
 
   private removeProjectile(index: number): void {
@@ -245,6 +411,7 @@ export class ProjectileSystem implements Tickable {
       material,
       velocity: new THREE.Vector3(),
       age: 0,
+      boltKind: 'weapon',
     }
   }
 }

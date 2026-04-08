@@ -10,6 +10,7 @@
  * @spec docs/superpowers/specs/2026-04-05-spire-enemy-design.md
  */
 import type { Tickable } from '@/lib/Tickable'
+import type { Hostage } from './hostage'
 
 /** Maximum age (seconds) before a projectile is automatically removed. */
 const MAX_LIFETIME = 4.0
@@ -58,9 +59,22 @@ export class EnemyProjectileSystem implements Tickable {
   private playerX = 0
   private playerY = 0
   private playerZ = 0
+  private readonly hostages: Hostage[] = []
 
   /** Fired when a projectile hits the player. Args: damage, sourceX, sourceZ. */
   onPlayerHit: ((damage: number, sourceX: number, sourceZ: number) => void) | null = null
+
+  /**
+   * Fired when a projectile hits a hostage instead of the player.
+   *
+   * @param hostage - Hit hostage
+   * @param damage - Projectile damage amount
+   * @param sourceX - Spawn X (knockback / feedback)
+   * @param sourceZ - Spawn Z
+   */
+  onHostageHit:
+    | ((hostage: Hostage, damage: number, sourceX: number, sourceZ: number) => void)
+    | null = null
 
   /** Fired each frame per projectile with updated position. Args: id, x, y, z. */
   onProjectileMove: ((id: number, x: number, y: number, z: number) => void) | null = null
@@ -78,6 +92,17 @@ export class EnemyProjectileSystem implements Tickable {
     this.playerX = x
     this.playerY = y
     this.playerZ = z
+  }
+
+  /** Register hostages for projectile collision (after the player check). */
+  addHostage(hostage: Hostage): void {
+    this.hostages.push(hostage)
+  }
+
+  /** Remove a hostage from collision checks. */
+  removeHostage(hostage: Hostage): void {
+    const idx = this.hostages.indexOf(hostage)
+    if (idx >= 0) this.hostages.splice(idx, 1)
   }
 
   /**
@@ -138,7 +163,7 @@ export class EnemyProjectileSystem implements Tickable {
       const b = 2 * (ox * segX + oy * segY + oz * segZ)
       const c = ox * ox + oy * oy + oz * oz - PLAYER_HIT_RADIUS * PLAYER_HIT_RADIUS
       const discriminant = b * b - 4 * a * c
-      const hit = discriminant >= 0 && (a === 0 ? c <= 0 : (() => {
+      const hitPlayer = discriminant >= 0 && (a === 0 ? c <= 0 : (() => {
         const sqrtD = Math.sqrt(discriminant)
         const t0 = (-b - sqrtD) / (2 * a)
         const t1 = (-b + sqrtD) / (2 * a)
@@ -150,8 +175,42 @@ export class EnemyProjectileSystem implements Tickable {
       p.y += segY
       p.z += segZ
 
-      if (hit) {
+      if (hitPlayer) {
         this.onPlayerHit?.(p.damage, p.sourceX, p.sourceZ)
+        this.onProjectileRemoved?.(p.id)
+        this.projectiles.splice(i, 1)
+        continue
+      }
+
+      let hitHostage: Hostage | null = null
+      for (const h of this.hostages) {
+        if (!h.alive) continue
+        const hx = h.position.x
+        const hy = h.hitCenterWorldY
+        const hz = h.position.z
+        const r = h.hitRadius
+        const oxh = p.x - segX - hx
+        const oyh = p.y - segY - hy
+        const ozh = p.z - segZ - hz
+        const ah = segX * segX + segY * segY + segZ * segZ
+        const bh = 2 * (oxh * segX + oyh * segY + ozh * segZ)
+        const ch = oxh * oxh + oyh * oyh + ozh * ozh - r * r
+        const dh = bh * bh - 4 * ah * ch
+        const segHitsHostage = dh >= 0 && (ah === 0 ? ch <= 0 : (() => {
+          const sqrtDh = Math.sqrt(dh)
+          const t0h = (-bh - sqrtDh) / (2 * ah)
+          const t1h = (-bh + sqrtDh) / (2 * ah)
+          return t0h <= 1 && t1h >= 0
+        })())
+        if (segHitsHostage) {
+          hitHostage = h
+          break
+        }
+      }
+
+      if (hitHostage) {
+        hitHostage.takeDamage(p.damage)
+        this.onHostageHit?.(hitHostage, p.damage, p.sourceX, p.sourceZ)
         this.onProjectileRemoved?.(p.id)
         this.projectiles.splice(i, 1)
         continue

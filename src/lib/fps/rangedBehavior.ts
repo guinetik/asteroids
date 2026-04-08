@@ -12,6 +12,8 @@
  * @spec docs/superpowers/specs/2026-04-05-spire-enemy-design.md
  */
 import type { EnemyBehavior, EnemyBehaviorOutput } from './enemy'
+import type { ChaseTargetSite } from './chaseTargeting'
+import { distSqXZ, pickNearestChaseSiteXZ } from './chaseTargeting'
 
 /** Configuration for ranged behavior. */
 export interface RangedBehaviorConfig {
@@ -77,7 +79,9 @@ export class RangedBehavior implements EnemyBehavior {
     enemyX: number,
     enemyZ: number,
     playerX: number,
+    playerY: number,
     playerZ: number,
+    hostageSites: ReadonlyArray<ChaseTargetSite>,
   ): EnemyBehaviorOutput {
     this.elapsed += dt
 
@@ -88,40 +92,45 @@ export class RangedBehavior implements EnemyBehavior {
       this.pickWanderTarget()
     }
 
-    const dx = playerX - enemyX
-    const dz = playerZ - enemyZ
-    const distToPlayer = Math.sqrt(dx * dx + dz * dz)
+    const nearest = pickNearestChaseSiteXZ(
+      enemyX, enemyZ, playerX, playerY, playerZ, hostageSites,
+    )
+    const dx = nearest.x - enemyX
+    const dz = nearest.z - enemyZ
+    const distToNearest = Math.sqrt(distSqXZ(enemyX, enemyZ, nearest.x, nearest.z))
 
     // State transitions
-    if (this.state === 'idle' && distToPlayer < this.config.aggroRadius) {
+    if (this.state === 'idle' && distToNearest < this.config.aggroRadius) {
       this.state = 'engage'
-    } else if (this.state === 'engage' && distToPlayer > this.config.leashRadius) {
+    } else if (this.state === 'engage' && distToNearest > this.config.leashRadius) {
       this.state = 'idle'
       this.pickWanderTarget()
     }
 
     if (this.state === 'engage') {
-      return this.tickEngage(dt, dx, dz, distToPlayer)
+      return this.tickEngage(dt, dx, dz, distToNearest, nearest)
     }
-    return this.tickIdle(dt, enemyX, enemyZ)
+    return this.tickIdle(dt, enemyX, enemyZ, playerX, playerY, playerZ)
   }
 
   /**
    * Handles per-frame logic while the enemy is engaged with the player.
    *
    * @param dt - Delta time in seconds.
-   * @param dx - X-axis distance from enemy to player.
-   * @param dz - Z-axis distance from enemy to player.
-   * @param distToPlayer - Euclidean distance from enemy to player.
+   * @param dx - X-axis distance from enemy to current aim target.
+   * @param dz - Z-axis distance from enemy to current aim target.
+   * @param distToNearest - Horizontal distance from enemy to aim target.
+   * @param nearest - Aim / chase target (player or hostage).
    */
   private tickEngage(
     dt: number,
     dx: number,
     dz: number,
-    distToPlayer: number,
+    distToNearest: number,
+    nearest: ChaseTargetSite,
   ): EnemyBehaviorOutput {
-    const inRange = distToPlayer <= this.config.preferredRange
-    const tooClose = distToPlayer < this.config.minRange
+    const inRange = distToNearest <= this.config.preferredRange
+    const tooClose = distToNearest < this.config.minRange
     const isAgitated = inRange
 
     // Fire cooldown — only fire when cooldown was already at zero entering this tick
@@ -133,28 +142,36 @@ export class RangedBehavior implements EnemyBehavior {
       this.fireCooldown = 1 / this.config.fireRate
     }
 
+    const aim = {
+      aimTargetX: nearest.x,
+      aimTargetY: nearest.y,
+      aimTargetZ: nearest.z,
+    }
+
     // Movement
     if (tooClose) {
       // Back away from player
-      const invDist = distToPlayer > 0.01 ? 1 / distToPlayer : 0
+      const invDist = distToNearest > 0.01 ? 1 / distToNearest : 0
       return {
         moveDir: { x: -dx * invDist, z: -dz * invDist },
         isMoving: true,
         isChasing: true,
         isAgitated: true,
         wantsToFire,
+        ...aim,
       }
     }
 
     if (!inRange) {
       // Approach player
-      const invDist = distToPlayer > 0.01 ? 1 / distToPlayer : 0
+      const invDist = distToNearest > 0.01 ? 1 / distToNearest : 0
       return {
         moveDir: { x: dx * invDist, z: dz * invDist },
         isMoving: true,
         isChasing: true,
         isAgitated: false,
         wantsToFire: false,
+        ...aim,
       }
     }
 
@@ -165,6 +182,7 @@ export class RangedBehavior implements EnemyBehavior {
       isChasing: true,
       isAgitated,
       wantsToFire,
+      ...aim,
     }
   }
 
@@ -179,6 +197,9 @@ export class RangedBehavior implements EnemyBehavior {
     dt: number,
     enemyX: number,
     enemyZ: number,
+    playerX: number,
+    playerY: number,
+    playerZ: number,
   ): EnemyBehaviorOutput {
     if (this.wanderPause > 0) {
       this.wanderPause -= dt
@@ -188,6 +209,9 @@ export class RangedBehavior implements EnemyBehavior {
         isChasing: false,
         isAgitated: false,
         wantsToFire: false,
+        aimTargetX: playerX,
+        aimTargetY: playerY,
+        aimTargetZ: playerZ,
       }
     }
 
@@ -205,6 +229,9 @@ export class RangedBehavior implements EnemyBehavior {
         isChasing: false,
         isAgitated: false,
         wantsToFire: false,
+        aimTargetX: playerX,
+        aimTargetY: playerY,
+        aimTargetZ: playerZ,
       }
     }
 
@@ -215,6 +242,9 @@ export class RangedBehavior implements EnemyBehavior {
       isChasing: false,
       isAgitated: false,
       wantsToFire: false,
+      aimTargetX: playerX,
+      aimTargetY: playerY,
+      aimTargetZ: playerZ,
     }
   }
 
