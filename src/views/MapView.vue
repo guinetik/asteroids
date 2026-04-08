@@ -39,12 +39,16 @@ const viewController = new MapViewController()
 const activeMessage = ref<ActiveShipMessage | null>(null)
 const pendingMessageCount = ref(0)
 const messageDialogVisible = ref(false)
+/**
+ * `controlsLocked: true` until the first MapViewController `onMapIntro` sync — hides shuttle HUD for
+ * the gap before `init()` (lib `MapIntroState` is `inactive` / unlocked until `start()` or `skip()`).
+ */
 const mapIntro = reactive<MapIntroUiState>({
   phase: 'inactive',
   letterboxVisible: false,
   messagePromptVisible: false,
   messageDialogVisible: false,
-  controlsLocked: false,
+  controlsLocked: true,
   cinematicCaption: '',
 })
 
@@ -125,6 +129,8 @@ const gravitationalAnomalyHud = reactive<GravitationalAnomalyHudState>({
   subtitle: '',
 })
 const habitatActive = ref(false)
+/** Hides orbit shuttle chrome during Earth first-mail cinematic → habitat (not used when intro is skipped). */
+const earthStartupOrbitHudSuppressed = ref(false)
 const shuttleControlVisible = ref(false)
 const habitatPrompt = ref<string | null>(null)
 const habitatFadeOpacity = ref(0)
@@ -203,6 +209,9 @@ onMounted(async () => {
     }
     viewController.onMessageUpdate = () => {
       refreshActiveMessage()
+    }
+    viewController.onEarthStartupOrbitHudSuppressed = (suppressed) => {
+      earthStartupOrbitHudSuppressed.value = suppressed
     }
     viewController.onHabitatActive = (active) => {
       habitatActive.value = active
@@ -387,13 +396,23 @@ function dockedPlanetId(): string | null {
     {{ mapIntro.cinematicCaption }}
   </p>
   <ShuttleHud
-    v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
+    v-show="
+      !mapOverlay.visible &&
+      !mapIntro.controlsLocked &&
+      !habitatActive &&
+      !earthStartupOrbitHudSuppressed
+    "
     :telemetry="telemetry"
     :fuel-cell-count="fuelCellCount"
     @use-fuel-cell="handleUseFuelCell"
   />
   <OrbitPrompt
-    v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
+    v-show="
+      !mapOverlay.visible &&
+      !mapIntro.controlsLocked &&
+      !habitatActive &&
+      !earthStartupOrbitHudSuppressed
+    "
     :orbitState="orbitState"
     :shop-available="shopButtonVisible && !shopDialogVisible && !shuttleControlVisible"
     :mission-available="missionButtonVisible && !missionOverlayVisible && !shuttleControlVisible"
@@ -401,14 +420,32 @@ function dockedPlanetId(): string | null {
     @open-shop="openShop"
     @open-mission="openMissionOverlay"
   />
-  <GravityWarning v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" :warning="gravityWarning" />
+  <GravityWarning
+    v-show="
+      !mapOverlay.visible &&
+      !mapIntro.controlsLocked &&
+      !habitatActive &&
+      !earthStartupOrbitHudSuppressed
+    "
+    :warning="gravityWarning"
+  />
   <GravitationalAnomalyHud
-    v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
+    v-show="
+      !mapOverlay.visible &&
+      !mapIntro.controlsLocked &&
+      !habitatActive &&
+      !earthStartupOrbitHudSuppressed
+    "
     :anomaly="gravitationalAnomalyHud"
   />
   <DamageVignette :intensity="telemetry.damageIntensity" :temperature="telemetry.temperature" />
   <DeathOverlay
-    v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
+    v-show="
+      !mapOverlay.visible &&
+      !mapIntro.controlsLocked &&
+      !habitatActive &&
+      !earthStartupOrbitHudSuppressed
+    "
     :visible="deathVisible"
     :cause="deathCause"
     @restart="handleRestart"
@@ -424,7 +461,14 @@ function dockedPlanetId(): string | null {
     </button>
   </div>
   <div
-    v-else-if="!mapIntro.controlsLocked && pendingMessageCount > 0 && activeMessage && !messageDialogVisible"
+    v-else-if="
+      !mapOverlay.visible &&
+      !mapIntro.controlsLocked &&
+      !earthStartupOrbitHudSuppressed &&
+      pendingMessageCount > 0 &&
+      activeMessage &&
+      !messageDialogVisible
+    "
     class="map-message-notice"
   >
     <button
@@ -440,7 +484,15 @@ function dockedPlanetId(): string | null {
     :message="activeMessage"
     @dismiss="dismissActiveMessage"
   />
-  <div v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive" class="map-view-toggles">
+  <div
+    v-show="
+      !mapOverlay.visible &&
+      !mapIntro.controlsLocked &&
+      !habitatActive &&
+      !earthStartupOrbitHudSuppressed
+    "
+    class="map-view-toggles"
+  >
     <button
       type="button"
       class="map-toggle-btn"
@@ -479,15 +531,24 @@ function dockedPlanetId(): string | null {
     @accept-mission="handleAcceptMission"
     @deliver-mission="handleDeliverMission"
     @accept-asteroid-mission="handleAcceptAsteroidMission"
+    @mail-changed="refreshActiveMessage"
   />
   <CreditsBadge
-    v-show="!mapOverlay.visible && !mapIntro.controlsLocked && !habitatActive"
+    v-show="
+      !mapOverlay.visible &&
+      !mapIntro.controlsLocked &&
+      !habitatActive &&
+      !earthStartupOrbitHudSuppressed
+    "
     :credits="playerCredits"
   />
   <div v-if="missionNotification" class="mission-notification">
     {{ missionNotification }}
   </div>
-  <div v-if="missionApproachVisible" class="mission-approach-prompt">
+  <div
+    v-if="missionApproachVisible && !earthStartupOrbitHudSuppressed"
+    class="mission-approach-prompt"
+  >
     <span class="mission-approach-prompt__name">{{ missionApproachName }}</span>
     <span class="mission-approach-prompt__action">E  Begin Mission</span>
   </div>

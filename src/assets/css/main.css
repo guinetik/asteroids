@@ -402,8 +402,9 @@ body {
 
 /* --- Ship Message Dialog --- */
 
+/* z above .habitat-fade (z-50) so mail can open from the habitat notice strip */
 .ship-message-dialog {
-  @apply fixed inset-0 z-40 flex items-center justify-center overflow-hidden overscroll-none bg-slate-950/55 px-4 py-6 backdrop-blur-sm sm:px-6 sm:py-8;
+  @apply fixed inset-0 z-[60] flex items-center justify-center overflow-hidden overscroll-none bg-slate-950/55 px-4 py-6 backdrop-blur-sm sm:px-6 sm:py-8;
 }
 
 .ship-message-card {
@@ -552,8 +553,9 @@ body {
   @apply border-cyan-200/50 bg-cyan-200/15 text-white;
 }
 
+/* Above .habitat-fade (z-50) so pending-mail strip stays visible inside the habitat (shuttle HUD stays hidden there). */
 .map-message-notice {
-  @apply fixed right-6 top-6 z-30;
+  @apply pointer-events-auto fixed right-6 top-6 z-[55];
 }
 
 .map-message-notice__button {
@@ -627,13 +629,13 @@ body {
 /* Shuttle Control Terminal */
 .shuttle-control-overlay {
   @apply fixed inset-0 z-40 flex items-center justify-center
-         bg-slate-950/55 px-6 py-8 backdrop-blur-sm;
+         bg-slate-950/55 px-4 py-6 backdrop-blur-sm sm:px-6 sm:py-8;
 }
 
 .shuttle-control-card {
-  @apply flex w-full max-w-5xl flex-col overflow-hidden rounded-2xl
+  @apply flex w-full max-w-7xl flex-col overflow-hidden rounded-2xl
          border border-cyan-400/25 bg-slate-950/95 text-slate-100 shadow-2xl;
-  max-height: 80vh;
+  max-height: 90vh;
   box-shadow:
     0 0 0 1px rgba(34, 211, 238, 0.08),
     0 30px 80px rgba(2, 6, 23, 0.7);
@@ -693,6 +695,103 @@ body {
 
 .shuttle-control-content {
   @apply flex-1 overflow-y-auto p-6;
+}
+
+.shuttle-control-content--programs {
+  @apply min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-5 sm:p-6;
+}
+
+/* ShipNet mail — Outlook-style folder + list + reader (shuttle terminal) */
+.shuttle-mail-program {
+  @apply flex min-h-[16rem] max-h-[min(68vh,640px)] text-slate-200;
+}
+
+.shuttle-mail-program__folder {
+  @apply flex w-36 shrink-0 flex-col gap-2 border-r border-white/10 bg-black/20 p-3;
+}
+
+.shuttle-mail-program__folder-title {
+  @apply font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500;
+}
+
+.shuttle-mail-program__folder-active {
+  @apply rounded border border-cyan-400/25 bg-cyan-400/10 px-2 py-1.5 font-mono text-xs text-cyan-200;
+}
+
+.shuttle-mail-program__folder-hint {
+  @apply text-[10px] leading-snug text-slate-500;
+}
+
+.shuttle-mail-program__list {
+  @apply flex w-[min(100%,260px)] shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-white/10 bg-black/15 p-2;
+}
+
+.shuttle-mail-program__row {
+  @apply flex w-full flex-col items-start gap-0.5 rounded-lg border border-transparent px-2 py-2 text-left transition-colors;
+}
+
+.shuttle-mail-program__row:hover {
+  @apply border-white/10 bg-white/5;
+}
+
+.shuttle-mail-program__row--active {
+  @apply border-cyan-400/30 bg-cyan-400/10;
+}
+
+.shuttle-mail-program__row--unread .shuttle-mail-program__row-subject {
+  @apply font-semibold text-cyan-100;
+}
+
+.shuttle-mail-program__row--locked {
+  @apply opacity-55;
+}
+
+.shuttle-mail-program__row-from {
+  @apply max-w-full truncate font-mono text-[10px] uppercase tracking-wider text-slate-500;
+}
+
+.shuttle-mail-program__row-subject {
+  @apply line-clamp-2 w-full text-xs text-slate-300;
+}
+
+.shuttle-mail-program__row-meta {
+  @apply font-mono text-[9px] text-slate-500;
+}
+
+.shuttle-mail-program__row-preview {
+  @apply line-clamp-2 w-full text-[10px] leading-snug text-slate-500;
+}
+
+.shuttle-mail-program__reader {
+  @apply flex min-w-0 flex-1 flex-col overflow-y-auto p-4;
+}
+
+.shuttle-mail-program__reader-empty {
+  @apply m-auto max-w-sm text-center text-sm text-slate-500;
+}
+
+.shuttle-mail-program__reader-header {
+  @apply mb-4 border-b border-white/10 pb-3;
+}
+
+.shuttle-mail-program__reader-subject {
+  @apply mb-2 font-mono text-sm font-normal uppercase tracking-wide text-cyan-100;
+}
+
+.shuttle-mail-program__reader-meta {
+  @apply flex flex-col gap-1 font-mono text-[11px] text-slate-400;
+}
+
+.shuttle-mail-program__reader-label {
+  @apply mr-2 text-slate-500;
+}
+
+.shuttle-mail-program__reader-body {
+  @apply flex flex-col gap-3 text-sm leading-relaxed text-slate-300;
+}
+
+.shuttle-mail-program__reader-footer {
+  @apply mt-6 flex flex-col gap-2 border-t border-white/10 pt-4;
 }
 
 .shuttle-control-screen__title {

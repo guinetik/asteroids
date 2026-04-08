@@ -136,7 +136,7 @@ onMounted(async () => {
     viewController.onStepChange = (index, steps) => {
       const obj = trackerObjectives.value.find((o) => o.id === `obj-${index}`)
       if (obj) {
-        obj.steps = [...steps.map((s) => ({ ...s }))]
+        obj.steps = steps.map((s) => ({ ...s }))
       }
     }
     viewController.onObjectiveComplete = (index) => {

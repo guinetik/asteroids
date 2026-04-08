@@ -58,3 +58,42 @@ export interface ActiveShipMessage extends ShipMessageDefinition {
   /** Current runtime lifecycle state. */
   status: Extract<ShipMessageStatus, 'pending' | 'shown'>
 }
+
+/**
+ * Row in the shuttle terminal mail list — one row per catalog message, `locked` until a record exists.
+ */
+export type ShipMessageInboxRowStatus = ShipMessageStatus | 'locked'
+
+/**
+ * One line in the ShipNet inbox (Outlook-style list + reader).
+ *
+ * @author guinetik
+ * @date 2026-04-07
+ */
+export interface ShipMessageInboxRow {
+  /** Definition id. */
+  id: string
+  /** Sender line from the definition. */
+  from: string
+  /** Subject line. */
+  subject: string
+  /** Lore date string. */
+  sentAt: string
+  /** Short excerpt for the list pane. */
+  preview: string
+  /** `locked` until the trigger has created a persisted record. */
+  status: ShipMessageInboxRowStatus
+  /** True when the message is pending (never opened in any UI). */
+  isUnread: boolean
+}
+
+/**
+ * Full message body for the inbox reader, including archive (`dismissed`) state.
+ *
+ * @author guinetik
+ * @date 2026-04-07
+ */
+export interface ShipMessageReadable extends ShipMessageDefinition {
+  /** Persisted lifecycle for reader chrome (dismissed = archived but still readable). */
+  inboxStatus: ShipMessageStatus
+}

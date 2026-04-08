@@ -40,6 +40,17 @@ describe('MapIntroState', () => {
     expect(state.cinematicProgress).toBe(1)
   })
 
+  it('advances from cinematic zoom to interactive when skipBlockingMessageAfterCinematic is set', () => {
+    const state = new MapIntroState()
+
+    state.start({ skipBlockingMessageAfterCinematic: true })
+    state.tick(MAP_INTRO_CINEMATIC_DURATION)
+
+    expect(state.phase).toBe('interactive')
+    expect(state.uiState.messagePromptVisible).toBe(false)
+    expect(state.controlsLocked).toBe(false)
+  })
+
   it('opens the message only from the prompt phase', () => {
     const state = new MapIntroState()
 

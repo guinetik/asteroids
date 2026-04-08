@@ -19,6 +19,7 @@ import type {
   GravitationalAnomalyHudState,
 } from '@/lib/ShuttleTelemetry'
 import { GameLoop } from '@/lib/GameLoop'
+import { Timer, type TimerHandle } from '@/lib/Timer'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'
 import { DEFAULT_BINDINGS } from '@/lib/defaultBindings'
@@ -369,6 +370,15 @@ const EARTH_DEPARTURE_MIN_HISTORY_POINTS = 3
 const VENUS_ORBIT_WARNING_DISTANCE = 1.5
 
 /**
+ * After Earth-orbit startup cinematic ends, wait this long (seconds) then open the habitat
+ * (same path as H / {@link MapViewController.enterHabitat}).
+ *
+ * @author guinetik
+ * @date 2026-04-07
+ */
+const POST_STARTUP_INTRO_HABITAT_DELAY_SEC = 2
+
+/**
  * Wraps a GravitySource into a GravityWell that ShuttleController can consume,
  * using map-scale gravity config.
  */
@@ -444,6 +454,22 @@ export class MapViewController implements Tickable {
   private explosionEmitter: ParticleEmitter | null = null
   private mapState = new MapState()
   private mapIntro = new MapIntroState()
+
+  /**
+   * After {@link beginStartupIntro} starts the cinematic, the next `cinematic_zoom` → `interactive`
+   * transition runs {@link finishStartupCinematicOpenOrbit}. Cleared when fired or reset.
+   */
+  private awaitingStartupCinematicOrbitHandoff = false
+
+  /** RAF {@link Timer} for auto habitat after startup cinematic; cleared on dispose or manual enter. */
+  private postStartupIntroHabitatTimerHandle: TimerHandle | null = null
+
+  /**
+   * True only after {@link finishStartupCinematicOpenOrbit} until habitat FPS — hides orbit HUD during
+   * the post-cinematic beat + transition (skipped when intro is bypassed for returning players).
+   */
+  private suppressOrbitShuttleHudForEarthStartup = false
+
   private mapCamera: MapCamera | null = null
   private worldLineHistory: WorldLineHistoryPoint[] = []
   private didDispatchEarthDistanceMessage = false
@@ -516,6 +542,11 @@ export class MapViewController implements Tickable {
 
   /** Called when the ship-message queue changes and Vue should refresh. */
   onMessageUpdate: (() => void) | null = null
+
+  /**
+   * When true, Vue should hide orbit shuttle chrome until habitat FPS (Earth first-mail cinematic path only).
+   */
+  onEarthStartupOrbitHudSuppressed: ((suppressed: boolean) => void) | null = null
 
   /** Fired when player enters/leaves habitat. */
   onHabitatActive: ((active: boolean) => void) | null = null
@@ -894,6 +925,7 @@ export class MapViewController implements Tickable {
     // --- Dev tools ---
     DevConsole.register('MapView', {
       skipIntro: () => {
+        this.clearStartupCinematicOrbitHandoff()
         this.mapIntro.skip()
         this.restoreIntroMapLayers()
         this.emitIntroUiState()
@@ -941,7 +973,16 @@ export class MapViewController implements Tickable {
    * One-shot actions, orbit state machine, and telemetry emission (runs just after input).
    */
   tick(dt: number): void {
+    const mapIntroPhaseBeforeTick = this.mapIntro.phase
     this.mapIntro.tick(dt)
+    if (
+      mapIntroPhaseBeforeTick === 'cinematic_zoom'
+      && this.mapIntro.phase === 'interactive'
+      && this.awaitingStartupCinematicOrbitHandoff
+    ) {
+      this.awaitingStartupCinematicOrbitHandoff = false
+      this.finishStartupCinematicOpenOrbit()
+    }
     this.syncIntroOrbitControlsEnabled()
     this.emitIntroUiState()
     const introLocked = this.mapIntro.controlsLocked
@@ -1979,6 +2020,7 @@ export class MapViewController implements Tickable {
 
   /** Enter the habitat interior (called by Vue OrbitPrompt click). */
   enterHabitat(): void {
+    this.cancelPostStartupIntroHabitatTimer()
     if (!this.shuttleController || !this.sceneObjects) return
     if (this.habitatState.isActive) return
     if (!this.inspectMode) {
@@ -2932,12 +2974,14 @@ export class MapViewController implements Tickable {
   private beginStartupIntro(): void {
     const activeMessage = shipMessageSystem.getActiveMessage()
     if (!activeMessage || !this.vehicleCamera) {
+      this.clearStartupCinematicOrbitHandoff()
       this.mapIntro.skip()
       this.emitIntroUiState()
       return
     }
 
-    this.mapIntro.start()
+    this.awaitingStartupCinematicOrbitHandoff = true
+    this.mapIntro.start({ skipBlockingMessageAfterCinematic: true })
     this.suppressIntroMapLayers()
     this.vehicleCamera.controls.enabled = false
     this.vehicleCamera.setConfig(MAP_ORBIT_CAMERA_CONFIG)
@@ -2948,6 +2992,57 @@ export class MapViewController implements Tickable {
       this.introCamera.updateProjectionMatrix()
     }
     this.emitIntroUiState()
+  }
+
+  /**
+   * Clears pending Earth-orbit cinematic handoff (dev skip, no-mail startup, or teardown).
+   */
+  private clearStartupCinematicOrbitHandoff(): void {
+    this.awaitingStartupCinematicOrbitHandoff = false
+    this.cancelPostStartupIntroHabitatTimer()
+    this.setEarthStartupOrbitHudSuppressed(false)
+  }
+
+  private setEarthStartupOrbitHudSuppressed(suppressed: boolean): void {
+    if (this.suppressOrbitShuttleHudForEarthStartup === suppressed) return
+    this.suppressOrbitShuttleHudForEarthStartup = suppressed
+    this.onEarthStartupOrbitHudSuppressed?.(suppressed)
+  }
+
+  private cancelPostStartupIntroHabitatTimer(): void {
+    if (this.postStartupIntroHabitatTimerHandle === null) return
+    Timer.cancel(this.postStartupIntroHabitatTimerHandle)
+    this.postStartupIntroHabitatTimerHandle = null
+  }
+
+  /**
+   * When the Earth-orbit cinematic ends: unlock orbit HUD, then after {@link POST_STARTUP_INTRO_HABITAT_DELAY_SEC}
+   * seconds auto-enter the habitat (same as pressing H).
+   */
+  private finishStartupCinematicOpenOrbit(): void {
+    if (this.vehicleCamera) {
+      this.vehicleCamera.controls.enabled = true
+    }
+    this.restoreIntroMapLayers()
+    this.shuttleController?.setInputEnabled(true)
+    this.setEarthStartupOrbitHudSuppressed(true)
+    this.emitIntroUiState()
+    this.cancelPostStartupIntroHabitatTimer()
+    this.postStartupIntroHabitatTimerHandle = Timer.after(
+      POST_STARTUP_INTRO_HABITAT_DELAY_SEC,
+      () => {
+        this.postStartupIntroHabitatTimerHandle = null
+        this.tryEnterHabitatAfterStartupIntro()
+      },
+    )
+  }
+
+  /** Invoked from {@link Timer} after the startup cinematic handoff — mirrors {@link enterHabitat}. */
+  private tryEnterHabitatAfterStartupIntro(): void {
+    if (!this.shuttleController || !this.sceneObjects) return
+    if (this.habitatState.isActive) return
+    if (this.mapState.isOpen) return
+    this.enterHabitat()
   }
 
   /**
@@ -3237,6 +3332,7 @@ export class MapViewController implements Tickable {
 
   private onEnterHabitat(): void {
     this.onHabitatActive?.(true)
+    this.setEarthStartupOrbitHudSuppressed(false)
     // Request pointer lock for FPS mouse look
     const el = this.sceneObjects?.renderer.domElement
     if (el) {
@@ -3285,6 +3381,7 @@ export class MapViewController implements Tickable {
   }
 
   dispose(): void {
+    this.clearStartupCinematicOrbitHandoff()
     document.removeEventListener('mousemove', this.onHabitatMouseMove)
     this.sceneObjects?.renderer.domElement.removeEventListener('click', this.onHabitatClick)
     this.habitatScene?.dispose()

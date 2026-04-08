@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import type { InventoryStack } from '@/lib/inventory/types'
 import type { ShuttleMissionBoard } from '@/lib/missions/types'
+import { shipMessageSystem } from '@/lib/messages/runtime'
 import ShuttleControlProgramInventory from './shuttle-control/ShuttleControlProgramInventory.vue'
+import ShuttleControlProgramMail from './shuttle-control/ShuttleControlProgramMail.vue'
 import ShuttleControlProgramMissions from './shuttle-control/ShuttleControlProgramMissions.vue'
 import ShuttleControlProgramShuttle from './shuttle-control/ShuttleControlProgramShuttle.vue'
 
-defineProps<{
+const props = defineProps<{
   visible: boolean
   inventoryStacks?: InventoryStack[]
   missionBoard?: ShuttleMissionBoard | null
@@ -20,25 +22,52 @@ const emit = defineEmits<{
   acceptMission: []
   deliverMission: [missionId: string]
   acceptAsteroidMission: []
+  mailChanged: []
 }>()
 
-type ControlScreen = 'shuttle' | 'missions' | 'inventory'
+type ControlScreen = 'shuttle' | 'mail' | 'missions' | 'inventory'
 
-const activeScreen = ref<ControlScreen>('shuttle')
+const activeScreen = ref<ControlScreen>('mail')
 
 const programByScreen: Record<ControlScreen, Component> = {
   shuttle: ShuttleControlProgramShuttle,
+  mail: ShuttleControlProgramMail,
   missions: ShuttleControlProgramMissions,
   inventory: ShuttleControlProgramInventory,
 }
 
 const activeProgram = computed(() => programByScreen[activeScreen.value])
 
-const screens: { id: ControlScreen; label: string }[] = [
-  { id: 'shuttle', label: 'Shuttle' },
-  { id: 'missions', label: 'Missions' },
-  { id: 'inventory', label: 'Inventory' },
-]
+const mailPendingCount = ref(0)
+
+function syncMailPendingCount(): void {
+  mailPendingCount.value = shipMessageSystem.getPendingMessageCount()
+}
+
+onMounted(syncMailPendingCount)
+
+watch(
+  () => props.visible,
+  (open) => {
+    if (open) syncMailPendingCount()
+  },
+)
+
+const screens = computed(() => {
+  const mailLabel =
+    mailPendingCount.value > 0 ? `Mail (${mailPendingCount.value})` : 'Mail'
+  return [
+    { id: 'mail' as const, label: mailLabel },
+    { id: 'shuttle' as const, label: 'Shuttle' },
+    { id: 'missions' as const, label: 'Missions' },
+    { id: 'inventory' as const, label: 'Inventory' },
+  ]
+})
+
+function onMailProgramChanged(): void {
+  syncMailPendingCount()
+  emit('mailChanged')
+}
 
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
@@ -98,7 +127,7 @@ function onKeydown(e: KeyboardEvent) {
         </nav>
 
         <!-- Right content area -->
-        <div class="shuttle-control-content">
+        <div class="shuttle-control-content shuttle-control-content--programs">
           <component
             :is="activeProgram"
             :inventory-stacks="inventoryStacks"
@@ -107,6 +136,7 @@ function onKeydown(e: KeyboardEvent) {
             @accept-mission="$emit('acceptMission')"
             @deliver-mission="(id: string) => $emit('deliverMission', id)"
             @accept-asteroid-mission="$emit('acceptAsteroidMission')"
+            @mail-changed="onMailProgramChanged"
           />
         </div>
       </div>

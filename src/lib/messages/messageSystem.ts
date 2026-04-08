@@ -9,6 +9,9 @@ import { loadMessageRecords, saveMessageRecords } from './messageStorage'
 import type {
   ActiveShipMessage,
   ShipMessageDefinition,
+  ShipMessageInboxRow,
+  ShipMessageInboxRowStatus,
+  ShipMessageReadable,
   ShipMessageRecord,
   ShipMessageTrigger,
 } from './messageTypes'
@@ -30,6 +33,9 @@ export interface MessagePersistence {
    */
   save(records: Record<string, ShipMessageRecord>): void
 }
+
+/** Max characters for inbox list preview text (single line / first paragraph). */
+const SHIP_MESSAGE_INBOX_PREVIEW_MAX_CHARS = 100
 
 /** Default persistence using `loadMessageRecords` / `saveMessageRecords` and localStorage. */
 const defaultPersistence: MessagePersistence = {
@@ -161,6 +167,52 @@ export class MessageSystem {
   /** Returns how many messages are still pending and unopened. */
   getPendingMessageCount(): number {
     return Object.values(this.records).filter((record) => record.status === 'pending').length
+  }
+
+  /**
+   * All catalog messages as inbox rows (locked until received in-world). Order: priority high → low,
+   * then id (matches typical tutorial ordering when the catalog is authored that way).
+   */
+  listInboxRows(): ShipMessageInboxRow[] {
+    const defs = [...this.definitions.values()].sort((a, b) => {
+      if (b.priority !== a.priority) return b.priority - a.priority
+      return a.id.localeCompare(b.id)
+    })
+
+    return defs.map((def) => {
+      const record = this.records[def.id]
+      const rawPreview = def.body[0] ?? def.subject
+      const preview =
+        rawPreview.length > SHIP_MESSAGE_INBOX_PREVIEW_MAX_CHARS
+          ? `${rawPreview.slice(0, SHIP_MESSAGE_INBOX_PREVIEW_MAX_CHARS)}…`
+          : rawPreview
+      const status: ShipMessageInboxRowStatus = record ? record.status : 'locked'
+      return {
+        id: def.id,
+        from: def.from,
+        subject: def.subject,
+        sentAt: def.sentAt,
+        preview,
+        status,
+        isUnread: record?.status === 'pending',
+      }
+    })
+  }
+
+  /**
+   * Returns the full message for the inbox reader, or null if it was never received (`locked`).
+   * Dismissed messages remain readable as archives.
+   *
+   * @param id - Message definition id
+   */
+  getReadableShipMessage(id: string): ShipMessageReadable | null {
+    const record = this.records[id]
+    const def = this.definitions.get(id)
+    if (!def || !record) return null
+    return {
+      ...def,
+      inboxStatus: record.status,
+    }
   }
 
   /** Writes the current record map through the persistence adapter. */

@@ -134,3 +134,46 @@ describe('MessageSystem.dismiss', () => {
     expect(reloaded.getActiveMessage()?.id).toBe('low-priority')
   })
 })
+
+describe('MessageSystem.listInboxRows', () => {
+  it('marks rows without a record as locked', () => {
+    const system = createSystem()
+
+    const rows = system.listInboxRows()
+    expect(rows).toHaveLength(3)
+    expect(rows.every((r) => r.status === 'locked')).toBe(true)
+  })
+
+  it('reflects pending and shown after triggers and markShown', () => {
+    const system = createSystem()
+    system.notifyTrigger('map_start_earth_orbit')
+
+    let rows = system.listInboxRows()
+    const hi = rows.find((r) => r.id === 'high-priority')
+    expect(hi?.status).toBe('pending')
+    expect(hi?.isUnread).toBe(true)
+
+    system.markShown('high-priority')
+    rows = system.listInboxRows()
+    expect(rows.find((r) => r.id === 'high-priority')?.status).toBe('shown')
+    expect(rows.find((r) => r.id === 'high-priority')?.isUnread).toBe(false)
+  })
+})
+
+describe('MessageSystem.getReadableShipMessage', () => {
+  it('returns null when no record exists', () => {
+    const system = createSystem()
+    expect(system.getReadableShipMessage('high-priority')).toBeNull()
+  })
+
+  it('returns body and inboxStatus including dismissed', () => {
+    const system = createSystem()
+    system.notifyTrigger('map_start_earth_orbit')
+    system.markShown('high-priority')
+    system.dismiss('high-priority')
+
+    const readable = system.getReadableShipMessage('high-priority')
+    expect(readable?.subject).toBe('High priority')
+    expect(readable?.inboxStatus).toBe('dismissed')
+  })
+})

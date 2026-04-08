@@ -78,6 +78,15 @@ export interface MapIntroUiState {
  * @date 2026-04-05
  * @spec docs/superpowers/specs/2026-04-05-startup-message-system-design.md
  */
+/** Options for {@link MapIntroState.start}. */
+export interface MapIntroStartOptions {
+  /**
+   * When true, the cinematic goes straight to `interactive` orbit instead of
+   * `awaiting_message_open` (no centered “new message” gate before gameplay).
+   */
+  skipBlockingMessageAfterCinematic?: boolean
+}
+
 export class MapIntroState {
   /** Current intro phase. */
   phase: MapIntroPhase = 'inactive'
@@ -85,16 +94,28 @@ export class MapIntroState {
   /** Elapsed time inside the cinematic zoom. */
   private elapsed = 0
 
-  /** Start the cinematic intro flow. */
-  start(): void {
+  /**
+   * When set by {@link start}, the post-cinematic phase skips the blocking mail prompt.
+   */
+  private skipBlockingMessageAfterCinematic = false
+
+  /**
+   * Start the cinematic intro flow.
+   *
+   * @param options - When `skipBlockingMessageAfterCinematic` is true, orbit unlocks immediately
+   * after the zoom with no “open message” step.
+   */
+  start(options?: MapIntroStartOptions): void {
     this.phase = 'cinematic_zoom'
     this.elapsed = 0
+    this.skipBlockingMessageAfterCinematic = options?.skipBlockingMessageAfterCinematic ?? false
   }
 
   /** Skip the intro entirely when no startup message is active. */
   skip(): void {
     this.phase = 'interactive'
     this.elapsed = 0
+    this.skipBlockingMessageAfterCinematic = false
   }
 
   /** Advance the cinematic timer. */
@@ -103,7 +124,12 @@ export class MapIntroState {
 
     this.elapsed += dt
     if (this.elapsed >= MAP_INTRO_CINEMATIC_DURATION) {
-      this.phase = 'awaiting_message_open'
+      if (this.skipBlockingMessageAfterCinematic) {
+        this.phase = 'interactive'
+        this.skipBlockingMessageAfterCinematic = false
+      } else {
+        this.phase = 'awaiting_message_open'
+      }
       this.elapsed = 0
     }
   }
