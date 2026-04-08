@@ -18,6 +18,7 @@ const PHAGE_SCALE = 2.0
 const LEG_COUNT = 8
 const LEG_TUBE_RADIUS = 0.025
 const LEG_SEGMENTS = 12
+const LEG_GEOMETRY_UPDATE_INTERVAL = 1 / 15
 
 const HIT_FLASH_DURATION = 0.08
 const HIT_RECOIL_DURATION = 0.25
@@ -99,6 +100,7 @@ export class BacteriophageController implements Tickable {
   private readonly timeOffset: number
   private flashTimer = 0
   private recoilTimer = 0
+  private legGeometryTimer = 0
   private dead = false
   private deathTimer = 0
   private disposed = false
@@ -122,6 +124,7 @@ export class BacteriophageController implements Tickable {
 
     this.buildBody()
     this.buildLegs()
+    this.refreshLegGeometry(0, false)
 
     // Set initial body height (legs extend from here)
     this.bodyGroup.position.y = 0.8
@@ -312,10 +315,10 @@ export class BacteriophageController implements Tickable {
     this.light.intensity = 0.6 + Math.sin(t * 2) * 0.3
 
     // --- Legs ---
-    for (const leg of this.legs) {
-      const curve = this.makeLegCurve(leg.angle, leg.phase, t, this.isMoving)
-      leg.mesh.geometry.dispose()
-      leg.mesh.geometry = new THREE.TubeGeometry(curve, LEG_SEGMENTS, LEG_TUBE_RADIUS, 4, false)
+    this.legGeometryTimer += dt
+    if (this.legGeometryTimer >= LEG_GEOMETRY_UPDATE_INTERVAL) {
+      this.refreshLegGeometry(t, this.isMoving)
+      this.legGeometryTimer %= LEG_GEOMETRY_UPDATE_INTERVAL
     }
 
     // --- Hit flash ---
@@ -344,30 +347,34 @@ export class BacteriophageController implements Tickable {
     this.bodyGroup.rotation.z = ease * 0.4 + Math.sin(t * 12) * 0.08 * (1 - ease)
 
     // --- Legs curl inward progressively ---
-    for (const leg of this.legs) {
-      const cx = Math.cos(leg.angle)
-      const cz = Math.sin(leg.angle)
+    this.legGeometryTimer += dt
+    if (this.legGeometryTimer >= LEG_GEOMETRY_UPDATE_INTERVAL) {
+      for (const leg of this.legs) {
+        const cx = Math.cos(leg.angle)
+        const cz = Math.sin(leg.angle)
 
-      // Interpolate from current rest pose to collapsed
-      const legSpread = 1.2 * (1 - ease) // legs pull inward
-      const legHeight = 0.8 * (1 - ease) // hip drops
-      const footDrop = -0.3 * ease // feet curl under
+        // Interpolate from current rest pose to collapsed
+        const legSpread = 1.2 * (1 - ease) // legs pull inward
+        const legHeight = 0.8 * (1 - ease) // hip drops
+        const footDrop = -0.3 * ease // feet curl under
 
-      const hip = new THREE.Vector3(cx * 0.3, legHeight, cz * 0.3)
-      const knee = new THREE.Vector3(
-        cx * (0.3 + legSpread * 0.4),
-        legHeight * 0.5 + Math.sin(t * 8 + leg.phase) * 0.03 * (1 - ease),
-        cz * (0.3 + legSpread * 0.4),
-      )
-      const foot = new THREE.Vector3(
-        cx * legSpread,
-        footDrop,
-        cz * legSpread,
-      )
+        const hip = new THREE.Vector3(cx * 0.3, legHeight, cz * 0.3)
+        const knee = new THREE.Vector3(
+          cx * (0.3 + legSpread * 0.4),
+          legHeight * 0.5 + Math.sin(t * 8 + leg.phase) * 0.03 * (1 - ease),
+          cz * (0.3 + legSpread * 0.4),
+        )
+        const foot = new THREE.Vector3(
+          cx * legSpread,
+          footDrop,
+          cz * legSpread,
+        )
 
-      const curve = new THREE.QuadraticBezierCurve3(hip, knee, foot)
-      leg.mesh.geometry.dispose()
-      leg.mesh.geometry = new THREE.TubeGeometry(curve, LEG_SEGMENTS, LEG_TUBE_RADIUS, 4, false)
+        const curve = new THREE.QuadraticBezierCurve3(hip, knee, foot)
+        leg.mesh.geometry.dispose()
+        leg.mesh.geometry = new THREE.TubeGeometry(curve, LEG_SEGMENTS, LEG_TUBE_RADIUS, 4, false)
+      }
+      this.legGeometryTimer %= LEG_GEOMETRY_UPDATE_INTERVAL
     }
 
     // --- Reset head flash during death ---
@@ -411,8 +418,17 @@ export class BacteriophageController implements Tickable {
   private die(): void {
     this.dead = true
     this.deathTimer = 0
+    this.legGeometryTimer = LEG_GEOMETRY_UPDATE_INTERVAL
     this.flashTimer = HIT_FLASH_DURATION
     this.head.material = flashMat
+  }
+
+  private refreshLegGeometry(time: number, isMoving: boolean): void {
+    for (const leg of this.legs) {
+      const curve = this.makeLegCurve(leg.angle, leg.phase, time, isMoving)
+      leg.mesh.geometry.dispose()
+      leg.mesh.geometry = new THREE.TubeGeometry(curve, LEG_SEGMENTS, LEG_TUBE_RADIUS, 4, false)
+    }
   }
 
   /** Clean up all geometry and materials. */

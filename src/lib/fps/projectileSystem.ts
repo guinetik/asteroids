@@ -30,6 +30,7 @@ const BOLT_DAMAGE = 25
 /** Internal projectile state. */
 interface Projectile {
   mesh: THREE.Mesh
+  material: THREE.ShaderMaterial
   velocity: THREE.Vector3
   age: number
 }
@@ -43,9 +44,15 @@ interface Projectile {
  */
 export class ProjectileSystem implements Tickable {
   private readonly projectiles: Projectile[] = []
+  private readonly pool: Projectile[] = []
   private readonly scene: THREE.Scene
   private readonly heightmap: Heightmap
   private readonly enemies: Enemy[] = []
+  private static readonly boltGeometry = (() => {
+    const geometry = new THREE.CylinderGeometry(BOLT_WIDTH, BOLT_WIDTH, BOLT_LENGTH, 6, 1, false)
+    geometry.rotateX(Math.PI / 2)
+    return geometry
+  })()
 
   /** Called when a projectile hits terrain. Position is the impact point. */
   onImpact: ((position: THREE.Vector3) => void) | null = null
@@ -76,58 +83,27 @@ export class ProjectileSystem implements Tickable {
    * @param color - Bolt color
    */
   spawn(origin: THREE.Vector3, direction: THREE.Vector3, color: THREE.Color): void {
-    const geometry = new THREE.CylinderGeometry(BOLT_WIDTH, BOLT_WIDTH, BOLT_LENGTH, 6, 1, false)
-    geometry.rotateX(Math.PI / 2)
+    const projectile = this.pool.pop() ?? this.createProjectile()
+    const mesh = projectile.mesh
+    const material = projectile.material
 
-    const material = new THREE.ShaderMaterial({
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      uniforms: {
-        uColor: { value: color.clone() },
-        uTime: { value: 0 },
-      },
-      vertexShader: /* glsl */ `
-        uniform float uTime;
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          float scale = 1.0 + uTime * 0.3;
-          vec3 scaled = position * vec3(scale, scale, 1.0);
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(scaled, 1.0);
-        }
-      `,
-      fragmentShader: /* glsl */ `
-        uniform vec3 uColor;
-        uniform float uTime;
-        varying vec2 vUv;
-        void main() {
-          float dist = abs(vUv.x - 0.5) * 2.0;
-          float core = smoothstep(1.0, 0.1, dist);
-          float whiteLine = smoothstep(0.3, 0.0, dist);
-          vec3 col = mix(uColor * 1.5, vec3(1.0), whiteLine * 0.4);
-          float taper = smoothstep(0.0, 0.15, vUv.y) * smoothstep(1.0, 0.85, vUv.y);
-          float alpha = core * taper;
-          alpha *= 0.9 + 0.1 * sin(uTime * 50.0 + vUv.y * 20.0);
-          gl_FragColor = vec4(col, alpha);
-        }
-      `,
-    })
-
-    const mesh = new THREE.Mesh(geometry, material)
     mesh.position.copy(origin)
-    mesh.lookAt(origin.clone().add(direction))
-    mesh.frustumCulled = false
+    mesh.lookAt(this._lookTarget.copy(origin).add(direction))
+    material.uniforms['uColor']!.value.copy(color)
+    material.uniforms['uTime']!.value = 0
+    mesh.visible = true
     this.scene.add(mesh)
 
     this.projectiles.push({
       mesh,
+      material,
       velocity: direction.clone().multiplyScalar(BOLT_SPEED),
       age: 0,
     })
   }
 
   private readonly _prevPos = new THREE.Vector3()
+  private readonly _lookTarget = new THREE.Vector3()
 
   tick(dt: number): void {
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
@@ -139,9 +115,8 @@ export class ProjectileSystem implements Tickable {
       p.mesh.position.addScaledVector(p.velocity, dt)
 
       // Feed time uniform
-      const mat = p.mesh.material as THREE.ShaderMaterial
-      if (mat.uniforms['uTime']) {
-        mat.uniforms['uTime'].value = p.age
+      if (p.material.uniforms['uTime']) {
+        p.material.uniforms['uTime'].value = p.age
       }
 
       const pos = p.mesh.position
@@ -199,14 +174,66 @@ export class ProjectileSystem implements Tickable {
   private removeProjectile(index: number): void {
     const p = this.projectiles[index]!
     this.scene.remove(p.mesh)
-    p.mesh.geometry.dispose()
-    ;(p.mesh.material as THREE.ShaderMaterial).dispose()
+    p.mesh.visible = false
     this.projectiles.splice(index, 1)
+    this.pool.push(p)
   }
 
   dispose(): void {
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       this.removeProjectile(i)
+    }
+    for (const projectile of this.pool) {
+      projectile.material.dispose()
+    }
+    this.pool.length = 0
+  }
+
+  private createProjectile(): Projectile {
+    const material = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      uniforms: {
+        uColor: { value: new THREE.Color() },
+        uTime: { value: 0 },
+      },
+      vertexShader: /* glsl */ `
+        uniform float uTime;
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          float scale = 1.0 + uTime * 0.3;
+          vec3 scaled = position * vec3(scale, scale, 1.0);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(scaled, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform vec3 uColor;
+        uniform float uTime;
+        varying vec2 vUv;
+        void main() {
+          float dist = abs(vUv.x - 0.5) * 2.0;
+          float core = smoothstep(1.0, 0.1, dist);
+          float whiteLine = smoothstep(0.3, 0.0, dist);
+          vec3 col = mix(uColor * 1.5, vec3(1.0), whiteLine * 0.4);
+          float taper = smoothstep(0.0, 0.15, vUv.y) * smoothstep(1.0, 0.85, vUv.y);
+          float alpha = core * taper;
+          alpha *= 0.9 + 0.1 * sin(uTime * 50.0 + vUv.y * 20.0);
+          gl_FragColor = vec4(col, alpha);
+        }
+      `,
+    })
+
+    const mesh = new THREE.Mesh(ProjectileSystem.boltGeometry, material)
+    mesh.frustumCulled = false
+    mesh.visible = false
+
+    return {
+      mesh,
+      material,
+      velocity: new THREE.Vector3(),
+      age: 0,
     }
   }
 }

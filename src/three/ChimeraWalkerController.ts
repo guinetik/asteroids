@@ -23,6 +23,8 @@ const TENTACLE_SEGMENTS = 4
 const TENTACLE_RADIAL_ATTACH = 0.72
 const TENTACLE_RADIUS_START = 0.055
 const TENTACLE_RADIUS_STEP = 0.01
+const LEG_GEOMETRY_UPDATE_INTERVAL = 1 / 18
+const TENTACLE_GEOMETRY_UPDATE_INTERVAL = 1 / 12
 
 const BODY_HEIGHT = 6.5
 const HIP_HEIGHT = 5.3
@@ -172,6 +174,8 @@ export class ChimeraWalkerController implements Tickable {
   private readonly timeOffset = Math.random() * 10
   private flashTimer = 0
   private recoilTimer = 0
+  private legGeometryTimer = 0
+  private tentacleGeometryTimer = 0
   private dead = false
   private deathTimer = 0
   private disposed = false
@@ -199,6 +203,8 @@ export class ChimeraWalkerController implements Tickable {
     this.buildLegs()
     this.buildHead()
     this.buildTentacles()
+    this.refreshLegGeometry(0, false)
+    this.refreshTentacleGeometry(0, false)
 
     this.enemy.onDeath = () => this.die()
   }
@@ -252,12 +258,16 @@ export class ChimeraWalkerController implements Tickable {
       ? 1 + Math.sin(t * 5) * 0.5
       : 0.5 + Math.sin(t * 1.5) * 0.2
 
-    for (const leg of this.legs) {
-      this.updateLeg(leg, t, this.isMoving)
+    this.legGeometryTimer += dt
+    if (this.legGeometryTimer >= LEG_GEOMETRY_UPDATE_INTERVAL) {
+      this.refreshLegGeometry(t, this.isMoving)
+      this.legGeometryTimer %= LEG_GEOMETRY_UPDATE_INTERVAL
     }
 
-    for (const tentacle of this.tentacles) {
-      this.updateTentacle(tentacle, t, this.isAgitated)
+    this.tentacleGeometryTimer += dt
+    if (this.tentacleGeometryTimer >= TENTACLE_GEOMETRY_UPDATE_INTERVAL) {
+      this.refreshTentacleGeometry(t, this.isAgitated)
+      this.tentacleGeometryTimer %= TENTACLE_GEOMETRY_UPDATE_INTERVAL
     }
 
     for (let i = 0; i < this.spineSegments.length; i++) {
@@ -518,31 +528,37 @@ export class ChimeraWalkerController implements Tickable {
     this.headGroup.rotation.x = ease * 0.4
     this.headGroup.position.y = -ease * 0.8
 
-    for (const leg of this.legs) {
-      const hip = new THREE.Vector3(leg.side * 0.8, HIP_HEIGHT * (1 - ease), 0)
-      const knee = new THREE.Vector3(leg.side * (1 - ease * 0.4), 2.2 * (1 - ease), -0.5)
-      const foot = new THREE.Vector3(leg.side * (1.2 - ease * 0.5), -0.4 * ease, -0.2)
+    this.legGeometryTimer += dt
+    if (this.legGeometryTimer >= LEG_GEOMETRY_UPDATE_INTERVAL) {
+      for (const leg of this.legs) {
+        const hip = new THREE.Vector3(leg.side * 0.8, HIP_HEIGHT * (1 - ease), 0)
+        const knee = new THREE.Vector3(leg.side * (1 - ease * 0.4), 2.2 * (1 - ease), -0.5)
+        const foot = new THREE.Vector3(leg.side * (1.2 - ease * 0.5), -0.4 * ease, -0.2)
 
-      const upperCurve = new THREE.QuadraticBezierCurve3(
-        hip,
-        hip.clone().lerp(knee, 0.5).add(new THREE.Vector3(0, 0.2, 0)),
-        knee,
-      )
-      const lowerCurve = new THREE.QuadraticBezierCurve3(
-        knee,
-        knee.clone().lerp(foot, 0.5).add(new THREE.Vector3(0, -0.1, 0)),
-        foot,
-      )
-      leg.upperMesh.geometry.dispose()
-      leg.upperMesh.geometry = new THREE.TubeGeometry(upperCurve, LEG_SEGMENTS, LEG_TUBE_RADIUS_UPPER, 6)
-      leg.lowerMesh.geometry.dispose()
-      leg.lowerMesh.geometry = new THREE.TubeGeometry(lowerCurve, LEG_SEGMENTS, LEG_TUBE_RADIUS_LOWER, 6)
-      leg.kneeSphere.position.copy(knee)
-      leg.ankleSphere.position.copy(foot)
+        const upperCurve = new THREE.QuadraticBezierCurve3(
+          hip,
+          hip.clone().lerp(knee, 0.5).add(new THREE.Vector3(0, 0.2, 0)),
+          knee,
+        )
+        const lowerCurve = new THREE.QuadraticBezierCurve3(
+          knee,
+          knee.clone().lerp(foot, 0.5).add(new THREE.Vector3(0, -0.1, 0)),
+          foot,
+        )
+        leg.upperMesh.geometry.dispose()
+        leg.upperMesh.geometry = new THREE.TubeGeometry(upperCurve, LEG_SEGMENTS, LEG_TUBE_RADIUS_UPPER, 6)
+        leg.lowerMesh.geometry.dispose()
+        leg.lowerMesh.geometry = new THREE.TubeGeometry(lowerCurve, LEG_SEGMENTS, LEG_TUBE_RADIUS_LOWER, 6)
+        leg.kneeSphere.position.copy(knee)
+        leg.ankleSphere.position.copy(foot)
+      }
+      this.legGeometryTimer %= LEG_GEOMETRY_UPDATE_INTERVAL
     }
 
-    for (const tentacle of this.tentacles) {
-      this.updateTentacle(tentacle, time + progress * 2, true)
+    this.tentacleGeometryTimer += dt
+    if (this.tentacleGeometryTimer >= TENTACLE_GEOMETRY_UPDATE_INTERVAL) {
+      this.refreshTentacleGeometry(time + progress * 2, true)
+      this.tentacleGeometryTimer %= TENTACLE_GEOMETRY_UPDATE_INTERVAL
     }
 
     if (this.flashTimer > 0) {
@@ -572,7 +588,21 @@ export class ChimeraWalkerController implements Tickable {
   private die(): void {
     this.dead = true
     this.deathTimer = 0
+    this.legGeometryTimer = LEG_GEOMETRY_UPDATE_INTERVAL
+    this.tentacleGeometryTimer = TENTACLE_GEOMETRY_UPDATE_INTERVAL
     this.flashTimer = HIT_FLASH_DURATION
     this.headMembrane.material = flashMat
+  }
+
+  private refreshLegGeometry(time: number, isMoving: boolean): void {
+    for (const leg of this.legs) {
+      this.updateLeg(leg, time, isMoving)
+    }
+  }
+
+  private refreshTentacleGeometry(time: number, isAgitated: boolean): void {
+    for (const tentacle of this.tentacles) {
+      this.updateTentacle(tentacle, time, isAgitated)
+    }
   }
 }
