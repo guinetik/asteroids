@@ -10,6 +10,11 @@
  * @spec docs/superpowers/specs/2026-04-07-upgrade-system-design.md
  */
 import upgradesData from '@/data/upgrades.json'
+import {
+  isKnownUpgradeId,
+  loadStoredPlayerUpgrades,
+  saveStoredPlayerUpgrades,
+} from '@/lib/upgradeStorage'
 
 /** Upgrade category for UI grouping. */
 export type UpgradeCategory = 'shuttle' | 'lander' | 'multitool' | 'suit'
@@ -77,6 +82,46 @@ export const UPGRADE_DEFINITIONS: Record<UpgradeId, NumericUpgradeDefinition> =
  */
 export const CURRENT_PLAYER_UPGRADE_LEVELS: Record<UpgradeId, number> =
   Object.fromEntries(definitions.map((d) => [d.id, 0])) as Record<UpgradeId, number>
+
+/**
+ * Merge persisted levels from localStorage into {@link CURRENT_PLAYER_UPGRADE_LEVELS}.
+ * Unknown keys and out-of-range values are ignored or clamped.
+ */
+export function hydratePlayerUpgradeLevelsFromStorage(): void {
+  const stored = loadStoredPlayerUpgrades()
+  if (!stored) return
+  for (const [key, raw] of Object.entries(stored)) {
+    if (!isKnownUpgradeId(key)) continue
+    if (typeof raw !== 'number' || !Number.isFinite(raw)) continue
+    const id = key as UpgradeId
+    const max = UPGRADE_DEFINITIONS[id].maxLevel
+    CURRENT_PLAYER_UPGRADE_LEVELS[id] = Math.max(0, Math.min(max, Math.floor(raw)))
+  }
+}
+
+/**
+ * Write current runtime upgrade levels to localStorage.
+ */
+export function saveCurrentPlayerUpgradesToStorage(): void {
+  saveStoredPlayerUpgrades(CURRENT_PLAYER_UPGRADE_LEVELS as unknown as Record<string, number>)
+}
+
+/**
+ * Reset all upgrades to level 0 and persist (e.g. player respawn economy reset).
+ */
+export function resetPlayerUpgradesToDefaults(): void {
+  for (const id of Object.keys(UPGRADE_DEFINITIONS) as UpgradeId[]) {
+    CURRENT_PLAYER_UPGRADE_LEVELS[id] = 0
+  }
+  saveStoredPlayerUpgrades(CURRENT_PLAYER_UPGRADE_LEVELS as unknown as Record<string, number>)
+}
+
+/**
+ * Copy of current upgrade levels for UI binding.
+ */
+export function getPlayerUpgradeLevelsSnapshot(): Record<UpgradeId, number> {
+  return { ...CURRENT_PLAYER_UPGRADE_LEVELS }
+}
 
 /**
  * Resolve a numeric upgrade value from arbitrary runtime levels.
@@ -155,4 +200,35 @@ export function getShuttleThrusterEfficiencyModifiers(
  */
 export function getCurrentShuttleThrusterEfficiencyModifiers(): ShuttleThrusterEfficiencyModifiers {
   return getShuttleThrusterEfficiencyModifiers(CURRENT_PLAYER_UPGRADE_LEVELS)
+}
+
+/** Per-thruster recharge-rate multipliers derived from shuttleThrusterCharge upgrade. */
+export interface ShuttleThrusterChargeModifiers {
+  /** Red booster bar recharge multiplier. */
+  thrust: number
+  /** Blue brake bar recharge multiplier. */
+  brake: number
+  /** White RCS bar recharge multiplier. */
+  rcs: number
+}
+
+/**
+ * Resolve shuttle thruster recharge-rate multipliers from arbitrary upgrade levels.
+ * All three groups share the single `shuttleThrusterCharge` upgrade.
+ *
+ * @param levels - Runtime upgrade level state.
+ * @returns Recharge-rate multipliers for shuttle thrusters.
+ */
+export function getShuttleThrusterChargeModifiers(levels: UpgradeLevels): ShuttleThrusterChargeModifiers {
+  const m = getUpgradeValue('shuttleThrusterCharge', levels)
+  return { thrust: m, brake: m, rcs: m }
+}
+
+/**
+ * Resolve shuttle thruster recharge-rate multipliers from current player upgrades.
+ *
+ * @returns Recharge-rate multipliers for shuttle thrusters.
+ */
+export function getCurrentShuttleThrusterChargeModifiers(): ShuttleThrusterChargeModifiers {
+  return getShuttleThrusterChargeModifiers(CURRENT_PLAYER_UPGRADE_LEVELS)
 }

@@ -8,24 +8,31 @@ import ShuttleControlProgramInventory from './shuttle-control/ShuttleControlProg
 import ShuttleControlProgramMail from './shuttle-control/ShuttleControlProgramMail.vue'
 import ShuttleControlProgramMissions from './shuttle-control/ShuttleControlProgramMissions.vue'
 import ShuttleControlProgramShuttle from './shuttle-control/ShuttleControlProgramShuttle.vue'
+import ShuttleControlProgramUpgrades from './shuttle-control/ShuttleControlProgramUpgrades.vue'
+import type { UpgradeId } from '@/lib/upgrades'
 
 const props = defineProps<{
   visible: boolean
   inventoryStacks?: InventoryStack[]
   missionBoard?: ShuttleMissionBoard | null
   dockedPlanet?: string | null
+  /** Snapshot of upgrade levels for the engineering bay. */
+  upgradeLevels?: Partial<Record<UpgradeId, number>>
+  /** Credits for upgrade purchase checks (map HUD source). */
+  playerCredits?: number
 }>()
 
 const emit = defineEmits<{
   close: []
   openShop: []
+  'purchase-upgrade': [upgradeId: UpgradeId]
   acceptMission: []
   deliverMission: [missionId: string]
   acceptAsteroidMission: []
   mailChanged: []
 }>()
 
-type ControlScreen = 'shuttle' | 'mail' | 'missions' | 'inventory'
+type ControlScreen = 'shuttle' | 'mail' | 'missions' | 'inventory' | 'upgrades'
 
 const activeScreen = ref<ControlScreen>('mail')
 
@@ -34,6 +41,7 @@ const programByScreen: Record<ControlScreen, Component> = {
   mail: ShuttleControlProgramMail,
   missions: ShuttleControlProgramMissions,
   inventory: ShuttleControlProgramInventory,
+  upgrades: ShuttleControlProgramUpgrades,
 }
 
 const activeProgram = computed(() => programByScreen[activeScreen.value])
@@ -53,6 +61,15 @@ watch(
   },
 )
 
+watch(
+  () => props.dockedPlanet,
+  (planet) => {
+    if (!planet && activeScreen.value === 'upgrades') {
+      activeScreen.value = 'mail'
+    }
+  },
+)
+
 const screens = computed(() => {
   const mailLabel =
     mailPendingCount.value > 0 ? `Mail (${mailPendingCount.value})` : 'Mail'
@@ -67,6 +84,10 @@ const screens = computed(() => {
 function onMailProgramChanged(): void {
   syncMailPendingCount()
   emit('mailChanged')
+}
+
+function emitPurchaseUpgrade(upgradeId: UpgradeId): void {
+  emit('purchase-upgrade', upgradeId)
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -118,11 +139,21 @@ function onKeydown(e: KeyboardEvent) {
           </button>
           <div class="shuttle-control-sidebar-divider" />
           <button
+            v-if="dockedPlanet"
             type="button"
             class="shuttle-control-nav-btn shuttle-control-nav-btn--shop"
             @click="$emit('openShop')"
           >
             Shop
+          </button>
+          <button
+            v-if="dockedPlanet"
+            type="button"
+            class="shuttle-control-nav-btn shuttle-control-nav-btn--upgrades-shop"
+            :class="{ 'shuttle-control-nav-btn--active': activeScreen === 'upgrades' }"
+            @click="activeScreen = 'upgrades'"
+          >
+            UPGRADES SHOP
           </button>
         </nav>
 
@@ -133,10 +164,13 @@ function onKeydown(e: KeyboardEvent) {
             :inventory-stacks="inventoryStacks"
             :board="missionBoard"
             :docked-planet="dockedPlanet"
+            :upgrade-levels="upgradeLevels ?? {}"
+            :player-credits="playerCredits ?? 0"
             @accept-mission="$emit('acceptMission')"
             @deliver-mission="(id: string) => $emit('deliverMission', id)"
             @accept-asteroid-mission="$emit('acceptAsteroidMission')"
             @mail-changed="onMailProgramChanged"
+            @purchase-upgrade="emitPurchaseUpgrade"
           />
         </div>
       </div>

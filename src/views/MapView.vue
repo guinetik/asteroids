@@ -22,6 +22,8 @@ import type { Inventory } from '@/lib/inventory/types'
 import { createProfile } from '@/lib/player/profile'
 import { createInventory } from '@/lib/inventory/inventory'
 import { shipMessageSystem } from '@/lib/messages/runtime'
+import { getUpgradeCost, UPGRADE_DEFINITIONS, type UpgradeId } from '@/lib/upgrades'
+import UpgradeInstalledAnnouncement from '@/components/UpgradeInstalledAnnouncement.vue'
 import { Timer, type TimerHandle } from '@/lib/Timer'
 import type { ActiveShipMessage } from '@/lib/messages/messageTypes'
 import type { MapIntroUiState } from '@/lib/mapIntroState'
@@ -132,6 +134,12 @@ const habitatActive = ref(false)
 /** Hides orbit shuttle chrome during Earth first-mail cinematic → habitat (not used when intro is skipped). */
 const earthStartupOrbitHudSuppressed = ref(false)
 const shuttleControlVisible = ref(false)
+/** Upgrade levels shown in the shuttle terminal engineering bay (synced on open / after purchase). */
+const upgradeLevelsUi = ref<Partial<Record<UpgradeId, number>>>({})
+const upgradeInstalledVisible = ref(false)
+const upgradeInstalledUpgradeName = ref('')
+const upgradeInstalledTier = ref(1)
+const upgradeInstalledCreditsSpent = ref(0)
 const habitatPrompt = ref<string | null>(null)
 const habitatFadeOpacity = ref(0)
 const deathVisible = ref(false)
@@ -218,6 +226,9 @@ onMounted(async () => {
     }
     viewController.onShuttleControl = (visible) => {
       shuttleControlVisible.value = visible
+      if (visible) {
+        upgradeLevelsUi.value = viewController.getUpgradeLevelsSnapshot()
+      }
     }
     viewController.onHabitatPrompt = (prompt) => {
       habitatPrompt.value = prompt
@@ -306,6 +317,21 @@ function closeShuttleControl() {
 function openShopFromTerminal() {
   shuttleControlVisible.value = false
   viewController.openShop()
+}
+
+function handlePurchaseUpgrade(upgradeId: UpgradeId): void {
+  if (!viewController.purchaseNextUpgradeLevel(upgradeId)) return
+  upgradeLevelsUi.value = viewController.getUpgradeLevelsSnapshot()
+  const newLevel = upgradeLevelsUi.value[upgradeId] ?? 0
+  const def = UPGRADE_DEFINITIONS[upgradeId]
+  upgradeInstalledUpgradeName.value = def.label
+  upgradeInstalledTier.value = newLevel
+  upgradeInstalledCreditsSpent.value = getUpgradeCost(upgradeId, newLevel)
+  upgradeInstalledVisible.value = true
+}
+
+function onUpgradeInstalledDismissed(): void {
+  upgradeInstalledVisible.value = false
 }
 
 function handleToggleAmbient() {
@@ -526,12 +552,22 @@ function dockedPlanetId(): string | null {
     :inventory-stacks="shopInventory.stacks"
     :mission-board="missionBoard"
     :docked-planet="dockedPlanetId()"
+    :upgrade-levels="upgradeLevelsUi"
+    :player-credits="playerCredits"
     @close="closeShuttleControl"
     @open-shop="openShopFromTerminal"
+    @purchase-upgrade="handlePurchaseUpgrade"
     @accept-mission="handleAcceptMission"
     @deliver-mission="handleDeliverMission"
     @accept-asteroid-mission="handleAcceptAsteroidMission"
     @mail-changed="refreshActiveMessage"
+  />
+  <UpgradeInstalledAnnouncement
+    :visible="upgradeInstalledVisible"
+    :upgrade-name="upgradeInstalledUpgradeName"
+    :tier="upgradeInstalledTier"
+    :credits-spent="upgradeInstalledCreditsSpent"
+    @dismissed="onUpgradeInstalledDismissed"
   />
   <CreditsBadge
     v-show="

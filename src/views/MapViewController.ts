@@ -94,7 +94,18 @@ import { computeShuttleBaseFuelDrain } from '@/lib/shuttleBaseFuelDrain'
 import { ShipHealth } from '@/lib/shipHealth'
 import type { ShipHealthConfig } from '@/lib/shipHealth'
 import shipHealthData from '@/data/shuttle/ship-health.json'
-import { getCurrentShuttleThrusterEfficiencyModifiers, getCurrentUpgradeValue, CURRENT_PLAYER_UPGRADE_LEVELS } from '@/lib/upgrades'
+import {
+  getCurrentShuttleThrusterEfficiencyModifiers,
+  getCurrentShuttleThrusterChargeModifiers,
+  getCurrentUpgradeValue,
+  getPlayerUpgradeLevelsSnapshot,
+  hydratePlayerUpgradeLevelsFromStorage,
+  resetPlayerUpgradesToDefaults,
+  saveCurrentPlayerUpgradesToStorage,
+  CURRENT_PLAYER_UPGRADE_LEVELS,
+  type UpgradeId,
+} from '@/lib/upgrades'
+import { tryPurchaseNextUpgradeLevel } from '@/lib/upgradePurchase'
 import { HabitatState } from '@/lib/habitatState'
 import { HabitatInteriorScene } from '@/three/HabitatInteriorScene'
 import {
@@ -111,9 +122,9 @@ import {
 } from '@/lib/shop/shopSession'
 import type { ShopSession } from '@/lib/shop/tradeTypes'
 import { tickDemandTimer, resetDemand } from '@/lib/shop/planetDemand'
-import { createProfile, spendCredits } from '@/lib/player/profile'
+import { createProfile, saveProfile, spendCredits } from '@/lib/player/profile'
 import type { PlayerProfile } from '@/lib/player/types'
-import { createInventory, addItem, getStack, consumeItem, canFitItem } from '@/lib/inventory/inventory'
+import { createInventory, addItem, getStack, consumeItem, canFitItem, DEFAULT_MAX_SLOTS } from '@/lib/inventory/inventory'
 import type { Inventory } from '@/lib/inventory/types'
 import '@/lib/shop/tradeGoods'
 import {
@@ -444,7 +455,9 @@ export class MapViewController implements Tickable {
   private missionOverlayOpen = false
   private missionButtonVisible = false
   private playerProfile: PlayerProfile = createProfile('Pilot')
-  private playerInventory: Inventory = createInventory()
+  private playerInventory: Inventory = createInventory(
+    Math.round(DEFAULT_MAX_SLOTS * getCurrentUpgradeValue('shuttleCargoBay')),
+  )
   private portalArrival: PortalArrivalSequence | null = null
   private boundarySystem: PortalBoundarySystem | null = null
   private gravityPass: ShaderPass | null = null
@@ -597,6 +610,7 @@ export class MapViewController implements Tickable {
 
     // --- Input ---
     this.inputManager = new InputManager(DEFAULT_BINDINGS)
+    hydratePlayerUpgradeLevelsFromStorage()
     this.tickHandler = new TickHandler()
     this.tickHandler.register(this.inputManager, TICK_PRIORITY_INPUT)
 
@@ -733,7 +747,13 @@ export class MapViewController implements Tickable {
     }
 
     // Ship health — temperature + radiation damage
-    this.shipHealth = new ShipHealth(shipHealthData as ShipHealthConfig)
+    // Scale maxHp by hull upgrade level (multiplier: 1.0 → 2.0)
+    const hullMultiplier = getCurrentUpgradeValue('shuttleHull')
+    const healthConfig: ShipHealthConfig = {
+      ...(shipHealthData as ShipHealthConfig),
+      maxHp: (shipHealthData as ShipHealthConfig).maxHp * hullMultiplier,
+    }
+    this.shipHealth = new ShipHealth(healthConfig)
     this.shipHealth.onDeath = (cause) => {
       this.triggerDeath(cause)
     }
@@ -1457,7 +1477,9 @@ export class MapViewController implements Tickable {
       this.shipHealth.tick(
         dt, sunDist, radiationProximity, isHealingAtEarth,
         getCurrentUpgradeValue('shuttleHeatResistance'),
-        getCurrentUpgradeValue('shuttleHull'),
+        1, // heatArmor — no upgrade for this slot currently
+        getCurrentUpgradeValue('shuttleFreezeResistance'),
+        getCurrentUpgradeValue('shuttleRadiationResistance'),
       )
       this.temperatureEffects?.setTemperature(this.shipHealth.temperature)
     }
@@ -1670,7 +1692,10 @@ export class MapViewController implements Tickable {
           brake: false,
           rcs: yawLeft || yawRight,
         },
-        { burnRateMultiplier: getCurrentShuttleThrusterEfficiencyModifiers() },
+        {
+          burnRateMultiplier: getCurrentShuttleThrusterEfficiencyModifiers(),
+          rechargeRateMultiplier: getCurrentShuttleThrusterChargeModifiers(),
+        },
       )
       if (this.orbitSystem.target && this.vehicleCamera) {
         const bx = this.orbitSystem.target.getWorldX()
@@ -1929,6 +1954,31 @@ export class MapViewController implements Tickable {
     }
   }
 
+  /**
+   * Snapshot of upgrade levels for shuttle terminal UI.
+   */
+  getUpgradeLevelsSnapshot(): Record<UpgradeId, number> {
+    return getPlayerUpgradeLevelsSnapshot()
+  }
+
+  /**
+   * Buy the next level for an upgrade if the player has enough credits.
+   *
+   * @param upgradeId - Upgrade to advance by one level.
+   * @returns True when purchase succeeded.
+   */
+  purchaseNextUpgradeLevel(upgradeId: UpgradeId): boolean {
+    const current = CURRENT_PLAYER_UPGRADE_LEVELS[upgradeId] ?? 0
+    const result = tryPurchaseNextUpgradeLevel(this.playerProfile, upgradeId, current)
+    if (!result.ok) return false
+    this.playerProfile = result.profile
+    CURRENT_PLAYER_UPGRADE_LEVELS[upgradeId] = result.newLevel
+    saveProfile(this.playerProfile)
+    saveCurrentPlayerUpgradesToStorage()
+    this.onCreditsUpdate?.(this.playerProfile.credits)
+    return true
+  }
+
   /** Open the shop dialog (called by Vue ShopButton click). */
   openShop(): void {
     if (this.shopSession) {
@@ -1990,7 +2040,13 @@ export class MapViewController implements Tickable {
   /** Deliver a completed mission (from shuttle control UI). */
   missionDeliver(missionId: string): void {
     const mission = this.missionBoard.activeMissions.find((m) => m.template.id === missionId)
-    const result = deliverMission(this.missionBoard, missionId, this.playerProfile, this.playerInventory)
+    const result = deliverMission(
+      this.missionBoard,
+      missionId,
+      this.playerProfile,
+      this.playerInventory,
+      getCurrentUpgradeValue('shuttleScienceStation'),
+    )
     if (result.ok) {
       this.missionBoard = result.board
       this.playerProfile = result.profile
@@ -2409,7 +2465,10 @@ export class MapViewController implements Tickable {
     // Reset shop and economy state
     this.shopSession = null
     this.playerProfile = createProfile('Pilot')
-    this.playerInventory = createInventory()
+    this.playerInventory = createInventory(
+      Math.round(DEFAULT_MAX_SLOTS * getCurrentUpgradeValue('shuttleCargoBay')),
+    )
+    resetPlayerUpgradesToDefaults()
     resetDemand()
     this.onShopButton?.(false, '')
     this.onShopState?.(null, this.playerProfile, this.playerInventory)

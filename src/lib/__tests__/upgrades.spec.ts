@@ -5,7 +5,7 @@
  * @date 2026-04-07
  * @spec docs/superpowers/specs/2026-04-07-upgrade-system-design.md
  */
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
   UPGRADE_DEFINITIONS,
   CURRENT_PLAYER_UPGRADE_LEVELS,
@@ -15,7 +15,13 @@ import {
   getUpgradesByCategory,
   getShuttleThrusterEfficiencyModifiers,
   getCurrentShuttleThrusterEfficiencyModifiers,
+  hydratePlayerUpgradeLevelsFromStorage,
+  resetPlayerUpgradesToDefaults,
 } from '../upgrades'
+import {
+  PLAYER_UPGRADES_STORAGE_KEY,
+  PLAYER_UPGRADES_STORAGE_SCHEMA_VERSION,
+} from '../upgradeStorage'
 
 /** Total number of upgrades defined in the JSON. */
 const EXPECTED_UPGRADE_COUNT = 26
@@ -49,12 +55,31 @@ describe('UPGRADE_DEFINITIONS', () => {
 })
 
 describe('CURRENT_PLAYER_UPGRADE_LEVELS', () => {
+  afterEach(() => {
+    localStorage.removeItem(PLAYER_UPGRADES_STORAGE_KEY)
+    resetPlayerUpgradesToDefaults()
+  })
+
   it('initializes all 26 upgrades to level 0', () => {
     const keys = Object.keys(CURRENT_PLAYER_UPGRADE_LEVELS)
     expect(keys).toHaveLength(EXPECTED_UPGRADE_COUNT)
     for (const level of Object.values(CURRENT_PLAYER_UPGRADE_LEVELS)) {
       expect(level).toBe(0)
     }
+  })
+
+  it('hydratePlayerUpgradeLevelsFromStorage merges stored levels', () => {
+    resetPlayerUpgradesToDefaults()
+    localStorage.setItem(
+      PLAYER_UPGRADES_STORAGE_KEY,
+      JSON.stringify({
+        v: PLAYER_UPGRADES_STORAGE_SCHEMA_VERSION,
+        levels: { shuttleHull: 2 },
+      }),
+    )
+    hydratePlayerUpgradeLevelsFromStorage()
+    expect(CURRENT_PLAYER_UPGRADE_LEVELS.shuttleHull).toBe(2)
+    expect(CURRENT_PLAYER_UPGRADE_LEVELS.shuttleThrusterEfficiency).toBe(0)
   })
 })
 

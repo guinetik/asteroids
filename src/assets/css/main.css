@@ -689,6 +689,16 @@ body {
   @apply border border-amber-400/20 text-amber-300 hover:bg-amber-400/10;
 }
 
+.shuttle-control-nav-btn--upgrades-shop {
+  @apply mt-1 border border-cyan-400/70 bg-cyan-500/20 font-mono text-[10px] leading-snug uppercase
+         tracking-[0.14em] text-cyan-200 shadow-[0_0_14px_rgba(34,211,238,0.35)]
+         hover:border-cyan-300 hover:bg-cyan-400/30 hover:text-cyan-50 hover:shadow-[0_0_18px_rgba(34,211,238,0.45)];
+}
+
+.shuttle-control-nav-btn--upgrades-shop.shuttle-control-nav-btn--active {
+  @apply border-cyan-300 bg-cyan-400/35 text-white shadow-[0_0_20px_rgba(34,211,238,0.5)];
+}
+
 .shuttle-control-sidebar-divider {
   @apply my-1 border-t border-white/5;
 }
@@ -699,6 +709,58 @@ body {
 
 .shuttle-control-content--programs {
   @apply min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-5 sm:p-6;
+}
+
+/* Shuttle terminal — stylized scrollbars (program panels + ShipNet) */
+.shuttle-control-content,
+.shuttle-control-content--programs,
+.shuttle-mail-program__list,
+.shuttle-mail-program__reader {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 211, 238, 0.42) rgba(15, 23, 42, 0.92);
+}
+
+.shuttle-control-content::-webkit-scrollbar,
+.shuttle-control-content--programs::-webkit-scrollbar,
+.shuttle-mail-program__list::-webkit-scrollbar,
+.shuttle-mail-program__reader::-webkit-scrollbar {
+  width: 9px;
+}
+
+.shuttle-control-content::-webkit-scrollbar-track,
+.shuttle-control-content--programs::-webkit-scrollbar-track,
+.shuttle-mail-program__list::-webkit-scrollbar-track,
+.shuttle-mail-program__reader::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.92);
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.12);
+}
+
+.shuttle-control-content::-webkit-scrollbar-thumb,
+.shuttle-control-content--programs::-webkit-scrollbar-thumb,
+.shuttle-mail-program__list::-webkit-scrollbar-thumb,
+.shuttle-mail-program__reader::-webkit-scrollbar-thumb {
+  border-radius: 2px;
+  background: linear-gradient(
+    180deg,
+    rgba(34, 211, 238, 0.38) 0%,
+    rgba(6, 182, 212, 0.22) 100%
+  );
+  box-shadow:
+    0 0 8px rgba(34, 211, 238, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(34, 211, 238, 0.28);
+}
+
+.shuttle-control-content::-webkit-scrollbar-thumb:hover,
+.shuttle-control-content--programs::-webkit-scrollbar-thumb:hover,
+.shuttle-mail-program__list::-webkit-scrollbar-thumb:hover,
+.shuttle-mail-program__reader::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(34, 211, 238, 0.55) 0%,
+    rgba(6, 182, 212, 0.38) 100%
+  );
 }
 
 /* ShipNet mail — Outlook-style folder + list + reader (shuttle terminal) */
@@ -802,8 +864,320 @@ body {
   @apply text-sm text-slate-500;
 }
 
+/* Shuttle terminal — engineering bay (persistent upgrades) */
+.upgrade-shop-program {
+  @apply flex flex-col gap-4 text-slate-200;
+}
+
+.upgrade-shop-program__header {
+  @apply flex flex-wrap items-end justify-between gap-3;
+}
+
+.upgrade-shop-program__credits {
+  @apply font-mono text-xs uppercase tracking-wider text-slate-500;
+}
+
+.upgrade-shop-program__credits-value {
+  @apply ml-2 text-cyan-300/90 tabular-nums;
+}
+
+.upgrade-shop-program__intro {
+  @apply max-w-3xl text-sm leading-relaxed text-slate-500;
+}
+
+.upgrade-shop-program__intro-em {
+  @apply font-medium text-cyan-200/85;
+}
+
+.upgrade-shop-program__category {
+  @apply flex flex-col gap-3;
+}
+
+.upgrade-shop-program__category-head {
+  @apply flex items-center gap-3 border-b border-white/10 pb-2;
+}
+
+.upgrade-shop-program__category-icon {
+  @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-violet-400/35
+         bg-violet-500/10 text-violet-200;
+}
+
+.upgrade-shop-program__category-svg {
+  @apply h-5 w-5;
+}
+
+.upgrade-shop-program__category-title {
+  @apply font-mono text-sm font-medium uppercase tracking-[0.18em] text-violet-200/95 sm:text-base sm:tracking-[0.2em];
+}
+
+.upgrade-shop-program__list {
+  @apply flex flex-col gap-2;
+}
+
+.upgrade-shop-program__row {
+  @apply grid gap-x-3 gap-y-2 rounded-lg border border-white/8 bg-white/[0.03] p-3;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+}
+
+.upgrade-shop-program__row-icon {
+  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-md border font-mono text-sm font-semibold;
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: start;
+}
+
+.upgrade-shop-program__row-icon--shuttle {
+  @apply border-cyan-500/40 bg-cyan-500/10 text-cyan-200;
+}
+
+.upgrade-shop-program__row-icon--lander {
+  @apply border-amber-500/35 bg-amber-500/10 text-amber-200;
+}
+
+.upgrade-shop-program__row-icon--multitool {
+  @apply border-emerald-500/35 bg-emerald-500/10 text-emerald-200;
+}
+
+.upgrade-shop-program__row-icon--suit {
+  @apply border-fuchsia-500/35 bg-fuchsia-500/10 text-fuchsia-200;
+}
+
+.upgrade-shop-program__meta {
+  @apply flex min-w-0 flex-col gap-0.5;
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.upgrade-shop-program__effect-compare {
+  @apply flex flex-col gap-1 rounded-md border border-white/6 bg-black/20 px-2 py-1.5;
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.upgrade-shop-program__effect-line {
+  @apply flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0 font-mono text-[11px] uppercase tracking-wider;
+}
+
+.upgrade-shop-program__effect-line--max {
+  @apply opacity-80;
+}
+
+.upgrade-shop-program__effect-label {
+  @apply text-slate-500;
+}
+
+.upgrade-shop-program__effect-value {
+  @apply tabular-nums text-cyan-200/90;
+}
+
+.upgrade-shop-program__effect-value--gain {
+  @apply text-amber-200/95;
+}
+
+.upgrade-shop-program__effect-muted {
+  @apply text-slate-500;
+}
+
+.upgrade-shop-program__levels-wrap {
+  @apply flex flex-col gap-1;
+  grid-column: 1 / -1;
+  grid-row: 3;
+}
+
+.upgrade-shop-program__levels-header {
+  @apply text-center font-mono text-[10px] uppercase tracking-[0.32em] text-slate-500 lg:text-right;
+}
+
+.upgrade-shop-program__name {
+  @apply font-mono text-sm text-cyan-100/90;
+}
+
+.upgrade-shop-program__desc {
+  @apply text-xs leading-snug text-slate-500;
+}
+
+.upgrade-shop-program__levels {
+  @apply flex shrink-0 flex-wrap justify-center gap-1.5 lg:justify-end;
+}
+
+.upgrade-shop-program__level {
+  @apply flex min-h-[3.25rem] min-w-[3.35rem] flex-col items-center justify-center gap-0.5 rounded-md border border-white/15
+         bg-black/25 font-mono transition-colors sm:min-w-[3.5rem];
+}
+
+.upgrade-shop-program__level--baseline {
+  @apply border-slate-500/35 bg-slate-800/50 text-slate-300;
+}
+
+.upgrade-shop-program__level--owned {
+  @apply border-cyan-500/40 bg-cyan-500/15 text-cyan-200;
+}
+
+.upgrade-shop-program__level--next {
+  @apply cursor-pointer border-amber-400/50 bg-amber-400/10 text-amber-100 hover:bg-amber-400/20;
+}
+
+.upgrade-shop-program__level--unaffordable {
+  @apply cursor-not-allowed opacity-50 hover:bg-amber-400/10;
+}
+
+.upgrade-shop-program__level--locked {
+  @apply cursor-not-allowed border-white/8 text-slate-600 opacity-60;
+}
+
+.upgrade-shop-program__level-num {
+  @apply text-sm font-semibold tabular-nums;
+}
+
+.upgrade-shop-program__level-cost {
+  @apply text-[9px] uppercase tracking-wide text-slate-400;
+}
+
+.upgrade-shop-program__level--owned .upgrade-shop-program__level-cost {
+  @apply text-cyan-400/60;
+}
+
+.upgrade-shop-program__level--baseline .upgrade-shop-program__level-cost {
+  @apply text-slate-500;
+}
+
+@media (min-width: 1024px) {
+  .upgrade-shop-program__row {
+    grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+  }
+
+  .upgrade-shop-program__levels-wrap {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    align-self: start;
+    justify-self: end;
+  }
+
+  .upgrade-shop-program__levels-header {
+    @apply pr-0 text-right;
+  }
+}
+
 .shuttle-control-footer {
   @apply flex items-center border-t border-white/10 px-5 py-3;
+}
+
+/* Upgrade installed toast (map / spaceport — MissionAnnouncement-style stripe).
+   Animation durations: keep in sync with UpgradeInstalledAnnouncement.vue (OPEN/CLOSE seconds). */
+.upgrade-installed-announcement {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  transform: translateY(-50%);
+  pointer-events: none;
+  overflow: hidden;
+  border-top: 1px solid rgba(0, 255, 204, 0.18);
+  border-bottom: 1px solid rgba(0, 255, 204, 0.18);
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(0, 255, 204, 0.05) 20%,
+    rgba(0, 255, 204, 0.1) 50%,
+    rgba(0, 255, 204, 0.05) 80%,
+    transparent
+  );
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow:
+    0 0 60px rgba(0, 255, 204, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  max-height: 0;
+}
+
+.upgrade-installed-announcement--opening {
+  animation: upgrade-installed-open 0.6s ease-out forwards;
+}
+
+.upgrade-installed-announcement--open {
+  max-height: 12rem;
+  padding: 2rem 0;
+}
+
+.upgrade-installed-announcement--closing {
+  animation: upgrade-installed-close 0.8s ease-in forwards;
+}
+
+.upgrade-installed-announcement__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.upgrade-installed-announcement__eyebrow {
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 0.95rem;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: rgba(0, 255, 204, 0.55);
+}
+
+.upgrade-installed-announcement__divider {
+  width: 14rem;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(0, 255, 204, 0.55),
+    rgba(167, 139, 250, 0.45),
+    rgba(0, 255, 204, 0.55),
+    transparent
+  );
+}
+
+.upgrade-installed-announcement__title {
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: clamp(1.35rem, 3.5vw, 2.1rem);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(0, 255, 204, 0.92);
+  text-align: center;
+  text-shadow:
+    0 0 22px rgba(0, 255, 204, 0.45),
+    0 0 48px rgba(0, 255, 204, 0.18);
+}
+
+.upgrade-installed-announcement__meta {
+  margin-top: 0.15rem;
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(196, 181, 253, 0.88);
+  text-shadow: 0 0 12px rgba(167, 139, 250, 0.35);
+}
+
+@keyframes upgrade-installed-open {
+  from {
+    max-height: 0;
+    padding: 0;
+    opacity: 0;
+  }
+  to {
+    max-height: 12rem;
+    padding: 2rem 0;
+    opacity: 1;
+  }
+}
+
+@keyframes upgrade-installed-close {
+  from {
+    max-height: 12rem;
+    padding: 2rem 0;
+    opacity: 1;
+  }
+  to {
+    max-height: 0;
+    padding: 0;
+    opacity: 0;
+  }
 }
 
 /* Credits Badge HUD */
