@@ -36,5 +36,24 @@
     "projectileDamage": 10,
     "fireRate": 0.5,
     "floatHeight": 6
+  },
+  "chimera": {
+    "maxHp": 120,
+    "hitRadius": 3.2,
+    "speed": 5,
+    "aggroRadius": 42,
+    "leashRadius": 64,
+    "agitateRadius": 14,
+    "wanderRadius": 16,
+    "wanderSpeed": 1.8,
+    "contactDamage": 24,
+    "contactRadius": 3.4,
+    "contactCooldown": 1.1,
+    "preferredRange": 0,
+    "minRange": 0,
+    "projectileSpeed": 0,
+    "projectileDamage": 0,
+    "fireRate": 0,
+    "floatHeight": 0
   }
 }

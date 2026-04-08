@@ -48,7 +48,14 @@ export interface EnemyTypeConfig {
 }
 
 /** All enemy type configs keyed by type name. */
-const ENEMY_TYPES = enemyTypesJson as Record<string, EnemyTypeConfig>
+const ENEMY_TYPES = Object.freeze(
+  Object.fromEntries(
+    Object.entries(enemyTypesJson as Record<string, EnemyTypeConfig>).map(([type, config]) => [
+      type,
+      Object.freeze({ ...config }),
+    ]),
+  ) as Record<string, Readonly<EnemyTypeConfig>>,
+)
 
 /**
  * Get the config for an enemy type.
@@ -60,5 +67,5 @@ const ENEMY_TYPES = enemyTypesJson as Record<string, EnemyTypeConfig>
 export function getEnemyTypeConfig(type: string): EnemyTypeConfig {
   const config = ENEMY_TYPES[type]
   if (!config) throw new Error(`Unknown enemy type: ${type}`)
-  return config
+  return { ...config }
 }

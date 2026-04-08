@@ -41,6 +41,7 @@ import { BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/Bacteriopha
 import { EnemyProjectileSystem } from '@/lib/fps/enemyProjectileSystem'
 import { SpireController, SPIRE_HIT_CENTER_Y } from '@/three/SpireController'
 import { EnemyProjectileMesh } from '@/three/EnemyProjectileMesh'
+import { ChimeraWalkerController, CHIMERA_HIT_CENTER_Y } from '@/three/ChimeraWalkerController'
 
 const AMBIENT_LIGHT_INTENSITY = 0.4
 const DIR_LIGHT_INTENSITY = 1.2
@@ -57,6 +58,9 @@ const CONTACT_KNOCKBACK = 12
 const SPIRE_SPAWN_COUNT = 4
 const SPIRE_SPAWN_RADIUS = 100
 const SPIRE_MIN_SPAWN_DISTANCE = 40
+const CHIMERA_SPAWN_COUNT = 3
+const CHIMERA_SPAWN_RADIUS = 90
+const CHIMERA_MIN_SPAWN_DISTANCE = 32
 
 const TEST_SURFACE: SurfaceFeatures = {
   craterDensity: 0.5,
@@ -92,6 +96,7 @@ export class FpsViewController implements Tickable {
   private readonly enemyControllers = new Map<number, BacteriophageController>()
   private enemyProjectileSystem: EnemyProjectileSystem | null = null
   private readonly spireControllers = new Map<number, SpireController>()
+  private readonly chimeraControllers = new Map<number, ChimeraWalkerController>()
   private readonly enemyProjectileMeshes = new Map<number, EnemyProjectileMesh>()
   private leftMouseDown = false
   private leftMouseJustPressed = false
@@ -340,6 +345,15 @@ export class FpsViewController implements Tickable {
             break
           }
         }
+        for (const [, ctrl] of this.chimeraControllers) {
+          if (ctrl.enemy === enemy) {
+            ctrl.flash()
+            if (!enemy.alive) {
+              this.projectileSystem!.removeEnemy(enemy)
+            }
+            break
+          }
+        }
       }
 
       // Spawn spires
@@ -357,6 +371,23 @@ export class FpsViewController implements Tickable {
         this.projectileSystem!.addEnemy(handle.enemy)
         this.tickHandler.register(controller, TICK_PRIORITY_ANIMATION)
         this.spireControllers.set(handle.id, controller)
+      }
+
+      // Spawn chimera walkers
+      for (let i = 0; i < CHIMERA_SPAWN_COUNT; i++) {
+        const angle = (i / CHIMERA_SPAWN_COUNT) * Math.PI * 2 + Math.PI / 6
+        const radius = CHIMERA_MIN_SPAWN_DISTANCE + Math.random() * (CHIMERA_SPAWN_RADIUS - CHIMERA_MIN_SPAWN_DISTANCE)
+        const x = Math.cos(angle) * radius
+        const z = Math.sin(angle) * radius
+        const groundY = heightmap.heightAt(x, z)
+
+        const handle = this.enemyDirector.spawn('chimera', x, groundY, z)
+        const controller = new ChimeraWalkerController(handle.enemy)
+        controller.group.position.set(x, groundY, z)
+        this.sceneManager.addToScene(controller.group)
+        this.projectileSystem!.addEnemy(handle.enemy)
+        this.tickHandler.register(controller, TICK_PRIORITY_ANIMATION)
+        this.chimeraControllers.set(handle.id, controller)
       }
     }
 
@@ -553,6 +584,48 @@ export class FpsViewController implements Tickable {
 
       // Feed player position to enemy projectile system
       this.enemyProjectileSystem?.setPlayerPosition(pp.x, pp.y, pp.z)
+
+      // Chimera sync
+      for (const handle of this.enemyDirector.enemies) {
+        const ctrl = this.chimeraControllers.get(handle.id)
+        if (!ctrl) continue
+
+        if (ctrl.deathComplete) {
+          this.tickHandler!.unregister(ctrl)
+          this.chimeraControllers.delete(handle.id)
+          this.enemyDirector!.despawn(handle)
+          continue
+        }
+
+        if (!handle.enemy.alive) continue
+
+        ctrl.isMoving = handle.lastOutput.isMoving
+        ctrl.isAgitated = handle.lastOutput.isAgitated
+
+        ctrl.group.position.x = handle.enemy.position.x
+        ctrl.group.position.z = handle.enemy.position.z
+
+        const groundY = this.heightmap?.heightAt(
+          handle.enemy.position.x,
+          handle.enemy.position.z,
+        ) ?? 0
+        ctrl.group.position.y = groundY
+        handle.enemy.position.y = groundY + CHIMERA_HIT_CENTER_Y
+
+        if (handle.lastOutput.isMoving) {
+          const dir = handle.lastOutput.moveDir
+          ctrl.group.rotation.y = Math.atan2(dir.x, dir.z)
+        }
+
+        if (this.heightmap) {
+          const n = this.heightmap.normalAt(
+            handle.enemy.position.x,
+            handle.enemy.position.z,
+          )
+          ctrl.group.rotation.x = Math.atan2(n.z, n.y)
+          ctrl.group.rotation.z = Math.atan2(-n.x, n.y)
+        }
+      }
     }
 
     // --- Damage flash decay ---
@@ -651,6 +724,8 @@ export class FpsViewController implements Tickable {
     for (const dummy of this.targetDummies) dummy.dispose()
     for (const ctrl of this.spireControllers.values()) ctrl.dispose()
     this.spireControllers.clear()
+    for (const ctrl of this.chimeraControllers.values()) ctrl.dispose()
+    this.chimeraControllers.clear()
     for (const mesh of this.enemyProjectileMeshes.values()) mesh.dispose()
     this.enemyProjectileMeshes.clear()
     this.enemyProjectileSystem?.dispose()

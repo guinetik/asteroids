@@ -153,8 +153,9 @@ export class EnemyDirector implements Tickable {
       handle.contactCooldown = Math.max(0, handle.contactCooldown - dt)
       if (handle.contactCooldown <= 0) {
         const cx = handle.enemy.position.x - this.playerX
+        const cy = handle.enemy.position.y - this.playerY
         const cz = handle.enemy.position.z - this.playerZ
-        const contactDist = Math.sqrt(cx * cx + cz * cz)
+        const contactDist = Math.sqrt(cx * cx + cy * cy + cz * cz)
         if (contactDist <= handle.config.contactRadius) {
           this.onContactDamage?.(handle, handle.config.contactDamage)
           handle.contactCooldown = handle.config.contactCooldown

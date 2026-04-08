@@ -70,6 +70,7 @@ import {
 import { generateMapCanvas } from '@/lib/terrain/mapColors'
 import type { MiniGame, MiniGameContext, MiniGameStep } from '@/lib/minigame/MiniGame'
 import { SurveyMinigame } from '@/lib/minigame/SurveyMinigame'
+import { ExterminateMinigame } from '@/lib/minigame/ExterminateMinigame'
 import playerConfigJson from '@/data/fps/player-config.json'
 import multiToolConfigJson from '@/data/fps/multitool-config.json'
 
@@ -84,6 +85,7 @@ const LANDER_SPAWN_LIGHT_ALIGNMENT_X = 5
 const LANDER_GAMEPLAY_START_OFFSET_X = 0
 const LANDER_GAMEPLAY_START_OFFSET_Y = 0
 const EVA_SPAWN_OFFSET_X = 8
+const CONTACT_KNOCKBACK = 12
 
 /** Thrust vibration at ground level (liftoff rumble). */
 const THRUST_VIBRATION_MAX = 1.2
@@ -342,24 +344,6 @@ export class LevelViewController implements Tickable {
       addWaypointMarker(`obj-${i}`, obj.x, obj.z, groundY, this.sceneManager!.scene)
     }
 
-
-    // ── Objective minigames ──────────────────────────────────────
-    const missionSeed = hashSeed(mission.id)
-    for (let i = 0; i < mission.objectives.length; i++) {
-      const obj = mission.objectives[i]!
-      if (obj.type === 'survey') {
-        const minigame = new SurveyMinigame(
-          i, obj, this.sceneManager!.scene, this.heightmap!, missionSeed,
-        )
-        minigame.onPrompt = (text) => this.onTerminalPrompt?.(text)
-        minigame.onComplete = (idx) => this.onObjectiveComplete?.(idx)
-        minigame.onStepChange = (idx, steps) => this.onStepChange?.(idx, steps)
-        minigame.onRefuel = () => this.landerController?.thrusterSystem.refuel()
-        minigame.onRegisterTickable = (t) => this.tickHandler!.register(t, TICK_PRIORITY_PHYSICS + 4)
-        minigame.onUnregisterTickable = (t) => this.tickHandler?.unregister(t)
-        this.minigames.push(minigame)
-      }
-    }
     // ── Minimap canvas ─────────────────────────────────────────
     const mapCanvas = generateMapCanvas(this.heightmap!.grid, TERRAIN_RESOLUTION)
     this.onMapCanvas?.(mapCanvas)
@@ -504,6 +488,64 @@ export class LevelViewController implements Tickable {
       }
     }
     this.multiTool.setProjectileSystem(this.projectileSystem)
+
+    // ── Objective minigames ──────────────────────────────────────
+    const missionSeed = hashSeed(mission.id)
+    for (let i = 0; i < mission.objectives.length; i++) {
+      const obj = mission.objectives[i]!
+      if (obj.type === 'survey') {
+        const minigame = new SurveyMinigame(
+          i, obj, this.sceneManager!.scene, this.heightmap!, missionSeed,
+        )
+        minigame.onPrompt = (text) => this.onTerminalPrompt?.(text)
+        minigame.onComplete = (idx) => this.onObjectiveComplete?.(idx)
+        minigame.onStepChange = (idx, steps) => this.onStepChange?.(idx, steps)
+        minigame.onRefuel = () => this.landerController?.thrusterSystem.refuel()
+        minigame.onRegisterTickable = (t) => this.tickHandler!.register(t, TICK_PRIORITY_PHYSICS + 4)
+        minigame.onUnregisterTickable = (t) => this.tickHandler?.unregister(t)
+        this.minigames.push(minigame)
+      } else if (obj.type === 'exterminate') {
+        const minigame = await ExterminateMinigame.create(
+          i,
+          obj,
+          this.sceneManager!.scene,
+          this.heightmap!,
+          this.projectileSystem,
+          mission.difficulty,
+        )
+        minigame.onPrompt = (text) => this.onTerminalPrompt?.(text)
+        minigame.onComplete = (idx) => this.onObjectiveComplete?.(idx)
+        minigame.onStepChange = (idx, steps) => this.onStepChange?.(idx, steps)
+        minigame.onDamagePlayer = (damage, sourceX, sourceZ) => {
+          this.playerController?.takeDamage(damage)
+          const playerPos = this.playerController?.group.position
+          if (playerPos) {
+            const dx = playerPos.x - sourceX
+            const dz = playerPos.z - sourceZ
+            const dist = Math.sqrt(dx * dx + dz * dz)
+            if (dist > 0.01) {
+              this.playerController?.applyLateralImpulse(
+                (dx / dist) * CONTACT_KNOCKBACK,
+                (dz / dist) * CONTACT_KNOCKBACK,
+              )
+            }
+          }
+        }
+        minigame.onKillPlayer = () => {
+          this.playerController?.takeDamage(999)
+        }
+        minigame.onDestroyLander = () => {
+          this.failLanderRun('Lander Destroyed by Nest Blast', { explode: true, hideLander: true })
+        }
+        minigame.onExplosion = (pos) => {
+          const up = new Vector3(0, 1, 0)
+          for (let j = 0; j < 20; j++) {
+            this.impactEmitter?.emit(pos, up.clone().multiplyScalar(10 + Math.random() * 10))
+          }
+        }
+        this.minigames.push(minigame)
+      }
+    }
 
     // ── Lander explosion VFX ───────────────────────────────────────
     this.landerExplosion = new LanderExplosion()

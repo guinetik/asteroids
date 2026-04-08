@@ -43,6 +43,15 @@ describe('EnemyDirector', () => {
     expect(h1.id).not.toBe(h2.id)
   })
 
+  it('should give each spawned enemy its own config copy', () => {
+    const h1 = director.spawn('bacteriophage', 0, 0, 0)
+    const h2 = director.spawn('bacteriophage', 10, 0, 10)
+
+    h1.config.contactDamage = 999
+
+    expect(h2.config.contactDamage).toBe(15)
+  })
+
   it('should track all alive enemies', () => {
     director.spawn('bacteriophage', 0, 0, 0)
     director.spawn('bacteriophage', 10, 0, 10)
@@ -102,6 +111,15 @@ describe('EnemyDirector', () => {
     director.onContactDamage = onContact
     director.spawn('bacteriophage', 0, 0, 0)
     director.setPlayerPosition(100, 0, 100)
+    director.tick(0.016)
+    expect(onContact).not.toHaveBeenCalled()
+  })
+
+  it('should NOT fire contact damage when player is vertically separated', () => {
+    const onContact = vi.fn()
+    director.onContactDamage = onContact
+    director.spawn('bacteriophage', 0, 0, 0)
+    director.setPlayerPosition(0, 3, 0)
     director.tick(0.016)
     expect(onContact).not.toHaveBeenCalled()
   })
