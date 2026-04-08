@@ -40,13 +40,13 @@ export interface SurfaceFeatures {
   craterDensity: number
   /** Largest crater as a fraction of asteroid radius. 0.3 = a crater 30% of the radius. */
   craterMaxScale: number
-  /** Coverage of loose boulders on the surface. Bennu is 0.85, Psyche is 0.15. */
+  /** Coverage of loose boulders on the surface. Also scales the micro-breakup pass inside disturbed zones. */
   boulderDensity: number
-  /** Frequency of ridges, channels, and linear features. High on icy (cracks) and volcanic (lava channels). */
+  /** Frequency of ridge-pass features such as ridges, channels, and linear scarps. */
   ridgeFrequency: number
-  /** Micro-surface roughness that affects how "gritty" the terrain feels up close. */
+  /** Strength of the disturbance-mask weighting and medium-breakup pass. Higher values intensify broken patches instead of adding uniform waviness everywhere. */
   roughness: number
-  /** How much loose dust/regolith covers the underlying rock. High on icy (frost). */
+  /** How much loose dust/regolith blankets the surface. Higher values increase dust softening, damping sharp breakup detail before crater and ridge passes. */
   dustCoverage: number
 }
 

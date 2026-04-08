@@ -26,11 +26,11 @@ const SCORCH_ALTITUDE = 20
 const WASH_FULL_ALTITUDE = 5
 
 // ── Dust particles ──
-const DUST_POOL_SIZE = 200
-const DUST_PARTICLE_SIZE = 2.5
+const DUST_POOL_SIZE = 320
+const DUST_PARTICLE_SIZE = 1.8
 const DUST_LIFETIME = 0.8
 const DUST_SPREAD = 1.5
-const DUST_OPACITY = 0.35
+const DUST_OPACITY = 0.5
 /** Max spawn rate (particles/sec) at closest altitude. */
 const DUST_MAX_SPAWN_RATE = 120
 /** Minimum spawn rate at WASH_MAX_ALTITUDE. */
@@ -117,7 +117,8 @@ export class ThrusterWashController {
 
   constructor(baseColor: [number, number, number]) {
     // ── Dust emitter ──
-    const dustColor = new THREE.Color(baseColor[0], baseColor[1], baseColor[2]).multiplyScalar(1.5)
+    const dustColor = new THREE.Color(baseColor[0], baseColor[1], baseColor[2])
+      .lerp(new THREE.Color(0.62, 0.62, 0.62), 0.7)
     this.dustEmitter = new ParticleEmitter({
       poolSize: DUST_POOL_SIZE,
       color: dustColor,
@@ -125,6 +126,8 @@ export class ThrusterWashController {
       lifetime: DUST_LIFETIME,
       spread: DUST_SPREAD,
       opacity: DUST_OPACITY,
+      sizeAttenuation: true,
+      sizeGrowth: 1.3,
     })
 
     // ── Wash spotlight ──

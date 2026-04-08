@@ -19,19 +19,30 @@ import type { SurfaceFeatures } from '@/lib/asteroids/types'
 // ---------------------------------------------------------------------------
 
 /** Maximum world-space height added by the noise pass. */
-const BASE_HEIGHT_SCALE = 40
+interface TerrainBiomeTuning {
+  broadReliefScale: number
+  disturbanceContrast: number
+  disturbanceBias: number
+  mediumBreakupScale: number
+  microBreakupScale: number
+  dustSoftening: number
+}
 
-/** Number of FBM octaves for the base noise pass. */
-const NOISE_OCTAVES = 5
+const BROAD_RELIEF_BASE_SCALE = 14
+const BROAD_RELIEF_FREQUENCY = 0.0018
+const DISTURBANCE_MASK_FREQUENCY = 0.0035
+const MEDIUM_BREAKUP_FREQUENCY = 0.014
+const MICRO_BREAKUP_FREQUENCY = 0.045
+const MICRO_BREAKUP_THRESHOLD = 0.58
 
-/** Amplitude decay per octave. */
-const NOISE_PERSISTENCE = 0.5
-
-/** Frequency growth per octave. */
-const NOISE_LACUNARITY = 2.2
-
-/** Base spatial frequency of the noise field (cycles per world unit). */
-const NOISE_BASE_FREQUENCY = 0.006
+const DEFAULT_BIOME_TUNING: TerrainBiomeTuning = {
+  broadReliefScale: 1,
+  disturbanceContrast: 1,
+  disturbanceBias: 0,
+  mediumBreakupScale: 1,
+  microBreakupScale: 1,
+  dustSoftening: 1,
+}
 
 /** Crater count multiplier applied to craterDensity. */
 const CRATER_COUNT_SCALE = 15
@@ -112,6 +123,8 @@ export interface TerrainGenOptions {
   worldSize: number
   /** Circular zones that remain flat (no craters, ridges, or noise deformation). */
   flatZones?: FlatZone[]
+  /** Optional biome identifier used to tune broad relief and breakup detail. */
+  biome?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -147,6 +160,100 @@ function fbm(
     freq *= lacunarity
   }
   return value
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value))
+}
+
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = clamp01((x - edge0) / (edge1 - edge0))
+  return t * t * (3 - 2 * t)
+}
+
+function getBiomeTuning(biome?: string): TerrainBiomeTuning {
+  switch (biome) {
+    case 'sandy':
+      return {
+        broadReliefScale: 0.9,
+        disturbanceContrast: 0.85,
+        disturbanceBias: -0.08,
+        mediumBreakupScale: 0.75,
+        microBreakupScale: 0.55,
+        dustSoftening: 1.2,
+      }
+    case 'rocky':
+      return {
+        broadReliefScale: 1,
+        disturbanceContrast: 1.15,
+        disturbanceBias: 0.05,
+        mediumBreakupScale: 1.2,
+        microBreakupScale: 1.15,
+        dustSoftening: 0.9,
+      }
+    case 'metallic':
+      return {
+        broadReliefScale: 0.95,
+        disturbanceContrast: 1.2,
+        disturbanceBias: 0.08,
+        mediumBreakupScale: 1.1,
+        microBreakupScale: 1.25,
+        dustSoftening: 0.8,
+      }
+    case 'icy':
+      return {
+        broadReliefScale: 1.1,
+        disturbanceContrast: 0.8,
+        disturbanceBias: -0.04,
+        mediumBreakupScale: 0.7,
+        microBreakupScale: 0.45,
+        dustSoftening: 1.15,
+      }
+    case 'volcanic':
+      return {
+        broadReliefScale: 1.08,
+        disturbanceContrast: 1.25,
+        disturbanceBias: 0.1,
+        mediumBreakupScale: 1.3,
+        microBreakupScale: 1.1,
+        dustSoftening: 0.75,
+      }
+    default:
+      return DEFAULT_BIOME_TUNING
+  }
+}
+
+function sampleDisturbanceMask(
+  noise: SimplexNoise,
+  x: number,
+  z: number,
+  roughness: number,
+  tuning: TerrainBiomeTuning,
+): number {
+  const raw = noise.n2(x * DISTURBANCE_MASK_FREQUENCY, z * DISTURBANCE_MASK_FREQUENCY) * 0.5 + 0.5
+  const contrasted = clamp01((raw - 0.5) * tuning.disturbanceContrast + 0.5 + tuning.disturbanceBias)
+  const power = 1.8 - roughness * 0.6
+  return Math.pow(contrasted, power)
+}
+
+function sampleBreakupHeight(
+  noise: SimplexNoise,
+  x: number,
+  z: number,
+  surface: SurfaceFeatures,
+  tuning: TerrainBiomeTuning,
+  disturbance: number,
+): number {
+  const medium = noise.n2(x * MEDIUM_BREAKUP_FREQUENCY, z * MEDIUM_BREAKUP_FREQUENCY)
+  const mediumAmp = 18 * surface.roughness * tuning.mediumBreakupScale
+
+  const microMask = smoothstep(MICRO_BREAKUP_THRESHOLD, 1, disturbance)
+  const micro = noise.n2(x * MICRO_BREAKUP_FREQUENCY, z * MICRO_BREAKUP_FREQUENCY)
+  const microAmp = 14 * surface.boulderDensity * tuning.microBreakupScale
+
+  const dustFactor = clamp01(1 - surface.dustCoverage * 0.85 * tuning.dustSoftening)
+
+  return medium * mediumAmp * disturbance + micro * microAmp * microMask * dustFactor
 }
 
 /**
@@ -385,24 +492,52 @@ export function generateFlatZones(
  * @spec docs/superpowers/plans/2026-04-04-terrain-system.md
  */
 export function generateTerrain(surface: SurfaceFeatures, options: TerrainGenOptions): Heightmap {
-  const { seed, resolution, worldSize } = options
+  const { seed, resolution, worldSize, biome } = options
   const hm = new Heightmap(resolution, worldSize)
   const rng = seededRandom(seed)
   const noise = new SimplexNoise(seed)
+  const tuning = getBiomeTuning(biome)
   const cellSize = worldSize / (resolution - 1)
 
   // -------------------------------------------------------------------------
-  // Pass 1: Multi-octave simplex noise base
+  // Pass 1: Broad support relief + masked breakup
   // -------------------------------------------------------------------------
-  const heightScale = BASE_HEIGHT_SCALE * (0.3 + surface.roughness * 0.7)
+  const broadReliefAmp =
+    BROAD_RELIEF_BASE_SCALE * (0.35 + surface.roughness * 0.25) * tuning.broadReliefScale
 
   for (let gz = 0; gz < resolution; gz++) {
     for (let gx = 0; gx < resolution; gx++) {
-      // Normalise grid coords to [0, worldSize] for noise sampling
-      const nx = gx * cellSize
-      const nz = gz * cellSize
-      const h = fbm(noise, nx, nz, NOISE_BASE_FREQUENCY, NOISE_OCTAVES, NOISE_PERSISTENCE, NOISE_LACUNARITY)
-      hm.set(gx, gz, h * heightScale)
+      const worldX = gx * cellSize
+      const worldZ = gz * cellSize
+
+      const broadRelief = fbm(
+        noise,
+        worldX,
+        worldZ,
+        BROAD_RELIEF_FREQUENCY,
+        3,
+        0.55,
+        2.1,
+      ) * broadReliefAmp
+
+      const disturbance = sampleDisturbanceMask(
+        noise,
+        worldX,
+        worldZ,
+        surface.roughness,
+        tuning,
+      )
+
+      const breakup = sampleBreakupHeight(
+        noise,
+        worldX,
+        worldZ,
+        surface,
+        tuning,
+        disturbance,
+      )
+
+      hm.set(gx, gz, broadRelief + breakup)
     }
   }
 

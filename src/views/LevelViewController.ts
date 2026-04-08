@@ -61,6 +61,7 @@ import { LevelLightingRig } from '@/three/atmosphere/LevelLightingRig'
 import { LevelPostProcessing } from '@/three/atmosphere/LevelPostProcessing'
 import { ThrusterWashController } from '@/three/atmosphere/ThrusterWashController'
 import { SurfaceDustController } from '@/three/atmosphere/SurfaceDustController'
+import { applyLanderAtmosphereState } from '@/three/atmosphere/landerAtmosphereState'
 import {
   addWaypointMarker,
   updateWaypointMarkers,
@@ -327,6 +328,7 @@ export class LevelViewController implements Tickable {
           resolution: TERRAIN_RESOLUTION,
           worldSize: LEVEL_GRID_SIZE,
           flatZones,
+          biome: asteroid.biome,
         })
     this.terrainMesh = new TerrainMesh(this.heightmap)
     this.collisionWorld = new CollisionWorld(this.heightmap)
@@ -1019,10 +1021,8 @@ export class LevelViewController implements Tickable {
       const currentState = this.stateMachine?.state ?? ''
 
       if (lander) {
-        const groundH = this.heightmap?.heightAt(lander.position.x, lander.position.z) ?? 0
-        this.atmosphereCtx.landerAltitude = Math.max(0, lander.position.y - groundH)
+        applyLanderAtmosphereState(this.atmosphereCtx, lander)
         const engineFiring = lander.isMainEngineActive
-        this.atmosphereCtx.landerThrust = engineFiring ? 1 : 0
 
         // Thrust vibration — strongest at liftoff, fades with altitude
         if (engineFiring && this.vehicleCamera) {
@@ -1031,9 +1031,6 @@ export class LevelViewController implements Tickable {
           const intensity = THRUST_VIBRATION_MIN + (THRUST_VIBRATION_MAX - THRUST_VIBRATION_MIN) * altFade * altFade
           this.vehicleCamera.shake(intensity, THRUST_VIBRATION_DURATION)
         }
-        this.atmosphereCtx.landerVelocityY = lander.body.velocityY
-        this.atmosphereCtx.landerGrounded = lander.body.grounded
-        this.atmosphereCtx.landerPosition.copy(lander.position)
       }
 
       if (player) {

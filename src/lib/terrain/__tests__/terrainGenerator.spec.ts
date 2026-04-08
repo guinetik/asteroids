@@ -20,6 +20,58 @@ const ICY_SURFACE: SurfaceFeatures = {
   dustCoverage: 0.85,
 }
 
+function percentileSpan(grid: Float32Array, lower: number, upper: number): number {
+  const values = Array.from(grid).sort((a, b) => a - b)
+  const lowerIndex = Math.round((values.length - 1) * lower)
+  const upperIndex = Math.round((values.length - 1) * upper)
+  return values[upperIndex]! - values[lowerIndex]!
+}
+
+function countAboveAbs(grid: Float32Array, threshold: number): number {
+  let count = 0
+  for (let i = 0; i < grid.length; i++) {
+    if (Math.abs(grid[i]!) > threshold) count++
+  }
+  return count
+}
+
+function localRoughness(grid: Float32Array, resolution: number): number {
+  let sum = 0
+  let samples = 0
+  for (let z = 1; z < resolution - 1; z++) {
+    for (let x = 1; x < resolution - 1; x++) {
+      const i = z * resolution + x
+      const c = grid[i]!
+      const dx = Math.abs(c - grid[i + 1]!)
+      const dz = Math.abs(c - grid[i + resolution]!)
+      sum += dx + dz
+      samples += 2
+    }
+  }
+  return samples === 0 ? 0 : sum / samples
+}
+
+function localDetailContrast(grid: Float32Array, resolution: number): number {
+  let sum = 0
+  let samples = 0
+  for (let z = 1; z < resolution - 1; z++) {
+    for (let x = 1; x < resolution - 1; x++) {
+      const i = z * resolution + x
+      const center = grid[i]!
+      const neighborMean =
+        (grid[i - 1]! + grid[i + 1]! + grid[i - resolution]! + grid[i + resolution]!) / 4
+      sum += Math.abs(center - neighborMean)
+      samples++
+    }
+  }
+  return samples === 0 ? 0 : sum / samples
+}
+
+// These constants are test-tuning guards for aggregate relief retention and local detail checks.
+const MODERATE_DETAIL_HEIGHT = 14
+const DUSTY_RELIEF_RETENTION_RATIO = 0.45
+const BOULDER_ROUGHNESS_GROWTH_LIMIT = 2.5
+
 describe('generateTerrain', () => {
   it('returns a Heightmap with the requested resolution', () => {
     const hm = generateTerrain(ROCKY_SURFACE, { seed: 42, resolution: 64, worldSize: 500 })
@@ -65,5 +117,117 @@ describe('generateTerrain', () => {
       if (low.grid[i]! < -1) lowNeg++
     }
     expect(highNeg).toBeGreaterThan(lowNeg)
+  })
+
+  it('high dustCoverage suppresses local roughness while preserving macro relief', () => {
+    const dusty: SurfaceFeatures = { ...ROCKY_SURFACE, dustCoverage: 0.9, roughness: 0.8 }
+    const exposed: SurfaceFeatures = { ...ROCKY_SURFACE, dustCoverage: 0.05, roughness: 0.8 }
+
+    const dustyHm = generateTerrain(dusty, { seed: 42, resolution: 96, worldSize: 1200 })
+    const exposedHm = generateTerrain(exposed, { seed: 42, resolution: 96, worldSize: 1200 })
+
+    const dustyMacroRelief = percentileSpan(dustyHm.grid, 0.05, 0.95)
+    const exposedMacroRelief = percentileSpan(exposedHm.grid, 0.05, 0.95)
+
+    expect(localRoughness(dustyHm.grid, dustyHm.resolution))
+      .toBeLessThan(localRoughness(exposedHm.grid, exposedHm.resolution))
+    expect(dustyMacroRelief).toBeGreaterThan(exposedMacroRelief * DUSTY_RELIEF_RETENTION_RATIO)
+  })
+
+  it('higher boulderDensity increases local micro-detail without runaway roughness', () => {
+    const lowBoulders: SurfaceFeatures = { ...ROCKY_SURFACE, boulderDensity: 0.05, roughness: 0.55 }
+    const highBoulders: SurfaceFeatures = { ...ROCKY_SURFACE, boulderDensity: 0.95, roughness: 0.55 }
+
+    const low = generateTerrain(lowBoulders, { seed: 77, resolution: 96, worldSize: 1200 })
+    const high = generateTerrain(highBoulders, { seed: 77, resolution: 96, worldSize: 1200 })
+
+    expect(localDetailContrast(high.grid, high.resolution))
+      .toBeGreaterThan(localDetailContrast(low.grid, low.resolution))
+    expect(localRoughness(high.grid, high.resolution))
+      .toBeLessThan(localRoughness(low.grid, low.resolution) * BOULDER_ROUGHNESS_GROWTH_LIMIT)
+  })
+
+  it('roughness increases strong-detail count and local roughness', () => {
+    const smooth: SurfaceFeatures = { ...ROCKY_SURFACE, roughness: 0.15, dustCoverage: 0.25 }
+    const rough: SurfaceFeatures = { ...ROCKY_SURFACE, roughness: 0.9, dustCoverage: 0.25 }
+
+    const smoothHm = generateTerrain(smooth, { seed: 99, resolution: 96, worldSize: 1200 })
+    const roughHm = generateTerrain(rough, { seed: 99, resolution: 96, worldSize: 1200 })
+
+    const smoothStrong = countAboveAbs(smoothHm.grid, MODERATE_DETAIL_HEIGHT)
+    const roughStrong = countAboveAbs(roughHm.grid, MODERATE_DETAIL_HEIGHT)
+
+    expect(roughStrong).toBeGreaterThan(smoothStrong)
+    expect(localRoughness(roughHm.grid, roughHm.resolution))
+      .toBeGreaterThan(localRoughness(smoothHm.grid, smoothHm.resolution))
+  })
+
+  it('biome changes filler distribution without changing deterministic seeding', () => {
+    const neutralA = generateTerrain(ROCKY_SURFACE, {
+      seed: 11,
+      resolution: 96,
+      worldSize: 1200,
+    })
+    const neutralB = generateTerrain(ROCKY_SURFACE, {
+      seed: 11,
+      resolution: 96,
+      worldSize: 1200,
+    })
+    const sandy = generateTerrain(ROCKY_SURFACE, {
+      seed: 11,
+      resolution: 96,
+      worldSize: 1200,
+      biome: 'sandy',
+    })
+    const rockyA = generateTerrain(ROCKY_SURFACE, {
+      seed: 11,
+      resolution: 96,
+      worldSize: 1200,
+      biome: 'rocky',
+    })
+    const rockyB = generateTerrain(ROCKY_SURFACE, {
+      seed: 11,
+      resolution: 96,
+      worldSize: 1200,
+      biome: 'rocky',
+    })
+    const volcanicA = generateTerrain(ROCKY_SURFACE, {
+      seed: 11,
+      resolution: 96,
+      worldSize: 1200,
+      biome: 'volcanic',
+    })
+    const volcanicB = generateTerrain(ROCKY_SURFACE, {
+      seed: 11,
+      resolution: 96,
+      worldSize: 1200,
+      biome: 'volcanic',
+    })
+
+    expect(localRoughness(sandy.grid, sandy.resolution))
+      .toBeLessThan(localRoughness(rockyA.grid, rockyA.resolution))
+    expect(localRoughness(volcanicA.grid, volcanicA.resolution))
+      .toBeGreaterThan(localRoughness(sandy.grid, sandy.resolution))
+    expect(neutralA.heightAt(100, -80)).toBe(neutralB.heightAt(100, -80))
+    expect(rockyA.heightAt(100, -80)).toBe(rockyB.heightAt(100, -80))
+    expect(volcanicA.heightAt(100, -80)).toBe(volcanicB.heightAt(100, -80))
+    expect(volcanicA.heightAt(100, -80)).not.toBe(neutralA.heightAt(100, -80))
+  })
+
+  it('keeps flat zones usable after the new breakup passes', () => {
+    const hm = generateTerrain(ROCKY_SURFACE, {
+      seed: 123,
+      resolution: 96,
+      worldSize: 1200,
+      biome: 'rocky',
+      flatZones: [{ x: 0, z: 0, radius: 120 }],
+    })
+
+    const center = hm.heightAt(0, 0)
+    const nearEdge = hm.heightAt(40, 35)
+    const outside = hm.heightAt(180, 180)
+
+    expect(Math.abs(center - nearEdge)).toBeLessThan(2)
+    expect(Math.abs(center - outside)).toBeGreaterThan(1)
   })
 })
