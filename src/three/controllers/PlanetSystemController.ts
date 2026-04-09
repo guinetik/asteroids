@@ -119,6 +119,10 @@ export class PlanetSystemController implements GravitySource {
     return this.group.position.x
   }
 
+  getWorldY(): number {
+    return this.group.position.y
+  }
+
   getWorldZ(): number {
     return this.group.position.z
   }

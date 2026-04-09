@@ -70,12 +70,8 @@ import { VibePortal } from '@/lib/portal'
 import { MapState } from '@/lib/mapState'
 import {
   MapIntroState,
-  MAP_INTRO_CINEMATIC_DURATION,
-  MAP_INTRO_BEAT_ENCELADUS,
-  MAP_INTRO_BEAT_VIROIDS,
-  MAP_INTRO_BEAT_JUPITER,
-  MAP_INTRO_BEAT_CLOUD_CITY,
-  MAP_INTRO_BEAT_EARTH,
+  INTRO_ZOOM_STEPS,
+  type IntroCinematicStep,
   type MapIntroUiState,
 } from '@/lib/mapIntroState'
 import { MapCamera, easeInOut } from '@/three/MapCamera'
@@ -162,7 +158,11 @@ import {
   beginAsteroidMission,
   tickAsteroidMissionBoard,
 } from '@/lib/missions/shuttleMissionSession'
-import type { ShuttleMissionBoard, ActiveShuttleMission, GeneratedAsteroidMission } from '@/lib/missions/types'
+import type {
+  ShuttleMissionBoard,
+  ActiveShuttleMission,
+  GeneratedAsteroidMission,
+} from '@/lib/missions/types'
 import { getGatherItemForPlanet } from '@/lib/missions/planetOrbitalConfig'
 import { generateAsteroidMission } from '@/lib/missions/asteroidMissionGenerator'
 import { computeMissionDifficulty } from '@/lib/missions/missionDifficulty'
@@ -307,7 +307,6 @@ const MAP_RETICLE_FADE_END = 2.0
  */
 const MAP_RETICLE_MIN_SPEED = 0.12
 
-
 /**
  * Target subtended height of the mission site (cyan beam + asteroid preview) as a fraction of
  * viewport height.
@@ -437,27 +436,43 @@ const MAP_INTRO_CAMERA_START_FOV = 32
 const MAP_INTRO_ENCELADUS_CAMERA_OFFSET = new THREE.Vector3(0.4, 0.3, 0.8)
 const MAP_INTRO_ENCELADUS_FOV = 28
 
-/** Camera offset from Jupiter for the shipyard / cloud city beats. */
-const MAP_INTRO_JUPITER_CAMERA_OFFSET = new THREE.Vector3(4, 3, 8)
-const MAP_INTRO_JUPITER_CLOSE_OFFSET = new THREE.Vector3(2, 1.5, 4)
-const MAP_INTRO_JUPITER_FOV = 35
+/** Camera offset from Jupiter — wide enough to show moon system (~7 unit radius). */
+const MAP_INTRO_JUPITER_CAMERA_OFFSET = new THREE.Vector3(3, 4, 10)
+/**
+ * Camera offset for cloud city beats — high Y for an over-the-shoulder / top-down read;
+ * XZ stays back so Jupiter stays visible; aim with {@link INTRO_CITY_CAMERA_LOOK_DROP}.
+ */
+const MAP_INTRO_JUPITER_CLOSE_OFFSET = new THREE.Vector3(2.85, 2.55, 7.4)
+/** FOV for wide Jupiter beats ({@link tickIntroZoomJupiter}, {@link tickIntroHoldJupiter}). */
+const MAP_INTRO_JUPITER_FOV = 40
+/** FOV for cloud city beats — match wide Jupiter; avoids an extra zoom-in on the planet. */
+const MAP_INTRO_JUPITER_CITY_FOV = 40
 
 /** Existing hero (shuttle) camera constants. */
 const MAP_INTRO_HERO_OFFSET = new THREE.Vector3(-24, 6, 14)
 const MAP_INTRO_HERO_LOOK_AT_OFFSET = new THREE.Vector3(0, 1.5, 0)
 const MAP_INTRO_HERO_FOV = 42
 
-/** Beat 5 sub-boundaries (within 0.70–1.00 range). */
-const MAP_INTRO_HERO_HOLD_START = 0.82
-const MAP_INTRO_HERO_HOLD_END = 0.92
-
 /** Intro prop rotation speeds (rad/s). */
 const INTRO_VIRUS_YAW_SPEED = 0.3
 const INTRO_CITY_YAW_SPEED = 0.2
 
-/** City Y positions for the rise-from-atmosphere animation during beat 4b. */
-const INTRO_CITY_START_Y = -0.5
-const INTRO_CITY_END_Y = 1.5
+/** City Y positions for the rise-from-atmosphere animation during beat 4b.
+ * Jupiter rendered radius is ~1.32 world units — start inside, rise just above pole. */
+const INTRO_CITY_START_Y_BASE = 1.0
+const INTRO_CITY_END_Y_BASE = 1.6
+/** Pushes the whole rise arc down (world Y) when the city sits too high on screen. */
+const INTRO_CITY_Y_LOWER = 0.6
+const INTRO_CITY_START_Y = INTRO_CITY_START_Y_BASE - INTRO_CITY_Y_LOWER
+const INTRO_CITY_END_Y = INTRO_CITY_END_Y_BASE - INTRO_CITY_Y_LOWER
+
+/** GLB uniform scale for Jupiter intro cloud city before relative size tweak. */
+const INTRO_CITY_MODEL_BASE_SCALE = 0.05
+/** Factor applied to {@link INTRO_CITY_MODEL_BASE_SCALE} (3 → 0.15 world scale). */
+const INTRO_CITY_MODEL_SIZE_MULTIPLIER = 3
+
+/** Look-at sits this far below city altitude — larger = stronger downward camera tilt. */
+const INTRO_CITY_CAMERA_LOOK_DROP = 0.24
 
 /** Enceladus is the 2nd moon of Saturn (index 1 in planetarium.json). */
 const ENCELADUS_MOON_INDEX = 1
@@ -621,7 +636,6 @@ export class MapViewController implements Tickable {
   /** Wedge sprite rotated into planar velocity direction as projected on the view. */
   private shipReticlePointer: THREE.Sprite | null = null
 
-
   /** World-space shuttle position reused for asteroid belt nearby tumble (avoid per-frame alloc). */
   private readonly _beltShuttleWorldScratch = new THREE.Vector3()
 
@@ -678,7 +692,9 @@ export class MapViewController implements Tickable {
   /** Fired when the shop button should show/hide. */
   onShopButton: ((visible: boolean, planetName: string) => void) | null = null
   /** Fired when the shop dialog state changes. */
-  onShopState: ((session: ShopSession | null, profile: PlayerProfile, inventory: Inventory) => void) | null = null
+  onShopState:
+    | ((session: ShopSession | null, profile: PlayerProfile, inventory: Inventory) => void)
+    | null = null
   /** Fired when credits change (for the HUD badge). */
   onCreditsUpdate: ((credits: number) => void) | null = null
   /**
@@ -687,13 +703,15 @@ export class MapViewController implements Tickable {
    */
   onUpgradeHudRefresh: (() => void) | null = null
   /** Fired when scripted installs should reuse the upgrade-installed announcement HUD. */
-  onUpgradeInstalledAnnouncement: ((
-    headline: string,
-    upgradeName: string,
-    tier: number,
-    creditsSpent: number,
-    metaText?: string,
-  ) => void) | null = null
+  onUpgradeInstalledAnnouncement:
+    | ((
+        headline: string,
+        upgradeName: string,
+        tier: number,
+        creditsSpent: number,
+        metaText?: string,
+      ) => void)
+    | null = null
   /** Fired when fuel cell count changes (for HUD refuel button). */
   onFuelCellCount: ((count: number) => void) | null = null
 
@@ -701,7 +719,9 @@ export class MapViewController implements Tickable {
   onMissionButton: ((visible: boolean, planetName: string) => void) | null = null
 
   /** Called when the mission minigame overlay should open/close. */
-  onMissionOverlay: ((visible: boolean, mission: ActiveShuttleMission | null, canFit: boolean) => void) | null = null
+  onMissionOverlay:
+    | ((visible: boolean, mission: ActiveShuttleMission | null, canFit: boolean) => void)
+    | null = null
 
   /** Called when the mission board state changes (for shuttle control terminal). */
   onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null = null
@@ -964,8 +984,9 @@ export class MapViewController implements Tickable {
       ...PLANETS.map((planet, i) => ({
         name: planet.name,
         displayRadius: planet.displayRadius,
-        orbitalSpeedMultiplier: SLINGSHOT_SPEED_OVERRIDES[planet.id]
-          ?? computeRelativeOrbitalSpeedMultiplier(planet.orbit, earthOrbit),
+        orbitalSpeedMultiplier:
+          SLINGSHOT_SPEED_OVERRIDES[planet.id] ??
+          computeRelativeOrbitalSpeedMultiplier(planet.orbit, earthOrbit),
         getWorldX: () => this.planetControllers[i]!.getWorldX(),
         getWorldZ: () => this.planetControllers[i]!.getWorldZ(),
       })),
@@ -989,10 +1010,7 @@ export class MapViewController implements Tickable {
     if (!arrived) {
       const pendingReturn = consumePendingMapReturnWorld()
       if (pendingReturn && this.shuttleController && this.orbitSystem) {
-        this.spawnShuttleAtCompletedMissionWaypoint(
-          pendingReturn.worldX,
-          pendingReturn.worldZ,
-        )
+        this.spawnShuttleAtCompletedMissionWaypoint(pendingReturn.worldX, pendingReturn.worldZ)
         usedMissionCompletionMapSpawn = true
         this.mapIntro.skip()
         this.emitIntroUiState()
@@ -1167,15 +1185,15 @@ export class MapViewController implements Tickable {
     const mapIntroPhaseBeforeTick = this.mapIntro.phase
     this.mapIntro.tick(dt)
     if (
-      mapIntroPhaseBeforeTick === 'cinematic_zoom'
-      && this.mapIntro.phase === 'awaiting_message_open'
+      mapIntroPhaseBeforeTick === 'cinematic_zoom' &&
+      this.mapIntro.phase === 'awaiting_message_open'
     ) {
       this.markMapIntroSeenAndSyncProfile()
     }
     if (
-      mapIntroPhaseBeforeTick === 'cinematic_zoom'
-      && this.mapIntro.phase === 'interactive'
-      && this.awaitingStartupCinematicOrbitHandoff
+      mapIntroPhaseBeforeTick === 'cinematic_zoom' &&
+      this.mapIntro.phase === 'interactive' &&
+      this.awaitingStartupCinematicOrbitHandoff
     ) {
       this.awaitingStartupCinematicOrbitHandoff = false
       this.finishStartupCinematicOpenOrbit()
@@ -1187,7 +1205,11 @@ export class MapViewController implements Tickable {
     this.syncVehicleCameraShipYawCoupling()
 
     // Map toggle (M key) — opens/closes tactical map
-    if (!introLocked && !this.habitatState.isActive && this.inputManager?.wasActionPressed('toggleMap')) {
+    if (
+      !introLocked &&
+      !this.habitatState.isActive &&
+      this.inputManager?.wasActionPressed('toggleMap')
+    ) {
       if (!this.mapState.isOpen) {
         // Guard: block during death or orbit approach
         const orbitState = this.orbitSystem?.state ?? 'free'
@@ -1383,8 +1405,9 @@ export class MapViewController implements Tickable {
             // Derive heading from the actual quaternion forward, not Euler rotation.y —
             // repeated rotateY() during orbit can cause Euler decomposition to diverge
             // from the visual forward (which the arrow child uses correctly).
-            const fwd = new THREE.Vector3(1, 0, 0)
-              .applyQuaternion(this.shuttleController.group.quaternion)
+            const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(
+              this.shuttleController.group.quaternion,
+            )
             const heading = Math.atan2(-fwd.z, fwd.x)
             const launchVelocity = this.orbitSystem.launchSlingshot(heading, dt)
             const vel = new THREE.Vector3(launchVelocity.vx, 0, launchVelocity.vz)
@@ -1641,15 +1664,19 @@ export class MapViewController implements Tickable {
             this.sunController.getWorldX(),
             this.sunController.getWorldZ(),
             this.sunController.mass,
-            px, pz,
+            px,
+            pz,
           )
         : 0
-      const isHealingAtEarth = orbitState === 'orbiting'
-        && this.orbitSystem?.target?.name === 'Earth'
+      const isHealingAtEarth =
+        orbitState === 'orbiting' && this.orbitSystem?.target?.name === 'Earth'
       const heatMitigation = getCurrentUpgradeValue('shuttleHeatResistance')
       const coldMitigation = getCurrentUpgradeValue('shuttleFreezeResistance')
       this.shipHealth.tick(
-        dt, sunDist, radiationProximity, isHealingAtEarth,
+        dt,
+        sunDist,
+        radiationProximity,
+        isHealingAtEarth,
         heatMitigation,
         heatMitigation,
         coldMitigation,
@@ -1783,10 +1810,7 @@ export class MapViewController implements Tickable {
       const camY = Math.abs(this.vehicleCamera.camera.position.y)
       // Camera Y increases as user zooms out via orbit controls
       // Close (camY < 5): full detail. Far (camY > 100): minimal
-      const lodFraction = camY < 5 ? 1.0
-        : camY < 20 ? 0.5
-        : camY < 50 ? 0.25
-        : 0.1
+      const lodFraction = camY < 5 ? 1.0 : camY < 20 ? 0.5 : camY < 50 ? 0.25 : 0.1
       for (const controller of this.beltControllers) {
         controller.setLodFraction(lodFraction)
       }
@@ -1918,7 +1942,11 @@ export class MapViewController implements Tickable {
     ) {
       const sx = this.shuttleController.position.x
       const sz = this.shuttleController.position.z
-      const inApproachRadius = isWithinAsteroidMissionApproachRadius(sx, sz, activeAsteroid.waypoint)
+      const inApproachRadius = isWithinAsteroidMissionApproachRadius(
+        sx,
+        sz,
+        activeAsteroid.waypoint,
+      )
       const orbitState = this.orbitSystem?.state ?? 'free'
       if (inApproachRadius && this.inputManager?.wasActionPressed('beginMission')) {
         if (orbitState === 'approaching') {
@@ -2353,9 +2381,9 @@ export class MapViewController implements Tickable {
       this.missionOverlayOpen = false
       this.onMissionOverlay?.(false, null, false)
       this.onMissionBoardUpdate?.(this.missionBoard)
-      this.onMissionComplete?.(result.board.activeMissions.find(
-        (m) => m.template.id === missionId,
-      ) ?? null)
+      this.onMissionComplete?.(
+        result.board.activeMissions.find((m) => m.template.id === missionId) ?? null,
+      )
     }
   }
 
@@ -2611,7 +2639,11 @@ export class MapViewController implements Tickable {
   /** Create or destroy the waypoint marker mesh based on active asteroid mission. */
   private syncWaypointMarker(): void {
     const mission = this.missionBoard.activeAsteroidMission
-    if (shouldShowAsteroidMissionMapSite(mission) && !this.missionWaypointRoot && this.sceneObjects) {
+    if (
+      shouldShowAsteroidMissionMapSite(mission) &&
+      !this.missionWaypointRoot &&
+      this.sceneObjects
+    ) {
       const root = new THREE.Group()
       root.position.set(mission!.waypoint.worldX, 0, mission!.waypoint.worldZ)
       const waypoint = createWaypointMarkerGroup(WAYPOINT_MARKER_DEFAULT_COLOR, 'orbitMap')
@@ -2891,7 +2923,9 @@ export class MapViewController implements Tickable {
     // Ship destroyed — credits and cargo gone; shuttle contracts / active asteroid mission voided.
     this.shopSession = null
     this.playerProfile = { ...this.playerProfile, credits: MAP_DEATH_RESPAWN_CREDITS }
-    this.playerInventory = this.inventoryWithStarterFuelCells(this.createInventoryForCurrentCargoBayLevel())
+    this.playerInventory = this.inventoryWithStarterFuelCells(
+      this.createInventoryForCurrentCargoBayLevel(),
+    )
     this.missionBoard = createMissionBoard()
     clearActiveMission()
     if (this.missionOverlayOpen) {
@@ -3159,9 +3193,7 @@ export class MapViewController implements Tickable {
 
     const key = bodyId.trim().toLowerCase()
     if (!key) {
-      console.info(
-        `[MapView] warp("earth") — ids: sun, ${PLANETS.map((p) => p.id).join(', ')}`,
-      )
+      console.info(`[MapView] warp("earth") — ids: sun, ${PLANETS.map((p) => p.id).join(', ')}`)
       return
     }
 
@@ -3182,9 +3214,7 @@ export class MapViewController implements Tickable {
     const planet = PLANETS.find((p) => p.id === key)
     if (!planet) {
       console.warn(`[MapView] warp: unknown body "${bodyId}"`)
-      console.info(
-        `[MapView] Try: sun, ${PLANETS.map((p) => p.id).join(', ')}`,
-      )
+      console.info(`[MapView] Try: sun, ${PLANETS.map((p) => p.id).join(', ')}`)
       return
     }
 
@@ -3608,8 +3638,12 @@ export class MapViewController implements Tickable {
     const renderPass = this.sceneObjects.composer.passes[0] as RenderPass
 
     if (this.mapIntro.phase === 'cinematic_zoom') {
-      const progress = easeInOut(this.mapIntro.cinematicProgress)
-      this.tickIntroBeat(progress, renderPass)
+      const step = this.mapIntro.cinematicStep
+      if (!step || step === 'done') return
+      const raw = this.mapIntro.cinematicStepProgress
+      const t = INTRO_ZOOM_STEPS.has(step) ? easeInOut(raw) : raw
+      this.tickIntroProps(step)
+      this.tickIntroStep(step, t, renderPass)
       return
     }
 
@@ -3627,34 +3661,43 @@ export class MapViewController implements Tickable {
     }
   }
 
-  /**
-   * Route eased progress to the correct camera beat handler.
-   * Also manages intro prop spawn/dispose at beat boundaries.
-   */
-  private tickIntroBeat(progress: number, renderPass: RenderPass): void {
-    this.tickIntroProps(progress)
-
-    if (progress < MAP_INTRO_BEAT_ENCELADUS) {
-      this.tickIntroBeatWideToEnceladus(progress, renderPass)
-    } else if (progress < MAP_INTRO_BEAT_VIROIDS) {
-      this.tickIntroBeatEnceladusHold(progress, renderPass)
-    } else if (progress < MAP_INTRO_BEAT_JUPITER) {
-      this.tickIntroBeatViroidReveal(progress, renderPass)
-    } else if (progress < MAP_INTRO_BEAT_CLOUD_CITY) {
-      this.tickIntroBeatJupiterApproach(progress, renderPass)
-    } else if (progress < MAP_INTRO_BEAT_EARTH) {
-      this.tickIntroBeatCloudCity(progress, renderPass)
-    } else {
-      this.tickIntroBeatEarthPlayer(progress, renderPass)
+  /** Route the current cinematic step to the correct camera handler. */
+  private tickIntroStep(step: IntroCinematicStep, t: number, renderPass: RenderPass): void {
+    switch (step) {
+      case 'zoom_enceladus':
+        return this.tickIntroZoomEnceladus(t, renderPass)
+      case 'hold_enceladus':
+        return this.tickIntroHoldEnceladus(renderPass)
+      case 'zoom_virus':
+        return this.tickIntroZoomVirus(t, renderPass)
+      case 'hold_virus':
+        return this.tickIntroHoldVirus(renderPass)
+      case 'zoom_jupiter':
+        return this.tickIntroZoomJupiter(t, renderPass)
+      case 'hold_jupiter':
+        return this.tickIntroHoldJupiter(renderPass)
+      case 'zoom_city':
+        return this.tickIntroZoomCity(t, renderPass)
+      case 'hold_city':
+        return this.tickIntroHoldCity(renderPass)
+      case 'zoom_shuttle':
+        return this.tickIntroZoomShuttle(t, renderPass)
+      case 'hold_shuttle':
+        return this.tickIntroHoldShuttle(renderPass)
+      case 'handoff':
+        return this.tickIntroHandoff(t, renderPass)
     }
   }
 
-  /** Manage spawn/dispose of VirusModel and CityModel at beat boundaries. */
-  private tickIntroProps(progress: number): void {
+  // ---- Intro prop lifecycle (step-based) ----
+
+  /** Manage spawn/dispose of VirusModel and CityModel based on step name. */
+  private tickIntroProps(step: IntroCinematicStep): void {
     const scene = this.sceneObjects?.scene
     if (!scene) return
 
-    const virusActive = progress >= MAP_INTRO_BEAT_VIROIDS && progress < MAP_INTRO_BEAT_JUPITER
+    // Virus: active during zoom_virus, hold_virus
+    const virusActive = step === 'zoom_virus' || step === 'hold_virus'
     if (virusActive && !this.introVirusModel) {
       this.spawnIntroVirus(scene)
     } else if (!virusActive && this.introVirusModel) {
@@ -3662,9 +3705,15 @@ export class MapViewController implements Tickable {
     }
     if (this.introVirusModel) {
       this.introVirusModel.group.rotation.y += INTRO_VIRUS_YAW_SPEED * (1 / 60)
+      const saturn = this.getPlanetControllerById('saturn')
+      if (saturn) {
+        const pos = saturn.getMoonWorldPosition(ENCELADUS_MOON_INDEX, this.introMoonWorldPos)
+        if (pos) this.introVirusModel.placeAt(pos.x, pos.y + 0.15, pos.z)
+      }
     }
 
-    const cityActive = progress >= MAP_INTRO_BEAT_CLOUD_CITY && progress < MAP_INTRO_BEAT_EARTH
+    // City: active during zoom_city, hold_city
+    const cityActive = step === 'zoom_city' || step === 'hold_city'
     if (cityActive && !this.introCityModel) {
       this.spawnIntroCity(scene)
     } else if (!cityActive && this.introCityModel) {
@@ -3672,6 +3721,11 @@ export class MapViewController implements Tickable {
     }
     if (this.introCityModel) {
       this.introCityModel.group.rotation.y += INTRO_CITY_YAW_SPEED * (1 / 60)
+      const jupiter = this.getPlanetControllerById('jupiter')
+      if (jupiter) {
+        this.introCityModel.group.position.x = jupiter.getWorldX()
+        this.introCityModel.group.position.z = jupiter.getWorldZ()
+      }
     }
   }
 
@@ -3679,16 +3733,13 @@ export class MapViewController implements Tickable {
   private spawnIntroVirus(scene: THREE.Scene): void {
     const saturn = this.getPlanetControllerById('saturn')
     if (!saturn) return
-    const enceladusPos = saturn.getMoonWorldPosition(
-      ENCELADUS_MOON_INDEX,
-      this.introMoonWorldPos,
-    )
-    if (!enceladusPos) return
+    const pos = saturn.getMoonWorldPosition(ENCELADUS_MOON_INDEX, this.introMoonWorldPos)
+    if (!pos) return
 
-    VirusModel.create({ scale: 8 }).then((virus) => {
+    VirusModel.create({ scale: 0.3 }).then((virus) => {
       if (this.introVirusModel) return
       this.introVirusModel = virus
-      virus.placeAt(enceladusPos.x + 0.15, enceladusPos.y + 0.1, enceladusPos.z)
+      virus.placeAt(pos.x + 0.08, pos.y + 0.05, pos.z)
       scene.add(virus.group)
     })
   }
@@ -3701,17 +3752,22 @@ export class MapViewController implements Tickable {
     this.introVirusModel = null
   }
 
-  /** Spawn the CityModel inside Jupiter (starts below surface, rises during beat 4b). */
+  /** Spawn the CityModel inside Jupiter. */
   private spawnIntroCity(scene: THREE.Scene): void {
     const jupiter = this.getPlanetControllerById('jupiter')
     if (!jupiter) return
-    const jx = jupiter.getWorldX()
-    const jz = jupiter.getWorldZ()
 
-    CityModel.create({ scale: 0.3 }).then((city) => {
+    CityModel.create({
+      scale: INTRO_CITY_MODEL_BASE_SCALE * INTRO_CITY_MODEL_SIZE_MULTIPLIER,
+      hologram: true,
+    }).then((city) => {
       if (this.introCityModel) return
       this.introCityModel = city
-      city.group.position.set(jx, INTRO_CITY_START_Y, jz)
+      city.group.position.set(
+        jupiter.getWorldX(),
+        jupiter.getWorldY() + INTRO_CITY_START_Y,
+        jupiter.getWorldZ(),
+      )
       scene.add(city.group)
     })
   }
@@ -3724,213 +3780,250 @@ export class MapViewController implements Tickable {
     this.introCityModel = null
   }
 
-  /** Beat 1 (0–0.12): Wide solar system zoom toward Saturn/Enceladus. */
-  private tickIntroBeatWideToEnceladus(
-    progress: number,
-    renderPass: RenderPass,
-  ): void {
+  // ---- Individual camera step methods ----
+
+  /** Zoom from wide solar system to Enceladus. */
+  private tickIntroZoomEnceladus(t: number, renderPass: RenderPass): void {
     const saturn = this.getPlanetControllerById('saturn')
     if (!saturn || !this.introCamera) return
+    const enceladus = this.getEnceladusWorldPos(saturn)
+    if (!enceladus) return
 
-    const enceladusTarget = this.getEnceladusWorldPos(saturn)
-    if (!enceladusTarget) return
-    const cameraTarget = enceladusTarget.clone().add(MAP_INTRO_ENCELADUS_CAMERA_OFFSET)
-
-    const t = easeInOut(progress / MAP_INTRO_BEAT_ENCELADUS)
-    this.introCamera.position.lerpVectors(MAP_INTRO_CAMERA_START_POSITION, cameraTarget, t)
+    const camDest = enceladus.clone().add(MAP_INTRO_ENCELADUS_CAMERA_OFFSET)
+    this.introCamera.position.lerpVectors(MAP_INTRO_CAMERA_START_POSITION, camDest, t)
     this.introCamera.fov = THREE.MathUtils.lerp(
       MAP_INTRO_CAMERA_START_FOV,
       MAP_INTRO_ENCELADUS_FOV,
       t,
     )
     this.introCamera.updateProjectionMatrix()
-    const lookTarget = new THREE.Vector3().lerpVectors(
-      MAP_INTRO_CAMERA_START_TARGET,
-      enceladusTarget,
-      t,
-    )
-    this.introCamera.lookAt(lookTarget)
+    const look = new THREE.Vector3().lerpVectors(MAP_INTRO_CAMERA_START_TARGET, enceladus, t)
+    this.introCamera.lookAt(look)
     renderPass.camera = this.introCamera
   }
 
-  /** Beat 2 (0.12–0.28): Hold on Enceladus — discovery caption. */
-  private tickIntroBeatEnceladusHold(
-    progress: number,
-    renderPass: RenderPass,
-  ): void {
+  /** Hold on Enceladus. */
+  private tickIntroHoldEnceladus(renderPass: RenderPass): void {
     const saturn = this.getPlanetControllerById('saturn')
     if (!saturn || !this.introCamera) return
+    const enceladus = this.getEnceladusWorldPos(saturn)
+    if (!enceladus) return
 
-    const enceladusTarget = this.getEnceladusWorldPos(saturn)
-    if (!enceladusTarget) return
-
-    this.introCamera.position.copy(enceladusTarget).add(MAP_INTRO_ENCELADUS_CAMERA_OFFSET)
+    this.introCamera.position.copy(enceladus).add(MAP_INTRO_ENCELADUS_CAMERA_OFFSET)
     this.introCamera.fov = MAP_INTRO_ENCELADUS_FOV
     this.introCamera.updateProjectionMatrix()
-    this.introCamera.lookAt(enceladusTarget)
+    this.introCamera.lookAt(enceladus)
     renderPass.camera = this.introCamera
   }
 
-  /** Beat 3 (0.28–0.42): Viroid reveal — camera pulls slightly closer to Enceladus. */
-  private tickIntroBeatViroidReveal(
-    progress: number,
-    renderPass: RenderPass,
-  ): void {
+  /** Zoom out slightly from Enceladus to reveal virus. */
+  private tickIntroZoomVirus(t: number, renderPass: RenderPass): void {
     const saturn = this.getPlanetControllerById('saturn')
     if (!saturn || !this.introCamera) return
+    const enceladus = this.getEnceladusWorldPos(saturn)
+    if (!enceladus) return
 
-    const enceladusTarget = this.getEnceladusWorldPos(saturn)
-    if (!enceladusTarget) return
-
-    const t =
-      (progress - MAP_INTRO_BEAT_VIROIDS) / (MAP_INTRO_BEAT_JUPITER - MAP_INTRO_BEAT_VIROIDS)
-    const closeOffset = MAP_INTRO_ENCELADUS_CAMERA_OFFSET.clone().multiplyScalar(1 - t * 0.3)
-    this.introCamera.position.copy(enceladusTarget).add(closeOffset)
+    const pullBack = MAP_INTRO_ENCELADUS_CAMERA_OFFSET.clone().multiplyScalar(1 + t * 0.5)
+    this.introCamera.position.copy(enceladus).add(pullBack)
     this.introCamera.fov = MAP_INTRO_ENCELADUS_FOV
     this.introCamera.updateProjectionMatrix()
-    this.introCamera.lookAt(enceladusTarget)
+    this.introCamera.lookAt(enceladus)
     renderPass.camera = this.introCamera
   }
 
-  /** Beat 4a (0.42–0.56): Sweep from Saturn/Enceladus to Jupiter. */
-  private tickIntroBeatJupiterApproach(
-    progress: number,
-    renderPass: RenderPass,
-  ): void {
+  /** Hold on virus + Enceladus. */
+  private tickIntroHoldVirus(renderPass: RenderPass): void {
+    const saturn = this.getPlanetControllerById('saturn')
+    if (!saturn || !this.introCamera) return
+    const enceladus = this.getEnceladusWorldPos(saturn)
+    if (!enceladus) return
+
+    const pullBack = MAP_INTRO_ENCELADUS_CAMERA_OFFSET.clone().multiplyScalar(1.5)
+    this.introCamera.position.copy(enceladus).add(pullBack)
+    this.introCamera.fov = MAP_INTRO_ENCELADUS_FOV
+    this.introCamera.updateProjectionMatrix()
+    this.introCamera.lookAt(enceladus)
+    renderPass.camera = this.introCamera
+  }
+
+  /** Zoom from Enceladus to Jupiter system. */
+  private tickIntroZoomJupiter(t: number, renderPass: RenderPass): void {
     const saturn = this.getPlanetControllerById('saturn')
     const jupiter = this.getPlanetControllerById('jupiter')
     if (!saturn || !jupiter || !this.introCamera) return
+    const enceladus = this.getEnceladusWorldPos(saturn)
+    if (!enceladus) return
 
-    const enceladusPos = this.getEnceladusWorldPos(saturn)
-    if (!enceladusPos) return
-    const fromPos = enceladusPos
+    const fromPos = enceladus
       .clone()
-      .add(MAP_INTRO_ENCELADUS_CAMERA_OFFSET.clone().multiplyScalar(0.7))
-    const jupiterTarget = new THREE.Vector3(jupiter.getWorldX(), 0, jupiter.getWorldZ())
-    const toPos = jupiterTarget.clone().add(MAP_INTRO_JUPITER_CAMERA_OFFSET)
+      .add(MAP_INTRO_ENCELADUS_CAMERA_OFFSET.clone().multiplyScalar(1.5))
+    const jupiterCenter = new THREE.Vector3(
+      jupiter.getWorldX(),
+      jupiter.getWorldY(),
+      jupiter.getWorldZ(),
+    )
+    const toPos = jupiterCenter.clone().add(MAP_INTRO_JUPITER_CAMERA_OFFSET)
 
-    const t = easeInOut(
-      (progress - MAP_INTRO_BEAT_JUPITER) /
-        (MAP_INTRO_BEAT_CLOUD_CITY - MAP_INTRO_BEAT_JUPITER),
-    )
     this.introCamera.position.lerpVectors(fromPos, toPos, t)
-    this.introCamera.fov = THREE.MathUtils.lerp(
-      MAP_INTRO_ENCELADUS_FOV,
-      MAP_INTRO_JUPITER_FOV,
-      t,
-    )
+    this.introCamera.fov = THREE.MathUtils.lerp(MAP_INTRO_ENCELADUS_FOV, MAP_INTRO_JUPITER_FOV, t)
     this.introCamera.updateProjectionMatrix()
-    const lookTarget = new THREE.Vector3().lerpVectors(enceladusPos, jupiterTarget, t)
-    this.introCamera.lookAt(lookTarget)
+    const look = new THREE.Vector3().lerpVectors(enceladus, jupiterCenter, t)
+    this.introCamera.lookAt(look)
     renderPass.camera = this.introCamera
   }
 
-  /** Beat 4b (0.56–0.70): Hold on Jupiter — cloud city rises from atmosphere. */
-  private tickIntroBeatCloudCity(
-    progress: number,
-    renderPass: RenderPass,
-  ): void {
+  /** Hold on Jupiter system (wide, moons visible). */
+  private tickIntroHoldJupiter(renderPass: RenderPass): void {
     const jupiter = this.getPlanetControllerById('jupiter')
     if (!jupiter || !this.introCamera) return
 
-    const jupiterTarget = new THREE.Vector3(jupiter.getWorldX(), 0, jupiter.getWorldZ())
-    const t =
-      (progress - MAP_INTRO_BEAT_CLOUD_CITY) /
-      (MAP_INTRO_BEAT_EARTH - MAP_INTRO_BEAT_CLOUD_CITY)
+    const jupiterCenter = new THREE.Vector3(
+      jupiter.getWorldX(),
+      jupiter.getWorldY(),
+      jupiter.getWorldZ(),
+    )
+    this.introCamera.position.copy(jupiterCenter).add(MAP_INTRO_JUPITER_CAMERA_OFFSET)
+    this.introCamera.fov = MAP_INTRO_JUPITER_FOV
+    this.introCamera.updateProjectionMatrix()
+    this.introCamera.lookAt(jupiterCenter)
+    renderPass.camera = this.introCamera
+  }
 
+  /** Zoom closer to Jupiter as city rises from atmosphere. */
+  private tickIntroZoomCity(t: number, renderPass: RenderPass): void {
+    const jupiter = this.getPlanetControllerById('jupiter')
+    if (!jupiter || !this.introCamera) return
+
+    const jupiterCenter = new THREE.Vector3(
+      jupiter.getWorldX(),
+      jupiter.getWorldY(),
+      jupiter.getWorldZ(),
+    )
+
+    // Animate city rising
+    const cityY = jupiterCenter.y + THREE.MathUtils.lerp(INTRO_CITY_START_Y, INTRO_CITY_END_Y, t)
     if (this.introCityModel) {
-      const cityY = THREE.MathUtils.lerp(INTRO_CITY_START_Y, INTRO_CITY_END_Y, easeInOut(t))
       this.introCityModel.group.position.y = cityY
     }
 
+    // Camera zooms in
     const offset = new THREE.Vector3().lerpVectors(
       MAP_INTRO_JUPITER_CAMERA_OFFSET,
       MAP_INTRO_JUPITER_CLOSE_OFFSET,
       t,
     )
-    this.introCamera.position.copy(jupiterTarget).add(offset)
-    this.introCamera.fov = MAP_INTRO_JUPITER_FOV
+    this.introCamera.position.copy(jupiterCenter).add(offset)
+    this.introCamera.fov = THREE.MathUtils.lerp(MAP_INTRO_JUPITER_FOV, MAP_INTRO_JUPITER_CITY_FOV, t)
     this.introCamera.updateProjectionMatrix()
-    this.introCamera.lookAt(jupiterTarget)
+    const look = new THREE.Vector3(
+      jupiterCenter.x,
+      cityY - INTRO_CITY_CAMERA_LOOK_DROP,
+      jupiterCenter.z,
+    )
+    this.introCamera.lookAt(look)
     renderPass.camera = this.introCamera
   }
 
-  /** Beat 5 (0.70–1.00): Sweep to shuttle, hero hold, orbit handoff. */
-  private tickIntroBeatEarthPlayer(
-    progress: number,
-    renderPass: RenderPass,
-  ): void {
+  /** Hold on cloud city above Jupiter. */
+  private tickIntroHoldCity(renderPass: RenderPass): void {
+    const jupiter = this.getPlanetControllerById('jupiter')
+    if (!jupiter || !this.introCamera) return
+
+    const jupiterCenter = new THREE.Vector3(
+      jupiter.getWorldX(),
+      jupiter.getWorldY(),
+      jupiter.getWorldZ(),
+    )
+    this.introCamera.position.copy(jupiterCenter).add(MAP_INTRO_JUPITER_CLOSE_OFFSET)
+    this.introCamera.fov = MAP_INTRO_JUPITER_CITY_FOV
+    this.introCamera.updateProjectionMatrix()
+    const look = new THREE.Vector3(
+      jupiterCenter.x,
+      jupiterCenter.y + INTRO_CITY_END_Y - INTRO_CITY_CAMERA_LOOK_DROP,
+      jupiterCenter.z,
+    )
+    this.introCamera.lookAt(look)
+    renderPass.camera = this.introCamera
+  }
+
+  /** Zoom from Jupiter to shuttle near Earth. */
+  private tickIntroZoomShuttle(t: number, renderPass: RenderPass): void {
     if (!this.introCamera || !this.vehicleCamera || !this.shuttleController) return
 
     const jupiter = this.getPlanetControllerById('jupiter')
-    const jupiterPos = jupiter
-      ? new THREE.Vector3(jupiter.getWorldX(), 0, jupiter.getWorldZ()).add(
+    const fromPos = jupiter
+      ? new THREE.Vector3(jupiter.getWorldX(), jupiter.getWorldY(), jupiter.getWorldZ()).add(
           MAP_INTRO_JUPITER_CLOSE_OFFSET,
         )
       : MAP_INTRO_CAMERA_START_POSITION
+    const fromLook = jupiter
+      ? new THREE.Vector3(
+          jupiter.getWorldX(),
+          jupiter.getWorldY() + INTRO_CITY_END_Y - INTRO_CITY_CAMERA_LOOK_DROP,
+          jupiter.getWorldZ(),
+        )
+      : MAP_INTRO_CAMERA_START_TARGET
 
-    const heroPosition = this.shuttleController.group.position
+    const heroPos = this.shuttleController.group.position
       .clone()
-      .add(
-        MAP_INTRO_HERO_OFFSET.clone().applyQuaternion(
-          this.shuttleController.group.quaternion,
-        ),
-      )
-    const heroTarget = this.shuttleController.group.position
+      .add(MAP_INTRO_HERO_OFFSET.clone().applyQuaternion(this.shuttleController.group.quaternion))
+    const heroLook = this.shuttleController.group.position
       .clone()
       .add(MAP_INTRO_HERO_LOOK_AT_OFFSET)
-    const targetPosition = this.vehicleCamera.camera.position
-    const targetLookAt = this.vehicleCamera.controls.target
 
-    if (progress < MAP_INTRO_HERO_HOLD_START) {
-      const t = easeInOut(
-        (progress - MAP_INTRO_BEAT_EARTH) /
-          (MAP_INTRO_HERO_HOLD_START - MAP_INTRO_BEAT_EARTH),
-      )
-      this.introCamera.position.lerpVectors(jupiterPos, heroPosition, t)
-      this.introCamera.fov = THREE.MathUtils.lerp(
-        MAP_INTRO_JUPITER_FOV,
-        MAP_INTRO_HERO_FOV,
-        t,
-      )
-      this.introCamera.updateProjectionMatrix()
-      const jupiterLookAt = jupiter
-        ? new THREE.Vector3(jupiter.getWorldX(), 0, jupiter.getWorldZ())
-        : MAP_INTRO_CAMERA_START_TARGET
-      const lookTarget = new THREE.Vector3().lerpVectors(jupiterLookAt, heroTarget, t)
-      this.introCamera.lookAt(lookTarget)
-      renderPass.camera = this.introCamera
-      return
-    }
+    this.introCamera.position.lerpVectors(fromPos, heroPos, t)
+    this.introCamera.fov = THREE.MathUtils.lerp(MAP_INTRO_JUPITER_CITY_FOV, MAP_INTRO_HERO_FOV, t)
+    this.introCamera.updateProjectionMatrix()
+    const look = new THREE.Vector3().lerpVectors(fromLook, heroLook, t)
+    this.introCamera.lookAt(look)
+    renderPass.camera = this.introCamera
+  }
 
-    if (progress < MAP_INTRO_HERO_HOLD_END) {
-      this.introCamera.position.copy(heroPosition)
-      this.introCamera.fov = MAP_INTRO_HERO_FOV
-      this.introCamera.updateProjectionMatrix()
-      this.introCamera.lookAt(heroTarget)
-      renderPass.camera = this.introCamera
-      return
-    }
+  /** Hold on shuttle — hero shot. */
+  private tickIntroHoldShuttle(renderPass: RenderPass): void {
+    if (!this.introCamera || !this.shuttleController) return
 
-    const t = easeInOut(
-      (progress - MAP_INTRO_HERO_HOLD_END) / (1 - MAP_INTRO_HERO_HOLD_END),
-    )
-    this.introCamera.position.lerpVectors(heroPosition, targetPosition, t)
+    const heroPos = this.shuttleController.group.position
+      .clone()
+      .add(MAP_INTRO_HERO_OFFSET.clone().applyQuaternion(this.shuttleController.group.quaternion))
+    const heroLook = this.shuttleController.group.position
+      .clone()
+      .add(MAP_INTRO_HERO_LOOK_AT_OFFSET)
+
+    this.introCamera.position.copy(heroPos)
+    this.introCamera.fov = MAP_INTRO_HERO_FOV
+    this.introCamera.updateProjectionMatrix()
+    this.introCamera.lookAt(heroLook)
+    renderPass.camera = this.introCamera
+  }
+
+  /** Handoff from intro camera to orbit camera. */
+  private tickIntroHandoff(t: number, renderPass: RenderPass): void {
+    if (!this.introCamera || !this.vehicleCamera || !this.shuttleController) return
+
+    const heroPos = this.shuttleController.group.position
+      .clone()
+      .add(MAP_INTRO_HERO_OFFSET.clone().applyQuaternion(this.shuttleController.group.quaternion))
+    const heroLook = this.shuttleController.group.position
+      .clone()
+      .add(MAP_INTRO_HERO_LOOK_AT_OFFSET)
+    const orbitPos = this.vehicleCamera.camera.position
+    const orbitLook = this.vehicleCamera.controls.target
+
+    this.introCamera.position.lerpVectors(heroPos, orbitPos, t)
     this.introCamera.fov = THREE.MathUtils.lerp(
       MAP_INTRO_HERO_FOV,
       this.vehicleCamera.camera.fov,
       t,
     )
     this.introCamera.updateProjectionMatrix()
-    const lookTarget = new THREE.Vector3().lerpVectors(heroTarget, targetLookAt, t)
-    this.introCamera.lookAt(lookTarget)
+    const look = new THREE.Vector3().lerpVectors(heroLook, orbitLook, t)
+    this.introCamera.lookAt(look)
     renderPass.camera = this.introCamera
   }
 
   /** Helper: get Enceladus world position from Saturn controller. */
-  private getEnceladusWorldPos(
-    saturn: PlanetSystemController,
-  ): THREE.Vector3 | null {
+  private getEnceladusWorldPos(saturn: PlanetSystemController): THREE.Vector3 | null {
     return saturn.getMoonWorldPosition(ENCELADUS_MOON_INDEX, this.introMoonWorldPos)
   }
 

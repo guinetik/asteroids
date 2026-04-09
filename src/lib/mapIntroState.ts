@@ -1,33 +1,86 @@
 /**
  * Map intro flow state for the opening orbit cutscene.
  *
- * Separates the cinematic onboarding sequence from the shuttle's orbit
- * mechanics so the map can keep animating while gameplay stays locked.
+ * Uses a {@link StateMachine.fromSequence} to drive fixed-duration camera
+ * steps (zoom / hold pairs). Each step has its own timer — no percentage-based
+ * budgets, no easing-curve warping between steps.
  *
  * @author guinetik
- * @date 2026-04-05
- * @spec docs/superpowers/specs/2026-04-05-startup-message-system-design.md
+ * @date 2026-04-09
+ * @spec docs/superpowers/specs/2026-04-09-intro-cinematic-expansion-design.md
  */
 
-import { easeInOutCubic } from '@/lib/math/easing'
+import { StateMachine } from '@/lib/stateMachine'
 
-/** Duration in seconds for the opening cinematic (6 visual beats). */
-export const MAP_INTRO_CINEMATIC_DURATION = 30
+// ---------------------------------------------------------------------------
+// Cinematic step durations (seconds) — tune these freely
+// ---------------------------------------------------------------------------
 
-/** Eased progress boundary: start of Enceladus discovery beat. */
-export const MAP_INTRO_BEAT_ENCELADUS = 0.12
+/** Zoom from wide solar system to Enceladus. */
+export const INTRO_DUR_ZOOM_ENCELADUS = 3
 
-/** Eased progress boundary: start of Viroid reveal beat. */
-export const MAP_INTRO_BEAT_VIROIDS = 0.28
+/** Hold on Enceladus — discovery caption. */
+export const INTRO_DUR_HOLD_ENCELADUS = 4
 
-/** Eased progress boundary: start of Jupiter approach beat. */
-export const MAP_INTRO_BEAT_JUPITER = 0.42
+/** Slight zoom out to reveal virus. */
+export const INTRO_DUR_ZOOM_VIRUS = 2
 
-/** Eased progress boundary: start of cloud city reveal beat. */
-export const MAP_INTRO_BEAT_CLOUD_CITY = 0.56
+/** Hold on virus + Enceladus. */
+export const INTRO_DUR_HOLD_VIRUS = 4
 
-/** Eased progress boundary: start of Earth / player beat. */
-export const MAP_INTRO_BEAT_EARTH = 0.7
+/** Zoom from Enceladus to Jupiter system. */
+export const INTRO_DUR_ZOOM_JUPITER = 3
+
+/** Hold on Jupiter — moons + raw materials caption. */
+export const INTRO_DUR_HOLD_JUPITER = 4
+
+/** Zoom closer to Jupiter as city rises. */
+export const INTRO_DUR_ZOOM_CITY = 2
+
+/** Hold on cloud city. */
+export const INTRO_DUR_HOLD_CITY = 4
+
+/** Zoom from Jupiter to shuttle near Earth. */
+export const INTRO_DUR_ZOOM_SHUTTLE = 3
+
+/** Hold on shuttle — hero shot. */
+export const INTRO_DUR_HOLD_SHUTTLE = 3
+
+/** Hand off from intro camera to orbit camera. */
+export const INTRO_DUR_HANDOFF = 2
+
+// ---------------------------------------------------------------------------
+// Cinematic step names
+// ---------------------------------------------------------------------------
+
+/** All possible cinematic step names. */
+export type IntroCinematicStep =
+  | 'zoom_enceladus'
+  | 'hold_enceladus'
+  | 'zoom_virus'
+  | 'hold_virus'
+  | 'zoom_jupiter'
+  | 'hold_jupiter'
+  | 'zoom_city'
+  | 'hold_city'
+  | 'zoom_shuttle'
+  | 'hold_shuttle'
+  | 'handoff'
+  | 'done'
+
+/** Steps that are zoom (eased) transitions vs holds (linear). */
+export const INTRO_ZOOM_STEPS: ReadonlySet<IntroCinematicStep> = new Set([
+  'zoom_enceladus',
+  'zoom_virus',
+  'zoom_jupiter',
+  'zoom_city',
+  'zoom_shuttle',
+  'handoff',
+])
+
+// ---------------------------------------------------------------------------
+// Captions — keyed by step
+// ---------------------------------------------------------------------------
 
 /** Caption: wide solar system establishing shot. */
 export const MAP_INTRO_CAPTION_SOLAR_SYSTEM = 'SOLAR SYSTEM, 2299 AD.'
@@ -52,23 +105,39 @@ export const MAP_INTRO_CAPTION_CLOUD_CITY =
 export const MAP_INTRO_CAPTION_RETIRED_OPERATOR =
   'A RETIRED LANDER OPERATOR JUST RECEIVED A REFURBISHED SHUTTLE FROM THE SPACE PROGRAM.'
 
+/** Map from cinematic step to its caption text. */
+const STEP_CAPTIONS: Record<IntroCinematicStep, string> = {
+  zoom_enceladus: MAP_INTRO_CAPTION_SOLAR_SYSTEM,
+  hold_enceladus: MAP_INTRO_CAPTION_ENCELADUS,
+  zoom_virus: MAP_INTRO_CAPTION_ENCELADUS,
+  hold_virus: MAP_INTRO_CAPTION_VIROIDS,
+  zoom_jupiter: MAP_INTRO_CAPTION_VIROIDS,
+  hold_jupiter: MAP_INTRO_CAPTION_JUPITER_MATERIALS,
+  zoom_city: MAP_INTRO_CAPTION_JUPITER_MATERIALS,
+  hold_city: MAP_INTRO_CAPTION_CLOUD_CITY,
+  zoom_shuttle: MAP_INTRO_CAPTION_RETIRED_OPERATOR,
+  hold_shuttle: MAP_INTRO_CAPTION_RETIRED_OPERATOR,
+  handoff: MAP_INTRO_CAPTION_RETIRED_OPERATOR,
+  done: '',
+}
+
 /**
- * Resolves the lower-third title line for a given eased intro progress value.
+ * Returns the caption for a given cinematic step.
  *
- * @param easedProgress - Eased 0–1 timeline (same cubic ease as the intro camera).
- * @returns One of the six caption strings.
+ * @param step - The current cinematic step name.
+ * @returns The caption string, or empty for non-cinematic steps.
  *
  * @author guinetik
  * @date 2026-04-09
  */
-export function mapIntroCaptionForEasedProgress(easedProgress: number): string {
-  if (easedProgress < MAP_INTRO_BEAT_ENCELADUS) return MAP_INTRO_CAPTION_SOLAR_SYSTEM
-  if (easedProgress < MAP_INTRO_BEAT_VIROIDS) return MAP_INTRO_CAPTION_ENCELADUS
-  if (easedProgress < MAP_INTRO_BEAT_JUPITER) return MAP_INTRO_CAPTION_VIROIDS
-  if (easedProgress < MAP_INTRO_BEAT_CLOUD_CITY) return MAP_INTRO_CAPTION_JUPITER_MATERIALS
-  if (easedProgress < MAP_INTRO_BEAT_EARTH) return MAP_INTRO_CAPTION_CLOUD_CITY
-  return MAP_INTRO_CAPTION_RETIRED_OPERATOR
+export function mapIntroCaptionForStep(step: IntroCinematicStep | null): string {
+  if (!step) return ''
+  return STEP_CAPTIONS[step] ?? ''
 }
+
+// ---------------------------------------------------------------------------
+// Outer intro flow phases (cinematic → message → interactive)
+// ---------------------------------------------------------------------------
 
 /** Phases of the map intro flow. */
 export type MapIntroPhase =
@@ -94,66 +163,85 @@ export interface MapIntroUiState {
   cinematicCaption: string
 }
 
-/**
- * Tracks the map intro lifecycle from cinematic zoom to interactive play.
- *
- * @author guinetik
- * @date 2026-04-05
- * @spec docs/superpowers/specs/2026-04-05-startup-message-system-design.md
- */
 /** Options for {@link MapIntroState.start}. */
 export interface MapIntroStartOptions {
   /**
    * When true, the cinematic goes straight to `interactive` orbit instead of
-   * `awaiting_message_open` (no centered “new message” gate before gameplay).
+   * `awaiting_message_open` (no centered "new message" gate before gameplay).
    */
   skipBlockingMessageAfterCinematic?: boolean
 }
 
+/**
+ * Tracks the map intro lifecycle from cinematic zoom to interactive play.
+ *
+ * The cinematic phase is driven by a {@link StateMachine} with fixed-duration
+ * steps (zoom/hold pairs). Each step exposes its own 0→1 progress via
+ * {@link cinematicStepProgress}. Zoom steps should be eased by the consumer;
+ * hold steps are linear.
+ *
+ * @author guinetik
+ * @date 2026-04-09
+ * @spec docs/superpowers/specs/2026-04-09-intro-cinematic-expansion-design.md
+ */
 export class MapIntroState {
   /** Current intro phase. */
   phase: MapIntroPhase = 'inactive'
 
-  /** Elapsed time inside the cinematic zoom. */
-  private elapsed = 0
+  /** The cinematic step sequence (created on {@link start}). */
+  private cinematic: StateMachine<IntroCinematicStep> | null = null
 
-  /**
-   * When set by {@link start}, the post-cinematic phase skips the blocking mail prompt.
-   */
+  /** When set, the post-cinematic phase skips the blocking mail prompt. */
   private skipBlockingMessageAfterCinematic = false
 
   /**
    * Start the cinematic intro flow.
    *
-   * @param options - When `skipBlockingMessageAfterCinematic` is true, orbit unlocks immediately
-   * after the zoom with no “open message” step.
+   * @param options - When `skipBlockingMessageAfterCinematic` is true, orbit
+   * unlocks immediately after the cinematic with no "open message" step.
    */
   start(options?: MapIntroStartOptions): void {
     this.phase = 'cinematic_zoom'
-    this.elapsed = 0
     this.skipBlockingMessageAfterCinematic = options?.skipBlockingMessageAfterCinematic ?? false
+    this.cinematic = StateMachine.fromSequence<IntroCinematicStep>(
+      [
+        { name: 'zoom_enceladus', duration: INTRO_DUR_ZOOM_ENCELADUS },
+        { name: 'hold_enceladus', duration: INTRO_DUR_HOLD_ENCELADUS },
+        { name: 'zoom_virus', duration: INTRO_DUR_ZOOM_VIRUS },
+        { name: 'hold_virus', duration: INTRO_DUR_HOLD_VIRUS },
+        { name: 'zoom_jupiter', duration: INTRO_DUR_ZOOM_JUPITER },
+        { name: 'hold_jupiter', duration: INTRO_DUR_HOLD_JUPITER },
+        { name: 'zoom_city', duration: INTRO_DUR_ZOOM_CITY },
+        { name: 'hold_city', duration: INTRO_DUR_HOLD_CITY },
+        { name: 'zoom_shuttle', duration: INTRO_DUR_ZOOM_SHUTTLE },
+        { name: 'hold_shuttle', duration: INTRO_DUR_HOLD_SHUTTLE },
+        { name: 'handoff', duration: INTRO_DUR_HANDOFF },
+        { name: 'done' },
+      ],
+      {
+        onComplete: () => {
+          this.finishCinematic()
+        },
+      },
+    )
   }
 
   /** Skip the intro entirely when no startup message is active. */
   skip(): void {
     this.phase = 'interactive'
-    this.elapsed = 0
+    this.cinematic = null
     this.skipBlockingMessageAfterCinematic = false
   }
 
   /** Advance the cinematic timer. */
   tick(dt: number): void {
-    if (this.phase !== 'cinematic_zoom') return
+    if (this.phase !== 'cinematic_zoom' || !this.cinematic) return
+    this.cinematic.tick(dt)
 
-    this.elapsed += dt
-    if (this.elapsed >= MAP_INTRO_CINEMATIC_DURATION) {
-      if (this.skipBlockingMessageAfterCinematic) {
-        this.phase = 'interactive'
-        this.skipBlockingMessageAfterCinematic = false
-      } else {
-        this.phase = 'awaiting_message_open'
-      }
-      this.elapsed = 0
+    // The 'done' state has no duration — finishCinematic fires via onComplete
+    // of the last timed step. But also handle if we land in 'done' via auto-transition.
+    if (this.cinematic.state === 'done') {
+      this.finishCinematic()
     }
   }
 
@@ -168,25 +256,20 @@ export class MapIntroState {
   completeMessage(): boolean {
     if (this.phase !== 'reading_message') return false
     this.phase = 'interactive'
-    this.elapsed = 0
+    this.cinematic = null
     return true
   }
 
-  /** Normalized cinematic zoom progress (0-1). */
-  get cinematicProgress(): number {
-    if (this.phase === 'cinematic_zoom') {
-      return Math.min(1, this.elapsed / MAP_INTRO_CINEMATIC_DURATION)
-    }
+  /** The current cinematic step name, or null if not in cinematic phase. */
+  get cinematicStep(): IntroCinematicStep | null {
+    if (this.phase !== 'cinematic_zoom' || !this.cinematic) return null
+    return this.cinematic.state
+  }
 
-    if (
-      this.phase === 'awaiting_message_open'
-      || this.phase === 'reading_message'
-      || this.phase === 'interactive'
-    ) {
-      return 1
-    }
-
-    return 0
+  /** 0→1 progress within the current cinematic step. */
+  get cinematicStepProgress(): number {
+    if (!this.cinematic) return 0
+    return this.cinematic.progress
   }
 
   /** Whether intro locking is still active. */
@@ -198,7 +281,7 @@ export class MapIntroState {
   get uiState(): MapIntroUiState {
     const cinematicCaption =
       this.phase === 'cinematic_zoom'
-        ? mapIntroCaptionForEasedProgress(easeInOutCubic(this.cinematicProgress))
+        ? mapIntroCaptionForStep(this.cinematicStep)
         : ''
 
     return {
@@ -209,5 +292,17 @@ export class MapIntroState {
       controlsLocked: this.controlsLocked,
       cinematicCaption,
     }
+  }
+
+  /** Transition from cinematic to the post-cinematic phase. */
+  private finishCinematic(): void {
+    if (this.phase !== 'cinematic_zoom') return
+    if (this.skipBlockingMessageAfterCinematic) {
+      this.phase = 'interactive'
+      this.skipBlockingMessageAfterCinematic = false
+    } else {
+      this.phase = 'awaiting_message_open'
+    }
+    this.cinematic = null
   }
 }

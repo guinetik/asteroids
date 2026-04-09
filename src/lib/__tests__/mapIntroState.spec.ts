@@ -6,15 +6,25 @@ import {
   MAP_INTRO_CAPTION_JUPITER_MATERIALS,
   MAP_INTRO_CAPTION_CLOUD_CITY,
   MAP_INTRO_CAPTION_RETIRED_OPERATOR,
-  MAP_INTRO_CINEMATIC_DURATION,
-  MAP_INTRO_BEAT_ENCELADUS,
-  MAP_INTRO_BEAT_VIROIDS,
-  MAP_INTRO_BEAT_JUPITER,
-  MAP_INTRO_BEAT_CLOUD_CITY,
-  MAP_INTRO_BEAT_EARTH,
+  INTRO_DUR_ZOOM_ENCELADUS,
+  INTRO_DUR_HOLD_ENCELADUS,
+  INTRO_DUR_ZOOM_VIRUS,
+  INTRO_DUR_HOLD_VIRUS,
+  INTRO_DUR_ZOOM_JUPITER,
+  INTRO_DUR_HOLD_JUPITER,
+  INTRO_DUR_ZOOM_CITY,
+  INTRO_DUR_HOLD_CITY,
+  INTRO_DUR_ZOOM_SHUTTLE,
+  INTRO_DUR_HOLD_SHUTTLE,
+  INTRO_DUR_HANDOFF,
   MapIntroState,
-  mapIntroCaptionForEasedProgress,
+  mapIntroCaptionForStep,
 } from '../mapIntroState'
+
+/** Tick through all cinematic steps until the cinematic phase ends. */
+function fastForwardCinematic(state: MapIntroState): void {
+  for (let i = 0; i < 20; i++) state.tick(10)
+}
 
 describe('MapIntroState', () => {
   it('starts inactive', () => {
@@ -22,7 +32,7 @@ describe('MapIntroState', () => {
 
     expect(state.phase).toBe('inactive')
     expect(state.controlsLocked).toBe(false)
-    expect(state.cinematicProgress).toBe(0)
+    expect(state.cinematicStep).toBeNull()
   })
 
   it('enters the cinematic zoom when started', () => {
@@ -33,35 +43,64 @@ describe('MapIntroState', () => {
     expect(state.phase).toBe('cinematic_zoom')
     expect(state.controlsLocked).toBe(true)
     expect(state.uiState.letterboxVisible).toBe(true)
+    expect(state.cinematicStep).toBe('zoom_enceladus')
   })
 
-  it('advances from cinematic zoom to awaiting message open after the full duration', () => {
+  it('advances through cinematic steps with fixed durations', () => {
     const state = new MapIntroState()
-
     state.start()
-    state.tick(MAP_INTRO_CINEMATIC_DURATION)
+
+    expect(state.cinematicStep).toBe('zoom_enceladus')
+    state.tick(INTRO_DUR_ZOOM_ENCELADUS)
+
+    expect(state.cinematicStep).toBe('hold_enceladus')
+    state.tick(INTRO_DUR_HOLD_ENCELADUS)
+
+    expect(state.cinematicStep).toBe('zoom_virus')
+    state.tick(INTRO_DUR_ZOOM_VIRUS)
+
+    expect(state.cinematicStep).toBe('hold_virus')
+    state.tick(INTRO_DUR_HOLD_VIRUS)
+
+    expect(state.cinematicStep).toBe('zoom_jupiter')
+    state.tick(INTRO_DUR_ZOOM_JUPITER)
+
+    expect(state.cinematicStep).toBe('hold_jupiter')
+    state.tick(INTRO_DUR_HOLD_JUPITER)
+
+    expect(state.cinematicStep).toBe('zoom_city')
+    state.tick(INTRO_DUR_ZOOM_CITY)
+
+    expect(state.cinematicStep).toBe('hold_city')
+    state.tick(INTRO_DUR_HOLD_CITY)
+
+    expect(state.cinematicStep).toBe('zoom_shuttle')
+    state.tick(INTRO_DUR_ZOOM_SHUTTLE)
+
+    expect(state.cinematicStep).toBe('hold_shuttle')
+    state.tick(INTRO_DUR_HOLD_SHUTTLE)
+
+    expect(state.cinematicStep).toBe('handoff')
+    state.tick(INTRO_DUR_HANDOFF)
 
     expect(state.phase).toBe('awaiting_message_open')
-    expect(state.uiState.messagePromptVisible).toBe(true)
-    expect(state.cinematicProgress).toBe(1)
   })
 
-  it('advances from cinematic zoom to interactive when skipBlockingMessageAfterCinematic is set', () => {
+  it('advances to interactive when skipBlockingMessageAfterCinematic is set', () => {
     const state = new MapIntroState()
-
     state.start({ skipBlockingMessageAfterCinematic: true })
-    state.tick(MAP_INTRO_CINEMATIC_DURATION)
+
+    // Fast-forward through all steps (one tick per step)
+    fastForwardCinematic(state)
 
     expect(state.phase).toBe('interactive')
-    expect(state.uiState.messagePromptVisible).toBe(false)
     expect(state.controlsLocked).toBe(false)
   })
 
   it('opens the message only from the prompt phase', () => {
     const state = new MapIntroState()
-
     state.start()
-    state.tick(MAP_INTRO_CINEMATIC_DURATION)
+    fastForwardCinematic(state)
 
     expect(state.openMessage()).toBe(true)
     expect(state.phase).toBe('reading_message')
@@ -70,9 +109,8 @@ describe('MapIntroState', () => {
 
   it('completes into interactive only after the message is open', () => {
     const state = new MapIntroState()
-
     state.start()
-    state.tick(MAP_INTRO_CINEMATIC_DURATION)
+    fastForwardCinematic(state)
     state.openMessage()
 
     expect(state.completeMessage()).toBe(true)
@@ -90,50 +128,30 @@ describe('MapIntroState', () => {
     expect(state.controlsLocked).toBe(false)
   })
 
-  it('shows the six cinematic captions in order by eased progress', () => {
-    // Beat 1: Solar system (0 to BEAT_ENCELADUS)
-    expect(mapIntroCaptionForEasedProgress(0)).toBe(MAP_INTRO_CAPTION_SOLAR_SYSTEM)
-    expect(mapIntroCaptionForEasedProgress(MAP_INTRO_BEAT_ENCELADUS - 0.01)).toBe(
-      MAP_INTRO_CAPTION_SOLAR_SYSTEM,
-    )
+  it('returns correct captions for each step', () => {
+    expect(mapIntroCaptionForStep('zoom_enceladus')).toBe(MAP_INTRO_CAPTION_SOLAR_SYSTEM)
+    expect(mapIntroCaptionForStep('hold_enceladus')).toBe(MAP_INTRO_CAPTION_ENCELADUS)
+    expect(mapIntroCaptionForStep('zoom_virus')).toBe(MAP_INTRO_CAPTION_ENCELADUS)
+    expect(mapIntroCaptionForStep('hold_virus')).toBe(MAP_INTRO_CAPTION_VIROIDS)
+    expect(mapIntroCaptionForStep('zoom_jupiter')).toBe(MAP_INTRO_CAPTION_VIROIDS)
+    expect(mapIntroCaptionForStep('hold_jupiter')).toBe(MAP_INTRO_CAPTION_JUPITER_MATERIALS)
+    expect(mapIntroCaptionForStep('zoom_city')).toBe(MAP_INTRO_CAPTION_JUPITER_MATERIALS)
+    expect(mapIntroCaptionForStep('hold_city')).toBe(MAP_INTRO_CAPTION_CLOUD_CITY)
+    expect(mapIntroCaptionForStep('zoom_shuttle')).toBe(MAP_INTRO_CAPTION_RETIRED_OPERATOR)
+    expect(mapIntroCaptionForStep('hold_shuttle')).toBe(MAP_INTRO_CAPTION_RETIRED_OPERATOR)
+    expect(mapIntroCaptionForStep('handoff')).toBe(MAP_INTRO_CAPTION_RETIRED_OPERATOR)
+    expect(mapIntroCaptionForStep('done')).toBe('')
+    expect(mapIntroCaptionForStep(null)).toBe('')
+  })
 
-    // Beat 2: Enceladus discovery
-    expect(mapIntroCaptionForEasedProgress(MAP_INTRO_BEAT_ENCELADUS)).toBe(
-      MAP_INTRO_CAPTION_ENCELADUS,
-    )
-    expect(mapIntroCaptionForEasedProgress(MAP_INTRO_BEAT_VIROIDS - 0.01)).toBe(
-      MAP_INTRO_CAPTION_ENCELADUS,
-    )
+  it('exposes step progress within 0-1 range', () => {
+    const state = new MapIntroState()
+    state.start()
 
-    // Beat 3: Viroid reveal
-    expect(mapIntroCaptionForEasedProgress(MAP_INTRO_BEAT_VIROIDS)).toBe(
-      MAP_INTRO_CAPTION_VIROIDS,
-    )
-    expect(mapIntroCaptionForEasedProgress(MAP_INTRO_BEAT_JUPITER - 0.01)).toBe(
-      MAP_INTRO_CAPTION_VIROIDS,
-    )
+    expect(state.cinematicStepProgress).toBe(0)
 
-    // Beat 4a: Jupiter materials
-    expect(mapIntroCaptionForEasedProgress(MAP_INTRO_BEAT_JUPITER)).toBe(
-      MAP_INTRO_CAPTION_JUPITER_MATERIALS,
-    )
-    expect(mapIntroCaptionForEasedProgress(MAP_INTRO_BEAT_CLOUD_CITY - 0.01)).toBe(
-      MAP_INTRO_CAPTION_JUPITER_MATERIALS,
-    )
-
-    // Beat 4b: Cloud city
-    expect(mapIntroCaptionForEasedProgress(MAP_INTRO_BEAT_CLOUD_CITY)).toBe(
-      MAP_INTRO_CAPTION_CLOUD_CITY,
-    )
-    expect(mapIntroCaptionForEasedProgress(MAP_INTRO_BEAT_EARTH - 0.01)).toBe(
-      MAP_INTRO_CAPTION_CLOUD_CITY,
-    )
-
-    // Beat 5: Retired operator
-    expect(mapIntroCaptionForEasedProgress(MAP_INTRO_BEAT_EARTH)).toBe(
-      MAP_INTRO_CAPTION_RETIRED_OPERATOR,
-    )
-    expect(mapIntroCaptionForEasedProgress(1)).toBe(MAP_INTRO_CAPTION_RETIRED_OPERATOR)
+    state.tick(INTRO_DUR_ZOOM_ENCELADUS / 2)
+    expect(state.cinematicStepProgress).toBeCloseTo(0.5, 1)
   })
 
   it('exposes the current cinematic caption on uiState during the zoom phase', () => {

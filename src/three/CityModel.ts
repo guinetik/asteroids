@@ -3,7 +3,8 @@
  *
  * Preloads once, then clones the scene (via SkeletonUtils `clone`) so geometries
  * stay shared with the cached template. Materials are tuned with {@link fixMaterials}
- * for the shuttle scene point light.
+ * for the shuttle scene point light. Pass {@link CityModelCreateOptions.hologram} to use
+ * the shared TRON hologram shader (map intro cloud city).
  *
  * @author guinetik
  * @date 2026-04-09
@@ -12,6 +13,11 @@
 import * as THREE from 'three'
 import { clone as cloneSkinnedScene } from 'three/addons/utils/SkeletonUtils.js'
 import { fixMaterials, loadGLB } from './loadGLB'
+import {
+  createTronHologramMaterial,
+  disposeTronHologramMaterials,
+  syncTronHologramTimeSeconds,
+} from './tronHologramMaterial'
 
 /** Public URL path served from `public/models/city.glb`. */
 export const CITY_MODEL_PUBLIC_PATH = '/models/city.glb'
@@ -23,6 +29,12 @@ const DEFAULT_CITY_SCALE = 1
 const DEFAULT_CAST_SHADOW = true
 const DEFAULT_RECEIVE_SHADOW = true
 
+/** Hologram tint — celestial ice-blue for the cloud city. */
+const HOLOGRAM_COLOR = new THREE.Color(0x88ccff)
+
+/** Grid-line tint (subtle cool tone). */
+const CITY_GRID_TINT = new THREE.Color(0.05, 0.08, 0.12)
+
 /** Options for {@link CityModel.create}. */
 export interface CityModelCreateOptions {
   /** Uniform scale applied to the cloned city (default 1). */
@@ -31,6 +43,8 @@ export interface CityModelCreateOptions {
   castShadow?: boolean
   /** When false, meshes do not receive shadows (default {@link DEFAULT_RECEIVE_SHADOW}). */
   receiveShadow?: boolean
+  /** When true, replaces all materials with a tron hologram shader. */
+  hologram?: boolean
 }
 
 let cityTemplate: THREE.Group | null = null
@@ -56,14 +70,18 @@ async function ensureCityTemplate(): Promise<THREE.Group> {
 /**
  * Decorative city GLB — add {@link group} to your scene after {@link CityModel.create}.
  *
- * Geometries and materials may be shared with the preload template; {@link dispose}
- * only clears this instance’s group (caller removes from scene).
+ * Geometries may be shared with the preload template. {@link dispose} clears this
+ * instance’s group and disposes a hologram material when used (caller removes from scene).
  */
 export class CityModel {
   /** Parent group for positioning; contains the cloned mesh hierarchy. */
   readonly group = new THREE.Group()
+  /** Present when created with `hologram: true`; disposed in {@link dispose}. */
+  private readonly tronMaterial: THREE.ShaderMaterial | null
+  private timeSyncMesh: THREE.Mesh | null = null
 
-  private constructor(sceneClone: THREE.Group) {
+  private constructor(sceneClone: THREE.Group, tronMaterial: THREE.ShaderMaterial | null) {
+    this.tronMaterial = tronMaterial
     this.group.add(sceneClone)
   }
 
@@ -77,7 +95,7 @@ export class CityModel {
   /**
    * Create a new city instance from the shared template.
    *
-   * @param options - Scale and shadow tuning
+   * @param options - Scale, shadow tuning, and optional hologram shader
    * @returns A city ready to place via {@link group}
    */
   static async create(options?: CityModelCreateOptions): Promise<CityModel> {
@@ -89,15 +107,38 @@ export class CityModel {
 
     const castShadow = options?.castShadow ?? DEFAULT_CAST_SHADOW
     const receiveShadow = options?.receiveShadow ?? DEFAULT_RECEIVE_SHADOW
+    const useHologram = options?.hologram ?? false
+    let tronMaterial: THREE.ShaderMaterial | null = null
+    const meshesForTimeSync: THREE.Mesh[] = []
+
     sceneClone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
         mesh.castShadow = castShadow
         mesh.receiveShadow = receiveShadow
+        if (useHologram) {
+          if (!tronMaterial) {
+            tronMaterial = createTronHologramMaterial({
+              color: HOLOGRAM_COLOR,
+              gridTint: CITY_GRID_TINT,
+            })
+          }
+          mesh.material = tronMaterial
+          meshesForTimeSync.push(mesh)
+        }
       }
     })
 
-    return new CityModel(sceneClone)
+    const model = new CityModel(sceneClone, tronMaterial)
+    const timeSyncTarget = meshesForTimeSync[0]
+    if (timeSyncTarget && tronMaterial) {
+      const mat = tronMaterial
+      model.timeSyncMesh = timeSyncTarget
+      timeSyncTarget.onBeforeRender = () => {
+        syncTronHologramTimeSeconds([mat], performance.now() * 0.001)
+      }
+    }
+    return model
   }
 
   /**
@@ -120,10 +161,17 @@ export class CityModel {
   }
 
   /**
-   * Detach cloned meshes from this group. Does not dispose GPU assets shared with
-   * the preload template.
+   * Detach cloned meshes from this group. Disposes the hologram material when
+   * {@link CityModelCreateOptions.hologram} was used. Does not dispose template geometry.
    */
   dispose(): void {
+    if (this.timeSyncMesh) {
+      this.timeSyncMesh.onBeforeRender = () => {}
+      this.timeSyncMesh = null
+    }
+    if (this.tronMaterial) {
+      disposeTronHologramMaterials([this.tronMaterial])
+    }
     this.group.clear()
   }
 }
