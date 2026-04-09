@@ -18,6 +18,12 @@ A 2.5D physics-driven lander game where you play as an autonomous space trucker 
 
 It's the 2300s. About 200 years ago, the discovery of neutron thrusters democratized space travel. Suddenly, getting off-world wasn't just for governments and megacorps — it was for everyone. A massive space rush followed. Companies mass-produced landers, rovers, habitats, and mining rigs. Asteroid mining colonies popped up across the belt. For a brief, golden era, space was the new frontier.
 
+It started on Enceladus. A geological survey team drilling through the ice shell found something that shouldn't have existed: a crystalline lattice structure that, when energized, produced thrust at relativistic scales. The neutron thruster. Suddenly, interplanetary travel wasn't measured in months — it was measured in days.
+
+But Enceladus wasn't empty. The drilling woke something. Silicate creatures — ancient, from interstellar space, territorial and lethal. Humanity calls them Viroids. They'd been slumbering in the ice for millennia, and they didn't appreciate the company.
+
+The neutron thruster fit remarkably well with 21st-century space tech. NASA-era lander designs, mothballed for two centuries, turned out to be the perfect chassis. Jupiter became the industrial heart of the expansion — its moons supplied raw materials, and a cloud city above the surface housed 3D-printing assembly lines that churned out ships by the thousands. Humanity spread fast.
+
 Then the bubble collapsed.
 
 The companies folded. The infrastructure crumbled. The colonies were abandoned — or worse, left half-operational with skeleton crews. Humanity is now scattered across space in a loose, unglamorous diaspora. No federation, no empire. Just people making do with aging equipment and shrinking margins.
@@ -27,6 +33,8 @@ The companies folded. The infrastructure crumbled. The colonies were abandoned �
 You are an independent contractor — a trucker, essentially. You own a refurbished lander from the third space race era, held together with aftermarket parts and stubbornness. The lander is paid off. That's all that matters.
 
 You take jobs from a mission board: mining companies that need resources extracted, colony administrators dealing with infestations, distress signals from workers trapped in overrun sites. You fly in, do the work, fly out, get paid. You have a cat.
+
+Earth-born, Moon-raised. You spent decades running lander ops for belt mining outfits before the work dried up. Something happened after you retired — something you don't talk about. You bought a ship to live in. You don't live on planets anymore.
 
 ### The Lander
 
