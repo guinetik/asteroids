@@ -10,9 +10,21 @@ const emit = defineEmits<{
   useFuelCell: []
 }>()
 
+/** Degrees in a full compass rotation (0–360°). */
+const COMPASS_DEGREES_FULL = 360
+
+/** Radians to degrees multiplier. */
+const DEGREES_PER_RADIAN = 180 / Math.PI
+
+/**
+ * Formats shuttle yaw (radians) as a compass degree string (0–360).
+ *
+ * @param rad - World yaw in radians (same convention as {@link ShuttleTelemetry.heading}).
+ */
 function formatHeading(rad: number): string {
-  const deg = ((rad * 180) / Math.PI) % 360
-  return `${deg < 0 ? deg + 360 : deg}`
+  let deg = (rad * DEGREES_PER_RADIAN) % COMPASS_DEGREES_FULL
+  if (deg < 0) deg += COMPASS_DEGREES_FULL
+  return `${deg.toFixed(0)}`
 }
 
 function pct(value: number, max: number): number {
@@ -48,18 +60,21 @@ function tempLabelClass(): string {
 
 <template>
   <div class="shuttle-hud">
-    <!-- Top center: position -->
-    <div class="hud-position">
-      X:{{ props.telemetry.posX.toFixed(0) }}
-      Z:{{ props.telemetry.posZ.toFixed(0) }}
+    <!-- Top center: position + velocity/heading (same “beats” as FPS HUD readouts). -->
+    <div class="hud-top-cluster">
+      <div class="hud-top-cluster__line">
+        X:{{ props.telemetry.posX.toFixed(0) }}
+        Z:{{ props.telemetry.posZ.toFixed(0) }}
+      </div>
+      <div class="hud-top-cluster__line hud-top-cluster__line--velocity">
+        <span>SPD {{ props.telemetry.speed.toFixed(1) }}</span>
+        <span>HDG {{ formatHeading(props.telemetry.heading) }}</span>
+      </div>
+      <div v-if="props.telemetry.adriftCountdown >= 0" class="hud-top-cluster__adrift">
+        {{ adriftSeconds() }}s
+      </div>
     </div>
 
-    <!-- Adrift countdown: centered below position -->
-    <div v-if="props.telemetry.adriftCountdown >= 0" class="hud-adrift-countdown">
-      {{ adriftSeconds() }}s
-    </div>
-
-    <!-- Temperature gauge: below position, only when outside safe zone -->
     <div v-if="props.telemetry.temperatureVisible" class="hud-temp-gauge">
       <span class="hud-temp-label" :class="tempLabelClass()">
         {{ tempLabel() }} {{ Math.abs(props.telemetry.temperature).toFixed(0) }}&deg;
@@ -78,81 +93,72 @@ function tempLabelClass(): string {
       </div>
     </div>
 
-    <!-- Top left: hull bar (above fuel) -->
-    <div class="hud-hull">
-      <span class="hud-hull-label">HULL</span>
-      <div class="hud-hull-track">
-        <div
-          class="hud-hull-fill"
-          :class="hullColor(props.telemetry.hp, props.telemetry.maxHp)"
-          :style="{ width: pct(props.telemetry.hp, props.telemetry.maxHp) + '%' }"
-        ></div>
-      </div>
-    </div>
-
-    <!-- Top left: fuel bar -->
-    <div class="hud-fuel">
-      <span class="hud-fuel-label">FUEL</span>
-      <div class="hud-fuel-track">
-        <div
-          class="hud-fuel-fill"
-          :class="fuelColor(props.telemetry.fuelLevel, props.telemetry.fuelCapacity)"
-          :style="{ width: pct(props.telemetry.fuelLevel, props.telemetry.fuelCapacity) + '%' }"
-        ></div>
-      </div>
-    </div>
-
-    <!-- Refuel button: beside fuel bar when low and have fuel cells -->
-    <button
-      v-if="(fuelCellCount ?? 0) > 0 && pct(props.telemetry.fuelLevel, props.telemetry.fuelCapacity) < 80"
-      type="button"
-      class="hud-refuel-btn"
-      @click.stop.prevent="emit('useFuelCell')"
-      @mousedown.stop
-      @pointerdown.stop
-    >
-      REFUEL ({{ fuelCellCount }})
-    </button>
-
-    <!-- Adrift warning: under fuel bar -->
     <div v-if="props.telemetry.adriftCountdown >= 0" class="hud-adrift-warning">
       ADRIFT — DOCK TO REFUEL
     </div>
 
-    <!-- Bottom left: speed and heading -->
-    <div class="hud-readouts">
-      <span>SPD {{ props.telemetry.speed.toFixed(1) }}</span>
-      <span>HDG {{ formatHeading(props.telemetry.heading) }}</span>
-    </div>
+    <!-- Bottom center: hull | thruster bars | fuel (mirrors FPS HP | tools | RTG). -->
+    <div class="hud-bottom-dock">
+      <div class="hud-bottom-dock__column hud-bottom-dock__column--hull">
+        <span class="hud-hull-label">HULL</span>
+        <div class="hud-hull-track">
+          <div
+            class="hud-hull-fill"
+            :class="hullColor(props.telemetry.hp, props.telemetry.maxHp)"
+            :style="{ width: pct(props.telemetry.hp, props.telemetry.maxHp) + '%' }"
+          ></div>
+        </div>
+      </div>
 
-    <!-- Bottom center: thruster gauges -->
-    <div class="hud-gauges">
-      <div class="hud-gauge">
-        <div class="hud-gauge-track">
-          <div
-            class="hud-gauge-fill bg-red-500"
-            :style="{ height: pct(props.telemetry.thrustCharge, props.telemetry.thrustCapacity) + '%' }"
-          ></div>
+      <div class="hud-thruster-gauges">
+        <div class="hud-gauge">
+          <div class="hud-gauge-track">
+            <div
+              class="hud-gauge-fill bg-red-500"
+              :style="{ height: pct(props.telemetry.thrustCharge, props.telemetry.thrustCapacity) + '%' }"
+            ></div>
+          </div>
+          <span class="hud-gauge-label">THR</span>
         </div>
-        <span class="hud-gauge-label">THR</span>
+        <div class="hud-gauge">
+          <div class="hud-gauge-track">
+            <div
+              class="hud-gauge-fill bg-blue-500"
+              :style="{ height: pct(props.telemetry.brakeCharge, props.telemetry.brakeCapacity) + '%' }"
+            ></div>
+          </div>
+          <span class="hud-gauge-label">BRK</span>
+        </div>
+        <div class="hud-gauge">
+          <div class="hud-gauge-track">
+            <div
+              class="hud-gauge-fill bg-white"
+              :style="{ height: pct(props.telemetry.rcsCharge, props.telemetry.rcsCapacity) + '%' }"
+            ></div>
+          </div>
+          <span class="hud-gauge-label">RCS</span>
+        </div>
       </div>
-      <div class="hud-gauge">
-        <div class="hud-gauge-track">
+
+      <div class="hud-bottom-dock__column hud-bottom-dock__column--fuel">
+        <span class="hud-fuel-label">FUEL</span>
+        <div class="hud-fuel-track">
           <div
-            class="hud-gauge-fill bg-blue-500"
-            :style="{ height: pct(props.telemetry.brakeCharge, props.telemetry.brakeCapacity) + '%' }"
+            class="hud-fuel-fill"
+            :class="fuelColor(props.telemetry.fuelLevel, props.telemetry.fuelCapacity)"
+            :style="{ width: pct(props.telemetry.fuelLevel, props.telemetry.fuelCapacity) + '%' }"
           ></div>
         </div>
-        <span class="hud-gauge-label">BRK</span>
-      </div>
-      <div class="hud-gauge">
-        <div class="hud-gauge-track">
-          <div
-            class="hud-gauge-fill bg-white"
-            :style="{ height: pct(props.telemetry.rcsCharge, props.telemetry.rcsCapacity) + '%' }"
-          ></div>
-        </div>
-        <span class="hud-gauge-label">RCS</span>
+        <button
+          v-if="(fuelCellCount ?? 0) > 0 && pct(props.telemetry.fuelLevel, props.telemetry.fuelCapacity) < 80"
+          type="button"
+          class="hud-dock-refuel-btn"
+          @click.stop.prevent="emit('useFuelCell')"
+          @mousedown.stop
+          @pointerdown.stop
+        >
+          REFUEL ({{ fuelCellCount }})
+        </button>
       </div>
     </div>
   </div>

@@ -24,12 +24,23 @@ body {
   text-shadow: 0 0 4px rgba(0, 255, 0, 0.5);
 }
 
-.hud-position {
-  @apply absolute top-4 left-1/2 -translate-x-1/2;
+/* Map shuttle + FPS: top-center “position / motion” stack */
+.hud-top-cluster {
+  @apply absolute top-4 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-0.5 text-center;
 }
 
-.hud-hull {
-  @apply absolute top-1 left-4 flex items-center gap-2;
+.hud-top-cluster__line {
+  @apply text-green-400;
+}
+
+.hud-top-cluster__line--velocity {
+  @apply flex flex-wrap justify-center gap-x-4 gap-y-0.5 tracking-wide;
+}
+
+.hud-top-cluster__adrift {
+  @apply font-mono text-2xl font-bold text-red-500;
+  text-shadow: 0 0 12px rgba(239, 68, 68, 0.8);
+  animation: gravity-pulse 1s ease-in-out infinite;
 }
 
 .hud-hull-label {
@@ -44,26 +55,19 @@ body {
   @apply h-full transition-all duration-200;
 }
 
-.hud-fuel {
-  @apply absolute top-6 left-4 flex items-center gap-2;
+.hud-dock-refuel-btn {
+  @apply mt-1 self-start rounded border border-amber-400/30 bg-amber-400/10 px-2 py-0.5
+         text-[10px] font-mono text-amber-300 transition-colors cursor-pointer pointer-events-auto;
 }
 
-.hud-refuel-btn {
-  @apply absolute top-5 left-44 rounded border border-amber-400/30
-         bg-amber-400/10 px-2 py-0.5 text-[10px] font-mono text-amber-300
-         hover:bg-amber-400/20 transition-colors cursor-pointer
-         pointer-events-auto;
+.hud-dock-refuel-btn:hover {
+  @apply border-amber-400/50 bg-amber-400/20;
 }
 
 .hud-adrift-warning {
-  @apply absolute top-12 left-4 text-red-500 text-xs font-bold;
+  @apply absolute bottom-28 left-1/2 z-20 max-w-xs -translate-x-1/2 px-4 text-center text-xs font-bold
+         text-red-500;
   text-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
-  animation: gravity-pulse 1s ease-in-out infinite;
-}
-
-.hud-adrift-countdown {
-  @apply absolute top-10 left-1/2 -translate-x-1/2 text-red-500 text-2xl font-bold font-mono;
-  text-shadow: 0 0 12px rgba(239, 68, 68, 0.8);
   animation: gravity-pulse 1s ease-in-out infinite;
 }
 
@@ -79,12 +83,25 @@ body {
   @apply h-full transition-all duration-200;
 }
 
-.hud-readouts {
-  @apply absolute bottom-4 left-4 flex flex-col gap-1;
+/* Bottom dock: hull | vertical thruster gauges | fuel (paired with FPS HUD bottom row). */
+.hud-bottom-dock {
+  @apply absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-end justify-center gap-5;
 }
 
-.hud-gauges {
-  @apply absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-3 items-end;
+.hud-bottom-dock__column {
+  @apply flex w-32 flex-col gap-1;
+}
+
+.hud-bottom-dock__column--hull {
+  @apply items-stretch;
+}
+
+.hud-bottom-dock__column--fuel {
+  @apply items-stretch;
+}
+
+.hud-thruster-gauges {
+  @apply flex items-end gap-3;
 }
 
 .hud-gauge {
@@ -168,7 +185,7 @@ body {
 }
 
 .gravity-warning {
-  @apply absolute top-12 left-1/2 -translate-x-1/2 text-center font-mono pointer-events-none;
+  @apply absolute top-28 left-1/2 z-20 -translate-x-1/2 text-center font-mono pointer-events-none;
   @apply transition-opacity duration-300;
 }
 
@@ -232,7 +249,8 @@ body {
 }
 
 .hud-temp-gauge {
-  @apply absolute top-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 font-mono pointer-events-none;
+  @apply absolute top-32 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-1 font-mono
+         pointer-events-none;
   animation: gravity-pulse 1.5s ease-in-out infinite;
 }
 
@@ -537,11 +555,11 @@ body {
   @apply pointer-events-none fixed bottom-[14%] left-0 right-0 z-[32] mx-auto max-w-3xl px-8 text-center font-mono text-sm font-medium uppercase leading-snug tracking-[0.18em] text-cyan-100/95 drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] md:text-base md:tracking-[0.22em];
 }
 
-/* Map route: title + quick access (habitat / shuttle terminal) — clears .credits-badge (top-right). */
+/* Map route: title + quick access (habitat / shuttle terminal). */
 .map-screen-nav {
   @apply fixed left-0 right-0 top-0 z-[35] flex items-center justify-between gap-4
-         border-b border-cyan-400/15 bg-gradient-to-b from-slate-950/92 to-transparent
-         px-4 py-2.5 pr-40 font-mono pointer-events-auto sm:px-6 sm:pr-44;
+         border-b border-cyan-400/15 bg-gradient-to-b from-slate-950/92 to-transparent px-4 py-2.5
+         font-mono pointer-events-auto sm:px-6;
 }
 
 .map-screen-nav__title {
@@ -1305,9 +1323,9 @@ body {
   }
 }
 
-/* Credits Badge HUD */
+/* Credits Badge HUD — bottom-left so top-center toasts / mail notice stay clear. */
 .credits-badge {
-  @apply fixed top-4 right-4 z-30 flex items-center gap-2
+  @apply fixed bottom-4 left-4 z-30 flex items-center gap-2
          rounded-lg border border-cyan-400/30 bg-slate-950/80
          px-4 py-2 font-mono text-sm text-cyan-300 shadow-lg
          pointer-events-none;
@@ -1326,14 +1344,6 @@ body {
   @apply mt-1 w-full rounded border border-amber-400/30
          bg-amber-400/10 px-4 py-1.5 text-xs font-mono text-amber-300
          hover:bg-amber-400/20 transition-colors cursor-pointer
-         pointer-events-auto;
-}
-
-/* Habitat Button (inside orbit prompt) */
-.orbit-prompt-habitat-btn {
-  @apply mt-1 w-full rounded border border-slate-400/30
-         bg-slate-400/10 px-4 py-1.5 text-xs font-mono text-slate-300
-         hover:bg-slate-400/20 transition-colors cursor-pointer
          pointer-events-auto;
 }
 

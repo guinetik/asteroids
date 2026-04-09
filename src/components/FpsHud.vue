@@ -60,10 +60,27 @@ const MODE_LABELS: Record<string, { key: string; label: string; color: string }>
   heal: { key: '3', label: 'MED', color: '#22c55e' },
 }
 
+/** Degrees in a full compass rotation (0–360°). */
+const COMPASS_DEGREES_FULL = 360
+
+/** Radians to degrees multiplier. */
+const DEGREES_PER_RADIAN = 180 / Math.PI
+
 const props = defineProps<{ telemetry: FpsTelemetry }>()
 
 function pct(value: number, max: number): number {
   return max > 0 ? (value / max) * 100 : 0
+}
+
+/**
+ * Formats camera yaw (radians) as a compass degree string (0–360), matching shuttle HDG readout style.
+ *
+ * @param rad - Y rotation from the FPS camera (see {@link FpsTelemetry.headingRad}).
+ */
+function formatHeadingDegFromRad(rad: number): string {
+  let deg = (rad * DEGREES_PER_RADIAN) % COMPASS_DEGREES_FULL
+  if (deg < 0) deg += COMPASS_DEGREES_FULL
+  return deg.toFixed(0)
 }
 
 function o2Color(): string {
@@ -81,34 +98,13 @@ function modeColor(): string {
 <template>
   <div class="fixed inset-0 pointer-events-none font-mono text-white/90">
 
-    <!-- ═══ TOP CENTER: Speed ═══ -->
-    <div class="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-2">
-      <span class="text-xs tracking-widest uppercase text-white/40">SPD</span>
-      <span class="text-sm tabular-nums text-white/70">{{ telemetry.speed.toFixed(1) }}</span>
-    </div>
-
-    <!-- ═══ MIDDLE LEFT: O2 + Stamina (vertical bars) ═══ -->
-    <div class="absolute left-6 top-1/2 -translate-y-1/2 flex gap-2 items-end">
-      <!-- O2 vertical bar -->
-      <div class="flex flex-col items-center gap-1">
-        <span class="text-[10px] text-white/40">{{ Math.ceil(telemetry.o2Level) }}</span>
-        <div class="w-3 h-28 bg-white/10 rounded-sm overflow-hidden flex flex-col-reverse">
-          <div
-            class="w-full transition-all duration-100 rounded-sm"
-            :style="{ height: pct(telemetry.o2Level, telemetry.o2Capacity) + '%', backgroundColor: o2Color() }"
-          />
-        </div>
-        <span class="text-[10px] tracking-widest uppercase text-white/50">O2</span>
-      </div>
-      <!-- Stamina vertical bar -->
-      <div class="flex flex-col items-center gap-1">
-        <div class="w-3 h-24 bg-white/10 rounded-sm overflow-hidden flex flex-col-reverse">
-          <div
-            class="w-full bg-green-400/80 transition-all duration-100 rounded-sm"
-            :style="{ height: pct(telemetry.sprintCharge, telemetry.sprintCapacity) + '%' }"
-          />
-        </div>
-        <span class="text-[10px] tracking-widest uppercase text-white/50">STA</span>
+    <!-- ═══ TOP CENTER: Speed + heading (aligned with shuttle SPD / HDG row) ═══ -->
+    <div class="absolute top-4 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-0.5">
+      <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-0.5 text-sm">
+        <span class="text-xs tracking-widest uppercase text-white/40">SPD</span>
+        <span class="tabular-nums text-white/70">{{ telemetry.speed.toFixed(1) }}</span>
+        <span class="text-xs tracking-widest uppercase text-white/40">HDG</span>
+        <span class="tabular-nums text-white/70">{{ formatHeadingDegFromRad(telemetry.headingRad) }}</span>
       </div>
     </div>
 
@@ -132,30 +128,48 @@ function modeColor(): string {
       </svg>
     </div>
 
-    <!-- ═══ BOTTOM CENTER: HP bar + Action Bar + flanking bars ═══ -->
-    <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
-
-      <!-- HP Bar (above toolbar) -->
-      <div class="flex items-center gap-2">
-        <span class="text-xs tracking-widest uppercase text-red-400/80 w-6">HP</span>
-        <div class="w-36 h-3 bg-white/10 rounded-sm overflow-hidden">
-          <div
-            class="h-full bg-red-500 transition-all duration-100"
-            :style="{ width: pct(telemetry.hp, telemetry.maxHp) + '%' }"
-          />
+    <!-- ═══ BOTTOM CENTER: HP | multitool “thruster” cluster | RTG (mirrors shuttle hull | THR/BRK/RCS | fuel) ═══ -->
+    <div class="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-end justify-center gap-5">
+      <div class="flex w-32 flex-col gap-1">
+        <span class="text-xs tracking-widest uppercase text-red-400/80">HP</span>
+        <div class="flex items-center gap-1">
+          <div class="h-3 min-w-0 flex-1 overflow-hidden rounded-sm bg-white/10">
+            <div
+              class="h-full bg-red-500 transition-all duration-100"
+              :style="{ width: pct(telemetry.hp, telemetry.maxHp) + '%' }"
+            />
+          </div>
+          <span class="shrink-0 text-[10px] tabular-nums text-white/40">{{ Math.ceil(telemetry.hp) }}</span>
         </div>
-        <span class="text-[10px] text-white/40 w-6 text-right">{{ Math.ceil(telemetry.hp) }}</span>
+        <div class="flex items-end justify-center gap-2 pt-1">
+          <div class="flex flex-col items-center gap-0.5">
+            <span class="text-[10px] text-white/40">{{ Math.ceil(telemetry.o2Level) }}</span>
+            <div class="flex h-16 w-2.5 flex-col-reverse overflow-hidden rounded-sm bg-white/10">
+              <div
+                class="w-full rounded-sm transition-all duration-100"
+                :style="{ height: pct(telemetry.o2Level, telemetry.o2Capacity) + '%', backgroundColor: o2Color() }"
+              />
+            </div>
+            <span class="text-[10px] tracking-widest uppercase text-white/50">O2</span>
+          </div>
+          <div class="flex flex-col items-center gap-0.5">
+            <div class="h-16 w-2.5 flex flex-col-reverse overflow-hidden rounded-sm bg-white/10">
+              <div
+                class="w-full rounded-sm bg-green-400/80 transition-all duration-100"
+                :style="{ height: pct(telemetry.sprintCharge, telemetry.sprintCapacity) + '%' }"
+              />
+            </div>
+            <span class="text-[10px] tracking-widest uppercase text-white/50">STA</span>
+          </div>
+        </div>
       </div>
 
-      <!-- Toolbar row: Mode Charge | [1][2][3] | RTG -->
-      <div class="flex items-center gap-3">
-
-        <!-- Mode charge (left of toolbar) -->
+      <div class="flex flex-col items-center gap-2">
         <div class="flex items-center gap-1.5">
           <span class="text-[10px] tracking-widest uppercase" :style="{ color: modeColor() + '80' }">
             {{ MODE_LABELS[telemetry.activeMode]?.label }}
           </span>
-          <div class="w-20 h-2 bg-white/10 rounded-sm overflow-hidden">
+          <div class="h-2 w-20 overflow-hidden rounded-sm bg-white/10">
             <div
               class="h-full transition-all duration-75"
               :style="{
@@ -165,13 +179,11 @@ function modeColor(): string {
             />
           </div>
         </div>
-
-        <!-- Action Bar [1][2][3] -->
         <div class="flex gap-1">
           <div
             v-for="(cfg, mode) in MODE_LABELS"
             :key="mode"
-            class="flex items-center gap-1 px-3 py-1.5 rounded text-xs tracking-wider uppercase transition-all duration-150"
+            class="flex items-center gap-1 rounded px-3 py-1.5 text-xs tracking-wider uppercase transition-all duration-150"
             :class="telemetry.activeMode === mode ? 'bg-white/15' : 'bg-white/5 opacity-50'"
             :style="telemetry.activeMode === mode ? { borderBottom: '2px solid ' + cfg.color, color: cfg.color } : {}"
           >
@@ -179,16 +191,15 @@ function modeColor(): string {
             <span>{{ cfg.label }}</span>
           </div>
         </div>
+      </div>
 
-        <!-- RTG (right of toolbar) -->
-        <div class="flex items-center gap-1.5">
-          <div class="w-20 h-2 bg-white/10 rounded-sm overflow-hidden">
-            <div
-              class="h-full bg-yellow-400/80 transition-all duration-75"
-              :style="{ width: pct(telemetry.rtgLevel, telemetry.rtgCapacity) + '%' }"
-            />
-          </div>
-          <span class="text-[10px] tracking-widest uppercase text-yellow-400/50">RTG</span>
+      <div class="flex w-32 flex-col gap-1">
+        <span class="text-[10px] tracking-widest uppercase text-yellow-400/50">RTG</span>
+        <div class="h-3 w-full overflow-hidden rounded-sm bg-white/10">
+          <div
+            class="h-full bg-yellow-400/80 transition-all duration-75"
+            :style="{ width: pct(telemetry.rtgLevel, telemetry.rtgCapacity) + '%' }"
+          />
         </div>
       </div>
     </div>

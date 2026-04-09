@@ -550,7 +550,6 @@ function dockedPlanetId(): string | null {
     :orbitState="orbitState"
     :shop-available="shopButtonVisible && !shopDialogVisible && !shuttleControlVisible"
     :mission-available="missionButtonVisible && !missionOverlayVisible && !shuttleControlVisible"
-    @open-habitat="viewController.enterHabitat()"
     @open-shop="openShop"
     @open-mission="openMissionOverlay"
   />
