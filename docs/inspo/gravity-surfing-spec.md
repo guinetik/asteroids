@@ -276,3 +276,272 @@ UPGRADE TIERS (future, not for initial release):
   Tier 2: Stabilized Coupling (6,000 CR) — resists wave disruption, 5x speed
   Tier 3: Military-Grade Coupler (12,000 CR) — max speed, can surf
           through mild gravity curves without ejection
+
+========================================
+PART 3: IMPLEMENTATION SHAPE
+========================================
+
+GOAL OF THIS SECTION:
+Translate the fantasy spec above into a buildable first release that fits
+the current codebase. This is the "what do we actually wire up first" layer.
+
+CURRENT REPO ANCHORS:
+- `gravitySurfing` already exists as a hidden upgrade in the upgrade system
+- Space Fabric HUD gating already exists
+- `MapViewController` already contains:
+    - `hasGravitySurfingUnlock` integration
+    - `applyInitialSpaceFabricVisibilityFromUpgrades()`
+    - dev hooks for granting/revoking the upgrade
+    - `installUpgradeFromConsumable()` and `onUpgradeInstalledAnnouncement`
+- Asteroid mission difficulty plumbing already exists via
+  `computeMissionDifficulty()`
+
+FIRST-RELEASE RULE:
+Do not try to ship the full fantasy in one pass. Release in two layers:
+
+LAYER A — QUEST + UPGRADE DELIVERY:
+- Add the unlock quest, package delivery, reward payout, and messaging
+- Reuse existing upgrade-install announcement flow where possible
+- Reuse existing asteroid mission framework where possible
+- No actual surfing movement required in this layer
+- Outcome: Space Fabric becomes a mid-game unlock, and the player receives
+  a clear promise/tutorial for the next feature
+
+LAYER B — SURFING MECHANIC:
+- Add coupling, rail motion, intersections, decouple stop, and wave spawn
+- Build only after the unlock quest exists and the upgrade is granted by
+  game content instead of dev tooling
+
+This split reduces risk. Layer A is mostly content/state plumbing.
+Layer B is movement/camera/controls work and should be treated separately.
+
+QUEST STATE MODEL:
+Use an explicit lightweight quest state instead of inferring from inventory
+or mail text alone.
+
+Recommended states:
+- `unavailable`
+- `offered`
+- `accepted`
+- `packageCollected`
+- `delivered`
+- `completed`
+
+Required flags/data:
+- `consortiumCertificationState`
+- `consortiumPackageCollectedAt` (optional timestamp/debug aid)
+- `consortiumPackageAsteroidId` or fixed waypoint id
+- `consortiumDeliveryRewardGranted` boolean safeguard
+
+Rationale:
+- Prevent duplicate rewards
+- Prevent duplicate Jay follow-up mail
+- Make save/load and UI copy deterministic
+- Avoid brittle "do we still have the item?" logic
+
+PACKAGE ITEM RULES:
+- Item id: `gridCouplingModule`
+- Inventory category: special mission item or equipment-style unique item
+- Stack size: 1
+- Sell/drop/jettison: disallowed
+- Loss behavior:
+    - If shuttle is destroyed while carrying it, package is lost
+    - Quest state returns to `offered`
+    - Consortium mail can re-issue the package waypoint after a short delay
+
+This is the main place where the original "offer does not repeat" text is
+too harsh for an actual game. First release should not permanently brick the
+feature for a player because of one bad death. Keep the tone threatening, but
+the implementation recoverable.
+
+MISSION STRUCTURE RECOMMENDATION:
+Treat "Consortium Certification" as a handcrafted special mission layered on
+top of the asteroid mission system, not as a fully procedural mission.
+
+Recommended shape:
+- Fixed asteroid target
+- Fixed objective chain
+- No random giver roll
+- No combat
+- Manual accept/track/complete flow
+
+Do not force this mission through the generic generator if that produces
+unnatural abstractions. A one-off special-case mission is acceptable here.
+
+MAIL / TERMINAL CONTENT CHANGES REQUIRED:
+The note at the top of this doc is now a hard requirement, not a soft reminder.
+
+Update or suppress any early-game content that currently assumes:
+- the player can already toggle Space Fabric
+- the player already understands grid lines
+- the player has access to Q-based grid coupling
+
+At minimum revise:
+- Shuttle Handoff
+- First Flight Notes
+- any map/HUD onboarding copy that references Space Fabric directly
+
+FIRST-TIME UNLOCK PRESENTATION:
+When delivery completes, present rewards in this order:
+1. Credits reward
+2. Heat Shield Level 1 install if needed
+3. Cryo Insulation Level 1 install if needed
+4. Gravity Surfing install announcement
+5. Jay follow-up mail unlocks
+
+Reasoning:
+- It mirrors the existing auto-install flow for module rewards
+- It gives Gravity Surfing the spotlight last
+- It avoids the new feature reveal being buried under utility upgrades
+
+Suggested install announcement metadata:
+- headline: `UPGRADE INSTALLED`
+- upgrade: `Gravity Surfing`
+- tier: `1`
+- meta: `Grid Coupling Module · Consortium Certified`
+
+SPACE FABRIC DEFAULT AFTER UNLOCK:
+- On the same session as quest delivery, force Space Fabric ON once
+- On later loads, preserve current gated behavior:
+    - if unlocked, map starts with fabric visible
+    - if revoked in dev, hide it immediately
+
+Reasoning:
+- The player just got taught about the feature
+- They should see the grid immediately without hunting for the toggle
+
+INPUT / CONTROLS DECISION:
+Keep `Q` as the coupling/decoupling input for now, but define exact priority:
+
+Priority order on map view:
+1. If surfing, `Q` decouples
+2. Else if gravitySurfing is unlocked and Space Fabric is ON and snap target
+   exists, `Q` couples
+3. Else existing `Q` interactions keep priority if they are context-bound
+4. Else no-op
+
+This priority needs to be checked against any current `Q` binding in map view
+before implementation to avoid hidden control conflicts.
+
+SURFING STATE MACHINE:
+Represent surfing as an explicit map-view locomotion mode.
+
+Recommended states:
+- `freeFlight`
+- `coupling`
+- `surfing`
+- `decoupling`
+- `forcedEjection`
+
+Key invariants:
+- Thruster-driven acceleration disabled in all non-`freeFlight` states
+- Slingshot/orbit capture disabled while surfing
+- Shuttle cannot enter land/approach interaction while surfing
+- Forced ejection preserves velocity only for danger-zone or disruption exits
+- Manual decouple always resolves to zero velocity before wave spawn
+
+INTERSECTION INPUT BUFFER:
+Do not require frame-perfect A/D input.
+
+Recommended first-release behavior:
+- input buffer window: ~0.35s before intersection
+- choice persists until the next intersection is resolved
+- if both A and D are pressed, last input wins
+- if no valid branch exists, continue straight
+
+Without buffering, the mechanic will feel unreliable at 3x speed.
+
+DANGER-BOUNDARY RULE:
+There are two decouple outcomes and they must stay distinct:
+
+1. Manual decouple:
+- fast stop
+- zero final velocity
+- spawn standard decouple wave
+
+2. Forced decouple:
+- no fast stop
+- preserve current rail velocity
+- no free safety stop before entering a gravity well
+
+This distinction is core to balance and should be enforced in code, not left
+as a tuning convention.
+
+SAVE / LOAD EXPECTATIONS:
+First release should support save/load for the quest state and upgrade unlock.
+Do not attempt to persist an active surf trajectory in the first mechanic pass.
+
+On load:
+- quest state restores normally
+- delivery rewards are not replayed if already granted
+- if player saved mid-surf, fall back to normal free flight at current map
+  position with safe velocity
+
+That fallback is acceptable and much simpler than restoring rail state.
+
+QA ACCEPTANCE CRITERIA:
+
+Quest unlock:
+- Player below the intended difficulty threshold does not receive the mail
+- Player at threshold receives the mail on next habitat terminal visit
+- Mission can be accepted and tracked
+- Package can be collected exactly once per run
+- Delivery at Earth grants rewards exactly once
+- Gravity Surfing upgrade appears as owned but never in the shop
+- Space Fabric toggle becomes visible immediately after delivery
+- Jay follow-up message appears exactly once
+
+Failure/recovery:
+- Dying before pickup leaves mission available
+- Dying after pickup does not duplicate the package
+- Reissued mission remains completable
+- Reloading after delivery does not repeat credits/upgrades/mail
+
+Mechanic:
+- Q does nothing when upgrade is locked
+- Q does nothing when Space Fabric is OFF
+- Q couples when eligible and decouples when surfing
+- Manual decouple ends at zero velocity and spawns a wave
+- Forced ejection preserves velocity
+- A/D branch selection works consistently with buffered input
+- Turning Space Fabric OFF while surfing decouples immediately
+
+PHASED SHIP PLAN:
+
+Phase 1 — Narrative gate:
+- special mail
+- special mission
+- package item
+- Earth delivery
+- reward/install flow
+- early-game text cleanup
+
+Phase 2 — Minimal surfing:
+- nearest-line snap
+- forward/reverse rail motion
+- manual decouple stop
+- HUD state
+
+Phase 3 — Advanced surfing:
+- intersections
+- curved rails
+- danger zones
+- wave disruption
+- polish VFX/camera
+
+OPEN DESIGN CALLS:
+- Should the certification mission live in MAIL only, or also appear on the
+  main mission board once offered?
+- Should package loss fully reset the mission, or simply respawn the package
+  on the same asteroid?
+- Should Space Fabric auto-enable only once on unlock, or every time the map
+  is entered until the player manually turns it off?
+- Does the Earth delivery happen from orbit with a prompt, or via habitat
+  terminal / docking menu for stronger ceremony?
+
+RECOMMENDED ANSWERS FOR FIRST RELEASE:
+- MAIL-triggered offer, then trackable from normal mission UI
+- package respawns via quest reset, not permanent failure
+- auto-enable Space Fabric once on unlock only
+- orbit delivery prompt, because it reuses existing map-view context and keeps
+  the reward beat immediate
