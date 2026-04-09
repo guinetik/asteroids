@@ -123,6 +123,23 @@ export class PlanetSystemController implements GravitySource {
     return this.group.position.z
   }
 
+  /**
+   * Compute the world-space position of a moon by its index in the planet's moon array.
+   *
+   * @param moonIndex - Index into the planet definition's `moons` array
+   * @param target - Vector3 to write into (avoids allocation per frame)
+   * @returns The target vector, or null if the index is out of range
+   *
+   * @author guinetik
+   * @date 2026-04-09
+   */
+  getMoonWorldPosition(moonIndex: number, target: THREE.Vector3): THREE.Vector3 | null {
+    const entry = this.moonEntries[moonIndex]
+    if (!entry) return null
+    entry.meshResult.mesh.getWorldPosition(target)
+    return target
+  }
+
   tick(dt: number, simTime: number): void {
     const shaderTime = simTime / SHADER_TIME_DIVISOR
 
