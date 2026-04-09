@@ -287,8 +287,19 @@ const MAP_RETICLE_MIN_SPEED = 0.12
 /** Distance in world units at which the "Begin Mission" prompt appears. */
 const MISSION_APPROACH_RADIUS = 15
 
-/** Apparent screen size of the waypoint marker as fraction of screen height. */
-const WAYPOINT_APPARENT_SIZE = 0.04
+/**
+ * Target subtended height of the mission site (cyan beam + asteroid preview) as a fraction of
+ * viewport height.
+ */
+const WAYPOINT_APPARENT_SIZE = 0.11
+
+/**
+ * Whether the shuttle map should draw the 3D mission site (marker + asteroid when loaded).
+ * Includes `in-transit` so a browser refresh after launch still shows the target.
+ */
+function shouldShowAsteroidMissionMapSite(mission: GeneratedAsteroidMission | null): boolean {
+  return mission !== null && (mission.status === 'accepted' || mission.status === 'in-transit')
+}
 
 /** Offset behind Earth so the shuttle doesn't overlap the planet mesh. */
 const SPAWN_OFFSET_BEHIND_EARTH = 7.5
@@ -545,13 +556,13 @@ export class MapViewController implements Tickable {
   private readonly _beltShuttleWorldScratch = new THREE.Vector3()
 
   /**
-   * Root at the mission waypoint world position: uniform screen scaling applies to both
-   * the orbit marker and the large preview asteroid.
+   * Root at the mission waypoint world position; uniform screen scaling applies to the cyan marker
+   * and the optional GLB asteroid preview.
    */
   private missionWaypointRoot: THREE.Group | null = null
   /** Cyan beam / ring / diamond group (child of `missionWaypointRoot`). */
   private missionOrbitWaypointMarker: THREE.Group | null = null
-  /** Large rock mesh alongside the marker; optional until GLB resolves. */
+  /** Random asteroid mesh beside the beam; populated after `asteroids.glb` loads. */
   private missionAsteroidPreviewMesh: THREE.Mesh | null = null
   /** Whether the shuttle is within approach range of the waypoint. */
   private missionApproachVisible = false
@@ -1786,6 +1797,7 @@ export class MapViewController implements Tickable {
 
       if (
         inRange &&
+        this.missionBoard.activeAsteroidMission?.status === 'accepted' &&
         this.inputManager?.wasActionPressed('orbitAction') &&
         this.orbitSystem?.state === 'free'
       ) {
@@ -2276,40 +2288,38 @@ export class MapViewController implements Tickable {
   /** Create or destroy the waypoint marker mesh based on active asteroid mission. */
   private syncWaypointMarker(): void {
     const mission = this.missionBoard.activeAsteroidMission
-    if (mission && mission.status === 'accepted' && !this.missionWaypointRoot && this.sceneObjects) {
+    if (shouldShowAsteroidMissionMapSite(mission) && !this.missionWaypointRoot && this.sceneObjects) {
       const root = new THREE.Group()
-      root.position.set(mission.waypoint.worldX, 0, mission.waypoint.worldZ)
+      root.position.set(mission!.waypoint.worldX, 0, mission!.waypoint.worldZ)
       const waypoint = createWaypointMarkerGroup(WAYPOINT_MARKER_DEFAULT_COLOR, 'orbitMap')
       root.add(waypoint)
       this.sceneObjects.scene.add(root)
       this.missionWaypointRoot = root
       this.missionOrbitWaypointMarker = waypoint
-      void this.spawnMissionAsteroidPreview(root, mission)
-    } else if ((!mission || mission.status !== 'accepted') && this.missionWaypointRoot) {
+      void this.spawnMissionAsteroidPreview(root, mission!)
+    } else if (!shouldShowAsteroidMissionMapSite(mission) && this.missionWaypointRoot) {
       this.disposeMissionWaypointSite()
     }
   }
 
   /**
-   * Attach a large random asteroid mesh once `asteroids.glb` finishes loading.
-   * Skips or disposes the mesh if the mission site was torn down meanwhile.
+   * Add an asteroid from `asteroids.glb` beside the waypoint (async load).
    *
-   * @param root - The mission site root this spawn was started for
-   * @param mission - Accepted mission driving the waypoint
+   * @param root - Mission site root this load was started for
+   * @param mission - Active shuttle asteroid mission
    */
   private async spawnMissionAsteroidPreview(
     root: THREE.Group,
     mission: GeneratedAsteroidMission,
   ): Promise<void> {
     try {
-      const seed = missionAsteroidShapeSeed(mission.id)
-      const mesh = await createMapMissionAsteroidPreviewMesh(seed)
+      const mesh = await createMapMissionAsteroidPreviewMesh(missionAsteroidShapeSeed(mission.id))
       if (this.missionWaypointRoot !== root) {
         disposeMapMissionAsteroidPreviewMesh(mesh)
         return
       }
       const active = this.missionBoard.activeAsteroidMission
-      if (!active || active.id !== mission.id || active.status !== 'accepted') {
+      if (!active || active.id !== mission.id || !shouldShowAsteroidMissionMapSite(active)) {
         disposeMapMissionAsteroidPreviewMesh(mesh)
         return
       }
@@ -2321,7 +2331,7 @@ export class MapViewController implements Tickable {
   }
 
   /**
-   * Remove the mission waypoint root, dispose the orbit marker and preview asteroid.
+   * Remove the mission waypoint root; dispose orbit marker and asteroid preview.
    */
   private disposeMissionWaypointSite(): void {
     if (this.missionAsteroidPreviewMesh) {
@@ -3076,8 +3086,9 @@ export class MapViewController implements Tickable {
     const trajectoryPoints = this.buildWorldLineTrajectory()
 
     let missionWaypoint: MapOverlayState['missionWaypoint'] = null
-    if (this.missionBoard.activeAsteroidMission?.status === 'accepted') {
-      const wp = this.missionBoard.activeAsteroidMission.waypoint
+    const boardMission = this.missionBoard.activeAsteroidMission
+    if (shouldShowAsteroidMissionMapSite(boardMission)) {
+      const wp = boardMission!.waypoint
       const wpScreen = this.mapCamera!.projectToScreen(new THREE.Vector3(wp.worldX, 0, wp.worldZ))
       const dx = wp.worldX - px
       const dz = wp.worldZ - pz
@@ -3085,7 +3096,7 @@ export class MapViewController implements Tickable {
       missionWaypoint = {
         screenX: wpScreen.x * 100,
         screenY: wpScreen.y * 100,
-        name: this.missionBoard.activeAsteroidMission.name,
+        name: boardMission!.name,
         distance: formatDistance(dist),
       }
     }

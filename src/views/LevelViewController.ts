@@ -31,8 +31,10 @@ import type { FlatZone } from '@/lib/terrain/terrainGenerator'
 import { getAsteroidById, ASTEROID_CATALOG } from '@/lib/asteroids/catalog'
 import type { AsteroidDefinition } from '@/lib/asteroids/types'
 import { loadActiveMission } from '@/lib/missions/missionStorage'
+import { persistCompletedAsteroidMissionRewards } from '@/lib/missions/asteroidMissionRewards'
 import { hasLevelRouteQueryOverrideFromSearchParams } from '@/lib/level/levelRouteAccess'
 import { LEVEL_GRID_SIZE, generateAsteroidMission } from '@/lib/missions/asteroidMissionGenerator'
+import { getCurrentUpgradeValue, hydratePlayerUpgradeLevelsFromStorage } from '@/lib/upgrades'
 import type { GeneratedAsteroidMission, ConcreteObjective } from '@/lib/missions/types'
 import { Heightmap } from '@/lib/terrain/heightmap'
 import { MultiToolController } from '@/three/MultiToolController'
@@ -73,7 +75,6 @@ import { ExterminateMinigame } from '@/lib/minigame/ExterminateMinigame'
 import { RescueMinigame } from '@/lib/minigame/RescueMinigame'
 import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
-import { getCurrentUpgradeValue } from '@/lib/upgrades'
 
 // ── Scene constants ─────────────────────────────────────────────
 const TERRAIN_RESOLUTION = 512
@@ -130,6 +131,11 @@ interface LevelContext {
   asteroid: AsteroidDefinition
   seed: number
   mission: GeneratedAsteroidMission
+  /**
+   * True when the mission was loaded from persisted shuttle storage (not URL dev overrides).
+   * Completion should grant CR and clear active mission; false for `asteroidId` / query bypass runs.
+   */
+  persistCompletionRewards: boolean
 }
 
 /** Maximum attempts to generate a mission matching the requested type. */
@@ -149,6 +155,7 @@ function resolveLevelContext(): LevelContext {
   const queryOverride = hasLevelRouteQueryOverrideFromSearchParams(params)
 
   let mission: GeneratedAsteroidMission
+  let persistCompletionRewards = false
 
   if (paramId) {
     mission = generateMissionWithType(difficulty, missionType)
@@ -164,12 +171,13 @@ function resolveLevelContext(): LevelContext {
       )
     }
     mission = stored
+    persistCompletionRewards = true
   }
 
   const asteroid = getAsteroidById(mission.asteroidId) ?? ASTEROID_CATALOG[0]!
   const seed = hashSeed(mission.id)
 
-  return { asteroid, seed, mission }
+  return { asteroid, seed, mission, persistCompletionRewards }
 }
 
 /**
@@ -309,6 +317,9 @@ export class LevelViewController implements Tickable {
   /** Called each frame with player world position for minimap. */
   onPlayerPosition: ((x: number, z: number) => void) | null = null
 
+  /** When true, successful exfil grants CR and clears persisted active shuttle mission. */
+  private persistShuttleMissionRewards = false
+
   /** Initialise all systems and start the game loop. */
   async init(container: HTMLElement): Promise<void> {
     const playerConfig = buildFpsPlayerConfig()
@@ -323,7 +334,8 @@ export class LevelViewController implements Tickable {
     this.sceneManager.mount(container)
 
     // ── Asteroid data ────────────────────────────────────────────
-    const { asteroid, seed, mission } = resolveLevelContext()
+    const { asteroid, seed, mission, persistCompletionRewards } = resolveLevelContext()
+    this.persistShuttleMissionRewards = persistCompletionRewards
     this.mission = mission
     this.missionObjectives = mission.objectives
     this.asteroidName = asteroid.name
@@ -930,7 +942,16 @@ export class LevelViewController implements Tickable {
   }
 
   private enterComplete(): void {
-    // Navigate to star map
+    if (
+      this.persistShuttleMissionRewards
+      && this.mission
+      && this.allObjectivesComplete()
+    ) {
+      hydratePlayerUpgradeLevelsFromStorage()
+      const rewardMult = getCurrentUpgradeValue('shuttleScienceStation')
+      persistCompletedAsteroidMissionRewards(this.mission, rewardMult)
+    }
+
     import('@/router').then(({ default: router }) => {
       router.push('/map')
     })
