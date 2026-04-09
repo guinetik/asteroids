@@ -10,7 +10,7 @@ import { spendCredits } from '@/lib/player/profile'
 import { getUpgradeCost, UPGRADE_DEFINITIONS, type UpgradeId } from '@/lib/upgrades'
 
 /** Failure reasons for {@link tryPurchaseNextUpgradeLevel}. */
-export type PurchaseUpgradeFailureReason = 'max_level' | 'insufficient_credits'
+export type PurchaseUpgradeFailureReason = 'max_level' | 'insufficient_credits' | 'not_buyable'
 
 /**
  * Attempt to buy the next level for an upgrade (e.g. 0→1, 1→2).
@@ -29,6 +29,9 @@ export function tryPurchaseNextUpgradeLevel(
   | { ok: true; profile: PlayerProfile; newLevel: number; creditsSpent: number }
   | { ok: false; reason: PurchaseUpgradeFailureReason } {
   const definition = UPGRADE_DEFINITIONS[upgradeId]
+  if (definition.hiddenFromShop) {
+    return { ok: false, reason: 'not_buyable' }
+  }
   const nextLevel = currentLevel + 1
   if (nextLevel > definition.maxLevel) {
     return { ok: false, reason: 'max_level' }

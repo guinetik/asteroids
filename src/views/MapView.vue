@@ -22,7 +22,15 @@ import type { Inventory } from '@/lib/inventory/types'
 import { createProfile } from '@/lib/player/profile'
 import { createInventory } from '@/lib/inventory/inventory'
 import { shipMessageSystem } from '@/lib/messages/runtime'
-import { getUpgradeCost, UPGRADE_DEFINITIONS, type UpgradeId } from '@/lib/upgrades'
+import {
+  getUpgradeCost,
+  getPlayerUpgradeLevelsSnapshot,
+  hasGravitySurfingUnlock,
+  hydratePlayerUpgradeLevelsFromStorage,
+  UPGRADE_DEFINITIONS,
+  type UpgradeId,
+  type UpgradeLevels,
+} from '@/lib/upgrades'
 import UpgradeInstalledAnnouncement from '@/components/UpgradeInstalledAnnouncement.vue'
 import { Timer, type TimerHandle } from '@/lib/Timer'
 import type { ActiveShipMessage } from '@/lib/messages/messageTypes'
@@ -36,6 +44,9 @@ import type {
 } from '@/lib/ShuttleTelemetry'
 import { isWithinAsteroidMissionApproachRadius } from '@/lib/missions/mapAsteroidMissionApproach'
 import type { OrbitHudState } from '@/lib/orbitCapture'
+
+/** So Space Fabric gating matches storage before the first paint (also merged again in controller `init`). */
+hydratePlayerUpgradeLevelsFromStorage()
 
 const container = ref<HTMLElement>()
 const viewController = new MapViewController()
@@ -136,7 +147,7 @@ const habitatActive = ref(false)
 const earthStartupOrbitHudSuppressed = ref(false)
 const shuttleControlVisible = ref(false)
 /** Upgrade levels shown in the shuttle terminal engineering bay (synced on open / after purchase). */
-const upgradeLevelsUi = ref<Partial<Record<UpgradeId, number>>>({})
+const upgradeLevelsUi = ref<Partial<Record<UpgradeId, number>>>(getPlayerUpgradeLevelsSnapshot())
 const upgradeInstalledVisible = ref(false)
 const upgradeInstalledUpgradeName = ref('')
 const upgradeInstalledTier = ref(1)
@@ -146,7 +157,7 @@ const habitatFadeOpacity = ref(0)
 const deathVisible = ref(false)
 const deathCause = ref('')
 const orbitsVisible = ref(true)
-const gridVisible = ref(true)
+const gridVisible = ref(false)
 const ambientVisible = ref(true)
 const shopButtonVisible = ref(false)
 const shopButtonPlanet = ref('')
@@ -176,6 +187,11 @@ const mapOverlay = reactive<MapOverlayState>({
   trajectoryPoints: [],
   missionWaypoint: null,
 })
+
+/** Space Fabric toggle is shown only after Gravity Surfing (shop-hidden upgrade). */
+const spaceFabricControlUnlocked = computed(() =>
+  hasGravitySurfingUnlock(upgradeLevelsUi.value as UpgradeLevels),
+)
 
 /** Begin-mission prompt: derived from telemetry + board so it never depends on a Three.js callback. */
 const missionApproachHud = computed(() => {
@@ -238,6 +254,9 @@ onMounted(async () => {
       orbitsVisible.value = state.orbitsVisible
       gridVisible.value = state.gridVisible
       ambientVisible.value = state.ambientVisible
+    }
+    viewController.onUpgradeHudRefresh = () => {
+      upgradeLevelsUi.value = viewController.getUpgradeLevelsSnapshot()
     }
     viewController.onMessageUpdate = () => {
       refreshActiveMessage()
@@ -308,6 +327,7 @@ onMounted(async () => {
       })
     }
     await viewController.init(container.value)
+    upgradeLevelsUi.value = viewController.getUpgradeLevelsSnapshot()
     refreshActiveMessage()
   }
 })
@@ -549,6 +569,7 @@ function dockedPlanetId(): string | null {
       Orbits
     </button>
     <button
+      v-if="spaceFabricControlUnlocked"
       type="button"
       class="map-toggle-btn"
       :class="gridVisible ? 'map-toggle-btn--active' : 'map-toggle-btn--inactive'"

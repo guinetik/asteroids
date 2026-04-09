@@ -108,6 +108,17 @@
     "valuesByLevel": [2, 3, 3.5, 5]
   },
   {
+    "id": "gravitySurfing",
+    "category": "shuttle",
+    "label": "Gravity Surfing",
+    "description": "Calibrated inertial senses let you read local spacetime curvature — unlocking the Space Fabric overlay on the solar map.",
+    "baseCost": 0,
+    "maxLevel": 1,
+    "valuesByLevel": [0, 1],
+    "hiddenFromShop": true,
+    "excludeFromMissionDifficulty": true
+  },
+  {
     "id": "landerThrusterEfficiency",
     "category": "lander",
     "label": "Thruster Efficiency",

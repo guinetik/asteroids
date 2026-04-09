@@ -1,9 +1,10 @@
 /**
  * Data-driven upgrade definitions and value resolution.
  *
- * Loads 27 upgrade definitions from JSON across 4 categories
- * (shuttle, lander, multitool, suit). Each upgrade has levels 0-3
- * with numeric values and linear cost scaling.
+ * Loads upgrade definitions from JSON across 4 categories
+ * (shuttle, lander, multitool, suit). Numeric upgrades have levels 0-3
+ * with values and linear cost scaling; some shuttle entries are shop-hidden
+ * story or dev grants (e.g. Gravity Surfing).
  *
  * @author guinetik
  * @date 2026-04-07
@@ -35,6 +36,14 @@ export interface NumericUpgradeDefinition {
   maxLevel: number
   /** Numeric value at each level from 0..maxLevel. */
   valuesByLevel: readonly number[]
+  /**
+   * When true, the engineering-bay UI never lists this upgrade (mission / dev unlock only).
+   */
+  hiddenFromShop?: boolean
+  /**
+   * When true, {@link computeMissionDifficulty} ignores this id so cosmetic unlocks do not shift belt scaling.
+   */
+  excludeFromMissionDifficulty?: boolean
 }
 
 /** Valid upgrade IDs derived from the JSON data. */
@@ -51,6 +60,7 @@ export type UpgradeId =
   | 'shuttleFuelCapacity'
   | 'shuttleScienceStation'
   | 'shuttleSlingshotSpeed'
+  | 'gravitySurfing'
   | 'landerThrusterEfficiency'
   | 'landerThrusterCharge'
   | 'landerThrusterSpeed'
@@ -83,6 +93,11 @@ export const UPGRADE_DEFINITIONS: Record<UpgradeId, NumericUpgradeDefinition> =
  */
 export const CURRENT_PLAYER_UPGRADE_LEVELS: Record<UpgradeId, number> =
   Object.fromEntries(definitions.map((d) => [d.id, 0])) as Record<UpgradeId, number>
+
+/**
+ * `gravitySurfing` value at tier 1 from catalog data — Space Fabric map control unlock threshold.
+ */
+const GRAVITY_SURFING_UNLOCK_VALUE = UPGRADE_DEFINITIONS.gravitySurfing.valuesByLevel[1]!
 
 /**
  * Merge persisted levels from localStorage into {@link CURRENT_PLAYER_UPGRADE_LEVELS}.
@@ -167,7 +182,16 @@ export function getUpgradeCost(upgradeId: UpgradeId, level: number): number {
  * @returns Array of matching upgrade definitions.
  */
 export function getUpgradesByCategory(category: UpgradeCategory): NumericUpgradeDefinition[] {
-  return definitions.filter((d) => d.category === category)
+  return definitions.filter((d) => d.category === category && !d.hiddenFromShop)
+}
+
+/**
+ * True when the player has unlocked map Space Fabric controls (Gravity Surfing).
+ *
+ * @param levels - Upgrade state to inspect (defaults to current persisted runtime).
+ */
+export function hasGravitySurfingUnlock(levels: UpgradeLevels = CURRENT_PLAYER_UPGRADE_LEVELS): boolean {
+  return getUpgradeValue('gravitySurfing', levels) >= GRAVITY_SURFING_UNLOCK_VALUE
 }
 
 /** Burn-rate multipliers for shuttle thruster bars. */

@@ -16,6 +16,7 @@ import {
   getShuttleThrusterEfficiencyModifiers,
   getCurrentShuttleThrusterEfficiencyModifiers,
   getShuttleSlingshotBurstMultiplier,
+  hasGravitySurfingUnlock,
   hydratePlayerUpgradeLevelsFromStorage,
   resetPlayerUpgradesToDefaults,
 } from '../upgrades'
@@ -25,10 +26,10 @@ import {
 } from '../upgradeStorage'
 
 /** Total number of upgrades defined in the JSON. */
-const EXPECTED_UPGRADE_COUNT = 27
+const EXPECTED_UPGRADE_COUNT = 28
 
 describe('UPGRADE_DEFINITIONS', () => {
-  it('loads all 27 upgrades from JSON', () => {
+  it('loads all 28 upgrades from JSON', () => {
     const ids = Object.keys(UPGRADE_DEFINITIONS)
     expect(ids).toHaveLength(EXPECTED_UPGRADE_COUNT)
   })
@@ -44,7 +45,9 @@ describe('UPGRADE_DEFINITIONS', () => {
       expect(['shuttle', 'lander', 'multitool', 'suit']).toContain(def.category)
       expect(def.label).toBeTruthy()
       expect(def.description).toBeTruthy()
-      expect(def.baseCost).toBeGreaterThan(0)
+      if (!def.hiddenFromShop) {
+        expect(def.baseCost).toBeGreaterThan(0)
+      }
     }
   })
 
@@ -61,7 +64,7 @@ describe('CURRENT_PLAYER_UPGRADE_LEVELS', () => {
     resetPlayerUpgradesToDefaults()
   })
 
-  it('initializes all 27 upgrades to level 0', () => {
+  it('initializes all 28 upgrades to level 0', () => {
     const keys = Object.keys(CURRENT_PLAYER_UPGRADE_LEVELS)
     expect(keys).toHaveLength(EXPECTED_UPGRADE_COUNT)
     for (const level of Object.values(CURRENT_PLAYER_UPGRADE_LEVELS)) {
@@ -116,6 +119,13 @@ describe('getCurrentUpgradeValue', () => {
   })
 })
 
+describe('hasGravitySurfingUnlock', () => {
+  it('is false at level 0 and true at level 1', () => {
+    expect(hasGravitySurfingUnlock({ gravitySurfing: 0 })).toBe(false)
+    expect(hasGravitySurfingUnlock({ gravitySurfing: 1 })).toBe(true)
+  })
+})
+
 describe('getUpgradeCost', () => {
   it('returns baseCost * level', () => {
     expect(getUpgradeCost('shuttleThrusterEfficiency', 1)).toBe(500)
@@ -134,8 +144,13 @@ describe('getUpgradeCost', () => {
 })
 
 describe('getUpgradesByCategory', () => {
-  it('returns 12 shuttle upgrades', () => {
+  it('returns 12 shuttle upgrades (shop-visible only)', () => {
     expect(getUpgradesByCategory('shuttle')).toHaveLength(12)
+  })
+
+  it('omits Gravity Surfing from shuttle shop list', () => {
+    const ids = getUpgradesByCategory('shuttle').map((d) => d.id)
+    expect(ids).not.toContain('gravitySurfing')
   })
 
   it('returns 5 lander upgrades', () => {

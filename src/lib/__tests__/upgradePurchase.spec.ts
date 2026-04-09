@@ -32,4 +32,10 @@ describe('tryPurchaseNextUpgradeLevel', () => {
     const result = tryPurchaseNextUpgradeLevel(profile, 'shuttleRadiationResistance', 0)
     expect(result).toEqual({ ok: false, reason: 'insufficient_credits' })
   })
+
+  it('refuses shop-hidden upgrades', () => {
+    const profile = createProfile('Test')
+    const result = tryPurchaseNextUpgradeLevel(profile, 'gravitySurfing', 0)
+    expect(result).toEqual({ ok: false, reason: 'not_buyable' })
+  })
 })

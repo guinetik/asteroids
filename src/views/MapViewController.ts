@@ -99,11 +99,13 @@ import {
   getCurrentShuttleThrusterChargeModifiers,
   getCurrentShuttleSlingshotBurstMultiplier,
   getCurrentUpgradeValue,
+  hasGravitySurfingUnlock,
   getPlayerUpgradeLevelsSnapshot,
   hydratePlayerUpgradeLevelsFromStorage,
   resetPlayerUpgradesToDefaults,
   saveCurrentPlayerUpgradesToStorage,
   CURRENT_PLAYER_UPGRADE_LEVELS,
+  UPGRADE_DEFINITIONS,
   type UpgradeId,
 } from '@/lib/upgrades'
 import { tryPurchaseNextUpgradeLevel } from '@/lib/upgradePurchase'
@@ -529,8 +531,8 @@ export class MapViewController implements Tickable {
   /** Whether planet orbit lines are currently visible. */
   private orbitsVisible = true
 
-  /** Whether the space-time fabric grid is currently visible. */
-  private gridVisible = true
+  /** Whether the space-time fabric grid is currently visible (default off until Gravity Surfing). */
+  private gridVisible = false
 
   /** Saved layer toggles while the opening intro suppresses orbit lines / fabric / debris. */
   private introLayerRestore: MapViewLayerToggleState | null = null
@@ -613,6 +615,11 @@ export class MapViewController implements Tickable {
   onShopState: ((session: ShopSession | null, profile: PlayerProfile, inventory: Inventory) => void) | null = null
   /** Fired when credits change (for the HUD badge). */
   onCreditsUpdate: ((credits: number) => void) | null = null
+  /**
+   * Fired when upgrade levels change outside the engineering-bay purchase flow (e.g. dev console),
+   * so the map HUD can refresh Gravity Surfing / Space Fabric gating.
+   */
+  onUpgradeHudRefresh: (() => void) | null = null
   /** Fired when fuel cell count changes (for HUD refuel button). */
   onFuelCellCount: ((count: number) => void) | null = null
 
@@ -733,6 +740,8 @@ export class MapViewController implements Tickable {
       gridMassExponent,
     )
     scene.add(this.spaceTimeGrid.mesh)
+    this.applyInitialSpaceFabricVisibilityFromUpgrades()
+    this.emitMapViewLayerToggles()
 
     // Sun is static — add once, never cleared
     this.spaceTimeGrid.addStaticSource({ x: 0, z: 0, mass: SUN.mass })
@@ -1038,6 +1047,12 @@ export class MapViewController implements Tickable {
       clearGravitationalEvents: () => this.gravitationalEventManager?.clear(),
       setGravitationalEventAutoSpawn: (enabled: boolean) => {
         this.gravitationalEventManager?.setAutoSpawnEnabled(Boolean(enabled))
+      },
+      grantGravitySurfing: () => {
+        this.devSetPlayerUpgradeLevel('gravitySurfing', 1)
+      },
+      setUpgradeLevel: (upgradeId: UpgradeId, level: number) => {
+        this.devSetPlayerUpgradeLevel(upgradeId, level)
       },
     })
 
@@ -1851,15 +1866,27 @@ export class MapViewController implements Tickable {
   }
 
   /**
+   * Applies default Space Fabric visibility from the Gravity Surfing upgrade (map load only).
+   */
+  private applyInitialSpaceFabricVisibilityFromUpgrades(): void {
+    if (hasGravitySurfingUnlock()) {
+      this.applyGridVisible(true)
+    } else {
+      this.applyGridVisible(false)
+    }
+  }
+
+  /**
    * Sets space-time fabric visibility and refreshes deform when enabling.
    *
    * @param visible - Whether the grid mesh should render.
    */
   private applyGridVisible(visible: boolean): void {
-    this.gridVisible = visible
+    const showFabric = Boolean(visible && hasGravitySurfingUnlock())
+    this.gridVisible = showFabric
     if (this.spaceTimeGrid) {
-      this.spaceTimeGrid.mesh.visible = visible
-      if (visible) {
+      this.spaceTimeGrid.mesh.visible = showFabric
+      if (showFabric) {
         this.syncSpaceTimeGridVisualBudget()
         this.spaceTimeGrid.forceFullVisualDeform()
       }
@@ -1917,6 +1944,9 @@ export class MapViewController implements Tickable {
    * Returns the new visibility state so the Vue layer can update button appearance.
    */
   toggleSpaceTimeGrid(): boolean {
+    if (!hasGravitySurfingUnlock()) {
+      return this.gridVisible
+    }
     this.applyGridVisible(!this.gridVisible)
     return this.gridVisible
   }
@@ -2037,6 +2067,7 @@ export class MapViewController implements Tickable {
    * @returns True when purchase succeeded.
    */
   purchaseNextUpgradeLevel(upgradeId: UpgradeId): boolean {
+    if (UPGRADE_DEFINITIONS[upgradeId].hiddenFromShop) return false
     const current = CURRENT_PLAYER_UPGRADE_LEVELS[upgradeId] ?? 0
     const result = tryPurchaseNextUpgradeLevel(this.playerProfile, upgradeId, current)
     if (!result.ok) return false
@@ -2046,6 +2077,28 @@ export class MapViewController implements Tickable {
     saveCurrentPlayerUpgradesToStorage()
     this.onCreditsUpdate?.(this.playerProfile.credits)
     return true
+  }
+
+  /**
+   * Dev-only: clamp and persist a single upgrade level, then sync map systems that depend on it.
+   *
+   * @param upgradeId - Catalog id (e.g. `gravitySurfing`).
+   * @param level - Target level `0..maxLevel`.
+   */
+  private devSetPlayerUpgradeLevel(upgradeId: UpgradeId, level: number): void {
+    if (!import.meta.env.DEV) return
+    const def = UPGRADE_DEFINITIONS[upgradeId]
+    const clamped = Math.max(0, Math.min(def.maxLevel, Math.floor(level)))
+    CURRENT_PLAYER_UPGRADE_LEVELS[upgradeId] = clamped
+    saveCurrentPlayerUpgradesToStorage()
+    if (upgradeId === 'gravitySurfing') {
+      if (!hasGravitySurfingUnlock()) {
+        this.applyGridVisible(false)
+      }
+      this.emitMapViewLayerToggles()
+    }
+    this.onUpgradeHudRefresh?.()
+    console.info(`[MapView] set upgrade ${upgradeId} → level ${clamped}`)
   }
 
   /** Open the shop dialog (called by Vue ShopButton click). */
@@ -3587,6 +3640,7 @@ export class MapViewController implements Tickable {
     this.habitatScene?.dispose()
     this.habitatScene = null
     DevConsole.unregister('MapView')
+    this.onUpgradeHudRefresh = null
     this.ambientSpace?.dispose()
     if (this.shipReticleGroup) {
       const disposeSprite = (s: THREE.Sprite) => {

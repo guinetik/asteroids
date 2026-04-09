@@ -27,8 +27,15 @@ const MAX_DIFFICULTY = 10
  * @returns Difficulty level from 1 (fresh player) to 10 (fully upgraded).
  */
 export function computeMissionDifficulty(levels: UpgradeLevels): number {
-  const upgradeIds = Object.keys(UPGRADE_DEFINITIONS) as UpgradeId[]
-  const sum = upgradeIds.reduce((acc, id) => acc + (levels[id] ?? 0), 0)
+  const upgradeIds = (Object.keys(UPGRADE_DEFINITIONS) as UpgradeId[]).filter(
+    (id) => !UPGRADE_DEFINITIONS[id].excludeFromMissionDifficulty,
+  )
+  const sum = upgradeIds.reduce((acc, id) => {
+    const def = UPGRADE_DEFINITIONS[id]
+    const raw = levels[id] ?? 0
+    const clamped = Math.max(0, Math.min(def.maxLevel, Math.floor(raw)))
+    return acc + clamped
+  }, 0)
   const avg = sum / upgradeIds.length
   const raw =
     Math.floor((avg / MAX_UPGRADE_LEVEL) * (MAX_DIFFICULTY - MIN_DIFFICULTY)) + MIN_DIFFICULTY

@@ -10,6 +10,8 @@
  * AsteroidDev.MapView.skipIntro()
  * AsteroidDev.MapView.warp('earth')
  * AsteroidDev.MapView.spawnGravitationalEventNearPlayer(200)
+ * AsteroidDev.MapView.grantGravitySurfing()
+ * AsteroidDev.MapView.setUpgradeLevel('gravitySurfing', 0)
  * AsteroidDev.help()
  *
  * Map spacetime anomalies: import types/event names from `devConsole` or listen on
