@@ -12,6 +12,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   sell: [itemId: string, quantity: number]
+  use: [itemId: string]
 }>()
 
 interface DisplayRow {
@@ -22,6 +23,8 @@ interface DisplayRow {
   weightKg: number
   pips: number
   sellPrice: number
+  canUse: boolean
+  useLabel: string
 }
 
 const rows = computed<DisplayRow[]>(() => {
@@ -43,6 +46,8 @@ const rows = computed<DisplayRow[]>(() => {
       weightKg: stack.totalWeightKg,
       pips,
       sellPrice,
+      canUse: stack.itemId === 'grid-coupling-module',
+      useLabel: stack.itemId === 'grid-coupling-module' ? 'Install' : 'Use',
     }
   })
 
@@ -55,6 +60,10 @@ const rows = computed<DisplayRow[]>(() => {
 
 function handleSell(itemId: string) {
   emit('sell', itemId, 1)
+}
+
+function handleUse(itemId: string) {
+  emit('use', itemId)
 }
 </script>
 
@@ -86,9 +95,17 @@ function handleSell(itemId: string) {
         </div>
         <span v-if="mode === 'sell'" class="inventory-table__price">{{ row.sellPrice }} CR</span>
         <button
+          v-if="mode === 'view' && row.canUse"
+          type="button"
+          class="inventory-table__action-btn"
+          @click="handleUse(row.itemId)"
+        >
+          {{ row.useLabel }}
+        </button>
+        <button
           v-if="mode === 'sell'"
           type="button"
-          class="inventory-table__sell-btn"
+          class="inventory-table__action-btn"
           @click="handleSell(row.itemId)"
         >
           Sell

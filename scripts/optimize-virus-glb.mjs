@@ -21,6 +21,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions'
 import {
   INSTANCE_DEFAULTS,
   PALETTE_DEFAULTS,
+  center,
   createTransform,
   dedup,
   flatten,
@@ -140,6 +141,7 @@ async function main(inputPath, outputPath) {
   })
 
   const transforms = [
+    center({ pivot: 'center' }),
     dedup(),
     instance({ min: INSTANCE_DEFAULTS.min }),
     palette({ min: PALETTE_DEFAULTS.min, keepAttributes: true }),

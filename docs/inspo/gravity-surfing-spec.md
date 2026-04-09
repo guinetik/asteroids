@@ -1,0 +1,278 @@
+GRAVITY SURFING SYSTEM — UNLOCK QUEST + MECHANIC SPEC
+Revision 2 — Space Jockey
+
+========================================
+⚠ IMPORTANT NOTE
+========================================
+
+The "Shuttle Handoff" and "First Flight Notes" message texts will need to
+be redesigned around this new system. The Space Fabric toggle is no longer
+available from the start — it is gated behind the gravitySurfing upgrade,
+which is only acquired via the Consortium Certification quest. Any early-game
+messaging that references the space fabric display, grid lines, or related
+HUD elements must be revised to reflect that these features are not yet
+accessible to a new player.
+
+
+========================================
+PART 1: UNLOCK QUEST
+========================================
+
+TRIGGER:
+- Player reaches upgrade level average that qualifies for difficulty 3 missions
+- On next visit to habitat terminal (MAIL tab), new message appears:
+
+MESSAGE:
+  from: "Space Consortium — Logistics Division"
+  subject: "Requisition Package — Field Operator Certification"
+  body:
+    "Operator,
+
+    Your recent activity logs were flagged by an associate of ours
+    (J. Mercer, independent contractor license 4471-R) as evidence
+    of sustained deep-field work using a Class-C orbital frame.
+
+    The Consortium does not typically certify retrofitted hardware
+    for relativistic grid coupling. However, your completion rate
+    on difficulty-2 contracts suggests the hull is holding and the
+    operator knows what the gauges mean.
+
+    We have staged a certification package at the following coordinates.
+    Retrieve it and deliver to Earth Spaceport for installation and
+    field licensing.
+
+    Contents are export-controlled. Do not open in the field. Do not
+    let the package drift. If the hull is lost the package is lost
+    and this offer does not repeat.
+
+    — Consortium Logistics, Sol Sector"
+
+MISSION: "CONSORTIUM CERTIFICATION"
+  type: collect
+  difficulty: special (unrated)
+  location: specific asteroid in the belt (fixed coordinates, not random)
+
+MISSION FLOW:
+  1. Player flies to waypoint in the asteroid belt
+  2. Arrives at a small asteroid — not a combat zone, no enemies
+  3. Level loads: flat terrain, single objective marker
+  4. Land, exit lander
+  5. Walk to objective: a sealed cargo container (procedural geometry —
+     BoxGeometry with Consortium branding, emissive cyan trim, locked indicator)
+  6. "[E] COLLECT CONSORTIUM PACKAGE"
+  7. Item added to shuttle inventory: "Grid Coupling Module" (special item,
+     cannot be sold, cannot be dropped)
+  8. Mission objective updates: "Deliver to Earth Spaceport"
+  9. Player must exfil, fly back to Earth, enter orbit
+  10. While orbiting Earth with the package in inventory, new prompt appears:
+      "CONSORTIUM DOCK AVAILABLE — Press E to deliver"
+  11. Delivery triggers:
+
+REWARDS (all applied immediately):
+  - gravitySurfing upgrade unlocked (permanent)
+      → this also unlocks the Space Fabric toggle in the HUD for the first time
+  - Heat Shield Level 1 (if not already owned — worth 5,000 CR)
+  - Cryo Insulation Level 1 (if not already owned — worth 5,000 CR)
+  - 2,000 CR bonus
+  - Jay message triggered (see below)
+
+POST-DELIVERY JAY MESSAGE:
+  from: "Jay Mercer"
+  subject: "You Got The Grid License"
+  body:
+    "Hey, you got Jay.
+
+    So the Consortium actually signed off on your hull. I put your
+    name in months ago and figured they would laugh at the application.
+    A Class-C shuttle running field contracts — most of those
+    certification officers have not seen one outside a museum.
+
+    The grid coupler they sent you is milspec. It lets you lock onto
+    the spacetime fabric lines your nav system already projects — but
+    your nav system could not project them before the coupler was
+    installed. You have been flying blind this whole time.
+
+    Enable the Space Fabric display in your HUD. Then press Q near
+    a grid line to couple. WASD to pick your rail. Q again to
+    decouple — fast stop, wherever you are. It drinks nothing.
+    The grid does the work.
+
+    The heat and cryo kits are their way of saying do not immediately
+    die trying to reach Saturn. You are welcome.
+
+    Do not make me regret the referral."
+
+========================================
+PART 2: GRAVITY SURFING MECHANIC
+========================================
+
+OVERVIEW:
+An advanced traversal system that lets the player snap to SpaceTimeGrid
+lines and travel along them at high speed with zero fuel cost. Unlocked
+via the Consortium Certification quest (awards the gravitySurfing upgrade).
+The gravitySurfing upgrade is the gate for both the Space Fabric HUD toggle
+and the surfing mechanic itself. Toggled with Q key while Space Fabric is on.
+
+PREREQUISITES:
+  1. gravitySurfing upgrade must be active
+  2. Space Fabric HUD toggle must be ON
+  Both conditions must be true. If either is false, Q does nothing.
+
+SPACE FABRIC TOGGLE:
+- Controlled by the player via HUD toggle (same as always, now accessible)
+- When OFF: grid lines are hidden. Surfing cannot be initiated. If the player
+  was surfing and turns the toggle OFF, surfing immediately decouples.
+- When ON: grid lines are visible. Surfing can be initiated if near a line.
+- The toggle has no effect on a player who does not have the gravitySurfing
+  upgrade — it does not appear in the HUD until the upgrade is active.
+
+ACTIVATION:
+- Q key pressed while:
+    a. gravitySurfing upgrade is active
+    b. Space Fabric toggle is ON
+    c. Shuttle is within snapping distance of a grid line (~0.5 grid cells)
+- If any condition is not met: Q does nothing (no feedback needed, or a
+  subtle "NO GRID LINE IN RANGE" if the upgrade is active but no line is close)
+
+COUPLING STATE:
+When coupled to a grid line:
+- Shuttle snaps to the nearest grid line (position interpolated smoothly
+  over 0.2s, not instant)
+- Shuttle aligns to the line direction (rotation lerps to face along the line)
+- Shuttle is now "on rails" — locked to this grid line
+- Visual feedback: grid line under the shuttle glows brighter (cyan/white),
+  pulsing energy traveling along the line in the shuttle's direction
+- Camera pulls back slightly to show more of the grid (speed feeling)
+
+MOVEMENT WHILE SURFING:
+- W: accelerate along the grid line (forward relative to current facing)
+- S: decelerate / accelerate in reverse direction
+- A/D: at grid intersections (where two lines cross), steer onto the
+  crossing line. A = turn left at next intersection, D = turn right.
+  If no intersection is nearby, A/D does nothing.
+- Speed: starts at 0 on coupling. W accelerates to max surf speed
+  (~3x top thruster speed). Acceleration is smooth, not instant.
+- Deceleration: S slows down. Shuttle can sit stationary on a line.
+
+INTERSECTION HANDLING:
+- When approaching a grid intersection, a brief UI indicator shows
+  available directions: forward (W), left (A), right (D), reverse (S)
+- No input at an intersection: shuttle continues straight through
+- A or D near intersection: shuttle smoothly curves onto the perpendicular
+  line (arc transition over 0.3s, not a hard snap)
+- Intersections near gravity wells: grid lines are CURVED by gravity.
+  Surfing near a planet means riding a curved rail automatically.
+  If the curve bends into the gravity well's event horizon, coupling
+  BREAKS and the shuttle is ejected at current velocity into the well.
+  Warning: "GRAVITATIONAL INTERFERENCE — GRID COUPLING LOST"
+
+DECOUPLING:
+- Q pressed while surfing: shuttle decouples from the grid
+- Shuttle rapidly decelerates to zero velocity (sub-0.5 seconds)
+- On reaching zero: a gravity wave spawns at the decouple point,
+  propagating outward. See DECOUPLE WAVE below.
+- Position: wherever the shuttle was on the line at the Q press
+- Visual: brief energy discharge effect on the grid line, ripple outward
+- Shuttle returns to normal flight mode immediately. All thrusters available.
+- No fuel cost for the stop. The grid absorbs kinetic energy.
+- Toggling Space Fabric OFF while surfing triggers the same decouple
+  sequence — fast deceleration, wave spawn, return to normal flight.
+
+DECOUPLE WAVE:
+  Spawns at the exact point the shuttle reaches zero velocity after decoupling.
+  - Type: standard SpaceTimeGrid gravity wave (same system as gravitational events)
+  - Size: fixed ~ship width (not speed-scaled — keep it visually consistent
+    and easy to tune)
+  - Parameters: exposed as tunable values for visual QA
+      waveRadius:       initial radius at spawn (default: ship width)
+      waveAmplitude:    Y-displacement height of the wave
+      wavePropagation:  outward travel speed
+      waveDamping:      amplitude falloff over distance
+      waveLifetime:     how long before the wave fully dissipates
+  - Always spawns. Regardless of decoupling speed. Small decouple = small visual,
+    same geometry — just tune amplitude/damping lower if needed.
+  - The wave can interact with other objects/debris in range the same way
+    any gravity wave does (consistent with existing wave behavior).
+
+FUEL COST:
+- Coupling: free
+- Surfing: free (the grid does the work)
+- Decoupling: free
+- While surfing you CANNOT slingshot, orbit planets, or interact with anything.
+  You are on rails. Decouple first.
+
+INTERACTION WITH GRAVITY:
+- Grid lines near planets/sun are curved due to gravity well deformation
+- Surfing through curved space: shuttle follows the bent line automatically
+- DANGER ZONES: if a grid line passes through a gravity well's event horizon
+  (the orange/red ring), coupling on that segment is not possible.
+  The line appears red/broken in that region.
+- If the shuttle is surfing toward a danger zone: warning flashes at 3 seconds
+  out. Auto-decouple at the danger boundary with velocity PRESERVED (not the
+  fast-decel stop — you are ejected at surf speed into the well).
+  This prevents using grid surfing to safely enter gravity wells.
+
+INTERACTION WITH GRAVITATIONAL EVENTS:
+- Spacetime disturbance waves can temporarily disrupt grid lines
+- If a wave passes through the line you are surfing: brief turbulence
+  (camera shake, speed fluctuation ±20%), coupling holds
+- If the wave is strong enough (high mass anomaly): coupling breaks,
+  shuttle ejected at current velocity. "WAVE DISRUPTION — COUPLING LOST"
+
+VISUAL EFFECTS:
+- Coupled grid line glows cyan-white (brighter than normal grid)
+- Energy pulse particles travel along the line in shuttle direction
+- At high speed: motion blur / streaking on nearby grid lines (parallax)
+- At intersections: brief flash as the shuttle passes through
+- On decouple: energy ripple expanding outward from decouple point,
+  then the gravity wave propagating on the grid plane
+- Camera: slightly wider FOV while surfing, slight motion blur at max speed
+
+HUD WHILE SURFING:
+- "GRID COUPLED" indicator (replaces normal flight indicators)
+- Current surf speed
+- Direction indicator (which way along the line)
+- Intersection preview: upcoming intersection countdown (distance or time)
+- "Q — DECOUPLE" reminder
+
+WIRING NOTES:
+- The gravitySurfing upgrade flag already exists in the upgrade system.
+  The quest delivery simply awards it via the existing mechanism.
+- The Space Fabric toggle visibility is gated on gravitySurfing being active.
+  No new toggle — same toggle, now accessible.
+- Surfing mechanic reads gravitySurfing flag on Q press. If false, Q is
+  ignored. No new upgrade key needed.
+- Decouple wave plugs into the existing gravity wave / gravitational event
+  system. Spawn point = shuttle world position at velocity-zero moment.
+  Parameters are tunable constants, not derived from speed.
+
+PERFORMANCE NOTES:
+- Surfing is position interpolation along a line segment at speed.
+  No physics simulation while coupled — the shuttle is on rails.
+- The expensive part is the visual effects (line glow, particles).
+  Keep particle count reasonable.
+- Grid intersection detection: check shuttle position against grid
+  cell boundaries each tick. Simple modulo math on grid spacing.
+- Decouple wave: reuses existing wave system. No new simulation needed.
+
+BALANCE NOTES:
+- Grid surfing handles flat traversal efficiently. It cannot change
+  Y-axis position (grid plane only). Slingshots are still required
+  for gravity well navigation and altitude changes.
+- Surf speed (~3x normal top thrust) should feel meaningful without
+  making the solar system feel small.
+- The fast deceleration on decouple is the key balance lever. You
+  arrive fast but arrive at zero velocity. Fuel is still required
+  to enter orbit, approach asteroids, etc. Surfing gets you there,
+  it does not finish the job.
+- Surfing near planets is risky due to grid curvature. Safe surfing
+  is in the flat void between bodies. Dangerous surfing is threading
+  the needle between Jupiter and Saturn's curved grid lines.
+
+UPGRADE TIERS (future, not for initial release):
+  Tier 0: Grid Coupling Module (quest reward) — basic surfing, 3x speed
+  Tier 1: Enhanced Coupling (upgrade shop, 3,000 CR) — 4x speed,
+          faster intersection turns
+  Tier 2: Stabilized Coupling (6,000 CR) — resists wave disruption, 5x speed
+  Tier 3: Military-Grade Coupler (12,000 CR) — max speed, can surf
+          through mild gravity curves without ejection

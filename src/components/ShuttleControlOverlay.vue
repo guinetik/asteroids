@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 import { computed, onMounted, ref, watch } from 'vue'
-import type { InventoryStack } from '@/lib/inventory/types'
+import type { Inventory, InventoryStack } from '@/lib/inventory/types'
 import type { ShuttleMissionBoard } from '@/lib/missions/types'
 import { shipMessageSystem } from '@/lib/messages/runtime'
 import ShuttleControlProgramInventory from './shuttle-control/ShuttleControlProgramInventory.vue'
@@ -13,6 +13,7 @@ import type { UpgradeId } from '@/lib/upgrades'
 
 const props = defineProps<{
   visible: boolean
+  inventory?: Inventory | null
   inventoryStacks?: InventoryStack[]
   missionBoard?: ShuttleMissionBoard | null
   dockedPlanet?: string | null
@@ -29,6 +30,7 @@ const emit = defineEmits<{
   acceptMission: []
   deliverMission: [missionId: string]
   acceptAsteroidMission: []
+  useItem: [itemId: string]
   mailChanged: []
 }>()
 
@@ -161,6 +163,7 @@ function onKeydown(e: KeyboardEvent) {
         <div class="shuttle-control-content shuttle-control-content--programs">
           <component
             :is="activeProgram"
+            :inventory="inventory"
             :inventory-stacks="inventoryStacks"
             :board="missionBoard"
             :docked-planet="dockedPlanet"
@@ -169,6 +172,7 @@ function onKeydown(e: KeyboardEvent) {
             @accept-mission="$emit('acceptMission')"
             @deliver-mission="(id: string) => $emit('deliverMission', id)"
             @accept-asteroid-mission="$emit('acceptAsteroidMission')"
+            @use-item="(itemId: string) => $emit('useItem', itemId)"
             @mail-changed="onMailProgramChanged"
             @purchase-upgrade="emitPurchaseUpgrade"
           />

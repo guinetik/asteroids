@@ -149,9 +149,11 @@ const shuttleControlVisible = ref(false)
 /** Upgrade levels shown in the shuttle terminal engineering bay (synced on open / after purchase). */
 const upgradeLevelsUi = ref<Partial<Record<UpgradeId, number>>>(getPlayerUpgradeLevelsSnapshot())
 const upgradeInstalledVisible = ref(false)
+const upgradeInstalledHeadline = ref('UPGRADE INSTALLED')
 const upgradeInstalledUpgradeName = ref('')
 const upgradeInstalledTier = ref(1)
 const upgradeInstalledCreditsSpent = ref(0)
+const upgradeInstalledMetaText = ref<string | null>(null)
 const habitatPrompt = ref<string | null>(null)
 const habitatFadeOpacity = ref(0)
 const deathVisible = ref(false)
@@ -257,6 +259,17 @@ onMounted(async () => {
     }
     viewController.onUpgradeHudRefresh = () => {
       upgradeLevelsUi.value = viewController.getUpgradeLevelsSnapshot()
+    }
+    viewController.onUpgradeInstalledAnnouncement = (headline, upgradeName, tier, creditsSpent, metaText) => {
+      upgradeInstalledHeadline.value = headline
+      upgradeInstalledUpgradeName.value = upgradeName
+      upgradeInstalledTier.value = tier
+      upgradeInstalledCreditsSpent.value = creditsSpent
+      upgradeInstalledMetaText.value = metaText ?? null
+      upgradeInstalledVisible.value = false
+      Timer.after(0, () => {
+        upgradeInstalledVisible.value = true
+      })
     }
     viewController.onMessageUpdate = () => {
       refreshActiveMessage()
@@ -369,14 +382,17 @@ function handlePurchaseUpgrade(upgradeId: UpgradeId): void {
   upgradeLevelsUi.value = viewController.getUpgradeLevelsSnapshot()
   const newLevel = upgradeLevelsUi.value[upgradeId] ?? 0
   const def = UPGRADE_DEFINITIONS[upgradeId]
+  upgradeInstalledHeadline.value = 'UPGRADE INSTALLED'
   upgradeInstalledUpgradeName.value = def.label
   upgradeInstalledTier.value = newLevel
   upgradeInstalledCreditsSpent.value = getUpgradeCost(upgradeId, newLevel)
+  upgradeInstalledMetaText.value = null
   upgradeInstalledVisible.value = true
 }
 
 function onUpgradeInstalledDismissed(): void {
   upgradeInstalledVisible.value = false
+  upgradeInstalledMetaText.value = null
 }
 
 function handleToggleAmbient() {
@@ -418,6 +434,10 @@ function handleRepairHull() {
 
 function handleUseFuelCell() {
   viewController.useFuelCell()
+}
+
+function handleUseInventoryItem(itemId: string) {
+  viewController.useInventoryItem(itemId)
 }
 
 function openMissionOverlay() {
@@ -595,6 +615,7 @@ function dockedPlanetId(): string | null {
   </div>
   <ShuttleControlOverlay
     :visible="shuttleControlVisible"
+    :inventory="shopInventory"
     :inventory-stacks="shopInventory.stacks"
     :mission-board="missionBoard"
     :docked-planet="dockedPlanetId()"
@@ -606,13 +627,16 @@ function dockedPlanetId(): string | null {
     @accept-mission="handleAcceptMission"
     @deliver-mission="handleDeliverMission"
     @accept-asteroid-mission="handleAcceptAsteroidMission"
+    @use-item="handleUseInventoryItem"
     @mail-changed="refreshActiveMessage"
   />
   <UpgradeInstalledAnnouncement
     :visible="upgradeInstalledVisible"
+    :headline="upgradeInstalledHeadline"
     :upgrade-name="upgradeInstalledUpgradeName"
     :tier="upgradeInstalledTier"
     :credits-spent="upgradeInstalledCreditsSpent"
+    :meta-text="upgradeInstalledMetaText ?? undefined"
     @dismissed="onUpgradeInstalledDismissed"
   />
   <CreditsBadge

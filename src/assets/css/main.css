@@ -864,6 +864,102 @@ body {
   @apply text-sm text-slate-500;
 }
 
+.cargo-capacity-panel {
+  @apply mb-4 rounded-xl border border-cyan-400/15 bg-cyan-500/5 p-4;
+}
+
+.cargo-capacity-panel__header {
+  @apply mb-3 flex items-end justify-between gap-4;
+}
+
+.cargo-capacity-panel__eyebrow {
+  @apply font-mono text-[10px] uppercase tracking-[0.24em] text-slate-500;
+}
+
+.cargo-capacity-panel__reading {
+  @apply mt-1 font-mono text-lg text-cyan-100;
+}
+
+.cargo-capacity-panel__slot-readout {
+  @apply rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.16em] text-slate-300;
+}
+
+.cargo-capacity-bar {
+  @apply flex h-3 w-full overflow-hidden rounded-full border border-white/10 bg-slate-900/80;
+}
+
+.cargo-capacity-bar__segment {
+  @apply h-full;
+}
+
+.cargo-capacity-bar__segment--rocks {
+  @apply bg-slate-300;
+}
+
+.cargo-capacity-bar__segment--special {
+  @apply bg-cyan-300;
+}
+
+.cargo-capacity-bar__segment--vendor {
+  @apply bg-amber-300;
+}
+
+.cargo-capacity-bar__segment--fuel {
+  @apply bg-emerald-300;
+}
+
+.cargo-capacity-bar__segment--other {
+  @apply bg-fuchsia-300;
+}
+
+.cargo-capacity-bar__remaining {
+  @apply h-full bg-slate-800/90;
+}
+
+.cargo-capacity-legend {
+  @apply mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3;
+}
+
+.cargo-capacity-legend__item {
+  @apply flex items-center gap-2 rounded-lg border border-white/5 bg-white/5 px-3 py-2 text-xs;
+}
+
+.cargo-capacity-legend__item--empty {
+  @apply opacity-50;
+}
+
+.cargo-capacity-legend__swatch {
+  @apply h-2.5 w-2.5 shrink-0 rounded-full;
+}
+
+.cargo-capacity-legend__swatch--rocks {
+  @apply bg-slate-300;
+}
+
+.cargo-capacity-legend__swatch--special {
+  @apply bg-cyan-300;
+}
+
+.cargo-capacity-legend__swatch--vendor {
+  @apply bg-amber-300;
+}
+
+.cargo-capacity-legend__swatch--fuel {
+  @apply bg-emerald-300;
+}
+
+.cargo-capacity-legend__swatch--other {
+  @apply bg-fuchsia-300;
+}
+
+.cargo-capacity-legend__label {
+  @apply flex-1 text-slate-300;
+}
+
+.cargo-capacity-legend__value {
+  @apply font-mono text-slate-100;
+}
+
 /* Shuttle terminal — engineering bay (persistent upgrades) */
 .upgrade-shop-program {
   @apply flex flex-col gap-4 text-slate-200;
@@ -1480,7 +1576,7 @@ body {
   @apply shrink-0 font-mono text-sm text-amber-300;
 }
 
-.inventory-table__sell-btn {
+.inventory-table__action-btn {
   @apply shrink-0 rounded border border-cyan-400/30 bg-cyan-400/10
          px-3 py-1 text-xs font-mono text-cyan-300
          hover:bg-cyan-400/20 transition-colors cursor-pointer;

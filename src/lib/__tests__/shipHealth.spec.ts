@@ -116,6 +116,30 @@ describe('ShipHealth', () => {
     })
   })
 
+  describe('thermal armor upgrades', () => {
+    it('heatArmor reduces overheating hull damage without changing drift', () => {
+      const mitigated = new ShipHealth(config)
+      const baseline = new ShipHealth(config)
+      for (let i = 0; i < 25; i++) {
+        mitigated.tick(1, 10, 0, false, 1, 0.5, 1, 1, 1)
+        baseline.tick(1, 10, 0, false, 1, 1, 1, 1, 1)
+      }
+      expect(mitigated.temperature).toBeCloseTo(baseline.temperature, 5)
+      expect(mitigated.hp).toBeGreaterThan(baseline.hp)
+    })
+
+    it('coldArmor reduces freezing hull damage without changing drift', () => {
+      const mitigated = new ShipHealth(config)
+      const baseline = new ShipHealth(config)
+      for (let i = 0; i < 25; i++) {
+        mitigated.tick(1, 500, 0, false, 1, 1, 1, 0.5, 1)
+        baseline.tick(1, 500, 0, false, 1, 1, 1, 1, 1)
+      }
+      expect(mitigated.temperature).toBeCloseTo(baseline.temperature, 5)
+      expect(mitigated.hp).toBeGreaterThan(baseline.hp)
+    })
+  })
+
   describe('radiation damage', () => {
     it('does not damage hull when proximity below radiationThreshold', () => {
       health.tick(1, 100, 0.1)
@@ -148,8 +172,8 @@ describe('ShipHealth', () => {
       const resistant = new ShipHealth(config)
       const normal = new ShipHealth(config)
       // coldResistance=0.5 → half drift rate in cold zone
-      resistant.tick(1, 500, 0, false, 1, 1, 0.5)
-      normal.tick(1, 500, 0, false, 1, 1, 1)
+      resistant.tick(1, 500, 0, false, 1, 1, 0.5, 1)
+      normal.tick(1, 500, 0, false, 1, 1, 1, 1)
       // resistant ship should be less cold (closer to 0)
       expect(resistant.temperature).toBeGreaterThan(normal.temperature)
     })
@@ -158,7 +182,7 @@ describe('ShipHealth', () => {
       const a = new ShipHealth(config)
       const b = new ShipHealth(config)
       a.tick(1, 500, 0)
-      b.tick(1, 500, 0, false, 1, 1, 1)
+      b.tick(1, 500, 0, false, 1, 1, 1, 1)
       expect(a.temperature).toBeCloseTo(b.temperature, 10)
     })
   })
@@ -169,7 +193,7 @@ describe('ShipHealth', () => {
       const normal = new ShipHealth(config)
       // proximity=1, dt=1: normal damage = maxRadiationDamage * 1 = 15
       // armored damage = 15 * 0.5 = 7.5
-      armored.tick(1, 100, 1, false, 1, 1, 1, 0.5)
+      armored.tick(1, 100, 1, false, 1, 1, 1, 1, 0.5)
       normal.tick(1, 100, 1)
       expect(armored.hp).toBeGreaterThan(normal.hp)
       expect(armored.hp).toBeCloseTo(100 - 7.5, 5)
@@ -179,7 +203,7 @@ describe('ShipHealth', () => {
       const a = new ShipHealth(config)
       const b = new ShipHealth(config)
       a.tick(1, 100, 1)
-      b.tick(1, 100, 1, false, 1, 1, 1, 1)
+      b.tick(1, 100, 1, false, 1, 1, 1, 1, 1)
       expect(a.hp).toBeCloseTo(b.hp, 10)
     })
   })

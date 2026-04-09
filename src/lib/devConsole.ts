@@ -11,6 +11,7 @@
  * AsteroidDev.MapView.warp('earth')
  * AsteroidDev.MapView.spawnGravitationalEventNearPlayer(200)
  * AsteroidDev.MapView.grantGravitySurfing()
+ * AsteroidDev.MapView.giveCredits(5000)
  * AsteroidDev.MapView.setUpgradeLevel('gravitySurfing', 0)
  * AsteroidDev.help()
  *

@@ -27,10 +27,13 @@ const props = withDefaults(
     /** Purchased tier (1–3). */
     tier: number
     /** Credits spent on this tier (shown as debit). */
-    creditsSpent: number
+    creditsSpent?: number
+    /** Optional replacement for the default tier/credit line. */
+    metaText?: string
   }>(),
   {
     headline: 'UPGRADE INSTALLED',
+    creditsSpent: 0,
   },
 )
 
@@ -80,7 +83,9 @@ onBeforeUnmount(() => {
   cancelSequence()
 })
 
-const creditsLabel = computed(() => `−${props.creditsSpent.toLocaleString()} CR`)
+const metaLabel = computed(() =>
+  props.metaText
+    ?? `Tier ${props.tier} · −${(props.creditsSpent ?? 0).toLocaleString()} CR`)
 </script>
 
 <template>
@@ -94,7 +99,7 @@ const creditsLabel = computed(() => `−${props.creditsSpent.toLocaleString()} C
       <div class="upgrade-installed-announcement__divider" />
       <div class="upgrade-installed-announcement__title">{{ upgradeName }}</div>
       <div class="upgrade-installed-announcement__meta">
-        Tier {{ tier }} · {{ creditsLabel }}
+        {{ metaLabel }}
       </div>
     </div>
   </div>
