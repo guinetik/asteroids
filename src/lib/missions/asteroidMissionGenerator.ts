@@ -309,6 +309,13 @@ export function rollObjective(slot: ObjectiveSlot, difficulty: number): Concrete
         timeLimit: interpolateRange(slot.params.timeLimit, difficulty),
         reward,
       }
+    case 'collect':
+      return {
+        type: 'collect',
+        x: 0,
+        z: 0,
+        reward,
+      }
   }
 }
 
@@ -432,6 +439,7 @@ export function generateAsteroidMission(difficulty: number): GeneratedAsteroidMi
   const asteroidId = pickAsteroidForDifficulty(difficulty)
 
   return {
+    kind: 'standard',
     id: missionId,
     asteroidId,
     giverId: pick.giver.id,

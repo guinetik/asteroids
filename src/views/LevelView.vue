@@ -14,6 +14,7 @@ import LevelMinimap from '@/components/LevelMinimap.vue'
 import type { MapMarker } from '@/components/LevelMinimap.vue'
 import type { LanderTelemetry } from '@/components/LanderHud.vue'
 import type { FpsTelemetry } from '@/components/FpsHud.vue'
+import { OBJECTIVE_LABELS } from '@/lib/minigame/MiniGame'
 
 const container = ref<HTMLElement>()
 const viewController = new LevelViewController()
@@ -46,6 +47,7 @@ const OBJECTIVE_COLORS: Record<string, string> = {
   exterminate: '#ff4444',
   rescue: '#ffcc44',
   survey: '#00ffcc',
+  collect: '#66d9ff',
 }
 
 const descentWarning = computed(() =>
@@ -177,7 +179,7 @@ onMounted(async () => {
         const mg = viewController.getMinigame(i)
         return {
           id: `obj-${i}`,
-          label: obj.type.toUpperCase(),
+          label: (OBJECTIVE_LABELS[obj.type] ?? obj.type).toUpperCase(),
           complete: false,
           steps: mg?.steps ?? [],
         }

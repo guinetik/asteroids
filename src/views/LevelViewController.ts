@@ -69,12 +69,15 @@ import {
   clearWaypointMarkers,
 } from '@/three/WaypointMarkers'
 import { generateMapCanvas } from '@/lib/terrain/mapColors'
+import { OBJECTIVE_LABELS } from '@/lib/minigame/MiniGame'
 import type { MiniGame, MiniGameContext, MiniGameStep } from '@/lib/minigame/MiniGame'
 import { SurveyMinigame } from '@/lib/minigame/SurveyMinigame'
 import { ExterminateMinigame } from '@/lib/minigame/ExterminateMinigame'
 import { RescueMinigame } from '@/lib/minigame/RescueMinigame'
+import { CollectMinigame } from '@/lib/minigame/CollectMinigame'
 import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
+import { getSpecialMissionById } from '@/lib/missions/specialMissions'
 
 // ── Scene constants ─────────────────────────────────────────────
 const TERRAIN_RESOLUTION = 512
@@ -156,8 +159,11 @@ function resolveLevelContext(): LevelContext {
 
   let mission: GeneratedAsteroidMission
   let persistCompletionRewards = false
+  const specialMission = missionType ? getSpecialMissionById(missionType) : undefined
 
-  if (paramId) {
+  if (specialMission) {
+    mission = specialMission
+  } else if (paramId) {
     mission = generateMissionWithType(difficulty, missionType)
     mission.asteroidId = paramId
   } else if (queryOverride) {
@@ -167,7 +173,8 @@ function resolveLevelContext(): LevelContext {
     if (!stored) {
       throw new Error(
         '[Level] No active mission in storage. Use /map to launch one, or open /level with '
-          + '?asteroidId=… or both ?difficulty=1-10&mission=gather|exterminate|rescue|survey',
+          + '?mission=<special-id>, ?asteroidId=…, or both ?difficulty=1-10&mission='
+          + 'gather|exterminate|rescue|survey|collect',
       )
     }
     mission = stored
@@ -611,6 +618,12 @@ export class LevelViewController implements Tickable {
         minigame.onFail = (_idx, cause) => {
           this.onDeathOverlay?.(true, cause)
         }
+        this.minigames.push(minigame)
+      } else if (obj.type === 'collect') {
+        const minigame = new CollectMinigame(i, obj, this.sceneManager!.scene, this.heightmap!)
+        minigame.onPrompt = (text) => this.onTerminalPrompt?.(text)
+        minigame.onComplete = (idx) => this.onObjectiveComplete?.(idx)
+        minigame.onStepChange = (idx, steps) => this.onStepChange?.(idx, steps)
         this.minigames.push(minigame)
       }
     }
@@ -1226,7 +1239,7 @@ export class LevelViewController implements Tickable {
         const compassHeading = headingRadToCompassDeg(headingRad)
         const objectives: CompassObjective[] = this.missionObjectives.map((obj, i) => ({
           id: `obj-${i}`,
-          label: obj.type.toUpperCase(),
+          label: (OBJECTIVE_LABELS[obj.type] ?? obj.type).toUpperCase(),
           relativeDeg: signedRelativeBearingDeg(
             compassHeading,
             worldBearingDegTo(playerPos.x, playerPos.z, obj.x, obj.z),

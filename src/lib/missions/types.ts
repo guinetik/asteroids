@@ -14,7 +14,7 @@
 import type { RestockTimer } from '@/lib/shop/tradeTypes'
 
 /** The four objective types a mission can contain. */
-export type ObjectiveType = 'gather' | 'exterminate' | 'rescue' | 'survey'
+export type ObjectiveType = 'gather' | 'exterminate' | 'rescue' | 'survey' | 'collect'
 
 /** Solar system region where missions spawn. Determines fuel cost and distance. */
 export type MissionRegion = 'near-earth' | 'asteroid-belt' | 'kuiper-belt'
@@ -69,12 +69,21 @@ export interface SurveyScalableParams {
   timeLimit: NumberRange
 }
 
+/** Scalable params for COLLECT objectives. Currently authored-only. */
+export interface CollectScalableParams {
+  /** Discriminator for the union type. */
+  type: 'collect'
+  /** Placeholder count range for one-off pickups. */
+  pickupCount: NumberRange
+}
+
 /** Union of all objective-specific scalable parameters. */
 export type ScalableParams =
   | GatherScalableParams
   | ExterminateScalableParams
   | RescueScalableParams
   | SurveyScalableParams
+  | CollectScalableParams
 
 /** A slot in a mission template that the generator fills with a concrete objective. */
 export interface ObjectiveSlot {
@@ -241,6 +250,12 @@ export interface ConcreteObjective {
   probeCount?: number
   /** For survey: time limit in seconds. */
   timeLimit?: number
+  /** For collect: stable inventory/item id granted by the pickup. */
+  collectItemId?: string
+  /** For collect: UI-facing item label. */
+  collectItemLabel?: string
+  /** For collect: prompt shown when in interaction range. */
+  interactionLabel?: string
   /** Credit reward for this objective. */
   reward: number
 }
@@ -248,8 +263,13 @@ export interface ConcreteObjective {
 /** Status of an asteroid mission. */
 export type AsteroidMissionStatus = 'available' | 'accepted' | 'in-transit'
 
+/** Standard procedural content or an authored special mission. */
+export type AsteroidMissionKind = 'standard' | 'special'
+
 /** A fully generated asteroid mission ready for play. */
 export interface GeneratedAsteroidMission {
+  /** Whether the mission is procedural or authored special content. */
+  kind: AsteroidMissionKind
   /** Unique instance id (templateId + timestamp). */
   id: string
   /** Asteroid template id from the catalog, e.g. "bennu", "kr3". Drives terrain and visuals. */

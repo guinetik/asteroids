@@ -1,7 +1,7 @@
 /**
  * Base interface for objective minigames.
  *
- * Each objective type (survey, gather, exterminate, rescue) implements
+ * Each objective type (survey, collect, exterminate, rescue) implements
  * this interface. The LevelViewController manages minigame instances
  * without knowing their internals — just ticking, querying status,
  * and listening for events.
@@ -48,6 +48,15 @@ export interface MiniGameStep {
   complete: boolean
   /** Whether this is the currently active step. */
   active: boolean
+}
+
+/** Shared fallback labels for objective-driven HUD/tracker views. */
+export const OBJECTIVE_LABELS: Record<string, string> = {
+  gather: 'Gather',
+  exterminate: 'Exterminate',
+  rescue: 'Rescue',
+  survey: 'Survey',
+  collect: 'Collect',
 }
 
 /**

@@ -51,7 +51,11 @@ export function loadActiveMission(): GeneratedAsteroidMission | null {
     if (parsed === null || Array.isArray(parsed) || typeof parsed !== 'object') {
       return null
     }
-    return parsed as GeneratedAsteroidMission
+    const mission = parsed as Partial<GeneratedAsteroidMission>
+    return {
+      ...mission,
+      kind: mission.kind === 'special' ? 'special' : 'standard',
+    } as GeneratedAsteroidMission
   } catch {
     return null
   }

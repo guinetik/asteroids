@@ -9,6 +9,7 @@
 import type { LocationQuery } from 'vue-router'
 import type { ObjectiveType } from '@/lib/missions/types'
 import { loadActiveMission } from '@/lib/missions/missionStorage'
+import { getSpecialMissionById } from '@/lib/missions/specialMissions'
 import { loadProfile } from '@/lib/player/profile'
 
 /** Allowed values for the `mission` query param when used with `difficulty` to bypass storage. */
@@ -17,6 +18,7 @@ const LEVEL_ROUTE_OBJECTIVE_TYPES: readonly ObjectiveType[] = [
   'exterminate',
   'rescue',
   'survey',
+  'collect',
 ]
 
 /** Minimum valid `difficulty` query value for bypass (inclusive). */
@@ -53,8 +55,13 @@ export function hasLevelRouteQueryOverrideFromSearchParams(params: URLSearchPara
   const asteroidId = params.get('asteroidId')?.trim() ?? ''
   if (asteroidId !== '') return true
 
+  const missionId = params.get('mission')?.trim() ?? ''
+  if (missionId !== '' && getSpecialMissionById(missionId)) {
+    return true
+  }
+
   const rawDifficulty = params.get('difficulty')
-  const missionRaw = params.get('mission')?.trim().toLowerCase() ?? ''
+  const missionRaw = missionId.toLowerCase()
   if (rawDifficulty === null || missionRaw === '') return false
 
   const difficulty = Number(rawDifficulty)

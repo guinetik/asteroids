@@ -5,6 +5,7 @@ import { PROFILE_STORAGE_KEY, loadProfile, createProfile, saveProfile } from '@/
 import type { GeneratedAsteroidMission } from '../types'
 
 const BASE_MISSION: GeneratedAsteroidMission = {
+  kind: 'standard',
   id: 'test-mission-1',
   asteroidId: 'bennu',
   giverId: 'jay',

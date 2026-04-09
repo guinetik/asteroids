@@ -1,0 +1,26 @@
+{
+  "kind": "special",
+  "id": "consortium-certification",
+  "asteroidId": "bennu",
+  "giverId": "space-consortium",
+  "giverName": "Space Consortium",
+  "templateId": "consortium-certification",
+  "name": "Consortium Certification",
+  "briefing": "Retrieve the sealed Consortium package from the staged asteroid container.",
+  "difficulty": 3,
+  "region": "asteroid-belt",
+  "objectives": [
+    {
+      "type": "collect",
+      "x": 0,
+      "z": 0,
+      "collectItemId": "grid-coupling-module",
+      "collectItemLabel": "Grid Coupling Module",
+      "interactionLabel": "[E] COLLECT CONSORTIUM PACKAGE",
+      "reward": 0
+    }
+  ],
+  "totalReward": 2000,
+  "waypoint": { "worldX": 260, "worldZ": 145 },
+  "status": "available"
+}

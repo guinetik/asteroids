@@ -38,6 +38,7 @@ beforeEach(() => {
 })
 
 const MOCK_MISSION: GeneratedAsteroidMission = {
+  kind: 'standard',
   id: 'test_mission_123',
   asteroidId: 'bennu',
   giverId: 'jay',
@@ -72,6 +73,11 @@ describe('hasLevelRouteQueryOverrideFromSearchParams', () => {
     expect(hasLevelRouteQueryOverrideFromSearchParams(p)).toBe(true)
   })
 
+  it('is true when mission is a known special mission id', () => {
+    const p = new URLSearchParams('mission=consortium-certification')
+    expect(hasLevelRouteQueryOverrideFromSearchParams(p)).toBe(true)
+  })
+
   it('is false when only difficulty is set', () => {
     const p = new URLSearchParams('difficulty=5')
     expect(hasLevelRouteQueryOverrideFromSearchParams(p)).toBe(false)
@@ -97,6 +103,7 @@ describe('canAccessLevelRoute', () => {
   it('allows access with override query only', () => {
     expect(canAccessLevelRoute(q({ difficulty: '5', mission: 'rescue' }))).toBe(true)
     expect(canAccessLevelRoute(q({ asteroidId: 'bennu' }))).toBe(true)
+    expect(canAccessLevelRoute(q({ mission: 'consortium-certification' }))).toBe(true)
   })
 
   it('denies without storage or override', () => {
