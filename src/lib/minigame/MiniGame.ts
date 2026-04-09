@@ -20,6 +20,8 @@ export interface MiniGameContext {
   levelState: string
   /** Lander world position (null if not available). */
   landerPosition: { x: number; y: number; z: number } | null
+  /** Whether the lander is currently grounded on the surface. */
+  landerGrounded: boolean
   /** EVA player world position (null if not in EVA). */
   playerPosition: { x: number; y: number; z: number } | null
   /** Whether the interact key (F) was just pressed this frame. */

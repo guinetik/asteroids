@@ -26,8 +26,8 @@ const DEFAULT_VIRUS_SCALE = 1
 const DEFAULT_CAST_SHADOW = true
 const DEFAULT_RECEIVE_SHADOW = true
 
-/** Hologram tint — teal-green to read distinct from red-tinted nest props. */
-const HOLOGRAM_COLOR = new THREE.Color(0x44ffcc)
+/** Hologram tint — hostile neon green for rescue outbreak sites. */
+const HOLOGRAM_COLOR = new THREE.Color(0x39ff14)
 
 const HOLOGRAM_VERTEX_SHADER = /* glsl */ `
   varying vec3 vWorldPos;

@@ -37,6 +37,9 @@ const HP_BAR_CLEARANCE_ABOVE_MESH = 0.15
  * for default {@link HostageModel} scale).
  */
 const HP_BAR_FALLBACK_LOCAL_Y = 2.15
+const HOSTAGE_REVEAL_DURATION = 0.9
+const HOSTAGE_REVEAL_START_SCALE = 0.18
+const HOSTAGE_REVEAL_START_DEPTH = 2.6
 
 /** HP ratio above this uses the “healthy” bar color. */
 const HP_PCT_HIGH = 0.55
@@ -131,6 +134,8 @@ class HostageInstance {
   private readonly ctx: CanvasRenderingContext2D
   private readonly texture: THREE.CanvasTexture
   private dead = false
+  private revealTimer = HOSTAGE_REVEAL_DURATION
+  private targetY = 0
   /** Rounded HP label — avoids redrawing when unchanged. */
   private lastRoundedHp = Number.NaN
 
@@ -192,6 +197,14 @@ class HostageInstance {
     this.hostage.position.copy(this.model.group.position)
   }
 
+  beginReveal(targetY: number): void {
+    this.targetY = targetY
+    this.revealTimer = HOSTAGE_REVEAL_DURATION
+    this.model.group.position.y = targetY - HOSTAGE_REVEAL_START_DEPTH
+    this.model.group.scale.setScalar(HOSTAGE_REVEAL_START_SCALE)
+    this.sprite.visible = false
+  }
+
   /** Redraw the canvas texture from current {@link Hostage.hp}. */
   redrawHpBar(): void {
     const w = HP_BAR_CANVAS_W
@@ -226,6 +239,19 @@ class HostageInstance {
   }
 
   tick(dt: number): void {
+    if (this.revealTimer > 0) {
+      this.revealTimer = Math.max(0, this.revealTimer - dt)
+      const t = 1 - this.revealTimer / HOSTAGE_REVEAL_DURATION
+      const eased = 1 - Math.pow(1 - t, 3)
+      this.model.group.position.y = this.targetY - (1 - eased) * HOSTAGE_REVEAL_START_DEPTH
+      const scale = HOSTAGE_REVEAL_START_SCALE + eased * (1 - HOSTAGE_REVEAL_START_SCALE)
+      this.model.group.scale.setScalar(scale)
+      this.sprite.visible = eased >= 0.45
+    } else {
+      this.model.group.position.y = this.targetY
+      this.model.group.scale.setScalar(1)
+      this.sprite.visible = !this.dead
+    }
     if (!this.dead && this.hostage.alive) {
       this.model.tickFeedback(dt)
     }
@@ -351,7 +377,7 @@ export class FpsHostageController implements Tickable {
       const angle = (i / count) * Math.PI * 2
       const x = Math.cos(angle) * radius
       const z = Math.sin(angle) * radius
-      await this.spawnAtPosition(x, z, Math.atan2(-x, -z))
+      await this.spawnAtPosition(x, z, Math.atan2(-x, -z), true)
     }
   }
 
@@ -365,7 +391,7 @@ export class FpsHostageController implements Tickable {
   ): Promise<void> {
     await HostageModel.preload()
     for (const pos of positions) {
-      await this.spawnAtPosition(pos.x, pos.z, pos.yaw)
+      await this.spawnAtPosition(pos.x, pos.z, pos.yaw, true)
     }
   }
 
@@ -407,7 +433,7 @@ export class FpsHostageController implements Tickable {
     this.clear()
   }
 
-  private async spawnAtPosition(x: number, z: number, yaw?: number): Promise<void> {
+  private async spawnAtPosition(x: number, z: number, yaw?: number, animateReveal = false): Promise<void> {
     const y = this.heightmap.heightAt(x, z)
     const model = await HostageModel.create()
     model.placeAt(x, y, z)
@@ -426,5 +452,9 @@ export class FpsHostageController implements Tickable {
 
     this.instances.push(inst)
     this.scene.add(model.group)
+
+    if (animateReveal) {
+      inst.beginReveal(y)
+    }
   }
 }
