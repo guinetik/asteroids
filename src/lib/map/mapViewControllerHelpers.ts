@@ -1,0 +1,146 @@
+import * as THREE from 'three'
+import { PLANETS } from '@/lib/planets/catalog'
+import type { GeneratedAsteroidMission } from '@/lib/missions/types'
+import type { GravityConfig, GravitySource } from '@/lib/physics/gravity'
+import { eventHorizonRadius, gravityAt, influenceRadius } from '@/lib/physics/gravity'
+import type { GravityWell } from '@/three/ShuttleController'
+import {
+  AIM_BLOCK_THRESHOLD,
+  EARTH_CATALOG_DISPLAY_RADIUS,
+  SPAWN_OFFSET_BEHIND_EARTH,
+} from '@/lib/map/mapViewControllerConfig'
+
+export type EmissiveMaterial =
+  | THREE.MeshLambertMaterial
+  | THREE.MeshPhongMaterial
+  | THREE.MeshStandardMaterial
+  | THREE.MeshPhysicalMaterial
+  | THREE.MeshToonMaterial
+
+/** Whether a material exposes emissive controls. */
+export function isEmissiveMaterial(material: THREE.Material): material is EmissiveMaterial {
+  return (
+    material instanceof THREE.MeshLambertMaterial ||
+    material instanceof THREE.MeshPhongMaterial ||
+    material instanceof THREE.MeshStandardMaterial ||
+    material instanceof THREE.MeshPhysicalMaterial ||
+    material instanceof THREE.MeshToonMaterial
+  )
+}
+
+/** Whether the shuttle map should draw the 3D asteroid mission site. */
+export function shouldShowAsteroidMissionMapSite(
+  mission: GeneratedAsteroidMission | null,
+): boolean {
+  return mission !== null && (mission.status === 'accepted' || mission.status === 'in-transit')
+}
+
+/** World-space standoff used by dev warp to keep the shuttle off the target body mesh. */
+export function mapWarpStandoffWorldUnits(displayRadius: number): number {
+  return SPAWN_OFFSET_BEHIND_EARTH * (displayRadius / EARTH_CATALOG_DISPLAY_RADIUS)
+}
+
+/** Wraps a GravitySource into a GravityWell that ShuttleController can consume. */
+export function makeGravityWell(
+  source: GravitySource,
+  config: GravityConfig,
+): GravityWell & GravitySource {
+  return {
+    mass: source.mass,
+    getWorldX: () => source.getWorldX(),
+    getWorldZ: () => source.getWorldZ(),
+    getGravityAt(pos: THREE.Vector3): THREE.Vector3 {
+      const g = gravityAt(source.getWorldX(), source.getWorldZ(), source.mass, pos.x, pos.z, config)
+      return new THREE.Vector3(g.ax, 0, g.az)
+    },
+  }
+}
+
+/** Compute gravity proximity for a single source. */
+export function computeGravityProximity(
+  sourceX: number,
+  sourceZ: number,
+  mass: number,
+  px: number,
+  pz: number,
+  config: GravityConfig,
+): number {
+  const dx = sourceX - px
+  const dz = sourceZ - pz
+  const dist = Math.sqrt(dx * dx + dz * dz)
+  const influence = influenceRadius(mass, config)
+  const horizon = eventHorizonRadius(mass, config)
+  if (dist >= influence) return 0
+  return Math.min(1, 1 - (dist - horizon) / (influence - horizon))
+}
+
+/** Max gravity proximity across the Sun and all current planet controllers. */
+export function computeMaxGravityProximity(
+  px: number,
+  pz: number,
+  sources: Array<{ getWorldX(): number; getWorldZ(): number; mass: number }>,
+  config: GravityConfig,
+): number {
+  let max = 0
+  for (const source of sources) {
+    max = Math.max(
+      max,
+      computeGravityProximity(source.getWorldX(), source.getWorldZ(), source.mass, px, pz, config),
+    )
+  }
+  return max
+}
+
+/** Returns true if the shuttle is aiming toward the currently captured planet. */
+export function isShuttleAimingAtPlanet(params: {
+  shuttlePosition: { x: number; z: number }
+  shuttleQuaternion: THREE.Quaternion
+  planetPosition: { x: number; z: number }
+}): boolean {
+  const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(params.shuttleQuaternion)
+  forward.y = 0
+  forward.normalize()
+
+  const toPlanet = new THREE.Vector3(
+    params.planetPosition.x - params.shuttlePosition.x,
+    0,
+    params.planetPosition.z - params.shuttlePosition.z,
+  ).normalize()
+
+  return forward.dot(toPlanet) > AIM_BLOCK_THRESHOLD
+}
+
+/** Build map overlay body data from the active planetarium controllers. */
+export function buildMapBodies(params: {
+  sun:
+    | {
+        getWorldX(): number
+        getWorldZ(): number
+        mass: number
+      }
+    | null
+  planets: Array<{ getWorldX(): number; getWorldZ(): number; mass: number }>
+}): Array<{ name: string; x: number; z: number; mass: number }> {
+  const bodies: Array<{ name: string; x: number; z: number; mass: number }> = []
+
+  if (params.sun) {
+    bodies.push({
+      name: 'Sun',
+      x: params.sun.getWorldX(),
+      z: params.sun.getWorldZ(),
+      mass: params.sun.mass,
+    })
+  }
+
+  for (let i = 0; i < params.planets.length; i++) {
+    const planet = params.planets[i]!
+    bodies.push({
+      name: PLANETS[i]?.name ?? '',
+      x: planet.getWorldX(),
+      z: planet.getWorldZ(),
+      mass: planet.mass,
+    })
+  }
+
+  return bodies
+}
