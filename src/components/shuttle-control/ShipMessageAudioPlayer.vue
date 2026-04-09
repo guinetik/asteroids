@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import type { AudioPlaybackHandle } from '@/audio/audioTypes'
-import { useAudio } from '@/audio/useAudio'
-import { startShipMessagePlayback } from './shipMessageAudioPlayback'
+import { computed, onMounted, watch } from 'vue'
+import { useShipMessageAudioSession } from './shipMessageAudioSession'
 
 const props = defineProps<{
   messageId: string
@@ -10,75 +8,27 @@ const props = defineProps<{
   autoplayToken: number
 }>()
 
-const audio = useAudio()
-
-let currentHandle: AudioPlaybackHandle | null = null
-let progressInterval: ReturnType<typeof setInterval> | null = null
-
-const isPlaying = ref(false)
-const progress = ref(0)
-
-const progressPercent = computed(() => `${Math.max(0, Math.min(100, progress.value * 100))}%`)
+const session = useShipMessageAudioSession(props.messageId)
+const isPlaying = session.isPlaying
+const progressPercent = session.progressPercent
 const buttonLabel = computed(() => (isPlaying.value ? 'Stop Audio Message' : 'Play Audio Message'))
 
-function clearProgressInterval(): void {
-  if (!progressInterval) return
-  clearInterval(progressInterval)
-  progressInterval = null
-}
-
-function resetPlaybackState(): void {
-  isPlaying.value = false
-  progress.value = 0
-  clearProgressInterval()
-}
-
-function stopPlayback(): void {
-  if (currentHandle) {
-    currentHandle.stop()
-    currentHandle = null
-  }
-  resetPlaybackState()
-}
-
-function updateProgress(): void {
-  if (!currentHandle) return
-  if (!currentHandle.playing()) return
-  progress.value = currentHandle.progress()
-}
-
-function beginPlayback(): void {
-  stopPlayback()
-  const handle = startShipMessagePlayback(audio, props.audioUrl, stopPlayback)
-  if (!handle) return
-  currentHandle = handle
-  isPlaying.value = true
-  progress.value = 0
-  progressInterval = setInterval(updateProgress, 100)
-}
-
 function togglePlayback(): void {
-  if (isPlaying.value) {
-    stopPlayback()
-    return
-  }
-  beginPlayback()
+  session.togglePlayback(props.audioUrl)
 }
 
 watch(
   () => props.autoplayToken,
   () => {
-    beginPlayback()
+    session.autoplay(props.audioUrl)
   },
 )
 
 onMounted(() => {
   if (props.autoplayToken > 0) {
-    beginPlayback()
+    session.autoplay(props.audioUrl)
   }
 })
-
-onUnmounted(stopPlayback)
 </script>
 
 <template>

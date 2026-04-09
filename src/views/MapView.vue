@@ -44,12 +44,18 @@ import type {
 } from '@/lib/ShuttleTelemetry'
 import { isWithinAsteroidMissionApproachRadius } from '@/lib/missions/mapAsteroidMissionApproach'
 import type { OrbitHudState } from '@/lib/orbitCapture'
+import {
+  stopMessageAudio,
+  useShipMessageAudioGlobalState,
+} from '@/components/shuttle-control/shipMessageAudioSession'
 
 /** So Space Fabric gating matches storage before the first paint (also merged again in controller `init`). */
 hydratePlayerUpgradeLevelsFromStorage()
 
 /** Matches `index.html` document title — map screen top bar branding. */
 const MAP_SCREEN_GAME_TITLE = 'Asteroid Lander'
+const shipMessageAudio = useShipMessageAudioGlobalState()
+const shipMessageAudioPlaying = computed(() => shipMessageAudio.isPlaying.value)
 
 const container = ref<HTMLElement>()
 const viewController = new MapViewController()
@@ -385,6 +391,10 @@ function openShuttleControlFromMap(): void {
   shopInventory.value = viewController.getPlayerInventorySnapshot()
 }
 
+function stopShuttleMessageAudio(): void {
+  stopMessageAudio()
+}
+
 function openHabitatFromMap(): void {
   shuttleControlVisible.value = false
   viewController.enterHabitat()
@@ -526,6 +536,14 @@ function dockedPlanetId(): string | null {
         @click="openShuttleControlFromMap"
       >
         Shuttle Control Panel
+      </button>
+      <button
+        v-if="shipMessageAudioPlaying"
+        type="button"
+        class="map-screen-nav__btn map-screen-nav__btn--audio-stop"
+        @click="stopShuttleMessageAudio"
+      >
+        Stop Message Audio
       </button>
     </div>
   </header>
