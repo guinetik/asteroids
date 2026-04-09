@@ -50,9 +50,9 @@ const PRESETS: Record<AudioEffectPreset, AudioEffectConfig> = {
   none: { id: 'none' },
   radio: {
     id: 'radio',
-    lowpassHz: 3400,
-    highpassHz: 280,
-    distortion: 0.08,
+    lowpassHz: 2600,
+    highpassHz: 420,
+    distortion: 0.18,
   },
   'helmet-comms': {
     id: 'helmet-comms',

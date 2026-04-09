@@ -94,12 +94,42 @@ export class MessageSystem {
   }
 
   /**
+   * Force-deliver a specific authored message by id.
+   *
+   * Used for dev tools or scripted narrative beats that should enqueue one exact
+   * inbox item without introducing a new gameplay trigger.
+   *
+   * @param id - Catalog message id to enqueue.
+   * @returns True when a new pending record was created.
+   */
+  enqueueById(id: string): boolean {
+    const definition = this.definitions.get(id)
+    if (!definition) return false
+
+    const record = this.records[id]
+    if (record?.status === 'dismissed') return false
+    if (record) return false
+
+    this.records[id] = {
+      id,
+      status: 'pending',
+      shownAt: null,
+      dismissedAt: null,
+    }
+    this.persist()
+    return true
+  }
+
+  /**
    * Returns the highest-priority non-dismissed message, or null when none are active.
    */
   getActiveMessage(): ActiveShipMessage | null {
     const activeRecords = Object.values(this.records)
       .filter((record) => record.status === 'pending' || record.status === 'shown')
       .sort((left, right) => {
+        const leftUnread = left.status === 'pending' ? 1 : 0
+        const rightUnread = right.status === 'pending' ? 1 : 0
+        if (rightUnread !== leftUnread) return rightUnread - leftUnread
         const leftPriority = this.definitions.get(left.id)?.priority ?? 0
         const rightPriority = this.definitions.get(right.id)?.priority ?? 0
         return rightPriority - leftPriority
@@ -134,6 +164,7 @@ export class MessageSystem {
       status: 'shown',
       shownAt,
     }
+    this.enqueueFollowUps(id)
     this.persist()
   }
 
@@ -220,5 +251,27 @@ export class MessageSystem {
   /** Writes the current record map through the persistence adapter. */
   private persist(): void {
     this.persistence.save(this.records)
+  }
+
+  /** Enqueues any authored follow-up messages unlocked by reading the given message. */
+  private enqueueFollowUps(id: string): void {
+    const definition = this.definitions.get(id)
+    if (!definition?.enqueueOnRead?.length) return
+
+    for (const nextId of definition.enqueueOnRead) {
+      const nextDefinition = this.definitions.get(nextId)
+      if (!nextDefinition) continue
+
+      const nextRecord = this.records[nextId]
+      if (nextRecord?.status === 'dismissed') continue
+      if (nextRecord) continue
+
+      this.records[nextId] = {
+        id: nextId,
+        status: 'pending',
+        shownAt: null,
+        dismissedAt: null,
+      }
+    }
   }
 }

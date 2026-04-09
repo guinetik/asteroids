@@ -623,9 +623,9 @@ describe('AudioManager', () => {
   it('resolveEffect(voice.comms) returns the radio preset parameters', () => {
     expect(manager.resolveEffect('voice.comms')).toEqual({
       id: 'radio',
-      lowpassHz: 3400,
-      highpassHz: 280,
-      distortion: 0.08,
+      lowpassHz: 2600,
+      highpassHz: 420,
+      distortion: 0.18,
     })
   })
 

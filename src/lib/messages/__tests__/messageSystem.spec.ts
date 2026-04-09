@@ -33,6 +33,16 @@ const definitions: ShipMessageDefinition[] = [
     delivery: 'inbox_prompt',
     priority: 50,
   },
+  {
+    id: 'follow-up',
+    from: 'Jay',
+    subject: 'Follow up',
+    sentAt: '2306-04-05 08:03 UTC',
+    body: ['Second message body.'],
+    trigger: 'map_brake_used',
+    delivery: 'inbox_prompt',
+    priority: 40,
+  },
 ]
 
 let savedRecords: Record<string, ShipMessageRecord> = {}
@@ -81,6 +91,45 @@ describe('MessageSystem.markShown', () => {
     expect(system.getActiveMessage()).toMatchObject({
       id: 'high-priority',
       status: 'shown',
+    })
+  })
+
+  it('prefers unread pending messages over older shown messages', () => {
+    const system = createSystem()
+
+    system.notifyTrigger('map_start_earth_orbit')
+    system.markShown('high-priority')
+    system.notifyTrigger('map_main_thruster_depleted')
+
+    expect(system.getActiveMessage()).toMatchObject({
+      id: 'fuel-tip',
+      status: 'pending',
+    })
+  })
+
+  it('enqueues follow-up messages when a message is first shown', () => {
+    const system = new MessageSystem(
+      definitions.map((definition) =>
+        definition.id === 'high-priority'
+          ? { ...definition, enqueueOnRead: ['follow-up'] }
+          : { ...definition },
+      ),
+      {
+        load: () => ({}),
+        save: (records) => {
+          savedRecords = structuredClone(records)
+        },
+      },
+    )
+
+    system.notifyTrigger('map_start_earth_orbit')
+    system.markShown('high-priority')
+
+    const rows = system.listInboxRows().map((row) => row.id)
+    expect(rows).toContain('follow-up')
+    expect(system.getRecord('follow-up')).toMatchObject({
+      id: 'follow-up',
+      status: 'pending',
     })
   })
 })

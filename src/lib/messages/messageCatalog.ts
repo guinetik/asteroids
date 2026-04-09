@@ -19,6 +19,7 @@ export const STARTUP_SELLER_MESSAGE: ShipMessageDefinition = {
   subject: "She's Yours Now",
   sentAt: '2306-04-05 08:14 UTC',
   audioUrl: '/sound/marta-001.mp3',
+  enqueueOnRead: ['jay-so-you-actually-did-it'],
   trigger: 'map_start_earth_orbit',
   delivery: 'blocking_intro',
   priority: STARTUP_MESSAGE_PRIORITY,
@@ -33,6 +34,36 @@ export const STARTUP_SELLER_MESSAGE: ShipMessageDefinition = {
     'Pick something close. Pick something that pays. Earn enough to upgrade, and then the whole system opens up.',
     'Stop by the dealership next time you are in Earth orbit. I will buy you a Space Unicorn Skibidi Latte.',
     '— Marta',
+  ],
+}
+
+export const JAY_STARTUP_FOLLOW_UP_MESSAGE: ShipMessageDefinition = {
+  id: 'jay-so-you-actually-did-it',
+  from: 'Jay Mercer',
+  subject: 'So You Actually Did It',
+  sentAt: '2306-04-05 08:22 UTC',
+  audioUrl: '/sound/jay.mp3',
+  trigger: 'map_start_earth_orbit',
+  delivery: 'inbox_prompt',
+  priority: JAY_MESSAGE_PRIORITY,
+  body: [
+    'Hey, you got Jay.',
+    'So you actually bought her. I was not sure you would go through with it after the third beer when we talked about this. But here you are. Up from the Moon, sitting in a shuttle, probably looking at Earth through the bay window wondering what the hell you just did.',
+    'Same thing I wondered eleven years ago. It passes.',
+    'Listen, I know Marta is going to send you some beautiful heartfelt message about being careful. She is right. But she is also a dealer and I am the guy who actually does this for a living, so here is the part she left out.',
+    "You do not need to burn hard to reach the rocks near Earth. Earth does most of the work. While you are parked at the spaceport, the planet is already pulling your hull through its gravity lane. Free speed. When your target lines up and the nav will show you when, you press E to lock orbit, aim your exit with A and D, and charge the slingshot. The spaceport gives you the kick. Earth's gravity does the rest. That is it. That is the whole trick.",
+    'Done right you barely spend fuel and you arrive fast. Done wrong you burn 20% of your tank on a bad angle and get to sit there watching the rock drift away while you do math in your head.',
+    "Watch the arrow. Green means go. Red means you are aimed at something solid. Launch with the planet's orbit, not against it. Prograde is your best friend out here. You will feel the difference the first time.",
+    'Do not be impatient. Impatient pilots buy fuel twice.',
+    'One more thing. Sometimes when you slingshot, especially the hard ones with the drive wound up, the local spacetime gets weird. Something about quantum entropy and the fabric not registering your jump cleanly. Your trajectory bends off the line you expected, the nav freaks out for a second, and the whole view does this ripple thing that makes your stomach flip.',
+    'It is completely harmless. I have done it a thousand times. Just reorient and keep flying.',
+    'The only actual side effect is an incontrollable urge to pee. Nobody talks about that part. I am telling you now so you do not think something is wrong with you. It is the spacetime thing. Everybody gets it. Wear the suit.',
+    'Now here is the thing. I did not talk you into this just so you could run contracts for strangers. I have been out here alone too long and you have been on the Moon too long and I think we are both done working for other people.',
+    'I am sending you a couple starter jobs. Easy stuff, close to home. We split the margins fair. Think of it as a trial run for something bigger.',
+    'Space Cowboys, Inc. You and me. We will figure out the logo later.',
+    'You will get the hang of it fast. Marta says you are good with your hands.',
+    'I have no opinion on that yet.',
+    '— Jay',
   ],
 }
 
@@ -139,6 +170,7 @@ export const JAY_VENUS_WARNING_MESSAGE: ShipMessageDefinition = {
 export const SHIP_MESSAGE_CATALOG: ShipMessageDefinition[] = [
   STARTUP_SELLER_MESSAGE,
   CONSORTIUM_CERTIFICATION_MESSAGE,
+  JAY_STARTUP_FOLLOW_UP_MESSAGE,
   JAY_DISTANCE_MESSAGE,
   JAY_THRUSTER_MESSAGE,
   JAY_BRAKE_MESSAGE,

@@ -849,7 +849,7 @@ body {
 }
 
 .shuttle-mail-program__reader-body {
-  @apply flex flex-col gap-3 text-sm leading-relaxed text-slate-300;
+  @apply flex flex-col gap-3 text-base leading-8 text-slate-300;
 }
 
 .shuttle-mail-program__reader-footer {

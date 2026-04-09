@@ -7,6 +7,18 @@ describe('SHIP_MESSAGE_CATALOG', () => {
     const startup = SHIP_MESSAGE_CATALOG.find((message) => message.id === 'seller-welcome-earth-orbit')
 
     expect(startup?.audioUrl).toBe('/sound/marta-001.mp3')
+    expect(startup?.enqueueOnRead).toEqual(['jay-so-you-actually-did-it'])
+  })
+
+  it('includes the Jay startup follow-up with audio', () => {
+    const followUp = SHIP_MESSAGE_CATALOG.find((message) => message.id === 'jay-so-you-actually-did-it')
+
+    expect(followUp).toMatchObject({
+      from: 'Jay Mercer',
+      subject: 'So You Actually Did It',
+      audioUrl: '/sound/jay.mp3',
+      delivery: 'inbox_prompt',
+    })
   })
 
   it('includes Jay brake guidance for the first brake-system use', () => {
