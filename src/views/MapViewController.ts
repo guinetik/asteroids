@@ -156,6 +156,7 @@ import {
   loadActiveMission,
   saveActiveMission,
 } from '@/lib/missions/missionStorage'
+import { isWithinAsteroidMissionApproachRadius } from '@/lib/missions/mapAsteroidMissionApproach'
 import '@/lib/missions/missionMaterials'
 import {
   createWaypointMarkerGroup,
@@ -288,14 +289,11 @@ const MAP_RETICLE_FADE_END = 2.0
 const MAP_RETICLE_MIN_SPEED = 0.12
 
 
-/** Distance in world units at which the "Begin Mission" prompt appears. */
-const MISSION_APPROACH_RADIUS = 15
-
 /**
  * Target subtended height of the mission site (cyan beam + asteroid preview) as a fraction of
  * viewport height.
  */
-const WAYPOINT_APPARENT_SIZE = 0.11
+const WAYPOINT_APPARENT_SIZE = 0.175
 
 /**
  * Whether the shuttle map should draw the 3D mission site (marker + asteroid when loaded).
@@ -568,8 +566,6 @@ export class MapViewController implements Tickable {
   private missionOrbitWaypointMarker: THREE.Group | null = null
   /** Random asteroid mesh beside the beam; populated after `asteroids.glb` loads. */
   private missionAsteroidPreviewMesh: THREE.Mesh | null = null
-  /** Whether the shuttle is within approach range of the waypoint. */
-  private missionApproachVisible = false
 
   /** Called when map overlay state changes for Vue HUD. */
   onMapOverlay: ((state: MapOverlayState) => void) | null = null
@@ -634,9 +630,6 @@ export class MapViewController implements Tickable {
 
   /** Called when a mission is delivered (credits awarded). */
   onMissionDeliver: ((mission: ActiveShuttleMission | null) => void) | null = null
-
-  /** Called when the shuttle approaches/leaves a mission waypoint. */
-  onMissionApproach: ((visible: boolean, missionName: string) => void) | null = null
 
   /** Called when the player begins an asteroid mission (E at waypoint). */
   onBeginAsteroidMission: ((mission: GeneratedAsteroidMission) => void) | null = null
@@ -1252,12 +1245,7 @@ export class MapViewController implements Tickable {
 
       // Approaching → press E to cancel
       if (state === 'approaching' && ePressed) {
-        this.orbitSystem.cancelApproach()
-        this.approachStartPos = null
-        this.shuttleController.unfreeze()
-        this.shuttleController.setInputEnabled(true)
-        this.vehicleCamera?.setConfig(MAP_CAMERA_CONFIG)
-        this.hideOrbitRing()
+        this.cancelOrbitApproachFromMap()
       }
 
       // Orbiting → hold E to charge, release to launch
@@ -1778,7 +1766,7 @@ export class MapViewController implements Tickable {
       this.missionBoard = tickAsteroidMissionBoard(this.missionBoard, dt)
     }
 
-    // Waypoint marker scale + approach detection
+    // Waypoint marker scale + VFX (must not gate begin-mission proximity — marker refs can lag).
     this.syncWaypointMarker()
     if (
       this.missionWaypointRoot &&
@@ -1799,33 +1787,30 @@ export class MapViewController implements Tickable {
         this.shuttleController.position.x,
         this.shuttleController.position.z,
       )
+    }
 
+    const activeAsteroid = this.missionBoard.activeAsteroidMission
+    if (
+      this.shuttleController &&
+      !this.shuttleController.dead &&
+      activeAsteroid &&
+      activeAsteroid.status === 'accepted'
+    ) {
       const sx = this.shuttleController.position.x
       const sz = this.shuttleController.position.z
-      const wx = this.missionBoard.activeAsteroidMission.waypoint.worldX
-      const wz = this.missionBoard.activeAsteroidMission.waypoint.worldZ
-      const approachDist = Math.sqrt((sx - wx) ** 2 + (sz - wz) ** 2)
-      const inRange = approachDist < MISSION_APPROACH_RADIUS
-
-      if (inRange !== this.missionApproachVisible) {
-        this.missionApproachVisible = inRange
-        this.onMissionApproach?.(inRange, this.missionBoard.activeAsteroidMission.name)
+      const inApproachRadius = isWithinAsteroidMissionApproachRadius(sx, sz, activeAsteroid.waypoint)
+      const orbitState = this.orbitSystem?.state ?? 'free'
+      if (inApproachRadius && this.inputManager?.wasActionPressed('beginMission')) {
+        if (orbitState === 'approaching') {
+          this.cancelOrbitApproachFromMap()
+        }
+        if (this.orbitSystem?.state === 'free') {
+          const mission = activeAsteroid
+          this.missionBoard = beginAsteroidMission(this.missionBoard)
+          saveActiveMission({ ...mission, status: 'in-transit' })
+          this.onBeginAsteroidMission?.(mission)
+        }
       }
-
-      if (
-        inRange &&
-        this.missionBoard.activeAsteroidMission?.status === 'accepted' &&
-        this.inputManager?.wasActionPressed('beginMission') &&
-        this.orbitSystem?.state === 'free'
-      ) {
-        const mission = this.missionBoard.activeAsteroidMission
-        this.missionBoard = beginAsteroidMission(this.missionBoard)
-        saveActiveMission({ ...mission, status: 'in-transit' })
-        this.onBeginAsteroidMission?.(mission)
-      }
-    } else if (this.missionApproachVisible) {
-      this.missionApproachVisible = false
-      this.onMissionApproach?.(false, '')
     }
 
     // Shop session restock tick
@@ -2788,6 +2773,19 @@ export class MapViewController implements Tickable {
   }
 
   /**
+   * Exit planet approach autopilot and restore free flight (shared by E cancel and mission begin).
+   */
+  private cancelOrbitApproachFromMap(): void {
+    if (this.orbitSystem?.state !== 'approaching') return
+    this.orbitSystem.cancelApproach()
+    this.approachStartPos = null
+    this.shuttleController?.unfreeze()
+    this.shuttleController?.setInputEnabled(true)
+    this.vehicleCamera?.setConfig(MAP_CAMERA_CONFIG)
+    this.hideOrbitRing()
+  }
+
+  /**
    * Place the shuttle at the asteroid mission waypoint after exfil (free flight, no marker load).
    *
    * @param worldX - Solar map world X from the completed mission waypoint.
@@ -3564,6 +3562,7 @@ export class MapViewController implements Tickable {
     this.onShuttleControl?.(false)
     this.onHabitatActive?.(false)
     this.onHabitatPrompt?.(null)
+    this.setEarthStartupOrbitHudSuppressed(false)
   }
 
   /** Re-acquire pointer lock after losing it (e.g. alt-tab). */

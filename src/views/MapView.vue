@@ -1,6 +1,6 @@
 <!-- src/views/MapView.vue -->
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { MapViewController } from './MapViewController'
 import ShuttleHud from '@/components/ShuttleHud.vue'
 import OrbitPrompt from '@/components/OrbitPrompt.vue'
@@ -34,6 +34,7 @@ import type {
   GravitationalAnomalyHudState,
   MapOverlayState,
 } from '@/lib/ShuttleTelemetry'
+import { isWithinAsteroidMissionApproachRadius } from '@/lib/missions/mapAsteroidMissionApproach'
 import type { OrbitHudState } from '@/lib/orbitCapture'
 
 const container = ref<HTMLElement>()
@@ -162,16 +163,6 @@ const missionOverlayCanFit = ref(false)
 const missionBoard = ref<ShuttleMissionBoard | null>(null)
 const missionNotification = ref<string | null>(null)
 let missionNotificationTimer: TimerHandle | null = null
-const missionApproachVisible = ref(false)
-const missionApproachName = ref('')
-
-function showMissionNotification(text: string): void {
-  missionNotification.value = text
-  if (missionNotificationTimer) Timer.cancel(missionNotificationTimer)
-  missionNotificationTimer = Timer.after(4, () => {
-    missionNotification.value = null
-  })
-}
 
 const mapOverlay = reactive<MapOverlayState>({
   visible: false,
@@ -185,6 +176,39 @@ const mapOverlay = reactive<MapOverlayState>({
   trajectoryPoints: [],
   missionWaypoint: null,
 })
+
+/** Begin-mission prompt: derived from telemetry + board so it never depends on a Three.js callback. */
+const missionApproachHud = computed(() => {
+  if (
+    mapOverlay.visible ||
+    mapIntro.controlsLocked ||
+    habitatActive.value ||
+    deathVisible.value ||
+    earthStartupOrbitHudSuppressed.value
+  ) {
+    return { visible: false as const, name: '' }
+  }
+  const board = missionBoard.value
+  const m = board?.activeAsteroidMission
+  if (!m || m.status !== 'accepted') {
+    return { visible: false as const, name: '' }
+  }
+  if (telemetry.hp <= 0) {
+    return { visible: false as const, name: '' }
+  }
+  if (!isWithinAsteroidMissionApproachRadius(telemetry.posX, telemetry.posZ, m.waypoint)) {
+    return { visible: false as const, name: '' }
+  }
+  return { visible: true as const, name: m.name }
+})
+
+function showMissionNotification(text: string): void {
+  missionNotification.value = text
+  if (missionNotificationTimer) Timer.cancel(missionNotificationTimer)
+  missionNotificationTimer = Timer.after(4, () => {
+    missionNotification.value = null
+  })
+}
 
 onMounted(async () => {
   if (container.value) {
@@ -277,10 +301,6 @@ onMounted(async () => {
       if (mission) {
         showMissionNotification(`Mission complete — +${mission.template.reward} CR`)
       }
-    }
-    viewController.onMissionApproach = (visible, missionName) => {
-      missionApproachVisible.value = visible
-      missionApproachName.value = missionName
     }
     viewController.onBeginAsteroidMission = () => {
       import('@/router').then((mod) => {
@@ -581,12 +601,9 @@ function dockedPlanetId(): string | null {
   <div v-if="missionNotification" class="mission-notification">
     {{ missionNotification }}
   </div>
-  <div
-    v-if="missionApproachVisible && !earthStartupOrbitHudSuppressed"
-    class="mission-approach-prompt"
-  >
-    <span class="mission-approach-prompt__name">{{ missionApproachName }}</span>
-    <span class="mission-approach-prompt__action">E  Begin Mission</span>
+  <div v-if="missionApproachHud.visible" class="mission-approach-prompt">
+    <span class="mission-approach-prompt__name">{{ missionApproachHud.name }}</span>
+    <span class="mission-approach-prompt__action">F  Begin Mission</span>
   </div>
   <PlanetShopDialog
     v-if="shopDialogVisible && shopSession"
