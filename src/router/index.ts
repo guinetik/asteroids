@@ -5,6 +5,7 @@ import LanderView from '@/views/LanderView.vue'
 import FpsView from '@/views/FpsView.vue'
 import LevelView from '@/views/LevelView.vue'
 import { canAccessLevelRoute } from '@/lib/level/levelRouteAccess'
+import { canAccessMapRoute } from '@/lib/map/mapRouteAccess'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -43,6 +44,9 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
+  if (to.name === 'map' && !canAccessMapRoute()) {
+    return { name: 'home' }
+  }
   if (to.name !== 'level') return true
   if (canAccessLevelRoute(to.query)) return true
   return { name: 'map' }
