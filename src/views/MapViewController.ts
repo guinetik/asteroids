@@ -163,6 +163,7 @@ import type { ShuttleMissionBoard, ActiveShuttleMission, GeneratedAsteroidMissio
 import { getGatherItemForPlanet } from '@/lib/missions/planetOrbitalConfig'
 import { generateAsteroidMission } from '@/lib/missions/asteroidMissionGenerator'
 import { computeMissionDifficulty } from '@/lib/missions/missionDifficulty'
+import { getSpecialMissionById } from '@/lib/missions/specialMissions'
 import {
   consumePendingMapReturnWorld,
   loadActiveMission,
@@ -1033,8 +1034,7 @@ export class MapViewController implements Tickable {
       skipIntro: () => {
         this.clearStartupCinematicOrbitHandoff()
         this.mapIntro.skip()
-        this.playerProfile = markMapIntroSeen(this.playerProfile)
-        this.persistPlayerProfile()
+        this.markMapIntroSeenAndSyncProfile()
         this.restoreIntroMapLayers()
         this.emitIntroUiState()
       },
@@ -1083,6 +1083,9 @@ export class MapViewController implements Tickable {
       setUpgradeLevel: (upgradeId: UpgradeId, level: number) => {
         this.devSetPlayerUpgradeLevel(upgradeId, level)
       },
+      startConsortiumCertificationMessage: () => {
+        this.devStartConsortiumCertificationMessage()
+      },
     })
 
     this.hydrateAsteroidMissionFromStorage()
@@ -1099,6 +1102,12 @@ export class MapViewController implements Tickable {
   tick(dt: number): void {
     const mapIntroPhaseBeforeTick = this.mapIntro.phase
     this.mapIntro.tick(dt)
+    if (
+      mapIntroPhaseBeforeTick === 'cinematic_zoom'
+      && this.mapIntro.phase === 'awaiting_message_open'
+    ) {
+      this.markMapIntroSeenAndSyncProfile()
+    }
     if (
       mapIntroPhaseBeforeTick === 'cinematic_zoom'
       && this.mapIntro.phase === 'interactive'
@@ -2036,6 +2045,17 @@ export class MapViewController implements Tickable {
     saveInventory(this.playerInventory)
   }
 
+  /**
+   * Marks the map intro cinematic as seen, persists, and syncs profile fields (e.g. `hasSeenIntro`)
+   * to Vue. No-op when already true.
+   */
+  private markMapIntroSeenAndSyncProfile(): void {
+    if (this.playerProfile.hasSeenIntro) return
+    this.playerProfile = markMapIntroSeen(this.playerProfile)
+    this.persistPlayerProfile()
+    this.emitShopState()
+  }
+
   /** Sync latest profile/inventory to Vue without implicitly opening the shop overlay. */
   private emitShopState(): void {
     const session = this.shopDialogOpen ? this.shopSession : null
@@ -2274,7 +2294,7 @@ export class MapViewController implements Tickable {
     this.onMissionOverlay?.(true, mission, canFit)
   }
 
-  /** Enter the habitat interior (called by Vue OrbitPrompt click). */
+  /** Enter the habitat interior (called from map nav “H Habitat” / startup handoff). */
   enterHabitat(): void {
     this.cancelPostStartupIntroHabitatTimer()
     if (!this.shuttleController || !this.sceneObjects) return
@@ -2394,6 +2414,10 @@ export class MapViewController implements Tickable {
     if (current >= targetLevel) return
     CURRENT_PLAYER_UPGRADE_LEVELS[upgradeId] = targetLevel
     saveCurrentPlayerUpgradesToStorage()
+    if (upgradeId === 'gravitySurfing') {
+      this.applyGridVisible(true)
+      this.emitMapViewLayerToggles()
+    }
     this.onUpgradeHudRefresh?.()
     const definition = UPGRADE_DEFINITIONS[upgradeId]
     this.onUpgradeInstalledAnnouncement?.(
@@ -2401,7 +2425,9 @@ export class MapViewController implements Tickable {
       definition.label,
       targetLevel,
       0,
-      `Tier ${targetLevel} · Auto-install`,
+      upgradeId === 'gravitySurfing'
+        ? 'Tier 1 · Grid Coupling Module'
+        : `Tier ${targetLevel} · Auto-install`,
     )
   }
 
@@ -2422,9 +2448,10 @@ export class MapViewController implements Tickable {
   useInventoryItem(itemId: string): void {
     if (itemId !== 'grid-coupling-module') return
 
+    const gravitySurfingLevel = CURRENT_PLAYER_UPGRADE_LEVELS.gravitySurfing ?? 0
     const heatLevel = CURRENT_PLAYER_UPGRADE_LEVELS.shuttleHeatResistance ?? 0
     const freezeLevel = CURRENT_PLAYER_UPGRADE_LEVELS.shuttleFreezeResistance ?? 0
-    if (heatLevel >= 1 && freezeLevel >= 1) return
+    if (gravitySurfingLevel >= 1 && heatLevel >= 1 && freezeLevel >= 1) return
 
     const stack = getStack(this.playerInventory, itemId)
     if (!stack || stack.quantity <= 0) return
@@ -2445,11 +2472,17 @@ export class MapViewController implements Tickable {
       {
         delay: 0,
         fn: () => {
-          this.installUpgradeFromConsumable('shuttleHeatResistance', 1)
+          this.installUpgradeFromConsumable('gravitySurfing', 1)
         },
       },
       {
         delay: 3,
+        fn: () => {
+          this.installUpgradeFromConsumable('shuttleHeatResistance', 1)
+        },
+      },
+      {
+        delay: 6,
         fn: () => {
           this.installUpgradeFromConsumable('shuttleFreezeResistance', 1)
           this.pendingModuleInstallTimer = null
@@ -3343,8 +3376,6 @@ export class MapViewController implements Tickable {
       this.vehicleCamera.controls.enabled = true
     }
 
-    this.playerProfile = markMapIntroSeen(this.playerProfile)
-    this.persistPlayerProfile()
     this.restoreIntroMapLayers()
     this.emitIntroUiState()
   }
@@ -3355,8 +3386,7 @@ export class MapViewController implements Tickable {
     if (!activeMessage || !this.vehicleCamera) {
       this.clearStartupCinematicOrbitHandoff()
       this.mapIntro.skip()
-      this.playerProfile = markMapIntroSeen(this.playerProfile)
-      this.persistPlayerProfile()
+      this.markMapIntroSeenAndSyncProfile()
       this.emitIntroUiState()
       return
     }
@@ -3401,6 +3431,7 @@ export class MapViewController implements Tickable {
    * seconds auto-enter the habitat (same as pressing H).
    */
   private finishStartupCinematicOpenOrbit(): void {
+    this.markMapIntroSeenAndSyncProfile()
     if (this.vehicleCamera) {
       this.vehicleCamera.controls.enabled = true
     }
@@ -3538,6 +3569,30 @@ export class MapViewController implements Tickable {
   /** Notify Vue that a new ship message may have entered the queue. */
   private emitMessageUpdate(): void {
     this.onMessageUpdate?.()
+  }
+
+  /** Dev-only: enqueue the Consortium message and start its authored special mission immediately. */
+  private devStartConsortiumCertificationMessage(): void {
+    const mission = getSpecialMissionById('consortium-certification')
+    if (!mission) {
+      console.warn('[MapView] Special mission consortium-certification not found.')
+      return
+    }
+
+    shipMessageSystem.enqueueById('consortium-certification-offer')
+    this.emitMessageUpdate()
+
+    const acceptedMission: GeneratedAsteroidMission = {
+      ...mission,
+      status: 'accepted',
+    }
+    this.missionBoard = {
+      ...this.missionBoard,
+      offeredAsteroidMission: null,
+      activeAsteroidMission: acceptedMission,
+    }
+    saveActiveMission(acceptedMission)
+    this.onMissionBoardUpdate?.(this.missionBoard)
   }
 
   /** Dispatch one-time gameplay tutorial messages from map-state conditions. */
