@@ -151,7 +151,11 @@ import type { ShuttleMissionBoard, ActiveShuttleMission, GeneratedAsteroidMissio
 import { getGatherItemForPlanet } from '@/lib/missions/planetOrbitalConfig'
 import { generateAsteroidMission } from '@/lib/missions/asteroidMissionGenerator'
 import { computeMissionDifficulty } from '@/lib/missions/missionDifficulty'
-import { loadActiveMission, saveActiveMission } from '@/lib/missions/missionStorage'
+import {
+  consumePendingMapReturnWorld,
+  loadActiveMission,
+  saveActiveMission,
+} from '@/lib/missions/missionStorage'
 import '@/lib/missions/missionMaterials'
 import {
   createWaypointMarkerGroup,
@@ -881,7 +885,7 @@ export class MapViewController implements Tickable {
     ]
     this.orbitSystem = new OrbitCaptureSystem(captureBodies)
 
-    // Portal arrival or default Earth orbit
+    // Portal arrival, completed-mission return at waypoint, or default Earth orbit
     this.portalArrival = new PortalArrivalSequence()
     const arrived = this.portalArrival.tryArrive(
       this.shuttleController,
@@ -894,7 +898,20 @@ export class MapViewController implements Tickable {
       },
       TICK_PRIORITY_ANIMATION,
     )
-    if (!arrived && earthController) {
+    let usedMissionCompletionMapSpawn = false
+    if (!arrived) {
+      const pendingReturn = consumePendingMapReturnWorld()
+      if (pendingReturn && this.shuttleController && this.orbitSystem) {
+        this.spawnShuttleAtCompletedMissionWaypoint(
+          pendingReturn.worldX,
+          pendingReturn.worldZ,
+        )
+        usedMissionCompletionMapSpawn = true
+        this.mapIntro.skip()
+        this.emitIntroUiState()
+      }
+    }
+    if (!arrived && earthController && !usedMissionCompletionMapSpawn) {
       const ex = earthController.getWorldX()
       const ez = earthController.getWorldZ()
       this.orbitSystem.beginCapture(ex + 1, ez)
@@ -920,7 +937,7 @@ export class MapViewController implements Tickable {
         this.emitMessageUpdate()
         this.beginStartupIntro()
       }
-    } else {
+    } else if (!usedMissionCompletionMapSpawn) {
       this.mapIntro.skip()
       this.emitIntroUiState()
     }
@@ -1140,7 +1157,7 @@ export class MapViewController implements Tickable {
       return
     }
 
-    // Door toggle + inspect mode (F key zooms camera tight on shuttle)
+    // Door toggle + inspect mode (R key zooms camera tight on shuttle)
     if (this.inputManager?.wasActionPressed('toggleDoors')) {
       this.shuttleController?.toggleDoors()
       this.inspectMode = !this.inspectMode
@@ -1798,7 +1815,7 @@ export class MapViewController implements Tickable {
       if (
         inRange &&
         this.missionBoard.activeAsteroidMission?.status === 'accepted' &&
-        this.inputManager?.wasActionPressed('orbitAction') &&
+        this.inputManager?.wasActionPressed('beginMission') &&
         this.orbitSystem?.state === 'free'
       ) {
         const mission = this.missionBoard.activeAsteroidMission
@@ -2768,6 +2785,21 @@ export class MapViewController implements Tickable {
       this.orbitRing = null
     }
     this.orbitRingIsPreview = false
+  }
+
+  /**
+   * Place the shuttle at the asteroid mission waypoint after exfil (free flight, no marker load).
+   *
+   * @param worldX - Solar map world X from the completed mission waypoint.
+   * @param worldZ - Solar map world Z from the completed mission waypoint.
+   */
+  private spawnShuttleAtCompletedMissionWaypoint(worldX: number, worldZ: number): void {
+    if (!this.shuttleController || !this.orbitSystem) return
+    this.shuttleController.group.position.set(worldX, 0, worldZ)
+    this.shuttleController.setVelocity(new THREE.Vector3(0, 0, 0))
+    const yaw = Math.atan2(worldZ, worldX) + Math.PI / 2
+    this.shuttleController.group.rotation.set(0, yaw, 0)
+    this.prepareShuttleAfterDevWarp()
   }
 
   /**

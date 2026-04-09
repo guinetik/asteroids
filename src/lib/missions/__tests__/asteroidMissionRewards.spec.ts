@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { persistCompletedAsteroidMissionRewards } from '../asteroidMissionRewards'
-import { ACTIVE_MISSION_KEY } from '../missionStorage'
+import { ACTIVE_MISSION_KEY, PENDING_MAP_RETURN_WORLD_KEY } from '../missionStorage'
 import { PROFILE_STORAGE_KEY, loadProfile, createProfile, saveProfile } from '@/lib/player/profile'
 import type { GeneratedAsteroidMission } from '../types'
 
@@ -41,6 +41,9 @@ describe('persistCompletedAsteroidMissionRewards', () => {
     expect(updated!.completedMissionCount).toBe(1)
     expect(updated!.visitedAsteroids['bennu']).toBe(1)
     expect(localStorage.getItem(ACTIVE_MISSION_KEY)).toBeNull()
+    expect(localStorage.getItem(PENDING_MAP_RETURN_WORLD_KEY)).toBe(
+      JSON.stringify({ worldX: 0, worldZ: 0 }),
+    )
   })
 
   it('applies reward multiplier', () => {

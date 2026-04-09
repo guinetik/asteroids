@@ -10,7 +10,7 @@
  * @spec docs/superpowers/specs/2026-04-06-asteroid-missions-design.md
  */
 import type { GeneratedAsteroidMission } from '@/lib/missions/types'
-import { clearActiveMission } from '@/lib/missions/missionStorage'
+import { clearActiveMission, savePendingMapReturnWorld } from '@/lib/missions/missionStorage'
 import {
   addCredits,
   loadProfile,
@@ -43,5 +43,9 @@ export function persistCompletedAsteroidMissionRewards(
     saveProfile(next)
   }
 
+  savePendingMapReturnWorld({
+    worldX: mission.waypoint.worldX,
+    worldZ: mission.waypoint.worldZ,
+  })
   clearActiveMission()
 }

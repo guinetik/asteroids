@@ -4,6 +4,9 @@ import {
   loadActiveMission,
   clearActiveMission,
   ACTIVE_MISSION_KEY,
+  savePendingMapReturnWorld,
+  consumePendingMapReturnWorld,
+  PENDING_MAP_RETURN_WORLD_KEY,
 } from '../missionStorage'
 import type { GeneratedAsteroidMission } from '../types'
 
@@ -25,6 +28,7 @@ const MOCK_MISSION: GeneratedAsteroidMission = {
 
 beforeEach(() => {
   localStorage.removeItem(ACTIVE_MISSION_KEY)
+  localStorage.removeItem(PENDING_MAP_RETURN_WORLD_KEY)
 })
 
 describe('saveActiveMission', () => {
@@ -66,5 +70,18 @@ describe('clearActiveMission', () => {
     saveActiveMission(MOCK_MISSION)
     clearActiveMission()
     expect(loadActiveMission()).toBeNull()
+  })
+})
+
+describe('pending map return world', () => {
+  it('returns null when absent', () => {
+    expect(consumePendingMapReturnWorld()).toBeNull()
+  })
+
+  it('save then consume returns coordinates and removes key', () => {
+    savePendingMapReturnWorld({ worldX: 12.5, worldZ: -88 })
+    expect(consumePendingMapReturnWorld()).toEqual({ worldX: 12.5, worldZ: -88 })
+    expect(localStorage.getItem(PENDING_MAP_RETURN_WORLD_KEY)).toBeNull()
+    expect(consumePendingMapReturnWorld()).toBeNull()
   })
 })
