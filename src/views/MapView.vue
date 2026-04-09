@@ -21,7 +21,10 @@ import type { PlayerProfile } from '@/lib/player/types'
 import type { Inventory } from '@/lib/inventory/types'
 import { createProfile } from '@/lib/player/profile'
 import { createInventory } from '@/lib/inventory/inventory'
-import { shipMessageSystem } from '@/lib/messages/runtime'
+import {
+  shipMessageSystem,
+  setShipMessageFollowUpDeliveryListener,
+} from '@/lib/messages/runtime'
 import {
   getUpgradeCost,
   getPlayerUpgradeLevelsSnapshot,
@@ -62,6 +65,7 @@ const viewController = new MapViewController()
 const activeMessage = ref<ActiveShipMessage | null>(null)
 const pendingMessageCount = ref(0)
 const messageDialogVisible = ref(false)
+const messageAudioAutoplayToken = ref(0)
 /**
  * `controlsLocked: true` until the first MapViewController `onMapIntro` sync — hides shuttle HUD for
  * the gap before `init()` (lib `MapIntroState` is `inactive` / unlocked until `start()` or `skip()`).
@@ -87,6 +91,7 @@ function openMessage(): void {
   if (activeMessage.value?.status === 'pending') {
     shipMessageSystem.markShown(activeMessage.value.id)
   }
+  messageAudioAutoplayToken.value += 1
 
   if (mapIntro.controlsLocked) {
     viewController.openIntroMessage()
@@ -351,6 +356,9 @@ onMounted(async () => {
         mod.default.push('/level')
       })
     }
+    setShipMessageFollowUpDeliveryListener(() => {
+      refreshActiveMessage()
+    })
     await viewController.init(container.value)
     upgradeLevelsUi.value = viewController.getUpgradeLevelsSnapshot()
     shopProfile.value = viewController.getPlayerProfileSnapshot()
@@ -360,6 +368,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  setShipMessageFollowUpDeliveryListener(null)
   viewController.dispose()
 })
 
@@ -633,6 +642,7 @@ function dockedPlanetId(): string | null {
   <ShipMessageDialog
     v-if="activeMessage && (mapIntro.messageDialogVisible || messageDialogVisible)"
     :message="activeMessage"
+    :autoplay-token="messageAudioAutoplayToken"
     @dismiss="dismissActiveMessage"
   />
   <div

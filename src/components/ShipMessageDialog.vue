@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import ShipMessageAudioPlayer from '@/components/shuttle-control/ShipMessageAudioPlayer.vue'
 import type { ActiveShipMessage } from '@/lib/messages/messageTypes'
 
 const props = defineProps<{
   message: ActiveShipMessage
+  autoplayToken: number
 }>()
 
 const subjectId = `ship-message-subject-${props.message.id}`
@@ -45,6 +47,16 @@ const emit = defineEmits<{
 
         <div class="ship-message-card__content">
           <h2 :id="subjectId" class="ship-message-card__subject">{{ props.message.subject }}</h2>
+
+          <div v-if="props.message.audioUrl" class="ship-message-card__audio">
+            <ShipMessageAudioPlayer
+              :key="props.message.id"
+              :message-id="props.message.id"
+              :audio-url="props.message.audioUrl"
+              :autoplay-token="props.autoplayToken"
+            />
+          </div>
+          <div v-if="props.message.audioUrl" class="ship-message-card__audio-divider" aria-hidden="true" />
 
           <div class="ship-message-card__copy">
             <p

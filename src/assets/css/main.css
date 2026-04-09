@@ -486,6 +486,14 @@ body {
   @apply shrink-0 border-b border-white/10 px-6 py-5 text-xl font-semibold tracking-tight text-white sm:text-2xl;
 }
 
+.ship-message-card__audio {
+  @apply shrink-0 px-6 pt-5;
+}
+
+.ship-message-card__audio-divider {
+  @apply mx-6 mt-4 shrink-0 border-t border-white/10;
+}
+
 .ship-message-card__copy {
   @apply min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 py-5 text-[15px] leading-7 text-slate-200;
   scrollbar-width: thin;
@@ -590,7 +598,7 @@ body {
 
 .map-intro-message-prompt {
   @apply fixed inset-x-0 z-40 flex justify-center px-6;
-  top: calc(var(--map-intro-letterbox-height) + 0.75rem);
+  top: calc(var(--map-intro-letterbox-height) + 4.75rem);
 }
 
 .map-intro-message-prompt__button {
@@ -606,7 +614,8 @@ body {
 
 /* Above .habitat-fade (z-50) so pending-mail strip stays visible inside the habitat (shuttle HUD stays hidden there). */
 .map-message-notice {
-  @apply pointer-events-auto fixed right-6 top-6 z-[55];
+  @apply pointer-events-auto fixed right-6 z-[55];
+  top: 5.25rem;
 }
 
 .map-message-notice__button {
