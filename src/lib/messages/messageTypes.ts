@@ -33,6 +33,8 @@ export interface ShipMessageDefinition {
   sentAt: string
   /** Paragraphs rendered in the message body. */
   body: string[]
+  /** Optional voice log bundled with the message and played through the comms channel. */
+  audioUrl?: string
   /** Gameplay trigger that makes this message eligible. */
   trigger: ShipMessageTrigger
   /** Whether the message blocks onboarding or simply arrives as a prompt. */

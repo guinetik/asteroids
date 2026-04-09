@@ -9,25 +9,29 @@ import type { ShipMessageDefinition } from './messageTypes'
 
 /** Startup handoff should always beat later tutorial prompts. */
 const STARTUP_MESSAGE_PRIORITY = 100
+const CONSORTIUM_MESSAGE_PRIORITY = 75
 const JAY_MESSAGE_PRIORITY = 50
 
 /** Opening seller handoff message shown when the player starts in Earth orbit. */
 export const STARTUP_SELLER_MESSAGE: ShipMessageDefinition = {
   id: 'seller-welcome-earth-orbit',
   from: 'Marta Vale, Vale Orbital Refurb',
-  subject: 'Your Shuttle Handoff and First Flight Notes',
+  subject: "She's Yours Now",
   sentAt: '2306-04-05 08:14 UTC',
+  audioUrl: '/sound/marta-001.mp3',
   trigger: 'map_start_earth_orbit',
   delivery: 'blocking_intro',
   priority: STARTUP_MESSAGE_PRIORITY,
   body: [
-    'Handoff is complete. Our runner got you up from the Moon and left you parked in low Earth orbit beside your shuttle. That is the only sensible way to deliver a ship like this. She is a space boat now. She does not come down to planets, and if you try to make her, you will turn your new home into scrap.',
-    'You already have the lander, which is why this hull makes sense for you. The working loop is simple: shuttle gets you across the system, lander gets you onto the mission rock, and your boots finish the job. When you come up on a mission-site asteroid, open the cargo bay, inspect the rig, and you will be able to undock the lander instead of throwing the whole shuttle into local work.',
-    'Open the bay doors with F and take a look before you leave Earth orbit. In there you have the lander, the habitat cylinder, and two separate fuel compartments. One tank is for the shuttle and one is for the lander. They do not mix, and you do not want to learn that distinction while drifting over a worksite with the wrong tank low.',
-    'The habitat is your shop floor and your apartment now. Open the bay and use the habitat for missions, ship modules, inventory, and maintenance. If you are going to live out of an orbital hauler in your forties, you may as well know where the drawers are before you cross Mars.',
-    'For navigation, this hull carries a relativistic drive and the map is projecting its own spacetime fabric solution for you. That grid is shipboard instrumentation, not decoration. Ride gravity right and it will add speed for free. Ride it wrong and it will bleed speed, drag you deep, and eventually put you into a planet or the Sun hard enough to make the paperwork somebody else\'s problem.',
-    'One more thing: until you fit better shielding, stay in the goldilocks band. Too close in and the ship cooks. Too far out and it freezes. Earth orbit is safe water, so use it to get comfortable with the bay, the habitat, and the way the old girl reads the system before you go looking for work.',
-    'You know your trade, so I will leave it there. Open the bay, check your lander, and make sure the ship feels like yours before you point it anywhere expensive.',
+    'Hey handsome. Marta here.',
+    'If I am good at my job — and you know from this deal that I am very good at my job — you should be reading this right as the runner parks at the spaceport. She made it up from the Moon in one piece. Your brand new shuttle.',
+    'I never thought I would be selling you a shuttle when I met you at Space Bingo four years ago. A retired lander guy in his forties buying a refurbished hauler to go independent? Baby, that is a midlife crisis.',
+    'I am not being sassy. I care about you and I want you to be careful.',
+    'I know after what happened on Luna you needed to get out of there. But this is a big jump. Literally.',
+    'Here is the reality. You have 1,000 credits to your name. That is it. That shuttle is beautiful but her shielding is bare minimum, which means your range right now is Earth orbit and not much further. Too close to the Sun and you cook. Too far out and the cold eats your systems. Stay in the neighborhood for now. Every spaceport has an engineering bay you can access from your shuttle terminal — that is where you buy upgrades like heat shields and cryo insulation to push further out. But you need credits first.',
+    'The good news is there is work. Open the mission board on your shuttle terminal — there are two kinds of contracts out there. Some need a shuttle, some need a lander. Good thing you have both. Not many haulers can say that. Twenty years of surface hours and a lander license are about to start paying for themselves in ways they never did on the Moon.',
+    'Pick something close. Pick something that pays. Earn enough to upgrade, and then the whole system opens up.',
+    'Stop by the dealership next time you are in Earth orbit. I will buy you a Space Unicorn Skibidi Latte.',
     '— Marta',
   ],
 }
@@ -96,6 +100,25 @@ export const JAY_MISSION_START_MESSAGE: ShipMessageDefinition = {
   ],
 }
 
+/** Special mission offer that also serves as the authored inbox handoff. */
+export const CONSORTIUM_CERTIFICATION_MESSAGE: ShipMessageDefinition = {
+  id: 'consortium-certification-offer',
+  from: 'Space Consortium — Logistics Division',
+  subject: 'Requisition Package — Field Operator Certification',
+  sentAt: '2306-04-09 12:10 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: CONSORTIUM_MESSAGE_PRIORITY,
+  body: [
+    'Operator,',
+    'Your recent activity logs were flagged by an associate of ours, J. Mercer, as evidence of sustained deep-field work using a Class-C orbital frame.',
+    'We do not typically certify retrofitted hulls for relativistic grid coupling. In this case, an exception package has been staged and attached to your work queue under Consortium Certification.',
+    'Proceed to the marked asteroid, retrieve the sealed Grid Coupling Module, and install it from shuttle inventory after recovery. Do not tamper with the package in the field.',
+    'This assignment has already been entered into your active mission ledger. Track the waypoint and complete the pickup at your discretion.',
+    '— Consortium Logistics, Sol Sector',
+  ],
+}
+
 /** Jay's warning when the player starts flirting with Venus' orbital lane. */
 export const JAY_VENUS_WARNING_MESSAGE: ShipMessageDefinition = {
   id: 'jay-venus-orbit-warning',
@@ -115,6 +138,7 @@ export const JAY_VENUS_WARNING_MESSAGE: ShipMessageDefinition = {
 /** Full message catalog for the current build. */
 export const SHIP_MESSAGE_CATALOG: ShipMessageDefinition[] = [
   STARTUP_SELLER_MESSAGE,
+  CONSORTIUM_CERTIFICATION_MESSAGE,
   JAY_DISTANCE_MESSAGE,
   JAY_THRUSTER_MESSAGE,
   JAY_BRAKE_MESSAGE,

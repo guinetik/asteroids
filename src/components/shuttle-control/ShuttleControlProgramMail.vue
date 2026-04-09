@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { shipMessageSystem } from '@/lib/messages/runtime'
 import type { ShipMessageInboxRow, ShipMessageReadable } from '@/lib/messages/messageTypes'
+import ShipMessageAudioPlayer from './ShipMessageAudioPlayer.vue'
 
 const emit = defineEmits<{
   mailChanged: []
@@ -9,6 +10,7 @@ const emit = defineEmits<{
 
 const rows = ref<ShipMessageInboxRow[]>(shipMessageSystem.listInboxRows())
 const selectedId = ref<string | null>(null)
+const selectedAudioAutoplayToken = ref(0)
 
 function refreshRows(): void {
   rows.value = shipMessageSystem.listInboxRows()
@@ -26,8 +28,11 @@ function statusLabel(row: ShipMessageInboxRow): string {
   return 'Archived'
 }
 
-function selectRow(id: string): void {
+function selectRow(id: string, options: { autoplayAudio?: boolean } = {}): void {
   selectedId.value = id
+  if (options.autoplayAudio) {
+    selectedAudioAutoplayToken.value += 1
+  }
   const record = shipMessageSystem.getRecord(id)
   if (record?.status === 'pending') {
     shipMessageSystem.markShown(id)
@@ -81,7 +86,7 @@ if (firstRow) {
           'shuttle-mail-program__row--locked': row.status === 'locked',
         }"
         :aria-selected="selectedId === row.id"
-        @click="selectRow(row.id)"
+        @click="selectRow(row.id, { autoplayAudio: true })"
       >
         <span class="shuttle-mail-program__row-from">{{ row.from }}</span>
         <span class="shuttle-mail-program__row-subject">{{ row.subject }}</span>
@@ -111,6 +116,14 @@ if (firstRow) {
             >
           </div>
         </header>
+        <ShipMessageAudioPlayer
+          v-if="readable.audioUrl"
+          :key="readable.id"
+          :message-id="readable.id"
+          :audio-url="readable.audioUrl"
+          :autoplay-token="selectedAudioAutoplayToken"
+        />
+        <div v-if="readable.audioUrl" class="shuttle-mail-program__audio-divider" aria-hidden="true" />
         <div class="shuttle-mail-program__reader-body">
           <p v-for="(paragraph, index) in readable.body" :key="`${readable.id}-${index}`">
             {{ paragraph }}
@@ -126,3 +139,10 @@ if (firstRow) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.shuttle-mail-program__audio-divider {
+  margin: 18px 0 20px;
+  border-top: 1px solid rgba(177, 228, 214, 0.16);
+}
+</style>

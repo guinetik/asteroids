@@ -3,6 +3,12 @@ import { SHIP_MESSAGE_CATALOG } from '../messageCatalog'
 import { MessageSystem } from '../messageSystem'
 
 describe('SHIP_MESSAGE_CATALOG', () => {
+  it('includes Marta audio on the startup seller message', () => {
+    const startup = SHIP_MESSAGE_CATALOG.find((message) => message.id === 'seller-welcome-earth-orbit')
+
+    expect(startup?.audioUrl).toBe('/sound/marta-001.mp3')
+  })
+
   it('includes Jay brake guidance for the first brake-system use', () => {
     const system = new MessageSystem(SHIP_MESSAGE_CATALOG, {
       load: () => ({}),
