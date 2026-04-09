@@ -4,6 +4,7 @@ import ShuttleView from '@/views/ShuttleView.vue'
 import LanderView from '@/views/LanderView.vue'
 import FpsView from '@/views/FpsView.vue'
 import LevelView from '@/views/LevelView.vue'
+import { canAccessLevelRoute } from '@/lib/level/levelRouteAccess'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -39,6 +40,12 @@ const router = createRouter({
       component: LevelView,
     },
   ],
+})
+
+router.beforeEach((to) => {
+  if (to.name !== 'level') return true
+  if (canAccessLevelRoute(to.query)) return true
+  return { name: 'map' }
 })
 
 export default router

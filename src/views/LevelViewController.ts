@@ -31,6 +31,7 @@ import type { FlatZone } from '@/lib/terrain/terrainGenerator'
 import { getAsteroidById, ASTEROID_CATALOG } from '@/lib/asteroids/catalog'
 import type { AsteroidDefinition } from '@/lib/asteroids/types'
 import { loadActiveMission } from '@/lib/missions/missionStorage'
+import { hasLevelRouteQueryOverrideFromSearchParams } from '@/lib/level/levelRouteAccess'
 import { LEVEL_GRID_SIZE, generateAsteroidMission } from '@/lib/missions/asteroidMissionGenerator'
 import type { GeneratedAsteroidMission, ConcreteObjective } from '@/lib/missions/types'
 import { Heightmap } from '@/lib/terrain/heightmap'
@@ -69,6 +70,7 @@ import { generateMapCanvas } from '@/lib/terrain/mapColors'
 import type { MiniGame, MiniGameContext, MiniGameStep } from '@/lib/minigame/MiniGame'
 import { SurveyMinigame } from '@/lib/minigame/SurveyMinigame'
 import { ExterminateMinigame } from '@/lib/minigame/ExterminateMinigame'
+import { RescueMinigame } from '@/lib/minigame/RescueMinigame'
 import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
 import { getCurrentUpgradeValue } from '@/lib/upgrades'
@@ -135,22 +137,33 @@ const MISSION_TYPE_RETRY_LIMIT = 20
 
 /**
  * Resolve the asteroid and terrain seed for the current level.
- * Priority: ?asteroidId= URL param (generates ad-hoc mission) > active mission > fallback.
- * Optional ?mission= param forces a specific objective type (e.g. ?mission=survey).
+ *
+ * Priority: `asteroidId` (ad-hoc) → query override (`difficulty` + `mission` type) → stored active
+ * mission only (no silent procedural fallback when storage is missing).
  */
 function resolveLevelContext(): LevelContext {
   const params = new URLSearchParams(window.location.search)
   const paramId = params.get('asteroidId')
   const missionType = params.get('mission')
   const difficulty = Math.max(1, Math.min(10, Number(params.get('difficulty')) || 5))
+  const queryOverride = hasLevelRouteQueryOverrideFromSearchParams(params)
 
   let mission: GeneratedAsteroidMission
 
   if (paramId) {
     mission = generateMissionWithType(difficulty, missionType)
     mission.asteroidId = paramId
+  } else if (queryOverride) {
+    mission = generateMissionWithType(difficulty, missionType)
   } else {
-    mission = loadActiveMission() ?? generateMissionWithType(difficulty, missionType)
+    const stored = loadActiveMission()
+    if (!stored) {
+      throw new Error(
+        '[Level] No active mission in storage. Use /map to launch one, or open /level with '
+          + '?asteroidId=… or both ?difficulty=1-10&mission=gather|exterminate|rescue|survey',
+      )
+    }
+    mission = stored
   }
 
   const asteroid = getAsteroidById(mission.asteroidId) ?? ASTEROID_CATALOG[0]!
@@ -542,6 +555,49 @@ export class LevelViewController implements Tickable {
           for (let j = 0; j < 20; j++) {
             this.impactEmitter?.emit(pos, up.clone().multiplyScalar(10 + Math.random() * 10))
           }
+        }
+        this.minigames.push(minigame)
+      } else if (obj.type === 'rescue') {
+        const minigame = await RescueMinigame.create(
+          i,
+          obj,
+          this.sceneManager!.scene,
+          this.heightmap!,
+          this.projectileSystem,
+          mission.difficulty,
+        )
+        minigame.onPrompt = (text) => this.onTerminalPrompt?.(text)
+        minigame.onComplete = (idx) => this.onObjectiveComplete?.(idx)
+        minigame.onStepChange = (idx, steps) => this.onStepChange?.(idx, steps)
+        minigame.onDamagePlayer = (damage, sourceX, sourceZ) => {
+          this.playerController?.takeDamage(damage)
+          const playerPos = this.playerController?.group.position
+          if (playerPos) {
+            const dx = playerPos.x - sourceX
+            const dz = playerPos.z - sourceZ
+            const dist = Math.sqrt(dx * dx + dz * dz)
+            if (dist > 0.01) {
+              this.playerController?.applyLateralImpulse(
+                (dx / dist) * CONTACT_KNOCKBACK,
+                (dz / dist) * CONTACT_KNOCKBACK,
+              )
+            }
+          }
+        }
+        minigame.onKillPlayer = () => {
+          this.playerController?.takeDamage(999)
+        }
+        minigame.onDestroyLander = () => {
+          this.failLanderRun('Lander Destroyed by Virus Blast', { explode: true, hideLander: true })
+        }
+        minigame.onExplosion = (pos) => {
+          const up = new Vector3(0, 1, 0)
+          for (let j = 0; j < 24; j++) {
+            this.impactEmitter?.emit(pos, up.clone().multiplyScalar(9 + Math.random() * 11))
+          }
+        }
+        minigame.onFail = (_idx, cause) => {
+          this.onDeathOverlay?.(true, cause)
         }
         this.minigames.push(minigame)
       }
@@ -1270,6 +1326,7 @@ export class LevelViewController implements Tickable {
     return {
       levelState: state,
       landerPosition: lander ? { x: lander.position.x, y: lander.position.y, z: lander.position.z } : null,
+      landerGrounded: lander?.body.grounded ?? false,
       playerPosition: state === 'eva' && player
         ? { x: player.group.position.x, y: player.group.position.y, z: player.group.position.z }
         : null,

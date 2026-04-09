@@ -20,4 +20,9 @@ export interface PlayerProfile {
   completedMissionCount: number
   /** Asteroid ID → mission visit count. Incremented once per mission, not per landing. */
   visitedAsteroids: Record<string, number>
+  /**
+   * After the player finishes the Earth orbit onboarding once, this is true and the map intro
+   * (mail / cinematic gate) is skipped. Saving a name on the home screen alone does not set this.
+   */
+  hasSeenIntro: boolean
 }

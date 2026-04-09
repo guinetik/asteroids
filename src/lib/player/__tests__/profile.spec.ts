@@ -8,6 +8,12 @@ import {
   recordMissionComplete,
   recordAsteroidVisit,
   PROFILE_STORAGE_KEY,
+  normalizePlayerDisplayName,
+  withPlayerDisplayName,
+  savePlayerDisplayName,
+  markMapIntroSeen,
+  DEFAULT_PLAYER_DISPLAY_NAME,
+  MAX_PLAYER_DISPLAY_NAME_LENGTH,
 } from '../profile'
 
 const mockStorage: Record<string, string> = {}
@@ -38,6 +44,7 @@ describe('createProfile', () => {
     expect(profile.credits).toBe(1000)
     expect(profile.completedMissionCount).toBe(0)
     expect(profile.visitedAsteroids).toEqual({})
+    expect(profile.hasSeenIntro).toBe(false)
   })
 
   it('preserves the name exactly as given', () => {
@@ -62,6 +69,29 @@ describe('saveProfile / loadProfile', () => {
   it('returns null when localStorage contains invalid JSON', () => {
     mockStorage[PROFILE_STORAGE_KEY] = 'not valid json {'
     expect(loadProfile()).toBeNull()
+  })
+
+  it('migrates legacy JSON without hasSeenIntro to hasSeenIntro true', () => {
+    mockStorage[PROFILE_STORAGE_KEY] = JSON.stringify({
+      name: 'Legacy',
+      credits: 500,
+      completedMissionCount: 2,
+      visitedAsteroids: {},
+    })
+    const loaded = loadProfile()
+    expect(loaded?.hasSeenIntro).toBe(true)
+    expect(loaded?.name).toBe('Legacy')
+  })
+
+  it('preserves explicit hasSeenIntro false from storage', () => {
+    mockStorage[PROFILE_STORAGE_KEY] = JSON.stringify({
+      name: 'HomeOnly',
+      credits: 1000,
+      completedMissionCount: 0,
+      visitedAsteroids: {},
+      hasSeenIntro: false,
+    })
+    expect(loadProfile()?.hasSeenIntro).toBe(false)
   })
 
   it('persists complex profile state', () => {
@@ -177,5 +207,60 @@ describe('recordAsteroidVisit', () => {
     recordAsteroidVisit(profile, 'bennu')
 
     expect(profile.visitedAsteroids).toEqual({})
+  })
+})
+
+describe('normalizePlayerDisplayName', () => {
+  it('trims whitespace', () => {
+    expect(normalizePlayerDisplayName('  Neo  ')).toBe('Neo')
+  })
+
+  it('uses default when empty', () => {
+    expect(normalizePlayerDisplayName('')).toBe(DEFAULT_PLAYER_DISPLAY_NAME)
+    expect(normalizePlayerDisplayName(' \t ')).toBe(DEFAULT_PLAYER_DISPLAY_NAME)
+  })
+
+  it('truncates past max length', () => {
+    const long = 'a'.repeat(MAX_PLAYER_DISPLAY_NAME_LENGTH + 10)
+    expect(normalizePlayerDisplayName(long).length).toBe(MAX_PLAYER_DISPLAY_NAME_LENGTH)
+  })
+})
+
+describe('withPlayerDisplayName', () => {
+  it('updates only the name field', () => {
+    const profile = addCredits(createProfile('Old'), 100)
+    const updated = withPlayerDisplayName(profile, 'New')
+    expect(updated.name).toBe('New')
+    expect(updated.credits).toBe(1100)
+    expect(updated.hasSeenIntro).toBe(false)
+  })
+})
+
+describe('markMapIntroSeen', () => {
+  it('sets hasSeenIntro to true', () => {
+    const profile = createProfile('Ada')
+    const updated = markMapIntroSeen(profile)
+    expect(updated.hasSeenIntro).toBe(true)
+    expect(profile.hasSeenIntro).toBe(false)
+  })
+})
+
+describe('savePlayerDisplayName', () => {
+  it('creates a new profile when storage is empty', () => {
+    const result = savePlayerDisplayName('Ripley')
+    expect(result.name).toBe('Ripley')
+    expect(loadProfile()).toEqual(result)
+    expect(result.credits).toBe(1000)
+    expect(result.hasSeenIntro).toBe(false)
+  })
+
+  it('renames without touching credits', () => {
+    const profile = addCredits(createProfile('A'), 250)
+    saveProfile(profile)
+    const result = savePlayerDisplayName('B')
+    expect(result.name).toBe('B')
+    expect(result.credits).toBe(1250)
+    expect(loadProfile()?.name).toBe('B')
+    expect(result.hasSeenIntro).toBe(false)
   })
 })
