@@ -9,11 +9,19 @@
  * @spec docs/superpowers/specs/2026-04-04-map-view-design.md
  */
 import * as THREE from 'three'
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
 
+/** Draco decoder path (matches `ShuttleController` and Vite-served `three` package). */
+const DRACO_DECODER_PATH = '/node_modules/three/examples/jsm/libs/draco/'
+
+const dracoLoader = new DRACOLoader()
+dracoLoader.setDecoderPath(DRACO_DECODER_PATH)
+
 const loader = new GLTFLoader()
 loader.setMeshoptDecoder(MeshoptDecoder)
+loader.setDRACOLoader(dracoLoader)
 
 /**
  * Load a GLB file and return its scene graph.

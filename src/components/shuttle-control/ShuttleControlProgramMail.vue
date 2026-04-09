@@ -52,9 +52,9 @@ function inboxStatusDisplay(msg: ShipMessageReadable): string {
 }
 
 refreshRows()
-const firstUnlocked = rows.value.find((r) => r.status !== 'locked')
-if (firstUnlocked) {
-  selectRow(firstUnlocked.id)
+const firstRow = rows.value[0]
+if (firstRow) {
+  selectRow(firstRow.id)
 }
 </script>
 

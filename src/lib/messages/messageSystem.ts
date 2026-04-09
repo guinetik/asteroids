@@ -170,23 +170,25 @@ export class MessageSystem {
   }
 
   /**
-   * All catalog messages as inbox rows (locked until received in-world). Order: priority high → low,
-   * then id (matches typical tutorial ordering when the catalog is authored that way).
+   * Inbox rows for messages that have actually been delivered (a persisted record exists).
+   * Undelivered catalog entries are omitted so the list does not show “locked” placeholders.
+   * Order: priority high → low, then id.
    */
   listInboxRows(): ShipMessageInboxRow[] {
-    const defs = [...this.definitions.values()].sort((a, b) => {
+    const defs = [...this.definitions.values()].filter((def) => this.records[def.id] !== undefined)
+    defs.sort((a, b) => {
       if (b.priority !== a.priority) return b.priority - a.priority
       return a.id.localeCompare(b.id)
     })
 
     return defs.map((def) => {
-      const record = this.records[def.id]
+      const record = this.records[def.id]!
       const rawPreview = def.body[0] ?? def.subject
       const preview =
         rawPreview.length > SHIP_MESSAGE_INBOX_PREVIEW_MAX_CHARS
           ? `${rawPreview.slice(0, SHIP_MESSAGE_INBOX_PREVIEW_MAX_CHARS)}…`
           : rawPreview
-      const status: ShipMessageInboxRowStatus = record ? record.status : 'locked'
+      const status: ShipMessageInboxRowStatus = record.status
       return {
         id: def.id,
         from: def.from,
@@ -194,7 +196,7 @@ export class MessageSystem {
         sentAt: def.sentAt,
         preview,
         status,
-        isUnread: record?.status === 'pending',
+        isUnread: record.status === 'pending',
       }
     })
   }

@@ -4,7 +4,7 @@ import { InputManager } from '../InputManager'
 const TEST_BINDINGS: Record<string, string[]> = {
   thrust: ['KeyW'],
   brake: ['KeyS'],
-  toggleDoors: ['KeyF'],
+  toggleDoors: ['KeyR'],
 }
 
 function pressKey(code: string): void {
@@ -43,14 +43,14 @@ describe('InputManager', () => {
   })
 
   it('detects action pressed this frame via wasActionPressed', () => {
-    pressKey('KeyF')
+    pressKey('KeyR')
     input.tick(0) // process the frame
 
     expect(input.wasActionPressed('toggleDoors')).toBe(true)
   })
 
   it('wasActionPressed returns false on subsequent frames', () => {
-    pressKey('KeyF')
+    pressKey('KeyR')
     input.tick(0) // frame 1: pressed
     input.tick(0) // frame 2: still held, but not "just pressed"
 
@@ -58,12 +58,12 @@ describe('InputManager', () => {
   })
 
   it('wasActionPressed resets after release and re-press', () => {
-    pressKey('KeyF')
+    pressKey('KeyR')
     input.tick(0)
-    releaseKey('KeyF')
+    releaseKey('KeyR')
     input.tick(0)
 
-    pressKey('KeyF')
+    pressKey('KeyR')
     input.tick(0)
 
     expect(input.wasActionPressed('toggleDoors')).toBe(true)

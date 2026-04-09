@@ -51,14 +51,14 @@ const SURFACE_LAYOUT: WaypointMarkerLayout = {
 
 /** Compact marker for {@link MapViewController} orbit map (shorter beam, no proximity fade). */
 const ORBIT_MAP_LAYOUT: WaypointMarkerLayout = {
-  beamHeight: 280,
-  beamCoreRadius: 0.55,
-  beamGlowRadius: 1.45,
-  ringRadius: 7,
-  ringTube: 0.32,
-  diamondSize: 1.2,
-  diamondTipOffset: 12,
-  diamondBobAmp: 0.4,
+  beamHeight: 620,
+  beamCoreRadius: 1.25,
+  beamGlowRadius: 3.2,
+  ringRadius: 12,
+  ringTube: 0.55,
+  diamondSize: 1.35,
+  diamondTipOffset: 14,
+  diamondBobAmp: 0.5,
   useProximityFade: false,
   fadeStartDistance: 300,
   fadeEndDistance: 80,

@@ -18,7 +18,19 @@ const MAP_MISSION_ASTEROID_GLB_URL = '/models/asteroids.glb'
 /**
  * Uniform scale after centering geometry at the origin (tripled from the first readable baseline).
  */
-const MAP_MISSION_ASTERO_PREVIEW_BASE_SCALE = 60
+const MAP_MISSION_ASTERO_PREVIEW_SCALE_BASELINE = 60
+
+/** Prior preview scale multiplier before {@link MAP_MISSION_ASTERO_PREVIEW_MAP_SIZE_RECENT_BUMP}. */
+const MAP_MISSION_ASTERO_PREVIEW_MAP_SIZE_FACTOR_BASE = 0.92
+
+/** Recent visual-only resize applied on top of {@link MAP_MISSION_ASTERO_PREVIEW_MAP_SIZE_FACTOR_BASE}. */
+const MAP_MISSION_ASTERO_PREVIEW_MAP_SIZE_RECENT_BUMP = 1.12
+
+const MAP_MISSION_ASTERO_PREVIEW_MAP_SIZE_FACTOR =
+  MAP_MISSION_ASTERO_PREVIEW_MAP_SIZE_FACTOR_BASE * MAP_MISSION_ASTERO_PREVIEW_MAP_SIZE_RECENT_BUMP
+
+const MAP_MISSION_ASTERO_PREVIEW_BASE_SCALE =
+  MAP_MISSION_ASTERO_PREVIEW_SCALE_BASELINE * MAP_MISSION_ASTERO_PREVIEW_MAP_SIZE_FACTOR
 
 /** Local X offset (parent applies screen scaling) so the mesh clears the cyan beam column. */
 const MAP_MISSION_ASTERO_PREVIEW_LOCAL_OFFSET_X = 14

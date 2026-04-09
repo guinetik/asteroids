@@ -136,12 +136,19 @@ describe('MessageSystem.dismiss', () => {
 })
 
 describe('MessageSystem.listInboxRows', () => {
-  it('marks rows without a record as locked', () => {
+  it('returns no rows until at least one message is delivered', () => {
     const system = createSystem()
+    expect(system.listInboxRows()).toHaveLength(0)
+  })
+
+  it('lists only definitions that have a persisted record', () => {
+    const system = createSystem()
+    system.notifyTrigger('map_start_earth_orbit')
 
     const rows = system.listInboxRows()
-    expect(rows).toHaveLength(3)
-    expect(rows.every((r) => r.status === 'locked')).toBe(true)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.id).toBe('high-priority')
+    expect(rows.find((r) => r.id === 'fuel-tip')).toBeUndefined()
   })
 
   it('reflects pending and shown after triggers and markShown', () => {
@@ -157,6 +164,16 @@ describe('MessageSystem.listInboxRows', () => {
     rows = system.listInboxRows()
     expect(rows.find((r) => r.id === 'high-priority')?.status).toBe('shown')
     expect(rows.find((r) => r.id === 'high-priority')?.isUnread).toBe(false)
+  })
+
+  it('includes one row per delivered message when several triggers fired', () => {
+    const system = createSystem()
+    system.notifyTrigger('map_start_earth_orbit')
+    system.notifyTrigger('map_main_thruster_depleted')
+    const rows = system.listInboxRows()
+    expect(rows).toHaveLength(2)
+    const ids = rows.map((r) => r.id).sort()
+    expect(ids).toEqual(['fuel-tip', 'high-priority'])
   })
 })
 

@@ -5,6 +5,7 @@ import {
   generateAsteroidMission,
   generateWaypointInRegion,
   interpolateRange,
+  isMissionWaypointSolarDistanceClearOfPlanets,
   nearEarthInnerCatalogForWaypointSpawn,
   objectiveCountForDifficulty,
   rollObjective,
@@ -145,6 +146,19 @@ describe('generateWaypointInRegion', () => {
     const dist = Math.sqrt(wp.worldX * wp.worldX + wp.worldZ * wp.worldZ)
     expect(dist).toBeGreaterThanOrEqual(200 * 0.5 * 0.9)
     expect(dist).toBeLessThanOrEqual(420 * 0.5 * 1.1)
+  })
+
+  it('rejects radii that sit on Earth nominal orbit at strict standoff', () => {
+    const earthOrbitWorld = 300 * ORBIT_SCALE
+    expect(isMissionWaypointSolarDistanceClearOfPlanets(earthOrbitWorld)).toBe(false)
+  })
+
+  it('keeps asteroid-belt waypoints outside strict planet-orbit gaps', () => {
+    for (let i = 0; i < 80; i++) {
+      const wp = generateWaypointInRegion('asteroid-belt', 4 + (i % 6))
+      const dist = Math.hypot(wp.worldX, wp.worldZ)
+      expect(isMissionWaypointSolarDistanceClearOfPlanets(dist)).toBe(true)
+    }
   })
 })
 

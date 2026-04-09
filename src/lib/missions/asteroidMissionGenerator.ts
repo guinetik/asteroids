@@ -3,7 +3,7 @@
  *
  * Takes a difficulty level, picks a giver and template, rolls
  * concrete objective values, and generates a waypoint position
- * within the appropriate belt region.
+ * within the appropriate belt region, keeping solar distance clear of planet orbit rings.
  *
  * @author guinetik
  * @date 2026-04-06
@@ -18,8 +18,8 @@ import type {
   GeneratedAsteroidMission,
 } from './types'
 import { getGiversForDifficulty } from './giverCatalog'
-import { ASTEROID_BELTS } from '@/lib/planets/catalog'
-import { ORBIT_SCALE } from '@/lib/planets/constants'
+import { ASTEROID_BELTS, PLANETS } from '@/lib/planets/catalog'
+import { ORBIT_SCALE, SIZE_SCALE } from '@/lib/planets/constants'
 import { generateFlatZones } from '@/lib/terrain/terrainGenerator'
 import difficultyMap from '@/data/asteroids/difficulty-map.json'
 import shipHealthData from '@/data/shuttle/ship-health.json'
@@ -135,6 +135,118 @@ const MAX_WAYPOINT_DIFFICULTY = 10
 function waypointAnnulusReachT(difficulty: number): number {
   const d = Math.max(MIN_WAYPOINT_DIFFICULTY, Math.min(MAX_WAYPOINT_DIFFICULTY, difficulty))
   return (d - MIN_WAYPOINT_DIFFICULTY) / (MAX_WAYPOINT_DIFFICULTY - MIN_WAYPOINT_DIFFICULTY)
+}
+
+/**
+ * Extra world-units beyond the planet mesh radius so mission waypoints avoid active orbit lanes.
+ */
+const MISSION_WAYPOINT_PLANET_ORBIT_STANDOFF_WORLD = 22
+
+/** Random samples inside the allowed annulus before running a deterministic radial sweep. */
+const WAYPOINT_ORBIT_CLEARANCE_MAX_ATTEMPTS = 56
+
+/** Steps when sweeping from inner to outer world radius for a corridor-free distance. */
+const WAYPOINT_ORBIT_CLEARANCE_SWEEP_STEPS = 56
+
+/** How much of a planet's eccentric radial span (world units) adds to required gap vs. nominal ring. */
+const WAYPOINT_ORBIT_ECCENTRICITY_PAD_FRACTION = 0.35
+
+/** Multipliers tried in order when the preferred annulus has no slot at full standoff (stays in band). */
+const WAYPOINT_ORBIT_STANDOFF_RELAXATION_SEQUENCE = [1, 0.55, 0.3] as const
+
+/**
+ * Whether a waypoint at this distance from the Sun (XZ plane, world units) stays clear of each
+ * planet's nominal orbit ring: worst-case aligned with the body, distance between circle radii
+ * `Rw` and `a·ORBIT_SCALE` must exceed mesh size + standoff (eccentricity adds a small radial pad).
+ *
+ * @param worldRadiusFromSun - `sqrt(worldX² + worldZ²)` for the waypoint.
+ * @param standoffMultiplier - Scales orbit standoff + eccentricity pad (`1` = strict, lower = fallback).
+ * @returns `false` if any planet's orbit ring is too close at this solar distance.
+ */
+export function isMissionWaypointSolarDistanceClearOfPlanets(
+  worldRadiusFromSun: number,
+  standoffMultiplier = 1,
+): boolean {
+  const Rw = worldRadiusFromSun
+  const m = standoffMultiplier
+  for (const planet of PLANETS) {
+    const aCatalog = planet.orbit.semiMajorAxis
+    const orbitRadiusWorld = aCatalog * ORBIT_SCALE
+    const meshRadiusWorld = planet.displayRadius * SIZE_SCALE
+    const eccRadialPadWorld = aCatalog * planet.orbit.eccentricity * ORBIT_SCALE
+    const minGap =
+      meshRadiusWorld
+      + MISSION_WAYPOINT_PLANET_ORBIT_STANDOFF_WORLD * m
+      + eccRadialPadWorld * WAYPOINT_ORBIT_ECCENTRICITY_PAD_FRACTION * m
+    if (Math.abs(Rw - orbitRadiusWorld) < minGap) {
+      return false
+    }
+  }
+  return true
+}
+
+/**
+ * Pick waypoint polar coordinates inside the catalog annulus, resampling until the solar distance
+ * clears all planet corridors; may broaden to the full region outer radius as a last resort.
+ *
+ * @param innerRadiusCatalog - Inner bound of the region (catalog units).
+ * @param outerRadiusCatalog - Outer bound of the region (catalog units).
+ * @param maxRadialOffsetCatalog - Max extra catalog radius outward from inner (difficulty clamp).
+ */
+function pickWaypointWorldXZInAnnulus(
+  innerRadiusCatalog: number,
+  outerRadiusCatalog: number,
+  maxRadialOffsetCatalog: number,
+): { worldX: number; worldZ: number } {
+  const bandCatalog = outerRadiusCatalog - innerRadiusCatalog
+  const radialSpanCatalog = Math.min(maxRadialOffsetCatalog, bandCatalog)
+  const outerReachCatalog = innerRadiusCatalog + radialSpanCatalog
+  const innerWorld = innerRadiusCatalog * ORBIT_SCALE
+  const outerWorldPreferred = outerReachCatalog * ORBIT_SCALE
+
+  const tryRandom = (
+    minW: number,
+    maxW: number,
+    standoffMult: number,
+  ): { worldX: number; worldZ: number } | null => {
+    if (maxW <= minW) return null
+    for (let attempt = 0; attempt < WAYPOINT_ORBIT_CLEARANCE_MAX_ATTEMPTS; attempt++) {
+      const angle = Math.random() * Math.PI * 2
+      const Rw = minW + Math.random() * (maxW - minW)
+      if (isMissionWaypointSolarDistanceClearOfPlanets(Rw, standoffMult)) {
+        return { worldX: Math.cos(angle) * Rw, worldZ: Math.sin(angle) * Rw }
+      }
+    }
+    return null
+  }
+
+  const trySweep = (
+    minW: number,
+    maxW: number,
+    standoffMult: number,
+  ): { worldX: number; worldZ: number } | null => {
+    if (maxW <= minW) return null
+    const angle = Math.random() * Math.PI * 2
+    for (let s = 0; s <= WAYPOINT_ORBIT_CLEARANCE_SWEEP_STEPS; s++) {
+      const t = s / WAYPOINT_ORBIT_CLEARANCE_SWEEP_STEPS
+      const Rw = minW + t * (maxW - minW)
+      if (isMissionWaypointSolarDistanceClearOfPlanets(Rw, standoffMult)) {
+        return { worldX: Math.cos(angle) * Rw, worldZ: Math.sin(angle) * Rw }
+      }
+    }
+    return null
+  }
+
+  for (const mult of WAYPOINT_ORBIT_STANDOFF_RELAXATION_SEQUENCE) {
+    let picked = tryRandom(innerWorld, outerWorldPreferred, mult)
+    if (picked) return picked
+    picked = trySweep(innerWorld, outerWorldPreferred, mult)
+    if (picked) return picked
+  }
+
+  const angle = Math.random() * Math.PI * 2
+  const RwFallback = (innerWorld + outerWorldPreferred) * 0.5
+  return { worldX: Math.cos(angle) * RwFallback, worldZ: Math.sin(angle) * RwFallback }
 }
 
 /**
@@ -256,14 +368,7 @@ export function generateWaypointInRegion(
     + (1 - WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY) * reachT
   const maxRadialOffsetCatalog = band * outerExtentFraction
 
-  const angle = Math.random() * Math.PI * 2
-  const radiusCatalog = innerRadius + Math.random() * maxRadialOffsetCatalog
-  const worldRadius = radiusCatalog * ORBIT_SCALE
-
-  return {
-    worldX: Math.cos(angle) * worldRadius,
-    worldZ: Math.sin(angle) * worldRadius,
-  }
+  return pickWaypointWorldXZInAnnulus(innerRadius, outerRadius, maxRadialOffsetCatalog)
 }
 
 /**
