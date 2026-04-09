@@ -10,6 +10,8 @@
  * @spec docs/superpowers/specs/2026-04-06-asteroid-missions-design.md
  */
 import type { GeneratedAsteroidMission } from '@/lib/missions/types'
+import { addItem, createInventory } from '@/lib/inventory/inventory'
+import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
 import { clearActiveMission, savePendingMapReturnWorld } from '@/lib/missions/missionStorage'
 import {
   addCredits,
@@ -42,6 +44,20 @@ export function persistCompletedAsteroidMissionRewards(
     next = recordAsteroidVisit(next, mission.asteroidId)
     saveProfile(next)
   }
+
+  let inventory = loadInventory() ?? createInventory()
+  for (const objective of mission.objectives) {
+    if (objective.type !== 'collect' || !objective.collectItemId) continue
+    const result = addItem(inventory, objective.collectItemId, 1)
+    if (!result.ok) {
+      console.warn(
+        `[asteroidMissionRewards] Failed to grant collect reward "${objective.collectItemId}": ${result.reason ?? 'unknown error'}`,
+      )
+      continue
+    }
+    inventory = result.inventory
+  }
+  saveInventory(inventory)
 
   savePendingMapReturnWorld({
     worldX: mission.waypoint.worldX,

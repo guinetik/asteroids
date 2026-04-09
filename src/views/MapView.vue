@@ -271,6 +271,8 @@ onMounted(async () => {
       shuttleControlVisible.value = visible
       if (visible) {
         upgradeLevelsUi.value = viewController.getUpgradeLevelsSnapshot()
+        shopProfile.value = viewController.getPlayerProfileSnapshot()
+        shopInventory.value = viewController.getPlayerInventorySnapshot()
       }
     }
     viewController.onHabitatPrompt = (prompt) => {
@@ -285,12 +287,13 @@ onMounted(async () => {
       if (!visible) shopDialogVisible.value = false
     }
     viewController.onShopState = (session, profile, inventory) => {
+      shopProfile.value = profile
+      shopInventory.value = inventory
       if (session) {
         shopSession.value = session
-        shopProfile.value = profile
-        shopInventory.value = inventory
         shopDialogVisible.value = true
       } else {
+        shopSession.value = null
         shopDialogVisible.value = false
       }
     }
@@ -328,6 +331,8 @@ onMounted(async () => {
     }
     await viewController.init(container.value)
     upgradeLevelsUi.value = viewController.getUpgradeLevelsSnapshot()
+    shopProfile.value = viewController.getPlayerProfileSnapshot()
+    shopInventory.value = viewController.getPlayerInventorySnapshot()
     refreshActiveMessage()
   }
 })

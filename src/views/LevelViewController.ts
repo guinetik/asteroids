@@ -163,6 +163,7 @@ function resolveLevelContext(): LevelContext {
 
   if (specialMission) {
     mission = specialMission
+    persistCompletionRewards = true
   } else if (paramId) {
     mission = generateMissionWithType(difficulty, missionType)
     mission.asteroidId = paramId

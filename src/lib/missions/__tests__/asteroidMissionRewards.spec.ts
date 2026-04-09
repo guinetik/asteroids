@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { persistCompletedAsteroidMissionRewards } from '../asteroidMissionRewards'
 import { ACTIVE_MISSION_KEY, PENDING_MAP_RETURN_WORLD_KEY } from '../missionStorage'
 import { PROFILE_STORAGE_KEY, loadProfile, createProfile, saveProfile } from '@/lib/player/profile'
+import { loadInventory } from '@/lib/inventory/inventoryStorage'
 import type { GeneratedAsteroidMission } from '../types'
 
 const BASE_MISSION: GeneratedAsteroidMission = {
@@ -58,5 +59,36 @@ describe('persistCompletedAsteroidMissionRewards', () => {
     localStorage.removeItem(PROFILE_STORAGE_KEY)
     persistCompletedAsteroidMissionRewards(BASE_MISSION, 1)
     expect(localStorage.getItem(ACTIVE_MISSION_KEY)).toBeNull()
+  })
+
+  it('adds collect rewards to shuttle inventory', () => {
+    const mission: GeneratedAsteroidMission = {
+      ...BASE_MISSION,
+      kind: 'special',
+      objectives: [
+        {
+          type: 'collect',
+          x: 0,
+          z: 0,
+          collectItemId: 'grid-coupling-module',
+          collectItemLabel: 'Grid Coupling Module',
+          reward: 0,
+        },
+      ],
+    }
+
+    persistCompletedAsteroidMissionRewards(mission, 1)
+
+    expect(loadInventory()).toEqual({
+      maxSlots: 8,
+      maxWeightKg: 500,
+      stacks: [
+        {
+          itemId: 'grid-coupling-module',
+          quantity: 1,
+          totalWeightKg: 12,
+        },
+      ],
+    })
   })
 })

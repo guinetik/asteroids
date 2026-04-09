@@ -135,6 +135,7 @@ import {
 import type { PlayerProfile } from '@/lib/player/types'
 import { createInventory, addItem, getStack, consumeItem, canFitItem, DEFAULT_MAX_SLOTS } from '@/lib/inventory/inventory'
 import type { Inventory } from '@/lib/inventory/types'
+import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
 import '@/lib/shop/tradeGoods'
 import {
   createMissionBoard,
@@ -655,6 +656,10 @@ export class MapViewController implements Tickable {
     hydratePlayerUpgradeLevelsFromStorage()
     const storedProfile = typeof localStorage === 'undefined' ? null : loadProfile()
     this.playerProfile = storedProfile ?? createProfile('Pilot')
+    const defaultInventory = createInventory(
+      Math.round(DEFAULT_MAX_SLOTS * getCurrentUpgradeValue('shuttleCargoBay')),
+    )
+    this.playerInventory = loadInventory() ?? defaultInventory
     this.tickHandler = new TickHandler()
     this.tickHandler.register(this.inputManager, TICK_PRIORITY_INPUT)
 
@@ -1998,9 +2003,10 @@ export class MapViewController implements Tickable {
     return this.ambientSpace.toggle()
   }
 
-  /** Write {@link playerProfile} to localStorage after any balance or profile-field change. */
+  /** Write current profile and shuttle inventory to localStorage. */
   private persistPlayerProfile(): void {
     saveProfile(this.playerProfile)
+    saveInventory(this.playerInventory)
   }
 
   /** Create or destroy shop session based on orbit state. */
@@ -2058,6 +2064,19 @@ export class MapViewController implements Tickable {
    */
   getUpgradeLevelsSnapshot(): Record<UpgradeId, number> {
     return getPlayerUpgradeLevelsSnapshot()
+  }
+
+  /** Current persisted player profile snapshot for Vue/UI sync. */
+  getPlayerProfileSnapshot(): PlayerProfile {
+    return { ...this.playerProfile }
+  }
+
+  /** Current shuttle inventory snapshot for Vue/UI sync. */
+  getPlayerInventorySnapshot(): Inventory {
+    return {
+      ...this.playerInventory,
+      stacks: this.playerInventory.stacks.map((stack) => ({ ...stack })),
+    }
   }
 
   /**
@@ -2623,11 +2642,11 @@ export class MapViewController implements Tickable {
     // Reset shop and economy state
     this.shopSession = null
     this.playerProfile = { ...createProfile('Pilot'), hasSeenIntro: true }
-    this.persistPlayerProfile()
+    resetPlayerUpgradesToDefaults()
     this.playerInventory = createInventory(
       Math.round(DEFAULT_MAX_SLOTS * getCurrentUpgradeValue('shuttleCargoBay')),
     )
-    resetPlayerUpgradesToDefaults()
+    this.persistPlayerProfile()
     resetDemand()
     this.onShopButton?.(false, '')
     this.onShopState?.(null, this.playerProfile, this.playerInventory)
