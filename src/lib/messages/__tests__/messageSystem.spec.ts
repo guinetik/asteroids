@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { Timer } from '@/lib/Timer'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MessageSystem } from '../messageSystem'
 import type { ShipMessageDefinition, ShipMessageRecord } from '../messageTypes'
 
@@ -107,11 +108,11 @@ describe('MessageSystem.markShown', () => {
     })
   })
 
-  it('enqueues follow-up messages when a message is first shown', () => {
+  it('does not enqueue follow-ups on show when the parent uses enqueueOnDismiss', () => {
     const system = new MessageSystem(
       definitions.map((definition) =>
         definition.id === 'high-priority'
-          ? { ...definition, enqueueOnRead: ['follow-up'] }
+          ? { ...definition, enqueueOnDismiss: ['follow-up'] }
           : { ...definition },
       ),
       {
@@ -125,12 +126,109 @@ describe('MessageSystem.markShown', () => {
     system.notifyTrigger('map_start_earth_orbit')
     system.markShown('high-priority')
 
+    expect(system.getRecord('follow-up')).toBeNull()
+  })
+})
+
+describe('MessageSystem.enqueueOnDismiss', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    Timer.cancelAll()
+  })
+
+  it('enqueues follow-up messages immediately when no delay is set', () => {
+    const system = new MessageSystem(
+      definitions.map((definition) =>
+        definition.id === 'high-priority'
+          ? { ...definition, enqueueOnDismiss: ['follow-up'] }
+          : { ...definition },
+      ),
+      {
+        load: () => ({}),
+        save: (records) => {
+          savedRecords = structuredClone(records)
+        },
+      },
+    )
+
+    system.notifyTrigger('map_start_earth_orbit')
+    system.markShown('high-priority')
+    system.dismiss('high-priority')
+
     const rows = system.listInboxRows().map((row) => row.id)
     expect(rows).toContain('follow-up')
     expect(system.getRecord('follow-up')).toMatchObject({
       id: 'follow-up',
       status: 'pending',
     })
+  })
+
+  it('schedules follow-ups after enqueueOnDismissDelaySeconds', () => {
+    let scheduled: (() => void) | null = null
+    vi.spyOn(Timer, 'after').mockImplementation((delaySec, fn) => {
+      expect(delaySec).toBe(12)
+      scheduled = fn
+      return 42
+    })
+
+    const system = new MessageSystem(
+      definitions.map((definition) =>
+        definition.id === 'high-priority'
+          ? {
+              ...definition,
+              enqueueOnDismiss: ['follow-up'],
+              enqueueOnDismissDelaySeconds: 12,
+            }
+          : { ...definition },
+      ),
+      {
+        load: () => ({}),
+        save: (records) => {
+          savedRecords = structuredClone(records)
+        },
+      },
+    )
+
+    system.notifyTrigger('map_start_earth_orbit')
+    system.markShown('high-priority')
+    system.dismiss('high-priority')
+
+    expect(system.getRecord('follow-up')).toBeNull()
+    expect(scheduled).not.toBeNull()
+    scheduled!()
+
+    expect(system.getRecord('follow-up')).toMatchObject({
+      id: 'follow-up',
+      status: 'pending',
+    })
+  })
+
+  it('invokes onFollowUpsEnqueued when delayed follow-ups are written', () => {
+    const hook = vi.fn()
+    vi.spyOn(Timer, 'after').mockImplementation((_delaySec, fn) => {
+      fn()
+      return 1
+    })
+
+    const system = new MessageSystem(
+      definitions.map((definition) =>
+        definition.id === 'high-priority'
+          ? {
+              ...definition,
+              enqueueOnDismiss: ['follow-up'],
+              enqueueOnDismissDelaySeconds: 5,
+            }
+          : { ...definition },
+      ),
+      { load: () => ({}), save: () => {} },
+      { onFollowUpsEnqueued: hook },
+    )
+
+    system.notifyTrigger('map_start_earth_orbit')
+    system.markShown('high-priority')
+    system.dismiss('high-priority')
+
+    expect(hook).toHaveBeenCalledTimes(1)
   })
 })
 

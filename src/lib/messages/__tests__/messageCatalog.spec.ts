@@ -7,7 +7,8 @@ describe('SHIP_MESSAGE_CATALOG', () => {
     const startup = SHIP_MESSAGE_CATALOG.find((message) => message.id === 'seller-welcome-earth-orbit')
 
     expect(startup?.audioUrl).toBe('/sound/marta-001.mp3')
-    expect(startup?.enqueueOnRead).toEqual(['jay-so-you-actually-did-it'])
+    expect(startup?.enqueueOnDismiss).toEqual(['jay-so-you-actually-did-it'])
+    expect(startup?.enqueueOnDismissDelaySeconds).toBe(10)
   })
 
   it('includes the Jay startup follow-up with audio', () => {

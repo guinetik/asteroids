@@ -21,8 +21,8 @@ export interface PlayerProfile {
   /** Asteroid ID → mission visit count. Incremented once per mission, not per landing. */
   visitedAsteroids: Record<string, number>
   /**
-   * After the player finishes the Earth orbit onboarding once, this is true and the map intro
-   * (mail / cinematic gate) is skipped. Saving a name on the home screen alone does not set this.
+   * After the opening map intro cinematic has played once, this is true and that cinematic is
+   * skipped on later visits. Independent of ship mail — Marta/Jay timing uses the message system.
    */
   hasSeenIntro: boolean
 }

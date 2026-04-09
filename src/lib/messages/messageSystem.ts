@@ -5,6 +5,7 @@
  * @date 2026-04-05
  * @spec docs/superpowers/specs/2026-04-05-startup-message-system-design.md
  */
+import { Timer } from '@/lib/Timer'
 import { loadMessageRecords, saveMessageRecords } from './messageStorage'
 import type {
   ActiveShipMessage,
@@ -44,23 +45,38 @@ const defaultPersistence: MessagePersistence = {
 }
 
 /**
+ * Optional hooks for embedding {@link MessageSystem} in the app shell (e.g. Vue refresh after
+ * delayed follow-up delivery).
+ */
+export interface MessageSystemHooks {
+  /**
+   * Called after new follow-up message records are written (including after a delayed dismiss).
+   */
+  onFollowUpsEnqueued?: () => void
+}
+
+/**
  * Owns message definitions, persisted lifecycle records, and active-message selection.
  */
 export class MessageSystem {
   private readonly definitions: Map<string, ShipMessageDefinition>
   private readonly persistence: MessagePersistence
+  private readonly hooks: MessageSystemHooks
   private records: Record<string, ShipMessageRecord>
 
   /**
    * @param definitions - Static catalog entries this system may surface
    * @param persistence - Optional persistence; defaults to localStorage-backed adapter
+   * @param hooks - Optional callbacks for UI sync when messages are delivered asynchronously
    */
   constructor(
     definitions: ShipMessageDefinition[],
     persistence: MessagePersistence = defaultPersistence,
+    hooks: MessageSystemHooks = {},
   ) {
     this.definitions = new Map(definitions.map((definition) => [definition.id, definition]))
     this.persistence = persistence
+    this.hooks = hooks
     this.records = persistence.load()
   }
 
@@ -164,7 +180,6 @@ export class MessageSystem {
       status: 'shown',
       shownAt,
     }
-    this.enqueueFollowUps(id)
     this.persist()
   }
 
@@ -183,6 +198,7 @@ export class MessageSystem {
       status: 'dismissed',
       dismissedAt,
     }
+    this.enqueueFollowUpsOnDismiss(id)
     this.persist()
   }
 
@@ -253,12 +269,32 @@ export class MessageSystem {
     this.persistence.save(this.records)
   }
 
-  /** Enqueues any authored follow-up messages unlocked by reading the given message. */
-  private enqueueFollowUps(id: string): void {
+  /** Enqueues any authored follow-up messages unlocked by dismissing/archiving the given message. */
+  private enqueueFollowUpsOnDismiss(id: string): void {
     const definition = this.definitions.get(id)
-    if (!definition?.enqueueOnRead?.length) return
+    if (!definition?.enqueueOnDismiss?.length) return
 
-    for (const nextId of definition.enqueueOnRead) {
+    const delaySec = definition.enqueueOnDismissDelaySeconds ?? 0
+    const nextIds = definition.enqueueOnDismiss
+
+    if (delaySec > 0) {
+      Timer.after(delaySec, () => {
+        this.enqueueFollowUpIds(nextIds)
+      })
+      return
+    }
+
+    this.enqueueFollowUpIds(nextIds)
+  }
+
+  /**
+   * Creates pending records for the given catalog ids when none exist yet.
+   *
+   * @param nextIds - Follow-up message ids from a parent definition
+   */
+  private enqueueFollowUpIds(nextIds: readonly string[]): void {
+    let added = false
+    for (const nextId of nextIds) {
       const nextDefinition = this.definitions.get(nextId)
       if (!nextDefinition) continue
 
@@ -272,6 +308,11 @@ export class MessageSystem {
         shownAt: null,
         dismissedAt: null,
       }
+      added = true
+    }
+    if (added) {
+      this.persist()
+      this.hooks.onFollowUpsEnqueued?.()
     }
   }
 }

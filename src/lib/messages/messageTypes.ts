@@ -35,8 +35,13 @@ export interface ShipMessageDefinition {
   body: string[]
   /** Optional voice log bundled with the message and played through the comms channel. */
   audioUrl?: string
-  /** Optional message ids to enqueue once this message is first marked as read/shown. */
-  enqueueOnRead?: string[]
+  /** Optional message ids to enqueue when this message is archived/dismissed (acknowledged). */
+  enqueueOnDismiss?: string[]
+  /**
+   * Seconds to wait after dismiss before {@link enqueueOnDismiss} messages are delivered.
+   * Omitted or `0` = immediate (same frame as {@link MessageSystem.dismiss} persistence).
+   */
+  enqueueOnDismissDelaySeconds?: number
   /** Gameplay trigger that makes this message eligible. */
   trigger: ShipMessageTrigger
   /** Whether the message blocks onboarding or simply arrives as a prompt. */

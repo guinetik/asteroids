@@ -115,7 +115,7 @@ export function createProfile(name: string): PlayerProfile {
 }
 
 /**
- * Return a copy of the profile with {@link PlayerProfile.hasSeenIntro} set to true (map onboarding done).
+ * Return a copy of the profile with {@link PlayerProfile.hasSeenIntro} set to true (intro cinematic seen).
  *
  * @param profile - Current profile.
  */
