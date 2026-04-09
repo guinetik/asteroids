@@ -1,10 +1,12 @@
 <!-- src/views/ShuttleView.vue -->
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { ShuttleViewController } from './ShuttleViewController'
 import ShuttleHud from '@/components/ShuttleHud.vue'
 import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
 
+const route = useRoute()
 const container = ref<HTMLElement>()
 const viewController = new ShuttleViewController()
 const telemetry = reactive<ShuttleTelemetry>({
@@ -33,7 +35,10 @@ onMounted(async () => {
     viewController.onTelemetry = (t) => {
       Object.assign(telemetry, t)
     }
-    await viewController.init(container.value)
+    const cityQuery = route.query.city
+    const city =
+      cityQuery === 'true' || (Array.isArray(cityQuery) && cityQuery.includes('true'))
+    await viewController.init(container.value, { city })
   }
 })
 

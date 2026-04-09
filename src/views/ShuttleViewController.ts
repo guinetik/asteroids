@@ -19,6 +19,7 @@ import { ThrusterEffectController } from '@/three/ThrusterEffectController'
 import { StarFieldController } from '@/three/StarFieldController'
 import { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
 import { CelestialBody } from '@/three/CelestialBody'
+import { CityModel } from '@/three/CityModel'
 import { AmbientLight, PointLight, Vector3 } from 'three'
 import { PortalArrivalSequence } from '@/three/PortalArrivalSequence'
 import { PortalBoundarySystem } from '@/three/PortalBoundarySystem'
@@ -31,6 +32,15 @@ const SUN_LIGHT_INTENSITY = 3
 const SUN_LIGHT_DISTANCE = 10000
 const SPAWN_MIN_RADIUS = 400
 const SPAWN_MAX_RADIUS = 1500
+
+/** Visual radius of the shuttle-scene sun sphere (passed to {@link CelestialBody} as `radius`). */
+const SHUTTLE_SUN_VISUAL_RADIUS = 50
+
+/** World units between the sun surface and the city prop’s pivot along +Y. */
+const CITY_CLEARANCE_ABOVE_SUN_SURFACE = 4
+
+/** Uniform scale for `city.glb` when `?city=true`; tune if asset units change. */
+const SHUTTLE_CITY_MODEL_SCALE = 10
 
 /**
  * Bridges Vue lifecycle to the game loop and Three.js scene.
@@ -53,11 +63,24 @@ export class ShuttleViewController implements Tickable {
   private celestialBodies: CelestialBody[] = []
   private portalArrival: PortalArrivalSequence | null = null
   private boundarySystem: PortalBoundarySystem | null = null
+  private cityModel: CityModel | null = null
 
   /** Called each frame with full shuttle telemetry for HUD display */
   onTelemetry: ((telemetry: ShuttleTelemetry) => void) | null = null
 
-  async init(container: HTMLElement): Promise<void> {
+  /**
+   * Mount the shuttle scene into `container`.
+   *
+   * @param container - DOM element for the renderer
+   * @param options - Optional flags (e.g. dev city prop)
+   */
+  async init(
+    container: HTMLElement,
+    options?: {
+      /** When true, spawn `city.glb` above the sun (`?city=true` from the view). */
+      city?: boolean
+    },
+  ): Promise<void> {
     // Core systems
     this.inputManager = new InputManager(DEFAULT_BINDINGS)
     this.tickHandler = new TickHandler()
@@ -84,7 +107,7 @@ export class ShuttleViewController implements Tickable {
     const sun = new CelestialBody({
       name: 'Sun',
       mass: 1.0,
-      radius: 50,
+      radius: SHUTTLE_SUN_VISUAL_RADIUS,
       color: 0xffcc00,
       glowColor: 0xff8800,
       glowScale: 1.3,
@@ -94,6 +117,12 @@ export class ShuttleViewController implements Tickable {
     this.sceneManager.addToScene(sun.group)
     this.spaceTimeGrid.addSource({ x: 0, z: 0, mass: sun.mass })
     sun.setSpaceTimeGrid(this.spaceTimeGrid)
+
+    if (options?.city) {
+      this.cityModel = await CityModel.create({ scale: SHUTTLE_CITY_MODEL_SCALE })
+      this.cityModel.placeOnTopOfSphere(SHUTTLE_SUN_VISUAL_RADIUS, CITY_CLEARANCE_ABOVE_SUN_SURFACE)
+      this.sceneManager.addToScene(this.cityModel.group)
+    }
 
     // Lighting — point light from sun + dim ambient
     const ambientLight = new AmbientLight(0xffffff, AMBIENT_LIGHT_INTENSITY)
@@ -211,6 +240,11 @@ export class ShuttleViewController implements Tickable {
   dispose(): void {
     DevConsole.unregister('ShuttleView')
     this.gameLoop?.stop()
+    if (this.cityModel) {
+      this.sceneManager?.removeFromScene(this.cityModel.group)
+      this.cityModel.dispose()
+      this.cityModel = null
+    }
     this.thrusterController?.dispose()
     this.portalArrival?.dispose()
     this.boundarySystem?.dispose()
