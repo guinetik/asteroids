@@ -66,9 +66,10 @@ The following lore points are canonized (update `docs/asteroid-lander-gdd.md`):
 ### Beat 4b — Cloud City Reveal
 
 - **Camera:** holds on Jupiter, pulls slightly closer (same pattern as beat 3 Viroid reveal)
-- **Visual:** a `CityModel` instance is created (async, preloaded during beat 4a) and placed in-scene near Jupiter's surface using `placeOnTopOfSphere`-style positioning relative to Jupiter's world position
+- **Visual:** a `CityModel` instance spawns inside Jupiter (below surface Y) and rises upward through the atmosphere during the beat, selling the idea that the cloud city lives inside the gas giant
+- **Rise animation:** Y position lerps from below-surface start to above-surface end, eased with `easeInOut`
 - **Scale:** tuned visually to read against Jupiter's display radius (0.0165)
-- **Rotation:** slow yaw spin (~0.2 rad/s) for visual interest
+- **Rotation:** slow yaw spin (~0.2 rad/s) on Y axis
 - **Cleanup:** city model is disposed when camera exits beat 4b
 
 ### Beat 5 — Earth & Player (existing, repositioned)
@@ -126,8 +127,8 @@ Both props follow the same pattern: preload early, spawn at beat start, animate 
 
 - **Preload:** call `CityModel.preload()` during scene init (alongside VirusModel)
 - **Create:** `CityModel.create()` at start of beat 4b (progress crosses 0.56)
-- **Place:** position near Jupiter's world position, offset above the surface (similar to `placeOnTopOfSphere` but relative to Jupiter's group position, not origin)
-- **Animate:** increment `group.rotation.y` by ~0.2 rad/s each tick
+- **Place:** starts below Jupiter's surface (Y = -0.5 relative to Jupiter), rises to above surface (Y = 1.5) during beat 4b via eased Y lerp
+- **Animate:** yaw rotation at ~0.2 rad/s + Y-axis rise from atmosphere (eased lerp tied to beat progress)
 - **Dispose:** call `dispose()` and remove from scene when progress exits 0.70
 - **State:** `private introCityModel: CityModel | null` on `MapViewController`
 

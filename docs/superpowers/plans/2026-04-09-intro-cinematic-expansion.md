@@ -300,6 +300,10 @@ const MAP_INTRO_HERO_HOLD_END = 0.92
 const INTRO_VIRUS_YAW_SPEED = 0.3
 const INTRO_CITY_YAW_SPEED = 0.2
 
+/** City Y positions for the rise-from-atmosphere animation during beat 4b. */
+const INTRO_CITY_START_Y = -0.5
+const INTRO_CITY_END_Y = 1.5
+
 /** Enceladus is the 2nd moon of Saturn (index 1 in planetarium.json). */
 const ENCELADUS_MOON_INDEX = 1
 ```
@@ -451,7 +455,7 @@ private disposeIntroVirus(scene: THREE.Scene): void {
   this.introVirusModel = null
 }
 
-/** Spawn the CityModel near Jupiter. */
+/** Spawn the CityModel inside Jupiter (starts below surface, rises during beat 4b). */
 private spawnIntroCity(scene: THREE.Scene): void {
   const jupiter = this.getPlanetControllerById('jupiter')
   if (!jupiter) return
@@ -461,7 +465,7 @@ private spawnIntroCity(scene: THREE.Scene): void {
   CityModel.create({ scale: 0.3 }).then((city) => {
     if (this.introCityModel) return // guard against double-spawn
     this.introCityModel = city
-    city.group.position.set(jx, 1.5, jz)
+    city.group.position.set(jx, INTRO_CITY_START_Y, jz)
     scene.add(city.group)
   })
 }
@@ -553,13 +557,20 @@ private tickIntroBeatJupiterApproach(progress: number, renderPass: RenderPass): 
   renderPass.camera = this.introCamera
 }
 
-/** Beat 4b (0.56–0.70): Hold on Jupiter — cloud city reveal. */
+/** Beat 4b (0.56–0.70): Hold on Jupiter — cloud city rises from atmosphere. */
 private tickIntroBeatCloudCity(progress: number, renderPass: RenderPass): void {
   const jupiter = this.getPlanetControllerById('jupiter')
   if (!jupiter || !this.introCamera) return
 
   const jupiterTarget = new THREE.Vector3(jupiter.getWorldX(), 0, jupiter.getWorldZ())
   const t = (progress - MAP_INTRO_BEAT_CLOUD_CITY) / (MAP_INTRO_BEAT_EARTH - MAP_INTRO_BEAT_CLOUD_CITY)
+
+  // Animate city rising from inside Jupiter's atmosphere
+  if (this.introCityModel) {
+    const cityY = THREE.MathUtils.lerp(INTRO_CITY_START_Y, INTRO_CITY_END_Y, easeInOut(t))
+    this.introCityModel.group.position.y = cityY
+  }
+
   const offset = new THREE.Vector3().lerpVectors(
     MAP_INTRO_JUPITER_CAMERA_OFFSET,
     MAP_INTRO_JUPITER_CLOSE_OFFSET,
