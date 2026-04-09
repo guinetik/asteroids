@@ -66,3 +66,11 @@ vec3 rotateY(vec3 v, float angle) {
     float s = sin(angle);
     return vec3(v.x * c + v.z * s, v.y, -v.x * s + v.z * c);
 }
+
+// Convert a sphere normal into equirectangular UV space.
+vec2 sphericalUv(vec3 normal) {
+    vec3 n = normalize(normal);
+    float u = atan(n.z, n.x) / (6.28318530718) + 0.5;
+    float v = asin(clamp(n.y, -1.0, 1.0)) / 3.14159265359 + 0.5;
+    return vec2(1.0 - u, v);
+}

@@ -12,6 +12,18 @@ import rockyFragSrc from '@/three/shaders/rockyPlanet.frag.glsl?raw'
 import type { Moon } from '@/lib/planets/types'
 import { MOON_SPHERE_SEGMENTS, SIZE_SCALE } from '@/lib/planets/constants'
 
+const BLACK_PIXEL = new Uint8Array([0, 0, 0, 255])
+
+function createFallbackTexture(): THREE.DataTexture {
+  const texture = new THREE.DataTexture(BLACK_PIXEL, 1, 1, THREE.RGBAFormat)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.needsUpdate = true
+  return texture
+}
+
+const FALLBACK_SURFACE_TEXTURE = createFallbackTexture()
+const FALLBACK_NIGHT_TEXTURE = createFallbackTexture()
+
 /** Return value from createMoonMesh. */
 export interface MoonMeshResult {
   /** The Three.js mesh. */
@@ -32,6 +44,12 @@ export function createMoonMesh(moon: Moon): MoonMeshResult {
 
   const uniforms: Record<string, THREE.IUniform> = {
     uTime: { value: 0 },
+    uSurfaceTexture: { value: FALLBACK_SURFACE_TEXTURE },
+    uNightTexture: { value: FALLBACK_NIGHT_TEXTURE },
+    uUseSurfaceTexture: { value: 0 },
+    uUseNightTexture: { value: 0 },
+    uTextureBlend: { value: 0 },
+    uLightingExposure: { value: 0.68 },
   }
   for (const [key, val] of Object.entries(moon.shader.uniforms)) {
     if (Array.isArray(val)) {

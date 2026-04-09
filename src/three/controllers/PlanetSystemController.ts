@@ -157,6 +157,7 @@ export class PlanetSystemController implements GravitySource {
   }
 
   dispose(): void {
+    this.planetMesh.dispose()
     const disposeMesh = (obj: THREE.Object3D) => {
       obj.traverse((child) => {
         if ('geometry' in child) {

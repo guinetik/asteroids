@@ -8,6 +8,9 @@ uniform vec3 uBaseColor;
 uniform float uSeed;
 uniform float uStormIntensity; // 0–1
 uniform float uRotationSpeed; // Rotation speed multiplier
+uniform sampler2D uSurfaceTexture;
+uniform float uUseSurfaceTexture;
+uniform float uTextureBlend;
 
 varying vec3 vModelNormal;
 varying vec3 vModelPosition;
@@ -36,6 +39,12 @@ void main() {
     vec3 lightBand = uBaseColor * 1.3;
     vec3 darkBand = uBaseColor * 0.7;
     vec3 surfaceColor = mix(darkBand, lightBand, bands);
+
+    if (uUseSurfaceTexture > 0.5) {
+        vec2 uv = sphericalUv(vModelNormal);
+        vec3 textureColor = texture2D(uSurfaceTexture, uv).rgb;
+        surfaceColor = mix(surfaceColor, textureColor, uTextureBlend);
+    }
 
     // --- Storm cells (Great Red Spot style) ---
     if (uStormIntensity > 0.0) {

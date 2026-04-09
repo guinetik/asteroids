@@ -7,6 +7,12 @@ uniform float uTime;
 uniform vec3 uBaseColor;
 uniform float uHasAtmosphere; // 0–1
 uniform float uSeed;
+uniform sampler2D uSurfaceTexture;
+uniform sampler2D uNightTexture;
+uniform float uUseSurfaceTexture;
+uniform float uUseNightTexture;
+uniform float uTextureBlend;
+uniform float uLightingExposure;
 
 varying vec3 vModelNormal;
 varying vec3 vModelPosition;
@@ -27,6 +33,12 @@ void main() {
     float variation = noise3D(vModelNormal * 10.0 + uSeed * 50.0);
     surfaceColor *= 0.9 + variation * 0.2;
 
+    if (uUseSurfaceTexture > 0.5) {
+        vec2 uv = sphericalUv(vModelNormal);
+        vec3 textureColor = texture2D(uSurfaceTexture, uv).rgb;
+        surfaceColor = mix(surfaceColor, textureColor, uTextureBlend);
+    }
+
     // --- Dynamic sunlight from the world-space sun at the origin + soft starlight fill ---
     vec3 normalView = normalize(vViewNormal);
     vec3 sunViewPos = (viewMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
@@ -41,7 +53,14 @@ void main() {
     vec3 lighting = sunlightColor * sunDiffuse
             + starlightColor * starlightFill;
 
-    surfaceColor *= lighting;
+    surfaceColor *= lighting * uLightingExposure;
+
+    if (uUseNightTexture > 0.5) {
+        vec2 uv = sphericalUv(vModelNormal);
+        vec3 nightColor = texture2D(uNightTexture, uv).rgb;
+        float nightMask = smoothstep(0.15, -0.2, dot(normalView, sunLightDir));
+        surfaceColor += nightColor * nightMask * 0.55;
+    }
 
     // --- Atmosphere: fresnel rim glow ---
     if (uHasAtmosphere > 0.0) {

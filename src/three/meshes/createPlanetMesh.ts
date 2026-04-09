@@ -17,12 +17,27 @@ import gasFragSrc from '@/three/shaders/gasGiant.frag.glsl?raw'
 import type { Planet } from '@/lib/planets/types'
 import { SPHERE_SEGMENTS, SIZE_SCALE } from '@/lib/planets/constants'
 
+const textureLoader = new THREE.TextureLoader()
+
+const PLANET_TEXTURES = new Set([
+  'mercury',
+  'venus',
+  'earth',
+  'mars',
+  'jupiter',
+  'saturn',
+  'uranus',
+  'neptune',
+])
+
 /** Return value from createPlanetMesh — the mesh and its shader uniforms. */
 export interface PlanetMeshResult {
   /** The Three.js mesh, scaled and tilted. */
   mesh: THREE.Mesh
   /** Shader uniforms for per-frame updates (uTime, etc.). */
   uniforms: Record<string, THREE.IUniform>
+  /** Release any textures created for the shader overlay. */
+  dispose: () => void
 }
 
 /**
@@ -34,9 +49,13 @@ export interface PlanetMeshResult {
 export function createPlanetMesh(planet: Planet): PlanetMeshResult {
   const radius = planet.displayRadius * SIZE_SCALE
   const geometry = new THREE.SphereGeometry(radius, SPHERE_SEGMENTS, SPHERE_SEGMENTS)
+  const ownedTextures: THREE.Texture[] = []
 
   const uniforms: Record<string, THREE.IUniform> = {
     uTime: { value: 0 },
+    uUseSurfaceTexture: { value: 0 },
+    uTextureBlend: { value: planet.shader.type === 'gasGiant' ? 0.9 : 0.82 },
+    uLightingExposure: { value: 1 },
   }
   for (const [key, val] of Object.entries(planet.shader.uniforms)) {
     if (Array.isArray(val)) {
@@ -44,6 +63,27 @@ export function createPlanetMesh(planet: Planet): PlanetMeshResult {
     } else {
       uniforms[key] = { value: val }
     }
+  }
+
+  if (PLANET_TEXTURES.has(planet.id)) {
+    const surfaceTexture = textureLoader.load(`/textures/${planet.id}.jpg`)
+    surfaceTexture.colorSpace = THREE.SRGBColorSpace
+    uniforms.uSurfaceTexture = { value: surfaceTexture }
+    const useSurfaceTextureUniform = uniforms.uUseSurfaceTexture
+    if (useSurfaceTextureUniform) {
+      useSurfaceTextureUniform.value = 1
+    }
+    ownedTextures.push(surfaceTexture)
+  }
+
+  if (planet.id === 'earth') {
+    const nightTexture = textureLoader.load('/textures/earth-night.jpg')
+    nightTexture.colorSpace = THREE.SRGBColorSpace
+    uniforms.uNightTexture = { value: nightTexture }
+    uniforms.uUseNightTexture = { value: 1 }
+    ownedTextures.push(nightTexture)
+  } else {
+    uniforms.uUseNightTexture = { value: 0 }
   }
 
   const fragSrc = planet.shader.type === 'gasGiant' ? gasFragSrc : rockyFragSrc
@@ -59,5 +99,13 @@ export function createPlanetMesh(planet: Planet): PlanetMeshResult {
   mesh.rotation.order = 'ZYX'
   mesh.rotation.z = planet.axialTilt
 
-  return { mesh, uniforms }
+  return {
+    mesh,
+    uniforms,
+    dispose: () => {
+      for (const texture of ownedTextures) {
+        texture.dispose()
+      }
+    },
+  }
 }
