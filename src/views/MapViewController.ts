@@ -151,8 +151,20 @@ import type { ShuttleMissionBoard, ActiveShuttleMission, GeneratedAsteroidMissio
 import { getGatherItemForPlanet } from '@/lib/missions/planetOrbitalConfig'
 import { generateAsteroidMission } from '@/lib/missions/asteroidMissionGenerator'
 import { computeMissionDifficulty } from '@/lib/missions/missionDifficulty'
-import { saveActiveMission } from '@/lib/missions/missionStorage'
+import { loadActiveMission, saveActiveMission } from '@/lib/missions/missionStorage'
 import '@/lib/missions/missionMaterials'
+import {
+  createWaypointMarkerGroup,
+  disposeWaypointMarkerGroup,
+  tickWaypointMarkerGroup,
+  ORBIT_MAP_WAYPOINT_SCALE_REFERENCE,
+  WAYPOINT_MARKER_DEFAULT_COLOR,
+} from '@/three/WaypointMarkers'
+import {
+  createMapMissionAsteroidPreviewMesh,
+  disposeMapMissionAsteroidPreviewMesh,
+  missionAsteroidShapeSeed,
+} from '@/three/MapMissionAsteroidPreview'
 
 /**
  * Orbit / grid / debris toggle snapshot for syncing the map HUD after intro suppression.
@@ -277,9 +289,6 @@ const MISSION_APPROACH_RADIUS = 15
 
 /** Apparent screen size of the waypoint marker as fraction of screen height. */
 const WAYPOINT_APPARENT_SIZE = 0.04
-
-/** Waypoint marker canvas texture size. */
-const WAYPOINT_CANVAS_SIZE = 128
 
 /** Offset behind Earth so the shuttle doesn't overlap the planet mesh. */
 const SPAWN_OFFSET_BEHIND_EARTH = 7.5
@@ -535,8 +544,15 @@ export class MapViewController implements Tickable {
   /** World-space shuttle position reused for asteroid belt nearby tumble (avoid per-frame alloc). */
   private readonly _beltShuttleWorldScratch = new THREE.Vector3()
 
-  /** THREE.Sprite for the mission waypoint marker. */
-  private waypointSprite: THREE.Sprite | null = null
+  /**
+   * Root at the mission waypoint world position: uniform screen scaling applies to both
+   * the orbit marker and the large preview asteroid.
+   */
+  private missionWaypointRoot: THREE.Group | null = null
+  /** Cyan beam / ring / diamond group (child of `missionWaypointRoot`). */
+  private missionOrbitWaypointMarker: THREE.Group | null = null
+  /** Large rock mesh alongside the marker; optional until GLB resolves. */
+  private missionAsteroidPreviewMesh: THREE.Mesh | null = null
   /** Whether the shuttle is within approach range of the waypoint. */
   private missionApproachVisible = false
 
@@ -1004,6 +1020,7 @@ export class MapViewController implements Tickable {
       },
     })
 
+    this.hydrateAsteroidMissionFromStorage()
     this.onCreditsUpdate?.(this.playerProfile.credits)
 
     // Start
@@ -1733,16 +1750,27 @@ export class MapViewController implements Tickable {
       this.missionBoard = tickAsteroidMissionBoard(this.missionBoard, dt)
     }
 
-    // Waypoint sprite scale + approach detection
-    this.syncWaypointSprite()
-    if (this.waypointSprite && this.vehicleCamera && this.shuttleController && this.missionBoard.activeAsteroidMission) {
-      const dist = this.vehicleCamera.camera.position.distanceTo(this.waypointSprite.position)
+    // Waypoint marker scale + approach detection
+    this.syncWaypointMarker()
+    if (
+      this.missionWaypointRoot &&
+      this.missionOrbitWaypointMarker &&
+      this.vehicleCamera &&
+      this.shuttleController &&
+      this.missionBoard.activeAsteroidMission
+    ) {
+      const dist = this.vehicleCamera.camera.position.distanceTo(this.missionWaypointRoot.position)
       const halfFovRad = THREE.MathUtils.degToRad(this.vehicleCamera.camera.fov / 2)
-      const waypointWorld = WAYPOINT_APPARENT_SIZE * 2 * dist * Math.tan(halfFovRad)
-      this.waypointSprite.scale.setScalar(waypointWorld)
+      const targetScreenHeight = WAYPOINT_APPARENT_SIZE * 2 * dist * Math.tan(halfFovRad)
+      const uniformScale = targetScreenHeight / ORBIT_MAP_WAYPOINT_SCALE_REFERENCE
+      this.missionWaypointRoot.scale.setScalar(uniformScale)
 
-      const pulse = 0.6 + 0.4 * Math.sin(this.simTime * 2)
-      ;(this.waypointSprite.material as THREE.SpriteMaterial).opacity = pulse
+      tickWaypointMarkerGroup(
+        this.missionOrbitWaypointMarker,
+        this.simTime,
+        this.shuttleController.position.x,
+        this.shuttleController.position.z,
+      )
 
       const sx = this.shuttleController.position.x
       const sz = this.shuttleController.position.z
@@ -2046,6 +2074,8 @@ export class MapViewController implements Tickable {
   /** Accept the offered asteroid mission (from shuttle control UI). */
   asteroidMissionAccept(): void {
     this.missionBoard = acceptAsteroidMission(this.missionBoard)
+    const active = this.missionBoard.activeAsteroidMission
+    if (active) saveActiveMission(active)
     this.onMissionBoardUpdate?.(this.missionBoard)
   }
 
@@ -2229,53 +2259,82 @@ export class MapViewController implements Tickable {
     this.emitFuelCellCount()
   }
 
-  /** Create or destroy the waypoint sprite based on active asteroid mission. */
-  private syncWaypointSprite(): void {
+  /**
+   * Restore an in-progress asteroid mission from localStorage after refresh
+   * (accepted → navigate to waypoint; in-transit → /level still valid).
+   */
+  private hydrateAsteroidMissionFromStorage(): void {
+    if (typeof localStorage === 'undefined') return
+    const stored = loadActiveMission()
+    if (!stored) return
+    if (stored.status !== 'accepted' && stored.status !== 'in-transit') return
+    if (this.missionBoard.activeAsteroidMission) return
+    this.missionBoard = { ...this.missionBoard, activeAsteroidMission: stored }
+    this.onMissionBoardUpdate?.(this.missionBoard)
+  }
+
+  /** Create or destroy the waypoint marker mesh based on active asteroid mission. */
+  private syncWaypointMarker(): void {
     const mission = this.missionBoard.activeAsteroidMission
-    if (mission && mission.status === 'accepted' && !this.waypointSprite && this.sceneObjects) {
-      const size = WAYPOINT_CANVAS_SIZE
-      const canvas = document.createElement('canvas')
-      canvas.width = size
-      canvas.height = size
-      const ctx = canvas.getContext('2d')!
-      const cx = size / 2
-      const cy = size / 2
-      const r = 20
+    if (mission && mission.status === 'accepted' && !this.missionWaypointRoot && this.sceneObjects) {
+      const root = new THREE.Group()
+      root.position.set(mission.waypoint.worldX, 0, mission.waypoint.worldZ)
+      const waypoint = createWaypointMarkerGroup(WAYPOINT_MARKER_DEFAULT_COLOR, 'orbitMap')
+      root.add(waypoint)
+      this.sceneObjects.scene.add(root)
+      this.missionWaypointRoot = root
+      this.missionOrbitWaypointMarker = waypoint
+      void this.spawnMissionAsteroidPreview(root, mission)
+    } else if ((!mission || mission.status !== 'accepted') && this.missionWaypointRoot) {
+      this.disposeMissionWaypointSite()
+    }
+  }
 
-      ctx.beginPath()
-      ctx.moveTo(cx, cy - r)
-      ctx.lineTo(cx + r, cy)
-      ctx.lineTo(cx, cy + r)
-      ctx.lineTo(cx - r, cy)
-      ctx.closePath()
+  /**
+   * Attach a large random asteroid mesh once `asteroids.glb` finishes loading.
+   * Skips or disposes the mesh if the mission site was torn down meanwhile.
+   *
+   * @param root - The mission site root this spawn was started for
+   * @param mission - Accepted mission driving the waypoint
+   */
+  private async spawnMissionAsteroidPreview(
+    root: THREE.Group,
+    mission: GeneratedAsteroidMission,
+  ): Promise<void> {
+    try {
+      const seed = missionAsteroidShapeSeed(mission.id)
+      const mesh = await createMapMissionAsteroidPreviewMesh(seed)
+      if (this.missionWaypointRoot !== root) {
+        disposeMapMissionAsteroidPreviewMesh(mesh)
+        return
+      }
+      const active = this.missionBoard.activeAsteroidMission
+      if (!active || active.id !== mission.id || active.status !== 'accepted') {
+        disposeMapMissionAsteroidPreviewMesh(mesh)
+        return
+      }
+      root.add(mesh)
+      this.missionAsteroidPreviewMesh = mesh
+    } catch (err) {
+      console.warn('[MapView] mission asteroid preview failed', err)
+    }
+  }
 
-      ctx.shadowColor = 'rgba(255, 180, 0, 0.8)'
-      ctx.shadowBlur = 15
-      ctx.fillStyle = 'rgba(255, 180, 0, 0.6)'
-      ctx.fill()
-
-      ctx.shadowBlur = 0
-      ctx.strokeStyle = 'rgba(255, 200, 50, 0.95)'
-      ctx.lineWidth = 2
-      ctx.stroke()
-
-      const tex = new THREE.CanvasTexture(canvas)
-      tex.needsUpdate = true
-
-      const mat = new THREE.SpriteMaterial({
-        map: tex,
-        transparent: true,
-        opacity: 0.8,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      })
-
-      this.waypointSprite = new THREE.Sprite(mat)
-      this.waypointSprite.position.set(mission.waypoint.worldX, 0, mission.waypoint.worldZ)
-      this.sceneObjects.scene.add(this.waypointSprite)
-    } else if ((!mission || mission.status !== 'accepted') && this.waypointSprite) {
-      this.waypointSprite.removeFromParent()
-      this.waypointSprite = null
+  /**
+   * Remove the mission waypoint root, dispose the orbit marker and preview asteroid.
+   */
+  private disposeMissionWaypointSite(): void {
+    if (this.missionAsteroidPreviewMesh) {
+      disposeMapMissionAsteroidPreviewMesh(this.missionAsteroidPreviewMesh)
+      this.missionAsteroidPreviewMesh = null
+    }
+    if (this.missionOrbitWaypointMarker) {
+      disposeWaypointMarkerGroup(this.missionOrbitWaypointMarker)
+      this.missionOrbitWaypointMarker = null
+    }
+    if (this.missionWaypointRoot && this.sceneObjects) {
+      this.sceneObjects.scene.remove(this.missionWaypointRoot)
+      this.missionWaypointRoot = null
     }
   }
 
@@ -3480,6 +3539,7 @@ export class MapViewController implements Tickable {
 
   dispose(): void {
     this.clearStartupCinematicOrbitHandoff()
+    this.disposeMissionWaypointSite()
     document.removeEventListener('mousemove', this.onHabitatMouseMove)
     this.sceneObjects?.renderer.domElement.removeEventListener('click', this.onHabitatClick)
     this.habitatScene?.dispose()

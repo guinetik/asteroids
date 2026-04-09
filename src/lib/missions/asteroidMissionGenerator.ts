@@ -22,6 +22,7 @@ import { ASTEROID_BELTS } from '@/lib/planets/catalog'
 import { ORBIT_SCALE } from '@/lib/planets/constants'
 import { generateFlatZones } from '@/lib/terrain/terrainGenerator'
 import difficultyMap from '@/data/asteroids/difficulty-map.json'
+import shipHealthData from '@/data/shuttle/ship-health.json'
 
 /** Simple string hash to derive a numeric seed. */
 function hashSeed(str: string): number {
@@ -80,11 +81,61 @@ export function pickAsteroidForDifficulty(difficulty: number): string {
   return entries[Math.floor(Math.random() * entries.length)]!.asteroidId
 }
 
-/** Earth's approximate semi-major axis in catalog units. */
+/**
+ * Legacy catalog floor for the near-earth mission annulus (pre–temp-safe tuning).
+ * Actual inner radius is {@link nearEarthInnerCatalogForWaypointSpawn} so waypoints stay
+ * outside the shuttle hot zone (`ship-health.json` `hotBoundary`).
+ */
 const NEAR_EARTH_INNER_RADIUS = 200
 
 /** Main belt inner radius — upper bound for near-earth missions. */
 const NEAR_EARTH_OUTER_RADIUS = 420
+
+/**
+ * World-units padding beyond `hotBoundary` so drafted missions are clearly outside solar heat
+ * damage (same distance basis as `ShipHealth.tick` `sunDistance`).
+ */
+const SHUTTLE_HOT_ZONE_WAYPOINT_MARGIN_WORLD = 8
+
+/**
+ * Difficulties 1–2 only pick `near-earth` templates so new pilots are not sent to the main belt
+ * or Kuiper (extreme range / cold) before upgrades.
+ */
+const NEAR_EARTH_ONLY_MAX_MISSION_DIFFICULTY = 2
+
+/**
+ * Catalog inner radius for near-earth waypoints: at least legacy inner edge, and far enough
+ * from the Sun to stay below shuttle heat (see `ship-health.json`).
+ *
+ * @returns Semi-major axis in planetarium catalog units (before `ORBIT_SCALE`).
+ */
+export function nearEarthInnerCatalogForWaypointSpawn(): number {
+  const safeInnerWorld = shipHealthData.hotBoundary + SHUTTLE_HOT_ZONE_WAYPOINT_MARGIN_WORLD
+  const fromTemp = safeInnerWorld / ORBIT_SCALE
+  return Math.max(NEAR_EARTH_INNER_RADIUS, fromTemp)
+}
+
+/**
+ * At difficulty 1, waypoint radius samples only this fraction of the region annulus (from the inner
+ * edge); at difficulty 10 the full annulus is used. Blended linearly between.
+ *
+ * Exported for tests and tuning; must stay in sync with {@link generateWaypointInRegion}.
+ */
+export const WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY = 0.22
+
+/** Mission difficulty bounds for waypoint radius blending. */
+const MIN_WAYPOINT_DIFFICULTY = 1
+const MAX_WAYPOINT_DIFFICULTY = 10
+
+/**
+ * Blend factor 0–1 from difficulty for waypoint outer reach (1 → 0, 10 → 1).
+ *
+ * @param difficulty - Mission difficulty (clamped 1–10).
+ */
+function waypointAnnulusReachT(difficulty: number): number {
+  const d = Math.max(MIN_WAYPOINT_DIFFICULTY, Math.min(MAX_WAYPOINT_DIFFICULTY, difficulty))
+  return (d - MIN_WAYPOINT_DIFFICULTY) / (MAX_WAYPOINT_DIFFICULTY - MIN_WAYPOINT_DIFFICULTY)
+}
 
 /**
  * Interpolate a NumberRange linearly by difficulty (1-10).
@@ -170,22 +221,27 @@ function findRegionForTemplate(
 
 /**
  * Generate a waypoint position within a belt region.
+ * Lower difficulty places the waypoint closer to the inner edge (e.g. nearer Earth in near-earth).
  *
  * @param region - Target region.
+ * @param difficulty - Mission difficulty (1–10); lower values bias radius inward.
  * @returns World-space XZ coordinates within the belt.
  */
-export function generateWaypointInRegion(region: MissionRegion): { worldX: number; worldZ: number } {
+export function generateWaypointInRegion(
+  region: MissionRegion,
+  difficulty: number,
+): { worldX: number; worldZ: number } {
   let innerRadius: number
   let outerRadius: number
 
   if (region === 'near-earth') {
-    innerRadius = NEAR_EARTH_INNER_RADIUS
+    innerRadius = nearEarthInnerCatalogForWaypointSpawn()
     outerRadius = NEAR_EARTH_OUTER_RADIUS
   } else {
     const beltId = region === 'asteroid-belt' ? 'main-belt' : 'kuiper-belt'
     const belt = ASTEROID_BELTS.find((b) => b.id === beltId)
     if (!belt) {
-      innerRadius = NEAR_EARTH_INNER_RADIUS
+      innerRadius = nearEarthInnerCatalogForWaypointSpawn()
       outerRadius = NEAR_EARTH_OUTER_RADIUS
     } else {
       innerRadius = belt.innerRadius
@@ -193,9 +249,16 @@ export function generateWaypointInRegion(region: MissionRegion): { worldX: numbe
     }
   }
 
+  const band = outerRadius - innerRadius
+  const reachT = waypointAnnulusReachT(difficulty)
+  const outerExtentFraction =
+    WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY
+    + (1 - WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY) * reachT
+  const maxRadialOffsetCatalog = band * outerExtentFraction
+
   const angle = Math.random() * Math.PI * 2
-  const radius = innerRadius + Math.random() * (outerRadius - innerRadius)
-  const worldRadius = radius * ORBIT_SCALE
+  const radiusCatalog = innerRadius + Math.random() * maxRadialOffsetCatalog
+  const worldRadius = radiusCatalog * ORBIT_SCALE
 
   return {
     worldX: Math.cos(angle) * worldRadius,
@@ -234,7 +297,15 @@ export function generateAsteroidMission(difficulty: number): GeneratedAsteroidMi
     throw new Error(`No templates match difficulty ${difficulty}`)
   }
 
-  const pick = candidates[Math.floor(Math.random() * candidates.length)]!
+  let pool = candidates
+  if (difficulty <= NEAR_EARTH_ONLY_MAX_MISSION_DIFFICULTY) {
+    const nearEarthOnly = candidates.filter((c) => c.region === 'near-earth')
+    if (nearEarthOnly.length > 0) {
+      pool = nearEarthOnly
+    }
+  }
+
+  const pick = pool[Math.floor(Math.random() * pool.length)]!
   const missionId = `${pick.template.id}_${Date.now()}`
   const count = objectiveCountForDifficulty(difficulty)
   const slots = [...pick.template.objectiveSlots]
@@ -251,7 +322,7 @@ export function generateAsteroidMission(difficulty: number): GeneratedAsteroidMi
   const completionBonus = interpolateRange(pick.template.completionBonus, difficulty)
   const totalReward = objectives.reduce((sum, o) => sum + o.reward, 0) + completionBonus
 
-  const waypoint = generateWaypointInRegion(pick.region)
+  const waypoint = generateWaypointInRegion(pick.region, difficulty)
 
   const asteroidId = pickAsteroidForDifficulty(difficulty)
 

@@ -1,11 +1,15 @@
 import { describe, it, expect } from 'vitest'
+import { ORBIT_SCALE } from '@/lib/planets/constants'
+import shipHealthData from '@/data/shuttle/ship-health.json'
 import {
   generateAsteroidMission,
   generateWaypointInRegion,
   interpolateRange,
+  nearEarthInnerCatalogForWaypointSpawn,
   objectiveCountForDifficulty,
   rollObjective,
   LEVEL_GRID_SIZE,
+  WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY,
 } from '../asteroidMissionGenerator'
 
 describe('interpolateRange', () => {
@@ -100,23 +104,44 @@ describe('rollObjective', () => {
 })
 
 describe('generateWaypointInRegion', () => {
-  it('generates position for asteroid-belt within belt bounds', () => {
-    const wp = generateWaypointInRegion('asteroid-belt')
+  it('generates position for asteroid-belt within belt bounds at high difficulty', () => {
+    const wp = generateWaypointInRegion('asteroid-belt', 10)
     const dist = Math.sqrt(wp.worldX * wp.worldX + wp.worldZ * wp.worldZ)
     // main-belt: innerRadius=420, outerRadius=660, ORBIT_SCALE=0.5
     expect(dist).toBeGreaterThanOrEqual(420 * 0.5 * 0.9)
     expect(dist).toBeLessThanOrEqual(660 * 0.5 * 1.1)
   })
 
-  it('generates position for kuiper-belt within belt bounds', () => {
-    const wp = generateWaypointInRegion('kuiper-belt')
+  it('generates position for kuiper-belt within belt bounds at high difficulty', () => {
+    const wp = generateWaypointInRegion('kuiper-belt', 10)
     const dist = Math.sqrt(wp.worldX * wp.worldX + wp.worldZ * wp.worldZ)
     expect(dist).toBeGreaterThanOrEqual(1400 * 0.5 * 0.9)
     expect(dist).toBeLessThanOrEqual(2400 * 0.5 * 1.1)
   })
 
-  it('generates position for near-earth in closer range', () => {
-    const wp = generateWaypointInRegion('near-earth')
+  it('keeps near-earth waypoints in inner annulus at difficulty 1', () => {
+    const wp = generateWaypointInRegion('near-earth', 1)
+    const dist = Math.sqrt(wp.worldX * wp.worldX + wp.worldZ * wp.worldZ)
+    const innerCatalog = nearEarthInnerCatalogForWaypointSpawn()
+    const outerCatalog = 420
+    const maxCatalog =
+      innerCatalog + (outerCatalog - innerCatalog) * WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY
+    const innerWorld = innerCatalog * ORBIT_SCALE
+    const maxWorld = maxCatalog * ORBIT_SCALE
+    expect(dist).toBeGreaterThanOrEqual(innerWorld * 0.99)
+    expect(dist).toBeLessThanOrEqual(maxWorld * 1.01)
+  })
+
+  it('keeps near-earth waypoints outside the shuttle hot zone', () => {
+    for (let i = 0; i < 40; i++) {
+      const wp = generateWaypointInRegion('near-earth', 1 + (i % 10))
+      const dist = Math.sqrt(wp.worldX * wp.worldX + wp.worldZ * wp.worldZ)
+      expect(dist).toBeGreaterThanOrEqual(shipHealthData.hotBoundary + 8)
+    }
+  })
+
+  it('allows full near-earth annulus at difficulty 10', () => {
+    const wp = generateWaypointInRegion('near-earth', 10)
     const dist = Math.sqrt(wp.worldX * wp.worldX + wp.worldZ * wp.worldZ)
     expect(dist).toBeGreaterThanOrEqual(200 * 0.5 * 0.9)
     expect(dist).toBeLessThanOrEqual(420 * 0.5 * 1.1)
@@ -174,6 +199,12 @@ describe('generateAsteroidMission', () => {
   it('region matches difficulty tier', () => {
     const easyMission = generateAsteroidMission(1)
     expect(easyMission.region).toBe('near-earth')
+  })
+
+  it('keeps difficulty 2 missions in the near-earth region only', () => {
+    for (let i = 0; i < 12; i++) {
+      expect(generateAsteroidMission(2).region).toBe('near-earth')
+    }
   })
 
   it('produces objectives with valid x/z positions within grid bounds', () => {

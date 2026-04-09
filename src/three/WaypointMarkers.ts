@@ -4,6 +4,7 @@
  * Each marker is a glowing vertical beam with a pulsing base ring
  * and rotating diamond tip. Placed at flat zone centers on the
  * terrain surface, visible from orbit during lander descent.
+ * The solar map uses a smaller {@link ORBIT_MAP_LAYOUT} preset.
  *
  * @author guinetik
  * @date 2026-04-07
@@ -11,29 +12,76 @@
  */
 import * as THREE from 'three'
 
-/** Beam height in world units — tall enough to see from lander altitude. */
-const BEAM_HEIGHT = 900
+/** Default marker color — cyan energy (matches shuttle mission UI). */
+export const WAYPOINT_MARKER_DEFAULT_COLOR = 0x66ffee
 
-/** Beam core cylinder radius. */
-const BEAM_CORE_RADIUS = 1.5
+/** Authoring dimensions for one marker variant. */
+interface WaypointMarkerLayout {
+  /** Vertical beam length (world units). */
+  beamHeight: number
+  beamCoreRadius: number
+  beamGlowRadius: number
+  ringRadius: number
+  ringTube: number
+  diamondSize: number
+  /** World units above beam top for the octahedron. */
+  diamondTipOffset: number
+  /** Vertical bob amplitude for diamond (world units). */
+  diamondBobAmp: number
+  /** When true, fade marker when the player is nearby (level EVA). */
+  useProximityFade: boolean
+  fadeStartDistance: number
+  fadeEndDistance: number
+}
 
-/** Beam glow cylinder radius. */
-const BEAM_GLOW_RADIUS = 4
+/** Full-size markers on asteroid terrain / lander approach. */
+const SURFACE_LAYOUT: WaypointMarkerLayout = {
+  beamHeight: 900,
+  beamCoreRadius: 1.5,
+  beamGlowRadius: 4,
+  ringRadius: 12,
+  ringTube: 0.6,
+  diamondSize: 3,
+  diamondTipOffset: 40,
+  diamondBobAmp: 2,
+  useProximityFade: true,
+  fadeStartDistance: 300,
+  fadeEndDistance: 80,
+}
 
-/** Base ring torus major radius. */
-const RING_RADIUS = 12
+/** Compact marker for {@link MapViewController} orbit map (shorter beam, no proximity fade). */
+const ORBIT_MAP_LAYOUT: WaypointMarkerLayout = {
+  beamHeight: 200,
+  beamCoreRadius: 0.4,
+  beamGlowRadius: 1.1,
+  ringRadius: 5,
+  ringTube: 0.25,
+  diamondSize: 1,
+  diamondTipOffset: 10,
+  diamondBobAmp: 0.35,
+  useProximityFade: false,
+  fadeStartDistance: 300,
+  fadeEndDistance: 80,
+}
 
-/** Base ring torus tube radius. */
-const RING_TUBE = 0.6
+/**
+ * Nominal vertical extent for scaling the orbit-map marker to a stable screen size
+ * (beam + tip offset + diamond).
+ */
+export const ORBIT_MAP_WAYPOINT_SCALE_REFERENCE =
+  ORBIT_MAP_LAYOUT.beamHeight + ORBIT_MAP_LAYOUT.diamondTipOffset + ORBIT_MAP_LAYOUT.diamondSize * 2
 
-/** Default marker color — cyan energy. */
-const MARKER_COLOR = 0x66ffee
+/** Preset id for {@link createWaypointMarkerGroup}. */
+export type WaypointMarkerPreset = 'surface' | 'orbitMap'
 
-/** Distance at which the marker starts fading (world units). */
-const FADE_START_DISTANCE = 300
-
-/** Distance at which the marker is fully faded (world units). */
-const FADE_END_DISTANCE = 80
+/** Animation state stored on `group.userData.waypointMarkerAnim`. */
+interface WaypointMarkerAnimUserData {
+  diamondRestY: number
+  diamondBobAmp: number
+  useProximityFade: boolean
+  fadeStartDistance: number
+  fadeEndDistance: number
+}
 
 /** Tracked marker entry. */
 interface WaypointMarker {
@@ -64,45 +112,40 @@ function createBeamMaterial(color: number, opacity: number): THREE.MeshBasicMate
   })
 }
 
-/**
- * Create the mesh group for a single waypoint marker.
- *
- * @param color - Marker color (default cyan).
- * @returns Group containing beam core, glow, ring, and diamond meshes.
- */
-function createMarkerMesh(color: number = MARKER_COLOR): THREE.Group {
+function buildMarkerGroupFromLayout(
+  color: number,
+  layout: WaypointMarkerLayout,
+): THREE.Group {
   const group = new THREE.Group()
+  const H = layout.beamHeight
 
-  // Beam core — bright inner cylinder
   const beamCoreGeo = new THREE.CylinderGeometry(
-    BEAM_CORE_RADIUS * 0.7,
-    BEAM_CORE_RADIUS,
-    BEAM_HEIGHT,
+    layout.beamCoreRadius * 0.7,
+    layout.beamCoreRadius,
+    H,
     10,
     1,
     true,
   )
   const beamCore = new THREE.Mesh(beamCoreGeo, createBeamMaterial(color, 0.72))
   beamCore.name = 'beamCore'
-  beamCore.position.y = BEAM_HEIGHT / 2
+  beamCore.position.y = H / 2
   group.add(beamCore)
 
-  // Beam glow — softer outer cylinder
   const beamGlowGeo = new THREE.CylinderGeometry(
-    BEAM_GLOW_RADIUS * 0.45,
-    BEAM_GLOW_RADIUS,
-    BEAM_HEIGHT * 1.08,
+    layout.beamGlowRadius * 0.45,
+    layout.beamGlowRadius,
+    H * 1.08,
     12,
     1,
     true,
   )
   const beamGlow = new THREE.Mesh(beamGlowGeo, createBeamMaterial(color, 0.22))
   beamGlow.name = 'beamGlow'
-  beamGlow.position.y = (BEAM_HEIGHT * 1.08) / 2
+  beamGlow.position.y = (H * 1.08) / 2
   group.add(beamGlow)
 
-  // Base ring — torus at ground level
-  const ringGeo = new THREE.TorusGeometry(RING_RADIUS, RING_TUBE, 8, 32)
+  const ringGeo = new THREE.TorusGeometry(layout.ringRadius, layout.ringTube, 8, 32)
   const ringMat = new THREE.MeshBasicMaterial({
     color,
     transparent: true,
@@ -114,8 +157,7 @@ function createMarkerMesh(color: number = MARKER_COLOR): THREE.Group {
   ring.position.y = 0.1
   group.add(ring)
 
-  // Top diamond — octahedron at beam peak
-  const diamondGeo = new THREE.OctahedronGeometry(3, 0)
+  const diamondGeo = new THREE.OctahedronGeometry(layout.diamondSize, 0)
   const diamondMat = new THREE.MeshBasicMaterial({
     color,
     transparent: true,
@@ -123,10 +165,110 @@ function createMarkerMesh(color: number = MARKER_COLOR): THREE.Group {
   })
   const diamond = new THREE.Mesh(diamondGeo, diamondMat)
   diamond.name = 'diamond'
-  diamond.position.y = BEAM_HEIGHT + 40
+  const diamondRestY = H + layout.diamondTipOffset
+  diamond.position.y = diamondRestY
   group.add(diamond)
 
+  const anim: WaypointMarkerAnimUserData = {
+    diamondRestY,
+    diamondBobAmp: layout.diamondBobAmp,
+    useProximityFade: layout.useProximityFade,
+    fadeStartDistance: layout.fadeStartDistance,
+    fadeEndDistance: layout.fadeEndDistance,
+  }
+  group.userData.waypointMarkerAnim = anim
+
   return group
+}
+
+/**
+ * Create a waypoint marker group (beam + ring + diamond).
+ *
+ * @param color - Hex emissive color.
+ * @param preset - `surface` for levels; `orbitMap` for solar map mission waypoint.
+ */
+export function createWaypointMarkerGroup(
+  color: number = WAYPOINT_MARKER_DEFAULT_COLOR,
+  preset: WaypointMarkerPreset = 'surface',
+): THREE.Group {
+  const layout = preset === 'orbitMap' ? ORBIT_MAP_LAYOUT : SURFACE_LAYOUT
+  return buildMarkerGroupFromLayout(color, layout)
+}
+
+/**
+ * Pulse / rotate / fade one marker group. Safe for orbit-map markers (no proximity fade).
+ *
+ * @param group - Group from {@link createWaypointMarkerGroup}.
+ * @param elapsed - Scene time (s).
+ * @param playerX - Optional player X for proximity fade.
+ * @param playerZ - Optional player Z for proximity fade.
+ */
+export function tickWaypointMarkerGroup(
+  group: THREE.Group,
+  elapsed: number,
+  playerX?: number,
+  playerZ?: number,
+): void {
+  const anim = group.userData.waypointMarkerAnim as WaypointMarkerAnimUserData | undefined
+  if (!anim) return
+
+  const pulse = 0.5 + 0.5 * Math.sin(elapsed * 3)
+
+  let proximity = 1
+  if (
+    anim.useProximityFade
+    && playerX !== undefined
+    && playerZ !== undefined
+  ) {
+    const dx = group.position.x - playerX
+    const dz = group.position.z - playerZ
+    const dist = Math.sqrt(dx * dx + dz * dz)
+    if (dist < anim.fadeStartDistance) {
+      proximity = Math.max(
+        0,
+        (dist - anim.fadeEndDistance) / (anim.fadeStartDistance - anim.fadeEndDistance),
+      )
+    }
+  }
+
+  const ring = group.getObjectByName('ring') as THREE.Mesh | undefined
+  if (ring) {
+    ring.scale.setScalar(0.9 + pulse * 0.2)
+    ;(ring.material as THREE.MeshBasicMaterial).opacity = (0.4 + pulse * 0.4) * proximity
+  }
+
+  const beamCore = group.getObjectByName('beamCore') as THREE.Mesh | undefined
+  if (beamCore) {
+    ;(beamCore.material as THREE.MeshBasicMaterial).opacity = (0.55 + pulse * 0.22) * proximity
+  }
+
+  const beamGlow = group.getObjectByName('beamGlow') as THREE.Mesh | undefined
+  if (beamGlow) {
+    beamGlow.scale.setScalar(0.95 + pulse * 0.1)
+    ;(beamGlow.material as THREE.MeshBasicMaterial).opacity = (0.16 + pulse * 0.12) * proximity
+  }
+
+  const diamond = group.getObjectByName('diamond') as THREE.Mesh | undefined
+  if (diamond) {
+    diamond.rotation.y = elapsed * 2
+    diamond.position.y = anim.diamondRestY + Math.sin(elapsed * 2) * anim.diamondBobAmp
+    ;(diamond.material as THREE.MeshBasicMaterial).opacity = 0.9 * proximity
+  }
+}
+
+/**
+ * Dispose all geometries and materials under a marker group, then remove from parent.
+ *
+ * @param group - Marker group to destroy.
+ */
+export function disposeWaypointMarkerGroup(group: THREE.Group): void {
+  group.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      child.geometry.dispose()
+      if (child.material instanceof THREE.Material) child.material.dispose()
+    }
+  })
+  group.removeFromParent()
 }
 
 /**
@@ -146,7 +288,7 @@ export function addWaypointMarker(
   scene: THREE.Scene,
 ): void {
   if (markers.find((m) => m.id === id)) return
-  const group = createMarkerMesh()
+  const group = createWaypointMarkerGroup(WAYPOINT_MARKER_DEFAULT_COLOR, 'surface')
   group.position.set(x, groundY, z)
   scene.add(group)
   markers.push({ id, group })
@@ -162,13 +304,7 @@ export function removeWaypointMarker(id: string, scene: THREE.Scene): void {
   const idx = markers.findIndex((m) => m.id === id)
   if (idx === -1) return
   const marker = markers[idx]!
-  scene.remove(marker.group)
-  marker.group.traverse((child) => {
-    if (child instanceof THREE.Mesh) {
-      child.geometry.dispose()
-      if (child.material instanceof THREE.Material) child.material.dispose()
-    }
-  })
+  disposeWaypointMarkerGroup(marker.group)
   markers.splice(idx, 1)
 }
 
@@ -179,13 +315,7 @@ export function removeWaypointMarker(id: string, scene: THREE.Scene): void {
  */
 export function clearWaypointMarkers(scene: THREE.Scene): void {
   for (const marker of markers) {
-    scene.remove(marker.group)
-    marker.group.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.geometry.dispose()
-        if (child.material instanceof THREE.Material) child.material.dispose()
-      }
-    })
+    disposeWaypointMarkerGroup(marker.group)
   }
   markers.length = 0
 }
@@ -200,41 +330,7 @@ export function clearWaypointMarkers(scene: THREE.Scene): void {
  * @param playerZ - Player world Z position (for proximity fade).
  */
 export function updateWaypointMarkers(elapsed: number, playerX?: number, playerZ?: number): void {
-  const pulse = 0.5 + 0.5 * Math.sin(elapsed * 3)
   for (const marker of markers) {
-    // Proximity fade — fully visible far away, fades when close
-    let proximity = 1
-    if (playerX !== undefined && playerZ !== undefined) {
-      const dx = marker.group.position.x - playerX
-      const dz = marker.group.position.z - playerZ
-      const dist = Math.sqrt(dx * dx + dz * dz)
-      if (dist < FADE_START_DISTANCE) {
-        proximity = Math.max(0, (dist - FADE_END_DISTANCE) / (FADE_START_DISTANCE - FADE_END_DISTANCE))
-      }
-    }
-
-    const ring = marker.group.getObjectByName('ring') as THREE.Mesh | undefined
-    if (ring) {
-      ring.scale.setScalar(0.9 + pulse * 0.2)
-      ;(ring.material as THREE.MeshBasicMaterial).opacity = (0.4 + pulse * 0.4) * proximity
-    }
-
-    const beamCore = marker.group.getObjectByName('beamCore') as THREE.Mesh | undefined
-    if (beamCore) {
-      ;(beamCore.material as THREE.MeshBasicMaterial).opacity = (0.55 + pulse * 0.22) * proximity
-    }
-
-    const beamGlow = marker.group.getObjectByName('beamGlow') as THREE.Mesh | undefined
-    if (beamGlow) {
-      beamGlow.scale.setScalar(0.95 + pulse * 0.1)
-      ;(beamGlow.material as THREE.MeshBasicMaterial).opacity = (0.16 + pulse * 0.12) * proximity
-    }
-
-    const diamond = marker.group.getObjectByName('diamond') as THREE.Mesh | undefined
-    if (diamond) {
-      diamond.rotation.y = elapsed * 2
-      diamond.position.y = BEAM_HEIGHT + 40 + Math.sin(elapsed * 2) * 2
-      ;(diamond.material as THREE.MeshBasicMaterial).opacity = 0.9 * proximity
-    }
+    tickWaypointMarkerGroup(marker.group, elapsed, playerX, playerZ)
   }
 }
