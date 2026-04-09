@@ -97,6 +97,7 @@ import shipHealthData from '@/data/shuttle/ship-health.json'
 import {
   getCurrentShuttleThrusterEfficiencyModifiers,
   getCurrentShuttleThrusterChargeModifiers,
+  getCurrentShuttleSlingshotBurstMultiplier,
   getCurrentUpgradeValue,
   getPlayerUpgradeLevelsSnapshot,
   hydratePlayerUpgradeLevelsFromStorage,
@@ -122,7 +123,13 @@ import {
 } from '@/lib/shop/shopSession'
 import type { ShopSession } from '@/lib/shop/tradeTypes'
 import { tickDemandTimer, resetDemand } from '@/lib/shop/planetDemand'
-import { createProfile, saveProfile, spendCredits } from '@/lib/player/profile'
+import {
+  createProfile,
+  loadProfile,
+  markMapIntroSeen,
+  saveProfile,
+  spendCredits,
+} from '@/lib/player/profile'
 import type { PlayerProfile } from '@/lib/player/types'
 import { createInventory, addItem, getStack, consumeItem, canFitItem, DEFAULT_MAX_SLOTS } from '@/lib/inventory/inventory'
 import type { Inventory } from '@/lib/inventory/types'
@@ -454,6 +461,10 @@ export class MapViewController implements Tickable {
   private missionBoard: ShuttleMissionBoard = createMissionBoard()
   private missionOverlayOpen = false
   private missionButtonVisible = false
+  /**
+   * Set in {@link init} from {@link loadProfile} or {@link createProfile}.
+   * Starting placeholder matches fresh profile credits until init runs.
+   */
   private playerProfile: PlayerProfile = createProfile('Pilot')
   private playerInventory: Inventory = createInventory(
     Math.round(DEFAULT_MAX_SLOTS * getCurrentUpgradeValue('shuttleCargoBay')),
@@ -611,6 +622,8 @@ export class MapViewController implements Tickable {
     // --- Input ---
     this.inputManager = new InputManager(DEFAULT_BINDINGS)
     hydratePlayerUpgradeLevelsFromStorage()
+    const storedProfile = typeof localStorage === 'undefined' ? null : loadProfile()
+    this.playerProfile = storedProfile ?? createProfile('Pilot')
     this.tickHandler = new TickHandler()
     this.tickHandler.register(this.inputManager, TICK_PRIORITY_INPUT)
 
@@ -872,9 +885,14 @@ export class MapViewController implements Tickable {
         this.orbitRing.position.set(ex, 0, ez)
       }
 
-      shipMessageSystem.notifyTrigger('map_start_earth_orbit')
-      this.emitMessageUpdate()
-      this.beginStartupIntro()
+      if (this.playerProfile.hasSeenIntro) {
+        this.mapIntro.skip()
+        this.emitIntroUiState()
+      } else {
+        shipMessageSystem.notifyTrigger('map_start_earth_orbit')
+        this.emitMessageUpdate()
+        this.beginStartupIntro()
+      }
     } else {
       this.mapIntro.skip()
       this.emitIntroUiState()
@@ -947,6 +965,8 @@ export class MapViewController implements Tickable {
       skipIntro: () => {
         this.clearStartupCinematicOrbitHandoff()
         this.mapIntro.skip()
+        this.playerProfile = markMapIntroSeen(this.playerProfile)
+        this.persistPlayerProfile()
         this.restoreIntroMapLayers()
         this.emitIntroUiState()
       },
@@ -983,6 +1003,8 @@ export class MapViewController implements Tickable {
         this.gravitationalEventManager?.setAutoSpawnEnabled(Boolean(enabled))
       },
     })
+
+    this.onCreditsUpdate?.(this.playerProfile.credits)
 
     // Start
     this.gameLoop = new GameLoop(this.tickHandler)
@@ -1219,7 +1241,7 @@ export class MapViewController implements Tickable {
             const finalSpeed = Math.sqrt(launchVelocity.vx ** 2 + launchVelocity.vz ** 2)
             const burstSpeed = this.shuttleController.beginSlingshotBurst(
               finalSpeed,
-              orbitConfig.slingshotBurstMultiplier,
+              getCurrentShuttleSlingshotBurstMultiplier(),
               orbitConfig.slingshotSettleDuration,
             )
             vel.setLength(burstSpeed)
@@ -1904,6 +1926,11 @@ export class MapViewController implements Tickable {
     return this.ambientSpace.toggle()
   }
 
+  /** Write {@link playerProfile} to localStorage after any balance or profile-field change. */
+  private persistPlayerProfile(): void {
+    saveProfile(this.playerProfile)
+  }
+
   /** Create or destroy shop session based on orbit state. */
   private updateShopSession(): void {
     const orbitState = this.orbitSystem?.state ?? 'free'
@@ -1973,7 +2000,7 @@ export class MapViewController implements Tickable {
     if (!result.ok) return false
     this.playerProfile = result.profile
     CURRENT_PLAYER_UPGRADE_LEVELS[upgradeId] = result.newLevel
-    saveProfile(this.playerProfile)
+    this.persistPlayerProfile()
     saveCurrentPlayerUpgradesToStorage()
     this.onCreditsUpdate?.(this.playerProfile.credits)
     return true
@@ -2051,6 +2078,7 @@ export class MapViewController implements Tickable {
       this.missionBoard = result.board
       this.playerProfile = result.profile
       this.playerInventory = result.inventory
+      this.persistPlayerProfile()
       this.onMissionBoardUpdate?.(this.missionBoard)
       this.onCreditsUpdate?.(this.playerProfile.credits)
       this.onMissionDeliver?.(mission ?? null)
@@ -2100,6 +2128,7 @@ export class MapViewController implements Tickable {
       this.shopSession = result.session
       this.playerProfile = result.profile
       this.playerInventory = result.inventory
+      this.persistPlayerProfile()
       this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
       this.onCreditsUpdate?.(this.playerProfile.credits)
       this.emitFuelCellCount()
@@ -2119,6 +2148,7 @@ export class MapViewController implements Tickable {
     if (result.ok) {
       this.playerProfile = result.profile
       this.playerInventory = result.inventory
+      this.persistPlayerProfile()
       this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
       this.onCreditsUpdate?.(this.playerProfile.credits)
       this.emitFuelCellCount()
@@ -2131,6 +2161,7 @@ export class MapViewController implements Tickable {
     const updated = spendCredits(this.playerProfile, REFUEL_COST)
     if (!updated) return
     this.playerProfile = updated
+    this.persistPlayerProfile()
     this.shuttleController.thrusterSystem.refuel()
     this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
     this.onCreditsUpdate?.(this.playerProfile.credits)
@@ -2145,6 +2176,7 @@ export class MapViewController implements Tickable {
     if (!addResult.ok) return
     this.playerProfile = updated
     this.playerInventory = addResult.inventory
+    this.persistPlayerProfile()
     this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
     this.onCreditsUpdate?.(this.playerProfile.credits)
     this.emitFuelCellCount()
@@ -2159,6 +2191,7 @@ export class MapViewController implements Tickable {
     if (!addResult.ok) return
     this.playerProfile = updated
     this.playerInventory = addResult.inventory
+    this.persistPlayerProfile()
     this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
     this.onCreditsUpdate?.(this.playerProfile.credits)
   }
@@ -2169,6 +2202,7 @@ export class MapViewController implements Tickable {
     const updated = spendCredits(this.playerProfile, REPAIR_COST)
     if (!updated) return
     this.playerProfile = updated
+    this.persistPlayerProfile()
     this.shipHealth.repairFull()
     if (this.shopSession) {
       this.onShopState?.(this.shopSession, this.playerProfile, this.playerInventory)
@@ -2464,7 +2498,8 @@ export class MapViewController implements Tickable {
 
     // Reset shop and economy state
     this.shopSession = null
-    this.playerProfile = createProfile('Pilot')
+    this.playerProfile = { ...createProfile('Pilot'), hasSeenIntro: true }
+    this.persistPlayerProfile()
     this.playerInventory = createInventory(
       Math.round(DEFAULT_MAX_SLOTS * getCurrentUpgradeValue('shuttleCargoBay')),
     )
@@ -3025,6 +3060,8 @@ export class MapViewController implements Tickable {
       this.vehicleCamera.controls.enabled = true
     }
 
+    this.playerProfile = markMapIntroSeen(this.playerProfile)
+    this.persistPlayerProfile()
     this.restoreIntroMapLayers()
     this.emitIntroUiState()
   }
@@ -3035,6 +3072,8 @@ export class MapViewController implements Tickable {
     if (!activeMessage || !this.vehicleCamera) {
       this.clearStartupCinematicOrbitHandoff()
       this.mapIntro.skip()
+      this.playerProfile = markMapIntroSeen(this.playerProfile)
+      this.persistPlayerProfile()
       this.emitIntroUiState()
       return
     }

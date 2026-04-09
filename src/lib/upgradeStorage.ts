@@ -1,5 +1,5 @@
 /**
- * localStorage persistence for player upgrade levels (26 data-driven upgrades).
+ * localStorage persistence for player upgrade levels (27 data-driven upgrades).
  *
  * @author guinetik
  * @date 2026-04-08

@@ -99,6 +99,15 @@
     "valuesByLevel": [1.0, 1.25, 1.5, 1.75]
   },
   {
+    "id": "shuttleSlingshotSpeed",
+    "category": "shuttle",
+    "label": "Slingshot Speed",
+    "description": "Gravity-assist tuning raises the slingshot exit burst speed multiplier.",
+    "baseCost": 750,
+    "maxLevel": 3,
+    "valuesByLevel": [2, 3, 3.5, 5]
+  },
+  {
     "id": "landerThrusterEfficiency",
     "category": "lander",
     "label": "Thruster Efficiency",

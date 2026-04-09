@@ -1,7 +1,7 @@
 /**
  * Data-driven upgrade definitions and value resolution.
  *
- * Loads 26 upgrade definitions from JSON across 4 categories
+ * Loads 27 upgrade definitions from JSON across 4 categories
  * (shuttle, lander, multitool, suit). Each upgrade has levels 0-3
  * with numeric values and linear cost scaling.
  *
@@ -50,6 +50,7 @@ export type UpgradeId =
   | 'shuttleCargoBay'
   | 'shuttleFuelCapacity'
   | 'shuttleScienceStation'
+  | 'shuttleSlingshotSpeed'
   | 'landerThrusterEfficiency'
   | 'landerThrusterCharge'
   | 'landerThrusterSpeed'
@@ -231,4 +232,23 @@ export function getShuttleThrusterChargeModifiers(levels: UpgradeLevels): Shuttl
  */
 export function getCurrentShuttleThrusterChargeModifiers(): ShuttleThrusterChargeModifiers {
   return getShuttleThrusterChargeModifiers(CURRENT_PLAYER_UPGRADE_LEVELS)
+}
+
+/**
+ * Slingshot exit burst multiplier from the Slingshot Speed upgrade (2 / 3 / 3.5 / 5 by level).
+ *
+ * @param levels - Runtime upgrade level state.
+ * @returns Value passed to {@link ShuttleController.beginSlingshotBurst}.
+ */
+export function getShuttleSlingshotBurstMultiplier(levels: UpgradeLevels): number {
+  return getUpgradeValue('shuttleSlingshotSpeed', levels)
+}
+
+/**
+ * Slingshot exit burst multiplier from current player upgrades.
+ *
+ * @returns Burst multiplier for the current slingshot launch.
+ */
+export function getCurrentShuttleSlingshotBurstMultiplier(): number {
+  return getShuttleSlingshotBurstMultiplier(CURRENT_PLAYER_UPGRADE_LEVELS)
 }

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { computeMissionDifficulty } from '../missionDifficulty'
 import { UPGRADE_DEFINITIONS, type UpgradeId, type UpgradeLevels } from '@/lib/upgrades'
 
-/** Helper: set all 26 upgrades to the same level. */
+/** Helper: set all upgrades to the same level. */
 function allAtLevel(level: number): UpgradeLevels {
   const levels: UpgradeLevels = {}
   for (const id of Object.keys(UPGRADE_DEFINITIONS) as UpgradeId[]) {
@@ -29,7 +29,7 @@ describe('computeMissionDifficulty', () => {
   })
 
   it('handles mixed levels (averages correctly)', () => {
-    // 1 upgrade at level 3 out of 26 → avg ≈ 0.115 → floor(0.115/3*9)+1 = 1
+    // 1 upgrade at level 3, rest 0 → low average → difficulty 1
     const levels: UpgradeLevels = { shuttleSystemsEfficiency: 3 }
     expect(computeMissionDifficulty(levels)).toBe(1)
   })

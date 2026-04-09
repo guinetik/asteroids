@@ -15,6 +15,7 @@ import {
   getUpgradesByCategory,
   getShuttleThrusterEfficiencyModifiers,
   getCurrentShuttleThrusterEfficiencyModifiers,
+  getShuttleSlingshotBurstMultiplier,
   hydratePlayerUpgradeLevelsFromStorage,
   resetPlayerUpgradesToDefaults,
 } from '../upgrades'
@@ -24,10 +25,10 @@ import {
 } from '../upgradeStorage'
 
 /** Total number of upgrades defined in the JSON. */
-const EXPECTED_UPGRADE_COUNT = 26
+const EXPECTED_UPGRADE_COUNT = 27
 
 describe('UPGRADE_DEFINITIONS', () => {
-  it('loads all 26 upgrades from JSON', () => {
+  it('loads all 27 upgrades from JSON', () => {
     const ids = Object.keys(UPGRADE_DEFINITIONS)
     expect(ids).toHaveLength(EXPECTED_UPGRADE_COUNT)
   })
@@ -60,7 +61,7 @@ describe('CURRENT_PLAYER_UPGRADE_LEVELS', () => {
     resetPlayerUpgradesToDefaults()
   })
 
-  it('initializes all 26 upgrades to level 0', () => {
+  it('initializes all 27 upgrades to level 0', () => {
     const keys = Object.keys(CURRENT_PLAYER_UPGRADE_LEVELS)
     expect(keys).toHaveLength(EXPECTED_UPGRADE_COUNT)
     for (const level of Object.values(CURRENT_PLAYER_UPGRADE_LEVELS)) {
@@ -133,8 +134,8 @@ describe('getUpgradeCost', () => {
 })
 
 describe('getUpgradesByCategory', () => {
-  it('returns 11 shuttle upgrades', () => {
-    expect(getUpgradesByCategory('shuttle')).toHaveLength(11)
+  it('returns 12 shuttle upgrades', () => {
+    expect(getUpgradesByCategory('shuttle')).toHaveLength(12)
   })
 
   it('returns 5 lander upgrades', () => {
@@ -147,6 +148,15 @@ describe('getUpgradesByCategory', () => {
 
   it('returns 5 suit upgrades', () => {
     expect(getUpgradesByCategory('suit')).toHaveLength(5)
+  })
+})
+
+describe('getShuttleSlingshotBurstMultiplier', () => {
+  it('returns absolute burst multipliers 2, 3, 3.5, 5 by upgrade level', () => {
+    expect(getShuttleSlingshotBurstMultiplier({})).toBe(2)
+    expect(getShuttleSlingshotBurstMultiplier({ shuttleSlingshotSpeed: 1 })).toBe(3)
+    expect(getShuttleSlingshotBurstMultiplier({ shuttleSlingshotSpeed: 2 })).toBe(3.5)
+    expect(getShuttleSlingshotBurstMultiplier({ shuttleSlingshotSpeed: 3 })).toBe(5)
   })
 })
 
