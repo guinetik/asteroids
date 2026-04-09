@@ -2,7 +2,7 @@
  * Procedural coronavirus enemy — floating spiky sphere (Spire).
  *
  * Builds geometry procedurally (no GLTF). Translucent membrane shell
- * with 42 Fibonacci-distributed spikes, inner core, and RNA strand.
+ * with Fibonacci-distributed spikes, inner core, and RNA strand.
  * Floats and bobs when idle, spikes extend when agitated.
  * Ported from docs/inspo/coronavirus-spire-demo.html.
  *
@@ -24,7 +24,8 @@ import {
 
 // ── Visual constants ────────────────────────────────────────────
 const SPIRE_SCALE = 2.0
-const SPIKE_COUNT = 42
+/** Fewer spikes = fewer draw calls + less tick work; coverage stays even (Fibonacci). */
+const SPIKE_COUNT = 32
 const BASE_RADIUS = 0.6
 
 const HIT_FLASH_DURATION = 0.08
@@ -67,11 +68,11 @@ const flashMat = new THREE.MeshBasicMaterial({ color: 0xff00ff })
 const fireFlashMat = new THREE.MeshBasicMaterial({ color: 0xffffff })
 
 // ── Shared geometries ───────────────────────────────────────────
-const membraneGeo = new THREE.SphereGeometry(BASE_RADIUS, 16, 12)
-const coreGeo = new THREE.SphereGeometry(BASE_RADIUS * 0.7, 12, 8)
-const rnaGeo = new THREE.TorusKnotGeometry(0.2, 0.04, 48, 4, 3, 2)
+const membraneGeo = new THREE.SphereGeometry(BASE_RADIUS, 12, 8)
+const coreGeo = new THREE.SphereGeometry(BASE_RADIUS * 0.7, 10, 6)
+const rnaGeo = new THREE.TorusKnotGeometry(0.2, 0.04, 32, 4, 3, 2)
 const stalkGeo = new THREE.CylinderGeometry(0.02, 0.03, 0.4, 4)
-const bulbGeo = new THREE.SphereGeometry(0.08, 6, 4)
+const bulbGeo = new THREE.SphereGeometry(0.08, 5, 3)
 
 // ── Fibonacci sphere distribution ──────────────────────────────
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5))
@@ -138,6 +139,8 @@ export class SpireController implements Tickable {
   /** Shared spike bulb shader for fire-flash restore. */
   private bulbTronMat!: THREE.ShaderMaterial
   private readonly tronMaterials: THREE.ShaderMaterial[] = []
+  /** Reused in spike tick to avoid `basePos.clone()` allocations per spike per frame. */
+  private readonly spikePosScratch = new THREE.Vector3()
 
   private elapsed = 0
   private readonly timeOffset: number
@@ -264,7 +267,7 @@ export class SpireController implements Tickable {
   /** @inheritdoc */
   tick(dt: number): void {
     if (this.disposed) return
-    syncTronHologramTimeSeconds(this.tronMaterials, performance.now() * 0.001)
+    syncTronHologramTimeSeconds(this.tronMaterials, this.elapsed + this.timeOffset)
     this.elapsed += dt
     const t = this.elapsed + this.timeOffset
 
@@ -324,17 +327,18 @@ export class SpireController implements Tickable {
       : 0.4 + Math.sin(t * 1.5) * 0.2
 
     // --- Spike animation ---
+    const scratch = this.spikePosScratch
     for (const spike of this.spikeData) {
       if (this.isAgitated) {
         // Agitated: spikes extend outward and wobble faster
         const extend = 1 + Math.sin(t * 6 + spike.phase) * 0.15
-        spike.group.position.copy(spike.basePos.clone().multiplyScalar(extend))
+        spike.group.position.copy(scratch.copy(spike.basePos).multiplyScalar(extend))
         spike.bulb.position.x = Math.sin(t * 8 + spike.phase) * 0.03
         spike.bulb.position.z = Math.cos(t * 8 + spike.phase * 1.3) * 0.03
       } else {
         // Idle: gentle sway
         const sway = 1 + Math.sin(t * 0.8 + spike.phase) * 0.03
-        spike.group.position.copy(spike.basePos.clone().multiplyScalar(sway))
+        spike.group.position.copy(scratch.copy(spike.basePos).multiplyScalar(sway))
         spike.bulb.position.x = Math.sin(t * 1.2 + spike.phase) * 0.01
         spike.bulb.position.z = 0
       }

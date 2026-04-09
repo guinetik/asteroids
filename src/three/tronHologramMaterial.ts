@@ -204,6 +204,9 @@ export function createTronHologramMaterial(
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
     opacity,
+    /** Shader ignores scene lights — avoids per-light CPU/GPU setup on every enemy mesh. */
+    lights: false,
+    fog: false,
   })
 }
 

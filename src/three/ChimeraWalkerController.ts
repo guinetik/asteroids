@@ -23,7 +23,9 @@ import {
 } from '@/three/tronHologramMaterial'
 
 const CHIMERA_SCALE = 0.9
-const LEG_SEGMENTS = 10
+/** Axial segments per leg tube — lower = cheaper {@link THREE.TubeGeometry} rebuilds. */
+const LEG_TUBE_AXIAL_SEGMENTS = 6
+const LEG_TUBE_RADIAL_SEGMENTS = 4
 const LEG_TUBE_RADIUS_UPPER = 0.09
 const LEG_TUBE_RADIUS_LOWER = 0.075
 const TENTACLE_COUNT = 10
@@ -31,8 +33,13 @@ const TENTACLE_SEGMENTS = 4
 const TENTACLE_RADIAL_ATTACH = 0.72
 const TENTACLE_RADIUS_START = 0.055
 const TENTACLE_RADIUS_STEP = 0.01
-const LEG_GEOMETRY_UPDATE_INTERVAL = 1 / 18
-const TENTACLE_GEOMETRY_UPDATE_INTERVAL = 1 / 12
+/** Leg curve rebake rate — tentacles dominate cost; legs can update slower. */
+const LEG_GEOMETRY_UPDATE_INTERVAL = 1 / 7
+/** Tentacle tubes are the hottest path (~40 meshes) — keep this low (~5 Hz). */
+const TENTACLE_GEOMETRY_UPDATE_INTERVAL = 1 / 5
+/** Axial segments per tentacle quadratic span. */
+const TENTACLE_TUBE_AXIAL_SEGMENTS = 5
+const TENTACLE_TUBE_RADIAL_SEGMENTS = 4
 
 const BODY_HEIGHT = 6.5
 const HIP_HEIGHT = 5.3
@@ -70,10 +77,10 @@ const flashMat = new THREE.MeshBasicMaterial({ color: 0xff00ff })
 
 const torsoGeo = new THREE.IcosahedronGeometry(1.2, 1)
 const hipGeo = new THREE.SphereGeometry(0.6, 8, 6)
-const dnaGeo = new THREE.TorusKnotGeometry(0.3, 0.06, 64, 4, 2, 3)
-const rnaGeo = new THREE.TorusKnotGeometry(0.25, 0.05, 48, 4, 3, 2)
-const headMembraneGeo = new THREE.SphereGeometry(0.9, 16, 12)
-const headCoreGeo = new THREE.SphereGeometry(0.55, 10, 8)
+const dnaGeo = new THREE.TorusKnotGeometry(0.3, 0.06, 32, 4, 2, 3)
+const rnaGeo = new THREE.TorusKnotGeometry(0.25, 0.05, 24, 4, 3, 2)
+const headMembraneGeo = new THREE.SphereGeometry(0.9, 12, 8)
+const headCoreGeo = new THREE.SphereGeometry(0.55, 8, 6)
 const jointKneeGeo = new THREE.SphereGeometry(0.18, 6, 4)
 const jointAnkleGeo = new THREE.SphereGeometry(0.14, 6, 4)
 const toeGeo = new THREE.ConeGeometry(0.06, 0.5, 4)
@@ -204,7 +211,7 @@ export class ChimeraWalkerController implements Tickable {
   /** @inheritdoc */
   tick(dt: number): void {
     if (this.disposed) return
-    syncTronHologramTimeSeconds(this.tronMaterials, performance.now() * 0.001)
+    syncTronHologramTimeSeconds(this.tronMaterials, this.elapsed + this.timeOffset)
     this.elapsed += dt
     const t = this.elapsed + this.timeOffset
 
@@ -359,10 +366,6 @@ export class ChimeraWalkerController implements Tickable {
       const eye = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 4), eyeMat)
       eye.position.set(side * 0.35, 8.95, 0.65)
       this.headGroup.add(eye)
-
-      const eyeLight = new THREE.PointLight(0xff2200, 0.3, 3)
-      eyeLight.position.copy(eye.position)
-      this.headGroup.add(eyeLight)
     }
   }
 
@@ -371,11 +374,21 @@ export class ChimeraWalkerController implements Tickable {
     const toeTron = this.makeTron(CHIMERA_TRON_HULL)
     for (const side of [-1, 1] as const) {
       const upperMesh = new THREE.Mesh(
-        new THREE.TubeGeometry(new THREE.LineCurve3(new THREE.Vector3(), new THREE.Vector3(0, -1, 0)), 8, LEG_TUBE_RADIUS_UPPER, 6),
+        new THREE.TubeGeometry(
+          new THREE.LineCurve3(new THREE.Vector3(), new THREE.Vector3(0, -1, 0)),
+          LEG_TUBE_AXIAL_SEGMENTS,
+          LEG_TUBE_RADIUS_UPPER,
+          LEG_TUBE_RADIAL_SEGMENTS,
+        ),
         legTron,
       )
       const lowerMesh = new THREE.Mesh(
-        new THREE.TubeGeometry(new THREE.LineCurve3(new THREE.Vector3(), new THREE.Vector3(0, -1, 0)), 8, LEG_TUBE_RADIUS_LOWER, 6),
+        new THREE.TubeGeometry(
+          new THREE.LineCurve3(new THREE.Vector3(), new THREE.Vector3(0, -1, 0)),
+          LEG_TUBE_AXIAL_SEGMENTS,
+          LEG_TUBE_RADIUS_LOWER,
+          LEG_TUBE_RADIAL_SEGMENTS,
+        ),
         legTron,
       )
       const kneeSphere = new THREE.Mesh(jointKneeGeo, legTron)
@@ -415,7 +428,13 @@ export class ChimeraWalkerController implements Tickable {
       for (let s = 0; s < TENTACLE_SEGMENTS; s++) {
         const radius = Math.max(0.014, TENTACLE_RADIUS_START - s * TENTACLE_RADIUS_STEP)
         const mesh = new THREE.Mesh(
-          new THREE.TubeGeometry(new THREE.LineCurve3(new THREE.Vector3(), new THREE.Vector3(0, -1, 0)), 8, radius, 5, false),
+          new THREE.TubeGeometry(
+            new THREE.LineCurve3(new THREE.Vector3(), new THREE.Vector3(0, -1, 0)),
+            TENTACLE_TUBE_AXIAL_SEGMENTS,
+            radius,
+            TENTACLE_TUBE_RADIAL_SEGMENTS,
+            false,
+          ),
           s < TENTACLE_SEGMENTS - 1 ? tentacleTron : tentacleTipTron,
         )
         this.tentaclesGroup.add(mesh)
@@ -468,7 +487,12 @@ export class ChimeraWalkerController implements Tickable {
       knee,
     )
     leg.upperMesh.geometry.dispose()
-    leg.upperMesh.geometry = new THREE.TubeGeometry(upperCurve, LEG_SEGMENTS, LEG_TUBE_RADIUS_UPPER, 6)
+    leg.upperMesh.geometry = new THREE.TubeGeometry(
+      upperCurve,
+      LEG_TUBE_AXIAL_SEGMENTS,
+      LEG_TUBE_RADIUS_UPPER,
+      LEG_TUBE_RADIAL_SEGMENTS,
+    )
 
     const lowerCurve = new THREE.QuadraticBezierCurve3(
       knee,
@@ -476,7 +500,12 @@ export class ChimeraWalkerController implements Tickable {
       ankle,
     )
     leg.lowerMesh.geometry.dispose()
-    leg.lowerMesh.geometry = new THREE.TubeGeometry(lowerCurve, LEG_SEGMENTS, LEG_TUBE_RADIUS_LOWER, 6)
+    leg.lowerMesh.geometry = new THREE.TubeGeometry(
+      lowerCurve,
+      LEG_TUBE_AXIAL_SEGMENTS,
+      LEG_TUBE_RADIUS_LOWER,
+      LEG_TUBE_RADIAL_SEGMENTS,
+    )
 
     leg.kneeSphere.position.copy(knee)
     leg.ankleSphere.position.copy(ankle)
@@ -521,7 +550,13 @@ export class ChimeraWalkerController implements Tickable {
       const radius = Math.max(0.012, TENTACLE_RADIUS_START - s * TENTACLE_RADIUS_STEP)
       const curve = new THREE.QuadraticBezierCurve3(prevEnd, mid, segEnd)
       tentacle.meshes[s]!.geometry.dispose()
-      tentacle.meshes[s]!.geometry = new THREE.TubeGeometry(curve, 8, radius, 5, false)
+      tentacle.meshes[s]!.geometry = new THREE.TubeGeometry(
+        curve,
+        TENTACLE_TUBE_AXIAL_SEGMENTS,
+        radius,
+        TENTACLE_TUBE_RADIAL_SEGMENTS,
+        false,
+      )
       prevEnd = segEnd
     }
   }
@@ -555,9 +590,19 @@ export class ChimeraWalkerController implements Tickable {
           foot,
         )
         leg.upperMesh.geometry.dispose()
-        leg.upperMesh.geometry = new THREE.TubeGeometry(upperCurve, LEG_SEGMENTS, LEG_TUBE_RADIUS_UPPER, 6)
+        leg.upperMesh.geometry = new THREE.TubeGeometry(
+          upperCurve,
+          LEG_TUBE_AXIAL_SEGMENTS,
+          LEG_TUBE_RADIUS_UPPER,
+          LEG_TUBE_RADIAL_SEGMENTS,
+        )
         leg.lowerMesh.geometry.dispose()
-        leg.lowerMesh.geometry = new THREE.TubeGeometry(lowerCurve, LEG_SEGMENTS, LEG_TUBE_RADIUS_LOWER, 6)
+        leg.lowerMesh.geometry = new THREE.TubeGeometry(
+          lowerCurve,
+          LEG_TUBE_AXIAL_SEGMENTS,
+          LEG_TUBE_RADIUS_LOWER,
+          LEG_TUBE_RADIAL_SEGMENTS,
+        )
         leg.kneeSphere.position.copy(knee)
         leg.ankleSphere.position.copy(foot)
       }

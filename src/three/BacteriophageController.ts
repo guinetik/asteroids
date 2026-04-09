@@ -25,8 +25,13 @@ import {
 const PHAGE_SCALE = 2.0
 const LEG_COUNT = 8
 const LEG_TUBE_RADIUS = 0.025
-const LEG_SEGMENTS = 12
-const LEG_GEOMETRY_UPDATE_INTERVAL = 1 / 15
+/** Axial segments per leg tube — lower = cheaper {@link THREE.TubeGeometry} rebuilds. */
+const LEG_TUBE_AXIAL_SEGMENTS = 8
+/**
+ * Seconds between leg curve rebakes — lower frequency cuts alloc/GPU upload cost
+ * (was ~15 Hz; ~6 Hz is enough for leg motion at typical scales).
+ */
+const LEG_GEOMETRY_UPDATE_INTERVAL = 1 / 6
 
 const HIT_FLASH_DURATION = 0.08
 const HIT_RECOIL_DURATION = 0.25
@@ -56,7 +61,7 @@ const flashMat = new THREE.MeshBasicMaterial({ color: 0xff00ff })
 // ── Shared geometries ───────────────────────────────────────────
 const baseGeo = new THREE.CylinderGeometry(0.3, 0.35, 0.08, 8)
 const headGeo = new THREE.IcosahedronGeometry(0.4, 0)
-const coreGeo = new THREE.TorusKnotGeometry(0.12, 0.02, 64, 4)
+const coreGeo = new THREE.TorusKnotGeometry(0.12, 0.02, 32, 4)
 const ringGeo = new THREE.TorusGeometry(0.32, 0.02, 4, 8)
 
 /** Per-leg state for animation — mesh, radial angle, and gait phase offset. */
@@ -210,7 +215,7 @@ export class BacteriophageController implements Tickable {
       const phase = i % 2 === 0 ? 0 : Math.PI
 
       const curve = this.makeLegCurve(angle, phase, 0, false)
-      const geo = new THREE.TubeGeometry(curve, LEG_SEGMENTS, LEG_TUBE_RADIUS, 4, false)
+      const geo = new THREE.TubeGeometry(curve, LEG_TUBE_AXIAL_SEGMENTS, LEG_TUBE_RADIUS, 4, false)
       const mesh = new THREE.Mesh(geo, legTron)
       this.legsGroup.add(mesh)
       this.legs.push({ mesh, angle, phase })
@@ -291,7 +296,7 @@ export class BacteriophageController implements Tickable {
   /** @inheritdoc */
   tick(dt: number): void {
     if (this.disposed) return
-    syncTronHologramTimeSeconds(this.tronMaterials, performance.now() * 0.001)
+    syncTronHologramTimeSeconds(this.tronMaterials, this.elapsed + this.timeOffset)
     this.elapsed += dt
     const t = this.elapsed + this.timeOffset
 
@@ -387,7 +392,7 @@ export class BacteriophageController implements Tickable {
 
         const curve = new THREE.QuadraticBezierCurve3(hip, knee, foot)
         leg.mesh.geometry.dispose()
-        leg.mesh.geometry = new THREE.TubeGeometry(curve, LEG_SEGMENTS, LEG_TUBE_RADIUS, 4, false)
+        leg.mesh.geometry = new THREE.TubeGeometry(curve, LEG_TUBE_AXIAL_SEGMENTS, LEG_TUBE_RADIUS, 4, false)
       }
       this.legGeometryTimer %= LEG_GEOMETRY_UPDATE_INTERVAL
     }
@@ -442,7 +447,7 @@ export class BacteriophageController implements Tickable {
     for (const leg of this.legs) {
       const curve = this.makeLegCurve(leg.angle, leg.phase, time, isMoving)
       leg.mesh.geometry.dispose()
-      leg.mesh.geometry = new THREE.TubeGeometry(curve, LEG_SEGMENTS, LEG_TUBE_RADIUS, 4, false)
+      leg.mesh.geometry = new THREE.TubeGeometry(curve, LEG_TUBE_AXIAL_SEGMENTS, LEG_TUBE_RADIUS, 4, false)
     }
   }
 
