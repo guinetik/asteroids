@@ -13,6 +13,14 @@
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 import type { Enemy } from '@/lib/fps/enemy'
+import {
+  createTronHologramMaterial,
+  disposeTronHologramMaterials,
+  syncTronHologramTimeSeconds,
+  TRON_HOLOGRAM_ENEMY_ALPHA_GAIN,
+  TRON_HOLOGRAM_ENEMY_COLOR_GAIN,
+  TRON_HOLOGRAM_ENEMY_MATERIAL_OPACITY,
+} from '@/three/tronHologramMaterial'
 
 // ── Visual constants ────────────────────────────────────────────
 const SPIRE_SCALE = 2.0
@@ -43,41 +51,16 @@ const DRIFT_SWAY_FREQ = 0.5
  */
 export const SPIRE_HIT_CENTER_Y = 0
 
-// ── Shared materials (reused across all Spire instances) ────────
-const membraneMat = new THREE.MeshPhysicalMaterial({
-  color: 0xcc4466,
-  transparent: true,
-  opacity: 0.35,
-  roughness: 0.3,
-  metalness: 0.1,
-  side: THREE.DoubleSide,
-})
-
-const coreMat = new THREE.MeshStandardMaterial({
-  color: 0x881111,
-  emissive: 0x440000,
-  emissiveIntensity: 0.4,
-  roughness: 0.6,
-  metalness: 0.2,
-})
-
-const stalkMat = new THREE.MeshStandardMaterial({
-  color: 0xddaa44,
-  emissive: 0x553300,
-  emissiveIntensity: 0.3,
-  metalness: 0.6,
-  roughness: 0.4,
-})
-
-const bulbMat = new THREE.MeshStandardMaterial({
-  color: 0xffcc44,
-  emissive: 0xff8800,
-  emissiveIntensity: 0.5,
-  metalness: 0.3,
-  roughness: 0.5,
-})
-
-const rnaMat = new THREE.MeshBasicMaterial({ color: 0xff3355 })
+/** TRON outer membrane shell. */
+const SPIRE_TRON_MEMBRANE = 0xff3d6b
+/** TRON inner core sphere. */
+const SPIRE_TRON_CORE = 0xff0066
+/** TRON spike stalks. */
+const SPIRE_TRON_STALK = 0xffcc00
+/** TRON spike bulbs. */
+const SPIRE_TRON_BULB = 0xffee44
+/** TRON RNA torus. */
+const SPIRE_TRON_RNA = 0xff2266
 
 const flashMat = new THREE.MeshBasicMaterial({ color: 0xff00ff })
 
@@ -150,6 +133,11 @@ export class SpireController implements Tickable {
   private core!: THREE.Mesh
   private rna!: THREE.Mesh
   private light!: THREE.PointLight
+  /** Membrane shader restored after hit flash. */
+  private membraneTronMat!: THREE.ShaderMaterial
+  /** Shared spike bulb shader for fire-flash restore. */
+  private bulbTronMat!: THREE.ShaderMaterial
+  private readonly tronMaterials: THREE.ShaderMaterial[] = []
 
   private elapsed = 0
   private readonly timeOffset: number
@@ -189,21 +177,41 @@ export class SpireController implements Tickable {
     this.enemy.onDeath = () => this.die()
   }
 
+  /**
+   * Allocate a TRON hologram material tracked for time sync and disposal.
+   *
+   * @param color - Primary tint
+   * @returns Shader material instance
+   */
+  private makeTron(color: number): THREE.ShaderMaterial {
+    const m = createTronHologramMaterial({
+      color,
+      colorGain: TRON_HOLOGRAM_ENEMY_COLOR_GAIN,
+      alphaGain: TRON_HOLOGRAM_ENEMY_ALPHA_GAIN,
+      opacity: TRON_HOLOGRAM_ENEMY_MATERIAL_OPACITY,
+    })
+    this.tronMaterials.push(m)
+    return m
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // Build geometry
   // ═══════════════════════════════════════════════════════════════
 
   private buildBody(): void {
-    // Outer membrane — translucent sphere
-    this.membrane = new THREE.Mesh(membraneGeo, membraneMat)
+    this.membraneTronMat = this.makeTron(SPIRE_TRON_MEMBRANE)
+    const coreTron = this.makeTron(SPIRE_TRON_CORE)
+    const rnaTron = this.makeTron(SPIRE_TRON_RNA)
+
+    this.membrane = new THREE.Mesh(membraneGeo, this.membraneTronMat)
     this.bodyGroup.add(this.membrane)
 
     // Inner core — opaque, slightly smaller
-    this.core = new THREE.Mesh(coreGeo, coreMat)
+    this.core = new THREE.Mesh(coreGeo, coreTron)
     this.bodyGroup.add(this.core)
 
     // RNA strand inside
-    this.rna = new THREE.Mesh(rnaGeo, rnaMat)
+    this.rna = new THREE.Mesh(rnaGeo, rnaTron)
     this.bodyGroup.add(this.rna)
 
     // Inner point light (orange/red glow)
@@ -212,6 +220,8 @@ export class SpireController implements Tickable {
   }
 
   private buildSpikes(): void {
+    const stalkTron = this.makeTron(SPIRE_TRON_STALK)
+    this.bulbTronMat = this.makeTron(SPIRE_TRON_BULB)
     const points = fibonacciSphere(SPIKE_COUNT)
 
     for (let i = 0; i < points.length; i++) {
@@ -219,12 +229,12 @@ export class SpireController implements Tickable {
       const spikeGroup = new THREE.Group()
 
       // Stalk
-      const stalk = new THREE.Mesh(stalkGeo, stalkMat)
+      const stalk = new THREE.Mesh(stalkGeo, stalkTron)
       stalk.position.set(0, 0.2, 0)
       spikeGroup.add(stalk)
 
       // Bulb (receptor binding domain)
-      const bulb = new THREE.Mesh(bulbGeo, bulbMat)
+      const bulb = new THREE.Mesh(bulbGeo, this.bulbTronMat)
       bulb.position.set(0, 0.44, 0)
       spikeGroup.add(bulb)
 
@@ -254,6 +264,7 @@ export class SpireController implements Tickable {
   /** @inheritdoc */
   tick(dt: number): void {
     if (this.disposed) return
+    syncTronHologramTimeSeconds(this.tronMaterials, performance.now() * 0.001)
     this.elapsed += dt
     const t = this.elapsed + this.timeOffset
 
@@ -333,7 +344,7 @@ export class SpireController implements Tickable {
     if (this.flashTimer > 0) {
       this.flashTimer -= dt
       if (this.flashTimer <= 0) {
-        this.membrane.material = membraneMat
+        this.membrane.material = this.membraneTronMat
       }
     }
 
@@ -341,7 +352,7 @@ export class SpireController implements Tickable {
     if (this.fireFlashTimer > 0) {
       this.fireFlashTimer -= dt
       if (this.fireFlashTimer <= 0 && this.fireFlashSpike) {
-        this.fireFlashSpike.bulb.material = bulbMat
+        this.fireFlashSpike.bulb.material = this.bulbTronMat
         this.fireFlashSpike = null
       }
     }
@@ -379,7 +390,7 @@ export class SpireController implements Tickable {
     if (this.flashTimer > 0) {
       this.flashTimer -= dt
       if (this.flashTimer <= 0) {
-        this.membrane.material = membraneMat
+        this.membrane.material = this.membraneTronMat
       }
     }
 
@@ -443,7 +454,7 @@ export class SpireController implements Tickable {
     if (bestSpike) {
       // Restore previous fire-flash spike if still active
       if (this.fireFlashSpike && this.fireFlashSpike !== bestSpike) {
-        this.fireFlashSpike.bulb.material = bulbMat
+        this.fireFlashSpike.bulb.material = this.bulbTronMat
       }
       bestSpike.bulb.material = fireFlashMat
       this.fireFlashSpike = bestSpike
@@ -478,21 +489,11 @@ export class SpireController implements Tickable {
   /** Clean up all geometry and instance-owned materials. */
   dispose(): void {
     this.disposed = true
+    disposeTronHologramMaterials(this.tronMaterials)
+    this.tronMaterials.length = 0
     this.group.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         child.geometry.dispose()
-        // Only dispose instance-owned materials (not shared statics)
-        if (
-          child.material !== membraneMat &&
-          child.material !== coreMat &&
-          child.material !== stalkMat &&
-          child.material !== bulbMat &&
-          child.material !== rnaMat &&
-          child.material !== flashMat &&
-          child.material !== fireFlashMat
-        ) {
-          ;(child.material as THREE.Material).dispose()
-        }
       }
     })
   }

@@ -2,7 +2,8 @@
  * Instanced GLB prop for virus geometry (`public/models/virus.glb`).
  *
  * Preloads the asset once, then clones the scene (via SkeletonUtils `clone`) for
- * each new instance. Per-instance hologram materials animate independently;
+ * each new instance. A shared TRON hologram material from
+ * {@link createTronHologramMaterial} animates via {@link syncTronHologramTimeSeconds};
  * geometries stay shared with the cached template.
  *
  * @author guinetik
@@ -12,6 +13,11 @@
 import * as THREE from 'three'
 import { clone as cloneSkinnedScene } from 'three/addons/utils/SkeletonUtils.js'
 import { loadGLB } from './loadGLB'
+import {
+  createTronHologramMaterial,
+  disposeTronHologramMaterials,
+  syncTronHologramTimeSeconds,
+} from './tronHologramMaterial'
 
 /** Public URL path served from `public/models/virus.glb`. */
 export const VIRUS_MODEL_PUBLIC_PATH = '/models/virus.glb'
@@ -29,46 +35,8 @@ const DEFAULT_RECEIVE_SHADOW = true
 /** Hologram tint — hostile neon green for rescue outbreak sites. */
 const HOLOGRAM_COLOR = new THREE.Color(0x39ff14)
 
-const HOLOGRAM_VERTEX_SHADER = /* glsl */ `
-  varying vec3 vWorldPos;
-  varying vec3 vWorldNormal;
-  varying vec2 vUv;
-
-  void main() {
-    vUv = uv;
-    vec4 worldPos = modelMatrix * vec4(position, 1.0);
-    vWorldPos = worldPos.xyz;
-    vWorldNormal = normalize(mat3(modelMatrix) * normal);
-    gl_Position = projectionMatrix * viewMatrix * worldPos;
-  }
-`
-
-const HOLOGRAM_FRAGMENT_SHADER = /* glsl */ `
-  uniform vec3 uColor;
-  uniform float uTime;
-
-  varying vec3 vWorldPos;
-  varying vec3 vWorldNormal;
-  varying vec2 vUv;
-
-  void main() {
-    vec3 viewDir = normalize(cameraPosition - vWorldPos);
-    float fresnel = pow(1.0 - abs(dot(normalize(vWorldNormal), viewDir)), 2.2);
-
-    float scanA = sin(vWorldPos.y * 4.5 - uTime * 5.5);
-    float scanB = sin((vWorldPos.x + vWorldPos.z) * 2.0 - uTime * 2.8);
-    float scan = 0.34 + 0.16 * scanA + 0.08 * scanB;
-
-    float gridX = smoothstep(0.92, 1.0, abs(fract(vUv.x * 8.0 + uTime * 0.08) * 2.0 - 1.0));
-    float gridY = smoothstep(0.85, 1.0, abs(fract(vUv.y * 14.0 - uTime * 0.18) * 2.0 - 1.0));
-    float grid = max(gridX, gridY) * 0.65;
-
-    float alpha = 0.045 + fresnel * 0.24 + scan * 0.09 + grid * 0.08;
-    vec3 color = uColor * (0.24 + fresnel * 0.72 + scan * 0.22) + vec3(0.03, 0.09, 0.08) * grid;
-
-    gl_FragColor = vec4(color, alpha);
-  }
-`
+/** Extra grid-line tint (matches legacy virus shader bias). */
+const VIRUS_GRID_TINT = new THREE.Color(0.03, 0.09, 0.08)
 
 /** Options for {@link VirusModel.create}. */
 export interface VirusModelCreateOptions {
@@ -102,16 +70,17 @@ async function ensureVirusTemplate(): Promise<THREE.Group> {
 /**
  * GLB virus — add {@link group} to your scene after {@link VirusModel.create}.
  *
- * Per-instance hologram materials are disposed in {@link dispose}; mesh geometries
- * remain shared with the preload template and other instances.
+ * The hologram material is disposed in {@link dispose}; mesh geometries remain
+ * shared with the preload template and other instances.
  */
 export class VirusModel {
   /** Parent group for positioning; contains the cloned mesh hierarchy. */
   readonly group = new THREE.Group()
-  private readonly hologramMaterials: THREE.ShaderMaterial[] = []
+  private readonly tronMaterial: THREE.ShaderMaterial
+  private timeSyncMesh: THREE.Mesh | null = null
 
-  private constructor(sceneClone: THREE.Group, hologramMaterials: THREE.ShaderMaterial[]) {
-    this.hologramMaterials = hologramMaterials
+  private constructor(sceneClone: THREE.Group, tronMaterial: THREE.ShaderMaterial) {
+    this.tronMaterial = tronMaterial
     this.group.add(sceneClone)
   }
 
@@ -131,44 +100,36 @@ export class VirusModel {
   static async create(options?: VirusModelCreateOptions): Promise<VirusModel> {
     const template = await ensureVirusTemplate()
     const sceneClone = cloneSkinnedScene(template) as THREE.Group
-    const hologramMaterials: THREE.ShaderMaterial[] = []
+    const tronMaterial = createTronHologramMaterial({
+      color: HOLOGRAM_COLOR,
+      gridTint: VIRUS_GRID_TINT,
+    })
 
     const scale = options?.scale ?? DEFAULT_VIRUS_SCALE
     sceneClone.scale.setScalar(BASE_VIRUS_ASSET_SCALE * scale)
 
     const castShadow = options?.castShadow ?? DEFAULT_CAST_SHADOW
     const receiveShadow = options?.receiveShadow ?? DEFAULT_RECEIVE_SHADOW
+    const meshesForTimeSync: THREE.Mesh[] = []
     sceneClone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
         mesh.castShadow = castShadow
         mesh.receiveShadow = receiveShadow
-
-        const hologramMaterial = new THREE.ShaderMaterial({
-          uniforms: {
-            uColor: { value: HOLOGRAM_COLOR.clone() },
-            uTime: { value: 0 },
-          },
-          vertexShader: HOLOGRAM_VERTEX_SHADER,
-          fragmentShader: HOLOGRAM_FRAGMENT_SHADER,
-          transparent: true,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending,
-          side: THREE.DoubleSide,
-          opacity: 0.72,
-        })
-        mesh.material = hologramMaterial
-        const timeUniform = hologramMaterial.uniforms['uTime']
-        mesh.onBeforeRender = () => {
-          if (timeUniform) {
-            timeUniform.value = performance.now() * 0.001
-          }
-        }
-        hologramMaterials.push(hologramMaterial)
+        mesh.material = tronMaterial
+        meshesForTimeSync.push(mesh)
       }
     })
 
-    return new VirusModel(sceneClone, hologramMaterials)
+    const model = new VirusModel(sceneClone, tronMaterial)
+    const timeSyncTarget = meshesForTimeSync[0]
+    if (timeSyncTarget) {
+      model.timeSyncMesh = timeSyncTarget
+      timeSyncTarget.onBeforeRender = () => {
+        syncTronHologramTimeSeconds([tronMaterial], performance.now() * 0.001)
+      }
+    }
+    return model
   }
 
   /**
@@ -192,14 +153,16 @@ export class VirusModel {
   }
 
   /**
-   * Remove this instance from the scene graph and dispose its hologram materials.
+   * Remove this instance from the scene graph and dispose its hologram material.
    *
    * Does not dispose shared mesh geometries from the GLB template.
    */
   dispose(): void {
-    for (const material of this.hologramMaterials) {
-      material.dispose()
+    if (this.timeSyncMesh) {
+      this.timeSyncMesh.onBeforeRender = () => {}
+      this.timeSyncMesh = null
     }
+    disposeTronHologramMaterials([this.tronMaterial])
     this.group.clear()
   }
 }

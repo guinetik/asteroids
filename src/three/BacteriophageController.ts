@@ -12,6 +12,14 @@
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 import type { Enemy } from '@/lib/fps/enemy'
+import {
+  createTronHologramMaterial,
+  disposeTronHologramMaterials,
+  syncTronHologramTimeSeconds,
+  TRON_HOLOGRAM_ENEMY_ALPHA_GAIN,
+  TRON_HOLOGRAM_ENEMY_COLOR_GAIN,
+  TRON_HOLOGRAM_ENEMY_MATERIAL_OPACITY,
+} from '@/three/tronHologramMaterial'
 
 // ── Visual constants ────────────────────────────────────────────
 const PHAGE_SCALE = 2.0
@@ -32,38 +40,18 @@ const DEATH_ANIM_DURATION = 1.2
  */
 export const PHAGE_HIT_CENTER_Y = 0.8 * PHAGE_SCALE
 
-// ── Shared materials (reused across all phage instances) ────────
-const siliconMetal = new THREE.MeshStandardMaterial({
-  color: 0x667788,
-  metalness: 0.6,
-  roughness: 0.35,
-})
-
-const neckMat = new THREE.MeshStandardMaterial({
-  color: 0x556677,
-  emissive: 0x0a3a3a,
-  emissiveIntensity: 0.4,
-})
-
-const headMat = new THREE.MeshPhysicalMaterial({
-  color: 0xddeeff,
-  transparent: true,
-  opacity: 0.35,
-  roughness: 0.05,
-  metalness: 0.3,
-})
+/** TRON base plate + trunk. */
+const PHAGE_TRON_HULL = 0x00d8f0
+/** TRON collar / neck rings. */
+const PHAGE_TRON_NECK = 0x00a8c8
+/** TRON capsid shell. */
+const PHAGE_TRON_HEAD = 0xff3dad
+/** TRON inner torus core. */
+const PHAGE_TRON_CORE = 0x39ff14
+/** TRON legs. */
+const PHAGE_TRON_LEG = 0x00ffcc
 
 const flashMat = new THREE.MeshBasicMaterial({ color: 0xff00ff })
-
-const coreMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc })
-
-const legMat = new THREE.MeshStandardMaterial({
-  color: 0x334455,
-  emissive: 0x00ffaa,
-  emissiveIntensity: 0.8,
-  metalness: 0.5,
-  roughness: 0.4,
-})
 
 // ── Shared geometries ───────────────────────────────────────────
 const baseGeo = new THREE.CylinderGeometry(0.3, 0.35, 0.08, 8)
@@ -95,6 +83,9 @@ export class BacteriophageController implements Tickable {
   private head!: THREE.Mesh
   private core!: THREE.Mesh
   private light!: THREE.PointLight
+  /** Capsid material restored after hit flash. */
+  private headTronMat!: THREE.ShaderMaterial
+  private readonly tronMaterials: THREE.ShaderMaterial[] = []
 
   private elapsed = 0
   private readonly timeOffset: number
@@ -133,25 +124,47 @@ export class BacteriophageController implements Tickable {
     this.enemy.onDeath = () => this.die()
   }
 
+  /**
+   * Allocate a TRON hologram material tracked for time sync and disposal.
+   *
+   * @param color - Primary tint
+   * @returns Shader material instance
+   */
+  private makeTron(color: number): THREE.ShaderMaterial {
+    const m = createTronHologramMaterial({
+      color,
+      colorGain: TRON_HOLOGRAM_ENEMY_COLOR_GAIN,
+      alphaGain: TRON_HOLOGRAM_ENEMY_ALPHA_GAIN,
+      opacity: TRON_HOLOGRAM_ENEMY_MATERIAL_OPACITY,
+    })
+    this.tronMaterials.push(m)
+    return m
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // Build geometry
   // ═══════════════════════════════════════════════════════════════
 
   private buildBody(): void {
+    const hullTron = this.makeTron(PHAGE_TRON_HULL)
+    const neckTron = this.makeTron(PHAGE_TRON_NECK)
+    this.headTronMat = this.makeTron(PHAGE_TRON_HEAD)
+    const coreTron = this.makeTron(PHAGE_TRON_CORE)
+
     // Baseplate
-    const base = new THREE.Mesh(baseGeo, siliconMetal)
+    const base = new THREE.Mesh(baseGeo, hullTron)
     base.position.y = -0.05
     this.bodyGroup.add(base)
 
     // Ring around baseplate
-    const ring = new THREE.Mesh(ringGeo, siliconMetal)
+    const ring = new THREE.Mesh(ringGeo, hullTron)
     ring.rotation.x = Math.PI / 2
     ring.position.y = -0.05
     this.bodyGroup.add(ring)
 
     // Trunk connector
     const trunkGeo = new THREE.CylinderGeometry(0.18, 0.28, 0.35, 8)
-    const trunk = new THREE.Mesh(trunkGeo, siliconMetal)
+    const trunk = new THREE.Mesh(trunkGeo, hullTron)
     trunk.position.y = 0.15
     this.bodyGroup.add(trunk)
 
@@ -162,25 +175,25 @@ export class BacteriophageController implements Tickable {
     for (let i = 0; i < COLLAR_SEGMENTS; i++) {
       const r = 0.15 + (i % 2 === 0 ? 0.05 : -0.03)
       const segGeo = new THREE.CylinderGeometry(r, r, 0.04, 8)
-      const seg = new THREE.Mesh(segGeo, neckMat)
+      const seg = new THREE.Mesh(segGeo, neckTron)
       seg.position.y = COLLAR_START_Y + i * COLLAR_SPACING
       this.bodyGroup.add(seg)
     }
 
     // Collar cap ring
     const capRingGeo = new THREE.TorusGeometry(0.14, 0.015, 4, 8)
-    const capRing = new THREE.Mesh(capRingGeo, neckMat)
+    const capRing = new THREE.Mesh(capRingGeo, neckTron)
     capRing.rotation.x = Math.PI / 2
     capRing.position.y = 0.36
     this.bodyGroup.add(capRing)
 
     // Capsid head
-    this.head = new THREE.Mesh(headGeo, headMat)
+    this.head = new THREE.Mesh(headGeo, this.headTronMat)
     this.head.position.y = 0.75
     this.bodyGroup.add(this.head)
 
     // DNA core (inside head)
-    this.core = new THREE.Mesh(coreGeo, coreMat)
+    this.core = new THREE.Mesh(coreGeo, coreTron)
     this.core.position.y = 0.75
     this.bodyGroup.add(this.core)
 
@@ -191,13 +204,14 @@ export class BacteriophageController implements Tickable {
   }
 
   private buildLegs(): void {
+    const legTron = this.makeTron(PHAGE_TRON_LEG)
     for (let i = 0; i < LEG_COUNT; i++) {
       const angle = (i / LEG_COUNT) * Math.PI * 2
       const phase = i % 2 === 0 ? 0 : Math.PI
 
       const curve = this.makeLegCurve(angle, phase, 0, false)
       const geo = new THREE.TubeGeometry(curve, LEG_SEGMENTS, LEG_TUBE_RADIUS, 4, false)
-      const mesh = new THREE.Mesh(geo, legMat)
+      const mesh = new THREE.Mesh(geo, legTron)
       this.legsGroup.add(mesh)
       this.legs.push({ mesh, angle, phase })
     }
@@ -277,6 +291,7 @@ export class BacteriophageController implements Tickable {
   /** @inheritdoc */
   tick(dt: number): void {
     if (this.disposed) return
+    syncTronHologramTimeSeconds(this.tronMaterials, performance.now() * 0.001)
     this.elapsed += dt
     const t = this.elapsed + this.timeOffset
 
@@ -325,7 +340,7 @@ export class BacteriophageController implements Tickable {
     if (this.flashTimer > 0) {
       this.flashTimer -= dt
       if (this.flashTimer <= 0) {
-        this.head.material = headMat
+        this.head.material = this.headTronMat
       }
     }
   }
@@ -381,7 +396,7 @@ export class BacteriophageController implements Tickable {
     if (this.flashTimer > 0) {
       this.flashTimer -= dt
       if (this.flashTimer <= 0) {
-        this.head.material = headMat
+        this.head.material = this.headTronMat
       }
     }
 
@@ -434,20 +449,11 @@ export class BacteriophageController implements Tickable {
   /** Clean up all geometry and materials. */
   dispose(): void {
     this.disposed = true
+    disposeTronHologramMaterials(this.tronMaterials)
+    this.tronMaterials.length = 0
     this.group.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         child.geometry.dispose()
-        // Only dispose instance-owned materials (not shared statics)
-        if (
-          child.material !== siliconMetal &&
-          child.material !== neckMat &&
-          child.material !== headMat &&
-          child.material !== coreMat &&
-          child.material !== legMat &&
-          child.material !== flashMat
-        ) {
-          ;(child.material as THREE.Material).dispose()
-        }
       }
     })
   }

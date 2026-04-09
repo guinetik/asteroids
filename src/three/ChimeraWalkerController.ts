@@ -13,6 +13,14 @@
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 import type { Enemy } from '@/lib/fps/enemy'
+import {
+  createTronHologramMaterial,
+  disposeTronHologramMaterials,
+  syncTronHologramTimeSeconds,
+  TRON_HOLOGRAM_ENEMY_ALPHA_GAIN,
+  TRON_HOLOGRAM_ENEMY_COLOR_GAIN,
+  TRON_HOLOGRAM_ENEMY_MATERIAL_OPACITY,
+} from '@/three/tronHologramMaterial'
 
 const CHIMERA_SCALE = 0.9
 const LEG_SEGMENTS = 10
@@ -41,60 +49,22 @@ const DEATH_ANIM_DURATION = 1.35
  */
 export const CHIMERA_HIT_CENTER_Y = BODY_HEIGHT * CHIMERA_SCALE
 
-const darkMetalMat = new THREE.MeshStandardMaterial({
-  color: 0x1a1a1a,
-  metalness: 0.85,
-  roughness: 0.25,
-})
-
-const bodyMat = new THREE.MeshStandardMaterial({
-  color: 0x222222,
-  metalness: 0.7,
-  roughness: 0.3,
-  emissive: 0x0a1a1a,
-  emissiveIntensity: 0.2,
-})
-
-const neckMat = new THREE.MeshStandardMaterial({
-  color: 0x1a1a1a,
-  emissive: 0x0a2a2a,
-  emissiveIntensity: 0.3,
-})
-
-const headMat = new THREE.MeshPhysicalMaterial({
-  color: 0xcc3333,
-  transparent: true,
-  opacity: 0.3,
-  roughness: 0.15,
-  metalness: 0.1,
-})
-
-const headCoreMat = new THREE.MeshStandardMaterial({
-  color: 0x661111,
-  emissive: 0x330000,
-  emissiveIntensity: 0.5,
-  roughness: 0.5,
-  metalness: 0.2,
-})
-
-const dnaMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc })
-const rnaMat = new THREE.MeshBasicMaterial({ color: 0xff3355 })
-
-const tentacleMat = new THREE.MeshStandardMaterial({
-  color: 0x993333,
-  emissive: 0x331111,
-  emissiveIntensity: 0.3,
-  metalness: 0.5,
-  roughness: 0.4,
-})
-
-const tentacleTipMat = new THREE.MeshBasicMaterial({ color: 0xff6644 })
-
-const toeMat = new THREE.MeshStandardMaterial({
-  color: 0x111111,
-  metalness: 0.9,
-  roughness: 0.2,
-})
+/** TRON hull — legs, joints, toes, hip. */
+const CHIMERA_TRON_HULL = 0x00d4e8
+/** TRON torso + spine stack. */
+const CHIMERA_TRON_BODY = 0x00a8c4
+/** TRON head outer shell. */
+const CHIMERA_TRON_HEAD_MEMBRANE = 0xff2a7a
+/** TRON head inner core. */
+const CHIMERA_TRON_HEAD_CORE = 0xff0066
+/** TRON DNA torus accent. */
+const CHIMERA_TRON_DNA = 0x39ff14
+/** TRON RNA torus accent. */
+const CHIMERA_TRON_RNA = 0xff3366
+/** TRON tentacle shaft. */
+const CHIMERA_TRON_TENTACLE = 0xff00cc
+/** TRON tentacle tip. */
+const CHIMERA_TRON_TENTACLE_TIP = 0xff66dd
 
 const flashMat = new THREE.MeshBasicMaterial({ color: 0xff00ff })
 
@@ -169,6 +139,11 @@ export class ChimeraWalkerController implements Tickable {
   private rnaCore!: THREE.Mesh
   private bodyLight!: THREE.PointLight
   private headLight!: THREE.PointLight
+  /** Restores head shell after hit / death flash (shared TRON shader). */
+  private headMembraneMat!: THREE.ShaderMaterial
+  private readonly tronMaterials: THREE.ShaderMaterial[] = []
+  /** Eye emissives — disposed with this instance. */
+  private readonly disposableBasicMaterials: THREE.MeshBasicMaterial[] = []
 
   private elapsed = 0
   private readonly timeOffset = Math.random() * 10
@@ -209,9 +184,27 @@ export class ChimeraWalkerController implements Tickable {
     this.enemy.onDeath = () => this.die()
   }
 
+  /**
+   * Allocate a TRON hologram material tracked for time sync and disposal.
+   *
+   * @param color - Primary tint
+   * @returns Shader material instance
+   */
+  private makeTron(color: number): THREE.ShaderMaterial {
+    const m = createTronHologramMaterial({
+      color,
+      colorGain: TRON_HOLOGRAM_ENEMY_COLOR_GAIN,
+      alphaGain: TRON_HOLOGRAM_ENEMY_ALPHA_GAIN,
+      opacity: TRON_HOLOGRAM_ENEMY_MATERIAL_OPACITY,
+    })
+    this.tronMaterials.push(m)
+    return m
+  }
+
   /** @inheritdoc */
   tick(dt: number): void {
     if (this.disposed) return
+    syncTronHologramTimeSeconds(this.tronMaterials, performance.now() * 0.001)
     this.elapsed += dt
     const t = this.elapsed + this.timeOffset
 
@@ -279,7 +272,7 @@ export class ChimeraWalkerController implements Tickable {
     if (this.flashTimer > 0) {
       this.flashTimer -= dt
       if (this.flashTimer <= 0) {
-        this.headMembrane.material = headMat
+        this.headMembrane.material = this.headMembraneMat
       }
     }
   }
@@ -294,6 +287,12 @@ export class ChimeraWalkerController implements Tickable {
   /** Clean up owned geometry. */
   dispose(): void {
     this.disposed = true
+    disposeTronHologramMaterials(this.tronMaterials)
+    this.tronMaterials.length = 0
+    for (const m of this.disposableBasicMaterials) {
+      m.dispose()
+    }
+    this.disposableBasicMaterials.length = 0
     this.group.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         if (!SHARED_GEOMETRIES.has(child.geometry)) {
@@ -304,28 +303,34 @@ export class ChimeraWalkerController implements Tickable {
   }
 
   private buildBody(): void {
-    const torso = new THREE.Mesh(torsoGeo, bodyMat)
+    const bodyTron = this.makeTron(CHIMERA_TRON_BODY)
+    const hullTron = this.makeTron(CHIMERA_TRON_HULL)
+    const neckTron = this.makeTron(CHIMERA_TRON_BODY)
+    const dnaTron = this.makeTron(CHIMERA_TRON_DNA)
+    const rnaTron = this.makeTron(CHIMERA_TRON_RNA)
+
+    const torso = new THREE.Mesh(torsoGeo, bodyTron)
     torso.position.y = BODY_HEIGHT
     this.bodyGroup.add(torso)
 
     for (let i = 0; i < 6; i++) {
       const r = 0.35 - i * 0.03
       const segGeo = new THREE.CylinderGeometry(r, r + 0.02, 0.15, 8)
-      const seg = new THREE.Mesh(segGeo, neckMat)
+      const seg = new THREE.Mesh(segGeo, neckTron)
       seg.position.y = 7.7 + i * 0.16
       this.bodyGroup.add(seg)
       this.spineSegments.push(seg)
     }
 
-    const hip = new THREE.Mesh(hipGeo, darkMetalMat)
+    const hip = new THREE.Mesh(hipGeo, hullTron)
     hip.position.y = HIP_HEIGHT
     this.bodyGroup.add(hip)
 
-    this.dnaCore = new THREE.Mesh(dnaGeo, dnaMat)
+    this.dnaCore = new THREE.Mesh(dnaGeo, dnaTron)
     this.dnaCore.position.y = BODY_HEIGHT
     this.bodyGroup.add(this.dnaCore)
 
-    this.rnaCore = new THREE.Mesh(rnaGeo, rnaMat)
+    this.rnaCore = new THREE.Mesh(rnaGeo, rnaTron)
     this.rnaCore.position.y = BODY_HEIGHT
     this.bodyGroup.add(this.rnaCore)
 
@@ -335,11 +340,12 @@ export class ChimeraWalkerController implements Tickable {
   }
 
   private buildHead(): void {
-    this.headMembrane = new THREE.Mesh(headMembraneGeo, headMat)
+    this.headMembraneMat = this.makeTron(CHIMERA_TRON_HEAD_MEMBRANE)
+    this.headMembrane = new THREE.Mesh(headMembraneGeo, this.headMembraneMat)
     this.headMembrane.position.y = HEAD_HEIGHT
     this.headGroup.add(this.headMembrane)
 
-    this.headCore = new THREE.Mesh(headCoreGeo, headCoreMat)
+    this.headCore = new THREE.Mesh(headCoreGeo, this.makeTron(CHIMERA_TRON_HEAD_CORE))
     this.headCore.position.y = HEAD_HEIGHT
     this.headGroup.add(this.headCore)
 
@@ -348,10 +354,9 @@ export class ChimeraWalkerController implements Tickable {
     this.headGroup.add(this.headLight)
 
     for (const side of [-1, 1] as const) {
-      const eye = new THREE.Mesh(
-        new THREE.SphereGeometry(0.12, 6, 4),
-        new THREE.MeshBasicMaterial({ color: 0xff2200 }),
-      )
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2200 })
+      this.disposableBasicMaterials.push(eyeMat)
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 4), eyeMat)
       eye.position.set(side * 0.35, 8.95, 0.65)
       this.headGroup.add(eye)
 
@@ -362,17 +367,19 @@ export class ChimeraWalkerController implements Tickable {
   }
 
   private buildLegs(): void {
+    const legTron = this.makeTron(CHIMERA_TRON_HULL)
+    const toeTron = this.makeTron(CHIMERA_TRON_HULL)
     for (const side of [-1, 1] as const) {
       const upperMesh = new THREE.Mesh(
         new THREE.TubeGeometry(new THREE.LineCurve3(new THREE.Vector3(), new THREE.Vector3(0, -1, 0)), 8, LEG_TUBE_RADIUS_UPPER, 6),
-        darkMetalMat,
+        legTron,
       )
       const lowerMesh = new THREE.Mesh(
         new THREE.TubeGeometry(new THREE.LineCurve3(new THREE.Vector3(), new THREE.Vector3(0, -1, 0)), 8, LEG_TUBE_RADIUS_LOWER, 6),
-        darkMetalMat,
+        legTron,
       )
-      const kneeSphere = new THREE.Mesh(jointKneeGeo, darkMetalMat)
-      const ankleSphere = new THREE.Mesh(jointAnkleGeo, darkMetalMat)
+      const kneeSphere = new THREE.Mesh(jointKneeGeo, legTron)
+      const ankleSphere = new THREE.Mesh(jointAnkleGeo, legTron)
 
       this.legsGroup.add(upperMesh)
       this.legsGroup.add(lowerMesh)
@@ -381,7 +388,7 @@ export class ChimeraWalkerController implements Tickable {
 
       const toes: Array<{ mesh: THREE.Mesh; offset: number }> = []
       for (const offset of [-1, 0, 1]) {
-        const toe = new THREE.Mesh(toeGeo, toeMat)
+        const toe = new THREE.Mesh(toeGeo, toeTron)
         toe.rotation.x = Math.PI * 0.6
         this.legsGroup.add(toe)
         toes.push({ mesh: toe, offset })
@@ -400,6 +407,8 @@ export class ChimeraWalkerController implements Tickable {
   }
 
   private buildTentacles(): void {
+    const tentacleTron = this.makeTron(CHIMERA_TRON_TENTACLE)
+    const tentacleTipTron = this.makeTron(CHIMERA_TRON_TENTACLE_TIP)
     for (let i = 0; i < TENTACLE_COUNT; i++) {
       const angle = (i / TENTACLE_COUNT) * Math.PI * 2
       const meshes: THREE.Mesh[] = []
@@ -407,7 +416,7 @@ export class ChimeraWalkerController implements Tickable {
         const radius = Math.max(0.014, TENTACLE_RADIUS_START - s * TENTACLE_RADIUS_STEP)
         const mesh = new THREE.Mesh(
           new THREE.TubeGeometry(new THREE.LineCurve3(new THREE.Vector3(), new THREE.Vector3(0, -1, 0)), 8, radius, 5, false),
-          s < TENTACLE_SEGMENTS - 1 ? tentacleMat : tentacleTipMat,
+          s < TENTACLE_SEGMENTS - 1 ? tentacleTron : tentacleTipTron,
         )
         this.tentaclesGroup.add(mesh)
         meshes.push(mesh)
@@ -564,7 +573,7 @@ export class ChimeraWalkerController implements Tickable {
     if (this.flashTimer > 0) {
       this.flashTimer -= dt
       if (this.flashTimer <= 0) {
-        this.headMembrane.material = headMat
+        this.headMembrane.material = this.headMembraneMat
       }
     }
 
