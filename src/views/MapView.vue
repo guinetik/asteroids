@@ -48,6 +48,9 @@ import type { OrbitHudState } from '@/lib/orbitCapture'
 /** So Space Fabric gating matches storage before the first paint (also merged again in controller `init`). */
 hydratePlayerUpgradeLevelsFromStorage()
 
+/** Matches `index.html` document title — map screen top bar branding. */
+const MAP_SCREEN_GAME_TITLE = 'Asteroid Lander'
+
 const container = ref<HTMLElement>()
 const viewController = new MapViewController()
 const activeMessage = ref<ActiveShipMessage | null>(null)
@@ -368,8 +371,23 @@ function handleToggleGrid() {
 
 function closeShuttleControl() {
   shuttleControlVisible.value = false
-  const canvas = document.querySelector('canvas')
-  canvas?.requestPointerLock()
+  // Habitat opens the terminal after `exitPointerLock`; map mode uses orbit drag without lock.
+  if (habitatActive.value) {
+    const canvas = document.querySelector('canvas')
+    canvas?.requestPointerLock()
+  }
+}
+
+function openShuttleControlFromMap(): void {
+  shuttleControlVisible.value = true
+  upgradeLevelsUi.value = viewController.getUpgradeLevelsSnapshot()
+  shopProfile.value = viewController.getPlayerProfileSnapshot()
+  shopInventory.value = viewController.getPlayerInventorySnapshot()
+}
+
+function openHabitatFromMap(): void {
+  shuttleControlVisible.value = false
+  viewController.enterHabitat()
 }
 
 function openShopFromTerminal() {
@@ -486,6 +504,31 @@ function dockedPlanetId(): string | null {
   <p v-show="mapIntro.cinematicCaption" class="map-intro-cinematic-caption">
     {{ mapIntro.cinematicCaption }}
   </p>
+  <header
+    v-show="
+      !mapOverlay.visible &&
+      !mapIntro.controlsLocked &&
+      !habitatActive &&
+      !earthStartupOrbitHudSuppressed &&
+      !deathVisible
+    "
+    class="map-screen-nav"
+    aria-label="Map screen navigation"
+  >
+    <span class="map-screen-nav__title">{{ MAP_SCREEN_GAME_TITLE }}</span>
+    <div class="map-screen-nav__actions">
+      <button type="button" class="map-screen-nav__btn map-screen-nav__btn--habitat" @click="openHabitatFromMap">
+        H Habitat
+      </button>
+      <button
+        type="button"
+        class="map-screen-nav__btn map-screen-nav__btn--terminal"
+        @click="openShuttleControlFromMap"
+      >
+        Shuttle Control Panel
+      </button>
+    </div>
+  </header>
   <ShuttleHud
     v-show="
       !mapOverlay.visible &&

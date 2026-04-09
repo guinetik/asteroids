@@ -537,6 +537,35 @@ body {
   @apply pointer-events-none fixed bottom-[14%] left-0 right-0 z-[32] mx-auto max-w-3xl px-8 text-center font-mono text-sm font-medium uppercase leading-snug tracking-[0.18em] text-cyan-100/95 drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] md:text-base md:tracking-[0.22em];
 }
 
+/* Map route: title + quick access (habitat / shuttle terminal) — clears .credits-badge (top-right). */
+.map-screen-nav {
+  @apply fixed left-0 right-0 top-0 z-[35] flex items-center justify-between gap-4
+         border-b border-cyan-400/15 bg-gradient-to-b from-slate-950/92 to-transparent
+         px-4 py-2.5 pr-40 font-mono pointer-events-auto sm:px-6 sm:pr-44;
+}
+
+.map-screen-nav__title {
+  @apply text-xs font-bold uppercase tracking-[0.28em] text-cyan-200/90 drop-shadow-[0_0_8px_rgba(34,211,238,0.35)]
+         sm:text-sm sm:tracking-[0.32em];
+}
+
+.map-screen-nav__actions {
+  @apply flex flex-shrink-0 flex-wrap items-center justify-end gap-2;
+}
+
+.map-screen-nav__btn {
+  @apply rounded border px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest transition-colors
+         sm:px-3.5 sm:text-xs;
+}
+
+.map-screen-nav__btn--habitat {
+  @apply border-slate-400/35 bg-slate-400/10 text-slate-200 hover:border-slate-300/50 hover:bg-slate-400/18;
+}
+
+.map-screen-nav__btn--terminal {
+  @apply border-cyan-400/35 bg-cyan-400/10 text-cyan-200 hover:border-cyan-300/50 hover:bg-cyan-400/18;
+}
+
 .map-intro-message-prompt {
   @apply fixed inset-x-0 z-40 flex justify-center px-6;
   top: calc(var(--map-intro-letterbox-height) + 0.75rem);
