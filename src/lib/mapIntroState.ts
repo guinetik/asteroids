@@ -11,40 +11,63 @@
 
 import { easeInOutCubic } from '@/lib/math/easing'
 
-/** Duration in seconds for the opening cinematic zoom (three camera beats: approach, hold, handoff). */
-export const MAP_INTRO_CINEMATIC_DURATION = 14
+/** Duration in seconds for the opening cinematic (6 visual beats). */
+export const MAP_INTRO_CINEMATIC_DURATION = 30
 
-/** End of the wide solar-system title-card beat (eased intro progress; keep in sync with map intro camera). */
-export const MAP_INTRO_CINEMATIC_HERO_HOLD_START = 0.38
+/** Eased progress boundary: start of Enceladus discovery beat. */
+export const MAP_INTRO_BEAT_ENCELADUS = 0.12
 
-/** End of the hero hold beat before orbit-camera handoff (eased intro progress). */
-export const MAP_INTRO_CINEMATIC_HERO_HOLD_END = 0.82
+/** Eased progress boundary: start of Viroid reveal beat. */
+export const MAP_INTRO_BEAT_VIROIDS = 0.28
 
-/** Title line: establishing wide shot. */
+/** Eased progress boundary: start of Jupiter approach beat. */
+export const MAP_INTRO_BEAT_JUPITER = 0.42
+
+/** Eased progress boundary: start of cloud city reveal beat. */
+export const MAP_INTRO_BEAT_CLOUD_CITY = 0.56
+
+/** Eased progress boundary: start of Earth / player beat. */
+export const MAP_INTRO_BEAT_EARTH = 0.7
+
+/** Caption: wide solar system establishing shot. */
 export const MAP_INTRO_CAPTION_SOLAR_SYSTEM = 'SOLAR SYSTEM, 2299 AD.'
 
-/** Title line: approach / Earth context. */
-export const MAP_INTRO_CAPTION_SPACE_RACE =
-  'A NEW SPACE RACE IS BORN OUT OF REFURBISHED 21ST CENTURY TECH.'
+/** Caption: Enceladus neutron thruster discovery. */
+export const MAP_INTRO_CAPTION_ENCELADUS =
+  'A DISCOVERY ON ENCELADUS UNLOCKED RELATIVISTIC ACCELERATION AT OUR FINGERTIPS: THE NEUTRON THRUSTER.'
 
-/** Title line: final beat before message prompt. */
-export const MAP_INTRO_CAPTION_LANDER_OPERATOR =
-  'A RETIRED LANDER OPERATOR JUST ACQUIRED A REFURBISHED SPACE SHUTTLE.'
+/** Caption: Viroid reveal on Enceladus. */
+export const MAP_INTRO_CAPTION_VIROIDS =
+  'BUT IT WAS HOME TO SOMETHING ELSE. SILICATE CREATURES FROM INTERSTELLAR SPACE. TERRITORIAL AND LETHAL. WE CALL THEM VIROIDS.'
+
+/** Caption: Jupiter raw materials / humanity spreading. */
+export const MAP_INTRO_CAPTION_JUPITER_MATERIALS =
+  "FROM THE NEUTRON, HUMANITY SPREAD TO THE OUTER SYSTEM. JUPITER'S MOONS PROVIDED THE RAW MATERIALS."
+
+/** Caption: Jupiter cloud city assembly lines. */
+export const MAP_INTRO_CAPTION_CLOUD_CITY =
+  'ABOVE THE SURFACE, A CLOUD CITY 3D-PRINTED THE ASSEMBLY LINES.'
+
+/** Caption: retired lander operator receives shuttle. */
+export const MAP_INTRO_CAPTION_RETIRED_OPERATOR =
+  'A RETIRED LANDER OPERATOR JUST RECEIVED A REFURBISHED SHUTTLE FROM THE SPACE PROGRAM.'
 
 /**
- * Resolves the lower-third title line for a given eased intro progress value
- * (same easing domain as the map intro camera’s three beats).
+ * Resolves the lower-third title line for a given eased intro progress value.
  *
  * @param easedProgress - Eased 0–1 timeline (same cubic ease as the intro camera).
- * @returns One of the three caption strings.
+ * @returns One of the six caption strings.
  *
  * @author guinetik
- * @date 2026-04-06
+ * @date 2026-04-09
  */
 export function mapIntroCaptionForEasedProgress(easedProgress: number): string {
-  if (easedProgress < MAP_INTRO_CINEMATIC_HERO_HOLD_START) return MAP_INTRO_CAPTION_SOLAR_SYSTEM
-  if (easedProgress < MAP_INTRO_CINEMATIC_HERO_HOLD_END) return MAP_INTRO_CAPTION_SPACE_RACE
-  return MAP_INTRO_CAPTION_LANDER_OPERATOR
+  if (easedProgress < MAP_INTRO_BEAT_ENCELADUS) return MAP_INTRO_CAPTION_SOLAR_SYSTEM
+  if (easedProgress < MAP_INTRO_BEAT_VIROIDS) return MAP_INTRO_CAPTION_ENCELADUS
+  if (easedProgress < MAP_INTRO_BEAT_JUPITER) return MAP_INTRO_CAPTION_VIROIDS
+  if (easedProgress < MAP_INTRO_BEAT_CLOUD_CITY) return MAP_INTRO_CAPTION_JUPITER_MATERIALS
+  if (easedProgress < MAP_INTRO_BEAT_EARTH) return MAP_INTRO_CAPTION_CLOUD_CITY
+  return MAP_INTRO_CAPTION_RETIRED_OPERATOR
 }
 
 /** Phases of the map intro flow. */
