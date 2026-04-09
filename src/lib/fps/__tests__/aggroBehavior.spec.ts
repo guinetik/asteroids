@@ -95,4 +95,24 @@ describe('AggroBehavior', () => {
     expect(out.moveDir.x).toBeGreaterThan(0)
     expect(out.aimTargetX).toBe(12)
   })
+
+  it('should request eye projectile while chasing in the eye range band', () => {
+    const b = new AggroBehavior({
+      ...TEST_CONFIG,
+      eyeProjectile: { fireRate: 2, minRange: 5, maxRange: 30 },
+    })
+    const out = b.tick(0.016, 0, 0, 15, 1, 0, [])
+    expect(out.isChasing).toBe(true)
+    expect(out.wantsToFire).toBe(true)
+  })
+
+  it('should NOT request eye projectile inside min range', () => {
+    const b = new AggroBehavior({
+      ...TEST_CONFIG,
+      eyeProjectile: { fireRate: 2, minRange: 8, maxRange: 30 },
+    })
+    const out = b.tick(0.016, 0, 0, 3, 1, 0, [])
+    expect(out.isChasing).toBe(true)
+    expect(out.wantsToFire).toBe(false)
+  })
 })

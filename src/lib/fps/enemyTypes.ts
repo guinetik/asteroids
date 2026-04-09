@@ -43,6 +43,16 @@ export interface EnemyTypeConfig {
   projectileDamage: number
   /** Shots per second. */
   fireRate: number
+  /**
+   * Min horizontal distance to target before {@link AggroBehavior} eye lasers
+   * may fire (chimera-style). Unused when zero or when using {@link RangedBehavior}.
+   */
+  eyeLaserMinRange: number
+  /**
+   * Max horizontal distance for eye lasers (typically ≤ aggro radius).
+   * Zero = unused.
+   */
+  eyeLaserMaxRange: number
   /** Hover height above terrain. 0 = ground unit. */
   floatHeight: number
 }

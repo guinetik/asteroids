@@ -16,6 +16,8 @@
     "projectileSpeed": 0,
     "projectileDamage": 0,
     "fireRate": 0,
+    "eyeLaserMinRange": 0,
+    "eyeLaserMaxRange": 0,
     "floatHeight": 0
   },
   "spire": {
@@ -35,6 +37,8 @@
     "projectileSpeed": 30,
     "projectileDamage": 10,
     "fireRate": 0.5,
+    "eyeLaserMinRange": 0,
+    "eyeLaserMaxRange": 0,
     "floatHeight": 6
   },
   "chimera": {
@@ -51,9 +55,11 @@
     "contactCooldown": 1.1,
     "preferredRange": 0,
     "minRange": 0,
-    "projectileSpeed": 0,
-    "projectileDamage": 0,
-    "fireRate": 0,
+    "projectileSpeed": 32,
+    "projectileDamage": 12,
+    "fireRate": 0.38,
+    "eyeLaserMinRange": 6,
+    "eyeLaserMaxRange": 44,
     "floatHeight": 0
   }
 }

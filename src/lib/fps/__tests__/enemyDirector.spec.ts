@@ -16,6 +16,14 @@ vi.mock('@/data/fps/enemy-types.json', () => ({
       contactDamage: 15,
       contactRadius: 2.0,
       contactCooldown: 1.0,
+      preferredRange: 0,
+      minRange: 0,
+      projectileSpeed: 0,
+      projectileDamage: 0,
+      fireRate: 0,
+      eyeLaserMinRange: 0,
+      eyeLaserMaxRange: 0,
+      floatHeight: 0,
     },
   },
 }))
@@ -93,6 +101,17 @@ describe('EnemyDirector', () => {
     director.tick(0.016)
     const moved = Math.abs(handle.enemy.position.x - startX)
     expect(moved).toBeLessThan(1)
+  })
+
+  it('should push apart two enemies spawned on the same XZ', () => {
+    const a = director.spawn('bacteriophage', 5, 0, 5)
+    const b = director.spawn('bacteriophage', 5, 0, 5)
+    director.setPlayerPosition(999, 0, 999)
+    director.tick(0.08)
+    const dx = a.enemy.position.x - b.enemy.position.x
+    const dz = a.enemy.position.z - b.enemy.position.z
+    const dist = Math.sqrt(dx * dx + dz * dz)
+    expect(dist).toBeGreaterThan(0.5)
   })
 
   // --- Contact damage ---

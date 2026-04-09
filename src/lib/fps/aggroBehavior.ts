@@ -16,6 +16,16 @@ import type { EnemyBehavior, EnemyBehaviorOutput } from './enemy'
 import type { ChaseTargetSite } from './chaseTargeting'
 import { distSqXZ, pickNearestChaseSiteXZ } from './chaseTargeting'
 
+/** Optional eye-laser volleys while chasing (chimera-style), independent of movement. */
+export interface AggroEyeProjectileConfig {
+  /** Shots per second while in range band. */
+  fireRate: number
+  /** Min horizontal distance to target — avoids firing through melee overlap. */
+  minRange: number
+  /** Max horizontal distance — typically inside aggro. */
+  maxRange: number
+}
+
 /** Configuration for aggro behavior — sourced from EnemyTypeConfig. */
 export interface AggroBehaviorConfig {
   /** Distance at which the enemy starts chasing the player. */
@@ -30,6 +40,11 @@ export interface AggroBehaviorConfig {
   wanderSpeed: number
   /** Chase movement speed (units/s). */
   speed: number
+  /**
+   * When set, requests {@link EnemyBehaviorOutput.wantsToFire} on cooldown while
+   * chasing and the horizontal distance to the chase target lies in [minRange, maxRange].
+   */
+  eyeProjectile?: AggroEyeProjectileConfig
 }
 
 /** Minimum distance to wander target before picking a new one. */
@@ -57,6 +72,8 @@ export class AggroBehavior implements EnemyBehavior {
   private readonly config: AggroBehaviorConfig
   private state: AggroState = 'idle'
   private elapsed = 0
+  /** Seconds until the next optional eye-laser shot (chimera). */
+  private eyeProjectileCooldown = 0
 
   // Wander state
   private wanderTargetX = 0
@@ -101,16 +118,18 @@ export class AggroBehavior implements EnemyBehavior {
     } else if (this.state === 'chase' && distToNearest > this.config.leashRadius) {
       this.state = 'idle'
       this.pickWanderTarget()
+      this.eyeProjectileCooldown = 0
     }
 
     // --- Behavior ---
     if (this.state === 'chase') {
-      return this.tickChase(enemyX, enemyZ, nearest, distToNearest)
+      return this.tickChase(dt, enemyX, enemyZ, nearest, distToNearest)
     }
     return this.tickIdle(dt, enemyX, enemyZ, playerX, playerY, playerZ)
   }
 
   private tickChase(
+    dt: number,
     enemyX: number,
     enemyZ: number,
     nearest: ChaseTargetSite,
@@ -119,13 +138,19 @@ export class AggroBehavior implements EnemyBehavior {
     const dx = nearest.x - enemyX
     const dz = nearest.z - enemyZ
 
+    const eye = this.config.eyeProjectile
+    if (eye) {
+      this.eyeProjectileCooldown = Math.max(0, this.eyeProjectileCooldown - dt)
+    }
+    const wantsEyeFire = eye ? this.tryConsumeEyeProjectileFire(distToNearest, eye) : false
+
     if (distToNearest < 0.01) {
       return {
         moveDir: { x: 0, z: 0 },
         isMoving: false,
         isChasing: true,
         isAgitated: true,
-        wantsToFire: false,
+        wantsToFire: wantsEyeFire,
         aimTargetX: nearest.x,
         aimTargetY: nearest.y,
         aimTargetZ: nearest.z,
@@ -157,11 +182,29 @@ export class AggroBehavior implements EnemyBehavior {
       isMoving: true,
       isChasing: true,
       isAgitated,
-      wantsToFire: false,
+      wantsToFire: wantsEyeFire,
       aimTargetX: nearest.x,
       aimTargetY: nearest.y,
       aimTargetZ: nearest.z,
     }
+  }
+
+  /**
+   * If cooldown is clear and the chase target lies in the laser band, starts a
+   * new cooldown and returns true so the view can spawn a projectile.
+   *
+   * @param distToNearest - Horizontal distance to chase target
+   * @param eye - Eye projectile tuning
+   */
+  private tryConsumeEyeProjectileFire(
+    distToNearest: number,
+    eye: AggroEyeProjectileConfig,
+  ): boolean {
+    if (this.eyeProjectileCooldown > 0) return false
+    if (distToNearest < eye.minRange || distToNearest > eye.maxRange) return false
+    if (eye.fireRate <= 0) return false
+    this.eyeProjectileCooldown = 1 / eye.fireRate
+    return true
   }
 
   private tickIdle(

@@ -11,7 +11,7 @@
 import type { Tickable } from '@/lib/Tickable'
 import type { EnemyBehavior, EnemyBehaviorOutput } from './enemy'
 import { Enemy } from './enemy'
-import { AggroBehavior } from './aggroBehavior'
+import { AggroBehavior, type AggroEyeProjectileConfig } from './aggroBehavior'
 import { RangedBehavior } from './rangedBehavior'
 import { getEnemyTypeConfig } from './enemyTypes'
 import type { EnemyTypeConfig } from './enemyTypes'
@@ -55,6 +55,108 @@ const INITIAL_BEHAVIOR_OUTPUT: EnemyBehaviorOutput = {
   aimTargetX: 0,
   aimTargetY: 0,
   aimTargetZ: 0,
+}
+
+/**
+ * Clearance beyond combined {@link EnemyTypeConfig.hitRadius} values before
+ * separation is considered satisfied (world units).
+ */
+const ENEMY_SEPARATION_PADDING = 0.55
+
+/**
+ * Separation push magnitude when fully overlapped (world units / second); scaled
+ * by how deep inside the comfort zone the other enemy is.
+ */
+const ENEMY_SEPARATION_ACCEL = 14
+
+/**
+ * Squared XZ distance below which two enemies are treated as coincident for
+ * repulsion direction (avoids normalize of near-zero).
+ */
+const ENEMY_SEPARATION_COINCIDENT_DIST_SQ = 1e-6
+
+/**
+ * Golden-ish angle step so coincident spawns spread on different axes.
+ */
+const ENEMY_SEPARATION_COINCIDENT_ANGLE_STEP = 2.399963229728653
+
+/**
+ * After behavior intents are computed, apply XZ displacement = intent + separation
+ * so alive enemies do not sit on the same spot (boids-style repulsion in XZ only).
+ *
+ * @param handles - All director handles (dead entries ignored)
+ * @param dt - Delta time in seconds
+ */
+function applyMovementWithSeparation(handles: readonly EnemyHandle[], dt: number): void {
+  const alive: EnemyHandle[] = []
+  for (const h of handles) {
+    if (h.enemy.alive) alive.push(h)
+  }
+  const n = alive.length
+  if (n === 0) return
+
+  const startX: number[] = new Array(n)
+  const startZ: number[] = new Array(n)
+  const radius: number[] = new Array(n)
+  const intentX: number[] = new Array(n)
+  const intentZ: number[] = new Array(n)
+
+  for (let i = 0; i < n; i++) {
+    const h = alive[i]!
+    startX[i] = h.enemy.position.x
+    startZ[i] = h.enemy.position.z
+    radius[i] = h.config.hitRadius
+
+    const output = h.lastOutput
+    const speed = output.isMoving
+      ? (output.isChasing ? h.config.speed : h.config.wanderSpeed)
+      : 0
+    if (output.isMoving && speed > 0) {
+      intentX[i] = output.moveDir.x * speed * dt
+      intentZ[i] = output.moveDir.z * speed * dt
+    } else {
+      intentX[i] = 0
+      intentZ[i] = 0
+    }
+  }
+
+  const sepX: number[] = new Array(n).fill(0)
+  const sepZ: number[] = new Array(n).fill(0)
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      if (i === j) continue
+      const dx = startX[i]! - startX[j]!
+      const dz = startZ[i]! - startZ[j]!
+      const distSq = dx * dx + dz * dz
+      const minDist = radius[i]! + radius[j]! + ENEMY_SEPARATION_PADDING
+      const minSq = minDist * minDist
+      if (distSq >= minSq) continue
+
+      let nx: number
+      let nz: number
+      if (distSq <= ENEMY_SEPARATION_COINCIDENT_DIST_SQ) {
+        const ang = i * ENEMY_SEPARATION_COINCIDENT_ANGLE_STEP
+        nx = Math.cos(ang)
+        nz = Math.sin(ang)
+      } else {
+        const inv = 1 / Math.sqrt(distSq)
+        nx = dx * inv
+        nz = dz * inv
+      }
+
+      const dist = distSq <= ENEMY_SEPARATION_COINCIDENT_DIST_SQ ? 0 : Math.sqrt(distSq)
+      const urgency = dist <= ENEMY_SEPARATION_COINCIDENT_DIST_SQ ? 1 : (minDist - dist) / minDist
+      sepX[i]! += nx * urgency * ENEMY_SEPARATION_ACCEL
+      sepZ[i]! += nz * urgency * ENEMY_SEPARATION_ACCEL
+    }
+  }
+
+  for (let i = 0; i < n; i++) {
+    const h = alive[i]!
+    h.enemy.position.x = startX[i]! + intentX[i]! + sepX[i]! * dt
+    h.enemy.position.z = startZ[i]! + intentZ[i]! + sepZ[i]! * dt
+  }
 }
 
 export class EnemyDirector implements Tickable {
@@ -116,6 +218,18 @@ export class EnemyDirector implements Tickable {
     const enemy = new Enemy({ maxHp: config.maxHp, hitRadius: config.hitRadius })
     enemy.position.set(x, y, z)
 
+    const eyeProjectile: AggroEyeProjectileConfig | undefined =
+      config.preferredRange <= 0 &&
+      config.projectileSpeed > 0 &&
+      config.fireRate > 0 &&
+      config.eyeLaserMaxRange > config.eyeLaserMinRange
+        ? {
+            fireRate: config.fireRate,
+            minRange: config.eyeLaserMinRange,
+            maxRange: config.eyeLaserMaxRange,
+          }
+        : undefined
+
     const behavior = config.preferredRange > 0
       ? new RangedBehavior({
           aggroRadius: config.aggroRadius,
@@ -135,6 +249,7 @@ export class EnemyDirector implements Tickable {
           wanderRadius: config.wanderRadius,
           wanderSpeed: config.wanderSpeed,
           speed: config.speed,
+          eyeProjectile,
         })
 
     const handle: EnemyHandle = {
@@ -177,7 +292,7 @@ export class EnemyDirector implements Tickable {
     for (const handle of this.handles) {
       if (!handle.enemy.alive) continue
 
-      // Tick behavior
+      // Tick behavior (movement applied below with pairwise separation)
       const output = handle.behavior.tick(
         dt,
         handle.enemy.position.x,
@@ -188,16 +303,12 @@ export class EnemyDirector implements Tickable {
         this.chaseSiteScratch,
       )
       handle.lastOutput = output
+    }
 
-      // Apply movement — chase uses full speed, idle wander uses wanderSpeed
-      const speed = output.isMoving
-        ? (output.isChasing ? handle.config.speed : handle.config.wanderSpeed)
-        : 0
+    applyMovementWithSeparation(this.handles, dt)
 
-      if (output.isMoving && speed > 0) {
-        handle.enemy.position.x += output.moveDir.x * speed * dt
-        handle.enemy.position.z += output.moveDir.z * speed * dt
-      }
+    for (const handle of this.handles) {
+      if (!handle.enemy.alive) continue
 
       // Contact damage — player first, then nearest alive hostage
       handle.contactCooldown = Math.max(0, handle.contactCooldown - dt)

@@ -99,6 +99,7 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
   private readonly groundControllers = new Map<number, BacteriophageController>()
   private readonly spireControllers = new Map<number, SpireController>()
   private readonly chimeraControllers = new Map<number, ChimeraWalkerController>()
+  private readonly chimeraLaserOriginScratch = new THREE.Vector3()
   private readonly enemyProjectileMeshes = new Map<number, EnemyProjectileMesh>()
   private readonly enemyByHandleId = new Map<number, Enemy>()
   private readonly encounterEnemies: Enemy[] = []
@@ -419,17 +420,54 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
       ctrl.group.position.y = groundY
       handle.enemy.position.y = groundY + hitCenterY
 
-      if (handle.lastOutput.isMoving) {
-        const dir = handle.lastOutput.moveDir
-        ctrl.group.rotation.y = Math.atan2(dir.x, dir.z)
-      }
-
       const n = this.heightmap.normalAt(handle.enemy.position.x, handle.enemy.position.z)
       ctrl.group.rotation.x = Math.atan2(n.z, n.y)
       ctrl.group.rotation.z = Math.atan2(-n.x, n.y)
+
+      if (handle.type === 'chimera' && handle.lastOutput.isChasing) {
+        const ax = handle.lastOutput.aimTargetX
+        const az = handle.lastOutput.aimTargetZ
+        const adx = ax - handle.enemy.position.x
+        const adz = az - handle.enemy.position.z
+        ctrl.group.rotation.y = Math.atan2(adx, adz)
+      } else if (handle.lastOutput.isMoving) {
+        const dir = handle.lastOutput.moveDir
+        ctrl.group.rotation.y = Math.atan2(dir.x, dir.z)
+      }
     }
 
     ctrl.tick(dt)
+
+    if (
+      handle.type === 'chimera' &&
+      handle.enemy.alive &&
+      handle.lastOutput.wantsToFire
+    ) {
+      const chim = ctrl as ChimeraWalkerController
+      chim.group.updateMatrixWorld(true)
+      const muzzle = this.chimeraLaserOriginScratch
+      chim.getEyeLaserMuzzle(muzzle)
+      const aimX = handle.lastOutput.aimTargetX
+      const aimY = handle.lastOutput.aimTargetY
+      const aimZ = handle.lastOutput.aimTargetZ
+      const ddx = aimX - muzzle.x
+      const ddy = aimY - muzzle.y
+      const ddz = aimZ - muzzle.z
+      const dist = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz)
+      if (dist > 0.01) {
+        this.enemyProjectileSystem.spawn(
+          muzzle.x,
+          muzzle.y,
+          muzzle.z,
+          ddx / dist,
+          ddy / dist,
+          ddz / dist,
+          handle.config.projectileSpeed,
+          handle.config.projectileDamage,
+        )
+        chim.pulseEyeLaser()
+      }
+    }
   }
 
   private syncSpireController(

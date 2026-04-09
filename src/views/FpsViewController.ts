@@ -133,6 +133,7 @@ export class FpsViewController implements Tickable {
   private enemyProjectileSystem: EnemyProjectileSystem | null = null
   private readonly spireControllers = new Map<number, SpireController>()
   private readonly chimeraControllers = new Map<number, ChimeraWalkerController>()
+  private readonly chimeraLaserOriginScratch = new Vector3()
   private readonly enemyProjectileMeshes = new Map<number, EnemyProjectileMesh>()
   /** Rescue NPCs when `?hostages` is set — HP, bars, projectile registration. */
   private fpsHostageController: FpsHostageController | null = null
@@ -730,7 +731,15 @@ export class FpsViewController implements Tickable {
         ctrl.group.position.y = groundY
         handle.enemy.position.y = groundY + CHIMERA_HIT_CENTER_Y
 
-        if (handle.lastOutput.isMoving) {
+        const aimX = handle.lastOutput.aimTargetX
+        const aimY = handle.lastOutput.aimTargetY
+        const aimZ = handle.lastOutput.aimTargetZ
+
+        if (handle.lastOutput.isChasing) {
+          const dx = aimX - handle.enemy.position.x
+          const dz = aimZ - handle.enemy.position.z
+          ctrl.group.rotation.y = Math.atan2(dx, dz)
+        } else if (handle.lastOutput.isMoving) {
           const dir = handle.lastOutput.moveDir
           ctrl.group.rotation.y = Math.atan2(dir.x, dir.z)
         }
@@ -742,6 +751,29 @@ export class FpsViewController implements Tickable {
           )
           ctrl.group.rotation.x = Math.atan2(n.z, n.y)
           ctrl.group.rotation.z = Math.atan2(-n.x, n.y)
+        }
+
+        if (handle.lastOutput.wantsToFire && this.enemyProjectileSystem) {
+          ctrl.group.updateMatrixWorld(true)
+          const muzzle = this.chimeraLaserOriginScratch
+          ctrl.getEyeLaserMuzzle(muzzle)
+          const ddx = aimX - muzzle.x
+          const ddy = aimY - muzzle.y
+          const ddz = aimZ - muzzle.z
+          const dist = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz)
+          if (dist > 0.01) {
+            this.enemyProjectileSystem.spawn(
+              muzzle.x,
+              muzzle.y,
+              muzzle.z,
+              ddx / dist,
+              ddy / dist,
+              ddz / dist,
+              handle.config.projectileSpeed,
+              handle.config.projectileDamage,
+            )
+            ctrl.pulseEyeLaser()
+          }
         }
       }
     }

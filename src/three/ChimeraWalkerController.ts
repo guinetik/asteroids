@@ -45,6 +45,8 @@ const BODY_HEIGHT = 6.5
 const HIP_HEIGHT = 5.3
 const HEAD_HEIGHT = 8.8
 
+const CHIMERA_EYE_LASER_FLASH_DURATION = 0.085
+
 const HIT_FLASH_DURATION = 0.08
 const HIT_RECOIL_DURATION = 0.25
 const HIT_RECOIL_INTENSITY = 0.14
@@ -151,6 +153,14 @@ export class ChimeraWalkerController implements Tickable {
   private readonly tronMaterials: THREE.ShaderMaterial[] = []
   /** Eye emissives — disposed with this instance. */
   private readonly disposableBasicMaterials: THREE.MeshBasicMaterial[] = []
+  private leftEye!: THREE.Mesh
+  private rightEye!: THREE.Mesh
+  private leftEyeMat!: THREE.MeshBasicMaterial
+  private rightEyeMat!: THREE.MeshBasicMaterial
+  /** Alternates which eye the domain uses as the laser muzzle. */
+  private eyeLaserUseRight = false
+  /** Restores red eye materials after a laser pulse. */
+  private eyeLaserFlashTimer = 0
 
   private elapsed = 0
   private readonly timeOffset = Math.random() * 10
@@ -189,6 +199,27 @@ export class ChimeraWalkerController implements Tickable {
     this.refreshTentacleGeometry(0, false)
 
     this.enemy.onDeath = () => this.die()
+  }
+
+  /**
+   * World position of the eye used for this shot (alternates L/R). Call after the
+   * group’s world matrix is current (e.g. `group.updateMatrixWorld(true)`).
+   *
+   * @param out - Receives world-space muzzle position
+   */
+  getEyeLaserMuzzle(out: THREE.Vector3): void {
+    this.eyeLaserUseRight = !this.eyeLaserUseRight
+    const eye = this.eyeLaserUseRight ? this.rightEye : this.leftEye
+    eye.getWorldPosition(out)
+  }
+
+  /**
+   * Brief magenta flash on both eyes when a laser is fired.
+   */
+  pulseEyeLaser(): void {
+    this.eyeLaserFlashTimer = CHIMERA_EYE_LASER_FLASH_DURATION
+    this.leftEye.material = flashMat
+    this.rightEye.material = flashMat
   }
 
   /**
@@ -282,6 +313,14 @@ export class ChimeraWalkerController implements Tickable {
         this.headMembrane.material = this.headMembraneMat
       }
     }
+
+    if (this.eyeLaserFlashTimer > 0) {
+      this.eyeLaserFlashTimer -= dt
+      if (this.eyeLaserFlashTimer <= 0) {
+        this.leftEye.material = this.leftEyeMat
+        this.rightEye.material = this.rightEyeMat
+      }
+    }
   }
 
   /** Flash the head membrane magenta and apply recoil. */
@@ -366,6 +405,13 @@ export class ChimeraWalkerController implements Tickable {
       const eye = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 4), eyeMat)
       eye.position.set(side * 0.35, 8.95, 0.65)
       this.headGroup.add(eye)
+      if (side === -1) {
+        this.leftEye = eye
+        this.leftEyeMat = eyeMat
+      } else {
+        this.rightEye = eye
+        this.rightEyeMat = eyeMat
+      }
     }
   }
 
@@ -565,6 +611,14 @@ export class ChimeraWalkerController implements Tickable {
     this.deathTimer += dt
     const progress = Math.min(1, this.deathTimer / DEATH_ANIM_DURATION)
     const ease = progress * progress
+
+    if (this.eyeLaserFlashTimer > 0) {
+      this.eyeLaserFlashTimer -= dt
+      if (this.eyeLaserFlashTimer <= 0) {
+        this.leftEye.material = this.leftEyeMat
+        this.rightEye.material = this.rightEyeMat
+      }
+    }
 
     this.bodyGroup.position.y = -ease * 1.8
     this.bodyGroup.rotation.x = ease * 1.2 + Math.sin(time * 15) * 0.08 * (1 - ease)
