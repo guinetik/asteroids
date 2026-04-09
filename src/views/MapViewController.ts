@@ -141,49 +141,21 @@ import {
 import type { Inventory } from '@/lib/inventory/types'
 import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
 import '@/lib/shop/tradeGoods'
-import {
-  createMissionBoard,
-  offerMission,
-  acceptMission,
-  completeMission,
-  deliverMission,
-  tickMissionBoard,
-  getActiveMissionsForPlanet,
-  offerAsteroidMission,
-  acceptAsteroidMission,
-  beginAsteroidMission,
-  tickAsteroidMissionBoard,
-} from '@/lib/missions/shuttleMissionSession'
 import type {
   ShuttleMissionBoard,
   ActiveShuttleMission,
   GeneratedAsteroidMission,
 } from '@/lib/missions/types'
 import { getGatherItemForPlanet } from '@/lib/missions/planetOrbitalConfig'
-import { generateAsteroidMission } from '@/lib/missions/asteroidMissionGenerator'
-import { computeMissionDifficulty } from '@/lib/missions/missionDifficulty'
 import { getSpecialMissionById } from '@/lib/missions/specialMissions'
 import {
   clearActiveMission,
   consumePendingMapReturnWorld,
-  loadActiveMission,
   saveActiveMission,
 } from '@/lib/missions/missionStorage'
-import { isWithinAsteroidMissionApproachRadius } from '@/lib/missions/mapAsteroidMissionApproach'
 import '@/lib/missions/missionMaterials'
-import {
-  createWaypointMarkerGroup,
-  disposeWaypointMarkerGroup,
-  tickWaypointMarkerGroup,
-  ORBIT_MAP_WAYPOINT_SCALE_REFERENCE,
-  WAYPOINT_MARKER_DEFAULT_COLOR,
-} from '@/three/WaypointMarkers'
-import {
-  createMapMissionAsteroidPreviewMesh,
-  disposeMapMissionAsteroidPreviewMesh,
-  missionAsteroidShapeSeed,
-} from '@/three/MapMissionAsteroidPreview'
 import { MapIntroFacade } from '@/lib/map/intro/MapIntroFacade'
+import { MapMissionFacade } from '@/lib/map/missions/MapMissionFacade'
 import {
   ADRIFT_TIMEOUT,
   APPROACH_DURATION,
@@ -323,9 +295,7 @@ export class MapViewController implements Tickable {
   private shopSession: ShopSession | null = null
   private shopDialogOpen = false
   private pendingModuleInstallTimer: TimerHandle | null = null
-  private missionBoard: ShuttleMissionBoard = createMissionBoard()
-  private missionOverlayOpen = false
-  private missionButtonVisible = false
+  private missionFacade = new MapMissionFacade()
   /**
    * Set in {@link init} from {@link loadProfile} or {@link createProfile}.
    * Starting placeholder matches fresh profile credits until init runs.
@@ -404,11 +374,6 @@ export class MapViewController implements Tickable {
    * Root at the mission waypoint world position; uniform screen scaling applies to the cyan marker
    * and the optional GLB asteroid preview.
    */
-  private missionWaypointRoot: THREE.Group | null = null
-  /** Cyan beam / ring / diamond group (child of `missionWaypointRoot`). */
-  private missionOrbitWaypointMarker: THREE.Group | null = null
-  /** Random asteroid mesh beside the beam; populated after `asteroids.glb` loads. */
-  private missionAsteroidPreviewMesh: THREE.Mesh | null = null
 
   /** Called when map overlay state changes for Vue HUD. */
   onMapOverlay: ((state: MapOverlayState) => void) | null = null
@@ -475,6 +440,30 @@ export class MapViewController implements Tickable {
     | null = null
   /** Fired when fuel cell count changes (for HUD refuel button). */
   onFuelCellCount: ((count: number) => void) | null = null
+
+  private get missionBoard(): ShuttleMissionBoard {
+    return this.missionFacade.board
+  }
+
+  private set missionBoard(value: ShuttleMissionBoard) {
+    this.missionFacade.board = value
+  }
+
+  private get missionOverlayOpen(): boolean {
+    return this.missionFacade.overlayOpen
+  }
+
+  private set missionOverlayOpen(value: boolean) {
+    this.missionFacade.overlayOpen = value
+  }
+
+  private get missionButtonVisible(): boolean {
+    return this.missionFacade.buttonVisible
+  }
+
+  private set missionButtonVisible(value: boolean) {
+    this.missionFacade.buttonVisible = value
+  }
 
   /** Called when mission button visibility changes in OrbitPrompt. */
   onMissionButton: ((visible: boolean, planetName: string) => void) | null = null
@@ -918,7 +907,7 @@ export class MapViewController implements Tickable {
       },
     })
 
-    this.hydrateAsteroidMissionFromStorage()
+    this.missionFacade.hydrateFromStorage(this.onMissionBoardUpdate)
     this.onCreditsUpdate?.(this.playerProfile.credits)
 
     // Start
@@ -1217,20 +1206,11 @@ export class MapViewController implements Tickable {
         this.missionOverlayOpen = false
         this.onMissionOverlay?.(false, null, false)
       } else {
-        const targetName = this.orbitSystem?.target?.name ?? null
-        const planet = targetName ? PLANETS.find((p) => p.name === targetName) : null
-        if (planet) {
-          const missions = getActiveMissionsForPlanet(this.missionBoard, planet.id)
-          if (missions.length > 0) {
-            const mission = missions[0]!
-            const gatherItem = getGatherItemForPlanet(planet.id)
-            const canFit = gatherItem
-              ? canFitItem(this.playerInventory, gatherItem, mission.template.gatherQuantity)
-              : false
-            this.missionOverlayOpen = true
-            this.onMissionOverlay?.(true, mission, canFit)
-          }
-        }
+        this.missionFacade.toggleOrbitMissionOverlay({
+          targetName: this.orbitSystem?.target?.name ?? null,
+          inventory: this.playerInventory,
+          onMissionOverlay: this.onMissionOverlay,
+        })
       }
     }
 
@@ -1654,58 +1634,29 @@ export class MapViewController implements Tickable {
       }
       this.updateShopSession()
       this.updateMissionState()
-      this.missionBoard = tickMissionBoard(this.missionBoard, dt)
-      this.missionBoard = tickAsteroidMissionBoard(this.missionBoard, dt)
+      this.missionFacade.tick(dt)
     }
 
     // Waypoint marker scale + VFX (must not gate begin-mission proximity — marker refs can lag).
-    this.syncWaypointMarker()
-    if (
-      this.missionWaypointRoot &&
-      this.missionOrbitWaypointMarker &&
-      this.vehicleCamera &&
-      this.shuttleController &&
-      this.missionBoard.activeAsteroidMission
-    ) {
-      const dist = this.vehicleCamera.camera.position.distanceTo(this.missionWaypointRoot.position)
-      const halfFovRad = THREE.MathUtils.degToRad(this.vehicleCamera.camera.fov / 2)
-      const targetScreenHeight = WAYPOINT_APPARENT_SIZE * 2 * dist * Math.tan(halfFovRad)
-      const uniformScale = targetScreenHeight / ORBIT_MAP_WAYPOINT_SCALE_REFERENCE
-      this.missionWaypointRoot.scale.setScalar(uniformScale)
-
-      tickWaypointMarkerGroup(
-        this.missionOrbitWaypointMarker,
-        this.simTime,
-        this.shuttleController.position.x,
-        this.shuttleController.position.z,
-      )
+    if (this.sceneObjects && this.vehicleCamera && this.shuttleController) {
+      this.missionFacade.tickWaypointVisuals({
+        scene: this.sceneObjects.scene,
+        vehicleCamera: this.vehicleCamera,
+        shuttlePosition: this.shuttleController.position,
+        simTime: this.simTime,
+        apparentSize: WAYPOINT_APPARENT_SIZE,
+      })
     }
 
-    const activeAsteroid = this.missionBoard.activeAsteroidMission
-    if (
-      this.shuttleController &&
-      !this.shuttleController.dead &&
-      activeAsteroid &&
-      activeAsteroid.status === 'accepted'
-    ) {
-      const sx = this.shuttleController.position.x
-      const sz = this.shuttleController.position.z
-      const inApproachRadius = isWithinAsteroidMissionApproachRadius(
-        sx,
-        sz,
-        activeAsteroid.waypoint,
-      )
-      const orbitState = this.orbitSystem?.state ?? 'free'
-      if (inApproachRadius && this.inputManager?.wasActionPressed('beginMission')) {
-        if (orbitState === 'approaching') {
-          this.cancelOrbitApproachFromMap()
-        }
-        if (this.orbitSystem?.state === 'free') {
-          const mission = activeAsteroid
-          this.missionBoard = beginAsteroidMission(this.missionBoard)
-          saveActiveMission({ ...mission, status: 'in-transit' })
-          this.onBeginAsteroidMission?.(mission)
-        }
+    if (this.shuttleController && !this.shuttleController.dead) {
+      const mission = this.missionFacade.tryBeginAsteroidMission({
+        shuttlePosition: this.shuttleController.position,
+        orbitSystem: this.orbitSystem,
+        beginMissionPressed: this.inputManager?.wasActionPressed('beginMission') ?? false,
+        cancelOrbitApproachFromMap: () => this.cancelOrbitApproachFromMap(),
+      })
+      if (mission) {
+        this.onBeginAsteroidMission?.(mission)
       }
     }
 
@@ -1987,27 +1938,13 @@ export class MapViewController implements Tickable {
 
   /** Update mission button visibility based on orbit state. */
   private updateMissionState(): void {
-    const orbitState = this.orbitSystem?.state ?? 'free'
-    const targetName = this.orbitSystem?.target?.name ?? null
-
-    if (orbitState === 'orbiting' && targetName) {
-      const planet = PLANETS.find((p) => p.name === targetName)
-      if (planet) {
-        const activeMissions = getActiveMissionsForPlanet(this.missionBoard, planet.id)
-        const hasActiveMission = activeMissions.length > 0
-        if (hasActiveMission !== this.missionButtonVisible) {
-          this.missionButtonVisible = hasActiveMission
-          this.onMissionButton?.(hasActiveMission, targetName)
-        }
-      }
-    } else if (this.missionButtonVisible) {
-      this.missionButtonVisible = false
-      this.onMissionButton?.(false, '')
-      if (this.missionOverlayOpen) {
-        this.missionOverlayOpen = false
-        this.onMissionOverlay?.(false, null, false)
-      }
-    }
+    this.missionFacade.updateMissionState({
+      orbitState: this.orbitSystem?.state ?? 'free',
+      targetName: this.orbitSystem?.target?.name ?? null,
+      inventory: this.playerInventory,
+      onMissionButton: this.onMissionButton,
+      onMissionOverlay: this.onMissionOverlay,
+    })
   }
 
   /**
@@ -2090,87 +2027,60 @@ export class MapViewController implements Tickable {
 
   /** Offer a mission when docking at a planet. */
   offerMissionAtPlanet(planetId: string): void {
-    if (!this.missionBoard.offeredMission) {
-      this.missionBoard = offerMission(this.missionBoard, planetId)
-      this.onMissionBoardUpdate?.(this.missionBoard)
-    }
+    this.missionFacade.offerMissionAtPlanet(planetId, this.onMissionBoardUpdate)
   }
 
   /** Accept the offered mission (from shuttle control UI). */
   missionAccept(): void {
-    this.missionBoard = acceptMission(this.missionBoard)
-    this.onMissionBoardUpdate?.(this.missionBoard)
+    this.missionFacade.missionAccept(this.onMissionBoardUpdate)
   }
 
   /** Generate and offer an asteroid mission based on current difficulty. */
   offerAsteroidMissionFromDifficulty(): void {
-    if (this.missionBoard.offeredAsteroidMission || this.missionBoard.activeAsteroidMission) return
-    if (this.missionBoard.asteroidRestockTimer) return
-    const difficulty = computeMissionDifficulty(CURRENT_PLAYER_UPGRADE_LEVELS)
-    const mission = generateAsteroidMission(difficulty)
-    this.missionBoard = offerAsteroidMission(this.missionBoard, mission)
-    this.onMissionBoardUpdate?.(this.missionBoard)
+    this.missionFacade.offerAsteroidMissionFromDifficulty(this.onMissionBoardUpdate)
   }
 
   /** Accept the offered asteroid mission (from shuttle control UI). */
   asteroidMissionAccept(): void {
-    this.missionBoard = acceptAsteroidMission(this.missionBoard)
-    const active = this.missionBoard.activeAsteroidMission
-    if (active) saveActiveMission(active)
-    this.onMissionBoardUpdate?.(this.missionBoard)
+    this.missionFacade.asteroidMissionAccept(this.onMissionBoardUpdate)
   }
 
   /** Complete the mission minigame (from overlay UI). */
   missionComplete(missionId: string): void {
-    const result = completeMission(this.missionBoard, missionId, this.playerInventory)
-    if (result.ok) {
-      this.missionBoard = result.board
-      this.playerInventory = result.inventory
-      this.missionOverlayOpen = false
-      this.onMissionOverlay?.(false, null, false)
-      this.onMissionBoardUpdate?.(this.missionBoard)
-      this.onMissionComplete?.(
-        result.board.activeMissions.find((m) => m.template.id === missionId) ?? null,
-      )
-    }
+    this.playerInventory = this.missionFacade.missionComplete({
+      missionId,
+      inventory: this.playerInventory,
+      onMissionOverlay: this.onMissionOverlay,
+      onMissionBoardUpdate: this.onMissionBoardUpdate,
+      onMissionComplete: this.onMissionComplete,
+    })
   }
 
   /** Deliver a completed mission (from shuttle control UI). */
   missionDeliver(missionId: string): void {
-    const mission = this.missionBoard.activeMissions.find((m) => m.template.id === missionId)
-    const result = deliverMission(
-      this.missionBoard,
+    const result = this.missionFacade.missionDeliver({
       missionId,
-      this.playerProfile,
-      this.playerInventory,
-      getCurrentUpgradeValue('shuttleScienceStation'),
-    )
-    if (result.ok) {
-      this.missionBoard = result.board
+      profile: this.playerProfile,
+      inventory: this.playerInventory,
+      scienceStationLevel: getCurrentUpgradeValue('shuttleScienceStation'),
+      onMissionBoardUpdate: this.onMissionBoardUpdate,
+      onMissionDeliver: this.onMissionDeliver,
+    })
+    if (result.creditsChanged) {
       this.playerProfile = result.profile
       this.playerInventory = result.inventory
       this.persistPlayerProfile()
-      this.onMissionBoardUpdate?.(this.missionBoard)
       this.onCreditsUpdate?.(this.playerProfile.credits)
-      this.onMissionDeliver?.(mission ?? null)
     }
   }
 
   /** Open the mission overlay (called by Vue OrbitPrompt click). */
   openMissionOverlay(): void {
-    if (!this.missionButtonVisible || this.missionOverlayOpen) return
-    const targetName = this.orbitSystem?.target?.name ?? null
-    const planet = targetName ? PLANETS.find((p) => p.name === targetName) : null
-    if (!planet) return
-    const missions = getActiveMissionsForPlanet(this.missionBoard, planet.id)
-    if (missions.length === 0) return
-    const mission = missions[0]!
-    const gatherItem = getGatherItemForPlanet(planet.id)
-    const canFit = gatherItem
-      ? canFitItem(this.playerInventory, gatherItem, mission.template.gatherQuantity)
-      : false
-    this.missionOverlayOpen = true
-    this.onMissionOverlay?.(true, mission, canFit)
+    this.missionFacade.openMissionOverlay({
+      targetName: this.orbitSystem?.target?.name ?? null,
+      inventory: this.playerInventory,
+      onMissionOverlay: this.onMissionOverlay,
+    })
   }
 
   /** Enter the habitat interior (called from map nav “H Habitat” / startup handoff). */
@@ -2368,87 +2278,6 @@ export class MapViewController implements Tickable {
         },
       },
     ])
-  }
-
-  /**
-   * Restore an in-progress asteroid mission from localStorage after refresh
-   * (accepted → navigate to waypoint; in-transit → /level still valid).
-   */
-  private hydrateAsteroidMissionFromStorage(): void {
-    if (typeof localStorage === 'undefined') return
-    const stored = loadActiveMission()
-    if (!stored) return
-    if (stored.status !== 'accepted' && stored.status !== 'in-transit') return
-    if (this.missionBoard.activeAsteroidMission) return
-    this.missionBoard = { ...this.missionBoard, activeAsteroidMission: stored }
-    this.onMissionBoardUpdate?.(this.missionBoard)
-  }
-
-  /** Create or destroy the waypoint marker mesh based on active asteroid mission. */
-  private syncWaypointMarker(): void {
-    const mission = this.missionBoard.activeAsteroidMission
-    if (
-      shouldShowAsteroidMissionMapSite(mission) &&
-      !this.missionWaypointRoot &&
-      this.sceneObjects
-    ) {
-      const root = new THREE.Group()
-      root.position.set(mission!.waypoint.worldX, 0, mission!.waypoint.worldZ)
-      const waypoint = createWaypointMarkerGroup(WAYPOINT_MARKER_DEFAULT_COLOR, 'orbitMap')
-      root.add(waypoint)
-      this.sceneObjects.scene.add(root)
-      this.missionWaypointRoot = root
-      this.missionOrbitWaypointMarker = waypoint
-      void this.spawnMissionAsteroidPreview(root, mission!)
-    } else if (!shouldShowAsteroidMissionMapSite(mission) && this.missionWaypointRoot) {
-      this.disposeMissionWaypointSite()
-    }
-  }
-
-  /**
-   * Add an asteroid from `asteroids.glb` beside the waypoint (async load).
-   *
-   * @param root - Mission site root this load was started for
-   * @param mission - Active shuttle asteroid mission
-   */
-  private async spawnMissionAsteroidPreview(
-    root: THREE.Group,
-    mission: GeneratedAsteroidMission,
-  ): Promise<void> {
-    try {
-      const mesh = await createMapMissionAsteroidPreviewMesh(missionAsteroidShapeSeed(mission.id))
-      if (this.missionWaypointRoot !== root) {
-        disposeMapMissionAsteroidPreviewMesh(mesh)
-        return
-      }
-      const active = this.missionBoard.activeAsteroidMission
-      if (!active || active.id !== mission.id || !shouldShowAsteroidMissionMapSite(active)) {
-        disposeMapMissionAsteroidPreviewMesh(mesh)
-        return
-      }
-      root.add(mesh)
-      this.missionAsteroidPreviewMesh = mesh
-    } catch (err) {
-      console.warn('[MapView] mission asteroid preview failed', err)
-    }
-  }
-
-  /**
-   * Remove the mission waypoint root; dispose orbit marker and asteroid preview.
-   */
-  private disposeMissionWaypointSite(): void {
-    if (this.missionAsteroidPreviewMesh) {
-      disposeMapMissionAsteroidPreviewMesh(this.missionAsteroidPreviewMesh)
-      this.missionAsteroidPreviewMesh = null
-    }
-    if (this.missionOrbitWaypointMarker) {
-      disposeWaypointMarkerGroup(this.missionOrbitWaypointMarker)
-      this.missionOrbitWaypointMarker = null
-    }
-    if (this.missionWaypointRoot && this.sceneObjects) {
-      this.sceneObjects.scene.remove(this.missionWaypointRoot)
-      this.missionWaypointRoot = null
-    }
   }
 
   /**
@@ -2674,20 +2503,19 @@ export class MapViewController implements Tickable {
     this.playerInventory = this.inventoryWithStarterFuelCells(
       this.createInventoryForCurrentCargoBayLevel(),
     )
-    this.missionBoard = createMissionBoard()
     clearActiveMission()
-    if (this.missionOverlayOpen) {
-      this.missionOverlayOpen = false
-      this.onMissionOverlay?.(false, null, false)
-    }
-    this.disposeMissionWaypointSite()
+    this.missionFacade.reset(
+      this.sceneObjects?.scene ?? null,
+      this.onMissionOverlay,
+      this.onMissionButton,
+      this.onMissionBoardUpdate,
+    )
     this.persistPlayerProfile()
     resetDemand()
     this.onShopButton?.(false, '')
     this.emitShopState()
     this.onCreditsUpdate?.(this.playerProfile.credits)
     this.emitFuelCellCount()
-    this.onMissionBoardUpdate?.(this.missionBoard)
 
     // Clear death state + show shuttle again, remove ice tint
     this.shuttleController.resetDeath()
@@ -3597,7 +3425,7 @@ export class MapViewController implements Tickable {
     if (this.sceneObjects?.scene) {
       this.introFacade?.dispose(this.sceneObjects.scene)
     }
-    this.disposeMissionWaypointSite()
+    this.missionFacade.dispose(this.sceneObjects?.scene ?? null)
     document.removeEventListener('mousemove', this.onHabitatMouseMove)
     this.sceneObjects?.renderer.domElement.removeEventListener('click', this.onHabitatClick)
     this.habitatScene?.dispose()
