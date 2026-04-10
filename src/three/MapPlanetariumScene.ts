@@ -11,6 +11,7 @@ import { PlanetSystemController } from '@/three/controllers/PlanetSystemControll
 import { AsteroidBeltController } from '@/three/controllers/AsteroidBeltController'
 import { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
 import { createGravityDistortionPass } from '@/three/GravityDistortionPass'
+import { createGravitySurfPass } from '@/three/GravitySurfPass'
 import { createSlingshotSpeedPass } from '@/three/SlingshotSpeedPass'
 import mapGravityData from '@/data/shuttle/map-gravity.json'
 
@@ -22,6 +23,7 @@ export interface MapPlanetariumSceneRefs {
   beltControllers: AsteroidBeltController[]
   spaceTimeGrid: SpaceTimeGrid
   gravityPass: ShaderPass
+  gravitySurfPass: ShaderPass
   slingshotSpeedPass: ShaderPass
   mapGridSize: number
 }
@@ -90,6 +92,9 @@ export class MapPlanetariumScene {
     )
     sceneObjects.composer.addPass(gravityPass)
 
+    const gravitySurfPass = createGravitySurfPass()
+    sceneObjects.composer.addPass(gravitySurfPass)
+
     const slingshotSpeedPass = createSlingshotSpeedPass()
     sceneObjects.composer.addPass(slingshotSpeedPass)
 
@@ -101,6 +106,7 @@ export class MapPlanetariumScene {
       beltControllers,
       spaceTimeGrid,
       gravityPass,
+      gravitySurfPass,
       slingshotSpeedPass,
       mapGridSize,
     }

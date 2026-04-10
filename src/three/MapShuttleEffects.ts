@@ -1,4 +1,5 @@
 import type { Tickable } from '@/lib/Tickable'
+import { GravitySurfEffectController } from '@/three/GravitySurfEffectController'
 import { MAP_VIEW_CONTROLLER_CONFIG as MAP_CONFIG } from '@/lib/map/mapViewControllerConfig'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
 import { TemperatureEffectController } from '@/three/TemperatureEffectController'
@@ -10,6 +11,7 @@ import * as THREE from 'three'
 export class MapShuttleEffects {
   readonly thrusterController: ThrusterEffectController
   readonly temperatureEffects: TemperatureEffectController
+  readonly gravitySurfEffects: GravitySurfEffectController
   readonly explosionEmitter: ParticleEmitter
 
   constructor(sceneObjects: MapSceneObjects, shuttleController: ShuttleController) {
@@ -21,6 +23,9 @@ export class MapShuttleEffects {
     this.temperatureEffects = new TemperatureEffectController()
     shuttleController.group.add(this.temperatureEffects.fireEmitter.points)
     shuttleController.group.add(this.temperatureEffects.frostEmitter.points)
+
+    this.gravitySurfEffects = new GravitySurfEffectController()
+    shuttleController.group.add(this.gravitySurfEffects.lines)
 
     this.explosionEmitter = new ParticleEmitter({
       poolSize: 200,
@@ -34,11 +39,20 @@ export class MapShuttleEffects {
   }
 
   getTickables(): Tickable[] {
-    return [this.thrusterController, this.temperatureEffects, this.explosionEmitter]
+    return [
+      this.thrusterController,
+      this.temperatureEffects,
+      this.gravitySurfEffects,
+      this.explosionEmitter,
+    ]
   }
 
   setTemperature(temperature: number): void {
     this.temperatureEffects.setTemperature(temperature)
+  }
+
+  setGravitySurfing(active: boolean, intensity: number): void {
+    this.gravitySurfEffects.setActive(active, intensity)
   }
 
   emitExplosion(position: THREE.Vector3, count: number = 150): void {
@@ -55,5 +69,6 @@ export class MapShuttleEffects {
   dispose(): void {
     this.thrusterController.dispose()
     this.temperatureEffects.dispose()
+    this.gravitySurfEffects.dispose()
   }
 }

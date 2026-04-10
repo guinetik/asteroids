@@ -15,6 +15,7 @@ export const DEFAULT_BINDINGS: Record<string, string[]> = {
   // Cargo bay doors + map inspect camera toggle.
   toggleDoors: ['KeyR'],
   toggleCamera: ['KeyC'],
+  gravitySurfingToggle: ['KeyQ'],
   orbitAction: ['KeyE'],
   // At asteroid mission waypoint — begin landing approach (orbit must be free).
   beginMission: ['KeyF'],

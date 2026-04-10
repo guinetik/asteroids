@@ -14,6 +14,7 @@ const telemetry = reactive<ShuttleTelemetry>({
   heading: 0,
   posX: 0,
   posZ: 0,
+  actionPrompt: null,
   fuelLevel: 0,
   fuelCapacity: 0,
   thrustCharge: 0,

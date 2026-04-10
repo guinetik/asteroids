@@ -155,6 +155,7 @@ import {
   mapWarpStandoffWorldUnits,
   shouldShowAsteroidMissionMapSite,
 } from '@/lib/map/mapViewControllerHelpers'
+import { GravitySurfingController } from '@/lib/map/GravitySurfingController'
 
 /**
  * Orbit / grid / debris toggle snapshot for syncing the map HUD after intro suppression.
@@ -222,6 +223,7 @@ export class MapViewController implements Tickable {
   private portalArrival: PortalArrivalSequence | null = null
   private sceneEnvironment: MapSceneEnvironment | null = null
   private gravityPass: ShaderPass | null = null
+  private gravitySurfPass: ShaderPass | null = null
   private slingshotSpeedPass: ShaderPass | null = null
   private adriftTimer = 0
   private shipHealth: ShipHealth | null = null
@@ -258,6 +260,9 @@ export class MapViewController implements Tickable {
 
   /** Current shuttle display scale, lerped each frame toward the screen-size target. */
   private currentShuttleScale: number = MAP_CONFIG.MAP_SHUTTLE_SCALE
+
+  /** Gravity Surfing rail locomotion controller. */
+  private gravitySurfingController = new GravitySurfingController()
 
   /** Increments per anomaly HUD message so Vue can re-run enter animation. */
   private gravitationalAnomalyHudToken = 0
@@ -452,6 +457,7 @@ export class MapViewController implements Tickable {
     this.beltControllers = planetarium.beltControllers
     this.spaceTimeGrid = planetarium.spaceTimeGrid
     this.gravityPass = planetarium.gravityPass
+    this.gravitySurfPass = planetarium.gravitySurfPass
     this.slingshotSpeedPass = planetarium.slingshotSpeedPass
     this.mapGridSize = planetarium.mapGridSize
     const { scene } = this.sceneObjects
@@ -853,8 +859,13 @@ export class MapViewController implements Tickable {
       return
     }
 
+    this.gravitySurfingController.requestToggle(this.getGravitySurfingDeps())
+    this.gravitySurfingController.tick(dt, this.getGravitySurfingDeps())
+
     const inspectToggle = this.modeCoordinator.resolveInspectToggle({
-      togglePressed: this.inputManager?.wasActionPressed('toggleDoors') ?? false,
+      togglePressed:
+        !this.gravitySurfingController.isActive() &&
+        (this.inputManager?.wasActionPressed('toggleDoors') ?? false),
       inspectMode: this.inspectMode,
       orbitState: this.orbitSystem?.state ?? 'free',
     })
@@ -886,7 +897,9 @@ export class MapViewController implements Tickable {
 
     // Habitat interior (H key) — enter/exit first-person interior
     const habitatTransition = this.modeCoordinator.resolveHabitatTransition({
-      togglePressed: this.inputManager?.wasActionPressed('focusHabitat') ?? false,
+      togglePressed:
+        !this.gravitySurfingController.isActive() &&
+        (this.inputManager?.wasActionPressed('focusHabitat') ?? false),
       habitatActive: this.habitatState.isActive,
       habitatPhase: this.habitatState.phase,
       inspectMode: this.inspectMode,
@@ -903,7 +916,12 @@ export class MapViewController implements Tickable {
     }
 
     // Orbit action (E key) — press to capture/cancel, hold to charge slingshot
-    if (this.orbitSystem && this.shuttleController && this.inputManager) {
+    if (
+      !this.gravitySurfingController.isActive() &&
+      this.orbitSystem &&
+      this.shuttleController &&
+      this.inputManager
+    ) {
       const previousCharge = this.slingshotCharge
       this.orbitFacade.handleOrbitInput(dt, {
         shuttleController: this.shuttleController,
@@ -968,6 +986,7 @@ export class MapViewController implements Tickable {
       this.shuttleController &&
       this.spaceTimeGrid &&
       !this.yRecovery &&
+      !this.gravitySurfingController.isActive() &&
       !this.shuttleController.dead &&
       (this.orbitSystem?.state ?? 'free') === 'free'
     ) {
@@ -1009,19 +1028,28 @@ export class MapViewController implements Tickable {
 
     if (this.shuttleController && !this.shuttleController.dead) {
       const orbitState = this.orbitSystem?.state ?? 'free'
+      const passiveFuelMultiplier = this.gravitySurfingController.isActive()
+        ? MAP_CONFIG.GRAVITY_SURF_PASSIVE_FUEL_MULTIPLIER
+        : 1
       this.shuttleController.thrusterSystem.consumeFuel(
-        computeShuttleBaseFuelDrain(dt, orbitState !== 'orbiting'),
+        computeShuttleBaseFuelDrain(dt, orbitState !== 'orbiting') * passiveFuelMultiplier,
       )
     }
 
     // Telemetry
     if (this.shuttleController && this.onTelemetry) {
       const ts = this.shuttleController.thrusterSystem
+      const gravitySurfPrompt = this.gravitySurfingController.canShowAttachPrompt(
+        this.getGravitySurfingDeps(),
+      )
+        ? 'Q GRAVITY SURF'
+        : null
       this.onTelemetry({
         speed: this.shuttleController.speed,
         heading: this.shuttleController.heading,
         posX: this.shuttleController.position.x,
         posZ: this.shuttleController.position.z,
+        actionPrompt: gravitySurfPrompt,
         fuelLevel: ts.fuelLevel,
         fuelCapacity: ts.fuelCapacity,
         thrustCharge: ts.getState('thrust').charge,
@@ -1204,6 +1232,22 @@ export class MapViewController implements Tickable {
         this.slingshotSpeedPass.uniforms.intensity!.value = 0
       }
     }
+
+    if (this.gravitySurfPass && this.shuttleController) {
+      const gravitySurfActive = this.gravitySurfingController.isActive() && !this.shuttleController.dead
+      const speedRatio = Math.min(1, this.shuttleController.speed / 20)
+      const targetIntensity = gravitySurfActive ? (0.35 + 0.65 * speedRatio) : 0
+      const nextIntensity = THREE.MathUtils.lerp(
+        this.gravitySurfPass.uniforms.intensity!.value,
+        targetIntensity,
+        Math.min(1, dt * 6),
+      )
+      this.gravitySurfPass.uniforms.intensity!.value = nextIntensity
+      this.gravitySurfPass.uniforms.time!.value += dt
+      this.shuttleEffects?.setGravitySurfing(gravitySurfActive, nextIntensity)
+    } else {
+      this.shuttleEffects?.setGravitySurfing(false, 0)
+    }
   }
 
   /**
@@ -1385,12 +1429,27 @@ export class MapViewController implements Tickable {
   private applyGridVisible(visible: boolean): void {
     const showFabric = Boolean(visible && hasGravitySurfingUnlock())
     this.gridVisible = showFabric
+    this.gravitySurfingController.onGridVisibilityChanged(showFabric, this.getGravitySurfingDeps())
     if (this.spaceTimeGrid) {
       this.spaceTimeGrid.mesh.visible = showFabric
       if (showFabric) {
         this.syncSpaceTimeGridVisualBudget()
         this.spaceTimeGrid.forceFullVisualDeform()
       }
+    }
+  }
+
+  private getGravitySurfingDeps() {
+    return {
+      gravitationalEventManager: this.gravitationalEventManager,
+      gridVisible: this.gridVisible,
+      hasGravitySurfingUnlock: hasGravitySurfingUnlock(),
+      inputManager: this.inputManager,
+      mapGridSize: this.mapGridSize,
+      orbitState: this.orbitSystem?.state ?? 'free',
+      slingshotBurstActive: this.shuttleController?.slingshotBurstActive ?? false,
+      shuttleController: this.shuttleController,
+      spaceTimeGrid: this.spaceTimeGrid,
     }
   }
 
@@ -2025,6 +2084,8 @@ export class MapViewController implements Tickable {
     if (!didRespawn) return
 
     // Reset slingshot state
+    this.gravitySurfingController.reset(this.getGravitySurfingDeps())
+    this.clearGravitySurfVisuals()
     this.yRecovery = false
     this.adriftTimer = 0
     this.resetWorldLineHistory()
@@ -2192,6 +2253,8 @@ export class MapViewController implements Tickable {
   private tickMapTransition(): void {
     if (!this.mapCamera || !this.sceneObjects) return
 
+    this.clearGravitySurfVisuals()
+
     const runtime = this.modeCoordinator.resolveMapTransitionRuntime(
       this.mapState.phase,
       this.mapState.progress,
@@ -2246,6 +2309,13 @@ export class MapViewController implements Tickable {
 
     // Hide overlay
     this.onMapOverlay?.(this.modeCoordinator.buildHiddenMapOverlayState())
+  }
+
+  private clearGravitySurfVisuals(): void {
+    if (this.gravitySurfPass) {
+      this.gravitySurfPass.uniforms.intensity!.value = 0
+    }
+    this.shuttleEffects?.setGravitySurfing(false, 0)
   }
 
   /** Build projected persistent world-line points for the tactical map. */

@@ -70,6 +70,9 @@ function tempLabelClass(): string {
         <span>SPD {{ props.telemetry.speed.toFixed(1) }}</span>
         <span>HDG {{ formatHeading(props.telemetry.heading) }}</span>
       </div>
+      <div v-if="props.telemetry.actionPrompt" class="hud-top-cluster__line hud-top-cluster__line--action">
+        {{ props.telemetry.actionPrompt }}
+      </div>
       <div v-if="props.telemetry.adriftCountdown >= 0" class="hud-top-cluster__adrift">
         {{ adriftSeconds() }}s
       </div>

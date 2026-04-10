@@ -219,6 +219,7 @@ export class ShuttleViewController implements Tickable {
         heading: this.shuttleController.heading,
         posX: this.shuttleController.position.x,
         posZ: this.shuttleController.position.z,
+        actionPrompt: null,
         fuelLevel: ts.fuelLevel,
         fuelCapacity: ts.fuelCapacity,
         thrustCharge: ts.getState('thrust').charge,

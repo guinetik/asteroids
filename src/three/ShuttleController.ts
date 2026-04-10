@@ -158,6 +158,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
   private velocity = new THREE.Vector3()
   private frozen = false
   private ignoreGridY = false
+  private externalBrakeActive = false
 
   /** Inject an external velocity (e.g. portal ejection). */
   setVelocity(v: THREE.Vector3): void {
@@ -182,6 +183,11 @@ export class ShuttleController implements Tickable, PortalVehicle {
   /** Enable or disable player input (autopilot takeover during approach). */
   setInputEnabled(enabled: boolean): void {
     this._inputEnabled = enabled
+  }
+
+  /** Drive brake VFX/resource state from an external controller while movement is frozen. */
+  setExternalBrakeActive(active: boolean): void {
+    this.externalBrakeActive = active
   }
 
   /** Whether player input is currently enabled. */
@@ -393,9 +399,11 @@ export class ShuttleController implements Tickable, PortalVehicle {
   }
 
   get isBraking(): boolean {
-    return this._inputEnabled
+    return this.externalBrakeActive || (
+      this._inputEnabled
       && this.inputManager.isActionActive('brake')
       && this.thrusterSystem.canFire('brake', this.getModifiers())
+    )
   }
 
   /** Set by orbit system to drive RCS VFX while input is disabled. */
@@ -576,6 +584,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
     this.deathSpeed = 0
     this.velocity.set(0, 0, 0)
     this.angularVelocity = 0
+    this.externalBrakeActive = false
     this._slingshotSpeed = 0
     this._slingshotBurstSpeed = 0
     this._slingshotFinalSpeed = 0
@@ -597,6 +606,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
     this._slingshotSettleDuration = 0
     this._slingshotSettleElapsed = 0
     this._slingshotLaunchFxRemaining = 0
+    this.externalBrakeActive = false
 
     const angle = Math.random() * Math.PI * 2
     const radius = SPAWN_MIN_RADIUS + Math.random() * (SPAWN_MAX_RADIUS - SPAWN_MIN_RADIUS)
@@ -798,6 +808,14 @@ export class ShuttleController implements Tickable, PortalVehicle {
       burnRateMultiplier: getCurrentShuttleThrusterEfficiencyModifiers(),
       rechargeRateMultiplier: getCurrentShuttleThrusterChargeModifiers(),
     }
+  }
+
+  /** Shared runtime modifiers used by both normal flight and external controllers. */
+  getThrusterRuntimeModifiers(): {
+    burnRateMultiplier: Record<ShuttleThrusterName, number>
+    rechargeRateMultiplier: Record<ShuttleThrusterName, number>
+  } {
+    return this.getModifiers()
   }
 
   private placeNozzles(scene: THREE.Object3D): void {

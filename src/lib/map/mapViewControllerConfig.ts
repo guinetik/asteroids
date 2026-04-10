@@ -61,6 +61,51 @@ export const SPAWN_OFFSET_BEHIND_EARTH = 7.5
 /** How much grid slope affects shuttle speed. */
 export const CURVATURE_SPEED_FACTOR = 0.3
 
+/** Rail snap distance in grid cells for Gravity Surfing coupling. */
+export const GRAVITY_SURF_SNAP_DISTANCE_CELLS = 0.2
+
+/** Seconds to slide onto the rail during coupling. */
+export const GRAVITY_SURF_COUPLE_DURATION_SEC = 0.2
+
+/** Seconds to fast-stop during manual decouple. */
+export const GRAVITY_SURF_DECOUPLE_DURATION_SEC = 0.45
+
+/** Default coupled rail cruise speed relative to map thrust speed. */
+export const GRAVITY_SURF_CRUISE_SPEED_MULTIPLIER = 10
+
+/** Seconds-ish response for ramping into gravity surf cruise. */
+export const GRAVITY_SURF_ACCEL_PER_SEC = 6
+
+/** Passive shuttle systems fuel drain multiplier while Gravity Surfing is active. */
+export const GRAVITY_SURF_PASSIVE_FUEL_MULTIPLIER = 3
+
+/** Maximum nose pitch applied while riding curved Gravity Surf rails. */
+export const GRAVITY_SURF_MAX_PITCH_RAD = 0.12
+
+/** Maximum roll applied while riding cross-curved Gravity Surf rails. */
+export const GRAVITY_SURF_MAX_ROLL_RAD = 0.16
+
+/** Response speed for easing Gravity Surf tilt toward the target pose. */
+export const GRAVITY_SURF_TILT_RESPONSE_PER_SEC = 8
+
+/** Speeds below this threshold count as fully stopped on the rail. */
+export const GRAVITY_SURF_STOP_SPEED = 0.05
+
+/** Strength of the first-pass decouple wave anomaly. */
+export const GRAVITY_SURF_DECOUPLE_WAVE_MASS = 1.8e-5
+
+/** First-pass decouple wave spreads wide rather than moving far. */
+export const GRAVITY_SURF_DECOUPLE_WAVE_WIDTH_MULT = 1.1
+
+/** Keep the decouple wave nearly stationary so it reads like a ripple. */
+export const GRAVITY_SURF_DECOUPLE_WAVE_SPEED = 0.01
+
+/** Lifetime of the synthetic decouple wave anomaly. */
+export const GRAVITY_SURF_DECOUPLE_WAVE_DURATION_SEC = 1.2
+
+/** Spawn the stop ripple slightly ahead of the shuttle nose. */
+export const GRAVITY_SURF_DECOUPLE_WAVE_FORWARD_OFFSET = 10
+
 /** Threshold where the whole space-time fabric is considered visible. */
 export const GRID_DEFORM_WHOLE_MAP_COVERAGE = 0.82
 
@@ -195,6 +240,21 @@ export const MAP_VIEW_CONTROLLER_CONFIG = {
   ARROW_HEAD_WIDTH,
   ARROW_MAX_LENGTH,
   CURVATURE_SPEED_FACTOR,
+  GRAVITY_SURF_COUPLE_DURATION_SEC,
+  GRAVITY_SURF_CRUISE_SPEED_MULTIPLIER,
+  GRAVITY_SURF_ACCEL_PER_SEC,
+  GRAVITY_SURF_DECOUPLE_DURATION_SEC,
+  GRAVITY_SURF_DECOUPLE_WAVE_DURATION_SEC,
+  GRAVITY_SURF_DECOUPLE_WAVE_FORWARD_OFFSET,
+  GRAVITY_SURF_DECOUPLE_WAVE_MASS,
+  GRAVITY_SURF_DECOUPLE_WAVE_SPEED,
+  GRAVITY_SURF_DECOUPLE_WAVE_WIDTH_MULT,
+  GRAVITY_SURF_MAX_PITCH_RAD,
+  GRAVITY_SURF_MAX_ROLL_RAD,
+  GRAVITY_SURF_PASSIVE_FUEL_MULTIPLIER,
+  GRAVITY_SURF_SNAP_DISTANCE_CELLS,
+  GRAVITY_SURF_STOP_SPEED,
+  GRAVITY_SURF_TILT_RESPONSE_PER_SEC,
   EARTH_CATALOG_DISPLAY_RADIUS,
   EARTH_DEPARTURE_MESSAGE_DISTANCE,
   EARTH_DEPARTURE_MIN_HISTORY_POINTS,

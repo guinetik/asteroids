@@ -10,6 +10,8 @@ export interface ShuttleTelemetry {
   heading: number
   posX: number
   posZ: number
+  /** Contextual top-center action prompt shown beneath position when available. */
+  actionPrompt: string | null
   fuelLevel: number
   fuelCapacity: number
   thrustCharge: number

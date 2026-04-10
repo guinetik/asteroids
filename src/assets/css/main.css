@@ -37,6 +37,11 @@ body {
   @apply flex flex-wrap justify-center gap-x-4 gap-y-0.5 tracking-wide;
 }
 
+.hud-top-cluster__line--action {
+  @apply rounded border border-cyan-300/35 bg-cyan-300/10 px-2 py-0.5 text-[11px] tracking-[0.18em] text-cyan-200;
+  text-shadow: 0 0 8px rgba(127, 232, 255, 0.55);
+}
+
 .hud-top-cluster__adrift {
   @apply font-mono text-2xl font-bold text-red-500;
   text-shadow: 0 0 12px rgba(239, 68, 68, 0.8);
