@@ -48,7 +48,6 @@ import {
   MAP_CAMERA_CONFIG,
   MAP_ORBIT_CAMERA_CONFIG,
   MAP_INSPECT_CAMERA_CONFIG,
-  MAP_DEATH_CAMERA_CONFIG,
 } from '@/three/VehicleCamera'
 import { buildSlingshotChargeCameraConfig } from '@/three/slingshotChargeCamera'
 import orbitConfig from '@/data/shuttle/orbit-capture.json'
@@ -136,8 +135,11 @@ import {
 } from '@/lib/missions/missionStorage'
 import '@/lib/missions/missionMaterials'
 import { MapIntroFacade } from '@/lib/map/intro/MapIntroFacade'
+import { MapLifeCycleFacade } from '@/lib/map/lifecycle/MapLifeCycleFacade'
 import { MapMessageFacade } from '@/lib/map/messages/MapMessageFacade'
 import { MapMissionFacade } from '@/lib/map/missions/MapMissionFacade'
+import { MapModeCoordinator } from '@/lib/map/mode/MapModeCoordinator'
+import { MapOrbitFacade } from '@/lib/map/orbit/MapOrbitFacade'
 import { MapShopFacade } from '@/lib/map/shop/MapShopFacade'
 import { MapPlanetariumScene } from '@/three/MapPlanetariumScene'
 import { MapSceneEnvironment } from '@/three/MapSceneEnvironment'
@@ -149,7 +151,6 @@ import {
   computeGravityProximity,
   computeMaxGravityProximity,
   isEmissiveMaterial,
-  isShuttleAimingAtPlanet,
   makeGravityWell,
   mapWarpStandoffWorldUnits,
   shouldShowAsteroidMissionMapSite,
@@ -199,13 +200,10 @@ export class MapViewController implements Tickable {
   private simTime = 0
   private resizeHandler: (() => void) | null = null
 
-  private orbitSystem: OrbitCaptureSystem | null = null
-  /** True when the orbit ring is showing a preview (dimmed, pre-capture). */
-  private orbitRingIsPreview = false
-  private approachStartPos: THREE.Vector3 | null = null
-  private approachProgress = 0
+  private orbitFacade = new MapOrbitFacade()
+  private lifeCycleFacade = new MapLifeCycleFacade()
+  private modeCoordinator = new MapModeCoordinator()
   private yRecovery = false
-  private slingshotCharge = 0
   private inspectMode = false
   private habitatState = new HabitatState()
   private habitatScene: HabitatInteriorScene | null = null
@@ -383,6 +381,46 @@ export class MapViewController implements Tickable {
   /** Called when the player begins an asteroid mission (E at waypoint). */
   onBeginAsteroidMission: ((mission: GeneratedAsteroidMission) => void) | null = null
 
+  private get orbitSystem(): OrbitCaptureSystem | null {
+    return this.orbitFacade.system
+  }
+
+  private set orbitSystem(value: OrbitCaptureSystem | null) {
+    this.orbitFacade.system = value
+  }
+
+  private get orbitRingIsPreview(): boolean {
+    return this.orbitFacade.orbitRingIsPreview
+  }
+
+  private set orbitRingIsPreview(value: boolean) {
+    this.orbitFacade.orbitRingIsPreview = value
+  }
+
+  private get approachStartPos(): THREE.Vector3 | null {
+    return this.orbitFacade.approachStartPos
+  }
+
+  private set approachStartPos(value: THREE.Vector3 | null) {
+    this.orbitFacade.approachStartPos = value
+  }
+
+  private get approachProgress(): number {
+    return this.orbitFacade.approachProgress
+  }
+
+  private set approachProgress(value: number) {
+    this.orbitFacade.approachProgress = value
+  }
+
+  private get slingshotCharge(): number {
+    return this.orbitFacade.slingshotCharge
+  }
+
+  private set slingshotCharge(value: number) {
+    this.orbitFacade.slingshotCharge = value
+  }
+
   async init(container: HTMLElement): Promise<void> {
     // Create canvas
     const canvas = document.createElement('canvas')
@@ -552,7 +590,7 @@ export class MapViewController implements Tickable {
         getWorldZ: () => this.planetControllers[i]!.getWorldZ(),
       })),
     ]
-    this.orbitSystem = new OrbitCaptureSystem(captureBodies)
+    this.orbitFacade.initialize(captureBodies)
 
     // Portal arrival, completed-mission return at waypoint, or default Earth orbit
     this.portalArrival = new PortalArrivalSequence()
@@ -580,18 +618,11 @@ export class MapViewController implements Tickable {
     if (!arrived && earthController && !usedMissionCompletionMapSpawn) {
       const ex = earthController.getWorldX()
       const ez = earthController.getWorldZ()
-      this.orbitSystem.beginCapture(ex + 1, ez)
-      const orbitR = this.orbitSystem.targetOrbitRadius
-      this.shuttleController.group.position.set(ex + orbitR, 0, ez)
-      this.orbitSystem.checkArrival(ex + orbitR, ez)
-      // Face away from Earth — default slingshot direction is outward
-      const awayAngle = Math.atan2(-ez, ex + orbitR - ex)
-      this.shuttleController.group.rotation.set(0, awayAngle, 0)
-      this.shuttleController.freeze()
-      this.shuttleController.setInputEnabled(false)
-      this.vehicleCamera.setConfig(MAP_ORBIT_CAMERA_CONFIG)
-      this.sceneVisuals?.showOrbitRing(orbitR)
-      this.sceneVisuals?.setOrbitRingPosition(ex, 0, ez)
+      this.orbitFacade.beginForcedOrbit(ex, ez, {
+        shuttleController: this.shuttleController,
+        vehicleCamera: this.vehicleCamera,
+        sceneVisuals: this.sceneVisuals,
+      })
 
       if (this.playerProfile.hasSeenIntro) {
         this.mapIntro.skip()
@@ -748,31 +779,20 @@ export class MapViewController implements Tickable {
 
     this.syncVehicleCameraShipYawCoupling()
 
-    // Map toggle (M key) — opens/closes tactical map
-    if (
-      !introLocked &&
-      !this.habitatState.isActive &&
-      this.inputManager?.wasActionPressed('toggleMap')
-    ) {
-      if (!this.mapState.isOpen) {
-        // Guard: block during death or orbit approach
-        const orbitState = this.orbitSystem?.state ?? 'free'
-        const isDead = this.shuttleController?.dead ?? false
-        if (!isDead && orbitState !== 'approaching') {
-          this.mapState.open()
-          this.onOpenMap()
-        }
-      } else if (this.mapState.phase === 'open') {
-        this.mapState.close()
-      }
-    }
-
-    // Also close on Escape
-    if (
-      !introLocked &&
-      this.inputManager?.wasActionPressed('closeMap') &&
-      this.mapState.phase === 'open'
-    ) {
+    const mapToggleAction = this.modeCoordinator.resolveMapToggleAction({
+      introLocked,
+      habitatActive: this.habitatState.isActive,
+      toggleMapPressed: this.inputManager?.wasActionPressed('toggleMap') ?? false,
+      closeMapPressed: this.inputManager?.wasActionPressed('closeMap') ?? false,
+      mapPhase: this.mapState.phase,
+      mapIsOpen: this.mapState.isOpen,
+      orbitState: this.orbitSystem?.state ?? 'free',
+      isDead: this.shuttleController?.dead ?? false,
+    })
+    if (mapToggleAction === 'open') {
+      this.mapState.open()
+      this.onOpenMap()
+    } else if (mapToggleAction === 'close') {
       this.mapState.close()
     }
 
@@ -833,161 +853,67 @@ export class MapViewController implements Tickable {
       return
     }
 
-    // Door toggle + inspect mode (R key zooms camera tight on shuttle)
-    if (this.inputManager?.wasActionPressed('toggleDoors')) {
-      this.shuttleController?.toggleDoors()
-      this.inspectMode = !this.inspectMode
+    const inspectToggle = this.modeCoordinator.resolveInspectToggle({
+      togglePressed: this.inputManager?.wasActionPressed('toggleDoors') ?? false,
+      inspectMode: this.inspectMode,
+      orbitState: this.orbitSystem?.state ?? 'free',
+    })
+    if (inspectToggle) {
+      if (inspectToggle.toggleDoors) {
+        this.shuttleController?.toggleDoors()
+      }
+      this.inspectMode = inspectToggle.nextInspectMode
       const bloomPass = this.sceneObjects?.composer.passes.find(
         (p) => p instanceof UnrealBloomPass,
       ) as UnrealBloomPass | undefined
-      if (this.inspectMode) {
+      if (inspectToggle.cameraMode === 'inspect') {
         this.vehicleCamera?.setConfig(MAP_INSPECT_CAMERA_CONFIG)
         if (this.vehicleCamera) {
-          this.vehicleCamera.controls.enableZoom = false
-        }
-        if (bloomPass) {
-          bloomPass.threshold = 1.5
-          bloomPass.strength = 0.2
+          this.vehicleCamera.controls.enableZoom = inspectToggle.enableZoom
         }
       } else {
         const isOrbiting = this.orbitSystem?.state === 'orbiting'
         this.vehicleCamera?.setConfig(isOrbiting ? MAP_ORBIT_CAMERA_CONFIG : MAP_CAMERA_CONFIG)
         if (this.vehicleCamera) {
-          this.vehicleCamera.controls.enableZoom = true
+          this.vehicleCamera.controls.enableZoom = inspectToggle.enableZoom
         }
-        if (bloomPass) {
-          bloomPass.threshold = 0.45
-          bloomPass.strength = 0.72
-        }
+      }
+      if (bloomPass) {
+        bloomPass.threshold = inspectToggle.bloomThreshold
+        bloomPass.strength = inspectToggle.bloomStrength
       }
     }
 
     // Habitat interior (H key) — enter/exit first-person interior
-    if (
-      this.inputManager?.wasActionPressed('focusHabitat') &&
-      this.shuttleController &&
-      this.sceneObjects
-    ) {
-      if (!this.habitatState.isActive) {
-        // Enter habitat
-        if (!this.inspectMode) {
-          this.shuttleController.toggleDoors()
-          this.inspectMode = true
-        }
-        this.habitatState.enter()
-      } else if (this.habitatState.phase === 'habitat') {
-        // Leave habitat
-        this.habitatState.leave()
-      }
+    const habitatTransition = this.modeCoordinator.resolveHabitatTransition({
+      togglePressed: this.inputManager?.wasActionPressed('focusHabitat') ?? false,
+      habitatActive: this.habitatState.isActive,
+      habitatPhase: this.habitatState.phase,
+      inspectMode: this.inspectMode,
+      canEnterHabitat: Boolean(this.shuttleController && this.sceneObjects),
+    })
+    if (habitatTransition.toggleDoors) {
+      this.shuttleController?.toggleDoors()
+    }
+    this.inspectMode = habitatTransition.nextInspectMode
+    if (habitatTransition.action === 'enter') {
+      this.habitatState.enter()
+    } else if (habitatTransition.action === 'leave') {
+      this.habitatState.leave()
     }
 
     // Orbit action (E key) — press to capture/cancel, hold to charge slingshot
     if (this.orbitSystem && this.shuttleController && this.inputManager) {
-      const state = this.orbitSystem.state
-      const ePressed = this.inputManager.wasActionPressed('orbitAction')
-      const eHeld = this.inputManager.isActionActive('orbitAction')
-
-      // Preview orbit ring — show dimmed ring when heading toward a body in preview range
-      if (state === 'free' && this.shuttleController) {
-        const vel = this.shuttleController.currentVelocity
-        const preview = this.orbitSystem.getNearestPreviewBody(
-          this.shuttleController.position.x,
-          this.shuttleController.position.z,
-          vel.x,
-          vel.z,
-          MAP_CONFIG.ORBIT_PREVIEW_MULTIPLIER,
-        )
-        if (preview) {
-          if (!this.orbitRingIsPreview) {
-            this.sceneVisuals?.showOrbitRing(preview.orbitRadius, MAP_CONFIG.ORBIT_PREVIEW_OPACITY)
-            this.orbitRingIsPreview = true
-          }
-          this.sceneVisuals?.setOrbitRingPosition(preview.worldX, 0, preview.worldZ)
-        } else if (this.orbitRingIsPreview) {
-          this.sceneVisuals?.hideOrbitRing()
-          this.orbitRingIsPreview = false
-        }
-      }
-
-      // Free → press E to capture
-      if (state === 'free' && ePressed) {
-        const px = this.shuttleController.position.x
-        const pz = this.shuttleController.position.z
-        if (this.orbitSystem.beginCapture(px, pz)) {
-          this.approachStartPos = new THREE.Vector3(px, 0, pz)
-          this.approachProgress = 0
-
-          this.shuttleController.freeze()
-          this.shuttleController.setInputEnabled(false)
-          this.vehicleCamera?.setConfig(MAP_ORBIT_CAMERA_CONFIG)
-          this.sceneVisuals?.showOrbitRing(this.orbitSystem.targetOrbitRadius)
-          this.orbitRingIsPreview = false
-        }
-      }
-
-      // Approaching → press E to cancel
-      if (state === 'approaching' && ePressed) {
-        this.cancelOrbitApproachFromMap()
-      }
-
-      // Orbiting → hold E to charge, release to launch
-      if (state === 'orbiting') {
-        if (eHeld) {
-          this.slingshotCharge = Math.min(
-            1,
-            this.slingshotCharge + dt / MAP_CONFIG.SLINGSHOT_CHARGE_TIME,
-          )
-          this.vehicleCamera?.applyConfigTuning(
-            buildSlingshotChargeCameraConfig(this.slingshotCharge),
-          )
-          this.updateLaunchArrow()
-        } else if (this.slingshotCharge > 0) {
-          const trajectoryBlocked = this.isAimingAtPlanet()
-          if (!canReleaseSlingshot(this.slingshotCharge, trajectoryBlocked)) {
-            this.slingshotCharge = 0
-            this.vehicleCamera?.setConfig(MAP_ORBIT_CAMERA_CONFIG)
-            this.hideLaunchArrow()
-          } else {
-            // Derive heading from the actual quaternion forward, not Euler rotation.y —
-            // repeated rotateY() during orbit can cause Euler decomposition to diverge
-            // from the visual forward (which the arrow child uses correctly).
-            const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(
-              this.shuttleController.group.quaternion,
-            )
-            const heading = Math.atan2(-fwd.z, fwd.x)
-            const launchVelocity = this.orbitSystem.launchSlingshot(heading, dt)
-            const vel = new THREE.Vector3(launchVelocity.vx, 0, launchVelocity.vz)
-            const finalSpeed = Math.sqrt(launchVelocity.vx ** 2 + launchVelocity.vz ** 2)
-            const burstSpeed = this.shuttleController.beginSlingshotBurst(
-              finalSpeed,
-              getCurrentShuttleSlingshotBurstMultiplier(),
-              orbitConfig.slingshotSettleDuration,
-            )
-            vel.setLength(burstSpeed)
-
-            this.shuttleController.unfreeze()
-            this.shuttleController.orbitYawLeft = false
-            this.shuttleController.orbitYawRight = false
-            this.shuttleController.setVelocity(vel)
-            this.shuttleController.setSlingshotSpeed(burstSpeed)
-            this.shuttleController.triggerSlingshotLaunchFx(orbitConfig.slingshotLaunchFxDuration)
-
-            // Launch costs are still tied to the committed full-charge release.
-            this.shuttleController.thrusterSystem.consumeFuel(
-              this.slingshotCharge * this.shuttleController.thrusterSystem.fuelCapacity * 0.1,
-            )
-
-            this.vehicleCamera?.setConfig(MAP_CAMERA_CONFIG)
-            if (this.vehicleCamera) {
-              this.vehicleCamera.controls.target.copy(this.shuttleController.position)
-            }
-            this.sceneVisuals?.hideOrbitRing()
-            this.orbitRingIsPreview = false
-            this.hideLaunchArrow()
-            this.slingshotCharge = 0
-            this.yRecovery = true
-          }
-        }
+      const previousCharge = this.slingshotCharge
+      this.orbitFacade.handleOrbitInput(dt, {
+        shuttleController: this.shuttleController,
+        vehicleCamera: this.vehicleCamera,
+        sceneVisuals: this.sceneVisuals,
+        inputManager: this.inputManager,
+        mapIntroControlsLocked: this.mapIntro.controlsLocked,
+      })
+      if (previousCharge > 0 && this.slingshotCharge === 0 && this.orbitSystem?.state === 'free') {
+        this.yRecovery = true
       }
     }
 
@@ -1073,58 +999,12 @@ export class MapViewController implements Tickable {
     }
 
     // Orbit approach — animated lerp toward orbit insertion point
-    if (
-      this.orbitSystem?.state === 'approaching' &&
-      this.shuttleController &&
-      this.approachStartPos
-    ) {
-      this.approachProgress = Math.min(
-        1,
-        this.approachProgress + dt / MAP_CONFIG.APPROACH_DURATION,
-      )
-      // Ease-out curve for smooth deceleration
-      const t = 1 - Math.pow(1 - this.approachProgress, 3)
-
-      // Target point on orbit circle tracks the moving planet
-      const target = this.orbitSystem.getApproachTarget()
-      if (target) {
-        const x = this.approachStartPos.x + (target.x - this.approachStartPos.x) * t
-        const z = this.approachStartPos.z + (target.z - this.approachStartPos.z) * t
-        this.shuttleController.group.position.set(x, 0, z)
-
-        // Face toward the planet during approach
-        const body = this.orbitSystem.target
-        if (body) {
-          const dx = body.getWorldX() - x
-          const dz = body.getWorldZ() - z
-          this.shuttleController.group.rotation.y = Math.atan2(-dz, dx)
-        }
-      }
-
-      // Ring follows planet during approach
-      if (this.orbitSystem.target) {
-        this.sceneVisuals?.setOrbitRingPosition(
-          this.orbitSystem.target.getWorldX(),
-          0,
-          this.orbitSystem.target.getWorldZ(),
-        )
-      }
-
-      // Arrive when lerp completes
-      if (this.approachProgress >= 1) {
-        const px = this.shuttleController.position.x
-        const pz = this.shuttleController.position.z
-        this.orbitSystem.checkArrival(px, pz)
-        this.approachStartPos = null
-
-        // Face away from planet — default launch direction is outward
-        if (this.orbitSystem.target) {
-          const bx = this.orbitSystem.target.getWorldX()
-          const bz = this.orbitSystem.target.getWorldZ()
-          const awayAngle = Math.atan2(-(pz - bz), px - bx)
-          this.shuttleController.group.rotation.set(0, awayAngle, 0)
-        }
-      }
+    if (this.orbitSystem?.state === 'approaching' && this.shuttleController) {
+      this.orbitFacade.tickApproach(dt, {
+        shuttleController: this.shuttleController,
+        vehicleCamera: this.vehicleCamera,
+        sceneVisuals: this.sceneVisuals,
+      })
     }
 
     if (this.shuttleController && !this.shuttleController.dead) {
@@ -1162,13 +1042,8 @@ export class MapViewController implements Tickable {
 
     // Orbit HUD state
     if (this.orbitSystem && this.shuttleController && this.onOrbitState) {
-      const hudState = this.orbitSystem.getHudState(
-        this.shuttleController.position.x,
-        this.shuttleController.position.z,
-      )
-      hudState.chargeLevel = this.slingshotCharge
-      hudState.inspectMode = this.inspectMode
-      this.onOrbitState(hudState)
+      const hudState = this.orbitFacade.buildHudState(this.shuttleController, this.inspectMode)
+      if (hudState) this.onOrbitState(hudState)
     }
 
     // Constant-screen-size shuttle scale — keeps the ship visible when zoomed out
@@ -1397,54 +1272,14 @@ export class MapViewController implements Tickable {
 
     // Orbit position driving — runs AFTER planets move to avoid jitter
     if (this.orbitSystem?.state === 'orbiting' && this.shuttleController && this.inputManager) {
-      const pos = this.orbitSystem.tickOrbit(dt)
-      const planetY = this.orbitSystem.target
-        ? (this.planetControllers.find(
-            (_c, i) => PLANETS[i]?.name === this.orbitSystem!.target?.name,
-          )?.group.position.y ?? 0)
-        : 0
-      if (pos) {
-        this.shuttleController.group.position.set(pos.x, planetY, pos.z)
-      }
-      // A/D yaw — input is disabled so read InputManager directly and set orbit flags for VFX
-      const yawLeft =
-        !this.mapIntro.controlsLocked &&
-        this.inputManager.isActionActive('yawLeft') &&
-        this.shuttleController.thrusterSystem.canFire('rcs', {
-          burnRateMultiplier: getCurrentShuttleThrusterEfficiencyModifiers(),
-        })
-      const yawRight =
-        !this.mapIntro.controlsLocked &&
-        this.inputManager.isActionActive('yawRight') &&
-        this.shuttleController.thrusterSystem.canFire('rcs', {
-          burnRateMultiplier: getCurrentShuttleThrusterEfficiencyModifiers(),
-        })
-      this.shuttleController.orbitYawLeft = yawLeft
-      this.shuttleController.orbitYawRight = yawRight
-      if (yawLeft) {
-        this.shuttleController.group.rotateY(MAP_PHYSICS.yawTorque * dt)
-      }
-      if (yawRight) {
-        this.shuttleController.group.rotateY(-MAP_PHYSICS.yawTorque * dt)
-      }
-      this.shuttleController.thrusterSystem.tick(
-        dt,
-        {
-          thrust: false,
-          brake: false,
-          rcs: yawLeft || yawRight,
-        },
-        {
-          burnRateMultiplier: getCurrentShuttleThrusterEfficiencyModifiers(),
-          rechargeRateMultiplier: getCurrentShuttleThrusterChargeModifiers(),
-        },
-      )
-      if (this.orbitSystem.target && this.vehicleCamera) {
-        const bx = this.orbitSystem.target.getWorldX()
-        const bz = this.orbitSystem.target.getWorldZ()
-        this.vehicleCamera.controls.target.set(bx, planetY, bz)
-        this.sceneVisuals?.setOrbitRingPosition(bx, planetY, bz)
-      }
+      this.orbitFacade.tickOrbit(dt, {
+        shuttleController: this.shuttleController,
+        vehicleCamera: this.vehicleCamera,
+        sceneVisuals: this.sceneVisuals,
+        inputManager: this.inputManager,
+        mapIntroControlsLocked: this.mapIntro.controlsLocked,
+        planetControllers: this.planetControllers,
+      })
       this.updateShopSession()
       this.updateMissionState()
       this.missionFacade.tick(dt)
@@ -2138,35 +1973,13 @@ export class MapViewController implements Tickable {
   /** Unified death handler — explode or freeze ship, zoom camera, show overlay. */
   private triggerDeath(cause: string): void {
     if (!this.shuttleController) return
-
-    const isCold = cause === 'Hull Frozen' || cause === 'Adrift'
-
-    if (isCold) {
-      // Freeze effect — tint shuttle blue/icy, keep visible
-      this.shuttleController.group.traverse((child) => {
-        if (child instanceof THREE.Mesh && child.material) {
-          const materials = Array.isArray(child.material) ? child.material : [child.material]
-          for (const material of materials) {
-            if (!isEmissiveMaterial(material)) continue
-            material.emissive.set(0x4488ff)
-            material.emissiveIntensity = 0.6
-          }
-        }
-      })
-    } else {
-      // Explosion burst at shuttle position
-      this.shuttleEffects?.emitExplosion(this.shuttleController.position.clone())
-      // Hide shuttle mesh
-      this.shuttleController.group.visible = false
-    }
-
-    // Disable all input + freeze movement
-    this.shuttleController.setInputEnabled(false)
-    this.shuttleController.freeze()
-
-    // Camera + overlay
-    this.vehicleCamera?.setConfig(MAP_DEATH_CAMERA_CONFIG)
-    this.onDeathOverlay?.(true, cause)
+    this.lifeCycleFacade.triggerDeath(cause, {
+      shuttleController: this.shuttleController,
+      shuttleEffects: this.shuttleEffects,
+      vehicleCamera: this.vehicleCamera,
+      onDeathOverlay: this.onDeathOverlay,
+      isEmissiveMaterial,
+    })
   }
 
   private respawnAtEarth(): void {
@@ -2179,10 +1992,11 @@ export class MapViewController implements Tickable {
       this.playerProfile,
       this.playerInventory,
     )
-    this.playerProfile = { ...this.playerProfile, credits: MAP_CONFIG.MAP_DEATH_RESPAWN_CREDITS }
-    this.playerInventory = this.inventoryWithStarterFuelCells(
-      this.createInventoryForCurrentCargoBayLevel(),
+    const respawnState = this.lifeCycleFacade.buildRespawnPlayerState(this.playerProfile, () =>
+      this.inventoryWithStarterFuelCells(this.createInventoryForCurrentCargoBayLevel()),
     )
+    this.playerProfile = respawnState.playerProfile
+    this.playerInventory = respawnState.playerInventory
     clearActiveMission()
     this.missionFacade.reset(
       this.sceneObjects?.scene ?? null,
@@ -2197,59 +2011,22 @@ export class MapViewController implements Tickable {
     this.onCreditsUpdate?.(this.playerProfile.credits)
     this.emitFuelCellCount()
 
-    // Clear death state + show shuttle again, remove ice tint
-    this.shuttleController.resetDeath()
-    this.shuttleController.group.visible = true
-    this.shuttleController.group.traverse((child) => {
-      if (child instanceof THREE.Mesh && child.material) {
-        const materials = Array.isArray(child.material) ? child.material : [child.material]
-        for (const material of materials) {
-          if (!isEmissiveMaterial(material) || material.emissiveIntensity <= 0) continue
-          material.emissive.set(0x000000)
-          material.emissiveIntensity = 0
-        }
-      }
-    })
-    this.shuttleController.freeze()
-    this.shuttleController.setInputEnabled(false)
-
-    // Return orbit system to free state
-    if (this.orbitSystem.state === 'approaching') {
-      this.orbitSystem.cancelApproach()
-    } else if (this.orbitSystem.state === 'orbiting') {
-      this.orbitSystem.launchSlingshot(0, 0)
-    }
-
-    // Find Earth
     const earthIndex = PLANETS.findIndex((p) => p.id === 'earth')
     const earthController = this.planetControllers[earthIndex]
-    if (!earthController) return
-
-    const ex = earthController.getWorldX()
-    const ez = earthController.getWorldZ()
-
-    // Force into Earth orbit (same pattern as init)
-    this.orbitSystem.beginCapture(ex + 1, ez)
-    const orbitR = this.orbitSystem.targetOrbitRadius
-    this.shuttleController.group.position.set(ex + orbitR, 0, ez)
-    this.orbitSystem.checkArrival(ex + orbitR, ez)
-
-    // Face away from Earth
-    const awayAngle = Math.atan2(-ez, orbitR)
-    this.shuttleController.group.rotation.set(0, awayAngle, 0)
-
-    // Camera + orbit ring
-    this.vehicleCamera?.setConfig(MAP_ORBIT_CAMERA_CONFIG)
-    this.vehicleCamera?.setTarget(this.shuttleController.group)
-    this.showOrbitRing(orbitR)
-    this.sceneVisuals?.setOrbitRingPosition(ex, 0, ez)
+    const didRespawn = this.lifeCycleFacade.respawnAtEarth({
+      shuttleController: this.shuttleController,
+      vehicleCamera: this.vehicleCamera,
+      sceneVisuals: this.sceneVisuals,
+      shipHealth: this.shipHealth,
+      orbitFacade: this.orbitFacade,
+      earthController: earthController ?? null,
+      isEmissiveMaterial,
+    })
+    if (!didRespawn) return
 
     // Reset slingshot state
-    this.slingshotCharge = 0
-    this.hideLaunchArrow()
     this.yRecovery = false
     this.adriftTimer = 0
-    this.shipHealth?.reset()
     this.resetWorldLineHistory()
     this.updateMissionState()
   }
@@ -2276,29 +2053,6 @@ export class MapViewController implements Tickable {
     return computeMaxGravityProximity(px, pz, sources, MAP_CONFIG.MAP_GRAVITY_CONFIG)
   }
 
-  /** Returns true if the shuttle is aiming toward the captured planet. */
-  private isAimingAtPlanet(): boolean {
-    if (!this.shuttleController || !this.orbitSystem?.target) return false
-    return isShuttleAimingAtPlanet({
-      shuttlePosition: this.shuttleController.position,
-      shuttleQuaternion: this.shuttleController.group.quaternion,
-      planetPosition: {
-        x: this.orbitSystem.target.getWorldX(),
-        z: this.orbitSystem.target.getWorldZ(),
-      },
-    })
-  }
-
-  /** Update the slingshot direction arrow length based on charge. */
-  private updateLaunchArrow(): void {
-    this.sceneVisuals?.updateLaunchArrow(this.slingshotCharge, this.isAimingAtPlanet())
-  }
-
-  /** Remove the launch arrow from shuttle group. */
-  private hideLaunchArrow(): void {
-    this.sceneVisuals?.hideLaunchArrow()
-  }
-
   /**
    * Rotating the shuttle with A/D should swing the chase cam only in free flight;
    * during planet orbit capture, yaw is for aiming and must not drag the camera offset.
@@ -2310,29 +2064,16 @@ export class MapViewController implements Tickable {
     this.vehicleCamera.setShipYawCoupling(driving)
   }
 
-  /** Create a dashed circle ring at the given radius and add to scene. */
-  private showOrbitRing(radius: number, opacity: number = MAP_CONFIG.ORBIT_RING_OPACITY): void {
-    this.sceneVisuals?.showOrbitRing(radius, opacity)
-  }
-
-  /** Remove the orbit ring from scene. */
-  private hideOrbitRing(): void {
-    this.sceneVisuals?.hideOrbitRing()
-    this.orbitRingIsPreview = false
-  }
-
   /**
    * Exit planet approach autopilot and restore free flight (shared by E cancel and mission begin).
    */
   private cancelOrbitApproachFromMap(): void {
-    if (this.orbitSystem?.state !== 'approaching') return
-    this.orbitSystem.cancelApproach()
-    this.approachStartPos = null
-    this.shuttleController?.unfreeze()
-    this.shuttleController?.setInputEnabled(true)
-    this.vehicleCamera?.setConfig(MAP_CAMERA_CONFIG)
-    this.sceneVisuals?.hideOrbitRing()
-    this.orbitRingIsPreview = false
+    if (!this.shuttleController) return
+    this.orbitFacade.cancelApproachFromMap({
+      shuttleController: this.shuttleController,
+      vehicleCamera: this.vehicleCamera,
+      sceneVisuals: this.sceneVisuals,
+    })
   }
 
   /**
@@ -2354,18 +2095,12 @@ export class MapViewController implements Tickable {
    * After a dev teleport, exit orbit capture UI/state so free-flight matches the new pose.
    */
   private prepareShuttleAfterDevWarp(): void {
-    this.orbitSystem?.resetToFreeFlight()
-    this.approachStartPos = null
-    this.slingshotCharge = 0
-    this.hideLaunchArrow()
-    this.sceneVisuals?.hideOrbitRing()
-    this.orbitRingIsPreview = false
-    this.shuttleController?.unfreeze()
-    this.shuttleController?.setInputEnabled(true)
-    this.vehicleCamera?.setConfig(MAP_CAMERA_CONFIG)
-    if (this.shuttleController) {
-      this.vehicleCamera?.setTarget(this.shuttleController.group)
-    }
+    if (!this.shuttleController) return
+    this.orbitFacade.prepareShuttleAfterDevWarp({
+      shuttleController: this.shuttleController,
+      vehicleCamera: this.vehicleCamera,
+      sceneVisuals: this.sceneVisuals,
+    })
   }
 
   /**
@@ -2457,35 +2192,26 @@ export class MapViewController implements Tickable {
   private tickMapTransition(): void {
     if (!this.mapCamera || !this.sceneObjects) return
 
-    const progress = easeInOut(this.mapState.progress)
+    const runtime = this.modeCoordinator.resolveMapTransitionRuntime(
+      this.mapState.phase,
+      this.mapState.progress,
+    )
     const aspect = window.innerWidth / window.innerHeight
 
     // Update ortho frustum based on transition progress
-    this.mapCamera.updateTransition(progress, aspect)
+    this.mapCamera.updateTransition(runtime.transitionProgress, aspect)
 
     // Swap render camera to ortho during map phases
     const renderPass = this.sceneObjects.composer.passes[0] as RenderPass
-    if (this.mapState.phase === 'opening' || this.mapState.phase === 'open') {
+    if (runtime.useMapCamera) {
       renderPass.camera = this.mapCamera.camera
     }
 
     // Emit overlay state when fully open
-    if (this.mapState.phase === 'open') {
+    if (runtime.showOverlay) {
       this.emitMapOverlay()
     } else {
-      // During transitions, hide overlay
-      this.onMapOverlay?.({
-        visible: false,
-        labels: [],
-        shipX: 0,
-        shipY: 0,
-        headingDeg: 0,
-        speed: 0,
-        distances: [],
-        gravityRings: [],
-        trajectoryPoints: [],
-        missionWaypoint: null,
-      })
+      this.onMapOverlay?.(this.modeCoordinator.buildHiddenMapOverlayState())
     }
 
     // No explicit render needed — the compositor tickable runs after this and calls composer.render()
@@ -2503,10 +2229,13 @@ export class MapViewController implements Tickable {
     }
 
     // Check if we were orbiting before map opened — restore appropriate state
-    const orbitState = this.orbitSystem?.state ?? 'free'
-    if (orbitState === 'free') {
+    const restoreState = this.modeCoordinator.shouldRestoreFreeFlightAfterMapClose(
+      this.orbitSystem?.state ?? 'free',
+      this.shuttleController.slingshotBurstActive,
+    )
+    if (restoreState.unfreezeShuttle) {
       this.shuttleController.unfreeze()
-      if (!this.shuttleController.slingshotBurstActive) {
+      if (restoreState.enableInput) {
         this.shuttleController.setInputEnabled(true)
       }
     }
@@ -2516,18 +2245,7 @@ export class MapViewController implements Tickable {
     this.spaceTimeGrid?.applyBaselineLineAppearance()
 
     // Hide overlay
-    this.onMapOverlay?.({
-      visible: false,
-      labels: [],
-      shipX: 0,
-      shipY: 0,
-      headingDeg: 0,
-      speed: 0,
-      distances: [],
-      gravityRings: [],
-      trajectoryPoints: [],
-      missionWaypoint: null,
-    })
+    this.onMapOverlay?.(this.modeCoordinator.buildHiddenMapOverlayState())
   }
 
   /** Build projected persistent world-line points for the tactical map. */
@@ -2868,35 +2586,28 @@ export class MapViewController implements Tickable {
 
     const renderPass = this.sceneObjects.composer.passes[0] as RenderPass
 
-    const phase = this.habitatState.phase
-    if (phase === 'transitioning_in') {
-      // During fade-out, keep rendering the map scene — the fade overlay covers it
-      if (this.vehicleCamera) {
-        this.vehicleCamera.controls.enabled = false
-      }
-    } else if (phase === 'waking_up' || phase === 'habitat' || phase === 'transitioning_out') {
-      // Swap to habitat scene
+    const renderState = this.modeCoordinator.resolveHabitatRenderState(
+      this.habitatState.phase,
+      this.habitatState.progress,
+    )
+    if (renderState.disableVehicleControls && this.vehicleCamera) {
+      this.vehicleCamera.controls.enabled = false
+    }
+
+    if (renderState.useHabitatScene) {
       ;(renderPass as { scene: THREE.Scene }).scene = this.habitatScene.getScene()
       renderPass.camera = this.habitatScene.getCamera()
-      if (this.vehicleCamera) {
-        this.vehicleCamera.controls.enabled = false
-      }
 
-      // During waking_up: animate camera from lying on bed (looking up) to standing
-      if (phase === 'waking_up') {
-        const t = easeInOut(this.habitatState.progress)
+      if (renderState.wakeUpProgress !== null) {
+        const t = renderState.wakeUpProgress
         const cam = this.habitatScene.fpsCamera
         const spawn = this.habitatScene.getSpawnPosition()
-        // Keep yaw locked toward the table during wake-up
         cam.yaw = spawn.yaw
-        // Start pitch looking straight up (-PI/2), lerp to 0 (level)
         const START_PITCH = -Math.PI / 2
         cam.pitch = START_PITCH * (1 - t)
-        // Eye height rises from floor to standing
         const lyingHeight = 0.5
         const standingHeight = spawn.position.y
         cam.camera.position.y = lyingHeight + (standingHeight - lyingHeight) * t
-        // Manually update camera quaternion so the animation renders correctly
         cam.tick(0)
       }
     }
@@ -2904,27 +2615,10 @@ export class MapViewController implements Tickable {
 
   /** Compute the fade overlay opacity based on habitat state. */
   private getHabitatFadeOpacity(): number {
-    const phase = this.habitatState.phase
-    const p = this.habitatState.progress
-    if (phase === 'transitioning_in') {
-      // Fade to black as we transition in
-      return easeInOut(p)
-    }
-    if (phase === 'waking_up') {
-      // Fade from black as we wake up (first 40% of wake-up)
-      const fadeProgress = Math.min(1, p / 0.4)
-      return 1 - easeInOut(fadeProgress)
-    }
-    if (phase === 'transitioning_out') {
-      // Fade to black, then clear
-      if (p > 0.5) {
-        // First half: fade to black
-        return easeInOut((1 - p) / 0.5)
-      }
-      // Second half: fade from black (back to map)
-      return easeInOut(p / 0.5)
-    }
-    return 0
+    return this.modeCoordinator.getHabitatFadeOpacity(
+      this.habitatState.phase,
+      this.habitatState.progress,
+    )
   }
 
   private onEnterHabitat(): void {
