@@ -1,7 +1,7 @@
 {
   "health": {
     "maxHp": 100,
-    "hypoxiaDamagePerSecond": 1
+    "hypoxiaDamagePerSecond": 12
   },
   "movement": {
     "moveThrust": 35.0,
@@ -16,7 +16,7 @@
   "o2": {
     "fuelCapacity": 100,
     "baseDrainRate": 0.3,
-    "deathTimerSeconds": 30,
+    "deathTimerSeconds": 10,
     "thrusters": {
       "sprint": {
         "capacity": 50,

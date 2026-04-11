@@ -50,7 +50,7 @@ export interface FpsPlayerConfig {
   health: {
     /** Maximum hit points. */
     maxHp: number
-    /** HP lost per second while O2 is empty. */
+    /** HP lost per second only while O2 (fuel) is fully depleted — no HP drain until then. */
     hypoxiaDamagePerSecond: number
   }
   /** Lateral movement tuning. */
@@ -284,7 +284,7 @@ export class FpsPlayerController implements Tickable {
     // --- Base O2 drain (breathing) ---
     this.thrusterSystem.consumeFuel(this.config.o2.baseDrainRate * dt)
 
-    // --- Hypoxia: no O2 → lose HP ---
+    // --- Hypoxia: HP drain only when O2 tank is empty ---
     if (this.thrusterSystem.isFuelEmpty && !this._dead) {
       this.takeDamage(this.config.health.hypoxiaDamagePerSecond * dt)
     }
