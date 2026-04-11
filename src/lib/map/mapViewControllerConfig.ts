@@ -151,9 +151,6 @@ export const SLINGSHOT_CHARGE_TIME = 2.0
 /** Seconds without fuel in free flight before game over. */
 export const ADRIFT_TIMEOUT = 60
 
-/** Credits after respawning from a map death. */
-export const MAP_DEATH_RESPAWN_CREDITS = 0
-
 /** Default shuttle reserve fuel cells placed into an empty hold. */
 export const STARTER_SHUTTLE_FUEL_CELL_COUNT = 1
 
@@ -312,7 +309,6 @@ export const MAP_VIEW_CONTROLLER_CONFIG = {
   INTRO_CITY_YAW_SPEED,
   INTRO_CITY_Y_LOWER,
   INTRO_VIRUS_YAW_SPEED,
-  MAP_DEATH_RESPAWN_CREDITS,
   MAP_GRAVITY_CONFIG,
   MAP_GRID_GAS_GIANT_WELL_WIDTH_MULT,
   MAP_INTRO_CAMERA_START_FOV,

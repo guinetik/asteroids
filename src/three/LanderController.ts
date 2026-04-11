@@ -45,13 +45,16 @@ const MAIN_ENGINE_THRUST = 10
 /** Lander thruster groups: main engine (red) and RCS (white) */
 export type LanderThrusterName = 'mainEngine' | 'rcs'
 
+/** Base lander fuel tank at upgrade level 0 (before `landerFuelCapacity` shop multiplier). */
+const LANDER_BASE_FUEL_CAPACITY = 1000
+
 /** Lander thruster config — shared fuel tank */
 const LANDER_THRUSTER_CONFIG: ThrusterSystemConfig<LanderThrusterName> = {
   thrusters: {
     mainEngine: { capacity: 120, burnRate: 18, rechargeRate: 14, fuelCostPerRecharge: 0.4 },
     rcs: { capacity: 80, burnRate: 5, rechargeRate: 9, fuelCostPerRecharge: 0.12 },
   },
-  fuelCapacity: 600,
+  fuelCapacity: LANDER_BASE_FUEL_CAPACITY,
 }
 
 /** Node name for the main descent engine bell in the GLB */

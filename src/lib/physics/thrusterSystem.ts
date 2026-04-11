@@ -49,6 +49,9 @@ export interface ThrusterState {
 /** Shuttle-specific preset: thrust / brake / rcs */
 export type ShuttleThrusterName = 'thrust' | 'brake' | 'rcs'
 
+/** Base shuttle fuel tank at upgrade level 0 (before `shuttleFuelCapacity` shop multiplier). */
+const SHUTTLE_BASE_FUEL_CAPACITY = 1000
+
 /** Default config matching the original shuttle tuning. */
 export const DEFAULT_SHUTTLE_CONFIG: ThrusterSystemConfig<ShuttleThrusterName> = {
   thrusters: {
@@ -56,7 +59,7 @@ export const DEFAULT_SHUTTLE_CONFIG: ThrusterSystemConfig<ShuttleThrusterName> =
     brake: { capacity: 60, burnRate: 60, rechargeRate: 5, fuelCostPerRecharge: 0.6 },
     rcs: { capacity: 60, burnRate: 8, rechargeRate: 5, fuelCostPerRecharge: 0.2 },
   },
-  fuelCapacity: 500,
+  fuelCapacity: SHUTTLE_BASE_FUEL_CAPACITY,
 }
 
 /**

@@ -8,7 +8,6 @@ import type { ShuttleController } from '@/three/ShuttleController'
 import type { PlanetSystemController } from '@/three/controllers/PlanetSystemController'
 import type { MapSceneVisuals } from '@/three/MapSceneVisuals'
 import type { MapShuttleEffects } from '@/three/MapShuttleEffects'
-import { MAP_VIEW_CONTROLLER_CONFIG as MAP_CONFIG } from '@/lib/map/mapViewControllerConfig'
 import type { EmissiveMaterial } from '@/lib/map/mapViewControllerHelpers'
 import type { MapOrbitFacade } from '@/lib/map/orbit/MapOrbitFacade'
 
@@ -31,12 +30,16 @@ interface RespawnDeps {
 }
 
 export class MapLifeCycleFacade {
+  /**
+   * Snapshot profile and replace hold contents after a map death.
+   * Credits are preserved; inventory is rebuilt by `createRespawnInventory` (starter fuel only).
+   */
   buildRespawnPlayerState(
     playerProfile: PlayerProfile,
     createRespawnInventory: () => Inventory,
   ): { playerProfile: PlayerProfile; playerInventory: Inventory } {
     return {
-      playerProfile: { ...playerProfile, credits: MAP_CONFIG.MAP_DEATH_RESPAWN_CREDITS },
+      playerProfile: { ...playerProfile },
       playerInventory: createRespawnInventory(),
     }
   }

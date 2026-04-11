@@ -2116,7 +2116,7 @@ export class MapViewController implements Tickable {
   private respawnAtEarth(): void {
     if (!this.shuttleController || !this.orbitSystem) return
 
-    // Ship destroyed — credits and cargo gone; shuttle contracts / active asteroid mission voided.
+    // Ship destroyed — cargo gone; credits kept; shuttle contracts / active asteroid mission voided.
     this.shopFacade.clear(
       this.onShopButton,
       this.onShopState,
