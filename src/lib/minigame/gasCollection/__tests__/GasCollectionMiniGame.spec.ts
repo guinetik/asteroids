@@ -4,9 +4,9 @@ import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
   MAX_DRONES,
-  MAX_AIR_TIME_YIELD,
   DRONE_COLLECT_RADIUS,
   COOK_ZONE_Y,
+  GAS_PER_PUFF,
 } from '../constants'
 import type { OrbitalMiniGameContext } from '../../OrbitalMiniGame'
 
@@ -21,7 +21,7 @@ describe('GasCollectionMiniGame', () => {
   let game: GasCollectionMiniGame
 
   beforeEach(() => {
-    game = new GasCollectionMiniGame('test-mission', 5)
+    game = new GasCollectionMiniGame('test-mission', 3)
   })
 
   describe('initialization', () => {
@@ -32,7 +32,7 @@ describe('GasCollectionMiniGame', () => {
 
     it('has correct progress tracking', () => {
       expect(game.progressCurrent).toBe(0)
-      expect(game.progressTotal).toBe(5)
+      expect(game.progressTotal).toBe(3)
     })
 
     it('starts with max drones available', () => {
@@ -42,6 +42,10 @@ describe('GasCollectionMiniGame', () => {
     it('ship starts at center of canvas', () => {
       expect(game.shipX).toBeCloseTo(CANVAS_WIDTH / 2)
       expect(game.shipY).toBeCloseTo(CANVAS_HEIGHT / 2)
+    })
+
+    it('ship starts facing right', () => {
+      expect(game.shipFacing).toBe(1)
     })
 
     it('has two steps', () => {
@@ -87,6 +91,20 @@ describe('GasCollectionMiniGame', () => {
       game.tick(0.5, STUB_CTX)
       expect(game.shipVy).toBeGreaterThan(initialVy)
     })
+
+    it('flips facing to -1 when pressing left', () => {
+      game.setInput({ up: false, down: false, left: true, right: false })
+      game.tick(0.016, STUB_CTX)
+      expect(game.shipFacing).toBe(-1)
+    })
+
+    it('flips facing back to 1 when pressing right', () => {
+      game.setInput({ up: false, down: false, left: true, right: false })
+      game.tick(0.016, STUB_CTX)
+      game.setInput({ up: false, down: false, left: false, right: true })
+      game.tick(0.016, STUB_CTX)
+      expect(game.shipFacing).toBe(1)
+    })
   })
 
   describe('cook zone', () => {
@@ -104,10 +122,11 @@ describe('GasCollectionMiniGame', () => {
   })
 
   describe('drone launching', () => {
-    it('launchDrone creates a drone', () => {
+    it('launchDrone creates a drone with gasLoaded=0', () => {
       game.launchDrone()
       expect(game.drones).toHaveLength(1)
       expect(game.dronesRemaining).toBe(MAX_DRONES - 1)
+      expect(game.drones[0]!.gasLoaded).toBe(0)
     })
 
     it('drone launches from ship position', () => {
@@ -138,28 +157,73 @@ describe('GasCollectionMiniGame', () => {
     })
   })
 
-  describe('drone collection', () => {
-    it('collecting a drone adds gas based on air time', () => {
-      game.launchDrone()
-      game.drones[0]!.airTime = 2.0
-      game.drones[0]!.x = game.shipX
-      game.drones[0]!.y = game.shipY
-      game.tick(0.016, STUB_CTX)
-      expect(game.drones[0]).toBeUndefined() // collected and cleaned up
-      expect(game.gasCollected).toBeCloseTo(2.0)
+  describe('gas puffs', () => {
+    it('spawns gas puffs over time', () => {
+      expect(game.gasPuffs).toHaveLength(0)
+      // Tick long enough for at least one puff to spawn
+      game.tick(1.0, STUB_CTX)
+      expect(game.gasPuffs.length).toBeGreaterThan(0)
     })
 
-    it('gas yield is clamped to MAX_AIR_TIME_YIELD', () => {
+    it('puffs rise upward', () => {
+      game.tick(1.0, STUB_CTX)
+      const puff = game.gasPuffs[0]!
+      const y1 = puff.y
+      game.tick(0.5, STUB_CTX)
+      expect(puff.y).toBeLessThan(y1)
+    })
+
+    it('drone passing through puff loads gas', () => {
+      // Manually place a puff and a drone at the same spot
+      const puff = { x: 200, y: 200, speed: 50, radius: 20, consumed: false, alpha: 0.8 }
+      game.gasPuffs.push(puff)
       game.launchDrone()
-      game.drones[0]!.airTime = 10.0
+      game.drones[0]!.x = 200
+      game.drones[0]!.y = 200
+      game.drones[0]!.airTime = 1.0
+      game.tick(0.016, STUB_CTX)
+      expect(game.drones[0]!.gasLoaded).toBe(GAS_PER_PUFF)
+      expect(puff.consumed).toBe(true)
+    })
+
+    it('drone can load gas from multiple puffs', () => {
+      game.gasPuffs.push(
+        { x: 200, y: 200, speed: 50, radius: 20, consumed: false, alpha: 0.8 },
+        { x: 202, y: 200, speed: 50, radius: 20, consumed: false, alpha: 0.8 },
+      )
+      game.launchDrone()
+      game.drones[0]!.x = 200
+      game.drones[0]!.y = 200
+      game.drones[0]!.airTime = 1.0
+      game.tick(0.016, STUB_CTX)
+      expect(game.drones[0]!.gasLoaded).toBe(2)
+    })
+  })
+
+  describe('ship-drone collection', () => {
+    it('catching a loaded drone banks its gas', () => {
+      game.launchDrone()
+      game.drones[0]!.gasLoaded = 2
+      game.drones[0]!.airTime = 1.0
       game.drones[0]!.x = game.shipX
       game.drones[0]!.y = game.shipY
       game.tick(0.016, STUB_CTX)
-      expect(game.gasCollected).toBeCloseTo(MAX_AIR_TIME_YIELD)
+      expect(game.gasCollected).toBe(2)
+    })
+
+    it('catching an empty drone gives no gas', () => {
+      game.launchDrone()
+      game.drones[0]!.gasLoaded = 0
+      game.drones[0]!.airTime = 1.0
+      game.drones[0]!.x = game.shipX
+      game.drones[0]!.y = game.shipY
+      game.tick(0.016, STUB_CTX)
+      expect(game.gasCollected).toBe(0)
     })
 
     it('collection requires proximity within DRONE_COLLECT_RADIUS', () => {
       game.launchDrone()
+      game.drones[0]!.gasLoaded = 1
       game.drones[0]!.airTime = 1.0
       game.drones[0]!.x = game.shipX + DRONE_COLLECT_RADIUS + 10
       game.drones[0]!.y = game.shipY
@@ -181,20 +245,16 @@ describe('GasCollectionMiniGame', () => {
     it('auto-completes when gas gauge reaches target', () => {
       const cb = vi.fn()
       game.onComplete = cb
+
+      // Launch drone, load it with enough gas, catch it
       game.launchDrone()
-      game.drones[0]!.airTime = 3.0
+      game.drones[0]!.gasLoaded = 3
+      game.drones[0]!.airTime = 1.0
       game.drones[0]!.x = game.shipX
       game.drones[0]!.y = game.shipY
       game.tick(0.016, STUB_CTX)
 
-      game.launchDrone()
-      const uncollected = game.drones.find((d) => !d.collected)!
-      uncollected.airTime = 3.0
-      uncollected.x = game.shipX
-      uncollected.y = game.shipY
-      game.tick(0.016, STUB_CTX)
-
-      expect(game.gasCollected).toBeGreaterThanOrEqual(5)
+      expect(game.gasCollected).toBeGreaterThanOrEqual(3)
       expect(game.status).toBe('completed')
       expect(cb).toHaveBeenCalledWith('test-mission')
     })
@@ -215,18 +275,13 @@ describe('GasCollectionMiniGame', () => {
 
   describe('tick guards', () => {
     it('tick is no-op after completed', () => {
-      // Force completion by collecting enough gas
       game.launchDrone()
-      game.drones[0]!.airTime = MAX_AIR_TIME_YIELD
+      game.drones[0]!.gasLoaded = 3
+      game.drones[0]!.airTime = 1.0
       game.drones[0]!.x = game.shipX
       game.drones[0]!.y = game.shipY
       game.tick(0.016, STUB_CTX)
-      game.launchDrone()
-      const d = game.drones.find((d) => !d.collected)!
-      d.airTime = MAX_AIR_TIME_YIELD
-      d.x = game.shipX
-      d.y = game.shipY
-      game.tick(0.016, STUB_CTX)
+      expect(game.status).toBe('completed')
 
       const gasBefore = game.gasCollected
       game.tick(1.0, STUB_CTX)
@@ -254,8 +309,14 @@ describe('GasCollectionMiniGame', () => {
   })
 
   describe('dispose', () => {
-    it('does not throw', () => {
-      expect(() => game.dispose()).not.toThrow()
+    it('clears drones and puffs', () => {
+      game.launchDrone()
+      game.gasPuffs.push({ x: 100, y: 200, speed: 50, radius: 20, consumed: false, alpha: 0.8 })
+      expect(game.drones.length).toBeGreaterThan(0)
+      expect(game.gasPuffs.length).toBeGreaterThan(0)
+      game.dispose()
+      expect(game.drones).toHaveLength(0)
+      expect(game.gasPuffs).toHaveLength(0)
     })
   })
 })

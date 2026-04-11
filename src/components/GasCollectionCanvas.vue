@@ -204,6 +204,8 @@ function drawShip(ctx: CanvasRenderingContext2D) {
 
   ctx.save()
   ctx.translate(x, y + hoverOffset)
+  // Flip ship when facing left
+  ctx.scale(props.minigame.shipFacing, 1)
   ctx.rotate(tilt)
 
   // Engine exhaust glow (behind everything)
@@ -291,14 +293,49 @@ function drawShip(ctx: CanvasRenderingContext2D) {
   ctx.restore()
 }
 
+function drawGasPuffs(ctx: CanvasRenderingContext2D) {
+  for (const puff of props.minigame.gasPuffs) {
+    if (puff.consumed) continue
+    ctx.save()
+    ctx.translate(puff.x, puff.y)
+
+    // Outer haze
+    ctx.globalAlpha = puff.alpha * 0.3
+    const hazeGrad = ctx.createRadialGradient(0, 0, puff.radius * 0.3, 0, 0, puff.radius * 1.4)
+    hazeGrad.addColorStop(0, '#ffdd44')
+    hazeGrad.addColorStop(0.5, '#ffaa22')
+    hazeGrad.addColorStop(1, 'rgba(255, 150, 30, 0)')
+    ctx.fillStyle = hazeGrad
+    ctx.beginPath()
+    ctx.arc(0, 0, puff.radius * 1.4, 0, Math.PI * 2)
+    ctx.fill()
+
+    // Inner cloud
+    ctx.globalAlpha = puff.alpha * 0.6
+    const innerGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, puff.radius)
+    innerGrad.addColorStop(0, '#ffeeaa')
+    innerGrad.addColorStop(0.6, '#ffcc44')
+    innerGrad.addColorStop(1, 'rgba(255, 180, 40, 0)')
+    ctx.fillStyle = innerGrad
+    ctx.beginPath()
+    ctx.arc(0, 0, puff.radius, 0, Math.PI * 2)
+    ctx.fill()
+
+    ctx.globalAlpha = 1.0
+    ctx.restore()
+  }
+}
+
 function drawDrones(ctx: CanvasRenderingContext2D) {
   for (const drone of props.minigame.drones) {
     if (drone.collected) continue
 
-    // Fading trail
+    const hasGas = drone.gasLoaded > 0
+
+    // Fading trail — green if loaded, cyan if empty
     const trailLen = 5
     ctx.globalAlpha = 0.15
-    ctx.strokeStyle = '#00ffcc'
+    ctx.strokeStyle = hasGas ? '#44ff44' : '#00ffcc'
     ctx.lineWidth = 2
     ctx.beginPath()
     ctx.moveTo(
@@ -312,18 +349,19 @@ function drawDrones(ctx: CanvasRenderingContext2D) {
     ctx.save()
     ctx.translate(drone.x, drone.y)
 
-    // Outer glow
+    // Outer glow — brighter if gas loaded
+    const glowColor = hasGas ? 'rgba(80, 255, 80,' : 'rgba(0, 255, 204,'
     const glowGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 14)
-    glowGrad.addColorStop(0, 'rgba(0, 255, 204, 0.6)')
-    glowGrad.addColorStop(0.5, 'rgba(0, 255, 204, 0.15)')
-    glowGrad.addColorStop(1, 'rgba(0, 255, 204, 0)')
+    glowGrad.addColorStop(0, `${glowColor} 0.7)`)
+    glowGrad.addColorStop(0.5, `${glowColor} 0.2)`)
+    glowGrad.addColorStop(1, `${glowColor} 0)`)
     ctx.fillStyle = glowGrad
     ctx.beginPath()
     ctx.arc(0, 0, 14, 0, Math.PI * 2)
     ctx.fill()
 
     // Inner core
-    ctx.fillStyle = '#00ffcc'
+    ctx.fillStyle = hasGas ? '#44ff44' : '#00ffcc'
     ctx.beginPath()
     ctx.arc(0, 0, 4, 0, Math.PI * 2)
     ctx.fill()
@@ -333,6 +371,14 @@ function drawDrones(ctx: CanvasRenderingContext2D) {
     ctx.beginPath()
     ctx.arc(0, 0, 1.5, 0, Math.PI * 2)
     ctx.fill()
+
+    // Gas loaded indicator
+    if (hasGas) {
+      ctx.fillStyle = '#44ff44'
+      ctx.font = 'bold 9px monospace'
+      ctx.textAlign = 'center'
+      ctx.fillText(`+${drone.gasLoaded}`, 0, -12)
+    }
 
     ctx.restore()
   }
@@ -418,6 +464,7 @@ function loop(time: number) {
   ctx.setLineDash([])
   ctx.globalAlpha = 1.0
 
+  drawGasPuffs(ctx)
   drawShip(ctx)
   drawDrones(ctx)
   drawGauge(ctx)

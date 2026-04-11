@@ -30,6 +30,24 @@ export interface Drone {
   vy: number
   /** Seconds since launch. */
   airTime: number
-  /** Whether this drone has been collected. */
+  /** Whether this drone has been collected by the ship. */
   collected: boolean
+  /** Gas units loaded from passing through gas puffs. */
+  gasLoaded: number
+}
+
+/** A gas puff rising from the atmosphere. */
+export interface GasPuff {
+  /** Horizontal position in canvas pixels. */
+  x: number
+  /** Vertical position in canvas pixels. */
+  y: number
+  /** Upward speed in px/s. */
+  speed: number
+  /** Radius for collision and rendering. */
+  radius: number
+  /** Whether this puff has been consumed by a drone. */
+  consumed: boolean
+  /** Visual opacity (fades as it rises). */
+  alpha: number
 }

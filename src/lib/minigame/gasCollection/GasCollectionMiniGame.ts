@@ -2,7 +2,7 @@
  * Gas collection orbital minigame.
  *
  * 2D side-scrolling collection game: fly the shuttle, launch drones
- * with Q, collect them for gas yield proportional to air time.
+ * through rising gas puffs to load them, then catch the loaded drone.
  * Pure game logic — no DOM or canvas. The Vue component reads state
  * and renders.
  *
@@ -17,7 +17,7 @@ import type {
   OrbitalMiniGameStatus,
   OrbitalMiniGameStep,
 } from '../OrbitalMiniGame'
-import type { ShipInput, Drone } from './types'
+import type { ShipInput, Drone, GasPuff } from './types'
 import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
@@ -29,16 +29,23 @@ import {
   DRONE_LAUNCH_ANGLE,
   DRONE_COLLECT_RADIUS,
   DRONE_GRACE_PERIOD,
-  MAX_AIR_TIME_YIELD,
   MAX_DRONES,
   SHIP_HALF_WIDTH,
   SHIP_HALF_HEIGHT,
   SHIP_GRAVITY,
   COOK_ZONE_Y,
+  PUFF_SPAWN_INTERVAL,
+  PUFF_SPEED_MIN,
+  PUFF_SPEED_MAX,
+  PUFF_RADIUS_MIN,
+  PUFF_RADIUS_MAX,
+  GAS_PER_PUFF,
+  DRONE_PUFF_COLLECT_RADIUS,
 } from './constants'
 
 /**
- * Gas collection minigame — fly the shuttle, launch and collect drones.
+ * Gas collection minigame — fly the shuttle, launch drones through
+ * rising gas puffs, catch loaded drones.
  *
  * @author guinetik
  * @date 2026-04-11
@@ -64,6 +71,8 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
   shipVx = 0
   /** Ship vertical velocity in px/s. */
   shipVy = 0
+  /** Ship facing direction: 1 = right, -1 = left. */
+  shipFacing = 1
 
   /** Active drones in flight. */
   drones: Drone[] = []
@@ -71,6 +80,11 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
   dronesRemaining = MAX_DRONES
   /** Accumulated gas gauge value. */
   gasCollected = 0
+
+  /** Rising gas puffs from the atmosphere. */
+  gasPuffs: GasPuff[] = []
+  /** Time accumulator for puff spawning. */
+  private puffTimer = 0
 
   private input: ShipInput = { up: false, down: false, left: false, right: false }
 
@@ -122,8 +136,10 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
 
     this.dronesRemaining--
 
-    const launchVx = this.shipVx + DRONE_LAUNCH_SPEED * Math.cos(DRONE_LAUNCH_ANGLE)
-    const launchVy = this.shipVy + DRONE_LAUNCH_SPEED * Math.sin(DRONE_LAUNCH_ANGLE)
+    // Launch in the direction the ship is facing
+    const angle = this.shipFacing === 1 ? DRONE_LAUNCH_ANGLE : Math.PI - DRONE_LAUNCH_ANGLE
+    const launchVx = this.shipVx + DRONE_LAUNCH_SPEED * Math.cos(angle)
+    const launchVy = this.shipVy + DRONE_LAUNCH_SPEED * Math.sin(angle)
 
     this.drones.push({
       x: this.shipX,
@@ -132,18 +148,22 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
       vy: launchVy,
       airTime: 0,
       collected: false,
+      gasLoaded: 0,
     })
   }
 
-  /** Per-frame update. Advances ship, drones, collisions, and end conditions. */
+  /** Per-frame update. Advances ship, puffs, drones, collisions, and end conditions. */
   tick(dt: number, _ctx: OrbitalMiniGameContext): void {
     if (this._status !== 'active') return
 
     this.tickShip(dt)
     if (this.checkCookZone()) return
-    this.checkCollisions()
+    this.tickGasPuffs(dt)
     this.tickDrones(dt)
+    this.checkDronePuffCollisions()
+    this.checkShipDroneCollisions()
     this.cleanupDrones()
+    this.cleanupPuffs()
     this.checkEndConditions()
   }
 
@@ -155,13 +175,10 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
   /** Clean up resources. */
   dispose(): void {
     this.drones.length = 0
+    this.gasPuffs.length = 0
   }
 
-  /**
-   * Advance ship physics: acceleration, drag, speed cap, position clamping.
-   *
-   * @param dt - delta time in seconds
-   */
+  /** Advance ship physics: gravity, acceleration, drag, speed cap, position clamping. */
   private tickShip(dt: number): void {
     // Planet gravity — constant pull downward
     this.shipVy += SHIP_GRAVITY * dt
@@ -170,6 +187,10 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
     if (this.input.left) this.shipVx -= SHIP_ACCELERATION * dt
     if (this.input.up) this.shipVy -= SHIP_ACCELERATION * dt
     if (this.input.down) this.shipVy += SHIP_ACCELERATION * dt
+
+    // Update facing direction based on horizontal input
+    if (this.input.right) this.shipFacing = 1
+    if (this.input.left) this.shipFacing = -1
 
     const dragPerFrame = Math.pow(SHIP_DRAG, dt * 60)
     this.shipVx *= dragPerFrame
@@ -192,11 +213,32 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
     )
   }
 
-  /**
-   * Advance drone physics: gravity and air time accumulation.
-   *
-   * @param dt - delta time in seconds
-   */
+  /** Spawn and advance gas puffs rising from the atmosphere. */
+  private tickGasPuffs(dt: number): void {
+    // Spawn new puffs
+    this.puffTimer += dt
+    while (this.puffTimer >= PUFF_SPAWN_INTERVAL) {
+      this.puffTimer -= PUFF_SPAWN_INTERVAL
+      this.gasPuffs.push({
+        x: 40 + Math.random() * (CANVAS_WIDTH - 80),
+        y: COOK_ZONE_Y + 20,
+        speed: PUFF_SPEED_MIN + Math.random() * (PUFF_SPEED_MAX - PUFF_SPEED_MIN),
+        radius: PUFF_RADIUS_MIN + Math.random() * (PUFF_RADIUS_MAX - PUFF_RADIUS_MIN),
+        consumed: false,
+        alpha: 0.6 + Math.random() * 0.3,
+      })
+    }
+
+    // Move puffs upward, fade as they rise
+    for (const puff of this.gasPuffs) {
+      puff.y -= puff.speed * dt
+      // Fade out as it rises away from the cook zone
+      const travelRatio = (COOK_ZONE_Y - puff.y) / COOK_ZONE_Y
+      puff.alpha = Math.max(0, 0.7 * (1 - travelRatio * 1.5))
+    }
+  }
+
+  /** Advance drone physics: gravity and air time accumulation. */
   private tickDrones(dt: number): void {
     for (const drone of this.drones) {
       if (drone.collected) continue
@@ -216,8 +258,25 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
     return false
   }
 
-  /** Check ship-drone proximity and collect drones within range. */
-  private checkCollisions(): void {
+  /** Check drone-puff collisions — drones passing through puffs load gas. */
+  private checkDronePuffCollisions(): void {
+    for (const drone of this.drones) {
+      if (drone.collected) continue
+      for (const puff of this.gasPuffs) {
+        if (puff.consumed) continue
+        const dx = drone.x - puff.x
+        const dy = drone.y - puff.y
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        if (dist <= puff.radius + DRONE_PUFF_COLLECT_RADIUS) {
+          puff.consumed = true
+          drone.gasLoaded += GAS_PER_PUFF
+        }
+      }
+    }
+  }
+
+  /** Check ship-drone proximity — catching a drone banks its loaded gas. */
+  private checkShipDroneCollisions(): void {
     for (const drone of this.drones) {
       if (drone.collected) continue
       if (drone.airTime < DRONE_GRACE_PERIOD) continue
@@ -226,8 +285,7 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
       const dist = Math.sqrt(dx * dx + dy * dy)
       if (dist <= DRONE_COLLECT_RADIUS) {
         drone.collected = true
-        const yield_ = Math.min(drone.airTime, MAX_AIR_TIME_YIELD)
-        this.gasCollected += yield_
+        this.gasCollected += drone.gasLoaded
       }
     }
   }
@@ -235,6 +293,11 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
   /** Remove collected drones and drones that fell off screen. */
   private cleanupDrones(): void {
     this.drones = this.drones.filter((d) => !d.collected && d.y <= CANVAS_HEIGHT + 20)
+  }
+
+  /** Remove consumed and off-screen gas puffs. */
+  private cleanupPuffs(): void {
+    this.gasPuffs = this.gasPuffs.filter((p) => !p.consumed && p.y > -40)
   }
 
   /** Check for mission completion or failure. */

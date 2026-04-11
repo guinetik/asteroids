@@ -48,6 +48,27 @@ export const SHIP_GRAVITY = 60
 /** Y position of the planet cook zone — ship below this = dead. */
 export const COOK_ZONE_Y = 310
 
+/** Gas puff spawn interval — average seconds between spawns. */
+export const PUFF_SPAWN_INTERVAL = 0.6
+
+/** Gas puff rise speed range — min px/s. */
+export const PUFF_SPEED_MIN = 40
+
+/** Gas puff rise speed range — max px/s. */
+export const PUFF_SPEED_MAX = 80
+
+/** Gas puff collision radius in px. */
+export const PUFF_RADIUS_MIN = 16
+
+/** Gas puff collision radius max in px. */
+export const PUFF_RADIUS_MAX = 30
+
+/** Gas units per puff collected by a drone. */
+export const GAS_PER_PUFF = 1
+
+/** Radius for drone-puff collision in px. */
+export const DRONE_PUFF_COLLECT_RADIUS = 24
+
 /** Ship hitbox half-width for collision and rendering. */
 export const SHIP_HALF_WIDTH = 24
 
