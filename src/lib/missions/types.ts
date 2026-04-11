@@ -145,6 +145,16 @@ export interface ShuttleMissionPool {
   missions: ShuttleMissionTemplate[]
 }
 
+/** Upgrade requirement to access a planet as a mission target. */
+export interface PlanetAccessRequirement {
+  /** Planet id. */
+  planetId: string
+  /** Upgrade id required (e.g. "shuttleHeatResistance"). */
+  upgradeId: string
+  /** Minimum upgrade level needed to survive at this planet. */
+  minLevel: number
+}
+
 /** Planet orbital config — what a planet produces when visited for a mission. */
 export interface PlanetOrbitalConfig {
   /** Planet id. */

@@ -1,0 +1,8 @@
+[
+  { "planetId": "venus", "upgradeId": "shuttleHeatResistance", "minLevel": 1 },
+  { "planetId": "mercury", "upgradeId": "shuttleHeatResistance", "minLevel": 3 },
+  { "planetId": "jupiter", "upgradeId": "shuttleFreezeResistance", "minLevel": 1 },
+  { "planetId": "saturn", "upgradeId": "shuttleFreezeResistance", "minLevel": 1 },
+  { "planetId": "uranus", "upgradeId": "shuttleFreezeResistance", "minLevel": 3 },
+  { "planetId": "neptune", "upgradeId": "shuttleFreezeResistance", "minLevel": 3 }
+]

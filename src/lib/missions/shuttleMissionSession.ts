@@ -12,8 +12,10 @@
 import type { ShuttleMissionBoard, ActiveShuttleMission, GeneratedAsteroidMission } from './types'
 import type { PlayerProfile } from '@/lib/player/types'
 import type { Inventory } from '@/lib/inventory/types'
+import type { UpgradeLevels } from '@/lib/upgrades'
 import { getMissionPool } from './shuttleMissionPools'
 import { getGatherItemForPlanet } from './planetOrbitalConfig'
+import { canAccessPlanet } from './planetAccessRequirements'
 import { addItem, removeItem, canFitItem } from '@/lib/inventory/inventory'
 import { addCredits } from '@/lib/player/profile'
 
@@ -51,21 +53,30 @@ export function createMissionBoard(): ShuttleMissionBoard {
 
 /**
  * Offer a mission from a planet's pool. Picks 1 random mission from
- * the planet's pool of 3. Does nothing if a restock timer is running
- * or the planet has no mission pool.
+ * the planet's pool, filtered to targets the player can safely reach
+ * with their current upgrades. Does nothing if a restock timer is
+ * running, the planet has no pool, or no missions pass the filter.
  *
  * @param board - Current mission board state.
  * @param planetId - Planet the player is docked at.
+ * @param upgradeLevels - Current player upgrade levels for access filtering.
  * @returns Updated board with an offered mission (or unchanged).
  */
-export function offerMission(board: ShuttleMissionBoard, planetId: string): ShuttleMissionBoard {
+export function offerMission(
+  board: ShuttleMissionBoard,
+  planetId: string,
+  upgradeLevels: UpgradeLevels = {},
+): ShuttleMissionBoard {
   if (board.restockTimer) return board
 
   const pool = getMissionPool(planetId)
   if (!pool || pool.missions.length === 0) return board
 
-  const index = Math.floor(Math.random() * pool.missions.length)
-  const mission = pool.missions[index]!
+  const accessible = pool.missions.filter((m) => canAccessPlanet(m.targetPlanet, upgradeLevels))
+  if (accessible.length === 0) return board
+
+  const index = Math.floor(Math.random() * accessible.length)
+  const mission = accessible[index]!
 
   return {
     ...board,

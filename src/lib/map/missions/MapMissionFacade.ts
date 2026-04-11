@@ -117,7 +117,7 @@ export class MapMissionFacade {
     onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null,
   ): void {
     if (!this.board.offeredMission) {
-      this.board = offerMission(this.board, planetId)
+      this.board = offerMission(this.board, planetId, CURRENT_PLAYER_UPGRADE_LEVELS)
       onMissionBoardUpdate?.(this.board)
     }
   }

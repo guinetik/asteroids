@@ -46,6 +46,26 @@ describe('offerMission', () => {
     expect(updated.offeredMission).toBeNull()
   })
 
+  it('filters missions by upgrade access — no heat means no Venus/Mercury targets', () => {
+    const board = createMissionBoard()
+    // Earth pool has targets: venus, mars, mercury — with no upgrades only mars is accessible
+    const updated = offerMission(board, 'earth', {})
+    expect(updated.offeredMission).not.toBeNull()
+    expect(updated.offeredMission!.targetPlanet).toBe('mars')
+  })
+
+  it('with heat 1, Venus targets become available', () => {
+    const board = createMissionBoard()
+    const results = new Set<string>()
+    for (let i = 0; i < 50; i++) {
+      const updated = offerMission(board, 'earth', { shuttleHeatResistance: 1 })
+      if (updated.offeredMission) results.add(updated.offeredMission.targetPlanet)
+    }
+    expect(results.has('mars')).toBe(true)
+    expect(results.has('venus')).toBe(true)
+    expect(results.has('mercury')).toBe(false)
+  })
+
   it('does not offer a mission if restock timer is active', () => {
     const board = createMissionBoard()
     const withOffer = offerMission(board, 'earth')
