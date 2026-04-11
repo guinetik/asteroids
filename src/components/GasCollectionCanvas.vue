@@ -6,6 +6,7 @@ import {
   CANVAS_HEIGHT,
   SHIP_HALF_WIDTH,
   SHIP_HALF_HEIGHT,
+  COOK_ZONE_Y,
 } from '@/lib/minigame/gasCollection/constants'
 import type { OrbitalMiniGameContext } from '@/lib/minigame/OrbitalMiniGame'
 
@@ -376,10 +377,11 @@ function drawEndScreen(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = props.minigame.status === 'completed' ? '#00ff88' : '#ff4444'
   ctx.font = 'bold 28px monospace'
   ctx.textAlign = 'center'
+  const failMsg = props.minigame.dronesRemaining === 0 && props.minigame.drones.length === 0
+    ? 'DRONES DEPLETED — MISSION FAILED'
+    : 'HULL OVERHEATED — TOO CLOSE TO SURFACE'
   ctx.fillText(
-    props.minigame.status === 'completed'
-      ? 'COLLECTION COMPLETE'
-      : 'DRONES DEPLETED — MISSION FAILED',
+    props.minigame.status === 'completed' ? 'COLLECTION COMPLETE' : failMsg,
     CANVAS_WIDTH / 2,
     CANVAS_HEIGHT / 2,
   )
@@ -402,6 +404,20 @@ function loop(time: number) {
   // Clear + draw
   ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
   drawBackground(ctx, dt)
+
+  // Cook zone warning — pulsing red line at the danger threshold
+  const cookPulse = 0.3 + 0.2 * Math.sin(simTime * 4)
+  ctx.globalAlpha = cookPulse
+  ctx.strokeStyle = '#ff3300'
+  ctx.lineWidth = 1.5
+  ctx.setLineDash([8, 6])
+  ctx.beginPath()
+  ctx.moveTo(0, COOK_ZONE_Y)
+  ctx.lineTo(CANVAS_WIDTH, COOK_ZONE_Y)
+  ctx.stroke()
+  ctx.setLineDash([])
+  ctx.globalAlpha = 1.0
+
   drawShip(ctx)
   drawDrones(ctx)
   drawGauge(ctx)

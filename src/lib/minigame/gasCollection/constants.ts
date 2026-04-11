@@ -42,6 +42,12 @@ export const MAX_DRONES = 5
 /** Minimum air time in seconds before a drone can be collected. */
 export const DRONE_GRACE_PERIOD = 0.3
 
+/** Downward gravity pull on the ship in px/s². */
+export const SHIP_GRAVITY = 60
+
+/** Y position of the planet cook zone — ship below this = dead. */
+export const COOK_ZONE_Y = 340
+
 /** Ship hitbox half-width for collision and rendering. */
 export const SHIP_HALF_WIDTH = 24
 

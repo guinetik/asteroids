@@ -6,6 +6,7 @@ import {
   MAX_DRONES,
   MAX_AIR_TIME_YIELD,
   DRONE_COLLECT_RADIUS,
+  COOK_ZONE_Y,
 } from '../constants'
 import type { OrbitalMiniGameContext } from '../../OrbitalMiniGame'
 
@@ -79,6 +80,26 @@ describe('GasCollectionMiniGame', () => {
       for (let i = 0; i < 100; i++) game.tick(0.016, STUB_CTX)
       expect(game.shipX).toBeGreaterThanOrEqual(0)
       expect(game.shipY).toBeGreaterThanOrEqual(0)
+    })
+
+    it('ship drifts downward from planet gravity', () => {
+      const initialVy = game.shipVy
+      game.tick(0.5, STUB_CTX)
+      expect(game.shipVy).toBeGreaterThan(initialVy)
+    })
+  })
+
+  describe('cook zone', () => {
+    it('fails if ship touches the cook zone', () => {
+      game.shipY = COOK_ZONE_Y
+      game.tick(0.016, STUB_CTX)
+      expect(game.status).toBe('failed')
+    })
+
+    it('does not fail above the cook zone', () => {
+      game.shipY = COOK_ZONE_Y - 20
+      game.tick(0.016, STUB_CTX)
+      expect(game.status).toBe('active')
     })
   })
 

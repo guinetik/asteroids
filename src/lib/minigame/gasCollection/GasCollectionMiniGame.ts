@@ -33,6 +33,8 @@ import {
   MAX_DRONES,
   SHIP_HALF_WIDTH,
   SHIP_HALF_HEIGHT,
+  SHIP_GRAVITY,
+  COOK_ZONE_Y,
 } from './constants'
 
 /**
@@ -138,6 +140,7 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
     if (this._status !== 'active') return
 
     this.tickShip(dt)
+    if (this.checkCookZone()) return
     this.checkCollisions()
     this.tickDrones(dt)
     this.cleanupDrones()
@@ -160,6 +163,9 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
    * @param dt - delta time in seconds
    */
   private tickShip(dt: number): void {
+    // Planet gravity — constant pull downward
+    this.shipVy += SHIP_GRAVITY * dt
+
     if (this.input.right) this.shipVx += SHIP_ACCELERATION * dt
     if (this.input.left) this.shipVx -= SHIP_ACCELERATION * dt
     if (this.input.up) this.shipVy -= SHIP_ACCELERATION * dt
@@ -199,6 +205,15 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
       drone.y += drone.vy * dt
       drone.airTime += dt
     }
+  }
+
+  /** Check if ship entered the cook zone — instant fail. */
+  private checkCookZone(): boolean {
+    if (this.shipY + SHIP_HALF_HEIGHT >= COOK_ZONE_Y) {
+      this._status = 'failed'
+      return true
+    }
+    return false
   }
 
   /** Check ship-drone proximity and collect drones within range. */
