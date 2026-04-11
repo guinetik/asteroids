@@ -6,6 +6,7 @@
  * @spec docs/superpowers/specs/2026-04-05-orbit-capture-slingshot-design.md
  */
 import { describe, it, expect, beforeEach } from 'vitest'
+import orbitConfig from '@/data/shuttle/orbit-capture.json'
 import { OrbitCaptureSystem } from '../orbitCapture'
 import type { CaptureBody } from '../orbitCapture'
 
@@ -203,7 +204,7 @@ describe('OrbitCaptureSystem', () => {
       const vel = system.launchSlingshot(0, 0.016)
       const speed = Math.sqrt(vel.vx * vel.vx + vel.vz * vel.vz)
 
-      expect(speed).toBeCloseTo(2.5, 5)
+      expect(speed).toBeCloseTo(orbitConfig.orbitLaunchSpeed, 5)
     })
 
     it('adds a prograde speed bonus without changing the aimed direction', () => {
@@ -219,7 +220,7 @@ describe('OrbitCaptureSystem', () => {
 
       const vel = movingSystem.launchSlingshot(0, 0.5)
 
-      expect(vel.vx).toBeCloseTo(5.5, 5)
+      expect(vel.vx).toBeCloseTo(orbitConfig.orbitLaunchSpeed + 3, 5)
       expect(vel.vz).toBeCloseTo(0, 5)
     })
 
@@ -237,7 +238,7 @@ describe('OrbitCaptureSystem', () => {
       const vel = movingSystem.launchSlingshot(Math.PI / 2, 0.5)
 
       expect(vel.vx).toBeCloseTo(0, 5)
-      expect(vel.vz).toBeCloseTo(-2.5, 5)
+      expect(vel.vz).toBeCloseTo(-orbitConfig.orbitLaunchSpeed, 5)
     })
 
     it('keeps at least the baseline speed when aiming opposite the planet motion', () => {
@@ -253,7 +254,7 @@ describe('OrbitCaptureSystem', () => {
 
       const vel = movingSystem.launchSlingshot(Math.PI, 0.5)
 
-      expect(vel.vx).toBeCloseTo(-2.5, 5)
+      expect(vel.vx).toBeCloseTo(-orbitConfig.orbitLaunchSpeed, 5)
       expect(vel.vz).toBeCloseTo(0, 5)
     })
 
@@ -268,8 +269,9 @@ describe('OrbitCaptureSystem', () => {
       const vel = sunSystem.launchSlingshot(0, 0.016)
       const speed = Math.sqrt(vel.vx * vel.vx + vel.vz * vel.vz)
 
-      expect(hud.orbitalSpeed).toBeCloseTo(30, 5)
-      expect(speed).toBeCloseTo(30, 5)
+      const sunBaseline = orbitConfig.orbitLaunchSpeed * 12
+      expect(hud.orbitalSpeed).toBeCloseTo(sunBaseline, 5)
+      expect(speed).toBeCloseTo(sunBaseline, 5)
     })
   })
 

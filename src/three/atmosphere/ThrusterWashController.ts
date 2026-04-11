@@ -16,6 +16,7 @@
 import * as THREE from 'three'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
 import type { AtmosphereContext } from './AtmosphereContext'
+import { useAudio } from '@/audio/useAudio'
 
 // ── Altitude thresholds ──
 /** Maximum altitude (meters) at which wash effects appear. */
@@ -50,6 +51,14 @@ const SCORCH_RADIUS = 12
 const SCORCH_SEGMENTS = 32
 /** Seconds for scorch to fade out after engines cut. */
 const SCORCH_FADE_DURATION = 1.0
+
+// ── Ground wash audio ──
+/** intensity threshold above which the ground-wash sound starts. */
+const WASH_AUDIO_THRESHOLD = 0.01
+/** Minimum volume when the effect just becomes active (low-intensity approach). */
+const WASH_AUDIO_MIN_VOL = 0.15
+/** Maximum volume at full intensity (thrusting at close range). */
+const WASH_AUDIO_MAX_VOL = 0.75
 
 /**
  * Custom shader for the ground scorch glow — radial gradient with pulsing.
@@ -114,6 +123,8 @@ export class ThrusterWashController {
   private dustSpawnAccumulator = 0
   private elapsedTime = 0
   private readonly _zFace = new THREE.Vector3(0, 0, 1)
+  /** Looping ground-wash audio handle — alive only while wash is active. */
+  private _groundWashHandle: ReturnType<ReturnType<typeof useAudio>['play']> | null = null
 
   constructor(baseColor: [number, number, number]) {
     // ── Dust emitter ──
@@ -238,10 +249,24 @@ export class ThrusterWashController {
       mat.uniforms['intensity']!.value = this.scorchIntensity * intensity
       mat.uniforms['time']!.value = this.elapsedTime
     }
+
+    // ── Ground wash audio — volume tracks intensity ──
+    if (intensity > WASH_AUDIO_THRESHOLD) {
+      if (this._groundWashHandle === null) {
+        this._groundWashHandle = useAudio().play('sfx.lander.thruster.ground', { loop: true })
+      }
+      const vol = WASH_AUDIO_MIN_VOL + (WASH_AUDIO_MAX_VOL - WASH_AUDIO_MIN_VOL) * intensity
+      this._groundWashHandle.setVolume(vol)
+    } else if (this._groundWashHandle !== null) {
+      this._groundWashHandle.stop()
+      this._groundWashHandle = null
+    }
   }
 
   /** Release GPU resources. */
   dispose(): void {
+    this._groundWashHandle?.stop()
+    this._groundWashHandle = null
     this.dustEmitter.dispose()
     this.washLight.dispose()
     this.scorchMesh.geometry.dispose()

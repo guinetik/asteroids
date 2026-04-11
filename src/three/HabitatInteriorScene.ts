@@ -14,6 +14,7 @@ import { FpsCamera, type FpsCameraConfig } from '@/three/FpsCamera'
 import { InputManager } from '@/lib/InputManager'
 import { HABITAT_BINDINGS } from '@/lib/defaultBindings'
 import { loadGLB } from '@/three/loadGLB'
+import { FootstepSystem } from '@/lib/fps/footstepSystem'
 
 // ---------------------------------------------------------------------------
 // Constants — no magic numbers
@@ -133,6 +134,9 @@ export class HabitatInteriorScene {
 
   /** Cached spawn for {@link getSpawnPosition}. */
   private spawnYaw = 0
+
+  /** Footstep audio for the flat habitat floor. */
+  private readonly footsteps = new FootstepSystem('habitat')
 
   constructor() {
     this.scene = new THREE.Scene()
@@ -488,6 +492,9 @@ export class HabitatInteriorScene {
 
     // Keep player glued to floor
     this.player.position.y = FLOOR_Y
+
+    // Footsteps — always grounded on the flat habitat floor
+    this.footsteps.update(dt, len > 0, true)
   }
 
   /**

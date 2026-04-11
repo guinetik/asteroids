@@ -21,6 +21,7 @@ import {
   getCurrentShuttleThrusterChargeModifiers,
   getCurrentUpgradeValue,
 } from '@/lib/upgrades'
+import { useAudio } from '@/audio/useAudio'
 
 /** Any object that can exert gravity on the shuttle */
 export interface GravityWell {
@@ -385,6 +386,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
 
   toggleDoors(): void {
     this.doorsOpen = !this.doorsOpen
+    useAudio().play(this.doorsOpen ? 'sfx.cargo.open' : 'sfx.cargo.close')
   }
 
   get position(): THREE.Vector3 {

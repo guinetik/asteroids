@@ -294,7 +294,16 @@ export class AudioManager {
     }
 
     const vol = this.computePlaybackVolume(def, options)
-    this.applyPerInstanceVolume(howl, vol, playback.howlPlayId)
+    if (options.fadeInMs && options.fadeInMs > 0) {
+      this.applyPerInstanceVolume(howl, 0, playback.howlPlayId)
+      if (playback.howlPlayId !== undefined) {
+        howl.fade(0, vol, options.fadeInMs, playback.howlPlayId)
+      } else {
+        howl.fade(0, vol, options.fadeInMs)
+      }
+    } else {
+      this.applyPerInstanceVolume(howl, vol, playback.howlPlayId)
+    }
     this.applyPlaybackLoopOption(howl, playback.howlPlayId, options.loop)
 
     const effectPreset = options.effect ?? def.effect

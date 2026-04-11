@@ -66,6 +66,15 @@ const PRESETS: Record<AudioEffectPreset, AudioEffectConfig> = {
     highpassHz: 600,
     distortion: 0.02,
   },
+  'hull-exterior': {
+    // Simulates a mechanical sound heard through a spacecraft hull from the inside.
+    // The hull absorbs high frequencies strongly; low-mid structure-borne vibration
+    // comes through with a slight resonant character.
+    id: 'hull-exterior',
+    lowpassHz: 900,
+    highpassHz: 80,
+    distortion: 0.1,
+  },
 }
 
 /**

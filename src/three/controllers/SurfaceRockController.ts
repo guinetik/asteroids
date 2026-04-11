@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import type { WorldSphereCollider } from '@/lib/physics/worldCollision'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import type { SurfaceFeatures } from '@/lib/asteroids/types'
 import {
@@ -247,5 +248,21 @@ export class SurfaceRockController {
       for (const material of mats) material.dispose()
     }
     this.meshes.length = 0
+  }
+
+  buildColliders(heightmap: Heightmap): WorldSphereCollider[] {
+    return this.spawns.map((spawn, index) => {
+      const radius = Math.max(1.2, spawn.diameter * 0.34)
+      const exposedHeight = spawn.diameter * spawn.heightRatio * (1 - spawn.burial * 0.35)
+      const centerY = heightmap.heightAt(spawn.x, spawn.z) + Math.max(radius * 0.7, exposedHeight * 0.45)
+      return {
+        id: `surface-rock-${index}`,
+        kind: 'sphere',
+        center: { x: spawn.x, y: centerY, z: spawn.z },
+        radius,
+        minY: heightmap.heightAt(spawn.x, spawn.z) - spawn.diameter * 0.1,
+        maxY: centerY + radius,
+      }
+    })
   }
 }

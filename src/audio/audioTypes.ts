@@ -21,6 +21,7 @@ export const AUDIO_EFFECT_PRESETS = [
   'radio',
   'helmet-comms',
   'terminal-beep',
+  'hull-exterior',
 ] as const
 
 /** Union of {@link AUDIO_EFFECT_PRESETS} values. */
@@ -122,6 +123,11 @@ export interface AudioPlayOptions {
   cooldownKey?: string
   loop?: boolean
   onEnd?: () => void
+  /**
+   * When set, the sound starts at volume 0 and fades up to its target volume
+   * over this many milliseconds using Howler's native fade.
+   */
+  fadeInMs?: number
 }
 
 /**

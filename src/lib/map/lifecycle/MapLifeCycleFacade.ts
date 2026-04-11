@@ -10,6 +10,7 @@ import type { MapSceneVisuals } from '@/three/MapSceneVisuals'
 import type { MapShuttleEffects } from '@/three/MapShuttleEffects'
 import type { EmissiveMaterial } from '@/lib/map/mapViewControllerHelpers'
 import type { MapOrbitFacade } from '@/lib/map/orbit/MapOrbitFacade'
+import { useAudio } from '@/audio/useAudio'
 
 interface TriggerDeathDeps {
   shuttleController: ShuttleController
@@ -68,6 +69,12 @@ export class MapLifeCycleFacade {
     shuttleController.freeze()
     vehicleCamera?.setConfig(MAP_DEATH_CAMERA_CONFIG)
     onDeathOverlay?.(true, cause)
+
+    // Cut all in-flight sounds immediately — sfx (thrusters, slingshot, etc.)
+    // and the anomaly ambient which may still be looping if the event hadn't expired.
+    const audio = useAudio()
+    audio.stopCategory('sfx')
+    audio.stopSound('ambient.anomaly')
   }
 
   respawnAtEarth({

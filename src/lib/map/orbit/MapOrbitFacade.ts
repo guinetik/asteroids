@@ -209,6 +209,7 @@ export class MapOrbitFacade {
     shuttleController.setSlingshotSpeed(burstSpeed)
     shuttleController.triggerSlingshotLaunchFx(orbitConfig.slingshotLaunchFxDuration)
     useAudio().play('sfx.slingshot')
+    useAudio().play('sfx.slingshot.burst')
     shuttleController.thrusterSystem.consumeFuel(
       this._slingshotCharge * shuttleController.thrusterSystem.fuelCapacity * 0.1,
     )

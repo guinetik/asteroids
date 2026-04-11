@@ -529,17 +529,25 @@ export class GravitationalEventManager {
       return
     }
 
+    // Track whether we notified the observer about this event starting so we can
+    // always fire the paired finish callback — even if the anomaly drifted out of
+    // range before it expired. Without this, the finish callback is silently
+    // skipped and any audio started on begin would loop indefinitely.
+    let startNotified = false
+
     ev.addEventListener(GRAVITATIONAL_EVENT_START, (ce) => {
       const d = (ce as CustomEvent<GravitationalEventStartDetail>).detail
       if (!this.isWithinHudRadius(d.x, d.z)) {
         return
       }
+      startNotified = true
       this.nearbyHudCallbacks?.onNearbyAnomalyStart?.(d, this.lastObserverX, this.lastObserverZ)
     })
 
     ev.addEventListener(GRAVITATIONAL_EVENT_FINISH, (ce) => {
       const d = (ce as CustomEvent<GravitationalEventFinishDetail>).detail
-      if (!this.isWithinHudRadius(d.x, d.z)) {
+      // Always notify finish if we notified start, regardless of current position.
+      if (!startNotified && !this.isWithinHudRadius(d.x, d.z)) {
         return
       }
       this.nearbyHudCallbacks?.onNearbyAnomalyFinish?.(d, this.lastObserverX, this.lastObserverZ)

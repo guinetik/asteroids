@@ -12,6 +12,7 @@
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 import type { InputManager } from '@/lib/InputManager'
+import { useAudio } from '@/audio/useAudio'
 import type { FpsCamera } from './FpsCamera'
 import { PlatformerBody } from '@/lib/physics/platformerBody'
 import { ThrusterSystem } from '@/lib/physics/thrusterSystem'
@@ -27,6 +28,10 @@ const SPRINT_JUMP_BOOST = 1.3
 const STRAFE_SPEED_SCALE = 0.9
 /** Strafe speed multiplier while ADS. */
 const ADS_STRAFE_SPEED_SCALE = 0.8
+/** Tiny amount of mid-air steering restored for jump testing. */
+const AIR_CONTROL_ACCEL_FRACTION = 0.22
+/** Caps how much speed input can add while airborne. */
+const AIR_CONTROL_SPEED_FRACTION = 0.2
 const PLAYER_COLLISION_CONFIG: CharacterCollisionConfig = {
   radius: 0.65,
   maxStepHeight: 0.9,
@@ -124,6 +129,8 @@ export class FpsPlayerController implements Tickable {
   private _aiming = false
   /** Coyote timer — time since last grounded, allows late jumps. */
   private coyoteTimer = 0
+  /** Tracks previous jump state for rising-edge sound trigger. */
+  private _prevJumping = false
 
   /** Fired when health reaches zero. */
   onDeath: (() => void) | null = null
@@ -262,7 +269,11 @@ export class FpsPlayerController implements Tickable {
       this.body.impulse(this.config.movement.jumpForce * jumpBoost)
       this.body.grounded = false
       this.coyoteTimer = 0
+      if (!this._prevJumping) {
+        useAudio().play('sfx.jump')
+      }
     }
+    this._prevJumping = canJump
 
     // --- Thruster system tick (recharge / drain) ---
     this.thrusterSystem.tick(dt, {
@@ -282,25 +293,25 @@ export class FpsPlayerController implements Tickable {
     const forward = this.camera.getForwardXZ()
     const right = this.camera.getRightXZ()
     const maxSpd = isSprinting ? mv.maxSprintSpeed : mv.maxSpeed
+    const strafe = this._aiming ? ADS_STRAFE_SPEED_SCALE : STRAFE_SPEED_SCALE
+    let wishX = 0
+    let wishZ = 0
+    if (this.inputManager.isActionActive('moveForward')) {
+      wishX += forward.x; wishZ += forward.y
+    }
+    if (this.inputManager.isActionActive('moveBack')) {
+      wishX -= forward.x; wishZ -= forward.y
+    }
+    if (this.inputManager.isActionActive('moveLeft')) {
+      wishX -= right.x * strafe; wishZ -= right.y * strafe
+    }
+    if (this.inputManager.isActionActive('moveRight')) {
+      wishX += right.x * strafe; wishZ += right.y * strafe
+    }
+    const wishLen = Math.sqrt(wishX * wishX + wishZ * wishZ)
 
     if (this.body.grounded) {
       // Grounded: instant velocity toward input direction (responsive walking)
-      const strafe = this._aiming ? ADS_STRAFE_SPEED_SCALE : STRAFE_SPEED_SCALE
-      let wishX = 0
-      let wishZ = 0
-      if (this.inputManager.isActionActive('moveForward')) {
-        wishX += forward.x; wishZ += forward.y
-      }
-      if (this.inputManager.isActionActive('moveBack')) {
-        wishX -= forward.x; wishZ -= forward.y
-      }
-      if (this.inputManager.isActionActive('moveLeft')) {
-        wishX -= right.x * strafe; wishZ -= right.y * strafe
-      }
-      if (this.inputManager.isActionActive('moveRight')) {
-        wishX += right.x * strafe; wishZ += right.y * strafe
-      }
-      const wishLen = Math.sqrt(wishX * wishX + wishZ * wishZ)
       if (wishLen > 0) {
         // Normalize and scale to target speed
         this.lateralVelocity.x = (wishX / wishLen) * maxSpd
@@ -311,7 +322,21 @@ export class FpsPlayerController implements Tickable {
         this.lateralVelocity.z = 0
       }
     } else {
-      // Airborne: no input — commit to your jump trajectory
+      // Airborne: preserve trajectory, but allow a very small amount of steering.
+      if (wishLen > 0) {
+        const dirX = wishX / wishLen
+        const dirZ = wishZ / wishLen
+        const currentAlongWish = this.lateralVelocity.x * dirX + this.lateralVelocity.z * dirZ
+        const maxAirControlSpeed = maxSpd * AIR_CONTROL_SPEED_FRACTION
+        if (currentAlongWish < maxAirControlSpeed) {
+          const addSpeed = Math.min(
+            maxAirControlSpeed - currentAlongWish,
+            maxSpd * AIR_CONTROL_ACCEL_FRACTION * dt,
+          )
+          this.lateralVelocity.x += dirX * addSpeed
+          this.lateralVelocity.z += dirZ * addSpeed
+        }
+      }
 
       // Air friction (weak — momentum carries)
       const speed = this.speed
@@ -344,12 +369,18 @@ export class FpsPlayerController implements Tickable {
     this.group.position.z = horizontalMove.z
 
     // --- Gravity + grounding ---
-    const floorY = this.collisionWorld.getGroundHeightOrNull(this.group.position.x, this.group.position.z) ?? -Infinity
-    this.group.position.y = this.body.tick(dt, this.group.position.y, floorY)
+    const support = this.collisionWorld.getHighestSupportUnderDisc(
+      this.group.position.x,
+      this.group.position.z,
+      this.group.position.y - PLAYER_COLLISION_CONFIG.airborneClearance,
+      this.group.position.y + PLAYER_COLLISION_CONFIG.maxStepHeight,
+      PLAYER_COLLISION_CONFIG.radius,
+    )
+    this.group.position.y = this.body.tick(dt, this.group.position.y, support.height)
 
-    // --- Terrain conforming (align up to surface normal when grounded) ---
+    // --- Surface conforming (align up to terrain/support normal when grounded) ---
     if (this.body.grounded) {
-      const n = this.collisionWorld.getGroundNormal(this.group.position.x, this.group.position.z)
+      const n = support.normal
       const tiltX = Math.atan2(n.z, n.y)
       const tiltZ = Math.atan2(-n.x, n.y)
       this.group.rotation.set(tiltX, this.group.rotation.y, tiltZ)

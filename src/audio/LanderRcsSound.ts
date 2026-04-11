@@ -1,66 +1,69 @@
 import { Howler } from 'howler'
 
-export interface ShuttleThrusterAudioFrame {
-  rcsLeft: number
-  rcsRight: number
-  angularSpeed: number
+export interface LanderRcsAudioFrame {
+  left: number
+  right: number
+  fore: number
+  aft: number
+  ascend: number
+  descend: number
   sfxVolume: number
 }
 
 /**
- * Stateful procedural shuttle RCS sound.
- * Main thrust and braking stay sample-based; this voice only shades left/right yaw jets.
+ * Stateful procedural RCS bed for the lunar lander.
+ * Keeps the main engine sample-based and only shades the short gas jets.
  */
-export class ShuttleThrusterSound {
+export class LanderRcsSound {
   private outputGain: GainNode | null = null
-  private rcsNoiseGain: GainNode | null = null
+  private bodyNoiseGain: GainNode | null = null
   private airNoiseGain: GainNode | null = null
   private toneOsc: OscillatorNode | null = null
   private toneGain: GainNode | null = null
   private stereoPanner: StereoPannerNode | null = null
-  private rcsNoiseSource: AudioBufferSourceNode | null = null
+  private bodyNoiseSource: AudioBufferSourceNode | null = null
   private airNoiseSource: AudioBufferSourceNode | null = null
 
-  private rcsLevel = 0
+  private bodyLevel = 0
+  private airLevel = 0
   private toneLevel = 0
   private pan = 0
   private alive = false
 
-  update(frame: ShuttleThrusterAudioFrame, dt: number): void {
-    const totalActivity = Math.max(frame.rcsLeft, frame.rcsRight)
+  update(frame: LanderRcsAudioFrame, dt: number): void {
+    const lateral = clamp01(Math.max(frame.left, frame.right, frame.fore, frame.aft))
+    const vertical = clamp01(Math.max(frame.ascend, frame.descend))
+    const totalActivity = clamp01(Math.max(lateral, vertical))
     if (totalActivity <= 0.0001 && !this.alive) return
     if (!this.ensureGraph()) return
 
     const outputGain = this.outputGain!
-    const rcsNoiseGain = this.rcsNoiseGain!
+    const bodyNoiseGain = this.bodyNoiseGain!
     const airNoiseGain = this.airNoiseGain!
     const toneOsc = this.toneOsc!
     const toneGain = this.toneGain!
     const stereoPanner = this.stereoPanner
-    const ctx = outputGain.context
-    const now = ctx.currentTime
+    const now = outputGain.context.currentTime
 
-    const angularNorm = clamp01(Math.abs(frame.angularSpeed) / 1.5)
-    const rcsTotal = clamp01(Math.max(frame.rcsLeft, frame.rcsRight))
-    const rcsBias = clamp(frame.rcsRight - frame.rcsLeft, -1, 1)
-
-    const rcsTarget = clamp01(rcsTotal * (0.8 + angularNorm * 0.36))
-    const airTarget = clamp01(rcsTotal * (0.11 + angularNorm * 0.08))
-    const toneTarget = clamp01(rcsTarget * 0.44)
-    const panTarget = rcsBias * 0.7
+    const leftRightBias = clamp(frame.right - frame.left, -1, 1)
+    const foreAftBias = clamp(frame.aft - frame.fore, -1, 1)
+    const bodyTarget = clamp01(lateral * 0.84 + vertical * 0.98)
+    const airTarget = clamp01(lateral * 0.11 + vertical * 0.18)
+    const toneTarget = clamp01(vertical * 0.3 + lateral * 0.16)
+    const panTarget = clamp(leftRightBias * 0.78 + foreAftBias * 0.18, -1, 1)
+    const frequencyTarget = 210 + vertical * 150 + lateral * 80 + Math.abs(foreAftBias) * 36
 
     const response = Math.max(0, dt) * 12
-    this.rcsLevel = damp(this.rcsLevel, rcsTarget, response * 1.35)
-    const airLevel = damp(this.airNoiseGain?.gain.value ?? 0, airTarget, response)
+    this.bodyLevel = damp(this.bodyLevel, bodyTarget, response * 1.3)
+    this.airLevel = damp(this.airLevel, airTarget, response)
     this.toneLevel = damp(this.toneLevel, toneTarget, response * 0.9)
-    this.pan = damp(this.pan, panTarget, response * 1.2)
+    this.pan = damp(this.pan, panTarget, response * 1.15)
 
     automateParam(outputGain.gain, frame.sfxVolume, now, 0.04, 0.0001, 1)
-    automateParam(rcsNoiseGain.gain, 0.025 + this.rcsLevel * (0.18 + angularNorm * 0.08), now, 0.03, 0.0001, 1)
-    automateParam(airNoiseGain.gain, 0.0001 + airLevel * 0.04, now, 0.04, 0.0001, 1)
-
-    automateParam(toneOsc.frequency, 210 + rcsTarget * 120 + angularNorm * 85, now, 0.05, 90, 720)
-    automateParam(toneGain.gain, 0.0001 + this.toneLevel * 0.026, now, 0.045, 0.0001, 1)
+    automateParam(bodyNoiseGain.gain, 0.0001 + this.bodyLevel * 0.19, now, 0.03, 0.0001, 1)
+    automateParam(airNoiseGain.gain, 0.0001 + this.airLevel * 0.035, now, 0.04, 0.0001, 1)
+    automateParam(toneOsc.frequency, frequencyTarget, now, 0.05, 100, 1100)
+    automateParam(toneGain.gain, 0.0001 + this.toneLevel * 0.018, now, 0.045, 0.0001, 1)
 
     if (stereoPanner) {
       automateParam(stereoPanner.pan, this.pan, now, 0.03, -1, 1)
@@ -77,7 +80,8 @@ export class ShuttleThrusterSound {
     if (ctx && this.outputGain) {
       automateParam(this.outputGain.gain, 0.0001, ctx.currentTime, 0.06, 0.0001, 1)
     }
-    this.rcsLevel = 0
+    this.bodyLevel = 0
+    this.airLevel = 0
     this.toneLevel = 0
     this.pan = 0
     this.alive = false
@@ -85,19 +89,19 @@ export class ShuttleThrusterSound {
 
   dispose(): void {
     this.stop()
-    this.disconnectNode(this.rcsNoiseSource)
+    this.disconnectNode(this.bodyNoiseSource)
     this.disconnectNode(this.airNoiseSource)
     this.disconnectNode(this.toneOsc)
-    this.disconnectNode(this.rcsNoiseGain)
+    this.disconnectNode(this.bodyNoiseGain)
     this.disconnectNode(this.airNoiseGain)
     this.disconnectNode(this.toneGain)
     this.disconnectNode(this.stereoPanner)
     this.disconnectNode(this.outputGain)
 
-    this.rcsNoiseSource = null
+    this.bodyNoiseSource = null
     this.airNoiseSource = null
     this.toneOsc = null
-    this.rcsNoiseGain = null
+    this.bodyNoiseGain = null
     this.airNoiseGain = null
     this.toneGain = null
     this.stereoPanner = null
@@ -124,12 +128,12 @@ export class ShuttleThrusterSound {
       outputGain.connect(masterGain)
     }
 
-    const rcsNoiseSource = createLoopingNoiseSource(ctx, 'pink')
-    const rcsNoiseGain = ctx.createGain()
-    rcsNoiseGain.gain.value = 0.0001
-    rcsNoiseSource.connect(rcsNoiseGain)
-    rcsNoiseGain.connect(outputGain)
-    rcsNoiseSource.start()
+    const bodyNoiseSource = createLoopingNoiseSource(ctx, 'pink')
+    const bodyNoiseGain = ctx.createGain()
+    bodyNoiseGain.gain.value = 0.0001
+    bodyNoiseSource.connect(bodyNoiseGain)
+    bodyNoiseGain.connect(outputGain)
+    bodyNoiseSource.start()
 
     const airNoiseSource = createLoopingNoiseSource(ctx, 'white')
     const airNoiseGain = ctx.createGain()
@@ -148,8 +152,8 @@ export class ShuttleThrusterSound {
 
     this.outputGain = outputGain
     this.stereoPanner = stereoPanner
-    this.rcsNoiseSource = rcsNoiseSource
-    this.rcsNoiseGain = rcsNoiseGain
+    this.bodyNoiseSource = bodyNoiseSource
+    this.bodyNoiseGain = bodyNoiseGain
     this.airNoiseSource = airNoiseSource
     this.airNoiseGain = airNoiseGain
     this.toneOsc = toneOsc

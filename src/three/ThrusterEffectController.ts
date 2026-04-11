@@ -76,6 +76,20 @@ export class ThrusterEffectController implements Tickable {
   /** When false, no audio is played or stopped (e.g. while inside the habitat). */
   private _audioEnabled = true
 
+  /** Handle for the looping thrust sound so it can be faded without restart. */
+  private _thrusterHandle: ReturnType<ReturnType<typeof useAudio>['play']> | null = null
+  /**
+   * 0–1 envelope for the thrust loop.
+   * Rises while W is held, falls while released. Sound stops when it reaches 0.
+   */
+  private _thrusterFadeT = 0
+  /** Peak volume of the thrust loop. */
+  private static readonly THRUSTER_TARGET_VOL = 0.6
+  /** Seconds to reach full volume from silence. */
+  private static readonly THRUSTER_FADE_IN = 0.6
+  /** Seconds to fade to silence after key release. */
+  private static readonly THRUSTER_FADE_OUT = 0.35
+
   constructor(shuttle: ShuttleController) {
     this.shuttle = shuttle
 
@@ -146,8 +160,15 @@ export class ThrusterEffectController implements Tickable {
   setAudioEnabled(enabled: boolean): void {
     this._audioEnabled = enabled
     if (!enabled) {
+      this._stopThrusterSound()
       this.thrusterSound.stop()
     }
+  }
+
+  private _stopThrusterSound(): void {
+    this._thrusterHandle?.stop()
+    this._thrusterHandle = null
+    this._thrusterFadeT = 0
   }
 
   tick(dt: number): void {
@@ -168,12 +189,31 @@ export class ThrusterEffectController implements Tickable {
       }
 
       if (effectState.emitThrust) {
-        if (!this.prevThrusting) {
-          audio.play('sfx.thrusterBurst')
-          audio.play('sfx.thrusterLoop', { loop: true })
+        // Start the loop only if nothing is running (handles both fresh press and re-press during fade-out)
+        if (this._thrusterHandle === null) {
+          this._thrusterHandle = audio.play('sfx.thrusterBurst', { loop: true })
         }
-      } else if (this.prevThrusting) {
-        audio.stopSound('sfx.thrusterLoop')
+        // Ramp up — continues naturally from wherever fade-out left off
+        this._thrusterFadeT = Math.min(
+          1,
+          this._thrusterFadeT + dt / ThrusterEffectController.THRUSTER_FADE_IN,
+        )
+      } else {
+        // Ramp down — handle stays alive until silence so re-press can reverse direction
+        if (this._thrusterHandle !== null) {
+          this._thrusterFadeT = Math.max(
+            0,
+            this._thrusterFadeT - dt / ThrusterEffectController.THRUSTER_FADE_OUT,
+          )
+          if (this._thrusterFadeT <= 0) {
+            this._stopThrusterSound()
+          }
+        }
+      }
+      if (this._thrusterHandle !== null) {
+        this._thrusterHandle.setVolume(
+          this._thrusterFadeT * ThrusterEffectController.THRUSTER_TARGET_VOL,
+        )
       }
 
       if (effectState.emitBrake && !this.prevBraking) {
@@ -190,15 +230,11 @@ export class ThrusterEffectController implements Tickable {
         dt,
       )
 
-      if (isRcsActive && !this.prevRcsActive) {
-        audio.play('sfx.thrusterBurst', { volume: 0.35 })
-      }
-
       this.prevThrusting = effectState.emitThrust
       this.prevBraking = effectState.emitBrake
       this.prevRcsActive = isRcsActive
     } else {
-      useAudio().stopSound('sfx.thrusterLoop')
+      this._stopThrusterSound()
       this.thrusterSound.stop()
       this.prevThrusting = false
       this.prevBraking = false
@@ -265,7 +301,7 @@ export class ThrusterEffectController implements Tickable {
   }
 
   dispose(): void {
-    useAudio().stopSound('sfx.thrusterLoop')
+    this._stopThrusterSound()
     this.thrusterSound.dispose()
     for (const sprite of this.idleThrusterSprites) {
       this.shuttle.group.remove(sprite)

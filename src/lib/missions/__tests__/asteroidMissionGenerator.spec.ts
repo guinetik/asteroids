@@ -7,6 +7,7 @@ import {
   interpolateRange,
   isMissionWaypointSolarDistanceClearOfPlanets,
   nearEarthInnerCatalogForWaypointSpawn,
+  nearEarthOuterCatalogForWaypointSpawn,
   objectiveCountForDifficulty,
   rollObjective,
   LEVEL_GRID_SIZE,
@@ -124,7 +125,7 @@ describe('generateWaypointInRegion', () => {
     const wp = generateWaypointInRegion('near-earth', 1)
     const dist = Math.sqrt(wp.worldX * wp.worldX + wp.worldZ * wp.worldZ)
     const innerCatalog = nearEarthInnerCatalogForWaypointSpawn()
-    const outerCatalog = 420
+    const outerCatalog = nearEarthOuterCatalogForWaypointSpawn()
     const maxCatalog =
       innerCatalog + (outerCatalog - innerCatalog) * WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY
     const innerWorld = innerCatalog * ORBIT_SCALE
@@ -144,8 +145,10 @@ describe('generateWaypointInRegion', () => {
   it('allows full near-earth annulus at difficulty 10', () => {
     const wp = generateWaypointInRegion('near-earth', 10)
     const dist = Math.sqrt(wp.worldX * wp.worldX + wp.worldZ * wp.worldZ)
-    expect(dist).toBeGreaterThanOrEqual(200 * 0.5 * 0.9)
-    expect(dist).toBeLessThanOrEqual(420 * 0.5 * 1.1)
+    const innerWorld = nearEarthInnerCatalogForWaypointSpawn() * ORBIT_SCALE
+    const outerWorld = nearEarthOuterCatalogForWaypointSpawn() * ORBIT_SCALE
+    expect(dist).toBeGreaterThanOrEqual(innerWorld * 0.99)
+    expect(dist).toBeLessThanOrEqual(outerWorld * 1.01)
   })
 
   it('rejects radii that sit on Earth nominal orbit at strict standoff', () => {

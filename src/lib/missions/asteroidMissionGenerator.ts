@@ -34,7 +34,7 @@ function hashSeed(str: string): number {
 }
 
 /** Level terrain grid size — shared with LevelViewController. */
-export const LEVEL_GRID_SIZE = 6000
+export const LEVEL_GRID_SIZE = 5000
 
 /** Objective count bands by difficulty. */
 const OBJECTIVE_COUNT_BY_DIFFICULTY: [number, number, number][] = [

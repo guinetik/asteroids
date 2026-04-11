@@ -795,6 +795,12 @@ export class ArrivalSequence {
   private nextExfilPhase(next: ExfilPhase): void {
     this.exfilPhase = next
     this.exfilPhaseElapsed = 0
+    if (next === 'closeDoors') {
+      useAudio().play('sfx.cargo.close')
+    }
+    if (next === 'depart') {
+      useAudio().play('sfx.level.arrival')
+    }
   }
 
   // ── Helpers ───────────────────────────────────────────────────
@@ -802,6 +808,9 @@ export class ArrivalSequence {
   private nextPhase(next: ArrivalPhase): void {
     this.phase = next
     this.phaseElapsed = 0
+    if (next === 'doors') {
+      useAudio().play('sfx.cargo.open')
+    }
   }
 
   private updateDoorRotation(): void {

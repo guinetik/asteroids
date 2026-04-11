@@ -25,6 +25,7 @@ import { ParticleEmitter } from './ParticleEmitter'
 import { WarningBeacon } from './WarningBeacon'
 import { getCurrentUpgradeValue } from '@/lib/upgrades'
 import { useAudio } from '@/audio/useAudio'
+import { LanderRcsSound } from '@/audio/LanderRcsSound'
 
 const LANDER_MODEL_PATH = '/models/lander.glb'
 
@@ -214,6 +215,9 @@ const SPEED_DAMAGE_MULTIPLIER = 2.0
 /** HP damage per radian of excess landing tilt. */
 const ANGLE_DAMAGE_MULTIPLIER = 25.0
 
+/** Impact speed (units/s) that maps to full touchdown volume (1.0). */
+const TOUCHDOWN_VOLUME_REF_SPEED = 20
+
 /** Base lander hull integrity before upgrade scaling. */
 const LANDER_BASE_HP = 100
 const LANDING_APPROACH_BUFFER_ALTITUDE = 22
@@ -365,6 +369,36 @@ export class LanderController implements Tickable {
   /** Previous-frame thruster states for audio edge detection. */
   private _prevMainEngine = false
   private _prevRcs = false
+  private readonly rcsSound = new LanderRcsSound()
+
+  /** Looping alarm handles — nulled when the alarm is not active. */
+  private _descentAlarmHandle: ReturnType<ReturnType<typeof useAudio>['play']> | null = null
+  private _attitudeAlarmHandle: ReturnType<ReturnType<typeof useAudio>['play']> | null = null
+  /** Previous warning levels for edge detection. */
+  private _prevDescentWarning: LandingWarningLevel = 'safe'
+  private _prevAttitudeWarning: LandingWarningLevel = 'safe'
+
+  /** Handle for the looping main-engine sound so it can be faded without restart. */
+  private _engineHandle: ReturnType<ReturnType<typeof useAudio>['play']> | null = null
+  /**
+   * 0–1 envelope for the engine loop.
+   * Rises while W is held, falls while released. Sound stops when it reaches 0.
+   */
+  private _engineFadeT = 0
+  /** Peak volume of the engine loop. */
+  private static readonly ENGINE_TARGET_VOL = 0.85
+  /** Seconds to reach full volume from silence. */
+  private static readonly ENGINE_FADE_IN = 0.4
+  /** Seconds to fade to silence after key release. */
+  private static readonly ENGINE_FADE_OUT = 0.25
+
+  /** Handle for the gyro loop (Q/E yaw) — shared for both directions, no restart on switch. */
+  private _gyroHandle: ReturnType<ReturnType<typeof useAudio>['play']> | null = null
+  /** 0–1 envelope for the gyro loop. */
+  private _gyroFadeT = 0
+  private static readonly GYRO_TARGET_VOL = 0.5
+  private static readonly GYRO_FADE_IN = 0.3
+  private static readonly GYRO_FADE_OUT = 0.2
 
   /** Called on hard landing with damage dealt and impact speed. */
   onCrash: ((damage: number, impactSpeed: number) => void) | null = null
@@ -589,10 +623,16 @@ export class LanderController implements Tickable {
       const speedExcess = Math.max(0, impactSpeed - SAFE_LANDING_SPEED)
       const angleExcess = Math.max(0, impactAngle - SAFE_LANDING_ANGLE)
       const damage = speedExcess * SPEED_DAMAGE_MULTIPLIER + angleExcess * ANGLE_DAMAGE_MULTIPLIER
+      // Touchdown thud on every landing — volume scales with impact speed, min 0.4
+      const touchdownVol = Math.min(1.0, Math.max(0.4, impactSpeed / TOUCHDOWN_VOLUME_REF_SPEED))
+      useAudio().play('sfx.touchdown', { volume: touchdownVol })
+
       if (damage > 0) {
         this.takeDamage(damage)
         this.onCrash?.(damage, impactSpeed)
-        useAudio().play('sfx.collision')
+        // Scale collision/explosion volume to damage severity: graze → 0.2, lethal → 1.0
+        const impactVol = Math.min(1.0, Math.max(0.2, damage / LANDER_BASE_HP))
+        useAudio().play(this.hp <= 0 ? 'sfx.explosion' : 'sfx.collision', { volume: impactVol })
       } else {
         useAudio().play('sfx.landing')
       }
@@ -649,16 +689,43 @@ export class LanderController implements Tickable {
       },
     )
 
-    // Lander thruster audio — edge-detect main engine and RCS
+    // Lander thruster audio — tick-driven fade for pop-free start
     const audio = useAudio()
-    if (this.isMainEngineActive && !this._prevMainEngine) {
-      audio.play('sfx.lander.thrusterLoop', { loop: true })
-    } else if (!this.isMainEngineActive && this._prevMainEngine) {
-      audio.stopSound('sfx.lander.thrusterLoop')
+    if (this.isMainEngineActive || this.isAnyRcsActive) {
+      audio.unlock()
     }
-    if (this.isAnyRcsActive && !this._prevRcs) {
-      audio.play('sfx.lander.thrusterBurst')
+    if (this.isMainEngineActive) {
+      // Start the loop only if nothing is running (handles both fresh press and re-press during fade-out)
+      if (this._engineHandle === null) {
+        this._engineHandle = audio.play('sfx.lander.thrusterLoop', { loop: true })
+      }
+      // Ramp up — continues naturally from wherever fade-out left off
+      this._engineFadeT = Math.min(1, this._engineFadeT + dt / LanderController.ENGINE_FADE_IN)
+    } else {
+      // Ramp down — handle stays alive until silence so re-press can reverse direction
+      if (this._engineHandle !== null) {
+        this._engineFadeT = Math.max(0, this._engineFadeT - dt / LanderController.ENGINE_FADE_OUT)
+        if (this._engineFadeT <= 0) {
+          this._engineHandle.stop()
+          this._engineHandle = null
+        }
+      }
     }
+    if (this._engineHandle !== null) {
+      this._engineHandle.setVolume(this._engineFadeT * LanderController.ENGINE_TARGET_VOL)
+    }
+    this.rcsSound.update(
+      {
+        left: this.isRcsActionActive('rcsLeft') ? 1 : 0,
+        right: this.isRcsActionActive('rcsRight') ? 1 : 0,
+        fore: this.isRcsActionActive('rcsFore') ? 1 : 0,
+        aft: this.isRcsActionActive('rcsAft') ? 1 : 0,
+        ascend: this.isRcsActionActive('rcsAscend') ? 1 : 0,
+        descend: this.isRcsActionActive('rcsDescend') ? 1 : 0,
+        sfxVolume: audio.getCategoryVolume('sfx'),
+      },
+      dt,
+    )
     this._prevMainEngine = this.isMainEngineActive
     this._prevRcs = this.isAnyRcsActive
 
@@ -701,7 +768,15 @@ export class LanderController implements Tickable {
   }
 
   dispose(): void {
-    useAudio().stopSound('sfx.lander.thrusterLoop')
+    this._engineHandle?.stop()
+    this._engineHandle = null
+    this._gyroHandle?.stop()
+    this._gyroHandle = null
+    this._descentAlarmHandle?.stop()
+    this._descentAlarmHandle = null
+    this._attitudeAlarmHandle?.stop()
+    this._attitudeAlarmHandle = null
+    this.rcsSound.dispose()
     this.flameEmitter.dispose()
     ;(this.nozzleGlow.material as THREE.SpriteMaterial).map?.dispose()
     ;(this.nozzleGlow.material as THREE.SpriteMaterial).dispose()
@@ -758,6 +833,28 @@ export class LanderController implements Tickable {
         this.topWarningBeacon.setColor(TOP_BEACON_SAFE_COLOR)
         break
     }
+
+    const audio = useAudio()
+
+    // Descent speed alarm — loop while warn/danger, stop on safe
+    const descent = this.descentWarningLevel
+    if (descent !== 'safe' && this._prevDescentWarning === 'safe') {
+      this._descentAlarmHandle = audio.play('sfx.lander.alarm', { loop: true })
+    } else if (descent === 'safe' && this._prevDescentWarning !== 'safe') {
+      this._descentAlarmHandle?.stop()
+      this._descentAlarmHandle = null
+    }
+    this._prevDescentWarning = descent
+
+    // Attitude tilt alarm — loop while warn/danger, stop on safe
+    const attitude = this.attitudeWarningLevel
+    if (attitude !== 'safe' && this._prevAttitudeWarning === 'safe') {
+      this._attitudeAlarmHandle = audio.play('sfx.lander.alarm.attitude', { loop: true })
+    } else if (attitude === 'safe' && this._prevAttitudeWarning !== 'safe') {
+      this._attitudeAlarmHandle?.stop()
+      this._attitudeAlarmHandle = null
+    }
+    this._prevAttitudeWarning = attitude
   }
 
   private tickLateralMovement(dt: number): void {
@@ -822,9 +919,33 @@ export class LanderController implements Tickable {
     if (Math.abs(this.tiltZ - targetTiltZ) < 0.005) this.tiltZ = targetTiltZ
 
     // Yaw — gyroscope rotation (airborne only)
-    if (!this.body.grounded) {
+    const yawActive = !this.body.grounded && (
+      this.inputManager.isActionActive('yawLeft') ||
+      this.inputManager.isActionActive('yawRight')
+    )
+    if (yawActive) {
       if (this.inputManager.isActionActive('yawLeft')) this.yaw += YAW_SPEED * dt
       if (this.inputManager.isActionActive('yawRight')) this.yaw -= YAW_SPEED * dt
+    }
+
+    // Gyro audio — same tick-driven fade as the main engine; single handle for both directions
+    const audio = useAudio()
+    if (yawActive) {
+      if (this._gyroHandle === null) {
+        this._gyroHandle = audio.play('sfx.lander.gyro', { loop: true })
+      }
+      this._gyroFadeT = Math.min(1, this._gyroFadeT + dt / LanderController.GYRO_FADE_IN)
+    } else {
+      if (this._gyroHandle !== null) {
+        this._gyroFadeT = Math.max(0, this._gyroFadeT - dt / LanderController.GYRO_FADE_OUT)
+        if (this._gyroFadeT <= 0) {
+          this._gyroHandle.stop()
+          this._gyroHandle = null
+        }
+      }
+    }
+    if (this._gyroHandle !== null) {
+      this._gyroHandle.setVolume(this._gyroFadeT * LanderController.GYRO_TARGET_VOL)
     }
 
     // Build rotation: yaw first, then tilt relative to yaw
@@ -935,12 +1056,8 @@ export class LanderController implements Tickable {
     // Track which nodes are active this frame
     const activeNodes = new Set<string>()
 
-    /** These RCS actions only work in the air */
-    const AIRBORNE_ONLY_ACTIONS = new Set(['rcsLeft', 'rcsRight', 'rcsFore', 'rcsAft', 'rcsAscend'])
-
     for (const [action, mapping] of Object.entries(RCS_ACTION_MAP)) {
-      if (!this.inputManager.isActionActive(action)) continue
-      if (AIRBORNE_ONLY_ACTIONS.has(action) && this.body.grounded) continue
+      if (!this.isRcsActionActive(action)) continue
       for (const nodeName of mapping.nodes) {
         activeNodes.add(nodeName)
       }
@@ -984,6 +1101,18 @@ export class LanderController implements Tickable {
       }
     }
     return new THREE.Vector3()
+  }
+
+  private isRcsActionActive(action: string): boolean {
+    if (!this.thrusterSystem.canFire('rcs', this.landerBurnRateModifiers())) return false
+    if (!this.inputManager.isActionActive(action)) return false
+    const airborneOnly = action === 'rcsLeft'
+      || action === 'rcsRight'
+      || action === 'rcsFore'
+      || action === 'rcsAft'
+      || action === 'rcsAscend'
+    if (airborneOnly && this.body.grounded) return false
+    return true
   }
 
   private spawnFlame(dt: number): void {

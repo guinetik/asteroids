@@ -12,6 +12,7 @@
 import type { Tickable } from '@/lib/Tickable'
 import { DevConsole } from '@/lib/devConsole'
 import { useAudio } from '@/audio/useAudio'
+import { FootstepSystem, MIN_MOVE_SPEED } from '@/lib/fps/footstepSystem'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'
@@ -96,6 +97,14 @@ const CONTACT_KNOCKBACK = 12
 
 /** Thrust vibration at ground level (liftoff rumble). */
 const THRUST_VIBRATION_MAX = 1.2
+/** Minimum volume of the shake sound at lowest vibration intensity. */
+const THRUST_SHAKE_VOL_MIN = 0.08
+/** Maximum volume of the shake sound at highest vibration intensity. */
+const THRUST_SHAKE_VOL_MAX = 0.55
+/** Seconds airborne before the floating ambient sound starts. */
+const FLOAT_SOUND_DELAY = 0.5
+/** Fade-in duration for the floating ambient sound (seconds). */
+const FLOAT_FADE_IN_MS = 600
 /** Thrust vibration at high altitude (cruise hum). */
 const THRUST_VIBRATION_MIN = 0.15
 /** Altitude at which vibration fully fades to minimum. */
@@ -230,6 +239,7 @@ export class LevelViewController implements Tickable {
   private surfaceRocks: SurfaceRockController | null = null
   private collisionWorld: CollisionWorld | null = null
   private readonly collisionCleanup: Array<() => void> = []
+  private readonly surfaceRockCollisionCleanup: Array<() => void> = []
   private stateMachine: StateMachine<LevelState> | null = null
 
   // ── Lander ───────────────────────────────────────────────────
@@ -239,6 +249,18 @@ export class LevelViewController implements Tickable {
   // ── EVA ──────────────────────────────────────────────────────
   private fpsCamera: FpsCamera | null = null
   private playerController: FpsPlayerController | null = null
+  private readonly footsteps = new FootstepSystem('asteroid')
+  /** Looping shake rumble — active while thrust vibration is applied. */
+  private _shakeHandle: ReturnType<ReturnType<typeof useAudio>['play']> | null = null
+  /** Looping floating sound — active while the player is airborne. */
+  private _floatingHandle: ReturnType<ReturnType<typeof useAudio>['play']> | null = null
+  private _prevGrounded = true
+  /** Seconds the player has been continuously airborne — delays float sound onset. */
+  private _floatTimer = 0
+  /** Breathing loops — walk is the resting layer, run replaces it while sprinting. */
+  private _breathingWalkHandle: ReturnType<ReturnType<typeof useAudio>['play']> | null = null
+  private _breathingRunHandle: ReturnType<ReturnType<typeof useAudio>['play']> | null = null
+  private _prevSprinting = false
   private multiTool: MultiToolController | null = null
   private multiToolState: MultiToolState | null = null
   private projectileSystem: ProjectileSystem | null = null
@@ -386,6 +408,9 @@ export class LevelViewController implements Tickable {
       baseColor: asteroid.visual.baseColor,
     })
     this.sceneManager.addToScene(this.surfaceRocks.group)
+    for (const collider of this.surfaceRocks.buildColliders(this.heightmap)) {
+      this.surfaceRockCollisionCleanup.push(this.collisionWorld.addCollider(collider))
+    }
 
     // ── Objective waypoint markers ──────────────────────────────
     for (let i = 0; i < mission.objectives.length; i++) {
@@ -701,6 +726,7 @@ export class LevelViewController implements Tickable {
     // ── Start ───────────────────────────────────────────────────
     this.gameLoop = new GameLoop(this.tickHandler)
     this.gameLoop.start()
+    useAudio().play('ambient.asteroid', { loop: true })
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -774,7 +800,6 @@ export class LevelViewController implements Tickable {
     }
 
     const audio = useAudio()
-    audio.play('sfx.level.arrival')
     audio.play('ambient.landerCockpit', { loop: true })
 
     // Letterbox
@@ -864,6 +889,10 @@ export class LevelViewController implements Tickable {
     // Pointer lock
     this.setupPointerLock()
     this.sceneManager!.renderer.domElement.requestPointerLock()
+
+    // Start resting breath loop — run breathing will take over when sprinting
+    this._breathingWalkHandle = useAudio().play('sfx.breathing.walk', { loop: true })
+    this._prevSprinting = false
   }
 
   private exitEva(): void {
@@ -893,6 +922,12 @@ export class LevelViewController implements Tickable {
     this.leftMouseDown = false
     this.leftMouseJustPressed = false
     this.rightMouseDown = false
+
+    // Stop breathing loops
+    this._breathingWalkHandle?.stop()
+    this._breathingWalkHandle = null
+    this._breathingRunHandle?.stop()
+    this._breathingRunHandle = null
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -920,6 +955,16 @@ export class LevelViewController implements Tickable {
     this.leftMouseDown = false
     this.leftMouseJustPressed = false
     this.rightMouseDown = false
+
+    // exitEva is skipped on the dead path so we must cut EVA audio here explicitly.
+    this._breathingWalkHandle?.stop()
+    this._breathingWalkHandle = null
+    this._breathingRunHandle?.stop()
+    this._breathingRunHandle = null
+    this._floatingHandle?.stop()
+    this._floatingHandle = null
+    this._floatTimer = 0
+    this.footsteps.reset()
 
     // Fade + message are driven by the dead state tick, not set here
   }
@@ -969,10 +1014,9 @@ export class LevelViewController implements Tickable {
     this.sceneManager!.setActiveCamera(this.arrivalSequence!.camera)
     this.sceneManager!.setCamera(null)
 
-    // Mirror arrival audio — cockpit bed + departure sting
+    // Cockpit ambient starts now; the departure sting fires when the ship actually moves
     const audio = useAudio()
     audio.play('ambient.landerCockpit', { loop: true })
-    audio.play('sfx.level.arrival')
 
     // Start reverse cutscene
     this.arrivalSequence!.playExfil(this.landerController!.group.position)
@@ -1091,6 +1135,14 @@ export class LevelViewController implements Tickable {
     // Stop lander physics/input — the run is over.
     this.tickHandler!.unregister(this.landerController)
     this.onDeathOverlay?.(true, cause)
+
+    // Cut all in-flight sounds: sfx (engine, RCS) and cockpit ambient.
+    // The lander tick is no longer running so the engine envelope won't
+    // reach zero naturally; stop them explicitly here.
+    const audio = useAudio()
+    audio.stopCategory('sfx')
+    audio.stopSound('ambient.landerCockpit')
+    this._shakeHandle = null // already stopped by stopCategory
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1119,7 +1171,6 @@ export class LevelViewController implements Tickable {
         this.landerController.group.visible = true
       }
       const audio = useAudio()
-      audio.stopSound('sfx.level.arrival')
       audio.stopSound('ambient.landerCockpit')
       this.onArrivalFade?.(0)
       this.stateMachine.setState('lander' as LevelState)
@@ -1190,7 +1241,10 @@ export class LevelViewController implements Tickable {
       const player = this.playerController
       const currentState = this.stateMachine?.state ?? ''
 
-      if (lander) {
+      // Only read lander input state when the player is actually flying the lander.
+      // isMainEngineActive is a live getter on the shared inputManager, so it would
+      // return true in EVA mode if the player presses the jump key (same binding).
+      if (lander && currentState === 'lander') {
         applyLanderAtmosphereState(this.atmosphereCtx, lander)
         const engineFiring = lander.isMainEngineActive
 
@@ -1200,7 +1254,19 @@ export class LevelViewController implements Tickable {
           const altFade = 1 - Math.min(1, alt / THRUST_VIBRATION_FADE_ALT)
           const intensity = THRUST_VIBRATION_MIN + (THRUST_VIBRATION_MAX - THRUST_VIBRATION_MIN) * altFade * altFade
           this.vehicleCamera.shake(intensity, THRUST_VIBRATION_DURATION)
+          const shakeVol = THRUST_SHAKE_VOL_MIN + (THRUST_SHAKE_VOL_MAX - THRUST_SHAKE_VOL_MIN) * (intensity / THRUST_VIBRATION_MAX)
+          if (this._shakeHandle === null) {
+            this._shakeHandle = useAudio().play('sfx.lander.shake', { loop: true, volume: shakeVol })
+          } else {
+            this._shakeHandle.setVolume(shakeVol)
+          }
+        } else if (this._shakeHandle !== null) {
+          this._shakeHandle.stop()
+          this._shakeHandle = null
         }
+      } else if (this.atmosphereCtx) {
+        // Not in lander mode — clear thrust so wash/shake effects stay silent.
+        this.atmosphereCtx.landerThrust = 0
       }
 
       if (player) {
@@ -1308,7 +1374,7 @@ export class LevelViewController implements Tickable {
   }
 
   /** Per-frame EVA logic — tool input, camera bob, aiming. */
-  private tickEva(_dt: number): void {
+  private tickEva(dt: number): void {
     // Tool keybinds
     if (this.inputManager && this.multiToolState) {
       if (this.inputManager.wasActionPressed('toolDrill')) this.multiToolState.setMode('drill')
@@ -1357,6 +1423,45 @@ export class LevelViewController implements Tickable {
         this.inputManager!.isActionActive('sprint'),
         this.playerController.grounded,
       )
+
+      // Footsteps — fire when moving and grounded on the asteroid surface
+      this.footsteps.update(
+        dt,
+        this.playerController.speed > MIN_MOVE_SPEED,
+        this.playerController.grounded,
+      )
+
+      // Floating loop — delayed onset + fade-in to avoid triggering on short hops
+      const grounded = this.playerController.grounded
+      if (!grounded) {
+        this._floatTimer += dt
+        if (this._floatTimer >= FLOAT_SOUND_DELAY && this._floatingHandle === null) {
+          this._floatingHandle = useAudio().play('sfx.floating', { loop: true, fadeInMs: FLOAT_FADE_IN_MS })
+        }
+      } else {
+        this._floatTimer = 0
+        if (this._floatingHandle !== null) {
+          this._floatingHandle.stop()
+          this._floatingHandle = null
+        }
+      }
+      this._prevGrounded = grounded
+
+      // Breathing crossfade — run loop plays only when actually sprinting with charge.
+      // Shift held with depleted stamina stays on walk breath. Floating is covered
+      // by the separate floating sound, not the breathing crossfade.
+      const sprintHeld = this.inputManager!.isActionActive('sprint')
+      const exerted = sprintHeld && this.playerController.thrusterSystem.canFire('sprint')
+      if (exerted && !this._prevSprinting) {
+        this._breathingWalkHandle?.stop()
+        this._breathingWalkHandle = null
+        this._breathingRunHandle = useAudio().play('sfx.breathing.run', { loop: true })
+      } else if (!exerted && this._prevSprinting) {
+        this._breathingRunHandle?.stop()
+        this._breathingRunHandle = null
+        this._breathingWalkHandle = useAudio().play('sfx.breathing.walk', { loop: true })
+      }
+      this._prevSprinting = exerted
     }
   }
 
@@ -1444,6 +1549,12 @@ export class LevelViewController implements Tickable {
   private clearCollisionRegistrations(): void {
     while (this.collisionCleanup.length > 0) {
       this.collisionCleanup.pop()?.()
+    }
+  }
+
+  private clearSurfaceRockCollisionRegistrations(): void {
+    while (this.surfaceRockCollisionCleanup.length > 0) {
+      this.surfaceRockCollisionCleanup.pop()?.()
     }
   }
 
@@ -1628,8 +1739,19 @@ export class LevelViewController implements Tickable {
     }
     this.minigames.length = 0
     this.gameLoop?.stop()
+    this._shakeHandle?.stop()
+    this._shakeHandle = null
+    this._floatingHandle?.stop()
+    this._floatingHandle = null
+    this._floatTimer = 0
+    this._breathingWalkHandle?.stop()
+    this._breathingWalkHandle = null
+    this._breathingRunHandle?.stop()
+    this._breathingRunHandle = null
+    useAudio().stopSound('ambient.asteroid')
     this.teardownPointerLock()
     this.clearCollisionRegistrations()
+    this.clearSurfaceRockCollisionRegistrations()
     this.projectileSystem?.dispose()
     this.impactEmitter?.dispose()
     this.multiTool?.dispose()
