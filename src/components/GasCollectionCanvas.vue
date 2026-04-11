@@ -539,7 +539,12 @@ function loop(time: number) {
   ctx.fillStyle = '#00ccff'
   ctx.font = '12px monospace'
   ctx.textAlign = 'right'
-  ctx.fillText(`DRONES: ${props.minigame.dronesRemaining} remaining`, CANVAS_WIDTH - 20, 30)
+  const inFlight = props.minigame.drones.filter((d) => !d.collected).length
+  ctx.fillText(
+    `DRONES: ${props.minigame.dronesRemaining} ready | ${inFlight} in flight`,
+    CANVAS_WIDTH - 20,
+    30,
+  )
 
   // Q prompt
   if (props.minigame.dronesRemaining > 0 && props.minigame.status === 'active') {

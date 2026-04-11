@@ -22,7 +22,7 @@ export const SHIP_DRAG = 0.92
 export const SHIP_MAX_SPEED = 400
 
 /** Downward acceleration on drones in px/s². */
-export const DRONE_GRAVITY = 110
+export const DRONE_GRAVITY = 140
 
 /** Pure launch impulse speed in px/s — strong kick, not affected by drag initially. */
 export const DRONE_LAUNCH_SPEED = 280
@@ -42,8 +42,8 @@ export const DRONE_COLLECT_RADIUS = 36
 /** Maximum gas yield per drone in seconds of air time. */
 export const MAX_AIR_TIME_YIELD = 3
 
-/** Total drones per attempt. */
-export const MAX_DRONES = 5
+/** Starting drone count — drones are reusable if caught. */
+export const MAX_DRONES = 3
 
 /** Minimum air time in seconds before a drone can be collected. Long enough to clear the ship. */
 export const DRONE_GRACE_PERIOD = 0.8

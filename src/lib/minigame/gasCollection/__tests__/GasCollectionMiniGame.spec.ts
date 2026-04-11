@@ -220,17 +220,21 @@ describe('GasCollectionMiniGame', () => {
   })
 
   describe('ship-drone collection', () => {
-    it('catching a loaded drone banks its gas', () => {
+    it('catching a loaded drone banks its gas and returns the drone', () => {
+      const before = game.dronesRemaining
       game.launchDrone()
+      expect(game.dronesRemaining).toBe(before - 1)
       game.drones[0]!.gasLoaded = 2
       game.drones[0]!.airTime = 1.0
       game.drones[0]!.x = game.shipX
       game.drones[0]!.y = game.shipY
       game.tick(0.016, STUB_CTX)
       expect(game.gasCollected).toBe(2)
+      expect(game.dronesRemaining).toBe(before) // returned to pool
     })
 
-    it('catching an empty drone gives no gas', () => {
+    it('catching an empty drone gives no gas but returns the drone', () => {
+      const before = game.dronesRemaining
       game.launchDrone()
       game.drones[0]!.gasLoaded = 0
       game.drones[0]!.airTime = 1.0
@@ -238,6 +242,7 @@ describe('GasCollectionMiniGame', () => {
       game.drones[0]!.y = game.shipY
       game.tick(0.016, STUB_CTX)
       expect(game.gasCollected).toBe(0)
+      expect(game.dronesRemaining).toBe(before)
     })
 
     it('collection requires proximity within DRONE_COLLECT_RADIUS', () => {
@@ -251,12 +256,14 @@ describe('GasCollectionMiniGame', () => {
     })
   })
 
-  describe('drone lost off screen', () => {
-    it('drone falling below canvas is removed', () => {
+  describe('drone lost in cook zone', () => {
+    it('drone past cook zone is destroyed — not returned to pool', () => {
+      const before = game.dronesRemaining
       game.launchDrone()
-      game.drones[0]!.y = CANVAS_HEIGHT + 50
+      game.drones[0]!.y = COOK_ZONE_Y + 10
       game.tick(0.016, STUB_CTX)
       expect(game.drones).toHaveLength(0)
+      expect(game.dronesRemaining).toBe(before - 1) // permanently lost
     })
   })
 

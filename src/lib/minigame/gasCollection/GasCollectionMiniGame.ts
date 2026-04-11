@@ -292,7 +292,7 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
     }
   }
 
-  /** Check ship-drone proximity — catching a drone banks its loaded gas. */
+  /** Check ship-drone proximity — catching a drone banks gas and returns the drone. */
   private checkShipDroneCollisions(): void {
     for (const drone of this.drones) {
       if (drone.collected) continue
@@ -303,13 +303,19 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
       if (dist <= DRONE_COLLECT_RADIUS) {
         drone.collected = true
         this.gasCollected += drone.gasLoaded
+        // Drone is reusable — return it to the pool
+        this.dronesRemaining++
       }
     }
   }
 
-  /** Remove collected drones, drones past the cook zone, and drones off screen. */
+  /** Remove collected drones and drones past the cook zone (permanently lost). */
   private cleanupDrones(): void {
-    this.drones = this.drones.filter((d) => !d.collected && d.y <= COOK_ZONE_Y)
+    this.drones = this.drones.filter((d) => {
+      if (d.collected) return false
+      if (d.y > COOK_ZONE_Y) return false // burned up — drone lost permanently
+      return true
+    })
   }
 
   /** Remove consumed and off-screen gas puffs. */
