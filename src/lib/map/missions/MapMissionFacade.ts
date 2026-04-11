@@ -214,7 +214,11 @@ export class MapMissionFacade {
     // Create orbital minigame for this mission
     const orbitalConfig = getPlanetOrbitalConfig(mission.template.targetPlanet)
     const minigameType = orbitalConfig?.minigameType ?? 'default'
-    this.activeMinigame = createOrbitalMiniGame(mission.template.id, minigameType)
+    this.activeMinigame = createOrbitalMiniGame(
+      mission.template.id,
+      minigameType,
+      mission.template.gatherQuantity,
+    )
     params.onMissionOverlay?.(true, mission, canFit)
   }
 

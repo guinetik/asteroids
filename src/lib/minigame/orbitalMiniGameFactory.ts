@@ -2,8 +2,7 @@
  * Orbital minigame factory.
  *
  * Dispatches on the minigameType string from planet-orbital-config.json
- * to create the appropriate OrbitalMiniGame implementation. All types
- * currently fall through to DefaultOrbitalMiniGame.
+ * to create the appropriate OrbitalMiniGame implementation.
  *
  * @author guinetik
  * @date 2026-04-10
@@ -11,20 +10,27 @@
  */
 import type { OrbitalMiniGame } from './OrbitalMiniGame'
 import { DefaultOrbitalMiniGame } from './DefaultOrbitalMiniGame'
+import { GasCollectionMiniGame } from './gasCollection/GasCollectionMiniGame'
 
 /**
  * Create an orbital minigame for the given mission and minigame type.
  *
  * @param missionId - The shuttle mission id.
  * @param minigameType - The minigame type from planet-orbital-config.json.
+ * @param targetGas - The gather quantity from the mission template.
  * @returns A new OrbitalMiniGame instance.
  *
  * @author guinetik
  * @date 2026-04-10
  */
-export function createOrbitalMiniGame(missionId: string, minigameType: string): OrbitalMiniGame {
+export function createOrbitalMiniGame(
+  missionId: string,
+  minigameType: string,
+  targetGas: number,
+): OrbitalMiniGame {
   switch (minigameType) {
     case 'gas-collection':
+      return new GasCollectionMiniGame(missionId, targetGas)
     case 'probe-deploy':
     case 'logistics':
     case 'chemistry':
