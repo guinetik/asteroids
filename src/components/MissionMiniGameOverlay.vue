@@ -3,8 +3,10 @@ import type { ActiveShuttleMission } from '@/lib/missions/types'
 import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
 import { GasCollectionMiniGame } from '@/lib/minigame/gasCollection/GasCollectionMiniGame'
 import { IceHarvestMiniGame } from '@/lib/minigame/iceHarvest/IceHarvestMiniGame'
+import { MaintenanceMiniGame } from '@/lib/minigame/maintenance/MaintenanceMiniGame'
 import GasCollectionCanvas from '@/components/GasCollectionCanvas.vue'
 import IceHarvestCanvas from '@/components/IceHarvestCanvas.vue'
+import MaintenanceCanvas from '@/components/MaintenanceCanvas.vue'
 import { getPlanetOrbitalConfig } from '@/lib/missions/planetOrbitalConfig'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 import { computed } from 'vue'
@@ -39,6 +41,14 @@ const isIceHarvest = computed(
 
 const iceMinigame = computed(
   () => (props.minigame instanceof IceHarvestMiniGame ? props.minigame : null),
+)
+
+const isMaintenance = computed(
+  () => props.minigame instanceof MaintenanceMiniGame,
+)
+
+const maintenanceMinigame = computed(
+  () => (props.minigame instanceof MaintenanceMiniGame ? props.minigame : null),
 )
 
 const orbitalConfig = computed(() => getPlanetOrbitalConfig(props.mission.template.targetPlanet))
@@ -89,6 +99,29 @@ const gatherItemDef = computed(() => {
       <div class="mission-minigame-card__body" style="padding: 0.5rem;">
         <IceHarvestCanvas
           :minigame="iceMinigame"
+          @complete="emit('complete')"
+          @fail="() => {}"
+        />
+      </div>
+    </div>
+  </div>
+
+  <!-- Maintenance: solar panel puzzle -->
+  <div v-else-if="isMaintenance && maintenanceMinigame" class="mission-minigame-overlay">
+    <div class="mission-minigame-card" style="max-width: 850px;">
+      <div class="mission-minigame-card__chrome">
+        <span>{{ mission.template.name }}</span>
+        <button
+          type="button"
+          class="ship-message-card__button"
+          @click="emit('close')"
+        >
+          Close
+        </button>
+      </div>
+      <div class="mission-minigame-card__body" style="padding: 0.5rem;">
+        <MaintenanceCanvas
+          :minigame="maintenanceMinigame"
           @complete="emit('complete')"
           @fail="() => {}"
         />

@@ -68,8 +68,20 @@ export interface SurfaceFeature {
   swirlSpeed: number
 }
 
-/** Surface rendering style — determines how cloud bands are drawn. */
-export type SurfaceStyle = 'flat' | 'banded'
+/** Surface rendering style — determines how the planet surface is drawn. */
+export type SurfaceStyle = 'flat' | 'banded' | 'terrain'
+
+/** A mesa/mountain silhouette on a terrain surface. */
+export interface MesaSilhouette {
+  /** Horizontal position as fraction of canvas width (0–1). */
+  xFrac: number
+  /** Total width in px. */
+  width: number
+  /** Height in px. */
+  height: number
+  /** Flat top width in px. */
+  flatTop: number
+}
 
 /** Full visual theme for a gas collection minigame instance. */
 export interface GasCollectionTheme {
@@ -93,6 +105,10 @@ export interface GasCollectionTheme {
   puffCenter: string
   /** Optional surface features drawn on the planet (e.g. Great Red Spot). */
   surfaceFeatures?: SurfaceFeature[]
+  /** Mesa silhouettes for 'terrain' surface style. */
+  mesas?: MesaSilhouette[]
+  /** Dust particle/band color for 'terrain' surfaces. */
+  dustColor?: string
   /** Briefing screen content. */
   briefing: BriefingContent
 }
@@ -179,10 +195,55 @@ const JUPITER_THEME: GasCollectionTheme = {
   },
 }
 
+/** Mars — rust-red rocky terrain with dust storms. */
+const MARS_THEME: GasCollectionTheme = {
+  sky: {
+    space: '#0c0808',
+    upperMid: '#100a08',
+    lowerMid: '#1a100c',
+    horizon: '#3a2018',
+    dense: '#2a1610',
+  },
+  surface: {
+    bright: '#8a4530',
+    mid: '#6e3422',
+    dark: '#4e2418',
+    shadow: '#2e140e',
+  },
+  surfaceStyle: 'terrain',
+  cloudBands: ['#7a3c28', '#5e2c1c', '#3e1c12'],
+  glowTint: 'rgb(180, 90, 50)',
+  windColor: '#be6e3c',
+  dustColor: '#b46438',
+  puffOuter: '#66cc44',
+  puffInner: '#44aa33',
+  puffCenter: '#99ee77',
+  mesas: [
+    { xFrac: 0.08, width: 60, height: 25, flatTop: 30 },
+    { xFrac: 0.22, width: 40, height: 15, flatTop: 20 },
+    { xFrac: 0.38, width: 90, height: 35, flatTop: 50 },
+    { xFrac: 0.55, width: 30, height: 12, flatTop: 18 },
+    { xFrac: 0.70, width: 70, height: 28, flatTop: 40 },
+    { xFrac: 0.88, width: 45, height: 18, flatTop: 25 },
+  ],
+  briefing: {
+    icon: '⚠',
+    title: 'SUBSURFACE METHANE VENT',
+    situation:
+      'Thermal sensors have detected methane venting from a subsurface pocket. ' +
+      'The Martian wind is carrying the gas upward — a rare sampling opportunity.',
+    instructions:
+      'Stay above the surface — the dust storms near ground level will shred your hull. ' +
+      'Launch collection drones into the rising methane plumes and catch them before ' +
+      'they drift into the dust layer.',
+  },
+}
+
 /** Theme lookup by planet id. Falls back to Venus for unknown planets. */
 const THEMES: Record<string, GasCollectionTheme> = {
   venus: VENUS_THEME,
   jupiter: JUPITER_THEME,
+  mars: MARS_THEME,
 }
 
 /**

@@ -3,12 +3,11 @@ import { createOrbitalMiniGame } from '../orbitalMiniGameFactory'
 import { DefaultOrbitalMiniGame } from '../DefaultOrbitalMiniGame'
 import { GasCollectionMiniGame } from '../gasCollection/GasCollectionMiniGame'
 import { IceHarvestMiniGame } from '../iceHarvest/IceHarvestMiniGame'
+import { MaintenanceMiniGame } from '../maintenance/MaintenanceMiniGame'
 
 const DEFAULT_TYPES = [
   'probe-deploy',
   'logistics',
-  'chemistry',
-  'maintenance',
 ]
 
 describe('createOrbitalMiniGame', () => {
@@ -34,6 +33,20 @@ describe('createOrbitalMiniGame', () => {
     expect(mg).toBeInstanceOf(IceHarvestMiniGame)
     expect(mg.missionId).toBe('mission-1')
     expect(mg.progressTotal).toBe(4)
+  })
+
+  it('returns GasCollectionMiniGame for type "chemistry"', () => {
+    const mg = createOrbitalMiniGame('mission-1', 'chemistry', 3)
+    expect(mg).toBeInstanceOf(GasCollectionMiniGame)
+    expect(mg.missionId).toBe('mission-1')
+    expect(mg.progressTotal).toBe(3)
+  })
+
+  it('returns MaintenanceMiniGame for type "maintenance"', () => {
+    const mg = createOrbitalMiniGame('mission-1', 'maintenance', 3)
+    expect(mg).toBeInstanceOf(MaintenanceMiniGame)
+    expect(mg.missionId).toBe('mission-1')
+    expect(mg.progressTotal).toBe(4) // fixed target count, not gatherQuantity
   })
 
   it('returns DefaultOrbitalMiniGame for unknown type', () => {

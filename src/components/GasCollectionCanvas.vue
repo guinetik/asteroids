@@ -211,6 +211,110 @@ function drawBandedSurface(ctx: CanvasRenderingContext2D, t: ReturnType<typeof g
   }
 }
 
+/** Pre-generated terrain features for 'terrain' style surfaces. */
+const terrainRocks: { x: number; y: number; w: number; h: number; shade: number }[] = []
+const terrainCraters: { x: number; y: number; r: number; depth: number }[] = []
+let terrainInited = false
+
+function initTerrain() {
+  if (terrainInited) return
+  terrainInited = true
+  for (let i = 0; i < 25; i++) {
+    terrainRocks.push({
+      x: Math.random() * CANVAS_WIDTH,
+      y: PLANET_HORIZON_Y + 15 + Math.random() * (CANVAS_HEIGHT - PLANET_HORIZON_Y - 25),
+      w: 3 + Math.random() * 14,
+      h: 2 + Math.random() * 8,
+      shade: Math.random() * 0.12 + 0.02,
+    })
+  }
+  for (let i = 0; i < 10; i++) {
+    terrainCraters.push({
+      x: Math.random() * CANVAS_WIDTH,
+      y: PLANET_HORIZON_Y + 25 + Math.random() * (CANVAS_HEIGHT - PLANET_HORIZON_Y - 35),
+      r: 6 + Math.random() * 18,
+      depth: Math.random() * 0.08 + 0.03,
+    })
+  }
+}
+
+/** Rocky terrain surface — mesas, craters, rocks, dust bands (Mars-style). */
+function drawTerrainSurface(ctx: CanvasRenderingContext2D, t: ReturnType<typeof getGasCollectionTheme>) {
+  initTerrain()
+
+  // Sun-lit highlight from upper right
+  const highlight = ctx.createLinearGradient(CANVAS_WIDTH, 0, CANVAS_WIDTH * 0.4, 0)
+  highlight.addColorStop(0, 'rgba(220,140,80,0.1)')
+  highlight.addColorStop(0.4, 'rgba(200,120,60,0.04)')
+  highlight.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = highlight
+  ctx.fillRect(0, PLANET_HORIZON_Y - 70, CANVAS_WIDTH, CANVAS_HEIGHT)
+
+  // Mesa silhouettes on the horizon
+  if (t.mesas) {
+    for (const m of t.mesas) {
+      const mx = CANVAS_WIDTH * m.xFrac
+      const curveFactor = 1 - Math.pow((m.xFrac - 0.5) * 2, 2)
+      const baseY = PLANET_HORIZON_Y - 55 + 70 * (1 - curveFactor) - 5
+
+      ctx.beginPath()
+      ctx.moveTo(mx - m.width / 2, baseY)
+      ctx.lineTo(mx - m.flatTop / 2, baseY - m.height)
+      ctx.lineTo(mx + m.flatTop / 2, baseY - m.height)
+      ctx.lineTo(mx + m.width / 2, baseY)
+      ctx.closePath()
+      ctx.fillStyle = t.surface.shadow + 'b3' // 70% alpha
+      ctx.fill()
+    }
+  }
+
+  // Craters
+  for (const c of terrainCraters) {
+    ctx.beginPath()
+    ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2)
+    ctx.fillStyle = `rgba(0,0,0,${c.depth})`
+    ctx.fill()
+
+    ctx.beginPath()
+    ctx.arc(c.x + c.r * 0.15, c.y - c.r * 0.15, c.r * 0.8, 0, Math.PI * 2)
+    ctx.fillStyle = `rgba(120,65,40,${c.depth * 0.5})`
+    ctx.fill()
+  }
+
+  // Rocks
+  for (const r of terrainRocks) {
+    ctx.beginPath()
+    ctx.ellipse(r.x, r.y, r.w / 2, r.h / 2, 0, 0, Math.PI * 2)
+    ctx.fillStyle = `rgba(50,25,15,${r.shade + 0.1})`
+    ctx.fill()
+
+    ctx.beginPath()
+    ctx.ellipse(r.x + 1, r.y - 1, r.w / 2 - 1, r.h / 2 - 1, 0, Math.PI, Math.PI * 2)
+    ctx.fillStyle = `rgba(160,90,55,${r.shade})`
+    ctx.fill()
+  }
+
+  // Dust bands — horizontal streaks blowing across
+  const dustColor = t.dustColor ?? t.windColor
+  for (let i = 0; i < 8; i++) {
+    const bandY = PLANET_HORIZON_Y * 0.6 + (i / 8) * PLANET_HORIZON_Y * 0.35
+    const speed = 20 + i * 8
+    const bandLen = CANVAS_WIDTH * 0.4 + (i % 3) * CANVAS_WIDTH * 0.2
+    const xOff = (simTime * speed + i * 200) % (CANVAS_WIDTH + bandLen) - bandLen * 0.5
+    const alpha = 0.02 + (i % 3) * 0.015
+    const bandH = 3 + (i % 4) * 3
+
+    const grad = ctx.createLinearGradient(xOff, 0, xOff + bandLen, 0)
+    grad.addColorStop(0, `${dustColor}00`)
+    grad.addColorStop(0.2, dustColor + Math.round(alpha * 255).toString(16).padStart(2, '0'))
+    grad.addColorStop(0.5, dustColor + Math.round(alpha * 1.2 * 255).toString(16).padStart(2, '0'))
+    grad.addColorStop(0.8, dustColor + Math.round(alpha * 255).toString(16).padStart(2, '0'))
+    grad.addColorStop(1, `${dustColor}00`)
+    ctx.fillStyle = grad
+    ctx.fillRect(xOff, bandY - bandH / 2, bandLen, bandH)
+  }
+}
+
 function drawBackground(ctx: CanvasRenderingContext2D, dt: number) {
   bgOffset += dt * 80
   simTime += dt
@@ -264,8 +368,11 @@ function drawBackground(ctx: CanvasRenderingContext2D, dt: number) {
   if (t.surfaceStyle === 'banded') {
     // Gas giant — sine-wave bands at multiple frequencies with turbulence
     drawBandedSurface(ctx, t)
+  } else if (t.surfaceStyle === 'terrain') {
+    // Rocky terrain — mesas, craters, dust (Mars-style)
+    drawTerrainSurface(ctx, t)
   } else {
-    // Rocky/flat — simple parallax rectangles
+    // Flat cloud bands (Venus-style)
     drawFlatBands(ctx, t)
   }
   // Surface features (e.g. Great Red Spot) — scroll with the cloud bands
