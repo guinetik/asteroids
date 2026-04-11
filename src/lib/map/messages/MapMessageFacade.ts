@@ -22,6 +22,7 @@ export class MapMessageFacade {
   private didDispatchBrakeMessage = false
   private didDispatchMainThrusterMessage = false
   private didDispatchVenusOrbitMessage = false
+  private didDispatchFirstSlingshotMessage = false
 
   notifyMapStartEarthOrbit(onMessageUpdate: (() => void) | null): void {
     this.notifyTrigger('map_start_earth_orbit', onMessageUpdate)
@@ -85,6 +86,12 @@ export class MapMessageFacade {
 
     this.didDispatchVenusOrbitMessage = true
     this.notifyTrigger('map_venus_orbit_warning', params.onMessageUpdate)
+  }
+
+  notifyFirstSlingshot(onMessageUpdate: (() => void) | null): void {
+    if (this.didDispatchFirstSlingshotMessage) return
+    this.didDispatchFirstSlingshotMessage = true
+    this.notifyTrigger('map_first_slingshot', onMessageUpdate)
   }
 
   private notifyTrigger(triggerId: ShipMessageTrigger, onMessageUpdate: (() => void) | null): void {

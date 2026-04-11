@@ -14,6 +14,7 @@ export type ShipMessageTrigger =
   | 'map_main_thruster_depleted'
   | 'mission_start'
   | 'map_venus_orbit_warning'
+  | 'map_first_slingshot'
 
 /** Delivery behavior for a shipboard message. */
 export type ShipMessageDelivery = 'blocking_intro' | 'inbox_prompt'

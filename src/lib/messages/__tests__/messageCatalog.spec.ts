@@ -17,7 +17,7 @@ describe('SHIP_MESSAGE_CATALOG', () => {
     expect(followUp).toMatchObject({
       from: 'Jay Mercer',
       subject: 'So You Actually Did It',
-      audioUrl: '/sound/jay.mp3',
+      audioUrl: '/sound/jay-001.mp3',
       delivery: 'inbox_prompt',
     })
   })

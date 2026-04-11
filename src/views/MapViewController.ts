@@ -932,6 +932,7 @@ export class MapViewController implements Tickable {
       })
       if (previousCharge > 0 && this.slingshotCharge === 0 && this.orbitSystem?.state === 'free') {
         this.yRecovery = true
+        this.messageFacade.notifyFirstSlingshot(this.onMessageUpdate)
       }
     }
 
@@ -1141,7 +1142,8 @@ export class MapViewController implements Tickable {
           const dx = c.getWorldX() - px
           const dz = c.getWorldZ() - pz
           const dist = Math.sqrt(dx * dx + dz * dz)
-          const collisionRadius = PLANETS[i]!.displayRadius * SIZE_SCALE
+          const collisionRadius =
+            PLANETS[i]!.displayRadius * SIZE_SCALE + MAP_CONFIG.MAP_SHUTTLE_COLLISION_RADIUS
           if (dist < collisionRadius) {
             this.triggerDeath(`Crashed Into ${PLANETS[i]!.name}`)
             return
