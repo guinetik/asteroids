@@ -20,7 +20,8 @@ import type {
   OrbitalMiniGameStep,
 } from '../OrbitalMiniGame'
 import type { ShipInput, RouteSymbol, TrafficShuttle } from './types'
-import { RouteSymbolType, ROUTE_SYMBOL_TYPES } from './types'
+import type { RouteSymbolType } from './types'
+import { ROUTE_SYMBOL_TYPES } from './types'
 import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
