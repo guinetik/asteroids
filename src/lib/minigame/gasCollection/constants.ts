@@ -46,7 +46,7 @@ export const DRONE_GRACE_PERIOD = 0.3
 export const SHIP_GRAVITY = 60
 
 /** Y position of the planet cook zone — ship below this = dead. */
-export const COOK_ZONE_Y = 340
+export const COOK_ZONE_Y = 310
 
 /** Ship hitbox half-width for collision and rendering. */
 export const SHIP_HALF_WIDTH = 24
