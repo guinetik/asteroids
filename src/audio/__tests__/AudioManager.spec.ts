@@ -427,11 +427,14 @@ describe('AudioManager', () => {
     })
     m.unlock()
     m.play('ui.click')
+    // applyCategoryState now also refreshes active playbacks immediately (so live sounds react to
+    // mute/volume changes without needing a replayed sound to pick up the new gain).
     m.applyCategoryState('ui', { volume: 0.5 })
     m.play('ui.click')
-    expect(mockHowlVolume).toHaveBeenCalledTimes(2)
-    expect(mockHowlVolume).toHaveBeenNthCalledWith(1, 0.35, 1)
-    expect(mockHowlVolume).toHaveBeenNthCalledWith(2, 0.175, 2)
+    expect(mockHowlVolume).toHaveBeenCalledTimes(3)
+    expect(mockHowlVolume).toHaveBeenNthCalledWith(1, 0.35, 1)   // first play at full vol
+    expect(mockHowlVolume).toHaveBeenNthCalledWith(2, 0.175, 1)  // refresh first instance to new vol
+    expect(mockHowlVolume).toHaveBeenNthCalledWith(3, 0.175, 2)  // second play at new vol
   })
 
   it('applies distinct per-play volume overrides per Howl play id on shared cached Howls', () => {
@@ -444,8 +447,8 @@ describe('AudioManager', () => {
 
   it('preload warms static sounds via cached Howls and Howl.load without duplicate instances', () => {
     manager.preload([...SEEDED_SOUND_IDS])
-    expect(mockHowlInstances).toHaveLength(3)
-    expect(mockLoad).toHaveBeenCalledTimes(3)
+    expect(mockHowlInstances).toHaveLength(SEEDED_SOUND_IDS.length)
+    expect(mockLoad).toHaveBeenCalledTimes(SEEDED_SOUND_IDS.length)
     const afterPreload = mockHowlInstances.length
     manager.unlock()
     manager.play('ui.click')

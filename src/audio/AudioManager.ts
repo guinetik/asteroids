@@ -28,6 +28,7 @@ import {
   type AudioPlayOptions,
   type AudioPlaybackHandle,
 } from './audioTypes'
+import { playProceduralSound } from './proceduralAudio'
 
 /** Howl error events may pass `null` for howl-level load failures (see Howler `_emit`). */
 type HowlErrorEventHandler = (soundId: number | null, error: unknown) => void
@@ -106,6 +107,20 @@ export class AudioManager {
    */
   applyCategoryState(category: AudioCategory, patch: Partial<AudioCategoryState>): void {
     this.categoryState[category] = { ...this.categoryState[category], ...patch }
+    this.refreshCategoryVolumes(category)
+  }
+
+  /**
+   * Pushes the current effective category volume to every active playback in that category.
+   * Called after any category state change (mute, volume) so live sounds react immediately.
+   */
+  private refreshCategoryVolumes(category: AudioCategory): void {
+    const list = this.activeByCategory.get(category)
+    if (!list?.length) return
+    const catVol = this.getCategoryVolume(category)
+    for (const p of list) {
+      this.applyPerInstanceVolume(p.howl, p.baseVolumeScale * catVol, p.howlPlayId)
+    }
   }
 
   /**
@@ -201,6 +216,14 @@ export class AudioManager {
     }
 
     this.applyPlaybackModePrelude(def, soundId)
+
+    const proceduralHandle = this.tryPlayProceduralSound(soundId, def, options)
+    if (proceduralHandle) {
+      if (def.playback === 'rate-limited') {
+        this.recordRateLimitTrigger(def, soundId, options)
+      }
+      return proceduralHandle
+    }
 
     const allowDynamicSrc = 'allowDynamicSrc' in def && def.allowDynamicSrc === true
     const dynamicSrc =
@@ -872,6 +895,25 @@ export class AudioManager {
       setVolume: () => {},
       setStereo: () => {},
     }
+  }
+
+  private tryPlayProceduralSound(
+    soundId: AudioSoundId,
+    def: Readonly<AudioDefinition>,
+    options: AudioPlayOptions,
+  ): AudioPlaybackHandle | null {
+    if (!def.procedural) return null
+    if (options.loop) {
+      return this.createNoopHandle(soundId)
+    }
+    return (
+      playProceduralSound({
+        soundId,
+        preset: def.procedural,
+        volume: this.computePlaybackVolume(def, options),
+        onEnd: options.onEnd,
+      }) ?? this.createNoopHandle(soundId)
+    )
   }
 }
 

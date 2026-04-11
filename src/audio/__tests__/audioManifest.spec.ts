@@ -15,23 +15,41 @@ describe('audioManifest', () => {
       'ui.confirm',
       'ui.error',
       'ui.hover',
+      // shuttle propulsion
       'sfx.thrusterLoop',
       'sfx.thrusterBurst',
-      'sfx.explosion',
+      'sfx.brake',
+      'sfx.slingshot',
+      'sfx.slingshot.charge',
+      'sfx.orbitCapture',
+      'sfx.fuelWarning',
+      // lander propulsion
+      'sfx.lander.thrusterLoop',
+      'sfx.lander.thrusterBurst',
       'sfx.landing',
       'sfx.collision',
-      'sfx.slingshot',
-      'sfx.fuelWarning',
+      'sfx.explosion',
+      // level / cinematic
+      'sfx.level.arrival',
+      'sfx.arrivalSeparation',
+      'sfx.dockingClamp',
+      // combat / EVA
       'sfx.laserFire',
       'sfx.projectileHit',
       'sfx.shieldHit',
       'sfx.pickup',
+      // ambient
       'ambient.space',
       'ambient.engine',
+      'ambient.landerCockpit',
+      'ambient.habitat',
+      'ambient.anomaly',
       'ambient.wind',
+      // music
       'music.menu',
       'music.level',
       'music.gameover',
+      // voice
       'voice.comms',
     ])
   })
@@ -99,7 +117,7 @@ describe('audioManifest', () => {
   })
 
   it('locks seeded cues to bundled static sources', () => {
-    expect(SEEDED_SOUND_IDS).toEqual(['ui.click', 'ui.error', 'sfx.explosion'])
+    expect(SEEDED_SOUND_IDS).toEqual(['ui.click', 'ui.error'])
     for (const id of SEEDED_SOUND_IDS) {
       const def = getAudioDefinition(id)
       expect(def.allowDynamicSrc).toBeUndefined()

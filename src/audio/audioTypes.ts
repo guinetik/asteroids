@@ -54,6 +54,19 @@ export const AUDIO_PLAYBACK_MODES = [
 /** Union of {@link AUDIO_PLAYBACK_MODES} values. */
 export type AudioPlaybackMode = (typeof AUDIO_PLAYBACK_MODES)[number]
 
+/**
+ * Built-in procedural synthesis recipes rendered at play time via Web Audio.
+ */
+export const AUDIO_PROCEDURAL_PRESETS = [
+  'laser-fire',
+  'projectile-hit',
+  'shield-hit',
+  'pickup',
+] as const
+
+/** Union of {@link AUDIO_PROCEDURAL_PRESETS} values. */
+export type AudioProceduralPreset = (typeof AUDIO_PROCEDURAL_PRESETS)[number]
+
 /** Fields shared by every manifest entry. */
 interface AudioDefinitionCommon {
   id: string
@@ -62,6 +75,7 @@ interface AudioDefinitionCommon {
   playback: AudioPlaybackMode
   volume: number
   effect: AudioEffectPreset
+  procedural?: AudioProceduralPreset
   cooldownMs?: number
 }
 
