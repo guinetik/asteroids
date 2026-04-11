@@ -188,6 +188,9 @@ const missionButtonVisible = ref(false)
 const missionOverlayVisible = ref(false)
 const missionOverlayMission = ref<ActiveShuttleMission | null>(null)
 const missionOverlayCanFit = ref(false)
+const activeOrbitalMinigame = computed(
+  () => viewController.activeMinigame,
+)
 const missionBoard = ref<ShuttleMissionBoard | null>(null)
 const missionNotification = ref<string | null>(null)
 let missionNotificationTimer: TimerHandle | null = null
@@ -745,6 +748,7 @@ function dockedPlanetId(): string | null {
     v-if="missionOverlayVisible && missionOverlayMission"
     :mission="missionOverlayMission"
     :can-fit-cargo="missionOverlayCanFit"
+    :minigame="activeOrbitalMinigame"
     @complete="handleMissionComplete"
     @close="closeMissionOverlay"
   />

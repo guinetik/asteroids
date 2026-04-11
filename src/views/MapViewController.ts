@@ -138,6 +138,7 @@ import { MapIntroFacade } from '@/lib/map/intro/MapIntroFacade'
 import { MapLifeCycleFacade } from '@/lib/map/lifecycle/MapLifeCycleFacade'
 import { MapMessageFacade } from '@/lib/map/messages/MapMessageFacade'
 import { MapMissionFacade } from '@/lib/map/missions/MapMissionFacade'
+import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
 import { MapModeCoordinator } from '@/lib/map/mode/MapModeCoordinator'
 import { MapOrbitFacade } from '@/lib/map/orbit/MapOrbitFacade'
 import { MapShopFacade } from '@/lib/map/shop/MapShopFacade'
@@ -368,6 +369,11 @@ export class MapViewController implements Tickable {
 
   private set missionButtonVisible(value: boolean) {
     this.missionFacade.buttonVisible = value
+  }
+
+  /** The currently active orbital minigame (if any). Exposed so the overlay can call `complete()`. */
+  get activeMinigame(): OrbitalMiniGame | null {
+    return this.missionFacade.activeMinigame
   }
 
   /** Called when mission button visibility changes in OrbitPrompt. */

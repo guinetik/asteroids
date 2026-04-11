@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ActiveShuttleMission } from '@/lib/missions/types'
+import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
 import { getPlanetOrbitalConfig } from '@/lib/missions/planetOrbitalConfig'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 import { computed } from 'vue'
@@ -7,12 +8,18 @@ import { computed } from 'vue'
 const props = defineProps<{
   mission: ActiveShuttleMission
   canFitCargo: boolean
+  minigame: OrbitalMiniGame | null
 }>()
 
 const emit = defineEmits<{
   complete: []
   close: []
 }>()
+
+function handleComplete() {
+  props.minigame?.complete()
+  emit('complete')
+}
 
 const orbitalConfig = computed(() => getPlanetOrbitalConfig(props.mission.template.targetPlanet))
 const gatherItemDef = computed(() => {
@@ -50,7 +57,7 @@ const gatherItemDef = computed(() => {
           type="button"
           class="mission-minigame-card__complete-btn"
           :disabled="!canFitCargo"
-          @click="emit('complete')"
+          @click="handleComplete"
         >
           Complete Mission
         </button>
