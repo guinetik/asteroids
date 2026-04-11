@@ -67,9 +67,28 @@ for (let i = 0; i < 60; i++) {
 /** Planet surface Y — curved horizon near the bottom. */
 const PLANET_HORIZON_Y = CANVAS_HEIGHT * 0.72
 
+/** Wind/atmosphere particles — spawn at left, drift right. */
+interface WindParticle { x: number; y: number; speed: number; alpha: number; len: number }
+const windParticles: WindParticle[] = []
+const MAX_WIND_PARTICLES = 30
+
+function spawnWindParticle() {
+  windParticles.push({
+    x: -20,
+    y: PLANET_HORIZON_Y - 40 + Math.random() * (CANVAS_HEIGHT - PLANET_HORIZON_Y + 60),
+    speed: 180 + Math.random() * 220,
+    alpha: 0.06 + Math.random() * 0.14,
+    len: 30 + Math.random() * 60,
+  })
+}
+
+/** Planet surface scroll offset — drives the "orbiting" motion. */
+let planetScrollX = 0
+
 function drawBackground(ctx: CanvasRenderingContext2D, dt: number) {
   bgOffset += dt * 80
   simTime += dt
+  planetScrollX += dt * 100
 
   // Deep space gradient — black to dark amber near horizon
   const spaceGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT)
@@ -108,43 +127,83 @@ function drawBackground(ctx: CanvasRenderingContext2D, dt: number) {
   ctx.arc(CANVAS_WIDTH / 2, curveCenterY, curveRadius, 0, Math.PI * 2)
   ctx.fill()
 
-  // Scrolling cloud bands on the planet surface — parallax layers
+  // Scrolling cloud bands on the planet surface — parallax layers moving left-to-right
   ctx.save()
   ctx.beginPath()
   ctx.arc(CANVAS_WIDTH / 2, curveCenterY, curveRadius, 0, Math.PI * 2)
   ctx.clip()
 
-  for (let i = 0; i < 8; i++) {
-    const bandY = PLANET_HORIZON_Y + 10 + i * 28
-    const speed = 40 + i * 18
-    const offset = (bgOffset * speed / 80) % (CANVAS_WIDTH * 2)
-    const thickness = 8 + i * 4
-    const alpha = 0.08 + (i % 3) * 0.04
+  for (let i = 0; i < 10; i++) {
+    const bandY = PLANET_HORIZON_Y + 5 + i * 24
+    const speed = 60 + i * 25
+    const scrollWrap = CANVAS_WIDTH * 2
+    const offset = (planetScrollX * speed / 80) % scrollWrap
+    const thickness = 10 + i * 5
+    const alpha = 0.1 + (i % 3) * 0.05
 
     ctx.globalAlpha = alpha
-    ctx.fillStyle = i % 2 === 0 ? '#ffcc88' : '#e68a00'
-    // Two strips for seamless wrap
-    ctx.fillRect(-offset, bandY, CANVAS_WIDTH * 3, thickness)
+    ctx.fillStyle = i % 3 === 0 ? '#ffdd99' : i % 3 === 1 ? '#e68a00' : '#cc7700'
+
+    // Draw band scrolling right — offset goes positive = moves right
+    ctx.fillRect(offset - scrollWrap, bandY, CANVAS_WIDTH * 3, thickness)
+
+    // Wavy edge on some bands for organic feel
+    if (i % 2 === 0) {
+      ctx.globalAlpha = alpha * 0.5
+      for (let wx = 0; wx < CANVAS_WIDTH; wx += 40) {
+        const waveY = bandY + Math.sin((wx + planetScrollX * speed / 80) * 0.03) * 6
+        ctx.fillRect(wx, waveY, 30, thickness * 0.4)
+      }
+    }
   }
   ctx.restore()
   ctx.globalAlpha = 1.0
 
   // Atmospheric glow along the horizon — thin bright line
-  const glowGrad = ctx.createLinearGradient(0, PLANET_HORIZON_Y - 20, 0, PLANET_HORIZON_Y + 15)
+  const glowGrad = ctx.createLinearGradient(0, PLANET_HORIZON_Y - 25, 0, PLANET_HORIZON_Y + 20)
   glowGrad.addColorStop(0, 'rgba(255, 180, 80, 0)')
-  glowGrad.addColorStop(0.4, 'rgba(255, 200, 120, 0.25)')
-  glowGrad.addColorStop(0.6, 'rgba(255, 160, 60, 0.15)')
+  glowGrad.addColorStop(0.3, 'rgba(255, 220, 140, 0.3)')
+  glowGrad.addColorStop(0.5, 'rgba(255, 200, 120, 0.2)')
+  glowGrad.addColorStop(0.7, 'rgba(255, 160, 60, 0.1)')
   glowGrad.addColorStop(1, 'rgba(255, 120, 30, 0)')
   ctx.fillStyle = glowGrad
-  ctx.fillRect(0, PLANET_HORIZON_Y - 20, CANVAS_WIDTH, 35)
+  ctx.fillRect(0, PLANET_HORIZON_Y - 25, CANVAS_WIDTH, 45)
+
+  // Wind particles — horizontal streaks drifting left to right
+  if (windParticles.length < MAX_WIND_PARTICLES && Math.random() < dt * 8) {
+    spawnWindParticle()
+  }
+  for (let i = windParticles.length - 1; i >= 0; i--) {
+    const p = windParticles[i]!
+    p.x += p.speed * dt
+    if (p.x > CANVAS_WIDTH + 40) {
+      windParticles.splice(i, 1)
+      continue
+    }
+    ctx.globalAlpha = p.alpha
+    ctx.strokeStyle = '#ffcc88'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(p.x - p.len, p.y)
+    ctx.lineTo(p.x, p.y)
+    ctx.stroke()
+  }
+  ctx.globalAlpha = 1.0
 }
 
 function drawShip(ctx: CanvasRenderingContext2D) {
   const { shipX: x, shipY: y } = props.minigame
   const hw = SHIP_HALF_WIDTH
   const hh = SHIP_HALF_HEIGHT
+
+  // Hover bob — gentle sine oscillation
+  const hoverOffset = Math.sin(simTime * 2.5) * 2.5
+  // Slight tilt based on vertical velocity
+  const tilt = Math.max(-0.12, Math.min(0.12, props.minigame.shipVy * 0.0003))
+
   ctx.save()
-  ctx.translate(x, y)
+  ctx.translate(x, y + hoverOffset)
+  ctx.rotate(tilt)
 
   // Engine exhaust glow (behind everything)
   const speed = Math.sqrt(
