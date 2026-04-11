@@ -31,6 +31,8 @@ export interface VehicleCameraConfig {
   minY: number
   /** Perspective FOV in degrees */
   fov: number
+  /** Minimum orbit-controls dolly distance — closest the camera can get to the target. */
+  minDistance?: number
   /** Maximum orbit controls zoom distance (0 = unlimited) */
   maxDistance?: number
 }
@@ -46,6 +48,21 @@ const SHUTTLE_MAP_CHASE_RETURN_IDLE_SECONDS = 10
  * orbit does not fight thrust for as long while driving.
  */
 const MAP_FREE_FLIGHT_CAMERA_CHASE_IDLE_SECONDS = 3
+
+/**
+ * When the player scroll-zooms closer than default chase distance, skip chase lerp so the view is
+ * not pulled back out (matches cargo-bay inspect closeness in free flight).
+ */
+const MAP_FREE_FLIGHT_CHASE_DISTANCE_EPSILON = 0.02
+
+/**
+ * Distance from shuttle to camera in cargo-bay inspect framing ({@link MAP_INSPECT_CAMERA_CONFIG}
+ * idle offset magnitude).
+ */
+export const MAP_SHUTTLE_INSPECT_CAMERA_DISTANCE = 0.25
+
+/** Furthest orbit dolly allowed while in inspect (slightly looser than idle). */
+const MAP_SHUTTLE_INSPECT_CAMERA_MAX_DISTANCE = 0.5
 
 /** Shuttle preset: behind and above, looking at the nose. */
 export const SHUTTLE_CAMERA_CONFIG: VehicleCameraConfig = {
@@ -73,6 +90,8 @@ export const MAP_CAMERA_CONFIG: VehicleCameraConfig = {
   idleTimeout: MAP_FREE_FLIGHT_CAMERA_CHASE_IDLE_SECONDS,
   minY: -Infinity,
   fov: 60,
+  /** Closest dolly matches cargo-bay (R) inspect framing. */
+  minDistance: MAP_SHUTTLE_INSPECT_CAMERA_DISTANCE,
 }
 
 /** Map death preset: pulls back and up from last shuttle position. */
@@ -86,12 +105,12 @@ export const MAP_DEATH_CAMERA_CONFIG: VehicleCameraConfig = {
 
 /** Map inspect preset: top-down on shuttle for cargo/menu view. */
 export const MAP_INSPECT_CAMERA_CONFIG: VehicleCameraConfig = {
-  idleOffset: new THREE.Vector3(0, 0.25, 0),
+  idleOffset: new THREE.Vector3(0, MAP_SHUTTLE_INSPECT_CAMERA_DISTANCE, 0),
   lerpSpeed: 5,
   idleTimeout: 0,
   minY: -Infinity,
   fov: 40,
-  maxDistance: 0.5,
+  maxDistance: MAP_SHUTTLE_INSPECT_CAMERA_MAX_DISTANCE,
 }
 
 /** Orbit map: camera height above shuttle in local space (smaller = tighter on ship). */
@@ -159,6 +178,7 @@ export class VehicleCamera implements Tickable {
     this.controls = new OrbitControls(this.camera, domElement)
     this.controls.enableDamping = true
     this.controls.dampingFactor = 0.1
+    this.controls.minDistance = config.minDistance ?? 0
     this.controls.maxDistance = config.maxDistance ?? Infinity
 
     this.controls.addEventListener('start', this.onControlStart)
@@ -198,6 +218,7 @@ export class VehicleCamera implements Tickable {
     this.config = config
     this.camera.fov = config.fov
     this.camera.updateProjectionMatrix()
+    this.controls.minDistance = config.minDistance ?? 0
     this.controls.maxDistance = config.maxDistance ?? Infinity
     // Force idle lerp to start immediately
     this.mouseIdleTimer = config.idleTimeout + 1
@@ -221,6 +242,7 @@ export class VehicleCamera implements Tickable {
     this.config = config
     this.camera.fov = config.fov
     this.camera.updateProjectionMatrix()
+    this.controls.minDistance = config.minDistance ?? 0
     this.controls.maxDistance = config.maxDistance ?? Infinity
   }
 
@@ -267,12 +289,20 @@ export class VehicleCamera implements Tickable {
       this.mouseIdleTimer += dt
 
       if (this.mouseIdleTimer > this.config.idleTimeout) {
-        const idleOffset = this.config.idleOffset.clone()
-          .applyQuaternion(this.target.quaternion)
-        const targetCamPos = targetPos.clone().add(idleOffset)
-        targetCamPos.y = Math.max(targetCamPos.y, this.config.minY)
+        const idleChaseDistance = this.config.idleOffset.length()
+        const camDist = this.camera.position.distanceTo(targetPos)
+        const preserveCloseZoom =
+          this.config.minDistance !== undefined &&
+          camDist + MAP_FREE_FLIGHT_CHASE_DISTANCE_EPSILON < idleChaseDistance
 
-        this.camera.position.lerp(targetCamPos, this.config.lerpSpeed * dt)
+        if (!preserveCloseZoom) {
+          const idleOffset = this.config.idleOffset.clone()
+            .applyQuaternion(this.target.quaternion)
+          const targetCamPos = targetPos.clone().add(idleOffset)
+          targetCamPos.y = Math.max(targetCamPos.y, this.config.minY)
+
+          this.camera.position.lerp(targetCamPos, this.config.lerpSpeed * dt)
+        }
       }
     }
 
