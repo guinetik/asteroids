@@ -70,7 +70,7 @@ export const PUFF_RADIUS_MIN = 16
 export const PUFF_RADIUS_MAX = 30
 
 /** Gas units per puff collected by a drone. */
-export const GAS_PER_PUFF = 1
+export const GAS_PER_PUFF = 0.35
 
 /** Radius for drone-puff collision in px. */
 export const DRONE_PUFF_COLLECT_RADIUS = 24

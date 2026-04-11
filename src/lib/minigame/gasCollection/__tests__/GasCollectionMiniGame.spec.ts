@@ -182,7 +182,7 @@ describe('GasCollectionMiniGame', () => {
       game.drones[0]!.y = 200
       game.drones[0]!.airTime = 1.0
       game.tick(0.016, STUB_CTX)
-      expect(game.drones[0]!.gasLoaded).toBe(GAS_PER_PUFF)
+      expect(game.drones[0]!.gasLoaded).toBeCloseTo(GAS_PER_PUFF)
       expect(puff.consumed).toBe(true)
     })
 
@@ -196,7 +196,7 @@ describe('GasCollectionMiniGame', () => {
       game.drones[0]!.y = 200
       game.drones[0]!.airTime = 1.0
       game.tick(0.016, STUB_CTX)
-      expect(game.drones[0]!.gasLoaded).toBe(2)
+      expect(game.drones[0]!.gasLoaded).toBeCloseTo(GAS_PER_PUFF * 2)
     })
   })
 
@@ -246,15 +246,15 @@ describe('GasCollectionMiniGame', () => {
       const cb = vi.fn()
       game.onComplete = cb
 
-      // Launch drone, load it with enough gas, catch it
+      // Launch drone, load it with enough gas to hit target, catch it
       game.launchDrone()
-      game.drones[0]!.gasLoaded = 3
+      game.drones[0]!.gasLoaded = game.targetGas
       game.drones[0]!.airTime = 1.0
       game.drones[0]!.x = game.shipX
       game.drones[0]!.y = game.shipY
       game.tick(0.016, STUB_CTX)
 
-      expect(game.gasCollected).toBeGreaterThanOrEqual(3)
+      expect(game.gasCollected).toBeGreaterThanOrEqual(game.targetGas)
       expect(game.status).toBe('completed')
       expect(cb).toHaveBeenCalledWith('test-mission')
     })
@@ -276,7 +276,7 @@ describe('GasCollectionMiniGame', () => {
   describe('tick guards', () => {
     it('tick is no-op after completed', () => {
       game.launchDrone()
-      game.drones[0]!.gasLoaded = 3
+      game.drones[0]!.gasLoaded = game.targetGas
       game.drones[0]!.airTime = 1.0
       game.drones[0]!.x = game.shipX
       game.drones[0]!.y = game.shipY
