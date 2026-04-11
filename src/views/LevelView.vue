@@ -21,6 +21,7 @@ import {
   toggleBackgroundMusic,
   useBackgroundMusicGlobalState,
 } from '@/audio/backgroundMusic'
+import { LEVEL_GRID_SIZE } from '@/lib/missions/asteroidMissionGenerator'
 
 const container = ref<HTMLElement>()
 const viewController = new LevelViewController()
@@ -309,7 +310,7 @@ function handleToggleMusic(): void {
     :map-canvas="mapCanvas"
     :player-x="playerX"
     :player-z="playerZ"
-    :grid-size="12000"
+    :grid-size="LEVEL_GRID_SIZE"
     :markers="mapMarkers"
   />
   <!-- Landing warnings — center screen, impossible to miss -->

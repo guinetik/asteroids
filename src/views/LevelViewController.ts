@@ -79,6 +79,7 @@ import { CollectMinigame } from '@/lib/minigame/CollectMinigame'
 import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
 import { getSpecialMissionById } from '@/lib/missions/specialMissions'
+import { SurfaceRockController } from '@/three/controllers/SurfaceRockController'
 
 // ── Scene constants ─────────────────────────────────────────────
 const TERRAIN_RESOLUTION = 512
@@ -226,6 +227,7 @@ export class LevelViewController implements Tickable {
   private sceneManager: SceneManager | null = null
   private heightmap: Heightmap | null = null
   private terrainMesh: TerrainMesh | null = null
+  private surfaceRocks: SurfaceRockController | null = null
   private collisionWorld: CollisionWorld | null = null
   private readonly collisionCleanup: Array<() => void> = []
   private stateMachine: StateMachine<LevelState> | null = null
@@ -349,6 +351,9 @@ export class LevelViewController implements Tickable {
     this.missionObjectives = mission.objectives
     this.asteroidName = asteroid.name
 
+    const spawnX = (Math.random() - 0.5) * 2 * SPAWN_POSITION_RANGE + LANDER_SPAWN_LIGHT_ALIGNMENT_X
+    const spawnZ = (Math.random() - 0.5) * 2 * SPAWN_POSITION_RANGE
+
     // ── Terrain ─────────────────────────────────────────────────
     const flat = new URLSearchParams(window.location.search).has('flat')
     const flatZones: FlatZone[] = mission.objectives.map((obj) => ({
@@ -369,6 +374,18 @@ export class LevelViewController implements Tickable {
     this.collisionWorld = new CollisionWorld(this.heightmap)
     this.sceneManager.addToScene(this.terrainMesh.mesh)
     this.terrainMesh.mesh.receiveShadow = true
+
+    this.surfaceRocks = await SurfaceRockController.create({
+      heightmap: this.heightmap,
+      surface: asteroid.surface,
+      seed,
+      exclusions: [
+        ...flatZones,
+        { x: spawnX, z: spawnZ, radius: FLAT_ZONE_RADIUS * 0.65 },
+      ],
+      baseColor: asteroid.visual.baseColor,
+    })
+    this.sceneManager.addToScene(this.surfaceRocks.group)
 
     // ── Objective waypoint markers ──────────────────────────────
     for (let i = 0; i < mission.objectives.length; i++) {
@@ -407,8 +424,6 @@ export class LevelViewController implements Tickable {
         child.castShadow = true
       }
     })
-    const spawnX = (Math.random() - 0.5) * 2 * SPAWN_POSITION_RANGE + LANDER_SPAWN_LIGHT_ALIGNMENT_X
-    const spawnZ = (Math.random() - 0.5) * 2 * SPAWN_POSITION_RANGE
     const gameplayStart = offsetGameplayLanderSpawn(new Vector3(spawnX, LANDER_SPAWN_HEIGHT, spawnZ))
     this.initialLanderSpawn.copy(gameplayStart)
     this.landerController.group.position.copy(gameplayStart)
@@ -954,11 +969,22 @@ export class LevelViewController implements Tickable {
     this.sceneManager!.setActiveCamera(this.arrivalSequence!.camera)
     this.sceneManager!.setCamera(null)
 
+    // Mirror arrival audio — cockpit bed + departure sting
+    const audio = useAudio()
+    audio.play('ambient.landerCockpit', { loop: true })
+    audio.play('sfx.level.arrival')
+
     // Start reverse cutscene
     this.arrivalSequence!.playExfil(this.landerController!.group.position)
 
     this.arrivalSequence!.onFadeOut = (opacity) => {
       this.onArrivalFade?.(opacity)
+    }
+
+    // Stop cockpit bed when exfil sequence finishes (onComplete shared with arrival sequence)
+    this.arrivalSequence!.onComplete = () => {
+      useAudio().stopSound('ambient.landerCockpit')
+      this.onArrivalFade?.(0)
     }
   }
 
@@ -1092,6 +1118,9 @@ export class LevelViewController implements Tickable {
       if (this.landerController) {
         this.landerController.group.visible = true
       }
+      const audio = useAudio()
+      audio.stopSound('sfx.level.arrival')
+      audio.stopSound('ambient.landerCockpit')
       this.onArrivalFade?.(0)
       this.stateMachine.setState('lander' as LevelState)
     }
@@ -1609,6 +1638,7 @@ export class LevelViewController implements Tickable {
     this.arrivalSequence?.dispose()
     this.landerExplosion?.dispose()
     this.landerController?.dispose()
+    this.surfaceRocks?.dispose()
     this.terrainMesh?.dispose()
     this.thrusterWash?.dispose()
     this.surfaceDust?.dispose()

@@ -34,7 +34,7 @@ function hashSeed(str: string): number {
 }
 
 /** Level terrain grid size — shared with LevelViewController. */
-export const LEVEL_GRID_SIZE = 12000
+export const LEVEL_GRID_SIZE = 6000
 
 /** Objective count bands by difficulty. */
 const OBJECTIVE_COUNT_BY_DIFFICULTY: [number, number, number][] = [
@@ -88,8 +88,14 @@ export function pickAsteroidForDifficulty(difficulty: number): string {
  */
 const NEAR_EARTH_INNER_RADIUS = 200
 
-/** Main belt inner radius — upper bound for near-earth missions. */
+/** Main belt inner radius — default outer bound for near-earth missions (catalog units). */
 const NEAR_EARTH_OUTER_RADIUS = 420
+
+/**
+ * Minimum catalog radial span for near-earth waypoints so the annulus stays valid when the
+ * temperature-safe inner radius exceeds {@link NEAR_EARTH_OUTER_RADIUS}.
+ */
+const NEAR_EARTH_MIN_RADIAL_SPAN_CATALOG = 80
 
 /**
  * World-units padding beyond `hotBoundary` so drafted missions are clearly outside solar heat
@@ -113,6 +119,17 @@ export function nearEarthInnerCatalogForWaypointSpawn(): number {
   const safeInnerWorld = shipHealthData.hotBoundary + SHUTTLE_HOT_ZONE_WAYPOINT_MARGIN_WORLD
   const fromTemp = safeInnerWorld / ORBIT_SCALE
   return Math.max(NEAR_EARTH_INNER_RADIUS, fromTemp)
+}
+
+/**
+ * Outer catalog radius for near-earth waypoint sampling: at least main-belt inner, and always
+ * beyond {@link nearEarthInnerCatalogForWaypointSpawn} by {@link NEAR_EARTH_MIN_RADIAL_SPAN_CATALOG}.
+ *
+ * @returns Semi-major axis cap in catalog units (before `ORBIT_SCALE`).
+ */
+export function nearEarthOuterCatalogForWaypointSpawn(): number {
+  const inner = nearEarthInnerCatalogForWaypointSpawn()
+  return Math.max(NEAR_EARTH_OUTER_RADIUS, inner + NEAR_EARTH_MIN_RADIAL_SPAN_CATALOG)
 }
 
 /**
@@ -355,13 +372,13 @@ export function generateWaypointInRegion(
 
   if (region === 'near-earth') {
     innerRadius = nearEarthInnerCatalogForWaypointSpawn()
-    outerRadius = NEAR_EARTH_OUTER_RADIUS
+    outerRadius = nearEarthOuterCatalogForWaypointSpawn()
   } else {
     const beltId = region === 'asteroid-belt' ? 'main-belt' : 'kuiper-belt'
     const belt = ASTEROID_BELTS.find((b) => b.id === beltId)
     if (!belt) {
       innerRadius = nearEarthInnerCatalogForWaypointSpawn()
-      outerRadius = NEAR_EARTH_OUTER_RADIUS
+      outerRadius = nearEarthOuterCatalogForWaypointSpawn()
     } else {
       innerRadius = belt.innerRadius
       outerRadius = belt.outerRadius

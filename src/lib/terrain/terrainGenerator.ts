@@ -44,6 +44,9 @@ const DEFAULT_BIOME_TUNING: TerrainBiomeTuning = {
   dustSoftening: 1,
 }
 
+/** Reference map size used to keep terrain character consistent across play-area changes. */
+const REFERENCE_WORLD_SIZE = 8000
+
 /** Crater count multiplier applied to craterDensity. */
 const CRATER_COUNT_SCALE = 15
 
@@ -229,8 +232,12 @@ function sampleDisturbanceMask(
   z: number,
   roughness: number,
   tuning: TerrainBiomeTuning,
+  frequencyScale: number,
 ): number {
-  const raw = noise.n2(x * DISTURBANCE_MASK_FREQUENCY, z * DISTURBANCE_MASK_FREQUENCY) * 0.5 + 0.5
+  const raw = noise.n2(
+    x * DISTURBANCE_MASK_FREQUENCY * frequencyScale,
+    z * DISTURBANCE_MASK_FREQUENCY * frequencyScale,
+  ) * 0.5 + 0.5
   const contrasted = clamp01((raw - 0.5) * tuning.disturbanceContrast + 0.5 + tuning.disturbanceBias)
   const power = 1.8 - roughness * 0.6
   return Math.pow(contrasted, power)
@@ -243,17 +250,44 @@ function sampleBreakupHeight(
   surface: SurfaceFeatures,
   tuning: TerrainBiomeTuning,
   disturbance: number,
+  frequencyScale: number,
+  amplitudeScale: number,
 ): number {
-  const medium = noise.n2(x * MEDIUM_BREAKUP_FREQUENCY, z * MEDIUM_BREAKUP_FREQUENCY)
-  const mediumAmp = 18 * surface.roughness * tuning.mediumBreakupScale
+  const medium = noise.n2(
+    x * MEDIUM_BREAKUP_FREQUENCY * frequencyScale,
+    z * MEDIUM_BREAKUP_FREQUENCY * frequencyScale,
+  )
+  const mediumAmp = 18 * surface.roughness * tuning.mediumBreakupScale * amplitudeScale
 
   const microMask = smoothstep(MICRO_BREAKUP_THRESHOLD, 1, disturbance)
-  const micro = noise.n2(x * MICRO_BREAKUP_FREQUENCY, z * MICRO_BREAKUP_FREQUENCY)
-  const microAmp = 14 * surface.boulderDensity * tuning.microBreakupScale
+  const micro = noise.n2(
+    x * MICRO_BREAKUP_FREQUENCY * frequencyScale,
+    z * MICRO_BREAKUP_FREQUENCY * frequencyScale,
+  )
+  const microAmp = 14 * surface.boulderDensity * tuning.microBreakupScale * amplitudeScale
 
   const dustFactor = clamp01(1 - surface.dustCoverage * 0.85 * tuning.dustSoftening)
 
   return medium * mediumAmp * disturbance + micro * microAmp * microMask * dustFactor
+}
+
+function craterCenterBounds(
+  radius: number,
+  worldSize: number,
+  resolution: number,
+): { min: number; max: number } {
+  const rimOuter = radius * CRATER_RIM_EXTENT
+  const cellSize = worldSize / (resolution - 1)
+  const rimOuterCells = rimOuter / cellSize
+  const min = rimOuterCells
+  const max = (resolution - 1) - rimOuterCells
+
+  if (max <= min) {
+    const center = (resolution - 1) * 0.5
+    return { min: center, max: center }
+  }
+
+  return { min, max }
 }
 
 /**
@@ -498,12 +532,18 @@ export function generateTerrain(surface: SurfaceFeatures, options: TerrainGenOpt
   const noise = new SimplexNoise(seed)
   const tuning = getBiomeTuning(biome)
   const cellSize = worldSize / (resolution - 1)
+  const worldScale = clamp01((REFERENCE_WORLD_SIZE / Math.max(worldSize, 1) - 1) / 0.75)
+  const frequencyScale = 1 + worldScale * 0.45
+  const reliefScale = 1 + worldScale * 0.65
 
   // -------------------------------------------------------------------------
   // Pass 1: Broad support relief + masked breakup
   // -------------------------------------------------------------------------
   const broadReliefAmp =
-    BROAD_RELIEF_BASE_SCALE * (0.35 + surface.roughness * 0.25) * tuning.broadReliefScale
+    BROAD_RELIEF_BASE_SCALE
+    * (0.35 + surface.roughness * 0.25)
+    * tuning.broadReliefScale
+    * reliefScale
 
   for (let gz = 0; gz < resolution; gz++) {
     for (let gx = 0; gx < resolution; gx++) {
@@ -514,7 +554,7 @@ export function generateTerrain(surface: SurfaceFeatures, options: TerrainGenOpt
         noise,
         worldX,
         worldZ,
-        BROAD_RELIEF_FREQUENCY,
+        BROAD_RELIEF_FREQUENCY * frequencyScale,
         3,
         0.55,
         2.1,
@@ -526,6 +566,7 @@ export function generateTerrain(surface: SurfaceFeatures, options: TerrainGenOpt
         worldZ,
         surface.roughness,
         tuning,
+        frequencyScale,
       )
 
       const breakup = sampleBreakupHeight(
@@ -535,6 +576,8 @@ export function generateTerrain(surface: SurfaceFeatures, options: TerrainGenOpt
         surface,
         tuning,
         disturbance,
+        frequencyScale,
+        reliefScale,
       )
 
       hm.set(gx, gz, broadRelief + breakup)
@@ -551,11 +594,11 @@ export function generateTerrain(surface: SurfaceFeatures, options: TerrainGenOpt
   // Read current grid into a scratch buffer so we can accumulate deltas
   // and write back in one go for each crater (applied directly to hm.grid).
   for (let c = 0; c < craterCount; c++) {
-    // Random centre in grid coordinates
-    const cx = rng() * (resolution - 1)
-    const cz = rng() * (resolution - 1)
     const radius = minRadius + rng() * (maxRadius - minRadius)
-    const depth = radius * CRATER_DEPTH_RATIO
+    const { min, max } = craterCenterBounds(radius, worldSize, resolution)
+    const cx = min + rng() * (max - min)
+    const cz = min + rng() * (max - min)
+    const depth = radius * CRATER_DEPTH_RATIO * reliefScale
     applyCrater(hm.grid, resolution, worldSize, cx, cz, radius, depth)
   }
 
@@ -575,7 +618,11 @@ export function generateTerrain(surface: SurfaceFeatures, options: TerrainGenOpt
     const lengthCells = (0.15 + rng() * 0.25) * resolution
     const x1 = x0 + Math.cos(angle) * lengthCells
     const z1 = z0 + Math.sin(angle) * lengthCells
-    const ridgeHeight = RIDGE_BASE_HEIGHT * (0.5 + rng() * 0.5) * (0.3 + surface.ridgeFrequency * 0.7)
+    const ridgeHeight =
+      RIDGE_BASE_HEIGHT
+      * (0.5 + rng() * 0.5)
+      * (0.3 + surface.ridgeFrequency * 0.7)
+      * reliefScale
     applyRidge(hm.grid, resolution, worldSize, noise, x0, z0, x1, z1, ridgeHeight, halfWidthCells)
   }
 
