@@ -15,6 +15,12 @@ import type { MapMarker } from '@/components/LevelMinimap.vue'
 import type { LanderTelemetry } from '@/components/LanderHud.vue'
 import type { FpsTelemetry } from '@/components/FpsHud.vue'
 import { OBJECTIVE_LABELS } from '@/lib/minigame/MiniGame'
+import {
+  playBackgroundMusic,
+  stopBackgroundMusic,
+  toggleBackgroundMusic,
+  useBackgroundMusicGlobalState,
+} from '@/audio/backgroundMusic'
 
 const container = ref<HTMLElement>()
 const viewController = new LevelViewController()
@@ -41,6 +47,8 @@ const mapCanvas = ref<HTMLCanvasElement | null>(null)
 const playerX = ref(0)
 const playerZ = ref(0)
 const mapMarkers = ref<MapMarker[]>([])
+const backgroundMusic = useBackgroundMusicGlobalState()
+const musicEnabled = computed(() => backgroundMusic.isEnabled.value)
 
 const OBJECTIVE_COLORS: Record<string, string> = {
   gather: '#66ffee',
@@ -102,6 +110,7 @@ const fpsTelemetry = reactive<FpsTelemetry>({
 })
 
 onMounted(async () => {
+  playBackgroundMusic('level')
   if (container.value) {
     viewController.onLetterbox = (visible) => {
       letterboxVisible.value = visible
@@ -197,12 +206,65 @@ function handleRestart() {
 }
 
 onUnmounted(() => {
+  stopBackgroundMusic('level')
   viewController.dispose()
 })
+
+function handleToggleMusic(): void {
+  toggleBackgroundMusic()
+}
 </script>
 
 <template>
   <div ref="container" class="scene-container"></div>
+  <div class="level-topbar">
+    <button
+      type="button"
+      class="level-topbar__music-btn"
+      :aria-label="musicEnabled ? 'Mute music' : 'Unmute music'"
+      :title="musicEnabled ? 'Mute music' : 'Unmute music'"
+      @click="handleToggleMusic"
+    >
+      <svg viewBox="0 0 24 24" class="level-topbar__music-icon" aria-hidden="true">
+        <path
+          d="M5 9v6h4l5 4V5L9 9H5Z"
+          fill="currentColor"
+        />
+        <path
+          v-if="musicEnabled"
+          d="M17 9.5a4 4 0 0 1 0 5"
+          fill="none"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-width="1.8"
+        />
+        <path
+          v-if="musicEnabled"
+          d="M19.5 7a7.5 7.5 0 0 1 0 10"
+          fill="none"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-width="1.8"
+        />
+        <path
+          v-if="!musicEnabled"
+          d="m17 8 4 8"
+          fill="none"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-width="2"
+        />
+        <path
+          v-if="!musicEnabled"
+          d="m21 8-4 8"
+          fill="none"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-width="2"
+        />
+      </svg>
+    </button>
+  </div>
   <!-- Helmet visor overlay — always visible, frames the view -->
   <div v-if="stateInfo.state === 'eva'" class="helmet-visor" />
   <div
@@ -312,6 +374,41 @@ onUnmounted(() => {
 </template>
 
 <style>
+.level-topbar {
+  position: fixed;
+  top: max(1rem, env(safe-area-inset-top, 0px) + 0.5rem);
+  right: max(1rem, env(safe-area-inset-right, 0px) + 0.5rem);
+  z-index: 35;
+}
+.level-topbar__music-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border: 1px solid rgba(34, 211, 238, 0.28);
+  border-radius: 9999px;
+  background: rgba(2, 6, 23, 0.76);
+  color: rgba(186, 230, 253, 0.92);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.06),
+    0 10px 24px rgba(2, 6, 23, 0.45);
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+.level-topbar__music-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(125, 211, 252, 0.5);
+  background: rgba(8, 47, 73, 0.8);
+  color: white;
+}
+.level-topbar__music-icon {
+  width: 1.3rem;
+  height: 1.3rem;
+}
 .letterbox-bar {
   position: fixed;
   left: 0;

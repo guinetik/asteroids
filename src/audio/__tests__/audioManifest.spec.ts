@@ -51,6 +51,11 @@ describe('audioManifest', () => {
     }
   })
 
+  it('points the shipped music cues at the bundled loop assets', () => {
+    expect(getAudioDefinition('music.menu').src).toBe('/sound/theme.mp3')
+    expect(getAudioDefinition('music.level').src).toBe('/sound/level.mp3')
+  })
+
   it('keeps record keys and definition ids aligned for every sound', () => {
     for (const id of AUDIO_SOUND_IDS) {
       expect(getAudioDefinition(id).id).toBe(id)

@@ -601,6 +601,22 @@ body {
   @apply border-amber-400/40 bg-amber-400/12 text-amber-100 hover:border-amber-300/60 hover:bg-amber-400/20;
 }
 
+.map-screen-nav__icon-btn {
+  @apply inline-flex h-10 w-10 items-center justify-center rounded-full border border-cyan-400/30
+         bg-slate-950/70 text-cyan-100 transition-colors;
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.06),
+    0 10px 24px rgba(2, 6, 23, 0.35);
+}
+
+.map-screen-nav__icon-btn:hover {
+  @apply border-cyan-300/55 bg-cyan-400/12 text-white;
+}
+
+.map-screen-nav__icon {
+  @apply h-5 w-5;
+}
+
 .map-intro-message-prompt {
   @apply fixed inset-x-0 z-40 flex justify-center px-6;
   top: calc(var(--map-intro-letterbox-height) + 4.75rem);

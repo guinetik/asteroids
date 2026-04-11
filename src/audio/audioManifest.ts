@@ -243,7 +243,7 @@ const manifestById: ManifestById = {
   // ── Music ───────────────────────────────────────────────────────────
   'music.menu': {
     id: 'music.menu',
-    src: SILENT_STATIC_WAV_DATA_URI,
+    src: '/sound/theme.mp3',
     category: 'music',
     load: 'lazy',
     playback: 'single-instance',
@@ -252,7 +252,7 @@ const manifestById: ManifestById = {
   },
   'music.level': {
     id: 'music.level',
-    src: SILENT_STATIC_WAV_DATA_URI,
+    src: '/sound/level.mp3',
     category: 'music',
     load: 'lazy',
     playback: 'single-instance',

@@ -51,6 +51,12 @@ import {
   stopMessageAudio,
   useShipMessageAudioGlobalState,
 } from '@/components/shuttle-control/shipMessageAudioSession'
+import {
+  playBackgroundMusic,
+  stopBackgroundMusic,
+  toggleBackgroundMusic,
+  useBackgroundMusicGlobalState,
+} from '@/audio/backgroundMusic'
 
 /** So Space Fabric gating matches storage before the first paint (also merged again in controller `init`). */
 hydratePlayerUpgradeLevelsFromStorage()
@@ -59,6 +65,8 @@ hydratePlayerUpgradeLevelsFromStorage()
 const MAP_SCREEN_GAME_TITLE = 'Asteroid Lander'
 const shipMessageAudio = useShipMessageAudioGlobalState()
 const shipMessageAudioPlaying = computed(() => shipMessageAudio.isPlaying.value)
+const backgroundMusic = useBackgroundMusicGlobalState()
+const musicEnabled = computed(() => backgroundMusic.isEnabled.value)
 
 const container = ref<HTMLElement>()
 const viewController = new MapViewController()
@@ -247,6 +255,7 @@ function showMissionNotification(text: string): void {
 }
 
 onMounted(async () => {
+  playBackgroundMusic('map')
   if (container.value) {
     viewController.onTelemetry = (t) => {
       Object.assign(telemetry, t)
@@ -373,6 +382,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   setShipMessageFollowUpDeliveryListener(null)
+  stopBackgroundMusic('map')
   viewController.dispose()
 })
 
@@ -406,6 +416,10 @@ function openShuttleControlFromMap(): void {
 
 function stopShuttleMessageAudio(): void {
   stopMessageAudio()
+}
+
+function handleToggleMusic(): void {
+  toggleBackgroundMusic()
 }
 
 function openHabitatFromMap(): void {
@@ -540,6 +554,52 @@ function dockedPlanetId(): string | null {
   >
     <span class="map-screen-nav__title">{{ MAP_SCREEN_GAME_TITLE }}</span>
     <div class="map-screen-nav__actions">
+      <button
+        type="button"
+        class="map-screen-nav__icon-btn"
+        :aria-label="musicEnabled ? 'Mute music' : 'Unmute music'"
+        :title="musicEnabled ? 'Mute music' : 'Unmute music'"
+        @click="handleToggleMusic"
+      >
+        <svg viewBox="0 0 24 24" class="map-screen-nav__icon" aria-hidden="true">
+          <path
+            d="M5 9v6h4l5 4V5L9 9H5Z"
+            fill="currentColor"
+          />
+          <path
+            v-if="musicEnabled"
+            d="M17 9.5a4 4 0 0 1 0 5"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-width="1.8"
+          />
+          <path
+            v-if="musicEnabled"
+            d="M19.5 7a7.5 7.5 0 0 1 0 10"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-width="1.8"
+          />
+          <path
+            v-if="!musicEnabled"
+            d="m17 8 4 8"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-width="2"
+          />
+          <path
+            v-if="!musicEnabled"
+            d="m21 8-4 8"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-width="2"
+          />
+        </svg>
+      </button>
       <button type="button" class="map-screen-nav__btn map-screen-nav__btn--habitat" @click="openHabitatFromMap">
         H Habitat
       </button>
