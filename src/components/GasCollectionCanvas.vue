@@ -23,6 +23,7 @@ const emit = defineEmits<{
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const started = ref(false)
+const briefingVisible = ref(false)
 let animId = 0
 let lastTime = 0
 let bgOffset = 0
@@ -583,15 +584,34 @@ function loop(time: number) {
   animId = requestAnimationFrame(loop)
 }
 
+/** Render one still frame — background + ship, no gameplay. */
+function drawStillFrame() {
+  const canvas = canvasRef.value
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+  drawBackground(ctx, 0.016)
+  drawShip(ctx)
+}
+
 function startGame() {
   started.value = true
+  briefingVisible.value = false
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('keyup', onKeyUp)
+  lastTime = 0
   animId = requestAnimationFrame(loop)
 }
 
 onMounted(() => {
-  // Don't start until player clicks the button
+  // Render one still frame, then fade in briefing
+  requestAnimationFrame(() => {
+    drawStillFrame()
+    setTimeout(() => {
+      briefingVisible.value = true
+    }, 600)
+  })
 })
 
 onUnmounted(() => {
@@ -602,43 +622,48 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <!-- Briefing screen before gameplay -->
-  <div v-if="!started" class="gas-collection-briefing">
-    <div class="gas-collection-briefing__icon">⚠</div>
-    <h3 class="gas-collection-briefing__title">ATMOSPHERIC STORM DETECTED</h3>
-    <p class="gas-collection-briefing__text">
-      Sensors detect a massive storm brewing near the atmosphere — gas pockets are
-      rising from the cloud layer. This is a rare collection window.
-    </p>
-    <p class="gas-collection-briefing__text">
-      Your ship cannot cross the atmosphere threshold or it will overheat.
-      Orbit at close range and deploy collection drones into the rising gas puffs.
-      Catch your drones before they burn up to bank the gas.
-    </p>
-    <div class="gas-collection-briefing__controls">
-      <span><b>W A S D</b> — fly</span>
-      <span><b>Q</b> — launch drone</span>
-    </div>
-    <p class="gas-collection-briefing__detail">
-      Drones: {{ minigame.dronesRemaining }} available — reusable if caught.
-      Target: {{ minigame.targetGas }} gas units.
-      Time limit: {{ Math.ceil(minigame.timeTotal) }}s.
-    </p>
-    <button
-      type="button"
-      class="gas-collection-briefing__start"
-      @click="startGame"
-    >
-      BEGIN COLLECTION
-    </button>
-  </div>
+  <div class="gas-collection-wrapper">
+    <!-- Canvas always renders -->
+    <canvas
+      ref="canvasRef"
+      :width="CANVAS_WIDTH"
+      :height="CANVAS_HEIGHT"
+      class="gas-collection-canvas"
+    />
 
-  <!-- Game canvas -->
-  <canvas
-    v-else
-    ref="canvasRef"
-    :width="CANVAS_WIDTH"
-    :height="CANVAS_HEIGHT"
-    class="gas-collection-canvas"
-  />
+    <!-- Briefing overlay — fades in on top of the still frame -->
+    <Transition name="gas-briefing">
+      <div v-if="briefingVisible && !started" class="gas-collection-briefing-overlay">
+        <div class="gas-collection-briefing">
+          <div class="gas-collection-briefing__icon">⚠</div>
+          <h3 class="gas-collection-briefing__title">ATMOSPHERIC STORM DETECTED</h3>
+          <p class="gas-collection-briefing__text">
+            Sensors detect a massive storm brewing near the atmosphere — gas pockets are
+            rising from the cloud layer. This is a rare collection window.
+          </p>
+          <p class="gas-collection-briefing__text">
+            Your ship cannot cross the atmosphere threshold or it will overheat.
+            Orbit at close range and deploy collection drones into the rising gas puffs.
+            Catch your drones before they burn up to bank the gas.
+          </p>
+          <div class="gas-collection-briefing__controls">
+            <span><b>W A S D</b> — fly</span>
+            <span><b>Q</b> — launch drone</span>
+          </div>
+          <p class="gas-collection-briefing__detail">
+            Drones: {{ minigame.dronesRemaining }} available — reusable if caught.
+            Target: {{ minigame.targetGas }} gas units.
+            Time limit: {{ Math.ceil(minigame.timeTotal) }}s.
+          </p>
+          <button
+            type="button"
+            class="gas-collection-briefing__start"
+            @click="startGame"
+          >
+            BEGIN COLLECTION
+          </button>
+        </div>
+      </div>
+    </Transition>
+  </div>
 </template>

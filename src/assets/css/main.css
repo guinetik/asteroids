@@ -1860,6 +1860,29 @@ body {
   image-rendering: pixelated;
 }
 
+/* Gas Collection Wrapper — positions canvas and briefing overlay */
+.gas-collection-wrapper {
+  @apply relative;
+}
+
+/* Gas Collection Briefing Overlay — sits on top of the canvas */
+.gas-collection-briefing-overlay {
+  @apply absolute inset-0 flex items-center justify-center
+         rounded-lg bg-black/60 backdrop-blur-sm;
+}
+
+/* Fade transition for briefing */
+.gas-briefing-enter-active {
+  transition: opacity 0.6s ease;
+}
+.gas-briefing-leave-active {
+  transition: opacity 0.3s ease;
+}
+.gas-briefing-enter-from,
+.gas-briefing-leave-to {
+  opacity: 0;
+}
+
 /* Gas Collection Briefing */
 .gas-collection-briefing {
   @apply flex flex-col items-center gap-4 px-8 py-6 text-center;
