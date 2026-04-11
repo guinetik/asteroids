@@ -22,7 +22,7 @@ export const SHIP_DRAG = 0.92
 export const SHIP_MAX_SPEED = 400
 
 /** Downward acceleration on drones in px/s². */
-export const DRONE_GRAVITY = 80
+export const DRONE_GRAVITY = 110
 
 /** Pure launch impulse speed in px/s — strong kick, not affected by drag initially. */
 export const DRONE_LAUNCH_SPEED = 280
