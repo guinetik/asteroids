@@ -32,6 +32,12 @@ const STOCK_MAX = 20
 /** Price threshold: goods below this get higher stock. */
 const CHEAP_THRESHOLD = 50
 
+/**
+ * Fraction of each good's catalog {@link TradeGoodDefinition.basePrice} charged when buying at its
+ * source planet. Lower than 1 widens profit on resale where demand is high.
+ */
+const TRADE_GOOD_SOURCE_BUY_PRICE_FRACTION = 0.85
+
 /** Refuel cost in credits. */
 export const REFUEL_COST = 100
 
@@ -70,7 +76,7 @@ function pickTradeSlots(planetId: string): [TradeGoodSlot, TradeGoodSlot, TradeG
     return {
       itemId: tg.id,
       stock,
-      price: tg.basePrice,
+      price: Math.round(tg.basePrice * TRADE_GOOD_SOURCE_BUY_PRICE_FRACTION),
     }
   }) as [TradeGoodSlot, TradeGoodSlot, TradeGoodSlot]
 }

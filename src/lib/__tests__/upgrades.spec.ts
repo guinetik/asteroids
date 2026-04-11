@@ -128,9 +128,9 @@ describe('hasGravitySurfingUnlock', () => {
 
 describe('getUpgradeCost', () => {
   it('returns baseCost * level', () => {
-    expect(getUpgradeCost('shuttleThrusterEfficiency', 1)).toBe(500)
-    expect(getUpgradeCost('shuttleThrusterEfficiency', 2)).toBe(1000)
-    expect(getUpgradeCost('shuttleThrusterEfficiency', 3)).toBe(1500)
+    expect(getUpgradeCost('shuttleThrusterEfficiency', 1)).toBe(1000)
+    expect(getUpgradeCost('shuttleThrusterEfficiency', 2)).toBe(2000)
+    expect(getUpgradeCost('shuttleThrusterEfficiency', 3)).toBe(3000)
   })
 
   it('returns 0 for level 0', () => {
@@ -138,8 +138,8 @@ describe('getUpgradeCost', () => {
   })
 
   it('works for late-game upgrades with high base cost', () => {
-    expect(getUpgradeCost('shuttleRadiationResistance', 1)).toBe(6000)
-    expect(getUpgradeCost('shuttleRadiationResistance', 3)).toBe(18000)
+    expect(getUpgradeCost('shuttleRadiationResistance', 1)).toBe(5000)
+    expect(getUpgradeCost('shuttleRadiationResistance', 3)).toBe(15000)
   })
 })
 

@@ -32,15 +32,16 @@ describe('getDemandMultiplier', () => {
 describe('computeSellPrice', () => {
   beforeEach(() => resetDemand())
 
-  it('returns base × multiplier for a demanded item', () => {
+  it('returns base × multiplier × route sell premium for a demanded item', () => {
     const price = computeSellPrice('mercury', 'cryogenic-coolants')
-    expect(price).toBeGreaterThanOrEqual(Math.round(80 * 3.0 * 0.8))
-    expect(price).toBeLessThanOrEqual(Math.round(80 * 3.0 * 1.2))
+    const premium = 1.22
+    expect(price).toBeGreaterThanOrEqual(Math.round(80 * 3.0 * 0.8 * premium))
+    expect(price).toBeLessThanOrEqual(Math.round(80 * 3.0 * 1.2 * premium))
   })
 
   it('returns junk price for non-demanded trade goods', () => {
     const price = computeSellPrice('mercury', 'entertainment-media')
-    expect(price).toBe(Math.round(15 * 0.5))
+    expect(price).toBe(Math.round(15 * 0.5 * 1.22))
   })
 
   it('returns 0 for unknown items', () => {

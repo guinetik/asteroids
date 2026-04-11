@@ -52,7 +52,7 @@ export interface TradeGoodSlot {
   itemId: string
   /** Units currently in stock. */
   stock: number
-  /** Base price at this planet (the producing planet's price). */
+  /** Credits per unit at this planet (discounted from catalog base at the source). */
   price: number
 }
 

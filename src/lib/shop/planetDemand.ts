@@ -26,6 +26,12 @@ export const DEMAND_REFRESH_INTERVAL_S = 300
 /** Fallback multiplier for items a planet doesn't specifically demand. */
 const JUNK_MULTIPLIER = 0.5
 
+/**
+ * Extra payout on trade-good sales after demand is applied. Shop buys use a sub-1 fraction of
+ * catalog base price, so this widens route profit margins.
+ */
+const TRADE_ROUTE_SELL_PREMIUM_MULTIPLIER = 1.22
+
 // ─── Internal state ─────────────────────────────────────────────────────────
 
 /** Internal structure for each planet's demand data loaded from JSON. */
@@ -118,7 +124,7 @@ export function computeSellPrice(planetId: string, itemId: string): number {
   const tg = getTradeGood(itemId)
   if (tg) {
     const multiplier = getDemandMultiplier(planetId, itemId)
-    return Math.round(tg.basePrice * multiplier)
+    return Math.round(tg.basePrice * multiplier * TRADE_ROUTE_SELL_PREMIUM_MULTIPLIER)
   }
 
   // Fallback: check fixed mineral sell prices from shop.json

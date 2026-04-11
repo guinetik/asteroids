@@ -7,7 +7,7 @@
       "description": "Venus station needs medical supplies from Earth orbit. Standard logistics run.",
       "targetPlanet": "earth",
       "gatherQuantity": 3,
-      "reward": 220
+      "reward": 825
     },
     {
       "id": "venus_mercury_solar_data",
@@ -15,7 +15,7 @@
       "description": "Deploy calibration probes near Mercury for the Venus solar research program.",
       "targetPlanet": "mercury",
       "gatherQuantity": 2,
-      "reward": 350
+      "reward": 1313
     },
     {
       "id": "venus_mars_soil_samples",
@@ -23,7 +23,7 @@
       "description": "Collect methane samples from Mars for comparative atmospheric studies.",
       "targetPlanet": "mars",
       "gatherQuantity": 4,
-      "reward": 300
+      "reward": 1125
     }
   ]
 }

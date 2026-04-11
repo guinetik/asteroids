@@ -7,7 +7,7 @@
       "description": "Align and calibrate Neptune's orbital solar mirror array. Return alignment data.",
       "targetPlanet": "neptune",
       "gatherQuantity": 2,
-      "reward": 550
+      "reward": 2063
     },
     {
       "id": "uranus_saturn_ice",
@@ -15,7 +15,7 @@
       "description": "Collect pristine ring ice from Saturn for Uranus cryo-lab experiments.",
       "targetPlanet": "saturn",
       "gatherQuantity": 3,
-      "reward": 480
+      "reward": 1800
     },
     {
       "id": "uranus_jupiter_hydrogen",
@@ -23,7 +23,7 @@
       "description": "Uranus outpost needs metallic hydrogen for emergency reactor fuel.",
       "targetPlanet": "jupiter",
       "gatherQuantity": 2,
-      "reward": 520
+      "reward": 1950
     }
   ]
 }

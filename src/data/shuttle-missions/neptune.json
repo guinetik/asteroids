@@ -7,7 +7,7 @@
       "description": "Deploy magnetosphere probes at Uranus. Data needed for Neptune's shield generators.",
       "targetPlanet": "uranus",
       "gatherQuantity": 3,
-      "reward": 500
+      "reward": 1875
     },
     {
       "id": "neptune_saturn_ring_samples",
@@ -15,7 +15,7 @@
       "description": "Collect ring ice for Neptune's water reclamation program.",
       "targetPlanet": "saturn",
       "gatherQuantity": 4,
-      "reward": 550
+      "reward": 2063
     },
     {
       "id": "neptune_earth_resupply",
@@ -23,7 +23,7 @@
       "description": "Maximum-range supply run to Earth. The longest haul in the system.",
       "targetPlanet": "earth",
       "gatherQuantity": 2,
-      "reward": 750
+      "reward": 2813
     }
   ]
 }

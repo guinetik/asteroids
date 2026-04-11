@@ -16,8 +16,8 @@ describe('tryPurchaseNextUpgradeLevel', () => {
     expect(result).toEqual({
       ok: true,
       newLevel: 1,
-      creditsSpent: 500,
-      profile: expect.objectContaining({ credits: profile.credits - 500 }),
+      creditsSpent: 1000,
+      profile: expect.objectContaining({ credits: profile.credits - 1000 }),
     })
   })
 
