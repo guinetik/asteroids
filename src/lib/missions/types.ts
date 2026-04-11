@@ -151,7 +151,7 @@ export interface PlanetOrbitalConfig {
   planetId: string
   /** Item id gathered at this planet (e.g. "venusian-gas"). */
   gatherItem: string
-  /** Minigame type (ignored until minigames are implemented). */
+  /** Minigame type — dispatched by orbitalMiniGameFactory to create the appropriate OrbitalMiniGame. */
   minigameType: string
 }
 
