@@ -12,6 +12,30 @@ export interface ShipReticleUpdate {
   isFreeFlight: boolean
 }
 
+interface ApproachTetherVisuals {
+  readonly line: THREE.Line<THREE.BufferGeometry, THREE.ShaderMaterial>
+  readonly lineGeometry: THREE.BufferGeometry
+  readonly lineMaterial: THREE.ShaderMaterial
+  readonly linePositions: Float32Array
+  readonly shipLockMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>
+  readonly planetLockMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>
+}
+
+interface TetherLineUniforms {
+  uTime: { value: number }
+  uProgress: { value: number }
+  uOpacity: { value: number }
+  uColor: { value: THREE.Color }
+  uPulseColor: { value: THREE.Color }
+}
+
+interface LockDiscUniforms {
+  uTime: { value: number }
+  uProgress: { value: number }
+  uOpacity: { value: number }
+  uColor: { value: THREE.Color }
+}
+
 export class MapSceneVisuals {
   private scene: THREE.Scene
   private shuttleGroup: THREE.Group | null = null
@@ -20,6 +44,7 @@ export class MapSceneVisuals {
   private shipReticleGroup: THREE.Group | null = null
   private shipReticleRing: THREE.Sprite | null = null
   private shipReticlePointer: THREE.Sprite | null = null
+  private approachTether: ApproachTetherVisuals | null = null
 
   constructor(sceneObjects: MapSceneObjects) {
     this.scene = sceneObjects.scene
@@ -94,6 +119,150 @@ export class MapSceneVisuals {
     }
   }
 
+  showApproachTether(): void {
+    if (this.approachTether) return
+
+    const linePositions = new Float32Array(6)
+    const lineGeometry = new THREE.BufferGeometry()
+    lineGeometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3))
+    lineGeometry.setAttribute(
+      'lineU',
+      new THREE.BufferAttribute(new Float32Array([0, 1]), 1),
+    )
+
+    const lineUniforms: TetherLineUniforms = {
+      uTime: { value: 0 },
+      uProgress: { value: 0 },
+      uOpacity: { value: 0 },
+      uColor: { value: MAP_CONFIG.ORBIT_TETHER_COLOR.clone() },
+      uPulseColor: { value: MAP_CONFIG.ORBIT_TETHER_PULSE_COLOR.clone() },
+    }
+    const lineMaterial = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      uniforms: lineUniforms as unknown as Record<string, THREE.IUniform>,
+      vertexShader: `
+        attribute float lineU;
+        varying float vLineU;
+
+        void main() {
+          vLineU = lineU;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform float uProgress;
+        uniform float uOpacity;
+        uniform vec3 uColor;
+        uniform vec3 uPulseColor;
+        varying float vLineU;
+
+        void main() {
+          float pulse = 0.5 + 0.5 * sin((vLineU * 10.0) - (uTime * 8.0));
+          float captureFront = smoothstep(0.0, 0.85, uProgress + (1.0 - vLineU) * 0.35);
+          vec3 color = mix(uColor, uPulseColor, pulse * 0.45);
+          float alpha = uOpacity * captureFront * (0.55 + pulse * 0.45);
+          gl_FragColor = vec4(color, alpha);
+        }
+      `,
+    })
+    const line = new THREE.Line(lineGeometry, lineMaterial)
+    line.renderOrder = 12
+
+    const shipLockMesh = this.createApproachLockDisc()
+    const planetLockMesh = this.createApproachLockDisc()
+    shipLockMesh.renderOrder = 11
+    planetLockMesh.renderOrder = 11
+
+    this.scene.add(line)
+    this.scene.add(shipLockMesh)
+    this.scene.add(planetLockMesh)
+
+    this.approachTether = {
+      line,
+      lineGeometry,
+      lineMaterial,
+      linePositions,
+      shipLockMesh,
+      planetLockMesh,
+    }
+  }
+
+  updateApproachTether(
+    shipPosition: THREE.Vector3,
+    planetPosition: THREE.Vector3,
+    progress: number,
+    dt: number,
+  ): void {
+    if (!this.approachTether) this.showApproachTether()
+    if (!this.approachTether) return
+
+    const tetherProgress = THREE.MathUtils.clamp(progress, 0, 1)
+    const opacity = tetherProgress * MAP_CONFIG.ORBIT_TETHER_MAX_OPACITY
+
+    const { lineGeometry, lineMaterial, linePositions, shipLockMesh, planetLockMesh } =
+      this.approachTether
+
+    linePositions[0] = shipPosition.x
+    linePositions[1] = shipPosition.y
+    linePositions[2] = shipPosition.z
+    linePositions[3] = planetPosition.x
+    linePositions[4] = planetPosition.y
+    linePositions[5] = planetPosition.z
+    const positionAttribute = lineGeometry.getAttribute('position') as THREE.BufferAttribute
+    positionAttribute.needsUpdate = true
+    const lineUniforms = lineMaterial.uniforms as unknown as TetherLineUniforms
+    lineUniforms.uTime.value += dt
+    lineUniforms.uProgress.value = tetherProgress
+    lineUniforms.uOpacity.value = opacity
+
+    shipLockMesh.position.copy(shipPosition)
+    planetLockMesh.position.copy(planetPosition)
+
+    const shipScale = THREE.MathUtils.lerp(
+      MAP_CONFIG.ORBIT_TETHER_SHIP_GLOW_RADIUS * 0.45,
+      MAP_CONFIG.ORBIT_TETHER_SHIP_GLOW_RADIUS,
+      tetherProgress,
+    )
+    const planetScale = THREE.MathUtils.lerp(
+      MAP_CONFIG.ORBIT_TETHER_PLANET_GLOW_RADIUS * 0.35,
+      MAP_CONFIG.ORBIT_TETHER_PLANET_GLOW_RADIUS,
+      tetherProgress,
+    )
+    shipLockMesh.scale.setScalar(shipScale)
+    planetLockMesh.scale.setScalar(planetScale)
+
+    const shipMaterial = shipLockMesh.material
+    const shipUniforms = shipMaterial.uniforms as unknown as LockDiscUniforms
+    shipUniforms.uTime.value += dt
+    shipUniforms.uProgress.value = tetherProgress
+    shipUniforms.uOpacity.value = opacity
+
+    const planetMaterial = planetLockMesh.material
+    const planetUniforms = planetMaterial.uniforms as unknown as LockDiscUniforms
+    planetUniforms.uTime.value += dt * 0.8
+    planetUniforms.uProgress.value = tetherProgress
+    planetUniforms.uOpacity.value = opacity * 0.85
+  }
+
+  hideApproachTether(): void {
+    if (!this.approachTether) return
+
+    const { line, lineGeometry, lineMaterial, shipLockMesh, planetLockMesh } = this.approachTether
+    this.scene.remove(line)
+    this.scene.remove(shipLockMesh)
+    this.scene.remove(planetLockMesh)
+    lineGeometry.dispose()
+    lineMaterial.dispose()
+    shipLockMesh.geometry.dispose()
+    shipLockMesh.material.dispose()
+    planetLockMesh.geometry.dispose()
+    planetLockMesh.material.dispose()
+    this.approachTether = null
+  }
+
   updateShipReticle(update: ShipReticleUpdate): void {
     if (!this.shipReticleGroup || !this.shipReticleRing || !this.shipReticlePointer) return
 
@@ -134,6 +303,7 @@ export class MapSceneVisuals {
   dispose(): void {
     this.hideLaunchArrow()
     this.hideOrbitRing()
+    this.hideApproachTether()
     if (this.shipReticleGroup) {
       const disposeSprite = (sprite: THREE.Sprite) => {
         const material = sprite.material as THREE.SpriteMaterial
@@ -236,5 +406,50 @@ export class MapSceneVisuals {
     this.shipReticleGroup.add(this.shipReticlePointer)
     this.shipReticleGroup.visible = false
     this.scene.add(this.shipReticleGroup)
+  }
+
+  private createApproachLockDisc(): THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> {
+    const geometry = new THREE.PlaneGeometry(1, 1, 1, 1)
+    const uniforms: LockDiscUniforms = {
+      uTime: { value: 0 },
+      uProgress: { value: 0 },
+      uOpacity: { value: 0 },
+      uColor: { value: MAP_CONFIG.ORBIT_TETHER_ANCHOR_COLOR.clone() },
+    }
+    const material = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      uniforms: uniforms as unknown as Record<string, THREE.IUniform>,
+      vertexShader: `
+        varying vec2 vUv;
+
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform float uProgress;
+        uniform float uOpacity;
+        uniform vec3 uColor;
+        varying vec2 vUv;
+
+        void main() {
+          vec2 centered = (vUv - 0.5) * 2.0;
+          float radius = length(centered);
+          float rim = smoothstep(0.7, 0.25, radius);
+          float ring = smoothstep(0.38, 0.34, abs(radius - (0.45 + 0.08 * sin(uTime * 5.0))));
+          float spokes = 0.5 + 0.5 * sin(atan(centered.y, centered.x) * 6.0 + uTime * 3.0);
+          float intensity = max(rim * 0.55, ring * (0.65 + 0.35 * spokes));
+          float alpha = intensity * uOpacity * (0.45 + uProgress * 0.55);
+          gl_FragColor = vec4(uColor, alpha);
+        }
+      `,
+    })
+    const mesh = new THREE.Mesh(geometry, material)
+    mesh.rotation.x = -Math.PI / 2
+    return mesh
   }
 }

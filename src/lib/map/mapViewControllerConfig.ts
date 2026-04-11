@@ -142,8 +142,8 @@ export const GRID_DEFORM_WHOLE_MAP_COVERAGE = 0.82
 /** Lower deform cadence while the whole map is visible. */
 export const GRID_DEFORM_INTERVAL_SCALE_WHOLE_MAP = 3
 
-/** Duration in seconds for the orbit-approach animation lerp. */
-export const APPROACH_DURATION = 1.5
+/** Duration in seconds for the orbit-approach tether / lock animation. */
+export const APPROACH_DURATION = 2.4
 
 /** Seconds to fully charge slingshot from 0 to 1. */
 export const SLINGSHOT_CHARGE_TIME = 2.0
@@ -195,6 +195,13 @@ export const ORBIT_RING_DASH_SIZE = 0.3
 export const ORBIT_RING_GAP_SIZE = 0.2
 export const ORBIT_PREVIEW_MULTIPLIER = 2.0
 export const ORBIT_PREVIEW_OPACITY = 0.3
+export const ORBIT_TETHER_COLOR = new THREE.Color('#7ce6ff')
+export const ORBIT_TETHER_PULSE_COLOR = new THREE.Color('#ffffff')
+export const ORBIT_TETHER_ANCHOR_COLOR = new THREE.Color('#34d7ff')
+export const ORBIT_TETHER_MAX_OPACITY = 0.95
+export const ORBIT_TETHER_MAX_WIDTH = 6
+export const ORBIT_TETHER_SHIP_GLOW_RADIUS = 0.85
+export const ORBIT_TETHER_PLANET_GLOW_RADIUS = 1.35
 
 /** Map-scale gravity tuning loaded from JSON. */
 export const MAP_GRAVITY_CONFIG: GravityConfig = {
@@ -338,6 +345,13 @@ export const MAP_VIEW_CONTROLLER_CONFIG = {
   ONE_SHOT_PRIORITY,
   ORBIT_PREVIEW_MULTIPLIER,
   ORBIT_PREVIEW_OPACITY,
+  ORBIT_TETHER_ANCHOR_COLOR,
+  ORBIT_TETHER_COLOR,
+  ORBIT_TETHER_MAX_OPACITY,
+  ORBIT_TETHER_MAX_WIDTH,
+  ORBIT_TETHER_PLANET_GLOW_RADIUS,
+  ORBIT_TETHER_PULSE_COLOR,
+  ORBIT_TETHER_SHIP_GLOW_RADIUS,
   ORBIT_RING_COLOR,
   ORBIT_RING_DASH_SIZE,
   ORBIT_RING_GAP_SIZE,

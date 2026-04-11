@@ -95,6 +95,7 @@ export class MapOrbitFacade {
     { shuttleController, vehicleCamera, sceneVisuals }: SharedDeps,
   ): void {
     if (!this._system) return
+    sceneVisuals?.hideApproachTether()
     this._system.beginCapture(bodyWorldX + 1, bodyWorldZ)
     const orbitR = this._system.targetOrbitRadius
     shuttleController.group.position.set(bodyWorldX + orbitR, 0, bodyWorldZ)
@@ -151,6 +152,7 @@ export class MapOrbitFacade {
         shuttleController.setInputEnabled(false)
         vehicleCamera?.setConfig(MAP_ORBIT_CAMERA_CONFIG)
         sceneVisuals?.showOrbitRing(this._system.targetOrbitRadius)
+        sceneVisuals?.showApproachTether()
         this._orbitRingIsPreview = false
       }
     }
@@ -223,9 +225,17 @@ export class MapOrbitFacade {
 
       const body = this._system.target
       if (body) {
-        const dx = body.getWorldX() - x
-        const dz = body.getWorldZ() - z
+        const bodyX = body.getWorldX()
+        const bodyZ = body.getWorldZ()
+        const dx = bodyX - x
+        const dz = bodyZ - z
         shuttleController.group.rotation.y = Math.atan2(-dz, dx)
+        sceneVisuals?.updateApproachTether(
+          shuttleController.group.position,
+          new THREE.Vector3(bodyX, 0, bodyZ),
+          t,
+          dt,
+        )
       }
     }
 
@@ -243,6 +253,7 @@ export class MapOrbitFacade {
     const pz = shuttleController.position.z
     this._system.checkArrival(px, pz)
     this._approachStartPos = null
+    sceneVisuals?.hideApproachTether()
 
     if (this._system.target) {
       const bx = this._system.target.getWorldX()
@@ -315,6 +326,7 @@ export class MapOrbitFacade {
     shuttleController.unfreeze()
     shuttleController.setInputEnabled(true)
     vehicleCamera?.setConfig(MAP_CAMERA_CONFIG)
+    sceneVisuals?.hideApproachTether()
     sceneVisuals?.hideOrbitRing()
     this._orbitRingIsPreview = false
   }
@@ -324,6 +336,7 @@ export class MapOrbitFacade {
     this._approachStartPos = null
     this._slingshotCharge = 0
     this.hideLaunchArrow(sceneVisuals)
+    sceneVisuals?.hideApproachTether()
     sceneVisuals?.hideOrbitRing()
     this._orbitRingIsPreview = false
     shuttleController.unfreeze()
