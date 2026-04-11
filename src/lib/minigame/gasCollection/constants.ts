@@ -81,6 +81,12 @@ export const GAS_PER_PUFF = 0.35
 /** Radius for drone-puff collision in px. */
 export const DRONE_PUFF_COLLECT_RADIUS = 24
 
+/** Base timer in seconds for the minimum gatherQuantity (2). */
+export const TIMER_BASE = 30
+
+/** Extra seconds added per unit of gatherQuantity above 2. */
+export const TIMER_PER_GAS = 5
+
 /** Ship hitbox half-width for collision and rendering. */
 export const SHIP_HALF_WIDTH = 24
 

@@ -8,6 +8,8 @@ import {
   COOK_ZONE_Y,
   COOK_ZONE_TOLERANCE,
   GAS_PER_PUFF,
+  TIMER_BASE,
+  TIMER_PER_GAS,
 } from '../constants'
 import type { OrbitalMiniGameContext } from '../../OrbitalMiniGame'
 
@@ -283,6 +285,25 @@ describe('GasCollectionMiniGame', () => {
       expect(game.gasCollected).toBeGreaterThanOrEqual(game.targetGas)
       expect(game.status).toBe('completed')
       expect(cb).toHaveBeenCalledWith('test-mission')
+    })
+
+    it('timer scales with gatherQuantity', () => {
+      const game2 = new GasCollectionMiniGame('t', 2)
+      expect(game2.timeTotal).toBe(TIMER_BASE)
+      const game6 = new GasCollectionMiniGame('t', 6)
+      expect(game6.timeTotal).toBe(TIMER_BASE + 4 * TIMER_PER_GAS)
+    })
+
+    it('fails when timer runs out', () => {
+      game.timeRemaining = 0.01
+      game.tick(0.02, STUB_CTX)
+      expect(game.status).toBe('failed')
+    })
+
+    it('timer counts down each tick', () => {
+      const before = game.timeRemaining
+      game.tick(1.0, STUB_CTX)
+      expect(game.timeRemaining).toBeCloseTo(before - 1.0, 0)
     })
 
     it('fails when all drones spent and gauge not full', () => {

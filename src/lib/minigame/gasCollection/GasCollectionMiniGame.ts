@@ -44,6 +44,8 @@ import {
   PUFF_RADIUS_MAX,
   GAS_PER_PUFF,
   DRONE_PUFF_COLLECT_RADIUS,
+  TIMER_BASE,
+  TIMER_PER_GAS,
 } from './constants'
 
 /**
@@ -86,6 +88,11 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
 
   /** Rising gas puffs from the atmosphere. */
   gasPuffs: GasPuff[] = []
+  /** Mission timer — seconds remaining. */
+  timeRemaining: number
+  /** Total mission time for display. */
+  readonly timeTotal: number
+
   /** Time accumulator for puff spawning. */
   private puffTimer = 0
   /** Time spent in the cook zone — death at COOK_ZONE_TOLERANCE. */
@@ -107,6 +114,8 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
   constructor(missionId: string, targetGas: number) {
     this.missionId = missionId
     this.targetGas = targetGas
+    this.timeTotal = TIMER_BASE + Math.max(0, targetGas - 2) * TIMER_PER_GAS
+    this.timeRemaining = this.timeTotal
   }
 
   /** Current minigame status. */
@@ -161,6 +170,7 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
   tick(dt: number, _ctx: OrbitalMiniGameContext): void {
     if (this._status !== 'active') return
 
+    this.timeRemaining -= dt
     this.tickShip(dt)
     if (this.checkCookZone(dt)) return
     this.tickGasPuffs(dt)
@@ -336,6 +346,14 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
       return
     }
 
+    // Time's up
+    if (this.timeRemaining <= 0) {
+      this.timeRemaining = 0
+      this._status = 'failed'
+      return
+    }
+
+    // All drones lost
     if (this.dronesRemaining === 0 && this.drones.length === 0) {
       this._status = 'failed'
     }

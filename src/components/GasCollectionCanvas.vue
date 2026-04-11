@@ -475,9 +475,10 @@ function drawEndScreen(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = props.minigame.status === 'completed' ? '#00ff88' : '#ff4444'
   ctx.font = 'bold 28px monospace'
   ctx.textAlign = 'center'
-  const failMsg = props.minigame.dronesRemaining === 0 && props.minigame.drones.length === 0
-    ? 'DRONES DEPLETED — MISSION FAILED'
-    : 'HULL OVERHEATED — TOO CLOSE TO SURFACE'
+  let failMsg = 'HULL OVERHEATED — TOO CLOSE TO SURFACE'
+  if (props.minigame.timeRemaining <= 0) failMsg = 'TIME EXPIRED — MISSION FAILED'
+  else if (props.minigame.dronesRemaining === 0 && props.minigame.drones.length === 0)
+    failMsg = 'ALL DRONES LOST — MISSION FAILED'
   ctx.fillText(
     props.minigame.status === 'completed' ? 'COLLECTION COMPLETE' : failMsg,
     CANVAS_WIDTH / 2,
@@ -534,6 +535,19 @@ function loop(time: number) {
 
   // Restore shake transform
   ctx.restore()
+
+  // Timer — center top
+  const timeLeft = Math.max(0, props.minigame.timeRemaining)
+  const timeRatio = timeLeft / props.minigame.timeTotal
+  const timeLow = timeLeft < 10
+  ctx.fillStyle = timeLow ? '#ff4444' : '#ffffff'
+  ctx.font = timeLow ? 'bold 16px monospace' : '14px monospace'
+  ctx.textAlign = 'center'
+  ctx.fillText(
+    `${Math.ceil(timeLeft)}s`,
+    CANVAS_WIDTH / 2,
+    24,
+  )
 
   // Drone counter
   ctx.fillStyle = '#00ccff'
