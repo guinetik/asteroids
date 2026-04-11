@@ -17,6 +17,8 @@ import type { ShuttleController } from './ShuttleController'
 import { ParticleEmitter } from './ParticleEmitter'
 import { getIdleThrusterSpritePulse } from './idleThrusterSpritePulse'
 import { resolveThrusterEffectState } from './thrusterEffectState'
+import { useAudio } from '@/audio/useAudio'
+import { ShuttleThrusterSound } from '@/audio/ShuttleThrusterSound'
 
 const THRUST_SPAWN_RATE = 800
 const BRAKE_SPAWN_RATE = 600
@@ -65,7 +67,14 @@ export class ThrusterEffectController implements Tickable {
   private brakeSpawnAccumulator = 0
   private rcsSpawnAccumulator = 0
   private elapsedTime = 0
+  private prevThrusting = false
+  private prevBraking = false
+  private prevRcsActive = false
   private readonly shuttle: ShuttleController
+  private readonly thrusterSound = new ShuttleThrusterSound()
+
+  /** When false, no audio is played or stopped (e.g. while inside the habitat). */
+  private _audioEnabled = true
 
   constructor(shuttle: ShuttleController) {
     this.shuttle = shuttle
@@ -129,6 +138,18 @@ export class ThrusterEffectController implements Tickable {
     }
   }
 
+  /**
+   * Enable or disable thruster audio without affecting VFX.
+   * Pass `false` when the player enters a non-flight context (e.g. habitat) so
+   * WASD input doesn't bleed shuttle thruster sounds into unrelated scenes.
+   */
+  setAudioEnabled(enabled: boolean): void {
+    this._audioEnabled = enabled
+    if (!enabled) {
+      this.thrusterSound.stop()
+    }
+  }
+
   tick(dt: number): void {
     this.elapsedTime += dt
     const scale = this.shuttle.group.scale.x
@@ -138,6 +159,51 @@ export class ThrusterEffectController implements Tickable {
       this.shuttle.thrusterSystem.fuelLevel > 0 && !this.shuttle.dead,
       this.shuttle.slingshotLaunchFxActive,
     )
+
+    if (this._audioEnabled) {
+      const audio = useAudio()
+      const isRcsActive = this.shuttle.isYawingLeft || this.shuttle.isYawingRight
+      if (effectState.emitThrust || effectState.emitBrake || isRcsActive) {
+        audio.unlock()
+      }
+
+      if (effectState.emitThrust) {
+        if (!this.prevThrusting) {
+          audio.play('sfx.thrusterBurst')
+          audio.play('sfx.thrusterLoop', { loop: true })
+        }
+      } else if (this.prevThrusting) {
+        audio.stopSound('sfx.thrusterLoop')
+      }
+
+      if (effectState.emitBrake && !this.prevBraking) {
+        audio.play('sfx.brake')
+      }
+
+      this.thrusterSound.update(
+        {
+          rcsLeft: this.shuttle.isYawingLeft ? 1 : 0,
+          rcsRight: this.shuttle.isYawingRight ? 1 : 0,
+          angularSpeed: this.shuttle.currentAngularVelocity,
+          sfxVolume: audio.getCategoryVolume('sfx'),
+        },
+        dt,
+      )
+
+      if (isRcsActive && !this.prevRcsActive) {
+        audio.play('sfx.thrusterBurst', { volume: 0.35 })
+      }
+
+      this.prevThrusting = effectState.emitThrust
+      this.prevBraking = effectState.emitBrake
+      this.prevRcsActive = isRcsActive
+    } else {
+      useAudio().stopSound('sfx.thrusterLoop')
+      this.thrusterSound.stop()
+      this.prevThrusting = false
+      this.prevBraking = false
+      this.prevRcsActive = false
+    }
 
     if (effectState.emitThrust) {
       this.thrustSpawnAccumulator += THRUST_SPAWN_RATE * dt
@@ -199,6 +265,8 @@ export class ThrusterEffectController implements Tickable {
   }
 
   dispose(): void {
+    useAudio().stopSound('sfx.thrusterLoop')
+    this.thrusterSound.dispose()
     for (const sprite of this.idleThrusterSprites) {
       this.shuttle.group.remove(sprite)
       ;(sprite.material as THREE.SpriteMaterial).map?.dispose()

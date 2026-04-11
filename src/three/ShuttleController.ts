@@ -439,6 +439,11 @@ export class ShuttleController implements Tickable, PortalVehicle {
     return this.group.rotation.y
   }
 
+  /** Current signed yaw angular velocity in radians per second. */
+  get currentAngularVelocity(): number {
+    return this.angularVelocity
+  }
+
   /** Current velocity vector (read-only copy for external systems). */
   get currentVelocity(): THREE.Vector3 {
     return this.velocity.clone()
