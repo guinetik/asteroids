@@ -103,11 +103,11 @@ describe('GasCollectionMiniGame', () => {
       expect(game.drones).toHaveLength(MAX_DRONES)
     })
 
-    it('drone falls under gravity', () => {
+    it('drone accelerates downward under gravity', () => {
       game.launchDrone()
-      const initialY = game.drones[0]!.y
-      for (let i = 0; i < 30; i++) game.tick(0.016, STUB_CTX)
-      expect(game.drones[0]!.y).toBeGreaterThan(initialY)
+      const initialVy = game.drones[0]!.vy
+      game.tick(0.5, STUB_CTX)
+      expect(game.drones[0]!.vy).toBeGreaterThan(initialVy)
     })
 
     it('drone accumulates airTime', () => {
