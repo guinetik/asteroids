@@ -29,6 +29,7 @@ import {
   DRONE_LAUNCH_ANGLE,
   DRONE_COLLECT_RADIUS,
   DRONE_DRAG,
+  DRONE_DRAG_DELAY,
   DRONE_GRACE_PERIOD,
   MAX_DRONES,
   SHIP_HALF_WIDTH,
@@ -137,10 +138,10 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
 
     this.dronesRemaining--
 
-    // Launch in the direction the ship is facing
+    // Launch in the direction the ship is facing — pure launch force, no ship velocity
     const angle = this.shipFacing === 1 ? DRONE_LAUNCH_ANGLE : Math.PI - DRONE_LAUNCH_ANGLE
-    const launchVx = this.shipVx + DRONE_LAUNCH_SPEED * Math.cos(angle)
-    const launchVy = this.shipVy + DRONE_LAUNCH_SPEED * Math.sin(angle)
+    const launchVx = DRONE_LAUNCH_SPEED * Math.cos(angle)
+    const launchVy = DRONE_LAUNCH_SPEED * Math.sin(angle)
 
     this.drones.push({
       x: this.shipX,
@@ -244,10 +245,12 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
     for (const drone of this.drones) {
       if (drone.collected) continue
       drone.vy += DRONE_GRAVITY * dt
-      // Air drag — drones are light, they float
-      const droneDrag = Math.pow(DRONE_DRAG, dt * 60)
-      drone.vx *= droneDrag
-      drone.vy *= droneDrag
+      // Drag only kicks in after the launch impulse has carried
+      if (drone.airTime > DRONE_DRAG_DELAY) {
+        const droneDrag = Math.pow(DRONE_DRAG, dt * 60)
+        drone.vx *= droneDrag
+        drone.vy *= droneDrag
+      }
       drone.x += drone.vx * dt
       drone.y += drone.vy * dt
       drone.airTime += dt

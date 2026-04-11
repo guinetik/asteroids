@@ -24,14 +24,17 @@ export const SHIP_MAX_SPEED = 400
 /** Downward acceleration on drones in px/s². Light — they float. */
 export const DRONE_GRAVITY = 35
 
-/** Base launch speed added to ship velocity in px/s. */
-export const DRONE_LAUNCH_SPEED = 140
+/** Pure launch impulse speed in px/s — strong kick, not affected by drag initially. */
+export const DRONE_LAUNCH_SPEED = 280
 
-/** Launch angle in radians (steep upward arc — goes up fast, drifts down slow). */
-export const DRONE_LAUNCH_ANGLE = -Math.PI / 3
+/** Launch angle in radians — 45° for a classic parabolic arc. */
+export const DRONE_LAUNCH_ANGLE = -Math.PI / 4
 
-/** Drone air drag multiplier per second (0–1, lower = more drag). Heavy drag kills velocity fast. */
-export const DRONE_DRAG = 0.88
+/** Drone air drag multiplier per second (0–1). Only applies after launch phase. */
+export const DRONE_DRAG = 0.93
+
+/** Seconds after launch before drag kicks in — lets the impulse carry. */
+export const DRONE_DRAG_DELAY = 0.4
 
 /** Radius in px for ship-drone collision. */
 export const DRONE_COLLECT_RADIUS = 36
