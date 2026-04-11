@@ -11,6 +11,7 @@
  */
 import type { Tickable } from '@/lib/Tickable'
 import { DevConsole } from '@/lib/devConsole'
+import { useAudio } from '@/audio/useAudio'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'
@@ -461,6 +462,7 @@ export class LevelViewController implements Tickable {
         this.initialLanderSpawn.copy(gameplayStart)
         this.landerController.group.position.copy(gameplayStart)
       }
+      useAudio().play('sfx.arrivalSeparation')
     }
 
     this.arrivalSequence.onFadeOut = (opacity) => {
@@ -474,6 +476,7 @@ export class LevelViewController implements Tickable {
       if (this.landerController) {
         this.landerController.group.visible = true
       }
+      useAudio().stopSound('ambient.landerCockpit')
       // Clear the fade
       this.onArrivalFade?.(0)
     }
@@ -754,6 +757,10 @@ export class LevelViewController implements Tickable {
       this.lightingRig.sun.intensity = Math.max(this.savedSunIntensity, 4)
       this.lightingRig.fill.intensity = Math.max(this.savedFillIntensity, 1.5)
     }
+
+    const audio = useAudio()
+    audio.play('sfx.level.arrival')
+    audio.play('ambient.landerCockpit', { loop: true })
 
     // Letterbox
     this.onLetterbox?.(true)
