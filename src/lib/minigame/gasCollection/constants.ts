@@ -25,13 +25,13 @@ export const SHIP_MAX_SPEED = 400
 export const DRONE_GRAVITY = 35
 
 /** Base launch speed added to ship velocity in px/s. */
-export const DRONE_LAUNCH_SPEED = 90
+export const DRONE_LAUNCH_SPEED = 140
 
-/** Launch angle in radians (gentle upward arc). */
-export const DRONE_LAUNCH_ANGLE = -Math.PI / 5
+/** Launch angle in radians (steep upward arc — goes up fast, drifts down slow). */
+export const DRONE_LAUNCH_ANGLE = -Math.PI / 3
 
-/** Drone air drag multiplier per second (0–1, lower = more drag). */
-export const DRONE_DRAG = 0.96
+/** Drone air drag multiplier per second (0–1, lower = more drag). Heavy drag kills velocity fast. */
+export const DRONE_DRAG = 0.88
 
 /** Radius in px for ship-drone collision. */
 export const DRONE_COLLECT_RADIUS = 36
@@ -42,8 +42,8 @@ export const MAX_AIR_TIME_YIELD = 3
 /** Total drones per attempt. */
 export const MAX_DRONES = 5
 
-/** Minimum air time in seconds before a drone can be collected. */
-export const DRONE_GRACE_PERIOD = 0.3
+/** Minimum air time in seconds before a drone can be collected. Long enough to clear the ship. */
+export const DRONE_GRACE_PERIOD = 0.8
 
 /** Downward gravity pull on the ship in px/s². */
 export const SHIP_GRAVITY = 60
