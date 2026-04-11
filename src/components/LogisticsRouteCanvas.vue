@@ -741,7 +741,7 @@ onUnmounted(() => {
             incoming traffic and protect your hull — one hull breach ends the route.
           </p>
           <div class="gas-collection-briefing__controls">
-            <span><b>W A S D</b> — fly</span>
+            <span><b>W A S D</b> or <b>Arrows</b> — fly</span>
           </div>
           <p class="gas-collection-briefing__detail">
             Hull: {{ minigame.hullMaxHp }} HP.
