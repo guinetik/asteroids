@@ -377,7 +377,7 @@ function drawDrones(ctx: CanvasRenderingContext2D) {
       ctx.fillStyle = '#44ff44'
       ctx.font = 'bold 9px monospace'
       ctx.textAlign = 'center'
-      ctx.fillText(`+${drone.gasLoaded}`, 0, -12)
+      ctx.fillText(`+${drone.gasLoaded.toFixed(1)}`, 0, -12)
     }
 
     ctx.restore()
