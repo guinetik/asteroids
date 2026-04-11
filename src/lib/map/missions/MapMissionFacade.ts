@@ -17,7 +17,7 @@ import type {
   GeneratedAsteroidMission,
   ShuttleMissionBoard,
 } from '@/lib/missions/types'
-import { getGatherItemForPlanet } from '@/lib/missions/planetOrbitalConfig'
+import { getGatherItemForPlanet, getPlanetOrbitalConfig } from '@/lib/missions/planetOrbitalConfig'
 import { computeMissionDifficulty } from '@/lib/missions/missionDifficulty'
 import { generateAsteroidMission } from '@/lib/missions/asteroidMissionGenerator'
 import { canFitItem } from '@/lib/inventory/inventory'
@@ -43,11 +43,14 @@ import type { MapOverlayState } from '@/lib/ShuttleTelemetry'
 import type { OrbitCaptureSystem } from '@/lib/orbitCapture'
 import { shouldShowAsteroidMissionMapSite } from '@/lib/map/mapViewControllerHelpers'
 import type { VehicleCamera } from '@/three/VehicleCamera'
+import { createOrbitalMiniGame } from '@/lib/minigame/orbitalMiniGameFactory'
+import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
 
 export class MapMissionFacade {
   board: ShuttleMissionBoard = createMissionBoard()
   overlayOpen = false
   buttonVisible = false
+  activeMinigame: OrbitalMiniGame | null = null
 
   private missionWaypointRoot: THREE.Group | null = null
   private missionOrbitWaypointMarker: THREE.Group | null = null
@@ -155,6 +158,8 @@ export class MapMissionFacade {
     if (!result.ok) return params.inventory
     this.board = result.board
     this.overlayOpen = false
+    this.activeMinigame?.dispose()
+    this.activeMinigame = null
     params.onMissionOverlay?.(false, null, false)
     params.onMissionBoardUpdate?.(this.board)
     params.onMissionComplete?.(
@@ -206,6 +211,10 @@ export class MapMissionFacade {
       ? canFitItem(params.inventory, gatherItem, mission.template.gatherQuantity)
       : false
     this.overlayOpen = true
+    // Create orbital minigame for this mission
+    const orbitalConfig = getPlanetOrbitalConfig(mission.template.targetPlanet)
+    const minigameType = orbitalConfig?.minigameType ?? 'default'
+    this.activeMinigame = createOrbitalMiniGame(mission.template.id, minigameType)
     params.onMissionOverlay?.(true, mission, canFit)
   }
 
@@ -219,6 +228,8 @@ export class MapMissionFacade {
     if (!this.buttonVisible) return
     if (this.overlayOpen) {
       this.overlayOpen = false
+      this.activeMinigame?.dispose()
+      this.activeMinigame = null
       params.onMissionOverlay?.(false, null, false)
       return
     }
@@ -307,6 +318,8 @@ export class MapMissionFacade {
     this.board = createMissionBoard()
     if (this.overlayOpen) {
       this.overlayOpen = false
+      this.activeMinigame?.dispose()
+      this.activeMinigame = null
       onMissionOverlay?.(false, null, false)
     }
     if (this.buttonVisible) {
@@ -320,6 +333,8 @@ export class MapMissionFacade {
   }
 
   dispose(scene: THREE.Scene | null): void {
+    this.activeMinigame?.dispose()
+    this.activeMinigame = null
     if (scene) {
       this.disposeWaypointSite(scene)
     }
