@@ -268,7 +268,7 @@ Always-visible HUD element in the top-right corner of MapView. Shows the player'
 ## 10. Player Start & Reset
 
 - `createProfile` starts with **1000 credits** (change from current 0).
-- On death: credits reset to 1000, inventory clears, all shop sessions destroyed, demand variance resets.
+- On death: **credits preserved**, inventory clears (starter fuel cells only), all shop sessions destroyed, demand variance resets.
 - On page refresh: same as death (localStorage profile resets to 1000 credits).
 
 ## 11. Item Icons
