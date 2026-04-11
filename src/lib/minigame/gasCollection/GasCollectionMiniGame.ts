@@ -28,6 +28,7 @@ import {
   DRONE_LAUNCH_SPEED,
   DRONE_LAUNCH_ANGLE,
   DRONE_COLLECT_RADIUS,
+  DRONE_DRAG,
   DRONE_GRACE_PERIOD,
   MAX_DRONES,
   SHIP_HALF_WIDTH,
@@ -243,6 +244,10 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
     for (const drone of this.drones) {
       if (drone.collected) continue
       drone.vy += DRONE_GRAVITY * dt
+      // Air drag — drones are light, they float
+      const droneDrag = Math.pow(DRONE_DRAG, dt * 60)
+      drone.vx *= droneDrag
+      drone.vy *= droneDrag
       drone.x += drone.vx * dt
       drone.y += drone.vy * dt
       drone.airTime += dt

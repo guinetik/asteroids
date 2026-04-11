@@ -21,14 +21,17 @@ export const SHIP_DRAG = 0.92
 /** Maximum ship speed in px/s. */
 export const SHIP_MAX_SPEED = 400
 
-/** Downward acceleration on drones in px/s². */
-export const DRONE_GRAVITY = 120
+/** Downward acceleration on drones in px/s². Light — they float. */
+export const DRONE_GRAVITY = 35
 
 /** Base launch speed added to ship velocity in px/s. */
-export const DRONE_LAUNCH_SPEED = 160
+export const DRONE_LAUNCH_SPEED = 90
 
-/** Launch angle in radians (shallow upward-right arc). */
-export const DRONE_LAUNCH_ANGLE = -Math.PI / 6
+/** Launch angle in radians (gentle upward arc). */
+export const DRONE_LAUNCH_ANGLE = -Math.PI / 5
+
+/** Drone air drag multiplier per second (0–1, lower = more drag). */
+export const DRONE_DRAG = 0.96
 
 /** Radius in px for ship-drone collision. */
 export const DRONE_COLLECT_RADIUS = 36
