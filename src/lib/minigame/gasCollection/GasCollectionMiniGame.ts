@@ -298,9 +298,9 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
     }
   }
 
-  /** Remove collected drones and drones that fell off screen. */
+  /** Remove collected drones, drones past the cook zone, and drones off screen. */
   private cleanupDrones(): void {
-    this.drones = this.drones.filter((d) => !d.collected && d.y <= CANVAS_HEIGHT + 20)
+    this.drones = this.drones.filter((d) => !d.collected && d.y <= COOK_ZONE_Y)
   }
 
   /** Remove consumed and off-screen gas puffs. */
