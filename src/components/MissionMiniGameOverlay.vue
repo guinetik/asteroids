@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { ActiveShuttleMission } from '@/lib/missions/types'
 import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
+import { GasCollectionMiniGame } from '@/lib/minigame/gasCollection/GasCollectionMiniGame'
+import GasCollectionCanvas from '@/components/GasCollectionCanvas.vue'
 import { getPlanetOrbitalConfig } from '@/lib/missions/planetOrbitalConfig'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 import { computed } from 'vue'
@@ -21,6 +23,14 @@ function handleComplete() {
   emit('complete')
 }
 
+const isGasCollection = computed(
+  () => props.minigame instanceof GasCollectionMiniGame,
+)
+
+const gasMinigame = computed(
+  () => (props.minigame instanceof GasCollectionMiniGame ? props.minigame : null),
+)
+
 const orbitalConfig = computed(() => getPlanetOrbitalConfig(props.mission.template.targetPlanet))
 const gatherItemDef = computed(() => {
   const itemId = orbitalConfig.value?.gatherItem
@@ -29,7 +39,31 @@ const gatherItemDef = computed(() => {
 </script>
 
 <template>
-  <div class="mission-minigame-overlay">
+  <!-- Gas Collection: fullscreen canvas -->
+  <div v-if="isGasCollection && gasMinigame" class="mission-minigame-overlay">
+    <div class="mission-minigame-card" style="max-width: 850px;">
+      <div class="mission-minigame-card__chrome">
+        <span>{{ mission.template.name }}</span>
+        <button
+          type="button"
+          class="ship-message-card__button"
+          @click="emit('close')"
+        >
+          Close
+        </button>
+      </div>
+      <div class="mission-minigame-card__body" style="padding: 0.5rem;">
+        <GasCollectionCanvas
+          :minigame="gasMinigame"
+          @complete="emit('complete')"
+          @fail="() => {}"
+        />
+      </div>
+    </div>
+  </div>
+
+  <!-- Default: button card -->
+  <div v-else class="mission-minigame-overlay">
     <div class="mission-minigame-card">
       <div class="mission-minigame-card__chrome">
         <span>Orbital Mission</span>
