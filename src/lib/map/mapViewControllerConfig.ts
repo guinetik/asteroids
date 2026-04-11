@@ -37,6 +37,33 @@ export const MAP_SHUTTLE_BASE_SIZE = 14
 /** Fixed world-space collision radius for the shuttle in map free flight. */
 export const MAP_SHUTTLE_COLLISION_RADIUS = (MAP_SHUTTLE_BASE_SIZE * MAP_SHUTTLE_SCALE) / 2
 
+/** Cooldown between asteroid impacts so dense belts do not multi-hit every frame. */
+export const ASTEROID_IMPACT_COOLDOWN_SEC = 0.5
+
+/** Minimum hull damage from a map-view asteroid impact. */
+export const ASTEROID_IMPACT_MIN_DAMAGE = 6
+
+/** Maximum hull damage from a severe map-view asteroid impact. */
+export const ASTEROID_IMPACT_MAX_DAMAGE = 28
+
+/** Lower bound on the post-impact shove applied to the shuttle. */
+export const ASTEROID_IMPACT_MIN_IMPULSE = 0.35
+
+/** Multiplier from inbound speed to impact shove strength. */
+export const ASTEROID_IMPACT_SPEED_TO_IMPULSE = 1.15
+
+/** Extra impulse contributed by the asteroid's own size. */
+export const ASTEROID_IMPACT_RADIUS_TO_IMPULSE = 1.4
+
+/** Minimum camera shake for a light asteroid hit. */
+export const ASTEROID_IMPACT_MIN_SHAKE = 0.45
+
+/** Maximum camera shake for a severe asteroid hit. */
+export const ASTEROID_IMPACT_MAX_SHAKE = 2.4
+
+/** Duration of asteroid impact camera shake in seconds. */
+export const ASTEROID_IMPACT_SHAKE_DURATION_SEC = 0.22
+
 /** Minimum apparent shuttle size as a fraction of viewport height. */
 export const MAP_SHUTTLE_MIN_APPARENT_SIZE = 0.012
 
@@ -237,6 +264,15 @@ export const MAP_VIEW_CONTROLLER_CONFIG = {
   ADRIFT_TIMEOUT,
   AIM_BLOCK_THRESHOLD,
   APPROACH_DURATION,
+  ASTEROID_IMPACT_COOLDOWN_SEC,
+  ASTEROID_IMPACT_MAX_DAMAGE,
+  ASTEROID_IMPACT_MAX_SHAKE,
+  ASTEROID_IMPACT_MIN_DAMAGE,
+  ASTEROID_IMPACT_MIN_IMPULSE,
+  ASTEROID_IMPACT_MIN_SHAKE,
+  ASTEROID_IMPACT_RADIUS_TO_IMPULSE,
+  ASTEROID_IMPACT_SHAKE_DURATION_SEC,
+  ASTEROID_IMPACT_SPEED_TO_IMPULSE,
   ARROW_COLOR_BLOCKED,
   ARROW_COLOR_SAFE,
   ARROW_HEAD_LENGTH,

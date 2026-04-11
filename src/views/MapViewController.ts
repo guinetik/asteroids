@@ -270,6 +270,10 @@ export class MapViewController implements Tickable {
 
   /** World-space shuttle position reused for asteroid belt nearby tumble (avoid per-frame alloc). */
   private readonly _beltShuttleWorldScratch = new THREE.Vector3()
+  /** Scratch vector for asteroid impact knockback direction. */
+  private readonly _asteroidImpactNormal = new THREE.Vector3()
+  /** Countdown until the next asteroid impact can damage the shuttle again. */
+  private asteroidImpactCooldown = 0
 
   /**
    * Root at the mission waypoint world position; uniform screen scaling applies to the cyan marker
@@ -1284,6 +1288,7 @@ export class MapViewController implements Tickable {
     for (const controller of this.beltControllers) {
       controller.tick(dt, this.simTime, shuttleWorldForBelts)
     }
+    this.tickAsteroidImpacts(dt, shuttleWorldForBelts)
 
     const shuttleX = this.shuttleController?.group.position.x ?? 0
     const shuttleZ = this.shuttleController?.group.position.z ?? 0
@@ -1385,6 +1390,71 @@ export class MapViewController implements Tickable {
       venusOrbitWarningDistance: MAP_CONFIG.VENUS_ORBIT_WARNING_DISTANCE,
       onMessageUpdate: this.onMessageUpdate,
     })
+  }
+
+  /** Apply asteroid impact damage + trajectory deflection while flying through belts. */
+  private tickAsteroidImpacts(dt: number, shuttleWorldPosition: THREE.Vector3 | null): void {
+    if (
+      !shuttleWorldPosition ||
+      !this.shuttleController ||
+      !this.shipHealth ||
+      this.shuttleController.dead ||
+      (this.orbitSystem?.state ?? 'free') !== 'free'
+    ) {
+      return
+    }
+
+    this.asteroidImpactCooldown = Math.max(0, this.asteroidImpactCooldown - dt)
+    if (this.asteroidImpactCooldown > 0) return
+
+    for (const controller of this.beltControllers) {
+      const impact = controller.findNearestImpact(
+        shuttleWorldPosition,
+        MAP_CONFIG.MAP_SHUTTLE_COLLISION_RADIUS,
+      )
+      if (!impact) continue
+
+      const velocity = this.shuttleController.currentVelocity
+      const speed = velocity.length()
+
+      this._asteroidImpactNormal.copy(shuttleWorldPosition).sub(impact.worldPosition)
+      if (this._asteroidImpactNormal.lengthSq() < 1e-6) {
+        if (speed > 0.001) {
+          this._asteroidImpactNormal.copy(velocity).multiplyScalar(-1)
+        } else {
+          this._asteroidImpactNormal.set(1, 0, 0)
+        }
+      }
+      this._asteroidImpactNormal.y = 0
+      this._asteroidImpactNormal.normalize()
+
+      const inboundSpeed = Math.max(0, -velocity.dot(this._asteroidImpactNormal))
+      const damageRatio = Math.min(1, Math.max(speed, inboundSpeed) / 6)
+      const damage =
+        MAP_CONFIG.ASTEROID_IMPACT_MIN_DAMAGE +
+        (MAP_CONFIG.ASTEROID_IMPACT_MAX_DAMAGE - MAP_CONFIG.ASTEROID_IMPACT_MIN_DAMAGE) *
+          damageRatio
+      this.shipHealth.applyDamage(damage, 'Asteroid Impact')
+      this.vehicleCamera?.shake(
+        MAP_CONFIG.ASTEROID_IMPACT_MIN_SHAKE +
+          (MAP_CONFIG.ASTEROID_IMPACT_MAX_SHAKE - MAP_CONFIG.ASTEROID_IMPACT_MIN_SHAKE) *
+            damageRatio,
+        MAP_CONFIG.ASTEROID_IMPACT_SHAKE_DURATION_SEC,
+      )
+
+      const impulseMagnitude = Math.max(
+        MAP_CONFIG.ASTEROID_IMPACT_MIN_IMPULSE,
+        inboundSpeed * MAP_CONFIG.ASTEROID_IMPACT_SPEED_TO_IMPULSE +
+          impact.asteroidRadius * MAP_CONFIG.ASTEROID_IMPACT_RADIUS_TO_IMPULSE,
+      )
+      velocity.addScaledVector(this._asteroidImpactNormal, impulseMagnitude)
+      if (inboundSpeed > 0) {
+        velocity.multiplyScalar(0.92)
+      }
+      this.shuttleController.setVelocity(velocity)
+      this.asteroidImpactCooldown = MAP_CONFIG.ASTEROID_IMPACT_COOLDOWN_SEC
+      return
+    }
   }
 
   /**

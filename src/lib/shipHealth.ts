@@ -95,6 +95,24 @@ export class ShipHealth {
   private _lastDamageIntensity = 0
 
   /**
+   * Apply direct hull damage from an instantaneous event.
+   *
+   * Used for collisions / impacts that should bypass the temperature-radiation
+   * simulation and immediately chip the hull.
+   */
+  applyDamage(amount: number, cause: string): void {
+    if (this._dead || amount <= 0) return
+
+    this._hp = Math.max(0, this._hp - amount)
+    this._lastDamageIntensity = Math.min(1, Math.max(this._lastDamageIntensity, amount / 25))
+
+    if (this._hp <= 0 && !this._dead) {
+      this._dead = true
+      this.onDeath?.(cause)
+    }
+  }
+
+  /**
    * Advance health simulation by dt seconds.
    *
    * @param dt - Delta time in seconds

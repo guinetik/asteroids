@@ -54,6 +54,9 @@ const TUMBLE_SPEED_JITTER_RATIO_MIN = 0.75
 /** Upper bound multiplier on per-instance tumble angular velocity. */
 const TUMBLE_SPEED_JITTER_RATIO_MAX = 1.35
 
+/** Approximate asteroid collision radius multiplier from sampled instance scale. */
+const ASTEROID_COLLISION_RADIUS_SCALE = 0.5
+
 /**
  * Per-geometry instance tracking: mesh, placement caches, and nearby tumble state.
  */
@@ -70,6 +73,8 @@ interface BeltInstanceData {
   tumbleAxes: THREE.Vector3[]
   /** Per-instance angular velocity scale (radians per sim-time unit). */
   tumbleSpeeds: number[]
+  /** Approximate per-instance collision radii in belt-local units. */
+  collisionRadii: number[]
   /** Parallel to `activeTumblerSet` for O(1) lookup in the sample window. */
   isTumbling: boolean[]
   /** Indices currently receiving per-frame tumble matrix updates. */
@@ -156,6 +161,8 @@ export class AsteroidBeltController {
   readonly group: THREE.Group
   private instanceDataList: BeltInstanceData[] = []
   private orbitalSpeed: number
+  private innerRadiusWorld = 0
+  private outerRadiusWorld = 0
 
   private tumbleEvaluationFrameCounter = 0
   private nearbyTumblerActiveCount = 0
@@ -165,11 +172,14 @@ export class AsteroidBeltController {
   private readonly _asteroidLocalLike = { x: 0, y: 0, z: 0 }
   private readonly _workMatrix = new THREE.Matrix4()
   private readonly _tumbleRotMatrix = new THREE.Matrix4()
+  private readonly _impactWorldPosition = new THREE.Vector3()
 
   private constructor(belt: AsteroidBelt) {
     this.group = new THREE.Group()
     this.group.name = belt.id
     this.orbitalSpeed = belt.orbitalSpeed
+    this.innerRadiusWorld = belt.innerRadius * ORBIT_SCALE
+    this.outerRadiusWorld = belt.outerRadius * ORBIT_SCALE
   }
 
   /**
@@ -225,6 +235,7 @@ export class AsteroidBeltController {
       const localPositions: THREE.Vector3[] = []
       const tumbleAxes: THREE.Vector3[] = []
       const tumbleSpeeds: number[] = []
+      const collisionRadii: number[] = []
       const isTumbling: boolean[] = []
 
       for (let i = 0; i < count; i++) {
@@ -266,6 +277,7 @@ export class AsteroidBeltController {
           TUMBLE_SPEED_JITTER_RATIO_MIN +
           Math.random() * (TUMBLE_SPEED_JITTER_RATIO_MAX - TUMBLE_SPEED_JITTER_RATIO_MIN)
         tumbleSpeeds.push(belt.tumbleSpeed * jitter)
+        collisionRadii.push(s * ASTEROID_COLLISION_RADIUS_SCALE)
         isTumbling.push(false)
       }
 
@@ -279,6 +291,7 @@ export class AsteroidBeltController {
         localPositions,
         tumbleAxes,
         tumbleSpeeds,
+        collisionRadii,
         isTumbling,
         activeTumblerSet: new Set<number>(),
         sampleCursor: 0,
@@ -448,6 +461,62 @@ export class AsteroidBeltController {
       if (wroteMatrices) {
         mesh.instanceMatrix.needsUpdate = true
       }
+    }
+  }
+
+  /**
+   * Return the nearest currently visible asteroid overlapping the shuttle.
+   *
+   * Uses simple sphere overlap in belt-local space; intended for map-view
+   * impact gameplay rather than exact mesh collision.
+   */
+  findNearestImpact(
+    shuttleWorldPosition: THREE.Vector3,
+    shuttleRadius: number,
+  ): { worldPosition: THREE.Vector3; asteroidRadius: number; distance: number } | null {
+    this._shuttleBeltLocal.copy(shuttleWorldPosition)
+    this.group.worldToLocal(this._shuttleBeltLocal)
+
+    const shuttleRadial = Math.hypot(this._shuttleBeltLocal.x, this._shuttleBeltLocal.z)
+    if (
+      shuttleRadial < this.innerRadiusWorld - NEARBY_TUMBLE_RADIUS ||
+      shuttleRadial > this.outerRadiusWorld + NEARBY_TUMBLE_RADIUS
+    ) {
+      return null
+    }
+
+    let nearestData: { localPosition: THREE.Vector3; asteroidRadius: number; distance: number } | null =
+      null
+
+    for (const data of this.instanceDataList) {
+      const visibleCount = data.mesh.count
+      for (let i = 0; i < visibleCount; i += 1) {
+        const localPosition = data.localPositions[i]!
+        const asteroidRadius = data.collisionRadii[i]!
+        const dx = localPosition.x - this._shuttleBeltLocal.x
+        const dy = localPosition.y - this._shuttleBeltLocal.y
+        const dz = localPosition.z - this._shuttleBeltLocal.z
+        const distSq = dx * dx + dy * dy + dz * dz
+        const impactRadius = shuttleRadius + asteroidRadius
+
+        if (distSq > impactRadius * impactRadius) continue
+
+        const distance = Math.sqrt(distSq)
+        if (!nearestData || distance < nearestData.distance) {
+          nearestData = { localPosition, asteroidRadius, distance }
+        }
+      }
+    }
+
+    if (!nearestData) return null
+
+    this._impactWorldPosition.copy(nearestData.localPosition)
+    this.group.localToWorld(this._impactWorldPosition)
+
+    return {
+      worldPosition: this._impactWorldPosition.clone(),
+      asteroidRadius: nearestData.asteroidRadius,
+      distance: nearestData.distance,
     }
   }
 
