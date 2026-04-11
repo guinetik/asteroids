@@ -1854,6 +1854,12 @@ body {
   @apply opacity-40 cursor-not-allowed;
 }
 
+/* Gas Collection Minigame Canvas */
+.gas-collection-canvas {
+  @apply w-full h-auto max-h-[80vh] rounded-lg border border-cyan-400/20;
+  image-rendering: pixelated;
+}
+
 /* Survey HUD — timer + probe count overlay during active surveys */
 .survey-hud {
   @apply fixed top-4 left-1/2 z-30 flex flex-col items-center gap-1 pointer-events-none;
