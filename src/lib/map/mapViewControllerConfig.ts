@@ -34,6 +34,9 @@ export const MAP_SHUTTLE_SCALE = 0.01
 /** Approximate local-space shuttle size before map scaling. */
 export const MAP_SHUTTLE_BASE_SIZE = 14
 
+/** Fixed world-space collision radius for the shuttle in map free flight. */
+export const MAP_SHUTTLE_COLLISION_RADIUS = (MAP_SHUTTLE_BASE_SIZE * MAP_SHUTTLE_SCALE) / 2
+
 /** Minimum apparent shuttle size as a fraction of viewport height. */
 export const MAP_SHUTTLE_MIN_APPARENT_SIZE = 0.012
 
@@ -293,6 +296,7 @@ export const MAP_VIEW_CONTROLLER_CONFIG = {
   MAP_RETICLE_FADE_START,
   MAP_RETICLE_MIN_SPEED,
   MAP_SHUTTLE_BASE_SIZE,
+  MAP_SHUTTLE_COLLISION_RADIUS,
   MAP_SHUTTLE_MIN_APPARENT_SIZE,
   MAP_SHUTTLE_SCALE,
   MAP_SHUTTLE_SCALE_LERP,
