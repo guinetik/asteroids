@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a12; display: flex; align-items: center; justify-content: center; height: 100vh; }
+  canvas { border: 1px solid rgba(100,200,220,0.15); border-radius: 4px; }
+</style>
+</head>
+<body>
+<canvas id="c" width="800" height="500"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = 800, H = 500;
+
+// Saturn position — upper right, partially off-screen
+const SATURN_X = W * 0.88;
+const SATURN_Y = H * 0.08;
+const SATURN_R = 180;
+
+// Ring parameters
+const RING_INNER = 220;
+const RING_OUTER = 340;
+const RING_TILT = 0.18; // vertical squash for perspective
+
+// Starfield
+const stars = [];
+for (let i = 0; i < 200; i++) {
+  stars.push({
+    x: Math.random() * W,
+    y: Math.random() * H,
+    r: Math.random() * 1.2 + 0.3,
+    brightness: Math.random() * 0.6 + 0.4,
+    twinkleSpeed: Math.random() * 2 + 1,
+    twinkleOffset: Math.random() * Math.PI * 2,
+  });
+}
+
+// Ring particles (the debris field the shuttle flies through)
+const ringParticles = [];
+for (let i = 0; i < 300; i++) {
+  const angle = Math.random() * Math.PI * 2;
+  const dist = RING_INNER + Math.random() * (RING_OUTER - RING_INNER);
+  // Cluster density — more particles near certain radii (ring gaps)
+  const bandNoise = Math.sin(dist * 0.08) * 0.3 + 0.7;
+  if (Math.random() > bandNoise) continue;
+  ringParticles.push({
+    angle,
+    dist,
+    size: Math.random() * 3 + 0.8,
+    brightness: Math.random() * 0.5 + 0.3,
+    speed: (0.02 + Math.random() * 0.03) / (dist * 0.005), // Kepler-ish
+    colorShift: Math.random(),
+  });
+}
+
+// Foreground ring chunks (close debris passing by)
+const debris = [];
+for (let i = 0; i < 25; i++) {
+  debris.push({
+    x: Math.random() * W * 1.4 - W * 0.2,
+    y: H * 0.55 + Math.random() * H * 0.5,
+    size: Math.random() * 6 + 2,
+    speed: 15 + Math.random() * 40,
+    brightness: Math.random() * 0.3 + 0.15,
+    parallax: 0.5 + Math.random() * 0.5,
+  });
+}
+
+// Gas puff placeholder positions (just for art reference)
+const puffDemo = [];
+for (let i = 0; i < 6; i++) {
+  puffDemo.push({
+    x: 80 + Math.random() * (W - 160),
+    y: H * 0.7 + Math.random() * H * 0.15,
+    r: 12 + Math.random() * 18,
+    speed: 20 + Math.random() * 15,
+    alpha: 0.4 + Math.random() * 0.3,
+  });
+}
+
+// Cook zone Y — the ring plane danger threshold
+const COOK_ZONE_Y = H * 0.78;
+
+let time = 0;
+
+function lerpColor(r1,g1,b1, r2,g2,b2, t) {
+  return [r1+(r2-r1)*t, g1+(g2-g1)*t, b1+(b2-b1)*t];
+}
+
+function drawBackground() {
+  // Deep space gradient — dark blue-black to slightly warm near the ring plane
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#05060f');
+  bg.addColorStop(0.4, '#080a18');
+  bg.addColorStop(0.65, '#0d0f1e');
+  bg.addColorStop(0.78, '#1a1520');
+  bg.addColorStop(0.85, '#2a1f28');
+  bg.addColorStop(1, '#1e1518');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawStars(t) {
+  for (const s of stars) {
+    const twinkle = Math.sin(t * s.twinkleSpeed + s.twinkleOffset) * 0.3 + 0.7;
+    const alpha = s.brightness * twinkle;
+    // Skip stars behind Saturn
+    const dx = s.x - SATURN_X;
+    const dy = s.y - SATURN_Y;
+    if (dx*dx + dy*dy < (SATURN_R+20)*(SATURN_R+20)) continue;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(220,225,255,${alpha})`;
+    ctx.fill();
+  }
+}
+
+function drawSaturn() {
+  // Planet body — banded gas giant
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(SATURN_X, SATURN_Y, SATURN_R, 0, Math.PI * 2);
+  ctx.clip();
+
+  // Base gradient
+  const pg = ctx.createLinearGradient(SATURN_X - SATURN_R, SATURN_Y - SATURN_R, SATURN_X + SATURN_R, SATURN_Y + SATURN_R);
+  pg.addColorStop(0, '#c4a44a');
+  pg.addColorStop(0.2, '#d4b870');
+  pg.addColorStop(0.35, '#b89545');
+  pg.addColorStop(0.5, '#c9a958');
+  pg.addColorStop(0.65, '#ddc080');
+  pg.addColorStop(0.8, '#b08a3a');
+  pg.addColorStop(1, '#9a7830');
+  ctx.fillStyle = pg;
+  ctx.fillRect(SATURN_X - SATURN_R, SATURN_Y - SATURN_R, SATURN_R*2, SATURN_R*2);
+
+  // Horizontal bands
+  for (let i = 0; i < 12; i++) {
+    const bandY = SATURN_Y - SATURN_R + (SATURN_R * 2 / 12) * i;
+    const bandH = SATURN_R * 2 / 12;
+    const alpha = (i % 2 === 0) ? 0.08 : 0.04;
+    const hue = i % 3 === 0 ? '#8a6520' : '#d4b870';
+    ctx.fillStyle = hue;
+    ctx.globalAlpha = alpha + Math.sin(i * 1.5 + time * 0.3) * 0.02;
+    ctx.fillRect(SATURN_X - SATURN_R, bandY, SATURN_R * 2, bandH);
+  }
+  ctx.globalAlpha = 1;
+
+  // Limb darkening
+  const limb = ctx.createRadialGradient(SATURN_X - 30, SATURN_Y - 30, SATURN_R * 0.3, SATURN_X, SATURN_Y, SATURN_R);
+  limb.addColorStop(0, 'rgba(0,0,0,0)');
+  limb.addColorStop(0.7, 'rgba(0,0,0,0.15)');
+  limb.addColorStop(1, 'rgba(0,0,0,0.5)');
+  ctx.fillStyle = limb;
+  ctx.fillRect(SATURN_X - SATURN_R, SATURN_Y - SATURN_R, SATURN_R*2, SATURN_R*2);
+
+  ctx.restore();
+
+  // Atmospheric glow
+  ctx.save();
+  const glow = ctx.createRadialGradient(SATURN_X, SATURN_Y, SATURN_R - 5, SATURN_X, SATURN_Y, SATURN_R + 25);
+  glow.addColorStop(0, 'rgba(200,170,80,0)');
+  glow.addColorStop(0.5, 'rgba(200,170,80,0.06)');
+  glow.addColorStop(1, 'rgba(200,170,80,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(SATURN_X, SATURN_Y, SATURN_R + 25, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawRingsBack(t) {
+  // Rings behind the planet
+  ctx.save();
+  for (const p of ringParticles) {
+    const a = p.angle + t * p.speed;
+    const px = SATURN_X + Math.cos(a) * p.dist;
+    const py = SATURN_Y + Math.sin(a) * p.dist * RING_TILT;
+
+    // Only draw particles that are "behind" the planet (top half of ellipse)
+    if (Math.sin(a) > 0.1) continue;
+
+    // Skip if inside planet circle
+    const dx = px - SATURN_X;
+    const dy = py - SATURN_Y;
+    if (dx*dx + dy*dy < SATURN_R*SATURN_R) continue;
+
+    if (px < -10 || px > W + 10 || py < -10 || py > H + 10) continue;
+
+    const [r,g,b] = lerpColor(180,160,120, 220,200,170, p.colorShift);
+    ctx.beginPath();
+    ctx.arc(px, py, p.size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${r|0},${g|0},${b|0},${p.brightness})`;
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawRingsFront(t) {
+  // Rings in front of the planet
+  ctx.save();
+  for (const p of ringParticles) {
+    const a = p.angle + t * p.speed;
+    const px = SATURN_X + Math.cos(a) * p.dist;
+    const py = SATURN_Y + Math.sin(a) * p.dist * RING_TILT;
+
+    if (Math.sin(a) <= 0.1) continue;
+
+    if (px < -10 || px > W + 10 || py < -10 || py > H + 10) continue;
+
+    const [r,g,b] = lerpColor(180,160,120, 220,200,170, p.colorShift);
+    const alpha = p.brightness * 0.8;
+    ctx.beginPath();
+    ctx.arc(px, py, p.size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${r|0},${g|0},${b|0},${alpha})`;
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Ring shadow on planet (subtle arc)
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(SATURN_X, SATURN_Y, SATURN_R, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.fillStyle = 'rgba(0,0,0,0.12)';
+  ctx.beginPath();
+  ctx.ellipse(SATURN_X, SATURN_Y - 10, RING_OUTER, RING_OUTER * RING_TILT, 0, 0.4, Math.PI - 0.4);
+  ctx.lineTo(SATURN_X + RING_OUTER, SATURN_Y - 10 - 8);
+  ctx.ellipse(SATURN_X, SATURN_Y - 10 - 8, RING_OUTER, RING_OUTER * RING_TILT, 0, Math.PI - 0.4, 0.4, true);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawForegroundDebris(t) {
+  for (const d of debris) {
+    d.x -= d.speed * 0.016; // Scrolling left
+    if (d.x < -20) d.x = W + 20 + Math.random() * 40;
+
+    // Slight bob
+    const bob = Math.sin(t * 1.5 + d.x * 0.01) * 2;
+
+    ctx.beginPath();
+    ctx.arc(d.x, d.y + bob, d.size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(160,140,110,${d.brightness})`;
+    ctx.fill();
+
+    // Subtle highlight
+    if (d.size > 3) {
+      ctx.beginPath();
+      ctx.arc(d.x - d.size * 0.3, d.y + bob - d.size * 0.3, d.size * 0.3, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(220,200,170,${d.brightness * 0.5})`;
+      ctx.fill();
+    }
+  }
+}
+
+function drawCookZone() {
+  // Danger zone — dense ring plane below
+  const zoneGrad = ctx.createLinearGradient(0, COOK_ZONE_Y - 30, 0, H);
+  zoneGrad.addColorStop(0, 'rgba(180,150,100,0)');
+  zoneGrad.addColorStop(0.08, 'rgba(180,150,100,0.06)');
+  zoneGrad.addColorStop(0.2, 'rgba(200,170,110,0.12)');
+  zoneGrad.addColorStop(0.5, 'rgba(190,160,100,0.25)');
+  zoneGrad.addColorStop(1, 'rgba(160,130,80,0.4)');
+  ctx.fillStyle = zoneGrad;
+  ctx.fillRect(0, COOK_ZONE_Y - 30, W, H - COOK_ZONE_Y + 30);
+
+  // Dense particle band
+  ctx.save();
+  for (let i = 0; i < 80; i++) {
+    const px = (i * 11.3 + time * 20) % (W + 40) - 20;
+    const py = COOK_ZONE_Y + 5 + Math.sin(i * 3.7) * 15 + Math.random() * 20;
+    const size = 1 + Math.random() * 3;
+    const alpha = 0.15 + Math.random() * 0.2;
+    ctx.beginPath();
+    ctx.arc(px, py, size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(190,165,115,${alpha})`;
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Dashed warning line
+  ctx.save();
+  ctx.setLineDash([8, 6]);
+  ctx.strokeStyle = 'rgba(220,160,60,0.35)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, COOK_ZONE_Y);
+  ctx.lineTo(W, COOK_ZONE_Y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawGasPuffs(t) {
+  for (const p of puffDemo) {
+    p.y -= p.speed * 0.016;
+    if (p.y < -30) {
+      p.y = H * 0.85;
+      p.x = 80 + Math.random() * (W - 160);
+    }
+    const fadeRatio = (COOK_ZONE_Y - p.y) / (COOK_ZONE_Y * 0.5);
+    const alpha = Math.max(0, p.alpha * (1 - fadeRatio));
+    if (alpha <= 0) continue;
+
+    // Glowing gas puff — warm amber/gold for Saturn
+    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+    grad.addColorStop(0, `rgba(220,190,100,${alpha * 0.8})`);
+    grad.addColorStop(0.5, `rgba(200,160,70,${alpha * 0.4})`);
+    grad.addColorStop(1, `rgba(180,140,50,0)`);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+}
+
+function drawVignette() {
+  const vg = ctx.createRadialGradient(W/2, H/2, W * 0.25, W/2, H/2, W * 0.7);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.35)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function render() {
+  time += 0.016;
+  ctx.clearRect(0, 0, W, H);
+
+  drawBackground();
+  drawStars(time);
+  drawRingsBack(time);
+  drawSaturn();
+  drawRingsFront(time);
+  drawCookZone();
+  drawGasPuffs(time);
+  drawForegroundDebris(time);
+  drawVignette();
+
+  requestAnimationFrame(render);
+}
+
+render();
+</script>
+</body>
+</html>

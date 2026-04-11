@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a12; display: flex; align-items: center; justify-content: center; height: 100vh; }
+  canvas { border: 1px solid rgba(100,200,220,0.15); border-radius: 4px; }
+</style>
+</head>
+<body>
+<canvas id="c" width="800" height="500"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = 800, H = 500;
+
+// Sun — small and distant, upper right
+const SUN_X = W * 0.82;
+const SUN_Y = H * 0.12;
+const SUN_R = 22;
+
+// Mars surface — curved horizon
+const SURFACE_Y = H * 0.72;
+const COOK_ZONE_Y = H * 0.78;
+
+// Starfield — more visible than Mercury, sun is weaker
+const stars = [];
+for (let i = 0; i < 140; i++) {
+  stars.push({
+    x: Math.random() * W,
+    y: Math.random() * H * 0.75,
+    r: Math.random() * 1.0 + 0.2,
+    brightness: Math.random() * 0.45 + 0.15,
+    twinkleSpeed: Math.random() * 2 + 1,
+    twinkleOffset: Math.random() * Math.PI * 2,
+  });
+}
+
+// Dust particles — Mars is dusty, constant haze
+const dustParticles = [];
+for (let i = 0; i < 80; i++) {
+  dustParticles.push({
+    x: Math.random() * W * 1.3,
+    y: SURFACE_Y * 0.4 + Math.random() * SURFACE_Y * 0.55,
+    size: 1 + Math.random() * 3,
+    speed: 10 + Math.random() * 35,
+    alpha: 0.04 + Math.random() * 0.08,
+    drift: (Math.random() - 0.5) * 8,
+  });
+}
+
+// Dust storm bands — horizontal streaks of wind-blown dust
+const dustBands = [];
+for (let i = 0; i < 12; i++) {
+  dustBands.push({
+    y: SURFACE_Y * 0.5 + Math.random() * SURFACE_Y * 0.4,
+    speed: 20 + Math.random() * 50,
+    alpha: 0.02 + Math.random() * 0.04,
+    height: 3 + Math.random() * 12,
+    offset: Math.random() * W,
+    length: W * 0.3 + Math.random() * W * 0.5,
+  });
+}
+
+// Surface rocks / boulders
+const rocks = [];
+for (let i = 0; i < 25; i++) {
+  rocks.push({
+    x: Math.random() * W,
+    y: SURFACE_Y + 15 + Math.random() * (H - SURFACE_Y - 25),
+    w: 3 + Math.random() * 14,
+    h: 2 + Math.random() * 8,
+    shade: Math.random() * 0.12 + 0.02,
+  });
+}
+
+// Surface craters — shallower than Mercury, more eroded
+const craters = [];
+for (let i = 0; i < 10; i++) {
+  craters.push({
+    x: Math.random() * W,
+    y: SURFACE_Y + 25 + Math.random() * (H - SURFACE_Y - 35),
+    r: 6 + Math.random() * 18,
+    depth: Math.random() * 0.08 + 0.03,
+  });
+}
+
+// Gas puffs — Martian atmosphere, thinner, more orange-pink
+const puffDemo = [];
+for (let i = 0; i < 7; i++) {
+  puffDemo.push({
+    x: 60 + Math.random() * (W - 120),
+    y: COOK_ZONE_Y + Math.random() * 25,
+    r: 10 + Math.random() * 16,
+    speed: 20 + Math.random() * 18,
+    alpha: 0.45 + Math.random() * 0.3,
+  });
+}
+
+// Distant mesa / mountain silhouettes on the horizon
+const mesas = [
+  { x: W * 0.08, w: 60, h: 25, flat: 30 },
+  { x: W * 0.22, w: 40, h: 15, flat: 20 },
+  { x: W * 0.38, w: 90, h: 35, flat: 50 },
+  { x: W * 0.55, w: 30, h: 12, flat: 18 },
+  { x: W * 0.7, w: 70, h: 28, flat: 40 },
+  { x: W * 0.88, w: 45, h: 18, flat: 25 },
+];
+
+let time = 0;
+
+function drawBackground() {
+  // Mars sky — dark rust fading to black
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0c0808');
+  bg.addColorStop(0.25, '#100a08');
+  bg.addColorStop(0.45, '#1a100c');
+  bg.addColorStop(0.6, '#24150f');
+  bg.addColorStop(0.7, '#2e1a12');
+  bg.addColorStop(0.75, '#3a2018');
+  bg.addColorStop(1, '#2a1610');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawSun(t) {
+  // Small distant sun with modest glow
+  ctx.save();
+
+  // Outer glow
+  const glow = ctx.createRadialGradient(SUN_X, SUN_Y, SUN_R, SUN_X, SUN_Y, SUN_R * 6);
+  glow.addColorStop(0, 'rgba(255,240,200,0.3)');
+  glow.addColorStop(0.2, 'rgba(255,220,160,0.08)');
+  glow.addColorStop(0.5, 'rgba(255,200,120,0.02)');
+  glow.addColorStop(1, 'rgba(255,180,100,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(SUN_X, SUN_Y, SUN_R * 6, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Sun disc — slightly pulsing
+  const pulse = Math.sin(t * 1.5) * 0.05 + 0.95;
+  const disc = ctx.createRadialGradient(SUN_X, SUN_Y, 0, SUN_X, SUN_Y, SUN_R * pulse);
+  disc.addColorStop(0, 'rgba(255,250,230,0.95)');
+  disc.addColorStop(0.6, 'rgba(255,235,190,0.85)');
+  disc.addColorStop(1, 'rgba(255,210,140,0.4)');
+  ctx.fillStyle = disc;
+  ctx.beginPath();
+  ctx.arc(SUN_X, SUN_Y, SUN_R * pulse, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Lens flare streak — subtle horizontal
+  ctx.globalAlpha = 0.04 + Math.sin(t * 0.7) * 0.01;
+  const flare = ctx.createLinearGradient(SUN_X - 120, SUN_Y, SUN_X + 120, SUN_Y);
+  flare.addColorStop(0, 'rgba(255,200,120,0)');
+  flare.addColorStop(0.4, 'rgba(255,220,160,1)');
+  flare.addColorStop(0.5, 'rgba(255,240,200,1)');
+  flare.addColorStop(0.6, 'rgba(255,220,160,1)');
+  flare.addColorStop(1, 'rgba(255,200,120,0)');
+  ctx.fillStyle = flare;
+  ctx.fillRect(SUN_X - 120, SUN_Y - 1.5, 240, 3);
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
+}
+
+function drawStars(t) {
+  for (const s of stars) {
+    const dx = s.x - SUN_X;
+    const dy = s.y - SUN_Y;
+    const sunDist = Math.sqrt(dx * dx + dy * dy);
+    const sunFade = Math.min(1, Math.max(0, (sunDist - SUN_R * 3) / 200));
+
+    const twinkle = Math.sin(t * s.twinkleSpeed + s.twinkleOffset) * 0.3 + 0.7;
+    const alpha = s.brightness * twinkle * sunFade;
+    if (alpha < 0.02) continue;
+
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(220,215,230,${alpha})`;
+    ctx.fill();
+  }
+}
+
+function drawAtmosphericHaze() {
+  // Thin Martian atmosphere — reddish haze near horizon
+  const haze = ctx.createLinearGradient(0, SURFACE_Y - 100, 0, SURFACE_Y + 20);
+  haze.addColorStop(0, 'rgba(180,90,50,0)');
+  haze.addColorStop(0.4, 'rgba(160,80,45,0.02)');
+  haze.addColorStop(0.7, 'rgba(140,70,35,0.06)');
+  haze.addColorStop(1, 'rgba(120,60,30,0.1)');
+  ctx.fillStyle = haze;
+  ctx.fillRect(0, SURFACE_Y - 100, W, 120);
+}
+
+function drawMarsSurface(t) {
+  ctx.save();
+
+  const curveDepth = 70;
+  ctx.beginPath();
+  ctx.moveTo(-10, H + 10);
+  ctx.lineTo(-10, SURFACE_Y + 25);
+  ctx.quadraticCurveTo(W / 2, SURFACE_Y - curveDepth, W + 10, SURFACE_Y + 25);
+  ctx.lineTo(W + 10, H + 10);
+  ctx.closePath();
+
+  // Mars regolith — rust red-brown gradient
+  const surfGrad = ctx.createLinearGradient(0, SURFACE_Y - curveDepth, 0, H);
+  surfGrad.addColorStop(0, '#8a4530');
+  surfGrad.addColorStop(0.1, '#7a3c28');
+  surfGrad.addColorStop(0.25, '#6e3422');
+  surfGrad.addColorStop(0.4, '#5e2c1c');
+  surfGrad.addColorStop(0.6, '#4e2418');
+  surfGrad.addColorStop(0.8, '#3e1c12');
+  surfGrad.addColorStop(1, '#2e140e');
+  ctx.fillStyle = surfGrad;
+  ctx.fill();
+
+  // Sun-lit highlight from upper right
+  ctx.save();
+  ctx.clip();
+
+  const highlight = ctx.createLinearGradient(W, 0, W * 0.4, 0);
+  highlight.addColorStop(0, 'rgba(220,140,80,0.1)');
+  highlight.addColorStop(0.4, 'rgba(200,120,60,0.04)');
+  highlight.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = highlight;
+  ctx.fillRect(0, SURFACE_Y - curveDepth, W, H);
+
+  // Mesa silhouettes on the horizon
+  for (const m of mesas) {
+    const mesaY = SURFACE_Y - curveDepth + 15;
+    // Offset by curve
+    const curveFactor = 1 - Math.pow((m.x / W - 0.5) * 2, 2);
+    const baseY = mesaY + curveDepth * (1 - curveFactor) - 5;
+
+    ctx.beginPath();
+    ctx.moveTo(m.x - m.w / 2, baseY);
+    // Sloped left side
+    ctx.lineTo(m.x - m.flat / 2, baseY - m.h);
+    // Flat top
+    ctx.lineTo(m.x + m.flat / 2, baseY - m.h);
+    // Sloped right side
+    ctx.lineTo(m.x + m.w / 2, baseY);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(60,28,18,0.7)';
+    ctx.fill();
+  }
+
+  // Craters
+  for (const c of craters) {
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(0,0,0,${c.depth})`;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(c.x + c.r * 0.15, c.y - c.r * 0.15, c.r * 0.8, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(120,65,40,${c.depth * 0.5})`;
+    ctx.fill();
+  }
+
+  // Rocks
+  for (const r of rocks) {
+    ctx.beginPath();
+    // Irregular rock shape
+    ctx.ellipse(r.x, r.y, r.w / 2, r.h / 2, 0, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(50,25,15,${r.shade + 0.1})`;
+    ctx.fill();
+
+    // Highlight edge
+    ctx.beginPath();
+    ctx.ellipse(r.x + 1, r.y - 1, r.w / 2 - 1, r.h / 2 - 1, 0, Math.PI, Math.PI * 2);
+    ctx.fillStyle = `rgba(160,90,55,${r.shade})`;
+    ctx.fill();
+  }
+
+  ctx.restore();
+  ctx.restore();
+}
+
+function drawDustBands(t) {
+  ctx.save();
+  for (const band of dustBands) {
+    const xOffset = (t * band.speed + band.offset) % (W + band.length) - band.length * 0.5;
+
+    const grad = ctx.createLinearGradient(xOffset, 0, xOffset + band.length, 0);
+    grad.addColorStop(0, 'rgba(180,100,55,0)');
+    grad.addColorStop(0.2, `rgba(180,100,55,${band.alpha})`);
+    grad.addColorStop(0.5, `rgba(160,85,45,${band.alpha * 1.2})`);
+    grad.addColorStop(0.8, `rgba(180,100,55,${band.alpha})`);
+    grad.addColorStop(1, 'rgba(180,100,55,0)');
+
+    ctx.fillStyle = grad;
+    ctx.fillRect(xOffset, band.y - band.height / 2, band.length, band.height);
+  }
+  ctx.restore();
+}
+
+function drawDustParticles(t) {
+  ctx.save();
+  for (const d of dustParticles) {
+    d.x += d.speed * 0.016;
+    d.y += d.drift * 0.016;
+    if (d.x > W + 20) {
+      d.x = -10;
+      d.y = SURFACE_Y * 0.4 + Math.random() * SURFACE_Y * 0.55;
+    }
+
+    ctx.beginPath();
+    ctx.arc(d.x, d.y, d.size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(190,110,60,${d.alpha})`;
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawCookZone(t) {
+  ctx.save();
+
+  const zoneGrad = ctx.createLinearGradient(0, COOK_ZONE_Y - 10, 0, H);
+  zoneGrad.addColorStop(0, 'rgba(200,80,30,0)');
+  zoneGrad.addColorStop(0.05, 'rgba(180,70,25,0.04)');
+  zoneGrad.addColorStop(0.3, 'rgba(160,60,20,0.08)');
+  zoneGrad.addColorStop(0.7, 'rgba(140,50,15,0.12)');
+  zoneGrad.addColorStop(1, 'rgba(120,40,10,0.18)');
+  ctx.fillStyle = zoneGrad;
+  ctx.fillRect(0, COOK_ZONE_Y - 10, W, H - COOK_ZONE_Y + 10);
+
+  // Dashed line — rust orange
+  const linePulse = Math.sin(t * 2.5) * 0.08 + 0.3;
+  ctx.setLineDash([8, 6]);
+  ctx.strokeStyle = `rgba(200,90,30,${linePulse})`;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, COOK_ZONE_Y);
+  ctx.lineTo(W, COOK_ZONE_Y);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawGasPuffs(t) {
+  for (const p of puffDemo) {
+    p.y -= p.speed * 0.016;
+    if (p.y < COOK_ZONE_Y * 0.3) {
+      p.y = COOK_ZONE_Y + 8 + Math.random() * 20;
+      p.x = 60 + Math.random() * (W - 120);
+    }
+    const fadeRatio = (COOK_ZONE_Y - p.y) / (COOK_ZONE_Y * 0.45);
+    const alpha = Math.max(0, p.alpha * (1 - fadeRatio));
+    if (alpha <= 0) continue;
+
+    // Martian gas — dusty orange-pink
+    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+    grad.addColorStop(0, `rgba(220,130,70,${alpha * 0.85})`);
+    grad.addColorStop(0.35, `rgba(200,100,55,${alpha * 0.5})`);
+    grad.addColorStop(0.7, `rgba(180,80,40,${alpha * 0.2})`);
+    grad.addColorStop(1, 'rgba(150,60,25,0)');
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+}
+
+function drawDustOverlay(t) {
+  // Overall dust haze — Mars is never fully clear
+  const pulse = Math.sin(t * 0.4) * 0.005 + 0.015;
+  ctx.fillStyle = `rgba(160,85,45,${pulse})`;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawVignette() {
+  const vg = ctx.createRadialGradient(W * 0.5, H * 0.4, W * 0.2, W * 0.5, H * 0.5, W * 0.72);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(0.6, 'rgba(0,0,0,0.1)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.4)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function render() {
+  time += 0.016;
+  ctx.clearRect(0, 0, W, H);
+
+  drawBackground();
+  drawStars(time);
+  drawSun(time);
+  drawAtmosphericHaze();
+  drawDustBands(time);
+  drawMarsSurface(time);
+  drawDustParticles(time);
+  drawCookZone(time);
+  drawGasPuffs(time);
+  drawDustOverlay(time);
+  drawVignette();
+
+  requestAnimationFrame(render);
+}
+
+render();
+</script>
+</body>
+</html>

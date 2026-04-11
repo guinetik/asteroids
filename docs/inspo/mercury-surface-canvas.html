@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a12; display: flex; align-items: center; justify-content: center; height: 100vh; }
+  canvas { border: 1px solid rgba(100,200,220,0.15); border-radius: 4px; }
+</style>
+</head>
+<body>
+<canvas id="c" width="800" height="500"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = 800, H = 500;
+
+// Sun — massive, upper left, mostly off-screen
+const SUN_X = -80;
+const SUN_Y = -120;
+const SUN_R = 320;
+
+// Mercury surface — curved horizon at the bottom like Venus reference
+const SURFACE_Y = H * 0.72;
+const COOK_ZONE_Y = H * 0.78;
+
+// Starfield — sparse, washed out by sun glare
+const stars = [];
+for (let i = 0; i < 90; i++) {
+  stars.push({
+    x: Math.random() * W,
+    y: Math.random() * H,
+    r: Math.random() * 0.9 + 0.2,
+    brightness: Math.random() * 0.3 + 0.1,
+    twinkleSpeed: Math.random() * 2 + 1,
+    twinkleOffset: Math.random() * Math.PI * 2,
+  });
+}
+
+// Solar flare particles streaming across the scene
+const solarWind = [];
+for (let i = 0; i < 60; i++) {
+  solarWind.push({
+    x: Math.random() * W * 1.5,
+    y: Math.random() * H * 0.7,
+    length: 15 + Math.random() * 50,
+    speed: 80 + Math.random() * 200,
+    alpha: Math.random() * 0.12 + 0.03,
+    thickness: Math.random() * 1.5 + 0.3,
+    yDrift: (Math.random() - 0.3) * 20,
+  });
+}
+
+// Heat shimmer distortion points on the surface
+const shimmerPoints = [];
+for (let i = 0; i < 40; i++) {
+  shimmerPoints.push({
+    x: Math.random() * W,
+    baseY: SURFACE_Y + Math.random() * (H - SURFACE_Y) * 0.4,
+    phase: Math.random() * Math.PI * 2,
+    speed: 1.5 + Math.random() * 2.5,
+    amplitude: 1 + Math.random() * 3,
+    size: 2 + Math.random() * 5,
+    alpha: 0.06 + Math.random() * 0.1,
+  });
+}
+
+// Surface craters
+const craters = [];
+for (let i = 0; i < 18; i++) {
+  const cx = Math.random() * W;
+  const cy = SURFACE_Y + 20 + Math.random() * (H - SURFACE_Y - 30);
+  craters.push({
+    x: cx,
+    y: cy,
+    r: 4 + Math.random() * 20,
+    depth: Math.random() * 0.15 + 0.05,
+  });
+}
+
+// Rising heat gas puffs
+const puffDemo = [];
+for (let i = 0; i < 7; i++) {
+  puffDemo.push({
+    x: 60 + Math.random() * (W - 120),
+    y: COOK_ZONE_Y + Math.random() * 30,
+    r: 10 + Math.random() * 16,
+    speed: 25 + Math.random() * 20,
+    alpha: 0.5 + Math.random() * 0.3,
+  });
+}
+
+// Coronal streamers — big arcing light rays from the sun
+const streamers = [];
+for (let i = 0; i < 8; i++) {
+  const angle = Math.PI * 0.15 + Math.random() * Math.PI * 0.55;
+  streamers.push({
+    angle,
+    length: 400 + Math.random() * 500,
+    width: 0.03 + Math.random() * 0.06,
+    alpha: 0.02 + Math.random() * 0.04,
+    pulseSpeed: 0.5 + Math.random() * 1.5,
+    pulseOffset: Math.random() * Math.PI * 2,
+  });
+}
+
+let time = 0;
+
+function drawBackground() {
+  // Hot gradient — sun-blasted from upper-left
+  const bg = ctx.createRadialGradient(SUN_X + 60, SUN_Y + 60, 50, SUN_X + 200, SUN_Y + 200, W * 1.2);
+  bg.addColorStop(0, '#4a3018');
+  bg.addColorStop(0.15, '#2a1a10');
+  bg.addColorStop(0.35, '#160e0a');
+  bg.addColorStop(0.6, '#0a0808');
+  bg.addColorStop(1, '#060506');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawSunGlow(t) {
+  // Massive corona glow — sun is mostly off-screen
+  ctx.save();
+
+  // Outer corona
+  const corona1 = ctx.createRadialGradient(SUN_X, SUN_Y, SUN_R * 0.8, SUN_X, SUN_Y, SUN_R * 2.5);
+  corona1.addColorStop(0, 'rgba(255,220,140,0.25)');
+  corona1.addColorStop(0.3, 'rgba(255,180,80,0.08)');
+  corona1.addColorStop(0.6, 'rgba(255,140,40,0.02)');
+  corona1.addColorStop(1, 'rgba(255,100,20,0)');
+  ctx.fillStyle = corona1;
+  ctx.fillRect(0, 0, W, H);
+
+  // Inner corona — pulsing
+  const pulse = Math.sin(t * 1.2) * 0.02 + 0.98;
+  const corona2 = ctx.createRadialGradient(SUN_X, SUN_Y, SUN_R * 0.5, SUN_X, SUN_Y, SUN_R * 1.5 * pulse);
+  corona2.addColorStop(0, 'rgba(255,240,200,0.4)');
+  corona2.addColorStop(0.4, 'rgba(255,200,120,0.12)');
+  corona2.addColorStop(0.7, 'rgba(255,160,60,0.03)');
+  corona2.addColorStop(1, 'rgba(255,120,30,0)');
+  ctx.fillStyle = corona2;
+  ctx.fillRect(0, 0, W, H);
+
+  // Sun body edge (barely visible arc in corner)
+  ctx.beginPath();
+  ctx.arc(SUN_X, SUN_Y, SUN_R, 0, Math.PI * 2);
+  const sunBody = ctx.createRadialGradient(SUN_X, SUN_Y, SUN_R * 0.7, SUN_X, SUN_Y, SUN_R);
+  sunBody.addColorStop(0, 'rgba(255,250,230,0.9)');
+  sunBody.addColorStop(0.6, 'rgba(255,230,170,0.8)');
+  sunBody.addColorStop(0.85, 'rgba(255,200,100,0.6)');
+  sunBody.addColorStop(1, 'rgba(255,160,50,0.2)');
+  ctx.fillStyle = sunBody;
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawStreamers(t) {
+  ctx.save();
+  for (const s of streamers) {
+    const pulse = Math.sin(t * s.pulseSpeed + s.pulseOffset) * 0.3 + 0.7;
+    const alpha = s.alpha * pulse;
+
+    ctx.beginPath();
+    const sx = SUN_X + Math.cos(s.angle) * SUN_R * 0.9;
+    const sy = SUN_Y + Math.sin(s.angle) * SUN_R * 0.9;
+    const ex = SUN_X + Math.cos(s.angle) * s.length;
+    const ey = SUN_Y + Math.sin(s.angle) * s.length;
+
+    const grad = ctx.createLinearGradient(sx, sy, ex, ey);
+    grad.addColorStop(0, `rgba(255,220,140,${alpha * 2})`);
+    grad.addColorStop(0.3, `rgba(255,180,80,${alpha})`);
+    grad.addColorStop(0.7, `rgba(255,140,40,${alpha * 0.3})`);
+    grad.addColorStop(1, 'rgba(255,100,20,0)');
+
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = s.width * SUN_R;
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawStars(t) {
+  for (const s of stars) {
+    // Stars are very dim near sun
+    const dx = s.x - SUN_X;
+    const dy = s.y - SUN_Y;
+    const sunDist = Math.sqrt(dx*dx + dy*dy);
+    const sunFade = Math.min(1, Math.max(0, (sunDist - SUN_R) / 400));
+
+    const twinkle = Math.sin(t * s.twinkleSpeed + s.twinkleOffset) * 0.3 + 0.7;
+    const alpha = s.brightness * twinkle * sunFade;
+    if (alpha < 0.02) continue;
+
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(220,215,240,${alpha})`;
+    ctx.fill();
+  }
+}
+
+function drawSolarWind(t) {
+  ctx.save();
+  for (const p of solarWind) {
+    // Stream from upper-left to lower-right
+    p.x += p.speed * 0.016;
+    p.y += p.yDrift * 0.016;
+    if (p.x > W + 60) {
+      p.x = -p.length - Math.random() * 100;
+      p.y = Math.random() * H * 0.65;
+    }
+
+    const angle = Math.atan2(p.yDrift, p.speed);
+    const ex = p.x - Math.cos(angle) * p.length;
+    const ey = p.y - Math.sin(angle) * p.length;
+
+    const grad = ctx.createLinearGradient(p.x, p.y, ex, ey);
+    grad.addColorStop(0, `rgba(255,200,100,${p.alpha})`);
+    grad.addColorStop(0.5, `rgba(255,170,60,${p.alpha * 0.5})`);
+    grad.addColorStop(1, 'rgba(255,140,30,0)');
+
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(p.x, p.y);
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = p.thickness;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawMercurySurface(t) {
+  // Curved horizon — like Venus but scorched gray
+  ctx.save();
+
+  // Surface arc
+  const curveDepth = 80;
+  ctx.beginPath();
+  ctx.moveTo(-10, H + 10);
+  ctx.lineTo(-10, SURFACE_Y + 30);
+  // Quadratic curve for the horizon
+  ctx.quadraticCurveTo(W / 2, SURFACE_Y - curveDepth, W + 10, SURFACE_Y + 30);
+  ctx.lineTo(W + 10, H + 10);
+  ctx.closePath();
+
+  // Scorched surface gradient — lit from upper-left by the sun
+  const surfGrad = ctx.createLinearGradient(0, SURFACE_Y - curveDepth, W, H);
+  surfGrad.addColorStop(0, '#8a7560');
+  surfGrad.addColorStop(0.15, '#6e5c48');
+  surfGrad.addColorStop(0.3, '#5a4a3a');
+  surfGrad.addColorStop(0.5, '#4a3c30');
+  surfGrad.addColorStop(0.7, '#3a2e24');
+  surfGrad.addColorStop(1, '#2a2018');
+  ctx.fillStyle = surfGrad;
+  ctx.fill();
+
+  // Sun-facing highlight on the left side of the curve
+  ctx.save();
+  ctx.clip();
+  const highlight = ctx.createLinearGradient(0, 0, W * 0.5, 0);
+  highlight.addColorStop(0, 'rgba(255,200,130,0.15)');
+  highlight.addColorStop(0.5, 'rgba(255,180,100,0.05)');
+  highlight.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = highlight;
+  ctx.fillRect(0, SURFACE_Y - curveDepth, W, H);
+
+  // Craters
+  for (const c of craters) {
+    // Shadow side
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(0,0,0,${c.depth})`;
+    ctx.fill();
+
+    // Lit rim (sun from upper-left)
+    ctx.beginPath();
+    ctx.arc(c.x - c.r * 0.2, c.y - c.r * 0.2, c.r * 0.85, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(140,120,95,${c.depth * 0.6})`;
+    ctx.fill();
+
+    // Inner shadow
+    ctx.beginPath();
+    ctx.arc(c.x + c.r * 0.15, c.y + c.r * 0.15, c.r * 0.6, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(0,0,0,${c.depth * 0.8})`;
+    ctx.fill();
+  }
+  ctx.restore();
+
+  ctx.restore();
+
+  // Heat haze above surface
+  const hazeGrad = ctx.createLinearGradient(0, SURFACE_Y - curveDepth - 40, 0, SURFACE_Y);
+  hazeGrad.addColorStop(0, 'rgba(255,160,60,0)');
+  hazeGrad.addColorStop(0.5, 'rgba(255,140,40,0.03)');
+  hazeGrad.addColorStop(1, 'rgba(255,120,30,0.08)');
+  ctx.fillStyle = hazeGrad;
+  ctx.fillRect(0, SURFACE_Y - curveDepth - 40, W, curveDepth + 40);
+}
+
+function drawHeatShimmer(t) {
+  ctx.save();
+  for (const s of shimmerPoints) {
+    const wobbleX = Math.sin(t * s.speed + s.phase) * s.amplitude;
+    const wobbleY = Math.cos(t * s.speed * 0.7 + s.phase) * s.amplitude * 0.5;
+
+    ctx.beginPath();
+    ctx.arc(s.x + wobbleX, s.baseY + wobbleY, s.size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,180,80,${s.alpha})`;
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawCookZone(t) {
+  // The cook zone here is thermal — glowing heat line
+  ctx.save();
+
+  // Heat glow below the line
+  const zoneGrad = ctx.createLinearGradient(0, COOK_ZONE_Y - 15, 0, H);
+  zoneGrad.addColorStop(0, 'rgba(255,120,30,0)');
+  zoneGrad.addColorStop(0.05, 'rgba(255,100,20,0.05)');
+  zoneGrad.addColorStop(0.3, 'rgba(255,80,10,0.1)');
+  zoneGrad.addColorStop(0.7, 'rgba(200,60,5,0.15)');
+  zoneGrad.addColorStop(1, 'rgba(160,40,0,0.2)');
+  ctx.fillStyle = zoneGrad;
+  ctx.fillRect(0, COOK_ZONE_Y - 15, W, H - COOK_ZONE_Y + 15);
+
+  // Pulsing danger line
+  const linePulse = Math.sin(t * 3) * 0.1 + 0.35;
+  ctx.setLineDash([8, 6]);
+  ctx.strokeStyle = `rgba(255,120,30,${linePulse})`;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, COOK_ZONE_Y);
+  ctx.lineTo(W, COOK_ZONE_Y);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawGasPuffs(t) {
+  for (const p of puffDemo) {
+    p.y -= p.speed * 0.016;
+    if (p.y < COOK_ZONE_Y * 0.3) {
+      p.y = COOK_ZONE_Y + 10 + Math.random() * 20;
+      p.x = 60 + Math.random() * (W - 120);
+    }
+    const fadeRatio = (COOK_ZONE_Y - p.y) / (COOK_ZONE_Y * 0.45);
+    const alpha = Math.max(0, p.alpha * (1 - fadeRatio));
+    if (alpha <= 0) continue;
+
+    // Hot gas — orange/red glow
+    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+    grad.addColorStop(0, `rgba(255,160,50,${alpha * 0.9})`);
+    grad.addColorStop(0.4, `rgba(255,120,30,${alpha * 0.5})`);
+    grad.addColorStop(0.7, `rgba(220,80,10,${alpha * 0.2})`);
+    grad.addColorStop(1, 'rgba(180,50,0,0)');
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+}
+
+function drawOverallHeatWash(t) {
+  // Subtle pulsing heat overlay across the whole scene
+  const pulse = Math.sin(t * 0.8) * 0.01 + 0.02;
+  ctx.fillStyle = `rgba(255,100,20,${pulse})`;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawVignette() {
+  // Asymmetric vignette — lighter toward sun, darker away
+  const vg = ctx.createRadialGradient(W * 0.15, H * 0.15, W * 0.15, W * 0.5, H * 0.5, W * 0.75);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(0.5, 'rgba(0,0,0,0.05)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.4)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function render() {
+  time += 0.016;
+  ctx.clearRect(0, 0, W, H);
+
+  drawBackground();
+  drawSunGlow(time);
+  drawStreamers(time);
+  drawStars(time);
+  drawSolarWind(time);
+  drawMercurySurface(time);
+  drawHeatShimmer(time);
+  drawCookZone(time);
+  drawGasPuffs(time);
+  drawOverallHeatWash(time);
+  drawVignette();
+
+  requestAnimationFrame(render);
+}
+
+render();
+</script>
+</body>
+</html>
