@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { GasCollectionMiniGame } from '@/lib/minigame/gasCollection/GasCollectionMiniGame'
 import {
   CANVAS_WIDTH,
@@ -11,10 +11,14 @@ import {
   COOK_ZONE_TOLERANCE,
 } from '@/lib/minigame/gasCollection/constants'
 import type { OrbitalMiniGameContext } from '@/lib/minigame/OrbitalMiniGame'
+import { getGasCollectionTheme } from '@/lib/minigame/gasCollection/theme'
 
 const props = defineProps<{
   minigame: GasCollectionMiniGame
+  planetId?: string
 }>()
+
+const theme = computed(() => getGasCollectionTheme(props.planetId ?? 'venus'))
 
 const emit = defineEmits<{
   complete: []
@@ -90,18 +94,137 @@ function spawnWindParticle() {
 /** Planet surface scroll offset — drives the "orbiting" motion. */
 let planetScrollX = 0
 
+/** Simple hash for pseudo-random noise in the banded renderer. */
+function hash(n: number): number {
+  return ((Math.sin(n) * 43758.5453123) % 1 + 1) % 1
+}
+
+/** 2D value noise — cheap approximation of the GLSL noise3D. */
+function noise2D(x: number, y: number): number {
+  const ix = Math.floor(x)
+  const iy = Math.floor(y)
+  const fx = x - ix
+  const fy = y - iy
+  const sx = fx * fx * (3 - 2 * fx)
+  const sy = fy * fy * (3 - 2 * fy)
+  const n = ix + iy * 57
+  const a = hash(n)
+  const b = hash(n + 1)
+  const c = hash(n + 57)
+  const d = hash(n + 58)
+  return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy
+}
+
+/** 2-octave fbm for cheap turbulence. */
+function fbm2(x: number, y: number): number {
+  return noise2D(x, y) * 0.5 + noise2D(x * 2, y * 2) * 0.25
+}
+
+/** Flat cloud bands — simple parallax rectangles (Venus-style). */
+function drawFlatBands(ctx: CanvasRenderingContext2D, t: ReturnType<typeof getGasCollectionTheme>) {
+  for (let i = 0; i < 10; i++) {
+    const bandY = PLANET_HORIZON_Y + 5 + i * 24
+    const speed = 60 + i * 25
+    const scrollWrap = CANVAS_WIDTH * 2
+    const offset = (planetScrollX * speed / 80) % scrollWrap
+    const thickness = 10 + i * 5
+    const alpha = 0.1 + (i % 3) * 0.05
+
+    ctx.globalAlpha = alpha
+    ctx.fillStyle = t.cloudBands[i % 3]!
+    ctx.fillRect(offset - scrollWrap, bandY, CANVAS_WIDTH * 3, thickness)
+
+    if (i % 2 === 0) {
+      ctx.globalAlpha = alpha * 0.5
+      for (let wx = 0; wx < CANVAS_WIDTH; wx += 40) {
+        const waveY = bandY + Math.sin((wx + planetScrollX * speed / 80) * 0.03) * 6
+        ctx.fillRect(wx, waveY, 30, thickness * 0.4)
+      }
+    }
+  }
+}
+
+/** Pre-parsed RGB triplet for fast lerp. */
+type RGB = [number, number, number]
+
+/** Parse a hex color to [r,g,b]. */
+function parseHex(hex: string): RGB {
+  return [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ]
+}
+
+/** Lerp two pre-parsed RGB colors, return CSS string. */
+function lerpRGB(a: RGB, b: RGB, t: number): string {
+  return `rgb(${Math.round(a[0] + (b[0] - a[0]) * t)},${Math.round(a[1] + (b[1] - a[1]) * t)},${Math.round(a[2] + (b[2] - a[2]) * t)})`
+}
+
+/** Cached parsed band colors per theme (avoids re-parsing every frame). */
+let cachedBandRGB: RGB[] | null = null
+let cachedBandSrc: string | null = null
+
+function getBandRGB(bands: [string, string, string]): RGB[] {
+  const key = bands[0]
+  if (cachedBandSrc === key && cachedBandRGB) return cachedBandRGB
+  cachedBandRGB = bands.map(parseHex)
+  cachedBandSrc = key
+  return cachedBandRGB
+}
+
+/** Gas giant banded surface — sine-wave bands with turbulence, mirroring the GLSL shader logic. */
+function drawBandedSurface(ctx: CanvasRenderingContext2D, t: ReturnType<typeof getGasCollectionTheme>) {
+  const surfaceHeight = CANVAS_HEIGHT - PLANET_HORIZON_Y
+  const step = 8 // px per scanline tile
+  const rgb = getBandRGB(t.cloudBands)
+  const scroll = planetScrollX * 0.006
+
+  for (let row = 0; row < surfaceHeight; row += step) {
+    const y = PLANET_HORIZON_Y + row
+    const lat = row / surfaceHeight
+
+    // Multi-frequency sine bands — mirrors the GLSL: sin(lat*15), sin(lat*25), sin(lat*40)
+    const band =
+      (Math.sin(lat * 15 * Math.PI + scroll) * 0.5 + 0.5) * 0.5 +
+      (Math.sin(lat * 25 * Math.PI - scroll * 0.5) * 0.25 + 0.25) * 0.5 +
+      (Math.sin(lat * 40 * Math.PI + scroll * 0.3) * 0.125 + 0.125) * 0.5
+
+    // Turbulence distortion
+    const turb = fbm2(lat * 5 + scroll * 0.2, simTime * 0.08) * 0.15
+    const bandVal = Math.max(0, Math.min(1, band + turb))
+
+    // Map band value to a pair of adjacent colors
+    const colorIdx = bandVal * 2
+    const ci = Math.min(1, Math.floor(colorIdx))
+    const baseRGB = rgb[ci]!
+    const nextRGB = rgb[ci + 1]!
+    const lerp = colorIdx - ci
+
+    ctx.globalAlpha = 0.2 + bandVal * 0.15
+    for (let col = 0; col < CANVAS_WIDTH; col += step) {
+      const colNoise = fbm2(col * 0.01 + scroll, lat * 8 + simTime * 0.05) * 0.3
+      const localVal = Math.max(0, Math.min(1, lerp + colNoise))
+      ctx.fillStyle = lerpRGB(baseRGB, nextRGB, localVal)
+      ctx.fillRect(col, y, step, step)
+    }
+  }
+}
+
 function drawBackground(ctx: CanvasRenderingContext2D, dt: number) {
   bgOffset += dt * 80
   simTime += dt
   planetScrollX += dt * 100
 
-  // Deep space gradient — black to dark amber near horizon
+  const t = theme.value
+
+  // Deep space gradient — transitions into planet atmosphere
   const spaceGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT)
-  spaceGrad.addColorStop(0, '#020108')
-  spaceGrad.addColorStop(0.4, '#0a0510')
-  spaceGrad.addColorStop(0.6, '#1a0800')
-  spaceGrad.addColorStop(0.72, '#4d2200')
-  spaceGrad.addColorStop(1.0, '#cc6600')
+  spaceGrad.addColorStop(0, t.sky.space)
+  spaceGrad.addColorStop(0.4, t.sky.upperMid)
+  spaceGrad.addColorStop(0.6, t.sky.lowerMid)
+  spaceGrad.addColorStop(0.72, t.sky.horizon)
+  spaceGrad.addColorStop(1.0, t.sky.dense)
   ctx.fillStyle = spaceGrad
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
 
@@ -123,54 +246,105 @@ function drawBackground(ctx: CanvasRenderingContext2D, dt: number) {
     CANVAS_WIDTH / 2, curveCenterY, curveRadius - 120,
     CANVAS_WIDTH / 2, curveCenterY, curveRadius + 40,
   )
-  planetGrad.addColorStop(0, '#ff9933')
-  planetGrad.addColorStop(0.4, '#e67300')
-  planetGrad.addColorStop(0.7, '#cc5500')
-  planetGrad.addColorStop(1.0, '#993300')
+  planetGrad.addColorStop(0, t.surface.bright)
+  planetGrad.addColorStop(0.4, t.surface.mid)
+  planetGrad.addColorStop(0.7, t.surface.dark)
+  planetGrad.addColorStop(1.0, t.surface.shadow)
   ctx.fillStyle = planetGrad
   ctx.beginPath()
   ctx.arc(CANVAS_WIDTH / 2, curveCenterY, curveRadius, 0, Math.PI * 2)
   ctx.fill()
 
-  // Scrolling cloud bands on the planet surface — parallax layers moving left-to-right
+  // Scrolling cloud bands on the planet surface
   ctx.save()
   ctx.beginPath()
   ctx.arc(CANVAS_WIDTH / 2, curveCenterY, curveRadius, 0, Math.PI * 2)
   ctx.clip()
 
-  for (let i = 0; i < 10; i++) {
-    const bandY = PLANET_HORIZON_Y + 5 + i * 24
-    const speed = 60 + i * 25
+  if (t.surfaceStyle === 'banded') {
+    // Gas giant — sine-wave bands at multiple frequencies with turbulence
+    drawBandedSurface(ctx, t)
+  } else {
+    // Rocky/flat — simple parallax rectangles
+    drawFlatBands(ctx, t)
+  }
+  // Surface features (e.g. Great Red Spot) — scroll with the cloud bands
+  if (t.surfaceFeatures) {
     const scrollWrap = CANVAS_WIDTH * 2
-    const offset = (planetScrollX * speed / 80) % scrollWrap
-    const thickness = 10 + i * 5
-    const alpha = 0.1 + (i % 3) * 0.05
+    const featSpeed = 30 // slow drift — much slower than the cloud bands
+    for (const feat of t.surfaceFeatures) {
+      const featX = ((feat.scrollPhase * scrollWrap + planetScrollX * featSpeed / 80) % scrollWrap) - scrollWrap * 0.25
+      const featY = PLANET_HORIZON_Y + feat.yOffset
 
-    ctx.globalAlpha = alpha
-    ctx.fillStyle = i % 3 === 0 ? '#ffdd99' : i % 3 === 1 ? '#e68a00' : '#cc7700'
+      // Only draw when on-screen (with generous margin)
+      if (featX > -feat.radiusX * 2 && featX < CANVAS_WIDTH + feat.radiusX * 2) {
+        ctx.save()
+        ctx.translate(featX, featY)
 
-    // Draw band scrolling right — offset goes positive = moves right
-    ctx.fillRect(offset - scrollWrap, bandY, CANVAS_WIDTH * 3, thickness)
+        // Outer halo — feathered glow, blends into the surface color
+        ctx.globalAlpha = 0.2
+        const haloGrad = ctx.createRadialGradient(0, 0, feat.radiusX * 0.3, 0, 0, feat.radiusX * 1.6)
+        haloGrad.addColorStop(0, feat.outerColor)
+        haloGrad.addColorStop(0.6, feat.outerColor + '40')
+        haloGrad.addColorStop(1, feat.outerColor + '00')
+        ctx.fillStyle = haloGrad
+        ctx.beginPath()
+        ctx.ellipse(0, 0, feat.radiusX * 1.6, feat.radiusY * 1.6, 0, 0, Math.PI * 2)
+        ctx.fill()
 
-    // Wavy edge on some bands for organic feel
-    if (i % 2 === 0) {
-      ctx.globalAlpha = alpha * 0.5
-      for (let wx = 0; wx < CANVAS_WIDTH; wx += 40) {
-        const waveY = bandY + Math.sin((wx + planetScrollX * speed / 80) * 0.03) * 6
-        ctx.fillRect(wx, waveY, 30, thickness * 0.4)
+        // Main storm body — soft elliptical gradient with long feather
+        ctx.globalAlpha = 0.6
+        const spotGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, feat.radiusX)
+        spotGrad.addColorStop(0, feat.coreColor)
+        spotGrad.addColorStop(0.35, feat.midColor)
+        spotGrad.addColorStop(0.65, feat.outerColor)
+        spotGrad.addColorStop(0.85, feat.outerColor + '60')
+        spotGrad.addColorStop(1, feat.outerColor + '00')
+        ctx.fillStyle = spotGrad
+        ctx.beginPath()
+        ctx.ellipse(0, 0, feat.radiusX, feat.radiusY, 0, 0, Math.PI * 2)
+        ctx.fill()
+
+        // Swirl arcs — concentric elliptical strokes that rotate slowly
+        const swirlAngle = simTime * feat.swirlSpeed
+        ctx.globalAlpha = 0.3
+        ctx.strokeStyle = feat.coreColor + 'aa'
+        ctx.lineWidth = 1.5
+        for (let ring = 0; ring < 4; ring++) {
+          const ringScale = 0.25 + ring * 0.16
+          const arcStart = swirlAngle + ring * 1.2
+          ctx.beginPath()
+          ctx.ellipse(0, 0, feat.radiusX * ringScale, feat.radiusY * ringScale, swirlAngle * 0.3 + ring * 0.4, arcStart, arcStart + 2.5)
+          ctx.stroke()
+        }
+
+        // Bright eye at the center
+        ctx.globalAlpha = 0.4
+        const eyeGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, feat.radiusX * 0.18)
+        eyeGrad.addColorStop(0, '#e8a090')
+        eyeGrad.addColorStop(0.6, feat.coreColor)
+        eyeGrad.addColorStop(1, feat.coreColor + '00')
+        ctx.fillStyle = eyeGrad
+        ctx.beginPath()
+        ctx.ellipse(0, 0, feat.radiusX * 0.18, feat.radiusY * 0.18, 0, 0, Math.PI * 2)
+        ctx.fill()
+
+        ctx.restore()
       }
     }
   }
+
   ctx.restore()
   ctx.globalAlpha = 1.0
 
   // Atmospheric glow along the horizon — thin bright line
+  const gt = t.glowTint
   const glowGrad = ctx.createLinearGradient(0, PLANET_HORIZON_Y - 25, 0, PLANET_HORIZON_Y + 20)
-  glowGrad.addColorStop(0, 'rgba(255, 180, 80, 0)')
-  glowGrad.addColorStop(0.3, 'rgba(255, 220, 140, 0.3)')
-  glowGrad.addColorStop(0.5, 'rgba(255, 200, 120, 0.2)')
-  glowGrad.addColorStop(0.7, 'rgba(255, 160, 60, 0.1)')
-  glowGrad.addColorStop(1, 'rgba(255, 120, 30, 0)')
+  glowGrad.addColorStop(0, gt.replace('rgb', 'rgba').replace(')', ', 0)'))
+  glowGrad.addColorStop(0.3, gt.replace('rgb', 'rgba').replace(')', ', 0.3)'))
+  glowGrad.addColorStop(0.5, gt.replace('rgb', 'rgba').replace(')', ', 0.2)'))
+  glowGrad.addColorStop(0.7, gt.replace('rgb', 'rgba').replace(')', ', 0.1)'))
+  glowGrad.addColorStop(1, gt.replace('rgb', 'rgba').replace(')', ', 0)'))
   ctx.fillStyle = glowGrad
   ctx.fillRect(0, PLANET_HORIZON_Y - 25, CANVAS_WIDTH, 45)
 
@@ -186,7 +360,7 @@ function drawBackground(ctx: CanvasRenderingContext2D, dt: number) {
       continue
     }
     ctx.globalAlpha = p.alpha
-    ctx.strokeStyle = '#ffcc88'
+    ctx.strokeStyle = t.windColor
     ctx.lineWidth = 1
     ctx.beginPath()
     ctx.moveTo(p.x - p.len, p.y)
@@ -298,6 +472,7 @@ function drawShip(ctx: CanvasRenderingContext2D) {
 }
 
 function drawGasPuffs(ctx: CanvasRenderingContext2D) {
+  const t = theme.value
   for (const puff of props.minigame.gasPuffs) {
     if (puff.consumed) continue
     ctx.save()
@@ -306,9 +481,9 @@ function drawGasPuffs(ctx: CanvasRenderingContext2D) {
     // Outer haze
     ctx.globalAlpha = puff.alpha * 0.3
     const hazeGrad = ctx.createRadialGradient(0, 0, puff.radius * 0.3, 0, 0, puff.radius * 1.4)
-    hazeGrad.addColorStop(0, '#ffdd44')
-    hazeGrad.addColorStop(0.5, '#ffaa22')
-    hazeGrad.addColorStop(1, 'rgba(255, 150, 30, 0)')
+    hazeGrad.addColorStop(0, t.puffOuter)
+    hazeGrad.addColorStop(0.5, t.puffInner)
+    hazeGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
     ctx.fillStyle = hazeGrad
     ctx.beginPath()
     ctx.arc(0, 0, puff.radius * 1.4, 0, Math.PI * 2)
@@ -317,9 +492,9 @@ function drawGasPuffs(ctx: CanvasRenderingContext2D) {
     // Inner cloud
     ctx.globalAlpha = puff.alpha * 0.6
     const innerGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, puff.radius)
-    innerGrad.addColorStop(0, '#ffeeaa')
-    innerGrad.addColorStop(0.6, '#ffcc44')
-    innerGrad.addColorStop(1, 'rgba(255, 180, 40, 0)')
+    innerGrad.addColorStop(0, t.puffCenter)
+    innerGrad.addColorStop(0.6, t.puffInner)
+    innerGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
     ctx.fillStyle = innerGrad
     ctx.beginPath()
     ctx.arc(0, 0, puff.radius, 0, Math.PI * 2)
@@ -635,17 +810,10 @@ onUnmounted(() => {
     <Transition name="gas-briefing">
       <div v-if="briefingVisible && !started" class="gas-collection-briefing-overlay">
         <div class="gas-collection-briefing">
-          <div class="gas-collection-briefing__icon">⚠</div>
-          <h3 class="gas-collection-briefing__title">ATMOSPHERIC STORM DETECTED</h3>
-          <p class="gas-collection-briefing__text">
-            Sensors detect a massive storm brewing near the atmosphere — gas pockets are
-            rising from the cloud layer. This is a rare collection window.
-          </p>
-          <p class="gas-collection-briefing__text">
-            Your ship cannot cross the atmosphere threshold or it will overheat.
-            Orbit at close range and deploy collection drones into the rising gas puffs.
-            Catch your drones before they burn up to bank the gas.
-          </p>
+          <div class="gas-collection-briefing__icon">{{ theme.briefing.icon }}</div>
+          <h3 class="gas-collection-briefing__title">{{ theme.briefing.title }}</h3>
+          <p class="gas-collection-briefing__text">{{ theme.briefing.situation }}</p>
+          <p class="gas-collection-briefing__text">{{ theme.briefing.instructions }}</p>
           <div class="gas-collection-briefing__controls">
             <span><b>W A S D</b> — fly</span>
             <span><b>Q</b> — launch drone</span>

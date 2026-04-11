@@ -2,7 +2,9 @@
 import type { ActiveShuttleMission } from '@/lib/missions/types'
 import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
 import { GasCollectionMiniGame } from '@/lib/minigame/gasCollection/GasCollectionMiniGame'
+import { IceHarvestMiniGame } from '@/lib/minigame/iceHarvest/IceHarvestMiniGame'
 import GasCollectionCanvas from '@/components/GasCollectionCanvas.vue'
+import IceHarvestCanvas from '@/components/IceHarvestCanvas.vue'
 import { getPlanetOrbitalConfig } from '@/lib/missions/planetOrbitalConfig'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 import { computed } from 'vue'
@@ -31,6 +33,14 @@ const gasMinigame = computed(
   () => (props.minigame instanceof GasCollectionMiniGame ? props.minigame : null),
 )
 
+const isIceHarvest = computed(
+  () => props.minigame instanceof IceHarvestMiniGame,
+)
+
+const iceMinigame = computed(
+  () => (props.minigame instanceof IceHarvestMiniGame ? props.minigame : null),
+)
+
 const orbitalConfig = computed(() => getPlanetOrbitalConfig(props.mission.template.targetPlanet))
 const gatherItemDef = computed(() => {
   const itemId = orbitalConfig.value?.gatherItem
@@ -55,6 +65,30 @@ const gatherItemDef = computed(() => {
       <div class="mission-minigame-card__body" style="padding: 0.5rem;">
         <GasCollectionCanvas
           :minigame="gasMinigame"
+          :planet-id="mission.template.targetPlanet"
+          @complete="emit('complete')"
+          @fail="() => {}"
+        />
+      </div>
+    </div>
+  </div>
+
+  <!-- Ice Harvest: fullscreen canvas -->
+  <div v-else-if="isIceHarvest && iceMinigame" class="mission-minigame-overlay">
+    <div class="mission-minigame-card" style="max-width: 850px;">
+      <div class="mission-minigame-card__chrome">
+        <span>{{ mission.template.name }}</span>
+        <button
+          type="button"
+          class="ship-message-card__button"
+          @click="emit('close')"
+        >
+          Close
+        </button>
+      </div>
+      <div class="mission-minigame-card__body" style="padding: 0.5rem;">
+        <IceHarvestCanvas
+          :minigame="iceMinigame"
           @complete="emit('complete')"
           @fail="() => {}"
         />

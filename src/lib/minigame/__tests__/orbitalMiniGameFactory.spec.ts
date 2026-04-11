@@ -2,12 +2,12 @@ import { describe, it, expect } from 'vitest'
 import { createOrbitalMiniGame } from '../orbitalMiniGameFactory'
 import { DefaultOrbitalMiniGame } from '../DefaultOrbitalMiniGame'
 import { GasCollectionMiniGame } from '../gasCollection/GasCollectionMiniGame'
+import { IceHarvestMiniGame } from '../iceHarvest/IceHarvestMiniGame'
 
 const DEFAULT_TYPES = [
   'probe-deploy',
   'logistics',
   'chemistry',
-  'ice-harvest',
   'maintenance',
 ]
 
@@ -27,6 +27,13 @@ describe('createOrbitalMiniGame', () => {
     expect(mg).toBeInstanceOf(GasCollectionMiniGame)
     expect(mg.missionId).toBe('mission-1')
     expect(mg.progressTotal).toBe(5)
+  })
+
+  it('returns IceHarvestMiniGame for type "ice-harvest"', () => {
+    const mg = createOrbitalMiniGame('mission-1', 'ice-harvest', 4)
+    expect(mg).toBeInstanceOf(IceHarvestMiniGame)
+    expect(mg.missionId).toBe('mission-1')
+    expect(mg.progressTotal).toBe(4)
   })
 
   it('returns DefaultOrbitalMiniGame for unknown type', () => {

@@ -11,6 +11,7 @@
 import type { OrbitalMiniGame } from './OrbitalMiniGame'
 import { DefaultOrbitalMiniGame } from './DefaultOrbitalMiniGame'
 import { GasCollectionMiniGame } from './gasCollection/GasCollectionMiniGame'
+import { IceHarvestMiniGame } from './iceHarvest/IceHarvestMiniGame'
 
 /**
  * Create an orbital minigame for the given mission and minigame type.
@@ -31,10 +32,11 @@ export function createOrbitalMiniGame(
   switch (minigameType) {
     case 'gas-collection':
       return new GasCollectionMiniGame(missionId, targetGas)
+    case 'ice-harvest':
+      return new IceHarvestMiniGame(missionId, targetGas)
     case 'probe-deploy':
     case 'logistics':
     case 'chemistry':
-    case 'ice-harvest':
     case 'maintenance':
     default:
       return new DefaultOrbitalMiniGame(missionId)

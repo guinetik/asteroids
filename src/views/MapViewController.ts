@@ -126,7 +126,6 @@ import type {
   ActiveShuttleMission,
   GeneratedAsteroidMission,
 } from '@/lib/missions/types'
-import { getGatherItemForPlanet } from '@/lib/missions/planetOrbitalConfig'
 import { getSpecialMissionById } from '@/lib/missions/specialMissions'
 import {
   clearActiveMission,
@@ -139,7 +138,8 @@ import { MapLifeCycleFacade } from '@/lib/map/lifecycle/MapLifeCycleFacade'
 import { MapMessageFacade } from '@/lib/map/messages/MapMessageFacade'
 import { MapMissionFacade } from '@/lib/map/missions/MapMissionFacade'
 import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
-import { GasCollectionMiniGame } from '@/lib/minigame/gasCollection/GasCollectionMiniGame'
+import { createOrbitalMiniGame } from '@/lib/minigame/orbitalMiniGameFactory'
+import { PLANET_ORBITAL_CONFIGS } from '@/lib/missions/planetOrbitalConfig'
 import { MapModeCoordinator } from '@/lib/map/mode/MapModeCoordinator'
 import { MapOrbitFacade } from '@/lib/map/orbit/MapOrbitFacade'
 import { MapShopFacade } from '@/lib/map/shop/MapShopFacade'
@@ -230,6 +230,8 @@ export class MapViewController implements Tickable {
   private slingshotSpeedPass: ShaderPass | null = null
   private adriftTimer = 0
   private shipHealth: ShipHealth | null = null
+  /** Ship health config with all distance fields pre-scaled by ORBIT_SCALE. */
+  private shipHealthConfig: ShipHealthConfig | null = null
   private mapState = new MapState()
   private mapIntro = new MapIntroState()
 
@@ -543,12 +545,22 @@ export class MapViewController implements Tickable {
     }
 
     // Ship health — temperature + radiation damage
-    // Scale maxHp by hull upgrade level (multiplier: 1.0 → 2.0)
+    // Scale maxHp by hull upgrade level (multiplier: 1.0 → 2.0).
+    // Distance-based boundaries are stored in ship-health.json as raw catalog units
+    // (matching semiMajorAxis values in planetarium.json). Multiply by ORBIT_SCALE here
+    // so shipHealth.ts always works in world-space — changing ORBIT_SCALE stays correct.
     const hullMultiplier = getCurrentUpgradeValue('shuttleHull')
+    const rawHealthData = shipHealthData as ShipHealthConfig
     const healthConfig: ShipHealthConfig = {
-      ...(shipHealthData as ShipHealthConfig),
-      maxHp: (shipHealthData as ShipHealthConfig).maxHp * hullMultiplier,
+      ...rawHealthData,
+      maxHp: rawHealthData.maxHp * hullMultiplier,
+      hotBoundary: rawHealthData.hotBoundary * ORBIT_SCALE,
+      heatZone2Boundary: rawHealthData.heatZone2Boundary * ORBIT_SCALE,
+      heatZone3Boundary: rawHealthData.heatZone3Boundary * ORBIT_SCALE,
+      coldBoundary: rawHealthData.coldBoundary * ORBIT_SCALE,
+      coldZone3Boundary: rawHealthData.coldZone3Boundary * ORBIT_SCALE,
     }
+    this.shipHealthConfig = healthConfig
     this.shipHealth = new ShipHealth(healthConfig)
     this.shipHealth.onDeath = (cause) => {
       this.triggerDeath(cause)
@@ -763,8 +775,8 @@ export class MapViewController implements Tickable {
       startConsortiumCertificationMessage: () => {
         this.devStartConsortiumCertificationMessage()
       },
-      openGasCollectionMinigame: (targetGas = 5) => {
-        this.devOpenGasCollectionMinigame(targetGas)
+      openMinigame: (gatherItem = 'venusian-gas', quantity = 5) => {
+        this.devOpenOrbitalMinigame(gatherItem, quantity)
       },
     })
 
@@ -2208,9 +2220,13 @@ export class MapViewController implements Tickable {
    * Compute zone-based thermal protection caps for the current sun distance.
    *
    * Each thermal upgrade level defines a protection zone keyed to a planet group.
-   * When the ship is within the zone covered by the player's upgrade level, the
-   * returned cap is tighter than the natural maximum, which causes `shipHealth.tick`
-   * to clamp temperature and suppress hull damage.
+   * Protection has two tiers based on how the player's level compares to the zone:
+   *
+   * - **Exact match** (`upgradeLevel === zoneLevel`): temperature capped at `protectedTempCap`
+   *   (75% bar), hull damage suppressed.
+   * - **Over-leveled** (`upgradeLevel > zoneLevel`): full immunity — temperature clamped at 0,
+   *   bar invisible, no thermal effect at all.
+   * - **Under-leveled** (`upgradeLevel < zoneLevel`): no protection, natural behaviour.
    *
    * Heat zones (inner → outer): Sun proximity (lvl 3) → Mercury (lvl 2) → Venus (lvl 1)
    * Cold zones (closer → farther): Jupiter/Saturn (lvl 2) → Uranus/Neptune/Pluto (lvl 3)
@@ -2219,10 +2235,16 @@ export class MapViewController implements Tickable {
    * @returns `heatCap` (positive clamp) and `coldCap` (negative clamp) for `tick()`
    */
   private computeThermalCaps(sunDist: number): { heatCap: number; coldCap: number } {
-    const cfg = shipHealthData as ShipHealthConfig
+    const cfg = this.shipHealthConfig!
     const heatLevel = CURRENT_PLAYER_UPGRADE_LEVELS.shuttleHeatResistance ?? 0
     const coldLevel = CURRENT_PLAYER_UPGRADE_LEVELS.shuttleFreezeResistance ?? 0
-    const cap = cfg.protectedTempCap
+    const partialCap = cfg.protectedTempCap
+
+    /** Temperature value used for full immunity — below displayThreshold so the bar stays dark. */
+    const IMMUNE_CAP = 0
+
+    const MAX_TEMP = 100
+    const MIN_TEMP = -100
 
     // Determine heat zone level (0 = no heat, 1 = Venus, 2 = Mercury, 3 = Sun proximity)
     let heatZone = 0
@@ -2238,10 +2260,18 @@ export class MapViewController implements Tickable {
       coldZone = sunDist > cfg.coldZone3Boundary ? 3 : 2
     }
 
-    const MAX_TEMP = 100
-    const MIN_TEMP = -100
-    const heatCap = heatZone > 0 && heatLevel >= heatZone ? cap : MAX_TEMP
-    const coldCap = coldZone > 0 && coldLevel >= coldZone ? -cap : MIN_TEMP
+    let heatCap = MAX_TEMP
+    if (heatZone > 0) {
+      if (heatLevel > heatZone) heatCap = IMMUNE_CAP
+      else if (heatLevel === heatZone) heatCap = partialCap
+    }
+
+    let coldCap = MIN_TEMP
+    if (coldZone > 0) {
+      if (coldLevel > coldZone) coldCap = -IMMUNE_CAP
+      else if (coldLevel === coldZone) coldCap = -partialCap
+    }
+
     return { heatCap, coldCap }
   }
 
@@ -2746,23 +2776,30 @@ export class MapViewController implements Tickable {
     this.onMissionBoardUpdate?.(this.missionBoard)
   }
 
-  /** Dev-only: open the gas collection minigame overlay directly for testing. */
-  private devOpenGasCollectionMinigame(targetGas = 5): void {
+  /** Dev-only: open any orbital minigame overlay by gather-item id. */
+  private devOpenOrbitalMinigame(gatherItem: string, quantity = 5): void {
     if (!import.meta.env.DEV) return
+    const entry = Object.values(PLANET_ORBITAL_CONFIGS).find((c) => c.gatherItem === gatherItem)
+    if (!entry) {
+      console.warn(`[dev] Unknown gather item "${gatherItem}". Valid items:`,
+        Object.values(PLANET_ORBITAL_CONFIGS).map((c) => c.gatherItem))
+      return
+    }
+    const missionId = `dev-${entry.minigameType}-test`
     const fakeMission = {
       template: {
-        id: 'dev-gas-test',
-        name: 'DEV: Gas Collection Test',
-        description: 'Dev tool — testing the gas collection minigame.',
-        targetPlanet: 'venus',
-        gatherQuantity: targetGas,
+        id: missionId,
+        name: `DEV: ${entry.minigameType}`,
+        description: `Dev tool — testing the ${entry.minigameType} minigame at ${entry.planetId}.`,
+        targetPlanet: entry.planetId,
+        gatherQuantity: quantity,
         reward: 0,
       },
       giverPlanet: 'earth',
       status: 'active' as const,
     }
     this.missionFacade.activeMinigame?.dispose()
-    this.missionFacade.activeMinigame = new GasCollectionMiniGame('dev-gas-test', targetGas)
+    this.missionFacade.activeMinigame = createOrbitalMiniGame(missionId, entry.minigameType, quantity)
     this.missionFacade.overlayOpen = true
     this.onMissionOverlay?.(true, fakeMission, true)
   }
