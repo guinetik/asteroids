@@ -1,8 +1,9 @@
 [
   { "planetId": "venus", "upgradeId": "shuttleHeatResistance", "minLevel": 1 },
-  { "planetId": "mercury", "upgradeId": "shuttleHeatResistance", "minLevel": 3 },
-  { "planetId": "jupiter", "upgradeId": "shuttleFreezeResistance", "minLevel": 1 },
-  { "planetId": "saturn", "upgradeId": "shuttleFreezeResistance", "minLevel": 1 },
+  { "planetId": "mercury", "upgradeId": "shuttleHeatResistance", "minLevel": 2 },
+  { "planetId": "jupiter", "upgradeId": "shuttleFreezeResistance", "minLevel": 2 },
+  { "planetId": "saturn", "upgradeId": "shuttleFreezeResistance", "minLevel": 2 },
   { "planetId": "uranus", "upgradeId": "shuttleFreezeResistance", "minLevel": 3 },
-  { "planetId": "neptune", "upgradeId": "shuttleFreezeResistance", "minLevel": 3 }
+  { "planetId": "neptune", "upgradeId": "shuttleFreezeResistance", "minLevel": 3 },
+  { "planetId": "pluto", "upgradeId": "shuttleFreezeResistance", "minLevel": 3 }
 ]

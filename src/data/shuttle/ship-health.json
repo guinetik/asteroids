@@ -1,12 +1,16 @@
 {
   "maxHp": 100,
   "healRate": 10,
-  "hotBoundary": 140,
-  "coldBoundary": 400,
+  "hotBoundary": 280,
+  "heatZone2Boundary": 220,
+  "heatZone3Boundary": 140,
+  "coldBoundary": 440,
+  "coldZone3Boundary": 1120,
   "tempDriftRate": 10,
   "damageThreshold": 70,
   "maxTempDamage": 4,
   "radiationThreshold": 0.3,
   "maxRadiationDamage": 15,
-  "displayThreshold": 20
+  "displayThreshold": 20,
+  "protectedTempCap": 75
 }

@@ -5,6 +5,10 @@
  * distance — hot near the Sun, cold past the outer planets.
  * Extreme temperature and radiation proximity tick hull damage.
  *
+ * Thermal upgrades provide zone-based protection: when the ship is within
+ * the upgrade's protected zone, temperature is hard-capped at `protectedTempCap`
+ * and hull damage from temperature is fully suppressed.
+ *
  * @author guinetik
  * @date 2026-04-06
  * @spec docs/superpowers/specs/2026-04-05-ship-health-temperature-design.md
@@ -16,10 +20,33 @@ export interface ShipHealthConfig {
   maxHp: number
   /** HP restored per second while healing (Earth orbit) */
   healRate: number
-  /** Distance from Sun below which heat rises (Venus orbit) */
+  /**
+   * World-space distance from Sun below which the heat zone begins.
+   * This value must already be scaled by ORBIT_SCALE before being passed to ShipHealth
+   * (MapViewController handles this at construction time).
+   * Conceptually sits between Venus and Earth in catalog units.
+   */
   hotBoundary: number
-  /** Distance from Sun above which cold rises (Jupiter orbit) */
+  /**
+   * World-space distance below which heat zone 2 (Mercury range) begins.
+   * Pre-scaled by ORBIT_SCALE; conceptually between Mercury and Venus in catalog units.
+   */
+  heatZone2Boundary: number
+  /**
+   * World-space distance below which heat zone 3 (Sun proximity) begins.
+   * Pre-scaled by ORBIT_SCALE; conceptually inside Mercury's orbit in catalog units.
+   */
+  heatZone3Boundary: number
+  /**
+   * World-space distance from Sun above which the cold zone begins.
+   * Pre-scaled by ORBIT_SCALE; conceptually between Mars and Jupiter in catalog units.
+   */
   coldBoundary: number
+  /**
+   * World-space distance above which cold zone 3 (deep cold: Uranus/Neptune/Pluto) begins.
+   * Pre-scaled by ORBIT_SCALE; conceptually between Saturn and Uranus in catalog units.
+   */
+  coldZone3Boundary: number
   /** Temperature drift speed (units/s toward zone target) */
   tempDriftRate: number
   /** Temperature magnitude above which hull takes damage */
@@ -32,6 +59,12 @@ export interface ShipHealthConfig {
   maxRadiationDamage: number
   /** Temperature magnitude above which the gauge is shown */
   displayThreshold: number
+  /**
+   * Maximum temperature magnitude when thermal protection is active.
+   * Temperature is clamped here and hull damage is suppressed.
+   * Must be a positive value in the range (0, 100]. e.g. 75 = 75% of the bar.
+   */
+  protectedTempCap: number
 }
 
 /** Target temperature value for the hot zone */
@@ -115,15 +148,22 @@ export class ShipHealth {
   /**
    * Advance health simulation by dt seconds.
    *
+   * The `heatTempCap` and `coldTempCap` parameters implement zone-based thermal
+   * protection. When a cap is tighter than the natural maximum, temperature is
+   * clamped at the cap value and hull damage from temperature is fully suppressed.
+   * Pass `MAX_TEMPERATURE` / `MIN_TEMPERATURE` (or omit) to disable protection.
+   *
    * @param dt - Delta time in seconds
    * @param sunDistance - Distance from the Sun in world units
    * @param radiationProximity - Gravity proximity to Sun (0–1)
    * @param healing - Whether the ship is healing (e.g. Earth orbit)
    * @param heatResistance - Multiplier on hot-zone drift rate (0–1, lower = more resistant)
-   * @param heatArmor - Multiplier on hull damage while overheated (positive temp past threshold; 0–1, lower = less damage)
+   * @param heatArmor - Multiplier on hull damage while overheated (0–1, lower = less damage)
    * @param coldResistance - Multiplier on cold-zone drift rate (0–1, lower = more resistant)
-   * @param coldArmor - Multiplier on hull damage while frozen (negative temp past threshold; 0–1, lower = less damage)
+   * @param coldArmor - Multiplier on hull damage while frozen (0–1, lower = less damage)
    * @param radiationArmor - Multiplier on radiation damage (0–1, lower = less damage)
+   * @param heatTempCap - Max positive temperature allowed; clamped + damage suppressed when < MAX_TEMPERATURE
+   * @param coldTempCap - Min negative temperature allowed; clamped + damage suppressed when > MIN_TEMPERATURE
    */
   tick(
     dt: number,
@@ -135,6 +175,8 @@ export class ShipHealth {
     coldResistance = 1,
     coldArmor = 1,
     radiationArmor = 1,
+    heatTempCap = MAX_TEMPERATURE,
+    coldTempCap = MIN_TEMPERATURE,
   ): void {
     if (this._dead) return
 
@@ -158,14 +200,28 @@ export class ShipHealth {
     const drift = Math.sign(diff) * Math.min(Math.abs(diff), this.config.tempDriftRate * driftMultiplier * resistanceFactor * dt)
     this._temperature = Math.max(MIN_TEMPERATURE, Math.min(MAX_TEMPERATURE, this._temperature + drift))
 
-    // Temperature damage
+    // Zone-based thermal protection: clamp temperature and flag protection state
+    const heatProtected = heatTempCap < MAX_TEMPERATURE
+    const coldProtected = coldTempCap > MIN_TEMPERATURE
+    if (heatProtected && this._temperature > heatTempCap) {
+      this._temperature = heatTempCap
+    }
+    if (coldProtected && this._temperature < coldTempCap) {
+      this._temperature = coldTempCap
+    }
+
+    // Temperature damage — suppressed entirely when thermal protection is active
     let tempDamage = 0
     const absTemp = Math.abs(this._temperature)
     if (absTemp > this.config.damageThreshold) {
-      const ratio = (absTemp - this.config.damageThreshold) / (MAX_TEMPERATURE - this.config.damageThreshold)
-      const armorFactor =
-        this._temperature > 0 ? heatArmor : this._temperature < 0 ? coldArmor : 1
-      tempDamage = ratio * this.config.maxTempDamage * armorFactor * dt
+      const isHeatDamage = this._temperature > 0
+      const isColdDamage = this._temperature < 0
+      const protectionBlocks = (isHeatDamage && heatProtected) || (isColdDamage && coldProtected)
+      if (!protectionBlocks) {
+        const ratio = (absTemp - this.config.damageThreshold) / (MAX_TEMPERATURE - this.config.damageThreshold)
+        const armorFactor = isHeatDamage ? heatArmor : isColdDamage ? coldArmor : 1
+        tempDamage = ratio * this.config.maxTempDamage * armorFactor * dt
+      }
     }
 
     // Radiation damage

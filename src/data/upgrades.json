@@ -48,7 +48,7 @@
     "id": "shuttleHeatResistance",
     "category": "shuttle",
     "label": "Heat Shield",
-    "description": "Ablative coating reduces thermal damage near stars.",
+    "description": "Ablative coating slows thermal drift and caps hull temperature in protected zones. Lvl 1: survives Venus. Lvl 2: survives Mercury. Lvl 3: survives Sun proximity.",
     "baseCost": 5000,
     "maxLevel": 3,
     "valuesByLevel": [1.0, 0.7, 0.45, 0.25]
@@ -57,7 +57,7 @@
     "id": "shuttleFreezeResistance",
     "category": "shuttle",
     "label": "Cryo Insulation",
-    "description": "Thermal lining resists cryogenic damage in deep space.",
+    "description": "Thermal lining slows cryo drift and caps hull temperature in protected zones. Lvl 2: survives Jupiter and Saturn. Lvl 3: survives Uranus, Neptune, and Pluto.",
     "baseCost": 5000,
     "maxLevel": 3,
     "valuesByLevel": [1.0, 0.7, 0.45, 0.25]

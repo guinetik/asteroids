@@ -12,6 +12,7 @@ import * as THREE from 'three'
 import { loadGLB } from './loadGLB'
 import { FuelTank } from './FuelTank'
 import { HabitatModule } from './HabitatModule'
+import { useAudio } from '@/audio/useAudio'
 
 const SHUTTLE_MODEL_PATH = '/models/shuttle.glb'
 const LANDER_MODEL_PATH = '/models/lander.glb'
@@ -700,6 +701,7 @@ export class ArrivalSequence {
         this.shuttleScene.add(this.fallingLander)
         this.fallingLander = null
       }
+      useAudio().play('sfx.dockingClamp')
       this.nextExfilPhase('closeDoors')
     }
   }

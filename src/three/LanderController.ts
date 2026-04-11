@@ -24,6 +24,7 @@ import type { Heightmap } from '@/lib/terrain/heightmap'
 import { ParticleEmitter } from './ParticleEmitter'
 import { WarningBeacon } from './WarningBeacon'
 import { getCurrentUpgradeValue } from '@/lib/upgrades'
+import { useAudio } from '@/audio/useAudio'
 
 const LANDER_MODEL_PATH = '/models/lander.glb'
 
@@ -361,6 +362,10 @@ export class LanderController implements Tickable {
   /** Tracks whether lander was grounded last frame. */
   private wasGrounded = false
 
+  /** Previous-frame thruster states for audio edge detection. */
+  private _prevMainEngine = false
+  private _prevRcs = false
+
   /** Called on hard landing with damage dealt and impact speed. */
   onCrash: ((damage: number, impactSpeed: number) => void) | null = null
 
@@ -587,6 +592,9 @@ export class LanderController implements Tickable {
       if (damage > 0) {
         this.takeDamage(damage)
         this.onCrash?.(damage, impactSpeed)
+        useAudio().play('sfx.collision')
+      } else {
+        useAudio().play('sfx.landing')
       }
     }
     this.wasGrounded = this.body.grounded
@@ -641,6 +649,19 @@ export class LanderController implements Tickable {
       },
     )
 
+    // Lander thruster audio — edge-detect main engine and RCS
+    const audio = useAudio()
+    if (this.isMainEngineActive && !this._prevMainEngine) {
+      audio.play('sfx.lander.thrusterLoop', { loop: true })
+    } else if (!this.isMainEngineActive && this._prevMainEngine) {
+      audio.stopSound('sfx.lander.thrusterLoop')
+    }
+    if (this.isAnyRcsActive && !this._prevRcs) {
+      audio.play('sfx.lander.thrusterBurst')
+    }
+    this._prevMainEngine = this.isMainEngineActive
+    this._prevRcs = this.isAnyRcsActive
+
     this.updateWarningBeacon()
 
     // Nozzle glow pulse — brighter when engine is firing
@@ -680,6 +701,7 @@ export class LanderController implements Tickable {
   }
 
   dispose(): void {
+    useAudio().stopSound('sfx.lander.thrusterLoop')
     this.flameEmitter.dispose()
     ;(this.nozzleGlow.material as THREE.SpriteMaterial).map?.dispose()
     ;(this.nozzleGlow.material as THREE.SpriteMaterial).dispose()

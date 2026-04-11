@@ -5,13 +5,17 @@ const config: ShipHealthConfig = {
   maxHp: 100,
   healRate: 10,
   hotBoundary: 40,
+  heatZone2Boundary: 25,
+  heatZone3Boundary: 12,
   coldBoundary: 350,
+  coldZone3Boundary: 600,
   tempDriftRate: 8,
   damageThreshold: 60,
   maxTempDamage: 5,
   radiationThreshold: 0.3,
   maxRadiationDamage: 15,
   displayThreshold: 20,
+  protectedTempCap: 55,
 }
 
 describe('ShipHealth', () => {
@@ -300,6 +304,88 @@ describe('ShipHealth', () => {
       for (let i = 0; i < 5; i++) health.tick(1, 500, 0)
       expect(health.temperature).toBeLessThan(-config.displayThreshold)
       expect(health.temperatureVisible).toBe(true)
+    })
+  })
+
+  describe('zone-based thermal protection caps', () => {
+    it('caps positive temperature at protectedTempCap when heatTempCap is active', () => {
+      // Tick many times in hot zone with protection active (heatTempCap = 55)
+      for (let i = 0; i < 50; i++) health.tick(1, 10, 0, false, 1, 1, 1, 1, 1, 55, -100)
+      expect(health.temperature).toBeLessThanOrEqual(55)
+      expect(health.temperature).toBeCloseTo(55, 0)
+    })
+
+    it('suppresses hull damage when heat protection cap is active', () => {
+      // Cap at 55 which is below damageThreshold (60) — no damage even though cap is applied
+      for (let i = 0; i < 50; i++) health.tick(1, 10, 0, false, 1, 1, 1, 1, 1, 55, -100)
+      expect(health.hp).toBe(100)
+    })
+
+    it('suppresses hull damage even when heatTempCap exceeds damageThreshold', () => {
+      // Cap at 65 which is above damageThreshold (60) — protection still blocks damage
+      for (let i = 0; i < 50; i++) health.tick(1, 10, 0, false, 1, 1, 1, 1, 1, 65, -100)
+      expect(health.temperature).toBeCloseTo(65, 0)
+      expect(health.hp).toBe(100)
+    })
+
+    it('allows temperature to reach max and damage hull when no cap is active', () => {
+      for (let i = 0; i < 30; i++) health.tick(1, 10, 0, false, 1, 1, 1, 1, 1, 100, -100)
+      expect(health.hp).toBeLessThan(100)
+    })
+
+    it('caps negative temperature at -protectedTempCap when coldTempCap is active', () => {
+      for (let i = 0; i < 50; i++) health.tick(1, 500, 0, false, 1, 1, 1, 1, 1, 100, -55)
+      expect(health.temperature).toBeGreaterThanOrEqual(-55)
+      expect(health.temperature).toBeCloseTo(-55, 0)
+    })
+
+    it('suppresses hull damage when cold protection cap is active', () => {
+      for (let i = 0; i < 50; i++) health.tick(1, 500, 0, false, 1, 1, 1, 1, 1, 100, -55)
+      expect(health.hp).toBe(100)
+    })
+
+    it('does not clamp cold temperature when no cold cap is set', () => {
+      for (let i = 0; i < 50; i++) health.tick(1, 500, 0, false, 1, 1, 1, 1, 1, 100, -100)
+      expect(health.temperature).toBeLessThan(-55)
+    })
+
+    it('heat cap does not interfere with cold zone', () => {
+      // Active heat cap but in cold zone — temperature should drift negative freely
+      for (let i = 0; i < 30; i++) health.tick(1, 500, 0, false, 1, 1, 1, 1, 1, 55, -100)
+      expect(health.temperature).toBeLessThan(0)
+    })
+
+    describe('full immunity (cap = 0)', () => {
+      it('clamps temperature to 0 in hot zone — bar stays below displayThreshold', () => {
+        for (let i = 0; i < 50; i++) health.tick(1, 10, 0, false, 1, 1, 1, 1, 1, 0, -100)
+        expect(health.temperature).toBe(0)
+        expect(health.temperatureVisible).toBe(false)
+      })
+
+      it('suppresses all hull damage when immune in hot zone', () => {
+        for (let i = 0; i < 50; i++) health.tick(1, 10, 0, false, 1, 1, 1, 1, 1, 0, -100)
+        expect(health.hp).toBe(100)
+      })
+
+      it('clamps temperature to 0 in cold zone — bar stays dark', () => {
+        for (let i = 0; i < 50; i++) health.tick(1, 500, 0, false, 1, 1, 1, 1, 1, 100, 0)
+        expect(health.temperature).toBe(0)
+        expect(health.temperatureVisible).toBe(false)
+      })
+
+      it('suppresses all hull damage when immune in cold zone', () => {
+        for (let i = 0; i < 50; i++) health.tick(1, 500, 0, false, 1, 1, 1, 1, 1, 100, 0)
+        expect(health.hp).toBe(100)
+      })
+
+      it('cools existing positive temperature down to 0 when entering immune hot zone', () => {
+        // Start with high temperature from a previous hot exposure
+        for (let i = 0; i < 15; i++) health.tick(1, 10, 0)
+        expect(health.temperature).toBeGreaterThan(0)
+        // Now enter immune zone — temperature must drop to 0
+        for (let i = 0; i < 30; i++) health.tick(1, 10, 0, false, 1, 1, 1, 1, 1, 0, -100)
+        expect(health.temperature).toBe(0)
+      })
     })
   })
 
