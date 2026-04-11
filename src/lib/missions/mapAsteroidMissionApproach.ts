@@ -6,8 +6,11 @@
  * @spec docs/superpowers/specs/2026-04-06-asteroid-missions-design.md
  */
 
-/** Planar distance (world units) at which the shuttle shows “Begin Mission” on the map. */
-export const MAP_ASTEROID_MISSION_APPROACH_RADIUS_WORLD = 100
+/**
+ * Planar distance (world units) at which the shuttle shows “Begin Mission” on the map.
+ * Tuned so the prompt appears only when the shuttle is near the waypoint marker, not on a wide outer ring.
+ */
+export const MAP_ASTEROID_MISSION_APPROACH_RADIUS_WORLD = 20
 
 /**
  * Whether the shuttle is within the approach disc for an active mission waypoint.
