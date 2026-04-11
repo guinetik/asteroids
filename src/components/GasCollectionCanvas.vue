@@ -22,6 +22,7 @@ const emit = defineEmits<{
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+const started = ref(false)
 let animId = 0
 let lastTime = 0
 let bgOffset = 0
@@ -582,10 +583,15 @@ function loop(time: number) {
   animId = requestAnimationFrame(loop)
 }
 
-onMounted(() => {
+function startGame() {
+  started.value = true
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('keyup', onKeyUp)
   animId = requestAnimationFrame(loop)
+}
+
+onMounted(() => {
+  // Don't start until player clicks the button
 })
 
 onUnmounted(() => {
@@ -596,7 +602,40 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <!-- Briefing screen before gameplay -->
+  <div v-if="!started" class="gas-collection-briefing">
+    <div class="gas-collection-briefing__icon">⚠</div>
+    <h3 class="gas-collection-briefing__title">ATMOSPHERIC STORM DETECTED</h3>
+    <p class="gas-collection-briefing__text">
+      Sensors detect a massive storm brewing near the atmosphere — gas pockets are
+      rising from the cloud layer. This is a rare collection window.
+    </p>
+    <p class="gas-collection-briefing__text">
+      Your ship cannot cross the atmosphere threshold or it will overheat.
+      Orbit at close range and deploy collection drones into the rising gas puffs.
+      Catch your drones before they burn up to bank the gas.
+    </p>
+    <div class="gas-collection-briefing__controls">
+      <span><b>W A S D</b> — fly</span>
+      <span><b>Q</b> — launch drone</span>
+    </div>
+    <p class="gas-collection-briefing__detail">
+      Drones: {{ minigame.dronesRemaining }} available — reusable if caught.
+      Target: {{ minigame.targetGas }} gas units.
+      Time limit: {{ Math.ceil(minigame.timeTotal) }}s.
+    </p>
+    <button
+      type="button"
+      class="gas-collection-briefing__start"
+      @click="startGame"
+    >
+      BEGIN COLLECTION
+    </button>
+  </div>
+
+  <!-- Game canvas -->
   <canvas
+    v-else
     ref="canvasRef"
     :width="CANVAS_WIDTH"
     :height="CANVAS_HEIGHT"

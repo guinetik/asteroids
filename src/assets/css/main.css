@@ -1860,6 +1860,42 @@ body {
   image-rendering: pixelated;
 }
 
+/* Gas Collection Briefing */
+.gas-collection-briefing {
+  @apply flex flex-col items-center gap-4 px-8 py-6 text-center;
+}
+
+.gas-collection-briefing__icon {
+  @apply text-4xl text-amber-400;
+}
+
+.gas-collection-briefing__title {
+  @apply text-lg font-mono font-bold uppercase tracking-widest text-amber-300;
+}
+
+.gas-collection-briefing__text {
+  @apply text-sm leading-relaxed text-slate-300 max-w-lg;
+}
+
+.gas-collection-briefing__controls {
+  @apply flex gap-6 text-xs font-mono text-cyan-400 border border-cyan-400/15
+         rounded-lg px-5 py-3 bg-cyan-400/5;
+}
+
+.gas-collection-briefing__detail {
+  @apply text-xs font-mono text-slate-500;
+}
+
+.gas-collection-briefing__start {
+  @apply mt-2 rounded-xl border border-cyan-300/30 bg-cyan-300/10
+         px-8 py-3 font-mono text-sm uppercase tracking-[0.2em]
+         text-cyan-200 transition-all;
+}
+
+.gas-collection-briefing__start:hover {
+  @apply border-cyan-200/50 bg-cyan-200/20 text-white;
+}
+
 /* Survey HUD — timer + probe count overlay during active surveys */
 .survey-hud {
   @apply fixed top-4 left-1/2 z-30 flex flex-col items-center gap-1 pointer-events-none;
