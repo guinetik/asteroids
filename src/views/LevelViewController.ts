@@ -1447,11 +1447,10 @@ export class LevelViewController implements Tickable {
       }
       this._prevGrounded = grounded
 
-      // Breathing crossfade — run loop plays only when actually sprinting with charge.
-      // Shift held with depleted stamina stays on walk breath. Floating is covered
-      // by the separate floating sound, not the breathing crossfade.
+      // Breathing crossfade — run loop plays only when grounded AND actually sprinting
+      // with O2 charge. Airborne shift doesn't drain stamina so it stays on walk breath.
       const sprintHeld = this.inputManager!.isActionActive('sprint')
-      const exerted = sprintHeld && this.playerController.thrusterSystem.canFire('sprint')
+      const exerted = grounded && sprintHeld && this.playerController.thrusterSystem.canFire('sprint')
       if (exerted && !this._prevSprinting) {
         this._breathingWalkHandle?.stop()
         this._breathingWalkHandle = null

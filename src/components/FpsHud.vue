@@ -128,10 +128,13 @@ function modeColor(): string {
       </svg>
     </div>
 
-    <!-- ═══ BOTTOM CENTER: HP | multitool “thruster” cluster | RTG (mirrors shuttle hull | THR/BRK/RCS | fuel) ═══ -->
+    <!--
+      Bottom HUD: HP left and RTG right on the same baseline (parallel resource bars); center is
+      O2/STA above mode charge + hotbar.
+    -->
     <div class="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-end justify-center gap-5">
-      <div class="flex w-32 flex-col gap-1">
-        <span class="text-xs tracking-widest uppercase text-red-400/80">HP</span>
+      <div class="flex w-32 shrink-0 flex-col gap-1">
+        <span class="text-[10px] tracking-widest uppercase text-red-400/80">HP</span>
         <div class="flex items-center gap-1">
           <div class="h-3 min-w-0 flex-1 overflow-hidden rounded-sm bg-white/10">
             <div
@@ -141,7 +144,11 @@ function modeColor(): string {
           </div>
           <span class="shrink-0 text-[10px] tabular-nums text-white/40">{{ Math.ceil(telemetry.hp) }}</span>
         </div>
-        <div class="flex items-end justify-center gap-2 pt-1">
+      </div>
+
+      <div class="flex flex-col items-center gap-2">
+        <!-- O2 + STA: centered above DRL / mode row -->
+        <div class="flex translate-x-2 items-end justify-center gap-3">
           <div class="flex flex-col items-center gap-0.5">
             <span class="text-[10px] text-white/40">{{ Math.ceil(telemetry.o2Level) }}</span>
             <div class="flex h-16 w-2.5 flex-col-reverse overflow-hidden rounded-sm bg-white/10">
@@ -162,9 +169,7 @@ function modeColor(): string {
             <span class="text-[10px] tracking-widest uppercase text-white/50">STA</span>
           </div>
         </div>
-      </div>
 
-      <div class="flex flex-col items-center gap-2">
         <div class="flex items-center gap-1.5">
           <span class="text-[10px] tracking-widest uppercase" :style="{ color: modeColor() + '80' }">
             {{ MODE_LABELS[telemetry.activeMode]?.label }}
@@ -179,6 +184,7 @@ function modeColor(): string {
             />
           </div>
         </div>
+
         <div class="flex gap-1">
           <div
             v-for="(cfg, mode) in MODE_LABELS"
@@ -193,7 +199,7 @@ function modeColor(): string {
         </div>
       </div>
 
-      <div class="flex w-32 flex-col gap-1">
+      <div class="flex w-32 shrink-0 flex-col gap-1">
         <span class="text-[10px] tracking-widest uppercase text-yellow-400/50">RTG</span>
         <div class="h-3 w-full overflow-hidden rounded-sm bg-white/10">
           <div

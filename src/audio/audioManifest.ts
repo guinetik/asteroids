@@ -525,7 +525,7 @@ const manifestById: ManifestById = {
     category: 'sfx',
     load: 'lazy',
     playback: 'single-instance',
-    volume: 0.2,
+    volume: 0.1,
     effect: 'none',
   },
   'sfx.breathing.walk': {
