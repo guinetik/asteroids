@@ -36,6 +36,7 @@ import {
   SHIP_HALF_HEIGHT,
   SHIP_GRAVITY,
   COOK_ZONE_Y,
+  COOK_ZONE_TOLERANCE,
   PUFF_SPAWN_INTERVAL,
   PUFF_SPEED_MIN,
   PUFF_SPEED_MAX,
@@ -68,7 +69,7 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
   /** Ship horizontal position in canvas pixels. */
   shipX = CANVAS_WIDTH / 2
   /** Ship vertical position in canvas pixels. */
-  shipY = CANVAS_HEIGHT / 2
+  shipY = CANVAS_HEIGHT * 0.3
   /** Ship horizontal velocity in px/s. */
   shipVx = 0
   /** Ship vertical velocity in px/s. */
@@ -87,6 +88,8 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
   gasPuffs: GasPuff[] = []
   /** Time accumulator for puff spawning. */
   private puffTimer = 0
+  /** Time spent in the cook zone — death at COOK_ZONE_TOLERANCE. */
+  heatTimer = 0
 
   private input: ShipInput = { up: false, down: false, left: false, right: false }
 
@@ -159,7 +162,7 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
     if (this._status !== 'active') return
 
     this.tickShip(dt)
-    if (this.checkCookZone()) return
+    if (this.checkCookZone(dt)) return
     this.tickGasPuffs(dt)
     this.tickDrones(dt)
     this.checkDronePuffCollisions()
@@ -257,11 +260,17 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
     }
   }
 
-  /** Check if ship entered the cook zone — instant fail. */
-  private checkCookZone(): boolean {
+  /** Check if ship is in the cook zone — accumulates heat, dies after tolerance. */
+  private checkCookZone(dt: number): boolean {
     if (this.shipY + SHIP_HALF_HEIGHT >= COOK_ZONE_Y) {
-      this._status = 'failed'
-      return true
+      this.heatTimer += dt
+      if (this.heatTimer >= COOK_ZONE_TOLERANCE) {
+        this._status = 'failed'
+        return true
+      }
+    } else {
+      // Cool down when above the line — recovers at half speed
+      this.heatTimer = Math.max(0, this.heatTimer - dt * 0.5)
     }
     return false
   }

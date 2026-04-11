@@ -51,8 +51,14 @@ export const DRONE_GRACE_PERIOD = 0.8
 /** Downward gravity pull on the ship in px/s². */
 export const SHIP_GRAVITY = 60
 
-/** Y position of the planet cook zone — ship below this = dead. */
+/** Y position of the planet cook zone — ship below this starts overheating. */
 export const COOK_ZONE_Y = 310
+
+/** Seconds the ship can survive in the cook zone before death. */
+export const COOK_ZONE_TOLERANCE = 0.5
+
+/** Y offset above cook zone where heat warning effects begin. */
+export const HEAT_WARNING_OFFSET = 60
 
 /** Gas puff spawn interval — average seconds between spawns. */
 export const PUFF_SPAWN_INTERVAL = 0.6

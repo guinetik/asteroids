@@ -6,6 +6,7 @@ import {
   MAX_DRONES,
   DRONE_COLLECT_RADIUS,
   COOK_ZONE_Y,
+  COOK_ZONE_TOLERANCE,
   GAS_PER_PUFF,
 } from '../constants'
 import type { OrbitalMiniGameContext } from '../../OrbitalMiniGame'
@@ -39,9 +40,9 @@ describe('GasCollectionMiniGame', () => {
       expect(game.dronesRemaining).toBe(MAX_DRONES)
     })
 
-    it('ship starts at center of canvas', () => {
+    it('ship starts at upper third of canvas', () => {
       expect(game.shipX).toBeCloseTo(CANVAS_WIDTH / 2)
-      expect(game.shipY).toBeCloseTo(CANVAS_HEIGHT / 2)
+      expect(game.shipY).toBeCloseTo(CANVAS_HEIGHT * 0.3)
     })
 
     it('ship starts facing right', () => {
@@ -108,16 +109,34 @@ describe('GasCollectionMiniGame', () => {
   })
 
   describe('cook zone', () => {
-    it('fails if ship touches the cook zone', () => {
+    it('does not fail immediately in the cook zone', () => {
       game.shipY = COOK_ZONE_Y
       game.tick(0.016, STUB_CTX)
+      expect(game.status).toBe('active')
+      expect(game.heatTimer).toBeGreaterThan(0)
+    })
+
+    it('fails after spending tolerance time in the cook zone', () => {
+      game.shipY = COOK_ZONE_Y
+      // Tick enough to exceed tolerance
+      const ticks = Math.ceil(COOK_ZONE_TOLERANCE / 0.016) + 1
+      for (let i = 0; i < ticks; i++) game.tick(0.016, STUB_CTX)
       expect(game.status).toBe('failed')
     })
 
-    it('does not fail above the cook zone', () => {
+    it('heat timer recovers when above the line', () => {
+      game.shipY = COOK_ZONE_Y
+      game.tick(0.1, STUB_CTX)
+      const heated = game.heatTimer
+      game.shipY = COOK_ZONE_Y - 30
+      game.tick(0.5, STUB_CTX)
+      expect(game.heatTimer).toBeLessThan(heated)
+    })
+
+    it('does not accumulate heat above the cook zone', () => {
       game.shipY = COOK_ZONE_Y - 20
-      game.tick(0.016, STUB_CTX)
-      expect(game.status).toBe('active')
+      game.tick(0.5, STUB_CTX)
+      expect(game.heatTimer).toBe(0)
     })
   })
 

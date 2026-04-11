@@ -7,6 +7,8 @@ import {
   SHIP_HALF_WIDTH,
   SHIP_HALF_HEIGHT,
   COOK_ZONE_Y,
+  HEAT_WARNING_OFFSET,
+  COOK_ZONE_TOLERANCE,
 } from '@/lib/minigame/gasCollection/constants'
 import type { OrbitalMiniGameContext } from '@/lib/minigame/OrbitalMiniGame'
 
@@ -417,6 +419,56 @@ function drawGauge(ctx: CanvasRenderingContext2D) {
   )
 }
 
+function drawHeatWarning(ctx: CanvasRenderingContext2D) {
+  const shipBottom = props.minigame.shipY + SHIP_HALF_HEIGHT
+  const warningStart = COOK_ZONE_Y - HEAT_WARNING_OFFSET
+  const heatRatio = props.minigame.heatTimer / COOK_ZONE_TOLERANCE
+
+  // Proximity-based warning — red vignette from edges
+  if (shipBottom > warningStart || heatRatio > 0) {
+    const proximity = Math.max(
+      (shipBottom - warningStart) / HEAT_WARNING_OFFSET,
+      heatRatio,
+    )
+    const intensity = Math.min(1, proximity) * 0.4
+
+    // Red vignette overlay — stronger edges
+    const vigGrad = ctx.createRadialGradient(
+      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, CANVAS_WIDTH * 0.25,
+      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, CANVAS_WIDTH * 0.6,
+    )
+    vigGrad.addColorStop(0, 'rgba(255, 0, 0, 0)')
+    vigGrad.addColorStop(1, `rgba(255, 30, 0, ${intensity})`)
+    ctx.fillStyle = vigGrad
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+
+    // Pulsing red flash when actually in the zone
+    if (heatRatio > 0) {
+      const flash = 0.1 + heatRatio * 0.25 * (0.5 + 0.5 * Math.sin(simTime * 12))
+      ctx.fillStyle = `rgba(255, 50, 0, ${flash})`
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+    }
+  }
+
+  // Heat bar — shows cook timer when in the zone
+  if (heatRatio > 0) {
+    const barW = 120
+    const barH = 6
+    const barX = (CANVAS_WIDTH - barW) / 2
+    const barY = 50
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
+    ctx.fillRect(barX, barY, barW, barH)
+    ctx.fillStyle = heatRatio > 0.7 ? '#ff2200' : '#ff6600'
+    ctx.fillRect(barX, barY, barW * heatRatio, barH)
+    ctx.strokeStyle = 'rgba(255, 100, 0, 0.5)'
+    ctx.strokeRect(barX, barY, barW, barH)
+    ctx.fillStyle = '#ff6600'
+    ctx.font = '9px monospace'
+    ctx.textAlign = 'center'
+    ctx.fillText('OVERHEATING', CANVAS_WIDTH / 2, barY - 4)
+  }
+}
+
 function drawEndScreen(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
@@ -447,6 +499,15 @@ function loop(time: number) {
     props.minigame.tick(dt, STUB_CTX)
   }
 
+  // Screen shake when overheating
+  const heatRatio = props.minigame.heatTimer / COOK_ZONE_TOLERANCE
+  ctx.save()
+  if (heatRatio > 0) {
+    const shakeX = (Math.random() - 0.5) * heatRatio * 8
+    const shakeY = (Math.random() - 0.5) * heatRatio * 8
+    ctx.translate(shakeX, shakeY)
+  }
+
   // Clear + draw
   ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
   drawBackground(ctx, dt)
@@ -468,6 +529,11 @@ function loop(time: number) {
   drawShip(ctx)
   drawDrones(ctx)
   drawGauge(ctx)
+
+  drawHeatWarning(ctx)
+
+  // Restore shake transform
+  ctx.restore()
 
   // Drone counter
   ctx.fillStyle = '#00ccff'
