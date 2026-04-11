@@ -22,7 +22,7 @@ export const SHIP_DRAG = 0.92
 export const SHIP_MAX_SPEED = 400
 
 /** Downward acceleration on drones in px/s². */
-export const DRONE_GRAVITY = 300
+export const DRONE_GRAVITY = 800
 
 /** Base launch speed added to ship velocity in px/s. */
 export const DRONE_LAUNCH_SPEED = 250
@@ -38,6 +38,9 @@ export const MAX_AIR_TIME_YIELD = 3
 
 /** Total drones per attempt. */
 export const MAX_DRONES = 5
+
+/** Minimum air time in seconds before a drone can be collected. */
+export const DRONE_GRACE_PERIOD = 0.3
 
 /** Ship hitbox half-width for collision and rendering. */
 export const SHIP_HALF_WIDTH = 24
