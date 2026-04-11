@@ -139,6 +139,7 @@ import { MapLifeCycleFacade } from '@/lib/map/lifecycle/MapLifeCycleFacade'
 import { MapMessageFacade } from '@/lib/map/messages/MapMessageFacade'
 import { MapMissionFacade } from '@/lib/map/missions/MapMissionFacade'
 import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
+import { GasCollectionMiniGame } from '@/lib/minigame/gasCollection/GasCollectionMiniGame'
 import { MapModeCoordinator } from '@/lib/map/mode/MapModeCoordinator'
 import { MapOrbitFacade } from '@/lib/map/orbit/MapOrbitFacade'
 import { MapShopFacade } from '@/lib/map/shop/MapShopFacade'
@@ -157,6 +158,7 @@ import {
   shouldShowAsteroidMissionMapSite,
 } from '@/lib/map/mapViewControllerHelpers'
 import { GravitySurfingController } from '@/lib/map/GravitySurfingController'
+import { useAudio } from '@/audio/useAudio'
 
 /**
  * Orbit / grid / debris toggle snapshot for syncing the map HUD after intro suppression.
@@ -502,6 +504,7 @@ export class MapViewController implements Tickable {
           title: 'Spacetime disturbance',
           subtitle: `Fabric depression · ~${Math.round(dist)} u · ${d.durationSec.toFixed(1)} s drift`,
         })
+        useAudio().play('ambient.anomaly', { loop: true })
       },
       onNearbyAnomalyFinish: () => {
         this.gravitationalAnomalyHudToken += 1
@@ -511,6 +514,7 @@ export class MapViewController implements Tickable {
           title: 'Disturbance passed',
           subtitle: 'Local grid stabilizing',
         })
+        useAudio().stopSound('ambient.anomaly')
       },
     })
 
@@ -759,6 +763,9 @@ export class MapViewController implements Tickable {
       startConsortiumCertificationMessage: () => {
         this.devStartConsortiumCertificationMessage()
       },
+      openGasCollectionMinigame: (targetGas = 5) => {
+        this.devOpenGasCollectionMinigame(targetGas)
+      },
     })
 
     this.missionFacade.hydrateFromStorage(this.onMissionBoardUpdate)
@@ -767,6 +774,8 @@ export class MapViewController implements Tickable {
     // Start
     this.gameLoop = new GameLoop(this.tickHandler)
     this.gameLoop.start()
+
+    useAudio().play('ambient.space', { loop: true })
   }
 
   /**
@@ -1127,6 +1136,7 @@ export class MapViewController implements Tickable {
         orbitState === 'orbiting' && this.orbitSystem?.target?.name === 'Earth'
       const heatMitigation = getCurrentUpgradeValue('shuttleHeatResistance')
       const coldMitigation = getCurrentUpgradeValue('shuttleFreezeResistance')
+      const { heatCap, coldCap } = this.computeThermalCaps(sunDist)
       this.shipHealth.tick(
         dt,
         sunDist,
@@ -1137,6 +1147,8 @@ export class MapViewController implements Tickable {
         coldMitigation,
         coldMitigation,
         getCurrentUpgradeValue('shuttleRadiationResistance'),
+        heatCap,
+        coldCap,
       )
       this.shuttleEffects?.setTemperature(this.shipHealth.temperature)
     }
@@ -2193,6 +2205,47 @@ export class MapViewController implements Tickable {
   }
 
   /**
+   * Compute zone-based thermal protection caps for the current sun distance.
+   *
+   * Each thermal upgrade level defines a protection zone keyed to a planet group.
+   * When the ship is within the zone covered by the player's upgrade level, the
+   * returned cap is tighter than the natural maximum, which causes `shipHealth.tick`
+   * to clamp temperature and suppress hull damage.
+   *
+   * Heat zones (inner → outer): Sun proximity (lvl 3) → Mercury (lvl 2) → Venus (lvl 1)
+   * Cold zones (closer → farther): Jupiter/Saturn (lvl 2) → Uranus/Neptune/Pluto (lvl 3)
+   *
+   * @param sunDist - Current distance from the Sun in world units
+   * @returns `heatCap` (positive clamp) and `coldCap` (negative clamp) for `tick()`
+   */
+  private computeThermalCaps(sunDist: number): { heatCap: number; coldCap: number } {
+    const cfg = shipHealthData as ShipHealthConfig
+    const heatLevel = CURRENT_PLAYER_UPGRADE_LEVELS.shuttleHeatResistance ?? 0
+    const coldLevel = CURRENT_PLAYER_UPGRADE_LEVELS.shuttleFreezeResistance ?? 0
+    const cap = cfg.protectedTempCap
+
+    // Determine heat zone level (0 = no heat, 1 = Venus, 2 = Mercury, 3 = Sun proximity)
+    let heatZone = 0
+    if (sunDist < cfg.hotBoundary) {
+      if (sunDist < cfg.heatZone3Boundary) heatZone = 3
+      else if (sunDist < cfg.heatZone2Boundary) heatZone = 2
+      else heatZone = 1
+    }
+
+    // Determine cold zone level (0 = no cold, 2 = Jupiter/Saturn, 3 = Uranus+)
+    let coldZone = 0
+    if (sunDist > cfg.coldBoundary) {
+      coldZone = sunDist > cfg.coldZone3Boundary ? 3 : 2
+    }
+
+    const MAX_TEMP = 100
+    const MIN_TEMP = -100
+    const heatCap = heatZone > 0 && heatLevel >= heatZone ? cap : MAX_TEMP
+    const coldCap = coldZone > 0 && coldLevel >= coldZone ? -cap : MIN_TEMP
+    return { heatCap, coldCap }
+  }
+
+  /**
    * Rotating the shuttle with A/D should swing the chase cam only in free flight;
    * during planet orbit capture, yaw is for aiming and must not drag the camera offset.
    */
@@ -2693,6 +2746,27 @@ export class MapViewController implements Tickable {
     this.onMissionBoardUpdate?.(this.missionBoard)
   }
 
+  /** Dev-only: open the gas collection minigame overlay directly for testing. */
+  private devOpenGasCollectionMinigame(targetGas = 5): void {
+    if (!import.meta.env.DEV) return
+    const fakeMission = {
+      template: {
+        id: 'dev-gas-test',
+        name: 'DEV: Gas Collection Test',
+        description: 'Dev tool — testing the gas collection minigame.',
+        targetPlanet: 'venus',
+        gatherQuantity: targetGas,
+        reward: 0,
+      },
+      giverPlanet: 'earth',
+      status: 'active' as const,
+    }
+    this.missionFacade.activeMinigame?.dispose()
+    this.missionFacade.activeMinigame = new GasCollectionMiniGame('dev-gas-test', targetGas)
+    this.missionFacade.overlayOpen = true
+    this.onMissionOverlay?.(true, fakeMission, true)
+  }
+
   /** Return the current world distance from the shuttle to a named planet. */
   private getDistanceToPlanet(planetId: string): number | null {
     if (!this.shuttleController) return null
@@ -2772,6 +2846,10 @@ export class MapViewController implements Tickable {
   private onEnterHabitat(): void {
     this.onHabitatActive?.(true)
     this.setEarthStartupOrbitHudSuppressed(false)
+    this.shuttleEffects?.thrusterController.setAudioEnabled(false)
+    const audio = useAudio()
+    audio.stopSound('ambient.space')
+    audio.play('ambient.habitat', { loop: true })
     // Request pointer lock for FPS mouse look
     const el = this.sceneObjects?.renderer.domElement
     if (el) {
@@ -2783,6 +2861,11 @@ export class MapViewController implements Tickable {
 
   private onExitHabitat(): void {
     if (!this.sceneObjects) return
+
+    this.shuttleEffects?.thrusterController.setAudioEnabled(true)
+    const audio = useAudio()
+    audio.stopSound('ambient.habitat')
+    audio.play('ambient.space', { loop: true })
 
     // Restore map scene + camera
     const renderPass = this.sceneObjects.composer.passes[0] as RenderPass
@@ -2821,6 +2904,10 @@ export class MapViewController implements Tickable {
   }
 
   dispose(): void {
+    const audio = useAudio()
+    audio.stopSound('ambient.space')
+    audio.stopSound('ambient.habitat')
+    audio.stopSound('ambient.anomaly')
     this.clearStartupCinematicOrbitHandoff()
     if (this.sceneObjects?.scene) {
       this.introFacade?.dispose(this.sceneObjects.scene)
