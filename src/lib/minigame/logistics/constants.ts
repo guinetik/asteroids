@@ -26,19 +26,19 @@ export const LANE_SPACING = 100
 // ─── Ship ───────────────────────────────────────────────────────────────────
 
 /** Ship acceleration in px/s² when holding W/S. */
-export const SHIP_ACCEL = 600
+export const SHIP_ACCEL = 1100
 
 /** Velocity drag multiplier applied per frame (0–1, lower = more drag). */
-export const SHIP_DRAG = 0.90
+export const SHIP_DRAG = 0.96
 
 /** Maximum vertical ship speed in px/s. */
-export const SHIP_MAX_SPEED_Y = 350
+export const SHIP_MAX_SPEED_Y = 550
 
 /** Maximum horizontal ship speed in px/s. */
-export const SHIP_MAX_SPEED_X = 200
+export const SHIP_MAX_SPEED_X = 450
 
 /** Soft spring strength pulling ship back to center (units/s²). */
-export const SPRING_STRENGTH = 3.0
+export const SPRING_STRENGTH = 2.0
 
 /** Ship collision half-width in px. */
 export const SHIP_HALF_SIZE = 14
@@ -75,7 +75,7 @@ export const MIN_MANIFEST_LENGTH = 4
 export const SYMBOL_COLLECT_RADIUS = 20
 
 /** Seconds between symbol spawns. */
-export const SYMBOL_SPAWN_INTERVAL = 1.8
+export const SYMBOL_SPAWN_INTERVAL = 1.1
 
 // ─── Traffic ────────────────────────────────────────────────────────────────
 
@@ -97,13 +97,13 @@ export const TRAFFIC_SPEED_RANDOM_RANGE = 0.6
 // ─── Difficulty Scaling ─────────────────────────────────────────────────────
 
 /** Base scroll speed at targetGas <= 4 (px/s). */
-export const BASE_SCROLL_SPEED = 100
+export const BASE_SCROLL_SPEED = 180
 
 /** Additional scroll speed per targetGas unit above 4 (px/s). */
-export const SCROLL_SPEED_PER_TARGET = 10
+export const SCROLL_SPEED_PER_TARGET = 20
 
 /** Base max traffic on screen at targetGas <= 4. */
 export const BASE_TRAFFIC_COUNT = 4
 
 /** Spawn interval for traffic shuttles (seconds). */
-export const TRAFFIC_SPAWN_INTERVAL = 2.0
+export const TRAFFIC_SPAWN_INTERVAL = 1.2

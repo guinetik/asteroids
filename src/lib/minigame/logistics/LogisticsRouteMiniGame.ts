@@ -229,13 +229,12 @@ export class LogisticsRouteMiniGame implements OrbitalMiniGame, OrbitalMiniGameE
     if (this.input.up) this.shipVy -= SHIP_ACCEL * dt
     if (this.input.down) this.shipVy += SHIP_ACCEL * dt
 
-    // Horizontal: WASD or soft spring toward centerX
-    if (this.input.left) {
-      this.shipVx -= SHIP_ACCEL * dt
-    } else if (this.input.right) {
-      this.shipVx += SHIP_ACCEL * dt
-    } else {
-      // Soft spring pulls ship back to lane center
+    // Horizontal: WASD acceleration
+    if (this.input.left) this.shipVx -= SHIP_ACCEL * dt
+    if (this.input.right) this.shipVx += SHIP_ACCEL * dt
+
+    // Soft spring always pulls toward center — gentle when pressing A/D, dominant when idle
+    if (!this.input.left && !this.input.right) {
       this.shipVx += SPRING_STRENGTH * (this.centerX - this.shipX) * dt
     }
 
