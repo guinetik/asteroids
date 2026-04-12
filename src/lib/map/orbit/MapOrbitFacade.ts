@@ -16,7 +16,7 @@ import {
 import { MAP_VIEW_CONTROLLER_CONFIG as MAP_CONFIG } from '@/lib/map/mapViewControllerConfig'
 import { isShuttleAimingAtPlanet } from '@/lib/map/mapViewControllerHelpers'
 import { MAP_CAMERA_CONFIG, MAP_ORBIT_CAMERA_CONFIG, type VehicleCamera } from '@/three/VehicleCamera'
-import { buildSlingshotChargeCameraConfig } from '@/three/slingshotChargeCamera'
+import { buildSlingshotChargeCameraConfig, buildSlingshotExitCameraConfig, SLINGSHOT_EXIT_CAMERA_DURATION_SEC } from '@/three/slingshotChargeCamera'
 import { MAP_PHYSICS, type ShuttleController } from '@/three/ShuttleController'
 import type { MapSceneVisuals } from '@/three/MapSceneVisuals'
 
@@ -43,6 +43,8 @@ export class MapOrbitFacade {
   private _slingshotCharge = 0
   private _orbitRingIsPreview = false
   private _chargeSoundPlaying = false
+  private _exitCameraProgress = 0
+  private _exitCameraActive = false
 
   get system(): OrbitCaptureSystem | null {
     return this._system
@@ -82,6 +84,16 @@ export class MapOrbitFacade {
 
   set orbitRingIsPreview(value: boolean) {
     this._orbitRingIsPreview = value
+  }
+
+  /** Whether the slingshot exit camera transition is active. */
+  get exitCameraActive(): boolean {
+    return this._exitCameraActive
+  }
+
+  /** Current exit camera blend progress (0 = orbit, 1 = free-flight). */
+  get exitCameraProgress(): number {
+    return this._exitCameraProgress
   }
 
   initialize(captureBodies: CaptureBody[]): void {
@@ -213,7 +225,8 @@ export class MapOrbitFacade {
       this._slingshotCharge * shuttleController.thrusterSystem.fuelCapacity * 0.1,
     )
 
-    vehicleCamera?.setConfig(MAP_CAMERA_CONFIG)
+    this._exitCameraProgress = 0
+    this._exitCameraActive = true
     if (vehicleCamera) {
       vehicleCamera.controls.target.copy(shuttleController.position)
     }
@@ -357,6 +370,20 @@ export class MapOrbitFacade {
     }
 
     return true
+  }
+
+  /**
+   * Advance the slingshot exit camera transition.
+   * Called from MapViewController.tick() during slingshot settle.
+   */
+  tickExitCamera(dt: number, vehicleCamera: VehicleCamera | null): void {
+    if (!this._exitCameraActive) return
+    this._exitCameraProgress = Math.min(1, this._exitCameraProgress + dt / SLINGSHOT_EXIT_CAMERA_DURATION_SEC)
+    vehicleCamera?.applyConfigTuning(buildSlingshotExitCameraConfig(this._exitCameraProgress))
+    if (this._exitCameraProgress >= 1) {
+      this._exitCameraActive = false
+      vehicleCamera?.setConfig(MAP_CAMERA_CONFIG)
+    }
   }
 
   buildHudState(shuttleController: ShuttleController, inspectMode: boolean): OrbitHudState | null {

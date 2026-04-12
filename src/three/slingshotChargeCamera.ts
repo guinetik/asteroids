@@ -6,7 +6,7 @@
  * @spec docs/superpowers/specs/2026-04-05-map-shuttle-player-design.md
  */
 import * as THREE from 'three'
-import { MAP_ORBIT_CAMERA_CONFIG, type VehicleCameraConfig } from './VehicleCamera'
+import { MAP_ORBIT_CAMERA_CONFIG, MAP_CAMERA_CONFIG, type VehicleCameraConfig } from './VehicleCamera'
 
 /** Full-charge camera preset: closer third-person framing behind the shuttle. */
 export const MAP_ORBIT_CHARGE_CAMERA_CONFIG: VehicleCameraConfig = {
@@ -16,6 +16,45 @@ export const MAP_ORBIT_CHARGE_CAMERA_CONFIG: VehicleCameraConfig = {
   minY: MAP_ORBIT_CAMERA_CONFIG.minY,
   fov: 48,
   maxDistance: 40,
+}
+
+/** Duration of the orbit → free-flight camera blend after slingshot release. */
+const SLINGSHOT_EXIT_CAMERA_DURATION_SEC = 1.0
+
+export { SLINGSHOT_EXIT_CAMERA_DURATION_SEC }
+
+/**
+ * Blend orbit camera toward free-flight chase framing after slingshot release.
+ *
+ * @param progress - Exit blend progress in the `[0, 1]` range (0 = orbit, 1 = free-flight).
+ * @returns Camera config interpolated between orbit and free-flight framing.
+ */
+export function buildSlingshotExitCameraConfig(progress: number): VehicleCameraConfig {
+  const t = Math.max(0, Math.min(1, progress))
+
+  return {
+    idleOffset: MAP_ORBIT_CAMERA_CONFIG.idleOffset.clone().lerp(
+      MAP_CAMERA_CONFIG.idleOffset,
+      t,
+    ),
+    lerpSpeed: THREE.MathUtils.lerp(
+      MAP_ORBIT_CAMERA_CONFIG.lerpSpeed,
+      MAP_CAMERA_CONFIG.lerpSpeed,
+      t,
+    ),
+    idleTimeout: 0,
+    minY: THREE.MathUtils.lerp(
+      MAP_ORBIT_CAMERA_CONFIG.minY,
+      MAP_CAMERA_CONFIG.minY === -Infinity ? -1000 : MAP_CAMERA_CONFIG.minY,
+      t,
+    ),
+    fov: THREE.MathUtils.lerp(
+      MAP_ORBIT_CAMERA_CONFIG.fov,
+      MAP_CAMERA_CONFIG.fov,
+      t,
+    ),
+    maxDistance: MAP_CAMERA_CONFIG.maxDistance,
+  }
 }
 
 /**

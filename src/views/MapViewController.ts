@@ -1285,6 +1285,9 @@ export class MapViewController implements Tickable {
       }
     }
 
+    // Slingshot exit camera transition
+    this.orbitFacade.tickExitCamera(dt, this.vehicleCamera)
+
     if (this.gravitySurfPass && this.shuttleController) {
       const gravitySurfActive = this.gravitySurfingController.isActive() && !this.shuttleController.dead
       const speedRatio = Math.min(1, this.shuttleController.speed / 20)
