@@ -1,6 +1,11 @@
 import * as THREE from 'three'
 import type { MapSceneObjects } from '@/three/MapSceneSetup'
 import { MAP_VIEW_CONTROLLER_CONFIG as MAP_CONFIG } from '@/lib/map/mapViewControllerConfig'
+import {
+  createTronHologramMaterial,
+  syncTronHologramTimeSeconds,
+  disposeTronHologramMaterials,
+} from '@/three/tronHologramMaterial'
 
 export interface ShipReticleUpdate {
   shuttlePosition: THREE.Vector3
@@ -54,6 +59,7 @@ export class MapSceneVisuals {
   private shuttleGroup: THREE.Group | null = null
   private orbitRing: THREE.LineLoop | null = null
   private launchArrow: THREE.Group | null = null
+  private launchArrowMaterials: THREE.ShaderMaterial[] = []
   private shipReticleGroup: THREE.Group | null = null
   private shipReticleRing: THREE.Sprite | null = null
   private shipReticlePointer: THREE.Sprite | null = null
@@ -70,7 +76,7 @@ export class MapSceneVisuals {
     this.shuttleGroup = group
   }
 
-  updateLaunchArrow(charge: number, blocked: boolean): void {
+  updateLaunchArrow(charge: number, _blocked: boolean): void {
     if (!this.shuttleGroup) return
     if (!this.launchArrow) {
       this.launchArrow = this.createLaunchArrowGroup()
@@ -82,20 +88,20 @@ export class MapSceneVisuals {
     const headLength = MAP_CONFIG.ARROW_HEAD_LENGTH * c
     const headRadius = MAP_CONFIG.ARROW_HEAD_WIDTH * 0.5 * c
     const shaftLength = Math.max(0, totalLength - headLength)
-    const shaftRadius = headRadius * 0.25
+    const shaftRadius = headRadius * 0.2
 
     const shaft = this.launchArrow.children[0] as THREE.Mesh
     const head = this.launchArrow.children[1] as THREE.Mesh
 
-    shaft.scale.set(shaftRadius, shaftLength, shaftRadius)
+    shaft.scale.set(shaftLength, shaftRadius, shaftRadius)
     shaft.position.set(shaftLength * 0.5, 0, 0)
 
-    head.scale.set(headRadius, headLength, headRadius)
+    head.scale.set(headLength, headRadius, headRadius)
     head.position.set(shaftLength + headLength * 0.5, 0, 0)
 
-    const color = new THREE.Color(blocked ? MAP_CONFIG.ARROW_COLOR_BLOCKED : MAP_CONFIG.ARROW_COLOR_SAFE)
-    ;(shaft.material as THREE.MeshBasicMaterial).color.copy(color)
-    ;(head.material as THREE.MeshBasicMaterial).color.copy(color)
+    // Advance tron shader time
+    const now = performance.now() * 0.001
+    syncTronHologramTimeSeconds(this.launchArrowMaterials, now)
   }
 
   hideLaunchArrow(): void {
@@ -104,39 +110,45 @@ export class MapSceneVisuals {
     for (const child of this.launchArrow.children) {
       const mesh = child as THREE.Mesh
       mesh.geometry.dispose()
-      ;(mesh.material as THREE.MeshBasicMaterial).dispose()
     }
+    disposeTronHologramMaterials(this.launchArrowMaterials)
+    this.launchArrowMaterials = []
     this.launchArrow = null
   }
 
-  /** Override the launch arrow color (e.g. for prograde/retrograde alignment feedback). */
+  /** Override the launch arrow tron hologram tint color. */
   updateLaunchArrowColor(color: number): void {
-    if (!this.launchArrow) return
     const c = new THREE.Color(color)
-    for (const child of this.launchArrow.children) {
-      ;((child as THREE.Mesh).material as THREE.MeshBasicMaterial).color.copy(c)
+    for (const mat of this.launchArrowMaterials) {
+      mat.uniforms['uColor']!.value.copy(c)
     }
   }
 
-  /** Create a cylindrical shaft + cone head group for the launch arrow. */
+  /** Create a tron-hologram dart: cylinder shaft + cone head, oriented along +X. */
   private createLaunchArrowGroup(): THREE.Group {
-    const shaftGeo = new THREE.CylinderGeometry(1, 1, 1, 8)
+    // Shaft: cylinder along +X (default is Y, rotateZ(-PI/2) tips Y→+X)
+    const shaftGeo = new THREE.CylinderGeometry(1, 1, 1, 6)
     shaftGeo.rotateZ(-Math.PI / 2)
-    const shaftMat = new THREE.MeshBasicMaterial({
+    const shaftMat = createTronHologramMaterial({
       color: MAP_CONFIG.ARROW_COLOR_SAFE,
-      transparent: true,
-      opacity: 0.85,
+      colorGain: 1.6,
+      alphaGain: 1.8,
+      opacity: 0.9,
     })
     const shaft = new THREE.Mesh(shaftGeo, shaftMat)
 
-    const headGeo = new THREE.ConeGeometry(1, 1, 12)
+    // Head: cone tip along +X (default tip is +Y, rotateZ(-PI/2) tips Y→+X)
+    const headGeo = new THREE.ConeGeometry(1, 1, 8)
     headGeo.rotateZ(-Math.PI / 2)
-    const headMat = new THREE.MeshBasicMaterial({
+    const headMat = createTronHologramMaterial({
       color: MAP_CONFIG.ARROW_COLOR_SAFE,
-      transparent: true,
-      opacity: 0.9,
+      colorGain: 1.8,
+      alphaGain: 2.0,
+      opacity: 0.95,
     })
     const head = new THREE.Mesh(headGeo, headMat)
+
+    this.launchArrowMaterials = [shaftMat, headMat]
 
     const group = new THREE.Group()
     group.add(shaft)
