@@ -697,7 +697,7 @@ function dockedPlanetId(): string | null {
         class="map-screen-nav__btn map-screen-nav__btn--terminal"
         @click="openShuttleControlFromMap"
       >
-        Shuttle Control Panel
+        Control Panel
       </button>
       <button
         v-if="shipMessageAudioPlaying"

@@ -119,7 +119,7 @@ function onKeydown(e: KeyboardEvent) {
     <div class="shuttle-control-card">
       <!-- Chrome bar -->
       <div class="shuttle-control-chrome">
-        <span>Shuttle Control Terminal</span>
+        <span>Control Panel</span>
         <button
           type="button"
           class="ship-message-card__button"
