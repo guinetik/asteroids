@@ -37,6 +37,16 @@ describe('audioManifest', () => {
       'sfx.explosion',
       // shuttle systems
       'sfx.touchdown',
+      'sfx.harpoon',
+      'sfx.ice_break',
+      'sfx.mission.shuttle.clear',
+      'sfx.collect',
+      'sfx.mistake',
+      'sfx.telemetry.shoot',
+      'sfx.target',
+      'sfx.drone',
+      'sfx.drone.pickup',
+      'sfx.geyser',
       'sfx.cargo.open',
       'sfx.cargo.close',
       // footsteps

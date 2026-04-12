@@ -22,6 +22,7 @@ import type {
 import type { ShipInput, RouteSymbol, TrafficShuttle } from './types'
 import type { RouteSymbolType } from './types'
 import { ROUTE_SYMBOL_TYPES } from './types'
+import { useAudio } from '@/audio/useAudio'
 import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
@@ -128,6 +129,12 @@ export class LogisticsRouteMiniGame implements OrbitalMiniGame, OrbitalMiniGameE
   readonly centerX = SHIP_START_X
 
   // ─── Private timers ─────────────────────────────────────────────────────────
+
+  /** Maximum wrong symbol collections allowed before mission fails. */
+  static readonly MAX_MISTAKES = 3
+
+  /** Wrong symbol collections so far. */
+  mistakeCount = 0
 
   private elapsedTime = 0
   private symbolSpawnTimer = 0
@@ -340,7 +347,7 @@ export class LogisticsRouteMiniGame implements OrbitalMiniGame, OrbitalMiniGameE
 
   // ─── Collision detection ────────────────────────────────────────────────────
 
-  /** Check if ship flies through the next manifest symbol. */
+  /** Check if ship flies through any symbol — correct ones advance the manifest, wrong ones count as mistakes. */
   private checkSymbolCollections(): void {
     if (this.manifestIndex >= this.manifest.length) return
 
@@ -348,17 +355,26 @@ export class LogisticsRouteMiniGame implements OrbitalMiniGame, OrbitalMiniGameE
 
     for (const sym of this.symbols) {
       if (sym.collected) continue
-      if (sym.type !== nextType) continue
 
       const dx = sym.x - this.shipX
       const dy = sym.y - this.shipY
       const dist = Math.sqrt(dx * dx + dy * dy)
+      if (dist > SYMBOL_COLLECT_RADIUS) continue
 
-      if (dist <= SYMBOL_COLLECT_RADIUS) {
-        sym.collected = true
+      sym.collected = true
+
+      if (sym.type === nextType) {
         this.manifestIndex++
-        return // Only collect one per frame
+        useAudio().play('sfx.collect')
+      } else {
+        this.mistakeCount++
+        useAudio().play('sfx.mistake')
+        if (this.mistakeCount >= LogisticsRouteMiniGame.MAX_MISTAKES) {
+          this._status = 'failed'
+        }
       }
+
+      return // Only one collection per frame
     }
   }
 

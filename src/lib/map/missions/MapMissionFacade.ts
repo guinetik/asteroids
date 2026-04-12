@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { useAudio } from '@/audio/useAudio'
 import {
   acceptAsteroidMission,
   acceptMission,
@@ -165,6 +166,7 @@ export class MapMissionFacade {
     params.onMissionComplete?.(
       result.board.activeMissions.find((mission) => mission.template.id === params.missionId) ?? null,
     )
+    useAudio().play('sfx.mission.shuttle.clear')
     return result.inventory
   }
 

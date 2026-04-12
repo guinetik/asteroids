@@ -21,6 +21,7 @@ import type {
   OrbitalMiniGameStep,
 } from '../OrbitalMiniGame'
 import type { ShipInput, IceChunk, IceShard, Harpoon, IceChunkSize } from './types'
+import { useAudio } from '@/audio/useAudio'
 import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
@@ -45,7 +46,7 @@ import {
   CHUNK_SPEED_MAX,
   CHUNK_DAMAGE_SMALL,
   CHUNK_DAMAGE_MEDIUM,
-  CHUNK_DAMAGE_LARGE,
+  CHUNK_DAMAGE_LARGE as CHUNK_DAMAGE_MAX,
   CHUNK_SHARDS_SMALL,
   CHUNK_SHARDS_MEDIUM,
   CHUNK_SHARDS_LARGE,
@@ -70,7 +71,7 @@ const CHUNK_RADII: Record<IceChunkSize, number> = {
 const CHUNK_DAMAGE: Record<IceChunkSize, number> = {
   small: CHUNK_DAMAGE_SMALL,
   medium: CHUNK_DAMAGE_MEDIUM,
-  large: CHUNK_DAMAGE_LARGE,
+  large: CHUNK_DAMAGE_MAX,
 }
 
 /** Shard count lookup by chunk size. */
@@ -194,6 +195,7 @@ export class IceHarvestMiniGame implements OrbitalMiniGame, OrbitalMiniGameEvent
       airTime: 0,
     }
     this.harpoonCooldown = HARPOON_COOLDOWN
+    useAudio().play('sfx.harpoon')
   }
 
   /** Per-frame update. Advances all systems. */
@@ -371,6 +373,7 @@ export class IceHarvestMiniGame implements OrbitalMiniGame, OrbitalMiniGameEvent
         chunk.shattered = true
         this.harpoon = null
         this.spawnShards(chunk)
+        useAudio().play('sfx.ice_break')
         return
       }
     }
@@ -403,10 +406,12 @@ export class IceHarvestMiniGame implements OrbitalMiniGame, OrbitalMiniGameEvent
       const dist = Math.sqrt(dx * dx + dy * dy)
       const hitDist = chunk.radius + Math.max(SHIP_HALF_WIDTH, SHIP_HALF_HEIGHT)
       if (dist <= hitDist) {
-        this.hullHp -= CHUNK_DAMAGE[chunk.size]
+        const damage = CHUNK_DAMAGE[chunk.size]!
+        this.hullHp -= damage
         this.damageFlash = 0.3
         chunk.shattered = true // chunk breaks on impact too
         this.spawnShards(chunk) // still produces shards on collision
+        useAudio().play('sfx.collision', { volume: Math.max(0.25, damage / CHUNK_DAMAGE_MAX) })
       }
     }
   }
@@ -421,6 +426,7 @@ export class IceHarvestMiniGame implements OrbitalMiniGame, OrbitalMiniGameEvent
       if (dist <= SHARD_COLLECT_RADIUS) {
         shard.collected = true
         this.iceCollected += shard.value
+        useAudio().play('sfx.collect')
       }
     }
   }

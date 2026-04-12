@@ -18,6 +18,7 @@ import type {
   OrbitalMiniGameStep,
 } from '../OrbitalMiniGame'
 import type { ShipInput, Drone, GasPuff } from './types'
+import { useAudio } from '@/audio/useAudio'
 import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
@@ -164,6 +165,7 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
       collected: false,
       gasLoaded: 0,
     })
+    useAudio().play('sfx.drone')
   }
 
   /** Per-frame update. Advances ship, puffs, drones, collisions, and end conditions. */
@@ -297,6 +299,7 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
         if (dist <= puff.radius + DRONE_PUFF_COLLECT_RADIUS) {
           puff.consumed = true
           drone.gasLoaded += GAS_PER_PUFF
+          useAudio().play('sfx.geyser')
         }
       }
     }
@@ -315,6 +318,7 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
         this.gasCollected += drone.gasLoaded
         // Drone is reusable — return it to the pool
         this.dronesRemaining++
+        useAudio().play('sfx.drone.pickup')
       }
     }
   }

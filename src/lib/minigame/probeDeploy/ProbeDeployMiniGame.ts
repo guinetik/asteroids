@@ -21,6 +21,7 @@ import type {
   OrbitalMiniGameStep,
 } from '../OrbitalMiniGame'
 import type { ShipInput, Probe, Meteorite, PlanetTarget, MeteoriteSize } from './types'
+import { useAudio } from '@/audio/useAudio'
 import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
@@ -229,6 +230,7 @@ export class ProbeDeployMiniGame implements OrbitalMiniGame, OrbitalMiniGameEven
     }
     this.probesRemaining -= 1
     this.probeCooldown = PROBE_COOLDOWN
+    useAudio().play('sfx.telemetry.shoot')
   }
 
   /** Per-frame update. Advances all systems. */
@@ -323,6 +325,7 @@ export class ProbeDeployMiniGame implements OrbitalMiniGame, OrbitalMiniGameEven
         const dist = Math.sqrt(dx * dx + dy * dy)
         if (dist < TARGET_HIT_RADIUS) {
           target.hit = true
+          useAudio().play('sfx.target')
           break
         }
       }
@@ -395,6 +398,7 @@ export class ProbeDeployMiniGame implements OrbitalMiniGame, OrbitalMiniGameEven
         this.hullHp -= METEORITE_DAMAGE
         this.damageFlash = 0.3
         this.gracePeriod = DAMAGE_GRACE_PERIOD
+        useAudio().play('sfx.collision', { volume: Math.max(0.3, METEORITE_DAMAGE / HULL_MAX_HP) })
 
         // Apply knockback away from meteorite
         const angle = Math.atan2(dy, dx)
