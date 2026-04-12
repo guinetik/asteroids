@@ -119,7 +119,6 @@ export class MapOrbitFacade {
     vehicleCamera?.setTarget(shuttleController.group)
     sceneVisuals?.showOrbitRing(orbitR)
     sceneVisuals?.setOrbitRingPosition(bodyWorldX, 0, bodyWorldZ)
-    sceneVisuals?.showProgradeMarkers()
     this._slingshotCharge = 0
     this.hideLaunchArrow(sceneVisuals)
     this._orbitRingIsPreview = false
@@ -181,6 +180,7 @@ export class MapOrbitFacade {
       if (!this._chargeSoundPlaying) {
         useAudio().play('sfx.slingshot.charge', { loop: true })
         this._chargeSoundPlaying = true
+        sceneVisuals?.showProgradeMarkers()
       }
       this._slingshotCharge = Math.min(1, this._slingshotCharge + dt / MAP_CONFIG.SLINGSHOT_CHARGE_TIME)
       vehicleCamera?.applyConfigTuning(buildSlingshotChargeCameraConfig(this._slingshotCharge))
@@ -230,6 +230,7 @@ export class MapOrbitFacade {
       this._slingshotCharge = 0
       vehicleCamera?.setConfig(MAP_ORBIT_CAMERA_CONFIG)
       this.hideLaunchArrow(sceneVisuals)
+      sceneVisuals?.hideProgradeMarkers()
       return
     }
 
@@ -312,7 +313,6 @@ export class MapOrbitFacade {
     this._system.checkArrival(px, pz)
     this._approachStartPos = null
     sceneVisuals?.hideApproachTether()
-    sceneVisuals?.showProgradeMarkers()
 
     if (this._system.target) {
       const bx = this._system.target.getWorldX()
