@@ -61,6 +61,9 @@ export interface GravitySurfingControllerDeps {
   spaceTimeGrid: SpaceTimeGrid | null
 }
 
+/** Minimum shuttle speed to allow gravity surf attachment — prevents ambiguous direction at rest. */
+const GRAVITY_SURF_MIN_ATTACH_SPEED = 0.15
+
 function easeInOut01(t: number): number {
   const clamped = THREE.MathUtils.clamp(t, 0, 1)
   return clamped * clamped * (3 - 2 * clamped)
@@ -242,6 +245,7 @@ export class GravitySurfingController {
       || !deps.hasGravitySurfingUnlock
       || deps.orbitState !== 'free'
       || deps.slingshotBurstActive
+      || deps.shuttleController.speed < GRAVITY_SURF_MIN_ATTACH_SPEED
     ) {
       return null
     }
@@ -257,7 +261,11 @@ export class GravitySurfingController {
   private beginCoupling(target: GravitySurfRailTarget, deps: GravitySurfingControllerDeps): void {
     const shuttle = deps.shuttleController
     if (!shuttle) return
-    const directionSign = gravitySurfDirectionFromHeading(target.axis, shuttle.heading)
+    // Derive direction from velocity (not heading) — velocity is the true direction of travel.
+    // The min-speed gate in getRailTarget guarantees velocity is meaningful here.
+    const vel = shuttle.currentVelocity
+    const velComponent = target.axis === 'x' ? vel.x : vel.z
+    const directionSign = velComponent >= 0 ? 1 : -1
     this.state = {
       mode: 'coupling',
       axis: target.axis,
