@@ -3043,11 +3043,11 @@ export class MapViewController implements Tickable {
 
     const bearings: CompassBearing[] = []
 
-    // Sun at origin — heading uses atan2(x, z) convention
+    // Sun at origin — rotation.y=0 faces -Z, so forward angle = heading + PI
     const sunAngle = Math.atan2(-sx, -sz)
     bearings.push({
       label: COMPASS_LABELS['sun']!,
-      bearingRad: heading - sunAngle,
+      bearingRad: sunAngle - heading,
       color: '#FFF0B0',
     })
 
@@ -3058,7 +3058,7 @@ export class MapViewController implements Tickable {
       const angle = Math.atan2(px - sx, pz - sz)
       bearings.push({
         label: COMPASS_LABELS[controller.id] ?? controller.id.slice(0, 2).toUpperCase(),
-        bearingRad: heading - angle,
+        bearingRad: angle - heading,
         color: controller.accentColor,
       })
     }
