@@ -1,6 +1,6 @@
 <!-- src/views/MapView.vue -->
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { MapViewController } from './MapViewController'
 import ShuttleHud from '@/components/ShuttleHud.vue'
 import OrbitPrompt from '@/components/OrbitPrompt.vue'
@@ -169,6 +169,12 @@ const habitatActive = ref(false)
 /** Hides orbit shuttle chrome during Earth first-mail cinematic → habitat (not used when intro is skipped). */
 const earthStartupOrbitHudSuppressed = ref(false)
 const shuttleControlVisible = ref(false)
+/** When opening the terminal from the map bar, optionally land on a specific program (e.g. missions). */
+const shuttleControlProgramOnOpen = ref<'missions' | undefined>(undefined)
+
+watch(shuttleControlVisible, (visible) => {
+  if (!visible) shuttleControlProgramOnOpen.value = undefined
+})
 /** Upgrade levels shown in the shuttle terminal engineering bay (synced on open / after purchase). */
 const upgradeLevelsUi = ref<Partial<Record<UpgradeId, number>>>(getPlayerUpgradeLevelsSnapshot())
 const upgradeInstalledVisible = ref(false)
@@ -414,6 +420,14 @@ function openShuttleControlFromMap(): void {
   shopInventory.value = viewController.getPlayerInventorySnapshot()
 }
 
+function openMissionsFromMap(): void {
+  shuttleControlProgramOnOpen.value = 'missions'
+  shuttleControlVisible.value = true
+  upgradeLevelsUi.value = viewController.getUpgradeLevelsSnapshot()
+  shopProfile.value = viewController.getPlayerProfileSnapshot()
+  shopInventory.value = viewController.getPlayerInventorySnapshot()
+}
+
 function stopShuttleMessageAudio(): void {
   stopMessageAudio()
 }
@@ -506,7 +520,7 @@ function handleMissionComplete() {
 }
 
 function closeMissionOverlay() {
-  missionOverlayVisible.value = false
+  viewController.closeMissionOverlay()
 }
 
 function handleAcceptMission() {
@@ -602,6 +616,13 @@ function dockedPlanetId(): string | null {
       </button>
       <button type="button" class="map-screen-nav__btn map-screen-nav__btn--habitat" @click="openHabitatFromMap">
         H Habitat
+      </button>
+      <button
+        type="button"
+        class="map-screen-nav__btn map-screen-nav__btn--missions"
+        @click="openMissionsFromMap"
+      >
+        Missions
       </button>
       <button
         type="button"
@@ -749,6 +770,7 @@ function dockedPlanetId(): string | null {
   </div>
   <ShuttleControlOverlay
     :visible="shuttleControlVisible"
+    :program-to-select-on-open="shuttleControlProgramOnOpen"
     :inventory="shopInventory"
     :inventory-stacks="shopInventory.stacks"
     :mission-board="missionBoard"

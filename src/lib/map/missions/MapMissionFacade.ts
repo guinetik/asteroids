@@ -223,6 +223,23 @@ export class MapMissionFacade {
     params.onMissionOverlay?.(true, mission, canFit)
   }
 
+  /**
+   * Closes the orbit mission minigame overlay without completing the mission.
+   *
+   * @param params - `onMissionOverlay` syncs Vue (or other UI) with facade state.
+   */
+  closeMissionOverlay(params: {
+    onMissionOverlay:
+      | ((visible: boolean, mission: ActiveShuttleMission | null, canFit: boolean) => void)
+      | null
+  }): void {
+    if (!this.overlayOpen) return
+    this.overlayOpen = false
+    this.activeMinigame?.dispose()
+    this.activeMinigame = null
+    params.onMissionOverlay?.(false, null, false)
+  }
+
   toggleOrbitMissionOverlay(params: {
     targetName: string | null
     inventory: Inventory
@@ -232,10 +249,7 @@ export class MapMissionFacade {
   }): void {
     if (!this.buttonVisible) return
     if (this.overlayOpen) {
-      this.overlayOpen = false
-      this.activeMinigame?.dispose()
-      this.activeMinigame = null
-      params.onMissionOverlay?.(false, null, false)
+      this.closeMissionOverlay({ onMissionOverlay: params.onMissionOverlay })
       return
     }
     this.openMissionOverlay(params)

@@ -13,7 +13,7 @@ import LogisticsRouteCanvas from '@/components/LogisticsRouteCanvas.vue'
 import ProbeDeployCanvas from '@/components/ProbeDeployCanvas.vue'
 import { getPlanetOrbitalConfig } from '@/lib/missions/planetOrbitalConfig'
 import { getItemDefinition } from '@/lib/inventory/catalog'
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 
 const props = defineProps<{
   mission: ActiveShuttleMission
@@ -30,6 +30,22 @@ function handleComplete() {
   props.minigame?.complete()
   emit('complete')
 }
+
+/** Capture phase so ESC closes the overlay even when a canvas minigame has focus. */
+function onGlobalKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Escape') return
+  e.preventDefault()
+  e.stopPropagation()
+  emit('close')
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onGlobalKeydown, true)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onGlobalKeydown, true)
+})
 
 const isGasCollection = computed(
   () => props.minigame instanceof GasCollectionMiniGame,

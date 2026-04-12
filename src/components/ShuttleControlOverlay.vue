@@ -11,6 +11,9 @@ import ShuttleControlProgramShuttle from './shuttle-control/ShuttleControlProgra
 import ShuttleControlProgramUpgrades from './shuttle-control/ShuttleControlProgramUpgrades.vue'
 import type { UpgradeId } from '@/lib/upgrades'
 
+/** Left-rail program in the shuttle control terminal. */
+type ControlScreen = 'shuttle' | 'mail' | 'missions' | 'inventory' | 'upgrades'
+
 const props = defineProps<{
   visible: boolean
   inventory?: Inventory | null
@@ -21,6 +24,11 @@ const props = defineProps<{
   upgradeLevels?: Partial<Record<UpgradeId, number>>
   /** Credits for upgrade purchase checks (map HUD source). */
   playerCredits?: number
+  /**
+   * When the overlay opens (`visible` becomes true), switches to this program.
+   * Omit to keep whichever tab was active last time.
+   */
+  programToSelectOnOpen?: ControlScreen
 }>()
 
 const emit = defineEmits<{
@@ -33,8 +41,6 @@ const emit = defineEmits<{
   useItem: [itemId: string]
   mailChanged: []
 }>()
-
-type ControlScreen = 'shuttle' | 'mail' | 'missions' | 'inventory' | 'upgrades'
 
 const activeScreen = ref<ControlScreen>('mail')
 
@@ -59,7 +65,12 @@ onMounted(syncMailPendingCount)
 watch(
   () => props.visible,
   (open) => {
-    if (open) syncMailPendingCount()
+    if (!open) return
+    syncMailPendingCount()
+    const pick = props.programToSelectOnOpen
+    if (pick) {
+      activeScreen.value = pick
+    }
   },
 )
 

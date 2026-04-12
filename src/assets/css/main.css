@@ -568,7 +568,7 @@ body {
   @apply pointer-events-none fixed bottom-[14%] left-0 right-0 z-[32] mx-auto max-w-3xl px-8 text-center font-mono text-sm font-medium uppercase leading-snug tracking-[0.18em] text-cyan-100/95 drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] md:text-base md:tracking-[0.22em];
 }
 
-/* Map route: title + quick access (habitat / shuttle terminal). */
+/* Map route: title + quick access (habitat / missions / shuttle terminal). */
 .map-screen-nav {
   @apply fixed left-0 right-0 top-0 z-[35] flex items-center justify-between gap-4
          border-b border-cyan-400/15 bg-gradient-to-b from-slate-950/92 to-transparent px-4 py-2.5
@@ -591,6 +591,10 @@ body {
 
 .map-screen-nav__btn--habitat {
   @apply border-slate-400/35 bg-slate-400/10 text-slate-200 hover:border-slate-300/50 hover:bg-slate-400/18;
+}
+
+.map-screen-nav__btn--missions {
+  @apply border-violet-400/35 bg-violet-400/10 text-violet-100 hover:border-violet-300/50 hover:bg-violet-400/18;
 }
 
 .map-screen-nav__btn--terminal {

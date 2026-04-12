@@ -988,8 +988,7 @@ export class MapViewController implements Tickable {
       this.missionButtonVisible
     ) {
       if (this.missionOverlayOpen) {
-        this.missionOverlayOpen = false
-        this.onMissionOverlay?.(false, null, false)
+        this.closeMissionOverlay()
       } else {
         this.missionFacade.toggleOrbitMissionOverlay({
           targetName: this.orbitSystem?.target?.name ?? null,
@@ -1902,6 +1901,15 @@ export class MapViewController implements Tickable {
     this.missionFacade.openMissionOverlay({
       targetName: this.orbitSystem?.target?.name ?? null,
       inventory: this.playerInventory,
+      onMissionOverlay: this.onMissionOverlay,
+    })
+  }
+
+  /**
+   * Dismisses the orbital mission minigame overlay (Close / ESC) without awarding completion.
+   */
+  closeMissionOverlay(): void {
+    this.missionFacade.closeMissionOverlay({
       onMissionOverlay: this.onMissionOverlay,
     })
   }
