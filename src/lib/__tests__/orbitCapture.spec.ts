@@ -334,6 +334,75 @@ describe('OrbitCaptureSystem', () => {
   })
 })
 
+describe('OrbitCaptureSystem prograde / retrograde', () => {
+  /** Creates a system with one body at origin, displayRadius=5, so orbitRadius is large enough
+   *  to place the shuttle at distance 20 within arrival tolerance. */
+  function makeSystem() {
+    // displayRadius=5 → orbitRadius = max(5*80*1.8, 0.5) = 720 — too large.
+    // Use captureRadiusOverride + orbitRadiusOverride to get orbitRadius≈18 and captureRadius≈100.
+    const body = makeBody('Test', 0, 0, 5, 1, 1, 100, 18)
+    return new OrbitCaptureSystem([body])
+  }
+
+  let system: OrbitCaptureSystem
+
+  beforeEach(() => {
+    system = makeSystem()
+  })
+
+  describe('prograde / retrograde', () => {
+    it('returns null when not orbiting', () => {
+      expect(system.getProgradeHeading()).toBeNull()
+      expect(system.getRetrogradeHeading()).toBeNull()
+    })
+
+    it('returns prograde heading perpendicular to radius (tangent in direction of travel)', () => {
+      system.beginCapture(20, 0)
+      system.checkArrival(20, 0)
+      const heading = system.getProgradeHeading()
+      expect(heading).not.toBeNull()
+      // At orbitAngle=0, prograde direction vector is (-sin(0), cos(0)) = (0, 1) in XZ
+      // heading = atan2(-1, 0) = -PI/2
+      expect(heading).toBeCloseTo(-Math.PI / 2, 5)
+    })
+
+    it('returns retrograde opposite to prograde', () => {
+      system.beginCapture(20, 0)
+      system.checkArrival(20, 0)
+      const pro = system.getProgradeHeading()!
+      const retro = system.getRetrogradeHeading()!
+      const diff = Math.abs(retro - pro)
+      const normalizedDiff = Math.min(diff, 2 * Math.PI - diff)
+      expect(normalizedDiff).toBeCloseTo(Math.PI, 5)
+    })
+
+    it('returns +1 alignment when facing exactly prograde', () => {
+      system.beginCapture(20, 0)
+      system.checkArrival(20, 0)
+      const prograde = system.getProgradeHeading()!
+      expect(system.getAlignment(prograde)).toBeCloseTo(1, 5)
+    })
+
+    it('returns -1 alignment when facing exactly retrograde', () => {
+      system.beginCapture(20, 0)
+      system.checkArrival(20, 0)
+      const retro = system.getRetrogradeHeading()!
+      expect(system.getAlignment(retro)).toBeCloseTo(-1, 5)
+    })
+
+    it('returns ~0 alignment when facing perpendicular to orbit', () => {
+      system.beginCapture(20, 0)
+      system.checkArrival(20, 0)
+      const radialHeading = 0
+      expect(Math.abs(system.getAlignment(radialHeading))).toBeLessThan(0.1)
+    })
+
+    it('returns null-safe 0 when not orbiting', () => {
+      expect(system.getAlignment(0)).toBe(0)
+    })
+  })
+})
+
 describe('OrbitCaptureSystem.getNearestPreviewBody', () => {
   // captureRadiusOverride=30 → previewRadius(2x)=60
   // Planet at X=100. Ship at X=60 → dist=40 (inside preview, outside capture).

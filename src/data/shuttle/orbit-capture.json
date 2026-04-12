@@ -8,5 +8,10 @@
   "orbitLaunchSpeed": 3.14,
   "slingshotSettleDuration": 3,
   "slingshotLaunchFxDuration": 0.99,
-  "slingshotDecayRate": 0.0001
+  "slingshotDecayRate": 0.0001,
+  "progradeAlignmentThreshold": 0.85,
+  "progradeSpeedMultiplier": 0.4,
+  "retrogradeAlignmentThreshold": -0.85,
+  "retrogradeSpeedMultiplier": 0.15,
+  "progradeSnapLerpSpeed": 8
 }

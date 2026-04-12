@@ -467,6 +467,48 @@ export class OrbitCaptureSystem {
     }
   }
 
+  // ─── Prograde / retrograde headings ──────────────────────────────────────
+
+  /**
+   * Prograde heading — tangent to the orbit circle in the direction of travel.
+   * Returns the heading in the same convention as {@link launchSlingshot}'s `facingAngle`.
+   *
+   * @returns Heading in radians, or `null` when not orbiting.
+   */
+  getProgradeHeading(): number | null {
+    if (!this.fsm.is('orbiting')) return null
+    const tx = -Math.sin(this.orbitAngle)
+    const tz = Math.cos(this.orbitAngle)
+    return Math.atan2(-tz, tx)
+  }
+
+  /**
+   * Retrograde heading — opposite to prograde (against direction of travel).
+   *
+   * @returns Heading in radians, or `null` when not orbiting.
+   */
+  getRetrogradeHeading(): number | null {
+    if (!this.fsm.is('orbiting')) return null
+    const tx = Math.sin(this.orbitAngle)
+    const tz = -Math.cos(this.orbitAngle)
+    return Math.atan2(-tz, tx)
+  }
+
+  /**
+   * Dot product of the aim direction with the prograde tangent.
+   *
+   * @param facingAngle - Shuttle heading in the same convention as {@link launchSlingshot}.
+   * @returns −1 (retrograde) to +1 (prograde). Returns 0 when not orbiting.
+   */
+  getAlignment(facingAngle: number): number {
+    if (!this.fsm.is('orbiting')) return 0
+    const aimX = Math.cos(facingAngle)
+    const aimZ = -Math.sin(facingAngle)
+    const tx = -Math.sin(this.orbitAngle)
+    const tz = Math.cos(this.orbitAngle)
+    return aimX * tx + aimZ * tz
+  }
+
   // ─── Slingshot launch ─────────────────────────────────────────────────────
 
   /**
