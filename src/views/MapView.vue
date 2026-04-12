@@ -13,6 +13,8 @@ import ShipMessageDialog from '@/components/ShipMessageDialog.vue'
 import ShuttleControlOverlay from '@/components/ShuttleControlOverlay.vue'
 import PlanetShopDialog from '@/components/shop/PlanetShopDialog.vue'
 import CreditsBadge from '@/components/hud/CreditsBadge.vue'
+import AchievementBanner from '@/components/AchievementBanner.vue'
+import AchievementsDialog from '@/components/AchievementsDialog.vue'
 import type { ShuttleMissionBoard, ActiveShuttleMission } from '@/lib/missions/types'
 import MissionMiniGameOverlay from '@/components/MissionMiniGameOverlay.vue'
 import { PLANETS } from '@/lib/planets/catalog'
@@ -39,6 +41,7 @@ import { Timer, type TimerHandle } from '@/lib/Timer'
 import type { ActiveShipMessage } from '@/lib/messages/messageTypes'
 import type { MapIntroUiState } from '@/lib/mapIntroState'
 import type { MapViewLayerToggleState } from './MapViewController'
+import type { AchievementProgress } from '@/data/achievements'
 import type {
   ShuttleTelemetry,
   GravityWarningState,
@@ -47,6 +50,11 @@ import type {
 } from '@/lib/ShuttleTelemetry'
 import { isWithinAsteroidMissionApproachRadius } from '@/lib/missions/mapAsteroidMissionApproach'
 import type { OrbitHudState } from '@/lib/orbitCapture'
+import {
+  evaluateAchievementUnlocks,
+  loadUnlockedAchievementIds,
+  persistUnlockedAchievementIds,
+} from '@/lib/achievements'
 import {
   stopMessageAudio,
   useShipMessageAudioGlobalState,
@@ -188,14 +196,19 @@ const habitatPrompt = ref<string | null>(null)
 const habitatFadeOpacity = ref(0)
 const deathVisible = ref(false)
 const deathCause = ref('')
+const achievementsOpen = ref(false)
+const unlockedAchievementIds = ref<string[]>(loadUnlockedAchievementIds())
+const achievementBannerRef = ref<InstanceType<typeof AchievementBanner> | null>(null)
 const orbitsVisible = ref(true)
 const gridVisible = ref(false)
+const labelsVisible = ref(true)
 const ambientVisible = ref(true)
 const shopButtonVisible = ref(false)
 const shopButtonPlanet = ref('')
 const shopDialogVisible = ref(false)
 const shopSession = ref<ShopSession | null>(null)
 const shopProfile = ref<PlayerProfile>(createProfile('Pilot'))
+const playerProfileSnapshot = ref<PlayerProfile>(createProfile('Pilot'))
 const shopInventory = ref<Inventory>(createInventory())
 const playerCredits = ref(1000)
 const fuelCellCount = ref(0)
@@ -227,6 +240,29 @@ const mapOverlay = reactive<MapOverlayState>({
 const spaceFabricControlUnlocked = computed(() =>
   hasGravitySurfingUnlock(upgradeLevelsUi.value as UpgradeLevels),
 )
+
+const achievementProgress = computed<AchievementProgress>(() => ({
+  profile: playerProfileSnapshot.value,
+  upgradeLevels: upgradeLevelsUi.value,
+}))
+
+watch(unlockedAchievementIds, (ids) => {
+  persistUnlockedAchievementIds(ids)
+}, { deep: true })
+
+watch(achievementProgress, (progress) => {
+  const result = evaluateAchievementUnlocks(progress, unlockedAchievementIds.value)
+  if (result.newlyUnlocked.length === 0) return
+  unlockedAchievementIds.value = result.unlockedIds
+  for (const unlocked of result.newlyUnlocked) {
+    achievementBannerRef.value?.show(
+      unlocked.icon,
+      unlocked.title,
+      unlocked.description,
+      unlocked.type,
+    )
+  }
+}, { deep: true, immediate: true })
 
 /** Begin-mission prompt: derived from telemetry + board so it never depends on a Three.js callback. */
 const missionApproachHud = computed(() => {
@@ -261,6 +297,12 @@ function showMissionNotification(text: string): void {
   })
 }
 
+function syncPersistentProgressFromController(): void {
+  playerProfileSnapshot.value = viewController.getPlayerProfileSnapshot()
+  upgradeLevelsUi.value = viewController.getUpgradeLevelsSnapshot()
+  playerCredits.value = playerProfileSnapshot.value.credits
+}
+
 onMounted(async () => {
   playBackgroundMusic('map')
   if (container.value) {
@@ -289,10 +331,11 @@ onMounted(async () => {
     viewController.onMapViewLayerToggles = (state: MapViewLayerToggleState) => {
       orbitsVisible.value = state.orbitsVisible
       gridVisible.value = state.gridVisible
+      labelsVisible.value = state.labelsVisible
       ambientVisible.value = state.ambientVisible
     }
     viewController.onUpgradeHudRefresh = () => {
-      upgradeLevelsUi.value = viewController.getUpgradeLevelsSnapshot()
+      syncPersistentProgressFromController()
     }
     viewController.onUpgradeInstalledAnnouncement = (headline, upgradeName, tier, creditsSpent, metaText) => {
       upgradeInstalledHeadline.value = headline
@@ -317,7 +360,7 @@ onMounted(async () => {
     viewController.onShuttleControl = (visible) => {
       shuttleControlVisible.value = visible
       if (visible) {
-        upgradeLevelsUi.value = viewController.getUpgradeLevelsSnapshot()
+        syncPersistentProgressFromController()
         shopProfile.value = viewController.getPlayerProfileSnapshot()
         shopInventory.value = viewController.getPlayerInventorySnapshot()
       }
@@ -335,6 +378,7 @@ onMounted(async () => {
     }
     viewController.onShopState = (session, profile, inventory) => {
       shopProfile.value = profile
+      playerProfileSnapshot.value = { ...profile }
       shopInventory.value = inventory
       if (session) {
         shopSession.value = session
@@ -346,6 +390,10 @@ onMounted(async () => {
     }
     viewController.onCreditsUpdate = (credits) => {
       playerCredits.value = credits
+      playerProfileSnapshot.value = {
+        ...viewController.getPlayerProfileSnapshot(),
+        credits,
+      }
     }
     viewController.onFuelCellCount = (count) => {
       fuelCellCount.value = count
@@ -364,11 +412,13 @@ onMounted(async () => {
     viewController.onMissionComplete = (mission) => {
       if (mission) {
         showMissionNotification(`Mission items collected — return to deliver`)
+        syncPersistentProgressFromController()
       }
     }
     viewController.onMissionDeliver = (mission) => {
       if (mission) {
         showMissionNotification(`Mission complete — +${mission.template.reward} CR`)
+        syncPersistentProgressFromController()
       }
     }
     viewController.onBeginAsteroidMission = () => {
@@ -380,7 +430,7 @@ onMounted(async () => {
       refreshActiveMessage()
     })
     await viewController.init(container.value)
-    upgradeLevelsUi.value = viewController.getUpgradeLevelsSnapshot()
+    syncPersistentProgressFromController()
     shopProfile.value = viewController.getPlayerProfileSnapshot()
     shopInventory.value = viewController.getPlayerInventorySnapshot()
     refreshActiveMessage()
@@ -416,7 +466,7 @@ function closeShuttleControl() {
 
 function openShuttleControlFromMap(): void {
   shuttleControlVisible.value = true
-  upgradeLevelsUi.value = viewController.getUpgradeLevelsSnapshot()
+  syncPersistentProgressFromController()
   shopProfile.value = viewController.getPlayerProfileSnapshot()
   shopInventory.value = viewController.getPlayerInventorySnapshot()
 }
@@ -424,7 +474,7 @@ function openShuttleControlFromMap(): void {
 function openMissionsFromMap(): void {
   shuttleControlProgramOnOpen.value = 'missions'
   shuttleControlVisible.value = true
-  upgradeLevelsUi.value = viewController.getUpgradeLevelsSnapshot()
+  syncPersistentProgressFromController()
   shopProfile.value = viewController.getPlayerProfileSnapshot()
   shopInventory.value = viewController.getPlayerInventorySnapshot()
 }
@@ -449,7 +499,7 @@ function openShopFromTerminal() {
 
 function handlePurchaseUpgrade(upgradeId: UpgradeId): void {
   if (!viewController.purchaseNextUpgradeLevel(upgradeId)) return
-  upgradeLevelsUi.value = viewController.getUpgradeLevelsSnapshot()
+  syncPersistentProgressFromController()
   const newLevel = upgradeLevelsUi.value[upgradeId] ?? 0
   const def = UPGRADE_DEFINITIONS[upgradeId]
   upgradeInstalledHeadline.value = 'UPGRADE INSTALLED'
@@ -463,6 +513,10 @@ function handlePurchaseUpgrade(upgradeId: UpgradeId): void {
 function onUpgradeInstalledDismissed(): void {
   upgradeInstalledVisible.value = false
   upgradeInstalledMetaText.value = null
+}
+
+function handleToggleLabels() {
+  labelsVisible.value = viewController.toggleLabels()
 }
 
 function handleToggleAmbient() {
@@ -627,6 +681,13 @@ function dockedPlanetId(): string | null {
       </button>
       <button
         type="button"
+        class="map-screen-nav__btn map-screen-nav__btn--achievements"
+        @click="achievementsOpen = true"
+      >
+        Achievements {{ unlockedAchievementIds.length }}
+      </button>
+      <button
+        type="button"
         class="map-screen-nav__btn map-screen-nav__btn--terminal"
         @click="openShuttleControlFromMap"
       >
@@ -768,6 +829,15 @@ function dockedPlanetId(): string | null {
       <span class="map-toggle-btn__dot" />
       Debris
     </button>
+    <button
+      type="button"
+      class="map-toggle-btn"
+      :class="labelsVisible ? 'map-toggle-btn--active' : 'map-toggle-btn--inactive'"
+      @click="handleToggleLabels"
+    >
+      <span class="map-toggle-btn__dot" />
+      Labels
+    </button>
   </div>
   <ShuttleControlOverlay
     :visible="shuttleControlVisible"
@@ -796,6 +866,13 @@ function dockedPlanetId(): string | null {
     :meta-text="upgradeInstalledMetaText ?? undefined"
     @dismissed="onUpgradeInstalledDismissed"
   />
+  <AchievementsDialog
+    :open="achievementsOpen"
+    :progress="achievementProgress"
+    :unlocked-ids="unlockedAchievementIds"
+    @close="achievementsOpen = false"
+  />
+  <AchievementBanner ref="achievementBannerRef" />
   <CreditsBadge
     v-show="
       !mapOverlay.visible &&

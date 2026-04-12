@@ -11,8 +11,8 @@ export const TICK_PRIORITY_COMPOSIT = TICK_PRIORITY_RENDER - 1
 /** One-shot action bridge runs just after input. */
 export const ONE_SHOT_PRIORITY = TICK_PRIORITY_INPUT + 1
 
-/** Only Jupiter-scale bodies and above deform the space-time grid. */
-export const GRID_MASS_THRESHOLD = 1.0
+/** Sun + gas/ice giants only deform the space-time grid (Jupiter, Saturn, Uranus, Neptune). */
+export const GRID_MASS_THRESHOLD = 4e-5
 
 /** Wider map-only grid wells for gas giants. */
 export const MAP_GRID_GAS_GIANT_WELL_WIDTH_MULT = 1.85
@@ -268,6 +268,12 @@ export const VENUS_ORBIT_WARNING_DISTANCE = 1.5
 /** Delay before auto-opening the habitat after the startup intro finishes. */
 export const POST_STARTUP_INTRO_HABITAT_DELAY_SEC = 2
 
+/** Target screen-height fraction for the planet indicator sprite. */
+export const PLANET_INDICATOR_APPARENT_SIZE = 0.028
+
+/** Planet apparent screen fraction below which the indicator fades in. */
+export const PLANET_INDICATOR_FADE_SCREEN_FRACTION = 0.008
+
 /**
  * Aggregated config export so future domain facades can depend on one object
  * instead of re-importing a long constant list.
@@ -351,6 +357,8 @@ export const MAP_VIEW_CONTROLLER_CONFIG = {
   MAP_SPACE_TIME_GRID_RESOLUTION,
   MAP_SPACE_TIME_GRID_RESOLUTION_BOOST,
   ONE_SHOT_PRIORITY,
+  PLANET_INDICATOR_APPARENT_SIZE,
+  PLANET_INDICATOR_FADE_SCREEN_FRACTION,
   ORBIT_PREVIEW_MULTIPLIER,
   ORBIT_PREVIEW_OPACITY,
   ORBIT_TETHER_ANCHOR_COLOR,

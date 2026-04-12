@@ -171,6 +171,8 @@ export interface MapViewLayerToggleState {
   orbitsVisible: boolean
   /** Space-time fabric grid visible. */
   gridVisible: boolean
+  /** Planet indicator labels visible. */
+  labelsVisible: boolean
   /** User debris toggle (ambient layers); meshes may still be hidden while orbiting. */
   ambientVisible: boolean
 }
@@ -259,6 +261,9 @@ export class MapViewController implements Tickable {
 
   /** Whether the space-time fabric grid is currently visible (default off until Gravity Surfing). */
   private gridVisible = false
+
+  /** Whether planet indicator labels are visible (user toggle + suppressed during intro/map overlay). */
+  private labelsVisible = true
 
   /** Saved layer toggles while the opening intro suppresses orbit lines / fabric / debris. */
   private introLayerRestore: MapViewLayerToggleState | null = null
@@ -762,6 +767,7 @@ export class MapViewController implements Tickable {
       toggleOrbits: () => this.toggleOrbits(),
       toggleSpaceTimeGrid: () => this.toggleSpaceTimeGrid(),
       toggleAmbient: () => this.toggleAmbient(),
+      toggleLabels: () => this.toggleLabels(),
       spawnGravitationalEvent: () => this.gravitationalEventManager?.spawnRandomInWorld() ?? null,
       spawnGravitationalEventNearPlayer: (maxOffset = 200) => {
         if (!this.gravitationalEventManager || !this.shuttleController) return null
@@ -1309,15 +1315,22 @@ export class MapViewController implements Tickable {
    * Advance the orrery simulation and update gravity grid sources.
    */
   private tickOrrery(dt: number): void {
-    // Pause simulation while map is open
-    if (this.mapState.isOpen) return
+    // Hide planet indicator labels while the tactical map overlay is open
+    if (this.mapState.isOpen) {
+      for (const controller of this.planetControllers) {
+        controller.setIndicatorVisible(false)
+      }
+      return
+    }
 
     this.simTime += dt * DEFAULT_TIME_SCALE
 
     this.sunController?.tick(dt, this.simTime)
 
+    const indicatorCamera = this.vehicleCamera?.camera ?? undefined
+    const showLabels = this.labelsVisible && !this.mapState.isOpen
     for (const controller of this.planetControllers) {
-      controller.tick(dt, this.simTime)
+      controller.tick(dt, this.simTime, indicatorCamera, showLabels)
     }
 
     // Asteroid belt LOD — show fewer instances when camera is zoomed out
@@ -1379,10 +1392,17 @@ export class MapViewController implements Tickable {
         inputManager: this.inputManager,
         mapIntroControlsLocked: this.mapIntro.controlsLocked,
       })
+    }
+
+    // Shop/mission UI must sync on every orbit FSM state. If we only run this while
+    // `orbiting`, leaving Earth never clears the shop session, so the next planet
+    // still shows Earth's stock.
+    if (this.orbitSystem) {
       this.updateShopSession()
       this.updateMissionState()
-      this.missionFacade.tick(dt)
     }
+
+    this.missionFacade.tick(dt)
 
     // Waypoint marker scale + VFX (must not gate begin-mission proximity — marker refs can lag).
     if (this.sceneObjects && this.vehicleCamera && this.shuttleController) {
@@ -1582,10 +1602,12 @@ export class MapViewController implements Tickable {
     this.introLayerRestore = {
       orbitsVisible: this.orbitsVisible,
       gridVisible: this.gridVisible,
+      labelsVisible: this.labelsVisible,
       ambientVisible: this.sceneEnvironment?.ambientVisible ?? true,
     }
     this.applyOrbitsVisible(false)
     this.applyGridVisible(false)
+    this.labelsVisible = false
     this.sceneEnvironment?.setMapIntroSuppressed(true)
     this.emitMapViewLayerToggles()
   }
@@ -1599,6 +1621,7 @@ export class MapViewController implements Tickable {
     this.introLayerRestore = null
     this.applyOrbitsVisible(saved.orbitsVisible)
     this.applyGridVisible(saved.gridVisible)
+    this.labelsVisible = saved.labelsVisible
     this.sceneEnvironment?.setMapIntroSuppressed(false)
     this.emitMapViewLayerToggles()
   }
@@ -1607,6 +1630,7 @@ export class MapViewController implements Tickable {
     this.onMapViewLayerToggles?.({
       orbitsVisible: this.orbitsVisible,
       gridVisible: this.gridVisible,
+      labelsVisible: this.labelsVisible,
       ambientVisible: this.sceneEnvironment?.ambientVisible ?? true,
     })
   }
@@ -1677,6 +1701,16 @@ export class MapViewController implements Tickable {
   toggleAmbient(): boolean {
     if (!this.sceneEnvironment) return true
     return this.sceneEnvironment.toggleAmbient()
+  }
+
+  /**
+   * Toggles planet indicator labels (dot + name).
+   * Returns the new visibility state so the Vue layer can update button appearance.
+   */
+  toggleLabels(): boolean {
+    this.labelsVisible = !this.labelsVisible
+    this.emitMapViewLayerToggles()
+    return this.labelsVisible
   }
 
   /** Write current profile and shuttle inventory to localStorage. */
