@@ -20,13 +20,29 @@ body {
 }
 
 .shuttle-hud {
-  @apply fixed inset-0 pointer-events-none font-mono text-xs text-green-400 z-20;
+  @apply fixed inset-0 pointer-events-none font-mono text-xs text-green-400 z-30;
   text-shadow: 0 0 4px rgba(0, 255, 0, 0.5);
 }
 
 /* Map shuttle + FPS: top-center “position / motion” stack */
 .hud-top-cluster {
-  @apply absolute top-4 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-0.5 text-center;
+  @apply absolute top-4 left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-0.5 text-center;
+}
+
+.hud-top-cluster__row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.hud-top-cluster__coords {
+  @apply text-green-400 whitespace-nowrap;
+  font-size: 0.65rem;
+}
+
+.hud-top-cluster__speed {
+  @apply text-green-400 whitespace-nowrap;
+  font-size: 0.65rem;
 }
 
 .hud-top-cluster__line {
@@ -46,6 +62,41 @@ body {
   @apply font-mono text-2xl font-bold text-red-500;
   text-shadow: 0 0 12px rgba(239, 68, 68, 0.8);
   animation: gravity-pulse 1s ease-in-out infinite;
+}
+
+.shuttle-compass {
+  position: relative;
+  width: 360px;
+  height: 28px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  mask-image: linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%);
+}
+
+.shuttle-compass__marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  text-shadow: 0 0 6px currentColor;
+  transition: opacity 0.15s ease;
+}
+
+.shuttle-compass__pointer {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid rgba(255, 255, 255, 0.75);
 }
 
 .hud-hull-label {
