@@ -1,6 +1,7 @@
 <script setup lang='ts'>
 import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
 import { ORBIT_SCALE } from '@/lib/planets/constants'
+import ShuttleCompass from '@/components/ShuttleCompass.vue'
 
 const props = defineProps<{
   telemetry: ShuttleTelemetry
@@ -11,22 +12,6 @@ const emit = defineEmits<{
   useFuelCell: []
 }>()
 
-/** Degrees in a full compass rotation (0–360°). */
-const COMPASS_DEGREES_FULL = 360
-
-/** Radians to degrees multiplier. */
-const DEGREES_PER_RADIAN = 180 / Math.PI
-
-/**
- * Formats shuttle yaw (radians) as a compass degree string (0–360).
- *
- * @param rad - World yaw in radians (same convention as {@link ShuttleTelemetry.heading}).
- */
-function formatHeading(rad: number): string {
-  let deg = (rad * DEGREES_PER_RADIAN) % COMPASS_DEGREES_FULL
-  if (deg < 0) deg += COMPASS_DEGREES_FULL
-  return `${deg.toFixed(0)}`
-}
 
 function pct(value: number, max: number): number {
   return max > 0 ? (value / max) * 100 : 0
@@ -61,15 +46,20 @@ function tempLabelClass(): string {
 
 <template>
   <div class="shuttle-hud">
-    <!-- Top center: position + velocity/heading (same “beats” as FPS HUD readouts). -->
+    <!-- Top center: coords left, compass strip center, speed right. -->
     <div class="hud-top-cluster">
-      <div class="hud-top-cluster__line">
-        X:{{ (props.telemetry.posX / ORBIT_SCALE).toFixed(2) }}
-        Z:{{ (props.telemetry.posZ / ORBIT_SCALE).toFixed(2) }} AU
-      </div>
-      <div class="hud-top-cluster__line hud-top-cluster__line--velocity">
-        <span>SPD {{ props.telemetry.speed.toFixed(1) }}</span>
-        <span>HDG {{ formatHeading(props.telemetry.heading) }}</span>
+      <div class="hud-top-cluster__row">
+        <span class="hud-top-cluster__coords">
+          X:{{ (props.telemetry.posX / ORBIT_SCALE).toFixed(2) }}
+          Z:{{ (props.telemetry.posZ / ORBIT_SCALE).toFixed(2) }} AU
+        </span>
+        <ShuttleCompass
+          :heading-rad="props.telemetry.heading"
+          :bearings="props.telemetry.compassBearings"
+        />
+        <span class="hud-top-cluster__speed">
+          SPD {{ props.telemetry.speed.toFixed(1) }}
+        </span>
       </div>
       <div v-if="props.telemetry.actionPrompt" class="hud-top-cluster__line hud-top-cluster__line--action">
         {{ props.telemetry.actionPrompt }}

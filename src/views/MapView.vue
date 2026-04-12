@@ -153,6 +153,7 @@ const telemetry = reactive<ShuttleTelemetry>({
   temperature: 0,
   temperatureVisible: false,
   damageIntensity: 0,
+  compassBearings: [],
 })
 const orbitState = reactive<OrbitHudState>({
   state: 'free',
