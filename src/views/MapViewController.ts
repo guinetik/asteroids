@@ -17,6 +17,7 @@ import type {
   ShuttleTelemetry,
   GravityWarningState,
   GravitationalAnomalyHudState,
+  CompassBearing,
 } from '@/lib/ShuttleTelemetry'
 import { GameLoop } from '@/lib/GameLoop'
 import { Timer, type TimerHandle } from '@/lib/Timer'
@@ -175,6 +176,21 @@ export interface MapViewLayerToggleState {
   labelsVisible: boolean
   /** User debris toggle (ambient layers); meshes may still be hidden while orbiting. */
   ambientVisible: boolean
+}
+
+/** Short compass labels for each planet + Sun. */
+const COMPASS_LABELS: Record<string, string> = {
+  sun: 'Sol',
+  mercury: 'Me',
+  venus: 'Ve',
+  earth: 'Ea',
+  mars: 'Ma',
+  ceres: 'Ce',
+  jupiter: 'Ju',
+  saturn: 'Sa',
+  uranus: 'Ur',
+  neptune: 'Ne',
+  pluto: 'Pl',
 }
 
 /**
@@ -1111,6 +1127,7 @@ export class MapViewController implements Tickable {
         temperature: this.shipHealth?.temperature ?? 0,
         temperatureVisible: this.shipHealth?.temperatureVisible ?? false,
         damageIntensity: this.shipHealth?.damageIntensity ?? 0,
+        compassBearings: this.computeCompassBearings(),
       })
     }
 
@@ -3012,6 +3029,41 @@ export class MapViewController implements Tickable {
     if (this.habitatState.phase !== 'habitat' || !this.habitatScene) return
     if (!document.pointerLockElement) return
     this.habitatScene.fpsCamera.applyMouseDelta(e.movementX, e.movementY)
+  }
+
+  /**
+   * Compute compass bearings from the shuttle to all planets and the Sun.
+   * Each bearing is relative to the shuttle's current heading.
+   */
+  private computeCompassBearings(): CompassBearing[] {
+    if (!this.shuttleController) return []
+    const sx = this.shuttleController.position.x
+    const sz = this.shuttleController.position.z
+    const heading = this.shuttleController.heading
+
+    const bearings: CompassBearing[] = []
+
+    // Sun at origin
+    const sunAngle = Math.atan2(-sz, -sx)
+    bearings.push({
+      label: COMPASS_LABELS['sun']!,
+      bearingRad: sunAngle - heading,
+      color: '#FFF0B0',
+    })
+
+    // Planets
+    for (const controller of this.planetControllers) {
+      const px = controller.getWorldX()
+      const pz = controller.getWorldZ()
+      const angle = Math.atan2(pz - sz, px - sx)
+      bearings.push({
+        label: COMPASS_LABELS[controller.id] ?? controller.id.slice(0, 2).toUpperCase(),
+        bearingRad: angle - heading,
+        color: controller.accentColor,
+      })
+    }
+
+    return bearings
   }
 
   dispose(): void {

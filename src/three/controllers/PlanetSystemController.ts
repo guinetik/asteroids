@@ -225,6 +225,16 @@ export class PlanetSystemController implements GravitySource {
     return this.group.position.z
   }
 
+  /** The planet's catalog id. */
+  get id(): string {
+    return this.planet.id
+  }
+
+  /** The planet's accent color from the catalog. */
+  get accentColor(): string {
+    return this.planet.accentColor
+  }
+
   /**
    * Compute the world-space position of a moon by its index in the planet's moon array.
    *
