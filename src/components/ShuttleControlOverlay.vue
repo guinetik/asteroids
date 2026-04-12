@@ -20,6 +20,10 @@ const props = defineProps<{
   inventoryStacks?: InventoryStack[]
   missionBoard?: ShuttleMissionBoard | null
   dockedPlanet?: string | null
+  /** Live shuttle telemetry for the orientation manual. */
+  telemetry?: any
+  /** Player name for the deed of ownership in the Shuttle manual */
+  playerName?: string
   /** Snapshot of upgrade levels for the engineering bay. */
   upgradeLevels?: Partial<Record<UpgradeId, number>>
   /** Credits for upgrade purchase checks (map HUD source). */
@@ -180,12 +184,15 @@ function onKeydown(e: KeyboardEvent) {
             :docked-planet="dockedPlanet"
             :upgrade-levels="upgradeLevels ?? {}"
             :player-credits="playerCredits ?? 0"
+            :telemetry="telemetry"
+            :player-name="playerName"
             @accept-mission="$emit('acceptMission')"
             @deliver-mission="(id: string) => $emit('deliverMission', id)"
             @accept-asteroid-mission="$emit('acceptAsteroidMission')"
             @use-item="(itemId: string) => $emit('useItem', itemId)"
             @mail-changed="onMailProgramChanged"
             @purchase-upgrade="emitPurchaseUpgrade"
+            @switch-to-upgrades="activeScreen = 'upgrades'"
           />
         </div>
       </div>
