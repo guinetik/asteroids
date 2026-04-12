@@ -301,6 +301,24 @@ export class MapOrbitFacade {
     if (yawLeft) shuttleController.group.rotateY(MAP_PHYSICS.yawTorque * dt)
     if (yawRight) shuttleController.group.rotateY(-MAP_PHYSICS.yawTorque * dt)
 
+    // W snaps nose toward prograde, S toward retrograde
+    const thrustSnap =
+      !mapIntroControlsLocked && inputManager.isActionActive('thrust')
+    const brakeSnap =
+      !mapIntroControlsLocked && inputManager.isActionActive('brake')
+    if ((thrustSnap || brakeSnap) && this._system) {
+      const targetHeading = thrustSnap
+        ? this._system.getProgradeHeading()
+        : this._system.getRetrogradeHeading()
+      if (targetHeading !== null) {
+        const current = shuttleController.group.rotation.y
+        let delta = targetHeading - current
+        // Normalize to [-PI, PI]
+        delta = ((delta + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI
+        shuttleController.group.rotation.y = current + delta * Math.min(1, dt * orbitConfig.progradeSnapLerpSpeed)
+      }
+    }
+
     shuttleController.thrusterSystem.tick(
       dt,
       { thrust: false, brake: false, rcs: yawLeft || yawRight },
@@ -325,6 +343,10 @@ export class MapOrbitFacade {
     const hudState = this._system.getHudState(shuttleController.position.x, shuttleController.position.z)
     hudState.chargeLevel = this._slingshotCharge
     hudState.inspectMode = inspectMode
+    // Compute live alignment from shuttle heading
+    const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(shuttleController.group.quaternion)
+    const heading = Math.atan2(-fwd.z, fwd.x)
+    hudState.progradeAlignment = this._system.getAlignment(heading)
     return hudState
   }
 

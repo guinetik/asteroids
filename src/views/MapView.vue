@@ -153,6 +153,7 @@ const orbitState = reactive<OrbitHudState>({
   slingshotSpeed: 0,
   chargeLevel: 0,
   inspectMode: false,
+  progradeAlignment: 0,
 })
 const gravityWarning = reactive<GravityWarningState>({
   proximity: 0,

@@ -90,6 +90,8 @@ export interface OrbitHudState {
   chargeLevel: number
   /** True when cargo inspect mode is active — hides orbit prompts. */
   inspectMode: boolean
+  /** Dot product of shuttle heading with prograde tangent. −1 (retro) to +1 (pro). */
+  progradeAlignment: number
 }
 
 // ─── Internal precomputed body data ─────────────────────────────────────────
@@ -587,6 +589,7 @@ export class OrbitCaptureSystem {
       slingshotSpeed: orbitalSpeed,
       chargeLevel: 0,
       inspectMode: false,
+      progradeAlignment: 0,
     }
   }
 }
