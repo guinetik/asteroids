@@ -853,6 +853,7 @@ function dockedPlanetId(): string | null {
     :docked-planet="dockedPlanetId()"
     :upgrade-levels="upgradeLevelsUi"
     :player-credits="playerCredits"
+    :player-name="playerProfile?.name"
     @close="closeShuttleControl"
     @open-shop="openShopFromTerminal"
     @purchase-upgrade="handlePurchaseUpgrade"

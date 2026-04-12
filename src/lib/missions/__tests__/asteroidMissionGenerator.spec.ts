@@ -109,16 +109,17 @@ describe('generateWaypointInRegion', () => {
   it('generates position for asteroid-belt within belt bounds at high difficulty', () => {
     const wp = generateWaypointInRegion('asteroid-belt', 10)
     const dist = Math.sqrt(wp.worldX * wp.worldX + wp.worldZ * wp.worldZ)
-    // main-belt: innerRadius=420, outerRadius=660, ORBIT_SCALE=0.5
-    expect(dist).toBeGreaterThanOrEqual(420 * 0.5 * 0.9)
-    expect(dist).toBeLessThanOrEqual(660 * 0.5 * 1.1)
+    // main-belt: innerRadius=2.06 AU, outerRadius=3.27 AU, ORBIT_SCALE=150
+    expect(dist).toBeGreaterThanOrEqual(2.06 * ORBIT_SCALE * 0.9)
+    expect(dist).toBeLessThanOrEqual(3.27 * ORBIT_SCALE * 1.1)
   })
 
   it('generates position for kuiper-belt within belt bounds at high difficulty', () => {
     const wp = generateWaypointInRegion('kuiper-belt', 10)
     const dist = Math.sqrt(wp.worldX * wp.worldX + wp.worldZ * wp.worldZ)
-    expect(dist).toBeGreaterThanOrEqual(1400 * 0.5 * 0.9)
-    expect(dist).toBeLessThanOrEqual(2400 * 0.5 * 1.1)
+    // kuiper-belt: innerRadius=30 AU, outerRadius=50 AU, ORBIT_SCALE=150
+    expect(dist).toBeGreaterThanOrEqual(30 * ORBIT_SCALE * 0.9)
+    expect(dist).toBeLessThanOrEqual(50 * ORBIT_SCALE * 1.1)
   })
 
   it('keeps near-earth waypoints in inner annulus at difficulty 1', () => {
@@ -152,7 +153,7 @@ describe('generateWaypointInRegion', () => {
   })
 
   it('rejects radii that sit on Earth nominal orbit at strict standoff', () => {
-    const earthOrbitWorld = 300 * ORBIT_SCALE
+    const earthOrbitWorld = 1.0 * ORBIT_SCALE
     expect(isMissionWaypointSolarDistanceClearOfPlanets(earthOrbitWorld)).toBe(false)
   })
 

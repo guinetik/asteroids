@@ -36,8 +36,7 @@ export interface NearestBody {
   distance: number
 }
 
-/** Threshold for switching from decimal to k-units display. */
-const K_UNIT_THRESHOLD = 1000
+import { ORBIT_SCALE } from '@/lib/planets/constants'
 
 /**
  * Find the N nearest celestial bodies to a position, sorted by distance.
@@ -64,16 +63,19 @@ export function findNearestBodies(
 }
 
 /**
- * Format a distance value for HUD display.
- * Values >= 1000 are shown as "1.5k", smaller as "5.7".
+ * Format a distance value for HUD display in Astronomical Units.
  *
  * @param distance - Distance in world units
  */
 export function formatDistance(distance: number): string {
-  if (distance >= K_UNIT_THRESHOLD) {
-    return `${(distance / K_UNIT_THRESHOLD).toFixed(1)}k`
+  const au = distance / ORBIT_SCALE
+  if (au >= 100) {
+    return `${au.toFixed(0)} AU`
   }
-  return distance.toFixed(1)
+  if (au >= 10) {
+    return `${au.toFixed(1)} AU`
+  }
+  return `${au.toFixed(2)} AU`
 }
 
 /**

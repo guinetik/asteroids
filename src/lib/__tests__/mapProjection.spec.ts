@@ -29,12 +29,19 @@ describe('findNearestBodies', () => {
 })
 
 describe('formatDistance', () => {
-  it('formats small distances with 1 decimal', () => {
-    expect(formatDistance(5.678)).toBe('5.7')
+  it('formats sub-10 AU distances with 2 decimals', () => {
+    // 150 world units = 1.00 AU (ORBIT_SCALE = 150)
+    expect(formatDistance(150)).toBe('1.00 AU')
   })
 
-  it('formats large distances in k units', () => {
-    expect(formatDistance(1500)).toBe('1.5k')
+  it('formats 10-100 AU distances with 1 decimal', () => {
+    // 3000 world units = 20.0 AU
+    expect(formatDistance(3000)).toBe('20.0 AU')
+  })
+
+  it('formats 100+ AU distances with no decimals', () => {
+    // 22500 world units = 150 AU
+    expect(formatDistance(22500)).toBe('150 AU')
   })
 })
 

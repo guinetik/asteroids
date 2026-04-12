@@ -74,7 +74,7 @@ export class MapPlanetariumScene {
       scene.add(controller.group)
     }
 
-    const kuiperOuterEdge = 2400 * ORBIT_SCALE
+    const kuiperOuterEdge = 50 * ORBIT_SCALE
     const mapGridSize = kuiperOuterEdge * 2.2
     const spaceTimeGrid = new SpaceTimeGrid(
       mapGridSize,

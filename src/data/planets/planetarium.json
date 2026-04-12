@@ -22,14 +22,14 @@
       "type": "Terrestrial",
       "accentColor": "#B0A898",
       "orbit": {
-        "semiMajorAxis": 187,
+        "semiMajorAxis": 0.387,
         "eccentricity": 0.2056,
         "inclination": 7.005,
         "longitudeOfAscendingNode": 48.331,
         "argumentOfPeriapsis": 29.124,
         "period": 87.97
       },
-      "displayRadius": 0.0044,
+      "displayRadius": 0.003,
       "axialTilt": 0.034,
       "rotationSpeed": 0.1071,
       "shader": {
@@ -50,14 +50,14 @@
       "type": "Terrestrial",
       "accentColor": "#D4B96A",
       "orbit": {
-        "semiMajorAxis": 255,
+        "semiMajorAxis": 0.723,
         "eccentricity": 0.0068,
         "inclination": 3.395,
         "longitudeOfAscendingNode": 76.68,
         "argumentOfPeriapsis": 54.884,
         "period": 224.7
       },
-      "displayRadius": 0.0066,
+      "displayRadius": 0.0073,
       "axialTilt": 177.4,
       "rotationSpeed": -0.0259,
       "shader": {
@@ -78,7 +78,7 @@
       "type": "Terrestrial",
       "accentColor": "#6AA4D4",
       "orbit": {
-        "semiMajorAxis": 300,
+        "semiMajorAxis": 1.0,
         "eccentricity": 0.0167,
         "inclination": 0,
         "longitudeOfAscendingNode": 0,
@@ -128,14 +128,14 @@
       "type": "Terrestrial",
       "accentColor": "#C87840",
       "orbit": {
-        "semiMajorAxis": 370,
+        "semiMajorAxis": 1.524,
         "eccentricity": 0.0934,
         "inclination": 1.85,
         "longitudeOfAscendingNode": 49.558,
         "argumentOfPeriapsis": 286.502,
         "period": 686.97
       },
-      "displayRadius": 0.0055,
+      "displayRadius": 0.0041,
       "axialTilt": 25.19,
       "rotationSpeed": 6.124,
       "shader": {
@@ -199,14 +199,14 @@
       "type": "Dwarf Planet",
       "accentColor": "#A0A0A0",
       "orbit": {
-        "semiMajorAxis": 527,
+        "semiMajorAxis": 2.767,
         "eccentricity": 0.076,
         "inclination": 10.59,
         "longitudeOfAscendingNode": 80.329,
         "argumentOfPeriapsis": 73.597,
         "period": 1682
       },
-      "displayRadius": 0.001,
+      "displayRadius": 0.0006,
       "axialTilt": 4,
       "rotationSpeed": 2.654,
       "shader": {
@@ -227,14 +227,14 @@
       "type": "Gas Giant",
       "accentColor": "#C8A878",
       "orbit": {
-        "semiMajorAxis": 684,
+        "semiMajorAxis": 5.203,
         "eccentricity": 0.0489,
         "inclination": 1.303,
         "longitudeOfAscendingNode": 100.464,
         "argumentOfPeriapsis": 273.867,
         "period": 4332.59
       },
-      "displayRadius": 0.0165,
+      "displayRadius": 0.0863,
       "axialTilt": 3.13,
       "rotationSpeed": 15.1951,
       "shader": {
@@ -341,14 +341,14 @@
       "type": "Gas Giant",
       "accentColor": "#D4C890",
       "orbit": {
-        "semiMajorAxis": 927,
+        "semiMajorAxis": 9.537,
         "eccentricity": 0.0565,
         "inclination": 2.485,
         "longitudeOfAscendingNode": 113.665,
         "argumentOfPeriapsis": 339.392,
         "period": 10759.22
       },
-      "displayRadius": 0.014,
+      "displayRadius": 0.0728,
       "axialTilt": 26.73,
       "rotationSpeed": 14.1513,
       "ring": {
@@ -524,14 +524,14 @@
       "type": "Ice Giant",
       "accentColor": "#78C8D4",
       "orbit": {
-        "semiMajorAxis": 1314,
+        "semiMajorAxis": 19.191,
         "eccentricity": 0.0457,
         "inclination": 0.773,
         "longitudeOfAscendingNode": 74.006,
         "argumentOfPeriapsis": 96.998,
         "period": 30688.5
       },
-      "displayRadius": 0.011,
+      "displayRadius": 0.0309,
       "axialTilt": 97.77,
       "rotationSpeed": -8.7965,
       "ring": {
@@ -665,14 +665,14 @@
       "type": "Ice Giant",
       "accentColor": "#5068C8",
       "orbit": {
-        "semiMajorAxis": 1645,
+        "semiMajorAxis": 30.069,
         "eccentricity": 0.0113,
         "inclination": 1.77,
         "longitudeOfAscendingNode": 131.784,
         "argumentOfPeriapsis": 276.336,
         "period": 60182
       },
-      "displayRadius": 0.0099,
+      "displayRadius": 0.0299,
       "axialTilt": 28.32,
       "rotationSpeed": 9.3625,
       "shader": {
@@ -716,14 +716,14 @@
       "type": "Dwarf Planet",
       "accentColor": "#C8B8A0",
       "orbit": {
-        "semiMajorAxis": 1886,
+        "semiMajorAxis": 39.482,
         "eccentricity": 0.2488,
         "inclination": 17.16,
         "longitudeOfAscendingNode": 110.299,
         "argumentOfPeriapsis": 113.834,
         "period": 90560
       },
-      "displayRadius": 0.0022,
+      "displayRadius": 0.0014,
       "axialTilt": 122.53,
       "rotationSpeed": -0.986,
       "shader": {
@@ -765,15 +765,15 @@
       "id": "main-belt",
       "name": "Asteroid Belt",
       "orbit": {
-        "semiMajorAxis": 527,
+        "semiMajorAxis": 2.77,
         "eccentricity": 0.08,
         "inclination": 1.5,
         "longitudeOfAscendingNode": 0,
         "argumentOfPeriapsis": 0,
-        "period": 1680
+        "period": 1682
       },
-      "innerRadius": 420,
-      "outerRadius": 660,
+      "innerRadius": 2.06,
+      "outerRadius": 3.27,
       "maxParticles": 12000,
       "thickness": 0.3,
       "orbitalSpeed": 0.002,
@@ -804,15 +804,15 @@
       "id": "kuiper-belt",
       "name": "Kuiper Belt",
       "orbit": {
-        "semiMajorAxis": 1900,
+        "semiMajorAxis": 43,
         "eccentricity": 0.05,
         "inclination": 1.8,
         "longitudeOfAscendingNode": 0,
         "argumentOfPeriapsis": 0,
         "period": 90560
       },
-      "innerRadius": 1400,
-      "outerRadius": 2400,
+      "innerRadius": 30,
+      "outerRadius": 50,
       "maxParticles": 18000,
       "thickness": 1,
       "orbitalSpeed": 0.0008,

@@ -94,8 +94,8 @@ function makeTestBelt(overrides: Partial<AsteroidBelt> = {}): AsteroidBelt {
       argumentOfPeriapsis: 0,
       period: 1,
     },
-    innerRadius: 10,
-    outerRadius: 10,
+    innerRadius: 0.05,
+    outerRadius: 0.05,
     maxParticles: 1,
     thickness: 0,
     orbitalSpeed: 0,
@@ -192,7 +192,7 @@ function tickFrames(
  * @returns A world-space shuttle position well outside the nearby tumble radius
  */
 function farAwayFrom(localAsteroidPosition: THREE.Vector3): THREE.Vector3 {
-  return localAsteroidPosition.clone().add(new THREE.Vector3(1000, 0, 0))
+  return localAsteroidPosition.clone().add(new THREE.Vector3(10000, 0, 0))
 }
 
 afterEach(() => {

@@ -1,5 +1,6 @@
 <script setup lang='ts'>
 import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
+import { ORBIT_SCALE } from '@/lib/planets/constants'
 
 const props = defineProps<{
   telemetry: ShuttleTelemetry
@@ -63,8 +64,8 @@ function tempLabelClass(): string {
     <!-- Top center: position + velocity/heading (same “beats” as FPS HUD readouts). -->
     <div class="hud-top-cluster">
       <div class="hud-top-cluster__line">
-        X:{{ props.telemetry.posX.toFixed(0) }}
-        Z:{{ props.telemetry.posZ.toFixed(0) }}
+        X:{{ (props.telemetry.posX / ORBIT_SCALE).toFixed(2) }}
+        Z:{{ (props.telemetry.posZ / ORBIT_SCALE).toFixed(2) }} AU
       </div>
       <div class="hud-top-cluster__line hud-top-cluster__line--velocity">
         <span>SPD {{ props.telemetry.speed.toFixed(1) }}</span>

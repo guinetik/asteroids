@@ -1248,6 +1248,232 @@ body {
   @apply flex items-center border-t border-white/10 px-5 py-3;
 }
 
+/* Shuttle Orientation Manual (ShuttleControlProgramShuttle.vue) */
+.orientation-manual {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.orientation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(165, 243, 252, 0.1);
+  padding-bottom: 1rem;
+}
+
+.orientation-header__logo h2 {
+  margin: 0.25rem 0 0;
+  font-size: 0.95rem;
+  letter-spacing: 0.125em;
+}
+
+.orientation-header__status {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.status-pill {
+  border-radius: 9999px;
+  border: 1px solid rgb(165 243 252 / 0.3);
+  background-color: rgb(0 0 0 / 0.4);
+  padding: 0.25rem 0.75rem;
+  font-family: monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgb(165 243 252 / 0.8);
+}
+
+.status-pill--docked {
+  border-color: rgb(245 158 11 / 0.4);
+  color: rgb(245 158 11);
+}
+
+.orientation-intro {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  border-left: 3px solid rgb(165 243 252);
+  background: rgba(165, 243, 252, 0.03);
+}
+
+.marta-note {
+  font-style: italic;
+  line-height: 1.6;
+  color: rgb(165 243 252 / 0.85);
+}
+
+.orientation-sections {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding-right: 0.5rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(165 243 252 / 0.3) transparent;
+}
+
+.orientation-section__title {
+  margin-bottom: 0.25rem;
+  font-family: monospace;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.125em;
+  color: rgb(251 191 36);
+}
+
+.orientation-section__subtitle {
+  margin-bottom: 1rem;
+  font-size: 1.125rem;
+  color: rgb(255 255 255 / 0.9);
+}
+
+.system-card {
+  border-radius: 1rem;
+  border: 1px solid rgb(165 243 252 / 0.2);
+  background-color: rgb(0 0 0 / 0.3);
+  padding: 1.5rem;
+  color: rgb(226 232 240);
+}
+
+.thruster-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.thruster-demo {
+  border: 1px solid rgba(165, 243, 252, 0.2);
+  border-radius: 8px;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.thruster-demo__label {
+  margin-bottom: 0.5rem;
+  font-family: monospace;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.125em;
+  color: rgb(165 243 252);
+}
+
+.thruster-demo__bar {
+  height: 6px;
+  background: rgba(165, 243, 252, 0.1);
+  border-radius: 9999px;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+}
+
+.thruster-demo__fill {
+  height: 100%;
+  background: linear-gradient(90deg, rgb(165 243 252), rgb(103 232 249));
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.thruster-demo--amber .thruster-demo__fill {
+  background: linear-gradient(90deg, rgb(251 191 36), rgb(245 158 11));
+}
+
+.thruster-demo--emerald .thruster-demo__fill {
+  background: linear-gradient(90deg, rgb(134 239 172), rgb(74 222 128));
+}
+
+.demo-hint {
+  margin-top: 1rem;
+  border-left: 2px solid rgb(251 191 36);
+  padding-left: 0.75rem;
+  font-size: 0.75rem;
+  font-style: italic;
+  color: rgb(251 191 36 / 0.8);
+}
+
+.upgrade-tease {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.upgrade-tag {
+  border-radius: 4px;
+  background: rgb(165 243 252 / 0.1);
+  padding: 2px 8px;
+  color: rgb(165 243 252);
+  font-family: monospace;
+}
+
+.checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.checklist-item {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.checklist-dot {
+  color: rgb(165 243 252);
+  font-size: 10px;
+  margin-top: 4px;
+}
+
+.orientation-footer {
+  margin-top: auto;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: rgb(148 163 184);
+  font-family: monospace;
+}
+
+.progress {
+  letter-spacing: 1px;
+}
+
+.marta-signature {
+  text-align: right;
+  line-height: 1.4;
+}
+
+/* Deed of ownership card at bottom of manual */
+.deed-card {
+  border-radius: 1rem;
+  border: 1px solid rgb(251 191 36 / 0.25);
+  background: rgba(0, 0, 0, 0.35);
+  padding: 2rem;
+  margin-top: 1rem;
+}
+
+.deed-header {
+  border-bottom: 1px dotted rgb(251 191 36 / 0.3);
+  padding-bottom: 1rem;
+}
+
+.deed-header h4 {
+  font-weight: 300;
+  letter-spacing: 0.04em;
+}
+
+.player-name {
+  font-family: serif;
+  font-weight: 300;
+  letter-spacing: 0.04em;
+}
+
 /* Upgrade installed toast (map / spaceport — MissionAnnouncement-style stripe).
    Animation durations: keep in sync with UpgradeInstalledAnnouncement.vue (OPEN/CLOSE seconds). */
 .upgrade-installed-announcement {

@@ -10,8 +10,8 @@
  * @spec docs/superpowers/specs/2026-04-04-planetarium-data-layer-design.md
  */
 
-/** Scale factor: scene orbit units to Three.js world units. */
-export const ORBIT_SCALE = 0.5
+/** Scale factor: AU to Three.js world units. 1 AU = 150 world units. */
+export const ORBIT_SCALE = 150
 
 /** Scale factor: body display sizes. Sun radius ~1.375, Earth ~0.385. */
 export const SIZE_SCALE = 80.0
