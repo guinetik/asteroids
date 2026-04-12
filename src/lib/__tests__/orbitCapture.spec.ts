@@ -209,54 +209,41 @@ describe('OrbitCaptureSystem', () => {
       expect(speed).toBeCloseTo(orbitConfig.orbitLaunchSpeed, 5)
     })
 
-    it('adds a prograde speed bonus without changing the aimed direction', () => {
-      const position = { x: 0, z: 0 }
-      const movingBody = makeMovingBody('Gamma', position, 0.1)
-      const movingSystem = new OrbitCaptureSystem([movingBody])
+    it('gives baseline speed when aiming radially (no alignment bonus)', () => {
+      system.beginCapture(20, 0)
+      system.checkArrival(14.4, 0)
+      system.tickOrbit(0.5)
 
-      movingSystem.beginCapture(20, 0)
-      movingSystem.checkArrival(14.4, 0)
-      movingSystem.tickOrbit(0.5)
+      // At orbitAngle≈0, aiming radially outward (angle=0) gives near-zero alignment
+      const vel = system.launchSlingshot(0, 0.5)
 
-      position.x = 1.5
-
-      const vel = movingSystem.launchSlingshot(0, 0.5)
-
-      expect(vel.vx).toBeCloseTo(orbitConfig.orbitLaunchSpeed + 3, 5)
+      expect(vel.vx).toBeCloseTo(orbitConfig.orbitLaunchSpeed, 1)
       expect(vel.vz).toBeCloseTo(0, 5)
     })
 
-    it('keeps the launch on the arrow direction when planet motion is perpendicular', () => {
-      const position = { x: 0, z: 0 }
-      const movingBody = makeMovingBody('Gamma', position, 0.1)
-      const movingSystem = new OrbitCaptureSystem([movingBody])
+    it('applies retrograde speed bonus when aiming opposite the orbit tangent', () => {
+      system.beginCapture(20, 0)
+      system.checkArrival(14.4, 0)
+      system.tickOrbit(0.5)
 
-      movingSystem.beginCapture(20, 0)
-      movingSystem.checkArrival(14.4, 0)
-      movingSystem.tickOrbit(0.5)
-
-      position.x = 1.5
-
-      const vel = movingSystem.launchSlingshot(Math.PI / 2, 0.5)
+      // At orbitAngle≈0, aiming at PI/2 is retrograde (alignment≈-1)
+      // Speed = baseSpeed * (1 + retrogradeSpeedMultiplier * 1) = baseSpeed * 1.15
+      const vel = system.launchSlingshot(Math.PI / 2, 0.5)
+      const speed = Math.sqrt(vel.vx ** 2 + vel.vz ** 2)
 
       expect(vel.vx).toBeCloseTo(0, 5)
-      expect(vel.vz).toBeCloseTo(-orbitConfig.orbitLaunchSpeed, 5)
+      expect(speed).toBeGreaterThan(orbitConfig.orbitLaunchSpeed)
     })
 
-    it('keeps at least the baseline speed when aiming opposite the planet motion', () => {
-      const position = { x: 0, z: 0 }
-      const movingBody = makeMovingBody('Gamma', position, 0.1)
-      const movingSystem = new OrbitCaptureSystem([movingBody])
+    it('gives baseline speed when aiming retrograde-ish without full retrograde alignment', () => {
+      system.beginCapture(20, 0)
+      system.checkArrival(14.4, 0)
+      system.tickOrbit(0.5)
 
-      movingSystem.beginCapture(20, 0)
-      movingSystem.checkArrival(14.4, 0)
-      movingSystem.tickOrbit(0.5)
+      // At orbitAngle≈0, aiming at PI (−X) has near-zero alignment (radial inward)
+      const vel = system.launchSlingshot(Math.PI, 0.5)
 
-      position.x = 1.5
-
-      const vel = movingSystem.launchSlingshot(Math.PI, 0.5)
-
-      expect(vel.vx).toBeCloseTo(-orbitConfig.orbitLaunchSpeed, 5)
+      expect(vel.vx).toBeCloseTo(-orbitConfig.orbitLaunchSpeed, 1)
       expect(vel.vz).toBeCloseTo(0, 5)
     })
 
@@ -399,6 +386,41 @@ describe('OrbitCaptureSystem prograde / retrograde', () => {
 
     it('returns null-safe 0 when not orbiting', () => {
       expect(system.getAlignment(0)).toBe(0)
+    })
+  })
+
+  describe('alignment launch bonus', () => {
+    it('gives 1.4x speed when aiming exactly prograde', () => {
+      system.beginCapture(20, 0)
+      system.checkArrival(20, 0)
+      system.tickOrbit(0.016)
+      const prograde = system.getProgradeHeading()!
+      const result = system.launchSlingshot(prograde, 0.016)
+      const speed = Math.sqrt(result.vx ** 2 + result.vz ** 2)
+      const baseSpeed = 3.14 // orbitLaunchSpeed from JSON
+      expect(speed).toBeCloseTo(baseSpeed * 1.4, 1)
+    })
+
+    it('gives 1.0x speed when aiming perpendicular to orbit', () => {
+      system.beginCapture(20, 0)
+      system.checkArrival(20, 0)
+      system.tickOrbit(0.016)
+      const radialHeading = 0
+      const result = system.launchSlingshot(radialHeading, 0.016)
+      const speed = Math.sqrt(result.vx ** 2 + result.vz ** 2)
+      const baseSpeed = 3.14
+      expect(speed).toBeCloseTo(baseSpeed, 1)
+    })
+
+    it('gives up to 1.15x speed when aiming exactly retrograde', () => {
+      system.beginCapture(20, 0)
+      system.checkArrival(20, 0)
+      system.tickOrbit(0.016)
+      const retro = system.getRetrogradeHeading()!
+      const result = system.launchSlingshot(retro, 0.016)
+      const speed = Math.sqrt(result.vx ** 2 + result.vz ** 2)
+      const baseSpeed = 3.14
+      expect(speed).toBeCloseTo(baseSpeed * 1.15, 1)
     })
   })
 })

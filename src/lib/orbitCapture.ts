@@ -514,31 +514,34 @@ export class OrbitCaptureSystem {
   /**
    * Computes the slingshot exit velocity and transitions `orbiting → free`.
    *
-   * Exit velocity always follows the player's aimed facing direction.
-   * The captured body's frame velocity contributes a prograde speed bonus
-   * along that aimed direction, but never rotates the exit vector away
-   * from the launch arrow.
+   * Exit speed is deterministic from the player's aim alignment with the
+   * orbit tangent:
+   * - Prograde (alignment > threshold): up to `1 + progradeSpeedMultiplier` × base speed.
+   * - Retrograde (alignment < −threshold): up to `1 + retrogradeSpeedMultiplier` × base speed.
+   * - All other directions: base speed.
+   *
+   * The exit velocity vector always follows the player's aimed facing direction.
    *
    * @param facingAngle - The shuttle's aimed direction in radians (XZ plane,
    *   0 = +X axis, increasing counter-clockwise).
-   * @param dt - Delta time for the current frame, used to normalise planet velocity.
+   * @param _dt - Unused; kept for signature compatibility.
    * @returns `{vx, vz}` exit velocity in world units per second.
    */
-  launchSlingshot(facingAngle: number, dt: number): Vel2 {
+  launchSlingshot(facingAngle: number, _dt: number): Vel2 {
     const speedMultiplier = this.targetData?.orbitalSpeedMultiplier ?? 1
     const aimX = Math.cos(facingAngle)
     const aimZ = -Math.sin(facingAngle)
 
-    let planetVx = 0
-    let planetVz = 0
-    if (this.targetData && dt > 0) {
-      planetVx = (this.targetData.body.getWorldX() - this.prevPlanetX) / dt
-      planetVz = (this.targetData.body.getWorldZ() - this.prevPlanetZ) / dt
+    const alignment = this.getAlignment(facingAngle)
+    const baseSpeed = orbitConfig.orbitLaunchSpeed * Math.max(1, speedMultiplier)
+
+    let speed = baseSpeed
+    if (alignment > orbitConfig.progradeAlignmentThreshold) {
+      speed = baseSpeed * (1 + orbitConfig.progradeSpeedMultiplier * alignment)
+    } else if (alignment < orbitConfig.retrogradeAlignmentThreshold) {
+      speed = baseSpeed * (1 + orbitConfig.retrogradeSpeedMultiplier * Math.abs(alignment))
     }
 
-    const progradeBoost = aimX * planetVx + aimZ * planetVz
-    const baseSpeed = orbitConfig.orbitLaunchSpeed * Math.max(1, speedMultiplier)
-    const speed = Math.max(baseSpeed, baseSpeed + progradeBoost)
     const vx = aimX * speed
     const vz = aimZ * speed
 
