@@ -44,6 +44,11 @@ interface SurfCouplingTetherVisuals {
   readonly lockMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>
 }
 
+interface ProgradeMarkerVisuals {
+  readonly progradeSprite: THREE.Sprite
+  readonly retrogradeSprite: THREE.Sprite
+}
+
 export class MapSceneVisuals {
   private scene: THREE.Scene
   private shuttleGroup: THREE.Group | null = null
@@ -54,6 +59,7 @@ export class MapSceneVisuals {
   private shipReticlePointer: THREE.Sprite | null = null
   private approachTether: ApproachTetherVisuals | null = null
   private surfCouplingTether: SurfCouplingTetherVisuals | null = null
+  private progradeMarkers: ProgradeMarkerVisuals | null = null
 
   constructor(sceneObjects: MapSceneObjects) {
     this.scene = sceneObjects.scene
@@ -472,11 +478,102 @@ export class MapSceneVisuals {
     return mesh
   }
 
+  showProgradeMarkers(): void {
+    if (this.progradeMarkers) return
+
+    const progradeSprite = this.createMarkerSprite('#34ff88', 'circle')
+    const retrogradeSprite = this.createMarkerSprite('#ffaa44', 'cross')
+    progradeSprite.renderOrder = 13
+    retrogradeSprite.renderOrder = 13
+
+    this.scene.add(progradeSprite)
+    this.scene.add(retrogradeSprite)
+
+    this.progradeMarkers = { progradeSprite, retrogradeSprite }
+  }
+
+  updateProgradeMarkers(
+    progradePos: THREE.Vector3,
+    retrogradePos: THREE.Vector3,
+    alignment: number,
+    _dt: number,
+  ): void {
+    if (!this.progradeMarkers) return
+    const { progradeSprite, retrogradeSprite } = this.progradeMarkers
+
+    progradeSprite.position.copy(progradePos)
+    retrogradeSprite.position.copy(retrogradePos)
+
+    // Pulse prograde marker brightness when aligned
+    const progradeMat = progradeSprite.material as THREE.SpriteMaterial
+    const baseOpacity = 0.7
+    const alignGlow = alignment > 0.85 ? 0.3 * ((alignment - 0.85) / 0.15) : 0
+    progradeMat.opacity = baseOpacity + alignGlow
+
+    const retroMat = retrogradeSprite.material as THREE.SpriteMaterial
+    const retroGlow = alignment < -0.85 ? 0.3 * ((Math.abs(alignment) - 0.85) / 0.15) : 0
+    retroMat.opacity = baseOpacity + retroGlow
+  }
+
+  hideProgradeMarkers(): void {
+    if (!this.progradeMarkers) return
+    const { progradeSprite, retrogradeSprite } = this.progradeMarkers
+    this.scene.remove(progradeSprite)
+    this.scene.remove(retrogradeSprite)
+    ;(progradeSprite.material as THREE.SpriteMaterial).map?.dispose()
+    ;(progradeSprite.material as THREE.SpriteMaterial).dispose()
+    ;(retrogradeSprite.material as THREE.SpriteMaterial).map?.dispose()
+    ;(retrogradeSprite.material as THREE.SpriteMaterial).dispose()
+    this.progradeMarkers = null
+  }
+
+  private createMarkerSprite(color: string, shape: 'circle' | 'cross'): THREE.Sprite {
+    const size = 64
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')!
+    const half = size / 2
+
+    ctx.strokeStyle = color
+    ctx.fillStyle = color
+    ctx.lineWidth = 4
+
+    if (shape === 'circle') {
+      ctx.beginPath()
+      ctx.arc(half, half, half * 0.6, 0, Math.PI * 2)
+      ctx.fill()
+    } else {
+      const arm = half * 0.5
+      ctx.beginPath()
+      ctx.moveTo(half - arm, half - arm)
+      ctx.lineTo(half + arm, half + arm)
+      ctx.moveTo(half + arm, half - arm)
+      ctx.lineTo(half - arm, half + arm)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.arc(half, half, half * 0.6, 0, Math.PI * 2)
+      ctx.stroke()
+    }
+
+    const texture = new THREE.CanvasTexture(canvas)
+    const material = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    })
+    const sprite = new THREE.Sprite(material)
+    sprite.scale.setScalar(0.3)
+    return sprite
+  }
+
   dispose(): void {
     this.hideLaunchArrow()
     this.hideOrbitRing()
     this.hideApproachTether()
     this.hideSurfCouplingTether()
+    this.hideProgradeMarkers()
     if (this.shipReticleGroup) {
       const disposeSprite = (sprite: THREE.Sprite) => {
         const material = sprite.material as THREE.SpriteMaterial

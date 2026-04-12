@@ -107,6 +107,7 @@ export class MapOrbitFacade {
     vehicleCamera?.setTarget(shuttleController.group)
     sceneVisuals?.showOrbitRing(orbitR)
     sceneVisuals?.setOrbitRingPosition(bodyWorldX, 0, bodyWorldZ)
+    sceneVisuals?.showProgradeMarkers()
     this._slingshotCharge = 0
     this.hideLaunchArrow(sceneVisuals)
     this._orbitRingIsPreview = false
@@ -217,6 +218,7 @@ export class MapOrbitFacade {
       vehicleCamera.controls.target.copy(shuttleController.position)
     }
     sceneVisuals?.hideOrbitRing()
+    sceneVisuals?.hideProgradeMarkers()
     this._orbitRingIsPreview = false
     this.hideLaunchArrow(sceneVisuals)
     this._slingshotCharge = 0
@@ -265,6 +267,7 @@ export class MapOrbitFacade {
     this._system.checkArrival(px, pz)
     this._approachStartPos = null
     sceneVisuals?.hideApproachTether()
+    sceneVisuals?.showProgradeMarkers()
 
     if (this._system.target) {
       const bx = this._system.target.getWorldX()
@@ -335,6 +338,24 @@ export class MapOrbitFacade {
       sceneVisuals?.setOrbitRingPosition(bx, planetY, bz)
     }
 
+    // Update prograde/retrograde markers
+    if (this._system) {
+      const proAngle = this._system.getProgradeAngle()
+      if (proAngle !== null && this._system.target) {
+        const retroAngle = proAngle + Math.PI
+        const bx = this._system.target.getWorldX()
+        const by = this._system.target.getWorldY()
+        const bz = this._system.target.getWorldZ()
+        const r = this._system.targetOrbitRadius
+        const proPos = new THREE.Vector3(bx + Math.cos(proAngle) * r, by, bz + Math.sin(proAngle) * r)
+        const retroPos = new THREE.Vector3(bx + Math.cos(retroAngle) * r, by, bz + Math.sin(retroAngle) * r)
+        const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(shuttleController.group.quaternion)
+        const heading = Math.atan2(-fwd.z, fwd.x)
+        const alignment = this._system.getAlignment(heading)
+        sceneVisuals?.updateProgradeMarkers(proPos, retroPos, alignment, dt)
+      }
+    }
+
     return true
   }
 
@@ -359,6 +380,7 @@ export class MapOrbitFacade {
     vehicleCamera?.setConfig(MAP_CAMERA_CONFIG)
     sceneVisuals?.hideApproachTether()
     sceneVisuals?.hideOrbitRing()
+    sceneVisuals?.hideProgradeMarkers()
     this._orbitRingIsPreview = false
   }
 

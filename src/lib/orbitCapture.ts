@@ -497,6 +497,17 @@ export class OrbitCaptureSystem {
   }
 
   /**
+   * Raw prograde angle in world space for marker positioning.
+   * This is the orbit angle offset by π/2 (tangent direction).
+   *
+   * @returns Angle in radians, or `null` when not orbiting.
+   */
+  getProgradeAngle(): number | null {
+    if (!this.fsm.is('orbiting')) return null
+    return this.orbitAngle + Math.PI / 2
+  }
+
+  /**
    * Dot product of the aim direction with the prograde tangent.
    *
    * @param facingAngle - Shuttle heading in the same convention as {@link launchSlingshot}.
