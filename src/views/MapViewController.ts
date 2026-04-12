@@ -782,11 +782,7 @@ export class MapViewController implements Tickable {
         this.devSetPlayerUpgradeLevel('gravitySurfing', 1)
       },
       giveCredits: (amount = 1000) => {
-        if (!Number.isFinite(amount)) return
-        this.playerProfile = addCredits(this.playerProfile, Math.max(0, Math.round(amount)))
-        this.persistPlayerProfile()
-        this.onCreditsUpdate?.(this.playerProfile.credits)
-        this.emitShopState()
+        this.giveCredits(amount)
       },
       setUpgradeLevel: (upgradeId: UpgradeId, level: number) => {
         this.devSetPlayerUpgradeLevel(upgradeId, level)
@@ -1836,6 +1832,19 @@ export class MapViewController implements Tickable {
   /** Current persisted player profile snapshot for Vue/UI sync. */
   getPlayerProfileSnapshot(): PlayerProfile {
     return { ...this.playerProfile }
+  }
+
+  /**
+   * Award credits using the standard persistence + HUD sync flow.
+   *
+   * @param amount - Positive credit amount to add.
+   */
+  giveCredits(amount: number): void {
+    if (!Number.isFinite(amount)) return
+    this.playerProfile = addCredits(this.playerProfile, Math.max(0, Math.round(amount)))
+    this.persistPlayerProfile()
+    this.onCreditsUpdate?.(this.playerProfile.credits)
+    this.emitShopState()
   }
 
   /** Current shuttle inventory snapshot for Vue/UI sync. */

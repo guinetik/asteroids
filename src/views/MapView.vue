@@ -255,10 +255,13 @@ watch(achievementProgress, (progress) => {
   if (result.newlyUnlocked.length === 0) return
   unlockedAchievementIds.value = result.unlockedIds
   for (const unlocked of result.newlyUnlocked) {
+    if (unlocked.rewardCredits > 0) {
+      viewController.giveCredits(unlocked.rewardCredits)
+    }
     achievementBannerRef.value?.show(
       unlocked.icon,
       unlocked.title,
-      unlocked.description,
+      `${unlocked.description} +${unlocked.rewardCredits.toLocaleString()} CR`,
       unlocked.type,
     )
   }
@@ -621,7 +624,16 @@ function dockedPlanetId(): string | null {
     class="map-screen-nav"
     aria-label="Map screen navigation"
   >
-    <span class="map-screen-nav__title">{{ MAP_SCREEN_GAME_TITLE }}</span>
+    <div class="map-screen-nav__brand">
+      <span class="map-screen-nav__title">{{ MAP_SCREEN_GAME_TITLE }}</span>
+      <button
+        type="button"
+        class="map-screen-nav__btn map-screen-nav__btn--achievements border-amber-300/55 text-amber-100 bg-amber-300/10 hover:bg-amber-300/18 hover:border-amber-200/80"
+        @click="achievementsOpen = true"
+      >
+        Achievements {{ unlockedAchievementIds.length }}
+      </button>
+    </div>
     <div class="map-screen-nav__actions">
       <button
         type="button"
@@ -678,13 +690,6 @@ function dockedPlanetId(): string | null {
         @click="openMissionsFromMap"
       >
         Missions
-      </button>
-      <button
-        type="button"
-        class="map-screen-nav__btn map-screen-nav__btn--achievements"
-        @click="achievementsOpen = true"
-      >
-        Achievements {{ unlockedAchievementIds.length }}
       </button>
       <button
         type="button"
