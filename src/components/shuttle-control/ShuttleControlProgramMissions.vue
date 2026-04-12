@@ -62,6 +62,10 @@ function objectiveSummary(mission: GeneratedAsteroidMission): string {
       return `Rescue ${obj.colonistCount} colonist${obj.colonistCount !== 1 ? 's' : ''} (${obj.oxygenTime}s oxygen)`
     case 'survey':
       return `Calibrate ${obj.probeCount} gravitometric probe${obj.probeCount !== 1 ? 's' : ''} (${obj.timeLimit}s)`
+    case 'collect': {
+      const item = obj.collectItemLabel ?? obj.collectItemId ?? 'designated cargo'
+      return `Collect ${item}`
+    }
   }
 }
 

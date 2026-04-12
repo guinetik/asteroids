@@ -25,6 +25,7 @@ const TYPE_COLORS: Record<string, string> = {
   gather: '#66ffee',
   exterminate: '#ff4444',
   rescue: '#ffcc44',
+  collect: '#66d9ff',
 }
 
 const headingDeg = computed(() => {

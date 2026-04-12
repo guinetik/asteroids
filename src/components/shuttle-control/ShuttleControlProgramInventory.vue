@@ -67,11 +67,11 @@ const cargoBands = computed<CargoBand[]>(() => {
   }
 
   return [
-    { id: 'rocks', label: 'Rocks', weightKg: weights.rocks, percent: 0 },
-    { id: 'special', label: 'Special', weightKg: weights.special, percent: 0 },
-    { id: 'vendor', label: 'Vendor Items', weightKg: weights.vendor, percent: 0 },
-    { id: 'fuel', label: 'Fuel', weightKg: weights.fuel, percent: 0 },
-    { id: 'other', label: 'Other', weightKg: weights.other, percent: 0 },
+    { id: 'rocks' as CargoBandId, label: 'Rocks', weightKg: weights.rocks, percent: 0 },
+    { id: 'special' as CargoBandId, label: 'Special', weightKg: weights.special, percent: 0 },
+    { id: 'vendor' as CargoBandId, label: 'Vendor Items', weightKg: weights.vendor, percent: 0 },
+    { id: 'fuel' as CargoBandId, label: 'Fuel', weightKg: weights.fuel, percent: 0 },
+    { id: 'other' as CargoBandId, label: 'Other', weightKg: weights.other, percent: 0 },
   ].map((band) => ({
     ...band,
     percent:

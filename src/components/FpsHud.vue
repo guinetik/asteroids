@@ -9,7 +9,7 @@ export interface CompassObjective {
   /** Relative bearing to player heading in degrees (-180 to 180). */
   relativeDeg: number
   /** Objective type for color-coding. */
-  type: 'gather' | 'exterminate' | 'rescue' | 'survey'
+  type: 'gather' | 'exterminate' | 'rescue' | 'survey' | 'collect'
 }
 
 /** Telemetry data from FpsPlayerController for HUD display. */
