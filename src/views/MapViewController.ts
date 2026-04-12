@@ -3039,29 +3039,38 @@ export class MapViewController implements Tickable {
     if (!this.shuttleController) return []
     const sx = this.shuttleController.position.x
     const sz = this.shuttleController.position.z
-    const heading = this.shuttleController.heading
+    const h = this.shuttleController.heading
+
+    // Shuttle forward is local +X rotated by heading around Y:
+    // forward = (cos h, 0, -sin h), right = (sin h, 0, cos h)
+    const fwdX = Math.cos(h)
+    const fwdZ = -Math.sin(h)
+    const rightX = Math.sin(h)
+    const rightZ = Math.cos(h)
 
     const bearings: CompassBearing[] = []
 
-    // Sun at origin — shuttle forward is local +X, so heading=0 faces world +X
-    // Use atan2(dz, dx) to match the rotation.y convention
-    const sunAngle = Math.atan2(-sz, -sx)
-    bearings.push({
-      label: COMPASS_LABELS['sun']!,
-      bearingRad: sunAngle - heading,
-      color: '#FFF0B0',
-    })
+    // Compute bearing using dot products: forward component and right component
+    // atan2(right dot, forward dot) gives signed angle from nose
+    const addBearing = (label: string, color: string, tx: number, tz: number) => {
+      const dx = tx - sx
+      const dz = tz - sz
+      const fwd = dx * fwdX + dz * fwdZ
+      const rgt = dx * rightX + dz * rightZ
+      bearings.push({ label, bearingRad: Math.atan2(rgt, fwd), color })
+    }
+
+    // Sun at origin
+    addBearing(COMPASS_LABELS['sun']!, '#FFF0B0', 0, 0)
 
     // Planets
     for (const controller of this.planetControllers) {
-      const px = controller.getWorldX()
-      const pz = controller.getWorldZ()
-      const angle = Math.atan2(pz - sz, px - sx)
-      bearings.push({
-        label: COMPASS_LABELS[controller.id] ?? controller.id.slice(0, 2).toUpperCase(),
-        bearingRad: angle - heading,
-        color: controller.accentColor,
-      })
+      addBearing(
+        COMPASS_LABELS[controller.id] ?? controller.id.slice(0, 2).toUpperCase(),
+        controller.accentColor,
+        controller.getWorldX(),
+        controller.getWorldZ(),
+      )
     }
 
     return bearings

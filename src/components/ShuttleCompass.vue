@@ -28,7 +28,7 @@ function normalizeDeg(deg: number): number {
 const markers = computed(() => {
   return props.bearings.map((b) => {
     const deg = normalizeDeg(b.bearingRad * RAD_TO_DEG)
-    let offsetPx = -deg * PX_PER_DEG
+    let offsetPx = deg * PX_PER_DEG
     let clamped = false
     if (offsetPx > MAX_OFFSET_PX) {
       offsetPx = MAX_OFFSET_PX
