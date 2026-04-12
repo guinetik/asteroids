@@ -185,6 +185,21 @@ export class MapOrbitFacade {
       this._slingshotCharge = Math.min(1, this._slingshotCharge + dt / MAP_CONFIG.SLINGSHOT_CHARGE_TIME)
       vehicleCamera?.applyConfigTuning(buildSlingshotChargeCameraConfig(this._slingshotCharge))
       this.updateLaunchArrow(shuttleController, sceneVisuals)
+      if (this._system && sceneVisuals) {
+        const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(shuttleController.group.quaternion)
+        const heading = Math.atan2(-fwd.z, fwd.x)
+        const alignment = this._system.getAlignment(heading)
+        const trajectoryBlocked = this.isAimingAtPlanet(shuttleController)
+        if (trajectoryBlocked) {
+          sceneVisuals.updateLaunchArrowColor(MAP_CONFIG.ARROW_COLOR_BLOCKED)
+        } else if (alignment > orbitConfig.progradeAlignmentThreshold) {
+          sceneVisuals.updateLaunchArrowColor(0x34ff88)
+        } else if (alignment < orbitConfig.retrogradeAlignmentThreshold) {
+          sceneVisuals.updateLaunchArrowColor(0xffaa44)
+        } else {
+          sceneVisuals.updateLaunchArrowColor(MAP_CONFIG.ARROW_COLOR_SAFE)
+        }
+      }
       return
     }
 

@@ -101,6 +101,12 @@ export class MapSceneVisuals {
     this.launchArrow = null
   }
 
+  /** Override the launch arrow color (e.g. for prograde/retrograde alignment feedback). */
+  updateLaunchArrowColor(color: number): void {
+    if (!this.launchArrow) return
+    this.launchArrow.setColor(new THREE.Color(color))
+  }
+
   showOrbitRing(radius: number, opacity: number = MAP_CONFIG.ORBIT_RING_OPACITY): void {
     this.hideOrbitRing()
     const points: THREE.Vector3[] = []
