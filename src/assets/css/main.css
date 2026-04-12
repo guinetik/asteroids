@@ -350,16 +350,16 @@ body {
 
 .map-ship-rotator {
   @apply relative;
-  width: 20px;
-  height: 24px;
+  width: 16px;
+  height: 20px;
 }
 
 .map-ship-icon {
-  width: 20px;
-  height: 24px;
+  width: 16px;
+  height: 20px;
   background: rgb(52, 211, 153);
-  clip-path: polygon(50% 0%, 85% 70%, 62% 58%, 62% 100%, 38% 100%, 38% 58%, 15% 70%);
-  filter: drop-shadow(0 0 6px rgba(52, 211, 153, 0.8));
+  clip-path: polygon(50% 0%, 100% 75%, 50% 60%, 0% 75%);
+  filter: drop-shadow(0 0 8px rgba(52, 211, 153, 0.9));
   animation: map-pulse 1.5s ease-in-out infinite;
 }
 

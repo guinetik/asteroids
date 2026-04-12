@@ -2598,9 +2598,12 @@ export class MapViewController implements Tickable {
       }
     })
 
-    // Heading arrow — convert heading to CSS rotation degrees
+    // Heading arrow — convert 3D heading (rotation.y, forward=+X) to CSS rotation degrees.
+    // On the ortho map: +X = screen-right, -Z = screen-up.
+    // CSS rotate(0deg) = up, rotate(90deg) = right.
+    // rotation.y increases CCW (top-down), CSS rotate increases CW — opposite signs.
     const heading = this.shuttleController.heading
-    const headingDeg = -((heading * 180) / Math.PI) + 90
+    const headingDeg = 90 - (heading * 180) / Math.PI
 
     // Gravity rings — project influence and event horizon radii to screen %
     const gravityRings = bodies
