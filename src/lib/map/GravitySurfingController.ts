@@ -171,32 +171,23 @@ export class GravitySurfingController {
     }
 
     if (this.state.mode === 'surfing') {
-      const brakeActive = this.isBrakeActive(shuttle, deps)
-      shuttle.setExternalBrakeActive(brakeActive)
-      if (brakeActive) {
-        const effectiveBrake = Math.min(
-          1,
-          MAP_PHYSICS.brakeFactor + Math.abs(shuttle.group.position.y) * MAP_PHYSICS.brakeDepthPenalty,
-        )
-        const frameScaledBrake = Math.pow(effectiveBrake, dt * 60)
-        this.state.cruiseSpeed *= frameScaledBrake
-        if (Math.abs(this.state.cruiseSpeed) < MAP_CONFIG.GRAVITY_SURF_STOP_SPEED) {
-          this.state.cruiseSpeed = 0
-          // At full stop while braking — flip direction and accelerate the other way
-          this.state.directionSign *= -1
-          this.state.targetCruiseSpeed *= -1
-        }
-      } else {
-        this.state.cruiseSpeed = THREE.MathUtils.damp(
-          this.state.cruiseSpeed,
-          this.state.targetCruiseSpeed,
-          MAP_CONFIG.GRAVITY_SURF_ACCEL_PER_SEC,
-          dt,
-        )
+      // S flips direction instantly — no braking, just reverse
+      if (deps.inputManager?.wasActionPressed('brake')) {
+        this.state.directionSign *= -1
+        this.state.targetCruiseSpeed *= -1
+        this.state.cruiseSpeed *= -1
       }
+
+      this.state.cruiseSpeed = THREE.MathUtils.damp(
+        this.state.cruiseSpeed,
+        this.state.targetCruiseSpeed,
+        MAP_CONFIG.GRAVITY_SURF_ACCEL_PER_SEC,
+        dt,
+      )
+      shuttle.setExternalBrakeActive(false)
       shuttle.thrusterSystem.tick(
         dt,
-        { thrust: false, brake: brakeActive, rcs: false },
+        { thrust: false, brake: false, rcs: false },
         shuttle.getThrusterRuntimeModifiers(),
       )
       this.state.alongCoord += this.state.cruiseSpeed * dt
