@@ -178,7 +178,7 @@ export const EARTH_CATALOG_DISPLAY_RADIUS =
   PLANETS.find((planet) => planet.id === EARTH_PLANET_ID)?.displayRadius ?? 0.0077
 
 /** Maximum arrow length at full charge (in shuttle local space, pre-scale). */
-export const ARROW_MAX_LENGTH = 300
+export const ARROW_MAX_LENGTH = 150
 export const ARROW_COLOR_SAFE = 0x00ffff
 export const ARROW_COLOR_BLOCKED = 0xff3333
 export const ARROW_HEAD_LENGTH = 40
