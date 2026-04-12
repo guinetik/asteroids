@@ -1267,9 +1267,13 @@ export class MapViewController implements Tickable {
       }
     }
 
-    // Slingshot speed lines — ramp down as burst settles
+    // Slingshot speed lines — ramp down as burst settles; kill on death or orbit capture
     if (this.slingshotSpeedPass && this.shuttleController) {
-      if (this.shuttleController.slingshotBurstActive) {
+      const burstActive =
+        this.shuttleController.slingshotBurstActive &&
+        !this.shuttleController.dead &&
+        (this.orbitSystem?.state ?? 'free') === 'free'
+      if (burstActive) {
         const progress = this.shuttleController.slingshotBurstProgress
         // Ramp up in first 5%, hold, then fade out in last 40%
         const rampUp = Math.min(1, progress / 0.05)

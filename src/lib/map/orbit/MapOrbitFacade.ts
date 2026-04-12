@@ -146,6 +146,7 @@ export class MapOrbitFacade {
       const pz = shuttleController.position.z
       if (this._system.beginCapture(px, pz)) {
         useAudio().play('sfx.orbitCapture')
+        shuttleController.cancelSlingshotBurst()
         this._approachStartPos = new THREE.Vector3(px, 0, pz)
         this._approachProgress = 0
         shuttleController.freeze()

@@ -65,6 +65,7 @@ export class MapLifeCycleFacade {
       shuttleController.group.visible = false
     }
 
+    shuttleController.cancelSlingshotBurst()
     shuttleController.setInputEnabled(false)
     shuttleController.freeze()
     vehicleCamera?.setConfig(MAP_DEATH_CAMERA_CONFIG)

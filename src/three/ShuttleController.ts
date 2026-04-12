@@ -239,6 +239,16 @@ export class ShuttleController implements Tickable, PortalVehicle {
     return this._slingshotSpeed
   }
 
+  /** Immediately cancel an active slingshot burst (death, orbit capture, etc.). */
+  cancelSlingshotBurst(): void {
+    this._slingshotSpeed = 0
+    this._slingshotBurstSpeed = 0
+    this._slingshotFinalSpeed = 0
+    this._slingshotSettleDuration = 0
+    this._slingshotSettleElapsed = 0
+    this._slingshotLaunchFxRemaining = 0
+  }
+
   /**
    * Trigger a short-lived post-launch thruster burst effect.
    *
