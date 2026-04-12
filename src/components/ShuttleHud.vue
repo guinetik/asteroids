@@ -48,18 +48,15 @@ function tempLabelClass(): string {
   <div class="shuttle-hud">
     <!-- Top center: coords left, compass strip center, speed right. -->
     <div class="hud-top-cluster">
-      <div class="hud-top-cluster__row">
-        <span class="hud-top-cluster__coords">
-          X:{{ (props.telemetry.posX / ORBIT_SCALE).toFixed(2) }}
-          Z:{{ (props.telemetry.posZ / ORBIT_SCALE).toFixed(2) }} AU
-        </span>
-        <ShuttleCompass
-          :heading-rad="props.telemetry.heading"
-          :bearings="props.telemetry.compassBearings"
-        />
-        <span class="hud-top-cluster__speed">
-          SPD {{ props.telemetry.speed.toFixed(1) }}
-        </span>
+      <ShuttleCompass
+        :heading-rad="props.telemetry.heading"
+        :bearings="props.telemetry.compassBearings"
+      />
+      <div class="hud-top-cluster__readout">
+        X:{{ (props.telemetry.posX / ORBIT_SCALE).toFixed(2) }}
+        Z:{{ (props.telemetry.posZ / ORBIT_SCALE).toFixed(2) }} AU
+        &middot;
+        SPD {{ props.telemetry.speed.toFixed(1) }}
       </div>
       <div v-if="props.telemetry.actionPrompt" class="hud-top-cluster__line hud-top-cluster__line--action">
         {{ props.telemetry.actionPrompt }}

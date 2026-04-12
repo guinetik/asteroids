@@ -29,20 +29,11 @@ body {
   @apply absolute top-4 left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-0.5 text-center;
 }
 
-.hud-top-cluster__row {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.hud-top-cluster__coords {
+.hud-top-cluster__readout {
   @apply text-green-400 whitespace-nowrap;
-  font-size: 0.65rem;
-}
-
-.hud-top-cluster__speed {
-  @apply text-green-400 whitespace-nowrap;
-  font-size: 0.65rem;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 4px rgba(0, 255, 0, 0.4);
 }
 
 .hud-top-cluster__line {
@@ -622,7 +613,7 @@ body {
 
 /* Map route: title + quick access (habitat / missions / shuttle terminal). */
 .map-screen-nav {
-  @apply fixed left-0 right-0 top-0 z-[35] flex items-center justify-between gap-4
+  @apply fixed left-0 right-0 top-0 z-20 flex items-center justify-between gap-4
          border-b border-cyan-400/15 bg-gradient-to-b from-slate-950/92 to-transparent px-4 py-2.5
          font-mono pointer-events-auto sm:px-6;
 }
