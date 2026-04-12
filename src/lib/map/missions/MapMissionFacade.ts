@@ -218,6 +218,7 @@ export class MapMissionFacade {
       mission.template.id,
       minigameType,
       mission.template.gatherQuantity,
+      mission.template.targetPlanet,
     )
     params.onMissionOverlay?.(true, mission, canFit)
   }

@@ -14,6 +14,7 @@ import { GasCollectionMiniGame } from './gasCollection/GasCollectionMiniGame'
 import { IceHarvestMiniGame } from './iceHarvest/IceHarvestMiniGame'
 import { MaintenanceMiniGame } from './maintenance/MaintenanceMiniGame'
 import { LogisticsRouteMiniGame } from './logistics/LogisticsRouteMiniGame'
+import { ProbeDeployMiniGame } from './probeDeploy/ProbeDeployMiniGame'
 
 /**
  * Create an orbital minigame for the given mission and minigame type.
@@ -21,6 +22,7 @@ import { LogisticsRouteMiniGame } from './logistics/LogisticsRouteMiniGame'
  * @param missionId - The shuttle mission id.
  * @param minigameType - The minigame type from planet-orbital-config.json.
  * @param targetGas - The gather quantity from the mission template.
+ * @param planetId - The target planet id (used by probe-deploy and similar minigames).
  * @returns A new OrbitalMiniGame instance.
  *
  * @author guinetik
@@ -30,6 +32,7 @@ export function createOrbitalMiniGame(
   missionId: string,
   minigameType: string,
   targetGas: number,
+  planetId?: string,
 ): OrbitalMiniGame {
   switch (minigameType) {
     case 'gas-collection':
@@ -43,6 +46,7 @@ export function createOrbitalMiniGame(
     case 'logistics':
       return new LogisticsRouteMiniGame(missionId, targetGas)
     case 'probe-deploy':
+      return new ProbeDeployMiniGame(missionId, targetGas, planetId ?? 'mercury')
     default:
       return new DefaultOrbitalMiniGame(missionId)
   }

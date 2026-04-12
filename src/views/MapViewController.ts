@@ -2799,7 +2799,7 @@ export class MapViewController implements Tickable {
       status: 'active' as const,
     }
     this.missionFacade.activeMinigame?.dispose()
-    this.missionFacade.activeMinigame = createOrbitalMiniGame(missionId, entry.minigameType, quantity)
+    this.missionFacade.activeMinigame = createOrbitalMiniGame(missionId, entry.minigameType, quantity, entry.planetId)
     this.missionFacade.overlayOpen = true
     this.onMissionOverlay?.(true, fakeMission, true)
   }

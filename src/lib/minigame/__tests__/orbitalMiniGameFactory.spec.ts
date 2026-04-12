@@ -5,21 +5,26 @@ import { GasCollectionMiniGame } from '../gasCollection/GasCollectionMiniGame'
 import { IceHarvestMiniGame } from '../iceHarvest/IceHarvestMiniGame'
 import { MaintenanceMiniGame } from '../maintenance/MaintenanceMiniGame'
 import { LogisticsRouteMiniGame } from '../logistics/LogisticsRouteMiniGame'
-
-const DEFAULT_TYPES = [
-  'probe-deploy',
-]
+import { ProbeDeployMiniGame } from '../probeDeploy/ProbeDeployMiniGame'
 
 describe('createOrbitalMiniGame', () => {
-  it.each(DEFAULT_TYPES)(
-    'returns DefaultOrbitalMiniGame for type "%s"',
-    (minigameType) => {
-      const mg = createOrbitalMiniGame('mission-1', minigameType, 3)
-      expect(mg.status).toBe('active')
-      expect(mg.missionId).toBe('mission-1')
-      expect(mg).toBeInstanceOf(DefaultOrbitalMiniGame)
-    },
-  )
+  it('returns ProbeDeployMiniGame for type "probe-deploy"', () => {
+    const mg = createOrbitalMiniGame('mission-1', 'probe-deploy', 3, 'mercury')
+    expect(mg).toBeInstanceOf(ProbeDeployMiniGame)
+    expect(mg.missionId).toBe('mission-1')
+  })
+
+  it('passes planetId through to ProbeDeployMiniGame', () => {
+    const mg = createOrbitalMiniGame('mission-1', 'probe-deploy', 2, 'uranus')
+    expect(mg).toBeInstanceOf(ProbeDeployMiniGame)
+    expect((mg as ProbeDeployMiniGame).planetId).toBe('uranus')
+  })
+
+  it('defaults planetId to mercury when not provided for probe-deploy', () => {
+    const mg = createOrbitalMiniGame('mission-1', 'probe-deploy', 2)
+    expect(mg).toBeInstanceOf(ProbeDeployMiniGame)
+    expect((mg as ProbeDeployMiniGame).planetId).toBe('mercury')
+  })
 
   it('returns GasCollectionMiniGame for type "gas-collection"', () => {
     const mg = createOrbitalMiniGame('mission-1', 'gas-collection', 5)
