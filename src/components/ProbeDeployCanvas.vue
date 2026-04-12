@@ -886,95 +886,107 @@ function drawShip(ctx: CanvasRenderingContext2D) {
 
   const x = SHIP_X
   const y = props.minigame.shipY
-  const hs = SHIP_HALF_SIZE
-  const bobOffset = Math.sin(simTime * 2.2) * 2.5
+  // Use the same proportions as the Venus/gas-collection shuttle
+  const hw = 24
+  const hh = 12
+  const bobOffset = Math.sin(simTime * 2.5) * 2.5
+  const tilt = Math.max(-0.12, Math.min(0.12, props.minigame.shipVy * 0.0003))
 
   ctx.save()
   ctx.translate(x, y + bobOffset)
+  ctx.rotate(tilt)
 
-  // Engine glow
-  const thrustUp = props.minigame.shipVy < -20
-  const thrustDown = props.minigame.shipVy > 20
-  if (thrustUp || thrustDown) {
-    const thrustDir = thrustUp ? -1 : 1
-    const flameLen = 8 + Math.abs(props.minigame.shipVy / 450) * 16 + Math.random() * 5
-    const flameGrad = ctx.createLinearGradient(0, thrustDir * hs, 0, thrustDir * (hs + flameLen))
+  // Engine exhaust glow (behind everything)
+  const speed = Math.abs(props.minigame.shipVy)
+  if (speed > 5) {
+    const flameLen = 10 + (speed / 450) * 20 + Math.random() * 6
+    const flameGrad = ctx.createLinearGradient(-hw, 0, -hw - flameLen, 0)
     if (isMercury) {
-      flameGrad.addColorStop(0, 'rgba(255,180,60,0.85)')
+      flameGrad.addColorStop(0, 'rgba(255,180,60,0.8)')
       flameGrad.addColorStop(0.4, 'rgba(255,120,30,0.4)')
       flameGrad.addColorStop(1, 'rgba(255,80,10,0)')
     } else {
-      flameGrad.addColorStop(0, 'rgba(60,220,240,0.85)')
-      flameGrad.addColorStop(0.4, 'rgba(40,180,200,0.4)')
-      flameGrad.addColorStop(1, 'rgba(20,140,160,0)')
+      flameGrad.addColorStop(0, 'rgba(0,200,255,0.8)')
+      flameGrad.addColorStop(0.4, 'rgba(100,180,255,0.4)')
+      flameGrad.addColorStop(1, 'rgba(100,180,255,0)')
     }
     ctx.fillStyle = flameGrad
     ctx.beginPath()
-    ctx.moveTo(-hs * 0.5, thrustDir * hs)
-    ctx.lineTo(0, thrustDir * (hs + flameLen))
-    ctx.lineTo(hs * 0.5, thrustDir * hs)
+    ctx.moveTo(-hw, -3)
+    ctx.lineTo(-hw - flameLen, 0)
+    ctx.lineTo(-hw, 3)
     ctx.closePath()
     ctx.fill()
   }
 
-  // Ship body — pointing right toward planet
-  ctx.fillStyle = '#c4c0bc'
+  // Fuselage — elongated shuttle body (matches Venus canvas)
+  ctx.fillStyle = '#c8c4be'
   ctx.strokeStyle = '#888'
-  ctx.lineWidth = 0.6
+  ctx.lineWidth = 0.5
   ctx.beginPath()
-  ctx.moveTo(hs + 4, 0)      // nose (right)
-  ctx.lineTo(hs - 2, -hs * 0.5)
-  ctx.lineTo(-hs + 4, -hs * 0.6)
-  ctx.lineTo(-hs, -hs * 0.4)
-  ctx.lineTo(-hs, hs * 0.4)
-  ctx.lineTo(-hs + 4, hs * 0.6)
-  ctx.lineTo(hs - 2, hs * 0.5)
+  ctx.moveTo(hw + 4, 0)                 // nose tip
+  ctx.lineTo(hw - 4, -hh * 0.5)         // upper nose curve
+  ctx.lineTo(-hw + 6, -hh * 0.55)       // upper body
+  ctx.lineTo(-hw, -hh * 0.4)            // rear top
+  ctx.lineTo(-hw, hh * 0.4)             // rear bottom
+  ctx.lineTo(-hw + 6, hh * 0.55)        // lower body
+  ctx.lineTo(hw - 4, hh * 0.5)          // lower nose curve
   ctx.closePath()
   ctx.fill()
   ctx.stroke()
 
-  // Thermal underside
+  // Thermal tile pattern — darker belly
   ctx.fillStyle = '#2a2a2e'
   ctx.beginPath()
-  ctx.moveTo(hs - 2, hs * 0.15)
-  ctx.lineTo(-hs + 4, hs * 0.3)
-  ctx.lineTo(-hs, hs * 0.4)
-  ctx.lineTo(-hs, hs * 0.05)
-  ctx.lineTo(-hs + 4, hs * 0.15)
-  ctx.lineTo(hs - 2, hs * 0.05)
+  ctx.moveTo(hw - 2, hh * 0.15)
+  ctx.lineTo(-hw + 6, hh * 0.3)
+  ctx.lineTo(-hw, hh * 0.4)
+  ctx.lineTo(-hw, hh * 0.05)
+  ctx.lineTo(-hw + 6, hh * 0.15)
+  ctx.lineTo(hw - 2, hh * 0.05)
   ctx.closePath()
   ctx.fill()
 
-  // Wing fin (top)
-  ctx.fillStyle = '#a0a09c'
+  // Wing — swept delta
+  ctx.fillStyle = '#a8a4a0'
   ctx.strokeStyle = '#777'
   ctx.beginPath()
-  ctx.moveTo(-4, -hs * 0.4)
-  ctx.lineTo(-hs + 2, -hs - 6)
-  ctx.lineTo(-hs, -hs * 0.5)
+  ctx.moveTo(-4, hh * 0.4)
+  ctx.lineTo(-hw + 2, hh + 6)
+  ctx.lineTo(-hw, hh * 0.5)
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+
+  // Vertical stabilizer (top fin)
+  ctx.fillStyle = '#b0aca8'
+  ctx.beginPath()
+  ctx.moveTo(-hw + 8, -hh * 0.55)
+  ctx.lineTo(-hw, -hh - 6)
+  ctx.lineTo(-hw - 2, -hh * 0.4)
   ctx.closePath()
   ctx.fill()
   ctx.stroke()
 
   // Cockpit window
   ctx.fillStyle = isMercury ? '#cc8822' : '#44aadd'
-  ctx.globalAlpha = 0.75
+  ctx.globalAlpha = 0.7
   ctx.beginPath()
-  ctx.ellipse(hs - 5, -1, 3, 2, 0, 0, Math.PI * 2)
+  ctx.ellipse(hw - 6, -1, 3, 2, 0, 0, Math.PI * 2)
   ctx.fill()
   ctx.globalAlpha = 1.0
 
   // Engine nozzles
   ctx.fillStyle = '#444'
-  ctx.fillRect(-hs - 2, -3, 3, 2)
-  ctx.fillRect(-hs - 2, 1, 3, 2)
+  ctx.fillRect(-hw - 2, -3, 3, 2)
+  ctx.fillRect(-hw - 2, 1, 3, 2)
 
   ctx.restore()
 }
 
 function drawHUD(ctx: CanvasRenderingContext2D) {
-  const hudColor = isMercury ? 'rgba(255,200,100,0.9)' : 'rgba(80,220,210,0.9)'
-  const hudDim = isMercury ? 'rgba(255,160,60,0.5)' : 'rgba(60,180,170,0.5)'
+  const hudColor = isMercury ? 'rgba(180,130,80,0.95)' : 'rgba(80,220,210,0.9)'
+  const hudDim = isMercury ? 'rgba(140,100,60,0.6)' : 'rgba(60,180,170,0.5)'
 
   // ─── Top-left info ────────────────────────────────────────────────────────
   ctx.font = '11px monospace'

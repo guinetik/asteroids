@@ -1861,7 +1861,7 @@ body {
 /* Gas Collection Minigame Canvas */
 .gas-collection-canvas {
   @apply w-full h-auto max-h-[80vh] rounded-lg border border-cyan-400/20;
-  image-rendering: pixelated;
+  image-rendering: auto;
 }
 
 /* Gas Collection Wrapper — positions canvas and briefing overlay */

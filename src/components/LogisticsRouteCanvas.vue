@@ -456,54 +456,98 @@ function drawTraffic(ctx: CanvasRenderingContext2D) {
 function drawPlayerShuttle(ctx: CanvasRenderingContext2D) {
   if (props.minigame.damageFlash > 0 && frameCount % 4 < 2) return
 
-  const bob = Math.sin(simTime * 2) * 2
+  const bob = Math.sin(simTime * 2.5) * 2.5
   const px = props.minigame.shipX
   const py = props.minigame.shipY + bob
-  const s = SHIP_HALF_SIZE
+  // Elongated shuttle proportions — rotated 90° (pointing up)
+  const hw = 12 // half-width (narrow)
+  const hh = 24 // half-height (long nose-to-tail)
+  const tilt = Math.max(-0.12, Math.min(0.12, props.minigame.shipVx * 0.0003))
 
   ctx.save()
   ctx.translate(px, py)
+  ctx.rotate(tilt)
 
-  // Engine trail gradient
-  const trailGrad = ctx.createLinearGradient(0, s + 2, 0, s + 20)
-  trailGrad.addColorStop(0, 'rgba(80,180,255,0.4)')
-  trailGrad.addColorStop(0.5, 'rgba(60,140,220,0.15)')
-  trailGrad.addColorStop(1, 'rgba(40,100,180,0)')
-  ctx.fillStyle = trailGrad
+  // Engine exhaust glow
+  const speed = Math.sqrt(
+    props.minigame.shipVx * props.minigame.shipVx +
+    props.minigame.shipVy * props.minigame.shipVy,
+  )
+  if (speed > 5) {
+    const flameLen = 10 + (speed / 450) * 20 + Math.random() * 6
+    const flameGrad = ctx.createLinearGradient(0, hh, 0, hh + flameLen)
+    flameGrad.addColorStop(0, 'rgba(0,200,255,0.8)')
+    flameGrad.addColorStop(0.4, 'rgba(100,180,255,0.4)')
+    flameGrad.addColorStop(1, 'rgba(100,180,255,0)')
+    ctx.fillStyle = flameGrad
+    ctx.beginPath()
+    ctx.moveTo(-3, hh)
+    ctx.lineTo(0, hh + flameLen)
+    ctx.lineTo(3, hh)
+    ctx.closePath()
+    ctx.fill()
+  }
+
+  // Fuselage — elongated shuttle body pointing up
+  ctx.fillStyle = '#c8c4be'
+  ctx.strokeStyle = '#888'
+  ctx.lineWidth = 0.5
   ctx.beginPath()
-  ctx.moveTo(-4, s + 2)
-  ctx.lineTo(4, s + 2)
-  ctx.lineTo(2, s + 18)
-  ctx.lineTo(-2, s + 18)
+  ctx.moveTo(0, -hh - 4)                // nose tip
+  ctx.lineTo(hw * 0.5, -hh + 4)         // right nose curve
+  ctx.lineTo(hw * 0.55, hh - 6)         // right body
+  ctx.lineTo(hw * 0.4, hh)              // rear right
+  ctx.lineTo(-hw * 0.4, hh)             // rear left
+  ctx.lineTo(-hw * 0.55, hh - 6)        // left body
+  ctx.lineTo(-hw * 0.5, -hh + 4)        // left nose curve
   ctx.closePath()
   ctx.fill()
-
-  // Shuttle body — pointing up (player moving up through scroll)
-  ctx.fillStyle = 'rgba(210,215,225,0.9)'
-  ctx.beginPath()
-  ctx.moveTo(0, -s)
-  ctx.lineTo(s * 0.7, s * 0.4)
-  ctx.lineTo(s * 0.35, s * 0.6)
-  ctx.lineTo(s * 0.2, s)
-  ctx.lineTo(-s * 0.2, s)
-  ctx.lineTo(-s * 0.35, s * 0.6)
-  ctx.lineTo(-s * 0.7, s * 0.4)
-  ctx.closePath()
-  ctx.fill()
-
-  // Cockpit
-  ctx.beginPath()
-  ctx.ellipse(0, -s * 0.3, 3, 5, 0, 0, Math.PI * 2)
-  ctx.fillStyle = 'rgba(80,180,220,0.5)'
-  ctx.fill()
-
-  // Wing accent
-  ctx.strokeStyle = 'rgba(60,100,160,0.4)'
-  ctx.lineWidth = 1
-  ctx.beginPath()
-  ctx.moveTo(-s * 0.6, s * 0.35)
-  ctx.lineTo(s * 0.6, s * 0.35)
   ctx.stroke()
+
+  // Thermal tile pattern — darker right side
+  ctx.fillStyle = '#2a2a2e'
+  ctx.beginPath()
+  ctx.moveTo(hw * 0.15, -hh + 2)
+  ctx.lineTo(hw * 0.3, hh - 6)
+  ctx.lineTo(hw * 0.4, hh)
+  ctx.lineTo(hw * 0.05, hh)
+  ctx.lineTo(hw * 0.15, hh - 6)
+  ctx.lineTo(hw * 0.05, -hh + 2)
+  ctx.closePath()
+  ctx.fill()
+
+  // Wing — swept delta (right)
+  ctx.fillStyle = '#a8a4a0'
+  ctx.strokeStyle = '#777'
+  ctx.beginPath()
+  ctx.moveTo(hw * 0.4, 4)
+  ctx.lineTo(hw + 6, hh - 2)
+  ctx.lineTo(hw * 0.5, hh)
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+
+  // Wing — swept delta (left)
+  ctx.beginPath()
+  ctx.moveTo(-hw * 0.4, 4)
+  ctx.lineTo(-hw - 6, hh - 2)
+  ctx.lineTo(-hw * 0.5, hh)
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+
+  // Cockpit window
+  ctx.fillStyle = '#44aadd'
+  ctx.globalAlpha = 0.7
+  ctx.beginPath()
+  ctx.ellipse(0, -hh + 6, 2, 3, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.globalAlpha = 1.0
+
+  // Engine nozzles
+  ctx.fillStyle = '#444'
+  ctx.fillRect(-3, hh, 2, 3)
+  ctx.fillRect(1, hh, 2, 3)
 
   ctx.restore()
 }
