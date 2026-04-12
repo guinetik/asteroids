@@ -5,10 +5,12 @@ import { GasCollectionMiniGame } from '@/lib/minigame/gasCollection/GasCollectio
 import { IceHarvestMiniGame } from '@/lib/minigame/iceHarvest/IceHarvestMiniGame'
 import { MaintenanceMiniGame } from '@/lib/minigame/maintenance/MaintenanceMiniGame'
 import { LogisticsRouteMiniGame } from '@/lib/minigame/logistics/LogisticsRouteMiniGame'
+import { ProbeDeployMiniGame } from '@/lib/minigame/probeDeploy/ProbeDeployMiniGame'
 import GasCollectionCanvas from '@/components/GasCollectionCanvas.vue'
 import IceHarvestCanvas from '@/components/IceHarvestCanvas.vue'
 import MaintenanceCanvas from '@/components/MaintenanceCanvas.vue'
 import LogisticsRouteCanvas from '@/components/LogisticsRouteCanvas.vue'
+import ProbeDeployCanvas from '@/components/ProbeDeployCanvas.vue'
 import { getPlanetOrbitalConfig } from '@/lib/missions/planetOrbitalConfig'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 import { computed } from 'vue'
@@ -59,6 +61,14 @@ const isLogistics = computed(
 
 const logisticsMinigame = computed(
   () => (props.minigame instanceof LogisticsRouteMiniGame ? props.minigame : null),
+)
+
+const isProbeDeploy = computed(
+  () => props.minigame instanceof ProbeDeployMiniGame,
+)
+
+const probeMinigame = computed(
+  () => (props.minigame instanceof ProbeDeployMiniGame ? props.minigame : null),
 )
 
 const orbitalConfig = computed(() => getPlanetOrbitalConfig(props.mission.template.targetPlanet))
@@ -155,6 +165,29 @@ const gatherItemDef = computed(() => {
       <div class="mission-minigame-card__body" style="padding: 0.5rem;">
         <LogisticsRouteCanvas
           :minigame="logisticsMinigame"
+          @complete="emit('complete')"
+          @fail="() => {}"
+        />
+      </div>
+    </div>
+  </div>
+
+  <!-- Probe Deploy: fullscreen canvas -->
+  <div v-else-if="isProbeDeploy && probeMinigame" class="mission-minigame-overlay">
+    <div class="mission-minigame-card" style="max-width: 850px;">
+      <div class="mission-minigame-card__chrome">
+        <span>{{ mission.template.name }}</span>
+        <button
+          type="button"
+          class="ship-message-card__button"
+          @click="emit('close')"
+        >
+          Close
+        </button>
+      </div>
+      <div class="mission-minigame-card__body" style="padding: 0.5rem;">
+        <ProbeDeployCanvas
+          :minigame="probeMinigame"
           @complete="emit('complete')"
           @fail="() => {}"
         />
