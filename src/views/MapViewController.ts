@@ -3036,22 +3036,28 @@ export class MapViewController implements Tickable {
    * Each bearing is relative to the shuttle's current heading.
    */
   private computeCompassBearings(): CompassBearing[] {
-    if (!this.shuttleController) return []
+    if (!this.shuttleController || !this.vehicleCamera) return []
     const sx = this.shuttleController.position.x
     const sz = this.shuttleController.position.z
-    const h = this.shuttleController.heading
 
-    // Shuttle forward is local +X rotated by heading around Y:
-    // forward = (cos h, 0, -sin h), right = (sin h, 0, cos h)
-    const fwdX = Math.cos(h)
-    const fwdZ = -Math.sin(h)
-    const rightX = Math.sin(h)
-    const rightZ = Math.cos(h)
+    // Use the camera's actual world-space look direction projected onto the XZ plane.
+    // This matches what the player sees on screen regardless of camera orbit angle.
+    const cam = this.vehicleCamera.camera
+    const target = this.vehicleCamera.controls.target
+    const lookX = target.x - cam.position.x
+    const lookZ = target.z - cam.position.z
+    const lookLen = Math.hypot(lookX, lookZ)
+    if (lookLen < 0.0001) return []
+    const fwdX = lookX / lookLen
+    const fwdZ = lookZ / lookLen
+    // Right vector is forward rotated 90° clockwise in XZ
+    const rightX = -fwdZ
+    const rightZ = fwdX
 
     const bearings: CompassBearing[] = []
 
     // Compute bearing using dot products: forward component and right component
-    // atan2(right dot, forward dot) gives signed angle from nose
+    // atan2(right dot, forward dot) gives signed angle from camera view direction
     const addBearing = (label: string, color: string, tx: number, tz: number) => {
       const dx = tx - sx
       const dz = tz - sz
