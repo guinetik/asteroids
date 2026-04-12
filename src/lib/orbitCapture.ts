@@ -48,6 +48,8 @@ export interface CaptureBody {
   readonly orbitalSpeedMultiplier?: number
   /** Returns the body's current X position in world space. */
   getWorldX(): number
+  /** Returns the body's current Y position in world space (orbital inclination). */
+  getWorldY(): number
   /** Returns the body's current Z position in world space (depth axis). */
   getWorldZ(): number
 }

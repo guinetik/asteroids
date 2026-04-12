@@ -15,7 +15,7 @@ export const MAP_ORBIT_CHARGE_CAMERA_CONFIG: VehicleCameraConfig = {
   idleTimeout: MAP_ORBIT_CAMERA_CONFIG.idleTimeout,
   minY: MAP_ORBIT_CAMERA_CONFIG.minY,
   fov: 48,
-  maxDistance: 3,
+  maxDistance: 40,
 }
 
 /**

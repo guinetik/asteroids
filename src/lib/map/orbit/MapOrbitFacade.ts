@@ -7,7 +7,6 @@ import {
   type OrbitHudState,
   type CaptureBody,
 } from '@/lib/orbitCapture'
-import { PLANETS } from '@/lib/planets/catalog'
 import { canReleaseSlingshot } from '@/lib/slingshotLaunchPolicy'
 import {
   getCurrentShuttleSlingshotBurstMultiplier,
@@ -19,7 +18,6 @@ import { isShuttleAimingAtPlanet } from '@/lib/map/mapViewControllerHelpers'
 import { MAP_CAMERA_CONFIG, MAP_ORBIT_CAMERA_CONFIG, type VehicleCamera } from '@/three/VehicleCamera'
 import { buildSlingshotChargeCameraConfig } from '@/three/slingshotChargeCamera'
 import { MAP_PHYSICS, type ShuttleController } from '@/three/ShuttleController'
-import type { PlanetSystemController } from '@/three/controllers/PlanetSystemController'
 import type { MapSceneVisuals } from '@/three/MapSceneVisuals'
 
 interface SharedDeps {
@@ -36,7 +34,6 @@ interface OrbitInputDeps extends SharedDeps {
 interface OrbitTickDeps extends SharedDeps {
   inputManager: InputManager
   mapIntroControlsLocked: boolean
-  planetControllers: PlanetSystemController[]
 }
 
 export class MapOrbitFacade {
@@ -238,13 +235,14 @@ export class MapOrbitFacade {
       const body = this._system.target
       if (body) {
         const bodyX = body.getWorldX()
+        const bodyY = body.getWorldY()
         const bodyZ = body.getWorldZ()
         const dx = bodyX - x
         const dz = bodyZ - z
         shuttleController.group.rotation.y = Math.atan2(-dz, dx)
         sceneVisuals?.updateApproachTether(
           shuttleController.group.position,
-          new THREE.Vector3(bodyX, 0, bodyZ),
+          new THREE.Vector3(bodyX, bodyY, bodyZ),
           t,
           dt,
         )
@@ -254,7 +252,7 @@ export class MapOrbitFacade {
     if (this._system.target) {
       sceneVisuals?.setOrbitRingPosition(
         this._system.target.getWorldX(),
-        0,
+        this._system.target.getWorldY(),
         this._system.target.getWorldZ(),
       )
     }
@@ -276,13 +274,11 @@ export class MapOrbitFacade {
   }
 
   tickOrbit(dt: number, deps: OrbitTickDeps): boolean {
-    const { shuttleController, inputManager, vehicleCamera, sceneVisuals, mapIntroControlsLocked, planetControllers } = deps
+    const { shuttleController, inputManager, vehicleCamera, sceneVisuals, mapIntroControlsLocked } = deps
     if (!this._system || this._system.state !== 'orbiting') return false
 
     const pos = this._system.tickOrbit(dt)
-    const planetY = this._system.target
-      ? (planetControllers.find((_controller, index) => PLANETS[index]?.name === this._system!.target?.name)?.group.position.y ?? 0)
-      : 0
+    const planetY = this._system.target?.getWorldY() ?? 0
     if (pos) {
       shuttleController.group.position.set(pos.x, planetY, pos.z)
     }

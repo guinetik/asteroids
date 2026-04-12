@@ -62,16 +62,24 @@ describe('gravitySurfing helpers', () => {
   })
 
   it('derives rail direction from heading', () => {
-    expect(gravitySurfDirectionFromHeading('x', 0)).toBe(-1)
-    expect(gravitySurfDirectionFromHeading('x', Math.PI)).toBe(1)
-    expect(gravitySurfDirectionFromHeading('z', -Math.PI / 2)).toBe(-1)
-    expect(gravitySurfDirectionFromHeading('z', Math.PI / 2)).toBe(1)
+    // heading=0 → forward (1,0,0) → +x component → directionSign=1
+    expect(gravitySurfDirectionFromHeading('x', 0)).toBe(1)
+    // heading=PI → forward (-1,0,0) → -x component → directionSign=-1
+    expect(gravitySurfDirectionFromHeading('x', Math.PI)).toBe(-1)
+    // heading=-PI/2 → forward (0,0,1) → +z component → directionSign=1
+    expect(gravitySurfDirectionFromHeading('z', -Math.PI / 2)).toBe(1)
+    // heading=PI/2 → forward (0,0,-1) → -z component → directionSign=-1
+    expect(gravitySurfDirectionFromHeading('z', Math.PI / 2)).toBe(-1)
   })
 
   it('returns canonical rail headings', () => {
-    expect(gravitySurfRailHeading('x', 1)).toBe(Math.PI)
-    expect(gravitySurfRailHeading('x', -1)).toBe(0)
+    // +x travel → heading=0 (model forward is +x)
+    expect(gravitySurfRailHeading('x', 1)).toBe(0)
+    // -x travel → heading=PI (model forward is -x)
+    expect(gravitySurfRailHeading('x', -1)).toBe(Math.PI)
+    // +z travel → heading=-PI/2 (model forward is +z)
     expect(gravitySurfRailHeading('z', 1)).toBe(-Math.PI / 2)
+    // -z travel → heading=PI/2 (model forward is -z)
     expect(gravitySurfRailHeading('z', -1)).toBe(Math.PI / 2)
   })
 })

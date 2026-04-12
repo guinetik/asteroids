@@ -82,7 +82,7 @@ export function findNearestGravitySurfRail(
  */
 export function gravitySurfRailHeading(axis: GravitySurfRailAxis, directionSign: number): number {
   if (axis === 'x') {
-    return directionSign >= 0 ? Math.PI : 0
+    return directionSign >= 0 ? 0 : Math.PI
   }
   return directionSign >= 0 ? -Math.PI / 2 : Math.PI / 2
 }
@@ -94,7 +94,7 @@ export function gravitySurfDirectionFromHeading(
   axis: GravitySurfRailAxis,
   heading: number,
 ): number {
-  const forward = new THREE.Vector3(-1, 0, 0)
+  const forward = new THREE.Vector3(1, 0, 0)
     .applyAxisAngle(new THREE.Vector3(0, 1, 0), heading)
   const component = axis === 'x' ? forward.x : forward.z
   return component >= 0 ? 1 : -1

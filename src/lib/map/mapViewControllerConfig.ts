@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import mapGravityData from '@/data/shuttle/map-gravity.json'
 import { PLANETS, SUN } from '@/lib/planets/catalog'
 import type { GravityConfig } from '@/lib/physics/gravity'
-import { influenceRadius } from '@/lib/physics/gravity'
+import { influenceRadius, eventHorizonRadius } from '@/lib/physics/gravity'
 import { TICK_PRIORITY_INPUT, TICK_PRIORITY_RENDER } from '@/lib/tickPriorities'
 
 /** Tick priority for the compositor (runs after animation, before render). */
@@ -94,17 +94,17 @@ export const CURVATURE_SPEED_FACTOR = 0.3
 /** Rail snap distance in grid cells for Gravity Surfing coupling. */
 export const GRAVITY_SURF_SNAP_DISTANCE_CELLS = 0.2
 
-/** Seconds to slide onto the rail during coupling. */
-export const GRAVITY_SURF_COUPLE_DURATION_SEC = 0.2
+/** Seconds to slide onto the rail during coupling (includes tether visual). */
+export const GRAVITY_SURF_COUPLE_DURATION_SEC = 1.0
 
 /** Seconds to fast-stop during manual decouple. */
 export const GRAVITY_SURF_DECOUPLE_DURATION_SEC = 0.45
 
 /** Default coupled rail cruise speed relative to map thrust speed. */
-export const GRAVITY_SURF_CRUISE_SPEED_MULTIPLIER = 10
+export const GRAVITY_SURF_CRUISE_SPEED_MULTIPLIER = 25
 
 /** Seconds-ish response for ramping into gravity surf cruise. */
-export const GRAVITY_SURF_ACCEL_PER_SEC = 6
+export const GRAVITY_SURF_ACCEL_PER_SEC = 10
 
 /** Passive shuttle systems fuel drain multiplier while Gravity Surfing is active. */
 export const GRAVITY_SURF_PASSIVE_FUEL_MULTIPLIER = 3
@@ -127,14 +127,14 @@ export const GRAVITY_SURF_DECOUPLE_WAVE_MASS = 1.8e-5
 /** First-pass decouple wave spreads wide rather than moving far. */
 export const GRAVITY_SURF_DECOUPLE_WAVE_WIDTH_MULT = 1.1
 
-/** Keep the decouple wave nearly stationary so it reads like a ripple. */
-export const GRAVITY_SURF_DECOUPLE_WAVE_SPEED = 0.01
+/** Shed momentum carries the decouple wave forward along the rail. */
+export const GRAVITY_SURF_DECOUPLE_WAVE_SPEED = 4
 
 /** Lifetime of the synthetic decouple wave anomaly. */
-export const GRAVITY_SURF_DECOUPLE_WAVE_DURATION_SEC = 1.2
+export const GRAVITY_SURF_DECOUPLE_WAVE_DURATION_SEC = 2.5
 
-/** Spawn the stop ripple slightly ahead of the shuttle nose. */
-export const GRAVITY_SURF_DECOUPLE_WAVE_FORWARD_OFFSET = 10
+/** Spawn the decouple wave well ahead of the shuttle nose — momentum shed forward. */
+export const GRAVITY_SURF_DECOUPLE_WAVE_FORWARD_OFFSET = 40
 
 /** Threshold where the whole space-time fabric is considered visible. */
 export const GRID_DEFORM_WHOLE_MAP_COVERAGE = 0.82
@@ -203,6 +203,13 @@ export const ORBIT_TETHER_MAX_WIDTH = 6
 export const ORBIT_TETHER_SHIP_GLOW_RADIUS = 0.85
 export const ORBIT_TETHER_PLANET_GLOW_RADIUS = 1.35
 
+/** Gravity surf coupling tether — emerald green to distinguish from orbit cyan. */
+export const SURF_TETHER_COLOR = new THREE.Color('#34ff88')
+export const SURF_TETHER_PULSE_COLOR = new THREE.Color('#aaffdd')
+export const SURF_TETHER_ANCHOR_COLOR = new THREE.Color('#22dd77')
+export const SURF_TETHER_MAX_OPACITY = 0.9
+export const SURF_TETHER_SHIP_GLOW_RADIUS = 0.7
+
 /** Map-scale gravity tuning loaded from JSON. */
 export const MAP_GRAVITY_CONFIG: GravityConfig = {
   gravityConstant: mapGravityData.gravityConstant,
@@ -211,8 +218,9 @@ export const MAP_GRAVITY_CONFIG: GravityConfig = {
   eventHorizonScale: mapGravityData.eventHorizonScale,
 }
 
-/** The Sun orbit lane should sit on the relativity bump radius. */
-export const SUN_BUMP_ORBIT_RADIUS = influenceRadius(SUN.mass, MAP_GRAVITY_CONFIG)
+/** The Sun orbit lane — midpoint between event horizon and influence edge. */
+export const SUN_BUMP_ORBIT_RADIUS =
+  (eventHorizonRadius(SUN.mass, MAP_GRAVITY_CONFIG) + influenceRadius(SUN.mass, MAP_GRAVITY_CONFIG)) * 0.4
 
 /** Intro camera starting shot. */
 export const MAP_INTRO_CAMERA_START_POSITION = new THREE.Vector3(0, 320, 900)
@@ -363,6 +371,11 @@ export const MAP_VIEW_CONTROLLER_CONFIG = {
   SPAWN_OFFSET_BEHIND_EARTH,
   STARTER_LANDER_FUEL_CELL_COUNT,
   STARTER_SHUTTLE_FUEL_CELL_COUNT,
+  SURF_TETHER_ANCHOR_COLOR,
+  SURF_TETHER_COLOR,
+  SURF_TETHER_MAX_OPACITY,
+  SURF_TETHER_PULSE_COLOR,
+  SURF_TETHER_SHIP_GLOW_RADIUS,
   SUN_BUMP_ORBIT_RADIUS,
   SUN_CAPTURE_RADIUS_MULTIPLIER,
   SUN_ORBIT_SPEED_MULTIPLIER,

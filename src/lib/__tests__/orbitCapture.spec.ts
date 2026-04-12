@@ -29,6 +29,7 @@ function makeBody(
     captureRadiusOverride,
     orbitRadiusOverride,
     getWorldX: () => x,
+    getWorldY: () => 0,
     getWorldZ: () => z,
   }
 }
@@ -51,6 +52,7 @@ function makeMovingBody(
     captureRadiusOverride,
     orbitRadiusOverride,
     getWorldX: () => position.x,
+    getWorldY: () => 0,
     getWorldZ: () => position.z,
   }
 }
@@ -342,6 +344,7 @@ describe('OrbitCaptureSystem.getNearestPreviewBody', () => {
       displayRadius: 1,
       captureRadiusOverride: 30,
       getWorldX: () => 100,
+      getWorldY: () => 0,
       getWorldZ: () => 0,
     },
   ]

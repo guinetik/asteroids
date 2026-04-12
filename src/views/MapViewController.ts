@@ -598,6 +598,17 @@ export class MapViewController implements Tickable {
       this.tickHandler.register(tickable, TICK_PRIORITY_ANIMATION)
     }
 
+    // --- Gravity surf coupling tether visuals ---
+    this.gravitySurfingController.onCouplingStart = () => {
+      this.sceneVisuals?.showSurfCouplingTether()
+    }
+    this.gravitySurfingController.onCouplingProgress = (shipPos, railPos, progress, dt) => {
+      this.sceneVisuals?.updateSurfCouplingTether(shipPos, railPos, progress, dt)
+    }
+    this.gravitySurfingController.onCouplingEnd = () => {
+      this.sceneVisuals?.hideSurfCouplingTether()
+    }
+
     // --- Orbit capture system ---
     const earthOrbit =
       PLANETS.find((planet) => planet.id === MAP_CONFIG.EARTH_PLANET_ID)?.orbit ?? PLANETS[0]!.orbit
@@ -610,6 +621,7 @@ export class MapViewController implements Tickable {
         captureRadiusMultiplier: MAP_CONFIG.SUN_CAPTURE_RADIUS_MULTIPLIER,
         orbitalSpeedMultiplier: MAP_CONFIG.SUN_ORBIT_SPEED_MULTIPLIER,
         getWorldX: () => this.sunController!.getWorldX(),
+        getWorldY: () => this.sunController!.group.position.y,
         getWorldZ: () => this.sunController!.getWorldZ(),
       },
       ...PLANETS.map((planet, i) => ({
@@ -619,6 +631,7 @@ export class MapViewController implements Tickable {
           MAP_CONFIG.SLINGSHOT_SPEED_OVERRIDES[planet.id] ??
           computeRelativeOrbitalSpeedMultiplier(planet.orbit, earthOrbit),
         getWorldX: () => this.planetControllers[i]!.getWorldX(),
+        getWorldY: () => this.planetControllers[i]!.getWorldY(),
         getWorldZ: () => this.planetControllers[i]!.getWorldZ(),
       })),
     ]
@@ -1358,7 +1371,6 @@ export class MapViewController implements Tickable {
         sceneVisuals: this.sceneVisuals,
         inputManager: this.inputManager,
         mapIntroControlsLocked: this.mapIntro.controlsLocked,
-        planetControllers: this.planetControllers,
       })
       this.updateShopSession()
       this.updateMissionState()
@@ -1428,7 +1440,8 @@ export class MapViewController implements Tickable {
       !this.shuttleController ||
       !this.shipHealth ||
       this.shuttleController.dead ||
-      (this.orbitSystem?.state ?? 'free') !== 'free'
+      (this.orbitSystem?.state ?? 'free') !== 'free' ||
+      this.gravitySurfingController.isActive()
     ) {
       return
     }

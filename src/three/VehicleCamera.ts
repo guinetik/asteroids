@@ -120,7 +120,7 @@ const MAP_ORBIT_CAMERA_IDLE_OFFSET_Y = 6
 const MAP_ORBIT_CAMERA_FOV = 50
 
 /** Orbit map max orbit-controls zoom distance (world units). */
-const MAP_ORBIT_CAMERA_MAX_DISTANCE = 12
+const MAP_ORBIT_CAMERA_MAX_DISTANCE = 40
 
 /** Map orbit preset: above shuttle for planet orbit; tuned closer than full-system view. */
 export const MAP_ORBIT_CAMERA_CONFIG: VehicleCameraConfig = {

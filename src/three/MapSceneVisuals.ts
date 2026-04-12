@@ -36,6 +36,14 @@ interface LockDiscUniforms {
   uColor: { value: THREE.Color }
 }
 
+interface SurfCouplingTetherVisuals {
+  readonly line: THREE.Line<THREE.BufferGeometry, THREE.ShaderMaterial>
+  readonly lineGeometry: THREE.BufferGeometry
+  readonly lineMaterial: THREE.ShaderMaterial
+  readonly linePositions: Float32Array
+  readonly lockMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>
+}
+
 export class MapSceneVisuals {
   private scene: THREE.Scene
   private shuttleGroup: THREE.Group | null = null
@@ -45,6 +53,7 @@ export class MapSceneVisuals {
   private shipReticleRing: THREE.Sprite | null = null
   private shipReticlePointer: THREE.Sprite | null = null
   private approachTether: ApproachTetherVisuals | null = null
+  private surfCouplingTether: SurfCouplingTetherVisuals | null = null
 
   constructor(sceneObjects: MapSceneObjects) {
     this.scene = sceneObjects.scene
@@ -300,10 +309,174 @@ export class MapSceneVisuals {
     }
   }
 
+  showSurfCouplingTether(): void {
+    if (this.surfCouplingTether) return
+
+    const linePositions = new Float32Array(6)
+    const lineGeometry = new THREE.BufferGeometry()
+    lineGeometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3))
+    lineGeometry.setAttribute(
+      'lineU',
+      new THREE.BufferAttribute(new Float32Array([0, 1]), 1),
+    )
+
+    const lineUniforms: TetherLineUniforms = {
+      uTime: { value: 0 },
+      uProgress: { value: 0 },
+      uOpacity: { value: 0 },
+      uColor: { value: MAP_CONFIG.SURF_TETHER_COLOR.clone() },
+      uPulseColor: { value: MAP_CONFIG.SURF_TETHER_PULSE_COLOR.clone() },
+    }
+    const lineMaterial = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      uniforms: lineUniforms as unknown as Record<string, THREE.IUniform>,
+      vertexShader: `
+        attribute float lineU;
+        varying float vLineU;
+
+        void main() {
+          vLineU = lineU;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform float uProgress;
+        uniform float uOpacity;
+        uniform vec3 uColor;
+        uniform vec3 uPulseColor;
+        varying float vLineU;
+
+        void main() {
+          float pulse = 0.5 + 0.5 * sin((vLineU * 14.0) - (uTime * 12.0));
+          float captureFront = smoothstep(0.0, 0.7, uProgress + (1.0 - vLineU) * 0.4);
+          vec3 color = mix(uColor, uPulseColor, pulse * 0.5);
+          float alpha = uOpacity * captureFront * (0.5 + pulse * 0.5);
+          gl_FragColor = vec4(color, alpha);
+        }
+      `,
+    })
+    const line = new THREE.Line(lineGeometry, lineMaterial)
+    line.renderOrder = 12
+
+    const lockMesh = this.createSurfCouplingLockDisc()
+    lockMesh.renderOrder = 11
+
+    this.scene.add(line)
+    this.scene.add(lockMesh)
+
+    this.surfCouplingTether = { line, lineGeometry, lineMaterial, linePositions, lockMesh }
+  }
+
+  updateSurfCouplingTether(
+    shipPosition: THREE.Vector3,
+    railPosition: THREE.Vector3,
+    progress: number,
+    dt: number,
+  ): void {
+    if (!this.surfCouplingTether) this.showSurfCouplingTether()
+    if (!this.surfCouplingTether) return
+
+    const tetherProgress = THREE.MathUtils.clamp(progress, 0, 1)
+    const opacity = tetherProgress * MAP_CONFIG.SURF_TETHER_MAX_OPACITY
+
+    const { lineGeometry, lineMaterial, linePositions, lockMesh } = this.surfCouplingTether
+
+    linePositions[0] = shipPosition.x
+    linePositions[1] = shipPosition.y
+    linePositions[2] = shipPosition.z
+    linePositions[3] = railPosition.x
+    linePositions[4] = railPosition.y
+    linePositions[5] = railPosition.z
+    const positionAttribute = lineGeometry.getAttribute('position') as THREE.BufferAttribute
+    positionAttribute.needsUpdate = true
+    const lineUniforms = lineMaterial.uniforms as unknown as TetherLineUniforms
+    lineUniforms.uTime.value += dt
+    lineUniforms.uProgress.value = tetherProgress
+    lineUniforms.uOpacity.value = opacity
+
+    lockMesh.position.copy(railPosition)
+    const lockScale = THREE.MathUtils.lerp(
+      MAP_CONFIG.SURF_TETHER_SHIP_GLOW_RADIUS * 0.3,
+      MAP_CONFIG.SURF_TETHER_SHIP_GLOW_RADIUS,
+      tetherProgress,
+    )
+    lockMesh.scale.setScalar(lockScale)
+
+    const lockUniforms = lockMesh.material.uniforms as unknown as LockDiscUniforms
+    lockUniforms.uTime.value += dt
+    lockUniforms.uProgress.value = tetherProgress
+    lockUniforms.uOpacity.value = opacity
+  }
+
+  hideSurfCouplingTether(): void {
+    if (!this.surfCouplingTether) return
+
+    const { line, lineGeometry, lineMaterial, lockMesh } = this.surfCouplingTether
+    this.scene.remove(line)
+    this.scene.remove(lockMesh)
+    lineGeometry.dispose()
+    lineMaterial.dispose()
+    lockMesh.geometry.dispose()
+    lockMesh.material.dispose()
+    this.surfCouplingTether = null
+  }
+
+  private createSurfCouplingLockDisc(): THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> {
+    const geometry = new THREE.PlaneGeometry(1, 1, 1, 1)
+    const uniforms: LockDiscUniforms = {
+      uTime: { value: 0 },
+      uProgress: { value: 0 },
+      uOpacity: { value: 0 },
+      uColor: { value: MAP_CONFIG.SURF_TETHER_ANCHOR_COLOR.clone() },
+    }
+    const material = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      uniforms: uniforms as unknown as Record<string, THREE.IUniform>,
+      vertexShader: `
+        varying vec2 vUv;
+
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform float uProgress;
+        uniform float uOpacity;
+        uniform vec3 uColor;
+        varying vec2 vUv;
+
+        void main() {
+          vec2 centered = (vUv - 0.5) * 2.0;
+          float radius = length(centered);
+          float rim = smoothstep(0.8, 0.2, radius);
+          float ring = smoothstep(0.3, 0.26, abs(radius - (0.5 + 0.06 * sin(uTime * 6.0))));
+          float grid = max(
+            smoothstep(0.04, 0.0, abs(centered.x)),
+            smoothstep(0.04, 0.0, abs(centered.y))
+          );
+          float intensity = max(rim * 0.4, max(ring * 0.8, grid * 0.6 * uProgress));
+          float alpha = intensity * uOpacity * (0.4 + uProgress * 0.6);
+          gl_FragColor = vec4(uColor, alpha);
+        }
+      `,
+    })
+    const mesh = new THREE.Mesh(geometry, material)
+    mesh.rotation.x = -Math.PI / 2
+    return mesh
+  }
+
   dispose(): void {
     this.hideLaunchArrow()
     this.hideOrbitRing()
     this.hideApproachTether()
+    this.hideSurfCouplingTether()
     if (this.shipReticleGroup) {
       const disposeSprite = (sprite: THREE.Sprite) => {
         const material = sprite.material as THREE.SpriteMaterial

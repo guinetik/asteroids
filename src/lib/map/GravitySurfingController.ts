@@ -71,6 +71,17 @@ export class GravitySurfingController {
   private tiltPitch = 0
   private tiltRoll = 0
 
+  /** Emitted each frame during coupling with (shipPos, railPos, progress 0→1). */
+  onCouplingProgress:
+    | ((shipPosition: THREE.Vector3, railPosition: THREE.Vector3, progress: number, dt: number) => void)
+    | null = null
+
+  /** Emitted when coupling starts. */
+  onCouplingStart: (() => void) | null = null
+
+  /** Emitted when coupling ends (transitions to surfing or cancelled). */
+  onCouplingEnd: (() => void) | null = null
+
   isActive(): boolean {
     return this.state.mode !== 'free'
   }
@@ -132,8 +143,15 @@ export class GravitySurfingController {
       shuttle.group.position.set(x, 0, z)
       shuttle.group.rotation.y = gravitySurfRailHeading(this.state.axis, this.state.directionSign)
       shuttle.setVelocity(new THREE.Vector3(0, 0, 0))
+      this.onCouplingProgress?.(
+        shuttle.group.position,
+        new THREE.Vector3(this.state.targetX, 0, this.state.targetZ),
+        t,
+        dt,
+      )
       this.state.elapsed = nextElapsed
       if (nextElapsed >= this.state.duration) {
+        this.onCouplingEnd?.()
         this.state = {
           mode: 'surfing',
           axis: this.state.axis,
@@ -257,6 +275,7 @@ export class GravitySurfingController {
     shuttle.setInputEnabled(false)
     shuttle.setExternalBrakeActive(false)
     shuttle.setVelocity(new THREE.Vector3(0, 0, 0))
+    this.onCouplingStart?.()
   }
 
   private beginDecouple(deps: GravitySurfingControllerDeps): void {
@@ -273,6 +292,7 @@ export class GravitySurfingController {
       return
     }
     if (this.state.mode === 'coupling') {
+      this.onCouplingEnd?.()
       this.state = { mode: 'free' }
       this.tiltPitch = 0
       this.tiltRoll = 0
@@ -300,7 +320,7 @@ export class GravitySurfingController {
     const shuttle = deps.shuttleController
     if (!shuttle) return
     if (spawnWave) {
-      const forward = new THREE.Vector3(-1, 0, 0)
+      const forward = new THREE.Vector3(1, 0, 0)
         .applyAxisAngle(new THREE.Vector3(0, 1, 0), shuttle.heading)
       const waveX = shuttle.position.x + forward.x * MAP_CONFIG.GRAVITY_SURF_DECOUPLE_WAVE_FORWARD_OFFSET
       const waveZ = shuttle.position.z + forward.z * MAP_CONFIG.GRAVITY_SURF_DECOUPLE_WAVE_FORWARD_OFFSET
@@ -359,7 +379,7 @@ export class GravitySurfingController {
       2,
       deps.mapGridSize / MAP_CONFIG.MAP_SPACE_TIME_GRID_RESOLUTION,
     )
-    const forwardDir = new THREE.Vector3(-1, 0, 0)
+    const forwardDir = new THREE.Vector3(1, 0, 0)
       .applyAxisAngle(new THREE.Vector3(0, 1, 0), shuttle.heading)
     const rightDir = new THREE.Vector3(forwardDir.z, 0, -forwardDir.x)
     const px = shuttle.group.position.x
