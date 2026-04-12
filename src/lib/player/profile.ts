@@ -88,6 +88,16 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     visitedAsteroids = p.visitedAsteroids as Record<string, number>
   }
 
+  let orbitedSolarBodies: Record<string, number> = {}
+  if (
+    p.orbitedSolarBodies !== undefined
+    && p.orbitedSolarBodies !== null
+    && typeof p.orbitedSolarBodies === 'object'
+    && !Array.isArray(p.orbitedSolarBodies)
+  ) {
+    orbitedSolarBodies = p.orbitedSolarBodies as Record<string, number>
+  }
+
   /**
    * Saves written before `hasSeenIntro` existed are treated as already onboarded so existing
    * players are not forced through the intro again.
@@ -99,6 +109,7 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     credits: p.credits,
     completedMissionCount,
     visitedAsteroids,
+    orbitedSolarBodies,
     hasSeenIntro,
   }
 }
@@ -110,6 +121,7 @@ export function createProfile(name: string): PlayerProfile {
     credits: STARTING_CREDITS,
     completedMissionCount: 0,
     visitedAsteroids: {},
+    orbitedSolarBodies: {},
     hasSeenIntro: false,
   }
 }
@@ -163,6 +175,24 @@ export function recordAsteroidVisit(profile: PlayerProfile, asteroidId: string):
     visitedAsteroids: {
       ...profile.visitedAsteroids,
       [asteroidId]: currentCount + 1,
+    },
+  }
+}
+
+/**
+ * Mark a solar map body as visited for first-orbit achievements if not already recorded.
+ *
+ * @param profile - Current profile.
+ * @param bodyKey - Planet id from the planetarium catalog or `"sun"`.
+ * @returns Same profile reference when already orbited; otherwise a copy with `orbitedSolarBodies` set.
+ */
+export function recordSolarBodyFirstOrbit(profile: PlayerProfile, bodyKey: string): PlayerProfile {
+  if ((profile.orbitedSolarBodies[bodyKey] ?? 0) > 0) return profile
+  return {
+    ...profile,
+    orbitedSolarBodies: {
+      ...profile.orbitedSolarBodies,
+      [bodyKey]: 1,
     },
   }
 }

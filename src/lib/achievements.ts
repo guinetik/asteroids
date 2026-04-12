@@ -6,6 +6,7 @@ import {
   type AchievementDefinition,
   type AchievementProgress,
 } from '@/data/achievements'
+import { getPlanet } from '@/lib/planets/catalog'
 import type { UpgradeLevels } from '@/lib/upgrades'
 
 const ACHIEVEMENTS_STORAGE_KEY = 'asteroid-lander-achievements-v1'
@@ -49,6 +50,19 @@ function getPurchasedUpgradeTierCount(upgradeLevels: UpgradeLevels): number {
   return Object.values(upgradeLevels).reduce((sum, level) => sum + Math.max(0, level ?? 0), 0)
 }
 
+function solarOrbitAchievementLabel(bodyKey: string): string {
+  if (bodyKey === 'sun') return 'the Sun'
+  try {
+    return getPlanet(bodyKey).name
+  } catch {
+    return bodyKey
+  }
+}
+
+function hasOrbitedSolarBody(profile: PlayerProfile, bodyKey: string): boolean {
+  return (profile.orbitedSolarBodies[bodyKey] ?? 0) > 0
+}
+
 export function isAchievementUnlocked(definition: AchievementDefinition, progress: AchievementProgress): boolean {
   switch (definition.kind) {
     case 'intro':
@@ -63,6 +77,8 @@ export function isAchievementUnlocked(definition: AchievementDefinition, progres
       return getPurchasedUpgradeTierCount(progress.upgradeLevels) >= (definition.threshold ?? 0)
     case 'specific_upgrade':
       return (progress.upgradeLevels[definition.upgradeId ?? 'gravitySurfing'] ?? 0) > 0
+    case 'solar_body_orbit':
+      return hasOrbitedSolarBody(progress.profile, definition.orbitBodyKey ?? '')
   }
 }
 
@@ -133,6 +149,11 @@ export function getAchievementLockedHint(
     }
     case 'specific_upgrade':
       return 'Unlock the Gravity Surfing upgrade.'
+    case 'solar_body_orbit': {
+      const key = definition.orbitBodyKey ?? ''
+      const label = solarOrbitAchievementLabel(key)
+      return `Enter orbit around ${label} on the solar map.`
+    }
   }
 }
 

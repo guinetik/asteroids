@@ -73,13 +73,35 @@ describe('achievements', () => {
     expect(loadUnlockedAchievementIds()).toEqual(['a', 'b'])
   })
 
+  it('unlocks solar orbit achievements from orbitedSolarBodies', () => {
+    const profile = {
+      ...createProfile('Pilot'),
+      hasSeenIntro: true,
+      orbitedSolarBodies: { sun: 1, mars: 1 },
+    }
+
+    const result = evaluateAchievementUnlocks(
+      {
+        profile,
+        upgradeLevels: {},
+      },
+      [],
+    )
+
+    expect(result.newlyUnlocked.some((a) => a.id === 'exploration-orbit-sun')).toBe(true)
+    expect(result.newlyUnlocked.some((a) => a.id === 'exploration-orbit-mars')).toBe(true)
+    // Earth has no first-orbit achievement (game starts in Earth orbit).
+    expect(result.newlyUnlocked.some((a) => a.id === 'exploration-orbit-earth')).toBe(false)
+  })
+
   it('returns contextual locked hints', () => {
     const hint = getAchievementLockedHint(
       {
         id: 'credits-five-thousand',
         category: 'credits',
         icon: '💰',
-        title: 'WAR CHEST',
+        title: 'RETIREMENT IS A LIE',
+        subtitle: '5,000 CR on hand · dreams sold separately',
         description: 'Hold 5,000 credits at once.',
         type: 'CREDITS',
         rewardCredits: 1000,

@@ -38,7 +38,7 @@ import { PlanetSystemController } from '@/three/controllers/PlanetSystemControll
 import { AsteroidBeltController } from '@/three/controllers/AsteroidBeltController'
 import { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
 import * as THREE from 'three'
-import { OrbitCaptureSystem, type OrbitHudState } from '@/lib/orbitCapture'
+import { OrbitCaptureSystem, type OrbitCaptureState, type OrbitHudState } from '@/lib/orbitCapture'
 import {
   influenceRadius,
   eventHorizonRadius,
@@ -108,8 +108,10 @@ import {
   saveProfile,
   addCredits,
   spendCredits,
+  recordSolarBodyFirstOrbit,
 } from '@/lib/player/profile'
 import type { PlayerProfile } from '@/lib/player/types'
+import { orbitBodyKeyFromCaptureName } from '@/lib/player/orbitBodyKey'
 import {
   createInventory,
   addItem,
@@ -223,6 +225,8 @@ export class MapViewController implements Tickable {
   private resizeHandler: (() => void) | null = null
 
   private orbitFacade = new MapOrbitFacade()
+  /** Prior frame orbit FSM state — detects `→ orbiting` edges for first-orbit achievements. */
+  private previousOrbitCaptureState: OrbitCaptureState = 'free'
   private lifeCycleFacade = new MapLifeCycleFacade()
   private modeCoordinator = new MapModeCoordinator()
   private yRecovery = false
@@ -1137,6 +1141,8 @@ export class MapViewController implements Tickable {
       if (hudState) this.onOrbitState(hudState)
     }
 
+    this.trackSolarOrbitAchievements()
+
     // Constant-screen-size shuttle scale — keeps the ship visible when zoomed out
     this.tickShuttleScale(dt)
 
@@ -1730,6 +1736,25 @@ export class MapViewController implements Tickable {
   private persistPlayerProfile(): void {
     saveProfile(this.playerProfile)
     saveInventory(this.playerInventory)
+  }
+
+  /**
+   * When the shuttle enters `orbiting`, persist a first-time flag for that body (Sun or planet).
+   * Drives exploration achievements and syncs profile to Vue.
+   */
+  private trackSolarOrbitAchievements(): void {
+    const system = this.orbitSystem
+    const state = system?.state ?? 'free'
+    const becameOrbiting = state === 'orbiting' && this.previousOrbitCaptureState !== 'orbiting'
+    this.previousOrbitCaptureState = state
+    if (!becameOrbiting || !system?.target) return
+    const key = orbitBodyKeyFromCaptureName(system.target.name)
+    if (!key) return
+    const next = recordSolarBodyFirstOrbit(this.playerProfile, key)
+    if (next === this.playerProfile) return
+    this.playerProfile = next
+    this.persistPlayerProfile()
+    this.emitShopState()
   }
 
   /**

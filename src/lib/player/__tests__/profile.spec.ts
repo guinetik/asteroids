@@ -7,6 +7,7 @@ import {
   spendCredits,
   recordMissionComplete,
   recordAsteroidVisit,
+  recordSolarBodyFirstOrbit,
   PROFILE_STORAGE_KEY,
   normalizePlayerDisplayName,
   withPlayerDisplayName,
@@ -44,6 +45,7 @@ describe('createProfile', () => {
     expect(profile.credits).toBe(1000)
     expect(profile.completedMissionCount).toBe(0)
     expect(profile.visitedAsteroids).toEqual({})
+    expect(profile.orbitedSolarBodies).toEqual({})
     expect(profile.hasSeenIntro).toBe(false)
   })
 
@@ -81,6 +83,7 @@ describe('saveProfile / loadProfile', () => {
     const loaded = loadProfile()
     expect(loaded?.hasSeenIntro).toBe(true)
     expect(loaded?.name).toBe('Legacy')
+    expect(loaded?.orbitedSolarBodies).toEqual({})
   })
 
   it('preserves explicit hasSeenIntro false from storage', () => {
@@ -207,6 +210,30 @@ describe('recordAsteroidVisit', () => {
     recordAsteroidVisit(profile, 'bennu')
 
     expect(profile.visitedAsteroids).toEqual({})
+  })
+})
+
+describe('recordSolarBodyFirstOrbit', () => {
+  it('records the first orbit for a body key', () => {
+    const profile = createProfile('Joe')
+    const updated = recordSolarBodyFirstOrbit(profile, 'mars')
+
+    expect(updated.orbitedSolarBodies['mars']).toBe(1)
+  })
+
+  it('returns the same reference when already orbited', () => {
+    const profile = createProfile('Joe')
+    const once = recordSolarBodyFirstOrbit(profile, 'earth')
+    const twice = recordSolarBodyFirstOrbit(once, 'earth')
+
+    expect(twice).toBe(once)
+  })
+
+  it('does not mutate the original profile', () => {
+    const profile = createProfile('Joe')
+    recordSolarBodyFirstOrbit(profile, 'sun')
+
+    expect(profile.orbitedSolarBodies).toEqual({})
   })
 })
 

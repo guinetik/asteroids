@@ -21,6 +21,11 @@ export interface PlayerProfile {
   /** Asteroid ID → mission visit count. Incremented once per mission, not per landing. */
   visitedAsteroids: Record<string, number>
   /**
+   * Planet id or `"sun"` → 1 after the player has entered orbit around that body at least once on
+   * the solar map. Used for exploration achievements only; not incremented on repeat visits.
+   */
+  orbitedSolarBodies: Record<string, number>
+  /**
    * After the opening map intro cinematic has played once, this is true and that cinematic is
    * skipped on later visits. Independent of ship mail — Marta/Jay timing uses the message system.
    */

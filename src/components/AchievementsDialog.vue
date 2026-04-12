@@ -38,6 +38,7 @@
                   </div>
                   <div class="achievement-dialog__text">
                     <div class="achievement-dialog__row-title">{{ item.title }}</div>
+                    <div class="achievement-dialog__row-subtitle">{{ item.subtitle }}</div>
                     <div class="achievement-dialog__row-description">
                       {{ isUnlocked(item.id) ? item.description : getAchievementLockedHint(item, progress) }}
                     </div>
@@ -224,11 +225,20 @@ function emitClose(): void {
 }
 
 .achievement-dialog__row-title {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   color: rgba(255, 242, 205, 0.98);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.1em;
+}
+
+.achievement-dialog__row-subtitle {
+  margin-bottom: 6px;
+  color: rgba(245, 196, 92, 0.72);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.35;
 }
 
 .achievement-dialog__row-description {

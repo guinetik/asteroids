@@ -262,6 +262,7 @@ watch(achievementProgress, (progress) => {
     achievementBannerRef.value?.show(
       unlocked.icon,
       unlocked.title,
+      unlocked.subtitle,
       `${unlocked.description} +${unlocked.rewardCredits.toLocaleString()} CR`,
       unlocked.type,
     )

@@ -21,6 +21,7 @@
           <div class="achievement-banner__icon">{{ item.icon }}</div>
           <div class="achievement-banner__body">
             <div class="achievement-banner__title">{{ item.title }}</div>
+            <div class="achievement-banner__subtitle">{{ item.subtitle }}</div>
             <div class="achievement-banner__description">{{ item.description }}</div>
           </div>
           <div class="achievement-banner__type">{{ item.type }}</div>
@@ -38,6 +39,7 @@ interface AchievementBannerItem {
   id: string
   icon: string
   title: string
+  subtitle: string
   description: string
   type: string
 }
@@ -45,10 +47,16 @@ interface AchievementBannerItem {
 const visible = ref<AchievementBannerItem[]>([])
 const DURATION_MS = 4500
 
-function show(icon: string, title: string, description: string, type = 'ACHIEVEMENT'): void {
+function show(
+  icon: string,
+  title: string,
+  subtitle: string,
+  description: string,
+  type = 'ACHIEVEMENT',
+): void {
   useAudio().play('ui.confirm')
   const id = `achievement-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-  visible.value.push({ id, icon, title, description, type })
+  visible.value.push({ id, icon, title, subtitle, description, type })
   window.setTimeout(() => {
     const index = visible.value.findIndex((item) => item.id === id)
     if (index >= 0) visible.value.splice(index, 1)
@@ -138,6 +146,15 @@ defineExpose({ show })
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.12em;
+  margin-bottom: 2px;
+}
+
+.achievement-banner__subtitle {
+  color: rgba(245, 196, 92, 0.78);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  line-height: 1.35;
   margin-bottom: 4px;
 }
 
