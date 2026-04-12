@@ -38,7 +38,10 @@ const INDICATOR_CANVAS_HEIGHT = 64
 const INDICATOR_DOT_RADIUS = 8
 
 /** Font size for the indicator label in canvas pixels. */
-const INDICATOR_FONT_SIZE = 24
+const INDICATOR_FONT_SIZE = 20
+
+/** Font family for the indicator label — matches the site's UI font. */
+const INDICATOR_FONT_FAMILY = "'Datatype', ui-monospace, monospace"
 
 /** Left padding so the dot glow is not clipped by the canvas edge. */
 const INDICATOR_LEFT_PAD = 14
@@ -84,10 +87,10 @@ function createIndicatorSprite(name: string, accentColor: string): {
   ctx.globalAlpha = 1.0
 
   // Label text
-  ctx.font = `bold ${INDICATOR_FONT_SIZE}px sans-serif`
+  ctx.font = `bold ${INDICATOR_FONT_SIZE}px ${INDICATOR_FONT_FAMILY}`
   ctx.fillStyle = accentColor
   ctx.textBaseline = 'middle'
-  ctx.fillText(name, INDICATOR_TEXT_OFFSET_X, cy)
+  ctx.fillText(name.toUpperCase(), INDICATOR_TEXT_OFFSET_X, cy)
 
   const texture = new THREE.CanvasTexture(canvas)
   texture.minFilter = THREE.LinearFilter

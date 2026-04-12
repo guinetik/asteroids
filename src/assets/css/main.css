@@ -334,7 +334,8 @@ body {
 }
 
 .map-label-distance {
-  @apply font-mono text-cyan-600 opacity-50;
+  @apply font-mono opacity-80;
+  color: rgb(210, 235, 240);
   font-size: 9px;
   position: absolute;
   left: 50%;
@@ -393,7 +394,7 @@ body {
 
 .map-distance-text {
   @apply font-mono text-xs;
-  fill: rgba(34, 211, 238, 0.6);
+  fill: rgba(210, 235, 240, 0.85);
   text-anchor: middle;
   dominant-baseline: middle;
 }
