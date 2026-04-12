@@ -3043,8 +3043,9 @@ export class MapViewController implements Tickable {
 
     const bearings: CompassBearing[] = []
 
-    // Sun at origin — rotation.y=0 faces -Z, so forward angle = heading + PI
-    const sunAngle = Math.atan2(-sx, -sz)
+    // Sun at origin — shuttle forward is local +X, so heading=0 faces world +X
+    // Use atan2(dz, dx) to match the rotation.y convention
+    const sunAngle = Math.atan2(-sz, -sx)
     bearings.push({
       label: COMPASS_LABELS['sun']!,
       bearingRad: sunAngle - heading,
@@ -3055,7 +3056,7 @@ export class MapViewController implements Tickable {
     for (const controller of this.planetControllers) {
       const px = controller.getWorldX()
       const pz = controller.getWorldZ()
-      const angle = Math.atan2(px - sx, pz - sz)
+      const angle = Math.atan2(pz - sz, px - sx)
       bearings.push({
         label: COMPASS_LABELS[controller.id] ?? controller.id.slice(0, 2).toUpperCase(),
         bearingRad: angle - heading,
