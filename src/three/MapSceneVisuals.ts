@@ -53,7 +53,7 @@ export class MapSceneVisuals {
   private scene: THREE.Scene
   private shuttleGroup: THREE.Group | null = null
   private orbitRing: THREE.LineLoop | null = null
-  private launchArrow: THREE.ArrowHelper | null = null
+  private launchArrow: THREE.Group | null = null
   private shipReticleGroup: THREE.Group | null = null
   private shipReticleRing: THREE.Sprite | null = null
   private shipReticlePointer: THREE.Sprite | null = null
@@ -73,38 +73,75 @@ export class MapSceneVisuals {
   updateLaunchArrow(charge: number, blocked: boolean): void {
     if (!this.shuttleGroup) return
     if (!this.launchArrow) {
-      this.launchArrow = new THREE.ArrowHelper(
-        new THREE.Vector3(1, 0, 0),
-        new THREE.Vector3(0, 0, 0),
-        MAP_CONFIG.ARROW_MAX_LENGTH,
-        MAP_CONFIG.ARROW_COLOR_SAFE,
-        MAP_CONFIG.ARROW_HEAD_LENGTH,
-        MAP_CONFIG.ARROW_HEAD_WIDTH,
-      )
+      this.launchArrow = this.createLaunchArrowGroup()
       this.shuttleGroup.add(this.launchArrow)
     }
 
-    this.launchArrow.setColor(
-      new THREE.Color(blocked ? MAP_CONFIG.ARROW_COLOR_BLOCKED : MAP_CONFIG.ARROW_COLOR_SAFE),
-    )
-    this.launchArrow.setLength(
-      MAP_CONFIG.ARROW_MAX_LENGTH * charge,
-      MAP_CONFIG.ARROW_HEAD_LENGTH * charge,
-      MAP_CONFIG.ARROW_HEAD_WIDTH * charge,
-    )
+    const c = Math.max(0.01, charge)
+    const totalLength = MAP_CONFIG.ARROW_MAX_LENGTH * c
+    const headLength = MAP_CONFIG.ARROW_HEAD_LENGTH * c
+    const headRadius = MAP_CONFIG.ARROW_HEAD_WIDTH * 0.5 * c
+    const shaftLength = Math.max(0, totalLength - headLength)
+    const shaftRadius = headRadius * 0.25
+
+    const shaft = this.launchArrow.children[0] as THREE.Mesh
+    const head = this.launchArrow.children[1] as THREE.Mesh
+
+    shaft.scale.set(shaftRadius, shaftLength, shaftRadius)
+    shaft.position.set(shaftLength * 0.5, 0, 0)
+
+    head.scale.set(headRadius, headLength, headRadius)
+    head.position.set(shaftLength + headLength * 0.5, 0, 0)
+
+    const color = new THREE.Color(blocked ? MAP_CONFIG.ARROW_COLOR_BLOCKED : MAP_CONFIG.ARROW_COLOR_SAFE)
+    ;(shaft.material as THREE.MeshBasicMaterial).color.copy(color)
+    ;(head.material as THREE.MeshBasicMaterial).color.copy(color)
   }
 
   hideLaunchArrow(): void {
     if (!this.launchArrow || !this.shuttleGroup) return
     this.shuttleGroup.remove(this.launchArrow)
-    this.launchArrow.dispose()
+    for (const child of this.launchArrow.children) {
+      const mesh = child as THREE.Mesh
+      mesh.geometry.dispose()
+      ;(mesh.material as THREE.MeshBasicMaterial).dispose()
+    }
     this.launchArrow = null
   }
 
   /** Override the launch arrow color (e.g. for prograde/retrograde alignment feedback). */
   updateLaunchArrowColor(color: number): void {
     if (!this.launchArrow) return
-    this.launchArrow.setColor(new THREE.Color(color))
+    const c = new THREE.Color(color)
+    for (const child of this.launchArrow.children) {
+      ;((child as THREE.Mesh).material as THREE.MeshBasicMaterial).color.copy(c)
+    }
+  }
+
+  /** Create a cylindrical shaft + cone head group for the launch arrow. */
+  private createLaunchArrowGroup(): THREE.Group {
+    const shaftGeo = new THREE.CylinderGeometry(1, 1, 1, 8)
+    shaftGeo.rotateZ(-Math.PI / 2)
+    const shaftMat = new THREE.MeshBasicMaterial({
+      color: MAP_CONFIG.ARROW_COLOR_SAFE,
+      transparent: true,
+      opacity: 0.85,
+    })
+    const shaft = new THREE.Mesh(shaftGeo, shaftMat)
+
+    const headGeo = new THREE.ConeGeometry(1, 1, 12)
+    headGeo.rotateZ(-Math.PI / 2)
+    const headMat = new THREE.MeshBasicMaterial({
+      color: MAP_CONFIG.ARROW_COLOR_SAFE,
+      transparent: true,
+      opacity: 0.9,
+    })
+    const head = new THREE.Mesh(headGeo, headMat)
+
+    const group = new THREE.Group()
+    group.add(shaft)
+    group.add(head)
+    return group
   }
 
   showOrbitRing(radius: number, opacity: number = MAP_CONFIG.ORBIT_RING_OPACITY): void {
