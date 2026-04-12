@@ -182,6 +182,9 @@ export class GravitySurfingController {
         this.state.cruiseSpeed *= frameScaledBrake
         if (Math.abs(this.state.cruiseSpeed) < MAP_CONFIG.GRAVITY_SURF_STOP_SPEED) {
           this.state.cruiseSpeed = 0
+          // At full stop while braking — flip direction and accelerate the other way
+          this.state.directionSign *= -1
+          this.state.targetCruiseSpeed *= -1
         }
       } else {
         this.state.cruiseSpeed = THREE.MathUtils.damp(
