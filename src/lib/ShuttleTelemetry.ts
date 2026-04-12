@@ -1,3 +1,13 @@
+/** A celestial body's bearing relative to the shuttle heading for the compass strip. */
+export interface CompassBearing {
+  /** Short label (e.g. "Sol", "Ea", "Ju") */
+  label: string
+  /** Bearing in radians relative to shuttle heading (0 = dead ahead, positive = right) */
+  bearingRad: number
+  /** CSS color string from the planet's accentColor */
+  color: string
+}
+
 /**
  * All shuttle data pushed to the HUD each frame.
  *
@@ -32,6 +42,8 @@ export interface ShuttleTelemetry {
   temperatureVisible: boolean
   /** Current damage intensity (0 = no damage, 1 = max damage rate). Drives red vignette. */
   damageIntensity: number
+  /** Planet bearings for the compass strip. */
+  compassBearings: CompassBearing[]
 }
 
 /** Toast state for synthetic spacetime ripples near the shuttle (map view). */
