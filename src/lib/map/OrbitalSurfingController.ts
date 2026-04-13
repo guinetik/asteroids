@@ -326,8 +326,14 @@ export class OrbitalSurfingController {
     this.state.elapsed = nextElapsed
 
     if (nextElapsed >= this.state.duration) {
-      // Transition to diving — fixed travel time regardless of arc length
-      const travelTimeSec = 4
+      // Travel time scales with arc length: short hops ~2s, full Pluto orbit ~10s
+      const arcLength = this.estimateArcLength(this.state.arcPoints)
+      // Pluto half-orbit ≈ 18850 world units (π × 40AU × 150 units/AU)
+      const maxArcLength = Math.PI * 40 * 150
+      const fraction = Math.min(1, arcLength / maxArcLength)
+      const minTimeSec = 2
+      const maxTimeSec = 10
+      const travelTimeSec = minTimeSec + fraction * (maxTimeSec - minTimeSec)
       const tPerSecond = 1 / travelTimeSec
       this.onCouplingEnd?.()
       this.onDiveStart?.()
