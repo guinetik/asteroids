@@ -692,16 +692,33 @@ export class MapViewController implements Tickable {
     }
     this.orbitalSurfingController.onComplete = (planetIndex) => {
       const controller = this.planetControllers[planetIndex]
-      if (controller && this.shuttleController) {
-        this.orbitFacade.beginForcedOrbit(
-          controller.getWorldX(),
-          controller.getWorldZ(),
-          {
-            shuttleController: this.shuttleController,
-            vehicleCamera: this.vehicleCamera,
-            sceneVisuals: this.sceneVisuals,
-          },
-        )
+      if (!controller || !this.shuttleController) return
+
+      // Position the shuttle near the planet so normal E-key capture can engage
+      const bx = controller.getWorldX()
+      const bz = controller.getWorldZ()
+
+      // Try forced orbit first
+      const orbitSystem = this.orbitFacade.system
+      if (orbitSystem && orbitSystem.state === 'free') {
+        this.orbitFacade.beginForcedOrbit(bx, bz, {
+          shuttleController: this.shuttleController,
+          vehicleCamera: this.vehicleCamera,
+          sceneVisuals: this.sceneVisuals,
+        })
+
+        // Verify it actually engaged — if not, fall back to positioning near planet
+        if ((orbitSystem.state as string) !== 'orbiting') {
+          console.warn('[OrbitalSurf] beginForcedOrbit did not engage, falling back')
+          this.shuttleController.group.position.set(bx + 5, 0, bz)
+          this.shuttleController.unfreeze()
+          this.shuttleController.setInputEnabled(true)
+        }
+      } else {
+        // Orbit system busy — just drop the shuttle near the planet
+        this.shuttleController.group.position.set(bx + 5, 0, bz)
+        this.shuttleController.unfreeze()
+        this.shuttleController.setInputEnabled(true)
       }
     }
 
