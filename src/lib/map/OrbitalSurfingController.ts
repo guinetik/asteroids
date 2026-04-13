@@ -346,8 +346,8 @@ export class OrbitalSurfingController {
     // Advance along spline
     this.state.t += this.state.speed * this.state.direction * dt
 
-    // Check if we've reached the end
-    if (this.state.t >= 0.95 && this.state.direction > 0) {
+    // Check if we've reached the end — only transition once (guard prevents reset loop)
+    if (this.state.t >= 0.95 && this.state.direction > 0 && this.state.phase !== 'ramp-up') {
       this.state.phase = 'ramp-up'
       this.state.phaseElapsed = 0
     }
