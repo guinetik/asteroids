@@ -298,7 +298,7 @@ export class OrbitalSurfingController {
 
     if (nextElapsed >= this.state.duration) {
       // Transition to diving — fixed travel time regardless of arc length
-      const travelTimeSec = 8
+      const travelTimeSec = 4
       const tPerSecond = 1 / travelTimeSec
       this.onDiveStart?.()
       this.state = {
@@ -400,8 +400,10 @@ export class OrbitalSurfingController {
     if (nextElapsed >= this.state.duration) {
       const planetIndex = this.state.targetPlanetIndex
       this.state = { mode: 'free' }
-      // Don't unfreeze or re-enable input — onComplete fires beginForcedOrbit
-      // which takes over shuttle control for the orbiting state.
+      // Briefly restore shuttle control so beginForcedOrbit can reposition it.
+      // beginForcedOrbit immediately re-freezes for the orbiting state.
+      shuttle.unfreeze()
+      shuttle.setInputEnabled(false)
       shuttle.group.rotation.x = 0
       shuttle.group.rotation.z = 0
       this.onSurfEnd?.()
