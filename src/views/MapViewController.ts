@@ -674,6 +674,7 @@ export class MapViewController implements Tickable {
     this.orbitalSurfingController.onCouplingStart = (arcPoints) => {
       this.manifoldSpline?.show(arcPoints, -MAP_CONFIG.ORBITAL_SURF_TUNNEL_DEPTH)
       this.sceneVisuals?.showSurfCouplingTether()
+      useAudio().play('sfx.wormhole')
     }
     this.orbitalSurfingController.onCouplingProgress = (shipPos, orbitPos, progress, dt) => {
       this.sceneVisuals?.updateSurfCouplingTether(shipPos, orbitPos, progress, dt)
@@ -682,7 +683,6 @@ export class MapViewController implements Tickable {
       this.sceneVisuals?.hideSurfCouplingTether()
     }
     this.orbitalSurfingController.onDiveStart = () => {
-      useAudio().play('sfx.wormhole')
       // Freeze simulation so planets stop moving while in the manifold tunnel
       this.simFrozen = true
       // Hide asteroid belts during the dive
@@ -695,6 +695,7 @@ export class MapViewController implements Tickable {
     this.orbitalSurfingController.onSurfEnd = () => {
       this.manifoldSpline?.hide()
       this.shuttleEffects?.setManifoldSurfing(false)
+      useAudio().stopSound('sfx.wormhole')
       // Restore simulation and belt visibility
       this.simFrozen = false
       for (const belt of this.beltControllers) {
