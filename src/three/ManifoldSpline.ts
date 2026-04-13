@@ -2,7 +2,8 @@
  * Manifold highway spline renderer — ancient viroid infrastructure.
  *
  * Builds a CatmullRomCurve3 from orbital arc points at tunnel depth,
- * renders parallel wireframe rails with a dim Tron-style glow shader.
+ * renders a wireframe tube (longitudinal rails + cross-section rings)
+ * with a dim Tron-style glow shader.
  *
  * @author guinetik
  * @date 2026-04-12
@@ -16,11 +17,20 @@ import { MAP_VIEW_CONTROLLER_CONFIG as MAP_CONFIG } from '@/lib/map/mapViewContr
 /** Number of sample points along the spline for rendering. */
 const RENDER_SEGMENTS = 128
 
-/** Lateral offset for the twin rail lines flanking the spline center. */
-const RAIL_HALF_WIDTH = 1.5
+/** Number of vertices around each cross-section ring. */
+const TUBE_RADIAL_SEGMENTS = 8
+
+/** Radius of the tube cross-section. */
+const TUBE_RADIUS = 3.5
+
+/** How often to place a ring cross-section (every N spline samples). */
+const RING_EVERY_N = 4
+
+/** Number of longitudinal rails running along the tube. */
+const RAIL_COUNT = 4
 
 /**
- * Manifold highway spline visual — dormant Tron wireframe beneath the grid.
+ * Manifold highway spline visual — wireframe tube beneath the grid.
  *
  * @author guinetik
  * @date 2026-04-12
@@ -31,7 +41,7 @@ export class ManifoldSpline implements Tickable {
   readonly group = new THREE.Group()
 
   private splineCurve: THREE.CatmullRomCurve3 | null = null
-  private railMesh: THREE.LineSegments | null = null
+  private tubeMesh: THREE.LineSegments | null = null
   private material: THREE.ShaderMaterial | null = null
   private time = 0
 
@@ -63,31 +73,59 @@ export class ManifoldSpline implements Tickable {
 
     this.splineCurve = new THREE.CatmullRomCurve3(curvePoints, false, 'centripetal', 0.5)
 
-    // Sample the spline into twin rail lines
     const vertices: number[] = []
     const sampledPoints = this.splineCurve.getSpacedPoints(RENDER_SEGMENTS)
 
-    for (let i = 0; i < sampledPoints.length - 1; i++) {
-      const p0 = sampledPoints[i]!
-      const p1 = sampledPoints[i + 1]!
+    // Precompute Frenet-like frames along the spline
+    const frames = this.computeFrames(sampledPoints)
 
-      // Tangent for lateral offset
-      const tangent = new THREE.Vector3().subVectors(p1, p0).normalize()
-      const up = new THREE.Vector3(0, 1, 0)
-      const lateral = new THREE.Vector3().crossVectors(tangent, up).normalize().multiplyScalar(RAIL_HALF_WIDTH)
+    // --- Longitudinal rails (lines running the length of the tube) ---
+    for (let rail = 0; rail < RAIL_COUNT; rail++) {
+      const angle = (Math.PI * 2 * rail) / RAIL_COUNT
+      const cosA = Math.cos(angle)
+      const sinA = Math.sin(angle)
 
-      // Center line segment
-      vertices.push(p0.x, p0.y, p0.z, p1.x, p1.y, p1.z)
-      // Left rail
-      vertices.push(
-        p0.x + lateral.x, p0.y, p0.z + lateral.z,
-        p1.x + lateral.x, p1.y, p1.z + lateral.z,
-      )
-      // Right rail
-      vertices.push(
-        p0.x - lateral.x, p0.y, p0.z - lateral.z,
-        p1.x - lateral.x, p1.y, p1.z - lateral.z,
-      )
+      for (let i = 0; i < sampledPoints.length - 1; i++) {
+        const p0 = sampledPoints[i]!
+        const p1 = sampledPoints[i + 1]!
+        const f0 = frames[i]!
+        const f1 = frames[i + 1]!
+
+        const x0 = p0.x + (f0.normal.x * cosA + f0.binormal.x * sinA) * TUBE_RADIUS
+        const y0 = p0.y + (f0.normal.y * cosA + f0.binormal.y * sinA) * TUBE_RADIUS
+        const z0 = p0.z + (f0.normal.z * cosA + f0.binormal.z * sinA) * TUBE_RADIUS
+
+        const x1 = p1.x + (f1.normal.x * cosA + f1.binormal.x * sinA) * TUBE_RADIUS
+        const y1 = p1.y + (f1.normal.y * cosA + f1.binormal.y * sinA) * TUBE_RADIUS
+        const z1 = p1.z + (f1.normal.z * cosA + f1.binormal.z * sinA) * TUBE_RADIUS
+
+        vertices.push(x0, y0, z0, x1, y1, z1)
+      }
+    }
+
+    // --- Cross-section rings (circles around the tube at intervals) ---
+    for (let i = 0; i < sampledPoints.length; i += RING_EVERY_N) {
+      const center = sampledPoints[i]!
+      const frame = frames[i]!
+
+      for (let j = 0; j < TUBE_RADIAL_SEGMENTS; j++) {
+        const a0 = (Math.PI * 2 * j) / TUBE_RADIAL_SEGMENTS
+        const a1 = (Math.PI * 2 * (j + 1)) / TUBE_RADIAL_SEGMENTS
+        const cos0 = Math.cos(a0)
+        const sin0 = Math.sin(a0)
+        const cos1 = Math.cos(a1)
+        const sin1 = Math.sin(a1)
+
+        const x0 = center.x + (frame.normal.x * cos0 + frame.binormal.x * sin0) * TUBE_RADIUS
+        const y0 = center.y + (frame.normal.y * cos0 + frame.binormal.y * sin0) * TUBE_RADIUS
+        const z0 = center.z + (frame.normal.z * cos0 + frame.binormal.z * sin0) * TUBE_RADIUS
+
+        const x1 = center.x + (frame.normal.x * cos1 + frame.binormal.x * sin1) * TUBE_RADIUS
+        const y1 = center.y + (frame.normal.y * cos1 + frame.binormal.y * sin1) * TUBE_RADIUS
+        const z1 = center.z + (frame.normal.z * cos1 + frame.binormal.z * sin1) * TUBE_RADIUS
+
+        vertices.push(x0, y0, z0, x1, y1, z1)
+      }
     }
 
     const geometry = new THREE.BufferGeometry()
@@ -124,8 +162,8 @@ export class ManifoldSpline implements Tickable {
       `,
     })
 
-    this.railMesh = new THREE.LineSegments(geometry, this.material)
-    this.group.add(this.railMesh)
+    this.tubeMesh = new THREE.LineSegments(geometry, this.material)
+    this.group.add(this.tubeMesh)
     this.group.visible = true
   }
 
@@ -151,15 +189,45 @@ export class ManifoldSpline implements Tickable {
 
   /** Dispose geometry and material. */
   dispose(): void {
-    if (this.railMesh) {
-      this.railMesh.geometry.dispose()
-      this.group.remove(this.railMesh)
-      this.railMesh = null
+    if (this.tubeMesh) {
+      this.tubeMesh.geometry.dispose()
+      this.group.remove(this.tubeMesh)
+      this.tubeMesh = null
     }
     if (this.material) {
       this.material.dispose()
       this.material = null
     }
     this.splineCurve = null
+  }
+
+  /**
+   * Compute approximate Frenet frames (normal + binormal) along sampled points.
+   * Uses finite differences for the tangent and a reference up vector.
+   */
+  private computeFrames(
+    points: THREE.Vector3[],
+  ): { normal: THREE.Vector3; binormal: THREE.Vector3 }[] {
+    const frames: { normal: THREE.Vector3; binormal: THREE.Vector3 }[] = []
+    const up = new THREE.Vector3(0, 1, 0)
+
+    for (let i = 0; i < points.length; i++) {
+      const prev = points[Math.max(0, i - 1)]!
+      const next = points[Math.min(points.length - 1, i + 1)]!
+      const tangent = new THREE.Vector3().subVectors(next, prev).normalize()
+
+      // If tangent is nearly parallel to up, use a fallback
+      let normal: THREE.Vector3
+      if (Math.abs(tangent.dot(up)) > 0.99) {
+        normal = new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(1, 0, 0)).normalize()
+      } else {
+        normal = new THREE.Vector3().crossVectors(up, tangent).normalize()
+      }
+      const binormal = new THREE.Vector3().crossVectors(tangent, normal).normalize()
+
+      frames.push({ normal, binormal })
+    }
+
+    return frames
   }
 }
