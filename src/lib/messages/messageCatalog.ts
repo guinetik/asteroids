@@ -181,6 +181,44 @@ export const JAY_VENUS_WARNING_MESSAGE: ShipMessageDefinition = {
   ],
 }
 
+/** Priority for Viroid Envoy messages — rare alien contact, high importance. */
+const VIROID_ENVOY_PRIORITY = 90
+
+/** Viroid Envoy's first contact after 3 exterminate missions. */
+export const VIROID_ENVOY_INITIAL_CONTACT: ShipMessageDefinition = {
+  id: 'viroid-envoy-initial-contact',
+  from: '— — —',
+  subject: '...',
+  sentAt: '2306-04-12 00:00 UTC',
+  trigger: 'viroid_envoy_initial_contact',
+  delivery: 'inbox_prompt',
+  priority: VIROID_ENVOY_PRIORITY,
+  body: [
+    'You kill. We watch.',
+    'The ones you destroy are what we were. What we no longer choose to be. You are removing noise from the system. This is noted.',
+    'A thing has been placed at the coordinates in this transmission. It is not a weapon. It is not a gift. It is a key to infrastructure you cannot currently perceive.',
+    'Install it. See what we built when we still built things.',
+    'Retrieve the package. The waypoint is marked.',
+  ],
+}
+
+/** Viroid Envoy's follow-up after installing the Dark Lattice Coupler. */
+export const VIROID_ENVOY_CERES_RENDEZVOUS: ShipMessageDefinition = {
+  id: 'viroid-envoy-ceres-rendezvous',
+  from: '— — —',
+  subject: 'Ceres',
+  sentAt: '2306-04-12 00:00 UTC',
+  trigger: 'viroid_envoy_ceres_rendezvous',
+  delivery: 'inbox_prompt',
+  priority: VIROID_ENVOY_PRIORITY,
+  enqueueOnDismiss: [],
+  body: [
+    'You see now. The highways. What remains.',
+    'Come to Ceres. There is something we need to discuss that cannot be encoded in a transmission.',
+    'You have proven useful. We would like to understand why.',
+  ],
+}
+
 /** Full message catalog for the current build. */
 export const SHIP_MESSAGE_CATALOG: ShipMessageDefinition[] = [
   STARTUP_SELLER_MESSAGE,
@@ -192,4 +230,6 @@ export const SHIP_MESSAGE_CATALOG: ShipMessageDefinition[] = [
   JAY_BRAKE_MESSAGE,
   JAY_MISSION_START_MESSAGE,
   JAY_VENUS_WARNING_MESSAGE,
+  VIROID_ENVOY_INITIAL_CONTACT,
+  VIROID_ENVOY_CERES_RENDEZVOUS,
 ]

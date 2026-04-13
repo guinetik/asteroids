@@ -15,6 +15,8 @@ export type ShipMessageTrigger =
   | 'mission_start'
   | 'map_venus_orbit_warning'
   | 'map_first_slingshot'
+  | 'viroid_envoy_initial_contact'
+  | 'viroid_envoy_ceres_rendezvous'
 
 /** Delivery behavior for a shipboard message. */
 export type ShipMessageDelivery = 'blocking_intro' | 'inbox_prompt'
