@@ -297,10 +297,9 @@ export class OrbitalSurfingController {
     this.state.elapsed = nextElapsed
 
     if (nextElapsed >= this.state.duration) {
-      // Transition to diving
-      const cruiseSpeed = MAP_PHYSICS.maxThrustSpeed * MAP_CONFIG.ORBITAL_SURF_CRUISE_SPEED_MULTIPLIER
-      const arcLength = this.estimateArcLength(this.state.arcPoints)
-      const tPerSecond = arcLength > 0 ? cruiseSpeed / arcLength : 1
+      // Transition to diving — fixed travel time regardless of arc length
+      const travelTimeSec = 8
+      const tPerSecond = 1 / travelTimeSec
       this.onDiveStart?.()
       this.state = {
         mode: 'diving',
