@@ -1080,10 +1080,9 @@ export class MapViewController implements Tickable {
       return
     }
 
-    // Orbital surfing toggle — checked BEFORE gravity surfing (orbit path priority)
-    if (!this.orbitalSurfingController.isActive()) {
-      this.orbitalSurfingController.requestToggle(this.getOrbitalSurfingDeps())
-    }
+    // Orbital surfing toggle — checked BEFORE gravity surfing (orbit path priority).
+    // No outer isActive() guard — requestToggle handles cancel-during-coupling internally.
+    this.orbitalSurfingController.requestToggle(this.getOrbitalSurfingDeps())
     this.orbitalSurfingController.tick(dt, this.getOrbitalSurfingDeps())
     this.manifoldSpline?.tick(dt)
 
@@ -1221,6 +1220,7 @@ export class MapViewController implements Tickable {
       this.spaceTimeGrid &&
       !this.yRecovery &&
       !this.gravitySurfingController.isActive() &&
+      !this.orbitalSurfingController.isActive() &&
       !this.shuttleController.dead &&
       (this.orbitSystem?.state ?? 'free') === 'free'
     ) {
@@ -1661,7 +1661,8 @@ export class MapViewController implements Tickable {
       !this.shipHealth ||
       this.shuttleController.dead ||
       (this.orbitSystem?.state ?? 'free') !== 'free' ||
-      this.gravitySurfingController.isActive()
+      this.gravitySurfingController.isActive() ||
+      this.orbitalSurfingController.isActive()
     ) {
       return
     }
