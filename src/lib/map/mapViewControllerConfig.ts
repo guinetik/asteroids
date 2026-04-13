@@ -173,7 +173,7 @@ export const ORBITAL_SURF_RAMP_DURATION_SEC = 1.2
 export const ORBITAL_SURF_COUPLE_DURATION_SEC = 1.0
 
 /** Max world units from an orbit ellipse point to allow attach. */
-export const ORBITAL_SURF_SNAP_DISTANCE = 15
+export const ORBITAL_SURF_SNAP_DISTANCE = 5
 
 /** Passive fuel drain multiplier while orbital surfing (same as gravity surfing). */
 export const ORBITAL_SURF_FUEL_MULTIPLIER = 3
