@@ -353,12 +353,17 @@ export class OrbitalSurfingController {
     }
 
     if (this.state.phase === 'ramp-up') {
-      const rampT = rampDuration <= 0 ? 1 : Math.min(1, this.state.phaseElapsed / rampDuration)
-      this.state.currentY = THREE.MathUtils.lerp(tunnelDepth, 0, easeInOut01(rampT))
       this.state.t = Math.min(1, this.state.t)
-      if (rampT >= 1) {
-        this.beginEmerging(shuttle)
-      }
+      // Skip the separate emerging phase — the spline geometry already has the
+      // exit ramp baked in. Go straight to orbit handoff.
+      const planetIndex = this.state.targetPlanetIndex
+      this.state = { mode: 'free' }
+      shuttle.unfreeze()
+      shuttle.setInputEnabled(false)
+      shuttle.group.rotation.x = 0
+      shuttle.group.rotation.z = 0
+      this.onSurfEnd?.()
+      this.onComplete?.(planetIndex)
     }
 
     // Clamp t for reverse direction
