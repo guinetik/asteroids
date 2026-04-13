@@ -114,6 +114,14 @@ export class OrbitalSurfingController {
   /** Fired when coupling starts — caller should build/show the manifold spline. */
   onCouplingStart: ((arcPoints: OrbitPoint2D[]) => void) | null = null
 
+  /** Fired each frame during coupling with (shipPos, orbitPos, progress 0→1, dt). */
+  onCouplingProgress:
+    | ((shipPosition: THREE.Vector3, orbitPosition: THREE.Vector3, progress: number, dt: number) => void)
+    | null = null
+
+  /** Fired when coupling ends (transitions to diving or cancelled). */
+  onCouplingEnd: (() => void) | null = null
+
   /** Fired when the dive begins (coupling → diving transition). */
   onDiveStart: (() => void) | null = null
 
@@ -296,6 +304,7 @@ export class OrbitalSurfingController {
     shuttle.setVelocity(new THREE.Vector3(0, 0, 0))
     shuttle.group.rotation.x = 0
     shuttle.group.rotation.z = 0
+    this.onCouplingEnd?.()
     this.onSurfEnd?.()
   }
 
@@ -308,12 +317,19 @@ export class OrbitalSurfingController {
     const z = THREE.MathUtils.lerp(this.state.startZ, this.state.targetZ, eased)
     shuttle.group.position.set(x, 0, z)
     shuttle.setVelocity(new THREE.Vector3(0, 0, 0))
+    this.onCouplingProgress?.(
+      shuttle.group.position,
+      new THREE.Vector3(this.state.targetX, 0, this.state.targetZ),
+      t,
+      dt,
+    )
     this.state.elapsed = nextElapsed
 
     if (nextElapsed >= this.state.duration) {
       // Transition to diving — fixed travel time regardless of arc length
       const travelTimeSec = 4
       const tPerSecond = 1 / travelTimeSec
+      this.onCouplingEnd?.()
       this.onDiveStart?.()
       this.state = {
         mode: 'diving',

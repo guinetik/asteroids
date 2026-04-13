@@ -673,6 +673,13 @@ export class MapViewController implements Tickable {
 
     this.orbitalSurfingController.onCouplingStart = (arcPoints) => {
       this.manifoldSpline?.show(arcPoints, -MAP_CONFIG.ORBITAL_SURF_TUNNEL_DEPTH)
+      this.sceneVisuals?.showSurfCouplingTether()
+    }
+    this.orbitalSurfingController.onCouplingProgress = (shipPos, orbitPos, progress, dt) => {
+      this.sceneVisuals?.updateSurfCouplingTether(shipPos, orbitPos, progress, dt)
+    }
+    this.orbitalSurfingController.onCouplingEnd = () => {
+      this.sceneVisuals?.hideSurfCouplingTether()
     }
     this.orbitalSurfingController.onDiveStart = () => {
       // Freeze simulation so planets stop moving while in the manifold tunnel
