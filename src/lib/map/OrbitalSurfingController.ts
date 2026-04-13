@@ -86,6 +86,8 @@ export interface OrbitalSurfingDeps {
    * Per-planet world positions, indexed by planet index.
    */
   planetWorldPositions: readonly { x: number; z: number }[]
+  /** Per-planet display names, indexed by planet index. */
+  planetNames: readonly string[]
 }
 
 /** Callback fired when the orbital surf completes and the player should enter orbit. */
@@ -126,6 +128,18 @@ export class OrbitalSurfingController {
   /** True when not in free state. */
   isActive(): boolean {
     return this.state.mode !== 'free'
+  }
+
+  /**
+   * Returns the HUD prompt string if a manifold attach is available, or null.
+   * E.g. "Q ENTER VENUS MANIFOLD"
+   */
+  getAttachPrompt(deps: OrbitalSurfingDeps): string | null {
+    if (this.state.mode !== 'free') return null
+    const snap = this.findSnapTarget(deps)
+    if (!snap) return null
+    const name = deps.planetNames[snap.planetIndex] ?? 'UNKNOWN'
+    return `Q ENTER ${name.toUpperCase()} MANIFOLD`
   }
 
   /** The arc points for the current surf, or null if not active. */

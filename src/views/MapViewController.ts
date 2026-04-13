@@ -1311,9 +1311,9 @@ export class MapViewController implements Tickable {
     // Telemetry
     if (this.shuttleController && this.onTelemetry) {
       const ts = this.shuttleController.thrusterSystem
-      const gravitySurfPrompt = this.gravitySurfingController.canShowAttachPrompt(
-        this.getGravitySurfingDeps(),
-      )
+      const manifoldPrompt = this.orbitalSurfingController.getAttachPrompt(this.getOrbitalSurfingDeps())
+      const gravitySurfPrompt = !manifoldPrompt
+        && this.gravitySurfingController.canShowAttachPrompt(this.getGravitySurfingDeps())
         ? 'Q GRAVITY SURF'
         : null
       this.onTelemetry({
@@ -1321,7 +1321,7 @@ export class MapViewController implements Tickable {
         heading: this.shuttleController.heading,
         posX: this.shuttleController.position.x,
         posZ: this.shuttleController.position.z,
-        actionPrompt: gravitySurfPrompt,
+        actionPrompt: manifoldPrompt ?? gravitySurfPrompt,
         fuelLevel: ts.fuelLevel,
         fuelCapacity: ts.fuelCapacity,
         thrustCharge: ts.getState('thrust').charge,
@@ -1858,6 +1858,7 @@ export class MapViewController implements Tickable {
         x: c.getWorldX(),
         z: c.getWorldZ(),
       })),
+      planetNames: PLANETS.map((p) => p.name),
     }
   }
 
