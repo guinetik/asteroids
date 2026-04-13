@@ -14,6 +14,8 @@ export class InertialDampenerSound {
   private outputGain: GainNode | null = null
   private energyOsc: OscillatorNode | null = null
   private energyGain: GainNode | null = null
+  private subOsc: OscillatorNode | null = null
+  private subGain: GainNode | null = null
   private bodyOsc: OscillatorNode | null = null
   private bodyFilter: BiquadFilterNode | null = null
   private bodyGain: GainNode | null = null
@@ -27,6 +29,7 @@ export class InertialDampenerSound {
   private settleUntil = 0
   private active = false
   private pulsePhase = 0
+  private impactUntil = 0
 
   update(frame: InertialDampenerAudioFrame, dt: number): void {
     if (!frame.dampenerActive && !this.active && !this.settling) return
@@ -35,6 +38,8 @@ export class InertialDampenerSound {
     const outputGain = this.outputGain!
     const energyOsc = this.energyOsc!
     const energyGain = this.energyGain!
+    const subOsc = this.subOsc!
+    const subGain = this.subGain!
     const bodyOsc = this.bodyOsc!
     const bodyFilter = this.bodyFilter!
     const bodyGain = this.bodyGain!
@@ -57,19 +62,25 @@ export class InertialDampenerSound {
         this.settling = false
         this.settleUntil = 0
         this.pulsePhase = 0
+        this.impactUntil = now + 0.16
       }
       this.active = true
+      const impactPulse = now < this.impactUntil ? 1 - (this.impactUntil - now) / 0.16 : 0
+      const impactBoost = 1 - impactPulse
 
-      automateParam(outputGain.gain, frame.sfxVolume, now, 0.04, 0.0001, 1)
-      automateParam(energyOsc.frequency, lerp(34, 420, ratio), now, 0.035, 34, 420)
-      automateParam(energyGain.gain, 0.0001 + (0.018 + ratio * 0.042) * gate, now, 0.02, 0.0001, 1)
+      automateParam(outputGain.gain, Math.min(1, frame.sfxVolume * 1.7), now, 0.03, 0.0001, 1)
+      automateParam(energyOsc.frequency, lerp(32, 220, ratio), now, 0.03, 32, 260)
+      automateParam(energyGain.gain, 0.0001 + (0.008 + ratio * 0.02) * gate, now, 0.02, 0.0001, 1)
 
-      automateParam(bodyOsc.frequency, 54, now, 0.04, 40, 120)
-      automateParam(bodyFilter.frequency, lerp(78, 280, ratio), now, 0.04, 60, 1000)
-      automateParam(bodyGain.gain, 0.0001 + (0.04 + ratio * 0.065) * (0.5 + pulse * 0.5), now, 0.025, 0.0001, 1)
+      automateParam(subOsc.frequency, lerp(40, 62, ratio), now, 0.025, 32, 90)
+      automateParam(subGain.gain, 0.0001 + (0.2 + ratio * 0.13) * (0.45 + pulse * 0.55 + impactBoost), now, 0.015, 0.0001, 1)
 
-      automateParam(gritPreGain.gain, 0.04 + decelNorm * 0.16, now, 0.02, 0.0001, 1)
-      automateParam(gritGain.gain, 0.0001 + decelNorm * 0.035 * gate, now, 0.02, 0.0001, 1)
+      automateParam(bodyOsc.frequency, 50, now, 0.035, 40, 120)
+      automateParam(bodyFilter.frequency, lerp(74, 180, ratio), now, 0.035, 60, 1000)
+      automateParam(bodyGain.gain, 0.0001 + (0.13 + ratio * 0.16) * (0.5 + pulse * 0.5 + impactBoost * 0.65), now, 0.018, 0.0001, 1)
+
+      automateParam(gritPreGain.gain, 0.12 + decelNorm * 0.3 + ratio * 0.08, now, 0.018, 0.0001, 1)
+      automateParam(gritGain.gain, 0.0001 + (0.03 + decelNorm * 0.08) * (0.4 + pulse * 0.6), now, 0.018, 0.0001, 1)
 
       if (currentVelocity <= 0.35 || ratio <= 0.03) {
         this.active = false
@@ -79,11 +90,13 @@ export class InertialDampenerSound {
     } else if (this.settling) {
       const remaining = Math.max(0, this.settleUntil - now)
       const pulse = clamp01(remaining / 0.18)
-      automateParam(outputGain.gain, frame.sfxVolume, now, 0.03, 0.0001, 1)
+      automateParam(outputGain.gain, Math.min(1, frame.sfxVolume * 1.5), now, 0.025, 0.0001, 1)
       automateParam(energyOsc.frequency, 38, now, 0.03, 34, 420)
-      automateParam(energyGain.gain, 0.0001 + pulse * 0.028, now, 0.025, 0.0001, 1)
+      automateParam(energyGain.gain, 0.0001 + pulse * 0.02, now, 0.02, 0.0001, 1)
+      automateParam(subOsc.frequency, 38, now, 0.025, 32, 90)
+      automateParam(subGain.gain, 0.0001 + pulse * 0.16, now, 0.018, 0.0001, 1)
       automateParam(bodyFilter.frequency, 82, now, 0.03, 60, 1000)
-      automateParam(bodyGain.gain, 0.0001 + pulse * 0.05, now, 0.025, 0.0001, 1)
+      automateParam(bodyGain.gain, 0.0001 + pulse * 0.095, now, 0.02, 0.0001, 1)
       automateParam(gritPreGain.gain, 0.0001, now, 0.04, 0.0001, 1)
       automateParam(gritGain.gain, 0.0001, now, 0.04, 0.0001, 1)
 
@@ -110,9 +123,11 @@ export class InertialDampenerSound {
   dispose(): void {
     this.stop()
     this.disconnectNode(this.energyOsc)
+    this.disconnectNode(this.subOsc)
     this.disconnectNode(this.bodyOsc)
     this.disconnectNode(this.gritSource)
     this.disconnectNode(this.energyGain)
+    this.disconnectNode(this.subGain)
     this.disconnectNode(this.bodyFilter)
     this.disconnectNode(this.bodyGain)
     this.disconnectNode(this.gritPreGain)
@@ -121,9 +136,11 @@ export class InertialDampenerSound {
     this.disconnectNode(this.outputGain)
 
     this.energyOsc = null
+    this.subOsc = null
     this.bodyOsc = null
     this.gritSource = null
     this.energyGain = null
+    this.subGain = null
     this.bodyFilter = null
     this.bodyGain = null
     this.gritPreGain = null
@@ -152,12 +169,20 @@ export class InertialDampenerSound {
     energyGain.connect(outputGain)
     energyOsc.start()
 
+    const subOsc = ctx.createOscillator()
+    subOsc.type = 'sine'
+    const subGain = ctx.createGain()
+    subGain.gain.value = 0.0001
+    subOsc.connect(subGain)
+    subGain.connect(outputGain)
+    subOsc.start()
+
     const bodyOsc = ctx.createOscillator()
-    bodyOsc.type = 'triangle'
+    bodyOsc.type = 'square'
     const bodyFilter = ctx.createBiquadFilter()
     bodyFilter.type = 'lowpass'
-    bodyFilter.frequency.value = 160
-    bodyFilter.Q.value = 1.2
+    bodyFilter.frequency.value = 140
+    bodyFilter.Q.value = 1.4
     const bodyGain = ctx.createGain()
     bodyGain.gain.value = 0.0001
     bodyOsc.connect(bodyFilter)
@@ -171,17 +196,24 @@ export class InertialDampenerSound {
     const gritShaper = ctx.createWaveShaper()
     gritShaper.curve = makeBitcrushCurve() as Float32Array<ArrayBuffer>
     gritShaper.oversample = 'none'
+    const gritFilter = ctx.createBiquadFilter()
+    gritFilter.type = 'bandpass'
+    gritFilter.frequency.value = 900
+    gritFilter.Q.value = 0.7
     const gritGain = ctx.createGain()
     gritGain.gain.value = 0.0001
     gritSource.connect(gritPreGain)
     gritPreGain.connect(gritShaper)
-    gritShaper.connect(gritGain)
+    gritShaper.connect(gritFilter)
+    gritFilter.connect(gritGain)
     gritGain.connect(outputGain)
     gritSource.start()
 
     this.outputGain = outputGain
     this.energyOsc = energyOsc
     this.energyGain = energyGain
+    this.subOsc = subOsc
+    this.subGain = subGain
     this.bodyOsc = bodyOsc
     this.bodyFilter = bodyFilter
     this.bodyGain = bodyGain
@@ -194,6 +226,7 @@ export class InertialDampenerSound {
 
   private fadeOut(now: number, seconds: number): void {
     automateParam(this.energyGain?.gain ?? null, 0.0001, now, seconds, 0.0001, 1)
+    automateParam(this.subGain?.gain ?? null, 0.0001, now, seconds, 0.0001, 1)
     automateParam(this.bodyGain?.gain ?? null, 0.0001, now, seconds, 0.0001, 1)
     automateParam(this.gritPreGain?.gain ?? null, 0.0001, now, seconds, 0.0001, 1)
     automateParam(this.gritGain?.gain ?? null, 0.0001, now, seconds, 0.0001, 1)
