@@ -8,9 +8,13 @@
  */
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
+import {
+  createTronHologramMaterial,
+  syncTronHologramTimeSeconds,
+} from '@/three/tronHologramMaterial'
 
 /** Wormhole lifecycle states. */
-export type WormholeState = 'idle' | 'summoning' | 'ejecting' | 'collapsing' | 'done'
+export type WormholeState = 'revealing' | 'idle' | 'summoning' | 'ejecting' | 'collapsing' | 'done'
 
 /** Minimal grid interface — avoids importing the full SpaceTimeGrid class. */
 export interface GridSource {
@@ -21,17 +25,29 @@ export interface GridSource {
 /** Negative mass applied to the spacetime grid to create an upward bulge. */
 const WORMHOLE_MASS = -0.6
 
-/** Radius of the wormhole core sphere in world units. */
+/** Default radius of the wormhole core sphere in world units (level / flat-arrival scale). */
 const WORMHOLE_RADIUS = 15
 
-/** Hex color of the portal glow (blue-ish). */
-const GLOW_COLOR = 0x4488ff
+/** Primary tron hologram tint for the portal surface (cyan-blue). */
+const PORTAL_COLOR = 0x00aaff
+
+/** Grid line accent — slightly warmer blue so the lattice reads against the body. */
+const PORTAL_GRID_TINT = 0x44ddff
 
 /** Glow sphere radius multiplier relative to the core. */
 const GLOW_SCALE = 2.0
 
-/** Base opacity of the glow sphere. */
-const GLOW_OPACITY = 0.25
+/** Alpha gain for the portal surface (body mesh). */
+const BODY_ALPHA_GAIN = 1.6
+
+/** Alpha gain for the outer glow sphere — softer than the core. */
+const GLOW_ALPHA_GAIN = 0.7
+
+/** Duration of the scale-from-zero reveal animation in seconds. */
+const REVEAL_DURATION = 1.2
+
+/** Rotation speed of the wormhole group in radians per second. */
+const SPIN_SPEED = 0.6
 
 /** Duration of the summoning hold before ejection in seconds. */
 const SUMMON_DURATION = 0.5
@@ -50,10 +66,12 @@ const COLLAPSE_DURATION = 3.0
  * Implements {@link Tickable} for per-frame animation updates.
  *
  * Lifecycle:
- * 1. `idle`      — visible, stable gravity well, waiting for shuttle spawn
- * 2. `ejecting`  — pulse animation fires (PULSE_DURATION seconds)
- * 3. `collapsing`— grid mass lerps to zero, meshes fade out (COLLAPSE_DURATION seconds)
- * 4. `done`      — invisible, mass zeroed, `onDone` callback fired once
+ * 0. `revealing`  — scales from 0 → 1 over REVEAL_DURATION; entered via {@link reveal}
+ * 1. `idle`       — full size, spinning, waiting for {@link eject} call
+ * 2. `summoning`  — brief hold before the pulse (SUMMON_DURATION seconds)
+ * 3. `ejecting`   — pulse animation fires (PULSE_DURATION seconds)
+ * 4. `collapsing` — grid mass lerps to zero, meshes fade out (COLLAPSE_DURATION seconds)
+ * 5. `done`       — invisible, mass zeroed, `onDone` callback fired once
  *
  * @author guinetik
  * @date 2026-04-04
@@ -75,11 +93,20 @@ export class PortalWormhole implements Tickable {
   /** Outer additive-blended glow sphere. */
   private readonly glowMesh: THREE.Mesh
 
+  /** Tron hologram material on the body mesh — needs `uTime` synced every frame. */
+  private readonly bodyMat: THREE.ShaderMaterial
+
+  /** Tron hologram material on the glow mesh — needs `uTime` synced every frame. */
+  private readonly glowMat: THREE.ShaderMaterial
+
   /** Current lifecycle state. */
   private currentState: WormholeState = 'idle'
 
   /** Elapsed time within the current phase. */
   private phaseTimer = 0
+
+  /** Accumulated scene time for tron shader animation. */
+  private elapsedTime = 0
 
   /** Fired once when summoning ends and shuttle should receive velocity. */
   onEject: (() => void) | null = null
@@ -89,29 +116,32 @@ export class PortalWormhole implements Tickable {
   /**
    * @param position - World position of the portal center.
    * @param grid     - SpaceTimeGrid (or stub) that accepts gravity sources.
+   * @param radius   - Core sphere radius in world units. Defaults to {@link WORMHOLE_RADIUS}.
+   *                   Pass a planet-scale value (e.g. `displayRadius * SIZE_SCALE`) to match
+   *                   a specific body's apparent size in the scene.
    */
-  constructor(position: THREE.Vector3, grid: GridSource) {
-    // Body sphere — small bright core
-    const bodyGeo = new THREE.SphereGeometry(WORMHOLE_RADIUS, 24, 24)
-    const bodyMat = new THREE.MeshBasicMaterial({
-      color: GLOW_COLOR,
-      transparent: true,
-      opacity: 0.8,
+  constructor(position: THREE.Vector3, grid: GridSource, radius = WORMHOLE_RADIUS) {
+    // Body sphere — tron hologram portal surface
+    const bodyGeo = new THREE.SphereGeometry(radius, 32, 32)
+    this.bodyMat = createTronHologramMaterial({
+      color: PORTAL_COLOR,
+      gridTint: PORTAL_GRID_TINT,
+      colorGain: 1.4,
+      alphaGain: BODY_ALPHA_GAIN,
     })
-    this.bodyMesh = new THREE.Mesh(bodyGeo, bodyMat)
+    this.bodyMesh = new THREE.Mesh(bodyGeo, this.bodyMat)
     this.group.add(this.bodyMesh)
 
-    // Glow sphere — larger, additive blended
-    const glowRadius = WORMHOLE_RADIUS * GLOW_SCALE
+    // Glow sphere — softer outer halo using the same tron shader
+    const glowRadius = radius * GLOW_SCALE
     const glowGeo = new THREE.SphereGeometry(glowRadius, 24, 24)
-    const glowMat = new THREE.MeshBasicMaterial({
-      color: GLOW_COLOR,
-      transparent: true,
-      opacity: GLOW_OPACITY,
-      blending: THREE.AdditiveBlending,
-      side: THREE.BackSide,
+    this.glowMat = createTronHologramMaterial({
+      color: PORTAL_COLOR,
+      gridTint: PORTAL_GRID_TINT,
+      colorGain: 0.6,
+      alphaGain: GLOW_ALPHA_GAIN,
     })
-    this.glowMesh = new THREE.Mesh(glowGeo, glowMat)
+    this.glowMesh = new THREE.Mesh(glowGeo, this.glowMat)
     this.group.add(this.glowMesh)
 
     this.group.position.copy(position)
@@ -138,10 +168,31 @@ export class PortalWormhole implements Tickable {
   }
 
   /**
+   * Make the wormhole visible and animate it scaling in from zero.
+   * Transitions to `idle` once the reveal completes.
+   * No-op if already past the `idle` state (i.e. eject has been called).
+   */
+  reveal(): void {
+    if (this.currentState !== 'idle') return
+    this.group.visible = true
+    this.group.scale.setScalar(0)
+    this.currentState = 'revealing'
+    this.phaseTimer = 0
+  }
+
+  /**
    * Trigger the ejection pulse → collapse sequence.
-   * No-op if not in `idle` state.
+   * If called while still in the `revealing` animation, snaps reveal to
+   * completion so the portal is always fully visible when the pulse fires.
+   * No-op if past `idle` (already summoning/ejecting/collapsing).
    */
   eject(): void {
+    if (this.currentState === 'revealing') {
+      // Snap reveal to completion
+      this.group.scale.setScalar(1)
+      this.currentState = 'idle'
+      this.phaseTimer = 0
+    }
     if (this.currentState !== 'idle') return
     this.currentState = 'summoning'
     this.phaseTimer = 0
@@ -152,11 +203,22 @@ export class PortalWormhole implements Tickable {
    * @param dt - Delta time in seconds since last frame.
    */
   tick(dt: number): void {
-    if (this.currentState === 'idle' || this.currentState === 'done') return
+    if (this.currentState === 'done') return
+
+    // Advance and sync shader time for scan / grid animations
+    this.elapsedTime += dt
+    syncTronHologramTimeSeconds([this.bodyMat, this.glowMat], this.elapsedTime)
+
+    // Spin the whole group while active
+    this.group.rotation.y += SPIN_SPEED * dt
+
+    if (this.currentState === 'idle') return
 
     this.phaseTimer += dt
 
-    if (this.currentState === 'summoning') {
+    if (this.currentState === 'revealing') {
+      this.tickRevealing()
+    } else if (this.currentState === 'summoning') {
       this.tickSummoning()
     } else if (this.currentState === 'ejecting') {
       this.tickEjecting()
@@ -171,9 +233,22 @@ export class PortalWormhole implements Tickable {
    */
   dispose(): void {
     this.bodyMesh.geometry.dispose()
-    ;(this.bodyMesh.material as THREE.MeshBasicMaterial).dispose()
+    this.bodyMat.dispose()
     this.glowMesh.geometry.dispose()
-    ;(this.glowMesh.material as THREE.MeshBasicMaterial).dispose()
+    this.glowMat.dispose()
+  }
+
+  /** Scale the group from 0 → 1 with an ease-out curve, then enter idle. */
+  private tickRevealing(): void {
+    const t = Math.min(this.phaseTimer / REVEAL_DURATION, 1)
+    const scale = 1 - (1 - t) * (1 - t)   // ease-out quad
+    this.group.scale.setScalar(scale)
+
+    if (t >= 1) {
+      this.group.scale.setScalar(1)
+      this.currentState = 'idle'
+      this.phaseTimer = 0
+    }
   }
 
   /** Hold the shuttle at the portal for a brief summoning moment. */
@@ -200,18 +275,17 @@ export class PortalWormhole implements Tickable {
     }
   }
 
-  /** Lerp grid mass to zero, fade meshes, then fire onDone. */
+  /** Lerp grid mass to zero, fade meshes via alphaGain, then fire onDone. */
   private tickCollapsing(): void {
     const t = Math.min(this.phaseTimer / COLLAPSE_DURATION, 1)
+    const remaining = 1 - t
 
     // Lerp grid mass toward zero
-    this.gridSource.mass = this.initialMass * (1 - t)
+    this.gridSource.mass = this.initialMass * remaining
 
-    // Fade glow and body opacity
-    const bodyMat = this.bodyMesh.material as THREE.MeshBasicMaterial
-    const glowMat = this.glowMesh.material as THREE.MeshBasicMaterial
-    bodyMat.opacity = 0.8 * (1 - t)
-    glowMat.opacity = GLOW_OPACITY * (1 - t)
+    // Fade tron shaders via alphaGain uniform
+    this.bodyMat.uniforms['uAlphaGain']!.value = BODY_ALPHA_GAIN * remaining
+    this.glowMat.uniforms['uAlphaGain']!.value = GLOW_ALPHA_GAIN * remaining
 
     // Shrink meshes
     const scale = 1 - t * 0.8

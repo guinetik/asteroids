@@ -116,10 +116,12 @@ function createIndicatorSprite(name: string, accentColor: string): {
 
 /**
  * Moon orbit semi-major axis scale factor.
- * Moon orbits in the JSON are in the same pixel units as planet displayRadii,
- * so they scale with SIZE_SCALE and are divided by this to fit the scene.
+ * Formula: (semiMajorAxis × SIZE_SCALE) / MOON_ORBIT_SCALE_DIVISOR = world-space orbit radius.
+ * Must be small enough that the innermost moon of each gas giant clears its parent's mesh.
+ * Binding constraint: Saturn Mimas (semiMajorAxis=14, Saturn r≈5.8): D < 192.
+ * At D=150 all moons orbit between 1.3–3× their parent's display radius.
  */
-const MOON_ORBIT_SCALE_DIVISOR = 350
+const MOON_ORBIT_SCALE_DIVISOR = 150
 
 /** Internal moon tracking. */
 interface MoonEntry {

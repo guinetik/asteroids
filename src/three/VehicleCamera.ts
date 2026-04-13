@@ -133,6 +133,34 @@ export const MAP_ORBIT_CAMERA_CONFIG: VehicleCameraConfig = {
 }
 
 /**
+ * Portal arrival — static cinematic phase.
+ * Camera is parked at a fixed world position via {@link VehicleCamera.parkAt},
+ * so `idleOffset` / `lerpSpeed` are unused. No `maxDistance` so OrbitControls
+ * does not clamp the camera into the wormhole when `controls.update()` runs.
+ */
+export const MAP_PORTAL_CINEMATIC_CAMERA_CONFIG: VehicleCameraConfig = {
+  idleOffset: new THREE.Vector3(0, 1, 0),
+  lerpSpeed: 1,
+  idleTimeout: 999,
+  minY: -Infinity,
+  fov: 55,
+}
+
+/**
+ * Portal arrival — descent phase. Tight third-person shot slightly behind and
+ * above the ship as it drops from wormhole height to Y=0.
+ * Switched to {@link MAP_ORBIT_CAMERA_CONFIG} once the ship docks.
+ */
+export const MAP_PORTAL_ARRIVAL_CAMERA_CONFIG: VehicleCameraConfig = {
+  idleOffset: new THREE.Vector3(-1.5, 1.5, 0),
+  lerpSpeed: 1.5,
+  idleTimeout: 999,
+  minY: -Infinity,
+  fov: 42,
+  maxDistance: 6,
+}
+
+/**
  * 3rd-person camera that tracks a vehicle with orbit controls.
  * Manual orbit is kept until the player stops dragging for {@link VehicleCameraConfig.idleTimeout}
  * seconds, then the camera eases to the default chase offset. When {@link setShipYawCoupling} is
@@ -195,6 +223,21 @@ export class VehicleCamera implements Tickable {
     const idleOffset = this.config.idleOffset.clone().applyQuaternion(object.quaternion)
     this.camera.position.copy(object.position).add(idleOffset)
     this.camera.position.y = Math.max(this.camera.position.y, this.config.minY)
+  }
+
+  /**
+   * Park the camera at a fixed world position looking at a fixed target.
+   * Clears the tracked vehicle so the camera does not follow anything.
+   * Call {@link setTarget} to resume vehicle tracking.
+   *
+   * @param cameraPos - World position for the camera.
+   * @param lookAt - World position the camera looks toward.
+   */
+  parkAt(cameraPos: THREE.Vector3, lookAt: THREE.Vector3): void {
+    this.target = null
+    this.camera.position.copy(cameraPos)
+    this.controls.target.copy(lookAt)
+    this.controls.update()
   }
 
   /** Update aspect ratio on resize. */

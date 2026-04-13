@@ -4,6 +4,7 @@ import { PLANETS, SUN } from '@/lib/planets/catalog'
 import type { GravityConfig } from '@/lib/physics/gravity'
 import { influenceRadius, eventHorizonRadius } from '@/lib/physics/gravity'
 import { TICK_PRIORITY_INPUT, TICK_PRIORITY_RENDER } from '@/lib/tickPriorities'
+import { SIZE_SCALE } from '@/lib/planets/constants'
 
 /** Tick priority for the compositor (runs after animation, before render). */
 export const TICK_PRIORITY_COMPOSIT = TICK_PRIORITY_RENDER - 1
@@ -87,6 +88,27 @@ export const WAYPOINT_APPARENT_SIZE = 0.175
 
 /** Offset behind Earth so the shuttle does not overlap the planet mesh. */
 export const SPAWN_OFFSET_BEHIND_EARTH = 7.5
+
+/** Y height above the map plane where the portal wormhole spawns during a portal arrival. */
+export const PORTAL_ARRIVAL_WORMHOLE_Y = 1.5
+
+/**
+ * Wormhole core sphere radius for map-view portal arrivals, matched to Earth's apparent size.
+ */
+export const PORTAL_WORMHOLE_RADIUS =
+  (PLANETS.find((p) => p.id === 'earth')?.displayRadius ?? 0.0077) * SIZE_SCALE * 0.5
+
+/**
+ * Seconds the camera holds on Earth alone before the wormhole becomes visible.
+ * Gives players a moment to orient before the portal appears.
+ */
+export const PORTAL_EARTH_HOLD_DURATION = 0.5
+
+/**
+ * Seconds the wormhole is visible and stable before the eject pulse fires.
+ * Camera stays on the wide static shot so players can see the portal opening.
+ */
+export const PORTAL_WORMHOLE_VIEW_DURATION = 1
 
 /** How much grid slope affects shuttle speed. */
 export const CURVATURE_SPEED_FACTOR = 0.3
@@ -231,11 +253,18 @@ export const MAP_INTRO_CAMERA_START_FOV = 32
 export const MAP_INTRO_ENCELADUS_CAMERA_OFFSET = new THREE.Vector3(0.4, 0.3, 0.8)
 export const MAP_INTRO_ENCELADUS_FOV = 28
 
-/** Jupiter intro framing. */
-export const MAP_INTRO_JUPITER_CAMERA_OFFSET = new THREE.Vector3(3, 4, 10)
-export const MAP_INTRO_JUPITER_CLOSE_OFFSET = new THREE.Vector3(2.85, 2.55, 7.4)
-export const MAP_INTRO_JUPITER_FOV = 40
-export const MAP_INTRO_JUPITER_CITY_FOV = 40
+/**
+ * Jupiter intro framing.
+ * Jupiter world-radius ≈ 0.0863 × SIZE_SCALE(80) ≈ 6.9 units.
+ * Galilean moons orbit up to semiMajorAxis = 28 world units from Jupiter.
+ * Reveal shot: camera ~95 units out so all four moons fit inside a 48° FOV
+ *   (visible half-width = 95 × tan(24°) ≈ 42 units > Callisto at 28).
+ * City shot: zooms in closer, framing Jupiter's north pole + rising city.
+ */
+export const MAP_INTRO_JUPITER_CAMERA_OFFSET = new THREE.Vector3(15, 25, 90)
+export const MAP_INTRO_JUPITER_CLOSE_OFFSET = new THREE.Vector3(16, 6, 68)
+export const MAP_INTRO_JUPITER_FOV = 48
+export const MAP_INTRO_JUPITER_CITY_FOV = 38
 
 /** Existing hero shuttle framing used during the intro. */
 export const MAP_INTRO_HERO_OFFSET = new THREE.Vector3(-24, 6, 14)
@@ -246,17 +275,26 @@ export const MAP_INTRO_HERO_FOV = 42
 export const INTRO_VIRUS_YAW_SPEED = 0.3
 export const INTRO_CITY_YAW_SPEED = 0.2
 
-/** Cloud city Y positions for the rise-from-atmosphere beat. */
-export const INTRO_CITY_START_Y_BASE = 1.0
-export const INTRO_CITY_END_Y_BASE = 1.6
+/**
+ * Cloud city Y positions for the rise-from-atmosphere beat.
+ * Jupiter mesh radius ≈ 6.9 world units, so positions must exceed that.
+ * The city starts just above the north pole and rises to a clear viewing height.
+ */
+export const INTRO_CITY_START_Y_BASE = 1
+export const INTRO_CITY_END_Y_BASE = 5
 export const INTRO_CITY_Y_LOWER = 0.6
 export const INTRO_CITY_START_Y = INTRO_CITY_START_Y_BASE - INTRO_CITY_Y_LOWER
 export const INTRO_CITY_END_Y = INTRO_CITY_END_Y_BASE - INTRO_CITY_Y_LOWER
 
-/** Cloud city intro model tuning. */
+/**
+ * Cloud city intro model tuning.
+ * At camera distance ≈ 70 units, scale must be ~2–3 world units to be clearly visible.
+ * INTRO_CITY_MODEL_BASE_SCALE × INTRO_CITY_MODEL_SIZE_MULTIPLIER = world-space size.
+ */
 export const INTRO_CITY_MODEL_BASE_SCALE = 0.05
-export const INTRO_CITY_MODEL_SIZE_MULTIPLIER = 3
-export const INTRO_CITY_CAMERA_LOOK_DROP = 0.24
+export const INTRO_CITY_MODEL_SIZE_MULTIPLIER = 15
+/** How far below the city's Y the camera look-target sits, framing city above Jupiter's limb. */
+export const INTRO_CITY_CAMERA_LOOK_DROP = 5.5
 
 /** Enceladus is the second moon of Saturn in the catalog. */
 export const ENCELADUS_MOON_INDEX = 1
@@ -377,6 +415,10 @@ export const MAP_VIEW_CONTROLLER_CONFIG = {
   SLINGSHOT_CHARGE_TIME,
   SLINGSHOT_SPEED_OVERRIDES,
   SPAWN_OFFSET_BEHIND_EARTH,
+  PORTAL_ARRIVAL_WORMHOLE_Y,
+  PORTAL_EARTH_HOLD_DURATION,
+  PORTAL_WORMHOLE_RADIUS,
+  PORTAL_WORMHOLE_VIEW_DURATION,
   STARTER_LANDER_FUEL_CELL_COUNT,
   STARTER_SHUTTLE_FUEL_CELL_COUNT,
   SURF_TETHER_ANCHOR_COLOR,

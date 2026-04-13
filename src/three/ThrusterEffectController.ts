@@ -19,6 +19,7 @@ import { getIdleThrusterSpritePulse } from './idleThrusterSpritePulse'
 import { resolveThrusterEffectState } from './thrusterEffectState'
 import { useAudio } from '@/audio/useAudio'
 import { ShuttleThrusterSound } from '@/audio/ShuttleThrusterSound'
+import { InertialDampenerSound } from '@/audio/InertialDampenerSound'
 
 const THRUST_SPAWN_RATE = 800
 const BRAKE_SPAWN_RATE = 600
@@ -72,6 +73,8 @@ export class ThrusterEffectController implements Tickable {
   private prevRcsActive = false
   private readonly shuttle: ShuttleController
   private readonly thrusterSound = new ShuttleThrusterSound()
+  private readonly inertialDampenerSound = new InertialDampenerSound()
+  private brakeInitialVelocity = 0
 
   /** When false, no audio is played or stopped (e.g. while inside the habitat). */
   private _audioEnabled = true
@@ -162,6 +165,8 @@ export class ThrusterEffectController implements Tickable {
     if (!enabled) {
       this._stopThrusterSound()
       this.thrusterSound.stop()
+      this.inertialDampenerSound.stop()
+      this.brakeInitialVelocity = 0
     }
   }
 
@@ -217,8 +222,18 @@ export class ThrusterEffectController implements Tickable {
       }
 
       if (effectState.emitBrake && !this.prevBraking) {
-        audio.play('sfx.brake')
+        this.brakeInitialVelocity = Math.max(this.shuttle.speed, 0.001)
       }
+
+      this.inertialDampenerSound.update(
+        {
+          currentVelocity: this.shuttle.speed,
+          initialVelocity: this.brakeInitialVelocity,
+          dampenerActive: effectState.emitBrake,
+          sfxVolume: audio.getCategoryVolume('sfx'),
+        },
+        dt,
+      )
 
       this.thrusterSound.update(
         {
@@ -236,9 +251,11 @@ export class ThrusterEffectController implements Tickable {
     } else {
       this._stopThrusterSound()
       this.thrusterSound.stop()
+      this.inertialDampenerSound.stop()
       this.prevThrusting = false
       this.prevBraking = false
       this.prevRcsActive = false
+      this.brakeInitialVelocity = 0
     }
 
     if (effectState.emitThrust) {
@@ -303,6 +320,7 @@ export class ThrusterEffectController implements Tickable {
   dispose(): void {
     this._stopThrusterSound()
     this.thrusterSound.dispose()
+    this.inertialDampenerSound.dispose()
     for (const sprite of this.idleThrusterSprites) {
       this.shuttle.group.remove(sprite)
       ;(sprite.material as THREE.SpriteMaterial).map?.dispose()

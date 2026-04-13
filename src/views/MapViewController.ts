@@ -49,6 +49,8 @@ import {
   MAP_CAMERA_CONFIG,
   MAP_ORBIT_CAMERA_CONFIG,
   MAP_INSPECT_CAMERA_CONFIG,
+  MAP_PORTAL_ARRIVAL_CAMERA_CONFIG,
+  MAP_PORTAL_CINEMATIC_CAMERA_CONFIG,
 } from '@/three/VehicleCamera'
 import { buildSlingshotChargeCameraConfig } from '@/three/slingshotChargeCamera'
 import orbitConfig from '@/data/shuttle/orbit-capture.json'
@@ -256,6 +258,8 @@ export class MapViewController implements Tickable {
   private shipHealthConfig: ShipHealthConfig | null = null
   private mapState = new MapState()
   private mapIntro = new MapIntroState()
+  /** When true, {@link tickOrrery} skips simTime advancement and planet/belt ticks. Set during portal arrival so Earth stays static. */
+  private simFrozen = false
 
   /**
    * After {@link beginStartupIntro} starts the cinematic, the next `cinematic_zoom` → `interactive`
@@ -425,6 +429,18 @@ export class MapViewController implements Tickable {
   /** Called when the player begins an asteroid mission (E at waypoint). */
   onBeginAsteroidMission: ((mission: GeneratedAsteroidMission) => void) | null = null
 
+  /**
+   * Called after a portal arrival docks to Earth orbit. Vue should show the
+   * {@link PortalWelcomeDialog} at this point. The player's choice is forwarded
+   * back via {@link portalWatchIntro} or {@link portalSkipIntro}.
+   */
+  onPortalWelcome: (() => void) | null = null
+
+  /** True if the current session was entered via a Vibe Jam portal URL. */
+  get isPortalArrival(): boolean {
+    return this.portalArrival?.isArrival ?? false
+  }
+
   private get orbitSystem(): OrbitCaptureSystem | null {
     return this.orbitFacade.system
   }
@@ -474,7 +490,15 @@ export class MapViewController implements Tickable {
     this.inputManager = new InputManager(DEFAULT_BINDINGS)
     hydratePlayerUpgradeLevelsFromStorage()
     const storedProfile = typeof localStorage === 'undefined' ? null : loadProfile()
-    this.playerProfile = storedProfile ?? createProfile('Pilot')
+    if (storedProfile) {
+      this.playerProfile = storedProfile
+    } else {
+      // No saved profile — check for portal arrival to seed the player name.
+      // If ?portal=true&username=Racer is present, use "Racer"; otherwise default to "Pilot".
+      const portalParams = new VibePortal()
+      const portalName = portalParams.arrival.username?.trim() || 'Pilot'
+      this.playerProfile = createProfile(portalName)
+    }
     const emptyHold = this.createInventoryForCurrentCargoBayLevel()
     const savedInventory = typeof localStorage === 'undefined' ? null : loadInventory()
     this.playerInventory = savedInventory
@@ -664,6 +688,52 @@ export class MapViewController implements Tickable {
 
     // Portal arrival, completed-mission return at waypoint, or default Earth orbit
     this.portalArrival = new PortalArrivalSequence()
+
+    // Freeze the orrery now so Earth stays at its current position during the portal animation.
+    if (this.portalArrival.isArrival && earthController) {
+      this.simFrozen = true
+      const ex = earthController.getWorldX()
+      const ez = earthController.getWorldZ()
+      const wy = MAP_CONFIG.PORTAL_ARRIVAL_WORMHOLE_Y
+
+      // ── Static cinematic camera ─────────────────────────────────────────
+      // Use MAP_PORTAL_CINEMATIC_CAMERA_CONFIG (no maxDistance) so OrbitControls
+      // does NOT clamp the parked camera into the wormhole. Camera sits to the
+      // side framing both Earth (y=0) and the wormhole (y=wy) in one shot.
+      if (this.vehicleCamera) {
+        this.vehicleCamera.setConfig(MAP_PORTAL_CINEMATIC_CAMERA_CONFIG)
+        // Look at the exact midpoint between Earth (y=0) and the portal (y=wy).
+        // Camera is offset to the side and slightly above the midpoint so both
+        // bodies sit comfortably inside the frame.
+        const mid = wy * 0.5
+        this.vehicleCamera.parkAt(
+          new THREE.Vector3(ex + wy * 1.8, mid, ez + wy * 1.2),
+          new THREE.Vector3(ex, mid, ez),
+        )
+      }
+
+      // ── Descent callback: eject pulse fired → camera follows ship down ──
+      this.portalArrival.onDescentStart = () => {
+        if (!this.shuttleController || !this.vehicleCamera) return
+        // Reveal ship as it exits the portal
+        this.shuttleController.group.visible = true
+        this.vehicleCamera.setConfig(MAP_PORTAL_ARRIVAL_CAMERA_CONFIG)
+        this.vehicleCamera.setTarget(this.shuttleController.group)
+      }
+
+      // ── Complete callback: ship docked → resume sim + orbit + welcome ───
+      this.portalArrival.onComplete = () => {
+        this.simFrozen = false
+        if (!this.shuttleController) return
+        this.orbitFacade.beginForcedOrbit(ex, ez, {
+          shuttleController: this.shuttleController,
+          vehicleCamera: this.vehicleCamera,
+          sceneVisuals: this.sceneVisuals,
+        })
+        this.onPortalWelcome?.()
+      }
+    }
+
     const arrived = this.portalArrival.tryArrive(
       this.shuttleController,
       this.spaceTimeGrid,
@@ -674,7 +744,53 @@ export class MapViewController implements Tickable {
         unregisterTick: (t) => this.tickHandler!.unregister(t),
       },
       TICK_PRIORITY_ANIMATION,
+      earthController
+        ? {
+            // Offset XZ by SPAWN_OFFSET_BEHIND_EARTH so the ship descends
+            // beside Earth rather than straight through the planet mesh.
+            anchorPos: new THREE.Vector3(
+              earthController.getWorldX(),
+              MAP_CONFIG.PORTAL_ARRIVAL_WORMHOLE_Y,
+              earthController.getWorldZ(),
+            ),
+            radius: MAP_CONFIG.PORTAL_WORMHOLE_RADIUS,
+            // Caller drives the cinematic timing: Earth alone → portal → ship
+            manualEject: true,
+          }
+        : undefined,
     )
+
+    // Cinematic timer: drives the 3-phase portal arrival sequence so each
+    // beat has enough screen time before the next phase begins.
+    //   Phase 0 (PORTAL_EARTH_HOLD_DURATION s): Earth alone, wormhole hidden
+    //   Phase 1 (PORTAL_WORMHOLE_VIEW_DURATION s): wormhole revealed, ship hidden
+    //   Phase 2: eject() called → summon pulse → onDescentStart → descent
+    if (arrived) {
+      // Ship and wormhole start hidden — revealed phase by phase
+      this.shuttleController.group.visible = false
+      const portalArrival = this.portalArrival!
+      portalArrival.setWormholeVisible(false)
+
+      let phaseTimer = 0
+      let phaseIndex = 0
+
+      const cinematicTimerTickable: Tickable = {
+        tick: (dt: number) => {
+          phaseTimer += dt
+          if (phaseIndex === 0 && phaseTimer >= MAP_CONFIG.PORTAL_EARTH_HOLD_DURATION) {
+            // Reveal the wormhole — players see it open above Earth
+            portalArrival.setWormholeVisible(true)
+            phaseTimer = 0
+            phaseIndex = 1
+          } else if (phaseIndex === 1 && phaseTimer >= MAP_CONFIG.PORTAL_WORMHOLE_VIEW_DURATION) {
+            // Begin eject sequence — ship will emerge and descend
+            portalArrival.eject()
+            this.tickHandler!.unregister(cinematicTimerTickable)
+          }
+        },
+      }
+      this.tickHandler.register(cinematicTimerTickable, TICK_PRIORITY_ANIMATION)
+    }
     let usedMissionCompletionMapSpawn = false
     if (!arrived) {
       const pendingReturn = consumePendingMapReturnWorld()
@@ -702,8 +818,13 @@ export class MapViewController implements Tickable {
         this.beginStartupIntro()
       }
     } else if (!usedMissionCompletionMapSpawn) {
-      this.mapIntro.skip()
-      this.emitIntroUiState()
+      // Portal arrival — intro decision is deferred to the welcome dialog (onPortalWelcome).
+      // Keep controls locked (mapIntro stays in 'inactive') until the player chooses.
+      // Non-portal arrivals that somehow land here just skip normally (shouldn't happen).
+      if (!arrived) {
+        this.mapIntro.skip()
+        this.emitIntroUiState()
+      }
     }
     this.resetWorldLineHistory()
 
@@ -1153,7 +1274,7 @@ export class MapViewController implements Tickable {
     }
 
     // Adrift check — 60s with no fuel in free flight = game over
-    if (this.shuttleController && !this.shuttleController.dead) {
+    if (this.shuttleController && !this.shuttleController.dead && !this.simFrozen) {
       const orbitState = this.orbitSystem?.state ?? 'free'
       const hasFuel = this.shuttleController.thrusterSystem.fuelLevel > 0
       if (orbitState === 'free' && !hasFuel) {
@@ -1167,7 +1288,7 @@ export class MapViewController implements Tickable {
     }
 
     // Ship health — temperature drift + radiation/temp damage
-    if (this.shipHealth && this.shuttleController && !this.shuttleController.dead) {
+    if (this.shipHealth && this.shuttleController && !this.shuttleController.dead && !this.simFrozen) {
       const orbitState = this.orbitSystem?.state ?? 'free'
       const px = this.shuttleController.position.x
       const pz = this.shuttleController.position.z
@@ -1203,7 +1324,7 @@ export class MapViewController implements Tickable {
     }
 
     // Planet collision — instant death if shuttle flies into a planet mesh
-    if (this.shuttleController && !this.shuttleController.dead) {
+    if (this.shuttleController && !this.shuttleController.dead && !this.simFrozen) {
       const orbitState = this.orbitSystem?.state ?? 'free'
       if (orbitState === 'free') {
         const px = this.shuttleController.position.x
@@ -1224,10 +1345,10 @@ export class MapViewController implements Tickable {
     }
 
     // Gravity proximity — VFX distortion + HUD warning
-    // Only active in free flight (not during orbit capture)
+    // Only active in free flight (not during orbit capture or portal arrival)
     if (this.shuttleController && this.gravityPass) {
       const orbitState = this.orbitSystem?.state ?? 'free'
-      if (orbitState === 'free' && !this.shuttleController.dead) {
+      if (orbitState === 'free' && !this.shuttleController.dead && !this.simFrozen) {
         const px = this.shuttleController.position.x
         const pz = this.shuttleController.position.z
         let maxProximity = 0
@@ -1341,6 +1462,10 @@ export class MapViewController implements Tickable {
       }
       return
     }
+
+    // Portal arrival freezes the orrery so Earth stays at a fixed position
+    // for the wormhole spawn. Resumed by the portal onComplete callback.
+    if (this.simFrozen) return
 
     this.simTime += dt * DEFAULT_TIME_SCALE
 
@@ -1549,6 +1674,27 @@ export class MapViewController implements Tickable {
    * Compute gravity proximity for a single source (0 = at influence edge, 1 = at event horizon).
    * Returns 0 if outside influence radius.
    */
+  /**
+   * Called by Vue when the player chooses to watch the intro from the portal welcome dialog.
+   * Triggers the full opening cinematic. No-op if the intro has already been seen.
+   */
+  portalWatchIntro(): void {
+    this.messageFacade.notifyMapStartEarthOrbit(this.onMessageUpdate)
+    this.beginStartupIntro()
+  }
+
+  /**
+   * Called by Vue when the player skips the intro from the portal welcome dialog.
+   * Unlocks controls, marks the intro as seen, and queues the Marta welcome
+   * message so the player receives it regardless of whether they watched the cinematic.
+   */
+  portalSkipIntro(): void {
+    this.messageFacade.notifyMapStartEarthOrbit(this.onMessageUpdate)
+    this.markMapIntroSeenAndSyncProfile()
+    this.mapIntro.skip()
+    this.emitIntroUiState()
+  }
+
   /** Reset shuttle after death — clear death state, place into Earth orbit. */
   /** Called by Vue when the player clicks Restart on the death overlay. */
   restart(): void {

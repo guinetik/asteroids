@@ -26,12 +26,12 @@ body {
 
 /* Map shuttle + FPS: top-center “position / motion” stack */
 .hud-top-cluster {
-  @apply absolute top-4 left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-0.5 text-center;
+  @apply absolute top-1 left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-0.5 text-center;
 }
 
 .hud-top-cluster__readout {
   @apply text-green-400 whitespace-nowrap;
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   letter-spacing: 0.06em;
   text-shadow: 0 0 4px rgba(0, 255, 0, 0.4);
 }
@@ -63,7 +63,13 @@ body {
   background: rgba(0, 0, 0, 0.45);
   border: 1px solid rgba(255, 255, 255, 0.12);
   mask-image: linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 12%,
+    black 88%,
+    transparent 100%
+  );
 }
 
 .shuttle-compass__marker {
@@ -632,8 +638,8 @@ body {
 }
 
 .map-screen-nav__btn {
-  @apply rounded border px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest transition-colors
-         sm:px-3.5 sm:text-xs;
+  @apply rounded border px-2 py-1.5 text-[10px] font-mono uppercase tracking-widest transition-colors
+         sm:px-2.5 sm:text-xs;
 }
 
 .map-screen-nav__btn--habitat {
@@ -873,11 +879,7 @@ body {
 .shuttle-mail-program__list::-webkit-scrollbar-thumb,
 .shuttle-mail-program__reader::-webkit-scrollbar-thumb {
   border-radius: 2px;
-  background: linear-gradient(
-    180deg,
-    rgba(34, 211, 238, 0.38) 0%,
-    rgba(6, 182, 212, 0.22) 100%
-  );
+  background: linear-gradient(180deg, rgba(34, 211, 238, 0.38) 0%, rgba(6, 182, 212, 0.22) 100%);
   box-shadow:
     0 0 8px rgba(34, 211, 238, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
@@ -888,11 +890,7 @@ body {
 .shuttle-control-content--programs::-webkit-scrollbar-thumb:hover,
 .shuttle-mail-program__list::-webkit-scrollbar-thumb:hover,
 .shuttle-mail-program__reader::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(
-    180deg,
-    rgba(34, 211, 238, 0.55) 0%,
-    rgba(6, 182, 212, 0.38) 100%
-  );
+  background: linear-gradient(180deg, rgba(34, 211, 238, 0.55) 0%, rgba(6, 182, 212, 0.38) 100%);
 }
 
 /* ShipNet mail — Outlook-style folder + list + reader (shuttle terminal) */
@@ -1634,12 +1632,25 @@ body {
   }
 }
 
-/* Credits Badge HUD — bottom-left so top-center toasts / mail notice stay clear. */
+/* Achievements button — sits below the credits badge, flush to bottom-left corner. */
+.achievements-badge-btn {
+  @apply fixed bottom-4 left-4 z-30
+         rounded-lg border px-3 py-1.5
+         font-mono text-xs uppercase tracking-widest
+         cursor-pointer transition-colors;
+}
+
+/* Credits Badge HUD — sits just above the achievements button in the bottom-left corner. */
 .credits-badge {
-  @apply fixed bottom-4 left-4 z-30 flex items-center gap-2
+  @apply fixed bottom-[calc(1rem+40px)] left-4 z-30 flex items-center gap-2
          rounded-lg border border-cyan-400/30 bg-slate-950/80
          px-4 py-2 font-mono text-sm text-cyan-300 shadow-lg
          pointer-events-none;
+}
+
+/* Music toggle — sits above the credits badge in the bottom-left stack. */
+.music-toggle-btn {
+  @apply fixed bottom-[calc(1rem+88px)] left-4 z-30;
 }
 
 .credits-badge__icon {
@@ -2208,4 +2219,122 @@ body {
 .survey-probes {
   @apply font-mono text-sm tracking-wider text-cyan-400;
   font-family: 'Datatype', ui-monospace, monospace;
+}
+
+/* ── Portal Welcome Dialog ─────────────────────────────────────────────────── */
+
+.portal-welcome-backdrop {
+  @apply fixed inset-0 z-50 flex items-center justify-center px-4;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+}
+
+.portal-welcome-card {
+  @apply flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-cyan-400/30 bg-slate-950/95 text-slate-100 shadow-2xl;
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.08),
+    0 0 60px rgba(34, 211, 238, 0.08),
+    0 32px 64px rgba(0, 0, 0, 0.6);
+}
+
+.portal-welcome-card__chrome {
+  @apply flex items-center justify-between border-b border-white/10 bg-white/5 px-5 py-3 font-mono text-[11px] uppercase tracking-[0.28em] text-cyan-200/80;
+}
+
+.portal-welcome-card__chrome-status {
+  @apply flex items-center gap-2;
+}
+
+.portal-welcome-card__status-dot {
+  @apply inline-block h-1.5 w-1.5 rounded-full bg-cyan-400;
+  box-shadow: 0 0 6px rgba(34, 211, 238, 0.9);
+  animation: portal-status-pulse 2s ease-in-out infinite;
+}
+
+.portal-welcome-card__body {
+  @apply flex flex-col items-center px-8 py-10 text-center;
+}
+
+.portal-welcome-card__icon {
+  @apply mb-4 text-5xl text-cyan-400;
+  text-shadow: 0 0 24px rgba(34, 211, 238, 0.6);
+  animation: portal-icon-glow 3s ease-in-out infinite alternate;
+}
+
+.portal-welcome-card__title {
+  @apply mb-3 text-2xl font-semibold tracking-tight text-white;
+}
+
+.portal-welcome-card__name {
+  @apply text-cyan-300;
+  text-shadow: 0 0 12px rgba(34, 211, 238, 0.5);
+}
+
+.portal-welcome-card__subtitle {
+  @apply mb-2 text-sm leading-relaxed text-slate-400;
+}
+
+.portal-welcome-card__prompt {
+  @apply mt-4 mb-6 text-sm leading-relaxed text-slate-300;
+}
+
+.portal-welcome-card__actions {
+  @apply flex w-full flex-col gap-3 sm:flex-row sm:justify-center;
+}
+
+.portal-welcome-card__btn {
+  @apply rounded-xl px-6 py-3 font-mono text-xs uppercase tracking-[0.22em] transition-all cursor-pointer;
+}
+
+.portal-welcome-card__btn--primary {
+  @apply border border-cyan-300/40 bg-cyan-300/15 text-cyan-100 hover:border-cyan-200/60 hover:bg-cyan-200/25 hover:text-white;
+}
+
+.portal-welcome-card__btn--secondary {
+  @apply border border-slate-600/50 bg-slate-800/50 text-slate-400 hover:border-slate-500/70 hover:bg-slate-700/50 hover:text-slate-200;
+}
+
+.portal-welcome-card__footer {
+  @apply border-t border-white/10 px-6 py-3 text-center;
+}
+
+.portal-welcome-card__footer-hint {
+  @apply font-mono text-[10px] uppercase tracking-[0.24em] text-slate-600;
+}
+
+.portal-welcome-enter-active {
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.portal-welcome-leave-active {
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.portal-welcome-enter-from,
+.portal-welcome-leave-to {
+  opacity: 0;
+  transform: scale(0.96) translateY(8px);
+}
+
+@keyframes portal-status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes portal-icon-glow {
+  from {
+    text-shadow: 0 0 12px rgba(34, 211, 238, 0.4);
+  }
+  to {
+    text-shadow: 0 0 32px rgba(34, 211, 238, 0.9);
+  }
 }

@@ -15,6 +15,7 @@ import PlanetShopDialog from '@/components/shop/PlanetShopDialog.vue'
 import CreditsBadge from '@/components/hud/CreditsBadge.vue'
 import AchievementBanner from '@/components/AchievementBanner.vue'
 import AchievementsDialog from '@/components/AchievementsDialog.vue'
+import PortalWelcomeDialog from '@/components/PortalWelcomeDialog.vue'
 import type { ShuttleMissionBoard, ActiveShuttleMission } from '@/lib/missions/types'
 import MissionMiniGameOverlay from '@/components/MissionMiniGameOverlay.vue'
 import { PLANETS } from '@/lib/planets/catalog'
@@ -198,6 +199,16 @@ const habitatFadeOpacity = ref(0)
 const deathVisible = ref(false)
 const deathCause = ref('')
 const achievementsOpen = ref(false)
+const portalWelcomeVisible = ref(false)
+const portalWelcomeIsFirstVisit = ref(false)
+/**
+ * Hidden for portal arrivals until the welcome dialog is dismissed.
+ * Initialised from the URL at setup time (before any async init) so the
+ * UI never flashes on during the loading phase.
+ */
+const portalCinematicActive = ref(
+  new URLSearchParams(window.location.search).get('portal') === 'true',
+)
 const unlockedAchievementIds = ref<string[]>(loadUnlockedAchievementIds())
 const achievementBannerRef = ref<InstanceType<typeof AchievementBanner> | null>(null)
 const orbitsVisible = ref(true)
@@ -431,6 +442,10 @@ onMounted(async () => {
         mod.default.push('/level')
       })
     }
+    viewController.onPortalWelcome = () => {
+      portalWelcomeIsFirstVisit.value = !viewController.getPlayerProfileSnapshot().hasSeenIntro
+      portalWelcomeVisible.value = true
+    }
     setShipMessageFollowUpDeliveryListener(() => {
       refreshActiveMessage()
     })
@@ -450,6 +465,18 @@ onUnmounted(() => {
 
 function handleRestart() {
   viewController.restart()
+}
+
+function handlePortalWatchIntro(): void {
+  portalWelcomeVisible.value = false
+  portalCinematicActive.value = false
+  viewController.portalWatchIntro()
+}
+
+function handlePortalSkip(): void {
+  portalWelcomeVisible.value = false
+  portalCinematicActive.value = false
+  viewController.portalSkipIntro()
 }
 
 function handleToggleOrbits() {
@@ -615,6 +642,7 @@ function dockedPlanetId(): string | null {
   <p v-show="mapIntro.cinematicCaption" class="map-intro-cinematic-caption">
     {{ mapIntro.cinematicCaption }}
   </p>
+  <template v-if="!portalCinematicActive">
   <header
     v-show="
       !mapOverlay.visible &&
@@ -628,61 +656,8 @@ function dockedPlanetId(): string | null {
   >
     <div class="map-screen-nav__brand">
       <span class="map-screen-nav__title">{{ MAP_SCREEN_GAME_TITLE }}</span>
-      <button
-        type="button"
-        class="map-screen-nav__btn map-screen-nav__btn--achievements border-amber-300/55 text-amber-100 bg-amber-300/10 hover:bg-amber-300/18 hover:border-amber-200/80"
-        @click="achievementsOpen = true"
-      >
-        Achievements {{ unlockedAchievementIds.length }}
-      </button>
     </div>
     <div class="map-screen-nav__actions">
-      <button
-        type="button"
-        class="map-screen-nav__icon-btn"
-        :aria-label="musicEnabled ? 'Mute music' : 'Unmute music'"
-        :title="musicEnabled ? 'Mute music' : 'Unmute music'"
-        @click="handleToggleMusic"
-      >
-        <svg viewBox="0 0 24 24" class="map-screen-nav__icon" aria-hidden="true">
-          <path
-            d="M5 9v6h4l5 4V5L9 9H5Z"
-            fill="currentColor"
-          />
-          <path
-            v-if="musicEnabled"
-            d="M17 9.5a4 4 0 0 1 0 5"
-            fill="none"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-width="1.8"
-          />
-          <path
-            v-if="musicEnabled"
-            d="M19.5 7a7.5 7.5 0 0 1 0 10"
-            fill="none"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-width="1.8"
-          />
-          <path
-            v-if="!musicEnabled"
-            d="m17 8 4 8"
-            fill="none"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-width="2"
-          />
-          <path
-            v-if="!musicEnabled"
-            d="m21 8-4 8"
-            fill="none"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-width="2"
-          />
-        </svg>
-      </button>
       <button type="button" class="map-screen-nav__btn map-screen-nav__btn--habitat" @click="openHabitatFromMap">
         H Habitat
       </button>
@@ -881,6 +856,43 @@ function dockedPlanetId(): string | null {
     @close="achievementsOpen = false"
   />
   <AchievementBanner ref="achievementBannerRef" />
+  <button
+    v-show="
+      !mapOverlay.visible &&
+      !mapIntro.controlsLocked &&
+      !habitatActive &&
+      !earthStartupOrbitHudSuppressed
+    "
+    type="button"
+    class="music-toggle-btn map-screen-nav__icon-btn"
+    :aria-label="musicEnabled ? 'Mute music' : 'Unmute music'"
+    :title="musicEnabled ? 'Mute music' : 'Unmute music'"
+    @click="handleToggleMusic"
+  >
+    <svg viewBox="0 0 24 24" class="map-screen-nav__icon" aria-hidden="true">
+      <path d="M5 9v6h4l5 4V5L9 9H5Z" fill="currentColor" />
+      <path
+        v-if="musicEnabled"
+        d="M17 9.5a4 4 0 0 1 0 5"
+        fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"
+      />
+      <path
+        v-if="musicEnabled"
+        d="M19.5 7a7.5 7.5 0 0 1 0 10"
+        fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"
+      />
+      <path
+        v-if="!musicEnabled"
+        d="m17 8 4 8"
+        fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"
+      />
+      <path
+        v-if="!musicEnabled"
+        d="m21 8-4 8"
+        fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"
+      />
+    </svg>
+  </button>
   <CreditsBadge
     v-show="
       !mapOverlay.visible &&
@@ -890,6 +902,19 @@ function dockedPlanetId(): string | null {
     "
     :credits="playerCredits"
   />
+  <button
+    v-show="
+      !mapOverlay.visible &&
+      !mapIntro.controlsLocked &&
+      !habitatActive &&
+      !earthStartupOrbitHudSuppressed
+    "
+    type="button"
+    class="achievements-badge-btn border-amber-300/55 text-amber-100 bg-amber-300/10 hover:bg-amber-300/18 hover:border-amber-200/80"
+    @click="achievementsOpen = true"
+  >
+    Achievements {{ unlockedAchievementIds.length }}
+  </button>
   <div v-if="missionNotification" class="mission-notification">
     {{ missionNotification }}
   </div>
@@ -927,5 +952,13 @@ function dockedPlanetId(): string | null {
     v-if="habitatFadeOpacity > 0"
     class="habitat-fade"
     :style="{ opacity: habitatFadeOpacity }"
+  />
+  </template>
+  <PortalWelcomeDialog
+    :visible="portalWelcomeVisible"
+    :player-name="playerProfileSnapshot.name"
+    :is-first-visit="portalWelcomeIsFirstVisit"
+    @watch-intro="handlePortalWatchIntro"
+    @skip="handlePortalSkip"
   />
 </template>
