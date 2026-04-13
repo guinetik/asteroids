@@ -318,10 +318,7 @@ export class OrbitalSurfingController {
   private tickDiving(dt: number, shuttle: ShuttleController, deps: OrbitalSurfingDeps): void {
     if (this.state.mode !== 'diving') return
 
-    // S key reverses direction
-    if (deps.inputManager?.wasActionPressed('brake')) {
-      this.state.direction *= -1
-    }
+    // No player input during diving — fully committed to the manifold
 
     // Tick thruster system for passive fuel drain
     shuttle.thrusterSystem.tick(
@@ -403,8 +400,8 @@ export class OrbitalSurfingController {
     if (nextElapsed >= this.state.duration) {
       const planetIndex = this.state.targetPlanetIndex
       this.state = { mode: 'free' }
-      shuttle.unfreeze()
-      shuttle.setInputEnabled(true)
+      // Don't unfreeze or re-enable input — onComplete fires beginForcedOrbit
+      // which takes over shuttle control for the orbiting state.
       shuttle.group.rotation.x = 0
       shuttle.group.rotation.z = 0
       this.onSurfEnd?.()
