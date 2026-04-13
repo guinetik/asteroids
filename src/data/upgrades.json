@@ -119,6 +119,17 @@
     "excludeFromMissionDifficulty": true
   },
   {
+    "id": "orbitalSurfing",
+    "category": "shuttle",
+    "label": "Orbital Surfing",
+    "description": "A viroid-origin dark lattice coupler lets you phase through the spacetime fabric — revealing ancient manifold highways along orbital paths.",
+    "baseCost": 0,
+    "maxLevel": 1,
+    "valuesByLevel": [0, 1],
+    "hiddenFromShop": true,
+    "excludeFromMissionDifficulty": true
+  },
+  {
     "id": "landerThrusterEfficiency",
     "category": "lander",
     "label": "Thruster Efficiency",
