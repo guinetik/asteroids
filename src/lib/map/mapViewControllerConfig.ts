@@ -164,7 +164,7 @@ export const GRAVITY_SURF_DECOUPLE_WAVE_FORWARD_OFFSET = 40
 export const ORBITAL_SURF_TUNNEL_DEPTH = 40
 
 /** Cruise speed multiplier on maxThrustSpeed for spline travel. */
-export const ORBITAL_SURF_CRUISE_SPEED_MULTIPLIER = 5
+export const ORBITAL_SURF_CRUISE_SPEED_MULTIPLIER = 40
 
 /** Seconds to dive from surface to tunnel depth (entry ramp). */
 export const ORBITAL_SURF_RAMP_DURATION_SEC = 1.2
@@ -182,16 +182,16 @@ export const ORBITAL_SURF_FUEL_MULTIPLIER = 3
 export const ORBITAL_SURF_SPLINE_SEGMENTS = 64
 
 /** Deep indigo base color for manifold wireframe lines. */
-export const ORBITAL_SURF_SPLINE_COLOR = 0x2a1a4e
+export const ORBITAL_SURF_SPLINE_COLOR = 0x4a3a8e
 
 /** Dim blue-violet edge glow for manifold lines. */
-export const ORBITAL_SURF_SPLINE_GLOW_COLOR = 0x4433aa
+export const ORBITAL_SURF_SPLINE_GLOW_COLOR = 0x7766dd
 
-/** Low opacity — ancient, dormant viroid infrastructure. */
-export const ORBITAL_SURF_SPLINE_OPACITY = 0.25
+/** Opacity for manifold lines — visible but ancient. */
+export const ORBITAL_SURF_SPLINE_OPACITY = 0.55
 
-/** Slow flicker speed for the manifold pulse — barely alive. */
-export const ORBITAL_SURF_PULSE_SPEED = 0.4
+/** Flicker speed for the manifold pulse — dormant but readable. */
+export const ORBITAL_SURF_PULSE_SPEED = 0.6
 
 /** Threshold where the whole space-time fabric is considered visible. */
 export const GRID_DEFORM_WHOLE_MAP_COVERAGE = 0.82
