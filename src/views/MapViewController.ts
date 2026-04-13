@@ -681,9 +681,12 @@ export class MapViewController implements Tickable {
       for (const belt of this.beltControllers) {
         belt.group.visible = false
       }
+      // Dark-sector bubble around the shuttle
+      this.shuttleEffects?.setManifoldSurfing(true)
     }
     this.orbitalSurfingController.onSurfEnd = () => {
       this.manifoldSpline?.hide()
+      this.shuttleEffects?.setManifoldSurfing(false)
       // Restore simulation and belt visibility
       this.simFrozen = false
       for (const belt of this.beltControllers) {

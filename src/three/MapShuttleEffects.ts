@@ -1,5 +1,6 @@
 import type { Tickable } from '@/lib/Tickable'
 import { GravitySurfEffectController } from '@/three/GravitySurfEffectController'
+import { ManifoldBubbleEffect } from '@/three/ManifoldBubbleEffect'
 import { MAP_VIEW_CONTROLLER_CONFIG as MAP_CONFIG } from '@/lib/map/mapViewControllerConfig'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
 import { TemperatureEffectController } from '@/three/TemperatureEffectController'
@@ -12,6 +13,7 @@ export class MapShuttleEffects {
   readonly thrusterController: ThrusterEffectController
   readonly temperatureEffects: TemperatureEffectController
   readonly gravitySurfEffects: GravitySurfEffectController
+  readonly manifoldBubble: ManifoldBubbleEffect
   readonly explosionEmitter: ParticleEmitter
 
   constructor(sceneObjects: MapSceneObjects, shuttleController: ShuttleController) {
@@ -26,6 +28,9 @@ export class MapShuttleEffects {
 
     this.gravitySurfEffects = new GravitySurfEffectController()
     shuttleController.group.add(this.gravitySurfEffects.lines)
+
+    this.manifoldBubble = new ManifoldBubbleEffect()
+    shuttleController.group.add(this.manifoldBubble.mesh)
 
     this.explosionEmitter = new ParticleEmitter({
       poolSize: 200,
@@ -43,6 +48,7 @@ export class MapShuttleEffects {
       this.thrusterController,
       this.temperatureEffects,
       this.gravitySurfEffects,
+      this.manifoldBubble,
       this.explosionEmitter,
     ]
   }
@@ -53,6 +59,11 @@ export class MapShuttleEffects {
 
   setGravitySurfing(active: boolean, intensity: number): void {
     this.gravitySurfEffects.setActive(active, intensity)
+  }
+
+  /** Activate or deactivate the dark-sector manifold bubble. */
+  setManifoldSurfing(active: boolean): void {
+    this.manifoldBubble.setActive(active)
   }
 
   emitExplosion(position: THREE.Vector3, count: number = 150): void {
@@ -70,5 +81,6 @@ export class MapShuttleEffects {
     this.thrusterController.dispose()
     this.temperatureEffects.dispose()
     this.gravitySurfEffects.dispose()
+    this.manifoldBubble.dispose()
   }
 }
