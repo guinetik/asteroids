@@ -158,6 +158,41 @@ export const GRAVITY_SURF_DECOUPLE_WAVE_DURATION_SEC = 2.5
 /** Spawn the decouple wave well ahead of the shuttle nose — momentum shed forward. */
 export const GRAVITY_SURF_DECOUPLE_WAVE_FORWARD_OFFSET = 40
 
+// ─── Orbital Surfing (Manifold Highway) ────────────────────────────────────
+
+/** World units below the grid plane for the manifold tunnel cruise altitude. */
+export const ORBITAL_SURF_TUNNEL_DEPTH = 40
+
+/** Cruise speed multiplier on maxThrustSpeed for spline travel. */
+export const ORBITAL_SURF_CRUISE_SPEED_MULTIPLIER = 5
+
+/** Seconds to dive from surface to tunnel depth (entry ramp). */
+export const ORBITAL_SURF_RAMP_DURATION_SEC = 1.2
+
+/** Seconds to snap onto the orbit path during coupling. */
+export const ORBITAL_SURF_COUPLE_DURATION_SEC = 1.0
+
+/** Max world units from an orbit ellipse point to allow attach. */
+export const ORBITAL_SURF_SNAP_DISTANCE = 15
+
+/** Passive fuel drain multiplier while orbital surfing (same as gravity surfing). */
+export const ORBITAL_SURF_FUEL_MULTIPLIER = 3
+
+/** Number of sample points along the orbital arc for the manifold spline. */
+export const ORBITAL_SURF_SPLINE_SEGMENTS = 64
+
+/** Deep indigo base color for manifold wireframe lines. */
+export const ORBITAL_SURF_SPLINE_COLOR = 0x2a1a4e
+
+/** Dim blue-violet edge glow for manifold lines. */
+export const ORBITAL_SURF_SPLINE_GLOW_COLOR = 0x4433aa
+
+/** Low opacity — ancient, dormant viroid infrastructure. */
+export const ORBITAL_SURF_SPLINE_OPACITY = 0.25
+
+/** Slow flicker speed for the manifold pulse — barely alive. */
+export const ORBITAL_SURF_PULSE_SPEED = 0.4
+
 /** Threshold where the whole space-time fabric is considered visible. */
 export const GRID_DEFORM_WHOLE_MAP_COVERAGE = 0.82
 
@@ -411,6 +446,17 @@ export const MAP_VIEW_CONTROLLER_CONFIG = {
   ORBIT_RING_GAP_SIZE,
   ORBIT_RING_OPACITY,
   ORBIT_RING_SEGMENTS,
+  ORBITAL_SURF_COUPLE_DURATION_SEC,
+  ORBITAL_SURF_CRUISE_SPEED_MULTIPLIER,
+  ORBITAL_SURF_FUEL_MULTIPLIER,
+  ORBITAL_SURF_PULSE_SPEED,
+  ORBITAL_SURF_RAMP_DURATION_SEC,
+  ORBITAL_SURF_SNAP_DISTANCE,
+  ORBITAL_SURF_SPLINE_COLOR,
+  ORBITAL_SURF_SPLINE_GLOW_COLOR,
+  ORBITAL_SURF_SPLINE_OPACITY,
+  ORBITAL_SURF_SPLINE_SEGMENTS,
+  ORBITAL_SURF_TUNNEL_DEPTH,
   POST_STARTUP_INTRO_HABITAT_DELAY_SEC,
   SLINGSHOT_CHARGE_TIME,
   SLINGSHOT_SPEED_OVERRIDES,
