@@ -9,12 +9,13 @@
 import * as THREE from 'three'
 import type { Planet, OrbitalElements } from '@/lib/planets/types'
 import type { GravitySource } from '@/lib/physics/gravity'
-import { orbitalPosition3D } from '@/lib/planets/orbit'
+import { orbitalPosition3D, orbitPathPoints } from '@/lib/planets/orbit'
 import {
   ORBIT_SCALE,
   SIZE_SCALE,
   ROTATION_SPEED_DIVISOR,
   MOON_ORBIT_SPEED_DIVISOR,
+  ORBIT_PATH_SEGMENTS,
 } from '@/lib/planets/constants'
 import {
   PLANET_INDICATOR_APPARENT_SIZE,
@@ -225,6 +226,15 @@ export class PlanetSystemController implements GravitySource {
 
   getWorldZ(): number {
     return this.group.position.z
+  }
+
+  /**
+   * Returns the sampled orbit ellipse as XZ world-space points.
+   * Used by orbital surfing to check proximity and build manifold splines.
+   */
+  getOrbitPointsXZ(): { x: number; z: number }[] {
+    const rawPoints = orbitPathPoints(this.scaledOrbit, ORBIT_PATH_SEGMENTS)
+    return rawPoints.map((p) => ({ x: p.x, z: p.y }))
   }
 
   /** The planet's catalog id. */
