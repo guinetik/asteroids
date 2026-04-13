@@ -87,6 +87,7 @@ import {
   getCurrentShuttleSlingshotBurstMultiplier,
   getCurrentUpgradeValue,
   hasGravitySurfingUnlock,
+  hasOrbitalSurfingUnlock,
   getPlayerUpgradeLevelsSnapshot,
   hydratePlayerUpgradeLevelsFromStorage,
   saveCurrentPlayerUpgradesToStorage,
@@ -163,6 +164,8 @@ import {
   shouldShowAsteroidMissionMapSite,
 } from '@/lib/map/mapViewControllerHelpers'
 import { GravitySurfingController } from '@/lib/map/GravitySurfingController'
+import { OrbitalSurfingController, type OrbitalSurfingDeps } from '@/lib/map/OrbitalSurfingController'
+import { ManifoldSpline } from '@/three/ManifoldSpline'
 import { useAudio } from '@/audio/useAudio'
 
 /**
@@ -297,6 +300,12 @@ export class MapViewController implements Tickable {
 
   /** Gravity Surfing rail locomotion controller. */
   private gravitySurfingController = new GravitySurfingController()
+
+  /** Orbital Surfing manifold highway controller. */
+  private orbitalSurfingController = new OrbitalSurfingController()
+
+  /** Manifold spline visual for orbital surfing. */
+  private manifoldSpline: ManifoldSpline | null = null
 
   /** Increments per anomaly HUD message so Vue can re-run enter animation. */
   private gravitationalAnomalyHudToken = 0
@@ -656,6 +665,31 @@ export class MapViewController implements Tickable {
     }
     this.gravitySurfingController.onCouplingEnd = () => {
       this.sceneVisuals?.hideSurfCouplingTether()
+    }
+
+    // --- Orbital surfing manifold highway ---
+    this.manifoldSpline = new ManifoldSpline()
+    this.sceneObjects.scene.add(this.manifoldSpline.group)
+
+    this.orbitalSurfingController.onCouplingStart = (arcPoints) => {
+      this.manifoldSpline?.show(arcPoints, -MAP_CONFIG.ORBITAL_SURF_TUNNEL_DEPTH)
+    }
+    this.orbitalSurfingController.onSurfEnd = () => {
+      this.manifoldSpline?.hide()
+    }
+    this.orbitalSurfingController.onComplete = (planetIndex) => {
+      const controller = this.planetControllers[planetIndex]
+      if (controller && this.shuttleController) {
+        this.orbitFacade.beginForcedOrbit(
+          controller.getWorldX(),
+          controller.getWorldZ(),
+          {
+            shuttleController: this.shuttleController,
+            vehicleCamera: this.vehicleCamera,
+            sceneVisuals: this.sceneVisuals,
+          },
+        )
+      }
     }
 
     // --- Orbit capture system ---
@@ -1046,12 +1080,23 @@ export class MapViewController implements Tickable {
       return
     }
 
-    this.gravitySurfingController.requestToggle(this.getGravitySurfingDeps())
+    // Orbital surfing toggle — checked BEFORE gravity surfing (orbit path priority)
+    if (!this.orbitalSurfingController.isActive()) {
+      this.orbitalSurfingController.requestToggle(this.getOrbitalSurfingDeps())
+    }
+    this.orbitalSurfingController.tick(dt, this.getOrbitalSurfingDeps())
+    this.manifoldSpline?.tick(dt)
+
+    // Gravity surfing — only allow toggle if orbital surfing is not active
+    if (!this.orbitalSurfingController.isActive()) {
+      this.gravitySurfingController.requestToggle(this.getGravitySurfingDeps())
+    }
     this.gravitySurfingController.tick(dt, this.getGravitySurfingDeps())
 
     const inspectToggle = this.modeCoordinator.resolveInspectToggle({
       togglePressed:
         !this.gravitySurfingController.isActive() &&
+        !this.orbitalSurfingController.isActive() &&
         (this.inputManager?.wasActionPressed('toggleDoors') ?? false),
       inspectMode: this.inspectMode,
       orbitState: this.orbitSystem?.state ?? 'free',
@@ -1086,6 +1131,7 @@ export class MapViewController implements Tickable {
     const habitatTransition = this.modeCoordinator.resolveHabitatTransition({
       togglePressed:
         !this.gravitySurfingController.isActive() &&
+        !this.orbitalSurfingController.isActive() &&
         (this.inputManager?.wasActionPressed('focusHabitat') ?? false),
       habitatActive: this.habitatState.isActive,
       habitatPhase: this.habitatState.phase,
@@ -1105,6 +1151,7 @@ export class MapViewController implements Tickable {
     // Orbit action (E key) — press to capture/cancel, hold to charge slingshot
     if (
       !this.gravitySurfingController.isActive() &&
+      !this.orbitalSurfingController.isActive() &&
       this.orbitSystem &&
       this.shuttleController &&
       this.inputManager
@@ -1217,7 +1264,9 @@ export class MapViewController implements Tickable {
       const orbitState = this.orbitSystem?.state ?? 'free'
       const passiveFuelMultiplier = this.gravitySurfingController.isActive()
         ? MAP_CONFIG.GRAVITY_SURF_PASSIVE_FUEL_MULTIPLIER
-        : 1
+        : this.orbitalSurfingController.isActive()
+          ? MAP_CONFIG.ORBITAL_SURF_FUEL_MULTIPLIER
+          : 1
       this.shuttleController.thrusterSystem.consumeFuel(
         computeShuttleBaseFuelDrain(dt, orbitState !== 'orbiting') * passiveFuelMultiplier,
       )
@@ -1756,6 +1805,22 @@ export class MapViewController implements Tickable {
       slingshotBurstActive: this.shuttleController?.slingshotBurstActive ?? false,
       shuttleController: this.shuttleController,
       spaceTimeGrid: this.spaceTimeGrid,
+    }
+  }
+
+  private getOrbitalSurfingDeps(): OrbitalSurfingDeps {
+    return {
+      shuttleController: this.shuttleController,
+      inputManager: this.inputManager,
+      hasOrbitalSurfingUnlock: hasOrbitalSurfingUnlock(),
+      orbitState: this.orbitFacade.system?.state ?? 'free',
+      gravitySurfingActive: this.gravitySurfingController.isActive(),
+      slingshotBurstActive: this.shuttleController?.slingshotBurstActive ?? false,
+      planetOrbitPoints: this.planetControllers.map((c) => c.getOrbitPointsXZ()),
+      planetWorldPositions: this.planetControllers.map((c) => ({
+        x: c.getWorldX(),
+        z: c.getWorldZ(),
+      })),
     }
   }
 
@@ -2306,6 +2371,19 @@ export class MapViewController implements Tickable {
 
   /** Use a terminal-triggered inventory item. */
   useInventoryItem(itemId: string): void {
+    if (itemId === 'dark-lattice-coupler') {
+      if (CURRENT_PLAYER_UPGRADE_LEVELS.orbitalSurfing >= 1) return
+      const stack = getStack(this.playerInventory, itemId)
+      if (!stack || stack.quantity <= 0) return
+      const result = consumeItem(this.playerInventory, itemId, 1)
+      if (!result.ok) return
+      this.playerInventory = result.inventory
+      this.persistPlayerProfile()
+      this.emitShopState()
+      this.installUpgradeFromConsumable('orbitalSurfing', 1)
+      return
+    }
+
     if (itemId !== 'grid-coupling-module') return
 
     const gravitySurfingLevel = CURRENT_PLAYER_UPGRADE_LEVELS.gravitySurfing ?? 0
@@ -2446,6 +2524,8 @@ export class MapViewController implements Tickable {
 
     // Reset slingshot state
     this.gravitySurfingController.reset(this.getGravitySurfingDeps())
+    this.orbitalSurfingController.reset(this.getOrbitalSurfingDeps())
+    this.manifoldSpline?.hide()
     this.clearGravitySurfVisuals()
     this.yRecovery = false
     this.adriftTimer = 0
