@@ -682,6 +682,7 @@ export class MapViewController implements Tickable {
       this.sceneVisuals?.hideSurfCouplingTether()
     }
     this.orbitalSurfingController.onDiveStart = () => {
+      useAudio().play('sfx.wormhole')
       // Freeze simulation so planets stop moving while in the manifold tunnel
       this.simFrozen = true
       // Hide asteroid belts during the dive

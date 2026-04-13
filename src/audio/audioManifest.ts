@@ -35,6 +35,7 @@ export const AUDIO_SOUND_IDS = [
   'sfx.slingshot.burst',
   'sfx.slingshot.charge',
   'sfx.orbitCapture',
+  'sfx.wormhole',
   'sfx.fuelWarning',
   // SFX — lander propulsion
   'sfx.lander.thrusterLoop',
@@ -209,6 +210,15 @@ const manifestById: ManifestById = {
   'sfx.orbitCapture': {
     id: 'sfx.orbitCapture',
     src: '/sound/sfx.orbitCapture.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'restart',
+    volume: 0.5,
+    effect: 'none',
+  },
+  'sfx.wormhole': {
+    id: 'sfx.wormhole',
+    src: '/sound/sfx.wormhole.mp3',
     category: 'sfx',
     load: 'lazy',
     playback: 'restart',
