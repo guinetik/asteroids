@@ -61,6 +61,7 @@ export type UpgradeId =
   | 'shuttleScienceStation'
   | 'shuttleSlingshotSpeed'
   | 'gravitySurfing'
+  | 'orbitalSurfing'
   | 'landerThrusterEfficiency'
   | 'landerThrusterCharge'
   | 'landerThrusterSpeed'
@@ -98,6 +99,11 @@ export const CURRENT_PLAYER_UPGRADE_LEVELS: Record<UpgradeId, number> =
  * `gravitySurfing` value at tier 1 from catalog data — Space Fabric map control unlock threshold.
  */
 const GRAVITY_SURFING_UNLOCK_VALUE = UPGRADE_DEFINITIONS.gravitySurfing.valuesByLevel[1]!
+
+/**
+ * `orbitalSurfing` value at tier 1 from catalog data — Manifold Highway unlock threshold.
+ */
+const ORBITAL_SURFING_UNLOCK_VALUE = UPGRADE_DEFINITIONS.orbitalSurfing.valuesByLevel[1]!
 
 /**
  * Merge persisted levels from localStorage into {@link CURRENT_PLAYER_UPGRADE_LEVELS}.
@@ -192,6 +198,15 @@ export function getUpgradesByCategory(category: UpgradeCategory): NumericUpgrade
  */
 export function hasGravitySurfingUnlock(levels: UpgradeLevels = CURRENT_PLAYER_UPGRADE_LEVELS): boolean {
   return getUpgradeValue('gravitySurfing', levels) >= GRAVITY_SURFING_UNLOCK_VALUE
+}
+
+/**
+ * True when the player has unlocked Orbital Surfing (Manifold Highway).
+ *
+ * @param levels - Upgrade state to inspect (defaults to current persisted runtime).
+ */
+export function hasOrbitalSurfingUnlock(levels: UpgradeLevels = CURRENT_PLAYER_UPGRADE_LEVELS): boolean {
+  return getUpgradeValue('orbitalSurfing', levels) >= ORBITAL_SURFING_UNLOCK_VALUE
 }
 
 /** Burn-rate multipliers for shuttle thruster bars. */

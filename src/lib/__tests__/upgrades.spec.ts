@@ -17,6 +17,7 @@ import {
   getCurrentShuttleThrusterEfficiencyModifiers,
   getShuttleSlingshotBurstMultiplier,
   hasGravitySurfingUnlock,
+  hasOrbitalSurfingUnlock,
   hydratePlayerUpgradeLevelsFromStorage,
   resetPlayerUpgradesToDefaults,
 } from '../upgrades'
@@ -26,10 +27,10 @@ import {
 } from '../upgradeStorage'
 
 /** Total number of upgrades defined in the JSON. */
-const EXPECTED_UPGRADE_COUNT = 28
+const EXPECTED_UPGRADE_COUNT = 29
 
 describe('UPGRADE_DEFINITIONS', () => {
-  it('loads all 28 upgrades from JSON', () => {
+  it('loads all 29 upgrades from JSON', () => {
     const ids = Object.keys(UPGRADE_DEFINITIONS)
     expect(ids).toHaveLength(EXPECTED_UPGRADE_COUNT)
   })
@@ -64,7 +65,7 @@ describe('CURRENT_PLAYER_UPGRADE_LEVELS', () => {
     resetPlayerUpgradesToDefaults()
   })
 
-  it('initializes all 28 upgrades to level 0', () => {
+  it('initializes all 29 upgrades to level 0', () => {
     const keys = Object.keys(CURRENT_PLAYER_UPGRADE_LEVELS)
     expect(keys).toHaveLength(EXPECTED_UPGRADE_COUNT)
     for (const level of Object.values(CURRENT_PLAYER_UPGRADE_LEVELS)) {
@@ -123,6 +124,16 @@ describe('hasGravitySurfingUnlock', () => {
   it('is false at level 0 and true at level 1', () => {
     expect(hasGravitySurfingUnlock({ gravitySurfing: 0 })).toBe(false)
     expect(hasGravitySurfingUnlock({ gravitySurfing: 1 })).toBe(true)
+  })
+})
+
+describe('hasOrbitalSurfingUnlock', () => {
+  it('returns false at level 0', () => {
+    expect(hasOrbitalSurfingUnlock({ orbitalSurfing: 0 })).toBe(false)
+  })
+
+  it('returns true at level 1', () => {
+    expect(hasOrbitalSurfingUnlock({ orbitalSurfing: 1 })).toBe(true)
   })
 })
 
