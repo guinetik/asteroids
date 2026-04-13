@@ -10,6 +10,7 @@ const { mockHandle, playMock, unlockMock } = vi.hoisted(() => {
     duration: () => 10,
     setVolume: vi.fn(),
     setStereo: vi.fn(),
+    setRate: vi.fn(),
   }
 
   return {

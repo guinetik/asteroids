@@ -348,6 +348,13 @@ export class AudioManager {
           howl.stereo(pan)
         }
       },
+      setRate: (rate: number) => {
+        if (playback.howlPlayId !== undefined) {
+          howl.rate(rate, playback.howlPlayId)
+        } else {
+          howl.rate(rate)
+        }
+      },
     }
   }
 
@@ -891,6 +898,9 @@ export class AudioManager {
       setStereo: (pan: number) => {
         if (stateRef.kind === 'active') stateRef.realHandle?.setStereo(pan)
       },
+      setRate: (rate: number) => {
+        if (stateRef.kind === 'active') stateRef.realHandle?.setRate(rate)
+      },
     }
   }
 
@@ -903,6 +913,7 @@ export class AudioManager {
       duration: () => 0,
       setVolume: () => {},
       setStereo: () => {},
+      setRate: () => {},
     }
   }
 

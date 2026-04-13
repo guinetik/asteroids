@@ -122,8 +122,8 @@ export class OrbitalSurfingController {
   /** Fired when coupling ends (transitions to diving or cancelled). */
   onCouplingEnd: (() => void) | null = null
 
-  /** Fired when the dive begins (coupling → diving transition). */
-  onDiveStart: (() => void) | null = null
+  /** Fired when the dive begins (coupling → diving transition). Receives travel time in seconds. */
+  onDiveStart: ((travelTimeSec: number) => void) | null = null
 
   /** Fired when the surf ends (back to free or orbit). */
   onSurfEnd: (() => void) | null = null
@@ -336,7 +336,7 @@ export class OrbitalSurfingController {
       const travelTimeSec = minTimeSec + fraction * (maxTimeSec - minTimeSec)
       const tPerSecond = 1 / travelTimeSec
       this.onCouplingEnd?.()
-      this.onDiveStart?.()
+      this.onDiveStart?.(travelTimeSec)
       this.state = {
         mode: 'diving',
         arcPoints: this.state.arcPoints,

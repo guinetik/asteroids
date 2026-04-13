@@ -109,6 +109,7 @@ export function playProceduralSound(args: ProceduralPlayArgs): AudioPlaybackHand
       if (!panner) return
       panner.pan.setValueAtTime(Math.max(-1, Math.min(1, pan)), ctx.currentTime)
     },
+    setRate: () => {},
   }
 }
 

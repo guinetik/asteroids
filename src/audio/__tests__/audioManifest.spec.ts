@@ -23,6 +23,7 @@ describe('audioManifest', () => {
       'sfx.slingshot.burst',
       'sfx.slingshot.charge',
       'sfx.orbitCapture',
+      'sfx.wormhole',
       'sfx.fuelWarning',
       // lander propulsion
       'sfx.lander.thrusterLoop',

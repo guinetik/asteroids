@@ -307,6 +307,9 @@ export class MapViewController implements Tickable {
   /** Manifold spline visual for orbital surfing. */
   private manifoldSpline: ManifoldSpline | null = null
 
+  /** Active wormhole sound handle — rate-adjusted to match travel time. */
+  private manifoldWormholeHandle: import('@/audio/audioTypes').AudioPlaybackHandle | null = null
+
   /** Increments per anomaly HUD message so Vue can re-run enter animation. */
   private gravitationalAnomalyHudToken = 0
   private sceneVisuals: MapSceneVisuals | null = null
@@ -674,7 +677,7 @@ export class MapViewController implements Tickable {
     this.orbitalSurfingController.onCouplingStart = (arcPoints) => {
       this.manifoldSpline?.show(arcPoints, -MAP_CONFIG.ORBITAL_SURF_TUNNEL_DEPTH)
       this.sceneVisuals?.showSurfCouplingTether()
-      useAudio().play('sfx.wormhole')
+      this.manifoldWormholeHandle = useAudio().play('sfx.wormhole')
     }
     this.orbitalSurfingController.onCouplingProgress = (shipPos, orbitPos, progress, dt) => {
       this.sceneVisuals?.updateSurfCouplingTether(shipPos, orbitPos, progress, dt)
@@ -682,7 +685,17 @@ export class MapViewController implements Tickable {
     this.orbitalSurfingController.onCouplingEnd = () => {
       this.sceneVisuals?.hideSurfCouplingTether()
     }
-    this.orbitalSurfingController.onDiveStart = () => {
+    this.orbitalSurfingController.onDiveStart = (travelTimeSec) => {
+      // Adjust wormhole sound rate so it lasts the full travel duration
+      if (this.manifoldWormholeHandle) {
+        const clipDuration = this.manifoldWormholeHandle.duration()
+        if (clipDuration > 0 && travelTimeSec > 0) {
+          // Add coupling time (~1s) since the clip started at Q press
+          const totalDuration = travelTimeSec + MAP_CONFIG.ORBITAL_SURF_COUPLE_DURATION_SEC
+          const rate = Math.max(0.5, Math.min(2.0, clipDuration / totalDuration))
+          this.manifoldWormholeHandle.setRate(rate)
+        }
+      }
       // Freeze simulation so planets stop moving while in the manifold tunnel
       this.simFrozen = true
       // Hide asteroid belts during the dive
@@ -695,7 +708,8 @@ export class MapViewController implements Tickable {
     this.orbitalSurfingController.onSurfEnd = () => {
       this.manifoldSpline?.hide()
       this.shuttleEffects?.setManifoldSurfing(false)
-      useAudio().stopSound('sfx.wormhole')
+      this.manifoldWormholeHandle?.stop()
+      this.manifoldWormholeHandle = null
       // Restore simulation and belt visibility
       this.simFrozen = false
       for (const belt of this.beltControllers) {

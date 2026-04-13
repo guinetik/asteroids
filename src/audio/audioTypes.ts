@@ -145,6 +145,8 @@ export interface AudioPlaybackHandle {
   setVolume(volume: number): void
   /** Sets stereo pan (-1 = full left, 0 = center, 1 = full right). */
   setStereo(pan: number): void
+  /** Sets the playback rate (1.0 = normal, 0.5 = half speed / lower pitch, 2.0 = double speed). */
+  setRate(rate: number): void
 }
 
 /**

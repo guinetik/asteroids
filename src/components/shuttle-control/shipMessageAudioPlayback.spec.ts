@@ -11,6 +11,7 @@ function makeHandle(soundId: string): AudioPlaybackHandle {
     duration: () => 0,
     setVolume: vi.fn(),
     setStereo: vi.fn(),
+    setRate: vi.fn(),
   }
 }
 
