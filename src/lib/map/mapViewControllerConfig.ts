@@ -181,16 +181,16 @@ export const ORBITAL_SURF_FUEL_MULTIPLIER = 3
 /** Number of sample points along the orbital arc for the manifold spline. */
 export const ORBITAL_SURF_SPLINE_SEGMENTS = 64
 
-/** Deep indigo base color for manifold wireframe lines. */
-export const ORBITAL_SURF_SPLINE_COLOR = 0x4a3a8e
+/** Cyan base color for manifold wireframe lines — matches orbit tether palette. */
+export const ORBITAL_SURF_SPLINE_COLOR = 0x00ccff
 
-/** Dim blue-violet edge glow for manifold lines. */
-export const ORBITAL_SURF_SPLINE_GLOW_COLOR = 0x7766dd
+/** Bright cyan glow for manifold lines. */
+export const ORBITAL_SURF_SPLINE_GLOW_COLOR = 0x66eeff
 
-/** Opacity for manifold lines — visible but ancient. */
-export const ORBITAL_SURF_SPLINE_OPACITY = 0.55
+/** Opacity for manifold lines — clearly visible. */
+export const ORBITAL_SURF_SPLINE_OPACITY = 0.7
 
-/** Flicker speed for the manifold pulse — dormant but readable. */
+/** Flicker speed for the manifold pulse. */
 export const ORBITAL_SURF_PULSE_SPEED = 0.6
 
 /** Threshold where the whole space-time fabric is considered visible. */

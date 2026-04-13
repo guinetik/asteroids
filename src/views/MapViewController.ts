@@ -674,8 +674,21 @@ export class MapViewController implements Tickable {
     this.orbitalSurfingController.onCouplingStart = (arcPoints) => {
       this.manifoldSpline?.show(arcPoints, -MAP_CONFIG.ORBITAL_SURF_TUNNEL_DEPTH)
     }
+    this.orbitalSurfingController.onDiveStart = () => {
+      // Freeze simulation so planets stop moving while in the manifold tunnel
+      this.simFrozen = true
+      // Hide asteroid belts during the dive
+      for (const belt of this.beltControllers) {
+        belt.group.visible = false
+      }
+    }
     this.orbitalSurfingController.onSurfEnd = () => {
       this.manifoldSpline?.hide()
+      // Restore simulation and belt visibility
+      this.simFrozen = false
+      for (const belt of this.beltControllers) {
+        belt.group.visible = true
+      }
     }
     this.orbitalSurfingController.onComplete = (planetIndex) => {
       const controller = this.planetControllers[planetIndex]
@@ -1085,6 +1098,12 @@ export class MapViewController implements Tickable {
     this.orbitalSurfingController.requestToggle(this.getOrbitalSurfingDeps())
     this.orbitalSurfingController.tick(dt, this.getOrbitalSurfingDeps())
     this.manifoldSpline?.tick(dt)
+
+    // Override ship position to follow the smooth CatmullRom spline (not raw arc points)
+    if (this.orbitalSurfingController.mode === 'diving' && this.manifoldSpline && this.shuttleController) {
+      const splinePos = this.manifoldSpline.getPositionAt(this.orbitalSurfingController.getSplineT())
+      this.shuttleController.group.position.copy(splinePos)
+    }
 
     // Gravity surfing — only allow toggle if orbital surfing is not active
     if (!this.orbitalSurfingController.isActive()) {
