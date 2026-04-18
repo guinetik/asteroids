@@ -27,8 +27,21 @@ export interface VehicleCameraConfig {
    * Use `0` to always use chase framing whenever not dragging.
    */
   idleTimeout: number
-  /** Camera never goes below this Y */
+  /** Camera never goes below this Y (absolute world-space). Ignored when {@link minYRelativeToTarget} is set. */
   minY: number
+  /**
+   * If set, the effective floor for the camera Y becomes
+   * `target.position.y + minYRelativeToTarget` each frame, overriding {@link minY}.
+   *
+   * Use this for vehicles that traverse uneven terrain (lander dropping into a crater,
+   * rover crossing a canyon) where an absolute `minY` would pin the camera above the
+   * world while the vehicle sinks below it — producing extreme look-down angles, an
+   * apparent "zoom out", and OrbitControls fighting the chase lerp.
+   *
+   * Negative values let the camera dip below the vehicle (e.g. when the player orbits
+   * to look up at the underside). Use `0` to clamp the camera to the vehicle's Y plane.
+   */
+  minYRelativeToTarget?: number
   /** Perspective FOV in degrees */
   fov: number
   /** Minimum orbit-controls dolly distance — closest the camera can get to the target. */
@@ -73,12 +86,22 @@ export const SHUTTLE_CAMERA_CONFIG: VehicleCameraConfig = {
   fov: 60,
 }
 
-/** Lander preset: in front (stairs side), higher angle. */
+/**
+ * Lander preset: in front (stairs side), higher angle.
+ *
+ * Uses {@link VehicleCameraConfig.minYRelativeToTarget} instead of an absolute
+ * world floor so the camera follows the lander down into craters. The previous
+ * `minY: 5` clamp pinned the camera above the world while the lander sank,
+ * producing an extreme look-down angle and an apparent zoom-out. `-8` lets
+ * the player orbit a small amount below the lander while still preventing the
+ * camera from flipping past it.
+ */
 export const LANDER_CAMERA_CONFIG: VehicleCameraConfig = {
   idleOffset: new THREE.Vector3(60, 40, 0),
   lerpSpeed: 5,
   idleTimeout: 1.0,
-  minY: 5,
+  minY: -Infinity,
+  minYRelativeToTarget: -8,
   fov: 60,
   maxDistance: 145,
 }
@@ -327,6 +350,14 @@ export class VehicleCamera implements Tickable {
     }
     this.lastTargetQuat.copy(q)
 
+    // Effective Y floor — relative-to-target overrides absolute when set so the
+    // camera tracks the vehicle into low terrain (craters, canyons) instead of
+    // staying pinned above the world.
+    const effectiveMinY =
+      this.config.minYRelativeToTarget !== undefined
+        ? targetPos.y + this.config.minYRelativeToTarget
+        : this.config.minY
+
     // After enough time without orbit-drag, ease to default chase framing
     if (!this.isMouseActive) {
       this.mouseIdleTimer += dt
@@ -342,7 +373,7 @@ export class VehicleCamera implements Tickable {
           const idleOffset = this.config.idleOffset.clone()
             .applyQuaternion(this.target.quaternion)
           const targetCamPos = targetPos.clone().add(idleOffset)
-          targetCamPos.y = Math.max(targetCamPos.y, this.config.minY)
+          targetCamPos.y = Math.max(targetCamPos.y, effectiveMinY)
 
           this.camera.position.lerp(targetCamPos, this.config.lerpSpeed * dt)
         }
@@ -350,8 +381,8 @@ export class VehicleCamera implements Tickable {
     }
 
     // Always clamp
-    if (this.camera.position.y < this.config.minY) {
-      this.camera.position.y = this.config.minY
+    if (this.camera.position.y < effectiveMinY) {
+      this.camera.position.y = effectiveMinY
     }
 
     // Camera shake — random offset that decays over time
