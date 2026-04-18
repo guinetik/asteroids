@@ -32,6 +32,15 @@ const ADS_STRAFE_SPEED_SCALE = 0.8
 const AIR_CONTROL_ACCEL_FRACTION = 0.22
 /** Caps how much speed input can add while airborne. */
 const AIR_CONTROL_SPEED_FRACTION = 0.2
+
+/**
+ * Default duration (seconds) that an external lateral impulse keeps the
+ * player's velocity from being overwritten by the grounded-movement loop.
+ * Short enough that walking control snaps back almost immediately, long
+ * enough that contact knockback actually visibly shoves the player. Callers
+ * can override this per-impulse via {@link FpsPlayerController.applyLateralImpulse}.
+ */
+const KNOCKBACK_OVERRIDE_DURATION = 0.28
 const PLAYER_COLLISION_CONFIG: CharacterCollisionConfig = {
   radius: 0.65,
   maxStepHeight: 0.9,
@@ -131,6 +140,14 @@ export class FpsPlayerController implements Tickable {
   private coyoteTimer = 0
   /** Tracks previous jump state for rising-edge sound trigger. */
   private _prevJumping = false
+  /**
+   * Seconds remaining during which the grounded-movement loop will preserve
+   * momentum instead of overwriting `lateralVelocity` from input. Set by
+   * {@link applyLateralImpulse} and decremented in {@link tick}. While > 0,
+   * the player slides under ground friction and input only nudges along the
+   * carried-over velocity (same shape as the airborne branch).
+   */
+  private knockbackTimer = 0
 
   /** Fired when health reaches zero. */
   onDeath: (() => void) | null = null
@@ -226,9 +243,32 @@ export class FpsPlayerController implements Tickable {
     this._aiming = aiming
   }
 
-  applyLateralImpulse(x: number, z: number): void {
+  /**
+   * Add an instantaneous lateral velocity change (knockback, explosion push,
+   * etc.) and prevent the grounded-movement loop from overwriting it for a
+   * short window so the impulse is actually felt.
+   *
+   * Without the override window the grounded branch of {@link tick} resets
+   * `lateralVelocity` to `(input * maxSpeed)` every frame, silently swallowing
+   * any impulse that lands while the player has their feet on the ground.
+   *
+   * @param x - World-space X velocity to add.
+   * @param z - World-space Z velocity to add.
+   * @param overrideDurationS - How long (seconds) to suppress the grounded
+   *   velocity overwrite so the impulse is preserved. Defaults to
+   *   {@link KNOCKBACK_OVERRIDE_DURATION}. Pass `0` to opt out (e.g. for unit
+   *   tests that want to observe friction decay without the override).
+   */
+  applyLateralImpulse(
+    x: number,
+    z: number,
+    overrideDurationS: number = KNOCKBACK_OVERRIDE_DURATION,
+  ): void {
     this.lateralVelocity.x += x
     this.lateralVelocity.z += z
+    if (overrideDurationS > 0) {
+      this.knockbackTimer = Math.max(this.knockbackTimer, overrideDurationS)
+    }
   }
 
   /**
@@ -310,7 +350,15 @@ export class FpsPlayerController implements Tickable {
     }
     const wishLen = Math.sqrt(wishX * wishX + wishZ * wishZ)
 
-    if (this.body.grounded) {
+    // Decay the knockback override window — while it's active the grounded
+    // branch below preserves momentum instead of clobbering `lateralVelocity`,
+    // so external impulses (contact damage, explosions, projectile pushback)
+    // are actually visible.
+    if (this.knockbackTimer > 0) {
+      this.knockbackTimer = Math.max(0, this.knockbackTimer - dt)
+    }
+
+    if (this.body.grounded && this.knockbackTimer <= 0) {
       // Grounded: instant velocity toward input direction (responsive walking)
       if (wishLen > 0) {
         // Normalize and scale to target speed
@@ -320,6 +368,29 @@ export class FpsPlayerController implements Tickable {
         // No input: stop immediately on ground
         this.lateralVelocity.x = 0
         this.lateralVelocity.z = 0
+      }
+    } else if (this.body.grounded) {
+      // Knockback override active — let the impulse carry the player while
+      // ground friction bleeds it off. Input still nudges along the existing
+      // direction (same shape as the airborne branch) so the player can
+      // partially fight the push.
+      if (wishLen > 0) {
+        const dirX = wishX / wishLen
+        const dirZ = wishZ / wishLen
+        const currentAlongWish = this.lateralVelocity.x * dirX + this.lateralVelocity.z * dirZ
+        if (currentAlongWish < maxSpd) {
+          const addSpeed = Math.min(maxSpd - currentAlongWish, mv.moveThrust * dt)
+          this.lateralVelocity.x += dirX * addSpeed
+          this.lateralVelocity.z += dirZ * addSpeed
+        }
+      }
+
+      const speed = this.speed
+      if (speed > 0) {
+        const drop = mv.groundFriction * dt
+        const factor = Math.max(0, speed - drop) / speed
+        this.lateralVelocity.x *= factor
+        this.lateralVelocity.z *= factor
       }
     } else {
       // Airborne: preserve trajectory, but allow a very small amount of steering.

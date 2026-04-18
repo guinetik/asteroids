@@ -257,6 +257,34 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
     }
   }
 
+  /**
+   * Flash the visual controller for an enemy that just took a projectile hit.
+   * Called by the level controller from `projectileSystem.onEnemyHit`. Silently
+   * ignores enemies that don't belong to this minigame.
+   *
+   * @param enemy - Enemy domain instance that was hit by a player projectile.
+   */
+  notifyEnemyHit(enemy: Enemy): void {
+    for (const [, ctrl] of this.groundControllers) {
+      if (ctrl.enemy === enemy) {
+        ctrl.flash()
+        return
+      }
+    }
+    for (const [, ctrl] of this.chimeraControllers) {
+      if (ctrl.enemy === enemy) {
+        ctrl.flash()
+        return
+      }
+    }
+    for (const [, ctrl] of this.spireControllers) {
+      if (ctrl.enemy === enemy) {
+        ctrl.flash()
+        return
+      }
+    }
+  }
+
   /** Clean up all resources owned by this minigame. */
   dispose(): void {
     this.clearEncounter()

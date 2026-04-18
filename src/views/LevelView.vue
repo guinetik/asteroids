@@ -10,6 +10,7 @@ import type { TrackerObjective } from '@/components/MissionTracker.vue'
 import FpsHud from '@/components/FpsHud.vue'
 import FpsCompass from '@/components/FpsCompass.vue'
 import DeathOverlay from '@/components/DeathOverlay.vue'
+import DamageFeedback from '@/components/DamageFeedback.vue'
 import LevelMinimap from '@/components/LevelMinimap.vue'
 import type { MapMarker } from '@/components/LevelMinimap.vue'
 import type { LanderTelemetry } from '@/components/LanderHud.vue'
@@ -48,6 +49,8 @@ const mapCanvas = ref<HTMLCanvasElement | null>(null)
 const playerX = ref(0)
 const playerZ = ref(0)
 const mapMarkers = ref<MapMarker[]>([])
+const damageFlash = ref(0)
+const damageFeedback = ref<InstanceType<typeof DamageFeedback> | null>(null)
 const backgroundMusic = useBackgroundMusicGlobalState()
 const musicEnabled = computed(() => backgroundMusic.isEnabled.value)
 
@@ -172,6 +175,12 @@ onMounted(async () => {
     viewController.onPlayerPosition = (x, z) => {
       playerX.value = x
       playerZ.value = z
+    }
+    viewController.onDamageFlash = (opacity) => {
+      damageFlash.value = opacity
+    }
+    viewController.onDamageDirection = (angle) => {
+      damageFeedback.value?.flash(angle)
     }
     await viewController.init(container.value)
 
@@ -371,6 +380,11 @@ function handleToggleMusic(): void {
     :visible="deathOverlayVisible"
     :cause="deathOverlayCause"
     @restart="handleRestart"
+  />
+  <DamageFeedback
+    v-if="stateInfo.state === 'eva'"
+    ref="damageFeedback"
+    :flash-opacity="damageFlash"
   />
 </template>
 

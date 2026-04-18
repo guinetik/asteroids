@@ -10,6 +10,7 @@
  * @date 2026-04-07
  * @spec docs/superpowers/specs/2026-04-07-survey-objective-design.md
  */
+import type { Enemy } from '@/lib/fps/enemy'
 
 /** Minigame lifecycle status. */
 export type MiniGameStatus = 'idle' | 'active' | 'completed' | 'failed'
@@ -85,4 +86,13 @@ export interface MiniGame {
   tick(dt: number, ctx: MiniGameContext): void
   /** Clean up all 3D resources. */
   dispose(): void
+  /**
+   * Optional notification that one of this minigame's enemies just took a
+   * projectile hit from the player. Implementations should locate the matching
+   * visual controller and trigger its hit-flash. Minigames that don't own
+   * enemies may leave this undefined.
+   *
+   * @param enemy - Enemy domain instance that was hit.
+   */
+  notifyEnemyHit?(enemy: Enemy): void
 }

@@ -93,7 +93,30 @@ const LANDER_SPAWN_LIGHT_ALIGNMENT_X = 5
 const LANDER_GAMEPLAY_START_OFFSET_X = 0
 const LANDER_GAMEPLAY_START_OFFSET_Y = 0
 const EVA_SPAWN_OFFSET_X = 8
-const CONTACT_KNOCKBACK = 12
+
+/**
+ * Lateral velocity (units/s) added to the player when an enemy makes contact
+ * or a projectile hits. Tuned to be larger than {@link FpsPlayerConfig}.movement.maxSpeed
+ * (currently 20 units/s) so the impulse is unmistakably a shove instead of a
+ * gentle nudge that the next walking-input frame snaps away. Pairs with the
+ * grounded knockback-override window in {@link FpsPlayerController.applyLateralImpulse}
+ * which prevents that next frame from clobbering the impulse.
+ */
+const CONTACT_KNOCKBACK = 26
+
+/**
+ * Duration (seconds) of the red damage vignette after the player takes a hit.
+ * Mirrors `DAMAGE_FLASH_DURATION` in {@link FpsViewController} so the level
+ * scene gets the same hit feedback as the standalone FPS demo.
+ */
+const DAMAGE_FLASH_DURATION = 0.3
+
+/**
+ * Strength of the random pitch/yaw camera flinch applied on every hit. Tuned
+ * to be noticeable without being disorienting; reused for both contact damage
+ * and projectile damage so projectile and melee hits feel the same.
+ */
+const DAMAGE_FLINCH_STRENGTH = 80
 
 /** Thrust vibration at ground level (liftoff rumble). */
 const THRUST_VIBRATION_MAX = 1.2
@@ -370,6 +393,23 @@ export class LevelViewController implements Tickable {
   /** Called each frame with player world position for minimap. */
   onPlayerPosition: ((x: number, z: number) => void) | null = null
 
+  /**
+   * Called each frame with the current red-vignette opacity (0 = clear, >0 =
+   * post-hit flash decaying back to 0). Wired to the same overlay that
+   * `FpsView.vue` uses for its standalone damage flash.
+   */
+  onDamageFlash: ((opacity: number) => void) | null = null
+
+  /**
+   * Called when the player takes a hit, providing the screen-space angle from
+   * the player to the damage source (radians, 0 = camera-forward, positive =
+   * to the right). Drives the directional pizza-slice indicator on the HUD.
+   */
+  onDamageDirection: ((angle: number) => void) | null = null
+
+  /** Seconds remaining on the active damage flash. Driven by `tick`. */
+  private damageFlashTimer = 0
+
   /** When true, successful exfil grants CR and clears persisted active shuttle mission. */
   private persistShuttleMissionRewards = false
 
@@ -555,6 +595,18 @@ export class LevelViewController implements Tickable {
     )
     this.playerController.group.visible = false
     this.playerController.onDeath = () => {
+      // Lander rescue — if the player dies while standing next to the lander
+      // (typically hypoxia after running the O2 tank dry), treat it as if they
+      // managed to climb back into the cockpit: replenish life support and
+      // transition into the lander instead of the dead state. Prevents the
+      // case where the player walks the last meter to the airlock and dies
+      // mid-press of the interact key.
+      if (this.isPlayerNearLander() && this.stateMachine?.is('eva')) {
+        this.playerController!.replenish()
+        this.onDeathFade?.(0)
+        this.stateMachine.trigger('enterVehicle')
+        return
+      }
       this.stateMachine?.trigger('die')
     }
     this.sceneManager.addToScene(this.playerController.group)
@@ -584,6 +636,20 @@ export class LevelViewController implements Tickable {
     this.projectileSystem.onImpact = (pos) => {
       for (let i = 0; i < 8; i++) {
         this._impactVel.copy(this._impactUp).multiplyScalar(5)
+        this.impactEmitter!.emit(pos, this._impactVel)
+      }
+    }
+    this.projectileSystem.onEnemyHit = (enemy, pos) => {
+      // Fan the hit out to whichever minigame owns this enemy so the matching
+      // visual controller plays its hit-flash. Mirrors the bookkeeping in
+      // `FpsViewController` where a single `onEnemyHit` callback dispatches
+      // to all controller maps.
+      for (const mg of this.minigames) {
+        mg.notifyEnemyHit?.(enemy)
+      }
+      // Impact spark burst at the contact point — same magnitude as FpsView.
+      for (let i = 0; i < 12; i++) {
+        this._impactVel.copy(this._impactUp).multiplyScalar(8)
         this.impactEmitter!.emit(pos, this._impactVel)
       }
     }
@@ -617,22 +683,15 @@ export class LevelViewController implements Tickable {
         minigame.onComplete = (idx) => this.onObjectiveComplete?.(idx)
         minigame.onStepChange = (idx, steps) => this.onStepChange?.(idx, steps)
         minigame.onDamagePlayer = (damage, sourceX, sourceZ) => {
-          this.playerController?.takeDamage(damage)
-          const playerPos = this.playerController?.group.position
-          if (playerPos) {
-            const dx = playerPos.x - sourceX
-            const dz = playerPos.z - sourceZ
-            const dist = Math.sqrt(dx * dx + dz * dz)
-            if (dist > 0.01) {
-              this.playerController?.applyLateralImpulse(
-                (dx / dist) * CONTACT_KNOCKBACK,
-                (dz / dist) * CONTACT_KNOCKBACK,
-              )
-            }
-          }
+          this.applyPlayerDamageFeedback(damage, sourceX, sourceZ)
         }
         minigame.onKillPlayer = () => {
-          this.playerController?.takeDamage(999)
+          const playerPos = this.playerController?.group.position
+          this.applyPlayerDamageFeedback(
+            999,
+            playerPos?.x ?? 0,
+            (playerPos?.z ?? 0) - 1,
+          )
         }
         minigame.onDestroyLander = () => {
           this.failLanderRun('Lander Destroyed by Nest Blast', { explode: true, hideLander: true })
@@ -657,22 +716,15 @@ export class LevelViewController implements Tickable {
         minigame.onComplete = (idx) => this.onObjectiveComplete?.(idx)
         minigame.onStepChange = (idx, steps) => this.onStepChange?.(idx, steps)
         minigame.onDamagePlayer = (damage, sourceX, sourceZ) => {
-          this.playerController?.takeDamage(damage)
-          const playerPos = this.playerController?.group.position
-          if (playerPos) {
-            const dx = playerPos.x - sourceX
-            const dz = playerPos.z - sourceZ
-            const dist = Math.sqrt(dx * dx + dz * dz)
-            if (dist > 0.01) {
-              this.playerController?.applyLateralImpulse(
-                (dx / dist) * CONTACT_KNOCKBACK,
-                (dz / dist) * CONTACT_KNOCKBACK,
-              )
-            }
-          }
+          this.applyPlayerDamageFeedback(damage, sourceX, sourceZ)
         }
         minigame.onKillPlayer = () => {
-          this.playerController?.takeDamage(999)
+          const playerPos = this.playerController?.group.position
+          this.applyPlayerDamageFeedback(
+            999,
+            playerPos?.x ?? 0,
+            (playerPos?.z ?? 0) - 1,
+          )
         }
         minigame.onDestroyLander = () => {
           this.failLanderRun('Lander Destroyed by Virus Blast', { explode: true, hideLander: true })
@@ -1020,8 +1072,12 @@ export class LevelViewController implements Tickable {
   }
 
   private exitEva(): void {
-    // Replenish O2 and stamina (back in lander, connected to life support)
+    // Replenish O2 and stamina (back in lander, connected to life support).
+    // Also clear the hypoxia vignette — `tickEva` only updates the fade while
+    // in EVA, so without an explicit reset the suit-darken stays on screen
+    // through the entire lander leg.
     this.playerController!.replenish()
+    this.onDeathFade?.(0)
 
     // Hide EVA visuals
     this.playerController!.group.visible = false
@@ -1335,6 +1391,16 @@ export class LevelViewController implements Tickable {
 
     this.enforceLanderAltitudeCeiling()
     this.tickMinigames(dt)
+
+    // Damage flash decay — same shape as `FpsViewController.tick`. The Vue
+    // overlay reads this every frame so we always emit (0 once cleared) to
+    // keep its `v-if` in sync.
+    if (this.damageFlashTimer > 0) {
+      this.damageFlashTimer = Math.max(0, this.damageFlashTimer - dt)
+      this.onDamageFlash?.(this.damageFlashTimer / DAMAGE_FLASH_DURATION)
+    } else {
+      this.onDamageFlash?.(0)
+    }
 
     // Dead: camera drops, screen fades, message appears
     if (this.stateMachine?.is('dead') && this.fpsCamera) {
@@ -1758,6 +1824,55 @@ export class LevelViewController implements Tickable {
   // ═══════════════════════════════════════════════════════════════
   // Helpers
   // ═══════════════════════════════════════════════════════════════
+
+  /**
+   * Apply the full hit-feedback bundle when the player takes damage:
+   * health drain, knockback away from the source, red vignette flash,
+   * camera flinch, and a directional indicator on the HUD.
+   *
+   * Mirrors {@link FpsViewController}'s contact + projectile damage handling
+   * so the level scene reacts to hits the same way the standalone FPS demo
+   * does. Safe to call when the player controller is missing — every step
+   * is null-guarded.
+   *
+   * @param damage - HP to deduct from the player.
+   * @param sourceX - World X of the damage source (enemy position or
+   *   projectile origin).
+   * @param sourceZ - World Z of the damage source.
+   */
+  private applyPlayerDamageFeedback(
+    damage: number,
+    sourceX: number,
+    sourceZ: number,
+  ): void {
+    this.playerController?.takeDamage(damage)
+    this.damageFlashTimer = DAMAGE_FLASH_DURATION
+
+    const playerPos = this.playerController?.group.position
+    if (!playerPos) return
+
+    const dx = playerPos.x - sourceX
+    const dz = playerPos.z - sourceZ
+    const dist = Math.sqrt(dx * dx + dz * dz)
+    if (dist > 0.01) {
+      this.playerController?.applyLateralImpulse(
+        (dx / dist) * CONTACT_KNOCKBACK,
+        (dz / dist) * CONTACT_KNOCKBACK,
+      )
+    }
+
+    // Camera flinch + screen-space damage direction (only meaningful while
+    // the FPS camera is active; the lander-cam path just skips it).
+    if (this.fpsCamera && this.stateMachine?.is('eva')) {
+      this.fpsCamera.applyMouseDelta(
+        (Math.random() - 0.5) * DAMAGE_FLINCH_STRENGTH,
+        -Math.random() * DAMAGE_FLINCH_STRENGTH,
+      )
+      const worldAngle = Math.atan2(sourceX - playerPos.x, sourceZ - playerPos.z)
+      const relAngle = worldAngle - this.fpsCamera.yaw
+      this.onDamageDirection?.(relAngle)
+    }
+  }
 
   /** Check if the FPS player is within interact range of the lander. */
   private isPlayerNearLander(): boolean {
