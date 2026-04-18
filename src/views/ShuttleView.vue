@@ -29,6 +29,7 @@ const telemetry = reactive<ShuttleTelemetry>({
   temperature: 0,
   temperatureVisible: false,
   damageIntensity: 0,
+  compassBearings: [],
 })
 
 onMounted(async () => {
