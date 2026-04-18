@@ -41,6 +41,16 @@ const AIR_CONTROL_SPEED_FRACTION = 0.2
  * can override this per-impulse via {@link FpsPlayerController.applyLateralImpulse}.
  */
 const KNOCKBACK_OVERRIDE_DURATION = 0.28
+
+/**
+ * Once the sprint thruster fully depletes, the player must let it recharge to
+ * at least this fraction of its capacity before holding Shift will engage
+ * sprint again. Without the lockout, the per-frame `canFire` check lets sprint
+ * stutter on for one frame as soon as a sliver of charge is recovered, which
+ * feels like the system is fighting the input. The minimum threshold makes
+ * "out of stamina" actually mean something.
+ */
+const SPRINT_RELOCK_FRACTION = 0.3
 const PLAYER_COLLISION_CONFIG: CharacterCollisionConfig = {
   radius: 0.65,
   maxStepHeight: 0.9,
@@ -148,6 +158,14 @@ export class FpsPlayerController implements Tickable {
    * carried-over velocity (same shape as the airborne branch).
    */
   private knockbackTimer = 0
+  /**
+   * Sprint lockout latch. Set to `true` the moment the sprint charge hits
+   * zero, cleared once the bar has refilled to {@link SPRINT_RELOCK_FRACTION}
+   * of capacity. While latched, holding Shift does nothing — the input is
+   * ignored regardless of charge level so the player can't dribble out one
+   * frame of sprint at a time.
+   */
+  private sprintLocked = false
 
   /** Fired when health reaches zero. */
   onDeath: (() => void) | null = null
@@ -289,9 +307,26 @@ export class FpsPlayerController implements Tickable {
    */
   tick(dt: number): void {
     const mv = this.config.movement
+
+    // Sprint lockout — once the bar empties, ignore Shift until the bar has
+    // refilled to a meaningful fraction of capacity. Prevents the
+    // "stuttering sprint" feel where holding Shift after exhaustion grabs
+    // every individual frame of recovered charge.
+    const sprintCfg = this.config.o2.thrusters.sprint
+    const sprintCharge = this.thrusterSystem.getState('sprint').charge
+    if (sprintCharge <= 0) {
+      this.sprintLocked = true
+    } else if (
+      this.sprintLocked &&
+      sprintCharge >= sprintCfg.capacity * SPRINT_RELOCK_FRACTION
+    ) {
+      this.sprintLocked = false
+    }
+
     const isSprinting =
       this.body.grounded &&
       this.inputManager.isActionActive('sprint') &&
+      !this.sprintLocked &&
       this.thrusterSystem.canFire('sprint')
 
     // --- Coyote time — track how long since last grounded ---

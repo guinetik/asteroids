@@ -9,13 +9,13 @@
     "zoomSpeed": 8
   },
   "rtg": {
-    "fuelCapacity": 240,
+    "fuelCapacity": 720,
     "burstMin": 0.3,
     "burstMax": 1.2,
     "burstAmount": 8,
     "thrusters": {
       "drill": { "capacity": 30, "burnRate": 120, "rechargeRate": 8, "fuelCostPerRecharge": 3.5 },
-      "weapon": { "capacity": 20, "burnRate": 160, "rechargeRate": 18, "fuelCostPerRecharge": 6.0 },
+      "weapon": { "capacity": 20, "burnRate": 160, "rechargeRate": 18, "fuelCostPerRecharge": 4.0 },
       "heal": { "capacity": 25, "burnRate": 50, "rechargeRate": 8, "fuelCostPerRecharge": 1.5 }
     }
   }
