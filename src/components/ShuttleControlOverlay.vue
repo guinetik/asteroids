@@ -175,7 +175,10 @@ function onKeydown(e: KeyboardEvent) {
         </nav>
 
         <!-- Right content area -->
-        <div class="shuttle-control-content shuttle-control-content--programs">
+        <div 
+          class="shuttle-control-content shuttle-control-content--programs"
+          :class="{ '!p-0 overflow-hidden': activeScreen === 'shuttle' }"
+        >
           <component
             :is="activeProgram"
             :inventory="inventory"
