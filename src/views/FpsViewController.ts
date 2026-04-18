@@ -36,11 +36,13 @@ import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
 import { getCurrentUpgradeValue } from '@/lib/upgrades'
 import { EnemyDirector } from '@/lib/fps/enemyDirector'
+import { EnemyLodApplier } from '@/lib/fps/enemyLodHelper'
 import { BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/BacteriophageController'
 import { EnemyProjectileSystem } from '@/lib/fps/enemyProjectileSystem'
+import { EnemyTiltCache } from '@/lib/fps/enemyTiltCache'
 import { SpireController, SPIRE_HIT_CENTER_Y } from '@/three/SpireController'
-import { EnemyProjectileMesh } from '@/three/EnemyProjectileMesh'
 import { ChimeraWalkerController, CHIMERA_HIT_CENTER_Y } from '@/three/ChimeraWalkerController'
+import { EnemyProjectileMeshPool } from '@/three/EnemyProjectileMeshPool'
 import { FpsHostageController } from '@/three/FpsHostageController'
 import { VirusModel } from '@/three/VirusModel'
 
@@ -134,7 +136,15 @@ export class FpsViewController implements Tickable {
   private readonly spireControllers = new Map<number, SpireController>()
   private readonly chimeraControllers = new Map<number, ChimeraWalkerController>()
   private readonly chimeraLaserOriginScratch = new Vector3()
-  private readonly enemyProjectileMeshes = new Map<number, EnemyProjectileMesh>()
+  /** Reused (0,1,0) seed for impact/explosion bursts. Treat as immutable. */
+  private readonly _impactUp = new Vector3(0, 1, 0)
+  /** Reused velocity scratch passed to `ParticleEmitter.emit` (which copies). */
+  private readonly _impactVel = new Vector3()
+  /** Reused scratch position used when the source position is constructed inline. */
+  private readonly _impactPos = new Vector3()
+  private enemyProjectileMeshPool: EnemyProjectileMeshPool | null = null
+  private enemyTiltCache: EnemyTiltCache | null = null
+  private readonly enemyLodApplier = new EnemyLodApplier()
   /** Rescue NPCs when `?hostages` is set — HP, bars, projectile registration. */
   private fpsHostageController: FpsHostageController | null = null
   /** GLB props from `?viruses` — disposed on teardown. */
@@ -213,7 +223,8 @@ export class FpsViewController implements Tickable {
     // Multi-tool state
     this.multiToolState = new MultiToolState(buildMultiToolConfig())
 
-    // Projectile system + impact particles
+    this.enemyTiltCache = new EnemyTiltCache(heightmap)
+
     this.projectileSystem = new ProjectileSystem(this.sceneManager.scene, heightmap)
     this.projectileSystem.setDamageMultiplier(getCurrentUpgradeValue('multitoolDamage'))
     this.impactEmitter = new ParticleEmitter({
@@ -226,9 +237,9 @@ export class FpsViewController implements Tickable {
     })
     this.sceneManager.addToScene(this.impactEmitter.points)
     this.projectileSystem.onImpact = (pos) => {
-      const up = new Vector3(0, 1, 0)
       for (let i = 0; i < 8; i++) {
-        this.impactEmitter!.emit(pos, up.clone().multiplyScalar(5))
+        this._impactVel.copy(this._impactUp).multiplyScalar(5)
+        this.impactEmitter!.emit(pos, this._impactVel)
       }
     }
     this.multiTool.setProjectileSystem(this.projectileSystem)
@@ -290,24 +301,24 @@ export class FpsViewController implements Tickable {
     this.projectileSystem.onEnemyHit = (enemy, pos) => {
       const dummy = this.targetDummies.find((d) => d.enemy === enemy)
       dummy?.flash()
-      const up = new Vector3(0, 1, 0)
       for (let i = 0; i < 12; i++) {
-        this.impactEmitter!.emit(pos, up.clone().multiplyScalar(8))
+        this._impactVel.copy(this._impactUp).multiplyScalar(8)
+        this.impactEmitter!.emit(pos, this._impactVel)
       }
     }
 
     this.projectileSystem.onHostageBolt = (hostage, pos, effect) => {
       if (effect === 'heal') {
         this.fpsHostageController?.notifyHealed(hostage)
-        const up = new Vector3(0, 1, 0)
         for (let i = 0; i < 10; i++) {
-          this.impactEmitter!.emit(pos, up.clone().multiplyScalar(6))
+          this._impactVel.copy(this._impactUp).multiplyScalar(6)
+          this.impactEmitter!.emit(pos, this._impactVel)
         }
       } else {
         this.fpsHostageController?.notifyDamaged(hostage)
-        const up = new Vector3(0, 1, 0)
         for (let i = 0; i < 8; i++) {
-          this.impactEmitter!.emit(pos, up.clone().multiplyScalar(7))
+          this._impactVel.copy(this._impactUp).multiplyScalar(7)
+          this.impactEmitter!.emit(pos, this._impactVel)
         }
       }
     }
@@ -362,12 +373,10 @@ export class FpsViewController implements Tickable {
 
       this.enemyProjectileSystem.onHostageHit = (hostage, _damage, _sourceX, _sourceZ) => {
         this.fpsHostageController?.notifyDamaged(hostage)
-        const up = new Vector3(0, 1, 0)
+        this._impactPos.set(hostage.position.x, hostage.hitCenterWorldY, hostage.position.z)
         for (let i = 0; i < 8; i++) {
-          this.impactEmitter!.emit(
-            new Vector3(hostage.position.x, hostage.hitCenterWorldY, hostage.position.z),
-            up.clone().multiplyScalar(5),
-          )
+          this._impactVel.copy(this._impactUp).multiplyScalar(5)
+          this.impactEmitter!.emit(this._impactPos, this._impactVel)
         }
       }
 
@@ -397,24 +406,10 @@ export class FpsViewController implements Tickable {
         }
       }
 
-      // Visual mesh lifecycle for enemy projectiles
-      this.enemyProjectileSystem.onProjectileMove = (id, x, y, z) => {
-        let mesh = this.enemyProjectileMeshes.get(id)
-        if (!mesh) {
-          mesh = new EnemyProjectileMesh()
-          this.sceneManager!.addToScene(mesh.group)
-          this.enemyProjectileMeshes.set(id, mesh)
-        }
-        mesh.setPosition(x, y, z)
-      }
-
-      this.enemyProjectileSystem.onProjectileRemoved = (id) => {
-        const mesh = this.enemyProjectileMeshes.get(id)
-        if (mesh) {
-          mesh.dispose()
-          this.enemyProjectileMeshes.delete(id)
-        }
-      }
+      this.enemyProjectileMeshPool = new EnemyProjectileMeshPool(this.sceneManager.scene)
+      this.enemyProjectileMeshPool.prewarm()
+      this.enemyProjectileSystem.onProjectileMove = this.enemyProjectileMeshPool.acquire
+      this.enemyProjectileSystem.onProjectileRemoved = this.enemyProjectileMeshPool.release
 
       for (let i = 0; i < ENEMY_SPAWN_COUNT; i++) {
         const angle = (i / ENEMY_SPAWN_COUNT) * Math.PI * 2
@@ -593,6 +588,16 @@ export class FpsViewController implements Tickable {
       const pp = this.playerController.group.position
       this.enemyDirector.setPlayerPosition(pp.x, pp.y, pp.z)
 
+      // v5: apply distance-based geometry LOD + N-nearest light cap once
+      // per frame, before any controller's tick observes `lodSkipGeometry`.
+      this.enemyLodApplier.begin(pp.x, pp.z)
+      for (const handle of this.enemyDirector.enemies) {
+        this.enemyLodApplier.consider(handle, this.enemyControllers.get(handle.id))
+        this.enemyLodApplier.consider(handle, this.chimeraControllers.get(handle.id))
+        this.enemyLodApplier.consider(handle, this.spireControllers.get(handle.id))
+      }
+      this.enemyLodApplier.commit()
+
       for (const handle of this.enemyDirector.enemies) {
         const ctrl = this.enemyControllers.get(handle.id)
         if (!ctrl) continue
@@ -602,6 +607,7 @@ export class FpsViewController implements Tickable {
           this.tickHandler!.unregister(ctrl)
           this.enemyControllers.delete(handle.id)
           this.enemyDirector!.despawn(handle)
+          this.enemyTiltCache?.release(handle.id)
           continue
         }
 
@@ -630,15 +636,13 @@ export class FpsViewController implements Tickable {
           ctrl.group.rotation.y = Math.atan2(dir.x, dir.z)
         }
 
-        // Tilt body to match terrain slope
-        if (this.heightmap) {
-          const n = this.heightmap.normalAt(
-            handle.enemy.position.x,
-            handle.enemy.position.z,
-          )
-          ctrl.group.rotation.x = Math.atan2(n.z, n.y)
-          ctrl.group.rotation.z = Math.atan2(-n.x, n.y)
-        }
+        // Tilt body to match terrain slope (throttled per-enemy resampling)
+        this.enemyTiltCache?.applyTilt(
+          handle.id,
+          handle.enemy.position.x,
+          handle.enemy.position.z,
+          ctrl.group,
+        )
       }
 
       // Spire sync
@@ -713,6 +717,7 @@ export class FpsViewController implements Tickable {
           this.tickHandler!.unregister(ctrl)
           this.chimeraControllers.delete(handle.id)
           this.enemyDirector!.despawn(handle)
+          this.enemyTiltCache?.release(handle.id)
           continue
         }
 
@@ -744,14 +749,12 @@ export class FpsViewController implements Tickable {
           ctrl.group.rotation.y = Math.atan2(dir.x, dir.z)
         }
 
-        if (this.heightmap) {
-          const n = this.heightmap.normalAt(
-            handle.enemy.position.x,
-            handle.enemy.position.z,
-          )
-          ctrl.group.rotation.x = Math.atan2(n.z, n.y)
-          ctrl.group.rotation.z = Math.atan2(-n.x, n.y)
-        }
+        this.enemyTiltCache?.applyTilt(
+          handle.id,
+          handle.enemy.position.x,
+          handle.enemy.position.z,
+          ctrl.group,
+        )
 
         if (handle.lastOutput.wantsToFire && this.enemyProjectileSystem) {
           ctrl.group.updateMatrixWorld(true)
@@ -880,12 +883,14 @@ export class FpsViewController implements Tickable {
     this.spireControllers.clear()
     for (const ctrl of this.chimeraControllers.values()) ctrl.dispose()
     this.chimeraControllers.clear()
-    for (const mesh of this.enemyProjectileMeshes.values()) mesh.dispose()
-    this.enemyProjectileMeshes.clear()
+    this.enemyProjectileMeshPool?.disposeAll()
+    this.enemyProjectileMeshPool = null
     this.enemyProjectileSystem?.dispose()
     for (const ctrl of this.enemyControllers.values()) ctrl.dispose()
     this.enemyControllers.clear()
     this.enemyDirector?.despawnAll()
+    this.enemyTiltCache?.clear()
+    this.enemyTiltCache = null
     this.projectileSystem?.dispose()
     this.impactEmitter?.dispose()
     this.multiTool?.dispose()

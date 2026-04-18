@@ -66,16 +66,28 @@ export class ProjectileSystem implements Tickable {
     return geometry
   })()
 
-  /** Called when a projectile hits terrain. Position is the impact point. */
+  /**
+   * Called when a projectile hits terrain.
+   *
+   * @param position - **Transient** impact point. Mutated on the next callback;
+   *   copy if you need to keep it past the synchronous handler body.
+   */
   onImpact: ((position: THREE.Vector3) => void) | null = null
-  /** Called when a projectile hits an enemy. */
+  /**
+   * Called when a projectile hits an enemy.
+   *
+   * @param enemy - Enemy that took the hit
+   * @param position - **Transient** impact point. Mutated on the next callback;
+   *   copy if you need to keep it past the synchronous handler body.
+   */
   onEnemyHit: ((enemy: Enemy, position: THREE.Vector3) => void) | null = null
 
   /**
    * Called when a player bolt hits a hostage — damage (weapon/drill) or heal (med).
    *
    * @param hostage - Hit hostage
-   * @param position - Impact position in world space
+   * @param position - **Transient** impact point. Mutated on the next callback;
+   *   copy if you need to keep it past the synchronous handler body.
    * @param effect - Whether the bolt hurt or healed
    */
   onHostageBolt: ((
@@ -83,6 +95,14 @@ export class ProjectileSystem implements Tickable {
     position: THREE.Vector3,
     effect: 'damage' | 'heal',
   ) => void) | null = null
+
+  /**
+   * Reused scratch position for impact/hit callbacks. Allocated once per
+   * `ProjectileSystem` so callers do not have to clone every frame; the
+   * **transient** contract on the callback typedefs documents that consumers
+   * must copy if they need to keep the value past the synchronous call.
+   */
+  private readonly _callbackPos = new THREE.Vector3()
 
   constructor(scene: THREE.Scene, heightmap: Heightmap) {
     this.scene = scene
@@ -135,7 +155,11 @@ export class ProjectileSystem implements Tickable {
     color: THREE.Color,
     boltKind: MultiToolMode,
   ): void {
-    const projectile = this.pool.pop() ?? this.createProjectile()
+    let projectile = this.pool.pop()
+    if (!projectile) {
+      projectile = this.createProjectile()
+      this.scene.add(projectile.mesh)
+    }
     const mesh = projectile.mesh
     const material = projectile.material
 
@@ -144,7 +168,6 @@ export class ProjectileSystem implements Tickable {
     material.uniforms['uColor']!.value.copy(color)
     material.uniforms['uTime']!.value = 0
     mesh.visible = true
-    this.scene.add(mesh)
 
     this.projectiles.push({
       mesh,
@@ -182,18 +205,21 @@ export class ProjectileSystem implements Tickable {
         const healHit = this.closestHostageHealHit(this._prevPos, pos)
         if (healHit) {
           healHit.hostage.heal(HEAL_BOLT_AMOUNT)
-          this.onHostageBolt?.(healHit.hostage, pos.clone(), 'heal')
+          this._callbackPos.copy(pos)
+          this.onHostageBolt?.(healHit.hostage, this._callbackPos, 'heal')
           hitHostage = true
         }
       } else {
         const combatHit = this.closestCombatBoltHit(this._prevPos, pos, p.boltKind)
         if (combatHit?.kind === 'enemy') {
           combatHit.enemy.takeDamage(BOLT_DAMAGE * this.damageMultiplier)
-          this.onEnemyHit?.(combatHit.enemy, pos.clone())
+          this._callbackPos.copy(pos)
+          this.onEnemyHit?.(combatHit.enemy, this._callbackPos)
           hitEnemy = true
         } else if (combatHit?.kind === 'hostage') {
           combatHit.hostage.takeDamage(BOLT_DAMAGE * this.damageMultiplier)
-          this.onHostageBolt?.(combatHit.hostage, pos.clone(), 'damage')
+          this._callbackPos.copy(pos)
+          this.onHostageBolt?.(combatHit.hostage, this._callbackPos, 'damage')
           hitHostage = true
         }
       }
@@ -205,7 +231,8 @@ export class ProjectileSystem implements Tickable {
       // Remove on hit or timeout
       if (hitEnemy || hitHostage || hitTerrain || p.age >= BOLT_MAX_LIFETIME) {
         if (hitTerrain || hitEnemy || hitHostage) {
-          this.onImpact?.(pos.clone())
+          this._callbackPos.copy(pos)
+          this.onImpact?.(this._callbackPos)
         }
         this.removeProjectile(i)
       }
@@ -350,7 +377,6 @@ export class ProjectileSystem implements Tickable {
 
   private removeProjectile(index: number): void {
     const p = this.projectiles[index]!
-    this.scene.remove(p.mesh)
     p.mesh.visible = false
     this.projectiles.splice(index, 1)
     this.pool.push(p)
@@ -361,9 +387,35 @@ export class ProjectileSystem implements Tickable {
       this.removeProjectile(i)
     }
     for (const projectile of this.pool) {
+      this.scene.remove(projectile.mesh)
       projectile.material.dispose()
     }
     this.pool.length = 0
+  }
+
+  /**
+   * Pre-allocate `count` projectile instances and add their meshes to the
+   * scene as invisible. Without this the pool starts empty and the first
+   * shots of a session each compile a fresh `ShaderMaterial` program
+   * synchronously the next time the renderer draws — visible as a hitch
+   * the first time the player fires while turning.
+   *
+   * Safe to call once during `init()` after the scene is built so the
+   * level's `renderer.compileAsync(scene, camera)` warmup pass walks over
+   * the prewarmed meshes (`compile` traverses with `traverse`, not
+   * `traverseVisible`, so invisible meshes still get warmed).
+   *
+   * @param count - Number of projectiles to prewarm. Conservative default
+   *   matches a short multitool burst.
+   *
+   * @spec docs/superpowers/specs/2026-04-18-fps-perf-fixes-design.md (v4)
+   */
+  prewarmPool(count: number = 16): void {
+    for (let i = 0; i < count; i++) {
+      const projectile = this.createProjectile()
+      this.scene.add(projectile.mesh)
+      this.pool.push(projectile)
+    }
   }
 
   private createProjectile(): Projectile {

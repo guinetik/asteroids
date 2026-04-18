@@ -36,7 +36,15 @@ export class SceneManager implements Tickable {
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true })
     this.renderer.setClearColor(0x000000)
-    this.renderer.setPixelRatio(window.devicePixelRatio)
+    // Cap pixel ratio. On hi-DPI displays (Retina, 4K), `window.devicePixelRatio`
+    // is often 2 or even 3, which means the GPU shades 4× to 9× as many fragments
+    // as the logical viewport. PBR + shadow lookup + post-processing made this the
+    // single biggest steady-state fragment-shader cost. Capping at 1.5 keeps the
+    // image clearly sharper than 1.0 (visually negligible blur on text/edges) but
+    // halves fragment cost vs DPR 2.
+    //
+    // @spec docs/superpowers/specs/2026-04-18-fps-perf-fixes-design.md (v4)
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFShadowMap
 

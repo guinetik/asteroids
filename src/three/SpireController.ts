@@ -24,8 +24,15 @@ import {
 
 // ── Visual constants ────────────────────────────────────────────
 const SPIRE_SCALE = 2.0
-/** Fewer spikes = fewer draw calls + less tick work; coverage stays even (Fibonacci). */
-const SPIKE_COUNT = 32
+/**
+ * Fewer spikes = fewer draw calls + less tick work; coverage stays even
+ * (Fibonacci spiral). Halved from 32 in the v2 perf pass — a Spire was
+ * 64 spike meshes (stalk + bulb per spike), so a mission with 4 Spires
+ * dropped ~128 draw calls per frame with this single change.
+ *
+ * @spec docs/superpowers/specs/2026-04-18-fps-perf-fixes-design.md
+ */
+const SPIKE_COUNT = 16
 const BASE_RADIUS = 0.6
 
 const HIT_FLASH_DURATION = 0.08
@@ -159,6 +166,17 @@ export class SpireController implements Tickable {
   isMoving = false
   /** Current agitation state — set by VC from director output. */
   isAgitated = false
+
+  /**
+   * Toggle the spire's inner point light. Called by the minigame VC every
+   * tick on a "keep N nearest, hide the rest" basis to cap dynamic-light
+   * fragment-shader cost when many enemies are visible.
+   *
+   * @param enabled Whether the inner light contributes this frame.
+   */
+  setLightsEnabled(enabled: boolean): void {
+    this.light.visible = enabled
+  }
 
   /** True once the death animation has fully completed. */
   get deathComplete(): boolean {

@@ -12,8 +12,16 @@
 import * as THREE from 'three'
 import type { AtmosphereContext } from './AtmosphereContext'
 
-/** Shadow map resolution in pixels (width and height). */
-const SHADOW_MAP_SIZE = 2048
+/**
+ * Shadow map resolution in pixels (width and height). Halved from 2048
+ * in the v4 perf pass — the shadow render pass is fragment-bound on the
+ * map size, so 1024 is ¼ the cost. Edges become slightly chunkier on
+ * very long shadows but at typical EVA viewing distances the difference
+ * is hard to spot against the rocky terrain.
+ *
+ * @spec docs/superpowers/specs/2026-04-18-fps-perf-fixes-design.md (v4)
+ */
+const SHADOW_MAP_SIZE = 1024
 /** Shadow camera frustum half-size — covers the terrain area. */
 const SHADOW_FRUSTUM = 3000
 /** Shadow bias to prevent acne on terrain. */

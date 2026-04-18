@@ -18,15 +18,32 @@ const ROLL_LERP_SPEED = 6
 const BOB_AMPLITUDE = 0.08
 /** How fast bob lerps (per second). */
 const BOB_LERP_SPEED = 8
-/** How much terrain tilt feeds into camera (0 = none, 1 = full). */
-const TERRAIN_TILT_FACTOR = 0.15
+/**
+ * How much terrain tilt feeds into camera (0 = none, 1 = full).
+ *
+ * Set to 0 by the FPS perf-fixes pass — coupling the camera to the player
+ * group's terrain tilt was contributing to the disorienting "weird walking
+ * on uneven terrain" feel. The bob/roll wobble fed by `setVelocity` covers
+ * the motion-feedback need without reading the platformer's surface normal.
+ *
+ * @spec docs/superpowers/specs/2026-04-18-fps-perf-fixes-design.md
+ */
+const TERRAIN_TILT_FACTOR = 0
 /** How fast terrain tilt lerps (per second). */
 const TERRAIN_TILT_LERP_SPEED = 4
 
 /** Helmet light to keep the immediate look direction readable in EVA. */
 const HELMET_LIGHT_COLOR = 0xf4f7ff
 const HELMET_LIGHT_INTENSITY = 110
-const HELMET_LIGHT_DISTANCE = 240
+/**
+ * Halved from 240 in the v4 perf pass. The previous range lit fragments
+ * up to 240 units away — well past the player's typical interaction
+ * radius — and added per-fragment spotlight cost across that whole cone.
+ * 120 still reaches noticeably past the immediate look direction.
+ *
+ * @spec docs/superpowers/specs/2026-04-18-fps-perf-fixes-design.md (v4)
+ */
+const HELMET_LIGHT_DISTANCE = 120
 const HELMET_LIGHT_ANGLE = Math.PI * 0.16
 const HELMET_LIGHT_PENUMBRA = 0.9
 const HELMET_LIGHT_DECAY = 1.35

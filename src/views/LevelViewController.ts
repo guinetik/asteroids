@@ -295,8 +295,28 @@ export class LevelViewController implements Tickable {
 
   private readonly initialLanderSpawn = new Vector3()
 
+  /** Reused (0,1,0) seed for impact/explosion particle bursts. Treat as immutable. */
+  private readonly _impactUp = new Vector3(0, 1, 0)
+  /** Reused velocity scratch passed to `ParticleEmitter.emit` (which copies internally). */
+  private readonly _impactVel = new Vector3()
+
   // ── Elapsed time (seconds) ──────────────────────────────────
   private elapsed = 0
+
+  /**
+   * Throttle for HUD telemetry callbacks. The lander/EVA telemetry build
+   * allocates a fresh literal (and `objectives.map(...)` for EVA) every
+   * call, and Vue then reactivity-broadcasts it through every text node
+   * and `:style` binding in `FpsHud.vue`. Emitting that at 60 Hz produced
+   * visible camera-rotation hitching with enemies on screen.
+   *
+   * 15 Hz is imperceptible for HUD readouts and standard for telemetry
+   * overlays. Reset on EVA/lander enter so the first tick still emits.
+   *
+   * @spec docs/superpowers/specs/2026-04-18-fps-perf-fixes-design.md
+   */
+  private static readonly TELEMETRY_INTERVAL_S = 1 / 15
+  private telemetryAccumulator = LevelViewController.TELEMETRY_INTERVAL_S
 
   // ── Mouse state (EVA) ────────────────────────────────────────
   private leftMouseDown = false
@@ -548,6 +568,10 @@ export class LevelViewController implements Tickable {
     // ── Projectile system + particles ───────────────────────────
     this.projectileSystem = new ProjectileSystem(this.sceneManager.scene, this.heightmap)
     this.projectileSystem.setDamageMultiplier(getCurrentUpgradeValue('multitoolDamage'))
+    // Prewarm the bolt pool so its ShaderMaterial program is in the scene
+    // graph before the precompile pass — first fire would otherwise compile
+    // synchronously on render and hitch the frame.
+    this.projectileSystem.prewarmPool()
     this.impactEmitter = new ParticleEmitter({
       poolSize: 64,
       color: new Color(0xffaa44),
@@ -558,9 +582,9 @@ export class LevelViewController implements Tickable {
     })
     this.sceneManager.addToScene(this.impactEmitter.points)
     this.projectileSystem.onImpact = (pos) => {
-      const up = new Vector3(0, 1, 0)
       for (let i = 0; i < 8; i++) {
-        this.impactEmitter!.emit(pos, up.clone().multiplyScalar(5))
+        this._impactVel.copy(this._impactUp).multiplyScalar(5)
+        this.impactEmitter!.emit(pos, this._impactVel)
       }
     }
     this.multiTool.setProjectileSystem(this.projectileSystem)
@@ -614,9 +638,9 @@ export class LevelViewController implements Tickable {
           this.failLanderRun('Lander Destroyed by Nest Blast', { explode: true, hideLander: true })
         }
         minigame.onExplosion = (pos) => {
-          const up = new Vector3(0, 1, 0)
           for (let j = 0; j < 20; j++) {
-            this.impactEmitter?.emit(pos, up.clone().multiplyScalar(10 + Math.random() * 10))
+            this._impactVel.copy(this._impactUp).multiplyScalar(10 + Math.random() * 10)
+            this.impactEmitter?.emit(pos, this._impactVel)
           }
         }
         this.minigames.push(minigame)
@@ -654,9 +678,9 @@ export class LevelViewController implements Tickable {
           this.failLanderRun('Lander Destroyed by Virus Blast', { explode: true, hideLander: true })
         }
         minigame.onExplosion = (pos) => {
-          const up = new Vector3(0, 1, 0)
           for (let j = 0; j < 24; j++) {
-            this.impactEmitter?.emit(pos, up.clone().multiplyScalar(9 + Math.random() * 11))
+            this._impactVel.copy(this._impactUp).multiplyScalar(9 + Math.random() * 11)
+            this.impactEmitter?.emit(pos, this._impactVel)
           }
         }
         minigame.onFail = (_idx, cause) => {
@@ -723,10 +747,104 @@ export class LevelViewController implements Tickable {
       this.sceneManager.onResizeCallback = (w, h) => this.postProcessing!.resize(w, h)
     }
 
+    // ── Shader pre-compile warmup ──────────────────────────────
+    // Three.js compiles shader programs the first time a material is drawn.
+    // For PBR (`MeshStandardMaterial`) and our many `ShaderMaterial` variants
+    // this is a multi-hundred-millisecond — sometimes multi-second — main-thread
+    // stall on a cold GPU shader cache. v2 made this **worse** by enabling
+    // frustum culling on rocks: instead of compiling once during the loading
+    // screen (because every rock batch was always rendered), shader compile
+    // was deferred until rotation brought a batch into view, producing the
+    // 3s RAF hitches the user reported.
+    //
+    // `compileAsync` walks the entire scene with `traverse` (not
+    // `traverseVisible`), so even hidden meshes — exterminate craters,
+    // pooled enemy projectiles, etc. — get warmed up. Where the
+    // `KHR_parallel_shader_compile` extension is available the compile
+    // happens off-thread; otherwise it still moves the cost to load time
+    // (where the existing mission intro masks it) instead of into gameplay.
+    //
+    // We don't bail on warmup failure — the game still works without it,
+    // just with the hitches it had before. A console warn is enough.
+    //
+    // @see docs/superpowers/specs/2026-04-18-fps-perf-fixes-design.md (v3)
+    await this.precompileShaders()
+
     // ── Start ───────────────────────────────────────────────────
     this.gameLoop = new GameLoop(this.tickHandler)
     this.gameLoop.start()
     useAudio().play('ambient.asteroid', { loop: true })
+  }
+
+  /**
+   * Run a one-shot WebGL shader pre-compile pass over the whole level scene.
+   *
+   * Should be called exactly once, after every static system has been built
+   * (terrain, rocks, lander, enemies, hostages, post-processing) and before
+   * the game loop starts. Idempotent — calling it twice is harmless but
+   * wastes time.
+   *
+   * **Why we force lights visible.** Three.js's `compile()` walks lights with
+   * `traverseVisible` (not `traverse`), so any light whose `.visible` is
+   * `false` at warmup time is **excluded from the program defines**
+   * (`NUM_SPOT_LIGHTS`, `NUM_POINT_LIGHTS`, ...). Several lights in the
+   * level start invisible and only flip on later — `helmetLightRig`
+   * (`enterEva`), `washLight` (lander thrust), `explosionLight` (mid-fight
+   * detonation). Without this protection, the moment any of those flips
+   * on, every PBR material's program key changes and Three.js recompiles
+   * the program **the next time each material is drawn**. For
+   * frustum-culled rock batches that's during a camera rotation — exactly
+   * the multi-second RAF stall the user reported.
+   *
+   * We snapshot every light's visibility, force them all visible, run the
+   * compile (which uses `traverseVisible` for lights but `traverse` for
+   * materials so it warms hidden meshes too), then restore. Any light count
+   * <= the warmup max reuses the warmed program; only counts greater than
+   * what we set up here would trigger a real recompile.
+   *
+   * Uses the FPS camera if available (its layer mask is the most permissive
+   * for EVA materials), falling back to the vehicle camera and finally to
+   * `SceneManager.activeCamera`. The choice of camera does **not** affect
+   * which materials are compiled — only which light/fog state the program
+   * is configured against.
+   *
+   * @returns A promise that resolves when every program reports ready.
+   *   Resolves immediately on environments that lack `compileAsync` (older
+   *   Three.js builds) so callers can `await` unconditionally.
+   *
+   * @see docs/superpowers/specs/2026-04-18-fps-perf-fixes-design.md (v3)
+   */
+  private async precompileShaders(): Promise<void> {
+    if (!this.sceneManager) return
+    const renderer = this.sceneManager.renderer
+    const scene = this.sceneManager.scene
+    const camera = this.fpsCamera?.camera
+      ?? this.vehicleCamera?.camera
+      ?? this.sceneManager.activeCamera
+    if (!camera) return
+
+    const restoreLightVisibility: Array<{ light: THREE.Light, visible: boolean }> = []
+    scene.traverse((obj) => {
+      const maybeLight = obj as THREE.Light
+      if (maybeLight.isLight) {
+        restoreLightVisibility.push({ light: maybeLight, visible: maybeLight.visible })
+        maybeLight.visible = true
+      }
+    })
+
+    try {
+      if (typeof renderer.compileAsync === 'function') {
+        await renderer.compileAsync(scene, camera)
+      } else if (typeof renderer.compile === 'function') {
+        renderer.compile(scene, camera)
+      }
+    } catch (err) {
+      console.warn('[LevelViewController] shader precompile failed; gameplay may hitch on first appearance of new materials', err)
+    } finally {
+      for (const entry of restoreLightVisibility) {
+        entry.light.visible = entry.visible
+      }
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -827,6 +945,9 @@ export class LevelViewController implements Tickable {
   // ═══════════════════════════════════════════════════════════════
 
   private enterLander(): void {
+    // Force the throttled HUD telemetry to emit on the very next tick so the
+    // lander HUD lights up immediately on state change.
+    this.telemetryAccumulator = LevelViewController.TELEMETRY_INTERVAL_S
     this.tickHandler!.register(this.landerController!, TICK_PRIORITY_PHYSICS)
     this.tickHandler!.register(this.vehicleCamera!, TICK_PRIORITY_RENDER - 2)
     this.tickHandler!.register(this.landerExplosion!, TICK_PRIORITY_PHYSICS + 3)
@@ -862,6 +983,9 @@ export class LevelViewController implements Tickable {
   // ═══════════════════════════════════════════════════════════════
 
   private enterEva(): void {
+    // Force the throttled HUD telemetry to emit on the very next tick so the
+    // EVA HUD lights up immediately on state change.
+    this.telemetryAccumulator = LevelViewController.TELEMETRY_INTERVAL_S
     this.hasExitedVehicle = true
     this.playerController!.group.position.copy(this.findSafeEvaSpawnPosition())
 
@@ -1306,8 +1430,19 @@ export class LevelViewController implements Tickable {
 
       this.onStateInfo?.({ state: currentState, grounded, canExfil, canEnterLander })
 
+      // Throttle the high-cardinality HUD payloads (lander/EVA telemetry +
+      // player-position) to TELEMETRY_INTERVAL_S. The Vue HUD bindings re-read
+      // every property on every callback, which made camera rotation feel
+      // jittery while enemies were on screen. State info above stays per-frame
+      // because it drives the action prompts (canExfil/canEnterLander).
+      this.telemetryAccumulator += dt
+      const shouldEmitTelemetry = this.telemetryAccumulator >= LevelViewController.TELEMETRY_INTERVAL_S
+      if (shouldEmitTelemetry) {
+        this.telemetryAccumulator = 0
+      }
+
       // Lander telemetry
-      if (currentState === 'lander' && this.onLanderTelemetry && this.landerController) {
+      if (shouldEmitTelemetry && currentState === 'lander' && this.onLanderTelemetry && this.landerController) {
         const ts = this.landerController.thrusterSystem
         this.onLanderTelemetry({
           altitude: this.landerController.altitudeAboveGround,
@@ -1335,7 +1470,7 @@ export class LevelViewController implements Tickable {
       }
 
       // FPS telemetry
-      if (currentState === 'eva' && this.onFpsTelemetry && this.playerController) {
+      if (shouldEmitTelemetry && currentState === 'eva' && this.onFpsTelemetry && this.playerController) {
         const ts = this.playerController.thrusterSystem
         const headingRad = this.fpsCamera!.camera.rotation.y
         const playerPos = this.playerController.group.position
@@ -1424,11 +1559,17 @@ export class LevelViewController implements Tickable {
         this.playerController.grounded,
       )
 
-      // Footsteps — fire when moving and grounded on the asteroid surface
+      // Footsteps — fire when moving and grounded on the asteroid surface.
+      // Pass the sprint state so the procedural synth can shorten cadence and
+      // brighten the step on a sprint.
+      const sprintingForSteps =
+        this.inputManager!.isActionActive('sprint') &&
+        this.playerController.thrusterSystem.canFire('sprint')
       this.footsteps.update(
         dt,
         this.playerController.speed > MIN_MOVE_SPEED,
         this.playerController.grounded,
+        sprintingForSteps,
       )
 
       // Floating loop — delayed onset + fade-in to avoid triggering on short hops

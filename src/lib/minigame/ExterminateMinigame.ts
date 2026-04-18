@@ -17,11 +17,13 @@ import { FLAT_ZONE_RADIUS } from '@/lib/terrain/terrainGenerator'
 import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import { EnemyDirector, type EnemyHandle } from '@/lib/fps/enemyDirector'
 import { EnemyProjectileSystem } from '@/lib/fps/enemyProjectileSystem'
+import { EnemyTiltCache } from '@/lib/fps/enemyTiltCache'
+import { EnemyLodApplier } from '@/lib/fps/enemyLodHelper'
 import { NestModel } from '@/three/NestModel'
 import { BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/BacteriophageController'
 import { SpireController, SPIRE_HIT_CENTER_Y } from '@/three/SpireController'
 import { ChimeraWalkerController, CHIMERA_HIT_CENTER_Y } from '@/three/ChimeraWalkerController'
-import { EnemyProjectileMesh } from '@/three/EnemyProjectileMesh'
+import { EnemyProjectileMeshPool } from '@/three/EnemyProjectileMeshPool'
 import type { Enemy } from '@/lib/fps/enemy'
 
 const NEST_SCALE = 5
@@ -100,7 +102,9 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
   private readonly spireControllers = new Map<number, SpireController>()
   private readonly chimeraControllers = new Map<number, ChimeraWalkerController>()
   private readonly chimeraLaserOriginScratch = new THREE.Vector3()
-  private readonly enemyProjectileMeshes = new Map<number, EnemyProjectileMesh>()
+  private readonly enemyProjectileMeshPool: EnemyProjectileMeshPool
+  private readonly enemyTiltCache: EnemyTiltCache
+  private readonly enemyLodApplier = new EnemyLodApplier()
   private readonly enemyByHandleId = new Map<number, Enemy>()
   private readonly encounterEnemies: Enemy[] = []
   private readonly craterGroup = new THREE.Group()
@@ -171,6 +175,9 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
     this.projectileSystem = projectileSystem
     this.missionDifficulty = missionDifficulty
     this.nest = nest
+    this.enemyProjectileMeshPool = new EnemyProjectileMeshPool(scene)
+    this.enemyProjectileMeshPool.prewarm()
+    this.enemyTiltCache = new EnemyTiltCache(heightmap)
 
     const groundY = heightmap.heightAt(objective.x, objective.z)
     this.nestPosition.set(objective.x, groundY, objective.z)
@@ -346,22 +353,8 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
       this.onDamagePlayer?.(damage, sourceX, sourceZ)
     }
 
-    this.enemyProjectileSystem.onProjectileMove = (id, x, y, z) => {
-      let mesh = this.enemyProjectileMeshes.get(id)
-      if (!mesh) {
-        mesh = new EnemyProjectileMesh()
-        this.scene.add(mesh.group)
-        this.enemyProjectileMeshes.set(id, mesh)
-      }
-      mesh.setPosition(x, y, z)
-    }
-
-    this.enemyProjectileSystem.onProjectileRemoved = (id) => {
-      const mesh = this.enemyProjectileMeshes.get(id)
-      if (!mesh) return
-      mesh.dispose()
-      this.enemyProjectileMeshes.delete(id)
-    }
+    this.enemyProjectileSystem.onProjectileMove = this.enemyProjectileMeshPool.acquire
+    this.enemyProjectileSystem.onProjectileRemoved = this.enemyProjectileMeshPool.release
   }
 
   private syncEnemySimulation(dt: number, ctx: MiniGameContext): void {
@@ -385,6 +378,22 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
     this.enemyDirector.tick(dt)
     this.enemyProjectileSystem.tick(dt)
 
+    // Compute distance-based geometry LOD + N-nearest light cap BEFORE
+    // controller ticks run. Distance-LOD has to be set before tick() so
+    // the controller's own tube-rebake branch can early-out; light caps
+    // are render-time visibility flags, so timing doesn't matter for them
+    // but we batch them in the same pass to avoid a second loop.
+    // @see docs/superpowers/specs/2026-04-18-fps-perf-fixes-design.md (v5)
+    const lodPlayerX = player?.x ?? this.objective.x + ENEMY_PLAYER_FAR_DISTANCE
+    const lodPlayerZ = player?.z ?? this.objective.z + ENEMY_PLAYER_FAR_DISTANCE
+    this.enemyLodApplier.begin(lodPlayerX, lodPlayerZ)
+    for (const handle of this.enemyDirector.enemies) {
+      this.enemyLodApplier.consider(handle, this.groundControllers.get(handle.id))
+      this.enemyLodApplier.consider(handle, this.chimeraControllers.get(handle.id))
+      this.enemyLodApplier.consider(handle, this.spireControllers.get(handle.id))
+    }
+    this.enemyLodApplier.commit()
+
     for (const handle of this.enemyDirector.enemies) {
       this.syncGroundController(this.groundControllers.get(handle.id), handle, dt, PHAGE_HIT_CENTER_Y)
       this.syncGroundController(this.chimeraControllers.get(handle.id), handle, dt, CHIMERA_HIT_CENTER_Y)
@@ -407,6 +416,7 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
       this.enemyDirector.despawn(handle)
       this.groundControllers.delete(handle.id)
       this.chimeraControllers.delete(handle.id)
+      this.enemyTiltCache.release(handle.id)
       return
     }
 
@@ -420,9 +430,12 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
       ctrl.group.position.y = groundY
       handle.enemy.position.y = groundY + hitCenterY
 
-      const n = this.heightmap.normalAt(handle.enemy.position.x, handle.enemy.position.z)
-      ctrl.group.rotation.x = Math.atan2(n.z, n.y)
-      ctrl.group.rotation.z = Math.atan2(-n.x, n.y)
+      this.enemyTiltCache.applyTilt(
+        handle.id,
+        handle.enemy.position.x,
+        handle.enemy.position.z,
+        ctrl.group,
+      )
 
       if (handle.type === 'chimera' && handle.lastOutput.isChasing) {
         const ax = handle.lastOutput.aimTargetX
@@ -651,14 +664,12 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
 
     this.enemyDirector.despawnAll()
     this.enemyByHandleId.clear()
+    this.enemyTiltCache.clear()
   }
 
   private clearEnemyProjectiles(): void {
     this.enemyProjectileSystem.dispose()
-    for (const mesh of this.enemyProjectileMeshes.values()) {
-      mesh.dispose()
-    }
-    this.enemyProjectileMeshes.clear()
+    this.enemyProjectileMeshPool.disposeAll()
   }
 
   private advanceStep(index: number): void {

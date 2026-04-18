@@ -207,9 +207,22 @@ export class SurfaceRockController {
         const material = tuneRockMaterial(template.material, look, texture, options.baseColor)
         const mesh = new THREE.InstancedMesh(template.geometry.clone(), material, bucket.length)
         mesh.name = `surfaceRock-${look.name}-${ti}`
-        mesh.castShadow = true
+        // Rocks no longer cast shadows. With 250–1000 instances across many
+        // batches, the shadow pass was rendering each rock a second time
+        // every frame; disabling halves the rock workload at the cost of
+        // missing self-shadows on terrain. Receive-shadow is kept so the
+        // sun/lander shadows from larger geometry still land on rocks.
+        //
+        // @spec docs/superpowers/specs/2026-04-18-fps-perf-fixes-design.md (v4)
+        mesh.castShadow = false
         mesh.receiveShadow = true
-        mesh.frustumCulled = false
+        // Frustum culling is enabled per-batch — the bounding sphere is
+        // recomputed below after every instance matrix is written so the
+        // sphere actually encloses the placed rocks (not just the geometry
+        // around its origin). Without this, hundreds of rock batches would
+        // submit draw calls every frame regardless of camera direction,
+        // which is exactly the camera-rotation lag we are chasing.
+        mesh.frustumCulled = true
         mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage)
 
         for (let localIndex = 0; localIndex < bucket.length; localIndex++) {
@@ -232,6 +245,7 @@ export class SurfaceRockController {
         }
 
         mesh.instanceMatrix.needsUpdate = true
+        mesh.computeBoundingSphere()
         controller.meshes.push(mesh)
         controller.group.add(mesh)
       }

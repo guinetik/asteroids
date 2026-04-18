@@ -20,6 +20,7 @@ import {
   TRON_HOLOGRAM_ENEMY_COLOR_GAIN,
   TRON_HOLOGRAM_ENEMY_MATERIAL_OPACITY,
 } from '@/three/tronHologramMaterial'
+import { MutableTubeGeometry } from '@/three/geometry/MutableTubeGeometry'
 
 // ── Visual constants ────────────────────────────────────────────
 const PHAGE_SCALE = 2.0
@@ -64,9 +65,11 @@ const headGeo = new THREE.IcosahedronGeometry(0.4, 0)
 const coreGeo = new THREE.TorusKnotGeometry(0.12, 0.02, 32, 4)
 const ringGeo = new THREE.TorusGeometry(0.32, 0.02, 4, 8)
 
-/** Per-leg state for animation — mesh, radial angle, and gait phase offset. */
+/** Per-leg state for animation — mesh, radial angle, gait phase offset, and tube buffer. */
 interface LegData {
   mesh: THREE.Mesh
+  /** In-place mutable tube geometry — same instance is rewritten every refresh. */
+  tube: MutableTubeGeometry
   angle: number
   phase: number
 }
@@ -105,6 +108,12 @@ export class BacteriophageController implements Tickable {
   isMoving = false
   /** Current agitation state — set by VC from director output. */
   isAgitated = false
+  /**
+   * When `true`, per-frame leg geometry rebakes are skipped — used by the
+   * minigame VC to LOD-out distant enemies whose tube wiggle is invisible.
+   * Set every tick by the caller; the controller never toggles it itself.
+   */
+  lodSkipGeometry = false
   /** True once the death animation has fully completed. */
   get deathComplete(): boolean {
     return this.dead && this.deathTimer >= DEATH_ANIM_DURATION
@@ -214,11 +223,12 @@ export class BacteriophageController implements Tickable {
       const angle = (i / LEG_COUNT) * Math.PI * 2
       const phase = i % 2 === 0 ? 0 : Math.PI
 
+      const tube = new MutableTubeGeometry(LEG_TUBE_AXIAL_SEGMENTS, 4, LEG_TUBE_RADIUS, false)
       const curve = this.makeLegCurve(angle, phase, 0, false)
-      const geo = new THREE.TubeGeometry(curve, LEG_TUBE_AXIAL_SEGMENTS, LEG_TUBE_RADIUS, 4, false)
-      const mesh = new THREE.Mesh(geo, legTron)
+      tube.update(curve)
+      const mesh = new THREE.Mesh(tube, legTron)
       this.legsGroup.add(mesh)
-      this.legs.push({ mesh, angle, phase })
+      this.legs.push({ mesh, tube, angle, phase })
     }
   }
 
@@ -335,8 +345,11 @@ export class BacteriophageController implements Tickable {
     this.light.intensity = 0.6 + Math.sin(t * 2) * 0.3
 
     // --- Legs ---
+    // Skip the rebake entirely when LODed out — caller (minigame VC) sets
+    // `lodSkipGeometry` for enemies that are too far for tube wiggle to be
+    // visible. The static last-pose stays on screen, no GPU upload happens.
     this.legGeometryTimer += dt
-    if (this.legGeometryTimer >= LEG_GEOMETRY_UPDATE_INTERVAL) {
+    if (!this.lodSkipGeometry && this.legGeometryTimer >= LEG_GEOMETRY_UPDATE_INTERVAL) {
       this.refreshLegGeometry(t, this.isMoving)
       this.legGeometryTimer %= LEG_GEOMETRY_UPDATE_INTERVAL
     }
@@ -367,16 +380,17 @@ export class BacteriophageController implements Tickable {
     this.bodyGroup.rotation.z = ease * 0.4 + Math.sin(t * 12) * 0.08 * (1 - ease)
 
     // --- Legs curl inward progressively ---
+    // Death animation is a one-shot, ~1.2s — keep mutating in place even
+    // when LOD-skipped during normal play, so the corpse pose still settles.
     this.legGeometryTimer += dt
     if (this.legGeometryTimer >= LEG_GEOMETRY_UPDATE_INTERVAL) {
       for (const leg of this.legs) {
         const cx = Math.cos(leg.angle)
         const cz = Math.sin(leg.angle)
 
-        // Interpolate from current rest pose to collapsed
-        const legSpread = 1.2 * (1 - ease) // legs pull inward
-        const legHeight = 0.8 * (1 - ease) // hip drops
-        const footDrop = -0.3 * ease // feet curl under
+        const legSpread = 1.2 * (1 - ease)
+        const legHeight = 0.8 * (1 - ease)
+        const footDrop = -0.3 * ease
 
         const hip = new THREE.Vector3(cx * 0.3, legHeight, cz * 0.3)
         const knee = new THREE.Vector3(
@@ -391,8 +405,7 @@ export class BacteriophageController implements Tickable {
         )
 
         const curve = new THREE.QuadraticBezierCurve3(hip, knee, foot)
-        leg.mesh.geometry.dispose()
-        leg.mesh.geometry = new THREE.TubeGeometry(curve, LEG_TUBE_AXIAL_SEGMENTS, LEG_TUBE_RADIUS, 4, false)
+        leg.tube.update(curve)
       }
       this.legGeometryTimer %= LEG_GEOMETRY_UPDATE_INTERVAL
     }
@@ -446,9 +459,19 @@ export class BacteriophageController implements Tickable {
   private refreshLegGeometry(time: number, isMoving: boolean): void {
     for (const leg of this.legs) {
       const curve = this.makeLegCurve(leg.angle, leg.phase, time, isMoving)
-      leg.mesh.geometry.dispose()
-      leg.mesh.geometry = new THREE.TubeGeometry(curve, LEG_TUBE_AXIAL_SEGMENTS, LEG_TUBE_RADIUS, 4, false)
+      leg.tube.update(curve)
     }
+  }
+
+  /**
+   * Toggle the inner point light on/off. The minigame VC calls this every
+   * tick on a "keep N nearest, hide the rest" basis to cap the number of
+   * dynamic lights affecting PBR materials when many enemies are visible.
+   *
+   * @param enabled Whether the body light should contribute this frame.
+   */
+  setLightsEnabled(enabled: boolean): void {
+    this.light.visible = enabled
   }
 
   /** Clean up all geometry and materials. */
