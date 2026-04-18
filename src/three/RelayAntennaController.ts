@@ -9,6 +9,11 @@
  */
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
+import {
+  createTronHologramMaterial,
+  disposeTronHologramMaterials,
+  syncTronHologramTimeSeconds,
+} from './tronHologramMaterial'
 
 const BUS_RADIUS = 1.1
 const BUS_HEIGHT = 0.9
@@ -52,19 +57,18 @@ const DISH_YAW_HZ = 0.08
 
 const BUS_COLOR = 0xc8ccd2
 const DISH_BACK_COLOR = 0xdde1e6
-const DISH_INNER_COLOR = 0xf2f4f7
 const RTG_COLOR = 0x2a2826
 const BOOM_COLOR = 0x9aa0a8
 const INSTRUMENT_COLOR = 0x2b2e33
 const GOLD_COLOR = 0xd4a437
 const COMMS_COLOR = 0xff4d4d
+const DISH_TRON_COLOR = 0x00e5ff
+const DISH_TRON_GRID_TINT = new THREE.Color(0.02, 0.06, 0.09)
 
 const BUS_METALNESS = 0.94
 const BUS_ROUGHNESS = 0.18
 const DISH_BACK_METALNESS = 0.88
 const DISH_BACK_ROUGHNESS = 0.18
-const DISH_INNER_METALNESS = 0.98
-const DISH_INNER_ROUGHNESS = 0.08
 const BOOM_METALNESS = 0.9
 const BOOM_ROUGHNESS = 0.22
 const STRUT_METALNESS = 0.92
@@ -85,6 +89,7 @@ export class RelayAntennaController implements Tickable {
   private readonly dishPivot = new THREE.Group()
   private readonly commsLight: THREE.PointLight
   private readonly commsMaterial: THREE.MeshStandardMaterial
+  private readonly dishTronMaterial: THREE.ShaderMaterial
   private readonly disposables: { dispose(): void }[] = []
   private elapsed = 0
 
@@ -100,6 +105,11 @@ export class RelayAntennaController implements Tickable {
       emissiveIntensity: 1.5,
     })
     this.disposables.push(this.commsMaterial)
+
+    this.dishTronMaterial = createTronHologramMaterial({
+      color: DISH_TRON_COLOR,
+      gridTint: DISH_TRON_GRID_TINT,
+    })
 
     this.buildDish()
     this.buildBooms()
@@ -160,22 +170,19 @@ export class RelayAntennaController implements Tickable {
         side: THREE.BackSide,
       }),
     )
-    const innerMat = this.track(
-      new THREE.MeshStandardMaterial({
-        color: DISH_INNER_COLOR,
-        metalness: DISH_INNER_METALNESS,
-        roughness: DISH_INNER_ROUGHNESS,
-        side: THREE.FrontSide,
-      }),
-    )
     const bowlGeom = this.track(
       new THREE.SphereGeometry(DISH_RADIUS, 48, 24, 0, Math.PI * 2, 0, DISH_THETA_LENGTH),
     )
-    const bowlInner = new THREE.Mesh(bowlGeom, innerMat)
+    const bowlInner = new THREE.Mesh(bowlGeom, this.dishTronMaterial)
     const bowlBack = new THREE.Mesh(bowlGeom, backMat)
-    bowlInner.castShadow = true
-    bowlInner.receiveShadow = true
+    bowlInner.castShadow = false
+    bowlInner.receiveShadow = false
     bowlBack.castShadow = true
+
+    const tronMat = this.dishTronMaterial
+    bowlInner.onBeforeRender = () => {
+      syncTronHologramTimeSeconds([tronMat], performance.now() * 0.001)
+    }
 
     bowlInner.rotation.x = Math.PI
     bowlBack.rotation.x = Math.PI
@@ -357,6 +364,7 @@ export class RelayAntennaController implements Tickable {
 
   dispose(): void {
     this.commsLight.dispose()
+    disposeTronHologramMaterials([this.dishTronMaterial])
     for (const d of this.disposables) d.dispose()
   }
 }

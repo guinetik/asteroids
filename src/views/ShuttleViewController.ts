@@ -21,6 +21,7 @@ import { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
 import { CelestialBody } from '@/three/CelestialBody'
 import { CityModel } from '@/three/CityModel'
 import { RelayAntennaController } from '@/three/RelayAntennaController'
+import { SatelliteModel } from '@/three/SatelliteModel'
 import { AmbientLight, PointLight, Vector3 } from 'three'
 import { PortalArrivalSequence } from '@/three/PortalArrivalSequence'
 import { PortalBoundarySystem } from '@/three/PortalBoundarySystem'
@@ -46,6 +47,18 @@ const SHUTTLE_CITY_MODEL_SCALE = 10
 /** Distance from the shuttle's spawn point to place the prototype relay antenna. */
 const RELAY_ANTENNA_SPAWN_DISTANCE = 80
 
+/** Distance from the shuttle's spawn point to place the GLB satellite. */
+const GLB_SATELLITE_SPAWN_DISTANCE = 80
+
+/** Lateral offset between the procedural relay and the GLB satellite so both are visible. */
+const GLB_SATELLITE_LATERAL_OFFSET = 40
+
+/** Uniform scale for `sattelite.glb`; tune if asset units change. */
+const GLB_SATELLITE_MODEL_SCALE = 0.08
+
+/** Local rotation (radians) applied to sattelite.glb to make its panels sit as wings. */
+const GLB_SATELLITE_LOCAL_ROTATION = { x: 0, y: 0, z: Math.PI / 2 }
+
 /**
  * Bridges Vue lifecycle to the game loop and Three.js scene.
  * Creates and wires all game systems on init, tears down on dispose.
@@ -69,6 +82,7 @@ export class ShuttleViewController implements Tickable {
   private boundarySystem: PortalBoundarySystem | null = null
   private cityModel: CityModel | null = null
   private relayAntenna: RelayAntennaController | null = null
+  private satelliteModel: SatelliteModel | null = null
 
   /** Called each frame with full shuttle telemetry for HUD display */
   onTelemetry: ((telemetry: ShuttleTelemetry) => void) | null = null
@@ -186,6 +200,21 @@ export class ShuttleViewController implements Tickable {
     this.sceneManager.addToScene(this.relayAntenna.group)
     this.tickHandler.register(this.relayAntenna, TICK_PRIORITY_ANIMATION)
 
+    // GLB satellite — placed alongside the procedural relay, offset laterally so both read clearly.
+    this.satelliteModel = await SatelliteModel.create({
+      scale: GLB_SATELLITE_MODEL_SCALE,
+      rotation: GLB_SATELLITE_LOCAL_ROTATION,
+      panelMeshNames: ['Object_7', 'Object_8'],
+    })
+    const lateral = new Vector3(-forward.z, 0, forward.x) // right-hand perpendicular on XZ
+    this.satelliteModel.group.position.set(
+      shuttlePos.x + forward.x * GLB_SATELLITE_SPAWN_DISTANCE + lateral.x * GLB_SATELLITE_LATERAL_OFFSET,
+      shuttlePos.y,
+      shuttlePos.z + forward.z * GLB_SATELLITE_SPAWN_DISTANCE + lateral.z * GLB_SATELLITE_LATERAL_OFFSET,
+    )
+    this.satelliteModel.group.lookAt(shuttlePos)
+    this.sceneManager.addToScene(this.satelliteModel.group)
+
     // Outbound portal walls at grid edges
     this.boundarySystem = new PortalBoundarySystem(
       4000,
@@ -271,6 +300,11 @@ export class ShuttleViewController implements Tickable {
       this.sceneManager?.removeFromScene(this.relayAntenna.group)
       this.relayAntenna.dispose()
       this.relayAntenna = null
+    }
+    if (this.satelliteModel) {
+      this.sceneManager?.removeFromScene(this.satelliteModel.group)
+      this.satelliteModel.dispose()
+      this.satelliteModel = null
     }
     this.thrusterController?.dispose()
     this.portalArrival?.dispose()
