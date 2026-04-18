@@ -20,6 +20,7 @@ import { StarFieldController } from '@/three/StarFieldController'
 import { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
 import { CelestialBody } from '@/three/CelestialBody'
 import { CityModel } from '@/three/CityModel'
+import { RelayAntennaController } from '@/three/RelayAntennaController'
 import { AmbientLight, PointLight, Vector3 } from 'three'
 import { PortalArrivalSequence } from '@/three/PortalArrivalSequence'
 import { PortalBoundarySystem } from '@/three/PortalBoundarySystem'
@@ -41,6 +42,9 @@ const CITY_CLEARANCE_ABOVE_SUN_SURFACE = 4
 
 /** Uniform scale for `city.glb` when `?city=true`; tune if asset units change. */
 const SHUTTLE_CITY_MODEL_SCALE = 10
+
+/** Distance from the shuttle's spawn point to place the prototype relay antenna. */
+const RELAY_ANTENNA_SPAWN_DISTANCE = 80
 
 /**
  * Bridges Vue lifecycle to the game loop and Three.js scene.
@@ -64,6 +68,7 @@ export class ShuttleViewController implements Tickable {
   private portalArrival: PortalArrivalSequence | null = null
   private boundarySystem: PortalBoundarySystem | null = null
   private cityModel: CityModel | null = null
+  private relayAntenna: RelayAntennaController | null = null
 
   /** Called each frame with full shuttle telemetry for HUD display */
   onTelemetry: ((telemetry: ShuttleTelemetry) => void) | null = null
@@ -166,6 +171,21 @@ export class ShuttleViewController implements Tickable {
     this.vehicleCamera.setTarget(this.shuttleController.group)
     this.tickHandler.register(this.shuttleController, TICK_PRIORITY_PHYSICS)
 
+    // Prototype relay antenna prop — Voyager-style satellite for future EVA maintenance mission.
+    // Placed in front of the shuttle's spawn so it's visible right away.
+    this.relayAntenna = new RelayAntennaController()
+    const shuttlePos = this.shuttleController.group.position
+    const forward = new Vector3(-shuttlePos.x, 0, -shuttlePos.z).normalize()
+    this.relayAntenna.group.position.set(
+      shuttlePos.x + forward.x * RELAY_ANTENNA_SPAWN_DISTANCE,
+      shuttlePos.y,
+      shuttlePos.z + forward.z * RELAY_ANTENNA_SPAWN_DISTANCE,
+    )
+    // Aim the dish at the shuttle (internal model faces -Z, which lookAt aligns to the target).
+    this.relayAntenna.group.lookAt(shuttlePos)
+    this.sceneManager.addToScene(this.relayAntenna.group)
+    this.tickHandler.register(this.relayAntenna, TICK_PRIORITY_ANIMATION)
+
     // Outbound portal walls at grid edges
     this.boundarySystem = new PortalBoundarySystem(
       4000,
@@ -234,6 +254,7 @@ export class ShuttleViewController implements Tickable {
         temperature: 0,
         temperatureVisible: false,
         damageIntensity: 0,
+        compassBearings: [],
       })
     }
   }
@@ -245,6 +266,11 @@ export class ShuttleViewController implements Tickable {
       this.sceneManager?.removeFromScene(this.cityModel.group)
       this.cityModel.dispose()
       this.cityModel = null
+    }
+    if (this.relayAntenna) {
+      this.sceneManager?.removeFromScene(this.relayAntenna.group)
+      this.relayAntenna.dispose()
+      this.relayAntenna = null
     }
     this.thrusterController?.dispose()
     this.portalArrival?.dispose()
