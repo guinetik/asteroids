@@ -1619,23 +1619,25 @@ export class LevelViewController implements Tickable {
         this.playerController.body.velocityY,
         slope,
       )
+      // Use the player controller's authoritative sprint state so multitool
+      // visuals + footsteps cadence respect the sprint lockout — recomputing
+      // from raw input or `canFire` would flicker on each frame of recovered
+      // stamina while the player is still locked out.
+      const sprintingNow = this.playerController.isSprinting
       this.multiTool?.setState(
         this.playerController.speed,
-        this.inputManager!.isActionActive('sprint'),
+        sprintingNow,
         this.playerController.grounded,
       )
 
       // Footsteps — fire when moving and grounded on the asteroid surface.
       // Pass the sprint state so the procedural synth can shorten cadence and
       // brighten the step on a sprint.
-      const sprintingForSteps =
-        this.inputManager!.isActionActive('sprint') &&
-        this.playerController.thrusterSystem.canFire('sprint')
       this.footsteps.update(
         dt,
         this.playerController.speed > MIN_MOVE_SPEED,
         this.playerController.grounded,
-        sprintingForSteps,
+        sprintingNow,
       )
 
       // Floating loop — delayed onset + fade-in to avoid triggering on short hops
@@ -1654,10 +1656,12 @@ export class LevelViewController implements Tickable {
       }
       this._prevGrounded = grounded
 
-      // Breathing crossfade — run loop plays only when grounded AND actually sprinting
-      // with O2 charge. Airborne shift doesn't drain stamina so it stays on walk breath.
-      const sprintHeld = this.inputManager!.isActionActive('sprint')
-      const exerted = grounded && sprintHeld && this.playerController.thrusterSystem.canFire('sprint')
+      // Breathing crossfade — run loop plays only when the player controller
+      // reports actual sprint engagement. Reading `isSprinting` (instead of
+      // recomputing from raw input + canFire) honours the sprint lockout, so
+      // the run-breath sound doesn't chatter on every frame of recovered
+      // stamina while the player is still holding Shift after exhaustion.
+      const exerted = this.playerController.isSprinting
       if (exerted && !this._prevSprinting) {
         this._breathingWalkHandle?.stop()
         this._breathingWalkHandle = null

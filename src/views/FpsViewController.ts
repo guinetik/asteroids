@@ -578,7 +578,7 @@ export class FpsViewController implements Tickable {
       )
       this.multiTool?.setState(
         this.playerController.speed,
-        this.inputManager!.isActionActive('sprint'),
+        this.playerController.isSprinting,
         this.playerController.grounded,
       )
     }

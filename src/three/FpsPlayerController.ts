@@ -166,6 +166,12 @@ export class FpsPlayerController implements Tickable {
    * frame of sprint at a time.
    */
   private sprintLocked = false
+  /**
+   * Latest sprint-engagement state from {@link tick}. Exposed via {@link isSprinting}
+   * so other systems (audio, FX, gameplay) react to actual sprint instead of
+   * recomputing the conditions and missing the lockout.
+   */
+  private _isSprinting = false
 
   /** Fired when health reaches zero. */
   onDeath: (() => void) | null = null
@@ -205,6 +211,19 @@ export class FpsPlayerController implements Tickable {
   /** Max O2 capacity. */
   get o2Capacity(): number {
     return this.thrusterSystem.fuelCapacity
+  }
+
+  /**
+   * Whether the player is actively sprinting this frame.
+   *
+   * Reflects the same combined check used internally in {@link tick}: grounded,
+   * sprint input held, lockout cleared, and at least one frame of charge
+   * available. Other systems (breathing audio, dust puffs, FOV kick) should
+   * read this instead of duplicating the check — duplicates miss the lockout
+   * and end up firing during the recovery window.
+   */
+  get isSprinting(): boolean {
+    return this._isSprinting
   }
 
   /** Current lateral speed magnitude (XZ plane only). */
@@ -328,6 +347,7 @@ export class FpsPlayerController implements Tickable {
       this.inputManager.isActionActive('sprint') &&
       !this.sprintLocked &&
       this.thrusterSystem.canFire('sprint')
+    this._isSprinting = isSprinting
 
     // --- Coyote time — track how long since last grounded ---
     if (this.body.grounded) {

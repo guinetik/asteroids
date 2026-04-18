@@ -86,9 +86,38 @@ provides a meaningful refill but won't trivially top off the new capacity.
 - `bun test:unit` — 1127/1127 pass (no sprint or RTG capacity values are
   hard-coded in the suite, so the tuning shifts didn't break anything).
 
+## Followup — audio + downstream consumers honour the lockout
+
+After shipping the lockout the player movement was correct, but the run-breath
+audio loop in `LevelViewController` was still chattering during the recovery
+window. The audio block (and the multitool / footsteps blocks alongside it)
+were independently recomputing "is the player sprinting?" from
+`isActionActive('sprint') && canFire('sprint')`, which doesn't know about the
+lockout — so every frame of recovered charge briefly counted as sprinting
+and re-triggered the breathing crossfade.
+
+Fix:
+
+1. Added an `isSprinting` getter on `FpsPlayerController` that exposes the
+   exact value computed inside `tick()` (grounded + input + !locked + canFire).
+2. `LevelViewController` now reads `playerController.isSprinting` for breathing
+   crossfade, multitool sprint state, and footsteps cadence — all three were
+   duplicating the check.
+3. `FpsViewController.multiTool.setState` switched to the same getter so the
+   demo scene benefits too.
+
+Single source of truth: anywhere downstream that needs "is the player
+sprinting?" reads `isSprinting`, never the raw input/charge pair.
+
 ## Files Changed
 
 - `src/three/FpsPlayerController.ts` — added `SPRINT_RELOCK_FRACTION` constant,
-  `sprintLocked` field, and lockout logic in `tick()`.
+  `sprintLocked` field, lockout logic in `tick()`, and an `isSprinting` getter
+  backed by the latest tick state.
 - `src/data/fps/multitool-config.json` — `fuelCapacity 240 → 720`,
   `weapon.fuelCostPerRecharge 6.0 → 4.0`.
+- `src/views/LevelViewController.ts` — breathing crossfade, multitool state, and
+  footsteps cadence now read `playerController.isSprinting` instead of
+  recomputing from raw input + `canFire`.
+- `src/views/FpsViewController.ts` — `multiTool.setState` reads
+  `playerController.isSprinting`.
