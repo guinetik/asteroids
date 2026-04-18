@@ -831,6 +831,7 @@ function dockedPlanetId(): string | null {
     :upgrade-levels="upgradeLevelsUi"
     :player-credits="playerCredits"
     :player-name="playerProfileSnapshot.name"
+    :telemetry="telemetry"
     @close="closeShuttleControl"
     @open-shop="openShopFromTerminal"
     @purchase-upgrade="handlePurchaseUpgrade"
