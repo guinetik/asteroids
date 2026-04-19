@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { useAudio } from '@/audio/useAudio'
+import type { ShuttleAudioDirector } from '@/audio/ShuttleAudioDirector'
 import {
   acceptAsteroidMission,
   acceptEvaMission,
@@ -183,7 +183,7 @@ export class MapMissionFacade {
   }
 
   evaMissionAccept(
-    waypoint: { worldX: number; worldZ: number },
+    waypoint: { worldX: number; worldY: number; worldZ: number },
     onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null,
   ): void {
     this.board = acceptEvaMission(this.board, waypoint)
@@ -216,6 +216,13 @@ export class MapMissionFacade {
       | null
     onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null
     onMissionComplete: ((mission: ActiveShuttleMission | null) => void) | null
+    /**
+     * Audio orchestrator that owns the mission-clear sting. The facade
+     * delegates the one-shot play to the director instead of touching
+     * Howler directly so all shuttle gameplay audio routes through a
+     * single owner.
+     */
+    audio: ShuttleAudioDirector
   }): Inventory {
     const result = completeMission(this.board, params.missionId, params.inventory)
     if (!result.ok) return params.inventory
@@ -229,7 +236,7 @@ export class MapMissionFacade {
     params.onMissionComplete?.(
       result.board.activeMissions.find((mission) => mission.template.id === params.missionId) ?? null,
     )
-    useAudio().play('sfx.mission.shuttle.clear')
+    params.audio.notifyMissionDelivered()
     return result.inventory
   }
 
@@ -353,7 +360,11 @@ export class MapMissionFacade {
 
     if (!this.evaWaypointRoot) {
       const root = new THREE.Group()
-      root.position.set(evaMission.waypoint.worldX, 0, evaMission.waypoint.worldZ)
+      root.position.set(
+        evaMission.waypoint.worldX,
+        evaMission.waypoint.worldY,
+        evaMission.waypoint.worldZ,
+      )
       const marker = createWaypointMarkerGroup(WAYPOINT_MARKER_DEFAULT_COLOR, 'orbitMap')
       root.add(marker)
       scene.add(root)

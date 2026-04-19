@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import orbitConfig from '@/data/shuttle/orbit-capture.json'
 import { type InputManager } from '@/lib/InputManager'
-import { useAudio } from '@/audio/useAudio'
+import type { ShuttleAudioDirector } from '@/audio/ShuttleAudioDirector'
 import {
   OrbitCaptureSystem,
   type OrbitHudState,
@@ -29,6 +29,14 @@ interface SharedDeps {
 interface OrbitInputDeps extends SharedDeps {
   inputManager: InputManager
   mapIntroControlsLocked: boolean
+  /**
+   * Audio orchestrator that owns the orbit-capture sting, slingshot
+   * release stings, and the slingshot charge loop. The facade no
+   * longer plays Howler clips directly — it just notifies the director
+   * on edge events and tracks `isChargingSlingshot` for the per-frame
+   * audio update in {@link MapViewController}.
+   */
+  audio: ShuttleAudioDirector
 }
 
 interface OrbitTickDeps extends SharedDeps {
@@ -42,7 +50,13 @@ export class MapOrbitFacade {
   private _approachProgress = 0
   private _slingshotCharge = 0
   private _orbitRingIsPreview = false
-  private _chargeSoundPlaying = false
+  /**
+   * True while the slingshot charge whine should be looping (E held
+   * while orbiting). Read by {@link MapViewController} every frame and
+   * passed into {@link ShuttleAudioDirector.update} for edge-detection
+   * on the loop start/stop.
+   */
+  private _isChargingSlingshot = false
   private _exitCameraProgress = 0
   private _exitCameraActive = false
 
@@ -86,6 +100,16 @@ export class MapOrbitFacade {
     this._orbitRingIsPreview = value
   }
 
+  /**
+   * True while the player is actively charging the slingshot
+   * (orbit-action key held while orbiting). Used by
+   * {@link MapViewController} to drive the {@link ShuttleAudioDirector}
+   * charge-loop in its per-frame update.
+   */
+  get isChargingSlingshot(): boolean {
+    return this._isChargingSlingshot
+  }
+
   /** Whether the slingshot exit camera transition is active. */
   get exitCameraActive(): boolean {
     return this._exitCameraActive
@@ -125,7 +149,7 @@ export class MapOrbitFacade {
   }
 
   handleOrbitInput(dt: number, deps: OrbitInputDeps): void {
-    const { shuttleController, inputManager, vehicleCamera, sceneVisuals } = deps
+    const { shuttleController, inputManager, vehicleCamera, sceneVisuals, audio } = deps
     if (!this._system) return
 
     const state = this._system.state
@@ -157,7 +181,7 @@ export class MapOrbitFacade {
       const px = shuttleController.position.x
       const pz = shuttleController.position.z
       if (this._system.beginCapture(px, pz)) {
-        useAudio().play('sfx.orbitCapture')
+        audio.notifyOrbitCapture()
         shuttleController.cancelSlingshotBurst()
         this._approachStartPos = new THREE.Vector3(px, 0, pz)
         this._approachProgress = 0
@@ -174,12 +198,17 @@ export class MapOrbitFacade {
       this.cancelApproachFromMap(deps)
     }
 
-    if (state !== 'orbiting') return
+    if (state !== 'orbiting') {
+      // Releasing E mid-flight or losing the orbit drops the charge —
+      // mirror that in the audio flag so the director's per-frame
+      // update can stop the loop on the next tick.
+      if (this._isChargingSlingshot) this._isChargingSlingshot = false
+      return
+    }
 
     if (eHeld) {
-      if (!this._chargeSoundPlaying) {
-        useAudio().play('sfx.slingshot.charge', { loop: true })
-        this._chargeSoundPlaying = true
+      if (!this._isChargingSlingshot) {
+        this._isChargingSlingshot = true
         sceneVisuals?.showProgradeMarkers()
       }
       this._slingshotCharge = Math.min(1, this._slingshotCharge + dt / MAP_CONFIG.SLINGSHOT_CHARGE_TIME)
@@ -220,8 +249,9 @@ export class MapOrbitFacade {
       return
     }
 
-    // E released — stop the charge whine regardless of what happens next
-    this.stopChargeSound()
+    // E released — drop the charge flag so the director cuts the loop
+    // on its next per-frame update, regardless of what happens next.
+    this._isChargingSlingshot = false
 
     if (this._slingshotCharge <= 0) return
 
@@ -252,8 +282,7 @@ export class MapOrbitFacade {
     shuttleController.setVelocity(vel)
     shuttleController.setSlingshotSpeed(burstSpeed)
     shuttleController.triggerSlingshotLaunchFx(orbitConfig.slingshotLaunchFxDuration)
-    useAudio().play('sfx.slingshot')
-    useAudio().play('sfx.slingshot.burst')
+    audio.notifySlingshotRelease()
     shuttleController.thrusterSystem.consumeFuel(
       this._slingshotCharge * shuttleController.thrusterSystem.fuelCapacity * 0.1,
     )
@@ -428,7 +457,9 @@ export class MapOrbitFacade {
   prepareShuttleAfterDevWarp({ shuttleController, vehicleCamera, sceneVisuals }: SharedDeps): void {
     this._system?.resetToFreeFlight()
     this._approachStartPos = null
-    this.stopChargeSound()
+    // Drop the charge flag — the director's per-frame update will cut
+    // the slingshot whine loop on the next tick.
+    this._isChargingSlingshot = false
     this._slingshotCharge = 0
     this.hideLaunchArrow(sceneVisuals)
     sceneVisuals?.hideApproachTether()
@@ -438,12 +469,6 @@ export class MapOrbitFacade {
     shuttleController.setInputEnabled(true)
     vehicleCamera?.setConfig(MAP_CAMERA_CONFIG)
     vehicleCamera?.setTarget(shuttleController.group)
-  }
-
-  private stopChargeSound(): void {
-    if (!this._chargeSoundPlaying) return
-    useAudio().stopSound('sfx.slingshot.charge')
-    this._chargeSoundPlaying = false
   }
 
   private isAimingAtPlanet(shuttleController: ShuttleController): boolean {

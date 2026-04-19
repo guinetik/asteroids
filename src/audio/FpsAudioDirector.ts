@@ -41,6 +41,21 @@ const FLOAT_FADE_IN_MS = 600
  */
 const CONTACT_DAMAGE_LOOP_HOLD = 0.4
 
+/** Base volume of the fall-damage thump at zero severity (still audible). */
+const FALL_LANDING_VOL_BASE = 0.15
+/** Volume range added to the thump as severity climbs to 1. */
+const FALL_LANDING_VOL_RANGE = 0.4
+/**
+ * Base volume of the layered fall-damage grunt. Floored well above zero
+ * so the vocal cue is always at least audible when it plays — the
+ * sub-threshold filter happens at the host (via the no-damage early
+ * return), so any call into {@link FpsAudioDirector.notifyFallDamage}
+ * is a fall worth voicing.
+ */
+const FALL_GRUNT_VOL_BASE = 0.35
+/** Volume range added to the grunt as severity climbs to 1. */
+const FALL_GRUNT_VOL_RANGE = 0.5
+
 /** Convenience alias for a Howler-backed playback handle. */
 type AudioHandle = ReturnType<ReturnType<typeof useAudio>['play']>
 
@@ -247,6 +262,38 @@ export class FpsAudioDirector {
   }
 
   /**
+   * **On-foot** player just took non-lethal fall damage from impacting
+   * the ground at speed (jumping into a crater, dropping off a ledge
+   * during EVA). This is the FPS character's body landing — *not* the
+   * lander vehicle's touchdown, which is owned by
+   * {@link three.LanderController} via `sfx.touchdown` / `sfx.collision`.
+   *
+   * Plays the composite cue: a thump (`sfx.landing`) layered with a
+   * vocal grunt (`sfx.grunt`), both volume-scaled by severity so a
+   * graze barely registers and a hard slam thuds.
+   *
+   * `sfx.grunt` uses `playback: 'restart'` in the manifest, so
+   * rapid-fire bad falls cut off the previous sample instead of
+   * stacking into a chorus — the director just hands the play
+   * request through and the manifest enforces single-instance
+   * voicing.
+   *
+   * The host is expected to filter sub-threshold falls (normal jumps,
+   * walking off a curb) before calling — every invocation here
+   * produces audible output.
+   *
+   * @param severity - Normalised fall-damage severity in `[0, 1]`,
+   *                   typically `damage / FALL_DAMAGE_MAX` from the
+   *                   gameplay-side fall-damage curve. Values outside
+   *                   the range are clamped.
+   */
+  notifyFallDamage(severity: number): void {
+    const s = clamp01(severity)
+    this.audio.play('sfx.landing', { volume: FALL_LANDING_VOL_BASE + FALL_LANDING_VOL_RANGE * s })
+    this.audio.play('sfx.grunt', { volume: FALL_GRUNT_VOL_BASE + FALL_GRUNT_VOL_RANGE * s })
+  }
+
+  /**
    * Final cleanup. Equivalent to {@link FpsAudioDirector.stop}; provided
    * for symmetry with other view-owned subsystems that have an explicit
    * dispose path.
@@ -272,4 +319,11 @@ export class FpsAudioDirector {
     // doesn't fire mid-stride against stale timing from the last run.
     this.footsteps.reset()
   }
+}
+
+/** Clamp a number into the inclusive `[0, 1]` interval. */
+function clamp01(value: number): number {
+  if (value < 0) return 0
+  if (value > 1) return 1
+  return value
 }

@@ -21,8 +21,6 @@ import {
   getCurrentShuttleThrusterChargeModifiers,
   getCurrentUpgradeValue,
 } from '@/lib/upgrades'
-import { useAudio } from '@/audio/useAudio'
-
 /** Any object that can exert gravity on the shuttle */
 export interface GravityWell {
   getGravityAt(position: THREE.Vector3): THREE.Vector3
@@ -396,7 +394,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
 
   toggleDoors(): void {
     this.doorsOpen = !this.doorsOpen
-    useAudio().play(this.doorsOpen ? 'sfx.cargo.open' : 'sfx.cargo.close')
+    this.onDoorsToggled?.(this.doorsOpen)
   }
 
   /** True if the cargo bay doors are currently open (or opening). */
@@ -444,6 +442,17 @@ export class ShuttleController implements Tickable, PortalVehicle {
   orbitYawRight = false
   /** Called when death animation completes. Falls back to respawn() if not set. */
   onDeath: (() => void) | null = null
+
+  /**
+   * Notified whenever {@link toggleDoors} flips the cargo bay state.
+   * Hosts (e.g. {@link views.MapViewController}) wire this to a
+   * {@link audio.ShuttleAudioDirector} so the controller stays free of
+   * any direct Howler references — door audio routes through the
+   * single shuttle-audio owner.
+   *
+   * @param open - `true` if the doors are now opening, `false` if closing.
+   */
+  onDoorsToggled: ((open: boolean) => void) | null = null
 
   get isYawingLeft(): boolean {
     return this.orbitYawLeft

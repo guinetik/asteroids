@@ -11,8 +11,9 @@
  */
 import type { Tickable } from '@/lib/Tickable'
 import { DevConsole } from '@/lib/devConsole'
-import { useAudio } from '@/audio/useAudio'
+import { LanderAudioDirector } from '@/audio/LanderAudioDirector'
 import { FpsAudioDirector } from '@/audio/FpsAudioDirector'
+import { LevelAudioDirector } from '@/audio/LevelAudioDirector'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'
@@ -182,10 +183,6 @@ const FALL_DAMAGE_FLINCH_STRENGTH = 35
 
 /** Thrust vibration at ground level (liftoff rumble). */
 const THRUST_VIBRATION_MAX = 1.2
-/** Minimum volume of the shake sound at lowest vibration intensity. */
-const THRUST_SHAKE_VOL_MIN = 0.08
-/** Maximum volume of the shake sound at highest vibration intensity. */
-const THRUST_SHAKE_VOL_MAX = 0.55
 /** Thrust vibration at high altitude (cruise hum). */
 const THRUST_VIBRATION_MIN = 0.15
 /** Altitude at which vibration fully fades to minimum. */
@@ -336,8 +333,17 @@ export class LevelViewController implements Tickable {
   // ── EVA ──────────────────────────────────────────────────────
   private fpsCamera: FpsCamera | null = null
   private playerController: FpsPlayerController | null = null
-  /** Looping shake rumble — active while thrust vibration is applied. */
-  private _shakeHandle: ReturnType<ReturnType<typeof useAudio>['play']> | null = null
+  /**
+   * Single owner for lander cinematic + environmental audio: the
+   * level-wide asteroid wind bed, the cockpit hum during arrival /
+   * exfil cinematics, the engine-vibration shake loop driven by the
+   * per-frame thrust intensity curve, the dropship-separation sting,
+   * and the destroyed-lander audio sweep. Replaces the scattered
+   * `useAudio().play(...)` / `stopSound(...)` calls and the
+   * `_shakeHandle` field this controller used to thread through
+   * cinematic callbacks and the crash / fail cleanup paths.
+   */
+  private readonly landerAudio = new LanderAudioDirector()
   /** Tracks the airborne→grounded transition for fall-damage application. */
   private _prevGrounded = true
   /**
@@ -347,6 +353,15 @@ export class LevelViewController implements Tickable {
    * so feedback stays consistent between the level and the sandbox.
    */
   private readonly fpsAudio = new FpsAudioDirector()
+  /**
+   * Single owner for miscellaneous level one-shots that don't belong to
+   * either the FPS or lander directors — currently the resource pickup
+   * chime and the objective (nest / virus) explosion cue. Replaces the
+   * last `useAudio().play(...)` call sites in this controller; the host
+   * just fires `notify*` events and lets the director handle volume
+   * curves and audio plumbing.
+   */
+  private readonly levelAudio = new LevelAudioDirector()
   private multiTool: MultiToolController | null = null
   private multiToolState: MultiToolState | null = null
   private projectileSystem: ProjectileSystem | null = null
@@ -686,7 +701,7 @@ export class LevelViewController implements Tickable {
         this.initialLanderSpawn.copy(gameplayStart)
         this.landerController.group.position.copy(gameplayStart)
       }
-      useAudio().play('sfx.arrivalSeparation')
+      this.landerAudio.notifyLanderSeparation()
     }
 
     this.arrivalSequence.onFadeOut = (opacity) => {
@@ -700,7 +715,7 @@ export class LevelViewController implements Tickable {
       if (this.landerController) {
         this.landerController.group.visible = true
       }
-      useAudio().stopSound('ambient.landerCockpit')
+      this.landerAudio.notifyArrivalCinematicEnd()
       // Clear the fade
       this.onArrivalFade?.(0)
     }
@@ -851,7 +866,7 @@ export class LevelViewController implements Tickable {
       }
       saveInventory(result.inventory)
       this.onResourcePickup?.(itemId, quantity, label)
-      useAudio().play('sfx.pickup', { volume: 0.35 })
+      this.levelAudio.notifyResourcePickup()
     }
     this.projectileSystem.onRockHit = (spawnIndex, pos) => {
       this.rockYieldSystem?.mineRock(spawnIndex)
@@ -1042,7 +1057,7 @@ export class LevelViewController implements Tickable {
     // ── Start ───────────────────────────────────────────────────
     this.gameLoop = new GameLoop(this.tickHandler)
     this.gameLoop.start()
-    useAudio().play('ambient.asteroid', { loop: true })
+    this.landerAudio.start()
   }
 
   /**
@@ -1186,8 +1201,7 @@ export class LevelViewController implements Tickable {
       this.lightingRig.fill.intensity = Math.max(this.savedFillIntensity, 1.5)
     }
 
-    const audio = useAudio()
-    audio.play('ambient.landerCockpit', { loop: true })
+    this.landerAudio.notifyArrivalCinematicStart()
 
     // Letterbox
     this.onLetterbox?.(true)
@@ -1416,8 +1430,7 @@ export class LevelViewController implements Tickable {
     this.sceneManager!.setCamera(null)
 
     // Cockpit ambient starts now; the departure sting fires when the ship actually moves
-    const audio = useAudio()
-    audio.play('ambient.landerCockpit', { loop: true })
+    this.landerAudio.notifyExfilCinematicStart()
 
     // Start reverse cutscene
     this.arrivalSequence!.playExfil(this.landerController!.group.position)
@@ -1428,7 +1441,7 @@ export class LevelViewController implements Tickable {
 
     // Stop cockpit bed when exfil sequence finishes (onComplete shared with arrival sequence)
     this.arrivalSequence!.onComplete = () => {
-      useAudio().stopSound('ambient.landerCockpit')
+      this.landerAudio.notifyExfilCinematicEnd()
       this.onArrivalFade?.(0)
     }
   }
@@ -1537,13 +1550,13 @@ export class LevelViewController implements Tickable {
     this.tickHandler!.unregister(this.landerController)
     this.onDeathOverlay?.(true, cause)
 
-    // Cut all in-flight sounds: sfx (engine, RCS) and cockpit ambient.
-    // The lander tick is no longer running so the engine envelope won't
-    // reach zero naturally; stop them explicitly here.
-    const audio = useAudio()
-    audio.stopCategory('sfx')
-    audio.stopSound('ambient.landerCockpit')
-    this._shakeHandle = null // already stopped by stopCategory
+    // Cut all in-flight gameplay sounds (sfx — engine, RCS, alarms,
+    // shake — plus cockpit ambient). The lander tick is no longer
+    // running so its engine envelope won't reach zero naturally; the
+    // director's destroyed-run sweep handles the blunt cut and drops
+    // its own internal handle references so the next rising edge
+    // re-creates them cleanly.
+    this.landerAudio.notifyLanderRunFailed()
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1571,8 +1584,7 @@ export class LevelViewController implements Tickable {
       if (this.landerController) {
         this.landerController.group.visible = true
       }
-      const audio = useAudio()
-      audio.stopSound('ambient.landerCockpit')
+      this.landerAudio.notifyArrivalCinematicEnd()
       this.onArrivalFade?.(0)
       this.stateMachine.setState('lander' as LevelState)
     }
@@ -1660,25 +1672,23 @@ export class LevelViewController implements Tickable {
         applyLanderAtmosphereState(this.atmosphereCtx, lander)
         const engineFiring = lander.isMainEngineActive
 
-        // Thrust vibration — strongest at liftoff, fades with altitude
+        // Thrust vibration — strongest at liftoff, fades with altitude.
+        // Camera shake stays here (it's a visual concern); the audio
+        // shake loop is owned by the LanderAudioDirector and driven
+        // via the per-frame update below using the same intensity.
+        let vibrationFactor = 0
         if (engineFiring && this.vehicleCamera) {
           const alt = this.atmosphereCtx.landerAltitude
           const altFade = 1 - Math.min(1, alt / THRUST_VIBRATION_FADE_ALT)
           const intensity = THRUST_VIBRATION_MIN + (THRUST_VIBRATION_MAX - THRUST_VIBRATION_MIN) * altFade * altFade
           this.vehicleCamera.shake(intensity, THRUST_VIBRATION_DURATION)
-          const shakeVol = THRUST_SHAKE_VOL_MIN + (THRUST_SHAKE_VOL_MAX - THRUST_SHAKE_VOL_MIN) * (intensity / THRUST_VIBRATION_MAX)
-          if (this._shakeHandle === null) {
-            this._shakeHandle = useAudio().play('sfx.lander.shake', { loop: true, volume: shakeVol })
-          } else {
-            this._shakeHandle.setVolume(shakeVol)
-          }
-        } else if (this._shakeHandle !== null) {
-          this._shakeHandle.stop()
-          this._shakeHandle = null
+          vibrationFactor = intensity / THRUST_VIBRATION_MAX
         }
+        this.landerAudio.update(dt, { engineFiring, vibrationFactor })
       } else if (this.atmosphereCtx) {
         // Not in lander mode — clear thrust so wash/shake effects stay silent.
         this.atmosphereCtx.landerThrust = 0
+        this.landerAudio.update(dt, { engineFiring: false, vibrationFactor: 0 })
       }
 
       if (player) {
@@ -1860,7 +1870,7 @@ export class LevelViewController implements Tickable {
       // (which runs before `LevelViewController.tick` thanks to the tick
       // priority ordering), so it's safe to read here.
       if (grounded && !this._prevGrounded) {
-        this.applyFallDamageFromLanding()
+        this.applyEvaFallDamage()
       }
 
       this._prevGrounded = grounded
@@ -2197,7 +2207,11 @@ export class LevelViewController implements Tickable {
   }
 
   /**
-   * Apply lenient, never-lethal fall damage when the player lands.
+   * Apply lenient, never-lethal fall damage when the **on-foot** EVA
+   * player slams into the ground at speed (jumping into a crater,
+   * dropping off a ledge). This is purely the FPS character body
+   * impacting terrain — *not* the lander vehicle's touchdown, which
+   * is owned by {@link three.LanderController}.
    *
    * Reads {@link PlatformerBody.impactVelocityY} from the player body
    * (the vertical velocity at the moment of ground contact this frame)
@@ -2208,16 +2222,17 @@ export class LevelViewController implements Tickable {
    * The result is then **clamped against the player's current HP** so
    * the post-hit HP is never less than {@link FALL_DAMAGE_MIN_HP_AFTER}.
    * This is the no-kill guarantee — no matter how high the player
-   * falls, they always survive the landing with a usable health bar.
+   * falls, they always survive the impact with a usable health bar.
    *
-   * Plays a gentle camera flinch + impact audio + the standard red
-   * vignette for clear feedback when actual damage was dealt. Silent
-   * for soft landings (jumps, walking off a curb).
+   * Plays a gentle camera flinch + composite impact audio + the
+   * standard red vignette for clear feedback when actual damage was
+   * dealt. Silent for soft landings (regular jumps, walking off a
+   * curb).
    *
    * Called once per airborne → grounded transition from {@link tickEva}.
    * Safe to call when the player controller is missing or already dead.
    */
-  private applyFallDamageFromLanding(): void {
+  private applyEvaFallDamage(): void {
     const player = this.playerController
     if (!player || player.isDead) return
 
@@ -2255,22 +2270,10 @@ export class LevelViewController implements Tickable {
       )
     }
 
-    const audio = useAudio()
-    // Soft thump on every survivable fall; reuse the existing landing SFX
-    // (already used by the lander on touchdown) so the bank stays the same.
-    // Volume scales with damage so a tiny graze barely registers and a hard
-    // fall thuds.
-    const landingVolume = Math.min(0.55, 0.15 + (damage / FALL_DAMAGE_MAX) * 0.4)
-    audio.play('sfx.landing', { volume: landingVolume })
-
-    // Player vocal grunt layered on top of the thud. `playback: 'restart'`
-    // in the manifest ensures rapid-fire bad landings cut off the previous
-    // sample instead of stacking into a chorus. Volume scales with damage
-    // so a tiny graze is a near-silent breath and a hard fall is a full
-    // "oof". Floor at 0.35 so the grunt is always at least audible when it
-    // plays — sub-threshold falls return early above and never reach here.
-    const gruntVolume = Math.min(0.85, 0.35 + (damage / FALL_DAMAGE_MAX) * 0.5)
-    audio.play('sfx.grunt', { volume: gruntVolume })
+    // Composite fall-damage cue (thump + vocal grunt) is owned by
+    // FpsAudioDirector — it volume-scales both layers from severity
+    // and routes through the manifest's restart-policy on the grunt.
+    this.fpsAudio.notifyFallDamage(damage / FALL_DAMAGE_MAX)
   }
 
   /**
@@ -2314,8 +2317,7 @@ export class LevelViewController implements Tickable {
       attenuation = Math.max(0, 1 - dist / EXPLOSION_FEEDBACK_RANGE)
     }
 
-    const volume = 0.3 + 0.7 * attenuation
-    useAudio().play('sfx.explosive', { volume })
+    this.levelAudio.notifyObjectiveExplosion(attenuation)
 
     if (
       attenuation > 0 &&
@@ -2450,10 +2452,9 @@ export class LevelViewController implements Tickable {
     }
     this.minigames.length = 0
     this.gameLoop?.stop()
-    this._shakeHandle?.stop()
-    this._shakeHandle = null
+    this.landerAudio.dispose()
     this.fpsAudio.dispose()
-    useAudio().stopSound('ambient.asteroid')
+    this.levelAudio.dispose()
     this.teardownPointerLock()
     this.clearCollisionRegistrations()
     this.clearSurfaceRockCollisionRegistrations()

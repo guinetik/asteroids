@@ -167,7 +167,7 @@ import {
 import { GravitySurfingController } from '@/lib/map/GravitySurfingController'
 import { OrbitalSurfingController, type OrbitalSurfingDeps } from '@/lib/map/OrbitalSurfingController'
 import { ManifoldSpline } from '@/three/ManifoldSpline'
-import { useAudio } from '@/audio/useAudio'
+import { ShuttleAudioDirector } from '@/audio/ShuttleAudioDirector'
 
 /**
  * Orbit / grid / debris toggle snapshot for syncing the map HUD after intro suppression.
@@ -308,8 +308,16 @@ export class MapViewController implements Tickable {
   /** Manifold spline visual for orbital surfing. */
   private manifoldSpline: ManifoldSpline | null = null
 
-  /** Active wormhole sound handle — rate-adjusted to match travel time. */
-  private manifoldWormholeHandle: import('@/audio/audioTypes').AudioPlaybackHandle | null = null
+  /**
+   * Single owner for shuttle gameplay audio: map / habitat ambient
+   * beds, gravitational anomaly proximity loop, slingshot charge +
+   * release stings, manifold (wormhole) tunnel loop, cargo door
+   * one-shots, mission-clear sting, and the destroyed-shuttle sweep.
+   * Replaces the scattered `useAudio().play(...)` / `stopSound(...)`
+   * calls and the `manifoldWormholeHandle` field this controller used
+   * to thread through orbital surf callbacks.
+   */
+  private readonly shuttleAudio = new ShuttleAudioDirector()
 
   /** Increments per anomaly HUD message so Vue can re-run enter animation. */
   private gravitationalAnomalyHudToken = 0
@@ -568,7 +576,7 @@ export class MapViewController implements Tickable {
           title: 'Spacetime disturbance',
           subtitle: `Fabric depression · ~${Math.round(dist)} u · ${d.durationSec.toFixed(1)} s drift`,
         })
-        useAudio().play('ambient.anomaly', { loop: true })
+        this.shuttleAudio.notifyAnomalyProximityStart()
       },
       onNearbyAnomalyFinish: () => {
         this.gravitationalAnomalyHudToken += 1
@@ -578,7 +586,7 @@ export class MapViewController implements Tickable {
           title: 'Disturbance passed',
           subtitle: 'Local grid stabilizing',
         })
-        useAudio().stopSound('ambient.anomaly')
+        this.shuttleAudio.notifyAnomalyProximityEnd()
       },
     })
 
@@ -604,6 +612,12 @@ export class MapViewController implements Tickable {
 
     this.shuttleController.onDeath = () => {
       this.triggerDeath('Crashed Into The Sun')
+    }
+
+    // Route cargo door audio through the single shuttle-audio owner so
+    // ShuttleController stays free of direct Howler references.
+    this.shuttleController.onDoorsToggled = (open) => {
+      this.shuttleAudio.notifyCargoDoorsToggled(open)
     }
 
     // Ship health — temperature + radiation damage
@@ -678,7 +692,7 @@ export class MapViewController implements Tickable {
     this.orbitalSurfingController.onCouplingStart = (arcPoints) => {
       this.manifoldSpline?.show(arcPoints, -MAP_CONFIG.ORBITAL_SURF_TUNNEL_DEPTH)
       this.sceneVisuals?.showSurfCouplingTether()
-      this.manifoldWormholeHandle = useAudio().play('sfx.wormhole')
+      this.shuttleAudio.notifyManifoldCouplingStart()
     }
     this.orbitalSurfingController.onCouplingProgress = (shipPos, orbitPos, progress, dt) => {
       this.sceneVisuals?.updateSurfCouplingTether(shipPos, orbitPos, progress, dt)
@@ -687,16 +701,12 @@ export class MapViewController implements Tickable {
       this.sceneVisuals?.hideSurfCouplingTether()
     }
     this.orbitalSurfingController.onDiveStart = (travelTimeSec) => {
-      // Adjust wormhole sound rate so it lasts the full travel duration
-      if (this.manifoldWormholeHandle) {
-        const clipDuration = this.manifoldWormholeHandle.duration()
-        if (clipDuration > 0 && travelTimeSec > 0) {
-          // Add coupling time (~1s) since the clip started at Q press
-          const totalDuration = travelTimeSec + MAP_CONFIG.ORBITAL_SURF_COUPLE_DURATION_SEC
-          const rate = Math.max(0.5, Math.min(2.0, clipDuration / totalDuration))
-          this.manifoldWormholeHandle.setRate(rate)
-        }
-      }
+      // Stretch the wormhole clip across the full ride (coupling + dive)
+      // so it doesn't loop or end early during the surf.
+      this.shuttleAudio.notifyManifoldDiveStarted(
+        travelTimeSec,
+        MAP_CONFIG.ORBITAL_SURF_COUPLE_DURATION_SEC,
+      )
       // Freeze simulation so planets stop moving while in the manifold tunnel
       this.simFrozen = true
       // Hide asteroid belts during the dive
@@ -709,8 +719,7 @@ export class MapViewController implements Tickable {
     this.orbitalSurfingController.onSurfEnd = () => {
       this.manifoldSpline?.hide()
       this.shuttleEffects?.setManifoldSurfing(false)
-      this.manifoldWormholeHandle?.stop()
-      this.manifoldWormholeHandle = null
+      this.shuttleAudio.notifyManifoldSurfEnd()
       // Restore simulation and belt visibility
       this.simFrozen = false
       for (const belt of this.beltControllers) {
@@ -1034,7 +1043,7 @@ export class MapViewController implements Tickable {
     this.gameLoop = new GameLoop(this.tickHandler)
     this.gameLoop.start()
 
-    useAudio().play('ambient.space', { loop: true })
+    this.shuttleAudio.start()
   }
 
   /**
@@ -1224,6 +1233,7 @@ export class MapViewController implements Tickable {
         vehicleCamera: this.vehicleCamera,
         sceneVisuals: this.sceneVisuals,
         inputManager: this.inputManager,
+        audio: this.shuttleAudio,
         mapIntroControlsLocked: this.mapIntro.controlsLocked,
       })
       if (previousCharge > 0 && this.slingshotCharge === 0 && this.orbitSystem?.state === 'free') {
@@ -1714,6 +1724,14 @@ export class MapViewController implements Tickable {
       })(),
       venusOrbitWarningDistance: MAP_CONFIG.VENUS_ORBIT_WARNING_DISTANCE,
       onMessageUpdate: this.onMessageUpdate,
+    })
+
+    // Per-frame audio: drive the slingshot charge whine loop on the
+    // rising / falling edge of the orbit facade's charge flag. Cheap
+    // (no allocations); safe to call every tick regardless of game
+    // mode — the director short-circuits when it isn't started.
+    this.shuttleAudio.update(dt, {
+      slingshotCharging: this.orbitFacade.isChargingSlingshot,
     })
   }
 
@@ -2274,6 +2292,7 @@ export class MapViewController implements Tickable {
       onMissionOverlay: this.onMissionOverlay,
       onMissionBoardUpdate: this.onMissionBoardUpdate,
       onMissionComplete: this.onMissionComplete,
+      audio: this.shuttleAudio,
     })
   }
 
@@ -2560,6 +2579,7 @@ export class MapViewController implements Tickable {
       vehicleCamera: this.vehicleCamera,
       onDeathOverlay: this.onDeathOverlay,
       isEmissiveMaterial,
+      audio: this.shuttleAudio,
     })
   }
 
@@ -3309,9 +3329,7 @@ export class MapViewController implements Tickable {
     this.onHabitatActive?.(true)
     this.setEarthStartupOrbitHudSuppressed(false)
     this.shuttleEffects?.thrusterController.setAudioEnabled(false)
-    const audio = useAudio()
-    audio.stopSound('ambient.space')
-    audio.play('ambient.habitat', { loop: true })
+    this.shuttleAudio.notifyEnterHabitat()
     // Request pointer lock for FPS mouse look
     const el = this.sceneObjects?.renderer.domElement
     if (el) {
@@ -3325,9 +3343,7 @@ export class MapViewController implements Tickable {
     if (!this.sceneObjects) return
 
     this.shuttleEffects?.thrusterController.setAudioEnabled(true)
-    const audio = useAudio()
-    audio.stopSound('ambient.habitat')
-    audio.play('ambient.space', { loop: true })
+    this.shuttleAudio.notifyExitHabitat()
 
     // Restore map scene + camera
     const renderPass = this.sceneObjects.composer.passes[0] as RenderPass
@@ -3417,10 +3433,7 @@ export class MapViewController implements Tickable {
   }
 
   dispose(): void {
-    const audio = useAudio()
-    audio.stopSound('ambient.space')
-    audio.stopSound('ambient.habitat')
-    audio.stopSound('ambient.anomaly')
+    this.shuttleAudio.dispose()
     this.clearStartupCinematicOrbitHandoff()
     if (this.sceneObjects?.scene) {
       this.introFacade?.dispose(this.sceneObjects.scene)

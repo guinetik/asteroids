@@ -10,7 +10,7 @@ import type { MapSceneVisuals } from '@/three/MapSceneVisuals'
 import type { MapShuttleEffects } from '@/three/MapShuttleEffects'
 import type { EmissiveMaterial } from '@/lib/map/mapViewControllerHelpers'
 import type { MapOrbitFacade } from '@/lib/map/orbit/MapOrbitFacade'
-import { useAudio } from '@/audio/useAudio'
+import type { ShuttleAudioDirector } from '@/audio/ShuttleAudioDirector'
 
 interface TriggerDeathDeps {
   shuttleController: ShuttleController
@@ -18,6 +18,12 @@ interface TriggerDeathDeps {
   vehicleCamera: VehicleCamera | null
   onDeathOverlay: ((visible: boolean, cause: string) => void) | null
   isEmissiveMaterial: (material: THREE.Material) => material is EmissiveMaterial
+  /**
+   * Audio orchestrator that performs the destroyed-shuttle audio sweep
+   * (kill sfx category, stop anomaly ambient, drop director-owned
+   * loops). The facade no longer touches Howler directly.
+   */
+  audio: ShuttleAudioDirector
 }
 
 interface RespawnDeps {
@@ -46,8 +52,14 @@ export class MapLifeCycleFacade {
   }
 
   triggerDeath(cause: string, deps: TriggerDeathDeps): void {
-    const { shuttleController, shuttleEffects, vehicleCamera, onDeathOverlay, isEmissiveMaterial } =
-      deps
+    const {
+      shuttleController,
+      shuttleEffects,
+      vehicleCamera,
+      onDeathOverlay,
+      isEmissiveMaterial,
+      audio,
+    } = deps
     const isCold = cause === 'Hull Frozen' || cause === 'Adrift'
 
     if (isCold) {
@@ -71,11 +83,11 @@ export class MapLifeCycleFacade {
     vehicleCamera?.setConfig(MAP_DEATH_CAMERA_CONFIG)
     onDeathOverlay?.(true, cause)
 
-    // Cut all in-flight sounds immediately — sfx (thrusters, slingshot, etc.)
-    // and the anomaly ambient which may still be looping if the event hadn't expired.
-    const audio = useAudio()
-    audio.stopCategory('sfx')
-    audio.stopSound('ambient.anomaly')
+    // Cut all in-flight gameplay sounds immediately — the director's
+    // destroyed-shuttle sweep covers sfx (thrusters, slingshot, etc.)
+    // plus the anomaly ambient which may still be looping if the event
+    // hadn't expired.
+    audio.notifyShuttleDestroyed()
   }
 
   respawnAtEarth({
