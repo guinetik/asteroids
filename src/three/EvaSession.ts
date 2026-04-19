@@ -20,6 +20,7 @@ import type { FpsTelemetry } from '@/components/FpsHud.vue'
 import { TICK_PRIORITY_PHYSICS, TICK_PRIORITY_RENDER } from '@/lib/tickPriorities'
 import { useAudio } from '@/audio/useAudio'
 import { EvaRcsSound } from '@/audio/EvaRcsSound'
+import { EvaCollisionResolver, type EvaCollider } from '@/lib/physics/evaCollisionResolver'
 import { EvaTetherController } from './EvaTetherController'
 
 /**
@@ -112,6 +113,12 @@ export interface EvaSessionConfig {
   getPoi: () => THREE.Vector3 | null
   /** Objects to scale up during EVA. Read once at session enter. */
   getHugeScaleTargets: () => EvaHugeScaleTarget[]
+  /**
+   * Build 3D colliders the EVA player should bounce off (shuttle hull, mission POI).
+   * Called once at session start, *after* huge-scale has been applied, so
+   * {@link EvaCollider} AABBs can be computed from current world bounds.
+   */
+  getColliders?: () => EvaCollider[]
   /** Multiplier applied to the spawn offset so the player emerges outside the scaled vehicle. */
   spawnOffsetScale: number
   /** Fired true when EVA becomes active, false when it ends. */
@@ -131,6 +138,7 @@ export class EvaSession implements Tickable {
   private readonly rcsSound = new EvaRcsSound()
   private mode: 'idle' | 'opening' | 'active' = 'idle'
   private controller: EvaTetherController | null = null
+  private readonly collisionResolver = new EvaCollisionResolver()
   private preEvaScales: { object: THREE.Object3D; scale: number }[] = []
   private preEvaHelmetLightIntensity: { spot: number; fill: number } | null = null
   private lastPrompt: string | null = null
@@ -228,6 +236,13 @@ export class EvaSession implements Tickable {
     controller.fpsCamera.yaw = vehicle.heading
     controller.fpsCamera.pitch = 0
 
+    // Colliders must be built after applyHugeScales so AABBs reflect the ×100 shuttle
+    // and any per-type POI scale boosts (e.g. telescope ×20).
+    this.collisionResolver.clear()
+    const colliders = this.config.getColliders?.() ?? []
+    for (const c of colliders) this.collisionResolver.add(c)
+    controller.setCollisionResolver(this.collisionResolver)
+
     sceneManager.addToScene(controller.group)
     sceneManager.addToScene(controller.tetherLine)
     sceneManager.addToScene(controller.fpsCamera.helmetLightRig)
@@ -270,6 +285,7 @@ export class EvaSession implements Tickable {
       this.controller.dispose()
       this.controller = null
     }
+    this.collisionResolver.clear()
     this.restoreHugeScales()
     this.rcsSound.stop()
     vehicle.setInputEnabled(true)

@@ -55,10 +55,10 @@ const GLB_SATELLITE_SPAWN_DISTANCE = 80
 /** Lateral offset between the procedural relay and the GLB satellite so both are visible. */
 const GLB_SATELLITE_LATERAL_OFFSET = 40
 
-/** Uniform scale for `sattelite.glb`; tune if asset units change. */
-const GLB_SATELLITE_MODEL_SCALE = 0.04
+/** Uniform scale for `satellite.glb` (10.73 units native); tune if asset units change. */
+const GLB_SATELLITE_MODEL_SCALE = 0.06
 
-/** Local rotation (radians) applied to sattelite.glb to make its panels sit as wings. */
+/** Local rotation (radians) applied to satellite.glb to make its panels sit as wings. */
 const GLB_SATELLITE_LOCAL_ROTATION = { x: 0, y: 0, z: Math.PI / 2 }
 
 /** Scale multiplier applied to the shuttle while the player is EVA. */
@@ -227,7 +227,6 @@ export class ShuttleViewController implements Tickable {
     this.satelliteModel = await SatelliteModel.create({
       scale: GLB_SATELLITE_MODEL_SCALE,
       rotation: GLB_SATELLITE_LOCAL_ROTATION,
-      panelMeshNames: ['Object_7', 'Object_8'],
     })
     const lateral = new Vector3(-forward.z, 0, forward.x) // right-hand perpendicular on XZ
     this.satelliteModel.group.position.set(

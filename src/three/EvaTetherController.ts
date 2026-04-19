@@ -14,6 +14,7 @@
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 import type { InputManager } from '@/lib/InputManager'
+import type { EvaCollisionResolver } from '@/lib/physics/evaCollisionResolver'
 import { FpsCamera, type FpsCameraConfig } from './FpsCamera'
 import {
   createTronHologramMaterial,
@@ -36,6 +37,11 @@ const EVA_IDLE_DAMPING = 0.5
 /** Below this speed with no thrust input the controller snaps velocity to zero. */
 const EVA_ZERO_VELOCITY_EPSILON = 0.05
 
+/** Body radius (world units) used for sphere-vs-collider resolution. Sized close to the
+ * helmet silhouette — larger values (e.g. 0.9) read as correct near the shuttle but hold
+ * the player an awkward metre off small props like the satellite POI (~0.9 m long). */
+const EVA_BODY_RADIUS = 0.35
+
 /** Maximum distance (world units) from the tether anchor before the line pulls taut. */
 const EVA_TETHER_MAX_LENGTH = 60
 
@@ -55,6 +61,15 @@ const TETHER_PLAYER_LOOKDOWN_DROP = 0.55
 
 /** Extra backward shift applied while looking down to keep the tether out of the camera frustum. */
 const TETHER_PLAYER_LOOKDOWN_BACKSHIFT = 0.32
+
+/** Minimum camera-space depth for the player-side tether endpoint so it stays behind the lens. */
+const TETHER_CAMERA_BACK_CLEARANCE = 0.72
+
+/** Minimum camera-space drop for the player-side tether endpoint so it stays under the helmet view. */
+const TETHER_CAMERA_DOWN_CLEARANCE = 0.92
+
+/** Minimum camera-space side offset to keep the tether from crossing the center of the screen. */
+const TETHER_CAMERA_SIDE_CLEARANCE = 0.34
 
 /** Radius of the tether tube (world units). */
 const TETHER_RADIUS = 0.02
@@ -152,14 +167,18 @@ export class EvaTetherController implements Tickable {
   private readonly playerAttachLocal = new THREE.Vector3()
   private readonly playerLookDownOffset = new THREE.Vector3()
   private readonly playerAttachOffsetWorld = new THREE.Vector3()
+  private readonly playerAttachCameraLocal = new THREE.Vector3()
+  private readonly anchorCameraLocal = new THREE.Vector3()
   private readonly ropeDelta = new THREE.Vector3()
   private readonly ropeVelocity = new THREE.Vector3()
   private readonly ropeDirection = new THREE.Vector3()
   private readonly playerAttachEuler = new THREE.Euler(0, 0, 0, 'YXZ')
   private readonly playerAttachQuat = new THREE.Quaternion()
+  private readonly playerAttachQuatInverse = new THREE.Quaternion()
 
   private anchor: THREE.Object3D | null = null
   private input: InputManager | null = null
+  private collisionResolver: EvaCollisionResolver | null = null
   private thrusting = false
   private o2 = EVA_O2_CAPACITY
   private rtg = EVA_RTG_CAPACITY
@@ -221,9 +240,42 @@ export class EvaTetherController implements Tickable {
     this.playerAttachOffsetWorld
       .copy(this.playerAttachLocal)
       .applyQuaternion(this.playerAttachQuat)
-    return this.playerAttachWorld
+    this.playerAttachWorld
       .copy(this.group.position)
       .add(this.playerAttachOffsetWorld)
+
+    // Final first-person cleanup: keep the player-side endpoint outside the camera frustum.
+    this.playerAttachQuatInverse.copy(this.playerAttachQuat).invert()
+    this.playerAttachCameraLocal
+      .copy(this.playerAttachWorld)
+      .sub(this.group.position)
+      .applyQuaternion(this.playerAttachQuatInverse)
+
+    if (this.anchor) {
+      const anchorWorld = this.getAnchorWorld()
+      if (anchorWorld) {
+        this.anchorCameraLocal
+          .copy(anchorWorld)
+          .sub(this.group.position)
+          .applyQuaternion(this.playerAttachQuatInverse)
+        const sideSign = this.anchorCameraLocal.x >= 0 ? 1 : -1
+        if (this.playerAttachCameraLocal.x * sideSign < TETHER_CAMERA_SIDE_CLEARANCE) {
+          this.playerAttachCameraLocal.x = sideSign * TETHER_CAMERA_SIDE_CLEARANCE
+        }
+      }
+    }
+
+    if (this.playerAttachCameraLocal.y > -TETHER_CAMERA_DOWN_CLEARANCE) {
+      this.playerAttachCameraLocal.y = -TETHER_CAMERA_DOWN_CLEARANCE
+    }
+    if (this.playerAttachCameraLocal.z > -TETHER_CAMERA_BACK_CLEARANCE) {
+      this.playerAttachCameraLocal.z = -TETHER_CAMERA_BACK_CLEARANCE
+    }
+
+    return this.playerAttachWorld
+      .copy(this.playerAttachCameraLocal)
+      .applyQuaternion(this.playerAttachQuat)
+      .add(this.group.position)
   }
 
   /** Provide the input manager that supplies EVA action state. */
@@ -234,6 +286,14 @@ export class EvaTetherController implements Tickable {
   /** Set the tether anchor (typically the shuttle group). */
   setAnchor(anchor: THREE.Object3D | null): void {
     this.anchor = anchor
+  }
+
+  /**
+   * Supply a 3D sphere-vs-collider resolver so the player bounces off the shuttle and
+   * mission POIs instead of floating through them. Null disables collision.
+   */
+  setCollisionResolver(resolver: EvaCollisionResolver | null): void {
+    this.collisionResolver = resolver
   }
 
   /** Teleport the EVA body to a world-space position and zero velocity. */
@@ -332,6 +392,10 @@ export class EvaTetherController implements Tickable {
     }
 
     this.group.position.addScaledVector(this.velocity, dt)
+
+    if (this.collisionResolver) {
+      this.collisionResolver.resolveSphere(this.group.position, EVA_BODY_RADIUS, this.velocity)
+    }
 
     const anchorPos = this.getAnchorWorld()
     if (anchorPos) {

@@ -2,20 +2,28 @@
   "planetId": "earth",
   "missions": [
     {
-      "id": "earth_relay_tx4_reboot",
-      "name": "Relay TX-4 Cold Reboot",
-      "description": "Comms relay TX-4 dropped off the grid last orbit. Dock at the relay, EVA out, and cycle the cold-gas thruster array so ground stations can reacquire it.",
+      "id": "earth_l1_relay_reterm",
+      "name": "L1 Uplink Backbone Reterm",
+      "description": "The main trunk on the Earth-Sun L1 relay is reading intermittent. Bring the crimp tool, EVA out, reterminate the backbone. Keep the old cable — the agency pays extra for failure analysis.",
       "poiType": "relay_antenna",
       "minigameType": "relay_repair",
-      "reward": 1400
+      "reward": 1200
     },
     {
-      "id": "earth_hubble_optical_alignment",
-      "name": "Hubble Optical Alignment",
-      "description": "Hubble's primary mirror actuator stack drifted out of spec after the last reboost. EVA to the observatory, lock the fine-guidance sensors, and walk the alignment back into tolerance.",
+      "id": "earth_cubesat_cluster_patch",
+      "name": "Cubesat Cluster Firmware Patch",
+      "description": "Three-bird cubesat cluster in sun-synch missed the last OTA window. Dock with the master node, push the patch by hand, verify the other two sync up before you head home.",
+      "poiType": "satellite",
+      "minigameType": "satellite_servicing",
+      "reward": 1500
+    },
+    {
+      "id": "earth_l2_observatory_phasing",
+      "name": "L2 Observatory Mirror Phasing",
+      "description": "The L2 observatory's primary mirror segments drifted out of phase after a micrometeorite strike. EVA out, read the wavefront sensor, walk each segment in by hand.",
       "poiType": "telescope",
       "minigameType": "telescope_alignment",
-      "reward": 2200
+      "reward": 1800
     }
   ]
 }

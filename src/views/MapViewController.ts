@@ -45,6 +45,11 @@ import {
 } from '@/lib/physics/gravity'
 import { ShuttleController, MAP_PHYSICS } from '@/three/ShuttleController'
 import { EvaSession, type EvaHugeScaleTarget, type EvaSceneHost } from '@/three/EvaSession'
+import {
+  createAabbColliderFromObject,
+  createAabbColliderFromObjects,
+  type EvaCollider,
+} from '@/lib/physics/evaCollisionResolver'
 import type { FpsTelemetry } from '@/components/FpsHud.vue'
 import {
   VehicleCamera,
@@ -3589,6 +3594,7 @@ export class MapViewController implements Tickable {
       getVehicle: () => this.shuttleController,
       getPoi: () => this.missionFacade.getEvaPoiWorldPos(),
       getHugeScaleTargets: () => this.buildEvaHugeScaleTargets(),
+      getColliders: () => this.buildEvaColliders(),
       spawnOffsetScale: MapViewController.EVA_MAP_SPAWN_OFFSET_SCALE,
       helmetLightIntensityScale: MapViewController.EVA_MAP_HELMET_LIGHT_SCALE,
       onEvaModeChange: (active) => {
@@ -3626,6 +3632,28 @@ export class MapViewController implements Tickable {
       })
     }
     return targets
+  }
+
+  /**
+   * Build the 3D colliders the EVA player should bounce off. Called by {@link EvaSession}
+   * after huge-scale has been applied, so world-space AABBs reflect the ×100 shuttle and
+   * any per-type POI scale boost. Shuttle and POI are static for the session lifetime —
+   * shuttle is frozen, POI never moves — so a one-shot snapshot is enough.
+   */
+  private buildEvaColliders(): EvaCollider[] {
+    const colliders: EvaCollider[] = []
+    if (this.shuttleController) {
+      // Use hull-only node list so fuel tanks, habitat, cargo lander, and FX emitters
+      // (all parented onto the same scene as the hull) don't inflate the AABB.
+      this.shuttleController.group.updateMatrixWorld(true)
+      colliders.push(createAabbColliderFromObjects(this.shuttleController.shuttleHullNodes))
+    }
+    const poiGroup = this.missionFacade.getEvaPoiGroup()
+    if (poiGroup) {
+      poiGroup.updateMatrixWorld(true)
+      colliders.push(createAabbColliderFromObject(poiGroup))
+    }
+    return colliders
   }
 
   dispose(): void {

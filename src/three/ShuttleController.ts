@@ -275,6 +275,14 @@ export class ShuttleController implements Tickable, PortalVehicle {
   private isDead = false
   private deathTarget: THREE.Vector3 | null = null
   private deathSpeed = 0
+  /**
+   * Snapshot of the shuttle GLB's root nodes taken after nozzles are placed but before
+   * any runtime props (fuel tanks, habitat, cargo lander) are parented onto gltf.scene.
+   * External systems that need tight hull bounds — e.g. EVA collision on the solar map —
+   * walk these nodes instead of the full scene graph so the collider isn't inflated by
+   * props that live inside the cargo bay.
+   */
+  private readonly hullNodes: THREE.Object3D[] = []
   private landerFuelTank: FuelTank | null = null
   private shuttleFuelTank: FuelTank | null = null
   private cargoLight: THREE.PointLight | null = null
@@ -321,6 +329,10 @@ export class ShuttleController implements Tickable, PortalVehicle {
     if (this.doorStbNode) this.doorStbClosedRotX = this.doorStbNode.rotation.x
 
     this.placeNozzles(gltf.scene)
+
+    // Snapshot hull nodes BEFORE any runtime props are parented onto gltf.scene.
+    // Used by EVA collision to build a tight hull AABB; see hullNodes field docs.
+    this.hullNodes.push(...gltf.scene.children)
 
     // Cargo bay fuel tanks: lander fuel (static display) + shuttle fuel (live)
     const landerTankLength = 120
@@ -400,6 +412,16 @@ export class ShuttleController implements Tickable, PortalVehicle {
   /** True if the cargo bay doors are currently open (or opening). */
   get isDoorsOpen(): boolean {
     return this.doorsOpen
+  }
+
+  /**
+   * Hull root nodes in the scaled, rotated GLB scene — excluding runtime props parented
+   * onto the cargo bay. Consumers that need a hull-tight AABB (EVA collision) should
+   * compute bounds by expanding a `THREE.Box3` over these nodes rather than over
+   * `this.group`, which includes fuel tanks, habitat, and the cargo lander.
+   */
+  get shuttleHullNodes(): readonly THREE.Object3D[] {
+    return this.hullNodes
   }
 
   /** 0 = fully closed, 1 = fully open (animated value). */

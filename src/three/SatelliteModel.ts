@@ -1,10 +1,10 @@
 /**
- * GLB prop for `public/models/sattelite.glb`.
+ * GLB prop for `public/models/satellite.glb`.
  *
- * Preloads once, then clones the scene so geometries stay shared with the
- * cached template. Supports a local rotation (to reorient the asset's native
- * axes) and replaces solar-panel meshes with the shared TRON hologram shader
- * for a cyan "our-world" look.
+ * Preloads once, then clones the scene so geometries stay shared with the cached
+ * template. Supports a local rotation (to reorient the asset's native axes). The GLB
+ * ships fully textured — no TRON-panel override pipeline — so `dispose` only needs to
+ * detach the cloned scene.
  *
  * @author guinetik
  * @date 2026-04-18
@@ -13,14 +13,9 @@
 import * as THREE from 'three'
 import { clone as cloneSkinnedScene } from 'three/addons/utils/SkeletonUtils.js'
 import { fixMaterials, loadGLB } from './loadGLB'
-import {
-  createTronHologramMaterial,
-  disposeTronHologramMaterials,
-  syncTronHologramTimeSeconds,
-} from './tronHologramMaterial'
 
-/** Public URL path served from `public/models/sattelite.glb`. */
-export const SATELLITE_MODEL_PUBLIC_PATH = '/models/sattelite.glb'
+/** Public URL path served from `public/models/satellite.glb`. */
+export const SATELLITE_MODEL_PUBLIC_PATH = '/models/satellite.glb'
 
 /** Uniform scale applied to the cloned satellite before optional per-instance tuning. */
 const DEFAULT_SATELLITE_SCALE = 1
@@ -28,21 +23,6 @@ const DEFAULT_SATELLITE_SCALE = 1
 /** Default shadow flags for satellite meshes. */
 const DEFAULT_CAST_SHADOW = true
 const DEFAULT_RECEIVE_SHADOW = true
-
-/** Cyan TRON tint used by default for solar-panel meshes. */
-const DEFAULT_PANEL_TRON_COLOR = 0x00e5ff
-
-/** Dark grid tint paired with {@link DEFAULT_PANEL_TRON_COLOR}. */
-const DEFAULT_PANEL_GRID_TINT = new THREE.Color(0.02, 0.06, 0.09)
-
-/** Name regex used to detect solar-panel meshes (checked on mesh and material). */
-const SOLAR_PANEL_NAME_REGEX = /panel|solar|array|wing|sail/i
-
-/** Minimum margin by which blue must exceed red/green for the color fallback. */
-const PANEL_BLUE_DOMINANCE = 0.08
-
-/** Maximum red channel (0–1) for a color to still read as "solar panel blue". */
-const PANEL_MAX_RED = 0.35
 
 let loggedTemplateStructure = false
 
@@ -56,12 +36,6 @@ export interface SatelliteModelCreateOptions {
   receiveShadow?: boolean
   /** Euler rotation applied to the cloned scene (radians) — reorients the asset's native axes. */
   rotation?: { x?: number; y?: number; z?: number }
-  /** Tron hologram tint for solar-panel meshes (default cyan). */
-  panelTronColor?: THREE.ColorRepresentation
-  /** Disable the tron hologram override entirely when false. */
-  tronPanels?: boolean
-  /** Explicit mesh names to treat as solar panels (overrides name/color heuristic). */
-  panelMeshNames?: readonly string[]
 }
 
 let satelliteTemplate: THREE.Group | null = null
@@ -86,7 +60,13 @@ async function ensureSatelliteTemplate(): Promise<THREE.Group> {
             parts.push(`• mesh="${mesh.name}" material="${mat?.name ?? '<unnamed>'}"`)
           }
         })
-        console.info('[SatelliteModel] loaded mesh list:\n' + parts.join('\n'))
+        const box = new THREE.Box3().setFromObject(scene)
+        const size = new THREE.Vector3()
+        box.getSize(size)
+        console.info(
+          `[SatelliteModel] loaded mesh list (raw size ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}):\n`
+          + parts.join('\n'),
+        )
       }
       return scene
     })
@@ -94,24 +74,17 @@ async function ensureSatelliteTemplate(): Promise<THREE.Group> {
   return satelliteTemplatePromise
 }
 
-
 /**
  * Decorative satellite GLB — add {@link group} to your scene after
- * {@link SatelliteModel.create}. Geometries may be shared with the preload
- * template; {@link dispose} clears this instance's group and disposes any
- * per-instance hologram materials.
+ * {@link SatelliteModel.create}. Geometries are shared with the preload template via
+ * {@link cloneSkinnedScene}; {@link dispose} clears this instance's group.
  */
 export class SatelliteModel {
   /** Parent group for positioning; contains the cloned mesh hierarchy. */
   readonly group = new THREE.Group()
-  private readonly tronMaterials: THREE.ShaderMaterial[]
 
-  private constructor(
-    sceneClone: THREE.Group,
-    tronMaterials: THREE.ShaderMaterial[],
-  ) {
+  private constructor(sceneClone: THREE.Group) {
     this.group.add(sceneClone)
-    this.tronMaterials = tronMaterials
   }
 
   /**
@@ -138,55 +111,16 @@ export class SatelliteModel {
 
     const castShadow = options?.castShadow ?? DEFAULT_CAST_SHADOW
     const receiveShadow = options?.receiveShadow ?? DEFAULT_RECEIVE_SHADOW
-    const tronPanels = options?.tronPanels ?? true
-    const panelColor = options?.panelTronColor ?? DEFAULT_PANEL_TRON_COLOR
-    const explicitNames = options?.panelMeshNames
-      ? new Set(options.panelMeshNames)
-      : null
-
-    const tronMaterials: THREE.ShaderMaterial[] = []
-    let timeSyncMesh: THREE.Mesh | null = null
 
     sceneClone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
         mesh.castShadow = castShadow
         mesh.receiveShadow = receiveShadow
-        if (!tronPanels) return
-        const matRef = mesh.material as THREE.Material | undefined
-        const matName = matRef?.name ?? ''
-        const stdMat = matRef as THREE.MeshStandardMaterial | undefined
-        const col = stdMat?.color
-        const colorMatchesPanel =
-          col !== undefined &&
-          col.r < PANEL_MAX_RED &&
-          col.b - col.r > PANEL_BLUE_DOMINANCE &&
-          col.b - col.g > PANEL_BLUE_DOMINANCE
-        const isPanel = explicitNames
-          ? explicitNames.has(mesh.name)
-          : SOLAR_PANEL_NAME_REGEX.test(mesh.name) ||
-            SOLAR_PANEL_NAME_REGEX.test(matName) ||
-            colorMatchesPanel
-        if (isPanel) {
-          const mat = createTronHologramMaterial({
-            color: panelColor,
-            gridTint: DEFAULT_PANEL_GRID_TINT,
-          })
-          mesh.material = mat
-          tronMaterials.push(mat)
-          if (!timeSyncMesh) timeSyncMesh = mesh
-        }
       }
     })
 
-    if (timeSyncMesh && tronMaterials.length > 0) {
-      const mats = tronMaterials
-      ;(timeSyncMesh as THREE.Mesh).onBeforeRender = () => {
-        syncTronHologramTimeSeconds(mats, performance.now() * 0.001)
-      }
-    }
-
-    return new SatelliteModel(sceneClone, tronMaterials)
+    return new SatelliteModel(sceneClone)
   }
 
   /**
@@ -196,15 +130,8 @@ export class SatelliteModel {
     this.group.rotation.y = yawRadians
   }
 
-  /**
-   * Detach cloned meshes from this group and dispose per-instance hologram materials.
-   * TRON overlay meshes share the panel's geometry (no per-instance geometry alloc), so
-   * they're freed when the scene clone is cleared.
-   */
+  /** Detach cloned meshes from this group. Shared geometries live in the template. */
   dispose(): void {
-    if (this.tronMaterials.length > 0) {
-      disposeTronHologramMaterials(this.tronMaterials)
-    }
     this.group.clear()
   }
 }
