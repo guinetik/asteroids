@@ -73,6 +73,8 @@ export interface MultiToolConfig {
  * @spec docs/superpowers/specs/2026-04-04-multitool-switching-design.md
  */
 export class MultiToolState implements Tickable {
+  private static readonly DRILL_RECOVERY_RATIO = 0.5
+
   private _mode: MultiToolMode = 'weapon'
   private _aiming = false
   private _isFiring = false
@@ -80,6 +82,8 @@ export class MultiToolState implements Tickable {
   private _mouseJustPressed = false
   private _speed = 0
   private autoTimer = 0
+  private drillRecoveryLocked = false
+  private drillRecoveryRequiresRelease = false
   private readonly config: MultiToolConfig
 
   /** RTG-powered thruster system for tool energy. */
@@ -167,6 +171,9 @@ export class MultiToolState implements Tickable {
   setInput(mouseDown: boolean, mouseJustPressed: boolean): void {
     this._mouseDown = mouseDown
     this._mouseJustPressed = mouseJustPressed
+    if (!mouseDown) {
+      this.drillRecoveryRequiresRelease = false
+    }
   }
 
   /** Feed player speed for drill safety lock. */
@@ -177,6 +184,15 @@ export class MultiToolState implements Tickable {
   /** Advance trigger logic, RTG decay, and thruster system by one frame. */
   tick(dt: number): void {
     this._isFiring = false
+
+    const drillState = this.thrusterSystem.getState('drill')
+    if (
+      this.drillRecoveryLocked &&
+      drillState.charge >= drillState.capacity * MultiToolState.DRILL_RECOVERY_RATIO
+    ) {
+      this.drillRecoveryLocked = false
+      this.drillRecoveryRequiresRelease = this._mouseDown
+    }
 
     // --- RTG stochastic recharge ---
     this.rtgBurstTimer -= dt
@@ -225,7 +241,11 @@ export class MultiToolState implements Tickable {
     }
 
     // --- Gate on charge ---
-    const canFire = wantsFire && this.thrusterSystem.canFire(this._mode)
+    const blockedByDrillRecovery = this._mode === 'drill' && (
+      this.drillRecoveryLocked || this.drillRecoveryRequiresRelease
+    )
+    const hasChargeToFire = this.thrusterSystem.canFire(this._mode)
+    const canFire = wantsFire && !blockedByDrillRecovery && hasChargeToFire
     this._isFiring = canFire
 
     // --- Thruster system tick — active mode drains when firing ---
@@ -234,6 +254,14 @@ export class MultiToolState implements Tickable {
       weapon: this._isFiring && this._mode === 'weapon',
       heal: this._isFiring && this._mode === 'heal',
     })
+
+    if (
+      (this._mode === 'drill' && wantsFire && !hasChargeToFire) ||
+      this.thrusterSystem.getState('drill').charge <= 0
+    ) {
+      this.drillRecoveryLocked = true
+      this.drillRecoveryRequiresRelease = true
+    }
 
   }
 }

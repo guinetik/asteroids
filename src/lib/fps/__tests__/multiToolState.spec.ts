@@ -76,6 +76,98 @@ describe('MultiToolState', () => {
     expect(state.isFiring).toBe(false)
   })
 
+  it('drill stays locked after depletion until recharged to at least 50%', () => {
+    state.setMode('drill')
+    state.setAiming(true)
+
+    state.setInput(true, true)
+    state.tick(0.25)
+    expect(state.isFiring).toBe(true)
+    expect(state.modeCharge).toBe(0)
+
+    state.setInput(true, false)
+    state.tick(0.016)
+    expect(state.isFiring).toBe(false)
+
+    state.setInput(false, false)
+    state.tick(1.5)
+    expect(state.modeCharge).toBeGreaterThan(0)
+    expect(state.modeCharge).toBeLessThan(state.modeChargeCapacity * 0.5)
+
+    state.setInput(true, false)
+    state.tick(0.016)
+    expect(state.isFiring).toBe(false)
+
+    state.setInput(false, false)
+    state.tick(0.5)
+    expect(state.modeCharge).toBeGreaterThanOrEqual(state.modeChargeCapacity * 0.5)
+
+    state.setInput(true, false)
+    state.tick(0.016)
+    expect(state.isFiring).toBe(false)
+
+    state.setInput(false, false)
+    state.tick(0.016)
+    state.setInput(true, true)
+    state.tick(0.016)
+    expect(state.isFiring).toBe(true)
+  })
+
+  it('drill requires releasing the trigger after recovery before firing again', () => {
+    state.setMode('drill')
+    state.setAiming(true)
+
+    state.setInput(true, true)
+    state.tick(0.25)
+    expect(state.isFiring).toBe(true)
+    expect(state.modeCharge).toBe(0)
+
+    state.setInput(true, false)
+    state.tick(2.1)
+    expect(state.modeCharge).toBeGreaterThanOrEqual(state.modeChargeCapacity * 0.5)
+    expect(state.isFiring).toBe(false)
+
+    state.setInput(true, false)
+    state.tick(0.016)
+    expect(state.isFiring).toBe(false)
+
+    state.setInput(false, false)
+    state.tick(0.016)
+    expect(state.isFiring).toBe(false)
+
+    state.setInput(true, true)
+    state.tick(0.016)
+    expect(state.isFiring).toBe(true)
+  })
+
+  it('drill enters recovery lock even when charge is too low to fire before exact zero', () => {
+    state.setMode('drill')
+    state.setAiming(true)
+
+    state.setInput(true, true)
+    state.tick(0.24)
+    expect(state.modeCharge).toBeGreaterThan(0)
+    expect(state.modeCharge).toBeLessThan(state.modeChargeCapacity * 0.5)
+
+    state.setInput(true, false)
+    state.tick(0.016)
+    expect(state.isFiring).toBe(false)
+
+    state.setInput(false, false)
+    state.tick(2.1)
+    expect(state.modeCharge).toBeGreaterThanOrEqual(state.modeChargeCapacity * 0.5)
+
+    state.setInput(true, false)
+    state.tick(0.016)
+    expect(state.isFiring).toBe(false)
+
+    state.setInput(false, false)
+    state.tick(0.016)
+    state.setInput(true, true)
+    state.tick(0.016)
+    expect(state.isFiring).toBe(true)
+  })
+
   // --- Trigger: auto (weapon) ---
 
   it('auto trigger: fires at fixed rate while held + aiming', () => {
