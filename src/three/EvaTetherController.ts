@@ -45,12 +45,19 @@ const TETHER_COLOR = 0x00e5ff
 /** Grid tint for the TRON hologram tether material. */
 const TETHER_GRID_TINT = new THREE.Color(0.02, 0.06, 0.09)
 
-/** World-space offset applied to the tether's player-side endpoint so the cable
- *  appears to attach to the EVA suit's chest instead of the camera eye. */
-const TETHER_PLAYER_ATTACH_OFFSET = new THREE.Vector3(0, -0.45, 0)
+/** Suit-local offset for the player-side tether endpoint.
+ *  Uses the underside of the suit so the cable hangs from the player's lower body
+ *  instead of appearing to sprout from the camera/head. */
+const TETHER_PLAYER_ATTACH_LOCAL_OFFSET = new THREE.Vector3(0, -1.05, 0.08)
+
+/** Extra drop applied to the player-side tether attach point while looking down. */
+const TETHER_PLAYER_LOOKDOWN_DROP = 0.55
+
+/** Extra backward shift applied while looking down to keep the tether out of the camera frustum. */
+const TETHER_PLAYER_LOOKDOWN_BACKSHIFT = 0.32
 
 /** Radius of the tether tube (world units). */
-const TETHER_RADIUS = 0.08
+const TETHER_RADIUS = 0.028
 
 /** Number of segments along the tether curve. */
 const TETHER_SEGMENTS = 32
@@ -58,20 +65,38 @@ const TETHER_SEGMENTS = 32
 /** Radial divisions around the tube. */
 const TETHER_RADIAL_SEGMENTS = 8
 
-/** Peak sag displacement applied at the midpoint of the tether curve. */
-const TETHER_SAG_AMOUNT = 0.8
+/** Minimal slack ratio preserved even while the rope is almost fully taut. */
+const TETHER_MIN_SLACK_RATIO = 0.015
 
-/** Local shuttle-space offset where the tether attaches (roughly the cargo-bay rim). */
-const TETHER_ANCHOR_LOCAL_OFFSET = new THREE.Vector3(0, 0.4, 1.2)
+/** Extra slack added when the player has room to drift before the tether goes taut. */
+const TETHER_MAX_SLACK_RATIO = 0.05
+
+/** Verlet substeps used to keep the rope stable. */
+const TETHER_SIMULATION_SUBSTEPS = 2
+
+/** Constraint solver iterations per frame for the rope segments. */
+const TETHER_CONSTRAINT_ITERATIONS = 10
+
+/** Mild drag so the rope settles instead of vibrating forever. */
+const TETHER_POINT_DAMPING = 0.985
+
+/** Local shuttle-space offset where the tether attaches on the shuttle underside. */
+const TETHER_ANCHOR_LOCAL_OFFSET = new THREE.Vector3(0, -1.15, 0.55)
 
 /** Spring stiffness applied once the player passes {@link EVA_TETHER_MAX_LENGTH}. */
-const TETHER_SPRING_K = 55
+const TETHER_SPRING_K = 120
+
+/** Extra non-linear spring force as the tether stretches farther past max range. */
+const TETHER_OVERSHOOT_BOOST = 8
+
+/** Converts outward velocity into an immediate inward yank once the tether goes taut. */
+const TETHER_OUTWARD_PULL = 1.35
 
 /** Extra velocity damping along the tether axis while the cable is taut. */
-const TETHER_TAUT_DAMPING = 4
+const TETHER_TAUT_DAMPING = 9
 
 /** Fraction of tether length the cable is allowed to stretch before a hard stop. */
-const TETHER_HARD_STOP_OVERSHOOT = 0.2
+const TETHER_HARD_STOP_OVERSHOOT = 0.1
 
 /** O2 tank capacity (arbitrary units — seconds of EVA at full drain). */
 const EVA_O2_CAPACITY = 180
@@ -117,10 +142,21 @@ export class EvaTetherController implements Tickable {
   private readonly tetherMaterial: THREE.ShaderMaterial
   private tetherGeometry: THREE.TubeGeometry | null = null
   private readonly tetherCurvePoints: THREE.Vector3[]
+  private readonly tetherPreviousPoints: THREE.Vector3[]
+  private readonly ropeSegmentLengths: number[]
   private readonly forwardVec = new THREE.Vector3()
   private readonly rightVec = new THREE.Vector3()
   private readonly upVec = new THREE.Vector3(0, 1, 0)
   private readonly thrustDir = new THREE.Vector3()
+  private readonly playerAttachWorld = new THREE.Vector3()
+  private readonly playerAttachLocal = new THREE.Vector3()
+  private readonly playerLookDownOffset = new THREE.Vector3()
+  private readonly playerAttachOffsetWorld = new THREE.Vector3()
+  private readonly ropeDelta = new THREE.Vector3()
+  private readonly ropeVelocity = new THREE.Vector3()
+  private readonly ropeDirection = new THREE.Vector3()
+  private readonly playerAttachEuler = new THREE.Euler(0, 0, 0, 'YXZ')
+  private readonly playerAttachQuat = new THREE.Quaternion()
 
   private anchor: THREE.Object3D | null = null
   private input: InputManager | null = null
@@ -139,8 +175,11 @@ export class EvaTetherController implements Tickable {
     this.tetherMaterial.depthTest = false
     this.tetherMaterial.depthWrite = false
     this.tetherCurvePoints = []
+    this.tetherPreviousPoints = []
+    this.ropeSegmentLengths = new Array(TETHER_SEGMENTS).fill(0)
     for (let i = 0; i <= TETHER_SEGMENTS; i++) {
       this.tetherCurvePoints.push(new THREE.Vector3())
+      this.tetherPreviousPoints.push(new THREE.Vector3())
     }
 
     this.tetherLine = new THREE.Mesh(undefined, this.tetherMaterial)
@@ -161,6 +200,32 @@ export class EvaTetherController implements Tickable {
     return this.anchorWorld
   }
 
+  /** Player-side tether endpoint attached in camera-local suit space. */
+  private getPlayerAttachWorld(): THREE.Vector3 {
+    const lookDownFactor = THREE.MathUtils.clamp(
+      -this.fpsCamera.pitch / EVA_CAMERA_CONFIG.pitchClamp,
+      0,
+      1,
+    )
+    this.playerLookDownOffset.set(
+      0,
+      -TETHER_PLAYER_LOOKDOWN_DROP * lookDownFactor,
+      TETHER_PLAYER_LOOKDOWN_BACKSHIFT * lookDownFactor,
+    )
+    this.playerAttachLocal
+      .copy(TETHER_PLAYER_ATTACH_LOCAL_OFFSET)
+      .add(this.playerLookDownOffset)
+
+    this.playerAttachEuler.set(0, this.fpsCamera.yaw, 0)
+    this.playerAttachQuat.setFromEuler(this.playerAttachEuler)
+    this.playerAttachOffsetWorld
+      .copy(this.playerAttachLocal)
+      .applyQuaternion(this.playerAttachQuat)
+    return this.playerAttachWorld
+      .copy(this.group.position)
+      .add(this.playerAttachOffsetWorld)
+  }
+
   /** Provide the input manager that supplies EVA action state. */
   setInput(input: InputManager): void {
     this.input = input
@@ -176,7 +241,7 @@ export class EvaTetherController implements Tickable {
     this.group.position.copy(pos)
     this.velocity.set(0, 0, 0)
     if (this.anchor) this.anchor.updateMatrixWorld(true)
-    this.updateTether()
+    this.resetTether()
   }
 
   /** Feed raw pointer-lock mouse deltas to the camera. */
@@ -276,19 +341,29 @@ export class EvaTetherController implements Tickable {
       const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
       if (dist > EVA_TETHER_MAX_LENGTH && dist > 0) {
         const overshoot = dist - EVA_TETHER_MAX_LENGTH
+        const overshootRatio = overshoot / EVA_TETHER_MAX_LENGTH
         const nx = dx / dist
         const ny = dy / dist
         const nz = dz / dist
-        const springAccel = TETHER_SPRING_K * overshoot
+        const outwardVel = this.velocity.x * nx + this.velocity.y * ny + this.velocity.z * nz
+        const springAccel =
+          TETHER_SPRING_K * overshoot * (1 + overshootRatio * TETHER_OVERSHOOT_BOOST)
         this.velocity.x -= nx * springAccel * dt
         this.velocity.y -= ny * springAccel * dt
         this.velocity.z -= nz * springAccel * dt
-        const outwardVel = this.velocity.x * nx + this.velocity.y * ny + this.velocity.z * nz
         if (outwardVel > 0) {
+          const yank = outwardVel * TETHER_OUTWARD_PULL
+          this.velocity.x -= nx * yank
+          this.velocity.y -= ny * yank
+          this.velocity.z -= nz * yank
           const damp = Math.min(1, TETHER_TAUT_DAMPING * dt)
-          this.velocity.x -= nx * outwardVel * damp
-          this.velocity.y -= ny * outwardVel * damp
-          this.velocity.z -= nz * outwardVel * damp
+          const postYankOutwardVel =
+            this.velocity.x * nx + this.velocity.y * ny + this.velocity.z * nz
+          if (postYankOutwardVel > 0) {
+            this.velocity.x -= nx * postYankOutwardVel * damp
+            this.velocity.y -= ny * postYankOutwardVel * damp
+            this.velocity.z -= nz * postYankOutwardVel * damp
+          }
         }
         if (overshoot > EVA_TETHER_MAX_LENGTH * TETHER_HARD_STOP_OVERSHOOT) {
           const scale =
@@ -298,30 +373,104 @@ export class EvaTetherController implements Tickable {
             anchorPos.y + dy * scale,
             anchorPos.z + dz * scale,
           )
+          const clampedOutwardVel =
+            this.velocity.x * nx + this.velocity.y * ny + this.velocity.z * nz
+          if (clampedOutwardVel > 0) {
+            this.velocity.x -= nx * clampedOutwardVel
+            this.velocity.y -= ny * clampedOutwardVel
+            this.velocity.z -= nz * clampedOutwardVel
+          }
         }
       }
     }
 
-    this.updateTether()
+    this.updateTether(dt)
   }
 
-  private updateTether(): void {
+  private resetTether(): void {
     const a = this.getAnchorWorld()
     if (!a) return
-    const bx = this.group.position.x + TETHER_PLAYER_ATTACH_OFFSET.x
-    const by = this.group.position.y + TETHER_PLAYER_ATTACH_OFFSET.y
-    const bz = this.group.position.z + TETHER_PLAYER_ATTACH_OFFSET.z
+    const b = this.getPlayerAttachWorld()
     for (let i = 0; i <= TETHER_SEGMENTS; i++) {
       const t = i / TETHER_SEGMENTS
-      const sag = -TETHER_SAG_AMOUNT * Math.sin(Math.PI * t)
       const pt = this.tetherCurvePoints[i]
-      if (!pt) continue
-      pt.set(
-        a.x + (bx - a.x) * t,
-        a.y + (by - a.y) * t + sag,
-        a.z + (bz - a.z) * t,
-      )
+      const prev = this.tetherPreviousPoints[i]
+      if (!pt || !prev) continue
+      pt.lerpVectors(a, b, t)
+      prev.copy(pt)
     }
+    this.rebuildTetherGeometry()
+  }
+
+  private updateTether(dt: number): void {
+    const a = this.getAnchorWorld()
+    if (!a) return
+    const b = this.getPlayerAttachWorld()
+    const pointCount = this.tetherCurvePoints.length
+    if (pointCount < 2) return
+
+    this.ropeDelta.subVectors(b, a)
+    const distance = this.ropeDelta.length()
+    if (distance <= 1e-5) {
+      this.resetTether()
+      return
+    }
+
+    const tautRatio = THREE.MathUtils.clamp(distance / EVA_TETHER_MAX_LENGTH, 0, 1)
+    const slackRatio = THREE.MathUtils.lerp(TETHER_MAX_SLACK_RATIO, TETHER_MIN_SLACK_RATIO, tautRatio)
+    const ropeLength = distance * (1 + slackRatio)
+    const segmentLength = ropeLength / TETHER_SEGMENTS
+    this.ropeSegmentLengths.fill(segmentLength)
+
+    const substepDt = dt / TETHER_SIMULATION_SUBSTEPS
+    for (let step = 0; step < TETHER_SIMULATION_SUBSTEPS; step++) {
+      for (let i = 1; i < pointCount - 1; i++) {
+        const pt = this.tetherCurvePoints[i]
+        const prev = this.tetherPreviousPoints[i]
+        if (!pt || !prev) continue
+
+        this.ropeVelocity.subVectors(pt, prev).multiplyScalar(TETHER_POINT_DAMPING)
+        prev.copy(pt)
+        pt.add(this.ropeVelocity)
+      }
+
+      for (let iter = 0; iter < TETHER_CONSTRAINT_ITERATIONS; iter++) {
+        this.tetherCurvePoints[0]?.copy(a)
+        this.tetherCurvePoints[pointCount - 1]?.copy(b)
+
+        for (let i = 0; i < pointCount - 1; i++) {
+          const current = this.tetherCurvePoints[i]
+          const next = this.tetherCurvePoints[i + 1]
+          if (!current || !next) continue
+
+          this.ropeDelta.subVectors(next, current)
+          const currentDistance = this.ropeDelta.length()
+          if (currentDistance <= 1e-5) continue
+
+          const targetLength = this.ropeSegmentLengths[i] ?? segmentLength
+          const error = currentDistance - targetLength
+          if (Math.abs(error) <= 1e-4) continue
+
+          const correctionScale = error / currentDistance
+          if (i === 0) {
+            next.addScaledVector(this.ropeDelta, -correctionScale)
+          } else if (i === pointCount - 2) {
+            current.addScaledVector(this.ropeDelta, correctionScale)
+          } else {
+            current.addScaledVector(this.ropeDelta, correctionScale * 0.5)
+            next.addScaledVector(this.ropeDelta, -correctionScale * 0.5)
+          }
+        }
+      }
+    }
+
+    this.ropeDirection.subVectors(b, a).normalize()
+    this.tetherCurvePoints[0]?.copy(a)
+    this.tetherCurvePoints[pointCount - 1]?.copy(b)
+    this.rebuildTetherGeometry()
+  }
+
+  private rebuildTetherGeometry(): void {
     const curve = new THREE.CatmullRomCurve3(this.tetherCurvePoints)
     const next = new THREE.TubeGeometry(
       curve,
