@@ -60,6 +60,9 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
   /** The shuttle mission id this minigame tracks. */
   readonly missionId: string
 
+  /** Default minigame renders as a Vue overlay card. */
+  readonly presentation = 'overlay' as const
+
   /** Target gas amount to collect for mission completion. */
   readonly targetGas: number
 

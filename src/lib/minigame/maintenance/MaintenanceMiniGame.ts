@@ -58,6 +58,9 @@ export class MaintenanceMiniGame implements OrbitalMiniGame, OrbitalMiniGameEven
   /** The shuttle mission id this minigame tracks. */
   readonly missionId: string
 
+  /** Default minigame renders as a Vue overlay card. */
+  readonly presentation = 'overlay' as const
+
   /** Target alignment count — all targets must be lit. */
   readonly targetCount: number
 

@@ -76,6 +76,9 @@ export class ProbeDeployMiniGame implements OrbitalMiniGame, OrbitalMiniGameEven
   /** The shuttle mission id this minigame tracks. */
   readonly missionId: string
 
+  /** Default minigame renders as a Vue overlay card. */
+  readonly presentation = 'overlay' as const
+
   /** The planet being targeted (theme selector). */
   readonly planetId: string
 

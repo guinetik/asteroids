@@ -66,6 +66,9 @@ export class LogisticsRouteMiniGame implements OrbitalMiniGame, OrbitalMiniGameE
   /** The shuttle mission id this minigame tracks. */
   readonly missionId: string
 
+  /** Default minigame renders as a Vue overlay card. */
+  readonly presentation = 'overlay' as const
+
   /** Target gas deliveries — drives manifest length and difficulty. */
   readonly targetGas: number
 

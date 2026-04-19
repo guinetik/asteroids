@@ -67,3 +67,22 @@ describe('createOrbitalMiniGame', () => {
     expect(mg.missionId).toBe('mission-2')
   })
 })
+
+describe('OrbitalMiniGame.presentation', () => {
+  const cases: Array<[string, string]> = [
+    ['gas-collection', 'overlay'],
+    ['ice-harvest', 'overlay'],
+    ['maintenance', 'overlay'],
+    ['chemistry', 'overlay'],
+    ['logistics', 'overlay'],
+    ['probe-deploy', 'overlay'],
+    ['unknown-type', 'overlay'], // default falls through to overlay
+  ]
+
+  for (const [type, expected] of cases) {
+    it(`reports presentation "${expected}" for ${type}`, () => {
+      const mg = createOrbitalMiniGame('m', type, 3, 'mercury')
+      expect(mg.presentation).toBe(expected)
+    })
+  }
+})

@@ -91,6 +91,9 @@ export class IceHarvestMiniGame implements OrbitalMiniGame, OrbitalMiniGameEvent
   /** The shuttle mission id this minigame tracks. */
   readonly missionId: string
 
+  /** Default minigame renders as a Vue overlay card. */
+  readonly presentation = 'overlay' as const
+
   /** Target ice amount to collect for mission completion. */
   readonly targetIce: number
 

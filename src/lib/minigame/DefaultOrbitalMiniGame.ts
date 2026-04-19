@@ -30,6 +30,9 @@ export class DefaultOrbitalMiniGame implements OrbitalMiniGame, OrbitalMiniGameE
   /** The shuttle mission id this minigame tracks. */
   readonly missionId: string
 
+  /** Default minigame renders as a Vue overlay card. */
+  readonly presentation = 'overlay' as const
+
   private _status: OrbitalMiniGameStatus = 'active'
   private readonly _steps: OrbitalMiniGameStep[] = [
     { label: 'Complete Mission', complete: false, active: true },

@@ -13,6 +13,9 @@
 /** Orbital minigame lifecycle status. */
 export type OrbitalMiniGameStatus = 'idle' | 'active' | 'completed' | 'failed'
 
+/** How this minigame presents to the player. Determines whether the host opens a Vue overlay or yields camera/input control to an in-scene controller. */
+export type OrbitalMiniGamePresentation = 'overlay' | 'in_scene'
+
 /** A single step in an orbital minigame's progression. */
 export interface OrbitalMiniGameStep {
   /** Step label shown in the tracker. */
@@ -52,6 +55,8 @@ export interface OrbitalMiniGameEvents {
 export interface OrbitalMiniGame {
   /** Current minigame status. */
   readonly status: OrbitalMiniGameStatus
+  /** How this minigame presents. Drives host dispatch between Vue overlay and in-scene controller. */
+  readonly presentation: OrbitalMiniGamePresentation
   /** The shuttle mission id this minigame tracks. */
   readonly missionId: string
   /** Ordered steps for the tracker HUD. */
