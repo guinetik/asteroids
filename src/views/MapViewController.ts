@@ -2365,7 +2365,9 @@ export class MapViewController implements Tickable {
     const poiObject = this.missionFacade.getEvaPoiGroup()
     if (!poiObject) {
       console.warn('[MapViewController] No POI object available for in-scene minigame; aborting.')
-      this.evaMinigameClose()
+      minigame.dispose()
+      this.activeEvaMinigame = null
+      this.evaSession?.endMinigame()
       return
     }
     this.satelliteRepairController = new SatelliteRepairController()
@@ -2384,9 +2386,10 @@ export class MapViewController implements Tickable {
   }
 
   /**
-   * Close the EVA minigame overlay without awarding the mission — e.g. the player
-   * clicks the × button. The EVA session resumes at 'active' mode and the player can
-   * retry or fly back to the shuttle.
+   * Close the active EVA minigame without awarding the mission. Disposes both
+   * the minigame instance and any active in-scene controller, then emits
+   * `onEvaMinigameChange(null)` so the Vue overlay (if mounted) unmounts.
+   * Used when the player dismisses the overlay via × button.
    */
   evaMinigameClose(): void {
     if (!this.activeEvaMinigame) return

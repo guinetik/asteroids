@@ -110,6 +110,9 @@ export class SatelliteRepairController {
   private components: DamagedComponent[] = []
   private prevFixKey = false
 
+  /** Reused scratch vector for per-component player-distance checks in `tick`. */
+  private readonly _tmpPlayerDist = new THREE.Vector3()
+
   /**
    * Attach to a scene + POI. Looks up each broken component by name, applies
    * a red wireframe overlay and a hidden FIX-prompt billboard above it. If
@@ -160,11 +163,10 @@ export class SatelliteRepairController {
 
     let nearest: DamagedComponent | null = null
     let nearestDist = FIX_PROMPT_RANGE
-    const tmp = new THREE.Vector3()
     for (const c of this.components) {
       if (c.fading) continue
-      c.source.getWorldPosition(tmp)
-      const d = tmp.distanceTo(player)
+      c.source.getWorldPosition(this._tmpPlayerDist)
+      const d = this._tmpPlayerDist.distanceTo(player)
       if (d < nearestDist) {
         nearest = c
         nearestDist = d
