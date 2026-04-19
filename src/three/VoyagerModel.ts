@@ -10,6 +10,7 @@
 import * as THREE from 'three'
 import { clone as cloneSkinnedScene } from 'three/addons/utils/SkeletonUtils.js'
 import { fixMaterials, loadGLB } from './loadGLB'
+import { MaintenanceBeacon, type MaintenanceBeaconState } from './MaintenanceBeacon'
 
 /** Public URL path served from `public/models/voyager.glb`. */
 export const VOYAGER_MODEL_PUBLIC_PATH = '/models/voyager.glb'
@@ -68,7 +69,11 @@ export interface VoyagerModelCreateOptions {
   receiveShadow?: boolean
   /** Euler rotation applied to the cloned scene (radians) — reorients the asset's axes. */
   rotation?: { x?: number; y?: number; z?: number }
+  /** Optional maintenance-light state; when omitted the cloned model has no beacon. */
+  maintenanceState?: MaintenanceBeaconState
 }
+
+const VOYAGER_MAINTENANCE_BEACON_OFFSET = new THREE.Vector3(0, -0.18, 0.25)
 
 /**
  * Decorative Voyager relay GLB — add {@link group} to your scene after
@@ -77,10 +82,12 @@ export interface VoyagerModelCreateOptions {
  */
 export class VoyagerModel {
   /** Parent group for positioning; contains the cloned mesh hierarchy. */
-  readonly group = new THREE.Group()
+  readonly group: THREE.Group
+  private readonly beacon: MaintenanceBeacon | null
 
-  private constructor(sceneClone: THREE.Group) {
-    this.group.add(sceneClone)
+  private constructor(group: THREE.Group, beacon: MaintenanceBeacon | null) {
+    this.group = group
+    this.beacon = beacon
   }
 
   /** Warm the Voyager GLB so the first {@link VoyagerModel.create} does not hitch. */
@@ -112,7 +119,17 @@ export class VoyagerModel {
       }
     })
 
-    return new VoyagerModel(sceneClone)
+    const group = new THREE.Group()
+    group.add(sceneClone)
+    const beacon = options?.maintenanceState
+      ? new MaintenanceBeacon(group, {
+        offset: VOYAGER_MAINTENANCE_BEACON_OFFSET,
+        initialState: options.maintenanceState,
+        radius: 0.03,
+        distance: 7,
+      })
+      : null
+    return new VoyagerModel(group, beacon)
   }
 
   /** Set yaw in radians around world +Y. */
@@ -120,8 +137,17 @@ export class VoyagerModel {
     this.group.rotation.y = yawRadians
   }
 
+  setMaintenanceState(state: MaintenanceBeaconState): void {
+    this.beacon?.setState(state)
+  }
+
+  tick(dt: number): void {
+    this.beacon?.tick(dt)
+  }
+
   /** Detach cloned meshes from this group. */
   dispose(): void {
+    this.beacon?.dispose()
     this.group.clear()
   }
 }

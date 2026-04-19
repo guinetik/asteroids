@@ -151,8 +151,9 @@ import { MapIntroFacade } from '@/lib/map/intro/MapIntroFacade'
 import { MapLifeCycleFacade } from '@/lib/map/lifecycle/MapLifeCycleFacade'
 import { MapMessageFacade } from '@/lib/map/messages/MapMessageFacade'
 import { MapMissionFacade } from '@/lib/map/missions/MapMissionFacade'
-import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
+import type { OrbitalMiniGame, OrbitalMiniGameEvents } from '@/lib/minigame/OrbitalMiniGame'
 import { createOrbitalMiniGame } from '@/lib/minigame/orbitalMiniGameFactory'
+import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 import { PLANET_ORBITAL_CONFIGS } from '@/lib/missions/planetOrbitalConfig'
 import { MapModeCoordinator } from '@/lib/map/mode/MapModeCoordinator'
 import { MapOrbitFacade } from '@/lib/map/orbit/MapOrbitFacade'
@@ -231,6 +232,19 @@ export class MapViewController implements Tickable {
   private preEvaBloomState: { threshold: number; strength: number } | null = null
   onEvaTelemetry: ((telemetry: FpsTelemetry) => void) | null = null
   onEvaModeChange: ((active: boolean) => void) | null = null
+  /**
+   * Fired when the EVA player opens a terminal minigame overlay. Payload is the active
+   * mission + the minigame instance the UI binds to. `null` means "close the overlay".
+   */
+  onEvaMinigameChange:
+    | ((
+        payload: {
+          mission: ActiveVisitRelayMission
+          minigame: OrbitalMiniGame
+        } | null,
+      ) => void)
+    | null = null
+  private activeEvaMinigame: OrbitalMiniGame | null = null
   private planetariumScene: MapPlanetariumScene | null = null
   private sunController: SunController | null = null
   private planetControllers: PlanetSystemController[] = []
@@ -459,6 +473,13 @@ export class MapViewController implements Tickable {
 
   /** Called when a mission is delivered (credits awarded). */
   onMissionDeliver: ((mission: ActiveShuttleMission | null) => void) | null = null
+
+  /**
+   * Called when an EVA (visit-relay) mission is completed at the in-EVA terminal.
+   * Reward is paid in the same call. Vue uses this to show a toast notification and
+   * refresh persistent progress (credits, etc.).
+   */
+  onEvaMissionComplete: ((mission: ActiveVisitRelayMission) => void) | null = null
 
   /** Called when the player begins an asteroid mission (E at waypoint). */
   onBeginAsteroidMission: ((mission: GeneratedAsteroidMission) => void) | null = null
@@ -2306,6 +2327,78 @@ export class MapViewController implements Tickable {
   private static readonly EVA_WAYPOINT_PLANET_LEAD_SECONDS = 3
 
   /** Accept the offered EVA mission (from shuttle control UI). */
+  /**
+   * Launch the in-EVA maintenance minigame for the POI the player is near. Invoked by
+   * EvaSession when the player presses the action key inside the terminal prompt
+   * range. Looks up the active EVA mission currently rendered at the POI, builds a
+   * minigame via {@link createOrbitalMiniGame}, wires its `onComplete` callback to
+   * {@link evaMinigameComplete}, and emits `onEvaMinigameChange` so the view-layer
+   * overlay opens.
+   */
+  private beginEvaMinigame(): void {
+    const mission = this.missionFacade.getActiveEvaMissionAtPoi()
+    if (!mission) {
+      // No mission rendered — shouldn't happen in normal play; bail so we don't leave
+      // the session stuck in minigame mode.
+      this.evaSession?.endMinigame()
+      return
+    }
+    const minigameType = mission.template.minigameType ?? 'default'
+    const minigame = createOrbitalMiniGame(
+      mission.template.id,
+      minigameType,
+      0,
+      mission.giverPlanet,
+    ) as OrbitalMiniGame & OrbitalMiniGameEvents
+    minigame.onComplete = (missionId: string) => this.evaMinigameComplete(missionId)
+    this.activeEvaMinigame = minigame
+    this.onEvaMinigameChange?.({ mission, minigame })
+  }
+
+  /**
+   * Close the EVA minigame overlay without awarding the mission — e.g. the player
+   * clicks the × button. The EVA session resumes at 'active' mode and the player can
+   * retry or fly back to the shuttle.
+   */
+  evaMinigameClose(): void {
+    if (!this.activeEvaMinigame) return
+    this.activeEvaMinigame.dispose()
+    this.activeEvaMinigame = null
+    this.onEvaMinigameChange?.(null)
+    this.evaSession?.endMinigame()
+  }
+
+  /**
+   * Fire the minigame's completion path — pays reward via the facade, closes the
+   * overlay, and returns the EVA session to 'active'. Safe to invoke from UI `Complete`
+   * button or from the minigame's own logic.
+   */
+  evaMinigameCompleteFromUi(): void {
+    this.activeEvaMinigame?.complete()
+  }
+
+  private evaMinigameComplete(missionId: string): void {
+    // Snapshot the mission *before* the facade strips it from the active list so
+    // the toast/audio fan-out has a stable reference to read reward + name from.
+    const completed = this.missionFacade.getActiveEvaMissionAtPoi()
+    const result = this.missionFacade.completeEvaMission({
+      missionId,
+      profile: this.playerProfile,
+      onMissionBoardUpdate: this.onMissionBoardUpdate,
+    })
+    if (result.creditsChanged) {
+      this.playerProfile = result.profile
+      saveProfile(this.playerProfile)
+      this.onCreditsUpdate?.(this.playerProfile.credits)
+      this.shuttleAudio.notifyMissionDelivered()
+      if (completed) this.onEvaMissionComplete?.(completed)
+    }
+    this.activeEvaMinigame?.dispose()
+    this.activeEvaMinigame = null
+    this.onEvaMinigameChange?.(null)
+    this.evaSession?.endMinigame()
+  }
+
   evaMissionAccept(): void {
     const giverPlanetId = this.missionFacade.board.offeringEvaPlanet
     if (!giverPlanetId) return
@@ -3600,12 +3693,16 @@ export class MapViewController implements Tickable {
         }
         return { allowed: true }
       },
+      onStartEvaMinigame: () => this.beginEvaMinigame(),
       getHugeScaleTargets: () => this.buildEvaHugeScaleTargets(),
       getColliders: () => this.buildEvaColliders(),
       spawnOffsetScale: MapViewController.EVA_MAP_SPAWN_OFFSET_SCALE,
       helmetLightIntensityScale: MapViewController.EVA_MAP_HELMET_LIGHT_SCALE,
       onEvaModeChange: (active) => {
         this.setEvaBloomOverride(active)
+        if (!active) {
+          this.missionFacade.armCompletedEvaSiteCleanup()
+        }
         this.onEvaModeChange?.(active)
       },
       onEvaTelemetry: (t) => this.onEvaTelemetry?.(t),

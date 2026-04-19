@@ -13,6 +13,7 @@
 import * as THREE from 'three'
 import { clone as cloneSkinnedScene } from 'three/addons/utils/SkeletonUtils.js'
 import { fixMaterials, loadGLB } from './loadGLB'
+import { MaintenanceBeacon, type MaintenanceBeaconState } from './MaintenanceBeacon'
 
 /** Public URL path served from `public/models/satellite.glb`. */
 export const SATELLITE_MODEL_PUBLIC_PATH = '/models/satellite.glb'
@@ -36,7 +37,11 @@ export interface SatelliteModelCreateOptions {
   receiveShadow?: boolean
   /** Euler rotation applied to the cloned scene (radians) — reorients the asset's native axes. */
   rotation?: { x?: number; y?: number; z?: number }
+  /** Optional maintenance-light state; when omitted the cloned model has no beacon. */
+  maintenanceState?: MaintenanceBeaconState
 }
+
+const SATELLITE_MAINTENANCE_BEACON_OFFSET = new THREE.Vector3(0, 0.03, 0)
 
 let satelliteTemplate: THREE.Group | null = null
 let satelliteTemplatePromise: Promise<THREE.Group> | null = null
@@ -81,10 +86,12 @@ async function ensureSatelliteTemplate(): Promise<THREE.Group> {
  */
 export class SatelliteModel {
   /** Parent group for positioning; contains the cloned mesh hierarchy. */
-  readonly group = new THREE.Group()
+  readonly group: THREE.Group
+  private readonly beacon: MaintenanceBeacon | null
 
-  private constructor(sceneClone: THREE.Group) {
-    this.group.add(sceneClone)
+  private constructor(group: THREE.Group, beacon: MaintenanceBeacon | null) {
+    this.group = group
+    this.beacon = beacon
   }
 
   /**
@@ -120,7 +127,15 @@ export class SatelliteModel {
       }
     })
 
-    return new SatelliteModel(sceneClone)
+    const group = new THREE.Group()
+    group.add(sceneClone)
+    const beacon = options?.maintenanceState
+      ? new MaintenanceBeacon(group, {
+        offset: SATELLITE_MAINTENANCE_BEACON_OFFSET,
+        initialState: options.maintenanceState,
+      })
+      : null
+    return new SatelliteModel(group, beacon)
   }
 
   /**
@@ -130,8 +145,17 @@ export class SatelliteModel {
     this.group.rotation.y = yawRadians
   }
 
+  setMaintenanceState(state: MaintenanceBeaconState): void {
+    this.beacon?.setState(state)
+  }
+
+  tick(dt: number): void {
+    this.beacon?.tick(dt)
+  }
+
   /** Detach cloned meshes from this group. Shared geometries live in the template. */
   dispose(): void {
+    this.beacon?.dispose()
     this.group.clear()
   }
 }

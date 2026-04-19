@@ -10,7 +10,7 @@
  * @spec docs/superpowers/specs/2026-04-06-asteroid-missions-design.md
  */
 import type { RestockTimer } from '@/lib/shop/tradeTypes'
-import type { GeneratedAsteroidMission, ShuttleMissionBoard } from './types'
+import type { EvaMissionPoiType, GeneratedAsteroidMission, ShuttleMissionBoard } from './types'
 
 /** Versioned localStorage key for the active asteroid mission. */
 export const ACTIVE_MISSION_KEY = 'asteroid-lander-active-mission-v1'
@@ -22,6 +22,8 @@ export const MISSION_BOARD_KEY = 'asteroid-lander-mission-board-v1'
  * {@link consumePendingMapReturnWorld}).
  */
 export const PENDING_MAP_RETURN_WORLD_KEY = 'asteroid-lander-map-return-world-v1'
+/** Versioned localStorage key for repaired EVA POI props that stay on the map. */
+export const COMPLETED_EVA_SITES_KEY = 'asteroid-lander-completed-eva-sites-v1'
 
 interface PersistedMissionBoard {
   board: ShuttleMissionBoard
@@ -34,6 +36,14 @@ export interface PendingMapReturnWorld {
   worldX: number
   /** World Z from the mission waypoint. */
   worldZ: number
+}
+
+/** Persisted repaired EVA site that should remain visible after mission completion. */
+export interface CompletedEvaSite {
+  key: string
+  poiType: EvaMissionPoiType
+  waypoint: { worldX: number; worldZ: number; poiLocalY: number }
+  cleanupArmed: boolean
 }
 
 /**
@@ -190,4 +200,61 @@ export function consumePendingMapReturnWorld(): PendingMapReturnWorld | null {
   } catch {
     return null
   }
+}
+
+/** Save all repaired EVA sites for future map loads. */
+export function saveCompletedEvaSites(sites: readonly CompletedEvaSite[]): void {
+  if (typeof localStorage === 'undefined') return
+  localStorage.setItem(COMPLETED_EVA_SITES_KEY, JSON.stringify(sites))
+}
+
+/** Load repaired EVA sites from storage. */
+export function loadCompletedEvaSites(): CompletedEvaSite[] {
+  if (typeof localStorage === 'undefined') return []
+  const raw = localStorage.getItem(COMPLETED_EVA_SITES_KEY)
+  if (raw === null) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.flatMap((entry) => {
+      if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) return []
+      const candidate = entry as Record<string, unknown>
+      const waypoint = candidate.waypoint
+      if (
+        typeof candidate.key !== 'string'
+        || typeof candidate.poiType !== 'string'
+        || waypoint === null
+        || typeof waypoint !== 'object'
+        || Array.isArray(waypoint)
+      ) {
+        return []
+      }
+      const wp = waypoint as Record<string, unknown>
+      if (
+        typeof wp.worldX !== 'number'
+        || typeof wp.worldZ !== 'number'
+        || typeof wp.poiLocalY !== 'number'
+      ) {
+        return []
+      }
+      return [{
+        key: candidate.key,
+        poiType: candidate.poiType as EvaMissionPoiType,
+        waypoint: {
+          worldX: wp.worldX,
+          worldZ: wp.worldZ,
+          poiLocalY: wp.poiLocalY,
+        },
+        cleanupArmed: candidate.cleanupArmed === true,
+      }]
+    })
+  } catch {
+    return []
+  }
+}
+
+/** Remove all repaired EVA site props from persistence. */
+export function clearCompletedEvaSites(): void {
+  if (typeof localStorage === 'undefined') return
+  localStorage.removeItem(COMPLETED_EVA_SITES_KEY)
 }

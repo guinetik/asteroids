@@ -5,6 +5,7 @@ import {
   acceptEvaMission,
   acceptMission,
   beginAsteroidMission,
+  completeEvaMission,
   completeMission,
   createMissionBoard,
   deliverMission,
@@ -31,11 +32,15 @@ import { CURRENT_PLAYER_UPGRADE_LEVELS } from '@/lib/upgrades'
 import { PLANETS } from '@/lib/planets/catalog'
 import {
   clearActiveMission,
+  clearCompletedEvaSites,
   clearMissionBoard,
+  loadCompletedEvaSites,
   loadActiveMission,
   loadMissionBoard,
+  saveCompletedEvaSites,
   saveActiveMission,
   saveMissionBoard,
+  type CompletedEvaSite,
 } from '@/lib/missions/missionStorage'
 import { isWithinAsteroidMissionApproachRadius } from '@/lib/missions/mapAsteroidMissionApproach'
 import {
@@ -62,6 +67,8 @@ import type { VehicleCamera } from '@/three/VehicleCamera'
 import { createOrbitalMiniGame } from '@/lib/minigame/orbitalMiniGameFactory'
 import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
 
+const COMPLETED_EVA_SITE_DESPAWN_DISTANCE = 180
+
 export class MapMissionFacade {
   board: ShuttleMissionBoard = createMissionBoard()
   overlayOpen = false
@@ -83,6 +90,9 @@ export class MapMissionFacade {
   private evaPoiContainer: THREE.Group | null = null
   private evaPoiInstance: EvaMissionPoiInstance | null = null
   private evaPoiRenderedMissionId: string | null = null
+  private completedEvaSites: CompletedEvaSite[] = []
+  private readonly completedEvaPoiContainers = new Map<string, THREE.Group>()
+  private readonly completedEvaPoiInstances = new Map<string, EvaMissionPoiInstance>()
 
   tick(dt: number): void {
     this.board = tickMissionBoard(this.board, dt)
@@ -100,6 +110,7 @@ export class MapMissionFacade {
   }
 
   hydrateFromStorage(onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null): void {
+    this.completedEvaSites = loadCompletedEvaSites()
     if (typeof localStorage === 'undefined') return
     const storedBoard = loadMissionBoard()
     if (storedBoard) {
@@ -354,6 +365,7 @@ export class MapMissionFacade {
   }
 
   private syncEvaWaypointSite(scene: THREE.Scene): void {
+    this.syncCompletedEvaSites(scene)
     const evaMission = pickActiveEvaMissionMapSite(this.board.activeEvaMissions)
 
     if (!evaMission) {
@@ -392,6 +404,30 @@ export class MapMissionFacade {
     }
   }
 
+  private syncCompletedEvaSites(scene: THREE.Scene): void {
+    const desiredKeys = new Set(this.completedEvaSites.map((site) => site.key))
+
+    for (const [key, instance] of this.completedEvaPoiInstances) {
+      if (desiredKeys.has(key)) continue
+      instance.dispose()
+      this.completedEvaPoiInstances.delete(key)
+    }
+    for (const [key, container] of this.completedEvaPoiContainers) {
+      if (desiredKeys.has(key)) continue
+      scene.remove(container)
+      this.completedEvaPoiContainers.delete(key)
+    }
+
+    for (const site of this.completedEvaSites) {
+      if (this.completedEvaPoiContainers.has(site.key)) continue
+      const container = new THREE.Group()
+      container.position.set(site.waypoint.worldX, site.waypoint.poiLocalY, site.waypoint.worldZ)
+      scene.add(container)
+      this.completedEvaPoiContainers.set(site.key, container)
+      void this.spawnCompletedEvaMissionPoi(site, container)
+    }
+  }
+
   tickWaypointVisuals(params: {
     scene: THREE.Scene
     vehicleCamera: VehicleCamera
@@ -403,6 +439,7 @@ export class MapMissionFacade {
     freezeScales?: boolean
   }): void {
     this.syncWaypointSite(params.scene)
+    this.pruneCompletedEvaSites(params.scene, params.shuttlePosition)
 
     const halfFovRad = THREE.MathUtils.degToRad(params.vehicleCamera.camera.fov / 2)
     const tanHalfFov = Math.tan(halfFovRad)
@@ -446,6 +483,9 @@ export class MapMissionFacade {
 
     // POI lives outside the rescaled root — tick its own animations with real time.
     this.evaPoiInstance?.tick(params.dt)
+    for (const instance of this.completedEvaPoiInstances.values()) {
+      instance.tick(params.dt)
+    }
   }
 
   tryBeginAsteroidMission(params: {
@@ -497,7 +537,10 @@ export class MapMissionFacade {
     if (scene) {
       this.disposeWaypointSite(scene)
       this.disposeEvaWaypointSite(scene)
+      this.disposeCompletedEvaSites(scene)
     }
+    this.completedEvaSites = []
+    clearCompletedEvaSites()
     onMissionBoardUpdate?.(this.board)
   }
 
@@ -507,6 +550,7 @@ export class MapMissionFacade {
     if (scene) {
       this.disposeWaypointSite(scene)
       this.disposeEvaWaypointSite(scene)
+      this.disposeCompletedEvaSites(scene)
     }
   }
 
@@ -555,6 +599,64 @@ export class MapMissionFacade {
     return mission.template.poiType
   }
 
+  /**
+   * The active EVA mission currently rendered at the POI waypoint (or null). Used by
+   * the EVA minigame flow to resolve which mission the player is interacting with when
+   * they approach the maintenance terminal.
+   */
+  getActiveEvaMissionAtPoi(): ActiveVisitRelayMission | null {
+    const mission = pickActiveEvaMissionMapSite(this.board.activeEvaMissions)
+    if (!mission || mission.template.id !== this.evaPoiRenderedMissionId) return null
+    return mission
+  }
+
+  /**
+   * Complete an active EVA mission in response to the in-EVA terminal minigame. Pays
+   * the reward directly (no deliver step) and removes the mission from the active list.
+   *
+   * @returns Updated profile plus `creditsChanged` so the view can refresh HUD totals.
+   */
+  completeEvaMission(params: {
+    missionId: string
+    profile: PlayerProfile
+    onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null
+  }): { profile: PlayerProfile; creditsChanged: boolean } {
+    const completedMission =
+      this.board.activeEvaMissions.find((mission) => mission.template.id === params.missionId) ?? null
+    const result = completeEvaMission(this.board, params.missionId, params.profile)
+    if (!result.ok) {
+      return { profile: params.profile, creditsChanged: false }
+    }
+    if (completedMission) {
+      const repairedSite: CompletedEvaSite = {
+        key: this.makeCompletedEvaSiteKey(completedMission),
+        poiType: completedMission.template.poiType,
+        waypoint: completedMission.waypoint,
+        cleanupArmed: false,
+      }
+      if (!this.completedEvaSites.some((site) => site.key === repairedSite.key)) {
+        this.completedEvaSites = [...this.completedEvaSites, repairedSite]
+        saveCompletedEvaSites(this.completedEvaSites)
+      }
+    }
+    this.board = result.board
+    this.persistBoard()
+    params.onMissionBoardUpdate?.(this.board)
+    return { profile: result.profile, creditsChanged: true }
+  }
+
+  armCompletedEvaSiteCleanup(): void {
+    let changed = false
+    this.completedEvaSites = this.completedEvaSites.map((site) => {
+      if (site.cleanupArmed) return site
+      changed = true
+      return { ...site, cleanupArmed: true }
+    })
+    if (changed) {
+      saveCompletedEvaSites(this.completedEvaSites)
+    }
+  }
+
   private disposeWaypointSite(scene: THREE.Scene): void {
     if (this.missionAsteroidPreviewMesh) {
       disposeMapMissionAsteroidPreviewMesh(this.missionAsteroidPreviewMesh)
@@ -591,6 +693,23 @@ export class MapMissionFacade {
     }
   }
 
+  private async spawnCompletedEvaMissionPoi(
+    site: CompletedEvaSite,
+    container: THREE.Group,
+  ): Promise<void> {
+    try {
+      const instance = await createEvaMissionPoi(site.poiType, 0, 'repaired')
+      if (this.completedEvaPoiContainers.get(site.key) !== container) {
+        instance.dispose()
+        return
+      }
+      container.add(instance.object)
+      this.completedEvaPoiInstances.set(site.key, instance)
+    } catch (error) {
+      console.warn('[MapView] completed EVA mission POI failed', error)
+    }
+  }
+
   private disposeEvaWaypointSite(scene: THREE.Scene): void {
     if (this.evaPoiInstance) {
       this.evaPoiInstance.dispose()
@@ -609,5 +728,38 @@ export class MapMissionFacade {
       this.evaWaypointRoot = null
     }
     this.evaPoiRenderedMissionId = null
+  }
+
+  private disposeCompletedEvaSites(scene: THREE.Scene): void {
+    for (const instance of this.completedEvaPoiInstances.values()) {
+      instance.dispose()
+    }
+    this.completedEvaPoiInstances.clear()
+    for (const container of this.completedEvaPoiContainers.values()) {
+      scene.remove(container)
+    }
+    this.completedEvaPoiContainers.clear()
+  }
+
+  private pruneCompletedEvaSites(
+    scene: THREE.Scene,
+    shuttlePosition: { x: number; z: number },
+  ): void {
+    const retainedSites = this.completedEvaSites.filter((site) => {
+      if (!site.cleanupArmed) return true
+      const dx = shuttlePosition.x - site.waypoint.worldX
+      const dz = shuttlePosition.z - site.waypoint.worldZ
+      return Math.hypot(dx, dz) < COMPLETED_EVA_SITE_DESPAWN_DISTANCE
+    })
+    if (retainedSites.length === this.completedEvaSites.length) return
+
+    this.completedEvaSites = retainedSites
+    saveCompletedEvaSites(this.completedEvaSites)
+    this.syncCompletedEvaSites(scene)
+  }
+
+  private makeCompletedEvaSiteKey(mission: ActiveVisitRelayMission): string {
+    const { worldX, worldZ, poiLocalY } = mission.waypoint
+    return `${mission.template.poiType}:${worldX.toFixed(3)}:${worldZ.toFixed(3)}:${poiLocalY.toFixed(3)}`
   }
 }

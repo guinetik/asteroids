@@ -18,8 +18,14 @@ import CreditsBadge from '@/components/hud/CreditsBadge.vue'
 import AchievementBanner from '@/components/AchievementBanner.vue'
 import AchievementsDialog from '@/components/AchievementsDialog.vue'
 import PortalWelcomeDialog from '@/components/PortalWelcomeDialog.vue'
-import type { ShuttleMissionBoard, ActiveShuttleMission } from '@/lib/missions/types'
+import type {
+  ShuttleMissionBoard,
+  ActiveShuttleMission,
+  ActiveVisitRelayMission,
+} from '@/lib/missions/types'
+import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
 import MissionMiniGameOverlay from '@/components/MissionMiniGameOverlay.vue'
+import EvaMinigameOverlay from '@/components/EvaMinigameOverlay.vue'
 import { PLANETS } from '@/lib/planets/catalog'
 import type { ShopSession } from '@/lib/shop/tradeTypes'
 import type { PlayerProfile } from '@/lib/player/types'
@@ -253,6 +259,13 @@ const missionOverlayCanFit = ref(false)
 const activeOrbitalMinigame = computed(
   () => viewController.activeMinigame,
 )
+/**
+ * EVA terminal minigame state. Populated when the EVA player presses F at a POI
+ * terminal; cleared when they Complete or Close the overlay (or the EVA session
+ * ends). Both refs flip together so the overlay never sees a mismatched pair.
+ */
+const evaMinigameMission = ref<ActiveVisitRelayMission | null>(null)
+const evaMinigameInstance = ref<OrbitalMiniGame | null>(null)
 const missionBoard = ref<ShuttleMissionBoard | null>(null)
 const missionNotification = ref<string | null>(null)
 let missionNotificationTimer: TimerHandle | null = null
@@ -368,6 +381,21 @@ onMounted(async () => {
     }
     viewController.onEvaModeChange = (active) => {
       evaActive.value = active
+    }
+    viewController.onEvaMinigameChange = (payload) => {
+      if (payload) {
+        evaMinigameMission.value = payload.mission
+        evaMinigameInstance.value = payload.minigame
+      } else {
+        evaMinigameMission.value = null
+        evaMinigameInstance.value = null
+      }
+    }
+    viewController.onEvaMissionComplete = (mission) => {
+      showMissionNotification(
+        `EVA mission complete — +${mission.template.reward.toLocaleString()} CR`,
+      )
+      syncPersistentProgressFromController()
     }
     viewController.onMapIntro = (state) => {
       Object.assign(mapIntro, state)
@@ -648,6 +676,16 @@ function handleAcceptAsteroidMission() {
 
 function handleAcceptEvaMission() {
   viewController.evaMissionAccept()
+}
+
+/** Player clicked the overlay's Complete button — pay reward and close. */
+function handleEvaMinigameComplete(): void {
+  viewController.evaMinigameCompleteFromUi()
+}
+
+/** Player dismissed the overlay (X or ESC) without finishing. */
+function handleEvaMinigameClose(): void {
+  viewController.evaMinigameClose()
 }
 
 function handleDeliverMission(missionId: string) {
@@ -991,6 +1029,30 @@ function dockedPlanetId(): string | null {
     @complete="handleMissionComplete"
     @close="closeMissionOverlay"
   />
+  <EvaMinigameOverlay
+    v-if="evaMinigameMission && evaMinigameInstance"
+    :mission="evaMinigameMission"
+    :minigame="evaMinigameInstance"
+    @complete="handleEvaMinigameComplete"
+    @close="handleEvaMinigameClose"
+  />
+  <div
+    v-if="
+      evaActive &&
+      telemetry.actionPrompt &&
+      !evaMinigameMission &&
+      !evaMinigameInstance &&
+      !shuttleControlVisible &&
+      !deathVisible
+    "
+    class="pointer-events-none fixed inset-x-0 bottom-24 z-30 flex justify-center px-6"
+  >
+    <div
+      class="rounded-full border border-cyan-300/45 bg-slate-950/68 px-5 py-2 font-mono text-xs uppercase tracking-[0.28em] text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.18)] backdrop-blur-sm"
+    >
+      {{ telemetry.actionPrompt }}
+    </div>
+  </div>
   <div v-if="habitatActive && habitatPrompt && !shuttleControlVisible" class="habitat-prompt">
     <span class="orbit-prompt-action">{{ habitatPrompt }}</span>
   </div>

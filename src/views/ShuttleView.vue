@@ -83,4 +83,14 @@ onUnmounted(() => {
   <ShuttleHud v-if="!evaActive" :telemetry="telemetry" />
   <HelmetVisor v-if="evaActive" />
   <FpsHud v-if="evaActive" :telemetry="evaTelemetry" variant="eva" />
+  <div
+    v-if="evaActive && telemetry.actionPrompt"
+    class="pointer-events-none fixed inset-x-0 bottom-24 z-30 flex justify-center px-6"
+  >
+    <div
+      class="rounded-full border border-cyan-300/45 bg-slate-950/68 px-5 py-2 font-mono text-xs uppercase tracking-[0.28em] text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.18)] backdrop-blur-sm"
+    >
+      {{ telemetry.actionPrompt }}
+    </div>
+  </div>
 </template>

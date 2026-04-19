@@ -15,39 +15,9 @@ import type { EvaMissionPoiType } from '@/lib/missions/types'
 import { SatelliteModel } from './SatelliteModel'
 import { VoyagerModel } from './VoyagerModel'
 import { HubbleModel } from './HubbleModel'
+import type { MaintenanceBeaconState } from './MaintenanceBeacon'
 
-/**
- * Uniform scale on the GLB satellite in map world units. `satellite.glb` is 10.73 units
- * long native; 0.1 × 10.73 ≈ 1.07 world units — reads clearly as a maintenance target in
- * EVA close-up without filling the sky.
- */
 const MAP_POI_SATELLITE_SCALE = 0.1
-
-/** Yellow maintenance-beacon color — "needs repair" cue on the POI satellite. */
-const SATELLITE_BEACON_COLOR = 0xffc64a
-
-/** Beacon point-light peak intensity; pulsed by a sin(blink) envelope. */
-const SATELLITE_BEACON_PEAK_INTENSITY = 3.2
-
-/** Beacon idle intensity floor so the bulb is visible even at the trough of the blink. */
-const SATELLITE_BEACON_BASE_INTENSITY = 0.4
-
-/** Beacon blink frequency (Hz). Slow pulse so it reads as "attention" rather than alarm. */
-const SATELLITE_BEACON_BLINK_HZ = 0.7
-
-/** Beacon point-light attenuation distance in world units. */
-const SATELLITE_BEACON_DISTANCE = 6
-
-/** Beacon point-light decay exponent. */
-const SATELLITE_BEACON_DECAY = 1.6
-
-/** Radius of the visible emissive bulb sphere at the beacon. */
-const SATELLITE_BEACON_BULB_RADIUS = 0.025
-
-/** Offset (world units) from the satellite's local origin to where the bulb sits. Set
- * to sink the beacon into the upper half of the bus body — emissive glow still reads
- * clearly through the hull, but the bulb itself doesn't float above the silhouette. */
-const SATELLITE_BEACON_LOCAL_OFFSET = new THREE.Vector3(0, 0.03, 0)
 
 /**
  * Uniform scale on the Voyager relay GLB in map world units. Starting point matched to
@@ -77,61 +47,25 @@ export interface EvaMissionPoiInstance {
   object: THREE.Object3D
   /** Per-frame update; no-op for static props. */
   tick(dt: number): void
+  /** Switch beacon status without rebuilding the prop. */
+  setMaintenanceState(state: MaintenanceBeaconState): void
   /** Release geometries, materials, and detach from parent. */
   dispose(): void
 }
 
-async function createSatellitePoi(localY: number): Promise<EvaMissionPoiInstance> {
-  const model = await SatelliteModel.create({ scale: MAP_POI_SATELLITE_SCALE })
-  model.group.position.set(MAP_POI_LOCAL_OFFSET_X, localY, 0)
-
-  const beaconMaterial = new THREE.MeshStandardMaterial({
-    color: SATELLITE_BEACON_COLOR,
-    emissive: SATELLITE_BEACON_COLOR,
-    emissiveIntensity: 1.2,
+async function createSatellitePoi(
+  localY: number,
+  maintenanceState: MaintenanceBeaconState,
+): Promise<EvaMissionPoiInstance> {
+  const model = await SatelliteModel.create({
+    scale: MAP_POI_SATELLITE_SCALE,
+    maintenanceState,
   })
-  const bulb = new THREE.Mesh(
-    new THREE.SphereGeometry(SATELLITE_BEACON_BULB_RADIUS, 12, 8),
-    beaconMaterial,
-  )
-  bulb.position.copy(SATELLITE_BEACON_LOCAL_OFFSET)
-  const light = new THREE.PointLight(
-    SATELLITE_BEACON_COLOR,
-    SATELLITE_BEACON_BASE_INTENSITY,
-    SATELLITE_BEACON_DISTANCE,
-    SATELLITE_BEACON_DECAY,
-  )
-  light.position.copy(SATELLITE_BEACON_LOCAL_OFFSET)
-  model.group.add(bulb, light)
-
-  let elapsed = 0
-  return {
-    object: model.group,
-    tick: (dt) => {
-      elapsed += dt
-      const blink = 0.5 + 0.5 * Math.sin(elapsed * SATELLITE_BEACON_BLINK_HZ * Math.PI * 2)
-      const pulse = blink * blink
-      light.intensity =
-        SATELLITE_BEACON_BASE_INTENSITY
-        + (SATELLITE_BEACON_PEAK_INTENSITY - SATELLITE_BEACON_BASE_INTENSITY) * pulse
-      beaconMaterial.emissiveIntensity = 0.5 + pulse * 3
-    },
-    dispose: () => {
-      light.dispose()
-      bulb.geometry.dispose()
-      beaconMaterial.dispose()
-      model.dispose()
-      model.group.removeFromParent()
-    },
-  }
-}
-
-async function createRelayAntennaPoi(localY: number): Promise<EvaMissionPoiInstance> {
-  const model = await VoyagerModel.create({ scale: MAP_POI_RELAY_ANTENNA_SCALE })
   model.group.position.set(MAP_POI_LOCAL_OFFSET_X, localY, 0)
   return {
     object: model.group,
-    tick: () => {},
+    tick: (dt) => model.tick(dt),
+    setMaintenanceState: (state) => model.setMaintenanceState(state),
     dispose: () => {
       model.dispose()
       model.group.removeFromParent()
@@ -139,12 +73,39 @@ async function createRelayAntennaPoi(localY: number): Promise<EvaMissionPoiInsta
   }
 }
 
-async function createTelescopePoi(localY: number): Promise<EvaMissionPoiInstance> {
-  const model = await HubbleModel.create({ scale: MAP_POI_TELESCOPE_SCALE })
+async function createRelayAntennaPoi(
+  localY: number,
+  maintenanceState: MaintenanceBeaconState,
+): Promise<EvaMissionPoiInstance> {
+  const model = await VoyagerModel.create({
+    scale: MAP_POI_RELAY_ANTENNA_SCALE,
+    maintenanceState,
+  })
   model.group.position.set(MAP_POI_LOCAL_OFFSET_X, localY, 0)
   return {
     object: model.group,
-    tick: () => {},
+    tick: (dt) => model.tick(dt),
+    setMaintenanceState: (state) => model.setMaintenanceState(state),
+    dispose: () => {
+      model.dispose()
+      model.group.removeFromParent()
+    },
+  }
+}
+
+async function createTelescopePoi(
+  localY: number,
+  maintenanceState: MaintenanceBeaconState,
+): Promise<EvaMissionPoiInstance> {
+  const model = await HubbleModel.create({
+    scale: MAP_POI_TELESCOPE_SCALE,
+    maintenanceState,
+  })
+  model.group.position.set(MAP_POI_LOCAL_OFFSET_X, localY, 0)
+  return {
+    object: model.group,
+    tick: (dt) => model.tick(dt),
+    setMaintenanceState: (state) => model.setMaintenanceState(state),
     dispose: () => {
       model.dispose()
       model.group.removeFromParent()
@@ -162,13 +123,14 @@ async function createTelescopePoi(localY: number): Promise<EvaMissionPoiInstance
 export async function createEvaMissionPoi(
   poiType: EvaMissionPoiType,
   localY: number,
+  maintenanceState: MaintenanceBeaconState = 'needs-maintenance',
 ): Promise<EvaMissionPoiInstance> {
   switch (poiType) {
     case 'satellite':
-      return createSatellitePoi(localY)
+      return createSatellitePoi(localY, maintenanceState)
     case 'relay_antenna':
-      return createRelayAntennaPoi(localY)
+      return createRelayAntennaPoi(localY, maintenanceState)
     case 'telescope':
-      return createTelescopePoi(localY)
+      return createTelescopePoi(localY, maintenanceState)
   }
 }

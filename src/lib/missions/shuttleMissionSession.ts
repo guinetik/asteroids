@@ -474,6 +474,44 @@ export function acceptEvaMission(
   }
 }
 
+/** Result of completing an EVA mission. */
+export interface CompleteEvaMissionResult {
+  ok: boolean
+  board: ShuttleMissionBoard
+  profile: PlayerProfile
+  reason?: string
+}
+
+/**
+ * Complete an active EVA (visit-relay) mission. Unlike gather missions, EVA missions
+ * have no deliver step — once the in-EVA terminal minigame completes, the reward is
+ * paid immediately and the mission is removed from the active list. Reward was already
+ * scaled by distance at offer time, so no additional multiplier is applied here.
+ *
+ * @param board - Current mission board state.
+ * @param missionId - ID of the EVA mission (matches `template.id`) to complete.
+ * @param profile - Player profile; receives the reward on success.
+ * @returns Updated board + profile on success, or `ok: false` + reason if not found.
+ */
+export function completeEvaMission(
+  board: ShuttleMissionBoard,
+  missionId: string,
+  profile: PlayerProfile,
+): CompleteEvaMissionResult {
+  const idx = board.activeEvaMissions.findIndex((m) => m.template.id === missionId)
+  if (idx === -1) {
+    return { ok: false, board, profile, reason: 'EVA mission not found' }
+  }
+  const mission = board.activeEvaMissions[idx]!
+  const updatedProfile = addCredits(profile, mission.template.reward)
+  const updatedMissions = board.activeEvaMissions.filter((_, i) => i !== idx)
+  return {
+    ok: true,
+    board: { ...board, activeEvaMissions: updatedMissions },
+    profile: updatedProfile,
+  }
+}
+
 /**
  * Tick the EVA mission restock timer.
  *

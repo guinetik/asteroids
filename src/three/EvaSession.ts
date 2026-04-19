@@ -65,6 +65,13 @@ const EVA_STUB_HP = 100
 const EVA_RCS_AUDIO_VOLUME = 0.42
 
 /**
+ * 3D distance (world units) at which the EVA player sees the "START MAINTENANCE [F]"
+ * prompt near a POI. Sized a touch larger than the POI props themselves + the player
+ * body radius so the prompt appears as you approach rather than requiring a hull bump.
+ */
+const EVA_TERMINAL_PROMPT_RANGE = 3.5
+
+/**
  * Minimal vehicle contract the EVA session depends on. {@link ShuttleController}
  * satisfies this naturally; any future player vehicle can opt in by exposing the
  * same surface.
@@ -117,6 +124,12 @@ export interface EvaSessionConfig {
    * "EVA [F]" offer. Defaults to always-allowed when not supplied.
    */
   canEva?: () => { allowed: true } | { allowed: false; reason: string }
+  /**
+   * Start the terminal minigame for the POI the player is currently near. The host
+   * view is expected to open an overlay, run the minigame, then call
+   * {@link EvaSession.endMinigame} when the overlay is dismissed or completed.
+   */
+  onStartEvaMinigame?: () => void
   /** Objects to scale up during EVA. Read once at session enter. */
   getHugeScaleTargets: () => EvaHugeScaleTarget[]
   /**
@@ -142,7 +155,7 @@ export interface EvaSessionConfig {
 export class EvaSession implements Tickable {
   private readonly config: EvaSessionConfig
   private readonly rcsSound = new EvaRcsSound()
-  private mode: 'idle' | 'opening' | 'active' = 'idle'
+  private mode: 'idle' | 'opening' | 'active' | 'minigame' = 'idle'
   private controller: EvaTetherController | null = null
   private readonly collisionResolver = new EvaCollisionResolver()
   private preEvaScales: { object: THREE.Object3D; scale: number }[] = []
@@ -155,9 +168,16 @@ export class EvaSession implements Tickable {
     this.config = config
   }
 
-  /** True while the player is out on EVA (post-door-open, pre-return). */
+  /** True while the player is out on EVA (post-door-open, pre-return). Stays true
+   * during the maintenance minigame sub-state so HUD/visor/bloom overrides persist. */
   get isActive(): boolean {
-    return this.mode === 'active'
+    return this.mode === 'active' || this.mode === 'minigame'
+  }
+
+  /** True while a maintenance minigame overlay is open. Lets the host view gate input
+   * handling (pointer lock, keybinds) on the overlay without toggling EVA mode. */
+  get isMinigameOpen(): boolean {
+    return this.mode === 'minigame'
   }
 
   tick(_dt: number): void {
@@ -204,8 +224,35 @@ export class EvaSession implements Tickable {
       return
     }
 
+    if (this.mode === 'minigame') {
+      // Player is in the maintenance overlay — suppress EVA prompts + RCS audio. The
+      // host view calls endMinigame() when the overlay closes, flipping back to active.
+      this.setPrompt(null)
+      return
+    }
+
     if (!this.controller) return
     this.updateRcsAudio(_dt)
+
+    // POI terminal proximity (3D) takes priority over the shuttle-return prompt so
+    // the player can't miss the maintenance action by accidentally re-entering range
+    // of the shuttle.
+    const poi = this.config.getPoi()
+    if (poi) {
+      const pdx = this.controller.group.position.x - poi.x
+      const pdy = this.controller.group.position.y - poi.y
+      const pdz = this.controller.group.position.z - poi.z
+      const distToPoi = Math.sqrt(pdx * pdx + pdy * pdy + pdz * pdz)
+      if (distToPoi < EVA_TERMINAL_PROMPT_RANGE) {
+        this.setPrompt('START MAINTENANCE [F]')
+        if (this.config.inputManager.wasActionPressed('evaToggle')) {
+          this.beginMinigame()
+        }
+        this.emitTelemetry()
+        return
+      }
+    }
+
     const rdx = this.controller.group.position.x - vehicle.group.position.x
     const rdz = this.controller.group.position.z - vehicle.group.position.z
     const distToVehicleXZ = Math.sqrt(rdx * rdx + rdz * rdz)
@@ -275,6 +322,30 @@ export class EvaSession implements Tickable {
     this.controller = controller
     this.attachPointerLock()
     this.config.onEvaModeChange?.(true)
+  }
+
+  /**
+   * Enter the minigame sub-state. Releases pointer lock and clears the EVA prompt so
+   * the overlay can take input. The host view opens its overlay via
+   * {@link EvaSessionConfig.onStartEvaMinigame}.
+   */
+  private beginMinigame(): void {
+    if (this.mode !== 'active') return
+    this.mode = 'minigame'
+    this.rcsSound.stop()
+    this.detachPointerLock()
+    this.setPrompt(null)
+    this.config.onStartEvaMinigame?.()
+  }
+
+  /**
+   * Return to the active EVA state after a minigame overlay closes. Idempotent —
+   * safe to call if the session has already ended (e.g. disposed while open).
+   */
+  endMinigame(): void {
+    if (this.mode !== 'minigame') return
+    this.mode = 'active'
+    this.attachPointerLock()
   }
 
   private endSession(vehicle: EvaSessionVehicle): void {
