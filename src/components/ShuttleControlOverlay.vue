@@ -8,11 +8,12 @@ import ShuttleControlProgramInventory from './shuttle-control/ShuttleControlProg
 import ShuttleControlProgramMail from './shuttle-control/ShuttleControlProgramMail.vue'
 import ShuttleControlProgramMissions from './shuttle-control/ShuttleControlProgramMissions.vue'
 import ShuttleControlProgramShuttle from './shuttle-control/ShuttleControlProgramShuttle.vue'
+import ShuttleControlProgramLander from './shuttle-control/ShuttleControlProgramLander.vue'
 import ShuttleControlProgramUpgrades from './shuttle-control/ShuttleControlProgramUpgrades.vue'
 import type { UpgradeId } from '@/lib/upgrades'
 
 /** Left-rail program in the shuttle control terminal. */
-type ControlScreen = 'shuttle' | 'mail' | 'missions' | 'inventory' | 'upgrades'
+type ControlScreen = 'shuttle' | 'lander' | 'mail' | 'missions' | 'inventory' | 'upgrades'
 
 const props = defineProps<{
   visible: boolean
@@ -51,6 +52,7 @@ const activeScreen = ref<ControlScreen>('mail')
 
 const programByScreen: Record<ControlScreen, Component> = {
   shuttle: ShuttleControlProgramShuttle,
+  lander: ShuttleControlProgramLander,
   mail: ShuttleControlProgramMail,
   missions: ShuttleControlProgramMissions,
   inventory: ShuttleControlProgramInventory,
@@ -94,6 +96,7 @@ const screens = computed(() => {
   return [
     { id: 'mail' as const, label: mailLabel },
     { id: 'shuttle' as const, label: 'Shuttle' },
+    { id: 'lander' as const, label: 'Lander' },
     { id: 'missions' as const, label: 'Missions' },
     { id: 'inventory' as const, label: 'Inventory' },
   ]
@@ -178,7 +181,7 @@ function onKeydown(e: KeyboardEvent) {
         <!-- Right content area -->
         <div 
           class="shuttle-control-content shuttle-control-content--programs"
-          :class="{ '!p-0 overflow-hidden': activeScreen === 'shuttle' }"
+          :class="{ '!p-0 overflow-hidden': activeScreen === 'shuttle' || activeScreen === 'lander' }"
         >
           <component
             :is="activeProgram"
