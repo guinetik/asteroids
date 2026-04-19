@@ -167,17 +167,35 @@ Shipped:
 
 Done means: player can dock at any planet, see an EVA mission offer with a reward scaled to that planet's distance, press Accept, and see it in the active list with the waypoint coordinates.
 
-### Phase 2 — Port to `/level` MapView 🟡 PENDING
+### Phase 2 — Port to `/map` MapView ✅ DONE
 
-The EVA session is already portable (see `EvaSession` — takes dependencies by injection). What's left is the map-side glue:
+Playable on `/map`: accept an EVA mission at any planet, see a waypoint beam + POI spawn near the giver's leading orbital position, park the shuttle over the waypoint column, press E to EVA up/down and back.
 
-- **Spawn the relay/satellite POI** at `activeEvaMission.template.waypoint` when the player has an active EVA mission. Follow the existing asteroid-mission POI pattern (`mapAsteroidMissionApproach.ts`, `WaypointMarkers`). A satellite glyph instead of the asteroid ring.
-- **Trigger range on approach.** When the shuttle comes within EVA range of the waypoint, surface the `EVA [E]` prompt via the existing `actionPrompt` on `ShuttleTelemetry`.
-- **Instantiate `EvaSession` in `MapViewController`.** Construct it with `getVehicle = () => shuttleController`, `getPoi = () => activeEvaPoiWorldPos`, huge-scale targets including the sun and any nearby planet, plus `onEvaTelemetry` / `onEvaModeChange` forwarded to `MapView.vue` the same way shuttle view does.
-- **Add `HelmetVisor` + `FpsHud variant="eva"` to `MapView.vue`** on `evaActive`.
-- **Keep the existing EVA bindings** — they already collide cleanly because `shuttleController.setInputEnabled(false)` gates vehicle input.
+Shipped:
+- **`EvaSceneHost` interface** on `EvaSession` — `SceneManager` satisfies it naturally, and `MapViewController` injects a small adapter that swaps the composer's `RenderPass.camera` for the FPS camera on `setActiveCamera`.
+- **POI container is a scene-level sibling of the beam root** (`MapMissionFacade.evaPoiContainer`). Beam root keeps its per-frame constant-apparent-size rescale so players can find the waypoint from across the map; the POI sits in real world units (shuttle-cargo proportion) so it becomes a distant speck, not a Earth-visible object.
+- **`MapViewController.createEvaSession`**: `getVehicle` → shuttle; `getPoi` → `missionFacade.getEvaPoiWorldPos()`; huge-scale targets = shuttle (×100) + sun (×4); `spawnOffsetScale = 1`; `helmetLightIntensityScale = 0.08` to stop the flashlight blowing out the sunlit hull.
+- **Auto-rescale freezes during EVA.** `tickShuttleScale` and the beam root's per-frame rescale in `tickWaypointVisuals` both early-return while `evaSession.isActive`, and `tickStartupIntroCamera` also skips so `introFacade` stops overwriting the render-pass camera.
+- **Bloom override**: EVA mode snapshots + boosts threshold / lowers strength so the shuttle's scaled TRON panels don't saturate. Restored on exit.
+- **Shuttle fuel drain paused** while EVA is active.
+- **Distance checks are XZ-planar** in `EvaSession` so the `EVA [E]` prompt fires when parked over the waypoint column regardless of the POI's vertical offset.
+- **HUD gates in `MapView.vue`**: `ShuttleHud`, `OrbitPrompt`, `GravityWarning`, nav bar, map toggles, credits/achievements badges all hide on `evaActive`. `HelmetVisor` + `FpsHud variant="eva"` render while active.
+- **Dedicated EVA crosshair** in `FpsHud` (soft cyan reticle, no tool).
+- **`FuelTank` indicator** is now a solid, depth-tested `MeshStandardMaterial`. Previously `depthTest: false` + `renderOrder: 1` leaked the fuel gauges through the shuttle chassis; the new version is properly occluded.
 
-No new systems needed; just wiring.
+### Phase 2.5 — EVA mission POI system ✅ DONE
+
+A distinct prop variant per mission, chosen from JSON. Same session/minigame pipeline for all variants.
+
+- **`poiType` field** on `VisitRelayShuttleMissionTemplate`: `'satellite' | 'relay_antenna' | 'telescope'`. Future variants plug in as one more union member + one factory branch.
+- **Waypoint generation at accept time**: `generateEvaWaypoint(planetX, planetZ)` picks a random `(angle, dist)` in `[60, 140]` around the giver planet, plus `poiLocalY` with `|y| ∈ [12, 25]` and random sign — enforces real verticality. The root itself stays on the Y=0 orbital plane so the beam marker aligns with the overhead map.
+- **Planet lead prediction**: `PlanetSystemController.predictWorldPosXZ(simTime)` evaluates the Kepler orbit at a future time. `MapViewController.evaMissionAccept` calls it with `simTime + 3s` so the waypoint is placed where the giver planet *will* be, not where it is.
+- **`EvaMissionPoi` factory** (`src/three/EvaMissionPoi.ts`): `createEvaMissionPoi(poiType, localY) → { object, tick, dispose }`.
+  - `'satellite'` → `SatelliteModel` at `scale 0.02`, only `Object_7` gets the TRON panel material; `Object_8` keeps its GLB material.
+  - `'relay_antenna'` → primitive `RelayAntennaController` at `scale 0.15`.
+  - `'telescope'` → `HubbleModel` (new loader, no TRON — coloured in a follow-up) at `scale 0.03`.
+- **Scale anchor**: `CARGO_LANDER_SCALE = 30` in `0.01` model space ≈ 0.3 world units. POI scales picked so each variant reads at roughly shuttle-cargo size, not billboard size.
+- **Mission content**: one `poiType: 'telescope'` mission on Earth (`earth_hubble_optical_alignment`, 2200 CR). All 8 planets have at least one satellite + one relay_antenna mission.
 
 ### Phase 3.5 — Mission lifecycle completion 🟡 PENDING
 
