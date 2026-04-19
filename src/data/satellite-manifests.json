@@ -1,0 +1,11 @@
+{
+  "satellite": {
+    "components": [
+      "satellite_antenna",
+      "satellite_circuits",
+      "satellite_solar_A",
+      "satellite_solar_B",
+      "satellite_thruster"
+    ]
+  }
+}
