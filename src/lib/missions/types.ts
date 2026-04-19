@@ -212,7 +212,7 @@ export interface ShuttleMissionBoard {
  * POI prop model spawned at the EVA waypoint. Drives the `EvaMissionPoi` factory;
  * new flavors (e.g. `'telescope'`) are added here plus one new branch in the factory.
  */
-export type EvaMissionPoiType = 'satellite' | 'relay_antenna'
+export type EvaMissionPoiType = 'satellite' | 'relay_antenna' | 'telescope'
 
 /**
  * A shuttle EVA mission template from JSON — player flies to a waypoint and spacewalks.

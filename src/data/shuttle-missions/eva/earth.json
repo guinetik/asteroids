@@ -10,20 +10,12 @@
       "reward": 1400
     },
     {
-      "id": "earth_probe_helios_calibration",
-      "name": "Helios Probe Calibration",
-      "description": "The Helios-3 gravitometric probe is reading drift. EVA out to its waypoint and re-seat the sensor boom — 20 minutes of float time, no rush.",
-      "poiType": "satellite",
-      "minigameType": "relay_repair",
-      "reward": 1200
-    },
-    {
-      "id": "earth_cubesat_cluster_patch",
-      "name": "Cubesat Cluster Firmware Patch",
-      "description": "A cluster of three cubesats missed the last OTA window. Visit the formation, jack into the master node, and push the patch manually.",
-      "poiType": "satellite",
-      "minigameType": "relay_repair",
-      "reward": 1800
+      "id": "earth_hubble_optical_alignment",
+      "name": "Hubble Optical Alignment",
+      "description": "Hubble's primary mirror actuator stack drifted out of spec after the last reboost. EVA to the observatory, lock the fine-guidance sensors, and walk the alignment back into tolerance.",
+      "poiType": "telescope",
+      "minigameType": "telescope_alignment",
+      "reward": 2200
     }
   ]
 }

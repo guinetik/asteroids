@@ -14,6 +14,7 @@ import * as THREE from 'three'
 import type { EvaMissionPoiType } from '@/lib/missions/types'
 import { SatelliteModel } from './SatelliteModel'
 import { RelayAntennaController } from './RelayAntennaController'
+import { HubbleModel } from './HubbleModel'
 
 /**
  * Uniform scale on the GLB satellite in map world units. Sized to the shuttle's cargo-bay
@@ -29,6 +30,13 @@ const MAP_POI_SATELLITE_SCALE = 0.02
  * are native ~0.5–3 unit, so a scale of 0.15 lands it near ~0.3 world units overall.
  */
 const MAP_POI_RELAY_ANTENNA_SCALE = 0.15
+
+/**
+ * Uniform scale on the Hubble telescope GLB in map world units. Native geometry spans
+ * ~18×19×27 local units; this puts it at ~0.4 world units, a touch larger than the
+ * satellite/relay since Hubble is a bigger sibling of the sat class.
+ */
+const MAP_POI_TELESCOPE_SCALE = 0.03
 
 /**
  * Local X offset of the POI prop inside its (now world-sized) container. A small
@@ -77,6 +85,19 @@ function createRelayAntennaPoi(localY: number): EvaMissionPoiInstance {
   }
 }
 
+async function createTelescopePoi(localY: number): Promise<EvaMissionPoiInstance> {
+  const model = await HubbleModel.create({ scale: MAP_POI_TELESCOPE_SCALE })
+  model.group.position.set(MAP_POI_LOCAL_OFFSET_X, localY, 0)
+  return {
+    object: model.group,
+    tick: () => {},
+    dispose: () => {
+      model.dispose()
+      model.group.removeFromParent()
+    },
+  }
+}
+
 /**
  * Build the POI prop for an EVA mission waypoint.
  *
@@ -93,5 +114,7 @@ export async function createEvaMissionPoi(
       return createSatellitePoi(localY)
     case 'relay_antenna':
       return createRelayAntennaPoi(localY)
+    case 'telescope':
+      return createTelescopePoi(localY)
   }
 }
