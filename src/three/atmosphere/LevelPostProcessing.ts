@@ -15,6 +15,9 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js'
 import { VignetteShader } from 'three/addons/shaders/VignetteShader.js'
+import fullscreenQuadVertexShader from '@/three/shaders/postprocessing/fullscreenQuad.vert.glsl?raw'
+import colorGradeFragmentShader from '@/three/shaders/postprocessing/colorGrade.frag.glsl?raw'
+import chromaticAberrationFragmentShader from '@/three/shaders/postprocessing/chromaticAberration.frag.glsl?raw'
 
 // ── Bloom ──
 /** Bloom intensity. Low — only bright emissives glow. */
@@ -52,38 +55,8 @@ const ColorGradeShader = {
     shadowTint: { value: new THREE.Vector3(SHADOW_TINT_R, SHADOW_TINT_G, SHADOW_TINT_B) },
     contrast: { value: CONTRAST },
   },
-  vertexShader: /* glsl */ `
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
-  fragmentShader: /* glsl */ `
-    uniform sampler2D tDiffuse;
-    uniform float desaturation;
-    uniform vec3 shadowTint;
-    uniform float contrast;
-    varying vec2 vUv;
-
-    void main() {
-      vec4 tex = texture2D(tDiffuse, vUv);
-      vec3 color = tex.rgb;
-
-      // Desaturate
-      float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
-      color = mix(color, vec3(luma), desaturation);
-
-      // Cool shadow tint — blend toward shadowTint in dark regions
-      float shadowMask = 1.0 - smoothstep(0.0, 0.3, luma);
-      color = mix(color, color * shadowTint, shadowMask * 0.4);
-
-      // Contrast S-curve
-      color = clamp((color - 0.5) * contrast + 0.5, 0.0, 1.0);
-
-      gl_FragColor = vec4(color, tex.a);
-    }
-  `,
+  vertexShader: fullscreenQuadVertexShader,
+  fragmentShader: colorGradeFragmentShader,
 }
 
 /**
@@ -94,27 +67,8 @@ const ChromaticAberrationShader = {
     tDiffuse: { value: null as THREE.Texture | null },
     amount: { value: CA_AMOUNT },
   },
-  vertexShader: /* glsl */ `
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
-  fragmentShader: /* glsl */ `
-    uniform sampler2D tDiffuse;
-    uniform float amount;
-    varying vec2 vUv;
-
-    void main() {
-      vec2 dir = vUv - 0.5;
-      float dist = length(dir);
-      float r = texture2D(tDiffuse, vUv - dir * amount * dist).r;
-      float g = texture2D(tDiffuse, vUv).g;
-      float b = texture2D(tDiffuse, vUv + dir * amount * dist).b;
-      gl_FragColor = vec4(r, g, b, 1.0);
-    }
-  `,
+  vertexShader: fullscreenQuadVertexShader,
+  fragmentShader: chromaticAberrationFragmentShader,
 }
 
 /**

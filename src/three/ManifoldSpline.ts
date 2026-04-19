@@ -13,6 +13,8 @@ import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 import type { OrbitPoint2D } from '@/lib/map/orbitalSurfing'
 import { MAP_VIEW_CONTROLLER_CONFIG as MAP_CONFIG } from '@/lib/map/mapViewControllerConfig'
+import manifoldSplineVertexShader from '@/three/shaders/effects/manifoldSpline.vert.glsl?raw'
+import manifoldSplineFragmentShader from '@/three/shaders/effects/manifoldSpline.frag.glsl?raw'
 
 /** Number of sample points along the spline for rendering. */
 const RENDER_SEGMENTS = 128
@@ -142,24 +144,8 @@ export class ManifoldSpline implements Tickable {
         uOpacity: { value: MAP_CONFIG.ORBITAL_SURF_SPLINE_OPACITY },
         uPulseSpeed: { value: MAP_CONFIG.ORBITAL_SURF_PULSE_SPEED },
       },
-      vertexShader: /* glsl */ `
-        void main() {
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: /* glsl */ `
-        uniform float uTime;
-        uniform vec3 uBaseColor;
-        uniform vec3 uGlowColor;
-        uniform float uOpacity;
-        uniform float uPulseSpeed;
-
-        void main() {
-          float pulse = 0.7 + 0.3 * sin(uTime * uPulseSpeed * 6.2831);
-          vec3 color = mix(uBaseColor, uGlowColor, pulse * 0.5);
-          gl_FragColor = vec4(color, uOpacity * pulse);
-        }
-      `,
+      vertexShader: manifoldSplineVertexShader,
+      fragmentShader: manifoldSplineFragmentShader,
     })
 
     this.tubeMesh = new THREE.LineSegments(geometry, this.material)

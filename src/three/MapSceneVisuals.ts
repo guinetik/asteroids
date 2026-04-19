@@ -6,6 +6,12 @@ import {
   syncTronHologramTimeSeconds,
   disposeTronHologramMaterials,
 } from '@/three/tronHologramMaterial'
+import tetherLineVertexShader from '@/three/shaders/map/tetherLine.vert.glsl?raw'
+import approachTetherLineFragmentShader from '@/three/shaders/map/approachTetherLine.frag.glsl?raw'
+import surfTetherLineFragmentShader from '@/three/shaders/map/surfTetherLine.frag.glsl?raw'
+import lockDiscVertexShader from '@/three/shaders/map/lockDisc.vert.glsl?raw'
+import approachLockDiscFragmentShader from '@/three/shaders/map/approachLockDisc.frag.glsl?raw'
+import surfLockDiscFragmentShader from '@/three/shaders/map/surfLockDisc.frag.glsl?raw'
 
 /** Camera-relative data for the ship HUD reticle each frame. */
 export interface ShipReticleUpdate {
@@ -219,31 +225,8 @@ export class MapSceneVisuals {
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       uniforms: lineUniforms as unknown as Record<string, THREE.IUniform>,
-      vertexShader: `
-        attribute float lineU;
-        varying float vLineU;
-
-        void main() {
-          vLineU = lineU;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform float uTime;
-        uniform float uProgress;
-        uniform float uOpacity;
-        uniform vec3 uColor;
-        uniform vec3 uPulseColor;
-        varying float vLineU;
-
-        void main() {
-          float pulse = 0.5 + 0.5 * sin((vLineU * 10.0) - (uTime * 8.0));
-          float captureFront = smoothstep(0.0, 0.85, uProgress + (1.0 - vLineU) * 0.35);
-          vec3 color = mix(uColor, uPulseColor, pulse * 0.45);
-          float alpha = uOpacity * captureFront * (0.55 + pulse * 0.45);
-          gl_FragColor = vec4(color, alpha);
-        }
-      `,
+      vertexShader: tetherLineVertexShader,
+      fragmentShader: approachTetherLineFragmentShader,
     })
     const line = new THREE.Line(lineGeometry, lineMaterial)
     line.renderOrder = 12
@@ -400,31 +383,8 @@ export class MapSceneVisuals {
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       uniforms: lineUniforms as unknown as Record<string, THREE.IUniform>,
-      vertexShader: `
-        attribute float lineU;
-        varying float vLineU;
-
-        void main() {
-          vLineU = lineU;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform float uTime;
-        uniform float uProgress;
-        uniform float uOpacity;
-        uniform vec3 uColor;
-        uniform vec3 uPulseColor;
-        varying float vLineU;
-
-        void main() {
-          float pulse = 0.5 + 0.5 * sin((vLineU * 14.0) - (uTime * 12.0));
-          float captureFront = smoothstep(0.0, 0.7, uProgress + (1.0 - vLineU) * 0.4);
-          vec3 color = mix(uColor, uPulseColor, pulse * 0.5);
-          float alpha = uOpacity * captureFront * (0.5 + pulse * 0.5);
-          gl_FragColor = vec4(color, alpha);
-        }
-      `,
+      vertexShader: tetherLineVertexShader,
+      fragmentShader: surfTetherLineFragmentShader,
     })
     const line = new THREE.Line(lineGeometry, lineMaterial)
     line.renderOrder = 12
@@ -505,35 +465,8 @@ export class MapSceneVisuals {
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       uniforms: uniforms as unknown as Record<string, THREE.IUniform>,
-      vertexShader: `
-        varying vec2 vUv;
-
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform float uTime;
-        uniform float uProgress;
-        uniform float uOpacity;
-        uniform vec3 uColor;
-        varying vec2 vUv;
-
-        void main() {
-          vec2 centered = (vUv - 0.5) * 2.0;
-          float radius = length(centered);
-          float rim = smoothstep(0.8, 0.2, radius);
-          float ring = smoothstep(0.3, 0.26, abs(radius - (0.5 + 0.06 * sin(uTime * 6.0))));
-          float grid = max(
-            smoothstep(0.04, 0.0, abs(centered.x)),
-            smoothstep(0.04, 0.0, abs(centered.y))
-          );
-          float intensity = max(rim * 0.4, max(ring * 0.8, grid * 0.6 * uProgress));
-          float alpha = intensity * uOpacity * (0.4 + uProgress * 0.6);
-          gl_FragColor = vec4(uColor, alpha);
-        }
-      `,
+      vertexShader: lockDiscVertexShader,
+      fragmentShader: surfLockDiscFragmentShader,
     })
     const mesh = new THREE.Mesh(geometry, material)
     mesh.rotation.x = -Math.PI / 2
@@ -753,32 +686,8 @@ export class MapSceneVisuals {
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       uniforms: uniforms as unknown as Record<string, THREE.IUniform>,
-      vertexShader: `
-        varying vec2 vUv;
-
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform float uTime;
-        uniform float uProgress;
-        uniform float uOpacity;
-        uniform vec3 uColor;
-        varying vec2 vUv;
-
-        void main() {
-          vec2 centered = (vUv - 0.5) * 2.0;
-          float radius = length(centered);
-          float rim = smoothstep(0.7, 0.25, radius);
-          float ring = smoothstep(0.38, 0.34, abs(radius - (0.45 + 0.08 * sin(uTime * 5.0))));
-          float spokes = 0.5 + 0.5 * sin(atan(centered.y, centered.x) * 6.0 + uTime * 3.0);
-          float intensity = max(rim * 0.55, ring * (0.65 + 0.35 * spokes));
-          float alpha = intensity * uOpacity * (0.45 + uProgress * 0.55);
-          gl_FragColor = vec4(uColor, alpha);
-        }
-      `,
+      vertexShader: lockDiscVertexShader,
+      fragmentShader: approachLockDiscFragmentShader,
     })
     const mesh = new THREE.Mesh(geometry, material)
     mesh.rotation.x = -Math.PI / 2

@@ -11,9 +11,8 @@
  */
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import * as THREE from 'three'
-
-/** Threshold below which effects are invisible — skip shader work. */
-const PROXIMITY_EPSILON = 0.001
+import fullscreenQuadVertexShader from '@/three/shaders/postprocessing/fullscreenQuad.vert.glsl?raw'
+import gravityDistortionFragmentShader from '@/three/shaders/postprocessing/gravityDistortion.frag.glsl?raw'
 
 /**
  * Creates a configured ShaderPass for gravity distortion.
@@ -35,53 +34,8 @@ export function createGravityDistortionPass(
       lensStrength: { value: lensStrength },
       chromStrength: { value: chromStrength },
     },
-    vertexShader: /* glsl */ `
-      varying vec2 vUv;
-      void main() {
-        vUv = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: /* glsl */ `
-      uniform sampler2D tDiffuse;
-      uniform float proximity;
-      uniform vec2 sourceUV;
-      uniform float lensStrength;
-      uniform float chromStrength;
-      varying vec2 vUv;
-
-      // Linear → sRGB conversion (this pass is last in the chain)
-      vec3 linearToSRGB(vec3 c) {
-        return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c));
-      }
-
-      void main() {
-        if (proximity < ${PROXIMITY_EPSILON.toFixed(4)}) {
-          vec4 texel = texture2D(tDiffuse, vUv);
-          gl_FragColor = vec4(linearToSRGB(texel.rgb), texel.a);
-          return;
-        }
-
-        // --- Gravitational lensing ---
-        // Pull UVs toward the gravity source position on screen
-        vec2 toSource = sourceUV - vUv;
-        float dist = length(toSource);
-        // Strength falls off with distance from source, scales with proximity
-        float lensAmount = proximity * lensStrength / (dist + 0.1);
-        vec2 lensedUV = vUv + toSource * lensAmount;
-
-        // --- Chromatic aberration ---
-        // Kicks in harder at high proximity (quadratic ramp)
-        float chromAmount = proximity * proximity * chromStrength;
-        vec2 chromDir = normalize(vUv - vec2(0.5));
-
-        float r = texture2D(tDiffuse, lensedUV + chromDir * chromAmount).r;
-        float g = texture2D(tDiffuse, lensedUV).g;
-        float b = texture2D(tDiffuse, lensedUV - chromDir * chromAmount).b;
-
-        gl_FragColor = vec4(linearToSRGB(vec3(r, g, b)), 1.0);
-      }
-    `,
+    vertexShader: fullscreenQuadVertexShader,
+    fragmentShader: gravityDistortionFragmentShader,
   }
 
   return new ShaderPass(shader)

@@ -11,6 +11,8 @@
  */
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
+import manifoldBubbleVertexShader from '@/three/shaders/effects/manifoldBubble.vert.glsl?raw'
+import manifoldBubbleFragmentShader from '@/three/shaders/effects/manifoldBubble.frag.glsl?raw'
 
 /** Bubble radius in shuttle local space. */
 const BUBBLE_RADIUS = 8
@@ -63,27 +65,8 @@ export class ManifoldBubbleEffect implements Tickable {
         uColor: { value: new THREE.Color(BUBBLE_COLOR) },
         uOpacity: { value: 0 },
       },
-      vertexShader: /* glsl */ `
-        varying vec3 vPos;
-        void main() {
-          vPos = position;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: /* glsl */ `
-        uniform float uTime;
-        uniform vec3 uColor;
-        uniform float uOpacity;
-        varying vec3 vPos;
-
-        void main() {
-          // Latitude-based shimmer — bands travel upward
-          float bands = sin(vPos.y * 3.0 + uTime * 4.0) * 0.5 + 0.5;
-          float edge = smoothstep(0.0, 0.3, bands);
-          vec3 color = uColor * (0.6 + 0.4 * edge);
-          gl_FragColor = vec4(color, uOpacity * (0.5 + 0.5 * edge));
-        }
-      `,
+      vertexShader: manifoldBubbleVertexShader,
+      fragmentShader: manifoldBubbleFragmentShader,
     })
 
     this.mesh = new THREE.LineSegments(wireframe, this.material)

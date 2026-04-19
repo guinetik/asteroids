@@ -17,6 +17,8 @@ import * as THREE from 'three'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
 import type { AtmosphereContext } from './AtmosphereContext'
 import { useAudio } from '@/audio/useAudio'
+import scorchVertexShader from '@/three/shaders/effects/scorch.vert.glsl?raw'
+import scorchFragmentShader from '@/three/shaders/effects/scorch.frag.glsl?raw'
 
 // ── Altitude thresholds ──
 /** Maximum altitude (meters) at which wash effects appear. */
@@ -69,43 +71,8 @@ const ScorchShader = {
     time: { value: 0 },
     baseColor: { value: new THREE.Vector3(1.0, 0.6, 0.2) },
   },
-  vertexShader: /* glsl */ `
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
-  fragmentShader: /* glsl */ `
-    uniform float intensity;
-    uniform float time;
-    uniform vec3 baseColor;
-    varying vec2 vUv;
-
-    // Simple noise for organic pulsing
-    float hash(vec2 p) {
-      return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-    }
-
-    void main() {
-      vec2 centered = vUv * 2.0 - 1.0;
-      float dist = length(centered);
-
-      // Radial falloff — hot center fading to nothing at edges
-      float glow = 1.0 - smoothstep(0.0, 1.0, dist);
-      glow = pow(glow, 2.0);
-
-      // Subtle noise pulse
-      float pulse = 0.9 + 0.1 * sin(time * 6.0 + hash(centered) * 6.28);
-
-      // Hot center (white-orange) to cooler edges (dim orange)
-      vec3 hotColor = vec3(1.0, 0.9, 0.7);
-      vec3 color = mix(baseColor, hotColor, glow * 0.6);
-
-      float alpha = glow * intensity * pulse;
-      gl_FragColor = vec4(color, alpha);
-    }
-  `,
+  vertexShader: scorchVertexShader,
+  fragmentShader: scorchFragmentShader,
 }
 
 /**

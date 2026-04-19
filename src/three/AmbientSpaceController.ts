@@ -20,6 +20,8 @@
  */
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
+import cloudVertexShader from '@/three/shaders/ambient/cloud.vert.glsl?raw'
+import cloudFragmentShader from '@/three/shaders/ambient/cloud.frag.glsl?raw'
 
 // ─── Sentinel ─────────────────────────────────────────────────────────────────
 
@@ -99,108 +101,6 @@ const CLOUD_TINT_COLORS = [
 
 // ─── Gas cloud GLSL shaders ────────────────────────────────────────────────────
 
-/** Billboard vertex shader — passes UVs through unchanged. */
-const CLOUD_VERT = /* glsl */`
-varying vec2 vUv;
-void main() {
-  vUv = uv;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}
-`
-
-/**
- * Fragment shader for gas cloud sprites.
- *
- * Implements the `distantGasCloud` pattern from the project nebula shader:
- * FBM noise structure, internal voids, bright emission knots, and wispy edges.
- * Animated slowly via `uTime` so clouds have subtle internal flow.
- */
-const CLOUD_FRAG = /* glsl */`
-precision mediump float;
-
-uniform float uTime;
-uniform float uSeed;
-uniform vec3  uColor;
-uniform float uOpacity;
-
-varying vec2 vUv;
-
-// ── Value noise ───────────────────────────────────────────────────────────────
-
-float h2(vec2 p) {
-  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-}
-
-float n2(vec2 p) {
-  vec2 i = floor(p);
-  vec2 f = fract(p);
-  f = f * f * (3.0 - 2.0 * f);
-  return mix(
-    mix(h2(i),               h2(i + vec2(1.0, 0.0)), f.x),
-    mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x),
-    f.y
-  );
-}
-
-// 5-octave FBM
-float fbm(vec2 p) {
-  float v = 0.0;
-  float a = 0.5;
-  for (int i = 0; i < 5; i++) {
-    v += a * n2(p);
-    p  = p * 2.0 + vec2(100.0);
-    a *= 0.5;
-  }
-  return v;
-}
-
-// ── Main ──────────────────────────────────────────────────────────────────────
-
-void main() {
-  // Map UV [0,1] → [-1,1], normalise so edge distance = 1
-  vec2  uv   = (vUv - 0.5) * 2.0;
-  float dist = length(uv);
-
-  // Soft radial falloff — cloud fades to zero at the sprite edge
-  float mask = pow(1.0 - smoothstep(0.0, 1.0, dist), 1.4);
-  if (mask < 0.005) discard;
-
-  float t = uTime * 0.04;
-
-  // Base noise coordinate seeded per cloud
-  vec2 q = uv * 2.5 + uSeed * 3.7;
-
-  // Main structural FBM (slowly flowing)
-  float nMain   = fbm(q + vec2(t * 0.7,  t * 0.5));
-  // Fine detail layer (counter-flows for turbulence)
-  float nDetail = fbm(q * 2.2 - vec2(t * 0.3, -t * 0.8) + 40.0) * 0.5 + 0.5;
-  // Void regions — carve empty channels
-  float voidN   = fbm(q * 1.3 + 70.0);
-  float voids   = smoothstep(-0.2, 0.3, voidN);
-  // Bright emission knots (HII-region style)
-  float knotN   = fbm(q * 3.5 + 120.0 + uSeed * 2.0);
-  float knots   = pow(max(knotN - 0.1, 0.0), 2.2) * 0.6;
-
-  // Combine density layers
-  float density  = mask * (nMain * 0.6 + 0.4) * (0.65 + nDetail * 0.35) * voids;
-  density       += knots * mask;
-
-  // Wispy edge — enhance mid-radius, suppress very centre and outer rim
-  float edge = smoothstep(0.0, 0.35, mask) * (1.0 - smoothstep(0.65, 1.0, mask));
-  density    = density * (0.35 + edge * 0.65);
-
-  // Color variation inside cloud
-  float cVar = fbm(q * 1.8 + 200.0) * 0.2;
-  vec3  col  = uColor * (0.8 + cVar * 2.5);
-  // Bright knot cores get a slight hue lift
-  col = mix(col, uColor * 1.6, knots);
-
-  float alpha = density * 0.8 * uOpacity;
-  if (alpha < 0.004) discard;
-
-  gl_FragColor = vec4(col * (0.15 + density * 0.6), alpha);
-}
-`
 
 // ─── Comet layer constants ─────────────────────────────────────────────────────
 
@@ -642,8 +542,8 @@ class GasCloudSprite {
         uColor: { value: color.clone() },
         uOpacity: { value: CLOUD_OPACITY },
       },
-      vertexShader: CLOUD_VERT,
-      fragmentShader: CLOUD_FRAG,
+      vertexShader: cloudVertexShader,
+      fragmentShader: cloudFragmentShader,
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,

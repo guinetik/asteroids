@@ -31,6 +31,7 @@
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-jsdoc": "^62.9.0",
         "eslint-plugin-oxlint": "~1.57.0",
+        "glslx": "^0.3.1",
         "jiti": "^2.6.1",
         "jsdom": "^29.0.1",
         "npm-run-all2": "^8.0.4",
@@ -752,6 +753,8 @@
     "glob": ["glob@10.5.0", "", { "dependencies": { "foreground-child": "^3.1.0", "jackspeak": "^3.1.2", "minimatch": "^9.0.4", "minipass": "^7.1.2", "package-json-from-dist": "^1.0.0", "path-scurry": "^1.11.1" }, "bin": { "glob": "dist/esm/bin.mjs" } }, "sha512-DfXN8DfhJ7NH3Oe7cFmu3NCu1wKbkReJ8TorzSAFbSKrlNaQSKfIzqYqVY8zlbs2NLBbWpRiU52GX2PbaBVNkg=="],
 
     "glob-parent": ["glob-parent@6.0.2", "", { "dependencies": { "is-glob": "^4.0.3" } }, "sha512-XxwI8EOhVQgWp6iDL+3b0r86f4d6AX6zSU55HfB4ydCEuXLXc5FcYeOu+nnGftS4TEju/11rt4KJPTMgbfmv4A=="],
+
+    "glslx": ["glslx@0.3.1", "", { "bin": { "glslx": "glslx" } }, "sha512-F3+QsQRol9JNv3N6Jw4K7cSeIFwy7/UqiGb0x8J3Q7IvEuBSfj+o59cbKdPQLnBY0LsyqfArAyxldax1FbPb6w=="],
 
     "gltf-validator": ["gltf-validator@2.0.0-dev.3.10", "", {}, "sha512-odJ4k0tRkGXiDGn78yDBg+fBbAIvBnXxh3RwAta0emSxGtyagFE8B4xELB1oYe3S5RD8Ci3uZAsZaascH2LAEQ=="],
 
