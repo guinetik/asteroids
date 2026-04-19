@@ -66,7 +66,20 @@ const COMPASS_DEGREES_FULL = 360
 /** Radians to degrees multiplier. */
 const DEGREES_PER_RADIAN = 180 / Math.PI
 
-const props = defineProps<{ telemetry: FpsTelemetry }>()
+const props = withDefaults(
+  defineProps<{
+    telemetry: FpsTelemetry
+    /**
+     * HUD variant. `'level'` (default) shows all elements including crosshair,
+     * mode charge, hotbar, and sprint stamina. `'eva'` hides combat/tool UI
+     * and keeps HP / O2 / RTG / SPD / HDG only.
+     */
+    variant?: 'level' | 'eva'
+  }>(),
+  { variant: 'level' },
+)
+
+const showCombatHud = (): boolean => props.variant !== 'eva'
 
 function pct(value: number, max: number): number {
   return max > 0 ? (value / max) * 100 : 0
@@ -109,7 +122,7 @@ function modeColor(): string {
     </div>
 
     <!-- ═══ CROSSHAIR: Center ═══ -->
-    <div class="absolute inset-0 flex items-center justify-center select-none"
+    <div v-if="showCombatHud()" class="absolute inset-0 flex items-center justify-center select-none"
       :style="{ opacity: telemetry.aiming ? 1 : 0.4 }">
       <svg v-if="telemetry.activeMode === 'drill'" width="32" height="32" viewBox="0 0 32 32">
         <circle cx="16" cy="16" r="12" fill="none" :stroke="modeColor()" stroke-width="1.5" />
@@ -159,7 +172,7 @@ function modeColor(): string {
             </div>
             <span class="text-[10px] tracking-widest uppercase text-white/50">O2</span>
           </div>
-          <div class="flex flex-col items-center gap-0.5">
+          <div v-if="showCombatHud()" class="flex flex-col items-center gap-0.5">
             <div class="h-16 w-2.5 flex flex-col-reverse overflow-hidden rounded-sm bg-white/10">
               <div
                 class="w-full rounded-sm bg-green-400/80 transition-all duration-100"
@@ -170,7 +183,7 @@ function modeColor(): string {
           </div>
         </div>
 
-        <div class="flex items-center gap-1.5">
+        <div v-if="showCombatHud()" class="flex items-center gap-1.5">
           <span class="text-[10px] tracking-widest uppercase" :style="{ color: modeColor() + '80' }">
             {{ MODE_LABELS[telemetry.activeMode]?.label }}
           </span>
@@ -185,7 +198,7 @@ function modeColor(): string {
           </div>
         </div>
 
-        <div class="flex gap-1">
+        <div v-if="showCombatHud()" class="flex gap-1">
           <div
             v-for="(cfg, mode) in MODE_LABELS"
             :key="mode"

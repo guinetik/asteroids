@@ -22,6 +22,8 @@ import { CelestialBody } from '@/three/CelestialBody'
 import { CityModel } from '@/three/CityModel'
 import { RelayAntennaController } from '@/three/RelayAntennaController'
 import { SatelliteModel } from '@/three/SatelliteModel'
+import { EvaSession, type EvaHugeScaleTarget } from '@/three/EvaSession'
+import type { FpsTelemetry } from '@/components/FpsHud.vue'
 import { AmbientLight, PointLight, Vector3 } from 'three'
 import { PortalArrivalSequence } from '@/three/PortalArrivalSequence'
 import { PortalBoundarySystem } from '@/three/PortalBoundarySystem'
@@ -54,10 +56,22 @@ const GLB_SATELLITE_SPAWN_DISTANCE = 80
 const GLB_SATELLITE_LATERAL_OFFSET = 40
 
 /** Uniform scale for `sattelite.glb`; tune if asset units change. */
-const GLB_SATELLITE_MODEL_SCALE = 0.08
+const GLB_SATELLITE_MODEL_SCALE = 0.04
 
 /** Local rotation (radians) applied to sattelite.glb to make its panels sit as wings. */
 const GLB_SATELLITE_LOCAL_ROTATION = { x: 0, y: 0, z: Math.PI / 2 }
+
+/** Scale multiplier applied to the shuttle while the player is EVA. */
+const EVA_HUGE_SHUTTLE = 2.5
+
+/** Scale multiplier applied to the relay antenna prop while EVA. */
+const EVA_HUGE_RELAY = 2.5
+
+/** Scale multiplier applied to the GLB satellite while EVA. */
+const EVA_HUGE_SATELLITE = 2.5
+
+/** Scale multiplier applied to the sun while EVA (even bigger). */
+const EVA_HUGE_SUN = 4
 
 /**
  * Bridges Vue lifecycle to the game loop and Three.js scene.
@@ -83,6 +97,14 @@ export class ShuttleViewController implements Tickable {
   private cityModel: CityModel | null = null
   private relayAntenna: RelayAntennaController | null = null
   private satelliteModel: SatelliteModel | null = null
+  private evaSession: EvaSession | null = null
+  private currentActionPrompt: string | null = null
+
+  /** Called each frame during EVA with FPS telemetry for the helmet HUD. */
+  onEvaTelemetry: ((telemetry: FpsTelemetry) => void) | null = null
+
+  /** Called when EVA mode enters or exits (true = entered). */
+  onEvaModeChange: ((active: boolean) => void) | null = null
 
   /** Called each frame with full shuttle telemetry for HUD display */
   onTelemetry: ((telemetry: ShuttleTelemetry) => void) | null = null
@@ -188,6 +210,7 @@ export class ShuttleViewController implements Tickable {
     // Prototype relay antenna prop — Voyager-style satellite for future EVA maintenance mission.
     // Placed in front of the shuttle's spawn so it's visible right away.
     this.relayAntenna = new RelayAntennaController()
+    this.relayAntenna.group.scale.setScalar(0.45)
     const shuttlePos = this.shuttleController.group.position
     const forward = new Vector3(-shuttlePos.x, 0, -shuttlePos.z).normalize()
     this.relayAntenna.group.position.set(
@@ -242,6 +265,23 @@ export class ShuttleViewController implements Tickable {
     // One-shot action bridge (runs just after input)
     this.tickHandler.register(this, ONE_SHOT_PRIORITY)
 
+    // EVA session — portable orchestrator. Runs after input so evaToggle fires on the right frame.
+    this.evaSession = new EvaSession({
+      sceneManager: this.sceneManager,
+      tickHandler: this.tickHandler,
+      inputManager: this.inputManager,
+      getVehicle: () => this.shuttleController,
+      getPoi: () => this.relayAntenna?.group.position ?? null,
+      getHugeScaleTargets: () => this.buildEvaHugeScaleTargets(),
+      spawnOffsetScale: EVA_HUGE_SHUTTLE,
+      onEvaModeChange: (active) => this.onEvaModeChange?.(active),
+      onEvaTelemetry: (t) => this.onEvaTelemetry?.(t),
+      onActionPrompt: (p) => {
+        this.currentActionPrompt = p
+      },
+    })
+    this.tickHandler.register(this.evaSession, ONE_SHOT_PRIORITY + 1)
+
     // --- Dev tools ---
     DevConsole.register('ShuttleView', {
       toggleDoors: () => this.shuttleController?.toggleDoors(),
@@ -258,7 +298,8 @@ export class ShuttleViewController implements Tickable {
     if (this.inputManager?.wasActionPressed('toggleDoors')) {
       this.shuttleController?.toggleDoors()
     }
-    if (this.shuttleController && !this.shuttleController.dead) {
+    const evaActive = this.evaSession?.isActive ?? false
+    if (this.shuttleController && !this.shuttleController.dead && !evaActive) {
       this.shuttleController.thrusterSystem.consumeFuel(computeShuttleBaseFuelDrain(dt, true))
     }
     if (this.shuttleController && this.onTelemetry) {
@@ -268,7 +309,7 @@ export class ShuttleViewController implements Tickable {
         heading: this.shuttleController.heading,
         posX: this.shuttleController.position.x,
         posZ: this.shuttleController.position.z,
-        actionPrompt: null,
+        actionPrompt: this.currentActionPrompt,
         fuelLevel: ts.fuelLevel,
         fuelCapacity: ts.fuelCapacity,
         thrustCharge: ts.getState('thrust').charge,
@@ -288,7 +329,19 @@ export class ShuttleViewController implements Tickable {
     }
   }
 
+  private buildEvaHugeScaleTargets(): EvaHugeScaleTarget[] {
+    const targets: EvaHugeScaleTarget[] = []
+    if (this.shuttleController) targets.push({ object: this.shuttleController.group, factor: EVA_HUGE_SHUTTLE })
+    if (this.relayAntenna) targets.push({ object: this.relayAntenna.group, factor: EVA_HUGE_RELAY })
+    if (this.satelliteModel) targets.push({ object: this.satelliteModel.group, factor: EVA_HUGE_SATELLITE })
+    const sun = this.celestialBodies[0]
+    if (sun) targets.push({ object: sun.group, factor: EVA_HUGE_SUN })
+    return targets
+  }
+
   dispose(): void {
+    this.evaSession?.dispose()
+    this.evaSession = null
     DevConsole.unregister('ShuttleView')
     this.gameLoop?.stop()
     if (this.cityModel) {

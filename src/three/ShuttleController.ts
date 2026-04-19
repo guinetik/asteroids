@@ -399,6 +399,26 @@ export class ShuttleController implements Tickable, PortalVehicle {
     useAudio().play(this.doorsOpen ? 'sfx.cargo.open' : 'sfx.cargo.close')
   }
 
+  /** True if the cargo bay doors are currently open (or opening). */
+  get isDoorsOpen(): boolean {
+    return this.doorsOpen
+  }
+
+  /** 0 = fully closed, 1 = fully open (animated value). */
+  get doorOpenProgress(): number {
+    return this.doorProgress
+  }
+
+  /** Open the cargo bay doors if not already open. */
+  openDoors(): void {
+    if (!this.doorsOpen) this.toggleDoors()
+  }
+
+  /** Close the cargo bay doors if currently open. */
+  closeDoors(): void {
+    if (this.doorsOpen) this.toggleDoors()
+  }
+
   get position(): THREE.Vector3 {
     return this.group.position
   }
