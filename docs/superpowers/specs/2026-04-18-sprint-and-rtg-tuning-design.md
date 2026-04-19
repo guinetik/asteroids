@@ -24,10 +24,11 @@ multitool RTG so the laser doesn't drain the tank in two trigger pulls.
 
 ### 1. Sprint lockout latch in `FpsPlayerController`
 
-New constant + state:
+New constant + state (the constant was originally `0.3`; raised to `0.5`
+in followup #3 — see below):
 
 ```ts
-const SPRINT_RELOCK_FRACTION = 0.3
+const SPRINT_RELOCK_FRACTION = 0.5
 private sprintLocked = false
 ```
 
@@ -109,11 +110,74 @@ Fix:
 Single source of truth: anywhere downstream that needs "is the player
 sprinting?" reads `isSprinting`, never the raw input/charge pair.
 
+## Followup #2 — require Shift release to clear the lockout
+
+After the audio routing fix the breathing-run loop *still* pulsed every couple
+of seconds when the player kept Shift held through exhaustion. Root cause:
+the lockout was auto-clearing as soon as the bar refilled past
+`SPRINT_RELOCK_FRACTION` (30 %), so with the current tuning
+(`capacity 50, burnRate 25, rechargeRate 15`) a held-Shift run would cycle:
+
+- recharge to 15 (1.0 s) → unlock
+- sprint, drain 15 → 0 (0.6 s) → lock
+- repeat every ~1.6 s
+
+Each unlock counted as a fresh rising edge of `isSprinting`, restarting
+`sfx.breathing.run` from zero — perceived by the player as the sprint sound
+"spamming" while there was no real stamina to back it up.
+
+Fix: gate the lockout's auto-clear on **both** the charge gate *and* a Shift
+release. New field on `FpsPlayerController`:
+
+```ts
+private sprintReleasedSinceLockout = true
+```
+
+Set to `false` when the lockout latches, set back to `true` the first frame
+the sprint button is observed released. The unlock condition becomes:
+
+```ts
+if (
+  this.sprintLocked &&
+  this.sprintReleasedSinceLockout &&
+  sprintCharge >= sprintCfg.capacity * SPRINT_RELOCK_FRACTION
+) {
+  this.sprintLocked = false
+}
+```
+
+Now after exhaustion, the player must let go of Shift before sprint becomes
+available again — the standard FPS stamina convention. The
+recharge-drain-lock cycle (and the audio pulse it caused) is gone, and any
+re-engagement is a deliberate input that the breathing crossfade can react to
+cleanly.
+
+## Followup #3 — raise the unlock charge gate to 50 %
+
+Even with the release requirement, the unlock fired as soon as the bar hit
+30 % capacity (≈1 s of recovery). Players who instinctively release+repress
+Shift the moment they notice they've stopped sprinting were back in a sprint
+within a heartbeat, and the breathing-run loop crossfaded right back in. The
+"out of stamina" beat just wasn't long enough to read as a real cooldown.
+
+Bumped `SPRINT_RELOCK_FRACTION` from `0.3` → `0.5`, which (with the current
+`capacity 50 / rechargeRate 15` tuning) means sprint can't re-engage until
+the bar is visibly half-full — about 1.7 s of recovery. Combined with the
+release-required gate from followup #2 this finally feels like a proper
+"winded" beat, and `isSprinting` only flips back true on a clearly-recovered
+bar.
+
+Also added: `replenish()` now clears `sprintLocked` and resets
+`sprintReleasedSinceLockout` so a return-to-lander refill (or any other
+manual top-up) gives the player fresh sprint immediately, without forcing a
+Shift release first.
+
 ## Files Changed
 
 - `src/three/FpsPlayerController.ts` — added `SPRINT_RELOCK_FRACTION` constant,
-  `sprintLocked` field, lockout logic in `tick()`, and an `isSprinting` getter
-  backed by the latest tick state.
+  `sprintLocked` + `sprintReleasedSinceLockout` fields, lockout logic in
+  `tick()` (with the release-required gate added in followup #2), and an
+  `isSprinting` getter backed by the latest tick state.
 - `src/data/fps/multitool-config.json` — `fuelCapacity 240 → 720`,
   `weapon.fuelCostPerRecharge 6.0 → 4.0`.
 - `src/views/LevelViewController.ts` — breathing crossfade, multitool state, and

@@ -36,6 +36,7 @@ describe('audioManifest', () => {
       'sfx.landing',
       'sfx.collision',
       'sfx.explosion',
+      'sfx.explosive',
       // shuttle systems
       'sfx.touchdown',
       'sfx.harpoon',

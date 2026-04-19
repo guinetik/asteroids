@@ -48,6 +48,7 @@ export const AUDIO_SOUND_IDS = [
   'sfx.landing',
   'sfx.collision',
   'sfx.explosion',
+  'sfx.explosive',
   // SFX — shuttle systems
   'sfx.touchdown',
   'sfx.harpoon',
@@ -327,6 +328,21 @@ const manifestById: ManifestById = {
     volume: 0.7,
     effect: 'none',
   },
+  /**
+   * Heavier "explosive charge" boom — used for objective detonations
+   * (nest blasts, virus blasts) where we want a punchier signature than
+   * the generic crash-impact `sfx.explosion`. Overlap so multiple objective
+   * blasts in quick succession all play.
+   */
+  'sfx.explosive': {
+    id: 'sfx.explosive',
+    src: '/sound/sfx.explosive.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'overlap',
+    volume: 0.85,
+    effect: 'none',
+  },
 
   // ── SFX — level / cinematic ─────────────────────────────────────────
   'sfx.level.arrival': {
@@ -581,7 +597,7 @@ const manifestById: ManifestById = {
     category: 'ambient',
     load: 'lazy',
     playback: 'single-instance',
-    volume: 0.2,
+    volume: 0.6,
     effect: 'none',
   },
   'ambient.habitat': {
@@ -599,7 +615,7 @@ const manifestById: ManifestById = {
     category: 'ambient',
     load: 'lazy',
     playback: 'single-instance',
-    volume: 0.25,
+    volume: 0.45,
     effect: 'none',
   },
   'ambient.anomaly': {

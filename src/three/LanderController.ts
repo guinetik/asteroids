@@ -385,8 +385,16 @@ export class LanderController implements Tickable {
    * Rises while W is held, falls while released. Sound stops when it reaches 0.
    */
   private _engineFadeT = 0
-  /** Peak volume of the engine loop. */
-  private static readonly ENGINE_TARGET_VOL = 0.85
+  /**
+   * Peak volume of the engine loop.
+   *
+   * Sits well below 1.0 so the engine sits in the soundbed alongside the
+   * cockpit ambient and alarm cues without dominating them. Tuned by ear
+   * across two passes — original `0.85` was overpowering, `0.55` still felt
+   * too forward against the louder cockpit ambient, so settled at `0.4`.
+   * The engine is now a supporting layer rather than the dominant cue.
+   */
+  private static readonly ENGINE_TARGET_VOL = 0.4
   /** Seconds to reach full volume from silence. */
   private static readonly ENGINE_FADE_IN = 0.4
   /** Seconds to fade to silence after key release. */

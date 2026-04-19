@@ -49,8 +49,15 @@ const KNOCKBACK_OVERRIDE_DURATION = 0.28
  * stutter on for one frame as soon as a sliver of charge is recovered, which
  * feels like the system is fighting the input. The minimum threshold makes
  * "out of stamina" actually mean something.
+ *
+ * Tuned to 0.5 so the player has to wait for a visibly-half-full bar before
+ * the next sprint kicks in (≈1.7 s of recovery at the current recharge rate).
+ * Combined with the `sprintReleasedSinceLockout` gate this gives a
+ * recognisable "winded" cooldown instead of the previous 1.6 s
+ * recharge-drain-lock cycle that pulsed the breathing audio every couple of
+ * seconds.
  */
-const SPRINT_RELOCK_FRACTION = 0.3
+const SPRINT_RELOCK_FRACTION = 0.5
 const PLAYER_COLLISION_CONFIG: CharacterCollisionConfig = {
   radius: 0.65,
   maxStepHeight: 0.9,
@@ -160,12 +167,27 @@ export class FpsPlayerController implements Tickable {
   private knockbackTimer = 0
   /**
    * Sprint lockout latch. Set to `true` the moment the sprint charge hits
-   * zero, cleared once the bar has refilled to {@link SPRINT_RELOCK_FRACTION}
-   * of capacity. While latched, holding Shift does nothing — the input is
-   * ignored regardless of charge level so the player can't dribble out one
-   * frame of sprint at a time.
+   * zero, cleared only after BOTH:
+   *   1. The sprint button has been released for at least one frame
+   *      (tracked via {@link sprintReleasedSinceLockout}), AND
+   *   2. The bar has refilled to {@link SPRINT_RELOCK_FRACTION} of capacity.
+   *
+   * The release requirement matters for audio/feel: without it, holding Shift
+   * after exhaustion auto-cycles `recharge → unlock → drain → lock` every
+   * couple of seconds, restarting the breathing-run sample on each cycle and
+   * producing an audible "spam" pulse even though the mechanical sprint is
+   * correctly suppressed most of the time. Forcing a Shift release breaks
+   * that cycle — the player has to deliberately re-engage the sprint, which
+   * is also the standard FPS stamina convention.
    */
   private sprintLocked = false
+  /**
+   * True once the sprint button has been observed released since the latest
+   * lockout. Stays `false` while the player keeps Shift held through a
+   * depletion event, gating the lockout's auto-clear. Reset back to `false`
+   * each time the lockout latches.
+   */
+  private sprintReleasedSinceLockout = true
   /**
    * Latest sprint-engagement state from {@link tick}. Exposed via {@link isSprinting}
    * so other systems (audio, FX, gameplay) react to actual sprint instead of
@@ -273,6 +295,10 @@ export class FpsPlayerController implements Tickable {
     this.thrusterSystem.refuel()
     this._hp = this.config.health.maxHp
     this._dead = false
+    // Clear sprint lockout state — a full bar should mean fresh sprint
+    // available without forcing a Shift release first.
+    this.sprintLocked = false
+    this.sprintReleasedSinceLockout = true
   }
 
   /** Set ADS state — affects strafe speed. */
@@ -327,16 +353,31 @@ export class FpsPlayerController implements Tickable {
   tick(dt: number): void {
     const mv = this.config.movement
 
-    // Sprint lockout — once the bar empties, ignore Shift until the bar has
-    // refilled to a meaningful fraction of capacity. Prevents the
-    // "stuttering sprint" feel where holding Shift after exhaustion grabs
-    // every individual frame of recovered charge.
+    // Sprint lockout — once the bar empties, ignore Shift until BOTH the bar
+    // has refilled to SPRINT_RELOCK_FRACTION and the player has released
+    // Shift at least once. The release requirement breaks the auto
+    // "recharge → drain → lock" cycle that otherwise restarts the breathing
+    // -run audio every couple of seconds when the player keeps Shift held
+    // through exhaustion. Mechanically this matches the standard FPS feel
+    // ("you ran out of stamina, let go and re-press to sprint again").
     const sprintCfg = this.config.o2.thrusters.sprint
     const sprintCharge = this.thrusterSystem.getState('sprint').charge
+    const sprintHeld = this.inputManager.isActionActive('sprint')
+
     if (sprintCharge <= 0) {
-      this.sprintLocked = true
-    } else if (
+      if (!this.sprintLocked) {
+        this.sprintLocked = true
+        this.sprintReleasedSinceLockout = false
+      }
+    }
+
+    if (this.sprintLocked && !sprintHeld) {
+      this.sprintReleasedSinceLockout = true
+    }
+
+    if (
       this.sprintLocked &&
+      this.sprintReleasedSinceLockout &&
       sprintCharge >= sprintCfg.capacity * SPRINT_RELOCK_FRACTION
     ) {
       this.sprintLocked = false
@@ -344,7 +385,7 @@ export class FpsPlayerController implements Tickable {
 
     const isSprinting =
       this.body.grounded &&
-      this.inputManager.isActionActive('sprint') &&
+      sprintHeld &&
       !this.sprintLocked &&
       this.thrusterSystem.canFire('sprint')
     this._isSprinting = isSprinting

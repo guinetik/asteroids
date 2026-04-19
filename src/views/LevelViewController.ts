@@ -1936,7 +1936,7 @@ export class LevelViewController implements Tickable {
     }
 
     const volume = 0.3 + 0.7 * attenuation
-    useAudio().play('sfx.explosion', { volume })
+    useAudio().play('sfx.explosive', { volume })
 
     if (
       attenuation > 0 &&
