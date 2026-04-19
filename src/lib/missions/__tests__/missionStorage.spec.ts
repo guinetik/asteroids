@@ -80,7 +80,7 @@ const MOCK_BOARD: ShuttleMissionBoard = {
         reward: 1600,
       },
       giverPlanet: 'earth',
-      waypoint: { worldX: -400, worldZ: 220 },
+      waypoint: { worldX: -400, worldZ: 220, poiLocalY: 0 },
       status: 'active',
     },
   ],

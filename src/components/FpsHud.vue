@@ -141,6 +141,18 @@ function modeColor(): string {
       </svg>
     </div>
 
+    <!-- ═══ EVA CROSSHAIR: soft cyan reticle, no tool ═══ -->
+    <div v-else class="absolute inset-0 flex items-center justify-center select-none opacity-60">
+      <svg width="28" height="28" viewBox="0 0 28 28">
+        <circle cx="14" cy="14" r="9" fill="none" stroke="#00e5ff" stroke-width="1" />
+        <circle cx="14" cy="14" r="1.2" fill="#00e5ff" />
+        <line x1="14" y1="2" x2="14" y2="7" stroke="#00e5ff" stroke-width="1" />
+        <line x1="14" y1="21" x2="14" y2="26" stroke="#00e5ff" stroke-width="1" />
+        <line x1="2" y1="14" x2="7" y2="14" stroke="#00e5ff" stroke-width="1" />
+        <line x1="21" y1="14" x2="26" y2="14" stroke="#00e5ff" stroke-width="1" />
+      </svg>
+    </div>
+
     <!--
       Bottom HUD: HP left and RTG right on the same baseline (parallel resource bars); center is
       O2/STA above mode charge + hotbar.

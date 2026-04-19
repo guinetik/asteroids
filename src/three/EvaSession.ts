@@ -20,14 +20,33 @@ import type { FpsTelemetry } from '@/components/FpsHud.vue'
 import { TICK_PRIORITY_PHYSICS, TICK_PRIORITY_RENDER } from '@/lib/tickPriorities'
 import { useAudio } from '@/audio/useAudio'
 import { EvaRcsSound } from '@/audio/EvaRcsSound'
-import type { SceneManager } from './SceneManager'
 import { EvaTetherController } from './EvaTetherController'
 
-/** Distance (world units) at which the player can initiate EVA near the POI. */
-const EVA_TRIGGER_RANGE = 25
+/**
+ * The surface EvaSession needs from its host scene. {@link SceneManager} satisfies this
+ * naturally; the solar-map view supplies a minimal adapter since it drives rendering
+ * through an EffectComposer rather than a SceneManager.
+ */
+export interface EvaSceneHost {
+  /** Parent for EVA objects; must match the scene currently rendered. */
+  addToScene(object: THREE.Object3D): void
+  /** Detach EVA objects. */
+  removeFromScene(object: THREE.Object3D): void
+  /** Hand render camera to the EVA first-person camera (null = revert to vehicle camera). */
+  setActiveCamera(camera: THREE.PerspectiveCamera | null): void
+  /** Renderer whose canvas receives pointer lock. */
+  readonly renderer: { domElement: HTMLElement }
+}
 
-/** Distance (world units) at which the EVA player can re-enter the vehicle. */
-const EVA_RETURN_RANGE = 18
+/**
+ * Horizontal (XZ) distance at which the player can initiate EVA near the POI. Uses
+ * planar distance rather than 3D so the vertical `poiLocalY` offset doesn't push the
+ * prompt out of range — the player parks right over the waypoint column and climbs.
+ */
+const EVA_TRIGGER_RANGE = 8
+
+/** Horizontal (XZ) distance at which the EVA player can re-enter the vehicle. */
+const EVA_RETURN_RANGE = 6
 
 /** Vehicle must be slower than this (world units / s) to initiate EVA. */
 const EVA_MAX_VEHICLE_SPEED = 0.5
@@ -78,8 +97,14 @@ export interface EvaHugeScaleTarget {
 
 /** Dependencies + callbacks wired to the host view. */
 export interface EvaSessionConfig {
-  sceneManager: SceneManager
+  sceneManager: EvaSceneHost
   tickHandler: TickHandler
+  /**
+   * Scale applied to the FPS helmet spot + fill lights at session start; restored to the
+   * original intensities on session end. Defaults to `1`. The solar-map view uses a
+   * smaller factor because the scene already has strong sun illumination and bloom.
+   */
+  helmetLightIntensityScale?: number
   inputManager: InputManager
   /** Resolve the player vehicle. Returning null is treated as "no EVA possible". */
   getVehicle: () => EvaSessionVehicle | null
@@ -107,6 +132,7 @@ export class EvaSession implements Tickable {
   private mode: 'idle' | 'opening' | 'active' = 'idle'
   private controller: EvaTetherController | null = null
   private preEvaScales: { object: THREE.Object3D; scale: number }[] = []
+  private preEvaHelmetLightIntensity: { spot: number; fill: number } | null = null
   private lastPrompt: string | null = null
   private boundOnMouseMove: ((e: MouseEvent) => void) | null = null
   private boundOnCanvasClick: (() => void) | null = null
@@ -141,8 +167,10 @@ export class EvaSession implements Tickable {
         this.setPrompt(null)
         return
       }
-      const distToPoi = vehicle.group.position.distanceTo(poi)
-      if (distToPoi >= EVA_TRIGGER_RANGE) {
+      const dx = vehicle.group.position.x - poi.x
+      const dz = vehicle.group.position.z - poi.z
+      const distToPoiXZ = Math.sqrt(dx * dx + dz * dz)
+      if (distToPoiXZ >= EVA_TRIGGER_RANGE) {
         this.setPrompt(null)
         return
       }
@@ -159,8 +187,10 @@ export class EvaSession implements Tickable {
 
     if (!this.controller) return
     this.updateRcsAudio(_dt)
-    const distToVehicle = this.controller.group.position.distanceTo(vehicle.group.position)
-    if (distToVehicle < EVA_RETURN_RANGE) {
+    const rdx = this.controller.group.position.x - vehicle.group.position.x
+    const rdz = this.controller.group.position.z - vehicle.group.position.z
+    const distToVehicleXZ = Math.sqrt(rdx * rdx + rdz * rdz)
+    if (distToVehicleXZ < EVA_RETURN_RANGE) {
       this.setPrompt('Return to Shuttle [E]')
       if (this.config.inputManager.wasActionPressed('evaToggle')) {
         this.endSession(vehicle)
@@ -203,6 +233,15 @@ export class EvaSession implements Tickable {
     sceneManager.addToScene(controller.fpsCamera.helmetLightRig)
     controller.fpsCamera.helmetLightRig.visible = true
 
+    const helmetScale = this.config.helmetLightIntensityScale ?? 1
+    if (helmetScale !== 1) {
+      const spot = controller.fpsCamera.helmetLight
+      const fill = controller.fpsCamera.helmetFillLight
+      this.preEvaHelmetLightIntensity = { spot: spot.intensity, fill: fill.intensity }
+      spot.intensity *= helmetScale
+      fill.intensity *= helmetScale
+    }
+
     tickHandler.register(controller, TICK_PRIORITY_PHYSICS)
     tickHandler.register(controller.fpsCamera, TICK_PRIORITY_RENDER - 1)
     sceneManager.setActiveCamera(controller.fpsCamera.camera)
@@ -218,6 +257,11 @@ export class EvaSession implements Tickable {
     this.detachPointerLock()
     sceneManager.setActiveCamera(null)
     if (this.controller) {
+      if (this.preEvaHelmetLightIntensity) {
+        this.controller.fpsCamera.helmetLight.intensity = this.preEvaHelmetLightIntensity.spot
+        this.controller.fpsCamera.helmetFillLight.intensity = this.preEvaHelmetLightIntensity.fill
+        this.preEvaHelmetLightIntensity = null
+      }
       tickHandler.unregister(this.controller)
       tickHandler.unregister(this.controller.fpsCamera)
       sceneManager.removeFromScene(this.controller.group)

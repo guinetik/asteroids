@@ -452,7 +452,7 @@ export function offerEvaMission(
  */
 export function acceptEvaMission(
   board: ShuttleMissionBoard,
-  waypoint: { worldX: number; worldZ: number },
+  waypoint: { worldX: number; worldZ: number; poiLocalY: number },
 ): ShuttleMissionBoard {
   if (!board.offeredEvaMission || !board.offeringEvaPlanet) return board
 

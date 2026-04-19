@@ -7,7 +7,7 @@
       "description": "The heliophysics team's flare buoy is cooking in the sun-side orbit. EVA out and swap the ablative radiator panels before the electronics bake.",
       "poiType": "satellite",
       "minigameType": "relay_repair",
-      "reward": 1500
+      "reward": 3500
     },
     {
       "id": "mercury_comms_relay_hardening",
@@ -15,7 +15,7 @@
       "description": "A comms relay near perihelion needs a manual firmware flash — too much radiation noise for OTA. Dock, spacewalk, patch, extract.",
       "poiType": "relay_antenna",
       "minigameType": "relay_repair",
-      "reward": 1300
+      "reward": 3300
     }
   ]
 }

@@ -15,14 +15,26 @@ import type { EvaMissionPoiType } from '@/lib/missions/types'
 import { SatelliteModel } from './SatelliteModel'
 import { RelayAntennaController } from './RelayAntennaController'
 
-/** Uniform scale on the GLB satellite so it reads at map zoom next to the beam marker. */
-const MAP_POI_SATELLITE_SCALE = 40
+/**
+ * Uniform scale on the GLB satellite in map world units. Sized to the shuttle's cargo-bay
+ * lander (`CARGO_LANDER_SCALE = 30` in `0.01` model space, ≈ 0.3 world units) — the
+ * shuttle deploys satellites, so they should read at roughly lander-size next to the
+ * hull, not fill the sky.
+ */
+const MAP_POI_SATELLITE_SCALE = 0.02
 
-/** Uniform scale on the primitive relay antenna so it reads at map zoom next to the beam marker. */
-const MAP_POI_RELAY_ANTENNA_SCALE = 6
+/**
+ * Uniform scale on the primitive relay antenna in map world units. Matched to the same
+ * lander-proportion target as {@link MAP_POI_SATELLITE_SCALE} — the relay's primitives
+ * are native ~0.5–3 unit, so a scale of 0.15 lands it near ~0.3 world units overall.
+ */
+const MAP_POI_RELAY_ANTENNA_SCALE = 0.15
 
-/** Local X offset that keeps the prop from overlapping the cyan beam column. */
-const MAP_POI_LOCAL_OFFSET_X = 14
+/**
+ * Local X offset of the POI prop inside its (now world-sized) container. A small
+ * lateral nudge so the prop doesn't sit exactly on the beam axis.
+ */
+const MAP_POI_LOCAL_OFFSET_X = 0.3
 
 /** An EVA mission POI ready to be attached under a waypoint root. */
 export interface EvaMissionPoiInstance {
@@ -34,9 +46,13 @@ export interface EvaMissionPoiInstance {
   dispose(): void
 }
 
-async function createSatellitePoi(): Promise<EvaMissionPoiInstance> {
-  const model = await SatelliteModel.create({ scale: MAP_POI_SATELLITE_SCALE })
-  model.group.position.set(MAP_POI_LOCAL_OFFSET_X, 0, 0)
+async function createSatellitePoi(localY: number): Promise<EvaMissionPoiInstance> {
+  const model = await SatelliteModel.create({
+    scale: MAP_POI_SATELLITE_SCALE,
+    // Only Object_7 gets the TRON hologram; Object_8 keeps its original GLB material.
+    panelMeshNames: ['Object_7'],
+  })
+  model.group.position.set(MAP_POI_LOCAL_OFFSET_X, localY, 0)
   return {
     object: model.group,
     tick: () => {},
@@ -47,10 +63,10 @@ async function createSatellitePoi(): Promise<EvaMissionPoiInstance> {
   }
 }
 
-function createRelayAntennaPoi(): EvaMissionPoiInstance {
+function createRelayAntennaPoi(localY: number): EvaMissionPoiInstance {
   const controller = new RelayAntennaController()
   controller.group.scale.setScalar(MAP_POI_RELAY_ANTENNA_SCALE)
-  controller.group.position.set(MAP_POI_LOCAL_OFFSET_X, 0, 0)
+  controller.group.position.set(MAP_POI_LOCAL_OFFSET_X, localY, 0)
   return {
     object: controller.group,
     tick: (dt) => controller.tick(dt),
@@ -65,15 +81,17 @@ function createRelayAntennaPoi(): EvaMissionPoiInstance {
  * Build the POI prop for an EVA mission waypoint.
  *
  * @param poiType - Which model the mission template specifies.
+ * @param localY - Vertical offset inside the waypoint root (the root itself sits on Y=0).
  * @returns Instance ready to be parented to the waypoint root.
  */
 export async function createEvaMissionPoi(
   poiType: EvaMissionPoiType,
+  localY: number,
 ): Promise<EvaMissionPoiInstance> {
   switch (poiType) {
     case 'satellite':
-      return createSatellitePoi()
+      return createSatellitePoi(localY)
     case 'relay_antenna':
-      return createRelayAntennaPoi()
+      return createRelayAntennaPoi(localY)
   }
 }

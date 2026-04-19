@@ -74,6 +74,13 @@ export class MapMissionFacade {
 
   private evaWaypointRoot: THREE.Group | null = null
   private evaWaypointMarker: THREE.Group | null = null
+  /**
+   * POI prop container. Separate from the waypoint root so it is NOT subject to the
+   * constant-apparent-size rescale applied every frame — the satellite/relay keeps its
+   * true world-space size and becomes a distant speck from across the map, only
+   * resolving visually once the shuttle is close to the waypoint.
+   */
+  private evaPoiContainer: THREE.Group | null = null
   private evaPoiInstance: EvaMissionPoiInstance | null = null
   private evaPoiRenderedMissionId: string | null = null
 
@@ -183,7 +190,7 @@ export class MapMissionFacade {
   }
 
   evaMissionAccept(
-    waypoint: { worldX: number; worldY: number; worldZ: number },
+    waypoint: { worldX: number; worldZ: number; poiLocalY: number },
     onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null,
   ): void {
     this.board = acceptEvaMission(this.board, waypoint)
@@ -359,19 +366,29 @@ export class MapMissionFacade {
     }
 
     if (!this.evaWaypointRoot) {
+      // Beam root sits on the orbital plane and gets auto-rescaled each frame to stay
+      // visible at any zoom — that's what makes the marker findable from across the map.
       const root = new THREE.Group()
-      root.position.set(
-        evaMission.waypoint.worldX,
-        evaMission.waypoint.worldY,
-        evaMission.waypoint.worldZ,
-      )
+      root.position.set(evaMission.waypoint.worldX, 0, evaMission.waypoint.worldZ)
       const marker = createWaypointMarkerGroup(WAYPOINT_MARKER_DEFAULT_COLOR, 'orbitMap')
       root.add(marker)
       scene.add(root)
       this.evaWaypointRoot = root
       this.evaWaypointMarker = marker
+
+      // POI container is a separate scene child, positioned at the waypoint + vertical
+      // offset. No auto-rescale — the satellite is real-world-sized, ~shuttle-cargo scale,
+      // so it vanishes into a pixel from Earth and only reads when the shuttle is close.
+      const poiContainer = new THREE.Group()
+      poiContainer.position.set(
+        evaMission.waypoint.worldX,
+        evaMission.waypoint.poiLocalY,
+        evaMission.waypoint.worldZ,
+      )
+      scene.add(poiContainer)
+      this.evaPoiContainer = poiContainer
       this.evaPoiRenderedMissionId = evaMission.template.id
-      void this.spawnEvaMissionPoi(root, evaMission)
+      void this.spawnEvaMissionPoi(poiContainer, evaMission)
     }
   }
 
@@ -382,6 +399,8 @@ export class MapMissionFacade {
     simTime: number
     apparentSize: number
     dt: number
+    /** Suspend per-frame auto-rescales of the waypoint roots (EvaSession owns the scale). */
+    freezeScales?: boolean
   }): void {
     this.syncWaypointSite(params.scene)
 
@@ -393,12 +412,14 @@ export class MapMissionFacade {
       this.missionOrbitWaypointMarker &&
       this.board.activeAsteroidMission
     ) {
-      const dist = params.vehicleCamera.camera.position.distanceTo(
-        this.missionWaypointRoot.position,
-      )
-      const targetScreenHeight = params.apparentSize * 2 * dist * tanHalfFov
-      const uniformScale = targetScreenHeight / ORBIT_MAP_WAYPOINT_SCALE_REFERENCE
-      this.missionWaypointRoot.scale.setScalar(uniformScale)
+      if (!params.freezeScales) {
+        const dist = params.vehicleCamera.camera.position.distanceTo(
+          this.missionWaypointRoot.position,
+        )
+        const targetScreenHeight = params.apparentSize * 2 * dist * tanHalfFov
+        const uniformScale = targetScreenHeight / ORBIT_MAP_WAYPOINT_SCALE_REFERENCE
+        this.missionWaypointRoot.scale.setScalar(uniformScale)
+      }
 
       tickWaypointMarkerGroup(
         this.missionOrbitWaypointMarker,
@@ -409,6 +430,7 @@ export class MapMissionFacade {
     }
 
     if (this.evaWaypointRoot && this.evaWaypointMarker) {
+      // Beam is always auto-rescaled for constant apparent size — it's the find-me marker.
       const dist = params.vehicleCamera.camera.position.distanceTo(this.evaWaypointRoot.position)
       const targetScreenHeight = params.apparentSize * 2 * dist * tanHalfFov
       const uniformScale = targetScreenHeight / ORBIT_MAP_WAYPOINT_SCALE_REFERENCE
@@ -420,9 +442,10 @@ export class MapMissionFacade {
         params.shuttlePosition.x,
         params.shuttlePosition.z,
       )
-
-      this.evaPoiInstance?.tick(params.dt)
     }
+
+    // POI lives outside the rescaled root — tick its own animations with real time.
+    this.evaPoiInstance?.tick(params.dt)
   }
 
   tryBeginAsteroidMission(params: {
@@ -509,6 +532,19 @@ export class MapMissionFacade {
     }
   }
 
+  /**
+   * World-space position of the active EVA mission POI, or null if no site is spawned.
+   * Used by {@link EvaSession} as the proximity target on the solar map.
+   */
+  getEvaPoiWorldPos(): THREE.Vector3 | null {
+    return this.evaPoiContainer ? this.evaPoiContainer.position : null
+  }
+
+  /** The scene root holding the EVA POI prop (for optional EVA huge-scale targeting). */
+  getEvaPoiGroup(): THREE.Group | null {
+    return this.evaPoiContainer
+  }
+
   private disposeWaypointSite(scene: THREE.Scene): void {
     if (this.missionAsteroidPreviewMesh) {
       disposeMapMissionAsteroidPreviewMesh(this.missionAsteroidPreviewMesh)
@@ -525,16 +561,20 @@ export class MapMissionFacade {
   }
 
   private async spawnEvaMissionPoi(
-    root: THREE.Group,
+    container: THREE.Group,
     mission: ActiveVisitRelayMission,
   ): Promise<void> {
     try {
-      const instance = await createEvaMissionPoi(mission.template.poiType)
-      if (this.evaWaypointRoot !== root || this.evaPoiRenderedMissionId !== mission.template.id) {
+      // POI container already carries the Y offset; factory places the prop at origin.
+      const instance = await createEvaMissionPoi(mission.template.poiType, 0)
+      if (
+        this.evaPoiContainer !== container
+        || this.evaPoiRenderedMissionId !== mission.template.id
+      ) {
         instance.dispose()
         return
       }
-      root.add(instance.object)
+      container.add(instance.object)
       this.evaPoiInstance = instance
     } catch (error) {
       console.warn('[MapView] EVA mission POI failed', error)
@@ -545,6 +585,10 @@ export class MapMissionFacade {
     if (this.evaPoiInstance) {
       this.evaPoiInstance.dispose()
       this.evaPoiInstance = null
+    }
+    if (this.evaPoiContainer) {
+      scene.remove(this.evaPoiContainer)
+      this.evaPoiContainer = null
     }
     if (this.evaWaypointMarker) {
       disposeWaypointMarkerGroup(this.evaWaypointMarker)

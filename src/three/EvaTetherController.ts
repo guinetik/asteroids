@@ -57,7 +57,7 @@ const TETHER_PLAYER_LOOKDOWN_DROP = 0.55
 const TETHER_PLAYER_LOOKDOWN_BACKSHIFT = 0.32
 
 /** Radius of the tether tube (world units). */
-const TETHER_RADIUS = 0.028
+const TETHER_RADIUS = 0.02
 
 /** Number of segments along the tether curve. */
 const TETHER_SEGMENTS = 32

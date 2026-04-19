@@ -256,8 +256,11 @@ export interface ActiveVisitRelayMission {
   /**
    * World-space waypoint generated at accept time near the giver planet's then-current
    * position. Snapshotted so the POI stays put while the giver planet keeps orbiting.
+   * The root always sits on the shuttle's Y=0 orbital plane (beam marker stays aligned
+   * with overhead map); `poiLocalY` raises or lowers the POI prop inside the root so
+   * egress has a small vertical component.
    */
-  waypoint: { worldX: number; worldZ: number }
+  waypoint: { worldX: number; worldZ: number; poiLocalY: number }
   /** Current mission status. */
   status: VisitRelayMissionStatus
 }

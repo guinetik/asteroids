@@ -44,6 +44,8 @@ import {
   eventHorizonRadius,
 } from '@/lib/physics/gravity'
 import { ShuttleController, MAP_PHYSICS } from '@/three/ShuttleController'
+import { EvaSession, type EvaHugeScaleTarget, type EvaSceneHost } from '@/three/EvaSession'
+import type { FpsTelemetry } from '@/components/FpsHud.vue'
 import {
   VehicleCamera,
   MAP_CAMERA_CONFIG,
@@ -218,6 +220,12 @@ export class MapViewController implements Tickable {
 
   private shuttleController: ShuttleController | null = null
   private shuttleEffects: MapShuttleEffects | null = null
+  private evaSession: EvaSession | null = null
+  private currentEvaPrompt: string | null = null
+  /** Bloom pass knobs snapshotted when EVA begins so we can restore them on exit. */
+  private preEvaBloomState: { threshold: number; strength: number } | null = null
+  onEvaTelemetry: ((telemetry: FpsTelemetry) => void) | null = null
+  onEvaModeChange: ((active: boolean) => void) | null = null
   private planetariumScene: MapPlanetariumScene | null = null
   private sunController: SunController | null = null
   private planetControllers: PlanetSystemController[] = []
@@ -949,6 +957,13 @@ export class MapViewController implements Tickable {
     // One-shot action bridge (doors toggle, telemetry)
     this.tickHandler.register(this, MAP_CONFIG.ONE_SHOT_PRIORITY)
 
+    // EVA session — same portable orchestrator as the shuttle scene, but routed through
+    // the map's EffectComposer-based render pipeline.
+    this.evaSession = this.createEvaSession()
+    if (this.evaSession) {
+      this.tickHandler.register(this.evaSession, MAP_CONFIG.ONE_SHOT_PRIORITY + 1)
+    }
+
     // --- Register orrery animation tick ---
     const orreryTickable: Tickable = {
       tick: (dt: number) => this.tickOrrery(dt),
@@ -1333,7 +1348,11 @@ export class MapViewController implements Tickable {
       })
     }
 
-    if (this.shuttleController && !this.shuttleController.dead) {
+    if (
+      this.shuttleController
+      && !this.shuttleController.dead
+      && !(this.evaSession?.isActive ?? false)
+    ) {
       const orbitState = this.orbitSystem?.state ?? 'free'
       const passiveFuelMultiplier = this.gravitySurfingController.isActive()
         ? MAP_CONFIG.GRAVITY_SURF_PASSIVE_FUEL_MULTIPLIER
@@ -1358,7 +1377,7 @@ export class MapViewController implements Tickable {
         heading: this.shuttleController.heading,
         posX: this.shuttleController.position.x,
         posZ: this.shuttleController.position.z,
-        actionPrompt: manifoldPrompt ?? gravitySurfPrompt,
+        actionPrompt: this.currentEvaPrompt ?? manifoldPrompt ?? gravitySurfPrompt,
         fuelLevel: ts.fuelLevel,
         fuelCapacity: ts.fuelCapacity,
         thrustCharge: ts.getState('thrust').charge,
@@ -1679,6 +1698,7 @@ export class MapViewController implements Tickable {
         simTime: this.simTime,
         apparentSize: MAP_CONFIG.WAYPOINT_APPARENT_SIZE,
         dt,
+        freezeScales: this.evaSession?.isActive ?? false,
       })
     }
 
@@ -2273,6 +2293,13 @@ export class MapViewController implements Tickable {
     this.missionFacade.offerEvaMissionAtPlanet(planetId, this.onMissionBoardUpdate)
   }
 
+  /**
+   * Lead time (sim seconds) used when accepting an EVA mission — waypoint is placed where
+   * the giver planet *will* be this many seconds from now, so the POI sits ahead of the
+   * planet's motion instead of drifting away as the player flies out.
+   */
+  private static readonly EVA_WAYPOINT_PLANET_LEAD_SECONDS = 3
+
   /** Accept the offered EVA mission (from shuttle control UI). */
   evaMissionAccept(): void {
     const giverPlanetId = this.missionFacade.board.offeringEvaPlanet
@@ -2280,7 +2307,9 @@ export class MapViewController implements Tickable {
     const index = PLANETS.findIndex((p) => p.id === giverPlanetId)
     const giverController = index >= 0 ? this.planetControllers[index] : null
     if (!giverController) return
-    const waypoint = generateEvaWaypoint(giverController.getWorldX(), giverController.getWorldZ())
+    const leadTime = this.simTime + MapViewController.EVA_WAYPOINT_PLANET_LEAD_SECONDS
+    const future = giverController.predictWorldPosXZ(leadTime)
+    const waypoint = generateEvaWaypoint(future.x, future.z)
     this.missionFacade.evaMissionAccept(waypoint, this.onMissionBoardUpdate)
   }
 
@@ -2543,6 +2572,10 @@ export class MapViewController implements Tickable {
    */
   private tickShuttleScale(dt: number): void {
     if (!this.shuttleController || !this.vehicleCamera) return
+    // EvaSession multiplies shuttle.group.scale by EVA_MAP_HUGE_SHUTTLE at session start
+    // and restores on exit. If this tick keeps running it will overwrite that every frame
+    // and the ship will stay pinned at 0.01 while the tether rope (radius 0.028) dwarfs it.
+    if (this.evaSession?.isActive) return
     const dist = this.vehicleCamera.camera.position.distanceTo(
       this.shuttleController.group.position,
     )
@@ -3182,6 +3215,10 @@ export class MapViewController implements Tickable {
    * Beat 5: Sweep to shuttle, hero hold, orbit handoff
    */
   private tickStartupIntroCamera(): void {
+    // EVA owns the render camera. If we let the intro facade run it will reset
+    // `renderPass.camera` back to the vehicle camera each frame and the helmet view
+    // will never be visible.
+    if (this.evaSession?.isActive) return
     this.introFacade?.tick({
       sceneObjects: this.sceneObjects,
       vehicleCamera: this.vehicleCamera,
@@ -3432,7 +3469,155 @@ export class MapViewController implements Tickable {
     return bearings
   }
 
+  /**
+   * Multiplier applied to the map shuttle when EVA starts. The map renders the shuttle at
+   * {@link MAP_SHUTTLE_SCALE} = 0.01 world units so it reads on the solar chart; EVA needs
+   * it back at roughly 1 world unit for the tether (radius 0.028) to sit correctly against
+   * the hull. 100× drops the native scale back into the shuttle-scene regime.
+   */
+  private static readonly EVA_MAP_HUGE_SHUTTLE = 100
+
+  /**
+   * Multiplier applied to the EVA mission POI waypoint root during EVA. Root is lerped to
+   * a constant-apparent-size each frame before freeze; 20× puts it at readable proportions
+   * once the auto-rescale is paused.
+   */
+  private static readonly EVA_MAP_HUGE_POI = 20
+
+  /** Uniform scale applied to the sun mesh during EVA so it reads as a nearby star. */
+  private static readonly EVA_MAP_HUGE_SUN = 4
+
+  /**
+   * Helmet light intensity scale during EVA on the map. Default FPS intensity is tuned
+   * for the dim level scene; on the sunlit map the helmet flashlight blows out nearby
+   * props. 0.08 keeps the visor authentic (there is *some* forward spill) without
+   * overwhelming surfaces at close range.
+   */
+  private static readonly EVA_MAP_HELMET_LIGHT_SCALE = 0.08
+
+  /**
+   * Multiplier on the EVA spawn offset. The shuttle scene uses the shuttle huge factor
+   * (ship-scale coords), but here the shuttle is only stretched back to ~1 world unit, so
+   * the default offset `(0, 2.5, 6)` is already close to correct.
+   */
+  private static readonly EVA_MAP_SPAWN_OFFSET_SCALE = 1
+
+  /**
+   * Bloom threshold applied while EVA is active. The map's default threshold is tuned for
+   * a 0.01-unit shuttle seen from orbit; once we scale the ship up to ~1 world unit for
+   * EVA, its TRON-emissive panels fill the screen and bloom blows out to pure white. A
+   * higher threshold clamps the bloom contribution until the player returns to the cockpit.
+   */
+  private static readonly EVA_MAP_BLOOM_THRESHOLD = 1.2
+
+  /** Bloom strength applied while EVA is active. Paired with {@link EVA_MAP_BLOOM_THRESHOLD}. */
+  private static readonly EVA_MAP_BLOOM_STRENGTH = 0.35
+
+  /**
+   * Snapshot and override the bloom pass while EVA is active; restore previous values on
+   * exit. Keeps the tactical-map bloom tuning intact for everything outside the EVA flow.
+   */
+  private setEvaBloomOverride(active: boolean): void {
+    const bloomPass = this.sceneObjects?.composer.passes.find(
+      (p) => p instanceof UnrealBloomPass,
+    ) as UnrealBloomPass | undefined
+    if (!bloomPass) return
+
+    if (active) {
+      if (!this.preEvaBloomState) {
+        this.preEvaBloomState = {
+          threshold: bloomPass.threshold,
+          strength: bloomPass.strength,
+        }
+      }
+      bloomPass.threshold = MapViewController.EVA_MAP_BLOOM_THRESHOLD
+      bloomPass.strength = MapViewController.EVA_MAP_BLOOM_STRENGTH
+      return
+    }
+
+    if (this.preEvaBloomState) {
+      bloomPass.threshold = this.preEvaBloomState.threshold
+      bloomPass.strength = this.preEvaBloomState.strength
+      this.preEvaBloomState = null
+    }
+  }
+
+  /**
+   * Minimal {@link EvaSceneHost} adapter backed by `sceneObjects`. `setActiveCamera` swaps
+   * the first pass of the EffectComposer the same way {@link captureMapCamera} does when
+   * switching to the tactical map.
+   */
+  private buildEvaSceneHost(): EvaSceneHost | null {
+    if (!this.sceneObjects) return null
+    const sceneObjects = this.sceneObjects
+    const getDefaultCamera = (): THREE.PerspectiveCamera | null =>
+      this.vehicleCamera?.camera ?? null
+    return {
+      renderer: sceneObjects.renderer,
+      addToScene: (obj) => sceneObjects.scene.add(obj),
+      removeFromScene: (obj) => sceneObjects.scene.remove(obj),
+      setActiveCamera: (camera) => {
+        const pass = sceneObjects.composer.passes[0] as RenderPass | undefined
+        if (!pass) return
+        const next = camera ?? getDefaultCamera() ?? pass.camera
+        if (camera) {
+          const domElement = sceneObjects.renderer.domElement
+          camera.aspect = domElement.clientWidth / domElement.clientHeight
+          camera.updateProjectionMatrix()
+        }
+        pass.camera = next
+      },
+    }
+  }
+
+  /**
+   * Build the EVA session bound to this view. Returns null if required deps are missing.
+   */
+  private createEvaSession(): EvaSession | null {
+    const sceneHost = this.buildEvaSceneHost()
+    if (!sceneHost || !this.tickHandler || !this.inputManager) return null
+    return new EvaSession({
+      sceneManager: sceneHost,
+      tickHandler: this.tickHandler,
+      inputManager: this.inputManager,
+      getVehicle: () => this.shuttleController,
+      getPoi: () => this.missionFacade.getEvaPoiWorldPos(),
+      getHugeScaleTargets: () => this.buildEvaHugeScaleTargets(),
+      spawnOffsetScale: MapViewController.EVA_MAP_SPAWN_OFFSET_SCALE,
+      helmetLightIntensityScale: MapViewController.EVA_MAP_HELMET_LIGHT_SCALE,
+      onEvaModeChange: (active) => {
+        this.setEvaBloomOverride(active)
+        this.onEvaModeChange?.(active)
+      },
+      onEvaTelemetry: (t) => this.onEvaTelemetry?.(t),
+      onActionPrompt: (p) => {
+        this.currentEvaPrompt = p
+      },
+    })
+  }
+
+  /** Targets scaled up during EVA so nearby objects read as large from the first-person view. */
+  private buildEvaHugeScaleTargets(): EvaHugeScaleTarget[] {
+    const targets: EvaHugeScaleTarget[] = []
+    if (this.shuttleController) {
+      targets.push({
+        object: this.shuttleController.group,
+        factor: MapViewController.EVA_MAP_HUGE_SHUTTLE,
+      })
+    }
+    // POI prop already sits in real world units (lander-cargo proportion); no huge-scale.
+    if (this.sunController) {
+      targets.push({
+        object: this.sunController.group,
+        factor: MapViewController.EVA_MAP_HUGE_SUN,
+      })
+    }
+    return targets
+  }
+
   dispose(): void {
+    this.evaSession?.dispose()
+    this.evaSession = null
     this.shuttleAudio.dispose()
     this.clearStartupCinematicOrbitHandoff()
     if (this.sceneObjects?.scene) {

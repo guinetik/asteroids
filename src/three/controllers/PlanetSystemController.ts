@@ -229,6 +229,19 @@ export class PlanetSystemController implements GravitySource {
   }
 
   /**
+   * Predict the planet's world XZ position at a future `simTime` on its orbital path.
+   * Used by missions that want to place a waypoint where the planet *will* be a few
+   * seconds from now so the POI doesn't drift away as the player flies out to it.
+   *
+   * @param simTime - Simulation time (same clock used by {@link tick}).
+   * @returns `{ x, z }` world-space coords on the Y=0 orbital plane.
+   */
+  predictWorldPosXZ(simTime: number): { x: number; z: number } {
+    const pos = orbitalPosition3D(this.scaledOrbit, simTime)
+    return { x: pos.x, z: pos.y }
+  }
+
+  /**
    * Returns the sampled orbit ellipse as XZ world-space points.
    * Used by orbital surfing to check proximity and build manifold splines.
    */

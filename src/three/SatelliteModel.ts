@@ -94,6 +94,7 @@ async function ensureSatelliteTemplate(): Promise<THREE.Group> {
   return satelliteTemplatePromise
 }
 
+
 /**
  * Decorative satellite GLB — add {@link group} to your scene after
  * {@link SatelliteModel.create}. Geometries may be shared with the preload
@@ -105,7 +106,10 @@ export class SatelliteModel {
   readonly group = new THREE.Group()
   private readonly tronMaterials: THREE.ShaderMaterial[]
 
-  private constructor(sceneClone: THREE.Group, tronMaterials: THREE.ShaderMaterial[]) {
+  private constructor(
+    sceneClone: THREE.Group,
+    tronMaterials: THREE.ShaderMaterial[],
+  ) {
     this.group.add(sceneClone)
     this.tronMaterials = tronMaterials
   }
@@ -194,6 +198,8 @@ export class SatelliteModel {
 
   /**
    * Detach cloned meshes from this group and dispose per-instance hologram materials.
+   * TRON overlay meshes share the panel's geometry (no per-instance geometry alloc), so
+   * they're freed when the scene clone is cleared.
    */
   dispose(): void {
     if (this.tronMaterials.length > 0) {

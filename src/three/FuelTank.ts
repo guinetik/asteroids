@@ -36,7 +36,7 @@ export class FuelTank {
   readonly group = new THREE.Group()
 
   private readonly indicator: THREE.Mesh
-  private readonly indicatorMat: THREE.MeshBasicMaterial
+  private readonly indicatorMat: THREE.MeshStandardMaterial
   private readonly indicatorLength: number
   private readonly baseX: number
 
@@ -60,16 +60,21 @@ export class FuelTank {
     this.indicatorLength = length - 10
     const indicatorRadius = radius * 0.85
     const indicatorGeo = new THREE.CylinderGeometry(indicatorRadius, indicatorRadius, this.indicatorLength, 16)
-    this.indicatorMat = new THREE.MeshBasicMaterial({
+    // Solid, depth-tested indicator. Previously used `depthTest: false` + `renderOrder`
+    // to force the fuel colour to render on top of the tank shell (visible from inside
+    // the cargo bay). That side effect also leaked the indicator through the shuttle
+    // chassis when viewed from outside — drawing neon cylinders floating on the hull.
+    // Normal opaque material lets the chassis properly occlude it.
+    this.indicatorMat = new THREE.MeshStandardMaterial({
       color: 0x00ff88,
-      transparent: true,
-      opacity: 0.8,
-      depthTest: false,
+      emissive: 0x00ff88,
+      emissiveIntensity: 0.55,
+      metalness: 0.2,
+      roughness: 0.45,
     })
     this.indicator = new THREE.Mesh(indicatorGeo, this.indicatorMat)
     this.indicator.position.copy(position)
     this.indicator.rotation.z = Math.PI / 2
-    this.indicator.renderOrder = 1
     this.indicator.visible = false
     this.baseX = position.x
     this.group.add(this.indicator)
@@ -95,10 +100,12 @@ export class FuelTank {
     const offset = halfLength * (1 - clamped)
     this.indicator.position.x = this.baseX - offset
 
-    // Color: green → yellow → red
+    // Color: green → yellow → red. Keep emissive in sync so the colour change reads
+    // under the cargo-bay lighting when the player peeks in.
     const r = ratio < 0.5 ? 1 : 1 - (ratio - 0.5) * 2
     const g = ratio > 0.5 ? 1 : ratio * 2
     this.indicatorMat.color.setRGB(r, g, 0.2)
+    this.indicatorMat.emissive.setRGB(r, g, 0.2)
   }
 
   dispose(): void {

@@ -3,6 +3,8 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { MapViewController } from './MapViewController'
 import ShuttleHud from '@/components/ShuttleHud.vue'
+import FpsHud, { type FpsTelemetry } from '@/components/FpsHud.vue'
+import HelmetVisor from '@/components/HelmetVisor.vue'
 import OrbitPrompt from '@/components/OrbitPrompt.vue'
 import GravityWarning from '@/components/GravityWarning.vue'
 import GravitationalAnomalyHud from '@/components/GravitationalAnomalyHud.vue'
@@ -176,6 +178,26 @@ const gravitationalAnomalyHud = reactive<GravitationalAnomalyHudState>({
   title: '',
   subtitle: '',
 })
+const evaActive = ref(false)
+const evaTelemetry = reactive<FpsTelemetry>({
+  hp: 100,
+  maxHp: 100,
+  o2Level: 0,
+  o2Capacity: 0,
+  sprintCharge: 0,
+  sprintCapacity: 0,
+  speed: 0,
+  grounded: false,
+  activeMode: 'drill',
+  aiming: false,
+  isFiring: false,
+  rtgLevel: 0,
+  rtgCapacity: 0,
+  modeCharge: 0,
+  modeCapacity: 0,
+  headingRad: 0,
+  objectives: [],
+})
 const habitatActive = ref(false)
 /** Hides orbit shuttle chrome during Earth first-mail cinematic → habitat (not used when intro is skipped). */
 const earthStartupOrbitHudSuppressed = ref(false)
@@ -340,6 +362,12 @@ onMounted(async () => {
     }
     viewController.onMapOverlay = (s) => {
       Object.assign(mapOverlay, s)
+    }
+    viewController.onEvaTelemetry = (t) => {
+      Object.assign(evaTelemetry, t)
+    }
+    viewController.onEvaModeChange = (active) => {
+      evaActive.value = active
     }
     viewController.onMapIntro = (state) => {
       Object.assign(mapIntro, state)
@@ -653,7 +681,8 @@ function dockedPlanetId(): string | null {
       !mapIntro.controlsLocked &&
       !habitatActive &&
       !earthStartupOrbitHudSuppressed &&
-      !deathVisible
+      !deathVisible &&
+      !evaActive
     "
     class="map-screen-nav"
     aria-label="Map screen navigation"
@@ -694,18 +723,22 @@ function dockedPlanetId(): string | null {
       !mapOverlay.visible &&
       !mapIntro.controlsLocked &&
       !habitatActive &&
-      !earthStartupOrbitHudSuppressed
+      !earthStartupOrbitHudSuppressed &&
+      !evaActive
     "
     :telemetry="telemetry"
     :fuel-cell-count="fuelCellCount"
     @use-fuel-cell="handleUseFuelCell"
   />
+  <HelmetVisor v-if="evaActive" />
+  <FpsHud v-if="evaActive" :telemetry="evaTelemetry" variant="eva" />
   <OrbitPrompt
     v-show="
       !mapOverlay.visible &&
       !mapIntro.controlsLocked &&
       !habitatActive &&
-      !earthStartupOrbitHudSuppressed
+      !earthStartupOrbitHudSuppressed &&
+      !evaActive
     "
     :orbitState="orbitState"
     :shop-available="shopButtonVisible && !shopDialogVisible && !shuttleControlVisible"
@@ -718,7 +751,8 @@ function dockedPlanetId(): string | null {
       !mapOverlay.visible &&
       !mapIntro.controlsLocked &&
       !habitatActive &&
-      !earthStartupOrbitHudSuppressed
+      !earthStartupOrbitHudSuppressed &&
+      !evaActive
     "
     :warning="gravityWarning"
   />
@@ -727,7 +761,8 @@ function dockedPlanetId(): string | null {
       !mapOverlay.visible &&
       !mapIntro.controlsLocked &&
       !habitatActive &&
-      !earthStartupOrbitHudSuppressed
+      !earthStartupOrbitHudSuppressed &&
+      !evaActive
     "
     :anomaly="gravitationalAnomalyHud"
   />
@@ -737,7 +772,8 @@ function dockedPlanetId(): string | null {
       !mapOverlay.visible &&
       !mapIntro.controlsLocked &&
       !habitatActive &&
-      !earthStartupOrbitHudSuppressed
+      !earthStartupOrbitHudSuppressed &&
+      !evaActive
     "
     :visible="deathVisible"
     :cause="deathCause"
@@ -783,7 +819,8 @@ function dockedPlanetId(): string | null {
       !mapOverlay.visible &&
       !mapIntro.controlsLocked &&
       !habitatActive &&
-      !earthStartupOrbitHudSuppressed
+      !earthStartupOrbitHudSuppressed &&
+      !evaActive
     "
     class="map-view-toggles"
   >
@@ -867,7 +904,8 @@ function dockedPlanetId(): string | null {
       !mapOverlay.visible &&
       !mapIntro.controlsLocked &&
       !habitatActive &&
-      !earthStartupOrbitHudSuppressed
+      !earthStartupOrbitHudSuppressed &&
+      !evaActive
     "
     type="button"
     class="music-toggle-btn map-screen-nav__icon-btn"
@@ -904,7 +942,8 @@ function dockedPlanetId(): string | null {
       !mapOverlay.visible &&
       !mapIntro.controlsLocked &&
       !habitatActive &&
-      !earthStartupOrbitHudSuppressed
+      !earthStartupOrbitHudSuppressed &&
+      !evaActive
     "
     :credits="playerCredits"
   />
@@ -913,7 +952,8 @@ function dockedPlanetId(): string | null {
       !mapOverlay.visible &&
       !mapIntro.controlsLocked &&
       !habitatActive &&
-      !earthStartupOrbitHudSuppressed
+      !earthStartupOrbitHudSuppressed &&
+      !evaActive
     "
     type="button"
     class="achievements-badge-btn border-amber-300/55 text-amber-100 bg-amber-300/10 hover:bg-amber-300/18 hover:border-amber-200/80"
