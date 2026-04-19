@@ -28,7 +28,6 @@ import {
   TICK_PRIORITY_INPUT,
   TICK_PRIORITY_PHYSICS,
   TICK_PRIORITY_ANIMATION,
-  TICK_PRIORITY_RENDER,
 } from '@/lib/tickPriorities'
 import { DEFAULT_TIME_SCALE, ORBIT_SCALE, SIZE_SCALE } from '@/lib/planets/constants'
 import { SUN, PLANETS } from '@/lib/planets/catalog'
@@ -59,23 +58,18 @@ import {
   MAP_PORTAL_ARRIVAL_CAMERA_CONFIG,
   MAP_PORTAL_CINEMATIC_CAMERA_CONFIG,
 } from '@/three/VehicleCamera'
-import { buildSlingshotChargeCameraConfig } from '@/three/slingshotChargeCamera'
-import orbitConfig from '@/data/shuttle/orbit-capture.json'
 import { PortalArrivalSequence } from '@/three/PortalArrivalSequence'
 import type { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { VibePortal } from '@/lib/portal'
 import { MapState } from '@/lib/mapState'
 import {
   MapIntroState,
-  INTRO_ZOOM_STEPS,
-  type IntroCinematicStep,
   type MapIntroUiState,
 } from '@/lib/mapIntroState'
-import { MapCamera, easeInOut } from '@/three/MapCamera'
+import { MapCamera } from '@/three/MapCamera'
 import { findNearestBodies, formatDistance, type MapBody } from '@/lib/mapProjection'
 import type { MapOverlayState } from '@/lib/ShuttleTelemetry'
 import { computeRelativeOrbitalSpeedMultiplier } from '@/lib/orbitSpeedProfile'
-import { canReleaseSlingshot } from '@/lib/slingshotLaunchPolicy'
 import {
   appendWorldLinePoint,
   shouldRecordWorldLinePoint,
@@ -90,8 +84,6 @@ import type { ShipHealthConfig } from '@/lib/shipHealth'
 import shipHealthData from '@/data/shuttle/ship-health.json'
 import {
   getCurrentShuttleThrusterEfficiencyModifiers,
-  getCurrentShuttleThrusterChargeModifiers,
-  getCurrentShuttleSlingshotBurstMultiplier,
   getCurrentUpgradeValue,
   hasGravitySurfingUnlock,
   hasOrbitalSurfingUnlock,
@@ -117,7 +109,6 @@ import {
   markMapIntroSeen,
   saveProfile,
   addCredits,
-  spendCredits,
   recordSolarBodyFirstOrbit,
 } from '@/lib/player/profile'
 import type { PlayerProfile } from '@/lib/player/types'
@@ -127,7 +118,6 @@ import {
   addItem,
   getStack,
   consumeItem,
-  canFitItem,
   DEFAULT_MAX_SLOTS,
   DEFAULT_MAX_WEIGHT_KG,
 } from '@/lib/inventory/inventory'

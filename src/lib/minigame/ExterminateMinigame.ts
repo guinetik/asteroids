@@ -33,7 +33,6 @@ const INNER_SPAWN_CLEAR_RADIUS = 40
 const COUNTDOWN_DURATION = 5
 const BLAST_RADIUS = 22
 const CRATER_RADIUS = 11
-const CONTACT_KNOCKBACK = 10
 const ENEMY_PLAYER_FAR_DISTANCE = 99999
 
 /** Outer fireball flash — slower, bigger, longer-lived than the original. */

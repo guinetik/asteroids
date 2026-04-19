@@ -306,12 +306,12 @@ export class CollisionWorld {
   }
 
   private canTraverseTerrain(
-    currentX: number,
-    currentZ: number,
-    targetX: number,
-    targetZ: number,
-    bodyBottomY: number,
-    config: CharacterCollisionConfig,
+    _currentX: number,
+    _currentZ: number,
+    _targetX: number,
+    _targetZ: number,
+    _bodyBottomY: number,
+    _config: CharacterCollisionConfig,
   ): boolean {
     if (!this.heightmap) return true
     return true

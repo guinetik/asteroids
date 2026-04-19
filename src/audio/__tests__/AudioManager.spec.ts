@@ -109,7 +109,7 @@ vi.mock('howler', () => {
 
     private emitPlayError(id: number): void {
       const err = new Error('sync playerror')
-      for (const { fn } of [...this.playErrorOn]) {
+      for (const { fn } of this.playErrorOn) {
         fn(id, err)
       }
       const onceCopy = [...this.playErrorOnce]
@@ -282,7 +282,7 @@ function fireRegisteredEndCallbacks(): void {
 
 function emitPlayErrorOnHowl(h: MockHowlProbe, id: number): void {
   const err = new Error('mock play error')
-  for (const { fn } of [...h.playErrorOn]) {
+  for (const { fn } of h.playErrorOn) {
     fn(id, err)
   }
   const onceCopy = [...h.playErrorOnce]
@@ -294,7 +294,7 @@ function emitPlayErrorOnHowl(h: MockHowlProbe, id: number): void {
 
 function emitLoadErrorOnHowl(h: MockHowlProbe, id: number | null): void {
   const err = new Error('mock load error')
-  for (const { fn } of [...h.loadErrorOn]) {
+  for (const { fn } of h.loadErrorOn) {
     fn(id, err)
   }
   const onceCopy = [...h.loadErrorOnce]

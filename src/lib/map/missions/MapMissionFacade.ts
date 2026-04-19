@@ -56,7 +56,6 @@ import {
   missionAsteroidShapeSeed,
 } from '@/three/MapMissionAsteroidPreview'
 import { createEvaMissionPoi, type EvaMissionPoiInstance } from '@/three/EvaMissionPoi'
-import type { MapOverlayState } from '@/lib/ShuttleTelemetry'
 import type { OrbitCaptureSystem } from '@/lib/orbitCapture'
 import {
   pickActiveEvaMissionMapSite,

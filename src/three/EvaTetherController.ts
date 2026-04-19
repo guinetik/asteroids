@@ -207,7 +207,7 @@ export class EvaTetherController implements Tickable {
     this.tetherMaterial.depthWrite = false
     this.tetherCurvePoints = []
     this.tetherPreviousPoints = []
-    this.ropeSegmentLengths = new Array(TETHER_SEGMENTS).fill(0)
+    this.ropeSegmentLengths = Array.from({ length: TETHER_SEGMENTS }, () => 0)
     for (let i = 0; i <= TETHER_SEGMENTS; i++) {
       this.tetherCurvePoints.push(new THREE.Vector3())
       this.tetherPreviousPoints.push(new THREE.Vector3())
@@ -472,7 +472,7 @@ export class EvaTetherController implements Tickable {
     this.rebuildTetherGeometry()
   }
 
-  private updateTether(dt: number): void {
+  private updateTether(_dt: number): void {
     const a = this.getAnchorWorld()
     if (!a) return
     const b = this.getPlayerAttachWorld()
@@ -496,7 +496,6 @@ export class EvaTetherController implements Tickable {
       .multiplyScalar(TETHER_PLAYER_MOTION_DAMPING)
     this.previousPlayerAttachWorld.copy(b)
 
-    const substepDt = dt / TETHER_SIMULATION_SUBSTEPS
     for (let step = 0; step < TETHER_SIMULATION_SUBSTEPS; step++) {
       for (let i = 1; i < pointCount - 1; i++) {
         const pt = this.tetherCurvePoints[i]

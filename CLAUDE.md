@@ -16,7 +16,17 @@ Asteroid Lander - a 2.5D physics-driven lander game for the Vibe Coding Game Jam
 - **Run tests:** `bun test:unit`
 - **Run a single test:** `bun test:unit src/path/to/test.spec.ts`
 
-Package manager is **Bun** (`bun install` to install dependencies). Use **`bun`** and **`bunx`** for scripts and one-off tools — do not use `npm` or `npx` in this repo.
+Package manager is **Bun** (`bun install` to install dependencies). Use **`bun`** and **`bunx`** for scripts and one-off tools — do not use `npm` or `npx` in this repo. A `preinstall` script rejects installs driven by other package managers.
+
+## Merge / acceptance criteria
+
+Before a change is considered complete (and before merge), all of the following must pass locally:
+
+1. **`bun run type-check`** — no TypeScript errors.
+2. **`bun run lint`** — oxlint **0 errors**, ESLint **0 errors** and **0 warnings** (ESLint runs with `--max-warnings 0`; TSDoc gaps are errors on `src/**/*.ts`).
+3. **`bun run test:unit`** — all Vitest tests green.
+
+Do not document or suggest `npm run` / `npx` for this project.
 
 ## Architecture
 
@@ -55,8 +65,8 @@ Package manager is **Bun** (`bun install` to install dependencies). Use **`bun`*
 
 Two linters with distinct responsibilities:
 
-- **Oxlint** — primary linter. Handles TS, Vue, Vitest, and correctness rules. Runs in ~10ms.
-- **ESLint** — only enforces `jsdoc/require-jsdoc` on `src/**/*.ts` (excluding tests). Uses `eslint-plugin-oxlint` to disable any rules oxlint already covers.
+- **Oxlint** — primary linter. Handles TS, Vue, Vitest, and correctness rules. Runs in ~10ms. Reference snippets under `docs/inspo/**` are excluded via `.oxlintrc.json` `ignorePatterns`.
+- **ESLint** — enforces `jsdoc/require-jsdoc` as **errors** on `src/**/*.ts` (excluding `__tests__`). Uses `eslint-plugin-oxlint` to disable any rules oxlint already covers. Invoked with **`--max-warnings 0`** so documentation/TSDoc warnings cannot slip through.
 
 `bun lint` runs both in sequence (oxlint first, then eslint).
 
@@ -74,7 +84,7 @@ Tuning levers per thruster group: `capacity`, `burnRate` (charge/s while firing)
 
 ## TSDoc Format
 
-Every exported function, class, interface, type alias, and constant must have a TSDoc comment. Enforced by ESLint's `jsdoc/require-jsdoc` rule (warns, does not block builds). Every interface property gets a doc comment explaining what it is, valid ranges, and real examples.
+Every exported function, class, interface, type alias, and constant must have a TSDoc comment. Enforced by ESLint's `jsdoc/require-jsdoc` rule at **error** severity. Every interface property gets a doc comment explaining what it is, valid ranges, and real examples.
 
 File-level header on all `src/lib/` and `src/three/` files:
 

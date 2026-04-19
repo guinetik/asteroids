@@ -301,7 +301,7 @@ export function addWaypointMarker(
  * @param id - Marker id to remove.
  * @param scene - Three.js scene to remove from.
  */
-export function removeWaypointMarker(id: string, scene: THREE.Scene): void {
+export function removeWaypointMarker(id: string, _scene: THREE.Scene): void {
   const idx = markers.findIndex((m) => m.id === id)
   if (idx === -1) return
   const marker = markers[idx]!
@@ -314,7 +314,7 @@ export function removeWaypointMarker(id: string, scene: THREE.Scene): void {
  *
  * @param scene - Three.js scene to clear.
  */
-export function clearWaypointMarkers(scene: THREE.Scene): void {
+export function clearWaypointMarkers(_scene: THREE.Scene): void {
   for (const marker of markers) {
     disposeWaypointMarkerGroup(marker.group)
   }

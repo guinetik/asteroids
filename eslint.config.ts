@@ -21,7 +21,7 @@ export default defineConfigWithVueTs(
     plugins: { jsdoc: pluginJsdoc },
     rules: {
       'jsdoc/require-jsdoc': [
-        'warn',
+        'error',
         {
           require: {
             FunctionDeclaration: true,

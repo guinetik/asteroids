@@ -46,9 +46,7 @@ describe('UPGRADE_DEFINITIONS', () => {
       expect(['shuttle', 'lander', 'multitool', 'suit']).toContain(def.category)
       expect(def.label).toBeTruthy()
       expect(def.description).toBeTruthy()
-      if (!def.hiddenFromShop) {
-        expect(def.baseCost).toBeGreaterThan(0)
-      }
+      expect(def.hiddenFromShop || def.baseCost > 0).toBe(true)
     }
   })
 

@@ -34,29 +34,6 @@ function makeBody(
   }
 }
 
-/** Creates a mock CaptureBody whose world position can change over time. */
-function makeMovingBody(
-  name: string,
-  position: { x: number; z: number },
-  displayRadius = 0.1,
-  orbitalSpeedMultiplier = 1,
-  captureRadiusMultiplier = 1,
-  captureRadiusOverride?: number,
-  orbitRadiusOverride?: number,
-): CaptureBody {
-  return {
-    name,
-    displayRadius,
-    orbitalSpeedMultiplier,
-    captureRadiusMultiplier,
-    captureRadiusOverride,
-    orbitRadiusOverride,
-    getWorldX: () => position.x,
-    getWorldY: () => 0,
-    getWorldZ: () => position.z,
-  }
-}
-
 describe('OrbitCaptureSystem', () => {
   let system: OrbitCaptureSystem
   let bodyA: CaptureBody

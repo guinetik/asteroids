@@ -1,0 +1,9 @@
+---
+description: Bun-only tooling and lint acceptance for the asteroids repo
+alwaysApply: true
+---
+
+# Tooling
+
+- Use **Bun** only: `bun install`, `bun run <script>`, `bunx <tool>`. Never instruct or assume `npm`, `npx`, `pnpm`, or `yarn` for this repository.
+- Quality bar before finishing work: `bun run lint`, `bun run type-check`, and `bun run test:unit` all pass. Lint means zero oxlint errors, zero ESLint errors, and zero ESLint warnings (including TSDoc/jsdoc on TypeScript sources).

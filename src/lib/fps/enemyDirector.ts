@@ -95,11 +95,11 @@ function applyMovementWithSeparation(handles: readonly EnemyHandle[], dt: number
   const n = alive.length
   if (n === 0) return
 
-  const startX: number[] = new Array(n)
-  const startZ: number[] = new Array(n)
-  const radius: number[] = new Array(n)
-  const intentX: number[] = new Array(n)
-  const intentZ: number[] = new Array(n)
+  const startX: number[] = Array.from({ length: n }, () => 0)
+  const startZ: number[] = Array.from({ length: n }, () => 0)
+  const radius: number[] = Array.from({ length: n }, () => 0)
+  const intentX: number[] = Array.from({ length: n }, () => 0)
+  const intentZ: number[] = Array.from({ length: n }, () => 0)
 
   for (let i = 0; i < n; i++) {
     const h = alive[i]!
@@ -120,8 +120,8 @@ function applyMovementWithSeparation(handles: readonly EnemyHandle[], dt: number
     }
   }
 
-  const sepX: number[] = new Array(n).fill(0)
-  const sepZ: number[] = new Array(n).fill(0)
+  const sepX: number[] = Array.from({ length: n }, () => 0)
+  const sepZ: number[] = Array.from({ length: n }, () => 0)
 
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < n; j++) {

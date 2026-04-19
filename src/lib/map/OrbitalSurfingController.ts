@@ -19,7 +19,6 @@ import {
   type OrbitSnapResult,
 } from '@/lib/map/orbitalSurfing'
 import type { ShuttleController } from '@/three/ShuttleController'
-import { MAP_PHYSICS } from '@/three/ShuttleController'
 
 /** Discriminated union of orbital surfing states. */
 type OrbitalSurfState =
@@ -352,7 +351,7 @@ export class OrbitalSurfingController {
     }
   }
 
-  private tickDiving(dt: number, shuttle: ShuttleController, deps: OrbitalSurfingDeps): void {
+  private tickDiving(dt: number, shuttle: ShuttleController, _deps: OrbitalSurfingDeps): void {
     if (this.state.mode !== 'diving') return
 
     // No player input during diving — fully committed to the manifold

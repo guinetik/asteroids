@@ -10,7 +10,6 @@ import type { InputManager } from '@/lib/InputManager'
 import { MAP_VIEW_CONTROLLER_CONFIG as MAP_CONFIG } from '@/lib/map/mapViewControllerConfig'
 import {
   findNearestGravitySurfRail,
-  gravitySurfDirectionFromHeading,
   gravitySurfRailHeading,
   gravitySurfVelocityVector,
   type GravitySurfRailAxis,

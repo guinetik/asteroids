@@ -123,12 +123,16 @@ describe('audioManifest', () => {
     }
   })
 
-  it('requires static sources for non-dynamic sounds and forbids silent src omission', () => {
+  it('allows dynamic sounds to omit static src', () => {
     for (const def of audioManifest) {
-      if (def.allowDynamicSrc === true) {
-        expect('src' in def && def.src !== undefined).toBe(false)
-        continue
-      }
+      if (def.allowDynamicSrc !== true) continue
+      expect('src' in def && def.src !== undefined).toBe(false)
+    }
+  })
+
+  it('requires static src for non-dynamic sounds', () => {
+    for (const def of audioManifest) {
+      if (def.allowDynamicSrc === true) continue
       expect(def.src).toBeDefined()
       expect(typeof def.src === 'string' || Array.isArray(def.src)).toBe(true)
     }

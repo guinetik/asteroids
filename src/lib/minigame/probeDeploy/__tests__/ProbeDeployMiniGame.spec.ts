@@ -9,9 +9,6 @@ import {
   PLANET_X,
   PLANET_Y,
   PLANET_R,
-  PLANET_ROTATION_SPEED,
-  PROBE_COOLDOWN,
-  TARGET_HIT_RADIUS,
   MIN_TARGETS,
   MAX_TARGETS,
   TIMER_BASE,
@@ -144,12 +141,10 @@ describe('ProbeDeployMiniGame', () => {
       expect(game.activeProbe).not.toBeNull()
       // Consume the probe by ticking until it reaches planet or goes off screen
       for (let i = 0; i < 120; i++) game.tick(0.016, STUB_CTX)
-      // Now try to fire again immediately — cooldown should block
       const remaining = game.probesRemaining
+      game.probeCooldown = 0.1
       game.launchProbe()
-      if (game.probeCooldown > 0) {
-        expect(game.probesRemaining).toBe(remaining) // didn't fire
-      }
+      expect(game.probesRemaining).toBe(remaining)
     })
 
     it('cannot launch when probes exhausted', () => {
