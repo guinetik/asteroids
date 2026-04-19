@@ -6,6 +6,7 @@ import { IceHarvestMiniGame } from '../iceHarvest/IceHarvestMiniGame'
 import { MaintenanceMiniGame } from '../maintenance/MaintenanceMiniGame'
 import { LogisticsRouteMiniGame } from '../logistics/LogisticsRouteMiniGame'
 import { ProbeDeployMiniGame } from '../probeDeploy/ProbeDeployMiniGame'
+import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 
 describe('createOrbitalMiniGame', () => {
   it('returns ProbeDeployMiniGame for type "probe-deploy"', () => {
@@ -65,6 +66,24 @@ describe('createOrbitalMiniGame', () => {
     const mg = createOrbitalMiniGame('mission-2', 'unknown-future-type', 1)
     expect(mg).toBeInstanceOf(DefaultOrbitalMiniGame)
     expect(mg.missionId).toBe('mission-2')
+  })
+
+  it('accepts an optional mission param without breaking existing cases', () => {
+    const mission = {
+      template: {
+        id: 'earth_sat_patch',
+        name: 'Cubesat Patch',
+        description: '',
+        poiType: 'satellite',
+        minigameType: 'maintenance',
+        reward: 1500,
+      },
+      giverPlanet: 'earth',
+      waypoint: { worldX: 0, worldZ: 0, poiLocalY: 0 },
+      status: 'active',
+    } as ActiveVisitRelayMission
+    const mg = createOrbitalMiniGame('m', 'maintenance', 3, 'earth', mission)
+    expect(mg.missionId).toBe('m')
   })
 })
 

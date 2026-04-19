@@ -2339,6 +2339,7 @@ export class MapViewController implements Tickable {
       minigameType,
       0,
       mission.giverPlanet,
+      mission,
     ) as OrbitalMiniGame & OrbitalMiniGameEvents
     minigame.onComplete = (missionId: string) => this.evaMinigameComplete(missionId)
     this.activeEvaMinigame = minigame
