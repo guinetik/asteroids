@@ -215,6 +215,14 @@ const SPEED_DAMAGE_MULTIPLIER = 2.0
 /** HP damage per radian of excess landing tilt. */
 const ANGLE_DAMAGE_MULTIPLIER = 25.0
 
+/**
+ * HP damage per radian of surface slope beyond {@link SAFE_LANDING_ANGLE}
+ * at the moment of touchdown. Tuned high enough that touching down onto a
+ * near-vertical wall (slope ≈ π/2 rad) is fatal even at zero descent speed,
+ * so the lander can no longer "stick" sideways to a cliff face.
+ */
+const SURFACE_SLOPE_DAMAGE_MULTIPLIER = 90.0
+
 /** Impact speed (units/s) that maps to full touchdown volume (1.0). */
 const TOUCHDOWN_VOLUME_REF_SPEED = 20
 
@@ -627,10 +635,22 @@ export class LanderController implements Tickable {
     // Detect landing transition (airborne → grounded) and evaluate safety
     if (this.body.grounded && !this.wasGrounded) {
       const impactSpeed = Math.abs(this.body.impactVelocityY)
-      const impactAngle = Math.sqrt(this.tiltX * this.tiltX + this.tiltZ * this.tiltZ)
+      // Lander's visual tilt has not yet lerped to the contact surface on the
+      // first frame of touchdown, so a hard impact onto a near-vertical wall
+      // would otherwise read as a perfectly upright landing. Score the lander
+      // tilt and the actual surface slope (acos(normal.y)) on separate damage
+      // tracks so a sideways slam into a cliff face or an inverted landing
+      // both crash, even when the other channel is near zero.
+      const landerTilt = Math.sqrt(this.tiltX * this.tiltX + this.tiltZ * this.tiltZ)
+      const supportNormalY = Math.max(-1, Math.min(1, this.sampleTerrainSupport().normal.y))
+      const surfaceSlope = Math.acos(supportNormalY)
       const speedExcess = Math.max(0, impactSpeed - SAFE_LANDING_SPEED)
-      const angleExcess = Math.max(0, impactAngle - SAFE_LANDING_ANGLE)
-      const damage = speedExcess * SPEED_DAMAGE_MULTIPLIER + angleExcess * ANGLE_DAMAGE_MULTIPLIER
+      const tiltExcess = Math.max(0, landerTilt - SAFE_LANDING_ANGLE)
+      const slopeExcess = Math.max(0, surfaceSlope - SAFE_LANDING_ANGLE)
+      const damage =
+        speedExcess * SPEED_DAMAGE_MULTIPLIER
+        + tiltExcess * ANGLE_DAMAGE_MULTIPLIER
+        + slopeExcess * SURFACE_SLOPE_DAMAGE_MULTIPLIER
       // Touchdown thud on every landing — volume scales with impact speed, min 0.4
       const touchdownVol = Math.min(1.0, Math.max(0.4, impactSpeed / TOUCHDOWN_VOLUME_REF_SPEED))
       useAudio().play('sfx.touchdown', { volume: touchdownVol })
