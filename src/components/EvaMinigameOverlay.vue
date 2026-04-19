@@ -1,16 +1,15 @@
 <!--
   EvaMinigameOverlay.vue
 
-  Modal overlay shown while the EVA player is interacting with a POI maintenance
-  terminal. Today it renders the default "Complete Mission" button card so the
-  end-to-end loop (approach POI → press F → overlay → reward paid) is playable.
-  Real per-minigameType branches (relay_repair, satellite_servicing,
-  telescope_alignment) plug in here as additional `v-if` blocks once their canvas
-  components exist — same pattern as MissionMiniGameOverlay.
+  Dispatcher for per-minigameType overlays. Currently only the default card
+  branch is wired — telescope, relay, and any future overlay-type canvas
+  mounts here as an additional `v-if` branch. Mirrors MissionMiniGameOverlay
+  for gather minigames. The final fallback is the "Complete Maintenance" card
+  so the EVA loop stays playable while per-type canvases roll out.
 
   @author guinetik
   @date 2026-04-19
-  @spec docs/superpowers/specs/2026-04-18-visit-relay-mission-design.md
+  @spec docs/superpowers/specs/2026-04-19-eva-minigame-wiring-design.md
 -->
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue'
@@ -59,6 +58,13 @@ onUnmounted(() => {
 
 <template>
   <div class="mission-minigame-overlay">
+    <!--
+      Per-minigameType branches plug in here (see
+      docs/superpowers/specs/2026-04-19-eva-minigame-wiring-design.md §"Overlay Branching Pattern").
+      Each minigame's own plan (telescope_alignment, relay_repair) adds its
+      `v-if="isXxx"` branch above the default card. None are registered yet;
+      everything falls through to the card.
+    -->
     <div class="mission-minigame-card">
       <div class="mission-minigame-card__chrome">
         <span>EVA Maintenance Terminal</span>
