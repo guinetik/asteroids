@@ -61,8 +61,6 @@ const PANEL_FILL = 'rgba(5, 7, 12, 0.8)'
 
 /** Configuration passed to `SatelliteRepairController.attach`. */
 export interface SatelliteRepairControllerConfig {
-  /** Scene root used to host the wireframe + prompt meshes. */
-  scene: THREE.Scene
   /** POI root — walked for named rigged sub-objects. */
   poiObject: THREE.Object3D
   /** Source of the EVA player world position for proximity checks. */
@@ -97,7 +95,7 @@ interface DamagedComponent {
  * Usage:
  * ```ts
  * const controller = new SatelliteRepairController()
- * controller.attach({ scene, poiObject, getPlayerPosition, isFixKeyPressed, minigame, mission })
+ * controller.attach({ poiObject, getPlayerPosition, isFixKeyPressed, minigame, mission })
  * // …later, per frame…
  * controller.tick(dt)
  * // …on minigame.onComplete or forced abort…
