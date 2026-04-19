@@ -122,8 +122,12 @@ function buildProceduralRecipe(
   sources: StoppableNode[],
 ): number {
   switch (preset) {
+    case 'tool-drill':
+      return buildToolDrill(ctx, output, startTime, volume, sources)
     case 'laser-fire':
       return buildLaserFire(ctx, output, startTime, volume, sources)
+    case 'tool-heal':
+      return buildToolHeal(ctx, output, startTime, volume, sources)
     case 'projectile-hit':
       return buildProjectileHit(ctx, output, startTime, volume, sources)
     case 'shield-hit':
@@ -133,6 +137,69 @@ function buildProceduralRecipe(
   }
 }
 
+function buildToolDrill(
+  ctx: AudioContext,
+  output: GainNode,
+  startTime: number,
+  volume: number,
+  sources: StoppableNode[],
+): number {
+  const duration = 0.42
+
+  const core = ctx.createOscillator()
+  const coreGain = ctx.createGain()
+  core.type = 'sine'
+  core.frequency.setValueAtTime(612, startTime)
+  core.frequency.linearRampToValueAtTime(664, startTime + 0.09)
+  core.frequency.linearRampToValueAtTime(628, startTime + 0.2)
+  core.frequency.linearRampToValueAtTime(688, startTime + 0.31)
+  core.frequency.linearRampToValueAtTime(604, startTime + duration)
+  applyHeldEnvelope(coreGain.gain, startTime, duration, volume * 0.34)
+  core.connect(coreGain)
+  coreGain.connect(output)
+  scheduleSource(core, startTime, duration + 0.03, sources)
+
+  const harmony = ctx.createOscillator()
+  const harmonyGain = ctx.createGain()
+  harmony.type = 'sine'
+  harmony.frequency.setValueAtTime(918, startTime)
+  harmony.frequency.linearRampToValueAtTime(996, startTime + 0.1)
+  harmony.frequency.linearRampToValueAtTime(940, startTime + 0.24)
+  harmony.frequency.linearRampToValueAtTime(1028, startTime + 0.34)
+  harmony.frequency.linearRampToValueAtTime(900, startTime + duration)
+  applyHeldEnvelope(harmonyGain.gain, startTime, duration * 0.95, volume * 0.16)
+  harmony.connect(harmonyGain)
+  harmonyGain.connect(output)
+  scheduleSource(harmony, startTime, duration + 0.03, sources)
+
+  const sheen = ctx.createOscillator()
+  const sheenGain = ctx.createGain()
+  sheen.type = 'triangle'
+  sheen.frequency.setValueAtTime(1520, startTime)
+  sheen.frequency.linearRampToValueAtTime(1680, startTime + 0.08)
+  sheen.frequency.linearRampToValueAtTime(1460, startTime + duration)
+  applyHeldEnvelope(sheenGain.gain, startTime, duration * 0.85, volume * 0.08)
+  sheen.connect(sheenGain)
+  sheenGain.connect(output)
+  scheduleSource(sheen, startTime, duration * 0.9 + 0.03, sources)
+
+  const airDuration = 0.26
+  const air = createNoiseSource(ctx, airDuration, 'white')
+  const airFilter = ctx.createBiquadFilter()
+  airFilter.type = 'bandpass'
+  airFilter.frequency.setValueAtTime(2200, startTime)
+  airFilter.frequency.linearRampToValueAtTime(1400, startTime + airDuration)
+  airFilter.Q.value = 1.8
+  const airGain = ctx.createGain()
+  applyNoiseEnvelope(airGain.gain, startTime, airDuration, volume * 0.035)
+  air.connect(airFilter)
+  airFilter.connect(airGain)
+  airGain.connect(output)
+  scheduleSource(air, startTime, airDuration + 0.02, sources)
+
+  return duration
+}
+
 function buildLaserFire(
   ctx: AudioContext,
   output: GainNode,
@@ -140,17 +207,65 @@ function buildLaserFire(
   volume: number,
   sources: StoppableNode[],
 ): number {
-  const duration = 0.14
-  const osc = ctx.createOscillator()
-  const gain = ctx.createGain()
-  osc.type = 'sawtooth'
-  osc.frequency.setValueAtTime(1400, startTime)
-  osc.frequency.exponentialRampToValueAtTime(180, startTime + duration)
-  applyPercussiveEnvelope(gain.gain, startTime, duration, volume)
-  osc.connect(gain)
-  gain.connect(output)
-  scheduleSource(osc, startTime, duration + 0.02, sources)
-  return duration
+  const duration = 0.16
+
+  const body = ctx.createOscillator()
+  const bodyGain = ctx.createGain()
+  body.type = 'sawtooth'
+  body.frequency.setValueAtTime(1680, startTime)
+  body.frequency.exponentialRampToValueAtTime(260, startTime + duration)
+  applyPercussiveEnvelope(bodyGain.gain, startTime, duration, volume * 0.54)
+  body.connect(bodyGain)
+  bodyGain.connect(output)
+  scheduleSource(body, startTime, duration + 0.025, sources)
+
+  const bite = ctx.createOscillator()
+  const biteGain = ctx.createGain()
+  bite.type = 'square'
+  bite.frequency.setValueAtTime(920, startTime)
+  bite.frequency.exponentialRampToValueAtTime(180, startTime + duration * 0.82)
+  applyNoiseEnvelope(biteGain.gain, startTime, duration * 0.82, volume * 0.16)
+  bite.connect(biteGain)
+  biteGain.connect(output)
+  scheduleSource(bite, startTime, duration * 0.82 + 0.025, sources)
+
+  const sizzleDuration = 0.055
+  const sizzle = createNoiseSource(ctx, sizzleDuration, 'white')
+  const sizzleFilter = ctx.createBiquadFilter()
+  sizzleFilter.type = 'bandpass'
+  sizzleFilter.frequency.setValueAtTime(2600, startTime)
+  sizzleFilter.frequency.exponentialRampToValueAtTime(1400, startTime + sizzleDuration)
+  sizzleFilter.Q.value = 1.6
+  const sizzleGain = ctx.createGain()
+  applyNoiseEnvelope(sizzleGain.gain, startTime, sizzleDuration, volume * 0.08)
+  sizzle.connect(sizzleFilter)
+  sizzleFilter.connect(sizzleGain)
+  sizzleGain.connect(output)
+  scheduleSource(sizzle, startTime, sizzleDuration + 0.01, sources)
+
+  const echoStart = startTime + 0.07
+  const echo = ctx.createOscillator()
+  const echoGain = ctx.createGain()
+  echo.type = 'triangle'
+  echo.frequency.setValueAtTime(720, echoStart)
+  echo.frequency.exponentialRampToValueAtTime(210, echoStart + 0.11)
+  applyNoiseEnvelope(echoGain.gain, echoStart, 0.11, volume * 0.16)
+  echo.connect(echoGain)
+  echoGain.connect(output)
+  scheduleSource(echo, echoStart, 0.13, sources)
+
+  const echo2Start = startTime + 0.135
+  const echo2 = ctx.createOscillator()
+  const echo2Gain = ctx.createGain()
+  echo2.type = 'triangle'
+  echo2.frequency.setValueAtTime(420, echo2Start)
+  echo2.frequency.exponentialRampToValueAtTime(150, echo2Start + 0.09)
+  applyNoiseEnvelope(echo2Gain.gain, echo2Start, 0.09, volume * 0.09)
+  echo2.connect(echo2Gain)
+  echo2Gain.connect(output)
+  scheduleSource(echo2, echo2Start, 0.11, sources)
+
+  return 0.28
 }
 
 function buildProjectileHit(
@@ -213,6 +328,40 @@ function buildShieldHit(
   shimmerGain.connect(output)
   scheduleSource(shimmer, startTime, duration * 0.7 + 0.03, sources)
   return duration
+}
+
+function buildToolHeal(
+  ctx: AudioContext,
+  output: GainNode,
+  startTime: number,
+  volume: number,
+  sources: StoppableNode[],
+): number {
+  const firstDuration = 0.11
+  const secondDuration = 0.13
+  const secondStart = startTime + 0.05
+
+  const first = ctx.createOscillator()
+  const firstGain = ctx.createGain()
+  first.type = 'sine'
+  first.frequency.setValueAtTime(480, startTime)
+  first.frequency.exponentialRampToValueAtTime(760, startTime + firstDuration)
+  applyPluckEnvelope(firstGain.gain, startTime, firstDuration, volume * 0.45)
+  first.connect(firstGain)
+  firstGain.connect(output)
+  scheduleSource(first, startTime, firstDuration + 0.02, sources)
+
+  const second = ctx.createOscillator()
+  const secondGain = ctx.createGain()
+  second.type = 'triangle'
+  second.frequency.setValueAtTime(720, secondStart)
+  second.frequency.exponentialRampToValueAtTime(1180, secondStart + secondDuration)
+  applyPluckEnvelope(secondGain.gain, secondStart, secondDuration, volume * 0.32)
+  second.connect(secondGain)
+  secondGain.connect(output)
+  scheduleSource(second, secondStart, secondDuration + 0.02, sources)
+
+  return secondStart - startTime + secondDuration
 }
 
 function buildPickup(
@@ -288,6 +437,18 @@ function applyPluckEnvelope(
   gain.setValueAtTime(0.0001, startTime)
   gain.linearRampToValueAtTime(Math.max(0.0001, peak), startTime + 0.004)
   gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * 0.25), startTime + duration * 0.45)
+  gain.exponentialRampToValueAtTime(0.0001, startTime + duration)
+}
+
+function applyHeldEnvelope(
+  gain: GainAutomationLike,
+  startTime: number,
+  duration: number,
+  peak: number,
+): void {
+  gain.setValueAtTime(0.0001, startTime)
+  gain.linearRampToValueAtTime(Math.max(0.0001, peak), startTime + 0.02)
+  gain.linearRampToValueAtTime(Math.max(0.0001, peak * 0.82), startTime + duration * 0.72)
   gain.exponentialRampToValueAtTime(0.0001, startTime + duration)
 }
 

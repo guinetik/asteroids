@@ -37,6 +37,10 @@ describe('audioManifest', () => {
       'sfx.collision',
       'sfx.explosion',
       'sfx.explosive',
+      'sfx.suit.impact',
+      'sfx.grunt.damage',
+      'sfx.suit.alarm',
+      'sfx.damage.slash',
       // shuttle systems
       'sfx.touchdown',
       'sfx.harpoon',
@@ -61,10 +65,13 @@ describe('audioManifest', () => {
       'sfx.arrivalSeparation',
       'sfx.dockingClamp',
       // combat / EVA
+      'sfx.tool.drill',
       'sfx.laserFire',
+      'sfx.tool.heal',
       'sfx.projectileHit',
       'sfx.shieldHit',
       'sfx.pickup',
+      'sfx.grunt',
       // ambient
       'ambient.space',
       'ambient.engine',
@@ -75,6 +82,7 @@ describe('audioManifest', () => {
       'ambient.wind',
       'sfx.floating',
       'sfx.jump',
+      'sfx.jump.voice',
       'sfx.breathing.walk',
       'sfx.breathing.run',
       // music

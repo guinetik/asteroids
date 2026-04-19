@@ -20,6 +20,7 @@ export const AUDIO_EFFECT_PRESETS = [
   'none',
   'radio',
   'helmet-comms',
+  'helmet-echo',
   'terminal-beep',
   'hull-exterior',
 ] as const
@@ -59,7 +60,9 @@ export type AudioPlaybackMode = (typeof AUDIO_PLAYBACK_MODES)[number]
  * Built-in procedural synthesis recipes rendered at play time via Web Audio.
  */
 export const AUDIO_PROCEDURAL_PRESETS = [
+  'tool-drill',
   'laser-fire',
+  'tool-heal',
   'projectile-hit',
   'shield-hit',
   'pickup',

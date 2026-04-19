@@ -49,6 +49,10 @@ export const AUDIO_SOUND_IDS = [
   'sfx.collision',
   'sfx.explosion',
   'sfx.explosive',
+  'sfx.suit.impact',
+  'sfx.grunt.damage',
+  'sfx.suit.alarm',
+  'sfx.damage.slash',
   // SFX — shuttle systems
   'sfx.touchdown',
   'sfx.harpoon',
@@ -73,10 +77,13 @@ export const AUDIO_SOUND_IDS = [
   'sfx.arrivalSeparation',
   'sfx.dockingClamp',
   // SFX — combat / EVA
+  'sfx.tool.drill',
   'sfx.laserFire',
+  'sfx.tool.heal',
   'sfx.projectileHit',
   'sfx.shieldHit',
   'sfx.pickup',
+  'sfx.grunt',
   // Ambient
   'ambient.space',
   'ambient.engine',
@@ -87,6 +94,7 @@ export const AUDIO_SOUND_IDS = [
   'ambient.wind',
   'sfx.floating',
   'sfx.jump',
+  'sfx.jump.voice',
   'sfx.breathing.walk',
   'sfx.breathing.run',
   // Music
@@ -343,6 +351,71 @@ const manifestById: ManifestById = {
     volume: 0.85,
     effect: 'none',
   },
+  /**
+   * Generic "projectile slammed into the suit" thud, played whenever the
+   * player takes ranged damage from any enemy. Overlap so back-to-back
+   * hits stack rather than swallow each other; volume kept conservative
+   * so the cue layers under the breathing/ambient bed instead of stomping
+   * it.
+   */
+  'sfx.suit.impact': {
+    id: 'sfx.suit.impact',
+    src: '/sound/sfx.suit.impact.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'overlap',
+    volume: 0.4,
+    effect: 'none',
+  },
+  /**
+   * Pained grunt layered on top of {@link sfx.suit.impact} when the player
+   * is shoved by ranged damage. Rate-limited so a burst of consecutive hits
+   * doesn't turn into a stuttering "uh-uh-uh" — one grunt per ~1.2 s window.
+   */
+  'sfx.grunt.damage': {
+    id: 'sfx.grunt.damage',
+    src: '/sound/sfx.grunt.damage.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'rate-limited',
+    volume: 0.55,
+    effect: 'none',
+    cooldownMs: 1200,
+  },
+  /**
+   * "Suit damage" alarm chirp routed through the {@link helmet-echo} preset
+   * so it reads as an internal helmet HUD warning rather than world audio.
+   * Rate-limited generously (~3.5 s) so it only punctuates noteworthy
+   * damage events, not every projectile sting.
+   */
+  'sfx.suit.alarm': {
+    id: 'sfx.suit.alarm',
+    src: '/sound/sfx.suit.alarm.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'rate-limited',
+    volume: 0.25,
+    effect: 'helmet-echo',
+    cooldownMs: 3500,
+  },
+  /**
+   * Sustained "being mauled" loop, played whenever any enemy is currently
+   * dealing contact damage to the player. Multiple attackers should still
+   * collapse to a single audible loop — the controller manages exactly one
+   * playback handle and refreshes a hold-timer on every contact frame, so
+   * `single-instance` here is just a defensive backstop against accidental
+   * duplicate plays. Looping is requested per-instance via `play({ loop:
+   * true })`.
+   */
+  'sfx.damage.slash': {
+    id: 'sfx.damage.slash',
+    src: '/sound/sfx.damage.slash.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'single-instance',
+    volume: 0.6,
+    effect: 'none',
+  },
 
   // ── SFX — level / cinematic ─────────────────────────────────────────
   'sfx.level.arrival': {
@@ -531,6 +604,16 @@ const manifestById: ManifestById = {
   },
 
   // ── SFX — combat / EVA ─────────────────────────────────────────────
+  'sfx.tool.drill': {
+    id: 'sfx.tool.drill',
+    src: SILENT_STATIC_WAV_DATA_URI,
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'overlap',
+    volume: 0.55,
+    effect: 'none',
+    procedural: 'tool-drill',
+  },
   'sfx.laserFire': {
     id: 'sfx.laserFire',
     src: SILENT_STATIC_WAV_DATA_URI,
@@ -540,6 +623,16 @@ const manifestById: ManifestById = {
     volume: 0.55,
     effect: 'none',
     procedural: 'laser-fire',
+  },
+  'sfx.tool.heal': {
+    id: 'sfx.tool.heal',
+    src: SILENT_STATIC_WAV_DATA_URI,
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'restart',
+    volume: 0.5,
+    effect: 'none',
+    procedural: 'tool-heal',
   },
   'sfx.projectileHit': {
     id: 'sfx.projectileHit',
@@ -570,6 +663,17 @@ const manifestById: ManifestById = {
     volume: 0.5,
     effect: 'none',
     procedural: 'pickup',
+  },
+  'sfx.grunt': {
+    id: 'sfx.grunt',
+    src: '/sound/sfx.grunt.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    // `restart` so back-to-back hard landings cut off the previous grunt
+    // instead of stacking and producing a chorus of the same sample.
+    playback: 'restart',
+    volume: 0.7,
+    effect: 'none',
   },
 
   // ── Ambient ─────────────────────────────────────────────────────────
@@ -644,6 +748,22 @@ const manifestById: ManifestById = {
     playback: 'single-instance',
     volume: 0.7,
     effect: 'none',
+  },
+  /**
+   * Effort grunt layered on top of {@link sfx.jump} when the player launches
+   * off the ground. Rate-limited so a string of consecutive hops doesn't
+   * spam the vocal — the suit thruster cue still fires every jump, this
+   * just colours the first one in a burst.
+   */
+  'sfx.jump.voice': {
+    id: 'sfx.jump.voice',
+    src: '/sound/sfx.jump.voice.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'rate-limited',
+    volume: 0.55,
+    effect: 'none',
+    cooldownMs: 1500,
   },
   'sfx.floating': {
     id: 'sfx.floating',

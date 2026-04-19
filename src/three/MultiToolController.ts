@@ -11,8 +11,10 @@
  */
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
+import type { AudioPlaybackHandle } from '@/audio/audioTypes'
 import { loadGLB } from './loadGLB'
 import partsJson from '@/data/multitool/identified-parts.json'
+import { useAudio } from '@/audio/useAudio'
 
 const MODEL_PATH = '/models/multitool.glb'
 
@@ -93,6 +95,8 @@ export class MultiToolController implements Tickable {
   private currentOffsetX = OFFSET_X
   private currentOffsetY = OFFSET_Y
   private currentOffsetZ = OFFSET_Z
+  private drillHandle: AudioPlaybackHandle | null = null
+  private drillAudioKeepAliveUntil = 0
 
   /**
    * Load the multi-tool model and attach to the FPS camera.
@@ -192,6 +196,9 @@ export class MultiToolController implements Tickable {
    * @param mode - Drives bolt collision behavior when firing
    */
   setMode(color: string, mode: MultiToolMode = 'drill'): void {
+    if (mode !== 'drill') {
+      this.stopDrillAudio()
+    }
     this.currentMode = mode
     this.boltKind = mode
     this.boltColor.set(color)
@@ -214,6 +221,23 @@ export class MultiToolController implements Tickable {
    */
   fire(): void {
     if (!this.camera || !this.projectileSystem) return
+
+    const audio = useAudio()
+    audio.unlock()
+    switch (this.boltKind) {
+      case 'drill':
+        this.drillAudioKeepAliveUntil = this.time + 0.08
+        if (!this.drillHandle?.playing()) {
+          this.drillHandle = audio.play('sfx.tool.drill')
+        }
+        break
+      case 'weapon':
+        audio.play('sfx.laserFire')
+        break
+      case 'heal':
+        audio.play('sfx.tool.heal')
+        break
+    }
 
     // Aim point: far along camera forward (where crosshair points)
     const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion)
@@ -252,6 +276,10 @@ export class MultiToolController implements Tickable {
   tick(dt: number): void {
     if (!this.model || !this.camera) return
     this.time += dt
+
+    if (this.currentMode !== 'drill' || this.time > this.drillAudioKeepAliveUntil) {
+      this.stopDrillAudio()
+    }
 
     // Lerp offset between hip and ADS positions
     const targetX = this.aiming ? ADS_OFFSET_X : OFFSET_X
@@ -325,8 +353,15 @@ export class MultiToolController implements Tickable {
   }
 
   dispose(): void {
+    this.stopDrillAudio()
     if (this.model) {
       this.model.parent?.remove(this.model)
     }
+  }
+
+  private stopDrillAudio(): void {
+    this.drillHandle?.stop()
+    this.drillHandle = null
+    this.drillAudioKeepAliveUntil = 0
   }
 }
