@@ -18,6 +18,8 @@ import type { InputManager } from '@/lib/InputManager'
 import type { TickHandler } from '@/lib/TickHandler'
 import type { FpsTelemetry } from '@/components/FpsHud.vue'
 import { TICK_PRIORITY_PHYSICS, TICK_PRIORITY_RENDER } from '@/lib/tickPriorities'
+import { useAudio } from '@/audio/useAudio'
+import { EvaRcsSound } from '@/audio/EvaRcsSound'
 import type { SceneManager } from './SceneManager'
 import { EvaTetherController } from './EvaTetherController'
 
@@ -38,6 +40,9 @@ const EVA_SPAWN_OFFSET = new THREE.Vector3(0, 2.5, 6)
 
 /** Stub HP for the FPS HUD while the EVA flow doesn't track real damage. */
 const EVA_STUB_HP = 100
+
+/** First-person EVA RCS sits quieter than ship-mounted jets. */
+const EVA_RCS_AUDIO_VOLUME = 0.42
 
 /**
  * Minimal vehicle contract the EVA session depends on. {@link ShuttleController}
@@ -98,6 +103,7 @@ export interface EvaSessionConfig {
  */
 export class EvaSession implements Tickable {
   private readonly config: EvaSessionConfig
+  private readonly rcsSound = new EvaRcsSound()
   private mode: 'idle' | 'opening' | 'active' = 'idle'
   private controller: EvaTetherController | null = null
   private preEvaScales: { object: THREE.Object3D; scale: number }[] = []
@@ -152,6 +158,7 @@ export class EvaSession implements Tickable {
     }
 
     if (!this.controller) return
+    this.updateRcsAudio(_dt)
     const distToVehicle = this.controller.group.position.distanceTo(vehicle.group.position)
     if (distToVehicle < EVA_RETURN_RANGE) {
       this.setPrompt('Return to Shuttle [E]')
@@ -220,6 +227,7 @@ export class EvaSession implements Tickable {
       this.controller = null
     }
     this.restoreHugeScales()
+    this.rcsSound.stop()
     vehicle.setInputEnabled(true)
     vehicle.unfreeze()
     vehicle.closeDoors()
@@ -265,6 +273,36 @@ export class EvaSession implements Tickable {
     })
   }
 
+  private updateRcsAudio(dt: number): void {
+    if (!this.controller) return
+
+    const audio = useAudio()
+    const hasRtg = this.controller.rtgLevel > 0
+    const forward = hasRtg && this.config.inputManager.isActionActive('evaForward') ? 1 : 0
+    const back = hasRtg && this.config.inputManager.isActionActive('evaBack') ? 1 : 0
+    const left = hasRtg && this.config.inputManager.isActionActive('evaStrafeLeft') ? 1 : 0
+    const right = hasRtg && this.config.inputManager.isActionActive('evaStrafeRight') ? 1 : 0
+    const up = hasRtg && this.config.inputManager.isActionActive('evaUp') ? 1 : 0
+    const down = hasRtg && this.config.inputManager.isActionActive('evaDown') ? 1 : 0
+
+    if (forward || back || left || right || up || down) {
+      audio.unlock()
+    }
+
+    this.rcsSound.update(
+      {
+        forward,
+        back,
+        left,
+        right,
+        up,
+        down,
+        sfxVolume: audio.getCategoryVolume('sfx') * EVA_RCS_AUDIO_VOLUME,
+      },
+      dt,
+    )
+  }
+
   private setPrompt(prompt: string | null): void {
     if (this.lastPrompt === prompt) return
     this.lastPrompt = prompt
@@ -302,14 +340,16 @@ export class EvaSession implements Tickable {
   }
 
   dispose(): void {
-    if (this.mode === 'idle') return
-    const vehicle = this.config.getVehicle()
-    if (vehicle) {
-      this.endSession(vehicle)
-    } else {
-      this.mode = 'idle'
-      this.detachPointerLock()
-      this.restoreHugeScales()
+    if (this.mode !== 'idle') {
+      const vehicle = this.config.getVehicle()
+      if (vehicle) {
+        this.endSession(vehicle)
+      } else {
+        this.mode = 'idle'
+        this.detachPointerLock()
+        this.restoreHugeScales()
+      }
     }
+    this.rcsSound.dispose()
   }
 }

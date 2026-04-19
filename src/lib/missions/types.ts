@@ -194,6 +194,55 @@ export interface ShuttleMissionBoard {
   activeAsteroidMission: GeneratedAsteroidMission | null
   /** Restock timer for asteroid missions. */
   asteroidRestockTimer: RestockTimer | null
+  /** Currently offered EVA (visit-relay) mission at the docked planet. */
+  offeredEvaMission: VisitRelayShuttleMissionTemplate | null
+  /** Which planet is offering the EVA mission (null if not docked). */
+  offeringEvaPlanet: string | null
+  /** Restock timer for EVA missions — counts down after one is taken. */
+  evaRestockTimer: RestockTimer | null
+  /** All active EVA missions the player has accepted. */
+  activeEvaMissions: ActiveVisitRelayMission[]
+}
+
+// ---------------------------------------------------------------------------
+// Shuttle EVA (visit-relay) missions
+// ---------------------------------------------------------------------------
+
+/** A shuttle EVA mission template from JSON — player flies to a waypoint and spacewalks. */
+export interface VisitRelayShuttleMissionTemplate {
+  /** Unique key, e.g. "earth_relay_tx4_reboot". */
+  id: string
+  /** Display name for the mission board. */
+  name: string
+  /** Flavor text describing the mission. */
+  description: string
+  /** World-space waypoint position for the POI (satellite / probe). */
+  waypoint: { worldX: number; worldZ: number }
+  /** Minigame id dispatched via OrbitalMiniGameFactory once the EVA terminal is interacted with. */
+  minigameType: string
+  /** Credits awarded on delivery back at the giver planet. */
+  reward: number
+}
+
+/** A planet's EVA mission pool loaded from JSON. */
+export interface VisitRelayMissionPool {
+  /** Planet id that offers these missions. */
+  planetId: string
+  /** The missions in this planet's EVA pool. */
+  missions: VisitRelayShuttleMissionTemplate[]
+}
+
+/** Status of an active EVA mission. */
+export type VisitRelayMissionStatus = 'active' | 'ready-to-deliver'
+
+/** An EVA mission the player has accepted and is working on. */
+export interface ActiveVisitRelayMission {
+  /** The original template. */
+  template: VisitRelayShuttleMissionTemplate
+  /** Planet the mission was accepted at (and where it must be delivered). */
+  giverPlanet: string
+  /** Current mission status. */
+  status: VisitRelayMissionStatus
 }
 
 // ---------------------------------------------------------------------------

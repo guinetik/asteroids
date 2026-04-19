@@ -42,6 +42,7 @@ const emit = defineEmits<{
   acceptMission: []
   deliverMission: [missionId: string]
   acceptAsteroidMission: []
+  acceptEvaMission: []
   useItem: [itemId: string]
   mailChanged: []
 }>()
@@ -192,6 +193,7 @@ function onKeydown(e: KeyboardEvent) {
             @accept-mission="$emit('acceptMission')"
             @deliver-mission="(id: string) => $emit('deliverMission', id)"
             @accept-asteroid-mission="$emit('acceptAsteroidMission')"
+            @accept-eva-mission="$emit('acceptEvaMission')"
             @use-item="(itemId: string) => $emit('useItem', itemId)"
             @mail-changed="onMailProgramChanged"
             @purchase-upgrade="emitPurchaseUpgrade"

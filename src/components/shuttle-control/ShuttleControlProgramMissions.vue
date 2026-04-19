@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import type { ShuttleMissionBoard, ActiveShuttleMission, GeneratedAsteroidMission, MissionRegion } from '@/lib/missions/types'
+import type {
+  ShuttleMissionBoard,
+  ActiveShuttleMission,
+  ActiveVisitRelayMission,
+  GeneratedAsteroidMission,
+  MissionRegion,
+} from '@/lib/missions/types'
 import { getPlanetOrbitalConfig } from '@/lib/missions/planetOrbitalConfig'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 import { getPlanet } from '@/lib/planets/catalog'
@@ -13,6 +19,7 @@ const emit = defineEmits<{
   acceptMission: []
   deliverMission: [missionId: string]
   acceptAsteroidMission: []
+  acceptEvaMission: []
 }>()
 
 function targetPlanetName(planetId: string): string {
@@ -67,6 +74,14 @@ function objectiveSummary(mission: GeneratedAsteroidMission): string {
       return `Collect ${item}`
     }
   }
+}
+
+function evaMissionStatusLabel(mission: ActiveVisitRelayMission): string {
+  if (mission.status === 'active') {
+    const { worldX, worldZ } = mission.template.waypoint
+    return `Travel to waypoint (${Math.round(worldX)}, ${Math.round(worldZ)})`
+  }
+  return `Return to ${targetPlanetName(mission.giverPlanet)}`
 }
 
 function regionLabel(region: MissionRegion): string {
@@ -125,13 +140,56 @@ function regionLabel(region: MissionRegion): string {
         Fly to a waypoint in deep space, exit the shuttle, and spacewalk to a relay or probe to service it.
       </p>
 
-      <!--
-        TODO: wire to ShuttleMissionBoard.offeredEvaMission / activeEvaMission /
-        evaRestockTimer once the visit-relay mission type is added to the data
-        model. See docs/superpowers/specs/2026-04-18-visit-relay-mission-design.md
-      -->
-      <div class="mission-board-empty">
+      <div v-if="!dockedPlanet" class="mission-board-empty">
+        Not docked at a planet
+      </div>
+
+      <div
+        v-else-if="board?.offeredEvaMission && board.offeringEvaPlanet === dockedPlanet"
+        class="mission-board-offer"
+      >
+        <div class="mission-board-offer__name">{{ board.offeredEvaMission.name }}</div>
+        <div class="mission-board-offer__desc">{{ board.offeredEvaMission.description }}</div>
+        <div class="mission-board-offer__meta">
+          <span>
+            Waypoint:
+            ({{ Math.round(board.offeredEvaMission.waypoint.worldX) }},
+            {{ Math.round(board.offeredEvaMission.waypoint.worldZ) }})
+          </span>
+          <span>Reward: {{ board.offeredEvaMission.reward }} CR</span>
+        </div>
+        <button
+          type="button"
+          class="mission-board-offer__accept-btn"
+          @click="emit('acceptEvaMission')"
+        >
+          Accept
+        </button>
+      </div>
+
+      <div v-else-if="board?.evaRestockTimer" class="mission-board-empty">
+        Restocking in {{ formatTime(board.evaRestockTimer.remaining) }}
+      </div>
+
+      <div v-else class="mission-board-empty">
         No EVA missions available
+      </div>
+
+      <div
+        v-for="mission in board?.activeEvaMissions"
+        :key="mission.template.id"
+        class="mission-board-active"
+      >
+        <div class="mission-board-active__name">{{ mission.template.name }}</div>
+        <div class="mission-board-active__route">
+          {{ targetPlanetName(mission.giverPlanet) }} &rarr; deep-space waypoint
+        </div>
+        <div class="mission-board-active__status">
+          {{ evaMissionStatusLabel(mission) }}
+        </div>
+        <div class="mission-board-active__cargo">
+          {{ mission.template.reward }} CR on delivery
+        </div>
       </div>
     </div>
 

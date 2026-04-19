@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { useAudio } from '@/audio/useAudio'
 import {
   acceptAsteroidMission,
+  acceptEvaMission,
   acceptMission,
   beginAsteroidMission,
   completeMission,
@@ -9,8 +10,10 @@ import {
   deliverMission,
   getActiveMissionsForPlanet,
   offerAsteroidMission,
+  offerEvaMission,
   offerMission,
   tickAsteroidMissionBoard,
+  tickEvaMissionBoard,
   tickMissionBoard,
 } from '@/lib/missions/shuttleMissionSession'
 import type {
@@ -26,7 +29,14 @@ import type { Inventory } from '@/lib/inventory/types'
 import type { PlayerProfile } from '@/lib/player/types'
 import { CURRENT_PLAYER_UPGRADE_LEVELS } from '@/lib/upgrades'
 import { PLANETS } from '@/lib/planets/catalog'
-import { loadActiveMission, saveActiveMission } from '@/lib/missions/missionStorage'
+import {
+  clearActiveMission,
+  clearMissionBoard,
+  loadActiveMission,
+  loadMissionBoard,
+  saveActiveMission,
+  saveMissionBoard,
+} from '@/lib/missions/missionStorage'
 import { isWithinAsteroidMissionApproachRadius } from '@/lib/missions/mapAsteroidMissionApproach'
 import {
   createWaypointMarkerGroup,
@@ -60,15 +70,39 @@ export class MapMissionFacade {
   tick(dt: number): void {
     this.board = tickMissionBoard(this.board, dt)
     this.board = tickAsteroidMissionBoard(this.board, dt)
+    this.board = tickEvaMissionBoard(this.board, dt)
+  }
+
+  private persistBoard(): void {
+    saveMissionBoard(this.board)
+    if (this.board.activeAsteroidMission) {
+      saveActiveMission(this.board.activeAsteroidMission)
+    } else {
+      clearActiveMission()
+    }
   }
 
   hydrateFromStorage(onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null): void {
     if (typeof localStorage === 'undefined') return
+    const storedBoard = loadMissionBoard()
+    if (storedBoard) {
+      this.board = storedBoard
+      const asteroid = storedBoard.activeAsteroidMission
+      if (asteroid && (asteroid.status === 'accepted' || asteroid.status === 'in-transit')) {
+        saveActiveMission(asteroid)
+      } else {
+        clearActiveMission()
+      }
+      onMissionBoardUpdate?.(this.board)
+      return
+    }
+
     const stored = loadActiveMission()
     if (!stored) return
     if (stored.status !== 'accepted' && stored.status !== 'in-transit') return
     if (this.board.activeAsteroidMission) return
     this.board = { ...this.board, activeAsteroidMission: stored }
+    this.persistBoard()
     onMissionBoardUpdate?.(this.board)
   }
 
@@ -125,6 +159,22 @@ export class MapMissionFacade {
 
   missionAccept(onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null): void {
     this.board = acceptMission(this.board)
+    this.persistBoard()
+    onMissionBoardUpdate?.(this.board)
+  }
+
+  offerEvaMissionAtPlanet(
+    planetId: string,
+    onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null,
+  ): void {
+    if (this.board.offeredEvaMission && this.board.offeringEvaPlanet === planetId) return
+    this.board = offerEvaMission(this.board, planetId)
+    onMissionBoardUpdate?.(this.board)
+  }
+
+  evaMissionAccept(onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null): void {
+    this.board = acceptEvaMission(this.board)
+    this.persistBoard()
     onMissionBoardUpdate?.(this.board)
   }
 
@@ -141,8 +191,7 @@ export class MapMissionFacade {
 
   asteroidMissionAccept(onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null): void {
     this.board = acceptAsteroidMission(this.board)
-    const active = this.board.activeAsteroidMission
-    if (active) saveActiveMission(active)
+    this.persistBoard()
     onMissionBoardUpdate?.(this.board)
   }
 
@@ -158,6 +207,7 @@ export class MapMissionFacade {
     const result = completeMission(this.board, params.missionId, params.inventory)
     if (!result.ok) return params.inventory
     this.board = result.board
+    this.persistBoard()
     this.overlayOpen = false
     this.activeMinigame?.dispose()
     this.activeMinigame = null
@@ -190,6 +240,7 @@ export class MapMissionFacade {
       return { profile: params.profile, inventory: params.inventory, creditsChanged: false }
     }
     this.board = result.board
+    this.persistBoard()
     params.onMissionBoardUpdate?.(this.board)
     params.onMissionDeliver?.(mission ?? null)
     return { profile: result.profile, inventory: result.inventory, creditsChanged: true }
@@ -324,7 +375,7 @@ export class MapMissionFacade {
     if (params.orbitSystem?.state !== 'free') return null
 
     this.board = beginAsteroidMission(this.board)
-    saveActiveMission({ ...activeAsteroid, status: 'in-transit' })
+    this.persistBoard()
     return activeAsteroid
   }
 
@@ -337,6 +388,8 @@ export class MapMissionFacade {
     onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null,
   ): void {
     this.board = createMissionBoard()
+    clearMissionBoard()
+    clearActiveMission()
     if (this.overlayOpen) {
       this.overlayOpen = false
       this.activeMinigame?.dispose()

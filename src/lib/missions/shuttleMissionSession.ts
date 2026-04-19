@@ -9,7 +9,14 @@
  * @date 2026-04-06
  * @spec docs/superpowers/specs/2026-04-06-shuttle-missions-design.md
  */
-import type { ShuttleMissionBoard, ActiveShuttleMission, GeneratedAsteroidMission } from './types'
+import type {
+  ShuttleMissionBoard,
+  ActiveShuttleMission,
+  GeneratedAsteroidMission,
+  ActiveVisitRelayMission,
+} from './types'
+import { getEvaMissionPool } from './evaMissionPools'
+import { getPlanet } from '@/lib/planets/catalog'
 import type { PlayerProfile } from '@/lib/player/types'
 import type { Inventory } from '@/lib/inventory/types'
 import type { UpgradeLevels } from '@/lib/upgrades'
@@ -24,6 +31,47 @@ const RESTOCK_MIN_S = 120
 
 /** Maximum restock timer duration in seconds. */
 const RESTOCK_MAX_S = 240
+
+/** Lower bound applied to the planet-distance reward multiplier (inner planets floor here). */
+const EVA_REWARD_MULTIPLIER_FLOOR = 0.85
+
+/** Absolute minimum payout (credits) for any offered EVA mission after scaling. */
+const EVA_MIN_REWARD = 1000
+
+/** Credit rounding step — scaled EVA rewards snap to this granularity for readability. */
+const EVA_REWARD_ROUND_STEP = 50
+
+/**
+ * Reward multiplier for an EVA mission offered at a given planet. Scales with
+ * the planet's distance from the Sun (semi-major axis, AU) using a sqrt curve
+ * — inner planets stay close to baseline, outer planets pay substantially
+ * more to reflect the extra travel and operating difficulty.
+ *
+ * @param planetId - Giver planet id.
+ * @returns Multiplier applied to the template's base reward.
+ */
+function planetRewardMultiplier(planetId: string): number {
+  try {
+    const planet = getPlanet(planetId)
+    const raw = Math.sqrt(planet.orbit.semiMajorAxis)
+    return Math.max(EVA_REWARD_MULTIPLIER_FLOOR, raw)
+  } catch {
+    return 1
+  }
+}
+
+/**
+ * Apply distance scaling + minimum floor + 50 CR rounding to an EVA mission's
+ * base reward.
+ *
+ * @param baseReward - Template's stored reward (Earth-equivalent baseline).
+ * @param planetId - Giver planet id used to derive the multiplier.
+ */
+function computeScaledEvaReward(baseReward: number, planetId: string): number {
+  const scaled = baseReward * planetRewardMultiplier(planetId)
+  const floored = Math.max(EVA_MIN_REWARD, scaled)
+  return Math.round(floored / EVA_REWARD_ROUND_STEP) * EVA_REWARD_ROUND_STEP
+}
 
 /**
  * Generate a random restock duration between min and max.
@@ -48,6 +96,10 @@ export function createMissionBoard(): ShuttleMissionBoard {
     offeredAsteroidMission: null,
     activeAsteroidMission: null,
     asteroidRestockTimer: null,
+    offeredEvaMission: null,
+    offeringEvaPlanet: null,
+    evaRestockTimer: null,
+    activeEvaMissions: [],
   }
 }
 
@@ -354,5 +406,85 @@ export function tickAsteroidMissionBoard(board: ShuttleMissionBoard, dt: number)
   return {
     ...board,
     asteroidRestockTimer: { ...board.asteroidRestockTimer, remaining },
+  }
+}
+
+/**
+ * Offer an EVA mission from the docked planet's pool. No-op if restocking,
+ * already offering, or the planet has no EVA pool.
+ *
+ * @param board - Current mission board state.
+ * @param planetId - Planet the player is docked at.
+ * @returns Updated board with an offered EVA mission (or unchanged).
+ */
+export function offerEvaMission(
+  board: ShuttleMissionBoard,
+  planetId: string,
+): ShuttleMissionBoard {
+  if (board.evaRestockTimer) return board
+  if (board.offeredEvaMission && board.offeringEvaPlanet === planetId) return board
+
+  const pool = getEvaMissionPool(planetId)
+  if (!pool || pool.missions.length === 0) return board
+
+  const index = Math.floor(Math.random() * pool.missions.length)
+  const chosen = pool.missions[index]!
+  const scaledMission = {
+    ...chosen,
+    reward: computeScaledEvaReward(chosen.reward, planetId),
+  }
+
+  return {
+    ...board,
+    offeredEvaMission: scaledMission,
+    offeringEvaPlanet: planetId,
+  }
+}
+
+/**
+ * Accept the currently offered EVA mission. Moves it to the active list and
+ * starts a restock timer.
+ *
+ * @param board - Current mission board state.
+ * @returns Updated board with the EVA mission accepted and timer started.
+ */
+export function acceptEvaMission(board: ShuttleMissionBoard): ShuttleMissionBoard {
+  if (!board.offeredEvaMission || !board.offeringEvaPlanet) return board
+
+  const newActive: ActiveVisitRelayMission = {
+    template: board.offeredEvaMission,
+    giverPlanet: board.offeringEvaPlanet,
+    status: 'active',
+  }
+
+  const total = randomRestockDuration()
+
+  return {
+    ...board,
+    offeredEvaMission: null,
+    offeringEvaPlanet: null,
+    evaRestockTimer: { remaining: total, total },
+    activeEvaMissions: [...board.activeEvaMissions, newActive],
+  }
+}
+
+/**
+ * Tick the EVA mission restock timer.
+ *
+ * @param board - Current board state.
+ * @param dt - Delta time in seconds.
+ * @returns Updated board (same reference if nothing changed).
+ */
+export function tickEvaMissionBoard(board: ShuttleMissionBoard, dt: number): ShuttleMissionBoard {
+  if (!board.evaRestockTimer) return board
+
+  const remaining = board.evaRestockTimer.remaining - dt
+  if (remaining <= 0) {
+    return { ...board, evaRestockTimer: null }
+  }
+
+  return {
+    ...board,
+    evaRestockTimer: { ...board.evaRestockTimer, remaining },
   }
 }

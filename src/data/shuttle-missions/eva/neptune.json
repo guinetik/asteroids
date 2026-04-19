@@ -1,0 +1,21 @@
+{
+  "planetId": "neptune",
+  "missions": [
+    {
+      "id": "neptune_deep_nav_beacon",
+      "name": "Deep-Space Navigation Beacon",
+      "description": "A deep-space nav beacon at the edge of the Kuiper is drifting off-frequency. EVA over and manually tune the reference cavity.",
+      "waypoint": { "worldX": 7400, "worldZ": 5200 },
+      "minigameType": "relay_repair",
+      "reward": 1600
+    },
+    {
+      "id": "neptune_triton_telescope_servicing",
+      "name": "Triton Telescope Servicing",
+      "description": "The Triton-orbiting telescope's primary mirror actuator froze. Spacewalk to the optics bay and release the stuck drive.",
+      "waypoint": { "worldX": -6800, "worldZ": -5500 },
+      "minigameType": "relay_repair",
+      "reward": 2100
+    }
+  ]
+}

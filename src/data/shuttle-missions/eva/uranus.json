@@ -1,0 +1,21 @@
+{
+  "planetId": "uranus",
+  "missions": [
+    {
+      "id": "uranus_tilt_anomaly_probe",
+      "name": "Tilt-Anomaly Probe Refit",
+      "description": "The axial-tilt monitoring probe suffered a gyro failure. EVA out to the satellite bus and swap the RCS reaction wheel stack.",
+      "waypoint": { "worldX": 5600, "worldZ": 3800 },
+      "minigameType": "relay_repair",
+      "reward": 1500
+    },
+    {
+      "id": "uranus_cryo_storage_inspection",
+      "name": "Cryogenic Storage Inspection",
+      "description": "Cryogenic fuel depot shows a slow helium boil-off. Spacewalk around the tank array, identify the leak, seal it with cold-patch.",
+      "waypoint": { "worldX": -5200, "worldZ": -4100 },
+      "minigameType": "relay_repair",
+      "reward": 2000
+    }
+  ]
+}

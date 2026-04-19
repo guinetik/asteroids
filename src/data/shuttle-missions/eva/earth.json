@@ -1,0 +1,29 @@
+{
+  "planetId": "earth",
+  "missions": [
+    {
+      "id": "earth_relay_tx4_reboot",
+      "name": "Relay TX-4 Cold Reboot",
+      "description": "Comms relay TX-4 dropped off the grid last orbit. Dock at the relay, EVA out, and cycle the cold-gas thruster array so ground stations can reacquire it.",
+      "waypoint": { "worldX": 900, "worldZ": -650 },
+      "minigameType": "relay_repair",
+      "reward": 1400
+    },
+    {
+      "id": "earth_probe_helios_calibration",
+      "name": "Helios Probe Calibration",
+      "description": "The Helios-3 gravitometric probe is reading drift. EVA out to its waypoint and re-seat the sensor boom — 20 minutes of float time, no rush.",
+      "waypoint": { "worldX": -520, "worldZ": 780 },
+      "minigameType": "relay_repair",
+      "reward": 1200
+    },
+    {
+      "id": "earth_cubesat_cluster_patch",
+      "name": "Cubesat Cluster Firmware Patch",
+      "description": "A cluster of three cubesats missed the last OTA window. Visit the formation, jack into the master node, and push the patch manually.",
+      "waypoint": { "worldX": 1200, "worldZ": 1450 },
+      "minigameType": "relay_repair",
+      "reward": 1800
+    }
+  ]
+}

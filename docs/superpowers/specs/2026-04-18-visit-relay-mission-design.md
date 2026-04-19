@@ -144,29 +144,55 @@ Register `"relay_repair"` in `orbitalMiniGameFactory.ts`. For this pass, return 
 
 The goal is to get the EVA loop right first, inside the existing shuttle scene, before wiring any of this to the mission system or the map. That way each step is playable.
 
-### Phase 1 — EVA sandbox in `/shuttle` (current focus)
+### Phase 1 — EVA sandbox in `/shuttle` ✅ DONE
 
-No missions, no POI, no data model. Just the mechanic.
+Playable in `/shuttle`: fly to the prototype relay, press E to open the cargo bay, egress in first-person, fly on a TRON-cyan tether with O2/RTG life support, return, shuttle unfreezes.
 
-1. **Exit-to-EVA trigger.** When the shuttle is within interaction range of the prototype relay antenna already in the shuttle scene, show "[E] EVA". On press, freeze the shuttle and hand control to a free-float EVA controller.
-2. **FreeFloatEvaController.** New controller with 6-DoF input, no gravity, no terrain. Camera cuts from the vehicle camera to the EVA first-person camera.
-3. **Terminal prop.** Add an emissive box to `RelayAntennaController` (or `SatelliteModel`) with an interaction zone.
-4. **Minigame overlay stub.** On terminal interaction, show a modal with a "Complete Repair" button (like `DefaultOrbitalMiniGame`). Dismiss on click.
-5. **Return-to-shuttle trigger.** When the EVA player is within range of the frozen shuttle, "[E] Return to Shuttle" → cut back to vehicle camera and unfreeze the shuttle.
+Shipped:
+- `EvaTetherController` — 6-DoF thrust (WASD+Space/Shift), zero-g drift, verlet-rope tether with spring + hard-stop, O2 + RTG drain/recharge, TRON hologram tube visual.
+- `EvaSession` — portable state machine (idle → opening → active). Owns door gating, pointer lock, huge-scale swap, camera hand-off, telemetry emission. Scene-agnostic; scene-specific knowledge injected via `EvaSessionConfig`.
+- `HelmetVisor` component, `FpsHud variant="eva"` that hides combat UI.
+- `ShuttleController` gained `openDoors/closeDoors/doorOpenProgress` accessors.
+- EVA input bindings on `DEFAULT_BINDINGS`.
+- EVA RCS audio hooked via `EvaRcsSound`.
 
-Deliverable: in `/shuttle`, player can fly to the prototype relay, EVA out, click the terminal, dismiss the modal, EVA back to the shuttle, continue flying. All visual; no mission bookkeeping.
+### Phase 3 — Mission data model + board wiring ✅ DONE (ahead of Phase 2)
 
-### Phase 2 — Port to `/level` MapView
+- Types: `VisitRelayShuttleMissionTemplate`, `ActiveVisitRelayMission`, `VisitRelayMissionStatus`, `VisitRelayMissionPool`. `ShuttleMissionBoard` extended with `offeredEvaMission`, `offeringEvaPlanet`, `evaRestockTimer`, `activeEvaMissions`.
+- Content: 2 authored missions per planet (all 8) under `src/data/shuttle-missions/eva/*.json`.
+- Pool loader: `evaMissionPools.ts` with `getEvaMissionPool`.
+- Session API: `offerEvaMission`, `acceptEvaMission`, `tickEvaMissionBoard`. Reward scaling via `planetRewardMultiplier = max(0.85, sqrt(semiMajorAxis))`, 1000 CR floor, rounded to 50.
+- Facade: `MapMissionFacade.offerEvaMissionAtPlanet` + `evaMissionAccept`. Persisted across reloads via the new `loadMissionBoard` / `saveMissionBoard` pair in `missionStorage`.
+- Wiring: `MapViewController.offerEvaMissionAtPlanet` called on planet dock; UI section in `ShuttleControlProgramMissions.vue` shows offered + active + restocking states; `accept-eva-mission` event forwards through `ShuttleControlOverlay` → `MapView` → `viewController.evaMissionAccept()`.
 
-Wire the same transition and controller into `LevelViewController` via its state machine. The shuttle/EVA state transitions are new nodes in the existing machine.
+Done means: player can dock at any planet, see an EVA mission offer with a reward scaled to that planet's distance, press Accept, and see it in the active list with the waypoint coordinates.
 
-### Phase 3 — Mission data model + dispatch
+### Phase 2 — Port to `/level` MapView 🟡 PENDING
 
-Add the `type` discriminator, migrate existing JSON, author 1–2 `visit_relay` entries, and implement POI rendering + waypoint trigger on the map.
+The EVA session is already portable (see `EvaSession` — takes dependencies by injection). What's left is the map-side glue:
 
-### Phase 4 — Real `relay_repair` minigame
+- **Spawn the relay/satellite POI** at `activeEvaMission.template.waypoint` when the player has an active EVA mission. Follow the existing asteroid-mission POI pattern (`mapAsteroidMissionApproach.ts`, `WaypointMarkers`). A satellite glyph instead of the asteroid ring.
+- **Trigger range on approach.** When the shuttle comes within EVA range of the waypoint, surface the `EVA [E]` prompt via the existing `actionPrompt` on `ShuttleTelemetry`.
+- **Instantiate `EvaSession` in `MapViewController`.** Construct it with `getVehicle = () => shuttleController`, `getPoi = () => activeEvaPoiWorldPos`, huge-scale targets including the sun and any nearby planet, plus `onEvaTelemetry` / `onEvaModeChange` forwarded to `MapView.vue` the same way shuttle view does.
+- **Add `HelmetVisor` + `FpsHud variant="eva"` to `MapView.vue`** on `evaActive`.
+- **Keep the existing EVA bindings** — they already collide cleanly because `shuttleController.setInputEnabled(false)` gates vehicle input.
 
-Separate spec once the flow is proven.
+No new systems needed; just wiring.
+
+### Phase 3.5 — Mission lifecycle completion 🟡 PENDING
+
+Currently accepting an EVA mission adds it to `activeEvaMissions` with status `'active'`, but nothing transitions it forward. Needed:
+
+- `markEvaReadyToDeliver(board, missionId)` in `shuttleMissionSession.ts` — called when the EVA terminal minigame completes.
+- `deliverEvaMission(board, missionId, profile)` — giver-planet delivery payout, removes the mission.
+- UI: "Deliver" button in `ShuttleControlProgramMissions.vue` when docked at the giver planet and status is `ready-to-deliver` (mirror the planetary `canDeliver` logic).
+- Facade: `evaMissionDeliver` + `evaMissionMarkReady`.
+
+### Phase 4 — Real `relay_repair` minigame 🟡 PENDING
+
+- Register `"relay_repair"` in `orbitalMiniGameFactory.ts`. For a bootstrap pass, return `DefaultOrbitalMiniGame` so the EVA terminal interaction completes cleanly.
+- A terminal prop (`EvaInteractable`) on the in-scene satellite with an interaction range sphere. The EVA player's raycast hits it → prompt appears → E opens the minigame overlay.
+- Design and implement the actual `relay_repair` minigame (cable routing, frequency tuning, firmware flash — TBD) in a separate spec.
 
 ## Risks
 

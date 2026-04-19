@@ -2123,6 +2123,7 @@ export class MapViewController implements Tickable {
     })
     if (openedPlanetId) {
       this.offerMissionAtPlanet(openedPlanetId)
+      this.offerEvaMissionAtPlanet(openedPlanetId)
       this.offerAsteroidMissionFromDifficulty()
       this.onCreditsUpdate?.(this.playerProfile.credits)
     }
@@ -2245,6 +2246,16 @@ export class MapViewController implements Tickable {
   /** Accept the offered asteroid mission (from shuttle control UI). */
   asteroidMissionAccept(): void {
     this.missionFacade.asteroidMissionAccept(this.onMissionBoardUpdate)
+  }
+
+  /** Offer an EVA (visit-relay) mission when docking at a planet. */
+  offerEvaMissionAtPlanet(planetId: string): void {
+    this.missionFacade.offerEvaMissionAtPlanet(planetId, this.onMissionBoardUpdate)
+  }
+
+  /** Accept the offered EVA mission (from shuttle control UI). */
+  evaMissionAccept(): void {
+    this.missionFacade.evaMissionAccept(this.onMissionBoardUpdate)
   }
 
   /** Complete the mission minigame (from overlay UI). */

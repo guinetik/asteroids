@@ -618,6 +618,10 @@ function handleAcceptAsteroidMission() {
   viewController.asteroidMissionAccept()
 }
 
+function handleAcceptEvaMission() {
+  viewController.evaMissionAccept()
+}
+
 function handleDeliverMission(missionId: string) {
   viewController.missionDeliver(missionId)
 }
@@ -838,6 +842,7 @@ function dockedPlanetId(): string | null {
     @accept-mission="handleAcceptMission"
     @deliver-mission="handleDeliverMission"
     @accept-asteroid-mission="handleAcceptAsteroidMission"
+    @accept-eva-mission="handleAcceptEvaMission"
     @use-item="handleUseInventoryItem"
     @mail-changed="refreshActiveMessage"
   />
