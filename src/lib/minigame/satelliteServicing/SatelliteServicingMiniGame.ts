@@ -103,7 +103,6 @@ export class SatelliteServicingMiniGame implements OrbitalMiniGame, OrbitalMiniG
     if (!this.brokenComponents.includes(componentName)) return
     if (this._repaired.has(componentName)) return
     this._repaired.add(componentName)
-    this.onStepChange?.(this._steps)
     if (this._repaired.size >= this.brokenComponents.length) {
       this.complete()
     }

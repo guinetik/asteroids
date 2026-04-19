@@ -49,4 +49,11 @@ describe('SatelliteServicingMiniGame', () => {
     expect(spy).toHaveBeenCalledTimes(1)
     expect(mg.status).toBe('completed')
   })
+
+  it('markRepaired after completion is a no-op', () => {
+    const mg = new SatelliteServicingMiniGame('mid', ['a'])
+    mg.complete()
+    mg.markRepaired('a')
+    expect(mg.progressCurrent).toBe(0)
+  })
 })
