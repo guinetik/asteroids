@@ -14,6 +14,9 @@
  */
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
+import particleEmitterAttenuatedVertexShader from '@/three/shaders/effects/particleEmitterAttenuated.vert.glsl?raw'
+import particleEmitterScreenSpaceVertexShader from '@/three/shaders/effects/particleEmitterScreenSpace.vert.glsl?raw'
+import particleEmitterFragmentShader from '@/three/shaders/effects/particleEmitter.frag.glsl?raw'
 
 /** Hide dead particles far off-screen instead of branching in the shader. */
 const FAR_AWAY = 99999
@@ -61,48 +64,6 @@ function getSoftParticleTexture(): THREE.Texture {
   ctx.fillRect(0, 0, size, size)
   _softTexture = new THREE.CanvasTexture(canvas)
   return _softTexture
-}
-
-/** Custom shader for per-particle fade and size growth. */
-const ParticleVertexShader = /* glsl */ `
-  attribute float life;
-  uniform float uBaseSize;
-  uniform float uSizeGrowth;
-  varying float vLife;
-
-  void main() {
-    vLife = life;
-    // Size grows from 1.0 to uSizeGrowth over lifetime
-    float sizeFactor = 1.0 + (uSizeGrowth - 1.0) * life;
-    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = uBaseSize * sizeFactor * (ATTENUATION_FACTOR);
-    gl_Position = projectionMatrix * mvPosition;
-  }
-`
-
-/** Fragment shader — fades opacity smoothly to zero at end of life. */
-const ParticleFragmentShader = /* glsl */ `
-  uniform vec3 uColor;
-  uniform float uOpacity;
-  uniform sampler2D uMap;
-  uniform bool uUseMap;
-  varying float vLife;
-
-  void main() {
-    // Smooth fade: full opacity at birth, zero at death
-    float fade = 1.0 - smoothstep(0.0, 1.0, vLife);
-    vec4 texColor = uUseMap ? texture2D(uMap, gl_PointCoord) : vec4(1.0);
-    gl_FragColor = vec4(uColor, uOpacity * fade * texColor.a);
-    if (gl_FragColor.a < 0.01) discard;
-  }
-`
-
-/** Build vertex shader with correct attenuation factor. */
-function buildVertexShader(sizeAttenuation: boolean): string {
-  const factor = sizeAttenuation
-    ? '(300.0 / -mvPosition.z)'
-    : '1.0'
-  return ParticleVertexShader.replace('ATTENUATION_FACTOR', factor)
 }
 
 /** Internal particle state for the pool. */
@@ -160,6 +121,9 @@ export class ParticleEmitter implements Tickable {
 
     const useSoft = config.soft ?? false
     const softTex = useSoft ? getSoftParticleTexture() : null
+    const vertexShader = config.sizeAttenuation
+      ? particleEmitterAttenuatedVertexShader
+      : particleEmitterScreenSpaceVertexShader
 
     const material = new THREE.ShaderMaterial({
       uniforms: {
@@ -170,8 +134,8 @@ export class ParticleEmitter implements Tickable {
         uMap: { value: softTex },
         uUseMap: { value: useSoft },
       },
-      vertexShader: buildVertexShader(config.sizeAttenuation ?? false),
-      fragmentShader: ParticleFragmentShader,
+      vertexShader,
+      fragmentShader: particleEmitterFragmentShader,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       transparent: true,
