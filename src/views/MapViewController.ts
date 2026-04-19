@@ -2316,14 +2316,15 @@ export class MapViewController implements Tickable {
    */
   private static readonly EVA_WAYPOINT_PLANET_LEAD_SECONDS = 3
 
-  /** Accept the offered EVA mission (from shuttle control UI). */
   /**
    * Launch the in-EVA maintenance minigame for the POI the player is near. Invoked by
    * EvaSession when the player presses the action key inside the terminal prompt
    * range. Looks up the active EVA mission currently rendered at the POI, builds a
    * minigame via {@link createOrbitalMiniGame}, wires its `onComplete` callback to
-   * {@link evaMinigameComplete}, and emits `onEvaMinigameChange` so the view-layer
-   * overlay opens.
+   * {@link evaMinigameComplete}, then branches on {@link OrbitalMiniGame.presentation}:
+   * - `'overlay'` — emits `onEvaMinigameChange` so the view-layer overlay opens.
+   * - `'in_scene'` — logs a warning and falls through to overlay until the
+   *   SatelliteRepairController lands in Task 10.
    */
   private beginEvaMinigame(): void {
     const mission = this.missionFacade.getActiveEvaMissionAtPoi()
@@ -2343,6 +2344,20 @@ export class MapViewController implements Tickable {
     ) as OrbitalMiniGame & OrbitalMiniGameEvents
     minigame.onComplete = (missionId: string) => this.evaMinigameComplete(missionId)
     this.activeEvaMinigame = minigame
+
+    if (minigame.presentation === 'overlay') {
+      this.onEvaMinigameChange?.({ mission, minigame })
+      return
+    }
+
+    // presentation === 'in_scene' — no in-scene controller is registered yet.
+    // The SatelliteRepairController lands in Task 10. Until then, log and fall
+    // through to overlay so the flow stays playable for any mission that
+    // accidentally lands on this branch (none currently do: satellite_servicing
+    // still falls through to DefaultOrbitalMiniGame in the factory).
+    console.warn(
+      `[MapViewController] In-scene minigame presentation not yet wired for "${minigameType}"; opening overlay fallback.`,
+    )
     this.onEvaMinigameChange?.({ mission, minigame })
   }
 
