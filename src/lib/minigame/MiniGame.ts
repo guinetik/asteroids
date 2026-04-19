@@ -41,6 +41,20 @@ export interface MiniGameEvents {
   onStepChange: ((objectiveIndex: number, steps: readonly MiniGameStep[]) => void) | null
 }
 
+/**
+ * Optional progress metadata appended to a step label so the tracker
+ * can render `Mine Olivine    23/75 kg` without each minigame having
+ * to format its own string.
+ */
+export interface MiniGameStepProgress {
+  /** Current value (e.g. kg mined so far). */
+  current: number
+  /** Target value (e.g. quota). */
+  target: number
+  /** Unit suffix (e.g. `'kg'`, `'probes'`). */
+  unit: string
+}
+
 /** A single step in a minigame's progression. */
 export interface MiniGameStep {
   /** Step label shown in the tracker. */
@@ -49,6 +63,13 @@ export interface MiniGameStep {
   complete: boolean
   /** Whether this is the currently active step. */
   active: boolean
+  /**
+   * Optional incremental progress meter rendered after the label.
+   * Other minigames can omit this field — the tracker treats it as
+   * additive UI when present and leaves the existing layout intact
+   * when absent.
+   */
+  progress?: MiniGameStepProgress
 }
 
 /** Shared fallback labels for objective-driven HUD/tracker views. */

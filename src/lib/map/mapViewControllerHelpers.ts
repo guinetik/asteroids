@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { PLANETS } from '@/lib/planets/catalog'
-import type { GeneratedAsteroidMission } from '@/lib/missions/types'
+import type { ActiveVisitRelayMission, GeneratedAsteroidMission } from '@/lib/missions/types'
 import type { GravityConfig, GravitySource } from '@/lib/physics/gravity'
 import { eventHorizonRadius, gravityAt, influenceRadius } from '@/lib/physics/gravity'
 import type { GravityWell } from '@/three/ShuttleController'
@@ -33,6 +33,20 @@ export function shouldShowAsteroidMissionMapSite(
   mission: GeneratedAsteroidMission | null,
 ): boolean {
   return mission !== null && (mission.status === 'accepted' || mission.status === 'in-transit')
+}
+
+/**
+ * Pick the EVA mission whose waypoint should currently be rendered on the map.
+ * One site at a time, mirroring the asteroid mission site rule; prefer the first
+ * active (not-yet-delivered) EVA mission so the player always sees the oldest target.
+ */
+export function pickActiveEvaMissionMapSite(
+  missions: readonly ActiveVisitRelayMission[],
+): ActiveVisitRelayMission | null {
+  for (const m of missions) {
+    if (m.status === 'active') return m
+  }
+  return null
 }
 
 /** World-space standoff used by dev warp to keep the shuttle off the target body mesh. */

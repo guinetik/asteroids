@@ -50,9 +50,14 @@ import {
   disposeMapMissionAsteroidPreviewMesh,
   missionAsteroidShapeSeed,
 } from '@/three/MapMissionAsteroidPreview'
+import { createEvaMissionPoi, type EvaMissionPoiInstance } from '@/three/EvaMissionPoi'
 import type { MapOverlayState } from '@/lib/ShuttleTelemetry'
 import type { OrbitCaptureSystem } from '@/lib/orbitCapture'
-import { shouldShowAsteroidMissionMapSite } from '@/lib/map/mapViewControllerHelpers'
+import {
+  pickActiveEvaMissionMapSite,
+  shouldShowAsteroidMissionMapSite,
+} from '@/lib/map/mapViewControllerHelpers'
+import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 import type { VehicleCamera } from '@/three/VehicleCamera'
 import { createOrbitalMiniGame } from '@/lib/minigame/orbitalMiniGameFactory'
 import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
@@ -66,6 +71,11 @@ export class MapMissionFacade {
   private missionWaypointRoot: THREE.Group | null = null
   private missionOrbitWaypointMarker: THREE.Group | null = null
   private missionAsteroidPreviewMesh: THREE.Mesh | null = null
+
+  private evaWaypointRoot: THREE.Group | null = null
+  private evaWaypointMarker: THREE.Group | null = null
+  private evaPoiInstance: EvaMissionPoiInstance | null = null
+  private evaPoiRenderedMissionId: string | null = null
 
   tick(dt: number): void {
     this.board = tickMissionBoard(this.board, dt)
@@ -172,8 +182,11 @@ export class MapMissionFacade {
     onMissionBoardUpdate?.(this.board)
   }
 
-  evaMissionAccept(onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null): void {
-    this.board = acceptEvaMission(this.board)
+  evaMissionAccept(
+    waypoint: { worldX: number; worldZ: number },
+    onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null,
+  ): void {
+    this.board = acceptEvaMission(this.board, waypoint)
     this.persistBoard()
     onMissionBoardUpdate?.(this.board)
   }
@@ -322,6 +335,33 @@ export class MapMissionFacade {
     } else if (!shouldShowAsteroidMissionMapSite(mission) && this.missionWaypointRoot) {
       this.disposeWaypointSite(scene)
     }
+
+    this.syncEvaWaypointSite(scene)
+  }
+
+  private syncEvaWaypointSite(scene: THREE.Scene): void {
+    const evaMission = pickActiveEvaMissionMapSite(this.board.activeEvaMissions)
+
+    if (!evaMission) {
+      if (this.evaWaypointRoot) this.disposeEvaWaypointSite(scene)
+      return
+    }
+
+    if (this.evaWaypointRoot && this.evaPoiRenderedMissionId !== evaMission.template.id) {
+      this.disposeEvaWaypointSite(scene)
+    }
+
+    if (!this.evaWaypointRoot) {
+      const root = new THREE.Group()
+      root.position.set(evaMission.waypoint.worldX, 0, evaMission.waypoint.worldZ)
+      const marker = createWaypointMarkerGroup(WAYPOINT_MARKER_DEFAULT_COLOR, 'orbitMap')
+      root.add(marker)
+      scene.add(root)
+      this.evaWaypointRoot = root
+      this.evaWaypointMarker = marker
+      this.evaPoiRenderedMissionId = evaMission.template.id
+      void this.spawnEvaMissionPoi(root, evaMission)
+    }
   }
 
   tickWaypointVisuals(params: {
@@ -330,28 +370,48 @@ export class MapMissionFacade {
     shuttlePosition: { x: number; z: number }
     simTime: number
     apparentSize: number
+    dt: number
   }): void {
     this.syncWaypointSite(params.scene)
+
+    const halfFovRad = THREE.MathUtils.degToRad(params.vehicleCamera.camera.fov / 2)
+    const tanHalfFov = Math.tan(halfFovRad)
+
     if (
-      !this.missionWaypointRoot ||
-      !this.missionOrbitWaypointMarker ||
-      !this.board.activeAsteroidMission
+      this.missionWaypointRoot &&
+      this.missionOrbitWaypointMarker &&
+      this.board.activeAsteroidMission
     ) {
-      return
+      const dist = params.vehicleCamera.camera.position.distanceTo(
+        this.missionWaypointRoot.position,
+      )
+      const targetScreenHeight = params.apparentSize * 2 * dist * tanHalfFov
+      const uniformScale = targetScreenHeight / ORBIT_MAP_WAYPOINT_SCALE_REFERENCE
+      this.missionWaypointRoot.scale.setScalar(uniformScale)
+
+      tickWaypointMarkerGroup(
+        this.missionOrbitWaypointMarker,
+        params.simTime,
+        params.shuttlePosition.x,
+        params.shuttlePosition.z,
+      )
     }
 
-    const dist = params.vehicleCamera.camera.position.distanceTo(this.missionWaypointRoot.position)
-    const halfFovRad = THREE.MathUtils.degToRad(params.vehicleCamera.camera.fov / 2)
-    const targetScreenHeight = params.apparentSize * 2 * dist * Math.tan(halfFovRad)
-    const uniformScale = targetScreenHeight / ORBIT_MAP_WAYPOINT_SCALE_REFERENCE
-    this.missionWaypointRoot.scale.setScalar(uniformScale)
+    if (this.evaWaypointRoot && this.evaWaypointMarker) {
+      const dist = params.vehicleCamera.camera.position.distanceTo(this.evaWaypointRoot.position)
+      const targetScreenHeight = params.apparentSize * 2 * dist * tanHalfFov
+      const uniformScale = targetScreenHeight / ORBIT_MAP_WAYPOINT_SCALE_REFERENCE
+      this.evaWaypointRoot.scale.setScalar(uniformScale)
 
-    tickWaypointMarkerGroup(
-      this.missionOrbitWaypointMarker,
-      params.simTime,
-      params.shuttlePosition.x,
-      params.shuttlePosition.z,
-    )
+      tickWaypointMarkerGroup(
+        this.evaWaypointMarker,
+        params.simTime,
+        params.shuttlePosition.x,
+        params.shuttlePosition.z,
+      )
+
+      this.evaPoiInstance?.tick(params.dt)
+    }
   }
 
   tryBeginAsteroidMission(params: {
@@ -402,6 +462,7 @@ export class MapMissionFacade {
     }
     if (scene) {
       this.disposeWaypointSite(scene)
+      this.disposeEvaWaypointSite(scene)
     }
     onMissionBoardUpdate?.(this.board)
   }
@@ -411,6 +472,7 @@ export class MapMissionFacade {
     this.activeMinigame = null
     if (scene) {
       this.disposeWaypointSite(scene)
+      this.disposeEvaWaypointSite(scene)
     }
   }
 
@@ -449,5 +511,38 @@ export class MapMissionFacade {
       scene.remove(this.missionWaypointRoot)
       this.missionWaypointRoot = null
     }
+  }
+
+  private async spawnEvaMissionPoi(
+    root: THREE.Group,
+    mission: ActiveVisitRelayMission,
+  ): Promise<void> {
+    try {
+      const instance = await createEvaMissionPoi(mission.template.poiType)
+      if (this.evaWaypointRoot !== root || this.evaPoiRenderedMissionId !== mission.template.id) {
+        instance.dispose()
+        return
+      }
+      root.add(instance.object)
+      this.evaPoiInstance = instance
+    } catch (error) {
+      console.warn('[MapView] EVA mission POI failed', error)
+    }
+  }
+
+  private disposeEvaWaypointSite(scene: THREE.Scene): void {
+    if (this.evaPoiInstance) {
+      this.evaPoiInstance.dispose()
+      this.evaPoiInstance = null
+    }
+    if (this.evaWaypointMarker) {
+      disposeWaypointMarkerGroup(this.evaWaypointMarker)
+      this.evaWaypointMarker = null
+    }
+    if (this.evaWaypointRoot) {
+      scene.remove(this.evaWaypointRoot)
+      this.evaWaypointRoot = null
+    }
+    this.evaPoiRenderedMissionId = null
   }
 }

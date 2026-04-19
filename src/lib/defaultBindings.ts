@@ -88,6 +88,7 @@ export const LEVEL_BINDINGS: Record<string, string[]> = {
   terminalInteract: ['KeyE'],
   skipCinematic: ['Escape'],
   toggleMap: ['KeyM'],
+  toggleInventory: ['KeyB'],
 }
 
 /** Habitat interior key bindings — FPS walk + interact. */

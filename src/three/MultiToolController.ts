@@ -26,6 +26,7 @@ const POWER_CYLINDER_HEIGHT = 1.5
 
 import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import type { MultiToolMode } from '@/lib/fps/multiToolState'
+import { FPS_VIEWMODEL_LAYER } from './FpsCamera'
 
 /** Position offset from camera origin (right, down, forward). */
 const OFFSET_X = 0.35
@@ -141,6 +142,9 @@ export class MultiToolController implements Tickable {
       }
     })
     scene.add(this.model)
+    this.model.traverse((child) => {
+      child.layers.set(FPS_VIEWMODEL_LAYER)
+    })
   }
 
   /** Show or hide the multi-tool model. */
@@ -216,15 +220,31 @@ export class MultiToolController implements Tickable {
     const aimPoint = this.camera.position.clone().addScaledVector(camForward, 500)
 
     // Origin: barrel tip in camera space
-    const origin = this.camera.position.clone()
-    const camDown = new THREE.Vector3(0, -1, 0).applyQuaternion(this.camera.quaternion)
-    origin.addScaledVector(camForward, 1.8)
-    origin.addScaledVector(camDown, 0.15)
+    const origin = this.getMuzzleWorldPosition(new THREE.Vector3())
 
     // Direction: from barrel toward aim point (converges on crosshair)
     const direction = aimPoint.sub(origin).normalize()
 
     this.projectileSystem.spawn(origin, direction, this.boltColor, this.boltKind)
+  }
+
+  /**
+   * World-space position of the gun's muzzle (barrel tip). Mirrors the
+   * spawn origin in {@link fire} so VFX such as tractor-beam particle
+   * streams converge on the same point projectiles leave from.
+   *
+   * @param out Vector receiving the result.
+   * @returns The same `out` vector for chaining, or `out` unchanged
+   *   when the camera is not yet bound.
+   */
+  getMuzzleWorldPosition(out: THREE.Vector3): THREE.Vector3 {
+    if (!this.camera) return out
+    const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion)
+    const camDown = new THREE.Vector3(0, -1, 0).applyQuaternion(this.camera.quaternion)
+    out.copy(this.camera.position)
+    out.addScaledVector(camForward, 1.8)
+    out.addScaledVector(camDown, 0.15)
+    return out
   }
 
   private readonly offset = new THREE.Vector3()

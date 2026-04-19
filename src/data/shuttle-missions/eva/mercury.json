@@ -5,7 +5,7 @@
       "id": "mercury_solar_flare_buoy",
       "name": "Solar Flare Monitoring Buoy",
       "description": "The heliophysics team's flare buoy is cooking in the sun-side orbit. EVA out and swap the ablative radiator panels before the electronics bake.",
-      "waypoint": { "worldX": 220, "worldZ": -140 },
+      "poiType": "satellite",
       "minigameType": "relay_repair",
       "reward": 1500
     },
@@ -13,7 +13,7 @@
       "id": "mercury_comms_relay_hardening",
       "name": "Comms Relay Hardening",
       "description": "A comms relay near perihelion needs a manual firmware flash — too much radiation noise for OTA. Dock, spacewalk, patch, extract.",
-      "waypoint": { "worldX": -180, "worldZ": 260 },
+      "poiType": "relay_antenna",
       "minigameType": "relay_repair",
       "reward": 1300
     }

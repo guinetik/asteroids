@@ -13,6 +13,12 @@ import DeathOverlay from '@/components/DeathOverlay.vue'
 import DamageFeedback from '@/components/DamageFeedback.vue'
 import LevelMinimap from '@/components/LevelMinimap.vue'
 import type { MapMarker } from '@/components/LevelMinimap.vue'
+import PickupToast from '@/components/PickupToast.vue'
+import type { PickupEntry } from '@/components/PickupToast.vue'
+import LevelInventoryPanel from '@/components/LevelInventoryPanel.vue'
+import type { Inventory } from '@/lib/inventory/types'
+import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
+import { removeItem } from '@/lib/inventory/inventory'
 import type { LanderTelemetry } from '@/components/LanderHud.vue'
 import type { FpsTelemetry } from '@/components/FpsHud.vue'
 import { OBJECTIVE_LABELS } from '@/lib/minigame/MiniGame'
@@ -34,6 +40,8 @@ const arrivalFade = ref(0)
 const deathOverlayVisible = ref(false)
 const deathOverlayCause = ref('')
 const showMap = ref(false)
+const showInventory = ref(false)
+const inventorySnapshot = ref<Inventory | null>(null)
 const terminalPrompt = ref<string | null>(null)
 const announceVisible = ref(false)
 const announceAsteroid = ref('')
@@ -51,6 +59,82 @@ const playerZ = ref(0)
 const mapMarkers = ref<MapMarker[]>([])
 const damageFlash = ref(0)
 const damageFeedback = ref<InstanceType<typeof DamageFeedback> | null>(null)
+const pickups = ref<PickupEntry[]>([])
+const PICKUP_AGGREGATE_WINDOW_SEC = 1.5
+const PICKUP_LIFETIME_SEC = 2.2
+const pickupTimers = new Map<string, { handle: ReturnType<typeof Timer.after>; key: string }>()
+let pickupSeq = 0
+
+/**
+ * Push a pickup notification, aggregating against the most recent
+ * unexpired entry with the same `itemId`. Each call refreshes the
+ * fade-out timer so a stream of extractions stays coalesced.
+ */
+function recordPickup(itemId: string, quantity: number, label: string): void {
+  const existing = pickups.value.find((p) => p.itemId === itemId)
+  let entry: PickupEntry
+  if (existing) {
+    existing.quantity += quantity
+    existing.pulse += 1
+    entry = existing
+    const previous = pickupTimers.get(existing.id)
+    if (previous) Timer.cancel(previous.handle)
+  } else {
+    pickupSeq += 1
+    entry = {
+      id: `pickup-${pickupSeq}`,
+      itemId,
+      label,
+      quantity,
+      pulse: 0,
+    }
+    pickups.value.push(entry)
+  }
+  const lifetime = Math.max(PICKUP_AGGREGATE_WINDOW_SEC, PICKUP_LIFETIME_SEC)
+  const handle = Timer.after(lifetime, () => {
+    const idx = pickups.value.findIndex((p) => p.id === entry.id)
+    if (idx >= 0) pickups.value.splice(idx, 1)
+    pickupTimers.delete(entry.id)
+  })
+  pickupTimers.set(entry.id, { handle, key: entry.id })
+}
+
+function clearPickups(): void {
+  for (const { handle } of pickupTimers.values()) Timer.cancel(handle)
+  pickupTimers.clear()
+  pickups.value = []
+  for (const handle of pickupFailedTimers) Timer.cancel(handle)
+  pickupFailedTimers.clear()
+  pickupFailed.value = null
+}
+
+/**
+ * Transient warning when a mineral hit produces no pickup (typically
+ * because the cargo hold is over weight or out of slots). Held in a
+ * single ref because we only ever show one banner at a time and the
+ * message text already changes on each failure.
+ */
+const pickupFailed = ref<{ id: number; label: string; reason: string } | null>(null)
+const pickupFailedTimers = new Set<ReturnType<typeof Timer.after>>()
+const PICKUP_FAILED_LIFETIME_SEC = 2.4
+let pickupFailedSeq = 0
+
+/**
+ * Surface a transient "INVENTORY FULL" warning. New failures replace
+ * the previous banner so the player always sees the latest reason
+ * rather than a stale stack.
+ */
+function recordPickupFailed(label: string, reason: string): void {
+  pickupFailedSeq += 1
+  pickupFailed.value = { id: pickupFailedSeq, label, reason }
+  const handle = Timer.after(PICKUP_FAILED_LIFETIME_SEC, () => {
+    if (pickupFailed.value && pickupFailed.value.id === pickupFailedSeq) {
+      pickupFailed.value = null
+    }
+    pickupFailedTimers.delete(handle)
+  })
+  pickupFailedTimers.add(handle)
+}
 const backgroundMusic = useBackgroundMusicGlobalState()
 const musicEnabled = computed(() => backgroundMusic.isEnabled.value)
 
@@ -182,6 +266,14 @@ onMounted(async () => {
     viewController.onDamageDirection = (angle) => {
       damageFeedback.value?.flash(angle)
     }
+    viewController.onResourcePickup = (itemId, quantity, label) => {
+      recordPickup(itemId, quantity, label)
+      if (showInventory.value) refreshInventorySnapshot()
+    }
+    viewController.onResourcePickupFailed = (label, reason) => {
+      recordPickupFailed(label, reason)
+      if (showInventory.value) refreshInventorySnapshot()
+    }
     await viewController.init(container.value)
 
     // Map markers + tracker from mission objectives
@@ -205,9 +297,7 @@ onMounted(async () => {
       })
     }
 
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'KeyM') showMap.value = !showMap.value
-    })
+    window.addEventListener('keydown', handleGlobalKeydown)
   }
 })
 
@@ -215,8 +305,69 @@ function handleRestart() {
   viewController.restart()
 }
 
+/**
+ * Refresh the cached cargo snapshot used by the inventory panel from
+ * persisted storage. Called when the panel opens, after a jettison,
+ * and after a successful pickup so the live readout stays in sync.
+ */
+function refreshInventorySnapshot(): void {
+  inventorySnapshot.value = loadInventory()
+}
+
+/** Open the cargo panel and release pointer-lock so the player can use the mouse. */
+function openInventoryPanel(): void {
+  refreshInventorySnapshot()
+  showInventory.value = true
+  if (typeof document !== 'undefined' && document.pointerLockElement) {
+    document.exitPointerLock()
+  }
+}
+
+function closeInventoryPanel(): void {
+  showInventory.value = false
+}
+
+function toggleInventoryPanel(): void {
+  if (showInventory.value) closeInventoryPanel()
+  else openInventoryPanel()
+}
+
+/**
+ * Handle a jettison request from the panel: drop `quantity` of `itemId`
+ * from the persisted inventory and refresh the snapshot. No-op when
+ * there is nothing to remove or the inventory hasn't loaded yet.
+ */
+function handleJettison(itemId: string, quantity: number): void {
+  if (quantity <= 0) return
+  const current = loadInventory()
+  if (!current) return
+  const result = removeItem(current, itemId, quantity)
+  if (!result.ok) return
+  saveInventory(result.inventory)
+  inventorySnapshot.value = result.inventory
+}
+
+function handleGlobalKeydown(e: KeyboardEvent): void {
+  if (e.code === 'KeyB') {
+    if (stateInfo.state !== 'eva' && stateInfo.state !== 'lander') return
+    e.preventDefault()
+    toggleInventoryPanel()
+    return
+  }
+  if (e.code === 'Escape' && showInventory.value) {
+    e.preventDefault()
+    closeInventoryPanel()
+    return
+  }
+  if (e.code === 'KeyM' && !showInventory.value) {
+    showMap.value = !showMap.value
+  }
+}
+
 onUnmounted(() => {
   stopBackgroundMusic('level')
+  clearPickups()
+  window.removeEventListener('keydown', handleGlobalKeydown)
   viewController.dispose()
 })
 
@@ -274,6 +425,19 @@ function handleToggleMusic(): void {
         />
       </svg>
     </button>
+    <button
+      v-if="stateInfo.state === 'eva' || stateInfo.state === 'lander'"
+      type="button"
+      class="level-topbar__cargo-btn"
+      :class="{ 'level-topbar__cargo-btn--active': showInventory }"
+      aria-label="Open cargo hold"
+      title="Open cargo hold (B)"
+      @click="toggleInventoryPanel"
+    >
+      <span class="level-topbar__cargo-icon" aria-hidden="true">&#x25A3;</span>
+      <span class="level-topbar__cargo-label">CARGO</span>
+      <span class="level-topbar__cargo-key" aria-hidden="true">B</span>
+    </button>
   </div>
   <!-- Helmet visor overlay — always visible, frames the view -->
   <div v-if="stateInfo.state === 'eva'" class="helmet-visor" />
@@ -321,6 +485,12 @@ function handleToggleMusic(): void {
     :player-z="playerZ"
     :grid-size="LEVEL_GRID_SIZE"
     :markers="mapMarkers"
+  />
+  <LevelInventoryPanel
+    :open="showInventory"
+    :inventory="inventorySnapshot"
+    @close="closeInventoryPanel"
+    @jettison="handleJettison"
   />
   <!-- Landing warnings — center screen, impossible to miss -->
   <div v-if="descentWarning !== 'safe' || attitudeWarning !== 'safe'" class="landing-warnings">
@@ -386,14 +556,80 @@ function handleToggleMusic(): void {
     ref="damageFeedback"
     :flash-opacity="damageFlash"
   />
+  <PickupToast
+    v-if="stateInfo.state === 'eva' || stateInfo.state === 'lander'"
+    :pickups="pickups"
+  />
+  <transition name="pickup-failed">
+    <div
+      v-if="pickupFailed && (stateInfo.state === 'eva' || stateInfo.state === 'lander')"
+      :key="pickupFailed.id"
+      class="pickup-failed"
+      role="status"
+      aria-live="polite"
+    >
+      <span class="pickup-failed__head">CARGO FULL</span>
+      <span class="pickup-failed__body">{{ pickupFailed.label }} lost &mdash; {{ pickupFailed.reason }}</span>
+    </div>
+  </transition>
 </template>
 
 <style>
 .level-topbar {
   position: fixed;
-  top: max(1rem, env(safe-area-inset-top, 0px) + 0.5rem);
-  right: max(1rem, env(safe-area-inset-right, 0px) + 0.5rem);
+  bottom: max(1rem, env(safe-area-inset-bottom, 0px) + 0.5rem);
+  left: max(1rem, env(safe-area-inset-left, 0px) + 0.5rem);
   z-index: 35;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.level-topbar__cargo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 3rem;
+  padding: 0 0.85rem;
+  border: 1px solid rgba(34, 211, 238, 0.32);
+  border-radius: 9999px;
+  background: rgba(2, 6, 23, 0.76);
+  color: rgba(186, 230, 253, 0.92);
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+}
+.level-topbar__cargo-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(125, 211, 252, 0.55);
+  background: rgba(8, 47, 73, 0.82);
+  color: white;
+}
+.level-topbar__cargo-btn--active {
+  border-color: rgba(102, 255, 238, 0.85);
+  color: rgba(102, 255, 238, 1);
+  background: rgba(8, 47, 73, 0.88);
+}
+.level-topbar__cargo-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.level-topbar__cargo-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  padding: 0 0.3rem;
+  border: 1px solid rgba(102, 255, 238, 0.45);
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(102, 255, 238, 0.95);
 }
 .level-topbar__music-btn {
   display: inline-flex;
@@ -556,5 +792,48 @@ function handleToggleMusic(): void {
     rgba(20, 40, 60, 0.06) 85%,
     rgba(10, 30, 50, 0.12) 100%
   );
+}
+
+.pickup-failed {
+  position: fixed;
+  bottom: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.45rem 1rem;
+  font-family: 'Datatype', ui-monospace, monospace;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  background: rgba(28, 6, 6, 0.7);
+  border: 1px solid rgba(255, 107, 107, 0.6);
+  box-shadow:
+    0 0 16px rgba(255, 107, 107, 0.25),
+    inset 0 0 10px rgba(255, 107, 107, 0.08);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.pickup-failed__head {
+  color: rgba(255, 107, 107, 0.95);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.pickup-failed__body {
+  color: rgba(255, 220, 220, 0.85);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+}
+.pickup-failed-enter-active,
+.pickup-failed-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.pickup-failed-enter-from,
+.pickup-failed-leave-to {
+  opacity: 0;
+  transform: translate(-50%, 8px);
 }
 </style>

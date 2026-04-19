@@ -1,14 +1,20 @@
+/**
+ * Collect minigame — single glowing crate, walk up and press [E].
+ *
+ * Spawns a {@link DepositCrateModel} at the objective waypoint. As soon
+ * as the player is within {@link TERMINAL_INTERACT_RANGE} the prompt
+ * lights up; pressing the terminal interact key hides the crate and
+ * marks the objective complete.
+ *
+ * @author guinetik
+ * @date 2026-04-07
+ */
 import * as THREE from 'three'
 import type { MiniGame, MiniGameContext, MiniGameEvents, MiniGameStatus, MiniGameStep } from './MiniGame'
 import type { ConcreteObjective } from '@/lib/missions/types'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import { TERMINAL_INTERACT_RANGE } from '@/three/TerminalModel'
-
-const CRATE_WIDTH = 3.2
-const CRATE_HEIGHT = 2.2
-const CRATE_DEPTH = 2.2
-const CRATE_BASE = 0x12303a
-const CRATE_TRIM = 0x5ce7ff
+import { DepositCrateModel } from '@/three/DepositCrateModel'
 
 export class CollectMinigame implements MiniGame, MiniGameEvents {
   readonly objectiveIndex: number
@@ -21,7 +27,7 @@ export class CollectMinigame implements MiniGame, MiniGameEvents {
   ]
 
   private readonly scene: THREE.Scene
-  private readonly crateGroup = new THREE.Group()
+  private readonly crate: DepositCrateModel
   private readonly objective: ConcreteObjective
 
   onPrompt: ((text: string | null) => void) | null = null
@@ -62,33 +68,10 @@ export class CollectMinigame implements MiniGame, MiniGameEvents {
     this.objective = objective
     this.scene = scene
 
-    const body = new THREE.Mesh(
-      new THREE.BoxGeometry(CRATE_WIDTH, CRATE_HEIGHT, CRATE_DEPTH),
-      new THREE.MeshStandardMaterial({
-        color: CRATE_BASE,
-        metalness: 0.55,
-        roughness: 0.42,
-      }),
-    )
-    body.position.y = CRATE_HEIGHT / 2
-    body.castShadow = true
-    body.receiveShadow = true
-    this.crateGroup.add(body)
-
-    const trim = new THREE.Mesh(
-      new THREE.BoxGeometry(CRATE_WIDTH + 0.08, 0.16, CRATE_DEPTH + 0.08),
-      new THREE.MeshStandardMaterial({
-        color: CRATE_TRIM,
-        emissive: CRATE_TRIM,
-        emissiveIntensity: 0.8,
-      }),
-    )
-    trim.position.y = CRATE_HEIGHT - 0.25
-    this.crateGroup.add(trim)
-
+    this.crate = new DepositCrateModel()
     const groundY = heightmap.heightAt(objective.x, objective.z)
-    this.crateGroup.position.set(objective.x, groundY, objective.z)
-    scene.add(this.crateGroup)
+    this.crate.placeAt(objective.x, objective.z, groundY)
+    scene.add(this.crate.group)
   }
 
   tick(_dt: number, ctx: MiniGameContext): void {
@@ -97,8 +80,8 @@ export class CollectMinigame implements MiniGame, MiniGameEvents {
     this._isPlayerNear = false
     if (ctx.levelState !== 'eva' || !ctx.playerPosition) return
 
-    const dx = ctx.playerPosition.x - this.crateGroup.position.x
-    const dz = ctx.playerPosition.z - this.crateGroup.position.z
+    const dx = ctx.playerPosition.x - this.crate.group.position.x
+    const dz = ctx.playerPosition.z - this.crate.group.position.z
     const dist = Math.sqrt(dx * dx + dz * dz)
     if (dist > TERMINAL_INTERACT_RANGE) return
 
@@ -111,7 +94,7 @@ export class CollectMinigame implements MiniGame, MiniGameEvents {
     this.completeStep(1)
     this._status = 'completed'
     this.onPrompt?.(null)
-    this.crateGroup.visible = false
+    this.crate.setVisible(false)
     this.onComplete?.(this.objectiveIndex)
   }
 
@@ -126,16 +109,7 @@ export class CollectMinigame implements MiniGame, MiniGameEvents {
   }
 
   dispose(): void {
-    this.scene.remove(this.crateGroup)
-    this.crateGroup.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.geometry.dispose()
-        if (Array.isArray(child.material)) {
-          for (const material of child.material) material.dispose()
-        } else {
-          child.material.dispose()
-        }
-      }
-    })
+    this.scene.remove(this.crate.group)
+    this.crate.dispose()
   }
 }

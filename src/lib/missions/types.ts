@@ -208,7 +208,19 @@ export interface ShuttleMissionBoard {
 // Shuttle EVA (visit-relay) missions
 // ---------------------------------------------------------------------------
 
-/** A shuttle EVA mission template from JSON — player flies to a waypoint and spacewalks. */
+/**
+ * POI prop model spawned at the EVA waypoint. Drives the `EvaMissionPoi` factory;
+ * new flavors (e.g. `'telescope'`) are added here plus one new branch in the factory.
+ */
+export type EvaMissionPoiType = 'satellite' | 'relay_antenna'
+
+/**
+ * A shuttle EVA mission template from JSON — player flies to a waypoint and spacewalks.
+ *
+ * Waypoints are not authored in the template: they are generated at accept time close
+ * to the giver planet's current world position so the POI always sits near the player's
+ * current orbit rather than at an absolute coordinate that drifts away as planets move.
+ */
 export interface VisitRelayShuttleMissionTemplate {
   /** Unique key, e.g. "earth_relay_tx4_reboot". */
   id: string
@@ -216,8 +228,8 @@ export interface VisitRelayShuttleMissionTemplate {
   name: string
   /** Flavor text describing the mission. */
   description: string
-  /** World-space waypoint position for the POI (satellite / probe). */
-  waypoint: { worldX: number; worldZ: number }
+  /** Which prop spawns at the waypoint. Same minigame; different lore + model. */
+  poiType: EvaMissionPoiType
   /** Minigame id dispatched via OrbitalMiniGameFactory once the EVA terminal is interacted with. */
   minigameType: string
   /** Credits awarded on delivery back at the giver planet. */
@@ -241,6 +253,11 @@ export interface ActiveVisitRelayMission {
   template: VisitRelayShuttleMissionTemplate
   /** Planet the mission was accepted at (and where it must be delivered). */
   giverPlanet: string
+  /**
+   * World-space waypoint generated at accept time near the giver planet's then-current
+   * position. Snapshotted so the POI stays put while the giver planet keeps orbiting.
+   */
+  waypoint: { worldX: number; worldZ: number }
   /** Current mission status. */
   status: VisitRelayMissionStatus
 }

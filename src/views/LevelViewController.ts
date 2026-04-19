@@ -47,6 +47,7 @@ import type { FpsTelemetry, CompassObjective } from '@/components/FpsHud.vue'
 import { headingRadToCompassDeg, worldBearingDegTo, signedRelativeBearingDeg } from '@/lib/math/bearing'
 import { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
+import { RockTargetIndicator } from '@/three/RockTargetIndicator'
 import { createLevelStateMachine, LANDER_INTERACT_RANGE, EXFIL_PROXIMITY_RANGE } from '@/lib/level/levelStateMachine'
 import type { LevelState } from '@/lib/level/levelStateMachine'
 import type { StateMachine } from '@/lib/stateMachine'
@@ -81,6 +82,11 @@ import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
 import { getSpecialMissionById } from '@/lib/missions/specialMissions'
 import { SurfaceRockController } from '@/three/controllers/SurfaceRockController'
+import { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
+import { addItem } from '@/lib/inventory/inventory'
+import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
+import { getItemDefinition } from '@/lib/inventory/catalog'
+import { GatherMinigame } from '@/lib/minigame/GatherMinigame'
 
 // ── Scene constants ─────────────────────────────────────────────
 const TERRAIN_RESOLUTION = 512
@@ -281,7 +287,13 @@ export class LevelViewController implements Tickable {
   private surfaceRocks: SurfaceRockController | null = null
   private collisionWorld: CollisionWorld | null = null
   private readonly collisionCleanup: Array<() => void> = []
-  private readonly surfaceRockCollisionCleanup: Array<() => void> = []
+  /**
+   * Per-spawn collider cleanups keyed by `spawnIndex`. Stored as a map
+   * (rather than a flat array) so the gather loop can drop just the
+   * mined-out rock's collider without rebuilding the whole registry.
+   */
+  private readonly surfaceRockCollisionCleanup = new Map<number, () => void>()
+  private rockYieldSystem: RockYieldSystem | null = null
   private stateMachine: StateMachine<LevelState> | null = null
 
   // ── Lander ───────────────────────────────────────────────────
@@ -307,6 +319,42 @@ export class LevelViewController implements Tickable {
   private multiToolState: MultiToolState | null = null
   private projectileSystem: ProjectileSystem | null = null
   private impactEmitter: ParticleEmitter | null = null
+  private rockTargetIndicator: RockTargetIndicator | null = null
+  /** Reused scratch — camera world position used by rock target picking. */
+  private readonly _rockPickOrigin = new Vector3()
+  /** Reused scratch — camera forward used by rock target picking. */
+  private readonly _rockPickDir = new Vector3()
+  /** Reused scratch — rock world center fed into the indicator sprite. */
+  private readonly _rockTargetCenter = new Vector3()
+  /**
+   * Maximum distance (world units) at which the drill targeting bar
+   * appears for a rock. Beyond this the bar hides even if the rock
+   * is still in line of sight — keeps the HUD focused on the rock
+   * the player can actually mine in a few seconds.
+   */
+  private static readonly ROCK_TARGET_PICK_RANGE = 60
+  /**
+   * Cyan particle stream that flies from a struck rock toward the
+   * player's gun muzzle, visualising mineral extraction. Lifetime is
+   * tuned so particles complete the trip in roughly one frame's
+   * worth of movement, hiding the lack of true homing.
+   */
+  private tractorEmitter: ParticleEmitter | null = null
+  /**
+   * Particle lifetime for the tractor stream (seconds). Must match
+   * the value passed to `new ParticleEmitter({ lifetime })` below;
+   * the velocity is computed as `distance / lifetime` so the
+   * particle reaches the gun muzzle right as it dies.
+   */
+  private static readonly TRACTOR_LIFETIME_SEC = 0.32
+  /** Particles emitted per drill bolt impact. Keep small — pool is shared. */
+  private static readonly TRACTOR_PARTICLES_PER_HIT = 4
+  /** Reused scratch — gun muzzle world position for tractor velocity calc. */
+  private readonly _tractorMuzzle = new Vector3()
+  /** Reused scratch — rock center used as tractor spawn origin. */
+  private readonly _tractorOrigin = new Vector3()
+  /** Reused scratch — direction from rock to muzzle, scaled by speed. */
+  private readonly _tractorVel = new Vector3()
 
   // ── Arrival ──────────────────────────────────────────────────
   private arrivalSequence: ArrivalSequence | null = null
@@ -334,6 +382,29 @@ export class LevelViewController implements Tickable {
 
   /** Called each frame during EVA with terminal prompt text (null to hide). */
   onTerminalPrompt: ((text: string | null) => void) | null = null
+
+  /**
+   * Called when a unit of resource is *successfully* added to the
+   * player inventory in-mission (currently fired by rock mining).
+   * The host UI surfaces this to the player as a stacking pickup
+   * toast.
+   *
+   * @param itemId Catalog item id (e.g. `"olivine"`).
+   * @param quantity Units added to inventory this tick (already rounded).
+   * @param label Human-readable item label (e.g. `"Olivine"`).
+   */
+  onResourcePickup: ((itemId: string, quantity: number, label: string) => void) | null = null
+
+  /**
+   * Called when a mineral was extracted from a rock but could not be
+   * stored — typically because the cargo hold is full or out of slots.
+   * The host UI surfaces this as a transient warning toast so the
+   * player understands why a mining hit produced no green pickup.
+   *
+   * @param label Human-readable item label (e.g. `"Magnetite"`).
+   * @param reason Short reason string from the inventory layer.
+   */
+  onResourcePickupFailed: ((label: string, reason: string) => void) | null = null
 
   private readonly initialLanderSpawn = new Vector3()
 
@@ -487,8 +558,10 @@ export class LevelViewController implements Tickable {
       baseColor: asteroid.visual.baseColor,
     })
     this.sceneManager.addToScene(this.surfaceRocks.group)
-    for (const collider of this.surfaceRocks.buildColliders(this.heightmap)) {
-      this.surfaceRockCollisionCleanup.push(this.collisionWorld.addCollider(collider))
+    const rockColliders = this.surfaceRocks.buildColliders(this.heightmap)
+    for (let i = 0; i < rockColliders.length; i++) {
+      const collider = rockColliders[i]!
+      this.surfaceRockCollisionCleanup.set(i, this.collisionWorld.addCollider(collider))
     }
 
     // ── Objective waypoint markers ──────────────────────────────
@@ -655,6 +728,28 @@ export class LevelViewController implements Tickable {
       opacity: 0.8,
     })
     this.sceneManager.addToScene(this.impactEmitter.points)
+    // Tractor stream — particles fly from the struck rock toward the
+    // gun muzzle. Soft+screen-space sizing keeps them readable across
+    // distances. Lifetime is short so the player perceives an
+    // "extraction" pull rather than a slow trail. Pool size budgets
+    // ~6 spawns per drill tick at the system's worst-case fire rate.
+    this.tractorEmitter = new ParticleEmitter({
+      poolSize: 96,
+      color: new Color(0x66ffee),
+      size: 6,
+      lifetime: LevelViewController.TRACTOR_LIFETIME_SEC,
+      spread: 1.4,
+      opacity: 0.85,
+      soft: true,
+      sizeAttenuation: false,
+      sizeGrowth: 0.4,
+    })
+    this.sceneManager.addToScene(this.tractorEmitter.points)
+    // Rock target indicator — single shared sprite that hops between
+    // the rock the player is currently aiming at while drill mode is
+    // active. Hidden by default; visibility toggled in `tickEva`.
+    this.rockTargetIndicator = new RockTargetIndicator()
+    this.sceneManager.addToScene(this.rockTargetIndicator.sprite)
     this.projectileSystem.onImpact = (pos) => {
       for (let i = 0; i < 8; i++) {
         this._impactVel.copy(this._impactUp).multiplyScalar(5)
@@ -676,6 +771,65 @@ export class LevelViewController implements Tickable {
       }
     }
     this.multiTool.setProjectileSystem(this.projectileSystem)
+
+    // ── Universal rock mining ───────────────────────────────────
+    // Every surface rock can be drilled regardless of mission type;
+    // gather objectives just listen to the same yield stream.
+    const miningSeed = hashSeed(mission.id)
+    this.rockYieldSystem = new RockYieldSystem({
+      composition: asteroid.composition,
+      seed: miningSeed,
+    })
+    if (this.surfaceRocks) {
+      const rockSpawns = this.surfaceRocks.spawns
+      const rockColliderEntries = this.surfaceRocks.buildColliders(this.heightmap)
+      for (let i = 0; i < rockSpawns.length; i++) {
+        const spawn = rockSpawns[i]!
+        const collider = rockColliderEntries[i]!
+        const center = typeof collider.center === 'function' ? collider.center() : collider.center
+        this.rockYieldSystem.registerRock({ spawnIndex: i, diameter: spawn.diameter })
+        this.projectileSystem.addRock({
+          spawnIndex: i,
+          cx: center.x,
+          cy: center.y,
+          cz: center.z,
+          radius: collider.radius,
+        })
+      }
+    }
+    this.rockYieldSystem.onConsume = (spawnIndex) => {
+      this.surfaceRocks?.hideRock(spawnIndex)
+      this.removeRockCollider(spawnIndex)
+      this.projectileSystem?.removeRock(spawnIndex)
+    }
+    this.rockYieldSystem.onMineralExtracted = (itemId, kg) => {
+      const inventory = loadInventory()
+      if (!inventory) return
+      const quantity = Math.max(1, Math.round(kg))
+      const def = getItemDefinition(itemId)
+      const label = def?.label ?? itemId
+      const result = addItem(inventory, itemId, quantity)
+      if (!result.ok) {
+        // Inventory full / over weight — surface a warning toast so the
+        // player understands why this hit produced no pickup. The mineral
+        // is still considered extracted by the gather minigame (which
+        // listens upstream of this handler) so quotas keep advancing.
+        this.onResourcePickupFailed?.(label, result.reason ?? 'Inventory full')
+        return
+      }
+      saveInventory(result.inventory)
+      this.onResourcePickup?.(itemId, quantity, label)
+      useAudio().play('sfx.pickup', { volume: 0.35 })
+    }
+    this.projectileSystem.onRockHit = (spawnIndex, pos) => {
+      this.rockYieldSystem?.mineRock(spawnIndex)
+      this.surfaceRocks?.flashRock(spawnIndex)
+      for (let i = 0; i < 6; i++) {
+        this._impactVel.copy(this._impactUp).multiplyScalar(6)
+        this.impactEmitter!.emit(pos, this._impactVel)
+      }
+      this.spawnTractorBurst(spawnIndex, pos)
+    }
 
     // ── Objective minigames ──────────────────────────────────────
     const missionSeed = hashSeed(mission.id)
@@ -757,6 +911,21 @@ export class LevelViewController implements Tickable {
         this.minigames.push(minigame)
       } else if (obj.type === 'collect') {
         const minigame = new CollectMinigame(i, obj, this.sceneManager!.scene, this.heightmap!)
+        minigame.onPrompt = (text) => this.onTerminalPrompt?.(text)
+        minigame.onComplete = (idx) => this.onObjectiveComplete?.(idx)
+        minigame.onStepChange = (idx, steps) => this.onStepChange?.(idx, steps)
+        this.minigames.push(minigame)
+      } else if (obj.type === 'gather' && this.rockYieldSystem) {
+        const minigame = new GatherMinigame({
+          objectiveIndex: i,
+          objective: obj,
+          scene: this.sceneManager!.scene,
+          heightmap: this.heightmap!,
+          composition: asteroid.composition,
+          difficulty: mission.difficulty,
+          seed: missionSeed,
+          rockYieldSystem: this.rockYieldSystem,
+        })
         minigame.onPrompt = (text) => this.onTerminalPrompt?.(text)
         minigame.onComplete = (idx) => this.onObjectiveComplete?.(idx)
         minigame.onStepChange = (idx, steps) => this.onStepChange?.(idx, steps)
@@ -1066,6 +1235,12 @@ export class LevelViewController implements Tickable {
     this.tickHandler!.register(this.multiToolState!, TICK_PRIORITY_PHYSICS + 1)
     this.tickHandler!.register(this.projectileSystem!, TICK_PRIORITY_PHYSICS + 2)
     this.tickHandler!.register(this.impactEmitter!, TICK_PRIORITY_PHYSICS + 3)
+    if (this.tractorEmitter) {
+      this.tickHandler!.register(this.tractorEmitter, TICK_PRIORITY_PHYSICS + 3)
+    }
+    if (this.surfaceRocks) {
+      this.tickHandler!.register(this.surfaceRocks, TICK_PRIORITY_PHYSICS + 3)
+    }
     this.tickHandler!.register(this.fpsCamera!, TICK_PRIORITY_RENDER - 2)
     this.tickHandler!.register(this.multiTool!, TICK_PRIORITY_RENDER - 2)
     this.fpsCamera!.helmetLightRig.visible = true
@@ -1104,6 +1279,9 @@ export class LevelViewController implements Tickable {
     this.tickHandler!.unregister(this.multiToolState!)
     this.tickHandler!.unregister(this.projectileSystem!)
     this.tickHandler!.unregister(this.impactEmitter!)
+    if (this.tractorEmitter) this.tickHandler!.unregister(this.tractorEmitter)
+    if (this.surfaceRocks) this.tickHandler!.unregister(this.surfaceRocks)
+    this.rockTargetIndicator?.hide()
     this.tickHandler!.unregister(this.fpsCamera!)
     this.tickHandler!.unregister(this.multiTool!)
     this.fpsCamera!.helmetLightRig.visible = false
@@ -1136,6 +1314,9 @@ export class LevelViewController implements Tickable {
     this.tickHandler!.unregister(this.multiToolState!)
     this.tickHandler!.unregister(this.projectileSystem!)
     this.tickHandler!.unregister(this.impactEmitter!)
+    if (this.tractorEmitter) this.tickHandler!.unregister(this.tractorEmitter)
+    if (this.surfaceRocks) this.tickHandler!.unregister(this.surfaceRocks)
+    this.rockTargetIndicator?.hide()
     this.tickHandler!.unregister(this.multiTool!)
     // NOTE: fpsCamera stays registered — it renders the death camera drop
     this.fpsCamera!.helmetLightRig.visible = false
@@ -1689,6 +1870,68 @@ export class LevelViewController implements Tickable {
       }
       this._prevSprinting = exerted
     }
+
+    this.updateRockTargetIndicator()
+  }
+
+  /**
+   * Refresh the rock-targeting HP bar each frame. Only active while
+   * the multi-tool is in drill mode — the bar otherwise immediately
+   * hides regardless of where the camera is pointing.
+   *
+   * Cheap path: a swept-sphere ray pick against the registered rock
+   * collider list (already maintained by `ProjectileSystem` for drill
+   * bolts), so we don't double-pay for spatial structures.
+   */
+  private updateRockTargetIndicator(): void {
+    const indicator = this.rockTargetIndicator
+    const projectiles = this.projectileSystem
+    const rockYield = this.rockYieldSystem
+    const rocks = this.surfaceRocks
+    const heightmap = this.heightmap
+    const camera = this.fpsCamera?.camera
+    const tool = this.multiToolState
+    if (!indicator || !projectiles || !rockYield || !rocks || !heightmap || !camera || !tool) {
+      this.rockTargetIndicator?.hide()
+      return
+    }
+    if (tool.mode !== 'drill') {
+      indicator.hide()
+      return
+    }
+    this._rockPickOrigin.copy(camera.position)
+    this._rockPickDir.set(0, 0, -1).applyQuaternion(camera.quaternion)
+    const hit = projectiles.pickRock(
+      this._rockPickOrigin,
+      this._rockPickDir,
+      LevelViewController.ROCK_TARGET_PICK_RANGE,
+    )
+    if (!hit) {
+      indicator.hide()
+      return
+    }
+    const roll = rockYield.peekRock(hit.spawnIndex)
+    if (!roll) {
+      indicator.hide()
+      return
+    }
+    const center = rocks.getRockCenter(hit.spawnIndex, heightmap, this._rockTargetCenter)
+    if (!center) {
+      indicator.hide()
+      return
+    }
+    const radius = rocks.getRockRadius(hit.spawnIndex)
+    const def = getItemDefinition(roll.itemId)
+    indicator.setTarget({
+      spawnIndex: hit.spawnIndex,
+      centerX: center.x,
+      centerY: center.y,
+      centerZ: center.z,
+      radius: radius ?? undefined,
+      remainingKg: roll.remainingKg,
+      totalKg: roll.totalKg,
+      label: def?.label ?? roll.itemId,
+    })
   }
 
   private enforceLanderAltitudeCeiling(): void {
@@ -1779,8 +2022,53 @@ export class LevelViewController implements Tickable {
   }
 
   private clearSurfaceRockCollisionRegistrations(): void {
-    while (this.surfaceRockCollisionCleanup.length > 0) {
-      this.surfaceRockCollisionCleanup.pop()?.()
+    for (const cleanup of this.surfaceRockCollisionCleanup.values()) cleanup()
+    this.surfaceRockCollisionCleanup.clear()
+  }
+
+  /**
+   * Drop the collider for a single mined-out rock. No-op if the rock
+   * has already been removed (idempotent so the depletion callback
+   * can fire safely even after dispose).
+   */
+  private removeRockCollider(spawnIndex: number): void {
+    const cleanup = this.surfaceRockCollisionCleanup.get(spawnIndex)
+    if (!cleanup) return
+    cleanup()
+    this.surfaceRockCollisionCleanup.delete(spawnIndex)
+  }
+
+  /**
+   * Spawn a tiny burst of tractor-beam particles flying from the
+   * struck rock toward the player's gun muzzle. Sets each particle's
+   * velocity such that it covers the gap in roughly one emitter
+   * lifetime; minor mid-flight player movement is masked by the
+   * additive blending and short fade.
+   *
+   * Silent when any of the required systems are not initialised
+   * (e.g. mined while the EVA gun model is still streaming in).
+   *
+   * @param spawnIndex Surface rock spawn id.
+   * @param impactPos World-space hit position from the projectile system.
+   */
+  private spawnTractorBurst(spawnIndex: number, impactPos: THREE.Vector3): void {
+    const tractor = this.tractorEmitter
+    const tool = this.multiTool
+    if (!tractor || !tool) return
+    tool.getMuzzleWorldPosition(this._tractorMuzzle)
+    if (this.surfaceRocks && this.heightmap) {
+      const center = this.surfaceRocks.getRockCenter(spawnIndex, this.heightmap, this._tractorOrigin)
+      if (!center) this._tractorOrigin.copy(impactPos)
+    } else {
+      this._tractorOrigin.copy(impactPos)
+    }
+    this._tractorVel.copy(this._tractorMuzzle).sub(this._tractorOrigin)
+    const distance = this._tractorVel.length()
+    if (distance < 0.01) return
+    const speed = distance / LevelViewController.TRACTOR_LIFETIME_SEC
+    this._tractorVel.multiplyScalar(speed / distance)
+    for (let i = 0; i < LevelViewController.TRACTOR_PARTICLES_PER_HIT; i++) {
+      tractor.emit(this._tractorOrigin, this._tractorVel)
     }
   }
 
@@ -2085,7 +2373,16 @@ export class LevelViewController implements Tickable {
     this.clearCollisionRegistrations()
     this.clearSurfaceRockCollisionRegistrations()
     this.projectileSystem?.dispose()
+    if (this.rockYieldSystem) {
+      this.rockYieldSystem.onMineralExtracted = null
+      this.rockYieldSystem.onConsume = null
+      this.rockYieldSystem = null
+    }
     this.impactEmitter?.dispose()
+    this.tractorEmitter?.dispose()
+    this.tractorEmitter = null
+    this.rockTargetIndicator?.dispose()
+    this.rockTargetIndicator = null
     this.multiTool?.dispose()
     this.playerController?.dispose()
     this.fpsCamera?.dispose()

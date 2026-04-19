@@ -443,17 +443,23 @@ export function offerEvaMission(
 
 /**
  * Accept the currently offered EVA mission. Moves it to the active list and
- * starts a restock timer.
+ * starts a restock timer. The waypoint is supplied by the caller so the POI is
+ * placed close to the giver planet's current world position.
  *
  * @param board - Current mission board state.
+ * @param waypoint - World-space coords where the POI prop should spawn.
  * @returns Updated board with the EVA mission accepted and timer started.
  */
-export function acceptEvaMission(board: ShuttleMissionBoard): ShuttleMissionBoard {
+export function acceptEvaMission(
+  board: ShuttleMissionBoard,
+  waypoint: { worldX: number; worldZ: number },
+): ShuttleMissionBoard {
   if (!board.offeredEvaMission || !board.offeringEvaPlanet) return board
 
   const newActive: ActiveVisitRelayMission = {
     template: board.offeredEvaMission,
     giverPlanet: board.offeringEvaPlanet,
+    waypoint,
     status: 'active',
   }
 

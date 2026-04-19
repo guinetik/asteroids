@@ -5,7 +5,7 @@
       "id": "saturn_ring_particle_sampler",
       "name": "Ring-Particle Sampler Servicing",
       "description": "The automated ring sampler is jammed — ice particle buildup on the collection aperture. EVA out and clear the inlet by hand.",
-      "waypoint": { "worldX": 4200, "worldZ": 1800 },
+      "poiType": "satellite",
       "minigameType": "relay_repair",
       "reward": 1500
     },
@@ -13,7 +13,7 @@
       "id": "saturn_titan_comms_uplink",
       "name": "Titan Comms Uplink Restore",
       "description": "The Titan relay uplink is broadcasting garbage. Bring up the diagnostic harness, EVA out, and reterminate the main backbone cable.",
-      "waypoint": { "worldX": -3900, "worldZ": -2200 },
+      "poiType": "relay_antenna",
       "minigameType": "relay_repair",
       "reward": 1900
     }

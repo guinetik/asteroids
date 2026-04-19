@@ -11,6 +11,7 @@
  */
 import * as THREE from 'three'
 import type { AtmosphereContext } from './AtmosphereContext'
+import { FPS_VIEWMODEL_LAYER } from '@/three/FpsCamera'
 
 /**
  * Shadow map resolution in pixels (width and height). Halved from 2048
@@ -67,6 +68,13 @@ export class LevelLightingRig {
     // ── Rim — opposite sun direction, cool blue ──
     this.rim = new THREE.DirectionalLight(RIM_COLOR, RIM_INTENSITY)
     this.rim.position.copy(ctx.sunDirection).multiplyScalar(-SUN_DISTANCE)
+
+    // World lighting must also illuminate the FPS view-model (gun)
+    // since the view-model lives on its own render layer to avoid
+    // being washed out by the helmet lights.
+    this.sun.layers.enable(FPS_VIEWMODEL_LAYER)
+    this.fill.layers.enable(FPS_VIEWMODEL_LAYER)
+    this.rim.layers.enable(FPS_VIEWMODEL_LAYER)
   }
 
   /** Add all lights to the scene. */

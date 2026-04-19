@@ -13,6 +13,16 @@
     { "itemId": "pyroxene", "sellPrice": 3 },
     { "itemId": "plagioclase-feldspar", "sellPrice": 4 },
     { "itemId": "iron-nickel-alloy", "sellPrice": 12 },
-    { "itemId": "water-ice", "sellPrice": 6 }
+    { "itemId": "water-ice", "sellPrice": 6 },
+    { "itemId": "troilite", "sellPrice": 4 },
+    { "itemId": "enstatite", "sellPrice": 3 },
+    { "itemId": "carbon-dioxide-ice", "sellPrice": 5 },
+    { "itemId": "ammonia-hydrate", "sellPrice": 5 },
+    { "itemId": "silicate-dust", "sellPrice": 2 },
+    { "itemId": "sodium-chloride", "sellPrice": 4 },
+    { "itemId": "basaltic-lava", "sellPrice": 5 },
+    { "itemId": "sulfur-deposits", "sellPrice": 4 },
+    { "itemId": "iron-oxide", "sellPrice": 3 },
+    { "itemId": "volcanic-glass", "sellPrice": 4 }
   ]
 }

@@ -5,7 +5,7 @@
       "id": "venus_atmo_dropsonde_refit",
       "name": "Atmospheric Dropsonde Refit",
       "description": "A dropsonde relay lost its parachute deployment seals after the last acid-storm pass. EVA to the satellite bus and re-seat the pyrotechnic cartridges.",
-      "waypoint": { "worldX": 480, "worldZ": 620 },
+      "poiType": "satellite",
       "minigameType": "relay_repair",
       "reward": 1400
     },
@@ -13,7 +13,7 @@
       "id": "venus_cloud_lidar_swap",
       "name": "Cloud LIDAR Emitter Swap",
       "description": "The high-altitude LIDAR array's emitter is drifting out of spec. Bring the new module, EVA across, and hot-swap it in place.",
-      "waypoint": { "worldX": -520, "worldZ": -300 },
+      "poiType": "relay_antenna",
       "minigameType": "relay_repair",
       "reward": 1600
     }

@@ -5,8 +5,8 @@ import type { ItemCategory } from '../types'
 const VALID_CATEGORIES = new Set<ItemCategory>(['mineral', 'consumable', 'equipment', 'trade-good'])
 
 describe('ITEM_CATALOG', () => {
-  it('contains 19 items', () => {
-    expect(Object.keys(ITEM_CATALOG)).toHaveLength(20)
+  it('contains 30 items', () => {
+    expect(Object.keys(ITEM_CATALOG)).toHaveLength(30)
   })
 
   it('all items have valid category', () => {
@@ -75,7 +75,7 @@ describe('getItemDefinition', () => {
 describe('getItemsByCategory', () => {
   it('returns only minerals for mineral category', () => {
     const minerals = getItemsByCategory('mineral')
-    expect(minerals.length).toBe(10)
+    expect(minerals.length).toBe(20)
     for (const item of minerals) {
       expect(item.category).toBe('mineral')
     }

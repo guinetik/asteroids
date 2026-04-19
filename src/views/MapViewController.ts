@@ -133,6 +133,7 @@ import type {
   GeneratedAsteroidMission,
 } from '@/lib/missions/types'
 import { getSpecialMissionById } from '@/lib/missions/specialMissions'
+import { generateEvaWaypoint } from '@/lib/missions/evaWaypointGenerator'
 import {
   clearActiveMission,
   consumePendingMapReturnWorld,
@@ -1667,6 +1668,7 @@ export class MapViewController implements Tickable {
         shuttlePosition: this.shuttleController.position,
         simTime: this.simTime,
         apparentSize: MAP_CONFIG.WAYPOINT_APPARENT_SIZE,
+        dt,
       })
     }
 
@@ -2255,7 +2257,13 @@ export class MapViewController implements Tickable {
 
   /** Accept the offered EVA mission (from shuttle control UI). */
   evaMissionAccept(): void {
-    this.missionFacade.evaMissionAccept(this.onMissionBoardUpdate)
+    const giverPlanetId = this.missionFacade.board.offeringEvaPlanet
+    if (!giverPlanetId) return
+    const index = PLANETS.findIndex((p) => p.id === giverPlanetId)
+    const giverController = index >= 0 ? this.planetControllers[index] : null
+    if (!giverController) return
+    const waypoint = generateEvaWaypoint(giverController.getWorldX(), giverController.getWorldZ())
+    this.missionFacade.evaMissionAccept(waypoint, this.onMissionBoardUpdate)
   }
 
   /** Complete the mission minigame (from overlay UI). */

@@ -2,12 +2,30 @@ import * as THREE from 'three'
 import type { WorldSphereCollider } from '@/lib/physics/worldCollision'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import type { SurfaceFeatures } from '@/lib/asteroids/types'
+import type { Tickable } from '@/lib/Tickable'
 import {
   generateAsteroidRockDistribution,
   type AsteroidRockSpawn,
   type RockExclusionZone,
 } from '@/lib/terrain/asteroidRockDistribution'
 import { loadGLB, fixMaterials } from '@/three/loadGLB'
+
+/** Seconds for a hit flash to decay back to neutral. */
+const FLASH_DURATION_SEC = 0.18
+/** Peak brightness multiplier applied to the per-instance color on hit. */
+const FLASH_PEAK_INTENSITY = 3.2
+/**
+ * Per-instance hit flash record. We keep the `mesh`/`localIndex` on
+ * the record so the tick loop can write back without re-querying the
+ * `instanceLocations` map on every frame.
+ */
+interface FlashRecord {
+  mesh: THREE.InstancedMesh
+  localIndex: number
+  remaining: number
+}
+const _flashColor = new THREE.Color()
+const _neutralColor = new THREE.Color(1, 1, 1)
 
 const SURFACE_ROCK_GLB_URL = '/models/asteroids.glb'
 const ROCK_TEXTURE_REPEAT = 1.35
@@ -153,10 +171,20 @@ function selectRockLookIndex(spawn: AsteroidRockSpawn, seed: number): number {
   return Math.min(ROCK_LOOKS.length - 1, Math.floor(normalized * ROCK_LOOKS.length))
 }
 
-export class SurfaceRockController {
+/** Internal record of where a spawn lives inside its instanced mesh. */
+interface RockInstanceLocation {
+  mesh: THREE.InstancedMesh
+  localIndex: number
+}
+
+export class SurfaceRockController implements Tickable {
   readonly group = new THREE.Group()
   readonly spawns: readonly AsteroidRockSpawn[]
   private readonly meshes: THREE.InstancedMesh[] = []
+  private readonly instanceLocations = new Map<number, RockInstanceLocation>()
+  private readonly hiddenSpawns = new Set<number>()
+  private readonly activeFlashes = new Map<number, FlashRecord>()
+  private static readonly _zeroMatrix = new THREE.Matrix4().scale(new THREE.Vector3(0, 0, 0))
 
   private constructor(spawns: AsteroidRockSpawn[]) {
     this.spawns = spawns
@@ -179,14 +207,14 @@ export class SurfaceRockController {
 
     const groupedSpawns = Array.from(
       { length: templates.length * ROCK_LOOKS.length },
-      () => [] as AsteroidRockSpawn[],
+      () => [] as { spawn: AsteroidRockSpawn; spawnIndex: number }[],
     )
 
     for (let i = 0; i < spawns.length; i++) {
       const spawn = spawns[i]!
       const templateIndex = i % templates.length
       const lookIndex = selectRockLookIndex(spawn, options.seed)
-      groupedSpawns[lookIndex * templates.length + templateIndex]!.push(spawn)
+      groupedSpawns[lookIndex * templates.length + templateIndex]!.push({ spawn, spawnIndex: i })
     }
 
     const reusablePos = new THREE.Vector3()
@@ -226,7 +254,8 @@ export class SurfaceRockController {
         mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage)
 
         for (let localIndex = 0; localIndex < bucket.length; localIndex++) {
-          const spawn = bucket[localIndex]!
+          const entry = bucket[localIndex]!
+          const spawn = entry.spawn
           const groundY = options.heightmap.heightAt(spawn.x, spawn.z)
           const scaleX = spawn.diameter
           const scaleY = spawn.diameter * spawn.heightRatio
@@ -242,6 +271,7 @@ export class SurfaceRockController {
           reusableQuat.setFromEuler(reusableEuler)
           reusableMatrix.compose(reusablePos, reusableQuat, reusableScale)
           mesh.setMatrixAt(localIndex, reusableMatrix)
+          controller.instanceLocations.set(entry.spawnIndex, { mesh, localIndex })
         }
 
         mesh.instanceMatrix.needsUpdate = true
@@ -270,7 +300,7 @@ export class SurfaceRockController {
       const exposedHeight = spawn.diameter * spawn.heightRatio * (1 - spawn.burial * 0.35)
       const centerY = heightmap.heightAt(spawn.x, spawn.z) + Math.max(radius * 0.7, exposedHeight * 0.45)
       return {
-        id: `surface-rock-${index}`,
+        id: rockColliderId(index),
         kind: 'sphere',
         center: { x: spawn.x, y: centerY, z: spawn.z },
         radius,
@@ -279,4 +309,133 @@ export class SurfaceRockController {
       }
     })
   }
+
+  /**
+   * Hide the visual instance for `spawnIndex` by zero-scaling its
+   * matrix. Idempotent — repeated calls are no-ops. Caller is
+   * responsible for removing the matching collider via the level's
+   * collider registry.
+   */
+  hideRock(spawnIndex: number): void {
+    if (this.hiddenSpawns.has(spawnIndex)) return
+    const location = this.instanceLocations.get(spawnIndex)
+    if (!location) return
+    location.mesh.setMatrixAt(location.localIndex, SurfaceRockController._zeroMatrix)
+    location.mesh.instanceMatrix.needsUpdate = true
+    this.hiddenSpawns.add(spawnIndex)
+  }
+
+  /** True when a given spawn has been hidden (mined out). */
+  isHidden(spawnIndex: number): boolean {
+    return this.hiddenSpawns.has(spawnIndex)
+  }
+
+  /**
+   * Lazily allocate a per-instance color buffer on `mesh` so individual
+   * rocks can be tinted without affecting their batch siblings. The
+   * buffer is initialised to neutral white (1,1,1) so the standard
+   * material behaves identically until {@link flashRock} is called.
+   *
+   * Idempotent — repeated calls reuse the existing attribute.
+   */
+  private ensureInstanceColors(mesh: THREE.InstancedMesh): void {
+    if (mesh.instanceColor) return
+    const count = mesh.count
+    const colors = new Float32Array(count * 3)
+    for (let i = 0; i < count; i++) {
+      colors[i * 3] = 1
+      colors[i * 3 + 1] = 1
+      colors[i * 3 + 2] = 1
+    }
+    mesh.instanceColor = new THREE.InstancedBufferAttribute(colors, 3)
+    mesh.instanceColor.setUsage(THREE.DynamicDrawUsage)
+    mesh.instanceColor.needsUpdate = true
+  }
+
+  /**
+   * Briefly tint a single rock white-hot to acknowledge a projectile
+   * hit. Subsequent calls on the same `spawnIndex` retrigger the flash,
+   * matching the visual feedback that enemies use via their per-controller
+   * `flash()` method. Mined-out (hidden) rocks are ignored so we don't
+   * resurrect zero-scaled instances.
+   */
+  flashRock(spawnIndex: number): void {
+    if (this.hiddenSpawns.has(spawnIndex)) return
+    const location = this.instanceLocations.get(spawnIndex)
+    if (!location) return
+    this.ensureInstanceColors(location.mesh)
+    const existing = this.activeFlashes.get(spawnIndex)
+    if (existing) {
+      existing.remaining = FLASH_DURATION_SEC
+    } else {
+      this.activeFlashes.set(spawnIndex, {
+        mesh: location.mesh,
+        localIndex: location.localIndex,
+        remaining: FLASH_DURATION_SEC,
+      })
+    }
+    _flashColor.setRGB(FLASH_PEAK_INTENSITY, FLASH_PEAK_INTENSITY, FLASH_PEAK_INTENSITY)
+    location.mesh.setColorAt(location.localIndex, _flashColor)
+    if (location.mesh.instanceColor) location.mesh.instanceColor.needsUpdate = true
+  }
+
+  /**
+   * Decay every active hit-flash toward neutral white and finalise any
+   * that have expired. Cheap when nothing is flashing — only iterates
+   * the active set, never the full instance pool.
+   */
+  tick(dt: number): void {
+    if (this.activeFlashes.size === 0) return
+    const finished: number[] = []
+    for (const [spawnIndex, record] of this.activeFlashes) {
+      record.remaining -= dt
+      if (record.remaining <= 0) {
+        record.mesh.setColorAt(record.localIndex, _neutralColor)
+        if (record.mesh.instanceColor) record.mesh.instanceColor.needsUpdate = true
+        finished.push(spawnIndex)
+        continue
+      }
+      const t = record.remaining / FLASH_DURATION_SEC
+      const intensity = 1 + (FLASH_PEAK_INTENSITY - 1) * t
+      _flashColor.setRGB(intensity, intensity, intensity)
+      record.mesh.setColorAt(record.localIndex, _flashColor)
+      if (record.mesh.instanceColor) record.mesh.instanceColor.needsUpdate = true
+    }
+    for (const spawnIndex of finished) this.activeFlashes.delete(spawnIndex)
+  }
+
+  /**
+   * World-space center of the rock's collision sphere. Used by the
+   * level controller to spawn tractor particles that home toward the
+   * player's gun. Returns `null` when the spawn is unknown.
+   */
+  getRockCenter(spawnIndex: number, heightmap: Heightmap, out: THREE.Vector3): THREE.Vector3 | null {
+    const spawn = this.spawns[spawnIndex]
+    if (!spawn) return null
+    const radius = Math.max(1.2, spawn.diameter * 0.34)
+    const exposedHeight = spawn.diameter * spawn.heightRatio * (1 - spawn.burial * 0.35)
+    const centerY = heightmap.heightAt(spawn.x, spawn.z) + Math.max(radius * 0.7, exposedHeight * 0.45)
+    return out.set(spawn.x, centerY, spawn.z)
+  }
+
+  /**
+   * Effective collision-sphere radius for a registered spawn, in
+   * world units. Mirrors the radius used by {@link getRockCenter} so
+   * UI elements (e.g. the targeting HP bar) can clear the visible
+   * surface of the rock instead of intersecting it on big spawns.
+   */
+  getRockRadius(spawnIndex: number): number | null {
+    const spawn = this.spawns[spawnIndex]
+    if (!spawn) return null
+    return Math.max(1.2, spawn.diameter * 0.34)
+  }
+}
+
+/**
+ * Canonical collider id for a surface rock at `spawnIndex`.
+ * Kept exported so the level controller can route hits/removals
+ * without duplicating the format string.
+ */
+export function rockColliderId(spawnIndex: number): string {
+  return `surface-rock-${spawnIndex}`
 }

@@ -78,7 +78,7 @@ function objectiveSummary(mission: GeneratedAsteroidMission): string {
 
 function evaMissionStatusLabel(mission: ActiveVisitRelayMission): string {
   if (mission.status === 'active') {
-    const { worldX, worldZ } = mission.template.waypoint
+    const { worldX, worldZ } = mission.waypoint
     return `Travel to waypoint (${Math.round(worldX)}, ${Math.round(worldZ)})`
   }
   return `Return to ${targetPlanetName(mission.giverPlanet)}`
@@ -151,11 +151,7 @@ function regionLabel(region: MissionRegion): string {
         <div class="mission-board-offer__name">{{ board.offeredEvaMission.name }}</div>
         <div class="mission-board-offer__desc">{{ board.offeredEvaMission.description }}</div>
         <div class="mission-board-offer__meta">
-          <span>
-            Waypoint:
-            ({{ Math.round(board.offeredEvaMission.waypoint.worldX) }},
-            {{ Math.round(board.offeredEvaMission.waypoint.worldZ) }})
-          </span>
+          <span>Waypoint: near {{ targetPlanetName(dockedPlanet) }}</span>
           <span>Reward: {{ board.offeredEvaMission.reward }} CR</span>
         </div>
         <button

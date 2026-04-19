@@ -5,7 +5,7 @@
       "id": "mars_methane_prospector_calibration",
       "name": "Methane Prospector Calibration",
       "description": "Methane-sniffing prospector satellite is reading negatives across all orbits — almost certainly a sensor drift issue. EVA and recalibrate the mass spectrometer.",
-      "waypoint": { "worldX": 1800, "worldZ": 960 },
+      "poiType": "satellite",
       "minigameType": "relay_repair",
       "reward": 1500
     },
@@ -13,7 +13,7 @@
       "id": "mars_sample_return_beacon",
       "name": "Sample-Return Beacon Check",
       "description": "The beacon that will guide the next sample-return capsule home has a flaky GPS module. EVA out, swap the board, verify lock.",
-      "waypoint": { "worldX": -1640, "worldZ": 520 },
+      "poiType": "relay_antenna",
       "minigameType": "relay_repair",
       "reward": 1700
     }

@@ -34,7 +34,14 @@ const TERRAIN_TILT_LERP_SPEED = 4
 
 /** Helmet light to keep the immediate look direction readable in EVA. */
 const HELMET_LIGHT_COLOR = 0xf4f7ff
-const HELMET_LIGHT_INTENSITY = 110
+/**
+ * Boosted from 110 → 280. Combined with the lower decay (was 1.35)
+ * the spot now actually delivers usable lux at the 8–25u mining
+ * range instead of fading into the ambient floor on dark asteroids.
+ * Spotlight cost is fragment-in-cone bound, not intensity bound, so
+ * boosting brightness is essentially free.
+ */
+const HELMET_LIGHT_INTENSITY = 180
 /**
  * Halved from 240 in the v4 perf pass. The previous range lit fragments
  * up to 240 units away — well past the player's typical interaction
@@ -44,16 +51,71 @@ const HELMET_LIGHT_INTENSITY = 110
  * @spec docs/superpowers/specs/2026-04-18-fps-perf-fixes-design.md (v4)
  */
 const HELMET_LIGHT_DISTANCE = 120
-const HELMET_LIGHT_ANGLE = Math.PI * 0.16
-const HELMET_LIGHT_PENUMBRA = 0.9
-const HELMET_LIGHT_DECAY = 1.35
-const HELMET_LIGHT_X_OFFSET = -0.18
-const HELMET_LIGHT_Y_OFFSET = 0.22
-const HELMET_LIGHT_Z_OFFSET = -0.08
+/** Widened from π*0.16 (~29°) → π*0.22 (~40°) so peripheral rocks aren't black. */
+const HELMET_LIGHT_ANGLE = Math.PI * 0.22
+/**
+ * Tightened from 0.9 → 0.55. With 0.9 only a tiny inner pinhole was
+ * at full brightness and most of the visible cone sat in the soft
+ * fade band, which is why rocks "right in front of you" still looked
+ * dark. 0.55 gives a solid hotspot with a soft outer feather.
+ */
+const HELMET_LIGHT_PENUMBRA = 0.55
+/**
+ * Lowered from 1.35 → 0.95. Sub-quadratic falloff so the beam still
+ * lights mineable rocks at 15–25u instead of decaying into nothing.
+ */
+const HELMET_LIGHT_DECAY = 1.1
+/**
+ * Light origin in camera-local space — modelled as an under-barrel
+ * tactical lantern slung beneath the multitool, just below where
+ * projectiles leave the muzzle. The multitool sits at roughly
+ * (x ≈ +0.35, y ≈ -0.45, z ≈ -0.7) with the barrel reaching to
+ * z ≈ -1.7, so the lantern origin sits a hair lower than the barrel
+ * and slightly forward of the muzzle. From there the cone projects
+ * straight ahead, so the gun is *behind* the emission volume and
+ * never sits inside it. The view-model also stays on its own render
+ * layer ({@link FPS_VIEWMODEL_LAYER}) as a belt-and-suspenders
+ * safeguard against any penumbra spill.
+ */
+const HELMET_LIGHT_X_OFFSET = 0.34
+const HELMET_LIGHT_Y_OFFSET = -0.58
+const HELMET_LIGHT_Z_OFFSET = -1.94
+/** Aim straight along camera forward — the lantern is bore-sighted with the gun. */
+const HELMET_LIGHT_TARGET_X = 0
+const HELMET_LIGHT_TARGET_Y = 0
 const HELMET_LIGHT_TARGET_DISTANCE = 180
-const HELMET_LIGHT_CONE_RADIUS = 20
+/**
+ * Visible additive cone is disabled — it was reading as a floating
+ * triangle in front of the camera once the emitter moved out of the
+ * helmet and onto the gun. The actual SpotLight contribution still
+ * draws the bright pool on geometry the cone hits.
+ */
+const HELMET_LIGHT_CONE_RADIUS = 14
 const HELMET_LIGHT_CONE_LENGTH = 180
-const HELMET_LIGHT_CONE_OPACITY = 0.035
+const HELMET_LIGHT_CONE_VISIBLE = false
+
+/**
+ * Short-range fill light. Co-located with the lantern under the
+ * barrel so the gun is never inside its falloff but the world a few
+ * meters in front of you stays readable.
+ */
+const HELMET_FILL_COLOR = 0xc8d6ff
+const HELMET_FILL_INTENSITY = 10
+const HELMET_FILL_DISTANCE = 10
+const HELMET_FILL_DECAY = 1.6
+const HELMET_FILL_X_OFFSET = 0.32
+const HELMET_FILL_Y_OFFSET = -0.58
+const HELMET_FILL_Z_OFFSET = -1.94
+
+/**
+ * Render layer reserved for the FPS view-model (gun, hands, arm-
+ * mounted UI). The camera enables this layer so the view-model
+ * renders; world lighting (sun / fill / rim) also enables it so the
+ * view-model is still lit naturally; the helmet lights stay on the
+ * default layer only so they cannot illuminate the gun barrel and
+ * wash it out.
+ */
+export const FPS_VIEWMODEL_LAYER = 1
 
 /** Tuning knobs for the FPS camera. */
 export interface FpsCameraConfig {
@@ -82,6 +144,12 @@ export class FpsCamera implements Tickable {
   readonly helmetLight: THREE.SpotLight
   readonly helmetLightTarget: THREE.Object3D
   readonly helmetLightCone: THREE.Mesh
+  /**
+   * Short-range omnidirectional fill that hugs the camera so close
+   * objects stay readable even when the spotlight cone is pointed
+   * elsewhere. Disposed alongside {@link helmetLight}.
+   */
+  readonly helmetFillLight: THREE.PointLight
 
   /** Current yaw angle in radians (horizontal rotation). */
   yaw = 0
@@ -107,6 +175,7 @@ export class FpsCamera implements Tickable {
   constructor(config: FpsCameraConfig) {
     this.config = config
     this.camera = new THREE.PerspectiveCamera(config.fov, 1, 0.01, 5000)
+    this.camera.layers.enable(FPS_VIEWMODEL_LAYER)
     this.baseFov = config.fov
     this.currentFov = config.fov
     this.targetFov = config.fov
@@ -127,7 +196,11 @@ export class FpsCamera implements Tickable {
     )
 
     this.helmetLightTarget = new THREE.Object3D()
-    this.helmetLightTarget.position.set(0, 0, -HELMET_LIGHT_TARGET_DISTANCE)
+    this.helmetLightTarget.position.set(
+      HELMET_LIGHT_TARGET_X,
+      HELMET_LIGHT_TARGET_Y,
+      -HELMET_LIGHT_TARGET_DISTANCE,
+    )
     this.helmetLight.target = this.helmetLightTarget
 
     const coneGeometry = new THREE.CylinderGeometry(
@@ -142,7 +215,7 @@ export class FpsCamera implements Tickable {
     const coneMaterial = new THREE.MeshBasicMaterial({
       color: HELMET_LIGHT_COLOR,
       transparent: true,
-      opacity: HELMET_LIGHT_CONE_OPACITY,
+      opacity: 0.02,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
@@ -150,10 +223,24 @@ export class FpsCamera implements Tickable {
     this.helmetLightCone = new THREE.Mesh(coneGeometry, coneMaterial)
     this.helmetLightCone.position.copy(this.helmetLight.position)
     this.helmetLightCone.renderOrder = 1
+    this.helmetLightCone.visible = HELMET_LIGHT_CONE_VISIBLE
+
+    this.helmetFillLight = new THREE.PointLight(
+      HELMET_FILL_COLOR,
+      HELMET_FILL_INTENSITY,
+      HELMET_FILL_DISTANCE,
+      HELMET_FILL_DECAY,
+    )
+    this.helmetFillLight.position.set(
+      HELMET_FILL_X_OFFSET,
+      HELMET_FILL_Y_OFFSET,
+      HELMET_FILL_Z_OFFSET,
+    )
 
     this.helmetLightRig.add(this.helmetLight)
     this.helmetLightRig.add(this.helmetLightTarget)
     this.helmetLightRig.add(this.helmetLightCone)
+    this.helmetLightRig.add(this.helmetFillLight)
     this.helmetLightRig.visible = false
   }
 
@@ -281,6 +368,7 @@ export class FpsCamera implements Tickable {
 
   dispose(): void {
     this.helmetLight.dispose()
+    this.helmetFillLight.dispose()
     this.helmetLightCone.geometry.dispose()
     if (Array.isArray(this.helmetLightCone.material)) {
       this.helmetLightCone.material.forEach((m) => m.dispose())

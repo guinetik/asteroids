@@ -5,7 +5,7 @@
       "id": "jupiter_magnetosphere_buoy",
       "name": "Magnetosphere Buoy Reboot",
       "description": "A magnetosphere buoy is glitching under Jupiter's radiation belt. EVA across, flash the rad-hardened firmware, bring back the data logs.",
-      "waypoint": { "worldX": 3200, "worldZ": -2400 },
+      "poiType": "relay_antenna",
       "minigameType": "relay_repair",
       "reward": 1500
     },
@@ -13,7 +13,7 @@
       "id": "jupiter_io_torus_probe",
       "name": "Io Torus Sulfur Probe",
       "description": "The sulfur-monitoring probe in the Io plasma torus is offline. Replace the ion-pitted mass analyzer and realign the antenna.",
-      "waypoint": { "worldX": -2800, "worldZ": 3100 },
+      "poiType": "satellite",
       "minigameType": "relay_repair",
       "reward": 1800
     }

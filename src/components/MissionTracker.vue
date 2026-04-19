@@ -54,6 +54,9 @@ defineProps<{
           >
             <span class="tracker-step-icon">{{ step.complete ? '\u2713' : '\u203A' }}</span>
             <span class="tracker-step-label">{{ step.label }}</span>
+            <span v-if="step.progress" class="tracker-step-progress">
+              {{ step.progress.current }}/{{ step.progress.target }} {{ step.progress.unit }}
+            </span>
           </div>
         </div>
       </div>
@@ -164,5 +167,14 @@ defineProps<{
 }
 .tracker-step--active .tracker-step-icon {
   color: rgba(0, 255, 204, 0.9);
+}
+.tracker-step-progress {
+  margin-left: auto;
+  padding-left: 0.5rem;
+  font-variant-numeric: tabular-nums;
+  color: rgba(0, 255, 204, 0.7);
+}
+.tracker-step--complete .tracker-step-progress {
+  color: rgba(0, 255, 204, 0.5);
 }
 </style>

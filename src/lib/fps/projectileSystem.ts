@@ -34,6 +34,18 @@ const BOLT_DAMAGE = 25
 /** HP restored when a med bolt hits a hostage. */
 const HEAL_BOLT_AMOUNT = 25
 
+/** Sphere registration for a mineable surface rock. */
+export interface MineableRockEntry {
+  /** Stable spawn index from the rock distribution. */
+  spawnIndex: number
+  /** Sphere center in world space. */
+  cx: number
+  cy: number
+  cz: number
+  /** Sphere radius for swept collision. */
+  radius: number
+}
+
 /** Internal projectile state. */
 interface Projectile {
   mesh: THREE.Mesh
@@ -58,6 +70,7 @@ export class ProjectileSystem implements Tickable {
   private readonly heightmap: Heightmap
   private readonly enemies: Enemy[] = []
   private readonly hostages: Hostage[] = []
+  private readonly rocks: MineableRockEntry[] = []
   private damageMultiplier = 1
   private readonly _hostageCenter = new THREE.Vector3()
   private static readonly boltGeometry = (() => {
@@ -95,6 +108,16 @@ export class ProjectileSystem implements Tickable {
     position: THREE.Vector3,
     effect: 'damage' | 'heal',
   ) => void) | null = null
+
+  /**
+   * Called when a **drill** bolt hits a registered mineable rock.
+   *
+   * @param spawnIndex - Stable id of the hit rock (matches the
+   *   collider id `surface-rock-${spawnIndex}`).
+   * @param position - **Transient** impact point. Mutated on the next
+   *   callback; copy if you need to keep it past the synchronous handler body.
+   */
+  onRockHit: ((spawnIndex: number, position: THREE.Vector3) => void) | null = null
 
   /**
    * Reused scratch position for impact/hit callbacks. Allocated once per
@@ -140,6 +163,64 @@ export class ProjectileSystem implements Tickable {
     const idx = this.hostages.indexOf(hostage)
     if (idx >= 0) this.hostages.splice(idx, 1)
   }
+
+  /**
+   * Register a mineable surface rock. Drill bolts (only) will collide
+   * with the registered sphere and emit `onRockHit`.
+   */
+  addRock(entry: MineableRockEntry): void {
+    this.rocks.push(entry)
+  }
+
+  /** Remove a rock from drill collision checks (e.g. after depletion). */
+  removeRock(spawnIndex: number): void {
+    const idx = this.rocks.findIndex((r) => r.spawnIndex === spawnIndex)
+    if (idx >= 0) this.rocks.splice(idx, 1)
+  }
+
+  /**
+   * Ray-pick the nearest registered mineable rock along
+   * `origin → origin + dir * maxDistance`. Returns the spawn index
+   * and intersection distance, or `null` when nothing is hit.
+   *
+   * Cheap — reuses the same swept-sphere math as drill bolts but
+   * with arbitrary segment length, so the HUD can highlight the rock
+   * the player is currently aiming at without spinning up a Three.js
+   * `Raycaster` against thousands of instanced rocks.
+   *
+   * @param origin Camera world-space position.
+   * @param dir Normalised camera forward.
+   * @param maxDistance Maximum range of the pick (world units).
+   */
+  pickRock(
+    origin: THREE.Vector3,
+    dir: THREE.Vector3,
+    maxDistance: number,
+  ): { spawnIndex: number; distance: number } | null {
+    if (this.rocks.length === 0) return null
+    const tx = origin.x + dir.x * maxDistance
+    const ty = origin.y + dir.y * maxDistance
+    const tz = origin.z + dir.z * maxDistance
+    this._pickFrom.copy(origin)
+    this._pickTo.set(tx, ty, tz)
+    let best: { spawnIndex: number; distance: number } | null = null
+    for (const rock of this.rocks) {
+      const t = this.segmentEnterSphereT(
+        this._pickFrom, this._pickTo,
+        rock.cx, rock.cy, rock.cz, rock.radius,
+      )
+      if (t === null) continue
+      const distance = t * maxDistance
+      if (best === null || distance < best.distance) {
+        best = { spawnIndex: rock.spawnIndex, distance }
+      }
+    }
+    return best
+  }
+
+  /** Reused scratch for {@link pickRock}. */
+  private readonly _pickFrom = new THREE.Vector3()
+  private readonly _pickTo = new THREE.Vector3()
 
   /**
    * Spawn a bolt projectile.
@@ -200,6 +281,7 @@ export class ProjectileSystem implements Tickable {
       // Med bolts: only hostages (closest along segment). Weapon/drill: enemies; weapon also contests hostages (friendly fire) with closest-hit wins.
       let hitEnemy = false
       let hitHostage = false
+      let hitRock = false
 
       if (p.boltKind === 'heal') {
         const healHit = this.closestHostageHealHit(this._prevPos, pos)
@@ -222,6 +304,17 @@ export class ProjectileSystem implements Tickable {
           this.onHostageBolt?.(combatHit.hostage, this._callbackPos, 'damage')
           hitHostage = true
         }
+
+        // Drill bolts also mine registered rocks. Combat hits win first
+        // so a rock standing right next to an enemy doesn't eat the bolt.
+        if (!hitEnemy && !hitHostage && p.boltKind === 'drill') {
+          const rockHit = this.closestRockHit(this._prevPos, pos)
+          if (rockHit) {
+            this._callbackPos.copy(pos)
+            this.onRockHit?.(rockHit.spawnIndex, this._callbackPos)
+            hitRock = true
+          }
+        }
       }
 
       // Terrain collision
@@ -229,14 +322,32 @@ export class ProjectileSystem implements Tickable {
       const hitTerrain = pos.y <= floorY + TERRAIN_HIT_MARGIN
 
       // Remove on hit or timeout
-      if (hitEnemy || hitHostage || hitTerrain || p.age >= BOLT_MAX_LIFETIME) {
-        if (hitTerrain || hitEnemy || hitHostage) {
+      if (hitEnemy || hitHostage || hitRock || hitTerrain || p.age >= BOLT_MAX_LIFETIME) {
+        if (hitTerrain || hitEnemy || hitHostage || hitRock) {
           this._callbackPos.copy(pos)
           this.onImpact?.(this._callbackPos)
         }
         this.removeProjectile(i)
       }
     }
+  }
+
+  /**
+   * Closest mineable rock along the swept segment. Used only by drill
+   * bolts; weapon bolts and med bolts ignore the rock registry.
+   */
+  private closestRockHit(
+    from: THREE.Vector3,
+    to: THREE.Vector3,
+  ): { spawnIndex: number; t: number } | null {
+    let best: { spawnIndex: number; t: number } | null = null
+    for (const rock of this.rocks) {
+      const t = this.segmentEnterSphereT(from, to, rock.cx, rock.cy, rock.cz, rock.radius)
+      if (t !== null && (best === null || t < best.t)) {
+        best = { spawnIndex: rock.spawnIndex, t }
+      }
+    }
+    return best
   }
 
   /**
