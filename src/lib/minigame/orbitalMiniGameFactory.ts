@@ -24,7 +24,7 @@ import type { ActiveVisitRelayMission } from '@/lib/missions/types'
  * @param minigameType - The minigame type from planet-orbital-config.json or EVA mission template.
  * @param targetGas - The gather quantity from the mission template.
  * @param planetId - The target planet id (used by probe-deploy and similar minigames).
- * @param mission - The active EVA mission, when the caller is on the EVA path. Gather-mission callers omit.
+ * @param _mission - The active EVA mission, when the caller is on the EVA path. Gather-mission callers omit.
  * @returns A new OrbitalMiniGame instance.
  *
  * @author guinetik
@@ -35,11 +35,10 @@ export function createOrbitalMiniGame(
   minigameType: string,
   targetGas: number,
   planetId?: string,
-  mission?: ActiveVisitRelayMission,
+  // `_mission` is reserved for EVA minigames (satellite_servicing) that read
+  // mission-level data like brokenComponents. All current cases ignore it.
+  _mission?: ActiveVisitRelayMission,
 ): OrbitalMiniGame {
-  // `mission` is currently unused by every existing case. It's reserved for EVA
-  // minigames (satellite_servicing) that read mission-level data like brokenComponents.
-  void mission
   switch (minigameType) {
     case 'gas-collection':
       return new GasCollectionMiniGame(missionId, targetGas)
