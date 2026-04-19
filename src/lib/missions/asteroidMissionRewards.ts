@@ -12,7 +12,12 @@
 import type { GeneratedAsteroidMission } from '@/lib/missions/types'
 import { addItem, createInventory } from '@/lib/inventory/inventory'
 import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
-import { clearActiveMission, savePendingMapReturnWorld } from '@/lib/missions/missionStorage'
+import {
+  clearActiveMission,
+  loadMissionBoard,
+  saveMissionBoard,
+  savePendingMapReturnWorld,
+} from '@/lib/missions/missionStorage'
 import {
   addCredits,
   loadProfile,
@@ -63,5 +68,14 @@ export function persistCompletedAsteroidMissionRewards(
     worldX: mission.waypoint.worldX,
     worldZ: mission.waypoint.worldZ,
   })
+
+  const board = loadMissionBoard()
+  if (board?.activeAsteroidMission?.id === mission.id) {
+    saveMissionBoard({
+      ...board,
+      activeAsteroidMission: null,
+    })
+  }
+
   clearActiveMission()
 }

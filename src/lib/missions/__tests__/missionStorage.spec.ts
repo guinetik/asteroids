@@ -1,14 +1,18 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   saveActiveMission,
   loadActiveMission,
   clearActiveMission,
   ACTIVE_MISSION_KEY,
+  saveMissionBoard,
+  loadMissionBoard,
+  clearMissionBoard,
+  MISSION_BOARD_KEY,
   savePendingMapReturnWorld,
   consumePendingMapReturnWorld,
   PENDING_MAP_RETURN_WORLD_KEY,
 } from '../missionStorage'
-import type { GeneratedAsteroidMission } from '../types'
+import type { GeneratedAsteroidMission, ShuttleMissionBoard } from '../types'
 
 const MOCK_MISSION: GeneratedAsteroidMission = {
   kind: 'standard',
@@ -27,8 +31,63 @@ const MOCK_MISSION: GeneratedAsteroidMission = {
   status: 'accepted',
 }
 
+const MOCK_BOARD: ShuttleMissionBoard = {
+  offeredMission: {
+    id: 'earth_mars_methane',
+    name: 'Mars Methane Run',
+    description: 'Collect a methane sample from Mars orbit.',
+    targetPlanet: 'mars',
+    gatherQuantity: 4,
+    reward: 900,
+  },
+  offeringPlanet: 'earth',
+  restockTimer: { remaining: 120, total: 180 },
+  activeMissions: [
+    {
+      template: {
+        id: 'earth_venus_gas_science',
+        name: 'Venus Gas Science',
+        description: 'Collect dense atmospheric gas.',
+        targetPlanet: 'venus',
+        gatherQuantity: 3,
+        reward: 1200,
+      },
+      giverPlanet: 'earth',
+      status: 'active',
+    },
+  ],
+  offeredAsteroidMission: null,
+  activeAsteroidMission: MOCK_MISSION,
+  asteroidRestockTimer: { remaining: 60, total: 120 },
+  offeredEvaMission: {
+    id: 'earth_relay_tx4_reboot',
+    name: 'Relay TX-4 Reboot',
+    description: 'Fly out and reboot the relay.',
+    waypoint: { worldX: 250, worldZ: -100 },
+    minigameType: 'relay-reboot',
+    reward: 1400,
+  },
+  offeringEvaPlanet: 'earth',
+  evaRestockTimer: { remaining: 90, total: 150 },
+  activeEvaMissions: [
+    {
+      template: {
+        id: 'earth_probe_maintenance',
+        name: 'Probe Maintenance',
+        description: 'Service the old probe.',
+        waypoint: { worldX: -400, worldZ: 220 },
+        minigameType: 'probe-maintenance',
+        reward: 1600,
+      },
+      giverPlanet: 'earth',
+      status: 'active',
+    },
+  ],
+}
+
 beforeEach(() => {
   localStorage.removeItem(ACTIVE_MISSION_KEY)
+  localStorage.removeItem(MISSION_BOARD_KEY)
   localStorage.removeItem(PENDING_MAP_RETURN_WORLD_KEY)
 })
 
@@ -71,6 +130,65 @@ describe('clearActiveMission', () => {
     saveActiveMission(MOCK_MISSION)
     clearActiveMission()
     expect(loadActiveMission()).toBeNull()
+  })
+})
+
+describe('mission board persistence', () => {
+  it('persists the mission board to localStorage', () => {
+    saveMissionBoard(MOCK_BOARD)
+    const raw = localStorage.getItem(MISSION_BOARD_KEY)
+    expect(raw).not.toBeNull()
+    expect(JSON.parse(raw!).board.activeMissions).toHaveLength(1)
+    expect(JSON.parse(raw!).board.activeEvaMissions).toHaveLength(1)
+  })
+
+  it('returns null when no mission board is saved', () => {
+    expect(loadMissionBoard()).toBeNull()
+  })
+
+  it('restores a saved mission board', () => {
+    saveMissionBoard(MOCK_BOARD)
+    const loaded = loadMissionBoard()
+    expect(loaded).not.toBeNull()
+    expect(loaded!.activeMissions[0]!.template.id).toBe('earth_venus_gas_science')
+    expect(loaded!.activeEvaMissions[0]!.template.id).toBe('earth_probe_maintenance')
+    expect(loaded!.activeAsteroidMission?.id).toBe(MOCK_MISSION.id)
+  })
+
+  it('subtracts elapsed time from restock timers on load', () => {
+    const nowSpy = vi.spyOn(Date, 'now')
+    nowSpy.mockReturnValue(1_000_000)
+    saveMissionBoard(MOCK_BOARD)
+    nowSpy.mockReturnValue(1_030_000)
+
+    const loaded = loadMissionBoard()
+    expect(loaded).not.toBeNull()
+    expect(loaded!.restockTimer!.remaining).toBeCloseTo(90)
+    expect(loaded!.asteroidRestockTimer!.remaining).toBeCloseTo(30)
+    expect(loaded!.evaRestockTimer!.remaining).toBeCloseTo(60)
+
+    nowSpy.mockRestore()
+  })
+
+  it('drops expired restock timers on load', () => {
+    const nowSpy = vi.spyOn(Date, 'now')
+    nowSpy.mockReturnValue(2_000_000)
+    saveMissionBoard(MOCK_BOARD)
+    nowSpy.mockReturnValue(2_200_000)
+
+    const loaded = loadMissionBoard()
+    expect(loaded).not.toBeNull()
+    expect(loaded!.restockTimer).toBeNull()
+    expect(loaded!.asteroidRestockTimer).toBeNull()
+    expect(loaded!.evaRestockTimer).toBeNull()
+
+    nowSpy.mockRestore()
+  })
+
+  it('clears the persisted mission board', () => {
+    saveMissionBoard(MOCK_BOARD)
+    clearMissionBoard()
+    expect(loadMissionBoard()).toBeNull()
   })
 })
 
