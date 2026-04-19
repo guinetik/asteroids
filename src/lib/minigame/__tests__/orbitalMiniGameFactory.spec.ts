@@ -6,6 +6,7 @@ import { IceHarvestMiniGame } from '../iceHarvest/IceHarvestMiniGame'
 import { MaintenanceMiniGame } from '../maintenance/MaintenanceMiniGame'
 import { LogisticsRouteMiniGame } from '../logistics/LogisticsRouteMiniGame'
 import { ProbeDeployMiniGame } from '../probeDeploy/ProbeDeployMiniGame'
+import { SatelliteServicingMiniGame } from '../satelliteServicing/SatelliteServicingMiniGame'
 import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 
 describe('createOrbitalMiniGame', () => {
@@ -85,6 +86,66 @@ describe('createOrbitalMiniGame', () => {
     const mg = createOrbitalMiniGame('m', 'maintenance', 3, 'earth', mission)
     expect(mg.missionId).toBe('m')
   })
+
+  it('returns SatelliteServicingMiniGame when mission has brokenComponents', () => {
+    const mission = {
+      template: {
+        id: 'earth_sat_patch',
+        name: 'Cubesat Patch',
+        description: '',
+        poiType: 'satellite',
+        minigameType: 'satellite_servicing',
+        reward: 1500,
+      },
+      giverPlanet: 'earth',
+      waypoint: { worldX: 0, worldZ: 0, poiLocalY: 0 },
+      status: 'active',
+      brokenComponents: ['satellite_antenna', 'satellite_solar_A'],
+    } as ActiveVisitRelayMission
+    const mg = createOrbitalMiniGame(
+      'earth_sat_patch',
+      'satellite_servicing',
+      0,
+      'earth',
+      mission,
+    )
+    expect(mg).toBeInstanceOf(SatelliteServicingMiniGame)
+    expect((mg as SatelliteServicingMiniGame).brokenComponents).toEqual([
+      'satellite_antenna',
+      'satellite_solar_A',
+    ])
+    expect(mg.presentation).toBe('in_scene')
+  })
+
+  it('falls back to Default for satellite_servicing when mission has no brokenComponents', () => {
+    const mission = {
+      template: {
+        id: 'earth_sat_patch',
+        name: 'Cubesat Patch',
+        description: '',
+        poiType: 'telescope', // no manifest — damage roll returns undefined
+        minigameType: 'satellite_servicing',
+        reward: 1500,
+      },
+      giverPlanet: 'earth',
+      waypoint: { worldX: 0, worldZ: 0, poiLocalY: 0 },
+      status: 'active',
+      // brokenComponents intentionally absent
+    } as ActiveVisitRelayMission
+    const mg = createOrbitalMiniGame(
+      'earth_sat_patch',
+      'satellite_servicing',
+      0,
+      'earth',
+      mission,
+    )
+    expect(mg).toBeInstanceOf(DefaultOrbitalMiniGame)
+  })
+
+  it('falls back to Default for satellite_servicing when mission is absent', () => {
+    const mg = createOrbitalMiniGame('earth_sat_patch', 'satellite_servicing', 0, 'earth')
+    expect(mg).toBeInstanceOf(DefaultOrbitalMiniGame)
+  })
 })
 
 describe('OrbitalMiniGame.presentation', () => {
@@ -95,6 +156,7 @@ describe('OrbitalMiniGame.presentation', () => {
     ['chemistry', 'overlay'],
     ['logistics', 'overlay'],
     ['probe-deploy', 'overlay'],
+    ['satellite_servicing', 'overlay'], // currently falls back when mission omitted
     ['unknown-type', 'overlay'], // default falls through to overlay
   ]
 

@@ -15,6 +15,7 @@ import { IceHarvestMiniGame } from './iceHarvest/IceHarvestMiniGame'
 import { MaintenanceMiniGame } from './maintenance/MaintenanceMiniGame'
 import { LogisticsRouteMiniGame } from './logistics/LogisticsRouteMiniGame'
 import { ProbeDeployMiniGame } from './probeDeploy/ProbeDeployMiniGame'
+import { SatelliteServicingMiniGame } from './satelliteServicing/SatelliteServicingMiniGame'
 import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 
 /**
@@ -24,7 +25,7 @@ import type { ActiveVisitRelayMission } from '@/lib/missions/types'
  * @param minigameType - The minigame type from planet-orbital-config.json or EVA mission template.
  * @param targetGas - The gather quantity from the mission template.
  * @param planetId - The target planet id (used by probe-deploy and similar minigames).
- * @param _mission - The active EVA mission, when the caller is on the EVA path. Gather-mission callers omit.
+ * @param mission - The active EVA mission, when the caller is on the EVA path. Gather-mission callers omit.
  * @returns A new OrbitalMiniGame instance.
  *
  * @author guinetik
@@ -35,9 +36,7 @@ export function createOrbitalMiniGame(
   minigameType: string,
   targetGas: number,
   planetId?: string,
-  // `_mission` is reserved for EVA minigames (satellite_servicing) that read
-  // mission-level data like brokenComponents. All current cases ignore it.
-  _mission?: ActiveVisitRelayMission,
+  mission?: ActiveVisitRelayMission,
 ): OrbitalMiniGame {
   switch (minigameType) {
     case 'gas-collection':
@@ -52,6 +51,15 @@ export function createOrbitalMiniGame(
       return new LogisticsRouteMiniGame(missionId, targetGas)
     case 'probe-deploy':
       return new ProbeDeployMiniGame(missionId, targetGas, planetId ?? 'mercury')
+    case 'satellite_servicing': {
+      const broken = mission?.brokenComponents
+      if (!broken || broken.length === 0) {
+        // No damage state rolled (non-satellite POI, or no manifest) — fall back
+        // to the default stub so the EVA flow stays playable.
+        return new DefaultOrbitalMiniGame(missionId)
+      }
+      return new SatelliteServicingMiniGame(missionId, broken)
+    }
     default:
       return new DefaultOrbitalMiniGame(missionId)
   }
