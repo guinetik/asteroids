@@ -545,6 +545,16 @@ export class MapMissionFacade {
     return this.evaPoiContainer
   }
 
+  /**
+   * `poiType` of the currently spawned EVA POI, or null if none. Lets MapViewController
+   * pick a per-type huge-scale factor (e.g. Hubble boosts to real-Hubble size during EVA).
+   */
+  getEvaPoiType(): import('@/lib/missions/types').EvaMissionPoiType | null {
+    const mission = pickActiveEvaMissionMapSite(this.board.activeEvaMissions)
+    if (!mission || mission.template.id !== this.evaPoiRenderedMissionId) return null
+    return mission.template.poiType
+  }
+
   private disposeWaypointSite(scene: THREE.Scene): void {
     if (this.missionAsteroidPreviewMesh) {
       disposeMapMissionAsteroidPreviewMesh(this.missionAsteroidPreviewMesh)

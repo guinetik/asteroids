@@ -22,16 +22,16 @@ import {
 } from './tronHologramMaterial'
 
 /** Acceleration applied per second of thrust in a single axis (world units / s²). */
-const EVA_THRUST_ACCEL = 14
+const EVA_THRUST_ACCEL = 2.5
 
 /** Hard cap on EVA speed (world units / s). */
-const EVA_MAX_SPEED = 16
+const EVA_MAX_SPEED = 4
 
 /** Velocity damping per second while the player is actively thrusting (light — preserves momentum). */
-const EVA_ACTIVE_DAMPING = 0.15
+const EVA_ACTIVE_DAMPING = 0.08
 
-/** Velocity damping per second while no thrust input is held (strong — auto-park). */
-const EVA_IDLE_DAMPING = 2.5
+/** Velocity damping per second while no thrust input is held (gentle — preserves drift). */
+const EVA_IDLE_DAMPING = 0.5
 
 /** Below this speed with no thrust input the controller snaps velocity to zero. */
 const EVA_ZERO_VELOCITY_EPSILON = 0.05

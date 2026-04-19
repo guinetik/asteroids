@@ -34,7 +34,9 @@ const MAP_POI_RELAY_ANTENNA_SCALE = 0.15
 /**
  * Uniform scale on the Hubble telescope GLB in map world units. Native geometry spans
  * ~18×19×27 local units; this puts it at ~0.4 world units, a touch larger than the
- * satellite/relay since Hubble is a bigger sibling of the sat class.
+ * satellite/relay since Hubble is a bigger sibling of the sat class. In EVA the POI
+ * container gets an additional huge-scale boost so Hubble reads at real-Hubble size
+ * while staying a speck from the /map AU-scale camera.
  */
 const MAP_POI_TELESCOPE_SCALE = 0.03
 

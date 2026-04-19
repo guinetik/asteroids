@@ -3478,11 +3478,17 @@ export class MapViewController implements Tickable {
   private static readonly EVA_MAP_HUGE_SHUTTLE = 100
 
   /**
-   * Multiplier applied to the EVA mission POI waypoint root during EVA. Root is lerped to
-   * a constant-apparent-size each frame before freeze; 20× puts it at readable proportions
-   * once the auto-rescale is paused.
+   * Per-poiType huge-scale factor applied to the EVA POI container during EVA only.
+   * Satellites + relay antennas are already tuned to look correct at world-unit scale in
+   * EVA close-up (shuttle-cargo proportion), so they stay at 1×. The telescope is
+   * authored smaller so it stays a speck on the /map AU view; it boosts during EVA to
+   * read at real-Hubble size next to the ×100 shuttle.
    */
-  private static readonly EVA_MAP_HUGE_POI = 20
+  private static readonly EVA_MAP_HUGE_POI_BY_TYPE: Record<string, number> = {
+    satellite: 1,
+    relay_antenna: 1,
+    telescope: 20,
+  }
 
   /** Uniform scale applied to the sun mesh during EVA so it reads as a nearby star. */
   private static readonly EVA_MAP_HUGE_SUN = 4
@@ -3605,7 +3611,14 @@ export class MapViewController implements Tickable {
         factor: MapViewController.EVA_MAP_HUGE_SHUTTLE,
       })
     }
-    // POI prop already sits in real world units (lander-cargo proportion); no huge-scale.
+    const poiGroup = this.missionFacade.getEvaPoiGroup()
+    const poiType = this.missionFacade.getEvaPoiType()
+    if (poiGroup && poiType) {
+      const factor = MapViewController.EVA_MAP_HUGE_POI_BY_TYPE[poiType] ?? 1
+      if (factor !== 1) {
+        targets.push({ object: poiGroup, factor })
+      }
+    }
     if (this.sunController) {
       targets.push({
         object: this.sunController.group,
