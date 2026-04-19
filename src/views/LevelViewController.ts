@@ -118,6 +118,25 @@ const DAMAGE_FLASH_DURATION = 0.3
  */
 const DAMAGE_FLINCH_STRENGTH = 80
 
+/**
+ * Camera flinch magnitude (mouse-delta units) at the centre of an objective
+ * blast. Falls off linearly with distance so a far blast is barely felt.
+ * Tuned to be heavier than {@link DAMAGE_FLINCH_STRENGTH} since the blast
+ * outranges most weapons.
+ */
+const EXPLOSION_FLINCH_STRENGTH = 240
+/**
+ * Maximum world-space distance at which the player still feels camera shake
+ * and full-volume audio for an objective explosion. Beyond this both fade out.
+ */
+const EXPLOSION_FEEDBACK_RANGE = 90
+/**
+ * Impact speed passed to {@link LanderExplosion.explode} for objective
+ * detonations. The lander emitter caps at this; reusing it means nest /
+ * virus blasts share the same fire+debris particle budget as a hard crash.
+ */
+const OBJECTIVE_EXPLOSION_IMPACT = 22
+
 /** Thrust vibration at ground level (liftoff rumble). */
 const THRUST_VIBRATION_MAX = 1.2
 /** Minimum volume of the shake sound at lowest vibration intensity. */
@@ -625,7 +644,10 @@ export class LevelViewController implements Tickable {
     // synchronously on render and hitch the frame.
     this.projectileSystem.prewarmPool()
     this.impactEmitter = new ParticleEmitter({
-      poolSize: 64,
+      // Doubled from 64 → 128 so a nest detonation can drop 30+ sparks at once
+      // without recycling particles that the projectile-impact path is still
+      // using during the same frame.
+      poolSize: 128,
       color: new Color(0xffaa44),
       size: 3,
       lifetime: 0.4,
@@ -697,10 +719,7 @@ export class LevelViewController implements Tickable {
           this.failLanderRun('Lander Destroyed by Nest Blast', { explode: true, hideLander: true })
         }
         minigame.onExplosion = (pos) => {
-          for (let j = 0; j < 20; j++) {
-            this._impactVel.copy(this._impactUp).multiplyScalar(10 + Math.random() * 10)
-            this.impactEmitter?.emit(pos, this._impactVel)
-          }
+          this.triggerObjectiveExplosion(pos, 32, 10)
         }
         this.minigames.push(minigame)
       } else if (obj.type === 'rescue') {
@@ -730,10 +749,7 @@ export class LevelViewController implements Tickable {
           this.failLanderRun('Lander Destroyed by Virus Blast', { explode: true, hideLander: true })
         }
         minigame.onExplosion = (pos) => {
-          for (let j = 0; j < 24; j++) {
-            this._impactVel.copy(this._impactUp).multiplyScalar(9 + Math.random() * 11)
-            this.impactEmitter?.emit(pos, this._impactVel)
-          }
+          this.triggerObjectiveExplosion(pos, 36, 9)
         }
         minigame.onFail = (_idx, cause) => {
           this.onDeathOverlay?.(true, cause)
@@ -1875,6 +1891,63 @@ export class LevelViewController implements Tickable {
       const worldAngle = Math.atan2(sourceX - playerPos.x, sourceZ - playerPos.z)
       const relAngle = worldAngle - this.fpsCamera.yaw
       this.onDamageDirection?.(relAngle)
+    }
+  }
+
+  /**
+   * Trigger the full presentation bundle for an objective explosion (nest
+   * detonation, virus blast). Centralised so exterminate and rescue minigames
+   * share the same fire+debris emitter, audio, spark burst, and proximity
+   * camera kick — keeps the visceral feel consistent across mission types.
+   *
+   * @param pos - World position of the blast.
+   * @param sparkBursts - How many vertical impactEmitter sparks to fire.
+   *   Tuned per minigame so rescue (slightly bigger crater area) emits a few
+   *   more chunks than the smaller nest blast.
+   * @param sparkBaseSpeed - Minimum upward velocity for the spark burst (the
+   *   max is base + 10 with random jitter).
+   */
+  private triggerObjectiveExplosion(
+    pos: Vector3,
+    sparkBursts: number,
+    sparkBaseSpeed: number,
+  ): void {
+    // Fire + debris from the lander explosion emitter — same particle budget
+    // as a hard crash, scaled by impact speed.
+    this.landerExplosion?.explode(pos, OBJECTIVE_EXPLOSION_IMPACT)
+
+    // Vertical spark fountain from the shared impact emitter.
+    for (let i = 0; i < sparkBursts; i++) {
+      this._impactVel.copy(this._impactUp).multiplyScalar(sparkBaseSpeed + Math.random() * 10)
+      this.impactEmitter?.emit(pos, this._impactVel)
+    }
+
+    // Distance-attenuated audio + camera kick. We compute the distance once
+    // and reuse it so both react proportionally — close blasts shake hard
+    // and play loud, far blasts read as a distant rumble with a tiny nudge.
+    const playerPos = this.playerController?.group.position
+    let attenuation = 1
+    if (playerPos) {
+      const dx = playerPos.x - pos.x
+      const dy = playerPos.y - pos.y
+      const dz = playerPos.z - pos.z
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
+      attenuation = Math.max(0, 1 - dist / EXPLOSION_FEEDBACK_RANGE)
+    }
+
+    const volume = 0.3 + 0.7 * attenuation
+    useAudio().play('sfx.explosion', { volume })
+
+    if (
+      attenuation > 0 &&
+      this.fpsCamera &&
+      this.stateMachine?.is('eva')
+    ) {
+      const kick = EXPLOSION_FLINCH_STRENGTH * attenuation
+      this.fpsCamera.applyMouseDelta(
+        (Math.random() - 0.5) * kick,
+        -Math.random() * kick,
+      )
     }
   }
 

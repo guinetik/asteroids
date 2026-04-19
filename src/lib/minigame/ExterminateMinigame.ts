@@ -35,10 +35,29 @@ const BLAST_RADIUS = 22
 const CRATER_RADIUS = 11
 const CONTACT_KNOCKBACK = 10
 const ENEMY_PLAYER_FAR_DISTANCE = 99999
-const EXPLOSION_FLASH_DURATION = 0.45
-const EXPLOSION_FLASH_MAX_SCALE = 34
-const EXPLOSION_LIGHT_INTENSITY = 6
-const EXPLOSION_LIGHT_DISTANCE = 80
+
+/** Outer fireball flash — slower, bigger, longer-lived than the original. */
+const EXPLOSION_FLASH_DURATION = 0.75
+const EXPLOSION_FLASH_MAX_SCALE = 62
+/** White-hot inner core — hits hard and decays first for a punchier flash. */
+const EXPLOSION_CORE_DURATION = 0.22
+const EXPLOSION_CORE_MAX_SCALE = 22
+/** Ground shockwave ring — expands across {@link BLAST_RADIUS} as it fades. */
+const SHOCKWAVE_DURATION = 0.6
+const SHOCKWAVE_MAX_SCALE = BLAST_RADIUS * 1.6
+const EXPLOSION_LIGHT_INTENSITY = 18
+const EXPLOSION_LIGHT_DISTANCE = 180
+
+/**
+ * Deploy marker — radius of the pulsing ring on the ground at the nest after
+ * defenders are cleared. Sits a hair outside {@link NEST_INTERACT_RANGE} so the
+ * outer rim of the visual marker corresponds to "you are now in interact range".
+ */
+const DEPLOY_MARKER_RADIUS = NEST_INTERACT_RANGE + 0.5
+/** Vertical light beam height for the deploy marker so it's visible at distance. */
+const DEPLOY_MARKER_BEAM_HEIGHT = 80
+/** Marker pulse frequency (Hz) — sine-modulates opacity so it reads as "active". */
+const DEPLOY_MARKER_PULSE_HZ = 1.1
 
 const craterMat = new THREE.MeshStandardMaterial({
   color: 0x120b08,
@@ -66,9 +85,66 @@ const explosionFlashMat = new THREE.MeshBasicMaterial({
   depthWrite: false,
 })
 
+/** White-hot inner core material — saturates the screen for the first frames. */
+const explosionCoreMat = new THREE.MeshBasicMaterial({
+  color: 0xffffff,
+  transparent: true,
+  opacity: 1,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+})
+
+/** Ground shockwave ring material — additive so it reads as a flash on terrain. */
+const shockwaveMat = new THREE.MeshBasicMaterial({
+  color: 0xffd28a,
+  transparent: true,
+  opacity: 0.85,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  side: THREE.DoubleSide,
+})
+
+/** Deploy marker ring material — yellow additive so it pops against the rust terrain. */
+const deployRingMat = new THREE.MeshBasicMaterial({
+  color: 0xffe066,
+  transparent: true,
+  opacity: 0.7,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  side: THREE.DoubleSide,
+})
+
+/** Deploy marker vertical beam material — same hue, lower opacity for soft column. */
+const deployBeamMat = new THREE.MeshBasicMaterial({
+  color: 0xffe066,
+  transparent: true,
+  opacity: 0.18,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  side: THREE.DoubleSide,
+})
+
 const craterGeo = new THREE.CircleGeometry(CRATER_RADIUS, 32)
 const craterRingGeo = new THREE.RingGeometry(CRATER_RADIUS * 0.72, CRATER_RADIUS * 1.08, 32)
 const explosionFlashGeo = new THREE.SphereGeometry(1, 16, 12)
+const explosionCoreGeo = new THREE.SphereGeometry(1, 16, 12)
+/** Thin ring centred on (0,0,0); expanded via mesh.scale during the explosion. */
+const shockwaveGeo = new THREE.RingGeometry(0.92, 1, 64)
+/** Marker outer ring (10–12% wider than {@link DEPLOY_MARKER_RADIUS} for a bezel). */
+const deployRingGeo = new THREE.RingGeometry(
+  DEPLOY_MARKER_RADIUS * 0.96,
+  DEPLOY_MARKER_RADIUS * 1.04,
+  64,
+)
+/** Marker vertical beam — narrow open cylinder, no caps, additive for a soft column. */
+const deployBeamGeo = new THREE.CylinderGeometry(
+  DEPLOY_MARKER_RADIUS * 0.05,
+  DEPLOY_MARKER_RADIUS * 0.05,
+  DEPLOY_MARKER_BEAM_HEIGHT,
+  16,
+  1,
+  true,
+)
 
 /**
  * Exterminate minigame for a single nest site.
@@ -108,12 +184,22 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
   private readonly enemyByHandleId = new Map<number, Enemy>()
   private readonly encounterEnemies: Enemy[] = []
   private readonly craterGroup = new THREE.Group()
-  private readonly explosionFlash = new THREE.Mesh(explosionFlashGeo, explosionFlashMat)
+  private readonly explosionFlash = new THREE.Mesh(explosionFlashGeo, explosionFlashMat.clone())
+  private readonly explosionCore = new THREE.Mesh(explosionCoreGeo, explosionCoreMat.clone())
   private readonly explosionLight = new THREE.PointLight(0xff8844, 0, EXPLOSION_LIGHT_DISTANCE)
+  private readonly shockwave = new THREE.Mesh(shockwaveGeo, shockwaveMat.clone())
+  /** Group containing the deploy marker (ring + beam). Visible when defenders dead, charges not yet armed. */
+  private readonly deployMarker = new THREE.Group()
+  private readonly deployMarkerRing = new THREE.Mesh(deployRingGeo, deployRingMat.clone())
+  private readonly deployMarkerBeam = new THREE.Mesh(deployBeamGeo, deployBeamMat.clone())
+  /** Time accumulator used to drive the deploy marker pulse (sine modulation). */
+  private deployMarkerPhase = 0
 
   private armed = false
   private countdownRemaining = COUNTDOWN_DURATION
   private explosionFlashTimer = 0
+  private explosionCoreTimer = 0
+  private shockwaveTimer = 0
   /** Called when the player should take direct damage. */
   onDamagePlayer: ((damage: number, sourceX: number, sourceZ: number) => void) | null = null
   /** Called when the player should be killed outright. */
@@ -187,6 +273,7 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
 
     this.buildCrater()
     this.buildExplosionFlash()
+    this.buildDeployMarker()
     this.spawnEncounter()
     this.wireEnemyCallbacks()
   }
@@ -237,6 +324,11 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
     if (allDefendersDead) {
       this.advanceStep(0)
     }
+
+    // Deploy marker visible only in the small window between "defenders dead"
+    // and "charges armed". Once the countdown starts it's redundant with the
+    // on-screen evacuate prompt, and after detonation the nest is gone.
+    this.syncDeployMarker(dt, allDefendersDead && !this.armed)
 
     if (!allDefendersDead) {
       this.updatePromptWhileBlocked(ctx)
@@ -293,7 +385,15 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
     this.nest.dispose()
     this.craterGroup.removeFromParent()
     this.explosionFlash.removeFromParent()
+    this.explosionCore.removeFromParent()
     this.explosionLight.removeFromParent()
+    this.shockwave.removeFromParent()
+    this.deployMarker.removeFromParent()
+    ;(this.explosionFlash.material as THREE.MeshBasicMaterial).dispose()
+    ;(this.explosionCore.material as THREE.MeshBasicMaterial).dispose()
+    ;(this.shockwave.material as THREE.MeshBasicMaterial).dispose()
+    ;(this.deployMarkerRing.material as THREE.MeshBasicMaterial).dispose()
+    ;(this.deployMarkerBeam.material as THREE.MeshBasicMaterial).dispose()
   }
 
   private buildCrater(): void {
@@ -312,9 +412,39 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
 
   private buildExplosionFlash(): void {
     this.explosionFlash.visible = false
+    this.explosionCore.visible = false
     this.explosionLight.visible = false
+    this.shockwave.visible = false
+    this.shockwave.rotation.x = -Math.PI / 2
     this.scene.add(this.explosionFlash)
+    this.scene.add(this.explosionCore)
     this.scene.add(this.explosionLight)
+    this.scene.add(this.shockwave)
+  }
+
+  /**
+   * Build the deploy marker (ground ring + vertical beam), positioned at the
+   * nest. Hidden until defenders are cleared so the marker appears as a
+   * positive cue ("you're cleared, head here") rather than a permanent waypoint.
+   */
+  private buildDeployMarker(): void {
+    this.deployMarkerRing.rotation.x = -Math.PI / 2
+    this.deployMarkerRing.position.set(
+      this.nestPosition.x,
+      this.nestPosition.y + 0.12,
+      this.nestPosition.z,
+    )
+
+    this.deployMarkerBeam.position.set(
+      this.nestPosition.x,
+      this.nestPosition.y + DEPLOY_MARKER_BEAM_HEIGHT * 0.5,
+      this.nestPosition.z,
+    )
+
+    this.deployMarker.add(this.deployMarkerRing)
+    this.deployMarker.add(this.deployMarkerBeam)
+    this.deployMarker.visible = false
+    this.scene.add(this.deployMarker)
   }
 
   private spawnEncounter(): void {
@@ -613,14 +743,33 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
     this.scene.remove(this.nest.group)
     this.nest.dispose()
 
+    // Deploy marker is no longer relevant once the charges fire.
+    this.deployMarker.visible = false
+
     this.craterGroup.visible = true
     this.explosionFlashTimer = EXPLOSION_FLASH_DURATION
+    this.explosionCoreTimer = EXPLOSION_CORE_DURATION
+    this.shockwaveTimer = SHOCKWAVE_DURATION
+
     this.explosionFlash.visible = true
     this.explosionFlash.position.set(this.nestPosition.x, this.nestPosition.y + 2, this.nestPosition.z)
     this.explosionFlash.scale.setScalar(1)
+    ;(this.explosionFlash.material as THREE.MeshBasicMaterial).opacity = 0.85
+
+    this.explosionCore.visible = true
+    this.explosionCore.position.set(this.nestPosition.x, this.nestPosition.y + 2, this.nestPosition.z)
+    this.explosionCore.scale.setScalar(1)
+    ;(this.explosionCore.material as THREE.MeshBasicMaterial).opacity = 1
+
+    this.shockwave.visible = true
+    this.shockwave.position.set(this.nestPosition.x, this.nestPosition.y + 0.18, this.nestPosition.z)
+    this.shockwave.scale.setScalar(1)
+    ;(this.shockwave.material as THREE.MeshBasicMaterial).opacity = 0.9
+
     this.explosionLight.visible = true
-    this.explosionLight.position.set(this.nestPosition.x, this.nestPosition.y + 3, this.nestPosition.z)
+    this.explosionLight.position.set(this.nestPosition.x, this.nestPosition.y + 4, this.nestPosition.z)
     this.explosionLight.intensity = EXPLOSION_LIGHT_INTENSITY
+
     this.onExplosion?.(this.nestPosition.clone())
 
     const playerHit = !!ctx.playerPosition &&
@@ -649,21 +798,70 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
   }
 
   private syncExplosionFlash(dt: number): void {
-    if (this.explosionFlashTimer <= 0) return
+    // Outer fireball + point light — long-lived, large, easeOut on opacity.
+    if (this.explosionFlashTimer > 0) {
+      this.explosionFlashTimer = Math.max(0, this.explosionFlashTimer - dt)
+      const t = 1 - this.explosionFlashTimer / EXPLOSION_FLASH_DURATION
+      this.explosionFlash.scale.setScalar(1 + t * EXPLOSION_FLASH_MAX_SCALE)
+      ;(this.explosionFlash.material as THREE.MeshBasicMaterial).opacity = (1 - t) * 0.85
+      this.explosionLight.intensity = (1 - t) * EXPLOSION_LIGHT_INTENSITY
 
-    this.explosionFlashTimer = Math.max(0, this.explosionFlashTimer - dt)
-    const t = 1 - this.explosionFlashTimer / EXPLOSION_FLASH_DURATION
-    const scale = 1 + t * EXPLOSION_FLASH_MAX_SCALE
-    this.explosionFlash.scale.setScalar(scale)
-    const opacity = (1 - t) * 0.8
-    ;(this.explosionFlash.material as THREE.MeshBasicMaterial).opacity = opacity
-    this.explosionLight.intensity = (1 - t) * EXPLOSION_LIGHT_INTENSITY
-
-    if (this.explosionFlashTimer <= 0) {
-      this.explosionFlash.visible = false
-      this.explosionLight.visible = false
-      this.explosionLight.intensity = 0
+      if (this.explosionFlashTimer <= 0) {
+        this.explosionFlash.visible = false
+        this.explosionLight.visible = false
+        this.explosionLight.intensity = 0
+      }
     }
+
+    // White-hot inner core — short, punchy. Decays first so the fireball
+    // momentarily dominates after the saturation.
+    if (this.explosionCoreTimer > 0) {
+      this.explosionCoreTimer = Math.max(0, this.explosionCoreTimer - dt)
+      const t = 1 - this.explosionCoreTimer / EXPLOSION_CORE_DURATION
+      this.explosionCore.scale.setScalar(1 + t * EXPLOSION_CORE_MAX_SCALE)
+      ;(this.explosionCore.material as THREE.MeshBasicMaterial).opacity = Math.pow(1 - t, 1.6)
+
+      if (this.explosionCoreTimer <= 0) {
+        this.explosionCore.visible = false
+      }
+    }
+
+    // Ground shockwave ring — expands from radius 1 to {@link SHOCKWAVE_MAX_SCALE}
+    // while fading. Provides a planar visual anchor for the blast separate from
+    // the spherical fireball.
+    if (this.shockwaveTimer > 0) {
+      this.shockwaveTimer = Math.max(0, this.shockwaveTimer - dt)
+      const t = 1 - this.shockwaveTimer / SHOCKWAVE_DURATION
+      // EaseOut so the wave starts fast and slows as it expands.
+      const eased = 1 - Math.pow(1 - t, 2)
+      this.shockwave.scale.setScalar(1 + eased * (SHOCKWAVE_MAX_SCALE - 1))
+      ;(this.shockwave.material as THREE.MeshBasicMaterial).opacity = (1 - t) * 0.9
+
+      if (this.shockwaveTimer <= 0) {
+        this.shockwave.visible = false
+      }
+    }
+  }
+
+  /**
+   * Update the deploy marker visibility + pulse. The marker pulses on a sine
+   * so it reads as "active waypoint" instead of a flat overlay; opacity
+   * modulation is bounded so it never fully disappears mid-pulse.
+   *
+   * @param dt - Frame delta in seconds.
+   * @param wantVisible - Whether the marker should be shown this frame
+   *   (defenders dead, charges not yet armed).
+   */
+  private syncDeployMarker(dt: number, wantVisible: boolean): void {
+    if (this.deployMarker.visible !== wantVisible) {
+      this.deployMarker.visible = wantVisible
+    }
+    if (!wantVisible) return
+
+    this.deployMarkerPhase += dt * DEPLOY_MARKER_PULSE_HZ * Math.PI * 2
+    const pulse = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(this.deployMarkerPhase))
+    ;(this.deployMarkerRing.material as THREE.MeshBasicMaterial).opacity = pulse * 0.7
+    ;(this.deployMarkerBeam.material as THREE.MeshBasicMaterial).opacity = pulse * 0.22
   }
 
   private clearEncounter(): void {
