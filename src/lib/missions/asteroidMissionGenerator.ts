@@ -36,6 +36,13 @@ function hashSeed(str: string): number {
 /** Level terrain grid size — shared with LevelViewController. */
 export const LEVEL_GRID_SIZE = 5000
 
+/**
+ * Minimum payout (credits) for any generated asteroid mission. Floors the sum
+ * of objective rewards + completion bonus so the cheapest run still buys into
+ * the shop economy (≈ one upgrade tier).
+ */
+export const MIN_ASTEROID_MISSION_REWARD = 1000
+
 /** Objective count bands by difficulty. */
 const OBJECTIVE_COUNT_BY_DIFFICULTY: [number, number, number][] = [
   [1, 3, 1],
@@ -449,7 +456,8 @@ export function generateAsteroidMission(difficulty: number): GeneratedAsteroidMi
   }
 
   const completionBonus = interpolateRange(pick.template.completionBonus, difficulty)
-  const totalReward = objectives.reduce((sum, o) => sum + o.reward, 0) + completionBonus
+  const rawReward = objectives.reduce((sum, o) => sum + o.reward, 0) + completionBonus
+  const totalReward = Math.max(MIN_ASTEROID_MISSION_REWARD, rawReward)
 
   const waypoint = generateWaypointInRegion(pick.region, difficulty)
 

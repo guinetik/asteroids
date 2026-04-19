@@ -1704,8 +1704,12 @@ body {
 }
 
 .mission-board-section__heading {
-  @apply mb-2 text-xs font-mono uppercase tracking-[0.2em] text-cyan-400/60
+  @apply mb-1 text-xs font-mono uppercase tracking-[0.2em] text-cyan-400/60
          border-b border-cyan-400/10 pb-1;
+}
+
+.mission-board-section__descriptor {
+  @apply mb-2 text-[11px] font-mono text-slate-400/70 italic leading-snug;
 }
 
 .mission-board-empty {

@@ -85,6 +85,9 @@ function regionLabel(region: MissionRegion): string {
     <!-- Planetary Missions -->
     <div class="mission-board-section">
       <h3 class="mission-board-section__heading">Planetary Missions</h3>
+      <p class="mission-board-section__descriptor">
+        Travel to another planet and gather resources from orbit via a minigame, then return for payout.
+      </p>
 
       <div v-if="!dockedPlanet" class="mission-board-empty">
         Not docked at a planet
@@ -115,9 +118,29 @@ function regionLabel(region: MissionRegion): string {
       </div>
     </div>
 
+    <!-- Shuttle EVA Missions -->
+    <div class="mission-board-section">
+      <h3 class="mission-board-section__heading">Shuttle EVA Missions</h3>
+      <p class="mission-board-section__descriptor">
+        Fly to a waypoint in deep space, exit the shuttle, and spacewalk to a relay or probe to service it.
+      </p>
+
+      <!--
+        TODO: wire to ShuttleMissionBoard.offeredEvaMission / activeEvaMission /
+        evaRestockTimer once the visit-relay mission type is added to the data
+        model. See docs/superpowers/specs/2026-04-18-visit-relay-mission-design.md
+      -->
+      <div class="mission-board-empty">
+        No EVA missions available
+      </div>
+    </div>
+
     <!-- Asteroid Missions -->
     <div class="mission-board-section">
       <h3 class="mission-board-section__heading">Asteroid Missions</h3>
+      <p class="mission-board-section__descriptor">
+        Accept contracts from mission givers to survey, mine, rescue, or clear hostiles at belt waypoints.
+      </p>
 
       <div v-if="board?.offeredAsteroidMission && !board.activeAsteroidMission" class="mission-board-offer">
         <div class="mission-board-offer__name">{{ board.offeredAsteroidMission.name }}</div>
