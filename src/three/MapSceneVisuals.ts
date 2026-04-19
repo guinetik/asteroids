@@ -7,6 +7,7 @@ import {
   disposeTronHologramMaterials,
 } from '@/three/tronHologramMaterial'
 
+/** Camera-relative data for the ship HUD reticle each frame. */
 export interface ShipReticleUpdate {
   shuttlePosition: THREE.Vector3
   shuttleVelocity: THREE.Vector3
@@ -17,6 +18,7 @@ export interface ShipReticleUpdate {
   isFreeFlight: boolean
 }
 
+/** Meshes and buffers for the orbit approach tether line + lock discs. */
 interface ApproachTetherVisuals {
   readonly line: THREE.Line<THREE.BufferGeometry, THREE.ShaderMaterial>
   readonly lineGeometry: THREE.BufferGeometry
@@ -26,6 +28,7 @@ interface ApproachTetherVisuals {
   readonly planetLockMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>
 }
 
+/** Shader uniforms for the animated tether line. */
 interface TetherLineUniforms {
   uTime: { value: number }
   uProgress: { value: number }
@@ -34,6 +37,7 @@ interface TetherLineUniforms {
   uPulseColor: { value: THREE.Color }
 }
 
+/** Shader uniforms for the circular lock disc sprites. */
 interface LockDiscUniforms {
   uTime: { value: number }
   uProgress: { value: number }
@@ -41,6 +45,7 @@ interface LockDiscUniforms {
   uColor: { value: THREE.Color }
 }
 
+/** Tether visuals while coupling onto a gravity-surf rail. */
 interface SurfCouplingTetherVisuals {
   readonly line: THREE.Line<THREE.BufferGeometry, THREE.ShaderMaterial>
   readonly lineGeometry: THREE.BufferGeometry
@@ -49,11 +54,13 @@ interface SurfCouplingTetherVisuals {
   readonly lockMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>
 }
 
+/** Prograde / retrograde HUD markers ahead/behind the shuttle. */
 interface ProgradeMarkerVisuals {
   readonly progradeSprite: THREE.Sprite
   readonly retrogradeSprite: THREE.Sprite
 }
 
+/** Reticles, tethers, and orbit visuals owned by the solar map scene. */
 export class MapSceneVisuals {
   private scene: THREE.Scene
   private shuttleGroup: THREE.Group | null = null

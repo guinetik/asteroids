@@ -1,13 +1,25 @@
+/**
+ * Pure helpers for map open/close, inspect mode, habitat transitions, and overlay state.
+ *
+ * @author guinetik
+ * @date 2026-04-19
+ * @spec docs/asteroid-lander-gdd.md
+ */
 import type { HabitatPhase } from '@/lib/habitatState'
 import type { MapPhase } from '@/lib/mapState'
 import { easeInOut } from '@/three/MapCamera'
 import type { MapOverlayState } from '@/lib/ShuttleTelemetry'
 
+/** Shuttle orbit phase while the tactical map may be available. */
 export type FlightOrbitState = 'free' | 'approaching' | 'orbiting'
+/** Vehicle camera mode on the solar map — inspection vs free flight. */
 export type FlightCameraMode = 'inspect' | 'flight'
+/** Result of evaluating map hotkeys for one frame. */
 export type MapToggleAction = 'open' | 'close' | 'none'
+/** Habitat airlock transition requested by the player. */
 export type HabitatTransitionAction = 'enter' | 'leave' | 'none'
 
+/** Inputs for {@link MapModeCoordinator.resolveMapToggleAction}. */
 interface ResolveMapToggleActionParams {
   introLocked: boolean
   habitatActive: boolean
@@ -19,12 +31,14 @@ interface ResolveMapToggleActionParams {
   isDead: boolean
 }
 
+/** Inputs for {@link MapModeCoordinator.resolveInspectToggle}. */
 interface ResolveInspectToggleParams {
   togglePressed: boolean
   inspectMode: boolean
   orbitState: FlightOrbitState
 }
 
+/** Inputs for {@link MapModeCoordinator.resolveHabitatTransition}. */
 interface ResolveHabitatTransitionParams {
   togglePressed: boolean
   habitatActive: boolean
@@ -33,6 +47,7 @@ interface ResolveHabitatTransitionParams {
   canEnterHabitat: boolean
 }
 
+/** Camera / post settings after toggling inspection mode. */
 export interface InspectToggleResult {
   nextInspectMode: boolean
   toggleDoors: boolean
@@ -42,18 +57,21 @@ export interface InspectToggleResult {
   bloomStrength: number
 }
 
+/** Habitat airlock action plus follow-on door/camera flags. */
 export interface HabitatTransitionResult {
   action: HabitatTransitionAction
   nextInspectMode: boolean
   toggleDoors: boolean
 }
 
+/** Derived render flags while the paper map opens or closes. */
 export interface MapTransitionRuntimeState {
   useMapCamera: boolean
   showOverlay: boolean
   transitionProgress: number
 }
 
+/** Whether the habitat scene owns the frame and wake-up vignette progress. */
 export interface HabitatRenderState {
   useHabitatScene: boolean
   disableVehicleControls: boolean
@@ -73,6 +91,7 @@ const HIDDEN_MAP_OVERLAY_STATE: MapOverlayState = {
   missionWaypoint: null,
 }
 
+/** Stateless coordinator — {@link MapViewController} calls into these pure methods each frame. */
 export class MapModeCoordinator {
   resolveMapToggleAction(params: ResolveMapToggleActionParams): MapToggleAction {
     if (params.introLocked) return 'none'

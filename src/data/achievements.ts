@@ -9,8 +9,10 @@ import type { UpgradeId, UpgradeLevels } from '@/lib/upgrades'
 import type { PlayerProfile } from '@/lib/player/types'
 import { PLANETS } from '@/lib/planets/catalog'
 
+/** High-level achievement tab / grouping key used in the player profile UI. */
 export type AchievementCategory = 'flight' | 'missions' | 'exploration' | 'credits' | 'upgrades'
 
+/** Static row from `ACHIEVEMENT_DEFINITIONS` — copy, rule kind, and optional thresholds. */
 export interface AchievementDefinition {
   id: string
   category: AchievementCategory
@@ -36,6 +38,7 @@ export interface AchievementDefinition {
   orbitBodyKey?: string
 }
 
+/** Snapshot of profile + upgrades passed into unlock evaluation. */
 export interface AchievementProgress {
   profile: PlayerProfile
   upgradeLevels: UpgradeLevels

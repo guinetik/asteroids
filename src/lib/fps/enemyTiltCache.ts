@@ -17,6 +17,7 @@ import type { Heightmap } from '@/lib/terrain/heightmap'
 const RESAMPLE_DIST_M = 0.5
 const RESAMPLE_DIST_SQ = RESAMPLE_DIST_M * RESAMPLE_DIST_M
 
+/** Cached terrain sample for one enemy: last XZ position and derived tilt angles. */
 interface TiltSample {
   x: number
   z: number

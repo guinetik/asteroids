@@ -20,12 +20,14 @@ import { buildSlingshotChargeCameraConfig, buildSlingshotExitCameraConfig, SLING
 import { MAP_PHYSICS, type ShuttleController } from '@/three/ShuttleController'
 import type { MapSceneVisuals } from '@/three/MapSceneVisuals'
 
+/** Shared handles for orbit capture ticks (shuttle, camera, VFX). */
 interface SharedDeps {
   shuttleController: ShuttleController
   vehicleCamera: VehicleCamera | null
   sceneVisuals: MapSceneVisuals | null
 }
 
+/** Input-frame dependencies including audio stings for orbit / slingshot. */
 interface OrbitInputDeps extends SharedDeps {
   inputManager: InputManager
   mapIntroControlsLocked: boolean
@@ -39,11 +41,13 @@ interface OrbitInputDeps extends SharedDeps {
   audio: ShuttleAudioDirector
 }
 
+/** Simulation tick dependencies (no direct audio edge work). */
 interface OrbitTickDeps extends SharedDeps {
   inputManager: InputManager
   mapIntroControlsLocked: boolean
 }
 
+/** Orbit ring, approach camera, slingshot charge, and HUD state for the solar map. */
 export class MapOrbitFacade {
   private _system: OrbitCaptureSystem | null = null
   private _approachStartPos: THREE.Vector3 | null = null

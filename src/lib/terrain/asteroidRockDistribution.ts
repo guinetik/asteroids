@@ -1,12 +1,21 @@
+/**
+ * Procedural scatter of surface rocks and ejecta for asteroid heightmaps.
+ *
+ * @author guinetik
+ * @date 2026-04-19
+ * @spec docs/asteroid-lander-gdd.md
+ */
 import { SimplexNoise } from '@/lib/math/simplexNoise'
 import type { SurfaceFeatures } from '@/lib/asteroids/types'
 
+/** Circular keep-out zone (landing pads, structures) where rocks may not spawn. */
 export interface RockExclusionZone {
   x: number
   z: number
   radius: number
 }
 
+/** One placed rock instance consumed by the terrain mesh builder. */
 export interface AsteroidRockSpawn {
   x: number
   z: number
@@ -19,6 +28,7 @@ export interface AsteroidRockSpawn {
   isEjecta: boolean
 }
 
+/** Synthetic crater used only to bias ejecta rock density near rims. */
 interface EjectaCrater {
   x: number
   z: number
@@ -26,6 +36,7 @@ interface EjectaCrater {
   rimAbundance: number
 }
 
+/** Knobs for {@link generateAsteroidRockDistribution}. */
 export interface AsteroidRockDistributionOptions {
   seed: number
   worldSize: number
@@ -44,6 +55,7 @@ const MAX_ROCKS = 1600
 const MIN_SPACING_FACTOR = 0.58
 const MAX_ATTEMPTS_FACTOR = 12
 
+/** Park–Miller style PRNG for deterministic rock placement. */
 function seededRandom(seed: number): () => number {
   let s = Math.max(1, Math.abs(seed) | 0)
   return () => {
@@ -52,14 +64,17 @@ function seededRandom(seed: number): () => number {
   }
 }
 
+/** Clamps `value` to `[min, max]`. */
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
 
+/** Shape parameter for diameter sampling vs abundance `k`. */
 function qOfK(k: number): number {
   return 1.79 + 0.152 / Math.max(k, 0.001)
 }
 
+/** Samples a rock diameter from a biased power distribution. */
 function sampleDiameter(k: number, minD: number, maxD: number, u: number): number {
   const q = qOfK(k)
   const bias = 1 + q * 0.3
@@ -67,6 +82,7 @@ function sampleDiameter(k: number, minD: number, maxD: number, u: number): numbe
   return minD + t * (maxD - minD)
 }
 
+/** Picks standard vs “hero” boulder sizes from surface traits and ejecta boost. */
 function sampleBoulderDiameter(surface: SurfaceFeatures, boost: number, rng: () => number): number {
   const bigChance =
     0.08
@@ -82,6 +98,7 @@ function sampleBoulderDiameter(surface: SurfaceFeatures, boost: number, rng: () 
   return MAX_DIAMETER + t * (LARGE_BOULDER_DIAMETER - MAX_DIAMETER)
 }
 
+/** Maps authored surface traits to a 0→1 rock-density scalar. */
 function effectiveRockAbundance(surface: SurfaceFeatures): number {
   const base =
     0.02
@@ -92,12 +109,14 @@ function effectiveRockAbundance(surface: SurfaceFeatures): number {
   return clamp(base, 0.02, 0.28)
 }
 
+/** Target number of rocks scaled by world area and abundance. */
 function targetRockCount(worldSize: number, k: number): number {
   const densityT = clamp((k - 0.02) / 0.26, 0, 1)
   const areaScale = Math.pow(worldSize / REFERENCE_WORLD_SIZE, 2)
   return Math.round((MIN_ROCKS + (MAX_ROCKS - MIN_ROCKS) * densityT) * areaScale)
 }
 
+/** Builds a handful of fake crater rims that boost nearby rock odds. */
 function generateEjectaCraters(
   worldSize: number,
   surface: SurfaceFeatures,
@@ -124,6 +143,7 @@ function generateEjectaCraters(
   return craters
 }
 
+/** Returns relative ejecta weight and whether the sample lies in ejecta terrain. */
 function ejectaBoost(
   x: number,
   z: number,
@@ -150,6 +170,7 @@ function ejectaBoost(
   return { boost: maxBoost, isEjecta }
 }
 
+/** True when a rock footprint intersects a player / POI exclusion disc. */
 function isInsideExclusion(
   x: number,
   z: number,
@@ -165,6 +186,7 @@ function isInsideExclusion(
   return false
 }
 
+/** Minimum-spacing check against rocks already accepted this generation. */
 function overlapsExisting(
   x: number,
   z: number,
@@ -180,6 +202,7 @@ function overlapsExisting(
   return false
 }
 
+/** Generates a rock list for one asteroid surface — deterministic from `seed`. */
 export function generateAsteroidRockDistribution(
   options: AsteroidRockDistributionOptions,
 ): AsteroidRockSpawn[] {

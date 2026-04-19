@@ -16,6 +16,7 @@ import type { Inventory } from '@/lib/inventory/types'
 import { addItem } from '@/lib/inventory/inventory'
 import { spendCredits } from '@/lib/player/profile'
 
+/** Planet trade shop session, fuel/repair purchases, and HUD callbacks. */
 export class MapShopFacade {
   session: ShopSession | null = null
   dialogOpen = false

@@ -10,6 +10,14 @@ import {
 } from '@/lib/terrain/asteroidRockDistribution'
 import { loadGLB, fixMaterials } from '@/three/loadGLB'
 
+/**
+ * Instanced surface rocks on asteroid terrain with mining hit feedback.
+ *
+ * @author guinetik
+ * @date 2026-04-19
+ * @spec docs/asteroid-lander-gdd.md
+ */
+
 /** Seconds for a hit flash to decay back to neutral. */
 const FLASH_DURATION_SEC = 0.18
 /** Peak brightness multiplier applied to the per-instance color on hit. */
@@ -30,6 +38,7 @@ const _neutralColor = new THREE.Color(1, 1, 1)
 const SURFACE_ROCK_GLB_URL = '/models/asteroids.glb'
 const ROCK_TEXTURE_REPEAT = 1.35
 
+/** Named material preset mapped to a tiled albedo texture. */
 interface RockLook {
   name: string
   textureUrl: string
@@ -62,12 +71,14 @@ const ROCK_LOOKS: readonly RockLook[] = [
   },
 ]
 
+/** Normalized rock mesh template extracted from the shared GLB. */
 interface RockTemplate {
   geometry: THREE.BufferGeometry
   material: THREE.Material
   bottomY: number
 }
 
+/** Construction inputs for {@link SurfaceRockController.create}. */
 interface SurfaceRockControllerOptions {
   heightmap: Heightmap
   surface: SurfaceFeatures
@@ -79,6 +90,7 @@ interface SurfaceRockControllerOptions {
 let templateCachePromise: Promise<RockTemplate[]> | null = null
 let rockTextureCachePromise: Promise<readonly THREE.Texture[]> | null = null
 
+/** Pulls normalized rock templates from every mesh in the asteroids GLB. */
 function extractTemplates(glbScene: THREE.Group): RockTemplate[] {
   const results: RockTemplate[] = []
 
@@ -112,6 +124,7 @@ function extractTemplates(glbScene: THREE.Group): RockTemplate[] {
   return results
 }
 
+/** Loads and caches normalized templates from `asteroids.glb`. */
 async function getRockTemplates(): Promise<RockTemplate[]> {
   if (!templateCachePromise) {
     templateCachePromise = loadGLB(SURFACE_ROCK_GLB_URL).then((scene) => {
@@ -122,6 +135,7 @@ async function getRockTemplates(): Promise<RockTemplate[]> {
   return templateCachePromise
 }
 
+/** Loads and caches repeating albedo textures for each {@link ROCK_LOOKS} entry. */
 async function getRockTextures(): Promise<readonly THREE.Texture[]> {
   if (!rockTextureCachePromise) {
     const loader = new THREE.TextureLoader()
@@ -140,6 +154,7 @@ async function getRockTextures(): Promise<readonly THREE.Texture[]> {
   return rockTextureCachePromise
 }
 
+/** Clones a template material, assigns albedo + optional mineral tint. */
 function tuneRockMaterial(
   source: THREE.Material,
   look: RockLook,
@@ -165,18 +180,20 @@ function tuneRockMaterial(
   return material
 }
 
+/** Stable rock palette index from spawn position and world seed. */
 function selectRockLookIndex(spawn: AsteroidRockSpawn, seed: number): number {
   const mix = Math.sin(spawn.x * 0.0061 + spawn.z * 0.0047 + seed * 0.000013) * 43758.5453
   const normalized = mix - Math.floor(mix)
   return Math.min(ROCK_LOOKS.length - 1, Math.floor(normalized * ROCK_LOOKS.length))
 }
 
-/** Internal record of where a spawn lives inside its instanced mesh. */
+/** Maps a logical spawn index to its instanced mesh + instance id. */
 interface RockInstanceLocation {
   mesh: THREE.InstancedMesh
   localIndex: number
 }
 
+/** Places instanced rocks, handles mining hits, and hides collected spawns. */
 export class SurfaceRockController implements Tickable {
   readonly group = new THREE.Group()
   readonly spawns: readonly AsteroidRockSpawn[]

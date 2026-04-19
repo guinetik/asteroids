@@ -15,6 +15,7 @@ import { createGravitySurfPass } from '@/three/GravitySurfPass'
 import { createSlingshotSpeedPass } from '@/three/SlingshotSpeedPass'
 import mapGravityData from '@/data/shuttle/map-gravity.json'
 
+/** Strong handles returned from {@link MapPlanetariumScene.initialize}. */
 export interface MapPlanetariumSceneRefs {
   sceneObjects: MapSceneObjects
   starField: StarFieldController
@@ -28,6 +29,7 @@ export interface MapPlanetariumSceneRefs {
   mapGridSize: number
 }
 
+/** Boots the solar-map planetarium scene, post stack, and controllers. */
 export class MapPlanetariumScene {
   private refs: MapPlanetariumSceneRefs | null = null
 

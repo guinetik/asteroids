@@ -69,6 +69,7 @@ import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
 
 const COMPLETED_EVA_SITE_DESPAWN_DISTANCE = 180
 
+/** Mission board UI, waypoints, EVA POIs, and orbital minigame wiring for the map. */
 export class MapMissionFacade {
   board: ShuttleMissionBoard = createMissionBoard()
   overlayOpen = false

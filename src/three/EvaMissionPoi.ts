@@ -53,6 +53,7 @@ export interface EvaMissionPoiInstance {
   dispose(): void
 }
 
+/** Builds the satellite GLB POI at the waypoint height. */
 async function createSatellitePoi(
   localY: number,
   maintenanceState: MaintenanceBeaconState,
@@ -73,6 +74,7 @@ async function createSatellitePoi(
   }
 }
 
+/** Builds the Voyager-style relay antenna POI at the waypoint height. */
 async function createRelayAntennaPoi(
   localY: number,
   maintenanceState: MaintenanceBeaconState,
@@ -93,6 +95,7 @@ async function createRelayAntennaPoi(
   }
 }
 
+/** Builds the Hubble-style telescope POI at the waypoint height. */
 async function createTelescopePoi(
   localY: number,
   maintenanceState: MaintenanceBeaconState,

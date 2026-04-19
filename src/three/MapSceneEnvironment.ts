@@ -5,6 +5,7 @@ import { PortalBoundarySystem } from '@/three/PortalBoundarySystem'
 import type { MapSceneObjects } from '@/three/MapSceneSetup'
 import * as THREE from 'three'
 
+/** Wires ambient lighting and portal boundaries around the shuttle play space. */
 export interface MapSceneEnvironmentOptions {
   sceneObjects: MapSceneObjects
   shuttleGroup: THREE.Group
@@ -14,6 +15,7 @@ export interface MapSceneEnvironmentOptions {
   getShuttleState: () => Partial<VibeJamParams>
 }
 
+/** Ambient space fill + boundary walls for the Vibe Jam asteroid arena. */
 export class MapSceneEnvironment {
   readonly ambientSpace: AmbientSpaceController
   readonly boundarySystem: PortalBoundarySystem

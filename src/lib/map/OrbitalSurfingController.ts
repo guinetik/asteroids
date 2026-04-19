@@ -93,6 +93,7 @@ export interface OrbitalSurfingDeps {
 /** Callback fired when the orbital surf completes and the player should enter orbit. */
 export type OrbitalSurfCompleteCallback = (planetIndex: number) => void
 
+/** Smoothstep-style easing for 0→1 progress (Hermite / smoothstep). */
 function easeInOut01(t: number): number {
   const clamped = Math.max(0, Math.min(1, t))
   return clamped * clamped * (3 - 2 * clamped)

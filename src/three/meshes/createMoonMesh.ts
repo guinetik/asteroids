@@ -14,6 +14,7 @@ import { MOON_SPHERE_SEGMENTS, SIZE_SCALE } from '@/lib/planets/constants'
 
 const BLACK_PIXEL = new Uint8Array([0, 0, 0, 255])
 
+/** 1×1 black texture used when a moon has no albedo / night map. */
 function createFallbackTexture(): THREE.DataTexture {
   const texture = new THREE.DataTexture(BLACK_PIXEL, 1, 1, THREE.RGBAFormat)
   texture.colorSpace = THREE.SRGBColorSpace

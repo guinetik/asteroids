@@ -112,6 +112,7 @@ function createBeamMaterial(color: number, opacity: number): THREE.MeshBasicMate
   })
 }
 
+/** Assembles beam + cap geometry for one waypoint color/layout preset. */
 function buildMarkerGroupFromLayout(
   color: number,
   layout: WaypointMarkerLayout,

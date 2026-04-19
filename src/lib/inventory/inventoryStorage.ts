@@ -15,6 +15,7 @@ import type { Inventory } from './types'
 /** Versioned localStorage key for the shuttle inventory save. */
 export const INVENTORY_STORAGE_KEY = 'asteroid-lander-shuttle-inventory-v1'
 
+/** Parses persisted JSON into an {@link Inventory}, or `null` if the payload is invalid. */
 function normalizeLoadedInventory(data: unknown): Inventory | null {
   if (data === null || typeof data !== 'object' || Array.isArray(data)) return null
 

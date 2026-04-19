@@ -65,6 +65,7 @@ const explosionFlashMat = new THREE.MeshBasicMaterial({
 
 const explosionFlashGeo = new THREE.SphereGeometry(1, 16, 12)
 
+/** One hostage prop orbiting the rescue capsule with simple bob animation. */
 interface ContainedHostageVisual {
   model: HostageModel
   angleOffset: number
@@ -72,6 +73,7 @@ interface ContainedHostageVisual {
   bobPhase: number
 }
 
+/** FPS-style outbreak rescue — waves, healing beam, and virus core objective. */
 export class RescueMinigame implements MiniGame, MiniGameEvents {
   readonly objectiveIndex: number
 

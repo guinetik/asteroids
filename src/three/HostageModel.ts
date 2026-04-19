@@ -162,17 +162,17 @@ function cloneMeshMaterialsDeep(root: THREE.Object3D): void {
   })
 }
 
-/**
- * Mixamo hostage prop — add {@link group} to the scene after {@link HostageModel.create}.
- *
- * Materials are cloned per instance so damage/heal emissive pulses stay local.
- */
 /** Duration of heal/damage emissive pulse on the rig (seconds). */
 const FEEDBACK_FLASH_DURATION = 0.35
 
 /** Emissive tint strength during feedback. */
 const FEEDBACK_EMISSIVE_INTENSITY = 0.85
 
+/**
+ * Mixamo hostage prop — add {@link group} to the scene after {@link HostageModel.create}.
+ *
+ * Materials are cloned per instance so damage/heal emissive pulses stay local.
+ */
 export class HostageModel {
   /** Parent group for placement. */
   readonly group = new THREE.Group()

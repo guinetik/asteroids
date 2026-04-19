@@ -1,11 +1,20 @@
+/**
+ * Heightmap + analytic colliders for character and disc movement on the asteroid surface.
+ *
+ * @author guinetik
+ * @date 2026-04-19
+ * @spec docs/asteroid-lander-gdd.md
+ */
 import type { Heightmap, Vec3 } from '@/lib/terrain/heightmap'
 
+/** Minimal 3D vector shape shared by physics helpers. */
 export interface Vec3Like {
   x: number
   y: number
   z: number
 }
 
+/** Tunables for {@link CollisionWorld.moveCharacterXZ} stepping and slopes. */
 export interface CharacterCollisionConfig {
   radius: number
   maxStepHeight: number
@@ -15,6 +24,7 @@ export interface CharacterCollisionConfig {
   airborneClearance: number
 }
 
+/** Vertical cylinder / sphere proxy used for props and hazards. */
 export interface WorldSphereCollider {
   id?: string
   kind: 'sphere'
@@ -25,6 +35,7 @@ export interface WorldSphereCollider {
   enabled?: boolean | (() => boolean)
 }
 
+/** Axis-aligned block volume (buildings, pads) for support and blocking. */
 export interface WorldAabbCollider {
   id?: string
   kind: 'aabb'
@@ -33,8 +44,10 @@ export interface WorldAabbCollider {
   enabled?: boolean | (() => boolean)
 }
 
+/** Discriminated union of analytic colliders registered on {@link CollisionWorld}. */
 export type WorldCollider = WorldSphereCollider | WorldAabbCollider
 
+/** Output of a horizontal move with ground probe and walkability flag. */
 export interface CharacterMoveResult {
   x: number
   z: number
@@ -46,12 +59,14 @@ export interface CharacterMoveResult {
   groundWalkable: boolean
 }
 
+/** Radius / skin / substep settings for {@link CollisionWorld.moveDiscXZ}. */
 export interface DiscCollisionConfig {
   radius: number
   skinWidth: number
   substepDistance: number
 }
 
+/** Best support height under a disc query, from terrain or colliders. */
 export interface SupportSurfaceResult {
   height: number
   normal: Vec3
@@ -60,23 +75,28 @@ export interface SupportSurfaceResult {
 
 const DEFAULT_GROUND_NORMAL: Vec3 = { x: 0, y: 1, z: 0 }
 
+/** Clamps `value` to `[min, max]`. */
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
 
+/** Reads a static vector or invokes a lazy callback. */
 function resolveVec3(value: Vec3Like | (() => Vec3Like)): Vec3Like {
   return typeof value === 'function' ? value() : value
 }
 
+/** Resolves optional dynamic `enabled` flags on colliders. */
 function isColliderEnabled(enabled: boolean | (() => boolean) | undefined): boolean {
   if (typeof enabled === 'function') return enabled()
   return enabled ?? true
 }
 
+/** Ground slope angle (radians) from an up-ish terrain normal. */
 function groundAngleFromNormal(normal: Vec3): number {
   return Math.acos(clamp(normal.y, -1, 1))
 }
 
+/** Heightmap-backed ground plus optional analytic meshes for FPS / EVA motion. */
 export class CollisionWorld {
   private readonly colliders: WorldCollider[] = []
 

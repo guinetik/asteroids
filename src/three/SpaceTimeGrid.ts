@@ -102,6 +102,7 @@ const SOURCE_INFLUENCE_RADIUS_MIN = 55
 /** Multiplier on Gaussian σ (via width scale) for the always-update disk around a source. */
 const SOURCE_INFLUENCE_SIGMA_MULT = 4.25
 
+/** Converts a 24-bit RGB hex to normalized `[r,g,b]` for grid tinting. */
 function gridHexToRgbUnit(hex: number): [number, number, number] {
   const r = ((hex >> 16) & 255) / 255
   const g = ((hex >> 8) & 255) / 255

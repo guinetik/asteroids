@@ -349,6 +349,7 @@ export class ThrusterEffectController implements Tickable {
   }
 }
 
+/** Procedural soft disc used for idle RCS / thruster sprites. */
 function createIdleThrusterTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas')
   canvas.width = IDLE_THRUSTER_TEXTURE_SIZE

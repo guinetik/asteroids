@@ -5,12 +5,14 @@ const STREAK_COUNT = 48
 const FAR_AWAY = 99999
 const LOCAL_FORWARD = new THREE.Vector3(-1, 0, 0)
 
+/** One motion streak in the gravity-surf line ribbon. */
 interface SurfStreak {
   head: THREE.Vector3
   velocity: THREE.Vector3
   length: number
 }
 
+/** GPU line ribbon that streaks along the shuttle path while gravity surfing. */
 export class GravitySurfEffectController implements Tickable {
   readonly lines: THREE.LineSegments
 

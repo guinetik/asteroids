@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { AudioPlaybackHandle } from '@/audio/audioTypes'
 import { startShipMessagePlayback } from './shipMessageAudioPlayback'
 
+/** Builds a stub playback handle for tests. */
 function makeHandle(soundId: string): AudioPlaybackHandle {
   return {
     soundId,

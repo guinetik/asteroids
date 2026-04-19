@@ -2,6 +2,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 
 const INTENSITY_EPSILON = 0.001
 
+/** Full-screen pass that tints the map during gravity-surf coupling / cruise. */
 export function createGravitySurfPass(): ShaderPass {
   const shader = {
     uniforms: {

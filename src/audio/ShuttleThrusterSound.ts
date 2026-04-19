@@ -1,5 +1,6 @@
 import { Howler } from 'howler'
 
+/** Per-frame shuttle RCS and yaw jet levels plus master SFX gain. */
 export interface ShuttleThrusterAudioFrame {
   rcsLeft: number
   rcsRight: number
@@ -167,6 +168,7 @@ export class ShuttleThrusterSound {
   }
 }
 
+/** Creates a looping buffer noise source (brown / pink / white) for jet beds. */
 function createLoopingNoiseSource(
   ctx: AudioContext,
   color: 'white' | 'pink' | 'brown',
@@ -215,11 +217,13 @@ function createLoopingNoiseSource(
   return source
 }
 
+/** Exponential smoothing toward `target` using `amount` in 0→1. */
 function damp(current: number, target: number, amount: number): number {
   const t = clamp01(amount)
   return current + (target - current) * t
 }
 
+/** Ramps an {@link AudioParam} to `value` with linear scheduling and clamping. */
 function automateParam(
   param: AudioParam,
   value: number,
@@ -235,10 +239,12 @@ function automateParam(
   param.linearRampToValueAtTime(safeValue, now + safeRamp)
 }
 
+/** Clamps `value` to `[min, max]`. */
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
 
+/** Clamps `value` to `[0, 1]`. */
 function clamp01(value: number): number {
   return clamp(value, 0, 1)
 }

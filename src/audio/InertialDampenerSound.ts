@@ -1,5 +1,6 @@
 import { Howler } from 'howler'
 
+/** Per-frame velocity and dampener state for inertial dampener procedural audio. */
 export interface InertialDampenerAudioFrame {
   currentVelocity: number
   initialVelocity: number
@@ -243,6 +244,7 @@ export class InertialDampenerSound {
   }
 }
 
+/** Creates a looping white-noise buffer for grit layers. */
 function createLoopingNoiseSource(ctx: AudioContext): AudioBufferSourceNode {
   const duration = 2
   const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * duration))
@@ -257,6 +259,7 @@ function createLoopingNoiseSource(ctx: AudioContext): AudioBufferSourceNode {
   return source
 }
 
+/** Precomputed waveshaper curve for light bitcrush / digital grit. */
 function makeBitcrushCurve(): Float32Array {
   const samples = 256
   const curve = new Float32Array(samples)
@@ -267,6 +270,7 @@ function makeBitcrushCurve(): Float32Array {
   return curve
 }
 
+/** Ramps an {@link AudioParam} when present; no-ops on `null`. */
 function automateParam(
   param: AudioParam | null,
   value: number,
@@ -283,14 +287,17 @@ function automateParam(
   param.linearRampToValueAtTime(safeValue, now + safeRamp)
 }
 
+/** Linear interpolation between `min` and `max` using `t` clamped to 0→1. */
 function lerp(min: number, max: number, t: number): number {
   return min + (max - min) * clamp01(t)
 }
 
+/** Clamps `value` to `[min, max]`. */
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
 
+/** Clamps `value` to `[0, 1]`. */
 function clamp01(value: number): number {
   return clamp(value, 0, 1)
 }

@@ -3,6 +3,7 @@ import { gravityAt, influenceRadius, eventHorizonRadius, type GravitySource } fr
 import { GravityRing } from './GravityRing'
 import type { SpaceTimeGrid } from './SpaceTimeGrid'
 
+/** Authoring data for a sun or planet mesh plus gravity visualization. */
 export interface CelestialBodyConfig {
   name: string
   mass: number // solar masses

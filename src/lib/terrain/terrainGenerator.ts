@@ -18,7 +18,7 @@ import type { SurfaceFeatures } from '@/lib/asteroids/types'
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Maximum world-space height added by the noise pass. */
+/** Per-biome multipliers for relief, breakup, and dust softening. */
 interface TerrainBiomeTuning {
   broadReliefScale: number
   disturbanceContrast: number
@@ -165,15 +165,18 @@ function fbm(
   return value
 }
 
+/** Clamps `value` to `[0, 1]`. */
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value))
 }
 
+/** Hermite smoothstep between `edge0` and `edge1`. */
 function smoothstep(edge0: number, edge1: number, x: number): number {
   const t = clamp01((x - edge0) / (edge1 - edge0))
   return t * t * (3 - 2 * t)
 }
 
+/** Returns biome tuning or {@link DEFAULT_BIOME_TUNING} when unknown. */
 function getBiomeTuning(biome?: string): TerrainBiomeTuning {
   switch (biome) {
     case 'sandy':
@@ -226,6 +229,7 @@ function getBiomeTuning(biome?: string): TerrainBiomeTuning {
   }
 }
 
+/** Low-frequency mask that gates medium/micro breakup detail. */
 function sampleDisturbanceMask(
   noise: SimplexNoise,
   x: number,
@@ -243,6 +247,7 @@ function sampleDisturbanceMask(
   return Math.pow(contrasted, power)
 }
 
+/** Medium + micro noise height contributions modulated by `disturbance`. */
 function sampleBreakupHeight(
   noise: SimplexNoise,
   x: number,
@@ -271,6 +276,7 @@ function sampleBreakupHeight(
   return medium * mediumAmp * disturbance + micro * microAmp * microMask * dustFactor
 }
 
+/** Valid grid index range for crater centers so rims stay inside the heightmap. */
 function craterCenterBounds(
   radius: number,
   worldSize: number,

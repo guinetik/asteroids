@@ -1,7 +1,9 @@
 import * as THREE from 'three'
 
+/** EVA prop maintenance status — drives beacon color and blink. */
 export type MaintenanceBeaconState = 'needs-maintenance' | 'repaired'
 
+/** Tunables for the POI bulb mesh and point light. */
 export interface MaintenanceBeaconOptions {
   offset: THREE.Vector3
   radius?: number
@@ -30,6 +32,7 @@ const DEFAULT_EMISSIVE_PEAK = 3.5
 const REPAIRED_INTENSITY = 1.15
 const REPAIRED_EMISSIVE = 1.6
 
+/** Blinking maintenance lamp used on satellite / relay / telescope POIs. */
 export class MaintenanceBeacon {
   readonly bulb: THREE.Mesh
   readonly light: THREE.PointLight

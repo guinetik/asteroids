@@ -1,6 +1,14 @@
+/**
+ * Procedural Web Audio one-shots for tool and combat SFX presets.
+ *
+ * @author guinetik
+ * @date 2026-04-19
+ * @spec docs/asteroid-lander-gdd.md
+ */
 import { Howler } from 'howler'
 import type { AudioPlaybackHandle, AudioProceduralPreset } from './audioTypes'
 
+/** Arguments for starting a procedural one-shot tied to a logical sound id. */
 interface ProceduralPlayArgs {
   soundId: string
   preset: AudioProceduralPreset
@@ -8,6 +16,7 @@ interface ProceduralPlayArgs {
   onEnd?: () => void
 }
 
+/** Minimal {@link AudioParam}-like surface used by envelope helpers. */
 interface GainAutomationLike {
   value: number
   setValueAtTime(value: number, startTime: number): void
@@ -15,8 +24,10 @@ interface GainAutomationLike {
   exponentialRampToValueAtTime(value: number, endTime: number): void
 }
 
+/** Audio source nodes we start/stop and track for cleanup. */
 type StoppableNode = Pick<AudioScheduledSourceNode, 'start' | 'stop' | 'connect' | 'disconnect'>
 
+/** Builds and plays a procedural preset; returns a handle or `null` when audio is unavailable. */
 export function playProceduralSound(args: ProceduralPlayArgs): AudioPlaybackHandle | null {
   if (Howler.noAudio) return null
 
@@ -48,6 +59,7 @@ export function playProceduralSound(args: ProceduralPlayArgs): AudioPlaybackHand
   let ended = false
   let currentVolume = args.volume
 
+  /** Tears down nodes and optionally invokes `onEnd` for natural completion. */
   function cleanup(manualStop: boolean): void {
     if (ended) return
     ended = true
@@ -76,6 +88,7 @@ export function playProceduralSound(args: ProceduralPlayArgs): AudioPlaybackHand
     }
   }
 
+  /** Stops all scheduled sources immediately (manual stop / skip `onEnd`). */
   function stopAllSources(): void {
     if (stopped) return
     stopped = true
@@ -113,6 +126,7 @@ export function playProceduralSound(args: ProceduralPlayArgs): AudioPlaybackHand
   }
 }
 
+/** Dispatches to the concrete builder for the requested procedural preset. */
 function buildProceduralRecipe(
   ctx: AudioContext,
   output: GainNode,
@@ -137,6 +151,7 @@ function buildProceduralRecipe(
   }
 }
 
+/** “Tool drill” preset — layered saws and air noise for a handheld drill. */
 function buildToolDrill(
   ctx: AudioContext,
   output: GainNode,
@@ -197,6 +212,7 @@ function buildToolDrill(
   return duration
 }
 
+/** Short laser burst with sizzle and decay echoes. */
 function buildLaserFire(
   ctx: AudioContext,
   output: GainNode,
@@ -265,6 +281,7 @@ function buildLaserFire(
   return 0.28
 }
 
+/** Impact thud plus filtered noise for projectile hits. */
 function buildProjectileHit(
   ctx: AudioContext,
   output: GainNode,
@@ -297,6 +314,7 @@ function buildProjectileHit(
   return duration
 }
 
+/** Shield impact — tonal body plus shimmering follow-through. */
 function buildShieldHit(
   ctx: AudioContext,
   output: GainNode,
@@ -327,6 +345,7 @@ function buildShieldHit(
   return duration
 }
 
+/** Two-pluck “heal” chirp for repair / med tool feedback. */
 function buildToolHeal(
   ctx: AudioContext,
   output: GainNode,
@@ -361,6 +380,7 @@ function buildToolHeal(
   return secondStart - startTime + secondDuration
 }
 
+/** Bright two-stage pickup blip. */
 function buildPickup(
   ctx: AudioContext,
   output: GainNode,
@@ -393,6 +413,7 @@ function buildPickup(
   return secondStart - startTime + secondDuration
 }
 
+/** Starts `source` at `startTime`, stops after `totalDuration`, and registers it for cleanup. */
 function scheduleSource(
   source: StoppableNode,
   startTime: number,
@@ -404,6 +425,7 @@ function scheduleSource(
   source.stop(startTime + totalDuration)
 }
 
+/** Sharp attack, exponential decay — good for impacts and plucks. */
 function applyPercussiveEnvelope(
   gain: GainAutomationLike,
   startTime: number,
@@ -415,6 +437,7 @@ function applyPercussiveEnvelope(
   gain.exponentialRampToValueAtTime(0.0001, startTime + duration)
 }
 
+/** Noise burst envelope: start at peak, decay out. */
 function applyNoiseEnvelope(
   gain: GainAutomationLike,
   startTime: number,
@@ -425,6 +448,7 @@ function applyNoiseEnvelope(
   gain.exponentialRampToValueAtTime(0.0001, startTime + duration)
 }
 
+/** Short pluck with mid-body sustain and long tail. */
 function applyPluckEnvelope(
   gain: GainAutomationLike,
   startTime: number,
@@ -437,6 +461,7 @@ function applyPluckEnvelope(
   gain.exponentialRampToValueAtTime(0.0001, startTime + duration)
 }
 
+/** Rises into a held plateau then tapers — for sustained tones (drill core). */
 function applyHeldEnvelope(
   gain: GainAutomationLike,
   startTime: number,
@@ -449,6 +474,7 @@ function applyHeldEnvelope(
   gain.exponentialRampToValueAtTime(0.0001, startTime + duration)
 }
 
+/** Finite-length white or brown noise buffer for one-shot layers. */
 function createNoiseSource(
   ctx: AudioContext,
   duration: number,

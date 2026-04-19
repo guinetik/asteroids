@@ -12,6 +12,7 @@ import type { EmissiveMaterial } from '@/lib/map/mapViewControllerHelpers'
 import type { MapOrbitFacade } from '@/lib/map/orbit/MapOrbitFacade'
 import type { ShuttleAudioDirector } from '@/audio/ShuttleAudioDirector'
 
+/** Dependencies for {@link MapLifeCycleFacade.triggerDeath}. */
 interface TriggerDeathDeps {
   shuttleController: ShuttleController
   shuttleEffects: MapShuttleEffects | null
@@ -26,6 +27,7 @@ interface TriggerDeathDeps {
   audio: ShuttleAudioDirector
 }
 
+/** Dependencies for habitat / orbit respawn camera and mesh resets. */
 interface RespawnDeps {
   shuttleController: ShuttleController
   vehicleCamera: VehicleCamera | null
@@ -36,6 +38,7 @@ interface RespawnDeps {
   isEmissiveMaterial: (material: THREE.Material) => material is EmissiveMaterial
 }
 
+/** Death, respawn inventory, and camera routing helpers for the solar map. */
 export class MapLifeCycleFacade {
   /**
    * Snapshot profile and replace hold contents after a map death.

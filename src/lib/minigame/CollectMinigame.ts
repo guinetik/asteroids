@@ -16,6 +16,7 @@ import type { Heightmap } from '@/lib/terrain/heightmap'
 import { TERMINAL_INTERACT_RANGE } from '@/three/TerminalModel'
 import { DepositCrateModel } from '@/three/DepositCrateModel'
 
+/** Walk-up crate pickup used for simple delivery objectives. */
 export class CollectMinigame implements MiniGame, MiniGameEvents {
   readonly objectiveIndex: number
 

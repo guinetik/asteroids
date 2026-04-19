@@ -118,6 +118,7 @@ function pickRequiredMinerals(
  */
 const MIN_ROCKS_PER_REQUIRED_MINERAL = 3
 
+/** Deterministic 0→1 PRNG for rock placement from a level seed. */
 function seededRng(seed: number): () => number {
   let s = (seed | 0) || 1
   return () => {
@@ -140,6 +141,7 @@ export interface GatherMinigameOptions {
   rockYieldSystem: RockYieldSystem
 }
 
+/** Mining quota minigame — surface rocks, yields, and deposit crate hand-in. */
 export class GatherMinigame implements MiniGame, MiniGameEvents {
   readonly objectiveIndex: number
 

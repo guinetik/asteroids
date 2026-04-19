@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 
+/** Visual tuning for the warning mast + lens + lights. */
 export interface WarningBeaconOptions {
   housingColor?: number
   lensColor?: number

@@ -14,6 +14,7 @@ import { getItemDefinition } from '@/lib/inventory/catalog'
 
 import shopData from '@/data/shop/shop.json'
 
+/** Ensures every listing references a real item and sane prices. */
 function validateCatalog(catalog: ShopCatalog): ShopCatalog {
   for (const listing of catalog.listings) {
     const item = getItemDefinition(listing.itemId)

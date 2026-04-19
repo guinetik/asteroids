@@ -9,6 +9,7 @@ import { ShuttleController } from '@/three/ShuttleController'
 import type { MapSceneObjects } from '@/three/MapSceneSetup'
 import * as THREE from 'three'
 
+/** Aggregates thruster, thermal, manifold, and explosion VFX for the shuttle. */
 export class MapShuttleEffects {
   readonly thrusterController: ThrusterEffectController
   readonly temperatureEffects: TemperatureEffectController

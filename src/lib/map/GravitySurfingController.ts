@@ -1,3 +1,10 @@
+/**
+ * Gravity Surfing coupling / cruise / decouple state machine for the solar map shuttle.
+ *
+ * @author guinetik
+ * @date 2026-04-19
+ * @spec docs/asteroid-lander-gdd.md
+ */
 import * as THREE from 'three'
 import type { InputManager } from '@/lib/InputManager'
 import { MAP_VIEW_CONTROLLER_CONFIG as MAP_CONFIG } from '@/lib/map/mapViewControllerConfig'
@@ -14,6 +21,7 @@ import type { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
 import type { ShuttleController } from '@/three/ShuttleController'
 import { MAP_PHYSICS } from '@/three/ShuttleController'
 
+/** Internal FSM payload for free flight, coupling, surfing, or decoupling. */
 type GravitySurfState =
   | { mode: 'free' }
   | {
@@ -49,6 +57,7 @@ type GravitySurfState =
       duration: number
     }
 
+/** Latest frame snapshot from {@link MapViewController} used by the controller tick. */
 export interface GravitySurfingControllerDeps {
   gravitationalEventManager: GravitationalEventManager | null
   gridVisible: boolean
@@ -64,11 +73,13 @@ export interface GravitySurfingControllerDeps {
 /** Minimum shuttle speed to allow gravity surf attachment — prevents ambiguous direction at rest. */
 const GRAVITY_SURF_MIN_ATTACH_SPEED = 0.15
 
+/** Smoothstep easing for coupling / decouple progress. */
 function easeInOut01(t: number): number {
   const clamped = THREE.MathUtils.clamp(t, 0, 1)
   return clamped * clamped * (3 - 2 * clamped)
 }
 
+/** Owns gravity-surf intent, rail snapping, and shuttle velocity overrides. */
 export class GravitySurfingController {
   private state: GravitySurfState = { mode: 'free' }
   private tiltPitch = 0

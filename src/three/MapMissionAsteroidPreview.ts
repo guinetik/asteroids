@@ -49,6 +49,7 @@ const MAP_MISSION_ASTERO_PREVIEW_ROUGHNESS_MIN = 0.9
 /** Maximum metalness for preview materials. */
 const MAP_MISSION_ASTERO_PREVIEW_METALNESS_MAX = 0.1
 
+/** Cached GLB mesh template before cloning for mission previews. */
 interface GeometryMaterialPair {
   /** Mesh vertex data (owned by the template cache; clone before use). */
   geometry: THREE.BufferGeometry

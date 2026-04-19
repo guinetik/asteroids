@@ -25,6 +25,7 @@ export const PENDING_MAP_RETURN_WORLD_KEY = 'asteroid-lander-map-return-world-v1
 /** Versioned localStorage key for repaired EVA POI props that stay on the map. */
 export const COMPLETED_EVA_SITES_KEY = 'asteroid-lander-completed-eva-sites-v1'
 
+/** Wrapper stored under {@link MISSION_BOARD_KEY} with a wall-clock timestamp. */
 interface PersistedMissionBoard {
   board: ShuttleMissionBoard
   savedAt: number
@@ -86,6 +87,7 @@ export function clearActiveMission(): void {
   localStorage.removeItem(ACTIVE_MISSION_KEY)
 }
 
+/** Rehydrates a shop restock timer after the tab was backgrounded. */
 function reviveRestockTimer(timer: unknown, elapsedSeconds: number): RestockTimer | null {
   if (timer === null || typeof timer !== 'object' || Array.isArray(timer)) return null
   const candidate = timer as Partial<RestockTimer>

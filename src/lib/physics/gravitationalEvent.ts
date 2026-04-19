@@ -106,6 +106,7 @@ const DEFAULT_HUD_NOTIFY_RADIUS = 520
 
 let eventIdSeq = 0
 
+/** Stable id for an anomaly — prefers `crypto.randomUUID` when available. */
 function randomId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
@@ -114,10 +115,12 @@ function randomId(): string {
   return `gravity-anomaly-${eventIdSeq}`
 }
 
+/** Uniform random float in `[min, max)`. */
 function randomInRange(min: number, max: number): number {
   return min + Math.random() * (max - min)
 }
 
+/** Random unit vector on the XZ plane. */
 function randomUnitDirXZ(): { dirX: number; dirZ: number } {
   const a = Math.random() * Math.PI * 2
   return { dirX: Math.cos(a), dirZ: Math.sin(a) }
@@ -194,6 +197,7 @@ export interface GravitationalEventNearbyHudCallbacks {
   ) => void
 }
 
+/** Normalizes a planar direction, falling back to {@link randomUnitDirXZ} if degenerate. */
 function normalizeDir(dirX: number, dirZ: number): { dirX: number; dirZ: number } {
   const len = Math.hypot(dirX, dirZ)
   if (len < 1e-8) {

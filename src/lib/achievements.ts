@@ -1,3 +1,10 @@
+/**
+ * Achievement unlock evaluation, persistence, and UI grouping helpers.
+ *
+ * @author guinetik
+ * @date 2026-04-12
+ * @spec docs/superpowers/specs/2026-04-03-player-profile-design.md
+ */
 import type { PlayerProfile } from '@/lib/player/types'
 import {
   ACHIEVEMENT_CATEGORY_LABELS,
@@ -11,17 +18,20 @@ import type { UpgradeLevels } from '@/lib/upgrades'
 
 const ACHIEVEMENTS_STORAGE_KEY = 'asteroid-lander-achievements-v1'
 
+/** Result of comparing profile state against locked achievements. */
 export interface AchievementUnlockResult {
   unlockedIds: string[]
   newlyUnlocked: AchievementDefinition[]
 }
 
+/** One accordion section in the achievements panel. */
 export interface AchievementGroup {
   category: AchievementCategory
   label: string
   items: AchievementDefinition[]
 }
 
+/** Reads persisted unlocked-id list from `localStorage`. */
 export function loadUnlockedAchievementIds(): string[] {
   try {
     const raw = localStorage.getItem(ACHIEVEMENTS_STORAGE_KEY)
@@ -34,6 +44,7 @@ export function loadUnlockedAchievementIds(): string[] {
   }
 }
 
+/** Writes the full unlocked-id list to `localStorage`. */
 export function persistUnlockedAchievementIds(ids: string[]): void {
   try {
     localStorage.setItem(ACHIEVEMENTS_STORAGE_KEY, JSON.stringify(ids))
@@ -42,14 +53,17 @@ export function persistUnlockedAchievementIds(ids: string[]): void {
   }
 }
 
+/** Counts asteroids with at least one logged visit. */
 function getUniqueAsteroidVisitCount(profile: PlayerProfile): number {
   return Object.values(profile.visitedAsteroids).filter((count) => count > 0).length
 }
 
+/** Sums installed upgrade tier steps across all shuttle systems. */
 function getPurchasedUpgradeTierCount(upgradeLevels: UpgradeLevels): number {
   return Object.values(upgradeLevels).reduce((sum, level) => sum + Math.max(0, level ?? 0), 0)
 }
 
+/** Human-readable solar body name for locked-hint copy. */
 function solarOrbitAchievementLabel(bodyKey: string): string {
   if (bodyKey === 'sun') return 'the Sun'
   try {
@@ -59,10 +73,12 @@ function solarOrbitAchievementLabel(bodyKey: string): string {
   }
 }
 
+/** True once the player has registered a first orbit in {@link PlayerProfile.orbitedSolarBodies}. */
 function hasOrbitedSolarBody(profile: PlayerProfile, bodyKey: string): boolean {
   return (profile.orbitedSolarBodies[bodyKey] ?? 0) > 0
 }
 
+/** Pure predicate — whether `progress` satisfies `definition` right now. */
 export function isAchievementUnlocked(definition: AchievementDefinition, progress: AchievementProgress): boolean {
   switch (definition.kind) {
     case 'intro':
@@ -82,6 +98,7 @@ export function isAchievementUnlocked(definition: AchievementDefinition, progres
   }
 }
 
+/** Returns newly unlocked rows and the merged id list for persistence. */
 export function evaluateAchievementUnlocks(
   progress: AchievementProgress,
   currentUnlockedIds: readonly string[],
@@ -102,6 +119,7 @@ export function evaluateAchievementUnlocks(
   }
 }
 
+/** Builds category sections from `ACHIEVEMENT_DEFINITIONS` order. */
 export function getAchievementGroups(): AchievementGroup[] {
   const groups = new Map<AchievementCategory, AchievementDefinition[]>()
   for (const definition of ACHIEVEMENT_DEFINITIONS) {
@@ -120,6 +138,7 @@ export function getAchievementGroups(): AchievementGroup[] {
   }))
 }
 
+/** Player-facing hint for locked rows — varies by achievement kind. */
 export function getAchievementLockedHint(
   definition: AchievementDefinition,
   progress: AchievementProgress,
@@ -157,6 +176,7 @@ export function getAchievementLockedHint(
   }
 }
 
+/** Clears persisted unlocks between Vitest cases. */
 export function resetAchievementStorageForTests(): void {
   try {
     localStorage.removeItem(ACHIEVEMENTS_STORAGE_KEY)

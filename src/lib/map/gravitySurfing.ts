@@ -1,7 +1,16 @@
+/**
+ * Space Fabric rail snapping, headings, and planar velocity helpers for the solar map.
+ *
+ * @author guinetik
+ * @date 2026-04-19
+ * @spec docs/asteroid-lander-gdd.md
+ */
 import * as THREE from 'three'
 
+/** Which world axis the player is riding on the fabric grid. */
 export type GravitySurfRailAxis = 'x' | 'z'
 
+/** Nearest rail segment and snapped shuttle position after a snap query. */
 export interface GravitySurfRailTarget {
   axis: GravitySurfRailAxis
   lineCoord: number
@@ -11,6 +20,7 @@ export interface GravitySurfRailTarget {
   distance: number
 }
 
+/** Inputs for {@link findNearestGravitySurfRail}. */
 export interface FindGravitySurfRailParams {
   x: number
   z: number
@@ -27,6 +37,7 @@ export function computeGravitySurfGridStep(gridSize: number, gridResolution: num
   return gridSize / gridResolution
 }
 
+/** Snaps a world coordinate to the nearest grid line along one axis. */
 function nearestGridLineCoord(value: number, halfSize: number, step: number): number {
   if (step <= 0) return value
   const index = Math.round((value + halfSize) / step)

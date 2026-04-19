@@ -210,6 +210,7 @@ function hashSeed(str: string): number {
   return Math.abs(hash)
 }
 
+/** Applies the gameplay spawn offset so the lander clears the portal geometry. */
 function offsetGameplayLanderSpawn(position: Vector3): Vector3 {
   return position.clone().add(new Vector3(
     LANDER_GAMEPLAY_START_OFFSET_X,

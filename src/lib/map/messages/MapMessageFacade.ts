@@ -3,6 +3,7 @@ import type { ShipMessageTrigger } from '@/lib/messages/messageTypes'
 import { isMainThrusterSpentForMessage } from '@/lib/messages/tutorialTriggers'
 import type { ThrusterState } from '@/lib/physics/thrusterSystem'
 
+/** Telemetry snapshot passed into map tutorial / comms triggers each tick. */
 export interface MapRuntimeMessageParams {
   worldLineHistoryLength: number
   earthDepartureMinHistoryPoints: number
@@ -17,6 +18,7 @@ export interface MapRuntimeMessageParams {
   onMessageUpdate: (() => void) | null
 }
 
+/** Enqueues ship messages for Earth departure, braking, slingshot tutorials, etc. */
 export class MapMessageFacade {
   private didDispatchEarthDistanceMessage = false
   private didDispatchBrakeMessage = false

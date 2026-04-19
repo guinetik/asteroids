@@ -159,6 +159,9 @@ function applyMovementWithSeparation(handles: readonly EnemyHandle[], dt: number
   }
 }
 
+/**
+ * Spawns enemies, runs AI ticks, separation, and contact/hostage rules each frame.
+ */
 export class EnemyDirector implements Tickable {
   private readonly handles: EnemyHandle[] = []
   private nextId = 1

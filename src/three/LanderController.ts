@@ -194,6 +194,7 @@ const _qYaw = new THREE.Quaternion()
 const _sampleOffset = new THREE.Vector3()
 const _sampleWorld = new THREE.Vector3()
 
+/** Height/normal probe under the lander feet for touchdown validation. */
 interface TerrainSupportSample {
   height: number
   normal: { x: number; y: number; z: number }
@@ -244,6 +245,7 @@ const LANDER_COLLISION_TOP_OFFSET = 18
 const LANDER_SUPPORT_MAX_STEP_UP = 6
 const LANDER_COLLIDER_ID = 'lander'
 
+/** HUD landing cue severity from speed / tilt / slope checks. */
 export type LandingWarningLevel = 'safe' | 'warn' | 'danger'
 
 /**

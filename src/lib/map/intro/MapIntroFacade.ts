@@ -35,8 +35,10 @@ import {
   MAP_INTRO_JUPITER_FOV,
 } from '@/lib/map/mapViewControllerConfig'
 
+/** Resolves a planet controller by catalog id for intro cinematics. */
 type FindPlanetController = (planetId: string) => PlanetSystemController | null
 
+/** Encapsulates the opening solar-map flythrough camera and hero models. */
 export class MapIntroFacade {
   static preload(): void {
     VirusModel.preload()

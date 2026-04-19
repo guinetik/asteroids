@@ -65,6 +65,9 @@ export interface AsteroidDevGlobal {
 // ─── Window augmentation ──────────────────────────────────────────────────────
 
 declare global {
+  /**
+   * Browser `Window` augmented with the Asteroid Lander dev-tools registry.
+   */
   interface Window {
     /** Dev-tools registry. Available in development builds only. */
     AsteroidDev: AsteroidDevGlobal

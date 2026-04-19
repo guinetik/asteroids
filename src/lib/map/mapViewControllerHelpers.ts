@@ -1,3 +1,11 @@
+/**
+ * Shared helpers for {@link MapViewController}: materials, mission-site visibility,
+ * gravity wells, and map overlay body lists.
+ *
+ * @author guinetik
+ * @date 2026-04-12
+ * @spec docs/asteroid-lander-gdd.md
+ */
 import * as THREE from 'three'
 import { PLANETS } from '@/lib/planets/catalog'
 import type { ActiveVisitRelayMission, GeneratedAsteroidMission } from '@/lib/missions/types'
@@ -10,6 +18,7 @@ import {
   SPAWN_OFFSET_BEHIND_EARTH,
 } from '@/lib/map/mapViewControllerConfig'
 
+/** Three.js mesh materials that expose `emissive` for manual glow control. */
 export type EmissiveMaterial =
   | THREE.MeshLambertMaterial
   | THREE.MeshPhongMaterial
