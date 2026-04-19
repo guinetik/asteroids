@@ -143,6 +143,8 @@ import { MapMessageFacade } from '@/lib/map/messages/MapMessageFacade'
 import { MapMissionFacade } from '@/lib/map/missions/MapMissionFacade'
 import type { OrbitalMiniGame, OrbitalMiniGameEvents } from '@/lib/minigame/OrbitalMiniGame'
 import { createOrbitalMiniGame } from '@/lib/minigame/orbitalMiniGameFactory'
+import { SatelliteRepairController } from '@/three/SatelliteRepairController'
+import { SatelliteServicingMiniGame } from '@/lib/minigame/satelliteServicing/SatelliteServicingMiniGame'
 import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 import { PLANET_ORBITAL_CONFIGS } from '@/lib/missions/planetOrbitalConfig'
 import { MapModeCoordinator } from '@/lib/map/mode/MapModeCoordinator'
@@ -235,6 +237,8 @@ export class MapViewController implements Tickable {
       ) => void)
     | null = null
   private activeEvaMinigame: OrbitalMiniGame | null = null
+  /** In-scene controller for the currently-active satellite servicing minigame, if any. */
+  private satelliteRepairController: SatelliteRepairController | null = null
   private planetariumScene: MapPlanetariumScene | null = null
   private sunController: SunController | null = null
   private planetControllers: PlanetSystemController[] = []
@@ -1704,6 +1708,7 @@ export class MapViewController implements Tickable {
     }
 
     this.missionFacade.tick(dt)
+    this.satelliteRepairController?.tick(dt)
 
     // Waypoint marker scale + VFX (must not gate begin-mission proximity — marker refs can lag).
     if (this.sceneObjects && this.vehicleCamera && this.shuttleController) {
@@ -2318,19 +2323,18 @@ export class MapViewController implements Tickable {
 
   /**
    * Launch the in-EVA maintenance minigame for the POI the player is near. Invoked by
-   * EvaSession when the player presses the action key inside the terminal prompt
-   * range. Looks up the active EVA mission currently rendered at the POI, builds a
-   * minigame via {@link createOrbitalMiniGame}, wires its `onComplete` callback to
+   * EvaSession when the player presses the action key inside the terminal prompt range.
+   * Looks up the active EVA mission currently rendered at the POI, builds a minigame via
+   * {@link createOrbitalMiniGame}, wires its `onComplete` callback to
    * {@link evaMinigameComplete}, then branches on {@link OrbitalMiniGame.presentation}:
-   * - `'overlay'` — emits `onEvaMinigameChange` so the view-layer overlay opens.
-   * - `'in_scene'` — logs a warning and falls through to overlay until the
-   *   SatelliteRepairController lands in Task 10.
+   * `'overlay'` emits `onEvaMinigameChange` so the view-layer overlay opens; `'in_scene'`
+   * instantiates a {@link SatelliteRepairController} and calls `attach` with the POI object,
+   * player-position accessor, F-key state, minigame, and mission — handing frame-level
+   * control to the 3D controller rather than the 2D overlay.
    */
   private beginEvaMinigame(): void {
     const mission = this.missionFacade.getActiveEvaMissionAtPoi()
     if (!mission) {
-      // No mission rendered — shouldn't happen in normal play; bail so we don't leave
-      // the session stuck in minigame mode.
       this.evaSession?.endMinigame()
       return
     }
@@ -2350,15 +2354,33 @@ export class MapViewController implements Tickable {
       return
     }
 
-    // presentation === 'in_scene' — no in-scene controller is registered yet.
-    // The SatelliteRepairController lands in Task 10. Until then, log and fall
-    // through to overlay so the flow stays playable for any mission that
-    // accidentally lands on this branch (none currently do: satellite_servicing
-    // still falls through to DefaultOrbitalMiniGame in the factory).
-    console.warn(
-      `[MapViewController] In-scene minigame presentation not yet wired for "${minigameType}"; opening overlay fallback.`,
-    )
-    this.onEvaMinigameChange?.({ mission, minigame })
+    // presentation === 'in_scene' — hand control to SatelliteRepairController.
+    if (!(minigame instanceof SatelliteServicingMiniGame)) {
+      console.warn(
+        `[MapViewController] Unknown in-scene minigame type "${minigameType}"; opening overlay fallback.`,
+      )
+      this.onEvaMinigameChange?.({ mission, minigame })
+      return
+    }
+    const poiObject = this.missionFacade.getEvaPoiGroup()
+    if (!poiObject) {
+      console.warn('[MapViewController] No POI object available for in-scene minigame; aborting.')
+      this.evaMinigameClose()
+      return
+    }
+    this.satelliteRepairController = new SatelliteRepairController()
+    this.satelliteRepairController.attach({
+      poiObject,
+      getPlayerPosition: () => {
+        const out = new THREE.Vector3()
+        const pass = this.sceneObjects?.composer.passes[0] as RenderPass | undefined
+        pass?.camera.getWorldPosition(out)
+        return out
+      },
+      isFixKeyPressed: () => this.inputManager?.isActionActive('interact') ?? false,
+      minigame,
+      mission,
+    })
   }
 
   /**
@@ -2370,6 +2392,8 @@ export class MapViewController implements Tickable {
     if (!this.activeEvaMinigame) return
     this.activeEvaMinigame.dispose()
     this.activeEvaMinigame = null
+    this.satelliteRepairController?.dispose()
+    this.satelliteRepairController = null
     this.onEvaMinigameChange?.(null)
     this.evaSession?.endMinigame()
   }
@@ -2401,6 +2425,8 @@ export class MapViewController implements Tickable {
     }
     this.activeEvaMinigame?.dispose()
     this.activeEvaMinigame = null
+    this.satelliteRepairController?.dispose()
+    this.satelliteRepairController = null
     this.onEvaMinigameChange?.(null)
     this.evaSession?.endMinigame()
   }
