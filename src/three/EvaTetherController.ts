@@ -62,14 +62,17 @@ const TETHER_PLAYER_LOOKDOWN_DROP = 0.55
 /** Extra backward shift applied while looking down to keep the tether out of the camera frustum. */
 const TETHER_PLAYER_LOOKDOWN_BACKSHIFT = 0.32
 
-/** Minimum camera-space depth for the player-side tether endpoint so it stays behind the lens. */
-const TETHER_CAMERA_BACK_CLEARANCE = 0.72
+/** Hidden guide point behind the player used as the visible end of the rope in first person. */
+const TETHER_PLAYER_GUIDE_LOCAL_OFFSET = new THREE.Vector3(0, -1.28, 0.86)
 
-/** Minimum camera-space drop for the player-side tether endpoint so it stays under the helmet view. */
-const TETHER_CAMERA_DOWN_CLEARANCE = 0.92
+/** Extra guide-point drop while looking down. */
+const TETHER_PLAYER_GUIDE_LOOKDOWN_DROP = 0.2
 
-/** Minimum camera-space side offset to keep the tether from crossing the center of the screen. */
-const TETHER_CAMERA_SIDE_CLEARANCE = 0.34
+/** Extra guide-point backshift while looking down. */
+const TETHER_PLAYER_GUIDE_LOOKDOWN_BACKSHIFT = 0.24
+
+/** Hide the final rope segments nearest the camera and end the visible tether at the guide point. */
+const TETHER_RENDER_HIDDEN_SEGMENTS = 3
 
 /** Radius of the tether tube (world units). */
 const TETHER_RADIUS = 0.02
@@ -94,6 +97,12 @@ const TETHER_CONSTRAINT_ITERATIONS = 10
 
 /** Mild drag so the rope settles instead of vibrating forever. */
 const TETHER_POINT_DAMPING = 0.985
+
+/** How much player-end motion feeds into the rope as a soft traveling wave. */
+const TETHER_PLAYER_MOTION_COUPLING = 0.16
+
+/** Damp the injected endpoint motion so the rope stays calm and EVA-like. */
+const TETHER_PLAYER_MOTION_DAMPING = 0.72
 
 /** Local shuttle-space offset where the tether attaches on the shuttle underside. */
 const TETHER_ANCHOR_LOCAL_OFFSET = new THREE.Vector3(0, -1.15, 0.55)
@@ -167,14 +176,17 @@ export class EvaTetherController implements Tickable {
   private readonly playerAttachLocal = new THREE.Vector3()
   private readonly playerLookDownOffset = new THREE.Vector3()
   private readonly playerAttachOffsetWorld = new THREE.Vector3()
-  private readonly playerAttachCameraLocal = new THREE.Vector3()
-  private readonly anchorCameraLocal = new THREE.Vector3()
+  private readonly playerGuideWorld = new THREE.Vector3()
+  private readonly playerGuideLocal = new THREE.Vector3()
+  private readonly playerGuideLookDownOffset = new THREE.Vector3()
+  private readonly playerGuideOffsetWorld = new THREE.Vector3()
   private readonly ropeDelta = new THREE.Vector3()
   private readonly ropeVelocity = new THREE.Vector3()
   private readonly ropeDirection = new THREE.Vector3()
   private readonly playerAttachEuler = new THREE.Euler(0, 0, 0, 'YXZ')
   private readonly playerAttachQuat = new THREE.Quaternion()
-  private readonly playerAttachQuatInverse = new THREE.Quaternion()
+  private readonly previousPlayerAttachWorld = new THREE.Vector3()
+  private readonly playerAttachDelta = new THREE.Vector3()
 
   private anchor: THREE.Object3D | null = null
   private input: InputManager | null = null
@@ -240,42 +252,35 @@ export class EvaTetherController implements Tickable {
     this.playerAttachOffsetWorld
       .copy(this.playerAttachLocal)
       .applyQuaternion(this.playerAttachQuat)
-    this.playerAttachWorld
+    return this.playerAttachWorld
       .copy(this.group.position)
       .add(this.playerAttachOffsetWorld)
+  }
 
-    // Final first-person cleanup: keep the player-side endpoint outside the camera frustum.
-    this.playerAttachQuatInverse.copy(this.playerAttachQuat).invert()
-    this.playerAttachCameraLocal
-      .copy(this.playerAttachWorld)
-      .sub(this.group.position)
-      .applyQuaternion(this.playerAttachQuatInverse)
+  /** Hidden guide point behind the player used as the visible rope end in first person. */
+  private getPlayerGuideWorld(): THREE.Vector3 {
+    const lookDownFactor = THREE.MathUtils.clamp(
+      -this.fpsCamera.pitch / EVA_CAMERA_CONFIG.pitchClamp,
+      0,
+      1,
+    )
+    this.playerGuideLookDownOffset.set(
+      0,
+      -TETHER_PLAYER_GUIDE_LOOKDOWN_DROP * lookDownFactor,
+      TETHER_PLAYER_GUIDE_LOOKDOWN_BACKSHIFT * lookDownFactor,
+    )
+    this.playerGuideLocal
+      .copy(TETHER_PLAYER_GUIDE_LOCAL_OFFSET)
+      .add(this.playerGuideLookDownOffset)
 
-    if (this.anchor) {
-      const anchorWorld = this.getAnchorWorld()
-      if (anchorWorld) {
-        this.anchorCameraLocal
-          .copy(anchorWorld)
-          .sub(this.group.position)
-          .applyQuaternion(this.playerAttachQuatInverse)
-        const sideSign = this.anchorCameraLocal.x >= 0 ? 1 : -1
-        if (this.playerAttachCameraLocal.x * sideSign < TETHER_CAMERA_SIDE_CLEARANCE) {
-          this.playerAttachCameraLocal.x = sideSign * TETHER_CAMERA_SIDE_CLEARANCE
-        }
-      }
-    }
-
-    if (this.playerAttachCameraLocal.y > -TETHER_CAMERA_DOWN_CLEARANCE) {
-      this.playerAttachCameraLocal.y = -TETHER_CAMERA_DOWN_CLEARANCE
-    }
-    if (this.playerAttachCameraLocal.z > -TETHER_CAMERA_BACK_CLEARANCE) {
-      this.playerAttachCameraLocal.z = -TETHER_CAMERA_BACK_CLEARANCE
-    }
-
-    return this.playerAttachWorld
-      .copy(this.playerAttachCameraLocal)
+    this.playerAttachEuler.set(0, this.fpsCamera.yaw, 0)
+    this.playerAttachQuat.setFromEuler(this.playerAttachEuler)
+    this.playerGuideOffsetWorld
+      .copy(this.playerGuideLocal)
       .applyQuaternion(this.playerAttachQuat)
-      .add(this.group.position)
+    return this.playerGuideWorld
+      .copy(this.group.position)
+      .add(this.playerGuideOffsetWorld)
   }
 
   /** Provide the input manager that supplies EVA action state. */
@@ -455,6 +460,7 @@ export class EvaTetherController implements Tickable {
     const a = this.getAnchorWorld()
     if (!a) return
     const b = this.getPlayerAttachWorld()
+    this.previousPlayerAttachWorld.copy(b)
     for (let i = 0; i <= TETHER_SEGMENTS; i++) {
       const t = i / TETHER_SEGMENTS
       const pt = this.tetherCurvePoints[i]
@@ -485,6 +491,10 @@ export class EvaTetherController implements Tickable {
     const ropeLength = distance * (1 + slackRatio)
     const segmentLength = ropeLength / TETHER_SEGMENTS
     this.ropeSegmentLengths.fill(segmentLength)
+    this.playerAttachDelta
+      .subVectors(b, this.previousPlayerAttachWorld)
+      .multiplyScalar(TETHER_PLAYER_MOTION_DAMPING)
+    this.previousPlayerAttachWorld.copy(b)
 
     const substepDt = dt / TETHER_SIMULATION_SUBSTEPS
     for (let step = 0; step < TETHER_SIMULATION_SUBSTEPS; step++) {
@@ -496,6 +506,15 @@ export class EvaTetherController implements Tickable {
         this.ropeVelocity.subVectors(pt, prev).multiplyScalar(TETHER_POINT_DAMPING)
         prev.copy(pt)
         pt.add(this.ropeVelocity)
+
+        const t = i / TETHER_SEGMENTS
+        const playerInfluence = Math.pow(t, 2.2) * (1 - tautRatio * 0.35)
+        if (playerInfluence > 0.0001) {
+          pt.addScaledVector(
+            this.playerAttachDelta,
+            playerInfluence * TETHER_PLAYER_MOTION_COUPLING,
+          )
+        }
       }
 
       for (let iter = 0; iter < TETHER_CONSTRAINT_ITERATIONS; iter++) {
@@ -535,7 +554,14 @@ export class EvaTetherController implements Tickable {
   }
 
   private rebuildTetherGeometry(): void {
-    const curve = new THREE.CatmullRomCurve3(this.tetherCurvePoints)
+    const visibleEnd = this.getPlayerGuideWorld()
+    const visiblePointCount = Math.max(2, this.tetherCurvePoints.length - TETHER_RENDER_HIDDEN_SEGMENTS)
+    const renderPoints = this.tetherCurvePoints
+      .slice(0, visiblePointCount)
+      .map((pt) => pt.clone())
+    renderPoints[renderPoints.length - 1] = visibleEnd.clone()
+
+    const curve = new THREE.CatmullRomCurve3(renderPoints)
     const next = new THREE.TubeGeometry(
       curve,
       TETHER_SEGMENTS,

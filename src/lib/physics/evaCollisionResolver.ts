@@ -25,6 +25,18 @@ export type EvaCollider =
       readonly center: THREE.Vector3
       readonly radius: number
     }
+  | {
+      /**
+       * Oriented bounding box. `min`/`max` are in the referenced object's *local* frame;
+       * the resolver transforms the player sphere into that frame each check so
+       * collision stays tight no matter how the object is rotated in world space.
+       * Requires uniform scale on {@link object}; the shuttle satisfies this during EVA.
+       */
+      readonly kind: 'obb'
+      readonly object: THREE.Object3D
+      readonly min: THREE.Vector3
+      readonly max: THREE.Vector3
+    }
 
 /** Outcome of a single resolution pass. Used for debug/telemetry, not required by callers. */
 export interface EvaResolveResult {
@@ -64,6 +76,48 @@ export function createAabbColliderFromObjects(
     min: box.min.clone(),
     max: box.max.clone(),
   }
+}
+
+/**
+ * Build an oriented-bounding-box `EvaCollider` from hull nodes in the parent object's
+ * local frame. Walks each mesh's geometry bounding box, transforms its 8 corners into
+ * `parent.matrixWorld`-inverse space, and expands a tight local Box3. Keeping the bounds
+ * in local space lets the resolver stay tight no matter how the parent is rotated —
+ * world-axis AABBs balloon ~1.4× on a 45°-oriented shuttle, leaving dead-corner gaps in
+ * front of the nose and behind the tail.
+ */
+export function createObbColliderFromHullNodes(
+  parent: THREE.Object3D,
+  hullNodes: readonly THREE.Object3D[],
+): EvaCollider {
+  parent.updateMatrixWorld(true)
+  const parentInverse = new THREE.Matrix4().copy(parent.matrixWorld).invert()
+  const min = new THREE.Vector3(Infinity, Infinity, Infinity)
+  const max = new THREE.Vector3(-Infinity, -Infinity, -Infinity)
+  const corner = new THREE.Vector3()
+  const meshLocal = new THREE.Matrix4()
+  for (const node of hullNodes) {
+    node.updateMatrixWorld(true)
+    node.traverse((child) => {
+      const mesh = child as THREE.Mesh
+      if (!mesh.isMesh) return
+      const geom = mesh.geometry
+      if (!geom.boundingBox) geom.computeBoundingBox()
+      const bb = geom.boundingBox
+      if (!bb) return
+      meshLocal.multiplyMatrices(parentInverse, mesh.matrixWorld)
+      for (let i = 0; i < 8; i++) {
+        corner.set(
+          (i & 1) ? bb.max.x : bb.min.x,
+          (i & 2) ? bb.max.y : bb.min.y,
+          (i & 4) ? bb.max.z : bb.min.z,
+        ).applyMatrix4(meshLocal)
+        min.min(corner)
+        max.max(corner)
+      }
+    })
+  }
+  return { kind: 'obb', object: parent, min, max }
 }
 
 /**
@@ -107,6 +161,11 @@ export class EvaCollisionResolver {
   private readonly colliders: EvaCollider[] = []
   private readonly tmpClosest = new THREE.Vector3()
   private readonly tmpNormal = new THREE.Vector3()
+  private readonly tmpLocalPos = new THREE.Vector3()
+  private readonly tmpWorldPos = new THREE.Vector3()
+  private readonly tmpQuat = new THREE.Quaternion()
+  private readonly tmpQuatInv = new THREE.Quaternion()
+  private readonly tmpScale = new THREE.Vector3()
 
   /** Register a collider. Returned callback removes it (idempotent). */
   add(collider: EvaCollider): () => void {
@@ -173,18 +232,71 @@ export class EvaCollisionResolver {
         continue
       }
 
-      // Sphere-vs-sphere.
-      this.tmpNormal.subVectors(position, c.center)
-      const combined = radius + c.radius
-      const distSq = this.tmpNormal.lengthSq()
-      if (distSq >= combined * combined) continue
-      const dist = Math.sqrt(distSq)
-      if (dist < 1e-5) {
-        this.tmpNormal.set(1, 0, 0)
-      } else {
-        this.tmpNormal.multiplyScalar(1 / dist)
+      if (c.kind === 'sphere') {
+        this.tmpNormal.subVectors(position, c.center)
+        const combined = radius + c.radius
+        const distSq = this.tmpNormal.lengthSq()
+        if (distSq >= combined * combined) continue
+        const dist = Math.sqrt(distSq)
+        if (dist < 1e-5) {
+          this.tmpNormal.set(1, 0, 0)
+        } else {
+          this.tmpNormal.multiplyScalar(1 / dist)
+        }
+        position.addScaledVector(this.tmpNormal, combined - dist)
+        this.killVelocityAlong(velocity, this.tmpNormal)
+        touched = true
+        continue
       }
-      position.addScaledVector(this.tmpNormal, combined - dist)
+
+      // OBB: transform sphere center into the object's local frame, do sphere-vs-AABB
+      // there, transform the push-out back to world. Assumes uniform scale.
+      c.object.updateMatrixWorld()
+      c.object.matrixWorld.decompose(this.tmpWorldPos, this.tmpQuat, this.tmpScale)
+      const uniformScale = this.tmpScale.x
+      if (uniformScale < 1e-6) continue
+      this.tmpQuatInv.copy(this.tmpQuat).invert()
+      this.tmpLocalPos
+        .copy(position)
+        .sub(this.tmpWorldPos)
+        .applyQuaternion(this.tmpQuatInv)
+        .multiplyScalar(1 / uniformScale)
+      const localRadius = radius / uniformScale
+      this.tmpClosest.set(
+        Math.max(c.min.x, Math.min(this.tmpLocalPos.x, c.max.x)),
+        Math.max(c.min.y, Math.min(this.tmpLocalPos.y, c.max.y)),
+        Math.max(c.min.z, Math.min(this.tmpLocalPos.z, c.max.z)),
+      )
+      this.tmpNormal.subVectors(this.tmpLocalPos, this.tmpClosest)
+      const obbDistSq = this.tmpNormal.lengthSq()
+      const insideObb = obbDistSq < 1e-10
+      let pushLocal: number
+      if (insideObb) {
+        const dxMin = this.tmpLocalPos.x - c.min.x
+        const dxMax = c.max.x - this.tmpLocalPos.x
+        const dyMin = this.tmpLocalPos.y - c.min.y
+        const dyMax = c.max.y - this.tmpLocalPos.y
+        const dzMin = this.tmpLocalPos.z - c.min.z
+        const dzMax = c.max.z - this.tmpLocalPos.z
+        const minDepth = Math.min(dxMin, dxMax, dyMin, dyMax, dzMin, dzMax)
+        this.tmpNormal.set(0, 0, 0)
+        if (minDepth === dxMin) this.tmpNormal.x = -1
+        else if (minDepth === dxMax) this.tmpNormal.x = 1
+        else if (minDepth === dyMin) this.tmpNormal.y = -1
+        else if (minDepth === dyMax) this.tmpNormal.y = 1
+        else if (minDepth === dzMin) this.tmpNormal.z = -1
+        else this.tmpNormal.z = 1
+        pushLocal = minDepth + localRadius
+      } else {
+        if (obbDistSq >= localRadius * localRadius) continue
+        const obbDist = Math.sqrt(obbDistSq)
+        this.tmpNormal.multiplyScalar(1 / obbDist)
+        pushLocal = localRadius - obbDist
+      }
+      // Rotate the local push-normal back to world (unit vectors ignore scale), scale the
+      // push magnitude by uniformScale so the world-space displacement matches.
+      this.tmpNormal.applyQuaternion(this.tmpQuat)
+      position.addScaledVector(this.tmpNormal, pushLocal * uniformScale)
       this.killVelocityAlong(velocity, this.tmpNormal)
       touched = true
     }

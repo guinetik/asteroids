@@ -17,8 +17,10 @@ export const DEFAULT_BINDINGS: Record<string, string[]> = {
   toggleCamera: ['KeyC'],
   gravitySurfingToggle: ['KeyQ'],
   orbitAction: ['KeyE'],
-  // Begin/end EVA when within range of a POI (prototype — shuttle scene only).
-  evaToggle: ['KeyE'],
+  // Begin/end EVA when within range of a POI. Shares KeyF with `beginMission` since both
+  // are "engage the mission prop in range" actions — an asteroid mission waypoint and an
+  // EVA POI never coexist at the same spot.
+  evaToggle: ['KeyF'],
   // EVA movement (only read while in EVA mode; keys reused from the shuttle set).
   evaForward: ['KeyW'],
   evaBack: ['KeyS'],

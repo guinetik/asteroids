@@ -1,21 +1,34 @@
 /**
  * Generate the world-space waypoint for an accepted EVA (visit-relay) mission.
  *
- * The waypoint is placed at a small random offset from the giver planet's
- * current world position — close enough that the player can see the marker on
- * the solar map from their current orbit, but far enough that the POI prop
- * reads as a separate object and doesn't overlap planet geometry.
+ * The waypoint is placed close to the giver planet and biased along its orbital tangent
+ * rather than purely radially — satellites should "hug the orbital line" of their host,
+ * not drift toward the sun (into overheat zones) or outward into the next planet's
+ * gravity well. Offsets are split into two axes derived from the planet's position
+ * relative to the sun at origin:
+ *   - **Tangential** (along the orbit, either leading or trailing the planet): larger
+ *     range so the POI sits clearly off the planet's current column.
+ *   - **Radial** (toward / away from the sun): bounded tight so the waypoint stays near
+ *     the orbital line. Matches the "~2–3 planet-radii off the orbital line" feel.
  *
  * @author guinetik
  * @date 2026-04-18
  * @spec docs/superpowers/specs/2026-04-18-visit-relay-mission-design.md
  */
 
-/** Minimum world-space planar offset from the planet center when placing the EVA waypoint. */
-export const EVA_WAYPOINT_MIN_OFFSET_WORLD = 60
+/** Minimum signed tangential offset magnitude (world units) along the planet's orbit. */
+export const EVA_WAYPOINT_MIN_TANGENTIAL_OFFSET = 150
 
-/** Maximum world-space planar offset from the planet center when placing the EVA waypoint. */
-export const EVA_WAYPOINT_MAX_OFFSET_WORLD = 140
+/** Maximum signed tangential offset magnitude (world units) along the planet's orbit. */
+export const EVA_WAYPOINT_MAX_TANGENTIAL_OFFSET = 280
+
+/**
+ * Maximum absolute radial offset (world units) from the planet's orbital line. Bounded
+ * tight so the waypoint doesn't drift toward the sun (overheat) or into the next
+ * planet's gravity well. Radial sign is randomized — waypoint may sit slightly inside
+ * or outside the orbital circle, but never far from it.
+ */
+export const EVA_WAYPOINT_MAX_RADIAL_OFFSET = 30
 
 /**
  * Minimum absolute vertical offset (world units) of the POI prop inside the waypoint
@@ -34,7 +47,9 @@ export const EVA_WAYPOINT_MAX_Y_OFFSET_WORLD = 25
 
 /**
  * Generate a waypoint world position near the giver planet, plus a small local Y offset
- * for the POI prop so the satellite doesn't sit exactly at shuttle altitude.
+ * for the POI prop so the satellite doesn't sit exactly at shuttle altitude. Waypoint
+ * hugs the planet's orbital line: most of the offset goes along the orbital tangent;
+ * radial offset (toward/away from the sun) is bounded tight.
  *
  * @param planetWorldX - Giver planet world X at accept time.
  * @param planetWorldZ - Giver planet world Z at accept time.
@@ -46,16 +61,32 @@ export function generateEvaWaypoint(
   planetWorldZ: number,
   rand: () => number = Math.random,
 ): { worldX: number; worldZ: number; poiLocalY: number } {
-  const angle = rand() * Math.PI * 2
-  const span = EVA_WAYPOINT_MAX_OFFSET_WORLD - EVA_WAYPOINT_MIN_OFFSET_WORLD
-  const dist = EVA_WAYPOINT_MIN_OFFSET_WORLD + rand() * span
+  // Radial unit vector (sun at origin → planet). Fallback to +X if the planet is somehow
+  // exactly at the sun; shouldn't happen in play but avoids NaN.
+  const planetDistFromSun = Math.hypot(planetWorldX, planetWorldZ)
+  const radialX = planetDistFromSun > 1e-6 ? planetWorldX / planetDistFromSun : 1
+  const radialZ = planetDistFromSun > 1e-6 ? planetWorldZ / planetDistFromSun : 0
+  // Tangential unit vector on XZ, perpendicular to radial (prograde convention).
+  const tangentX = -radialZ
+  const tangentZ = radialX
+
+  const tangSpan = EVA_WAYPOINT_MAX_TANGENTIAL_OFFSET - EVA_WAYPOINT_MIN_TANGENTIAL_OFFSET
+  const tangMagnitude = EVA_WAYPOINT_MIN_TANGENTIAL_OFFSET + rand() * tangSpan
+  const tangSign = rand() < 0.5 ? -1 : 1
+  const tangentialOffset = tangMagnitude * tangSign
+
+  const radialMagnitude = rand() * EVA_WAYPOINT_MAX_RADIAL_OFFSET
+  const radialSign = rand() < 0.5 ? -1 : 1
+  const radialOffset = radialMagnitude * radialSign
+
   const ySpan = EVA_WAYPOINT_MAX_Y_OFFSET_WORLD - EVA_WAYPOINT_MIN_Y_OFFSET_WORLD
   const yMagnitude = EVA_WAYPOINT_MIN_Y_OFFSET_WORLD + rand() * ySpan
   const ySign = rand() < 0.5 ? -1 : 1
   const poiLocalY = yMagnitude * ySign
+
   return {
-    worldX: planetWorldX + Math.cos(angle) * dist,
-    worldZ: planetWorldZ + Math.sin(angle) * dist,
+    worldX: planetWorldX + tangentX * tangentialOffset + radialX * radialOffset,
+    worldZ: planetWorldZ + tangentZ * tangentialOffset + radialZ * radialOffset,
     poiLocalY,
   }
 }

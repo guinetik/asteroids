@@ -111,6 +111,12 @@ export interface EvaSessionConfig {
   getVehicle: () => EvaSessionVehicle | null
   /** World-space POI position for the proximity check (null = no POI active). */
   getPoi: () => THREE.Vector3 | null
+  /**
+   * Optional gate: return false while external state forbids EVA (e.g. the shuttle is
+   * captured in a planetary orbit). The session shows a blocking prompt instead of the
+   * "EVA [F]" offer. Defaults to always-allowed when not supplied.
+   */
+  canEva?: () => { allowed: true } | { allowed: false; reason: string }
   /** Objects to scale up during EVA. Read once at session enter. */
   getHugeScaleTargets: () => EvaHugeScaleTarget[]
   /**
@@ -125,7 +131,7 @@ export interface EvaSessionConfig {
   onEvaModeChange?: (active: boolean) => void
   /** Per-frame FPS HUD telemetry while EVA is active. */
   onEvaTelemetry?: (telemetry: FpsTelemetry) => void
-  /** Prompt text for the view-level HUD ("EVA [E]", "Return to Shuttle [E]", etc.). */
+  /** Prompt text for the view-level HUD ("EVA [F]", "Return to Shuttle [F]", etc.). */
   onActionPrompt?: (prompt: string | null) => void
 }
 
@@ -186,7 +192,12 @@ export class EvaSession implements Tickable {
         this.setPrompt('STOP SHIP TO EVA')
         return
       }
-      this.setPrompt('EVA [E]')
+      const gate = this.config.canEva?.() ?? { allowed: true }
+      if (!gate.allowed) {
+        this.setPrompt(gate.reason)
+        return
+      }
+      this.setPrompt('EVA [F]')
       if (this.config.inputManager.wasActionPressed('evaToggle')) {
         this.beginOpening(vehicle)
       }
@@ -199,7 +210,7 @@ export class EvaSession implements Tickable {
     const rdz = this.controller.group.position.z - vehicle.group.position.z
     const distToVehicleXZ = Math.sqrt(rdx * rdx + rdz * rdz)
     if (distToVehicleXZ < EVA_RETURN_RANGE) {
-      this.setPrompt('Return to Shuttle [E]')
+      this.setPrompt('Return to Shuttle [F]')
       if (this.config.inputManager.wasActionPressed('evaToggle')) {
         this.endSession(vehicle)
         return

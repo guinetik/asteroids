@@ -47,7 +47,7 @@ import { ShuttleController, MAP_PHYSICS } from '@/three/ShuttleController'
 import { EvaSession, type EvaHugeScaleTarget, type EvaSceneHost } from '@/three/EvaSession'
 import {
   createAabbColliderFromObject,
-  createAabbColliderFromObjects,
+  createObbColliderFromHullNodes,
   type EvaCollider,
 } from '@/lib/physics/evaCollisionResolver'
 import type { FpsTelemetry } from '@/components/FpsHud.vue'
@@ -3593,6 +3593,13 @@ export class MapViewController implements Tickable {
       inputManager: this.inputManager,
       getVehicle: () => this.shuttleController,
       getPoi: () => this.missionFacade.getEvaPoiWorldPos(),
+      canEva: () => {
+        const state = this.orbitSystem?.state
+        if (state === 'orbiting' || state === 'approaching') {
+          return { allowed: false, reason: 'EXIT ORBIT TO EVA' }
+        }
+        return { allowed: true }
+      },
       getHugeScaleTargets: () => this.buildEvaHugeScaleTargets(),
       getColliders: () => this.buildEvaColliders(),
       spawnOffsetScale: MapViewController.EVA_MAP_SPAWN_OFFSET_SCALE,
@@ -3643,10 +3650,15 @@ export class MapViewController implements Tickable {
   private buildEvaColliders(): EvaCollider[] {
     const colliders: EvaCollider[] = []
     if (this.shuttleController) {
-      // Use hull-only node list so fuel tanks, habitat, cargo lander, and FX emitters
-      // (all parented onto the same scene as the hull) don't inflate the AABB.
-      this.shuttleController.group.updateMatrixWorld(true)
-      colliders.push(createAabbColliderFromObjects(this.shuttleController.shuttleHullNodes))
+      // OBB in the shuttle's local frame: stays tight no matter how the shuttle is
+      // rotated in world space. A world-axis AABB balloons ~1.4× on a 45° heading,
+      // leaving dead-corner gaps in front of the nose and behind the tail.
+      colliders.push(
+        createObbColliderFromHullNodes(
+          this.shuttleController.group,
+          this.shuttleController.shuttleHullNodes,
+        ),
+      )
     }
     const poiGroup = this.missionFacade.getEvaPoiGroup()
     if (poiGroup) {
