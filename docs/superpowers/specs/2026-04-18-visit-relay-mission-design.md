@@ -197,14 +197,14 @@ A distinct prop variant per mission, chosen from JSON. Same session/minigame pip
 - **Scale anchor**: `CARGO_LANDER_SCALE = 30` in `0.01` model space ≈ 0.3 world units. POI scales picked so each variant reads at roughly shuttle-cargo size, not billboard size.
 - **Mission content**: one `poiType: 'telescope'` mission on Earth (`earth_hubble_optical_alignment`, 2200 CR). All 8 planets have at least one satellite + one relay_antenna mission.
 
-### Phase 3.5 — Mission lifecycle completion 🟡 PENDING
+### Phase 3.5 — Mission lifecycle completion ✅ DONE
 
-Currently accepting an EVA mission adds it to `activeEvaMissions` with status `'active'`, but nothing transitions it forward. Needed:
+**Design change from original spec:** EVA missions have no deliver step. Once the in-EVA terminal minigame completes, the reward (already distance-scaled at offer time) pays out immediately and the mission is removed from `activeEvaMissions`. Rationale: the player already did the interesting work out at the waypoint — forcing a return-to-giver trip just to click "Deliver" is busywork. Gather missions keep their deliver step because the cargo is the gameplay point.
 
-- `markEvaReadyToDeliver(board, missionId)` in `shuttleMissionSession.ts` — called when the EVA terminal minigame completes.
-- `deliverEvaMission(board, missionId, profile)` — giver-planet delivery payout, removes the mission.
-- UI: "Deliver" button in `ShuttleControlProgramMissions.vue` when docked at the giver planet and status is `ready-to-deliver` (mirror the planetary `canDeliver` logic).
-- Facade: `evaMissionDeliver` + `evaMissionMarkReady`.
+Shipped:
+- `completeEvaMission(board, missionId, profile)` in `shuttleMissionSession.ts` — pays reward, removes mission.
+- `MapMissionFacade.completeEvaMission` + `MapViewController` wiring to fire on minigame success and trigger the delivered-sound.
+- `VisitRelayMissionStatus = 'active' | 'ready-to-deliver'` union kept in `types.ts` for forward compatibility, but `'ready-to-deliver'` is currently unused. Safe to prune if nothing else adopts it.
 
 ### Phase 4 — Real `relay_repair` minigame 🟡 PENDING
 
