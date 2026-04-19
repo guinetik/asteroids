@@ -12,7 +12,7 @@
 import type { Tickable } from '@/lib/Tickable'
 import { DevConsole } from '@/lib/devConsole'
 import { useAudio } from '@/audio/useAudio'
-import { FootstepSystem, MIN_MOVE_SPEED } from '@/lib/fps/footstepSystem'
+import { FpsAudioDirector } from '@/audio/FpsAudioDirector'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'
@@ -143,16 +143,49 @@ const EXPLOSION_FEEDBACK_RANGE = 90
  */
 const OBJECTIVE_EXPLOSION_IMPACT = 22
 
+// ── Fall damage ─────────────────────────────────────────────────
+// Player fall damage is intentionally generous and *never lethal*:
+// small drops are silent, big drops sting, and a free-fall from
+// orbit will not kill you outright — the floor leaves the player
+// alive with at least {@link FALL_DAMAGE_MIN_HP_AFTER} hp so they
+// can keep playing instead of dying to gravity. Tuned against
+// `player-config.json` (gravity = 4 units/s², jumpForce = 12) so
+// that:
+//   • a normal jump impact (~12 units/s) → 0 damage
+//   • a hop off a small ledge (~22 units/s) → 0 damage
+//   • a fall from a real cliff (~30 units/s) → ~1 damage
+//   • terminal-velocity slam (~100 units/s) → clamped to FALL_DAMAGE_MAX
+/** Impact speed (units/s, magnitude) below which no fall damage is dealt. */
+const FALL_DAMAGE_SAFE_SPEED = 28
+/** HP lost per unit/s of impact speed above {@link FALL_DAMAGE_SAFE_SPEED}. */
+const FALL_DAMAGE_PER_UNIT = 0.55
+/**
+ * Hard ceiling on a single fall damage event. Even a terminal-velocity
+ * crash cannot exceed this. Kept well below max HP so the player can
+ * absorb several bad landings in a row.
+ */
+const FALL_DAMAGE_MAX = 22
+/**
+ * Floor for the player's HP after a fall damage hit. Fall damage is
+ * clamped so that `hp >= FALL_DAMAGE_MIN_HP_AFTER` immediately after
+ * impact — gravity itself can never deal the killing blow. Set high
+ * enough that the player still has a clear "I'm alive" beat after a
+ * catastrophic fall.
+ */
+const FALL_DAMAGE_MIN_HP_AFTER = 5
+/**
+ * Camera flinch magnitude applied alongside fall damage. Lighter than
+ * {@link DAMAGE_FLINCH_STRENGTH} (combat hit) so the feedback reads as
+ * "thudding into the ground" rather than "took a punch from the side".
+ */
+const FALL_DAMAGE_FLINCH_STRENGTH = 35
+
 /** Thrust vibration at ground level (liftoff rumble). */
 const THRUST_VIBRATION_MAX = 1.2
 /** Minimum volume of the shake sound at lowest vibration intensity. */
 const THRUST_SHAKE_VOL_MIN = 0.08
 /** Maximum volume of the shake sound at highest vibration intensity. */
 const THRUST_SHAKE_VOL_MAX = 0.55
-/** Seconds airborne before the floating ambient sound starts. */
-const FLOAT_SOUND_DELAY = 0.5
-/** Fade-in duration for the floating ambient sound (seconds). */
-const FLOAT_FADE_IN_MS = 600
 /** Thrust vibration at high altitude (cruise hum). */
 const THRUST_VIBRATION_MIN = 0.15
 /** Altitude at which vibration fully fades to minimum. */
@@ -303,18 +336,17 @@ export class LevelViewController implements Tickable {
   // ── EVA ──────────────────────────────────────────────────────
   private fpsCamera: FpsCamera | null = null
   private playerController: FpsPlayerController | null = null
-  private readonly footsteps = new FootstepSystem('asteroid')
   /** Looping shake rumble — active while thrust vibration is applied. */
   private _shakeHandle: ReturnType<ReturnType<typeof useAudio>['play']> | null = null
-  /** Looping floating sound — active while the player is airborne. */
-  private _floatingHandle: ReturnType<ReturnType<typeof useAudio>['play']> | null = null
+  /** Tracks the airborne→grounded transition for fall-damage application. */
   private _prevGrounded = true
-  /** Seconds the player has been continuously airborne — delays float sound onset. */
-  private _floatTimer = 0
-  /** Breathing loops — walk is the resting layer, run replaces it while sprinting. */
-  private _breathingWalkHandle: ReturnType<ReturnType<typeof useAudio>['play']> | null = null
-  private _breathingRunHandle: ReturnType<ReturnType<typeof useAudio>['play']> | null = null
-  private _prevSprinting = false
+  /**
+   * Single owner for all FPS player-movement audio (breathing, floating,
+   * contact-damage loop, ranged-damage composite). Both this controller
+   * and {@link FpsViewController} share the same director implementation
+   * so feedback stays consistent between the level and the sandbox.
+   */
+  private readonly fpsAudio = new FpsAudioDirector()
   private multiTool: MultiToolController | null = null
   private multiToolState: MultiToolState | null = null
   private projectileSystem: ProjectileSystem | null = null
@@ -858,8 +890,8 @@ export class LevelViewController implements Tickable {
         minigame.onPrompt = (text) => this.onTerminalPrompt?.(text)
         minigame.onComplete = (idx) => this.onObjectiveComplete?.(idx)
         minigame.onStepChange = (idx, steps) => this.onStepChange?.(idx, steps)
-        minigame.onDamagePlayer = (damage, sourceX, sourceZ) => {
-          this.applyPlayerDamageFeedback(damage, sourceX, sourceZ)
+        minigame.onDamagePlayer = (damage, sourceX, sourceZ, source) => {
+          this.applyPlayerDamageFeedback(damage, sourceX, sourceZ, source)
         }
         minigame.onKillPlayer = () => {
           const playerPos = this.playerController?.group.position
@@ -888,8 +920,8 @@ export class LevelViewController implements Tickable {
         minigame.onPrompt = (text) => this.onTerminalPrompt?.(text)
         minigame.onComplete = (idx) => this.onObjectiveComplete?.(idx)
         minigame.onStepChange = (idx, steps) => this.onStepChange?.(idx, steps)
-        minigame.onDamagePlayer = (damage, sourceX, sourceZ) => {
-          this.applyPlayerDamageFeedback(damage, sourceX, sourceZ)
+        minigame.onDamagePlayer = (damage, sourceX, sourceZ, source) => {
+          this.applyPlayerDamageFeedback(damage, sourceX, sourceZ, source)
         }
         minigame.onKillPlayer = () => {
           const playerPos = this.playerController?.group.position
@@ -1257,9 +1289,10 @@ export class LevelViewController implements Tickable {
     this.setupPointerLock()
     this.sceneManager!.renderer.domElement.requestPointerLock()
 
-    // Start resting breath loop — run breathing will take over when sprinting
-    this._breathingWalkHandle = useAudio().play('sfx.breathing.walk', { loop: true })
-    this._prevSprinting = false
+    // Hand FPS audio (breathing, floating, contact-damage loop, ranged
+    // damage composite) over to the director. It owns all loop handles
+    // and edge-detect state from here until the matching `stop()`.
+    this.fpsAudio.start()
   }
 
   private exitEva(): void {
@@ -1297,11 +1330,8 @@ export class LevelViewController implements Tickable {
     this.leftMouseJustPressed = false
     this.rightMouseDown = false
 
-    // Stop breathing loops
-    this._breathingWalkHandle?.stop()
-    this._breathingWalkHandle = null
-    this._breathingRunHandle?.stop()
-    this._breathingRunHandle = null
+    // Cuts breathing, floating, and any in-flight contact-damage loop.
+    this.fpsAudio.stop()
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1333,15 +1363,9 @@ export class LevelViewController implements Tickable {
     this.leftMouseJustPressed = false
     this.rightMouseDown = false
 
-    // exitEva is skipped on the dead path so we must cut EVA audio here explicitly.
-    this._breathingWalkHandle?.stop()
-    this._breathingWalkHandle = null
-    this._breathingRunHandle?.stop()
-    this._breathingRunHandle = null
-    this._floatingHandle?.stop()
-    this._floatingHandle = null
-    this._floatTimer = 0
-    this.footsteps.reset()
+    // exitEva is skipped on the dead path so we must cut EVA audio here
+    // explicitly. The director's stop() also resets footstep cadence.
+    this.fpsAudio.stop()
 
     // Fade + message are driven by the dead state tick, not set here
   }
@@ -1599,6 +1623,7 @@ export class LevelViewController implements Tickable {
       this.onDamageFlash?.(0)
     }
 
+
     // Dead: camera drops, screen fades, message appears
     if (this.stateMachine?.is('dead') && this.fpsCamera) {
       const DEATH_PITCH_SPEED = 1.2
@@ -1817,9 +1842,10 @@ export class LevelViewController implements Tickable {
         slope,
       )
       // Use the player controller's authoritative sprint state so multitool
-      // visuals + footsteps cadence respect the sprint lockout — recomputing
-      // from raw input or `canFire` would flicker on each frame of recovered
-      // stamina while the player is still locked out.
+      // visuals + the FPS audio director (footsteps + breathing cadence)
+      // respect the sprint lockout — recomputing from raw input or
+      // `canFire` would flicker on each frame of recovered stamina while
+      // the player is still locked out.
       const sprintingNow = this.playerController.isSprinting
       this.multiTool?.setState(
         this.playerController.speed,
@@ -1827,48 +1853,26 @@ export class LevelViewController implements Tickable {
         this.playerController.grounded,
       )
 
-      // Footsteps — fire when moving and grounded on the asteroid surface.
-      // Pass the sprint state so the procedural synth can shorten cadence and
-      // brighten the step on a sprint.
-      this.footsteps.update(
-        dt,
-        this.playerController.speed > MIN_MOVE_SPEED,
-        this.playerController.grounded,
-        sprintingNow,
-      )
-
-      // Floating loop — delayed onset + fade-in to avoid triggering on short hops
       const grounded = this.playerController.grounded
-      if (!grounded) {
-        this._floatTimer += dt
-        if (this._floatTimer >= FLOAT_SOUND_DELAY && this._floatingHandle === null) {
-          this._floatingHandle = useAudio().play('sfx.floating', { loop: true, fadeInMs: FLOAT_FADE_IN_MS })
-        }
-      } else {
-        this._floatTimer = 0
-        if (this._floatingHandle !== null) {
-          this._floatingHandle.stop()
-          this._floatingHandle = null
-        }
+
+      // Fall damage — only on the airborne → grounded transition. The
+      // body's `impactVelocityY` is set during this frame's player tick
+      // (which runs before `LevelViewController.tick` thanks to the tick
+      // priority ordering), so it's safe to read here.
+      if (grounded && !this._prevGrounded) {
+        this.applyFallDamageFromLanding()
       }
+
       this._prevGrounded = grounded
 
-      // Breathing crossfade — run loop plays only when the player controller
-      // reports actual sprint engagement. Reading `isSprinting` (instead of
-      // recomputing from raw input + canFire) honours the sprint lockout, so
-      // the run-breath sound doesn't chatter on every frame of recovered
-      // stamina while the player is still holding Shift after exhaustion.
-      const exerted = this.playerController.isSprinting
-      if (exerted && !this._prevSprinting) {
-        this._breathingWalkHandle?.stop()
-        this._breathingWalkHandle = null
-        this._breathingRunHandle = useAudio().play('sfx.breathing.run', { loop: true })
-      } else if (!exerted && this._prevSprinting) {
-        this._breathingRunHandle?.stop()
-        this._breathingRunHandle = null
-        this._breathingWalkHandle = useAudio().play('sfx.breathing.walk', { loop: true })
-      }
-      this._prevSprinting = exerted
+      // All player-movement audio (footsteps, breathing crossfade,
+      // floating onset with delay+fade, contact-damage loop decay) is
+      // owned by the director.
+      this.fpsAudio.update(dt, {
+        grounded,
+        sprinting: sprintingNow,
+        speed: this.playerController.speed,
+      })
     }
 
     this.updateRockTargetIndicator()
@@ -2152,9 +2156,19 @@ export class LevelViewController implements Tickable {
     damage: number,
     sourceX: number,
     sourceZ: number,
+    source?: 'projectile' | 'contact',
   ): void {
     this.playerController?.takeDamage(damage)
     this.damageFlashTimer = DAMAGE_FLASH_DURATION
+
+    // Damage audio (composite ranged thud / mauling loop) is owned by
+    // the FPS audio director. See `FpsAudioDirector.notifyProjectileDamage`
+    // and `notifyContactDamage` for the full per-cue rationale.
+    if (source === 'projectile') {
+      this.fpsAudio.notifyProjectileDamage()
+    } else if (source === 'contact') {
+      this.fpsAudio.notifyContactDamage()
+    }
 
     const playerPos = this.playerController?.group.position
     if (!playerPos) return
@@ -2180,6 +2194,83 @@ export class LevelViewController implements Tickable {
       const relAngle = worldAngle - this.fpsCamera.yaw
       this.onDamageDirection?.(relAngle)
     }
+  }
+
+  /**
+   * Apply lenient, never-lethal fall damage when the player lands.
+   *
+   * Reads {@link PlatformerBody.impactVelocityY} from the player body
+   * (the vertical velocity at the moment of ground contact this frame)
+   * and converts the portion above {@link FALL_DAMAGE_SAFE_SPEED} into
+   * HP loss, scaled by {@link FALL_DAMAGE_PER_UNIT} and capped at
+   * {@link FALL_DAMAGE_MAX}.
+   *
+   * The result is then **clamped against the player's current HP** so
+   * the post-hit HP is never less than {@link FALL_DAMAGE_MIN_HP_AFTER}.
+   * This is the no-kill guarantee — no matter how high the player
+   * falls, they always survive the landing with a usable health bar.
+   *
+   * Plays a gentle camera flinch + impact audio + the standard red
+   * vignette for clear feedback when actual damage was dealt. Silent
+   * for soft landings (jumps, walking off a curb).
+   *
+   * Called once per airborne → grounded transition from {@link tickEva}.
+   * Safe to call when the player controller is missing or already dead.
+   */
+  private applyFallDamageFromLanding(): void {
+    const player = this.playerController
+    if (!player || player.isDead) return
+
+    const impactSpeed = Math.abs(player.body.impactVelocityY)
+    if (impactSpeed <= FALL_DAMAGE_SAFE_SPEED) return
+
+    const overshoot = impactSpeed - FALL_DAMAGE_SAFE_SPEED
+    const rawDamage = Math.min(overshoot * FALL_DAMAGE_PER_UNIT, FALL_DAMAGE_MAX)
+
+    // No-kill clamp — we only ever deal up to (currentHp - floor) damage,
+    // so the player always lives. Using the controller's `_hp` would be
+    // cleaner but it's private; the public `hp` getter is sufficient
+    // because both are in lock-step (no other code path mutates between
+    // the read and the takeDamage call within the same tick frame).
+    const survivableDamage = Math.max(0, player.hp - FALL_DAMAGE_MIN_HP_AFTER)
+    const damage = Math.min(rawDamage, survivableDamage)
+    if (damage <= 0) return
+
+    player.takeDamage(damage)
+
+    // Same red-vignette pulse the combat path uses (`damageFlashTimer` is
+    // decayed each frame in `tick` and broadcast via `onDamageFlash`, which
+    // `LevelView.vue` pipes into the shared `DamageVignette` overlay). The
+    // result is the player gets the exact same "I just took damage" HUD cue
+    // for a fall as they do for an enemy hit.
+    this.damageFlashTimer = DAMAGE_FLASH_DURATION
+
+    if (this.fpsCamera && this.stateMachine?.is('eva')) {
+      // Pure downward flinch — pitch nose-down a touch to sell the
+      // "knees buckle" feel; no horizontal jitter so it doesn't get
+      // confused with combat damage.
+      this.fpsCamera.applyMouseDelta(
+        (Math.random() - 0.5) * (FALL_DAMAGE_FLINCH_STRENGTH * 0.3),
+        FALL_DAMAGE_FLINCH_STRENGTH,
+      )
+    }
+
+    const audio = useAudio()
+    // Soft thump on every survivable fall; reuse the existing landing SFX
+    // (already used by the lander on touchdown) so the bank stays the same.
+    // Volume scales with damage so a tiny graze barely registers and a hard
+    // fall thuds.
+    const landingVolume = Math.min(0.55, 0.15 + (damage / FALL_DAMAGE_MAX) * 0.4)
+    audio.play('sfx.landing', { volume: landingVolume })
+
+    // Player vocal grunt layered on top of the thud. `playback: 'restart'`
+    // in the manifest ensures rapid-fire bad landings cut off the previous
+    // sample instead of stacking into a chorus. Volume scales with damage
+    // so a tiny graze is a near-silent breath and a hard fall is a full
+    // "oof". Floor at 0.35 so the grunt is always at least audible when it
+    // plays — sub-threshold falls return early above and never reach here.
+    const gruntVolume = Math.min(0.85, 0.35 + (damage / FALL_DAMAGE_MAX) * 0.5)
+    audio.play('sfx.grunt', { volume: gruntVolume })
   }
 
   /**
@@ -2361,13 +2452,7 @@ export class LevelViewController implements Tickable {
     this.gameLoop?.stop()
     this._shakeHandle?.stop()
     this._shakeHandle = null
-    this._floatingHandle?.stop()
-    this._floatingHandle = null
-    this._floatTimer = 0
-    this._breathingWalkHandle?.stop()
-    this._breathingWalkHandle = null
-    this._breathingRunHandle?.stop()
-    this._breathingRunHandle = null
+    this.fpsAudio.dispose()
     useAudio().stopSound('ambient.asteroid')
     this.teardownPointerLock()
     this.clearCollisionRegistrations()

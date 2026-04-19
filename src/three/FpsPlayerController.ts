@@ -406,7 +406,13 @@ export class FpsPlayerController implements Tickable {
       this.body.grounded = false
       this.coyoteTimer = 0
       if (!this._prevJumping) {
-        useAudio().play('sfx.jump')
+        // Layer the thruster cue + the effort grunt on the rising edge.
+        // The grunt's manifest entry is rate-limited so a burst of hops
+        // doesn't repeat the vocal — only the first jump in a window
+        // colours in.
+        const audio = useAudio()
+        audio.play('sfx.jump')
+        audio.play('sfx.jump.voice')
       }
     }
     this._prevJumping = canJump

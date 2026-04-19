@@ -28,6 +28,7 @@ const {
   mockMasterGain,
   mockCreateBiquadFilter,
   mockCreateWaveShaper,
+  mockCreateGainCtx,
   mockGainNodes,
   playCounterRef,
   syncPlayErrorRef,
@@ -53,6 +54,7 @@ const {
   },
   mockCreateBiquadFilter: vi.fn(),
   mockCreateWaveShaper: vi.fn(),
+  mockCreateGainCtx: vi.fn(),
   mockGainNodes: [] as Array<{
     connect: ReturnType<typeof vi.fn>
     disconnect: ReturnType<typeof vi.fn>
@@ -72,6 +74,11 @@ vi.mock('howler', () => {
   mockCreateWaveShaper.mockImplementation(() => ({
     curve: null as Float32Array | null,
     oversample: '4x' as const,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  }))
+  mockCreateGainCtx.mockImplementation(() => ({
+    gain: { value: 1 },
     connect: vi.fn(),
     disconnect: vi.fn(),
   }))
@@ -228,13 +235,14 @@ vi.mock('howler', () => {
         return {
           state: 'suspended' as string,
           resume: mockCtxResume,
-          createGain: vi.fn(() => ({
-            gain: { value: 1 },
+          createGain: mockCreateGainCtx,
+          createBiquadFilter: mockCreateBiquadFilter,
+          createWaveShaper: mockCreateWaveShaper,
+          createDelay: vi.fn(() => ({
+            delayTime: { value: 0 },
             connect: vi.fn(),
             disconnect: vi.fn(),
           })),
-          createBiquadFilter: mockCreateBiquadFilter,
-          createWaveShaper: mockCreateWaveShaper,
         }
       },
       volume(this: { _volume: number }, vol?: number) {
@@ -677,6 +685,7 @@ describe('AudioManager', () => {
 
   it('inserts the Web Audio effect chain on the per-play gain for voice playback', () => {
     manager.unlock()
+    const gainsBefore = mockCreateGainCtx.mock.results.length
     manager.play('voice.comms', { src: '/comms/chain.mp3' })
     expect(mockCreateBiquadFilter).toHaveBeenCalledTimes(2)
     expect(mockCreateWaveShaper).toHaveBeenCalledTimes(1)
@@ -690,17 +699,28 @@ describe('AudioManager', () => {
     const sound = h._soundById?.(1)
     expect(sound?._node.disconnect).toHaveBeenCalled()
     expect(sound?._node.connect).toHaveBeenCalled()
-    const wsResults = mockCreateWaveShaper.mock.results
-    const waveShaper = wsResults[wsResults.length - 1]?.value as {
+    // The chain now ends in a wrapping output Gain (the merger node) that is
+    // wired to the master bus. The dry-only `voice.comms` preset creates two
+    // gains on this play (input + output); assert the most recent one routes
+    // to mockMasterGain.
+    const gainResults = mockCreateGainCtx.mock.results.slice(gainsBefore)
+    const outputGain = gainResults[gainResults.length - 1]?.value as {
       connect: ReturnType<typeof vi.fn>
     }
-    expect(waveShaper?.connect).toHaveBeenCalledWith(mockMasterGain)
+    expect(outputGain?.connect).toHaveBeenCalledWith(mockMasterGain)
   })
 
   it('does not throw when the effect chain cannot connect to the master bus', () => {
-    mockCreateWaveShaper.mockImplementationOnce(() => ({
-      curve: null as Float32Array | null,
-      oversample: '4x' as const,
+    // Force the next-created Gain (the chain's output merger) to throw on
+    // connect. The manager must swallow the failure and fall back to the
+    // dry signal path without crashing.
+    mockCreateGainCtx.mockImplementationOnce(() => ({
+      gain: { value: 1 },
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    }))
+    mockCreateGainCtx.mockImplementationOnce(() => ({
+      gain: { value: 1 },
       connect: vi.fn(() => {
         throw new Error('bus connect fail')
       }),

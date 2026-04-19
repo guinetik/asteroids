@@ -25,6 +25,11 @@ export const VOICE_DUCK_FADE_RELEASE_MS = 220
 
 /**
  * Serializable parameters for a DSP preset (band limits, distortion amount, etc.).
+ *
+ * The optional `delaySeconds` / `feedback` / `wetMix` fields enable a parallel
+ * delay-feedback bus stitched in alongside the main band-limited path. When
+ * `delaySeconds` is omitted or zero the effect runs as a pure linear chain
+ * (HP → LP → WaveShaper), preserving the original behaviour.
  */
 export interface AudioEffectConfig {
   id: AudioEffectPreset
@@ -32,6 +37,22 @@ export interface AudioEffectConfig {
   highpassHz?: number
   /** WaveShaper curve intensity (0 = effectively linear). */
   distortion?: number
+  /**
+   * Delay-line length in seconds. When > 0 a parallel feedback-delay bus is
+   * mixed in after the band-limit stage to produce slap-back / short-room
+   * echo character (e.g. inside-the-helmet ringing).
+   */
+  delaySeconds?: number
+  /**
+   * Per-tap feedback gain for the delay loop (`0`–`<1`). Higher values give
+   * longer-lived echoes; clamp below `0.95` to stay stable.
+   */
+  feedback?: number
+  /**
+   * Wet-bus level mixed back into the dry output (`0`–`1`). The dry signal
+   * is always summed at unity gain alongside the wet tap.
+   */
+  wetMix?: number
 }
 
 /**
@@ -60,6 +81,25 @@ const PRESETS: Record<AudioEffectPreset, AudioEffectConfig> = {
     highpassHz: 180,
     distortion: 0.04,
   },
+  /**
+   * "Inside the helmet" — band-limited like {@link helmet-comms} but with a
+   * short slap-back delay + feedback to suggest a tiny enclosed cavity. Used
+   * for low-priority diagnostic cues (e.g. suit damage alarm) so they read
+   * as the suit's own audio rather than the world's.
+   *
+   * Tuning: ~80 ms initial tap with 35 % feedback gives a couple of audible
+   * repeats before falling under the noise floor; wet mix sits around half
+   * the dry so the sound is still clearly identifiable.
+   */
+  'helmet-echo': {
+    id: 'helmet-echo',
+    lowpassHz: 3200,
+    highpassHz: 220,
+    distortion: 0.05,
+    delaySeconds: 0.08,
+    feedback: 0.35,
+    wetMix: 0.45,
+  },
   'terminal-beep': {
     id: 'terminal-beep',
     lowpassHz: 12000,
@@ -87,9 +127,22 @@ export function getAudioEffectConfig(id: AudioEffectPreset): AudioEffectConfig {
 }
 
 /**
- * Builds a high-pass → low-pass → WaveShaper chain for the given preset, or `null` for `none`.
+ * Builds the DSP chain for the given preset, or `null` for `none`.
  *
- * @param ctx - Shared {@link AudioContext} (Howler's context).
+ * Topology:
+ * ```
+ * input → hp → lp → ws ─┬─────────────────────→ output (dry path)
+ *                       └─→ delay → wet ──────→ output (optional, when delaySeconds > 0)
+ *                              ↑      ↓
+ *                              └─ feedback ─┘
+ * ```
+ *
+ * `input` and `output` are wrapping {@link GainNode}s so callers can connect
+ * a single source/sink pair regardless of whether the wet bus is active.
+ * When the preset has no delay configured the wet bus is skipped entirely
+ * and the chain collapses to the original linear band-limited form.
+ *
+ * @param ctx      - Shared {@link AudioContext} (Howler's context).
  * @param effectId - Preset to instantiate.
  */
 export function createEffectChain(
@@ -99,6 +152,9 @@ export function createEffectChain(
   if (effectId === 'none') return null
   const config = getAudioEffectConfig(effectId)
   if (config.id === 'none') return null
+
+  const input = ctx.createGain()
+  const output = ctx.createGain()
 
   const hp = ctx.createBiquadFilter()
   hp.type = 'highpass'
@@ -112,17 +168,47 @@ export function createEffectChain(
   ws.curve = makeDistortionCurve(config.distortion ?? 0) as Float32Array<ArrayBuffer>
   ws.oversample = '4x'
 
+  input.connect(hp)
   hp.connect(lp)
   lp.connect(ws)
+  ws.connect(output)
+
+  let delay: DelayNode | null = null
+  let feedbackGain: GainNode | null = null
+  let wetGain: GainNode | null = null
+
+  const delaySeconds = config.delaySeconds ?? 0
+  if (delaySeconds > 0) {
+    delay = ctx.createDelay(Math.max(2.0, delaySeconds * 4))
+    delay.delayTime.value = delaySeconds
+
+    feedbackGain = ctx.createGain()
+    // Clamp feedback to keep the loop stable; values >= 1 self-oscillate.
+    feedbackGain.gain.value = Math.min(0.95, Math.max(0, config.feedback ?? 0))
+
+    wetGain = ctx.createGain()
+    wetGain.gain.value = Math.max(0, config.wetMix ?? 0.4)
+
+    ws.connect(delay)
+    delay.connect(feedbackGain)
+    feedbackGain.connect(delay)
+    delay.connect(wetGain)
+    wetGain.connect(output)
+  }
 
   return {
-    input: hp,
-    output: ws,
+    input,
+    output,
     dispose: () => {
       try {
+        input.disconnect()
         hp.disconnect()
         lp.disconnect()
         ws.disconnect()
+        delay?.disconnect()
+        feedbackGain?.disconnect()
+        wetGain?.disconnect()
+        output.disconnect()
       } catch {
         /* ignore */
       }

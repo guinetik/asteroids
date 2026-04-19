@@ -12,10 +12,20 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { FpsViewController } from './FpsViewController'
 import FpsHud from '@/components/FpsHud.vue'
 import type { FpsTelemetry } from '@/components/FpsHud.vue'
+import { useAudio } from '@/audio/useAudio'
 
 const container = ref<HTMLElement>()
 const viewController = new FpsViewController()
 const pointerLocked = ref(true)
+/**
+ * Gate the controller behind an explicit user gesture. Browsers refuse to
+ * start audio contexts (and pointer-lock requests originating from
+ * non-user-initiated code paths are flaky) without one, and the sandbox
+ * is the screen we use most for iterating on FPS audio — having to live
+ * with silent first-load every time was getting in the way.
+ */
+const started = ref(false)
+const initializing = ref(false)
 const damageFlash = ref(0)
 const damageDir = ref<number | null>(null)
 const damageDirTimer = ref(0)
@@ -176,28 +186,51 @@ const telemetry = reactive<FpsTelemetry>({
   objectives: [],
 })
 
-onMounted(async () => {
-  if (container.value) {
-    viewController.onTelemetry = (t) => {
-      Object.assign(telemetry, t)
-    }
-    viewController.onPointerLockChange = (locked) => {
-      pointerLocked.value = locked
-    }
-    viewController.onDamageFlash = (opacity) => {
-      damageFlash.value = opacity
-    }
-    viewController.onDamageDirection = (angle) => {
-      damageDir.value = angle
-      damageDirTimer.value = DAMAGE_DIR_DURATION
-    }
-    await viewController.init(container.value)
+/**
+ * Wire callbacks ahead of time so they're attached the moment `init`
+ * starts spawning subsystems. Doing this in `onMounted` (rather than
+ * inside `start()`) keeps the click handler's hot path tiny — by the
+ * time the user hits PLAY all the listeners are already in place.
+ */
+onMounted(() => {
+  viewController.onTelemetry = (t) => {
+    Object.assign(telemetry, t)
+  }
+  viewController.onPointerLockChange = (locked) => {
+    pointerLocked.value = locked
+  }
+  viewController.onDamageFlash = (opacity) => {
+    damageFlash.value = opacity
+  }
+  viewController.onDamageDirection = (angle) => {
+    damageDir.value = angle
+    damageDirTimer.value = DAMAGE_DIR_DURATION
   }
 })
 
 onUnmounted(() => {
   viewController.dispose()
 })
+
+/**
+ * User-gesture entry point. Unlocks the audio context (Howler refuses to
+ * resume otherwise on Chrome/Edge), then boots the FPS controller. Guards
+ * against double-clicks via {@link initializing}; once we're past the
+ * `await`, {@link started} is flipped and the overlay disappears in the
+ * same tick the renderer mounts.
+ */
+async function start() {
+  if (started.value || initializing.value) return
+  if (!container.value) return
+  initializing.value = true
+  try {
+    useAudio().unlock()
+    await viewController.init(container.value)
+    started.value = true
+  } finally {
+    initializing.value = false
+  }
+}
 
 function resumeLock() {
   viewController.requestPointerLock()
@@ -206,49 +239,79 @@ function resumeLock() {
 
 <template>
   <div ref="container" class="scene-container"></div>
-  <FpsHud :telemetry="telemetry" />
-  <!-- Base damage vignette — faint red ring -->
-  <div
-    v-if="damageFlash > 0"
-    class="fixed inset-0 pointer-events-none z-45"
-    :style="{ background: baseVignette }"
-  />
-  <!-- Directional damage ring — pizza slices around screen edge -->
-  <svg
-    v-if="damageDir !== null"
-    class="damage-ring"
-    viewBox="0 0 1000 1000"
-    preserveAspectRatio="xMidYMid slice"
-  >
-    <defs>
-      <linearGradient
-        v-for="slice in slicePaths"
-        :id="`sliceGrad${slice.index}`"
-        :key="`g${slice.index}`"
-        :x1="`${slice.gradX1}%`"
-        :y1="`${slice.gradY1}%`"
-        :x2="`${slice.gradX2}%`"
-        :y2="`${slice.gradY2}%`"
-      >
-        <stop offset="0%" stop-color="rgb(255, 20, 20)" stop-opacity="0" />
-        <stop offset="50%" stop-color="rgb(255, 20, 20)" stop-opacity="0.3" />
-        <stop offset="100%" stop-color="rgb(255, 20, 20)" stop-opacity="1" />
-      </linearGradient>
-    </defs>
-    <path
-      v-for="slice in slicePaths"
-      :key="slice.index"
-      :d="slice.d"
-      :fill="`url(#sliceGrad${slice.index})`"
-      :opacity="sliceOpacity(slice.index)"
+  <template v-if="started">
+    <FpsHud :telemetry="telemetry" />
+    <!-- Base damage vignette — faint red ring -->
+    <div
+      v-if="damageFlash > 0"
+      class="fixed inset-0 pointer-events-none z-45"
+      :style="{ background: baseVignette }"
     />
-  </svg>
+    <!-- Directional damage ring — pizza slices around screen edge -->
+    <svg
+      v-if="damageDir !== null"
+      class="damage-ring"
+      viewBox="0 0 1000 1000"
+      preserveAspectRatio="xMidYMid slice"
+    >
+      <defs>
+        <linearGradient
+          v-for="slice in slicePaths"
+          :id="`sliceGrad${slice.index}`"
+          :key="`g${slice.index}`"
+          :x1="`${slice.gradX1}%`"
+          :y1="`${slice.gradY1}%`"
+          :x2="`${slice.gradX2}%`"
+          :y2="`${slice.gradY2}%`"
+        >
+          <stop offset="0%" stop-color="rgb(255, 20, 20)" stop-opacity="0" />
+          <stop offset="50%" stop-color="rgb(255, 20, 20)" stop-opacity="0.3" />
+          <stop offset="100%" stop-color="rgb(255, 20, 20)" stop-opacity="1" />
+        </linearGradient>
+      </defs>
+      <path
+        v-for="slice in slicePaths"
+        :key="slice.index"
+        :d="slice.d"
+        :fill="`url(#sliceGrad${slice.index})`"
+        :opacity="sliceOpacity(slice.index)"
+      />
+    </svg>
+    <div
+      v-if="!pointerLocked"
+      class="fixed inset-0 flex items-center justify-center bg-black/60 cursor-pointer z-50"
+      @click="resumeLock"
+    >
+      <span class="text-lg text-white/80 font-mono tracking-widest uppercase">
+        Click to resume
+      </span>
+    </div>
+  </template>
+  <!--
+    Pre-flight gate. Renders on top of the empty container until the user
+    clicks PLAY, at which point we unlock the audio context, boot the
+    controller, and tear this overlay down in the same tick the HUD
+    appears.
+  -->
   <div
-    v-if="!pointerLocked"
-    class="fixed inset-0 flex items-center justify-center bg-black/60 cursor-pointer z-50"
-    @click="resumeLock"
+    v-if="!started"
+    class="fps-start-overlay"
+    @click="start"
   >
-    <span class="text-lg text-white/80 font-mono tracking-widest uppercase">Click to resume</span>
+    <div class="fps-start-card">
+      <div class="fps-start-eyebrow">FPS Sandbox</div>
+      <button
+        type="button"
+        class="fps-start-button"
+        :disabled="initializing"
+        @click.stop="start"
+      >
+        {{ initializing ? 'Booting…' : '▶ Play' }}
+      </button>
+      <div class="fps-start-hint">
+        Click to unlock audio &amp; capture mouse
+      </div>
+    </div>
   </div>
 </template>
 
@@ -260,5 +323,81 @@ function resumeLock() {
   height: 100%;
   z-index: 45;
   pointer-events: none;
+}
+
+/*
+ * Pre-flight gate. Sits above everything (z-index 100) so it captures
+ * the mandatory user gesture. Background is a solid black wash so we
+ * don't show whatever the empty WebGL canvas paints in the meantime.
+ */
+.fps-start-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, #0a0f14 0%, #000 100%);
+  cursor: pointer;
+  z-index: 100;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+}
+
+.fps-start-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 2.5rem 3rem;
+  border: 1px solid rgba(120, 220, 255, 0.25);
+  border-radius: 6px;
+  background: rgba(10, 18, 26, 0.85);
+  box-shadow:
+    0 0 0 1px rgba(120, 220, 255, 0.05),
+    0 20px 60px rgba(0, 0, 0, 0.6),
+    inset 0 0 40px rgba(120, 220, 255, 0.04);
+}
+
+.fps-start-eyebrow {
+  font-size: 0.75rem;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: rgba(120, 220, 255, 0.7);
+}
+
+.fps-start-button {
+  appearance: none;
+  border: 1px solid rgba(120, 220, 255, 0.6);
+  background: rgba(120, 220, 255, 0.08);
+  color: #d8f5ff;
+  font-family: inherit;
+  font-size: 1.5rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 0.85rem 2.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+
+.fps-start-button:hover:not(:disabled) {
+  background: rgba(120, 220, 255, 0.18);
+  box-shadow: 0 0 24px rgba(120, 220, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.fps-start-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.fps-start-button:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.fps-start-hint {
+  font-size: 0.7rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: rgba(180, 200, 220, 0.5);
 }
 </style>

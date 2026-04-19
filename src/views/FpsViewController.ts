@@ -45,6 +45,7 @@ import { ChimeraWalkerController, CHIMERA_HIT_CENTER_Y } from '@/three/ChimeraWa
 import { EnemyProjectileMeshPool } from '@/three/EnemyProjectileMeshPool'
 import { FpsHostageController } from '@/three/FpsHostageController'
 import { VirusModel } from '@/three/VirusModel'
+import { FpsAudioDirector } from '@/audio/FpsAudioDirector'
 
 const AMBIENT_LIGHT_INTENSITY = 0.4
 const DIR_LIGHT_INTENSITY = 1.2
@@ -166,6 +167,14 @@ export class FpsViewController implements Tickable {
   onDamageDirection: ((angle: number) => void) | null = null
 
   private damageFlashTimer = 0
+
+  /**
+   * Single owner for all FPS player-movement audio (breathing, floating,
+   * contact-damage loop, ranged-damage composite). Shared with
+   * {@link LevelViewController} so feedback in the sandbox matches the
+   * full game.
+   */
+  private readonly fpsAudio = new FpsAudioDirector()
 
   async init(container: HTMLElement): Promise<void> {
     const config = buildFpsPlayerConfig()
@@ -336,6 +345,7 @@ export class FpsViewController implements Tickable {
       this.enemyDirector.onContactDamage = (handle, damage) => {
         this.playerController?.takeDamage(damage)
         this.damageFlashTimer = DAMAGE_FLASH_DURATION
+        this.fpsAudio.notifyContactDamage()
 
         const pp = this.playerController!.group.position
         const ep = handle.enemy.position
@@ -383,6 +393,7 @@ export class FpsViewController implements Tickable {
       this.enemyProjectileSystem.onPlayerHit = (damage, sourceX, sourceZ) => {
         this.playerController?.takeDamage(damage)
         this.damageFlashTimer = DAMAGE_FLASH_DURATION
+        this.fpsAudio.notifyProjectileDamage()
         const pp = this.playerController!.group.position
         // Knockback away from projectile source
         const dx = pp.x - sourceX
@@ -525,6 +536,12 @@ export class FpsViewController implements Tickable {
       heal: () => this.playerController?.replenish(),
       kill: () => this.playerController?.takeDamage(999),
     })
+
+    // Hand FPS player audio (breathing, floating, contact-damage loop,
+    // ranged-damage composite) to the shared director. This is the same
+    // path LevelViewController uses, so the sandbox now hears the full
+    // bed of cues instead of just the contact loop + per-hit thud.
+    this.fpsAudio.start()
 
     // Start
     this.gameLoop = new GameLoop(this.tickHandler)
@@ -789,6 +806,19 @@ export class FpsViewController implements Tickable {
       this.onDamageFlash?.(0)
     }
 
+    // FPS player audio (footsteps, breathing crossfade, floating onset,
+    // contact-damage loop decay) is owned by the director. Reading
+    // `isSprinting` from the controller honours the sprint lockout so the
+    // run-breath loop doesn't chatter while the player holds Shift through
+    // stamina exhaustion.
+    if (this.playerController) {
+      this.fpsAudio.update(_dt, {
+        grounded: this.playerController.grounded,
+        sprinting: this.playerController.isSprinting,
+        speed: this.playerController.speed,
+      })
+    }
+
     if (this.playerController && this.onTelemetry) {
       const ts = this.playerController.thrusterSystem
       this.onTelemetry({
@@ -899,5 +929,6 @@ export class FpsViewController implements Tickable {
     this.terrainGrid?.dispose()
     this.sceneManager?.dispose()
     this.inputManager?.dispose()
+    this.fpsAudio.dispose()
   }
 }
