@@ -1,7 +1,7 @@
 <!-- src/components/MissionAnnouncement.vue -->
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
-import { Timer, type TimerHandle } from '@/lib/Timer'
+import { Timer } from '@/lib/Timer'
 
 /** Duration in ms for the stripe to expand open. */
 const OPEN_DURATION = 600
@@ -22,13 +22,12 @@ const emit = defineEmits<{
 
 const phase = ref<'closed' | 'opening' | 'open' | 'closing'>('closed')
 const removed = ref(false)
-let sequenceHandle: TimerHandle | undefined
 
 watch(() => props.visible, async (val) => {
   if (!val) return
   await nextTick()
   phase.value = 'opening'
-  sequenceHandle = Timer.sequence([
+  Timer.sequence([
     { delay: OPEN_DURATION / 1000, fn: () => { phase.value = 'open' } },
     { delay: HOLD_DURATION / 1000, fn: () => { phase.value = 'closing' } },
     {

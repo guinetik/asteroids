@@ -10,7 +10,6 @@ import {
   PANEL_POSITIONS,
   PANEL_HALF_SIZE,
   PANEL_HIT_RADIUS,
-  PANEL_DRAG_SENSITIVITY,
   TIME_LIMIT,
 } from '@/lib/minigame/maintenance/constants'
 import type { OrbitalMiniGameContext } from '@/lib/minigame/OrbitalMiniGame'
@@ -31,7 +30,6 @@ let animId = 0
 let lastTime = 0
 let simTime = 0
 let isDragging = false
-let dragStartAngle = 0
 
 /** Sun position — read from minigame (randomized per game). */
 function sunX() { return props.minigame.sunX }

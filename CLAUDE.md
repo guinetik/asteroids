@@ -16,7 +16,7 @@ Asteroid Lander - a 2.5D physics-driven lander game for the Vibe Coding Game Jam
 - **Run tests:** `bun test:unit`
 - **Run a single test:** `bun test:unit src/path/to/test.spec.ts`
 
-Package manager is **Bun** (`bun install` to install dependencies).
+Package manager is **Bun** (`bun install` to install dependencies). Use **`bun`** and **`bunx`** for scripts and one-off tools — do not use `npm` or `npx` in this repo.
 
 ## Architecture
 

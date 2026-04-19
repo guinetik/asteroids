@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { UpgradeId } from '@/lib/upgrades'
-import { getUpgradesByCategory } from '@/lib/upgrades'
 
 /**
  * Vale Orbital Refurb — Lander Orientation Manual.
@@ -14,11 +13,9 @@ const props = defineProps<{
   playerName?: string
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   'switch-to-upgrades': []
 }>()
-
-const landerUpgrades = computed(() => getUpgradesByCategory('lander'))
 
 const activeUpgrades = computed(() => {
   if (!props.upgradeLevels) return {}

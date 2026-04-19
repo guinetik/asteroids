@@ -7,7 +7,6 @@ import {
   LANE_COUNT,
   LANE_START_X,
   LANE_SPACING,
-  SHIP_HALF_SIZE,
   HULL_MAX_HP,
 } from '@/lib/minigame/logistics/constants'
 import type { OrbitalMiniGameContext } from '@/lib/minigame/OrbitalMiniGame'

@@ -11,6 +11,7 @@ import ShuttleControlProgramShuttle from './shuttle-control/ShuttleControlProgra
 import ShuttleControlProgramLander from './shuttle-control/ShuttleControlProgramLander.vue'
 import ShuttleControlProgramUpgrades from './shuttle-control/ShuttleControlProgramUpgrades.vue'
 import type { UpgradeId } from '@/lib/upgrades'
+import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
 
 /** Left-rail program in the shuttle control terminal. */
 type ControlScreen = 'shuttle' | 'lander' | 'mail' | 'missions' | 'inventory' | 'upgrades'
@@ -22,7 +23,7 @@ const props = defineProps<{
   missionBoard?: ShuttleMissionBoard | null
   dockedPlanet?: string | null
   /** Live shuttle telemetry for the orientation manual. */
-  telemetry?: any
+  telemetry?: ShuttleTelemetry | null
   /** Player name for the deed of ownership in the Shuttle manual */
   playerName?: string
   /** Snapshot of upgrade levels for the engineering bay. */

@@ -2,7 +2,6 @@
 import { computed, ref } from 'vue'
 import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
 import type { UpgradeId } from '@/lib/upgrades'
-import { getUpgradesByCategory } from '@/lib/upgrades'
 
 /**
  * Vale Orbital Refurb — Shuttle Orientation Manual.
@@ -16,11 +15,9 @@ const props = defineProps<{
   playerName?: string
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   'switch-to-upgrades': []
 }>()
-
-const shuttleUpgrades = computed(() => getUpgradesByCategory('shuttle'))
 
 const statusSummary = computed(() => {
   const t = props.telemetry
@@ -36,7 +33,7 @@ const statusSummary = computed(() => {
 const activeUpgrades = computed(() => {
   if (!props.upgradeLevels) return {}
   return Object.fromEntries(
-    Object.entries(props.upgradeLevels).filter(([_, level]) => level > 0)
+    Object.entries(props.upgradeLevels).filter(([, level]) => level > 0)
   )
 })
 

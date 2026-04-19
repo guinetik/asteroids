@@ -30,7 +30,6 @@ const started = ref(false)
 const briefingVisible = ref(false)
 let animId = 0
 let lastTime = 0
-let bgOffset = 0
 let simTime = 0
 
 const STUB_CTX: OrbitalMiniGameContext = {
@@ -316,7 +315,6 @@ function drawTerrainSurface(ctx: CanvasRenderingContext2D, t: ReturnType<typeof 
 }
 
 function drawBackground(ctx: CanvasRenderingContext2D, dt: number) {
-  bgOffset += dt * 80
   simTime += dt
   planetScrollX += dt * 100
 
@@ -822,7 +820,6 @@ function loop(time: number) {
 
   // Timer — center top
   const timeLeft = Math.max(0, props.minigame.timeRemaining)
-  const timeRatio = timeLeft / props.minigame.timeTotal
   const timeLow = timeLeft < 10
   ctx.fillStyle = timeLow ? '#ff4444' : '#ffffff'
   ctx.font = timeLow ? 'bold 16px monospace' : '14px monospace'

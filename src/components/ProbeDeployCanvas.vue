@@ -8,7 +8,6 @@ import {
   PLANET_Y,
   PLANET_R,
   SHIP_X,
-  SHIP_HALF_SIZE,
   HULL_MAX_HP,
 } from '@/lib/minigame/probeDeploy/constants'
 import type { OrbitalMiniGameContext } from '@/lib/minigame/OrbitalMiniGame'
