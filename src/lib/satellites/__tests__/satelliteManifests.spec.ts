@@ -35,15 +35,17 @@ describe('satelliteManifests', () => {
   })
 
   it('validateManifest reports ok when all components are present', () => {
+    const manifest = getSatelliteManifest('satellite')
+    expect(manifest).not.toBeNull()
     const root = new THREE.Object3D()
-    for (const n of ['a', 'b', 'c']) {
+    for (const n of manifest!.components) {
       const o = new THREE.Object3D()
       o.name = n
       root.add(o)
     }
-    const result = validateManifest(root, ['a', 'b', 'c'])
+    const result = validateManifest(root, manifest!.components)
     expect(result.ok).toBe(true)
     expect(result.missing).toEqual([])
-    expect(result.found).toEqual(['a', 'b', 'c'])
+    expect(result.found).toEqual([...manifest!.components])
   })
 })
