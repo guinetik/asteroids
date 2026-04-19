@@ -263,6 +263,12 @@ export interface ActiveVisitRelayMission {
   waypoint: { worldX: number; worldZ: number; poiLocalY: number }
   /** Current mission status. */
   status: VisitRelayMissionStatus
+  /**
+   * For `satellite_servicing` missions only: names of rigged sub-objects on the POI
+   * that start in the damaged state. Rolled deterministically from the mission id
+   * at accept time so retries see the same damage.
+   */
+  brokenComponents?: string[]
 }
 
 // ---------------------------------------------------------------------------

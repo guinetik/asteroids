@@ -14,8 +14,10 @@ import type {
   ActiveShuttleMission,
   GeneratedAsteroidMission,
   ActiveVisitRelayMission,
+  VisitRelayShuttleMissionTemplate,
 } from './types'
 import { getEvaMissionPool } from './evaMissionPools'
+import { getSatelliteManifest } from '@/lib/satellites/satelliteManifests'
 import { getPlanet } from '@/lib/planets/catalog'
 import type { PlayerProfile } from '@/lib/player/types'
 import type { Inventory } from '@/lib/inventory/types'
@@ -102,6 +104,14 @@ export function createMissionBoard(): ShuttleMissionBoard {
     activeEvaMissions: [],
   }
 }
+
+/**
+ * Alias for {@link createMissionBoard} — used by EVA-focused test helpers
+ * and callers that prefer the more specific name.
+ *
+ * @returns An empty ShuttleMissionBoard.
+ */
+export const createShuttleMissionBoard = createMissionBoard
 
 /**
  * Offer a mission from a planet's pool. Picks 1 random mission from
@@ -441,6 +451,87 @@ export function offerEvaMission(
   }
 }
 
+/** Broken-component count per giver-planet difficulty tier. */
+const DAMAGE_COUNT_BY_PLANET: Record<string, number> = {
+  earth: 1,
+  mars: 1,
+  jupiter: 2,
+  saturn: 2,
+  mercury: 3,
+  venus: 3,
+  uranus: 3,
+  neptune: 3,
+}
+
+/** Default to hard (3) if a planet id isn't in the tier table — safer than crashing. */
+const DEFAULT_DAMAGE_COUNT = 3
+
+/**
+ * Deterministic 32-bit hash of a string. Used to seed the mulberry32 PRNG so a
+ * given mission id always rolls the same brokenComponents list.
+ *
+ * @param str - Input string, typically a mission id.
+ * @returns Unsigned 32-bit hash.
+ */
+function hashMissionId(str: string): number {
+  let h = 0x811c9dc5 | 0
+  for (let i = 0; i < str.length; i++) {
+    h = Math.imul(h ^ str.charCodeAt(i), 0x01000193)
+  }
+  return h >>> 0
+}
+
+/**
+ * Mulberry32 PRNG seeded from a 32-bit integer.
+ *
+ * @param seed - Integer seed.
+ * @returns Function producing the next random number in [0, 1).
+ */
+function mulberry32(seed: number): () => number {
+  let s = seed | 0
+  return () => {
+    s = (s + 0x6d2b79f5) | 0
+    let t = Math.imul(s ^ (s >>> 15), 1 | s)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+/**
+ * Roll the broken-component list for a satellite-servicing mission.
+ *
+ * Deterministic given (missionId, manifest). Returns `undefined` for missions
+ * that are not satellite_servicing, or whose POI type has no manifest — the
+ * runtime treats `undefined` as "no damage state" and falls back to the
+ * default stub minigame at dispatch time.
+ *
+ * @param tmpl - Mission template.
+ * @param planetId - Giver planet id — drives the damage tier count.
+ * @returns Broken component names, or `undefined` when damage does not apply.
+ */
+function rollBrokenComponents(
+  tmpl: VisitRelayShuttleMissionTemplate,
+  planetId: string,
+): string[] | undefined {
+  if (tmpl.minigameType !== 'satellite_servicing') return undefined
+  const manifest = getSatelliteManifest(tmpl.poiType)
+  if (!manifest || manifest.components.length === 0) return undefined
+  const count = Math.min(
+    DAMAGE_COUNT_BY_PLANET[planetId] ?? DEFAULT_DAMAGE_COUNT,
+    manifest.components.length,
+  )
+  const rng = mulberry32(hashMissionId(tmpl.id))
+  // Fisher-Yates partial shuffle — take first `count` after shuffling.
+  const pool = [...manifest.components]
+  for (let i = 0; i < count; i++) {
+    const j = i + Math.floor(rng() * (pool.length - i))
+    const tmp = pool[i]!
+    pool[i] = pool[j]!
+    pool[j] = tmp
+  }
+  return pool.slice(0, count)
+}
+
 /**
  * Accept the currently offered EVA mission. Moves it to the active list and
  * starts a restock timer. The waypoint is supplied by the caller so the POI is
@@ -456,11 +547,13 @@ export function acceptEvaMission(
 ): ShuttleMissionBoard {
   if (!board.offeredEvaMission || !board.offeringEvaPlanet) return board
 
+  const rolled = rollBrokenComponents(board.offeredEvaMission, board.offeringEvaPlanet)
   const newActive: ActiveVisitRelayMission = {
     template: board.offeredEvaMission,
     giverPlanet: board.offeringEvaPlanet,
     waypoint,
     status: 'active',
+    ...(rolled !== undefined ? { brokenComponents: rolled } : {}),
   }
 
   const total = randomRestockDuration()
