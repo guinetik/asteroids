@@ -389,6 +389,31 @@ describe('ShipHealth', () => {
     })
   })
 
+  describe('isEvaThermalBlocked', () => {
+    it('returns false at neutral temperature with no protection caps', () => {
+      expect(health.isEvaThermalBlocked(100, -100)).toBe(false)
+    })
+
+    it('returns true when temperature magnitude exceeds 75', () => {
+      for (let i = 0; i < 80; i++) health.tick(1, 800, 0)
+      expect(health.temperature).toBeLessThan(-75)
+      expect(health.isEvaThermalBlocked(100, -100)).toBe(true)
+    })
+
+    it('returns false when heat-capped below damage and within 75% gauge', () => {
+      for (let i = 0; i < 50; i++) health.tick(1, 10, 0, false, 1, 1, 1, 1, 1, 65, -100)
+      expect(health.temperature).toBeCloseTo(65, 0)
+      expect(health.isEvaThermalBlocked(65, -100)).toBe(false)
+    })
+
+    it('returns true in unprotected hot exposure hot enough for hull thermal damage', () => {
+      for (let i = 0; i < 30; i++) health.tick(1, 10, 0, false, 1, 1, 1, 1, 1, 100, -100)
+      expect(health.temperature).toBeGreaterThan(config.damageThreshold)
+      expect(health.hp).toBeLessThan(100)
+      expect(health.isEvaThermalBlocked(100, -100)).toBe(true)
+    })
+  })
+
   describe('reset', () => {
     it('restores HP to maxHp', () => {
       for (let i = 0; i < 5; i++) health.tick(1, 100, 1)

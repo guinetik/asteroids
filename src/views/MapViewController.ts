@@ -3681,6 +3681,18 @@ export class MapViewController implements Tickable {
         if (state === 'orbiting' || state === 'approaching') {
           return { allowed: false, reason: 'EXIT ORBIT TO EVA' }
         }
+        if (this.shipHealth && this.shuttleController && this.shipHealthConfig) {
+          const px = this.shuttleController.position.x
+          const pz = this.shuttleController.position.z
+          const sunDist = Math.sqrt(px * px + pz * pz)
+          const { heatCap, coldCap } = this.computeThermalCaps(sunDist)
+          if (this.shipHealth.isEvaThermalBlocked(heatCap, coldCap)) {
+            const t = this.shipHealth.temperature
+            const reason =
+              t > 0 ? 'THERMAL STRESS — COOL HULL TO EVA' : 'CRYO STRESS — WARM HULL TO EVA'
+            return { allowed: false, reason }
+          }
+        }
         return { allowed: true }
       },
       onStartEvaMinigame: () => this.beginEvaMinigame(),

@@ -79,6 +79,12 @@ const MIN_TEMPERATURE = -100
 const MAX_TEMPERATURE = 100
 
 /**
+ * Absolute temperature (0–100 scale) above which EVA is blocked even when zone
+ * protection fully suppresses hull damage — the suit lockout matches the HUD stress band.
+ */
+const EVA_THERMAL_GAUGE_BLOCK_BEYOND = 75
+
+/**
  * Manages ship hull integrity and temperature.
  * Pure domain logic — no Three.js, no rendering.
  *
@@ -118,6 +124,41 @@ export class ShipHealth {
   /** Whether the temperature gauge should be visible to the player. */
   get temperatureVisible(): boolean {
     return Math.abs(this._temperature) > this.config.displayThreshold
+  }
+
+  /**
+   * Whether EVA egress should be denied for thermal reasons: hull temperature magnitude
+   * is past 75% on the −100…+100 gauge, or the ship
+   * would take hull damage from temperature on this frame (identical rules to the
+   * temperature branch inside {@link ShipHealth.tick} — radiation damage alone does not
+   * trigger this).
+   *
+   * @param heatTempCap - Same `heatTempCap` passed to {@link ShipHealth.tick}
+   * @param coldTempCap - Same `coldTempCap` passed to {@link ShipHealth.tick}
+   * @returns True while thermal stress forbids EVA
+   */
+  isEvaThermalBlocked(heatTempCap: number, coldTempCap: number): boolean {
+    const absTemp = Math.abs(this._temperature)
+    if (absTemp > EVA_THERMAL_GAUGE_BLOCK_BEYOND) return true
+    return this.isTakingThermalHullDamage(heatTempCap, coldTempCap)
+  }
+
+  /**
+   * True when {@link ShipHealth.tick} would apply a non-zero temperature damage term
+   * (extremes past {@link ShipHealthConfig.damageThreshold} without matching zone protection).
+   *
+   * @param heatTempCap - Same `heatTempCap` as {@link ShipHealth.tick}
+   * @param coldTempCap - Same `coldTempCap` as {@link ShipHealth.tick}
+   */
+  private isTakingThermalHullDamage(heatTempCap: number, coldTempCap: number): boolean {
+    const absTemp = Math.abs(this._temperature)
+    if (absTemp <= this.config.damageThreshold) return false
+    const heatProtected = heatTempCap < MAX_TEMPERATURE
+    const coldProtected = coldTempCap > MIN_TEMPERATURE
+    const isHeatDamage = this._temperature > 0
+    const isColdDamage = this._temperature < 0
+    const protectionBlocks = (isHeatDamage && heatProtected) || (isColdDamage && coldProtected)
+    return !protectionBlocks
   }
 
   /** Current damage intensity (0–1). Drives the red vignette overlay. */
