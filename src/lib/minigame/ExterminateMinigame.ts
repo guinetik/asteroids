@@ -200,8 +200,24 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
   private explosionFlashTimer = 0
   private explosionCoreTimer = 0
   private shockwaveTimer = 0
-  /** Called when the player should take direct damage. */
-  onDamagePlayer: ((damage: number, sourceX: number, sourceZ: number) => void) | null = null
+  /**
+   * Called when the player should take direct damage.
+   *
+   * @param damage  - HP to deduct.
+   * @param sourceX - World X of the damage source.
+   * @param sourceZ - World Z of the damage source.
+   * @param source  - What dealt the damage. `'projectile'` for ranged hits
+   *                  fired by enemies, `'contact'` for melee/touch damage.
+   *                  Lets the controller pick the right impact SFX.
+   */
+  onDamagePlayer:
+    | ((
+        damage: number,
+        sourceX: number,
+        sourceZ: number,
+        source?: 'projectile' | 'contact',
+      ) => void)
+    | null = null
   /** Called when the player should be killed outright. */
   onKillPlayer: (() => void) | null = null
   /** Called when the lander is destroyed by the nest blast. */
@@ -504,11 +520,11 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
     this.enemyDirector.onContactDamage = (handle, damage) => {
       const enemy = this.enemyByHandleId.get(handle.id)
       if (!enemy || !enemy.alive) return
-      this.onDamagePlayer?.(damage, enemy.position.x, enemy.position.z)
+      this.onDamagePlayer?.(damage, enemy.position.x, enemy.position.z, 'contact')
     }
 
     this.enemyProjectileSystem.onPlayerHit = (damage, sourceX, sourceZ) => {
-      this.onDamagePlayer?.(damage, sourceX, sourceZ)
+      this.onDamagePlayer?.(damage, sourceX, sourceZ, 'projectile')
     }
 
     this.enemyProjectileSystem.onProjectileMove = this.enemyProjectileMeshPool.acquire

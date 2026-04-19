@@ -120,7 +120,24 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
   private virusBaseY = 0
   private virusAnimTime = 0
 
-  onDamagePlayer: ((damage: number, sourceX: number, sourceZ: number) => void) | null = null
+  /**
+   * Called when the player should take direct damage.
+   *
+   * @param damage  - HP to deduct.
+   * @param sourceX - World X of the damage source.
+   * @param sourceZ - World Z of the damage source.
+   * @param source  - What dealt the damage. `'projectile'` for ranged hits
+   *                  fired by enemies, `'contact'` for melee/touch damage.
+   *                  Lets the controller pick the right impact SFX.
+   */
+  onDamagePlayer:
+    | ((
+        damage: number,
+        sourceX: number,
+        sourceZ: number,
+        source?: 'projectile' | 'contact',
+      ) => void)
+    | null = null
   onKillPlayer: (() => void) | null = null
   onDestroyLander: (() => void) | null = null
   onExplosion: ((position: THREE.Vector3) => void) | null = null
@@ -333,7 +350,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     this.enemyDirector.onContactDamage = (handle, damage) => {
       const enemy = this.enemyByHandleId.get(handle.id)
       if (!enemy || !enemy.alive) return
-      this.onDamagePlayer?.(damage, enemy.position.x, enemy.position.z)
+      this.onDamagePlayer?.(damage, enemy.position.x, enemy.position.z, 'contact')
     }
 
     this.enemyDirector.onHostageContactDamage = (_handle, hostage) => {
@@ -341,7 +358,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     }
 
     this.enemyProjectileSystem.onPlayerHit = (damage, sourceX, sourceZ) => {
-      this.onDamagePlayer?.(damage, sourceX, sourceZ)
+      this.onDamagePlayer?.(damage, sourceX, sourceZ, 'projectile')
     }
 
     this.enemyProjectileSystem.onHostageHit = (hostage) => {
