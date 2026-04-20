@@ -3689,11 +3689,29 @@ export class MapViewController implements Tickable {
    * @param active - True when EVA is starting; false when it is ending.
    */
   private handleEvaModeChange(active: boolean): void {
+    this.setOrbitLinesVisible(!active)
     this.setEvaBloomOverride(active)
     if (!active) {
       this.missionFacade.armCompletedEvaSiteCleanup()
     }
     this.onEvaModeChange?.(active)
+  }
+
+  /**
+   * Toggle the tactical-map orbital path lines. Hidden during EVA so the
+   * astronaut isn't looking at a ship-HUD sensor overlay through their helmet;
+   * restored on exit. Iterates every `PlanetSystemController`'s `orbitLines`.
+   * Does not modify `this.orbitsVisible` so the user's toggle preference is
+   * preserved across EVA sessions.
+   *
+   * @param visible - True to show orbit lines, false to hide.
+   */
+  private setOrbitLinesVisible(visible: boolean): void {
+    for (const controller of this.planetControllers) {
+      for (const line of controller.orbitLines) {
+        line.visible = visible
+      }
+    }
   }
 
   /**
