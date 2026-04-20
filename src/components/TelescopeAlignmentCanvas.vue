@@ -179,6 +179,27 @@ function onKeyDown(e: KeyboardEvent): void {
   }
 }
 
+/** Chromatic-aberration channel sign: R offsets left, B offsets right, G stays centered. */
+type ChromaChannel = 'r' | 'g' | 'b'
+
+/**
+ * CSS style for one chromatic-aberration layer: base blur + channel-offset translate.
+ * The three layers are stacked with mix-blend-mode: screen so R/G/B recombine into
+ * a sharp image when `chroma` is zero, and fringe visibly as `chroma` rises.
+ *
+ * @param channel - Which R/G/B layer this style is for.
+ * @returns Inline CSS for the `<img>` element.
+ */
+function eyepieceImageStyle(channel: ChromaChannel): Record<string, string> {
+  const sign = channel === 'r' ? -1 : channel === 'b' ? 1 : 0
+  const dx = knobs.chroma * sign + knobs.azimuth
+  const dy = knobs.elevation
+  return {
+    filter: `blur(${Math.max(0, knobs.focus).toFixed(2)}px)`,
+    transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px)`,
+  }
+}
+
 onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
   props.minigame.reportQuality(quality.value)
@@ -201,7 +222,26 @@ onUnmounted(() => {
 
     <div class="telescope-body">
       <div class="telescope-eyepiece" aria-label="Telescope eyepiece">
-        <div class="telescope-eyepiece__placeholder" />
+        <img
+          class="telescope-eyepiece__img telescope-eyepiece__img--r"
+          :src="`/telescope/${target.image}`"
+          :alt="target.label"
+          :style="eyepieceImageStyle('r')"
+        />
+        <img
+          class="telescope-eyepiece__img telescope-eyepiece__img--g"
+          :src="`/telescope/${target.image}`"
+          alt=""
+          aria-hidden="true"
+          :style="eyepieceImageStyle('g')"
+        />
+        <img
+          class="telescope-eyepiece__img telescope-eyepiece__img--b"
+          :src="`/telescope/${target.image}`"
+          alt=""
+          aria-hidden="true"
+          :style="eyepieceImageStyle('b')"
+        />
       </div>
 
       <div class="telescope-knobs">
@@ -307,9 +347,9 @@ onUnmounted(() => {
   max-height: 80vmin;
   aspect-ratio: 1 / 1;
 }
-.telescope-eyepiece__placeholder {
-  @apply absolute inset-0;
-  background: radial-gradient(circle at 50% 50%, #1e293b 0%, #05070c 80%);
+.telescope-eyepiece__img {
+  @apply absolute inset-0 w-full h-full object-cover pointer-events-none;
+  mix-blend-mode: screen;
 }
 .telescope-knobs {
   @apply flex flex-col gap-3;
