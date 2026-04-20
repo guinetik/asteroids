@@ -2372,7 +2372,7 @@ export class MapViewController implements Tickable {
     // or through the overlay can reach the canvas underneath and trigger
     // OrbitControls.setPointerCapture on an element that just lost pointer
     // lock — which throws InvalidStateError.
-    this.vehicleCamera.controls.enabled = false
+    if (this.vehicleCamera) this.vehicleCamera.controls.enabled = false
     this.onEvaMinigameChange?.({ mission, minigame })
   }
 
@@ -2388,7 +2388,7 @@ export class MapViewController implements Tickable {
     this.activeEvaMinigame = null
     this.satelliteRepairController?.dispose()
     this.satelliteRepairController = null
-    this.vehicleCamera.controls.enabled = true
+    if (this.vehicleCamera) this.vehicleCamera.controls.enabled = true
     this.onEvaMinigameChange?.(null)
     this.evaSession?.endMinigame()
   }
@@ -2423,7 +2423,7 @@ export class MapViewController implements Tickable {
     this.satelliteRepairController?.dispose()
     this.satelliteRepairController = null
     this.currentAimPrompt = null
-    this.vehicleCamera.controls.enabled = true
+    if (this.vehicleCamera) this.vehicleCamera.controls.enabled = true
     this.onEvaMinigameChange?.(null)
     this.evaSession?.endMinigame()
   }
