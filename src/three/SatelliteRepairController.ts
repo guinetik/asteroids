@@ -3,10 +3,12 @@
  *
  * Attaches to a satellite POI during EVA, applies a red wireframe overlay to
  * each broken component, and runs a forward raycast from the FPS camera to
- * detect aim. The aimed component's wireframe turns orange and shows a
- * "[F] FIX" billboard; F-press while aimed calls `minigame.markRepaired`,
- * fades the overlay, and removes it. Completing all repairs fires the
- * minigame's `onComplete`, which the host pipes into its reward chain.
+ * detect aim. The aimed component's wireframe turns orange; pressing F while
+ * aimed flips the wireframe to green, holds for {@link REPAIR_HOLD_SECONDS},
+ * then removes it and marks the component repaired. Prompt text is surfaced
+ * through the EVA HUD via the {@link SatelliteRepairControllerConfig.onAimPromptChange}
+ * callback rather than a 3D billboard. Completing all repairs fires
+ * `minigame.onComplete`, which the host pipes into its reward chain.
  *
  * @author guinetik
  * @date 2026-04-19
@@ -16,6 +18,7 @@ import * as THREE from 'three'
 import type { SatelliteServicingMiniGame } from '@/lib/minigame/satelliteServicing/SatelliteServicingMiniGame'
 import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 import { validateManifest } from '@/lib/satellites/satelliteManifests'
+import { Timer } from '@/lib/Timer'
 
 /** Maximum raycast distance (world units) for aim detection. Rays longer than this don't highlight a component. */
 const AIM_RAYCAST_MAX_DISTANCE = 15
@@ -26,41 +29,14 @@ const AIM_HIGHLIGHT_COLOR = 0xfb923c
 /** Red emissive wireframe color for damaged components. */
 const DAMAGE_WIREFRAME_COLOR = 0xf87171
 
-/** Fade-out duration (seconds) applied to a wireframe when its component is repaired. */
-const WIREFRAME_FADE_SECONDS = 0.5
+/** Wireframe overlay opacity — fixed, no fade. */
+const WIREFRAME_OPACITY = 0.9
 
-/** Billboard canvas pixel dimensions — power-of-two-safe. */
-const BILLBOARD_CANVAS_WIDTH = 256
+/** Seconds the repaired wireframe stays visible (green) before being removed. */
+const REPAIR_HOLD_SECONDS = 2
 
-/** Billboard canvas height in pixels. */
-const BILLBOARD_CANVAS_HEIGHT = 64
-
-/** Billboard sprite scale in world units — wide/short reads at normal EVA distances. */
-const BILLBOARD_SCALE_X = 1.2
-
-/** Billboard sprite scale Y in world units. */
-const BILLBOARD_SCALE_Y = 0.3
-
-/** Billboard vertical offset above each component's local origin (world units). */
-const BILLBOARD_LOCAL_Y_OFFSET = 1.2
-
-/** Starting opacity for the red wireframe overlay. */
-const WIREFRAME_START_OPACITY = 0.9
-
-/** Stroke width (px) of the border drawn on the FIX prompt canvas. */
-const BORDER_STROKE_WIDTH = 2
-
-/** Font size (px) for the FIX prompt label text. */
-const FONT_SIZE_PX = 28
-
-/** Stroke color for the FIX prompt panel border. */
-const BORDER_COLOR = '#22d3ee'
-
-/** Text fill color for the FIX prompt label. */
-const TEXT_COLOR = '#cffafe'
-
-/** Background fill for the FIX prompt panel. */
-const PANEL_FILL = 'rgba(5, 7, 12, 0.8)'
+/** Green color applied to a component's wireframe during the post-repair hold. */
+const REPAIR_COMPLETE_COLOR = 0x4ade80
 
 /** Configuration passed to `SatelliteRepairController.attach`. */
 export interface SatelliteRepairControllerConfig {
@@ -74,23 +50,26 @@ export interface SatelliteRepairControllerConfig {
   minigame: SatelliteServicingMiniGame
   /** The active mission — reserved for future use (mission-specific tuning). */
   mission: ActiveVisitRelayMission
+  /**
+   * Called when the aim state transitions between "nothing aimed" and "aimed
+   * at a broken component". Host routes the payload into the EVA HUD prompt
+   * channel so the player sees "[F] FIX" only while aiming at a fixable part.
+   * Fires with null to clear the prompt.
+   */
+  onAimPromptChange?: (prompt: string | null) => void
 }
 
-/** Internal per-component state. Tracks the source object, damage overlay, prompt, and fade. */
+/** Internal per-component state. Tracks the source object, damage overlay, and repair progress. */
 interface DamagedComponent {
   /** Name of the rigged sub-object this component represents. */
   name: string
   /** Source Object3D on the POI tree — the wireframe overlay sits on top of this. */
   source: THREE.Object3D
-  /** Red (or orange when aimed) wireframe overlay group. */
+  /** Red (or orange when aimed, green when repaired) wireframe overlay group. */
   wireframe: THREE.Object3D
-  /** FIX-prompt billboard shown only when this component is the current aim target. */
-  promptBillboard: THREE.Sprite
-  /** Set to true when `markRepaired` fires for this component; drives the fade-out loop. */
+  /** Set to true when repair is initiated; prevents further aim-pick and normal logic. */
   fading: boolean
-  /** Elapsed fade seconds, capped at `WIREFRAME_FADE_SECONDS`. */
-  fadeTimer: number
-  /** Whether this component is the current aim target — drives wireframe color + prompt visibility. */
+  /** Whether this component is the current aim target — drives wireframe color. */
   aimed: boolean
 }
 
@@ -116,6 +95,9 @@ export class SatelliteRepairController {
   private components: DamagedComponent[] = []
   private prevFixKey = false
 
+  /** Tracks whether any component was aimed at on the previous frame. */
+  private prevHasAimed = false
+
   /** Reused raycaster for per-frame aim detection. */
   private readonly _raycaster = new THREE.Raycaster()
 
@@ -123,10 +105,10 @@ export class SatelliteRepairController {
   private readonly _forward = new THREE.Vector3()
 
   /**
-   * Attach to a scene + POI. Looks up each broken component by name, applies
-   * a red wireframe overlay and a hidden FIX-prompt billboard above it. If
-   * any manifest component is missing from the POI tree, logs a warning and
-   * skips that component (so the rest of the mission stays playable).
+   * Attach to a scene + POI. Looks up each broken component by name and applies
+   * a red wireframe overlay. If any manifest component is missing from the POI
+   * tree, logs a warning and skips that component (so the rest of the mission
+   * stays playable).
    *
    * @param cfg - Attachment configuration.
    */
@@ -144,17 +126,12 @@ export class SatelliteRepairController {
       const source = cfg.poiObject.getObjectByName(name)
       if (!source) continue
       const wireframe = this.buildWireframe(source)
-      const promptBillboard = this.buildFixPrompt()
-      promptBillboard.visible = false
       source.add(wireframe)
-      source.add(promptBillboard)
       this.components.push({
         name,
         source,
         wireframe,
-        promptBillboard,
         fading: false,
-        fadeTimer: 0,
         aimed: false,
       })
     }
@@ -163,11 +140,11 @@ export class SatelliteRepairController {
   /**
    * Per-frame update. Runs a forward raycast from the FPS camera to detect
    * which broken component the player is aiming at, turns its wireframe orange,
-   * shows the FIX prompt, and on F-press triggers the repair stub.
+   * and on F-press triggers the green-hold repair sequence.
    *
-   * @param dt - Delta time in seconds.
+   * @param dt - Delta time in seconds (unused post-fade-removal; kept for interface symmetry).
    */
-  tick(dt: number): void {
+  tick(_dt: number): void {
     if (!this.cfg) return
     const camera = this.cfg.getCamera()
 
@@ -182,12 +159,10 @@ export class SatelliteRepairController {
       aimed = this.pickAimedComponent()
     }
 
-    // Apply aim state changes — swap wireframe color when entering/leaving aim,
-    // toggle billboard visibility so only the aimed component shows its FIX prompt.
+    // Apply aim state changes — swap wireframe color when entering/leaving aim.
     for (const c of this.components) {
       if (c.fading) {
         c.aimed = false
-        c.promptBillboard.visible = false
         continue
       }
       const nowAimed = c === aimed
@@ -195,28 +170,37 @@ export class SatelliteRepairController {
         c.aimed = nowAimed
         this.setWireframeColor(c.wireframe, nowAimed ? AIM_HIGHLIGHT_COLOR : DAMAGE_WIREFRAME_COLOR)
       }
-      c.promptBillboard.visible = nowAimed
     }
 
-    // F edge-trigger: only while the player is actively aiming at a broken component.
+    // Emit aim-prompt transitions to the host so the EVA HUD shows "[F] FIX"
+    // only while the player is looking at a repairable component.
+    const hasAimed = aimed != null
+    if (hasAimed !== this.prevHasAimed) {
+      this.prevHasAimed = hasAimed
+      this.cfg.onAimPromptChange?.(hasAimed ? '[F] FIX' : null)
+    }
+
+    // F edge-trigger: while aimed at a broken component, flip it to the
+    // green "repaired" state, hold for REPAIR_HOLD_SECONDS, then remove the
+    // wireframe and mark the repair. Deferring `markRepaired` until after the
+    // hold lets the green celebration play out before the mission completes
+    // and the controller is disposed.
     const fixPressed = this.cfg.isFixKeyPressed()
     const fixJustPressed = fixPressed && !this.prevFixKey
     this.prevFixKey = fixPressed
     if (fixJustPressed && aimed) {
       aimed.fading = true
-      aimed.promptBillboard.visible = false
-      this.cfg.minigame.markRepaired(aimed.name)
-    }
-
-    // Fade loop — unchanged from the proximity version.
-    for (const c of this.components) {
-      if (!c.fading) continue
-      c.fadeTimer += dt
-      const t = Math.min(1, c.fadeTimer / WIREFRAME_FADE_SECONDS)
-      this.setWireframeOpacity(c.wireframe, WIREFRAME_START_OPACITY * (1 - t))
-      if (t >= 1 && c.wireframe.parent) {
-        c.wireframe.parent.remove(c.wireframe)
-      }
+      aimed.aimed = false
+      this.setWireframeColor(aimed.wireframe, REPAIR_COMPLETE_COLOR)
+      const name = aimed.name
+      const wireframeRef = aimed.wireframe
+      Timer.after(REPAIR_HOLD_SECONDS, () => {
+        if (wireframeRef.parent) wireframeRef.parent.remove(wireframeRef)
+        // If the controller was disposed during the hold (player exited EVA),
+        // `this.cfg` is null — skip the repair mark so the mission state stays
+        // consistent with "no partial progress persisted."
+        if (this.cfg) this.cfg.minigame.markRepaired(name)
+      })
     }
   }
 
@@ -267,14 +251,15 @@ export class SatelliteRepairController {
   }
 
   /**
-   * Detach and dispose every overlay/prompt. Safe to call multiple times.
+   * Detach and dispose every overlay. Safe to call multiple times.
    */
   dispose(): void {
+    // Tell the host to clear any aim prompt it was displaying for us.
+    this.cfg?.onAimPromptChange?.(null)
+    this.prevHasAimed = false
     for (const c of this.components) {
       if (c.wireframe.parent) c.wireframe.parent.remove(c.wireframe)
-      if (c.promptBillboard.parent) c.promptBillboard.parent.remove(c.promptBillboard)
       this.disposeObject(c.wireframe)
-      this.disposeObject(c.promptBillboard)
     }
     this.components = []
     this.cfg = null
@@ -299,7 +284,7 @@ export class SatelliteRepairController {
           color: DAMAGE_WIREFRAME_COLOR,
           wireframe: true,
           transparent: true,
-          opacity: WIREFRAME_START_OPACITY,
+          opacity: WIREFRAME_OPACITY,
           depthTest: true,
           depthWrite: false,
         }),
@@ -314,46 +299,6 @@ export class SatelliteRepairController {
       group.add(clone)
     })
     return group
-  }
-
-  /**
-   * Build a canvas-textured sprite saying "[F] FIX". Visible toggling lives
-   * in `tick`. Positioned slightly above the component's local origin.
-   *
-   * @returns Billboard sprite ready to parent under a component source.
-   */
-  private buildFixPrompt(): THREE.Sprite {
-    const canvas = document.createElement('canvas')
-    canvas.width = BILLBOARD_CANVAS_WIDTH
-    canvas.height = BILLBOARD_CANVAS_HEIGHT
-    const ctx = canvas.getContext('2d')!
-    ctx.fillStyle = PANEL_FILL
-    ctx.fillRect(0, 0, BILLBOARD_CANVAS_WIDTH, BILLBOARD_CANVAS_HEIGHT)
-    ctx.strokeStyle = BORDER_COLOR
-    ctx.lineWidth = BORDER_STROKE_WIDTH
-    ctx.strokeRect(
-      BORDER_STROKE_WIDTH / 2,
-      BORDER_STROKE_WIDTH / 2,
-      BILLBOARD_CANVAS_WIDTH - BORDER_STROKE_WIDTH,
-      BILLBOARD_CANVAS_HEIGHT - BORDER_STROKE_WIDTH,
-    )
-    ctx.fillStyle = TEXT_COLOR
-    ctx.font = `bold ${FONT_SIZE_PX}px monospace`
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText('[F] FIX', BILLBOARD_CANVAS_WIDTH / 2, BILLBOARD_CANVAS_HEIGHT / 2)
-    const texture = new THREE.CanvasTexture(canvas)
-    texture.minFilter = THREE.LinearFilter
-    const material = new THREE.SpriteMaterial({ map: texture, transparent: true })
-    const sprite = new THREE.Sprite(material)
-    sprite.scale.set(BILLBOARD_SCALE_X, BILLBOARD_SCALE_Y, 1)
-    sprite.position.set(0, BILLBOARD_LOCAL_Y_OFFSET, 0)
-    // The FIX prompt is a child of the component's source node, so it lives in the
-    // path of our aim-detection raycast. Sprites require `raycaster.camera` to be
-    // set, which we don't use — we only intersect against source meshes to detect
-    // aim. Skip sprite intersection entirely.
-    sprite.raycast = () => {}
-    return sprite
   }
 
   /**
@@ -372,21 +317,6 @@ export class SatelliteRepairController {
   }
 
   /**
-   * Tween every mesh material's opacity inside `wireframe`.
-   *
-   * @param wireframe - Overlay group previously built by `buildWireframe`.
-   * @param opacity - Target opacity, 0..1.
-   */
-  private setWireframeOpacity(wireframe: THREE.Object3D, opacity: number): void {
-    wireframe.traverse((obj) => {
-      const mesh = obj as THREE.Mesh
-      if (!mesh.isMesh) return
-      const mat = mesh.material as THREE.MeshBasicMaterial
-      mat.opacity = opacity
-    })
-  }
-
-  /**
    * Dispose geometry + materials under `obj`. Shared geometry is NOT disposed
    * because the base mesh still uses it.
    *
@@ -400,12 +330,6 @@ export class SatelliteRepairController {
         const mat = mesh.material
         if (Array.isArray(mat)) mat.forEach((m) => m.dispose())
         else if (mat) mat.dispose()
-      }
-      const sprite = child as THREE.Sprite
-      if (sprite.isSprite) {
-        const sm = sprite.material
-        if (sm.map) sm.map.dispose()
-        sm.dispose()
       }
     })
   }

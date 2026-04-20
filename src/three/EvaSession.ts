@@ -139,6 +139,14 @@ export interface EvaSessionConfig {
    * overlay) would be wrong.
    */
   isInSceneMinigameActive?: () => boolean
+  /**
+   * Optional prompt source for in-scene minigames. When `isInSceneMinigameActive`
+   * returns true, the session calls this hook each tick. A non-null return value
+   * is shown as the EVA HUD prompt (taking priority over the shuttle-return prompt).
+   * Null means "no in-scene prompt this frame" — fall through to other prompt
+   * sources (e.g. shuttle-return).
+   */
+  getInSceneMinigamePrompt?: () => string | null
   /** Objects to scale up during EVA. Read once at session enter. */
   getHugeScaleTargets: () => EvaHugeScaleTarget[]
   /**
@@ -266,6 +274,18 @@ export class EvaSession implements Tickable {
           this.emitTelemetry()
           return
         }
+      }
+    }
+
+    // In-scene minigame prompt takes priority over the shuttle-return prompt.
+    // Only consulted when an in-scene minigame is active (otherwise the old
+    // POI path above would have shown its own prompt + returned).
+    if (this.config.isInSceneMinigameActive?.() ?? false) {
+      const inScenePrompt = this.config.getInSceneMinigamePrompt?.() ?? null
+      if (inScenePrompt) {
+        this.setPrompt(inScenePrompt)
+        this.emitTelemetry()
+        return
       }
     }
 

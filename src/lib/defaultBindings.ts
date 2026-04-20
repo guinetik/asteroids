@@ -21,6 +21,10 @@ export const DEFAULT_BINDINGS: Record<string, string[]> = {
   // are "engage the mission prop in range" actions — an asteroid mission waypoint and an
   // EVA POI never coexist at the same spot.
   evaToggle: ['KeyF'],
+  // In-scene minigame interaction — fires when the player is aimed at a broken
+  // satellite component and wants to repair it. Shares KeyF with `evaToggle` and
+  // `beginMission`; the one active at the moment of press wins based on context.
+  interact: ['KeyF'],
   // EVA movement (only read while in EVA mode; keys reused from the shuttle set).
   evaForward: ['KeyW'],
   evaBack: ['KeyS'],

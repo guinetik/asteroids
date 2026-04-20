@@ -239,6 +239,8 @@ export class MapViewController implements Tickable {
   private activeEvaMinigame: OrbitalMiniGame | null = null
   /** In-scene controller for the currently-active satellite servicing minigame, if any. */
   private satelliteRepairController: SatelliteRepairController | null = null
+  /** Current in-scene minigame prompt text, piped to EvaSession via `getInSceneMinigamePrompt`. */
+  private currentAimPrompt: string | null = null
   private planetariumScene: MapPlanetariumScene | null = null
   private sunController: SunController | null = null
   private planetControllers: PlanetSystemController[] = []
@@ -2398,6 +2400,7 @@ export class MapViewController implements Tickable {
     this.activeEvaMinigame = null
     this.satelliteRepairController?.dispose()
     this.satelliteRepairController = null
+    this.currentAimPrompt = null
     this.onEvaMinigameChange?.(null)
     this.evaSession?.endMinigame()
   }
@@ -3748,6 +3751,9 @@ export class MapViewController implements Tickable {
       isFixKeyPressed: () => this.inputManager?.isActionActive('interact') ?? false,
       minigame,
       mission,
+      onAimPromptChange: (prompt: string | null) => {
+        this.currentAimPrompt = prompt
+      },
     })
   }
 
@@ -3766,6 +3772,7 @@ export class MapViewController implements Tickable {
     this.satelliteRepairController = null
     this.activeEvaMinigame?.dispose()
     this.activeEvaMinigame = null
+    this.currentAimPrompt = null
   }
 
   /**
@@ -3801,6 +3808,7 @@ export class MapViewController implements Tickable {
       },
       onStartEvaMinigame: () => this.beginEvaMinigame(),
       isInSceneMinigameActive: () => this.satelliteRepairController != null,
+      getInSceneMinigamePrompt: () => this.currentAimPrompt,
       getHugeScaleTargets: () => this.buildEvaHugeScaleTargets(),
       getColliders: () => this.buildEvaColliders(),
       spawnOffsetScale: MapViewController.EVA_MAP_SPAWN_OFFSET_SCALE,
