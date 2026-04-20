@@ -16,14 +16,18 @@ import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 import type { RelayRepairMiniGame } from '@/lib/minigame/relayRepair/RelayRepairMiniGame'
 import { getRelayPuzzle } from '@/lib/minigame/relayRepair/puzzles'
 import {
+  CAPTION_FADE_MS,
   CELL_PX,
   GRID_COLS,
   GRID_ROWS,
+  LOCK_ANIMATION_MS,
+  LOCK_THRESHOLD,
   NODE_RADIUS_PCT,
 } from '@/lib/minigame/relayRepair/constants'
 import { SHAPE_ROTATIONS, DIR_DELTA } from '@/lib/minigame/relayRepair/shapes'
 import { traceWave, cellId } from '@/lib/minigame/relayRepair/wave'
 import { computeQuality } from '@/lib/minigame/relayRepair/quality'
+import { wigglyPath } from '@/lib/minigame/relayRepair/wiggle'
 import type { Cell, Direction, Rotation } from '@/lib/minigame/relayRepair/types'
 
 const props = defineProps<{
@@ -70,6 +74,50 @@ const sinkReached = computed(() =>
 const quality = computed(() => computeQuality(trace.value.activeCells.size, sinkReached.value))
 const qualityPct = computed(() => Math.round(quality.value * 100))
 const canLock = computed(() => quality.value >= 0.95)
+
+/** Lock-in state machine. */
+type LockState = 'calibrating' | 'locking' | 'locked'
+const lockState = ref<LockState>('calibrating')
+const time = ref(0)
+let rafId = 0
+let lastTs = 0
+
+/** RAF loop — advances wiggle time. Pauses when the player has locked in. */
+function tick(ts: number): void {
+  if (lockState.value === 'locked') { rafId = 0; return }
+  if (lastTs === 0) lastTs = ts
+  const dt = (ts - lastTs) / 1000
+  lastTs = ts
+  time.value += dt
+  rafId = requestAnimationFrame(tick)
+}
+
+/** Wiggly SVG path `d` for an active outer pipe arm. */
+function wigglePathD(row: number, col: number, port: Direction): string {
+  const s = portStart(row, col, port)
+  const e = portEdge(row, col, port)
+  return wigglyPath(s.x, s.y, e.x, e.y, time.value)
+}
+
+/** Kick off the lock-in sequence. */
+function handleLockIn(): void {
+  if (quality.value < LOCK_THRESHOLD || lockState.value !== 'calibrating') return
+  lockState.value = 'locking'
+  setTimeout(() => {
+    lockState.value = 'locked'
+    props.minigame.complete()
+    setTimeout(() => emit('complete'), CAPTION_FADE_MS)
+  }, LOCK_ANIMATION_MS)
+}
+
+/** Status-bar text reflecting current lock state. */
+const statusText = computed(() => {
+  if (lockState.value === 'locked') return 'BACKBONE RESTORED'
+  if (lockState.value === 'locking') return 'LOCKING IN'
+  if (canLock.value) return 'SIGNAL LOCK AVAILABLE'
+  return sinkReached.value ? 'PATH COMPLETE' : 'CALIBRATING'
+})
+
 const deadEnds = computed(() => {
   const list: Array<{ fromRow: number; fromCol: number; dir: Direction }> = []
   for (const exit of trace.value.exits) {
@@ -171,6 +219,8 @@ function handleCellWheel(e: WheelEvent, id: string): void {
 /** Global keyboard handler for navigation, rotation, and overlay dismiss. */
 function onKeyDown(e: KeyboardEvent): void {
   const k = e.key.toLowerCase()
+  // Freeze tuning input once we're locking/locked — Escape still aborts.
+  if (lockState.value !== 'calibrating' && k !== 'escape') return
   if (k === 'escape') {
     e.preventDefault()
     emit('close')
@@ -181,22 +231,18 @@ function onKeyDown(e: KeyboardEvent): void {
   if (k === 'a' || e.key === 'ArrowLeft') { e.preventDefault(); moveSelection('W'); return }
   if (k === 'd' || e.key === 'ArrowRight') { e.preventDefault(); moveSelection('E'); return }
   if (k === 'r') { e.preventDefault(); rotateCell(selectedId.value); return }
-  // `e` key handler added in Task 11.
-}
-
-/** Placeholder handler until lock-in ships in Task 11. */
-function handleTempComplete(): void {
-  props.minigame.complete()
-  emit('complete')
+  if (k === 'e' && canLock.value) { e.preventDefault(); handleLockIn(); return }
 }
 
 onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
   props.minigame.reportQuality(quality.value)
+  rafId = requestAnimationFrame(tick)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeyDown)
+  if (rafId) cancelAnimationFrame(rafId)
 })
 </script>
 
@@ -205,9 +251,7 @@ onUnmounted(() => {
     <div class="relay-status">
       <span class="relay-status__location">EVA / RELAY BAY · {{ puzzle.relay }}</span>
       <span class="relay-status__mission">{{ mission.template.name }}</span>
-      <span class="relay-status__state">
-        {{ canLock ? 'SIGNAL LOCK AVAILABLE' : sinkReached ? 'PATH COMPLETE' : 'CALIBRATING' }}
-      </span>
+      <span class="relay-status__state">{{ statusText }}</span>
     </div>
 
     <div class="relay-osc">
@@ -286,14 +330,21 @@ onUnmounted(() => {
                 class="relay-hub-arm"
                 :class="{ 'relay-hub-arm--active': segmentActive(cell.row, cell.col, rotatedPortAt(cell, i) ?? 'N') }"
               />
-              <line
-                :x1="portStart(cell.row, cell.col, canonPort).x"
-                :y1="portStart(cell.row, cell.col, canonPort).y"
-                :x2="portEdge(cell.row, cell.col, canonPort).x"
-                :y2="portEdge(cell.row, cell.col, canonPort).y"
-                class="relay-pipe-arm"
-                :class="{ 'relay-pipe-arm--active': segmentActive(cell.row, cell.col, rotatedPortAt(cell, i) ?? 'N') }"
-              />
+              <template v-if="segmentActive(cell.row, cell.col, rotatedPortAt(cell, i) ?? 'N')">
+                <path
+                  :d="wigglePathD(cell.row, cell.col, canonPort)"
+                  class="relay-pipe-arm--active-path"
+                />
+              </template>
+              <template v-else>
+                <line
+                  :x1="portStart(cell.row, cell.col, canonPort).x"
+                  :y1="portStart(cell.row, cell.col, canonPort).y"
+                  :x2="portEdge(cell.row, cell.col, canonPort).x"
+                  :y2="portEdge(cell.row, cell.col, canonPort).y"
+                  class="relay-pipe-arm"
+                />
+              </template>
             </template>
           </g>
           <circle
@@ -356,7 +407,11 @@ onUnmounted(() => {
       <span>ESC · ABORT</span>
     </div>
 
-    <button type="button" class="relay-temp-complete" @click="handleTempComplete">(WIP) Complete</button>
-    <button type="button" class="relay-close" @click="emit('close')">Close</button>
+    <transition name="relay-caption">
+      <div v-if="lockState === 'locked'" class="relay-caption">
+        <div class="relay-caption__label">{{ puzzle.label }}</div>
+        <div class="relay-caption__body">Carrier {{ puzzle.carrier }} · backbone nominal</div>
+      </div>
+    </transition>
   </div>
 </template>
