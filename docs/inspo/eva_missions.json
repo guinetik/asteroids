@@ -1,0 +1,178 @@
+{
+  "mercury": {
+    "planetId": "mercury",
+    "missions": [
+      {
+        "id": "mercury_coronagraph_occulter",
+        "name": "Helios Coronagraph Occulter Realignment",
+        "description": "The Helios-A coronagraph's occulter disc has drifted a tenth of a degree — enough to flood the primary with direct sunlight. EVA over and re-shim the disc mounts before the next flare cycle.",
+        "poiType": "telescope",
+        "minigameType": "telescope_alignment",
+        "reward": 1800
+      }
+    ]
+  },
+  "venus": {
+    "planetId": "venus",
+    "missions": [
+      {
+        "id": "venus_cloud_deck_relay",
+        "name": "Cloud-Deck Relay Dish Reseat",
+        "description": "Acid-pitted mounting bolts are letting the Venus telemetry relay drift out of alignment. EVA across and reseat the main dish before the dropsonde network loses uplink.",
+        "poiType": "relay_antenna",
+        "minigameType": "relay_repair",
+        "reward": 1200
+      },
+      {
+        "id": "venus_dropsonde_carrier_refit",
+        "name": "Dropsonde Carrier Cartridge Swap",
+        "description": "The dropsonde carrier's pyrotechnic deployment cartridges failed cert after the last acid-storm pass. Cycle out to the bus and swap the cartridge rack — surface science goes dark without it.",
+        "poiType": "satellite",
+        "minigameType": "satellite_servicing",
+        "reward": 1500
+      }
+    ]
+  },
+  "earth": {
+    "planetId": "earth",
+    "missions": [
+      {
+        "id": "earth_l1_relay_reterm",
+        "name": "L1 Uplink Backbone Reterm",
+        "description": "The main trunk on the Earth-Sun L1 relay is reading intermittent. Bring the crimp tool, EVA out, reterminate the backbone. Keep the old cable — the agency pays extra for failure analysis.",
+        "poiType": "relay_antenna",
+        "minigameType": "relay_repair",
+        "reward": 1200
+      },
+      {
+        "id": "earth_cubesat_cluster_patch",
+        "name": "Cubesat Cluster Firmware Patch",
+        "description": "Three-bird cubesat cluster in sun-synch missed the last OTA window. Dock with the master node, push the patch by hand, verify the other two sync up before you head home.",
+        "poiType": "satellite",
+        "minigameType": "satellite_servicing",
+        "reward": 1500
+      },
+      {
+        "id": "earth_l2_observatory_phasing",
+        "name": "L2 Observatory Mirror Phasing",
+        "description": "The L2 observatory's primary mirror segments drifted out of phase after a micrometeorite strike. EVA out, read the wavefront sensor, walk each segment in by hand.",
+        "poiType": "telescope",
+        "minigameType": "telescope_alignment",
+        "reward": 1800
+      }
+    ]
+  },
+  "mars": {
+    "planetId": "mars",
+    "missions": [
+      {
+        "id": "mars_sample_return_beacon",
+        "name": "Sample-Return Beacon IMU Swap",
+        "description": "The beacon that will guide the next sample-return capsule home has a flaky inertial unit. EVA across, swap the IMU board, verify three-axis lock against the onboard reference.",
+        "poiType": "relay_antenna",
+        "minigameType": "relay_repair",
+        "reward": 1400
+      },
+      {
+        "id": "mars_methane_prospector_recal",
+        "name": "Methane Prospector Recalibration",
+        "description": "The methane-sniffing prospector satellite is reading dead-negatives across every orbit — almost certainly sensor drift. EVA and recalibrate the mass spectrometer against the onboard reference gas.",
+        "poiType": "satellite",
+        "minigameType": "satellite_servicing",
+        "reward": 1700
+      },
+      {
+        "id": "mars_phobos_astrometric_focus",
+        "name": "Phobos Astrometric Array Focusing",
+        "description": "The Phobos-mounted astrometric array lost focus after the last moonquake. EVA over, walk the focus motor through its range, record the new optimum before the next transit window.",
+        "poiType": "telescope",
+        "minigameType": "telescope_alignment",
+        "reward": 2100
+      }
+    ]
+  },
+  "jupiter": {
+    "planetId": "jupiter",
+    "missions": [
+      {
+        "id": "jupiter_galilean_relay_flash",
+        "name": "Galilean Relay Firmware Flash",
+        "description": "The relay that keeps Io, Europa, and Ganymede on the same timebase is glitching under the radiation belt. Flash the rad-hardened firmware, pull the error logs, don't linger.",
+        "poiType": "relay_antenna",
+        "minigameType": "relay_repair",
+        "reward": 1600
+      },
+      {
+        "id": "jupiter_io_torus_probe_rebuild",
+        "name": "Io Torus Plasma Probe Rebuild",
+        "description": "The sulfur-monitoring probe in the Io plasma torus is offline — mass analyzer ion-pitted past spec. Carry the replacement head out, swap it, realign the high-gain antenna toward Jupiter.",
+        "poiType": "satellite",
+        "minigameType": "satellite_servicing",
+        "reward": 2000
+      },
+      {
+        "id": "jupiter_europa_plume_spectrograph",
+        "name": "Europa Plume Spectrograph Shutter Service",
+        "description": "The spectrograph watching Europa for water-plume eruptions has a stuck aperture shutter. EVA over and free it up — the astrobio team has been dark for four months.",
+        "poiType": "telescope",
+        "minigameType": "telescope_alignment",
+        "reward": 2400
+      }
+    ]
+  },
+  "saturn": {
+    "planetId": "saturn",
+    "missions": [
+      {
+        "id": "saturn_titan_comms_reterm",
+        "name": "Titan Uplink Backbone Reterm",
+        "description": "The Titan relay uplink has been broadcasting garbage since last ring-plane crossing. Bring the diagnostic harness, EVA out, reterminate the main backbone cable.",
+        "poiType": "relay_antenna",
+        "minigameType": "relay_repair",
+        "reward": 1700
+      },
+      {
+        "id": "saturn_ring_sampler_inlet",
+        "name": "Ring-Particle Sampler Inlet Clearance",
+        "description": "The automated ring sampler is jammed — ice buildup on the collection aperture. EVA out with the scraper and clear the inlet by hand. Do not touch the filter.",
+        "poiType": "satellite",
+        "minigameType": "satellite_servicing",
+        "reward": 2100
+      },
+      {
+        "id": "saturn_enceladus_plume_spectrograph",
+        "name": "Enceladus Plume Spectrograph Cryo Purge",
+        "description": "The spectrograph watching Enceladus's south-polar plumes has a slow helium leak — detector's drifting warm and the organic bands are washing out. EVA over, purge the cryo line, re-pressurize. The astrobio team wants their amino-acid signal back.",
+        "poiType": "telescope",
+        "minigameType": "telescope_alignment",
+        "reward": 2500
+      }
+    ]
+  },
+  "uranus": {
+    "planetId": "uranus",
+    "missions": [
+      {
+        "id": "uranus_tilt_probe_wheel_swap",
+        "name": "Tilt-Anomaly Probe Reaction Wheel Swap",
+        "description": "The axial-tilt monitoring probe took a gyro hit — one reaction wheel is frozen solid. EVA to the bus and swap the whole momentum stack. No rush. Nobody else is out here.",
+        "poiType": "satellite",
+        "minigameType": "satellite_servicing",
+        "reward": 2400
+      }
+    ]
+  },
+  "neptune": {
+    "planetId": "neptune",
+    "missions": [
+      {
+        "id": "neptune_triton_telescope_actuator",
+        "name": "Triton Telescope Actuator Release",
+        "description": "The Triton-orbiting exoplanet watcher's primary mirror actuator seized last month and nobody's been out to fix it. Deep-space money for deep-space work. The transit window is long — take your time.",
+        "poiType": "telescope",
+        "minigameType": "telescope_alignment",
+        "reward": 3200
+      }
+    ]
+  }
+}
