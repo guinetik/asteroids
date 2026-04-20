@@ -2385,36 +2385,49 @@ body {
 /* ──────────────────────────────────────────────────────────────────────── */
 
 .telescope-overlay {
-  @apply fixed inset-0 z-50 flex flex-col gap-4 p-6 font-mono text-cyan-100;
-  background-color: #05070c;
+  @apply w-full max-w-4xl rounded-xl border border-cyan-400/20
+         bg-slate-900/95 shadow-2xl
+         flex flex-col gap-4 p-6 font-mono text-cyan-100;
+  max-height: 90vh;
+  overflow: hidden;
 }
 .telescope-status {
-  @apply flex justify-between items-center border border-cyan-400/25 px-4 py-2 text-sm tracking-widest;
-}
-.telescope-body {
-  @apply flex-1 grid gap-4;
-  grid-template-columns: 1fr 360px;
+  @apply flex justify-between items-center border border-cyan-400/25
+         px-4 py-2 text-sm tracking-widest;
 }
 .telescope-eyepiece {
-  @apply relative rounded-full overflow-hidden border border-cyan-400/25 self-center justify-self-center;
-  width: 780px;
-  height: 780px;
-  max-width: 80vmin;
-  max-height: 80vmin;
+  @apply relative self-center rounded-full overflow-hidden
+         border border-cyan-400/25;
+  width: 480px;
+  height: 480px;
+  max-width: 60vmin;
+  max-height: 60vmin;
   aspect-ratio: 1 / 1;
 }
 .telescope-eyepiece__img {
   @apply absolute inset-0 w-full h-full object-cover pointer-events-none;
   mix-blend-mode: screen;
 }
+.telescope-quality {
+  @apply flex items-center gap-3 border border-cyan-400/25 px-4 py-2 text-sm;
+}
+.telescope-quality__bar {
+  @apply flex-1 h-2 bg-cyan-400/10;
+}
+.telescope-quality__bar span {
+  @apply block h-full;
+}
 .telescope-knobs {
-  @apply flex flex-col gap-3;
+  @apply flex items-start justify-between gap-3;
 }
 .telescope-knob {
-  @apply flex flex-col gap-1 border border-cyan-400/25 p-2 rounded-sm;
+  @apply flex flex-col gap-1 border border-cyan-400/25 p-2 rounded-sm
+         flex-1 min-w-0;
+  cursor: ns-resize;
 }
 .telescope-knob__dial {
   @apply w-[72px] h-[72px] border border-cyan-400/40 rounded-full self-center;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
 }
 .telescope-knob__label {
   @apply text-xs tracking-widest text-center;
@@ -2438,20 +2451,12 @@ body {
 .telescope-pointing__caption {
   @apply text-xs tracking-widest;
 }
-.telescope-quality {
-  @apply flex items-center gap-3 border border-cyan-400/25 px-4 py-2 text-sm;
-}
-.telescope-quality__bar {
-  @apply flex-1 h-2 bg-cyan-400/10;
-}
-.telescope-quality__bar span {
-  @apply block h-full;
-}
 .telescope-hints {
   @apply flex flex-wrap gap-4 text-xs tracking-widest text-cyan-200;
 }
 .telescope-caption {
-  @apply absolute inset-x-0 bottom-20 mx-auto w-fit border border-emerald-400/60 bg-slate-950/80 px-6 py-3 text-center tracking-widest;
+  @apply absolute inset-x-0 bottom-20 mx-auto w-fit border border-emerald-400/60
+         bg-slate-950/80 px-6 py-3 text-center tracking-widest;
 }
 .telescope-caption__label {
   @apply text-emerald-200;

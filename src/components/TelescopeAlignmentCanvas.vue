@@ -147,6 +147,21 @@ function pulseKnob(axis: keyof KnobState): void {
   pulse[axis] = performance.now()
 }
 
+/**
+ * Wheel-scroll on a knob adjusts it by one step.
+ * Scrolling down is +1 (increase error), up is −1 (decrease error).
+ * Holding Shift applies the fine-step multiplier.
+ *
+ * @param e - The WheelEvent from the knob element.
+ * @param axis - Which knob axis to adjust.
+ */
+function onKnobWheel(e: WheelEvent, axis: keyof KnobState): void {
+  if (lockState.value !== 'calibrating') return
+  const dir: -1 | 1 = e.deltaY > 0 ? 1 : -1
+  adjust(axis, dir, e.shiftKey)
+  pulseKnob(axis)
+}
+
 /** Reactive check — is this axis currently flashing? Driven off driftTime (RAF tick). */
 function isPulsing(axis: keyof KnobState): boolean {
   // Tying the expression to driftTime.value ensures Vue re-evaluates on every RAF tick,
@@ -337,103 +352,27 @@ onUnmounted(() => {
       <span class="telescope-status__state">{{ statusText }}</span>
     </div>
 
-    <div class="telescope-body">
-      <div class="telescope-eyepiece" aria-label="Telescope eyepiece">
-        <img
-          class="telescope-eyepiece__img telescope-eyepiece__img--r"
-          :src="`/telescope/${target.image}`"
-          :alt="target.label"
-          :style="eyepieceImageStyle('r')"
-        />
-        <img
-          class="telescope-eyepiece__img telescope-eyepiece__img--g"
-          :src="`/telescope/${target.image}`"
-          alt=""
-          aria-hidden="true"
-          :style="eyepieceImageStyle('g')"
-        />
-        <img
-          class="telescope-eyepiece__img telescope-eyepiece__img--b"
-          :src="`/telescope/${target.image}`"
-          alt=""
-          aria-hidden="true"
-          :style="eyepieceImageStyle('b')"
-        />
-      </div>
-
-      <div class="telescope-knobs">
-        <div class="telescope-knob">
-          <div
-            class="telescope-knob__dial"
-            :class="[`telescope-led-${focusLed}`, { 'telescope-knob-pulse': isPulsing('focus') }]"
-            data-axis="focus"
-            aria-label="Focus knob"
-          />
-          <div class="telescope-knob__label">FOCUS · Q/W</div>
-          <div class="telescope-knob__bar">
-            <span
-              :style="{ width: `${Math.round(focusQ * 100)}%` }"
-              :class="`telescope-bar-${focusLed}`"
-            />
-          </div>
-        </div>
-        <div class="telescope-knob">
-          <div
-            class="telescope-knob__dial"
-            :class="[`telescope-led-${chromaLed}`, { 'telescope-knob-pulse': isPulsing('chroma') }]"
-            data-axis="chroma"
-            aria-label="Chromatic aberration knob"
-          />
-          <div class="telescope-knob__label">CHROMA · A/S</div>
-          <div class="telescope-knob__bar">
-            <span
-              :style="{ width: `${Math.round(chromaQ * 100)}%` }"
-              :class="`telescope-bar-${chromaLed}`"
-            />
-          </div>
-        </div>
-        <div class="telescope-pointing">
-          <div class="telescope-pointing__crosshair">
-            <span
-              class="telescope-pointing__dot"
-              :style="{ left: `${pointingDotX}%`, top: `${pointingDotY}%` }"
-            />
-          </div>
-          <div class="telescope-pointing__caption">
-            {{ pointingCentered ? 'CENTERED' : `${Math.round(pointingDistNorm * 100)}% OFF` }}
-          </div>
-        </div>
-        <div class="telescope-knob">
-          <div
-            class="telescope-knob__dial"
-            :class="[`telescope-led-${azLed}`, { 'telescope-knob-pulse': isPulsing('azimuth') }]"
-            data-axis="azimuth"
-            aria-label="Azimuth pointing knob"
-          />
-          <div class="telescope-knob__label">AZIMUTH · Z/X</div>
-          <div class="telescope-knob__bar">
-            <span
-              :style="{ width: `${Math.round(azQ * 100)}%` }"
-              :class="`telescope-bar-${azLed}`"
-            />
-          </div>
-        </div>
-        <div class="telescope-knob">
-          <div
-            class="telescope-knob__dial"
-            :class="[`telescope-led-${elLed}`, { 'telescope-knob-pulse': isPulsing('elevation') }]"
-            data-axis="elevation"
-            aria-label="Elevation pointing knob"
-          />
-          <div class="telescope-knob__label">ELEVATION · C/V</div>
-          <div class="telescope-knob__bar">
-            <span
-              :style="{ width: `${Math.round(elQ * 100)}%` }"
-              :class="`telescope-bar-${elLed}`"
-            />
-          </div>
-        </div>
-      </div>
+    <div class="telescope-eyepiece" aria-label="Telescope eyepiece">
+      <img
+        class="telescope-eyepiece__img telescope-eyepiece__img--r"
+        :src="`/telescope/${target.image}`"
+        :alt="target.label"
+        :style="eyepieceImageStyle('r')"
+      />
+      <img
+        class="telescope-eyepiece__img telescope-eyepiece__img--g"
+        :src="`/telescope/${target.image}`"
+        alt=""
+        aria-hidden="true"
+        :style="eyepieceImageStyle('g')"
+      />
+      <img
+        class="telescope-eyepiece__img telescope-eyepiece__img--b"
+        :src="`/telescope/${target.image}`"
+        alt=""
+        aria-hidden="true"
+        :style="eyepieceImageStyle('b')"
+      />
     </div>
 
     <div class="telescope-quality">
@@ -447,12 +386,91 @@ onUnmounted(() => {
       <div class="telescope-quality__pct">{{ qualityPct }}%</div>
     </div>
 
+    <div class="telescope-knobs">
+      <div class="telescope-knob" @wheel.prevent="onKnobWheel($event, 'focus')">
+        <div
+          class="telescope-knob__dial"
+          :class="[`telescope-led-${focusLed}`, { 'telescope-knob-pulse': isPulsing('focus') }]"
+          data-axis="focus"
+          aria-label="Focus knob"
+        />
+        <div class="telescope-knob__label">FOCUS · Q/W</div>
+        <div class="telescope-knob__bar">
+          <span
+            :style="{ width: `${Math.round(focusQ * 100)}%` }"
+            :class="`telescope-bar-${focusLed}`"
+          />
+        </div>
+      </div>
+
+      <div class="telescope-knob" @wheel.prevent="onKnobWheel($event, 'chroma')">
+        <div
+          class="telescope-knob__dial"
+          :class="[`telescope-led-${chromaLed}`, { 'telescope-knob-pulse': isPulsing('chroma') }]"
+          data-axis="chroma"
+          aria-label="Chromatic aberration knob"
+        />
+        <div class="telescope-knob__label">CHROMA · A/S</div>
+        <div class="telescope-knob__bar">
+          <span
+            :style="{ width: `${Math.round(chromaQ * 100)}%` }"
+            :class="`telescope-bar-${chromaLed}`"
+          />
+        </div>
+      </div>
+
+      <div class="telescope-pointing">
+        <div class="telescope-pointing__crosshair">
+          <span
+            class="telescope-pointing__dot"
+            :style="{ left: `${pointingDotX}%`, top: `${pointingDotY}%` }"
+          />
+        </div>
+        <div class="telescope-pointing__caption">
+          {{ pointingCentered ? 'CENTERED' : `${Math.round(pointingDistNorm * 100)}% OFF` }}
+        </div>
+      </div>
+
+      <div class="telescope-knob" @wheel.prevent="onKnobWheel($event, 'azimuth')">
+        <div
+          class="telescope-knob__dial"
+          :class="[`telescope-led-${azLed}`, { 'telescope-knob-pulse': isPulsing('azimuth') }]"
+          data-axis="azimuth"
+          aria-label="Azimuth pointing knob"
+        />
+        <div class="telescope-knob__label">AZIMUTH · Z/X</div>
+        <div class="telescope-knob__bar">
+          <span
+            :style="{ width: `${Math.round(azQ * 100)}%` }"
+            :class="`telescope-bar-${azLed}`"
+          />
+        </div>
+      </div>
+
+      <div class="telescope-knob" @wheel.prevent="onKnobWheel($event, 'elevation')">
+        <div
+          class="telescope-knob__dial"
+          :class="[`telescope-led-${elLed}`, { 'telescope-knob-pulse': isPulsing('elevation') }]"
+          data-axis="elevation"
+          aria-label="Elevation pointing knob"
+        />
+        <div class="telescope-knob__label">ELEVATION · C/V</div>
+        <div class="telescope-knob__bar">
+          <span
+            :style="{ width: `${Math.round(elQ * 100)}%` }"
+            :class="`telescope-bar-${elLed}`"
+          />
+        </div>
+      </div>
+    </div>
+
     <div class="telescope-hints">
       <span>Q/W FOCUS</span>
       <span>A/S CHROMA</span>
       <span>Z/X AZ</span>
       <span>C/V EL</span>
       <span>SHIFT · FINE</span>
+      <span>WHEEL · ADJUST</span>
       <span>E · LOCK IN (≥95%)</span>
       <span>ESC · ABORT</span>
     </div>
