@@ -2544,6 +2544,13 @@ body {
 .relay-grid-panel__state {
   @apply text-amber-300;
 }
+.relay-grid-panel__state--ok {
+  @apply text-emerald-300;
+}
+.relay-dead-end {
+  fill: #fbbf24;
+  filter: drop-shadow(0 0 5px #fbbf24);
+}
 .relay-grid-panel__svg {
   @apply w-full;
   display: block;
