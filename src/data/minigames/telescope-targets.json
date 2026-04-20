@@ -1,0 +1,32 @@
+{
+  "mercury_corona_monitor": {
+    "image": "sol_corona.jpg",
+    "label": "SOL \u2014 CORONAL LIMB",
+    "caption": "prominence arc, ~400,000 km \u00b7 SDO/AIA 304 \u00b7 0341 UTC"
+  },
+  "earth_l2_observatory_phasing": {
+    "image": "deep_field.jpg",
+    "label": "JWST L2 \u2014 DEEP FIELD",
+    "caption": "NIRCam \u00b7 5.6 \u03bcm composite \u00b7 F444W / F356W / F200W"
+  },
+  "mars_phobos_astrometry": {
+    "image": "m13_cluster.jpg",
+    "label": "HST \u2014 M13 GLOBULAR",
+    "caption": "ACS/WFC \u00b7 330,000 stars \u00b7 25,000 ly"
+  },
+  "jupiter_europa_plume_spectro": {
+    "image": "europa_plume.jpg",
+    "label": "EUROPA \u2014 PLUME EMISSION",
+    "caption": "Hubble STIS \u00b7 H\u2082O vapor \u00b7 south polar region"
+  },
+  "saturn_enceladus_plume_spectro": {
+    "image": "enceladus_plume.jpg",
+    "label": "ENCELADUS \u2014 CRYO PLUME",
+    "caption": "Cassini ISS \u00b7 back-lit, south pole"
+  },
+  "neptune_triton_exoplanet_watch": {
+    "image": "exoplanet_field.jpg",
+    "label": "TRITON \u2014 TRANSIT FIELD",
+    "caption": "HAT-P-7 analog \u00b7 TESS cadence \u00b7 2 min"
+  }
+}
