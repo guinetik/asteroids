@@ -131,6 +131,30 @@ const driftTime = ref(0)
 let rafId = 0
 let lastTs = 0
 
+/** Duration in ms of the knob key-pulse flash. */
+const KNOB_PULSE_MS = 180
+
+/** Timestamps of the last pulse per axis — compared against performance.now(). */
+const pulse = reactive<Record<keyof KnobState, number>>({
+  focus: 0,
+  chroma: 0,
+  azimuth: 0,
+  elevation: 0,
+})
+
+/** Trigger a brief visual pulse on a knob axis. */
+function pulseKnob(axis: keyof KnobState): void {
+  pulse[axis] = performance.now()
+}
+
+/** Reactive check — is this axis currently flashing? Driven off driftTime (RAF tick). */
+function isPulsing(axis: keyof KnobState): boolean {
+  // Tying the expression to driftTime.value ensures Vue re-evaluates on every RAF tick,
+  // so the pulse fades out without a dedicated timer.
+  void driftTime.value
+  return performance.now() - pulse[axis] < KNOB_PULSE_MS
+}
+
 /** Displayed knob values = raw intent + bounded per-axis sine drift. */
 const displayedKnobs = computed<KnobState>(() => ({
   focus: Math.max(0, knobs.focus + computeDrift(driftTime.value, DRIFT_FOCUS, MAX_FOCUS)),
@@ -219,34 +243,42 @@ function onKeyDown(e: KeyboardEvent): void {
     case 'q':
       e.preventDefault()
       adjust('focus', -1, fine)
+      pulseKnob('focus')
       break
     case 'w':
       e.preventDefault()
       adjust('focus', +1, fine)
+      pulseKnob('focus')
       break
     case 'a':
       e.preventDefault()
       adjust('chroma', -1, fine)
+      pulseKnob('chroma')
       break
     case 's':
       e.preventDefault()
       adjust('chroma', +1, fine)
+      pulseKnob('chroma')
       break
     case 'z':
       e.preventDefault()
       adjust('azimuth', -1, fine)
+      pulseKnob('azimuth')
       break
     case 'x':
       e.preventDefault()
       adjust('azimuth', +1, fine)
+      pulseKnob('azimuth')
       break
     case 'c':
       e.preventDefault()
       adjust('elevation', -1, fine)
+      pulseKnob('elevation')
       break
     case 'v':
       e.preventDefault()
       adjust('elevation', +1, fine)
+      pulseKnob('elevation')
       break
     case 'e':
       if (canLock.value) {
@@ -293,7 +325,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="telescope-overlay">
+  <div
+    class="telescope-overlay"
+    role="dialog"
+    aria-label="Telescope alignment"
+    tabindex="0"
+  >
     <div class="telescope-status">
       <span class="telescope-status__location">{{ target.label }}</span>
       <span class="telescope-status__mission">{{ mission.template.name }}</span>
@@ -326,7 +363,12 @@ onUnmounted(() => {
 
       <div class="telescope-knobs">
         <div class="telescope-knob">
-          <div class="telescope-knob__dial" :class="`led-${focusLed}`" data-axis="focus" />
+          <div
+            class="telescope-knob__dial"
+            :class="[`led-${focusLed}`, { 'knob-pulse': isPulsing('focus') }]"
+            data-axis="focus"
+            aria-label="Focus knob"
+          />
           <div class="telescope-knob__label">FOCUS · Q/W</div>
           <div class="telescope-knob__bar">
             <span
@@ -336,7 +378,12 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="telescope-knob">
-          <div class="telescope-knob__dial" :class="`led-${chromaLed}`" data-axis="chroma" />
+          <div
+            class="telescope-knob__dial"
+            :class="[`led-${chromaLed}`, { 'knob-pulse': isPulsing('chroma') }]"
+            data-axis="chroma"
+            aria-label="Chromatic aberration knob"
+          />
           <div class="telescope-knob__label">CHROMA · A/S</div>
           <div class="telescope-knob__bar">
             <span
@@ -357,7 +404,12 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="telescope-knob">
-          <div class="telescope-knob__dial" :class="`led-${azLed}`" data-axis="azimuth" />
+          <div
+            class="telescope-knob__dial"
+            :class="[`led-${azLed}`, { 'knob-pulse': isPulsing('azimuth') }]"
+            data-axis="azimuth"
+            aria-label="Azimuth pointing knob"
+          />
           <div class="telescope-knob__label">AZIMUTH · Z/X</div>
           <div class="telescope-knob__bar">
             <span
@@ -367,7 +419,12 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="telescope-knob">
-          <div class="telescope-knob__dial" :class="`led-${elLed}`" data-axis="elevation" />
+          <div
+            class="telescope-knob__dial"
+            :class="[`led-${elLed}`, { 'knob-pulse': isPulsing('elevation') }]"
+            data-axis="elevation"
+            aria-label="Elevation pointing knob"
+          />
           <div class="telescope-knob__label">ELEVATION · C/V</div>
           <div class="telescope-knob__bar">
             <span
@@ -512,5 +569,9 @@ onUnmounted(() => {
 }
 .led-green {
   border-color: #34d399;
+}
+.knob-pulse {
+  border-color: #7dd3fc;
+  box-shadow: 0 0 6px rgba(125, 211, 252, 0.9);
 }
 </style>
