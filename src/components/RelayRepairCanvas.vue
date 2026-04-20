@@ -120,6 +120,10 @@ const statusText = computed(() => {
 
 const deadEnds = computed(() => {
   const list: Array<{ fromRow: number; fromCol: number; dir: Direction }> = []
+  // Once the backbone is restored, suppress dead-end markers — the player
+  // has solved the puzzle and shouldn't see warning pulses on T-branches
+  // that happen to terminate off-path.
+  if (sinkReached.value) return list
   for (const exit of trace.value.exits) {
     if (exit.row === SINK_ROW && exit.col === SINK_COL && exit.dir === SINK_DIR) continue
     const delta = DIR_DELTA[exit.dir]
