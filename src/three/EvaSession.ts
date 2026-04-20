@@ -47,7 +47,7 @@ export interface EvaSceneHost {
 const EVA_TRIGGER_RANGE = 8
 
 /** Horizontal (XZ) distance at which the EVA player can re-enter the vehicle. */
-const EVA_RETURN_RANGE = 6
+const EVA_RETURN_RANGE = 2.5
 
 /** Vehicle must be slower than this (world units / s) to initiate EVA. */
 const EVA_MAX_VEHICLE_SPEED = 0.5
