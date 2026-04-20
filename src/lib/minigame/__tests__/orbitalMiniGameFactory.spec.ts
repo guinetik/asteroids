@@ -8,6 +8,7 @@ import { LogisticsRouteMiniGame } from '../logistics/LogisticsRouteMiniGame'
 import { ProbeDeployMiniGame } from '../probeDeploy/ProbeDeployMiniGame'
 import { SatelliteServicingMiniGame } from '../satelliteServicing/SatelliteServicingMiniGame'
 import { TelescopeAlignmentMiniGame } from '../telescopeAlignment/TelescopeAlignmentMiniGame'
+import { RelayRepairMiniGame } from '../relayRepair/RelayRepairMiniGame'
 import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 
 describe('createOrbitalMiniGame', () => {
@@ -153,6 +154,12 @@ describe('createOrbitalMiniGame', () => {
     expect(g).toBeInstanceOf(TelescopeAlignmentMiniGame)
     expect(g.presentation).toBe('overlay')
   })
+
+  it('creates a RelayRepairMiniGame for relay_repair', () => {
+    const g = createOrbitalMiniGame('earth_l1_relay_reterm', 'relay_repair', 0)
+    expect(g).toBeInstanceOf(RelayRepairMiniGame)
+    expect(g.presentation).toBe('overlay')
+  })
 })
 
 describe('OrbitalMiniGame.presentation', () => {
@@ -165,6 +172,7 @@ describe('OrbitalMiniGame.presentation', () => {
     ['probe-deploy', 'overlay'],
     ['satellite_servicing', 'overlay'], // currently falls back when mission omitted
     ['telescope_alignment', 'overlay'],
+    ['relay_repair', 'overlay'],
     ['unknown-type', 'overlay'], // default falls through to overlay
   ]
 

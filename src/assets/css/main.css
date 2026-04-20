@@ -2496,3 +2496,21 @@ body {
   border-color: #7dd3fc;
   box-shadow: 0 0 6px rgba(125, 211, 252, 0.9);
 }
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/* Relay repair minigame                                                   */
+/* ──────────────────────────────────────────────────────────────────────── */
+
+.relay-overlay {
+  @apply w-full max-w-3xl rounded-xl border border-cyan-400/20
+         bg-slate-900/95 shadow-2xl
+         flex flex-col gap-4 p-6 font-mono text-cyan-100;
+  max-height: 90vh;
+  overflow: hidden;
+}
+.relay-placeholder-actions {
+  @apply mt-4 flex gap-3;
+}
+.relay-placeholder-actions button {
+  @apply px-4 py-2 border border-cyan-400/40 rounded text-cyan-100 hover:bg-cyan-400/10;
+}

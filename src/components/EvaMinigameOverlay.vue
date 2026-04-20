@@ -17,6 +17,8 @@ import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
 import TelescopeAlignmentCanvas from '@/components/TelescopeAlignmentCanvas.vue'
 import { TelescopeAlignmentMiniGame } from '@/lib/minigame/telescopeAlignment/TelescopeAlignmentMiniGame'
+import RelayRepairCanvas from '@/components/RelayRepairCanvas.vue'
+import { RelayRepairMiniGame } from '@/lib/minigame/relayRepair/RelayRepairMiniGame'
 
 const props = defineProps<{
   /** The EVA mission whose terminal the player is interacting with. */
@@ -35,6 +37,11 @@ const emit = defineEmits<{
 /** Narrow the generic minigame to a telescope instance for the canvas prop. */
 const telescopeMinigame = computed(() =>
   props.minigame instanceof TelescopeAlignmentMiniGame ? props.minigame : null,
+)
+
+/** Narrow the generic minigame to a relay instance for the canvas prop. */
+const relayMinigame = computed(() =>
+  props.minigame instanceof RelayRepairMiniGame ? props.minigame : null,
 )
 
 /**
@@ -75,6 +82,13 @@ onUnmounted(() => {
       v-if="telescopeMinigame"
       :mission="mission"
       :minigame="telescopeMinigame"
+      @complete="emit('complete')"
+      @close="emit('close')"
+    />
+    <RelayRepairCanvas
+      v-else-if="relayMinigame"
+      :mission="mission"
+      :minigame="relayMinigame"
       @complete="emit('complete')"
       @close="emit('close')"
     />

@@ -17,6 +17,7 @@ import { LogisticsRouteMiniGame } from './logistics/LogisticsRouteMiniGame'
 import { ProbeDeployMiniGame } from './probeDeploy/ProbeDeployMiniGame'
 import { SatelliteServicingMiniGame } from './satelliteServicing/SatelliteServicingMiniGame'
 import { TelescopeAlignmentMiniGame } from './telescopeAlignment/TelescopeAlignmentMiniGame'
+import { RelayRepairMiniGame } from './relayRepair/RelayRepairMiniGame'
 import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 
 /**
@@ -54,6 +55,8 @@ export function createOrbitalMiniGame(
       return new ProbeDeployMiniGame(missionId, targetGas, planetId ?? 'mercury')
     case 'telescope_alignment':
       return new TelescopeAlignmentMiniGame(missionId)
+    case 'relay_repair':
+      return new RelayRepairMiniGame(missionId)
     case 'satellite_servicing': {
       const broken = mission?.brokenComponents
       if (!broken || broken.length === 0) {
