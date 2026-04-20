@@ -11,6 +11,7 @@ import {
   objectiveCountForDifficulty,
   rollObjective,
   LEVEL_GRID_SIZE,
+  MIN_ASTEROID_MISSION_REWARD,
   WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY,
 } from '../asteroidMissionGenerator'
 
@@ -197,7 +198,7 @@ describe('generateAsteroidMission', () => {
     expect(mission.briefing).toBeTruthy()
     expect(mission.difficulty).toBe(1)
     expect(mission.objectives.length).toBeGreaterThan(0)
-    expect(mission.totalReward).toBeGreaterThan(0)
+    expect(mission.totalReward).toBeGreaterThanOrEqual(MIN_ASTEROID_MISSION_REWARD)
     expect(mission.waypoint.worldX).toBeDefined()
     expect(mission.waypoint.worldZ).toBeDefined()
     expect(mission.status).toBe('available')

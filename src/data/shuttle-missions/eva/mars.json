@@ -7,7 +7,7 @@
       "description": "Methane-sniffing prospector satellite is reading negatives across all orbits — almost certainly a sensor drift issue. EVA and recalibrate the mass spectrometer.",
       "poiType": "satellite",
       "minigameType": "relay_repair",
-      "reward": 1500
+      "reward": 300
     },
     {
       "id": "mars_sample_return_beacon",
@@ -15,7 +15,7 @@
       "description": "The beacon that will guide the next sample-return capsule home has a flaky GPS module. EVA out, swap the board, verify lock.",
       "poiType": "relay_antenna",
       "minigameType": "relay_repair",
-      "reward": 1700
+      "reward": 350
     }
   ]
 }

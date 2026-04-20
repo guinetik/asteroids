@@ -12,13 +12,31 @@ import type {
 import { getGatherItemForPlanet, getPlanetOrbitalConfig } from '@/lib/missions/planetOrbitalConfig'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 import { getPlanet } from '@/lib/planets/catalog'
+import type { UpgradeLevels } from '@/lib/upgrades'
+import { getUpgradeValue } from '@/lib/upgrades'
 
 const props = defineProps<{
   board: ShuttleMissionBoard | null
   dockedPlanet: string | null
   /** Shuttle cargo hold — used to disable Accept when the pickup cannot fit. */
   inventory?: Inventory | null
+  /** Used so asteroid rewards match Science Station payout multiplier. */
+  upgradeLevels?: UpgradeLevels | null
 }>()
+
+/** Same multiplier applied when completing an asteroid mission (see LevelViewController). */
+const scienceStationRewardMult = computed(() =>
+  getUpgradeValue('shuttleScienceStation', props.upgradeLevels ?? {}),
+)
+
+/**
+ * CR shown for asteroid contracts — base contract × Science Station (rounded).
+ *
+ * @param baseReward - Stored mission `totalReward` before station bonus.
+ */
+function buffedAsteroidRewardCr(baseReward: number): number {
+  return Math.round(baseReward * scienceStationRewardMult.value)
+}
 
 /** True when offered planetary cargo can fit in the current hold (or inventory unknown). */
 const canAcceptPlanetaryOffer = computed(() => {
@@ -114,47 +132,7 @@ function regionLabel(region: MissionRegion): string {
   <div class="shuttle-control-screen">
     <h2 class="shuttle-control-screen__title">Missions</h2>
 
-    <!-- Planetary Missions -->
-    <div class="mission-board-section">
-      <h3 class="mission-board-section__heading">Planetary Missions</h3>
-      <p class="mission-board-section__descriptor">
-        Travel to another planet and gather resources from orbit via a minigame, then return for payout.
-      </p>
-
-      <div v-if="!dockedPlanet" class="mission-board-empty">
-        Not docked at a planet
-      </div>
-
-      <div v-else-if="board?.offeredMission && board.offeringPlanet === dockedPlanet" class="mission-board-offer">
-        <div class="mission-board-offer__name">{{ board.offeredMission.name }}</div>
-        <div class="mission-board-offer__desc">{{ board.offeredMission.description }}</div>
-        <div class="mission-board-offer__meta">
-          <span>Target: {{ targetPlanetName(board.offeredMission.targetPlanet) }}</span>
-          <span>Reward: {{ board.offeredMission.reward }} CR</span>
-        </div>
-        <button
-          type="button"
-          class="mission-board-offer__accept-btn"
-          :disabled="!canAcceptPlanetaryOffer"
-          @click="emit('acceptMission')"
-        >
-          Accept
-        </button>
-        <p v-if="!canAcceptPlanetaryOffer" class="mission-board-offer__inventory-hint">
-          Cargo hold full — sell items at the station shop (sidebar) to make room for this pickup.
-        </p>
-      </div>
-
-      <div v-else-if="board?.restockTimer" class="mission-board-empty">
-        Restocking in {{ formatTime(board.restockTimer.remaining) }}
-      </div>
-
-      <div v-else class="mission-board-empty">
-        No missions available
-      </div>
-    </div>
-
-    <!-- Shuttle EVA Missions -->
+    <!-- Shuttle EVA Missions (first — quick local spacewalk jobs) -->
     <div class="mission-board-section">
       <h3 class="mission-board-section__heading">Shuttle EVA Missions</h3>
       <p class="mission-board-section__descriptor">
@@ -210,6 +188,47 @@ function regionLabel(region: MissionRegion): string {
       </div>
     </div>
 
+    <!-- Planetary Missions -->
+    <div class="mission-board-section">
+      <h3 class="mission-board-section__heading">Planetary Missions</h3>
+      <p class="mission-board-section__descriptor">
+        Contract runs to other planets: match orbit from the shuttle, secure the orbital pickup in your cargo hold,
+        then return to the posting station for your payout.
+      </p>
+
+      <div v-if="!dockedPlanet" class="mission-board-empty">
+        Not docked at a planet
+      </div>
+
+      <div v-else-if="board?.offeredMission && board.offeringPlanet === dockedPlanet" class="mission-board-offer">
+        <div class="mission-board-offer__name">{{ board.offeredMission.name }}</div>
+        <div class="mission-board-offer__desc">{{ board.offeredMission.description }}</div>
+        <div class="mission-board-offer__meta">
+          <span>Target: {{ targetPlanetName(board.offeredMission.targetPlanet) }}</span>
+          <span>Reward: {{ board.offeredMission.reward }} CR</span>
+        </div>
+        <button
+          type="button"
+          class="mission-board-offer__accept-btn"
+          :disabled="!canAcceptPlanetaryOffer"
+          @click="emit('acceptMission')"
+        >
+          Accept
+        </button>
+        <p v-if="!canAcceptPlanetaryOffer" class="mission-board-offer__inventory-hint">
+          Cargo hold full — sell items at the station shop (sidebar) to make room for this pickup.
+        </p>
+      </div>
+
+      <div v-else-if="board?.restockTimer" class="mission-board-empty">
+        Restocking in {{ formatTime(board.restockTimer.remaining) }}
+      </div>
+
+      <div v-else class="mission-board-empty">
+        No missions available
+      </div>
+    </div>
+
     <!-- Asteroid Missions -->
     <div class="mission-board-section">
       <h3 class="mission-board-section__heading">Asteroid Missions</h3>
@@ -223,7 +242,7 @@ function regionLabel(region: MissionRegion): string {
         <div class="mission-board-offer__desc">{{ board.offeredAsteroidMission.briefing }}</div>
         <div class="mission-board-offer__meta">
           <span>Region: {{ regionLabel(board.offeredAsteroidMission.region) }}</span>
-          <span>Reward: {{ board.offeredAsteroidMission.totalReward }} CR</span>
+          <span>Reward: {{ buffedAsteroidRewardCr(board.offeredAsteroidMission.totalReward) }} CR</span>
         </div>
         <div class="mission-board-offer__objective">
           {{ objectiveSummary(board.offeredAsteroidMission) }}
@@ -247,7 +266,7 @@ function regionLabel(region: MissionRegion): string {
         </div>
         <div class="mission-board-active__cargo">
           {{ objectiveSummary(board.activeAsteroidMission) }}
-          &middot; {{ board.activeAsteroidMission.totalReward }} CR
+          &middot; {{ buffedAsteroidRewardCr(board.activeAsteroidMission.totalReward) }} CR
         </div>
       </div>
 

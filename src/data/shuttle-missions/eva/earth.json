@@ -7,7 +7,7 @@
       "description": "The main trunk on the Earth-Sun L1 relay is reading intermittent. Bring the crimp tool, EVA out, reterminate the backbone. Keep the old cable — the agency pays extra for failure analysis.",
       "poiType": "relay_antenna",
       "minigameType": "relay_repair",
-      "reward": 1200
+      "reward": 250
     },
     {
       "id": "earth_cubesat_cluster_patch",
@@ -15,7 +15,7 @@
       "description": "Three-bird cubesat cluster in sun-synch missed the last OTA window. Dock with the master node, push the patch by hand, verify the other two sync up before you head home.",
       "poiType": "satellite",
       "minigameType": "satellite_servicing",
-      "reward": 1500
+      "reward": 300
     },
     {
       "id": "earth_l2_observatory_phasing",
@@ -23,7 +23,7 @@
       "description": "The L2 observatory's primary mirror segments drifted out of phase after a micrometeorite strike. EVA out, read the wavefront sensor, walk each segment in by hand.",
       "poiType": "telescope",
       "minigameType": "telescope_alignment",
-      "reward": 1800
+      "reward": 350
     }
   ]
 }

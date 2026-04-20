@@ -7,7 +7,7 @@
       "description": "The science division needs gas samples from Venus's upper atmosphere for climate modeling.",
       "targetPlanet": "venus",
       "gatherQuantity": 5,
-      "reward": 1125
+      "reward": 3750
     },
     {
       "id": "earth_mars_methane",
@@ -15,7 +15,7 @@
       "description": "Exobiology lab requests methane samples from the Martian subsurface for biomarker analysis.",
       "targetPlanet": "mars",
       "gatherQuantity": 3,
-      "reward": 938
+      "reward": 3125
     },
     {
       "id": "earth_mercury_probe",
@@ -23,7 +23,7 @@
       "description": "Deploy a thermal probe into Mercury's orbit and return the telemetry data.",
       "targetPlanet": "mercury",
       "gatherQuantity": 1,
-      "reward": 1500
+      "reward": 5000
     }
   ]
 }

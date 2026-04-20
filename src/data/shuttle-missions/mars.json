@@ -7,7 +7,7 @@
       "description": "Martian foundries need sulfuric compounds for ore processing. Collect atmospheric gas from Venus.",
       "targetPlanet": "venus",
       "gatherQuantity": 4,
-      "reward": 1050
+      "reward": 3500
     },
     {
       "id": "mars_earth_cargo_pickup",
@@ -15,7 +15,7 @@
       "description": "Pick up a shipment of bioculture starters from Earth's orbital warehouse.",
       "targetPlanet": "earth",
       "gatherQuantity": 2,
-      "reward": 750
+      "reward": 2500
     },
     {
       "id": "mars_jupiter_hydrogen",
@@ -23,7 +23,7 @@
       "description": "The fusion reactor needs metallic hydrogen from Jupiter. Hazard pay included.",
       "targetPlanet": "jupiter",
       "gatherQuantity": 3,
-      "reward": 1875
+      "reward": 6250
     }
   ]
 }

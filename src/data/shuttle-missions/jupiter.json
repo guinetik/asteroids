@@ -7,7 +7,7 @@
       "description": "Jupiter station needs pristine ice from Saturn's rings for coolant production.",
       "targetPlanet": "saturn",
       "gatherQuantity": 4,
-      "reward": 1688
+      "reward": 5625
     },
     {
       "id": "jupiter_mars_methane",
@@ -15,7 +15,7 @@
       "description": "Jupiter's atmospheric refineries use methane as a catalyst. Collect from Mars.",
       "targetPlanet": "mars",
       "gatherQuantity": 5,
-      "reward": 1500
+      "reward": 5000
     },
     {
       "id": "jupiter_earth_supplies",
@@ -23,7 +23,7 @@
       "description": "Long-haul cargo pickup from Earth. The crew needs fresh supplies.",
       "targetPlanet": "earth",
       "gatherQuantity": 3,
-      "reward": 2063
+      "reward": 6875
     }
   ]
 }

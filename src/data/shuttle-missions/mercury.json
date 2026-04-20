@@ -7,7 +7,7 @@
       "description": "Mercury's chemical plants need Venusian gas for heat-resistant alloy production.",
       "targetPlanet": "venus",
       "gatherQuantity": 6,
-      "reward": 1200
+      "reward": 4000
     },
     {
       "id": "mercury_earth_cargo",
@@ -15,7 +15,7 @@
       "description": "New solar furnace components are waiting at Earth's orbital dock.",
       "targetPlanet": "earth",
       "gatherQuantity": 2,
-      "reward": 938
+      "reward": 3125
     },
     {
       "id": "mercury_mars_methane_fuel",
@@ -23,7 +23,7 @@
       "description": "Mercury mining rigs burn methane for backup power. Collect from Mars.",
       "targetPlanet": "mars",
       "gatherQuantity": 5,
-      "reward": 1313
+      "reward": 4375
     }
   ]
 }

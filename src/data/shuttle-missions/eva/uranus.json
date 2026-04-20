@@ -7,7 +7,7 @@
       "description": "The axial-tilt monitoring probe suffered a gyro failure. EVA out to the satellite bus and swap the RCS reaction wheel stack.",
       "poiType": "satellite",
       "minigameType": "relay_repair",
-      "reward": 1500
+      "reward": 300
     },
     {
       "id": "uranus_cryo_storage_inspection",
@@ -15,7 +15,7 @@
       "description": "Cryogenic fuel depot shows a slow helium boil-off. Spacewalk around the tank array, identify the leak, seal it with cold-patch.",
       "poiType": "relay_antenna",
       "minigameType": "relay_repair",
-      "reward": 2000
+      "reward": 400
     }
   ]
 }

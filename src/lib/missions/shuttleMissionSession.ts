@@ -27,6 +27,7 @@ import { getGatherItemForPlanet } from './planetOrbitalConfig'
 import { canAccessPlanet } from './planetAccessRequirements'
 import { addItem, removeItem, canFitItem } from '@/lib/inventory/inventory'
 import { addCredits } from '@/lib/player/profile'
+import { EVA_MAX_PAYOUT_CR } from './missionEconomy'
 
 /** Minimum restock timer duration in seconds. */
 const RESTOCK_MIN_S = 120
@@ -37,7 +38,7 @@ const RESTOCK_MAX_S = 240
 /** Lower bound applied to the planet-distance reward multiplier (inner planets floor here). */
 const EVA_REWARD_MULTIPLIER_FLOOR = 0.85
 
-/** Absolute minimum payout (credits) for any offered EVA mission after scaling. */
+/** Absolute minimum payout (credits) for any offered EVA mission after scaling (still below planetary shuttle cargo min). */
 const EVA_MIN_REWARD = 1000
 
 /** Credit rounding step — scaled EVA rewards snap to this granularity for readability. */
@@ -63,8 +64,7 @@ function planetRewardMultiplier(planetId: string): number {
 }
 
 /**
- * Apply distance scaling + minimum floor + 50 CR rounding to an EVA mission's
- * base reward.
+ * Apply distance scaling + minimum floor + global EVA cap + 50 CR rounding.
  *
  * @param baseReward - Template's stored reward (Earth-equivalent baseline).
  * @param planetId - Giver planet id used to derive the multiplier.
@@ -72,7 +72,8 @@ function planetRewardMultiplier(planetId: string): number {
 function computeScaledEvaReward(baseReward: number, planetId: string): number {
   const scaled = baseReward * planetRewardMultiplier(planetId)
   const floored = Math.max(EVA_MIN_REWARD, scaled)
-  return Math.round(floored / EVA_REWARD_ROUND_STEP) * EVA_REWARD_ROUND_STEP
+  const capped = Math.min(floored, EVA_MAX_PAYOUT_CR)
+  return Math.round(capped / EVA_REWARD_ROUND_STEP) * EVA_REWARD_ROUND_STEP
 }
 
 /**

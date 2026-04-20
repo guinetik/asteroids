@@ -7,7 +7,7 @@
       "description": "Saturn's orbital habitats need metallic hydrogen for their fusion cores.",
       "targetPlanet": "jupiter",
       "gatherQuantity": 3,
-      "reward": 1575
+      "reward": 5250
     },
     {
       "id": "saturn_uranus_mag_data",
@@ -15,7 +15,7 @@
       "description": "Researchers studying Saturn's rings need Uranus magnetic field data for comparison.",
       "targetPlanet": "uranus",
       "gatherQuantity": 2,
-      "reward": 1875
+      "reward": 6250
     },
     {
       "id": "saturn_earth_cargo",
@@ -23,7 +23,7 @@
       "description": "Long-range supply run to Earth orbit. Premium pay for the distance.",
       "targetPlanet": "earth",
       "gatherQuantity": 2,
-      "reward": 2250
+      "reward": 7500
     }
   ]
 }

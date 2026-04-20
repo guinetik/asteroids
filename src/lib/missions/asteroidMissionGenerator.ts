@@ -23,6 +23,7 @@ import { ORBIT_SCALE, SIZE_SCALE } from '@/lib/planets/constants'
 import { generateFlatZones } from '@/lib/terrain/terrainGenerator'
 import difficultyMap from '@/data/asteroids/difficulty-map.json'
 import shipHealthData from '@/data/shuttle/ship-health.json'
+import { MIN_ASTEROID_MISSION_REWARD } from './missionEconomy'
 
 /** Simple string hash to derive a numeric seed. */
 function hashSeed(str: string): number {
@@ -36,12 +37,7 @@ function hashSeed(str: string): number {
 /** Level terrain grid size — shared with LevelViewController. */
 export const LEVEL_GRID_SIZE = 5000
 
-/**
- * Minimum payout (credits) for any generated asteroid mission. Floors the sum
- * of objective rewards + completion bonus so the cheapest run still buys into
- * the shop economy (≈ one upgrade tier).
- */
-export const MIN_ASTEROID_MISSION_REWARD = 1000
+export { MIN_ASTEROID_MISSION_REWARD }
 
 /** Objective count bands by difficulty. */
 const OBJECTIVE_COUNT_BY_DIFFICULTY: [number, number, number][] = [

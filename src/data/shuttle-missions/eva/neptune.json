@@ -7,7 +7,7 @@
       "description": "A deep-space nav beacon at the edge of the Kuiper is drifting off-frequency. EVA over and manually tune the reference cavity.",
       "poiType": "relay_antenna",
       "minigameType": "relay_repair",
-      "reward": 1600
+      "reward": 300
     },
     {
       "id": "neptune_triton_telescope_servicing",
@@ -15,7 +15,7 @@
       "description": "The Triton-orbiting telescope's primary mirror actuator froze. Spacewalk to the optics bay and release the stuck drive.",
       "poiType": "satellite",
       "minigameType": "relay_repair",
-      "reward": 2100
+      "reward": 400
     }
   ]
 }
