@@ -164,6 +164,7 @@ describe('OrbitalMiniGame.presentation', () => {
     ['logistics', 'overlay'],
     ['probe-deploy', 'overlay'],
     ['satellite_servicing', 'overlay'], // currently falls back when mission omitted
+    ['telescope_alignment', 'overlay'],
     ['unknown-type', 'overlay'], // default falls through to overlay
   ]
 
