@@ -373,6 +373,11 @@ export class EvaSession implements Tickable {
     this.rcsSound.stop()
     this.detachPointerLock()
     this.setPrompt(null)
+    // Zero the player's residual velocity so they don't drift away from the POI
+    // while the overlay is open. setPosition zeroes velocity as a side-effect.
+    if (this.controller) {
+      this.controller.setPosition(this.controller.group.position)
+    }
     this.config.onStartEvaMinigame?.()
   }
 

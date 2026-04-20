@@ -73,7 +73,7 @@ export interface HubbleModelCreateOptions {
   maintenanceState?: MaintenanceBeaconState
 }
 
-const HUBBLE_MAINTENANCE_BEACON_OFFSET = new THREE.Vector3(0.2, 0.08, 0)
+const HUBBLE_MAINTENANCE_BEACON_OFFSET = new THREE.Vector3(0, 0, 0)
 
 /**
  * Decorative Hubble telescope GLB — add {@link group} to your scene after
