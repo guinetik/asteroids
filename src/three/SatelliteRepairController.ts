@@ -348,6 +348,11 @@ export class SatelliteRepairController {
     const sprite = new THREE.Sprite(material)
     sprite.scale.set(BILLBOARD_SCALE_X, BILLBOARD_SCALE_Y, 1)
     sprite.position.set(0, BILLBOARD_LOCAL_Y_OFFSET, 0)
+    // The FIX prompt is a child of the component's source node, so it lives in the
+    // path of our aim-detection raycast. Sprites require `raycaster.camera` to be
+    // set, which we don't use — we only intersect against source meshes to detect
+    // aim. Skip sprite intersection entirely.
+    sprite.raycast = () => {}
     return sprite
   }
 
