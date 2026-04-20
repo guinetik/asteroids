@@ -11,7 +11,7 @@
   @spec docs/superpowers/specs/2026-04-19-telescope-alignment-design.md
 -->
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 import type { TelescopeAlignmentMiniGame } from '@/lib/minigame/telescopeAlignment/TelescopeAlignmentMiniGame'
 import { getTelescopeTarget } from '@/lib/minigame/telescopeAlignment/targets'
@@ -23,7 +23,12 @@ import {
   STEP_COARSE,
   STEP_POINTING,
   STEP_FINE_MUL,
+  DRIFT_FOCUS,
+  DRIFT_CHROMA,
+  DRIFT_AZIMUTH,
+  DRIFT_ELEVATION,
 } from '@/lib/minigame/telescopeAlignment/constants'
+import { computeDrift } from '@/lib/minigame/telescopeAlignment/drift'
 import { computeQuality, perKnobQuality, ledColor } from '@/lib/minigame/telescopeAlignment/quality'
 import type { KnobState } from '@/lib/minigame/telescopeAlignment/types'
 
@@ -86,14 +91,36 @@ const knobs = reactive<KnobState>({
   elevation: rollSigned(MAX_POINTING),
 })
 
-const quality = computed(() => computeQuality(knobs))
+const driftTime = ref(0)
+let rafId = 0
+let lastTs = 0
+
+/** Displayed knob values = raw intent + bounded per-axis sine drift. */
+const displayedKnobs = computed<KnobState>(() => ({
+  focus: Math.max(0, knobs.focus + computeDrift(driftTime.value, DRIFT_FOCUS, MAX_FOCUS)),
+  chroma: Math.max(0, knobs.chroma + computeDrift(driftTime.value, DRIFT_CHROMA, MAX_CHROMA)),
+  azimuth: knobs.azimuth + computeDrift(driftTime.value, DRIFT_AZIMUTH, MAX_POINTING),
+  elevation: knobs.elevation + computeDrift(driftTime.value, DRIFT_ELEVATION, MAX_POINTING),
+}))
+
+/** RAF loop — advance drift time, recompute displayed knob values, push quality. */
+function tick(ts: number): void {
+  if (lastTs === 0) lastTs = ts
+  const dt = (ts - lastTs) / 1000
+  lastTs = ts
+  driftTime.value += dt
+  props.minigame.reportQuality(computeQuality(displayedKnobs.value))
+  rafId = requestAnimationFrame(tick)
+}
+
+const quality = computed(() => computeQuality(displayedKnobs.value))
 const qualityPct = computed(() => Math.round(quality.value * 100))
 const canLock = computed(() => quality.value >= LOCK_THRESHOLD)
 
-const focusQ = computed(() => perKnobQuality(knobs.focus, MAX_FOCUS))
-const chromaQ = computed(() => perKnobQuality(knobs.chroma, MAX_CHROMA))
-const azQ = computed(() => perKnobQuality(knobs.azimuth, MAX_POINTING))
-const elQ = computed(() => perKnobQuality(knobs.elevation, MAX_POINTING))
+const focusQ = computed(() => perKnobQuality(displayedKnobs.value.focus, MAX_FOCUS))
+const chromaQ = computed(() => perKnobQuality(displayedKnobs.value.chroma, MAX_CHROMA))
+const azQ = computed(() => perKnobQuality(displayedKnobs.value.azimuth, MAX_POINTING))
+const elQ = computed(() => perKnobQuality(displayedKnobs.value.elevation, MAX_POINTING))
 
 const focusLed = computed(() => ledColor(focusQ.value))
 const chromaLed = computed(() => ledColor(chromaQ.value))
@@ -101,16 +128,16 @@ const azLed = computed(() => ledColor(azQ.value))
 const elLed = computed(() => ledColor(elQ.value))
 
 const pointingDistNorm = computed(() => {
-  const ax = knobs.azimuth / MAX_POINTING
-  const ay = knobs.elevation / MAX_POINTING
+  const ax = displayedKnobs.value.azimuth / MAX_POINTING
+  const ay = displayedKnobs.value.elevation / MAX_POINTING
   return Math.min(1, Math.sqrt(ax * ax + ay * ay) / Math.SQRT2)
 })
 const pointingCentered = computed(() => pointingDistNorm.value < POINTING_CENTERED_THRESHOLD)
 const pointingDotX = computed(
-  () => 50 + (knobs.azimuth / MAX_POINTING) * POINTING_DOT_HALF_RANGE_PCT,
+  () => 50 + (displayedKnobs.value.azimuth / MAX_POINTING) * POINTING_DOT_HALF_RANGE_PCT,
 )
 const pointingDotY = computed(
-  () => 50 + (knobs.elevation / MAX_POINTING) * POINTING_DOT_HALF_RANGE_PCT,
+  () => 50 + (displayedKnobs.value.elevation / MAX_POINTING) * POINTING_DOT_HALF_RANGE_PCT,
 )
 
 /**
@@ -191,22 +218,24 @@ type ChromaChannel = 'r' | 'g' | 'b'
  * @returns Inline CSS for the `<img>` element.
  */
 function eyepieceImageStyle(channel: ChromaChannel): Record<string, string> {
+  const d = displayedKnobs.value
   const sign = channel === 'r' ? -1 : channel === 'b' ? 1 : 0
-  const dx = knobs.chroma * sign + knobs.azimuth
-  const dy = knobs.elevation
+  const dx = d.chroma * sign + d.azimuth
+  const dy = d.elevation
   return {
-    filter: `blur(${Math.max(0, knobs.focus).toFixed(2)}px)`,
+    filter: `blur(${Math.max(0, d.focus).toFixed(2)}px)`,
     transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px)`,
   }
 }
 
 onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
-  props.minigame.reportQuality(quality.value)
+  rafId = requestAnimationFrame(tick)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeyDown)
+  cancelAnimationFrame(rafId)
 })
 </script>
 
