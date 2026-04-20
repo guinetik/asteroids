@@ -25,7 +25,7 @@ import type { KnobState, LedColor } from './types'
  * the player's read of "off".
  *
  * @param knobs - Current knob state.
- * @returns Weighted quality where 1 means perfectly aligned.
+ * @returns Weighted quality in [0, 1]. Assumes QUALITY_WEIGHT_* constants sum to 1.0 so perfect alignment returns exactly 1.
  */
 export function computeQuality(knobs: KnobState): number {
   const focusErr = Math.abs(knobs.focus) / MAX_FOCUS
@@ -44,7 +44,7 @@ export function computeQuality(knobs: KnobState): number {
  * Compute the per-knob quality used for LED + mini-bar.
  *
  * @param value - Raw knob value (may be negative for pointing axes).
- * @param max - Maximum absolute value the knob reaches.
+ * @param max - Maximum absolute value the knob reaches. Must be >= 0.
  * @returns Quality in [0, 1]; 1 when centered, 0 at max deflection.
  */
 export function perKnobQuality(value: number, max: number): number {
