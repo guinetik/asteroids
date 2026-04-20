@@ -130,6 +130,15 @@ export interface EvaSessionConfig {
    * {@link EvaSession.endMinigame} when the overlay is dismissed or completed.
    */
   onStartEvaMinigame?: () => void
+  /**
+   * Optional predicate. When it returns true, the POI terminal prompt and the
+   * F-press that would call `beginMinigame` are suppressed — the session stays
+   * in its `active` sub-state. Used for in-scene minigames (satellite servicing)
+   * where the host attaches a controller on EVA-enter and drives repairs inline,
+   * so entering the "minigame" sub-state (which releases pointer lock for a Vue
+   * overlay) would be wrong.
+   */
+  isInSceneMinigameActive?: () => boolean
   /** Objects to scale up during EVA. Read once at session enter. */
   getHugeScaleTargets: () => EvaHugeScaleTarget[]
   /**
@@ -244,12 +253,19 @@ export class EvaSession implements Tickable {
       const pdz = this.controller.group.position.z - poi.z
       const distToPoi = Math.sqrt(pdx * pdx + pdy * pdy + pdz * pdz)
       if (distToPoi < EVA_TERMINAL_PROMPT_RANGE) {
-        this.setPrompt('START MAINTENANCE [F]')
-        if (this.config.inputManager.wasActionPressed('evaToggle')) {
-          this.beginMinigame()
+        // In-scene minigames (e.g. satellite servicing) attach their controller on
+        // EVA-enter and drive repairs inline with pointer lock held. Skip the
+        // terminal prompt + F-press so the player isn't told to press F and so F
+        // doesn't accidentally transition us into the overlay-oriented sub-state.
+        const inSceneActive = this.config.isInSceneMinigameActive?.() ?? false
+        if (!inSceneActive) {
+          this.setPrompt('START MAINTENANCE [F]')
+          if (this.config.inputManager.wasActionPressed('evaToggle')) {
+            this.beginMinigame()
+          }
+          this.emitTelemetry()
+          return
         }
-        this.emitTelemetry()
-        return
       }
     }
 
