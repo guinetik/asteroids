@@ -365,7 +365,7 @@ onUnmounted(() => {
         <div class="telescope-knob">
           <div
             class="telescope-knob__dial"
-            :class="[`led-${focusLed}`, { 'knob-pulse': isPulsing('focus') }]"
+            :class="[`telescope-led-${focusLed}`, { 'telescope-knob-pulse': isPulsing('focus') }]"
             data-axis="focus"
             aria-label="Focus knob"
           />
@@ -373,14 +373,14 @@ onUnmounted(() => {
           <div class="telescope-knob__bar">
             <span
               :style="{ width: `${Math.round(focusQ * 100)}%` }"
-              :class="`bar-${focusLed}`"
+              :class="`telescope-bar-${focusLed}`"
             />
           </div>
         </div>
         <div class="telescope-knob">
           <div
             class="telescope-knob__dial"
-            :class="[`led-${chromaLed}`, { 'knob-pulse': isPulsing('chroma') }]"
+            :class="[`telescope-led-${chromaLed}`, { 'telescope-knob-pulse': isPulsing('chroma') }]"
             data-axis="chroma"
             aria-label="Chromatic aberration knob"
           />
@@ -388,7 +388,7 @@ onUnmounted(() => {
           <div class="telescope-knob__bar">
             <span
               :style="{ width: `${Math.round(chromaQ * 100)}%` }"
-              :class="`bar-${chromaLed}`"
+              :class="`telescope-bar-${chromaLed}`"
             />
           </div>
         </div>
@@ -406,7 +406,7 @@ onUnmounted(() => {
         <div class="telescope-knob">
           <div
             class="telescope-knob__dial"
-            :class="[`led-${azLed}`, { 'knob-pulse': isPulsing('azimuth') }]"
+            :class="[`telescope-led-${azLed}`, { 'telescope-knob-pulse': isPulsing('azimuth') }]"
             data-axis="azimuth"
             aria-label="Azimuth pointing knob"
           />
@@ -414,14 +414,14 @@ onUnmounted(() => {
           <div class="telescope-knob__bar">
             <span
               :style="{ width: `${Math.round(azQ * 100)}%` }"
-              :class="`bar-${azLed}`"
+              :class="`telescope-bar-${azLed}`"
             />
           </div>
         </div>
         <div class="telescope-knob">
           <div
             class="telescope-knob__dial"
-            :class="[`led-${elLed}`, { 'knob-pulse': isPulsing('elevation') }]"
+            :class="[`telescope-led-${elLed}`, { 'telescope-knob-pulse': isPulsing('elevation') }]"
             data-axis="elevation"
             aria-label="Elevation pointing knob"
           />
@@ -429,7 +429,7 @@ onUnmounted(() => {
           <div class="telescope-knob__bar">
             <span
               :style="{ width: `${Math.round(elQ * 100)}%` }"
-              :class="`bar-${elLed}`"
+              :class="`telescope-bar-${elLed}`"
             />
           </div>
         </div>
@@ -441,7 +441,7 @@ onUnmounted(() => {
       <div class="telescope-quality__bar">
         <span
           :style="{ width: `${qualityPct}%` }"
-          :class="canLock ? 'bar-green' : 'bar-amber'"
+          :class="canLock ? 'telescope-bar-green' : 'telescope-bar-amber'"
         />
       </div>
       <div class="telescope-quality__pct">{{ qualityPct }}%</div>
@@ -466,114 +466,3 @@ onUnmounted(() => {
   </div>
 </template>
 
-<style scoped>
-@reference 'tailwindcss';
-
-.telescope-overlay {
-  @apply fixed inset-0 z-50 flex flex-col gap-4 p-6 font-mono text-cyan-100;
-  background-color: #05070c;
-}
-.telescope-status {
-  @apply flex justify-between items-center border border-cyan-400/25 px-4 py-2 text-sm tracking-widest;
-}
-.telescope-body {
-  @apply flex-1 grid gap-4;
-  grid-template-columns: 1fr 360px;
-}
-.telescope-eyepiece {
-  @apply relative rounded-full overflow-hidden border border-cyan-400/25 self-center justify-self-center;
-  width: 780px;
-  height: 780px;
-  max-width: 80vmin;
-  max-height: 80vmin;
-  aspect-ratio: 1 / 1;
-}
-.telescope-eyepiece__img {
-  @apply absolute inset-0 w-full h-full object-cover pointer-events-none;
-  mix-blend-mode: screen;
-}
-.telescope-knobs {
-  @apply flex flex-col gap-3;
-}
-.telescope-knob {
-  @apply flex flex-col gap-1 border border-cyan-400/25 p-2 rounded-sm;
-}
-.telescope-knob__dial {
-  @apply w-[72px] h-[72px] border border-cyan-400/40 rounded-full self-center;
-}
-.telescope-knob__label {
-  @apply text-xs tracking-widest text-center;
-}
-.telescope-knob__bar {
-  @apply h-1 bg-cyan-400/10;
-}
-.telescope-knob__bar span {
-  @apply block h-full;
-}
-.telescope-pointing {
-  @apply flex flex-col items-center gap-1 border border-cyan-400/25 p-2 rounded-sm;
-}
-.telescope-pointing__crosshair {
-  @apply relative w-[72px] h-[72px] border border-cyan-400/40;
-}
-.telescope-pointing__dot {
-  @apply absolute w-2 h-2 rounded-full bg-cyan-300;
-  transform: translate(-50%, -50%);
-}
-.telescope-pointing__caption {
-  @apply text-xs tracking-widest;
-}
-.telescope-quality {
-  @apply flex items-center gap-3 border border-cyan-400/25 px-4 py-2 text-sm;
-}
-.telescope-quality__bar {
-  @apply flex-1 h-2 bg-cyan-400/10;
-}
-.telescope-quality__bar span {
-  @apply block h-full;
-}
-.telescope-hints {
-  @apply flex flex-wrap gap-4 text-xs tracking-widest text-cyan-200;
-}
-.telescope-caption {
-  @apply absolute inset-x-0 bottom-20 mx-auto w-fit border border-emerald-400/60 bg-slate-950/80 px-6 py-3 text-center tracking-widest;
-}
-.telescope-caption__label {
-  @apply text-emerald-200;
-}
-.telescope-caption__body {
-  @apply text-cyan-100 text-xs;
-}
-/* matches CAPTION_FADE_MS = 1200 */
-.telescope-caption-enter-active {
-  transition: opacity 1200ms ease-in;
-}
-.telescope-caption-enter-from {
-  opacity: 0;
-}
-.telescope-caption-enter-to {
-  opacity: 1;
-}
-.bar-red {
-  @apply bg-red-400;
-}
-.bar-amber {
-  @apply bg-amber-400;
-}
-.bar-green {
-  @apply bg-emerald-400;
-}
-.led-red {
-  border-color: #f87171;
-}
-.led-amber {
-  border-color: #fbbf24;
-}
-.led-green {
-  border-color: #34d399;
-}
-.knob-pulse {
-  border-color: #7dd3fc;
-  box-shadow: 0 0 6px rgba(125, 211, 252, 0.9);
-}
-</style>

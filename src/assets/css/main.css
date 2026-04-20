@@ -2379,3 +2379,115 @@ body {
     text-shadow: 0 0 32px rgba(34, 211, 238, 0.9);
   }
 }
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/* Telescope alignment minigame                                            */
+/* ──────────────────────────────────────────────────────────────────────── */
+
+.telescope-overlay {
+  @apply fixed inset-0 z-50 flex flex-col gap-4 p-6 font-mono text-cyan-100;
+  background-color: #05070c;
+}
+.telescope-status {
+  @apply flex justify-between items-center border border-cyan-400/25 px-4 py-2 text-sm tracking-widest;
+}
+.telescope-body {
+  @apply flex-1 grid gap-4;
+  grid-template-columns: 1fr 360px;
+}
+.telescope-eyepiece {
+  @apply relative rounded-full overflow-hidden border border-cyan-400/25 self-center justify-self-center;
+  width: 780px;
+  height: 780px;
+  max-width: 80vmin;
+  max-height: 80vmin;
+  aspect-ratio: 1 / 1;
+}
+.telescope-eyepiece__img {
+  @apply absolute inset-0 w-full h-full object-cover pointer-events-none;
+  mix-blend-mode: screen;
+}
+.telescope-knobs {
+  @apply flex flex-col gap-3;
+}
+.telescope-knob {
+  @apply flex flex-col gap-1 border border-cyan-400/25 p-2 rounded-sm;
+}
+.telescope-knob__dial {
+  @apply w-[72px] h-[72px] border border-cyan-400/40 rounded-full self-center;
+}
+.telescope-knob__label {
+  @apply text-xs tracking-widest text-center;
+}
+.telescope-knob__bar {
+  @apply h-1 bg-cyan-400/10;
+}
+.telescope-knob__bar span {
+  @apply block h-full;
+}
+.telescope-pointing {
+  @apply flex flex-col items-center gap-1 border border-cyan-400/25 p-2 rounded-sm;
+}
+.telescope-pointing__crosshair {
+  @apply relative w-[72px] h-[72px] border border-cyan-400/40;
+}
+.telescope-pointing__dot {
+  @apply absolute w-2 h-2 rounded-full bg-cyan-300;
+  transform: translate(-50%, -50%);
+}
+.telescope-pointing__caption {
+  @apply text-xs tracking-widest;
+}
+.telescope-quality {
+  @apply flex items-center gap-3 border border-cyan-400/25 px-4 py-2 text-sm;
+}
+.telescope-quality__bar {
+  @apply flex-1 h-2 bg-cyan-400/10;
+}
+.telescope-quality__bar span {
+  @apply block h-full;
+}
+.telescope-hints {
+  @apply flex flex-wrap gap-4 text-xs tracking-widest text-cyan-200;
+}
+.telescope-caption {
+  @apply absolute inset-x-0 bottom-20 mx-auto w-fit border border-emerald-400/60 bg-slate-950/80 px-6 py-3 text-center tracking-widest;
+}
+.telescope-caption__label {
+  @apply text-emerald-200;
+}
+.telescope-caption__body {
+  @apply text-cyan-100 text-xs;
+}
+/* matches CAPTION_FADE_MS = 1200 */
+.telescope-caption-enter-active {
+  transition: opacity 1200ms ease-in;
+}
+.telescope-caption-enter-from {
+  opacity: 0;
+}
+.telescope-caption-enter-to {
+  opacity: 1;
+}
+.telescope-bar-red {
+  @apply bg-red-400;
+}
+.telescope-bar-amber {
+  @apply bg-amber-400;
+}
+.telescope-bar-green {
+  @apply bg-emerald-400;
+}
+.telescope-led-red {
+  border-color: #f87171;
+}
+.telescope-led-amber {
+  border-color: #fbbf24;
+}
+.telescope-led-green {
+  border-color: #34d399;
+}
+.telescope-knob-pulse {
+  border-color: #7dd3fc;
+  box-shadow: 0 0 6px rgba(125, 211, 252, 0.9);
+}
