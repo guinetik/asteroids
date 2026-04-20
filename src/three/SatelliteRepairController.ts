@@ -67,9 +67,7 @@ export interface SatelliteRepairControllerConfig {
   /** POI root — walked for named rigged sub-objects. */
   poiObject: THREE.Object3D
   /** Provider of the FPS camera used for raycast aim detection. May return null between frames if the camera is being swapped. */
-  getCamera?: () => THREE.Camera | null
-  /** @deprecated Unused after the raycast rewrite; removed in Task 3. */
-  getPlayerPosition?: () => THREE.Vector3
+  getCamera: () => THREE.Camera | null
   /** True while the F-press should register as a repair attempt. */
   isFixKeyPressed: () => boolean
   /** The minigame instance — controller calls `markRepaired(name)` on success. */
@@ -111,6 +109,7 @@ interface DamagedComponent {
  *
  * @author guinetik
  * @date 2026-04-19
+ * @spec docs/superpowers/specs/2026-04-19-eva-minigame-wiring-design.md
  */
 export class SatelliteRepairController {
   private cfg: SatelliteRepairControllerConfig | null = null
@@ -170,7 +169,7 @@ export class SatelliteRepairController {
    */
   tick(dt: number): void {
     if (!this.cfg) return
-    const camera = this.cfg.getCamera?.() ?? null
+    const camera = this.cfg.getCamera()
 
     // Find the aimed-at component via a forward raycast from the camera. The
     // raycast hits MESH descendants of each component's source node; we match
@@ -242,6 +241,7 @@ export class SatelliteRepairController {
           nearestDistance = hit.distance
           nearest = c
         }
+        // Take only the closest surface point for this component; don't scan deeper.
         break
       }
     }

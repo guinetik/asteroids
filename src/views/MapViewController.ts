@@ -2322,15 +2322,12 @@ export class MapViewController implements Tickable {
   private static readonly EVA_WAYPOINT_PLANET_LEAD_SECONDS = 3
 
   /**
-   * Launch the in-EVA maintenance minigame for the POI the player is near. Invoked by
-   * EvaSession when the player presses the action key inside the terminal prompt range.
-   * Looks up the active EVA mission currently rendered at the POI, builds a minigame via
-   * {@link createOrbitalMiniGame}, wires its `onComplete` callback to
-   * {@link evaMinigameComplete}, then branches on {@link OrbitalMiniGame.presentation}:
-   * `'overlay'` emits `onEvaMinigameChange` so the view-layer overlay opens; `'in_scene'`
-   * instantiates a {@link SatelliteRepairController} and calls `attach` with the POI object,
-   * player-position accessor, F-key state, minigame, and mission — handing frame-level
-   * control to the 3D controller rather than the 2D overlay.
+   * Launch an overlay-presentation EVA minigame for the POI the player is near.
+   * Called by `EvaSession.beginMinigame` via `onStartEvaMinigame`, which only
+   * fires when `isInSceneMinigameActive()` returns false — i.e. for overlay-
+   * based minigames (telescope, relay, default). In-scene minigames (satellite
+   * servicing) are auto-attached on EVA enter via `maybeAttachSatelliteRepair`
+   * and never reach this method.
    */
   private beginEvaMinigame(): void {
     const mission = this.missionFacade.getActiveEvaMissionAtPoi()
@@ -2348,41 +2345,12 @@ export class MapViewController implements Tickable {
     ) as OrbitalMiniGame & OrbitalMiniGameEvents
     minigame.onComplete = (missionId: string) => this.evaMinigameComplete(missionId)
     this.activeEvaMinigame = minigame
-
-    if (minigame.presentation === 'overlay') {
-      this.onEvaMinigameChange?.({ mission, minigame })
-      return
-    }
-
-    // presentation === 'in_scene' — hand control to SatelliteRepairController.
-    if (!(minigame instanceof SatelliteServicingMiniGame)) {
+    if (minigame.presentation === 'in_scene') {
       console.warn(
-        `[MapViewController] Unknown in-scene minigame type "${minigameType}"; opening overlay fallback.`,
+        `[MapViewController] In-scene minigame "${minigameType}" reached beginEvaMinigame; auto-attach is missing. Falling back to overlay.`,
       )
-      this.onEvaMinigameChange?.({ mission, minigame })
-      return
     }
-    const poiObject = this.missionFacade.getEvaPoiGroup()
-    if (!poiObject) {
-      console.warn('[MapViewController] No POI object available for in-scene minigame; aborting.')
-      minigame.dispose()
-      this.activeEvaMinigame = null
-      this.evaSession?.endMinigame()
-      return
-    }
-    this.satelliteRepairController = new SatelliteRepairController()
-    this.satelliteRepairController.attach({
-      poiObject,
-      getPlayerPosition: () => {
-        const out = new THREE.Vector3()
-        const pass = this.sceneObjects?.composer.passes[0] as RenderPass | undefined
-        pass?.camera.getWorldPosition(out)
-        return out
-      },
-      isFixKeyPressed: () => this.inputManager?.isActionActive('interact') ?? false,
-      minigame,
-      mission,
-    })
+    this.onEvaMinigameChange?.({ mission, minigame })
   }
 
   /**
@@ -3710,6 +3678,97 @@ export class MapViewController implements Tickable {
   }
 
   /**
+   * Handles scene bookkeeping when EVA mode changes — bloom swap, fuel-pause,
+   * and forwarding to the external callback. Extracted from the inline
+   * `onEvaModeChange` lambda so `createEvaSession` can also call
+   * `maybeAttachSatelliteRepair` / `teardownSatelliteRepairOnExit` before it.
+   *
+   * @param active - True when EVA is starting; false when it is ending.
+   */
+  private handleEvaModeChange(active: boolean): void {
+    this.setEvaBloomOverride(active)
+    if (!active) {
+      this.missionFacade.armCompletedEvaSiteCleanup()
+    }
+    this.onEvaModeChange?.(active)
+  }
+
+  /**
+   * If the player has an accepted, in-progress EVA mission whose POI is the
+   * one they're EVAing out to AND whose minigameType is `satellite_servicing`,
+   * return it. Otherwise return null.
+   *
+   * @returns The active satellite-servicing mission at the current POI, or null.
+   */
+  private getActiveSatelliteServicingMission(): ActiveVisitRelayMission | null {
+    const mission = this.missionFacade.getActiveEvaMissionAtPoi()
+    if (!mission) return null
+    if (mission.template.minigameType !== 'satellite_servicing') return null
+    const broken = mission.brokenComponents
+    if (!broken || broken.length === 0) return null
+    return mission
+  }
+
+  /**
+   * If a satellite-servicing EVA mission is active at the current POI, build
+   * the minigame, attach the in-scene controller, and wire `onComplete` into
+   * the existing reward chain. No-op otherwise.
+   */
+  private maybeAttachSatelliteRepair(): void {
+    const mission = this.getActiveSatelliteServicingMission()
+    if (!mission) return
+    const poiObject = this.missionFacade.getEvaPoiGroup()
+    if (!poiObject) {
+      console.warn('[MapViewController] No POI object for satellite repair; skipping auto-attach.')
+      return
+    }
+    const minigame = createOrbitalMiniGame(
+      mission.template.id,
+      mission.template.minigameType,
+      0,
+      mission.giverPlanet,
+      mission,
+    ) as OrbitalMiniGame & OrbitalMiniGameEvents
+    if (!(minigame instanceof SatelliteServicingMiniGame)) {
+      console.warn(
+        '[MapViewController] Satellite mission produced non-SatelliteServicingMiniGame; skipping.',
+      )
+      minigame.dispose()
+      return
+    }
+    minigame.onComplete = (missionId: string) => this.evaMinigameComplete(missionId)
+    this.activeEvaMinigame = minigame
+    this.satelliteRepairController = new SatelliteRepairController()
+    this.satelliteRepairController.attach({
+      poiObject,
+      getCamera: () => {
+        const pass = this.sceneObjects?.composer.passes[0] as RenderPass | undefined
+        return pass?.camera ?? null
+      },
+      isFixKeyPressed: () => this.inputManager?.isActionActive('interact') ?? false,
+      minigame,
+      mission,
+    })
+  }
+
+  /**
+   * Called on EVA exit. If the satellite-servicing controller is still attached,
+   * the player left EVA without repairing every component — abort silently.
+   * No reward, no mission removal; the mission stays in the active list with
+   * its brokenComponents intact so the next EVA re-attaches with the same damage.
+   *
+   * If the controller has already been disposed (e.g. because `onComplete` fired
+   * mid-EVA and `evaMinigameComplete` ran the cleanup), this is a no-op.
+   */
+  private teardownSatelliteRepairOnExit(): void {
+    if (!this.satelliteRepairController) return
+    this.satelliteRepairController.dispose()
+    this.satelliteRepairController = null
+    this.activeEvaMinigame?.dispose()
+    this.activeEvaMinigame = null
+  }
+
+  /**
    * Build the EVA session bound to this view. Returns null if required deps are missing.
    */
   private createEvaSession(): EvaSession | null {
@@ -3741,16 +3800,18 @@ export class MapViewController implements Tickable {
         return { allowed: true }
       },
       onStartEvaMinigame: () => this.beginEvaMinigame(),
+      isInSceneMinigameActive: () => this.satelliteRepairController != null,
       getHugeScaleTargets: () => this.buildEvaHugeScaleTargets(),
       getColliders: () => this.buildEvaColliders(),
       spawnOffsetScale: MapViewController.EVA_MAP_SPAWN_OFFSET_SCALE,
       helmetLightIntensityScale: MapViewController.EVA_MAP_HELMET_LIGHT_SCALE,
       onEvaModeChange: (active) => {
-        this.setEvaBloomOverride(active)
-        if (!active) {
-          this.missionFacade.armCompletedEvaSiteCleanup()
+        if (active) {
+          this.maybeAttachSatelliteRepair()
+        } else {
+          this.teardownSatelliteRepairOnExit()
         }
-        this.onEvaModeChange?.(active)
+        this.handleEvaModeChange(active)
       },
       onEvaTelemetry: (t) => this.onEvaTelemetry?.(t),
       onActionPrompt: (p) => {
