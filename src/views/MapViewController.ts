@@ -3910,7 +3910,13 @@ export class MapViewController implements Tickable {
     const poiGroup = this.missionFacade.getEvaPoiGroup()
     if (poiGroup) {
       poiGroup.updateMatrixWorld(true)
-      colliders.push(createAabbColliderFromObject(poiGroup))
+      // Skip POI collision while a satellite-servicing minigame is active so
+      // deployed solar panels / antennas don't block the raycast-aim approach.
+      // The inline raycast + F-repair interaction already gates distance.
+      const skipForServicing = this.getActiveSatelliteServicingMission() != null
+      if (!skipForServicing) {
+        colliders.push(createAabbColliderFromObject(poiGroup))
+      }
     }
     return colliders
   }
