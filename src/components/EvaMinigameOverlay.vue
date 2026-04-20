@@ -12,9 +12,11 @@
   @spec docs/superpowers/specs/2026-04-19-eva-minigame-wiring-design.md
 -->
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
+import TelescopeAlignmentCanvas from '@/components/TelescopeAlignmentCanvas.vue'
+import { TelescopeAlignmentMiniGame } from '@/lib/minigame/telescopeAlignment/TelescopeAlignmentMiniGame'
 
 const props = defineProps<{
   /** The EVA mission whose terminal the player is interacting with. */
@@ -29,6 +31,11 @@ const emit = defineEmits<{
   /** User dismissed the overlay (X button or ESC) — host should restore EVA control. */
   close: []
 }>()
+
+/** Narrow the generic minigame to a telescope instance for the canvas prop. */
+const telescopeMinigame = computed(() =>
+  props.minigame instanceof TelescopeAlignmentMiniGame ? props.minigame : null,
+)
 
 /**
  * Capture-phase ESC handler so the overlay closes even if a future minigame
@@ -61,11 +68,17 @@ onUnmounted(() => {
     <!--
       Per-minigameType branches plug in here (see
       docs/superpowers/specs/2026-04-19-eva-minigame-wiring-design.md §"Overlay Branching Pattern").
-      Each minigame's own plan (telescope_alignment, relay_repair) adds its
-      `v-if="isXxx"` branch above the default card. None are registered yet;
-      everything falls through to the card.
+      Each minigame's own plan adds its branch above the default card;
+      telescope_alignment is the first registered canvas.
     -->
-    <div class="mission-minigame-card">
+    <TelescopeAlignmentCanvas
+      v-if="telescopeMinigame"
+      :mission="mission"
+      :minigame="telescopeMinigame"
+      @complete="emit('complete')"
+      @close="emit('close')"
+    />
+    <div v-else class="mission-minigame-card">
       <div class="mission-minigame-card__chrome">
         <span>EVA Maintenance Terminal</span>
         <button

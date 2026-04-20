@@ -7,6 +7,7 @@ import { MaintenanceMiniGame } from '../maintenance/MaintenanceMiniGame'
 import { LogisticsRouteMiniGame } from '../logistics/LogisticsRouteMiniGame'
 import { ProbeDeployMiniGame } from '../probeDeploy/ProbeDeployMiniGame'
 import { SatelliteServicingMiniGame } from '../satelliteServicing/SatelliteServicingMiniGame'
+import { TelescopeAlignmentMiniGame } from '../telescopeAlignment/TelescopeAlignmentMiniGame'
 import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 
 describe('createOrbitalMiniGame', () => {
@@ -145,6 +146,12 @@ describe('createOrbitalMiniGame', () => {
   it('falls back to Default for satellite_servicing when mission is absent', () => {
     const mg = createOrbitalMiniGame('earth_sat_patch', 'satellite_servicing', 0, 'earth')
     expect(mg).toBeInstanceOf(DefaultOrbitalMiniGame)
+  })
+
+  it('creates a TelescopeAlignmentMiniGame for telescope_alignment', () => {
+    const g = createOrbitalMiniGame('earth_l2_observatory_phasing', 'telescope_alignment', 0)
+    expect(g).toBeInstanceOf(TelescopeAlignmentMiniGame)
+    expect(g.presentation).toBe('overlay')
   })
 })
 
