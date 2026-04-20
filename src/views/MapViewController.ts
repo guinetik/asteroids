@@ -2187,7 +2187,7 @@ export class MapViewController implements Tickable {
     if (openedPlanetId) {
       this.offerMissionAtPlanet(openedPlanetId)
       this.offerEvaMissionAtPlanet(openedPlanetId)
-      this.offerAsteroidMissionFromDifficulty()
+      this.offerAsteroidMissionFromDifficulty(openedPlanetId)
       this.onCreditsUpdate?.(this.playerProfile.credits)
     }
   }
@@ -2305,9 +2305,21 @@ export class MapViewController implements Tickable {
     return this.missionFacade.missionAccept(this.playerInventory, this.onMissionBoardUpdate)
   }
 
-  /** Generate and offer an asteroid mission based on current difficulty. */
-  offerAsteroidMissionFromDifficulty(): void {
-    this.missionFacade.offerAsteroidMissionFromDifficulty(this.onMissionBoardUpdate)
+  /**
+   * Generate and offer an asteroid mission for the station on `planetId`. Waypoints are
+   * anchored near that world's orbit (not global belt radii).
+   */
+  offerAsteroidMissionFromDifficulty(planetId: string): void {
+    const controller = this.getPlanetControllerById(planetId)
+    if (!controller) return
+    this.missionFacade.offerAsteroidMissionFromDifficulty(
+      {
+        planetId,
+        worldX: controller.getWorldX(),
+        worldZ: controller.getWorldZ(),
+      },
+      this.onMissionBoardUpdate,
+    )
   }
 
   /** Accept the offered asteroid mission (from shuttle control UI). */

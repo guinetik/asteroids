@@ -2,8 +2,9 @@
  * Mission difficulty derivation from player upgrade levels.
  *
  * Maps the average upgrade level (0-3) linearly to mission
- * difficulty (1-10). Higher upgrades unlock harder missions
- * in deeper belt regions.
+ * difficulty (1-10). Higher upgrades unlock harder contracts (more objectives,
+ * tougher rolls). Asteroid waypoints are anchored on the posting station's orbit,
+ * not on global belt radii.
  *
  * @author guinetik
  * @date 2026-04-06

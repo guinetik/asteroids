@@ -371,7 +371,15 @@ export interface GeneratedAsteroidMission {
   briefing: string
   /** Rolled difficulty (1-10). */
   difficulty: number
-  /** Belt region where waypoint spawns. */
+  /**
+   * Station planet that posted this contract; procedural waypoints are generated near this
+   * world's orbit. Omitted on older saves or authored specials with fixed waypoints.
+   */
+  originPlanetId?: string
+  /**
+   * Template tier / flavor (near-earth, main belt, kuiper). Objective difficulty — not the
+   * solar-map spawn location when {@link originPlanetId} is set.
+   */
   region: MissionRegion
   /** Concrete objectives with rolled values. */
   objectives: ConcreteObjective[]

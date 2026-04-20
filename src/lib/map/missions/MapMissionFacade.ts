@@ -24,7 +24,10 @@ import type {
 } from '@/lib/missions/types'
 import { getGatherItemForPlanet, getPlanetOrbitalConfig } from '@/lib/missions/planetOrbitalConfig'
 import { computeMissionDifficulty } from '@/lib/missions/missionDifficulty'
-import { generateAsteroidMission } from '@/lib/missions/asteroidMissionGenerator'
+import {
+  generateAsteroidMission,
+  type AsteroidMissionHostAnchor,
+} from '@/lib/missions/asteroidMissionGenerator'
 import { canFitItem } from '@/lib/inventory/inventory'
 import type { Inventory } from '@/lib/inventory/types'
 import type { PlayerProfile } from '@/lib/player/types'
@@ -218,12 +221,13 @@ export class MapMissionFacade {
   }
 
   offerAsteroidMissionFromDifficulty(
+    host: AsteroidMissionHostAnchor,
     onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null,
   ): void {
     if (this.board.offeredAsteroidMission || this.board.activeAsteroidMission) return
     if (this.board.asteroidRestockTimer) return
     const difficulty = computeMissionDifficulty(CURRENT_PLAYER_UPGRADE_LEVELS)
-    const mission = generateAsteroidMission(difficulty)
+    const mission = generateAsteroidMission(difficulty, host)
     this.board = offerAsteroidMission(this.board, mission)
     onMissionBoardUpdate?.(this.board)
   }

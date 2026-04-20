@@ -126,6 +126,23 @@ function regionLabel(region: MissionRegion): string {
     case 'kuiper-belt': return 'Kuiper Belt'
   }
 }
+
+/**
+ * Operating zone for procedural contracts — waypoint is anchored on the posting station's orbit.
+ * Falls back to legacy belt labels when `originPlanetId` is missing (old saves / specials).
+ *
+ * @param mission - Offered or active asteroid mission.
+ */
+function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
+  if (mission.originPlanetId) {
+    try {
+      return `Near ${getPlanet(mission.originPlanetId).name} orbit`
+    } catch {
+      /* use belt tier below */
+    }
+  }
+  return regionLabel(mission.region)
+}
 </script>
 
 <template>
@@ -233,7 +250,7 @@ function regionLabel(region: MissionRegion): string {
     <div class="mission-board-section">
       <h3 class="mission-board-section__heading">Asteroid Missions</h3>
       <p class="mission-board-section__descriptor">
-        Accept contracts from mission givers to survey, mine, rescue, or clear hostiles at belt waypoints.
+        Contracts send you to a waypoint near your posting station's orbit; difficulty scales with your upgrades.
       </p>
 
       <div v-if="board?.offeredAsteroidMission && !board.activeAsteroidMission" class="mission-board-offer">
@@ -241,7 +258,7 @@ function regionLabel(region: MissionRegion): string {
         <div class="mission-board-offer__giver">From: {{ board.offeredAsteroidMission.giverName }}</div>
         <div class="mission-board-offer__desc">{{ board.offeredAsteroidMission.briefing }}</div>
         <div class="mission-board-offer__meta">
-          <span>Region: {{ regionLabel(board.offeredAsteroidMission.region) }}</span>
+          <span>Zone: {{ asteroidOperatingLabel(board.offeredAsteroidMission) }}</span>
           <span>Reward: {{ buffedAsteroidRewardCr(board.offeredAsteroidMission.totalReward) }} CR</span>
         </div>
         <div class="mission-board-offer__objective">
@@ -259,7 +276,7 @@ function regionLabel(region: MissionRegion): string {
       <div v-else-if="board?.activeAsteroidMission" class="mission-board-active">
         <div class="mission-board-active__name">{{ board.activeAsteroidMission.name }}</div>
         <div class="mission-board-active__route">
-          {{ board.activeAsteroidMission.giverName }} &middot; {{ regionLabel(board.activeAsteroidMission.region) }}
+          {{ board.activeAsteroidMission.giverName }} &middot; {{ asteroidOperatingLabel(board.activeAsteroidMission) }}
         </div>
         <div class="mission-board-active__status">
           {{ board.activeAsteroidMission.status === 'accepted' ? 'Navigate to waypoint' : 'In transit' }}

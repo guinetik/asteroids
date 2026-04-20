@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { ORBIT_SCALE } from '@/lib/planets/constants'
+import { getPlanet } from '@/lib/planets/catalog'
 import shipHealthData from '@/data/shuttle/ship-health.json'
 import {
   generateAsteroidMission,
+  generateAsteroidWaypointNearHostPlanet,
   generateWaypointInRegion,
   interpolateRange,
   isMissionWaypointSolarDistanceClearOfPlanets,
@@ -10,6 +12,7 @@ import {
   nearEarthOuterCatalogForWaypointSpawn,
   objectiveCountForDifficulty,
   rollObjective,
+  syntheticEarthHostAnchor,
   LEVEL_GRID_SIZE,
   MIN_ASTEROID_MISSION_REWARD,
   WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY,
@@ -106,6 +109,31 @@ describe('rollObjective', () => {
   })
 })
 
+describe('generateAsteroidWaypointNearHostPlanet', () => {
+  it('keeps waypoint solar radius close to the host planet (Earth @ 1 AU)', () => {
+    const earth = getPlanet('earth')
+    const hostR = earth.orbit.semiMajorAxis * ORBIT_SCALE
+    const maxJitter = 20 + 95 + 1e-6
+    for (let i = 0; i < 120; i++) {
+      const wp = generateAsteroidWaypointNearHostPlanet(hostR, 0, 10)
+      const Rw = Math.hypot(wp.worldX, wp.worldZ)
+      expect(Math.abs(Rw - hostR)).toBeLessThanOrEqual(maxJitter + 1e-3)
+    }
+  })
+
+  it('keeps waypoint solar radius close to Jupiter host orbit, not inner planets', () => {
+    const jupiter = getPlanet('jupiter')
+    const hostR = jupiter.orbit.semiMajorAxis * ORBIT_SCALE
+    const maxJitter = 20 + 95 + 1e-6
+    for (let i = 0; i < 80; i++) {
+      const wp = generateAsteroidWaypointNearHostPlanet(hostR, 0, 8)
+      const Rw = Math.hypot(wp.worldX, wp.worldZ)
+      expect(Math.abs(Rw - hostR)).toBeLessThanOrEqual(maxJitter + 1e-3)
+      expect(Rw).toBeGreaterThan(400)
+    }
+  })
+})
+
 describe('generateWaypointInRegion', () => {
   it('generates position for asteroid-belt within belt bounds at high difficulty', () => {
     const wp = generateWaypointInRegion('asteroid-belt', 10)
@@ -189,6 +217,24 @@ describe('objectiveCountForDifficulty', () => {
 })
 
 describe('generateAsteroidMission', () => {
+  it('tags origin planet when a host anchor is passed', () => {
+    const mars = getPlanet('mars')
+    const hostR = mars.orbit.semiMajorAxis * ORBIT_SCALE
+    const mission = generateAsteroidMission(5, {
+      planetId: 'mars',
+      worldX: hostR,
+      worldZ: 0,
+    })
+    expect(mission.originPlanetId).toBe('mars')
+    const Rw = Math.hypot(mission.waypoint.worldX, mission.waypoint.worldZ)
+    expect(Math.abs(Rw - hostR)).toBeLessThanOrEqual(20 + 95 + 1e-3)
+  })
+
+  it('defaults synthetic host to Earth when no anchor is passed', () => {
+    const mission = generateAsteroidMission(3)
+    expect(mission.originPlanetId).toBe(syntheticEarthHostAnchor().planetId)
+  })
+
   it('generates a valid mission at difficulty 1', () => {
     const mission = generateAsteroidMission(1)
     expect(mission.id).toBeTruthy()

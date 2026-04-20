@@ -2,8 +2,10 @@
  * Asteroid mission generator.
  *
  * Takes a difficulty level, picks a giver and template, rolls
- * concrete objective values, and generates a waypoint position
- * within the appropriate belt region, keeping solar distance clear of planet orbit rings.
+ * concrete objective values, and generates a waypoint near the posting station's orbital
+ * ring (angular separation + modest radial jitter). Belt `region` on templates still tiers
+ * objective difficulty; spawn is host-local unless using legacy helpers like
+ * {@link generateWaypointInRegion}.
  *
  * @author guinetik
  * @date 2026-04-06
@@ -18,7 +20,7 @@ import type {
   GeneratedAsteroidMission,
 } from './types'
 import { getGiversForDifficulty } from './giverCatalog'
-import { ASTEROID_BELTS, PLANETS } from '@/lib/planets/catalog'
+import { ASTEROID_BELTS, getPlanet, PLANETS } from '@/lib/planets/catalog'
 import { ORBIT_SCALE, SIZE_SCALE } from '@/lib/planets/constants'
 import { generateFlatZones } from '@/lib/terrain/terrainGenerator'
 import difficultyMap from '@/data/asteroids/difficulty-map.json'
@@ -152,7 +154,7 @@ const MAX_WAYPOINT_DIFFICULTY = 10
  *
  * @param difficulty - Mission difficulty (clamped 1–10).
  */
-function waypointAnnulusReachT(difficulty: number): number {
+export function missionDifficultyReachT(difficulty: number): number {
   const d = Math.max(MIN_WAYPOINT_DIFFICULTY, Math.min(MAX_WAYPOINT_DIFFICULTY, difficulty))
   return (d - MIN_WAYPOINT_DIFFICULTY) / (MAX_WAYPOINT_DIFFICULTY - MIN_WAYPOINT_DIFFICULTY)
 }
@@ -359,10 +361,90 @@ function findRegionForTemplate(
 }
 
 /**
- * Generate a waypoint position within a belt region.
- * Lower difficulty places the waypoint closer to the inner edge (e.g. nearer Earth in near-earth).
+ * Station that posts a procedural asteroid contract — solar-map waypoint is anchored from
+ * {@link worldX}/{@link worldZ} when the offer is drafted.
+ */
+export interface AsteroidMissionHostAnchor {
+  planetId: string
+  worldX: number
+  worldZ: number
+}
+
+/**
+ * Default host for dev/query mission generation — Earth at 1 AU on +X (matches catalog scale).
+ */
+export function syntheticEarthHostAnchor(): AsteroidMissionHostAnchor {
+  const earth = getPlanet('earth')
+  const r = earth.orbit.semiMajorAxis * ORBIT_SCALE
+  return { planetId: 'earth', worldX: r, worldZ: 0 }
+}
+
+/** Max orbital separation (degrees) from the host along its orbit ring — scales with difficulty. */
+const HOST_ASTEROID_MAX_ANGLE_DEG_BASE = 8
+
+/** Extra degrees at max difficulty (added to {@link HOST_ASTEROID_MAX_ANGLE_DEG_BASE}). */
+const HOST_ASTEROID_MAX_ANGLE_DEG_SPAN = 34
+
+/** Max inward/outward tweak to solar radius (world units), scaled by difficulty. */
+const HOST_ASTEROID_RADIAL_JITTER_BASE = 20
+
+const HOST_ASTEROID_RADIAL_JITTER_SPAN = 95
+
+/**
+ * Place an asteroid contract waypoint near the host world's orbital ring: mostly angular
+ * separation along the orbit (like EVA), with a modest radial jitter that scales with
+ * difficulty. Avoids sun-centered main-belt sampling that sent inner-planet stations to the
+ * outer system when upgrades raised mission tier.
  *
- * @param region - Target region.
+ * @param hostWorldX - Giver planet world X when the mission is offered.
+ * @param hostWorldZ - Giver planet world Z when the mission is offered.
+ * @param difficulty - Mission difficulty 1–10 (drives max angle / radial jitter).
+ * @param rand - RNG in [0,1); injectable for tests.
+ */
+export function generateAsteroidWaypointNearHostPlanet(
+  hostWorldX: number,
+  hostWorldZ: number,
+  difficulty: number,
+  rand: () => number = Math.random,
+): { worldX: number; worldZ: number } {
+  const hostAngle = Math.atan2(hostWorldZ, hostWorldX)
+  const hostR = Math.hypot(hostWorldX, hostWorldZ)
+  const t = missionDifficultyReachT(difficulty)
+  const maxAngleRad =
+    ((HOST_ASTEROID_MAX_ANGLE_DEG_BASE + t * HOST_ASTEROID_MAX_ANGLE_DEG_SPAN) * Math.PI) / 180
+  const maxRadialJitter = HOST_ASTEROID_RADIAL_JITTER_BASE + t * HOST_ASTEROID_RADIAL_JITTER_SPAN
+
+  const tryPick = (): { worldX: number; worldZ: number } | null => {
+    const deltaAngle = (rand() * 2 - 1) * maxAngleRad
+    const deltaR = (rand() * 2 - 1) * maxRadialJitter
+    const newR = Math.max(1e-3, hostR + deltaR)
+    const wx = Math.cos(hostAngle + deltaAngle) * newR
+    const wz = Math.sin(hostAngle + deltaAngle) * newR
+    const Rw = Math.hypot(wx, wz)
+    if (!isMissionWaypointSolarDistanceClearOfPlanets(Rw)) return null
+    return { worldX: wx, worldZ: wz }
+  }
+
+  for (let attempt = 0; attempt < 96; attempt++) {
+    const p = tryPick()
+    if (p) return p
+  }
+
+  // Last resort: tiny jitter only (still host-local).
+  const tinyAngle = ((rand() * 2 - 1) * maxAngleRad) / 4
+  const tinyR = (rand() * 2 - 1) * Math.min(maxRadialJitter, 40)
+  const r0 = Math.max(1e-3, hostR + tinyR)
+  return {
+    worldX: Math.cos(hostAngle + tinyAngle) * r0,
+    worldZ: Math.sin(hostAngle + tinyAngle) * r0,
+  }
+}
+
+/**
+ * Legacy sun-centered waypoint sampling inside a belt annulus (tests / tooling).
+ * Lower difficulty biases radius toward the inner edge.
+ *
+ * @param region - Target belt band in catalog space.
  * @param difficulty - Mission difficulty (1–10); lower values bias radius inward.
  * @returns World-space XZ coordinates within the belt.
  */
@@ -389,7 +471,7 @@ export function generateWaypointInRegion(
   }
 
   const band = outerRadius - innerRadius
-  const reachT = waypointAnnulusReachT(difficulty)
+  const reachT = missionDifficultyReachT(difficulty)
   const outerExtentFraction =
     WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY
     + (1 - WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY) * reachT
@@ -402,9 +484,16 @@ export function generateWaypointInRegion(
  * Generate a complete asteroid mission at a given difficulty.
  *
  * @param difficulty - Mission difficulty (1-10).
+ * @param host - Station planet and world position when the contract is drafted; waypoint is
+ *   generated near that orbit. When omitted (tests, level URL overrides), uses Earth @ 1 AU.
+ * @param rand - Optional RNG for deterministic tests.
  * @returns Fully generated mission ready for the mission board.
  */
-export function generateAsteroidMission(difficulty: number): GeneratedAsteroidMission {
+export function generateAsteroidMission(
+  difficulty: number,
+  host: AsteroidMissionHostAnchor | null = null,
+  rand: () => number = Math.random,
+): GeneratedAsteroidMission {
   const givers = getGiversForDifficulty(difficulty)
   if (givers.length === 0) {
     throw new Error(`No givers available for difficulty ${difficulty}`)
@@ -455,7 +544,13 @@ export function generateAsteroidMission(difficulty: number): GeneratedAsteroidMi
   const rawReward = objectives.reduce((sum, o) => sum + o.reward, 0) + completionBonus
   const totalReward = Math.max(MIN_ASTEROID_MISSION_REWARD, rawReward)
 
-  const waypoint = generateWaypointInRegion(pick.region, difficulty)
+  const anchor = host ?? syntheticEarthHostAnchor()
+  const waypoint = generateAsteroidWaypointNearHostPlanet(
+    anchor.worldX,
+    anchor.worldZ,
+    difficulty,
+    rand,
+  )
 
   const asteroidId = pickAsteroidForDifficulty(difficulty)
 
@@ -469,6 +564,7 @@ export function generateAsteroidMission(difficulty: number): GeneratedAsteroidMi
     name: pick.template.name,
     briefing: pick.template.briefing,
     difficulty,
+    originPlanetId: anchor.planetId,
     region: pick.region,
     objectives,
     totalReward,
