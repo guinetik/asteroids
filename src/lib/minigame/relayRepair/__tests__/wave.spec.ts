@@ -53,15 +53,28 @@ describe('traceWave', () => {
     expect(offGrid?.blocked).toBe(true)
   })
 
-  it('T-piece at rotation 0 with W-incoming exits N and S', () => {
+  it('T-piece at rotation 0 with S-heading (N-incoming) branches to E and S', () => {
     const cells: Cell[] = [
       { row: 1, col: 1, shape: 'T', rotation: 0, visualRotation: 0 },
     ]
-    const { activeSegments, exits } = traceWave(cells, 1, 1, 'E')
-    expect(activeSegments.has('1-1-W')).toBe(true)
+    // Wave heading S enters from N. T-rot-0 ports = [N, E, S] → N accepted,
+    // exits E and S (both off a 1×1 virtual grid).
+    const { activeSegments, exits } = traceWave(cells, 1, 1, 'S')
     expect(activeSegments.has('1-1-N')).toBe(true)
     expect(activeSegments.has('1-1-E')).toBe(true)
     expect(activeSegments.has('1-1-S')).toBe(true)
-    expect(exits).toHaveLength(3)
+    expect(activeSegments.has('1-1-W')).toBe(false)
+    expect(exits).toHaveLength(2)
+  })
+
+  it('blocks when incoming direction has no matching port', () => {
+    const cells: Cell[] = [
+      { row: 1, col: 1, shape: 'T', rotation: 0, visualRotation: 0 },
+    ]
+    // Wave heading E enters from W. T-rot-0 ports = [N, E, S] — no W → blocked.
+    const { activeCells, exits } = traceWave(cells, 1, 1, 'E')
+    expect(activeCells.size).toBe(0)
+    expect(exits).toHaveLength(1)
+    expect(exits[0]?.blocked).toBe(true)
   })
 })

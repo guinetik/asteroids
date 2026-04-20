@@ -35,9 +35,8 @@ export function traceWave(
   const activeSegments = new Set<string>()
   const exits: WaveExit[] = []
   const visited = new Set<string>()
-  /** Each queue entry carries a `source` flag so the start cell bypasses the port-acceptance check. */
-  const queue: Array<{ row: number; col: number; dir: Direction; source?: boolean }> = [
-    { row: startRow, col: startCol, dir: startDir, source: true },
+  const queue: Array<{ row: number; col: number; dir: Direction }> = [
+    { row: startRow, col: startCol, dir: startDir },
   ]
 
   while (queue.length > 0) {
@@ -59,8 +58,7 @@ export function traceWave(
 
     const ports = getPorts(cell.shape, cell.rotation)
     const entering = OPPOSITE[step.dir]
-    // Non-source cells must expose the entering port — otherwise the wave is blocked.
-    if (!step.source && !ports.includes(entering)) {
+    if (!ports.includes(entering)) {
       exits.push({ row: step.row, col: step.col, dir: step.dir, blocked: true })
       continue
     }
