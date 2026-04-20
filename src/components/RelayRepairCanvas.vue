@@ -15,6 +15,8 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 import type { RelayRepairMiniGame } from '@/lib/minigame/relayRepair/RelayRepairMiniGame'
 import { getRelayPuzzle } from '@/lib/minigame/relayRepair/puzzles'
+import { getRelayDifficulty } from '@/lib/minigame/relayRepair/difficulty'
+import { applyRelayDifficulty } from '@/lib/minigame/relayRepair/applyDifficulty'
 import {
   CAPTION_FADE_MS,
   CELL_PX,
@@ -61,7 +63,8 @@ const SINK_ROW = 2
 const SINK_COL = GRID_COLS
 const SINK_DIR: Direction = 'E'
 
-const cells = reactive(puzzle.cells.map((c) => ({ ...c })))
+const tier = getRelayDifficulty(props.mission.giverPlanet)
+const cells = reactive(applyRelayDifficulty(puzzle.cells, props.mission.template.id, tier))
 const selectedId = ref<string>(puzzle.startSelected)
 const hoveredId = ref<string | null>(null)
 
