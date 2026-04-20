@@ -2525,14 +2525,23 @@ body {
 .relay-osc__lock {
   @apply text-emerald-300;
 }
-.relay-osc__trace {
-  @apply absolute inset-x-0 bottom-0;
+.relay-osc__svg {
+  @apply absolute inset-x-0 bottom-0 w-full;
   height: 48px;
-  background: repeating-linear-gradient(
-    to right,
-    transparent 0 49px,
-    rgba(34, 211, 238, 0.12) 49px 50px
-  );
+}
+.relay-osc__grid {
+  stroke: rgba(34, 211, 238, 0.06);
+  stroke-width: 1;
+}
+.relay-osc__baseline {
+  stroke: rgba(34, 211, 238, 0.18);
+  stroke-dasharray: 2 4;
+}
+.relay-osc__wave {
+  fill: none;
+  stroke: #34d399;
+  stroke-width: 1.5;
+  filter: drop-shadow(0 0 2px #34d399);
 }
 .relay-grid-panel {
   @apply relative border border-cyan-400/25 bg-slate-950/70 px-8 py-4;
@@ -2648,3 +2657,36 @@ body {
 .relay-caption-enter-active { transition: opacity 1200ms ease-in; }
 .relay-caption-enter-from { opacity: 0; }
 .relay-caption-enter-to { opacity: 1; }
+.relay-terminal-line {
+  stroke: rgba(103, 232, 249, 0.3);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.relay-terminal-line--active {
+  stroke: #34d399;
+}
+.relay-terminal-arrow {
+  fill: rgba(103, 232, 249, 0.3);
+}
+.relay-terminal-arrow--active {
+  fill: #34d399;
+}
+.relay-terminal-label {
+  fill: #cffafe;
+  font-size: 11px;
+  font-family: monospace;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+.relay-terminal-sublabel {
+  fill: #fbbf24;
+  font-size: 9px;
+  font-family: monospace;
+  letter-spacing: 1.5px;
+}
+.relay-terminal-sublabel--active {
+  fill: #34d399;
+}
+.relay-cell--hovered .relay-node-body {
+  stroke: #7dd3fc;
+}

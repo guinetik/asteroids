@@ -238,6 +238,16 @@ function onKeyDown(e: KeyboardEvent): void {
   if (k === 'e' && canLock.value) { e.preventDefault(); handleLockIn(); return }
 }
 
+/** Static sine wave used by the oscilloscope strip — 1200 px wide so browsers tile it cleanly. */
+const oscPath = (() => {
+  const pts: string[] = []
+  for (let x = 0; x < 1200; x += 2) {
+    const y = 24 + Math.sin(x * 0.06) * 14
+    pts.push(`${x},${y}`)
+  }
+  return 'M ' + pts.join(' L ')
+})()
+
 onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
   props.minigame.reportQuality(quality.value)
@@ -263,7 +273,19 @@ onUnmounted(() => {
         <span>INPUT SIGNAL · {{ puzzle.carrier }} · CLEAN</span>
         <span class="relay-osc__lock">● CARRIER LOCKED</span>
       </div>
-      <div class="relay-osc__trace" />
+      <svg class="relay-osc__svg" preserveAspectRatio="none" viewBox="0 0 600 48">
+        <line
+          v-for="i in 12"
+          :key="`osc-v-${i}`"
+          :x1="(i - 1) * 50"
+          y1="0"
+          :x2="(i - 1) * 50"
+          y2="48"
+          class="relay-osc__grid"
+        />
+        <line x1="0" y1="24" x2="600" y2="24" class="relay-osc__baseline" />
+        <path :d="oscPath" class="relay-osc__wave" />
+      </svg>
     </div>
 
     <div class="relay-grid-panel">
@@ -391,6 +413,71 @@ onUnmounted(() => {
             r="3"
             class="relay-dead-end"
           />
+        </g>
+
+        <!-- Source terminal (IN) flanking cell (0,0) at the grid's west edge -->
+        <g>
+          <line
+            :x1="portEdge(SOURCE_ROW, SOURCE_COL, 'W').x - 18"
+            :y1="portEdge(SOURCE_ROW, SOURCE_COL, 'W').y"
+            :x2="portEdge(SOURCE_ROW, SOURCE_COL, 'W').x"
+            :y2="portEdge(SOURCE_ROW, SOURCE_COL, 'W').y"
+            class="relay-terminal-line relay-terminal-line--active"
+          />
+          <polygon
+            :points="`
+              ${portEdge(SOURCE_ROW, SOURCE_COL, 'W').x - 10},${portEdge(SOURCE_ROW, SOURCE_COL, 'W').y - 6}
+              ${portEdge(SOURCE_ROW, SOURCE_COL, 'W').x},${portEdge(SOURCE_ROW, SOURCE_COL, 'W').y}
+              ${portEdge(SOURCE_ROW, SOURCE_COL, 'W').x - 10},${portEdge(SOURCE_ROW, SOURCE_COL, 'W').y + 6}
+            `"
+            class="relay-terminal-arrow relay-terminal-arrow--active"
+          />
+          <text
+            :x="portEdge(SOURCE_ROW, SOURCE_COL, 'W').x - 28"
+            :y="portEdge(SOURCE_ROW, SOURCE_COL, 'W').y - 4"
+            class="relay-terminal-label"
+            text-anchor="end"
+          >IN</text>
+          <text
+            :x="portEdge(SOURCE_ROW, SOURCE_COL, 'W').x - 28"
+            :y="portEdge(SOURCE_ROW, SOURCE_COL, 'W').y + 10"
+            class="relay-terminal-sublabel relay-terminal-sublabel--active"
+            text-anchor="end"
+          >{{ puzzle.carrier }} · LOCKED</text>
+        </g>
+
+        <!-- Sink terminal (OUT) flanking cell (SINK_ROW, GRID_COLS - 1) at the grid's east edge -->
+        <g>
+          <line
+            :x1="portEdge(SINK_ROW, GRID_COLS - 1, 'E').x"
+            :y1="portEdge(SINK_ROW, GRID_COLS - 1, 'E').y"
+            :x2="portEdge(SINK_ROW, GRID_COLS - 1, 'E').x + 18"
+            :y2="portEdge(SINK_ROW, GRID_COLS - 1, 'E').y"
+            class="relay-terminal-line"
+            :class="{ 'relay-terminal-line--active': sinkReached }"
+          />
+          <polygon
+            :points="`
+              ${portEdge(SINK_ROW, GRID_COLS - 1, 'E').x + 18},${portEdge(SINK_ROW, GRID_COLS - 1, 'E').y - 6}
+              ${portEdge(SINK_ROW, GRID_COLS - 1, 'E').x + 28},${portEdge(SINK_ROW, GRID_COLS - 1, 'E').y}
+              ${portEdge(SINK_ROW, GRID_COLS - 1, 'E').x + 18},${portEdge(SINK_ROW, GRID_COLS - 1, 'E').y + 6}
+            `"
+            class="relay-terminal-arrow"
+            :class="{ 'relay-terminal-arrow--active': sinkReached }"
+          />
+          <text
+            :x="portEdge(SINK_ROW, GRID_COLS - 1, 'E').x + 38"
+            :y="portEdge(SINK_ROW, GRID_COLS - 1, 'E').y - 4"
+            class="relay-terminal-label"
+            text-anchor="start"
+          >OUT</text>
+          <text
+            :x="portEdge(SINK_ROW, GRID_COLS - 1, 'E').x + 38"
+            :y="portEdge(SINK_ROW, GRID_COLS - 1, 'E').y + 10"
+            class="relay-terminal-sublabel"
+            :class="{ 'relay-terminal-sublabel--active': sinkReached }"
+            text-anchor="start"
+          >{{ sinkReached ? 'CARRIER OK' : 'NO CARRIER' }}</text>
         </g>
       </svg>
     </div>
