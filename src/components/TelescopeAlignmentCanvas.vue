@@ -467,6 +467,8 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@reference 'tailwindcss';
+
 .telescope-overlay {
   @apply fixed inset-0 z-50 flex flex-col gap-4 p-6 font-mono text-cyan-100;
   background-color: #05070c;
