@@ -2,11 +2,11 @@
  * In-scene controller for the satellite servicing minigame.
  *
  * Attaches to a satellite POI during EVA, applies a red wireframe overlay to
- * each broken component, detects when the EVA player drifts into interact
- * range of a still-broken component, shows a "FIX [F]" billboard, and on
- * F-press stubs the repair (marks the component repaired, fades the overlay,
- * calls `minigame.markRepaired`). The real drag mechanic lands in a later
- * plan; this skeleton ships the end-to-end loop with a single-press stub.
+ * each broken component, and runs a forward raycast from the FPS camera to
+ * detect aim. The aimed component's wireframe turns orange and shows a
+ * "[F] FIX" billboard; F-press while aimed calls `minigame.markRepaired`,
+ * fades the overlay, and removes it. Completing all repairs fires the
+ * minigame's `onComplete`, which the host pipes into its reward chain.
  *
  * @author guinetik
  * @date 2026-04-19
@@ -17,8 +17,11 @@ import type { SatelliteServicingMiniGame } from '@/lib/minigame/satelliteServici
 import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 import { validateManifest } from '@/lib/satellites/satelliteManifests'
 
-/** Distance (world units) within which a FIX prompt appears above a broken component. */
-const FIX_PROMPT_RANGE = 2.5
+/** Maximum raycast distance (world units) for aim detection. Rays longer than this don't highlight a component. */
+const AIM_RAYCAST_MAX_DISTANCE = 15
+
+/** Orange emissive color applied to the wireframe of the currently aimed-at broken component. */
+const AIM_HIGHLIGHT_COLOR = 0xfb923c
 
 /** Red emissive wireframe color for damaged components. */
 const DAMAGE_WIREFRAME_COLOR = 0xf87171
@@ -63,8 +66,10 @@ const PANEL_FILL = 'rgba(5, 7, 12, 0.8)'
 export interface SatelliteRepairControllerConfig {
   /** POI root — walked for named rigged sub-objects. */
   poiObject: THREE.Object3D
-  /** Source of the EVA player world position for proximity checks. */
-  getPlayerPosition: () => THREE.Vector3
+  /** Provider of the FPS camera used for raycast aim detection. May return null between frames if the camera is being swapped. */
+  getCamera?: () => THREE.Camera | null
+  /** @deprecated Unused after the raycast rewrite; removed in Task 3. */
+  getPlayerPosition?: () => THREE.Vector3
   /** True while the F-press should register as a repair attempt. */
   isFixKeyPressed: () => boolean
   /** The minigame instance — controller calls `markRepaired(name)` on success. */
@@ -75,18 +80,20 @@ export interface SatelliteRepairControllerConfig {
 
 /** Internal per-component state. Tracks the source object, damage overlay, prompt, and fade. */
 interface DamagedComponent {
-  /** Named sub-object identifier matching the satellite manifest. */
+  /** Name of the rigged sub-object this component represents. */
   name: string
-  /** The original POI sub-object being overlaid. */
+  /** Source Object3D on the POI tree — the wireframe overlay sits on top of this. */
   source: THREE.Object3D
-  /** Red wireframe group parented under `source`. */
+  /** Red (or orange when aimed) wireframe overlay group. */
   wireframe: THREE.Object3D
-  /** Billboard sprite parented under `source`, toggled in proximity. */
+  /** FIX-prompt billboard shown only when this component is the current aim target. */
   promptBillboard: THREE.Sprite
-  /** True once a repair is triggered — drives fade animation. */
+  /** Set to true when `markRepaired` fires for this component; drives the fade-out loop. */
   fading: boolean
-  /** Accumulated time since fade started, in seconds. */
+  /** Elapsed fade seconds, capped at `WIREFRAME_FADE_SECONDS`. */
   fadeTimer: number
+  /** Whether this component is the current aim target — drives wireframe color + prompt visibility. */
+  aimed: boolean
 }
 
 /**
@@ -95,7 +102,7 @@ interface DamagedComponent {
  * Usage:
  * ```ts
  * const controller = new SatelliteRepairController()
- * controller.attach({ poiObject, getPlayerPosition, isFixKeyPressed, minigame, mission })
+ * controller.attach({ poiObject, getCamera, isFixKeyPressed, minigame, mission })
  * // …later, per frame…
  * controller.tick(dt)
  * // …on minigame.onComplete or forced abort…
@@ -110,8 +117,11 @@ export class SatelliteRepairController {
   private components: DamagedComponent[] = []
   private prevFixKey = false
 
-  /** Reused scratch vector for per-component player-distance checks in `tick`. */
-  private readonly _tmpPlayerDist = new THREE.Vector3()
+  /** Reused raycaster for per-frame aim detection. */
+  private readonly _raycaster = new THREE.Raycaster()
+
+  /** Reused forward vector sampled from the camera each frame. */
+  private readonly _forward = new THREE.Vector3()
 
   /**
    * Attach to a scene + POI. Looks up each broken component by name, applies
@@ -146,48 +156,60 @@ export class SatelliteRepairController {
         promptBillboard,
         fading: false,
         fadeTimer: 0,
+        aimed: false,
       })
     }
   }
 
   /**
-   * Per-frame update. Runs proximity detection for broken components, shows
-   * the FIX prompt on the nearest in-range one, and applies the single-press
-   * stub repair when the F key transitions pressed.
+   * Per-frame update. Runs a forward raycast from the FPS camera to detect
+   * which broken component the player is aiming at, turns its wireframe orange,
+   * shows the FIX prompt, and on F-press triggers the repair stub.
    *
    * @param dt - Delta time in seconds.
    */
   tick(dt: number): void {
     if (!this.cfg) return
-    const player = this.cfg.getPlayerPosition()
+    const camera = this.cfg.getCamera?.() ?? null
 
-    let nearest: DamagedComponent | null = null
-    let nearestDist = FIX_PROMPT_RANGE
+    // Find the aimed-at component via a forward raycast from the camera. The
+    // raycast hits MESH descendants of each component's source node; we match
+    // back to the component by ancestry.
+    let aimed: DamagedComponent | null = null
+    if (camera) {
+      camera.getWorldDirection(this._forward)
+      this._raycaster.set(camera.position, this._forward)
+      this._raycaster.far = AIM_RAYCAST_MAX_DISTANCE
+      aimed = this.pickAimedComponent()
+    }
+
+    // Apply aim state changes — swap wireframe color when entering/leaving aim,
+    // toggle billboard visibility so only the aimed component shows its FIX prompt.
     for (const c of this.components) {
-      if (c.fading) continue
-      c.source.getWorldPosition(this._tmpPlayerDist)
-      const d = this._tmpPlayerDist.distanceTo(player)
-      if (d < nearestDist) {
-        nearest = c
-        nearestDist = d
+      if (c.fading) {
+        c.aimed = false
+        c.promptBillboard.visible = false
+        continue
       }
+      const nowAimed = c === aimed
+      if (nowAimed !== c.aimed) {
+        c.aimed = nowAimed
+        this.setWireframeColor(c.wireframe, nowAimed ? AIM_HIGHLIGHT_COLOR : DAMAGE_WIREFRAME_COLOR)
+      }
+      c.promptBillboard.visible = nowAimed
     }
 
-    // Hide prompts on every component; reveal only the nearest in-range.
-    for (const c of this.components) {
-      c.promptBillboard.visible = c === nearest && !c.fading
-    }
-
+    // F edge-trigger: only while the player is actively aiming at a broken component.
     const fixPressed = this.cfg.isFixKeyPressed()
     const fixJustPressed = fixPressed && !this.prevFixKey
     this.prevFixKey = fixPressed
-    if (fixJustPressed && nearest) {
-      nearest.fading = true
-      nearest.promptBillboard.visible = false
-      this.cfg.minigame.markRepaired(nearest.name)
+    if (fixJustPressed && aimed) {
+      aimed.fading = true
+      aimed.promptBillboard.visible = false
+      this.cfg.minigame.markRepaired(aimed.name)
     }
 
-    // Drive fade + wireframe removal.
+    // Fade loop — unchanged from the proximity version.
     for (const c of this.components) {
       if (!c.fading) continue
       c.fadeTimer += dt
@@ -197,6 +219,51 @@ export class SatelliteRepairController {
         c.wireframe.parent.remove(c.wireframe)
       }
     }
+  }
+
+  /**
+   * Raycast against every non-fading damaged component's source subtree and
+   * return the component whose source tree has the closest mesh intersection.
+   * Returns null if no broken component is in the ray's path.
+   *
+   * @returns The aimed-at component, or null when no broken component is hit.
+   */
+  private pickAimedComponent(): DamagedComponent | null {
+    let nearest: DamagedComponent | null = null
+    let nearestDistance = Number.POSITIVE_INFINITY
+    for (const c of this.components) {
+      if (c.fading) continue
+      const hits = this._raycaster.intersectObject(c.source, true)
+      // Filter hits that actually belong to the source mesh — exclude wireframe
+      // overlay geometry so the raycast doesn't self-hit our own red mesh clones.
+      for (const hit of hits) {
+        if (this.isWireframeDescendant(hit.object)) continue
+        if (hit.distance < nearestDistance) {
+          nearestDistance = hit.distance
+          nearest = c
+        }
+        break
+      }
+    }
+    return nearest
+  }
+
+  /**
+   * True when `obj` lives under any component's wireframe group. Used to
+   * reject self-hits during the aim raycast.
+   *
+   * @param obj - Object3D to test.
+   * @returns Whether the object is inside a wireframe overlay.
+   */
+  private isWireframeDescendant(obj: THREE.Object3D): boolean {
+    for (const c of this.components) {
+      let cur: THREE.Object3D | null = obj
+      while (cur) {
+        if (cur === c.wireframe) return true
+        cur = cur.parent
+      }
+    }
+    return false
   }
 
   /**
@@ -282,6 +349,21 @@ export class SatelliteRepairController {
     sprite.scale.set(BILLBOARD_SCALE_X, BILLBOARD_SCALE_Y, 1)
     sprite.position.set(0, BILLBOARD_LOCAL_Y_OFFSET, 0)
     return sprite
+  }
+
+  /**
+   * Set every wireframe mesh material's base color.
+   *
+   * @param wireframe - Overlay group previously built by `buildWireframe`.
+   * @param hex - Target color as a 24-bit hex number.
+   */
+  private setWireframeColor(wireframe: THREE.Object3D, hex: number): void {
+    wireframe.traverse((obj) => {
+      const mesh = obj as THREE.Mesh
+      if (!mesh.isMesh) return
+      const mat = mesh.material as THREE.MeshBasicMaterial
+      mat.color.setHex(hex)
+    })
   }
 
   /**
