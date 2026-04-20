@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import type { ShuttleMissionBoard } from '../types'
 import {
   createMissionBoard,
   offerMission,
@@ -18,6 +19,13 @@ import { createProfile } from '@/lib/player/profile'
 import { createInventory } from '@/lib/inventory/inventory'
 // Side-effect: register mission materials into item catalog
 import '../missionMaterials'
+
+/** Accept with an empty default hold (Earth pool missions fit this inventory). */
+function acceptWithEmptyHold(board: ShuttleMissionBoard) {
+  const r = acceptMission(board, createInventory())
+  if (!r.ok) throw new Error(`acceptMission failed: ${r.reason ?? 'unknown'}`)
+  return r.board
+}
 
 describe('createMissionBoard', () => {
   it('creates an empty mission board', () => {
@@ -69,7 +77,7 @@ describe('offerMission', () => {
   it('does not offer a mission if restock timer is active', () => {
     const board = createMissionBoard()
     const withOffer = offerMission(board, 'earth')
-    const accepted = acceptMission(withOffer)
+    const accepted = acceptWithEmptyHold(withOffer)
     const reoffered = offerMission(accepted, 'earth')
     expect(reoffered.offeredMission).toBeNull()
   })
@@ -79,7 +87,8 @@ describe('acceptMission', () => {
   it('moves offered mission to active list', () => {
     const board = offerMission(createMissionBoard(), 'earth')
     const missionId = board.offeredMission!.id
-    const updated = acceptMission(board)
+    const { ok, board: updated } = acceptMission(board, createInventory())
+    expect(ok).toBe(true)
     expect(updated.offeredMission).toBeNull()
     expect(updated.activeMissions).toHaveLength(1)
     expect(updated.activeMissions[0]!.template.id).toBe(missionId)
@@ -89,22 +98,33 @@ describe('acceptMission', () => {
 
   it('starts restock timer on accept', () => {
     const board = offerMission(createMissionBoard(), 'earth')
-    const updated = acceptMission(board)
+    const { ok, board: updated } = acceptMission(board, createInventory())
+    expect(ok).toBe(true)
     expect(updated.restockTimer).not.toBeNull()
     expect(updated.restockTimer!.remaining).toBeGreaterThan(0)
   })
 
-  it('returns board unchanged if no offered mission', () => {
+  it('returns unchanged board when no offered mission', () => {
     const board = createMissionBoard()
-    const updated = acceptMission(board)
-    expect(updated.activeMissions).toHaveLength(0)
+    const result = acceptMission(board, createInventory())
+    expect(result.ok).toBe(false)
+    expect(result.board.activeMissions).toHaveLength(0)
+  })
+
+  it('rejects when cargo cannot fit planned pickup quantity', () => {
+    const board = offerMission(createMissionBoard(), 'earth')
+    const inventory = { ...createInventory(), maxWeightKg: 0 }
+    const result = acceptMission(board, inventory)
+    expect(result.ok).toBe(false)
+    expect(result.reason).toContain('cargo hold')
+    expect(result.board.offeredMission).not.toBeNull()
   })
 })
 
 describe('completeMission', () => {
   it('adds gather items to inventory and sets status to ready-to-deliver', () => {
     const board = offerMission(createMissionBoard(), 'earth')
-    const accepted = acceptMission(board)
+    const accepted = acceptWithEmptyHold(board)
     const mission = accepted.activeMissions[0]!
     const inventory = createInventory()
 
@@ -116,7 +136,7 @@ describe('completeMission', () => {
 
   it('fails when inventory cannot fit items', () => {
     const board = offerMission(createMissionBoard(), 'earth')
-    const accepted = acceptMission(board)
+    const accepted = acceptWithEmptyHold(board)
     const mission = accepted.activeMissions[0]!
     const inventory = createInventory()
     const fullInventory = { ...inventory, maxWeightKg: 0 }
@@ -137,7 +157,7 @@ describe('completeMission', () => {
 describe('deliverMission', () => {
   it('removes items, awards credits, and removes mission', () => {
     const board = offerMission(createMissionBoard(), 'earth')
-    const accepted = acceptMission(board)
+    const accepted = acceptWithEmptyHold(board)
     const mission = accepted.activeMissions[0]!
     const inventory = createInventory()
     const profile = createProfile('Pilot')
@@ -160,7 +180,7 @@ describe('deliverMission', () => {
 
   it('fails if mission is not ready-to-deliver', () => {
     const board = offerMission(createMissionBoard(), 'earth')
-    const accepted = acceptMission(board)
+    const accepted = acceptWithEmptyHold(board)
     const mission = accepted.activeMissions[0]!
     const inventory = createInventory()
     const profile = createProfile('Pilot')
@@ -173,7 +193,7 @@ describe('deliverMission', () => {
 describe('tickMissionBoard', () => {
   it('decrements restock timer', () => {
     const board = offerMission(createMissionBoard(), 'earth')
-    const accepted = acceptMission(board)
+    const accepted = acceptWithEmptyHold(board)
     const remaining = accepted.restockTimer!.remaining
 
     const ticked = tickMissionBoard(accepted, 10)
@@ -182,7 +202,7 @@ describe('tickMissionBoard', () => {
 
   it('clears timer when it expires', () => {
     const board = offerMission(createMissionBoard(), 'earth')
-    const accepted = acceptMission(board)
+    const accepted = acceptWithEmptyHold(board)
     const remaining = accepted.restockTimer!.remaining
 
     const ticked = tickMissionBoard(accepted, remaining + 1)
@@ -199,7 +219,7 @@ describe('tickMissionBoard', () => {
 describe('getActiveMissionsForPlanet', () => {
   it('returns missions targeting the given planet', () => {
     const board = offerMission(createMissionBoard(), 'earth')
-    const accepted = acceptMission(board)
+    const accepted = acceptWithEmptyHold(board)
     const mission = accepted.activeMissions[0]!
 
     const matches = getActiveMissionsForPlanet(accepted, mission.template.targetPlanet)
@@ -209,7 +229,7 @@ describe('getActiveMissionsForPlanet', () => {
 
   it('returns empty array for unrelated planet', () => {
     const board = offerMission(createMissionBoard(), 'earth')
-    const accepted = acceptMission(board)
+    const accepted = acceptWithEmptyHold(board)
     const matches = getActiveMissionsForPlanet(accepted, 'pluto')
     expect(matches).toHaveLength(0)
   })
@@ -218,7 +238,7 @@ describe('getActiveMissionsForPlanet', () => {
 describe('getDeliverableMissions', () => {
   it('returns ready-to-deliver missions for the giver planet', () => {
     const board = offerMission(createMissionBoard(), 'earth')
-    const accepted = acceptMission(board)
+    const accepted = acceptWithEmptyHold(board)
     const mission = accepted.activeMissions[0]!
     const inventory = createInventory()
     const completed = completeMission(accepted, mission.template.id, inventory)
@@ -229,7 +249,7 @@ describe('getDeliverableMissions', () => {
 
   it('excludes active (not completed) missions', () => {
     const board = offerMission(createMissionBoard(), 'earth')
-    const accepted = acceptMission(board)
+    const accepted = acceptWithEmptyHold(board)
     const deliverable = getDeliverableMissions(accepted, 'earth')
     expect(deliverable).toHaveLength(0)
   })

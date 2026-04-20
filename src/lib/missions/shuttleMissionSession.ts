@@ -147,15 +147,52 @@ export function offerMission(
   }
 }
 
+/** Result of attempting to accept an offered planetary shuttle mission. */
+export interface AcceptMissionResult {
+  /** True when the mission moved to active and the restock timer started. */
+  ok: boolean
+  /** Mission board after accept, or unchanged when `ok` is false. */
+  board: ShuttleMissionBoard
+  /** Explanation when `ok` is false (shown in UI for inventory rejection). */
+  reason?: string
+}
+
 /**
  * Accept the currently offered mission. Moves it to the active list
  * and starts a restock timer.
  *
+ * Rejects when the cargo hold cannot fit the gather quantity that will be
+ * awarded at the target planet (same rule as {@link completeMission}).
+ *
  * @param board - Current mission board state.
- * @returns Updated board with mission accepted and timer started.
+ * @param inventory - Shuttle cargo hold used to validate space for mission pickup.
+ * @returns Updated board with mission accepted and timer started, or unchanged with `ok: false`.
  */
-export function acceptMission(board: ShuttleMissionBoard): ShuttleMissionBoard {
-  if (!board.offeredMission || !board.offeringPlanet) return board
+export function acceptMission(
+  board: ShuttleMissionBoard,
+  inventory: Inventory,
+): AcceptMissionResult {
+  if (!board.offeredMission || !board.offeringPlanet) {
+    return { ok: false, board }
+  }
+
+  const gatherItem = getGatherItemForPlanet(board.offeredMission.targetPlanet)
+  if (!gatherItem) {
+    return {
+      ok: false,
+      board,
+      reason: 'No gather item configured for target planet',
+    }
+  }
+
+  if (!canFitItem(inventory, gatherItem, board.offeredMission.gatherQuantity)) {
+    return {
+      ok: false,
+      board,
+      reason:
+        'Your cargo hold cannot fit this pickup. Sell items at the station shop to make room.',
+    }
+  }
 
   const newActive: ActiveShuttleMission = {
     template: board.offeredMission,
@@ -166,10 +203,13 @@ export function acceptMission(board: ShuttleMissionBoard): ShuttleMissionBoard {
   const total = randomRestockDuration()
 
   return {
-    ...board,
-    offeredMission: null,
-    restockTimer: { remaining: total, total },
-    activeMissions: [...board.activeMissions, newActive],
+    ok: true,
+    board: {
+      ...board,
+      offeredMission: null,
+      restockTimer: { remaining: total, total },
+      activeMissions: [...board.activeMissions, newActive],
+    },
   }
 }
 

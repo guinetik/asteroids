@@ -47,6 +47,20 @@ describe('computeSellPrice', () => {
   it('returns 0 for unknown items', () => {
     expect(computeSellPrice('mercury', 'nonexistent')).toBe(0)
   })
+
+  it('applies mineral catalog base × demand × premium for belt metals', () => {
+    const ceresNiFe = computeSellPrice('ceres', 'iron-nickel-alloy')
+    const marsNiFe = computeSellPrice('mars', 'iron-nickel-alloy')
+    expect(ceresNiFe).toBeGreaterThan(marsNiFe)
+    const premium = 1.22
+    expect(marsNiFe).toBe(Math.round(34 * 1.0 * premium))
+  })
+
+  it('prices troilite higher where chemistry clusters demand sulfur feedstock', () => {
+    const venus = computeSellPrice('venus', 'troilite')
+    const mars = computeSellPrice('mars', 'troilite')
+    expect(venus).toBeGreaterThan(mars)
+  })
 })
 
 describe('getDesirabilityPips', () => {
@@ -64,6 +78,16 @@ describe('getDesirabilityPips', () => {
 
   it('returns 0 for unknown items', () => {
     expect(getDesirabilityPips('mercury', 'nonexistent')).toBe(0)
+  })
+
+  it('returns 0 pips for minerals at baseline demand (no premium row)', () => {
+    expect(getDesirabilityPips('mars', 'iron-nickel-alloy')).toBe(0)
+  })
+
+  it('returns pips when a mineral has explicit demand', () => {
+    const pips = getDesirabilityPips('ceres', 'iron-nickel-alloy')
+    expect(pips).toBeGreaterThanOrEqual(1)
+    expect(pips).toBeLessThanOrEqual(5)
   })
 })
 

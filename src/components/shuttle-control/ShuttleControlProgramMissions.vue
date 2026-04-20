@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import type { Inventory } from '@/lib/inventory/types'
+import { canFitItem } from '@/lib/inventory/inventory'
 import type {
   ShuttleMissionBoard,
   ActiveShuttleMission,
@@ -6,14 +9,28 @@ import type {
   GeneratedAsteroidMission,
   MissionRegion,
 } from '@/lib/missions/types'
-import { getPlanetOrbitalConfig } from '@/lib/missions/planetOrbitalConfig'
+import { getGatherItemForPlanet, getPlanetOrbitalConfig } from '@/lib/missions/planetOrbitalConfig'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 import { getPlanet } from '@/lib/planets/catalog'
 
 const props = defineProps<{
   board: ShuttleMissionBoard | null
   dockedPlanet: string | null
+  /** Shuttle cargo hold — used to disable Accept when the pickup cannot fit. */
+  inventory?: Inventory | null
 }>()
+
+/** True when offered planetary cargo can fit in the current hold (or inventory unknown). */
+const canAcceptPlanetaryOffer = computed(() => {
+  const inv = props.inventory
+  const mission = props.board?.offeredMission
+  const giver = props.board?.offeringPlanet
+  if (!mission || !giver || !props.dockedPlanet || giver !== props.dockedPlanet) return true
+  if (!inv) return true
+  const gatherItem = getGatherItemForPlanet(mission.targetPlanet)
+  if (!gatherItem) return false
+  return canFitItem(inv, gatherItem, mission.gatherQuantity)
+})
 
 const emit = defineEmits<{
   acceptMission: []
@@ -118,10 +135,14 @@ function regionLabel(region: MissionRegion): string {
         <button
           type="button"
           class="mission-board-offer__accept-btn"
+          :disabled="!canAcceptPlanetaryOffer"
           @click="emit('acceptMission')"
         >
           Accept
         </button>
+        <p v-if="!canAcceptPlanetaryOffer" class="mission-board-offer__inventory-hint">
+          Cargo hold full — sell items at the station shop (sidebar) to make room for this pickup.
+        </p>
       </div>
 
       <div v-else-if="board?.restockTimer" class="mission-board-empty">

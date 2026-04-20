@@ -5,7 +5,11 @@
       { "itemId": "luxury-foods", "multiplier": 2.0 },
       { "itemId": "purified-water", "multiplier": 2.5 },
       { "itemId": "frost-compounds", "multiplier": 2.5 },
-      { "itemId": "filtration-membranes", "multiplier": 1.8 }
+      { "itemId": "filtration-membranes", "multiplier": 1.8 },
+      { "itemId": "iron-nickel-alloy", "multiplier": 2.8 },
+      { "itemId": "troilite", "multiplier": 3.0 },
+      { "itemId": "magnetite", "multiplier": 2.6 },
+      { "itemId": "iron-sulfides", "multiplier": 2.4 }
     ]
   },
   "venus": {
@@ -14,7 +18,11 @@
       { "itemId": "medicine", "multiplier": 1.8 },
       { "itemId": "construction-prefabs", "multiplier": 1.5 },
       { "itemId": "thermal-regulators", "multiplier": 1.5 },
-      { "itemId": "drill-bits", "multiplier": 1.5 }
+      { "itemId": "drill-bits", "multiplier": 1.5 },
+      { "itemId": "troilite", "multiplier": 3.2 },
+      { "itemId": "iron-sulfides", "multiplier": 2.8 },
+      { "itemId": "pyroxene", "multiplier": 2.5 },
+      { "itemId": "enstatite", "multiplier": 2.4 }
     ]
   },
   "earth": {
@@ -23,7 +31,11 @@
       { "itemId": "exotic-gems", "multiplier": 2.5 },
       { "itemId": "void-crystals", "multiplier": 4.0 },
       { "itemId": "ancient-artifacts", "multiplier": 3.5 },
-      { "itemId": "atmospheric-samples", "multiplier": 2.0 }
+      { "itemId": "atmospheric-samples", "multiplier": 2.0 },
+      { "itemId": "iron-nickel-alloy", "multiplier": 3.2 },
+      { "itemId": "organic-compounds", "multiplier": 3.0 },
+      { "itemId": "magnetite", "multiplier": 2.6 },
+      { "itemId": "enstatite", "multiplier": 2.5 }
     ]
   },
   "mars": {
@@ -32,7 +44,11 @@
       { "itemId": "biocultures", "multiplier": 1.5 },
       { "itemId": "luxury-foods", "multiplier": 1.5 },
       { "itemId": "entertainment-media", "multiplier": 1.5 },
-      { "itemId": "hydroponics-kits", "multiplier": 1.8 }
+      { "itemId": "hydroponics-kits", "multiplier": 1.8 },
+      { "itemId": "water-ice", "multiplier": 3.2 },
+      { "itemId": "iron-oxide", "multiplier": 2.8 },
+      { "itemId": "olivine", "multiplier": 2.4 },
+      { "itemId": "carbonates", "multiplier": 2.2 }
     ]
   },
   "ceres": {
@@ -41,7 +57,12 @@
       { "itemId": "resonance-instruments", "multiplier": 2.0 },
       { "itemId": "luxury-foods", "multiplier": 1.8 },
       { "itemId": "drill-bits", "multiplier": 1.5 },
-      { "itemId": "magnetic-coils", "multiplier": 2.0 }
+      { "itemId": "magnetic-coils", "multiplier": 2.0 },
+      { "itemId": "iron-nickel-alloy", "multiplier": 4.0 },
+      { "itemId": "troilite", "multiplier": 3.6 },
+      { "itemId": "enstatite", "multiplier": 3.6 },
+      { "itemId": "magnetite", "multiplier": 3.0 },
+      { "itemId": "plagioclase-feldspar", "multiplier": 2.8 }
     ]
   },
   "jupiter": {
@@ -50,7 +71,11 @@
       { "itemId": "heat-resistant-alloys", "multiplier": 2.5 },
       { "itemId": "construction-prefabs", "multiplier": 2.0 },
       { "itemId": "textiles", "multiplier": 2.0 },
-      { "itemId": "pressure-vessels", "multiplier": 2.0 }
+      { "itemId": "pressure-vessels", "multiplier": 2.0 },
+      { "itemId": "water-ice", "multiplier": 3.5 },
+      { "itemId": "ammonia-hydrate", "multiplier": 3.4 },
+      { "itemId": "carbon-dioxide-ice", "multiplier": 3.0 },
+      { "itemId": "troilite", "multiplier": 2.2 }
     ]
   },
   "saturn": {
@@ -59,7 +84,11 @@
       { "itemId": "dark-matter-sensors", "multiplier": 3.0 },
       { "itemId": "luxury-foods", "multiplier": 2.5 },
       { "itemId": "navigation-beacons", "multiplier": 2.5 },
-      { "itemId": "medicine", "multiplier": 2.5 }
+      { "itemId": "medicine", "multiplier": 2.5 },
+      { "itemId": "water-ice", "multiplier": 3.6 },
+      { "itemId": "organic-compounds", "multiplier": 3.0 },
+      { "itemId": "ammonia-hydrate", "multiplier": 3.2 },
+      { "itemId": "enstatite", "multiplier": 2.4 }
     ]
   },
   "uranus": {
@@ -68,7 +97,11 @@
       { "itemId": "iron-composites", "multiplier": 2.5 },
       { "itemId": "medicine", "multiplier": 3.0 },
       { "itemId": "plasma-conduits", "multiplier": 2.5 },
-      { "itemId": "construction-prefabs", "multiplier": 2.5 }
+      { "itemId": "construction-prefabs", "multiplier": 2.5 },
+      { "itemId": "ammonia-hydrate", "multiplier": 3.8 },
+      { "itemId": "water-ice", "multiplier": 3.2 },
+      { "itemId": "carbon-dioxide-ice", "multiplier": 3.0 },
+      { "itemId": "hydrated-silicates", "multiplier": 2.6 }
     ]
   },
   "neptune": {
@@ -77,7 +110,11 @@
       { "itemId": "construction-prefabs", "multiplier": 3.0 },
       { "itemId": "entertainment-media", "multiplier": 3.0 },
       { "itemId": "textiles", "multiplier": 3.0 },
-      { "itemId": "biocultures", "multiplier": 3.5 }
+      { "itemId": "biocultures", "multiplier": 3.5 },
+      { "itemId": "water-ice", "multiplier": 3.8 },
+      { "itemId": "carbon-dioxide-ice", "multiplier": 3.4 },
+      { "itemId": "organic-compounds", "multiplier": 3.2 },
+      { "itemId": "troilite", "multiplier": 2.5 }
     ]
   },
   "pluto": {
@@ -86,7 +123,11 @@
       { "itemId": "purified-water", "multiplier": 3.5 },
       { "itemId": "helium-3-cells", "multiplier": 3.5 },
       { "itemId": "medicine", "multiplier": 4.0 },
-      { "itemId": "hydroponics-kits", "multiplier": 3.5 }
+      { "itemId": "hydroponics-kits", "multiplier": 3.5 },
+      { "itemId": "organic-compounds", "multiplier": 4.0 },
+      { "itemId": "water-ice", "multiplier": 3.8 },
+      { "itemId": "carbon-dioxide-ice", "multiplier": 3.6 },
+      { "itemId": "ammonia-hydrate", "multiplier": 3.5 }
     ]
   }
 }

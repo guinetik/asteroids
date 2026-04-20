@@ -185,10 +185,18 @@ export class MapMissionFacade {
     }
   }
 
-  missionAccept(onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null): void {
-    this.board = acceptMission(this.board)
+  missionAccept(
+    inventory: Inventory,
+    onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null,
+  ): { ok: boolean; reason?: string } {
+    const result = acceptMission(this.board, inventory)
+    if (!result.ok) {
+      return { ok: false, reason: result.reason }
+    }
+    this.board = result.board
     this.persistBoard()
     onMissionBoardUpdate?.(this.board)
+    return { ok: true }
   }
 
   offerEvaMissionAtPlanet(

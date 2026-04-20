@@ -2296,9 +2296,13 @@ export class MapViewController implements Tickable {
     this.missionFacade.offerMissionAtPlanet(planetId, this.onMissionBoardUpdate)
   }
 
-  /** Accept the offered mission (from shuttle control UI). */
-  missionAccept(): void {
-    this.missionFacade.missionAccept(this.onMissionBoardUpdate)
+  /**
+   * Accept the offered planetary mission (from shuttle control UI).
+   *
+   * @returns Whether accept succeeded; `reason` when the cargo hold cannot fit the pickup.
+   */
+  missionAccept(): { ok: boolean; reason?: string } {
+    return this.missionFacade.missionAccept(this.playerInventory, this.onMissionBoardUpdate)
   }
 
   /** Generate and offer an asteroid mission based on current difficulty. */

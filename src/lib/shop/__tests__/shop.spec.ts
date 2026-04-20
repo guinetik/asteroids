@@ -73,7 +73,7 @@ describe('sellItem', () => {
     const result = sellItem(profile, inventory, 'olivine', 10)
 
     expect(result.ok).toBe(true)
-    expect(result.profile.credits).toBe(1030)
+    expect(result.profile.credits).toBe(1040)
     expect(result.inventory.stacks[0]!.quantity).toBe(40)
   })
 
@@ -83,7 +83,7 @@ describe('sellItem', () => {
     const result = sellItem(profile, inventory, 'iron-nickel-alloy', 5)
 
     expect(result.ok).toBe(true)
-    expect(result.profile.credits).toBe(1060)
+    expect(result.profile.credits).toBe(1170)
   })
 
   it('fails when item not in inventory', () => {

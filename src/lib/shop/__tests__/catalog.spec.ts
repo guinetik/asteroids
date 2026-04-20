@@ -47,11 +47,11 @@ describe('getBuyPrice', () => {
 
 describe('getSellPrice', () => {
   it('returns correct price for iron-nickel-alloy', () => {
-    expect(getSellPrice('iron-nickel-alloy')).toBe(12)
+    expect(getSellPrice('iron-nickel-alloy')).toBe(34)
   })
 
   it('returns correct price for olivine', () => {
-    expect(getSellPrice('olivine')).toBe(3)
+    expect(getSellPrice('olivine')).toBe(4)
   })
 
   it('returns undefined for non-sellable item', () => {

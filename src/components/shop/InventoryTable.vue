@@ -58,8 +58,23 @@ const rows = computed<DisplayRow[]>(() => {
   return result
 })
 
-function handleSell(itemId: string) {
+/**
+ * Sell one unit from this stack at the station's demand price.
+ *
+ * @param itemId - Inventory item id.
+ */
+function handleSellOne(itemId: string): void {
   emit('sell', itemId, 1)
+}
+
+/**
+ * Sell the entire stack at the station's demand price per unit.
+ *
+ * @param itemId - Inventory item id.
+ * @param quantity - Units in this stack.
+ */
+function handleSellAll(itemId: string, quantity: number): void {
+  emit('sell', itemId, quantity)
 }
 
 function handleUse(itemId: string) {
@@ -102,14 +117,23 @@ function handleUse(itemId: string) {
         >
           {{ row.useLabel }}
         </button>
-        <button
-          v-if="mode === 'sell'"
-          type="button"
-          class="inventory-table__action-btn"
-          @click="handleSell(row.itemId)"
-        >
-          Sell
-        </button>
+        <div v-if="mode === 'sell'" class="inventory-table__sell-actions">
+          <button
+            type="button"
+            class="inventory-table__action-btn"
+            @click="handleSellOne(row.itemId)"
+          >
+            Sell 1
+          </button>
+          <button
+            v-if="row.quantity > 1"
+            type="button"
+            class="inventory-table__action-btn inventory-table__action-btn--sell-all"
+            @click="handleSellAll(row.itemId, row.quantity)"
+          >
+            Sell all
+          </button>
+        </div>
       </div>
     </div>
   </div>

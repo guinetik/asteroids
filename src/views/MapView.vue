@@ -667,7 +667,10 @@ function closeMissionOverlay() {
 }
 
 function handleAcceptMission() {
-  viewController.missionAccept()
+  const result = viewController.missionAccept()
+  if (!result.ok && result.reason) {
+    showMissionNotification(result.reason)
+  }
 }
 
 function handleAcceptAsteroidMission() {
