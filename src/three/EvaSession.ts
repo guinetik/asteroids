@@ -47,7 +47,7 @@ export interface EvaSceneHost {
 const EVA_TRIGGER_RANGE = 8
 
 /** Horizontal (XZ) distance at which the EVA player can re-enter the vehicle. */
-const EVA_RETURN_RANGE = 2.5
+const EVA_RETURN_RANGE = 5
 
 /** Vehicle must be slower than this (world units / s) to initiate EVA. */
 const EVA_MAX_VEHICLE_SPEED = 0.5
@@ -66,10 +66,12 @@ const EVA_RCS_AUDIO_VOLUME = 0.42
 
 /**
  * 3D distance (world units) at which the EVA player sees the "START MAINTENANCE [F]"
- * prompt near a POI. Sized a touch larger than the POI props themselves + the player
- * body radius so the prompt appears as you approach rather than requiring a hull bump.
+ * prompt near a POI. Sized generously so scaled POIs (e.g. the ×20 telescope) trigger
+ * the prompt as you approach, not at the instant you clip the hull. Smaller POIs like
+ * satellites (×1) simply have a bigger forgiveness bubble; the in-scene minigame hook
+ * (satellite servicing) short-circuits this path anyway.
  */
-const EVA_TERMINAL_PROMPT_RANGE = 3.5
+const EVA_TERMINAL_PROMPT_RANGE = 15
 
 /**
  * Minimal vehicle contract the EVA session depends on. {@link ShuttleController}
