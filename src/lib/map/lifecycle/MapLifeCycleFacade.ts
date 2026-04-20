@@ -34,7 +34,7 @@ interface RespawnDeps {
   sceneVisuals: MapSceneVisuals | null
   shipHealth: ShipHealth | null
   orbitFacade: MapOrbitFacade
-  earthController: PlanetSystemController | null
+  planetController: PlanetSystemController | null
   isEmissiveMaterial: (material: THREE.Material) => material is EmissiveMaterial
 }
 
@@ -93,16 +93,16 @@ export class MapLifeCycleFacade {
     audio.notifyShuttleDestroyed()
   }
 
-  respawnAtEarth({
+  respawnAtPlanet({
     shuttleController,
     vehicleCamera,
     sceneVisuals,
     shipHealth,
     orbitFacade,
-    earthController,
+    planetController,
     isEmissiveMaterial,
   }: RespawnDeps): boolean {
-    if (!earthController) return false
+    if (!planetController) return false
 
     shuttleController.resetDeath()
     shuttleController.group.visible = true
@@ -118,7 +118,7 @@ export class MapLifeCycleFacade {
     shuttleController.freeze()
     shuttleController.setInputEnabled(false)
 
-    orbitFacade.beginForcedOrbit(earthController.getWorldX(), earthController.getWorldZ(), {
+    orbitFacade.beginForcedOrbit(planetController.getWorldX(), planetController.getWorldZ(), {
       shuttleController,
       vehicleCamera,
       sceneVisuals,

@@ -58,9 +58,6 @@ const EVA_DOOR_OPEN_THRESHOLD = 0.98
 /** Local offset (vehicle space) where the EVA player appears on exit. */
 const EVA_SPAWN_OFFSET = new THREE.Vector3(0, 2.5, 6)
 
-/** Stub HP for the FPS HUD while the EVA flow doesn't track real damage. */
-const EVA_STUB_HP = 100
-
 /** First-person EVA RCS sits quieter than ship-mounted jets. */
 const EVA_RCS_AUDIO_VOLUME = 0.42
 
@@ -165,6 +162,8 @@ export interface EvaSessionConfig {
   onEvaTelemetry?: (telemetry: FpsTelemetry) => void
   /** Prompt text for the view-level HUD ("EVA [F]", "Return to Shuttle [F]", etc.). */
   onActionPrompt?: (prompt: string | null) => void
+  /** Fired when the EVA player dies (e.g. hypoxia). */
+  onDeath?: (cause: string) => void
 }
 
 /**
@@ -331,6 +330,9 @@ export class EvaSession implements Tickable {
     )
     controller.fpsCamera.yaw = vehicle.heading
     controller.fpsCamera.pitch = 0
+    controller.onDeath = () => {
+      this.handleControllerDeath(vehicle)
+    }
 
     // Colliders must be built after applyHugeScales so AABBs reflect the ×100 shuttle
     // and any per-type POI scale boosts (e.g. telescope ×20).
@@ -396,7 +398,7 @@ export class EvaSession implements Tickable {
     this.controller?.setInput(this.config.inputManager)
   }
 
-  private endSession(vehicle: EvaSessionVehicle): void {
+  private endSession(vehicle: EvaSessionVehicle, restoreVehicle: boolean = true): void {
     const { sceneManager, tickHandler } = this.config
     this.mode = 'idle'
     this.detachPointerLock()
@@ -418,11 +420,19 @@ export class EvaSession implements Tickable {
     this.collisionResolver.clear()
     this.restoreHugeScales()
     this.rcsSound.stop()
-    vehicle.setInputEnabled(true)
-    vehicle.unfreeze()
-    vehicle.closeDoors()
+    if (restoreVehicle) {
+      vehicle.setInputEnabled(true)
+      vehicle.unfreeze()
+      vehicle.closeDoors()
+    }
     this.config.onEvaModeChange?.(false)
     this.setPrompt(null)
+  }
+
+  private handleControllerDeath(vehicle: EvaSessionVehicle): void {
+    if (this.mode === 'idle' || !this.controller) return
+    this.endSession(vehicle, false)
+    this.config.onDeath?.('Hypoxia')
   }
 
   private applyHugeScales(): void {
@@ -443,8 +453,8 @@ export class EvaSession implements Tickable {
   private emitTelemetry(): void {
     if (!this.config.onEvaTelemetry || !this.controller) return
     this.config.onEvaTelemetry({
-      hp: EVA_STUB_HP,
-      maxHp: EVA_STUB_HP,
+      hp: this.controller.hpLevel,
+      maxHp: this.controller.hpCapacity,
       o2Level: this.controller.o2Level,
       o2Capacity: this.controller.o2Capacity,
       sprintCharge: 0,

@@ -16,6 +16,7 @@ import type { Tickable } from '@/lib/Tickable'
 import type { InputManager } from '@/lib/InputManager'
 import type { EvaCollisionResolver } from '@/lib/physics/evaCollisionResolver'
 import { FpsCamera, type FpsCameraConfig } from './FpsCamera'
+import playerConfigJson from '@/data/fps/player-config.json'
 import {
   createTronHologramMaterial,
   disposeTronHologramMaterials,
@@ -133,6 +134,8 @@ const EVA_O2_CAPACITY = 180
 
 /** O2 drained per second just by being in vacuum. */
 const EVA_O2_DRAIN_PER_SEC = 1
+const EVA_MAX_HP = playerConfigJson.health.maxHp
+const EVA_HYPOXIA_DAMAGE_PER_SEC = playerConfigJson.health.hypoxiaDamagePerSecond
 
 /** RTG battery capacity (arbitrary units). */
 const EVA_RTG_CAPACITY = 100
@@ -202,6 +205,10 @@ export class EvaTetherController implements Tickable {
   private thrusting = false
   private o2 = EVA_O2_CAPACITY
   private rtg = EVA_RTG_CAPACITY
+  private hp = EVA_MAX_HP
+  private dead = false
+
+  onDeath: (() => void) | null = null
 
   constructor() {
     this.fpsCamera = new FpsCamera(EVA_CAMERA_CONFIG)
@@ -346,6 +353,21 @@ export class EvaTetherController implements Tickable {
     return EVA_O2_CAPACITY
   }
 
+  /** Current HP remaining (0..max). */
+  get hpLevel(): number {
+    return this.hp
+  }
+
+  /** Max HP. */
+  get hpCapacity(): number {
+    return EVA_MAX_HP
+  }
+
+  /** True once hypoxia or another damage source has killed the EVA player. */
+  get isDead(): boolean {
+    return this.dead
+  }
+
   /** Current RTG charge remaining (0..capacity). */
   get rtgLevel(): number {
     return this.rtg
@@ -360,11 +382,28 @@ export class EvaTetherController implements Tickable {
   refillLifeSupport(): void {
     this.o2 = EVA_O2_CAPACITY
     this.rtg = EVA_RTG_CAPACITY
+    this.hp = EVA_MAX_HP
+    this.dead = false
+  }
+
+  takeDamage(amount: number): void {
+    if (this.dead) return
+    this.hp = Math.max(0, this.hp - amount)
+    if (this.hp <= 0) {
+      this.dead = true
+      this.onDeath?.()
+    }
   }
 
   tick(dt: number): void {
+    if (this.dead) return
+
     this.thrusting = false
     this.o2 = Math.max(0, this.o2 - EVA_O2_DRAIN_PER_SEC * dt)
+    if (this.o2 <= 0) {
+      this.takeDamage(EVA_HYPOXIA_DAMAGE_PER_SEC * dt)
+      if (this.dead) return
+    }
     if (this.input && this.rtg > 0) {
       const yaw = this.fpsCamera.yaw
       const pitch = this.fpsCamera.pitch

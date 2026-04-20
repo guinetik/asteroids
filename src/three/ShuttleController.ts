@@ -19,6 +19,7 @@ import { getSlingshotAutoAlignYaw, getVelocityHeading } from '@/lib/slingshotAut
 import {
   getCurrentShuttleThrusterEfficiencyModifiers,
   getCurrentShuttleThrusterChargeModifiers,
+  getCurrentShuttleSlingshotCruiseSpeedMultiplier,
   getCurrentUpgradeValue,
 } from '@/lib/upgrades'
 /** Any object that can exert gravity on the shuttle */
@@ -219,14 +220,16 @@ export class ShuttleController implements Tickable, PortalVehicle {
   /**
    * Begin a locked slingshot burst that decays to the stable lane speed.
    *
-   * @param finalSpeed - Stable post-settle speed.
+   * @param finalSpeed - Physics exit speed magnitude from orbit launch (before upgrade tuning).
    * @param burstMultiplier - Immediate burst multiplier applied at launch.
    * @param settleDuration - Seconds to decay from burst to final speed.
    * @returns Immediate launch speed.
    */
   beginSlingshotBurst(finalSpeed: number, burstMultiplier: number, settleDuration: number): number {
-    this._slingshotBurstSpeed = finalSpeed * Math.max(1, burstMultiplier)
-    this._slingshotFinalSpeed = finalSpeed
+    const burstM = Math.max(1, burstMultiplier)
+    const cruiseM = getCurrentShuttleSlingshotCruiseSpeedMultiplier()
+    this._slingshotBurstSpeed = finalSpeed * burstM
+    this._slingshotFinalSpeed = finalSpeed * cruiseM
     this._slingshotSettleDuration = Math.max(0, settleDuration)
     this._slingshotSettleElapsed = 0
     this._slingshotSpeed = this._slingshotSettleDuration > 0
@@ -688,6 +691,13 @@ export class ShuttleController implements Tickable, PortalVehicle {
 
   private updateMovement(dt: number): void {
     const p = this.physics
+    const speedUpgradeMultiplier = getCurrentUpgradeValue('shuttleThrusterSpeed')
+    const upgradedMaxThrustSpeed = p.maxThrustSpeed * speedUpgradeMultiplier
+    const upgradedCruiseEquilibrium =
+      (p.speedReturnEquilibriumSpeed === undefined
+        ? p.maxThrustSpeed
+        : p.speedReturnEquilibriumSpeed) * speedUpgradeMultiplier
+    const upgradedMaxGravitySpeed = p.maxGravitySpeed * speedUpgradeMultiplier
 
     // Yaw (A/D) — apply angular torque, builds up angular velocity
     if (this.isYawingLeft) {
@@ -809,8 +819,8 @@ export class ShuttleController implements Tickable, PortalVehicle {
     }
 
     // Decay slingshot speed protection
-    if (!this.slingshotBurstActive && this._slingshotSpeed > p.maxThrustSpeed) {
-      const excess = this._slingshotSpeed - p.maxThrustSpeed
+    if (!this.slingshotBurstActive && this._slingshotSpeed > upgradedMaxThrustSpeed) {
+      const excess = this._slingshotSpeed - upgradedMaxThrustSpeed
       this._slingshotSpeed -= excess * orbitConfig.slingshotDecayRate * dt
     }
 
@@ -822,26 +832,22 @@ export class ShuttleController implements Tickable, PortalVehicle {
     const currentSpeed = this.velocity.length()
     const slingshotProtected =
       this.slingshotBurstActive ||
-      (this._slingshotSpeed > p.maxThrustSpeed &&
+      (this._slingshotSpeed > upgradedMaxThrustSpeed &&
         currentSpeed <= this._slingshotSpeed + SLINGSHOT_PROTECT_SPEED_EPSILON)
 
-    const cruiseEquilibrium =
-      p.speedReturnEquilibriumSpeed === undefined
-        ? p.maxThrustSpeed
-        : p.speedReturnEquilibriumSpeed
-
     // Bleed maneuver / thrust overshoot back toward cruise without snapping heading
-    if (!slingshotProtected && p.speedExcessReturnRate > 0 && cruiseEquilibrium >= 0) {
+    if (!slingshotProtected && p.speedExcessReturnRate > 0 && upgradedCruiseEquilibrium >= 0) {
       const spd = this.velocity.length()
-      if (spd > cruiseEquilibrium + SHUTTLE_VELOCITY_ALIGN_EPSILON) {
-        const excess = spd - cruiseEquilibrium
-        const newSpd = cruiseEquilibrium + excess * Math.exp(-p.speedExcessReturnRate * dt)
+      if (spd > upgradedCruiseEquilibrium + SHUTTLE_VELOCITY_ALIGN_EPSILON) {
+        const excess = spd - upgradedCruiseEquilibrium
+        const newSpd =
+          upgradedCruiseEquilibrium + excess * Math.exp(-p.speedExcessReturnRate * dt)
         this.velocity.multiplyScalar(newSpd / spd)
       }
     }
 
-    if (!slingshotProtected && this.velocity.length() > p.maxGravitySpeed) {
-      this.velocity.setLength(p.maxGravitySpeed)
+    if (!slingshotProtected && this.velocity.length() > upgradedMaxGravitySpeed) {
+      this.velocity.setLength(upgradedMaxGravitySpeed)
     }
 
     // Apply velocity and follow spacetime geometry

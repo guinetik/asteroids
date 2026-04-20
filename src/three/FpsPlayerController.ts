@@ -32,6 +32,10 @@ const ADS_STRAFE_SPEED_SCALE = 0.8
 const AIR_CONTROL_ACCEL_FRACTION = 0.22
 /** Caps how much speed input can add while airborne. */
 const AIR_CONTROL_SPEED_FRACTION = 0.2
+/** Slightly stronger air control while the jump thrusters are held to hover. */
+const HOVER_AIR_CONTROL_ACCEL_FRACTION = 0.4
+/** Hovering still drifts, but gives a little more mid-air steering than a plain jump arc. */
+const HOVER_AIR_CONTROL_SPEED_FRACTION = 0.35
 
 /**
  * Default duration (seconds) that an external lateral impulse keeps the
@@ -95,6 +99,8 @@ export interface FpsPlayerConfig {
     maxSprintSpeed: number
     /** Upward velocity impulse on jump (units/s). */
     jumpForce: number
+    /** Upward acceleration applied while holding jump in mid-air to soften gravity. */
+    hoverForce: number
     /** Downward acceleration (units/s²). */
     gravity: number
   }
@@ -104,6 +110,8 @@ export interface FpsPlayerConfig {
     fuelCapacity: number
     /** O2 drained per second regardless of activity. */
     baseDrainRate: number
+    /** Extra O2 drained per second while the player is holding hover thrust in mid-air. */
+    hoverDrainRate: number
     /** Seconds between O2 empty and death. */
     deathTimerSeconds: number
     /** Per-thruster configuration for sprint and jump. */
@@ -426,6 +434,16 @@ export class FpsPlayerController implements Tickable {
     // --- Base O2 drain (breathing) ---
     this.thrusterSystem.consumeFuel(this.config.o2.baseDrainRate * dt)
 
+    const hoverActive =
+      jumpHeld &&
+      !canJump &&
+      !this.body.grounded &&
+      !this.thrusterSystem.isFuelEmpty
+    if (hoverActive) {
+      this.body.impulse(this.config.movement.hoverForce * dt)
+      this.thrusterSystem.consumeFuel(this.config.o2.hoverDrainRate * dt)
+    }
+
     // --- Hypoxia: HP drain only when O2 tank is empty ---
     if (this.thrusterSystem.isFuelEmpty && !this._dead) {
       this.takeDamage(this.config.health.hypoxiaDamagePerSecond * dt)
@@ -496,15 +514,21 @@ export class FpsPlayerController implements Tickable {
       }
     } else {
       // Airborne: preserve trajectory, but allow a very small amount of steering.
+      const airControlAccelFraction = hoverActive
+        ? HOVER_AIR_CONTROL_ACCEL_FRACTION
+        : AIR_CONTROL_ACCEL_FRACTION
+      const airControlSpeedFraction = hoverActive
+        ? HOVER_AIR_CONTROL_SPEED_FRACTION
+        : AIR_CONTROL_SPEED_FRACTION
       if (wishLen > 0) {
         const dirX = wishX / wishLen
         const dirZ = wishZ / wishLen
         const currentAlongWish = this.lateralVelocity.x * dirX + this.lateralVelocity.z * dirZ
-        const maxAirControlSpeed = maxSpd * AIR_CONTROL_SPEED_FRACTION
+        const maxAirControlSpeed = maxSpd * airControlSpeedFraction
         if (currentAlongWish < maxAirControlSpeed) {
           const addSpeed = Math.min(
             maxAirControlSpeed - currentAlongWish,
-            maxSpd * AIR_CONTROL_ACCEL_FRACTION * dt,
+            maxSpd * airControlAccelFraction * dt,
           )
           this.lateralVelocity.x += dirX * addSpeed
           this.lateralVelocity.z += dirZ * addSpeed

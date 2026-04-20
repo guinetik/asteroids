@@ -98,6 +98,11 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     orbitedSolarBodies = p.orbitedSolarBodies as Record<string, number>
   }
 
+  const lastDockedPlanetId =
+    typeof p.lastDockedPlanetId === 'string' && p.lastDockedPlanetId.trim().length > 0
+      ? p.lastDockedPlanetId
+      : 'earth'
+
   /**
    * Saves written before `hasSeenIntro` existed are treated as already onboarded so existing
    * players are not forced through the intro again.
@@ -110,6 +115,7 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     completedMissionCount,
     visitedAsteroids,
     orbitedSolarBodies,
+    lastDockedPlanetId,
     hasSeenIntro,
   }
 }
@@ -122,6 +128,7 @@ export function createProfile(name: string): PlayerProfile {
     completedMissionCount: 0,
     visitedAsteroids: {},
     orbitedSolarBodies: {},
+    lastDockedPlanetId: 'earth',
     hasSeenIntro: false,
   }
 }
@@ -195,4 +202,10 @@ export function recordSolarBodyFirstOrbit(profile: PlayerProfile, bodyKey: strin
       [bodyKey]: 1,
     },
   }
+}
+
+/** Return a copy of the profile with the map respawn planet updated. */
+export function setLastDockedPlanet(profile: PlayerProfile, planetId: string): PlayerProfile {
+  if (profile.lastDockedPlanetId === planetId) return profile
+  return { ...profile, lastDockedPlanetId: planetId }
 }

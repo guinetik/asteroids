@@ -26,6 +26,11 @@ export interface PlayerProfile {
    */
   orbitedSolarBodies: Record<string, number>
   /**
+   * Planet id used for map respawn placement after refresh or death. Updated when orbit capture
+   * completes around a real planet; excludes the Sun.
+   */
+  lastDockedPlanetId: string | null
+  /**
    * After the opening map intro cinematic has played once, this is true and that cinematic is
    * skipped on later visits. Independent of ship mail — Marta/Jay timing uses the message system.
    */

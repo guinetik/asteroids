@@ -32,6 +32,14 @@ function createController(): {
   return { ctrl, input, cam }
 }
 
+function pressKey(code: string): void {
+  window.dispatchEvent(new KeyboardEvent('keydown', { code }))
+}
+
+function releaseKey(code: string): void {
+  window.dispatchEvent(new KeyboardEvent('keyup', { code }))
+}
+
 describe('FpsPlayerController', () => {
   it('spawns at given position', () => {
     const { ctrl } = createController()
@@ -101,6 +109,24 @@ describe('FpsPlayerController', () => {
     expect(ctrl.hp).toBe(0)
     expect(ctrl.isDead).toBe(true)
     expect(died).toBe(true)
+  })
+
+  it('holding jump in mid-air hovers and consumes extra o2', () => {
+    const { ctrl, input } = createController()
+    ctrl.group.position.y = 0
+    ctrl.tick(0.016)
+    ctrl.jump()
+
+    pressKey('Space')
+    input.tick(0.016)
+    const beforeY = ctrl.group.position.y
+    const beforeO2 = ctrl.o2Level
+    ctrl.tick(0.25)
+    releaseKey('Space')
+    input.tick(0.016)
+
+    expect(ctrl.group.position.y).toBeGreaterThan(beforeY)
+    expect(ctrl.o2Level).toBeLessThan(beforeO2 - playerConfigJson.o2.baseDrainRate * 0.25)
   })
 
   it('ground friction decelerates lateral velocity', () => {

@@ -8,14 +8,16 @@
     "sprintMultiplier": 2.0,
     "groundFriction": 25.0,
     "airFriction": 0.2,
-    "maxSpeed": 20.0,
-    "maxSprintSpeed": 40.0,
+    "maxSpeed": 12.0,
+    "maxSprintSpeed": 24.0,
     "jumpForce": 12.0,
-    "gravity": 4.0
+    "gravity": 4.0,
+    "hoverForce": 3.2
   },
   "o2": {
     "fuelCapacity": 100,
     "baseDrainRate": 0.3,
+    "hoverDrainRate": 2.5,
     "deathTimerSeconds": 10,
     "thrusters": {
       "sprint": {

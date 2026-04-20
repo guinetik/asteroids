@@ -110,6 +110,7 @@ import {
   saveProfile,
   addCredits,
   recordSolarBodyFirstOrbit,
+  setLastDockedPlanet,
 } from '@/lib/player/profile'
 import type { PlayerProfile } from '@/lib/player/types'
 import { orbitBodyKeyFromCaptureName } from '@/lib/player/orbitBodyKey'
@@ -675,21 +676,9 @@ export class MapViewController implements Tickable {
     await this.shuttleController.load()
     this.shuttleController.group.scale.setScalar(MAP_CONFIG.MAP_SHUTTLE_SCALE)
     this.sceneVisuals?.attachShuttle(this.shuttleController.group)
+    const earthController = this.getPlanetControllerById('earth')
 
-    // Spawn next to Earth — find its controller by matching PLANETS order
-    const earthIndex = PLANETS.findIndex((p) => p.id === 'earth')
-    const earthController = this.planetControllers[earthIndex]
-    if (earthController) {
-      const ex = earthController.getWorldX()
-      const ez = earthController.getWorldZ()
-      // Place slightly behind Earth (away from the Sun)
-      const awayFromSun = Math.atan2(ez, ex)
-      this.shuttleController.group.position.set(
-        ex + Math.cos(awayFromSun) * MAP_CONFIG.SPAWN_OFFSET_BEHIND_EARTH,
-        0,
-        ez + Math.sin(awayFromSun) * MAP_CONFIG.SPAWN_OFFSET_BEHIND_EARTH,
-      )
-    }
+    this.spawnShuttleAtLastDockedPlanet()
 
     // Render shuttle after Sun corona so opaque shuttle pixels overwrite additive glow
     this.shuttleController.group.traverse((child) => {
@@ -816,7 +805,7 @@ export class MapViewController implements Tickable {
     ]
     this.orbitFacade.initialize(captureBodies)
 
-    // Portal arrival, completed-mission return at waypoint, or default Earth orbit
+    // Portal arrival, completed-mission return at waypoint, or default saved orbit
     this.portalArrival = new PortalArrivalSequence()
 
     // Freeze the orrery now so Earth stays at its current position during the portal animation.
@@ -931,16 +920,17 @@ export class MapViewController implements Tickable {
         this.emitIntroUiState()
       }
     }
-    if (!arrived && earthController && !usedMissionCompletionMapSpawn) {
-      const ex = earthController.getWorldX()
-      const ez = earthController.getWorldZ()
+    const initialOrbitController = this.getRespawnPlanetController()
+    if (!arrived && initialOrbitController && !usedMissionCompletionMapSpawn) {
+      const ex = initialOrbitController.getWorldX()
+      const ez = initialOrbitController.getWorldZ()
       this.orbitFacade.beginForcedOrbit(ex, ez, {
         shuttleController: this.shuttleController,
         vehicleCamera: this.vehicleCamera,
         sceneVisuals: this.sceneVisuals,
       })
 
-      if (this.playerProfile.hasSeenIntro) {
+      if (this.playerProfile.hasSeenIntro || initialOrbitController !== earthController) {
         this.mapIntro.skip()
         this.emitIntroUiState()
       } else {
@@ -1873,7 +1863,7 @@ export class MapViewController implements Tickable {
   /** Reset shuttle after death — clear death state, place into Earth orbit. */
   /** Called by Vue when the player clicks Restart on the death overlay. */
   restart(): void {
-    this.respawnAtEarth()
+    this.respawnAtLastDockedPlanet()
     this.onDeathOverlay?.(false, '')
   }
 
@@ -2088,7 +2078,10 @@ export class MapViewController implements Tickable {
     if (!becameOrbiting || !system?.target) return
     const key = orbitBodyKeyFromCaptureName(system.target.name)
     if (!key) return
-    const next = recordSolarBodyFirstOrbit(this.playerProfile, key)
+    let next = recordSolarBodyFirstOrbit(this.playerProfile, key)
+    if (key !== 'sun') {
+      next = setLastDockedPlanet(next, key)
+    }
     if (next === this.playerProfile) return
     this.playerProfile = next
     this.persistPlayerProfile()
@@ -2743,7 +2736,7 @@ export class MapViewController implements Tickable {
     })
   }
 
-  private respawnAtEarth(): void {
+  private respawnAtLastDockedPlanet(): void {
     if (!this.shuttleController || !this.orbitSystem) return
 
     // Ship destroyed — cargo gone; credits kept; shuttle contracts / active asteroid mission voided.
@@ -2772,15 +2765,14 @@ export class MapViewController implements Tickable {
     this.onCreditsUpdate?.(this.playerProfile.credits)
     this.emitFuelCellCount()
 
-    const earthIndex = PLANETS.findIndex((p) => p.id === 'earth')
-    const earthController = this.planetControllers[earthIndex]
-    const didRespawn = this.lifeCycleFacade.respawnAtEarth({
+    const planetController = this.getRespawnPlanetController()
+    const didRespawn = this.lifeCycleFacade.respawnAtPlanet({
       shuttleController: this.shuttleController,
       vehicleCamera: this.vehicleCamera,
       sceneVisuals: this.sceneVisuals,
       shipHealth: this.shipHealth,
       orbitFacade: this.orbitFacade,
-      earthController: earthController ?? null,
+      planetController,
       isEmissiveMaterial,
     })
     if (!didRespawn) return
@@ -2794,6 +2786,27 @@ export class MapViewController implements Tickable {
     this.adriftTimer = 0
     this.resetWorldLineHistory()
     this.updateMissionState()
+  }
+
+  /** Place the shuttle near the saved docked planet, falling back to Earth for older/invalid saves. */
+  private spawnShuttleAtLastDockedPlanet(): void {
+    if (!this.shuttleController) return
+    const controller = this.getRespawnPlanetController()
+    if (!controller) return
+    const px = controller.getWorldX()
+    const pz = controller.getWorldZ()
+    const awayFromSun = Math.atan2(pz, px)
+    this.shuttleController.group.position.set(
+      px + Math.cos(awayFromSun) * MAP_CONFIG.SPAWN_OFFSET_BEHIND_EARTH,
+      0,
+      pz + Math.sin(awayFromSun) * MAP_CONFIG.SPAWN_OFFSET_BEHIND_EARTH,
+    )
+  }
+
+  /** Resolve the saved respawn planet controller with Earth fallback when the save is missing/invalid. */
+  private getRespawnPlanetController(): PlanetSystemController | null {
+    const savedPlanetId = this.playerProfile.lastDockedPlanetId ?? 'earth'
+    return this.getPlanetControllerById(savedPlanetId) ?? this.getPlanetControllerById('earth')
   }
 
   /**
@@ -3865,6 +3878,16 @@ export class MapViewController implements Tickable {
       onEvaTelemetry: (t) => this.onEvaTelemetry?.(t),
       onActionPrompt: (p) => {
         this.currentEvaPrompt = p
+      },
+      onDeath: (cause) => {
+        if (this.activeEvaMinigame) {
+          this.activeEvaMinigame.dispose()
+          this.activeEvaMinigame = null
+          if (this.vehicleCamera) this.vehicleCamera.controls.enabled = true
+          this.onEvaMinigameChange?.(null)
+        }
+        this.currentAimPrompt = null
+        this.triggerDeath(cause)
       },
     })
   }
