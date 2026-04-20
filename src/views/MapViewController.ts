@@ -2368,6 +2368,11 @@ export class MapViewController implements Tickable {
         `[MapViewController] In-scene minigame "${minigameType}" reached beginEvaMinigame; auto-attach is missing. Falling back to overlay.`,
       )
     }
+    // Disable OrbitControls while the overlay is open. Without this, clicks on
+    // or through the overlay can reach the canvas underneath and trigger
+    // OrbitControls.setPointerCapture on an element that just lost pointer
+    // lock — which throws InvalidStateError.
+    this.vehicleCamera.controls.enabled = false
     this.onEvaMinigameChange?.({ mission, minigame })
   }
 
@@ -2383,6 +2388,7 @@ export class MapViewController implements Tickable {
     this.activeEvaMinigame = null
     this.satelliteRepairController?.dispose()
     this.satelliteRepairController = null
+    this.vehicleCamera.controls.enabled = true
     this.onEvaMinigameChange?.(null)
     this.evaSession?.endMinigame()
   }
@@ -2417,6 +2423,7 @@ export class MapViewController implements Tickable {
     this.satelliteRepairController?.dispose()
     this.satelliteRepairController = null
     this.currentAimPrompt = null
+    this.vehicleCamera.controls.enabled = true
     this.onEvaMinigameChange?.(null)
     this.evaSession?.endMinigame()
   }
