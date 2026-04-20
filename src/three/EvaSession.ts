@@ -375,8 +375,11 @@ export class EvaSession implements Tickable {
     this.setPrompt(null)
     // Zero the player's residual velocity so they don't drift away from the POI
     // while the overlay is open. setPosition zeroes velocity as a side-effect.
+    // Also detach the input manager so minigame keybinds (Q/W/A/S/Z/X/C/V) don't
+    // bleed through to the EVA thrusters while the overlay is open.
     if (this.controller) {
       this.controller.setPosition(this.controller.group.position)
+      this.controller.setInput(null)
     }
     this.config.onStartEvaMinigame?.()
   }
@@ -389,6 +392,8 @@ export class EvaSession implements Tickable {
     if (this.mode !== 'minigame') return
     this.mode = 'active'
     this.attachPointerLock()
+    // Restore input after the overlay closes so thrust resumes.
+    this.controller?.setInput(this.config.inputManager)
   }
 
   private endSession(vehicle: EvaSessionVehicle): void {

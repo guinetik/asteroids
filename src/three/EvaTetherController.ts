@@ -63,7 +63,7 @@ const TETHER_PLAYER_LOOKDOWN_DROP = 0.55
 const TETHER_PLAYER_LOOKDOWN_BACKSHIFT = 0.32
 
 /** Hidden guide point behind the player used as the visible end of the rope in first person. */
-const TETHER_PLAYER_GUIDE_LOCAL_OFFSET = new THREE.Vector3(0, -1.28, 0.86)
+const TETHER_PLAYER_GUIDE_LOCAL_OFFSET = new THREE.Vector3(0.08, -1.34, 0.96)
 
 /** Extra guide-point drop while looking down. */
 const TETHER_PLAYER_GUIDE_LOOKDOWN_DROP = 0.2
@@ -73,6 +73,12 @@ const TETHER_PLAYER_GUIDE_LOOKDOWN_BACKSHIFT = 0.24
 
 /** Hide the final rope segments nearest the camera and end the visible tether at the guide point. */
 const TETHER_RENDER_HIDDEN_SEGMENTS = 3
+
+/** Number of visible tail segments softly steered into the backpack guide point. */
+const TETHER_RENDER_GUIDE_SEGMENTS = 6
+
+/** How strongly the visible tail bends toward the hidden backpack guide path. */
+const TETHER_RENDER_GUIDE_STRENGTH = 0.88
 
 /** Radius of the tether tube (world units). */
 const TETHER_RADIUS = 0.02
@@ -99,10 +105,10 @@ const TETHER_CONSTRAINT_ITERATIONS = 10
 const TETHER_POINT_DAMPING = 0.985
 
 /** How much player-end motion feeds into the rope as a soft traveling wave. */
-const TETHER_PLAYER_MOTION_COUPLING = 0.16
+const TETHER_PLAYER_MOTION_COUPLING = 0.28
 
 /** Damp the injected endpoint motion so the rope stays calm and EVA-like. */
-const TETHER_PLAYER_MOTION_DAMPING = 0.72
+const TETHER_PLAYER_MOTION_DAMPING = 0.82
 
 /** Local shuttle-space offset where the tether attaches on the shuttle underside. */
 const TETHER_ANCHOR_LOCAL_OFFSET = new THREE.Vector3(0, -1.15, 0.55)
@@ -183,6 +189,8 @@ export class EvaTetherController implements Tickable {
   private readonly ropeDelta = new THREE.Vector3()
   private readonly ropeVelocity = new THREE.Vector3()
   private readonly ropeDirection = new THREE.Vector3()
+  private readonly renderGuideStart = new THREE.Vector3()
+  private readonly renderGuideTarget = new THREE.Vector3()
   private readonly playerAttachEuler = new THREE.Euler(0, 0, 0, 'YXZ')
   private readonly playerAttachQuat = new THREE.Quaternion()
   private readonly previousPlayerAttachWorld = new THREE.Vector3()
@@ -273,8 +281,7 @@ export class EvaTetherController implements Tickable {
       .copy(TETHER_PLAYER_GUIDE_LOCAL_OFFSET)
       .add(this.playerGuideLookDownOffset)
 
-    this.playerAttachEuler.set(0, this.fpsCamera.yaw, 0)
-    this.playerAttachQuat.setFromEuler(this.playerAttachEuler)
+    this.playerAttachQuat.copy(this.fpsCamera.camera.quaternion)
     this.playerGuideOffsetWorld
       .copy(this.playerGuideLocal)
       .applyQuaternion(this.playerAttachQuat)
@@ -283,8 +290,8 @@ export class EvaTetherController implements Tickable {
       .add(this.playerGuideOffsetWorld)
   }
 
-  /** Provide the input manager that supplies EVA action state. */
-  setInput(input: InputManager): void {
+  /** Provide the input manager that supplies EVA action state, or null to lock input. */
+  setInput(input: InputManager | null): void {
     this.input = input
   }
 
@@ -507,7 +514,7 @@ export class EvaTetherController implements Tickable {
         pt.add(this.ropeVelocity)
 
         const t = i / TETHER_SEGMENTS
-        const playerInfluence = Math.pow(t, 2.2) * (1 - tautRatio * 0.35)
+        const playerInfluence = Math.pow(t, 1.7) * (1 - tautRatio * 0.28)
         if (playerInfluence > 0.0001) {
           pt.addScaledVector(
             this.playerAttachDelta,
@@ -558,7 +565,23 @@ export class EvaTetherController implements Tickable {
     const renderPoints = this.tetherCurvePoints
       .slice(0, visiblePointCount)
       .map((pt) => pt.clone())
-    renderPoints[renderPoints.length - 1] = visibleEnd.clone()
+    const lastIndex = renderPoints.length - 1
+    renderPoints[lastIndex] = visibleEnd.clone()
+
+    const guideSegmentCount = Math.min(TETHER_RENDER_GUIDE_SEGMENTS, lastIndex)
+    if (guideSegmentCount > 0) {
+      this.renderGuideStart.copy(renderPoints[Math.max(0, lastIndex - guideSegmentCount)] ?? renderPoints[0]!)
+      for (let step = 1; step <= guideSegmentCount; step++) {
+        const pointIndex = lastIndex - guideSegmentCount + step
+        const pt = renderPoints[pointIndex]
+        if (!pt) continue
+        const t = step / guideSegmentCount
+        this.renderGuideTarget.lerpVectors(this.renderGuideStart, visibleEnd, t)
+        const blend = THREE.MathUtils.smootherstep(t, 0, 1) * TETHER_RENDER_GUIDE_STRENGTH
+        pt.lerp(this.renderGuideTarget, blend)
+      }
+      renderPoints[lastIndex]?.copy(visibleEnd)
+    }
 
     const curve = new THREE.CatmullRomCurve3(renderPoints)
     const next = new THREE.TubeGeometry(
