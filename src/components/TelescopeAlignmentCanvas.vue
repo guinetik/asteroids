@@ -27,6 +27,8 @@ import {
   DRIFT_CHROMA,
   DRIFT_AZIMUTH,
   DRIFT_ELEVATION,
+  LOCK_ANIMATION_MS,
+  CAPTION_FADE_MS,
 } from '@/lib/minigame/telescopeAlignment/constants'
 import { computeDrift } from '@/lib/minigame/telescopeAlignment/drift'
 import { computeQuality, perKnobQuality, ledColor } from '@/lib/minigame/telescopeAlignment/quality'
@@ -48,11 +50,45 @@ const emit = defineEmits<{
 
 const target = getTelescopeTarget(props.mission.template.id)
 
-/** Placeholder handler until lock-in ships in Task 11. */
-function handleTempComplete(): void {
-  props.minigame.complete()
-  emit('complete')
+/** Lock-in state machine: player is tuning, locking in (animating), or fully locked. */
+type LockState = 'calibrating' | 'locking' | 'locked'
+const lockState = ref<LockState>('calibrating')
+
+/** Ease-out-cubic for the knob-zeroing animation. */
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3)
 }
+
+/** Kick off the lock-in sequence. Animates knobs to zero, then calls complete. */
+function handleLockIn(): void {
+  if (!canLock.value || lockState.value !== 'calibrating') return
+  lockState.value = 'locking'
+  const start = performance.now()
+  const initial: KnobState = { ...knobs }
+  function step(now: number): void {
+    const tNorm = Math.min(1, (now - start) / LOCK_ANIMATION_MS)
+    const k = 1 - easeOutCubic(tNorm)
+    knobs.focus = initial.focus * k
+    knobs.chroma = initial.chroma * k
+    knobs.azimuth = initial.azimuth * k
+    knobs.elevation = initial.elevation * k
+    if (tNorm < 1) {
+      requestAnimationFrame(step)
+    } else {
+      lockState.value = 'locked'
+      props.minigame.complete()
+      window.setTimeout(() => emit('complete'), CAPTION_FADE_MS)
+    }
+  }
+  requestAnimationFrame(step)
+}
+
+/** Status-bar text reflecting current lock state. */
+const statusText = computed(() => {
+  if (lockState.value === 'locked') return 'CAPTURE COMPLETE'
+  if (lockState.value === 'locking') return 'LOCKING IN'
+  return canLock.value ? 'SIGNAL LOCK AVAILABLE' : 'CALIBRATING'
+})
 
 /** Initial knob roll — magnitude 40–100% of range so players always start misaligned. */
 const INIT_ROLL_MIN = 0.4
@@ -168,6 +204,17 @@ function adjust(axis: keyof KnobState, dir: -1 | 1, fine: boolean): void {
 function onKeyDown(e: KeyboardEvent): void {
   const k = e.key.toLowerCase()
   const fine = e.shiftKey
+
+  // Escape always aborts, regardless of lock state.
+  if (k === 'escape') {
+    e.preventDefault()
+    emit('close')
+    return
+  }
+
+  // Once we're locking or locked, freeze tuning input.
+  if (lockState.value !== 'calibrating') return
+
   switch (k) {
     case 'q':
       e.preventDefault()
@@ -200,6 +247,12 @@ function onKeyDown(e: KeyboardEvent): void {
     case 'v':
       e.preventDefault()
       adjust('elevation', +1, fine)
+      break
+    case 'e':
+      if (canLock.value) {
+        e.preventDefault()
+        handleLockIn()
+      }
       break
     default:
       break
@@ -244,9 +297,7 @@ onUnmounted(() => {
     <div class="telescope-status">
       <span class="telescope-status__location">{{ target.label }}</span>
       <span class="telescope-status__mission">{{ mission.template.name }}</span>
-      <span class="telescope-status__state">
-        {{ canLock ? 'SIGNAL LOCK AVAILABLE' : 'CALIBRATING' }}
-      </span>
+      <span class="telescope-status__state">{{ statusText }}</span>
     </div>
 
     <div class="telescope-body">
@@ -349,10 +400,12 @@ onUnmounted(() => {
       <span>ESC · ABORT</span>
     </div>
 
-    <button type="button" class="telescope-temp-complete" @click="handleTempComplete">
-      (WIP) Complete
-    </button>
-    <button type="button" class="telescope-close" @click="emit('close')">Close</button>
+    <transition name="telescope-caption">
+      <div v-if="lockState === 'locked'" class="telescope-caption">
+        <div class="telescope-caption__label">{{ target.label }}</div>
+        <div class="telescope-caption__body">{{ target.caption }}</div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -423,12 +476,24 @@ onUnmounted(() => {
 .telescope-hints {
   @apply flex flex-wrap gap-4 text-xs tracking-widest text-cyan-200;
 }
-.telescope-temp-complete,
-.telescope-close {
-  @apply absolute top-4 right-4 px-3 py-1 border border-cyan-400/40 rounded text-cyan-100;
+.telescope-caption {
+  @apply absolute inset-x-0 bottom-20 mx-auto w-fit border border-emerald-400/60 bg-slate-950/80 px-6 py-3 text-center tracking-widest;
 }
-.telescope-close {
-  right: 140px;
+.telescope-caption__label {
+  @apply text-emerald-200;
+}
+.telescope-caption__body {
+  @apply text-cyan-100 text-xs;
+}
+/* matches CAPTION_FADE_MS = 1200 */
+.telescope-caption-enter-active {
+  transition: opacity 1200ms ease-in;
+}
+.telescope-caption-enter-from {
+  opacity: 0;
+}
+.telescope-caption-enter-to {
+  opacity: 1;
 }
 .bar-red {
   @apply bg-red-400;
