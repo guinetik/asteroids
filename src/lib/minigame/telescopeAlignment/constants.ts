@@ -56,8 +56,11 @@ export const CAPTION_FADE_MS = 1200
 /** Diameter of the eyepiece clip-path circle in px. */
 export const EYEPIECE_DIAMETER_PX = 780
 
+/** Ambient drift amplitude for the focus axis — calmer than other axes to reduce blur flicker. */
+export const DRIFT_AMP_FOCUS = 0.012
+
 /** Per-axis drift oscillator frequency (Hz) and phase offset. */
-export const DRIFT_FOCUS = { freq: 0.73, phase: 0.0, amp: 0.012 } as const
+export const DRIFT_FOCUS = { freq: 0.73, phase: 0.0, amp: DRIFT_AMP_FOCUS } as const
 
 /** Chromatic aberration drift oscillator. */
 export const DRIFT_CHROMA = { freq: 1.03, phase: 1.5, amp: DRIFT_AMP_PCT } as const
