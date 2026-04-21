@@ -154,6 +154,18 @@ function sampleYOffset(thicknessDeg: number): number {
   return rayleigh * (Math.random() < 0.5 ? 1 : -1)
 }
 
+/** World-space snapshot of a belt instance for turret raycast. */
+export interface AsteroidInstanceSnapshot {
+  /** Index into AsteroidBeltController's internal mesh list. */
+  beltMeshIndex: number
+  /** Instance index within that mesh. */
+  localIndex: number
+  /** World-space position at snapshot time. */
+  worldPosition: THREE.Vector3
+  /** Collision radius in world units (already scaled by belt transform). */
+  radius: number
+}
+
 /**
  * Instanced asteroid belt with GLB-based geometry and Kirkwood gap rejection.
  */
@@ -309,6 +321,56 @@ export class AsteroidBeltController {
     const f = Math.max(0, Math.min(1, fraction))
     for (const data of this.instanceDataList) {
       data.mesh.count = Math.max(1, Math.round(data.maxCount * f))
+    }
+  }
+
+  /**
+   * Yield a snapshot of every currently-visible instance in world space.
+   * Used by {@link TurretYieldCoordinator} at session-open to register
+   * belt asteroids for beam targeting.
+   *
+   * Sim is frozen during turret mode, so snapshotted world positions remain
+   * valid for the session.
+   */
+  enumerateInstances(): AsteroidInstanceSnapshot[] {
+    const result: AsteroidInstanceSnapshot[] = []
+    const scratch = new THREE.Vector3()
+    for (let meshIndex = 0; meshIndex < this.instanceDataList.length; meshIndex++) {
+      const data = this.instanceDataList[meshIndex]!
+      const visibleCount = data.mesh.count
+      for (let i = 0; i < visibleCount; i++) {
+        scratch.copy(data.localPositions[i]!)
+        this.group.localToWorld(scratch)
+        result.push({
+          beltMeshIndex: meshIndex,
+          localIndex: i,
+          worldPosition: scratch.clone(),
+          radius: data.collisionRadii[i]!,
+        })
+      }
+    }
+    return result
+  }
+
+  /**
+   * Hide a specific belt instance by zero-scaling its matrix. Used when the
+   * turret beam depletes an asteroid — the instance is invisible at no
+   * per-frame cost since the InstancedMesh retains the zero-scale matrix.
+   */
+  hideInstance(beltMeshIndex: number, localIndex: number): void {
+    const data = this.instanceDataList[beltMeshIndex]
+    if (!data) return
+    if (localIndex < 0 || localIndex >= data.maxCount) return
+    const scratch = new THREE.Matrix4()
+    scratch.makeScale(0, 0, 0)
+    // Translate to localPosition so a later restore could place it back; zero scale hides it.
+    scratch.setPosition(data.localPositions[localIndex]!)
+    data.mesh.setMatrixAt(localIndex, scratch)
+    data.mesh.instanceMatrix.needsUpdate = true
+    // Also clear any tumble state so it doesn't try to re-apply a rotating matrix.
+    if (data.isTumbling[localIndex]) {
+      data.isTumbling[localIndex] = false
+      data.activeTumblerSet.delete(localIndex)
     }
   }
 
