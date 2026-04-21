@@ -41,6 +41,11 @@ export interface ParticleEmitterConfig {
   soft?: boolean
   /** Size multiplier at end of life (1.0 = no growth, 2.0 = doubles). Default 1.0. */
   sizeGrowth?: number
+  /**
+   * Optional per-particle update hook called each tick before position integration.
+   * Mutate `particle.velocity` to steer. Called only for live particles.
+   */
+  steeringUpdate?: (particle: Particle, dt: number) => void
 }
 
 /** Cached soft particle texture — shared across all soft emitters. */
@@ -66,11 +71,15 @@ function getSoftParticleTexture(): THREE.Texture {
   return _softTexture
 }
 
-/** Internal particle state for the pool. */
-interface Particle {
+/** Per-particle runtime state. Exposed so consumers can wire per-tick steering via {@link ParticleEmitterConfig.steeringUpdate}. */
+export interface Particle {
+  /** True while this pool slot is live. */
   alive: boolean
+  /** Accumulated age in seconds. */
   age: number
+  /** World-space position. */
   position: THREE.Vector3
+  /** World-space velocity (units/sec). */
   velocity: THREE.Vector3
 }
 
@@ -91,10 +100,12 @@ export class ParticleEmitter implements Tickable {
   private readonly lifetime: number
   private readonly spread: number
   private readonly lifeAttr: THREE.BufferAttribute
+  private readonly steeringUpdate: ((particle: Particle, dt: number) => void) | null
 
   constructor(config: ParticleEmitterConfig) {
     this.lifetime = config.lifetime
     this.spread = config.spread
+    this.steeringUpdate = config.steeringUpdate ?? null
 
     this.pool = Array.from({ length: config.poolSize }, () => ({
       alive: false,
@@ -194,6 +205,7 @@ export class ParticleEmitter implements Tickable {
         continue
       }
 
+      this.steeringUpdate?.(p, dt)
       p.position.addScaledVector(p.velocity, dt)
       positions[i3] = p.position.x
       positions[i3 + 1] = p.position.y
