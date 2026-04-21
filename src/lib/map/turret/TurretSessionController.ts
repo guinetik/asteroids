@@ -89,6 +89,7 @@ export class TurretSessionController {
   private mouseDx = 0
   private mouseDy = 0
   private firing = false
+  private mouseFireHeld = false
   private readonly rayOrigin = new THREE.Vector3()
   private readonly rayDir = new THREE.Vector3()
   private readonly targetInstances: BeamTargetInstance[] = []
@@ -114,7 +115,7 @@ export class TurretSessionController {
     this.rig = new TurretRigController(deps.shuttleController.group)
     this.tractor = new TurretTractorEmitter()
     this.inputManager = new InputManager({
-      turretFire: ['Space'],
+      // turretFire is driven by mouse button, not keyboard.
       exitTurret: ['Escape', 'KeyT'],
     })
 
@@ -233,6 +234,7 @@ export class TurretSessionController {
     this.targetInstances.length = 0
     this.yieldSystem = null
     this.firing = false
+    this.mouseFireHeld = false
     // Release the shuttle so flight controls work again on the map.
     this.deps.shuttleController.unfreeze()
     this.deps.shuttleController.setInputEnabled(true)
@@ -244,7 +246,7 @@ export class TurretSessionController {
     this.mouseDy = 0
     this.rig.applyAim(this.aim)
 
-    this.firing = this.inputManager.isActionActive('turretFire')
+    this.firing = this.mouseFireHeld
     const thrusterSystem = this.deps.shuttleController.thrusterSystem
     const modifiers = this.buildThrusterModifiers()
     const canFire = thrusterSystem.canFire('turretMining' as ShuttleThrusterName, modifiers)
@@ -326,12 +328,28 @@ export class TurretSessionController {
     this.mouseDy += event.movementY
   }
 
+  private mouseDownHandler = (event: MouseEvent): void => {
+    if (!this.session.isActive || this.session.phase !== 'active') return
+    if (event.button !== 0) return
+    this.mouseFireHeld = true
+  }
+
+  private mouseUpHandler = (event: MouseEvent): void => {
+    if (event.button !== 0) return
+    this.mouseFireHeld = false
+  }
+
   private attachMouseListener(): void {
     window.addEventListener('mousemove', this.mouseMoveHandler)
+    window.addEventListener('mousedown', this.mouseDownHandler)
+    window.addEventListener('mouseup', this.mouseUpHandler)
   }
 
   private detachMouseListener(): void {
     window.removeEventListener('mousemove', this.mouseMoveHandler)
+    window.removeEventListener('mousedown', this.mouseDownHandler)
+    window.removeEventListener('mouseup', this.mouseUpHandler)
+    this.mouseFireHeld = false
   }
 
   private requestPointerLock(): void {

@@ -55,7 +55,7 @@ export class TurretRigController {
     beamGeom.rotateX(Math.PI / 2) // align cylinder length with +Z
     beamGeom.translate(0, 0, -BEAM_BASE_LENGTH / 2) // near end at camera origin
     this.beamMaterial = new THREE.MeshBasicMaterial({
-      color: 0xff3399,
+      color: 0x3b82f6,
       transparent: true,
       opacity: 0.85,
       toneMapped: false,
