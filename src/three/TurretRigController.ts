@@ -15,7 +15,7 @@ import {
 } from '@/lib/map/turret/turretConstants'
 
 const BEAM_BASE_LENGTH = 1
-const BEAM_RADIUS = 0.04
+const BEAM_RADIUS = 0.35
 
 /**
  * Yaw offset applied to turretBase so the camera's default -Z forward aligns
@@ -55,11 +55,12 @@ export class TurretRigController {
     beamGeom.rotateX(Math.PI / 2) // align cylinder length with +Z
     beamGeom.translate(0, 0, -BEAM_BASE_LENGTH / 2) // near end at camera origin
     this.beamMaterial = new THREE.MeshBasicMaterial({
-      color: 0x3b82f6,
+      color: 0x66aaff,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.9,
       toneMapped: false,
       depthWrite: false,
+      blending: THREE.AdditiveBlending,
     })
     this.beamMesh = new THREE.Mesh(beamGeom, this.beamMaterial)
     this.beamMesh.visible = false
