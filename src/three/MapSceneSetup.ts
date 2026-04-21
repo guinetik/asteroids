@@ -41,7 +41,7 @@ const HEMISPHERE_INTENSITY = 0.6
 const FILL_LIGHT_COLOR = 0xa9bfe6
 const FILL_LIGHT_INTENSITY = 0.35
 const CAMERA_LIGHT_COLOR = 0xcad4ff
-const CAMERA_LIGHT_INTENSITY = 0.55
+const CAMERA_LIGHT_INTENSITY = 0.28
 
 // --- Controls ---
 
@@ -57,6 +57,7 @@ const CONTROLS_ROTATE_SPEED = 0.4
 export interface MapSceneObjects {
   scene: THREE.Scene
   camera: THREE.PerspectiveCamera
+  cameraLight: THREE.PointLight
   renderer: THREE.WebGLRenderer
   composer: EffectComposer
   controls: OrbitControls
@@ -126,7 +127,7 @@ export function createMapScene(canvas: HTMLCanvasElement): MapSceneObjects {
   controls.zoomSpeed = CONTROLS_ZOOM_SPEED
   controls.rotateSpeed = CONTROLS_ROTATE_SPEED
 
-  return { scene, camera, renderer, composer, controls }
+  return { scene, camera, cameraLight, renderer, composer, controls }
 }
 
 /**

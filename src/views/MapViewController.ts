@@ -3909,17 +3909,20 @@ export class MapViewController implements Tickable {
   /** Inspect-mode bloom strength. Mirrors the inspect toggle output. */
   private static readonly MAP_INSPECT_BLOOM_STRENGTH = 0.2
 
-  /** Overscale where parked/orbit bloom mitigation begins. */
-  private static readonly ORBIT_BLOOM_CLAMP_OVERSCALE_START = 6
+  /** Overscale where close-up shuttle bloom mitigation begins. */
+  private static readonly ORBIT_BLOOM_CLAMP_OVERSCALE_START = 1.05
 
-  /** Overscale where parked/orbit bloom mitigation reaches full effect. */
-  private static readonly ORBIT_BLOOM_CLAMP_OVERSCALE_END = 20
+  /** Overscale where close-up shuttle bloom mitigation reaches full effect. */
+  private static readonly ORBIT_BLOOM_CLAMP_OVERSCALE_END = 1.8
 
   /** Bloom threshold used at maximum parked/orbit bloom mitigation. */
-  private static readonly ORBIT_BLOOM_CLAMP_THRESHOLD = 1.15
+  private static readonly ORBIT_BLOOM_CLAMP_THRESHOLD = 1.9
 
   /** Bloom strength used at maximum parked/orbit bloom mitigation. */
-  private static readonly ORBIT_BLOOM_CLAMP_STRENGTH = 0.28
+  private static readonly ORBIT_BLOOM_CLAMP_STRENGTH = 0.08
+
+  /** Camera-attached fill light intensity used outside close-up shuttle suppression. */
+  private static readonly MAP_CAMERA_LIGHT_BASE_INTENSITY = 0.28
 
   /**
    * Snapshot and override the bloom pass while EVA is active; restore previous values on
@@ -3951,9 +3954,9 @@ export class MapViewController implements Tickable {
   }
 
   /**
-   * Clamp map bloom while parked in orbit and the constant-screen-size shuttle scaler has pushed
-   * the ship far above its baseline map size. This preserves free-flight bloom while keeping
-   * close orbit views readable.
+   * Clamp map bloom when the constant-screen-size shuttle scaler has pushed the ship far above
+   * its baseline map size. This keeps close zooms onto the player's own hull readable in both
+   * orbit and free roam, while preserving the normal tactical-map bloom look at typical scales.
    */
   private applyOrbitBloomClamp(overscale: number): void {
     if (this.evaSession?.isActive) return
@@ -3969,10 +3972,14 @@ export class MapViewController implements Tickable {
     const baseStrength = this.inspectMode
       ? MapViewController.MAP_INSPECT_BLOOM_STRENGTH
       : MapViewController.MAP_BLOOM_STRENGTH
+    const cameraLight = this.sceneObjects?.cameraLight
 
-    if ((this.orbitSystem?.state ?? 'free') !== 'orbiting') {
+    if (overscale <= MapViewController.ORBIT_BLOOM_CLAMP_OVERSCALE_START) {
       bloomPass.threshold = baseThreshold
       bloomPass.strength = baseStrength
+      if (cameraLight) {
+        cameraLight.intensity = MapViewController.MAP_CAMERA_LIGHT_BASE_INTENSITY
+      }
       return
     }
 
@@ -3991,6 +3998,13 @@ export class MapViewController implements Tickable {
       MapViewController.ORBIT_BLOOM_CLAMP_STRENGTH,
       clampT,
     )
+    if (cameraLight) {
+      cameraLight.intensity = THREE.MathUtils.lerp(
+        MapViewController.MAP_CAMERA_LIGHT_BASE_INTENSITY,
+        0,
+        clampT,
+      )
+    }
   }
 
   /**

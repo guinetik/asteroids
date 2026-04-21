@@ -13,6 +13,7 @@ import { InputManager } from '@/lib/InputManager'
 import { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 import { getCurrentUpgradeValue } from '@/lib/upgrades'
+import { MINERAL_VISUALS } from '@/lib/asteroids/minerals'
 import type { ThrusterRuntimeModifiers, ShuttleThrusterName } from '@/lib/physics/thrusterSystem'
 import { TurretSession, type TurretSessionTickInput, type TurretPhase } from './TurretSession'
 import {
@@ -258,6 +259,14 @@ export class TurretSessionController {
             compositionOverride: tier.composition,
             totalKgOverride: tier.hpKg,
           })
+          const roll = this.yieldSystem.peekRock(spawnIndex)
+          if (roll) {
+            belt.setInstanceBaseTint(
+              snap.beltMeshIndex,
+              snap.localIndex,
+              this.getCompositionTintColor(roll.itemId),
+            )
+          }
         }
       }
       this.rebuildTargetList()
@@ -381,6 +390,29 @@ export class TurretSessionController {
       .slice(0, 3)
       .map((entry) => `${entry.name} ${Math.round(entry.percentage)}%`)
       .join(' • ')
+  }
+
+  /** Map a rolled mineral item to a readable asteroid tint for pre-target scanning. */
+  private getCompositionTintColor(itemId: string): THREE.Color {
+    const readablePalette: Record<string, THREE.Color> = {
+      olivine: new THREE.Color(0.78, 1.95, 0.42),
+      magnetite: new THREE.Color(0.5, 0.82, 1.85),
+      pyroxene: new THREE.Color(2.05, 1.15, 0.45),
+      'iron-nickel-alloy': new THREE.Color(1.85, 1.92, 2.08),
+    }
+    const paletteColor = readablePalette[itemId]
+    if (paletteColor) return paletteColor.clone()
+
+    const fallback = new THREE.Color(1, 1, 1)
+    const label = getItemDefinition(itemId)?.label
+    if (!label) return fallback
+    const visual = MINERAL_VISUALS[label]
+    if (!visual) return fallback
+    const color = new THREE.Color(visual.color[0], visual.color[1], visual.color[2])
+    const hsl = { h: 0, s: 0, l: 0 }
+    color.getHSL(hsl)
+    color.setHSL(hsl.h, Math.min(1, hsl.s * 1.45 + 0.08), Math.min(0.72, hsl.l * 1.08 + 0.04))
+    return color
   }
 
   /** Emit a tiny spark spray at the beam contact point, matching FPS mining impacts. */

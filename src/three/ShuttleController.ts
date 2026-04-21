@@ -137,6 +137,14 @@ const LANDER_MODEL_PATH = '/models/lander.glb'
 const CARGO_LANDER_SCALE = 30
 /** Position inside the bay — raw model coords (cm), pre-rotation: X=nose-tail, Y=wingspan, Z=height */
 const CARGO_LANDER_OFFSET = new THREE.Vector3(-320, 0, 20)
+const SHUTTLE_HULL_MIN_ROUGHNESS = 0.9
+const SHUTTLE_HULL_MAX_METALNESS = 0.04
+const SHUTTLE_HULL_MAX_ENV_MAP_INTENSITY = 0.12
+const SHUTTLE_HULL_MAX_EMISSIVE_INTENSITY = 0
+const SHUTTLE_HULL_MAX_CLEARCOAT = 0.02
+const SHUTTLE_HULL_MIN_CLEARCOAT_ROUGHNESS = 0.94
+const SHUTTLE_HULL_MAX_PHONG_SHININESS = 3
+const SHUTTLE_HULL_PHONG_SPECULAR_SCALE = 0.12
 
 /**
  * Controls the shuttle model — loading, door animation, movement, and nozzle placement.
@@ -323,6 +331,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
     const gltf = await gltfLoader.loadAsync(SHUTTLE_MODEL_PATH)
     gltf.scene.scale.setScalar(MODEL_SCALE)
     gltf.scene.rotation.x = MODEL_ROTATION_X
+    this.tuneHullMaterials(gltf.scene)
     this.group.add(gltf.scene)
 
     // Find door nodes for programmatic animation
@@ -922,5 +931,53 @@ export class ShuttleController implements Tickable, PortalVehicle {
       }
     })
     return found
+  }
+
+  /**
+   * The tactical map can scale the shuttle far beyond its authored size so it stays readable.
+   * At those close-up scales, the GLB's stock specular response blooms into a white silhouette.
+   * Clamp the hull materials so zooming onto your own ship still preserves actual form.
+   */
+  private tuneHullMaterials(root: THREE.Object3D): void {
+    root.traverse((child) => {
+      if (!(child instanceof THREE.Mesh) || !child.material) return
+
+      const materials = Array.isArray(child.material) ? child.material : [child.material]
+      for (const material of materials) {
+        material.side = THREE.DoubleSide
+
+        if (material instanceof THREE.MeshStandardMaterial) {
+          material.roughness = Math.max(material.roughness, SHUTTLE_HULL_MIN_ROUGHNESS)
+          material.metalness = Math.min(material.metalness, SHUTTLE_HULL_MAX_METALNESS)
+          material.envMapIntensity = Math.min(
+            material.envMapIntensity,
+            SHUTTLE_HULL_MAX_ENV_MAP_INTENSITY,
+          )
+          if (material.emissive) {
+            material.emissive.setHex(0x000000)
+          }
+          material.emissiveIntensity = Math.min(
+            material.emissiveIntensity,
+            SHUTTLE_HULL_MAX_EMISSIVE_INTENSITY,
+          )
+          material.emissiveMap = null
+        }
+
+        if (material instanceof THREE.MeshPhysicalMaterial) {
+          material.clearcoat = Math.min(material.clearcoat, SHUTTLE_HULL_MAX_CLEARCOAT)
+          material.clearcoatRoughness = Math.max(
+            material.clearcoatRoughness,
+            SHUTTLE_HULL_MIN_CLEARCOAT_ROUGHNESS,
+          )
+        }
+
+        if (material instanceof THREE.MeshPhongMaterial) {
+          material.shininess = Math.min(material.shininess, SHUTTLE_HULL_MAX_PHONG_SHININESS)
+          material.specular.multiplyScalar(SHUTTLE_HULL_PHONG_SPECULAR_SCALE)
+        }
+
+        material.needsUpdate = true
+      }
+    })
   }
 }

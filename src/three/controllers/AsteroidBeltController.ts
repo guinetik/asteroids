@@ -14,6 +14,7 @@
 import * as THREE from 'three'
 import type { AsteroidBelt } from '@/lib/planets/types'
 import { ORBIT_SCALE } from '@/lib/planets/constants'
+import { TURRET_MINING_LIGHT_LAYER } from '@/lib/map/turret/turretRenderLayers'
 import { loadGLB, fixMaterials } from '@/three/loadGLB'
 import {
   decideNearbyTumbleState,
@@ -85,12 +86,15 @@ interface BeltInstanceData {
   activeTumblerSet: Set<number>
   /** Rotates which visible indices are considered each evaluation pass. */
   sampleCursor: number
+  /** Persistent per-instance tint, used for composition readability and flash recovery. */
+  baseColors: THREE.Color[]
 }
 
 interface ActiveMiningFlash {
   mesh: THREE.InstancedMesh
   localIndex: number
   remaining: number
+  baseColor: THREE.Color
 }
 
 /**
@@ -246,20 +250,24 @@ export class AsteroidBeltController {
 
       // Tune material for asteroid rendering
       if (material instanceof THREE.MeshStandardMaterial) {
-        material.roughness = Math.max(material.roughness, 0.9)
-        material.metalness = Math.min(material.metalness, 0.1)
-        const ec = belt.emissiveColor ?? [0.06, 0.05, 0.04]
+        material.color.setRGB(1.08, 1.08, 1.08)
+        material.roughness = THREE.MathUtils.clamp(material.roughness, 0.56, 0.76)
+        material.metalness = THREE.MathUtils.clamp(material.metalness, 0.08, 0.2)
+        const ec = belt.emissiveColor ?? [0.018, 0.018, 0.022]
         material.emissive = new THREE.Color(ec[0], ec[1], ec[2])
-        material.emissiveIntensity = 0.5
+        material.emissiveIntensity = 0.05
         material.vertexColors = true
         material.needsUpdate = true
       } else if (material instanceof THREE.MeshPhongMaterial) {
+        material.color.setRGB(1.06, 1.06, 1.06)
+        material.shininess = Math.max(material.shininess, 12)
         material.vertexColors = true
         material.needsUpdate = true
       }
 
       const instancedMesh = new THREE.InstancedMesh(geometry, material, count)
       instancedMesh.frustumCulled = false
+      instancedMesh.layers.enable(TURRET_MINING_LIGHT_LAYER)
 
       const baseMatrices: THREE.Matrix4[] = []
       const localPositions: THREE.Vector3[] = []
@@ -267,6 +275,7 @@ export class AsteroidBeltController {
       const tumbleSpeeds: number[] = []
       const collisionRadii: number[] = []
       const isTumbling: boolean[] = []
+      const baseColors: THREE.Color[] = []
 
       for (let i = 0; i < count; i++) {
         // Radius with Kirkwood gap rejection
@@ -309,6 +318,7 @@ export class AsteroidBeltController {
         tumbleSpeeds.push(belt.tumbleSpeed * jitter)
         collisionRadii.push(s * ASTEROID_COLLISION_RADIUS_SCALE)
         isTumbling.push(false)
+        baseColors.push(MINING_FLASH_NEUTRAL_COLOR.clone())
       }
 
       instancedMesh.instanceMatrix.needsUpdate = true
@@ -325,6 +335,7 @@ export class AsteroidBeltController {
         isTumbling,
         activeTumblerSet: new Set<number>(),
         sampleCursor: 0,
+        baseColors,
       })
     }
 
@@ -428,10 +439,24 @@ export class AsteroidBeltController {
         mesh: data.mesh,
         localIndex,
         remaining: MINING_FLASH_DURATION_SEC,
+        baseColor: data.baseColors[localIndex]!.clone(),
       })
     }
     data.mesh.setColorAt(localIndex, MINING_FLASH_PEAK_COLOR)
     if (data.mesh.instanceColor) data.mesh.instanceColor.needsUpdate = true
+  }
+
+  /** Persistently tint one asteroid instance so composition reads before targeting. */
+  setInstanceBaseTint(beltMeshIndex: number, localIndex: number, color: THREE.Color): void {
+    const data = this.instanceDataList[beltMeshIndex]
+    if (!data) return
+    if (localIndex < 0 || localIndex >= data.mesh.count) return
+    this.ensureInstanceColors(data.mesh)
+    data.baseColors[localIndex] = color.clone()
+    data.mesh.setColorAt(localIndex, data.baseColors[localIndex]!)
+    if (data.mesh.instanceColor) data.mesh.instanceColor.needsUpdate = true
+    const active = this.activeMiningFlashes.get(`${beltMeshIndex}:${localIndex}`)
+    if (active) active.baseColor.copy(data.baseColors[localIndex]!)
   }
 
   /**
@@ -444,13 +469,13 @@ export class AsteroidBeltController {
     for (const [key, record] of this.activeMiningFlashes) {
       record.remaining -= dt
       if (record.remaining <= 0) {
-        record.mesh.setColorAt(record.localIndex, MINING_FLASH_NEUTRAL_COLOR)
+        record.mesh.setColorAt(record.localIndex, record.baseColor)
         if (record.mesh.instanceColor) record.mesh.instanceColor.needsUpdate = true
         finished.push(key)
         continue
       }
       const t = record.remaining / MINING_FLASH_DURATION_SEC
-      _miningFlashColor.copy(MINING_FLASH_NEUTRAL_COLOR).lerp(MINING_FLASH_PEAK_COLOR, t)
+      _miningFlashColor.copy(record.baseColor).lerp(MINING_FLASH_PEAK_COLOR, t)
       record.mesh.setColorAt(record.localIndex, _miningFlashColor)
       if (record.mesh.instanceColor) record.mesh.instanceColor.needsUpdate = true
     }
@@ -709,7 +734,7 @@ export class AsteroidBeltController {
     if (!data) return
     const key = `${beltMeshIndex}:${localIndex}`
     if (!this.activeMiningFlashes.has(key)) return
-    data.mesh.setColorAt(localIndex, MINING_FLASH_NEUTRAL_COLOR)
+    data.mesh.setColorAt(localIndex, data.baseColors[localIndex] ?? MINING_FLASH_NEUTRAL_COLOR)
     if (data.mesh.instanceColor) data.mesh.instanceColor.needsUpdate = true
     this.activeMiningFlashes.delete(key)
   }

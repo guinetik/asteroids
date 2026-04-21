@@ -9,6 +9,7 @@
  */
 import * as THREE from 'three'
 import type { TurretAimState } from '@/lib/map/turret/TurretAimState'
+import { TURRET_MINING_LIGHT_LAYER } from '@/lib/map/turret/turretRenderLayers'
 import { TURRET_BEAM_MAX_RANGE, TURRET_NOSE_OFFSET } from '@/lib/map/turret/turretConstants'
 
 /**
@@ -21,6 +22,22 @@ const BEAM_CORE_WIDTH = 0.028
 const BEAM_GLOW_WIDTH = 0.11
 const BEAM_HIT_FLASH_SCALE = 0.18
 const BEAM_MUZZLE_FLASH_SCALE = 0.1
+const TURRET_LIGHT_COLOR = 0xeaf3ff
+const TURRET_LIGHT_INTENSITY = 18
+const TURRET_LIGHT_DISTANCE = 70
+const TURRET_LIGHT_ANGLE = Math.PI * 0.13
+const TURRET_LIGHT_PENUMBRA = 0.58
+const TURRET_LIGHT_DECAY = 1.45
+const TURRET_LIGHT_X_OFFSET = 0
+const TURRET_LIGHT_Y_OFFSET = -0.16
+const TURRET_LIGHT_Z_OFFSET = -0.18
+const TURRET_LIGHT_TARGET_DISTANCE = 180
+const TURRET_FILL_COLOR = 0xcad8ff
+const TURRET_FILL_INTENSITY = 0.9
+const TURRET_FILL_DISTANCE = 4.5
+const TURRET_FILL_DECAY = 2.1
+const TURRET_FILL_Y_OFFSET = -0.22
+const TURRET_FILL_Z_OFFSET = -0.2
 
 /** Build a soft circular sprite texture so additive flashes don't show square card edges. */
 function createSoftDiscTexture(innerColor: string, outerColor: string): THREE.CanvasTexture {
@@ -63,6 +80,10 @@ export class TurretRigController {
   readonly camera: THREE.PerspectiveCamera
   /** Beam visuals parented under the turret camera. */
   readonly beamGroup: THREE.Group
+  /** Forward-facing turret spotlight for close mining readability. */
+  readonly workLight: THREE.SpotLight
+  readonly workLightTarget: THREE.Object3D
+  readonly workFillLight: THREE.PointLight
 
   private readonly shuttleGroup: THREE.Object3D
   private readonly coreMaterial: THREE.MeshBasicMaterial
@@ -88,7 +109,37 @@ export class TurretRigController {
 
     this.camera = new THREE.PerspectiveCamera(70, 1, 0.01, 10_000)
     this.camera.position.set(0, 0, 0)
+    this.camera.layers.enable(TURRET_MINING_LIGHT_LAYER)
     this.turretBase.add(this.camera)
+
+    this.workLight = new THREE.SpotLight(
+      TURRET_LIGHT_COLOR,
+      TURRET_LIGHT_INTENSITY,
+      TURRET_LIGHT_DISTANCE,
+      TURRET_LIGHT_ANGLE,
+      TURRET_LIGHT_PENUMBRA,
+      TURRET_LIGHT_DECAY,
+    )
+    this.workLight.position.set(
+      TURRET_LIGHT_X_OFFSET,
+      TURRET_LIGHT_Y_OFFSET,
+      TURRET_LIGHT_Z_OFFSET,
+    )
+    this.workLight.layers.set(TURRET_MINING_LIGHT_LAYER)
+    this.workLightTarget = new THREE.Object3D()
+    this.workLightTarget.position.set(0, 0, -TURRET_LIGHT_TARGET_DISTANCE)
+    this.workLight.target = this.workLightTarget
+    this.workFillLight = new THREE.PointLight(
+      TURRET_FILL_COLOR,
+      TURRET_FILL_INTENSITY,
+      TURRET_FILL_DISTANCE,
+      TURRET_FILL_DECAY,
+    )
+    this.workFillLight.layers.set(TURRET_MINING_LIGHT_LAYER)
+    this.workFillLight.position.set(0, TURRET_FILL_Y_OFFSET, TURRET_FILL_Z_OFFSET)
+    this.camera.add(this.workLight)
+    this.camera.add(this.workLightTarget)
+    this.camera.add(this.workFillLight)
 
     this.ribbonGeometry = new THREE.PlaneGeometry(1, 1)
     this.coreMaterial = new THREE.MeshBasicMaterial({
@@ -219,6 +270,8 @@ export class TurretRigController {
     this.muzzleFlashTexture.dispose()
     this.hitFlashMaterial.dispose()
     this.muzzleFlashMaterial.dispose()
+    this.workLight.dispose()
+    this.workFillLight.dispose()
   }
 
   private createRibbon(
