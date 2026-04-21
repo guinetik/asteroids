@@ -15,7 +15,9 @@ export const MAP_ORBIT_CHARGE_CAMERA_CONFIG: VehicleCameraConfig = {
   idleTimeout: MAP_ORBIT_CAMERA_CONFIG.idleTimeout,
   minY: MAP_ORBIT_CAMERA_CONFIG.minY,
   fov: 48,
-  maxDistance: 40,
+  maxDistance: MAP_ORBIT_CAMERA_CONFIG.maxDistance,
+  dampingFactor: MAP_ORBIT_CAMERA_CONFIG.dampingFactor,
+  preserveDragInertia: MAP_ORBIT_CAMERA_CONFIG.preserveDragInertia,
 }
 
 /** Duration of the orbit → free-flight camera blend after slingshot release. */
@@ -96,5 +98,11 @@ export function buildSlingshotChargeCameraConfig(chargeLevel: number): VehicleCa
       MAP_ORBIT_CHARGE_CAMERA_CONFIG.maxDistance ?? 0,
       charge,
     ),
+    dampingFactor: THREE.MathUtils.lerp(
+      MAP_ORBIT_CAMERA_CONFIG.dampingFactor ?? 0.1,
+      MAP_ORBIT_CHARGE_CAMERA_CONFIG.dampingFactor ?? 0.1,
+      charge,
+    ),
+    preserveDragInertia: MAP_ORBIT_CHARGE_CAMERA_CONFIG.preserveDragInertia,
   }
 }

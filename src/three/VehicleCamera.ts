@@ -48,6 +48,10 @@ export interface VehicleCameraConfig {
   minDistance?: number
   /** Maximum orbit controls zoom distance (0 = unlimited) */
   maxDistance?: number
+  /** OrbitControls damping factor. Lower values preserve more drag momentum. */
+  dampingFactor?: number
+  /** When true, keep OrbitControls drag momentum after pointer release. */
+  preserveDragInertia?: boolean
 }
 
 /**
@@ -143,7 +147,7 @@ const MAP_ORBIT_CAMERA_IDLE_OFFSET_Y = 6
 const MAP_ORBIT_CAMERA_FOV = 50
 
 /** Orbit map max orbit-controls zoom distance (world units). */
-const MAP_ORBIT_CAMERA_MAX_DISTANCE = 40
+const MAP_ORBIT_CAMERA_MAX_DISTANCE = 120
 
 /** Map orbit preset: above shuttle for planet orbit; tuned closer than full-system view. */
 export const MAP_ORBIT_CAMERA_CONFIG: VehicleCameraConfig = {
@@ -153,6 +157,8 @@ export const MAP_ORBIT_CAMERA_CONFIG: VehicleCameraConfig = {
   minY: 1,
   fov: MAP_ORBIT_CAMERA_FOV,
   maxDistance: MAP_ORBIT_CAMERA_MAX_DISTANCE,
+  dampingFactor: 0.06,
+  preserveDragInertia: true,
 }
 
 /**
@@ -230,7 +236,7 @@ export class VehicleCamera implements Tickable {
 
     this.controls = new OrbitControls(this.camera, domElement)
     this.controls.enableDamping = true
-    this.controls.dampingFactor = 0.1
+    this.controls.dampingFactor = config.dampingFactor ?? 0.1
     this.controls.minDistance = config.minDistance ?? 0
     this.controls.maxDistance = config.maxDistance ?? Infinity
 
@@ -301,6 +307,7 @@ export class VehicleCamera implements Tickable {
     this.camera.updateProjectionMatrix()
     this.controls.minDistance = config.minDistance ?? 0
     this.controls.maxDistance = config.maxDistance ?? Infinity
+    this.controls.dampingFactor = config.dampingFactor ?? 0.1
     // Force idle lerp to start immediately
     this.mouseIdleTimer = config.idleTimeout + 1
     this.isMouseActive = false
@@ -325,6 +332,7 @@ export class VehicleCamera implements Tickable {
     this.camera.updateProjectionMatrix()
     this.controls.minDistance = config.minDistance ?? 0
     this.controls.maxDistance = config.maxDistance ?? Infinity
+    this.controls.dampingFactor = config.dampingFactor ?? 0.1
   }
 
   /**
@@ -433,7 +441,9 @@ export class VehicleCamera implements Tickable {
   private onControlEnd = (): void => {
     this.isMouseActive = false
     this.mouseIdleTimer = 0
-    this.clearOrbitInternalInertia()
+    if (!this.config.preserveDragInertia) {
+      this.clearOrbitInternalInertia()
+    }
   }
 
   /**

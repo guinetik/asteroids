@@ -134,6 +134,19 @@ interface BodyData {
  */
 const ORBIT_ARRIVAL_TOLERANCE = 0.15
 
+/**
+ * Hidden gameplay boost applied on top of the displayed orbital multiplier.
+ *
+ * HUD readouts keep showing the raw per-body lane speed, but orbit rotation and slingshot launch
+ * gain extra punch on faster lanes so outer-system departures feel practical without changing the
+ * number presented to the player.
+ */
+function getGameplayOrbitalSpeedMultiplier(displayedMultiplier: number): number {
+  const base = Math.max(0.25, displayedMultiplier)
+  if (base <= 1) return base
+  return base * Math.sqrt(base)
+}
+
 // ─── OrbitCaptureSystem ──────────────────────────────────────────────────────
 
 /**
@@ -456,10 +469,13 @@ export class OrbitCaptureSystem {
     this.prevPlanetX = bx
     this.prevPlanetZ = bz
 
+    const gameplaySpeedMultiplier = getGameplayOrbitalSpeedMultiplier(
+      this.targetData.orbitalSpeedMultiplier,
+    )
     this.orbitAngle +=
       (
         orbitConfig.orbitVisualSpeed
-        * this.targetData.orbitalSpeedMultiplier
+        * gameplaySpeedMultiplier
         / this.targetData.orbitRadius
       ) * dt
 
@@ -542,11 +558,12 @@ export class OrbitCaptureSystem {
    */
   launchSlingshot(facingAngle: number, _dt: number): Vel2 {
     const speedMultiplier = this.targetData?.orbitalSpeedMultiplier ?? 1
+    const gameplaySpeedMultiplier = getGameplayOrbitalSpeedMultiplier(speedMultiplier)
     const aimX = Math.cos(facingAngle)
     const aimZ = -Math.sin(facingAngle)
 
     const alignment = this.getAlignment(facingAngle)
-    const baseSpeed = orbitConfig.orbitLaunchSpeed * Math.max(1, speedMultiplier)
+    const baseSpeed = orbitConfig.orbitLaunchSpeed * Math.max(1, gameplaySpeedMultiplier)
 
     let speed = baseSpeed
     if (alignment > orbitConfig.progradeAlignmentThreshold) {
