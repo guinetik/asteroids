@@ -5,8 +5,8 @@ import { Timer } from '@/lib/Timer'
 import { LevelViewController } from './LevelViewController'
 import LanderHud from '@/components/LanderHud.vue'
 import MissionAnnouncement from '@/components/MissionAnnouncement.vue'
-import MissionTracker from '@/components/MissionTracker.vue'
-import type { TrackerObjective } from '@/components/MissionTracker.vue'
+import ObjectiveTracker from '@/components/ObjectiveTracker.vue'
+import type { ObjectiveTrackerEntry } from '@/components/ObjectiveTracker.vue'
 import FpsHud from '@/components/FpsHud.vue'
 import FpsCompass from '@/components/FpsCompass.vue'
 import DeathOverlay from '@/components/DeathOverlay.vue'
@@ -50,7 +50,7 @@ const objCompleteVisible = ref(false)
 const objCompleteLabel = ref('')
 const missionCompleteVisible = ref(false)
 const trackerVisible = ref(false)
-const trackerObjectives = ref<TrackerObjective[]>([])
+const trackerObjectives = ref<ObjectiveTrackerEntry[]>([])
 const trackerAsteroid = ref('')
 const trackerMission = ref('')
 const mapCanvas = ref<HTMLCanvasElement | null>(null)
@@ -465,10 +465,10 @@ function handleToggleMusic(): void {
     asteroid-name="MISSION COMPLETE"
     :mission-name="trackerMission"
   />
-  <MissionTracker
+  <ObjectiveTracker
     v-if="trackerVisible && (stateInfo.state === 'lander' || stateInfo.state === 'eva')"
-    :asteroid-name="trackerAsteroid"
-    :mission-name="trackerMission"
+    :eyebrow="trackerAsteroid"
+    :title="trackerMission"
     :objectives="trackerObjectives"
   />
   <LanderHud v-if="stateInfo.state === 'lander'" :telemetry="landerTelemetry" />

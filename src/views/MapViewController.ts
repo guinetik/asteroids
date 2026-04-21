@@ -114,6 +114,17 @@ import {
   setLastDockedPlanet,
 } from '@/lib/player/profile'
 import type { PlayerProfile } from '@/lib/player/types'
+import {
+  applyJourneyTrigger,
+  buildActiveJourneyTracker,
+  hasCompletedJourney,
+  getActiveJourneyNextStepLabel,
+  isJourneyFeatureUnlocked,
+  SLINGSHOT_JOURNEY_FEATURE_ID,
+  WELCOME_JOURNEY_ID,
+  type JourneyTrackerState,
+  type JourneyTriggerId,
+} from '@/lib/journeys'
 import { orbitBodyKeyFromCaptureName } from '@/lib/player/orbitBodyKey'
 import {
   createInventory,
@@ -170,6 +181,7 @@ import { GravitySurfingController } from '@/lib/map/GravitySurfingController'
 import { OrbitalSurfingController, type OrbitalSurfingDeps } from '@/lib/map/OrbitalSurfingController'
 import { ManifoldSpline } from '@/three/ManifoldSpline'
 import { ShuttleAudioDirector } from '@/audio/ShuttleAudioDirector'
+import { shipMessageSystem } from '@/lib/messages/runtime'
 
 /**
  * Orbit / grid / debris toggle snapshot for syncing the map HUD after intro suppression.
@@ -353,6 +365,7 @@ export class MapViewController implements Tickable {
   /** Increments per anomaly HUD message so Vue can re-run enter animation. */
   private gravitationalAnomalyHudToken = 0
   private sceneVisuals: MapSceneVisuals | null = null
+  private unsubscribeJourneyMessageArchive: (() => void) | null = null
 
   /** World-space shuttle position reused for asteroid belt nearby tumble (avoid per-frame alloc). */
   private readonly _beltShuttleWorldScratch = new THREE.Vector3()
@@ -410,6 +423,8 @@ export class MapViewController implements Tickable {
   onHabitatPrompt: ((prompt: string | null) => void) | null = null
   /** Fired with fade opacity (0 = clear, 1 = black) during habitat transitions. */
   onHabitatFade: ((opacity: number) => void) | null = null
+  /** Fired when the current active journey tracker changes. */
+  onJourneyTracker: ((state: JourneyTrackerState | null) => void) | null = null
   /** Fired when the shop button should show/hide. */
   onShopButton: ((visible: boolean, planetName: string) => void) | null = null
   /** Fired when the shop dialog state changes. */
@@ -554,6 +569,13 @@ export class MapViewController implements Tickable {
     // --- Input ---
     this.inputManager = new InputManager(DEFAULT_BINDINGS)
     hydratePlayerUpgradeLevelsFromStorage()
+    this.unsubscribeJourneyMessageArchive?.()
+    this.unsubscribeJourneyMessageArchive = shipMessageSystem.onMessageArchived((messageId) => {
+      this.notifyJourneyTrigger(`message_archived:${messageId}`)
+    })
+    this.messageFacade.setTutorialMessagesUnlocked(
+      hasCompletedJourney(this.playerProfile, WELCOME_JOURNEY_ID),
+    )
     const storedProfile = typeof localStorage === 'undefined' ? null : loadProfile()
     if (storedProfile) {
       this.playerProfile = storedProfile
@@ -607,6 +629,7 @@ export class MapViewController implements Tickable {
     MapIntroFacade.preload()
     this.applyInitialSpaceFabricVisibilityFromUpgrades()
     this.emitMapViewLayerToggles()
+    this.emitJourneyTracker()
 
     this.gravitationalEventManager = new GravitationalEventManager({
       worldHalfExtent: this.mapGridSize / 2,
@@ -1183,7 +1206,12 @@ export class MapViewController implements Tickable {
 
         // Check for exit via Escape/H inside the habitat's own input
         if (this.habitatScene.inputManager.wasActionPressed('exitHabitat')) {
-          this.habitatState.leave()
+          if (this.canLeaveHabitatJourney()) {
+            this.notifyJourneyTrigger('left_habitat')
+            this.habitatState.leave()
+          } else {
+            this.showJourneyLeaveBlockedPrompt()
+          }
         }
       }
 
@@ -1268,7 +1296,12 @@ export class MapViewController implements Tickable {
     if (habitatTransition.action === 'enter') {
       this.habitatState.enter()
     } else if (habitatTransition.action === 'leave') {
-      this.habitatState.leave()
+      if (this.canLeaveHabitatJourney()) {
+        this.notifyJourneyTrigger('left_habitat')
+        this.habitatState.leave()
+      } else {
+        this.showJourneyLeaveBlockedPrompt()
+      }
     }
 
     // Orbit action (E key) — press to capture/cancel, hold to charge slingshot
@@ -1760,6 +1793,7 @@ export class MapViewController implements Tickable {
 
     this.recordWorldLinePoint()
     this.messageFacade.triggerRuntimeMessages({
+      tutorialMessagesUnlocked: hasCompletedJourney(this.playerProfile, WELCOME_JOURNEY_ID),
       worldLineHistoryLength: this.worldLineHistory.length,
       earthDepartureMinHistoryPoints: MAP_CONFIG.EARTH_DEPARTURE_MIN_HISTORY_POINTS,
       earthDistance: this.getDistanceToPlanet('earth'),
@@ -2089,6 +2123,36 @@ export class MapViewController implements Tickable {
   private persistPlayerProfile(): void {
     saveProfile(this.playerProfile)
     saveInventory(this.playerInventory)
+  }
+
+  notifyJourneyTrigger(trigger: JourneyTriggerId): void {
+    const result = applyJourneyTrigger(this.playerProfile, trigger)
+    if (!result.changed) return
+    this.playerProfile = result.profile
+    this.persistPlayerProfile()
+    this.messageFacade.setTutorialMessagesUnlocked(
+      hasCompletedJourney(this.playerProfile, WELCOME_JOURNEY_ID),
+    )
+    this.emitJourneyTracker()
+  }
+
+  private emitJourneyTracker(): void {
+    this.onJourneyTracker?.(buildActiveJourneyTracker(this.playerProfile))
+  }
+
+  private canLeaveHabitatJourney(): boolean {
+    const nextLabel = getActiveJourneyNextStepLabel(this.playerProfile)
+    return nextLabel === null || nextLabel === 'Leave the Habitat'
+  }
+
+  private showJourneyLeaveBlockedPrompt(): void {
+    const nextLabel = getActiveJourneyNextStepLabel(this.playerProfile)
+    if (!nextLabel) return
+    this.onHabitatPrompt?.(`Complete Journey first: ${nextLabel}`)
+  }
+
+  private isSlingshotUnlocked(): boolean {
+    return isJourneyFeatureUnlocked(this.playerProfile, SLINGSHOT_JOURNEY_FEATURE_ID)
   }
 
   /**
@@ -2581,6 +2645,7 @@ export class MapViewController implements Tickable {
     this.playerProfile = result.profile
     this.playerInventory = result.inventory
     this.persistPlayerProfile()
+    this.notifyJourneyTrigger('bought_shuttle_fuel')
     this.emitShopState()
     this.onCreditsUpdate?.(this.playerProfile.credits)
     this.emitFuelCellCount()
@@ -3556,6 +3621,7 @@ export class MapViewController implements Tickable {
       await this.habitatScene.load()
       this.habitatScene.onInteract = (target) => {
         if (target === 'table') {
+          this.notifyJourneyTrigger('shuttle_control_opened')
           this.onShuttleControl?.(true)
           document.exitPointerLock()
         }
@@ -4124,6 +4190,8 @@ export class MapViewController implements Tickable {
   }
 
   dispose(): void {
+    this.unsubscribeJourneyMessageArchive?.()
+    this.unsubscribeJourneyMessageArchive = null
     this.evaSession?.dispose()
     this.evaSession = null
     this.shuttleAudio.dispose()

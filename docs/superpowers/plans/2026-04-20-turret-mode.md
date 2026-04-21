@@ -164,20 +164,20 @@ In `src/lib/physics/thrusterSystem.ts`, inside the `else` branch at around lines
   if (this.fuel > 0 && this.charges[name] < cfg.capacity) {
     const rechargeMultiplier = Math.max(0, modifiers?.rechargeRateMultiplier?.[name] ?? 1)
     const fuelCostMultiplier = Math.max(0, modifiers?.fuelCostMultiplier?.[name] ?? 1)
-    const fuelCost = Math.max(
-      0,
-      cfg.rechargeRate * rechargeMultiplier * dt * cfg.fuelCostPerRecharge * fuelCostMultiplier,
-    )
+    const desiredRecharge = cfg.rechargeRate * rechargeMultiplier * dt
+    const chargeSpace = cfg.capacity - this.charges[name]
+    const actualRecharge = Math.min(desiredRecharge, chargeSpace)
+    const fuelCost = Math.max(0, actualRecharge * cfg.fuelCostPerRecharge * fuelCostMultiplier)
     const actualFuelUsed = Math.min(fuelCost, this.fuel)
-    const actualRecharge =
+    const chargeFromFuel =
       fuelCostMultiplier > 0 ? actualFuelUsed / (cfg.fuelCostPerRecharge * fuelCostMultiplier) : 0
-    this.charges[name] = Math.min(cfg.capacity, this.charges[name] + actualRecharge)
+    this.charges[name] = Math.min(cfg.capacity, this.charges[name] + chargeFromFuel)
     this.fuel = Math.max(0, this.fuel - actualFuelUsed)
   }
 }
 ```
 
-Note: the `actualRecharge` calculation divides by the effective per-unit cost so that a cheap multiplier recharges faster per fuel spent, not slower. When `fuelCostMultiplier === 0`, skip recharge (no division by zero).
+Note: `desiredRecharge` is capped against `chargeSpace` *before* computing fuel cost, so a thruster near its cap does not over-spend fuel on recharge that would be clamped away. `chargeFromFuel` back-derives charge recovery from fuel actually spent, and is skipped when `fuelCostMultiplier === 0` to avoid division by zero. (This supersedes an earlier draft of this snippet that computed `fuelCost` from the uncapped rate and over-spent fuel near the charge cap; the plan was corrected during Task 1 implementation.)
 
 - [ ] **Step 6: Run tests to verify green**
 

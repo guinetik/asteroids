@@ -3,18 +3,24 @@ import {
   MAP_INTRO_CAPTION_SOLAR_SYSTEM,
   MAP_INTRO_CAPTION_PHOBOS,
   MAP_INTRO_CAPTION_VIROIDS,
-  MAP_INTRO_CAPTION_JUPITER_MATERIALS,
+  MAP_INTRO_CAPTION_LUNA,
+  MAP_INTRO_CAPTION_JUPITER,
   MAP_INTRO_CAPTION_CLOUD_CITY,
+  MAP_INTRO_CAPTION_SATURN,
   MAP_INTRO_CAPTION_RETIRED_OPERATOR,
   INTRO_DUR_HOLD_SOLAR_SYSTEM,
   INTRO_DUR_ZOOM_PHOBOS,
   INTRO_DUR_HOLD_PHOBOS,
   INTRO_DUR_ZOOM_VIRUS,
   INTRO_DUR_HOLD_VIRUS,
+  INTRO_DUR_ZOOM_MOON,
+  INTRO_DUR_HOLD_MOON,
   INTRO_DUR_ZOOM_JUPITER,
   INTRO_DUR_HOLD_JUPITER,
   INTRO_DUR_ZOOM_CITY,
   INTRO_DUR_HOLD_CITY,
+  INTRO_DUR_ZOOM_SATURN,
+  INTRO_DUR_HOLD_SATURN,
   INTRO_DUR_ZOOM_SHUTTLE,
   INTRO_DUR_HOLD_SHUTTLE,
   INTRO_DUR_HANDOFF,
@@ -66,6 +72,12 @@ describe('MapIntroState', () => {
     expect(state.cinematicStep).toBe('hold_virus')
     state.tick(INTRO_DUR_HOLD_VIRUS)
 
+    expect(state.cinematicStep).toBe('zoom_moon')
+    state.tick(INTRO_DUR_ZOOM_MOON)
+
+    expect(state.cinematicStep).toBe('hold_moon')
+    state.tick(INTRO_DUR_HOLD_MOON)
+
     expect(state.cinematicStep).toBe('zoom_jupiter')
     state.tick(INTRO_DUR_ZOOM_JUPITER)
 
@@ -77,6 +89,12 @@ describe('MapIntroState', () => {
 
     expect(state.cinematicStep).toBe('hold_city')
     state.tick(INTRO_DUR_HOLD_CITY)
+
+    expect(state.cinematicStep).toBe('zoom_saturn')
+    state.tick(INTRO_DUR_ZOOM_SATURN)
+
+    expect(state.cinematicStep).toBe('hold_saturn')
+    state.tick(INTRO_DUR_HOLD_SATURN)
 
     expect(state.cinematicStep).toBe('zoom_shuttle')
     state.tick(INTRO_DUR_ZOOM_SHUTTLE)
@@ -138,10 +156,14 @@ describe('MapIntroState', () => {
     expect(mapIntroCaptionForStep('hold_phobos')).toBe(MAP_INTRO_CAPTION_PHOBOS)
     expect(mapIntroCaptionForStep('zoom_virus')).toBe(MAP_INTRO_CAPTION_PHOBOS)
     expect(mapIntroCaptionForStep('hold_virus')).toBe(MAP_INTRO_CAPTION_VIROIDS)
-    expect(mapIntroCaptionForStep('zoom_jupiter')).toBe(MAP_INTRO_CAPTION_VIROIDS)
-    expect(mapIntroCaptionForStep('hold_jupiter')).toBe(MAP_INTRO_CAPTION_JUPITER_MATERIALS)
-    expect(mapIntroCaptionForStep('zoom_city')).toBe(MAP_INTRO_CAPTION_JUPITER_MATERIALS)
+    expect(mapIntroCaptionForStep('zoom_moon')).toBe(MAP_INTRO_CAPTION_VIROIDS)
+    expect(mapIntroCaptionForStep('hold_moon')).toBe(MAP_INTRO_CAPTION_LUNA)
+    expect(mapIntroCaptionForStep('zoom_jupiter')).toBe(MAP_INTRO_CAPTION_LUNA)
+    expect(mapIntroCaptionForStep('hold_jupiter')).toBe(MAP_INTRO_CAPTION_JUPITER)
+    expect(mapIntroCaptionForStep('zoom_city')).toBe(MAP_INTRO_CAPTION_JUPITER)
     expect(mapIntroCaptionForStep('hold_city')).toBe(MAP_INTRO_CAPTION_CLOUD_CITY)
+    expect(mapIntroCaptionForStep('zoom_saturn')).toBe(MAP_INTRO_CAPTION_CLOUD_CITY)
+    expect(mapIntroCaptionForStep('hold_saturn')).toBe(MAP_INTRO_CAPTION_SATURN)
     expect(mapIntroCaptionForStep('zoom_shuttle')).toBe(MAP_INTRO_CAPTION_RETIRED_OPERATOR)
     expect(mapIntroCaptionForStep('hold_shuttle')).toBe(MAP_INTRO_CAPTION_RETIRED_OPERATOR)
     expect(mapIntroCaptionForStep('handoff')).toBe(MAP_INTRO_CAPTION_RETIRED_OPERATOR)

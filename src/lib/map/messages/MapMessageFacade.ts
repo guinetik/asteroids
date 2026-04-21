@@ -5,6 +5,7 @@ import type { ThrusterState } from '@/lib/physics/thrusterSystem'
 
 /** Telemetry snapshot passed into map tutorial / comms triggers each tick. */
 export interface MapRuntimeMessageParams {
+  tutorialMessagesUnlocked: boolean
   worldLineHistoryLength: number
   earthDepartureMinHistoryPoints: number
   earthDistance: number | null
@@ -40,6 +41,7 @@ export class MapMessageFacade {
   }
 
   triggerRuntimeMessages(params: MapRuntimeMessageParams): void {
+    if (!params.tutorialMessagesUnlocked) return
     this.triggerEarthDistanceMessage(params)
     this.triggerBrakeMessage(params)
     this.triggerMainThrusterMessage(params)
@@ -91,9 +93,16 @@ export class MapMessageFacade {
   }
 
   notifyFirstSlingshot(onMessageUpdate: (() => void) | null): void {
+    if (!this.runtimeTutorialMessagesUnlocked) return
     if (this.didDispatchFirstSlingshotMessage) return
     this.didDispatchFirstSlingshotMessage = true
     this.notifyTrigger('map_first_slingshot', onMessageUpdate)
+  }
+
+  private runtimeTutorialMessagesUnlocked = true
+
+  setTutorialMessagesUnlocked(unlocked: boolean): void {
+    this.runtimeTutorialMessagesUnlocked = unlocked
   }
 
   private notifyTrigger(triggerId: ShipMessageTrigger, onMessageUpdate: (() => void) | null): void {

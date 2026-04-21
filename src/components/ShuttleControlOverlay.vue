@@ -40,6 +40,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   openShop: []
+  'screen-change': [screen: ControlScreen]
   'purchase-upgrade': [upgradeId: UpgradeId]
   acceptMission: []
   deliverMission: [missionId: string]
@@ -90,6 +91,11 @@ watch(
     }
   },
 )
+
+watch(activeScreen, (screen, previous) => {
+  if (screen === previous) return
+  emit('screen-change', screen)
+})
 
 const screens = computed(() => {
   const mailLabel =

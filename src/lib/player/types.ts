@@ -45,4 +45,10 @@ export interface PlayerProfile {
    * Defaults to `1` for missing entries; `2` after USC partnership unlocks Earth, etc.
    */
   missionPayMultipliers: Record<string, number>
+  /** Journey ids already completed. */
+  completedJourneyIds: string[]
+  /** Per-journey completed step ids for resumable journey progress. */
+  journeyStepProgress: Record<string, string[]>
+  /** Feature ids unlocked by journey completion. */
+  unlockedFeatureIds: string[]
 }

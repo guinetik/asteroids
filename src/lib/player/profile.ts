@@ -11,6 +11,10 @@
  * @spec docs/superpowers/specs/2026-04-03-player-profile-design.md
  */
 import type { PlayerProfile } from './types'
+import {
+  SLINGSHOT_JOURNEY_FEATURE_ID,
+  WELCOME_JOURNEY_ID,
+} from '@/lib/journeys'
 
 /** localStorage key for the player profile. */
 export const PROFILE_STORAGE_KEY = 'asteroid-lander-profile'
@@ -116,7 +120,7 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     )
   }
 
-  let missionPayMultipliers: Record<string, number> = {}
+  const missionPayMultipliers: Record<string, number> = {}
   if (
     p.missionPayMultipliers !== undefined
     && p.missionPayMultipliers !== null
@@ -130,6 +134,49 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     }
   }
 
+  const hasJourneyFields =
+    Array.isArray(p.completedJourneyIds)
+    || (
+      p.journeyStepProgress !== undefined
+      && p.journeyStepProgress !== null
+      && typeof p.journeyStepProgress === 'object'
+      && !Array.isArray(p.journeyStepProgress)
+    )
+    || Array.isArray(p.unlockedFeatureIds)
+
+  let completedJourneyIds: string[] = []
+  if (Array.isArray(p.completedJourneyIds)) {
+    completedJourneyIds = p.completedJourneyIds.filter(
+      (entry): entry is string => typeof entry === 'string' && entry.length > 0,
+    )
+  } else if (!hasJourneyFields && hasSeenIntro) {
+    completedJourneyIds = [WELCOME_JOURNEY_ID]
+  }
+
+  const journeyStepProgress: Record<string, string[]> = {}
+  if (
+    p.journeyStepProgress !== undefined
+    && p.journeyStepProgress !== null
+    && typeof p.journeyStepProgress === 'object'
+    && !Array.isArray(p.journeyStepProgress)
+  ) {
+    for (const [journeyId, stepIds] of Object.entries(p.journeyStepProgress as Record<string, unknown>)) {
+      if (!Array.isArray(stepIds)) continue
+      journeyStepProgress[journeyId] = stepIds.filter(
+        (entry): entry is string => typeof entry === 'string' && entry.length > 0,
+      )
+    }
+  }
+
+  let unlockedFeatureIds: string[] = []
+  if (Array.isArray(p.unlockedFeatureIds)) {
+    unlockedFeatureIds = p.unlockedFeatureIds.filter(
+      (entry): entry is string => typeof entry === 'string' && entry.length > 0,
+    )
+  } else if (!hasJourneyFields && hasSeenIntro) {
+    unlockedFeatureIds = [SLINGSHOT_JOURNEY_FEATURE_ID]
+  }
+
   return {
     name: p.name,
     credits: p.credits,
@@ -140,6 +187,9 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     hasSeenIntro,
     unlockedFastTravelPlanets,
     missionPayMultipliers,
+    completedJourneyIds,
+    journeyStepProgress,
+    unlockedFeatureIds,
   }
 }
 
@@ -155,6 +205,9 @@ export function createProfile(name: string): PlayerProfile {
     hasSeenIntro: false,
     unlockedFastTravelPlanets: [],
     missionPayMultipliers: {},
+    completedJourneyIds: [],
+    journeyStepProgress: {},
+    unlockedFeatureIds: [],
   }
 }
 

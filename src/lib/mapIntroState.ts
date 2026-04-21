@@ -31,10 +31,16 @@ export const INTRO_DUR_ZOOM_VIRUS = 2
 /** Hold on virus + Phobos. */
 export const INTRO_DUR_HOLD_VIRUS = 4
 
-/** Zoom from Phobos to Jupiter system. */
+/** Zoom from Phobos to the Earth-Moon system. */
+export const INTRO_DUR_ZOOM_MOON = 3
+
+/** Hold on Luna — human population + ship fabrication caption. */
+export const INTRO_DUR_HOLD_MOON = 6
+
+/** Zoom from Luna to Jupiter. */
 export const INTRO_DUR_ZOOM_JUPITER = 3
 
-/** Hold on Jupiter — moons + raw materials caption. */
+/** Hold on Jupiter — outer-system expansion caption. */
 export const INTRO_DUR_HOLD_JUPITER = 4
 
 /** Zoom closer to Jupiter as city rises. */
@@ -42,6 +48,12 @@ export const INTRO_DUR_ZOOM_CITY = 2
 
 /** Hold on cloud city. */
 export const INTRO_DUR_HOLD_CITY = 4
+
+/** Zoom from Jupiter to Saturn. */
+export const INTRO_DUR_ZOOM_SATURN = 2.5
+
+/** Hold on Saturn — elite / viroid stasis caption. */
+export const INTRO_DUR_HOLD_SATURN = 4
 
 /** Zoom from Jupiter to shuttle near Earth. */
 export const INTRO_DUR_ZOOM_SHUTTLE = 3
@@ -63,10 +75,14 @@ export type IntroCinematicStep =
   | 'hold_phobos'
   | 'zoom_virus'
   | 'hold_virus'
+  | 'zoom_moon'
+  | 'hold_moon'
   | 'zoom_jupiter'
   | 'hold_jupiter'
   | 'zoom_city'
   | 'hold_city'
+  | 'zoom_saturn'
+  | 'hold_saturn'
   | 'zoom_shuttle'
   | 'hold_shuttle'
   | 'handoff'
@@ -76,8 +92,10 @@ export type IntroCinematicStep =
 export const INTRO_ZOOM_STEPS: ReadonlySet<IntroCinematicStep> = new Set([
   'zoom_phobos',
   'zoom_virus',
+  'zoom_moon',
   'zoom_jupiter',
   'zoom_city',
+  'zoom_saturn',
   'zoom_shuttle',
   'handoff',
 ])
@@ -95,15 +113,23 @@ export const MAP_INTRO_CAPTION_PHOBOS =
 
 /** Caption: Viroid reveal on Phobos. */
 export const MAP_INTRO_CAPTION_VIROIDS =
-  'BUT IT WAS HOME TO SOMETHING ELSE. SILICATE CREATURES FROM INTERSTELLAR SPACE. TERRITORIAL AND LETHAL. WE CALL THEM VIROIDS.'
+  'BUT THE MOON WAS ALSO HIDING SOMETHING IN STASIS: SILICATE CREATURES FROM INTERSTELLAR SPACE. TERRITORIAL. LETHAL.'
 
-/** Caption: Jupiter raw materials / humanity spreading. */
-export const MAP_INTRO_CAPTION_JUPITER_MATERIALS =
-  "FROM THE NEUTRON, HUMANITY SPREAD TO THE OUTER SYSTEM. JUPITER'S MOONS PROVIDED THE RAW MATERIALS."
+/** Caption: Luna population and near-Earth fabrication. */
+export const MAP_INTRO_CAPTION_LUNA =
+  'BACK ON EARTH, VIROIDS ASSIMILATE TERRAIN FASTER THAN WE CAN RECLAIM IT. MOST OF HUMANITY LIVES ON LUNA. TO SUPPORT THIS MIGRATION, MASS 3D PRINTING PROJECTS ASSEMBLED THOUSANDS OF NEAR-EARTH SHIPS LIKE THE SPACE SHUTTLE.'
+
+/** Caption: Jupiter expansion beat. */
+export const MAP_INTRO_CAPTION_JUPITER =
+  "WITH LUNA AS ITS INDUSTRIAL BASE, HUMANITY PUSHED OUTWARD. JUPITER'S SYSTEM BECAME THE GATEWAY TO THE DEEPER SOLAR SYSTEM."
 
 /** Caption: Jupiter cloud city assembly lines. */
 export const MAP_INTRO_CAPTION_CLOUD_CITY =
-  'ABOVE THE SURFACE, A CLOUD CITY 3D-PRINTED THE ASSEMBLY LINES.'
+  'USING THE MOONS RESOURCES, ABOVE JUPITER, CLOUD CITIES 3D-PRINTED THE SHIPS, HABITATS, AND INFRASTRUCTURE OF THE OUTER SYSTEM.'
+
+/** Caption: Saturn elite / viroid stasis beat. */
+export const MAP_INTRO_CAPTION_SATURN =
+  'AT SATURN LIVE THE ELITE OF HUMANITY. BELOW THE FREEZING POINT OF VIROIDS, OUT HERE THEY CAN ONLY EXIST IN STASIS.'
 
 /** Caption: retired lander operator receives shuttle. */
 export const MAP_INTRO_CAPTION_RETIRED_OPERATOR =
@@ -116,10 +142,14 @@ const STEP_CAPTIONS: Record<IntroCinematicStep, string> = {
   hold_phobos: MAP_INTRO_CAPTION_PHOBOS,
   zoom_virus: MAP_INTRO_CAPTION_PHOBOS,
   hold_virus: MAP_INTRO_CAPTION_VIROIDS,
-  zoom_jupiter: MAP_INTRO_CAPTION_VIROIDS,
-  hold_jupiter: MAP_INTRO_CAPTION_JUPITER_MATERIALS,
-  zoom_city: MAP_INTRO_CAPTION_JUPITER_MATERIALS,
+  zoom_moon: MAP_INTRO_CAPTION_VIROIDS,
+  hold_moon: MAP_INTRO_CAPTION_LUNA,
+  zoom_jupiter: MAP_INTRO_CAPTION_LUNA,
+  hold_jupiter: MAP_INTRO_CAPTION_JUPITER,
+  zoom_city: MAP_INTRO_CAPTION_JUPITER,
   hold_city: MAP_INTRO_CAPTION_CLOUD_CITY,
+  zoom_saturn: MAP_INTRO_CAPTION_CLOUD_CITY,
+  hold_saturn: MAP_INTRO_CAPTION_SATURN,
   zoom_shuttle: MAP_INTRO_CAPTION_RETIRED_OPERATOR,
   hold_shuttle: MAP_INTRO_CAPTION_RETIRED_OPERATOR,
   handoff: MAP_INTRO_CAPTION_RETIRED_OPERATOR,
@@ -215,10 +245,14 @@ export class MapIntroState {
         { name: 'hold_phobos', duration: INTRO_DUR_HOLD_PHOBOS },
         { name: 'zoom_virus', duration: INTRO_DUR_ZOOM_VIRUS },
         { name: 'hold_virus', duration: INTRO_DUR_HOLD_VIRUS },
+        { name: 'zoom_moon', duration: INTRO_DUR_ZOOM_MOON },
+        { name: 'hold_moon', duration: INTRO_DUR_HOLD_MOON },
         { name: 'zoom_jupiter', duration: INTRO_DUR_ZOOM_JUPITER },
         { name: 'hold_jupiter', duration: INTRO_DUR_HOLD_JUPITER },
         { name: 'zoom_city', duration: INTRO_DUR_ZOOM_CITY },
         { name: 'hold_city', duration: INTRO_DUR_HOLD_CITY },
+        { name: 'zoom_saturn', duration: INTRO_DUR_ZOOM_SATURN },
+        { name: 'hold_saturn', duration: INTRO_DUR_HOLD_SATURN },
         { name: 'zoom_shuttle', duration: INTRO_DUR_ZOOM_SHUTTLE },
         { name: 'hold_shuttle', duration: INTRO_DUR_HOLD_SHUTTLE },
         { name: 'handoff', duration: INTRO_DUR_HANDOFF },

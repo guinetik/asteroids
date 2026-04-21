@@ -870,7 +870,7 @@ body {
 
 /* Above .habitat-fade (z-50) so pending-mail strip stays visible inside the habitat (shuttle HUD stays hidden there). */
 .map-message-notice {
-  @apply pointer-events-auto fixed right-6 z-[55];
+  @apply pointer-events-auto fixed inset-x-0 z-[55] flex justify-center px-6;
   top: 5.25rem;
 }
 

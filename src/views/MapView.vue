@@ -19,6 +19,7 @@ import CreditsBadge from '@/components/hud/CreditsBadge.vue'
 import AchievementBanner from '@/components/AchievementBanner.vue'
 import AchievementsDialog from '@/components/AchievementsDialog.vue'
 import PortalWelcomeDialog from '@/components/PortalWelcomeDialog.vue'
+import ObjectiveTracker from '@/components/ObjectiveTracker.vue'
 import type {
   ShuttleMissionBoard,
   ActiveShuttleMission,
@@ -53,6 +54,7 @@ import type { ActiveShipMessage } from '@/lib/messages/messageTypes'
 import type { MapIntroUiState } from '@/lib/mapIntroState'
 import type { MapViewBootState, MapViewLayerToggleState } from './MapViewController'
 import type { AchievementProgress } from '@/data/achievements'
+import type { JourneyTrackerState } from '@/lib/journeys'
 import type {
   ShuttleTelemetry,
   GravityWarningState,
@@ -276,6 +278,7 @@ const mapBootState = reactive<MapViewBootState>({
   label: 'Loading',
 })
 const mapExperienceStarted = ref(false)
+const journeyTracker = ref<JourneyTrackerState | null>(null)
 
 const mapBootOverlayVisible = computed(() => !mapExperienceStarted.value)
 const mapBootReady = computed(() => mapBootState.phase === 'ready')
@@ -517,6 +520,9 @@ onMounted(async () => {
     viewController.onHabitatFade = (opacity) => {
       habitatFadeOpacity.value = opacity
     }
+    viewController.onJourneyTracker = (state) => {
+      journeyTracker.value = state
+    }
     viewController.onShopButton = (visible, planetName) => {
       shopButtonVisible.value = visible
       shopButtonPlanet.value = planetName
@@ -641,6 +647,7 @@ function closeShuttleControl() {
 }
 
 function openShuttleControlFromMap(): void {
+  viewController.notifyJourneyTrigger('shuttle_control_opened')
   shuttleControlVisible.value = true
   syncPersistentProgressFromController()
   shopProfile.value = viewController.getPlayerProfileSnapshot()
@@ -648,6 +655,7 @@ function openShuttleControlFromMap(): void {
 }
 
 function openMissionsFromMap(): void {
+  viewController.notifyJourneyTrigger('shuttle_control_opened')
   shuttleControlProgramOnOpen.value = 'missions'
   shuttleControlVisible.value = true
   syncPersistentProgressFromController()
@@ -669,6 +677,7 @@ function openHabitatFromMap(): void {
 }
 
 function openShopFromTerminal() {
+  viewController.notifyJourneyTrigger('shop_opened')
   shuttleControlVisible.value = false
   viewController.openShop()
 }
@@ -723,6 +732,24 @@ function handleShopRefuel() {
 
 function handleShopBuyReserveFuel() {
   viewController.shopBuyReserveFuel()
+}
+
+function handleShuttleControlScreenChange(screen: string): void {
+  if (screen === 'shuttle') {
+    viewController.notifyJourneyTrigger('shuttle_program_opened')
+    return
+  }
+  if (screen === 'lander') {
+    viewController.notifyJourneyTrigger('lander_program_opened')
+    return
+  }
+  if (screen === 'inventory') {
+    viewController.notifyJourneyTrigger('inventory_opened')
+    return
+  }
+  if (screen === 'upgrades') {
+    viewController.notifyJourneyTrigger('upgrades_opened')
+  }
 }
 
 function handleShopBuyLanderFuel() {
@@ -996,6 +1023,12 @@ watch(
     :autoplay-token="messageAudioAutoplayToken"
     @dismiss="dismissActiveMessage"
   />
+  <ObjectiveTracker
+    v-if="journeyTracker && !mapBootOverlayVisible"
+    :eyebrow="journeyTracker.eyebrow"
+    :title="journeyTracker.title"
+    :objectives="journeyTracker.objectives"
+  />
   <div
     v-show="
       !mapOverlay.visible &&
@@ -1056,6 +1089,7 @@ watch(
     :player-name="playerProfileSnapshot.name"
     :telemetry="telemetry"
     @close="closeShuttleControl"
+    @screen-change="handleShuttleControlScreenChange"
     @open-shop="openShopFromTerminal"
     @purchase-upgrade="handlePurchaseUpgrade"
     @accept-mission="handleAcceptMission"

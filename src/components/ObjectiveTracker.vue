@@ -1,31 +1,51 @@
-<!-- src/components/MissionTracker.vue -->
+<!-- src/components/ObjectiveTracker.vue -->
 <script setup lang="ts">
-import type { MiniGameStep } from '@/lib/minigame/MiniGame'
+/** Optional progress metadata shown after a tracker step label. */
+export interface ObjectiveTrackerStepProgress {
+  /** Current progress value. */
+  current: number
+  /** Target progress value. */
+  target: number
+  /** Unit suffix. */
+  unit: string
+}
+
+/** Display step for the objective tracker. */
+export interface ObjectiveTrackerStep {
+  /** Step label. */
+  label: string
+  /** Whether this step is complete. */
+  complete: boolean
+  /** Whether this step is currently active. */
+  active: boolean
+  /** Optional progress meter metadata. */
+  progress?: ObjectiveTrackerStepProgress
+}
 
 /** Objective display entry for the tracker. */
-export interface TrackerObjective {
+export interface ObjectiveTrackerEntry {
   /** Unique id. */
   id: string
-  /** Display label (e.g. "SURVEY", "GATHER"). */
+  /** Display label. */
   label: string
   /** Whether this objective is complete. */
   complete: boolean
-  /** Steps for this objective (from minigame). */
-  steps: readonly MiniGameStep[]
+  /** Optional nested steps. */
+  steps: readonly ObjectiveTrackerStep[]
 }
 
 defineProps<{
-  asteroidName: string
-  missionName: string
-  objectives: TrackerObjective[]
+  eyebrow: string
+  title: string
+  objectives: ObjectiveTrackerEntry[]
 }>()
 </script>
 
 <template>
   <div class="mission-tracker">
     <div class="tracker-header">
-      <div class="tracker-asteroid">{{ asteroidName }}</div>
-      <div class="tracker-mission">{{ missionName }}</div>
+      <div class="tracker-asteroid">{{ eyebrow }}</div>
+      <div class="tracker-mission">{{ title }}</div>
     </div>
     <div class="tracker-objectives">
       <div
@@ -40,7 +60,6 @@ defineProps<{
           <span class="tracker-check">{{ obj.complete ? '\u2713' : '\u25CB' }}</span>
           <span class="tracker-label">{{ obj.label }}</span>
         </div>
-        <!-- Steps: show completed + current active, hide future -->
         <div v-if="!obj.complete && obj.steps.length > 0" class="tracker-steps">
           <div
             v-for="(step, si) in obj.steps"
@@ -69,7 +88,7 @@ defineProps<{
   position: fixed;
   top: 1rem;
   right: 1rem;
-  z-index: 30;
+  z-index: 65;
   pointer-events: none;
   display: flex;
   flex-direction: column;
