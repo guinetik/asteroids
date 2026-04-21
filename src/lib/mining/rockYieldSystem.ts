@@ -224,15 +224,6 @@ export class RockYieldSystem {
     return converted
   }
 
-  /**
-   * Deterministic 32-bit hash from `(seed, spawnIndex)`. Avoids a full
-   * RNG instance per-rock — we only ever pull a single random number.
-   * Delegates to {@link rollMineralFrom} using the system-level weighted list.
-   */
-  private rollMineral(spawnIndex: number): string {
-    return this.rollMineralFrom(this.weightedItems, spawnIndex)
-  }
-
   /** Build a weighted mineral list from a composition table, same rules as constructor. */
   private buildWeightedItems(
     composition: readonly MineralEntry[],
