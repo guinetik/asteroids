@@ -14,7 +14,7 @@
   "beam": {
     "maxRangeWorldUnits": 80,
     "dpsKgPerSec": 30,
-    "noseOffset": { "x": 0, "y": 0.3, "z": 1.8 }
+    "noseOffset": { "x": 0, "y": 2.0, "z": 0 }
   },
   "tiers": {
     "small":  { "radiusMax": 1.5,    "hpKg": 40,  "lootId": "asteroid-belt-small"  },

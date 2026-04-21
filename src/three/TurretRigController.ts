@@ -18,6 +18,15 @@ const BEAM_BASE_LENGTH = 1
 const BEAM_RADIUS = 0.04
 const RETICLE_DISTANCE = 5
 
+/**
+ * Yaw offset applied to turretBase so the camera's default -Z forward aligns
+ * with the shuttle's local +X forward (the convention used elsewhere, e.g.
+ * `ShuttleController.forward` built from `new Vector3(1,0,0).applyQuaternion`).
+ * Without this, the camera points 90° off the shuttle nose, which is inside
+ * the hull.
+ */
+const SHUTTLE_FORWARD_YAW_OFFSET = Math.PI / 2
+
 /** Rig for the active turret session. Parented under {@link shuttleGroup} on build. */
 export class TurretRigController {
   /** Group rotated by base yaw; parent of the camera. */
@@ -90,7 +99,7 @@ export class TurretRigController {
 
   /** Apply aim state to base + camera rotations. */
   applyAim(state: TurretAimState): void {
-    this.turretBase.rotation.set(0, state.baseYaw, 0)
+    this.turretBase.rotation.set(0, state.baseYaw + SHUTTLE_FORWARD_YAW_OFFSET, 0)
     this.camera.rotation.set(state.conePitch, state.coneYaw, 0, 'YXZ')
   }
 
