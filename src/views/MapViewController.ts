@@ -2704,6 +2704,18 @@ export class MapViewController implements Tickable {
       MAP_CONFIG.MAP_SHUTTLE_MIN_APPARENT_SIZE * 2 * dist * Math.tan(halfFovRad)
     const requiredScale = minWorldSize / MAP_CONFIG.MAP_SHUTTLE_BASE_SIZE
     const targetScale = Math.max(MAP_CONFIG.MAP_SHUTTLE_SCALE, requiredScale)
+    const overscale = targetScale / MAP_CONFIG.MAP_SHUTTLE_SCALE
+    const reticleT = THREE.MathUtils.clamp(
+      (overscale - MAP_CONFIG.MAP_RETICLE_FADE_START) /
+        (MAP_CONFIG.MAP_RETICLE_FADE_END - MAP_CONFIG.MAP_RETICLE_FADE_START),
+      0,
+      1,
+    )
+    const reticleAlpha = reticleT * reticleT * (3 - 2 * reticleT)
+    this.vehicleCamera.setIdleRecenterSuppressed(
+      this.orbitSystem?.state === 'free' && reticleAlpha > 0.005,
+    )
+    this.applyOrbitBloomClamp(overscale)
     this.currentShuttleScale = THREE.MathUtils.lerp(
       this.currentShuttleScale,
       targetScale,
@@ -3659,6 +3671,30 @@ export class MapViewController implements Tickable {
   /** Bloom strength applied while EVA is active. Paired with {@link EVA_MAP_BLOOM_THRESHOLD}. */
   private static readonly EVA_MAP_BLOOM_STRENGTH = 0.35
 
+  /** Default tactical-map bloom threshold used outside inspect / EVA / orbit mitigation. */
+  private static readonly MAP_BLOOM_THRESHOLD = 0.45
+
+  /** Default tactical-map bloom strength used outside inspect / EVA / orbit mitigation. */
+  private static readonly MAP_BLOOM_STRENGTH = 0.72
+
+  /** Inspect-mode bloom threshold. Mirrors the inspect toggle output. */
+  private static readonly MAP_INSPECT_BLOOM_THRESHOLD = 1.5
+
+  /** Inspect-mode bloom strength. Mirrors the inspect toggle output. */
+  private static readonly MAP_INSPECT_BLOOM_STRENGTH = 0.2
+
+  /** Overscale where parked/orbit bloom mitigation begins. */
+  private static readonly ORBIT_BLOOM_CLAMP_OVERSCALE_START = 6
+
+  /** Overscale where parked/orbit bloom mitigation reaches full effect. */
+  private static readonly ORBIT_BLOOM_CLAMP_OVERSCALE_END = 20
+
+  /** Bloom threshold used at maximum parked/orbit bloom mitigation. */
+  private static readonly ORBIT_BLOOM_CLAMP_THRESHOLD = 1.15
+
+  /** Bloom strength used at maximum parked/orbit bloom mitigation. */
+  private static readonly ORBIT_BLOOM_CLAMP_STRENGTH = 0.28
+
   /**
    * Snapshot and override the bloom pass while EVA is active; restore previous values on
    * exit. Keeps the tactical-map bloom tuning intact for everything outside the EVA flow.
@@ -3686,6 +3722,49 @@ export class MapViewController implements Tickable {
       bloomPass.strength = this.preEvaBloomState.strength
       this.preEvaBloomState = null
     }
+  }
+
+  /**
+   * Clamp map bloom while parked in orbit and the constant-screen-size shuttle scaler has pushed
+   * the ship far above its baseline map size. This preserves free-flight bloom while keeping
+   * close orbit views readable.
+   */
+  private applyOrbitBloomClamp(overscale: number): void {
+    if (this.evaSession?.isActive) return
+
+    const bloomPass = this.sceneObjects?.composer.passes.find(
+      (p) => p instanceof UnrealBloomPass,
+    ) as UnrealBloomPass | undefined
+    if (!bloomPass) return
+
+    const baseThreshold = this.inspectMode
+      ? MapViewController.MAP_INSPECT_BLOOM_THRESHOLD
+      : MapViewController.MAP_BLOOM_THRESHOLD
+    const baseStrength = this.inspectMode
+      ? MapViewController.MAP_INSPECT_BLOOM_STRENGTH
+      : MapViewController.MAP_BLOOM_STRENGTH
+
+    if ((this.orbitSystem?.state ?? 'free') !== 'orbiting') {
+      bloomPass.threshold = baseThreshold
+      bloomPass.strength = baseStrength
+      return
+    }
+
+    const clampT = THREE.MathUtils.smoothstep(
+      overscale,
+      MapViewController.ORBIT_BLOOM_CLAMP_OVERSCALE_START,
+      MapViewController.ORBIT_BLOOM_CLAMP_OVERSCALE_END,
+    )
+    bloomPass.threshold = THREE.MathUtils.lerp(
+      baseThreshold,
+      MapViewController.ORBIT_BLOOM_CLAMP_THRESHOLD,
+      clampT,
+    )
+    bloomPass.strength = THREE.MathUtils.lerp(
+      baseStrength,
+      MapViewController.ORBIT_BLOOM_CLAMP_STRENGTH,
+      clampT,
+    )
   }
 
   /**

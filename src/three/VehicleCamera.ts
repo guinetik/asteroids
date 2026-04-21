@@ -215,6 +215,8 @@ export class VehicleCamera implements Tickable {
    * When false, yaw changes are absorbed so manual orbit framing is unchanged (e.g. planet orbit).
    */
   private shipYawCouplingEnabled = true
+  /** When true, map view is intentionally zoomed out and idle chase recenter is suspended. */
+  private idleRecenterSuppressed = false
 
   /** Camera shake state. */
   private shakeIntensity = 0
@@ -277,6 +279,19 @@ export class VehicleCamera implements Tickable {
    */
   setShipYawCoupling(enabled: boolean): void {
     this.shipYawCouplingEnabled = enabled
+  }
+
+  /**
+   * Suspend or resume the idle chase recenter behavior without affecting manual orbit drag state.
+   *
+   * When suppression is active, the idle timer is held at zero so zooming back in does not
+   * immediately snap the camera to chase framing.
+   */
+  setIdleRecenterSuppressed(suppressed: boolean): void {
+    this.idleRecenterSuppressed = suppressed
+    if (suppressed) {
+      this.mouseIdleTimer = 0
+    }
   }
 
   /** Transition to a new camera config. Resets idle timer so the offset lerps immediately. */
@@ -359,7 +374,7 @@ export class VehicleCamera implements Tickable {
         : this.config.minY
 
     // After enough time without orbit-drag, ease to default chase framing
-    if (!this.isMouseActive) {
+    if (!this.isMouseActive && !this.idleRecenterSuppressed) {
       this.mouseIdleTimer += dt
 
       if (this.mouseIdleTimer > this.config.idleTimeout) {
@@ -378,6 +393,8 @@ export class VehicleCamera implements Tickable {
           this.camera.position.lerp(targetCamPos, this.config.lerpSpeed * dt)
         }
       }
+    } else if (this.idleRecenterSuppressed) {
+      this.mouseIdleTimer = 0
     }
 
     // Always clamp
