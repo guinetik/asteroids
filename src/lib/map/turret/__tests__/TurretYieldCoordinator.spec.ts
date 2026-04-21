@@ -11,6 +11,7 @@ function makeHandle(overrides: Partial<TurretInstanceHandle> = {}): TurretInstan
     worldPosition: new Vector3(),
     radius: 1,
     tierId: 'small',
+    compositionLabel: 'Ice 60% • Iron 40%',
     ...overrides,
   }
 }

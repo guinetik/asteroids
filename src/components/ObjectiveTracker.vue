@@ -86,7 +86,7 @@ defineProps<{
 <style>
 .mission-tracker {
   position: fixed;
-  top: 1rem;
+  top: 5.5rem;
   right: 1rem;
   z-index: 65;
   pointer-events: none;

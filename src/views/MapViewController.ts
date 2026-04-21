@@ -3683,6 +3683,14 @@ export class MapViewController implements Tickable {
         shuttleController: this.shuttleController!,
         beltControllers: this.beltControllers,
         host,
+        commitInventoryUnit: (itemId) => {
+          const result = addItem(this.playerInventory, itemId, 1)
+          if (!result.ok) return { ok: false as const, reason: result.reason ?? 'Inventory full' }
+          this.playerInventory = result.inventory
+          saveInventory(this.playerInventory)
+          this.emitShopState()
+          return { ok: true as const }
+        },
         onResourcePickup: this.onResourcePickup ?? undefined,
         onResourcePickupFailed: this.onResourcePickupFailed ?? undefined,
         onFadeOpacity: (op) => this.onTurretFade?.(op),

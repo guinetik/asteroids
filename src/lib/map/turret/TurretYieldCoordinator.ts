@@ -31,6 +31,8 @@ export interface TurretInstanceHandle {
   readonly radius: number
   /** Tier classification for loot/HP. */
   readonly tierId: TurretTierId
+  /** Short human-readable composition summary for HUD target readouts. */
+  readonly compositionLabel: string
 }
 
 /** Result of a single inventory commit attempt. */

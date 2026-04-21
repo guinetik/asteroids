@@ -20,6 +20,8 @@ import AchievementBanner from '@/components/AchievementBanner.vue'
 import AchievementsDialog from '@/components/AchievementsDialog.vue'
 import PortalWelcomeDialog from '@/components/PortalWelcomeDialog.vue'
 import ObjectiveTracker from '@/components/ObjectiveTracker.vue'
+import PickupToast from '@/components/PickupToast.vue'
+import type { PickupEntry } from '@/components/PickupToast.vue'
 import type {
   ShuttleMissionBoard,
   ActiveShuttleMission,
@@ -231,6 +233,12 @@ const habitatFadeOpacity = ref(0)
 const turretFadeOpacity = ref(0)
 const turretHudPhase = ref<'idle' | 'opening' | 'active' | 'closing'>('idle')
 const turretReticleValid = ref(false)
+const turretTarget = ref<{
+  label: string
+  remainingKg: number
+  totalKg: number
+  compositionLabel: string
+} | null>(null)
 const deathVisible = ref(false)
 const deathCause = ref('')
 const achievementsOpen = ref(false)
@@ -276,6 +284,15 @@ const evaMinigameInstance = ref<OrbitalMiniGame | null>(null)
 const missionBoard = ref<ShuttleMissionBoard | null>(null)
 const missionNotification = ref<string | null>(null)
 let missionNotificationTimer: TimerHandle | null = null
+const pickups = ref<PickupEntry[]>([])
+const PICKUP_AGGREGATE_WINDOW_SEC = 1.5
+const PICKUP_LIFETIME_SEC = 2.2
+const pickupTimers = new Map<string, { handle: ReturnType<typeof Timer.after>; key: string }>()
+let pickupSeq = 0
+const pickupFailed = ref<{ id: number; label: string; reason: string } | null>(null)
+const pickupFailedTimers = new Set<ReturnType<typeof Timer.after>>()
+const PICKUP_FAILED_LIFETIME_SEC = 2.4
+let pickupFailedSeq = 0
 const mapBootState = reactive<MapViewBootState>({
   phase: 'preparing',
   label: 'Loading',
@@ -285,6 +302,10 @@ const journeyTracker = ref<JourneyTrackerState | null>(null)
 
 const mapBootOverlayVisible = computed(() => !mapExperienceStarted.value)
 const mapBootReady = computed(() => mapBootState.phase === 'ready')
+const turretTargetRatio = computed(() => {
+  if (!turretTarget.value || turretTarget.value.totalKg <= 0) return 0
+  return Math.max(0, Math.min(1, turretTarget.value.remainingKg / turretTarget.value.totalKg))
+})
 
 const mapOverlay = reactive<MapOverlayState>({
   visible: false,
@@ -298,6 +319,56 @@ const mapOverlay = reactive<MapOverlayState>({
   trajectoryPoints: [],
   missionWaypoint: null,
 })
+
+function recordPickup(itemId: string, quantity: number, label: string): void {
+  const existing = pickups.value.find((p) => p.itemId === itemId)
+  let entry: PickupEntry
+  if (existing) {
+    existing.quantity += quantity
+    existing.pulse += 1
+    entry = existing
+    const previous = pickupTimers.get(existing.id)
+    if (previous) Timer.cancel(previous.handle)
+  } else {
+    pickupSeq += 1
+    entry = {
+      id: `pickup-${pickupSeq}`,
+      itemId,
+      label,
+      quantity,
+      pulse: 0,
+    }
+    pickups.value.push(entry)
+  }
+  const lifetime = Math.max(PICKUP_AGGREGATE_WINDOW_SEC, PICKUP_LIFETIME_SEC)
+  const handle = Timer.after(lifetime, () => {
+    const idx = pickups.value.findIndex((p) => p.id === entry.id)
+    if (idx >= 0) pickups.value.splice(idx, 1)
+    pickupTimers.delete(entry.id)
+  })
+  pickupTimers.set(entry.id, { handle, key: entry.id })
+}
+
+function recordPickupFailed(label: string, reason: string): void {
+  pickupFailedSeq += 1
+  pickupFailed.value = { id: pickupFailedSeq, label, reason }
+  const handle = Timer.after(PICKUP_FAILED_LIFETIME_SEC, () => {
+    if (pickupFailed.value?.id === pickupFailedSeq) {
+      pickupFailed.value = null
+    }
+    pickupFailedTimers.delete(handle)
+  })
+  pickupFailedTimers.add(handle)
+}
+
+function clearPickupUi(): void {
+  for (const { handle } of pickupTimers.values()) Timer.cancel(handle)
+  pickupTimers.clear()
+  pickups.value = []
+  for (const handle of pickupFailedTimers) Timer.cancel(handle)
+  pickupFailedTimers.clear()
+  pickupFailed.value = null
+}
 
 /** Set of planet ids the player has unlocked for fast travel (from profile). */
 const fastTravelablePlanetIds = computed<Set<string>>(
@@ -529,6 +600,14 @@ onMounted(async () => {
     viewController.onTurretHudState = (state) => {
       turretHudPhase.value = state.phase
       turretReticleValid.value = state.reticleValid
+      turretTarget.value = state.target
+      if (state.phase !== 'active') turretTarget.value = null
+    }
+    viewController.onResourcePickup = (itemId, quantity, label) => {
+      recordPickup(itemId, quantity, label)
+    }
+    viewController.onResourcePickupFailed = (label, reason) => {
+      recordPickupFailed(label, reason)
     }
     viewController.onJourneyTracker = (state) => {
       journeyTracker.value = state
@@ -611,6 +690,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  clearPickupUi()
   setShipMessageFollowUpDeliveryListener(null)
   stopBackgroundMusic('map')
   viewController.dispose()
@@ -1286,6 +1366,30 @@ watch(
       />
     </svg>
   </div>
+  <div v-if="turretHudPhase === 'active' && turretTarget" class="turret-target-card">
+    <div class="turret-target-card__eyebrow">Target Composition</div>
+    <div class="turret-target-card__label">{{ turretTarget.label }}</div>
+    <div class="turret-target-card__composition">{{ turretTarget.compositionLabel }}</div>
+    <div class="turret-target-card__bar">
+      <div class="turret-target-card__bar-fill" :style="{ width: `${turretTargetRatio * 100}%` }"></div>
+    </div>
+    <div class="turret-target-card__hp">
+      {{ Math.ceil(turretTarget.remainingKg) }} / {{ Math.round(turretTarget.totalKg) }} KG
+    </div>
+  </div>
+  <PickupToast :pickups="pickups" />
+  <transition name="pickup-failed">
+    <div
+      v-if="pickupFailed"
+      :key="pickupFailed.id"
+      class="pickup-failed"
+      role="status"
+      aria-live="polite"
+    >
+      <span class="pickup-failed__head">CARGO FULL</span>
+      <span class="pickup-failed__body">{{ pickupFailed.label }} lost - {{ pickupFailed.reason }}</span>
+    </div>
+  </transition>
   </template>
   <PortalWelcomeDialog
     :visible="portalWelcomeVisible"
@@ -1295,3 +1399,120 @@ watch(
     @skip="handlePortalSkip"
   />
 </template>
+
+<style>
+.turret-crosshair {
+  position: fixed;
+  inset: 50% auto auto 50%;
+  z-index: 44;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  filter: drop-shadow(0 0 14px rgba(59, 130, 246, 0.38));
+}
+
+.turret-target-card {
+  position: fixed;
+  left: 50%;
+  bottom: max(4rem, env(safe-area-inset-bottom, 0px) + 3rem);
+  z-index: 44;
+  width: min(28rem, calc(100vw - 2rem));
+  transform: translateX(-50%);
+  padding: 0.9rem 1rem 0.85rem;
+  border: 1px solid rgba(103, 232, 249, 0.34);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(5, 18, 28, 0.9), rgba(3, 10, 18, 0.82));
+  box-shadow: 0 0 30px rgba(34, 211, 238, 0.16), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+
+.turret-target-card__eyebrow {
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(186, 230, 253, 0.76);
+}
+
+.turret-target-card__label {
+  margin-top: 0.25rem;
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 1.2rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #e0fbff;
+}
+
+.turret-target-card__composition {
+  margin-top: 0.2rem;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: rgba(191, 219, 254, 0.88);
+}
+
+.turret-target-card__bar {
+  height: 0.48rem;
+  margin-top: 0.65rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.95);
+  box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.18);
+}
+
+.turret-target-card__bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #22d3ee, #67e8f9 55%, #ecfeff);
+  box-shadow: 0 0 20px rgba(103, 232, 249, 0.45);
+}
+
+.turret-target-card__hp {
+  margin-top: 0.42rem;
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(224, 242, 254, 0.88);
+}
+
+.pickup-failed {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right, 0px) + 0.5rem);
+  bottom: max(7.25rem, env(safe-area-inset-bottom, 0px) + 3rem);
+  z-index: 46;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: min(22rem, calc(100vw - 2rem));
+  padding: 0.8rem 0.95rem;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: 0.9rem;
+  background: rgba(36, 8, 8, 0.9);
+  box-shadow: 0 0 24px rgba(248, 113, 113, 0.14);
+  pointer-events: none;
+}
+
+.pickup-failed__head {
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #fca5a5;
+}
+
+.pickup-failed__body {
+  font-size: 0.84rem;
+  color: rgba(254, 226, 226, 0.92);
+}
+
+.pickup-failed-enter-active,
+.pickup-failed-leave-active {
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.pickup-failed-enter-from,
+.pickup-failed-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+</style>

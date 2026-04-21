@@ -11,8 +11,6 @@
 import * as THREE from 'three'
 import { InputManager } from '@/lib/InputManager'
 import { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
-import { addItem } from '@/lib/inventory/inventory'
-import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 import { getCurrentUpgradeValue } from '@/lib/upgrades'
 import type { ThrusterRuntimeModifiers, ShuttleThrusterName } from '@/lib/physics/thrusterSystem'
@@ -30,6 +28,7 @@ import {
 } from './turretConstants'
 import { TurretRigController } from '@/three/TurretRigController'
 import { TurretTractorEmitter } from '@/three/TurretTractorEmitter'
+import { ParticleEmitter } from '@/three/ParticleEmitter'
 import type { ShuttleController } from '@/three/ShuttleController'
 import type { AsteroidBeltController } from '@/three/controllers/AsteroidBeltController'
 
@@ -53,6 +52,8 @@ export interface TurretSessionControllerDeps {
   beltControllers: AsteroidBeltController[]
   /** Scene host for camera hand-off and particle attach. */
   host: TurretSceneHost
+  /** Commit one whole unit into the live map inventory state. */
+  commitInventoryUnit: (itemId: string) => { ok: true } | { ok: false; reason: string }
   /** Called when a mineral unit is committed. HUD + audio hook. */
   onResourcePickup?: (itemId: string, quantity: number, label: string) => void
   /** Called on commit failure (inventory full). HUD toast hook. */
@@ -69,6 +70,20 @@ export interface TurretHudState {
   phase: TurretPhase
   /** True when the beam is hitting a registered asteroid this frame. */
   reticleValid: boolean
+  /** Active target details for the HUD panel; null when nothing is under the reticle. */
+  target: TurretHudTarget | null
+}
+
+/** Extra target metadata surfaced to the Vue turret HUD. */
+export interface TurretHudTarget {
+  /** Human-readable label for the currently rolled mineral. */
+  label: string
+  /** Remaining HP of this asteroid in kg. */
+  remainingKg: number
+  /** Total HP of this asteroid in kg. */
+  totalKg: number
+  /** Composition summary for the current asteroid tier. */
+  compositionLabel: string
 }
 
 /**
@@ -77,10 +92,12 @@ export interface TurretHudState {
  * {@link TurretSession}.
  */
 export class TurretSessionController {
+  private static readonly IMPACT_SPARK_INTERVAL_SEC = 1 / 24
   private readonly deps: TurretSessionControllerDeps
   private readonly session: TurretSession
   private readonly rig: TurretRigController
   private readonly tractor: TurretTractorEmitter
+  private readonly impactEmitter: ParticleEmitter
   private readonly inputManager: InputManager
   private readonly coordinator: TurretYieldCoordinator
   private yieldSystem: RockYieldSystem | null = null
@@ -93,6 +110,11 @@ export class TurretSessionController {
   private readonly rayOrigin = new THREE.Vector3()
   private readonly rayDir = new THREE.Vector3()
   private readonly targetInstances: BeamTargetInstance[] = []
+  private readonly impactPos = new THREE.Vector3()
+  private readonly impactVel = new THREE.Vector3()
+  private readonly impactRight = new THREE.Vector3()
+  private readonly impactUp = new THREE.Vector3()
+  private sparkBurstCooldown = 0
 
   /** True while session is in any non-idle phase. */
   get isActive(): boolean {
@@ -114,6 +136,17 @@ export class TurretSessionController {
     this.deps = deps
     this.rig = new TurretRigController(deps.shuttleController.group)
     this.tractor = new TurretTractorEmitter()
+    this.impactEmitter = new ParticleEmitter({
+      poolSize: 180,
+      color: new THREE.Color(0xffbf7a),
+      size: 8.5,
+      lifetime: 0.38,
+      spread: 3.8,
+      opacity: 0.95,
+      soft: true,
+      sizeAttenuation: false,
+      sizeGrowth: 0.55,
+    })
     this.inputManager = new InputManager({
       // turretFire is driven by mouse button, not keyboard.
       exitTurret: ['Escape', 'KeyT'],
@@ -155,7 +188,7 @@ export class TurretSessionController {
     // Emit phase for the Vue HUD during opening/closing too; handleActiveTick
     // emits its own hud state with reticleValid while firing.
     if (this.session.phase !== 'active') {
-      this.deps.onHudState?.({ phase: this.session.phase, reticleValid: false })
+      this.deps.onHudState?.({ phase: this.session.phase, reticleValid: false, target: null })
     }
   }
 
@@ -163,6 +196,7 @@ export class TurretSessionController {
   dispose(): void {
     this.rig.dispose()
     this.tractor.dispose()
+    this.impactEmitter.dispose()
     this.inputManager.dispose()
     this.detachMouseListener()
   }
@@ -182,7 +216,10 @@ export class TurretSessionController {
     this.rig.attach()
     this.rig.applyAim(this.aim)
     this.deps.host.addToScene(this.tractor.points)
+    this.deps.host.addToScene(this.impactEmitter.points)
     this.tractor.setTarget(this.rig.turretBase)
+    this.impactEmitter.reset()
+    this.sparkBurstCooldown = 0
     this.deps.host.setActiveCamera(this.rig.camera)
     this.requestPointerLock()
 
@@ -208,12 +245,13 @@ export class TurretSessionController {
             beltIndex,
             beltMeshIndex: snap.beltMeshIndex,
             localIndex: snap.localIndex,
-            localPosition: snap.localPosition.clone(),
-            worldPosition: snap.worldPosition.clone(),
-            radius: snap.radius,
-            tierId: tier.id,
-          }
-          const spawnIndex = this.coordinator.register(handle)
+          localPosition: snap.localPosition.clone(),
+          worldPosition: snap.worldPosition.clone(),
+          radius: snap.radius,
+          tierId: tier.id,
+          compositionLabel: this.formatCompositionLabel(tier.composition),
+        }
+        const spawnIndex = this.coordinator.register(handle)
           this.yieldSystem.registerRock({
             spawnIndex,
             diameter: snap.radius * 2,
@@ -232,17 +270,23 @@ export class TurretSessionController {
     this.exitPointerLock()
     this.deps.host.setActiveCamera(null)
     this.deps.host.removeFromScene(this.tractor.points)
+    this.deps.host.removeFromScene(this.impactEmitter.points)
     this.rig.detach()
     this.coordinator.clear()
     this.targetInstances.length = 0
     this.yieldSystem = null
     this.firing = false
     this.mouseFireHeld = false
+    this.impactEmitter.reset()
+    this.sparkBurstCooldown = 0
     this.deps.shuttleController.unfreeze()
     this.deps.shuttleController.setInputEnabled(true)
   }
 
   private handleActiveTick(_input: TurretSessionTickInput, dt: number): void {
+    this.sparkBurstCooldown = Math.max(0, this.sparkBurstCooldown - dt)
+    for (const belt of this.deps.beltControllers) belt.tickMiningFeedback(dt)
+
     this.aim = tickTurretAim(this.aim, { mouseDx: this.mouseDx, mouseDy: this.mouseDy })
     this.mouseDx = 0
     this.mouseDy = 0
@@ -262,6 +306,20 @@ export class TurretSessionController {
       this.targetInstances,
     )
     const reticleValid = hit !== null
+    let target: TurretHudTarget | null = null
+    if (hit && this.yieldSystem) {
+      const roll = this.yieldSystem.peekRock(hit.spawnIndex)
+      const handle = this.coordinator.resolveInstance(hit.spawnIndex)
+      if (roll && handle) {
+        const def = getItemDefinition(roll.itemId)
+        target = {
+          label: def?.label ?? roll.itemId,
+          remainingKg: roll.remainingKg,
+          totalKg: roll.totalKg,
+          compositionLabel: handle.compositionLabel,
+        }
+      }
+    }
 
     this.firing = this.mouseFireHeld
     const thrusterSystem = this.deps.shuttleController.thrusterSystem
@@ -271,8 +329,22 @@ export class TurretSessionController {
 
     if (beamActive) {
       const length = hit?.distance ?? TURRET_BEAM_MAX_RANGE
-      this.rig.showBeam(length)
+      const impactInset = hit
+        ? Math.min(
+          Math.max((this.coordinator.resolveInstance(hit.spawnIndex)?.radius ?? 0) * 0.35, 0.12),
+          0.75,
+        )
+        : 0
+      this.rig.showBeam(length, impactInset)
       if (hit && this.yieldSystem) {
+        const handle = this.coordinator.resolveInstance(hit.spawnIndex)
+        if (handle) {
+          this.deps.beltControllers[handle.beltIndex]?.flashMiningHit(
+            handle.beltMeshIndex,
+            handle.localIndex,
+          )
+        }
+        this.spawnImpactSparks(length, impactInset)
         const yieldMult = getCurrentUpgradeValue('turretMiningYield')
         const kg = TURRET_BEAM_DPS * dt * yieldMult
         this.yieldSystem.mineRock(hit.spawnIndex, kg)
@@ -280,7 +352,7 @@ export class TurretSessionController {
     } else {
       this.rig.hideBeam()
     }
-    this.deps.onHudState?.({ phase: this.session.phase, reticleValid })
+    this.deps.onHudState?.({ phase: this.session.phase, reticleValid, target })
 
     const activeRecord: Record<ShuttleThrusterName, boolean> = {
       thrust: false,
@@ -291,11 +363,49 @@ export class TurretSessionController {
     thrusterSystem.tick(dt, activeRecord, modifiers)
 
     this.tractor.tick(dt)
+    this.impactEmitter.tick(dt)
   }
 
   private buildThrusterModifiers(): ThrusterRuntimeModifiers<ShuttleThrusterName> {
     const efficiency = getCurrentUpgradeValue('turretMiningEfficiency')
     return { fuelCostMultiplier: { turretMining: efficiency } }
+  }
+
+  /** Build a compact composition string for the HUD from the registered loot table. */
+  private formatCompositionLabel(
+    composition: readonly { name: string; percentage: number }[],
+  ): string {
+    return composition
+      .slice()
+      .sort((a, b) => b.percentage - a.percentage)
+      .slice(0, 3)
+      .map((entry) => `${entry.name} ${Math.round(entry.percentage)}%`)
+      .join(' • ')
+  }
+
+  /** Emit a tiny spark spray at the beam contact point, matching FPS mining impacts. */
+  private spawnImpactSparks(length: number, impactInset: number): void {
+    if (this.sparkBurstCooldown > 0) return
+    this.sparkBurstCooldown = TurretSessionController.IMPACT_SPARK_INTERVAL_SEC
+
+    this.impactPos.copy(this.rayDir).multiplyScalar(length + impactInset).add(this.rayOrigin)
+    this.impactRight.crossVectors(this.rayDir, THREE.Object3D.DEFAULT_UP)
+    if (this.impactRight.lengthSq() < 1e-4) {
+      this.impactRight.set(1, 0, 0)
+    } else {
+      this.impactRight.normalize()
+    }
+    this.impactUp.crossVectors(this.impactRight, this.rayDir).normalize()
+
+    for (let i = 0; i < 10; i++) {
+      const lateral = (Math.random() - 0.5) * 3.8
+      const vertical = Math.random() * 3.2
+      const rebound = 4.6 + Math.random() * 4.4
+      this.impactVel.copy(this.rayDir).multiplyScalar(-rebound)
+      this.impactVel.addScaledVector(this.impactRight, lateral)
+      this.impactVel.addScaledVector(this.impactUp, vertical)
+      this.impactEmitter.emit(this.impactPos, this.impactVel)
+    }
   }
 
   /** Rebuild `targetInstances` from the coordinator — called after registration or depletion. */
@@ -333,11 +443,8 @@ export class TurretSessionController {
   // ----- commit path -----
 
   private commitOneUnit(itemId: string): { ok: true } | { ok: false; reason: string } {
-    const inventory = loadInventory()
-    if (!inventory) return { ok: false, reason: 'Inventory unavailable' }
-    const result = addItem(inventory, itemId, 1)
-    if (!result.ok) return { ok: false, reason: result.reason ?? 'Inventory full' }
-    saveInventory(result.inventory)
+    const result = this.deps.commitInventoryUnit(itemId)
+    if (!result.ok) return result
     const def = getItemDefinition(itemId)
     this.deps.onResourcePickup?.(itemId, 1, def?.label ?? itemId)
     return { ok: true }
