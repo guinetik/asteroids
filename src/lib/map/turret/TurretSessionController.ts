@@ -156,7 +156,13 @@ export class TurretSessionController {
   // ----- internals -----
 
   private handleOpen(): void {
-    // Visual setup FIRST, so even if mining registration throws we still
+    // Freeze the shuttle FIRST — it ticks on its own via TickHandler, so
+    // MapViewController's early-return doesn't stop it. Mirror EVA's
+    // vehicle.freeze() + setInputEnabled(false) pattern.
+    this.deps.shuttleController.setInputEnabled(false)
+    this.deps.shuttleController.freeze()
+
+    // Visual setup SECOND, so even if mining registration throws we still
     // show the turret view instead of silently reverting to the map view.
     this.aim = createTurretAimState()
     this.rig.attach()
@@ -214,6 +220,9 @@ export class TurretSessionController {
     this.targetInstances.length = 0
     this.yieldSystem = null
     this.firing = false
+    // Release the shuttle so flight controls work again on the map.
+    this.deps.shuttleController.unfreeze()
+    this.deps.shuttleController.setInputEnabled(true)
   }
 
   private handleActiveTick(_input: TurretSessionTickInput, dt: number): void {
