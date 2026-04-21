@@ -84,7 +84,7 @@ export class TurretRigController {
   /** Apply aim state to base + camera rotations. */
   applyAim(state: TurretAimState): void {
     this.turretBase.rotation.set(0, state.baseYaw + SHUTTLE_FORWARD_YAW_OFFSET, 0)
-    this.camera.rotation.set(state.conePitch, state.coneYaw, 0, 'YXZ')
+    this.camera.rotation.set(state.conePitch, 0, 0, 'YXZ')
   }
 
   /** Show the beam cylinder at the given length (meters). */

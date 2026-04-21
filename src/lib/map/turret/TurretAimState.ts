@@ -1,68 +1,52 @@
 /**
- * Pure turret aim math. Tracks the rotating turret base (A/D traverse) plus
- * the camera's local cone-relative pitch/yaw from mouse deltas.
+ * Pure turret aim math. Single 360° yaw + clamped pitch, driven entirely by
+ * mouse deltas. Mouse-right maps to "look right" (turret rotates clockwise
+ * from above = THREE rotation.y decreasing), matching the FPS convention
+ * used elsewhere in the codebase.
  *
  * @author guinetik
  * @date 2026-04-20
  * @spec docs/superpowers/specs/2026-04-20-turret-mode-design.md
  */
-import {
-  TURRET_CONE_HALF_ANGLE,
-  TURRET_MOUSE_SENSITIVITY,
-  TURRET_PITCH_LIMIT,
-  TURRET_TRAVERSE_SPEED,
-} from './turretConstants'
+import { TURRET_MOUSE_SENSITIVITY, TURRET_PITCH_LIMIT } from './turretConstants'
 
 /** Turret aim state — immutable snapshot. */
 export interface TurretAimState {
-  /** World-relative yaw of the turret base (radians). Accumulates across A/D input. */
+  /** World-relative yaw of the turret base (radians). Unclamped — full 360° rotation. */
   readonly baseYaw: number
-  /** Camera yaw within the cone, relative to the base (radians). Clamped. */
-  readonly coneYaw: number
-  /** Camera pitch from horizontal (radians). Clamped. */
+  /** Camera pitch from horizontal (radians). Clamped to `±TURRET_PITCH_LIMIT`. */
   readonly conePitch: number
 }
 
 /** Per-tick input bag for {@link tickTurretAim}. */
 export interface TurretAimInput {
-  /** Key yaw axis: -1 (left), 0, +1 (right). */
-  readonly yawAxis: number
-  /** Mouse x delta in pixels this frame. */
+  /** Mouse x delta in pixels this frame. Positive = mouse moved right. */
   readonly mouseDx: number
-  /** Mouse y delta in pixels this frame. */
+  /** Mouse y delta in pixels this frame. Positive = mouse moved down. */
   readonly mouseDy: number
 }
 
-/** Build an identity aim state (camera pointing straight down the base forward). */
+/** Build an identity aim state (turret facing shuttle-forward, camera level). */
 export function createTurretAimState(): TurretAimState {
-  return { baseYaw: 0, coneYaw: 0, conePitch: 0 }
+  return { baseYaw: 0, conePitch: 0 }
 }
 
 /**
  * Advance one tick of aim state. Pure — no side effects.
  *
  * @param state - Current aim state.
- * @param input - Raw key + mouse input for this frame.
- * @param dt - Delta time in seconds.
+ * @param input - Mouse input for this frame.
  * @returns Next aim state snapshot.
  */
-export function tickTurretAim(
-  state: TurretAimState,
-  input: TurretAimInput,
-  dt: number,
-): TurretAimState {
-  const baseYaw = state.baseYaw + input.yawAxis * TURRET_TRAVERSE_SPEED * dt
-
-  // Mouse X moves the camera yaw within the cone. Positive mouseDx (mouse right) maps to
-  // positive coneYaw (look right), matching the test contract and Three.js euler convention.
-  const rawConeYaw = state.coneYaw + input.mouseDx * TURRET_MOUSE_SENSITIVITY
-  const coneYaw = clamp(rawConeYaw, -TURRET_CONE_HALF_ANGLE, TURRET_CONE_HALF_ANGLE)
-
-  // Mouse Y moves pitch; up mouse = look up.
-  const rawConePitch = state.conePitch - input.mouseDy * TURRET_MOUSE_SENSITIVITY
-  const conePitch = clamp(rawConePitch, -TURRET_PITCH_LIMIT, TURRET_PITCH_LIMIT)
-
-  return { baseYaw, coneYaw, conePitch }
+export function tickTurretAim(state: TurretAimState, input: TurretAimInput): TurretAimState {
+  // Mouse right (positive dx) should turn the camera right. In THREE, camera yaw
+  // rotates CCW when rotation.y is positive, so right-look needs rotation.y to
+  // decrease. Subtract mouseDx.
+  const baseYaw = state.baseYaw - input.mouseDx * TURRET_MOUSE_SENSITIVITY
+  // Mouse up (negative dy) should tilt view up (positive pitch). Subtract mouseDy.
+  const rawPitch = state.conePitch - input.mouseDy * TURRET_MOUSE_SENSITIVITY
+  const conePitch = clamp(rawPitch, -TURRET_PITCH_LIMIT, TURRET_PITCH_LIMIT)
+  return { baseYaw, conePitch }
 }
 
 /**

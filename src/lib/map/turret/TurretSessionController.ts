@@ -115,8 +115,6 @@ export class TurretSessionController {
     this.tractor = new TurretTractorEmitter()
     this.inputManager = new InputManager({
       turretFire: ['Space'],
-      turretYawLeft: ['KeyA', 'ArrowLeft'],
-      turretYawRight: ['KeyD', 'ArrowRight'],
       exitTurret: ['Escape', 'KeyT'],
     })
 
@@ -241,14 +239,7 @@ export class TurretSessionController {
   }
 
   private handleActiveTick(_input: TurretSessionTickInput, dt: number): void {
-    const yawAxis =
-      (this.inputManager.isActionActive('turretYawRight') ? 1 : 0) -
-      (this.inputManager.isActionActive('turretYawLeft') ? 1 : 0)
-    this.aim = tickTurretAim(
-      this.aim,
-      { yawAxis, mouseDx: this.mouseDx, mouseDy: this.mouseDy },
-      dt,
-    )
+    this.aim = tickTurretAim(this.aim, { mouseDx: this.mouseDx, mouseDy: this.mouseDy })
     this.mouseDx = 0
     this.mouseDy = 0
     this.rig.applyAim(this.aim)
