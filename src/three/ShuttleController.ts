@@ -7,7 +7,7 @@ import type { InputManager } from '@/lib/InputManager'
 import type { SpaceTimeGrid } from './SpaceTimeGrid'
 import { checkEventHorizon, type GravitySource, type GravityConfig } from '@/lib/physics/gravity'
 import { ThrusterSystem, DEFAULT_SHUTTLE_CONFIG } from '@/lib/physics/thrusterSystem'
-import type { ShuttleThrusterName } from '@/lib/physics/thrusterSystem'
+import type { ShuttleThrusterName, ThrusterRuntimeModifiers } from '@/lib/physics/thrusterSystem'
 import { loadGLB } from './loadGLB'
 import { FuelTank } from './FuelTank'
 import { HabitatModule } from './HabitatModule'
@@ -869,15 +869,13 @@ export class ShuttleController implements Tickable, PortalVehicle {
         thrust: this.isThrusting,
         brake: this.isBraking,
         rcs: this.isYawingLeft || this.isYawingRight,
+        turretMining: false,
       },
       this.getModifiers(),
     )
   }
 
-  private getModifiers(): {
-    burnRateMultiplier: Record<ShuttleThrusterName, number>
-    rechargeRateMultiplier: Record<ShuttleThrusterName, number>
-  } {
+  private getModifiers(): ThrusterRuntimeModifiers<ShuttleThrusterName> {
     return {
       burnRateMultiplier: getCurrentShuttleThrusterEfficiencyModifiers(),
       rechargeRateMultiplier: getCurrentShuttleThrusterChargeModifiers(),
@@ -885,10 +883,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
   }
 
   /** Shared runtime modifiers used by both normal flight and external controllers. */
-  getThrusterRuntimeModifiers(): {
-    burnRateMultiplier: Record<ShuttleThrusterName, number>
-    rechargeRateMultiplier: Record<ShuttleThrusterName, number>
-  } {
+  getThrusterRuntimeModifiers(): ThrusterRuntimeModifiers<ShuttleThrusterName> {
     return this.getModifiers()
   }
 

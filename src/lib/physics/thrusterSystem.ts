@@ -52,8 +52,8 @@ export interface ThrusterState {
   active: boolean
 }
 
-/** Shuttle-specific preset: thrust / brake / rcs */
-export type ShuttleThrusterName = 'thrust' | 'brake' | 'rcs'
+/** Shuttle-specific preset: thrust / brake / rcs / turret-mining beam. */
+export type ShuttleThrusterName = 'thrust' | 'brake' | 'rcs' | 'turretMining'
 
 /** Base shuttle fuel tank at upgrade level 0 (before `shuttleFuelCapacity` shop multiplier). */
 const SHUTTLE_BASE_FUEL_CAPACITY = 1000
@@ -64,6 +64,7 @@ export const DEFAULT_SHUTTLE_CONFIG: ThrusterSystemConfig<ShuttleThrusterName> =
     thrust: { capacity: 100, burnRate: 54, rechargeRate: 21, fuelCostPerRecharge: 0.5 },
     brake: { capacity: 60, burnRate: 60, rechargeRate: 5, fuelCostPerRecharge: 0.6 },
     rcs: { capacity: 60, burnRate: 8, rechargeRate: 5, fuelCostPerRecharge: 0.2 },
+    turretMining: { capacity: 100, burnRate: 20, rechargeRate: 25, fuelCostPerRecharge: 0.8 },
   },
   fuelCapacity: SHUTTLE_BASE_FUEL_CAPACITY,
 }

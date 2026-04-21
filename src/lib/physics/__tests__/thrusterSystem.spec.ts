@@ -40,14 +40,14 @@ describe('ThrusterSystem', () => {
   it('drains charge when thruster is active', () => {
     const sys = createShuttleSystem()
     const before = sys.getState('thrust').charge
-    sys.tick(1, { thrust: true, brake: false, rcs: false })
+    sys.tick(1, { thrust: true, brake: false, rcs: false, turretMining: false })
     expect(sys.getState('thrust').charge).toBe(before - DEFAULT_THRUSTER_CONFIG.thrust.burnRate)
   })
 
   it('applies burn rate multipliers to active thruster drain', () => {
     const sys = createShuttleSystem()
     const before = sys.getState('thrust').charge
-    sys.tick(1, { thrust: true, brake: false, rcs: false }, {
+    sys.tick(1, { thrust: true, brake: false, rcs: false, turretMining: false }, {
       burnRateMultiplier: { thrust: 0.5 },
     })
     expect(sys.getState('thrust').charge).toBe(
@@ -57,17 +57,17 @@ describe('ThrusterSystem', () => {
 
   it('applies burn rate multipliers to canFire thresholds', () => {
     const sys = createShuttleSystem()
-    sys.tick(1.84, { thrust: true, brake: false, rcs: false })
+    sys.tick(1.84, { thrust: true, brake: false, rcs: false, turretMining: false })
     expect(sys.canFire('thrust')).toBe(false)
     expect(sys.canFire('thrust', { burnRateMultiplier: { thrust: 0.25 } })).toBe(true)
   })
 
   it('recharges idle thrusters consuming fuel', () => {
     const sys = createShuttleSystem()
-    sys.tick(2, { thrust: true, brake: false, rcs: false })
+    sys.tick(2, { thrust: true, brake: false, rcs: false, turretMining: false })
     const chargeAfterDrain = sys.getState('thrust').charge
     const fuelBefore = sys.fuelLevel
-    sys.tick(1, { thrust: false, brake: false, rcs: false })
+    sys.tick(1, { thrust: false, brake: false, rcs: false, turretMining: false })
     expect(sys.getState('thrust').charge).toBeGreaterThan(chargeAfterDrain)
     expect(sys.fuelLevel).toBeLessThan(fuelBefore)
   })
@@ -76,15 +76,15 @@ describe('ThrusterSystem', () => {
     const thrustCfg = DEFAULT_THRUSTER_CONFIG.thrust
     const dt = 1
     const sysDefault = createShuttleSystem()
-    sysDefault.tick(1, { thrust: true, brake: false, rcs: false })
+    sysDefault.tick(1, { thrust: true, brake: false, rcs: false, turretMining: false })
     const chargeAfterDrain = sysDefault.getState('thrust').charge
-    sysDefault.tick(dt, { thrust: false, brake: false, rcs: false })
+    sysDefault.tick(dt, { thrust: false, brake: false, rcs: false, turretMining: false })
     const gainDefault = sysDefault.getState('thrust').charge - chargeAfterDrain
 
     const sysDouble = createShuttleSystem()
-    sysDouble.tick(1, { thrust: true, brake: false, rcs: false })
+    sysDouble.tick(1, { thrust: true, brake: false, rcs: false, turretMining: false })
     expect(sysDouble.getState('thrust').charge).toBe(chargeAfterDrain)
-    sysDouble.tick(dt, { thrust: false, brake: false, rcs: false }, {
+    sysDouble.tick(dt, { thrust: false, brake: false, rcs: false, turretMining: false }, {
       rechargeRateMultiplier: { thrust: 2 },
     })
     const gainDouble = sysDouble.getState('thrust').charge - chargeAfterDrain
@@ -97,15 +97,15 @@ describe('ThrusterSystem', () => {
     const thrustCfg = DEFAULT_THRUSTER_CONFIG.thrust
     const dt = 1
     const sysDefault = createShuttleSystem()
-    sysDefault.tick(1, { thrust: true, brake: false, rcs: false })
+    sysDefault.tick(1, { thrust: true, brake: false, rcs: false, turretMining: false })
     const chargeAfterDrain = sysDefault.getState('thrust').charge
-    sysDefault.tick(dt, { thrust: false, brake: false, rcs: false })
+    sysDefault.tick(dt, { thrust: false, brake: false, rcs: false, turretMining: false })
     const gainDefault = sysDefault.getState('thrust').charge - chargeAfterDrain
 
     const sysHalf = createShuttleSystem()
-    sysHalf.tick(1, { thrust: true, brake: false, rcs: false })
+    sysHalf.tick(1, { thrust: true, brake: false, rcs: false, turretMining: false })
     expect(sysHalf.getState('thrust').charge).toBe(chargeAfterDrain)
-    sysHalf.tick(dt, { thrust: false, brake: false, rcs: false }, {
+    sysHalf.tick(dt, { thrust: false, brake: false, rcs: false, turretMining: false }, {
       rechargeRateMultiplier: { thrust: 0.5 },
     })
     const gainHalf = sysHalf.getState('thrust').charge - chargeAfterDrain
@@ -119,8 +119,8 @@ describe('ThrusterSystem', () => {
       modifiers?: ThrusterRuntimeModifiers<ShuttleThrusterName>,
     ) => {
       const sys = createShuttleSystem()
-      sys.tick(1, { thrust: true, brake: false, rcs: false })
-      sys.tick(1, { thrust: false, brake: false, rcs: false }, modifiers)
+      sys.tick(1, { thrust: true, brake: false, rcs: false, turretMining: false })
+      sys.tick(1, { thrust: false, brake: false, rcs: false, turretMining: false }, modifiers)
       return {
         thrustCharge: sys.getState('thrust').charge,
         fuelLevel: sys.fuelLevel,
@@ -134,16 +134,16 @@ describe('ThrusterSystem', () => {
 
   it('does not recharge active thrusters', () => {
     const sys = createShuttleSystem()
-    sys.tick(0.5, { thrust: true, brake: false, rcs: false })
+    sys.tick(0.5, { thrust: true, brake: false, rcs: false, turretMining: false })
     const chargeAfterDrain = sys.getState('thrust').charge
     expect(chargeAfterDrain).toBeGreaterThan(0)
-    sys.tick(0.5, { thrust: true, brake: false, rcs: false })
+    sys.tick(0.5, { thrust: true, brake: false, rcs: false, turretMining: false })
     expect(sys.getState('thrust').charge).toBeLessThan(chargeAfterDrain)
   })
 
   it('canFire returns false when charge is insufficient', () => {
     const sys = createShuttleSystem()
-    sys.tick(100, { thrust: true, brake: false, rcs: false })
+    sys.tick(100, { thrust: true, brake: false, rcs: false, turretMining: false })
     expect(sys.canFire('thrust')).toBe(false)
   })
 
@@ -155,13 +155,13 @@ describe('ThrusterSystem', () => {
   it('stops recharging when fuel is empty', () => {
     const sys = createShuttleSystem({ fuelCapacity: 1 })
     // Drain charge first so recharge actually consumes fuel
-    sys.tick(3, { thrust: true, brake: true, rcs: true })
+    sys.tick(3, { thrust: true, brake: true, rcs: true, turretMining: false })
     // Now let it try to recharge — should exhaust the tiny fuel tank
-    sys.tick(10, { thrust: false, brake: false, rcs: false })
+    sys.tick(10, { thrust: false, brake: false, rcs: false, turretMining: false })
     expect(sys.fuelLevel).toBe(0)
     const chargeNow = sys.getState('thrust').charge
     // With no fuel left, charge should not increase further
-    sys.tick(1, { thrust: false, brake: false, rcs: false })
+    sys.tick(1, { thrust: false, brake: false, rcs: false, turretMining: false })
     expect(sys.getState('thrust').charge).toBe(chargeNow)
   })
 
@@ -170,8 +170,8 @@ describe('ThrusterSystem', () => {
     const cb = vi.fn()
     sys.onFuelEmpty = cb
     // Drain charge so recharge consumes the tiny fuel tank
-    sys.tick(3, { thrust: true, brake: true, rcs: true })
-    sys.tick(10, { thrust: false, brake: false, rcs: false })
+    sys.tick(3, { thrust: true, brake: true, rcs: true, turretMining: false })
+    sys.tick(10, { thrust: false, brake: false, rcs: false, turretMining: false })
     expect(cb).toHaveBeenCalledTimes(1)
   })
 
@@ -179,13 +179,13 @@ describe('ThrusterSystem', () => {
     const sys = createShuttleSystem({ fuelCapacity: 0 })
     const cb = vi.fn()
     sys.onAllDepleted = cb
-    sys.tick(100, { thrust: true, brake: true, rcs: true })
+    sys.tick(100, { thrust: true, brake: true, rcs: true, turretMining: true })
     expect(cb).toHaveBeenCalled()
   })
 
   it('clamps charge to capacity', () => {
     const sys = createShuttleSystem()
-    sys.tick(10, { thrust: false, brake: false, rcs: false })
+    sys.tick(10, { thrust: false, brake: false, rcs: false, turretMining: false })
     expect(sys.getState('thrust').charge).toBe(DEFAULT_THRUSTER_CONFIG.thrust.capacity)
   })
 

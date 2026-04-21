@@ -359,7 +359,7 @@ export class OrbitalSurfingController {
     // Tick thruster system for passive fuel drain
     shuttle.thrusterSystem.tick(
       dt * MAP_CONFIG.ORBITAL_SURF_FUEL_MULTIPLIER,
-      { thrust: false, brake: false, rcs: false },
+      { thrust: false, brake: false, rcs: false, turretMining: false },
       shuttle.getThrusterRuntimeModifiers(),
     )
 

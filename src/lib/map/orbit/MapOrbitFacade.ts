@@ -31,6 +31,7 @@ interface SharedDeps {
 interface OrbitInputDeps extends SharedDeps {
   inputManager: InputManager
   mapIntroControlsLocked: boolean
+  journeySlingshotUnlocked: boolean
   /**
    * Audio orchestrator that owns the orbit-capture sting, slingshot
    * release stings, and the slingshot charge loop. The facade no
@@ -153,7 +154,14 @@ export class MapOrbitFacade {
   }
 
   handleOrbitInput(dt: number, deps: OrbitInputDeps): void {
-    const { shuttleController, inputManager, vehicleCamera, sceneVisuals, audio } = deps
+    const {
+      shuttleController,
+      inputManager,
+      vehicleCamera,
+      sceneVisuals,
+      audio,
+      journeySlingshotUnlocked,
+    } = deps
     if (!this._system) return
 
     const state = this._system.state
@@ -207,6 +215,17 @@ export class MapOrbitFacade {
       // mirror that in the audio flag so the director's per-frame
       // update can stop the loop on the next tick.
       if (this._isChargingSlingshot) this._isChargingSlingshot = false
+      return
+    }
+
+    if (!journeySlingshotUnlocked) {
+      if (this._isChargingSlingshot) this._isChargingSlingshot = false
+      if (this._slingshotCharge > 0) {
+        this._slingshotCharge = 0
+        vehicleCamera?.setConfig(MAP_ORBIT_CAMERA_CONFIG)
+        this.hideLaunchArrow(sceneVisuals)
+        sceneVisuals?.hideProgradeMarkers()
+      }
       return
     }
 
@@ -384,7 +403,7 @@ export class MapOrbitFacade {
 
     shuttleController.thrusterSystem.tick(
       dt,
-      { thrust: false, brake: false, rcs: yawLeft || yawRight },
+      { thrust: false, brake: false, rcs: yawLeft || yawRight, turretMining: false },
       {
         burnRateMultiplier: getCurrentShuttleThrusterEfficiencyModifiers(),
         rechargeRateMultiplier: getCurrentShuttleThrusterChargeModifiers(),

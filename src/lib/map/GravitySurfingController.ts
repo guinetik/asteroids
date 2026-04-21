@@ -197,7 +197,7 @@ export class GravitySurfingController {
       shuttle.setExternalBrakeActive(false)
       shuttle.thrusterSystem.tick(
         dt,
-        { thrust: false, brake: false, rcs: false },
+        { thrust: false, brake: false, rcs: false, turretMining: false },
         shuttle.getThrusterRuntimeModifiers(),
       )
       this.state.alongCoord += this.state.cruiseSpeed * dt
@@ -217,7 +217,7 @@ export class GravitySurfingController {
       if (brakeActive) {
         shuttle.thrusterSystem.tick(
           dt,
-          { thrust: false, brake: true, rcs: false },
+          { thrust: false, brake: true, rcs: false, turretMining: false },
           shuttle.getThrusterRuntimeModifiers(),
         )
       }
