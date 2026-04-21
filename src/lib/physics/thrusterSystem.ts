@@ -37,7 +37,11 @@ export interface ThrusterRuntimeModifiers<T extends string = string> {
   burnRateMultiplier?: Partial<Record<T, number>>
   /** Scales the recharge rate while a thruster is idle. Higher means charge refills faster. */
   rechargeRateMultiplier?: Partial<Record<T, number>>
-  /** Scales fuel cost per unit of charge recovered (per-thruster). Lower means cheaper recharges. */
+  /**
+   * Scales fuel cost per unit of charge recovered (per-thruster). Lower means cheaper
+   * recharges. A value of `0` disables idle recharge for that thruster (no fuel spent,
+   * no charge gained).
+   */
   fuelCostMultiplier?: Partial<Record<T, number>>
 }
 
