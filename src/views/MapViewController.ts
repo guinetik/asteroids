@@ -1258,18 +1258,9 @@ export class MapViewController implements Tickable {
 
     if (this.turretSessionController?.isActive) {
       this.turretSessionController.tick(dt)
-      // Keep belts rotating and the sim time advancing so the world moves
-      // around the turret view — the shuttle keeps coasting on its own
-      // TickHandler registration, so asteroids stay aligned for a player
-      // who matched belt speed before entering the turret.
-      this.simTime += dt
-      const shuttleWorldForBelts = this.shuttleController
-        ? this.shuttleController.group.getWorldPosition(this._beltShuttleWorldScratch)
-        : null
-      for (const belt of this.beltControllers) {
-        belt.tick(dt, this.simTime, shuttleWorldForBelts)
-      }
-      // Skip all other gameplay logic (orbit transitions, damage, UI toggles).
+      // Skip the rest of gameplay — orrery sim (belts/planets/sun), orbit
+      // transitions, damage, UI toggles. Combined with shuttleController.freeze
+      // this pauses the whole world while the player aims.
       if (this.turretSessionController.phase !== 'idle') return
     }
 

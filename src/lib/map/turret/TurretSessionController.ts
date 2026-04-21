@@ -170,11 +170,11 @@ export class TurretSessionController {
   // ----- internals -----
 
   private handleOpen(): void {
-    // Disable shuttle input so the player can't steer from inside the turret,
-    // but DO NOT freeze physics — the ship should coast with whatever velocity
-    // it had (typically matched to the belt's rotation) so asteroids stay
-    // roughly stationary relative to the camera.
+    // Pause everything — ship physics, orrery simulation (belts/planets/sun),
+    // time. The whole world stops until the player exits turret mode. Keeps
+    // aiming predictable: rocks stay where they are.
     this.deps.shuttleController.setInputEnabled(false)
+    this.deps.shuttleController.freeze()
 
     // Visual setup, so even if mining registration throws we still show the
     // turret view instead of silently reverting to the map view.
@@ -238,7 +238,7 @@ export class TurretSessionController {
     this.yieldSystem = null
     this.firing = false
     this.mouseFireHeld = false
-    // Restore shuttle input; we never froze physics so there's nothing to unfreeze.
+    this.deps.shuttleController.unfreeze()
     this.deps.shuttleController.setInputEnabled(true)
   }
 
