@@ -47,6 +47,31 @@ interface ResolveHabitatTransitionParams {
   canEnterHabitat: boolean
 }
 
+/** Inputs for {@link MapModeCoordinator.resolveTurretToggle}. */
+export interface ResolveTurretToggleParams {
+  /** True when the toggle-turret binding was pressed this frame. */
+  togglePressed: boolean
+  /** True when a turret session is already live. */
+  turretActive: boolean
+  /** Current shuttle orbit phase. */
+  orbitState: FlightOrbitState
+  /** True when the tactical map is open. */
+  mapIsOpen: boolean
+  /** True when the habitat scene is active. */
+  habitatActive: boolean
+  /** True when an EVA session is active. */
+  evaActive: boolean
+  /** True when the shuttle is in the death state. */
+  isDead: boolean
+  /** True when the mining turret has been purchased (`turretMiningUnlock >= 1`). */
+  unlocked: boolean
+  /** True when the map intro is still locking out controls. */
+  introLocked: boolean
+}
+
+/** Result of resolving a turret toggle. Exit is handled internally by the session. */
+export type TurretToggleAction = 'enter' | null
+
 /** Camera / post settings after toggling inspection mode. */
 export interface InspectToggleResult {
   nextInspectMode: boolean
@@ -149,6 +174,24 @@ export class MapModeCoordinator {
     }
 
     return { action: 'none', nextInspectMode: params.inspectMode, toggleDoors: false }
+  }
+
+  /**
+   * Resolve whether the turret should open this frame. Exit is owned by
+   * {@link TurretSession} itself (ESC or re-press inside the session),
+   * so this only gates entry.
+   */
+  resolveTurretToggle(params: ResolveTurretToggleParams): TurretToggleAction {
+    if (!params.togglePressed) return null
+    if (params.turretActive) return null
+    if (params.mapIsOpen) return null
+    if (params.habitatActive) return null
+    if (params.evaActive) return null
+    if (params.isDead) return null
+    if (params.introLocked) return null
+    if (!params.unlocked) return null
+    if (params.orbitState === 'approaching') return null
+    return 'enter'
   }
 
   resolveMapTransitionRuntime(mapPhase: MapPhase, mapProgress: number): MapTransitionRuntimeState {
