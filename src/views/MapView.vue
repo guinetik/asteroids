@@ -228,6 +228,7 @@ const upgradeInstalledCreditsSpent = ref(0)
 const upgradeInstalledMetaText = ref<string | null>(null)
 const habitatPrompt = ref<string | null>(null)
 const habitatFadeOpacity = ref(0)
+const turretFadeOpacity = ref(0)
 const deathVisible = ref(false)
 const deathCause = ref('')
 const achievementsOpen = ref(false)
@@ -519,6 +520,9 @@ onMounted(async () => {
     }
     viewController.onHabitatFade = (opacity) => {
       habitatFadeOpacity.value = opacity
+    }
+    viewController.onTurretFade = (opacity) => {
+      turretFadeOpacity.value = opacity
     }
     viewController.onJourneyTracker = (state) => {
       journeyTracker.value = state
@@ -1239,6 +1243,11 @@ watch(
     class="habitat-fade"
     :style="{ opacity: habitatFadeOpacity }"
   />
+  <div
+    v-if="turretFadeOpacity > 0"
+    class="turret-fade"
+    :style="{ opacity: turretFadeOpacity }"
+  />
   </template>
   <PortalWelcomeDialog
     :visible="portalWelcomeVisible"
@@ -1248,3 +1257,9 @@ watch(
     @skip="handlePortalSkip"
   />
 </template>
+
+<style>
+.turret-fade {
+  @apply pointer-events-none fixed inset-0 z-50 bg-black;
+}
+</style>
