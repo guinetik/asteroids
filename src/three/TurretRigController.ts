@@ -15,7 +15,14 @@ import {
 } from '@/lib/map/turret/turretConstants'
 
 const BEAM_BASE_LENGTH = 1
-const BEAM_RADIUS = 0.35
+const BEAM_RADIUS = 0.08
+/**
+ * Camera-local offset for the beam origin. Shifting slightly below-and-ahead of
+ * the camera puts the camera OUTSIDE the cylinder (not inside its axis, where
+ * only the near endcap would be visible). The result reads like a shoulder- or
+ * hood-mounted laser firing forward — classic FPS weapon placement.
+ */
+const BEAM_MUZZLE_OFFSET = new THREE.Vector3(0, -0.25, -0.5)
 
 /**
  * Yaw offset applied to turretBase so the camera's default -Z forward aligns
@@ -64,6 +71,10 @@ export class TurretRigController {
     })
     this.beamMesh = new THREE.Mesh(beamGeom, this.beamMaterial)
     this.beamMesh.visible = false
+    // Offset the beam's origin so the camera is outside the cylinder's volume;
+    // otherwise the camera looks straight down the beam axis and only sees the
+    // tiny end cap.
+    this.beamMesh.position.copy(BEAM_MUZZLE_OFFSET)
     // Disable frustum culling — the scaled cylinder's bounding sphere may not
     // cover the full length after the dynamic Z-scale, causing the beam to be
     // culled when the camera moves.
