@@ -156,44 +156,53 @@ export class TurretSessionController {
   // ----- internals -----
 
   private handleOpen(): void {
-    this.yieldSystem = new RockYieldSystem({
-      composition: [],
-      seed: Date.now() | 0,
-    })
-    this.yieldSystem.onConsume = (spawnIndex) => {
-      this.coordinator.notifyDepleted(spawnIndex)
-    }
-    this.yieldSystem.onMineralExtracted = (itemId, kg, spawnIndex) => {
-      this.coordinator.acceptYield(itemId, kg, spawnIndex)
-    }
-
-    for (const belt of this.deps.beltControllers) {
-      for (const snap of belt.enumerateInstances()) {
-        const tier = pickTier(snap.radius)
-        const handle: TurretInstanceHandle = {
-          beltMeshIndex: snap.beltMeshIndex,
-          localIndex: snap.localIndex,
-          worldPosition: snap.worldPosition.clone(),
-          radius: snap.radius,
-          tierId: tier.id,
-        }
-        const spawnIndex = this.coordinator.register(handle)
-        this.yieldSystem.registerRock({
-          spawnIndex,
-          diameter: snap.radius * 2,
-          compositionOverride: tier.composition,
-          totalKgOverride: tier.hpKg,
-        })
-      }
-    }
-
+    // Visual setup FIRST, so even if mining registration throws we still
+    // show the turret view instead of silently reverting to the map view.
     this.aim = createTurretAimState()
     this.rig.attach()
+    this.rig.applyAim(this.aim)
     this.deps.host.addToScene(this.tractor.points)
     this.tractor.setTarget(this.rig.turretBase)
     this.deps.host.setActiveCamera(this.rig.camera)
     this.requestPointerLock()
-    this.rebuildTargetList()
+
+    // Now register belt asteroids for mining. If any step fails we log
+    // and continue — beam won't hit anything but the FP view still works.
+    try {
+      this.yieldSystem = new RockYieldSystem({
+        composition: [],
+        seed: Date.now() | 0,
+      })
+      this.yieldSystem.onConsume = (spawnIndex) => {
+        this.coordinator.notifyDepleted(spawnIndex)
+      }
+      this.yieldSystem.onMineralExtracted = (itemId, kg, spawnIndex) => {
+        this.coordinator.acceptYield(itemId, kg, spawnIndex)
+      }
+
+      for (const belt of this.deps.beltControllers) {
+        for (const snap of belt.enumerateInstances()) {
+          const tier = pickTier(snap.radius)
+          const handle: TurretInstanceHandle = {
+            beltMeshIndex: snap.beltMeshIndex,
+            localIndex: snap.localIndex,
+            worldPosition: snap.worldPosition.clone(),
+            radius: snap.radius,
+            tierId: tier.id,
+          }
+          const spawnIndex = this.coordinator.register(handle)
+          this.yieldSystem.registerRock({
+            spawnIndex,
+            diameter: snap.radius * 2,
+            compositionOverride: tier.composition,
+            totalKgOverride: tier.hpKg,
+          })
+        }
+      }
+      this.rebuildTargetList()
+    } catch (err) {
+      console.error('[TurretSession] belt registration failed:', err)
+    }
   }
 
   private handleClose(): void {
