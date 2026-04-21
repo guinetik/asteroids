@@ -1257,9 +1257,3 @@ watch(
     @skip="handlePortalSkip"
   />
 </template>
-
-<style>
-.turret-fade {
-  @apply pointer-events-none fixed inset-0 z-50 bg-black;
-}
-</style>

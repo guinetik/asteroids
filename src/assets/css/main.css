@@ -942,6 +942,10 @@ body {
   @apply pointer-events-none fixed inset-0 z-50 bg-black;
 }
 
+.turret-fade {
+  @apply pointer-events-none fixed inset-0 z-50 bg-black;
+}
+
 .fast-travel-fade {
   @apply pointer-events-none fixed inset-0 z-[80] bg-black;
   transition: opacity 600ms ease-in-out;
