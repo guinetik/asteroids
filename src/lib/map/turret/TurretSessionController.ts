@@ -251,6 +251,9 @@ export class TurretSessionController {
     const modifiers = this.buildThrusterModifiers()
     const canFire = thrusterSystem.canFire('turretMining' as ShuttleThrusterName, modifiers)
     const beamActive = this.firing && canFire
+    if (this.firing && !canFire) {
+      console.log('[Turret] firing but canFire=false — turretMining charge depleted or modifier=0')
+    }
 
     let reticleValid = false
     if (beamActive) {
@@ -329,26 +332,30 @@ export class TurretSessionController {
   }
 
   private mouseDownHandler = (event: MouseEvent): void => {
-    if (!this.session.isActive || this.session.phase !== 'active') return
     if (event.button !== 0) return
+    if (!this.session.isActive || this.session.phase !== 'active') return
     this.mouseFireHeld = true
+    console.log('[Turret] fire down')
   }
 
   private mouseUpHandler = (event: MouseEvent): void => {
     if (event.button !== 0) return
     this.mouseFireHeld = false
+    console.log('[Turret] fire up')
   }
 
   private attachMouseListener(): void {
-    window.addEventListener('mousemove', this.mouseMoveHandler)
-    window.addEventListener('mousedown', this.mouseDownHandler)
-    window.addEventListener('mouseup', this.mouseUpHandler)
+    // Use document-level listeners with capture so page UI (buttons, overlays)
+    // can't swallow the click before the turret sees it.
+    document.addEventListener('mousemove', this.mouseMoveHandler, true)
+    document.addEventListener('mousedown', this.mouseDownHandler, true)
+    document.addEventListener('mouseup', this.mouseUpHandler, true)
   }
 
   private detachMouseListener(): void {
-    window.removeEventListener('mousemove', this.mouseMoveHandler)
-    window.removeEventListener('mousedown', this.mouseDownHandler)
-    window.removeEventListener('mouseup', this.mouseUpHandler)
+    document.removeEventListener('mousemove', this.mouseMoveHandler, true)
+    document.removeEventListener('mousedown', this.mouseDownHandler, true)
+    document.removeEventListener('mouseup', this.mouseUpHandler, true)
     this.mouseFireHeld = false
   }
 
