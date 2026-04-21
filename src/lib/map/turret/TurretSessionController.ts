@@ -59,6 +59,16 @@ export interface TurretSessionControllerDeps {
   onResourcePickupFailed?: (label: string, reason: string) => void
   /** Called each frame with fade opacity for the Vue fade overlay. */
   onFadeOpacity?: (opacity: number) => void
+  /** Per-tick HUD state for the Vue crosshair + any future turret HUD widgets. */
+  onHudState?: (state: TurretHudState) => void
+}
+
+/** State the Vue HUD needs each frame. */
+export interface TurretHudState {
+  /** Current session phase — HUD is visible only while `'active'`. */
+  phase: TurretPhase
+  /** True when the beam is hitting a registered asteroid this frame. */
+  reticleValid: boolean
 }
 
 /**
@@ -143,6 +153,11 @@ export class TurretSessionController {
     this.inputManager.tick(dt)
     this.session.tick(dt, input)
     this.deps.onFadeOpacity?.(this.session.fadeOpacity)
+    // Emit phase for the Vue HUD during opening/closing too; handleActiveTick
+    // emits its own hud state with reticleValid while firing.
+    if (this.session.phase !== 'active') {
+      this.deps.onHudState?.({ phase: this.session.phase, reticleValid: false })
+    }
   }
 
   /** Dispose on shutdown. */
@@ -244,13 +259,14 @@ export class TurretSessionController {
     const canFire = thrusterSystem.canFire('turretMining' as ShuttleThrusterName, modifiers)
     const beamActive = this.firing && canFire
 
+    let reticleValid = false
     if (beamActive) {
       this.rig.camera.getWorldPosition(this.rayOrigin)
       this.rig.camera.getWorldDirection(this.rayDir)
       const hit = raycastBeam(this.rayOrigin, this.rayDir, TURRET_BEAM_MAX_RANGE, this.targetInstances)
       const length = hit?.distance ?? TURRET_BEAM_MAX_RANGE
       this.rig.showBeam(length)
-      this.rig.setReticleTargetValid(hit !== null)
+      reticleValid = hit !== null
       if (hit && this.yieldSystem) {
         const yieldMult = getCurrentUpgradeValue('turretMiningYield')
         const kg = TURRET_BEAM_DPS * dt * yieldMult
@@ -258,8 +274,8 @@ export class TurretSessionController {
       }
     } else {
       this.rig.hideBeam()
-      this.rig.setReticleTargetValid(false)
     }
+    this.deps.onHudState?.({ phase: this.session.phase, reticleValid })
 
     const activeRecord: Record<ShuttleThrusterName, boolean> = {
       thrust: false,

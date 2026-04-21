@@ -16,7 +16,6 @@ import {
 
 const BEAM_BASE_LENGTH = 1
 const BEAM_RADIUS = 0.04
-const RETICLE_DISTANCE = 5
 
 /**
  * Yaw offset applied to turretBase so the camera's default -Z forward aligns
@@ -36,12 +35,9 @@ export class TurretRigController {
   readonly camera: THREE.PerspectiveCamera
   /** Beam mesh (camera-local cylinder); toggled visible while firing. */
   readonly beamMesh: THREE.Mesh
-  /** Reticle sprite at fixed camera-space distance. */
-  readonly reticle: THREE.Sprite
 
   private readonly shuttleGroup: THREE.Object3D
   private readonly beamMaterial: THREE.MeshBasicMaterial
-  private readonly reticleMaterial: THREE.SpriteMaterial
 
   constructor(shuttleGroup: THREE.Object3D) {
     this.shuttleGroup = shuttleGroup
@@ -68,19 +64,6 @@ export class TurretRigController {
     this.beamMesh = new THREE.Mesh(beamGeom, this.beamMaterial)
     this.beamMesh.visible = false
     this.camera.add(this.beamMesh)
-
-    // Reticle: sprite in camera space at RETICLE_DISTANCE.
-    this.reticleMaterial = new THREE.SpriteMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.8,
-      depthWrite: false,
-      depthTest: false,
-    })
-    this.reticle = new THREE.Sprite(this.reticleMaterial)
-    this.reticle.position.set(0, 0, -RETICLE_DISTANCE)
-    this.reticle.scale.set(0.15, 0.15, 1)
-    this.camera.add(this.reticle)
   }
 
   /** Attach turret base to the shuttle group. Call once on session open. */
@@ -116,16 +99,10 @@ export class TurretRigController {
     this.beamMesh.visible = false
   }
 
-  /** Tint the reticle green when a valid target is in beam reach, white otherwise. */
-  setReticleTargetValid(valid: boolean): void {
-    this.reticleMaterial.color.setHex(valid ? 0x66ff88 : 0xffffff)
-  }
-
   /** Dispose GL resources. */
   dispose(): void {
     this.detach()
     this.beamMaterial.dispose()
-    this.reticleMaterial.dispose()
     if (this.beamMesh.geometry) this.beamMesh.geometry.dispose()
   }
 }

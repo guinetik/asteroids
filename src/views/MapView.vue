@@ -229,6 +229,8 @@ const upgradeInstalledMetaText = ref<string | null>(null)
 const habitatPrompt = ref<string | null>(null)
 const habitatFadeOpacity = ref(0)
 const turretFadeOpacity = ref(0)
+const turretHudPhase = ref<'idle' | 'opening' | 'active' | 'closing'>('idle')
+const turretReticleValid = ref(false)
 const deathVisible = ref(false)
 const deathCause = ref('')
 const achievementsOpen = ref(false)
@@ -523,6 +525,10 @@ onMounted(async () => {
     }
     viewController.onTurretFade = (opacity) => {
       turretFadeOpacity.value = opacity
+    }
+    viewController.onTurretHudState = (state) => {
+      turretHudPhase.value = state.phase
+      turretReticleValid.value = state.reticleValid
     }
     viewController.onJourneyTracker = (state) => {
       journeyTracker.value = state
@@ -1248,6 +1254,38 @@ watch(
     class="turret-fade"
     :style="{ opacity: turretFadeOpacity }"
   />
+  <div
+    v-if="turretHudPhase === 'active'"
+    class="turret-crosshair"
+    :style="{ opacity: turretReticleValid ? 1 : 0.5 }"
+  >
+    <svg width="32" height="32" viewBox="0 0 32 32">
+      <circle
+        cx="16"
+        cy="16"
+        r="12"
+        fill="none"
+        :stroke="turretReticleValid ? '#66ff88' : '#3b82f6'"
+        stroke-width="1.5"
+      />
+      <line
+        x1="16"
+        y1="8"
+        x2="16"
+        y2="24"
+        :stroke="turretReticleValid ? '#66ff88' : '#3b82f6'"
+        stroke-width="1"
+      />
+      <line
+        x1="8"
+        y1="16"
+        x2="24"
+        y2="16"
+        :stroke="turretReticleValid ? '#66ff88' : '#3b82f6'"
+        stroke-width="1"
+      />
+    </svg>
+  </div>
   </template>
   <PortalWelcomeDialog
     :visible="portalWelcomeVisible"

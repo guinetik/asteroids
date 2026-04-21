@@ -946,6 +946,10 @@ body {
   @apply pointer-events-none fixed inset-0 z-50 bg-black;
 }
 
+.turret-crosshair {
+  @apply pointer-events-none fixed inset-0 z-40 flex items-center justify-center select-none;
+}
+
 .fast-travel-fade {
   @apply pointer-events-none fixed inset-0 z-[80] bg-black;
   transition: opacity 600ms ease-in-out;

@@ -163,7 +163,10 @@ import { PLANET_ORBITAL_CONFIGS } from '@/lib/missions/planetOrbitalConfig'
 import { MapModeCoordinator } from '@/lib/map/mode/MapModeCoordinator'
 import { MapOrbitFacade } from '@/lib/map/orbit/MapOrbitFacade'
 import { MapShopFacade } from '@/lib/map/shop/MapShopFacade'
-import { TurretSessionController } from '@/lib/map/turret/TurretSessionController'
+import {
+  TurretSessionController,
+  type TurretHudState,
+} from '@/lib/map/turret/TurretSessionController'
 import { MapPlanetariumScene } from '@/three/MapPlanetariumScene'
 import { MapSceneEnvironment } from '@/three/MapSceneEnvironment'
 import { MapShuttleEffects } from '@/three/MapShuttleEffects'
@@ -427,6 +430,8 @@ export class MapViewController implements Tickable {
   onHabitatFade: ((opacity: number) => void) | null = null
   /** Fired with fade opacity (0 = clear, 1 = black) during turret-mode transitions. */
   onTurretFade: ((opacity: number) => void) | null = null
+  /** Fired per-frame with turret HUD state (phase + reticle validity). */
+  onTurretHudState: ((state: TurretHudState) => void) | null = null
   /** Fired when a resource is picked up (e.g. turret mining commits a unit). */
   onResourcePickup: ((itemId: string, quantity: number, label: string) => void) | null = null
   /** Fired when a resource pickup fails (e.g. inventory full). */
@@ -3679,6 +3684,7 @@ export class MapViewController implements Tickable {
         onResourcePickup: this.onResourcePickup ?? undefined,
         onResourcePickupFailed: this.onResourcePickupFailed ?? undefined,
         onFadeOpacity: (op) => this.onTurretFade?.(op),
+        onHudState: (state) => this.onTurretHudState?.(state),
       })
     }
     return this.turretSessionController
