@@ -163,6 +163,7 @@ import { PLANET_ORBITAL_CONFIGS } from '@/lib/missions/planetOrbitalConfig'
 import { MapModeCoordinator } from '@/lib/map/mode/MapModeCoordinator'
 import { MapOrbitFacade } from '@/lib/map/orbit/MapOrbitFacade'
 import { MapShopFacade } from '@/lib/map/shop/MapShopFacade'
+import { TurretSessionController } from '@/lib/map/turret/TurretSessionController'
 import { MapPlanetariumScene } from '@/three/MapPlanetariumScene'
 import { MapSceneEnvironment } from '@/three/MapSceneEnvironment'
 import { MapShuttleEffects } from '@/three/MapShuttleEffects'
@@ -282,6 +283,7 @@ export class MapViewController implements Tickable {
   private inspectMode = false
   private habitatState = new HabitatState()
   private habitatScene: HabitatInteriorScene | null = null
+  private turretSessionController: TurretSessionController | null = null
   private shopFacade = new MapShopFacade()
   private pendingModuleInstallTimer: TimerHandle | null = null
   private missionFacade = new MapMissionFacade()
@@ -423,6 +425,12 @@ export class MapViewController implements Tickable {
   onHabitatPrompt: ((prompt: string | null) => void) | null = null
   /** Fired with fade opacity (0 = clear, 1 = black) during habitat transitions. */
   onHabitatFade: ((opacity: number) => void) | null = null
+  /** Fired with fade opacity (0 = clear, 1 = black) during turret-mode transitions. */
+  onTurretFade: ((opacity: number) => void) | null = null
+  /** Fired when a resource is picked up (e.g. turret mining commits a unit). */
+  onResourcePickup: ((itemId: string, quantity: number, label: string) => void) | null = null
+  /** Fired when a resource pickup fails (e.g. inventory full). */
+  onResourcePickupFailed: ((label: string, reason: string) => void) | null = null
   /** Fired when the current active journey tracker changes. */
   onJourneyTracker: ((state: JourneyTrackerState | null) => void) | null = null
   /** Fired when the shop button should show/hide. */
@@ -1224,6 +1232,29 @@ export class MapViewController implements Tickable {
 
     if (introLocked) {
       return
+    }
+
+    // Turret mode toggle + active branch (mirrors habitat/EVA early-return pattern)
+    const turretUnlocked = getCurrentUpgradeValue('turretMiningUnlock') >= 1
+    const turretToggle = this.modeCoordinator.resolveTurretToggle({
+      togglePressed: this.inputManager?.wasActionPressed('toggleTurret') ?? false,
+      turretActive: this.turretSessionController?.isActive ?? false,
+      orbitState: this.orbitSystem?.state ?? 'free',
+      mapIsOpen: this.mapState.isOpen,
+      habitatActive: this.habitatState.isActive,
+      evaActive: this.evaSession?.isActive ?? false,
+      isDead: this.shuttleController?.dead ?? false,
+      unlocked: turretUnlocked,
+      introLocked,
+    })
+    if (turretToggle === 'enter') {
+      this.ensureTurretSessionController().open()
+    }
+
+    if (this.turretSessionController?.isActive) {
+      this.turretSessionController.tick(dt)
+      // Skip all remaining gameplay logic while turret is active (sim freeze).
+      if (this.turretSessionController.phase !== 'idle') return
     }
 
     // Orbital surfing toggle — checked BEFORE gravity surfing (orbit path priority).
@@ -3631,6 +3662,25 @@ export class MapViewController implements Tickable {
       }
     }
     return this.habitatScene
+  }
+
+  /** Lazy-init the turret session controller on first T press. Reuses the EVA scene-host adapter for camera swapping. */
+  private ensureTurretSessionController(): TurretSessionController {
+    if (!this.turretSessionController) {
+      const host = this.buildEvaSceneHost()
+      if (!host) {
+        throw new Error('Cannot open turret before scene objects are ready')
+      }
+      this.turretSessionController = new TurretSessionController({
+        shuttleController: this.shuttleController!,
+        beltControllers: this.beltControllers,
+        host,
+        onResourcePickup: this.onResourcePickup ?? undefined,
+        onResourcePickupFailed: this.onResourcePickupFailed ?? undefined,
+        onFadeOpacity: (op) => this.onTurretFade?.(op),
+      })
+    }
+    return this.turretSessionController
   }
 
   private tickHabitatTransition(): void {
