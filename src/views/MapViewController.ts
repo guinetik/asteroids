@@ -3534,10 +3534,11 @@ export class MapViewController implements Tickable {
    * Beat 5: Sweep to shuttle, hero hold, orbit handoff
    */
   private tickStartupIntroCamera(): void {
-    // EVA owns the render camera. If we let the intro facade run it will reset
-    // `renderPass.camera` back to the vehicle camera each frame and the helmet view
-    // will never be visible.
+    // EVA and turret both own the render camera while active. Letting the
+    // intro facade run would reset `renderPass.camera` back to the vehicle
+    // camera each frame, making the FP view invisible.
     if (this.evaSession?.isActive) return
+    if (this.turretSessionController?.isActive) return
     this.introFacade?.tick({
       sceneObjects: this.sceneObjects,
       vehicleCamera: this.vehicleCamera,
