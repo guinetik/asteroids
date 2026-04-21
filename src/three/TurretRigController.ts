@@ -64,6 +64,12 @@ export class TurretRigController {
     })
     this.beamMesh = new THREE.Mesh(beamGeom, this.beamMaterial)
     this.beamMesh.visible = false
+    // Disable frustum culling — the scaled cylinder's bounding sphere may not
+    // cover the full length after the dynamic Z-scale, causing the beam to be
+    // culled when the camera moves.
+    this.beamMesh.frustumCulled = false
+    // Render after opaque geometry so the additive blend lands on top.
+    this.beamMesh.renderOrder = 999
     this.camera.add(this.beamMesh)
   }
 
@@ -92,7 +98,10 @@ export class TurretRigController {
   showBeam(lengthMeters: number): void {
     const clamped = Math.min(Math.max(lengthMeters, 0.01), TURRET_BEAM_MAX_RANGE)
     this.beamMesh.scale.set(1, 1, clamped / BEAM_BASE_LENGTH)
-    this.beamMesh.visible = true
+    if (!this.beamMesh.visible) {
+      this.beamMesh.visible = true
+      console.log('[Turret] beam visible, length=', clamped.toFixed(1), 'parent=', this.beamMesh.parent?.type)
+    }
   }
 
   /** Hide the beam (idle / not firing / out of fuel). */
