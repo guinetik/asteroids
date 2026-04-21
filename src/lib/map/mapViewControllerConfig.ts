@@ -280,13 +280,14 @@ export const SUN_BUMP_ORBIT_RADIUS =
   (eventHorizonRadius(SUN.mass, MAP_GRAVITY_CONFIG) + influenceRadius(SUN.mass, MAP_GRAVITY_CONFIG)) * 0.4
 
 /** Intro camera starting shot. */
-export const MAP_INTRO_CAMERA_START_POSITION = new THREE.Vector3(0, 320, 900)
+export const MAP_INTRO_CAMERA_START_POSITION = new THREE.Vector3(0, 820, 180)
 export const MAP_INTRO_CAMERA_START_TARGET = new THREE.Vector3(0, 0, 0)
-export const MAP_INTRO_CAMERA_START_FOV = 32
+export const MAP_INTRO_CAMERA_START_FOV = 42
 
-/** Enceladus intro shot framing. */
-export const MAP_INTRO_ENCELADUS_CAMERA_OFFSET = new THREE.Vector3(0.4, 0.3, 0.8)
-export const MAP_INTRO_ENCELADUS_FOV = 28
+/** Phobos intro shot framing. */
+export const MAP_INTRO_PHOBOS_CAMERA_OFFSET = new THREE.Vector3(0.4, 0.3, 0.8)
+export const MAP_INTRO_PHOBOS_APPROACH_OFFSET = new THREE.Vector3(0, 180, 42)
+export const MAP_INTRO_PHOBOS_FOV = 28
 
 /**
  * Jupiter intro framing.
@@ -331,8 +332,8 @@ export const INTRO_CITY_MODEL_SIZE_MULTIPLIER = 15
 /** How far below the city's Y the camera look-target sits, framing city above Jupiter's limb. */
 export const INTRO_CITY_CAMERA_LOOK_DROP = 5.5
 
-/** Enceladus is the second moon of Saturn in the catalog. */
-export const ENCELADUS_MOON_INDEX = 1
+/** Phobos is the first moon of Mars in the catalog. */
+export const PHOBOS_MOON_INDEX = 0
 
 export const EARTH_DEPARTURE_MESSAGE_DISTANCE = 12
 export const EARTH_DEPARTURE_MIN_HISTORY_POINTS = 3
@@ -389,7 +390,7 @@ export const MAP_VIEW_CONTROLLER_CONFIG = {
   EARTH_DEPARTURE_MESSAGE_DISTANCE,
   EARTH_DEPARTURE_MIN_HISTORY_POINTS,
   EARTH_PLANET_ID,
-  ENCELADUS_MOON_INDEX,
+  PHOBOS_MOON_INDEX,
   GRID_DEFORM_INTERVAL_SCALE_WHOLE_MAP,
   GRID_DEFORM_WHOLE_MAP_COVERAGE,
   GRID_MASS_THRESHOLD,
@@ -408,8 +409,9 @@ export const MAP_VIEW_CONTROLLER_CONFIG = {
   MAP_INTRO_CAMERA_START_FOV,
   MAP_INTRO_CAMERA_START_POSITION,
   MAP_INTRO_CAMERA_START_TARGET,
-  MAP_INTRO_ENCELADUS_CAMERA_OFFSET,
-  MAP_INTRO_ENCELADUS_FOV,
+  MAP_INTRO_PHOBOS_APPROACH_OFFSET,
+  MAP_INTRO_PHOBOS_CAMERA_OFFSET,
+  MAP_INTRO_PHOBOS_FOV,
   MAP_INTRO_HERO_FOV,
   MAP_INTRO_HERO_LOOK_AT_OFFSET,
   MAP_INTRO_HERO_OFFSET,

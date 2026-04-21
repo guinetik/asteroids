@@ -16,19 +16,22 @@ import { StateMachine } from '@/lib/stateMachine'
 // Cinematic step durations (seconds) — tune these freely
 // ---------------------------------------------------------------------------
 
-/** Zoom from wide solar system to Enceladus. */
-export const INTRO_DUR_ZOOM_ENCELADUS = 3
+/** Hold on the full solar system so the player can read the opening subtitle. */
+export const INTRO_DUR_HOLD_SOLAR_SYSTEM = 2.5
 
-/** Hold on Enceladus — discovery caption. */
-export const INTRO_DUR_HOLD_ENCELADUS = 4
+/** Zoom from wide solar system to Phobos. */
+export const INTRO_DUR_ZOOM_PHOBOS = 3
+
+/** Hold on Phobos — discovery caption. */
+export const INTRO_DUR_HOLD_PHOBOS = 4
 
 /** Slight zoom out to reveal virus. */
 export const INTRO_DUR_ZOOM_VIRUS = 2
 
-/** Hold on virus + Enceladus. */
+/** Hold on virus + Phobos. */
 export const INTRO_DUR_HOLD_VIRUS = 4
 
-/** Zoom from Enceladus to Jupiter system. */
+/** Zoom from Phobos to Jupiter system. */
 export const INTRO_DUR_ZOOM_JUPITER = 3
 
 /** Hold on Jupiter — moons + raw materials caption. */
@@ -55,8 +58,9 @@ export const INTRO_DUR_HANDOFF = 2
 
 /** All possible cinematic step names. */
 export type IntroCinematicStep =
-  | 'zoom_enceladus'
-  | 'hold_enceladus'
+  | 'hold_solar_system'
+  | 'zoom_phobos'
+  | 'hold_phobos'
   | 'zoom_virus'
   | 'hold_virus'
   | 'zoom_jupiter'
@@ -70,7 +74,7 @@ export type IntroCinematicStep =
 
 /** Steps that are zoom (eased) transitions vs holds (linear). */
 export const INTRO_ZOOM_STEPS: ReadonlySet<IntroCinematicStep> = new Set([
-  'zoom_enceladus',
+  'zoom_phobos',
   'zoom_virus',
   'zoom_jupiter',
   'zoom_city',
@@ -85,11 +89,11 @@ export const INTRO_ZOOM_STEPS: ReadonlySet<IntroCinematicStep> = new Set([
 /** Caption: wide solar system establishing shot. */
 export const MAP_INTRO_CAPTION_SOLAR_SYSTEM = 'SOLAR SYSTEM, 2299 AD.'
 
-/** Caption: Enceladus neutron thruster discovery. */
-export const MAP_INTRO_CAPTION_ENCELADUS =
-  'A DISCOVERY ON ENCELADUS UNLOCKED RELATIVISTIC ACCELERATION AT OUR FINGERTIPS: THE NEUTRON THRUSTER.'
+/** Caption: Phobos neutron thruster discovery. */
+export const MAP_INTRO_CAPTION_PHOBOS =
+  'A DISCOVERY ON PHOBOS UNLOCKED RELATIVISTIC ACCELERATION AT OUR FINGERTIPS: THE NEUTRON THRUSTER.'
 
-/** Caption: Viroid reveal on Enceladus. */
+/** Caption: Viroid reveal on Phobos. */
 export const MAP_INTRO_CAPTION_VIROIDS =
   'BUT IT WAS HOME TO SOMETHING ELSE. SILICATE CREATURES FROM INTERSTELLAR SPACE. TERRITORIAL AND LETHAL. WE CALL THEM VIROIDS.'
 
@@ -107,9 +111,10 @@ export const MAP_INTRO_CAPTION_RETIRED_OPERATOR =
 
 /** Map from cinematic step to its caption text. */
 const STEP_CAPTIONS: Record<IntroCinematicStep, string> = {
-  zoom_enceladus: MAP_INTRO_CAPTION_SOLAR_SYSTEM,
-  hold_enceladus: MAP_INTRO_CAPTION_ENCELADUS,
-  zoom_virus: MAP_INTRO_CAPTION_ENCELADUS,
+  hold_solar_system: MAP_INTRO_CAPTION_SOLAR_SYSTEM,
+  zoom_phobos: MAP_INTRO_CAPTION_SOLAR_SYSTEM,
+  hold_phobos: MAP_INTRO_CAPTION_PHOBOS,
+  zoom_virus: MAP_INTRO_CAPTION_PHOBOS,
   hold_virus: MAP_INTRO_CAPTION_VIROIDS,
   zoom_jupiter: MAP_INTRO_CAPTION_VIROIDS,
   hold_jupiter: MAP_INTRO_CAPTION_JUPITER_MATERIALS,
@@ -205,8 +210,9 @@ export class MapIntroState {
     this.skipBlockingMessageAfterCinematic = options?.skipBlockingMessageAfterCinematic ?? false
     this.cinematic = StateMachine.fromSequence<IntroCinematicStep>(
       [
-        { name: 'zoom_enceladus', duration: INTRO_DUR_ZOOM_ENCELADUS },
-        { name: 'hold_enceladus', duration: INTRO_DUR_HOLD_ENCELADUS },
+        { name: 'hold_solar_system', duration: INTRO_DUR_HOLD_SOLAR_SYSTEM },
+        { name: 'zoom_phobos', duration: INTRO_DUR_ZOOM_PHOBOS },
+        { name: 'hold_phobos', duration: INTRO_DUR_HOLD_PHOBOS },
         { name: 'zoom_virus', duration: INTRO_DUR_ZOOM_VIRUS },
         { name: 'hold_virus', duration: INTRO_DUR_HOLD_VIRUS },
         { name: 'zoom_jupiter', duration: INTRO_DUR_ZOOM_JUPITER },

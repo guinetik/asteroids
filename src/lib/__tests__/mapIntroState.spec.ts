@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAP_INTRO_CAPTION_SOLAR_SYSTEM,
-  MAP_INTRO_CAPTION_ENCELADUS,
+  MAP_INTRO_CAPTION_PHOBOS,
   MAP_INTRO_CAPTION_VIROIDS,
   MAP_INTRO_CAPTION_JUPITER_MATERIALS,
   MAP_INTRO_CAPTION_CLOUD_CITY,
   MAP_INTRO_CAPTION_RETIRED_OPERATOR,
-  INTRO_DUR_ZOOM_ENCELADUS,
-  INTRO_DUR_HOLD_ENCELADUS,
+  INTRO_DUR_HOLD_SOLAR_SYSTEM,
+  INTRO_DUR_ZOOM_PHOBOS,
+  INTRO_DUR_HOLD_PHOBOS,
   INTRO_DUR_ZOOM_VIRUS,
   INTRO_DUR_HOLD_VIRUS,
   INTRO_DUR_ZOOM_JUPITER,
@@ -43,18 +44,21 @@ describe('MapIntroState', () => {
     expect(state.phase).toBe('cinematic_zoom')
     expect(state.controlsLocked).toBe(true)
     expect(state.uiState.letterboxVisible).toBe(true)
-    expect(state.cinematicStep).toBe('zoom_enceladus')
+    expect(state.cinematicStep).toBe('hold_solar_system')
   })
 
   it('advances through cinematic steps with fixed durations', () => {
     const state = new MapIntroState()
     state.start()
 
-    expect(state.cinematicStep).toBe('zoom_enceladus')
-    state.tick(INTRO_DUR_ZOOM_ENCELADUS)
+    expect(state.cinematicStep).toBe('hold_solar_system')
+    state.tick(INTRO_DUR_HOLD_SOLAR_SYSTEM)
 
-    expect(state.cinematicStep).toBe('hold_enceladus')
-    state.tick(INTRO_DUR_HOLD_ENCELADUS)
+    expect(state.cinematicStep).toBe('zoom_phobos')
+    state.tick(INTRO_DUR_ZOOM_PHOBOS)
+
+    expect(state.cinematicStep).toBe('hold_phobos')
+    state.tick(INTRO_DUR_HOLD_PHOBOS)
 
     expect(state.cinematicStep).toBe('zoom_virus')
     state.tick(INTRO_DUR_ZOOM_VIRUS)
@@ -129,9 +133,10 @@ describe('MapIntroState', () => {
   })
 
   it('returns correct captions for each step', () => {
-    expect(mapIntroCaptionForStep('zoom_enceladus')).toBe(MAP_INTRO_CAPTION_SOLAR_SYSTEM)
-    expect(mapIntroCaptionForStep('hold_enceladus')).toBe(MAP_INTRO_CAPTION_ENCELADUS)
-    expect(mapIntroCaptionForStep('zoom_virus')).toBe(MAP_INTRO_CAPTION_ENCELADUS)
+    expect(mapIntroCaptionForStep('hold_solar_system')).toBe(MAP_INTRO_CAPTION_SOLAR_SYSTEM)
+    expect(mapIntroCaptionForStep('zoom_phobos')).toBe(MAP_INTRO_CAPTION_SOLAR_SYSTEM)
+    expect(mapIntroCaptionForStep('hold_phobos')).toBe(MAP_INTRO_CAPTION_PHOBOS)
+    expect(mapIntroCaptionForStep('zoom_virus')).toBe(MAP_INTRO_CAPTION_PHOBOS)
     expect(mapIntroCaptionForStep('hold_virus')).toBe(MAP_INTRO_CAPTION_VIROIDS)
     expect(mapIntroCaptionForStep('zoom_jupiter')).toBe(MAP_INTRO_CAPTION_VIROIDS)
     expect(mapIntroCaptionForStep('hold_jupiter')).toBe(MAP_INTRO_CAPTION_JUPITER_MATERIALS)
@@ -150,7 +155,8 @@ describe('MapIntroState', () => {
 
     expect(state.cinematicStepProgress).toBe(0)
 
-    state.tick(INTRO_DUR_ZOOM_ENCELADUS / 2)
+    state.tick(INTRO_DUR_HOLD_SOLAR_SYSTEM)
+    state.tick(INTRO_DUR_ZOOM_PHOBOS / 2)
     expect(state.cinematicStepProgress).toBeCloseTo(0.5, 1)
   })
 
