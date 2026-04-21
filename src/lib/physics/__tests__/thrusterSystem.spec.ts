@@ -4,7 +4,21 @@ import {
   DEFAULT_SHUTTLE_CONFIG,
   DEFAULT_THRUSTER_CONFIG,
 } from '../thrusterSystem'
-import type { ShuttleThrusterName, ThrusterRuntimeModifiers } from '../thrusterSystem'
+import type {
+  ShuttleThrusterName,
+  ThrusterRuntimeModifiers,
+  ThrusterSystemConfig,
+} from '../thrusterSystem'
+
+type TestName = 'a' | 'b'
+
+const TEST_CONFIG: ThrusterSystemConfig<TestName> = {
+  thrusters: {
+    a: { capacity: 10, burnRate: 5, rechargeRate: 10, fuelCostPerRecharge: 1 },
+    b: { capacity: 10, burnRate: 5, rechargeRate: 10, fuelCostPerRecharge: 1 },
+  },
+  fuelCapacity: 100,
+}
 
 function createShuttleSystem(overrides: Partial<typeof DEFAULT_SHUTTLE_CONFIG> = {}) {
   return new ThrusterSystem<ShuttleThrusterName>({ ...DEFAULT_SHUTTLE_CONFIG, ...overrides })
@@ -193,5 +207,48 @@ describe('ThrusterSystem', () => {
     sys.consumeFuel(999999)
     sys.consumeFuel(10)
     expect(sys.fuelLevel).toBe(0)
+  })
+})
+
+describe('ThrusterSystem.tick — fuelCostMultiplier', () => {
+  it('scales per-group fuel cost while idle-recharging', () => {
+    const system = new ThrusterSystem<TestName>(TEST_CONFIG)
+    // Drain charges so both thrusters need recharge
+    system.tick(1, { a: true, b: true })
+    const before = system.fuelLevel
+
+    // Tick idle for 1s with multiplier: a=0.5 (cheap), b=2 (expensive)
+    system.tick(1, { a: false, b: false }, {
+      fuelCostMultiplier: { a: 0.5, b: 2 },
+    })
+    const after = system.fuelLevel
+    const drained = before - after
+
+    // a costs 0.5 per charge unit (5 units recovered → 2.5 fuel)
+    // b costs 2 per charge unit (5 units recovered → 10 fuel)
+    // Total expected: ~12.5 fuel; exact value depends on cap clamping and rates
+    expect(drained).toBeGreaterThan(10)
+    expect(drained).toBeLessThan(16)
+  })
+
+  it('treats missing fuelCostMultiplier entries as 1.0 (backward compatible)', () => {
+    const system = new ThrusterSystem<TestName>(TEST_CONFIG)
+    system.tick(1, { a: true, b: true })
+
+    const baseline = new ThrusterSystem<TestName>(TEST_CONFIG)
+    baseline.tick(1, { a: true, b: true })
+
+    const deltaWithMods = (() => {
+      const f0 = system.fuelLevel
+      system.tick(1, { a: false, b: false }, { fuelCostMultiplier: { a: 1 } })
+      return f0 - system.fuelLevel
+    })()
+    const deltaWithoutMods = (() => {
+      const f0 = baseline.fuelLevel
+      baseline.tick(1, { a: false, b: false })
+      return f0 - baseline.fuelLevel
+    })()
+
+    expect(deltaWithMods).toBeCloseTo(deltaWithoutMods, 3)
   })
 })

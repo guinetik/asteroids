@@ -37,6 +37,8 @@ export interface ThrusterRuntimeModifiers<T extends string = string> {
   burnRateMultiplier?: Partial<Record<T, number>>
   /** Scales the recharge rate while a thruster is idle. Higher means charge refills faster. */
   rechargeRateMultiplier?: Partial<Record<T, number>>
+  /** Scales fuel cost per unit of charge recovered (per-thruster). Lower means cheaper recharges. */
+  fuelCostMultiplier?: Partial<Record<T, number>>
 }
 
 /** Snapshot of a single thruster's runtime state. */
@@ -199,10 +201,15 @@ export class ThrusterSystem<T extends string = ShuttleThrusterName> {
       } else {
         if (this.fuel > 0 && this.charges[name] < cfg.capacity) {
           const rechargeMultiplier = Math.max(0, modifiers?.rechargeRateMultiplier?.[name] ?? 1)
-          const fuelCost = Math.max(0, cfg.rechargeRate * rechargeMultiplier * dt * cfg.fuelCostPerRecharge)
+          const fuelCostMultiplier = Math.max(0, modifiers?.fuelCostMultiplier?.[name] ?? 1)
+          const desiredRecharge = cfg.rechargeRate * rechargeMultiplier * dt
+          const chargeSpace = cfg.capacity - this.charges[name]
+          const actualRecharge = Math.min(desiredRecharge, chargeSpace)
+          const fuelCost = Math.max(0, actualRecharge * cfg.fuelCostPerRecharge * fuelCostMultiplier)
           const actualFuelUsed = Math.min(fuelCost, this.fuel)
-          const actualRecharge = actualFuelUsed / cfg.fuelCostPerRecharge
-          this.charges[name] = Math.min(cfg.capacity, this.charges[name] + actualRecharge)
+          const chargeFromFuel =
+            fuelCostMultiplier > 0 ? actualFuelUsed / (cfg.fuelCostPerRecharge * fuelCostMultiplier) : 0
+          this.charges[name] = Math.min(cfg.capacity, this.charges[name] + chargeFromFuel)
           this.fuel = Math.max(0, this.fuel - actualFuelUsed)
         }
       }
