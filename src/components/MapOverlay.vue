@@ -5,7 +5,23 @@ import type { MapOverlayState } from '@/lib/ShuttleTelemetry'
 
 const props = defineProps<{
   overlay: MapOverlayState
+  /**
+   * Set of planet ids that the player can fast travel to. Each label whose `id`
+   * is in this set is rendered with a clickable hotspot overlay.
+   */
+  fastTravelablePlanetIds?: Set<string>
 }>()
+
+const emit = defineEmits<{
+  'planet-click': [planetId: string, planetName: string]
+}>()
+
+const fastTravelable = computed(() => props.fastTravelablePlanetIds ?? new Set<string>())
+
+function isFastTravelable(planetId: string | undefined): boolean {
+  if (!planetId) return false
+  return fastTravelable.value.has(planetId)
+}
 
 /** Whether the persistent world-line trail is drawn. */
 const worldLineVisible = ref(true)
@@ -95,11 +111,23 @@ const trajectorySegments = computed(() => {
       v-for="label in overlay.labels"
       :key="'label-' + label.name"
       class="map-body-indicator"
+      :class="{ 'map-body-indicator--fast-travel': isFastTravelable(label.id) }"
       :style="{ left: label.screenX + '%', top: label.screenY + '%' }"
     >
       <div class="map-body-dot" />
       <span class="map-label">{{ label.name }}</span>
       <span v-if="!routeBodyNames.has(label.name)" class="map-label-distance">{{ label.distance }}</span>
+      <button
+        v-if="isFastTravelable(label.id)"
+        type="button"
+        class="map-fast-travel-hotspot"
+        :title="`Fast travel to ${label.name}`"
+        :aria-label="`Fast travel to ${label.name}`"
+        @click.stop="emit('planet-click', label.id, label.name)"
+      >
+        <span class="map-fast-travel-hotspot__ring" aria-hidden="true" />
+        <span class="map-fast-travel-hotspot__label">JUMP</span>
+      </button>
     </div>
 
     <!-- Mission waypoint indicator -->

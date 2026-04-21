@@ -25,6 +25,7 @@ import {
   recordMissionComplete,
   saveProfile,
 } from '@/lib/player/profile'
+import { contractSystem } from '@/lib/contracts/runtime'
 
 /**
  * Award mission payout, bump visit/completion stats, and remove the persisted active mission.
@@ -78,4 +79,11 @@ export function persistCompletedAsteroidMissionRewards(
   }
 
   clearActiveMission()
+
+  contractSystem.notifyMissionCompleted({
+    kind: 'asteroid',
+    giverPlanetId: null,
+    giverId: mission.giverId ?? null,
+    targetPlanetId: null,
+  })
 }

@@ -109,6 +109,27 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
    */
   const hasSeenIntro = typeof p.hasSeenIntro === 'boolean' ? p.hasSeenIntro : true
 
+  let unlockedFastTravelPlanets: string[] = []
+  if (Array.isArray(p.unlockedFastTravelPlanets)) {
+    unlockedFastTravelPlanets = p.unlockedFastTravelPlanets.filter(
+      (entry): entry is string => typeof entry === 'string' && entry.length > 0,
+    )
+  }
+
+  let missionPayMultipliers: Record<string, number> = {}
+  if (
+    p.missionPayMultipliers !== undefined
+    && p.missionPayMultipliers !== null
+    && typeof p.missionPayMultipliers === 'object'
+    && !Array.isArray(p.missionPayMultipliers)
+  ) {
+    for (const [planetId, value] of Object.entries(p.missionPayMultipliers as Record<string, unknown>)) {
+      if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+        missionPayMultipliers[planetId] = value
+      }
+    }
+  }
+
   return {
     name: p.name,
     credits: p.credits,
@@ -117,6 +138,8 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     orbitedSolarBodies,
     lastDockedPlanetId,
     hasSeenIntro,
+    unlockedFastTravelPlanets,
+    missionPayMultipliers,
   }
 }
 
@@ -130,6 +153,8 @@ export function createProfile(name: string): PlayerProfile {
     orbitedSolarBodies: {},
     lastDockedPlanetId: 'earth',
     hasSeenIntro: false,
+    unlockedFastTravelPlanets: [],
+    missionPayMultipliers: {},
   }
 }
 
@@ -208,4 +233,56 @@ export function recordSolarBodyFirstOrbit(profile: PlayerProfile, bodyKey: strin
 export function setLastDockedPlanet(profile: PlayerProfile, planetId: string): PlayerProfile {
   if (profile.lastDockedPlanetId === planetId) return profile
   return { ...profile, lastDockedPlanetId: planetId }
+}
+
+/**
+ * Return a copy of the profile with `planetId` added to the fast-travel unlock list.
+ * No-op when the planet is already unlocked.
+ *
+ * @param profile - Current profile.
+ * @param planetId - Planet id to unlock for fast travel.
+ */
+export function unlockFastTravelPlanet(profile: PlayerProfile, planetId: string): PlayerProfile {
+  if (profile.unlockedFastTravelPlanets.includes(planetId)) return profile
+  return {
+    ...profile,
+    unlockedFastTravelPlanets: [...profile.unlockedFastTravelPlanets, planetId],
+  }
+}
+
+/**
+ * Return a copy of the profile with the per-planet mission pay multiplier updated.
+ * Higher of existing/new is kept so a contract reward never downgrades a previous bonus.
+ *
+ * @param profile - Current profile.
+ * @param planetId - Planet whose missions receive the multiplier.
+ * @param multiplier - Numeric multiplier (e.g. `2` for 2x pay).
+ */
+export function setMissionPayMultiplier(
+  profile: PlayerProfile,
+  planetId: string,
+  multiplier: number,
+): PlayerProfile {
+  const existing = profile.missionPayMultipliers[planetId] ?? 1
+  const next = Math.max(existing, multiplier)
+  if (next === existing && planetId in profile.missionPayMultipliers) return profile
+  return {
+    ...profile,
+    missionPayMultipliers: {
+      ...profile.missionPayMultipliers,
+      [planetId]: next,
+    },
+  }
+}
+
+/**
+ * Resolve the per-planet pay multiplier (defaults to `1` when no contract has unlocked one).
+ *
+ * @param profile - Current profile.
+ * @param planetId - Giver planet id (e.g. `'earth'`).
+ * @returns Multiplier applied to mission credit rewards.
+ */
+export function getMissionPayMultiplier(profile: PlayerProfile, planetId: string | null): number {
+  if (!planetId) return 1
+  return profile.missionPayMultipliers[planetId] ?? 1
 }

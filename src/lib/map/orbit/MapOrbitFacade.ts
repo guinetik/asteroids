@@ -294,8 +294,6 @@ export class MapOrbitFacade {
     this._exitCameraProgress = 0
     this._exitCameraActive = true
     if (vehicleCamera) {
-      vehicleCamera.setConfig(buildSlingshotExitCameraConfig(0))
-      vehicleCamera.setTarget(shuttleController.group)
       vehicleCamera.controls.target.copy(shuttleController.position)
     }
     sceneVisuals?.hideOrbitRing()

@@ -11,6 +11,7 @@ import GravitationalAnomalyHud from '@/components/GravitationalAnomalyHud.vue'
 import DeathOverlay from '@/components/DeathOverlay.vue'
 import DamageVignette from '@/components/DamageVignette.vue'
 import MapOverlay from '@/components/MapOverlay.vue'
+import FastTravelConfirmDialog from '@/components/FastTravelConfirmDialog.vue'
 import ShipMessageDialog from '@/components/ShipMessageDialog.vue'
 import ShuttleControlOverlay from '@/components/ShuttleControlOverlay.vue'
 import PlanetShopDialog from '@/components/shop/PlanetShopDialog.vue'
@@ -36,6 +37,7 @@ import {
   shipMessageSystem,
   setShipMessageFollowUpDeliveryListener,
 } from '@/lib/messages/runtime'
+import { contractSystem } from '@/lib/contracts/runtime'
 import {
   getUpgradeCost,
   getPlayerUpgradeLevelsSnapshot,
@@ -49,7 +51,7 @@ import UpgradeInstalledAnnouncement from '@/components/UpgradeInstalledAnnouncem
 import { Timer, type TimerHandle } from '@/lib/Timer'
 import type { ActiveShipMessage } from '@/lib/messages/messageTypes'
 import type { MapIntroUiState } from '@/lib/mapIntroState'
-import type { MapViewLayerToggleState } from './MapViewController'
+import type { MapViewBootState, MapViewLayerToggleState } from './MapViewController'
 import type { AchievementProgress } from '@/data/achievements'
 import type {
   ShuttleTelemetry,
@@ -269,6 +271,14 @@ const evaMinigameInstance = ref<OrbitalMiniGame | null>(null)
 const missionBoard = ref<ShuttleMissionBoard | null>(null)
 const missionNotification = ref<string | null>(null)
 let missionNotificationTimer: TimerHandle | null = null
+const mapBootState = reactive<MapViewBootState>({
+  phase: 'preparing',
+  label: 'Loading',
+})
+const mapExperienceStarted = ref(false)
+
+const mapBootOverlayVisible = computed(() => !mapExperienceStarted.value)
+const mapBootReady = computed(() => mapBootState.phase === 'ready')
 
 const mapOverlay = reactive<MapOverlayState>({
   visible: false,
@@ -282,6 +292,62 @@ const mapOverlay = reactive<MapOverlayState>({
   trajectoryPoints: [],
   missionWaypoint: null,
 })
+
+/** Set of planet ids the player has unlocked for fast travel (from profile). */
+const fastTravelablePlanetIds = computed<Set<string>>(
+  () => new Set(playerProfileSnapshot.value.unlockedFastTravelPlanets ?? []),
+)
+
+const fastTravelDialogVisible = ref(false)
+const fastTravelTargetPlanetId = ref<string>('')
+const fastTravelTargetPlanetLabel = ref<string>('')
+/** Drives the fade-to-black overlay used during the fast travel jump. */
+const fastTravelFadeOpacity = ref(0)
+const FAST_TRAVEL_FADE_MS = 600
+const FAST_TRAVEL_HOLD_MS = 220
+
+/**
+ * Handle the player clicking an unlocked planet on the tactical map. Opens the
+ * confirmation dialog so they can review the destination before jumping.
+ */
+function handleMapPlanetClick(planetId: string, planetName: string): void {
+  if (!fastTravelablePlanetIds.value.has(planetId)) return
+  fastTravelTargetPlanetId.value = planetId
+  fastTravelTargetPlanetLabel.value = planetName
+  fastTravelDialogVisible.value = true
+}
+
+function cancelFastTravel(): void {
+  fastTravelDialogVisible.value = false
+}
+
+/**
+ * Run the fade-to-black transition, perform the warp at peak darkness, then
+ * fade back in with the shuttle in its new orbit. Uses raw timeouts so the
+ * sequence keeps running even if Vue reactivity is interrupted by the warp.
+ */
+async function confirmFastTravel(): Promise<void> {
+  const planetId = fastTravelTargetPlanetId.value
+  if (!planetId) {
+    fastTravelDialogVisible.value = false
+    return
+  }
+  fastTravelDialogVisible.value = false
+
+  await new Promise<void>((resolve) => {
+    fastTravelFadeOpacity.value = 1
+    window.setTimeout(resolve, FAST_TRAVEL_FADE_MS)
+  })
+
+  viewController.fastTravelToPlanet(planetId)
+  syncPersistentProgressFromController()
+
+  await new Promise<void>((resolve) => window.setTimeout(resolve, FAST_TRAVEL_HOLD_MS))
+
+  fastTravelFadeOpacity.value = 0
+  fastTravelTargetPlanetId.value = ''
+  fastTravelTargetPlanetLabel.value = ''
+}
 
 /** Space Fabric toggle is shown only after Gravity Surfing (shop-hidden upgrade). */
 const spaceFabricControlUnlocked = computed(() =>
@@ -355,7 +421,6 @@ function syncPersistentProgressFromController(): void {
 }
 
 onMounted(async () => {
-  playBackgroundMusic('map')
   if (container.value) {
     viewController.onTelemetry = (t) => {
       Object.assign(telemetry, t)
@@ -396,6 +461,12 @@ onMounted(async () => {
         `EVA mission complete — +${mission.template.reward.toLocaleString()} CR`,
       )
       syncPersistentProgressFromController()
+      contractSystem.notifyMissionCompleted({
+        kind: 'eva',
+        giverPlanetId: mission.giverPlanet,
+        giverId: null,
+        targetPlanetId: null,
+      })
     }
     viewController.onMapIntro = (state) => {
       Object.assign(mapIntro, state)
@@ -405,6 +476,9 @@ onMounted(async () => {
       gridVisible.value = state.gridVisible
       labelsVisible.value = state.labelsVisible
       ambientVisible.value = state.ambientVisible
+    }
+    viewController.onBootState = (state) => {
+      Object.assign(mapBootState, state)
     }
     viewController.onUpgradeHudRefresh = () => {
       syncPersistentProgressFromController()
@@ -485,12 +559,19 @@ onMounted(async () => {
       if (mission) {
         showMissionNotification(`Mission items collected — return to deliver`)
         syncPersistentProgressFromController()
+        contractSystem.notifyOrbitalMissionCompleted(mission.template.targetPlanet)
       }
     }
     viewController.onMissionDeliver = (mission) => {
       if (mission) {
         showMissionNotification(`Mission complete — +${mission.template.reward} CR`)
         syncPersistentProgressFromController()
+        contractSystem.notifyMissionCompleted({
+          kind: 'shuttle',
+          giverPlanetId: mission.giverPlanet,
+          giverId: null,
+          targetPlanetId: mission.template.targetPlanet,
+        })
       }
     }
     viewController.onBeginAsteroidMission = () => {
@@ -521,6 +602,13 @@ onUnmounted(() => {
 
 function handleRestart() {
   viewController.restart()
+}
+
+function handlePlay(): void {
+  if (mapExperienceStarted.value || !mapBootReady.value) return
+  mapExperienceStarted.value = true
+  playBackgroundMusic('map')
+  viewController.startExperience()
 }
 
 function handlePortalWatchIntro(): void {
@@ -596,6 +684,7 @@ function handlePurchaseUpgrade(upgradeId: UpgradeId): void {
   upgradeInstalledCreditsSpent.value = getUpgradeCost(upgradeId, newLevel)
   upgradeInstalledMetaText.value = null
   upgradeInstalledVisible.value = true
+  contractSystem.notifyUpgradeInstalled(upgradeId, newLevel)
 }
 
 function onUpgradeInstalledDismissed(): void {
@@ -700,10 +789,46 @@ function dockedPlanetId(): string | null {
   const planet = PLANETS.find((p) => p.name === orbitState.nearestBodyName)
   return planet?.id ?? null
 }
+
+/**
+ * Notify the contract system whenever the shuttle transitions into an
+ * `orbiting` state at a planet. The watcher uses an `oldState` signature so a
+ * single visit only fires the notification once until the player breaks orbit.
+ */
+watch(
+  () => ({ state: orbitState.state, name: orbitState.nearestBodyName }),
+  (next, prev) => {
+    if (next.state !== 'orbiting' || prev?.state === 'orbiting') return
+    if (!next.name) return
+    const planet = PLANETS.find((p) => p.name === next.name)
+    if (!planet) return
+    contractSystem.notifyPlanetVisited(planet.id)
+  },
+)
 </script>
 
 <template>
   <div ref="container" class="scene-container"></div>
+  <div
+    v-if="mapBootOverlayVisible"
+    class="map-boot-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="map-boot-title"
+  >
+    <div class="map-boot-card">
+      <div v-if="!mapBootReady" class="map-boot-spinner" />
+      <h1 v-if="!mapBootReady" id="map-boot-title" class="map-boot-title">Loading</h1>
+      <button
+        type="button"
+        class="map-boot-play"
+        :disabled="!mapBootReady"
+        @click="handlePlay"
+      >
+        PLAY
+      </button>
+    </div>
+  </div>
   <div
     class="map-intro-letterbox map-intro-letterbox--top"
     :class="{ 'map-intro-letterbox--hidden': !mapIntro.letterboxVisible }"
@@ -820,7 +945,23 @@ function dockedPlanetId(): string | null {
     :cause="deathCause"
     @restart="handleRestart"
   />
-  <MapOverlay :overlay="mapOverlay" />
+  <MapOverlay
+    :overlay="mapOverlay"
+    :fast-travelable-planet-ids="fastTravelablePlanetIds"
+    @planet-click="handleMapPlanetClick"
+  />
+  <FastTravelConfirmDialog
+    :visible="fastTravelDialogVisible"
+    :planet-label="fastTravelTargetPlanetLabel"
+    @confirm="confirmFastTravel"
+    @cancel="cancelFastTravel"
+  />
+  <div
+    v-show="fastTravelFadeOpacity > 0"
+    class="fast-travel-fade"
+    :style="{ opacity: fastTravelFadeOpacity }"
+    aria-hidden="true"
+  />
   <div v-if="mapIntro.messagePromptVisible && activeMessage" class="map-intro-message-prompt">
     <button
       type="button"

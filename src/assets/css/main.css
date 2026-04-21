@@ -19,6 +19,91 @@ body {
   @apply w-screen h-screen overflow-hidden;
 }
 
+.map-boot-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(34, 211, 238, 0.08), transparent 24%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.42), rgba(2, 6, 23, 0.68));
+  backdrop-filter: blur(4px);
+}
+
+.map-boot-card {
+  width: min(100%, 22rem);
+  display: grid;
+  justify-items: center;
+  gap: 0.7rem;
+  padding: 1.2rem 1.1rem 1rem;
+  text-align: center;
+}
+
+.map-boot-spinner {
+  width: 3.25rem;
+  height: 3.25rem;
+  border: 2px solid rgba(103, 232, 249, 0.2);
+  border-top-color: rgba(165, 243, 252, 0.95);
+  border-radius: 999px;
+  animation: map-boot-spin 0.9s linear infinite;
+}
+
+.map-boot-title {
+  margin: 0;
+  font-size: clamp(1rem, 2vw, 1.15rem);
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(236, 254, 255, 0.9);
+}
+
+.map-boot-status {
+  margin: 0;
+  min-height: 1.1rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(207, 250, 254, 0.55);
+}
+
+.map-boot-play {
+  min-width: 9.5rem;
+  padding: 0.72rem 1.15rem;
+  border: 1px solid rgba(103, 232, 249, 0.28);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(34, 211, 238, 0.16), rgba(8, 47, 73, 0.7));
+  color: rgba(236, 254, 255, 0.94);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    border-color 140ms ease,
+    opacity 140ms ease;
+  box-shadow: 0 0 0 rgba(103, 232, 249, 0);
+}
+
+.map-boot-play:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(165, 243, 252, 0.72);
+  box-shadow: 0 0 1.5rem rgba(34, 211, 238, 0.18);
+}
+
+.map-boot-play:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+
+@keyframes map-boot-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Helmet visor frame — rounded viewport with opaque corners. */
 .helmet-visor {
   position: fixed;
@@ -413,6 +498,78 @@ body {
   white-space: nowrap;
 }
 
+.map-body-indicator--fast-travel .map-body-dot {
+  background: rgb(106, 232, 196);
+  box-shadow: 0 0 10px rgba(106, 232, 196, 0.85);
+}
+
+.map-fast-travel-hotspot {
+  pointer-events: auto;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  margin-left: -28px;
+  margin-top: -28px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  color: rgba(106, 232, 196, 0.9);
+  z-index: 12;
+}
+
+.map-fast-travel-hotspot:focus-visible {
+  outline: 1px solid rgba(106, 232, 196, 0.85);
+  outline-offset: 4px;
+}
+
+.map-fast-travel-hotspot__ring {
+  position: absolute;
+  inset: 0;
+  border: 1px dashed rgba(106, 232, 196, 0.55);
+  border-radius: 50%;
+  animation: map-fast-travel-pulse 1.8s ease-in-out infinite;
+}
+
+.map-fast-travel-hotspot__label {
+  position: absolute;
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  text-shadow: 0 0 6px rgba(106, 232, 196, 0.6);
+}
+
+.map-fast-travel-hotspot:hover .map-fast-travel-hotspot__label,
+.map-fast-travel-hotspot:focus-visible .map-fast-travel-hotspot__label {
+  opacity: 1;
+}
+
+.map-fast-travel-hotspot:hover .map-fast-travel-hotspot__ring {
+  border-color: rgba(106, 232, 196, 0.95);
+  box-shadow: 0 0 14px rgba(106, 232, 196, 0.45);
+  animation-duration: 0.9s;
+}
+
+@keyframes map-fast-travel-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 0.95;
+  }
+}
+
 .map-ship-marker {
   @apply absolute pointer-events-none;
   transform: translate(-50%, -50%);
@@ -785,6 +942,11 @@ body {
   @apply pointer-events-none fixed inset-0 z-50 bg-black;
 }
 
+.fast-travel-fade {
+  @apply pointer-events-none fixed inset-0 z-[80] bg-black;
+  transition: opacity 600ms ease-in-out;
+}
+
 /* Shuttle Control Terminal */
 .shuttle-control-overlay {
   @apply fixed inset-0 z-40 flex items-center justify-center
@@ -987,6 +1149,45 @@ body {
   @apply mb-4 border-b border-white/10 pb-3;
 }
 
+.shuttle-mail-program__reader-header-row {
+  @apply flex items-start justify-between gap-4;
+}
+
+.shuttle-mail-program__reader-header-text {
+  @apply min-w-0 flex-1;
+}
+
+.shuttle-mail-program__reader-action {
+  @apply flex shrink-0 flex-col items-end gap-1;
+}
+
+.shuttle-mail-program__acknowledge-button {
+  @apply rounded-xl border border-cyan-300/60 bg-cyan-300/15 px-5 py-2.5 font-mono text-xs font-semibold uppercase tracking-[0.24em] text-cyan-50 shadow-[0_0_18px_rgba(34,211,238,0.25)] transition-colors;
+  animation: shuttle-mail-program-acknowledge-pulse 2.4s ease-in-out infinite;
+}
+
+.shuttle-mail-program__acknowledge-button:hover {
+  @apply border-cyan-200/80 bg-cyan-200/25 text-white;
+}
+
+.shuttle-mail-program__acknowledge-button:focus-visible {
+  @apply outline-none ring-2 ring-cyan-200/60 ring-offset-2 ring-offset-slate-900;
+}
+
+.shuttle-mail-program__acknowledge-hint {
+  @apply max-w-[180px] text-right font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-300/60;
+}
+
+@keyframes shuttle-mail-program-acknowledge-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 18px rgba(34, 211, 238, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 26px rgba(34, 211, 238, 0.55);
+  }
+}
+
 .shuttle-mail-program__reader-subject {
   @apply mb-2 font-mono text-sm font-normal uppercase tracking-wide text-cyan-100;
 }
@@ -1001,10 +1202,6 @@ body {
 
 .shuttle-mail-program__reader-body {
   @apply flex flex-col gap-3 text-base leading-8 text-slate-300;
-}
-
-.shuttle-mail-program__reader-footer {
-  @apply mt-6 flex flex-col gap-2 border-t border-white/10 pt-4;
 }
 
 .shuttle-control-screen__title {

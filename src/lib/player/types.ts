@@ -35,4 +35,14 @@ export interface PlayerProfile {
    * skipped on later visits. Independent of ship mail — Marta/Jay timing uses the message system.
    */
   hasSeenIntro: boolean
+  /**
+   * Planet ids the player has unlocked for fast travel from the solar map.
+   * Granted by contract reward effects of type `'fast-travel'`.
+   */
+  unlockedFastTravelPlanets: string[]
+  /**
+   * Per-planet reward multiplier applied when crediting any mission whose giver is that planet.
+   * Defaults to `1` for missing entries; `2` after USC partnership unlocks Earth, etc.
+   */
+  missionPayMultipliers: Record<string, number>
 }

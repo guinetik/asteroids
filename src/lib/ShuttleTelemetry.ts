@@ -72,6 +72,8 @@ export interface GravityWarningState {
 export interface MapBodyLabel {
   /** Display name */
   name: string
+  /** Stable planet id used for click handlers (lowercase, matches `Planet.id`). Sun = `'sun'`. */
+  id: string
   /** Screen X as percentage (0–100) */
   screenX: number
   /** Screen Y as percentage (0–100) */

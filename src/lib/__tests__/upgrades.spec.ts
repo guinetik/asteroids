@@ -16,6 +16,7 @@ import {
   getShuttleThrusterEfficiencyModifiers,
   getCurrentShuttleThrusterEfficiencyModifiers,
   getShuttleSlingshotBurstMultiplier,
+  getShuttleSlingshotCruiseSpeedMultiplier,
   hasGravitySurfingUnlock,
   hasOrbitalSurfingUnlock,
   hydratePlayerUpgradeLevelsFromStorage,
@@ -181,6 +182,18 @@ describe('getShuttleSlingshotBurstMultiplier', () => {
     expect(getShuttleSlingshotBurstMultiplier({ shuttleSlingshotSpeed: 1 })).toBe(3)
     expect(getShuttleSlingshotBurstMultiplier({ shuttleSlingshotSpeed: 2 })).toBe(3.5)
     expect(getShuttleSlingshotBurstMultiplier({ shuttleSlingshotSpeed: 3 })).toBe(5)
+  })
+})
+
+describe('getShuttleSlingshotCruiseSpeedMultiplier', () => {
+  it('is 1 at stock burst factor 2; scales with excess burst coupling', () => {
+    expect(getShuttleSlingshotCruiseSpeedMultiplier({})).toBe(1)
+    // burst 3 → 1 + (3-2)*0.25 = 1.25
+    expect(getShuttleSlingshotCruiseSpeedMultiplier({ shuttleSlingshotSpeed: 1 })).toBeCloseTo(1.25)
+    // burst 3.5 → 1 + 1.5*0.25 = 1.375
+    expect(getShuttleSlingshotCruiseSpeedMultiplier({ shuttleSlingshotSpeed: 2 })).toBeCloseTo(1.375)
+    // burst 5 → 1 + 3*0.25 = 1.75
+    expect(getShuttleSlingshotCruiseSpeedMultiplier({ shuttleSlingshotSpeed: 3 })).toBeCloseTo(1.75)
   })
 })
 

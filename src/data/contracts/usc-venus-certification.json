@@ -1,0 +1,92 @@
+{
+  "id": "usc-venus-certification",
+  "inboxName": "United Space Consortium",
+  "from": "USC — Operator Relations",
+  "sentAt": "2306-04-06 15:30 UTC",
+  "triggerOnMissionCompletedNth": 1,
+  "introSubject": "Contract — Venus Lane Certification",
+  "introBody": [
+    "Operator,",
+    "Your first delivery has been logged with Sol Sector dispatch. The United Space Consortium is extending a partnership offer to qualifying independent pilots. We are short on certified Venus-lane operators and your file matched the screening parameters.",
+    "Completion of the following work qualifies you for a permanent Earth orbital kiosk and a 2x payout multiplier on all Earth-issued contracts:",
+    "1) Complete one shuttle EVA contract.",
+    "2) Complete one asteroid contract.",
+    "3) Install Heat Shield Lvl 1 — non-negotiable for inner-system work.",
+    "4) Enter Venus orbit.",
+    "5) Complete one orbital mission targeting Venus.",
+    "Accept and your terminal will receive Consortium dispatch updates as you progress.",
+    "— USC Operator Relations, Sol Sector"
+  ],
+  "steps": [
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "missionType": "eva",
+      "subject": "Step 1 — Shuttle EVA",
+      "flavor": [
+        "Operator,",
+        "Take any shuttle EVA contract from a planetary spaceport. Repair work, satellite servicing, hardpoint inspection — any qualifying EVA file your terminal lists.",
+        "Submit the close-out and the Consortium will log the credit toward your certification.",
+        "— USC Operator Relations"
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "missionType": "asteroid",
+      "subject": "Step 2 — Asteroid Operation",
+      "flavor": [
+        "Operator,",
+        "Lander qualification next. Accept any asteroid contract, deploy the lander, complete the field objectives and exfil cleanly.",
+        "We are not looking for heroics. We are looking for a clean log.",
+        "— USC Operator Relations"
+      ]
+    },
+    {
+      "kind": "install-upgrade",
+      "upgradeId": "shuttleHeatResistance",
+      "minLevel": 1,
+      "subject": "Step 3 — Heat Shield Lvl 1",
+      "flavor": [
+        "Operator,",
+        "Inner-system work without a Heat Shield is a closed coffin. Have your shuttle outfitted with Heat Shield Level 1 at any spaceport engineering bay.",
+        "Confirmation pings to your file the moment it is installed.",
+        "— USC Operator Relations"
+      ]
+    },
+    {
+      "kind": "visit-planet",
+      "planetId": "venus",
+      "subject": "Step 4 — Venus Orbital Insertion",
+      "flavor": [
+        "Operator,",
+        "Hold a stable Venus orbit. Confirm thermal limits are within the Heat Shield envelope. The Consortium will log your insertion the moment your transponder pings inside the lane.",
+        "Do not loaf. Establish orbit, acknowledge the chime, then proceed to your orbital mission task.",
+        "— USC Operator Relations"
+      ]
+    },
+    {
+      "kind": "orbital-mission",
+      "planetId": "venus",
+      "subject": "Step 5 — Venus Orbital Operation",
+      "flavor": [
+        "Operator,",
+        "Final certification objective. Accept any planetary shuttle contract whose target is Venus and complete its orbital task in-lane.",
+        "Deliver the cargo at the giver and your file is closed in your favor.",
+        "— USC Operator Relations"
+      ]
+    }
+  ],
+  "completionSubject": "Certified — Earth Kiosk Granted",
+  "completionBody": [
+    "Operator,",
+    "Certification logged. The United Space Consortium has unlocked a permanent operator kiosk for you in Earth orbit. Your transponder will be recognized by traffic control on inbound approach from anywhere in the system.",
+    "Per the partnership agreement, all Earth-issued contracts now pay at a 2x rate. We expect this incentive will keep you in the inner system for the foreseeable future.",
+    "Welcome to the lane.",
+    "— USC Operator Relations, Sol Sector"
+  ],
+  "rewards": [
+    { "type": "fast-travel", "planetId": "earth" },
+    { "type": "mission-pay-multiplier", "planetId": "earth", "multiplier": 2 }
+  ]
+}

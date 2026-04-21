@@ -102,7 +102,7 @@
     "id": "shuttleSlingshotSpeed",
     "category": "shuttle",
     "label": "Slingshot Speed",
-    "description": "Gravity-assist tuning raises the slingshot exit burst speed multiplier.",
+    "description": "Gravity-assist tuning raises slingshot burst strength and post-settle cruise speed.",
     "baseCost": 1500,
     "maxLevel": 3,
     "valuesByLevel": [2, 3, 3.5, 5]

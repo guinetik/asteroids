@@ -10,12 +10,14 @@ import { loadMessageRecords, saveMessageRecords } from './messageStorage'
 import type {
   ActiveShipMessage,
   ShipMessageDefinition,
+  ShipMessageFolder,
   ShipMessageInboxRow,
   ShipMessageInboxRowStatus,
   ShipMessageReadable,
   ShipMessageRecord,
   ShipMessageTrigger,
 } from './messageTypes'
+import { DEFAULT_INBOX_FOLDER_ID, DEFAULT_INBOX_FOLDER_LABEL } from './messageTypes'
 
 /**
  * Persistence adapter for ship message records; swap in tests or custom backends.
@@ -53,6 +55,14 @@ export interface MessageSystemHooks {
    * Called after new follow-up message records are written (including after a delayed dismiss).
    */
   onFollowUpsEnqueued?: () => void
+  /**
+   * Called immediately after a message is archived/dismissed. Receivers can fan out to other
+   * subsystems (e.g. {@link ContractSystem.notifyMessageArchived}) without coupling them
+   * directly to the inbox UI.
+   *
+   * @param messageId - Id of the message that was archived.
+   */
+  onMessageArchived?: (messageId: string) => void
 }
 
 /**
@@ -63,6 +73,7 @@ export class MessageSystem {
   private readonly persistence: MessagePersistence
   private readonly hooks: MessageSystemHooks
   private records: Record<string, ShipMessageRecord>
+  private readonly archiveListeners = new Set<(id: string) => void>()
 
   /**
    * @param definitions - Static catalog entries this system may surface
@@ -78,6 +89,22 @@ export class MessageSystem {
     this.persistence = persistence
     this.hooks = hooks
     this.records = persistence.load()
+  }
+
+  /**
+   * Register additional message definitions after construction.
+   *
+   * Used by subsystems (e.g. {@link ContractSystem}) that need to inject their own
+   * authored messages into the same inbox without re-creating the singleton.
+   * Existing ids are not overwritten; the first registration wins.
+   *
+   * @param definitions - Extra message definitions to merge into the catalog.
+   */
+  registerDefinitions(definitions: readonly ShipMessageDefinition[]): void {
+    for (const definition of definitions) {
+      if (this.definitions.has(definition.id)) continue
+      this.definitions.set(definition.id, definition)
+    }
   }
 
   /**
@@ -200,6 +227,26 @@ export class MessageSystem {
     }
     this.enqueueFollowUpsOnDismiss(id)
     this.persist()
+    this.hooks.onMessageArchived?.(id)
+    for (const listener of this.archiveListeners) {
+      try {
+        listener(id)
+      } catch {
+        // listeners must not break the system; swallow to keep other subscribers alive
+      }
+    }
+  }
+
+  /**
+   * Subscribe to message archive events. Listeners run after persistence completes
+   * and after `enqueueOnDismiss` follow-ups are scheduled.
+   *
+   * @param listener - Callback invoked with the just-archived message id.
+   * @returns Unsubscribe function.
+   */
+  onMessageArchived(listener: (id: string) => void): () => void {
+    this.archiveListeners.add(listener)
+    return () => this.archiveListeners.delete(listener)
   }
 
   /**
@@ -220,9 +267,16 @@ export class MessageSystem {
    * Inbox rows for messages that have actually been delivered (a persisted record exists).
    * Undelivered catalog entries are omitted so the list does not show “locked” placeholders.
    * Order: priority high → low, then id.
+   *
+   * @param folderId - When provided, only rows belonging to this folder are returned.
+   *                   Use {@link DEFAULT_INBOX_FOLDER_ID} for the standard inbox.
    */
-  listInboxRows(): ShipMessageInboxRow[] {
-    const defs = [...this.definitions.values()].filter((def) => this.records[def.id] !== undefined)
+  listInboxRows(folderId?: string): ShipMessageInboxRow[] {
+    const defs = [...this.definitions.values()].filter((def) => {
+      if (this.records[def.id] === undefined) return false
+      if (folderId === undefined) return true
+      return this.folderIdOf(def) === folderId
+    })
     defs.sort((a, b) => {
       if (b.priority !== a.priority) return b.priority - a.priority
       return a.id.localeCompare(b.id)
@@ -236,7 +290,7 @@ export class MessageSystem {
           ? `${rawPreview.slice(0, SHIP_MESSAGE_INBOX_PREVIEW_MAX_CHARS)}…`
           : rawPreview
       const status: ShipMessageInboxRowStatus = record.status
-      return {
+      const row: ShipMessageInboxRow = {
         id: def.id,
         from: def.from,
         subject: def.subject,
@@ -244,8 +298,63 @@ export class MessageSystem {
         preview,
         status,
         isUnread: record.status === 'pending',
+        folderId: this.folderIdOf(def),
       }
+      if (def.contractId) row.contractId = def.contractId
+      return row
     })
+  }
+
+  /**
+   * Returns one entry per inbox folder that currently has at least one delivered row.
+   *
+   * The default inbox is always present, even when empty, so the sidebar never collapses
+   * to nothing during a fresh save.
+   */
+  listFolders(): ShipMessageFolder[] {
+    const totals = new Map<string, { label: string; total: number; unread: number }>()
+    totals.set(DEFAULT_INBOX_FOLDER_ID, {
+      label: DEFAULT_INBOX_FOLDER_LABEL,
+      total: 0,
+      unread: 0,
+    })
+
+    for (const def of this.definitions.values()) {
+      const record = this.records[def.id]
+      if (!record) continue
+      const folderId = this.folderIdOf(def)
+      const existing = totals.get(folderId)
+      if (existing) {
+        existing.total += 1
+        if (record.status === 'pending') existing.unread += 1
+        if (folderId !== DEFAULT_INBOX_FOLDER_ID && def.folderLabel) {
+          existing.label = def.folderLabel
+        }
+      } else {
+        totals.set(folderId, {
+          label: def.folderLabel ?? folderId,
+          total: 1,
+          unread: record.status === 'pending' ? 1 : 0,
+        })
+      }
+    }
+
+    return [...totals.entries()]
+      .map(([id, value]) => ({ id, label: value.label, total: value.total, unread: value.unread }))
+      .sort((a, b) => {
+        if (a.id === DEFAULT_INBOX_FOLDER_ID) return -1
+        if (b.id === DEFAULT_INBOX_FOLDER_ID) return 1
+        return a.label.localeCompare(b.label)
+      })
+  }
+
+  /**
+   * Resolve the folder id for a definition, defaulting to the standard inbox.
+   *
+   * @param def - Catalog message definition.
+   */
+  private folderIdOf(def: ShipMessageDefinition): string {
+    return def.folderId ?? DEFAULT_INBOX_FOLDER_ID
   }
 
   /**

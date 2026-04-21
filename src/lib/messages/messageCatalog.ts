@@ -10,6 +10,13 @@ import type { ShipMessageDefinition } from './messageTypes'
 /** Wall-clock delay before Jay's comm arrives after Marta's message is archived. */
 const JAY_FOLLOW_UP_AFTER_MARTA_DISMISS_DELAY_SEC = 10
 
+/**
+ * Wall-clock delay before Jay's contract heads-up arrives in the inbox after the
+ * player archives the first-slingshot message. Gives the cinematic moment time
+ * to breathe instead of slamming a contract into the mail program immediately.
+ */
+const JAY_CONTRACT_INCOMING_DELAY_SEC = 10
+
 /** Startup handoff should always beat later tutorial prompts. */
 const STARTUP_MESSAGE_PRIORITY = 100
 const CONSORTIUM_MESSAGE_PRIORITY = 75
@@ -70,6 +77,8 @@ export const JAY_FIRST_SLINGSHOT_MESSAGE: ShipMessageDefinition = {
   trigger: 'map_first_slingshot',
   delivery: 'inbox_prompt',
   priority: JAY_MESSAGE_PRIORITY,
+  enqueueOnDismiss: ['jay-contract-incoming'],
+  enqueueOnDismissDelaySeconds: JAY_CONTRACT_INCOMING_DELAY_SEC,
   body: [
     'Hey, you got Jay.',
     'That was your first slingshot. See what I mean? The planet does the work. You just pick the angle and let go. That is flying.',
@@ -78,6 +87,28 @@ export const JAY_FIRST_SLINGSHOT_MESSAGE: ShipMessageDefinition = {
     'Open the mission board on your shuttle terminal. There are two kinds of contracts out there — some need a shuttle, some need a lander. Good thing you have both.',
     'Pick something close. Pick something that pays. Earn enough to upgrade, and then the whole system opens up.',
     "Space Cowboys, Inc. You and me. We'll figure out the logo later.",
+    '— Jay',
+  ],
+}
+
+/**
+ * Heads-up Jay sends a few seconds after the slingshot message is archived. Lives
+ * in the default inbox; archiving it offers the Space Cowboys, Inc. contract in
+ * its dedicated mail folder.
+ */
+export const JAY_CONTRACT_INCOMING_MESSAGE: ShipMessageDefinition = {
+  id: 'jay-contract-incoming',
+  from: 'Jay Mercer',
+  subject: 'Dropped Something In Your Queue',
+  sentAt: '2306-04-05 08:48 UTC',
+  trigger: 'contract',
+  delivery: 'inbox_prompt',
+  priority: JAY_MESSAGE_PRIORITY,
+  body: [
+    'Hey, you got Jay.',
+    "Quick heads up — I just routed you a real contract. Not a one-off shuttle run, the actual paperwork. Space Cowboys, Inc., partner-tier, our first job together.",
+    'It dropped in its own folder in your mail program. Open the shuttle terminal, hit the mail tab, you will see a "Space Cowboys, Inc." entry on the left. Read it when you get a sec, accept it if you are still in.',
+    'No rush. Archive this one when you are done with it and pop over there.',
     '— Jay',
   ],
 }
@@ -225,6 +256,7 @@ export const SHIP_MESSAGE_CATALOG: ShipMessageDefinition[] = [
   CONSORTIUM_CERTIFICATION_MESSAGE,
   JAY_STARTUP_FOLLOW_UP_MESSAGE,
   JAY_FIRST_SLINGSHOT_MESSAGE,
+  JAY_CONTRACT_INCOMING_MESSAGE,
   JAY_DISTANCE_MESSAGE,
   JAY_THRUSTER_MESSAGE,
   JAY_BRAKE_MESSAGE,

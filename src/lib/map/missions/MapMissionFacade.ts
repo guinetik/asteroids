@@ -631,11 +631,18 @@ export class MapMissionFacade {
   completeEvaMission(params: {
     missionId: string
     profile: PlayerProfile
+    /** Optional multiplier applied to the EVA reward (e.g. contract pay bonus). */
+    rewardMultiplier?: number
     onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null
   }): { profile: PlayerProfile; creditsChanged: boolean } {
     const completedMission =
       this.board.activeEvaMissions.find((mission) => mission.template.id === params.missionId) ?? null
-    const result = completeEvaMission(this.board, params.missionId, params.profile)
+    const result = completeEvaMission(
+      this.board,
+      params.missionId,
+      params.profile,
+      params.rewardMultiplier ?? 1,
+    )
     if (!result.ok) {
       return { profile: params.profile, creditsChanged: false }
     }

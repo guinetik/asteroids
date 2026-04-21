@@ -800,7 +800,7 @@ const manifestById: ManifestById = {
     category: 'music',
     load: 'lazy',
     playback: 'single-instance',
-    volume: 0.3,
+    volume: 0.1,
     effect: 'none',
   },
   'music.level': {

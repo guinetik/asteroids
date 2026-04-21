@@ -284,6 +284,39 @@ export function getShuttleSlingshotBurstMultiplier(levels: UpgradeLevels): numbe
 }
 
 /**
+ * Baseline burst coupling at upgrade level 0 — values below this do not add post-settle cruise bonus.
+ */
+const SLINGSHOT_BURST_BASELINE_FOR_CRUISE = 2
+
+/**
+ * Portion of excess burst multiplier carried into stable lane speed after the settle ramp.
+ * Tuned so higher tiers clearly raise cruise without dwarfing the burst spike.
+ */
+const SLINGSHOT_CRUISE_BOOST_PER_BURST_EXCESS = 0.25
+
+/**
+ * Multiplier applied to physics slingshot exit speed for the **post-settle** cruise target.
+ * Stock burst factor is 2; stronger coupling raises both the spike and the speed the lane
+ * decays toward (still subject to map max speed caps).
+ *
+ * @param levels - Runtime upgrade level state.
+ * @returns Factor ≥ 1 applied to lane speed after the slingshot burst completes.
+ */
+export function getShuttleSlingshotCruiseSpeedMultiplier(levels: UpgradeLevels): number {
+  const burst = getShuttleSlingshotBurstMultiplier(levels)
+  return 1 + Math.max(0, burst - SLINGSHOT_BURST_BASELINE_FOR_CRUISE) * SLINGSHOT_CRUISE_BOOST_PER_BURST_EXCESS
+}
+
+/**
+ * Post-settle slingshot cruise multiplier for the current player (map free flight).
+ *
+ * @returns Factor ≥ 1 for stable speed after burst decay.
+ */
+export function getCurrentShuttleSlingshotCruiseSpeedMultiplier(): number {
+  return getShuttleSlingshotCruiseSpeedMultiplier(CURRENT_PLAYER_UPGRADE_LEVELS)
+}
+
+/**
  * Slingshot exit burst multiplier from current player upgrades.
  *
  * @returns Burst multiplier for the current slingshot launch.

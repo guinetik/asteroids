@@ -3,10 +3,10 @@ import { findNearestBodies, formatDistance, headingToVector } from '../mapProjec
 
 describe('findNearestBodies', () => {
   const bodies = [
-    { name: 'Sun', x: 0, z: 0, mass: 1.0 },
-    { name: 'Earth', x: 100, z: 0, mass: 0.000003 },
-    { name: 'Jupiter', x: 500, z: 0, mass: 0.000955 },
-    { name: 'Neptune', x: 2000, z: 0, mass: 0.0000515 },
+    { id: 'sun', name: 'Sun', x: 0, z: 0, mass: 1.0 },
+    { id: 'earth', name: 'Earth', x: 100, z: 0, mass: 0.000003 },
+    { id: 'jupiter', name: 'Jupiter', x: 500, z: 0, mass: 0.000955 },
+    { id: 'neptune', name: 'Neptune', x: 2000, z: 0, mass: 0.0000515 },
   ]
 
   it('returns the 3 nearest bodies sorted by distance', () => {

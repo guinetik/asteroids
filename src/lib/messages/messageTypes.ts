@@ -17,6 +17,13 @@ export type ShipMessageTrigger =
   | 'map_first_slingshot'
   | 'viroid_envoy_initial_contact'
   | 'viroid_envoy_ceres_rendezvous'
+  | 'contract'
+
+/** Built-in inbox folder id used by all general ship comms (default sidebar entry). */
+export const DEFAULT_INBOX_FOLDER_ID = 'inbox'
+
+/** Display label for the default inbox folder shown in the mail sidebar. */
+export const DEFAULT_INBOX_FOLDER_LABEL = 'Inbox'
 
 /** Delivery behavior for a shipboard message. */
 export type ShipMessageDelivery = 'blocking_intro' | 'inbox_prompt'
@@ -51,6 +58,31 @@ export interface ShipMessageDefinition {
   delivery: ShipMessageDelivery
   /** Higher numbers win when multiple messages are active. */
   priority: number
+  /**
+   * Optional inbox folder id; defaults to {@link DEFAULT_INBOX_FOLDER_ID} when omitted.
+   * Contracts route their messages to a folder named after the contract id.
+   */
+  folderId?: string
+  /**
+   * Display label for {@link folderId}. Only required for non-default folders;
+   * the first message that registers a folder defines its label.
+   */
+  folderLabel?: string
+  /**
+   * When set, marks this message as a contract-related entry. The mail reader
+   * uses this to surface accept/decline controls and progress callouts.
+   */
+  contractId?: string
+  /**
+   * Per-contract role for this message:
+   *   - `'intro'` — offer message with Accept/Decline buttons in the reader
+   *   - `'step'` — flavor text dropped when a step unlocks
+   *   - `'completion'` — celebratory message dropped when the contract finishes
+   * Undefined for plain catalog messages.
+   */
+  contractMessageKind?: 'intro' | 'step' | 'completion'
+  /** Index into {@link Contract.steps} for `contractMessageKind === 'step'` messages. */
+  contractStepIndex?: number
 }
 
 /** Persisted runtime state for one message. */
@@ -97,6 +129,22 @@ export interface ShipMessageInboxRow {
   status: ShipMessageInboxRowStatus
   /** True when the message is pending (never opened in any UI). */
   isUnread: boolean
+  /** Folder id this row belongs to. Defaults to {@link DEFAULT_INBOX_FOLDER_ID}. */
+  folderId: string
+  /** Optional contract id when this row was authored by the contract system. */
+  contractId?: string
+}
+
+/** One folder entry surfaced in the mail sidebar. */
+export interface ShipMessageFolder {
+  /** Stable id used to filter inbox rows. */
+  id: string
+  /** Sidebar label (e.g. `"Inbox"` or `"Space Cowboys, Inc."`). */
+  label: string
+  /** Total rows currently in the folder (records exist for them). */
+  total: number
+  /** Subset of {@link total} that is still `pending`. */
+  unread: number
 }
 
 /**

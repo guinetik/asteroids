@@ -143,11 +143,12 @@ export function buildMapBodies(params: {
       }
     | null
   planets: Array<{ getWorldX(): number; getWorldZ(): number; mass: number }>
-}): Array<{ name: string; x: number; z: number; mass: number }> {
-  const bodies: Array<{ name: string; x: number; z: number; mass: number }> = []
+}): Array<{ id: string; name: string; x: number; z: number; mass: number }> {
+  const bodies: Array<{ id: string; name: string; x: number; z: number; mass: number }> = []
 
   if (params.sun) {
     bodies.push({
+      id: 'sun',
       name: 'Sun',
       x: params.sun.getWorldX(),
       z: params.sun.getWorldZ(),
@@ -157,8 +158,10 @@ export function buildMapBodies(params: {
 
   for (let i = 0; i < params.planets.length; i++) {
     const planet = params.planets[i]!
+    const def = PLANETS[i]
     bodies.push({
-      name: PLANETS[i]?.name ?? '',
+      id: def?.id ?? '',
+      name: def?.name ?? '',
       x: planet.getWorldX(),
       z: planet.getWorldZ(),
       mass: planet.mass,

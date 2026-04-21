@@ -12,6 +12,8 @@
 
 /** A celestial body with position and mass for map projection. */
 export interface MapBody {
+  /** Stable id used for click handlers (Sun = `'sun'`). */
+  id: string
   /** Display name */
   name: string
   /** World X position */
@@ -24,6 +26,8 @@ export interface MapBody {
 
 /** A body with its computed distance from the ship. */
 export interface NearestBody {
+  /** Stable id used for click handlers (Sun = `'sun'`). */
+  id: string
   /** Display name */
   name: string
   /** World X position */

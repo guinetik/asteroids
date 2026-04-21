@@ -105,6 +105,7 @@ import type { ShopSession } from '@/lib/shop/tradeTypes'
 import { tickDemandTimer, resetDemand } from '@/lib/shop/planetDemand'
 import {
   createProfile,
+  getMissionPayMultiplier,
   loadProfile,
   markMapIntroSeen,
   saveProfile,
@@ -185,6 +186,12 @@ export interface MapViewLayerToggleState {
   labelsVisible: boolean
   /** User debris toggle (ambient layers); meshes may still be hidden while orbiting. */
   ambientVisible: boolean
+}
+
+/** Boot/preload status for the map-screen loader overlay. */
+export interface MapViewBootState {
+  phase: 'preparing' | 'ready' | 'started'
+  label: string
 }
 
 /** Short compass labels for each planet + Sun. */
@@ -353,6 +360,7 @@ export class MapViewController implements Tickable {
   private readonly _asteroidImpactNormal = new THREE.Vector3()
   /** Countdown until the next asteroid impact can damage the shuttle again. */
   private asteroidImpactCooldown = 0
+  private experienceStarted = false
 
   /**
    * Root at the mission waypoint world position; uniform screen scaling applies to the cyan marker
@@ -367,6 +375,9 @@ export class MapViewController implements Tickable {
 
   /** Called when orbit / fabric / debris toggles change (including intro restore). */
   onMapViewLayerToggles: ((state: MapViewLayerToggleState) => void) | null = null
+
+  /** Called while the scene is preparing, and again when the PLAY gate can open. */
+  onBootState: ((state: MapViewBootState) => void) | null = null
 
   /** Called each frame with full shuttle telemetry for HUD display. */
   onTelemetry: ((telemetry: ShuttleTelemetry) => void) | null = null
@@ -534,6 +545,8 @@ export class MapViewController implements Tickable {
   }
 
   async init(container: HTMLElement): Promise<void> {
+    this.emitBootState('preparing', 'Loading')
+
     // Create canvas
     const canvas = document.createElement('canvas')
     container.appendChild(canvas)
@@ -560,11 +573,13 @@ export class MapViewController implements Tickable {
     this.emitFuelCellCount()
     this.tickHandler = new TickHandler()
     this.tickHandler.register(this.inputManager, TICK_PRIORITY_INPUT)
+    this.emitBootState('preparing', 'Loading')
 
     // --- Camera / planetarium scene ---
     this.vehicleCamera = new VehicleCamera(MAP_CAMERA_CONFIG, canvas)
     this.planetariumScene = new MapPlanetariumScene()
     const planetarium = await this.planetariumScene.initialize(canvas, this.vehicleCamera.camera)
+    this.emitBootState('preparing', 'Loading')
     this.sceneObjects = planetarium.sceneObjects
     this.sceneVisuals = new MapSceneVisuals(this.sceneObjects)
     this.sunController = planetarium.sunController
@@ -673,6 +688,7 @@ export class MapViewController implements Tickable {
       this.triggerDeath(cause)
     }
 
+    this.emitBootState('preparing', 'Loading')
     await this.shuttleController.load()
     this.shuttleController.group.scale.setScalar(MAP_CONFIG.MAP_SHUTTLE_SCALE)
     this.sceneVisuals?.attachShuttle(this.shuttleController.group)
@@ -1066,10 +1082,19 @@ export class MapViewController implements Tickable {
     this.missionFacade.hydrateFromStorage(this.onMissionBoardUpdate)
     this.onCreditsUpdate?.(this.playerProfile.credits)
 
-    // Start
     this.gameLoop = new GameLoop(this.tickHandler)
-    this.gameLoop.start()
+    this.emitBootState('preparing', 'Loading')
+    this.syncPreparedReadyFrame()
+    this.sceneObjects.composer.render()
+    this.emitBootState('ready', 'Ready')
+  }
 
+  /** Start map simulation/audio after the loader overlay receives a user gesture. */
+  startExperience(): void {
+    if (this.experienceStarted || !this.gameLoop) return
+    this.experienceStarted = true
+    this.emitBootState('started', 'Loading')
+    this.gameLoop.start()
     this.shuttleAudio.start()
   }
 
@@ -2399,9 +2424,12 @@ export class MapViewController implements Tickable {
     // Snapshot the mission *before* the facade strips it from the active list so
     // the toast/audio fan-out has a stable reference to read reward + name from.
     const completed = this.missionFacade.getActiveEvaMissionAtPoi()
+    const giverPlanet = completed?.giverPlanet ?? null
+    const payMultiplier = getMissionPayMultiplier(this.playerProfile, giverPlanet)
     const result = this.missionFacade.completeEvaMission({
       missionId,
       profile: this.playerProfile,
+      rewardMultiplier: payMultiplier,
       onMissionBoardUpdate: this.onMissionBoardUpdate,
     })
     if (result.creditsChanged) {
@@ -2447,11 +2475,16 @@ export class MapViewController implements Tickable {
 
   /** Deliver a completed mission (from shuttle control UI). */
   missionDeliver(missionId: string): void {
+    const mission = this.missionFacade.board.activeMissions.find(
+      (entry) => entry.template.id === missionId,
+    )
+    const giverPlanet = mission?.giverPlanet ?? null
+    const payMultiplier = getMissionPayMultiplier(this.playerProfile, giverPlanet)
     const result = this.missionFacade.missionDeliver({
       missionId,
       profile: this.playerProfile,
       inventory: this.playerInventory,
-      scienceStationLevel: getCurrentUpgradeValue('shuttleScienceStation'),
+      scienceStationLevel: getCurrentUpgradeValue('shuttleScienceStation') * payMultiplier,
       onMissionBoardUpdate: this.onMissionBoardUpdate,
       onMissionDeliver: this.onMissionDeliver,
     })
@@ -2712,8 +2745,11 @@ export class MapViewController implements Tickable {
       1,
     )
     const reticleAlpha = reticleT * reticleT * (3 - 2 * reticleT)
+    const orbitState = this.orbitSystem?.state ?? 'free'
+    const slingshotCameraResetActive =
+      this.shuttleController.slingshotBurstActive || this.orbitFacade.exitCameraActive
     this.vehicleCamera.setIdleRecenterSuppressed(
-      this.orbitSystem?.state === 'free' && reticleAlpha > 0.005,
+      orbitState === 'free' && reticleAlpha > 0.005 && !slingshotCameraResetActive,
     )
     this.applyOrbitBloomClamp(overscale)
     this.currentShuttleScale = THREE.MathUtils.lerp(
@@ -3010,6 +3046,40 @@ export class MapViewController implements Tickable {
     )
   }
 
+  /**
+   * Warp the shuttle into a stable orbit standoff position above the requested
+   * planet and immediately request that the tactical map close. Used by the
+   * fast-travel UI: callers should run their own fade transition around this
+   * call so the warp is invisible.
+   *
+   * @param planetId - Catalog id of the destination planet (lowercase). The
+   *                   sun is intentionally rejected — fast travel is for
+   *                   planet-to-planet jumps only.
+   * @returns `true` when the warp ran, `false` when the id was unknown or the
+   *          shuttle is not ready.
+   */
+  public fastTravelToPlanet(planetId: string): boolean {
+    const key = planetId.trim().toLowerCase()
+    if (!key || key === 'sun') {
+      console.warn(`[MapView] fastTravel: invalid planetId "${planetId}"`)
+      return false
+    }
+    if (!this.shuttleController) {
+      console.warn('[MapView] fastTravel: shuttle not ready')
+      return false
+    }
+    const planet = PLANETS.find((p) => p.id === key)
+    if (!planet) {
+      console.warn(`[MapView] fastTravel: unknown planet "${planetId}"`)
+      return false
+    }
+    this.devWarpNearBody(key)
+    if (this.mapState.isOpen) {
+      this.mapState.close()
+    }
+    return true
+  }
+
   /** Called when the map first opens. Freezes everything, positions ortho camera. */
   private onOpenMap(): void {
     if (!this.shuttleController || !this.mapCamera) return
@@ -3176,6 +3246,7 @@ export class MapViewController implements Tickable {
       const dz = b.z - pz
       const dist = Math.sqrt(dx * dx + dz * dz)
       return {
+        id: b.id,
         name: b.name,
         screenX: screen.x * 100,
         screenY: screen.y * 100,
@@ -3385,6 +3456,28 @@ export class MapViewController implements Tickable {
   /** Push the current intro UI state to Vue. */
   private emitIntroUiState(): void {
     this.onMapIntro?.(this.mapIntro.uiState)
+  }
+
+  /**
+   * Snap the hidden pre-play frame to the actual ready-state camera so returning players
+   * see the parked shuttle view instead of the orbit-setup transition frame.
+   */
+  private syncPreparedReadyFrame(): void {
+    if (this.portalArrival?.isArrival) {
+      this.tickStartupIntroCamera()
+      return
+    }
+
+    if (this.playerProfile.hasSeenIntro && this.vehicleCamera) {
+      this.vehicleCamera.tick(0)
+      return
+    }
+
+    this.tickStartupIntroCamera()
+  }
+
+  private emitBootState(phase: MapViewBootState['phase'], label: string): void {
+    this.onBootState?.({ phase, label })
   }
 
   /** Dev-only: enqueue the Consortium message and start its authored special mission immediately. */
