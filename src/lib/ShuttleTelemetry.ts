@@ -30,6 +30,12 @@ export interface ShuttleTelemetry {
   brakeCapacity: number
   rcsCharge: number
   rcsCapacity: number
+  /** Current turret-mining beam charge (0..turretMiningCapacity). Used by the HUD while in turret mode. */
+  turretMiningCharge: number
+  /** Turret-mining charge capacity. Zero when no turret upgrade is installed. */
+  turretMiningCapacity: number
+  /** True while a turret session is active — HUD swaps the thruster cluster for the cyan MINE gauge. */
+  turretActive: boolean
   /** Seconds remaining before adrift game over. -1 when not adrift. */
   adriftCountdown: number
   /** Current hull HP */

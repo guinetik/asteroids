@@ -14,6 +14,7 @@ import {
   type AchievementProgress,
 } from '@/data/achievements'
 import { getPlanet } from '@/lib/planets/catalog'
+import { hasCompletedJourney } from '@/lib/journeys'
 import type { UpgradeLevels } from '@/lib/upgrades'
 
 const ACHIEVEMENTS_STORAGE_KEY = 'asteroid-lander-achievements-v1'
@@ -83,6 +84,8 @@ export function isAchievementUnlocked(definition: AchievementDefinition, progres
   switch (definition.kind) {
     case 'intro':
       return progress.profile.hasSeenIntro
+    case 'journey_completed':
+      return hasCompletedJourney(progress.profile, definition.journeyId ?? 'welcome')
     case 'missions_completed':
       return progress.profile.completedMissionCount >= (definition.threshold ?? 0)
     case 'unique_asteroids':
@@ -146,6 +149,8 @@ export function getAchievementLockedHint(
   switch (definition.kind) {
     case 'intro':
       return 'Finish the opening flight sequence on the map.'
+    case 'journey_completed':
+      return 'Complete the Welcome Journey in the habitat and on the map.'
     case 'missions_completed': {
       const current = progress.profile.completedMissionCount
       const needed = definition.threshold ?? 0

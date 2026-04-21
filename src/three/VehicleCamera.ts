@@ -149,12 +149,22 @@ const MAP_ORBIT_CAMERA_FOV = 50
 /** Orbit map max orbit-controls zoom distance (world units). */
 const MAP_ORBIT_CAMERA_MAX_DISTANCE = 120
 
-/** Map orbit preset: above shuttle for planet orbit; tuned closer than full-system view. */
+/**
+ * Map orbit preset: above shuttle for planet orbit; tuned closer than full-system view.
+ *
+ * Uses {@link VehicleCameraConfig.minYRelativeToTarget} instead of an absolute world floor
+ * so the camera follows the planet's Y. Inclined orbits (Neptune ~1.77°, Pluto ~17.16°)
+ * place the planet — and therefore the orbit-target — well above or below the ecliptic
+ * plane. An absolute `minY: 1` floor pinned the camera at world Y=1 each frame, so wheel
+ * zoom and pitch were instantly undone by the clamp once `controls.update()` ran. A
+ * relative floor lets the camera sit just above the planet regardless of inclination.
+ */
 export const MAP_ORBIT_CAMERA_CONFIG: VehicleCameraConfig = {
   idleOffset: new THREE.Vector3(0, MAP_ORBIT_CAMERA_IDLE_OFFSET_Y, 0),
   lerpSpeed: 2,
   idleTimeout: 999,
-  minY: 1,
+  minY: -Infinity,
+  minYRelativeToTarget: 1,
   fov: MAP_ORBIT_CAMERA_FOV,
   maxDistance: MAP_ORBIT_CAMERA_MAX_DISTANCE,
   dampingFactor: 0.06,

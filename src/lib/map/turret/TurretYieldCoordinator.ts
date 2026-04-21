@@ -60,10 +60,15 @@ export class TurretYieldCoordinator {
     this.deps = deps
   }
 
-  /** Register a belt instance with this coordinator; returns the assigned spawnIndex. */
-  register(handle: TurretInstanceHandle): number {
-    const spawnIndex = this.nextSpawnIndex++
+  /**
+   * Register a belt instance with this coordinator under a caller-supplied
+   * spawnIndex. The index is reused as the {@link RockYieldSystem} key so a
+   * stable per-instance hash produces matching rolls across map preview and
+   * turret session.
+   */
+  register(spawnIndex: number, handle: TurretInstanceHandle): number {
     this.handles.set(spawnIndex, handle)
+    this.nextSpawnIndex = Math.max(this.nextSpawnIndex, spawnIndex + 1)
     return spawnIndex
   }
 

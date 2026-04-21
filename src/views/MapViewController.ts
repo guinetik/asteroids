@@ -167,6 +167,7 @@ import {
   TurretSessionController,
   type TurretHudState,
 } from '@/lib/map/turret/TurretSessionController'
+import { applyBeltCompositionTints } from '@/lib/map/turret/compositionTint'
 import { MapPlanetariumScene } from '@/three/MapPlanetariumScene'
 import { MapSceneEnvironment } from '@/three/MapSceneEnvironment'
 import { MapShuttleEffects } from '@/three/MapShuttleEffects'
@@ -620,6 +621,10 @@ export class MapViewController implements Tickable {
     this.sunController = planetarium.sunController
     this.planetControllers = planetarium.planetControllers
     this.beltControllers = planetarium.beltControllers
+    // Tint every belt instance by its primary mineral so the player can read
+    // composition on approach. Deterministic per (belt, mesh, instance) so the
+    // tint the player sees matches the mineral the turret later rolls out.
+    applyBeltCompositionTints(this.beltControllers)
     this.spaceTimeGrid = planetarium.spaceTimeGrid
     this.gravityPass = planetarium.gravityPass
     this.gravitySurfPass = planetarium.gravitySurfPass
@@ -1058,12 +1063,7 @@ export class MapViewController implements Tickable {
     // --- Dev tools ---
     DevConsole.register('MapView', {
       skipIntro: () => {
-        this.clearStartupCinematicOrbitHandoff()
-        this.mapIntro.skip()
-        this.markMapIntroSeenAndSyncProfile()
-        this.restoreIntroMapLayers()
-        this.introFacade?.dispose(this.sceneObjects!.scene)
-        this.emitIntroUiState()
+        this.skipIntro()
       },
       getShuttlePosition: () => {
         const pos = this.shuttleController?.group.position
@@ -1258,9 +1258,17 @@ export class MapViewController implements Tickable {
 
     if (this.turretSessionController?.isActive) {
       this.turretSessionController.tick(dt)
-      // Skip the rest of gameplay — orrery sim (belts/planets/sun), orbit
-      // transitions, damage, UI toggles. Combined with shuttleController.freeze
-      // this pauses the whole world while the player aims.
+      // The turret camera is mounted on the nose, so yawing back at the hull puts the
+      // ship right in front of the map's base lights. Force the zoomed-in bloom clamp
+      // (normally driven by tickShuttleScale, which we skip here) so cameraLight fades
+      // to 0 and the bloom threshold rises past the hull's diffuse peak.
+      this.applyOrbitBloomClamp(MapViewController.TURRET_FORCE_CLAMP_OVERSCALE)
+      // Push telemetry during the turret session so the HUD can swap to the
+      // MINE gauge and show live charge depletion. The rest of the gameplay
+      // tick (orrery sim, orbit transitions, damage, UI toggles) stays paused
+      // alongside shuttleController.freeze — the world waits until the player
+      // exits turret mode.
+      this.emitShuttleTelemetry()
       if (this.turretSessionController.phase !== 'idle') return
     }
 
@@ -1473,37 +1481,7 @@ export class MapViewController implements Tickable {
     }
 
     // Telemetry
-    if (this.shuttleController && this.onTelemetry) {
-      const ts = this.shuttleController.thrusterSystem
-      const manifoldPrompt = this.orbitalSurfingController.getAttachPrompt(this.getOrbitalSurfingDeps())
-      const gravitySurfPrompt = !manifoldPrompt
-        && this.gravitySurfingController.canShowAttachPrompt(this.getGravitySurfingDeps())
-        ? 'Q GRAVITY SURF'
-        : null
-      this.onTelemetry({
-        speed: this.shuttleController.speed,
-        heading: this.shuttleController.heading,
-        posX: this.shuttleController.position.x,
-        posZ: this.shuttleController.position.z,
-        actionPrompt: this.currentEvaPrompt ?? manifoldPrompt ?? gravitySurfPrompt,
-        fuelLevel: ts.fuelLevel,
-        fuelCapacity: ts.fuelCapacity,
-        thrustCharge: ts.getState('thrust').charge,
-        thrustCapacity: ts.getState('thrust').capacity,
-        brakeCharge: ts.getState('brake').charge,
-        brakeCapacity: ts.getState('brake').capacity,
-        rcsCharge: ts.getState('rcs').charge,
-        rcsCapacity: ts.getState('rcs').capacity,
-        adriftCountdown:
-          this.adriftTimer > 0 ? MAP_CONFIG.ADRIFT_TIMEOUT - this.adriftTimer : -1,
-        hp: this.shipHealth?.hp ?? 100,
-        maxHp: this.shipHealth?.maxHp ?? 100,
-        temperature: this.shipHealth?.temperature ?? 0,
-        temperatureVisible: this.shipHealth?.temperatureVisible ?? false,
-        damageIntensity: this.shipHealth?.damageIntensity ?? 0,
-        compassBearings: this.computeCompassBearings(),
-      })
-    }
+    this.emitShuttleTelemetry()
 
     // Orbit HUD state
     if (this.orbitSystem && this.shuttleController && this.onOrbitState) {
@@ -3450,6 +3428,32 @@ export class MapViewController implements Tickable {
     this.emitIntroUiState()
   }
 
+  /** Skip the startup intro immediately and return the player to normal map control. */
+  skipIntro(): void {
+    const shouldAutoEnterHabitat = !this.playerProfile.hasSeenIntro
+    this.clearStartupCinematicOrbitHandoff()
+    this.mapIntro.skip()
+    this.markMapIntroSeenAndSyncProfile()
+    if (this.vehicleCamera) {
+      this.vehicleCamera.controls.enabled = true
+    }
+    this.restoreIntroMapLayers()
+    this.shuttleController?.setInputEnabled(true)
+    this.introFacade?.dispose(this.sceneObjects?.scene ?? null)
+    if (shouldAutoEnterHabitat) {
+      this.setEarthStartupOrbitHudSuppressed(true)
+      this.cancelPostStartupIntroHabitatTimer()
+      this.postStartupIntroHabitatTimerHandle = Timer.after(
+        MAP_CONFIG.POST_STARTUP_INTRO_HABITAT_DELAY_SEC,
+        () => {
+          this.postStartupIntroHabitatTimerHandle = null
+          this.tryEnterHabitatAfterStartupIntro()
+        },
+      )
+    }
+    this.emitIntroUiState()
+  }
+
   /** Start the opening cutscene only when an active startup message exists. */
   private beginStartupIntro(): void {
     if (!this.messageFacade.hasActiveMessage() || !this.vehicleCamera) {
@@ -3925,6 +3929,13 @@ export class MapViewController implements Tickable {
   private static readonly MAP_CAMERA_LIGHT_BASE_INTENSITY = 0.28
 
   /**
+   * Overscale value fed into {@link applyOrbitBloomClamp} while the turret session is
+   * active — past {@link ORBIT_BLOOM_CLAMP_OVERSCALE_END} so the clamp lerp saturates
+   * (max threshold, min strength, cameraLight → 0).
+   */
+  private static readonly TURRET_FORCE_CLAMP_OVERSCALE = 2
+
+  /**
    * Snapshot and override the bloom pass while EVA is active; restore previous values on
    * exit. Keeps the tactical-map bloom tuning intact for everything outside the EVA flow.
    */
@@ -3951,6 +3962,48 @@ export class MapViewController implements Tickable {
       bloomPass.strength = this.preEvaBloomState.strength
       this.preEvaBloomState = null
     }
+  }
+
+  /**
+   * Push a single ShuttleTelemetry frame to the HUD. Extracted so both the
+   * normal gameplay tick and the early-return turret branch can call it —
+   * the turret needs telemetry too so the MINE gauge shows live charge.
+   */
+  private emitShuttleTelemetry(): void {
+    if (!this.shuttleController || !this.onTelemetry) return
+    const ts = this.shuttleController.thrusterSystem
+    const manifoldPrompt = this.orbitalSurfingController.getAttachPrompt(this.getOrbitalSurfingDeps())
+    const gravitySurfPrompt = !manifoldPrompt
+      && this.gravitySurfingController.canShowAttachPrompt(this.getGravitySurfingDeps())
+      ? 'Q GRAVITY SURF'
+      : null
+    const turretMining = ts.getState('turretMining')
+    this.onTelemetry({
+      speed: this.shuttleController.speed,
+      heading: this.shuttleController.heading,
+      posX: this.shuttleController.position.x,
+      posZ: this.shuttleController.position.z,
+      actionPrompt: this.currentEvaPrompt ?? manifoldPrompt ?? gravitySurfPrompt,
+      fuelLevel: ts.fuelLevel,
+      fuelCapacity: ts.fuelCapacity,
+      thrustCharge: ts.getState('thrust').charge,
+      thrustCapacity: ts.getState('thrust').capacity,
+      brakeCharge: ts.getState('brake').charge,
+      brakeCapacity: ts.getState('brake').capacity,
+      rcsCharge: ts.getState('rcs').charge,
+      rcsCapacity: ts.getState('rcs').capacity,
+      turretMiningCharge: turretMining.charge,
+      turretMiningCapacity: turretMining.capacity,
+      turretActive: this.turretSessionController?.isActive ?? false,
+      adriftCountdown:
+        this.adriftTimer > 0 ? MAP_CONFIG.ADRIFT_TIMEOUT - this.adriftTimer : -1,
+      hp: this.shipHealth?.hp ?? 100,
+      maxHp: this.shipHealth?.maxHp ?? 100,
+      temperature: this.shipHealth?.temperature ?? 0,
+      temperatureVisible: this.shipHealth?.temperatureVisible ?? false,
+      damageIntensity: this.shipHealth?.damageIntensity ?? 0,
+      compassBearings: this.computeCompassBearings(),
+    })
   }
 
   /**

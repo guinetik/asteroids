@@ -23,9 +23,9 @@ describe('TurretYieldCoordinator', () => {
       onInstanceConsumed: () => {},
       onPickupFailed: () => {},
     })
-    const a = coord.register(makeHandle({ localIndex: 0 }))
-    const b = coord.register(makeHandle({ localIndex: 1 }))
-    const c = coord.register(makeHandle({ beltMeshIndex: 1, localIndex: 0 }))
+    const a = coord.register(10, makeHandle({ localIndex: 0 }))
+    const b = coord.register(20, makeHandle({ localIndex: 1 }))
+    const c = coord.register(30, makeHandle({ beltMeshIndex: 1, localIndex: 0 }))
     expect(a).not.toBe(b)
     expect(b).not.toBe(c)
     expect(a).not.toBe(c)
@@ -38,7 +38,7 @@ describe('TurretYieldCoordinator', () => {
       onInstanceConsumed: () => {},
       onPickupFailed: () => {},
     })
-    coord.register(makeHandle())
+    coord.register(0, makeHandle())
     coord.acceptYield('iron', 0.4, 0)
     expect(commit).not.toHaveBeenCalled()
     coord.acceptYield('iron', 0.5, 0)
@@ -55,7 +55,7 @@ describe('TurretYieldCoordinator', () => {
       onInstanceConsumed: () => {},
       onPickupFailed: () => {},
     })
-    coord.register(makeHandle())
+    coord.register(0, makeHandle())
     coord.acceptYield('iron', 3.7, 0)
     expect(commit).toHaveBeenCalledTimes(3)
   })
@@ -68,7 +68,7 @@ describe('TurretYieldCoordinator', () => {
       onInstanceConsumed: () => {},
       onPickupFailed: failed,
     })
-    coord.register(makeHandle())
+    coord.register(0, makeHandle())
     coord.acceptYield('iron', 3.5, 0)
     expect(commit).toHaveBeenCalledTimes(1)
     expect(failed).toHaveBeenCalledTimes(1)
@@ -83,8 +83,8 @@ describe('TurretYieldCoordinator', () => {
       onPickupFailed: () => {},
     })
     const handle = makeHandle({ beltMeshIndex: 2, localIndex: 7 })
-    coord.register(handle)
-    coord.notifyDepleted(0)
+    coord.register(42, handle)
+    coord.notifyDepleted(42)
     expect(consumed).toHaveBeenCalledTimes(1)
     expect(consumed.mock.calls[0]![0]).toBe(handle)
   })
@@ -96,7 +96,7 @@ describe('TurretYieldCoordinator', () => {
       onPickupFailed: () => {},
     })
     const handle = makeHandle({ localIndex: 3 })
-    const idx = coord.register(handle)
+    const idx = coord.register(7, handle)
     expect(coord.resolveInstance(idx)).toBe(handle)
     expect(coord.resolveInstance(99999)).toBeNull()
   })

@@ -13,5 +13,19 @@
     { "name": "Magnetite", "percentage": 35 },
     { "name": "Pyroxene", "percentage": 20 },
     { "name": "Iron-Nickel Alloy", "percentage": 10 }
+  ],
+  "kuiper-belt-small": [
+    { "name": "Water Ice", "percentage": 75 },
+    { "name": "Carbon Dioxide Ice", "percentage": 25 }
+  ],
+  "kuiper-belt-medium": [
+    { "name": "Water Ice", "percentage": 60 },
+    { "name": "Carbon Dioxide Ice", "percentage": 30 },
+    { "name": "Sodium Chloride", "percentage": 10 }
+  ],
+  "kuiper-belt-large": [
+    { "name": "Water Ice", "percentage": 45 },
+    { "name": "Carbon Dioxide Ice", "percentage": 35 },
+    { "name": "Sodium Chloride", "percentage": 20 }
   ]
 }

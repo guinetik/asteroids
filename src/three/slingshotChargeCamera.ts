@@ -8,12 +8,19 @@
 import * as THREE from 'three'
 import { MAP_ORBIT_CAMERA_CONFIG, MAP_CAMERA_CONFIG, type VehicleCameraConfig } from './VehicleCamera'
 
-/** Full-charge camera preset: closer third-person framing behind the shuttle. */
+/**
+ * Full-charge camera preset: closer third-person framing behind the shuttle.
+ *
+ * Inherits {@link MAP_ORBIT_CAMERA_CONFIG.minYRelativeToTarget} so the floor follows the
+ * planet's Y on inclined orbits — see the docs on `MAP_ORBIT_CAMERA_CONFIG` for the
+ * Neptune/Pluto bug this prevents.
+ */
 export const MAP_ORBIT_CHARGE_CAMERA_CONFIG: VehicleCameraConfig = {
   idleOffset: new THREE.Vector3(-1.4, 0.7, 0),
   lerpSpeed: MAP_ORBIT_CAMERA_CONFIG.lerpSpeed,
   idleTimeout: MAP_ORBIT_CAMERA_CONFIG.idleTimeout,
   minY: MAP_ORBIT_CAMERA_CONFIG.minY,
+  minYRelativeToTarget: MAP_ORBIT_CAMERA_CONFIG.minYRelativeToTarget,
   fov: 48,
   maxDistance: MAP_ORBIT_CAMERA_CONFIG.maxDistance,
   dampingFactor: MAP_ORBIT_CAMERA_CONFIG.dampingFactor,
@@ -45,9 +52,15 @@ export function buildSlingshotExitCameraConfig(progress: number): VehicleCameraC
       t,
     ),
     idleTimeout: 0,
-    minY: THREE.MathUtils.lerp(
-      MAP_ORBIT_CAMERA_CONFIG.minY,
-      MAP_CAMERA_CONFIG.minY === -Infinity ? -1000 : MAP_CAMERA_CONFIG.minY,
+    minY: lerpFiniteFloor(MAP_ORBIT_CAMERA_CONFIG.minY, MAP_CAMERA_CONFIG.minY, t),
+    /**
+     * Orbit framing keeps the camera floor relative to the planet (see
+     * {@link MAP_ORBIT_CAMERA_CONFIG}); free-flight has no floor at all. Ramp the relative
+     * floor toward a value low enough to be a no-op as the blend completes.
+     */
+    minYRelativeToTarget: THREE.MathUtils.lerp(
+      MAP_ORBIT_CAMERA_CONFIG.minYRelativeToTarget ?? 0,
+      -1000,
       t,
     ),
     fov: THREE.MathUtils.lerp(
@@ -57,6 +70,17 @@ export function buildSlingshotExitCameraConfig(progress: number): VehicleCameraC
     ),
     maxDistance: MAP_CAMERA_CONFIG.maxDistance,
   }
+}
+
+/**
+ * Lerp two `minY` floors while replacing `-Infinity` with a sentinel low number so the
+ * mix doesn't produce `NaN`. Free-flight uses `-Infinity`; the orbit preset now uses
+ * `-Infinity` too (the floor is supplied by `minYRelativeToTarget`), but the sentinel
+ * keeps the helper safe if either side is later changed.
+ */
+function lerpFiniteFloor(a: number, b: number, t: number): number {
+  const safe = (v: number): number => (v === -Infinity ? -1000 : v)
+  return THREE.MathUtils.lerp(safe(a), safe(b), t)
 }
 
 /**
@@ -83,9 +107,14 @@ export function buildSlingshotChargeCameraConfig(chargeLevel: number): VehicleCa
       MAP_ORBIT_CHARGE_CAMERA_CONFIG.idleTimeout,
       charge,
     ),
-    minY: THREE.MathUtils.lerp(
+    minY: lerpFiniteFloor(
       MAP_ORBIT_CAMERA_CONFIG.minY,
       MAP_ORBIT_CHARGE_CAMERA_CONFIG.minY,
+      charge,
+    ),
+    minYRelativeToTarget: THREE.MathUtils.lerp(
+      MAP_ORBIT_CAMERA_CONFIG.minYRelativeToTarget ?? 0,
+      MAP_ORBIT_CHARGE_CAMERA_CONFIG.minYRelativeToTarget ?? 0,
       charge,
     ),
     fov: THREE.MathUtils.lerp(

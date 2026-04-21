@@ -13,7 +13,6 @@ import { InputManager } from '@/lib/InputManager'
 import { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 import { getCurrentUpgradeValue } from '@/lib/upgrades'
-import { MINERAL_VISUALS } from '@/lib/asteroids/minerals'
 import type { ThrusterRuntimeModifiers, ShuttleThrusterName } from '@/lib/physics/thrusterSystem'
 import { TurretSession, type TurretSessionTickInput, type TurretPhase } from './TurretSession'
 import {
@@ -27,6 +26,12 @@ import {
   TURRET_BEAM_DPS,
   TURRET_BEAM_MAX_RANGE,
 } from './turretConstants'
+import {
+  COMPOSITION_TINT_SEED,
+  getCompositionTintColor,
+  getTurretBeltId,
+  instanceSalt,
+} from './compositionTint'
 import { TurretRigController } from '@/three/TurretRigController'
 import { TurretTractorEmitter } from '@/three/TurretTractorEmitter'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
@@ -229,7 +234,7 @@ export class TurretSessionController {
     try {
       this.yieldSystem = new RockYieldSystem({
         composition: [],
-        seed: Date.now() | 0,
+        seed: COMPOSITION_TINT_SEED,
       })
       this.yieldSystem.onConsume = (spawnIndex) => {
         this.coordinator.notifyDepleted(spawnIndex)
@@ -240,19 +245,28 @@ export class TurretSessionController {
 
       for (let beltIndex = 0; beltIndex < this.deps.beltControllers.length; beltIndex++) {
         const belt = this.deps.beltControllers[beltIndex]!
+        // Belts without a turret tier table (decorative belts, if any) are
+        // skipped so neither the beam nor the HUD tries to interpret them.
+        const turretBeltId = getTurretBeltId(belt)
+        if (!turretBeltId) continue
         for (const snap of belt.enumerateInstances()) {
-          const tier = pickTier(snap.radius)
+          const tier = pickTier(snap.radius, turretBeltId)
           const handle: TurretInstanceHandle = {
             beltIndex,
             beltMeshIndex: snap.beltMeshIndex,
             localIndex: snap.localIndex,
-          localPosition: snap.localPosition.clone(),
-          worldPosition: snap.worldPosition.clone(),
-          radius: snap.radius,
-          tierId: tier.id,
-          compositionLabel: this.formatCompositionLabel(tier.composition),
-        }
-        const spawnIndex = this.coordinator.register(handle)
+            localPosition: snap.localPosition.clone(),
+            worldPosition: snap.worldPosition.clone(),
+            radius: snap.radius,
+            tierId: tier.id,
+            compositionLabel: this.formatCompositionLabel(tier.composition),
+          }
+          // Stable salt shared with the map-init tint pass so the mineral this
+          // session rolls matches the tint the player already saw on approach.
+          const spawnIndex = this.coordinator.register(
+            instanceSalt(beltIndex, snap.beltMeshIndex, snap.localIndex),
+            handle,
+          )
           this.yieldSystem.registerRock({
             spawnIndex,
             diameter: snap.radius * 2,
@@ -264,7 +278,7 @@ export class TurretSessionController {
             belt.setInstanceBaseTint(
               snap.beltMeshIndex,
               snap.localIndex,
-              this.getCompositionTintColor(roll.itemId),
+              getCompositionTintColor(roll.itemId),
             )
           }
         }
@@ -390,29 +404,6 @@ export class TurretSessionController {
       .slice(0, 3)
       .map((entry) => `${entry.name} ${Math.round(entry.percentage)}%`)
       .join(' • ')
-  }
-
-  /** Map a rolled mineral item to a readable asteroid tint for pre-target scanning. */
-  private getCompositionTintColor(itemId: string): THREE.Color {
-    const readablePalette: Record<string, THREE.Color> = {
-      olivine: new THREE.Color(0.78, 1.95, 0.42),
-      magnetite: new THREE.Color(0.5, 0.82, 1.85),
-      pyroxene: new THREE.Color(2.05, 1.15, 0.45),
-      'iron-nickel-alloy': new THREE.Color(1.85, 1.92, 2.08),
-    }
-    const paletteColor = readablePalette[itemId]
-    if (paletteColor) return paletteColor.clone()
-
-    const fallback = new THREE.Color(1, 1, 1)
-    const label = getItemDefinition(itemId)?.label
-    if (!label) return fallback
-    const visual = MINERAL_VISUALS[label]
-    if (!visual) return fallback
-    const color = new THREE.Color(visual.color[0], visual.color[1], visual.color[2])
-    const hsl = { h: 0, s: 0, l: 0 }
-    color.getHSL(hsl)
-    color.setHSL(hsl.h, Math.min(1, hsl.s * 1.45 + 0.08), Math.min(0.72, hsl.l * 1.08 + 0.04))
-    return color
   }
 
   /** Emit a tiny spark spray at the beam contact point, matching FPS mining impacts. */

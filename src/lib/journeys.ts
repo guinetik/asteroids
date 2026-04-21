@@ -1,7 +1,10 @@
 import type { PlayerProfile } from '@/lib/player/types'
 
+/** Stable ids for journey definitions persisted on the player profile. */
 export type JourneyId = 'welcome'
+/** Feature unlock ids granted by completing journeys. */
 export type JourneyFeatureId = 'slingshot'
+/** Runtime trigger ids that can advance one or more journey steps. */
 export type JourneyTriggerId =
   | `message_archived:${string}`
   | 'shuttle_control_opened'
@@ -13,12 +16,14 @@ export type JourneyTriggerId =
   | 'upgrades_opened'
   | 'left_habitat'
 
+/** Progress meter metadata for a tracker step when a step needs sub-progress. */
 export interface JourneyTrackerStepProgress {
   current: number
   target: number
   unit: string
 }
 
+/** One visible step inside the HUD tracker for the active journey. */
 export interface JourneyTrackerStep {
   label: string
   complete: boolean
@@ -26,6 +31,7 @@ export interface JourneyTrackerStep {
   progress?: JourneyTrackerStepProgress
 }
 
+/** One top-level objective entry rendered by the shared objective tracker UI. */
 export interface JourneyTrackerEntry {
   id: string
   label: string
@@ -33,18 +39,21 @@ export interface JourneyTrackerEntry {
   steps: readonly JourneyTrackerStep[]
 }
 
+/** UI payload describing the currently active journey in tracker form. */
 export interface JourneyTrackerState {
   eyebrow: string
   title: string
   objectives: JourneyTrackerEntry[]
 }
 
+/** One authored journey step and the trigger that fulfills it. */
 interface JourneyStepDefinition {
   id: string
   label: string
   trigger: JourneyTriggerId
 }
 
+/** Full authored definition for a journey and its unlocks. */
 interface JourneyDefinition {
   id: JourneyId
   eyebrow: string
@@ -54,7 +63,9 @@ interface JourneyDefinition {
   steps: readonly JourneyStepDefinition[]
 }
 
+/** Canonical id for the onboarding journey. */
 export const WELCOME_JOURNEY_ID: JourneyId = 'welcome'
+/** Unlock granted after the onboarding journey completes. */
 export const SLINGSHOT_JOURNEY_FEATURE_ID: JourneyFeatureId = 'slingshot'
 
 const JOURNEY_DEFINITIONS: readonly JourneyDefinition[] = [
@@ -114,6 +125,7 @@ const JOURNEY_DEFINITIONS: readonly JourneyDefinition[] = [
   },
 ]
 
+/** Result payload returned after trying to apply a journey trigger. */
 export interface ApplyJourneyTriggerResult {
   profile: PlayerProfile
   changed: boolean
@@ -121,22 +133,27 @@ export interface ApplyJourneyTriggerResult {
   unlockedFeatureIds: JourneyFeatureId[]
 }
 
+/** Deduplicate persisted string lists while preserving first-seen order. */
 function uniqueStrings(values: readonly string[]): string[] {
   return [...new Set(values)]
 }
 
+/** Read the completed step ids for one journey from the player profile. */
 function getCompletedStepIds(profile: PlayerProfile, journeyId: JourneyId): string[] {
   return uniqueStrings(profile.journeyStepProgress[journeyId] ?? [])
 }
 
+/** Check whether a journey is already marked complete on the profile. */
 function isJourneyComplete(profile: PlayerProfile, journeyId: JourneyId): boolean {
   return profile.completedJourneyIds.includes(journeyId)
 }
 
+/** Public completion check used by onboarding gates elsewhere in the map flow. */
 export function hasCompletedJourney(profile: PlayerProfile, journeyId: JourneyId): boolean {
   return isJourneyComplete(profile, journeyId)
 }
 
+/** Check whether a journey-gated feature has been unlocked for the profile. */
 export function isJourneyFeatureUnlocked(
   profile: PlayerProfile,
   featureId: JourneyFeatureId,
@@ -144,6 +161,7 @@ export function isJourneyFeatureUnlocked(
   return profile.unlockedFeatureIds.includes(featureId)
 }
 
+/** Apply one runtime trigger and return any resulting journey completion/unlocks. */
 export function applyJourneyTrigger(
   profile: PlayerProfile,
   trigger: JourneyTriggerId,
@@ -197,6 +215,7 @@ export function applyJourneyTrigger(
   }
 }
 
+/** Build the HUD tracker payload for the first incomplete journey, if any remain. */
 export function buildActiveJourneyTracker(profile: PlayerProfile): JourneyTrackerState | null {
   const activeJourney = JOURNEY_DEFINITIONS.find((journey) => !isJourneyComplete(profile, journey.id))
   if (!activeJourney) return null
@@ -228,6 +247,7 @@ export function buildActiveJourneyTracker(profile: PlayerProfile): JourneyTracke
   }
 }
 
+/** Return the next visible step label for the active journey, if one remains. */
 export function getActiveJourneyNextStepLabel(profile: PlayerProfile): string | null {
   const activeJourney = JOURNEY_DEFINITIONS.find((journey) => !isJourneyComplete(profile, journey.id))
   if (!activeJourney) return null

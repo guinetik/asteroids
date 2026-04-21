@@ -7,9 +7,6 @@
  */
 import type { ShipMessageDefinition } from './messageTypes'
 
-/** Wall-clock delay before Jay's comm arrives after Marta's message is archived. */
-const JAY_FOLLOW_UP_AFTER_MARTA_DISMISS_DELAY_SEC = 10
-
 /**
  * Wall-clock delay before Jay's contract heads-up arrives in the inbox after the
  * player archives the first-slingshot message. Gives the cinematic moment time
@@ -30,7 +27,6 @@ export const STARTUP_SELLER_MESSAGE: ShipMessageDefinition = {
   sentAt: '2306-04-05 08:14 UTC',
   audioUrl: '/sound/marta-001.mp3',
   enqueueOnDismiss: ['jay-so-you-actually-did-it'],
-  enqueueOnDismissDelaySeconds: JAY_FOLLOW_UP_AFTER_MARTA_DISMISS_DELAY_SEC,
   trigger: 'map_start_earth_orbit',
   delivery: 'blocking_intro',
   priority: STARTUP_MESSAGE_PRIORITY,

@@ -102,33 +102,46 @@ function tempLabelClass(): string {
       </div>
 
       <div class="hud-thruster-gauges">
-        <div class="hud-gauge">
-          <div class="hud-gauge-track">
-            <div
-              class="hud-gauge-fill bg-red-500"
-              :style="{ height: pct(props.telemetry.thrustCharge, props.telemetry.thrustCapacity) + '%' }"
-            ></div>
+        <template v-if="props.telemetry.turretActive">
+          <div class="hud-gauge">
+            <div class="hud-gauge-track">
+              <div
+                class="hud-gauge-fill bg-cyan-400"
+                :style="{ height: pct(props.telemetry.turretMiningCharge, props.telemetry.turretMiningCapacity) + '%' }"
+              ></div>
+            </div>
+            <span class="hud-gauge-label">MINE</span>
           </div>
-          <span class="hud-gauge-label">THR</span>
-        </div>
-        <div class="hud-gauge">
-          <div class="hud-gauge-track">
-            <div
-              class="hud-gauge-fill bg-blue-500"
-              :style="{ height: pct(props.telemetry.brakeCharge, props.telemetry.brakeCapacity) + '%' }"
-            ></div>
+        </template>
+        <template v-else>
+          <div class="hud-gauge">
+            <div class="hud-gauge-track">
+              <div
+                class="hud-gauge-fill bg-red-500"
+                :style="{ height: pct(props.telemetry.thrustCharge, props.telemetry.thrustCapacity) + '%' }"
+              ></div>
+            </div>
+            <span class="hud-gauge-label">THR</span>
           </div>
-          <span class="hud-gauge-label">BRK</span>
-        </div>
-        <div class="hud-gauge">
-          <div class="hud-gauge-track">
-            <div
-              class="hud-gauge-fill bg-white"
-              :style="{ height: pct(props.telemetry.rcsCharge, props.telemetry.rcsCapacity) + '%' }"
-            ></div>
+          <div class="hud-gauge">
+            <div class="hud-gauge-track">
+              <div
+                class="hud-gauge-fill bg-blue-500"
+                :style="{ height: pct(props.telemetry.brakeCharge, props.telemetry.brakeCapacity) + '%' }"
+              ></div>
+            </div>
+            <span class="hud-gauge-label">BRK</span>
           </div>
-          <span class="hud-gauge-label">RCS</span>
-        </div>
+          <div class="hud-gauge">
+            <div class="hud-gauge-track">
+              <div
+                class="hud-gauge-fill bg-white"
+                :style="{ height: pct(props.telemetry.rcsCharge, props.telemetry.rcsCapacity) + '%' }"
+              ></div>
+            </div>
+            <span class="hud-gauge-label">RCS</span>
+          </div>
+        </template>
       </div>
 
       <div class="hud-bottom-dock__column hud-bottom-dock__column--fuel">

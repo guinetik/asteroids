@@ -8,7 +8,7 @@ describe('SHIP_MESSAGE_CATALOG', () => {
 
     expect(startup?.audioUrl).toBe('/sound/marta-001.mp3')
     expect(startup?.enqueueOnDismiss).toEqual(['jay-so-you-actually-did-it'])
-    expect(startup?.enqueueOnDismissDelaySeconds).toBe(10)
+    expect(startup?.enqueueOnDismissDelaySeconds).toBeUndefined()
   })
 
   it('includes the Jay startup follow-up with audio', () => {

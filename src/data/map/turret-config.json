@@ -17,9 +17,16 @@
     "noseOffset": { "x": 6, "y": 2, "z": 0 }
   },
   "tiers": {
-    "small":  { "radiusMax": 1.5,    "hpKg": 40,  "lootId": "asteroid-belt-small"  },
-    "medium": { "radiusMax": 3.5,    "hpKg": 180, "lootId": "asteroid-belt-medium" },
-    "large":  { "radiusMax": 999999, "hpKg": 600, "lootId": "asteroid-belt-large"  }
+    "main-belt": {
+      "small":  { "radiusMax": 1.5,    "hpKg": 40,  "lootId": "asteroid-belt-small"  },
+      "medium": { "radiusMax": 3.5,    "hpKg": 180, "lootId": "asteroid-belt-medium" },
+      "large":  { "radiusMax": 999999, "hpKg": 600, "lootId": "asteroid-belt-large"  }
+    },
+    "kuiper-belt": {
+      "small":  { "radiusMax": 0.6,    "hpKg": 30,  "lootId": "kuiper-belt-small"  },
+      "medium": { "radiusMax": 1.4,    "hpKg": 140, "lootId": "kuiper-belt-medium" },
+      "large":  { "radiusMax": 999999, "hpKg": 520, "lootId": "kuiper-belt-large"  }
+    }
   },
   "tractor": {
     "burstCount": 20,

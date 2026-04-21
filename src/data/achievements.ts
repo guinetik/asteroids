@@ -8,6 +8,7 @@
 import type { UpgradeId, UpgradeLevels } from '@/lib/upgrades'
 import type { PlayerProfile } from '@/lib/player/types'
 import { PLANETS } from '@/lib/planets/catalog'
+import { WELCOME_JOURNEY_ID, type JourneyId } from '@/lib/journeys'
 
 /** High-level achievement tab / grouping key used in the player profile UI. */
 export type AchievementCategory = 'flight' | 'missions' | 'exploration' | 'credits' | 'upgrades'
@@ -26,6 +27,7 @@ export interface AchievementDefinition {
   rewardCredits: number
   kind:
     | 'intro'
+    | 'journey_completed'
     | 'missions_completed'
     | 'unique_asteroids'
     | 'credits_balance'
@@ -34,6 +36,8 @@ export interface AchievementDefinition {
     | 'solar_body_orbit'
   threshold?: number
   upgradeId?: UpgradeId
+  /** Journey id used by `journey_completed` achievements. */
+  journeyId?: JourneyId
   /** Planet id or `"sun"` — must match keys in {@link PlayerProfile.orbitedSolarBodies}. */
   orbitBodyKey?: string
 }
@@ -102,7 +106,8 @@ export const ACHIEVEMENT_DEFINITIONS: readonly AchievementDefinition[] = [
     description: 'Complete the opening flight onboarding and take command of the solar map.',
     type: 'FLIGHT LOG',
     rewardCredits: 250,
-    kind: 'intro',
+    kind: 'journey_completed',
+    journeyId: WELCOME_JOURNEY_ID,
   },
   {
     id: 'missions-first-contract',

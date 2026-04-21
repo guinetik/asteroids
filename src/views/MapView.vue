@@ -143,6 +143,16 @@ function dismissActiveMessage(): void {
   refreshActiveMessage()
 }
 
+function handleWindowKeydown(event: KeyboardEvent): void {
+  if (event.key !== 'Escape') return
+  if (!mapExperienceStarted.value || portalWelcomeVisible.value) return
+  if (!mapIntro.controlsLocked) return
+  event.preventDefault()
+  viewController.skipIntro()
+  syncPersistentProgressFromController()
+  refreshActiveMessage()
+}
+
 function messagePromptLabel(): string {
   return pendingMessageCount.value === 1
     ? 'You have 1 new message'
@@ -162,6 +172,9 @@ const telemetry = reactive<ShuttleTelemetry>({
   brakeCapacity: 0,
   rcsCharge: 0,
   rcsCapacity: 0,
+  turretMiningCharge: 0,
+  turretMiningCapacity: 0,
+  turretActive: false,
   adriftCountdown: -1,
   hp: 100,
   maxHp: 100,
@@ -498,6 +511,7 @@ function syncPersistentProgressFromController(): void {
 }
 
 onMounted(async () => {
+  window.addEventListener('keydown', handleWindowKeydown)
   if (container.value) {
     viewController.onTelemetry = (t) => {
       Object.assign(telemetry, t)
@@ -611,6 +625,8 @@ onMounted(async () => {
     }
     viewController.onJourneyTracker = (state) => {
       journeyTracker.value = state
+      syncPersistentProgressFromController()
+      shopProfile.value = viewController.getPlayerProfileSnapshot()
     }
     viewController.onShopButton = (visible, planetName) => {
       shopButtonVisible.value = visible
@@ -690,6 +706,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('keydown', handleWindowKeydown)
   clearPickupUi()
   setShipMessageFollowUpDeliveryListener(null)
   stopBackgroundMusic('map')
@@ -1114,7 +1131,7 @@ watch(
     @dismiss="dismissActiveMessage"
   />
   <ObjectiveTracker
-    v-if="journeyTracker && !mapBootOverlayVisible"
+    v-if="journeyTracker && !mapBootOverlayVisible && !mapIntro.controlsLocked"
     :eyebrow="journeyTracker.eyebrow"
     :title="journeyTracker.title"
     :objectives="journeyTracker.objectives"

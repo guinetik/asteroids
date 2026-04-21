@@ -32,6 +32,7 @@ const selectedFolderId = ref<string>(DEFAULT_INBOX_FOLDER_ID)
 const rows = ref<ShipMessageInboxRow[]>(shipMessageSystem.listInboxRows(selectedFolderId.value))
 const selectedId = ref<string | null>(null)
 const selectedAudioAutoplayToken = ref(0)
+const readerRefreshToken = ref(0)
 
 function refreshFolders(): void {
   folders.value = shipMessageSystem.listFolders()
@@ -44,9 +45,11 @@ function refreshRows(): void {
 function refreshAll(): void {
   refreshFolders()
   refreshRows()
+  readerRefreshToken.value += 1
 }
 
 const readable = computed<ShipMessageReadable | null>(() => {
+  readerRefreshToken.value
   if (!selectedId.value) return null
   return shipMessageSystem.getReadableShipMessage(selectedId.value)
 })

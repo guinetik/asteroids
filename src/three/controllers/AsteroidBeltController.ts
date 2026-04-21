@@ -90,6 +90,7 @@ interface BeltInstanceData {
   baseColors: THREE.Color[]
 }
 
+/** One temporary mining-hit flash entry tracked until the tint settles back. */
 interface ActiveMiningFlash {
   mesh: THREE.InstancedMesh
   localIndex: number
@@ -100,6 +101,13 @@ interface ActiveMiningFlash {
 /**
  * Extract all Mesh geometries from a loaded GLB scene.
  * Returns pairs of [geometry, material] for each unique mesh found.
+ *
+ * Also ensures each geometry has a white `color` attribute so Three.js
+ * enables `USE_COLOR` when `material.vertexColors = true`. Without this,
+ * `mesh.instanceColor` populates `vColor` in the vertex shader but
+ * `color_fragment` never multiplies it into `diffuseColor` (see
+ * Three.js 0.183 shader chunk: that multiply is gated on `USE_COLOR`,
+ * not on `USE_INSTANCING_COLOR`), so per-instance tints silently fail.
  */
 function extractGeometries(
   glbScene: THREE.Group,
@@ -107,13 +115,41 @@ function extractGeometries(
   const results: { geometry: THREE.BufferGeometry; material: THREE.Material }[] = []
   glbScene.traverse((child) => {
     if (child instanceof THREE.Mesh && child.geometry) {
+      const geometry = child.geometry.clone()
+      if (!geometry.getAttribute('color')) {
+        const position = geometry.getAttribute('position')
+        if (position) {
+          const colors = new Float32Array(position.count * 3)
+          colors.fill(1)
+          geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+        }
+      }
       results.push({
-        geometry: child.geometry.clone(),
+        geometry,
         material: (Array.isArray(child.material) ? child.material[0]! : child.material).clone(),
       })
     }
   })
   return results
+}
+
+/**
+ * Inject a per-instance tint multiplier into the emissive term so asteroids
+ * glow their composition colour even under very dim ambient (which is the
+ * whole map scene). Without this, the `instanceColor` only reaches the
+ * diffuse term, and diffuse is near zero in deep-space lighting — so every
+ * asteroid reads as the uniform belt emissive colour instead of its tint.
+ */
+function patchInstancedColorEmissive(material: THREE.Material): void {
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <emissivemap_fragment>',
+      `#include <emissivemap_fragment>
+      #ifdef USE_COLOR
+        totalEmissiveRadiance *= vColor.rgb;
+      #endif`,
+    )
+  }
 }
 
 /**
@@ -255,7 +291,7 @@ export class AsteroidBeltController {
         material.metalness = THREE.MathUtils.clamp(material.metalness, 0.08, 0.2)
         const ec = belt.emissiveColor ?? [0.018, 0.018, 0.022]
         material.emissive = new THREE.Color(ec[0], ec[1], ec[2])
-        material.emissiveIntensity = 0.05
+        material.emissiveIntensity = 0.35
         material.vertexColors = true
         material.needsUpdate = true
       } else if (material instanceof THREE.MeshPhongMaterial) {
@@ -264,9 +300,12 @@ export class AsteroidBeltController {
         material.vertexColors = true
         material.needsUpdate = true
       }
+      // Route vColor into the emissive term too — otherwise composition tints
+      // only reach diffuse, which is near-black in deep-space lighting and
+      // every asteroid reads as the uniform belt emissive colour.
+      patchInstancedColorEmissive(material)
 
       const instancedMesh = new THREE.InstancedMesh(geometry, material, count)
-      instancedMesh.frustumCulled = false
       instancedMesh.layers.enable(TURRET_MINING_LIGHT_LAYER)
 
       const baseMatrices: THREE.Matrix4[] = []
@@ -322,6 +361,11 @@ export class AsteroidBeltController {
       }
 
       instancedMesh.instanceMatrix.needsUpdate = true
+      // Compute the bounding sphere from all instance matrices so frustum
+      // culling is accurate — otherwise Three.js would test the single-
+      // asteroid geometry sphere and over-cull. This lets Kuiper skip the
+      // vertex shader entirely when the camera is at Earth looking sunward.
+      instancedMesh.computeBoundingSphere()
       controller.group.add(instancedMesh)
 
       controller.instanceDataList.push({

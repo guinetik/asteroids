@@ -145,6 +145,12 @@ const SHUTTLE_HULL_MAX_CLEARCOAT = 0.02
 const SHUTTLE_HULL_MIN_CLEARCOAT_ROUGHNESS = 0.94
 const SHUTTLE_HULL_MAX_PHONG_SHININESS = 3
 const SHUTTLE_HULL_PHONG_SPECULAR_SCALE = 0.12
+/**
+ * Scalar applied to the hull albedo so the summed diffuse contribution from ambient,
+ * hemisphere, directional, sun, and camera-fill lights can't blow past the map bloom
+ * threshold when the turret camera is mounted on the nose and yawed back at the hull.
+ */
+const SHUTTLE_HULL_COLOR_SCALE = 0.7
 
 /**
  * Controls the shuttle model — loading, door animation, movement, and nozzle placement.
@@ -227,6 +233,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
 
   /**
    * Begin a locked slingshot burst that decays to the stable lane speed.
+   * Burst and cruise multipliers come only from the slingshot upgrade — not thruster speed.
    *
    * @param finalSpeed - Physics exit speed magnitude from orbit launch (before upgrade tuning).
    * @param burstMultiplier - Immediate burst multiplier applied at launch.
@@ -701,12 +708,15 @@ export class ShuttleController implements Tickable, PortalVehicle {
   private updateMovement(dt: number): void {
     const p = this.physics
     const speedUpgradeMultiplier = getCurrentUpgradeValue('shuttleThrusterSpeed')
-    const upgradedMaxThrustSpeed = p.maxThrustSpeed * speedUpgradeMultiplier
+    /** Baseline caps from JSON — slingshot protection/decay must not depend on thruster upgrades. */
+    const baseMaxThrustSpeed = p.maxThrustSpeed
+    const baseMaxGravitySpeed = p.maxGravitySpeed
+    const upgradedMaxThrustSpeed = baseMaxThrustSpeed * speedUpgradeMultiplier
     const upgradedCruiseEquilibrium =
       (p.speedReturnEquilibriumSpeed === undefined
-        ? p.maxThrustSpeed
+        ? baseMaxThrustSpeed
         : p.speedReturnEquilibriumSpeed) * speedUpgradeMultiplier
-    const upgradedMaxGravitySpeed = p.maxGravitySpeed * speedUpgradeMultiplier
+    const upgradedMaxGravitySpeed = baseMaxGravitySpeed * speedUpgradeMultiplier
 
     // Yaw (A/D) — apply angular torque, builds up angular velocity
     if (this.isYawingLeft) {
@@ -757,20 +767,32 @@ export class ShuttleController implements Tickable, PortalVehicle {
     forward.normalize()
     if (this.isThrusting) {
       const speedSq = this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z
-      let thrustMultiplier = p.thrustAlignMaxMultiplier
-      if (speedSq > SHUTTLE_VELOCITY_ALIGN_EPSILON * SHUTTLE_VELOCITY_ALIGN_EPSILON) {
-        const speed = Math.sqrt(speedSq)
-        const forwardAlign = Math.max(0, Math.min(1, this.velocity.dot(forward) / speed))
-        thrustMultiplier = THREE.MathUtils.lerp(
-          p.thrustAlignMinMultiplier,
-          p.thrustAlignMaxMultiplier,
-          forwardAlign,
+      const planarSpeed =
+        speedSq > SHUTTLE_VELOCITY_ALIGN_EPSILON * SHUTTLE_VELOCITY_ALIGN_EPSILON
+          ? Math.sqrt(speedSq)
+          : 0
+      /**
+       * Above the thruster-tier speed ceiling, main engine does nothing: avoids breaking slingshot
+       * protection (and speed clamps) and prevents misaligned thrust from shaving coast speed.
+       */
+      if (planarSpeed <= upgradedMaxThrustSpeed + SHUTTLE_VELOCITY_ALIGN_EPSILON) {
+        let thrustMultiplier = p.thrustAlignMaxMultiplier
+        if (planarSpeed > SHUTTLE_VELOCITY_ALIGN_EPSILON) {
+          const forwardAlign = Math.max(
+            0,
+            Math.min(1, this.velocity.dot(forward) / planarSpeed),
+          )
+          thrustMultiplier = THREE.MathUtils.lerp(
+            p.thrustAlignMinMultiplier,
+            p.thrustAlignMaxMultiplier,
+            forwardAlign,
+          )
+        }
+        this.velocity.addScaledVector(
+          forward,
+          p.thrustForce * speedUpgradeMultiplier * thrustMultiplier * dt,
         )
       }
-      this.velocity.addScaledVector(
-        forward,
-        p.thrustForce * getCurrentUpgradeValue('shuttleThrusterSpeed') * thrustMultiplier * dt,
-      )
     }
 
     // Brake (S) — inertia dampener, weaker deeper in gravity wells
@@ -827,9 +849,9 @@ export class ShuttleController implements Tickable, PortalVehicle {
       }
     }
 
-    // Decay slingshot speed protection
-    if (!this.slingshotBurstActive && this._slingshotSpeed > upgradedMaxThrustSpeed) {
-      const excess = this._slingshotSpeed - upgradedMaxThrustSpeed
+    // Decay slingshot speed protection (floor uses base cap only — independent of thruster upgrades)
+    if (!this.slingshotBurstActive && this._slingshotSpeed > baseMaxThrustSpeed) {
+      const excess = this._slingshotSpeed - baseMaxThrustSpeed
       this._slingshotSpeed -= excess * orbitConfig.slingshotDecayRate * dt
     }
 
@@ -841,11 +863,19 @@ export class ShuttleController implements Tickable, PortalVehicle {
     const currentSpeed = this.velocity.length()
     const slingshotProtected =
       this.slingshotBurstActive ||
-      (this._slingshotSpeed > upgradedMaxThrustSpeed &&
+      (this._slingshotSpeed > baseMaxThrustSpeed &&
         currentSpeed <= this._slingshotSpeed + SLINGSHOT_PROTECT_SPEED_EPSILON)
 
+    const coastingAboveThrustCap =
+      this.isThrusting && currentSpeed > upgradedMaxThrustSpeed + SHUTTLE_VELOCITY_ALIGN_EPSILON
+
     // Bleed maneuver / thrust overshoot back toward cruise without snapping heading
-    if (!slingshotProtected && p.speedExcessReturnRate > 0 && upgradedCruiseEquilibrium >= 0) {
+    if (
+      !slingshotProtected &&
+      !coastingAboveThrustCap &&
+      p.speedExcessReturnRate > 0 &&
+      upgradedCruiseEquilibrium >= 0
+    ) {
       const spd = this.velocity.length()
       if (spd > upgradedCruiseEquilibrium + SHUTTLE_VELOCITY_ALIGN_EPSILON) {
         const excess = spd - upgradedCruiseEquilibrium
@@ -855,7 +885,11 @@ export class ShuttleController implements Tickable, PortalVehicle {
       }
     }
 
-    if (!slingshotProtected && this.velocity.length() > upgradedMaxGravitySpeed) {
+    if (
+      !slingshotProtected &&
+      !coastingAboveThrustCap &&
+      this.velocity.length() > upgradedMaxGravitySpeed
+    ) {
       this.velocity.setLength(upgradedMaxGravitySpeed)
     }
 
@@ -947,6 +981,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
         material.side = THREE.DoubleSide
 
         if (material instanceof THREE.MeshStandardMaterial) {
+          material.color.multiplyScalar(SHUTTLE_HULL_COLOR_SCALE)
           material.roughness = Math.max(material.roughness, SHUTTLE_HULL_MIN_ROUGHNESS)
           material.metalness = Math.min(material.metalness, SHUTTLE_HULL_MAX_METALNESS)
           material.envMapIntensity = Math.min(
