@@ -263,5 +263,38 @@
     "baseCost": 2000,
     "maxLevel": 3,
     "valuesByLevel": [1.0, 1.15, 1.35, 1.5]
+  },
+  {
+    "id": "turretMiningUnlock",
+    "category": "shuttle",
+    "label": "Mining Turret Mount",
+    "description": "Installs a hull-mounted mining laser. Press T from the map to operate.",
+    "baseCost": 2500,
+    "maxLevel": 1,
+    "valuesByLevel": [0, 1],
+    "hiddenFromShop": false,
+    "excludeFromMissionDifficulty": true
+  },
+  {
+    "id": "turretMiningYield",
+    "category": "shuttle",
+    "label": "Turret Focus Array",
+    "description": "Tighter beam focus extracts more ore per second.",
+    "baseCost": 1800,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 1.35, 1.75, 2.25],
+    "hiddenFromShop": false,
+    "excludeFromMissionDifficulty": true
+  },
+  {
+    "id": "turretMiningEfficiency",
+    "category": "shuttle",
+    "label": "Turret Power Regulator",
+    "description": "Reduces fuel consumption while the mining beam is active.",
+    "baseCost": 1800,
+    "maxLevel": 3,
+    "valuesByLevel": [1.0, 0.75, 0.55, 0.4],
+    "hiddenFromShop": false,
+    "excludeFromMissionDifficulty": true
   }
 ]

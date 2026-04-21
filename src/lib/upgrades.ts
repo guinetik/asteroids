@@ -77,6 +77,9 @@ export type UpgradeId =
   | 'suitStaminaEfficiency'
   | 'suitO2Capacity'
   | 'suitMobility'
+  | 'turretMiningUnlock'
+  | 'turretMiningYield'
+  | 'turretMiningEfficiency'
 
 /** Runtime player upgrade levels keyed by upgrade id. */
 export type UpgradeLevels = Partial<Record<UpgradeId, number>>

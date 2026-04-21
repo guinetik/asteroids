@@ -28,10 +28,10 @@ import {
 } from '../upgradeStorage'
 
 /** Total number of upgrades defined in the JSON. */
-const EXPECTED_UPGRADE_COUNT = 29
+const EXPECTED_UPGRADE_COUNT = 32
 
 describe('UPGRADE_DEFINITIONS', () => {
-  it('loads all 29 upgrades from JSON', () => {
+  it('loads all 32 upgrades from JSON', () => {
     const ids = Object.keys(UPGRADE_DEFINITIONS)
     expect(ids).toHaveLength(EXPECTED_UPGRADE_COUNT)
   })
@@ -64,7 +64,7 @@ describe('CURRENT_PLAYER_UPGRADE_LEVELS', () => {
     resetPlayerUpgradesToDefaults()
   })
 
-  it('initializes all 29 upgrades to level 0', () => {
+  it('initializes all 32 upgrades to level 0', () => {
     const keys = Object.keys(CURRENT_PLAYER_UPGRADE_LEVELS)
     expect(keys).toHaveLength(EXPECTED_UPGRADE_COUNT)
     for (const level of Object.values(CURRENT_PLAYER_UPGRADE_LEVELS)) {
@@ -154,8 +154,8 @@ describe('getUpgradeCost', () => {
 })
 
 describe('getUpgradesByCategory', () => {
-  it('returns 12 shuttle upgrades (shop-visible only)', () => {
-    expect(getUpgradesByCategory('shuttle')).toHaveLength(12)
+  it('returns 15 shuttle upgrades (shop-visible only)', () => {
+    expect(getUpgradesByCategory('shuttle')).toHaveLength(15)
   })
 
   it('omits Gravity Surfing from shuttle shop list', () => {
@@ -214,5 +214,33 @@ describe('getShuttleThrusterEfficiencyModifiers', () => {
       brake: 1,
       rcs: 1,
     })
+  })
+})
+
+describe('turret mining upgrades', () => {
+  afterEach(() => {
+    resetPlayerUpgradesToDefaults()
+  })
+
+  it('turretMiningUnlock starts locked at level 0 and unlocks at level 1', () => {
+    expect(getCurrentUpgradeValue('turretMiningUnlock')).toBe(0)
+    CURRENT_PLAYER_UPGRADE_LEVELS.turretMiningUnlock = 1
+    expect(getCurrentUpgradeValue('turretMiningUnlock')).toBe(1)
+  })
+
+  it('turretMiningYield scales across levels', () => {
+    expect(getCurrentUpgradeValue('turretMiningYield')).toBe(1.0)
+    CURRENT_PLAYER_UPGRADE_LEVELS.turretMiningYield = 1
+    expect(getCurrentUpgradeValue('turretMiningYield')).toBe(1.35)
+    CURRENT_PLAYER_UPGRADE_LEVELS.turretMiningYield = 3
+    expect(getCurrentUpgradeValue('turretMiningYield')).toBe(2.25)
+  })
+
+  it('turretMiningEfficiency scales down across levels', () => {
+    expect(getCurrentUpgradeValue('turretMiningEfficiency')).toBe(1.0)
+    CURRENT_PLAYER_UPGRADE_LEVELS.turretMiningEfficiency = 1
+    expect(getCurrentUpgradeValue('turretMiningEfficiency')).toBe(0.75)
+    CURRENT_PLAYER_UPGRADE_LEVELS.turretMiningEfficiency = 3
+    expect(getCurrentUpgradeValue('turretMiningEfficiency')).toBe(0.4)
   })
 })
