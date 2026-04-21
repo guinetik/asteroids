@@ -104,6 +104,9 @@ export class TurretSession {
           this._phase = 'closing'
           return
         }
+        if (this._fadeOpacity > 0) {
+          this._fadeOpacity = Math.max(0, this._fadeOpacity - dt / TURRET_FADE_OUT_DURATION)
+        }
         this.deps.tickActive(input, dt)
         return
       }

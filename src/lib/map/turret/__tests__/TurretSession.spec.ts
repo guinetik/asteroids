@@ -86,4 +86,16 @@ describe('TurretSession', () => {
     expect(deps.onOpen).toHaveBeenCalledTimes(1)
     expect(session.phase).toBe('active')
   })
+
+  it('fades back out during active to reveal the turret view', () => {
+    session.open()
+    // Fade in
+    session.tick(TURRET_FADE_IN_DURATION, { exitPressed: false })
+    expect(session.phase).toBe('active')
+    expect(session.fadeOpacity).toBeGreaterThanOrEqual(TURRET_OPENING_COMPLETE_THRESHOLD)
+    // First active tick begins the reveal fade-out
+    session.tick(TURRET_FADE_OUT_DURATION, { exitPressed: false })
+    expect(session.phase).toBe('active')
+    expect(session.fadeOpacity).toBe(0)
+  })
 })
