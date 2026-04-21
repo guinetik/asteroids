@@ -4,8 +4,10 @@ import { TurretYieldCoordinator, type TurretInstanceHandle } from '../TurretYiel
 
 function makeHandle(overrides: Partial<TurretInstanceHandle> = {}): TurretInstanceHandle {
   return {
+    beltIndex: 0,
     beltMeshIndex: 0,
     localIndex: 0,
+    localPosition: new Vector3(),
     worldPosition: new Vector3(),
     radius: 1,
     tierId: 'small',

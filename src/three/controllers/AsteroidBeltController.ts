@@ -154,13 +154,15 @@ function sampleYOffset(thicknessDeg: number): number {
   return rayleigh * (Math.random() < 0.5 ? 1 : -1)
 }
 
-/** World-space snapshot of a belt instance for turret raycast. */
+/** Snapshot of a belt instance for turret raycast (both local + world). */
 export interface AsteroidInstanceSnapshot {
   /** Index into AsteroidBeltController's internal mesh list. */
   beltMeshIndex: number
   /** Instance index within that mesh. */
   localIndex: number
-  /** World-space position at snapshot time. */
+  /** Belt-local position (stable; belt group rotates around this). */
+  localPosition: THREE.Vector3
+  /** World-space position at snapshot time (re-derive each frame if the belt rotates). */
   worldPosition: THREE.Vector3
   /** Collision radius in world units (already scaled by belt transform). */
   radius: number
@@ -339,17 +341,33 @@ export class AsteroidBeltController {
       const data = this.instanceDataList[meshIndex]!
       const visibleCount = data.mesh.count
       for (let i = 0; i < visibleCount; i++) {
-        scratch.copy(data.localPositions[i]!)
+        const localPosition = data.localPositions[i]!
+        scratch.copy(localPosition)
         this.group.localToWorld(scratch)
         result.push({
           beltMeshIndex: meshIndex,
           localIndex: i,
+          localPosition: localPosition.clone(),
           worldPosition: scratch.clone(),
           radius: data.collisionRadii[i]!,
         })
       }
     }
     return result
+  }
+
+  /**
+   * Re-derive the world-space position of a single registered instance using
+   * the belt group's current matrix. Used by the turret session each frame so
+   * the raycast stays accurate while the belt rotates.
+   *
+   * @param localPosition - Belt-local position captured at registration.
+   * @param out - Vector3 to write the world position into.
+   */
+  projectInstanceToWorld(localPosition: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
+    out.copy(localPosition)
+    this.group.localToWorld(out)
+    return out
   }
 
   /**

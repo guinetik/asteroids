@@ -13,11 +13,19 @@ import { TURRET_YIELD_COMMIT_GRANULARITY_KG } from './turretConstants'
 
 /** Per-instance handle a coordinator stores for lookup/hide callbacks. */
 export interface TurretInstanceHandle {
+  /** Index of the owning belt in `TurretSessionControllerDeps.beltControllers`. */
+  readonly beltIndex: number
   /** Which belt mesh (index into AsteroidBeltController.instanceDataList) owns the instance. */
   readonly beltMeshIndex: number
   /** Instance index within that mesh. */
   readonly localIndex: number
-  /** World-space sphere center (snapshotted at turret-open time; sim is frozen). */
+  /** Belt-local position — stable across belt rotation; used to re-derive world each frame. */
+  readonly localPosition: Vector3
+  /**
+   * World-space sphere center. Mutable: refreshed each tick from
+   * {@link localPosition} via the belt group's current matrix so the raycast
+   * tracks the rotating belt.
+   */
   readonly worldPosition: Vector3
   /** Collision radius in world units. */
   readonly radius: number

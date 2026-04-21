@@ -170,14 +170,14 @@ export class TurretSessionController {
   // ----- internals -----
 
   private handleOpen(): void {
-    // Freeze the shuttle FIRST — it ticks on its own via TickHandler, so
-    // MapViewController's early-return doesn't stop it. Mirror EVA's
-    // vehicle.freeze() + setInputEnabled(false) pattern.
+    // Disable shuttle input so the player can't steer from inside the turret,
+    // but DO NOT freeze physics — the ship should coast with whatever velocity
+    // it had (typically matched to the belt's rotation) so asteroids stay
+    // roughly stationary relative to the camera.
     this.deps.shuttleController.setInputEnabled(false)
-    this.deps.shuttleController.freeze()
 
-    // Visual setup SECOND, so even if mining registration throws we still
-    // show the turret view instead of silently reverting to the map view.
+    // Visual setup, so even if mining registration throws we still show the
+    // turret view instead of silently reverting to the map view.
     this.aim = createTurretAimState()
     this.rig.attach()
     this.rig.applyAim(this.aim)
@@ -186,7 +186,7 @@ export class TurretSessionController {
     this.deps.host.setActiveCamera(this.rig.camera)
     this.requestPointerLock()
 
-    // Now register belt asteroids for mining. If any step fails we log
+    // Register belt asteroids for mining. If any step fails we log
     // and continue — beam won't hit anything but the FP view still works.
     try {
       this.yieldSystem = new RockYieldSystem({
@@ -200,12 +200,15 @@ export class TurretSessionController {
         this.coordinator.acceptYield(itemId, kg, spawnIndex)
       }
 
-      for (const belt of this.deps.beltControllers) {
+      for (let beltIndex = 0; beltIndex < this.deps.beltControllers.length; beltIndex++) {
+        const belt = this.deps.beltControllers[beltIndex]!
         for (const snap of belt.enumerateInstances()) {
           const tier = pickTier(snap.radius)
           const handle: TurretInstanceHandle = {
+            beltIndex,
             beltMeshIndex: snap.beltMeshIndex,
             localIndex: snap.localIndex,
+            localPosition: snap.localPosition.clone(),
             worldPosition: snap.worldPosition.clone(),
             radius: snap.radius,
             tierId: tier.id,
@@ -235,8 +238,7 @@ export class TurretSessionController {
     this.yieldSystem = null
     this.firing = false
     this.mouseFireHeld = false
-    // Release the shuttle so flight controls work again on the map.
-    this.deps.shuttleController.unfreeze()
+    // Restore shuttle input; we never froze physics so there's nothing to unfreeze.
     this.deps.shuttleController.setInputEnabled(true)
   }
 
@@ -246,8 +248,11 @@ export class TurretSessionController {
     this.mouseDy = 0
     this.rig.applyAim(this.aim)
 
-    // Raycast every active tick — crosshair reflects target validity whether
-    // or not we're firing. FPS convention.
+    // Refresh asteroid world positions — the belt rotates while turret is
+    // active, so cached snapshots drift each frame. Then raycast.
+    this.refreshTargetWorldPositions()
+    // Crosshair reflects target validity whether or not we're firing (FPS
+    // convention).
     this.rig.camera.getWorldPosition(this.rayOrigin)
     this.rig.camera.getWorldDirection(this.rayDir)
     const hit = raycastBeam(
@@ -305,10 +310,22 @@ export class TurretSessionController {
     }
   }
 
-  private onInstanceConsumed(handle: TurretInstanceHandle): void {
-    for (const belt of this.deps.beltControllers) {
-      belt.hideInstance(handle.beltMeshIndex, handle.localIndex)
+  /**
+   * Refresh every registered asteroid's `worldPosition` from its stored
+   * belt-local position via the belt group's current matrix. Called each
+   * active tick so the raycast tracks belt rotation while the ship coasts.
+   */
+  private refreshTargetWorldPositions(): void {
+    for (const { handle } of this.coordinator.listInstances()) {
+      const belt = this.deps.beltControllers[handle.beltIndex]
+      if (!belt) continue
+      belt.projectInstanceToWorld(handle.localPosition, handle.worldPosition)
     }
+  }
+
+  private onInstanceConsumed(handle: TurretInstanceHandle): void {
+    const belt = this.deps.beltControllers[handle.beltIndex]
+    belt?.hideInstance(handle.beltMeshIndex, handle.localIndex)
     this.tractor.spawnBurst(handle.worldPosition)
     this.rebuildTargetList()
   }
