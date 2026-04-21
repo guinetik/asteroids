@@ -246,23 +246,27 @@ export class TurretSessionController {
     this.mouseDy = 0
     this.rig.applyAim(this.aim)
 
+    // Raycast every active tick — crosshair reflects target validity whether
+    // or not we're firing. FPS convention.
+    this.rig.camera.getWorldPosition(this.rayOrigin)
+    this.rig.camera.getWorldDirection(this.rayDir)
+    const hit = raycastBeam(
+      this.rayOrigin,
+      this.rayDir,
+      TURRET_BEAM_MAX_RANGE,
+      this.targetInstances,
+    )
+    const reticleValid = hit !== null
+
     this.firing = this.mouseFireHeld
     const thrusterSystem = this.deps.shuttleController.thrusterSystem
     const modifiers = this.buildThrusterModifiers()
     const canFire = thrusterSystem.canFire('turretMining' as ShuttleThrusterName, modifiers)
     const beamActive = this.firing && canFire
-    if (this.firing && !canFire) {
-      console.log('[Turret] firing but canFire=false — turretMining charge depleted or modifier=0')
-    }
 
-    let reticleValid = false
     if (beamActive) {
-      this.rig.camera.getWorldPosition(this.rayOrigin)
-      this.rig.camera.getWorldDirection(this.rayDir)
-      const hit = raycastBeam(this.rayOrigin, this.rayDir, TURRET_BEAM_MAX_RANGE, this.targetInstances)
       const length = hit?.distance ?? TURRET_BEAM_MAX_RANGE
       this.rig.showBeam(length)
-      reticleValid = hit !== null
       if (hit && this.yieldSystem) {
         const yieldMult = getCurrentUpgradeValue('turretMiningYield')
         const kg = TURRET_BEAM_DPS * dt * yieldMult
@@ -335,13 +339,11 @@ export class TurretSessionController {
     if (event.button !== 0) return
     if (!this.session.isActive || this.session.phase !== 'active') return
     this.mouseFireHeld = true
-    console.log('[Turret] fire down')
   }
 
   private mouseUpHandler = (event: MouseEvent): void => {
     if (event.button !== 0) return
     this.mouseFireHeld = false
-    console.log('[Turret] fire up')
   }
 
   private attachMouseListener(): void {

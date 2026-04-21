@@ -103,7 +103,6 @@ export class TurretRigController {
   /** Show the beam at the given length (meters from muzzle along camera forward). */
   showBeam(lengthMeters: number): void {
     const clamped = Math.min(Math.max(lengthMeters, 0.01), TURRET_BEAM_MAX_RANGE)
-    // Update the far endpoint only; muzzle stays pinned.
     this.beamPositions[5] = BEAM_MUZZLE_OFFSET.z - clamped
     const attr = this.beamGeometry.getAttribute('position') as THREE.BufferAttribute
     attr.needsUpdate = true
