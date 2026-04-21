@@ -22,10 +22,11 @@ const RETICLE_DISTANCE = 5
  * Yaw offset applied to turretBase so the camera's default -Z forward aligns
  * with the shuttle's local +X forward (the convention used elsewhere, e.g.
  * `ShuttleController.forward` built from `new Vector3(1,0,0).applyQuaternion`).
- * Without this, the camera points 90° off the shuttle nose, which is inside
- * the hull.
+ * `-π/2` rotates the camera's -Z to point along +X; `+π/2` points the
+ * opposite way (tail), which is the bug that left the player looking
+ * backward at the shuttle's fin.
  */
-const SHUTTLE_FORWARD_YAW_OFFSET = Math.PI / 2
+const SHUTTLE_FORWARD_YAW_OFFSET = -Math.PI / 2
 
 /** Rig for the active turret session. Parented under {@link shuttleGroup} on build. */
 export class TurretRigController {
