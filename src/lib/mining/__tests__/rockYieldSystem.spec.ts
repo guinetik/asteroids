@@ -178,3 +178,50 @@ describe('RockYieldSystem', () => {
     expect(sys.peekRock(0)?.itemId).not.toBe(targetId)
   })
 })
+
+describe('RockYieldSystem.registerRock — overrides', () => {
+  it('uses compositionOverride when provided', () => {
+    const baseComposition: MineralEntry[] = [{ name: 'Olivine', percentage: 100 }]
+    const override: MineralEntry[] = [{ name: 'Pyroxene', percentage: 100 }]
+    const system = new RockYieldSystem({ composition: baseComposition, seed: 1 })
+    system.registerRock({ spawnIndex: 0, diameter: 1, compositionOverride: override })
+    const roll = system.peekRock(0)
+    expect(roll).not.toBeNull()
+    expect(roll!.itemId).toBe('pyroxene')
+  })
+
+  it('uses totalKgOverride when provided', () => {
+    const composition: MineralEntry[] = [{ name: 'Olivine', percentage: 100 }]
+    const system = new RockYieldSystem({ composition, seed: 1 })
+    system.registerRock({ spawnIndex: 0, diameter: 1, totalKgOverride: 250 })
+    const roll = system.peekRock(0)
+    expect(roll).not.toBeNull()
+    expect(roll!.totalKg).toBe(250)
+    expect(roll!.remainingKg).toBe(250)
+  })
+
+  it('applies both overrides together', () => {
+    const base: MineralEntry[] = [{ name: 'Olivine', percentage: 100 }]
+    const override: MineralEntry[] = [{ name: 'Pyroxene', percentage: 100 }]
+    const system = new RockYieldSystem({ composition: base, seed: 1 })
+    system.registerRock({
+      spawnIndex: 0,
+      diameter: 1,
+      compositionOverride: override,
+      totalKgOverride: 500,
+    })
+    const roll = system.peekRock(0)
+    expect(roll!.itemId).toBe('pyroxene')
+    expect(roll!.totalKg).toBe(500)
+  })
+
+  it('falls back to constructor composition and diameter-based HP when overrides absent', () => {
+    const composition: MineralEntry[] = [{ name: 'Olivine', percentage: 100 }]
+    const system = new RockYieldSystem({ composition, seed: 1 })
+    system.registerRock({ spawnIndex: 0, diameter: 2 })
+    const roll = system.peekRock(0)
+    expect(roll!.itemId).toBe('olivine')
+    // totalKg computed from diameter — just verify it's set and positive
+    expect(roll!.totalKg).toBeGreaterThan(0)
+  })
+})

@@ -48,8 +48,12 @@ interface RockRoll {
 export interface RockYieldSpawn {
   /** Stable index used by both the mesh layer and collider id. */
   spawnIndex: number
-  /** Diameter in world units, used to compute total kg. */
+  /** Diameter in world units, used to compute total kg when {@link totalKgOverride} is absent. */
   diameter: number
+  /** Override the system-level composition for this rock only (e.g. belt tier loot tables). */
+  compositionOverride?: readonly MineralEntry[]
+  /** Override the diameter-derived HP (kg). Takes precedence over {@link diameter} for yield size. */
+  totalKgOverride?: number
 }
 
 /** Construction options for {@link RockYieldSystem}. */
@@ -100,10 +104,14 @@ export class RockYieldSystem {
    */
   registerRock(spawn: RockYieldSpawn): void {
     if (this.rocks.has(spawn.spawnIndex)) return
-    if (this.weightedItems.length === 0) return
 
-    const itemId = this.rollMineral(spawn.spawnIndex)
-    const totalKg = this.rollTotalKg(spawn.diameter)
+    const weightedItems = spawn.compositionOverride
+      ? this.buildWeightedItems(spawn.compositionOverride)
+      : this.weightedItems
+    if (weightedItems.length === 0) return
+
+    const itemId = this.rollMineralFrom(weightedItems, spawn.spawnIndex)
+    const totalKg = spawn.totalKgOverride ?? this.rollTotalKg(spawn.diameter)
     this.rocks.set(spawn.spawnIndex, { itemId, totalKg, remainingKg: totalKg })
   }
 
@@ -219,17 +227,41 @@ export class RockYieldSystem {
   /**
    * Deterministic 32-bit hash from `(seed, spawnIndex)`. Avoids a full
    * RNG instance per-rock — we only ever pull a single random number.
+   * Delegates to {@link rollMineralFrom} using the system-level weighted list.
    */
   private rollMineral(spawnIndex: number): string {
+    return this.rollMineralFrom(this.weightedItems, spawnIndex)
+  }
+
+  /** Build a weighted mineral list from a composition table, same rules as constructor. */
+  private buildWeightedItems(
+    composition: readonly MineralEntry[],
+  ): { itemId: string; weight: number }[] {
+    const result: { itemId: string; weight: number }[] = []
+    for (const entry of composition) {
+      const itemId = resolveCompositionItemId(entry.name)
+      if (itemId === null) continue
+      const weight = Math.max(0, entry.percentage)
+      if (weight <= 0) continue
+      result.push({ itemId, weight })
+    }
+    return result
+  }
+
+  /** Roll a mineral from an arbitrary weighted list using seed + spawn index. */
+  private rollMineralFrom(
+    items: { itemId: string; weight: number }[],
+    spawnIndex: number,
+  ): string {
     const r = pseudoRandom(this.seed, spawnIndex)
-    const totalWeight = this.weightedItems.reduce((sum, entry) => sum + entry.weight, 0)
+    const totalWeight = items.reduce((sum, entry) => sum + entry.weight, 0)
     const target = r * totalWeight
     let acc = 0
-    for (const entry of this.weightedItems) {
+    for (const entry of items) {
       acc += entry.weight
       if (target < acc) return entry.itemId
     }
-    return this.weightedItems[this.weightedItems.length - 1]!.itemId
+    return items[items.length - 1]!.itemId
   }
 
   private rollTotalKg(diameter: number): number {
