@@ -1,7 +1,7 @@
 /**
  * 3D rig for the turret session: attach point on the shuttle nose, camera,
- * beam mesh, reticle sprite. State comes from {@link TurretAimState}; this
- * controller is the write-out path to Three.js.
+ * beam mesh. State comes from {@link TurretAimState}; this controller is
+ * the write-out path to Three.js.
  *
  * @author guinetik
  * @date 2026-04-20
@@ -9,28 +9,20 @@
  */
 import * as THREE from 'three'
 import type { TurretAimState } from '@/lib/map/turret/TurretAimState'
-import {
-  TURRET_BEAM_MAX_RANGE,
-  TURRET_NOSE_OFFSET,
-} from '@/lib/map/turret/turretConstants'
+import { TURRET_BEAM_MAX_RANGE, TURRET_NOSE_OFFSET } from '@/lib/map/turret/turretConstants'
 
-const BEAM_BASE_LENGTH = 1
-const BEAM_RADIUS = 0.08
 /**
- * Camera-local offset for the beam origin. Shifting slightly below-and-ahead of
- * the camera puts the camera OUTSIDE the cylinder (not inside its axis, where
- * only the near endcap would be visible). The result reads like a shoulder- or
- * hood-mounted laser firing forward — classic FPS weapon placement.
+ * Camera-local muzzle position. Slightly below view center so the beam origin
+ * reads as a barrel below the crosshair (standard FPS look), without putting
+ * the camera inside the line geometry.
  */
-const BEAM_MUZZLE_OFFSET = new THREE.Vector3(0, -0.25, -0.5)
+const BEAM_MUZZLE_OFFSET = new THREE.Vector3(0, -0.08, -0.3)
 
 /**
  * Yaw offset applied to turretBase so the camera's default -Z forward aligns
  * with the shuttle's local +X forward (the convention used elsewhere, e.g.
  * `ShuttleController.forward` built from `new Vector3(1,0,0).applyQuaternion`).
- * `-π/2` rotates the camera's -Z to point along +X; `+π/2` points the
- * opposite way (tail), which is the bug that left the player looking
- * backward at the shuttle's fin.
+ * `-π/2` rotates the camera's -Z to point along +X.
  */
 const SHUTTLE_FORWARD_YAW_OFFSET = -Math.PI / 2
 
@@ -40,11 +32,13 @@ export class TurretRigController {
   readonly turretBase: THREE.Group
   /** First-person perspective camera for the turret view. */
   readonly camera: THREE.PerspectiveCamera
-  /** Beam mesh (camera-local cylinder); toggled visible while firing. */
-  readonly beamMesh: THREE.Mesh
+  /** Line primitive used as the beam; toggled visible while firing. */
+  readonly beamLine: THREE.Line
 
   private readonly shuttleGroup: THREE.Object3D
-  private readonly beamMaterial: THREE.MeshBasicMaterial
+  private readonly beamMaterial: THREE.LineBasicMaterial
+  private readonly beamGeometry: THREE.BufferGeometry
+  private readonly beamPositions: Float32Array
 
   constructor(shuttleGroup: THREE.Object3D) {
     this.shuttleGroup = shuttleGroup
@@ -57,31 +51,32 @@ export class TurretRigController {
     this.camera.position.set(0, 0, 0)
     this.turretBase.add(this.camera)
 
-    // Beam: cylinder along +Z, child of camera so it follows aim.
-    const beamGeom = new THREE.CylinderGeometry(BEAM_RADIUS, BEAM_RADIUS, BEAM_BASE_LENGTH, 8, 1)
-    beamGeom.rotateX(Math.PI / 2) // align cylinder length with +Z
-    beamGeom.translate(0, 0, -BEAM_BASE_LENGTH / 2) // near end at camera origin
-    this.beamMaterial = new THREE.MeshBasicMaterial({
+    // Two-point line primitive (muzzle -> impact). WebGL line width is always 1
+    // pixel, but additive blending + post-bloom make it read as a glowing beam
+    // without the perspective cone artifact of a cylinder aligned with the view.
+    this.beamPositions = new Float32Array([
+      BEAM_MUZZLE_OFFSET.x,
+      BEAM_MUZZLE_OFFSET.y,
+      BEAM_MUZZLE_OFFSET.z,
+      BEAM_MUZZLE_OFFSET.x,
+      BEAM_MUZZLE_OFFSET.y,
+      BEAM_MUZZLE_OFFSET.z - 1,
+    ])
+    this.beamGeometry = new THREE.BufferGeometry()
+    this.beamGeometry.setAttribute('position', new THREE.BufferAttribute(this.beamPositions, 3))
+    this.beamMaterial = new THREE.LineBasicMaterial({
       color: 0x66aaff,
       transparent: true,
-      opacity: 0.9,
+      opacity: 1.0,
       toneMapped: false,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     })
-    this.beamMesh = new THREE.Mesh(beamGeom, this.beamMaterial)
-    this.beamMesh.visible = false
-    // Offset the beam's origin so the camera is outside the cylinder's volume;
-    // otherwise the camera looks straight down the beam axis and only sees the
-    // tiny end cap.
-    this.beamMesh.position.copy(BEAM_MUZZLE_OFFSET)
-    // Disable frustum culling — the scaled cylinder's bounding sphere may not
-    // cover the full length after the dynamic Z-scale, causing the beam to be
-    // culled when the camera moves.
-    this.beamMesh.frustumCulled = false
-    // Render after opaque geometry so the additive blend lands on top.
-    this.beamMesh.renderOrder = 999
-    this.camera.add(this.beamMesh)
+    this.beamLine = new THREE.Line(this.beamGeometry, this.beamMaterial)
+    this.beamLine.visible = false
+    this.beamLine.frustumCulled = false
+    this.beamLine.renderOrder = 999
+    this.camera.add(this.beamLine)
   }
 
   /** Attach turret base to the shuttle group. Call once on session open. */
@@ -96,7 +91,7 @@ export class TurretRigController {
     if (this.turretBase.parent) {
       this.turretBase.parent.remove(this.turretBase)
     }
-    this.beamMesh.visible = false
+    this.beamLine.visible = false
   }
 
   /** Apply aim state to base + camera rotations. */
@@ -105,25 +100,25 @@ export class TurretRigController {
     this.camera.rotation.set(state.conePitch, 0, 0, 'YXZ')
   }
 
-  /** Show the beam cylinder at the given length (meters). */
+  /** Show the beam at the given length (meters from muzzle along camera forward). */
   showBeam(lengthMeters: number): void {
     const clamped = Math.min(Math.max(lengthMeters, 0.01), TURRET_BEAM_MAX_RANGE)
-    this.beamMesh.scale.set(1, 1, clamped / BEAM_BASE_LENGTH)
-    if (!this.beamMesh.visible) {
-      this.beamMesh.visible = true
-      console.log('[Turret] beam visible, length=', clamped.toFixed(1), 'parent=', this.beamMesh.parent?.type)
-    }
+    // Update the far endpoint only; muzzle stays pinned.
+    this.beamPositions[5] = BEAM_MUZZLE_OFFSET.z - clamped
+    const attr = this.beamGeometry.getAttribute('position') as THREE.BufferAttribute
+    attr.needsUpdate = true
+    this.beamLine.visible = true
   }
 
   /** Hide the beam (idle / not firing / out of fuel). */
   hideBeam(): void {
-    this.beamMesh.visible = false
+    this.beamLine.visible = false
   }
 
   /** Dispose GL resources. */
   dispose(): void {
     this.detach()
     this.beamMaterial.dispose()
-    if (this.beamMesh.geometry) this.beamMesh.geometry.dispose()
+    this.beamGeometry.dispose()
   }
 }
