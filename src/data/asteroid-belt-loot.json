@@ -1,0 +1,17 @@
+{
+  "asteroid-belt-small": [
+    { "name": "Olivine", "percentage": 70 },
+    { "name": "Magnetite", "percentage": 30 }
+  ],
+  "asteroid-belt-medium": [
+    { "name": "Olivine", "percentage": 55 },
+    { "name": "Magnetite", "percentage": 35 },
+    { "name": "Pyroxene", "percentage": 10 }
+  ],
+  "asteroid-belt-large": [
+    { "name": "Olivine", "percentage": 35 },
+    { "name": "Magnetite", "percentage": 35 },
+    { "name": "Pyroxene", "percentage": 20 },
+    { "name": "Iron-Nickel Alloy", "percentage": 10 }
+  ]
+}

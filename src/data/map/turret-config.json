@@ -1,0 +1,34 @@
+{
+  "fade": {
+    "inDurationSec": 0.4,
+    "outDurationSec": 0.4,
+    "openingCompleteThreshold": 0.98,
+    "closingCompleteThreshold": 0.02
+  },
+  "aim": {
+    "coneHalfAngleDeg": 60,
+    "pitchLimitDeg": 75,
+    "traverseSpeedDegPerSec": 50,
+    "mouseSensitivity": 0.002
+  },
+  "beam": {
+    "maxRangeWorldUnits": 80,
+    "dpsKgPerSec": 30,
+    "noseOffset": { "x": 0, "y": 0.3, "z": 1.8 }
+  },
+  "tiers": {
+    "small":  { "radiusMax": 1.5,    "hpKg": 40,  "lootId": "asteroid-belt-small"  },
+    "medium": { "radiusMax": 3.5,    "hpKg": 180, "lootId": "asteroid-belt-medium" },
+    "large":  { "radiusMax": 999999, "hpKg": 600, "lootId": "asteroid-belt-large"  }
+  },
+  "tractor": {
+    "burstCount": 20,
+    "particleSpeed": 6,
+    "steerAcceleration": 40,
+    "arrivalRadius": 1.5,
+    "maxLifetimeSec": 1.2
+  },
+  "yieldBuffer": {
+    "commitUnitGranularityKg": 1
+  }
+}

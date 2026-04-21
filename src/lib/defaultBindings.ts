@@ -39,6 +39,7 @@ export const DEFAULT_BINDINGS: Record<string, string[]> = {
   shopAction: ['KeyB'],
   missionAction: ['KeyI'],
   closeMap: ['Escape'],
+  toggleTurret: ['KeyT'],
 }
 
 /** Lander key bindings */
