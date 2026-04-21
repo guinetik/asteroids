@@ -8,7 +8,7 @@
  * @spec docs/superpowers/specs/2026-04-20-contracts-design.md
  */
 import { computed } from 'vue'
-import type { Contract, ContractInstance } from '@/lib/contracts/contractTypes'
+import type { Contract, ContractInstance, ContractStep } from '@/lib/contracts/contractTypes'
 
 const props = defineProps<{
   /** Contract definition the message belongs to. */
@@ -22,40 +22,121 @@ const emit = defineEmits<{
   decline: [contractId: string]
 }>()
 
+const STEP_MARKER_DONE = '\u2713'
+const STEP_MARKER_CURRENT = '\u25B8'
+const STEP_MARKER_PENDING = '\u00B7'
+
 const status = computed(() => props.instance?.status ?? 'available')
 
-const stepLines = computed(() =>
+function stepLabel(step: ContractStep): string {
+  if (step.kind === 'complete-missions') {
+    const filterBits: string[] = []
+    filterBits.push(step.missionType ? `${step.missionType} mission` : 'mission')
+    if (step.giverId) filterBits.push(`for ${step.giverId}`)
+    if (step.giverPlanetId) filterBits.push(`from ${step.giverPlanetId}`)
+    const filterLabel = filterBits.join(' ')
+    return `Complete ${step.count} ${filterLabel}${step.count === 1 ? '' : 's'}`
+  }
+  if (step.kind === 'install-upgrade') {
+    return `Install ${step.upgradeId} (Lvl ${step.minLevel}+)`
+  }
+  if (step.kind === 'visit-planet') {
+    return `Enter orbit at ${step.planetId}`
+  }
+  return `Complete an orbital mission at ${step.planetId}`
+}
+
+function requiredCount(step: ContractStep): number {
+  return step.kind === 'complete-missions' ? step.count : 1
+}
+
+interface StepEntry {
+  index: number
+  state: 'done' | 'current' | 'pending'
+  marker: string
+  label: string
+  progressLabel: string | null
+}
+
+const stepEntries = computed<StepEntry[]>(() =>
   props.contract.steps.map((step, index) => {
-    const ordinal = `${index + 1}.`
-    if (step.kind === 'complete-missions') {
-      const filterBits: string[] = []
-      if (step.missionType) filterBits.push(`${step.missionType} mission`)
-      else filterBits.push('mission')
-      if (step.giverId) filterBits.push(`for ${step.giverId}`)
-      if (step.giverPlanetId) filterBits.push(`from ${step.giverPlanetId}`)
-      const filterLabel = filterBits.join(' ')
-      return `${ordinal} Complete ${step.count} ${filterLabel}${step.count === 1 ? '' : 's'}`
+    const instance = props.instance
+    const required = requiredCount(step)
+    const label = stepLabel(step)
+
+    if (!instance || instance.status === 'available' || instance.status === 'declined') {
+      return {
+        index,
+        state: 'pending',
+        marker: STEP_MARKER_PENDING,
+        label,
+        progressLabel: step.kind === 'complete-missions' ? `0/${required}` : null,
+      }
     }
-    if (step.kind === 'install-upgrade') {
-      return `${ordinal} Install ${step.upgradeId} (Lvl ${step.minLevel}+)`
+
+    const counter = instance.stepCounters[index] ?? 0
+    const completed =
+      instance.status === 'completed' || index < instance.currentStepIndex || counter >= required
+    if (completed) {
+      return {
+        index,
+        state: 'done',
+        marker: STEP_MARKER_DONE,
+        label,
+        progressLabel: step.kind === 'complete-missions' ? `${required}/${required}` : null,
+      }
     }
-    if (step.kind === 'visit-planet') {
-      return `${ordinal} Enter orbit at ${step.planetId}`
+
+    const isCurrent = instance.status === 'active' && index === instance.currentStepIndex
+    return {
+      index,
+      state: isCurrent ? 'current' : 'pending',
+      marker: isCurrent ? STEP_MARKER_CURRENT : STEP_MARKER_PENDING,
+      label,
+      progressLabel: step.kind === 'complete-missions' ? `${counter}/${required}` : null,
     }
-    return `${ordinal} Complete an orbital mission at ${step.planetId}`
   }),
 )
+
+const progressSummary = computed(() => {
+  const total = props.contract.steps.length
+  const done = stepEntries.value.filter((entry) => entry.state === 'done').length
+  return { done, total }
+})
+
+const headerLabel = computed(() => {
+  if (status.value === 'active') return 'Contract Progress'
+  if (status.value === 'completed') return 'Contract Complete'
+  if (status.value === 'declined') return 'Contract Declined'
+  return 'Contract Offer'
+})
 </script>
 
 <template>
   <section class="contract-accept-card" :data-status="status">
     <header class="contract-accept-card__header">
-      <span class="contract-accept-card__chrome">Contract Offer · {{ props.contract.inboxName }}</span>
+      <span class="contract-accept-card__chrome">
+        {{ headerLabel }} · {{ props.contract.inboxName }}
+        <template v-if="status === 'active'">
+          · {{ progressSummary.done }}/{{ progressSummary.total }}
+        </template>
+      </span>
       <span class="contract-accept-card__status">{{ status }}</span>
     </header>
 
     <ol class="contract-accept-card__steps">
-      <li v-for="(line, index) in stepLines" :key="index">{{ line }}</li>
+      <li
+        v-for="entry in stepEntries"
+        :key="entry.index"
+        class="contract-accept-card__step"
+        :data-state="entry.state"
+      >
+        <span class="contract-accept-card__step-marker" aria-hidden="true">{{ entry.marker }}</span>
+        <span class="contract-accept-card__step-label">{{ entry.index + 1 }}. {{ entry.label }}</span>
+        <span v-if="entry.progressLabel" class="contract-accept-card__step-progress">
+          {{ entry.progressLabel }}
+        </span>
+      </li>
     </ol>
 
     <ul class="contract-accept-card__rewards">
@@ -101,112 +182,194 @@ const stepLines = computed(() =>
 
 <style scoped>
 .contract-accept-card {
-  margin: 18px 0 12px;
-  padding: 16px 18px;
-  border: 1px solid rgba(177, 228, 214, 0.32);
-  border-radius: 6px;
-  background: rgba(8, 24, 30, 0.65);
-  color: #c9efe4;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  margin: 32px 0 16px;
+  padding: 20px;
+  border: 1px solid rgba(106, 232, 196, 0.2);
+  background: rgba(106, 232, 196, 0.03);
+  border-radius: 4px;
   display: grid;
-  gap: 12px;
+  gap: 16px;
+  position: relative;
+}
+
+.contract-accept-card::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  width: 8px;
+  height: 8px;
+  border-top: 2px solid #6ae8c4;
+  border-left: 2px solid #6ae8c4;
+}
+
+.contract-accept-card::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 8px;
+  height: 8px;
+  border-bottom: 2px solid #6ae8c4;
+  border-right: 2px solid #6ae8c4;
 }
 
 .contract-accept-card__header {
   display: flex;
   justify-content: space-between;
   font-size: 11px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: rgba(177, 228, 214, 0.7);
+  color: rgba(106, 232, 196, 0.6);
+  border-bottom: 1px solid rgba(106, 232, 196, 0.15);
+  padding-bottom: 12px;
 }
 
 .contract-accept-card__steps {
   margin: 0;
-  padding-left: 18px;
+  padding: 0;
+  list-style: none;
   display: grid;
-  gap: 6px;
+  gap: 8px;
   font-size: 13px;
-  color: rgba(220, 248, 240, 0.92);
+  color: rgba(220, 248, 240, 0.9);
+}
+
+.contract-accept-card__step {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 2px 0;
+}
+
+.contract-accept-card__step-marker {
+  font-family: inherit;
+  font-size: 13px;
+  text-align: center;
+  color: rgba(177, 228, 214, 0.35);
+}
+
+.contract-accept-card__step-label {
+  color: rgba(177, 228, 214, 0.55);
+}
+
+.contract-accept-card__step-progress {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: rgba(177, 228, 214, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+
+.contract-accept-card__step[data-state='current'] .contract-accept-card__step-marker {
+  color: #6ae8c4;
+}
+
+.contract-accept-card__step[data-state='current'] .contract-accept-card__step-label {
+  color: #dcf8f0;
+}
+
+.contract-accept-card__step[data-state='current'] .contract-accept-card__step-progress {
+  color: #6ae8c4;
+}
+
+.contract-accept-card__step[data-state='done'] .contract-accept-card__step-marker {
+  color: #a6e864;
+}
+
+.contract-accept-card__step[data-state='done'] .contract-accept-card__step-label {
+  color: rgba(220, 248, 240, 0.7);
+  text-decoration: line-through;
+  text-decoration-color: rgba(166, 232, 100, 0.35);
+}
+
+.contract-accept-card__step[data-state='done'] .contract-accept-card__step-progress {
+  color: rgba(166, 232, 100, 0.75);
 }
 
 .contract-accept-card__rewards {
   list-style: none;
   margin: 0;
-  padding: 8px 12px;
-  border: 1px dashed rgba(106, 232, 196, 0.45);
-  border-radius: 4px;
+  padding: 12px;
+  border: 1px solid rgba(106, 232, 196, 0.15);
+  background: rgba(106, 232, 196, 0.05);
+  border-radius: 2px;
   font-size: 12px;
-  color: rgba(180, 244, 220, 0.92);
+  color: rgba(177, 228, 214, 0.9);
   display: grid;
-  gap: 4px;
+  gap: 6px;
 }
 
 .contract-accept-card__rewards strong {
   color: #6ae8c4;
   font-weight: 600;
-  text-transform: capitalize;
 }
 
 .contract-accept-card__footer {
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-top: 4px;
 }
 
 .contract-accept-card__btn {
   appearance: none;
-  border-radius: 4px;
-  border: 1px solid rgba(106, 232, 196, 0.6);
+  background: transparent;
+  border: 1px solid rgba(106, 232, 196, 0.3);
+  color: rgba(177, 228, 214, 0.8);
   padding: 8px 16px;
   font-family: inherit;
-  font-size: 12px;
-  letter-spacing: 0.12em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
+  transition: all 120ms ease;
+  border-radius: 2px;
 }
 
 .contract-accept-card__btn--primary {
-  background: rgba(106, 232, 196, 0.18);
+  background: rgba(106, 232, 196, 0.1);
   color: #6ae8c4;
+  border-color: rgba(106, 232, 196, 0.5);
 }
 
 .contract-accept-card__btn--primary:hover {
-  background: rgba(106, 232, 196, 0.32);
-}
-
-.contract-accept-card__btn--secondary {
-  background: transparent;
-  color: rgba(180, 244, 220, 0.8);
-  border-color: rgba(180, 244, 220, 0.4);
+  background: rgba(106, 232, 196, 0.25);
+  border-color: #6ae8c4;
+  box-shadow: 0 0 12px rgba(106, 232, 196, 0.2);
 }
 
 .contract-accept-card__btn--secondary:hover {
-  background: rgba(180, 244, 220, 0.12);
+  border-color: #6ae8c4;
+  color: #6ae8c4;
 }
 
 .contract-accept-card__pill {
   display: inline-flex;
   padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  letter-spacing: 0.16em;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
+  border-radius: 2px;
 }
 
 .contract-accept-card__pill--active {
-  background: rgba(106, 232, 196, 0.16);
+  background: rgba(106, 232, 196, 0.15);
   color: #6ae8c4;
+  border: 1px solid rgba(106, 232, 196, 0.3);
 }
 
 .contract-accept-card__pill--done {
-  background: rgba(166, 232, 100, 0.16);
-  color: #b6e870;
+  background: rgba(166, 232, 100, 0.15);
+  color: #a6e864;
+  border: 1px solid rgba(166, 232, 100, 0.3);
 }
 
 .contract-accept-card__pill--declined {
-  background: rgba(255, 132, 100, 0.18);
-  color: #ff9f80;
+  background: rgba(255, 132, 100, 0.15);
+  color: #ff8464;
+  border: 1px solid rgba(255, 132, 100, 0.3);
 }
 </style>

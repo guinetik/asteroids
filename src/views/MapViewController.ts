@@ -3439,7 +3439,9 @@ export class MapViewController implements Tickable {
     }
     this.restoreIntroMapLayers()
     this.shuttleController?.setInputEnabled(true)
-    this.introFacade?.dispose(this.sceneObjects?.scene ?? null)
+    if (this.sceneObjects?.scene) {
+      this.introFacade?.dispose(this.sceneObjects.scene)
+    }
     if (shouldAutoEnterHabitat) {
       this.setEarthStartupOrbitHudSuppressed(true)
       this.cancelPostStartupIntroHabitatTimer()

@@ -51,50 +51,65 @@ onMounted(() => {
 <style scoped>
 .ship-message-audio-player {
   margin-top: 16px;
-  padding: 12px 14px;
-  background: rgba(120, 255, 223, 0.04);
-  border: 1px solid rgba(120, 255, 223, 0.14);
-  border-radius: 8px;
+  padding: 12px 16px;
+  background: rgba(106, 232, 196, 0.03);
+  border: 1px solid rgba(106, 232, 196, 0.15);
+  border-radius: 4px;
+  position: relative;
+}
+
+.ship-message-audio-player::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: rgba(106, 232, 196, 0.4);
 }
 
 .ship-message-audio-player__button {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   padding: 0;
   font: inherit;
-  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: rgba(196, 240, 228, 0.82);
+  color: rgba(177, 228, 214, 0.8);
   background: transparent;
   border: none;
   cursor: pointer;
+  transition: color 120ms ease;
 }
 
 .ship-message-audio-player__button:hover {
-  color: rgba(236, 255, 248, 0.98);
+  color: #6ae8c4;
 }
 
 .ship-message-audio-player__button--playing {
-  color: rgba(120, 255, 223, 0.96);
+  color: #6ae8c4;
 }
 
 .ship-message-audio-player__icon {
-  width: 1em;
+  width: 1.2em;
   text-align: center;
+  font-size: 14px;
 }
 
 .ship-message-audio-player__progress {
-  margin-top: 10px;
-  height: 3px;
-  background: rgba(196, 240, 228, 0.14);
-  border-radius: 999px;
-  overflow: hidden;
+  margin-top: 12px;
+  height: 2px;
+  background: rgba(106, 232, 196, 0.15);
+  position: relative;
 }
 
 .ship-message-audio-player__progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, rgba(120, 255, 223, 0.56), rgba(120, 255, 223, 0.95));
-  transition: width 0.12s linear;
+  background: #6ae8c4;
+  transition: width 0.1s linear;
+  box-shadow: 0 0 8px rgba(106, 232, 196, 0.6);
 }
 </style>

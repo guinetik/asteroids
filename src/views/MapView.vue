@@ -111,6 +111,12 @@ const mapIntro = reactive<MapIntroUiState>({
 })
 
 function refreshActiveMessage(): void {
+  if ((messageDialogVisible.value || mapIntro.messageDialogVisible) && activeMessage.value) {
+    // If the dialog is open, don't swap the message out from under the user.
+    // Just update the count.
+    pendingMessageCount.value = shipMessageSystem.getPendingMessageCount()
+    return
+  }
   activeMessage.value = shipMessageSystem.getActiveMessage()
   pendingMessageCount.value = shipMessageSystem.getPendingMessageCount()
   if (!activeMessage.value) {
@@ -121,6 +127,8 @@ function refreshActiveMessage(): void {
 function openMessage(): void {
   if (activeMessage.value?.status === 'pending') {
     shipMessageSystem.markShown(activeMessage.value.id)
+    activeMessage.value = { ...activeMessage.value, status: 'shown' }
+    pendingMessageCount.value = shipMessageSystem.getPendingMessageCount()
   }
   messageAudioAutoplayToken.value += 1
 
@@ -129,8 +137,6 @@ function openMessage(): void {
   } else {
     messageDialogVisible.value = true
   }
-
-  refreshActiveMessage()
 }
 
 function dismissActiveMessage(): void {
@@ -140,16 +146,6 @@ function dismissActiveMessage(): void {
     viewController.completeIntroMessage()
   }
   messageDialogVisible.value = false
-  refreshActiveMessage()
-}
-
-function handleWindowKeydown(event: KeyboardEvent): void {
-  if (event.key !== 'Escape') return
-  if (!mapExperienceStarted.value || portalWelcomeVisible.value) return
-  if (!mapIntro.controlsLocked) return
-  event.preventDefault()
-  viewController.skipIntro()
-  syncPersistentProgressFromController()
   refreshActiveMessage()
 }
 
@@ -172,9 +168,6 @@ const telemetry = reactive<ShuttleTelemetry>({
   brakeCapacity: 0,
   rcsCharge: 0,
   rcsCapacity: 0,
-  turretMiningCharge: 0,
-  turretMiningCapacity: 0,
-  turretActive: false,
   adriftCountdown: -1,
   hp: 100,
   maxHp: 100,
@@ -182,6 +175,9 @@ const telemetry = reactive<ShuttleTelemetry>({
   temperatureVisible: false,
   damageIntensity: 0,
   compassBearings: [],
+  turretMiningCharge: 0,
+  turretMiningCapacity: 0,
+  turretActive: false,
 })
 const orbitState = reactive<OrbitHudState>({
   state: 'free',
@@ -511,7 +507,6 @@ function syncPersistentProgressFromController(): void {
 }
 
 onMounted(async () => {
-  window.addEventListener('keydown', handleWindowKeydown)
   if (container.value) {
     viewController.onTelemetry = (t) => {
       Object.assign(telemetry, t)
@@ -625,8 +620,6 @@ onMounted(async () => {
     }
     viewController.onJourneyTracker = (state) => {
       journeyTracker.value = state
-      syncPersistentProgressFromController()
-      shopProfile.value = viewController.getPlayerProfileSnapshot()
     }
     viewController.onShopButton = (visible, planetName) => {
       shopButtonVisible.value = visible
@@ -706,7 +699,6 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleWindowKeydown)
   clearPickupUi()
   setShipMessageFollowUpDeliveryListener(null)
   stopBackgroundMusic('map')
@@ -1131,7 +1123,7 @@ watch(
     @dismiss="dismissActiveMessage"
   />
   <ObjectiveTracker
-    v-if="journeyTracker && !mapBootOverlayVisible && !mapIntro.controlsLocked"
+    v-if="journeyTracker && !mapBootOverlayVisible"
     :eyebrow="journeyTracker.eyebrow"
     :title="journeyTracker.title"
     :objectives="journeyTracker.objectives"
@@ -1407,7 +1399,6 @@ watch(
       <span class="pickup-failed__body">{{ pickupFailed.label }} lost - {{ pickupFailed.reason }}</span>
     </div>
   </transition>
-  </template>
   <PortalWelcomeDialog
     :visible="portalWelcomeVisible"
     :player-name="playerProfileSnapshot.name"
@@ -1415,6 +1406,7 @@ watch(
     @watch-intro="handlePortalWatchIntro"
     @skip="handlePortalSkip"
   />
+  </template>
 </template>
 
 <style>
