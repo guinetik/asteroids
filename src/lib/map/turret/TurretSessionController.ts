@@ -247,6 +247,7 @@ export class TurretSessionController {
     this.sparkBurstCooldown = 0
     this.beamLatched = false
     this.overheatLocked = false
+    this.prevBeamActive = false
     this.deps.host.setActiveCamera(this.rig.camera)
     this.requestPointerLock()
 
