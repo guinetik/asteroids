@@ -3949,8 +3949,12 @@ export class MapViewController implements Tickable {
     this.onBootState?.({ phase, label })
   }
 
-  /** Dev-only: enqueue the Consortium message and start its authored special mission immediately. */
-  private devStartConsortiumCertificationMessage(): void {
+  /**
+   * Enqueue the Consortium Certification inbox message and force its authored special
+   * mission as the active asteroid mission, with the authored waypoint already placed
+   * on the star map. Shared by the Act 1 climax staging path and the dev console helper.
+   */
+  private stageConsortiumCertification(): void {
     const mission = getSpecialMissionById('consortium-certification')
     if (!mission) {
       console.warn('[MapView] Special mission consortium-certification not found.')
@@ -3970,6 +3974,11 @@ export class MapViewController implements Tickable {
     }
     saveActiveMission(acceptedMission)
     this.onMissionBoardUpdate?.(this.missionBoard)
+  }
+
+  /** Dev-only: enqueue the Consortium message and start its authored special mission immediately. */
+  private devStartConsortiumCertificationMessage(): void {
+    this.stageConsortiumCertification()
   }
 
   /** Dev-only: open any orbital minigame overlay by gather-item id. */
