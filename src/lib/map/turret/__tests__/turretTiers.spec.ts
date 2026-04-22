@@ -4,16 +4,16 @@ import { pickTier, TURRET_TIERS } from '../turretTiers'
 describe('pickTier', () => {
   it('returns small for radius below small cutoff', () => {
     expect(pickTier(0.05).id).toBe('small')
-    expect(pickTier(0.14).id).toBe('small')
+    expect(pickTier(0.12).id).toBe('small')
   })
 
   it('returns medium for radius between small and medium cutoffs', () => {
-    expect(pickTier(0.16).id).toBe('medium')
-    expect(pickTier(0.27).id).toBe('medium')
+    expect(pickTier(0.14).id).toBe('medium')
+    expect(pickTier(0.21).id).toBe('medium')
   })
 
   it('returns large for radius above medium cutoff', () => {
-    expect(pickTier(0.29).id).toBe('large')
+    expect(pickTier(0.23).id).toBe('large')
     expect(pickTier(1000).id).toBe('large')
   })
 
