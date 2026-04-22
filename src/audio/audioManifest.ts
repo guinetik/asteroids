@@ -160,7 +160,7 @@ const manifestById: ManifestById = {
   },
   'ui.hover': {
     id: 'ui.hover',
-    src: '/sound/ui.hover.mp3',
+    src: '/sound/sfx.ui.mouseover.mp3',
     category: 'ui',
     load: 'lazy',
     playback: 'rate-limited',
