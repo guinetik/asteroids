@@ -1,0 +1,33 @@
+{
+  "planetId": "mars",
+  "giverName": "Martian Marines Corps",
+  "missions": [
+    {
+      "id": "mars_marines_bulk_supply",
+      "name": "Forward Base Supply",
+      "description": "Marines need bulk asteroid ore for temporary forward bases. Any rock will do — just fill the hold.",
+      "difficulty": "easy",
+      "oreCategory": "any",
+      "targetKg": 350,
+      "reward": 750
+    },
+    {
+      "id": "mars_marines_olivine_plating",
+      "name": "Armor Plating Contract",
+      "description": "Raw olivine for a new armor lamination run. Marines want it clean — no cross-contamination from other ores.",
+      "difficulty": "medium",
+      "oreCategory": "olivine",
+      "targetKg": 475,
+      "reward": 1350
+    },
+    {
+      "id": "mars_marines_iron_nickel",
+      "name": "Classified Procurement",
+      "description": "Marines need iron-nickel alloy for projects they won't explain. Small quantity, generous payout.",
+      "difficulty": "hard",
+      "oreCategory": "iron-nickel-alloy",
+      "targetKg": 200,
+      "reward": 2200
+    }
+  ]
+}

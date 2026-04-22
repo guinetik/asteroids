@@ -1,0 +1,15 @@
+{
+  "planetId": "uranus",
+  "giverName": "United Space Consortium",
+  "missions": [
+    {
+      "id": "usc_uranus_ice_research",
+      "name": "Cryogenic Research Shipment",
+      "description": "USC labs need primordial water-ice for deep-cold chemistry studies. Bring it fresh from the kuiper belt.",
+      "difficulty": "hard",
+      "oreCategory": "water-ice",
+      "targetKg": 425,
+      "reward": 2600
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "planetId": "pluto",
+  "giverName": "United Space Consortium",
+  "missions": [
+    {
+      "id": "usc_pluto_deep_ice_survey",
+      "name": "Trans-Neptunian Ice Sampling",
+      "description": "USC wants deep water-ice from the furthest reaches of the kuiper belt. Nobody goes out this far without the right gear. That's why the pay is what it is.",
+      "difficulty": "hard",
+      "oreCategory": "water-ice",
+      "targetKg": 500,
+      "reward": 3200
+    }
+  ]
+}

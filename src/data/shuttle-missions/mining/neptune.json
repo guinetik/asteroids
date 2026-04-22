@@ -1,0 +1,15 @@
+{
+  "planetId": "neptune",
+  "giverName": "United Space Consortium",
+  "missions": [
+    {
+      "id": "usc_neptune_ice_reactor",
+      "name": "Reactor Coolant Resupply",
+      "description": "Neptune station's fusion reactor runs on water-ice moderators pulled from kuiper rocks. Quantity matters — run short, station goes dark.",
+      "difficulty": "hard",
+      "oreCategory": "water-ice",
+      "targetKg": 475,
+      "reward": 2900
+    }
+  ]
+}
