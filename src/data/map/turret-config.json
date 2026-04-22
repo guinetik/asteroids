@@ -18,13 +18,13 @@
   },
   "tiers": {
     "main-belt": {
-      "small":  { "radiusMax": 1.5,    "hpKg": 40,  "lootId": "asteroid-belt-small"  },
-      "medium": { "radiusMax": 3.5,    "hpKg": 180, "lootId": "asteroid-belt-medium" },
+      "small":  { "radiusMax": 0.15,   "hpKg": 40,  "lootId": "asteroid-belt-small"  },
+      "medium": { "radiusMax": 0.28,   "hpKg": 180, "lootId": "asteroid-belt-medium" },
       "large":  { "radiusMax": 999999, "hpKg": 600, "lootId": "asteroid-belt-large"  }
     },
     "kuiper-belt": {
-      "small":  { "radiusMax": 0.6,    "hpKg": 30,  "lootId": "kuiper-belt-small"  },
-      "medium": { "radiusMax": 1.4,    "hpKg": 140, "lootId": "kuiper-belt-medium" },
+      "small":  { "radiusMax": 0.3,    "hpKg": 30,  "lootId": "kuiper-belt-small"  },
+      "medium": { "radiusMax": 0.6,    "hpKg": 140, "lootId": "kuiper-belt-medium" },
       "large":  { "radiusMax": 999999, "hpKg": 520, "lootId": "kuiper-belt-large"  }
     }
   },
