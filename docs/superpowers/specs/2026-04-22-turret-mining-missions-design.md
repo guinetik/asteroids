@@ -46,7 +46,7 @@ Missions also create economic pressure the current turret loop doesn't. Mining i
    - Credits awarded (`reward × scienceStationMultiplier`).
    - Entry removed from `activeMiningMissions[]`.
    - `contractSystem.notifyMissionCompleted({ kind: 'mining', ... })` fires.
-7. Player can hold multiple mining missions across different givers simultaneously. The shared `TurretYieldCoordinator.onMineralExtracted` tick increments every matching active mission — e.g. mining silicate-ore with a Mars (silicate) and an "any" Jupiter contract active counts toward both.
+7. Player can hold multiple mining missions across different givers simultaneously. The shared `onResourcePickup` hook in `MapViewController` forwards each committed kg to every matching active mission — e.g. mining olivine with a Mars (olivine) and an "any-main-belt" Jupiter contract active credits both.
 
 ## Architecture
 
@@ -442,12 +442,12 @@ Science Station multiplier (up to 1.75×) applies on delivery, same as planetary
 
 Mirror the existing `offerEvaMission` / `takeEvaMission` / etc. helpers:
 
-- `offerMiningMission(board: ShuttleMissionBoard, planetId: string): ShuttleMissionBoard` — when player docks, select one mission from the pool (simplest: random among not-currently-active). Filter out missions whose `oreCategory === 'kuiper-ice'` if kuiper belt isn't mineable yet.
+- `offerMiningMission(board: ShuttleMissionBoard, planetId: string): ShuttleMissionBoard` — when player docks, select one mission from the pool (random among not-currently-active).
 - `takeMiningMission(board, template, planetId): ShuttleMissionBoard` — move from offered to active, start restock timer.
-- `tickMiningRestock(board, dt): ShuttleMissionBoard` — when timer runs out, refill `offeredMiningMission` from the pool.
+- `tickMiningRestock(board, dt): ShuttleMissionBoard` — when timer runs out, clear the timer so the next dock can refill `offeredMiningMission`.
 - `getReadyMiningMissions(board, planetId): ActiveTurretMiningMission[]` — for dock-time delivery.
 
-Restock window: **180 s**, matching planetary.
+Restock window: reuse the existing `randomRestockDuration()` (120–240 s) from `shuttleMissionSession.ts` for consistency with planetary and EVA cadence.
 
 ### `missionStorage.ts` additions
 
@@ -502,12 +502,11 @@ New files under `src/lib/missions/__tests__/`:
 
 - **`turretMiningPools.spec.ts`**
   - Pool loader returns missions for the requested planet.
-  - Kuiper filter: when kuiper belt not mineable, `offerMiningMission` skips `oreCategory === 'kuiper-ice'` templates for USC planets.
   - Offered selection does not repeat a currently-active mission from the same planet.
 
 - **`turretMiningSession.spec.ts`**
   - `takeMiningMission` moves offered → active, starts restock timer, clears offered.
-  - `recordMiningProgress` increments `minedKg` only for matching ore; ignores mismatched ore; `'any'` matches all asteroid ores but NOT kuiper-ice.
+  - `recordMiningProgress` increments `minedKg` only for matching ore; ignores mismatched ore; `'any'` matches main-belt ores (`olivine`, `magnetite`, `pyroxene`, `iron-nickel-alloy`) but NOT kuiper ices (`water-ice`, `carbon-dioxide-ice`, `sodium-chloride`).
   - Transition to `ready-to-deliver` when `minedKg >= targetKg`.
   - Multiple matching actives all receive the same increment.
   - `tickMiningRestock` refills offered slot when timer elapses.
