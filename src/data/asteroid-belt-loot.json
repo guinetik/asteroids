@@ -9,10 +9,10 @@
     { "name": "Pyroxene", "percentage": 10 }
   ],
   "asteroid-belt-large": [
-    { "name": "Olivine", "percentage": 35 },
-    { "name": "Magnetite", "percentage": 35 },
+    { "name": "Olivine", "percentage": 30 },
+    { "name": "Magnetite", "percentage": 30 },
     { "name": "Pyroxene", "percentage": 20 },
-    { "name": "Iron-Nickel Alloy", "percentage": 10 }
+    { "name": "Iron-Nickel Alloy", "percentage": 20 }
   ],
   "kuiper-belt-small": [
     { "name": "Water Ice", "percentage": 75 },
