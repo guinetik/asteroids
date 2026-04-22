@@ -3324,6 +3324,17 @@ export class MapViewController implements Tickable {
       vehicleCamera: this.vehicleCamera,
       sceneVisuals: this.sceneVisuals,
     })
+    // Persist the new "home" planet so a refresh respawns the player here.
+    // Going through the achievement tracker isn't enough — fast travel doesn't
+    // exit the `orbiting` capture state (player jumps planet→planet), so the
+    // non-orbiting → orbiting transition that normally records this never fires.
+    let next = recordSolarBodyFirstOrbit(this.playerProfile, key)
+    next = setLastDockedPlanet(next, key)
+    if (next !== this.playerProfile) {
+      this.playerProfile = next
+      this.persistPlayerProfile()
+      this.emitShopState()
+    }
     return true
   }
 
