@@ -23,6 +23,7 @@ import type {
   ShuttleMissionBoard,
 } from '@/lib/missions/types'
 import { getGatherItemForPlanet, getPlanetOrbitalConfig } from '@/lib/missions/planetOrbitalConfig'
+import { tickTurretMiningRestock } from '@/lib/missions/turretMiningSession'
 import { computeMissionDifficulty } from '@/lib/missions/missionDifficulty'
 import {
   generateAsteroidMission,
@@ -111,6 +112,7 @@ export class MapMissionFacade {
     this.board = tickMissionBoard(this.board, dt)
     this.board = tickAsteroidMissionBoard(this.board, dt)
     this.board = tickEvaMissionBoard(this.board, dt)
+    this.board = tickTurretMiningRestock(this.board, dt)
   }
 
   private persistBoard(): void {

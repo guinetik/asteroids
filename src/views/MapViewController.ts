@@ -156,7 +156,11 @@ import {
   saveActiveMission,
   saveMissionBoard,
 } from '@/lib/missions/missionStorage'
-import { recordTurretMiningProgress } from '@/lib/missions/turretMiningSession'
+import {
+  offerTurretMiningMission,
+  recordTurretMiningProgress,
+} from '@/lib/missions/turretMiningSession'
+import { deliverTurretMiningMissions } from '@/lib/missions/turretMiningRewards'
 import '@/lib/missions/missionMaterials'
 import { MapIntroFacade } from '@/lib/map/intro/MapIntroFacade'
 import { MapLifeCycleFacade } from '@/lib/map/lifecycle/MapLifeCycleFacade'
@@ -2392,9 +2396,11 @@ export class MapViewController implements Tickable {
       inventory: this.playerInventory,
     })
     if (openedPlanetId) {
+      this.deliverTurretMiningMissionsAtPlanet(openedPlanetId)
       this.offerMissionAtPlanet(openedPlanetId)
       this.offerEvaMissionAtPlanet(openedPlanetId)
       this.offerAsteroidMissionFromDifficulty(openedPlanetId)
+      this.offerTurretMiningMissionAtPlanet(openedPlanetId)
       this.onCreditsUpdate?.(this.playerProfile.credits)
     }
   }
@@ -2553,6 +2559,44 @@ export class MapViewController implements Tickable {
   /** Offer an EVA (visit-relay) mission when docking at a planet. */
   offerEvaMissionAtPlanet(planetId: string): void {
     this.missionFacade.offerEvaMissionAtPlanet(planetId, this.onMissionBoardUpdate)
+  }
+
+  /**
+   * Deliver any turret mining missions that are `ready-to-deliver` at `planetId`.
+   * Credits are awarded with the Science Station multiplier applied. Persists
+   * board, inventory, and profile on success.
+   */
+  private deliverTurretMiningMissionsAtPlanet(planetId: string): void {
+    const payMultiplier = getMissionPayMultiplier(this.playerProfile, planetId)
+    const scienceMult = getCurrentUpgradeValue('shuttleScienceStation') * payMultiplier
+    const result = deliverTurretMiningMissions(
+      this.missionFacade.board,
+      planetId,
+      this.playerInventory,
+      this.playerProfile,
+      scienceMult,
+    )
+    if (result.delivered.length === 0) return
+    this.missionFacade.board = result.board
+    this.playerInventory = result.inventory
+    this.playerProfile = result.profile
+    saveMissionBoard(result.board)
+    saveInventory(result.inventory)
+    this.persistPlayerProfile()
+    this.onMissionBoardUpdate?.(this.missionFacade.board)
+    this.onCreditsUpdate?.(this.playerProfile.credits)
+  }
+
+  /**
+   * Offer a turret mining mission when docking at a planet, if no restock timer
+   * is running and the planet's pool has an available contract.
+   */
+  private offerTurretMiningMissionAtPlanet(planetId: string): void {
+    const offered = offerTurretMiningMission(this.missionFacade.board, planetId)
+    if (offered === this.missionFacade.board) return
+    this.missionFacade.board = offered
+    saveMissionBoard(offered)
+    this.onMissionBoardUpdate?.(this.missionFacade.board)
   }
 
   /**
