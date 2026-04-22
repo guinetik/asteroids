@@ -92,7 +92,7 @@ import {
   getPlayerUpgradeLevelsSnapshot,
   hydratePlayerUpgradeLevelsFromStorage,
   resetPlayerUpgradesToDefaults,
-  saveCurrentPlayerUpgradesToStorage,
+  setPlayerUpgradeLevel,
   CURRENT_PLAYER_UPGRADE_LEVELS,
   UPGRADE_DEFINITIONS,
   type UpgradeId,
@@ -2523,13 +2523,12 @@ export class MapViewController implements Tickable {
     const result = tryPurchaseNextUpgradeLevel(this.playerProfile, upgradeId, current)
     if (!result.ok) return false
     this.playerProfile = result.profile
-    CURRENT_PLAYER_UPGRADE_LEVELS[upgradeId] = result.newLevel
+    setPlayerUpgradeLevel(upgradeId, result.newLevel)
     if (upgradeId === 'shuttleCargoBay') {
       this.playerInventory = this.applyCargoBayLimits(this.playerInventory)
       this.emitShopState()
     }
     this.persistPlayerProfile()
-    saveCurrentPlayerUpgradesToStorage()
     this.onCreditsUpdate?.(this.playerProfile.credits)
     return true
   }
@@ -2542,10 +2541,7 @@ export class MapViewController implements Tickable {
    */
   private devSetPlayerUpgradeLevel(upgradeId: UpgradeId, level: number): void {
     if (!import.meta.env.DEV) return
-    const def = UPGRADE_DEFINITIONS[upgradeId]
-    const clamped = Math.max(0, Math.min(def.maxLevel, Math.floor(level)))
-    CURRENT_PLAYER_UPGRADE_LEVELS[upgradeId] = clamped
-    saveCurrentPlayerUpgradesToStorage()
+    const clamped = setPlayerUpgradeLevel(upgradeId, level)
     if (upgradeId === 'gravitySurfing') {
       if (!hasGravitySurfingUnlock()) {
         this.applyGridVisible(false)
@@ -2945,8 +2941,7 @@ export class MapViewController implements Tickable {
   private installUpgradeFromConsumable(upgradeId: UpgradeId, targetLevel: number): void {
     const current = CURRENT_PLAYER_UPGRADE_LEVELS[upgradeId] ?? 0
     if (current >= targetLevel) return
-    CURRENT_PLAYER_UPGRADE_LEVELS[upgradeId] = targetLevel
-    saveCurrentPlayerUpgradesToStorage()
+    setPlayerUpgradeLevel(upgradeId, targetLevel)
     this.syncMapAfterExternalShuttleInstall(upgradeId, targetLevel, {
       defaultMeta: (defId, level) =>
         defId === 'gravitySurfing' ? 'Tier 1 · Grid Coupling Module' : `Tier ${level} · Auto-install`,
