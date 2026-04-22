@@ -312,7 +312,7 @@ const manifestById: ManifestById = {
     src: '/sound/sfx.laserPulse.mp3',
     category: 'sfx',
     load: 'lazy',
-    playback: 'restart',
+    playback: 'overlap',
     volume: 0.5,
     effect: 'none',
   },
