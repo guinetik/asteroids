@@ -390,6 +390,15 @@ const HOST_ASTEROID_RADIAL_JITTER_BASE = 20
 
 const HOST_ASTEROID_RADIAL_JITTER_SPAN = 95
 
+/** Fresh Earth contracts stay very close to the local orbit lane: 3–5 Earth radii from Earth. */
+const EARLY_EARTH_LOCAL_DISTANCE_MIN_RADIUS_MULTIPLE = 3
+
+/** Upper edge of the early Earth local contract annulus. */
+const EARLY_EARTH_LOCAL_DISTANCE_MAX_RADIUS_MULTIPLE = 5
+
+/** Only low-difficulty Earth asteroid missions use the tight onboarding annulus. */
+const EARLY_EARTH_LOCAL_MAX_MISSION_DIFFICULTY = 2
+
 /**
  * Place an asteroid contract waypoint near the host world's orbital ring: mostly angular
  * separation along the orbit (like EVA), with a modest radial jitter that scales with
@@ -406,7 +415,29 @@ export function generateAsteroidWaypointNearHostPlanet(
   hostWorldZ: number,
   difficulty: number,
   rand: () => number = Math.random,
+  hostPlanetId: string | null = null,
 ): { worldX: number; worldZ: number } {
+  if (hostPlanetId === 'earth' && difficulty <= EARLY_EARTH_LOCAL_MAX_MISSION_DIFFICULTY) {
+    const earthRadiusWorld = getPlanet('earth').displayRadius * SIZE_SCALE
+    const minDistance = earthRadiusWorld * EARLY_EARTH_LOCAL_DISTANCE_MIN_RADIUS_MULTIPLE
+    const maxDistance = earthRadiusWorld * EARLY_EARTH_LOCAL_DISTANCE_MAX_RADIUS_MULTIPLE
+
+    for (let attempt = 0; attempt < 96; attempt++) {
+      const angle = rand() * Math.PI * 2
+      const distance = minDistance + rand() * (maxDistance - minDistance)
+      const wx = hostWorldX + Math.cos(angle) * distance
+      const wz = hostWorldZ + Math.sin(angle) * distance
+      if (isMissionWaypointSolarDistanceClearOfPlanets(Math.hypot(wx, wz))) {
+        return { worldX: wx, worldZ: wz }
+      }
+    }
+
+    return {
+      worldX: hostWorldX + (minDistance + maxDistance) * 0.5,
+      worldZ: hostWorldZ,
+    }
+  }
+
   const hostAngle = Math.atan2(hostWorldZ, hostWorldX)
   const hostR = Math.hypot(hostWorldX, hostWorldZ)
   const t = missionDifficultyReachT(difficulty)
@@ -550,6 +581,7 @@ export function generateAsteroidMission(
     anchor.worldZ,
     difficulty,
     rand,
+    anchor.planetId,
   )
 
   const asteroidId = pickAsteroidForDifficulty(difficulty)

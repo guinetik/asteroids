@@ -37,6 +37,22 @@ export type EvaCollider =
       readonly min: THREE.Vector3
       readonly max: THREE.Vector3
     }
+  | {
+      /**
+       * Oriented cylinder. `localCenter`, `localAxis`, `halfLength`, `radius` are all in
+       * the referenced object's *local* frame; the resolver transforms the player sphere
+       * into that frame each check so the cylinder rotates with the object. Chosen for
+       * hulls where an AABB/OBB would give too many sharp corners to navigate around —
+       * a cylinder presents a smooth curved surface in the radial direction. Requires
+       * uniform scale on {@link object}.
+       */
+      readonly kind: 'cylinder'
+      readonly object: THREE.Object3D
+      readonly localCenter: THREE.Vector3
+      readonly localAxis: THREE.Vector3
+      readonly halfLength: number
+      readonly radius: number
+    }
 
 /** Outcome of a single resolution pass. Used for debug/telemetry, not required by callers. */
 export interface EvaResolveResult {
@@ -118,6 +134,73 @@ export function createObbColliderFromHullNodes(
     })
   }
   return { kind: 'obb', object: parent, min, max }
+}
+
+/**
+ * Build an oriented cylinder `EvaCollider` from hull nodes, aligned with the longest
+ * local-axis of the hull's AABB. Prefer this over {@link createObbColliderFromHullNodes}
+ * for long, narrow hulls (like the shuttle) — a cylinder has no corners in the radial
+ * direction, so the EVA player can slide smoothly along the hull without snagging on the
+ * OBB's eight sharp edges. Radius is taken as the larger of the two cross-section
+ * half-extents so the cylinder fully envelops the hull (slight corner inflation is the
+ * intentional tradeoff for smooth navigation). Requires uniform scale on `parent`.
+ */
+export function createCylinderColliderFromHullNodes(
+  parent: THREE.Object3D,
+  hullNodes: readonly THREE.Object3D[],
+): EvaCollider {
+  parent.updateMatrixWorld(true)
+  const parentInverse = new THREE.Matrix4().copy(parent.matrixWorld).invert()
+  const min = new THREE.Vector3(Infinity, Infinity, Infinity)
+  const max = new THREE.Vector3(-Infinity, -Infinity, -Infinity)
+  const corner = new THREE.Vector3()
+  const meshLocal = new THREE.Matrix4()
+  for (const node of hullNodes) {
+    node.updateMatrixWorld(true)
+    node.traverse((child) => {
+      const mesh = child as THREE.Mesh
+      if (!mesh.isMesh) return
+      const geom = mesh.geometry
+      if (!geom.boundingBox) geom.computeBoundingBox()
+      const bb = geom.boundingBox
+      if (!bb) return
+      meshLocal.multiplyMatrices(parentInverse, mesh.matrixWorld)
+      for (let i = 0; i < 8; i++) {
+        corner.set(
+          (i & 1) ? bb.max.x : bb.min.x,
+          (i & 2) ? bb.max.y : bb.min.y,
+          (i & 4) ? bb.max.z : bb.min.z,
+        ).applyMatrix4(meshLocal)
+        min.min(corner)
+        max.max(corner)
+      }
+    })
+  }
+  const halfX = (max.x - min.x) * 0.5
+  const halfY = (max.y - min.y) * 0.5
+  const halfZ = (max.z - min.z) * 0.5
+  const localCenter = new THREE.Vector3(
+    (min.x + max.x) * 0.5,
+    (min.y + max.y) * 0.5,
+    (min.z + max.z) * 0.5,
+  )
+  const localAxis = new THREE.Vector3()
+  let halfLength: number
+  let radius: number
+  if (halfX >= halfY && halfX >= halfZ) {
+    localAxis.set(1, 0, 0)
+    halfLength = halfX
+    radius = Math.max(halfY, halfZ)
+  } else if (halfY >= halfX && halfY >= halfZ) {
+    localAxis.set(0, 1, 0)
+    halfLength = halfY
+    radius = Math.max(halfX, halfZ)
+  } else {
+    localAxis.set(0, 0, 1)
+    halfLength = halfZ
+    radius = Math.max(halfX, halfY)
+  }
+  return { kind: 'cylinder', object: parent, localCenter, localAxis, halfLength, radius }
 }
 
 /**
@@ -249,54 +332,109 @@ export class EvaCollisionResolver {
         continue
       }
 
-      // OBB: transform sphere center into the object's local frame, do sphere-vs-AABB
-      // there, transform the push-out back to world. Assumes uniform scale.
+      if (c.kind === 'obb') {
+        // OBB: transform sphere center into the object's local frame, do sphere-vs-AABB
+        // there, transform the push-out back to world. Assumes uniform scale.
+        c.object.updateMatrixWorld()
+        c.object.matrixWorld.decompose(this.tmpWorldPos, this.tmpQuat, this.tmpScale)
+        const uniformScale = this.tmpScale.x
+        if (uniformScale < 1e-6) continue
+        this.tmpQuatInv.copy(this.tmpQuat).invert()
+        this.tmpLocalPos
+          .copy(position)
+          .sub(this.tmpWorldPos)
+          .applyQuaternion(this.tmpQuatInv)
+          .multiplyScalar(1 / uniformScale)
+        const localRadius = radius / uniformScale
+        this.tmpClosest.set(
+          Math.max(c.min.x, Math.min(this.tmpLocalPos.x, c.max.x)),
+          Math.max(c.min.y, Math.min(this.tmpLocalPos.y, c.max.y)),
+          Math.max(c.min.z, Math.min(this.tmpLocalPos.z, c.max.z)),
+        )
+        this.tmpNormal.subVectors(this.tmpLocalPos, this.tmpClosest)
+        const obbDistSq = this.tmpNormal.lengthSq()
+        const insideObb = obbDistSq < 1e-10
+        let pushLocal: number
+        if (insideObb) {
+          const dxMin = this.tmpLocalPos.x - c.min.x
+          const dxMax = c.max.x - this.tmpLocalPos.x
+          const dyMin = this.tmpLocalPos.y - c.min.y
+          const dyMax = c.max.y - this.tmpLocalPos.y
+          const dzMin = this.tmpLocalPos.z - c.min.z
+          const dzMax = c.max.z - this.tmpLocalPos.z
+          const minDepth = Math.min(dxMin, dxMax, dyMin, dyMax, dzMin, dzMax)
+          this.tmpNormal.set(0, 0, 0)
+          if (minDepth === dxMin) this.tmpNormal.x = -1
+          else if (minDepth === dxMax) this.tmpNormal.x = 1
+          else if (minDepth === dyMin) this.tmpNormal.y = -1
+          else if (minDepth === dyMax) this.tmpNormal.y = 1
+          else if (minDepth === dzMin) this.tmpNormal.z = -1
+          else this.tmpNormal.z = 1
+          pushLocal = minDepth + localRadius
+        } else {
+          if (obbDistSq >= localRadius * localRadius) continue
+          const obbDist = Math.sqrt(obbDistSq)
+          this.tmpNormal.multiplyScalar(1 / obbDist)
+          pushLocal = localRadius - obbDist
+        }
+        // Rotate the local push-normal back to world (unit vectors ignore scale), scale the
+        // push magnitude by uniformScale so the world-space displacement matches.
+        this.tmpNormal.applyQuaternion(this.tmpQuat)
+        position.addScaledVector(this.tmpNormal, pushLocal * uniformScale)
+        this.killVelocityAlong(velocity, this.tmpNormal)
+        touched = true
+        continue
+      }
+
+      // Cylinder: transform sphere center into the object's local frame, resolve against
+      // a capped cylinder whose axis = c.localAxis. Push-out is either radial (if the
+      // player is beside the hull) or axial (if they're hovering over the caps), whichever
+      // requires less displacement. Rotation-aware; assumes uniform scale.
       c.object.updateMatrixWorld()
       c.object.matrixWorld.decompose(this.tmpWorldPos, this.tmpQuat, this.tmpScale)
-      const uniformScale = this.tmpScale.x
-      if (uniformScale < 1e-6) continue
+      const cylScale = this.tmpScale.x
+      if (cylScale < 1e-6) continue
       this.tmpQuatInv.copy(this.tmpQuat).invert()
       this.tmpLocalPos
         .copy(position)
         .sub(this.tmpWorldPos)
         .applyQuaternion(this.tmpQuatInv)
-        .multiplyScalar(1 / uniformScale)
-      const localRadius = radius / uniformScale
-      this.tmpClosest.set(
-        Math.max(c.min.x, Math.min(this.tmpLocalPos.x, c.max.x)),
-        Math.max(c.min.y, Math.min(this.tmpLocalPos.y, c.max.y)),
-        Math.max(c.min.z, Math.min(this.tmpLocalPos.z, c.max.z)),
-      )
-      this.tmpNormal.subVectors(this.tmpLocalPos, this.tmpClosest)
-      const obbDistSq = this.tmpNormal.lengthSq()
-      const insideObb = obbDistSq < 1e-10
-      let pushLocal: number
-      if (insideObb) {
-        const dxMin = this.tmpLocalPos.x - c.min.x
-        const dxMax = c.max.x - this.tmpLocalPos.x
-        const dyMin = this.tmpLocalPos.y - c.min.y
-        const dyMax = c.max.y - this.tmpLocalPos.y
-        const dzMin = this.tmpLocalPos.z - c.min.z
-        const dzMax = c.max.z - this.tmpLocalPos.z
-        const minDepth = Math.min(dxMin, dxMax, dyMin, dyMax, dzMin, dzMax)
-        this.tmpNormal.set(0, 0, 0)
-        if (minDepth === dxMin) this.tmpNormal.x = -1
-        else if (minDepth === dxMax) this.tmpNormal.x = 1
-        else if (minDepth === dyMin) this.tmpNormal.y = -1
-        else if (minDepth === dyMax) this.tmpNormal.y = 1
-        else if (minDepth === dzMin) this.tmpNormal.z = -1
-        else this.tmpNormal.z = 1
-        pushLocal = minDepth + localRadius
+        .multiplyScalar(1 / cylScale)
+      const cylLocalRadius = radius / cylScale
+      // Vector from cylinder center to sphere center in cylinder local space.
+      this.tmpLocalPos.sub(c.localCenter)
+      const axial =
+        this.tmpLocalPos.x * c.localAxis.x
+        + this.tmpLocalPos.y * c.localAxis.y
+        + this.tmpLocalPos.z * c.localAxis.z
+      // Radial component = local offset minus axial projection along the cylinder axis.
+      const radialX = this.tmpLocalPos.x - c.localAxis.x * axial
+      const radialY = this.tmpLocalPos.y - c.localAxis.y * axial
+      const radialZ = this.tmpLocalPos.z - c.localAxis.z * axial
+      const radialLen = Math.sqrt(radialX * radialX + radialY * radialY + radialZ * radialZ)
+      // Signed overlap along each axis (positive = penetrating past the cap/side).
+      const radialGap = c.radius + cylLocalRadius - radialLen
+      const axialGap = c.halfLength + cylLocalRadius - Math.abs(axial)
+      if (radialGap <= 0 || axialGap <= 0) continue
+      // Pick shallower axis for push — natural "slide around" feel.
+      if (radialGap < axialGap) {
+        if (radialLen < 1e-5) {
+          // Degenerate: sphere center on the axis line. Push along an arbitrary perpendicular.
+          this.tmpNormal.set(1, 0, 0)
+          if (Math.abs(c.localAxis.x) > 0.9) this.tmpNormal.set(0, 1, 0)
+        } else {
+          this.tmpNormal.set(radialX / radialLen, radialY / radialLen, radialZ / radialLen)
+        }
+        this.tmpNormal.applyQuaternion(this.tmpQuat)
+        position.addScaledVector(this.tmpNormal, radialGap * cylScale)
       } else {
-        if (obbDistSq >= localRadius * localRadius) continue
-        const obbDist = Math.sqrt(obbDistSq)
-        this.tmpNormal.multiplyScalar(1 / obbDist)
-        pushLocal = localRadius - obbDist
+        const sign = axial >= 0 ? 1 : -1
+        this.tmpNormal
+          .copy(c.localAxis as THREE.Vector3)
+          .multiplyScalar(sign)
+          .applyQuaternion(this.tmpQuat)
+        position.addScaledVector(this.tmpNormal, axialGap * cylScale)
       }
-      // Rotate the local push-normal back to world (unit vectors ignore scale), scale the
-      // push magnitude by uniformScale so the world-space displacement matches.
-      this.tmpNormal.applyQuaternion(this.tmpQuat)
-      position.addScaledVector(this.tmpNormal, pushLocal * uniformScale)
       this.killVelocityAlong(velocity, this.tmpNormal)
       touched = true
     }

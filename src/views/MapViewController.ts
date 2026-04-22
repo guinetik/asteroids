@@ -46,7 +46,7 @@ import { ShuttleController, MAP_PHYSICS } from '@/three/ShuttleController'
 import { EvaSession, type EvaHugeScaleTarget, type EvaSceneHost } from '@/three/EvaSession'
 import {
   createAabbColliderFromObject,
-  createObbColliderFromHullNodes,
+  createCylinderColliderFromHullNodes,
   type EvaCollider,
 } from '@/lib/physics/evaCollisionResolver'
 import type { FpsTelemetry } from '@/components/FpsHud.vue'
@@ -89,6 +89,7 @@ import {
   hasOrbitalSurfingUnlock,
   getPlayerUpgradeLevelsSnapshot,
   hydratePlayerUpgradeLevelsFromStorage,
+  resetPlayerUpgradesToDefaults,
   saveCurrentPlayerUpgradesToStorage,
   CURRENT_PLAYER_UPGRADE_LEVELS,
   UPGRADE_DEFINITIONS,
@@ -135,7 +136,7 @@ import {
   DEFAULT_MAX_WEIGHT_KG,
 } from '@/lib/inventory/inventory'
 import type { Inventory } from '@/lib/inventory/types'
-import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
+import { clearInventory, loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
 import '@/lib/shop/tradeGoods'
 import type {
   ShuttleMissionBoard,
@@ -146,6 +147,8 @@ import { getSpecialMissionById } from '@/lib/missions/specialMissions'
 import { generateEvaWaypoint } from '@/lib/missions/evaWaypointGenerator'
 import {
   clearActiveMission,
+  clearCompletedEvaSites,
+  clearMissionBoard,
   consumePendingMapReturnWorld,
   saveActiveMission,
 } from '@/lib/missions/missionStorage'
@@ -266,6 +269,19 @@ export class MapViewController implements Tickable {
   private satelliteRepairController: SatelliteRepairController | null = null
   /** Current in-scene minigame prompt text, piped to EvaSession via `getInSceneMinigamePrompt`. */
   private currentAimPrompt: string | null = null
+  /**
+   * POI prompt range cached at EVA session start (after huge-scale has been applied).
+   * Fed to {@link EvaSession} via `getPoiPromptRange`. Null outside EVA or when there
+   * is no active POI. See {@link buildEvaColliders} for how it is computed.
+   */
+  private evaPoiPromptRange: number | null = null
+  /**
+   * Shuttle hull world-space AABB cached at EVA session start. Fed to
+   * {@link EvaSession} via `getVehicleReturnBounds` so the "Return to Shuttle [F]"
+   * prompt wraps the visible hull (not the group origin, which may not sit at the
+   * cargo bay). Null outside EVA.
+   */
+  private evaVehicleReturnBounds: { min: THREE.Vector3; max: THREE.Vector3 } | null = null
   private planetariumScene: MapPlanetariumScene | null = null
   private sunController: SunController | null = null
   private planetControllers: PlanetSystemController[] = []
@@ -599,6 +615,11 @@ export class MapViewController implements Tickable {
       const portalParams = new VibePortal()
       const portalName = portalParams.arrival.username?.trim() || 'Pilot'
       this.playerProfile = createProfile(portalName)
+      resetPlayerUpgradesToDefaults()
+      clearInventory()
+      clearMissionBoard()
+      clearActiveMission()
+      clearCompletedEvaSites()
     }
     const emptyHold = this.createInventoryForCurrentCargoBayLevel()
     const savedInventory = typeof localStorage === 'undefined' ? null : loadInventory()
@@ -2547,7 +2568,7 @@ export class MapViewController implements Tickable {
     if (!giverController) return
     const leadTime = this.simTime + MapViewController.EVA_WAYPOINT_PLANET_LEAD_SECONDS
     const future = giverController.predictWorldPosXZ(leadTime)
-    const waypoint = generateEvaWaypoint(future.x, future.z)
+    const waypoint = generateEvaWaypoint(future.x, future.z, giverPlanetId)
     this.missionFacade.evaMissionAccept(waypoint, this.onMissionBoardUpdate)
   }
 
@@ -3909,6 +3930,14 @@ export class MapViewController implements Tickable {
   private static readonly EVA_MAP_SPAWN_OFFSET_SCALE = 1
 
   /**
+   * Buffer (world units) added to the POI's largest half-extent when computing the
+   * "START MAINTENANCE [F]" prompt range. Keeps the trigger tight against small
+   * satellites (~2-unit half-extent → ~4-unit trigger) while giving the ×20 telescope
+   * enough approach room without a fixed fudge factor.
+   */
+  private static readonly EVA_POI_PROMPT_BUFFER = 2
+
+  /**
    * Bloom threshold applied while EVA is active. The map's default threshold is tuned for
    * a 0.01-unit shuttle seen from orbit; once we scale the ship up to ~1 world unit for
    * EVA, its TRON-emissive panels fill the screen and bloom blows out to pure white. A
@@ -4119,6 +4148,8 @@ export class MapViewController implements Tickable {
     this.setEvaBloomOverride(active)
     if (!active) {
       this.missionFacade.armCompletedEvaSiteCleanup()
+      this.evaPoiPromptRange = null
+      this.evaVehicleReturnBounds = null
     }
     this.onEvaModeChange?.(active)
   }
@@ -4255,6 +4286,8 @@ export class MapViewController implements Tickable {
       getInSceneMinigamePrompt: () => this.currentAimPrompt,
       getHugeScaleTargets: () => this.buildEvaHugeScaleTargets(),
       getColliders: () => this.buildEvaColliders(),
+      getPoiPromptRange: () => this.evaPoiPromptRange,
+      getVehicleReturnBounds: () => this.evaVehicleReturnBounds,
       spawnOffsetScale: MapViewController.EVA_MAP_SPAWN_OFFSET_SCALE,
       helmetLightIntensityScale: MapViewController.EVA_MAP_HELMET_LIGHT_SCALE,
       onEvaModeChange: (active) => {
@@ -4312,24 +4345,48 @@ export class MapViewController implements Tickable {
    * Build the 3D colliders the EVA player should bounce off. Called by {@link EvaSession}
    * after huge-scale has been applied, so world-space AABBs reflect the ×100 shuttle and
    * any per-type POI scale boost. Shuttle and POI are static for the session lifetime —
-   * shuttle is frozen, POI never moves — so a one-shot snapshot is enough.
+   * shuttle is frozen, POI never moves — so a one-shot snapshot is enough. Also caches
+   * the POI prompt range and the shuttle return bounds for the session; the session
+   * reads both via its per-tick config hooks.
    */
   private buildEvaColliders(): EvaCollider[] {
     const colliders: EvaCollider[] = []
+    this.evaVehicleReturnBounds = null
+    this.evaPoiPromptRange = null
     if (this.shuttleController) {
-      // OBB in the shuttle's local frame: stays tight no matter how the shuttle is
-      // rotated in world space. A world-axis AABB balloons ~1.4× on a 45° heading,
-      // leaving dead-corner gaps in front of the nose and behind the tail.
+      // Cylinder aligned with the shuttle's longest local axis. Smooth radial surface
+      // means the EVA player can slide around the hull without catching on OBB corners,
+      // which was the dominant navigation complaint on the previous OBB collider.
       colliders.push(
-        createObbColliderFromHullNodes(
+        createCylinderColliderFromHullNodes(
           this.shuttleController.group,
           this.shuttleController.shuttleHullNodes,
         ),
       )
+      // Snapshot the shuttle hull's world-space AABB for the bounds-aware "Return to
+      // Shuttle [F]" prompt. Using bounds (not group.position) keeps the trigger zone
+      // wrapped around the visible hull regardless of where the group origin sits.
+      this.shuttleController.group.updateMatrixWorld(true)
+      const hullBox = new THREE.Box3()
+      hullBox.makeEmpty()
+      for (const node of this.shuttleController.shuttleHullNodes) {
+        hullBox.expandByObject(node)
+      }
+      if (!hullBox.isEmpty()) {
+        this.evaVehicleReturnBounds = { min: hullBox.min.clone(), max: hullBox.max.clone() }
+      }
     }
     const poiGroup = this.missionFacade.getEvaPoiGroup()
     if (poiGroup) {
       poiGroup.updateMatrixWorld(true)
+      // Size-aware prompt range so a stock satellite requires close approach while a
+      // ×20 telescope still triggers at a reasonable distance.
+      const poiBox = new THREE.Box3().setFromObject(poiGroup)
+      if (!poiBox.isEmpty()) {
+        const size = poiBox.getSize(new THREE.Vector3())
+        const maxHalfExtent = Math.max(size.x, size.y, size.z) * 0.5
+        this.evaPoiPromptRange = maxHalfExtent + MapViewController.EVA_POI_PROMPT_BUFFER
+      }
       // Skip POI collision while a satellite-servicing minigame is active so
       // deployed solar panels / antennas don't block the raycast-aim approach.
       // The inline raycast + F-repair interaction already gates distance.

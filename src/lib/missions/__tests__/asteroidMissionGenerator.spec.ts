@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ORBIT_SCALE } from '@/lib/planets/constants'
+import { ORBIT_SCALE, SIZE_SCALE } from '@/lib/planets/constants'
 import { getPlanet } from '@/lib/planets/catalog'
 import shipHealthData from '@/data/shuttle/ship-health.json'
 import {
@@ -110,6 +110,21 @@ describe('rollObjective', () => {
 })
 
 describe('generateAsteroidWaypointNearHostPlanet', () => {
+  it('keeps early Earth asteroid waypoints inside the 3–5 Earth-radius onboarding band', () => {
+    const earth = getPlanet('earth')
+    const hostR = earth.orbit.semiMajorAxis * ORBIT_SCALE
+    const earthRadiusWorld = earth.displayRadius * SIZE_SCALE
+    const minDistance = earthRadiusWorld * 3
+    const maxDistance = earthRadiusWorld * 5
+
+    for (let i = 0; i < 40; i++) {
+      const wp = generateAsteroidWaypointNearHostPlanet(hostR, 0, 1, Math.random, 'earth')
+      const distanceFromEarth = Math.hypot(wp.worldX - hostR, wp.worldZ)
+      expect(distanceFromEarth).toBeGreaterThanOrEqual(minDistance - 1e-6)
+      expect(distanceFromEarth).toBeLessThanOrEqual(maxDistance + 1e-6)
+    }
+  })
+
   it('keeps waypoint solar radius close to the host planet (Earth @ 1 AU)', () => {
     const earth = getPlanet('earth')
     const hostR = earth.orbit.semiMajorAxis * ORBIT_SCALE

@@ -62,13 +62,24 @@ const EVA_SPAWN_OFFSET = new THREE.Vector3(0, 2.5, 6)
 const EVA_RCS_AUDIO_VOLUME = 0.42
 
 /**
- * 3D distance (world units) at which the EVA player sees the "START MAINTENANCE [F]"
- * prompt near a POI. Sized generously so scaled POIs (e.g. the ×20 telescope) trigger
- * the prompt as you approach, not at the instant you clip the hull. Smaller POIs like
- * satellites (×1) simply have a bigger forgiveness bubble; the in-scene minigame hook
- * (satellite servicing) short-circuits this path anyway.
+ * Fallback 3D distance (world units) at which the EVA player sees the
+ * "START MAINTENANCE [F]" prompt near a POI. Applies only when the host view
+ * does not supply a size-aware override via
+ * {@link EvaSessionConfig.getPoiPromptRange}. Hosts that mix POI scales
+ * (e.g. a ~1-unit satellite next to a ×20 telescope) should always provide
+ * an override — a fixed fallback bubble makes satellites trigger "from
+ * across the parking lot" while barely catching the telescope hull.
  */
-const EVA_TERMINAL_PROMPT_RANGE = 15
+const EVA_TERMINAL_PROMPT_RANGE = 6
+
+/**
+ * Buffer (world units) added to the shuttle hull AABB for the "Return to Shuttle [F]"
+ * prompt when a host provides return bounds. Chosen so the player sees the prompt
+ * once they're within arm's reach of the hull, not when they've drifted near the
+ * ship's floating pivot. Falls back to {@link EVA_RETURN_RANGE} (XZ-from-center)
+ * when no bounds are supplied.
+ */
+const EVA_RETURN_BOUNDS_BUFFER = 4
 
 /**
  * Minimal vehicle contract the EVA session depends on. {@link ShuttleController}
@@ -154,6 +165,23 @@ export interface EvaSessionConfig {
    * {@link EvaCollider} AABBs can be computed from current world bounds.
    */
   getColliders?: () => EvaCollider[]
+  /**
+   * World-space 3D distance at which the "START MAINTENANCE [F]" prompt shows near
+   * the POI. Called each tick so the host can scale with POI size (e.g. ~3 units for
+   * a stock satellite, ~50 for a ×20 telescope). When omitted or null, the fallback
+   * {@link EVA_TERMINAL_PROMPT_RANGE} is used.
+   */
+  getPoiPromptRange?: () => number | null
+  /**
+   * World-space AABB used for the "Return to Shuttle [F]" prompt check. When provided,
+   * the session uses point-to-AABB 3D distance with a small buffer so the trigger
+   * wraps the hull instead of pivoting on `vehicle.group.position`, which may not
+   * coincide with the cargo bay (the intuitive re-entry point). Sampled each tick
+   * so the host can update it if the vehicle's world bounds change — the shuttle is
+   * frozen during EVA so a cached snapshot is typically sufficient. Returning null
+   * falls back to the legacy XZ-from-center check.
+   */
+  getVehicleReturnBounds?: () => { min: THREE.Vector3; max: THREE.Vector3 } | null
   /** Multiplier applied to the spawn offset so the player emerges outside the scaled vehicle. */
   spawnOffsetScale: number
   /** Fired true when EVA becomes active, false when it ends. */
@@ -261,7 +289,8 @@ export class EvaSession implements Tickable {
       const pdy = this.controller.group.position.y - poi.y
       const pdz = this.controller.group.position.z - poi.z
       const distToPoi = Math.sqrt(pdx * pdx + pdy * pdy + pdz * pdz)
-      if (distToPoi < EVA_TERMINAL_PROMPT_RANGE) {
+      const poiPromptRange = this.config.getPoiPromptRange?.() ?? EVA_TERMINAL_PROMPT_RANGE
+      if (distToPoi < poiPromptRange) {
         // In-scene minigames (e.g. satellite servicing) attach their controller on
         // EVA-enter and drive repairs inline with pointer lock held. Skip the
         // terminal prompt + F-press so the player isn't told to press F and so F
@@ -290,10 +319,30 @@ export class EvaSession implements Tickable {
       }
     }
 
-    const rdx = this.controller.group.position.x - vehicle.group.position.x
-    const rdz = this.controller.group.position.z - vehicle.group.position.z
-    const distToVehicleXZ = Math.sqrt(rdx * rdx + rdz * rdz)
-    if (distToVehicleXZ < EVA_RETURN_RANGE) {
+    const returnBounds = this.config.getVehicleReturnBounds?.() ?? null
+    let canReturn: boolean
+    if (returnBounds) {
+      // Point-to-AABB distance: zero if the player is inside the box, otherwise the
+      // straight-line distance to the nearest face. Far more forgiving than pivoting
+      // on vehicle.group.position for hulls whose origin isn't at the cargo bay.
+      const px = this.controller.group.position.x
+      const py = this.controller.group.position.y
+      const pz = this.controller.group.position.z
+      const clampedX = Math.max(returnBounds.min.x, Math.min(px, returnBounds.max.x))
+      const clampedY = Math.max(returnBounds.min.y, Math.min(py, returnBounds.max.y))
+      const clampedZ = Math.max(returnBounds.min.z, Math.min(pz, returnBounds.max.z))
+      const ddx = px - clampedX
+      const ddy = py - clampedY
+      const ddz = pz - clampedZ
+      const distToBounds = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz)
+      canReturn = distToBounds < EVA_RETURN_BOUNDS_BUFFER
+    } else {
+      const rdx = this.controller.group.position.x - vehicle.group.position.x
+      const rdz = this.controller.group.position.z - vehicle.group.position.z
+      const distToVehicleXZ = Math.sqrt(rdx * rdx + rdz * rdz)
+      canReturn = distToVehicleXZ < EVA_RETURN_RANGE
+    }
+    if (canReturn) {
       this.setPrompt('Return to Shuttle [F]')
       if (this.config.inputManager.wasActionPressed('evaToggle')) {
         this.endSession(vehicle)
