@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
 import type { UpgradeId } from '@/lib/upgrades'
+import { uiAudio } from '@/audio/UiAudioDirector'
 
 /**
  * Vale Orbital Refurb — Shuttle Orientation Manual.
@@ -142,7 +143,7 @@ const prevChapter = () => {
             v-for="chapter in chapters" 
             :key="chapter.id"
             :class="['nav-item', { active: currentChapter === chapter.id }]"
-            @click="currentChapter = chapter.id"
+            @click="uiAudio.notifyButtonHover(); currentChapter = chapter.id"
           >
             <span class="ch-num">0{{ chapter.id }}</span>
             <span class="ch-title">{{ chapter.title }}</span>

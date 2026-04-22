@@ -141,7 +141,7 @@ function onKeydown(e: KeyboardEvent) {
         <button
           type="button"
           class="ship-message-card__button"
-          @click="uiAudio.notifyCancel(); $emit('close')"
+          @click="uiAudio.notifySwitch(); $emit('close')"
         >
           Close
         </button>
