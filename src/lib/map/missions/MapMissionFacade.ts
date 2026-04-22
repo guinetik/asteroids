@@ -75,6 +75,7 @@ import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
 
 const COMPLETED_EVA_SITE_DESPAWN_DISTANCE = 180
 
+/** Debug helper to stringify a world-space waypoint for logging. */
 function formatWaypointDebug(worldX: number, worldZ: number): string {
   const radiusWorld = Math.hypot(worldX, worldZ)
   return `world=(${worldX.toFixed(2)}, ${worldZ.toFixed(2)}) au=(${(worldX / ORBIT_SCALE).toFixed(3)}, ${(worldZ / ORBIT_SCALE).toFixed(3)}) r=${radiusWorld.toFixed(2)} (${(radiusWorld / ORBIT_SCALE).toFixed(3)} AU)`

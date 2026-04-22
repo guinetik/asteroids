@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { createProfile } from '@/lib/player/profile'
+import { WELCOME_JOURNEY_ID } from '@/lib/journeys'
 import {
   evaluateAchievementUnlocks,
   getAchievementLockedHint,
@@ -18,6 +19,7 @@ describe('achievements', () => {
     const profile = {
       ...createProfile('Pilot'),
       hasSeenIntro: true,
+      completedJourneyIds: [WELCOME_JOURNEY_ID],
       completedMissionCount: 1,
       credits: 2200,
       visitedAsteroids: { bennu: 1 },

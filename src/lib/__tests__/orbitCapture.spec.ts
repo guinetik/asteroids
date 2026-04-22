@@ -92,12 +92,14 @@ describe('OrbitCaptureSystem', () => {
     })
 
     it('supports per-body capture range overrides', () => {
+      // displayRadius=0.15, SIZE_SCALE=80, captureMultiplier from config (24),
+      // multiplier=0.2 → captureRadius ≈ 57.6. 30 is inside, 100 is outside.
       const sunLikeBody = makeBody('Sun', 0, 0, 0.15, 1, 0.2)
       const inRangeSystem = new OrbitCaptureSystem([sunLikeBody])
       const outOfRangeSystem = new OrbitCaptureSystem([sunLikeBody])
 
       expect(inRangeSystem.beginCapture(30, 0)).toBe(true)
-      expect(outOfRangeSystem.beginCapture(50, 0)).toBe(false)
+      expect(outOfRangeSystem.beginCapture(100, 0)).toBe(false)
     })
 
     it('supports explicit capture and orbit radii for special bodies', () => {
@@ -235,9 +237,14 @@ describe('OrbitCaptureSystem', () => {
       const vel = sunSystem.launchSlingshot(0, 0.016)
       const speed = Math.sqrt(vel.vx * vel.vx + vel.vz * vel.vz)
 
-      const sunBaseline = orbitConfig.orbitLaunchSpeed * 12
-      expect(hud.orbitalSpeed).toBeCloseTo(sunBaseline, 5)
-      expect(speed).toBeCloseTo(sunBaseline, 5)
+      // HUD reports the displayed per-body lane speed (raw multiplier).
+      const hudBaseline = orbitConfig.orbitLaunchSpeed * 12
+      expect(hud.orbitalSpeed).toBeCloseTo(hudBaseline, 5)
+      // Slingshot launch applies the hidden gameplay boost (mult * sqrt(mult))
+      // so outer-system departures feel practical without changing the HUD number.
+      const gameplayMultiplier = 12 * Math.sqrt(12)
+      const launchBaseline = orbitConfig.orbitLaunchSpeed * gameplayMultiplier
+      expect(speed).toBeCloseTo(launchBaseline, 5)
     })
   })
 

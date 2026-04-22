@@ -28,10 +28,10 @@ import {
 } from '../upgradeStorage'
 
 /** Total number of upgrades defined in the JSON. */
-const EXPECTED_UPGRADE_COUNT = 32
+const EXPECTED_UPGRADE_COUNT = 33
 
 describe('UPGRADE_DEFINITIONS', () => {
-  it('loads all 32 upgrades from JSON', () => {
+  it('loads all upgrades from JSON', () => {
     const ids = Object.keys(UPGRADE_DEFINITIONS)
     expect(ids).toHaveLength(EXPECTED_UPGRADE_COUNT)
   })
@@ -64,7 +64,7 @@ describe('CURRENT_PLAYER_UPGRADE_LEVELS', () => {
     resetPlayerUpgradesToDefaults()
   })
 
-  it('initializes all 32 upgrades to level 0', () => {
+  it('initializes all upgrades to level 0', () => {
     const keys = Object.keys(CURRENT_PLAYER_UPGRADE_LEVELS)
     expect(keys).toHaveLength(EXPECTED_UPGRADE_COUNT)
     for (const level of Object.values(CURRENT_PLAYER_UPGRADE_LEVELS)) {
@@ -154,8 +154,8 @@ describe('getUpgradeCost', () => {
 })
 
 describe('getUpgradesByCategory', () => {
-  it('returns 15 shuttle upgrades (shop-visible only)', () => {
-    expect(getUpgradesByCategory('shuttle')).toHaveLength(15)
+  it('returns 16 shuttle upgrades (shop-visible only)', () => {
+    expect(getUpgradesByCategory('shuttle')).toHaveLength(16)
   })
 
   it('omits Gravity Surfing from shuttle shop list', () => {
