@@ -87,6 +87,7 @@ import {
   toggleBackgroundMusic,
   useBackgroundMusicGlobalState,
 } from '@/audio/backgroundMusic'
+import { uiAudio } from '@/audio/UiAudioDirector'
 
 /** So Space Fabric gating matches storage before the first paint (also merged again in controller `init`). */
 hydratePlayerUpgradeLevelsFromStorage()
@@ -1008,24 +1009,32 @@ function closeMissionOverlay() {
 function handleAcceptMission() {
   const result = viewController.missionAccept()
   if (!result.ok && result.reason) {
+    uiAudio.notifyError()
     showMissionNotification(result.reason)
+  } else {
+    uiAudio.notifyMissionAccepted()
   }
 }
 
 function handleAcceptAsteroidMission() {
   viewController.asteroidMissionAccept()
+  uiAudio.notifyMissionAccepted()
 }
 
 function handleAcceptEvaMission() {
   viewController.evaMissionAccept()
+  uiAudio.notifyMissionAccepted()
 }
 
 function handleAcceptMiningMission() {
   viewController.miningMissionAccept()
+  uiAudio.notifyMissionAccepted()
 }
 
 function handleDeliverMiningMission(missionId: string) {
   viewController.miningMissionDeliver(missionId)
+  uiAudio.notifyMissionComplete()
+  uiAudio.notifyRewardReceived()
 }
 
 /** Player clicked the overlay's Complete button — pay reward and close. */
@@ -1040,6 +1049,8 @@ function handleEvaMinigameClose(): void {
 
 function handleDeliverMission(missionId: string) {
   viewController.missionDeliver(missionId)
+  uiAudio.notifyMissionComplete()
+  uiAudio.notifyRewardReceived()
 }
 
 function dockedPlanetId(): string | null {

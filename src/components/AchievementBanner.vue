@@ -33,7 +33,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useAudio } from '@/audio/useAudio'
+import { uiAudio } from '@/audio/UiAudioDirector'
 
 interface AchievementBannerItem {
   id: string
@@ -54,7 +54,7 @@ function show(
   description: string,
   type = 'ACHIEVEMENT',
 ): void {
-  useAudio().play('ui.confirm')
+  uiAudio.notifyAchievementUnlocked()
   const id = `achievement-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
   visible.value.push({ id, icon, title, subtitle, description, type })
   window.setTimeout(() => {
