@@ -133,7 +133,7 @@ const manifestById: ManifestById = {
   // ── UI ──────────────────────────────────────────────────────────────
   'ui.click': {
     id: 'ui.click',
-    src: '/sound/ui.click.mp3',
+    src: '/sound/sfx.ui.primary.mp3',
     category: 'ui',
     load: 'eager',
     playback: 'restart',
