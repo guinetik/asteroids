@@ -78,6 +78,39 @@ const hasAnyActiveMission = computed(() => {
   )
 })
 
+/** Show the EVA section only while there's an offer at the dock or a restock timer running. */
+const evaSectionVisible = computed(() => {
+  const b = props.board
+  if (!b || !props.dockedPlanet) return false
+  const hasOffer = b.offeredEvaMission !== null && b.offeringEvaPlanet === props.dockedPlanet
+  return hasOffer || b.evaRestockTimer !== null
+})
+
+/** Show the mining section only when unlocked AND offering at this dock OR restocking. */
+const miningSectionVisible = computed(() => {
+  if (!miningTabVisible.value) return false
+  const b = props.board
+  if (!b || !props.dockedPlanet) return false
+  const hasOffer = b.offeredMiningMission !== null && b.offeringMiningPlanet === props.dockedPlanet
+  return hasOffer || b.miningRestockTimer !== null
+})
+
+/** Show the asteroid section only when offering or restocking at this dock. */
+const asteroidSectionVisible = computed(() => {
+  const b = props.board
+  if (!b) return false
+  const hasOffer = b.offeredAsteroidMission !== null && b.activeAsteroidMission === null
+  return hasOffer || b.asteroidRestockTimer !== null
+})
+
+/** Show the planetary section only when offering at this dock or restocking. */
+const planetarySectionVisible = computed(() => {
+  const b = props.board
+  if (!b || !props.dockedPlanet) return false
+  const hasOffer = b.offeredMission !== null && b.offeringPlanet === props.dockedPlanet
+  return hasOffer || b.restockTimer !== null
+})
+
 const emit = defineEmits<{
   acceptMission: []
   deliverMission: [missionId: string]
@@ -236,24 +269,20 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
     <h2 class="shuttle-control-screen__title">Missions</h2>
 
     <!-- Shuttle EVA Missions (first — quick local spacewalk jobs) -->
-    <div class="mission-board-section">
+    <div v-if="evaSectionVisible" class="mission-board-section">
       <h3 class="mission-board-section__heading">Shuttle EVA Missions</h3>
       <p class="mission-board-section__descriptor">
         Fly to a waypoint in deep space, exit the shuttle, and spacewalk to a relay or probe to service it.
       </p>
 
-      <div v-if="!dockedPlanet" class="mission-board-empty">
-        Not docked at a planet
-      </div>
-
       <div
-        v-else-if="board?.offeredEvaMission && board.offeringEvaPlanet === dockedPlanet"
+        v-if="board?.offeredEvaMission && board.offeringEvaPlanet === dockedPlanet"
         class="mission-board-offer"
       >
         <div class="mission-board-offer__name">{{ board.offeredEvaMission.name }}</div>
         <div class="mission-board-offer__desc">{{ board.offeredEvaMission.description }}</div>
         <div class="mission-board-offer__meta">
-          <span>Waypoint: near {{ targetPlanetName(dockedPlanet) }}</span>
+          <span>Waypoint: near {{ targetPlanetName(dockedPlanet ?? '') }}</span>
           <span>Reward: {{ board.offeredEvaMission.reward }} CR</span>
         </div>
         <button
@@ -268,26 +297,18 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
       <div v-else-if="board?.evaRestockTimer" class="mission-board-empty">
         Restocking in {{ formatTime(board.evaRestockTimer.remaining) }}
       </div>
-
-      <div v-else class="mission-board-empty">
-        No EVA missions available
-      </div>
     </div>
 
     <!-- Turret Mining Missions (second — bulk ore collection via the map turret) -->
-    <div v-if="miningTabVisible" class="mission-board-section">
+    <div v-if="miningSectionVisible" class="mission-board-section">
       <h3 class="mission-board-section__heading">Turret Mining Missions</h3>
       <p class="mission-board-section__descriptor">
         Dock at a planet with a mining contract to accept it, then extract ore in the asteroid belt
         using the map turret. Return to deliver when the target quantity is reached.
       </p>
 
-      <div v-if="!dockedPlanet" class="mission-board-empty">
-        Not docked at a planet
-      </div>
-
       <div
-        v-else-if="board?.offeredMiningMission && board.offeringMiningPlanet === dockedPlanet"
+        v-if="board?.offeredMiningMission && board.offeringMiningPlanet === dockedPlanet"
         class="mission-board-offer"
       >
         <div class="mission-board-offer__name">{{ board.offeredMiningMission.name }}</div>
@@ -309,14 +330,10 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
       <div v-else-if="board?.miningRestockTimer" class="mission-board-empty">
         Restocking in {{ formatTime(board.miningRestockTimer.remaining) }}
       </div>
-
-      <div v-else class="mission-board-empty">
-        No mining missions available
-      </div>
     </div>
 
     <!-- Asteroid Missions (third — local lander jobs near the posting station) -->
-    <div class="mission-board-section">
+    <div v-if="asteroidSectionVisible" class="mission-board-section">
       <h3 class="mission-board-section__heading">Asteroid Missions</h3>
       <p class="mission-board-section__descriptor">
         Contracts send you to a waypoint near your posting station's orbit; difficulty scales with your upgrades.
@@ -342,32 +359,20 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
         </button>
       </div>
 
-      <div v-else-if="board?.activeAsteroidMission" class="mission-board-empty">
-        Asteroid contract in progress — see Active Missions below.
-      </div>
-
       <div v-else-if="board?.asteroidRestockTimer" class="mission-board-empty">
         Restocking in {{ formatTime(board.asteroidRestockTimer.remaining) }}
-      </div>
-
-      <div v-else class="mission-board-empty">
-        No asteroid missions available
       </div>
     </div>
 
     <!-- Planetary Missions (fourth — advanced: requires interplanetary travel) -->
-    <div class="mission-board-section">
+    <div v-if="planetarySectionVisible" class="mission-board-section">
       <h3 class="mission-board-section__heading">Planetary Missions</h3>
       <p class="mission-board-section__descriptor">
         Advanced contracts that send you to <em>another</em> planet: match orbit from the shuttle, secure the orbital
         pickup in your cargo hold, then return to the posting station for your payout.
       </p>
 
-      <div v-if="!dockedPlanet" class="mission-board-empty">
-        Not docked at a planet
-      </div>
-
-      <div v-else-if="board?.offeredMission && board.offeringPlanet === dockedPlanet" class="mission-board-offer">
+      <div v-if="board?.offeredMission && board.offeringPlanet === dockedPlanet" class="mission-board-offer">
         <div class="mission-board-offer__name">{{ board.offeredMission.name }}</div>
         <div class="mission-board-offer__desc">{{ board.offeredMission.description }}</div>
         <div class="mission-board-offer__meta">
@@ -389,10 +394,6 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
 
       <div v-else-if="board?.restockTimer" class="mission-board-empty">
         Restocking in {{ formatTime(board.restockTimer.remaining) }}
-      </div>
-
-      <div v-else class="mission-board-empty">
-        No missions available
       </div>
     </div>
 
