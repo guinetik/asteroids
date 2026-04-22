@@ -46,6 +46,14 @@ export interface ContractSystemHooks {
    * @param contract - The contract that was completed.
    */
   onRewardGranted?: (effect: RewardEffect, contract: Contract) => void
+  /**
+   * Called once per contract when its instance transitions into `completed` status,
+   * both on the live path and during `replayCompletedRewards`. Receivers typically
+   * emit a journey trigger or run post-completion UI cleanup.
+   *
+   * @param contractId - Id of the contract that just completed.
+   */
+  onContractCompleted?: (contractId: string) => void
 }
 
 /** Default persistence backed by `loadContractSnapshot`/`saveContractSnapshot`. */
@@ -74,6 +82,7 @@ export class ContractSystem {
   private readonly persistence: ContractPersistence
   private readonly hooks: ContractSystemHooks
   private snapshot: ContractStoreSnapshot
+  private hasReplayedCompletedRewards = false
 
   /**
    * @param contracts - Static contract catalog.
@@ -121,23 +130,27 @@ export class ContractSystem {
   }
 
   /**
-   * Re-fire `onRewardGranted` for every contract instance currently in
-   * `completed` state. Reward effects are required to be idempotent
-   * (`unlockFastTravelPlanet` is a no-op on duplicates, `setMissionPayMultiplier`
-   * never regresses), so this is safe to call on startup as a recovery path
-   * for profiles that lost a reward (e.g. saved before the reward wiring
-   * existed, or via a window the controller was holding a stale profile).
+   * Re-fire `onRewardGranted` and `onContractCompleted` for every contract instance
+   * currently in `completed` state. Reward effects and completion listeners are required
+   * to be idempotent (`unlockFastTravelPlanet` is a no-op on duplicates, journey step
+   * applicators are step-idempotent), so this is safe to call on startup as a recovery
+   * path for profiles that lost a reward or need to catch up journey progress.
    *
-   * Persisted instance state is untouched — this only re-applies the reward
-   * side-effects through the registered hook.
+   * Intended to be called exactly once per runtime session; subsequent calls are no-ops
+   * to protect downstream subscribers (staging, UI, analytics) from duplicate events.
+   *
+   * Persisted instance state is untouched — this only re-applies the side-effects through
+   * the registered hooks.
    */
   replayCompletedRewards(): void {
-    if (!this.hooks.onRewardGranted) return
+    if (this.hasReplayedCompletedRewards) return
+    this.hasReplayedCompletedRewards = true
     for (const instance of Object.values(this.snapshot.instances)) {
       if (instance.status !== 'completed') continue
       const contract = this.contracts.get(instance.contractId)
       if (!contract) continue
       this.applyRewards(contract)
+      this.hooks.onContractCompleted?.(contract.id)
     }
   }
 
@@ -391,6 +404,7 @@ export class ContractSystem {
         }
         this.deliverCompletionMessage(contract)
         this.applyRewards(contract)
+        this.hooks.onContractCompleted?.(contract.id)
         this.evaluatePrerequisiteContractOffers()
       } else {
         updated = { ...updated, currentStepIndex: nextIndex }

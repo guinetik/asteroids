@@ -468,6 +468,111 @@ describe('ContractSystem persistence', () => {
   })
 })
 
+describe('onContractCompleted hook', () => {
+  it('fires exactly once when a contract transitions from active to completed', () => {
+    const completedIds: string[] = []
+    const messages = new MessageSystem(
+      [triggerMessage],
+      { load: () => ({}), save: () => {} },
+    )
+    const snapshot: ContractStoreSnapshot = {
+      ...emptyContractSnapshot(),
+    }
+    const contracts = new ContractSystem(
+      [cowboysContract],
+      messages,
+      { load: () => snapshot, save: () => {} },
+      {
+        onContractCompleted: (id) => completedIds.push(id),
+      },
+    )
+
+    // Offer + accept Cowboys by firing the Nth mission trigger.
+    offerCowboys(contracts)
+    contracts.acceptContract('space-cowboys-mars-hq')
+
+    // Step 1 needs 3 missions, step 2 an install, step 3 a visit.
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+    contracts.notifyUpgradeInstalled('shuttleFreezeResistance', 1)
+    expect(completedIds).toEqual([])
+
+    contracts.notifyPlanetVisited('mars')
+
+    expect(completedIds).toEqual(['space-cowboys-mars-hq'])
+  })
+
+  it('fires during replayCompletedRewards for pre-existing completed instances', () => {
+    const now = new Date().toISOString()
+    const snapshot: ContractStoreSnapshot = {
+      ...emptyContractSnapshot(),
+      instances: {
+        'space-cowboys-mars-hq': {
+          contractId: 'space-cowboys-mars-hq',
+          status: 'completed',
+          currentStepIndex: 2,
+          stepCounters: [3, 1, 1],
+          offeredAt: now,
+          acceptedAt: now,
+          completedAt: now,
+        },
+      },
+    }
+    const completedIds: string[] = []
+    const messages = new MessageSystem(
+      [triggerMessage],
+      { load: () => ({}), save: () => {} },
+    )
+    const contracts = new ContractSystem(
+      [cowboysContract],
+      messages,
+      { load: () => snapshot, save: () => {} },
+      {
+        onContractCompleted: (id) => completedIds.push(id),
+        onRewardGranted: () => {},
+      },
+    )
+    contracts.replayCompletedRewards()
+    expect(completedIds).toEqual(['space-cowboys-mars-hq'])
+  })
+
+  it('replayCompletedRewards is a no-op on subsequent calls (single-fire guard)', () => {
+    const now = new Date().toISOString()
+    const snapshot: ContractStoreSnapshot = {
+      ...emptyContractSnapshot(),
+      instances: {
+        'space-cowboys-mars-hq': {
+          contractId: 'space-cowboys-mars-hq',
+          status: 'completed',
+          currentStepIndex: 2,
+          stepCounters: [3, 1, 1],
+          offeredAt: now,
+          acceptedAt: now,
+          completedAt: now,
+        },
+      },
+    }
+    const completedIds: string[] = []
+    const messages = new MessageSystem(
+      [triggerMessage],
+      { load: () => ({}), save: () => {} },
+    )
+    const contracts = new ContractSystem(
+      [cowboysContract],
+      messages,
+      { load: () => snapshot, save: () => {} },
+      {
+        onContractCompleted: (id) => completedIds.push(id),
+      },
+    )
+    contracts.replayCompletedRewards()
+    contracts.replayCompletedRewards()
+    contracts.replayCompletedRewards()
+    expect(completedIds).toEqual(['space-cowboys-mars-hq'])
+  })
+})
+
 beforeEach(() => {
   vi.restoreAllMocks()
 })
