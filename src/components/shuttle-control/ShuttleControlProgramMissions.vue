@@ -84,6 +84,7 @@ const emit = defineEmits<{
   acceptAsteroidMission: []
   acceptEvaMission: []
   acceptMiningMission: []
+  deliverMiningMission: [missionId: string]
 }>()
 
 /**
@@ -122,10 +123,23 @@ function miningStatusLabel(mission: ActiveTurretMiningMission): string {
   const inv = props.inventory
   const ready = inv ? isMiningMissionReady(inv, mission) : false
   if (ready) {
-    if (props.dockedPlanet === mission.giverPlanet) return 'Ready — delivery on dock'
+    if (props.dockedPlanet === mission.giverPlanet) return 'Ready — press Deliver'
     return `Return to ${targetPlanetName(mission.giverPlanet)} to deliver`
   }
   return `Posted by ${targetPlanetName(mission.giverPlanet)}`
+}
+
+/**
+ * True when the player can press Deliver on a mining mission right now —
+ * docked at the giver planet AND cargo holds at least `targetKg` of matching ore.
+ *
+ * @param mission - The active turret mining mission.
+ * @returns Whether the deliver button should be enabled and visible.
+ */
+function canDeliverMining(mission: ActiveTurretMiningMission): boolean {
+  if (props.dockedPlanet !== mission.giverPlanet) return false
+  const inv = props.inventory
+  return inv ? isMiningMissionReady(inv, mission) : false
 }
 
 
@@ -451,6 +465,14 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
         <div class="mission-board-active__cargo">
           {{ mission.template.reward }} CR on delivery
         </div>
+        <button
+          v-if="canDeliverMining(mission)"
+          type="button"
+          class="mission-board-active__deliver-btn"
+          @click="emit('deliverMiningMission', mission.template.id)"
+        >
+          Deliver
+        </button>
       </div>
 
       <!-- Asteroid active (single, may be null) -->

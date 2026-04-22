@@ -24,6 +24,8 @@ import type {
 } from '@/lib/missions/types'
 import { getGatherItemForPlanet, getPlanetOrbitalConfig } from '@/lib/missions/planetOrbitalConfig'
 import { takeTurretMiningMission, tickTurretMiningRestock } from '@/lib/missions/turretMiningSession'
+import { deliverTurretMiningMission } from '@/lib/missions/turretMiningRewards'
+import type { ActiveTurretMiningMission } from '@/lib/missions/types'
 import { computeMissionDifficulty } from '@/lib/missions/missionDifficulty'
 import {
   generateAsteroidMission,
@@ -266,6 +268,40 @@ export class MapMissionFacade {
     this.board = takeTurretMiningMission(this.board)
     this.persistBoard()
     onMissionBoardUpdate?.(this.board)
+  }
+
+  /**
+   * Deliver one mining mission by template id. Player-pressed via the Deliver
+   * button on the active mission card. Consumes ore, awards CR, removes the
+   * mission, and notifies the host so it can show a toast.
+   */
+  miningMissionDeliver(params: {
+    missionId: string
+    planetId: string
+    inventory: Inventory
+    profile: PlayerProfile
+    rewardMultiplier: number
+    onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null
+    onMiningMissionDeliver:
+      | ((mission: ActiveTurretMiningMission, creditsEarned: number) => void)
+      | null
+  }): { profile: PlayerProfile; inventory: Inventory; creditsChanged: boolean } {
+    const result = deliverTurretMiningMission(
+      this.board,
+      params.missionId,
+      params.planetId,
+      params.inventory,
+      params.profile,
+      params.rewardMultiplier,
+    )
+    if (!result.ok || !result.mission) {
+      return { profile: params.profile, inventory: params.inventory, creditsChanged: false }
+    }
+    this.board = result.board
+    this.persistBoard()
+    params.onMissionBoardUpdate?.(this.board)
+    params.onMiningMissionDeliver?.(result.mission, result.creditsEarned)
+    return { profile: result.profile, inventory: result.inventory, creditsChanged: true }
   }
 
   missionComplete(params: {

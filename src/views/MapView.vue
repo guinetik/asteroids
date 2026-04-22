@@ -745,6 +745,10 @@ onMounted(async () => {
         })
       }
     }
+    viewController.onMiningMissionDeliver = (mission, creditsEarned) => {
+      showMissionNotification(`${mission.template.name} delivered — +${creditsEarned} CR`)
+      syncPersistentProgressFromController()
+    }
     viewController.onBeginAsteroidMission = () => {
       import('@/router').then((mod) => {
         mod.default.push('/level')
@@ -998,6 +1002,10 @@ function handleAcceptEvaMission() {
 
 function handleAcceptMiningMission() {
   viewController.miningMissionAccept()
+}
+
+function handleDeliverMiningMission(missionId: string) {
+  viewController.miningMissionDeliver(missionId)
 }
 
 /** Player clicked the overlay's Complete button — pay reward and close. */
@@ -1321,6 +1329,7 @@ watch(
     @accept-asteroid-mission="handleAcceptAsteroidMission"
     @accept-eva-mission="handleAcceptEvaMission"
     @accept-mining-mission="handleAcceptMiningMission"
+    @deliver-mining-mission="handleDeliverMiningMission"
     @use-item="handleUseInventoryItem"
     @mail-changed="refreshActiveMessage"
   />

@@ -143,6 +143,7 @@ import '@/lib/shop/tradeGoods'
 import type {
   ShuttleMissionBoard,
   ActiveShuttleMission,
+  ActiveTurretMiningMission,
   GeneratedAsteroidMission,
 } from '@/lib/missions/types'
 import { getSpecialMissionById } from '@/lib/missions/specialMissions'
@@ -155,10 +156,7 @@ import {
   saveActiveMission,
   saveMissionBoard,
 } from '@/lib/missions/missionStorage'
-import {
-  offerTurretMiningMission,
-} from '@/lib/missions/turretMiningSession'
-import { deliverTurretMiningMissions } from '@/lib/missions/turretMiningRewards'
+import { offerTurretMiningMission } from '@/lib/missions/turretMiningSession'
 import '@/lib/missions/missionMaterials'
 import { MapIntroFacade } from '@/lib/map/intro/MapIntroFacade'
 import { MapLifeCycleFacade } from '@/lib/map/lifecycle/MapLifeCycleFacade'
@@ -560,6 +558,11 @@ export class MapViewController implements Tickable {
 
   /** Called when a mission is delivered (credits awarded). */
   onMissionDeliver: ((mission: ActiveShuttleMission | null) => void) | null = null
+
+  /** Called when a turret mining mission is delivered. Vue shows a toast. */
+  onMiningMissionDeliver:
+    | ((mission: ActiveTurretMiningMission, creditsEarned: number) => void)
+    | null = null
 
   /**
    * Called when an EVA (visit-relay) mission is completed at the in-EVA terminal.
@@ -2422,7 +2425,6 @@ export class MapViewController implements Tickable {
       inventory: this.playerInventory,
     })
     if (openedPlanetId) {
-      this.deliverTurretMiningMissionsAtPlanet(openedPlanetId)
       this.offerMissionAtPlanet(openedPlanetId)
       this.offerEvaMissionAtPlanet(openedPlanetId)
       this.offerAsteroidMissionFromDifficulty(openedPlanetId)
@@ -2593,28 +2595,34 @@ export class MapViewController implements Tickable {
   }
 
   /**
-   * Deliver any turret mining missions that are `ready-to-deliver` at `planetId`.
-   * Credits are awarded with the Science Station multiplier applied. Persists
-   * board, inventory, and profile on success.
+   * Deliver one mining mission by id. Triggered by the player pressing the
+   * Deliver button on the active mission card while docked at the giver
+   * planet. Refuses delivery (no-op) if cargo doesn't cover the target.
+   *
+   * @param missionId - Template id of the mining mission to deliver.
    */
-  private deliverTurretMiningMissionsAtPlanet(planetId: string): void {
+  miningMissionDeliver(missionId: string): void {
+    const mission = this.missionFacade.board.activeMiningMissions.find(
+      (entry) => entry.template.id === missionId,
+    )
+    if (!mission) return
+    const planetId = mission.giverPlanet
     const payMultiplier = getMissionPayMultiplier(this.playerProfile, planetId)
     const scienceMult = getCurrentUpgradeValue('shuttleScienceStation') * payMultiplier
-    const result = deliverTurretMiningMissions(
-      this.missionFacade.board,
+    const result = this.missionFacade.miningMissionDeliver({
+      missionId,
       planetId,
-      this.playerInventory,
-      this.playerProfile,
-      scienceMult,
-    )
-    if (result.delivered.length === 0) return
-    this.missionFacade.board = result.board
+      inventory: this.playerInventory,
+      profile: this.playerProfile,
+      rewardMultiplier: scienceMult,
+      onMissionBoardUpdate: this.onMissionBoardUpdate,
+      onMiningMissionDeliver: this.onMiningMissionDeliver,
+    })
+    if (!result.creditsChanged) return
     this.playerInventory = result.inventory
     this.playerProfile = result.profile
-    saveMissionBoard(result.board)
     saveInventory(result.inventory)
     this.persistPlayerProfile()
-    this.onMissionBoardUpdate?.(this.missionFacade.board)
     this.onCreditsUpdate?.(this.playerProfile.credits)
   }
 

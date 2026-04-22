@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { addItem, createInventory } from '../../inventory/inventory'
 import { createMissionBoard } from '../shuttleMissionSession'
-import { deliverTurretMiningMissions } from '../turretMiningRewards'
+import { deliverTurretMiningMission } from '../turretMiningRewards'
 import type { PlayerProfile } from '@/lib/player/types'
 import type { ActiveTurretMiningMission, TurretMiningMissionTemplate } from '../types'
 
@@ -32,13 +32,29 @@ function activeMission(overrides: Partial<ActiveTurretMiningMission> = {}): Acti
   }
 }
 
-describe('deliverTurretMiningMissions', () => {
-  it('is a no-op when inventory cannot cover the mission at this planet', () => {
+describe('deliverTurretMiningMission', () => {
+  it('returns ok:false when the mission id is unknown', () => {
     const board = { ...createMissionBoard(), activeMiningMissions: [activeMission()] }
-    const inv = createInventory()
-    const result = deliverTurretMiningMissions(board, 'mars', inv, profile(0), 1)
-    expect(result.delivered).toHaveLength(0)
+    const inv = addItem(createInventory(), 'olivine', 500).inventory
+    const result = deliverTurretMiningMission(board, 'unknown', 'mars', inv, profile(0), 1)
+    expect(result.ok).toBe(false)
     expect(result.profile.credits).toBe(0)
+    expect(result.board.activeMiningMissions).toHaveLength(1)
+  })
+
+  it('returns ok:false when docked at a different planet than the giver', () => {
+    const mission = activeMission({ giverPlanet: 'mars' })
+    const board = { ...createMissionBoard(), activeMiningMissions: [mission] }
+    const inv = addItem(createInventory(), 'olivine', 500).inventory
+    const result = deliverTurretMiningMission(
+      board,
+      mission.template.id,
+      'jupiter',
+      inv,
+      profile(0),
+      1,
+    )
+    expect(result.ok).toBe(false)
   })
 
   it('delivers a specific-ore mission: removes ore, awards credits, removes from board', () => {
@@ -47,22 +63,39 @@ describe('deliverTurretMiningMissions', () => {
     })
     const board = { ...createMissionBoard(), activeMiningMissions: [mission] }
     const withOre = addItem(createInventory(), 'olivine', 200).inventory
-    const result = deliverTurretMiningMissions(board, 'mars', withOre, profile(100), 1)
-    expect(result.delivered).toHaveLength(1)
+    const result = deliverTurretMiningMission(
+      board,
+      mission.template.id,
+      'mars',
+      withOre,
+      profile(100),
+      1,
+    )
+    expect(result.ok).toBe(true)
+    expect(result.creditsEarned).toBe(1200)
     expect(result.profile.credits).toBe(100 + 1200)
     expect(result.inventory.stacks.find((s) => s.itemId === 'olivine')?.quantity).toBe(50)
     expect(result.board.activeMiningMissions).toHaveLength(0)
+    expect(result.mission?.template.id).toBe(mission.template.id)
   })
 
   it('applies reward multiplier (Science Station)', () => {
     const mission = activeMission({ template: template({ reward: 1000 }) })
     const board = { ...createMissionBoard(), activeMiningMissions: [mission] }
     const inv = addItem(createInventory(), 'olivine', 500).inventory
-    const result = deliverTurretMiningMissions(board, 'mars', inv, profile(0), 1.5)
+    const result = deliverTurretMiningMission(
+      board,
+      mission.template.id,
+      'mars',
+      inv,
+      profile(0),
+      1.5,
+    )
+    expect(result.creditsEarned).toBe(1500)
     expect(result.profile.credits).toBe(1500)
   })
 
-  it('delivers an `any`-tier mission by draining main-belt stacks in order', () => {
+  it('delivers an `any`-tier mission by draining main-belt stacks in catalog order', () => {
     const mission = activeMission({
       template: template({ oreCategory: 'any', targetKg: 100, reward: 800 }),
     })
@@ -70,64 +103,36 @@ describe('deliverTurretMiningMissions', () => {
     let inv = createInventory()
     inv = addItem(inv, 'olivine', 40).inventory
     inv = addItem(inv, 'magnetite', 80).inventory
-    const result = deliverTurretMiningMissions(board, 'mars', inv, profile(0), 1)
-    expect(result.delivered).toHaveLength(1)
+    const result = deliverTurretMiningMission(
+      board,
+      mission.template.id,
+      'mars',
+      inv,
+      profile(0),
+      1,
+    )
+    expect(result.ok).toBe(true)
     expect(result.profile.credits).toBe(800)
     // 100 kg total removed: all 40 olivine + 60 magnetite (order = MAIN_BELT_ORE_IDS).
     expect(result.inventory.stacks.find((s) => s.itemId === 'olivine')).toBeUndefined()
     expect(result.inventory.stacks.find((s) => s.itemId === 'magnetite')?.quantity).toBe(20)
   })
 
-  it('refuses delivery when inventory cannot cover targetKg (specific-ore shortfall)', () => {
+  it('refuses delivery on shortfall and leaves inputs unchanged', () => {
     const mission = activeMission({ template: template({ targetKg: 100 }) })
     const board = { ...createMissionBoard(), activeMiningMissions: [mission] }
     const inv = addItem(createInventory(), 'olivine', 50).inventory
-    const result = deliverTurretMiningMissions(board, 'mars', inv, profile(0), 1)
-    expect(result.delivered).toHaveLength(0)
-    expect(result.profile.credits).toBe(0)
+    const result = deliverTurretMiningMission(
+      board,
+      mission.template.id,
+      'mars',
+      inv,
+      profile(0),
+      1,
+    )
+    expect(result.ok).toBe(false)
     expect(result.inventory).toBe(inv) // inventory not mutated
     expect(result.board.activeMiningMissions).toHaveLength(1)
-  })
-
-  it('refuses any-tier delivery when main-belt stacks fall short', () => {
-    const mission = activeMission({
-      template: template({ oreCategory: 'any', targetKg: 100 }),
-    })
-    const board = { ...createMissionBoard(), activeMiningMissions: [mission] }
-    const inv = addItem(createInventory(), 'olivine', 80).inventory
-    const result = deliverTurretMiningMissions(board, 'mars', inv, profile(0), 1)
-    expect(result.delivered).toHaveLength(0)
     expect(result.profile.credits).toBe(0)
-  })
-
-  it('delivers multiple ready missions at the same planet in one call', () => {
-    const m1 = activeMission({
-      template: template({ id: 'a', oreCategory: 'olivine', targetKg: 50, reward: 500 }),
-    })
-    const m2 = activeMission({
-      template: template({ id: 'b', oreCategory: 'magnetite', targetKg: 40, reward: 400 }),
-    })
-    const board = { ...createMissionBoard(), activeMiningMissions: [m1, m2] }
-    let inv = createInventory()
-    inv = addItem(inv, 'olivine', 100).inventory
-    inv = addItem(inv, 'magnetite', 100).inventory
-    const result = deliverTurretMiningMissions(board, 'mars', inv, profile(0), 1)
-    expect(result.delivered).toHaveLength(2)
-    expect(result.profile.credits).toBe(900)
-    expect(result.board.activeMiningMissions).toHaveLength(0)
-  })
-
-  it('skips missions for other planets', () => {
-    const marsMission = activeMission({ giverPlanet: 'mars' })
-    const jupiterMission = activeMission({
-      giverPlanet: 'jupiter',
-      template: template({ id: 'j1' }),
-    })
-    const board = { ...createMissionBoard(), activeMiningMissions: [marsMission, jupiterMission] }
-    const inv = addItem(createInventory(), 'olivine', 500).inventory
-    const result = deliverTurretMiningMissions(board, 'mars', inv, profile(0), 1)
-    expect(result.delivered).toHaveLength(1)
-    expect(result.board.activeMiningMissions).toHaveLength(1)
-    expect(result.board.activeMiningMissions[0]!.giverPlanet).toBe('jupiter')
   })
 })

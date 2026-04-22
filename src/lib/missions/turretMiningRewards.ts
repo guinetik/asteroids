@@ -22,16 +22,20 @@ import type {
 import { MAIN_BELT_ORE_IDS } from './turretMiningSession'
 import { contractSystem } from '@/lib/contracts/runtime'
 
-/** Outcome of delivering mining missions at a giver planet dock. */
+/** Outcome of delivering one mining mission. */
 export interface TurretMiningDeliveryResult {
-  /** Board with successfully-delivered missions removed from `activeMiningMissions`. */
+  /** True when the mission was delivered (ore consumed + credits awarded). */
+  ok: boolean
+  /** Board with the delivered mission removed (or unchanged on failure). */
   board: ShuttleMissionBoard
-  /** Inventory with ore consumed. Same reference as input when nothing delivered. */
+  /** Inventory with ore consumed (or unchanged on failure). */
   inventory: Inventory
-  /** Profile with credits added. Same reference as input when nothing delivered. */
+  /** Profile with credits added (or unchanged on failure). */
   profile: PlayerProfile
-  /** Missions successfully delivered this call. */
-  delivered: ActiveTurretMiningMission[]
+  /** The mission that was delivered (or null on failure). */
+  mission: ActiveTurretMiningMission | null
+  /** Credits awarded after the multiplier (0 on failure). */
+  creditsEarned: number
 }
 
 /**
@@ -93,67 +97,59 @@ function drainForCategory(
 }
 
 /**
- * Deliver every mining mission that is ready-to-deliver at the given giver planet.
- *
- * Each eligible mission consumes its required ore from inventory in a single
- * pass; a shortfall on any mission leaves that mission in place with the
- * inventory unmodified for it (other missions may still deliver). Credits
- * are awarded per successful delivery with `rewardMultiplier` (Science
- * Station) applied and rounded.
+ * Deliver one mining mission by template id, if the player is docked at its
+ * giver planet and cargo holds enough ore. Consumes the ore, awards credits
+ * (with `rewardMultiplier` applied and rounded), removes the mission from
+ * the active list, and fires the contract-completion event.
  *
  * @param board - Current mission board.
- * @param planetId - Giver planet the player just docked at.
+ * @param missionId - Template id of the mission to deliver.
+ * @param planetId - Planet the player is docked at — must equal the mission's giver.
  * @param inventory - Player inventory.
  * @param profile - Player profile; credits on success.
  * @param rewardMultiplier - Science Station bonus (1.0 at level 0).
- * @returns Updated board / inventory / profile + list of delivered missions.
+ * @returns `ok: true` with updated state on success, or `ok: false` with input
+ *   refs preserved on shortfall / wrong-planet / unknown-id.
  */
-export function deliverTurretMiningMissions(
+export function deliverTurretMiningMission(
   board: ShuttleMissionBoard,
+  missionId: string,
   planetId: string,
   inventory: Inventory,
   profile: PlayerProfile,
   rewardMultiplier: number,
 ): TurretMiningDeliveryResult {
-  const delivered: ActiveTurretMiningMission[] = []
-  let workingInventory = inventory
-  let workingProfile = profile
-
-  const nextActives: ActiveTurretMiningMission[] = []
-  for (const mission of board.activeMiningMissions) {
-    if (mission.giverPlanet !== planetId) {
-      nextActives.push(mission)
-      continue
-    }
-    const drain = drainForCategory(
-      workingInventory,
-      mission.template.oreCategory,
-      mission.template.targetKg,
-    )
-    if (!drain.ok) {
-      nextActives.push(mission) // keep mission; player can try again after mining more.
-      continue
-    }
-    workingInventory = drain.inventory
-    const creditsEarned = Math.round(mission.template.reward * rewardMultiplier)
-    workingProfile = addCredits(workingProfile, creditsEarned)
-    delivered.push(mission)
-    contractSystem.notifyMissionCompleted({
-      kind: 'mining',
-      giverPlanetId: mission.giverPlanet,
-      giverId: null,
-      targetPlanetId: null,
-    })
+  const idx = board.activeMiningMissions.findIndex((m) => m.template.id === missionId)
+  if (idx === -1) {
+    return { ok: false, board, inventory, profile, mission: null, creditsEarned: 0 }
   }
-
-  if (delivered.length === 0) {
-    return { board, inventory, profile, delivered }
+  const mission = board.activeMiningMissions[idx]!
+  if (mission.giverPlanet !== planetId) {
+    return { ok: false, board, inventory, profile, mission: null, creditsEarned: 0 }
   }
-
+  const drain = drainForCategory(
+    inventory,
+    mission.template.oreCategory,
+    mission.template.targetKg,
+  )
+  if (!drain.ok) {
+    return { ok: false, board, inventory, profile, mission: null, creditsEarned: 0 }
+  }
+  const creditsEarned = Math.round(mission.template.reward * rewardMultiplier)
+  const nextProfile = addCredits(profile, creditsEarned)
+  const nextActives = board.activeMiningMissions.filter((_, i) => i !== idx)
+  contractSystem.notifyMissionCompleted({
+    kind: 'mining',
+    giverPlanetId: mission.giverPlanet,
+    giverId: null,
+    targetPlanetId: null,
+  })
   return {
+    ok: true,
     board: { ...board, activeMiningMissions: nextActives },
-    inventory: workingInventory,
-    profile: workingProfile,
-    delivered,
+    inventory: drain.inventory,
+    profile: nextProfile,
+    mission,
+    creditsEarned,
   }
 }
