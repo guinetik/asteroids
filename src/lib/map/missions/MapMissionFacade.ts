@@ -237,7 +237,13 @@ export class MapMissionFacade {
     if (this.board.offeredAsteroidMission || this.board.activeAsteroidMission) return
     if (this.board.asteroidRestockTimer) return
     const difficulty = computeMissionDifficulty(CURRENT_PLAYER_UPGRADE_LEVELS)
-    const mission = generateAsteroidMission(difficulty, host)
+    let mission: ReturnType<typeof generateAsteroidMission>
+    try {
+      mission = generateAsteroidMission(difficulty, host)
+    } catch (err) {
+      console.warn('[MapMissionFacade] No asteroid contract drafted:', err)
+      return
+    }
     this.board = offerAsteroidMission(this.board, mission)
     onMissionBoardUpdate?.(this.board)
   }

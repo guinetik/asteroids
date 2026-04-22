@@ -19,7 +19,7 @@ import type {
   MissionGiverTemplate,
   GeneratedAsteroidMission,
 } from './types'
-import { getGiversForDifficulty } from './giverCatalog'
+import { getGiversForDifficulty, MISSION_GIVERS } from './giverCatalog'
 import { ASTEROID_BELTS, getPlanet, PLANETS } from '@/lib/planets/catalog'
 import { ORBIT_SCALE, SIZE_SCALE } from '@/lib/planets/constants'
 import { generateFlatZones } from '@/lib/terrain/terrainGenerator'
@@ -361,6 +361,16 @@ function findRegionForTemplate(
 }
 
 /**
+ * True when every slot on a giver template only rolls exterminate or rescue objectives.
+ *
+ * @param template - Giver mission entry from JSON.
+ * @returns Whether the template is restricted to those objective types.
+ */
+function isExterminateOrRescueOnlyTemplate(template: MissionGiverTemplate): boolean {
+  return template.objectiveSlots.every((s) => s.type === 'exterminate' || s.type === 'rescue')
+}
+
+/**
  * Station that posts a procedural asteroid contract — solar-map waypoint is anchored from
  * {@link worldX}/{@link worldZ} when the offer is drafted.
  */
@@ -525,7 +535,14 @@ export function generateAsteroidMission(
   host: AsteroidMissionHostAnchor | null = null,
   rand: () => number = Math.random,
 ): GeneratedAsteroidMission {
-  const givers = getGiversForDifficulty(difficulty)
+  const anchor = host ?? syntheticEarthHostAnchor()
+  const saturnHost = anchor.planetId === 'saturn'
+  /**
+   * Saturn only posts hazard / SAR contracts (no mining or survey). Use the full giver
+   * catalog so Colonial Guard and Frontier Rescue are not squeezed out by low-tier miners
+   * at the same difficulty band.
+   */
+  const givers = saturnHost ? MISSION_GIVERS : getGiversForDifficulty(difficulty)
   if (givers.length === 0) {
     throw new Error(`No givers available for difficulty ${difficulty}`)
   }
@@ -538,6 +555,7 @@ export function generateAsteroidMission(
 
   for (const giver of givers) {
     for (const template of giver.missions) {
+      if (saturnHost && !isExterminateOrRescueOnlyTemplate(template)) continue
       const region = findRegionForTemplate(template, difficulty)
       if (region) {
         candidates.push({ giver, template, region })
@@ -546,7 +564,10 @@ export function generateAsteroidMission(
   }
 
   if (candidates.length === 0) {
-    throw new Error(`No templates match difficulty ${difficulty}`)
+    throw new Error(
+      `No templates match difficulty ${difficulty}` +
+        (saturnHost ? ' for Saturn (exterminate/rescue only)' : ''),
+    )
   }
 
   let pool = candidates
@@ -575,7 +596,6 @@ export function generateAsteroidMission(
   const rawReward = objectives.reduce((sum, o) => sum + o.reward, 0) + completionBonus
   const totalReward = Math.max(MIN_ASTEROID_MISSION_REWARD, rawReward)
 
-  const anchor = host ?? syntheticEarthHostAnchor()
   const waypoint = generateAsteroidWaypointNearHostPlanet(
     anchor.worldX,
     anchor.worldZ,

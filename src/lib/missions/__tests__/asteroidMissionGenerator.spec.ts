@@ -309,4 +309,26 @@ describe('generateAsteroidMission', () => {
     expect(hard.objectives.length).toBeGreaterThanOrEqual(1)
     expect(hard.objectives.length).toBeLessThanOrEqual(objectiveCountForDifficulty(8))
   })
+
+  it('Saturn host only offers exterminate or rescue asteroid objectives', () => {
+    const saturn = getPlanet('saturn')
+    const hostR = saturn.orbit.semiMajorAxis * ORBIT_SCALE
+    const host = { planetId: 'saturn' as const, worldX: hostR, worldZ: 0 }
+    for (let d = 2; d <= 10; d++) {
+      for (let i = 0; i < 24; i++) {
+        const mission = generateAsteroidMission(d, host)
+        expect(mission.originPlanetId).toBe('saturn')
+        for (const obj of mission.objectives) {
+          expect(obj.type === 'exterminate' || obj.type === 'rescue').toBe(true)
+        }
+      }
+    }
+  })
+
+  it('throws when Saturn has no exterminate/rescue template for mission difficulty', () => {
+    const saturn = getPlanet('saturn')
+    const hostR = saturn.orbit.semiMajorAxis * ORBIT_SCALE
+    const host = { planetId: 'saturn' as const, worldX: hostR, worldZ: 0 }
+    expect(() => generateAsteroidMission(1, host)).toThrow(/Saturn/)
+  })
 })
