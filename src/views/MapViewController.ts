@@ -197,6 +197,7 @@ import { GravitySurfingController } from '@/lib/map/GravitySurfingController'
 import { OrbitalSurfingController, type OrbitalSurfingDeps } from '@/lib/map/OrbitalSurfingController'
 import { ManifoldSpline } from '@/three/ManifoldSpline'
 import { ShuttleAudioDirector } from '@/audio/ShuttleAudioDirector'
+import { uiAudio } from '@/audio/UiAudioDirector'
 import { shipMessageSystem } from '@/lib/messages/runtime'
 import { contractSystem, onContractCompleted } from '@/lib/contracts/runtime'
 
@@ -4123,10 +4124,14 @@ export class MapViewController implements Tickable {
           this.emitShopState()
           return { ok: true as const }
         },
-        onResourcePickup: this.onResourcePickup ?? undefined,
+        onResourcePickup: (itemId, quantity, label) => {
+          this.onResourcePickup?.(itemId, quantity, label)
+          uiAudio.notifyItemCollected()
+        },
         onResourcePickupFailed: this.onResourcePickupFailed ?? undefined,
         onFadeOpacity: (op) => this.onTurretFade?.(op),
         onHudState: (state) => this.onTurretHudState?.(state),
+        onBeamActivated: () => uiAudio.notifyLaserFire(),
       })
     }
     return this.turretSessionController

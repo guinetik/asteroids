@@ -64,6 +64,8 @@ export interface TurretSessionControllerDeps {
   onResourcePickup?: (itemId: string, quantity: number, label: string) => void
   /** Called on commit failure (inventory full). HUD toast hook. */
   onResourcePickupFailed?: (label: string, reason: string) => void
+  /** Called once on the rising edge of beam activation (not every frame). */
+  onBeamActivated?: () => void
   /** Called each frame with fade opacity for the Vue fade overlay. */
   onFadeOpacity?: (opacity: number) => void
   /** Per-tick HUD state for the Vue crosshair + any future turret HUD widgets. */
@@ -130,6 +132,7 @@ export class TurretSessionController {
   private sparkBurstCooldown = 0
   private beamLatched = false
   private overheatLocked = false
+  private prevBeamActive = false
 
   /** True while session is in any non-idle phase. */
   get isActive(): boolean {
@@ -320,6 +323,7 @@ export class TurretSessionController {
     this.mouseFireHeld = false
     this.beamLatched = false
     this.overheatLocked = false
+    this.prevBeamActive = false
     this.impactEmitter.reset()
     this.sparkBurstCooldown = 0
     this.deps.shuttleController.unfreeze()
@@ -386,6 +390,11 @@ export class TurretSessionController {
     }
 
     const beamActive = this.firing && this.beamLatched && canFire
+
+    if (beamActive && !this.prevBeamActive) {
+      this.deps.onBeamActivated?.()
+    }
+    this.prevBeamActive = beamActive
 
     if (beamActive) {
       const length = hit?.distance ?? TURRET_BEAM_MAX_RANGE
