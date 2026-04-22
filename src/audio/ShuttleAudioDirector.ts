@@ -89,16 +89,13 @@ export class ShuttleAudioDirector {
   private chargeLoop: AudioHandle = null
   /** Manifold tunnel loop; rate-adjusted to match surf travel time. */
   private wormholeLoop: AudioHandle = null
+  /** Low-fuel alarm loop; active while fuel fraction is below {@link SHUTTLE_LOW_FUEL_FRACTION}. */
+  private fuelWarningLoop: AudioHandle = null
 
   /** True between {@link start} and {@link stop}. */
   private active = false
   /** True when the player is currently inside the habitat interior. */
   private insideHabitat = false
-  /**
-   * Latches after a low-fuel warning until fraction rises above
-   * {@link SHUTTLE_LOW_FUEL_CLEAR_FRACTION}.
-   */
-  private shuttleFuelLowLatched = false
 
   /**
    * Begin shuttle audio output. Starts the map (space) ambient bed.
@@ -164,11 +161,13 @@ export class ShuttleAudioDirector {
   tickShuttleFuelTelemetry(fuelLevel: number, fuelCapacity: number, shuttleAlive: boolean): void {
     if (!shuttleAlive || fuelCapacity <= 0) return
     const ratio = fuelLevel / fuelCapacity
-    if (ratio > SHUTTLE_LOW_FUEL_CLEAR_FRACTION) {
-      this.shuttleFuelLowLatched = false
-    } else if (ratio <= SHUTTLE_LOW_FUEL_FRACTION && !this.shuttleFuelLowLatched) {
-      this.shuttleFuelLowLatched = true
-      this.audio.play('sfx.fuelWarning')
+    if (ratio <= SHUTTLE_LOW_FUEL_FRACTION) {
+      if (this.fuelWarningLoop === null) {
+        this.fuelWarningLoop = this.audio.play('sfx.fuelWarning', { loop: true })
+      }
+    } else if (ratio > SHUTTLE_LOW_FUEL_CLEAR_FRACTION && this.fuelWarningLoop !== null) {
+      this.fuelWarningLoop.stop()
+      this.fuelWarningLoop = null
     }
   }
 
@@ -370,10 +369,10 @@ export class ShuttleAudioDirector {
    * won't reach zero on their own.
    */
   notifyShuttleDestroyed(): void {
-    this.shuttleFuelLowLatched = false
     this.audio.stopCategory('sfx')
     this.chargeLoop = null
     this.wormholeLoop = null
+    this.fuelWarningLoop = null
     if (this.anomalyAmbient !== null) {
       this.anomalyAmbient.stop()
       this.anomalyAmbient = null
@@ -411,6 +410,8 @@ export class ShuttleAudioDirector {
     this.chargeLoop = null
     this.wormholeLoop?.stop()
     this.wormholeLoop = null
+    this.fuelWarningLoop?.stop()
+    this.fuelWarningLoop = null
     // Belt-and-braces stop on the ambient ids in case Howler still has
     // a stale instance from before our handle was registered (e.g.
     // hot-reload or external `play(..., { loop: true })` call).

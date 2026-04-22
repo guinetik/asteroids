@@ -21,6 +21,8 @@ describe('audioManifest', () => {
       'ui.scan',
       'ui.achievement',
       'ui.reward',
+      'sfx.upgrade.install',
+      'sfx.ui.shuttleprogram.click',
       // shuttle propulsion
       'sfx.thrusterLoop',
       'sfx.thrusterBurst',
@@ -155,7 +157,7 @@ describe('audioManifest', () => {
     } catch {
       /* strict mode may throw on frozen prop assign */
     }
-    expect(getAudioDefinition('ui.click').src).toBe('/sound/ui.click.mp3')
+    expect(getAudioDefinition('ui.click').src).toBe('/sound/sfx.ui.primary.mp3')
 
     const fromList = audioManifest[0]
     expect(fromList?.id).toBe('ui.click')

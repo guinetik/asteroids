@@ -20,8 +20,8 @@
  *   intensity-modulated volume; driven by per-frame {@link update}.
  * - `sfx.arrivalSeparation`   — one-shot sting when the dropship
  *   shuttle releases the lander.
- * - `sfx.fuelWarning`         — one-shot when lander fuel fraction
- *   drops through ~20% ({@link LanderAudioDirector.tickLanderFuelTelemetry}).
+ * - `sfx.fuelWarning`         — looping alarm while lander fuel fraction
+ *   is below ~20%; gated by {@link LanderAudioDirector.tickLanderFuelTelemetry}.
  *
  * Audio explicitly **not** owned here:
  * - Lander main engine (`sfx.lander.thrusterLoop`), descent /
@@ -81,14 +81,11 @@ export class LanderAudioDirector {
   private cockpitAmbient: AudioHandle = null
   /** Engine vibration loop; created lazily on first firing tick. */
   private shakeLoop: AudioHandle = null
+  /** Low-fuel alarm loop; active while fuel fraction is below {@link LANDER_LOW_FUEL_FRACTION}. */
+  private fuelWarningLoop: AudioHandle = null
 
   /** True between {@link start} and {@link stop}. */
   private active = false
-  /**
-   * Latches after a low-fuel warning until fraction rises above
-   * {@link LANDER_LOW_FUEL_CLEAR_FRACTION}.
-   */
-  private landerFuelLowLatched = false
 
   /**
    * Begin level audio output. Starts the asteroid wind ambient bed.
@@ -157,20 +154,23 @@ export class LanderAudioDirector {
   tickLanderFuelTelemetry(fuelLevel: number, fuelCapacity: number): void {
     if (!this.active || fuelCapacity <= 0) return
     const ratio = fuelLevel / fuelCapacity
-    if (ratio > LANDER_LOW_FUEL_CLEAR_FRACTION) {
-      this.landerFuelLowLatched = false
-    } else if (ratio <= LANDER_LOW_FUEL_FRACTION && !this.landerFuelLowLatched) {
-      this.landerFuelLowLatched = true
-      this.audio.play('sfx.fuelWarning')
+    if (ratio <= LANDER_LOW_FUEL_FRACTION) {
+      if (this.fuelWarningLoop === null) {
+        this.fuelWarningLoop = this.audio.play('sfx.fuelWarning', { loop: true })
+      }
+    } else if (ratio > LANDER_LOW_FUEL_CLEAR_FRACTION && this.fuelWarningLoop !== null) {
+      this.fuelWarningLoop.stop()
+      this.fuelWarningLoop = null
     }
   }
 
   /**
-   * Call when leaving lander flight (EVA, cinematic, etc.) so the next
-   * lander session can warn again after refuel.
+   * Call when leaving lander flight (EVA, cinematic, etc.) to stop any
+   * active fuel warning loop so the next session starts clean.
    */
   clearLanderFuelWarningLatch(): void {
-    this.landerFuelLowLatched = false
+    this.fuelWarningLoop?.stop()
+    this.fuelWarningLoop = null
   }
 
   /**
@@ -227,12 +227,11 @@ export class LanderAudioDirector {
    * RCS / alarm envelopes never reach zero on their own.
    */
   notifyLanderRunFailed(): void {
-    this.landerFuelLowLatched = false
     this.audio.stopCategory('sfx')
-    // The shake loop belongs to category 'sfx', so stopCategory has
-    // already silenced it. Drop the handle reference so the next
-    // rising edge re-creates it cleanly.
+    // 'sfx' category sweep silences shake + fuelWarning loops — drop
+    // handles so next rising-edge re-creates them cleanly.
     this.shakeLoop = null
+    this.fuelWarningLoop = null
     this.stopCockpit()
   }
 
@@ -273,6 +272,8 @@ export class LanderAudioDirector {
     this.cockpitAmbient = null
     this.shakeLoop?.stop()
     this.shakeLoop = null
+    this.fuelWarningLoop?.stop()
+    this.fuelWarningLoop = null
     // Belt-and-braces stop on the ambient ids in case Howler still
     // has a stale instance from before our handle was registered.
     this.audio.stopSound('ambient.asteroid')

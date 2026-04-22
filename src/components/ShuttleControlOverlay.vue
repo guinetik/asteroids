@@ -112,7 +112,7 @@ const screens = computed(() => {
 })
 
 function selectScreen(id: ControlScreen): void {
-  uiAudio.notifySwitch()
+  uiAudio.notifyShuttleProgramClick()
   activeScreen.value = id
 }
 

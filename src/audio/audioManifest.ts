@@ -33,6 +33,8 @@ export const AUDIO_SOUND_IDS = [
   'ui.scan',
   'ui.achievement',
   'ui.reward',
+  'sfx.upgrade.install',
+  'sfx.ui.shuttleprogram.click',
   // SFX — shuttle propulsion
   'sfx.thrusterLoop',
   'sfx.thrusterBurst',
@@ -223,6 +225,24 @@ const manifestById: ManifestById = {
     volume: 0.6,
     effect: 'none',
   },
+  'sfx.upgrade.install': {
+    id: 'sfx.upgrade.install',
+    src: '/sound/sfx.upgrade.install.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'restart',
+    volume: 0.7,
+    effect: 'none',
+  },
+  'sfx.ui.shuttleprogram.click': {
+    id: 'sfx.ui.shuttleprogram.click',
+    src: '/sound/sfx.ui.shuttleprogram.click.mp3',
+    category: 'ui',
+    load: 'lazy',
+    playback: 'restart',
+    volume: 0.4,
+    effect: 'none',
+  },
 
   // ── SFX — shuttle propulsion ────────────────────────────────────────
   'sfx.thrusterLoop': {
@@ -302,10 +322,9 @@ const manifestById: ManifestById = {
     src: '/sound/sfx.fuelWarning.mp3',
     category: 'sfx',
     load: 'lazy',
-    playback: 'rate-limited',
+    playback: 'single-instance',
     volume: 0.5,
     effect: 'none',
-    cooldownMs: 3000,
   },
   'sfx.laserPulse': {
     id: 'sfx.laserPulse',

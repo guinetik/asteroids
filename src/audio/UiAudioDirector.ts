@@ -43,6 +43,10 @@ const MISSION_COMPLETE_VOLUME = 0.6
 const REWARD_VOLUME = 0.6
 /** Volume for laser-pulse SFX. */
 const LASER_VOLUME = 0.5
+/** Volume for upgrade installation fanfare. */
+const UPGRADE_INSTALL_VOLUME = 0.7
+/** Volume for shuttle control program tab click. */
+const SHUTTLE_PROGRAM_CLICK_VOLUME = 0.4
 
 /**
  * Audio orchestrator for UI events. Single-instance for the app lifetime;
@@ -157,6 +161,20 @@ export class UiAudioDirector {
    */
   notifyLaserFire(): void {
     this.audio.play('sfx.laserPulse', { volume: LASER_VOLUME })
+  }
+
+  /**
+   * An upgrade was successfully purchased and installed.
+   */
+  notifyUpgradeInstalled(): void {
+    this.audio.play('sfx.upgrade.install', { volume: UPGRADE_INSTALL_VOLUME })
+  }
+
+  /**
+   * Player clicked a program tab inside the shuttle control terminal.
+   */
+  notifyShuttleProgramClick(): void {
+    this.audio.play('sfx.ui.shuttleprogram.click', { volume: SHUTTLE_PROGRAM_CLICK_VOLUME })
   }
 }
 
