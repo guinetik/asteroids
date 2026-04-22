@@ -120,7 +120,7 @@ export type AudioSoundId = (typeof AUDIO_SOUND_IDS)[number]
  * Sound ids that still use the silent WAV placeholder (no real asset yet).
  * Remove an id from this list once its `src` is swapped for a real file.
  */
-export const SEEDED_SOUND_IDS = ['ui.click', 'ui.error'] as const
+export const SEEDED_SOUND_IDS = ['ui.error'] as const
 
 /**
  * Ensures each manifest record key matches its `id` field for compile-time drift checks.

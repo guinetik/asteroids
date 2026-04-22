@@ -15,6 +15,12 @@ describe('audioManifest', () => {
       'ui.confirm',
       'ui.error',
       'ui.hover',
+      'ui.switch',
+      'ui.type',
+      'ui.processing',
+      'ui.scan',
+      'ui.achievement',
+      'ui.reward',
       // shuttle propulsion
       'sfx.thrusterLoop',
       'sfx.thrusterBurst',
@@ -25,6 +31,7 @@ describe('audioManifest', () => {
       'sfx.orbitCapture',
       'sfx.wormhole',
       'sfx.fuelWarning',
+      'sfx.laserPulse',
       // lander propulsion
       'sfx.lander.thrusterLoop',
       'sfx.lander.thrusterBurst',
@@ -148,7 +155,7 @@ describe('audioManifest', () => {
     } catch {
       /* strict mode may throw on frozen prop assign */
     }
-    expect(getAudioDefinition('ui.click').src).toBe(SILENT_STATIC_WAV_DATA_URI)
+    expect(getAudioDefinition('ui.click').src).toBe('/sound/ui.click.mp3')
 
     const fromList = audioManifest[0]
     expect(fromList?.id).toBe('ui.click')
@@ -162,7 +169,7 @@ describe('audioManifest', () => {
   })
 
   it('locks seeded cues to bundled static sources', () => {
-    expect(SEEDED_SOUND_IDS).toEqual(['ui.click', 'ui.error'])
+    expect(SEEDED_SOUND_IDS).toEqual(['ui.error'])
     for (const id of SEEDED_SOUND_IDS) {
       const def = getAudioDefinition(id)
       expect(def.allowDynamicSrc).toBeUndefined()
