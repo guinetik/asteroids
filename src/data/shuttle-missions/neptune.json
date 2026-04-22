@@ -1,5 +1,6 @@
 {
   "planetId": "neptune",
+  "giverName": "Neptune Deep Space Command",
   "missions": [
     {
       "id": "neptune_uranus_mag_survey",

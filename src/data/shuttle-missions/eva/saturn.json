@@ -1,5 +1,6 @@
 {
   "planetId": "saturn",
+  "giverName": "Saturn Research Division",
   "missions": [
     {
       "id": "saturn_ring_particle_sampler",

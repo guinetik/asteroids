@@ -1,5 +1,6 @@
 {
   "planetId": "jupiter",
+  "giverName": "Jupiter Orbital Station",
   "missions": [
     {
       "id": "jupiter_magnetosphere_buoy",

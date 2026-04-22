@@ -1,5 +1,6 @@
 {
   "planetId": "earth",
+  "giverName": "Earth Orbital Authority",
   "missions": [
     {
       "id": "earth_venus_gas_science",

@@ -1,5 +1,6 @@
 {
   "planetId": "neptune",
+  "giverName": "Neptune Deep Space Research",
   "missions": [
     {
       "id": "neptune_deep_nav_beacon",

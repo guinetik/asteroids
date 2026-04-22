@@ -1559,7 +1559,7 @@ watch(
 .turret-target-card {
   position: fixed;
   left: 50%;
-  bottom: max(4rem, env(safe-area-inset-bottom, 0px) + 3rem);
+  bottom: max(10rem, env(safe-area-inset-bottom, 0px) + 8.5rem);
   z-index: 44;
   width: min(28rem, calc(100vw - 2rem));
   transform: translateX(-50%);
@@ -1570,6 +1570,12 @@ watch(
   box-shadow: 0 0 30px rgba(34, 211, 238, 0.16), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(12px);
   pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .turret-target-card {
+    bottom: max(10.75rem, env(safe-area-inset-bottom, 0px) + 9rem);
+  }
 }
 
 .turret-target-card__eyebrow {

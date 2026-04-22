@@ -342,6 +342,8 @@ export class MapViewController implements Tickable {
   private mapIntro = new MapIntroState()
   /** When true, {@link tickOrrery} skips simTime advancement and planet/belt ticks. Set during portal arrival so Earth stays static. */
   private simFrozen = false
+  /** Turret mining freeze gate so the entire solar-system sim pauses while the player is in turret mode. */
+  private turretSimFrozen = false
 
   /**
    * After {@link beginStartupIntro} starts the cinematic, the next `cinematic_zoom` → `interactive`
@@ -1336,10 +1338,12 @@ export class MapViewController implements Tickable {
       introLocked,
     })
     if (turretToggle === 'enter') {
+      this.turretSimFrozen = true
       this.ensureTurretSessionController().open()
     }
 
     if (this.turretSessionController?.isActive) {
+      this.turretSimFrozen = true
       this.turretSessionController.tick(dt)
       // The turret camera is mounted on the nose, so yawing back at the hull puts the
       // ship right in front of the map's base lights. Force the zoomed-in bloom clamp
@@ -1353,6 +1357,7 @@ export class MapViewController implements Tickable {
       // exits turret mode.
       this.emitShuttleTelemetry()
       if (this.turretSessionController.phase !== 'idle') return
+      this.turretSimFrozen = false
     }
 
     // Canvas orbital minigame overlay — freeze the world while the player is in a minigame.
@@ -1615,7 +1620,7 @@ export class MapViewController implements Tickable {
     }
 
     // Adrift check — 60s with no fuel in free flight = game over
-    if (this.shuttleController && !this.shuttleController.dead && !this.simFrozen) {
+    if (this.shuttleController && !this.shuttleController.dead && !this.isSimulationFrozen()) {
       const orbitState = this.orbitSystem?.state ?? 'free'
       const hasFuel = this.shuttleController.thrusterSystem.fuelLevel > 0
       if (orbitState === 'free' && !hasFuel) {
@@ -1629,7 +1634,12 @@ export class MapViewController implements Tickable {
     }
 
     // Ship health — temperature drift + radiation/temp damage
-    if (this.shipHealth && this.shuttleController && !this.shuttleController.dead && !this.simFrozen) {
+    if (
+      this.shipHealth &&
+      this.shuttleController &&
+      !this.shuttleController.dead &&
+      !this.isSimulationFrozen()
+    ) {
       const orbitState = this.orbitSystem?.state ?? 'free'
       const px = this.shuttleController.position.x
       const pz = this.shuttleController.position.z
@@ -1665,7 +1675,7 @@ export class MapViewController implements Tickable {
     }
 
     // Planet collision — instant death if shuttle flies into a planet mesh
-    if (this.shuttleController && !this.shuttleController.dead && !this.simFrozen) {
+    if (this.shuttleController && !this.shuttleController.dead && !this.isSimulationFrozen()) {
       const orbitState = this.orbitSystem?.state ?? 'free'
       if (orbitState === 'free') {
         const px = this.shuttleController.position.x
@@ -1689,7 +1699,7 @@ export class MapViewController implements Tickable {
     // Only active in free flight (not during orbit capture or portal arrival)
     if (this.shuttleController && this.gravityPass) {
       const orbitState = this.orbitSystem?.state ?? 'free'
-      if (orbitState === 'free' && !this.shuttleController.dead && !this.simFrozen) {
+      if (orbitState === 'free' && !this.shuttleController.dead && !this.isSimulationFrozen()) {
         const px = this.shuttleController.position.x
         const pz = this.shuttleController.position.z
         let maxProximity = 0
@@ -1806,7 +1816,7 @@ export class MapViewController implements Tickable {
 
     // Portal arrival freezes the orrery so Earth stays at a fixed position
     // for the wormhole spawn. Resumed by the portal onComplete callback.
-    if (this.simFrozen) return
+    if (this.isSimulationFrozen()) return
 
     this.simTime += dt * DEFAULT_TIME_SCALE
 
@@ -4029,6 +4039,11 @@ export class MapViewController implements Tickable {
       })
     }
     return this.turretSessionController
+  }
+
+  /** True whenever either a map-level sequence or turret mode has paused the solar-system sim. */
+  private isSimulationFrozen(): boolean {
+    return this.simFrozen || this.turretSimFrozen
   }
 
   private tickHabitatTransition(): void {

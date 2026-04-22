@@ -1,5 +1,6 @@
 {
   "planetId": "mercury",
+  "giverName": "Mercury Heliophysics Lab",
   "missions": [
     {
       "id": "mercury_solar_flare_buoy",

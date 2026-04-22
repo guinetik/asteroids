@@ -1,5 +1,6 @@
 {
   "planetId": "venus",
+  "giverName": "Venus Atmospheric Institute",
   "missions": [
     {
       "id": "venus_earth_logistics",

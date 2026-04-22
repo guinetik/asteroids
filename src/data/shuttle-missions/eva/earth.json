@@ -1,5 +1,6 @@
 {
   "planetId": "earth",
+  "giverName": "Earth Space Agency",
   "missions": [
     {
       "id": "earth_l1_relay_reterm",

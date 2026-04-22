@@ -1,5 +1,6 @@
 {
   "planetId": "mercury",
+  "giverName": "Mercury Industrial Consortium",
   "missions": [
     {
       "id": "mercury_venus_gas_harvest",

@@ -20,6 +20,10 @@ import { getItemDefinition } from '@/lib/inventory/catalog'
 import { getPlanet } from '@/lib/planets/catalog'
 import type { UpgradeLevels } from '@/lib/upgrades'
 import { getUpgradeValue } from '@/lib/upgrades'
+import { getMissionPool } from '@/lib/missions/shuttleMissionPools'
+import { getEvaMissionPool } from '@/lib/missions/evaMissionPools'
+import { getTurretMiningPool } from '@/lib/missions/turretMiningPools'
+import type { EvaMissionPoiType } from '@/lib/missions/types'
 
 const props = defineProps<{
   board: ShuttleMissionBoard | null
@@ -262,6 +266,53 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
   }
   return regionLabel(mission.region)
 }
+
+/**
+ * Giver name for the planetary (shuttle) mission pool at a given planet.
+ *
+ * @param planetId - The planet id whose pool to query.
+ * @returns Pool's `giverName`, or an empty string if not set.
+ */
+function planetaryGiverName(planetId: string | null): string {
+  if (!planetId) return ''
+  return getMissionPool(planetId)?.giverName ?? ''
+}
+
+/**
+ * Giver name for the EVA mission pool at a given planet.
+ *
+ * @param planetId - The planet id whose pool to query.
+ * @returns Pool's `giverName`, or an empty string if not set.
+ */
+function evaGiverName(planetId: string | null): string {
+  if (!planetId) return ''
+  return getEvaMissionPool(planetId)?.giverName ?? ''
+}
+
+/**
+ * Giver name for the turret mining pool at a given planet.
+ *
+ * @param planetId - The planet id whose pool to query.
+ * @returns Pool's `giverName`, or an empty string if not set.
+ */
+function miningGiverName(planetId: string | null): string {
+  if (!planetId) return ''
+  return getTurretMiningPool(planetId)?.giverName ?? ''
+}
+
+/**
+ * Human-readable label for an EVA mission's POI type.
+ *
+ * @param poiType - The `poiType` field from a `VisitRelayShuttleMissionTemplate`.
+ * @returns Display label, e.g. `"Relay Antenna Repair"`.
+ */
+function evaTypeLabel(poiType: EvaMissionPoiType): string {
+  switch (poiType) {
+    case 'satellite': return 'Satellite Servicing'
+    case 'relay_antenna': return 'Relay Antenna Repair'
+    case 'telescope': return 'Telescope Alignment'
+  }
+}
 </script>
 
 <template>
@@ -280,8 +331,12 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
         class="mission-board-offer"
       >
         <div class="mission-board-offer__name">{{ board.offeredEvaMission.name }}</div>
+        <div v-if="evaGiverName(board.offeringEvaPlanet)" class="mission-board-offer__giver">
+          From: {{ evaGiverName(board.offeringEvaPlanet) }}
+        </div>
         <div class="mission-board-offer__desc">{{ board.offeredEvaMission.description }}</div>
         <div class="mission-board-offer__meta">
+          <span>Type: {{ evaTypeLabel(board.offeredEvaMission.poiType) }}</span>
           <span>Waypoint: near {{ targetPlanetName(dockedPlanet ?? '') }}</span>
           <span>Reward: {{ board.offeredEvaMission.reward }} CR</span>
         </div>
@@ -312,6 +367,9 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
         class="mission-board-offer"
       >
         <div class="mission-board-offer__name">{{ board.offeredMiningMission.name }}</div>
+        <div v-if="miningGiverName(board.offeringMiningPlanet)" class="mission-board-offer__giver">
+          From: {{ miningGiverName(board.offeringMiningPlanet) }}
+        </div>
         <div class="mission-board-offer__desc">{{ board.offeredMiningMission.description }}</div>
         <div class="mission-board-offer__meta">
           <span>Ore: {{ oreLabelFor(board.offeredMiningMission.oreCategory) }}</span>
@@ -374,6 +432,9 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
 
       <div v-if="board?.offeredMission && board.offeringPlanet === dockedPlanet" class="mission-board-offer">
         <div class="mission-board-offer__name">{{ board.offeredMission.name }}</div>
+        <div v-if="planetaryGiverName(board.offeringPlanet)" class="mission-board-offer__giver">
+          From: {{ planetaryGiverName(board.offeringPlanet) }}
+        </div>
         <div class="mission-board-offer__desc">{{ board.offeredMission.description }}</div>
         <div class="mission-board-offer__meta">
           <span>Target: {{ targetPlanetName(board.offeredMission.targetPlanet) }}</span>
@@ -412,6 +473,9 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
         class="mission-board-active"
       >
         <div class="mission-board-active__name">{{ mission.template.name }}</div>
+        <div v-if="planetaryGiverName(mission.giverPlanet)" class="mission-board-active__giver">
+          {{ planetaryGiverName(mission.giverPlanet) }}
+        </div>
         <div class="mission-board-active__route">
           {{ targetPlanetName(mission.giverPlanet) }} &rarr; {{ targetPlanetName(mission.template.targetPlanet) }}
         </div>
@@ -439,6 +503,9 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
         class="mission-board-active"
       >
         <div class="mission-board-active__name">{{ mission.template.name }}</div>
+        <div v-if="evaGiverName(mission.giverPlanet)" class="mission-board-active__giver">
+          {{ evaGiverName(mission.giverPlanet) }}
+        </div>
         <div class="mission-board-active__route">
           {{ targetPlanetName(mission.giverPlanet) }} &rarr; deep-space waypoint
         </div>
@@ -446,7 +513,7 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
           {{ evaMissionStatusLabel(mission) }}
         </div>
         <div class="mission-board-active__cargo">
-          {{ mission.template.reward }} CR on delivery
+          {{ evaTypeLabel(mission.template.poiType) }} &middot; {{ mission.template.reward }} CR on delivery
         </div>
       </div>
 
@@ -457,6 +524,9 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
         class="mission-board-active"
       >
         <div class="mission-board-active__name">{{ mission.template.name }}</div>
+        <div v-if="miningGiverName(mission.giverPlanet)" class="mission-board-active__giver">
+          {{ miningGiverName(mission.giverPlanet) }}
+        </div>
         <div class="mission-board-active__route">
           {{ miningProgressLabel(mission) }}
         </div>

@@ -141,6 +141,8 @@ export interface ShuttleMissionTemplate {
 export interface ShuttleMissionPool {
   /** Planet id that offers these missions. */
   planetId: string
+  /** Display name of the organization or authority posting these missions. */
+  giverName?: string
   /** The 3 missions in this planet's pool. */
   missions: ShuttleMissionTemplate[]
 }
@@ -248,6 +250,8 @@ export interface VisitRelayShuttleMissionTemplate {
 export interface VisitRelayMissionPool {
   /** Planet id that offers these missions. */
   planetId: string
+  /** Display name of the organization or authority posting these EVA missions. */
+  giverName?: string
   /** The missions in this planet's EVA pool. */
   missions: VisitRelayShuttleMissionTemplate[]
 }

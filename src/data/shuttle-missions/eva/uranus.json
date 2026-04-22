@@ -1,5 +1,6 @@
 {
   "planetId": "uranus",
+  "giverName": "Uranus Outpost Authority",
   "missions": [
     {
       "id": "uranus_tilt_anomaly_probe",
