@@ -1160,6 +1160,16 @@ export class MapViewController implements Tickable {
 
     this.syncVehicleCameraShipYawCoupling()
 
+    const shouldSkipStartupIntro =
+      this.inputManager?.wasActionPressed('skipCinematic') === true &&
+      (this.mapIntro.phase === 'cinematic_zoom' ||
+        this.mapIntro.phase === 'awaiting_message_open' ||
+        this.mapIntro.phase === 'reading_message')
+    if (shouldSkipStartupIntro) {
+      this.skipIntro()
+      return
+    }
+
     const mapToggleAction = this.modeCoordinator.resolveMapToggleAction({
       introLocked,
       habitatActive: this.habitatState.isActive,
@@ -3456,9 +3466,15 @@ export class MapViewController implements Tickable {
     this.emitIntroUiState()
   }
 
-  /** Start the opening cutscene only when an active startup message exists. */
+  /**
+   * Start the opening cutscene for first-time Earth-orbit spawns.
+   *
+   * The startup message is enqueued separately before this runs, but the
+   * cinematic itself should not be cancelled just because the inbox has not
+   * surfaced an active row on this exact frame.
+   */
   private beginStartupIntro(): void {
-    if (!this.messageFacade.hasActiveMessage() || !this.vehicleCamera) {
+    if (!this.vehicleCamera) {
       this.clearStartupCinematicOrbitHandoff()
       this.mapIntro.skip()
       this.markMapIntroSeenAndSyncProfile()

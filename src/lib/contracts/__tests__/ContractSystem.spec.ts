@@ -64,7 +64,7 @@ const uscContract: Contract = {
     },
     {
       kind: 'orbital-mission',
-      planetId: 'venus',
+      targetPlanetId: 'venus',
       subject: 'Orbital',
       flavor: ['Do orbital at venus'],
     },
@@ -300,9 +300,9 @@ describe('ContractSystem mission filters', () => {
     contracts.notifyMissionCompleted({
       kind: 'eva', giverPlanetId: 'earth', giverId: null, targetPlanetId: null,
     })
-    contracts.notifyOrbitalMissionCompleted('mars')
+    contracts.notifyOrbitalMissionCompleted({ giverPlanetId: 'earth', targetPlanetId: 'mars' })
     expect(contracts.getInstance(uscContract.id)?.currentStepIndex).toBe(1)
-    contracts.notifyOrbitalMissionCompleted('venus')
+    contracts.notifyOrbitalMissionCompleted({ giverPlanetId: 'earth', targetPlanetId: 'venus' })
     expect(contracts.getInstance(uscContract.id)?.status).toBe('completed')
     expect(granted).toEqual([
       { type: 'fast-travel', planetId: 'earth' },

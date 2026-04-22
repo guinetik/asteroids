@@ -66,12 +66,28 @@ export interface VisitPlanetStep {
   flavor: string[]
 }
 
-/** Step that requires the player to deliver a shuttle planetary mission targeting `planetId`. */
+/**
+ * Step that requires the player to complete the orbital pickup phase of a
+ * planetary shuttle mission. Both filters are optional and AND-ed together:
+ *   - `giverPlanetId` — the posting station the contract was picked up at
+ *     (e.g. `'mars'` for "complete an orbital mission from Mars").
+ *   - `targetPlanetId` — the body the orbital minigame runs at (e.g. `'venus'`).
+ * Omitting both matches any orbital mission completion.
+ */
 export interface OrbitalMissionStep {
   kind: 'orbital-mission'
-  planetId: string
+  giverPlanetId?: string
+  targetPlanetId?: string
   subject: string
   flavor: string[]
+}
+
+/** Event payload emitted when a planetary shuttle orbital pickup completes. */
+export interface OrbitalMissionCompletedEvent {
+  /** Posting station that issued the contract. */
+  giverPlanetId: string
+  /** Body the orbital minigame ran at. */
+  targetPlanetId: string
 }
 
 /** Discriminated union of all supported contract steps. */

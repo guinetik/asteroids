@@ -278,6 +278,8 @@ export class MessageSystem {
       return this.folderIdOf(def) === folderId
     })
     defs.sort((a, b) => {
+      const pinnedDelta = (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)
+      if (pinnedDelta !== 0) return pinnedDelta
       if (b.priority !== a.priority) return b.priority - a.priority
       return a.id.localeCompare(b.id)
     })
@@ -299,6 +301,7 @@ export class MessageSystem {
         status,
         isUnread: record.status === 'pending',
         folderId: this.folderIdOf(def),
+        pinned: def.pinned === true,
       }
       if (def.contractId) row.contractId = def.contractId
       return row

@@ -76,13 +76,20 @@ export interface ShipMessageDefinition {
   /**
    * Per-contract role for this message:
    *   - `'intro'` — offer message with Accept/Decline buttons in the reader
+   *   - `'brief'` — pinned active-contract dossier, always visible at top of the folder
    *   - `'step'` — flavor text dropped when a step unlocks
    *   - `'completion'` — celebratory message dropped when the contract finishes
    * Undefined for plain catalog messages.
    */
-  contractMessageKind?: 'intro' | 'step' | 'completion'
+  contractMessageKind?: 'intro' | 'brief' | 'step' | 'completion'
   /** Index into {@link Contract.steps} for `contractMessageKind === 'step'` messages. */
   contractStepIndex?: number
+  /**
+   * When true, the inbox list pins this message above all non-pinned rows in the
+   * same folder. Used by contract briefs so the active dossier stays at the top
+   * of its folder regardless of arrival order.
+   */
+  pinned?: boolean
 }
 
 /** Persisted runtime state for one message. */
@@ -133,6 +140,8 @@ export interface ShipMessageInboxRow {
   folderId: string
   /** Optional contract id when this row was authored by the contract system. */
   contractId?: string
+  /** True when the message should sort above all non-pinned rows in its folder. */
+  pinned: boolean
 }
 
 /** One folder entry surfaced in the mail sidebar. */

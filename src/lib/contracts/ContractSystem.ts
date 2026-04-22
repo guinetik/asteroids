@@ -11,15 +11,14 @@
  * @spec docs/superpowers/specs/2026-04-20-contracts-design.md
  */
 import type { MessageSystem } from '@/lib/messages/messageSystem'
-import type {
-  ShipMessageDefinition,
-} from '@/lib/messages/messageTypes'
+import type { ShipMessageDefinition } from '@/lib/messages/messageTypes'
 import type {
   Contract,
   ContractInstance,
   ContractStep,
   ContractStoreSnapshot,
   MissionCompletedEvent,
+  OrbitalMissionCompletedEvent,
   RewardEffect,
 } from './contractTypes'
 import { emptyContractSnapshot, loadContractSnapshot, saveContractSnapshot } from './contractStorage'
@@ -60,6 +59,9 @@ const CONTRACT_MESSAGE_TRIGGER = 'contract' as const
 
 /** Priority used for contract-driven inbox messages (above tutorial Jay messages). */
 const CONTRACT_MESSAGE_PRIORITY = 80
+
+/** Priority used for the pinned active-brief message; sorts above siblings within the pinned group. */
+const CONTRACT_BRIEF_PRIORITY = 100
 
 /**
  * Owns contract definitions, persisted instance state, and the event hooks used to
@@ -216,12 +218,13 @@ export class ContractSystem {
   }
 
   /**
-   * Notify the system that the player delivered a planetary shuttle mission whose
-   * orbital minigame ran at `planetId`.
+   * Notify the system that the player completed the orbital pickup phase of a
+   * planetary shuttle mission. Both the giver (posting station) and target
+   * (orbital body) planet ids are passed so steps can filter on either side.
    *
-   * @param planetId - Planet where the orbital minigame completed.
+   * @param event - Giver + target planet ids for the just-completed pickup.
    */
-  notifyOrbitalMissionCompleted(planetId: string): void {
+  notifyOrbitalMissionCompleted(event: OrbitalMissionCompletedEvent): void {
     let changed = false
     for (const instance of Object.values(this.snapshot.instances)) {
       if (instance.status !== 'active') continue
@@ -229,7 +232,8 @@ export class ContractSystem {
       if (!contract) continue
       const step = contract.steps[instance.currentStepIndex]
       if (!step || step.kind !== 'orbital-mission') continue
-      if (step.planetId !== planetId) continue
+      if (step.giverPlanetId && step.giverPlanetId !== event.giverPlanetId) continue
+      if (step.targetPlanetId && step.targetPlanetId !== event.targetPlanetId) continue
       this.advanceStep(contract, instance, 1)
       changed = true
     }
@@ -259,6 +263,7 @@ export class ContractSystem {
       ...this.snapshot,
       instances: { ...this.snapshot.instances, [contractId]: updated },
     }
+    this.deliverBriefMessage(contract)
     this.deliverStepMessage(contract, 0)
     this.persist()
     this.afterChange()
@@ -360,6 +365,15 @@ export class ContractSystem {
     this.messageSystem.enqueueById(contractStepMessageId(contract.id, stepIndex))
   }
 
+  /**
+   * Deliver the pinned "active brief" dossier message into the contract folder.
+   * Always shows up first in the folder list and renders the live progress card
+   * in the reader so the player has a one-click reference for this contract.
+   */
+  private deliverBriefMessage(contract: Contract): void {
+    this.messageSystem.enqueueById(contractBriefMessageId(contract.id))
+  }
+
   /** Deliver the completion message into the contract folder. */
   private deliverCompletionMessage(contract: Contract): void {
     this.messageSystem.enqueueById(contractCompletionMessageId(contract.id))
@@ -411,6 +425,11 @@ export function contractIntroMessageId(contractId: string): string {
   return `contract.${contractId}.intro`
 }
 
+/** Stable id for the pinned active-contract brief shown at the top of the folder. */
+export function contractBriefMessageId(contractId: string): string {
+  return `contract.${contractId}.brief`
+}
+
 /** Stable id for a contract step's flavor message. */
 export function contractStepMessageId(contractId: string, stepIndex: number): string {
   return `contract.${contractId}.step.${stepIndex}`
@@ -449,6 +468,16 @@ export function buildContractMessageDefinitions(contract: Contract): ShipMessage
     ...(contract.introAudioUrl ? { audioUrl: contract.introAudioUrl } : {}),
   }
 
+  const brief: ShipMessageDefinition = {
+    ...base,
+    id: contractBriefMessageId(contract.id),
+    subject: `Active Brief — ${contract.inboxName}`,
+    body: buildContractBriefBody(contract),
+    contractMessageKind: 'brief',
+    pinned: true,
+    priority: CONTRACT_BRIEF_PRIORITY,
+  }
+
   const stepMessages: ShipMessageDefinition[] = contract.steps.map((step, index) => ({
     ...base,
     id: contractStepMessageId(contract.id, index),
@@ -466,5 +495,21 @@ export function buildContractMessageDefinitions(contract: Contract): ShipMessage
     contractMessageKind: 'completion',
   }
 
-  return [intro, ...stepMessages, completion]
+  return [intro, brief, ...stepMessages, completion]
+}
+
+/**
+ * Build the static body text for a contract's pinned active-brief message. The
+ * reader pairs this with the live progress card, so this body acts as a flavor
+ * preamble — short and punchy, not a duplicate of the step list.
+ *
+ * @param contract - Contract whose brief body should be generated.
+ */
+function buildContractBriefBody(contract: Contract): string[] {
+  return [
+    `Active contract — ${contract.inboxName}.`,
+    'This brief stays pinned at the top of your folder for the duration of the job. Open it any time to review your objectives, see live step progress, and check the reward on completion.',
+    'Step flavor messages will arrive as you unlock them. They will live below this brief in this same folder.',
+    `— ${contract.from}`,
+  ]
 }

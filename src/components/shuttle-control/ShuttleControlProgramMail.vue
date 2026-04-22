@@ -49,6 +49,7 @@ function refreshAll(): void {
 }
 
 const readable = computed<ShipMessageReadable | null>(() => {
+   
   readerRefreshToken.value
   if (!selectedId.value) return null
   return shipMessageSystem.getReadableShipMessage(selectedId.value)
@@ -66,6 +67,23 @@ const activeContract = computed(() => {
   }
 })
 
+const showContractCardAbove = computed(() => {
+  const entry = activeContract.value
+  if (!entry) return false
+  const r = readable.value
+  if (r?.contractMessageKind === 'brief') return true
+  const status = entry.instance?.status ?? 'available'
+  return status === 'active' || status === 'completed'
+})
+
+const canAcknowledgeSelected = computed(() => {
+  const r = readable.value
+  if (!r) return false
+  if (r.inboxStatus === 'dismissed') return false
+  if (r.pinned) return false
+  return true
+})
+
 function statusLabel(row: ShipMessageInboxRow): string {
   if (row.status === 'locked') return 'Locked'
   if (row.status === 'pending') return 'Unread'
@@ -78,8 +96,6 @@ function selectFolder(folderId: string): void {
   selectedFolderId.value = folderId
   selectedId.value = null
   refreshRows()
-  const firstRow = rows.value[0]
-  if (firstRow) selectRow(firstRow.id)
 }
 
 function selectRow(id: string, options: { autoplayAudio?: boolean } = {}): void {
@@ -132,10 +148,6 @@ onUnmounted(() => {
 })
 
 refreshAll()
-const firstRow = rows.value[0]
-if (firstRow) {
-  selectRow(firstRow.id)
-}
 </script>
 
 <template>
@@ -179,13 +191,19 @@ if (firstRow) {
             'shuttle-mail-program__row--active': selectedId === row.id,
             'shuttle-mail-program__row--unread': row.isUnread,
             'shuttle-mail-program__row--locked': row.status === 'locked',
+            'shuttle-mail-program__row--pinned': row.pinned,
           }"
           :aria-selected="selectedId === row.id"
           @click="selectRow(row.id, { autoplayAudio: true })"
         >
-          <span class="shuttle-mail-program__row-from">{{ row.from }}</span>
+          <span class="shuttle-mail-program__row-from">
+            <span v-if="row.pinned" class="shuttle-mail-program__row-pin" aria-hidden="true">📌</span>
+            {{ row.from }}
+          </span>
           <span class="shuttle-mail-program__row-subject">{{ row.subject }}</span>
-          <span class="shuttle-mail-program__row-meta">{{ row.sentAt }} · {{ statusLabel(row) }}</span>
+          <span class="shuttle-mail-program__row-meta">
+            <span v-if="row.pinned">Pinned · </span>{{ row.sentAt }} · {{ statusLabel(row) }}
+          </span>
           <span class="shuttle-mail-program__row-preview">{{ row.preview }}</span>
         </button>
         <p v-if="rows.length === 0" class="shuttle-mail-program__row-empty">
@@ -223,7 +241,7 @@ if (firstRow) {
                 </div>
               </div>
               <div
-                v-if="readable.inboxStatus !== 'dismissed'"
+                v-if="canAcknowledgeSelected"
                 class="shuttle-mail-program__reader-action"
               >
                 <button
@@ -237,6 +255,13 @@ if (firstRow) {
                   Acknowledge to clear the alert and unlock follow-ups
                 </span>
               </div>
+              <div
+                v-else-if="readable.pinned"
+                class="shuttle-mail-program__reader-pinned"
+                title="Pinned active brief — stays at the top of this folder"
+              >
+                <span aria-hidden="true">📌</span> Pinned brief
+              </div>
             </div>
           </header>
           <ShipMessageAudioPlayer
@@ -247,13 +272,20 @@ if (firstRow) {
             :autoplay-token="selectedAudioAutoplayToken"
           />
           <div v-if="readable.audioUrl" class="shuttle-mail-program__audio-divider" aria-hidden="true" />
+          <ContractAcceptCard
+            v-if="activeContract && showContractCardAbove"
+            :contract="activeContract.contract"
+            :instance="activeContract.instance"
+            @accept="acceptContract"
+            @decline="declineContract"
+          />
           <div class="shuttle-mail-program__reader-body">
             <p v-for="(paragraph, index) in readable.body" :key="`${readable.id}-${index}`">
               {{ paragraph }}
             </p>
           </div>
           <ContractAcceptCard
-            v-if="activeContract"
+            v-if="activeContract && !showContractCardAbove"
             :contract="activeContract.contract"
             :instance="activeContract.instance"
             @accept="acceptContract"
@@ -388,6 +420,32 @@ if (firstRow) {
 .shuttle-mail-program__row--unread .shuttle-mail-program__row-subject {
   color: #6ae8c4;
   font-weight: 600;
+}
+
+.shuttle-mail-program__row--pinned {
+  background: rgba(106, 232, 196, 0.04);
+  border-bottom: 1px solid rgba(106, 232, 196, 0.25);
+  box-shadow: inset 3px 0 0 rgba(106, 232, 196, 0.5);
+}
+
+.shuttle-mail-program__row--pinned:hover {
+  background: rgba(106, 232, 196, 0.09);
+}
+
+.shuttle-mail-program__row--pinned.shuttle-mail-program__row--active {
+  box-shadow: inset 3px 0 0 #6ae8c4;
+}
+
+.shuttle-mail-program__row--pinned .shuttle-mail-program__row-subject {
+  color: #6ae8c4;
+  font-weight: 600;
+}
+
+.shuttle-mail-program__row-pin {
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 11px;
+  filter: hue-rotate(120deg) saturate(0.8);
 }
 
 .shuttle-mail-program__row-from {

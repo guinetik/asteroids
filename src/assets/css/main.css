@@ -1186,6 +1186,10 @@ body {
   @apply max-w-[180px] text-right font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-300/60;
 }
 
+.shuttle-mail-program__reader-pinned {
+  @apply shrink-0 rounded-md border border-emerald-300/30 bg-emerald-300/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-200;
+}
+
 @keyframes shuttle-mail-program-acknowledge-pulse {
   0%,
   100% {

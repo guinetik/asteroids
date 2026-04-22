@@ -205,48 +205,7 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
       </div>
     </div>
 
-    <!-- Planetary Missions -->
-    <div class="mission-board-section">
-      <h3 class="mission-board-section__heading">Planetary Missions</h3>
-      <p class="mission-board-section__descriptor">
-        Contract runs to other planets: match orbit from the shuttle, secure the orbital pickup in your cargo hold,
-        then return to the posting station for your payout.
-      </p>
-
-      <div v-if="!dockedPlanet" class="mission-board-empty">
-        Not docked at a planet
-      </div>
-
-      <div v-else-if="board?.offeredMission && board.offeringPlanet === dockedPlanet" class="mission-board-offer">
-        <div class="mission-board-offer__name">{{ board.offeredMission.name }}</div>
-        <div class="mission-board-offer__desc">{{ board.offeredMission.description }}</div>
-        <div class="mission-board-offer__meta">
-          <span>Target: {{ targetPlanetName(board.offeredMission.targetPlanet) }}</span>
-          <span>Reward: {{ board.offeredMission.reward }} CR</span>
-        </div>
-        <button
-          type="button"
-          class="mission-board-offer__accept-btn"
-          :disabled="!canAcceptPlanetaryOffer"
-          @click="emit('acceptMission')"
-        >
-          Accept
-        </button>
-        <p v-if="!canAcceptPlanetaryOffer" class="mission-board-offer__inventory-hint">
-          Cargo hold full — sell items at the station shop (sidebar) to make room for this pickup.
-        </p>
-      </div>
-
-      <div v-else-if="board?.restockTimer" class="mission-board-empty">
-        Restocking in {{ formatTime(board.restockTimer.remaining) }}
-      </div>
-
-      <div v-else class="mission-board-empty">
-        No missions available
-      </div>
-    </div>
-
-    <!-- Asteroid Missions -->
+    <!-- Asteroid Missions (second — local lander jobs near the posting station) -->
     <div class="mission-board-section">
       <h3 class="mission-board-section__heading">Asteroid Missions</h3>
       <p class="mission-board-section__descriptor">
@@ -293,6 +252,47 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
 
       <div v-else class="mission-board-empty">
         No asteroid missions available
+      </div>
+    </div>
+
+    <!-- Planetary Missions (third — advanced: requires interplanetary travel) -->
+    <div class="mission-board-section">
+      <h3 class="mission-board-section__heading">Planetary Missions</h3>
+      <p class="mission-board-section__descriptor">
+        Advanced contracts that send you to <em>another</em> planet: match orbit from the shuttle, secure the orbital
+        pickup in your cargo hold, then return to the posting station for your payout.
+      </p>
+
+      <div v-if="!dockedPlanet" class="mission-board-empty">
+        Not docked at a planet
+      </div>
+
+      <div v-else-if="board?.offeredMission && board.offeringPlanet === dockedPlanet" class="mission-board-offer">
+        <div class="mission-board-offer__name">{{ board.offeredMission.name }}</div>
+        <div class="mission-board-offer__desc">{{ board.offeredMission.description }}</div>
+        <div class="mission-board-offer__meta">
+          <span>Target: {{ targetPlanetName(board.offeredMission.targetPlanet) }}</span>
+          <span>Reward: {{ board.offeredMission.reward }} CR</span>
+        </div>
+        <button
+          type="button"
+          class="mission-board-offer__accept-btn"
+          :disabled="!canAcceptPlanetaryOffer"
+          @click="emit('acceptMission')"
+        >
+          Accept
+        </button>
+        <p v-if="!canAcceptPlanetaryOffer" class="mission-board-offer__inventory-hint">
+          Cargo hold full — sell items at the station shop (sidebar) to make room for this pickup.
+        </p>
+      </div>
+
+      <div v-else-if="board?.restockTimer" class="mission-board-empty">
+        Restocking in {{ formatTime(board.restockTimer.remaining) }}
+      </div>
+
+      <div v-else class="mission-board-empty">
+        No missions available
       </div>
     </div>
 

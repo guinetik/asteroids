@@ -9,47 +9,37 @@
     "Hey, you got Jay.",
     "Alright, paperwork. We are calling this thing Space Cowboys, Inc. You and me, partners, fifty-fifty. The HQ goes on Mars — cheap dust, decent gravity, nobody breathing down our necks.",
     "Before we drop a pin on the rust planet we need a little street cred. People only talk to operators who have logged hours. So here is the run, in order:",
-    "1) Knock out three jobs of any kind to prove you can finish a contract.",
-    "2) Take an asteroid run too, so the lander logs are not blank.",
-    "3) Pick up three of my contracts so the dispatch ledger reads clean.",
-    "4) Bolt on Cryo Insulation Lvl 1 — Mars gets cold the second the sun drops.",
-    "5) Then come visit me at Mars. We open the office.",
+    "1) Knock out an EVA contract — proves you can suit up and clock out clean.",
+    "2) Pick up two asteroid jobs off my board, so the lander log reads Mercer twice.",
+    "3) Bolt on Cryo Insulation Lvl 1 — Mars gets cold the second the sun drops.",
+    "4) Then come visit me at Mars. We open the office.",
+    "5) Sign the welcome paperwork by running an orbital out of Mars — first delivery as a real Cowboys office.",
     "Accept and I will start ringing your inbox with the next move every time you finish one.",
     "— Jay"
   ],
   "steps": [
     {
       "kind": "complete-missions",
-      "count": 3,
-      "subject": "Three Jobs, Any Flavor",
-      "flavor": [
-        "Hey, you got Jay.",
-        "First three are easy: take whatever pays. Shuttle haul, EVA repair, asteroid run — it does not matter. Dispatchers like seeing the count tick up.",
-        "Fly clean, deliver, log it. Three is the magic number where they stop calling you a tourist.",
-        "— Jay"
-      ]
-    },
-    {
-      "kind": "complete-missions",
       "count": 1,
-      "missionType": "asteroid",
-      "subject": "One For The Lander",
+      "missionType": "eva",
+      "subject": "Suit Up — One EVA",
       "flavor": [
         "Hey, you got Jay.",
-        "Now do an asteroid run. Boots on the rock. Doors open, suit up, don't trip over your own oxygen line.",
-        "Half of getting work out here is having a lander log that isn't blank. So go scuff that thing up.",
+        "First one's the suit job. Pick any EVA contract off the board, get out there, finish it without losing a glove or a tether. Easy money for a guy with hands.",
+        "Close it out clean and the dispatch ledger ticks over. One down.",
         "— Jay"
       ]
     },
     {
       "kind": "complete-missions",
-      "count": 3,
+      "count": 2,
+      "missionType": "asteroid",
       "giverId": "jay",
-      "subject": "Three For The House",
+      "subject": "Two Rocks With My Name On Them",
       "flavor": [
         "Hey, you got Jay.",
-        "Now run three of mine. Yeah, I'm the dispatcher and the pilot and the guy who buys you a beer when it's done. Welcome to early-stage equity.",
-        "We split the margins fair, I promise. Pick something off my list, fly it, get back. Three of those and we're a real outfit on paper.",
+        "Now we put a Mercer stamp on the lander logs. Take two asteroid contracts off my list specifically — not the consortium boards, mine — boots on the rock both times.",
+        "I am the dispatcher and the pilot and the guy who buys you a beer when it's done. Welcome to early-stage equity. Two of mine and we read like a real outfit on paper.",
         "— Jay"
       ]
     },
@@ -73,6 +63,17 @@
         "Hey, you got Jay.",
         "Burn for Mars. Park in orbit, dock at the spaceport, walk into the engineering bay — I'll be the guy holding two coffees and a key card.",
         "Welcome to HQ, partner. The kiosk is yours. Anytime you wanna come home, you point the nose at Mars and we will leave the lights on.",
+        "— Jay"
+      ]
+    },
+    {
+      "kind": "orbital-mission",
+      "giverPlanetId": "mars",
+      "subject": "First Job From The Mars Desk",
+      "flavor": [
+        "Hey, you got Jay.",
+        "Welcome aboard, partner. First order of business — pick up an orbital contract from our own kiosk here at Mars and run it. Doesn't matter where the cargo is parked; what matters is the slip says Space Cowboys, Inc. on the giver line.",
+        "Walk into the Mars spaceport mission board, grab the planetary shuttle job on offer, fly the orbital pickup, and ring me when the cargo is in the hold. That is the official ribbon-cutting.",
         "— Jay"
       ]
     }

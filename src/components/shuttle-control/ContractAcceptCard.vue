@@ -43,7 +43,11 @@ function stepLabel(step: ContractStep): string {
   if (step.kind === 'visit-planet') {
     return `Enter orbit at ${step.planetId}`
   }
-  return `Complete an orbital mission at ${step.planetId}`
+  const orbitalBits: string[] = []
+  if (step.giverPlanetId) orbitalBits.push(`from ${step.giverPlanetId}`)
+  if (step.targetPlanetId) orbitalBits.push(`at ${step.targetPlanetId}`)
+  const suffix = orbitalBits.length > 0 ? ` ${orbitalBits.join(' ')}` : ''
+  return `Complete an orbital mission${suffix}`
 }
 
 function requiredCount(step: ContractStep): number {

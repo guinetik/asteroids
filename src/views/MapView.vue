@@ -223,8 +223,11 @@ const habitatActive = ref(false)
 /** Hides orbit shuttle chrome during Earth first-mail cinematic → habitat (not used when intro is skipped). */
 const earthStartupOrbitHudSuppressed = ref(false)
 const shuttleControlVisible = ref(false)
+/** Programs the map nav bar can deep-link the shuttle terminal into. */
+type ShuttleControlInitialProgram = 'mail' | 'missions' | 'inventory'
+
 /** When opening the terminal from the map bar, optionally land on a specific program (e.g. missions). */
-const shuttleControlProgramOnOpen = ref<'missions' | undefined>(undefined)
+const shuttleControlProgramOnOpen = ref<ShuttleControlInitialProgram | undefined>(undefined)
 
 watch(shuttleControlVisible, (visible) => {
   if (!visible) shuttleControlProgramOnOpen.value = undefined
@@ -507,6 +510,7 @@ function syncPersistentProgressFromController(): void {
 }
 
 onMounted(async () => {
+  window.addEventListener('keydown', handleWindowKeydown)
   if (container.value) {
     viewController.onTelemetry = (t) => {
       Object.assign(telemetry, t)
@@ -663,7 +667,10 @@ onMounted(async () => {
       if (mission) {
         showMissionNotification(`Mission items collected — return to deliver`)
         syncPersistentProgressFromController()
-        contractSystem.notifyOrbitalMissionCompleted(mission.template.targetPlanet)
+        contractSystem.notifyOrbitalMissionCompleted({
+          giverPlanetId: mission.giverPlanet,
+          targetPlanetId: mission.template.targetPlanet,
+        })
       }
     }
     viewController.onMissionDeliver = (mission) => {
@@ -699,6 +706,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('keydown', handleWindowKeydown)
   clearPickupUi()
   setShipMessageFollowUpDeliveryListener(null)
   stopBackgroundMusic('map')
@@ -728,6 +736,19 @@ function handlePortalSkip(): void {
   viewController.portalSkipIntro()
 }
 
+function handleWindowKeydown(event: KeyboardEvent): void {
+  if (event.key !== 'Escape') return
+  if (
+    mapIntro.phase !== 'cinematic_zoom' &&
+    mapIntro.phase !== 'awaiting_message_open' &&
+    mapIntro.phase !== 'reading_message'
+  ) {
+    return
+  }
+  event.preventDefault()
+  viewController.skipIntro()
+}
+
 function handleToggleOrbits() {
   orbitsVisible.value = viewController.toggleOrbits()
 }
@@ -745,17 +766,9 @@ function closeShuttleControl() {
   }
 }
 
-function openShuttleControlFromMap(): void {
+function openProgramFromMap(program: ShuttleControlInitialProgram): void {
   viewController.notifyJourneyTrigger('shuttle_control_opened')
-  shuttleControlVisible.value = true
-  syncPersistentProgressFromController()
-  shopProfile.value = viewController.getPlayerProfileSnapshot()
-  shopInventory.value = viewController.getPlayerInventorySnapshot()
-}
-
-function openMissionsFromMap(): void {
-  viewController.notifyJourneyTrigger('shuttle_control_opened')
-  shuttleControlProgramOnOpen.value = 'missions'
+  shuttleControlProgramOnOpen.value = program
   shuttleControlVisible.value = true
   syncPersistentProgressFromController()
   shopProfile.value = viewController.getPlayerProfileSnapshot()
@@ -983,30 +996,46 @@ watch(
       <span class="map-screen-nav__title">{{ MAP_SCREEN_GAME_TITLE }}</span>
     </div>
     <div class="map-screen-nav__actions">
-      <button type="button" class="map-screen-nav__btn map-screen-nav__btn--habitat" @click="openHabitatFromMap">
-        H Habitat
+      <button
+        type="button"
+        class="map-screen-nav__icon-btn"
+        title="Habitat (H)"
+        @click="openHabitatFromMap"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="map-screen-nav__icon"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
       </button>
       <button
         type="button"
-        class="map-screen-nav__btn map-screen-nav__btn--missions"
-        @click="openMissionsFromMap"
+        class="map-screen-nav__icon-btn"
+        title="Mail"
+        @click="openProgramFromMap('mail')"
       >
-        Missions
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="map-screen-nav__icon"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
       </button>
       <button
         type="button"
-        class="map-screen-nav__btn map-screen-nav__btn--terminal"
-        @click="openShuttleControlFromMap"
+        class="map-screen-nav__icon-btn"
+        title="Missions (I)"
+        @click="openProgramFromMap('missions')"
       >
-        Control Panel
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="map-screen-nav__icon"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+      </button>
+      <button
+        type="button"
+        class="map-screen-nav__icon-btn"
+        title="Inventory (B)"
+        @click="openProgramFromMap('inventory')"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="map-screen-nav__icon"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
       </button>
       <button
         v-if="shipMessageAudioPlaying"
         type="button"
-        class="map-screen-nav__btn map-screen-nav__btn--audio-stop"
+        class="map-screen-nav__icon-btn"
+        title="Stop Message Audio"
         @click="stopShuttleMessageAudio"
       >
-        Stop Message Audio
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="map-screen-nav__icon"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/></svg>
       </button>
     </div>
   </header>

@@ -12,8 +12,8 @@
     "1) Complete one shuttle EVA contract.",
     "2) Complete one asteroid contract.",
     "3) Install Heat Shield Lvl 1 — non-negotiable for inner-system work.",
-    "4) Enter Venus orbit.",
-    "5) Complete one orbital mission targeting Venus.",
+    "4) Complete one orbital mission of any kind to demonstrate dispatch handling.",
+    "5) Establish Venus orbit to close out the certification.",
     "Accept and your terminal will receive Consortium dispatch updates as you progress.",
     "— USC Operator Relations, Sol Sector"
   ],
@@ -55,24 +55,23 @@
       ]
     },
     {
-      "kind": "visit-planet",
-      "planetId": "venus",
-      "subject": "Step 4 — Venus Orbital Insertion",
+      "kind": "orbital-mission",
+      "subject": "Step 4 — Orbital Dispatch Handling",
       "flavor": [
         "Operator,",
-        "Hold a stable Venus orbit. Confirm thermal limits are within the Heat Shield envelope. The Consortium will log your insertion the moment your transponder pings inside the lane.",
-        "Do not loaf. Establish orbit, acknowledge the chime, then proceed to your orbital mission task.",
+        "Take any planetary shuttle contract and run the orbital task end to end. Pickup, orbital minigame, delivery — we want the full dispatch loop on file.",
+        "It does not matter which planet writes the contract. Earth is the obvious source while you build heat tolerance. Submit a clean close-out and the Consortium will log the credit.",
         "— USC Operator Relations"
       ]
     },
     {
-      "kind": "orbital-mission",
+      "kind": "visit-planet",
       "planetId": "venus",
-      "subject": "Step 5 — Venus Orbital Operation",
+      "subject": "Step 5 — Venus Orbital Insertion",
       "flavor": [
         "Operator,",
-        "Final certification objective. Accept any planetary shuttle contract whose target is Venus and complete its orbital task in-lane.",
-        "Deliver the cargo at the giver and your file is closed in your favor.",
+        "Final objective. Burn for Venus and hold a stable orbit. Confirm thermal limits are within the Heat Shield envelope. The Consortium will log your insertion the moment your transponder pings inside the lane.",
+        "Establish orbit and your file is closed in your favor.",
         "— USC Operator Relations"
       ]
     }
