@@ -2556,6 +2556,11 @@ export class MapViewController implements Tickable {
     this.missionFacade.asteroidMissionAccept(this.onMissionBoardUpdate)
   }
 
+  /** Accept the offered turret mining mission (from shuttle control UI). */
+  miningMissionAccept(): void {
+    this.missionFacade.miningMissionAccept(this.onMissionBoardUpdate)
+  }
+
   /** Offer an EVA (visit-relay) mission when docking at a planet. */
   offerEvaMissionAtPlanet(planetId: string): void {
     this.missionFacade.offerEvaMissionAtPlanet(planetId, this.onMissionBoardUpdate)

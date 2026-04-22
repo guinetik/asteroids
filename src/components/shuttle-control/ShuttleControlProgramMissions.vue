@@ -6,6 +6,8 @@ import type {
   ShuttleMissionBoard,
   ActiveShuttleMission,
   ActiveVisitRelayMission,
+  ActiveTurretMiningMission,
+  MiningOreCategory,
   GeneratedAsteroidMission,
   MissionRegion,
 } from '@/lib/missions/types'
@@ -50,12 +52,61 @@ const canAcceptPlanetaryOffer = computed(() => {
   return canFitItem(inv, gatherItem, mission.gatherQuantity)
 })
 
+/** True when the turret mining upgrade has been purchased (level ≥ 1). */
+const miningTabVisible = computed(
+  () => getUpgradeValue('turretMiningUnlock', props.upgradeLevels ?? {}) >= 1,
+)
+
+/** Active turret mining missions from the board. */
+const activeMiningMissions = computed<ActiveTurretMiningMission[]>(
+  () => props.board?.activeMiningMissions ?? [],
+)
+
 const emit = defineEmits<{
   acceptMission: []
   deliverMission: [missionId: string]
   acceptAsteroidMission: []
   acceptEvaMission: []
+  acceptMiningMission: []
 }>()
+
+/**
+ * Human-readable label for a mining ore category.
+ *
+ * @param category - The ore category from the mission template.
+ * @returns Display label from the inventory catalog, or `'Any main-belt ore'` for the `'any'` tier.
+ */
+function oreLabelFor(category: MiningOreCategory): string {
+  if (category === 'any') return 'Any main-belt ore'
+  const def = getItemDefinition(category)
+  return def ? def.label : category
+}
+
+/**
+ * Ore progress line for an active mining mission.
+ *
+ * @param mission - The active turret mining mission.
+ * @returns A string like `"210 / 475 kg of Olivine"`.
+ */
+function miningProgressLabel(mission: ActiveTurretMiningMission): string {
+  const ore = oreLabelFor(mission.template.oreCategory)
+  return `${mission.minedKg} / ${mission.template.targetKg} kg of ${ore}`
+}
+
+/**
+ * Status line for an active mining mission.
+ *
+ * @param mission - The active turret mining mission.
+ * @returns Delivery prompt when ready and docked at giver, return prompt when ready elsewhere, or posting planet otherwise.
+ */
+function miningStatusLabel(mission: ActiveTurretMiningMission): string {
+  if (mission.status === 'ready-to-deliver') {
+    if (props.dockedPlanet === mission.giverPlanet) return 'Ready — delivery on dock'
+    return `Return to ${targetPlanetName(mission.giverPlanet)} to deliver`
+  }
+  return `Posted by ${targetPlanetName(mission.giverPlanet)}`
+}
+
 
 function targetPlanetName(planetId: string): string {
   try {
@@ -205,7 +256,65 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
       </div>
     </div>
 
-    <!-- Asteroid Missions (second — local lander jobs near the posting station) -->
+    <!-- Turret Mining Missions (second — bulk ore collection via the map turret) -->
+    <div v-if="miningTabVisible" class="mission-board-section">
+      <h3 class="mission-board-section__heading">Turret Mining Missions</h3>
+      <p class="mission-board-section__descriptor">
+        Dock at a planet with a mining contract to accept it, then extract ore in the asteroid belt
+        using the map turret. Return to deliver when the target quantity is reached.
+      </p>
+
+      <div v-if="!dockedPlanet" class="mission-board-empty">
+        Not docked at a planet
+      </div>
+
+      <div
+        v-else-if="board?.offeredMiningMission && board.offeringMiningPlanet === dockedPlanet"
+        class="mission-board-offer"
+      >
+        <div class="mission-board-offer__name">{{ board.offeredMiningMission.name }}</div>
+        <div class="mission-board-offer__desc">{{ board.offeredMiningMission.description }}</div>
+        <div class="mission-board-offer__meta">
+          <span>Ore: {{ oreLabelFor(board.offeredMiningMission.oreCategory) }}</span>
+          <span>Quantity: {{ board.offeredMiningMission.targetKg }} kg</span>
+          <span>Reward: {{ board.offeredMiningMission.reward }} CR</span>
+        </div>
+        <button
+          type="button"
+          class="mission-board-offer__accept-btn"
+          @click="emit('acceptMiningMission')"
+        >
+          Accept
+        </button>
+      </div>
+
+      <div v-else-if="board?.miningRestockTimer" class="mission-board-empty">
+        Restocking in {{ formatTime(board.miningRestockTimer.remaining) }}
+      </div>
+
+      <div v-else-if="activeMiningMissions.length === 0" class="mission-board-empty">
+        No mining missions available
+      </div>
+
+      <div
+        v-for="mission in activeMiningMissions"
+        :key="mission.template.id"
+        class="mission-board-active"
+      >
+        <div class="mission-board-active__name">{{ mission.template.name }}</div>
+        <div class="mission-board-active__route">
+          {{ miningProgressLabel(mission) }}
+        </div>
+        <div class="mission-board-active__status">
+          {{ miningStatusLabel(mission) }}
+        </div>
+        <div class="mission-board-active__cargo">
+          {{ mission.template.reward }} CR on delivery
+        </div>
+      </div>
+    </div>
+
+    <!-- Asteroid Missions (third — local lander jobs near the posting station) -->
     <div class="mission-board-section">
       <h3 class="mission-board-section__heading">Asteroid Missions</h3>
       <p class="mission-board-section__descriptor">
@@ -255,7 +364,7 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
       </div>
     </div>
 
-    <!-- Planetary Missions (third — advanced: requires interplanetary travel) -->
+    <!-- Planetary Missions (fourth — advanced: requires interplanetary travel) -->
     <div class="mission-board-section">
       <h3 class="mission-board-section__heading">Planetary Missions</h3>
       <p class="mission-board-section__descriptor">

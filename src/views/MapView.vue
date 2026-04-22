@@ -977,6 +977,10 @@ function handleAcceptEvaMission() {
   viewController.evaMissionAccept()
 }
 
+function handleAcceptMiningMission() {
+  viewController.miningMissionAccept()
+}
+
 /** Player clicked the overlay's Complete button — pay reward and close. */
 function handleEvaMinigameComplete(): void {
   viewController.evaMinigameCompleteFromUi()
@@ -1295,6 +1299,7 @@ watch(
     @deliver-mission="handleDeliverMission"
     @accept-asteroid-mission="handleAcceptAsteroidMission"
     @accept-eva-mission="handleAcceptEvaMission"
+    @accept-mining-mission="handleAcceptMiningMission"
     @use-item="handleUseInventoryItem"
     @mail-changed="refreshActiveMessage"
   />

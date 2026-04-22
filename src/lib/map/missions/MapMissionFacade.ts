@@ -23,7 +23,7 @@ import type {
   ShuttleMissionBoard,
 } from '@/lib/missions/types'
 import { getGatherItemForPlanet, getPlanetOrbitalConfig } from '@/lib/missions/planetOrbitalConfig'
-import { tickTurretMiningRestock } from '@/lib/missions/turretMiningSession'
+import { takeTurretMiningMission, tickTurretMiningRestock } from '@/lib/missions/turretMiningSession'
 import { computeMissionDifficulty } from '@/lib/missions/missionDifficulty'
 import {
   generateAsteroidMission,
@@ -252,6 +252,18 @@ export class MapMissionFacade {
 
   asteroidMissionAccept(onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null): void {
     this.board = acceptAsteroidMission(this.board)
+    this.persistBoard()
+    onMissionBoardUpdate?.(this.board)
+  }
+
+  /**
+   * Accept the offered mining mission (from shuttle control UI).
+   *
+   * @param onMissionBoardUpdate - Callback invoked with the updated board so
+   *   reactive UI state (e.g. `missionBoard` ref in `MapView`) refreshes immediately.
+   */
+  miningMissionAccept(onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null): void {
+    this.board = takeTurretMiningMission(this.board)
     this.persistBoard()
     onMissionBoardUpdate?.(this.board)
   }
