@@ -62,6 +62,18 @@ const activeMiningMissions = computed<ActiveTurretMiningMission[]>(
   () => props.board?.activeMiningMissions ?? [],
 )
 
+/** True when the player has at least one active mission of any kind. */
+const hasAnyActiveMission = computed(() => {
+  const b = props.board
+  if (!b) return false
+  return (
+    b.activeMissions.length > 0 ||
+    b.activeEvaMissions.length > 0 ||
+    b.activeMiningMissions.length > 0 ||
+    b.activeAsteroidMission !== null
+  )
+})
+
 const emit = defineEmits<{
   acceptMission: []
   deliverMission: [missionId: string]
@@ -237,23 +249,6 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
       <div v-else class="mission-board-empty">
         No EVA missions available
       </div>
-
-      <div
-        v-for="mission in board?.activeEvaMissions"
-        :key="mission.template.id"
-        class="mission-board-active"
-      >
-        <div class="mission-board-active__name">{{ mission.template.name }}</div>
-        <div class="mission-board-active__route">
-          {{ targetPlanetName(mission.giverPlanet) }} &rarr; deep-space waypoint
-        </div>
-        <div class="mission-board-active__status">
-          {{ evaMissionStatusLabel(mission) }}
-        </div>
-        <div class="mission-board-active__cargo">
-          {{ mission.template.reward }} CR on delivery
-        </div>
-      </div>
     </div>
 
     <!-- Turret Mining Missions (second — bulk ore collection via the map turret) -->
@@ -292,25 +287,8 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
         Restocking in {{ formatTime(board.miningRestockTimer.remaining) }}
       </div>
 
-      <div v-else-if="activeMiningMissions.length === 0" class="mission-board-empty">
+      <div v-else class="mission-board-empty">
         No mining missions available
-      </div>
-
-      <div
-        v-for="mission in activeMiningMissions"
-        :key="mission.template.id"
-        class="mission-board-active"
-      >
-        <div class="mission-board-active__name">{{ mission.template.name }}</div>
-        <div class="mission-board-active__route">
-          {{ miningProgressLabel(mission) }}
-        </div>
-        <div class="mission-board-active__status">
-          {{ miningStatusLabel(mission) }}
-        </div>
-        <div class="mission-board-active__cargo">
-          {{ mission.template.reward }} CR on delivery
-        </div>
       </div>
     </div>
 
@@ -341,18 +319,8 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
         </button>
       </div>
 
-      <div v-else-if="board?.activeAsteroidMission" class="mission-board-active">
-        <div class="mission-board-active__name">{{ board.activeAsteroidMission.name }}</div>
-        <div class="mission-board-active__route">
-          {{ board.activeAsteroidMission.giverName }} &middot; {{ asteroidOperatingLabel(board.activeAsteroidMission) }}
-        </div>
-        <div class="mission-board-active__status">
-          {{ board.activeAsteroidMission.status === 'accepted' ? 'Navigate to waypoint' : 'In transit' }}
-        </div>
-        <div class="mission-board-active__cargo">
-          {{ objectiveSummary(board.activeAsteroidMission) }}
-          &middot; {{ buffedAsteroidRewardCr(board.activeAsteroidMission.totalReward) }} CR
-        </div>
+      <div v-else-if="board?.activeAsteroidMission" class="mission-board-empty">
+        Asteroid contract in progress — see Active Missions below.
       </div>
 
       <div v-else-if="board?.asteroidRestockTimer" class="mission-board-empty">
@@ -405,17 +373,18 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
       </div>
     </div>
 
-    <!-- Active Missions -->
+    <!-- Active Missions — consolidated view across every mission kind -->
     <div class="mission-board-section">
       <h3 class="mission-board-section__heading">Active Missions</h3>
 
-      <div v-if="!board || board.activeMissions.length === 0" class="mission-board-empty">
+      <div v-if="!hasAnyActiveMission" class="mission-board-empty">
         No active missions
       </div>
 
+      <!-- Planetary actives -->
       <div
         v-for="mission in board?.activeMissions"
-        :key="mission.template.id"
+        :key="`planetary-${mission.template.id}`"
         class="mission-board-active"
       >
         <div class="mission-board-active__name">{{ mission.template.name }}</div>
@@ -437,6 +406,57 @@ function asteroidOperatingLabel(mission: GeneratedAsteroidMission): string {
         >
           Deliver
         </button>
+      </div>
+
+      <!-- EVA actives -->
+      <div
+        v-for="mission in board?.activeEvaMissions"
+        :key="`eva-${mission.template.id}`"
+        class="mission-board-active"
+      >
+        <div class="mission-board-active__name">{{ mission.template.name }}</div>
+        <div class="mission-board-active__route">
+          {{ targetPlanetName(mission.giverPlanet) }} &rarr; deep-space waypoint
+        </div>
+        <div class="mission-board-active__status">
+          {{ evaMissionStatusLabel(mission) }}
+        </div>
+        <div class="mission-board-active__cargo">
+          {{ mission.template.reward }} CR on delivery
+        </div>
+      </div>
+
+      <!-- Turret mining actives -->
+      <div
+        v-for="mission in activeMiningMissions"
+        :key="`mining-${mission.template.id}`"
+        class="mission-board-active"
+      >
+        <div class="mission-board-active__name">{{ mission.template.name }}</div>
+        <div class="mission-board-active__route">
+          {{ miningProgressLabel(mission) }}
+        </div>
+        <div class="mission-board-active__status">
+          {{ miningStatusLabel(mission) }}
+        </div>
+        <div class="mission-board-active__cargo">
+          {{ mission.template.reward }} CR on delivery
+        </div>
+      </div>
+
+      <!-- Asteroid active (single, may be null) -->
+      <div v-if="board?.activeAsteroidMission" class="mission-board-active">
+        <div class="mission-board-active__name">{{ board.activeAsteroidMission.name }}</div>
+        <div class="mission-board-active__route">
+          {{ board.activeAsteroidMission.giverName }} &middot; {{ asteroidOperatingLabel(board.activeAsteroidMission) }}
+        </div>
+        <div class="mission-board-active__status">
+          {{ board.activeAsteroidMission.status === 'accepted' ? 'Navigate to waypoint' : 'In transit' }}
+        </div>
+        <div class="mission-board-active__cargo">
+          {{ objectiveSummary(board.activeAsteroidMission) }}
+          &middot; {{ buffedAsteroidRewardCr(board.activeAsteroidMission.totalReward) }} CR
+        </div>
       </div>
     </div>
   </div>
