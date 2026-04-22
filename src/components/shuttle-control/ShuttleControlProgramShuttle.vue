@@ -98,11 +98,17 @@ const chapters = [
 const currentChapter = ref(1)
 
 const nextChapter = () => {
-  if (currentChapter.value < chapters.length) currentChapter.value++
+  if (currentChapter.value < chapters.length) {
+    uiAudio.notifyButtonHover()
+    currentChapter.value++
+  }
 }
 
 const prevChapter = () => {
-  if (currentChapter.value > 1) currentChapter.value--
+  if (currentChapter.value > 1) {
+    uiAudio.notifyButtonHover()
+    currentChapter.value--
+  }
 }
 </script>
 
