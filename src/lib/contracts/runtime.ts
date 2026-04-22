@@ -34,6 +34,9 @@ const contractChangeListeners = new Set<() => void>()
 /** Fired when a `shuttle-upgrade` contract reward actually raised the stored level (not on replay no-ops). */
 const contractShuttleUpgradeListeners = new Set<(payload: ContractShuttleUpgradeGrantPayload) => void>()
 
+/** Subscribers notified once per contract that transitions to `completed`. */
+const contractCompletedListeners = new Set<(contractId: string) => void>()
+
 /**
  * Upgrade grant from a completed contract, after `ensureUpgradeAtLeast` has persisted.
  */
@@ -99,6 +102,15 @@ export const contractSystem = new ContractSystem(
       }
     },
     onRewardGranted: (effect, c) => applyRewardToProfile(effect, c),
+    onContractCompleted: (id) => {
+      for (const listener of Array.from(contractCompletedListeners)) {
+        try {
+          listener(id)
+        } catch {
+          // listeners must not break the system
+        }
+      }
+    },
   },
 )
 
@@ -140,6 +152,17 @@ export function onContractShuttleUpgradeGranted(
 ): () => void {
   contractShuttleUpgradeListeners.add(listener)
   return () => contractShuttleUpgradeListeners.delete(listener)
+}
+
+/**
+ * Subscribe to "a contract just finished" (live path + `replayCompletedRewards`).
+ *
+ * @param listener - Receives the completed contract id.
+ * @returns Unsubscribe function.
+ */
+export function onContractCompleted(listener: (contractId: string) => void): () => void {
+  contractCompletedListeners.add(listener)
+  return () => contractCompletedListeners.delete(listener)
 }
 
 /**
