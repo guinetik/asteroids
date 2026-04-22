@@ -31,6 +31,46 @@ function toggleWorldLine(): void {
   worldLineVisible.value = !worldLineVisible.value
 }
 
+/** Whether the hot/cold zone rings are drawn. Default off — discreet reference feature. */
+const thermalZonesVisible = ref(false)
+
+/** Toggle thermal-zone ring visibility. */
+function toggleThermalZones(): void {
+  thermalZonesVisible.value = !thermalZonesVisible.value
+}
+
+/**
+ * Build an SVG path for a single thermal zone annulus.
+ *
+ * Two concentric ellipses (outer + inner) combined with `fill-rule="evenodd"`
+ * render as a transparent ring. Using separate rx/ry per axis gives a true
+ * screen-space circle in the stretched viewBox — a single shared radius
+ * would render as an ellipse on non-square viewports. When the inner radius
+ * is zero (the hot3 disc that touches the Sun), the inner subpath is omitted
+ * so the shape fills as a solid disc.
+ *
+ * @param z - Projected zone state with center + inner/outer X/Y radii in %
+ * @returns SVG `d` attribute string for the annulus
+ */
+function buildThermalZonePath(z: {
+  centerX: number
+  centerY: number
+  innerRadiusX: number
+  innerRadiusY: number
+  outerRadiusX: number
+  outerRadiusY: number
+}): string {
+  const outer = ellipseSubpath(z.centerX, z.centerY, z.outerRadiusX, z.outerRadiusY)
+  if (z.innerRadiusX <= 0 || z.innerRadiusY <= 0) return outer
+  const inner = ellipseSubpath(z.centerX, z.centerY, z.innerRadiusX, z.innerRadiusY)
+  return `${outer} ${inner}`
+}
+
+/** Build a closed SVG ellipse subpath using two arcs (start at west point, sweep around). */
+function ellipseSubpath(cx: number, cy: number, rx: number, ry: number): string {
+  return `M ${cx - rx},${cy} a ${rx},${ry} 0 1,0 ${rx * 2},0 a ${rx},${ry} 0 1,0 ${-rx * 2},0 Z`
+}
+
 /** Bodies that already have a route line — don't duplicate the distance label. */
 const routeBodyNames = computed(() =>
   new Set(props.overlay.distances.map((d) => d.name)),
@@ -51,6 +91,22 @@ const trajectorySegments = computed(() => {
 
 <template>
   <div v-if="overlay.visible" class="map-overlay">
+    <!-- Thermal zone rings (hot/cold) — toggled discreet layer, rendered below gravity rings -->
+    <svg
+      v-if="thermalZonesVisible"
+      class="map-thermal-svg"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+    >
+      <path
+        v-for="zone in overlay.thermalZones"
+        :key="'thermal-' + zone.kind"
+        :d="buildThermalZonePath(zone)"
+        fill-rule="evenodd"
+        :class="['map-thermal-ring', 'map-thermal-ring--' + zone.kind]"
+      />
+    </svg>
+
     <!-- Gravity rings -->
     <div
       v-for="ring in overlay.gravityRings"
@@ -160,6 +216,15 @@ const trajectorySegments = computed(() => {
 
     <!-- Bottom-right overlay controls -->
     <div class="map-overlay-controls">
+      <button
+        type="button"
+        class="map-toggle-btn"
+        :class="thermalZonesVisible ? 'map-toggle-btn--active' : 'map-toggle-btn--inactive'"
+        @click="toggleThermalZones"
+      >
+        <span class="map-toggle-btn__dot" />
+        Thermal
+      </button>
       <button
         type="button"
         class="map-toggle-btn"

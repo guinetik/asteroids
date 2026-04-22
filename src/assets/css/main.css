@@ -604,6 +604,37 @@ body {
   @apply absolute inset-0 w-full h-full pointer-events-none;
 }
 
+.map-thermal-svg {
+  @apply absolute inset-0 w-full h-full pointer-events-none;
+  z-index: 0;
+}
+
+.map-thermal-ring {
+  stroke: none;
+  opacity: 0.22;
+  mix-blend-mode: screen;
+}
+
+.map-thermal-ring--hot3 {
+  fill: #f87171;
+}
+
+.map-thermal-ring--hot2 {
+  fill: #fb923c;
+}
+
+.map-thermal-ring--hot1 {
+  fill: #fbbf24;
+}
+
+.map-thermal-ring--cold2 {
+  fill: #60a5fa;
+}
+
+.map-thermal-ring--cold3 {
+  fill: #818cf8;
+}
+
 .map-trajectory-line {
   stroke: rgba(52, 211, 153, 0.55);
   stroke-width: 1.5;
@@ -635,7 +666,9 @@ body {
 }
 
 .map-overlay-controls {
-  @apply absolute bottom-6 right-6 flex flex-col gap-2 pointer-events-auto;
+  @apply absolute flex flex-col gap-2 pointer-events-auto;
+  bottom: 2.25rem;
+  right: 0.5rem;
 }
 
 @keyframes map-pulse {

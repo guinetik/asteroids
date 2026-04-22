@@ -126,6 +126,33 @@ export interface MapTrajectoryPoint {
   screenY: number
 }
 
+/** Thermal zone classification used to style the tactical-map ring color. */
+export type MapThermalZoneKind = 'hot1' | 'hot2' | 'hot3' | 'cold2' | 'cold3'
+
+/**
+ * Screen-projected annular thermal zone centered on the Sun.
+ *
+ * Separate X/Y radii are emitted so the renderer can draw a true screen-space
+ * circle even when the SVG viewBox is stretched to a non-square viewport (a
+ * single shared radius would render as an ellipse on widescreen monitors).
+ */
+export interface MapThermalZone {
+  /** Zone classification — drives color/opacity in the overlay. */
+  kind: MapThermalZoneKind
+  /** Sun screen X (%) — ring center. */
+  centerX: number
+  /** Sun screen Y (%) — ring center. */
+  centerY: number
+  /** Inner edge radius along the viewport X axis, in % (0 for the innermost disc). */
+  innerRadiusX: number
+  /** Inner edge radius along the viewport Y axis, in %. */
+  innerRadiusY: number
+  /** Outer edge radius along the viewport X axis, in %. */
+  outerRadiusX: number
+  /** Outer edge radius along the viewport Y axis, in %. */
+  outerRadiusY: number
+}
+
 /** Full state for the map overlay HUD. */
 export interface MapOverlayState {
   /** Whether the overlay is visible */
@@ -144,6 +171,8 @@ export interface MapOverlayState {
   distances: MapDistanceLine[]
   /** Gravity influence + event horizon rings */
   gravityRings: MapGravityRing[]
+  /** Thermal zone bands around the Sun (hot and cold protection zones). */
+  thermalZones: MapThermalZone[]
   /** Persistent run-long world line in screen space */
   trajectoryPoints: MapTrajectoryPoint[]
   /** Mission waypoint projected to screen, if an active asteroid mission exists. */

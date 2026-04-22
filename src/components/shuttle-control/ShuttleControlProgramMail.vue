@@ -49,8 +49,8 @@ function refreshAll(): void {
 }
 
 const readable = computed<ShipMessageReadable | null>(() => {
-   
-  readerRefreshToken.value
+  // Touch the token so this computed re-runs after `refreshAll()` increments it.
+  void readerRefreshToken.value
   if (!selectedId.value) return null
   return shipMessageSystem.getReadableShipMessage(selectedId.value)
 })

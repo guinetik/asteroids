@@ -28,6 +28,7 @@ import type {
   ActiveVisitRelayMission,
 } from '@/lib/missions/types'
 import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
+import { isCanvasOrbitalMinigame } from '@/lib/minigame/canvasOrbitalMinigames'
 import MissionMiniGameOverlay from '@/components/MissionMiniGameOverlay.vue'
 import EvaMinigameOverlay from '@/components/EvaMinigameOverlay.vue'
 import { PLANETS } from '@/lib/planets/catalog'
@@ -289,6 +290,13 @@ const activeOrbitalMinigame = computed(
   () => viewController.activeMinigame,
 )
 
+watch(
+  [missionOverlayVisible, activeOrbitalMinigame],
+  ([visible, mg]) => {
+    viewController.setShuttleMissionMinigameBed(Boolean(visible && isCanvasOrbitalMinigame(mg)))
+  },
+)
+
 /** Lander hull in shop matches upgraded max — used to disable Lander Hull Repair. */
 const shopLanderHullFull = computed(() => {
   const maxHp = LANDER_BASE_HP * getCurrentUpgradeValue('landerHull')
@@ -337,6 +345,7 @@ const mapOverlay = reactive<MapOverlayState>({
   speed: 0,
   distances: [],
   gravityRings: [],
+  thermalZones: [],
   trajectoryPoints: [],
   missionWaypoint: null,
 })
