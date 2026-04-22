@@ -17,6 +17,8 @@ import { useAudio } from './useAudio'
 const CLICK_VOLUME = 0.35
 /** Volume for hover cue (kept subtle). */
 const HOVER_VOLUME = 0.18
+/** Volume for nav-item click using the hover sound (louder than passive hover). */
+const NAV_CLICK_VOLUME = 0.35
 /** Volume for confirm / accept actions. */
 const CONFIRM_VOLUME = 0.45
 /** Volume for cancel / dismiss actions (softer than confirm). */
@@ -68,6 +70,14 @@ export class UiAudioDirector {
    */
   notifyButtonHover(): void {
     this.audio.play('ui.hover', { volume: HOVER_VOLUME })
+  }
+
+  /**
+   * Player clicked a nav item that uses the hover tone (e.g. manual chapter
+   * index, pagination). Louder than passive hover so it reads as a click.
+   */
+  notifyNavClick(): void {
+    this.audio.play('ui.hover', { volume: NAV_CLICK_VOLUME })
   }
 
   /**

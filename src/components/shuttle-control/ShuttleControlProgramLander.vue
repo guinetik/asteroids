@@ -70,14 +70,14 @@ const currentChapter = ref(1)
 
 const nextChapter = () => {
   if (currentChapter.value < chapters.length) {
-    uiAudio.notifyButtonHover()
+    uiAudio.notifyNavClick()
     currentChapter.value++
   }
 }
 
 const prevChapter = () => {
   if (currentChapter.value > 1) {
-    uiAudio.notifyButtonHover()
+    uiAudio.notifyNavClick()
     currentChapter.value--
   }
 }
@@ -116,7 +116,7 @@ const prevChapter = () => {
             v-for="chapter in chapters" 
             :key="chapter.id"
             :class="['nav-item', { active: currentChapter === chapter.id }]"
-            @click="uiAudio.notifyButtonHover(); currentChapter = chapter.id"
+            @click="uiAudio.notifyNavClick(); currentChapter = chapter.id"
           >
             <span class="ch-num">0{{ chapter.id }}</span>
             <span class="ch-title">{{ chapter.title }}</span>
