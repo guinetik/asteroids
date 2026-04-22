@@ -1,6 +1,7 @@
 {
   "planetId": "uranus",
   "giverName": "United Space Consortium",
+  "giverId": "usc-uranus",
   "missions": [
     {
       "id": "usc_uranus_ice_research",

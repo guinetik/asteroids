@@ -1,6 +1,7 @@
 {
   "planetId": "jupiter",
   "giverName": "Jovian Cloud City",
+  "giverId": "jovian-cloud-city",
   "missions": [
     {
       "id": "jupiter_cloud_city_any_ore",

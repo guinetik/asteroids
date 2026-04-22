@@ -109,6 +109,30 @@ export const JAY_CONTRACT_INCOMING_MESSAGE: ShipMessageDefinition = {
   ],
 }
 
+/** Nudge priority — MMC’s drill-sergeant handler; slightly above general Jay line noise. */
+const MMC_SAMPAIO_MESSAGE_PRIORITY = 55
+
+/**
+ * Main-inbox nudge from Colonel Sampaio when the MMC turret contract unlocks. The real offer
+ * and every step after live in the Martian Marine Corps folder — this is your orders to get eyes
+ * on the mail stack (same “handler” idea as {@link JAY_CONTRACT_INCOMING_MESSAGE}, but Corps voice).
+ */
+export const COLONEL_SAMPAIO_MMC_HEADS_UP: ShipMessageDefinition = {
+  id: 'sampaio-mmc-contract-heads-up',
+  from: 'Col. Hélder Sampaio, MMC (Engineering & Mining Liaison)',
+  subject: "LISTEN — YOU'VE GOT ORDERS IN THE MMC STACK",
+  sentAt: '2306-04-10 10:55 UTC',
+  trigger: 'contract',
+  delivery: 'inbox_prompt',
+  priority: MMC_SAMPAIO_MESSAGE_PRIORITY,
+  body: [
+    "Phobos cleared your file. You closed the Space Cowboys' Mars charter and you already ran a line on red dirt — that means you are eligible for a proper Corps turret detachment, not a sticker on your window.",
+    "The packet starts with a hull mount, not a joyride. No turret, no mining line from the Corps. Already carrying one? The contract will log it. Before you go joyriding in the belt: there is a contract packet under MARTIAN MARINE CORPS in your shuttle mail. Not this inbox. The folder on the left. Open the terminal, hit Messages, read the offer, then hit Accept or Decline like you mean it.",
+    "If you can not find a mail folder, you are not ready for my ore runs. I am not re-explaining the UI in a second message.",
+    '— Sampaio. Move.',
+  ],
+}
+
 /** Jay's first note after the player meaningfully departs Earth orbit. */
 export const JAY_DISTANCE_MESSAGE: ShipMessageDefinition = {
   id: 'jay-distance-from-earth',
@@ -253,6 +277,7 @@ export const SHIP_MESSAGE_CATALOG: ShipMessageDefinition[] = [
   JAY_STARTUP_FOLLOW_UP_MESSAGE,
   JAY_FIRST_SLINGSHOT_MESSAGE,
   JAY_CONTRACT_INCOMING_MESSAGE,
+  COLONEL_SAMPAIO_MMC_HEADS_UP,
   JAY_DISTANCE_MESSAGE,
   JAY_THRUSTER_MESSAGE,
   JAY_BRAKE_MESSAGE,

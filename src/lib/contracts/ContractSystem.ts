@@ -98,6 +98,7 @@ export class ContractSystem {
       definitions.push(...buildContractMessageDefinitions(contract))
     }
     this.messageSystem.registerDefinitions(definitions)
+    this.evaluatePrerequisiteContractOffers()
   }
 
   /**
@@ -340,6 +341,9 @@ export class ContractSystem {
     this.snapshot = {
       ...this.snapshot,
       instances: { ...this.snapshot.instances, [contract.id]: instance },
+    }
+    if (contract.headsUpInboxMessageId) {
+      this.messageSystem.enqueueById(contract.headsUpInboxMessageId)
     }
     this.messageSystem.enqueueById(contractIntroMessageId(contract.id))
     this.persist()

@@ -129,6 +129,12 @@ export interface Contract {
     /** Giver planet (posting world) and how many completed missions to require. */
     minGiverPlanetCompletions: { planetId: string; min: number }
   }
+  /**
+   * When set, {@link ContractSystem} enqueues this catalog id into the main inbox
+   * when the contract is first offered, before the offer intro. Use for “Jay nudge”
+   * style messages so the player has a default-folder prompt to open mail.
+   */
+  headsUpInboxMessageId?: string
   /** Subject for the offer/intro message. */
   introSubject: string
   /** Body paragraphs for the offer/intro message (rendered above the Accept button). */

@@ -77,6 +77,35 @@ const uscContract: Contract = {
   ],
 }
 
+const mmcPrereqContract: Contract = {
+  id: 'martian-marine-corps-cohort',
+  inboxName: 'MMC',
+  from: 'MMC',
+  sentAt: TEST_DATE,
+  offerWhenPrerequisites: {
+    requiredCompletedContractId: 'space-cowboys-mars-hq',
+    minGiverPlanetCompletions: { planetId: 'mars', min: 1 },
+  },
+  introSubject: 'MMC',
+  introBody: ['intro'],
+  steps: [
+    {
+      kind: 'complete-missions',
+      count: 1,
+      missionType: 'mining',
+      giverId: 'martian-marines',
+      subject: 'Mine',
+      flavor: ['a'],
+    },
+  ],
+  completionSubject: 'Done',
+  completionBody: ['b'],
+  rewards: [
+    { type: 'mission-pay-multiplier', planetId: 'mars', multiplier: 2 },
+    { type: 'shuttle-upgrade', upgradeId: 'orbitalSurfing', minLevel: 1 },
+  ],
+}
+
 const triggerMessage = {
   id: 'jay-first-slingshot-contracts',
   from: 'Jay',
@@ -95,8 +124,15 @@ interface Harness {
   granted: RewardEffect[]
 }
 
-function createHarness(contractList: Contract[] = [cowboysContract, uscContract]): Harness {
-  const snapshot = emptyContractSnapshot()
+function createHarness(
+  contractList: Contract[] = [cowboysContract, uscContract],
+  initial: ContractStoreSnapshot = emptyContractSnapshot(),
+): Harness {
+  const snapshot: ContractStoreSnapshot = {
+    ...initial,
+    instances: { ...initial.instances },
+    giverPlanetCompletions: { ...initial.giverPlanetCompletions },
+  }
   const granted: RewardEffect[] = []
 
   const messages = new MessageSystem(
@@ -115,6 +151,8 @@ function createHarness(contractList: Contract[] = [cowboysContract, uscContract]
       save: (next) => {
         snapshot.instances = next.instances
         snapshot.observedMissionCompletions = next.observedMissionCompletions
+        snapshot.giverPlanetCompletions = { ...next.giverPlanetCompletions }
+        snapshot.version = next.version
       },
     },
     {
@@ -176,6 +214,34 @@ describe('ContractSystem.notifyMissionCompletedNth trigger', () => {
     })
     const instance = contracts.getInstance(uscContract.id)
     expect(instance?.status).toBe('available')
+  })
+})
+
+describe('ContractSystem.offerWhenPrerequisites', () => {
+  it('offers the MMC intro when a saved snapshot already has Space Cowboys done and a Mars giver count', () => {
+    const base = emptyContractSnapshot()
+    const { contracts, messages } = createHarness(
+      [cowboysContract, uscContract, mmcPrereqContract],
+      {
+        ...base,
+        instances: {
+          'space-cowboys-mars-hq': {
+            contractId: 'space-cowboys-mars-hq',
+            status: 'completed',
+            currentStepIndex: 2,
+            stepCounters: [1, 1, 1],
+            offeredAt: 't0',
+            acceptedAt: 't0',
+            completedAt: 't0',
+          },
+        },
+        giverPlanetCompletions: { mars: 1 },
+      },
+    )
+    expect(contracts.getInstance(mmcPrereqContract.id)?.status).toBe('available')
+    expect(messages.getRecord(contractIntroMessageId(mmcPrereqContract.id))).toMatchObject({
+      status: 'pending',
+    })
   })
 })
 

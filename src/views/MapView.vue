@@ -771,10 +771,11 @@ onMounted(async () => {
       // written to the persisted profile by the contract runtime. Pull the
       // updated profile back into the controller so the UI sees the new state
       // immediately — without this, fast-travel hotspots stay locked until the
-      // next page reload.
-      if (viewController.refreshPlayerProfileFromStorage()) {
-        syncPersistentProgressFromController()
-      }
+      // next page reload. Shuttle upgrade grants (e.g. manifold unlock) also
+      // persist in the upgrade key — re-hydrate so the HUD and shop match.
+      viewController.refreshPlayerProfileFromStorage()
+      hydratePlayerUpgradeLevelsFromStorage()
+      syncPersistentProgressFromController()
     })
     await viewController.init(container.value)
     syncPersistentProgressFromController()

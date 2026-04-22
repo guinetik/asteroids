@@ -2971,19 +2971,6 @@ export class MapViewController implements Tickable {
 
   /** Use a terminal-triggered inventory item. */
   useInventoryItem(itemId: string): void {
-    if (itemId === 'dark-lattice-coupler') {
-      if (CURRENT_PLAYER_UPGRADE_LEVELS.orbitalSurfing >= 1) return
-      const stack = getStack(this.playerInventory, itemId)
-      if (!stack || stack.quantity <= 0) return
-      const result = consumeItem(this.playerInventory, itemId, 1)
-      if (!result.ok) return
-      this.playerInventory = result.inventory
-      this.persistPlayerProfile()
-      this.emitShopState()
-      this.installUpgradeFromConsumable('orbitalSurfing', 1)
-      return
-    }
-
     if (itemId !== 'grid-coupling-module') return
 
     const gravitySurfingLevel = CURRENT_PLAYER_UPGRADE_LEVELS.gravitySurfing ?? 0

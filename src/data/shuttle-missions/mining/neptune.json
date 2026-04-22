@@ -1,6 +1,7 @@
 {
   "planetId": "neptune",
   "giverName": "United Space Consortium",
+  "giverId": "usc-neptune",
   "missions": [
     {
       "id": "usc_neptune_ice_reactor",

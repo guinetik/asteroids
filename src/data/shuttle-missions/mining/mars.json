@@ -1,6 +1,7 @@
 {
   "planetId": "mars",
   "giverName": "Martian Marines Corps",
+  "giverId": "martian-marines",
   "missions": [
     {
       "id": "mars_marines_bulk_supply",

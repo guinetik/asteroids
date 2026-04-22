@@ -1,0 +1,88 @@
+{
+  "id": "martian-marine-corps-cohort",
+  "inboxName": "Martian Marine Corps",
+  "from": "Col. Hélder Sampaio, MMC (Engineering & Mining Liaison)",
+  "sentAt": "2306-04-10 11:00 UTC",
+  "offerWhenPrerequisites": {
+    "requiredCompletedContractId": "space-cowboys-mars-hq",
+    "minGiverPlanetCompletions": { "planetId": "mars", "min": 1 }
+  },
+  "headsUpInboxMessageId": "sampaio-mmc-contract-heads-up",
+  "introSubject": "MMC Turret Cohort — Read Before You Throttle",
+  "introBody": [
+    "This is Sampaio. Phobos desk, Engineering & Mining. We are not writing sonnets. You already proved you can work with Jay's outfit and you bled a Mars giver line once — that is enough to put you in our queue, not in my good graces.",
+    "The Corps is short turret hands who can haul main-belt ore without cooking the hull. You want on that roster, you will take this contract, you will do the steps in order, and you will not improvise the spec. First: your bird carries a turret. Then: you use it on our boards.",
+    "You finish clean: you get double pay on our Mars-issued lines and we file your manifold cert so you can ride the orbital highways like a person who read the manual. You tap Decline, you do not get a second whiny text from me.",
+    "Accept below or walk. Your shuttle, your choice — my patience is shorter than your fuel.",
+    "— Sampaio, MMC. Out."
+  ],
+  "steps": [
+    {
+      "kind": "install-upgrade",
+      "upgradeId": "turretMiningUnlock",
+      "minLevel": 1,
+      "subject": "OP 1 — Mount the turret",
+      "flavor": [
+        "I do not hand out belt hours to shuttles with empty cheekbones. You get a mining turret mount installed in an engineering bay before the Corps posts turret work on your log. If your bird cannot carry the tool, you are not in my detachment. Full stop. Already got it installed? Good — file shows green and we keep moving."
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "missionType": "mining",
+      "giverId": "martian-marines",
+      "subject": "OP 2 — Corps belt haul",
+      "flavor": [
+        "Second evolution: turret job off our board, not a tourist run. The mining board on Mars will not list Corps belt work until that mount is live — you pick a Martian Marine Corps mining run off the spaceport, you fill the belt, you come home and you close with a clean receipt. Giver line says Martian Marine Corps. One delivery."
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "missionType": "mining",
+      "giverPlanetId": "mars",
+      "subject": "OP 3 — Second Mars turret run",
+      "flavor": [
+        "You already proved you can read one board. Do it again: another turret mining run posted from Mars. Giver planet line says Mars. I do not care if the name on the tin is the Corps, the colonials, or your cousin — the posting station is Mars. Mine, return, close. No excuses."
+      ]
+    },
+    {
+      "kind": "install-upgrade",
+      "upgradeId": "turretMiningYield",
+      "minLevel": 3,
+      "subject": "OP 4 — Focus array, tier III",
+      "flavor": [
+        "Focus array to three. I want that beam where I put it, not wobbling off a grain of dust. Belt debris is not a suggestion. Fit the tier and prove it in the next receipt."
+      ]
+    },
+    {
+      "kind": "install-upgrade",
+      "upgradeId": "turretMiningCharge",
+      "minLevel": 3,
+      "subject": "OP 5 — Cooling loop, tier III",
+      "flavor": [
+        "Cooling to three. You cook your emitter in a hot zone, you are a flare for every pirate board from here to the Kuiper. I will not be the one explaining your slag to next of kin. Install. Test. Fly."
+      ]
+    },
+    {
+      "kind": "install-upgrade",
+      "upgradeId": "turretMiningEfficiency",
+      "minLevel": 3,
+      "subject": "OP 6 — Power regulator, tier III",
+      "flavor": [
+        "Regulator to three. We sit on target longer than a tourist cruise. You burn like an amateur, you go home on a tender. I want discipline in the bus and in the tank. Last box — do not get cute."
+      ]
+    }
+  ],
+  "completionSubject": "Cleared — Mars pay band & manifold (do not get cocky)",
+  "completionBody": [
+    "Sampaio. You are recorded as MMC turret partner. Phobos has your double pay on Mars-issued work — do not make me read your ledger; I am not your accountant. Your avionics got the manifold package: ride the posted corridors, do not guess the line.",
+    "You are not a Marine. You are a contractor we can use. That is harder to earn. Keep the hull in one piece or we strip the flag next contract.",
+    "Dismissed. Fly straight.",
+    "— Sampaio, MMC"
+  ],
+  "rewards": [
+    { "type": "mission-pay-multiplier", "planetId": "mars", "multiplier": 2 },
+    { "type": "shuttle-upgrade", "upgradeId": "orbitalSurfing", "minLevel": 1 }
+  ]
+}

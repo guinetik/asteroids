@@ -1,6 +1,7 @@
 {
   "planetId": "pluto",
   "giverName": "United Space Consortium",
+  "giverId": "usc-pluto",
   "missions": [
     {
       "id": "usc_pluto_deep_ice_survey",

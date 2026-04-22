@@ -21,6 +21,7 @@ import type {
 } from './types'
 import { MAIN_BELT_ORE_IDS } from './turretMiningSession'
 import { contractSystem } from '@/lib/contracts/runtime'
+import { getTurretMiningPool } from './turretMiningPools'
 
 /** Outcome of delivering one mining mission. */
 export interface TurretMiningDeliveryResult {
@@ -138,10 +139,12 @@ export function deliverTurretMiningMission(
   const creditsEarned = Math.round(mission.template.reward * rewardMultiplier)
   const nextProfile = addCredits(profile, creditsEarned)
   const nextActives = board.activeMiningMissions.filter((_, i) => i !== idx)
+  const giverId =
+    mission.giverId ?? getTurretMiningPool(mission.giverPlanet)?.giverId ?? null
   contractSystem.notifyMissionCompleted({
     kind: 'mining',
     giverPlanetId: mission.giverPlanet,
-    giverId: null,
+    giverId,
     targetPlanetId: null,
   })
   return {
