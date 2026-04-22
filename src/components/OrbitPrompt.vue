@@ -10,6 +10,8 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
+  openEngineeringBay: []
+  openMissionBoard: []
   openShop: []
   openMission: []
 }>()
@@ -63,6 +65,22 @@ const details = computed(() => {
     <div v-if="isCharging" class="orbit-prompt-bar">
       <div class="orbit-prompt-bar-fill" :style="{ width: (props.orbitState.chargeLevel * 100) + '%' }"></div>
     </div>
+    <button
+      v-if="shopAvailable && orbitState.state === 'orbiting'"
+      type="button"
+      class="orbit-prompt-engineering-btn"
+      @click="emit('openEngineeringBay')"
+    >
+      U  Engineering Bay
+    </button>
+    <button
+      v-if="shopAvailable && orbitState.state === 'orbiting'"
+      type="button"
+      class="orbit-prompt-mission-board-btn"
+      @click="emit('openMissionBoard')"
+    >
+      J  Mission Board
+    </button>
     <button
       v-if="shopAvailable && orbitState.state === 'orbiting'"
       type="button"

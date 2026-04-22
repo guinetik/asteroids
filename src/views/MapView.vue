@@ -227,7 +227,7 @@ const habitatActive = ref(false)
 const earthStartupOrbitHudSuppressed = ref(false)
 const shuttleControlVisible = ref(false)
 /** Programs the map nav bar can deep-link the shuttle terminal into. */
-type ShuttleControlInitialProgram = 'mail' | 'missions' | 'inventory'
+type ShuttleControlInitialProgram = 'mail' | 'missions' | 'inventory' | 'upgrades'
 
 /** When opening the terminal from the map bar, optionally land on a specific program (e.g. missions). */
 const shuttleControlProgramOnOpen = ref<ShuttleControlInitialProgram | undefined>(undefined)
@@ -706,6 +706,14 @@ onMounted(async () => {
     viewController.onMissionButton = (visible) => {
       missionButtonVisible.value = visible
     }
+    viewController.onOrbitOpenEngineeringBay = () => {
+      if (!shopButtonVisible.value) return
+      openProgramFromMap('upgrades')
+    }
+    viewController.onOrbitOpenMissionBoard = () => {
+      if (!shopButtonVisible.value) return
+      openProgramFromMap('missions')
+    }
     viewController.onMissionOverlay = (visible, mission, canFit) => {
       missionOverlayVisible.value = visible
       missionOverlayMission.value = mission
@@ -830,10 +838,21 @@ function closeShuttleControl() {
   }
 }
 
+/**
+ * Opens the shuttle terminal on a program, or switches to it if the terminal is already open.
+ */
 function openProgramFromMap(program: ShuttleControlInitialProgram): void {
+  if (shopDialogVisible.value) {
+    viewController.closeShop()
+  }
+  if (missionOverlayVisible.value) {
+    closeMissionOverlay()
+  }
   viewController.notifyJourneyTrigger('shuttle_control_opened')
   shuttleControlProgramOnOpen.value = program
-  shuttleControlVisible.value = true
+  if (!shuttleControlVisible.value) {
+    shuttleControlVisible.value = true
+  }
   syncPersistentProgressFromController()
   shopProfile.value = viewController.getPlayerProfileSnapshot()
   shopInventory.value = viewController.getPlayerInventorySnapshot()
@@ -1136,6 +1155,8 @@ watch(
     :orbitState="orbitState"
     :shop-available="shopButtonVisible && !shopDialogVisible && !shuttleControlVisible"
     :mission-available="missionButtonVisible && !missionOverlayVisible && !shuttleControlVisible"
+    @open-engineering-bay="() => openProgramFromMap('upgrades')"
+    @open-mission-board="() => openProgramFromMap('missions')"
     @open-shop="openShop"
     @open-mission="openMissionOverlay"
   />

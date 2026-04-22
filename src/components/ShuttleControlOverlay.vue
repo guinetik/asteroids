@@ -73,11 +73,10 @@ function syncMailPendingCount(): void {
 onMounted(syncMailPendingCount)
 
 watch(
-  () => props.visible,
-  (open) => {
+  () => [props.visible, props.programToSelectOnOpen] as const,
+  ([open, pick]) => {
     if (!open) return
     syncMailPendingCount()
-    const pick = props.programToSelectOnOpen
     if (pick) {
       activeScreen.value = pick
     }

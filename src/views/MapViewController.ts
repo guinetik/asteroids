@@ -477,6 +477,16 @@ export class MapViewController implements Tickable {
   onShopState:
     | ((session: ShopSession | null, profile: PlayerProfile, inventory: Inventory) => void)
     | null = null
+  /**
+   * While orbiting a planet with port services, the player used the Engineering Bay
+   * shortcut (default U). Vue should open the shuttle terminal on the upgrades screen.
+   */
+  onOrbitOpenEngineeringBay: (() => void) | null = null
+  /**
+   * While orbiting a planet with port services, the player used the Mission Board
+   * shortcut (default J). Vue should open the shuttle terminal on the missions program.
+   */
+  onOrbitOpenMissionBoard: (() => void) | null = null
   /** Fired when credits change (for the HUD badge). */
   onCreditsUpdate: ((credits: number) => void) | null = null
   /**
@@ -1464,6 +1474,24 @@ export class MapViewController implements Tickable {
       } else {
         this.shopFacade.open(this.onShopState, this.playerProfile, this.playerInventory)
       }
+    }
+
+    // Engineering Bay (U key) — open shuttle terminal upgrades while orbiting
+    if (
+      this.inputManager?.wasActionPressed('engineeringBayAction') &&
+      this.orbitSystem?.state === 'orbiting' &&
+      this.shopFacade.session
+    ) {
+      this.onOrbitOpenEngineeringBay?.()
+    }
+
+    // Mission Board (J key) — open shuttle terminal missions while orbiting
+    if (
+      this.inputManager?.wasActionPressed('missionBoardAction') &&
+      this.orbitSystem?.state === 'orbiting' &&
+      this.shopFacade.session
+    ) {
+      this.onOrbitOpenMissionBoard?.()
     }
 
     // Mission action (I key) — open mission overlay while orbiting

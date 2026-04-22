@@ -37,6 +37,10 @@ export const DEFAULT_BINDINGS: Record<string, string[]> = {
   toggleMap: ['KeyM'],
   focusHabitat: ['KeyH'],
   shopAction: ['KeyB'],
+  /** Shuttle terminal: Engineering Bay (upgrades) while orbiting a serviced planet. */
+  engineeringBayAction: ['KeyU'],
+  /** Shuttle terminal: Mission Board while orbiting a serviced planet. */
+  missionBoardAction: ['KeyJ'],
   missionAction: ['KeyI'],
   closeMap: ['Escape'],
   toggleTurret: ['KeyT'],
