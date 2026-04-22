@@ -132,21 +132,70 @@ export function saveCurrentPlayerUpgradesToStorage(): void {
   saveStoredPlayerUpgrades(CURRENT_PLAYER_UPGRADE_LEVELS as unknown as Record<string, number>)
 }
 
+/** Listeners notified when any upgrade level transitions from 0 to ≥1. */
+const upgradeInstallListeners = new Set<(upgradeId: UpgradeId) => void>()
+
+/**
+ * Subscribe to the "an upgrade just got installed" event. The event fires once per
+ * transition of a stored upgrade level from 0 to any value ≥1 — a tier bump from 1
+ * to 2 is NOT an install event.
+ *
+ * @param listener - Receives the upgrade id whose level crossed zero.
+ * @returns Unsubscribe function.
+ */
+export function onUpgradeInstalled(listener: (upgradeId: UpgradeId) => void): () => void {
+  upgradeInstallListeners.add(listener)
+  return () => upgradeInstallListeners.delete(listener)
+}
+
+/** Fire upgradeInstallListeners; swallow listener errors so one bad subscriber cannot break others. */
+function emitUpgradeInstalled(upgradeId: UpgradeId): void {
+  // Snapshot before iteration: a listener that subscribes a new handler mid-dispatch
+  // must not receive the in-flight event.
+  for (const listener of Array.from(upgradeInstallListeners)) {
+    try {
+      listener(upgradeId)
+    } catch {
+      // best-effort notification — upstream listeners are isolated
+    }
+  }
+}
+
+/**
+ * Set an upgrade's stored level to an exact value (clamped to catalog maxLevel).
+ * Persists to storage. Fires `onUpgradeInstalled` if the previous level was 0 and
+ * the new level is ≥1. Idempotent when the new value equals the old.
+ *
+ * @param upgradeId - Catalog upgrade to set.
+ * @param newLevel - Target level.
+ * @returns The actually persisted level after clamping.
+ */
+export function setPlayerUpgradeLevel(upgradeId: UpgradeId, newLevel: number): number {
+  const def = UPGRADE_DEFINITIONS[upgradeId]
+  const clamped = Math.max(0, Math.min(def.maxLevel, Math.floor(newLevel)))
+  const current = CURRENT_PLAYER_UPGRADE_LEVELS[upgradeId] ?? 0
+  if (clamped === current) return current
+  CURRENT_PLAYER_UPGRADE_LEVELS[upgradeId] = clamped
+  saveCurrentPlayerUpgradesToStorage()
+  if (current === 0 && clamped >= 1) emitUpgradeInstalled(upgradeId)
+  return clamped
+}
+
 /**
  * Ensure an upgrade is at least `minLevel` (capped to catalog `maxLevel`).
  * Idempotent: does nothing if already at or above. Persists to storage.
+ * Fires `onUpgradeInstalled` when the level transitions from 0 to ≥1.
  *
  * @param upgradeId - Catalog upgrade to bump.
  * @param minLevel - Target minimum level.
  * @returns True when a higher level was written.
  */
 export function ensureUpgradeAtLeast(upgradeId: UpgradeId, minLevel: number): boolean {
+  const current = CURRENT_PLAYER_UPGRADE_LEVELS[upgradeId] ?? 0
   const def = UPGRADE_DEFINITIONS[upgradeId]
   const target = Math.max(0, Math.min(def.maxLevel, Math.floor(minLevel)))
-  const current = CURRENT_PLAYER_UPGRADE_LEVELS[upgradeId] ?? 0
   if (current >= target) return false
-  CURRENT_PLAYER_UPGRADE_LEVELS[upgradeId] = target
-  saveCurrentPlayerUpgradesToStorage()
+  setPlayerUpgradeLevel(upgradeId, target)
   return true
 }
 
