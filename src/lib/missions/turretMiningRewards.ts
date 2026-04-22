@@ -121,9 +121,7 @@ export function deliverTurretMiningMissions(
 
   const nextActives: ActiveTurretMiningMission[] = []
   for (const mission of board.activeMiningMissions) {
-    const eligible =
-      mission.giverPlanet === planetId && mission.status === 'ready-to-deliver'
-    if (!eligible) {
+    if (mission.giverPlanet !== planetId) {
       nextActives.push(mission)
       continue
     }

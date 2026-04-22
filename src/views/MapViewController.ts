@@ -157,7 +157,6 @@ import {
 } from '@/lib/missions/missionStorage'
 import {
   offerTurretMiningMission,
-  recordTurretMiningProgress,
 } from '@/lib/missions/turretMiningSession'
 import { deliverTurretMiningMissions } from '@/lib/missions/turretMiningRewards'
 import '@/lib/missions/missionMaterials'
@@ -4011,12 +4010,6 @@ export class MapViewController implements Tickable {
           const result = addItem(this.playerInventory, itemId, 1)
           if (!result.ok) return { ok: false as const, reason: result.reason ?? 'Inventory full' }
           this.playerInventory = result.inventory
-          const nextBoard = recordTurretMiningProgress(this.missionFacade.board, itemId, 1)
-          if (nextBoard !== this.missionFacade.board) {
-            this.missionFacade.board = nextBoard
-            saveMissionBoard(nextBoard)
-            this.onMissionBoardUpdate?.(nextBoard)
-          }
           saveInventory(this.playerInventory)
           this.emitShopState()
           return { ok: true as const }

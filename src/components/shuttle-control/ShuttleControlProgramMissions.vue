@@ -12,6 +12,10 @@ import type {
   MissionRegion,
 } from '@/lib/missions/types'
 import { getGatherItemForPlanet, getPlanetOrbitalConfig } from '@/lib/missions/planetOrbitalConfig'
+import {
+  computeMiningProgressKg,
+  isMiningMissionReady,
+} from '@/lib/missions/turretMiningSession'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 import { getPlanet } from '@/lib/planets/catalog'
 import type { UpgradeLevels } from '@/lib/upgrades'
@@ -95,24 +99,29 @@ function oreLabelFor(category: MiningOreCategory): string {
 }
 
 /**
- * Ore progress line for an active mining mission.
+ * Ore progress line for an active mining mission, derived from current cargo.
  *
  * @param mission - The active turret mining mission.
- * @returns A string like `"210 / 475 kg of Olivine"`.
+ * @returns A string like `"210 / 475 kg of Olivine"`, capped at the target.
  */
 function miningProgressLabel(mission: ActiveTurretMiningMission): string {
   const ore = oreLabelFor(mission.template.oreCategory)
-  return `${mission.minedKg} / ${mission.template.targetKg} kg of ${ore}`
+  const inv = props.inventory
+  const kg = inv ? Math.min(computeMiningProgressKg(inv, mission), mission.template.targetKg) : 0
+  return `${kg} / ${mission.template.targetKg} kg of ${ore}`
 }
 
 /**
- * Status line for an active mining mission.
+ * Status line for an active mining mission, derived from current cargo.
  *
  * @param mission - The active turret mining mission.
- * @returns Delivery prompt when ready and docked at giver, return prompt when ready elsewhere, or posting planet otherwise.
+ * @returns Delivery prompt when ready and docked at giver, return prompt when
+ *   ready elsewhere, or posting planet otherwise.
  */
 function miningStatusLabel(mission: ActiveTurretMiningMission): string {
-  if (mission.status === 'ready-to-deliver') {
+  const inv = props.inventory
+  const ready = inv ? isMiningMissionReady(inv, mission) : false
+  if (ready) {
     if (props.dockedPlanet === mission.giverPlanet) return 'Ready — delivery on dock'
     return `Return to ${targetPlanetName(mission.giverPlanet)} to deliver`
   }

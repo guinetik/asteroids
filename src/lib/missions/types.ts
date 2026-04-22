@@ -326,19 +326,17 @@ export interface TurretMiningMissionPool {
   missions: TurretMiningMissionTemplate[]
 }
 
-/** Status of an active mining mission. */
-export type TurretMiningMissionStatus = 'active' | 'ready-to-deliver'
-
-/** A mining mission the player has accepted. */
+/**
+ * A mining mission the player has accepted. Progress and readiness are
+ * computed on-demand from current cargo inventory — no per-commit event
+ * tracking. The player just needs the right ore in the hold when they
+ * dock at the giver planet.
+ */
 export interface ActiveTurretMiningMission {
   /** The original template. */
   template: TurretMiningMissionTemplate
   /** Planet where the mission was accepted (and where delivery must occur). */
   giverPlanet: string
-  /** Kilograms mined toward this mission since acceptance. */
-  minedKg: number
-  /** Current mission status. */
-  status: TurretMiningMissionStatus
 }
 
 // ---------------------------------------------------------------------------

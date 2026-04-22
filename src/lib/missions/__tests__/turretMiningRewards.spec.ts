@@ -29,14 +29,12 @@ function activeMission(overrides: Partial<ActiveTurretMiningMission> = {}): Acti
   return {
     template: overrides.template ?? template(),
     giverPlanet: overrides.giverPlanet ?? 'mars',
-    minedKg: overrides.minedKg ?? 200,
-    status: overrides.status ?? 'ready-to-deliver',
   }
 }
 
 describe('deliverTurretMiningMissions', () => {
-  it('is a no-op when no missions are ready at this planet', () => {
-    const board = { ...createMissionBoard(), activeMiningMissions: [activeMission({ status: 'active' })] }
+  it('is a no-op when inventory cannot cover the mission at this planet', () => {
+    const board = { ...createMissionBoard(), activeMiningMissions: [activeMission()] }
     const inv = createInventory()
     const result = deliverTurretMiningMissions(board, 'mars', inv, profile(0), 1)
     expect(result.delivered).toHaveLength(0)

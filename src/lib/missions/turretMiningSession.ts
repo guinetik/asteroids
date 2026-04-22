@@ -3,14 +3,16 @@
  *
  * Parallels `shuttleMissionSession.ts` (planetary + EVA flows) for the mining
  * mission kind. Boards are immutable inputs; every function returns a new
- * board. Progress recording is driven by the existing `onResourcePickup`
- * callback from `TurretSessionController` — this module never touches the
- * turret directly.
+ * board. Progress and readiness are derived from current cargo inventory at
+ * read time — no per-commit event tracking. The player just needs the right
+ * ore in the hold when they dock at the giver planet.
  *
  * @author guinetik
  * @date 2026-04-22
  * @spec docs/superpowers/specs/2026-04-22-turret-mining-missions-design.md
  */
+import type { Inventory } from '@/lib/inventory/types'
+import { getStack } from '@/lib/inventory/inventory'
 import type {
   ActiveTurretMiningMission,
   MiningOreCategory,
@@ -35,8 +37,9 @@ const RESTOCK_MAX_S = 240
 /**
  * Whether an ore id is a main-belt ore (olivine, magnetite, pyroxene, iron-nickel-alloy).
  *
- * Used by {@link recordTurretMiningProgress} to gate `'any'`-tier contracts so they only
- * credit main-belt pickups — kuiper ices are hard-specific and must be targeted explicitly.
+ * Used by {@link computeMiningProgressKg} to gate `'any'`-tier contracts so they
+ * only count main-belt cargo — kuiper ices are hard-specific and must be targeted
+ * explicitly.
  *
  * @param itemId - Inventory catalog id.
  * @returns True if `itemId` is part of the main-belt ore set.
@@ -46,15 +49,56 @@ export function isMainBeltOre(itemId: string): boolean {
 }
 
 /**
- * Return whether a mining mission's `oreCategory` matches a given extracted ore.
+ * Return whether a mining mission's `oreCategory` matches a given ore item id.
  *
  * @param category - Mission's declared ore category.
- * @param itemId - Extracted inventory item id.
+ * @param itemId - Inventory item id to test.
  * @returns True when the ore should count toward the mission's progress.
  */
 export function matchesMiningOreCategory(category: MiningOreCategory, itemId: string): boolean {
   if (category === 'any') return isMainBeltOre(itemId)
   return category === itemId
+}
+
+/**
+ * Total kg of matching ore currently in cargo for a given mining mission.
+ *
+ * For specific-ore missions: the quantity of that one item. For `'any'` missions:
+ * the sum across all {@link MAIN_BELT_ORE_IDS} stacks.
+ *
+ * @param inventory - Current shuttle inventory.
+ * @param mission - The active mining mission to measure against.
+ * @returns Kilograms of matching ore present in cargo (uncapped — may exceed `targetKg`).
+ */
+export function computeMiningProgressKg(
+  inventory: Inventory,
+  mission: ActiveTurretMiningMission,
+): number {
+  const category = mission.template.oreCategory
+  if (category === 'any') {
+    let total = 0
+    for (const itemId of MAIN_BELT_ORE_IDS) {
+      const stack = getStack(inventory, itemId)
+      if (stack) total += stack.quantity
+    }
+    return total
+  }
+  const stack = getStack(inventory, category)
+  return stack ? stack.quantity : 0
+}
+
+/**
+ * Whether a mission can be delivered right now given the current inventory.
+ *
+ * @param inventory - Current shuttle inventory.
+ * @param mission - The active mining mission.
+ * @returns True when cargo holds at least `targetKg` of matching ore.
+ */
+export function isMiningMissionReady(
+  inventory: Inventory,
+  mission: ActiveTurretMiningMission,
+): boolean {
+  return computeMiningProgressKg(inventory, mission) >= mission.template.targetKg
 }
 
 /**
@@ -110,8 +154,6 @@ export function takeTurretMiningMission(board: ShuttleMissionBoard): ShuttleMiss
   const newActive: ActiveTurretMiningMission = {
     template: board.offeredMiningMission,
     giverPlanet: board.offeringMiningPlanet,
-    minedKg: 0,
-    status: 'active',
   }
 
   const total = randomMiningRestockDuration()
@@ -144,50 +186,4 @@ export function tickTurretMiningRestock(
     ...board,
     miningRestockTimer: { ...board.miningRestockTimer, remaining },
   }
-}
-
-/**
- * Record mining progress against every matching active mining mission.
- * Called on each whole-kg turret commit via the `onResourcePickup` hook in
- * `MapViewController`.
- *
- * @param board - Current mission board state.
- * @param itemId - Extracted inventory item id.
- * @param kg - Kilograms committed this tick (whole units).
- * @returns Updated board; missions that crossed `targetKg` flip to `ready-to-deliver`.
- */
-export function recordTurretMiningProgress(
-  board: ShuttleMissionBoard,
-  itemId: string,
-  kg: number,
-): ShuttleMissionBoard {
-  if (board.activeMiningMissions.length === 0) return board
-  let changed = false
-  const nextActives = board.activeMiningMissions.map((active) => {
-    if (active.status === 'ready-to-deliver') return active
-    if (!matchesMiningOreCategory(active.template.oreCategory, itemId)) return active
-    const minedKg = active.minedKg + kg
-    const status: ActiveTurretMiningMission['status'] =
-      minedKg >= active.template.targetKg ? 'ready-to-deliver' : 'active'
-    changed = true
-    return { ...active, minedKg, status }
-  })
-  if (!changed) return board
-  return { ...board, activeMiningMissions: nextActives }
-}
-
-/**
- * Get all active mining missions ready for delivery at a specific giver planet.
- *
- * @param board - Current board state.
- * @param planetId - Giver planet to filter by.
- * @returns Missions with `status === 'ready-to-deliver'` where `giverPlanet` matches.
- */
-export function getReadyTurretMiningMissions(
-  board: ShuttleMissionBoard,
-  planetId: string,
-): ActiveTurretMiningMission[] {
-  return board.activeMiningMissions.filter(
-    (m) => m.giverPlanet === planetId && m.status === 'ready-to-deliver',
-  )
 }
