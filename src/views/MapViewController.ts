@@ -4093,6 +4093,7 @@ export class MapViewController implements Tickable {
       await this.habitatScene.load()
       this.habitatScene.onInteract = (target) => {
         if (target === 'table') {
+          uiAudio.notifyType()
           this.notifyJourneyTrigger('shuttle_control_opened')
           this.onShuttleControl?.(true)
           document.exitPointerLock()
