@@ -30,4 +30,17 @@ describe('journeys', () => {
     expect(profile.completedJourneyIds).toContain('welcome')
     expect(isJourneyFeatureUnlocked(profile, 'slingshot')).toBe(true)
   })
+
+  it('accepts contract_completed and upgrade_installed triggers without effect when no journey matches', () => {
+    let profile = createProfile('Pilot')
+    const contractResult = applyJourneyTrigger(profile, 'contract_completed:usc-venus-certification')
+    expect(contractResult.changed).toBe(false)
+    expect(contractResult.completedJourneyIds).toEqual([])
+    expect(contractResult.unlockedFeatureIds).toEqual([])
+    profile = contractResult.profile
+    const upgradeResult = applyJourneyTrigger(profile, 'upgrade_installed:gravitySurfing')
+    expect(upgradeResult.changed).toBe(false)
+    expect(upgradeResult.completedJourneyIds).toEqual([])
+    expect(upgradeResult.unlockedFeatureIds).toEqual([])
+  })
 })

@@ -1,4 +1,5 @@
 import type { PlayerProfile } from '@/lib/player/types'
+import type { UpgradeId } from '@/lib/upgrades'
 
 /** Stable ids for journey definitions persisted on the player profile. */
 export type JourneyId = 'welcome'
@@ -7,6 +8,8 @@ export type JourneyFeatureId = 'slingshot'
 /** Runtime trigger ids that can advance one or more journey steps. */
 export type JourneyTriggerId =
   | `message_archived:${string}`
+  | `contract_completed:${string}`
+  | `upgrade_installed:${UpgradeId}`
   | 'shuttle_control_opened'
   | 'shuttle_program_opened'
   | 'lander_program_opened'
