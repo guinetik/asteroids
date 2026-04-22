@@ -681,6 +681,7 @@ export class MapViewController implements Tickable {
       ? this.ensureMinimumStarterFuelCells(this.applyCargoBayLimits(savedInventory))
       : this.inventoryWithStarterFuelCells(emptyHold)
     this.persistPlayerProfile()
+    this.replayAct1JourneyTriggers()
     this.emitFuelCellCount()
     this.tickHandler = new TickHandler()
     this.tickHandler.register(this.inputManager, TICK_PRIORITY_INPUT)
@@ -4013,6 +4014,24 @@ export class MapViewController implements Tickable {
     if (storedActive?.id === 'consortium-certification') return
 
     this.stageConsortiumCertification()
+  }
+
+  /**
+   * Replay `contract_completed` and `upgrade_installed:gravitySurfing` triggers for a
+   * profile loaded from disk. Makes the Act 1 journey self-heal when the save predates
+   * the journey (or when the player completed contracts in a prior build). Invoked once
+   * during controller init, after the contract system has hydrated.
+   */
+  private replayAct1JourneyTriggers(): void {
+    for (const instance of contractSystem.listInstances()) {
+      if (instance.status === 'completed') {
+        this.notifyJourneyTrigger(`contract_completed:${instance.contractId}`)
+      }
+    }
+    if ((CURRENT_PLAYER_UPGRADE_LEVELS.gravitySurfing ?? 0) >= 1) {
+      this.notifyJourneyTrigger('upgrade_installed:gravitySurfing')
+    }
+    this.maybeStageAct1Climax()
   }
 
   /** Dev-only: enqueue the Consortium message and start its authored special mission immediately. */
