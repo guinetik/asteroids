@@ -4,7 +4,13 @@ import type { ShopSession, TradeGoodSlot } from '@/lib/shop/tradeTypes'
 import type { PlayerProfile } from '@/lib/player/types'
 import type { Inventory } from '@/lib/inventory/types'
 import { getTradeGood } from '@/lib/shop/tradeGoods'
-import { REFUEL_COST, RESERVE_FUEL_COST, LANDER_FUEL_COST, REPAIR_COST } from '@/lib/shop/shopSession'
+import {
+  REFUEL_COST,
+  RESERVE_FUEL_COST,
+  LANDER_FUEL_COST,
+  LANDER_REPAIR_COST,
+  REPAIR_COST,
+} from '@/lib/shop/shopSession'
 import InventoryTable from './InventoryTable.vue'
 
 const props = defineProps<{
@@ -13,6 +19,7 @@ const props = defineProps<{
   inventory: Inventory
   fuelFull?: boolean
   hullFull?: boolean
+  landerHullFull?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -23,6 +30,7 @@ const emit = defineEmits<{
   buyReserveFuel: []
   buyLanderFuel: []
   repairHull: []
+  repairLander: []
 }>()
 
 const planetName = computed(() => {
@@ -102,6 +110,23 @@ function onKeydown(e: KeyboardEvent) {
                 @click="$emit('refuel')"
               >
                 {{ fuelFull ? 'Full' : 'Buy' }}
+              </button>
+            </div>
+
+            <div class="planet-shop-item planet-shop-item--service">
+              <div class="planet-shop-item__icon-placeholder planet-shop-icon--service">P</div>
+              <div class="planet-shop-item__info">
+                <span class="planet-shop-item__name">Lander Hull Repair</span>
+                <span class="planet-shop-item__desc">Structural service for the surface lander. Restores hull to 100% for your next deployment.</span>
+              </div>
+              <span class="planet-shop-item__price">{{ LANDER_REPAIR_COST }} CR</span>
+              <button
+                type="button"
+                class="planet-shop-item__buy-btn planet-shop-btn--service"
+                :disabled="!canAfford(LANDER_REPAIR_COST) || landerHullFull"
+                @click="$emit('repairLander')"
+              >
+                {{ landerHullFull ? 'Full' : 'Buy' }}
               </button>
             </div>
 

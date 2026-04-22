@@ -3,6 +3,7 @@ import {
   createShopSession,
   LANDER_FUEL_COST,
   LANDER_FUEL_ID,
+  LANDER_REPAIR_COST,
   REFUEL_COST,
   REPAIR_COST,
   RESERVE_FUEL_COST,
@@ -148,6 +149,13 @@ export class MapShopFacade {
 
   repairHull(profile: PlayerProfile): { ok: boolean; profile: PlayerProfile } {
     const updated = spendCredits(profile, REPAIR_COST)
+    if (!updated) return { ok: false, profile }
+    return { ok: true, profile: updated }
+  }
+
+  /** Pay for lander hull restoration (profile field updated by {@link MapViewController.shopRepairLander}). */
+  repairLander(profile: PlayerProfile): { ok: boolean; profile: PlayerProfile } {
+    const updated = spendCredits(profile, LANDER_REPAIR_COST)
     if (!updated) return { ok: false, profile }
     return { ok: true, profile: updated }
   }

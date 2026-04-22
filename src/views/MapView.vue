@@ -42,6 +42,7 @@ import {
 } from '@/lib/messages/runtime'
 import { contractSystem, onContractsChanged } from '@/lib/contracts/runtime'
 import {
+  getCurrentUpgradeValue,
   getUpgradeCost,
   getPlayerUpgradeLevelsSnapshot,
   hasGravitySurfingUnlock,
@@ -50,6 +51,7 @@ import {
   type UpgradeId,
   type UpgradeLevels,
 } from '@/lib/upgrades'
+import { LANDER_BASE_HP } from '@/three/LanderController'
 import UpgradeInstalledAnnouncement from '@/components/UpgradeInstalledAnnouncement.vue'
 import { Timer, type TimerHandle } from '@/lib/Timer'
 import type { ActiveShipMessage } from '@/lib/messages/messageTypes'
@@ -286,6 +288,13 @@ const missionOverlayCanFit = ref(false)
 const activeOrbitalMinigame = computed(
   () => viewController.activeMinigame,
 )
+
+/** Lander hull in shop matches upgraded max — used to disable Lander Hull Repair. */
+const shopLanderHullFull = computed(() => {
+  const maxHp = LANDER_BASE_HP * getCurrentUpgradeValue('landerHull')
+  const v = shopProfile.value.landerHullHp
+  return v === undefined || v >= maxHp * 0.99
+})
 /**
  * EVA terminal minigame state. Populated when the EVA player presses F at a POI
  * terminal; cleared when they Complete or Close the overlay (or the EVA session
@@ -919,6 +928,10 @@ function handleRepairHull() {
   viewController.shopRepairHull()
 }
 
+function handleRepairLander() {
+  viewController.shopRepairLander()
+}
+
 function handleUseFuelCell() {
   viewController.useFuelCell()
 }
@@ -1369,6 +1382,7 @@ watch(
     :inventory="shopInventory"
     :fuel-full="telemetry.fuelLevel >= telemetry.fuelCapacity * 0.99"
     :hull-full="telemetry.hp >= telemetry.maxHp"
+    :lander-hull-full="shopLanderHullFull"
     @close="closeShop"
     @buy-trade-good="handleShopBuyTradeGood"
     @sell-item="handleShopSellItem"
@@ -1376,6 +1390,7 @@ watch(
     @buy-reserve-fuel="handleShopBuyReserveFuel"
     @buy-lander-fuel="handleShopBuyLanderFuel"
     @repair-hull="handleRepairHull"
+    @repair-lander="handleRepairLander"
   />
   <MissionMiniGameOverlay
     v-if="missionOverlayVisible && missionOverlayMission"

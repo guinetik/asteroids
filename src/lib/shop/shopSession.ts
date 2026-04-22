@@ -53,8 +53,11 @@ export const LANDER_FUEL_ID = 'fuel-cell'
 /** Lander fuel cost in credits. */
 export const LANDER_FUEL_COST = 75
 
-/** Hull repair cost in credits (Earth only). */
+/** Shuttle hull repair cost in credits (Earth orbit trading post only). */
 export const REPAIR_COST = 250
+
+/** Lander hull repair cost in credits (any trading post — restores persisted lander HP). */
+export const LANDER_REPAIR_COST = 200
 
 /**
  * Pick 3 random trade goods from a planet's 5-item pool.

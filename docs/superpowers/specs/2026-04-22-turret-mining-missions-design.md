@@ -22,7 +22,7 @@ Missions also create economic pressure the current turret loop doesn't. Mining i
 - Reuse existing systems: `ShuttleMissionBoard`, `TurretYieldCoordinator`, inventory pipeline, restock timers, Science Station multiplier, contract notify.
 - Gate the mission type behind `turretMiningUnlock >= 1` so players without the turret never see it.
 - Put visible quantity pressure on the `shuttleCargoBay` upgrade — medium and hard missions should not fit a base-cap inventory alongside normal trade goods.
-- Extend the loot system to produce a kuiper-specific ore (`kuiper-ice`) for the late-game USC missions, without touching level-scene mining.
+- Reuse the existing mineral catalog: Mars/Jupiter contracts ask for specific main-belt ores already produced by the turret (`olivine`, `magnetite`, `iron-nickel-alloy`), and USC contracts ask for `water-ice` from the already-mineable kuiper belt. No new items, no loot-table changes.
 
 ## Non-Goals (this pass)
 
@@ -30,15 +30,16 @@ Missions also create economic pressure the current turret loop doesn't. Mining i
 - A new minigame at delivery. Delivery is a dock-time auto-complete.
 - Map waypoints for mining missions. All mining missions are count-based — player mines anywhere that produces the right ore. (Decided during brainstorming.)
 - New planet entries. Pluto already exists in `planetarium.json` (verified at L713) and has trade-goods, planet-demand, and access-requirements wiring.
+- New inventory items or loot tables. `olivine`, `magnetite`, `iron-nickel-alloy`, `water-ice` all ship today in `src/data/inventory/items.json`. The kuiper belt is already instanced and mineable with its own loot composition in `asteroid-belt-loot.json`.
 - Market/shop changes. Ore is consumed on delivery; whether the player sells surplus ore at the shop is unchanged.
 - New turret upgrades. `turretMiningYield` and `turretMiningEfficiency` from the turret spec cover throughput and fuel.
 
 ## User Flow
 
 1. Player has purchased `turretMiningUnlock`. The "Mining" tab in Shuttle Control unlocks at any giver planet (Mars, Jupiter, Uranus, Neptune, Pluto).
-2. Player docks at **Mars** → opens Shuttle Control → Mining tab → sees one offered mission (e.g. "Marines need 450 kg of silicate-ore — 1,400 CR"). Presses **Accept**.
-3. Mission moves to `activeMiningMissions[]` with `minedKg = 0`. Restock timer starts (180 s) before Mars offers a new one.
-4. Player undocks, presses **T** on the map, turret-mines the belt. Each beam tick that yields silicate-ore increments the Mars mission's `minedKg`. HUD shows progress (e.g. "Mars Mining 210 / 450 kg"). Ore also accumulates normally in inventory.
+2. Player docks at **Mars** → opens Shuttle Control → Mining tab → sees one offered mission (e.g. "Marines need 475 kg of olivine — 1,350 CR"). Presses **Accept**.
+3. Mission moves to `activeMiningMissions[]` with `minedKg = 0`. Restock timer starts (120–240 s, matching existing mission kinds via `randomRestockDuration()`) before Mars offers a new one.
+4. Player undocks, presses **T** on the map, turret-mines the belt. Each whole-kg commit that yields olivine increments the Mars mission's `minedKg`. HUD shows progress (e.g. "Mars Mining 210 / 475 kg"). Ore also accumulates normally in inventory.
 5. When `minedKg >= targetKg`, mission flips to `ready-to-deliver`. HUD toast: *"Mining contract complete — return to Mars"*.
 6. Player flies back to Mars, docks. On dock, any `activeMiningMissions[i]` with `status === 'ready-to-deliver'` and matching `giverPlanet` auto-completes:
    - `targetKg` of the specified ore is removed from inventory.
@@ -95,16 +96,16 @@ New types in `src/lib/missions/types.ts`:
 export type MiningMissionDifficulty = 'easy' | 'medium' | 'hard'
 
 /**
- * What ore a mining mission wants. `'any'` counts every ore toward progress (easy tier).
- * Specific IDs restrict progress tracking to that exact item.
+ * What ore a mining mission wants. `'any'` counts every asteroid-belt ore toward progress
+ * (easy tier). Specific IDs restrict progress tracking to that exact item and must match
+ * real catalog entries from `src/data/inventory/items.json`.
  */
 export type MiningOreCategory =
   | 'any'
-  | 'silicate-ore'
-  | 'iron-ore'
-  | 'nickel-ore'
-  | 'rare-metal'
-  | 'kuiper-ice'
+  | 'olivine'
+  | 'magnetite'
+  | 'iron-nickel-alloy'
+  | 'water-ice'
 
 /** A turret mining mission template from JSON — one entry in a giver planet's pool. */
 export interface TurretMiningMissionTemplate {
@@ -169,7 +170,7 @@ Five pool JSON files under `src/data/shuttle-missions/mining/`:
 
 ### `mars.json` — Martian Marines Corps
 
-Silicate specialization (armor plating, structural material). Easy / medium-silicate / hard-rare-metal.
+Olivine specialization (Olivine is described in items.json as "Valuable for industrial silicate production" — fits the Marines' armor-plating/structural usage lore). Easy / medium-olivine / hard-iron-nickel-alloy.
 
 ```json
 {
@@ -186,20 +187,20 @@ Silicate specialization (armor plating, structural material). Easy / medium-sili
       "reward": 750
     },
     {
-      "id": "mars_marines_silicate_plating",
+      "id": "mars_marines_olivine_plating",
       "name": "Armor Plating Contract",
-      "description": "Silicate-ore for new armor lamination. Marines want it clean — no crosscontamination from other ores.",
+      "description": "Raw olivine for a new armor lamination run. Marines want it clean — no cross-contamination from other ores.",
       "difficulty": "medium",
-      "oreCategory": "silicate-ore",
+      "oreCategory": "olivine",
       "targetKg": 475,
       "reward": 1350
     },
     {
-      "id": "mars_marines_rare_metal",
+      "id": "mars_marines_iron_nickel",
       "name": "Classified Procurement",
-      "description": "Marines need rare-metal for projects they won't explain. Small quantity, generous payout.",
+      "description": "Marines need iron-nickel alloy for projects they won't explain. Small quantity, generous payout.",
       "difficulty": "hard",
-      "oreCategory": "rare-metal",
+      "oreCategory": "iron-nickel-alloy",
       "targetKg": 200,
       "reward": 2200
     }
@@ -209,7 +210,7 @@ Silicate specialization (armor plating, structural material). Easy / medium-sili
 
 ### `jupiter.json` — Jovian Cloud City
 
-Iron specialization (city infrastructure). Easy / medium-iron / hard-rare-metal.
+Magnetite specialization (items.json: "Used in electronics and radiation shielding" — fits Cloud City's orbital-platform infrastructure lore). Easy / medium-magnetite / hard-iron-nickel-alloy.
 
 ```json
 {
@@ -226,20 +227,20 @@ Iron specialization (city infrastructure). Easy / medium-iron / hard-rare-metal.
       "reward": 820
     },
     {
-      "id": "jupiter_cloud_city_iron",
-      "name": "Platform Reinforcement",
-      "description": "New residential sectors need iron-ore for support frames. Purity matters — Cloud City inspectors reject mixed loads.",
+      "id": "jupiter_cloud_city_magnetite",
+      "name": "Shielded Platform Reinforcement",
+      "description": "New residential sectors need magnetite for radiation-shielded support frames. Purity matters — Cloud City inspectors reject mixed loads.",
       "difficulty": "medium",
-      "oreCategory": "iron-ore",
+      "oreCategory": "magnetite",
       "targetKg": 500,
       "reward": 1500
     },
     {
-      "id": "jupiter_cloud_city_rare_metal",
+      "id": "jupiter_cloud_city_iron_nickel",
       "name": "Executive Suites",
-      "description": "Premium rare-metal fittings for the new orbital penthouse tier. Discreet delivery, excellent pay.",
+      "description": "Premium iron-nickel fittings for the new orbital penthouse tier. Discreet delivery, excellent pay.",
       "difficulty": "hard",
-      "oreCategory": "rare-metal",
+      "oreCategory": "iron-nickel-alloy",
       "targetKg": 225,
       "reward": 2500
     }
@@ -249,7 +250,7 @@ Iron specialization (city infrastructure). Easy / medium-iron / hard-rare-metal.
 
 ### `uranus.json` / `neptune.json` / `pluto.json` — United Space Consortium
 
-Kuiper-ice only. One or two hard-tier missions per planet. Flavor differs per location; giver is the same organization.
+Kuiper water-ice only. One hard-tier mission per planet. Flavor differs per location; giver is the same organization.
 
 ```json
 {
@@ -259,9 +260,9 @@ Kuiper-ice only. One or two hard-tier missions per planet. Flavor differs per lo
     {
       "id": "usc_uranus_ice_research",
       "name": "Cryogenic Research Shipment",
-      "description": "USC labs need primordial kuiper ice for deep-cold chemistry studies. Bring it fresh from the belt.",
+      "description": "USC labs need primordial water-ice for deep-cold chemistry studies. Bring it fresh from the kuiper belt.",
       "difficulty": "hard",
-      "oreCategory": "kuiper-ice",
+      "oreCategory": "water-ice",
       "targetKg": 425,
       "reward": 2600
     }
@@ -277,9 +278,9 @@ Kuiper-ice only. One or two hard-tier missions per planet. Flavor differs per lo
     {
       "id": "usc_neptune_ice_reactor",
       "name": "Reactor Coolant Resupply",
-      "description": "Neptune station's fusion reactor runs on kuiper-ice moderators. Quantity matters — run short, station goes dark.",
+      "description": "Neptune station's fusion reactor runs on water-ice moderators pulled from kuiper rocks. Quantity matters — run short, station goes dark.",
       "difficulty": "hard",
-      "oreCategory": "kuiper-ice",
+      "oreCategory": "water-ice",
       "targetKg": 475,
       "reward": 2900
     }
@@ -295,9 +296,9 @@ Kuiper-ice only. One or two hard-tier missions per planet. Flavor differs per lo
     {
       "id": "usc_pluto_deep_ice_survey",
       "name": "Trans-Neptunian Ice Sampling",
-      "description": "USC wants deep kuiper ice from the furthest belt. Nobody goes out this far without the right gear. That's why the pay is what it is.",
+      "description": "USC wants deep water-ice from the furthest reaches of the kuiper belt. Nobody goes out this far without the right gear. That's why the pay is what it is.",
       "difficulty": "hard",
-      "oreCategory": "kuiper-ice",
+      "oreCategory": "water-ice",
       "targetKg": 500,
       "reward": 3200
     }
@@ -307,56 +308,20 @@ Kuiper-ice only. One or two hard-tier missions per planet. Flavor differs per lo
 
 Quantities and rewards are the initial authoring — balance may adjust during implementation.
 
-## Loot Table & Inventory Extension
+## Ore Catalog & Belt Routing — Already In Place
 
-### New inventory item — `kuiper-ice`
+No new items or loot tables. Research during design confirmed:
 
-Added to `src/lib/inventory/catalog.ts`:
+- **`src/data/inventory/items.json`** already contains `olivine`, `magnetite`, `pyroxene`, `iron-nickel-alloy`, `water-ice`, `carbon-dioxide-ice`, `sodium-chloride`, and others (items.json L2–L17).
+- **`src/data/asteroid-belt-loot.json`** already defines both `asteroid-belt-small/medium/large` and `kuiper-belt-small/medium/large` compositions.
+- **`src/lib/map/turret/turretTiers.ts`** already exposes `TurretBeltId = 'main-belt' | 'kuiper-belt'` and routes loot per belt.
+- **Kuiper belt is already instanced** on the map alongside the main belt.
 
-```ts
-{
-  id: 'kuiper-ice',
-  label: 'Kuiper Ice',
-  description: 'Ancient ice from trans-Neptunian rocks, chemically distinct from water ice — laced with precursor compounds.',
-  icon: 'kuiper-ice.png',
-  weightPerUnit: 1,
-  maxStack: 100,
-  basePrice: 45,
-}
-```
-
-Initial `basePrice` of 45 CR/unit sits at the common-ore band so the shop remains a fallback sell channel; the mining mission payout is the premium path. Final value resolved at implementation time by matching existing ore prices (see research-needed item 6).
-
-### Loot table entries — `src/data/asteroid-belt-loot.json`
-
-Extend with three kuiper tiers:
-
-```json
-{
-  "asteroid-belt-small":  [ /* existing */ ],
-  "asteroid-belt-medium": [ /* existing */ ],
-  "asteroid-belt-large":  [ /* existing */ ],
-  "kuiper-belt-small":    [{ "itemId": "kuiper-ice", "weightKg": 1.0 }],
-  "kuiper-belt-medium":   [{ "itemId": "kuiper-ice", "weightKg": 1.0 }],
-  "kuiper-belt-large":    [{ "itemId": "kuiper-ice", "weightKg": 1.0 }]
-}
-```
-
-Kuiper rocks drop 100% `kuiper-ice`. No mixed composition — single-mineral belt.
-
-### Belt routing — research-needed
-
-The turret-mode spec describes the turret raycasting a `beltControllers` plural. For kuiper missions to be playable, the map must:
-1. Instance an `AsteroidBeltController` at kuiper orbital distance (outside Neptune's orbit).
-2. Route that controller's loot-table lookup to the `kuiper-belt-*` keys.
-
-**If kuiper belt is not yet instanced on the map**, USC pools ship as authored but the "Mining" tab's offered-slot filter hides kuiper-ice missions until the belt exists (same pattern planet-access-requirements uses for locked planets). Document this branch as a follow-up task — not a design blocker.
-
-**If kuiper belt is already instanced**, the loot-table lookup needs a region tag on `AsteroidBeltController` so `TurretYieldCoordinator.registerRock` picks `kuiper-belt-*` vs `asteroid-belt-*`. Implementation confirms which branch is live.
+All four mining-target ores — `olivine`, `magnetite`, `iron-nickel-alloy`, `water-ice` — are already produced by the turret during normal play. The mission system simply reads what the turret already yields; no ore plumbing needed.
 
 ## Progress Tracking
 
-Extend `TurretYieldCoordinator` with a subscribe slot (if one doesn't already exist). On every whole-kg commit to inventory, fire `onMineralExtracted(itemId, kg)`. The new `miningMissionTracker` subscribes:
+The existing turret integration in `MapViewController.ts` already has an `onResourcePickup(itemId, quantity, label)` callback that fires on every successful inventory commit (see `TurretSessionController.commitOneUnit` → `deps.onResourcePickup`). The mining tracker hooks into that same callback with zero changes to the turret internals:
 
 ```ts
 function recordMiningProgress(itemId: string, kg: number): void {
@@ -380,16 +345,16 @@ function recordMiningProgress(itemId: string, kg: number): void {
 }
 
 function matchesOreCategory(category: MiningOreCategory, itemId: string): boolean {
-  if (category === 'any') return isAsteroidOre(itemId)  // excludes non-ore items
+  if (category === 'any') return isMainBeltOre(itemId)  // excludes kuiper ices
   return category === itemId
 }
 ```
 
 **Design choices:**
-- Progress only counts ore mined **after** the mission was accepted. The tracker subscribes to live `onMineralExtracted` events, not inventory state. Mining 500 kg of iron before accepting does not auto-complete a later iron mission.
-- `'any'` matches asteroid ores only — silicate/iron/nickel/rare-metal. It does **not** count kuiper-ice (kuiper-ice is hard-specific) or non-ore drops. `isAsteroidOre(itemId)` is a tiny helper over the known ore list.
-- Multiple matching missions all receive the same `kg` increment each tick. Mining 10 kg of iron with two iron missions active credits 10 kg to both — this is intentional and matches how the player conceptually "fulfills two contracts from one run".
-- Persistence is localStorage-backed (via `saveMissionBoard`). The turret's whole-kg buffering means this saves at human-scale rates, not per-frame.
+- Progress only counts ore mined **after** the mission was accepted. The tracker subscribes to live `onResourcePickup` events, not inventory state. Mining 500 kg of magnetite before accepting does not auto-complete a later magnetite mission.
+- `'any'` matches main-belt ores only — `olivine`, `magnetite`, `pyroxene`, `iron-nickel-alloy`, and any other items emitted by `asteroid-belt-*` loot tiers. It does NOT count kuiper ices (`water-ice`, etc.) — kuiper contracts are hard-tier and tracked via their specific `oreCategory`. `isMainBeltOre(itemId)` is a tiny helper over the known main-belt ore list, authored inside `turretMiningSession.ts`.
+- Multiple matching missions all receive the same `kg` increment each tick. Mining 10 kg of magnetite with two magnetite missions active credits 10 kg to both — intentional; matches the "one run fulfills multiple contracts" fantasy.
+- Persistence is localStorage-backed (via `saveMissionBoard`). The turret's whole-kg commit buffering means this saves at human-scale rates, not per-frame.
 
 ## Delivery
 
@@ -444,15 +409,15 @@ function deliverMiningMissionsAtDock(planetId: string): DeliveryReport {
 
 | Difficulty | Giver | Ore | Target kg | Reward (CR) |
 |---|---|---|---|---|
-| Easy | Mars (Marines) | any | 350 | 750 |
-| Easy | Jupiter (Cloud City) | any | 380 | 820 |
-| Medium | Mars (Marines) | silicate-ore | 475 | 1350 |
-| Medium | Jupiter (Cloud City) | iron-ore | 500 | 1500 |
-| Hard | Mars (Marines) | rare-metal | 200 | 2200 |
-| Hard | Jupiter (Cloud City) | rare-metal | 225 | 2500 |
-| Hard | Uranus (USC) | kuiper-ice | 425 | 2600 |
-| Hard | Neptune (USC) | kuiper-ice | 475 | 2900 |
-| Hard | Pluto (USC) | kuiper-ice | 500 | 3200 |
+| Easy | Mars (Marines) | any main-belt | 350 | 750 |
+| Easy | Jupiter (Cloud City) | any main-belt | 380 | 820 |
+| Medium | Mars (Marines) | olivine | 475 | 1350 |
+| Medium | Jupiter (Cloud City) | magnetite | 500 | 1500 |
+| Hard | Mars (Marines) | iron-nickel-alloy | 200 | 2200 |
+| Hard | Jupiter (Cloud City) | iron-nickel-alloy | 225 | 2500 |
+| Hard | Uranus (USC) | water-ice | 425 | 2600 |
+| Hard | Neptune (USC) | water-ice | 475 | 2900 |
+| Hard | Pluto (USC) | water-ice | 500 | 3200 |
 
 **Cargo bay pressure:**
 - Base 500 kg: holds easy missions if inventory empty; medium/hard-kuiper don't fit alongside anything else.
@@ -516,13 +481,12 @@ While turret session is active, if any `activeMiningMissions[i]` exists, show a 
 | File | Delta | Nature |
 |---|---|---|
 | `src/lib/missions/types.ts` | +4 types + 4 board fields | Data model. |
-| `src/lib/missions/missionStorage.ts` | +4 field round-trips | Persistence. |
-| `src/lib/missions/shuttleMissionSession.ts` | +4 helpers | Offer/take/restock/getReady. |
-| `src/lib/map/turret/TurretYieldCoordinator.ts` | +1 subscribe hook | If `onMineralExtracted` isn't already exposed to a subscriber slot, add one. |
-| `src/lib/inventory/catalog.ts` | +1 item | `kuiper-ice`. |
-| `src/data/asteroid-belt-loot.json` | +3 entries | `kuiper-belt-small/medium/large`. |
-| `src/components/shuttle-control/ShuttleControlProgramMissions.vue` + controller | Mining tab | UI layer. |
-| Dock handler (TBD in code — find existing deliverMission call site) | Call `deliverMiningMissionsAtDock(planetId)` | Delivery trigger. |
+| `src/lib/missions/missionStorage.ts` | +4 field round-trips + 1 new timer revival | Persistence. |
+| `src/lib/missions/shuttleMissionSession.ts` | +1 field in `createMissionBoard` initializer | Board default shape. |
+| `src/lib/contracts/contractTypes.ts` | `ContractMissionType` union gains `'mining'` | Contract step matching. |
+| `src/views/MapViewController.ts` | ~5 lines near the turret `onResourcePickup` wiring | Fire `recordMiningProgress(itemId, quantity)` when the turret commits ore. |
+| `src/views/MapView.vue` (dock handler) | ~6 lines near the existing planetary `deliverMission` call | Call `deliverMiningMissionsAtDock(...)` on dock-enter at a giver planet. |
+| `src/components/shuttle-control/ShuttleControlProgramMissions.vue` + any host layer | Mining tab | UI layer. |
 
 ### New data files
 
@@ -560,16 +524,21 @@ Not tested (per CLAUDE.md — framework/rendering layers):
 - Vue Mining tab markup.
 - Dock call-site wiring (covered by smoke test).
 
-## Open Questions / Research-Needed
+## Resolved Design Questions
 
-Flagged during design for implementation to resolve:
+All design-time research items are resolved:
 
-1. **Kuiper belt on map.** Verify whether an `AsteroidBeltController` is instanced at kuiper orbital distance (beyond Neptune). If not, USC missions ship but are filtered-out of the offered slot until kuiper is mineable. Follow-up task: instance kuiper belt + region tag.
-2. **`TurretYieldCoordinator` subscribe hook.** If the coordinator doesn't already expose a consumer callback beyond inventory commit, add a lightweight `addMineralListener(fn)` so `miningMissionTracker` can register without tight coupling.
-3. **`shuttleCargoBay` values confirmation.** Spec assumes base 500 / L1 675 / L2 825 / L3 1000 kg based on multipliers `[1.0, 1.35, 1.65, 2.0]` applied to `DEFAULT_MAX_WEIGHT_KG = 500`. Implementation reads the current values; tuning retargets if numbers drifted.
-4. **`removeOreByCategory` helper.** Inventory's current API removes by `itemId` + quantity. The mining delivery needs a helper that removes N kg of a specific ore. Straightforward additive change to `src/lib/inventory/inventory.ts`.
-5. **Dock-time delivery call site.** Planetary missions deliver on dock — need to locate that call site and add `deliverMiningMissionsAtDock(planetId)` alongside (or under the same dock handler).
-6. **`kuiper-ice` basePrice.** Tune during implementation by matching the common-ore band in the shop. Mission is the premium path; shop fallback should exist but pay less per kg than the contract.
+1. **Kuiper belt on map.** Confirmed instanced. `TurretBeltId = 'main-belt' | 'kuiper-belt'` and kuiper tier tables already exist in `turretTiers.ts`; `asteroid-belt-loot.json` already defines kuiper tiers.
+2. **Turret progress hook.** Reuse the existing `deps.onResourcePickup(itemId, quantity, label)` callback wired from `MapViewController` to `TurretSessionController`. No new subscribe hook needed.
+3. **`shuttleCargoBay` values.** Confirmed at 500 / 675 / 825 / 1000 kg via `DEFAULT_MAX_WEIGHT_KG = 500` in `src/lib/inventory/inventory.ts` × upgrade multipliers `[1.0, 1.35, 1.65, 2.0]`.
+4. **Inventory delivery helper.** Existing `removeItem(inventory, itemId, quantity)` covers specific-ore delivery. For `'any'`-tier missions, the delivery helper walks main-belt ore stacks and removes up to `targetKg` across them; this is authored inside `turretMiningRewards.ts`, not in `inventory.ts`.
+5. **Dock-time delivery call site.** Lives in `src/views/MapView.vue` near the existing planetary `deliverMission` (grep `contractSystem.notifyMissionCompleted({ kind: 'shuttle' ... })` — around line 715).
+6. **Ore catalog.** All four target ores are already in `src/data/inventory/items.json`. No catalog edits.
+
+## Scoped-Out / Non-Blocking
+
+1. **Mission pool variety per restock.** Each giver currently offers one mission selected randomly. A future pass could keep history so the same mission doesn't repeat.
+2. **Dynamic quantity scaling with upgrade average.** Current pass uses authored-per-template values; a `NumberRange`-driven scaler is future work.
 
 ## Acceptance Criteria
 
@@ -584,8 +553,8 @@ Per CLAUDE.md merge gate:
    - Undock → enter turret → mine belt → HUD progress updates → mission flips `ready-to-deliver`.
    - Return to Mars → dock → mission auto-delivers → credits awarded → ore removed from inventory.
    - Restock timer elapses → Mars offers a new mission.
-   - With two active missions (Mars silicate + Jupiter iron), mining silicate does NOT credit Jupiter; mining iron does NOT credit Mars.
-   - Dock Uranus without `shuttleFreezeResistance` 3: USC tab visible, but offered mining slot hidden or shows locked.
+   - With two active missions (Mars olivine + Jupiter magnetite), mining olivine does NOT credit Jupiter; mining magnetite does NOT credit Mars.
+   - Dock Uranus without `shuttleFreezeResistance` 3: per existing access-requirements gate, Uranus is already unreachable — no extra check needed in the mining tab.
 
 ## Future Work (documented, not implemented)
 

@@ -177,6 +177,15 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     unlockedFeatureIds = [SLINGSHOT_JOURNEY_FEATURE_ID]
   }
 
+  const shuttleHullHp =
+    typeof p.shuttleHullHp === 'number' && Number.isFinite(p.shuttleHullHp) && p.shuttleHullHp >= 0
+      ? p.shuttleHullHp
+      : undefined
+  const landerHullHp =
+    typeof p.landerHullHp === 'number' && Number.isFinite(p.landerHullHp) && p.landerHullHp >= 0
+      ? p.landerHullHp
+      : undefined
+
   return {
     name: p.name,
     credits: p.credits,
@@ -190,6 +199,8 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     completedJourneyIds,
     journeyStepProgress,
     unlockedFeatureIds,
+    ...(shuttleHullHp !== undefined ? { shuttleHullHp } : {}),
+    ...(landerHullHp !== undefined ? { landerHullHp } : {}),
   }
 }
 

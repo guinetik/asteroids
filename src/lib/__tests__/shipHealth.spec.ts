@@ -25,6 +25,29 @@ describe('ShipHealth', () => {
     health = new ShipHealth(config)
   })
 
+  describe('setPersistedHp', () => {
+    it('clamps to max and invokes onHpChanged', () => {
+      const spy = vi.fn()
+      health.onHpChanged = spy
+      health.applyDamage(40, 'test')
+      expect(health.hp).toBe(60)
+      expect(spy).toHaveBeenCalled()
+      spy.mockClear()
+      health.setPersistedHp(55)
+      expect(health.hp).toBe(55)
+      expect(spy).toHaveBeenCalled()
+      health.setPersistedHp(9999)
+      expect(health.hp).toBe(100)
+    })
+
+    it('clears death when HP is restored from zero', () => {
+      health.applyDamage(200, 'test')
+      expect(health.hp).toBe(0)
+      health.setPersistedHp(50)
+      expect(health.hp).toBe(50)
+    })
+  })
+
   describe('initial state', () => {
     it('starts at full HP', () => {
       expect(health.hp).toBe(100)

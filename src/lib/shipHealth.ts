@@ -101,6 +101,9 @@ export class ShipHealth {
   /** Fired when HP reaches 0 with the cause of death. */
   onDeath: ((cause: string) => void) | null = null
 
+  /** Fired after {@link ShipHealth.hp} changes (damage, healing, repair, reset, load). */
+  onHpChanged: (() => void) | null = null
+
   constructor(config: ShipHealthConfig) {
     this.config = config
     this._hp = config.maxHp
@@ -168,6 +171,27 @@ export class ShipHealth {
 
   private _lastDamageIntensity = 0
 
+  private notifyHpChangedIfNeeded(previousHp: number): void {
+    if (this._hp !== previousHp) {
+      this.onHpChanged?.()
+    }
+  }
+
+  /**
+   * Restore hull from persisted save data (clamped to current max).
+   * Clears death when HP is brought back above zero.
+   *
+   * @param hp - Hit points to apply.
+   */
+  setPersistedHp(hp: number): void {
+    const previousHp = this._hp
+    this._hp = Math.max(0, Math.min(this.config.maxHp, hp))
+    if (this._hp > 0) {
+      this._dead = false
+    }
+    this.notifyHpChangedIfNeeded(previousHp)
+  }
+
   /**
    * Apply direct hull damage from an instantaneous event.
    *
@@ -177,8 +201,10 @@ export class ShipHealth {
   applyDamage(amount: number, cause: string): void {
     if (this._dead || amount <= 0) return
 
+    const previousHp = this._hp
     this._hp = Math.max(0, this._hp - amount)
     this._lastDamageIntensity = Math.min(1, Math.max(this._lastDamageIntensity, amount / 25))
+    this.notifyHpChangedIfNeeded(previousHp)
 
     if (this._hp <= 0 && !this._dead) {
       this._dead = true
@@ -220,6 +246,8 @@ export class ShipHealth {
     coldTempCap = MIN_TEMPERATURE,
   ): void {
     if (this._dead) return
+
+    const hpBeforeTick = this._hp
 
     // Temperature drift toward zone target — stronger the deeper in the zone
     let targetTemp: number
@@ -300,18 +328,24 @@ export class ShipHealth {
       this._dead = true
       this.onDeath?.(this.getDeathCause(radiationProximity))
     }
+
+    this.notifyHpChangedIfNeeded(hpBeforeTick)
   }
 
   /** Restore HP to maximum (full hull repair). */
   repairFull(): void {
+    const previousHp = this._hp
     this._hp = this.config.maxHp
+    this.notifyHpChangedIfNeeded(previousHp)
   }
 
   /** Reset HP and temperature to initial values. */
   reset(): void {
+    const previousHp = this._hp
     this._hp = this.config.maxHp
     this._temperature = 0
     this._dead = false
+    this.notifyHpChangedIfNeeded(previousHp)
   }
 
   /**

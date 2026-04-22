@@ -114,6 +114,26 @@ describe('saveProfile / loadProfile', () => {
     expect(loaded!.completedMissionCount).toBe(1)
     expect(loaded!.visitedAsteroids).toEqual({ bennu: 1 })
   })
+
+  it('round-trips shuttle and lander hull HP fields', () => {
+    const profile = createProfile('Hull')
+    saveProfile({ ...profile, shuttleHullHp: 72, landerHullHp: 81 })
+    const loaded = loadProfile()
+    expect(loaded?.shuttleHullHp).toBe(72)
+    expect(loaded?.landerHullHp).toBe(81)
+  })
+
+  it('drops invalid hull HP values on load', () => {
+    mockStorage[PROFILE_STORAGE_KEY] = JSON.stringify({
+      name: 'X',
+      credits: 1,
+      shuttleHullHp: -1,
+      landerHullHp: NaN,
+    })
+    const loaded = loadProfile()
+    expect(loaded?.shuttleHullHp).toBeUndefined()
+    expect(loaded?.landerHullHp).toBeUndefined()
+  })
 })
 
 describe('addCredits', () => {

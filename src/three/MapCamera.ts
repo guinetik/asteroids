@@ -25,11 +25,17 @@ export interface FrustumBounds {
   bottom: number
 }
 
-/** Full-system frustum half-extent in world units. */
-const FRUSTUM_HALF_SIZE = mapOverlayData.frustumHalfSize
+/** Minimum full-system frustum half-extent in world units (covers inner planets). */
+const FRUSTUM_HALF_SIZE_MIN = mapOverlayData.frustumHalfSize
 
 /** Initial tight-crop frustum half-extent around ship. */
 const FRUSTUM_INITIAL_HALF_SIZE = mapOverlayData.frustumInitialHalfSize
+
+/**
+ * Multiplier applied to the ship's distance from the sun to guarantee the ship
+ * is visible in the fully-open map. 1.2 places the ship at ~83% from center.
+ */
+const FRUSTUM_SHIP_MARGIN = mapOverlayData.frustumShipMargin
 
 /** Height of the ortho camera above the XZ plane. */
 const CAMERA_HEIGHT = mapOverlayData.cameraHeight
@@ -61,6 +67,45 @@ export function lerpFrustum(initial: number, final_: number, t: number): number 
 }
 
 /**
+ * Linearly interpolate the camera's horizontal anchor from the ship's
+ * starting position toward the solar-system origin (sun at 0,0,0) as the
+ * transition progresses. Keeps the opening animation feeling like a zoom-out
+ * from the ship while ensuring the fully-open view is always centered on the sun.
+ *
+ * @param shipStart - Camera's initial horizontal coordinate (ship X or Z)
+ * @param t - Interpolation factor 0–1 (already eased by caller)
+ * @returns World-space coordinate for the camera on the given axis
+ */
+export function lerpCameraAnchor(shipStart: number, t: number): number {
+  return shipStart * (1 - t)
+}
+
+/**
+ * Compute the fully-open frustum half-size needed to fit both the sun and the
+ * ship on screen with margin, accounting for aspect ratio. The horizontal
+ * extent is the raw half-size; the vertical extent is `halfSize / aspect`, so
+ * a ship displaced along Z needs the half-size scaled by aspect to stay on
+ * screen. Outer-system trips (Neptune, Pluto, Kuiper) expand the view;
+ * inner-system trips clamp to the minimum so the map still frames the inner
+ * planets comfortably.
+ *
+ * @param shipX - Ship world X position (maps to screen horizontal)
+ * @param shipZ - Ship world Z position (maps to screen vertical, needs aspect scaling)
+ * @param aspect - Viewport width / height
+ * @returns Frustum half-size in world units for the fully-open state
+ */
+export function computeTargetFrustumHalfSize(
+  shipX: number,
+  shipZ: number,
+  aspect: number,
+): number {
+  const horizontalRequired = Math.abs(shipX)
+  const verticalRequired = Math.abs(shipZ) * aspect
+  const shipRequired = Math.max(horizontalRequired, verticalRequired) * FRUSTUM_SHIP_MARGIN
+  return Math.max(FRUSTUM_HALF_SIZE_MIN, shipRequired)
+}
+
+/**
  * Smooth ease-in-out curve (cubic).
  *
  * @param t - Input 0–1
@@ -85,6 +130,13 @@ export class MapCamera {
   /** The orthographic camera instance. */
   readonly camera: THREE.OrthographicCamera
 
+  /** Ship X position at the moment the map opened — start of the camera anchor lerp. */
+  private openShipX = 0
+
+  /** Ship Z position at the moment the map opened — start of the camera anchor lerp. */
+  private openShipZ = 0
+
+
   constructor() {
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, CAMERA_HEIGHT + 100)
     this.camera.position.set(0, CAMERA_HEIGHT, 0)
@@ -99,21 +151,29 @@ export class MapCamera {
    * @param aspect - Viewport aspect ratio
    */
   positionAboveShip(shipX: number, shipZ: number, aspect: number): void {
+    this.openShipX = shipX
+    this.openShipZ = shipZ
     this.camera.position.set(shipX, CAMERA_HEIGHT, shipZ)
     this.camera.lookAt(shipX, 0, shipZ)
     this.updateFrustum(FRUSTUM_INITIAL_HALF_SIZE, aspect)
   }
 
   /**
-   * Update the frustum based on transition progress.
-   * At progress=0, frustum is tight around ship.
-   * At progress=1, frustum covers the full system.
+   * Update the frustum and camera anchor based on transition progress.
+   * At progress=0, frustum is tight and camera sits above the ship.
+   * At progress=1, frustum covers the full system and camera is centered
+   * on the sun (world origin) so distant players still see the whole system.
    *
    * @param progress - Transition progress 0–1 (already eased by caller)
    * @param aspect - Viewport aspect ratio
    */
   updateTransition(progress: number, aspect: number): void {
-    const halfSize = lerpFrustum(FRUSTUM_INITIAL_HALF_SIZE, FRUSTUM_HALF_SIZE, progress)
+    const targetHalfSize = computeTargetFrustumHalfSize(this.openShipX, this.openShipZ, aspect)
+    const halfSize = lerpFrustum(FRUSTUM_INITIAL_HALF_SIZE, targetHalfSize, progress)
+    const anchorX = lerpCameraAnchor(this.openShipX, progress)
+    const anchorZ = lerpCameraAnchor(this.openShipZ, progress)
+    this.camera.position.set(anchorX, CAMERA_HEIGHT, anchorZ)
+    this.camera.lookAt(anchorX, 0, anchorZ)
     this.updateFrustum(halfSize, aspect)
   }
 

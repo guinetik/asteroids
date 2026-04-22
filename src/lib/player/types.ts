@@ -51,4 +51,14 @@ export interface PlayerProfile {
   journeyStepProgress: Record<string, string[]>
   /** Feature ids unlocked by journey completion. */
   unlockedFeatureIds: string[]
+  /**
+   * Shuttle hull HP on the solar map (temperature, radiation, impacts).
+   * Omitted or `undefined` in older saves — treated as full until the first sync.
+   */
+  shuttleHullHp?: number
+  /**
+   * Lander hull HP carried between asteroid missions.
+   * Omitted or `undefined` in older saves — treated as full on next landing.
+   */
+  landerHullHp?: number
 }

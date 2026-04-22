@@ -43,6 +43,7 @@ import {
   eventHorizonRadius,
 } from '@/lib/physics/gravity'
 import { ShuttleController, MAP_PHYSICS } from '@/three/ShuttleController'
+import { LANDER_BASE_HP } from '@/three/LanderController'
 import { EvaSession, type EvaHugeScaleTarget, type EvaSceneHost } from '@/three/EvaSession'
 import {
   createAabbColliderFromObject,
@@ -325,6 +326,8 @@ export class MapViewController implements Tickable {
   private shipHealth: ShipHealth | null = null
   /** Ship health config with all distance fields pre-scaled by ORBIT_SCALE. */
   private shipHealthConfig: ShipHealthConfig | null = null
+  /** Debounced write of shuttle hull HP to {@link playerProfile}. */
+  private shuttleHullPersistTimer: ReturnType<typeof setTimeout> | null = null
   private mapState = new MapState()
   private mapIntro = new MapIntroState()
   /** When true, {@link tickOrrery} skips simTime advancement and planet/belt ticks. Set during portal arrival so Earth stays static. */
@@ -748,6 +751,18 @@ export class MapViewController implements Tickable {
     this.shipHealth = new ShipHealth(healthConfig)
     this.shipHealth.onDeath = (cause) => {
       this.triggerDeath(cause)
+    }
+    const maxShuttleHp = healthConfig.maxHp
+    const savedShuttleHp = this.playerProfile.shuttleHullHp
+    const initialShuttleHp =
+      savedShuttleHp === undefined
+        ? maxShuttleHp
+        : savedShuttleHp <= 0
+          ? maxShuttleHp
+          : Math.min(savedShuttleHp, maxShuttleHp)
+    this.shipHealth.setPersistedHp(initialShuttleHp)
+    this.shipHealth.onHpChanged = () => {
+      this.scheduleShuttleHullPersist()
     }
 
     this.emitBootState('preparing', 'Loading')
@@ -2172,6 +2187,33 @@ export class MapViewController implements Tickable {
     saveInventory(this.playerInventory)
   }
 
+  /** Persist shuttle hull HP to the profile (immediate). */
+  private flushShuttleHullToProfile(): void {
+    if (!this.shipHealth) return
+    const hp = this.shipHealth.hp
+    if (this.playerProfile.shuttleHullHp === hp) return
+    this.playerProfile = { ...this.playerProfile, shuttleHullHp: hp }
+    saveProfile(this.playerProfile)
+  }
+
+  /** Debounce hull writes — temperature/radiation tick can change HP every frame. */
+  private scheduleShuttleHullPersist(): void {
+    if (this.shuttleHullPersistTimer !== null) {
+      clearTimeout(this.shuttleHullPersistTimer)
+    }
+    this.shuttleHullPersistTimer = setTimeout(() => {
+      this.shuttleHullPersistTimer = null
+      this.flushShuttleHullToProfile()
+    }, 200)
+  }
+
+  private clearShuttleHullPersistTimer(): void {
+    if (this.shuttleHullPersistTimer !== null) {
+      clearTimeout(this.shuttleHullPersistTimer)
+      this.shuttleHullPersistTimer = null
+    }
+  }
+
   notifyJourneyTrigger(trigger: JourneyTriggerId): void {
     const result = applyJourneyTrigger(this.playerProfile, trigger)
     if (!result.changed) return
@@ -2731,8 +2773,25 @@ export class MapViewController implements Tickable {
     const result = this.shopFacade.repairHull(this.playerProfile)
     if (!result.ok) return
     this.playerProfile = result.profile
-    this.persistPlayerProfile()
+    this.clearShuttleHullPersistTimer()
     this.shipHealth.repairFull()
+    this.playerProfile = { ...this.playerProfile, shuttleHullHp: this.shipHealth.hp }
+    this.persistPlayerProfile()
+    if (this.shopFacade.session) {
+      this.emitShopState()
+    }
+    this.onCreditsUpdate?.(this.playerProfile.credits)
+  }
+
+  /**
+   * Repair lander hull to 100% at any trading post (updates persisted {@link PlayerProfile.landerHullHp}).
+   */
+  shopRepairLander(): void {
+    const result = this.shopFacade.repairLander(this.playerProfile)
+    if (!result.ok) return
+    const maxLander = LANDER_BASE_HP * getCurrentUpgradeValue('landerHull')
+    this.playerProfile = { ...result.profile, landerHullHp: maxLander }
+    this.persistPlayerProfile()
     if (this.shopFacade.session) {
       this.emitShopState()
     }
@@ -2927,6 +2986,10 @@ export class MapViewController implements Tickable {
     )
     this.playerProfile = respawnState.playerProfile
     this.playerInventory = respawnState.playerInventory
+    this.clearShuttleHullPersistTimer()
+    if (this.shipHealth) {
+      this.playerProfile = { ...this.playerProfile, shuttleHullHp: this.shipHealth.maxHp }
+    }
     clearActiveMission()
     this.missionFacade.reset(
       this.sceneObjects?.scene ?? null,
@@ -4468,6 +4531,8 @@ export class MapViewController implements Tickable {
   }
 
   dispose(): void {
+    this.clearShuttleHullPersistTimer()
+    this.flushShuttleHullToProfile()
     this.unsubscribeJourneyMessageArchive?.()
     this.unsubscribeJourneyMessageArchive = null
     this.evaSession?.dispose()

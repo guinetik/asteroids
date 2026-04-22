@@ -228,7 +228,8 @@ const SURFACE_SLOPE_DAMAGE_MULTIPLIER = 90.0
 const TOUCHDOWN_VOLUME_REF_SPEED = 20
 
 /** Base lander hull integrity before upgrade scaling. */
-const LANDER_BASE_HP = 100
+/** Base lander hull before {@link getCurrentUpgradeValue}(`landerHull`). */
+export const LANDER_BASE_HP = 100
 const LANDING_APPROACH_BUFFER_ALTITUDE = 22
 const LANDING_APPROACH_REACTION_TIME = 2.8
 const LANDING_APPROACH_MIN_DESCENT_SPEED = 1.0
@@ -427,6 +428,9 @@ export class LanderController implements Tickable {
   /** Called when the lander fuel tank is depleted. */
   onFuelEmpty: (() => void) | null = null
 
+  /** Fired when {@link LanderController.hp} changes (damage, repair, respawn reset, persisted load). */
+  onHullHpChanged: (() => void) | null = null
+
   constructor(inputManager: InputManager) {
     this.inputManager = inputManager
     this.thrusterSystem = new ThrusterSystem<LanderThrusterName>({
@@ -532,22 +536,48 @@ export class LanderController implements Tickable {
 
   /** Apply damage to the lander. Fires onDeath when HP reaches 0. */
   takeDamage(amount: number): void {
+    const previousHp = this._hp
     this._hp = Math.max(0, this._hp - amount)
+    this.notifyHullHpChangedIfNeeded(previousHp)
     if (this._hp <= 0) {
       this.onDeath?.()
     }
   }
 
+  /**
+   * Set hull HP from persisted save data (clamped to {@link LanderController.maxHp}).
+   * Does not fire {@link LanderController.onDeath} when the result is zero — use for load only.
+   *
+   * @param hp - Hit points to apply.
+   */
+  setHullHpFromProfile(hp: number): void {
+    const previousHp = this._hp
+    this._hp = Math.max(0, Math.min(this.maxHp, hp))
+    this.notifyHullHpChangedIfNeeded(previousHp)
+    this.updateWarningBeacon()
+  }
+
   /** Restore hull to full integrity (called when returning to shuttle). */
   repairHull(): void {
+    const previousHp = this._hp
     this._hp = this.maxHp
+    this.notifyHullHpChangedIfNeeded(previousHp)
+    this.updateWarningBeacon()
+  }
+
+  private notifyHullHpChangedIfNeeded(previousHp: number): void {
+    if (this._hp !== previousHp) {
+      this.onHullHpChanged?.()
+    }
   }
 
   /** Reset lander state for repositioning. */
   resetForRespawn(position: THREE.Vector3): void {
     this.group.position.copy(position)
     this.group.visible = true
+    const previousHp = this._hp
     this._hp = this.maxHp
+    this.notifyHullHpChangedIfNeeded(previousHp)
     this.thrusterSystem.refuel()
     this.body.velocityY = 0
     this.body.grounded = false

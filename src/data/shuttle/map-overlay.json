@@ -1,6 +1,7 @@
 {
   "frustumHalfSize": 1350,
   "frustumInitialHalfSize": 50,
+  "frustumShipMargin": 1.2,
   "cameraHeight": 1500,
   "openDuration": 1.0,
   "closeDuration": 0.5,

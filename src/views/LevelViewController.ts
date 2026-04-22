@@ -86,6 +86,7 @@ import { SurfaceRockController } from '@/three/controllers/SurfaceRockController
 import { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
 import { addItem } from '@/lib/inventory/inventory'
 import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
+import { loadProfile, saveProfile } from '@/lib/player/profile'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 import { GatherMinigame } from '@/lib/minigame/GatherMinigame'
 
@@ -551,8 +552,12 @@ export class LevelViewController implements Tickable {
   /** When true, successful exfil grants CR and clears persisted active shuttle mission. */
   private persistShuttleMissionRewards = false
 
+  /** Debounced write of lander hull HP to {@link loadProfile}. */
+  private landerHullPersistTimer: ReturnType<typeof setTimeout> | null = null
+
   /** Initialise all systems and start the game loop. */
   async init(container: HTMLElement): Promise<void> {
+    hydratePlayerUpgradeLevelsFromStorage()
     const playerConfig = buildFpsPlayerConfig()
 
     // ── Input + tick handler ────────────────────────────────────
@@ -666,6 +671,20 @@ export class LevelViewController implements Tickable {
 
     this.landerController.onFuelEmpty = () => {
       this.failLanderRun('Out of Fuel')
+    }
+
+    const storedProfile = typeof localStorage === 'undefined' ? null : loadProfile()
+    const savedLanderHp = storedProfile?.landerHullHp
+    if (
+      savedLanderHp !== undefined
+      && savedLanderHp > 0
+      && this.landerController
+    ) {
+      this.landerController.setHullHpFromProfile(savedLanderHp)
+    }
+
+    this.landerController.onHullHpChanged = () => {
+      this.scheduleLanderHullPersist()
     }
 
     this.sceneManager.addToScene(this.landerController.group)
@@ -1448,6 +1467,9 @@ export class LevelViewController implements Tickable {
   }
 
   private enterComplete(): void {
+    this.clearLanderHullPersistTimer()
+    this.flushLanderHullToProfile()
+
     if (
       this.persistShuttleMissionRewards
       && this.mission
@@ -1464,6 +1486,8 @@ export class LevelViewController implements Tickable {
   }
 
   private restartLevel(): void {
+    this.clearLanderHullPersistTimer()
+
     this.onDeathOverlay?.(false, '')
     this.onDeathFade?.(0)
     this.onDeathMessage?.(false)
@@ -2441,11 +2465,44 @@ export class LevelViewController implements Tickable {
   }
 
   // ═══════════════════════════════════════════════════════════════
+  // Persisted lander hull
+  // ═══════════════════════════════════════════════════════════════
+
+  /** Write lander HP into the player profile in localStorage. */
+  private flushLanderHullToProfile(): void {
+    if (typeof localStorage === 'undefined' || !this.landerController) return
+    const stored = loadProfile()
+    if (!stored) return
+    const hp = this.landerController.hp
+    if (stored.landerHullHp === hp) return
+    saveProfile({ ...stored, landerHullHp: hp })
+  }
+
+  private scheduleLanderHullPersist(): void {
+    if (this.landerHullPersistTimer !== null) {
+      clearTimeout(this.landerHullPersistTimer)
+    }
+    this.landerHullPersistTimer = setTimeout(() => {
+      this.landerHullPersistTimer = null
+      this.flushLanderHullToProfile()
+    }, 200)
+  }
+
+  private clearLanderHullPersistTimer(): void {
+    if (this.landerHullPersistTimer !== null) {
+      clearTimeout(this.landerHullPersistTimer)
+      this.landerHullPersistTimer = null
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // Dispose
   // ═══════════════════════════════════════════════════════════════
 
   /** Tear down all systems and stop the game loop. */
   dispose(): void {
+    this.clearLanderHullPersistTimer()
+    this.flushLanderHullToProfile()
     DevConsole.unregister('LevelView')
     if (this.sceneManager) clearWaypointMarkers(this.sceneManager.scene)
     for (const mg of this.minigames) {
