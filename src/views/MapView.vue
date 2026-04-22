@@ -41,7 +41,11 @@ import {
   shipMessageSystem,
   setShipMessageFollowUpDeliveryListener,
 } from '@/lib/messages/runtime'
-import { contractSystem, onContractsChanged } from '@/lib/contracts/runtime'
+import {
+  contractSystem,
+  onContractShuttleUpgradeGranted,
+  onContractsChanged,
+} from '@/lib/contracts/runtime'
 import {
   getCurrentUpgradeValue,
   getUpgradeCost,
@@ -409,6 +413,7 @@ const fastTravelTargetPlanetId = ref<string>('')
 const fastTravelTargetPlanetLabel = ref<string>('')
 /** Disposer for the contract-change subscription (set in onMounted). */
 let unsubscribeContracts: (() => void) | null = null
+let unsubscribeContractShuttleUpgrade: (() => void) | null = null
 /** Drives the fade-to-black overlay used during the fast travel jump. */
 const fastTravelFadeOpacity = ref(0)
 const FAST_TRAVEL_FADE_MS = 600
@@ -778,6 +783,13 @@ onMounted(async () => {
       syncPersistentProgressFromController()
     })
     await viewController.init(container.value)
+    unsubscribeContractShuttleUpgrade = onContractShuttleUpgradeGranted((payload) => {
+      viewController.syncShuttleUpgradeGrantFromContract(
+        payload.upgradeId,
+        payload.newLevel,
+        payload.contractInboxName,
+      )
+    })
     syncPersistentProgressFromController()
     shopProfile.value = viewController.getPlayerProfileSnapshot()
     shopInventory.value = viewController.getPlayerInventorySnapshot()
@@ -792,6 +804,8 @@ onUnmounted(() => {
   stopBackgroundMusic('map')
   unsubscribeContracts?.()
   unsubscribeContracts = null
+  unsubscribeContractShuttleUpgrade?.()
+  unsubscribeContractShuttleUpgrade = null
   viewController.dispose()
 })
 

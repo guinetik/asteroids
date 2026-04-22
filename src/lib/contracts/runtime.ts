@@ -18,16 +18,33 @@ import {
   unlockFastTravelPlanet,
 } from '@/lib/player/profile'
 import {
+  CURRENT_PLAYER_UPGRADE_LEVELS,
   ensureUpgradeAtLeast,
   getPlayerUpgradeLevelsSnapshot,
+  hydratePlayerUpgradeLevelsFromStorage,
   type UpgradeId,
 } from '@/lib/upgrades'
 import { CONTRACT_CATALOG } from './contractCatalog'
 import { ContractSystem } from './ContractSystem'
-import type { RewardEffect } from './contractTypes'
+import type { Contract, RewardEffect } from './contractTypes'
 
 /** Subscribers notified whenever a contract state mutation occurs. */
 const contractChangeListeners = new Set<() => void>()
+
+/** Fired when a `shuttle-upgrade` contract reward actually raised the stored level (not on replay no-ops). */
+const contractShuttleUpgradeListeners = new Set<(payload: ContractShuttleUpgradeGrantPayload) => void>()
+
+/**
+ * Upgrade grant from a completed contract, after `ensureUpgradeAtLeast` has persisted.
+ */
+export interface ContractShuttleUpgradeGrantPayload {
+  /** Catalog upgrade id. */
+  upgradeId: UpgradeId
+  /** New persisted level. */
+  newLevel: number
+  /** Contract folder label (e.g. for overlay meta). */
+  contractInboxName: string
+}
 
 /**
  * Apply a contract reward effect to the persisted player profile. Idempotent:
@@ -35,8 +52,9 @@ const contractChangeListeners = new Set<() => void>()
  * regresses an existing bonus.
  *
  * @param effect - Reward effect drawn from `Contract.rewards`.
+ * @param contract - Contract that produced this effect (for shuttle-upgrade UI meta).
  */
-function applyRewardToProfile(effect: RewardEffect): void {
+function applyRewardToProfile(effect: RewardEffect, contract: Contract): void {
   const profile = loadProfile()
   if (!profile) return
   let next = profile
@@ -45,7 +63,22 @@ function applyRewardToProfile(effect: RewardEffect): void {
   } else if (effect.type === 'mission-pay-multiplier') {
     next = setMissionPayMultiplier(next, effect.planetId, effect.multiplier)
   } else if (effect.type === 'shuttle-upgrade') {
-    ensureUpgradeAtLeast(effect.upgradeId, effect.minLevel)
+    const leveled = ensureUpgradeAtLeast(effect.upgradeId, effect.minLevel)
+    if (leveled) {
+      const newLevel = CURRENT_PLAYER_UPGRADE_LEVELS[effect.upgradeId] ?? 0
+      const payload: ContractShuttleUpgradeGrantPayload = {
+        upgradeId: effect.upgradeId,
+        newLevel,
+        contractInboxName: contract.inboxName,
+      }
+      for (const listener of contractShuttleUpgradeListeners) {
+        try {
+          listener(payload)
+        } catch {
+          // best-effort; do not break reward application
+        }
+      }
+    }
   }
   if (next !== profile) saveProfile(next)
 }
@@ -65,7 +98,7 @@ export const contractSystem = new ContractSystem(
         }
       }
     },
-    onRewardGranted: (effect) => applyRewardToProfile(effect),
+    onRewardGranted: (effect, c) => applyRewardToProfile(effect, c),
   },
 )
 
@@ -76,6 +109,12 @@ shipMessageSystem.onMessageArchived((id) => {
 // Recovery path: re-apply rewards for any contract that finished in a previous
 // session. Reward effects are idempotent so this is a safe no-op for healthy
 // profiles, and a self-heal for ones that lost the unlock for any reason.
+//
+// Must merge localStorage into `CURRENT_PLAYER_UPGRADE_LEVELS` before replay:
+// `shuttle-upgrade` rewards call `ensureUpgradeAtLeast` → `saveCurrentPlayerUpgradesToStorage`,
+// which persists the *entire* in-memory map. If this module loads before MapView
+// (or any other hydrator), defaults would be all zeros and we would wipe LS.
+hydratePlayerUpgradeLevelsFromStorage()
 contractSystem.replayCompletedRewards()
 
 /**
@@ -87,6 +126,20 @@ contractSystem.replayCompletedRewards()
 export function onContractsChanged(listener: () => void): () => void {
   contractChangeListeners.add(listener)
   return () => contractChangeListeners.delete(listener)
+}
+
+/**
+ * Subscribe to “contract just granted a shuttle upgrade level” (after persistence).
+ * Skipped on `replayCompletedRewards` when the level was already at target.
+ *
+ * @param listener - Receives the grant payload.
+ * @returns Unsubscribe function.
+ */
+export function onContractShuttleUpgradeGranted(
+  listener: (payload: ContractShuttleUpgradeGrantPayload) => void,
+): () => void {
+  contractShuttleUpgradeListeners.add(listener)
+  return () => contractShuttleUpgradeListeners.delete(listener)
 }
 
 /**

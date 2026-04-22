@@ -2947,6 +2947,41 @@ export class MapViewController implements Tickable {
     if (current >= targetLevel) return
     CURRENT_PLAYER_UPGRADE_LEVELS[upgradeId] = targetLevel
     saveCurrentPlayerUpgradesToStorage()
+    this.syncMapAfterExternalShuttleInstall(upgradeId, targetLevel, {
+      defaultMeta: (defId, level) =>
+        defId === 'gravitySurfing' ? 'Tier 1 · Grid Coupling Module' : `Tier ${level} · Auto-install`,
+    })
+  }
+
+  /**
+   * Map-side follow-up when the contract runtime has already run
+   * {@link ensureUpgradeAtLeast} (storage + `CURRENT_PLAYER_UPGRADE_LEVELS`).
+   * Aligns the fabric/grid with gravity unlock and fires the same HUD + “installed”
+   * overlay as the shop, so Manifold/Space Fabric work without a full reload.
+   *
+   * @param upgradeId - Install id.
+   * @param newLevel - New persisted level.
+   * @param contractInboxName - Contract folder name for the overlay meta line.
+   */
+  syncShuttleUpgradeGrantFromContract(
+    upgradeId: UpgradeId,
+    newLevel: number,
+    contractInboxName: string,
+  ): void {
+    this.syncMapAfterExternalShuttleInstall(upgradeId, newLevel, {
+      defaultMeta: () => `Contract reward · ${contractInboxName}`,
+    })
+  }
+
+  /**
+   * Shared path for contract rewards and consumables after `CURRENT` + storage
+   * already hold the new level.
+   */
+  private syncMapAfterExternalShuttleInstall(
+    upgradeId: UpgradeId,
+    newLevel: number,
+    options: { defaultMeta: (defId: UpgradeId, level: number) => string },
+  ): void {
     if (upgradeId === 'gravitySurfing') {
       this.applyGridVisible(true)
       this.emitMapViewLayerToggles()
@@ -2956,11 +2991,9 @@ export class MapViewController implements Tickable {
     this.onUpgradeInstalledAnnouncement?.(
       'UPGRADE INSTALLED',
       definition.label,
-      targetLevel,
+      newLevel,
       0,
-      upgradeId === 'gravitySurfing'
-        ? 'Tier 1 · Grid Coupling Module'
-        : `Tier ${targetLevel} · Auto-install`,
+      options.defaultMeta(upgradeId, newLevel),
     )
   }
 
