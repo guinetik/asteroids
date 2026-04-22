@@ -73,7 +73,25 @@ export interface VoyagerModelCreateOptions {
   maintenanceState?: MaintenanceBeaconState
 }
 
-const VOYAGER_MAINTENANCE_BEACON_OFFSET = new THREE.Vector3(0, -0.18, 0.25)
+/**
+ * Beacon offset in the voyager GLB's native (pre-scale) frame. The old constant
+ * `(0, -0.18, 0.25)` was tuned for the old 0.1 base scale, so ÷0.1 gives its native
+ * equivalent. At use-time this is multiplied by the current `scale`, which keeps the
+ * bulb/light inside the model hull at any base scale — otherwise `model.group.scale`
+ * stays at 1 while the visible `sceneClone` shrinks, leaving the beacon floating
+ * outside the (now tiny) voyager.
+ */
+const VOYAGER_MAINTENANCE_BEACON_OFFSET_NATIVE = new THREE.Vector3(0, -1.8, 2.5)
+
+/**
+ * Beacon `PointLight.distance` (world-space, unscaled by parent) per unit of model
+ * `scale`. Picked to match the halo/body ratio the beacon had at the original 0.1
+ * voyager scale (7 world-unit distance ÷ 0.1 scale).
+ */
+const VOYAGER_BEACON_DISTANCE_PER_SCALE = 70
+
+/** Matching per-scale bulb radius so the emissive bulb mesh stays body-proportional. */
+const VOYAGER_BEACON_RADIUS_PER_SCALE = 0.3
 
 /**
  * Decorative Voyager relay GLB — add {@link group} to your scene after
@@ -123,10 +141,15 @@ export class VoyagerModel {
     group.add(sceneClone)
     const beacon = options?.maintenanceState
       ? new MaintenanceBeacon(group, {
-        offset: VOYAGER_MAINTENANCE_BEACON_OFFSET,
+        // Offset lives in `model.group` (scale 1) so it's in world units at attach time;
+        // multiply by `scale` so the beacon sits inside the (scaled) sceneClone rather
+        // than floating out in space when the model shrinks.
+        offset: VOYAGER_MAINTENANCE_BEACON_OFFSET_NATIVE.clone().multiplyScalar(scale),
         initialState: options.maintenanceState,
-        radius: 0.03,
-        distance: 7,
+        // PointLight.distance is in world units and is NOT scaled by the parent; tie
+        // it to `scale` so the halo stays body-proportional at any model size.
+        distance: scale * VOYAGER_BEACON_DISTANCE_PER_SCALE,
+        radius: scale * VOYAGER_BEACON_RADIUS_PER_SCALE,
       })
       : null
     return new VoyagerModel(group, beacon)

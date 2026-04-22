@@ -17,15 +17,23 @@ import { VoyagerModel } from './VoyagerModel'
 import { HubbleModel } from './HubbleModel'
 import type { MaintenanceBeaconState } from './MaintenanceBeacon'
 
-const MAP_POI_SATELLITE_SCALE = 0.1
+/**
+ * Base uniform scale on the GLB satellite, tuned for the /map AU view. Sized close to
+ * `MAP_SHUTTLE_SCALE = 0.01`-shuttle silhouette so the prop reads as "small craft near
+ * the waypoint" rather than dominating the scene. EVA close-up size (~1 world unit next
+ * to the ×100 shuttle) is reconstituted by `EVA_MAP_HUGE_POI_BY_TYPE.satellite` applying
+ * a 20× boost at EVA enter.
+ */
+const MAP_POI_SATELLITE_SCALE = 0.005
 
 /**
- * Uniform scale on the Voyager relay GLB in map world units. Starting point matched to
- * the satellite POI (~1 world unit); tune against the `[VoyagerModel] loaded mesh list
- * (raw size …)` log after the first load. Procedural `RelayAntennaController` is retired
- * from this factory — saved for a future minigame now that all POIs are authored GLBs.
+ * Base uniform scale on the Voyager relay GLB in map world units. Same sizing rationale
+ * as {@link MAP_POI_SATELLITE_SCALE} — small on the AU map, boosted ×20 during EVA via
+ * `EVA_MAP_HUGE_POI_BY_TYPE.relay_antenna` so close-up reads match the ×100 shuttle.
+ * Procedural `RelayAntennaController` is retired from this factory — saved for a future
+ * minigame now that all POIs are authored GLBs.
  */
-const MAP_POI_RELAY_ANTENNA_SCALE = 0.1
+const MAP_POI_RELAY_ANTENNA_SCALE = 0.005
 
 /**
  * Uniform scale on the Hubble telescope GLB in map world units. Kept small so the prop
@@ -36,10 +44,13 @@ const MAP_POI_RELAY_ANTENNA_SCALE = 0.1
 const MAP_POI_TELESCOPE_SCALE = 0.06
 
 /**
- * Local X offset of the POI prop inside its (now world-sized) container. A small
- * lateral nudge so the prop doesn't sit exactly on the beam axis.
+ * Local X offset of the POI prop inside its container. Kept at 0 — the POI container
+ * is scaled by `EVA_MAP_HUGE_POI_BY_TYPE` during EVA, and any non-zero local offset is
+ * amplified by that factor (a 0.3 nudge becomes a 6-world-unit drift at ×20 scale,
+ * which puts the prop visibly sideways of its waypoint beam). If a lateral nudge is
+ * wanted later, apply it to the POI container's world position, not here.
  */
-const MAP_POI_LOCAL_OFFSET_X = 0.3
+const MAP_POI_LOCAL_OFFSET_X = 0
 
 /** An EVA mission POI ready to be attached under a waypoint root. */
 export interface EvaMissionPoiInstance {

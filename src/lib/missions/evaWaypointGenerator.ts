@@ -53,11 +53,11 @@ const EARTH_LOCAL_WAYPOINT_MIN_RADIUS_MULTIPLE = 3
 /** Upper edge of the early Earth EVA annulus. */
 const EARTH_LOCAL_WAYPOINT_MAX_RADIUS_MULTIPLE = 5
 
-/** Earth-local EVA POIs float modestly above/below the orbital plane. */
-const EARTH_LOCAL_POI_MIN_Y_RADIUS_MULTIPLE = 0.75
-
-/** Upper bound for Earth-local EVA POI vertical offset. */
-const EARTH_LOCAL_POI_MAX_Y_RADIUS_MULTIPLE = 1.5
+// Vertical POI offset for Earth missions uses the same world-unit constants
+// as non-Earth (`EVA_WAYPOINT_MIN_Y_OFFSET_WORLD` / `MAX`) — tying Y to Earth
+// radius (~0.62 world units) puts the prop inside the ×100-scaled shuttle hull
+// during EVA, which was the "satellite inside ship" regression the tighter
+// onboarding path introduced.
 
 /**
  * Generate a waypoint world position near the giver planet, plus a small local Y offset
@@ -85,12 +85,8 @@ export function generateEvaWaypoint(
     const earthRadiusWorld = getPlanet('earth').displayRadius * SIZE_SCALE
     const minDistance = earthRadiusWorld * EARTH_LOCAL_WAYPOINT_MIN_RADIUS_MULTIPLE
     const maxDistance = earthRadiusWorld * EARTH_LOCAL_WAYPOINT_MAX_RADIUS_MULTIPLE
-    const yMagnitude =
-      earthRadiusWorld
-      * (
-        EARTH_LOCAL_POI_MIN_Y_RADIUS_MULTIPLE
-        + rand() * (EARTH_LOCAL_POI_MAX_Y_RADIUS_MULTIPLE - EARTH_LOCAL_POI_MIN_Y_RADIUS_MULTIPLE)
-      )
+    const ySpan = EVA_WAYPOINT_MAX_Y_OFFSET_WORLD - EVA_WAYPOINT_MIN_Y_OFFSET_WORLD
+    const yMagnitude = EVA_WAYPOINT_MIN_Y_OFFSET_WORLD + rand() * ySpan
     const ySign = rand() < 0.5 ? -1 : 1
     const angle = rand() * Math.PI * 2
     const distance = minDistance + rand() * (maxDistance - minDistance)

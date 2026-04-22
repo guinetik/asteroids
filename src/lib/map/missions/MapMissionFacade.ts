@@ -96,6 +96,16 @@ export class MapMissionFacade {
   private completedEvaSites: CompletedEvaSite[] = []
   private readonly completedEvaPoiContainers = new Map<string, THREE.Group>()
   private readonly completedEvaPoiInstances = new Map<string, EvaMissionPoiInstance>()
+  /**
+   * Uniform-scale multiplier applied to completed-site POI containers, keyed by poiType.
+   * Set by the host (MapViewController) when the EVA session starts so freshly-repaired
+   * sites stay at the same visual size as the active POI during EVA close-up. Null when
+   * EVA is inactive — containers sit at scale 1 (their map-view size). Without this, a
+   * mission that completes mid-EVA spawns a new `CompletedEvaSite` container at 1× while
+   * the active container was scaled ×20, so the satellite visibly shrinks and appears to
+   * move further away at the instant the light turns green.
+   */
+  private evaPoiScaleByType: Readonly<Record<string, number>> | null = null
 
   tick(dt: number): void {
     this.board = tickMissionBoard(this.board, dt)
@@ -434,6 +444,8 @@ export class MapMissionFacade {
       if (this.completedEvaPoiContainers.has(site.key)) continue
       const container = new THREE.Group()
       container.position.set(site.waypoint.worldX, site.waypoint.poiLocalY, site.waypoint.worldZ)
+      const evaScale = this.evaPoiScaleByType?.[site.poiType]
+      if (evaScale !== undefined) container.scale.setScalar(evaScale)
       scene.add(container)
       this.completedEvaPoiContainers.set(site.key, container)
       void this.spawnCompletedEvaMissionPoi(site, container)
@@ -662,6 +674,24 @@ export class MapMissionFacade {
     this.persistBoard()
     params.onMissionBoardUpdate?.(this.board)
     return { profile: result.profile, creditsChanged: true }
+  }
+
+  /**
+   * Record the EVA POI scale multiplier by poiType, and immediately apply it to every
+   * already-spawned completed-site container. Pass `null` on EVA exit to reset all
+   * completed-site containers to scale 1. New containers spawned while the scale is
+   * set pick it up at construction via {@link syncCompletedEvaSites}.
+   *
+   * @param scaleByType - Map of poiType → uniform scale, or null to reset.
+   */
+  setEvaPoiScaleByType(scaleByType: Readonly<Record<string, number>> | null): void {
+    this.evaPoiScaleByType = scaleByType
+    for (const [key, container] of this.completedEvaPoiContainers) {
+      const site = this.completedEvaSites.find((s) => s.key === key)
+      if (!site) continue
+      const factor = scaleByType?.[site.poiType] ?? 1
+      container.scale.setScalar(factor)
+    }
   }
 
   armCompletedEvaSiteCleanup(): void {

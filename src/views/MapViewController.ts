@@ -3900,14 +3900,14 @@ export class MapViewController implements Tickable {
 
   /**
    * Per-poiType huge-scale factor applied to the EVA POI container during EVA only.
-   * Satellites + relay antennas are already tuned to look correct at world-unit scale in
-   * EVA close-up (shuttle-cargo proportion), so they stay at 1×. The telescope is
-   * authored smaller so it stays a speck on the /map AU view; it boosts during EVA to
-   * read at real-Hubble size next to the ×100 shuttle.
+   * Base `MAP_POI_*_SCALE` values in {@link three.EvaMissionPoi} are tuned so POIs sit
+   * near shuttle silhouette on the /map AU view; these factors reconstitute real EVA
+   * close-up size (~1 world unit beside the ×100 shuttle for satellites/relays,
+   * real-Hubble proportion for the telescope).
    */
   private static readonly EVA_MAP_HUGE_POI_BY_TYPE: Record<string, number> = {
-    satellite: 1,
-    relay_antenna: 1,
+    satellite: 20,
+    relay_antenna: 20,
     telescope: 20,
   }
 
@@ -4146,6 +4146,13 @@ export class MapViewController implements Tickable {
   private handleEvaModeChange(active: boolean): void {
     this.setOrbitLinesVisible(!active)
     this.setEvaBloomOverride(active)
+    // Mirror the active-POI huge-scale onto completed-site POI containers, so a mission
+    // that finishes mid-EVA doesn't spawn its "repaired" prop at 1× while everything else
+    // is at ×20 (player perceives the sat shrinking + drifting away the instant it turns
+    // green). Cleared on EVA exit so completed props revert to their map-view size.
+    this.missionFacade.setEvaPoiScaleByType(
+      active ? MapViewController.EVA_MAP_HUGE_POI_BY_TYPE : null,
+    )
     if (!active) {
       this.missionFacade.armCompletedEvaSiteCleanup()
       this.evaPoiPromptRange = null

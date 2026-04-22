@@ -41,7 +41,22 @@ export interface SatelliteModelCreateOptions {
   maintenanceState?: MaintenanceBeaconState
 }
 
-const SATELLITE_MAINTENANCE_BEACON_OFFSET = new THREE.Vector3(0, 0.03, 0)
+/**
+ * Beacon offset in the satellite GLB's native (pre-scale) frame. Old constant
+ * `(0, 0.03, 0)` was tuned for the 0.1 base scale, so ÷0.1 gives the native value.
+ * Scaled by `scale` at use-time so the bulb/light stay inside the hull at any size.
+ */
+const SATELLITE_MAINTENANCE_BEACON_OFFSET_NATIVE = new THREE.Vector3(0, 0.3, 0)
+
+/**
+ * Beacon `PointLight.distance` (world-space, unscaled by parent) per unit of model
+ * `scale`. Picked to give the same halo/body ratio the beacon had at the original
+ * 0.1 satellite scale (6 world-unit distance ÷ 0.1 scale).
+ */
+const SATELLITE_BEACON_DISTANCE_PER_SCALE = 60
+
+/** Matching per-scale bulb radius so the emissive bulb mesh stays body-proportional. */
+const SATELLITE_BEACON_RADIUS_PER_SCALE = 0.25
 
 let satelliteTemplate: THREE.Group | null = null
 let satelliteTemplatePromise: Promise<THREE.Group> | null = null
@@ -131,8 +146,17 @@ export class SatelliteModel {
     group.add(sceneClone)
     const beacon = options?.maintenanceState
       ? new MaintenanceBeacon(group, {
-        offset: SATELLITE_MAINTENANCE_BEACON_OFFSET,
+        // Offset lives in `model.group` (scale 1) so it's in world units at attach time;
+        // multiply by `scale` so the beacon sits inside the (scaled) sceneClone rather
+        // than floating out in space when the model shrinks.
+        offset: SATELLITE_MAINTENANCE_BEACON_OFFSET_NATIVE.clone().multiplyScalar(scale),
         initialState: options.maintenanceState,
+        // PointLight.distance is in world units and is NOT scaled by the parent.
+        // Tied to `scale` here so a shrunken map-size satellite gets a proportionally
+        // small halo (avoids the "huge light blob disconnected from tiny sat" look)
+        // while the EVA ×20 container boost keeps it readable in close-up.
+        distance: scale * SATELLITE_BEACON_DISTANCE_PER_SCALE,
+        radius: scale * SATELLITE_BEACON_RADIUS_PER_SCALE,
       })
       : null
     return new SatelliteModel(group, beacon)
