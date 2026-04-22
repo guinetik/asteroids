@@ -103,6 +103,10 @@ export function createMissionBoard(): ShuttleMissionBoard {
     offeringEvaPlanet: null,
     evaRestockTimer: null,
     activeEvaMissions: [],
+    offeredMiningMission: null,
+    offeringMiningPlanet: null,
+    miningRestockTimer: null,
+    activeMiningMissions: [],
   }
 }
 

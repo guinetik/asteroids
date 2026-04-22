@@ -18,7 +18,7 @@
 import type { UpgradeId } from '@/lib/upgrades'
 
 /** Mission family that can satisfy a `complete-missions` step. */
-export type ContractMissionType = 'shuttle' | 'asteroid' | 'eva'
+export type ContractMissionType = 'shuttle' | 'asteroid' | 'eva' | 'mining'
 
 /** Tag emitted on every mission-completed event for step matching. */
 export interface MissionCompletedEvent {

@@ -84,6 +84,10 @@ const MOCK_BOARD: ShuttleMissionBoard = {
       status: 'active',
     },
   ],
+  offeredMiningMission: null,
+  offeringMiningPlanet: null,
+  miningRestockTimer: null,
+  activeMiningMissions: [],
 }
 
 beforeEach(() => {

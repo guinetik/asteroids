@@ -202,6 +202,14 @@ export interface ShuttleMissionBoard {
   evaRestockTimer: RestockTimer | null
   /** All active EVA missions the player has accepted. */
   activeEvaMissions: ActiveVisitRelayMission[]
+  /** Currently offered mining mission at the docked planet (null if restocking or not docked). */
+  offeredMiningMission: TurretMiningMissionTemplate | null
+  /** Which planet is offering the mining mission (null if not docked). */
+  offeringMiningPlanet: string | null
+  /** Restock timer for mining missions — counts down after one is taken. */
+  miningRestockTimer: RestockTimer | null
+  /** All active mining missions the player has accepted. */
+  activeMiningMissions: ActiveTurretMiningMission[]
 }
 
 // ---------------------------------------------------------------------------
@@ -269,6 +277,68 @@ export interface ActiveVisitRelayMission {
    * at accept time so retries see the same damage.
    */
   brokenComponents?: string[]
+}
+
+// ---------------------------------------------------------------------------
+// Turret Mining Missions — contract-driven bulk ore collection on /map
+// ---------------------------------------------------------------------------
+
+/** Difficulty tier of a turret mining mission. Drives ore specificity and reward band. */
+export type MiningMissionDifficulty = 'easy' | 'medium' | 'hard'
+
+/**
+ * What ore a mining mission wants. `'any'` counts every main-belt ore toward
+ * progress (easy tier). Specific IDs restrict progress tracking to that exact
+ * catalog item from `src/data/inventory/items.json`.
+ */
+export type MiningOreCategory =
+  | 'any'
+  | 'olivine'
+  | 'magnetite'
+  | 'iron-nickel-alloy'
+  | 'water-ice'
+
+/** A turret mining mission template from JSON — one entry in a giver planet's pool. */
+export interface TurretMiningMissionTemplate {
+  /** Unique key, e.g. "mars_marines_olivine_plating". */
+  id: string
+  /** Display name shown on the mission board. */
+  name: string
+  /** Flavor text / briefing from the giver. */
+  description: string
+  /** Difficulty tier — drives authoring of ore category and reward. */
+  difficulty: MiningMissionDifficulty
+  /** Which ore counts toward progress. */
+  oreCategory: MiningOreCategory
+  /** Kilograms required to mark the mission ready-to-deliver. */
+  targetKg: number
+  /** Credits awarded on delivery (before Science Station multiplier). */
+  reward: number
+}
+
+/** A giver planet's mining mission pool loaded from JSON. */
+export interface TurretMiningMissionPool {
+  /** Planet id that offers these missions. */
+  planetId: string
+  /** Display name of the giver organization (e.g. "Martian Marines Corps"). */
+  giverName: string
+  /** Missions in this planet's mining pool. */
+  missions: TurretMiningMissionTemplate[]
+}
+
+/** Status of an active mining mission. */
+export type TurretMiningMissionStatus = 'active' | 'ready-to-deliver'
+
+/** A mining mission the player has accepted. */
+export interface ActiveTurretMiningMission {
+  /** The original template. */
+  template: TurretMiningMissionTemplate
+  /** Planet where the mission was accepted (and where delivery must occur). */
+  giverPlanet: string
+  /** Kilograms mined toward this mission since acceptance. */
+  minedKg: number
+  /** Current mission status. */
+  status: TurretMiningMissionStatus
 }
 
 // ---------------------------------------------------------------------------
