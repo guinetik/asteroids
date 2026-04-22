@@ -12,6 +12,7 @@ import {
   REPAIR_COST,
 } from '@/lib/shop/shopSession'
 import InventoryTable from './InventoryTable.vue'
+import { uiAudio } from '@/audio/UiAudioDirector'
 
 const props = defineProps<{
   session: ShopSession
@@ -79,7 +80,7 @@ function onKeydown(e: KeyboardEvent) {
       <div class="planet-shop-header">
         <span class="planet-shop-header__title">{{ planetName }} Trading Post</span>
         <span class="planet-shop-header__credits">CR {{ profile.credits.toLocaleString() }}</span>
-        <button type="button" class="ship-message-card__button" @click="$emit('close')">
+        <button type="button" class="ship-message-card__button" @click="uiAudio.notifyCancel(); $emit('close')">
           Close
         </button>
       </div>
@@ -107,7 +108,7 @@ function onKeydown(e: KeyboardEvent) {
                 type="button"
                 class="planet-shop-item__buy-btn planet-shop-btn--service"
                 :disabled="!canAfford(REFUEL_COST) || fuelFull"
-                @click="$emit('refuel')"
+                @click="uiAudio.notifyConfirm(); $emit('refuel')"
               >
                 {{ fuelFull ? 'Full' : 'Buy' }}
               </button>
@@ -124,7 +125,7 @@ function onKeydown(e: KeyboardEvent) {
                 type="button"
                 class="planet-shop-item__buy-btn planet-shop-btn--service"
                 :disabled="!canAfford(REPAIR_COST) || hullFull"
-                @click="$emit('repairHull')"
+                @click="uiAudio.notifyConfirm(); $emit('repairHull')"
               >
                 {{ hullFull ? 'Full' : 'Buy' }}
               </button>
@@ -141,7 +142,7 @@ function onKeydown(e: KeyboardEvent) {
                 type="button"
                 class="planet-shop-item__buy-btn planet-shop-btn--service"
                 :disabled="!canAfford(LANDER_REPAIR_COST) || landerHullFull"
-                @click="$emit('repairLander')"
+                @click="uiAudio.notifyConfirm(); $emit('repairLander')"
               >
                 {{ landerHullFull ? 'Full' : 'Buy' }}
               </button>
@@ -163,7 +164,7 @@ function onKeydown(e: KeyboardEvent) {
                 type="button"
                 class="planet-shop-item__buy-btn planet-shop-btn--fuel"
                 :disabled="!canAfford(RESERVE_FUEL_COST)"
-                @click="$emit('buyReserveFuel')"
+                @click="uiAudio.notifyConfirm(); $emit('buyReserveFuel')"
               >
                 Buy
               </button>
@@ -180,7 +181,7 @@ function onKeydown(e: KeyboardEvent) {
                 type="button"
                 class="planet-shop-item__buy-btn planet-shop-btn--fuel"
                 :disabled="!canAfford(LANDER_FUEL_COST)"
-                @click="$emit('buyLanderFuel')"
+                @click="uiAudio.notifyConfirm(); $emit('buyLanderFuel')"
               >
                 Buy
               </button>
@@ -215,7 +216,7 @@ function onKeydown(e: KeyboardEvent) {
                 type="button"
                 class="planet-shop-item__buy-btn planet-shop-btn--trade"
                 :disabled="slot.stock <= 0 || !canAfford(slot.price)"
-                @click="$emit('buyTradeGood', index, 1)"
+                @click="uiAudio.notifyConfirm(); $emit('buyTradeGood', index, 1)"
               >
                 Buy
               </button>

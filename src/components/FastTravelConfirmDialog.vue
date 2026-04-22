@@ -8,6 +8,7 @@
  * @spec docs/superpowers/specs/2026-04-20-contracts-design.md
  */
 import { computed } from 'vue'
+import { uiAudio } from '@/audio/UiAudioDirector'
 
 const props = defineProps<{
   /** Whether the dialog is visible. */
@@ -83,14 +84,14 @@ const fuelOk = computed(() => props.fuelRatio + 1e-6 >= props.requiredFuelRatio)
               type="button"
               class="fast-travel-card__btn fast-travel-card__btn--primary"
               :disabled="!fuelOk"
-              @click="emit('confirm')"
+              @click="uiAudio.notifyConfirm(); emit('confirm')"
             >
               Confirm Jump
             </button>
             <button
               type="button"
               class="fast-travel-card__btn fast-travel-card__btn--secondary"
-              @click="emit('cancel')"
+              @click="uiAudio.notifyCancel(); emit('cancel')"
             >
               Cancel
             </button>

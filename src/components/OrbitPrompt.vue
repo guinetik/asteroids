@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { OrbitHudState } from '@/lib/orbitCapture'
+import { uiAudio } from '@/audio/UiAudioDirector'
 
 const props = defineProps<{
   orbitState: OrbitHudState
@@ -69,7 +70,7 @@ const details = computed(() => {
       v-if="shopAvailable && orbitState.state === 'orbiting'"
       type="button"
       class="orbit-prompt-engineering-btn"
-      @click="emit('openEngineeringBay')"
+      @click="uiAudio.notifyButtonClick(); emit('openEngineeringBay')"
     >
       U  Engineering Bay
     </button>
@@ -77,7 +78,7 @@ const details = computed(() => {
       v-if="shopAvailable && orbitState.state === 'orbiting'"
       type="button"
       class="orbit-prompt-mission-board-btn"
-      @click="emit('openMissionBoard')"
+      @click="uiAudio.notifyButtonClick(); emit('openMissionBoard')"
     >
       J  Mission Board
     </button>
@@ -85,7 +86,7 @@ const details = computed(() => {
       v-if="shopAvailable && orbitState.state === 'orbiting'"
       type="button"
       class="orbit-prompt-shop-btn"
-      @click="emit('openShop')"
+      @click="uiAudio.notifyButtonClick(); emit('openShop')"
     >
       B  Shop
     </button>
@@ -93,7 +94,7 @@ const details = computed(() => {
       v-if="missionAvailable && orbitState.state === 'orbiting'"
       type="button"
       class="orbit-prompt-mission-btn"
-      @click="emit('openMission')"
+      @click="uiAudio.notifyButtonClick(); emit('openMission')"
     >
       I  Mission
     </button>

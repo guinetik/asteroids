@@ -847,14 +847,17 @@ function handleWindowKeydown(event: KeyboardEvent): void {
 }
 
 function handleToggleOrbits() {
+  uiAudio.notifySwitch()
   orbitsVisible.value = viewController.toggleOrbits()
 }
 
 function handleToggleGrid() {
+  uiAudio.notifySwitch()
   gridVisible.value = viewController.toggleSpaceTimeGrid()
 }
 
 function closeShuttleControl() {
+  uiAudio.notifyCancel()
   shuttleControlVisible.value = false
   // Habitat opens the terminal after `exitPointerLock`; map mode uses orbit drag without lock.
   if (habitatActive.value) {
@@ -867,6 +870,7 @@ function closeShuttleControl() {
  * Opens the shuttle terminal on a program, or switches to it if the terminal is already open.
  */
 function openProgramFromMap(program: ShuttleControlInitialProgram): void {
+  uiAudio.notifyButtonClick()
   if (shopDialogVisible.value) {
     viewController.closeShop()
   }
@@ -888,10 +892,12 @@ function stopShuttleMessageAudio(): void {
 }
 
 function handleToggleMusic(): void {
+  uiAudio.notifySwitch()
   toggleBackgroundMusic()
 }
 
 function openHabitatFromMap(): void {
+  uiAudio.notifyButtonClick()
   shuttleControlVisible.value = false
   viewController.enterHabitat()
 }
@@ -922,10 +928,12 @@ function onUpgradeInstalledDismissed(): void {
 }
 
 function handleToggleLabels() {
+  uiAudio.notifySwitch()
   labelsVisible.value = viewController.toggleLabels()
 }
 
 function handleToggleAmbient() {
+  uiAudio.notifySwitch()
   ambientVisible.value = viewController.toggleAmbient()
 }
 

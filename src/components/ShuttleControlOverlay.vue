@@ -12,6 +12,7 @@ import ShuttleControlProgramLander from './shuttle-control/ShuttleControlProgram
 import ShuttleControlProgramUpgrades from './shuttle-control/ShuttleControlProgramUpgrades.vue'
 import type { UpgradeId } from '@/lib/upgrades'
 import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
+import { uiAudio } from '@/audio/UiAudioDirector'
 
 /** Left-rail program in the shuttle control terminal. */
 type ControlScreen = 'shuttle' | 'lander' | 'mail' | 'missions' | 'inventory' | 'upgrades'
@@ -110,6 +111,11 @@ const screens = computed(() => {
   ]
 })
 
+function selectScreen(id: ControlScreen): void {
+  uiAudio.notifySwitch()
+  activeScreen.value = id
+}
+
 function onMailProgramChanged(): void {
   syncMailPendingCount()
   emit('mailChanged')
@@ -135,7 +141,7 @@ function onKeydown(e: KeyboardEvent) {
         <button
           type="button"
           class="ship-message-card__button"
-          @click="$emit('close')"
+          @click="uiAudio.notifyCancel(); $emit('close')"
         >
           Close
         </button>
@@ -162,7 +168,7 @@ function onKeydown(e: KeyboardEvent) {
             type="button"
             class="shuttle-control-nav-btn"
             :class="{ 'shuttle-control-nav-btn--active': activeScreen === screen.id }"
-            @click="activeScreen = screen.id"
+            @click="selectScreen(screen.id)"
           >
             {{ screen.label }}
           </button>
@@ -171,7 +177,7 @@ function onKeydown(e: KeyboardEvent) {
             v-if="dockedPlanet"
             type="button"
             class="shuttle-control-nav-btn shuttle-control-nav-btn--shop"
-            @click="$emit('openShop')"
+            @click="uiAudio.notifyButtonClick(); $emit('openShop')"
           >
             Shop
           </button>
@@ -180,7 +186,7 @@ function onKeydown(e: KeyboardEvent) {
             type="button"
             class="shuttle-control-nav-btn shuttle-control-nav-btn--upgrades-shop"
             :class="{ 'shuttle-control-nav-btn--active': activeScreen === 'upgrades' }"
-            @click="activeScreen = 'upgrades'"
+            @click="selectScreen('upgrades')"
           >
             UPGRADES SHOP
           </button>
