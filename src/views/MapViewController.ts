@@ -326,8 +326,14 @@ export class MapViewController implements Tickable {
   private shipHealth: ShipHealth | null = null
   /** Ship health config with all distance fields pre-scaled by ORBIT_SCALE. */
   private shipHealthConfig: ShipHealthConfig | null = null
-  /** Debounced write of shuttle hull HP to {@link playerProfile}. */
+  /** Throttled write of shuttle hull HP to {@link playerProfile}. */
   private shuttleHullPersistTimer: ReturnType<typeof setTimeout> | null = null
+
+  /** Flush hull to storage when the tab navigates away (refresh often skips Vue dispose). */
+  private readonly flushShuttleHullOnPageHide = (): void => {
+    this.clearShuttleHullPersistTimer()
+    this.flushShuttleHullToProfile()
+  }
   private mapState = new MapState()
   private mapIntro = new MapIntroState()
   /** When true, {@link tickOrrery} skips simTime advancement and planet/belt ticks. Set during portal arrival so Earth stays static. */
@@ -763,6 +769,9 @@ export class MapViewController implements Tickable {
     this.shipHealth.setPersistedHp(initialShuttleHp)
     this.shipHealth.onHpChanged = () => {
       this.scheduleShuttleHullPersist()
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pagehide', this.flushShuttleHullOnPageHide)
     }
 
     this.emitBootState('preparing', 'Loading')
@@ -2196,11 +2205,12 @@ export class MapViewController implements Tickable {
     saveProfile(this.playerProfile)
   }
 
-  /** Debounce hull writes — temperature/radiation tick can change HP every frame. */
+  /**
+   * Throttle hull writes (~5/s). A debounce would never fire while HP changed every frame
+   * (e.g. continuous cold damage at Neptune), so the save would never hit localStorage.
+   */
   private scheduleShuttleHullPersist(): void {
-    if (this.shuttleHullPersistTimer !== null) {
-      clearTimeout(this.shuttleHullPersistTimer)
-    }
+    if (this.shuttleHullPersistTimer !== null) return
     this.shuttleHullPersistTimer = setTimeout(() => {
       this.shuttleHullPersistTimer = null
       this.flushShuttleHullToProfile()
@@ -2767,7 +2777,7 @@ export class MapViewController implements Tickable {
     this.onCreditsUpdate?.(this.playerProfile.credits)
   }
 
-  /** Repair hull to 100% (Earth only, 250 credits). */
+  /** Repair shuttle hull to 100% at any trading post (250 credits). */
   shopRepairHull(): void {
     if (!this.shipHealth) return
     const result = this.shopFacade.repairHull(this.playerProfile)
@@ -4531,6 +4541,9 @@ export class MapViewController implements Tickable {
   }
 
   dispose(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('pagehide', this.flushShuttleHullOnPageHide)
+    }
     this.clearShuttleHullPersistTimer()
     this.flushShuttleHullToProfile()
     this.unsubscribeJourneyMessageArchive?.()

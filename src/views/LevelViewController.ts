@@ -552,8 +552,13 @@ export class LevelViewController implements Tickable {
   /** When true, successful exfil grants CR and clears persisted active shuttle mission. */
   private persistShuttleMissionRewards = false
 
-  /** Debounced write of lander hull HP to {@link loadProfile}. */
+  /** Throttled write of lander hull HP to {@link loadProfile}. */
   private landerHullPersistTimer: ReturnType<typeof setTimeout> | null = null
+
+  private readonly flushLanderHullOnPageHide = (): void => {
+    this.clearLanderHullPersistTimer()
+    this.flushLanderHullToProfile()
+  }
 
   /** Initialise all systems and start the game loop. */
   async init(container: HTMLElement): Promise<void> {
@@ -685,6 +690,9 @@ export class LevelViewController implements Tickable {
 
     this.landerController.onHullHpChanged = () => {
       this.scheduleLanderHullPersist()
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pagehide', this.flushLanderHullOnPageHide)
     }
 
     this.sceneManager.addToScene(this.landerController.group)
@@ -2478,10 +2486,11 @@ export class LevelViewController implements Tickable {
     saveProfile({ ...stored, landerHullHp: hp })
   }
 
+  /**
+   * Throttle lander hull writes. Debouncing would skip saves while HP changes every frame.
+   */
   private scheduleLanderHullPersist(): void {
-    if (this.landerHullPersistTimer !== null) {
-      clearTimeout(this.landerHullPersistTimer)
-    }
+    if (this.landerHullPersistTimer !== null) return
     this.landerHullPersistTimer = setTimeout(() => {
       this.landerHullPersistTimer = null
       this.flushLanderHullToProfile()
@@ -2501,6 +2510,9 @@ export class LevelViewController implements Tickable {
 
   /** Tear down all systems and stop the game loop. */
   dispose(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('pagehide', this.flushLanderHullOnPageHide)
+    }
     this.clearLanderHullPersistTimer()
     this.flushLanderHullToProfile()
     DevConsole.unregister('LevelView')

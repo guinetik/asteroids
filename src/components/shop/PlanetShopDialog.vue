@@ -114,6 +114,23 @@ function onKeydown(e: KeyboardEvent) {
             </div>
 
             <div class="planet-shop-item planet-shop-item--service">
+              <div class="planet-shop-item__icon-placeholder planet-shop-icon--service">S</div>
+              <div class="planet-shop-item__info">
+                <span class="planet-shop-item__name">Shuttle Hull Repair</span>
+                <span class="planet-shop-item__desc">Restores your orbiter’s hull to 100% (radiation, thermal, and impact damage).</span>
+              </div>
+              <span class="planet-shop-item__price">{{ REPAIR_COST }} CR</span>
+              <button
+                type="button"
+                class="planet-shop-item__buy-btn planet-shop-btn--service"
+                :disabled="!canAfford(REPAIR_COST) || hullFull"
+                @click="$emit('repairHull')"
+              >
+                {{ hullFull ? 'Full' : 'Buy' }}
+              </button>
+            </div>
+
+            <div class="planet-shop-item planet-shop-item--service">
               <div class="planet-shop-item__icon-placeholder planet-shop-icon--service">P</div>
               <div class="planet-shop-item__info">
                 <span class="planet-shop-item__name">Lander Hull Repair</span>
@@ -127,23 +144,6 @@ function onKeydown(e: KeyboardEvent) {
                 @click="$emit('repairLander')"
               >
                 {{ landerHullFull ? 'Full' : 'Buy' }}
-              </button>
-            </div>
-
-            <div v-if="session.planetId === 'earth'" class="planet-shop-item planet-shop-item--service">
-              <div class="planet-shop-item__icon-placeholder planet-shop-icon--service">H</div>
-              <div class="planet-shop-item__info">
-                <span class="planet-shop-item__name">Hull Repair</span>
-                <span class="planet-shop-item__desc">Full structural overhaul. Restores hull integrity to 100%.</span>
-              </div>
-              <span class="planet-shop-item__price">{{ REPAIR_COST }} CR</span>
-              <button
-                type="button"
-                class="planet-shop-item__buy-btn planet-shop-btn--service"
-                :disabled="!canAfford(REPAIR_COST) || hullFull"
-                @click="$emit('repairHull')"
-              >
-                {{ hullFull ? 'Full' : 'Buy' }}
               </button>
             </div>
           </div>
