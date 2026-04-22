@@ -231,6 +231,15 @@ export class VehicleCamera implements Tickable {
    * When false, yaw changes are absorbed so manual orbit framing is unchanged (e.g. planet orbit).
    */
   private shipYawCouplingEnabled = true
+  /**
+   * Low-pass filter time constant (seconds) on ship quaternion when applying yaw coupling.
+   * `0` keeps legacy behavior (full orientation delta each frame).
+   */
+  private shipYawCouplingSmoothTauSec = 0
+  /** Smoothed orientation used for coupling when {@link shipYawCouplingSmoothTauSec} &gt; 0. */
+  private readonly yawCouplingSmoothedQuat = new THREE.Quaternion()
+  /** Previous smoothed orientation — builds a partial delta for the camera offset. */
+  private readonly yawCouplingPrevSmoothedQuat = new THREE.Quaternion()
   /** When true, map view is intentionally zoomed out and idle chase recenter is suspended. */
   private idleRecenterSuppressed = false
 
@@ -259,6 +268,8 @@ export class VehicleCamera implements Tickable {
     this.target = object
     this.lastTargetPos.copy(object.position)
     this.lastTargetQuat.copy(object.quaternion)
+    this.yawCouplingSmoothedQuat.copy(object.quaternion)
+    this.yawCouplingPrevSmoothedQuat.copy(object.quaternion)
     this.controls.target.copy(object.position)
 
     const idleOffset = this.config.idleOffset.clone().applyQuaternion(object.quaternion)
@@ -298,6 +309,20 @@ export class VehicleCamera implements Tickable {
   }
 
   /**
+   * Smooth how fast the chase camera follows ship yaw. `0` = instant (default).
+   *
+   * @param tauSeconds - Rough time for smoothed heading to catch the ship; e.g. `0.16`.
+   */
+  setShipYawCouplingSmoothing(tauSeconds: number): void {
+    this.shipYawCouplingSmoothTauSec = Math.max(0, tauSeconds)
+    if (this.target) {
+      const q = this.target.quaternion
+      this.yawCouplingSmoothedQuat.copy(q)
+      this.yawCouplingPrevSmoothedQuat.copy(q)
+    }
+  }
+
+  /**
    * Suspend or resume the idle chase recenter behavior without affecting manual orbit drag state.
    *
    * When suppression is active, the idle timer is held at zero so zooming back in does not
@@ -322,7 +347,10 @@ export class VehicleCamera implements Tickable {
     this.mouseIdleTimer = config.idleTimeout + 1
     this.isMouseActive = false
     if (this.target) {
-      this.lastTargetQuat.copy(this.target.quaternion)
+      const q = this.target.quaternion
+      this.lastTargetQuat.copy(q)
+      this.yawCouplingSmoothedQuat.copy(q)
+      this.yawCouplingPrevSmoothedQuat.copy(q)
     }
   }
 
@@ -375,11 +403,26 @@ export class VehicleCamera implements Tickable {
     // flight). Euler-Y–only rotation diverges from chase framing that uses the full quaternion.
     const q = this.target.quaternion
     if (this.shipYawCouplingEnabled) {
-      this.quatInvScratch.copy(this.lastTargetQuat).invert()
-      this.quatDeltaScratch.copy(q).multiply(this.quatInvScratch)
-      this.scratchOffset.copy(this.camera.position).sub(targetPos)
-      this.scratchOffset.applyQuaternion(this.quatDeltaScratch)
-      this.camera.position.copy(targetPos).add(this.scratchOffset)
+      if (this.shipYawCouplingSmoothTauSec > 0) {
+        const alpha = 1 - Math.exp(-dt / this.shipYawCouplingSmoothTauSec)
+        this.yawCouplingSmoothedQuat.slerp(q, alpha)
+        this.quatInvScratch.copy(this.yawCouplingPrevSmoothedQuat).invert()
+        this.quatDeltaScratch
+          .copy(this.yawCouplingSmoothedQuat)
+          .multiply(this.quatInvScratch)
+        this.scratchOffset.copy(this.camera.position).sub(targetPos)
+        this.scratchOffset.applyQuaternion(this.quatDeltaScratch)
+        this.camera.position.copy(targetPos).add(this.scratchOffset)
+        this.yawCouplingPrevSmoothedQuat.copy(this.yawCouplingSmoothedQuat)
+      } else {
+        this.quatInvScratch.copy(this.lastTargetQuat).invert()
+        this.quatDeltaScratch.copy(q).multiply(this.quatInvScratch)
+        this.scratchOffset.copy(this.camera.position).sub(targetPos)
+        this.scratchOffset.applyQuaternion(this.quatDeltaScratch)
+        this.camera.position.copy(targetPos).add(this.scratchOffset)
+        this.yawCouplingSmoothedQuat.copy(q)
+        this.yawCouplingPrevSmoothedQuat.copy(q)
+      }
     }
     this.lastTargetQuat.copy(q)
 

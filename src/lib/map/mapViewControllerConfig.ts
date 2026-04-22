@@ -83,6 +83,21 @@ export const MAP_RETICLE_FADE_END = 2.0
 /** Minimum planar speed before the reticle motion wedge appears. */
 export const MAP_RETICLE_MIN_SPEED = 0.12
 
+/**
+ * Once the motion wedge is shown, it stays until planar speed drops below this (hysteresis).
+ * Prevents rapid show/hide when speed oscillates near {@link MAP_RETICLE_MIN_SPEED}.
+ */
+export const MAP_RETICLE_MIN_SPEED_OFF = 0.055
+
+/** Time constant (seconds) for smoothing the wedge heading toward true velocity. */
+export const MAP_RETICLE_HEADING_SMOOTH_TAU_SEC = 0.1
+
+/**
+ * Low-pass ship yaw into camera-orbit coupling. `0` = legacy instant coupling.
+ * Used on the solar map so A/D does not whip the chase camera at high turn rates.
+ */
+export const MAP_SHIP_YAW_CAMERA_SMOOTH_TAU_SEC = 0.16
+
 /** Target apparent size for the asteroid mission site marker. */
 export const WAYPOINT_APPARENT_SIZE = 0.175
 
@@ -442,6 +457,9 @@ export const MAP_VIEW_CONTROLLER_CONFIG = {
   MAP_RETICLE_FADE_END,
   MAP_RETICLE_FADE_START,
   MAP_RETICLE_MIN_SPEED,
+  MAP_RETICLE_MIN_SPEED_OFF,
+  MAP_RETICLE_HEADING_SMOOTH_TAU_SEC,
+  MAP_SHIP_YAW_CAMERA_SMOOTH_TAU_SEC,
   MAP_SHUTTLE_BASE_SIZE,
   MAP_SHUTTLE_COLLISION_RADIUS,
   MAP_SHUTTLE_MIN_APPARENT_SIZE,

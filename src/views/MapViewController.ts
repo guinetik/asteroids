@@ -673,6 +673,7 @@ export class MapViewController implements Tickable {
 
     // --- Camera / planetarium scene ---
     this.vehicleCamera = new VehicleCamera(MAP_CAMERA_CONFIG, canvas)
+    this.vehicleCamera.setShipYawCouplingSmoothing(MAP_CONFIG.MAP_SHIP_YAW_CAMERA_SMOOTH_TAU_SEC)
     this.planetariumScene = new MapPlanetariumScene()
     const planetarium = await this.planetariumScene.initialize(canvas, this.vehicleCamera.camera)
     this.emitBootState('preparing', 'Loading')
@@ -2425,8 +2426,9 @@ export class MapViewController implements Tickable {
     const targetPlanetId = targetName
       ? (PLANETS.find((planet) => planet.name === targetName)?.id ?? null)
       : null
+    const orbitState = this.orbitSystem?.state ?? 'free'
     const { openedPlanetId } = this.shopFacade.updateOrbitState({
-      orbitState: this.orbitSystem?.state ?? 'free',
+      orbitState,
       targetName,
       targetPlanetId,
       onShopButton: this.onShopButton,
@@ -2435,11 +2437,17 @@ export class MapViewController implements Tickable {
       inventory: this.playerInventory,
     })
     if (openedPlanetId) {
-      this.offerMissionAtPlanet(openedPlanetId)
       this.offerEvaMissionAtPlanet(openedPlanetId)
       this.offerAsteroidMissionFromDifficulty(openedPlanetId)
       this.offerTurretMiningMissionAtPlanet(openedPlanetId)
       this.onCreditsUpdate?.(this.playerProfile.credits)
+    }
+    /**
+     * Planetary shuttle contracts: refresh whenever orbiting a station, not only on the
+     * first shop-session frame (stale offers from another planet used to block Mars, etc.).
+     */
+    if (orbitState === 'orbiting' && targetPlanetId) {
+      this.offerMissionAtPlanet(targetPlanetId)
     }
   }
 
@@ -3070,6 +3078,7 @@ export class MapViewController implements Tickable {
       cameraFov: this.vehicleCamera.camera.fov,
       cameraAzimuth: this.vehicleCamera.controls.getAzimuthalAngle(),
       isFreeFlight: this.orbitSystem?.state === 'free',
+      dt,
     })
   }
 

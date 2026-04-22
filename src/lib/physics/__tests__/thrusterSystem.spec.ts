@@ -57,7 +57,12 @@ describe('ThrusterSystem', () => {
 
   it('applies burn rate multipliers to canFire thresholds', () => {
     const sys = createShuttleSystem()
-    sys.tick(1.84, { thrust: true, brake: false, rcs: false, turretMining: false })
+    const thrust = DEFAULT_THRUSTER_CONFIG.thrust
+    const oneFrame = 1 / 60
+    /** Midway between “below default frame threshold” and “above 0.25× threshold”. */
+    const drainSeconds =
+      (2 * thrust.capacity - thrust.burnRate * oneFrame * 1.25) / (2 * thrust.burnRate)
+    sys.tick(drainSeconds, { thrust: true, brake: false, rcs: false, turretMining: false })
     expect(sys.canFire('thrust')).toBe(false)
     expect(sys.canFire('thrust', { burnRateMultiplier: { thrust: 0.25 } })).toBe(true)
   })
@@ -74,15 +79,19 @@ describe('ThrusterSystem', () => {
 
   it('rechargeRateMultiplier 2.0 recharges twice as fast as default', () => {
     const thrustCfg = DEFAULT_THRUSTER_CONFIG.thrust
-    const dt = 1
+    const drainSeconds = 1
     const sysDefault = createShuttleSystem()
-    sysDefault.tick(1, { thrust: true, brake: false, rcs: false, turretMining: false })
+    sysDefault.tick(drainSeconds, { thrust: true, brake: false, rcs: false, turretMining: false })
     const chargeAfterDrain = sysDefault.getState('thrust').charge
+    const headroom = thrustCfg.capacity - chargeAfterDrain
+    /** Stay under capacity so 2× recharge is not clamped while 1× still fits. */
+    const dt = (headroom - 0.01) / (2 * thrustCfg.rechargeRate)
+
     sysDefault.tick(dt, { thrust: false, brake: false, rcs: false, turretMining: false })
     const gainDefault = sysDefault.getState('thrust').charge - chargeAfterDrain
 
     const sysDouble = createShuttleSystem()
-    sysDouble.tick(1, { thrust: true, brake: false, rcs: false, turretMining: false })
+    sysDouble.tick(drainSeconds, { thrust: true, brake: false, rcs: false, turretMining: false })
     expect(sysDouble.getState('thrust').charge).toBe(chargeAfterDrain)
     sysDouble.tick(dt, { thrust: false, brake: false, rcs: false, turretMining: false }, {
       rechargeRateMultiplier: { thrust: 2 },

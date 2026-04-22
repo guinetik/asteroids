@@ -81,6 +81,14 @@ describe('offerMission', () => {
     const reoffered = offerMission(accepted, 'earth')
     expect(reoffered.offeredMission).toBeNull()
   })
+
+  it('replaces a pending offer when docking mission computers at another planet', () => {
+    let board = offerMission(createMissionBoard(), 'earth')
+    expect(board.offeringPlanet).toBe('earth')
+    board = offerMission(board, 'mars')
+    expect(board.offeringPlanet).toBe('mars')
+    expect(board.offeredMission).not.toBeNull()
+  })
 })
 
 describe('acceptMission', () => {

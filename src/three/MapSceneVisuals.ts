@@ -13,6 +13,20 @@ import lockDiscVertexShader from '@/three/shaders/map/lockDisc.vert.glsl?raw'
 import approachLockDiscFragmentShader from '@/three/shaders/map/approachLockDisc.frag.glsl?raw'
 import surfLockDiscFragmentShader from '@/three/shaders/map/surfLockDisc.frag.glsl?raw'
 
+/**
+ * Interpolate from `a` toward `b` along the shortest arc (radians).
+ *
+ * @param a - Start angle
+ * @param b - Target angle
+ * @param t - Mix factor in `[0, 1]`
+ */
+function lerpAngleRadShortest(a: number, b: number, t: number): number {
+  let d = b - a
+  if (d > Math.PI) d -= 2 * Math.PI
+  if (d < -Math.PI) d += 2 * Math.PI
+  return a + d * t
+}
+
 /** Camera-relative data for the ship HUD reticle each frame. */
 export interface ShipReticleUpdate {
   shuttlePosition: THREE.Vector3
@@ -22,6 +36,8 @@ export interface ShipReticleUpdate {
   cameraFov: number
   cameraAzimuth: number
   isFreeFlight: boolean
+  /** Delta time in seconds (heading smooth / hysteresis timing). */
+  dt: number
 }
 
 /** Meshes and buffers for the orbit approach tether line + lock discs. */
@@ -72,6 +88,10 @@ export class MapSceneVisuals {
   private shuttleGroup: THREE.Group | null = null
   private orbitRing: THREE.LineLoop | null = null
   private launchArrow: THREE.Group | null = null
+  /** Hysteresis: once planar speed crosses "on", require lower speed to hide the wedge. */
+  private reticleWedgeSpeedGate = false
+  /** Low-pass filtered heading (rad) for the motion wedge; cleared when wedge hides. */
+  private reticleWedgeHeadingSmooth: number | null = null
   private launchArrowMaterials: THREE.ShaderMaterial[] = []
   private shipReticleGroup: THREE.Group | null = null
   private shipReticleRing: THREE.Sprite | null = null
@@ -345,10 +365,36 @@ export class MapSceneVisuals {
       this.shipReticleGroup.scale.setScalar(reticleWorld)
       this.shipReticleRing.visible = false
 
+      const dt = Math.max(1e-4, update.dt > 0 ? update.dt : 1 / 60)
       const speed = Math.hypot(update.shuttleVelocity.x, update.shuttleVelocity.z)
-      if (speed >= MAP_CONFIG.MAP_RETICLE_MIN_SPEED) {
-        const worldHeading = Math.atan2(update.shuttleVelocity.x, update.shuttleVelocity.z)
-        const spriteAngle = worldHeading - update.cameraAzimuth - Math.PI / 2
+      const speedOn = MAP_CONFIG.MAP_RETICLE_MIN_SPEED
+      const speedOff = MAP_CONFIG.MAP_RETICLE_MIN_SPEED_OFF
+
+      if (!this.reticleWedgeSpeedGate && speed >= speedOn) {
+        this.reticleWedgeSpeedGate = true
+      }
+      if (this.reticleWedgeSpeedGate && speed < speedOff) {
+        this.reticleWedgeSpeedGate = false
+        this.reticleWedgeHeadingSmooth = null
+      }
+
+      if (this.reticleWedgeSpeedGate) {
+        const rawHeading = Math.atan2(update.shuttleVelocity.x, update.shuttleVelocity.z)
+        const tau = MAP_CONFIG.MAP_RETICLE_HEADING_SMOOTH_TAU_SEC
+        if (this.reticleWedgeHeadingSmooth === null) {
+          this.reticleWedgeHeadingSmooth = rawHeading
+        } else if (tau > 0) {
+          const a = 1 - Math.exp(-dt / tau)
+          this.reticleWedgeHeadingSmooth = lerpAngleRadShortest(
+            this.reticleWedgeHeadingSmooth,
+            rawHeading,
+            a,
+          )
+        } else {
+          this.reticleWedgeHeadingSmooth = rawHeading
+        }
+        const spriteAngle =
+          this.reticleWedgeHeadingSmooth - update.cameraAzimuth - Math.PI / 2
         this.shipReticlePointer.visible = true
         ;(this.shipReticlePointer.material as THREE.SpriteMaterial).rotation = spriteAngle
         ;(this.shipReticlePointer.material as THREE.SpriteMaterial).opacity = reticleAlpha
@@ -357,6 +403,8 @@ export class MapSceneVisuals {
       }
     } else {
       this.shipReticleGroup.visible = false
+      this.reticleWedgeSpeedGate = false
+      this.reticleWedgeHeadingSmooth = null
     }
   }
 

@@ -61,8 +61,8 @@ export interface ShuttlePhysicsConfig {
   thrustAlignMaxMultiplier: number
   /**
    * RCS lateral multiplier when planar velocity is perpendicular to the push direction
-   * (no sideways drift along that jet). Strafe-yaw is weaker; fighting or aiding sideways
-   * motion is stronger.
+   * (typical yaw-while-coasting: velocity along nose, push on port/starboard). Kept slightly
+   * below {@link rcsAlignMaxMultiplier} so aiding/fighting existing sideways drift stays a bit stronger.
    */
   rcsAlignMinMultiplier: number
   /**
@@ -752,7 +752,10 @@ export class ShuttleController implements Tickable, PortalVehicle {
           alongAbs,
         )
       }
-      this.velocity.addScaledVector(right, pushSign * p.yawLateralForce * mult * dt)
+      this.velocity.addScaledVector(
+        right,
+        pushSign * p.yawLateralForce * mult * speedUpgradeMultiplier * dt,
+      )
     }
     if (this.isYawingLeft) {
       applyRcsAlongRight(-1)

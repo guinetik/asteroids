@@ -29,11 +29,8 @@ import { addItem, removeItem, canFitItem } from '@/lib/inventory/inventory'
 import { addCredits } from '@/lib/player/profile'
 import { EVA_MAX_PAYOUT_CR } from './missionEconomy'
 
-/** Minimum restock timer duration in seconds. */
-const RESTOCK_MIN_S = 120
-
-/** Maximum restock timer duration in seconds. */
-const RESTOCK_MAX_S = 240
+/** Duration (seconds) for planetary mission board restock after accepting a contract. */
+const RESTOCK_DURATION_S = 180
 
 /** Lower bound applied to the planet-distance reward multiplier (inner planets floor here). */
 const EVA_REWARD_MULTIPLIER_FLOOR = 0.85
@@ -74,15 +71,6 @@ function computeScaledEvaReward(baseReward: number, planetId: string): number {
   const floored = Math.max(EVA_MIN_REWARD, scaled)
   const capped = Math.min(floored, EVA_MAX_PAYOUT_CR)
   return Math.round(capped / EVA_REWARD_ROUND_STEP) * EVA_REWARD_ROUND_STEP
-}
-
-/**
- * Generate a random restock duration between min and max.
- *
- * @returns Duration in seconds.
- */
-function randomRestockDuration(): number {
-  return RESTOCK_MIN_S + Math.random() * (RESTOCK_MAX_S - RESTOCK_MIN_S)
 }
 
 /**
@@ -165,7 +153,7 @@ export interface AcceptMissionResult {
 
 /**
  * Accept the currently offered mission. Moves it to the active list
- * and starts a restock timer.
+ * and starts a fixed-duration restock timer.
  *
  * Rejects when the cargo hold cannot fit the gather quantity that will be
  * awarded at the target planet (same rule as {@link completeMission}).
@@ -206,14 +194,12 @@ export function acceptMission(
     status: 'active',
   }
 
-  const total = randomRestockDuration()
-
   return {
     ok: true,
     board: {
       ...board,
       offeredMission: null,
-      restockTimer: { remaining: total, total },
+      restockTimer: { remaining: RESTOCK_DURATION_S, total: RESTOCK_DURATION_S },
       activeMissions: [...board.activeMissions, newActive],
     },
   }
@@ -425,13 +411,12 @@ export function offerAsteroidMission(
 export function acceptAsteroidMission(board: ShuttleMissionBoard): ShuttleMissionBoard {
   if (!board.offeredAsteroidMission) return board
 
-  const total = randomRestockDuration()
   return {
     ...board,
     offeredAsteroidMission: null,
     offeringAsteroidPlanet: null,
     activeAsteroidMission: { ...board.offeredAsteroidMission, status: 'accepted' },
-    asteroidRestockTimer: { remaining: total, total },
+    asteroidRestockTimer: { remaining: RESTOCK_DURATION_S, total: RESTOCK_DURATION_S },
   }
 }
 
@@ -607,13 +592,11 @@ export function acceptEvaMission(
     ...(rolled !== undefined ? { brokenComponents: rolled } : {}),
   }
 
-  const total = randomRestockDuration()
-
   return {
     ...board,
     offeredEvaMission: null,
     offeringEvaPlanet: null,
-    evaRestockTimer: { remaining: total, total },
+    evaRestockTimer: { remaining: RESTOCK_DURATION_S, total: RESTOCK_DURATION_S },
     activeEvaMissions: [...board.activeEvaMissions, newActive],
   }
 }

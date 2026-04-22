@@ -199,12 +199,24 @@ export class MapMissionFacade {
     }
   }
 
+  /**
+   * Post a planetary shuttle contract for `planetId` whenever the board is not restocking
+   * and there is no active offer already posted **at this station** (stale offers from
+   * other planets are replaced).
+   */
   offerMissionAtPlanet(
     planetId: string,
     onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null,
   ): void {
-    if (!this.board.offeredMission) {
-      this.board = offerMission(this.board, planetId, CURRENT_PLAYER_UPGRADE_LEVELS)
+    if (this.board.restockTimer) return
+
+    const alreadyOfferingHere =
+      this.board.offeredMission !== null && this.board.offeringPlanet === planetId
+    if (alreadyOfferingHere) return
+
+    const before = this.board
+    this.board = offerMission(this.board, planetId, CURRENT_PLAYER_UPGRADE_LEVELS)
+    if (this.board !== before) {
       onMissionBoardUpdate?.(this.board)
     }
   }
