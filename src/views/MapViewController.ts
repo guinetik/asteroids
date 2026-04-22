@@ -152,7 +152,6 @@ import {
   clearCompletedEvaSites,
   clearMissionBoard,
   consumePendingMapReturnWorld,
-  loadMissionBoard,
   saveActiveMission,
   saveMissionBoard,
 } from '@/lib/missions/missionStorage'
@@ -3984,10 +3983,11 @@ export class MapViewController implements Tickable {
           const result = addItem(this.playerInventory, itemId, 1)
           if (!result.ok) return { ok: false as const, reason: result.reason ?? 'Inventory full' }
           this.playerInventory = result.inventory
-          const board = loadMissionBoard()
-          if (board) {
-            const nextBoard = recordTurretMiningProgress(board, itemId, 1)
-            if (nextBoard !== board) saveMissionBoard(nextBoard)
+          const nextBoard = recordTurretMiningProgress(this.missionFacade.board, itemId, 1)
+          if (nextBoard !== this.missionFacade.board) {
+            this.missionFacade.board = nextBoard
+            saveMissionBoard(nextBoard)
+            this.onMissionBoardUpdate?.(nextBoard)
           }
           saveInventory(this.playerInventory)
           this.emitShopState()
