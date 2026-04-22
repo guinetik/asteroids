@@ -69,7 +69,7 @@ import {
 } from '@/lib/mapIntroState'
 import { MapCamera } from '@/three/MapCamera'
 import { findNearestBodies, formatDistance, type MapBody } from '@/lib/mapProjection'
-import type { MapOverlayState } from '@/lib/ShuttleTelemetry'
+import type { MapOverlayState, MapThermalZone } from '@/lib/ShuttleTelemetry'
 import { computeRelativeOrbitalSpeedMultiplier } from '@/lib/orbitSpeedProfile'
 import {
   appendWorldLinePoint,
@@ -82,6 +82,7 @@ import { GravitationalEventManager } from '@/lib/physics/gravitationalEvent'
 import { computeShuttleBaseFuelDrain } from '@/lib/shuttleBaseFuelDrain'
 import { ShipHealth } from '@/lib/shipHealth'
 import type { ShipHealthConfig } from '@/lib/shipHealth'
+import { getThermalZoneBands } from '@/lib/mapThermalZones'
 import shipHealthData from '@/data/shuttle/ship-health.json'
 import {
   getCurrentShuttleThrusterEfficiencyModifiers,
@@ -151,8 +152,11 @@ import {
   clearCompletedEvaSites,
   clearMissionBoard,
   consumePendingMapReturnWorld,
+  loadMissionBoard,
   saveActiveMission,
+  saveMissionBoard,
 } from '@/lib/missions/missionStorage'
+import { recordTurretMiningProgress } from '@/lib/missions/turretMiningSession'
 import '@/lib/missions/missionMaterials'
 import { MapIntroFacade } from '@/lib/map/intro/MapIntroFacade'
 import { MapLifeCycleFacade } from '@/lib/map/lifecycle/MapLifeCycleFacade'
@@ -517,6 +521,15 @@ export class MapViewController implements Tickable {
   /** The currently active orbital minigame (if any). Exposed so the overlay can call `complete()`. */
   get activeMinigame(): OrbitalMiniGame | null {
     return this.missionFacade.activeMinigame
+  }
+
+  /**
+   * Layers `ambient.shuttleMission` (`shuttle.mp3`) during canvas orbital minigames.
+   *
+   * @param active - True while the mission overlay shows a canvas minigame.
+   */
+  setShuttleMissionMinigameBed(active: boolean): void {
+    this.shuttleAudio.notifyShuttleMissionBed(active)
   }
 
   /** Called when mission button visibility changes in OrbitPrompt. */
@@ -1533,6 +1546,11 @@ export class MapViewController implements Tickable {
       this.shuttleController.thrusterSystem.consumeFuel(
         computeShuttleBaseFuelDrain(dt, orbitState !== 'orbiting') * passiveFuelMultiplier,
       )
+    }
+
+    if (this.shuttleController) {
+      const ts = this.shuttleController.thrusterSystem
+      this.shuttleAudio.tickShuttleFuelTelemetry(ts.fuelLevel, ts.fuelCapacity, !this.shuttleController.dead)
     }
 
     // Telemetry
@@ -3554,6 +3572,38 @@ export class MapViewController implements Tickable {
         }
       })
 
+    // Thermal zones — project each annular band (from ship-health boundaries) to screen %.
+    // Separate X and Z offsets are projected so the overlay can render true screen-space
+    // circles: the ortho frustum is aspect-scaled (top/bottom = ±halfSize/aspect), so a
+    // world offset along Z maps to a different percentage of the viewport height than the
+    // same offset along X does of the viewport width.
+    const thermalZones: MapThermalZone[] = this.shipHealthConfig
+      ? getThermalZoneBands(this.shipHealthConfig).map((band) => {
+          const center = this.mapCamera!.projectToScreen(new THREE.Vector3(0, 0, 0))
+          const innerEdgeX = this.mapCamera!.projectToScreen(
+            new THREE.Vector3(band.innerWorldRadius, 0, 0),
+          )
+          const innerEdgeZ = this.mapCamera!.projectToScreen(
+            new THREE.Vector3(0, 0, band.innerWorldRadius),
+          )
+          const outerEdgeX = this.mapCamera!.projectToScreen(
+            new THREE.Vector3(band.outerWorldRadius, 0, 0),
+          )
+          const outerEdgeZ = this.mapCamera!.projectToScreen(
+            new THREE.Vector3(0, 0, band.outerWorldRadius),
+          )
+          return {
+            kind: band.kind,
+            centerX: center.x * 100,
+            centerY: center.y * 100,
+            innerRadiusX: Math.abs(innerEdgeX.x - center.x) * 100,
+            innerRadiusY: Math.abs(innerEdgeZ.y - center.y) * 100,
+            outerRadiusX: Math.abs(outerEdgeX.x - center.x) * 100,
+            outerRadiusY: Math.abs(outerEdgeZ.y - center.y) * 100,
+          }
+        })
+      : []
+
     const trajectoryPoints = this.buildWorldLineTrajectory()
 
     let missionWaypoint: MapOverlayState['missionWaypoint'] = null
@@ -3581,6 +3631,7 @@ export class MapViewController implements Tickable {
       speed: this.shuttleController.speed,
       distances,
       gravityRings,
+      thermalZones,
       trajectoryPoints,
       missionWaypoint,
     })
@@ -3876,6 +3927,11 @@ export class MapViewController implements Tickable {
           const result = addItem(this.playerInventory, itemId, 1)
           if (!result.ok) return { ok: false as const, reason: result.reason ?? 'Inventory full' }
           this.playerInventory = result.inventory
+          const board = loadMissionBoard()
+          if (board) {
+            const nextBoard = recordTurretMiningProgress(board, itemId, 1)
+            if (nextBoard !== board) saveMissionBoard(nextBoard)
+          }
           saveInventory(this.playerInventory)
           this.emitShopState()
           return { ok: true as const }
