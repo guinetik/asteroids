@@ -2,7 +2,7 @@ import type { PlayerProfile } from '@/lib/player/types'
 import type { UpgradeId } from '@/lib/upgrades'
 
 /** Stable ids for journey definitions persisted on the player profile. */
-export type JourneyId = 'welcome'
+export type JourneyId = 'welcome' | 'act-1-inner-system'
 /** Feature unlock ids granted by completing journeys. */
 export type JourneyFeatureId = 'slingshot'
 /** Runtime trigger ids that can advance one or more journey steps. */
@@ -68,6 +68,8 @@ interface JourneyDefinition {
 
 /** Canonical id for the onboarding journey. */
 export const WELCOME_JOURNEY_ID: JourneyId = 'welcome'
+/** Canonical id for the Act 1 inner-system arc. */
+export const ACT_1_JOURNEY_ID: JourneyId = 'act-1-inner-system'
 /** Unlock granted after the onboarding journey completes. */
 export const SLINGSHOT_JOURNEY_FEATURE_ID: JourneyFeatureId = 'slingshot'
 
@@ -123,6 +125,35 @@ const JOURNEY_DEFINITIONS: readonly JourneyDefinition[] = [
         id: 'leave-habitat',
         label: 'Leave the Habitat',
         trigger: 'left_habitat',
+      },
+    ],
+  },
+  {
+    id: ACT_1_JOURNEY_ID,
+    eyebrow: 'Act I',
+    title: 'Inner System',
+    objectiveLabel: 'Earn your manifold cert',
+    unlocks: [],
+    steps: [
+      {
+        id: 'usc-cert',
+        label: 'Complete USC Venus Certification',
+        trigger: 'contract_completed:usc-venus-certification',
+      },
+      {
+        id: 'cowboys-hq',
+        label: 'Complete Space Cowboys Mars HQ',
+        trigger: 'contract_completed:space-cowboys-mars-hq',
+      },
+      {
+        id: 'mmc-cohort',
+        label: 'Complete MMC Turret Cohort',
+        trigger: 'contract_completed:martian-marine-corps-cohort',
+      },
+      {
+        id: 'grid-coupling',
+        label: 'Install the USC Module',
+        trigger: 'upgrade_installed:gravitySurfing',
       },
     ],
   },
