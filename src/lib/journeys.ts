@@ -70,6 +70,12 @@ interface JourneyDefinition {
 export const WELCOME_JOURNEY_ID: JourneyId = 'welcome'
 /** Canonical id for the Act 1 inner-system arc. */
 export const ACT_1_JOURNEY_ID: JourneyId = 'act-1-inner-system'
+/** Contract ids that must all complete to unlock the Act 1 climax (Consortium Certification). */
+export const ACT_1_CONTRACT_IDS = [
+  'usc-venus-certification',
+  'space-cowboys-mars-hq',
+  'martian-marine-corps-cohort',
+] as const
 /** Unlock granted after the onboarding journey completes. */
 export const SLINGSHOT_JOURNEY_FEATURE_ID: JourneyFeatureId = 'slingshot'
 
@@ -138,17 +144,17 @@ const JOURNEY_DEFINITIONS: readonly JourneyDefinition[] = [
       {
         id: 'usc-cert',
         label: 'Complete USC Venus Certification',
-        trigger: 'contract_completed:usc-venus-certification',
+        trigger: `contract_completed:${ACT_1_CONTRACT_IDS[0]}`,
       },
       {
         id: 'cowboys-hq',
         label: 'Complete Space Cowboys Mars HQ',
-        trigger: 'contract_completed:space-cowboys-mars-hq',
+        trigger: `contract_completed:${ACT_1_CONTRACT_IDS[1]}`,
       },
       {
         id: 'mmc-cohort',
         label: 'Complete MMC Turret Cohort',
-        trigger: 'contract_completed:martian-marine-corps-cohort',
+        trigger: `contract_completed:${ACT_1_CONTRACT_IDS[2]}`,
       },
       {
         id: 'grid-coupling',

@@ -91,6 +91,7 @@ import {
   hasOrbitalSurfingUnlock,
   getPlayerUpgradeLevelsSnapshot,
   hydratePlayerUpgradeLevelsFromStorage,
+  onUpgradeInstalled,
   resetPlayerUpgradesToDefaults,
   setPlayerUpgradeLevel,
   CURRENT_PLAYER_UPGRADE_LEVELS,
@@ -125,6 +126,7 @@ import {
   isJourneyFeatureUnlocked,
   SLINGSHOT_JOURNEY_FEATURE_ID,
   WELCOME_JOURNEY_ID,
+  ACT_1_CONTRACT_IDS,
   type JourneyTrackerState,
   type JourneyTriggerId,
 } from '@/lib/journeys'
@@ -153,6 +155,7 @@ import {
   clearCompletedEvaSites,
   clearMissionBoard,
   consumePendingMapReturnWorld,
+  loadActiveMission,
   saveActiveMission,
   saveMissionBoard,
 } from '@/lib/missions/missionStorage'
@@ -195,6 +198,7 @@ import { OrbitalSurfingController, type OrbitalSurfingDeps } from '@/lib/map/Orb
 import { ManifoldSpline } from '@/three/ManifoldSpline'
 import { ShuttleAudioDirector } from '@/audio/ShuttleAudioDirector'
 import { shipMessageSystem } from '@/lib/messages/runtime'
+import { contractSystem, onContractCompleted } from '@/lib/contracts/runtime'
 
 /**
  * Orbit / grid / debris toggle snapshot for syncing the map HUD after intro suppression.
@@ -403,6 +407,8 @@ export class MapViewController implements Tickable {
   private gravitationalAnomalyHudToken = 0
   private sceneVisuals: MapSceneVisuals | null = null
   private unsubscribeJourneyMessageArchive: (() => void) | null = null
+  private unsubscribeContractCompleted: (() => void) | null = null
+  private unsubscribeUpgradeInstalled: (() => void) | null = null
 
   /** World-space shuttle position reused for asteroid belt nearby tumble (avoid per-frame alloc). */
   private readonly _beltShuttleWorldScratch = new THREE.Vector3()
@@ -641,6 +647,15 @@ export class MapViewController implements Tickable {
     this.unsubscribeJourneyMessageArchive?.()
     this.unsubscribeJourneyMessageArchive = shipMessageSystem.onMessageArchived((messageId) => {
       this.notifyJourneyTrigger(`message_archived:${messageId}`)
+    })
+    this.unsubscribeContractCompleted?.()
+    this.unsubscribeContractCompleted = onContractCompleted((contractId) => {
+      this.notifyJourneyTrigger(`contract_completed:${contractId}`)
+      this.maybeStageAct1Climax()
+    })
+    this.unsubscribeUpgradeInstalled?.()
+    this.unsubscribeUpgradeInstalled = onUpgradeInstalled((upgradeId) => {
+      this.notifyJourneyTrigger(`upgrade_installed:${upgradeId}`)
     })
     this.messageFacade.setTutorialMessagesUnlocked(
       hasCompletedJourney(this.playerProfile, WELCOME_JOURNEY_ID),
@@ -3976,6 +3991,30 @@ export class MapViewController implements Tickable {
     this.onMissionBoardUpdate?.(this.missionBoard)
   }
 
+  /**
+   * When all three inner-system contracts are complete and the player has not yet
+   * acquired (or started acquiring) gravity surfing, stage the Consortium message
+   * and active asteroid mission. Guarded on derived state only — idempotent across
+   * repeat calls. Intended to be invoked after each `contract_completed` event.
+   */
+  private maybeStageAct1Climax(): void {
+    for (const id of ACT_1_CONTRACT_IDS) {
+      const instance = contractSystem.getInstance(id)
+      if (!instance || instance.status !== 'completed') return
+    }
+
+    const gravitySurfingLevel = CURRENT_PLAYER_UPGRADE_LEVELS.gravitySurfing ?? 0
+    if (gravitySurfingLevel >= 1) return
+
+    const activeMissionId = this.missionBoard.activeAsteroidMission?.id
+    if (activeMissionId === 'consortium-certification') return
+
+    const storedActive = loadActiveMission()
+    if (storedActive?.id === 'consortium-certification') return
+
+    this.stageConsortiumCertification()
+  }
+
   /** Dev-only: enqueue the Consortium message and start its authored special mission immediately. */
   private devStartConsortiumCertificationMessage(): void {
     this.stageConsortiumCertification()
@@ -4749,6 +4788,10 @@ export class MapViewController implements Tickable {
     this.flushShuttleHullToProfile()
     this.unsubscribeJourneyMessageArchive?.()
     this.unsubscribeJourneyMessageArchive = null
+    this.unsubscribeContractCompleted?.()
+    this.unsubscribeContractCompleted = null
+    this.unsubscribeUpgradeInstalled?.()
+    this.unsubscribeUpgradeInstalled = null
     this.evaSession?.dispose()
     this.evaSession = null
     this.shuttleAudio.dispose()
