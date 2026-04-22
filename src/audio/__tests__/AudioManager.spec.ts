@@ -425,7 +425,7 @@ describe('AudioManager', () => {
 
   it('ignores options.src for static manifest entries (uses bundled src)', () => {
     manager.unlock()
-    manager.play('ui.click', { src: 'https://example.com/override.mp3' })
+    manager.play('ui.error', { src: 'https://example.com/override.mp3' })
     expect(getLastMockHowl()?.src[0]).toBe(SILENT_STATIC_WAV_DATA_URI)
   })
 
@@ -459,7 +459,7 @@ describe('AudioManager', () => {
     expect(mockLoad).toHaveBeenCalledTimes(SEEDED_SOUND_IDS.length)
     const afterPreload = mockHowlInstances.length
     manager.unlock()
-    manager.play('ui.click')
+    manager.play('ui.error')
     expect(mockHowlInstances).toHaveLength(afterPreload)
     expect(mockPlay).toHaveBeenCalledTimes(1)
   })
