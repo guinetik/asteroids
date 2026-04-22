@@ -102,8 +102,11 @@ const miningSectionVisible = computed(() => {
 /** Show the asteroid section only when offering or restocking at this dock. */
 const asteroidSectionVisible = computed(() => {
   const b = props.board
-  if (!b) return false
-  const hasOffer = b.offeredAsteroidMission !== null && b.activeAsteroidMission === null
+  if (!b || !props.dockedPlanet) return false
+  const hasOffer =
+    b.offeredAsteroidMission !== null &&
+    b.offeringAsteroidPlanet === props.dockedPlanet &&
+    b.activeAsteroidMission === null
   return hasOffer || b.asteroidRestockTimer !== null
 })
 
@@ -397,7 +400,14 @@ function evaTypeLabel(poiType: EvaMissionPoiType): string {
         Contracts send you to a waypoint near your posting station's orbit; difficulty scales with your upgrades.
       </p>
 
-      <div v-if="board?.offeredAsteroidMission && !board.activeAsteroidMission" class="mission-board-offer">
+      <div
+        v-if="
+          board?.offeredAsteroidMission &&
+          board.offeringAsteroidPlanet === dockedPlanet &&
+          !board.activeAsteroidMission
+        "
+        class="mission-board-offer"
+      >
         <div class="mission-board-offer__name">{{ board.offeredAsteroidMission.name }}</div>
         <div class="mission-board-offer__giver">From: {{ board.offeredAsteroidMission.giverName }}</div>
         <div class="mission-board-offer__desc">{{ board.offeredAsteroidMission.briefing }}</div>

@@ -192,6 +192,8 @@ export interface ShuttleMissionBoard {
   activeMissions: ActiveShuttleMission[]
   /** Currently offered asteroid mission (null if restocking). */
   offeredAsteroidMission: GeneratedAsteroidMission | null
+  /** Which planet is offering the asteroid mission (null if not docked). */
+  offeringAsteroidPlanet: string | null
   /** The one active asteroid mission (null if none accepted). */
   activeAsteroidMission: GeneratedAsteroidMission | null
   /** Restock timer for asteroid missions. */

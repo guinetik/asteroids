@@ -3,11 +3,11 @@
   "inboxName": "United Space Consortium",
   "from": "USC — Operator Relations",
   "sentAt": "2306-04-06 15:30 UTC",
-  "triggerOnMissionCompletedNth": 1,
+  "triggerOnMissionOfKind": { "n": 1, "missionType": "asteroid" },
   "introSubject": "Contract — Venus Lane Certification",
   "introBody": [
     "Operator,",
-    "Your first delivery has been logged with Sol Sector dispatch. The United Space Consortium is extending a partnership offer to qualifying independent pilots. We are short on certified Venus-lane operators and your file matched the screening parameters.",
+    "A completed asteroid-belt run has been logged in your Sol Sector file. The United Space Consortium is extending a partnership offer to qualifying independent pilots. We are short on certified Venus-lane operators; belt experience was one of the screening parameters.",
     "Completion of the following work qualifies you for a permanent Earth orbital kiosk and a 2x payout multiplier on all Earth-issued contracts:",
     "1) Complete one shuttle EVA contract.",
     "2) Complete one asteroid contract.",

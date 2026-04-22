@@ -3,7 +3,7 @@
   "inboxName": "Space Cowboys, Inc.",
   "from": "Jay Mercer",
   "sentAt": "2306-04-05 09:12 UTC",
-  "triggerOnMessageArchived": "jay-contract-incoming",
+  "triggerOnMissionCompletedNth": 1,
   "introSubject": "Contract — Mars HQ",
   "introBody": [
     "Hey, you got Jay.",

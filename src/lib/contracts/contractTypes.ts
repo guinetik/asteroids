@@ -115,8 +115,14 @@ export interface Contract {
   sentAt: string
   /** Offer this contract when the message with this id is archived. */
   triggerOnMessageArchived?: string
-  /** Offer this contract when the player completes their Nth mission overall. */
+  /** Offer this contract when the player completes their Nth mission overall (any family). */
   triggerOnMissionCompletedNth?: number
+  /**
+   * Offer when the player completes their Nth mission of a specific family
+   * (e.g. first asteroid: `{ n: 1, missionType: "asteroid" }`). Mutually useful
+   * with but independent from {@link triggerOnMissionCompletedNth}.
+   */
+  triggerOnMissionOfKind?: { n: number; missionType: ContractMissionType }
   /**
    * When set, the intro is offered after another contract is `completed` and
    * the player has hit the min mission count for a given giver planet (see
@@ -188,6 +194,11 @@ export interface ContractStoreSnapshot {
    * `offerWhenPrerequisites` checks.
    */
   giverPlanetCompletions: Record<string, number>
+  /**
+   * Total completions per {@link ContractMissionType} (used by
+   * `triggerOnMissionOfKind` and for diagnostics).
+   */
+  missionCompletionsByKind: Partial<Record<ContractMissionType, number>>
   /** Schema version for forward-compatible migrations. */
   version: 1
 }

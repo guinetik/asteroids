@@ -97,6 +97,7 @@ export function createMissionBoard(): ShuttleMissionBoard {
     restockTimer: null,
     activeMissions: [],
     offeredAsteroidMission: null,
+    offeringAsteroidPlanet: null,
     activeAsteroidMission: null,
     asteroidRestockTimer: null,
     offeredEvaMission: null,
@@ -408,7 +409,11 @@ export function offerAsteroidMission(
   mission: GeneratedAsteroidMission,
 ): ShuttleMissionBoard {
   if (board.asteroidRestockTimer) return board
-  return { ...board, offeredAsteroidMission: mission }
+  return {
+    ...board,
+    offeredAsteroidMission: mission,
+    offeringAsteroidPlanet: mission.originPlanetId ?? null,
+  }
 }
 
 /**
@@ -424,6 +429,7 @@ export function acceptAsteroidMission(board: ShuttleMissionBoard): ShuttleMissio
   return {
     ...board,
     offeredAsteroidMission: null,
+    offeringAsteroidPlanet: null,
     activeAsteroidMission: { ...board.offeredAsteroidMission, status: 'accepted' },
     asteroidRestockTimer: { remaining: total, total },
   }

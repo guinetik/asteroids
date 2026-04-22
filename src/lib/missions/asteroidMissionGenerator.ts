@@ -400,11 +400,14 @@ const HOST_ASTEROID_RADIAL_JITTER_BASE = 20
 
 const HOST_ASTEROID_RADIAL_JITTER_SPAN = 95
 
-/** Fresh Earth contracts stay very close to the local orbit lane: 3–5 Earth radii from Earth. */
-const EARLY_EARTH_LOCAL_DISTANCE_MIN_RADIUS_MULTIPLE = 3
+/** Moon semi-major axes are rendered locally around their parent, not in solar AU space. */
+const LOCAL_MOON_ORBIT_SCALE_DIVISOR = 150
 
-/** Upper edge of the early Earth local contract annulus. */
-const EARLY_EARTH_LOCAL_DISTANCE_MAX_RADIUS_MULTIPLE = 5
+/** Fresh Earth asteroid contracts must stay well outside the Moon's local orbital lane. */
+const EARLY_EARTH_MIN_MOON_ORBIT_CLEARANCE_MULTIPLE = 1.5
+
+/** Upper edge of the early Earth local contract annulus, measured in local Moon-orbit radii. */
+const EARLY_EARTH_LOCAL_DISTANCE_MAX_MOON_ORBIT_MULTIPLE = 2.25
 
 /** Only low-difficulty Earth asteroid missions use the tight onboarding annulus. */
 const EARLY_EARTH_LOCAL_MAX_MISSION_DIFFICULTY = 2
@@ -428,9 +431,18 @@ export function generateAsteroidWaypointNearHostPlanet(
   hostPlanetId: string | null = null,
 ): { worldX: number; worldZ: number } {
   if (hostPlanetId === 'earth' && difficulty <= EARLY_EARTH_LOCAL_MAX_MISSION_DIFFICULTY) {
-    const earthRadiusWorld = getPlanet('earth').displayRadius * SIZE_SCALE
-    const minDistance = earthRadiusWorld * EARLY_EARTH_LOCAL_DISTANCE_MIN_RADIUS_MULTIPLE
-    const maxDistance = earthRadiusWorld * EARLY_EARTH_LOCAL_DISTANCE_MAX_RADIUS_MULTIPLE
+    const earth = getPlanet('earth')
+    const moonOrbitWorld =
+      ((earth.moons[0]?.orbit.semiMajorAxis ?? 0) * SIZE_SCALE) / LOCAL_MOON_ORBIT_SCALE_DIVISOR
+    const earthRadiusWorld = earth.displayRadius * SIZE_SCALE
+    const minDistance = Math.max(
+      moonOrbitWorld * EARLY_EARTH_MIN_MOON_ORBIT_CLEARANCE_MULTIPLE,
+      earthRadiusWorld * 3,
+    )
+    const maxDistance = Math.max(
+      minDistance + earthRadiusWorld * 2,
+      moonOrbitWorld * EARLY_EARTH_LOCAL_DISTANCE_MAX_MOON_ORBIT_MULTIPLE,
+    )
 
     for (let attempt = 0; attempt < 96; attempt++) {
       const angle = rand() * Math.PI * 2

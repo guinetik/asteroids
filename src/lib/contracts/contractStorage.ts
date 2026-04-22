@@ -16,6 +16,7 @@ export function emptyContractSnapshot(): ContractStoreSnapshot {
     instances: {},
     observedMissionCompletions: 0,
     giverPlanetCompletions: {},
+    missionCompletionsByKind: {},
     version: 1,
   }
 }
@@ -62,10 +63,19 @@ export function loadContractSnapshot(): ContractStoreSnapshot {
     ) {
       giverPlanetCompletions = { ...(obj.giverPlanetCompletions as Record<string, number>) }
     }
+    let missionCompletionsByKind: Partial<Record<string, number>> = {}
+    if (
+      obj.missionCompletionsByKind
+      && typeof obj.missionCompletionsByKind === 'object'
+      && !Array.isArray(obj.missionCompletionsByKind)
+    ) {
+      missionCompletionsByKind = { ...(obj.missionCompletionsByKind as Record<string, number>) }
+    }
     return {
       instances,
       observedMissionCompletions,
       giverPlanetCompletions,
+      missionCompletionsByKind: missionCompletionsByKind as ContractStoreSnapshot['missionCompletionsByKind'],
       version: 1,
     }
   } catch {

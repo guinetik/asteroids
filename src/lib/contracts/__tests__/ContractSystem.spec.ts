@@ -7,7 +7,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MessageSystem } from '@/lib/messages/messageSystem'
 import { ContractSystem, contractIntroMessageId, contractStepMessageId, contractCompletionMessageId } from '../ContractSystem'
-import type { Contract, ContractStoreSnapshot, RewardEffect } from '../contractTypes'
+import type { Contract, ContractStoreSnapshot, MissionCompletedEvent, RewardEffect } from '../contractTypes'
 import { emptyContractSnapshot } from '../contractStorage'
 
 const TEST_DATE = '2306-04-05 09:12 UTC'
@@ -17,7 +17,7 @@ const cowboysContract: Contract = {
   inboxName: 'Space Cowboys, Inc.',
   from: 'Jay',
   sentAt: TEST_DATE,
-  triggerOnMessageArchived: 'jay-first-slingshot-contracts',
+  triggerOnMissionCompletedNth: 1,
   introSubject: 'Contract — Mars HQ',
   introBody: ['Intro body'],
   steps: [
@@ -51,7 +51,7 @@ const uscContract: Contract = {
   inboxName: 'USC',
   from: 'USC',
   sentAt: TEST_DATE,
-  triggerOnMissionCompletedNth: 1,
+  triggerOnMissionOfKind: { n: 1, missionType: 'asteroid' },
   introSubject: 'USC Offer',
   introBody: ['USC intro'],
   steps: [
@@ -117,6 +117,51 @@ const triggerMessage = {
   priority: 50,
 }
 
+const sampleShuttleMission: MissionCompletedEvent = {
+  kind: 'shuttle',
+  giverPlanetId: 'earth',
+  giverId: null,
+  targetPlanetId: 'mars',
+}
+
+const sampleAsteroidMission: MissionCompletedEvent = {
+  kind: 'asteroid',
+  giverPlanetId: null,
+  giverId: 'jay',
+  targetPlanetId: null,
+}
+
+/** Fires the mission event that makes Space Cowboys available (`triggerOnMissionCompletedNth: 1`). */
+function offerCowboys(contracts: ContractSystem): void {
+  contracts.notifyMissionCompleted(sampleShuttleMission)
+}
+
+/**
+ * Cowboys first, then the first asteroid — USC is offered only on the first asteroid; Jay’s
+ * contract is offered on the first mission of any type.
+ */
+function offerCowboysThenUsc(contracts: ContractSystem): void {
+  offerCowboys(contracts)
+  contracts.notifyMissionCompleted(sampleAsteroidMission)
+}
+
+/** Minimal contract used only to test `triggerOnMessageArchived` wiring. */
+const messageTriggerContract: Contract = {
+  id: 'message-trigger-stub',
+  inboxName: 'Test Trigger',
+  from: 'Test',
+  sentAt: TEST_DATE,
+  triggerOnMessageArchived: 'jay-first-slingshot-contracts',
+  introSubject: 'Stub',
+  introBody: ['body'],
+  steps: [
+    { kind: 'visit-planet', planetId: 'earth', subject: 's', flavor: ['f'] },
+  ],
+  completionSubject: 'Done',
+  completionBody: ['d'],
+  rewards: [],
+}
+
 interface Harness {
   contracts: ContractSystem
   messages: MessageSystem
@@ -132,6 +177,7 @@ function createHarness(
     ...initial,
     instances: { ...initial.instances },
     giverPlanetCompletions: { ...initial.giverPlanetCompletions },
+    missionCompletionsByKind: { ...initial.missionCompletionsByKind },
   }
   const granted: RewardEffect[] = []
 
@@ -152,6 +198,7 @@ function createHarness(
         snapshot.instances = next.instances
         snapshot.observedMissionCompletions = next.observedMissionCompletions
         snapshot.giverPlanetCompletions = { ...next.giverPlanetCompletions }
+        snapshot.missionCompletionsByKind = { ...next.missionCompletionsByKind }
         snapshot.version = next.version
       },
     },
@@ -166,31 +213,31 @@ function createHarness(
 
 describe('ContractSystem.notifyMessageArchived', () => {
   it('offers a contract when its trigger message is archived', () => {
-    const { contracts, messages } = createHarness()
+    const { contracts, messages } = createHarness([messageTriggerContract])
     messages.notifyTrigger('map_first_slingshot')
     messages.dismiss(triggerMessage.id)
 
     contracts.notifyMessageArchived(triggerMessage.id)
 
-    const instance = contracts.getInstance(cowboysContract.id)
+    const instance = contracts.getInstance(messageTriggerContract.id)
     expect(instance?.status).toBe('available')
-    expect(messages.getRecord(contractIntroMessageId(cowboysContract.id))).toMatchObject({
+    expect(messages.getRecord(contractIntroMessageId(messageTriggerContract.id))).toMatchObject({
       status: 'pending',
     })
   })
 
   it('does not double-offer the same contract on a second archive', () => {
-    const { contracts } = createHarness()
+    const { contracts } = createHarness([messageTriggerContract])
     contracts.notifyMessageArchived(triggerMessage.id)
-    const first = contracts.getInstance(cowboysContract.id)
+    const first = contracts.getInstance(messageTriggerContract.id)
     contracts.notifyMessageArchived(triggerMessage.id)
-    const second = contracts.getInstance(cowboysContract.id)
+    const second = contracts.getInstance(messageTriggerContract.id)
     expect(second?.offeredAt).toBe(first?.offeredAt)
   })
 })
 
-describe('ContractSystem.notifyMissionCompletedNth trigger', () => {
-  it('offers the USC contract on the first mission completion', () => {
+describe('ContractSystem offer triggers (first mission & first asteroid)', () => {
+  it('offers Space Cowboys on the first mission completion of any type', () => {
     const { contracts, messages } = createHarness()
     contracts.notifyMissionCompleted({
       kind: 'shuttle',
@@ -198,19 +245,52 @@ describe('ContractSystem.notifyMissionCompletedNth trigger', () => {
       giverId: null,
       targetPlanetId: 'mars',
     })
+    expect(contracts.getInstance(cowboysContract.id)?.status).toBe('available')
+    expect(messages.getRecord(contractIntroMessageId(cowboysContract.id))).toMatchObject({
+      status: 'pending',
+    })
+  })
+
+  it('offers the USC contract only on the first asteroid mission completion', () => {
+    const { contracts, messages } = createHarness()
+    contracts.notifyMissionCompleted({
+      kind: 'shuttle',
+      giverPlanetId: 'earth',
+      giverId: null,
+      targetPlanetId: 'mars',
+    })
+    expect(contracts.getInstance(uscContract.id)).toBeNull()
+    contracts.notifyMissionCompleted({
+      kind: 'asteroid',
+      giverPlanetId: null,
+      giverId: 'jay',
+      targetPlanetId: null,
+    })
     expect(contracts.getInstance(uscContract.id)?.status).toBe('available')
     expect(messages.getRecord(contractIntroMessageId(uscContract.id))).toMatchObject({
       status: 'pending',
     })
   })
 
-  it('does not re-offer USC after the first completion', () => {
+  it('offers both when the first mission is already an asteroid', () => {
     const { contracts } = createHarness()
     contracts.notifyMissionCompleted({
-      kind: 'shuttle', giverPlanetId: 'earth', giverId: null, targetPlanetId: 'mars',
+      kind: 'asteroid',
+      giverPlanetId: null,
+      giverId: 'jay',
+      targetPlanetId: null,
+    })
+    expect(contracts.getInstance(cowboysContract.id)?.status).toBe('available')
+    expect(contracts.getInstance(uscContract.id)?.status).toBe('available')
+  })
+
+  it('does not re-offer USC after the first asteroid', () => {
+    const { contracts } = createHarness()
+    contracts.notifyMissionCompleted({
+      kind: 'asteroid', giverPlanetId: null, giverId: 'jay', targetPlanetId: null,
     })
     contracts.notifyMissionCompleted({
-      kind: 'shuttle', giverPlanetId: 'earth', giverId: null, targetPlanetId: 'mars',
+      kind: 'asteroid', giverPlanetId: null, giverId: 'jay', targetPlanetId: null,
     })
     const instance = contracts.getInstance(uscContract.id)
     expect(instance?.status).toBe('available')
@@ -248,7 +328,7 @@ describe('ContractSystem.offerWhenPrerequisites', () => {
 describe('ContractSystem.acceptContract', () => {
   it('moves an available contract to active and delivers step-1 flavor', () => {
     const { contracts, messages } = createHarness()
-    contracts.notifyMessageArchived(triggerMessage.id)
+    offerCowboys(contracts)
     expect(contracts.acceptContract(cowboysContract.id)).toBe(true)
     expect(contracts.getInstance(cowboysContract.id)?.status).toBe('active')
     expect(messages.getRecord(contractStepMessageId(cowboysContract.id, 0))).toMatchObject({
@@ -265,7 +345,7 @@ describe('ContractSystem.acceptContract', () => {
 describe('ContractSystem.declineContract', () => {
   it('marks an offered contract as declined', () => {
     const { contracts } = createHarness()
-    contracts.notifyMessageArchived(triggerMessage.id)
+    offerCowboys(contracts)
     expect(contracts.declineContract(cowboysContract.id)).toBe(true)
     expect(contracts.getInstance(cowboysContract.id)?.status).toBe('declined')
   })
@@ -274,7 +354,7 @@ describe('ContractSystem.declineContract', () => {
 describe('ContractSystem.advanceStep — complete-missions', () => {
   it('counts only after acceptance', () => {
     const { contracts } = createHarness()
-    contracts.notifyMessageArchived(triggerMessage.id)
+    offerCowboys(contracts)
     contracts.notifyMissionCompleted({
       kind: 'shuttle', giverPlanetId: 'earth', giverId: null, targetPlanetId: 'mars',
     })
@@ -288,7 +368,7 @@ describe('ContractSystem.advanceStep — complete-missions', () => {
 
   it('advances to next step when the count threshold is met', () => {
     const { contracts, messages } = createHarness()
-    contracts.notifyMessageArchived(triggerMessage.id)
+    offerCowboys(contracts)
     contracts.acceptContract(cowboysContract.id)
     for (let i = 0; i < 3; i++) {
       contracts.notifyMissionCompleted({
@@ -305,7 +385,7 @@ describe('ContractSystem.advanceStep — complete-missions', () => {
 describe('ContractSystem.advanceStep — install-upgrade and visit-planet', () => {
   it('advances on upgrade install at minLevel', () => {
     const { contracts } = createHarness()
-    contracts.notifyMessageArchived(triggerMessage.id)
+    offerCowboys(contracts)
     contracts.acceptContract(cowboysContract.id)
     for (let i = 0; i < 3; i++) {
       contracts.notifyMissionCompleted({
@@ -319,7 +399,7 @@ describe('ContractSystem.advanceStep — install-upgrade and visit-planet', () =
 
   it('completes the contract and grants rewards on the final visit', () => {
     const { contracts, granted, messages } = createHarness()
-    contracts.notifyMessageArchived(triggerMessage.id)
+    offerCowboys(contracts)
     contracts.acceptContract(cowboysContract.id)
     for (let i = 0; i < 3; i++) {
       contracts.notifyMissionCompleted({
@@ -341,9 +421,7 @@ describe('ContractSystem.advanceStep — install-upgrade and visit-planet', () =
 describe('ContractSystem mission filters', () => {
   it('only counts missions that match missionType filters', () => {
     const { contracts } = createHarness()
-    contracts.notifyMissionCompleted({
-      kind: 'shuttle', giverPlanetId: 'earth', giverId: null, targetPlanetId: 'mars',
-    })
+    offerCowboysThenUsc(contracts)
     contracts.acceptContract(uscContract.id)
 
     contracts.notifyMissionCompleted({
@@ -359,9 +437,7 @@ describe('ContractSystem mission filters', () => {
 
   it('counts orbital-mission completion at the right planet', () => {
     const { contracts, granted } = createHarness()
-    contracts.notifyMissionCompleted({
-      kind: 'shuttle', giverPlanetId: 'earth', giverId: null, targetPlanetId: 'mars',
-    })
+    offerCowboysThenUsc(contracts)
     contracts.acceptContract(uscContract.id)
     contracts.notifyMissionCompleted({
       kind: 'eva', giverPlanetId: 'earth', giverId: null, targetPlanetId: null,
@@ -386,7 +462,7 @@ describe('ContractSystem persistence', () => {
       messages,
       { load: () => emptyContractSnapshot(), save },
     )
-    sys.notifyMessageArchived(triggerMessage.id)
+    sys.notifyMissionCompleted(sampleShuttleMission)
     sys.acceptContract(cowboysContract.id)
     expect(save).toHaveBeenCalled()
   })

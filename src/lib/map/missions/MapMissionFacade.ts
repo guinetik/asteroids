@@ -36,6 +36,7 @@ import type { Inventory } from '@/lib/inventory/types'
 import type { PlayerProfile } from '@/lib/player/types'
 import { CURRENT_PLAYER_UPGRADE_LEVELS } from '@/lib/upgrades'
 import { PLANETS } from '@/lib/planets/catalog'
+import { ORBIT_SCALE } from '@/lib/planets/constants'
 import {
   clearActiveMission,
   clearCompletedEvaSites,
@@ -74,6 +75,11 @@ import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
 
 const COMPLETED_EVA_SITE_DESPAWN_DISTANCE = 180
 
+function formatWaypointDebug(worldX: number, worldZ: number): string {
+  const radiusWorld = Math.hypot(worldX, worldZ)
+  return `world=(${worldX.toFixed(2)}, ${worldZ.toFixed(2)}) au=(${(worldX / ORBIT_SCALE).toFixed(3)}, ${(worldZ / ORBIT_SCALE).toFixed(3)}) r=${radiusWorld.toFixed(2)} (${(radiusWorld / ORBIT_SCALE).toFixed(3)} AU)`
+}
+
 /** Mission board UI, waypoints, EVA POIs, and orbital minigame wiring for the map. */
 export class MapMissionFacade {
   board: ShuttleMissionBoard = createMissionBoard()
@@ -83,6 +89,7 @@ export class MapMissionFacade {
 
   private missionWaypointRoot: THREE.Group | null = null
   private missionOrbitWaypointMarker: THREE.Group | null = null
+  private missionAsteroidPreviewRoot: THREE.Group | null = null
   private missionAsteroidPreviewMesh: THREE.Mesh | null = null
 
   private evaWaypointRoot: THREE.Group | null = null
@@ -248,6 +255,9 @@ export class MapMissionFacade {
       console.warn('[MapMissionFacade] No asteroid contract drafted:', err)
       return
     }
+    console.warn(
+      `[MapMissionFacade] Drafted asteroid mission "${mission.name}" from ${host.planetId} @ ${formatWaypointDebug(host.worldX, host.worldZ)} -> waypoint ${formatWaypointDebug(mission.waypoint.worldX, mission.waypoint.worldZ)} difficulty=${difficulty} region=${mission.region}`,
+    )
     this.board = offerAsteroidMission(this.board, mission)
     onMissionBoardUpdate?.(this.board)
   }
@@ -434,7 +444,14 @@ export class MapMissionFacade {
       scene.add(root)
       this.missionWaypointRoot = root
       this.missionOrbitWaypointMarker = waypoint
-      void this.spawnMissionAsteroidPreview(root, mission!)
+      const previewRoot = new THREE.Group()
+      previewRoot.position.copy(root.position)
+      scene.add(previewRoot)
+      this.missionAsteroidPreviewRoot = previewRoot
+      console.warn(
+        `[MapMissionFacade] Spawned asteroid mission site "${mission!.name}" at ${formatWaypointDebug(mission!.waypoint.worldX, mission!.waypoint.worldZ)}`,
+      )
+      void this.spawnMissionAsteroidPreview(previewRoot, mission!)
     } else if (!shouldShowAsteroidMissionMapSite(mission) && this.missionWaypointRoot) {
       this.disposeWaypointSite(scene)
     }
@@ -640,7 +657,7 @@ export class MapMissionFacade {
   ): Promise<void> {
     try {
       const mesh = await createMapMissionAsteroidPreviewMesh(missionAsteroidShapeSeed(mission.id))
-      if (this.missionWaypointRoot !== root) {
+      if (this.missionAsteroidPreviewRoot !== root) {
         disposeMapMissionAsteroidPreviewMesh(mesh)
         return
       }
@@ -766,6 +783,10 @@ export class MapMissionFacade {
     if (this.missionAsteroidPreviewMesh) {
       disposeMapMissionAsteroidPreviewMesh(this.missionAsteroidPreviewMesh)
       this.missionAsteroidPreviewMesh = null
+    }
+    if (this.missionAsteroidPreviewRoot) {
+      scene.remove(this.missionAsteroidPreviewRoot)
+      this.missionAsteroidPreviewRoot = null
     }
     if (this.missionOrbitWaypointMarker) {
       disposeWaypointMarkerGroup(this.missionOrbitWaypointMarker)

@@ -156,6 +156,10 @@ export function loadMissionBoard(): ShuttleMissionBoard | null {
       offeredMission: board.offeredMission ?? null,
       offeringPlanet: board.offeringPlanet ?? null,
       offeredAsteroidMission: board.offeredAsteroidMission ?? null,
+      offeringAsteroidPlanet:
+        typeof board.offeringAsteroidPlanet === 'string'
+          ? board.offeringAsteroidPlanet
+          : board.offeredAsteroidMission?.originPlanetId ?? null,
       activeAsteroidMission: board.activeAsteroidMission ?? null,
       offeredEvaMission: board.offeredEvaMission ?? null,
       offeringEvaPlanet: board.offeringEvaPlanet ?? null,

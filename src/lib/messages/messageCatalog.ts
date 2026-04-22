@@ -88,23 +88,24 @@ export const JAY_FIRST_SLINGSHOT_MESSAGE: ShipMessageDefinition = {
 }
 
 /**
- * Heads-up Jay sends a few seconds after the slingshot message is archived. Lives
- * in the default inbox; archiving it offers the Space Cowboys, Inc. contract in
- * its dedicated mail folder.
+ * Heads-up Jay sends a few seconds after the first-slingshot message is archived. Lives
+ * in the default inbox. The actual Space Cowboys, Inc. contract is offered to the
+ * **mail folder** the moment the player completes **any** first mission, not when
+ * this message is archived.
  */
 export const JAY_CONTRACT_INCOMING_MESSAGE: ShipMessageDefinition = {
   id: 'jay-contract-incoming',
   from: 'Jay Mercer',
-  subject: 'Dropped Something In Your Queue',
+  subject: 'After Your First Run — Partner Paperwork',
   sentAt: '2306-04-05 08:48 UTC',
   trigger: 'contract',
   delivery: 'inbox_prompt',
   priority: JAY_MESSAGE_PRIORITY,
   body: [
     'Hey, you got Jay.',
-    "Quick heads up — I just routed you a real contract. Not a one-off shuttle run, the actual paperwork. Space Cowboys, Inc., partner-tier, our first job together.",
-    'It dropped in its own folder in your mail program. Open the shuttle terminal, hit the mail tab, you will see a "Space Cowboys, Inc." entry on the left. Read it when you get a sec, accept it if you are still in.',
-    'No rush. Archive this one when you are done with it and pop over there.',
+    "I am not parking the real Space Cowboys, Inc. contract in your mail until you have one real job under your belt — shuttle, lander, anything that pays. Close something out, then the system will open a new folder with the partner offer.",
+    'Until you see that, you are on starter boards only. The logo can wait. Your flight hours cannot.',
+    'When the folder shows up, read it, accept it if you are still in, and we are fifty-fifty on everything after.',
     '— Jay',
   ],
 }

@@ -110,12 +110,13 @@ describe('rollObjective', () => {
 })
 
 describe('generateAsteroidWaypointNearHostPlanet', () => {
-  it('keeps early Earth asteroid waypoints inside the 3–5 Earth-radius onboarding band', () => {
+  it("keeps early Earth asteroid waypoints outside 1.5x the Moon's local orbit", () => {
     const earth = getPlanet('earth')
     const hostR = earth.orbit.semiMajorAxis * ORBIT_SCALE
+    const moonOrbitWorld = (earth.moons[0]!.orbit.semiMajorAxis * SIZE_SCALE) / 150
     const earthRadiusWorld = earth.displayRadius * SIZE_SCALE
-    const minDistance = earthRadiusWorld * 3
-    const maxDistance = earthRadiusWorld * 5
+    const minDistance = Math.max(moonOrbitWorld * 1.5, earthRadiusWorld * 3)
+    const maxDistance = Math.max(minDistance + earthRadiusWorld * 2, moonOrbitWorld * 2.25)
 
     for (let i = 0; i < 40; i++) {
       const wp = generateAsteroidWaypointNearHostPlanet(hostR, 0, 1, Math.random, 'earth')

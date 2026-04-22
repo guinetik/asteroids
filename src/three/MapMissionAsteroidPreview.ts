@@ -16,15 +16,18 @@ import { loadGLB, fixMaterials } from '@/three/loadGLB'
 const MAP_MISSION_ASTEROID_GLB_URL = '/models/asteroids.glb'
 
 /**
- * Uniform scale after centering geometry at the origin (tripled from the first readable baseline).
+ * Uniform scale after centering geometry at the origin.
+ *
+ * Keep this firmly in "decorative waypoint rock" territory so it never reads as
+ * larger than a nearby planet on the solar map.
  */
-const MAP_MISSION_ASTERO_PREVIEW_SCALE_BASELINE = 60
+const MAP_MISSION_ASTERO_PREVIEW_SCALE_BASELINE = 0.34
 
-/** Prior preview scale multiplier before {@link MAP_MISSION_ASTERO_PREVIEW_MAP_SIZE_RECENT_BUMP}. */
-const MAP_MISSION_ASTERO_PREVIEW_MAP_SIZE_FACTOR_BASE = 0.92
+/** Map readability factor after the post-marker separation rework. */
+const MAP_MISSION_ASTERO_PREVIEW_MAP_SIZE_FACTOR_BASE = 0.85
 
-/** Recent visual-only resize applied on top of {@link MAP_MISSION_ASTERO_PREVIEW_MAP_SIZE_FACTOR_BASE}. */
-const MAP_MISSION_ASTERO_PREVIEW_MAP_SIZE_RECENT_BUMP = 1.12
+/** Small visual-only trim to keep the mesh comfortably sub-planet-sized. */
+const MAP_MISSION_ASTERO_PREVIEW_MAP_SIZE_RECENT_BUMP = 0.92
 
 const MAP_MISSION_ASTERO_PREVIEW_MAP_SIZE_FACTOR =
   MAP_MISSION_ASTERO_PREVIEW_MAP_SIZE_FACTOR_BASE * MAP_MISSION_ASTERO_PREVIEW_MAP_SIZE_RECENT_BUMP
@@ -32,8 +35,8 @@ const MAP_MISSION_ASTERO_PREVIEW_MAP_SIZE_FACTOR =
 const MAP_MISSION_ASTERO_PREVIEW_BASE_SCALE =
   MAP_MISSION_ASTERO_PREVIEW_SCALE_BASELINE * MAP_MISSION_ASTERO_PREVIEW_MAP_SIZE_FACTOR
 
-/** Local X offset (parent applies screen scaling) so the mesh clears the cyan beam column. */
-const MAP_MISSION_ASTERO_PREVIEW_LOCAL_OFFSET_X = 14
+/** Local X offset so the mesh clears the cyan beam column without looking detached. */
+const MAP_MISSION_ASTERO_PREVIEW_LOCAL_OFFSET_X = 0.42
 
 /** Warm emissive tint so the rock reads under map lighting (matches belt tuning). */
 const MAP_MISSION_ASTERO_PREVIEW_EMISSIVE_RGB: readonly [number, number, number] = [

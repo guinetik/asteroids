@@ -172,10 +172,14 @@ export class ContractSystem {
       const g = event.giverPlanetId
       nextGiver[g] = (nextGiver[g] ?? 0) + 1
     }
+    const prevByKind = this.snapshot.missionCompletionsByKind ?? {}
+    const nextByKind: typeof prevByKind = { ...prevByKind }
+    nextByKind[event.kind] = (nextByKind[event.kind] ?? 0) + 1
     this.snapshot = {
       ...this.snapshot,
       observedMissionCompletions: this.snapshot.observedMissionCompletions + 1,
       giverPlanetCompletions: nextGiver,
+      missionCompletionsByKind: nextByKind,
     }
 
     let changed = false
@@ -183,6 +187,16 @@ export class ContractSystem {
     for (const contract of this.contracts.values()) {
       if (contract.triggerOnMissionCompletedNth === undefined) continue
       if (this.snapshot.observedMissionCompletions !== contract.triggerOnMissionCompletedNth) continue
+      if (this.snapshot.instances[contract.id]) continue
+      this.offerContract(contract)
+      changed = true
+    }
+
+    for (const contract of this.contracts.values()) {
+      const t = contract.triggerOnMissionOfKind
+      if (t === undefined) continue
+      if (t.missionType !== event.kind) continue
+      if ((this.snapshot.missionCompletionsByKind?.[t.missionType] ?? 0) !== t.n) continue
       if (this.snapshot.instances[contract.id]) continue
       this.offerContract(contract)
       changed = true

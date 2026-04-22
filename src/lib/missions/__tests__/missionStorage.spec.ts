@@ -57,6 +57,7 @@ const MOCK_BOARD: ShuttleMissionBoard = {
     },
   ],
   offeredAsteroidMission: null,
+  offeringAsteroidPlanet: null,
   activeAsteroidMission: MOCK_MISSION,
   asteroidRestockTimer: { remaining: 60, total: 120 },
   offeredEvaMission: {
