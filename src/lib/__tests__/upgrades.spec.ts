@@ -236,6 +236,14 @@ describe('turret mining upgrades', () => {
     expect(getCurrentUpgradeValue('turretMiningYield')).toBe(2.25)
   })
 
+  it('turretMiningCharge scales across levels', () => {
+    expect(getCurrentUpgradeValue('turretMiningCharge')).toBe(1.0)
+    CURRENT_PLAYER_UPGRADE_LEVELS.turretMiningCharge = 1
+    expect(getCurrentUpgradeValue('turretMiningCharge')).toBe(1.35)
+    CURRENT_PLAYER_UPGRADE_LEVELS.turretMiningCharge = 3
+    expect(getCurrentUpgradeValue('turretMiningCharge')).toBe(2.2)
+  })
+
   it('turretMiningEfficiency scales down across levels', () => {
     expect(getCurrentUpgradeValue('turretMiningEfficiency')).toBe(1.0)
     CURRENT_PLAYER_UPGRADE_LEVELS.turretMiningEfficiency = 1

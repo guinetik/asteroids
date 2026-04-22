@@ -79,6 +79,7 @@ export type UpgradeId =
   | 'suitMobility'
   | 'turretMiningUnlock'
   | 'turretMiningYield'
+  | 'turretMiningCharge'
   | 'turretMiningEfficiency'
 
 /** Runtime player upgrade levels keyed by upgrade id. */
@@ -129,6 +130,24 @@ export function hydratePlayerUpgradeLevelsFromStorage(): void {
  */
 export function saveCurrentPlayerUpgradesToStorage(): void {
   saveStoredPlayerUpgrades(CURRENT_PLAYER_UPGRADE_LEVELS as unknown as Record<string, number>)
+}
+
+/**
+ * Ensure an upgrade is at least `minLevel` (capped to catalog `maxLevel`).
+ * Idempotent: does nothing if already at or above. Persists to storage.
+ *
+ * @param upgradeId - Catalog upgrade to bump.
+ * @param minLevel - Target minimum level.
+ * @returns True when a higher level was written.
+ */
+export function ensureUpgradeAtLeast(upgradeId: UpgradeId, minLevel: number): boolean {
+  const def = UPGRADE_DEFINITIONS[upgradeId]
+  const target = Math.max(0, Math.min(def.maxLevel, Math.floor(minLevel)))
+  const current = CURRENT_PLAYER_UPGRADE_LEVELS[upgradeId] ?? 0
+  if (current >= target) return false
+  CURRENT_PLAYER_UPGRADE_LEVELS[upgradeId] = target
+  saveCurrentPlayerUpgradesToStorage()
+  return true
 }
 
 /**
@@ -274,6 +293,11 @@ export function getShuttleThrusterChargeModifiers(levels: UpgradeLevels): Shuttl
  */
 export function getCurrentShuttleThrusterChargeModifiers(): ShuttleThrusterChargeModifiers {
   return getShuttleThrusterChargeModifiers(CURRENT_PLAYER_UPGRADE_LEVELS)
+}
+
+/** Turret-mining beam recharge multiplier derived from `turretMiningCharge`. */
+export function getCurrentTurretMiningChargeMultiplier(): number {
+  return getCurrentUpgradeValue('turretMiningCharge')
 }
 
 /**

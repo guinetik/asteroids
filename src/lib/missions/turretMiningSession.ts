@@ -151,9 +151,13 @@ export function offerTurretMiningMission(
 export function takeTurretMiningMission(board: ShuttleMissionBoard): ShuttleMissionBoard {
   if (!board.offeredMiningMission || !board.offeringMiningPlanet) return board
 
+  const pool = getTurretMiningPool(board.offeringMiningPlanet)
+  if (!pool) return board
+
   const newActive: ActiveTurretMiningMission = {
     template: board.offeredMiningMission,
     giverPlanet: board.offeringMiningPlanet,
+    giverId: pool.giverId,
   }
 
   const total = randomMiningRestockDuration()

@@ -326,6 +326,11 @@ export interface TurretMiningMissionPool {
   planetId: string
   /** Display name of the giver organization (e.g. "Martian Marines Corps"). */
   giverName: string
+  /**
+   * Stable id for contract filters and future scripting (e.g. `martian-marines`
+   * for the MMC mining board at Mars).
+   */
+  giverId: string
   /** Missions in this planet's mining pool. */
   missions: TurretMiningMissionTemplate[]
 }
@@ -341,6 +346,11 @@ export interface ActiveTurretMiningMission {
   template: TurretMiningMissionTemplate
   /** Planet where the mission was accepted (and where delivery must occur). */
   giverPlanet: string
+  /**
+   * Giver org id (from the pool), for contract and telemetry matching.
+   * Omitted on boards accepted before the field existed — resolved at deliver time.
+   */
+  giverId?: string
 }
 
 // ---------------------------------------------------------------------------

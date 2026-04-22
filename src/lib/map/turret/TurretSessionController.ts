@@ -12,7 +12,7 @@ import * as THREE from 'three'
 import { InputManager } from '@/lib/InputManager'
 import { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
 import { getItemDefinition } from '@/lib/inventory/catalog'
-import { getCurrentUpgradeValue } from '@/lib/upgrades'
+import { getCurrentTurretMiningChargeMultiplier, getCurrentUpgradeValue } from '@/lib/upgrades'
 import type { ThrusterRuntimeModifiers, ShuttleThrusterName } from '@/lib/physics/thrusterSystem'
 import { TurretSession, type TurretSessionTickInput, type TurretPhase } from './TurretSession'
 import {
@@ -78,6 +78,12 @@ export interface TurretHudState {
   reticleValid: boolean
   /** Active target details for the HUD panel; null when nothing is under the reticle. */
   target: TurretHudTarget | null
+  /** Current turret charge ratio (0..1) for heat/cooldown messaging. */
+  chargeRatio: number
+  /** Minimum ratio required before the beam can re-arm after cooling. */
+  relockRatio: number
+  /** Optional status message surfaced by the turret HUD. */
+  statusLabel: string | null
 }
 
 /** Extra target metadata surfaced to the Vue turret HUD. */
@@ -99,6 +105,7 @@ export interface TurretHudTarget {
  */
 export class TurretSessionController {
   private static readonly IMPACT_SPARK_INTERVAL_SEC = 1 / 24
+  private static readonly RELOCK_RATIO = 0.5
   private readonly deps: TurretSessionControllerDeps
   private readonly session: TurretSession
   private readonly rig: TurretRigController
@@ -121,6 +128,8 @@ export class TurretSessionController {
   private readonly impactRight = new THREE.Vector3()
   private readonly impactUp = new THREE.Vector3()
   private sparkBurstCooldown = 0
+  private beamLatched = false
+  private overheatLocked = false
 
   /** True while session is in any non-idle phase. */
   get isActive(): boolean {
@@ -194,7 +203,14 @@ export class TurretSessionController {
     // Emit phase for the Vue HUD during opening/closing too; handleActiveTick
     // emits its own hud state with reticleValid while firing.
     if (this.session.phase !== 'active') {
-      this.deps.onHudState?.({ phase: this.session.phase, reticleValid: false, target: null })
+      this.deps.onHudState?.({
+        phase: this.session.phase,
+        reticleValid: false,
+        target: null,
+        chargeRatio: 0,
+        relockRatio: TurretSessionController.RELOCK_RATIO,
+        statusLabel: null,
+      })
     }
   }
 
@@ -226,6 +242,8 @@ export class TurretSessionController {
     this.tractor.setTarget(this.rig.turretBase)
     this.impactEmitter.reset()
     this.sparkBurstCooldown = 0
+    this.beamLatched = false
+    this.overheatLocked = false
     this.deps.host.setActiveCamera(this.rig.camera)
     this.requestPointerLock()
 
@@ -300,6 +318,8 @@ export class TurretSessionController {
     this.yieldSystem = null
     this.firing = false
     this.mouseFireHeld = false
+    this.beamLatched = false
+    this.overheatLocked = false
     this.impactEmitter.reset()
     this.sparkBurstCooldown = 0
     this.deps.shuttleController.unfreeze()
@@ -347,8 +367,25 @@ export class TurretSessionController {
     this.firing = this.mouseFireHeld
     const thrusterSystem = this.deps.shuttleController.thrusterSystem
     const modifiers = this.buildThrusterModifiers()
+    const turretState = thrusterSystem.getState('turretMining' as ShuttleThrusterName)
+    const chargeRatio =
+      turretState.capacity > 0 ? turretState.charge / turretState.capacity : 0
+    if (this.overheatLocked && chargeRatio >= TurretSessionController.RELOCK_RATIO) {
+      this.overheatLocked = false
+    }
     const canFire = thrusterSystem.canFire('turretMining' as ShuttleThrusterName, modifiers)
-    const beamActive = this.firing && canFire
+    const thresholdReady = chargeRatio >= TurretSessionController.RELOCK_RATIO
+
+    if (!this.firing) {
+      this.beamLatched = false
+      if (chargeRatio < TurretSessionController.RELOCK_RATIO) {
+        this.overheatLocked = true
+      }
+    } else if (!this.beamLatched && !this.overheatLocked && thresholdReady && canFire) {
+      this.beamLatched = true
+    }
+
+    const beamActive = this.firing && this.beamLatched && canFire
 
     if (beamActive) {
       const length = hit?.distance ?? TURRET_BEAM_MAX_RANGE
@@ -375,7 +412,28 @@ export class TurretSessionController {
     } else {
       this.rig.hideBeam()
     }
-    this.deps.onHudState?.({ phase: this.session.phase, reticleValid, target })
+    if (this.beamLatched && !beamActive) {
+      this.beamLatched = false
+      if (chargeRatio < TurretSessionController.RELOCK_RATIO) {
+        this.overheatLocked = true
+      }
+    }
+
+    const statusLabel = this.overheatLocked
+      ? `OVERHEATED - COOL TO ${Math.round(TurretSessionController.RELOCK_RATIO * 100)}%`
+      : !this.beamLatched && this.firing && !thresholdReady
+        ? `CHARGE ${Math.round(chargeRatio * 100)}% / ${Math.round(
+          TurretSessionController.RELOCK_RATIO * 100,
+        )}%`
+        : null
+    this.deps.onHudState?.({
+      phase: this.session.phase,
+      reticleValid,
+      target,
+      chargeRatio,
+      relockRatio: TurretSessionController.RELOCK_RATIO,
+      statusLabel,
+    })
 
     const activeRecord: Record<ShuttleThrusterName, boolean> = {
       thrust: false,
@@ -391,7 +449,11 @@ export class TurretSessionController {
 
   private buildThrusterModifiers(): ThrusterRuntimeModifiers<ShuttleThrusterName> {
     const efficiency = getCurrentUpgradeValue('turretMiningEfficiency')
-    return { fuelCostMultiplier: { turretMining: efficiency } }
+    const recharge = getCurrentTurretMiningChargeMultiplier()
+    return {
+      fuelCostMultiplier: { turretMining: efficiency },
+      rechargeRateMultiplier: { turretMining: recharge },
+    }
   }
 
   /** Build a compact composition string for the HUD from the registered loot table. */

@@ -22,7 +22,7 @@ export type ContractMissionType = 'shuttle' | 'asteroid' | 'eva' | 'mining'
 
 /** Tag emitted on every mission-completed event for step matching. */
 export interface MissionCompletedEvent {
-  /** Which mission family completed. */
+  /** Which mission family completed (e.g. turret mining = `mining`). */
   kind: ContractMissionType
   /** Planet id that issued the mission (for shuttle/eva) or the asteroid's home planet (asteroid). */
   giverPlanetId: string | null
@@ -101,6 +101,7 @@ export type ContractStep =
 export type RewardEffect =
   | { type: 'fast-travel'; planetId: string }
   | { type: 'mission-pay-multiplier'; planetId: string; multiplier: number }
+  | { type: 'shuttle-upgrade'; upgradeId: UpgradeId; minLevel: number }
 
 /** Static contract definition authored as JSON. */
 export interface Contract {
@@ -116,6 +117,18 @@ export interface Contract {
   triggerOnMessageArchived?: string
   /** Offer this contract when the player completes their Nth mission overall. */
   triggerOnMissionCompletedNth?: number
+  /**
+   * When set, the intro is offered after another contract is `completed` and
+   * the player has hit the min mission count for a given giver planet (see
+   * `giverPlanetCompletions` in the contract snapshot). Checked at mission
+   * complete and when any contract instance transitions to `completed`.
+   */
+  offerWhenPrerequisites?: {
+    /** Id of a contract the player must have finished. */
+    requiredCompletedContractId: string
+    /** Giver planet (posting world) and how many completed missions to require. */
+    minGiverPlanetCompletions: { planetId: string; min: number }
+  }
   /** Subject for the offer/intro message. */
   introSubject: string
   /** Body paragraphs for the offer/intro message (rendered above the Accept button). */
@@ -163,6 +176,12 @@ export interface ContractStoreSnapshot {
   instances: Record<string, ContractInstance>
   /** Total mission completions observed since the system was first booted (used by Nth triggers). */
   observedMissionCompletions: number
+  /**
+   * Count of completed missions whose `giverPlanetId` was each planet
+   * (e.g. shuttle / EVA / turret posted from that world). Drives
+   * `offerWhenPrerequisites` checks.
+   */
+  giverPlanetCompletions: Record<string, number>
   /** Schema version for forward-compatible migrations. */
   version: 1
 }

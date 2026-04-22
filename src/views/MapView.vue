@@ -248,6 +248,7 @@ const habitatFadeOpacity = ref(0)
 const turretFadeOpacity = ref(0)
 const turretHudPhase = ref<'idle' | 'opening' | 'active' | 'closing'>('idle')
 const turretReticleValid = ref(false)
+const turretStatusLabel = ref<string | null>(null)
 const turretTarget = ref<{
   label: string
   remainingKg: number
@@ -664,8 +665,12 @@ onMounted(async () => {
     viewController.onTurretHudState = (state) => {
       turretHudPhase.value = state.phase
       turretReticleValid.value = state.reticleValid
+      turretStatusLabel.value = state.statusLabel
       turretTarget.value = state.target
-      if (state.phase !== 'active') turretTarget.value = null
+      if (state.phase !== 'active') {
+        turretTarget.value = null
+        turretStatusLabel.value = null
+      }
     }
     viewController.onResourcePickup = (itemId, quantity, label) => {
       recordPickup(itemId, quantity, label)
@@ -1523,6 +1528,9 @@ watch(
       {{ Math.ceil(turretTarget.remainingKg) }} / {{ Math.round(turretTarget.totalKg) }} KG
     </div>
   </div>
+  <div v-if="turretHudPhase === 'active' && turretStatusLabel" class="turret-status-pill">
+    {{ turretStatusLabel }}
+  </div>
   <PickupToast :pickups="pickups" />
   <transition name="pickup-failed">
     <div
@@ -1625,6 +1633,25 @@ watch(
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: rgba(224, 242, 254, 0.88);
+}
+
+.turret-status-pill {
+  position: fixed;
+  left: 50%;
+  bottom: max(6.75rem, env(safe-area-inset-bottom, 0px) + 5.25rem);
+  z-index: 45;
+  transform: translateX(-50%);
+  padding: 0.55rem 0.9rem;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  border-radius: 999px;
+  background: rgba(42, 10, 10, 0.88);
+  box-shadow: 0 0 20px rgba(248, 113, 113, 0.16);
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(254, 202, 202, 0.96);
+  pointer-events: none;
 }
 
 .pickup-failed {

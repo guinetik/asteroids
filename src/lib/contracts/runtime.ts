@@ -17,7 +17,11 @@ import {
   setMissionPayMultiplier,
   unlockFastTravelPlanet,
 } from '@/lib/player/profile'
-import { getPlayerUpgradeLevelsSnapshot, type UpgradeId } from '@/lib/upgrades'
+import {
+  ensureUpgradeAtLeast,
+  getPlayerUpgradeLevelsSnapshot,
+  type UpgradeId,
+} from '@/lib/upgrades'
 import { CONTRACT_CATALOG } from './contractCatalog'
 import { ContractSystem } from './ContractSystem'
 import type { RewardEffect } from './contractTypes'
@@ -40,6 +44,8 @@ function applyRewardToProfile(effect: RewardEffect): void {
     next = unlockFastTravelPlanet(next, effect.planetId)
   } else if (effect.type === 'mission-pay-multiplier') {
     next = setMissionPayMultiplier(next, effect.planetId, effect.multiplier)
+  } else if (effect.type === 'shuttle-upgrade') {
+    ensureUpgradeAtLeast(effect.upgradeId, effect.minLevel)
   }
   if (next !== profile) saveProfile(next)
 }

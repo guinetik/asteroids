@@ -64,7 +64,7 @@ export const DEFAULT_SHUTTLE_CONFIG: ThrusterSystemConfig<ShuttleThrusterName> =
     thrust: { capacity: 100, burnRate: 54, rechargeRate: 21, fuelCostPerRecharge: 0.5 },
     brake: { capacity: 60, burnRate: 60, rechargeRate: 5, fuelCostPerRecharge: 0.6 },
     rcs: { capacity: 60, burnRate: 8, rechargeRate: 5, fuelCostPerRecharge: 0.2 },
-    turretMining: { capacity: 100, burnRate: 20, rechargeRate: 25, fuelCostPerRecharge: 0.8 },
+    turretMining: { capacity: 100, burnRate: 14, rechargeRate: 35, fuelCostPerRecharge: 0.8 },
   },
   fuelCapacity: SHUTTLE_BASE_FUEL_CAPACITY,
 }
