@@ -14,6 +14,9 @@
  *   the player is flying the shuttle (i.e. not inside the habitat).
  * - `ambient.habitat`         — habitat ambient bed; active while
  *   inside the parked shuttle interior.
+ * - `ambient.engine`          — layered with habitat while inside the
+ *   parked shuttle (idle systems hum).
+ * - `ambient.shuttleMission`  — canvas orbital minigame bed (`shuttle.mp3`).
  * - `ambient.anomaly`         — gravitational anomaly proximity loop;
  *   gated by {@link notifyAnomalyProximityStart} / {@link notifyAnomalyProximityEnd}.
  * - `sfx.slingshot.charge`    — slingshot charge whine loop; gated by
@@ -48,6 +51,11 @@ import type { AudioPlaybackHandle } from './audioTypes'
 const WORMHOLE_RATE_MIN = 0.5
 const WORMHOLE_RATE_MAX = 2.0
 
+/** Fuel fraction at or below which `sfx.fuelWarning` may fire (shuttle). */
+const SHUTTLE_LOW_FUEL_FRACTION = 0.2
+/** Hysteresis: latch clears above this fraction to avoid boundary flutter. */
+const SHUTTLE_LOW_FUEL_CLEAR_FRACTION = 0.22
+
 /** Per-frame state pushed by the host view. */
 export interface ShuttleAudioState {
   /**
@@ -71,6 +79,10 @@ export class ShuttleAudioDirector {
   private spaceAmbient: AudioHandle = null
   /** Habitat ambient bed; active between {@link notifyEnterHabitat} and {@link notifyExitHabitat}. */
   private habitatAmbient: AudioHandle = null
+  /** Engine idle bed; layered with {@link habitatAmbient} in the habitat. */
+  private engineAmbient: AudioHandle = null
+  /** Interactive orbital minigame canvas bed; gated by {@link notifyShuttleMissionBed}. */
+  private shuttleMissionBed: AudioHandle = null
   /** Anomaly proximity loop; active while inside a gravitational disturbance. */
   private anomalyAmbient: AudioHandle = null
   /** Slingshot charge whine loop; gated by per-frame {@link update}. */
@@ -82,6 +94,11 @@ export class ShuttleAudioDirector {
   private active = false
   /** True when the player is currently inside the habitat interior. */
   private insideHabitat = false
+  /**
+   * Latches after a low-fuel warning until fraction rises above
+   * {@link SHUTTLE_LOW_FUEL_CLEAR_FRACTION}.
+   */
+  private shuttleFuelLowLatched = false
 
   /**
    * Begin shuttle audio output. Starts the map (space) ambient bed.
@@ -137,6 +154,44 @@ export class ShuttleAudioDirector {
   }
 
   /**
+   * Per-frame shuttle fuel check for the map view. Plays `sfx.fuelWarning`
+   * once when fraction drops through ~20%.
+   *
+   * @param fuelLevel    - Current fuel units.
+   * @param fuelCapacity - Tank capacity (must be &gt; 0).
+   * @param shuttleAlive - False skips the check (e.g. destroyed shuttle).
+   */
+  tickShuttleFuelTelemetry(fuelLevel: number, fuelCapacity: number, shuttleAlive: boolean): void {
+    if (!shuttleAlive || fuelCapacity <= 0) return
+    const ratio = fuelLevel / fuelCapacity
+    if (ratio > SHUTTLE_LOW_FUEL_CLEAR_FRACTION) {
+      this.shuttleFuelLowLatched = false
+    } else if (ratio <= SHUTTLE_LOW_FUEL_FRACTION && !this.shuttleFuelLowLatched) {
+      this.shuttleFuelLowLatched = true
+      this.audio.play('sfx.fuelWarning')
+    }
+  }
+
+  /**
+   * Starts or stops the orbital minigame ambient bed (`ambient.shuttleMission`).
+   *
+   * @param active - True while a canvas shuttle mission overlay is visible.
+   */
+  notifyShuttleMissionBed(active: boolean): void {
+    if (active) {
+      if (this.shuttleMissionBed === null) {
+        this.shuttleMissionBed = this.audio.play('ambient.shuttleMission', { loop: true })
+      }
+      return
+    }
+    if (this.shuttleMissionBed !== null) {
+      this.shuttleMissionBed.stop()
+      this.shuttleMissionBed = null
+    }
+    this.audio.stopSound('ambient.shuttleMission')
+  }
+
+  /**
    * Player just entered the habitat (parked shuttle interior). Swaps
    * the space ambient bed for the habitat ambient bed.
    *
@@ -154,6 +209,9 @@ export class ShuttleAudioDirector {
     if (this.habitatAmbient === null) {
       this.habitatAmbient = this.audio.play('ambient.habitat', { loop: true })
     }
+    if (this.engineAmbient === null) {
+      this.engineAmbient = this.audio.play('ambient.engine', { loop: true })
+    }
   }
 
   /**
@@ -168,6 +226,11 @@ export class ShuttleAudioDirector {
       this.habitatAmbient = null
     }
     this.audio.stopSound('ambient.habitat')
+    if (this.engineAmbient !== null) {
+      this.engineAmbient.stop()
+      this.engineAmbient = null
+    }
+    this.audio.stopSound('ambient.engine')
     if (this.active && this.spaceAmbient === null) {
       this.spaceAmbient = this.audio.play('ambient.space', { loop: true })
     }
@@ -307,6 +370,7 @@ export class ShuttleAudioDirector {
    * won't reach zero on their own.
    */
   notifyShuttleDestroyed(): void {
+    this.shuttleFuelLowLatched = false
     this.audio.stopCategory('sfx')
     this.chargeLoop = null
     this.wormholeLoop = null
@@ -315,6 +379,11 @@ export class ShuttleAudioDirector {
       this.anomalyAmbient = null
     }
     this.audio.stopSound('ambient.anomaly')
+    if (this.shuttleMissionBed !== null) {
+      this.shuttleMissionBed.stop()
+      this.shuttleMissionBed = null
+    }
+    this.audio.stopSound('ambient.shuttleMission')
   }
 
   /**
@@ -332,6 +401,10 @@ export class ShuttleAudioDirector {
     this.spaceAmbient = null
     this.habitatAmbient?.stop()
     this.habitatAmbient = null
+    this.engineAmbient?.stop()
+    this.engineAmbient = null
+    this.shuttleMissionBed?.stop()
+    this.shuttleMissionBed = null
     this.anomalyAmbient?.stop()
     this.anomalyAmbient = null
     this.chargeLoop?.stop()
@@ -343,6 +416,8 @@ export class ShuttleAudioDirector {
     // hot-reload or external `play(..., { loop: true })` call).
     this.audio.stopSound('ambient.space')
     this.audio.stopSound('ambient.habitat')
+    this.audio.stopSound('ambient.engine')
+    this.audio.stopSound('ambient.shuttleMission')
     this.audio.stopSound('ambient.anomaly')
   }
 }

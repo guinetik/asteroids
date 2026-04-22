@@ -87,6 +87,7 @@ export const AUDIO_SOUND_IDS = [
   // Ambient
   'ambient.space',
   'ambient.engine',
+  'ambient.shuttleMission',
   'ambient.landerCockpit',
   'ambient.habitat',
   'ambient.anomaly',
@@ -693,6 +694,19 @@ const manifestById: ManifestById = {
     load: 'lazy',
     playback: 'single-instance',
     volume: 0.2,
+    effect: 'none',
+  },
+  /**
+   * Shuttle systems bed for interactive orbital minigames (canvas overlays).
+   * Uses the legacy `shuttle.mp3` asset until a dedicated mix replaces it.
+   */
+  'ambient.shuttleMission': {
+    id: 'ambient.shuttleMission',
+    src: '/sound/shuttle.mp3',
+    category: 'ambient',
+    load: 'lazy',
+    playback: 'single-instance',
+    volume: 0.22,
     effect: 'none',
   },
   'ambient.landerCockpit': {

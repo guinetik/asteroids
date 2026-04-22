@@ -75,6 +75,7 @@ describe('audioManifest', () => {
       // ambient
       'ambient.space',
       'ambient.engine',
+      'ambient.shuttleMission',
       'ambient.landerCockpit',
       'ambient.habitat',
       'ambient.anomaly',

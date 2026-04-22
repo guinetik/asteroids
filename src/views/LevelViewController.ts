@@ -1718,10 +1718,13 @@ export class LevelViewController implements Tickable {
           vibrationFactor = intensity / THRUST_VIBRATION_MAX
         }
         this.landerAudio.update(dt, { engineFiring, vibrationFactor })
+        const ts = lander.thrusterSystem
+        this.landerAudio.tickLanderFuelTelemetry(ts.fuelLevel, ts.fuelCapacity)
       } else if (this.atmosphereCtx) {
         // Not in lander mode — clear thrust so wash/shake effects stay silent.
         this.atmosphereCtx.landerThrust = 0
         this.landerAudio.update(dt, { engineFiring: false, vibrationFactor: 0 })
+        this.landerAudio.clearLanderFuelWarningLatch()
       }
 
       if (player) {

@@ -1,6 +1,6 @@
 <!-- src/views/MapView.vue -->
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, shallowRef, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { MapViewController } from './MapViewController'
 import ShuttleHud from '@/components/ShuttleHud.vue'
 import FpsHud, { type FpsTelemetry } from '@/components/FpsHud.vue'
@@ -286,9 +286,7 @@ const missionButtonVisible = ref(false)
 const missionOverlayVisible = ref(false)
 const missionOverlayMission = ref<ActiveShuttleMission | null>(null)
 const missionOverlayCanFit = ref(false)
-const activeOrbitalMinigame = computed(
-  () => viewController.activeMinigame,
-)
+const activeOrbitalMinigame = shallowRef<OrbitalMiniGame | null>(null)
 
 watch(
   [missionOverlayVisible, activeOrbitalMinigame],
@@ -712,6 +710,7 @@ onMounted(async () => {
       missionOverlayVisible.value = visible
       missionOverlayMission.value = mission
       missionOverlayCanFit.value = canFit
+      activeOrbitalMinigame.value = visible ? viewController.activeMinigame : null
     }
     viewController.onMissionBoardUpdate = (board) => {
       missionBoard.value = board

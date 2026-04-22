@@ -20,6 +20,8 @@
  *   intensity-modulated volume; driven by per-frame {@link update}.
  * - `sfx.arrivalSeparation`   — one-shot sting when the dropship
  *   shuttle releases the lander.
+ * - `sfx.fuelWarning`         — one-shot when lander fuel fraction
+ *   drops through ~20% ({@link LanderAudioDirector.tickLanderFuelTelemetry}).
  *
  * Audio explicitly **not** owned here:
  * - Lander main engine (`sfx.lander.thrusterLoop`), descent /
@@ -37,6 +39,11 @@
 
 import { useAudio } from './useAudio'
 import type { AudioPlaybackHandle } from './audioTypes'
+
+/** Fuel fraction at or below which `sfx.fuelWarning` may fire (lander). */
+const LANDER_LOW_FUEL_FRACTION = 0.2
+/** Hysteresis: latch clears above this fraction. */
+const LANDER_LOW_FUEL_CLEAR_FRACTION = 0.22
 
 /** Shake-loop volume at minimum vibration (engine just firing at altitude). */
 const SHAKE_VOL_MIN = 0.08
@@ -77,6 +84,11 @@ export class LanderAudioDirector {
 
   /** True between {@link start} and {@link stop}. */
   private active = false
+  /**
+   * Latches after a low-fuel warning until fraction rises above
+   * {@link LANDER_LOW_FUEL_CLEAR_FRACTION}.
+   */
+  private landerFuelLowLatched = false
 
   /**
    * Begin level audio output. Starts the asteroid wind ambient bed.
@@ -135,6 +147,33 @@ export class LanderAudioDirector {
   }
 
   /**
+   * Per-frame lander fuel check while the player is flying the lander.
+   * Plays `sfx.fuelWarning` once when fraction drops through
+   * {@link LANDER_LOW_FUEL_FRACTION}.
+   *
+   * @param fuelLevel    - Current fuel units.
+   * @param fuelCapacity - Tank capacity (must be &gt; 0).
+   */
+  tickLanderFuelTelemetry(fuelLevel: number, fuelCapacity: number): void {
+    if (!this.active || fuelCapacity <= 0) return
+    const ratio = fuelLevel / fuelCapacity
+    if (ratio > LANDER_LOW_FUEL_CLEAR_FRACTION) {
+      this.landerFuelLowLatched = false
+    } else if (ratio <= LANDER_LOW_FUEL_FRACTION && !this.landerFuelLowLatched) {
+      this.landerFuelLowLatched = true
+      this.audio.play('sfx.fuelWarning')
+    }
+  }
+
+  /**
+   * Call when leaving lander flight (EVA, cinematic, etc.) so the next
+   * lander session can warn again after refuel.
+   */
+  clearLanderFuelWarningLatch(): void {
+    this.landerFuelLowLatched = false
+  }
+
+  /**
    * Arrival cinematic just started — the dropship is descending
    * toward the asteroid with the lander stowed. Starts the cockpit
    * ambient bed for the duration of the cinematic.
@@ -188,6 +227,7 @@ export class LanderAudioDirector {
    * RCS / alarm envelopes never reach zero on their own.
    */
   notifyLanderRunFailed(): void {
+    this.landerFuelLowLatched = false
     this.audio.stopCategory('sfx')
     // The shake loop belongs to category 'sfx', so stopCategory has
     // already silenced it. Drop the handle reference so the next

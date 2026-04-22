@@ -1340,6 +1340,14 @@ export class MapViewController implements Tickable {
       if (this.turretSessionController.phase !== 'idle') return
     }
 
+    // Canvas orbital minigame overlay — freeze the world while the player is in a minigame.
+    // Mirrors the turret early-return pattern: telemetry keeps the HUD alive; everything
+    // else (physics, damage, input) stays paused until the overlay closes.
+    if (this.missionOverlayOpen) {
+      this.emitShuttleTelemetry()
+      return
+    }
+
     // Orbital surfing toggle — checked BEFORE gravity surfing (orbit path priority).
     // No outer isActive() guard — requestToggle handles cancel-during-coupling internally.
     this.orbitalSurfingController.requestToggle(this.getOrbitalSurfingDeps())
