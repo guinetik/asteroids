@@ -147,14 +147,20 @@ export function loadMissionBoard(): ShuttleMissionBoard | null {
       restockTimer: reviveRestockTimer(board.restockTimer, elapsedSeconds),
       asteroidRestockTimer: reviveRestockTimer(board.asteroidRestockTimer, elapsedSeconds),
       evaRestockTimer: reviveRestockTimer(board.evaRestockTimer, elapsedSeconds),
+      miningRestockTimer: reviveRestockTimer(board.miningRestockTimer, elapsedSeconds),
       activeMissions: Array.isArray(board.activeMissions) ? board.activeMissions : [],
       activeEvaMissions: Array.isArray(board.activeEvaMissions) ? board.activeEvaMissions : [],
+      activeMiningMissions: Array.isArray(board.activeMiningMissions)
+        ? board.activeMiningMissions
+        : [],
       offeredMission: board.offeredMission ?? null,
       offeringPlanet: board.offeringPlanet ?? null,
       offeredAsteroidMission: board.offeredAsteroidMission ?? null,
       activeAsteroidMission: board.activeAsteroidMission ?? null,
       offeredEvaMission: board.offeredEvaMission ?? null,
       offeringEvaPlanet: board.offeringEvaPlanet ?? null,
+      offeredMiningMission: board.offeredMiningMission ?? null,
+      offeringMiningPlanet: board.offeringMiningPlanet ?? null,
     }
   } catch {
     return null
