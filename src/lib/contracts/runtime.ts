@@ -67,6 +67,11 @@ shipMessageSystem.onMessageArchived((id) => {
   contractSystem.notifyMessageArchived(id)
 })
 
+// Recovery path: re-apply rewards for any contract that finished in a previous
+// session. Reward effects are idempotent so this is a safe no-op for healthy
+// profiles, and a self-heal for ones that lost the unlock for any reason.
+contractSystem.replayCompletedRewards()
+
 /**
  * Register a callback fired whenever any contract state changes.
  *

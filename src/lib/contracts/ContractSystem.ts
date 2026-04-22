@@ -120,6 +120,27 @@ export class ContractSystem {
   }
 
   /**
+   * Re-fire `onRewardGranted` for every contract instance currently in
+   * `completed` state. Reward effects are required to be idempotent
+   * (`unlockFastTravelPlanet` is a no-op on duplicates, `setMissionPayMultiplier`
+   * never regresses), so this is safe to call on startup as a recovery path
+   * for profiles that lost a reward (e.g. saved before the reward wiring
+   * existed, or via a window the controller was holding a stale profile).
+   *
+   * Persisted instance state is untouched — this only re-applies the reward
+   * side-effects through the registered hook.
+   */
+  replayCompletedRewards(): void {
+    if (!this.hooks.onRewardGranted) return
+    for (const instance of Object.values(this.snapshot.instances)) {
+      if (instance.status !== 'completed') continue
+      const contract = this.contracts.get(instance.contractId)
+      if (!contract) continue
+      this.applyRewards(contract)
+    }
+  }
+
+  /**
    * Notify the system that a message was archived. If any contract was waiting on
    * this id (`triggerOnMessageArchived`), it transitions to `available` and its
    * intro message is delivered to the contract folder.

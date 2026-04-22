@@ -2,6 +2,14 @@
   "planetId": "mars",
   "missions": [
     {
+      "id": "mars_local_methane_marines",
+      "name": "Marines Methane Resupply",
+      "description": "Mars Space Marines garrison needs subsurface methane samples for fuel cell topping. Run a local orbital pickup and bring it back to the spaceport.",
+      "targetPlanet": "mars",
+      "gatherQuantity": 3,
+      "reward": 2200
+    },
+    {
       "id": "mars_venus_acid_reagents",
       "name": "Venusian Acid Reagents",
       "description": "Martian foundries need sulfuric compounds for ore processing. Collect atmospheric gas from Venus.",

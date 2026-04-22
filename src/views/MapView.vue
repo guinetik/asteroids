@@ -40,7 +40,7 @@ import {
   shipMessageSystem,
   setShipMessageFollowUpDeliveryListener,
 } from '@/lib/messages/runtime'
-import { contractSystem } from '@/lib/contracts/runtime'
+import { contractSystem, onContractsChanged } from '@/lib/contracts/runtime'
 import {
   getUpgradeCost,
   getPlayerUpgradeLevelsSnapshot,
@@ -390,14 +390,31 @@ const fastTravelablePlanetIds = computed<Set<string>>(
 const fastTravelDialogVisible = ref(false)
 const fastTravelTargetPlanetId = ref<string>('')
 const fastTravelTargetPlanetLabel = ref<string>('')
+/** Disposer for the contract-change subscription (set in onMounted). */
+let unsubscribeContracts: (() => void) | null = null
 /** Drives the fade-to-black overlay used during the fast travel jump. */
 const fastTravelFadeOpacity = ref(0)
 const FAST_TRAVEL_FADE_MS = 600
 const FAST_TRAVEL_HOLD_MS = 220
+/** Delay between fade-in and the auto orbit lock — short pause so the player
+ * sees the planet on approach before the shuttle "settles" into orbit. */
+const FAST_TRAVEL_AUTO_ORBIT_DELAY_MS = 500
+/** Minimum fuel ratio required to authorize a fast-travel jump. */
+const FAST_TRAVEL_REQUIRED_FUEL_RATIO = 0.85
+/** Fraction of *current* fuel consumed by a fast-travel jump. */
+const FAST_TRAVEL_FUEL_COST_RATIO = 0.8
+
+/** Live 0..1 fuel ratio derived from telemetry. */
+const fuelRatio = computed<number>(() => {
+  if (telemetry.fuelCapacity <= 0) return 0
+  return Math.max(0, Math.min(1, telemetry.fuelLevel / telemetry.fuelCapacity))
+})
 
 /**
  * Handle the player clicking an unlocked planet on the tactical map. Opens the
- * confirmation dialog so they can review the destination before jumping.
+ * confirmation dialog so they can review the destination before jumping. The
+ * dialog itself surfaces the fuel-gate; opening it (rather than blocking the
+ * click) ensures the player can see *why* the jump is unavailable.
  */
 function handleMapPlanetClick(planetId: string, planetName: string): void {
   if (!fastTravelablePlanetIds.value.has(planetId)) return
@@ -421,6 +438,15 @@ async function confirmFastTravel(): Promise<void> {
     fastTravelDialogVisible.value = false
     return
   }
+  if (fuelRatio.value + 1e-6 < FAST_TRAVEL_REQUIRED_FUEL_RATIO) {
+    showMissionNotification(
+      `Fast travel denied — reactor at ${Math.round(fuelRatio.value * 100)}%, need ${Math.round(
+        FAST_TRAVEL_REQUIRED_FUEL_RATIO * 100,
+      )}%`,
+    )
+    fastTravelDialogVisible.value = false
+    return
+  }
   fastTravelDialogVisible.value = false
 
   await new Promise<void>((resolve) => {
@@ -428,6 +454,7 @@ async function confirmFastTravel(): Promise<void> {
     window.setTimeout(resolve, FAST_TRAVEL_FADE_MS)
   })
 
+  viewController.consumeShuttleFuelFraction(FAST_TRAVEL_FUEL_COST_RATIO)
   viewController.fastTravelToPlanet(planetId)
   syncPersistentProgressFromController()
 
@@ -436,6 +463,14 @@ async function confirmFastTravel(): Promise<void> {
   fastTravelFadeOpacity.value = 0
   fastTravelTargetPlanetId.value = ''
   fastTravelTargetPlanetLabel.value = ''
+
+  // Auto-engage orbit capture after the fade-in so the player lands docked at
+  // the destination instead of drifting free — equivalent to pressing E on
+  // arrival, with a short delay so the snap reads as a graceful settle.
+  window.setTimeout(() => {
+    viewController.lockOrbitAtPlanet(planetId)
+    syncPersistentProgressFromController()
+  }, FAST_TRAVEL_AUTO_ORBIT_DELAY_MS)
 }
 
 /** Space Fabric toggle is shown only after Gravity Surfing (shop-hidden upgrade). */
@@ -697,6 +732,16 @@ onMounted(async () => {
     setShipMessageFollowUpDeliveryListener(() => {
       refreshActiveMessage()
     })
+    unsubscribeContracts = onContractsChanged(() => {
+      // Contract reward effects (fast-travel unlocks, pay multipliers) are
+      // written to the persisted profile by the contract runtime. Pull the
+      // updated profile back into the controller so the UI sees the new state
+      // immediately — without this, fast-travel hotspots stay locked until the
+      // next page reload.
+      if (viewController.refreshPlayerProfileFromStorage()) {
+        syncPersistentProgressFromController()
+      }
+    })
     await viewController.init(container.value)
     syncPersistentProgressFromController()
     shopProfile.value = viewController.getPlayerProfileSnapshot()
@@ -710,6 +755,8 @@ onUnmounted(() => {
   clearPickupUi()
   setShipMessageFollowUpDeliveryListener(null)
   stopBackgroundMusic('map')
+  unsubscribeContracts?.()
+  unsubscribeContracts = null
   viewController.dispose()
 })
 
@@ -1108,6 +1155,9 @@ watch(
   <FastTravelConfirmDialog
     :visible="fastTravelDialogVisible"
     :planet-label="fastTravelTargetPlanetLabel"
+    :fuel-ratio="fuelRatio"
+    :required-fuel-ratio="FAST_TRAVEL_REQUIRED_FUEL_RATIO"
+    :fuel-cost-ratio="FAST_TRAVEL_FUEL_COST_RATIO"
     @confirm="confirmFastTravel"
     @cancel="cancelFastTravel"
   />

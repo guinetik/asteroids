@@ -2345,6 +2345,22 @@ export class MapViewController implements Tickable {
   }
 
   /**
+   * Re-read the persisted profile from storage and adopt it as the controller's
+   * in-memory copy. Used after external mutators (e.g. contract reward effects)
+   * write to the profile so the UI sees the new state on the next sync.
+   *
+   * @returns True when the in-memory profile was replaced; false when no stored
+   *   profile is available.
+   */
+  refreshPlayerProfileFromStorage(): boolean {
+    const stored = loadProfile()
+    if (!stored) return false
+    this.playerProfile = stored
+    this.onCreditsUpdate?.(this.playerProfile.credits)
+    return true
+  }
+
+  /**
    * Award credits using the standard persistence + HUD sync flow.
    *
    * @param amount - Positive credit amount to add.
@@ -3189,6 +3205,52 @@ export class MapViewController implements Tickable {
     if (this.mapState.isOpen) {
       this.mapState.close()
     }
+    return true
+  }
+
+  /**
+   * Drain the given fraction of the shuttle's *current* fuel reserves. Used by
+   * the fast-travel flow to charge the burn cost — `0.8` removes 80% of what
+   * the shuttle currently has and leaves the remaining 20% in the tank.
+   *
+   * @param fraction - 0..1 portion of current fuel to consume.
+   * @returns Fuel units actually drained (0 when the shuttle is unavailable).
+   */
+  public consumeShuttleFuelFraction(fraction: number): number {
+    if (!this.shuttleController) return 0
+    if (!Number.isFinite(fraction) || fraction <= 0) return 0
+    const ts = this.shuttleController.thrusterSystem
+    const drain = Math.min(ts.fuelLevel, ts.fuelLevel * Math.max(0, Math.min(1, fraction)))
+    if (drain <= 0) return 0
+    ts.consumeFuel(drain)
+    return drain
+  }
+
+  /**
+   * Snap the shuttle into a stable orbit around the named planet, mirroring the
+   * effect of the player pressing the orbit-action key from a clean approach.
+   * Used as the auto-capture step after a fast-travel jump so the player isn't
+   * dropped in free flight and forced to engage capture themselves.
+   *
+   * @param planetId - Catalog id of the planet to orbit. The sun is rejected
+   *                   because forced orbit only applies to planets.
+   * @returns `true` when the orbit was engaged, `false` when the id was unknown
+   *          or required runtime systems are unavailable.
+   */
+  public lockOrbitAtPlanet(planetId: string): boolean {
+    const key = planetId.trim().toLowerCase()
+    if (!key || key === 'sun') return false
+    if (!this.shuttleController) return false
+    const planet = PLANETS.find((p) => p.id === key)
+    if (!planet) return false
+    const idx = PLANETS.indexOf(planet)
+    const ctrl = this.planetControllers[idx]
+    if (!ctrl) return false
+    this.orbitFacade.beginForcedOrbit(ctrl.getWorldX(), ctrl.getWorldZ(), {
+      shuttleController: this.shuttleController,
+      vehicleCamera: this.vehicleCamera,
+      sceneVisuals: this.sceneVisuals,
+    })
     return true
   }
 
