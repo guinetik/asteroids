@@ -60,7 +60,9 @@ import { LANDER_BASE_HP } from '@/three/LanderController'
 import UpgradeInstalledAnnouncement from '@/components/UpgradeInstalledAnnouncement.vue'
 import JourneyCompletedAnnouncement from '@/components/JourneyCompletedAnnouncement.vue'
 import { Timer, type TimerHandle } from '@/lib/Timer'
-import type { ActiveShipMessage } from '@/lib/messages/messageTypes'
+import type { ActiveShipMessage, ShipMessageDefinition } from '@/lib/messages/messageTypes'
+import MapContractNotice from '@/components/MapContractNotice.vue'
+import { contractNoticeLabel } from '@/lib/messages/contractNoticeLabel'
 import type { MapIntroUiState } from '@/lib/mapIntroState'
 import type { MapViewBootState, MapViewLayerToggleState } from './MapViewController'
 import type { AchievementProgress } from '@/data/achievements'
@@ -102,9 +104,17 @@ const musicEnabled = computed(() => backgroundMusic.isEnabled.value)
 
 const container = ref<HTMLElement>()
 const viewController = new MapViewController()
-const activeMessage = ref<ActiveShipMessage | null>(null)
-const pendingMessageCount = ref(0)
+const activeInboxMessage = ref<ActiveShipMessage | null>(null)
+const activeContractMessage = ref<ActiveShipMessage | null>(null)
+const pendingInboxCount = ref(0)
 const messageDialogVisible = ref(false)
+
+/** Filter predicate for inbox-only (non-contract) messages. */
+const INBOX_FILTER = (def: ShipMessageDefinition): boolean =>
+  def.contractMessageKind === undefined
+/** Filter predicate for contract-origin messages. */
+const CONTRACT_FILTER = (def: ShipMessageDefinition): boolean =>
+  def.contractMessageKind !== undefined
 const messageAudioAutoplayToken = ref(0)
 /**
  * `controlsLocked: true` until the first MapViewController `onMapIntro` sync — hides shuttle HUD for
@@ -120,28 +130,36 @@ const mapIntro = reactive<MapIntroUiState>({
 })
 
 function refreshActiveMessage(): void {
-  const prevCount = pendingMessageCount.value
-  if ((messageDialogVisible.value || mapIntro.messageDialogVisible) && activeMessage.value) {
-    // If the dialog is open, don't swap the message out from under the user.
-    // Just update the count.
-    pendingMessageCount.value = shipMessageSystem.getPendingMessageCount()
-    if (pendingMessageCount.value > prevCount) uiAudio.notifyInboxMessage()
-    return
+  const prevInboxCount = pendingInboxCount.value
+  const prevContractId = activeContractMessage.value?.id ?? null
+
+  // Inbox channel — do not swap the dialog out from under the user.
+  if ((messageDialogVisible.value || mapIntro.messageDialogVisible) && activeInboxMessage.value) {
+    pendingInboxCount.value = shipMessageSystem.getPendingMessageCount(INBOX_FILTER)
+  } else {
+    activeInboxMessage.value = shipMessageSystem.getActiveMessage(INBOX_FILTER)
+    pendingInboxCount.value = shipMessageSystem.getPendingMessageCount(INBOX_FILTER)
+    if (!activeInboxMessage.value) {
+      messageDialogVisible.value = false
+    }
   }
-  activeMessage.value = shipMessageSystem.getActiveMessage()
-  pendingMessageCount.value = shipMessageSystem.getPendingMessageCount()
-  if (pendingMessageCount.value > prevCount) uiAudio.notifyInboxMessage()
-  if (!activeMessage.value) {
-    messageDialogVisible.value = false
+  if (pendingInboxCount.value > prevInboxCount) uiAudio.notifyInboxMessage()
+
+  // Contract channel — independent from the inbox dialog state.
+  const nextContract = shipMessageSystem.getActiveMessage(CONTRACT_FILTER)
+  activeContractMessage.value = nextContract
+  const nextContractId = nextContract?.id ?? null
+  if (nextContractId && nextContractId !== prevContractId) {
+    uiAudio.notifyContractUpdate()
   }
 }
 
 function openMessage(): void {
   uiAudio.notifyConfirm()
-  if (activeMessage.value?.status === 'pending') {
-    shipMessageSystem.markShown(activeMessage.value.id)
-    activeMessage.value = { ...activeMessage.value, status: 'shown' }
-    pendingMessageCount.value = shipMessageSystem.getPendingMessageCount()
+  if (activeInboxMessage.value?.status === 'pending') {
+    shipMessageSystem.markShown(activeInboxMessage.value.id)
+    activeInboxMessage.value = { ...activeInboxMessage.value, status: 'shown' }
+    pendingInboxCount.value = shipMessageSystem.getPendingMessageCount(INBOX_FILTER)
   }
   messageAudioAutoplayToken.value += 1
 
@@ -153,8 +171,8 @@ function openMessage(): void {
 }
 
 function dismissActiveMessage(): void {
-  if (!activeMessage.value) return
-  shipMessageSystem.dismiss(activeMessage.value.id)
+  if (!activeInboxMessage.value) return
+  shipMessageSystem.dismiss(activeInboxMessage.value.id)
   if (mapIntro.controlsLocked) {
     viewController.completeIntroMessage()
   }
@@ -163,10 +181,45 @@ function dismissActiveMessage(): void {
 }
 
 function messagePromptLabel(): string {
-  return pendingMessageCount.value === 1
+  return pendingInboxCount.value === 1
     ? 'You have 1 new message'
-    : `You have ${pendingMessageCount.value} new messages`
+    : `You have ${pendingInboxCount.value} new messages`
 }
+
+/** Computed pill label for the cyan contract-notice channel, or null when no contract message is active. */
+const contractNoticePill = computed<string | null>(() => {
+  const readable = activeContractMessage.value
+  if (!readable) return null
+  const contractId = readable.contractId
+  if (!contractId) return null
+  const contract = contractSystem.getContract(contractId)
+  return contractNoticeLabel(
+    { ...readable, inboxStatus: readable.status },
+    contract?.inboxName ?? null,
+  )
+})
+
+/** Deep-link state forwarded to ShuttleControlOverlay when the cyan pill is clicked. */
+const shuttleControlMailFocusFolderId = ref<string | undefined>(undefined)
+
+/** Deep-link message id forwarded to ShuttleControlOverlay when the cyan pill is clicked. */
+const shuttleControlMailFocusMessageId = ref<string | undefined>(undefined)
+
+/** Opens the shuttle terminal mail tab deep-linked to the contract folder + message. */
+function openContractMessage(): void {
+  const readable = activeContractMessage.value
+  if (!readable?.contractId) return
+  uiAudio.notifyConfirm()
+  shuttleControlMailFocusFolderId.value = readable.contractId
+  shuttleControlMailFocusMessageId.value = readable.id
+  shuttleControlProgramOnOpen.value = 'mail'
+  shuttleControlVisible.value = true
+  if (readable.status === 'pending') {
+    shipMessageSystem.markShown(readable.id)
+  }
+  refreshActiveMessage()
+}
+
 const telemetry = reactive<ShuttleTelemetry>({
   speed: 0,
   heading: 0,
@@ -243,7 +296,11 @@ type ShuttleControlInitialProgram = 'mail' | 'missions' | 'inventory' | 'upgrade
 const shuttleControlProgramOnOpen = ref<ShuttleControlInitialProgram | undefined>(undefined)
 
 watch(shuttleControlVisible, (visible) => {
-  if (!visible) shuttleControlProgramOnOpen.value = undefined
+  if (!visible) {
+    shuttleControlProgramOnOpen.value = undefined
+    shuttleControlMailFocusFolderId.value = undefined
+    shuttleControlMailFocusMessageId.value = undefined
+  }
 })
 /** Upgrade levels shown in the shuttle terminal engineering bay (synced on open / after purchase). */
 const upgradeLevelsUi = ref<Partial<Record<UpgradeId, number>>>(getPlayerUpgradeLevelsSnapshot())
@@ -1310,7 +1367,7 @@ watch(
     :style="{ opacity: fastTravelFadeOpacity }"
     aria-hidden="true"
   />
-  <div v-if="mapIntro.messagePromptVisible && activeMessage" class="map-intro-message-prompt">
+  <div v-if="mapIntro.messagePromptVisible && activeInboxMessage" class="map-intro-message-prompt">
     <button
       type="button"
       class="map-intro-message-prompt__button"
@@ -1324,8 +1381,8 @@ watch(
       !mapOverlay.visible &&
       !mapIntro.controlsLocked &&
       !earthStartupOrbitHudSuppressed &&
-      pendingMessageCount > 0 &&
-      activeMessage &&
+      pendingInboxCount > 0 &&
+      activeInboxMessage &&
       !messageDialogVisible
     "
     class="map-message-notice"
@@ -1338,9 +1395,20 @@ watch(
       {{ messagePromptLabel() }}
     </button>
   </div>
+  <MapContractNotice
+    v-if="
+      !mapOverlay.visible &&
+      !mapIntro.controlsLocked &&
+      !earthStartupOrbitHudSuppressed &&
+      contractNoticePill &&
+      activeContractMessage
+    "
+    :label="contractNoticePill"
+    @click="openContractMessage"
+  />
   <ShipMessageDialog
-    v-if="activeMessage && (mapIntro.messageDialogVisible || messageDialogVisible)"
-    :message="activeMessage"
+    v-if="activeInboxMessage && (mapIntro.messageDialogVisible || messageDialogVisible)"
+    :message="activeInboxMessage"
     :autoplay-token="messageAudioAutoplayToken"
     @dismiss="dismissActiveMessage"
   />
@@ -1402,6 +1470,8 @@ watch(
   <ShuttleControlOverlay
     :visible="shuttleControlVisible"
     :program-to-select-on-open="shuttleControlProgramOnOpen"
+    :mail-focus-folder-id="shuttleControlMailFocusFolderId"
+    :mail-focus-message-id="shuttleControlMailFocusMessageId"
     :inventory="shopInventory"
     :inventory-stacks="shopInventory.stacks"
     :mission-board="missionBoard"
