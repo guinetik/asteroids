@@ -36,6 +36,10 @@ const props = defineProps<{
    * Omit to keep whichever tab was active last time.
    */
   programToSelectOnOpen?: ControlScreen
+  /** Deep-link: folder id to pre-select in the mail program when the overlay opens. */
+  mailFocusFolderId?: string
+  /** Deep-link: message id to pre-select within {@link mailFocusFolderId}. */
+  mailFocusMessageId?: string
 }>()
 
 const emit = defineEmits<{
@@ -197,7 +201,31 @@ function onKeydown(e: KeyboardEvent) {
           class="shuttle-control-content shuttle-control-content--programs"
           :class="{ '!p-0 overflow-hidden': activeScreen === 'shuttle' || activeScreen === 'lander' }"
         >
+          <ShuttleControlProgramMail
+            v-if="activeScreen === 'mail'"
+            :inventory="inventory"
+            :inventory-stacks="inventoryStacks"
+            :board="missionBoard"
+            :docked-planet="dockedPlanet"
+            :upgrade-levels="upgradeLevels ?? {}"
+            :player-credits="playerCredits ?? 0"
+            :telemetry="telemetry"
+            :player-name="playerName"
+            :focus-folder-id="mailFocusFolderId"
+            :focus-message-id="mailFocusMessageId"
+            @accept-mission="$emit('acceptMission')"
+            @deliver-mission="(id: string) => $emit('deliverMission', id)"
+            @accept-asteroid-mission="$emit('acceptAsteroidMission')"
+            @accept-eva-mission="$emit('acceptEvaMission')"
+            @accept-mining-mission="$emit('acceptMiningMission')"
+            @deliver-mining-mission="(missionId: string) => $emit('deliverMiningMission', missionId)"
+            @use-item="(itemId: string) => $emit('useItem', itemId)"
+            @mail-changed="onMailProgramChanged"
+            @purchase-upgrade="emitPurchaseUpgrade"
+            @switch-to-upgrades="activeScreen = 'upgrades'"
+          />
           <component
+            v-else
             :is="activeProgram"
             :inventory="inventory"
             :inventory-stacks="inventoryStacks"
