@@ -15,9 +15,11 @@ describe('journeys', () => {
     profile = applyJourneyTrigger(profile, 'shuttle_control_opened').profile
     profile = applyJourneyTrigger(profile, 'shuttle_program_opened').profile
     profile = applyJourneyTrigger(profile, 'lander_program_opened').profile
-    profile = applyJourneyTrigger(profile, 'bought_shuttle_fuel').profile
     profile = applyJourneyTrigger(profile, 'inventory_opened').profile
     profile = applyJourneyTrigger(profile, 'upgrades_opened').profile
+    profile = applyJourneyTrigger(profile, 'accepted_asteroid_mission').profile
+    profile = applyJourneyTrigger(profile, 'accepted_eva_mission').profile
+    profile = applyJourneyTrigger(profile, 'bought_shuttle_fuel').profile
 
     const beforeExitTracker = buildActiveJourneyTracker(profile)
     const steps = beforeExitTracker?.objectives[0]?.steps ?? []
@@ -57,9 +59,11 @@ describe('act-1-inner-system journey', () => {
     profile = applyJourneyTrigger(profile, 'shuttle_control_opened').profile
     profile = applyJourneyTrigger(profile, 'shuttle_program_opened').profile
     profile = applyJourneyTrigger(profile, 'lander_program_opened').profile
-    profile = applyJourneyTrigger(profile, 'bought_shuttle_fuel').profile
     profile = applyJourneyTrigger(profile, 'inventory_opened').profile
     profile = applyJourneyTrigger(profile, 'upgrades_opened').profile
+    profile = applyJourneyTrigger(profile, 'accepted_asteroid_mission').profile
+    profile = applyJourneyTrigger(profile, 'accepted_eva_mission').profile
+    profile = applyJourneyTrigger(profile, 'bought_shuttle_fuel').profile
     profile = applyJourneyTrigger(profile, 'left_habitat').profile
 
     profile = applyJourneyTrigger(profile, 'contract_completed:usc-venus-certification').profile

@@ -1067,11 +1067,13 @@ function handleAcceptMission() {
 function handleAcceptAsteroidMission() {
   viewController.asteroidMissionAccept()
   uiAudio.notifyMissionAccepted()
+  viewController.notifyJourneyTrigger('accepted_asteroid_mission')
 }
 
 function handleAcceptEvaMission() {
   viewController.evaMissionAccept()
   uiAudio.notifyMissionAccepted()
+  viewController.notifyJourneyTrigger('accepted_eva_mission')
 }
 
 function handleAcceptMiningMission() {

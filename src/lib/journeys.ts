@@ -17,6 +17,8 @@ export type JourneyTriggerId =
   | 'bought_shuttle_fuel'
   | 'inventory_opened'
   | 'upgrades_opened'
+  | 'accepted_asteroid_mission'
+  | 'accepted_eva_mission'
   | 'left_habitat'
 
 /** Progress meter metadata for a tracker step when a step needs sub-progress. */
@@ -113,11 +115,6 @@ const JOURNEY_DEFINITIONS: readonly JourneyDefinition[] = [
         trigger: 'lander_program_opened',
       },
       {
-        id: 'buy-shuttle-fuel',
-        label: 'Explore the shop and buy some Shuttle Fuel',
-        trigger: 'bought_shuttle_fuel',
-      },
-      {
         id: 'open-inventory',
         label: 'Explore the inventory',
         trigger: 'inventory_opened',
@@ -126,6 +123,21 @@ const JOURNEY_DEFINITIONS: readonly JourneyDefinition[] = [
         id: 'open-upgrades',
         label: 'Explore the Upgrades Shop',
         trigger: 'upgrades_opened',
+      },
+      {
+        id: 'accept-asteroid-mission',
+        label: 'Accept an asteroid mission',
+        trigger: 'accepted_asteroid_mission',
+      },
+      {
+        id: 'accept-eva-mission',
+        label: 'Accept an EVA mission',
+        trigger: 'accepted_eva_mission',
+      },
+      {
+        id: 'buy-shuttle-fuel',
+        label: 'Visit the shop and buy Shuttle Fuel',
+        trigger: 'bought_shuttle_fuel',
       },
       {
         id: 'leave-habitat',
