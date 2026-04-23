@@ -11,7 +11,7 @@
  * @date 2026-04-05
  * @spec docs/superpowers/specs/2026-04-20-contracts-design.md
  */
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { shipMessageSystem } from '@/lib/messages/runtime'
 import { uiAudio } from '@/audio/UiAudioDirector'
 import {
@@ -26,6 +26,13 @@ import ContractAcceptCard from './ContractAcceptCard.vue'
 
 const emit = defineEmits<{
   mailChanged: []
+}>()
+
+const props = defineProps<{
+  /** Folder id to force-select when the mail program is opened via deep-link. */
+  focusFolderId?: string
+  /** Message id to force-select within {@link focusFolderId}. */
+  focusMessageId?: string
 }>()
 
 const folders = ref<ShipMessageFolder[]>(shipMessageSystem.listFolders())
@@ -152,6 +159,19 @@ onUnmounted(() => {
 })
 
 refreshAll()
+
+watch(
+  () => [props.focusFolderId, props.focusMessageId] as const,
+  ([folderId, messageId]) => {
+    if (!folderId || !messageId) return
+    if (selectedFolderId.value !== folderId) {
+      selectedFolderId.value = folderId
+      refreshRows()
+    }
+    selectRow(messageId, { autoplayAudio: true })
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
