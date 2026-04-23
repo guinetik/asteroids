@@ -101,7 +101,7 @@ function selectFolder(folderId: string): void {
 }
 
 function selectRow(id: string, options: { autoplayAudio?: boolean } = {}): void {
-  uiAudio.notifyButtonClick()
+  uiAudio.notifyConfirm()
   selectedId.value = id
   if (options.autoplayAudio) {
     selectedAudioAutoplayToken.value += 1
