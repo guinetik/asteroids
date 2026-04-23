@@ -70,6 +70,47 @@ describe('EnemyDirector', () => {
     expect(() => director.spawn('unknown', 0, 0, 0)).toThrow('Unknown enemy type')
   })
 
+  // --- Spawn listeners ---
+
+  it('fires spawn listeners for future spawns', () => {
+    const observed: number[] = []
+    director.addSpawnListener((handle) => observed.push(handle.id))
+    const h1 = director.spawn('bacteriophage', 0, 0, 0)
+    const h2 = director.spawn('bacteriophage', 1, 0, 1)
+    expect(observed).toEqual([h1.id, h2.id])
+  })
+
+  it('replays existing enemies to a listener that subscribes after spawn', () => {
+    const h1 = director.spawn('bacteriophage', 0, 0, 0)
+    const h2 = director.spawn('bacteriophage', 1, 0, 1)
+    const observed: number[] = []
+    director.addSpawnListener((handle) => observed.push(handle.id))
+    expect(observed).toEqual([h1.id, h2.id])
+    const h3 = director.spawn('bacteriophage', 2, 0, 2)
+    expect(observed).toEqual([h1.id, h2.id, h3.id])
+  })
+
+  it('isolates listener errors thrown during catch-up', () => {
+    director.spawn('bacteriophage', 0, 0, 0)
+    const goodObserved: number[] = []
+    expect(() => {
+      director.addSpawnListener(() => {
+        throw new Error('boom')
+      })
+    }).not.toThrow()
+    director.addSpawnListener((handle) => goodObserved.push(handle.id))
+    expect(goodObserved.length).toBe(1)
+  })
+
+  it('unsubscribes from future spawns when the returned disposer is called', () => {
+    const observed: number[] = []
+    const off = director.addSpawnListener((handle) => observed.push(handle.id))
+    director.spawn('bacteriophage', 0, 0, 0)
+    off()
+    director.spawn('bacteriophage', 1, 0, 1)
+    expect(observed).toHaveLength(1)
+  })
+
   // --- Despawning ---
 
   it('should despawn an enemy by handle', () => {

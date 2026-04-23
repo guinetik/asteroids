@@ -184,10 +184,25 @@ export class EnemyDirector implements Tickable {
    * for loot pickups without coupling individual minigames to the loot
    * pipeline.
    *
-   * @param listener - Callback invoked with the freshly created handle.
+   * Catch-up semantics: the listener is also invoked synchronously for
+   * every enemy already tracked by the director at the time of subscription.
+   * This is required because some minigames spawn their encounter inside
+   * their constructor, before the level controller can wire the drop
+   * observer; without catch-up, the loot pipeline would silently miss
+   * those enemies.
+   *
+   * @param listener - Callback invoked with each existing handle and every
+   *                   subsequently spawned handle.
    * @returns Unsubscribe function.
    */
   addSpawnListener(listener: (handle: EnemyHandle) => void): () => void {
+    for (const handle of this.handles) {
+      try {
+        listener(handle)
+      } catch {
+        // observer-side errors must not break subscription
+      }
+    }
     this.spawnListeners.add(listener)
     return () => this.spawnListeners.delete(listener)
   }

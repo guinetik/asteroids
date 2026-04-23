@@ -66,6 +66,23 @@ describe('DropSystem', () => {
     expect(system.pickups).toHaveLength(0)
   })
 
+  it('collects pickups regardless of vertical separation between player and item', () => {
+    // The pickup floats at chest height while the player anchor is at the
+    // feet, and terrain may differ between them. A cylindrical overlap
+    // means the Y axis must be irrelevant.
+    const onPickup = vi.fn()
+    const system = new DropSystem({
+      policy: ALWAYS_ARMED,
+      pickupRadius: 1.0,
+      spawnYOffset: 0,
+      onPickup,
+    })
+    system.spawnFor('viroid-psychosphere', { x: 0, y: 10, z: 0 })
+    const collected = system.tick(1 / 60, { x: 0.2, y: 0, z: 0 })
+    expect(collected).toHaveLength(1)
+    expect(onPickup).toHaveBeenCalledTimes(1)
+  })
+
   it('isolates listener errors from each other and from spawn flow', () => {
     const onPickup = vi.fn(() => {
       throw new Error('host failure')

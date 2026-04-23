@@ -76,8 +76,16 @@ export interface DropSystemOptions {
   /** Policy that gates whether a drop materializes on enemy death. */
   policy: DropPolicy
   /**
-   * Radius (world units) within which a player counts as "touching" a pickup.
-   * Defaults to 1.5 units which is friendly to FPS movement speeds.
+   * Horizontal radius (world units, XZ plane only) within which a player
+   * counts as "touching" a pickup. The check intentionally ignores Y because
+   * the player anchor point is at the feet (`group.position.y === ground`)
+   * while pickups float at chest height, and the enemy that dropped them
+   * may have died on terrain at a different elevation than the player's
+   * current footing. A cylindrical check keeps the feel consistent with
+   * the rest of the FPS layer.
+   *
+   * Defaults to 2.5 units, which is comfortable to walk into without
+   * needing pixel-perfect alignment.
    */
   pickupRadius?: number
   /**
@@ -112,7 +120,7 @@ export class DropSystem {
 
   constructor(options: DropSystemOptions) {
     this.policy = options.policy
-    this.pickupRadius = options.pickupRadius ?? 1.5
+    this.pickupRadius = options.pickupRadius ?? 2.5
     this.spawnYOffset = options.spawnYOffset ?? 0.6
     this.onPickupCb = options.onPickup ?? null
   }
@@ -160,8 +168,13 @@ export class DropSystem {
    * Drive overlap checks and clear collected pickups. Call once per frame
    * with the player's current world position.
    *
+   * The overlap test is **cylindrical** (XZ-only): we ignore the vertical
+   * axis on purpose so that terrain elevation differences and the
+   * feet-vs-chest height gap between player anchor and pickup mesh don't
+   * cause pickups to silently fail to register.
+   *
    * @param dt - Frame delta in seconds (drives the internal `elapsed` clock).
-   * @param playerPosition - Player world position (XYZ).
+   * @param playerPosition - Player world position (XYZ). Y is ignored.
    * @returns Pickups collected this frame (already removed from the live list).
    */
   tick(dt: number, playerPosition: { x: number; y: number; z: number }): readonly PickupEntity[] {
@@ -172,9 +185,8 @@ export class DropSystem {
     for (let i = this._pickups.length - 1; i >= 0; i--) {
       const pickup = this._pickups[i]!
       const dx = pickup.position.x - playerPosition.x
-      const dy = pickup.position.y - playerPosition.y
       const dz = pickup.position.z - playerPosition.z
-      if (dx * dx + dy * dy + dz * dz <= radiusSq) {
+      if (dx * dx + dz * dz <= radiusSq) {
         this._pickups.splice(i, 1)
         collected.push(pickup)
       }
