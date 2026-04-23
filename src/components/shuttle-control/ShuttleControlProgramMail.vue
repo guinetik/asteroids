@@ -13,6 +13,7 @@
  */
 import { computed, onUnmounted, ref } from 'vue'
 import { shipMessageSystem } from '@/lib/messages/runtime'
+import { uiAudio } from '@/audio/UiAudioDirector'
 import {
   DEFAULT_INBOX_FOLDER_ID,
   type ShipMessageFolder,
@@ -93,12 +94,14 @@ function statusLabel(row: ShipMessageInboxRow): string {
 
 function selectFolder(folderId: string): void {
   if (selectedFolderId.value === folderId) return
+  uiAudio.notifyButtonClick()
   selectedFolderId.value = folderId
   selectedId.value = null
   refreshRows()
 }
 
 function selectRow(id: string, options: { autoplayAudio?: boolean } = {}): void {
+  uiAudio.notifyButtonClick()
   selectedId.value = id
   if (options.autoplayAudio) {
     selectedAudioAutoplayToken.value += 1

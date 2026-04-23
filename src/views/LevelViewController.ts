@@ -920,6 +920,7 @@ export class LevelViewController implements Tickable {
         minigame.onRefuel = () => this.landerController?.thrusterSystem.refuel()
         minigame.onRegisterTickable = (t) => this.tickHandler!.register(t, TICK_PRIORITY_PHYSICS + 4)
         minigame.onUnregisterTickable = (t) => this.tickHandler?.unregister(t)
+        minigame.onProbeCollect = () => this.levelAudio.notifyResourcePickup()
         this.minigames.push(minigame)
       } else if (obj.type === 'exterminate') {
         const minigame = await ExterminateMinigame.create(

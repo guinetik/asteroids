@@ -60,6 +60,9 @@ export class SurveyMinigame implements MiniGame, MiniGameEvents {
   /** Unregister a tickable from the tick handler. */
   onUnregisterTickable: ((tickable: Tickable) => void) | null = null
 
+  /** Called each time the lander collects a survey probe. */
+  onProbeCollect: (() => void) | null = null
+
   // ── MiniGameEvents ──────────────────────────────────────────
   onPrompt: ((text: string | null) => void) | null = null
   onComplete: ((objectiveIndex: number) => void) | null = null
@@ -223,6 +226,7 @@ export class SurveyMinigame implements MiniGame, MiniGameEvents {
     })
 
     this.probeController = new SurveyProbeController(this.scene)
+    this.probeController.onCollect = () => this.onProbeCollect?.()
     this.probeController.spawn(positions, this.terminal.position)
     this.onRegisterTickable?.(this.probeController)
     this.onPrompt?.(null)

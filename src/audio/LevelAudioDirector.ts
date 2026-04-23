@@ -60,7 +60,7 @@ export class LevelAudioDirector {
    * rather than dramatic, so it reads the same regardless of yield.
    */
   notifyResourcePickup(): void {
-    this.audio.play('sfx.pickup', { volume: PICKUP_VOLUME })
+    this.audio.play('sfx.collect', { volume: PICKUP_VOLUME })
   }
 
   /**

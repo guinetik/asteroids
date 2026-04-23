@@ -133,7 +133,7 @@ export class UiAudioDirector {
    * An item (ore, cargo unit, resource) was collected into inventory.
    */
   notifyItemCollected(): void {
-    this.audio.play('sfx.pickup', { volume: COLLECT_VOLUME })
+    this.audio.play('sfx.collect', { volume: COLLECT_VOLUME })
   }
 
   /**
@@ -154,7 +154,7 @@ export class UiAudioDirector {
    * A mission was delivered / completed.
    */
   notifyMissionComplete(): void {
-    this.audio.play('ui.reward', { volume: MISSION_COMPLETE_VOLUME })
+    this.audio.play('sfx.mission.shuttle.clear', { volume: MISSION_COMPLETE_VOLUME })
   }
 
   /**

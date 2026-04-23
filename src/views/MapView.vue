@@ -919,6 +919,7 @@ function handlePurchaseUpgrade(upgradeId: UpgradeId): void {
   upgradeInstalledCreditsSpent.value = getUpgradeCost(upgradeId, newLevel)
   upgradeInstalledMetaText.value = null
   upgradeInstalledVisible.value = true
+  uiAudio.notifyUpgradeInstalled()
   contractSystem.notifyUpgradeInstalled(upgradeId, newLevel)
 }
 
@@ -1042,7 +1043,6 @@ function handleAcceptMiningMission() {
 function handleDeliverMiningMission(missionId: string) {
   viewController.miningMissionDeliver(missionId)
   uiAudio.notifyMissionComplete()
-  uiAudio.notifyRewardReceived()
 }
 
 /** Player clicked the overlay's Complete button — pay reward and close. */
@@ -1058,7 +1058,6 @@ function handleEvaMinigameClose(): void {
 function handleDeliverMission(missionId: string) {
   viewController.missionDeliver(missionId)
   uiAudio.notifyMissionComplete()
-  uiAudio.notifyRewardReceived()
 }
 
 function dockedPlanetId(): string | null {
