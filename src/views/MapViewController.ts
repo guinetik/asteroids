@@ -3215,9 +3215,7 @@ export class MapViewController implements Tickable {
       shuttlePosition: this.shuttleController.group.position,
       shuttleVelocity: this.shuttleController.currentVelocity,
       shuttleScale: this.currentShuttleScale,
-      cameraPosition: this.vehicleCamera.camera.position,
-      cameraFov: this.vehicleCamera.camera.fov,
-      cameraAzimuth: this.vehicleCamera.controls.getAzimuthalAngle(),
+      camera: this.vehicleCamera.camera,
       isFreeFlight: this.orbitSystem?.state === 'free',
       dt,
     })
@@ -4124,6 +4122,12 @@ export class MapViewController implements Tickable {
    * `startTrigger` gate opens before any step-advance triggers run.
    */
   private replayAct1JourneyTriggers(): void {
+    // Returning saves (past the opening cinematic) arm the journey UI immediately
+    // so mid-session gate-opens (e.g. accepting USC from the map-side shuttle
+    // overlay) can surface their banner without requiring a fresh habitat entry.
+    if (this.playerProfile.hasSeenIntro) {
+      this.journeyUiArmed = true
+    }
     for (const instance of contractSystem.listInstances()) {
       if (instance.status === 'active' || instance.status === 'completed') {
         this.notifyJourneyTrigger(`contract_accepted:${instance.contractId}`)
