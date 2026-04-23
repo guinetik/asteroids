@@ -244,10 +244,18 @@ export class LanderAudioDirector {
     this.stop()
   }
 
-  /** Internal: start cockpit ambient if not already running. */
+  /** Internal: start cockpit ambient — plays twice then stops. */
   private startCockpit(): void {
     if (this.cockpitAmbient !== null) return
-    this.cockpitAmbient = this.audio.play('ambient.landerCockpit', { loop: true })
+    this.cockpitAmbient = this.audio.play('ambient.landerCockpit', {
+      onEnd: () => {
+        this.cockpitAmbient = this.audio.play('ambient.landerCockpit', {
+          onEnd: () => {
+            this.cockpitAmbient = null
+          },
+        })
+      },
+    })
   }
 
   /** Internal: stop cockpit ambient (idempotent). */

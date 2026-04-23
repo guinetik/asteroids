@@ -800,6 +800,8 @@ export class ArrivalSequence {
     }
     if (next === 'depart') {
       useAudio().play('sfx.level.arrival')
+      useAudio().play('ambient.space', { loop: true, volume: 0.25 })
+      useAudio().play('ambient.engine', { loop: true, volume: 0.3 })
     }
   }
 
