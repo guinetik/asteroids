@@ -131,9 +131,18 @@ export interface EvaSessionConfig {
   /**
    * Optional gate: return false while external state forbids EVA (e.g. the shuttle is
    * captured in a planetary orbit). The session shows a blocking prompt instead of the
-   * "EVA [F]" offer. Defaults to always-allowed when not supplied.
+   * "EVA [F]" offer unless `suppressActionPrompt` is set — e.g. while orbiting, the player
+   * already has orbit/terminal prompts and should not see duplicate callouts. Defaults
+   * to always-allowed when not supplied.
    */
-  canEva?: () => { allowed: true } | { allowed: false; reason: string }
+  canEva?: () =>
+    | { allowed: true }
+    | {
+        allowed: false
+        reason: string
+        /** When true, no top HUD callout (e.g. orbiting — avoid clashing with orbit prompts). */
+        suppressActionPrompt?: boolean
+      }
   /**
    * Start the terminal minigame for the POI the player is currently near. The host
    * view is expected to open an overlay, run the minigame, then call
@@ -260,7 +269,9 @@ export class EvaSession implements Tickable {
       }
       const gate = this.config.canEva?.() ?? { allowed: true }
       if (!gate.allowed) {
-        this.setPrompt(gate.reason)
+        this.setPrompt(
+          'suppressActionPrompt' in gate && gate.suppressActionPrompt ? null : gate.reason,
+        )
         return
       }
       this.setPrompt('EVA [F]')

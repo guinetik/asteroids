@@ -4782,7 +4782,7 @@ export class MapViewController implements Tickable {
       canEva: () => {
         const state = this.orbitSystem?.state
         if (state === 'orbiting' || state === 'approaching') {
-          return { allowed: false, reason: 'EXIT ORBIT TO EVA' }
+          return { allowed: false, reason: 'EXIT ORBIT TO EVA', suppressActionPrompt: true }
         }
         if (this.shipHealth && this.shuttleController && this.shipHealthConfig) {
           const px = this.shuttleController.position.x

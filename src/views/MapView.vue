@@ -553,6 +553,12 @@ const missionApproachHud = computed(() => {
   ) {
     return { visible: false as const, name: '' }
   }
+  // Same rule as `MapMissionFacade.tryBeginAsteroidMission`: only free flight may engage
+  // the landing approach; hide the prompt while captured so orbit/terminal UI isn't
+  // overlaid when a waypoint shares Earth (or any body) space with the orbit ring.
+  if (orbitState.state !== 'free') {
+    return { visible: false as const, name: '' }
+  }
   const board = missionBoard.value
   const m = board?.activeAsteroidMission
   if (!m || m.status !== 'accepted') {
