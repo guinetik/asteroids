@@ -24,6 +24,7 @@ describe('audioManifest', () => {
       'sfx.upgrade.install',
       'sfx.ui.shuttleprogram.click',
       'sfx.inbox',
+      'sfx.knob',
       // shuttle propulsion
       'sfx.thrusterLoop',
       'sfx.thrusterBurst',

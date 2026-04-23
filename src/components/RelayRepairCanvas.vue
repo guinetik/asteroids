@@ -11,7 +11,7 @@
   @spec docs/superpowers/specs/2026-04-20-relay-repair-design.md
 -->
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 import type { RelayRepairMiniGame } from '@/lib/minigame/relayRepair/RelayRepairMiniGame'
 import { getRelayPuzzle } from '@/lib/minigame/relayRepair/puzzles'
@@ -31,6 +31,8 @@ import { traceWave, cellId } from '@/lib/minigame/relayRepair/wave'
 import { computeQuality } from '@/lib/minigame/relayRepair/quality'
 import { wigglyPath } from '@/lib/minigame/relayRepair/wiggle'
 import type { Cell, Direction, Rotation } from '@/lib/minigame/relayRepair/types'
+import { RelayAudio } from '@/lib/minigame/relayRepair/relayAudio'
+import { uiAudio } from '@/audio/UiAudioDirector'
 
 const props = defineProps<{
   /** The EVA mission opening this overlay. */
@@ -64,7 +66,10 @@ const SINK_COL = GRID_COLS
 const SINK_DIR: Direction = 'E'
 
 const tier = getRelayDifficulty(props.mission.giverPlanet)
-const cells = reactive(applyRelayDifficulty(puzzle.cells, props.mission.template.id, tier))
+// Fresh PRNG seed per play so each session rerolls misrotations instead of
+// replaying the same deterministic hash-of-missionId layout every time.
+const rollSeed = Math.floor(Math.random() * 0x7fffffff)
+const cells = reactive(applyRelayDifficulty(puzzle.cells, props.mission.template.id, tier, rollSeed))
 const selectedId = ref<string>(puzzle.startSelected)
 const hoveredId = ref<string | null>(null)
 
@@ -106,6 +111,7 @@ function wigglePathD(row: number, col: number, port: Direction): string {
 function handleLockIn(): void {
   if (quality.value < LOCK_THRESHOLD || lockState.value !== 'calibrating') return
   lockState.value = 'locking'
+  uiAudio.notifyConfirm()
   setTimeout(() => {
     lockState.value = 'locked'
     props.minigame.complete()
@@ -199,6 +205,7 @@ function rotateCell(id: string): void {
   cell.rotation = (((cell.rotation + 1) % 4 + 4) % 4) as Rotation
   cell.visualRotation = cell.visualRotation + 1
   props.minigame.reportQuality(quality.value)
+  uiAudio.notifyKnob()
 }
 
 /** Move the selection one cell in the given grid direction, skipping empties. */
@@ -241,25 +248,58 @@ function onKeyDown(e: KeyboardEvent): void {
   if (k === 'e' && canLock.value) { e.preventDefault(); handleLockIn(); return }
 }
 
-/** Static sine wave used by the oscilloscope strip — 1200 px wide so browsers tile it cleanly. */
-const oscPath = (() => {
+/**
+ * Oscilloscope path — animated via `time.value` so distortion jitter breathes
+ * while the puzzle is out of tune. 1200 px wide so browsers tile it cleanly.
+ * Pure sine when quality = 1; jittered phase + grain noise scales with (1 - q).
+ */
+const oscPath = computed(() => {
+  const q = quality.value
+  const invQ = 1 - q
+  const amp = 14
+  const grainAmp = invQ * 9
+  const phaseJitter = invQ * 0.9
+  const t = time.value
   const pts: string[] = []
   for (let x = 0; x < 1200; x += 2) {
-    const y = 24 + Math.sin(x * 0.06) * 14
-    pts.push(`${x},${y}`)
+    const phase = x * 0.06 + phaseJitter * Math.sin(t * 4.2 + x * 0.021)
+    const base = Math.sin(phase) * amp
+    const grain =
+      grainAmp *
+      (Math.sin(x * 2.13 + t * 11.3) * 0.5 + Math.sin(x * 0.71 + t * 3.1) * 0.5)
+    const y = 24 + base + grain
+    pts.push(`${x},${y.toFixed(2)}`)
   }
   return 'M ' + pts.join(' L ')
-})()
+})
+
+/** Input-signal label — tracks quality so the header mirrors the audio state. */
+const inputSignalLabel = computed(() => {
+  if (quality.value >= 0.98) return 'CLEAN'
+  if (quality.value >= 0.7) return 'TUNING'
+  return 'NOISY'
+})
+
+/** Persistent radio-tuner audio graph. Null until mounted or when audio is unavailable. */
+let audio: RelayAudio | null = null
+
+watch(quality, (q) => {
+  audio?.setQuality(q)
+})
 
 onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
   props.minigame.reportQuality(quality.value)
+  audio = new RelayAudio()
+  audio.setQuality(quality.value)
   rafId = requestAnimationFrame(tick)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeyDown)
   if (rafId) cancelAnimationFrame(rafId)
+  audio?.dispose()
+  audio = null
 })
 </script>
 
@@ -273,7 +313,7 @@ onUnmounted(() => {
 
     <div class="relay-osc">
       <div class="relay-osc__label">
-        <span>INPUT SIGNAL · {{ puzzle.carrier }} · CLEAN</span>
+        <span>INPUT SIGNAL · {{ puzzle.carrier }} · {{ inputSignalLabel }}</span>
         <span class="relay-osc__lock">● CARRIER LOCKED</span>
       </div>
       <svg class="relay-osc__svg" preserveAspectRatio="none" viewBox="0 0 600 48">
@@ -493,12 +533,22 @@ onUnmounted(() => {
       <div class="relay-quality__pct">{{ qualityPct }}%</div>
     </div>
 
-    <div class="relay-hints">
-      <span>WASD · MOVE</span>
-      <span>CLICK · WHEEL · ROTATE</span>
-      <span>R · ROTATE</span>
-      <span>E · LOCK IN (≥95%)</span>
-      <span>ESC · ABORT</span>
+    <div class="relay-actions">
+      <div class="relay-hints">
+        <span>WASD · MOVE</span>
+        <span>CLICK · WHEEL · ROTATE</span>
+        <span>R · ROTATE</span>
+        <span>ESC · ABORT</span>
+      </div>
+      <button
+        type="button"
+        class="relay-complete-button"
+        :class="{ 'relay-complete-button--ready': canLock && lockState === 'calibrating' }"
+        :disabled="!canLock || lockState !== 'calibrating'"
+        @click="handleLockIn"
+      >
+        {{ canLock ? 'Complete Maintenance' : 'Maintenance In Progress' }}
+      </button>
     </div>
 
     <transition name="relay-caption">

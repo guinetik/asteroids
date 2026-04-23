@@ -49,6 +49,8 @@ const LASER_VOLUME = 0.5
 const UPGRADE_INSTALL_VOLUME = 0.7
 /** Volume for shuttle control program tab click. */
 const SHUTTLE_PROGRAM_CLICK_VOLUME = 0.6
+/** Volume for knob / dial rotation cue. */
+const KNOB_VOLUME = 0.45
 
 /**
  * Audio orchestrator for UI events. Single-instance for the app lifetime;
@@ -192,6 +194,14 @@ export class UiAudioDirector {
    */
   notifyInboxMessage(): void {
     this.audio.play('sfx.inbox', { volume: 0.7 })
+  }
+
+  /**
+   * Player rotated a knob / dial — e.g. a relay-repair pipe node. Uses
+   * `restart` playback so rapid spins don't stack overlapping samples.
+   */
+  notifyKnob(): void {
+    this.audio.play('sfx.knob', { volume: KNOB_VOLUME })
   }
 }
 

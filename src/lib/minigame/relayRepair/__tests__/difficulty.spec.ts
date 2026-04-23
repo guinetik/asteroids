@@ -26,9 +26,9 @@ describe('getRelayDifficulty', () => {
 })
 
 describe('WRONG_CELLS_BY_TIER', () => {
-  it('tier sizes are 2/3/4', () => {
-    expect(WRONG_CELLS_BY_TIER[1]).toBe(2)
-    expect(WRONG_CELLS_BY_TIER[2]).toBe(3)
-    expect(WRONG_CELLS_BY_TIER[3]).toBe(4)
+  it('tier sizes are 4/6/8', () => {
+    expect(WRONG_CELLS_BY_TIER[1]).toBe(4)
+    expect(WRONG_CELLS_BY_TIER[2]).toBe(6)
+    expect(WRONG_CELLS_BY_TIER[3]).toBe(8)
   })
 })

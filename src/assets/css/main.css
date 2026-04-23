@@ -3022,6 +3022,39 @@ body {
 .relay-hints {
   @apply flex flex-wrap gap-4 text-[10px] tracking-widest text-cyan-200;
 }
+.relay-actions {
+  @apply flex items-center justify-between gap-4 flex-wrap;
+}
+.relay-complete-button {
+  appearance: none;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  color: #fbbf24;
+  padding: 8px 18px;
+  font-family: inherit;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  cursor: not-allowed;
+  transition: all 140ms ease;
+  border-radius: 2px;
+  opacity: 0.85;
+}
+.relay-complete-button--ready {
+  background: rgba(106, 232, 196, 0.1);
+  border-color: rgba(106, 232, 196, 0.5);
+  color: #6ae8c4;
+  cursor: pointer;
+  opacity: 1;
+}
+.relay-complete-button--ready:hover {
+  background: rgba(106, 232, 196, 0.2);
+  border-color: #6ae8c4;
+  box-shadow: 0 0 14px rgba(106, 232, 196, 0.35);
+}
+.relay-complete-button:disabled {
+  pointer-events: none;
+}
 .relay-caption {
   @apply absolute inset-x-0 bottom-20 mx-auto w-fit border border-emerald-400/60
          bg-slate-950/80 px-6 py-3 text-center tracking-widest;

@@ -36,6 +36,7 @@ export const AUDIO_SOUND_IDS = [
   'sfx.upgrade.install',
   'sfx.ui.shuttleprogram.click',
   'sfx.inbox',
+  'sfx.knob',
   // SFX — shuttle propulsion
   'sfx.thrusterLoop',
   'sfx.thrusterBurst',
@@ -251,6 +252,15 @@ const manifestById: ManifestById = {
     load: 'lazy',
     playback: 'single-instance',
     volume: 0.7,
+    effect: 'none',
+  },
+  'sfx.knob': {
+    id: 'sfx.knob',
+    src: '/sound/sfx.knob.mp3',
+    category: 'ui',
+    load: 'lazy',
+    playback: 'restart',
+    volume: 0.45,
     effect: 'none',
   },
 

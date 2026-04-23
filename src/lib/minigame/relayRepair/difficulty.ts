@@ -25,9 +25,9 @@ const TIER_BY_PLANET: Readonly<Record<string, RelayDifficultyTier>> = {
 
 /** Number of cells misrotated at each tier. */
 export const WRONG_CELLS_BY_TIER: Readonly<Record<RelayDifficultyTier, number>> = {
-  1: 2,
-  2: 3,
-  3: 4,
+  1: 4,
+  2: 6,
+  3: 8,
 }
 
 /**
