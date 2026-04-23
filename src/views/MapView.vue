@@ -60,7 +60,8 @@ import { LANDER_BASE_HP } from '@/three/LanderController'
 import UpgradeInstalledAnnouncement from '@/components/UpgradeInstalledAnnouncement.vue'
 import JourneyCompletedAnnouncement from '@/components/JourneyCompletedAnnouncement.vue'
 import { Timer, type TimerHandle } from '@/lib/Timer'
-import type { ActiveShipMessage, ShipMessageDefinition } from '@/lib/messages/messageTypes'
+import type { ActiveShipMessage } from '@/lib/messages/messageTypes'
+import { isContractMessage, isInboxMessage } from '@/lib/messages/messageChannels'
 import MapContractNotice from '@/components/MapContractNotice.vue'
 import { contractNoticeLabel } from '@/lib/messages/contractNoticeLabel'
 import type { MapIntroUiState } from '@/lib/mapIntroState'
@@ -109,12 +110,8 @@ const activeContractMessage = ref<ActiveShipMessage | null>(null)
 const pendingInboxCount = ref(0)
 const messageDialogVisible = ref(false)
 
-/** Filter predicate for inbox-only (non-contract) messages. */
-const INBOX_FILTER = (def: ShipMessageDefinition): boolean =>
-  def.contractMessageKind === undefined
-/** Filter predicate for contract-origin messages. */
-const CONTRACT_FILTER = (def: ShipMessageDefinition): boolean =>
-  def.contractMessageKind !== undefined
+const INBOX_FILTER = isInboxMessage
+const CONTRACT_FILTER = isContractMessage
 const messageAudioAutoplayToken = ref(0)
 /**
  * `controlsLocked: true` until the first MapViewController `onMapIntro` sync — hides shuttle HUD for
@@ -186,6 +183,14 @@ function messagePromptLabel(): string {
     : `You have ${pendingInboxCount.value} new messages`
 }
 
+// --- Contract notification channel ---
+
+/** Deep-link folder id forwarded to ShuttleControlOverlay when the cyan pill is clicked. */
+const shuttleControlMailFocusFolderId = ref<string | undefined>(undefined)
+
+/** Deep-link message id forwarded to ShuttleControlOverlay when the cyan pill is clicked. */
+const shuttleControlMailFocusMessageId = ref<string | undefined>(undefined)
+
 /** Computed pill label for the cyan contract-notice channel, or null when no contract message is active. */
 const contractNoticePill = computed<string | null>(() => {
   const readable = activeContractMessage.value
@@ -198,12 +203,6 @@ const contractNoticePill = computed<string | null>(() => {
     contract?.inboxName ?? null,
   )
 })
-
-/** Deep-link state forwarded to ShuttleControlOverlay when the cyan pill is clicked. */
-const shuttleControlMailFocusFolderId = ref<string | undefined>(undefined)
-
-/** Deep-link message id forwarded to ShuttleControlOverlay when the cyan pill is clicked. */
-const shuttleControlMailFocusMessageId = ref<string | undefined>(undefined)
 
 /** Opens the shuttle terminal mail tab deep-linked to the contract folder + message. */
 function openContractMessage(): void {
