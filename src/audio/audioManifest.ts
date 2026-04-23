@@ -35,6 +35,7 @@ export const AUDIO_SOUND_IDS = [
   'ui.reward',
   'sfx.upgrade.install',
   'sfx.ui.shuttleprogram.click',
+  'sfx.inbox',
   // SFX — shuttle propulsion
   'sfx.thrusterLoop',
   'sfx.thrusterBurst',
@@ -241,6 +242,15 @@ const manifestById: ManifestById = {
     load: 'lazy',
     playback: 'restart',
     volume: 0.4,
+    effect: 'none',
+  },
+  'sfx.inbox': {
+    id: 'sfx.inbox',
+    src: '/sound/sfx.inbox.mp3',
+    category: 'ui',
+    load: 'lazy',
+    playback: 'single-instance',
+    volume: 0.7,
     effect: 'none',
   },
 

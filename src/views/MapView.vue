@@ -120,14 +120,17 @@ const mapIntro = reactive<MapIntroUiState>({
 })
 
 function refreshActiveMessage(): void {
+  const prevCount = pendingMessageCount.value
   if ((messageDialogVisible.value || mapIntro.messageDialogVisible) && activeMessage.value) {
     // If the dialog is open, don't swap the message out from under the user.
     // Just update the count.
     pendingMessageCount.value = shipMessageSystem.getPendingMessageCount()
+    if (pendingMessageCount.value > prevCount) uiAudio.notifyInboxMessage()
     return
   }
   activeMessage.value = shipMessageSystem.getActiveMessage()
   pendingMessageCount.value = shipMessageSystem.getPendingMessageCount()
+  if (pendingMessageCount.value > prevCount) uiAudio.notifyInboxMessage()
   if (!activeMessage.value) {
     messageDialogVisible.value = false
   }

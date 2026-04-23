@@ -186,6 +186,13 @@ export class UiAudioDirector {
   notifyShuttleProgramClick(): void {
     this.audio.play('sfx.ui.shuttleprogram.click', { volume: SHUTTLE_PROGRAM_CLICK_VOLUME })
   }
+
+  /**
+   * A new ship message arrived and the inbox notification is shown.
+   */
+  notifyInboxMessage(): void {
+    this.audio.play('sfx.inbox', { volume: 0.7 })
+  }
 }
 
 /**
