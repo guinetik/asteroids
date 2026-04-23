@@ -25,6 +25,7 @@ describe('audioManifest', () => {
       'sfx.ui.shuttleprogram.click',
       'sfx.inbox',
       'sfx.contract',
+      'sfx.money',
       'sfx.knob',
       // shuttle propulsion
       'sfx.thrusterLoop',

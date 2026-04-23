@@ -12,6 +12,7 @@
  */
 import { shipMessageSystem } from '@/lib/messages/runtime'
 import {
+  addCredits,
   loadProfile,
   saveProfile,
   setMissionPayMultiplier,
@@ -25,7 +26,7 @@ import {
   type UpgradeId,
 } from '@/lib/upgrades'
 import { CONTRACT_CATALOG } from './contractCatalog'
-import { ContractSystem } from './ContractSystem'
+import { ContractSystem, type ContractStepCompletedPayload } from './ContractSystem'
 import type { Contract, RewardEffect } from './contractTypes'
 
 /** Subscribers notified whenever a contract state mutation occurs. */
@@ -39,6 +40,9 @@ const contractCompletedListeners = new Set<(contractId: string) => void>()
 
 /** Subscribers notified when a contract transitions from `available` to `active`. */
 const contractAcceptedListeners = new Set<(contractId: string) => void>()
+
+/** Subscribers notified when a contract step crosses its completion threshold. */
+const contractStepCompletedListeners = new Set<(payload: ContractStepCompletedPayload) => void>()
 
 /**
  * Upgrade grant from a completed contract, after `ensureUpgradeAtLeast` has persisted.
@@ -123,8 +127,31 @@ export const contractSystem = new ContractSystem(
         }
       }
     },
+    onContractStepCompleted: (payload) => {
+      payContractStepCredits(payload.creditsReward)
+      for (const listener of Array.from(contractStepCompletedListeners)) {
+        try {
+          listener(payload)
+        } catch {
+          // listeners must not break the system
+        }
+      }
+    },
   },
 )
+
+/**
+ * Credit the player's wallet with a contract step payout. Fractional values are
+ * preserved end-to-end (USC's `666.69` minimum-wage stipend depends on this).
+ *
+ * @param amount - Authored CR payout. Skips persistence when not a positive finite number.
+ */
+function payContractStepCredits(amount: number): void {
+  if (!Number.isFinite(amount) || amount <= 0) return
+  const profile = loadProfile()
+  if (!profile) return
+  saveProfile(addCredits(profile, amount))
+}
 
 shipMessageSystem.onMessageArchived((id) => {
   contractSystem.notifyMessageArchived(id)
@@ -188,6 +215,22 @@ export function onContractCompleted(listener: (contractId: string) => void): () 
 export function onContractAccepted(listener: (contractId: string) => void): () => void {
   contractAcceptedListeners.add(listener)
   return () => contractAcceptedListeners.delete(listener)
+}
+
+/**
+ * Subscribe to "a contract step just transitioned from incomplete to complete".
+ * Fires only on the live path — never during {@link ContractSystem.replayCompletedRewards}.
+ * Receivers typically refresh the credits HUD, show a toast, and play the
+ * `sfx.money` cue.
+ *
+ * @param listener - Receives the step-completed payload (contract id, step index, payout).
+ * @returns Unsubscribe function.
+ */
+export function onContractStepCompleted(
+  listener: (payload: ContractStepCompletedPayload) => void,
+): () => void {
+  contractStepCompletedListeners.add(listener)
+  return () => contractStepCompletedListeners.delete(listener)
 }
 
 /**

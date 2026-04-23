@@ -32,8 +32,19 @@ export interface MissionCompletedEvent {
   targetPlanetId: string | null
 }
 
+/**
+ * Mixin applied to every {@link ContractStep} variant. Authored CR payout that
+ * fires once when the step transitions from incomplete to complete. Fractional
+ * values (e.g. `666.69`) are preserved end-to-end — payout uses
+ * `addCredits` directly, not the rounding {@link MapViewController.giveCredits}.
+ */
+export interface ContractStepRewardMixin {
+  /** CR paid the moment this step transitions from incomplete to complete (default 0). */
+  creditsReward?: number
+}
+
 /** Step that requires N completed missions matching optional filters. */
-export interface CompleteMissionsStep {
+export interface CompleteMissionsStep extends ContractStepRewardMixin {
   kind: 'complete-missions'
   /** Total missions of the matching kind required to mark the step complete. */
   count: number
@@ -50,7 +61,7 @@ export interface CompleteMissionsStep {
 }
 
 /** Step that requires the player to have a specific upgrade at >= minLevel. */
-export interface InstallUpgradeStep {
+export interface InstallUpgradeStep extends ContractStepRewardMixin {
   kind: 'install-upgrade'
   upgradeId: UpgradeId
   minLevel: number
@@ -59,7 +70,7 @@ export interface InstallUpgradeStep {
 }
 
 /** Step that requires the player to enter orbit at a specific planet. */
-export interface VisitPlanetStep {
+export interface VisitPlanetStep extends ContractStepRewardMixin {
   kind: 'visit-planet'
   planetId: string
   subject: string
@@ -74,7 +85,7 @@ export interface VisitPlanetStep {
  *   - `targetPlanetId` — the body the orbital minigame runs at (e.g. `'venus'`).
  * Omitting both matches any orbital mission completion.
  */
-export interface OrbitalMissionStep {
+export interface OrbitalMissionStep extends ContractStepRewardMixin {
   kind: 'orbital-mission'
   giverPlanetId?: string
   targetPlanetId?: string
@@ -97,7 +108,7 @@ export type ContractTradeAction = 'buy' | 'sell'
  * Step that requires buying or selling N units of a specific trade good at a
  * specific planet shop.
  */
-export interface TradeGoodsStep {
+export interface TradeGoodsStep extends ContractStepRewardMixin {
   /** Buy (`'buy'`) or sell (`'sell'`) action required. */
   kind: 'trade-goods'
   /** Required shop action. */

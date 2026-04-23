@@ -44,6 +44,7 @@ import {
 import {
   contractSystem,
   onContractShuttleUpgradeGranted,
+  onContractStepCompleted,
   onContractsChanged,
 } from '@/lib/contracts/runtime'
 import {
@@ -479,6 +480,7 @@ const fastTravelTargetPlanetLabel = ref<string>('')
 /** Disposer for the contract-change subscription (set in onMounted). */
 let unsubscribeContracts: (() => void) | null = null
 let unsubscribeContractShuttleUpgrade: (() => void) | null = null
+let unsubscribeContractStepCompleted: (() => void) | null = null
 /** Drives the fade-to-black overlay used during the fast travel jump. */
 const fastTravelFadeOpacity = ref(0)
 const FAST_TRAVEL_FADE_MS = 600
@@ -885,6 +887,19 @@ onMounted(async () => {
         payload.contractInboxName,
       )
     })
+    unsubscribeContractStepCompleted = onContractStepCompleted((payload) => {
+      // Runtime already credited the wallet via `addCredits` + `saveProfile`;
+      // pull the persisted snapshot back into the controller so the credits HUD
+      // updates immediately, then surface the toast + audio cue.
+      viewController.refreshPlayerProfileFromStorage()
+      shopProfile.value = viewController.getPlayerProfileSnapshot()
+      if (payload.creditsReward > 0) {
+        showMissionNotification(
+          `Contract step complete — +${payload.creditsReward.toLocaleString()} CR`,
+        )
+        uiAudio.notifyCreditsAwarded()
+      }
+    })
     syncPersistentProgressFromController()
     shopProfile.value = viewController.getPlayerProfileSnapshot()
     shopInventory.value = viewController.getPlayerInventorySnapshot()
@@ -901,6 +916,8 @@ onUnmounted(() => {
   unsubscribeContracts = null
   unsubscribeContractShuttleUpgrade?.()
   unsubscribeContractShuttleUpgrade = null
+  unsubscribeContractStepCompleted?.()
+  unsubscribeContractStepCompleted = null
   viewController.dispose()
 })
 

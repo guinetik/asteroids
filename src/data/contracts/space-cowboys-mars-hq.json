@@ -22,6 +22,7 @@
       "kind": "complete-missions",
       "count": 1,
       "missionType": "eva",
+      "creditsReward": 500,
       "subject": "Suit Up — One EVA",
       "flavor": [
         "Hey, you got Jay.",
@@ -35,6 +36,7 @@
       "count": 2,
       "missionType": "asteroid",
       "giverId": "jay",
+      "creditsReward": 500,
       "subject": "Two Rocks With My Name On Them",
       "flavor": [
         "Hey, you got Jay.",
@@ -47,6 +49,7 @@
       "kind": "install-upgrade",
       "upgradeId": "shuttleFreezeResistance",
       "minLevel": 1,
+      "creditsReward": 500,
       "subject": "Bolt On Cryo Insulation",
       "flavor": [
         "Hey, you got Jay.",
@@ -58,6 +61,7 @@
     {
       "kind": "visit-planet",
       "planetId": "mars",
+      "creditsReward": 500,
       "subject": "Come To Mars",
       "flavor": [
         "Hey, you got Jay.",
@@ -69,6 +73,7 @@
     {
       "kind": "orbital-mission",
       "giverPlanetId": "mars",
+      "creditsReward": 500,
       "subject": "First Job From The Mars Desk",
       "flavor": [
         "Hey, you got Jay.",

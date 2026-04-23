@@ -55,6 +55,8 @@ const KNOB_VOLUME = 0.45
 const INBOX_VOLUME = 0.7
 /** Volume for contract-update arrival ping (paired with {@link INBOX_VOLUME} — distinct channel, same level by default). */
 const CONTRACT_VOLUME = 0.7
+/** Volume for the credits-awarded chime fired on every contract step payout. */
+const MONEY_VOLUME = 0.6
 
 /**
  * Audio orchestrator for UI events. Single-instance for the app lifetime;
@@ -206,6 +208,14 @@ export class UiAudioDirector {
    */
   notifyContractUpdate(): void {
     this.audio.play('sfx.contract', { volume: CONTRACT_VOLUME })
+  }
+
+  /**
+   * A contract step payout was credited to the player wallet. Plays the
+   * `sfx.money` cue alongside the credit-toast notification.
+   */
+  notifyCreditsAwarded(): void {
+    this.audio.play('sfx.money', { volume: MONEY_VOLUME })
   }
 
   /**

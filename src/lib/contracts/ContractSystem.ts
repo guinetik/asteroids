@@ -63,6 +63,26 @@ export interface ContractSystemHooks {
    * @param contractId - Id of the contract that was just accepted.
    */
   onContractAccepted?: (contractId: string) => void
+  /**
+   * Called exactly once per step when its counter first crosses the required
+   * threshold during live progression (never during {@link ContractSystem.replayCompletedRewards}).
+   * Receivers typically credit the player's wallet with `creditsReward` and
+   * surface a UI toast plus an audio cue.
+   *
+   * @param payload - Identifies the contract + step that just satisfied,
+   *   plus the authored CR payout (defaults to `0` when omitted in JSON).
+   */
+  onContractStepCompleted?: (payload: ContractStepCompletedPayload) => void
+}
+
+/** Payload for {@link ContractSystemHooks.onContractStepCompleted}. */
+export interface ContractStepCompletedPayload {
+  /** Contract whose step just satisfied. */
+  contractId: string
+  /** Index into `Contract.steps` of the step that just satisfied. */
+  stepIndex: number
+  /** Authored CR payout for the step (`0` when omitted). Fractional values preserved. */
+  creditsReward: number
 }
 
 /** Default persistence backed by `loadContractSnapshot`/`saveContractSnapshot`. */
@@ -433,6 +453,11 @@ export class ContractSystem {
     let updated: ContractInstance = { ...instance, stepCounters: counters }
 
     if (counters[stepIndex]! >= required) {
+      this.hooks.onContractStepCompleted?.({
+        contractId: contract.id,
+        stepIndex,
+        creditsReward: step.creditsReward ?? 0,
+      })
       const nextIndex = stepIndex + 1
       if (nextIndex >= contract.steps.length) {
         updated = { ...updated, status: 'completed', completedAt: new Date().toISOString() }

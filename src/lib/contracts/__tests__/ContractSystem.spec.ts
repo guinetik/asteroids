@@ -7,7 +7,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MessageSystem } from '@/lib/messages/messageSystem'
 import { ContractSystem, contractIntroMessageId, contractStepMessageId, contractCompletionMessageId } from '../ContractSystem'
-import type { Contract, ContractStoreSnapshot, MissionCompletedEvent, RewardEffect } from '../contractTypes'
+import type {
+  Contract,
+  ContractStoreSnapshot,
+  MissionCompletedEvent,
+  RewardEffect,
+} from '../contractTypes'
+import type { ContractStepCompletedPayload } from '../ContractSystem'
 import { emptyContractSnapshot } from '../contractStorage'
 
 const TEST_DATE = '2306-04-05 09:12 UTC'
@@ -662,6 +668,129 @@ describe('onContractCompleted hook', () => {
     contracts.replayCompletedRewards()
     contracts.replayCompletedRewards()
     expect(completedIds).toEqual(['space-cowboys-mars-hq'])
+  })
+})
+
+describe('onContractStepCompleted hook', () => {
+  /**
+   * Contract with three steps each carrying a distinct payout. Step 1 needs 3
+   * mission completions (count threshold), step 2 is an upgrade install
+   * (single-event), step 3 omits `creditsReward` to assert the default-zero path.
+   */
+  const payoutContract: Contract = {
+    id: 'payout-fixture',
+    inboxName: 'Payout Fixture',
+    from: 'Payout Tester',
+    sentAt: TEST_DATE,
+    triggerOnMissionCompletedNth: 1,
+    introSubject: 'Payout intro',
+    introBody: ['intro'],
+    steps: [
+      {
+        kind: 'complete-missions',
+        count: 3,
+        creditsReward: 4000,
+        subject: 'Step 1',
+        flavor: ['s1'],
+      },
+      {
+        kind: 'install-upgrade',
+        upgradeId: 'shuttleFreezeResistance',
+        minLevel: 1,
+        creditsReward: 666.69,
+        subject: 'Step 2',
+        flavor: ['s2'],
+      },
+      {
+        kind: 'visit-planet',
+        planetId: 'mars',
+        subject: 'Step 3',
+        flavor: ['s3'],
+      },
+    ],
+    completionSubject: 'Done',
+    completionBody: ['d'],
+    rewards: [],
+  }
+
+  function createPayoutHarness(): {
+    contracts: ContractSystem
+    payouts: ContractStepCompletedPayload[]
+  } {
+    const messages = new MessageSystem([triggerMessage], { load: () => ({}), save: () => {} })
+    const payouts: ContractStepCompletedPayload[] = []
+    const contracts = new ContractSystem(
+      [payoutContract],
+      messages,
+      { load: () => emptyContractSnapshot(), save: () => {} },
+      {
+        onContractStepCompleted: (payload) => payouts.push(payload),
+      },
+    )
+    return { contracts, payouts }
+  }
+
+  it('fires exactly once per step transition with the authored creditsReward', () => {
+    const { contracts, payouts } = createPayoutHarness()
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+    contracts.acceptContract(payoutContract.id)
+
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+    contracts.notifyUpgradeInstalled('shuttleFreezeResistance', 1)
+    contracts.notifyPlanetVisited('mars')
+
+    expect(payouts).toEqual([
+      { contractId: payoutContract.id, stepIndex: 0, creditsReward: 4000 },
+      { contractId: payoutContract.id, stepIndex: 1, creditsReward: 666.69 },
+      { contractId: payoutContract.id, stepIndex: 2, creditsReward: 0 },
+    ])
+  })
+
+  it('does not fire on partial counter increments', () => {
+    const { contracts, payouts } = createPayoutHarness()
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+    contracts.acceptContract(payoutContract.id)
+
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+    expect(payouts).toEqual([])
+
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+    expect(payouts).toEqual([
+      { contractId: payoutContract.id, stepIndex: 0, creditsReward: 4000 },
+    ])
+  })
+
+  it('does not fire during replayCompletedRewards', () => {
+    const now = new Date().toISOString()
+    const snapshot: ContractStoreSnapshot = {
+      ...emptyContractSnapshot(),
+      instances: {
+        [payoutContract.id]: {
+          contractId: payoutContract.id,
+          status: 'completed',
+          currentStepIndex: 2,
+          stepCounters: [3, 1, 1],
+          offeredAt: now,
+          acceptedAt: now,
+          completedAt: now,
+        },
+      },
+    }
+    const messages = new MessageSystem([triggerMessage], { load: () => ({}), save: () => {} })
+    const payouts: ContractStepCompletedPayload[] = []
+    const contracts = new ContractSystem(
+      [payoutContract],
+      messages,
+      { load: () => snapshot, save: () => {} },
+      {
+        onContractStepCompleted: (payload) => payouts.push(payload),
+      },
+    )
+    contracts.replayCompletedRewards()
+    expect(payouts).toEqual([])
   })
 })
 

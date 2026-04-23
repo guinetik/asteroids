@@ -10,6 +10,7 @@
     "Around here we play the percentages: no Viroid checkpoints, no Earth tax bite, just clean spreads and faster turns. You want real credits, you learn to move cargo where demand pays premium.",
     "Your hand is simple and sharp. Run a full loop: buy in Venus, cash out on Earth, rebuy on Earth, cash out on Mars, rebuy on Mars, close the table back on Venus.",
     "You complete the circuit, I mark you as a house-trusted trader. That means permanent jump clearance back to Venus and a doubled payout lane on all Venus-issued contracts.",
+    "House rule before you ante: lose your shuttle on the route, you lose the cargo with it. The Exchange does not insure freight that does not make it to a counter. Fly clean.",
     "Ante up and follow the cards exactly.",
     "- Lucas Maverick"
   ],
@@ -20,6 +21,7 @@
       "planetId": "venus",
       "itemId": "acid-resistant-coatings",
       "count": 10,
+      "creditsReward": 3000,
       "subject": "Hand One - Buy Coatings on Venus",
       "flavor": [
         "First card: buy 10 units of Acid-Resistant Coatings at Venus. House rule says you start where the stack is hottest."
@@ -31,6 +33,7 @@
       "planetId": "earth",
       "itemId": "acid-resistant-coatings",
       "count": 10,
+      "creditsReward": 3000,
       "subject": "Hand Two - Cash Out Coatings on Earth",
       "flavor": [
         "Second card: move those 10 coating units to Earth and sell the lot. You do not leave chips stranded on the table."
@@ -42,6 +45,7 @@
       "planetId": "earth",
       "itemId": "luxury-foods",
       "count": 10,
+      "creditsReward": 3000,
       "subject": "Hand Three - Buy Luxury Foods on Earth",
       "flavor": [
         "Third card: buy 10 units of Luxury Foods on Earth. Premium stock, steady spread, no hero plays."
@@ -53,6 +57,7 @@
       "planetId": "mars",
       "itemId": "luxury-foods",
       "count": 10,
+      "creditsReward": 3000,
       "subject": "Hand Four - Sell Luxury Foods on Mars",
       "flavor": [
         "Fourth card: take those 10 units to Mars and sell clean. Mars pays when you bring comfort and timing."
@@ -64,6 +69,7 @@
       "planetId": "mars",
       "itemId": "drill-bits",
       "count": 10,
+      "creditsReward": 3000,
       "subject": "Hand Five - Buy Drill Bits on Mars",
       "flavor": [
         "Fifth card: buy 10 Drill Bits on Mars. Industrial goods are your stable suit for the close."
@@ -75,6 +81,7 @@
       "planetId": "venus",
       "itemId": "drill-bits",
       "count": 10,
+      "creditsReward": 3000,
       "subject": "Final Hand - Close the Loop at Venus",
       "flavor": [
         "Last card: bring those 10 Drill Bits back to Venus and sell. Close the loop, rake the pot, and walk away with market cred."
