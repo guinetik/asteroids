@@ -13,6 +13,9 @@ import playerConfigJson from '@/data/fps/player-config.json'
 import type { FpsPlayerConfig } from '@/three/FpsPlayerController'
 import { getCurrentUpgradeValue } from '@/lib/upgrades'
 
+/** Baseline sprint-capacity boost applied before suit stamina upgrades. */
+const BASE_SPRINT_CAPACITY_MULTIPLIER = 2
+
 /**
  * Build a {@link FpsPlayerConfig} with all five suit upgrade multipliers applied.
  *
@@ -51,7 +54,10 @@ export function buildFpsPlayerConfig(): FpsPlayerConfig {
       thrusters: {
         sprint: {
           ...base.o2.thrusters.sprint,
-          capacity: base.o2.thrusters.sprint.capacity * staminaCapacity,
+          capacity:
+            base.o2.thrusters.sprint.capacity
+            * BASE_SPRINT_CAPACITY_MULTIPLIER
+            * staminaCapacity,
           burnRate: base.o2.thrusters.sprint.burnRate * staminaEfficiency,
         },
         jump: {

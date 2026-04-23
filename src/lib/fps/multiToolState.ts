@@ -74,6 +74,7 @@ export interface MultiToolConfig {
  */
 export class MultiToolState implements Tickable {
   private static readonly DRILL_RECOVERY_RATIO = 0.5
+  private static readonly DRILL_PARTIAL_RECOVERY_MULTIPLIER = 1.5
 
   private _mode: MultiToolMode = 'weapon'
   private _aiming = false
@@ -253,6 +254,10 @@ export class MultiToolState implements Tickable {
       drill: this._isFiring && this._mode === 'drill',
       weapon: this._isFiring && this._mode === 'weapon',
       heal: this._isFiring && this._mode === 'heal',
+    }, {
+      rechargeRateMultiplier: {
+        drill: this.getDrillRechargeRateMultiplier(),
+      },
     })
 
     if (
@@ -263,5 +268,19 @@ export class MultiToolState implements Tickable {
       this.drillRecoveryRequiresRelease = true
     }
 
+  }
+
+  /**
+   * Drill recharge has two recovery lanes:
+   * - if the player fully bottoms out, keep the default recharge rate until
+   *   the standard 50% recovery threshold is reached
+   * - if they feather the drill and never hit zero, recharge 1.5x faster
+   */
+  private getDrillRechargeRateMultiplier(): number {
+    const drillCharge = this.thrusterSystem.getState('drill').charge
+    if (this.drillRecoveryLocked || drillCharge <= 0) {
+      return 1
+    }
+    return MultiToolState.DRILL_PARTIAL_RECOVERY_MULTIPLIER
   }
 }

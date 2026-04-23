@@ -168,6 +168,33 @@ describe('MultiToolState', () => {
     expect(state.isFiring).toBe(true)
   })
 
+  it('partially depleted drill recharges at 1.5x the default rate', () => {
+    state.setMode('drill')
+    state.setAiming(true)
+
+    state.setInput(true, true)
+    state.tick(0.1)
+    expect(state.modeCharge).toBe(18)
+
+    state.setInput(false, false)
+    state.tick(1)
+    expect(state.modeCharge).toBe(30)
+  })
+
+  it('fully depleted drill keeps the default recharge rate until 50% recovery', () => {
+    state.setMode('drill')
+    state.setAiming(true)
+
+    state.setInput(true, true)
+    state.tick(0.25)
+    expect(state.modeCharge).toBe(0)
+
+    state.setInput(false, false)
+    state.tick(1)
+    expect(state.modeCharge).toBe(8)
+    expect(state.modeCharge).toBeLessThan(state.modeChargeCapacity * 0.5)
+  })
+
   // --- Trigger: auto (weapon) ---
 
   it('auto trigger: fires at fixed rate while held + aiming', () => {
