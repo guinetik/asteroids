@@ -311,6 +311,18 @@ export class FpsAudioDirector {
   }
 
   /**
+   * Player just took environmental tick damage (nest aura, hazard pool,
+   * etc.). Plays a single vocal grunt — the manifest entry for
+   * `sfx.grunt` uses `playback: 'restart'` so rapid back-to-back ticks
+   * never stack into a chorus. No looping SFX is started (unlike
+   * contact damage); the caller is expected to fire this once per tick
+   * while the player stays in the hazard zone.
+   */
+  notifyHazardDamage(): void {
+    this.audio.play('sfx.grunt')
+  }
+
+  /**
    * **On-foot** player just took non-lethal fall damage from impacting
    * the ground at speed (jumping into a crater, dropping off a ledge
    * during EVA). This is the FPS character's body landing — *not* the

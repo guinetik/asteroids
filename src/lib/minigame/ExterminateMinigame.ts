@@ -35,6 +35,17 @@ const BLAST_RADIUS = 22
 const CRATER_RADIUS = 11
 const ENEMY_PLAYER_FAR_DISTANCE = 99999
 
+/**
+ * Radius around the nest where the player takes tick damage.
+ * Smaller than {@link NEST_INTERACT_RANGE} (16) so charges can still be armed
+ * from the outer ring without standing directly in the hazard.
+ */
+const NEST_HAZARD_RADIUS = 10
+/** Seconds between nest-hazard damage ticks while the player is inside the radius. */
+const NEST_HAZARD_TICK_INTERVAL = 1.0
+/** HP damage dealt per hazard tick. */
+const NEST_HAZARD_DAMAGE = 6
+
 /** Outer fireball flash — slower, bigger, longer-lived than the original. */
 const EXPLOSION_FLASH_DURATION = 0.75
 const EXPLOSION_FLASH_MAX_SCALE = 62
@@ -210,6 +221,8 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
   private explosionFlashTimer = 0
   private explosionCoreTimer = 0
   private shockwaveTimer = 0
+  /** Time until the next nest-hazard damage tick; reset to the interval on apply. */
+  private nestHazardCooldown = 0
   /**
    * Called when the player should take direct damage.
    *
@@ -217,7 +230,8 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
    * @param sourceX - World X of the damage source.
    * @param sourceZ - World Z of the damage source.
    * @param source  - What dealt the damage. `'projectile'` for ranged hits
-   *                  fired by enemies, `'contact'` for melee/touch damage.
+   *                  fired by enemies, `'contact'` for melee/touch damage,
+   *                  `'hazard'` for environmental tick damage (nest aura).
    *                  Lets the controller pick the right impact SFX.
    */
   onDamagePlayer:
@@ -225,7 +239,7 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
         damage: number,
         sourceX: number,
         sourceZ: number,
-        source?: 'projectile' | 'contact',
+        source?: 'projectile' | 'contact' | 'hazard',
       ) => void)
     | null = null
   /** Called when the player should be killed outright. */
@@ -341,6 +355,7 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
 
     this.syncEnemySimulation(dt, ctx)
     this.syncExplosionFlash(dt)
+    this.syncNestHazard(dt, ctx)
 
     if (this._status === 'completed' || this._status === 'failed') {
       return
@@ -821,6 +836,46 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
     this.clearEncounter()
     this.clearEnemyProjectiles()
     this.onComplete?.(this.objectiveIndex)
+  }
+
+  /**
+   * Damage the player on a fixed interval while they stand inside
+   * {@link NEST_HAZARD_RADIUS} of the nest. Only active while the nest is
+   * intact (before detonation). The cooldown is reset when the player
+   * leaves the radius so re-entering triggers a damage tick immediately
+   * on the next frame — otherwise stepping out and back in could delay
+   * the first hit by up to a full interval.
+   *
+   * @param dt - Frame delta in seconds.
+   * @param ctx - Current minigame context (player position, active mode).
+   */
+  private syncNestHazard(dt: number, ctx: MiniGameContext): void {
+    // Nest gone → no hazard. Also skip when the minigame is finished.
+    if (this._status !== 'active') {
+      this.nestHazardCooldown = 0
+      return
+    }
+    if (ctx.levelState !== 'eva' || !ctx.playerPosition) {
+      this.nestHazardCooldown = 0
+      return
+    }
+
+    const dist = this.distanceToNest(ctx.playerPosition.x, ctx.playerPosition.z)
+    if (dist > NEST_HAZARD_RADIUS) {
+      this.nestHazardCooldown = 0
+      return
+    }
+
+    this.nestHazardCooldown -= dt
+    if (this.nestHazardCooldown > 0) return
+
+    this.nestHazardCooldown = NEST_HAZARD_TICK_INTERVAL
+    this.onDamagePlayer?.(
+      NEST_HAZARD_DAMAGE,
+      this.nestPosition.x,
+      this.nestPosition.z,
+      'hazard',
+    )
   }
 
   private syncExplosionFlash(dt: number): void {

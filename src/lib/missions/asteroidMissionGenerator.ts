@@ -38,7 +38,7 @@ function hashSeed(str: string): number {
 }
 
 /** Level terrain grid size — shared with LevelViewController. */
-export const LEVEL_GRID_SIZE = 5000
+export const LEVEL_GRID_SIZE = 3500
 
 export { MIN_ASTEROID_MISSION_REWARD }
 

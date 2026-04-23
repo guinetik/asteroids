@@ -2378,18 +2378,22 @@ export class LevelViewController implements Tickable {
     damage: number,
     sourceX: number,
     sourceZ: number,
-    source?: 'projectile' | 'contact',
+    source?: 'projectile' | 'contact' | 'hazard',
   ): void {
     this.playerController?.takeDamage(damage)
     this.damageFlashTimer = DAMAGE_FLASH_DURATION
 
     // Damage audio (composite ranged thud / mauling loop) is owned by
     // the FPS audio director. See `FpsAudioDirector.notifyProjectileDamage`
-    // and `notifyContactDamage` for the full per-cue rationale.
+    // and `notifyContactDamage` for the full per-cue rationale. Hazard
+    // damage (nest aura, etc.) routes to `notifyHazardDamage` which plays
+    // a vocal grunt on the manifest's restart policy.
     if (source === 'projectile') {
       this.fpsAudio.notifyProjectileDamage()
     } else if (source === 'contact') {
       this.fpsAudio.notifyContactDamage()
+    } else if (source === 'hazard') {
+      this.fpsAudio.notifyHazardDamage()
     }
 
     const playerPos = this.playerController?.group.position
