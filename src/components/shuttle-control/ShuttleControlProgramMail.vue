@@ -75,13 +75,34 @@ const activeContract = computed(() => {
   }
 })
 
+/**
+ * The accept/decline card is intentionally surfaced only on the two
+ * messages where the player can meaningfully act on the contract:
+ *
+ * - `brief` (the pinned active brief, delivered on accept) → renders
+ *   above the body, since it's the live progress dossier the player
+ *   returns to mid-run.
+ * - `intro` while the contract is still `available` → renders below the
+ *   body, so the accept/decline buttons sit at the natural reading
+ *   end of the pitch.
+ *
+ * Step flavor messages and the completion message intentionally render
+ * *no* card even when the contract is active/completed — those are
+ * one-shot lore beats, not action surfaces, and stacking the live
+ * progress card on top of every step retread visually duplicates the
+ * pinned brief that's always one click away.
+ */
 const showContractCardAbove = computed(() => {
+  if (!activeContract.value) return false
+  return readable.value?.contractMessageKind === 'brief'
+})
+
+const showContractCardBelow = computed(() => {
   const entry = activeContract.value
   if (!entry) return false
-  const r = readable.value
-  if (r?.contractMessageKind === 'brief') return true
+  if (readable.value?.contractMessageKind !== 'intro') return false
   const status = entry.instance?.status ?? 'available'
-  return status === 'active' || status === 'completed'
+  return status === 'available'
 })
 
 const canAcknowledgeSelected = computed(() => {
@@ -309,7 +330,7 @@ watch(
             </p>
           </div>
           <ContractAcceptCard
-            v-if="activeContract && !showContractCardAbove"
+            v-if="activeContract && showContractCardBelow"
             :contract="activeContract.contract"
             :instance="activeContract.instance"
             @accept="acceptContract"
