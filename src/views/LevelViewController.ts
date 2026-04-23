@@ -95,6 +95,17 @@ import { getItemDefinition } from '@/lib/inventory/catalog'
 import { worldPointToHearing } from '@/lib/audio/worldHearing'
 import { GatherMinigame } from '@/lib/minigame/GatherMinigame'
 import { Timer, type TimerHandle } from '@/lib/Timer'
+import { DropSystem, createContractDropPolicy } from '@/lib/fps/dropSystem'
+import { PsychospherePickupController } from '@/three/PsychospherePickupController'
+import { contractSystem } from '@/lib/contracts/runtime'
+
+/**
+ * Inventory item id of the loot dropped by viroid (bacteriophage) deaths
+ * while a `collect-drops` contract step is armed for it. Cinderline is the
+ * first contract to wire this; future loot kinds should be added to the
+ * map in {@link LevelViewController.installDropObserver}.
+ */
+const VIROID_DROP_ITEM_ID = 'viroid-psychosphere'
 
 // ── Scene constants ─────────────────────────────────────────────
 const TERRAIN_RESOLUTION = 512
@@ -475,6 +486,18 @@ export class LevelViewController implements Tickable {
   /** Active minigames — one per objective that has a minigame. */
   private minigames: MiniGame[] = []
 
+  /**
+   * Loot drop system shared across all minigames in the current run. Created
+   * lazily in {@link initialize} once the FPS player exists; ticked from the
+   * level loop and observed by every spawned virus enemy via
+   * {@link ExterminateMinigame.installEnemySpawnObserver} /
+   * {@link RescueMinigame.installEnemySpawnObserver}.
+   */
+  private dropSystem: DropSystem | null = null
+
+  /** Visual layer for {@link dropSystem}; reads pickups each frame. */
+  private psychospherePickupController: PsychospherePickupController | null = null
+
   /** Called each frame during EVA with terminal prompt text (null to hide). */
   onTerminalPrompt: ((text: string | null) => void) | null = null
 
@@ -692,7 +715,7 @@ export class LevelViewController implements Tickable {
     })
 
     // ── Lighting rig (replaces hardcoded lights) ───────────────
-    this.lightingRig = new LevelLightingRig(this.atmosphereCtx)
+    this.lightingRig = new LevelLightingRig(this.atmosphereCtx, this.sceneManager.renderer)
     this.lightingRig.addToScene(this.sceneManager.scene)
 
     // ── Lander (created once, stays in scene) ───────────────────
@@ -967,6 +990,19 @@ export class LevelViewController implements Tickable {
       this.spawnTractorBurst(spawnIndex, pos, this.getTractorParticleCount(spawnIndex), false)
     }
 
+    // ── Loot drop system ────────────────────────────────────────
+    // Created before the minigames so each one can register its enemy
+    // director with the spawn observer below. Policy is contract-driven:
+    // pickups only materialize when an active contract has a matching
+    // `collect-drops` step.
+    this.dropSystem = new DropSystem({
+      policy: createContractDropPolicy(contractSystem),
+      onPickup: (pickup) => this.handlePickupCollected(pickup),
+    })
+    this.psychospherePickupController = new PsychospherePickupController(this.dropSystem)
+    this.sceneManager.addToScene(this.psychospherePickupController.group)
+    this.tickHandler.register(this.psychospherePickupController, TICK_PRIORITY_RENDER)
+
     // ── Objective minigames ──────────────────────────────────────
     const missionSeed = hashSeed(mission.id)
     for (let i = 0; i < mission.objectives.length; i++) {
@@ -1012,6 +1048,7 @@ export class LevelViewController implements Tickable {
         minigame.onExplosion = (pos) => {
           this.triggerObjectiveExplosion(pos, 32, 10)
         }
+        this.installDropObserver(minigame)
         this.minigames.push(minigame)
       } else if (obj.type === 'rescue') {
         const minigame = await RescueMinigame.create(
@@ -1045,6 +1082,7 @@ export class LevelViewController implements Tickable {
         minigame.onFail = (_idx, cause) => {
           this.onDeathOverlay?.(true, cause)
         }
+        this.installDropObserver(minigame)
         this.minigames.push(minigame)
       } else if (obj.type === 'collect') {
         const minigame = new CollectMinigame(i, obj, this.sceneManager!.scene, this.heightmap!)
@@ -1909,6 +1947,11 @@ export class LevelViewController implements Tickable {
 
   /** Per-frame EVA logic — tool input, camera bob, aiming. */
   private tickEva(dt: number): void {
+    if (this.dropSystem && this.playerController) {
+      const pos = this.playerController.group.position
+      this.dropSystem.tick(dt, { x: pos.x, y: pos.y, z: pos.z })
+    }
+
     // Tool keybinds
     if (this.inputManager && this.multiToolState) {
       if (this.inputManager.wasActionPressed('toolDrill')) this.multiToolState.setMode('drill')
@@ -2458,6 +2501,67 @@ export class LevelViewController implements Tickable {
    * @param sparkBaseSpeed - Minimum upward velocity for the spark burst (the
    *   max is base + 10 with random jitter).
    */
+  /**
+   * Map an enemy type key to the inventory item it can drop (when armed by
+   * an active contract). New loot kinds get added here; the rest of the
+   * pipeline is data-driven via {@link DropPolicy}.
+   *
+   * @param enemyType - The `type` field on an {@link EnemyHandle}.
+   * @returns Item id (e.g. `'viroid-psychosphere'`) or null if no drop is associated.
+   */
+  private dropItemForEnemyType(enemyType: string): string | null {
+    if (enemyType === 'bacteriophage') return VIROID_DROP_ITEM_ID
+    return null
+  }
+
+  /**
+   * Wire the level's loot pipeline into a freshly created combat minigame.
+   * Each enemy spawn registers an auxiliary death listener (so the
+   * controller's primary `onDeath` is preserved) that asks the drop system
+   * to spawn a pickup at the enemy's last position. The system gates the
+   * spawn through its policy, so contracts decide whether the loot
+   * actually appears.
+   *
+   * @param minigame - Combat minigame whose enemy director should feed loot drops.
+   */
+  private installDropObserver(minigame: ExterminateMinigame | RescueMinigame): void {
+    if (!this.dropSystem) return
+    const dropSystem = this.dropSystem
+    minigame.installEnemySpawnObserver((handle) => {
+      const itemId = this.dropItemForEnemyType(handle.type)
+      if (!itemId) return
+      handle.enemy.addDeathListener(() => {
+        const pos = handle.enemy.position
+        dropSystem.spawnFor(itemId, { x: pos.x, y: pos.y, z: pos.z })
+      })
+    })
+  }
+
+  /**
+   * Bridge a drop-system pickup event into the player's inventory and the
+   * contract step counter. Failures (inventory full / over weight) surface
+   * the same warning toast as failed mining pickups so the player knows the
+   * loot was lost.
+   *
+   * @param pickup - Pickup entity collected this tick.
+   */
+  private handlePickupCollected(pickup: { itemId: string; quantity?: number }): void {
+    const inventory = loadInventory()
+    if (!inventory) return
+    const quantity = pickup.quantity ?? 1
+    const def = getItemDefinition(pickup.itemId)
+    const label = def?.label ?? pickup.itemId
+    const result = addItem(inventory, pickup.itemId, quantity)
+    if (!result.ok) {
+      this.onResourcePickupFailed?.(label, result.reason ?? 'Inventory full')
+      return
+    }
+    saveInventory(result.inventory)
+    this.onResourcePickup?.(pickup.itemId, quantity, label)
+    this.levelAudio.notifyResourcePickup()
+    contractSystem.notifyDropCollected({ itemId: pickup.itemId, quantity })
+  }
+
   private triggerObjectiveExplosion(
     pos: Vector3,
     sparkBursts: number,
@@ -2757,6 +2861,10 @@ export class LevelViewController implements Tickable {
     this.impactEmitter?.dispose()
     this.tractorEmitter?.dispose()
     this.tractorEmitter = null
+    this.psychospherePickupController?.dispose()
+    this.psychospherePickupController = null
+    this.dropSystem?.clear()
+    this.dropSystem = null
     this.rockTargetIndicator?.dispose()
     this.rockTargetIndicator = null
     this.multiTool?.dispose()

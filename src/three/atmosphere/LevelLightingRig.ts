@@ -33,6 +33,54 @@ const RIM_INTENSITY = 0.3
 const RIM_COLOR = 0x6688cc
 /** Distance to place the directional light source from origin. */
 const SUN_DISTANCE = 500
+/** Equirect texture width (height = half). 256×128 is plenty after PMREM. */
+const ENV_TEXTURE_WIDTH = 256
+/** Dim the sky sun tint so the envmap doesn't double-count direct light. */
+const ENV_SKY_INTENSITY = 0.6
+/** Floor multiplier keeps ground pickup non-black on very dark asteroids. */
+const ENV_GROUND_MIN = 0.1
+/** Ground brightness relative to baseColor. */
+const ENV_GROUND_INTENSITY = 0.35
+/** Overall envmap contribution to PBR materials. 1.0 = native, <1 = dimmer. */
+const ENV_SCENE_INTENSITY = 0.7
+
+/**
+ * Generate a procedural equirectangular environment texture for the level scene.
+ * Top half = sky (sun-tinted), middle = warm horizon, bottom = ground (base color).
+ * Gives PBR materials something to sample so metallic surfaces don't go pure black
+ * in shadow.
+ */
+function createEnvironmentTexture(ctx: AtmosphereContext): THREE.CanvasTexture {
+  const width = ENV_TEXTURE_WIDTH
+  const height = width / 2
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const c = canvas.getContext('2d')!
+
+  const sunR = ctx.sunColor.r
+  const sunG = ctx.sunColor.g
+  const sunB = ctx.sunColor.b
+  const zenithCss = `rgb(${Math.round(sunR * 255 * ENV_SKY_INTENSITY * 0.55)},${Math.round(sunG * 255 * ENV_SKY_INTENSITY * 0.55)},${Math.round(sunB * 255 * ENV_SKY_INTENSITY * 0.7)})`
+  const horizonCss = `rgb(${Math.round(sunR * 255 * ENV_SKY_INTENSITY)},${Math.round(sunG * 255 * ENV_SKY_INTENSITY * 0.9)},${Math.round(sunB * 255 * ENV_SKY_INTENSITY * 0.75)})`
+  const groundR = Math.max(ENV_GROUND_MIN, ctx.baseColor[0] * ENV_GROUND_INTENSITY)
+  const groundG = Math.max(ENV_GROUND_MIN, ctx.baseColor[1] * ENV_GROUND_INTENSITY)
+  const groundB = Math.max(ENV_GROUND_MIN, ctx.baseColor[2] * ENV_GROUND_INTENSITY)
+  const groundCss = `rgb(${Math.round(groundR * 255)},${Math.round(groundG * 255)},${Math.round(groundB * 255)})`
+
+  const gradient = c.createLinearGradient(0, 0, 0, height)
+  gradient.addColorStop(0, zenithCss)
+  gradient.addColorStop(0.5, horizonCss)
+  gradient.addColorStop(0.55, groundCss)
+  gradient.addColorStop(1, groundCss)
+  c.fillStyle = gradient
+  c.fillRect(0, 0, width, height)
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.mapping = THREE.EquirectangularReflectionMapping
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
+}
 
 /**
  * Manages the three-light rig (sun + fill + rim) for the level scene.
@@ -45,8 +93,12 @@ export class LevelLightingRig {
   readonly fill: THREE.HemisphereLight
   /** Rim/back light opposite the sun for silhouette separation. */
   readonly rim: THREE.DirectionalLight
+  /** PMREM-convolved environment map for PBR reflections. */
+  readonly environment: THREE.Texture
+  private readonly sourceEnvTexture: THREE.CanvasTexture
+  private installedScene: THREE.Scene | null = null
 
-  constructor(ctx: AtmosphereContext) {
+  constructor(ctx: AtmosphereContext, renderer: THREE.WebGLRenderer) {
     // ── Sun ──
     this.sun = new THREE.DirectionalLight(ctx.sunColor, ctx.sunIntensity)
     this.sun.position.copy(ctx.sunDirection).multiplyScalar(SUN_DISTANCE)
@@ -75,20 +127,40 @@ export class LevelLightingRig {
     this.sun.layers.enable(FPS_VIEWMODEL_LAYER)
     this.fill.layers.enable(FPS_VIEWMODEL_LAYER)
     this.rim.layers.enable(FPS_VIEWMODEL_LAYER)
+
+    // ── Environment map for PBR reflections ──
+    // Without this, metallic materials (GLTF lander, EVA suit) render pure
+    // black in shadow because metalness has no diffuse component and no
+    // reflections to sample.
+    this.sourceEnvTexture = createEnvironmentTexture(ctx)
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    this.environment = pmrem.fromEquirectangular(this.sourceEnvTexture).texture
+    pmrem.dispose()
   }
 
-  /** Add all lights to the scene. */
+  /** Add all lights and install the environment map on the scene. */
   addToScene(scene: THREE.Scene): void {
     scene.add(this.sun)
     scene.add(this.fill)
     scene.add(this.rim)
+    scene.environment = this.environment
+    scene.environmentIntensity = ENV_SCENE_INTENSITY
+    this.installedScene = scene
   }
 
-  /** Remove all lights and dispose shadow map. */
+  /** Remove all lights, clear scene environment, dispose GPU resources. */
   dispose(): void {
+    if (this.installedScene) {
+      if (this.installedScene.environment === this.environment) {
+        this.installedScene.environment = null
+      }
+      this.installedScene = null
+    }
     this.sun.shadow.map?.dispose()
     this.sun.dispose()
     this.fill.dispose()
     this.rim.dispose()
+    this.environment.dispose()
+    this.sourceEnvTexture.dispose()
   }
 }
