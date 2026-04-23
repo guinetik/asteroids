@@ -1,10 +1,10 @@
 import * as THREE from 'three'
 import mapGravityData from '@/data/shuttle/map-gravity.json'
-import { PLANETS, SUN } from '@/lib/planets/catalog'
+import { PLANETS } from '@/lib/planets/catalog'
 import type { GravityConfig } from '@/lib/physics/gravity'
-import { influenceRadius, eventHorizonRadius } from '@/lib/physics/gravity'
 import { TICK_PRIORITY_INPUT, TICK_PRIORITY_RENDER } from '@/lib/tickPriorities'
-import { SIZE_SCALE } from '@/lib/planets/constants'
+import { ORBIT_SCALE, SIZE_SCALE } from '@/lib/planets/constants'
+import shipHealthData from '@/data/shuttle/ship-health.json'
 
 /** Tick priority for the compositor (runs after animation, before render). */
 export const TICK_PRIORITY_COMPOSIT = TICK_PRIORITY_RENDER - 1
@@ -308,9 +308,19 @@ export const MAP_GRAVITY_CONFIG: GravityConfig = {
   eventHorizonScale: mapGravityData.eventHorizonScale,
 }
 
-/** The Sun orbit lane — midpoint between event horizon and influence edge. */
-export const SUN_BUMP_ORBIT_RADIUS =
-  (eventHorizonRadius(SUN.mass, MAP_GRAVITY_CONFIG) + influenceRadius(SUN.mass, MAP_GRAVITY_CONFIG)) * 0.4
+/**
+ * The Sun orbit lane — anchored directly to `radiationZone3Boundary` so the
+ * dashed orbit ring visually traces the lethal Zone 3 frontier the radiation
+ * HUD warns about. Decoupled from `eventHorizonScale` on purpose: that scale
+ * controls the "crashed into the sun" kill radius and we need to tune it
+ * independently of where the orbit lane sits.
+ *
+ * Math: `radiationZone3Boundary (0.25) × ORBIT_SCALE (150) = 37.5` world units.
+ * Sun mesh ends at `SUN.displayRadius (0.15) × SIZE_SCALE (80) = 12` world
+ * units, leaving 25.5 wu of breathing room between the orbit ring and the
+ * visible solar surface.
+ */
+export const SUN_BUMP_ORBIT_RADIUS = shipHealthData.radiationZone3Boundary * ORBIT_SCALE
 
 /** Intro camera starting shot. */
 export const MAP_INTRO_CAMERA_START_POSITION = new THREE.Vector3(0, 540, 130)

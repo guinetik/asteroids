@@ -814,7 +814,7 @@ export class MapViewController implements Tickable {
     }
 
     this.shuttleController.onDeath = () => {
-      this.triggerDeath('Crashed Into The Sun')
+      this.triggerDeath('Consumed By The Sun')
     }
 
     // Route cargo door audio through the single shuttle-audio owner so
@@ -1510,8 +1510,15 @@ export class MapViewController implements Tickable {
       }
     }
 
+    // Death seizes ALL gameplay one-shots (orbit capture, shop, terminals,
+    // mission overlays). Skipping the rest of the per-frame action handling
+    // prevents bugs like pressing E mid death-fall to trigger an orbit
+    // capture on the body that just killed the shuttle.
+    const shuttleDead = this.shuttleController?.dead ?? false
+
     // Orbit action (E key) — press to capture/cancel, hold to charge slingshot
     if (
+      !shuttleDead &&
       !this.gravitySurfingController.isActive() &&
       !this.orbitalSurfingController.isActive() &&
       this.orbitSystem &&
@@ -1535,6 +1542,7 @@ export class MapViewController implements Tickable {
 
     // Shop action (B key) — toggle shop while orbiting
     if (
+      !shuttleDead &&
       this.inputManager?.wasActionPressed('shopAction') &&
       this.orbitSystem?.state === 'orbiting' &&
       this.shopFacade.session
@@ -1549,6 +1557,7 @@ export class MapViewController implements Tickable {
 
     // Engineering Bay (U key) — open shuttle terminal upgrades while orbiting
     if (
+      !shuttleDead &&
       this.inputManager?.wasActionPressed('engineeringBayAction') &&
       this.orbitSystem?.state === 'orbiting' &&
       this.shopFacade.session
@@ -1558,6 +1567,7 @@ export class MapViewController implements Tickable {
 
     // Mission Board (J key) — open shuttle terminal missions while orbiting
     if (
+      !shuttleDead &&
       this.inputManager?.wasActionPressed('missionBoardAction') &&
       this.orbitSystem?.state === 'orbiting' &&
       this.shopFacade.session
@@ -1567,6 +1577,7 @@ export class MapViewController implements Tickable {
 
     // Mission action (I key) — open mission overlay while orbiting
     if (
+      !shuttleDead &&
       this.inputManager?.wasActionPressed('missionAction') &&
       this.orbitSystem?.state === 'orbiting' &&
       this.missionButtonVisible
@@ -1811,6 +1822,13 @@ export class MapViewController implements Tickable {
 
         // Update shader uniforms
         this.gravityPass.uniforms.proximity!.value = maxProximity
+        // Chromatic aberration is reserved for radiation exposure — when the
+        // shielding is nominal (no radiation damage active), zero out the
+        // chroma channel so the player only sees the gravitational lens warp.
+        // This keeps the RGB-split visual in lockstep with the RadiationWarning
+        // banner: chromatic split == "you are being irradiated".
+        const radActive = this.shipHealth?.isTakingRadiationDamage ?? false
+        this.gravityPass.uniforms.chromMultiplier!.value = radActive ? 1.0 : 0.0
         if (maxProximity > 0 && this.vehicleCamera) {
           const sourceWorld = new THREE.Vector3(nearestSourceX, 0, nearestSourceZ)
           const projected = sourceWorld.project(this.vehicleCamera.camera)
@@ -1831,6 +1849,7 @@ export class MapViewController implements Tickable {
       } else {
         // Not in free state or dead — clear effects
         this.gravityPass.uniforms.proximity!.value = 0
+        this.gravityPass.uniforms.chromMultiplier!.value = 0
         if (this.onGravityWarning) {
           this.onGravityWarning({ proximity: 0, bodyName: null, visible: false })
         }

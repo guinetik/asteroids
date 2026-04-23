@@ -1322,6 +1322,7 @@ watch(
       !mapIntro.controlsLocked &&
       !habitatActive &&
       !earthStartupOrbitHudSuppressed &&
+      !deathVisible &&
       !evaActive
     "
     :telemetry="telemetry"
@@ -1336,6 +1337,7 @@ watch(
       !mapIntro.controlsLocked &&
       !habitatActive &&
       !earthStartupOrbitHudSuppressed &&
+      !deathVisible &&
       !evaActive
     "
     :orbitState="orbitState"
@@ -1352,6 +1354,7 @@ watch(
       !mapIntro.controlsLocked &&
       !habitatActive &&
       !earthStartupOrbitHudSuppressed &&
+      !deathVisible &&
       !evaActive
     "
     :warning="gravityWarning"
@@ -1362,6 +1365,7 @@ watch(
       !mapIntro.controlsLocked &&
       !habitatActive &&
       !earthStartupOrbitHudSuppressed &&
+      !deathVisible &&
       !evaActive
     "
     :warning="radiationWarning"
@@ -1372,6 +1376,7 @@ watch(
       !mapIntro.controlsLocked &&
       !habitatActive &&
       !earthStartupOrbitHudSuppressed &&
+      !deathVisible &&
       !evaActive
     "
     :anomaly="gravitationalAnomalyHud"
@@ -1456,6 +1461,7 @@ watch(
       !mapIntro.controlsLocked &&
       !habitatActive &&
       !earthStartupOrbitHudSuppressed &&
+      !deathVisible &&
       !evaActive
     "
     class="map-view-toggles"
@@ -1560,6 +1566,7 @@ watch(
       !mapIntro.controlsLocked &&
       !habitatActive &&
       !earthStartupOrbitHudSuppressed &&
+      !deathVisible &&
       !evaActive
     "
     type="button"
@@ -1598,6 +1605,7 @@ watch(
       !mapIntro.controlsLocked &&
       !habitatActive &&
       !earthStartupOrbitHudSuppressed &&
+      !deathVisible &&
       !evaActive
     "
     :credits="playerCredits"
@@ -1608,6 +1616,7 @@ watch(
       !mapIntro.controlsLocked &&
       !habitatActive &&
       !earthStartupOrbitHudSuppressed &&
+      !deathVisible &&
       !evaActive
     "
     type="button"

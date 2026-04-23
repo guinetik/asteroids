@@ -3,6 +3,7 @@ uniform float proximity;
 uniform vec2 sourceUV;
 uniform float lensStrength;
 uniform float chromStrength;
+uniform float chromMultiplier;
 varying vec2 vUv;
 
 const float PROXIMITY_EPSILON = 0.001;
@@ -23,7 +24,7 @@ void main() {
   float lensAmount = proximity * lensStrength / (dist + 0.1);
   vec2 lensedUV = vUv + toSource * lensAmount;
 
-  float chromAmount = proximity * proximity * chromStrength;
+  float chromAmount = proximity * proximity * chromStrength * chromMultiplier;
   vec2 chromDir = normalize(vUv - vec2(0.5));
 
   float r = texture2D(tDiffuse, lensedUV + chromDir * chromAmount).r;

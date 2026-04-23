@@ -17,7 +17,9 @@ import gravityDistortionFragmentShader from '@/three/shaders/postprocessing/grav
 /**
  * Creates a configured ShaderPass for gravity distortion.
  * Caller updates `pass.uniforms.proximity.value` and
- * `pass.uniforms.sourceUV.value` each frame.
+ * `pass.uniforms.sourceUV.value` each frame, and may modulate
+ * `pass.uniforms.chromMultiplier.value` to gate the chromatic
+ * aberration channel (e.g. shielded vs irradiated state).
  *
  * @param lensStrength - Maximum UV warp magnitude at proximity=1
  * @param chromStrength - Maximum chromatic aberration offset at proximity=1
@@ -33,6 +35,7 @@ export function createGravityDistortionPass(
       sourceUV: { value: new THREE.Vector2(0.5, 0.5) },
       lensStrength: { value: lensStrength },
       chromStrength: { value: chromStrength },
+      chromMultiplier: { value: 1.0 },
     },
     vertexShader: fullscreenQuadVertexShader,
     fragmentShader: gravityDistortionFragmentShader,
