@@ -118,6 +118,7 @@ function dismissSelected(): void {
   if (!selectedId.value) return
   const r = shipMessageSystem.getReadableShipMessage(selectedId.value)
   if (!r || r.inboxStatus === 'dismissed') return
+  uiAudio.notifyScanComplete()
   shipMessageSystem.dismiss(selectedId.value)
   refreshAll()
   emit('mailChanged')
