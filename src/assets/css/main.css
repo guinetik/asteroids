@@ -918,6 +918,32 @@ body {
   @apply border-cyan-200/45 bg-cyan-200/15 text-white;
 }
 
+/* Contract notification pill — stacked above .map-message-notice, paired cyan palette. */
+.map-contract-notice {
+  @apply pointer-events-auto fixed inset-x-0 z-[56] flex justify-center px-6;
+  top: 1.75rem;
+}
+
+.map-contract-notice__button {
+  @apply rounded-full border px-4 py-2 font-mono text-xs uppercase tracking-[0.22em] transition-colors;
+  border-color: rgba(106, 232, 196, 0.5);
+  background: rgba(2, 6, 23, 0.82);
+  color: #6ae8c4;
+  box-shadow:
+    inset 3px 0 0 #6ae8c4,
+    0 0 18px rgba(106, 232, 196, 0.25),
+    0 10px 24px rgba(2, 6, 23, 0.45);
+}
+
+.map-contract-notice__button:hover {
+  background: rgba(106, 232, 196, 0.18);
+  color: #ffffff;
+  box-shadow:
+    inset 3px 0 0 #6ae8c4,
+    0 0 24px rgba(106, 232, 196, 0.4),
+    0 10px 24px rgba(2, 6, 23, 0.45);
+}
+
 /* --- Map View Toggle Controls (bottom-right) --- */
 
 .map-view-toggles {

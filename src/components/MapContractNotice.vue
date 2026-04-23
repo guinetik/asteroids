@@ -5,7 +5,9 @@
  * Sibling of the blue `map-message-notice` rendered in {@link MapView.vue}.
  * Consumers compute the label through {@link contractNoticeLabel} and handle
  * the `click` event by deep-linking `ShuttleControlOverlay` into the contract
- * folder + target message.
+ * folder + target message. Styling lives in `src/assets/css/main.css` under
+ * the `.map-contract-notice` / `__button` classes so it stays in lockstep
+ * with the sibling inbox pill (`.map-message-notice`).
  *
  * @author guinetik
  * @date 2026-04-23
@@ -35,30 +37,3 @@ function onClick(): void {
     </button>
   </div>
 </template>
-
-<style scoped>
-.map-contract-notice {
-  pointer-events: auto;
-}
-
-.map-contract-notice__button {
-  appearance: none;
-  background: rgba(106, 232, 196, 0.12);
-  border: 1px solid rgba(106, 232, 196, 0.5);
-  color: #6ae8c4;
-  padding: 10px 18px;
-  font-family: inherit;
-  font-size: 12px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  cursor: pointer;
-  border-radius: 2px;
-  box-shadow: inset 3px 0 0 #6ae8c4, 0 0 18px rgba(106, 232, 196, 0.25);
-  transition: background 120ms ease, box-shadow 120ms ease;
-}
-
-.map-contract-notice__button:hover {
-  background: rgba(106, 232, 196, 0.22);
-  box-shadow: inset 3px 0 0 #6ae8c4, 0 0 24px rgba(106, 232, 196, 0.4);
-}
-</style>
