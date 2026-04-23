@@ -56,3 +56,8 @@ export function getTradeGood(id: string): TradeGoodDefinition | undefined {
 export function getTradeGoodsByPlanet(planetId: string): TradeGoodDefinition[] {
   return tradeGoods.filter((tg) => tg.producedBy === planetId)
 }
+
+/** Get all trade goods not produced by the given planet. */
+export function getTradeGoodsExcludingPlanet(planetId: string): TradeGoodDefinition[] {
+  return tradeGoods.filter((tg) => tg.producedBy !== planetId)
+}

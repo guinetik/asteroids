@@ -54,6 +54,10 @@ export interface TradeGoodSlot {
   stock: number
   /** Credits per unit at this planet (discounted from catalog base at the source). */
   price: number
+  /** True when this slot is imported from another planet. */
+  isImported?: boolean
+  /** Origin planet for imported slots. */
+  originPlanetId?: string
 }
 
 /** Restock timer state. */
@@ -68,11 +72,11 @@ export interface RestockTimer {
 export interface ShopSession {
   /** Planet id this shop belongs to. */
   planetId: string
-  /** The 3 currently displayed trade good slots. */
-  tradeSlots: [TradeGoodSlot, TradeGoodSlot, TradeGoodSlot]
+  /** Currently displayed trade good slots (3 random for most planets; full pool on Venus). */
+  tradeSlots: TradeGoodSlot[]
   /** Restock countdown. Null when stock is available and timer hasn't started. */
   restockTimer: RestockTimer | null
-  /** Whether all 3 trade slots are sold out. */
+  /** Whether all currently displayed trade slots are sold out. */
   allSoldOut: boolean
 }
 

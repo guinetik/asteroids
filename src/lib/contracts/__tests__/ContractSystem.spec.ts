@@ -162,6 +162,40 @@ const messageTriggerContract: Contract = {
   rewards: [],
 }
 
+/** Trade-loop contract used to validate buy/sell step progression. */
+const venusTradeLoopContract: Contract = {
+  id: 'venusian-zeppelin-trade-loop',
+  inboxName: 'Venusian Zeppelin Exchange',
+  from: 'Lucas Maverick',
+  sentAt: TEST_DATE,
+  triggerOnPlanetVisited: 'venus',
+  introSubject: 'Trade Loop',
+  introBody: ['Run the loop'],
+  steps: [
+    {
+      kind: 'trade-goods',
+      action: 'buy',
+      planetId: 'venus',
+      itemId: 'acid-resistant-coatings',
+      count: 10,
+      subject: 'Buy',
+      flavor: ['buy'],
+    },
+    {
+      kind: 'trade-goods',
+      action: 'sell',
+      planetId: 'earth',
+      itemId: 'acid-resistant-coatings',
+      count: 10,
+      subject: 'Sell',
+      flavor: ['sell'],
+    },
+  ],
+  completionSubject: 'Done',
+  completionBody: ['done'],
+  rewards: [{ type: 'fast-travel', planetId: 'venus' }],
+}
+
 interface Harness {
   contracts: ContractSystem
   messages: MessageSystem
@@ -325,6 +359,17 @@ describe('ContractSystem.offerWhenPrerequisites', () => {
   })
 })
 
+describe('ContractSystem triggerOnPlanetVisited', () => {
+  it('offers a contract when the player first orbits the trigger planet', () => {
+    const { contracts, messages } = createHarness([venusTradeLoopContract])
+    contracts.notifyPlanetVisited('venus')
+    expect(contracts.getInstance(venusTradeLoopContract.id)?.status).toBe('available')
+    expect(messages.getRecord(contractIntroMessageId(venusTradeLoopContract.id))).toMatchObject({
+      status: 'pending',
+    })
+  })
+})
+
 describe('ContractSystem.acceptContract', () => {
   it('moves an available contract to active and delivers step-1 flavor', () => {
     const { contracts, messages } = createHarness()
@@ -450,6 +495,53 @@ describe('ContractSystem mission filters', () => {
       { type: 'fast-travel', planetId: 'earth' },
       { type: 'mission-pay-multiplier', planetId: 'earth', multiplier: 2 },
     ])
+  })
+})
+
+describe('ContractSystem trade-goods steps', () => {
+  it('counts only matching action, planet, and item transactions', () => {
+    const { contracts } = createHarness([venusTradeLoopContract])
+    contracts.notifyPlanetVisited('venus')
+    contracts.acceptContract(venusTradeLoopContract.id)
+
+    contracts.notifyTradeTransaction({
+      action: 'sell',
+      planetId: 'venus',
+      itemId: 'acid-resistant-coatings',
+      quantity: 10,
+    })
+    expect(contracts.getInstance(venusTradeLoopContract.id)?.stepCounters[0]).toBe(0)
+
+    contracts.notifyTradeTransaction({
+      action: 'buy',
+      planetId: 'venus',
+      itemId: 'acid-resistant-coatings',
+      quantity: 4,
+    })
+    expect(contracts.getInstance(venusTradeLoopContract.id)?.stepCounters[0]).toBe(4)
+  })
+
+  it('advances by quantity and caps progress at required count', () => {
+    const { contracts, granted } = createHarness([venusTradeLoopContract])
+    contracts.notifyPlanetVisited('venus')
+    contracts.acceptContract(venusTradeLoopContract.id)
+
+    contracts.notifyTradeTransaction({
+      action: 'buy',
+      planetId: 'venus',
+      itemId: 'acid-resistant-coatings',
+      quantity: 12,
+    })
+    expect(contracts.getInstance(venusTradeLoopContract.id)?.currentStepIndex).toBe(1)
+
+    contracts.notifyTradeTransaction({
+      action: 'sell',
+      planetId: 'earth',
+      itemId: 'acid-resistant-coatings',
+      quantity: 10,
+    })
+    expect(contracts.getInstance(venusTradeLoopContract.id)?.status).toBe('completed')
+    expect(granted).toEqual([{ type: 'fast-travel', planetId: 'venus' }])
   })
 })
 

@@ -27,6 +27,7 @@
   },
   "earth": {
     "demands": [
+      { "itemId": "acid-resistant-coatings", "multiplier": 1.7 },
       { "itemId": "helium-3-cells", "multiplier": 2.5 },
       { "itemId": "exotic-gems", "multiplier": 2.5 },
       { "itemId": "void-crystals", "multiplier": 4.0 },

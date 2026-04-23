@@ -2421,11 +2421,40 @@ body {
 }
 
 .planet-shop-body {
-  @apply grid grid-cols-2 gap-4 overflow-y-auto p-5;
+  @apply grid min-h-0 flex-1 grid-cols-2 gap-4 overflow-hidden p-5;
 }
 
 .planet-shop-column {
-  @apply flex flex-col gap-2;
+  @apply flex min-h-0 flex-col gap-2;
+}
+
+.planet-shop-column--buy {
+  @apply overflow-y-auto pr-2;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(251, 191, 36, 0.42) rgba(15, 23, 42, 0.9);
+}
+
+.planet-shop-column--buy::-webkit-scrollbar {
+  width: 9px;
+}
+
+.planet-shop-column--buy::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.9);
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.12);
+}
+
+.planet-shop-column--buy::-webkit-scrollbar-thumb {
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(251, 191, 36, 0.38) 0%, rgba(217, 119, 6, 0.24) 100%);
+  box-shadow:
+    0 0 8px rgba(251, 191, 36, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.planet-shop-column--buy::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(251, 191, 36, 0.56) 0%, rgba(217, 119, 6, 0.38) 100%);
 }
 
 .planet-shop-column__title {
@@ -2454,6 +2483,27 @@ body {
   @apply font-mono text-[10px] uppercase tracking-wider text-slate-500 px-1 mb-0.5;
 }
 
+.planet-shop-group__header {
+  @apply flex w-full items-center justify-between rounded px-1 py-1 text-left
+         hover:bg-white/5 transition-colors;
+}
+
+.planet-shop-group__chevron {
+  @apply text-xs text-slate-400 transition-transform;
+}
+
+.planet-shop-group__chevron[data-open='true'] {
+  transform: rotate(0deg);
+}
+
+.planet-shop-group__chevron[data-open='false'] {
+  transform: rotate(-90deg);
+}
+
+.planet-shop-group__content {
+  @apply flex flex-col gap-1;
+}
+
 .planet-shop-item {
   @apply flex items-center gap-3 rounded-lg border border-white/5
          bg-white/5 px-3 py-2;
@@ -2469,6 +2519,10 @@ body {
 
 .planet-shop-item--trade {
   @apply border-amber-400/15;
+}
+
+.planet-shop-item--import {
+  @apply border-cyan-400/20 bg-cyan-400/5;
 }
 
 .planet-shop-item--sold-out {
@@ -2489,7 +2543,7 @@ body {
 }
 
 .planet-shop-item__desc {
-  @apply text-xs text-slate-500 line-clamp-2;
+  @apply text-xs text-slate-300;
 }
 
 .planet-shop-item__stock {
@@ -2532,6 +2586,19 @@ body {
 
 .planet-shop-icon--trade {
   @apply bg-amber-900/50 text-amber-300;
+}
+
+.planet-shop-icon--import {
+  @apply bg-cyan-900/50 text-cyan-300;
+}
+
+.planet-shop-subgroup-label {
+  @apply mt-1 px-1 font-mono text-[10px] uppercase tracking-wider text-cyan-300/80;
+}
+
+.planet-shop-item__origin {
+  @apply inline-flex w-fit rounded border border-cyan-400/30 bg-cyan-400/10
+         px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-cyan-200;
 }
 
 .planet-shop-restock {

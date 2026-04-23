@@ -43,6 +43,10 @@ function stepLabel(step: ContractStep): string {
   if (step.kind === 'visit-planet') {
     return `Enter orbit at ${step.planetId}`
   }
+  if (step.kind === 'trade-goods') {
+    const action = step.action === 'buy' ? 'Buy' : 'Sell'
+    return `${action} ${step.count} ${step.itemId} at ${step.planetId}`
+  }
   const orbitalBits: string[] = []
   if (step.giverPlanetId) orbitalBits.push(`from ${step.giverPlanetId}`)
   if (step.targetPlanetId) orbitalBits.push(`at ${step.targetPlanetId}`)
@@ -51,7 +55,9 @@ function stepLabel(step: ContractStep): string {
 }
 
 function requiredCount(step: ContractStep): number {
-  return step.kind === 'complete-missions' ? step.count : 1
+  if (step.kind === 'complete-missions') return step.count
+  if (step.kind === 'trade-goods') return step.count
+  return 1
 }
 
 interface StepEntry {
@@ -74,7 +80,8 @@ const stepEntries = computed<StepEntry[]>(() =>
         state: 'pending',
         marker: STEP_MARKER_PENDING,
         label,
-        progressLabel: step.kind === 'complete-missions' ? `0/${required}` : null,
+        progressLabel:
+          step.kind === 'complete-missions' || step.kind === 'trade-goods' ? `0/${required}` : null,
       }
     }
 
@@ -87,7 +94,10 @@ const stepEntries = computed<StepEntry[]>(() =>
         state: 'done',
         marker: STEP_MARKER_DONE,
         label,
-        progressLabel: step.kind === 'complete-missions' ? `${required}/${required}` : null,
+        progressLabel:
+          step.kind === 'complete-missions' || step.kind === 'trade-goods'
+            ? `${required}/${required}`
+            : null,
       }
     }
 
@@ -97,7 +107,10 @@ const stepEntries = computed<StepEntry[]>(() =>
       state: isCurrent ? 'current' : 'pending',
       marker: isCurrent ? STEP_MARKER_CURRENT : STEP_MARKER_PENDING,
       label,
-      progressLabel: step.kind === 'complete-missions' ? `${counter}/${required}` : null,
+      progressLabel:
+        step.kind === 'complete-missions' || step.kind === 'trade-goods'
+          ? `${counter}/${required}`
+          : null,
     }
   }),
 )
@@ -150,6 +163,10 @@ const headerLabel = computed(() => {
         </template>
         <template v-else-if="reward.type === 'mission-pay-multiplier'">
           Reward — {{ reward.multiplier }}× mission pay at <strong>{{ reward.planetId }}</strong>
+        </template>
+        <template v-else-if="reward.type === 'shuttle-upgrade'">
+          Reward — Upgrade <strong>{{ reward.upgradeId }}</strong> to Lvl
+          <strong>{{ reward.minLevel }}</strong>
         </template>
       </li>
     </ul>

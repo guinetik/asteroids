@@ -90,12 +90,49 @@ export interface OrbitalMissionCompletedEvent {
   targetPlanetId: string
 }
 
+/** Trade action kind tracked by contract trade-loop steps. */
+export type ContractTradeAction = 'buy' | 'sell'
+
+/**
+ * Step that requires buying or selling N units of a specific trade good at a
+ * specific planet shop.
+ */
+export interface TradeGoodsStep {
+  /** Buy (`'buy'`) or sell (`'sell'`) action required. */
+  kind: 'trade-goods'
+  /** Required shop action. */
+  action: ContractTradeAction
+  /** Planet where the transaction must happen (e.g. `'venus'`). */
+  planetId: string
+  /** Trade-good id from `src/data/shop/trade-goods.json`. */
+  itemId: string
+  /** Required total units across matching transactions. */
+  count: number
+  /** Authored summary shown on the step's flavor message subject. */
+  subject: string
+  /** Authored body paragraphs for the step's flavor message. */
+  flavor: string[]
+}
+
+/** Event payload emitted when a trade-shop transaction completes successfully. */
+export interface TradeTransactionEvent {
+  /** Which action happened. */
+  action: ContractTradeAction
+  /** Planet where the transaction occurred. */
+  planetId: string
+  /** Trade-good id bought or sold. */
+  itemId: string
+  /** Quantity transacted (units). */
+  quantity: number
+}
+
 /** Discriminated union of all supported contract steps. */
 export type ContractStep =
   | CompleteMissionsStep
   | InstallUpgradeStep
   | VisitPlanetStep
   | OrbitalMissionStep
+  | TradeGoodsStep
 
 /** Reward applied when a contract is completed. */
 export type RewardEffect =
@@ -123,6 +160,8 @@ export interface Contract {
    * with but independent from {@link triggerOnMissionCompletedNth}.
    */
   triggerOnMissionOfKind?: { n: number; missionType: ContractMissionType }
+  /** Offer this contract when the player first enters orbit at this planet id. */
+  triggerOnPlanetVisited?: string
   /**
    * When set, the intro is offered after another contract is `completed` and
    * the player has hit the min mission count for a given giver planet (see

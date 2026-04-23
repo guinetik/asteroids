@@ -1,0 +1,95 @@
+{
+  "id": "venusian-zeppelin-trade-loop",
+  "inboxName": "Venusian Zeppelin Exchange",
+  "from": "Lucas Maverick, Exchange Floor Boss",
+  "sentAt": "2306-04-14 18:20 UTC",
+  "triggerOnPlanetVisited": "venus",
+  "introSubject": "Contract - Venusian Zeppelin Market Table",
+  "introBody": [
+    "Pilot, welcome to the Venusian Zeppelin Exchange. Name is Lucas Maverick. Used to burn nights at poker tables, now I run the biggest interplanetary retail floor in the inner system.",
+    "Around here we play the percentages: no Viroid checkpoints, no Earth tax bite, just clean spreads and faster turns. You want real credits, you learn to move cargo where demand pays premium.",
+    "Your hand is simple and sharp. Run a full loop: buy in Venus, cash out on Earth, rebuy on Earth, cash out on Mars, rebuy on Mars, close the table back on Venus.",
+    "You complete the circuit, I mark you as a house-trusted trader. That means permanent jump clearance back to Venus and a doubled payout lane on all Venus-issued contracts.",
+    "Ante up and follow the cards exactly.",
+    "- Lucas Maverick"
+  ],
+  "steps": [
+    {
+      "kind": "trade-goods",
+      "action": "buy",
+      "planetId": "venus",
+      "itemId": "acid-resistant-coatings",
+      "count": 10,
+      "subject": "Hand One - Buy Coatings on Venus",
+      "flavor": [
+        "First card: buy 10 units of Acid-Resistant Coatings at Venus. House rule says you start where the stack is hottest."
+      ]
+    },
+    {
+      "kind": "trade-goods",
+      "action": "sell",
+      "planetId": "earth",
+      "itemId": "acid-resistant-coatings",
+      "count": 10,
+      "subject": "Hand Two - Cash Out Coatings on Earth",
+      "flavor": [
+        "Second card: move those 10 coating units to Earth and sell the lot. You do not leave chips stranded on the table."
+      ]
+    },
+    {
+      "kind": "trade-goods",
+      "action": "buy",
+      "planetId": "earth",
+      "itemId": "luxury-foods",
+      "count": 10,
+      "subject": "Hand Three - Buy Luxury Foods on Earth",
+      "flavor": [
+        "Third card: buy 10 units of Luxury Foods on Earth. Premium stock, steady spread, no hero plays."
+      ]
+    },
+    {
+      "kind": "trade-goods",
+      "action": "sell",
+      "planetId": "mars",
+      "itemId": "luxury-foods",
+      "count": 10,
+      "subject": "Hand Four - Sell Luxury Foods on Mars",
+      "flavor": [
+        "Fourth card: take those 10 units to Mars and sell clean. Mars pays when you bring comfort and timing."
+      ]
+    },
+    {
+      "kind": "trade-goods",
+      "action": "buy",
+      "planetId": "mars",
+      "itemId": "drill-bits",
+      "count": 10,
+      "subject": "Hand Five - Buy Drill Bits on Mars",
+      "flavor": [
+        "Fifth card: buy 10 Drill Bits on Mars. Industrial goods are your stable suit for the close."
+      ]
+    },
+    {
+      "kind": "trade-goods",
+      "action": "sell",
+      "planetId": "venus",
+      "itemId": "drill-bits",
+      "count": 10,
+      "subject": "Final Hand - Close the Loop at Venus",
+      "flavor": [
+        "Last card: bring those 10 Drill Bits back to Venus and sell. Close the loop, rake the pot, and walk away with market cred."
+      ]
+    }
+  ],
+  "completionSubject": "Table Cleared - Venus Lane Granted",
+  "completionBody": [
+    "You played the route like a pro: disciplined buys, clean exits, full loop closure. That is the difference between gamblers and operators.",
+    "I have tagged your transponder for permanent fast-travel return to Venus. Also filing a 2x payout multiplier on every Venus-issued contract in your ledger.",
+    "The house likes winners. Keep your odds sharp.",
+    "- Lucas Maverick"
+  ],
+  "rewards": [
+    { "type": "fast-travel", "planetId": "venus" },
+    { "type": "mission-pay-multiplier", "planetId": "venus", "multiplier": 2 }
+  ]
+}

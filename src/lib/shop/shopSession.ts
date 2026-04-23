@@ -12,7 +12,8 @@ import type { ShopSession, TradeGoodSlot } from './tradeTypes'
 import type { PlayerProfile } from '@/lib/player/types'
 import type { Inventory } from '@/lib/inventory/types'
 import type { ShopResult } from './types'
-import { getTradeGoodsByPlanet } from './tradeGoods'
+import type { TradeGoodDefinition } from './tradeTypes'
+import { getTradeGoodsByPlanet, getTradeGoodsExcludingPlanet } from './tradeGoods'
 import { addItem, canFitItem, removeItem } from '@/lib/inventory/inventory'
 import { spendCredits, addCredits } from '@/lib/player/profile'
 import { computeSellPrice } from './planetDemand'
@@ -37,6 +38,10 @@ const CHEAP_THRESHOLD = 50
  * source planet. Lower than 1 widens profit on resale where demand is high.
  */
 const TRADE_GOOD_SOURCE_BUY_PRICE_FRACTION = 0.85
+/** Fraction used for imported goods sold through the Venus marketplace. */
+const TRADE_GOOD_IMPORTED_BUY_PRICE_FRACTION = 1.05
+/** Number of random off-world imports added to Venus inventory. */
+const VENUS_IMPORT_SLOT_COUNT = 3
 
 /** Refuel cost in credits. */
 export const REFUEL_COST = 100
@@ -60,28 +65,48 @@ export const REPAIR_COST = 250
 export const LANDER_REPAIR_COST = 200
 
 /**
- * Pick 3 random trade goods from a planet's 5-item pool.
- * Returns them as TradeGoodSlots with randomized stock.
+ * Pick trade-good slots for a planet.
+ *
+ * Most planets: 3 random goods from the local pool.
+ * Venus special-case: include the full local pool to support the
+ * Venusian Zeppelin market loop visibility.
  *
  * @param planetId - The planet whose trade goods pool to draw from.
- * @returns A tuple of 3 trade good slots.
+ * @returns Trade good slots with randomized stock.
  */
-function pickTradeSlots(planetId: string): [TradeGoodSlot, TradeGoodSlot, TradeGoodSlot] {
+function pickTradeSlots(planetId: string): TradeGoodSlot[] {
   const allGoods = getTradeGoodsByPlanet(planetId)
-  const shuffled = [...allGoods].sort(() => Math.random() - 0.5)
-  const picked = shuffled.slice(0, 3)
+  const localSlots = allGoods.map((tg) => buildSlot(tg, false))
+  if (planetId !== 'venus') {
+    const shuffled = [...localSlots].sort(() => Math.random() - 0.5)
+    return shuffled.slice(0, 3)
+  }
+  const importPool = getTradeGoodsExcludingPlanet('venus')
+  const importSlots = [...importPool]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, VENUS_IMPORT_SLOT_COUNT)
+    .map((tg) => buildSlot(tg, true))
+  return [...localSlots, ...importSlots]
+}
 
-  return picked.map((tg) => {
-    const stock =
-      tg.basePrice < CHEAP_THRESHOLD
-        ? STOCK_MIN + Math.floor(Math.random() * (STOCK_MAX - STOCK_MIN + 1))
-        : STOCK_MIN + Math.floor(Math.random() * (STOCK_MAX / 2 - STOCK_MIN + 1))
-    return {
-      itemId: tg.id,
-      stock,
-      price: Math.round(tg.basePrice * TRADE_GOOD_SOURCE_BUY_PRICE_FRACTION),
-    }
-  }) as [TradeGoodSlot, TradeGoodSlot, TradeGoodSlot]
+/**
+ * Build a shop slot with randomized stock and source/import price policy.
+ */
+function buildSlot(tg: TradeGoodDefinition, isImported: boolean): TradeGoodSlot {
+  const stock =
+    tg.basePrice < CHEAP_THRESHOLD
+      ? STOCK_MIN + Math.floor(Math.random() * (STOCK_MAX - STOCK_MIN + 1))
+      : STOCK_MIN + Math.floor(Math.random() * (STOCK_MAX / 2 - STOCK_MIN + 1))
+  const price = Math.round(
+    tg.basePrice
+      * (isImported ? TRADE_GOOD_IMPORTED_BUY_PRICE_FRACTION : TRADE_GOOD_SOURCE_BUY_PRICE_FRACTION),
+  )
+  return {
+    itemId: tg.id,
+    stock,
+    price,
+    ...(isImported ? { isImported: true, originPlanetId: tg.producedBy } : {}),
+  }
 }
 
 /**
@@ -97,7 +122,7 @@ function randomRestockDuration(): number {
  * Create a new shop session for a planet.
  *
  * @param planetId - The planet the player is orbiting.
- * @returns A fresh ShopSession with 3 random trade good slots.
+ * @returns A fresh ShopSession with planet-specific trade good slots.
  */
 export function createShopSession(planetId: string): ShopSession {
   const tradeSlots = pickTradeSlots(planetId)
@@ -146,7 +171,7 @@ export function tickShopSession(session: ShopSession, dt: number): ShopSession {
  * @param session - Current shop session.
  * @param profile - Player profile.
  * @param inventory - Player inventory.
- * @param slotIndex - Which trade slot (0, 1, or 2).
+ * @param slotIndex - Which trade slot index in the current session.
  * @param quantity - Units to buy.
  * @returns Updated session, profile, and inventory.
  */
@@ -180,7 +205,7 @@ export function buyTradeGood(
     return { ok: false, session, profile, inventory, reason: addResult.reason }
   }
 
-  const updatedSlots = [...session.tradeSlots] as [TradeGoodSlot, TradeGoodSlot, TradeGoodSlot]
+  const updatedSlots = [...session.tradeSlots]
   updatedSlots[slotIndex] = { ...slot, stock: slot.stock - quantity }
   const updatedSession = { ...session, tradeSlots: updatedSlots }
 

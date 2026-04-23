@@ -8,6 +8,7 @@ import {
 import { createProfile } from '@/lib/player/profile'
 import { createInventory, addItem } from '@/lib/inventory/inventory'
 import { resetDemand } from '../planetDemand'
+import { getTradeGoodsByPlanet } from '../tradeGoods'
 // Side-effect: register trade goods into item catalog
 import '../tradeGoods'
 
@@ -31,6 +32,17 @@ describe('createShopSession', () => {
     for (const slot of session.tradeSlots) {
       expect(slot.stock).toBeGreaterThan(0)
     }
+  })
+
+  it('venus shows full local pool plus 3 imported goods', () => {
+    const venusPool = getTradeGoodsByPlanet('venus')
+    const session = createShopSession('venus')
+    const local = session.tradeSlots.filter((slot) => !slot.isImported)
+    const imported = session.tradeSlots.filter((slot) => slot.isImported)
+    expect(local).toHaveLength(venusPool.length)
+    expect(imported).toHaveLength(3)
+    expect(new Set(session.tradeSlots.map((slot) => slot.itemId)).size).toBe(session.tradeSlots.length)
+    expect(imported.every((slot) => slot.originPlanetId && slot.originPlanetId !== 'venus')).toBe(true)
   })
 })
 

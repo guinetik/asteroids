@@ -20,6 +20,7 @@ import type {
   MissionCompletedEvent,
   OrbitalMissionCompletedEvent,
   RewardEffect,
+  TradeTransactionEvent,
 } from './contractTypes'
 import { emptyContractSnapshot, loadContractSnapshot, saveContractSnapshot } from './contractStorage'
 
@@ -271,6 +272,12 @@ export class ContractSystem {
    */
   notifyPlanetVisited(planetId: string): void {
     let changed = false
+    for (const contract of this.contracts.values()) {
+      if (contract.triggerOnPlanetVisited !== planetId) continue
+      if (this.snapshot.instances[contract.id]) continue
+      this.offerContract(contract)
+      changed = true
+    }
     for (const instance of Object.values(this.snapshot.instances)) {
       if (instance.status !== 'active') continue
       const contract = this.contracts.get(instance.contractId)
@@ -302,6 +309,28 @@ export class ContractSystem {
       if (step.giverPlanetId && step.giverPlanetId !== event.giverPlanetId) continue
       if (step.targetPlanetId && step.targetPlanetId !== event.targetPlanetId) continue
       this.advanceStep(contract, instance, 1)
+      changed = true
+    }
+    if (changed) this.afterChange()
+  }
+
+  /**
+   * Notify the system that a trade transaction completed in a planetary shop.
+   * Advances active `trade-goods` steps that match action, planet, and item id.
+   *
+   * @param event - Transaction details for the committed buy/sell action.
+   */
+  notifyTradeTransaction(event: TradeTransactionEvent): void {
+    if (event.quantity <= 0) return
+    let changed = false
+    for (const instance of Object.values(this.snapshot.instances)) {
+      if (instance.status !== 'active') continue
+      const contract = this.contracts.get(instance.contractId)
+      if (!contract) continue
+      const step = contract.steps[instance.currentStepIndex]
+      if (!step || step.kind !== 'trade-goods') continue
+      if (!matchesTradeTransaction(step, event)) continue
+      this.advanceStep(contract, instance, event.quantity)
       changed = true
     }
     if (changed) this.afterChange()
@@ -505,7 +534,9 @@ export class ContractSystem {
 
 /** Required completion count for a step (1 unless the step is `complete-missions`). */
 function requiredCount(step: ContractStep): number {
-  return step.kind === 'complete-missions' ? step.count : 1
+  if (step.kind === 'complete-missions') return step.count
+  if (step.kind === 'trade-goods') return step.count
+  return 1
 }
 
 /** True when a `complete-missions` step matches the supplied event filters. */
@@ -516,6 +547,17 @@ function matchesMissionEvent(
   if (step.missionType !== undefined && step.missionType !== event.kind) return false
   if (step.giverId !== undefined && step.giverId !== event.giverId) return false
   if (step.giverPlanetId !== undefined && step.giverPlanetId !== event.giverPlanetId) return false
+  return true
+}
+
+/** True when a `trade-goods` step matches a committed transaction event. */
+function matchesTradeTransaction(
+  step: { action: string; planetId: string; itemId: string },
+  event: TradeTransactionEvent,
+): boolean {
+  if (step.action !== event.action) return false
+  if (step.planetId !== event.planetId) return false
+  if (step.itemId !== event.itemId) return false
   return true
 }
 

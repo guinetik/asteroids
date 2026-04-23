@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { ShopSession, TradeGoodSlot } from '@/lib/shop/tradeTypes'
 import type { PlayerProfile } from '@/lib/player/types'
 import type { Inventory } from '@/lib/inventory/types'
@@ -47,6 +47,10 @@ const restockRemaining = computed(() => {
   return `${min}:${sec.toString().padStart(2, '0')}`
 })
 
+const tradeGroupLabel = computed(() =>
+  props.session.planetId === 'venus' ? 'THE VENUSIAN ZEPPELIN' : 'Trade Goods',
+)
+
 function slotLabel(slot: TradeGoodSlot) {
   const tg = getTradeGood(slot.itemId)
   return tg?.label ?? slot.itemId
@@ -62,8 +66,49 @@ function slotIcon(slot: TradeGoodSlot) {
   return tg?.label.charAt(0) ?? '?'
 }
 
+const venusLocalSlots = computed(() =>
+  props.session.tradeSlots.filter((slot) => !slot.isImported),
+)
+
+const venusImportSlots = computed(() =>
+  props.session.tradeSlots.filter((slot) => slot.isImported),
+)
+
+function formatPlanetLabel(planetId: string): string {
+  return planetId
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function slotOriginLabel(slot: TradeGoodSlot): string | null {
+  if (!slot.isImported) return null
+  const origin = slot.originPlanetId ?? getTradeGood(slot.itemId)?.producedBy
+  if (!origin) return null
+  return `FROM ${formatPlanetLabel(origin).toUpperCase()}`
+}
+
 function canAfford(cost: number): boolean {
   return props.profile.credits >= cost
+}
+
+const servicesOpen = ref(false)
+const fuelOpen = ref(false)
+const tradeOpen = ref(true)
+
+function toggleServices(): void {
+  servicesOpen.value = !servicesOpen.value
+  uiAudio.notifySwitch()
+}
+
+function toggleFuel(): void {
+  fuelOpen.value = !fuelOpen.value
+  uiAudio.notifySwitch()
+}
+
+function toggleTrade(): void {
+  tradeOpen.value = !tradeOpen.value
+  uiAudio.notifySwitch()
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -90,14 +135,23 @@ function onKeydown(e: KeyboardEvent) {
       <!-- Body: buy + sell columns -->
       <div class="planet-shop-body">
         <!-- Buy column -->
-        <div class="planet-shop-column">
+        <div class="planet-shop-column planet-shop-column--buy">
           <h3 class="planet-shop-column__title">Buy</h3>
 
           <!-- Services group -->
           <div class="planet-shop-group planet-shop-group--services">
-            <span class="planet-shop-group__label">Services</span>
+            <button
+              type="button"
+              class="planet-shop-group__header"
+              :aria-expanded="servicesOpen ? 'true' : 'false'"
+              @click="toggleServices"
+            >
+              <span class="planet-shop-group__label">Services</span>
+              <span class="planet-shop-group__chevron" :data-open="servicesOpen">▾</span>
+            </button>
 
-            <div class="planet-shop-item planet-shop-item--service">
+            <div v-show="servicesOpen" class="planet-shop-group__content">
+              <div class="planet-shop-item planet-shop-item--service">
               <div class="planet-shop-item__icon-placeholder planet-shop-icon--service">F</div>
               <div class="planet-shop-item__info">
                 <span class="planet-shop-item__name">Refuel</span>
@@ -112,9 +166,9 @@ function onKeydown(e: KeyboardEvent) {
               >
                 {{ fuelFull ? 'Full' : 'Buy' }}
               </button>
-            </div>
+              </div>
 
-            <div class="planet-shop-item planet-shop-item--service">
+              <div class="planet-shop-item planet-shop-item--service">
               <div class="planet-shop-item__icon-placeholder planet-shop-icon--service">S</div>
               <div class="planet-shop-item__info">
                 <span class="planet-shop-item__name">Shuttle Hull Repair</span>
@@ -129,9 +183,9 @@ function onKeydown(e: KeyboardEvent) {
               >
                 {{ hullFull ? 'Full' : 'Buy' }}
               </button>
-            </div>
+              </div>
 
-            <div class="planet-shop-item planet-shop-item--service">
+              <div class="planet-shop-item planet-shop-item--service">
               <div class="planet-shop-item__icon-placeholder planet-shop-icon--service">P</div>
               <div class="planet-shop-item__info">
                 <span class="planet-shop-item__name">Lander Hull Repair</span>
@@ -146,14 +200,24 @@ function onKeydown(e: KeyboardEvent) {
               >
                 {{ landerHullFull ? 'Full' : 'Buy' }}
               </button>
+              </div>
             </div>
           </div>
 
           <!-- Fuel group -->
           <div class="planet-shop-group planet-shop-group--fuel">
-            <span class="planet-shop-group__label">Fuel Supplies</span>
+            <button
+              type="button"
+              class="planet-shop-group__header"
+              :aria-expanded="fuelOpen ? 'true' : 'false'"
+              @click="toggleFuel"
+            >
+              <span class="planet-shop-group__label">Fuel Supplies</span>
+              <span class="planet-shop-group__chevron" :data-open="fuelOpen">▾</span>
+            </button>
 
-            <div class="planet-shop-item planet-shop-item--fuel">
+            <div v-show="fuelOpen" class="planet-shop-group__content">
+              <div class="planet-shop-item planet-shop-item--fuel">
               <div class="planet-shop-item__icon-placeholder planet-shop-icon--fuel">S</div>
               <div class="planet-shop-item__info">
                 <span class="planet-shop-item__name">Shuttle Fuel Cell</span>
@@ -168,9 +232,9 @@ function onKeydown(e: KeyboardEvent) {
               >
                 Buy
               </button>
-            </div>
+              </div>
 
-            <div class="planet-shop-item planet-shop-item--fuel">
+              <div class="planet-shop-item planet-shop-item--fuel">
               <div class="planet-shop-item__icon-placeholder planet-shop-icon--fuel">L</div>
               <div class="planet-shop-item__info">
                 <span class="planet-shop-item__name">Lander Fuel Cell</span>
@@ -185,41 +249,110 @@ function onKeydown(e: KeyboardEvent) {
               >
                 Buy
               </button>
+              </div>
             </div>
           </div>
 
           <!-- Trade goods group -->
           <div class="planet-shop-group planet-shop-group--trade">
-            <span class="planet-shop-group__label">Trade Goods</span>
-
-            <div v-if="restockRemaining" class="planet-shop-restock">
-              Restocking in {{ restockRemaining }}
-            </div>
-
-            <!-- Trade goods -->
-            <div
-              v-for="(slot, index) in session.tradeSlots"
-              :key="slot.itemId"
-              class="planet-shop-item planet-shop-item--trade"
-              :class="{ 'planet-shop-item--sold-out': slot.stock <= 0 }"
+            <button
+              type="button"
+              class="planet-shop-group__header"
+              :aria-expanded="tradeOpen ? 'true' : 'false'"
+              @click="toggleTrade"
             >
-              <div class="planet-shop-item__icon-placeholder planet-shop-icon--trade">{{ slotIcon(slot) }}</div>
-              <div class="planet-shop-item__info">
-                <span class="planet-shop-item__name">{{ slotLabel(slot) }}</span>
-                <span class="planet-shop-item__desc">{{ slotDescription(slot) }}</span>
-                <span class="planet-shop-item__stock">
-                  {{ slot.stock > 0 ? `${slot.stock} in stock` : 'Sold out' }}
-                </span>
+              <span class="planet-shop-group__label">{{ tradeGroupLabel }}</span>
+              <span class="planet-shop-group__chevron" :data-open="tradeOpen">▾</span>
+            </button>
+
+            <div v-show="tradeOpen" class="planet-shop-group__content">
+              <div v-if="restockRemaining" class="planet-shop-restock">
+                Restocking in {{ restockRemaining }}
               </div>
-              <span class="planet-shop-item__price">{{ slot.price }} CR</span>
-              <button
-                type="button"
-                class="planet-shop-item__buy-btn planet-shop-btn--trade"
-                :disabled="slot.stock <= 0 || !canAfford(slot.price)"
-                @click="uiAudio.notifyConfirm(); $emit('buyTradeGood', index, 1)"
-              >
-                Buy
-              </button>
+
+              <template v-if="session.planetId === 'venus'">
+                <div class="planet-shop-subgroup-label">VENUS GOODS</div>
+                <div
+                  v-for="slot in venusLocalSlots"
+                  :key="slot.itemId"
+                  class="planet-shop-item planet-shop-item--trade"
+                  :class="{ 'planet-shop-item--sold-out': slot.stock <= 0 }"
+                >
+                  <div class="planet-shop-item__icon-placeholder planet-shop-icon--trade">{{ slotIcon(slot) }}</div>
+                  <div class="planet-shop-item__info">
+                    <span class="planet-shop-item__name">{{ slotLabel(slot) }}</span>
+                    <span class="planet-shop-item__desc">{{ slotDescription(slot) }}</span>
+                    <span class="planet-shop-item__stock">
+                      {{ slot.stock > 0 ? `${slot.stock} in stock` : 'Sold out' }}
+                    </span>
+                  </div>
+                  <span class="planet-shop-item__price">{{ slot.price }} CR</span>
+                  <button
+                    type="button"
+                    class="planet-shop-item__buy-btn planet-shop-btn--trade"
+                    :disabled="slot.stock <= 0 || !canAfford(slot.price)"
+                    @click="uiAudio.notifyConfirm(); $emit('buyTradeGood', session.tradeSlots.indexOf(slot), 1)"
+                  >
+                    Buy
+                  </button>
+                </div>
+
+                <div class="planet-shop-subgroup-label">IMPORTS</div>
+                <div
+                  v-for="slot in venusImportSlots"
+                  :key="slot.itemId"
+                  class="planet-shop-item planet-shop-item--trade planet-shop-item--import"
+                  :class="{ 'planet-shop-item--sold-out': slot.stock <= 0 }"
+                >
+                  <div class="planet-shop-item__icon-placeholder planet-shop-icon--import">{{ slotIcon(slot) }}</div>
+                  <div class="planet-shop-item__info">
+                    <span class="planet-shop-item__name">{{ slotLabel(slot) }}</span>
+                    <span v-if="slotOriginLabel(slot)" class="planet-shop-item__origin">
+                      {{ slotOriginLabel(slot) }}
+                    </span>
+                    <span class="planet-shop-item__desc">{{ slotDescription(slot) }}</span>
+                    <span class="planet-shop-item__stock">
+                      {{ slot.stock > 0 ? `${slot.stock} in stock` : 'Sold out' }}
+                    </span>
+                  </div>
+                  <span class="planet-shop-item__price">{{ slot.price }} CR</span>
+                  <button
+                    type="button"
+                    class="planet-shop-item__buy-btn planet-shop-btn--trade"
+                    :disabled="slot.stock <= 0 || !canAfford(slot.price)"
+                    @click="uiAudio.notifyConfirm(); $emit('buyTradeGood', session.tradeSlots.indexOf(slot), 1)"
+                  >
+                    Buy
+                  </button>
+                </div>
+              </template>
+              <template v-else>
+                <!-- Trade goods -->
+                <div
+                  v-for="(slot, index) in session.tradeSlots"
+                  :key="slot.itemId"
+                  class="planet-shop-item planet-shop-item--trade"
+                  :class="{ 'planet-shop-item--sold-out': slot.stock <= 0 }"
+                >
+                  <div class="planet-shop-item__icon-placeholder planet-shop-icon--trade">{{ slotIcon(slot) }}</div>
+                  <div class="planet-shop-item__info">
+                    <span class="planet-shop-item__name">{{ slotLabel(slot) }}</span>
+                    <span class="planet-shop-item__desc">{{ slotDescription(slot) }}</span>
+                    <span class="planet-shop-item__stock">
+                      {{ slot.stock > 0 ? `${slot.stock} in stock` : 'Sold out' }}
+                    </span>
+                  </div>
+                  <span class="planet-shop-item__price">{{ slot.price }} CR</span>
+                  <button
+                    type="button"
+                    class="planet-shop-item__buy-btn planet-shop-btn--trade"
+                    :disabled="slot.stock <= 0 || !canAfford(slot.price)"
+                    @click="uiAudio.notifyConfirm(); $emit('buyTradeGood', index, 1)"
+                  >
+                    Buy
+                  </button>
+                </div>
+              </template>
             </div>
           </div>
         </div>
