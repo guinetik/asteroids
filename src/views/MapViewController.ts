@@ -122,9 +122,11 @@ import {
   applyJourneyTrigger,
   buildActiveJourneyTracker,
   getJourneyDisplay,
+  getJourneyPendingStartAnnouncement,
   hasCompletedJourney,
   getActiveJourneyNextStepLabel,
   isJourneyFeatureUnlocked,
+  markJourneyStartAnnounced,
   SLINGSHOT_JOURNEY_FEATURE_ID,
   WELCOME_JOURNEY_ID,
   ACT_1_CONTRACT_IDS,
@@ -224,6 +226,12 @@ export interface MapViewBootState {
   phase: 'preparing' | 'ready' | 'started'
   label: string
 }
+
+/**
+ * Seconds of quiet between a journey's "COMPLETE" banner dismissing and the
+ * next journey's "BEGINS" banner opening — avoids banner whiplash.
+ */
+const JOURNEY_INTERLUDE_SEC = 5
 
 /** Short compass labels for each planet + Sun. */
 const COMPASS_LABELS: Record<string, string> = {
@@ -411,6 +419,10 @@ export class MapViewController implements Tickable {
   private unsubscribeJourneyMessageArchive: (() => void) | null = null
   private unsubscribeContractCompleted: (() => void) | null = null
   private unsubscribeUpgradeInstalled: (() => void) | null = null
+  /** True after the first habitat entry post-intro — gates journey UI visibility. */
+  private journeyUiArmed = false
+  /** Active 5-second gap between a journey-complete banner and the next journey-start banner. */
+  private journeyInterludeTimer: TimerHandle | null = null
 
   /** World-space shuttle position reused for asteroid belt nearby tumble (avoid per-frame alloc). */
   private readonly _beltShuttleWorldScratch = new THREE.Vector3()
@@ -515,6 +527,12 @@ export class MapViewController implements Tickable {
   onJourneyCompletedAnnouncement:
     | ((eyebrow: string, title: string, metaText: string) => void)
     | null = null
+  /** Fired when a new journey is being introduced so the map can show the amber "begins" banner. */
+  onJourneyStartedAnnouncement:
+    | ((eyebrow: string, title: string, metaText: string) => void)
+    | null = null
+  /** Fired to gate the objective tracker HUD on/off during intro + between-journey interludes. */
+  onJourneyTrackerVisible: ((visible: boolean) => void) | null = null
   /** Fired when fuel cell count changes (for HUD refuel button). */
   onFuelCellCount: ((count: number) => void) | null = null
 
@@ -2330,10 +2348,70 @@ export class MapViewController implements Tickable {
       this.onJourneyCompletedAnnouncement?.(display.eyebrow, display.title, display.objectiveLabel)
     }
     this.emitJourneyTracker()
+    if (result.completedJourneyIds.length > 0) {
+      this.hideJourneyTrackerAndScheduleNextStart()
+    }
   }
 
   private emitJourneyTracker(): void {
     this.onJourneyTracker?.(buildActiveJourneyTracker(this.playerProfile))
+  }
+
+  /**
+   * Hide the objective tracker, let the completion banner finish, wait a beat,
+   * then fire the next journey's "JOURNEY BEGINS" banner (if any).
+   *
+   * Timing: completion banner is ~4.6s total (0.6s open + 3.2s hold + 0.8s close),
+   * and we want ~5s of quiet after it dismisses before the next banner opens.
+   */
+  private hideJourneyTrackerAndScheduleNextStart(): void {
+    this.onJourneyTrackerVisible?.(false)
+    this.clearJourneyInterludeTimer()
+    this.journeyInterludeTimer = Timer.after(JOURNEY_INTERLUDE_SEC, () => {
+      this.journeyInterludeTimer = null
+      this.tryAnnounceNextJourneyStart()
+    })
+  }
+
+  /** Cancel the pending interlude timer if one is in flight. */
+  private clearJourneyInterludeTimer(): void {
+    if (this.journeyInterludeTimer !== null) {
+      Timer.cancel(this.journeyInterludeTimer)
+      this.journeyInterludeTimer = null
+    }
+  }
+
+  /**
+   * Fire the pending "JOURNEY BEGINS" banner for the next un-announced active journey,
+   * or just reveal the tracker when there is no pending announcement.
+   * No-op when the journey UI has not yet been armed (pre-intro or pre-habitat).
+   */
+  private tryAnnounceNextJourneyStart(): void {
+    if (!this.journeyUiArmed) return
+    const pendingId = getJourneyPendingStartAnnouncement(this.playerProfile)
+    if (pendingId === null) {
+      this.onJourneyTrackerVisible?.(true)
+      return
+    }
+    const display = getJourneyDisplay(pendingId)
+    if (!display) {
+      this.onJourneyTrackerVisible?.(true)
+      return
+    }
+    this.playerProfile = markJourneyStartAnnounced(this.playerProfile, pendingId)
+    this.persistPlayerProfile()
+    this.onJourneyStartedAnnouncement?.(display.eyebrow, display.title, display.objectiveLabel)
+    this.onJourneyTrackerVisible?.(true)
+  }
+
+  /**
+   * Arm the journey UI. Called the first time the player enters the habitat post-intro.
+   * Idempotent — re-arming is a no-op.
+   */
+  armJourneyUiFromHabitatEntry(): void {
+    if (this.journeyUiArmed) return
+    this.journeyUiArmed = true
+    this.tryAnnounceNextJourneyStart()
   }
 
   private canLeaveHabitatJourney(): boolean {
@@ -4195,6 +4273,7 @@ export class MapViewController implements Tickable {
 
   private onEnterHabitat(): void {
     this.onHabitatActive?.(true)
+    this.armJourneyUiFromHabitatEntry()
     this.setEarthStartupOrbitHudSuppressed(false)
     this.shuttleEffects?.thrusterController.setAudioEnabled(false)
     this.shuttleAudio.notifyEnterHabitat()
@@ -4827,6 +4906,7 @@ export class MapViewController implements Tickable {
     this.unsubscribeContractCompleted = null
     this.unsubscribeUpgradeInstalled?.()
     this.unsubscribeUpgradeInstalled = null
+    this.clearJourneyInterludeTimer()
     this.evaSession?.dispose()
     this.evaSession = null
     this.shuttleAudio.dispose()

@@ -177,6 +177,19 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     unlockedFeatureIds = [SLINGSHOT_JOURNEY_FEATURE_ID]
   }
 
+  let announcedJourneyStartIds: string[] = []
+  if (Array.isArray(p.announcedJourneyStartIds)) {
+    announcedJourneyStartIds = p.announcedJourneyStartIds.filter(
+      (entry): entry is string => typeof entry === 'string' && entry.length > 0,
+    )
+  } else if (hasSeenIntro) {
+    // Legacy profiles that already played past the intro shouldn't re-see
+    // the "Welcome" begin-banner. Seed with every journey that is already
+    // in `completedJourneyIds` plus the welcome journey id — the welcome
+    // banner only makes sense for fresh saves from this point forward.
+    announcedJourneyStartIds = [...completedJourneyIds, WELCOME_JOURNEY_ID]
+  }
+
   const shuttleHullHp =
     typeof p.shuttleHullHp === 'number' && Number.isFinite(p.shuttleHullHp) && p.shuttleHullHp >= 0
       ? p.shuttleHullHp
@@ -199,6 +212,7 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     completedJourneyIds,
     journeyStepProgress,
     unlockedFeatureIds,
+    announcedJourneyStartIds,
     ...(shuttleHullHp !== undefined ? { shuttleHullHp } : {}),
     ...(landerHullHp !== undefined ? { landerHullHp } : {}),
   }
@@ -219,6 +233,7 @@ export function createProfile(name: string): PlayerProfile {
     completedJourneyIds: [],
     journeyStepProgress: {},
     unlockedFeatureIds: [],
+    announcedJourneyStartIds: [],
   }
 }
 

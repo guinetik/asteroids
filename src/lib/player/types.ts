@@ -52,6 +52,11 @@ export interface PlayerProfile {
   /** Feature ids unlocked by journey completion. */
   unlockedFeatureIds: string[]
   /**
+   * Journey ids whose "JOURNEY BEGINS" banner has already fired for this profile.
+   * Prevents the intro banner from replaying on reload once shown.
+   */
+  announcedJourneyStartIds: string[]
+  /**
    * Shuttle hull HP on the solar map (temperature, radiation, impacts).
    * Omitted or `undefined` in older saves — treated as full until the first sync.
    */

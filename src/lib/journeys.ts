@@ -214,6 +214,32 @@ export function getJourneyDisplay(journeyId: JourneyId): JourneyDisplay | null {
   }
 }
 
+/**
+ * First incomplete journey that has NOT yet had its "JOURNEY BEGINS" banner fired,
+ * or `null` when every active journey has already been announced.
+ */
+export function getJourneyPendingStartAnnouncement(profile: PlayerProfile): JourneyId | null {
+  const announced = new Set(profile.announcedJourneyStartIds)
+  for (const journey of JOURNEY_DEFINITIONS) {
+    if (isJourneyComplete(profile, journey.id)) continue
+    if (announced.has(journey.id)) continue
+    return journey.id
+  }
+  return null
+}
+
+/** Mark a journey's start banner as announced. Idempotent. */
+export function markJourneyStartAnnounced(
+  profile: PlayerProfile,
+  journeyId: JourneyId,
+): PlayerProfile {
+  if (profile.announcedJourneyStartIds.includes(journeyId)) return profile
+  return {
+    ...profile,
+    announcedJourneyStartIds: uniqueStrings([...profile.announcedJourneyStartIds, journeyId]),
+  }
+}
+
 /** Check whether a journey-gated feature has been unlocked for the profile. */
 export function isJourneyFeatureUnlocked(
   profile: PlayerProfile,

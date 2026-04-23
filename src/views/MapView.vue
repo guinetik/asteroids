@@ -253,6 +253,11 @@ const journeyCompletedVisible = ref(false)
 const journeyCompletedEyebrow = ref('ACT')
 const journeyCompletedTitle = ref('')
 const journeyCompletedMeta = ref('')
+const journeyStartedVisible = ref(false)
+const journeyStartedEyebrow = ref('ACT')
+const journeyStartedTitle = ref('')
+const journeyStartedMeta = ref('')
+const journeyTrackerVisible = ref(false)
 const habitatPrompt = ref<string | null>(null)
 const habitatFadeOpacity = ref(0)
 const turretFadeOpacity = ref(0)
@@ -656,6 +661,18 @@ onMounted(async () => {
         journeyCompletedVisible.value = true
       })
     }
+    viewController.onJourneyStartedAnnouncement = (eyebrow, title, metaText) => {
+      journeyStartedEyebrow.value = eyebrow
+      journeyStartedTitle.value = title
+      journeyStartedMeta.value = metaText
+      journeyStartedVisible.value = false
+      Timer.after(0, () => {
+        journeyStartedVisible.value = true
+      })
+    }
+    viewController.onJourneyTrackerVisible = (visible) => {
+      journeyTrackerVisible.value = visible
+    }
     viewController.onMessageUpdate = () => {
       refreshActiveMessage()
     }
@@ -944,6 +961,10 @@ function onUpgradeInstalledDismissed(): void {
 
 function onJourneyCompletedDismissed(): void {
   journeyCompletedVisible.value = false
+}
+
+function onJourneyStartedDismissed(): void {
+  journeyStartedVisible.value = false
 }
 
 function handleToggleLabels() {
@@ -1312,7 +1333,7 @@ watch(
     @dismiss="dismissActiveMessage"
   />
   <ObjectiveTracker
-    v-if="journeyTracker && !mapBootOverlayVisible"
+    v-if="journeyTracker && journeyTrackerVisible && !mapBootOverlayVisible"
     :eyebrow="journeyTracker.eyebrow"
     :title="journeyTracker.title"
     :objectives="journeyTracker.objectives"
@@ -1404,6 +1425,13 @@ watch(
     :meta-text="journeyCompletedMeta"
     :headline="`${journeyCompletedEyebrow} — JOURNEY COMPLETE`"
     @dismissed="onJourneyCompletedDismissed"
+  />
+  <JourneyCompletedAnnouncement
+    :visible="journeyStartedVisible"
+    :title="journeyStartedTitle"
+    :meta-text="journeyStartedMeta"
+    :headline="`${journeyStartedEyebrow} — JOURNEY BEGINS`"
+    @dismissed="onJourneyStartedDismissed"
   />
   <AchievementsDialog
     :open="achievementsOpen"
