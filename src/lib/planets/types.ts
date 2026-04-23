@@ -114,6 +114,8 @@ export interface Planet {
 
 /** Solar data — the central star. */
 export interface SunData {
+  /** Stable id used by gameplay systems (e.g. contracts), conventionally `'sun'`. */
+  readonly id: string
   /** Display name. */
   readonly name: string
   /** Visual radius in scene units. */

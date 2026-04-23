@@ -1533,6 +1533,7 @@ export class MapViewController implements Tickable {
         inputManager: this.inputManager,
         audio: this.shuttleAudio,
         mapIntroControlsLocked: this.mapIntro.controlsLocked,
+        onSlingshotReleased: (bodyName) => this.notifyOrbitalLaunchFromBodyName(bodyName),
       })
       if (previousCharge > 0 && this.slingshotCharge === 0 && this.orbitSystem?.state === 'free') {
         this.yRecovery = true
@@ -2154,6 +2155,24 @@ export class MapViewController implements Tickable {
   restart(): void {
     this.respawnAtLastDockedPlanet()
     this.onDeathOverlay?.(false, '')
+  }
+
+  /**
+   * Resolve a capture-body display name to its stable id and forward a
+   * `launch-from-body` event to the contract system. Names come from the
+   * orbit-capture catalog in {@link initialize}; the Sun is special-cased
+   * because it lives outside {@link PLANETS}.
+   *
+   * @param bodyName - Body display name from the orbit-capture system (e.g. `'Sun'`, `'Mars'`).
+   */
+  private notifyOrbitalLaunchFromBodyName(bodyName: string): void {
+    if (bodyName === SUN.name) {
+      contractSystem.notifyOrbitalLaunched({ planetId: SUN.id })
+      return
+    }
+    const planet = PLANETS.find((p) => p.name === bodyName)
+    if (!planet) return
+    contractSystem.notifyOrbitalLaunched({ planetId: planet.id })
   }
 
   /**

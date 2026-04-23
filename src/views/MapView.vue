@@ -32,7 +32,7 @@ import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
 import { isCanvasOrbitalMinigame } from '@/lib/minigame/canvasOrbitalMinigames'
 import MissionMiniGameOverlay from '@/components/MissionMiniGameOverlay.vue'
 import EvaMinigameOverlay from '@/components/EvaMinigameOverlay.vue'
-import { PLANETS } from '@/lib/planets/catalog'
+import { PLANETS, SUN } from '@/lib/planets/catalog'
 import type { ShopSession } from '@/lib/shop/tradeTypes'
 import type { PlayerProfile } from '@/lib/player/types'
 import type { Inventory } from '@/lib/inventory/types'
@@ -1207,6 +1207,10 @@ watch(
   (next, prev) => {
     if (next.state !== 'orbiting' || prev?.state === 'orbiting') return
     if (!next.name) return
+    if (next.name === SUN.name) {
+      contractSystem.notifyPlanetVisited(SUN.id)
+      return
+    }
     const planet = PLANETS.find((p) => p.name === next.name)
     if (!planet) return
     contractSystem.notifyPlanetVisited(planet.id)

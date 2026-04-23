@@ -2,6 +2,10 @@ import { describe, it, expect } from 'vitest'
 import { SUN, PLANETS, PLANET_IDS, ASTEROID_BELTS, getPlanet } from '../catalog'
 
 describe('SUN', () => {
+  it('has id "sun"', () => {
+    expect(SUN.id).toBe('sun')
+  })
+
   it('has name "Sun"', () => {
     expect(SUN.name).toBe('Sun')
   })

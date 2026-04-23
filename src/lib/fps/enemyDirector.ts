@@ -175,6 +175,23 @@ export class EnemyDirector implements Tickable {
   /** Fired when an enemy touches the player. */
   onContactDamage: ((handle: EnemyHandle, damage: number) => void) | null = null
 
+  /** Auxiliary spawn observers (e.g. drop system). Fires synchronously after each successful spawn. */
+  private readonly spawnListeners = new Set<(handle: EnemyHandle) => void>()
+
+  /**
+   * Subscribe an observer to be notified every time {@link spawn} returns a
+   * new enemy handle. The drop system uses this to attach death listeners
+   * for loot pickups without coupling individual minigames to the loot
+   * pipeline.
+   *
+   * @param listener - Callback invoked with the freshly created handle.
+   * @returns Unsubscribe function.
+   */
+  addSpawnListener(listener: (handle: EnemyHandle) => void): () => void {
+    this.spawnListeners.add(listener)
+    return () => this.spawnListeners.delete(listener)
+  }
+
   /**
    * Fired when an enemy touches a hostage (player was not in contact range).
    *
@@ -266,6 +283,13 @@ export class EnemyDirector implements Tickable {
     }
 
     this.handles.push(handle)
+    for (const listener of Array.from(this.spawnListeners)) {
+      try {
+        listener(handle)
+      } catch {
+        // best-effort notification — observers must not break spawning
+      }
+    }
     return handle
   }
 

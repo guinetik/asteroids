@@ -1,5 +1,6 @@
 {
   "sun": {
+    "id": "sun",
     "name": "Sun",
     "displayRadius": 0.15,
     "rotationSpeed": 0.2474,

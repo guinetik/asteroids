@@ -37,8 +37,16 @@ export class Enemy {
   /** Collision radius for projectile hit checks. */
   readonly hitRadius: number
 
-  /** Fired when HP reaches zero. */
+  /**
+   * Primary death hook — typically used by the controller that owns this
+   * enemy (e.g. {@link BacteriophageController.die}). Auxiliary observers
+   * (loot drops, analytics) should subscribe via {@link addDeathListener}
+   * instead so the controller's hook is never clobbered.
+   */
   onDeath: (() => void) | null = null
+
+  /** Auxiliary death observers; fired alongside {@link onDeath}. */
+  private readonly deathListeners = new Set<() => void>()
 
   constructor(config: EnemyConfig) {
     this.maxHp = config.maxHp
@@ -52,7 +60,19 @@ export class Enemy {
   }
 
   /**
-   * Apply damage. Fires onDeath when HP reaches zero.
+   * Subscribe an auxiliary death observer. Listener errors are swallowed so
+   * one bad subscriber cannot break others or the controller's primary hook.
+   *
+   * @param listener - Callback invoked exactly once when HP reaches zero.
+   * @returns Unsubscribe function.
+   */
+  addDeathListener(listener: () => void): () => void {
+    this.deathListeners.add(listener)
+    return () => this.deathListeners.delete(listener)
+  }
+
+  /**
+   * Apply damage. Fires onDeath and all death listeners when HP reaches zero.
    *
    * @param amount - Damage to apply
    */
@@ -61,6 +81,13 @@ export class Enemy {
     this.hp = Math.max(0, this.hp - amount)
     if (this.hp <= 0) {
       this.onDeath?.()
+      for (const listener of Array.from(this.deathListeners)) {
+        try {
+          listener()
+        } catch {
+          // best-effort notification — auxiliary observers are isolated
+        }
+      }
     }
   }
 }

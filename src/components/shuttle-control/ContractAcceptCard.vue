@@ -47,6 +47,12 @@ function stepLabel(step: ContractStep): string {
     const action = step.action === 'buy' ? 'Buy' : 'Sell'
     return `${action} ${step.count} ${step.itemId} at ${step.planetId}`
   }
+  if (step.kind === 'collect-drops') {
+    return `Collect ${step.count} ${step.itemId}`
+  }
+  if (step.kind === 'launch-from-body') {
+    return `Launch from ${step.planetId}`
+  }
   const orbitalBits: string[] = []
   if (step.giverPlanetId) orbitalBits.push(`from ${step.giverPlanetId}`)
   if (step.targetPlanetId) orbitalBits.push(`at ${step.targetPlanetId}`)
@@ -57,6 +63,7 @@ function stepLabel(step: ContractStep): string {
 function requiredCount(step: ContractStep): number {
   if (step.kind === 'complete-missions') return step.count
   if (step.kind === 'trade-goods') return step.count
+  if (step.kind === 'collect-drops') return step.count
   return 1
 }
 

@@ -10,6 +10,7 @@
  */
 import martianMarineCorpsCohort from '@/data/contracts/martian-marine-corps-cohort.json'
 import spaceCowboysMarsHq from '@/data/contracts/space-cowboys-mars-hq.json'
+import theCinderline from '@/data/contracts/the-cinderline.json'
 import uscVenusCertification from '@/data/contracts/usc-venus-certification.json'
 import venusianZeppelinTradeLoop from '@/data/contracts/venusian-zeppelin-trade-loop.json'
 import type { Contract } from './contractTypes'
@@ -20,4 +21,5 @@ export const CONTRACT_CATALOG: Contract[] = [
   uscVenusCertification as Contract,
   martianMarineCorpsCohort as Contract,
   venusianZeppelinTradeLoop as Contract,
+  theCinderline as Contract,
 ]

@@ -17,7 +17,9 @@ import type {
   ContractInstance,
   ContractStep,
   ContractStoreSnapshot,
+  DropCollectedEvent,
   MissionCompletedEvent,
+  OrbitalLaunchEvent,
   OrbitalMissionCompletedEvent,
   RewardEffect,
   TradeTransactionEvent,
@@ -357,6 +359,51 @@ export class ContractSystem {
   }
 
   /**
+   * Notify the system that the player picked up a dropped item (e.g. viroid
+   * psychosphere collected by walking over the pickup mesh in the FPS layer).
+   * Advances any active `collect-drops` step whose `itemId` matches.
+   *
+   * @param event - Item id and units gained on this pickup.
+   */
+  notifyDropCollected(event: DropCollectedEvent): void {
+    if (event.quantity <= 0) return
+    let changed = false
+    for (const instance of Object.values(this.snapshot.instances)) {
+      if (instance.status !== 'active') continue
+      const contract = this.contracts.get(instance.contractId)
+      if (!contract) continue
+      const step = contract.steps[instance.currentStepIndex]
+      if (!step || step.kind !== 'collect-drops') continue
+      if (step.itemId !== event.itemId) continue
+      this.advanceStep(contract, instance, event.quantity)
+      changed = true
+    }
+    if (changed) this.afterChange()
+  }
+
+  /**
+   * Notify the system that the player slingshot-launched out of orbit at a
+   * specific body. Advances active `launch-from-body` steps whose `planetId`
+   * matches.
+   *
+   * @param event - Body id the launch originated from.
+   */
+  notifyOrbitalLaunched(event: OrbitalLaunchEvent): void {
+    let changed = false
+    for (const instance of Object.values(this.snapshot.instances)) {
+      if (instance.status !== 'active') continue
+      const contract = this.contracts.get(instance.contractId)
+      if (!contract) continue
+      const step = contract.steps[instance.currentStepIndex]
+      if (!step || step.kind !== 'launch-from-body') continue
+      if (step.planetId !== event.planetId) continue
+      this.advanceStep(contract, instance, 1)
+      changed = true
+    }
+    if (changed) this.afterChange()
+  }
+
+  /**
    * Player accepted a contract from the mail reader. Transitions to `active`,
    * stamps `acceptedAt`, and delivers the first step's flavor message.
    *
@@ -561,6 +608,7 @@ export class ContractSystem {
 function requiredCount(step: ContractStep): number {
   if (step.kind === 'complete-missions') return step.count
   if (step.kind === 'trade-goods') return step.count
+  if (step.kind === 'collect-drops') return step.count
   return 1
 }
 

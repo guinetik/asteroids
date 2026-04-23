@@ -94,6 +94,17 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
   private readonly virus: VirusModel
   private readonly virusPosition = new THREE.Vector3()
   private readonly enemyDirector = new EnemyDirector()
+
+  /**
+   * Subscribe an observer to every enemy this minigame spawns. Used by the
+   * level VC to wire the loot drop system without exposing the director.
+   *
+   * @param listener - Receives each freshly created {@link EnemyHandle}.
+   * @returns Unsubscribe function.
+   */
+  installEnemySpawnObserver(listener: (handle: EnemyHandle) => void): () => void {
+    return this.enemyDirector.addSpawnListener(listener)
+  }
   private readonly enemyProjectileSystem = new EnemyProjectileSystem()
   private readonly hostages: FpsHostageController
   private readonly groundControllers = new Map<number, BacteriophageController>()

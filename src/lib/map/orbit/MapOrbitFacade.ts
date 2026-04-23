@@ -39,6 +39,13 @@ interface OrbitInputDeps extends SharedDeps {
    * audio update in {@link MapViewController}.
    */
   audio: ShuttleAudioDirector
+  /**
+   * Called immediately after the slingshot release fires successfully, with
+   * the display name of the body the player launched from (e.g. `'Sun'`,
+   * `'Mars'`). Receivers typically map name → body id and forward to the
+   * contract system as a `launch-from-body` step event.
+   */
+  onSlingshotReleased?: (bodyName: string) => void
 }
 
 /** Simulation tick dependencies (no direct audio edge work). */
@@ -153,7 +160,7 @@ export class MapOrbitFacade {
   }
 
   handleOrbitInput(dt: number, deps: OrbitInputDeps): void {
-    const { shuttleController, inputManager, vehicleCamera, sceneVisuals, audio } = deps
+    const { shuttleController, inputManager, vehicleCamera, sceneVisuals, audio, onSlingshotReleased } = deps
     if (!this._system) return
 
     const state = this._system.state
@@ -270,6 +277,7 @@ export class MapOrbitFacade {
 
     const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(shuttleController.group.quaternion)
     const heading = Math.atan2(-fwd.z, fwd.x)
+    const launchedFromName = this._system.target?.name ?? null
     const launchVelocity = this._system.launchSlingshot(heading, dt)
     const vel = new THREE.Vector3(launchVelocity.vx, 0, launchVelocity.vz)
     const finalSpeed = Math.sqrt(launchVelocity.vx ** 2 + launchVelocity.vz ** 2)
@@ -287,6 +295,7 @@ export class MapOrbitFacade {
     shuttleController.setSlingshotSpeed(burstSpeed)
     shuttleController.triggerSlingshotLaunchFx(orbitConfig.slingshotLaunchFxDuration)
     audio.notifySlingshotRelease()
+    if (launchedFromName) onSlingshotReleased?.(launchedFromName)
     shuttleController.thrusterSystem.consumeFuel(
       this._slingshotCharge * shuttleController.thrusterSystem.fuelCapacity * 0.1,
     )

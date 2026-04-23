@@ -137,6 +137,53 @@ export interface TradeTransactionEvent {
   quantity: number
 }
 
+/**
+ * Step that requires the player to collect N units of a specific dropped item
+ * (e.g. viroid psychosphere harvested from FPS-level kills). Counter advances
+ * by `event.quantity` per pickup; step satisfies when `>= count`.
+ */
+export interface CollectDropsStep extends ContractStepRewardMixin {
+  /** Discriminator. */
+  kind: 'collect-drops'
+  /** Inventory item id from `src/data/inventory/items.json` (e.g. `'viroid-psychosphere'`). */
+  itemId: string
+  /** Required total units to collect after the step becomes active. */
+  count: number
+  /** Authored summary shown on the step's flavor message subject. */
+  subject: string
+  /** Authored body paragraphs for the step's flavor message. */
+  flavor: string[]
+}
+
+/**
+ * Step that requires the player to slingshot-launch out of orbit at a specific
+ * body (e.g. break solar orbit at the Sun). Matches by `planetId`.
+ */
+export interface LaunchFromBodyStep extends ContractStepRewardMixin {
+  /** Discriminator. */
+  kind: 'launch-from-body'
+  /** Body id the launch must originate from (e.g. `'sun'`, `'mercury'`). */
+  planetId: string
+  /** Authored summary shown on the step's flavor message subject. */
+  subject: string
+  /** Authored body paragraphs for the step's flavor message. */
+  flavor: string[]
+}
+
+/** Event payload emitted when the player collects a drop pickup in the FPS layer. */
+export interface DropCollectedEvent {
+  /** Inventory item id that was picked up (matches {@link CollectDropsStep.itemId}). */
+  itemId: string
+  /** Units gained on this pickup (typically 1). */
+  quantity: number
+}
+
+/** Event payload emitted when the player slingshot-launches out of orbit at a body. */
+export interface OrbitalLaunchEvent {
+  /** Body id the launch originated from (e.g. `'sun'`). */
+  planetId: string
+}
+
 /** Discriminated union of all supported contract steps. */
 export type ContractStep =
   | CompleteMissionsStep
@@ -144,6 +191,8 @@ export type ContractStep =
   | VisitPlanetStep
   | OrbitalMissionStep
   | TradeGoodsStep
+  | CollectDropsStep
+  | LaunchFromBodyStep
 
 /** Reward applied when a contract is completed. */
 export type RewardEffect =

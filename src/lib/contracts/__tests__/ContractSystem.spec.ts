@@ -551,6 +551,91 @@ describe('ContractSystem trade-goods steps', () => {
   })
 })
 
+/** Cinderline-shape contract used to validate `collect-drops` and `launch-from-body` steps. */
+const cinderlineLikeContract: Contract = {
+  id: 'cinderline-test',
+  inboxName: 'Anvil',
+  from: 'Anvil',
+  sentAt: TEST_DATE,
+  triggerOnPlanetVisited: 'mercury',
+  introSubject: 'Cinderline',
+  introBody: ['intro'],
+  steps: [
+    {
+      kind: 'collect-drops',
+      itemId: 'viroid-psychosphere',
+      count: 3,
+      subject: 'Harvest',
+      flavor: ['harvest'],
+    },
+    {
+      kind: 'launch-from-body',
+      planetId: 'sun',
+      subject: 'Break solar orbit',
+      flavor: ['launch'],
+    },
+  ],
+  completionSubject: 'Done',
+  completionBody: ['done'],
+  rewards: [{ type: 'fast-travel', planetId: 'mercury' }],
+}
+
+describe('ContractSystem collect-drops steps', () => {
+  it('advances by quantity per pickup and clamps at the required count', () => {
+    const { contracts } = createHarness([cinderlineLikeContract])
+    contracts.notifyPlanetVisited('mercury')
+    contracts.acceptContract(cinderlineLikeContract.id)
+
+    contracts.notifyDropCollected({ itemId: 'viroid-psychosphere', quantity: 1 })
+    expect(contracts.getInstance(cinderlineLikeContract.id)?.stepCounters[0]).toBe(1)
+
+    contracts.notifyDropCollected({ itemId: 'viroid-psychosphere', quantity: 5 })
+    const instance = contracts.getInstance(cinderlineLikeContract.id)
+    expect(instance?.currentStepIndex).toBe(1)
+    expect(instance?.stepCounters[0]).toBe(3)
+  })
+
+  it('ignores drops of other items', () => {
+    const { contracts } = createHarness([cinderlineLikeContract])
+    contracts.notifyPlanetVisited('mercury')
+    contracts.acceptContract(cinderlineLikeContract.id)
+
+    contracts.notifyDropCollected({ itemId: 'olivine', quantity: 5 })
+    expect(contracts.getInstance(cinderlineLikeContract.id)?.stepCounters[0]).toBe(0)
+  })
+
+  it('ignores zero-quantity events', () => {
+    const { contracts } = createHarness([cinderlineLikeContract])
+    contracts.notifyPlanetVisited('mercury')
+    contracts.acceptContract(cinderlineLikeContract.id)
+
+    contracts.notifyDropCollected({ itemId: 'viroid-psychosphere', quantity: 0 })
+    expect(contracts.getInstance(cinderlineLikeContract.id)?.stepCounters[0]).toBe(0)
+  })
+})
+
+describe('ContractSystem launch-from-body steps', () => {
+  it('advances when launching from the matching planet id', () => {
+    const { contracts, granted } = createHarness([cinderlineLikeContract])
+    contracts.notifyPlanetVisited('mercury')
+    contracts.acceptContract(cinderlineLikeContract.id)
+    contracts.notifyDropCollected({ itemId: 'viroid-psychosphere', quantity: 3 })
+
+    contracts.notifyOrbitalLaunched({ planetId: 'mercury' })
+    expect(contracts.getInstance(cinderlineLikeContract.id)?.status).toBe('active')
+
+    contracts.notifyOrbitalLaunched({ planetId: 'sun' })
+    expect(contracts.getInstance(cinderlineLikeContract.id)?.status).toBe('completed')
+    expect(granted).toEqual([{ type: 'fast-travel', planetId: 'mercury' }])
+  })
+
+  it('does not advance when no contract is active', () => {
+    const { contracts } = createHarness([cinderlineLikeContract])
+    contracts.notifyOrbitalLaunched({ planetId: 'sun' })
+    expect(contracts.getInstance(cinderlineLikeContract.id)).toBeNull()
+  })
+})
+
 describe('ContractSystem persistence', () => {
   it('persists snapshot on every change', () => {
     const save = vi.fn()
