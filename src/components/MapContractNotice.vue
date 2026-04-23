@@ -1,13 +1,11 @@
 <script setup lang="ts">
 /**
- * Cyan tactical-map notification pill for contract-origin ship messages.
+ * Cyan contract-update pill rendered inside `.map-screen-nav__actions`, to the
+ * left of the navbar icon buttons. Distinct from the blue `ShipMessageDialog`
+ * channel — this pill deep-links into `ShuttleControlOverlay`'s mail program
+ * with the contract folder + target message pre-selected on click.
  *
- * Sibling of the blue `map-message-notice` rendered in {@link MapView.vue}.
- * Consumers compute the label through {@link contractNoticeLabel} and handle
- * the `click` event by deep-linking `ShuttleControlOverlay` into the contract
- * folder + target message. Styling lives in `src/assets/css/main.css` under
- * the `.map-contract-notice` / `__button` classes so it stays in lockstep
- * with the sibling inbox pill (`.map-message-notice`).
+ * Styling lives in `src/assets/css/main.css` under `.map-contract-notice__button`.
  *
  * @author guinetik
  * @date 2026-04-23
@@ -31,9 +29,7 @@ function onClick(): void {
 </script>
 
 <template>
-  <div class="map-contract-notice">
-    <button type="button" class="map-contract-notice__button" @click="onClick">
-      {{ label }}
-    </button>
-  </div>
+  <button type="button" class="map-contract-notice__button" @click="onClick">
+    {{ label }}
+  </button>
 </template>

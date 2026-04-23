@@ -1243,6 +1243,15 @@ watch(
       <span class="map-screen-nav__title">{{ MAP_SCREEN_GAME_TITLE }}</span>
     </div>
     <div class="map-screen-nav__actions">
+      <MapContractNotice
+        v-if="
+          contractNoticePill &&
+          activeContractMessage &&
+          activeContractMessage.status === 'pending'
+        "
+        :label="contractNoticePill"
+        @click="openContractMessage"
+      />
       <button
         type="button"
         class="map-screen-nav__icon-btn"
@@ -1397,18 +1406,6 @@ watch(
       {{ messagePromptLabel() }}
     </button>
   </div>
-  <MapContractNotice
-    v-if="
-      !mapOverlay.visible &&
-      !mapIntro.controlsLocked &&
-      !earthStartupOrbitHudSuppressed &&
-      contractNoticePill &&
-      activeContractMessage &&
-      activeContractMessage.status === 'pending'
-    "
-    :label="contractNoticePill"
-    @click="openContractMessage"
-  />
   <ShipMessageDialog
     v-if="activeInboxMessage && (mapIntro.messageDialogVisible || messageDialogVisible)"
     :message="activeInboxMessage"
