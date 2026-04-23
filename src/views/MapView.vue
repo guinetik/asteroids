@@ -58,6 +58,7 @@ import {
 } from '@/lib/upgrades'
 import { LANDER_BASE_HP } from '@/three/LanderController'
 import UpgradeInstalledAnnouncement from '@/components/UpgradeInstalledAnnouncement.vue'
+import JourneyCompletedAnnouncement from '@/components/JourneyCompletedAnnouncement.vue'
 import { Timer, type TimerHandle } from '@/lib/Timer'
 import type { ActiveShipMessage } from '@/lib/messages/messageTypes'
 import type { MapIntroUiState } from '@/lib/mapIntroState'
@@ -248,6 +249,10 @@ const upgradeInstalledUpgradeName = ref('')
 const upgradeInstalledTier = ref(1)
 const upgradeInstalledCreditsSpent = ref(0)
 const upgradeInstalledMetaText = ref<string | null>(null)
+const journeyCompletedVisible = ref(false)
+const journeyCompletedEyebrow = ref('ACT')
+const journeyCompletedTitle = ref('')
+const journeyCompletedMeta = ref('')
 const habitatPrompt = ref<string | null>(null)
 const habitatFadeOpacity = ref(0)
 const turretFadeOpacity = ref(0)
@@ -642,6 +647,15 @@ onMounted(async () => {
         upgradeInstalledVisible.value = true
       })
     }
+    viewController.onJourneyCompletedAnnouncement = (eyebrow, title, metaText) => {
+      journeyCompletedEyebrow.value = eyebrow
+      journeyCompletedTitle.value = title
+      journeyCompletedMeta.value = metaText
+      journeyCompletedVisible.value = false
+      Timer.after(0, () => {
+        journeyCompletedVisible.value = true
+      })
+    }
     viewController.onMessageUpdate = () => {
       refreshActiveMessage()
     }
@@ -926,6 +940,10 @@ function handlePurchaseUpgrade(upgradeId: UpgradeId): void {
 function onUpgradeInstalledDismissed(): void {
   upgradeInstalledVisible.value = false
   upgradeInstalledMetaText.value = null
+}
+
+function onJourneyCompletedDismissed(): void {
+  journeyCompletedVisible.value = false
 }
 
 function handleToggleLabels() {
@@ -1379,6 +1397,13 @@ watch(
     :credits-spent="upgradeInstalledCreditsSpent"
     :meta-text="upgradeInstalledMetaText ?? undefined"
     @dismissed="onUpgradeInstalledDismissed"
+  />
+  <JourneyCompletedAnnouncement
+    :visible="journeyCompletedVisible"
+    :title="journeyCompletedTitle"
+    :meta-text="journeyCompletedMeta"
+    :headline="`${journeyCompletedEyebrow} — JOURNEY COMPLETE`"
+    @dismissed="onJourneyCompletedDismissed"
   />
   <AchievementsDialog
     :open="achievementsOpen"

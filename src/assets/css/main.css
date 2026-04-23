@@ -1895,6 +1895,123 @@ body {
   }
 }
 
+/* Journey completion banner — structurally identical to upgrade-installed, amber palette. */
+.journey-completed-announcement {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  transform: translateY(-50%);
+  pointer-events: none;
+  overflow: hidden;
+  border-top: 1px solid rgba(251, 191, 36, 0.22);
+  border-bottom: 1px solid rgba(251, 191, 36, 0.22);
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(251, 191, 36, 0.06) 20%,
+    rgba(251, 146, 60, 0.12) 50%,
+    rgba(251, 191, 36, 0.06) 80%,
+    transparent
+  );
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow:
+    0 0 60px rgba(251, 146, 60, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  max-height: 0;
+}
+
+.journey-completed-announcement--opening {
+  animation: journey-completed-open 0.6s ease-out forwards;
+}
+
+.journey-completed-announcement--open {
+  max-height: 12rem;
+  padding: 2rem 0;
+}
+
+.journey-completed-announcement--closing {
+  animation: journey-completed-close 0.8s ease-in forwards;
+}
+
+.journey-completed-announcement__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.journey-completed-announcement__eyebrow {
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 0.95rem;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: rgba(252, 211, 77, 0.7);
+}
+
+.journey-completed-announcement__divider {
+  width: 14rem;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(251, 191, 36, 0.6),
+    rgba(251, 146, 60, 0.55),
+    rgba(251, 191, 36, 0.6),
+    transparent
+  );
+}
+
+.journey-completed-announcement__title {
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: clamp(1.35rem, 3.5vw, 2.1rem);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(253, 224, 71, 0.95);
+  text-align: center;
+  text-shadow:
+    0 0 22px rgba(251, 146, 60, 0.5),
+    0 0 48px rgba(251, 146, 60, 0.22);
+}
+
+.journey-completed-announcement__meta {
+  margin-top: 0.15rem;
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(253, 186, 116, 0.9);
+  text-shadow: 0 0 12px rgba(251, 146, 60, 0.4);
+}
+
+@keyframes journey-completed-open {
+  from {
+    max-height: 0;
+    padding: 0;
+    opacity: 0;
+  }
+  to {
+    max-height: 12rem;
+    padding: 2rem 0;
+    opacity: 1;
+  }
+}
+
+@keyframes journey-completed-close {
+  from {
+    max-height: 12rem;
+    padding: 2rem 0;
+    opacity: 1;
+  }
+  to {
+    max-height: 0;
+    padding: 0;
+    opacity: 0;
+  }
+}
+
 /* Achievements button — sits below the credits badge, flush to bottom-left corner. */
 .achievements-badge-btn {
   @apply fixed bottom-4 left-4 z-30

@@ -94,8 +94,8 @@ defineProps<{
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.8rem 1rem;
-  background: rgba(0, 10, 15, 0.5);
-  border: 1px solid rgba(0, 255, 204, 0.15);
+  background: rgba(16, 10, 0, 0.55);
+  border: 1px solid rgba(251, 191, 36, 0.22);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   min-width: 10rem;
@@ -104,7 +104,7 @@ defineProps<{
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  border-bottom: 1px solid rgba(0, 255, 204, 0.15);
+  border-bottom: 1px solid rgba(251, 191, 36, 0.22);
   padding-bottom: 0.4rem;
 }
 .tracker-asteroid {
@@ -112,14 +112,14 @@ defineProps<{
   font-size: 0.65rem;
   letter-spacing: 0.3em;
   text-transform: uppercase;
-  color: rgba(0, 255, 204, 0.4);
+  color: rgba(252, 211, 77, 0.5);
 }
 .tracker-mission {
   font-family: 'Datatype', ui-monospace, monospace;
   font-size: 0.8rem;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: rgba(0, 255, 204, 0.8);
+  color: rgba(253, 224, 71, 0.9);
 }
 .tracker-objectives {
   display: flex;
@@ -139,29 +139,29 @@ defineProps<{
   font-size: 0.75rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 243, 214, 0.7);
   transition: color 0.3s;
 }
 .tracker-objective--complete {
-  color: rgba(0, 255, 204, 0.5);
+  color: rgba(251, 191, 36, 0.55);
 }
 .tracker-objective--complete .tracker-label {
   text-decoration: line-through;
-  text-decoration-color: rgba(0, 255, 204, 0.3);
+  text-decoration-color: rgba(251, 191, 36, 0.35);
 }
 .tracker-check {
   font-size: 0.85rem;
-  color: rgba(0, 255, 204, 0.6);
+  color: rgba(252, 211, 77, 0.7);
 }
 .tracker-objective--complete .tracker-check {
-  color: rgba(0, 255, 204, 0.9);
+  color: rgba(253, 224, 71, 0.95);
 }
 .tracker-steps {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
   padding-left: 1.2rem;
-  border-left: 1px solid rgba(0, 255, 204, 0.1);
+  border-left: 1px solid rgba(251, 191, 36, 0.18);
   margin-left: 0.35rem;
 }
 .tracker-step {
@@ -171,29 +171,29 @@ defineProps<{
   font-family: 'Datatype', ui-monospace, monospace;
   font-size: 0.65rem;
   letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 243, 214, 0.38);
   transition: color 0.3s;
 }
 .tracker-step--active {
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 243, 214, 0.9);
 }
 .tracker-step--complete {
-  color: rgba(0, 255, 204, 0.4);
+  color: rgba(251, 191, 36, 0.45);
 }
 .tracker-step-icon {
   font-size: 0.7rem;
-  color: rgba(0, 255, 204, 0.5);
+  color: rgba(252, 211, 77, 0.55);
 }
 .tracker-step--active .tracker-step-icon {
-  color: rgba(0, 255, 204, 0.9);
+  color: rgba(253, 224, 71, 0.95);
 }
 .tracker-step-progress {
   margin-left: auto;
   padding-left: 0.5rem;
   font-variant-numeric: tabular-nums;
-  color: rgba(0, 255, 204, 0.7);
+  color: rgba(252, 211, 77, 0.75);
 }
 .tracker-step--complete .tracker-step-progress {
-  color: rgba(0, 255, 204, 0.5);
+  color: rgba(251, 191, 36, 0.55);
 }
 </style>

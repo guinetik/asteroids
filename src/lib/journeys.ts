@@ -193,6 +193,27 @@ export function hasCompletedJourney(profile: PlayerProfile, journeyId: JourneyId
   return isJourneyComplete(profile, journeyId)
 }
 
+/** Display fields for a journey, used by HUD trackers and completion banners. */
+export interface JourneyDisplay {
+  /** Small-caps eyebrow text (e.g. `"Act I"`). */
+  eyebrow: string
+  /** Large headline (e.g. `"Inner System"`). */
+  title: string
+  /** One-line objective summary (e.g. `"Earn your manifold cert"`). */
+  objectiveLabel: string
+}
+
+/** Look up the authored display fields for a journey id, or `null` if unknown. */
+export function getJourneyDisplay(journeyId: JourneyId): JourneyDisplay | null {
+  const definition = JOURNEY_DEFINITIONS.find((j) => j.id === journeyId)
+  if (!definition) return null
+  return {
+    eyebrow: definition.eyebrow,
+    title: definition.title,
+    objectiveLabel: definition.objectiveLabel,
+  }
+}
+
 /** Check whether a journey-gated feature has been unlocked for the profile. */
 export function isJourneyFeatureUnlocked(
   profile: PlayerProfile,

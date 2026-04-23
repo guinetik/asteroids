@@ -121,6 +121,7 @@ import type { PlayerProfile } from '@/lib/player/types'
 import {
   applyJourneyTrigger,
   buildActiveJourneyTracker,
+  getJourneyDisplay,
   hasCompletedJourney,
   getActiveJourneyNextStepLabel,
   isJourneyFeatureUnlocked,
@@ -509,6 +510,10 @@ export class MapViewController implements Tickable {
         creditsSpent: number,
         metaText?: string,
       ) => void)
+    | null = null
+  /** Fired when a journey just completed so the map can show the amber completion banner. */
+  onJourneyCompletedAnnouncement:
+    | ((eyebrow: string, title: string, metaText: string) => void)
     | null = null
   /** Fired when fuel cell count changes (for HUD refuel button). */
   onFuelCellCount: ((count: number) => void) | null = null
@@ -2319,6 +2324,11 @@ export class MapViewController implements Tickable {
     this.messageFacade.setTutorialMessagesUnlocked(
       hasCompletedJourney(this.playerProfile, WELCOME_JOURNEY_ID),
     )
+    for (const journeyId of result.completedJourneyIds) {
+      const display = getJourneyDisplay(journeyId)
+      if (!display) continue
+      this.onJourneyCompletedAnnouncement?.(display.eyebrow, display.title, display.objectiveLabel)
+    }
     this.emitJourneyTracker()
   }
 
