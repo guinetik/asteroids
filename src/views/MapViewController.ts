@@ -1187,6 +1187,11 @@ export class MapViewController implements Tickable {
       skipIntro: () => {
         this.skipIntro()
       },
+      toggleEvaColliders: () => {
+        const session = this.evaSession
+        if (!session) return
+        session.setColliderDebugVisible(!session.isColliderDebugVisible)
+      },
       getShuttlePosition: () => {
         const pos = this.shuttleController?.group.position
         if (pos)
@@ -4878,6 +4883,12 @@ export class MapViewController implements Tickable {
         createCylinderColliderFromHullNodes(
           this.shuttleController.group,
           this.shuttleController.shuttleHullNodes,
+          // Trim 5% off the tail end so the cylinder ends at the fuselage tail rather
+          // than overshooting past the engine nozzles — those are thin protrusions the
+          // EVA player should clip past, same as wings and the vertical fin. Keep the
+          // full nose length (no low-end trim equivalent) so the cockpit stays enclosed.
+          // If back-end is on the HIGH axial end in model local space, swap these values.
+          { axialKeepLow: 0.05, axialKeepHigh: 1.0 },
         ),
       )
       // Snapshot the shuttle hull's world-space AABB for the bounds-aware "Return to

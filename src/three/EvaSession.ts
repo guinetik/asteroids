@@ -22,6 +22,10 @@ import { useAudio } from '@/audio/useAudio'
 import { EvaRcsSound } from '@/audio/EvaRcsSound'
 import { EvaCollisionResolver, type EvaCollider } from '@/lib/physics/evaCollisionResolver'
 import { EvaTetherController } from './EvaTetherController'
+import {
+  buildEvaColliderWireframes,
+  type EvaColliderDebugHandle,
+} from './EvaColliderDebug'
 
 /**
  * The surface EvaSession needs from its host scene. {@link SceneManager} satisfies this
@@ -215,6 +219,8 @@ export class EvaSession implements Tickable {
   private readonly collisionResolver = new EvaCollisionResolver()
   private preEvaScales: { object: THREE.Object3D; scale: number }[] = []
   private preEvaHelmetLightIntensity: { spot: number; fill: number } | null = null
+  private colliderDebug: EvaColliderDebugHandle | null = null
+  private colliderDebugVisible = false
   private lastPrompt: string | null = null
   private boundOnMouseMove: ((e: MouseEvent) => void) | null = null
   private boundOnCanvasClick: (() => void) | null = null
@@ -233,6 +239,22 @@ export class EvaSession implements Tickable {
    * handling (pointer lock, keybinds) on the overlay without toggling EVA mode. */
   get isMinigameOpen(): boolean {
     return this.mode === 'minigame'
+  }
+
+  /**
+   * Show or hide the bright-green debug wireframes drawn around every registered
+   * EVA collider. Hidden by default; wire a DevConsole command on the host view
+   * (e.g. `toggleEvaColliders`) that calls this with the negated current state
+   * so the wireframes can be reviewed on demand without cluttering gameplay.
+   */
+  setColliderDebugVisible(visible: boolean): void {
+    this.colliderDebugVisible = visible
+    this.colliderDebug?.setVisible(visible)
+  }
+
+  /** Current visibility state of the EVA collider debug wireframes. */
+  get isColliderDebugVisible(): boolean {
+    return this.colliderDebugVisible
   }
 
   tick(_dt: number): void {
@@ -401,6 +423,13 @@ export class EvaSession implements Tickable {
     for (const c of colliders) this.collisionResolver.add(c)
     controller.setCollisionResolver(this.collisionResolver)
 
+    // Debug wireframes around every registered EVA collider. Hidden by default;
+    // toggle via {@link setColliderDebugVisible} (wired to a DevConsole command
+    // on the host view) when investigating "stuck on nothing" reports.
+    this.colliderDebug = buildEvaColliderWireframes(colliders)
+    this.colliderDebug.setVisible(this.colliderDebugVisible)
+    sceneManager.addToScene(this.colliderDebug.sceneRoot)
+
     sceneManager.addToScene(controller.group)
     sceneManager.addToScene(controller.tetherLine)
     sceneManager.addToScene(controller.fpsCamera.helmetLightRig)
@@ -478,6 +507,11 @@ export class EvaSession implements Tickable {
       this.controller = null
     }
     this.collisionResolver.clear()
+    if (this.colliderDebug) {
+      sceneManager.removeFromScene(this.colliderDebug.sceneRoot)
+      this.colliderDebug.dispose()
+      this.colliderDebug = null
+    }
     this.restoreHugeScales()
     this.rcsSound.stop()
     if (restoreVehicle) {

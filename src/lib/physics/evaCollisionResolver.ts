@@ -136,71 +136,177 @@ export function createObbColliderFromHullNodes(
   return { kind: 'obb', object: parent, min, max }
 }
 
+/** Options for {@link createCylinderColliderFromHullNodes}. */
+export interface CylinderColliderOptions {
+  /**
+   * Fraction of hull vertices that must sit inside the radial cylinder wall, in
+   * (0, 1]. Protrusion verts (wing tips, tail-fin spike) land in the outer
+   * percentile band and get excluded, leaving a cylinder that hugs the fuselage.
+   * Defaults to `0.9` — captures the fuselage body while letting wings/fins
+   * clip through as passable volume. Lower (e.g. `0.8`) for an even tighter fit
+   * around a narrow fuselage; raise toward `1.0` to fully envelop everything
+   * (back to the old bounding-cylinder behavior).
+   */
+  radialPercentile?: number
+  /**
+   * Lower axial quantile to keep, in [0, 1). The cylinder's "low" end sits at the
+   * axis coordinate of the vertex at this quantile after sorting along the
+   * cylinder axis. Defaults to `0` (extend fully to the hull's low-end tip —
+   * typically the nose). Raise to trim a protrusion off the low end.
+   */
+  axialKeepLow?: number
+  /**
+   * Upper axial quantile to keep, in (0, 1]. The cylinder's "high" end sits at
+   * the axis coordinate of the vertex at this quantile. Defaults to `1.0`
+   * (extend fully to the hull's high-end tip). Lower (e.g. `0.9`) to trim
+   * engine nacelles / thruster bells sticking past the fuselage tail.
+   */
+  axialKeepHigh?: number
+}
+
+/** Default fraction of hull verts enclosed by the cylinder's radial wall. */
+const DEFAULT_RADIAL_PERCENTILE = 0.9
+
+/** Default lower axial quantile kept — `0` means "extend all the way to the low end tip". */
+const DEFAULT_AXIAL_KEEP_LOW = 0
+
+/** Default upper axial quantile kept — `1` means "extend all the way to the high end tip". */
+const DEFAULT_AXIAL_KEEP_HIGH = 1
+
 /**
  * Build an oriented cylinder `EvaCollider` from hull nodes, aligned with the longest
  * local-axis of the hull's AABB. Prefer this over {@link createObbColliderFromHullNodes}
  * for long, narrow hulls (like the shuttle) — a cylinder has no corners in the radial
  * direction, so the EVA player can slide smoothly along the hull without snagging on the
- * OBB's eight sharp edges. Radius is taken as the larger of the two cross-section
- * half-extents so the cylinder fully envelops the hull (slight corner inflation is the
- * intentional tradeoff for smooth navigation). Requires uniform scale on `parent`.
+ * OBB's eight sharp edges.
+ *
+ * The cylinder is centered on the per-axis **median** of the hull's vertex positions
+ * (not the AABB midpoint), and the radius is a **percentile** of per-vertex radial
+ * distances (default: 90th). Both choices are robust to thin protrusions like wings
+ * and tail fins — those contribute a small fraction of the hull's verts, so they land
+ * in the outer percentile band and get excluded from the fit. Protrusions poke out
+ * through the cylinder wall and are passable by the EVA player, while the main
+ * fuselage is snugly enclosed. Requires uniform scale on `parent`.
  */
 export function createCylinderColliderFromHullNodes(
   parent: THREE.Object3D,
   hullNodes: readonly THREE.Object3D[],
+  options: CylinderColliderOptions = {},
 ): EvaCollider {
+  const radialPercentile = clampUnit(options.radialPercentile ?? DEFAULT_RADIAL_PERCENTILE)
+  const axialKeepLowRaw = clampUnit(options.axialKeepLow ?? DEFAULT_AXIAL_KEEP_LOW)
+  const axialKeepHighRaw = clampUnit(options.axialKeepHigh ?? DEFAULT_AXIAL_KEEP_HIGH)
+  // Guarantee a valid half-open range regardless of caller input.
+  const axialKeepLow = Math.min(axialKeepLowRaw, axialKeepHighRaw)
+  const axialKeepHigh = Math.max(axialKeepLowRaw, axialKeepHighRaw)
+
   parent.updateMatrixWorld(true)
   const parentInverse = new THREE.Matrix4().copy(parent.matrixWorld).invert()
-  const min = new THREE.Vector3(Infinity, Infinity, Infinity)
-  const max = new THREE.Vector3(-Infinity, -Infinity, -Infinity)
-  const corner = new THREE.Vector3()
+  const xs: number[] = []
+  const ys: number[] = []
+  const zs: number[] = []
   const meshLocal = new THREE.Matrix4()
+  const v = new THREE.Vector3()
   for (const node of hullNodes) {
     node.updateMatrixWorld(true)
     node.traverse((child) => {
       const mesh = child as THREE.Mesh
       if (!mesh.isMesh) return
-      const geom = mesh.geometry
-      if (!geom.boundingBox) geom.computeBoundingBox()
-      const bb = geom.boundingBox
-      if (!bb) return
+      const pos = mesh.geometry.attributes.position as THREE.BufferAttribute | undefined
+      if (!pos) return
       meshLocal.multiplyMatrices(parentInverse, mesh.matrixWorld)
-      for (let i = 0; i < 8; i++) {
-        corner.set(
-          (i & 1) ? bb.max.x : bb.min.x,
-          (i & 2) ? bb.max.y : bb.min.y,
-          (i & 4) ? bb.max.z : bb.min.z,
-        ).applyMatrix4(meshLocal)
-        min.min(corner)
-        max.max(corner)
+      for (let i = 0; i < pos.count; i++) {
+        v.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(meshLocal)
+        xs.push(v.x)
+        ys.push(v.y)
+        zs.push(v.z)
       }
     })
   }
-  const halfX = (max.x - min.x) * 0.5
-  const halfY = (max.y - min.y) * 0.5
-  const halfZ = (max.z - min.z) * 0.5
-  const localCenter = new THREE.Vector3(
-    (min.x + max.x) * 0.5,
-    (min.y + max.y) * 0.5,
-    (min.z + max.z) * 0.5,
-  )
+  const vertCount = xs.length
+  if (vertCount === 0) {
+    return {
+      kind: 'cylinder',
+      object: parent,
+      localCenter: new THREE.Vector3(),
+      localAxis: new THREE.Vector3(1, 0, 0),
+      halfLength: 0,
+      radius: 0,
+    }
+  }
+
+  // Build sorted per-axis copies for median + percentile span queries. The original
+  // xs/ys/zs arrays keep their per-vertex ordering so we can compute consistent
+  // radii against the derived axis line below.
+  const sortedXs = [...xs].sort((a, b) => a - b)
+  const sortedYs = [...ys].sort((a, b) => a - b)
+  const sortedZs = [...zs].sort((a, b) => a - b)
+  const medianX = sortedXs[Math.floor(vertCount / 2)] ?? 0
+  const medianY = sortedYs[Math.floor(vertCount / 2)] ?? 0
+  const medianZ = sortedZs[Math.floor(vertCount / 2)] ?? 0
+
+  // Decide the cylinder axis from the widest full AABB span — protrusions on a
+  // non-length axis rarely out-length the hull body, so the full span is a safe
+  // pick and avoids coupling axis selection to the axial-keep trim settings.
+  const fullSpanX = (sortedXs[vertCount - 1] ?? 0) - (sortedXs[0] ?? 0)
+  const fullSpanY = (sortedYs[vertCount - 1] ?? 0) - (sortedYs[0] ?? 0)
+  const fullSpanZ = (sortedZs[vertCount - 1] ?? 0) - (sortedZs[0] ?? 0)
   const localAxis = new THREE.Vector3()
-  let halfLength: number
-  let radius: number
-  if (halfX >= halfY && halfX >= halfZ) {
+  let axisIdx: 0 | 1 | 2
+  let sortedAxis: readonly number[]
+  if (fullSpanX >= fullSpanY && fullSpanX >= fullSpanZ) {
     localAxis.set(1, 0, 0)
-    halfLength = halfX
-    radius = Math.max(halfY, halfZ)
-  } else if (halfY >= halfX && halfY >= halfZ) {
+    axisIdx = 0
+    sortedAxis = sortedXs
+  } else if (fullSpanY >= fullSpanX && fullSpanY >= fullSpanZ) {
     localAxis.set(0, 1, 0)
-    halfLength = halfY
-    radius = Math.max(halfX, halfZ)
+    axisIdx = 1
+    sortedAxis = sortedYs
   } else {
     localAxis.set(0, 0, 1)
-    halfLength = halfZ
-    radius = Math.max(halfX, halfY)
+    axisIdx = 2
+    sortedAxis = sortedZs
   }
+
+  // Axial extents use the caller's asymmetric keep range so protrusions at one
+  // end (e.g. engine bells past the tail) can be trimmed without also shortening
+  // the opposite end (the nose).
+  const loIdx = Math.min(vertCount - 1, Math.max(0, Math.floor(axialKeepLow * (vertCount - 1))))
+  const hiIdx = Math.min(vertCount - 1, Math.max(0, Math.floor(axialKeepHigh * (vertCount - 1))))
+  const axialMin = sortedAxis[loIdx] ?? 0
+  const axialMax = sortedAxis[hiIdx] ?? 0
+  const axialCenter = (axialMin + axialMax) * 0.5
+  const halfLength = (axialMax - axialMin) * 0.5
+  // Cylinder center: median on non-axial axes (outlier-robust), trimmed midpoint on axial.
+  const localCenter = new THREE.Vector3(medianX, medianY, medianZ)
+  if (axisIdx === 0) localCenter.x = axialCenter
+  else if (axisIdx === 1) localCenter.y = axialCenter
+  else localCenter.z = axialCenter
+
+  // Radial distance from the axis line (through localCenter along localAxis) per vert.
+  const radiiSquared: number[] = Array.from({ length: vertCount })
+  for (let i = 0; i < vertCount; i++) {
+    const dx = (xs[i] ?? 0) - medianX
+    const dy = (ys[i] ?? 0) - medianY
+    const dz = (zs[i] ?? 0) - medianZ
+    let rSq: number
+    if (axisIdx === 0) rSq = dy * dy + dz * dz
+    else if (axisIdx === 1) rSq = dx * dx + dz * dz
+    else rSq = dx * dx + dy * dy
+    radiiSquared[i] = rSq
+  }
+  radiiSquared.sort((a, b) => a - b)
+  const radialIdx = Math.min(vertCount - 1, Math.floor(radialPercentile * (vertCount - 1)))
+  const radius = Math.sqrt(radiiSquared[radialIdx] ?? 0)
+
   return { kind: 'cylinder', object: parent, localCenter, localAxis, halfLength, radius }
+}
+
+/** Clamp a number into `[0, 1]`. Used to sanitize percentile options. */
+function clampUnit(x: number): number {
+  if (x <= 0) return 0
+  if (x >= 1) return 1
+  return x
 }
 
 /**

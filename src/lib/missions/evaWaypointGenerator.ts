@@ -36,16 +36,18 @@ export const EVA_WAYPOINT_MAX_RADIAL_OFFSET = 30
  * Minimum absolute vertical offset (world units) of the POI prop inside the waypoint
  * root. Prevents the satellite from spawning at exactly Y=0 where the shuttle already
  * sits — the POI must be clearly above or below the orbital plane so EVA egress has a
- * real vertical component to traverse.
+ * real vertical component to traverse. Raised from 12 because parked-shuttle framings
+ * sometimes landed the satellite visually "on top of" the cargo bay at close vertical
+ * range; this pushes the minimum separation so the satellite reads as a separate prop.
  */
-export const EVA_WAYPOINT_MIN_Y_OFFSET_WORLD = 12
+export const EVA_WAYPOINT_MIN_Y_OFFSET_WORLD = 22
 
 /**
  * Maximum absolute vertical offset (world units) of the POI prop inside the waypoint
  * root. Paired with {@link EVA_WAYPOINT_MIN_Y_OFFSET_WORLD}; final `poiLocalY` has
  * magnitude in [min, max] with a random sign.
  */
-export const EVA_WAYPOINT_MAX_Y_OFFSET_WORLD = 25
+export const EVA_WAYPOINT_MAX_Y_OFFSET_WORLD = 38
 
 /** Early Earth EVA waypoints stay 3–5 Earth radii from the planet center. */
 const EARTH_LOCAL_WAYPOINT_MIN_RADIUS_MULTIPLE = 3

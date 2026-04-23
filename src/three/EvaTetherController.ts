@@ -44,7 +44,7 @@ const EVA_ZERO_VELOCITY_EPSILON = 0.05
 const EVA_BODY_RADIUS = 0.35
 
 /** Maximum distance (world units) from the tether anchor before the line pulls taut. */
-const EVA_TETHER_MAX_LENGTH = 60
+const EVA_TETHER_MAX_LENGTH = 100
 
 /** Tether cable color — cyan to match the TRON "our-world" palette. */
 const TETHER_COLOR = 0x00e5ff
