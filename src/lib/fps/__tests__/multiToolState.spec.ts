@@ -47,6 +47,8 @@ describe('MultiToolState', () => {
   })
 
   it('hold trigger: waits for the configured interval before firing again', () => {
+    // Drill fireRate in multitool-config.json: interval = 1 / fireRate (e.g. 12 Hz => ~0.0833s)
+    const interval = 1 / (multiToolConfigJson as MultiToolConfig).modes.drill.fireRate!
     state.setMode('drill')
     state.setAiming(true)
     state.setInput(true, true)
@@ -56,10 +58,10 @@ describe('MultiToolState', () => {
     state.tick(0.016)
     expect(state.isFiring).toBe(false)
     state.setInput(true, false)
-    state.tick(0.07)
+    state.tick(0.05)
     expect(state.isFiring).toBe(false)
     state.setInput(true, false)
-    state.tick(0.014)
+    state.tick(interval - 0.016 - 0.05 + 0.001)
     expect(state.isFiring).toBe(true)
   })
 
@@ -102,8 +104,9 @@ describe('MultiToolState', () => {
     state.setMode('drill')
     state.setAiming(true)
 
+    // One long tick while firing: drain must cover full mode capacity (see multitool-config drill burn/capacity)
     state.setInput(true, true)
-    state.tick(0.25)
+    state.tick(0.31)
     expect(state.isFiring).toBe(true)
     expect(state.modeCharge).toBe(0)
 
@@ -140,7 +143,7 @@ describe('MultiToolState', () => {
     state.setAiming(true)
 
     state.setInput(true, true)
-    state.tick(0.25)
+    state.tick(0.31)
     expect(state.isFiring).toBe(true)
     expect(state.modeCharge).toBe(0)
 
@@ -196,7 +199,7 @@ describe('MultiToolState', () => {
 
     state.setInput(true, true)
     state.tick(0.1)
-    expect(state.modeCharge).toBe(18)
+    expect(state.modeCharge).toBe(20)
 
     state.setInput(false, false)
     state.tick(1)
@@ -208,7 +211,7 @@ describe('MultiToolState', () => {
     state.setAiming(true)
 
     state.setInput(true, true)
-    state.tick(0.25)
+    state.tick(0.31)
     expect(state.modeCharge).toBe(0)
 
     state.setInput(false, false)
