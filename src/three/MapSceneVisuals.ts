@@ -92,6 +92,10 @@ export class MapSceneVisuals {
   private reticleWedgeSpeedGate = false
   /** Low-pass filtered heading (rad) for the motion wedge; cleared when wedge hides. */
   private reticleWedgeHeadingSmooth: number | null = null
+  /** Low-pass filtered sprite rotation (rad) after camera azimuth is applied. */
+  private reticleWedgeSpriteAngleSmooth: number | null = null
+  private progradeMarkerOpacitySmooth: number | null = null
+  private retrogradeMarkerOpacitySmooth: number | null = null
   private launchArrowMaterials: THREE.ShaderMaterial[] = []
   private shipReticleGroup: THREE.Group | null = null
   private shipReticleRing: THREE.Sprite | null = null
@@ -376,6 +380,7 @@ export class MapSceneVisuals {
       if (this.reticleWedgeSpeedGate && speed < speedOff) {
         this.reticleWedgeSpeedGate = false
         this.reticleWedgeHeadingSmooth = null
+        this.reticleWedgeSpriteAngleSmooth = null
       }
 
       if (this.reticleWedgeSpeedGate) {
@@ -393,18 +398,34 @@ export class MapSceneVisuals {
         } else {
           this.reticleWedgeHeadingSmooth = rawHeading
         }
-        const spriteAngle =
+        const targetSpriteAngle =
           this.reticleWedgeHeadingSmooth - update.cameraAzimuth - Math.PI / 2
+        const tauSprite = MAP_CONFIG.MAP_RETICLE_SPRITE_ANGLE_SMOOTH_TAU_SEC
+        if (this.reticleWedgeSpriteAngleSmooth === null) {
+          this.reticleWedgeSpriteAngleSmooth = targetSpriteAngle
+        } else if (tauSprite > 0) {
+          const aS = 1 - Math.exp(-dt / tauSprite)
+          this.reticleWedgeSpriteAngleSmooth = lerpAngleRadShortest(
+            this.reticleWedgeSpriteAngleSmooth,
+            targetSpriteAngle,
+            aS,
+          )
+        } else {
+          this.reticleWedgeSpriteAngleSmooth = targetSpriteAngle
+        }
         this.shipReticlePointer.visible = true
-        ;(this.shipReticlePointer.material as THREE.SpriteMaterial).rotation = spriteAngle
+        ;(this.shipReticlePointer.material as THREE.SpriteMaterial).rotation =
+          this.reticleWedgeSpriteAngleSmooth
         ;(this.shipReticlePointer.material as THREE.SpriteMaterial).opacity = reticleAlpha
       } else {
         this.shipReticlePointer.visible = false
+        this.reticleWedgeSpriteAngleSmooth = null
       }
     } else {
       this.shipReticleGroup.visible = false
       this.reticleWedgeSpeedGate = false
       this.reticleWedgeHeadingSmooth = null
+      this.reticleWedgeSpriteAngleSmooth = null
     }
   }
 
@@ -539,7 +560,7 @@ export class MapSceneVisuals {
     progradePos: THREE.Vector3,
     retrogradePos: THREE.Vector3,
     alignment: number,
-    _dt: number,
+    dt: number,
   ): void {
     if (!this.progradeMarkers) return
     const { progradeSprite, retrogradeSprite } = this.progradeMarkers
@@ -547,19 +568,33 @@ export class MapSceneVisuals {
     progradeSprite.position.copy(progradePos)
     retrogradeSprite.position.copy(retrogradePos)
 
-    // Pulse prograde marker brightness when aligned
+    const dtu = Math.max(1e-4, dt)
+    const tauOp = MAP_CONFIG.MAP_PROGRADE_MARKER_OPACITY_SMOOTH_TAU_SEC
+    const smoothOp = (prev: number | null, target: number): number => {
+      if (prev === null) return target
+      if (tauOp <= 0) return target
+      return prev + (target - prev) * (1 - Math.exp(-dtu / tauOp))
+    }
+
+    // Pulse prograde marker brightness when aligned (opacity low-pass reduces flicker).
     const progradeMat = progradeSprite.material as THREE.SpriteMaterial
     const baseOpacity = 0.7
     const alignGlow = alignment > 0.85 ? 0.3 * ((alignment - 0.85) / 0.15) : 0
-    progradeMat.opacity = baseOpacity + alignGlow
+    const targetPro = baseOpacity + alignGlow
+    this.progradeMarkerOpacitySmooth = smoothOp(this.progradeMarkerOpacitySmooth, targetPro)
+    progradeMat.opacity = THREE.MathUtils.clamp(this.progradeMarkerOpacitySmooth, 0.35, 1)
 
     const retroMat = retrogradeSprite.material as THREE.SpriteMaterial
     const retroGlow = alignment < -0.85 ? 0.3 * ((Math.abs(alignment) - 0.85) / 0.15) : 0
-    retroMat.opacity = baseOpacity + retroGlow
+    const targetRetro = baseOpacity + retroGlow
+    this.retrogradeMarkerOpacitySmooth = smoothOp(this.retrogradeMarkerOpacitySmooth, targetRetro)
+    retroMat.opacity = THREE.MathUtils.clamp(this.retrogradeMarkerOpacitySmooth, 0.35, 1)
   }
 
   hideProgradeMarkers(): void {
     if (!this.progradeMarkers) return
+    this.progradeMarkerOpacitySmooth = null
+    this.retrogradeMarkerOpacitySmooth = null
     const { progradeSprite, retrogradeSprite } = this.progradeMarkers
     this.scene.remove(progradeSprite)
     this.scene.remove(retrogradeSprite)

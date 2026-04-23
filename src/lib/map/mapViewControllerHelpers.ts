@@ -114,6 +114,22 @@ export function computeMaxGravityProximity(
   return max
 }
 
+/**
+ * Camera-height driven asteroid belt density for the 3D map view.
+ *
+ * The default orbit camera opens around y=3, so we intentionally avoid
+ * full-density belts there to keep the initial map view responsive. The
+ * densest presentation is reserved for deliberate close inspection.
+ */
+export function getMapAsteroidBeltLodFraction(cameraY: number): number {
+  const y = Math.abs(cameraY)
+  if (y < 2.5) return 1
+  if (y < 8) return 0.35
+  if (y < 20) return 0.2
+  if (y < 50) return 0.1
+  return 0.05
+}
+
 /** Returns true if the shuttle is aiming toward the currently captured planet. */
 export function isShuttleAimingAtPlanet(params: {
   shuttlePosition: { x: number; z: number }

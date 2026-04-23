@@ -191,6 +191,7 @@ import {
   buildMapBodies,
   computeGravityProximity,
   computeMaxGravityProximity,
+  getMapAsteroidBeltLodFraction,
   isEmissiveMaterial,
   makeGravityWell,
   mapWarpStandoffWorldUnits,
@@ -1877,9 +1878,7 @@ export class MapViewController implements Tickable {
     // Asteroid belt LOD — show fewer instances when camera is zoomed out
     if (this.vehicleCamera) {
       const camY = Math.abs(this.vehicleCamera.camera.position.y)
-      // Camera Y increases as user zooms out via orbit controls
-      // Close (camY < 5): full detail. Far (camY > 100): minimal
-      const lodFraction = camY < 5 ? 1.0 : camY < 20 ? 0.5 : camY < 50 ? 0.25 : 0.1
+      const lodFraction = getMapAsteroidBeltLodFraction(camY)
       for (const controller of this.beltControllers) {
         controller.setLodFraction(lodFraction)
       }
