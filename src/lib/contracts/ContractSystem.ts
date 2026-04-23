@@ -54,6 +54,14 @@ export interface ContractSystemHooks {
    * @param contractId - Id of the contract that just completed.
    */
   onContractCompleted?: (contractId: string) => void
+  /**
+   * Called once per contract when its instance transitions from `available` to
+   * `active` (the player tapped Accept). Receivers typically emit a journey
+   * trigger that gates a later arc on explicit buy-in.
+   *
+   * @param contractId - Id of the contract that was just accepted.
+   */
+  onContractAccepted?: (contractId: string) => void
 }
 
 /** Default persistence backed by `loadContractSnapshot`/`saveContractSnapshot`. */
@@ -325,6 +333,7 @@ export class ContractSystem {
     this.deliverBriefMessage(contract)
     this.deliverStepMessage(contract, 0)
     this.persist()
+    this.hooks.onContractAccepted?.(contractId)
     this.afterChange()
     return true
   }

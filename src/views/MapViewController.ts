@@ -202,7 +202,7 @@ import { ManifoldSpline } from '@/three/ManifoldSpline'
 import { ShuttleAudioDirector } from '@/audio/ShuttleAudioDirector'
 import { uiAudio } from '@/audio/UiAudioDirector'
 import { shipMessageSystem } from '@/lib/messages/runtime'
-import { contractSystem, onContractCompleted } from '@/lib/contracts/runtime'
+import { contractSystem, onContractAccepted, onContractCompleted } from '@/lib/contracts/runtime'
 
 /**
  * Orbit / grid / debris toggle snapshot for syncing the map HUD after intro suppression.
@@ -418,6 +418,7 @@ export class MapViewController implements Tickable {
   private sceneVisuals: MapSceneVisuals | null = null
   private unsubscribeJourneyMessageArchive: (() => void) | null = null
   private unsubscribeContractCompleted: (() => void) | null = null
+  private unsubscribeContractAccepted: (() => void) | null = null
   private unsubscribeUpgradeInstalled: (() => void) | null = null
   /** True after the first habitat entry post-intro — gates journey UI visibility. */
   private journeyUiArmed = false
@@ -676,6 +677,10 @@ export class MapViewController implements Tickable {
     this.unsubscribeContractCompleted = onContractCompleted((contractId) => {
       this.notifyJourneyTrigger(`contract_completed:${contractId}`)
       this.maybeStageAct1Climax()
+    })
+    this.unsubscribeContractAccepted?.()
+    this.unsubscribeContractAccepted = onContractAccepted((contractId) => {
+      this.notifyJourneyTrigger(`contract_accepted:${contractId}`)
     })
     this.unsubscribeUpgradeInstalled?.()
     this.unsubscribeUpgradeInstalled = onUpgradeInstalled((upgradeId) => {
@@ -2350,6 +2355,10 @@ export class MapViewController implements Tickable {
     this.emitJourneyTracker()
     if (result.completedJourneyIds.length > 0) {
       this.hideJourneyTrackerAndScheduleNextStart()
+    } else if (result.newlyStartReadyJourneyIds.length > 0) {
+      // A journey's start gate just opened mid-session (e.g. player accepted
+      // the USC contract). Fire its "JOURNEY BEGINS" banner now.
+      this.tryAnnounceNextJourneyStart()
     }
   }
 
@@ -4106,12 +4115,21 @@ export class MapViewController implements Tickable {
   }
 
   /**
-   * Replay `contract_completed` and `upgrade_installed:gravitySurfing` triggers for a
-   * profile loaded from disk. Makes the Act 1 journey self-heal when the save predates
-   * the journey (or when the player completed contracts in a prior build). Invoked once
-   * during controller init, after the contract system has hydrated.
+   * Replay `contract_accepted`, `contract_completed`, and
+   * `upgrade_installed:gravitySurfing` triggers for a profile loaded from disk.
+   * Makes the Act 1 journey self-heal when the save predates the journey (or
+   * when the player completed contracts in a prior build). Invoked once during
+   * controller init, after the contract system has hydrated.
+   *
+   * `contract_accepted` is fired before `contract_completed` so the Act 1
+   * `startTrigger` gate opens before any step-advance triggers run.
    */
   private replayAct1JourneyTriggers(): void {
+    for (const instance of contractSystem.listInstances()) {
+      if (instance.status === 'active' || instance.status === 'completed') {
+        this.notifyJourneyTrigger(`contract_accepted:${instance.contractId}`)
+      }
+    }
     for (const instance of contractSystem.listInstances()) {
       if (instance.status === 'completed') {
         this.notifyJourneyTrigger(`contract_completed:${instance.contractId}`)
@@ -4904,6 +4922,8 @@ export class MapViewController implements Tickable {
     this.unsubscribeJourneyMessageArchive = null
     this.unsubscribeContractCompleted?.()
     this.unsubscribeContractCompleted = null
+    this.unsubscribeContractAccepted?.()
+    this.unsubscribeContractAccepted = null
     this.unsubscribeUpgradeInstalled?.()
     this.unsubscribeUpgradeInstalled = null
     this.clearJourneyInterludeTimer()

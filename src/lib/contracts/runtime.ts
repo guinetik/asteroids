@@ -37,6 +37,9 @@ const contractShuttleUpgradeListeners = new Set<(payload: ContractShuttleUpgrade
 /** Subscribers notified once per contract that transitions to `completed`. */
 const contractCompletedListeners = new Set<(contractId: string) => void>()
 
+/** Subscribers notified when a contract transitions from `available` to `active`. */
+const contractAcceptedListeners = new Set<(contractId: string) => void>()
+
 /**
  * Upgrade grant from a completed contract, after `ensureUpgradeAtLeast` has persisted.
  */
@@ -111,6 +114,15 @@ export const contractSystem = new ContractSystem(
         }
       }
     },
+    onContractAccepted: (id) => {
+      for (const listener of Array.from(contractAcceptedListeners)) {
+        try {
+          listener(id)
+        } catch {
+          // listeners must not break the system
+        }
+      }
+    },
   },
 )
 
@@ -163,6 +175,19 @@ export function onContractShuttleUpgradeGranted(
 export function onContractCompleted(listener: (contractId: string) => void): () => void {
   contractCompletedListeners.add(listener)
   return () => contractCompletedListeners.delete(listener)
+}
+
+/**
+ * Subscribe to "a contract just moved from offered to accepted". Fires only on the
+ * live path; startup self-heal for already-accepted contracts is done by the caller
+ * iterating `contractSystem.listInstances()`.
+ *
+ * @param listener - Receives the accepted contract id.
+ * @returns Unsubscribe function.
+ */
+export function onContractAccepted(listener: (contractId: string) => void): () => void {
+  contractAcceptedListeners.add(listener)
+  return () => contractAcceptedListeners.delete(listener)
 }
 
 /**

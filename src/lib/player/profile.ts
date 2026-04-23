@@ -190,6 +190,13 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     announcedJourneyStartIds = [...completedJourneyIds, WELCOME_JOURNEY_ID]
   }
 
+  let journeyStartReadyIds: string[] = []
+  if (Array.isArray(p.journeyStartReadyIds)) {
+    journeyStartReadyIds = p.journeyStartReadyIds.filter(
+      (entry): entry is string => typeof entry === 'string' && entry.length > 0,
+    )
+  }
+
   const shuttleHullHp =
     typeof p.shuttleHullHp === 'number' && Number.isFinite(p.shuttleHullHp) && p.shuttleHullHp >= 0
       ? p.shuttleHullHp
@@ -213,6 +220,7 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     journeyStepProgress,
     unlockedFeatureIds,
     announcedJourneyStartIds,
+    journeyStartReadyIds,
     ...(shuttleHullHp !== undefined ? { shuttleHullHp } : {}),
     ...(landerHullHp !== undefined ? { landerHullHp } : {}),
   }
@@ -234,6 +242,7 @@ export function createProfile(name: string): PlayerProfile {
     journeyStepProgress: {},
     unlockedFeatureIds: [],
     announcedJourneyStartIds: [],
+    journeyStartReadyIds: [],
   }
 }
 

@@ -57,6 +57,12 @@ export interface PlayerProfile {
    */
   announcedJourneyStartIds: string[]
   /**
+   * Journey ids whose `startTrigger` gate has been satisfied. Journeys with a
+   * `startTrigger` are hidden from HUD + announcement until their id appears
+   * here. Journeys without a `startTrigger` are always ready.
+   */
+  journeyStartReadyIds: string[]
+  /**
    * Shuttle hull HP on the solar map (temperature, radiation, impacts).
    * Omitted or `undefined` in older saves — treated as full until the first sync.
    */

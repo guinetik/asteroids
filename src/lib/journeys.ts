@@ -8,6 +8,7 @@ export type JourneyFeatureId = 'slingshot'
 /** Runtime trigger ids that can advance one or more journey steps. */
 export type JourneyTriggerId =
   | `message_archived:${string}`
+  | `contract_accepted:${string}`
   | `contract_completed:${string}`
   | `upgrade_installed:${UpgradeId}`
   | 'shuttle_control_opened'
@@ -65,6 +66,13 @@ interface JourneyDefinition {
   title: string
   objectiveLabel: string
   unlocks: readonly JourneyFeatureId[]
+  /**
+   * When present, the journey is hidden from the HUD tracker / start-banner and
+   * its step-advance events are ignored until this trigger fires for the profile.
+   * Default: no gate — the journey becomes active as soon as earlier journeys
+   * complete.
+   */
+  startTrigger?: JourneyTriggerId
   steps: readonly JourneyStepDefinition[]
 }
 
@@ -152,6 +160,9 @@ const JOURNEY_DEFINITIONS: readonly JourneyDefinition[] = [
     title: 'Inner System',
     objectiveLabel: 'Earn your manifold cert',
     unlocks: [],
+    // Act 1 stays hidden until the player has actually accepted the USC contract —
+    // before that the "Inner System" title would spoiler the arc.
+    startTrigger: `contract_accepted:${ACT_1_CONTRACT_IDS[0]}`,
     steps: [
       {
         id: 'usc-cert',
@@ -183,6 +194,8 @@ export interface ApplyJourneyTriggerResult {
   changed: boolean
   completedJourneyIds: JourneyId[]
   unlockedFeatureIds: JourneyFeatureId[]
+  /** Journey ids whose `startTrigger` gate was just satisfied by this call. */
+  newlyStartReadyJourneyIds: JourneyId[]
 }
 
 /** Deduplicate persisted string lists while preserving first-seen order. */
@@ -198,6 +211,19 @@ function getCompletedStepIds(profile: PlayerProfile, journeyId: JourneyId): stri
 /** Check whether a journey is already marked complete on the profile. */
 function isJourneyComplete(profile: PlayerProfile, journeyId: JourneyId): boolean {
   return profile.completedJourneyIds.includes(journeyId)
+}
+
+/**
+ * Check whether a journey is start-ready on the profile. Journeys without a
+ * `startTrigger` are always ready; journeys with one require the trigger to
+ * have fired (recorded in `journeyStartReadyIds`).
+ */
+function isJourneyStartReady(
+  profile: PlayerProfile,
+  definition: JourneyDefinition,
+): boolean {
+  if (definition.startTrigger === undefined) return true
+  return profile.journeyStartReadyIds.includes(definition.id)
 }
 
 /** Public completion check used by onboarding gates elsewhere in the map flow. */
@@ -234,6 +260,7 @@ export function getJourneyPendingStartAnnouncement(profile: PlayerProfile): Jour
   const announced = new Set(profile.announcedJourneyStartIds)
   for (const journey of JOURNEY_DEFINITIONS) {
     if (isJourneyComplete(profile, journey.id)) continue
+    if (!isJourneyStartReady(profile, journey)) continue
     if (announced.has(journey.id)) continue
     return journey.id
   }
@@ -269,9 +296,27 @@ export function applyJourneyTrigger(
   let changed = false
   const completedJourneyIds: JourneyId[] = []
   const unlockedFeatureIds: JourneyFeatureId[] = []
+  const newlyStartReadyJourneyIds: JourneyId[] = []
 
+  // Pass 1: resolve any `startTrigger` matches before step-advance pass so a
+  // trigger that both gates a journey and advances one of its steps does the
+  // right thing in a single call.
+  for (const journey of JOURNEY_DEFINITIONS) {
+    if (journey.startTrigger !== trigger) continue
+    if (nextProfile.journeyStartReadyIds.includes(journey.id)) continue
+    nextProfile = {
+      ...nextProfile,
+      journeyStartReadyIds: uniqueStrings([...nextProfile.journeyStartReadyIds, journey.id]),
+    }
+    newlyStartReadyJourneyIds.push(journey.id)
+    changed = true
+  }
+
+  // Pass 2: advance steps for every journey that is both not-yet-complete and
+  // start-ready.
   for (const journey of JOURNEY_DEFINITIONS) {
     if (isJourneyComplete(nextProfile, journey.id)) continue
+    if (!isJourneyStartReady(nextProfile, journey)) continue
 
     const completedStepIds = new Set(getCompletedStepIds(nextProfile, journey.id))
     const matchingSteps = journey.steps.filter((step) => step.trigger === trigger)
@@ -311,12 +356,15 @@ export function applyJourneyTrigger(
     changed,
     completedJourneyIds,
     unlockedFeatureIds: uniqueStrings(unlockedFeatureIds) as JourneyFeatureId[],
+    newlyStartReadyJourneyIds,
   }
 }
 
 /** Build the HUD tracker payload for the first incomplete journey, if any remain. */
 export function buildActiveJourneyTracker(profile: PlayerProfile): JourneyTrackerState | null {
-  const activeJourney = JOURNEY_DEFINITIONS.find((journey) => !isJourneyComplete(profile, journey.id))
+  const activeJourney = JOURNEY_DEFINITIONS.find(
+    (journey) => !isJourneyComplete(profile, journey.id) && isJourneyStartReady(profile, journey),
+  )
   if (!activeJourney) return null
 
   const completedStepIds = new Set(getCompletedStepIds(profile, activeJourney.id))
@@ -348,7 +396,9 @@ export function buildActiveJourneyTracker(profile: PlayerProfile): JourneyTracke
 
 /** Return the next visible step label for the active journey, if one remains. */
 export function getActiveJourneyNextStepLabel(profile: PlayerProfile): string | null {
-  const activeJourney = JOURNEY_DEFINITIONS.find((journey) => !isJourneyComplete(profile, journey.id))
+  const activeJourney = JOURNEY_DEFINITIONS.find(
+    (journey) => !isJourneyComplete(profile, journey.id) && isJourneyStartReady(profile, journey),
+  )
   if (!activeJourney) return null
   const completedStepIds = new Set(getCompletedStepIds(profile, activeJourney.id))
   const nextStep = activeJourney.steps.find((step) => !completedStepIds.has(step.id))
