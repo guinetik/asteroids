@@ -327,15 +327,25 @@ export class AudioManager {
           ? howl.playing(playback.howlPlayId)
           : howl.playing(),
       progress: () => {
-        const id = playback.howlPlayId
-        const dur = id !== undefined ? howl.duration(id) : howl.duration()
-        const pos = id !== undefined ? Number(howl.seek(id)) : Number(howl.seek())
-        return dur > 0 ? pos / dur : 0
+        try {
+          const id = playback.howlPlayId
+          const dur = id !== undefined ? howl.duration(id) : howl.duration()
+          if (!Number.isFinite(dur) || dur <= 0) return 0
+          const pos = id !== undefined ? Number(howl.seek(id)) : Number(howl.seek())
+          return pos / dur
+        } catch {
+          return 0
+        }
       },
-      duration: () =>
-        playback.howlPlayId !== undefined
-          ? howl.duration(playback.howlPlayId)
-          : howl.duration(),
+      duration: () => {
+        try {
+          const id = playback.howlPlayId
+          const d = id !== undefined ? howl.duration(id) : howl.duration()
+          return Number.isFinite(d) && d > 0 ? d : 0
+        } catch {
+          return 0
+        }
+      },
       setVolume: (vol: number) => {
         playback.baseVolumeScale = vol
         const effectiveVol = vol * this.getCategoryVolume(def.category)

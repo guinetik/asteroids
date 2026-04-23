@@ -14,6 +14,7 @@ import { DevConsole } from '@/lib/devConsole'
 import { LanderAudioDirector } from '@/audio/LanderAudioDirector'
 import { FpsAudioDirector } from '@/audio/FpsAudioDirector'
 import { LevelAudioDirector } from '@/audio/LevelAudioDirector'
+import { getAudioDefinition } from '@/audio/audioManifest'
 import type { AudioPlaybackHandle } from '@/audio/audioTypes'
 import { useAudio } from '@/audio/useAudio'
 import { GameLoop } from '@/lib/GameLoop'
@@ -49,6 +50,7 @@ import type { LanderTelemetry } from '@/components/LanderHud.vue'
 import type { FpsTelemetry, CompassObjective } from '@/components/FpsHud.vue'
 import { headingRadToCompassDeg, worldBearingDegTo, signedRelativeBearingDeg } from '@/lib/math/bearing'
 import { ProjectileSystem } from '@/lib/fps/projectileSystem'
+import type { ProjectileImpactContext } from '@/lib/fps/projectileSystem'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
 import { RockTargetIndicator } from '@/three/RockTargetIndicator'
 import { createLevelStateMachine, LANDER_INTERACT_RANGE, EXFIL_PROXIMITY_RANGE } from '@/lib/level/levelStateMachine'
@@ -90,7 +92,9 @@ import { addItem } from '@/lib/inventory/inventory'
 import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
 import { loadProfile, saveProfile } from '@/lib/player/profile'
 import { getItemDefinition } from '@/lib/inventory/catalog'
+import { worldPointToHearing } from '@/lib/audio/worldHearing'
 import { GatherMinigame } from '@/lib/minigame/GatherMinigame'
+import { Timer, type TimerHandle } from '@/lib/Timer'
 
 // ── Scene constants ─────────────────────────────────────────────
 const TERRAIN_RESOLUTION = 512
@@ -122,6 +126,14 @@ const CONTACT_KNOCKBACK = 26
 const DAMAGE_FLASH_DURATION = 0.3
 /** Seconds a mining-hit sizzle should linger after the latest valid rock hit. */
 const MINING_SIZZLE_KEEPALIVE_SECONDS = 0.18
+/**
+ * One-shot LAS/drill ground sizzle length (seconds) — short so it does not outlast the
+ * impact spark burst; intentionally not tied to full MP3 decode length.
+ */
+const SIZZLE_IMPACT_DURATION_SEC = 0.1
+/** Distance falloff for sizzle at impact: larger = softer with range. */
+const SIZZLE_SPATIAL_REF_DISTANCE = 10
+const SIZZLE_SPATIAL_MIN_VOLUME = 0.12
 
 /**
  * Strength of the random pitch/yaw camera flinch applied on every hit. Tuned
@@ -436,6 +448,8 @@ export class LevelViewController implements Tickable {
   private miningSizzleHandle: AudioPlaybackHandle | null = null
   /** Time threshold after which the mining-contact bed should stop. */
   private miningSizzleKeepAliveUntil = 0
+  /** {@link Timer.after} handle that stops `sfx.sizzle.impact`; cleared on dispose / new impact. */
+  private sizzleImpactTimerHandle: TimerHandle | null = null
 
   // ── Arrival ──────────────────────────────────────────────────
   private arrivalSequence: ArrivalSequence | null = null
@@ -859,11 +873,12 @@ export class LevelViewController implements Tickable {
     // active. Hidden by default; visibility toggled in `tickEva`.
     this.rockTargetIndicator = new RockTargetIndicator()
     this.sceneManager.addToScene(this.rockTargetIndicator.sprite)
-    this.projectileSystem.onImpact = (pos) => {
+    this.projectileSystem.onImpact = (pos, context) => {
       for (let i = 0; i < 8; i++) {
         this._impactVel.copy(this._impactUp).multiplyScalar(5)
         this.impactEmitter!.emit(pos, this._impactVel)
       }
+      this.maybePlayShortSurfaceSizzle(context, pos)
     }
     this.projectileSystem.onEnemyHit = (enemy, pos) => {
       // Fan the hit out to whichever minigame owns this enemy so the matching
@@ -2635,6 +2650,64 @@ export class LevelViewController implements Tickable {
     this.miningSizzleHandle = audio.play('sfx.sizzle', { loop: true })
   }
 
+  /**
+   * One-shot sizzle for LAS on terrain/rock and drill on terrain only. Uses `sfx.sizzle.impact`
+   * (not the looping `sfx.sizzle`) and {@link worldPointToHearing} for pan + distance.
+   *
+   * @param context - Impact classification from `ProjectileSystem`.
+   * @param impactWorld - **Transient** hit point in world space (copy before any async if needed).
+   */
+  private maybePlayShortSurfaceSizzle(
+    context: ProjectileImpactContext,
+    impactWorld: Vector3,
+  ): void {
+    if (context.boltKind === 'heal') return
+    if (context.kind === 'enemy' || context.kind === 'hostage') return
+    if (context.boltKind === 'drill' && context.kind === 'drill_rock') return
+    const isLasSurface =
+      context.boltKind === 'weapon' && (context.kind === 'terrain' || context.kind === 'weapon_rock')
+    const isDrillGround = context.boltKind === 'drill' && context.kind === 'terrain'
+    if (!isLasSurface && !isDrillGround) return
+    this.playShortSurfaceSizzle(impactWorld)
+  }
+
+  /** Cancels the pending `sfx.sizzle.impact` stop from {@link playShortSurfaceSizzle}. */
+  private cancelSizzleImpactTimer(): void {
+    if (this.sizzleImpactTimerHandle === null) return
+    Timer.cancel(this.sizzleImpactTimerHandle)
+    this.sizzleImpactTimerHandle = null
+  }
+
+  /**
+   * Plays a brief `sfx.sizzle.impact` at `impactWorld` with stereo + distance, stopped after
+   * {@link SIZZLE_IMPACT_DURATION_SEC} via {@link Timer.after}.
+   *
+   * @param impactWorld - World-space contact point.
+   */
+  private playShortSurfaceSizzle(impactWorld: Vector3): void {
+    this.cancelSizzleImpactTimer()
+    const audio = useAudio()
+    audio.unlock()
+    const def = getAudioDefinition('sfx.sizzle.impact')
+    const camera = this.fpsCamera?.camera
+    let vol = def.volume
+    let pan = 0
+    if (camera) {
+      const w = worldPointToHearing(camera, impactWorld, {
+        refDistance: SIZZLE_SPATIAL_REF_DISTANCE,
+        minVolumeScale: SIZZLE_SPATIAL_MIN_VOLUME,
+      })
+      vol = def.volume * w.volumeScale
+      pan = w.pan
+    }
+    const h = audio.play('sfx.sizzle.impact', { loop: false, volume: vol })
+    h.setStereo(pan)
+    this.sizzleImpactTimerHandle = Timer.after(SIZZLE_IMPACT_DURATION_SEC, () => {
+      this.sizzleImpactTimerHandle = null
+      h.stop()
+    })
+  }
+
   /** Stop and forget the looping mining-contact sizzle. */
   private stopMiningSizzle(): void {
     this.miningSizzleHandle?.stop()
@@ -2671,6 +2744,7 @@ export class LevelViewController implements Tickable {
     this.fpsAudio.dispose()
     this.levelAudio.dispose()
     this.stopMiningSizzle()
+    this.cancelSizzleImpactTimer()
     this.teardownPointerLock()
     this.clearCollisionRegistrations()
     this.clearSurfaceRockCollisionRegistrations()

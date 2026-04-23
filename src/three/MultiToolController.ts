@@ -14,7 +14,9 @@ import type { Tickable } from '@/lib/Tickable'
 import type { AudioPlaybackHandle } from '@/audio/audioTypes'
 import { loadGLB } from './loadGLB'
 import partsJson from '@/data/multitool/identified-parts.json'
+import { getAudioDefinition } from '@/audio/audioManifest'
 import { useAudio } from '@/audio/useAudio'
+import { worldPointToHearing } from '@/lib/audio/worldHearing'
 
 const MODEL_PATH = '/models/multitool.glb'
 
@@ -233,9 +235,21 @@ export class MultiToolController implements Tickable {
           this.drillLoop = audio.play('sfx.laserPulse', { loop: true })
         }
         break
-      case 'weapon':
-        audio.play('sfx.laserFire')
+      case 'weapon': {
+        const muzzle = this.getMuzzleWorldPosition(new THREE.Vector3())
+        if (this.camera) {
+          const w = worldPointToHearing(this.camera, muzzle, {
+            refDistance: 50,
+            minVolumeScale: 0.88,
+          })
+          const def = getAudioDefinition('sfx.impact.gun')
+          const h = audio.play('sfx.impact.gun', { volume: def.volume * w.volumeScale })
+          h.setStereo(w.pan)
+        } else {
+          audio.play('sfx.impact.gun')
+        }
         break
+      }
       case 'heal':
         audio.play('sfx.tool.heal')
         break

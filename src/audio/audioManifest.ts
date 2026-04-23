@@ -49,6 +49,7 @@ export const AUDIO_SOUND_IDS = [
   'sfx.fuelWarning',
   'sfx.laserPulse',
   'sfx.sizzle',
+  'sfx.sizzle.impact',
   'sfx.rock.melt',
   'sfx.heartbeat',
   'sfx.flatline',
@@ -93,6 +94,7 @@ export const AUDIO_SOUND_IDS = [
   'sfx.dockingClamp',
   // SFX — combat / EVA
   'sfx.tool.drill',
+  'sfx.impact.gun',
   'sfx.laserFire',
   'sfx.tool.heal',
   'sfx.projectileHit',
@@ -366,7 +368,18 @@ const manifestById: ManifestById = {
     src: '/sound/sfx.sizzle.mp3',
     category: 'sfx',
     load: 'lazy',
-    playback: 'single-instance',
+    // Overlap: layer contact one-shots with the continuous mining sizzle.
+    playback: 'overlap',
+    volume: 0.45,
+    effect: 'none',
+  },
+  /** Same asset as `sfx.sizzle`; `overlap` so contact one-shots do not stop the mining loop. */
+  'sfx.sizzle.impact': {
+    id: 'sfx.sizzle.impact',
+    src: '/sound/sfx.sizzle.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'overlap',
     volume: 0.45,
     effect: 'none',
   },
@@ -766,6 +779,15 @@ const manifestById: ManifestById = {
     volume: 0.55,
     effect: 'none',
     procedural: 'tool-drill',
+  },
+  'sfx.impact.gun': {
+    id: 'sfx.impact.gun',
+    src: '/sound/sfx.impact.gun.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'overlap',
+    volume: 0.55,
+    effect: 'none',
   },
   'sfx.laserFire': {
     id: 'sfx.laserFire',

@@ -3,9 +3,10 @@
  *
  * Pure game logic — owns projectile state and Three.js meshes. Checks
  * terrain collision via heightmap each frame. Calls onImpact when a
- * projectile hits terrain so the ViewController can spawn particles.
- * Combat bolts pick the **nearest** hit along each step among enemies; **weapon**
- * (LAS) bolts also target hostages (friendly fire). **Drill** does not damage hostages.
+ * projectile hits terrain (or a mineable rock for LAS) so the ViewController
+ * can spawn particles. Combat bolts pick the **nearest** hit along each step
+ * among enemies; **weapon** (LAS) bolts also target hostages (friendly fire)
+ * and stop on registered rocks without mining. **Drill** does not damage hostages.
  *
  * @author guinetik
  * @date 2026-04-04
@@ -35,6 +36,22 @@ const BOLT_DAMAGE = 25
 
 /** HP restored when a med bolt hits a hostage. */
 const HEAL_BOLT_AMOUNT = 25
+
+/**
+ * What surface or body a bolt struck when {@link ProjectileSystem.onImpact} runs.
+ * Used for VFX and contact SFX; drill mining uses {@link ProjectileSystem.onRockHit} in addition
+ * for `drill_rock`.
+ */
+export type ProjectileImpactKind = 'terrain' | 'drill_rock' | 'weapon_rock' | 'enemy' | 'hostage'
+
+/**
+ * Carried with {@link ProjectileSystem.onImpact} so listeners can style feedback per mode/surface
+ * (e.g. short sizzle on terrain vs looping sizzle on drilled rock).
+ */
+export interface ProjectileImpactContext {
+  boltKind: MultiToolMode
+  kind: ProjectileImpactKind
+}
 
 /** Sphere registration for a mineable surface rock. */
 export interface MineableRockEntry {
@@ -82,12 +99,16 @@ export class ProjectileSystem implements Tickable {
   })()
 
   /**
-   * Called when a projectile hits terrain.
+   * Called when a projectile hits a solid (terrain, rock, enemy, or hostage).
    *
    * @param position - **Transient** impact point. Mutated on the next callback;
    *   copy if you need to keep it past the synchronous handler body.
+   * @param context - Which tool mode and surface/body; see {@link ProjectileImpactContext}.
    */
-  onImpact: ((position: THREE.Vector3) => void) | null = null
+  onImpact: ((
+    position: THREE.Vector3,
+    context: ProjectileImpactContext,
+  ) => void) | null = null
   /**
    * Called when a projectile hits an enemy.
    *
@@ -284,6 +305,8 @@ export class ProjectileSystem implements Tickable {
       let hitEnemy = false
       let hitHostage = false
       let hitRock = false
+      /** True when a LAS bolt hits a registered rock surface (VFX only; no mining). */
+      let hitWeaponRock = false
 
       if (p.boltKind === 'heal') {
         const healHit = this.closestHostageHealHit(this._prevPos, pos)
@@ -317,6 +340,16 @@ export class ProjectileSystem implements Tickable {
             hitRock = true
           }
         }
+
+        // Weapon bolts: rocks are solid for impact VFX (same spark burst as
+        // terrain) but do not mine — `onRockHit` is drill-only.
+        if (!hitEnemy && !hitHostage && !hitRock && p.boltKind === 'weapon') {
+          const rockHit = this.closestRockHit(this._prevPos, pos)
+          if (rockHit) {
+            this._callbackPos.lerpVectors(this._prevPos, pos, rockHit.t)
+            hitWeaponRock = true
+          }
+        }
       }
 
       // Terrain collision
@@ -324,10 +357,24 @@ export class ProjectileSystem implements Tickable {
       const hitTerrain = pos.y <= floorY + TERRAIN_HIT_MARGIN
 
       // Remove on hit or timeout
-      if (hitEnemy || hitHostage || hitRock || hitTerrain || p.age >= BOLT_MAX_LIFETIME) {
-        if (hitTerrain || hitEnemy || hitHostage || hitRock) {
-          this._callbackPos.copy(pos)
-          this.onImpact?.(this._callbackPos)
+      if (hitEnemy || hitHostage || hitRock || hitWeaponRock || hitTerrain || p.age >= BOLT_MAX_LIFETIME) {
+        if (hitTerrain || hitEnemy || hitHostage || hitRock || hitWeaponRock) {
+          if (!hitWeaponRock) {
+            this._callbackPos.copy(pos)
+          }
+          let kind: ProjectileImpactKind
+          if (hitEnemy) {
+            kind = 'enemy'
+          } else if (hitHostage) {
+            kind = 'hostage'
+          } else if (hitWeaponRock) {
+            kind = 'weapon_rock'
+          } else if (hitRock) {
+            kind = 'drill_rock'
+          } else {
+            kind = 'terrain'
+          }
+          this.onImpact?.(this._callbackPos, { boltKind: p.boltKind, kind })
         }
         this.removeProjectile(i)
       }
