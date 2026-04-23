@@ -25,6 +25,7 @@ import { ORBIT_SCALE, SIZE_SCALE } from '@/lib/planets/constants'
 import { generateFlatZones } from '@/lib/terrain/terrainGenerator'
 import difficultyMap from '@/data/asteroids/difficulty-map.json'
 import shipHealthData from '@/data/shuttle/ship-health.json'
+import hostGiverOverridesData from '@/data/missions/host-giver-overrides.json'
 import { MIN_ASTEROID_MISSION_REWARD } from './missionEconomy'
 
 /** Simple string hash to derive a numeric seed. */
@@ -534,6 +535,56 @@ export function generateWaypointInRegion(
 }
 
 /**
+ * Stations whose mission boards are restricted to exterminate / rescue (combat & SAR) work.
+ * Adding a planet here makes that planet's asteroid board reject mining / survey templates,
+ * regardless of difficulty band — used for narrative-tagged worlds whose flavor would clash
+ * with generic hauler contracts (Saturn = hazard cleanup; Mercury = Cinderline territory,
+ * viroid hunting).
+ */
+const COMBAT_ONLY_HOST_PLANET_IDS: ReadonlySet<string> = new Set(['saturn', 'mercury'])
+
+/**
+ * Whether the host planet only posts exterminate / rescue contracts on its asteroid board.
+ *
+ * @param planetId - Host planet identifier.
+ * @returns `true` when the board should hide gather/survey templates entirely.
+ */
+function isCombatOnlyHostPlanet(planetId: string): boolean {
+  return COMBAT_ONLY_HOST_PLANET_IDS.has(planetId)
+}
+
+/**
+ * Per-host re-attribution for asteroid contracts. When a planet is listed here, every mission
+ * drafted at that station is re-stamped with the override `giverId` / `giverName` so the board
+ * UI and downstream contract filters see the local order rather than the underlying template
+ * source (e.g. Mercury's combat work is signed by The Cinderline at The Anvil, even though the
+ * mechanical template still comes from Colonial Guard).
+ */
+interface HostGiverOverride {
+  /** Host planet id whose mission board this override applies to. */
+  planetId: string
+  /** Replacement stable id used for `giverId` propagation (contract filters, telemetry). */
+  giverId: string
+  /** Replacement display name shown on the mission board's "From: ..." line. */
+  giverName: string
+}
+
+const HOST_GIVER_OVERRIDES: ReadonlyMap<string, HostGiverOverride> = new Map(
+  (hostGiverOverridesData as HostGiverOverride[]).map((entry) => [entry.planetId, entry]),
+)
+
+/**
+ * Resolve the giver attribution for a mission drafted at the given host. Returns the host
+ * override when one exists; otherwise the underlying template's giver is used as-is.
+ *
+ * @param planetId - Host planet identifier.
+ * @returns Host-side override, or `undefined` when the host has no re-attribution rule.
+ */
+function getHostGiverOverride(planetId: string): HostGiverOverride | undefined {
+  return HOST_GIVER_OVERRIDES.get(planetId)
+}
+
+/**
  * Generate a complete asteroid mission at a given difficulty.
  *
  * @param difficulty - Mission difficulty (1-10).
@@ -548,13 +599,13 @@ export function generateAsteroidMission(
   rand: () => number = Math.random,
 ): GeneratedAsteroidMission {
   const anchor = host ?? syntheticEarthHostAnchor()
-  const saturnHost = anchor.planetId === 'saturn'
+  const combatOnlyHost = isCombatOnlyHostPlanet(anchor.planetId)
   /**
-   * Saturn only posts hazard / SAR contracts (no mining or survey). Use the full giver
-   * catalog so Colonial Guard and Frontier Rescue are not squeezed out by low-tier miners
-   * at the same difficulty band.
+   * Combat-only hosts use the full giver catalog so Colonial Guard / Frontier Rescue are not
+   * squeezed out by low-tier miners and surveyors that share the same difficulty band; the
+   * subsequent template loop drops anything that is not exterminate/rescue.
    */
-  const givers = saturnHost ? MISSION_GIVERS : getGiversForDifficulty(difficulty)
+  const givers = combatOnlyHost ? MISSION_GIVERS : getGiversForDifficulty(difficulty)
   if (givers.length === 0) {
     throw new Error(`No givers available for difficulty ${difficulty}`)
   }
@@ -567,7 +618,7 @@ export function generateAsteroidMission(
 
   for (const giver of givers) {
     for (const template of giver.missions) {
-      if (saturnHost && !isExterminateOrRescueOnlyTemplate(template)) continue
+      if (combatOnlyHost && !isExterminateOrRescueOnlyTemplate(template)) continue
       const region = findRegionForTemplate(template, difficulty)
       if (region) {
         candidates.push({ giver, template, region })
@@ -576,10 +627,8 @@ export function generateAsteroidMission(
   }
 
   if (candidates.length === 0) {
-    throw new Error(
-      `No templates match difficulty ${difficulty}` +
-        (saturnHost ? ' for Saturn (exterminate/rescue only)' : ''),
-    )
+    const planetSuffix = combatOnlyHost ? ` for ${anchor.planetId} (exterminate/rescue only)` : ''
+    throw new Error(`No templates match difficulty ${difficulty}${planetSuffix}`)
   }
 
   let pool = candidates
@@ -617,13 +666,14 @@ export function generateAsteroidMission(
   )
 
   const asteroidId = pickAsteroidForDifficulty(difficulty)
+  const hostGiverOverride = getHostGiverOverride(anchor.planetId)
 
   return {
     kind: 'standard',
     id: missionId,
     asteroidId,
-    giverId: pick.giver.id,
-    giverName: pick.giver.name,
+    giverId: hostGiverOverride?.giverId ?? pick.giver.id,
+    giverName: hostGiverOverride?.giverName ?? pick.giver.name,
     templateId: pick.template.id,
     name: pick.template.name,
     briefing: pick.template.briefing,

@@ -326,10 +326,62 @@ describe('generateAsteroidMission', () => {
     }
   })
 
-  it('throws when Saturn has no exterminate/rescue template for mission difficulty', () => {
+  it('Saturn host posts a combat contract from difficulty 1 once Colonial Guard covers the band', () => {
     const saturn = getPlanet('saturn')
     const hostR = saturn.orbit.semiMajorAxis * ORBIT_SCALE
     const host = { planetId: 'saturn' as const, worldX: hostR, worldZ: 0 }
-    expect(() => generateAsteroidMission(1, host)).toThrow(/Saturn/)
+    const mission = generateAsteroidMission(1, host)
+    expect(mission.originPlanetId).toBe('saturn')
+    for (const obj of mission.objectives) {
+      expect(obj.type === 'exterminate' || obj.type === 'rescue').toBe(true)
+    }
+  })
+
+  it('Mercury host only offers exterminate or rescue asteroid objectives', () => {
+    const mercury = getPlanet('mercury')
+    const hostR = mercury.orbit.semiMajorAxis * ORBIT_SCALE
+    const host = { planetId: 'mercury' as const, worldX: hostR, worldZ: 0 }
+    for (let d = 1; d <= 10; d++) {
+      for (let i = 0; i < 24; i++) {
+        const mission = generateAsteroidMission(d, host)
+        expect(mission.originPlanetId).toBe('mercury')
+        for (const obj of mission.objectives) {
+          expect(obj.type === 'exterminate' || obj.type === 'rescue').toBe(true)
+        }
+      }
+    }
+  })
+
+  it('Mercury host posts a combat contract from difficulty 1 (Cinderline narrative requirement)', () => {
+    const mercury = getPlanet('mercury')
+    const hostR = mercury.orbit.semiMajorAxis * ORBIT_SCALE
+    const host = { planetId: 'mercury' as const, worldX: hostR, worldZ: 0 }
+    const mission = generateAsteroidMission(1, host)
+    expect(mission.originPlanetId).toBe('mercury')
+    for (const obj of mission.objectives) {
+      expect(obj.type === 'exterminate' || obj.type === 'rescue').toBe(true)
+    }
+  })
+
+  it('Mercury host re-attributes the asteroid contract to The Cinderline', () => {
+    const mercury = getPlanet('mercury')
+    const hostR = mercury.orbit.semiMajorAxis * ORBIT_SCALE
+    const host = { planetId: 'mercury' as const, worldX: hostR, worldZ: 0 }
+    for (let d = 1; d <= 10; d++) {
+      for (let i = 0; i < 12; i++) {
+        const mission = generateAsteroidMission(d, host)
+        expect(mission.giverId).toBe('cinderline')
+        expect(mission.giverName).toBe('The Cinderline')
+      }
+    }
+  })
+
+  it('non-overridden hosts keep the underlying template giver attribution', () => {
+    const earth = getPlanet('earth')
+    const hostR = earth.orbit.semiMajorAxis * ORBIT_SCALE
+    const host = { planetId: 'earth' as const, worldX: hostR, worldZ: 0 }
+    const mission = generateAsteroidMission(3, host)
+    expect(mission.giverId).not.toBe('cinderline')
+    expect(mission.giverName).not.toBe('The Cinderline')
   })
 })
