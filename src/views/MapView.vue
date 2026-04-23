@@ -879,6 +879,9 @@ onMounted(async () => {
       viewController.refreshPlayerProfileFromStorage()
       hydratePlayerUpgradeLevelsFromStorage()
       syncPersistentProgressFromController()
+      // Contract progress can enqueue new brief/step/completion messages
+      // — refresh so the cyan pill + notifyContractUpdate fire on arrival.
+      refreshActiveMessage()
     })
     await viewController.init(container.value)
     unsubscribeContractShuttleUpgrade = onContractShuttleUpgradeGranted((payload) => {
@@ -1400,7 +1403,8 @@ watch(
       !mapIntro.controlsLocked &&
       !earthStartupOrbitHudSuppressed &&
       contractNoticePill &&
-      activeContractMessage
+      activeContractMessage &&
+      activeContractMessage.status === 'pending'
     "
     :label="contractNoticePill"
     @click="openContractMessage"
