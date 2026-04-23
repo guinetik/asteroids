@@ -20,7 +20,7 @@ const HOVER_VOLUME = 0.18
 /** Volume for nav-item click using the hover sound (louder than passive hover). */
 const NAV_CLICK_VOLUME = 0.35
 /** Volume for confirm / accept actions. */
-const CONFIRM_VOLUME = 0.45
+const CONFIRM_VOLUME = 0.65
 /** Volume for cancel / dismiss actions (softer than confirm). */
 const CANCEL_VOLUME = 0.3
 /** Volume for error / blocked actions. */
@@ -48,7 +48,7 @@ const LASER_VOLUME = 0.5
 /** Volume for upgrade installation fanfare. */
 const UPGRADE_INSTALL_VOLUME = 0.7
 /** Volume for shuttle control program tab click. */
-const SHUTTLE_PROGRAM_CLICK_VOLUME = 0.4
+const SHUTTLE_PROGRAM_CLICK_VOLUME = 0.6
 
 /**
  * Audio orchestrator for UI events. Single-instance for the app lifetime;
