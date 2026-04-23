@@ -922,11 +922,10 @@ body {
 .map-contract-notice__button {
   @apply inline-flex h-10 items-center rounded-full border px-4 font-mono text-[10px] font-semibold
          uppercase tracking-[0.22em] transition-colors sm:text-xs;
-  border-color: rgba(106, 232, 196, 0.5);
+  border-color: rgba(106, 232, 196, 0.55);
   background: rgba(2, 6, 23, 0.82);
   color: #6ae8c4;
   box-shadow:
-    inset 3px 0 0 #6ae8c4,
     0 0 18px rgba(106, 232, 196, 0.25),
     0 10px 24px rgba(2, 6, 23, 0.35);
   animation: map-contract-notice-pulse 2.2s ease-in-out infinite;
@@ -935,8 +934,8 @@ body {
 .map-contract-notice__button:hover {
   background: rgba(106, 232, 196, 0.18);
   color: #ffffff;
+  border-color: rgba(106, 232, 196, 0.75);
   box-shadow:
-    inset 3px 0 0 #6ae8c4,
     0 0 24px rgba(106, 232, 196, 0.45),
     0 10px 24px rgba(2, 6, 23, 0.35);
 }
@@ -944,13 +943,11 @@ body {
 @keyframes map-contract-notice-pulse {
   0%, 100% {
     box-shadow:
-      inset 3px 0 0 #6ae8c4,
       0 0 18px rgba(106, 232, 196, 0.25),
       0 10px 24px rgba(2, 6, 23, 0.35);
   }
   50% {
     box-shadow:
-      inset 3px 0 0 #6ae8c4,
       0 0 28px rgba(106, 232, 196, 0.5),
       0 10px 24px rgba(2, 6, 23, 0.35);
   }
