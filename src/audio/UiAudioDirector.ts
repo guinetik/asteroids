@@ -51,6 +51,10 @@ const UPGRADE_INSTALL_VOLUME = 0.7
 const SHUTTLE_PROGRAM_CLICK_VOLUME = 0.6
 /** Volume for knob / dial rotation cue. */
 const KNOB_VOLUME = 0.45
+/** Volume for inbox message arrival ping. */
+const INBOX_VOLUME = 0.7
+/** Volume for contract-update arrival ping (paired with {@link INBOX_VOLUME} — distinct channel, same level by default). */
+const CONTRACT_VOLUME = 0.7
 
 /**
  * Audio orchestrator for UI events. Single-instance for the app lifetime;
@@ -193,7 +197,7 @@ export class UiAudioDirector {
    * A new ship message arrived and the inbox notification is shown.
    */
   notifyInboxMessage(): void {
-    this.audio.play('sfx.inbox', { volume: 0.7 })
+    this.audio.play('sfx.inbox', { volume: INBOX_VOLUME })
   }
 
   /**
@@ -201,7 +205,7 @@ export class UiAudioDirector {
    * inbox ping so players instantly recognise a contract update on the /map.
    */
   notifyContractUpdate(): void {
-    this.audio.play('sfx.contract', { volume: 0.7 })
+    this.audio.play('sfx.contract', { volume: CONTRACT_VOLUME })
   }
 
   /**
