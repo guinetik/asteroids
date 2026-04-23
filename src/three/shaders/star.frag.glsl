@@ -176,49 +176,47 @@ void main() {
 
     float tempBlend = smoothstep(5000.0, 7500.0, uTemperature);
 
-    vec3 hotColor     = baseColor * vec3(1.6, 1.35, 1.2);
-    vec3 coolColor    = mix(baseColor * vec3(0.5, 0.3, 0.2),  baseColor * vec3(0.7, 0.8, 0.95), tempBlend);
-    vec3 warmColor    = mix(baseColor * vec3(1.2, 1.0, 0.85), baseColor * vec3(1.0, 1.05, 1.2),  tempBlend);
-    vec3 blazingColor = mix(baseColor * vec3(2.0, 1.6, 1.3),  baseColor * vec3(1.4, 1.5, 1.8),   tempBlend);
+    vec3 hotColor     = baseColor * vec3(1.3, 1.15, 1.0);
+    vec3 coolColor    = mix(baseColor * vec3(0.45, 0.28, 0.18), baseColor * vec3(0.65, 0.75, 0.9),  tempBlend);
+    vec3 warmColor    = mix(baseColor * vec3(1.0, 0.85, 0.7),   baseColor * vec3(0.9, 0.95, 1.1),   tempBlend);
+    vec3 blazingColor = mix(baseColor * vec3(1.5, 1.3, 1.05),   baseColor * vec3(1.2, 1.3, 1.55),   tempBlend);
 
     vec3 surfaceColor;
     if (totalIntensity < 0.35) {
         surfaceColor = mix(coolColor, warmColor, totalIntensity / 0.35);
     } else if (totalIntensity < 0.65) {
         surfaceColor = mix(warmColor, hotColor, (totalIntensity - 0.35) / 0.3);
-    } else if (totalIntensity < 1.0) {
-        surfaceColor = mix(hotColor, blazingColor, (totalIntensity - 0.65) / 0.35);
     } else {
-        surfaceColor = blazingColor * (1.0 + (totalIntensity - 1.0) * 0.8);
+        surfaceColor = mix(hotColor, blazingColor, clamp((totalIntensity - 0.65) / 0.35, 0.0, 1.0));
     }
 
     // Bubble highlights
     float bubbleHighlight = pow(bubbles, 1.5) * turbIntensity;
-    surfaceColor += blazingColor * bubbleHighlight * 0.6;
+    surfaceColor += blazingColor * bubbleHighlight * 0.25;
 
     // --- Limb darkening ---
-    surfaceColor *= 0.75 + limbDarkening * 0.25;
+    surfaceColor *= 0.7 + limbDarkening * 0.3;
 
     // --- Organic rim glow ---
     float rimAngle    = atan(vModelNormal.y, vModelNormal.x) + selfRotation;
     float rimNoise    = noise3D(vec3(rimAngle * 3.0, edgeDist * 2.0, time * 0.2)) * 0.5 + 0.5;
     float rimIntensity = pow(edgeDist, 2.0) * (0.4 + rimNoise * 0.6);
-    vec3  rimColor    = baseColor * vec3(1.3, 0.95, 0.6);
-    surfaceColor += rimColor * rimIntensity * 0.6 * uActivityLevel;
+    vec3  rimColor    = baseColor * vec3(1.15, 0.85, 0.55);
+    surfaceColor += rimColor * rimIntensity * 0.3 * uActivityLevel;
 
     // --- Edge glow (corona bleeding) ---
-    float edgeGlow = pow(edgeDist, 0.5) * 0.3 * uActivityLevel;
+    float edgeGlow = pow(edgeDist, 0.6) * 0.12 * uActivityLevel;
     surfaceColor += warmColor * edgeGlow;
 
     // --- Center boost ---
-    float centerBoost = pow(viewAngle, 1.5) * 0.2;
+    float centerBoost = pow(viewAngle, 1.5) * 0.08;
     surfaceColor += baseColor * centerBoost;
 
     // --- Shimmer ---
-    float shimmer = sin(turbIntensity * 10.0 + time * 3.0) * 0.05 + 1.0;
+    float shimmer = sin(turbIntensity * 10.0 + time * 3.0) * 0.04 + 1.0;
     surfaceColor *= shimmer;
 
-    surfaceColor = clamp(surfaceColor, 0.0, 3.5);
+    surfaceColor = clamp(surfaceColor, 0.0, 1.5);
 
     gl_FragColor = vec4(surfaceColor, 1.0);
 }

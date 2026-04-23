@@ -9,6 +9,8 @@ import * as THREE from 'three'
 import vertSrc from '@/three/shaders/sphere.vert.glsl?raw'
 import commonSrc from '@/three/shaders/common.glsl?raw'
 import starFragSrc from '@/three/shaders/star.frag.glsl?raw'
+import coronaVertSrc from '@/three/shaders/corona.vert.glsl?raw'
+import coronaFragSrc from '@/three/shaders/corona.frag.glsl?raw'
 import type { SunData } from '@/lib/planets/types'
 import { SPHERE_SEGMENTS, SIZE_SCALE } from '@/lib/planets/constants'
 
@@ -21,42 +23,30 @@ const SUN_LIGHT_DECAY = 1.2
 /** Range of the sun's point light (0 = infinite). */
 const SUN_LIGHT_RANGE = 0
 
-/** Scale multiplier for the corona sprite relative to sun radius. */
-const CORONA_SCALE = 6
+/** Half-size (in sun radii) of the corona billboard quad. Diameter = 2 * this. */
+const CORONA_HALF_EXTENT_RADII = 4
 
-/** Resolution of the corona gradient texture. */
-const CORONA_TEXTURE_SIZE = 256
+/** Inner (core) tint for the corona shader. */
+const CORONA_CORE_COLOR: readonly [number, number, number] = [1.0, 0.94, 0.78]
+
+/** Outer (edge) tint for the corona shader. */
+const CORONA_EDGE_COLOR: readonly [number, number, number] = [1.0, 0.5, 0.2]
+
+/** Overall corona brightness multiplier. */
+const CORONA_INTENSITY = 0.55
 
 /** Return value from createSunMesh. */
 export interface SunMeshResult {
-  /** Group containing the star mesh, light, and corona sprite. */
+  /** Group containing the star mesh, light, and corona billboard. */
   group: THREE.Group
   /** The star mesh (for rotation). */
   mesh: THREE.Mesh
   /** The point light (for reference by other controllers). */
   light: THREE.PointLight
-  /** Shader uniforms for per-frame updates. */
+  /** Shader uniforms for per-frame updates on the star surface. */
   uniforms: Record<string, THREE.IUniform>
-  /** Corona texture (for disposal). */
-  coronaTexture: THREE.CanvasTexture
-}
-
-/** Create a radial gradient canvas texture for the corona sprite. */
-function createCoronaTexture(): THREE.CanvasTexture {
-  const size = CORONA_TEXTURE_SIZE
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')!
-  const half = size / 2
-  const gradient = ctx.createRadialGradient(half, half, 0, half, half, half)
-  gradient.addColorStop(0, 'rgba(255, 240, 200, 0.6)')
-  gradient.addColorStop(0.15, 'rgba(255, 200, 100, 0.3)')
-  gradient.addColorStop(0.4, 'rgba(255, 160, 60, 0.08)')
-  gradient.addColorStop(1, 'rgba(255, 120, 40, 0)')
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, 0, size, size)
-  return new THREE.CanvasTexture(canvas)
+  /** Corona shader uniforms (for per-frame time updates). */
+  coronaUniforms: Record<string, THREE.IUniform>
 }
 
 /**
@@ -91,20 +81,31 @@ export function createSunMesh(sunData: SunData): SunMeshResult {
   light.decay = SUN_LIGHT_DECAY
   mesh.add(light)
 
-  // Corona glow sprite
-  const coronaTexture = createCoronaTexture()
-  const coronaMaterial = new THREE.SpriteMaterial({
-    map: coronaTexture,
+  // Procedural corona billboard — plane + shader, camera-facing via vertex shader.
+  const coronaSize = radius * CORONA_HALF_EXTENT_RADII * 2
+  const coronaGeometry = new THREE.PlaneGeometry(coronaSize, coronaSize)
+  const coronaUniforms: Record<string, THREE.IUniform> = {
+    uTime: { value: 0 },
+    uCoreColor: { value: new THREE.Vector3(...CORONA_CORE_COLOR) },
+    uEdgeColor: { value: new THREE.Vector3(...CORONA_EDGE_COLOR) },
+    uActivity: { value: u.uActivityLevel as number },
+    uIntensity: { value: CORONA_INTENSITY },
+  }
+  const coronaMaterial = new THREE.ShaderMaterial({
+    vertexShader: coronaVertSrc,
+    fragmentShader: commonSrc + '\n' + coronaFragSrc,
+    uniforms: coronaUniforms,
     blending: THREE.AdditiveBlending,
     transparent: true,
     depthWrite: false,
   })
-  const corona = new THREE.Sprite(coronaMaterial)
-  corona.scale.setScalar(radius * CORONA_SCALE)
-  mesh.add(corona)
+  const corona = new THREE.Mesh(coronaGeometry, coronaMaterial)
+  // Render before the star so additive blend stacks behind it.
+  corona.renderOrder = -1
 
   const group = new THREE.Group()
+  group.add(corona)
   group.add(mesh)
 
-  return { group, mesh, light, uniforms, coronaTexture }
+  return { group, mesh, light, uniforms, coronaUniforms }
 }

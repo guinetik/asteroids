@@ -15,6 +15,7 @@ const fragmentShadersWithCommon = new Set([
   'gasGiant.frag.glsl',
   'rockyPlanet.frag.glsl',
   'star.frag.glsl',
+  'corona.frag.glsl',
 ])
 
 /**

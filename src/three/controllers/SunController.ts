@@ -52,9 +52,14 @@ export class SunController implements GravitySource {
   tick(dt: number, simTime: number): void {
     const shaderTime = simTime / SHADER_TIME_DIVISOR
 
-    // Update shader time
+    // Update shader time on the star surface
     if (this.sunResult.uniforms.uTime) {
       this.sunResult.uniforms.uTime.value = shaderTime
+    }
+
+    // Update shader time on the corona
+    if (this.sunResult.coronaUniforms.uTime) {
+      this.sunResult.coronaUniforms.uTime.value = shaderTime
     }
 
     // Self-rotation
@@ -75,6 +80,5 @@ export class SunController implements GravitySource {
         }
       }
     })
-    this.sunResult.coronaTexture.dispose()
   }
 }
