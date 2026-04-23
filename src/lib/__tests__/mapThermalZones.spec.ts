@@ -15,6 +15,9 @@ const baseCfg: ShipHealthConfig = {
   maxTempDamage: 4,
   radiationThreshold: 0.3,
   maxRadiationDamage: 15,
+  radiationZone1Boundary: 83,
+  radiationZone2Boundary: 30,
+  radiationZone3Boundary: 15,
   displayThreshold: 20,
   protectedTempCap: 75,
 }

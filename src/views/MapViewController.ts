@@ -17,6 +17,7 @@ import type {
   ShuttleTelemetry,
   GravityWarningState,
   GravitationalAnomalyHudState,
+  RadiationWarningState,
   CompassBearing,
 } from '@/lib/ShuttleTelemetry'
 import { GameLoop } from '@/lib/GameLoop'
@@ -460,6 +461,14 @@ export class MapViewController implements Tickable {
   /** Called each frame with gravity warning state for HUD. */
   onGravityWarning: ((state: GravityWarningState) => void) | null = null
 
+  /**
+   * Called each frame with the resolved radiation exposure state. Drives the
+   * top-of-screen banner and the geiger-counter audio loop. Always invoked
+   * (even when zone is `0`) so the HUD can clear stale visible state when the
+   * ship leaves a band.
+   */
+  onRadiationWarning: ((state: RadiationWarningState) => void) | null = null
+
   /** Nearby synthetic spacetime anomaly — brief HUD toasts on start/finish. */
   onGravitationalAnomalyHud: ((state: GravitationalAnomalyHudState) => void) | null = null
 
@@ -829,6 +838,9 @@ export class MapViewController implements Tickable {
       heatZone3Boundary: rawHealthData.heatZone3Boundary * ORBIT_SCALE,
       coldBoundary: rawHealthData.coldBoundary * ORBIT_SCALE,
       coldZone3Boundary: rawHealthData.coldZone3Boundary * ORBIT_SCALE,
+      radiationZone1Boundary: rawHealthData.radiationZone1Boundary * ORBIT_SCALE,
+      radiationZone2Boundary: rawHealthData.radiationZone2Boundary * ORBIT_SCALE,
+      radiationZone3Boundary: rawHealthData.radiationZone3Boundary * ORBIT_SCALE,
     }
     this.shipHealthConfig = healthConfig
     this.shipHealth = new ShipHealth(healthConfig)
@@ -1696,34 +1708,43 @@ export class MapViewController implements Tickable {
       const px = this.shuttleController.position.x
       const pz = this.shuttleController.position.z
       const sunDist = Math.sqrt(px * px + pz * pz)
-      const radiationProximity = this.sunController
-        ? this.computeProximity(
-            this.sunController.getWorldX(),
-            this.sunController.getWorldZ(),
-            this.sunController.mass,
-            px,
-            pz,
-          )
-        : 0
       const isHealingAtEarth =
         orbitState === 'orbiting' && this.orbitSystem?.target?.name === 'Earth'
       const heatMitigation = getCurrentUpgradeValue('shuttleHeatResistance')
       const coldMitigation = getCurrentUpgradeValue('shuttleFreezeResistance')
+      const radiationLevel = CURRENT_PLAYER_UPGRADE_LEVELS.shuttleRadiationResistance ?? 0
       const { heatCap, coldCap } = this.computeThermalCaps(sunDist)
       this.shipHealth.tick(
         dt,
         sunDist,
-        radiationProximity,
         isHealingAtEarth,
         heatMitigation,
         heatMitigation,
         coldMitigation,
         coldMitigation,
-        getCurrentUpgradeValue('shuttleRadiationResistance'),
+        radiationLevel,
         heatCap,
         coldCap,
       )
       this.shuttleEffects?.setTemperature(this.shipHealth.temperature)
+
+      // Push the post-tick radiation snapshot to the HUD + audio director.
+      // Emitted every frame (even at zone 0) so consumers can clear stale
+      // banners and stop the geiger loop the instant the ship leaves a band.
+      const radZone = this.shipHealth.radiationZone
+      const radDamageActive = this.shipHealth.isTakingRadiationDamage
+      this.onRadiationWarning?.({
+        zone: radZone,
+        damageActive: radDamageActive,
+        visible: radZone > 0,
+      })
+      this.shuttleAudio.tickRadiationTelemetry(radDamageActive)
+    } else {
+      // Either the simulation is frozen, the shuttle is dead, or shipHealth
+      // is missing — clear any latent radiation HUD/audio state so the
+      // overlay doesn't get stuck on while time is paused.
+      this.onRadiationWarning?.({ zone: 0, damageActive: false, visible: false })
+      this.shuttleAudio.tickRadiationTelemetry(false)
     }
 
     // Planet collision — instant death if shuttle flies into a planet mesh

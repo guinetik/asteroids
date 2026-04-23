@@ -365,6 +365,40 @@ body {
   animation: gravity-pulse 0.5s ease-in-out infinite;
 }
 
+.radiation-warning {
+  @apply absolute top-[4.25rem] left-1/2 z-20 -translate-x-1/2 text-center font-mono pointer-events-none;
+  @apply transition-opacity duration-300;
+}
+
+.radiation-warning-caution {
+  @apply text-yellow-300 text-xs opacity-70;
+  text-shadow: 0 0 4px rgba(253, 224, 71, 0.45);
+  animation: radiation-pulse 1.4s ease-in-out infinite;
+}
+
+.radiation-warning-danger {
+  @apply text-amber-400 text-sm font-bold;
+  text-shadow: 0 0 6px rgba(251, 191, 36, 0.7);
+  animation: radiation-pulse 0.85s ease-in-out infinite;
+}
+
+.radiation-warning-critical {
+  @apply text-rose-500 text-base font-bold;
+  text-shadow: 0 0 10px rgba(244, 63, 94, 0.85), 0 0 18px rgba(244, 63, 94, 0.45);
+  animation: radiation-pulse 0.4s ease-in-out infinite;
+  letter-spacing: 0.08em;
+}
+
+@keyframes radiation-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
 .gravitational-anomaly-hud-wrap {
   @apply fixed top-[5.5rem] left-0 right-0 z-20 flex justify-center pointer-events-none;
 }

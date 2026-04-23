@@ -11,6 +11,9 @@
   "maxTempDamage": 4,
   "radiationThreshold": 0.3,
   "maxRadiationDamage": 15,
+  "radiationZone1Boundary": 0.55,
+  "radiationZone2Boundary": 0.35,
+  "radiationZone3Boundary": 0.25,
   "displayThreshold": 20,
   "protectedTempCap": 75
 }

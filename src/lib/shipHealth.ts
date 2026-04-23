@@ -9,9 +9,16 @@
  * the upgrade's protected zone, temperature is hard-capped at `protectedTempCap`
  * and hull damage from temperature is fully suppressed.
  *
+ * Radiation upgrades likewise provide zone-based protection: each successive
+ * boundary closer to the Sun raises the required `shuttleRadiationResistance`
+ * level. A player whose level matches or exceeds the active zone is fully
+ * shielded; one level under takes half damage; two or more levels under takes
+ * full damage. See {@link ShipHealth.tick} and the design spec for the table.
+ *
  * @author guinetik
  * @date 2026-04-06
  * @spec docs/superpowers/specs/2026-04-05-ship-health-temperature-design.md
+ * @spec docs/superpowers/specs/2026-04-23-radiation-zones-design.md
  */
 
 /** Tuning constants loaded from ship-health.json. */
@@ -53,10 +60,38 @@ export interface ShipHealthConfig {
   damageThreshold: number
   /** Max hull damage per second from extreme temperature */
   maxTempDamage: number
-  /** Radiation proximity above which hull takes damage (0–1) */
+  /**
+   * Legacy radiation proximity threshold (0–1).
+   * Retained in the schema for save-file / catalog parity but no longer
+   * consulted by the radiation damage path, which is now zone-based.
+   *
+   * @deprecated Replaced by `radiationZone{1,2,3}Boundary` in 2026-04-23.
+   */
   radiationThreshold: number
-  /** Max hull damage per second from radiation */
+  /** Max hull damage per second from radiation at the deepest zone (Sun proximity) */
   maxRadiationDamage: number
+  /**
+   * Sun-distance below which radiation Zone 1 begins (outer edge of any radiation).
+   * Pre-scaled by ORBIT_SCALE. Default catalog value (`0.55`) sits between Venus
+   * (`0.72`) and Mercury (`0.39`), so Mercury orbit lands inside Zone 1 (requires
+   * `shuttleRadiationResistance` Lvl 1 to be safe).
+   */
+  radiationZone1Boundary: number
+  /**
+   * Sun-distance below which radiation Zone 2 begins.
+   * Pre-scaled by ORBIT_SCALE. Default catalog value (`0.35`) sits just inside
+   * Mercury's orbit — moving inward past Mercury immediately requires
+   * `shuttleRadiationResistance` Lvl 2 for full immunity.
+   */
+  radiationZone2Boundary: number
+  /**
+   * Sun-distance below which radiation Zone 3 begins (deepest, Sun-proximity).
+   * Pre-scaled by ORBIT_SCALE. Default catalog value (`0.25`) is aligned with
+   * `heatZone3Boundary` so the lethal radiation and lethal heat bands kick in
+   * together — only `shuttleRadiationResistance` Lvl 3 is fully safe here, and
+   * Lvl 2 takes partial damage ("burn less severely" per the design spec).
+   */
+  radiationZone3Boundary: number
   /** Temperature magnitude above which the gauge is shown */
   displayThreshold: number
   /**
@@ -84,6 +119,59 @@ const MAX_TEMPERATURE = 100
  */
 const EVA_THERMAL_GAUGE_BLOCK_BEYOND = 75
 
+/** Number of radiation zones (Zone 1 = outermost, Zone 3 = Sun-proximity). */
+const RADIATION_ZONE_COUNT = 3
+
+/** Damage multiplier applied when the player's upgrade level is exactly one tier under the zone. */
+const RADIATION_PARTIAL_ARMOR = 0.5
+
+/** Damage multiplier applied when the player has no relevant protection (level << zone). */
+const RADIATION_FULL_DAMAGE = 1
+
+/** Damage multiplier applied when the player is fully shielded (level ≥ zone). */
+const RADIATION_IMMUNE = 0
+
+/**
+ * Resolved radiation zone (`0` = none, `1`–`3` = nested bands closer to the Sun).
+ */
+export type RadiationZone = 0 | 1 | 2 | 3
+
+/**
+ * Compute the active radiation zone from a sun distance and the per-zone boundaries.
+ * Pure function — exposed for tests and HUD overlays that need the same classification.
+ *
+ * @param sunDistance - Distance from the Sun in world units.
+ * @param config - Ship-health config carrying the three radiation boundaries.
+ * @returns The most-severe zone the ship currently occupies (`0` = safe).
+ */
+export function getRadiationZone(sunDistance: number, config: ShipHealthConfig): RadiationZone {
+  if (sunDistance < config.radiationZone3Boundary) return 3
+  if (sunDistance < config.radiationZone2Boundary) return 2
+  if (sunDistance < config.radiationZone1Boundary) return 1
+  return 0
+}
+
+/**
+ * Resolve the per-tick radiation armor multiplier from the player's upgrade level
+ * vs the active zone. Tiered model:
+ *
+ * - `level >= zone` → fully shielded (returns `0`)
+ * - `level === zone - 1` → partial protection (returns `0.5`)
+ * - `level <= zone - 2` → no protection (returns `1`)
+ *
+ * Zone `0` always returns `0` regardless of level (no radiation in safe space).
+ *
+ * @param level - The player's `shuttleRadiationResistance` upgrade level (`0`–`3`).
+ * @param zone - The active radiation zone resolved from sun distance.
+ * @returns Damage multiplier in `{0, 0.5, 1}`.
+ */
+export function getRadiationArmor(level: number, zone: RadiationZone): number {
+  if (zone === 0) return RADIATION_IMMUNE
+  if (level >= zone) return RADIATION_IMMUNE
+  if (level === zone - 1) return RADIATION_PARTIAL_ARMOR
+  return RADIATION_FULL_DAMAGE
+}
+
 /**
  * Manages ship hull integrity and temperature.
  * Pure domain logic — no Three.js, no rendering.
@@ -97,6 +185,8 @@ export class ShipHealth {
   private _temperature = 0
   private readonly config: ShipHealthConfig
   private _dead = false
+  private _lastRadiationZone: RadiationZone = 0
+  private _lastRadiationArmor = RADIATION_FULL_DAMAGE
 
   /** Fired when HP reaches 0 with the cause of death. */
   onDeath: ((cause: string) => void) | null = null
@@ -127,6 +217,32 @@ export class ShipHealth {
   /** Whether the temperature gauge should be visible to the player. */
   get temperatureVisible(): boolean {
     return Math.abs(this._temperature) > this.config.displayThreshold
+  }
+
+  /**
+   * Active radiation zone after the most recent {@link ShipHealth.tick}.
+   * `0` when the ship is outside any radiation band.
+   */
+  get radiationZone(): RadiationZone {
+    return this._lastRadiationZone
+  }
+
+  /**
+   * Effective radiation armor multiplier from the most recent {@link ShipHealth.tick}
+   * (`0` when fully shielded, `0.5` partial, `1` full damage). Useful for HUD pulses
+   * that need to know whether radiation is *actually* hurting the hull right now.
+   */
+  get radiationArmor(): number {
+    return this._lastRadiationArmor
+  }
+
+  /**
+   * True when the ship is in any radiation zone AND the player's protection isn't
+   * sufficient to block damage — the canonical "we're being irradiated" predicate
+   * for HUD warnings and audio cues.
+   */
+  get isTakingRadiationDamage(): boolean {
+    return this._lastRadiationZone > 0 && this._lastRadiationArmor > 0
   }
 
   /**
@@ -220,28 +336,30 @@ export class ShipHealth {
    * clamped at the cap value and hull damage from temperature is fully suppressed.
    * Pass `MAX_TEMPERATURE` / `MIN_TEMPERATURE` (or omit) to disable protection.
    *
+   * Radiation is zone-based: the active zone is resolved from `sunDistance` against
+   * `radiationZone{1,2,3}Boundary`. Damage is then tiered by the player's
+   * `radiationLevel` vs the active zone (see {@link getRadiationArmor}).
+   *
    * @param dt - Delta time in seconds
    * @param sunDistance - Distance from the Sun in world units
-   * @param radiationProximity - Gravity proximity to Sun (0–1)
    * @param healing - Whether the ship is healing (e.g. Earth orbit)
    * @param heatResistance - Multiplier on hot-zone drift rate (0–1, lower = more resistant)
    * @param heatArmor - Multiplier on hull damage while overheated (0–1, lower = less damage)
    * @param coldResistance - Multiplier on cold-zone drift rate (0–1, lower = more resistant)
    * @param coldArmor - Multiplier on hull damage while frozen (0–1, lower = less damage)
-   * @param radiationArmor - Multiplier on radiation damage (0–1, lower = less damage)
+   * @param radiationLevel - Player's `shuttleRadiationResistance` upgrade level (0–3)
    * @param heatTempCap - Max positive temperature allowed; clamped + damage suppressed when < MAX_TEMPERATURE
    * @param coldTempCap - Min negative temperature allowed; clamped + damage suppressed when > MIN_TEMPERATURE
    */
   tick(
     dt: number,
     sunDistance: number,
-    radiationProximity: number,
     healing = false,
     heatResistance = 1,
     heatArmor = 1,
     coldResistance = 1,
     coldArmor = 1,
-    radiationArmor = 1,
+    radiationLevel = 0,
     heatTempCap = MAX_TEMPERATURE,
     coldTempCap = MIN_TEMPERATURE,
   ): void {
@@ -249,16 +367,13 @@ export class ShipHealth {
 
     const hpBeforeTick = this._hp
 
-    // Temperature drift toward zone target — stronger the deeper in the zone
     let targetTemp: number
     let driftMultiplier = 1
     if (sunDistance < this.config.hotBoundary) {
       targetTemp = HOT_ZONE_TARGET
-      // Closer to Sun = faster heating (1x at boundary, up to 4x at origin)
       driftMultiplier = 1 + 3 * (1 - sunDistance / this.config.hotBoundary)
     } else if (sunDistance > this.config.coldBoundary) {
       targetTemp = COLD_ZONE_TARGET
-      // Further from Sun = faster freezing
       driftMultiplier = 1 + 3 * Math.min(1, (sunDistance - this.config.coldBoundary) / this.config.coldBoundary)
     } else {
       targetTemp = SAFE_ZONE_TARGET
@@ -269,7 +384,6 @@ export class ShipHealth {
     const drift = Math.sign(diff) * Math.min(Math.abs(diff), this.config.tempDriftRate * driftMultiplier * resistanceFactor * dt)
     this._temperature = Math.max(MIN_TEMPERATURE, Math.min(MAX_TEMPERATURE, this._temperature + drift))
 
-    // Zone-based thermal protection: clamp temperature and flag protection state
     const heatProtected = heatTempCap < MAX_TEMPERATURE
     const coldProtected = coldTempCap > MIN_TEMPERATURE
     if (heatProtected && this._temperature > heatTempCap) {
@@ -279,7 +393,6 @@ export class ShipHealth {
       this._temperature = coldTempCap
     }
 
-    // Temperature damage — suppressed entirely when thermal protection is active
     let tempDamage = 0
     const absTemp = Math.abs(this._temperature)
     if (absTemp > this.config.damageThreshold) {
@@ -293,40 +406,34 @@ export class ShipHealth {
       }
     }
 
-    // Radiation damage
+    const zone = getRadiationZone(sunDistance, this.config)
+    const radArmor = getRadiationArmor(radiationLevel, zone)
+    this._lastRadiationZone = zone
+    this._lastRadiationArmor = radArmor
     let radDamage = 0
-    if (radiationProximity > this.config.radiationThreshold) {
-      const ratio =
-        (radiationProximity - this.config.radiationThreshold) /
-        (1 - this.config.radiationThreshold)
-      radDamage = ratio * this.config.maxRadiationDamage * radiationArmor * dt
+    if (zone > 0 && radArmor > 0) {
+      radDamage = this.config.maxRadiationDamage * (zone / RADIATION_ZONE_COUNT) * radArmor * dt
     }
 
-    // Apply damage
     const totalDamage = tempDamage + radDamage
     if (totalDamage > 0) {
       this._hp = Math.max(0, this._hp - totalDamage)
     }
 
-    // Damage intensity for vignette — starts at displayThreshold, maxes at 100
     const absTemp2 = Math.abs(this._temperature)
     const tempIntensity = absTemp2 > this.config.displayThreshold
       ? (absTemp2 - this.config.displayThreshold) / (MAX_TEMPERATURE - this.config.displayThreshold)
       : 0
-    const radIntensity = radiationProximity > this.config.radiationThreshold
-      ? (radiationProximity - this.config.radiationThreshold) / (1 - this.config.radiationThreshold)
-      : 0
+    const radIntensity = zone > 0 ? (zone / RADIATION_ZONE_COUNT) * radArmor : 0
     this._lastDamageIntensity = Math.min(1, Math.max(tempIntensity, radIntensity))
 
-    // Healing — only when no damage is occurring
     if (healing && totalDamage === 0) {
       this._hp = Math.min(this.config.maxHp, this._hp + this.config.healRate * dt)
     }
 
-    // Death check
     if (this._hp <= 0 && !this._dead) {
       this._dead = true
-      this.onDeath?.(this.getDeathCause(radiationProximity))
+      this.onDeath?.(this.getDeathCause())
     }
 
     this.notifyHpChangedIfNeeded(hpBeforeTick)
@@ -345,17 +452,20 @@ export class ShipHealth {
     this._hp = this.config.maxHp
     this._temperature = 0
     this._dead = false
+    this._lastRadiationZone = 0
+    this._lastRadiationArmor = RADIATION_FULL_DAMAGE
     this.notifyHpChangedIfNeeded(previousHp)
   }
 
   /**
-   * Determine cause of death from current game state.
+   * Determine cause of death from the most recent {@link ShipHealth.tick} state.
+   * Radiation wins when it was actively damaging the hull; otherwise we fall back
+   * to the temperature direction.
    *
-   * @param radiationProximity - Current radiation proximity (0–1)
-   * @returns Human-readable death cause string
+   * @returns Human-readable death cause string.
    */
-  private getDeathCause(radiationProximity: number): string {
-    if (radiationProximity > this.config.radiationThreshold) return 'Radiation Exposure'
+  private getDeathCause(): string {
+    if (this._lastRadiationZone > 0 && this._lastRadiationArmor > 0) return 'Radiation Exposure'
     if (this._temperature > this.config.damageThreshold) return 'Hull Overheated'
     return 'Hull Frozen'
   }

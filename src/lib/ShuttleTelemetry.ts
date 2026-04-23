@@ -74,6 +74,29 @@ export interface GravityWarningState {
   visible: boolean
 }
 
+/**
+ * Radiation exposure state pushed to the HUD each frame.
+ * Mirrors the {@link GravityWarningState} contract so the HUD overlay can drive
+ * the radiation banner with the same per-frame push pattern.
+ */
+export interface RadiationWarningState {
+  /**
+   * Active radiation zone for this frame.
+   * `0` means the ship is outside any radiation band; `1`–`3` index the nested
+   * Sun-proximity bands defined by `radiationZone{1,2,3}Boundary`.
+   */
+  zone: 0 | 1 | 2 | 3
+  /**
+   * True when the active zone is non-zero **and** the player's
+   * `shuttleRadiationResistance` is insufficient to fully shield it — i.e. the
+   * hull is actively losing HP to radiation right now. Drives both the banner
+   * tier and the geiger-counter audio loop.
+   */
+  damageActive: boolean
+  /** Whether the warning banner should be rendered (`zone > 0`). */
+  visible: boolean
+}
+
 /** Screen-projected position for a celestial body label. */
 export interface MapBodyLabel {
   /** Display name */

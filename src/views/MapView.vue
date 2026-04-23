@@ -7,6 +7,7 @@ import FpsHud, { type FpsTelemetry } from '@/components/FpsHud.vue'
 import HelmetVisor from '@/components/HelmetVisor.vue'
 import OrbitPrompt from '@/components/OrbitPrompt.vue'
 import GravityWarning from '@/components/GravityWarning.vue'
+import RadiationWarning from '@/components/RadiationWarning.vue'
 import GravitationalAnomalyHud from '@/components/GravitationalAnomalyHud.vue'
 import DeathOverlay from '@/components/DeathOverlay.vue'
 import DamageVignette from '@/components/DamageVignette.vue'
@@ -72,6 +73,7 @@ import type { JourneyTrackerState } from '@/lib/journeys'
 import type {
   ShuttleTelemetry,
   GravityWarningState,
+  RadiationWarningState,
   GravitationalAnomalyHudState,
   MapOverlayState,
 } from '@/lib/ShuttleTelemetry'
@@ -247,6 +249,11 @@ const orbitState = reactive<OrbitHudState>({
   chargeLevel: 0,
   inspectMode: false,
   progradeAlignment: 0,
+})
+const radiationWarning = reactive<RadiationWarningState>({
+  zone: 0,
+  damageActive: false,
+  visible: false,
 })
 const gravityWarning = reactive<GravityWarningState>({
   proximity: 0,
@@ -650,6 +657,9 @@ onMounted(async () => {
     }
     viewController.onGravityWarning = (w) => {
       Object.assign(gravityWarning, w)
+    }
+    viewController.onRadiationWarning = (w) => {
+      Object.assign(radiationWarning, w)
     }
     viewController.onGravitationalAnomalyHud = (h) => {
       Object.assign(gravitationalAnomalyHud, h)
@@ -1345,6 +1355,16 @@ watch(
       !evaActive
     "
     :warning="gravityWarning"
+  />
+  <RadiationWarning
+    v-show="
+      !mapOverlay.visible &&
+      !mapIntro.controlsLocked &&
+      !habitatActive &&
+      !earthStartupOrbitHudSuppressed &&
+      !evaActive
+    "
+    :warning="radiationWarning"
   />
   <GravitationalAnomalyHud
     v-show="

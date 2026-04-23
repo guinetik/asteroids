@@ -71,6 +71,7 @@ describe('audioManifest', () => {
       'sfx.drone',
       'sfx.drone.pickup',
       'sfx.geyser',
+      'sfx.geiger',
       'sfx.cargo.open',
       'sfx.cargo.close',
       // footsteps

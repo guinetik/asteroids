@@ -27,6 +27,8 @@
  * - `sfx.orbitCapture`        — orbit-capture sting (one-shot).
  * - `sfx.slingshot` + `sfx.slingshot.burst` — slingshot release (one-shots).
  * - `sfx.mission.shuttle.clear` — mission delivered sting (one-shot).
+ * - `sfx.geiger`               — geiger-counter clicker loop; gated by
+ *   {@link ShuttleAudioDirector.tickRadiationTelemetry}.
  *
  * Audio explicitly **not** owned here:
  * - Shuttle main engine, RCS, brake — owned by
@@ -91,6 +93,14 @@ export class ShuttleAudioDirector {
   private wormholeLoop: AudioHandle = null
   /** Low-fuel alarm loop; active while fuel fraction is below {@link SHUTTLE_LOW_FUEL_FRACTION}. */
   private fuelWarningLoop: AudioHandle = null
+  /**
+   * Geiger-counter clicker loop. Active for as long as
+   * {@link ShuttleAudioDirector.tickRadiationTelemetry} reports
+   * {@link lib.shipHealth.ShipHealth.isTakingRadiationDamage} as true.
+   * Single-instance via the manifest plus this nullable handle so concurrent
+   * ticks can never spawn overlapping loops.
+   */
+  private radiationLoop: AudioHandle = null
 
   /** True between {@link start} and {@link stop}. */
   private active = false
@@ -168,6 +178,34 @@ export class ShuttleAudioDirector {
     } else if (ratio > SHUTTLE_LOW_FUEL_CLEAR_FRACTION && this.fuelWarningLoop !== null) {
       this.fuelWarningLoop.stop()
       this.fuelWarningLoop = null
+    }
+  }
+
+  /**
+   * Per-frame radiation exposure check. Spins up the looping geiger-counter
+   * clicker on the rising edge of `damageActive` and tears it down on the
+   * falling edge. No hysteresis is needed because the source signal
+   * ({@link lib.shipHealth.ShipHealth.isTakingRadiationDamage}) is itself
+   * driven by zone boundaries and tick-rate-stable.
+   *
+   * Inactive director ticks short-circuit so callers can fire this every
+   * frame regardless of whether {@link start} has run.
+   *
+   * @param damageActive - True when the hull is currently losing HP to
+   *                       radiation. False at all other times — including
+   *                       safely shielded inside a radiation zone.
+   */
+  tickRadiationTelemetry(damageActive: boolean): void {
+    if (!this.active) return
+    if (damageActive) {
+      if (this.radiationLoop === null) {
+        this.radiationLoop = this.audio.play('sfx.geiger', { loop: true })
+      }
+      return
+    }
+    if (this.radiationLoop !== null) {
+      this.radiationLoop.stop()
+      this.radiationLoop = null
     }
   }
 
@@ -373,6 +411,7 @@ export class ShuttleAudioDirector {
     this.chargeLoop = null
     this.wormholeLoop = null
     this.fuelWarningLoop = null
+    this.radiationLoop = null
     if (this.anomalyAmbient !== null) {
       this.anomalyAmbient.stop()
       this.anomalyAmbient = null
@@ -412,6 +451,8 @@ export class ShuttleAudioDirector {
     this.wormholeLoop = null
     this.fuelWarningLoop?.stop()
     this.fuelWarningLoop = null
+    this.radiationLoop?.stop()
+    this.radiationLoop = null
     // Belt-and-braces stop on the ambient ids in case Howler still has
     // a stale instance from before our handle was registered (e.g.
     // hot-reload or external `play(..., { loop: true })` call).

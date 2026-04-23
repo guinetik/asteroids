@@ -83,6 +83,7 @@ export const AUDIO_SOUND_IDS = [
   'sfx.drone',
   'sfx.drone.pickup',
   'sfx.geyser',
+  'sfx.geiger',
   'sfx.cargo.open',
   'sfx.cargo.close',
   // SFX — footsteps
@@ -694,6 +695,22 @@ const manifestById: ManifestById = {
     load: 'lazy',
     playback: 'overlap',
     volume: 0.5,
+    effect: 'none',
+  },
+  /**
+   * Geiger-counter clicker loop that signals active radiation damage in the
+   * map view. Played by {@link audio.ShuttleAudioDirector.tickRadiationTelemetry}
+   * with `loop: true` whenever {@link lib.ShipHealth.isTakingRadiationDamage}
+   * is true, so playback duration is fully driven by gameplay state — manifest
+   * stays `single-instance` to defensively keep at most one looping handle.
+   */
+  'sfx.geiger': {
+    id: 'sfx.geiger',
+    src: '/sound/sfx.geiger.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'single-instance',
+    volume: 0.55,
     effect: 'none',
   },
   'sfx.mission.shuttle.clear': {
