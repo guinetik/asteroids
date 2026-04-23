@@ -1,8 +1,8 @@
 /**
  * Creates the Three.js environment for the map view.
  *
- * Sets up renderer with bloom post-processing, ACES tone mapping,
- * layered starlight fill lighting, and damped orbital camera controls.
+ * Sets up renderer with ACES tone mapping, layered starlight fill lighting,
+ * and damped orbital camera controls. No bloom — keeps stars crisp and saves GPU.
  * Self-contained — does not depend on SceneManager.
  *
  * @author guinetik
@@ -12,7 +12,6 @@
 import * as THREE from 'three'
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
 // --- Scene constants ---
@@ -24,12 +23,6 @@ const CAMERA_FAR = 50000
 const CAMERA_INITIAL_POSITION_Y = 3
 const CAMERA_INITIAL_POSITION_Z = 20
 const TONE_MAPPING_EXPOSURE = 1.35
-
-// --- Bloom ---
-
-const BLOOM_STRENGTH = 0.72
-const BLOOM_RADIUS = 0.55
-const BLOOM_THRESHOLD = 0.45
 
 // --- Lighting ---
 
@@ -105,16 +98,9 @@ export function createMapScene(canvas: HTMLCanvasElement): MapSceneObjects {
   camera.add(cameraLight)
   scene.add(camera)
 
-  // Post-processing
+  // Post-processing (bloom intentionally omitted — see StarFieldController / map stars)
   const composer = new EffectComposer(renderer)
   composer.addPass(new RenderPass(scene, camera))
-  const bloomPass = new UnrealBloomPass(
-    new THREE.Vector2(window.innerWidth, window.innerHeight),
-    BLOOM_STRENGTH,
-    BLOOM_RADIUS,
-    BLOOM_THRESHOLD,
-  )
-  composer.addPass(bloomPass)
 
   // OrbitControls
   const controls = new OrbitControls(camera, canvas)
