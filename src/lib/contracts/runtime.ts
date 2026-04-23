@@ -140,8 +140,42 @@ export const contractSystem = new ContractSystem(
       }
     },
     consumeItemsForDelivery: (itemId, count) => consumeInventoryItems(itemId, count),
+    getInstalledUpgradeLevel: (upgradeId) => getInstalledUpgradeLevelForContracts(upgradeId),
+    hasOrbitedPlanet: (planetId) => hasOrbitedPlanetForContracts(planetId),
   },
 )
+
+/**
+ * Look up the player's currently installed level for a shuttle upgrade so
+ * the contract engine can passively snap an `install-upgrade` step that
+ * the player already satisfies. Reads the in-memory upgrade snapshot
+ * (which {@link hydratePlayerUpgradeLevelsFromStorage} keeps in sync with
+ * localStorage). Unknown ids return `0` and the engine treats that as
+ * "not installed".
+ *
+ * @param upgradeId - Catalog upgrade id from the active step.
+ * @returns Installed level, or `0` when the upgrade is not in the snapshot.
+ */
+function getInstalledUpgradeLevelForContracts(upgradeId: string): number {
+  const snapshot = getPlayerUpgradeLevelsSnapshot()
+  return snapshot[upgradeId as UpgradeId] ?? 0
+}
+
+/**
+ * Check whether the player has previously orbited a body so the contract
+ * engine can passively snap a `visit-planet` step that the player has
+ * already fulfilled. Reads {@link PlayerProfile.orbitedSolarBodies} from
+ * persisted profile state. Returns `false` when the profile is missing
+ * (fresh game) or the body has never been orbited.
+ *
+ * @param planetId - Body id from the active step (e.g. `'mars'`, `'sun'`).
+ * @returns `true` when the body has been orbited at least once.
+ */
+function hasOrbitedPlanetForContracts(planetId: string): boolean {
+  const profile = loadProfile()
+  if (!profile) return false
+  return (profile.orbitedSolarBodies?.[planetId] ?? 0) > 0
+}
 
 /**
  * Atomic inventory consumption used by the engine when an active
@@ -193,6 +227,16 @@ shipMessageSystem.onMessageArchived((id) => {
 // (or any other hydrator), defaults would be all zeros and we would wipe LS.
 hydratePlayerUpgradeLevelsFromStorage()
 contractSystem.replayCompletedRewards()
+
+// Save-migration self-heal: walk every active contract and snap any
+// passive-state step the player already satisfies. Catches Cinderline
+// instances stuck on the radiation-shielding install-upgrade step from
+// before per-contract passive eval landed, and any future variant of
+// the same class of bug. Order matters — must run after the upgrade
+// snapshot is hydrated so `getInstalledUpgradeLevel` reads real levels,
+// and after `replayCompletedRewards` so completed contracts aren't
+// touched.
+contractSystem.evaluatePassiveStateForActiveContracts()
 
 /**
  * Register a callback fired whenever any contract state changes.

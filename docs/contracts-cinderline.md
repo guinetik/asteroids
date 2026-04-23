@@ -98,6 +98,53 @@ Bodies are addressed by their stable id (`'sun'`, `'mercury'`, etc).
 | `notifyOrbitalLaunched` | `{ planetId }` | Wired to the slingshot release path in `MapOrbitFacade`. The Sun is special-cased in `MapViewController.notifyOrbitalLaunchFromBodyName` because it lives outside the `PLANETS` array. |
 | `notifyPlanetVisited` (extended) | `planetId` | Also resolves active `deliver-items` steps. The engine consults `ContractSystemHooks.consumeItemsForDelivery(itemId, count)`; the runtime hook calls `removeItem` + `saveInventory` and returns the boolean. |
 
+## Passive auto-advance for `install-upgrade` and `visit-planet`
+
+The Cinderline's chain (`complete-missions → collect-drops → deliver-items
+→ install-upgrade → visit-planet → launch-from-body`) put the
+`install-upgrade` step deep enough to expose a structural gap in the
+engine: `notifyUpgradeInstalled` only ever advances a step when the
+*current* step is `install-upgrade` and a fresh install event fires.
+Players normally have radiation shielding tier 3+ long before reaching
+step 4 (Mercury sits in radiation zone 3), so no new install event would
+ever fire and the step stalled forever. The MMC contract escaped this
+because its `install-upgrade` was step 0, where the runtime's
+`acceptContractWithRetroEval` retro-fire happened to land on it.
+
+The fix lives in the engine: every step transition (acceptance and
+`advanceStep`'s own forward move) calls `evaluatePassiveCurrentStep`,
+which asks the host:
+
+| Hook | Step kind | Behaviour |
+|------|-----------|-----------|
+| `getInstalledUpgradeLevel(upgradeId): number` | `install-upgrade` | Snap when returned level `>= step.minLevel`. |
+| `hasOrbitedPlanet(planetId): boolean` | `visit-planet` | Snap when `true`. |
+
+Snaps cascade naturally — if the auto-advanced step lands on another
+auto-derivable step, `advanceStep` re-enters `evaluatePassiveCurrentStep`
+and walks forward until the chain hits a step that requires explicit
+player action. `deliver-items` is intentionally excluded: consumption is
+a meaningful side-effect that must be triggered by the player explicitly
+orbiting the destination.
+
+Runtime wiring in `src/lib/contracts/runtime.ts` sources state from
+`getPlayerUpgradeLevelsSnapshot()` (in-memory upgrade map kept in sync
+with localStorage) and `loadProfile().orbitedSolarBodies` so the engine
+stays free of inventory/profile imports.
+
+### Save migration
+
+`ContractSystem.evaluatePassiveStateForActiveContracts()` walks every
+active contract once and snaps any passive-state step the player
+already satisfies. Called from `runtime.ts` immediately after
+`replayCompletedRewards()` (which itself runs after upgrade hydration),
+it self-heals saves written before per-contract passive eval landed —
+e.g. a Cinderline instance persisted with `currentStepIndex = 4`
+(install-upgrade radiation shielding) where the player has owned
+tier 3 the entire run. Cascade rules and reward semantics match a
+normal step transition: every snapped step pays its authored
+`creditsReward` and `onContractsChanged` fires once at the end.
+
 ## Sun as a visitable body
 
 `SunData` gains a `readonly id: string` (always `'sun'`). The `MapView.vue`

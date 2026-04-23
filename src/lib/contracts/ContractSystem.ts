@@ -95,6 +95,40 @@ export interface ContractSystemHooks {
    * @returns Whether the consumption committed.
    */
   consumeItemsForDelivery?: (itemId: string, count: number) => boolean
+  /**
+   * Asked by the engine after a contract advances into (or is accepted on)
+   * an `install-upgrade` step, to check whether the player already owns the
+   * required upgrade level. When the answer is `>= step.minLevel` the engine
+   * auto-completes the step in place — no fresh `notifyUpgradeInstalled`
+   * event is needed.
+   *
+   * Without this hook, an `install-upgrade` step that the player satisfied
+   * before it became current (e.g. the Cinderline asks for radiation
+   * shielding tier 3 several steps in, and the player typically already
+   * has tier 3 by then) would stall forever, because
+   * {@link ContractSystem.notifyUpgradeInstalled} only fires when the
+   * engineering bay actually performs an install.
+   *
+   * @param upgradeId - Catalog upgrade id from the active step.
+   * @returns The currently installed level, or `0` when not installed.
+   */
+  getInstalledUpgradeLevel?: (upgradeId: string) => number
+  /**
+   * Asked by the engine after a contract advances into (or is accepted on)
+   * a `visit-planet` step, to check whether the player has previously
+   * orbited that body. When `true` the engine auto-completes the step in
+   * place — no fresh `notifyPlanetVisited` event is needed.
+   *
+   * Symmetric to {@link ContractSystemHooks.getInstalledUpgradeLevel}: it
+   * lets the engine recognise passive state the runtime already persists
+   * (in this game, `PlayerProfile.orbitedSolarBodies`) so a step does not
+   * require the player to redundantly visit a planet they have already
+   * been to.
+   *
+   * @param planetId - Body id from the active step (e.g. `'mars'`, `'sun'`).
+   * @returns Whether the body has been orbited at least once.
+   */
+  hasOrbitedPlanet?: (planetId: string) => boolean
 }
 
 /** Payload for {@link ContractSystemHooks.onContractStepCompleted}. */
@@ -203,6 +237,41 @@ export class ContractSystem {
       this.applyRewards(contract)
       this.hooks.onContractCompleted?.(contract.id)
     }
+  }
+
+  /**
+   * Save-migration helper: walk every active contract and snap any
+   * passive-state step (`install-upgrade`, `visit-planet`) that the
+   * player already satisfies. Intended to be called exactly once on
+   * startup, after {@link ContractSystem.replayCompletedRewards} and
+   * after the runtime has hydrated upgrade levels + profile state, so
+   * the registered `getInstalledUpgradeLevel` / `hasOrbitedPlanet`
+   * hooks return current values.
+   *
+   * Self-heals saves created before the per-contract passive eval
+   * landed — e.g. a Cinderline instance stuck on the radiation-shielding
+   * `install-upgrade` step because the player installed the upgrade
+   * before the chain advanced into it. New saves don't need this (the
+   * engine snaps in-flight) but it's safe to keep on as a belt-and-
+   * suspenders recovery path.
+   *
+   * Behaviour mirrors a normal step transition: snaps cascade, the
+   * authored `creditsReward` for each snapped step pays out via
+   * `onContractStepCompleted`, and `onContractsChanged` fires once at
+   * the end if anything moved.
+   */
+  evaluatePassiveStateForActiveContracts(): void {
+    let changed = false
+    for (const instance of Object.values(this.snapshot.instances)) {
+      if (instance.status !== 'active') continue
+      const contract = this.contracts.get(instance.contractId)
+      if (!contract) continue
+      const before = instance.currentStepIndex
+      this.evaluatePassiveCurrentStep(contract)
+      const after = this.snapshot.instances[contract.id]?.currentStepIndex ?? before
+      if (after !== before) changed = true
+    }
+    if (changed) this.afterChange()
   }
 
   /**
@@ -464,6 +533,7 @@ export class ContractSystem {
     }
     this.deliverBriefMessage(contract)
     this.deliverStepMessage(contract, 0)
+    this.evaluatePassiveCurrentStep(contract)
     this.persist()
     this.hooks.onContractAccepted?.(contractId)
     this.afterChange()
@@ -559,6 +629,7 @@ export class ContractSystem {
           instances: { ...this.snapshot.instances, [contract.id]: updated },
         }
         this.deliverStepMessage(contract, nextIndex)
+        this.evaluatePassiveCurrentStep(contract)
       }
     } else {
       this.snapshot = {
@@ -568,6 +639,51 @@ export class ContractSystem {
     }
 
     this.persist()
+  }
+
+  /**
+   * Snap the active instance's *current* step forward when the player
+   * already satisfies its passive condition (an `install-upgrade` whose
+   * level is met, or a `visit-planet` whose body has been orbited).
+   *
+   * Called immediately after a step transition (acceptance or
+   * `advanceStep`'s own forward move) so a chain like
+   * `complete-missions → collect-drops → deliver-items → install-upgrade`
+   * does not stall on the install when the player has already owned the
+   * upgrade for the entire run. The check cascades naturally: if the
+   * snap lands on another auto-derivable step, `advanceStep` re-enters
+   * here and steps again.
+   *
+   * Always reads the live instance from `this.snapshot` (not a stale
+   * caller copy) so cascading writes operate on the freshest state.
+   * Bounded by `contract.steps.length` — each call advances at most one
+   * step, and `requiredCount` for both passive kinds is `1`, so there
+   * is no infinite loop risk.
+   *
+   * `deliver-items` is intentionally excluded: consumption is a
+   * meaningful side-effect that requires the explicit player action of
+   * orbiting the destination.
+   *
+   * @param contract - Definition for the active instance.
+   */
+  private evaluatePassiveCurrentStep(contract: Contract): void {
+    const instance = this.snapshot.instances[contract.id]
+    if (!instance || instance.status !== 'active') return
+    const step = contract.steps[instance.currentStepIndex]
+    if (!step) return
+
+    if (step.kind === 'install-upgrade') {
+      const level = this.hooks.getInstalledUpgradeLevel?.(step.upgradeId) ?? 0
+      if (level < step.minLevel) return
+      this.advanceStep(contract, instance, 1)
+      return
+    }
+
+    if (step.kind === 'visit-planet') {
+      const visited = this.hooks.hasOrbitedPlanet?.(step.planetId) ?? false
+      if (!visited) return
+      this.advanceStep(contract, instance, 1)
+    }
   }
 
   /** Deliver a step's flavor message into the contract folder. */

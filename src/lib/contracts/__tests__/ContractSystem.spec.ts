@@ -979,6 +979,323 @@ describe('onContractStepCompleted hook', () => {
   })
 })
 
+describe('ContractSystem passive auto-advance (install-upgrade / visit-planet)', () => {
+  /**
+   * Mirrors the Cinderline shape that triggered the original bug: the
+   * install-upgrade is the *third* step, deep enough that retro-eval at
+   * acceptance never sees it as the current step. Also exercises a final
+   * visit-planet so cascade behaviour can be checked.
+   */
+  const passiveContract: Contract = {
+    id: 'passive-fixture',
+    inboxName: 'Passive Fixture',
+    from: 'Tester',
+    sentAt: TEST_DATE,
+    triggerOnMissionCompletedNth: 1,
+    introSubject: 'Passive intro',
+    introBody: ['intro'],
+    steps: [
+      {
+        kind: 'complete-missions',
+        count: 1,
+        creditsReward: 100,
+        subject: 'Step 1',
+        flavor: ['s1'],
+      },
+      {
+        kind: 'install-upgrade',
+        upgradeId: 'shuttleFreezeResistance',
+        minLevel: 3,
+        creditsReward: 200,
+        subject: 'Step 2',
+        flavor: ['s2'],
+      },
+      {
+        kind: 'visit-planet',
+        planetId: 'mars',
+        creditsReward: 300,
+        subject: 'Step 3',
+        flavor: ['s3'],
+      },
+    ],
+    completionSubject: 'Done',
+    completionBody: ['d'],
+    rewards: [],
+  }
+
+  /**
+   * Build a passive-eval harness with controllable upgrade-level and
+   * orbited-body hooks so each test can flip the player's pre-state and
+   * assert the expected snap/no-snap.
+   */
+  function createPassiveHarness(opts: {
+    installedLevels?: Record<string, number>
+    orbitedPlanets?: Set<string>
+  } = {}): {
+    contracts: ContractSystem
+    payouts: ContractStepCompletedPayload[]
+    installedLevels: Record<string, number>
+    orbitedPlanets: Set<string>
+  } {
+    const installedLevels = { ...opts.installedLevels }
+    const orbitedPlanets = new Set(opts.orbitedPlanets ?? [])
+    const messages = new MessageSystem([triggerMessage], { load: () => ({}), save: () => {} })
+    const payouts: ContractStepCompletedPayload[] = []
+    const contracts = new ContractSystem(
+      [passiveContract],
+      messages,
+      { load: () => emptyContractSnapshot(), save: () => {} },
+      {
+        onContractStepCompleted: (payload) => payouts.push(payload),
+        getInstalledUpgradeLevel: (upgradeId) => installedLevels[upgradeId] ?? 0,
+        hasOrbitedPlanet: (planetId) => orbitedPlanets.has(planetId),
+      },
+    )
+    return { contracts, payouts, installedLevels, orbitedPlanets }
+  }
+
+  it('snaps install-upgrade when the chain advances into it and player already owns the level', () => {
+    // Cinderline reproduction: the install-upgrade is at index 1 (step 2).
+    // The player has rad shielding tier 3 from the start, but no fresh
+    // notifyUpgradeInstalled event will ever fire. Without passive eval
+    // the step would stall after the mission completion advances into it.
+    const { contracts, payouts } = createPassiveHarness({
+      installedLevels: { shuttleFreezeResistance: 3 },
+    })
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+    contracts.acceptContract(passiveContract.id)
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+
+    expect(contracts.getInstance(passiveContract.id)?.currentStepIndex).toBe(2)
+    expect(payouts).toEqual([
+      { contractId: passiveContract.id, stepIndex: 0, creditsReward: 100 },
+      { contractId: passiveContract.id, stepIndex: 1, creditsReward: 200 },
+    ])
+  })
+
+  it('does not snap install-upgrade when player level is below minLevel', () => {
+    const { contracts } = createPassiveHarness({
+      installedLevels: { shuttleFreezeResistance: 2 },
+    })
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+    contracts.acceptContract(passiveContract.id)
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+
+    expect(contracts.getInstance(passiveContract.id)?.currentStepIndex).toBe(1)
+  })
+
+  it('snaps install-upgrade at step 0 during acceptance (MMC parity)', () => {
+    // Sanity: when install-upgrade is the *first* step, acceptance alone
+    // should be enough to advance — same behaviour MMC relied on before.
+    const mmcLikeContract: Contract = {
+      id: 'mmc-like',
+      inboxName: 'MMC-like',
+      from: 'Sampaio',
+      sentAt: TEST_DATE,
+      triggerOnMissionCompletedNth: 1,
+      introSubject: 'i',
+      introBody: ['i'],
+      steps: [
+        {
+          kind: 'install-upgrade',
+          upgradeId: 'turretMiningUnlock',
+          minLevel: 1,
+          creditsReward: 1000,
+          subject: 'op1',
+          flavor: ['op1'],
+        },
+        {
+          kind: 'complete-missions',
+          count: 1,
+          subject: 'op2',
+          flavor: ['op2'],
+        },
+      ],
+      completionSubject: 'Done',
+      completionBody: ['d'],
+      rewards: [],
+    }
+    const messages = new MessageSystem([triggerMessage], { load: () => ({}), save: () => {} })
+    const payouts: ContractStepCompletedPayload[] = []
+    const contracts = new ContractSystem(
+      [mmcLikeContract],
+      messages,
+      { load: () => emptyContractSnapshot(), save: () => {} },
+      {
+        onContractStepCompleted: (payload) => payouts.push(payload),
+        getInstalledUpgradeLevel: () => 1,
+        hasOrbitedPlanet: () => false,
+      },
+    )
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+    contracts.acceptContract(mmcLikeContract.id)
+
+    expect(contracts.getInstance(mmcLikeContract.id)?.currentStepIndex).toBe(1)
+    expect(payouts).toEqual([
+      { contractId: mmcLikeContract.id, stepIndex: 0, creditsReward: 1000 },
+    ])
+  })
+
+  it('snaps visit-planet when the chain advances into it and player already orbited the body', () => {
+    const { contracts } = createPassiveHarness({
+      installedLevels: { shuttleFreezeResistance: 3 },
+      orbitedPlanets: new Set(['mars']),
+    })
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+    contracts.acceptContract(passiveContract.id)
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+
+    expect(contracts.getInstance(passiveContract.id)?.status).toBe('completed')
+  })
+
+  it('does nothing when neither hook is provided (engine stays inert)', () => {
+    const messages = new MessageSystem([triggerMessage], { load: () => ({}), save: () => {} })
+    const contracts = new ContractSystem(
+      [passiveContract],
+      messages,
+      { load: () => emptyContractSnapshot(), save: () => {} },
+      {},
+    )
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+    contracts.acceptContract(passiveContract.id)
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+
+    expect(contracts.getInstance(passiveContract.id)?.currentStepIndex).toBe(1)
+  })
+
+  it('evaluatePassiveStateForActiveContracts snaps a stuck install-upgrade in a pre-existing save', () => {
+    // Save migration: a save was written before per-contract passive
+    // eval landed. The Cinderline-shaped instance was persisted with
+    // currentStepIndex=1 (install-upgrade) and the player has had the
+    // upgrade for the entire run. New engine should snap on startup.
+    const now = new Date().toISOString()
+    const stuckSnapshot: ContractStoreSnapshot = {
+      ...emptyContractSnapshot(),
+      instances: {
+        [passiveContract.id]: {
+          contractId: passiveContract.id,
+          status: 'active',
+          currentStepIndex: 1,
+          stepCounters: [1, 0, 0],
+          offeredAt: now,
+          acceptedAt: now,
+          completedAt: null,
+        },
+      },
+    }
+    const messages = new MessageSystem([triggerMessage], { load: () => ({}), save: () => {} })
+    const payouts: ContractStepCompletedPayload[] = []
+    let changeCount = 0
+    const contracts = new ContractSystem(
+      [passiveContract],
+      messages,
+      { load: () => stuckSnapshot, save: () => {} },
+      {
+        onContractsChanged: () => {
+          changeCount++
+        },
+        onContractStepCompleted: (payload) => payouts.push(payload),
+        getInstalledUpgradeLevel: () => 3,
+        hasOrbitedPlanet: () => false,
+      },
+    )
+
+    expect(contracts.getInstance(passiveContract.id)?.currentStepIndex).toBe(1)
+    contracts.evaluatePassiveStateForActiveContracts()
+    expect(contracts.getInstance(passiveContract.id)?.currentStepIndex).toBe(2)
+    expect(payouts).toEqual([
+      { contractId: passiveContract.id, stepIndex: 1, creditsReward: 200 },
+    ])
+    expect(changeCount).toBe(1)
+  })
+
+  it('evaluatePassiveStateForActiveContracts is a no-op when no active step is auto-derivable', () => {
+    // Active contract whose current step is `complete-missions` — passive
+    // eval has nothing to snap. Helper must not fire onContractsChanged.
+    const now = new Date().toISOString()
+    const onMissionStepSnapshot: ContractStoreSnapshot = {
+      ...emptyContractSnapshot(),
+      instances: {
+        [passiveContract.id]: {
+          contractId: passiveContract.id,
+          status: 'active',
+          currentStepIndex: 0,
+          stepCounters: [0, 0, 0],
+          offeredAt: now,
+          acceptedAt: now,
+          completedAt: null,
+        },
+      },
+    }
+    const messages = new MessageSystem([triggerMessage], { load: () => ({}), save: () => {} })
+    let changeCount = 0
+    const contracts = new ContractSystem(
+      [passiveContract],
+      messages,
+      { load: () => onMissionStepSnapshot, save: () => {} },
+      {
+        onContractsChanged: () => {
+          changeCount++
+        },
+        getInstalledUpgradeLevel: () => 3,
+        hasOrbitedPlanet: () => true,
+      },
+    )
+
+    contracts.evaluatePassiveStateForActiveContracts()
+    expect(contracts.getInstance(passiveContract.id)?.currentStepIndex).toBe(0)
+    expect(changeCount).toBe(0)
+  })
+
+  it('does NOT auto-advance deliver-items even when the destination is in orbitedPlanets', () => {
+    // deliver-items intentionally sidesteps passive eval: consumption is
+    // a meaningful side-effect that requires the explicit player action
+    // of orbiting the destination. Hook should never be called for it.
+    const deliveryContract: Contract = {
+      id: 'delivery-fixture',
+      inboxName: 'Delivery',
+      from: 'Tester',
+      sentAt: TEST_DATE,
+      triggerOnMissionCompletedNth: 1,
+      introSubject: 'i',
+      introBody: ['i'],
+      steps: [
+        {
+          kind: 'deliver-items',
+          planetId: 'mercury',
+          itemId: 'viroid-psychosphere',
+          count: 5,
+          subject: 'd1',
+          flavor: ['d1'],
+        },
+      ],
+      completionSubject: 'Done',
+      completionBody: ['d'],
+      rewards: [],
+    }
+    const messages = new MessageSystem([triggerMessage], { load: () => ({}), save: () => {} })
+    let consumeCalls = 0
+    const contracts = new ContractSystem(
+      [deliveryContract],
+      messages,
+      { load: () => emptyContractSnapshot(), save: () => {} },
+      {
+        consumeItemsForDelivery: () => {
+          consumeCalls++
+          return true
+        },
+        hasOrbitedPlanet: () => true, // even with this true, no auto-snap
+      },
+    )
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+    contracts.acceptContract(deliveryContract.id)
+
+    expect(consumeCalls).toBe(0)
+    expect(contracts.getInstance(deliveryContract.id)?.currentStepIndex).toBe(0)
+    expect(contracts.getInstance(deliveryContract.id)?.status).toBe('active')
+  })
+})
+
 beforeEach(() => {
   vi.restoreAllMocks()
 })
