@@ -431,9 +431,9 @@ export class LevelViewController implements Tickable {
   /** Spawn-radius jitter for the final rock-to-gun vacuum cloud. */
   private static readonly TRACTOR_CONSUME_SPAWN_RADIUS = 1.8
   /** Minimum speed fraction used so consume particles arrive over a beat, not instantly. */
-  private static readonly TRACTOR_CONSUME_MIN_SPEED_FRACTION = 0.45
+  private static readonly TRACTOR_CONSUME_MIN_SPEED_FRACTION = 0.33
   /** Maximum speed fraction for the faster front edge of the vacuum cloud. */
-  private static readonly TRACTOR_CONSUME_MAX_SPEED_FRACTION = 1.15
+  private static readonly TRACTOR_CONSUME_MAX_SPEED_FRACTION = 0.82
   /** Lateral velocity jitter so the consume burst feels like a cloud, not a laser line. */
   private static readonly TRACTOR_CONSUME_LATERAL_SPEED = 3.8
   /** Reused scratch — gun muzzle world position for tractor velocity calc. */
