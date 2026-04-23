@@ -1343,6 +1343,7 @@ watch(
     :eyebrow="journeyTracker.eyebrow"
     :title="journeyTracker.title"
     :objectives="journeyTracker.objectives"
+    variant="journey"
   />
   <div
     v-show="

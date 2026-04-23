@@ -34,15 +34,24 @@ export interface ObjectiveTrackerEntry {
   steps: readonly ObjectiveTrackerStep[]
 }
 
-defineProps<{
-  eyebrow: string
-  title: string
-  objectives: ObjectiveTrackerEntry[]
-}>()
+/** Color theme for the tracker. `mission` = cyan (level missions); `journey` = amber (meta journeys). */
+export type ObjectiveTrackerVariant = 'mission' | 'journey'
+
+withDefaults(
+  defineProps<{
+    eyebrow: string
+    title: string
+    objectives: ObjectiveTrackerEntry[]
+    variant?: ObjectiveTrackerVariant
+  }>(),
+  {
+    variant: 'mission',
+  },
+)
 </script>
 
 <template>
-  <div class="mission-tracker">
+  <div class="mission-tracker" :class="`mission-tracker--${variant}`">
     <div class="tracker-header">
       <div class="tracker-asteroid">{{ eyebrow }}</div>
       <div class="tracker-mission">{{ title }}</div>
@@ -84,7 +93,27 @@ defineProps<{
 </template>
 
 <style>
+/**
+ * Palette is driven by four CSS variables. The default block below is the cyan
+ * "mission" theme used by LevelView; `.mission-tracker--journey` overrides them
+ * with amber values for MapView's journey tracker.
+ */
 .mission-tracker {
+  --tracker-bg: rgba(0, 10, 15, 0.5);
+  --tracker-border: rgba(0, 255, 204, 0.15);
+  --tracker-border-soft: rgba(0, 255, 204, 0.1);
+  --tracker-eyebrow: rgba(0, 255, 204, 0.4);
+  --tracker-title: rgba(0, 255, 204, 0.8);
+  --tracker-text: rgba(255, 255, 255, 0.6);
+  --tracker-text-dim: rgba(255, 255, 255, 0.3);
+  --tracker-text-bright: rgba(255, 255, 255, 0.8);
+  --tracker-accent: rgba(0, 255, 204, 0.5);
+  --tracker-accent-strong: rgba(0, 255, 204, 0.9);
+  --tracker-accent-soft: rgba(0, 255, 204, 0.4);
+  --tracker-accent-subtle: rgba(0, 255, 204, 0.6);
+  --tracker-progress: rgba(0, 255, 204, 0.7);
+  --tracker-strikethrough: rgba(0, 255, 204, 0.3);
+
   position: fixed;
   top: 5.5rem;
   right: 1rem;
@@ -94,17 +123,33 @@ defineProps<{
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.8rem 1rem;
-  background: rgba(16, 10, 0, 0.55);
-  border: 1px solid rgba(251, 191, 36, 0.22);
+  background: var(--tracker-bg);
+  border: 1px solid var(--tracker-border);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   min-width: 10rem;
+}
+.mission-tracker--journey {
+  --tracker-bg: rgba(16, 10, 0, 0.55);
+  --tracker-border: rgba(251, 191, 36, 0.22);
+  --tracker-border-soft: rgba(251, 191, 36, 0.18);
+  --tracker-eyebrow: rgba(252, 211, 77, 0.5);
+  --tracker-title: rgba(253, 224, 71, 0.9);
+  --tracker-text: rgba(255, 243, 214, 0.7);
+  --tracker-text-dim: rgba(255, 243, 214, 0.38);
+  --tracker-text-bright: rgba(255, 243, 214, 0.9);
+  --tracker-accent: rgba(251, 191, 36, 0.55);
+  --tracker-accent-strong: rgba(253, 224, 71, 0.95);
+  --tracker-accent-soft: rgba(251, 191, 36, 0.45);
+  --tracker-accent-subtle: rgba(252, 211, 77, 0.7);
+  --tracker-progress: rgba(252, 211, 77, 0.75);
+  --tracker-strikethrough: rgba(251, 191, 36, 0.35);
 }
 .tracker-header {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  border-bottom: 1px solid rgba(251, 191, 36, 0.22);
+  border-bottom: 1px solid var(--tracker-border);
   padding-bottom: 0.4rem;
 }
 .tracker-asteroid {
@@ -112,14 +157,14 @@ defineProps<{
   font-size: 0.65rem;
   letter-spacing: 0.3em;
   text-transform: uppercase;
-  color: rgba(252, 211, 77, 0.5);
+  color: var(--tracker-eyebrow);
 }
 .tracker-mission {
   font-family: 'Datatype', ui-monospace, monospace;
   font-size: 0.8rem;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: rgba(253, 224, 71, 0.9);
+  color: var(--tracker-title);
 }
 .tracker-objectives {
   display: flex;
@@ -139,29 +184,29 @@ defineProps<{
   font-size: 0.75rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(255, 243, 214, 0.7);
+  color: var(--tracker-text);
   transition: color 0.3s;
 }
 .tracker-objective--complete {
-  color: rgba(251, 191, 36, 0.55);
+  color: var(--tracker-accent);
 }
 .tracker-objective--complete .tracker-label {
   text-decoration: line-through;
-  text-decoration-color: rgba(251, 191, 36, 0.35);
+  text-decoration-color: var(--tracker-strikethrough);
 }
 .tracker-check {
   font-size: 0.85rem;
-  color: rgba(252, 211, 77, 0.7);
+  color: var(--tracker-accent-subtle);
 }
 .tracker-objective--complete .tracker-check {
-  color: rgba(253, 224, 71, 0.95);
+  color: var(--tracker-accent-strong);
 }
 .tracker-steps {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
   padding-left: 1.2rem;
-  border-left: 1px solid rgba(251, 191, 36, 0.18);
+  border-left: 1px solid var(--tracker-border-soft);
   margin-left: 0.35rem;
 }
 .tracker-step {
@@ -171,29 +216,29 @@ defineProps<{
   font-family: 'Datatype', ui-monospace, monospace;
   font-size: 0.65rem;
   letter-spacing: 0.08em;
-  color: rgba(255, 243, 214, 0.38);
+  color: var(--tracker-text-dim);
   transition: color 0.3s;
 }
 .tracker-step--active {
-  color: rgba(255, 243, 214, 0.9);
+  color: var(--tracker-text-bright);
 }
 .tracker-step--complete {
-  color: rgba(251, 191, 36, 0.45);
+  color: var(--tracker-accent-soft);
 }
 .tracker-step-icon {
   font-size: 0.7rem;
-  color: rgba(252, 211, 77, 0.55);
+  color: var(--tracker-accent);
 }
 .tracker-step--active .tracker-step-icon {
-  color: rgba(253, 224, 71, 0.95);
+  color: var(--tracker-accent-strong);
 }
 .tracker-step-progress {
   margin-left: auto;
   padding-left: 0.5rem;
   font-variant-numeric: tabular-nums;
-  color: rgba(252, 211, 77, 0.75);
+  color: var(--tracker-progress);
 }
 .tracker-step--complete .tracker-step-progress {
-  color: rgba(251, 191, 36, 0.55);
+  color: var(--tracker-accent);
 }
 </style>
