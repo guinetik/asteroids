@@ -36,6 +36,16 @@ const AIR_CONTROL_SPEED_FRACTION = 0.2
 const HOVER_AIR_CONTROL_ACCEL_FRACTION = 0.4
 /** Hovering still drifts, but gives a little more mid-air steering than a plain jump arc. */
 const HOVER_AIR_CONTROL_SPEED_FRACTION = 0.35
+/** Maximum vertical gap (units) the boots will snap downward over while walking. */
+const GRAVITY_BOOTS_SNAP_DISTANCE = 0.18
+/** Maximum ledge drop (units) the boots will briefly mask before declaring a fall. */
+const GRAVITY_BOOTS_LEDGE_DROP = 0.35
+/** How long the boots preserve locomotion-grounded state across tiny gaps. */
+const GRAVITY_BOOTS_GRACE_TIME = 0.08
+/** Downward snap speed (units/s) while the boots pull the player onto support. */
+const GRAVITY_BOOTS_SNAP_SPEED = 18
+/** Upward velocity above this breaks the boots immediately into airborne mode. */
+const GRAVITY_BOOTS_UPWARD_BREAK_SPEED = 0.75
 
 /**
  * Default duration (seconds) that an external lateral impulse keeps the
@@ -48,20 +58,18 @@ const KNOCKBACK_OVERRIDE_DURATION = 0.28
 
 /**
  * Once the sprint thruster fully depletes, the player must let it recharge to
- * at least this fraction of its capacity before holding Shift will engage
- * sprint again. Without the lockout, the per-frame `canFire` check lets sprint
- * stutter on for one frame as soon as a sliver of charge is recovered, which
- * feels like the system is fighting the input. The minimum threshold makes
- * "out of stamina" actually mean something.
+ * a full bar before holding Shift can engage sprint again. Without the lockout,
+ * the per-frame `canFire` check lets sprint stutter on for one frame as soon as
+ * a sliver of charge is recovered, which feels like the system is fighting the
+ * input. Requiring a full refill makes "out of stamina" read as a complete
+ * cooldown instead of a partial pause.
  *
- * Tuned to 0.5 so the player has to wait for a visibly-half-full bar before
- * the next sprint kicks in (≈1.7 s of recovery at the current recharge rate).
- * Combined with the `sprintReleasedSinceLockout` gate this gives a
- * recognisable "winded" cooldown instead of the previous 1.6 s
- * recharge-drain-lock cycle that pulsed the breathing audio every couple of
- * seconds.
+ * Tuned to `1` so sprint stays unavailable until the tank has completely
+ * recovered. Combined with the `sprintReleasedSinceLockout` gate this gives a
+ * recognisable "winded" cooldown instead of the previous recharge-drain-lock
+ * cycle that pulsed the breathing audio every couple of seconds.
  */
-const SPRINT_RELOCK_FRACTION = 0.5
+const SPRINT_RELOCK_FRACTION = 1
 const PLAYER_COLLISION_CONFIG: CharacterCollisionConfig = {
   radius: 0.65,
   maxStepHeight: 0.9,
@@ -202,6 +210,10 @@ export class FpsPlayerController implements Tickable {
    * recomputing the conditions and missing the lockout.
    */
   private _isSprinting = false
+  /** Stable grounded state used by locomotion/audio/UI consumers. */
+  private bootsGrounded = false
+  /** Short grace window so tiny support ambiguity does not flicker grounded state. */
+  private bootsGraceTimer = 0
 
   /** Fired when health reaches zero. */
   onDeath: (() => void) | null = null
@@ -230,6 +242,11 @@ export class FpsPlayerController implements Tickable {
 
   /** Whether the player is on the ground. */
   get grounded(): boolean {
+    return this.bootsGrounded
+  }
+
+  /** Whether the physics body has strict support contact this frame. */
+  get physicsGrounded(): boolean {
     return this.body.grounded
   }
 
@@ -347,10 +364,11 @@ export class FpsPlayerController implements Tickable {
    * Applies an upward velocity impulse via {@link PlatformerBody}.
    */
   jump(): void {
-    if (!this.body.grounded) return
+    if (!this.grounded) return
     if (!this.thrusterSystem.canFire('jump')) return
     this.body.impulse(this.config.movement.jumpForce)
     this.body.grounded = false
+    this.breakGravityBoots()
   }
 
   /**
@@ -371,8 +389,15 @@ export class FpsPlayerController implements Tickable {
     const sprintCfg = this.config.o2.thrusters.sprint
     const sprintCharge = this.thrusterSystem.getState('sprint').charge
     const sprintHeld = this.inputManager.isActionActive('sprint')
+    const hasMoveInput =
+      this.inputManager.isActionActive('moveForward') ||
+      this.inputManager.isActionActive('moveBack') ||
+      this.inputManager.isActionActive('moveLeft') ||
+      this.inputManager.isActionActive('moveRight')
+    const sprintWantsEngage = this.grounded && sprintHeld && hasMoveInput
+    const sprintCanFire = this.thrusterSystem.canFire('sprint')
 
-    if (sprintCharge <= 0) {
+    if (sprintCharge <= 0 || (sprintWantsEngage && !sprintCanFire)) {
       if (!this.sprintLocked) {
         this.sprintLocked = true
         this.sprintReleasedSinceLockout = false
@@ -392,14 +417,13 @@ export class FpsPlayerController implements Tickable {
     }
 
     const isSprinting =
-      this.body.grounded &&
-      sprintHeld &&
+      sprintWantsEngage &&
       !this.sprintLocked &&
-      this.thrusterSystem.canFire('sprint')
+      sprintCanFire
     this._isSprinting = isSprinting
 
     // --- Coyote time — track how long since last grounded ---
-    if (this.body.grounded) {
+    if (this.grounded) {
       this.coyoteTimer = COYOTE_TIME
     } else {
       this.coyoteTimer = Math.max(0, this.coyoteTimer - dt)
@@ -412,6 +436,7 @@ export class FpsPlayerController implements Tickable {
       const jumpBoost = isSprinting ? SPRINT_JUMP_BOOST : 1
       this.body.impulse(this.config.movement.jumpForce * jumpBoost)
       this.body.grounded = false
+      this.breakGravityBoots()
       this.coyoteTimer = 0
       if (!this._prevJumping) {
         // Layer the thruster cue + the effort grunt on the rising edge.
@@ -437,11 +462,12 @@ export class FpsPlayerController implements Tickable {
     const hoverActive =
       jumpHeld &&
       !canJump &&
-      !this.body.grounded &&
+      !this.grounded &&
       !this.thrusterSystem.isFuelEmpty
     if (hoverActive) {
       this.body.impulse(this.config.movement.hoverForce * dt)
       this.thrusterSystem.consumeFuel(this.config.o2.hoverDrainRate * dt)
+      this.breakGravityBoots()
     }
 
     // --- Hypoxia: HP drain only when O2 tank is empty ---
@@ -478,7 +504,7 @@ export class FpsPlayerController implements Tickable {
       this.knockbackTimer = Math.max(0, this.knockbackTimer - dt)
     }
 
-    if (this.body.grounded && this.knockbackTimer <= 0) {
+    if (this.grounded && this.knockbackTimer <= 0) {
       // Grounded: instant velocity toward input direction (responsive walking)
       if (wishLen > 0) {
         // Normalize and scale to target speed
@@ -489,7 +515,7 @@ export class FpsPlayerController implements Tickable {
         this.lateralVelocity.x = 0
         this.lateralVelocity.z = 0
       }
-    } else if (this.body.grounded) {
+    } else if (this.grounded) {
       // Knockback override active — let the impulse carry the player while
       // ground friction bleeds it off. Input still nudges along the existing
       // direction (same shape as the airborne branch) so the player can
@@ -573,15 +599,65 @@ export class FpsPlayerController implements Tickable {
       this.group.position.y + PLAYER_COLLISION_CONFIG.maxStepHeight,
       PLAYER_COLLISION_CONFIG.radius,
     )
+    const wantsMovementBoots = wishLen > 0 && this.knockbackTimer <= 0
+    const shouldBreakBoots =
+      canJump || hoverActive || this.knockbackTimer > 0 || this.body.velocityY > GRAVITY_BOOTS_UPWARD_BREAK_SPEED
+    const supportGap = this.group.position.y - support.height
+    const supportBelowFeet = support.height <= this.group.position.y
+    const supportWalkable = support.normal.y >= Math.cos(PLAYER_COLLISION_CONFIG.maxClimbAngleRad)
+    const canUseGravityBoots =
+      wantsMovementBoots &&
+      !shouldBreakBoots &&
+      supportWalkable &&
+      supportBelowFeet &&
+      supportGap >= 0 &&
+      supportGap <= GRAVITY_BOOTS_LEDGE_DROP
+
+    if (shouldBreakBoots) {
+      this.breakGravityBoots()
+    } else if (canUseGravityBoots) {
+      this.bootsGraceTimer = GRAVITY_BOOTS_GRACE_TIME
+    } else {
+      this.bootsGraceTimer = Math.max(0, this.bootsGraceTimer - dt)
+    }
+
+    const shouldSnapToSupport =
+      canUseGravityBoots &&
+      supportGap <= GRAVITY_BOOTS_SNAP_DISTANCE
+
+    if (shouldSnapToSupport) {
+      const snapDistance = Math.min(supportGap, GRAVITY_BOOTS_SNAP_SPEED * dt)
+      this.group.position.y = Math.max(support.height, this.group.position.y - snapDistance)
+      if (this.group.position.y <= support.height + 1e-4) {
+        this.group.position.y = support.height
+        if (this.body.velocityY < 0) {
+          this.body.velocityY = 0
+        }
+      }
+    }
+
     this.group.position.y = this.body.tick(dt, this.group.position.y, support.height)
+    this.bootsGrounded =
+      this.body.grounded ||
+      (
+        this.bootsGraceTimer > 0 &&
+        canUseGravityBoots &&
+        supportGap <= GRAVITY_BOOTS_SNAP_DISTANCE
+      )
 
     // --- Surface conforming (align up to terrain/support normal when grounded) ---
-    if (this.body.grounded) {
+    if (this.grounded) {
       const n = support.normal
       const tiltX = Math.atan2(n.z, n.y)
       const tiltZ = Math.atan2(-n.x, n.y)
       this.group.rotation.set(tiltX, this.group.rotation.y, tiltZ)
     }
+  }
+
+  /** Clear boots-grounded state so the next frame uses airborne locomotion rules. */
+  private breakGravityBoots(): void {
+    this.bootsGrounded = false
+    this.bootsGraceTimer = 0
   }
 
   /** Release resources. No owned listeners — pointer lock handled by ViewController. */

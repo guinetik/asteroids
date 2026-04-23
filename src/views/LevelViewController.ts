@@ -1901,16 +1901,17 @@ export class LevelViewController implements Tickable {
       )
 
       const grounded = this.playerController.grounded
+      const physicsGrounded = this.playerController.physicsGrounded
 
       // Fall damage — only on the airborne → grounded transition. The
       // body's `impactVelocityY` is set during this frame's player tick
       // (which runs before `LevelViewController.tick` thanks to the tick
       // priority ordering), so it's safe to read here.
-      if (grounded && !this._prevGrounded) {
+      if (physicsGrounded && !this._prevGrounded) {
         this.applyEvaFallDamage()
       }
 
-      this._prevGrounded = grounded
+      this._prevGrounded = physicsGrounded
 
       // All player-movement audio (footsteps, breathing crossfade,
       // floating onset with delay+fade, contact-damage loop decay) is

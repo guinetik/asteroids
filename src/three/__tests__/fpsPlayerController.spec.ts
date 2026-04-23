@@ -6,6 +6,11 @@ import { InputManager } from '@/lib/InputManager'
 import { FPS_BINDINGS } from '@/lib/defaultBindings'
 import { FpsCamera } from '../FpsCamera'
 import playerConfigJson from '@/data/fps/player-config.json'
+import {
+  CollisionWorld,
+  type CharacterMoveResult,
+  type SupportSurfaceResult,
+} from '@/lib/physics/worldCollision'
 
 // Build a flat heightmap at y=0
 function flatHeightmap(): Heightmap {
@@ -27,6 +32,64 @@ function createController(): {
     cam,
     playerConfigJson as FpsPlayerConfig,
     hm,
+  )
+  cam.setTarget(ctrl.group)
+  return { ctrl, input, cam }
+}
+
+class ScriptedCollisionWorld extends CollisionWorld {
+  supportHeight = 0
+
+  override moveCharacterXZ(
+    current: { x: number; y: number; z: number },
+    deltaX: number,
+    deltaZ: number,
+    _bodyBottomY: number,
+    _bodyTopY: number,
+    _config: Parameters<CollisionWorld['moveCharacterXZ']>[5],
+  ): CharacterMoveResult {
+    return {
+      x: current.x + deltaX,
+      z: current.z + deltaZ,
+      blocked: false,
+      touchedCollider: false,
+      groundHeight: this.supportHeight,
+      groundNormal: { x: 0, y: 1, z: 0 },
+      groundAngleRad: 0,
+      groundWalkable: true,
+    }
+  }
+
+  override getHighestSupportUnderDisc(
+    _x: number,
+    _z: number,
+    _minY: number,
+    _maxY: number,
+    _radius: number,
+    _ignoreColliderId?: string,
+  ): SupportSurfaceResult {
+    return {
+      height: this.supportHeight,
+      normal: { x: 0, y: 1, z: 0 },
+      colliderId: null,
+    }
+  }
+}
+
+function createControllerWithCollisionWorld(world: CollisionWorld): {
+  ctrl: FpsPlayerController
+  input: InputManager
+  cam: FpsCamera
+} {
+  const input = new InputManager(FPS_BINDINGS)
+  const cam = new FpsCamera(playerConfigJson.camera)
+  const hm = flatHeightmap()
+  const ctrl = new FpsPlayerController(
+    input,
+    cam,
+    playerConfigJson as FpsPlayerConfig,
+    hm,
+    world,
   )
   cam.setTarget(ctrl.group)
   return { ctrl, input, cam }
@@ -161,5 +224,118 @@ describe('FpsPlayerController', () => {
     const airDecel = airSpeedBefore - ctrl2.speed
 
     expect(airDecel).toBeLessThan(groundDecel)
+  })
+
+  it('keeps boots-grounded over a tiny support dip while moving', () => {
+    const world = new ScriptedCollisionWorld()
+    const { ctrl, input } = createControllerWithCollisionWorld(world)
+
+    ctrl.group.position.y = 0
+    ctrl.tick(0.016)
+    world.supportHeight = -0.1
+
+    pressKey('KeyW')
+    input.tick(0.016)
+    ctrl.tick(0.016)
+    releaseKey('KeyW')
+    input.tick(0.016)
+
+    expect(ctrl.grounded).toBe(true)
+    expect(ctrl.speed).toBe(playerConfigJson.movement.maxSpeed)
+  })
+
+  it('keeps sprint engaged across a tiny support dip while moving', () => {
+    const world = new ScriptedCollisionWorld()
+    const { ctrl, input } = createControllerWithCollisionWorld(world)
+
+    ctrl.group.position.y = 0
+    ctrl.tick(0.016)
+    world.supportHeight = -0.1
+
+    pressKey('KeyW')
+    pressKey('ShiftLeft')
+    input.tick(0.016)
+    ctrl.tick(0.016)
+    releaseKey('KeyW')
+    releaseKey('ShiftLeft')
+    input.tick(0.016)
+
+    expect(ctrl.grounded).toBe(true)
+    expect(ctrl.isSprinting).toBe(true)
+    expect(ctrl.speed).toBe(playerConfigJson.movement.maxSprintSpeed)
+  })
+
+  it('jump exits boots-grounded immediately', () => {
+    const world = new ScriptedCollisionWorld()
+    const { ctrl, input } = createControllerWithCollisionWorld(world)
+
+    ctrl.group.position.y = 0
+    ctrl.tick(0.016)
+
+    pressKey('KeyW')
+    pressKey('Space')
+    input.tick(0.016)
+    ctrl.tick(0.016)
+    releaseKey('KeyW')
+    releaseKey('Space')
+    input.tick(0.016)
+
+    expect(ctrl.grounded).toBe(false)
+    expect(ctrl.physicsGrounded).toBe(false)
+    expect(ctrl.group.position.y).toBeGreaterThan(0)
+  })
+
+  it('drops out of boots-grounded when walking off a real ledge', () => {
+    const world = new ScriptedCollisionWorld()
+    const { ctrl, input } = createControllerWithCollisionWorld(world)
+
+    ctrl.group.position.y = 0
+    ctrl.tick(0.016)
+    world.supportHeight = -1
+
+    pressKey('KeyW')
+    input.tick(0.016)
+    ctrl.tick(0.016)
+    releaseKey('KeyW')
+    input.tick(0.016)
+
+    expect(ctrl.grounded).toBe(false)
+    expect(ctrl.physicsGrounded).toBe(false)
+  })
+
+  it('uses airborne steering rules after leaving support', () => {
+    const world = new ScriptedCollisionWorld()
+    const { ctrl, input } = createControllerWithCollisionWorld(world)
+
+    world.supportHeight = -10
+    ctrl.group.position.y = 5
+
+    pressKey('KeyW')
+    input.tick(0.016)
+    ctrl.tick(0.1)
+    releaseKey('KeyW')
+    input.tick(0.016)
+
+    expect(ctrl.grounded).toBe(false)
+    expect(ctrl.speed).toBeLessThan(playerConfigJson.movement.maxSpeed)
+  })
+
+  it('lets knockback break boots-grounded over a tiny support dip', () => {
+    const world = new ScriptedCollisionWorld()
+    const { ctrl, input } = createControllerWithCollisionWorld(world)
+
+    ctrl.group.position.y = 0
+    ctrl.tick(0.016)
+    world.supportHeight = -0.1
+    ctrl.applyLateralImpulse(4, 0)
+
+    pressKey('KeyW')
+    input.tick(0.016)
+    ctrl.tick(0.016)
+    releaseKey('KeyW')
+    input.tick(0.016)
+
+    expect(ctrl.grounded).toBe(false)
+    expect(ctrl.physicsGrounded).toBe(false)
   })
 })
