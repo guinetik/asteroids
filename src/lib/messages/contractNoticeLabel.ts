@@ -17,7 +17,7 @@
 
 import type { ShipMessageReadable } from '@/lib/messages/messageTypes'
 
-/** Pill label returned when no contract name is available. */
+/** Label used for `intro` messages; the generic offer copy per spec. */
 const GENERIC_OFFER_LABEL = 'NEW CONTRACT OFFER'
 const GENERIC_UPDATED_LABEL = 'CONTRACT UPDATED'
 const GENERIC_COMPLETE_LABEL = 'CONTRACT COMPLETE'
