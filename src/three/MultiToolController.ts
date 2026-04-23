@@ -60,6 +60,8 @@ const ADS_OFFSET_Z = -0.50
 const ADS_LERP_SPEED = 12
 /** How fast tilt lerps (per second). */
 const TILT_LERP_SPEED = 8
+/** Short grace window that keeps the drill audio alive across tiny fire gaps. */
+const DRILL_AUDIO_KEEPALIVE_SECONDS = 0.12
 
 /**
  * FPS weapon fixture — loads multi-tool GLB and attaches to camera.
@@ -95,7 +97,7 @@ export class MultiToolController implements Tickable {
   private currentOffsetX = OFFSET_X
   private currentOffsetY = OFFSET_Y
   private currentOffsetZ = OFFSET_Z
-  private drillHandle: AudioPlaybackHandle | null = null
+  private drillLoop: AudioPlaybackHandle | null = null
   private drillAudioKeepAliveUntil = 0
 
   /**
@@ -226,9 +228,9 @@ export class MultiToolController implements Tickable {
     audio.unlock()
     switch (this.boltKind) {
       case 'drill':
-        this.drillAudioKeepAliveUntil = this.time + 0.08
-        if (!this.drillHandle?.playing()) {
-          this.drillHandle = audio.play('sfx.tool.drill')
+        this.drillAudioKeepAliveUntil = this.time + DRILL_AUDIO_KEEPALIVE_SECONDS
+        if (!this.drillLoop?.playing()) {
+          this.drillLoop = audio.play('sfx.laserPulse', { loop: true })
         }
         break
       case 'weapon':
@@ -276,10 +278,7 @@ export class MultiToolController implements Tickable {
   tick(dt: number): void {
     if (!this.model || !this.camera) return
     this.time += dt
-
-    if (this.currentMode !== 'drill' || this.time > this.drillAudioKeepAliveUntil) {
-      this.stopDrillAudio()
-    }
+    this.updateDrillAudio()
 
     // Lerp offset between hip and ADS positions
     const targetX = this.aiming ? ADS_OFFSET_X : OFFSET_X
@@ -360,8 +359,13 @@ export class MultiToolController implements Tickable {
   }
 
   private stopDrillAudio(): void {
-    this.drillHandle?.stop()
-    this.drillHandle = null
+    this.drillLoop?.stop()
+    this.drillLoop = null
     this.drillAudioKeepAliveUntil = 0
+  }
+
+  private updateDrillAudio(): void {
+    if (this.currentMode === 'drill' && this.time <= this.drillAudioKeepAliveUntil) return
+    this.stopDrillAudio()
   }
 }

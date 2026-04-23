@@ -89,17 +89,26 @@ export const MAP_RETICLE_MIN_SPEED = 0.135
  */
 export const MAP_RETICLE_MIN_SPEED_OFF = 0.045
 
-/** Time constant (seconds) for smoothing the wedge heading toward true velocity. */
-export const MAP_RETICLE_HEADING_SMOOTH_TAU_SEC = 0.055
+/**
+ * World-space distance along planar velocity for building a second projected point (NDC delta).
+ * Larger values reduce numeric noise; keep modest relative to map scale.
+ */
+export const MAP_RETICLE_WEDGE_PROJECT_OFFSET = 280
 
 /**
- * Extra low-pass on the wedge sprite’s final rotation (velocity heading minus camera azimuth).
- * Kills frame-to-frame jitter when the orbit camera moves faster than velocity.
+ * Low-pass (seconds) on wedge sprite rotation after screen-space velocity projection.
+ * Replaces separate heading + azimuth filters so camera pitch/orbit does not desync the wedge.
  */
-export const MAP_RETICLE_SPRITE_ANGLE_SMOOTH_TAU_SEC = 0.048
+export const MAP_RETICLE_WEDGE_ROTATION_SMOOTH_TAU_SEC = 0.055
+
+/** Low-pass on reticle opacity when shuttle apparent scale crosses the fade band (reduces flicker). */
+export const MAP_RETICLE_ALPHA_SMOOTH_TAU_SEC = 0.09
 
 /** Opacity smoothing for orbit prograde / retrograde markers (reduces alignment flicker). */
 export const MAP_PROGRADE_MARKER_OPACITY_SMOOTH_TAU_SEC = 0.12
+
+/** Low-pass on prograde/retro world positions (reduces marker jitter on the orbit ring). */
+export const MAP_PROGRADE_MARKER_POSITION_SMOOTH_TAU_SEC = 0.08
 
 /**
  * Low-pass ship yaw into camera-orbit coupling. `0` = legacy instant coupling.
@@ -467,9 +476,11 @@ export const MAP_VIEW_CONTROLLER_CONFIG = {
   MAP_RETICLE_FADE_START,
   MAP_RETICLE_MIN_SPEED,
   MAP_RETICLE_MIN_SPEED_OFF,
-  MAP_RETICLE_HEADING_SMOOTH_TAU_SEC,
-  MAP_RETICLE_SPRITE_ANGLE_SMOOTH_TAU_SEC,
+  MAP_RETICLE_WEDGE_PROJECT_OFFSET,
+  MAP_RETICLE_WEDGE_ROTATION_SMOOTH_TAU_SEC,
+  MAP_RETICLE_ALPHA_SMOOTH_TAU_SEC,
   MAP_PROGRADE_MARKER_OPACITY_SMOOTH_TAU_SEC,
+  MAP_PROGRADE_MARKER_POSITION_SMOOTH_TAU_SEC,
   MAP_SHIP_YAW_CAMERA_SMOOTH_TAU_SEC,
   MAP_SHUTTLE_BASE_SIZE,
   MAP_SHUTTLE_COLLISION_RADIUS,

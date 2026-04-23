@@ -15,7 +15,7 @@
  *
  * Bumped 2026-04-18 (8 → 14) so visibly larger boulders read as
  * tougher targets — combined with `MAX_ROCK_YIELD_KG` below the
- * biggest rocks now take ~4× the hits of the smallest ones to break.
+ * biggest rocks now take ~5× the hits of the smallest ones to break.
  */
 export const MINERAL_KG_PER_DIAMETER_UNIT = 14
 
@@ -25,9 +25,9 @@ export const MIN_ROCK_YIELD_KG = 6
 /**
  * Upper clamp on rock yield. Massive boulders cap out so a single
  * rock can't trivialise an entire quota, but the cap is high enough
- * that a 24m boulder takes roughly 40 drill bolts to break.
+ * that a 24m boulder takes roughly 60 drill bolts to break.
  */
 export const MAX_ROCK_YIELD_KG = 240
 
 /** Kilograms removed by a single drill bolt impact. */
-export const BOLT_DAMAGE_KG_PER_HIT = 6
+export const BOLT_DAMAGE_KG_PER_HIT = 4

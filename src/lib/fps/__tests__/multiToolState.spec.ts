@@ -38,7 +38,7 @@ describe('MultiToolState', () => {
 
   // --- Trigger: hold (drill) ---
 
-  it('hold trigger: fires every frame while mouse held + aiming', () => {
+  it('hold trigger: fires immediately on press while aiming', () => {
     state.setMode('drill')
     state.setAiming(true)
     state.setInput(true, true)
@@ -46,7 +46,7 @@ describe('MultiToolState', () => {
     expect(state.isFiring).toBe(true)
   })
 
-  it('hold trigger: keeps firing while mouse held', () => {
+  it('hold trigger: waits for the configured interval before firing again', () => {
     state.setMode('drill')
     state.setAiming(true)
     state.setInput(true, true)
@@ -54,6 +54,12 @@ describe('MultiToolState', () => {
     expect(state.isFiring).toBe(true)
     state.setInput(true, false)
     state.tick(0.016)
+    expect(state.isFiring).toBe(false)
+    state.setInput(true, false)
+    state.tick(0.07)
+    expect(state.isFiring).toBe(false)
+    state.setInput(true, false)
+    state.tick(0.014)
     expect(state.isFiring).toBe(true)
   })
 
@@ -74,6 +80,22 @@ describe('MultiToolState', () => {
     state.setInput(false, false)
     state.tick(0.016)
     expect(state.isFiring).toBe(false)
+  })
+
+  it('hold trigger: still fires every frame when no fireRate is configured', () => {
+    const config = structuredClone(multiToolConfigJson as MultiToolConfig)
+    delete config.modes.drill.fireRate
+    state = new MultiToolState(config)
+
+    state.setMode('drill')
+    state.setAiming(true)
+    state.setInput(true, true)
+    state.tick(0.016)
+    expect(state.isFiring).toBe(true)
+
+    state.setInput(true, false)
+    state.tick(0.016)
+    expect(state.isFiring).toBe(true)
   })
 
   it('drill stays locked after depletion until recharged to at least 50%', () => {

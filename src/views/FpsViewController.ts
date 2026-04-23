@@ -817,6 +817,8 @@ export class FpsViewController implements Tickable {
         sprinting: this.playerController.isSprinting,
         speed: this.playerController.speed,
         hovering: this.playerController.isHovering,
+        o2Level: this.playerController.o2Level,
+        o2Capacity: this.playerController.o2Capacity,
       })
     }
 

@@ -213,7 +213,27 @@ export class MultiToolState implements Tickable {
 
       switch (cfg.trigger) {
         case 'hold':
-          wantsFire = this._mouseDown
+          if (!this._mouseDown) {
+            this.autoTimer = 0
+            break
+          }
+
+          if (cfg.fireRate === undefined) {
+            wantsFire = true
+            break
+          }
+
+          if (this._mouseJustPressed) {
+            wantsFire = true
+            this.autoTimer = 0
+            break
+          }
+
+          this.autoTimer += dt
+          if (this.autoTimer >= 1 / cfg.fireRate) {
+            wantsFire = true
+            this.autoTimer -= 1 / cfg.fireRate
+          }
           break
 
         case 'auto': {

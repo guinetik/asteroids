@@ -36,6 +36,8 @@ const FLOAT_SOUND_DELAY = 0.5
 const FLOAT_FADE_IN_MS = 600
 /** Master SFX gain applied to the procedural hover-RCS bed. */
 const FPS_HOVER_RCS_VOLUME = 0.26
+/** Oxygen fraction threshold at or below which the low-O2 loop should sound. */
+const LOW_OXYGEN_FRACTION = 0.2
 /**
  * How long (seconds) the contact-damage loop is held after the most recent
  * melee tick before fading. Sized larger than a typical melee tick interval
@@ -85,6 +87,10 @@ export interface FpsAudioMovementState {
    * quieter floating bed while upward suit jets add the RCS texture.
    */
   hovering: boolean
+  /** Current oxygen amount in the suit reserve. */
+  o2Level: number
+  /** Maximum oxygen capacity used to normalize {@link o2Level}. */
+  o2Capacity: number
 }
 
 /**
@@ -108,10 +114,14 @@ export class FpsAudioDirector {
   private breathingWalk: AudioHandle | null = null
   /** Exertion breath loop. Replaces the walk loop while sprinting. */
   private breathingRun: AudioHandle | null = null
+  /** Suffocation breath loop. Replaces both normal breathing loops at zero O2. */
+  private breathingHard: AudioHandle | null = null
   /** Floating ambient loop. Created after {@link FLOAT_SOUND_DELAY} of continuous airtime. */
   private floating: AudioHandle | null = null
   /** Sustained "being mauled" loop. Refreshed by {@link FpsAudioDirector.notifyContactDamage}. */
   private contactLoop: AudioHandle | null = null
+  /** Low-O2 warning loop. */
+  private oxygenLow: AudioHandle | null = null
 
   /** Continuous-airtime accumulator that gates the floating loop start. */
   private floatTimer = 0
@@ -205,17 +215,25 @@ export class FpsAudioDirector {
     )
 
     // ── Breathing crossfade ─────────────────────────────────────
-    if (state.sprinting !== this.prevSprinting) {
-      if (state.sprinting) {
-        this.breathingWalk?.stop()
-        this.breathingWalk = null
-        this.breathingRun = this.audio.play('sfx.breathing.run', { loop: true })
-      } else {
-        this.breathingRun?.stop()
-        this.breathingRun = null
-        this.breathingWalk = this.audio.play('sfx.breathing.walk', { loop: true })
+    const o2Capacity = Math.max(0, state.o2Capacity)
+    const o2Level = Math.max(0, state.o2Level)
+    const o2Fraction = o2Capacity > 0 ? clamp01(o2Level / o2Capacity) : 0
+    const o2Empty = o2Level <= 0
+    if (o2Empty) {
+      this.ensureBreathingMode('hard')
+    } else {
+      this.ensureBreathingMode(state.sprinting ? 'run' : 'walk')
+    }
+    this.prevSprinting = state.sprinting
+
+    // ── Low-oxygen warning loop ────────────────────────────────
+    if (!o2Empty && o2Fraction < LOW_OXYGEN_FRACTION) {
+      if (this.oxygenLow === null) {
+        this.oxygenLow = this.audio.play('sfx.oxygen.low', { loop: true })
       }
-      this.prevSprinting = state.sprinting
+    } else {
+      this.oxygenLow?.stop()
+      this.oxygenLow = null
     }
 
     // ── Floating loop with delayed onset + fade-in ─────────────
@@ -340,6 +358,10 @@ export class FpsAudioDirector {
     this.breathingWalk = null
     this.breathingRun?.stop()
     this.breathingRun = null
+    this.breathingHard?.stop()
+    this.breathingHard = null
+    this.oxygenLow?.stop()
+    this.oxygenLow = null
     this.floating?.stop()
     this.floating = null
     this.contactLoop?.stop()
@@ -351,6 +373,39 @@ export class FpsAudioDirector {
     // Clear cadence so the next time we start, the very first step
     // doesn't fire mid-stride against stale timing from the last run.
     this.footsteps.reset()
+  }
+
+  /** Ensure exactly one breathing loop matches the requested exertion mode. */
+  private ensureBreathingMode(mode: 'walk' | 'run' | 'hard'): void {
+    if (mode === 'walk') {
+      this.breathingRun?.stop()
+      this.breathingRun = null
+      this.breathingHard?.stop()
+      this.breathingHard = null
+      if (this.breathingWalk === null) {
+        this.breathingWalk = this.audio.play('sfx.breathing.walk', { loop: true })
+      }
+      return
+    }
+
+    if (mode === 'run') {
+      this.breathingWalk?.stop()
+      this.breathingWalk = null
+      this.breathingHard?.stop()
+      this.breathingHard = null
+      if (this.breathingRun === null) {
+        this.breathingRun = this.audio.play('sfx.breathing.run', { loop: true })
+      }
+      return
+    }
+
+    this.breathingWalk?.stop()
+    this.breathingWalk = null
+    this.breathingRun?.stop()
+    this.breathingRun = null
+    if (this.breathingHard === null) {
+      this.breathingHard = this.audio.play('sfx.breathing.hard', { loop: true })
+    }
   }
 }
 

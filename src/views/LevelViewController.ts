@@ -14,6 +14,8 @@ import { DevConsole } from '@/lib/devConsole'
 import { LanderAudioDirector } from '@/audio/LanderAudioDirector'
 import { FpsAudioDirector } from '@/audio/FpsAudioDirector'
 import { LevelAudioDirector } from '@/audio/LevelAudioDirector'
+import type { AudioPlaybackHandle } from '@/audio/audioTypes'
+import { useAudio } from '@/audio/useAudio'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'
@@ -118,6 +120,8 @@ const CONTACT_KNOCKBACK = 26
  * scene gets the same hit feedback as the standalone FPS demo.
  */
 const DAMAGE_FLASH_DURATION = 0.3
+/** Seconds a mining-hit sizzle should linger after the latest valid rock hit. */
+const MINING_SIZZLE_KEEPALIVE_SECONDS = 0.18
 
 /**
  * Strength of the random pitch/yaw camera flinch applied on every hit. Tuned
@@ -395,15 +399,43 @@ export class LevelViewController implements Tickable {
    * the velocity is computed as `distance / lifetime` so the
    * particle reaches the gun muzzle right as it dies.
    */
-  private static readonly TRACTOR_LIFETIME_SEC = 0.32
+  private static readonly TRACTOR_LIFETIME_SEC = 0.58
   /** Particles emitted per drill bolt impact. Keep small — pool is shared. */
-  private static readonly TRACTOR_PARTICLES_PER_HIT = 4
+  private static readonly TRACTOR_PARTICLES_PER_HIT = 8
+  /** Visible chip burst count per mining hit now that drill shots are paced. */
+  private static readonly MINING_IMPACT_PARTICLES_PER_HIT = 12
+  /** Extra visible chip particles added for larger rocks. */
+  private static readonly MINING_IMPACT_PARTICLES_PER_RADIUS = 2.5
+  /** Ceiling for large-rock chip bursts so the shared pool stays healthy. */
+  private static readonly MAX_MINING_IMPACT_PARTICLES_PER_HIT = 28
+  /** Upward launch speed for mining chip particles. */
+  private static readonly MINING_IMPACT_VERTICAL_SPEED = 7.5
+  /** Random lateral scatter added to each mining chip particle. */
+  private static readonly MINING_IMPACT_LATERAL_SPEED = 2.2
+  /** Extra tractor particles added for larger rocks on each hit. */
+  private static readonly TRACTOR_PARTICLES_PER_RADIUS = 1.5
+  /** Strong one-shot vacuum burst when a rock is fully consumed. */
+  private static readonly TRACTOR_PARTICLES_ON_CONSUME = 52
+  /** Spawn-radius jitter for the final rock-to-gun vacuum cloud. */
+  private static readonly TRACTOR_CONSUME_SPAWN_RADIUS = 1.8
+  /** Minimum speed fraction used so consume particles arrive over a beat, not instantly. */
+  private static readonly TRACTOR_CONSUME_MIN_SPEED_FRACTION = 0.45
+  /** Maximum speed fraction for the faster front edge of the vacuum cloud. */
+  private static readonly TRACTOR_CONSUME_MAX_SPEED_FRACTION = 1.15
+  /** Lateral velocity jitter so the consume burst feels like a cloud, not a laser line. */
+  private static readonly TRACTOR_CONSUME_LATERAL_SPEED = 3.8
   /** Reused scratch — gun muzzle world position for tractor velocity calc. */
   private readonly _tractorMuzzle = new Vector3()
   /** Reused scratch — rock center used as tractor spawn origin. */
   private readonly _tractorOrigin = new Vector3()
   /** Reused scratch — direction from rock to muzzle, scaled by speed. */
   private readonly _tractorVel = new Vector3()
+  /** Reused scratch — offset spawn position for consume vacuum particles. */
+  private readonly _tractorSpawnPos = new Vector3()
+  /** Looping rock-contact bed sustained while mining hits keep landing. */
+  private miningSizzleHandle: AudioPlaybackHandle | null = null
+  /** Time threshold after which the mining-contact bed should stop. */
+  private miningSizzleKeepAliveUntil = 0
 
   // ── Arrival ──────────────────────────────────────────────────
   private arrivalSequence: ArrivalSequence | null = null
@@ -797,10 +829,12 @@ export class LevelViewController implements Tickable {
       // using during the same frame.
       poolSize: 128,
       color: new Color(0xffaa44),
-      size: 3,
-      lifetime: 0.4,
-      spread: 15,
-      opacity: 0.8,
+      size: 6.5,
+      lifetime: 0.6,
+      spread: 12,
+      opacity: 1,
+      soft: true,
+      sizeGrowth: 1.55,
     })
     this.sceneManager.addToScene(this.impactEmitter.points)
     // Tractor stream — particles fly from the struck rock toward the
@@ -809,15 +843,15 @@ export class LevelViewController implements Tickable {
     // "extraction" pull rather than a slow trail. Pool size budgets
     // ~6 spawns per drill tick at the system's worst-case fire rate.
     this.tractorEmitter = new ParticleEmitter({
-      poolSize: 96,
+      poolSize: 224,
       color: new Color(0x66ffee),
-      size: 6,
-      lifetime: LevelViewController.TRACTOR_LIFETIME_SEC,
-      spread: 1.4,
-      opacity: 0.85,
+      size: 4.8,
+      lifetime: 0.58,
+      spread: 2.8,
+      opacity: 1,
       soft: true,
-      sizeAttenuation: false,
-      sizeGrowth: 0.4,
+      sizeAttenuation: true,
+      sizeGrowth: 0.7,
     })
     this.sceneManager.addToScene(this.tractorEmitter.points)
     // Rock target indicator — single shared sprite that hops between
@@ -873,6 +907,9 @@ export class LevelViewController implements Tickable {
       }
     }
     this.rockYieldSystem.onConsume = (spawnIndex) => {
+      this.stopMiningSizzle()
+      useAudio().play('sfx.rock.melt')
+      this.spawnConsumeVacuumBurst(spawnIndex)
       this.surfaceRocks?.hideRock(spawnIndex)
       this.removeRockCollider(spawnIndex)
       this.projectileSystem?.removeRock(spawnIndex)
@@ -897,13 +934,22 @@ export class LevelViewController implements Tickable {
       this.levelAudio.notifyResourcePickup()
     }
     this.projectileSystem.onRockHit = (spawnIndex, pos) => {
-      this.rockYieldSystem?.mineRock(spawnIndex)
+      const result = this.rockYieldSystem?.mineRock(spawnIndex)
+      if (!result) return
+      if (!result.depleted) {
+        this.keepMiningSizzleAlive()
+      }
       this.surfaceRocks?.flashRock(spawnIndex)
-      for (let i = 0; i < 6; i++) {
-        this._impactVel.copy(this._impactUp).multiplyScalar(6)
+      const impactParticleCount = this.getMiningImpactParticleCount(spawnIndex)
+      for (let i = 0; i < impactParticleCount; i++) {
+        this._impactVel.set(
+          (Math.random() - 0.5) * LevelViewController.MINING_IMPACT_LATERAL_SPEED,
+          LevelViewController.MINING_IMPACT_VERTICAL_SPEED + Math.random() * 1.5,
+          (Math.random() - 0.5) * LevelViewController.MINING_IMPACT_LATERAL_SPEED,
+        )
         this.impactEmitter!.emit(pos, this._impactVel)
       }
-      this.spawnTractorBurst(spawnIndex, pos)
+      this.spawnTractorBurst(spawnIndex, pos, this.getTractorParticleCount(spawnIndex), false)
     }
 
     // ── Objective minigames ──────────────────────────────────────
@@ -1409,6 +1455,8 @@ export class LevelViewController implements Tickable {
     // exitEva is skipped on the dead path so we must cut EVA audio here
     // explicitly. The director's stop() also resets footstep cadence.
     this.fpsAudio.stop()
+    useAudio().play('sfx.heartbeat')
+    useAudio().play('sfx.flatline')
 
     // Fade + message are driven by the dead state tick, not set here
   }
@@ -1600,6 +1648,7 @@ export class LevelViewController implements Tickable {
   /** Per-frame update — dispatches F key triggers and mode-specific logic. */
   tick(dt: number): void {
     this.elapsed += dt
+    this.updateMiningSizzle()
 
     // Tick arrival sequence if active
     if (this.arrivalSequence) {
@@ -1921,6 +1970,8 @@ export class LevelViewController implements Tickable {
         sprinting: sprintingNow,
         speed: this.playerController.speed,
         hovering: this.playerController.isHovering,
+        o2Level: this.playerController.o2Level,
+        o2Capacity: this.playerController.o2Capacity,
       })
     }
 
@@ -2104,12 +2155,17 @@ export class LevelViewController implements Tickable {
    * @param spawnIndex Surface rock spawn id.
    * @param impactPos World-space hit position from the projectile system.
    */
-  private spawnTractorBurst(spawnIndex: number, impactPos: THREE.Vector3): void {
+  private spawnTractorBurst(
+    spawnIndex: number,
+    impactPos: THREE.Vector3,
+    particleCount: number,
+    useRockCenter: boolean,
+  ): void {
     const tractor = this.tractorEmitter
     const tool = this.multiTool
-    if (!tractor || !tool) return
+    if (!tractor || !tool || particleCount <= 0) return
     tool.getMuzzleWorldPosition(this._tractorMuzzle)
-    if (this.surfaceRocks && this.heightmap) {
+    if (useRockCenter && this.surfaceRocks && this.heightmap) {
       const center = this.surfaceRocks.getRockCenter(spawnIndex, this.heightmap, this._tractorOrigin)
       if (!center) this._tractorOrigin.copy(impactPos)
     } else {
@@ -2120,9 +2176,68 @@ export class LevelViewController implements Tickable {
     if (distance < 0.01) return
     const speed = distance / LevelViewController.TRACTOR_LIFETIME_SEC
     this._tractorVel.multiplyScalar(speed / distance)
-    for (let i = 0; i < LevelViewController.TRACTOR_PARTICLES_PER_HIT; i++) {
+    for (let i = 0; i < particleCount; i++) {
       tractor.emit(this._tractorOrigin, this._tractorVel)
     }
+  }
+
+  private spawnConsumeVacuumBurst(spawnIndex: number): void {
+    const tractor = this.tractorEmitter
+    const tool = this.multiTool
+    if (!tractor || !tool || !this.surfaceRocks || !this.heightmap) return
+    const center = this.surfaceRocks.getRockCenter(spawnIndex, this.heightmap, this._tractorOrigin)
+    if (!center) return
+    tool.getMuzzleWorldPosition(this._tractorMuzzle)
+
+    for (let i = 0; i < LevelViewController.TRACTOR_PARTICLES_ON_CONSUME; i++) {
+      this._tractorSpawnPos.copy(this._tractorOrigin).add(
+        this._impactVel.set(
+          (Math.random() - 0.5) * LevelViewController.TRACTOR_CONSUME_SPAWN_RADIUS,
+          (Math.random() - 0.5) * LevelViewController.TRACTOR_CONSUME_SPAWN_RADIUS,
+          (Math.random() - 0.5) * LevelViewController.TRACTOR_CONSUME_SPAWN_RADIUS,
+        ),
+      )
+
+      this._tractorVel.copy(this._tractorMuzzle).sub(this._tractorSpawnPos)
+      const distance = this._tractorVel.length()
+      if (distance < 0.01) continue
+
+      const speedFraction = LevelViewController.TRACTOR_CONSUME_MIN_SPEED_FRACTION
+        + Math.random()
+          * (
+            LevelViewController.TRACTOR_CONSUME_MAX_SPEED_FRACTION
+            - LevelViewController.TRACTOR_CONSUME_MIN_SPEED_FRACTION
+          )
+      const speed = (distance / LevelViewController.TRACTOR_LIFETIME_SEC) * speedFraction
+      this._tractorVel.multiplyScalar(speed / distance)
+      this._tractorVel.add(
+        this._impactVel.set(
+          (Math.random() - 0.5) * LevelViewController.TRACTOR_CONSUME_LATERAL_SPEED,
+          (Math.random() - 0.5) * LevelViewController.TRACTOR_CONSUME_LATERAL_SPEED,
+          (Math.random() - 0.5) * LevelViewController.TRACTOR_CONSUME_LATERAL_SPEED,
+        ),
+      )
+      tractor.emit(this._tractorSpawnPos, this._tractorVel)
+    }
+  }
+
+  private getMiningImpactParticleCount(spawnIndex: number): number {
+    const radius = this.surfaceRocks?.getRockRadius(spawnIndex) ?? 0
+    return Math.min(
+      LevelViewController.MAX_MINING_IMPACT_PARTICLES_PER_HIT,
+      Math.round(
+        LevelViewController.MINING_IMPACT_PARTICLES_PER_HIT
+          + radius * LevelViewController.MINING_IMPACT_PARTICLES_PER_RADIUS,
+      ),
+    )
+  }
+
+  private getTractorParticleCount(spawnIndex: number): number {
+    const radius = this.surfaceRocks?.getRockRadius(spawnIndex) ?? 0
+    return Math.round(
+      LevelViewController.TRACTOR_PARTICLES_PER_HIT
+        + radius * LevelViewController.TRACTOR_PARTICLES_PER_RADIUS,
+    )
   }
 
   private createLocalAabbCollider(object: THREE.Object3D, localMin: THREE.Vector3, localMax: THREE.Vector3) {
@@ -2510,6 +2625,30 @@ export class LevelViewController implements Tickable {
     }
   }
 
+  /** Extend or start the looping sizzle that sells active rock contact while mining. */
+  private keepMiningSizzleAlive(): void {
+    this.miningSizzleKeepAliveUntil = this.elapsed + MINING_SIZZLE_KEEPALIVE_SECONDS
+    if (this.miningSizzleHandle?.playing()) return
+
+    const audio = useAudio()
+    audio.unlock()
+    this.miningSizzleHandle = audio.play('sfx.sizzle', { loop: true })
+  }
+
+  /** Stop and forget the looping mining-contact sizzle. */
+  private stopMiningSizzle(): void {
+    this.miningSizzleHandle?.stop()
+    this.miningSizzleHandle = null
+    this.miningSizzleKeepAliveUntil = 0
+  }
+
+  /** Release the mining-contact loop once the recent-hit grace window expires. */
+  private updateMiningSizzle(): void {
+    if (!this.miningSizzleHandle) return
+    if (this.elapsed <= this.miningSizzleKeepAliveUntil) return
+    this.stopMiningSizzle()
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // Dispose
   // ═══════════════════════════════════════════════════════════════
@@ -2531,6 +2670,7 @@ export class LevelViewController implements Tickable {
     this.landerAudio.dispose()
     this.fpsAudio.dispose()
     this.levelAudio.dispose()
+    this.stopMiningSizzle()
     this.teardownPointerLock()
     this.clearCollisionRegistrations()
     this.clearSurfaceRockCollisionRegistrations()

@@ -27,14 +27,51 @@ function lerpAngleRadShortest(a: number, b: number, t: number): number {
   return a + d * t
 }
 
+/**
+ * Sprite rotation (radians) that aligns the velocity wedge with planar motion as seen on screen.
+ * Uses two perspective projections so camera pitch and orbit match the HUD arrow.
+ *
+ * @param camera - Active map camera
+ * @param shuttlePos - Shuttle world position
+ * @param velocity - World velocity (XZ used; Y ignored for direction)
+ * @param offset - World units along velocity toward the second sample point
+ * @param p0 - Scratch (mutated)
+ * @param p1 - Scratch (mutated)
+ * @param velPlanar - Scratch (mutated)
+ * @returns `atan2` in screen space, or `null` if degenerate
+ */
+function computeReticleWedgeScreenRotation(
+  camera: THREE.PerspectiveCamera,
+  shuttlePos: THREE.Vector3,
+  velocity: THREE.Vector3,
+  offset: number,
+  p0: THREE.Vector3,
+  p1: THREE.Vector3,
+  velPlanar: THREE.Vector3,
+): number | null {
+  velPlanar.set(velocity.x, 0, velocity.z)
+  const speed = velPlanar.length()
+  if (speed < 1e-8) return null
+  velPlanar.multiplyScalar(offset / speed)
+
+  p0.copy(shuttlePos)
+  p0.project(camera)
+  p1.copy(shuttlePos).add(velPlanar)
+  p1.project(camera)
+
+  const dx = p1.x - p0.x
+  const dy = p1.y - p0.y
+  if (dx * dx + dy * dy < 1e-14) return null
+  return Math.atan2(dy, dx)
+}
+
 /** Camera-relative data for the ship HUD reticle each frame. */
 export interface ShipReticleUpdate {
   shuttlePosition: THREE.Vector3
   shuttleVelocity: THREE.Vector3
   shuttleScale: number
-  cameraPosition: THREE.Vector3
-  cameraFov: number
-  cameraAzimuth: number
+  /** Map view camera (projection used for wedge rotation and FOV). */
+  camera: THREE.PerspectiveCamera
   isFreeFlight: boolean
   /** Delta time in seconds (heading smooth / hysteresis timing). */
   dt: number
@@ -90,12 +127,17 @@ export class MapSceneVisuals {
   private launchArrow: THREE.Group | null = null
   /** Hysteresis: once planar speed crosses "on", require lower speed to hide the wedge. */
   private reticleWedgeSpeedGate = false
-  /** Low-pass filtered heading (rad) for the motion wedge; cleared when wedge hides. */
-  private reticleWedgeHeadingSmooth: number | null = null
-  /** Low-pass filtered sprite rotation (rad) after camera azimuth is applied. */
-  private reticleWedgeSpriteAngleSmooth: number | null = null
+  /** Low-pass filtered screen-space wedge rotation (rad); cleared when wedge hides. */
+  private reticleWedgeRotationSmooth: number | null = null
+  /** Low-pass filtered reticle alpha when scale-driven fade jitters. */
+  private reticleAlphaSmooth: number | null = null
+  private readonly reticleProjectScratch0 = new THREE.Vector3()
+  private readonly reticleProjectScratch1 = new THREE.Vector3()
+  private readonly reticleVelocityPlanar = new THREE.Vector3()
   private progradeMarkerOpacitySmooth: number | null = null
   private retrogradeMarkerOpacitySmooth: number | null = null
+  private progradePosSmooth: THREE.Vector3 | null = null
+  private retrogradePosSmooth: THREE.Vector3 | null = null
   private launchArrowMaterials: THREE.ShaderMaterial[] = []
   private shipReticleGroup: THREE.Group | null = null
   private shipReticleRing: THREE.Sprite | null = null
@@ -350,8 +392,9 @@ export class MapSceneVisuals {
   updateShipReticle(update: ShipReticleUpdate): void {
     if (!this.shipReticleGroup || !this.shipReticleRing || !this.shipReticlePointer) return
 
-    const dist = update.cameraPosition.distanceTo(update.shuttlePosition)
-    const halfFovRad = THREE.MathUtils.degToRad(update.cameraFov / 2)
+    const cam = update.camera
+    const dist = cam.position.distanceTo(update.shuttlePosition)
+    const halfFovRad = THREE.MathUtils.degToRad(cam.fov / 2)
     const overscale = update.shuttleScale / MAP_CONFIG.MAP_SHUTTLE_SCALE
     const t = THREE.MathUtils.clamp(
       (overscale - MAP_CONFIG.MAP_RETICLE_FADE_START) /
@@ -359,7 +402,19 @@ export class MapSceneVisuals {
       0,
       1,
     )
-    const reticleAlpha = t * t * (3 - 2 * t)
+    const reticleAlphaRaw = t * t * (3 - 2 * t)
+    const dt = Math.max(1e-4, update.dt > 0 ? update.dt : 1 / 60)
+    const tauAlpha = MAP_CONFIG.MAP_RETICLE_ALPHA_SMOOTH_TAU_SEC
+    if (tauAlpha > 0) {
+      if (this.reticleAlphaSmooth === null) this.reticleAlphaSmooth = reticleAlphaRaw
+      else {
+        const aA = 1 - Math.exp(-dt / tauAlpha)
+        this.reticleAlphaSmooth += (reticleAlphaRaw - this.reticleAlphaSmooth) * aA
+      }
+    } else {
+      this.reticleAlphaSmooth = reticleAlphaRaw
+    }
+    const reticleAlpha = this.reticleAlphaSmooth ?? reticleAlphaRaw
 
     if (update.isFreeFlight && reticleAlpha > 0.005) {
       this.shipReticleGroup.visible = true
@@ -369,7 +424,6 @@ export class MapSceneVisuals {
       this.shipReticleGroup.scale.setScalar(reticleWorld)
       this.shipReticleRing.visible = false
 
-      const dt = Math.max(1e-4, update.dt > 0 ? update.dt : 1 / 60)
       const speed = Math.hypot(update.shuttleVelocity.x, update.shuttleVelocity.z)
       const speedOn = MAP_CONFIG.MAP_RETICLE_MIN_SPEED
       const speedOff = MAP_CONFIG.MAP_RETICLE_MIN_SPEED_OFF
@@ -379,53 +433,49 @@ export class MapSceneVisuals {
       }
       if (this.reticleWedgeSpeedGate && speed < speedOff) {
         this.reticleWedgeSpeedGate = false
-        this.reticleWedgeHeadingSmooth = null
-        this.reticleWedgeSpriteAngleSmooth = null
+        this.reticleWedgeRotationSmooth = null
       }
 
       if (this.reticleWedgeSpeedGate) {
-        const rawHeading = Math.atan2(update.shuttleVelocity.x, update.shuttleVelocity.z)
-        const tau = MAP_CONFIG.MAP_RETICLE_HEADING_SMOOTH_TAU_SEC
-        if (this.reticleWedgeHeadingSmooth === null) {
-          this.reticleWedgeHeadingSmooth = rawHeading
-        } else if (tau > 0) {
-          const a = 1 - Math.exp(-dt / tau)
-          this.reticleWedgeHeadingSmooth = lerpAngleRadShortest(
-            this.reticleWedgeHeadingSmooth,
-            rawHeading,
-            a,
-          )
-        } else {
-          this.reticleWedgeHeadingSmooth = rawHeading
+        const rawAngle = computeReticleWedgeScreenRotation(
+          cam,
+          update.shuttlePosition,
+          update.shuttleVelocity,
+          MAP_CONFIG.MAP_RETICLE_WEDGE_PROJECT_OFFSET,
+          this.reticleProjectScratch0,
+          this.reticleProjectScratch1,
+          this.reticleVelocityPlanar,
+        )
+        const tauRot = MAP_CONFIG.MAP_RETICLE_WEDGE_ROTATION_SMOOTH_TAU_SEC
+        if (rawAngle !== null) {
+          if (this.reticleWedgeRotationSmooth === null) {
+            this.reticleWedgeRotationSmooth = rawAngle
+          } else if (tauRot > 0) {
+            const aR = 1 - Math.exp(-dt / tauRot)
+            this.reticleWedgeRotationSmooth = lerpAngleRadShortest(
+              this.reticleWedgeRotationSmooth,
+              rawAngle,
+              aR,
+            )
+          } else {
+            this.reticleWedgeRotationSmooth = rawAngle
+          }
         }
-        const targetSpriteAngle =
-          this.reticleWedgeHeadingSmooth - update.cameraAzimuth - Math.PI / 2
-        const tauSprite = MAP_CONFIG.MAP_RETICLE_SPRITE_ANGLE_SMOOTH_TAU_SEC
-        if (this.reticleWedgeSpriteAngleSmooth === null) {
-          this.reticleWedgeSpriteAngleSmooth = targetSpriteAngle
-        } else if (tauSprite > 0) {
-          const aS = 1 - Math.exp(-dt / tauSprite)
-          this.reticleWedgeSpriteAngleSmooth = lerpAngleRadShortest(
-            this.reticleWedgeSpriteAngleSmooth,
-            targetSpriteAngle,
-            aS,
-          )
-        } else {
-          this.reticleWedgeSpriteAngleSmooth = targetSpriteAngle
+        this.shipReticlePointer.visible = this.reticleWedgeRotationSmooth !== null
+        if (this.reticleWedgeRotationSmooth !== null) {
+          ;(this.shipReticlePointer.material as THREE.SpriteMaterial).rotation =
+            this.reticleWedgeRotationSmooth
         }
-        this.shipReticlePointer.visible = true
-        ;(this.shipReticlePointer.material as THREE.SpriteMaterial).rotation =
-          this.reticleWedgeSpriteAngleSmooth
         ;(this.shipReticlePointer.material as THREE.SpriteMaterial).opacity = reticleAlpha
       } else {
         this.shipReticlePointer.visible = false
-        this.reticleWedgeSpriteAngleSmooth = null
+        this.reticleWedgeRotationSmooth = null
       }
     } else {
       this.shipReticleGroup.visible = false
       this.reticleWedgeSpeedGate = false
-      this.reticleWedgeHeadingSmooth = null
-      this.reticleWedgeSpriteAngleSmooth = null
+      this.reticleWedgeRotationSmooth = null
+      this.reticleAlphaSmooth = null
     }
   }
 
@@ -565,10 +615,16 @@ export class MapSceneVisuals {
     if (!this.progradeMarkers) return
     const { progradeSprite, retrogradeSprite } = this.progradeMarkers
 
-    progradeSprite.position.copy(progradePos)
-    retrogradeSprite.position.copy(retrogradePos)
-
     const dtu = Math.max(1e-4, dt)
+    const tauPos = MAP_CONFIG.MAP_PROGRADE_MARKER_POSITION_SMOOTH_TAU_SEC
+    const aPos = tauPos > 0 ? 1 - Math.exp(-dtu / tauPos) : 1
+    if (this.progradePosSmooth === null) this.progradePosSmooth = progradePos.clone()
+    else this.progradePosSmooth.lerp(progradePos, aPos)
+    if (this.retrogradePosSmooth === null) this.retrogradePosSmooth = retrogradePos.clone()
+    else this.retrogradePosSmooth.lerp(retrogradePos, aPos)
+    progradeSprite.position.copy(this.progradePosSmooth)
+    retrogradeSprite.position.copy(this.retrogradePosSmooth)
+
     const tauOp = MAP_CONFIG.MAP_PROGRADE_MARKER_OPACITY_SMOOTH_TAU_SEC
     const smoothOp = (prev: number | null, target: number): number => {
       if (prev === null) return target
@@ -595,6 +651,8 @@ export class MapSceneVisuals {
     if (!this.progradeMarkers) return
     this.progradeMarkerOpacitySmooth = null
     this.retrogradeMarkerOpacitySmooth = null
+    this.progradePosSmooth = null
+    this.retrogradePosSmooth = null
     const { progradeSprite, retrogradeSprite } = this.progradeMarkers
     this.scene.remove(progradeSprite)
     this.scene.remove(retrogradeSprite)
