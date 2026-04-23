@@ -341,3 +341,65 @@ describe('MessageSystem.getReadableShipMessage', () => {
     expect(readable?.inboxStatus).toBe('dismissed')
   })
 })
+
+describe('MessageSystem filter predicate', () => {
+  /**
+   * Build a MessageSystem seeded with:
+   *   - `inbox-high` (priority 10, non-contract) — eligible on 'map_start_earth_orbit'
+   *   - `contract-one` (priority 5, contractId='foo', contractMessageKind='intro') — eligible on 'contract'
+   * Both messages become `pending` after their trigger fires.
+   */
+  function buildChannelFixture(): MessageSystem {
+    const defs: ShipMessageDefinition[] = [
+      {
+        id: 'inbox-high',
+        from: 'Dispatcher',
+        subject: 'Inbox A',
+        sentAt: '2412.09.14',
+        body: ['inbox body'],
+        trigger: 'map_start_earth_orbit',
+        delivery: 'inbox_prompt',
+        priority: 10,
+      },
+      {
+        id: 'contract-one',
+        from: 'Dispatcher',
+        subject: 'Contract A',
+        sentAt: '2412.09.15',
+        body: ['contract body'],
+        trigger: 'contract',
+        delivery: 'inbox_prompt',
+        priority: 5,
+        contractId: 'foo',
+        contractMessageKind: 'intro',
+      },
+    ]
+    const system = new MessageSystem(defs, { load: () => ({}), save: () => {} })
+    system.notifyTrigger('map_start_earth_orbit')
+    system.notifyTrigger('contract')
+    return system
+  }
+
+  it('getActiveMessage returns the head of the subset matching the predicate', () => {
+    const system = buildChannelFixture()
+    const inbox = system.getActiveMessage((def) => def.contractMessageKind === undefined)
+    const contract = system.getActiveMessage((def) => def.contractMessageKind !== undefined)
+    expect(inbox?.id).toBe('inbox-high')
+    expect(contract?.id).toBe('contract-one')
+  })
+
+  it('getActiveMessage returns null when no record matches the predicate', () => {
+    const system = buildChannelFixture()
+    system.markShown('contract-one')
+    system.dismiss('contract-one')
+    const contract = system.getActiveMessage((def) => def.contractMessageKind !== undefined)
+    expect(contract).toBeNull()
+  })
+
+  it('getPendingMessageCount counts only records whose definition matches the predicate', () => {
+    const system = buildChannelFixture()
+    expect(system.getPendingMessageCount((def) => def.contractMessageKind === undefined)).toBe(1)
+    expect(system.getPendingMessageCount((def) => def.contractMessageKind !== undefined)).toBe(1)
+    expect(system.getPendingMessageCount()).toBe(2)
+  })
+})

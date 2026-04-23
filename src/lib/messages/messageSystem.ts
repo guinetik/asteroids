@@ -165,10 +165,23 @@ export class MessageSystem {
 
   /**
    * Returns the highest-priority non-dismissed message, or null when none are active.
+   *
+   * @param filter - Optional predicate run against each candidate's
+   *                 {@link ShipMessageDefinition}. Only records whose definition
+   *                 satisfies the predicate are considered. Use this to split
+   *                 active-message state into independent UI channels (inbox vs
+   *                 contract).
    */
-  getActiveMessage(): ActiveShipMessage | null {
+  getActiveMessage(
+    filter?: (definition: ShipMessageDefinition) => boolean,
+  ): ActiveShipMessage | null {
     const activeRecords = Object.values(this.records)
       .filter((record) => record.status === 'pending' || record.status === 'shown')
+      .filter((record) => {
+        if (!filter) return true
+        const def = this.definitions.get(record.id)
+        return def ? filter(def) : false
+      })
       .sort((left, right) => {
         const leftUnread = left.status === 'pending' ? 1 : 0
         const rightUnread = right.status === 'pending' ? 1 : 0
@@ -258,9 +271,21 @@ export class MessageSystem {
     return this.records[id] ?? null
   }
 
-  /** Returns how many messages are still pending and unopened. */
-  getPendingMessageCount(): number {
-    return Object.values(this.records).filter((record) => record.status === 'pending').length
+  /**
+   * Returns how many messages are still pending and unopened.
+   *
+   * @param filter - Optional predicate run against each candidate's
+   *                 {@link ShipMessageDefinition}. When supplied, only pending
+   *                 records whose definition satisfies the predicate are
+   *                 counted.
+   */
+  getPendingMessageCount(filter?: (definition: ShipMessageDefinition) => boolean): number {
+    return Object.values(this.records).filter((record) => {
+      if (record.status !== 'pending') return false
+      if (!filter) return true
+      const def = this.definitions.get(record.id)
+      return def ? filter(def) : false
+    }).length
   }
 
   /**
