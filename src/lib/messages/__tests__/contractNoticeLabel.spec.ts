@@ -1,6 +1,6 @@
 /**
  * Tests for contractNoticeLabel — the pure mapper that turns a contract-origin
- * ShipMessageReadable + its contract display name into the cyan /map pill text.
+ * ShipMessageReadable into the cyan /map pill text.
  */
 import { describe, expect, it } from 'vitest'
 import type { ShipMessageReadable } from '@/lib/messages/messageTypes'
@@ -25,43 +25,27 @@ function makeReadable(
 }
 
 describe('contractNoticeLabel', () => {
-  it('returns the generic offer label for an intro message', () => {
-    const label = contractNoticeLabel(
-      makeReadable({ contractMessageKind: 'intro' }),
-      'Gravity Surfer',
+  it('returns the offer label for an intro message', () => {
+    expect(contractNoticeLabel(makeReadable({ contractMessageKind: 'intro' }))).toBe(
+      'NEW CONTRACT OFFER',
     )
-    expect(label).toBe('NEW CONTRACT OFFER')
   })
 
-  it('returns a named updated label for a brief (active dossier) message', () => {
-    const label = contractNoticeLabel(
-      makeReadable({ contractMessageKind: 'brief' }),
-      'Gravity Surfer',
+  it('returns the updated label for a brief (active dossier) message', () => {
+    expect(contractNoticeLabel(makeReadable({ contractMessageKind: 'brief' }))).toBe(
+      'CONTRACT UPDATED',
     )
-    expect(label).toBe('CONTRACT UPDATED: Gravity Surfer')
   })
 
-  it('returns a named updated label for a step flavor message', () => {
-    const label = contractNoticeLabel(
-      makeReadable({ contractMessageKind: 'step' }),
-      'Gravity Surfer',
+  it('returns the updated label for a step flavor message', () => {
+    expect(contractNoticeLabel(makeReadable({ contractMessageKind: 'step' }))).toBe(
+      'CONTRACT UPDATED',
     )
-    expect(label).toBe('CONTRACT UPDATED: Gravity Surfer')
   })
 
-  it('returns a named complete label for a completion message', () => {
-    const label = contractNoticeLabel(
-      makeReadable({ contractMessageKind: 'completion' }),
-      'Gravity Surfer',
+  it('returns the complete label for a completion message', () => {
+    expect(contractNoticeLabel(makeReadable({ contractMessageKind: 'completion' }))).toBe(
+      'CONTRACT COMPLETE',
     )
-    expect(label).toBe('CONTRACT COMPLETE: Gravity Surfer')
-  })
-
-  it('falls back to a generic updated label when the contract name is missing', () => {
-    const label = contractNoticeLabel(
-      makeReadable({ contractMessageKind: 'step' }),
-      null,
-    )
-    expect(label).toBe('CONTRACT UPDATED')
   })
 })

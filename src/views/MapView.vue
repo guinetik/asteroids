@@ -194,14 +194,8 @@ const shuttleControlMailFocusMessageId = ref<string | undefined>(undefined)
 /** Computed pill label for the cyan contract-notice channel, or null when no contract message is active. */
 const contractNoticePill = computed<string | null>(() => {
   const readable = activeContractMessage.value
-  if (!readable) return null
-  const contractId = readable.contractId
-  if (!contractId) return null
-  const contract = contractSystem.getContract(contractId)
-  return contractNoticeLabel(
-    { ...readable, inboxStatus: readable.status },
-    contract?.inboxName ?? null,
-  )
+  if (!readable?.contractId) return null
+  return contractNoticeLabel({ ...readable, inboxStatus: readable.status })
 })
 
 /** Opens the shuttle terminal mail tab deep-linked to the contract folder + message. */
