@@ -298,9 +298,7 @@ export function applyJourneyTrigger(
   const unlockedFeatureIds: JourneyFeatureId[] = []
   const newlyStartReadyJourneyIds: JourneyId[] = []
 
-  // Pass 1: resolve any `startTrigger` matches before step-advance pass so a
-  // trigger that both gates a journey and advances one of its steps does the
-  // right thing in a single call.
+  // Pass 1: start-trigger matches — open any gates this trigger opens.
   for (const journey of JOURNEY_DEFINITIONS) {
     if (journey.startTrigger !== trigger) continue
     if (nextProfile.journeyStartReadyIds.includes(journey.id)) continue
@@ -312,11 +310,12 @@ export function applyJourneyTrigger(
     changed = true
   }
 
-  // Pass 2: advance steps for every journey that is both not-yet-complete and
-  // start-ready.
+  // Pass 2: advance steps for every not-yet-complete journey. Step progress
+  // accumulates even for gated journeys so the tracker can show retroactive
+  // checks the moment the gate finally opens (e.g. player completed Jay's
+  // Cowboys arc before they accepted USC — Cowboys step starts already ticked).
   for (const journey of JOURNEY_DEFINITIONS) {
     if (isJourneyComplete(nextProfile, journey.id)) continue
-    if (!isJourneyStartReady(nextProfile, journey)) continue
 
     const completedStepIds = new Set(getCompletedStepIds(nextProfile, journey.id))
     const matchingSteps = journey.steps.filter((step) => step.trigger === trigger)
@@ -338,7 +337,16 @@ export function applyJourneyTrigger(
         [journey.id]: [...completedStepIds],
       },
     }
+  }
 
+  // Pass 3: mark complete any journey that is both start-ready AND step-complete.
+  // Two firing points converge here: pass 2 (last step just landed) and pass 1
+  // (gate just opened on a journey whose steps were all already done — the Jay
+  // / MMC / gravitySurfing path without a prior USC accept).
+  for (const journey of JOURNEY_DEFINITIONS) {
+    if (isJourneyComplete(nextProfile, journey.id)) continue
+    if (!isJourneyStartReady(nextProfile, journey)) continue
+    const completedStepIds = new Set(getCompletedStepIds(nextProfile, journey.id))
     const journeyComplete = journey.steps.every((step) => completedStepIds.has(step.id))
     if (!journeyComplete) continue
 
@@ -349,6 +357,7 @@ export function applyJourneyTrigger(
       unlockedFeatureIds: uniqueStrings([...nextProfile.unlockedFeatureIds, ...journey.unlocks]),
     }
     unlockedFeatureIds.push(...journey.unlocks)
+    changed = true
   }
 
   return {

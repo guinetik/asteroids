@@ -78,20 +78,58 @@ describe('act-1-inner-system journey', () => {
     expect(buildActiveJourneyTracker(profile)?.title).toBe('Inner System')
   })
 
-  it('does not advance Act 1 step triggers fired before the USC accept gate opens', () => {
+  it('records step progress for Act 1 even before the USC accept gate opens, and shows it ticked on gate open', () => {
     let profile = createProfile('Pilot')
 
-    // Firing a completion trigger BEFORE the accept gate opens is a no-op
-    // for step progress.
-    const preGate = applyJourneyTrigger(profile, 'contract_completed:usc-venus-certification')
-    expect(preGate.changed).toBe(false)
-    profile = preGate.profile
-    expect(profile.journeyStepProgress['act-1-inner-system']).toBeUndefined()
+    // Walk Welcome to completion so the only incomplete journey is Act 1.
+    profile = applyJourneyTrigger(profile, 'message_archived:seller-welcome-earth-orbit').profile
+    profile = applyJourneyTrigger(profile, 'message_archived:jay-so-you-actually-did-it').profile
+    profile = applyJourneyTrigger(profile, 'shuttle_control_opened').profile
+    profile = applyJourneyTrigger(profile, 'shuttle_program_opened').profile
+    profile = applyJourneyTrigger(profile, 'lander_program_opened').profile
+    profile = applyJourneyTrigger(profile, 'inventory_opened').profile
+    profile = applyJourneyTrigger(profile, 'upgrades_opened').profile
+    profile = applyJourneyTrigger(profile, 'accepted_asteroid_mission').profile
+    profile = applyJourneyTrigger(profile, 'accepted_eva_mission').profile
+    profile = applyJourneyTrigger(profile, 'bought_shuttle_fuel').profile
+    profile = applyJourneyTrigger(profile, 'left_habitat').profile
 
-    // After accepting, the same trigger now advances step 1.
+    // Player completes Jay's contract before ever accepting USC.
+    const jayCompletion = applyJourneyTrigger(
+      profile,
+      'contract_completed:space-cowboys-mars-hq',
+    )
+    expect(jayCompletion.changed).toBe(true)
+    profile = jayCompletion.profile
+    expect(profile.journeyStepProgress['act-1-inner-system']).toContain('cowboys-hq')
+
+    // But Act 1 is still hidden from the HUD tracker until the gate opens.
+    expect(buildActiveJourneyTracker(profile)).toBeNull()
+
+    // Accepting USC opens the gate. Act 1 appears with Jay's step already ticked.
     profile = applyJourneyTrigger(profile, 'contract_accepted:usc-venus-certification').profile
+    const tracker = buildActiveJourneyTracker(profile)
+    expect(tracker?.title).toBe('Inner System')
+    const cowboysStep = tracker?.objectives[0]?.steps[1]
+    expect(cowboysStep?.label).toBe('Complete Space Cowboys Mars HQ')
+    expect(cowboysStep?.complete).toBe(true)
+  })
+
+  it('does not mark Act 1 complete until its start gate is open, even if every step has already fired', () => {
+    let profile = createProfile('Pilot')
+
+    // Fire every Act 1 step trigger before the gate is open.
     profile = applyJourneyTrigger(profile, 'contract_completed:usc-venus-certification').profile
-    expect(profile.journeyStepProgress['act-1-inner-system']).toContain('usc-cert')
+    profile = applyJourneyTrigger(profile, 'contract_completed:space-cowboys-mars-hq').profile
+    profile = applyJourneyTrigger(profile, 'contract_completed:martian-marine-corps-cohort').profile
+    profile = applyJourneyTrigger(profile, 'upgrade_installed:gravitySurfing').profile
+
+    expect(profile.completedJourneyIds).not.toContain('act-1-inner-system')
+
+    // Opening the gate now completes Act 1 in a single call — the third pass
+    // detects start-ready + step-complete and fires the completion + unlocks.
+    const result = applyJourneyTrigger(profile, 'contract_accepted:usc-venus-certification')
+    expect(result.completedJourneyIds).toContain('act-1-inner-system')
   })
 
   it('completes when all three contracts are done and gravitySurfing installs', () => {
