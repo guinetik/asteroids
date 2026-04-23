@@ -26,6 +26,7 @@
  * @date 2026-04-18
  */
 
+import { EvaRcsSound } from './EvaRcsSound'
 import { useAudio } from './useAudio'
 import { FootstepSystem, MIN_MOVE_SPEED, type FootstepSurface } from '@/lib/fps/footstepSystem'
 
@@ -33,6 +34,8 @@ import { FootstepSystem, MIN_MOVE_SPEED, type FootstepSurface } from '@/lib/fps/
 const FLOAT_SOUND_DELAY = 0.5
 /** Fade-in duration (ms) for the floating ambient loop. */
 const FLOAT_FADE_IN_MS = 600
+/** Master SFX gain applied to the procedural hover-RCS bed. */
+const FPS_HOVER_RCS_VOLUME = 0.26
 /**
  * How long (seconds) the contact-damage loop is held after the most recent
  * melee tick before fading. Sized larger than a typical melee tick interval
@@ -76,6 +79,12 @@ export interface FpsAudioMovementState {
    * micro-jitter doesn't trigger steps.
    */
   speed: number
+  /**
+   * True while the player is actively holding hover thrust in mid-air.
+   * This is narrower than plain airtime so falling keeps using the
+   * quieter floating bed while upward suit jets add the RCS texture.
+   */
+  hovering: boolean
 }
 
 /**
@@ -92,6 +101,8 @@ export class FpsAudioDirector {
    * Surface can be swapped at runtime via {@link FpsAudioDirector.setSurface}.
    */
   private readonly footsteps: FootstepSystem
+  /** Procedural suit-jet bed used while the player hovers on jump thrusters. */
+  private readonly hoverRcs = new EvaRcsSound()
 
   /** Resting breath loop. Active whenever the director is started and the player is not sprinting. */
   private breathingWalk: AudioHandle | null = null
@@ -179,6 +190,7 @@ export class FpsAudioDirector {
       // Even when inactive, age out the contact-damage hold so a paused
       // session resumes silent rather than spawning a phantom loop.
       this.contactHold = Math.max(0, this.contactHold - dt)
+      this.hoverRcs.stop()
       return
     }
 
@@ -221,6 +233,25 @@ export class FpsAudioDirector {
         this.floating.stop()
         this.floating = null
       }
+    }
+
+    // ── Hover RCS bed ───────────────────────────────────────────
+    if (state.hovering) {
+      this.audio.unlock()
+      this.hoverRcs.update(
+        {
+          forward: 0,
+          back: 0,
+          left: 0,
+          right: 0,
+          up: 1,
+          down: 0,
+          sfxVolume: this.audio.getCategoryVolume('sfx') * FPS_HOVER_RCS_VOLUME,
+        },
+        dt,
+      )
+    } else {
+      this.hoverRcs.stop()
     }
 
     // ── Contact-damage loop maintenance ─────────────────────────
@@ -300,6 +331,7 @@ export class FpsAudioDirector {
    */
   dispose(): void {
     this.stop()
+    this.hoverRcs.dispose()
   }
 
   /** Internal: stop and null every handle, reset hold + edge state. */
@@ -312,6 +344,7 @@ export class FpsAudioDirector {
     this.floating = null
     this.contactLoop?.stop()
     this.contactLoop = null
+    this.hoverRcs.stop()
     this.floatTimer = 0
     this.contactHold = 0
     this.prevSprinting = false

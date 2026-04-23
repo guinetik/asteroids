@@ -210,6 +210,8 @@ export class FpsPlayerController implements Tickable {
    * recomputing the conditions and missing the lockout.
    */
   private _isSprinting = false
+  /** Latest airborne hover-thrust engagement state from {@link tick}. */
+  private _isHovering = false
   /** Stable grounded state used by locomotion/audio/UI consumers. */
   private bootsGrounded = false
   /** Short grace window so tiny support ambiguity does not flicker grounded state. */
@@ -273,6 +275,11 @@ export class FpsPlayerController implements Tickable {
     return this._isSprinting
   }
 
+  /** Whether the player is actively holding hover thrust in mid-air this frame. */
+  get isHovering(): boolean {
+    return this._isHovering
+  }
+
   /** Current lateral speed magnitude (XZ plane only). */
   get speed(): number {
     const vx = this.lateralVelocity.x
@@ -320,6 +327,7 @@ export class FpsPlayerController implements Tickable {
     this.thrusterSystem.refuel()
     this._hp = this.config.health.maxHp
     this._dead = false
+    this._isHovering = false
     // Clear sprint lockout state — a full bar should mean fresh sprint
     // available without forcing a Shift release first.
     this.sprintLocked = false
@@ -464,6 +472,7 @@ export class FpsPlayerController implements Tickable {
       !canJump &&
       !this.grounded &&
       !this.thrusterSystem.isFuelEmpty
+    this._isHovering = hoverActive
     if (hoverActive) {
       this.body.impulse(this.config.movement.hoverForce * dt)
       this.thrusterSystem.consumeFuel(this.config.o2.hoverDrainRate * dt)
@@ -662,6 +671,7 @@ export class FpsPlayerController implements Tickable {
 
   /** Release resources. No owned listeners — pointer lock handled by ViewController. */
   dispose(): void {
+    this._isHovering = false
     // No owned resources to clean up
   }
 }

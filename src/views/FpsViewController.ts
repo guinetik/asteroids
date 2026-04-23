@@ -816,6 +816,7 @@ export class FpsViewController implements Tickable {
         grounded: this.playerController.grounded,
         sprinting: this.playerController.isSprinting,
         speed: this.playerController.speed,
+        hovering: this.playerController.isHovering,
       })
     }
 

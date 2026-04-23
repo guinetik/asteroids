@@ -1920,6 +1920,7 @@ export class LevelViewController implements Tickable {
         grounded,
         sprinting: sprintingNow,
         speed: this.playerController.speed,
+        hovering: this.playerController.isHovering,
       })
     }
 
