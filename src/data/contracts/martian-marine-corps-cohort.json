@@ -37,40 +37,79 @@
       ]
     },
     {
+      "kind": "install-upgrade",
+      "upgradeId": "shuttleCargoBay",
+      "minLevel": 3,
+      "subject": "OP 3 — Cargo bay, tier III",
+      "flavor": [
+        "You want drill-grade work, you carry drill-grade loads. Upgrade your cargo bay to tier three before we continue. No room, no contract."
+      ]
+    },
+    {
       "kind": "complete-missions",
       "count": 1,
       "missionType": "mining",
       "giverPlanetId": "mars",
-      "subject": "OP 3 — Second Mars turret run",
+      "subject": "OP 4 — Verify cargo run",
       "flavor": [
-        "You already proved you can read one board. Do it again: another turret mining run posted from Mars. Giver planet line says Mars. I do not care if the name on the tin is the Corps, the colonials, or your cousin — the posting station is Mars. Mine, return, close. No excuses."
+        "Now prove that bigger hold does actual work. Run one mining mission posted from Mars and close it clean."
       ]
     },
     {
       "kind": "install-upgrade",
       "upgradeId": "turretMiningYield",
       "minLevel": 3,
-      "subject": "OP 4 — Focus array, tier III",
+      "subject": "OP 5 — Focus array, tier III",
       "flavor": [
         "Focus array to three. I want that beam where I put it, not wobbling off a grain of dust. Belt debris is not a suggestion. Fit the tier and prove it in the next receipt."
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "missionType": "mining",
+      "giverPlanetId": "mars",
+      "subject": "OP 6 — Focus array field proof",
+      "flavor": [
+        "Take the tuned focus array to the belt and show me one clean Mars-posted mining closeout. Hardware means nothing without receipts."
       ]
     },
     {
       "kind": "install-upgrade",
       "upgradeId": "turretMiningCharge",
       "minLevel": 3,
-      "subject": "OP 5 — Cooling loop, tier III",
+      "subject": "OP 7 — Cooling loop, tier III",
       "flavor": [
         "Cooling to three. You cook your emitter in a hot zone, you are a flare for every pirate board from here to the Kuiper. I will not be the one explaining your slag to next of kin. Install. Test. Fly."
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "missionType": "mining",
+      "giverPlanetId": "mars",
+      "subject": "OP 8 — Cooling loop field proof",
+      "flavor": [
+        "Run another Mars mining job and come back with the emitter intact. Cooling upgrade is approved only after a live-cycle proof."
       ]
     },
     {
       "kind": "install-upgrade",
       "upgradeId": "turretMiningEfficiency",
       "minLevel": 3,
-      "subject": "OP 6 — Power regulator, tier III",
+      "subject": "OP 9 — Power regulator, tier III",
       "flavor": [
         "Regulator to three. We sit on target longer than a tourist cruise. You burn like an amateur, you go home on a tender. I want discipline in the bus and in the tank. Last box — do not get cute."
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "missionType": "mining",
+      "giverPlanetId": "mars",
+      "subject": "OP 10 — Final Mars qualification run",
+      "flavor": [
+        "Final evolution. One last Mars-posted mining mission with the full stack installed. Deliver clean and I sign the cohort file."
       ]
     }
   ],
