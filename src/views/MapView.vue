@@ -137,6 +137,7 @@ function refreshActiveMessage(): void {
 }
 
 function openMessage(): void {
+  uiAudio.notifyConfirm()
   if (activeMessage.value?.status === 'pending') {
     shipMessageSystem.markShown(activeMessage.value.id)
     activeMessage.value = { ...activeMessage.value, status: 'shown' }
