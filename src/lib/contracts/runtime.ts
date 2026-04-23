@@ -11,6 +11,8 @@
  * @spec docs/superpowers/specs/2026-04-20-contracts-design.md
  */
 import { shipMessageSystem } from '@/lib/messages/runtime'
+import { removeItem } from '@/lib/inventory/inventory'
+import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
 import {
   addCredits,
   loadProfile,
@@ -137,8 +139,32 @@ export const contractSystem = new ContractSystem(
         }
       }
     },
+    consumeItemsForDelivery: (itemId, count) => consumeInventoryItems(itemId, count),
   },
 )
+
+/**
+ * Atomic inventory consumption used by the engine when an active
+ * `deliver-items` step's destination orbit fires. Loads the current inventory,
+ * attempts a `removeItem`, and persists the new state on success.
+ *
+ * Returns `false` (and writes nothing) when the inventory is missing, the
+ * stack is absent, or the stack has fewer than `count` units. The engine
+ * uses the boolean to decide whether to advance the step.
+ *
+ * @param itemId - Inventory item id to consume.
+ * @param count - Units to remove on a successful delivery.
+ * @returns Whether the consumption committed.
+ */
+function consumeInventoryItems(itemId: string, count: number): boolean {
+  if (!Number.isFinite(count) || count <= 0) return false
+  const inventory = loadInventory()
+  if (!inventory) return false
+  const result = removeItem(inventory, itemId, count)
+  if (!result.ok) return false
+  saveInventory(result.inventory)
+  return true
+}
 
 /**
  * Credit the player's wallet with a contract step payout. Fractional values are

@@ -614,6 +614,106 @@ describe('ContractSystem collect-drops steps', () => {
   })
 })
 
+describe('ContractSystem deliver-items steps', () => {
+  /** Cinderline-shape contract whose first step is a Mercury delivery. */
+  const deliveryContract: Contract = {
+    id: 'deliver-test',
+    inboxName: 'Anvil',
+    from: 'Anvil',
+    sentAt: TEST_DATE,
+    triggerOnPlanetVisited: 'mercury',
+    introSubject: 'Deliver',
+    introBody: ['intro'],
+    steps: [
+      {
+        kind: 'deliver-items',
+        planetId: 'mercury',
+        itemId: 'viroid-psychosphere',
+        count: 20,
+        creditsReward: 500,
+        subject: 'Handoff',
+        flavor: ['handoff'],
+      },
+    ],
+    completionSubject: 'Done',
+    completionBody: ['done'],
+    rewards: [{ type: 'fast-travel', planetId: 'mercury' }],
+  }
+
+  function buildDeliveryHarness(
+    consumeImpl: (itemId: string, count: number) => boolean,
+  ): { contracts: ContractSystem; consumeCalls: Array<{ itemId: string; count: number }> } {
+    const consumeCalls: Array<{ itemId: string; count: number }> = []
+    const messages = new MessageSystem([triggerMessage], { load: () => ({}), save: () => {} })
+    const snapshot = emptyContractSnapshot()
+    const contracts = new ContractSystem(
+      [deliveryContract],
+      messages,
+      {
+        load: () => snapshot,
+        save: (next) => Object.assign(snapshot, next),
+      },
+      {
+        consumeItemsForDelivery: (itemId, count) => {
+          consumeCalls.push({ itemId, count })
+          return consumeImpl(itemId, count)
+        },
+      },
+    )
+    return { contracts, consumeCalls }
+  }
+
+  it('advances and consumes inventory when orbiting the destination with enough items', () => {
+    const { contracts, consumeCalls } = buildDeliveryHarness(() => true)
+    contracts.notifyPlanetVisited('mercury')
+    contracts.acceptContract(deliveryContract.id)
+
+    contracts.notifyPlanetVisited('mercury')
+
+    expect(consumeCalls).toEqual([{ itemId: 'viroid-psychosphere', count: 20 }])
+    expect(contracts.getInstance(deliveryContract.id)?.status).toBe('completed')
+  })
+
+  it('does not advance when the inventory hook reports insufficient stock', () => {
+    const { contracts, consumeCalls } = buildDeliveryHarness(() => false)
+    contracts.notifyPlanetVisited('mercury')
+    contracts.acceptContract(deliveryContract.id)
+
+    contracts.notifyPlanetVisited('mercury')
+
+    expect(consumeCalls).toEqual([{ itemId: 'viroid-psychosphere', count: 20 }])
+    const instance = contracts.getInstance(deliveryContract.id)
+    expect(instance?.status).toBe('active')
+    expect(instance?.currentStepIndex).toBe(0)
+  })
+
+  it('ignores planet visits to other bodies', () => {
+    const { contracts, consumeCalls } = buildDeliveryHarness(() => true)
+    contracts.notifyPlanetVisited('mercury')
+    contracts.acceptContract(deliveryContract.id)
+
+    contracts.notifyPlanetVisited('venus')
+
+    expect(consumeCalls).toEqual([])
+    expect(contracts.getInstance(deliveryContract.id)?.status).toBe('active')
+  })
+
+  it('retries on each Mercury orbit until the host hook succeeds', () => {
+    let armed = false
+    const { contracts, consumeCalls } = buildDeliveryHarness(() => armed)
+    contracts.notifyPlanetVisited('mercury')
+    contracts.acceptContract(deliveryContract.id)
+
+    contracts.notifyPlanetVisited('mercury')
+    expect(contracts.getInstance(deliveryContract.id)?.status).toBe('active')
+
+    armed = true
+    contracts.notifyPlanetVisited('mercury')
+    expect(contracts.getInstance(deliveryContract.id)?.status).toBe('completed')
+    expect(consumeCalls).toHaveLength(2)
+  })
+})
+
 describe('ContractSystem launch-from-body steps', () => {
   it('advances when launching from the matching planet id', () => {
     const { contracts, granted } = createHarness([cinderlineLikeContract])

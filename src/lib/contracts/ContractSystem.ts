@@ -75,6 +75,26 @@ export interface ContractSystemHooks {
    *   plus the authored CR payout (defaults to `0` when omitted in JSON).
    */
   onContractStepCompleted?: (payload: ContractStepCompletedPayload) => void
+  /**
+   * Asked by the engine when the player orbits the destination of an active
+   * `deliver-items` step. The host (typically the inventory bridge in
+   * `runtime.ts`) attempts to remove `count` units of `itemId` from the
+   * player's inventory.
+   *
+   * - Return `true` when the consumption succeeded — the engine then advances
+   *   the step (which fires `onContractStepCompleted`, posts the next flavor
+   *   message, and pays any authored CR).
+   * - Return `false` when the player did not have enough — the engine leaves
+   *   the step pending and the player can retry on a future orbit.
+   *
+   * Implementations MUST be atomic: do not partially consume on a `false`
+   * return, and persist the inventory write before returning `true`.
+   *
+   * @param itemId - Inventory item id to consume.
+   * @param count - Units to consume on a successful delivery.
+   * @returns Whether the consumption committed.
+   */
+  consumeItemsForDelivery?: (itemId: string, count: number) => boolean
 }
 
 /** Payload for {@link ContractSystemHooks.onContractStepCompleted}. */
@@ -290,6 +310,11 @@ export class ContractSystem {
   /**
    * Notify the system that the player entered orbit at a planet (any visit, including repeats).
    *
+   * Drives three behaviors: offering contracts gated on `triggerOnPlanetVisited`,
+   * advancing active `visit-planet` steps, and resolving active
+   * `deliver-items` steps (which additionally consume inventory via the
+   * {@link ContractSystemHooks.consumeItemsForDelivery} hook before advancing).
+   *
    * @param planetId - Planet id (e.g. `'mars'`).
    */
   notifyPlanetVisited(planetId: string): void {
@@ -305,10 +330,21 @@ export class ContractSystem {
       const contract = this.contracts.get(instance.contractId)
       if (!contract) continue
       const step = contract.steps[instance.currentStepIndex]
-      if (!step || step.kind !== 'visit-planet') continue
-      if (step.planetId !== planetId) continue
-      this.advanceStep(contract, instance, 1)
-      changed = true
+      if (!step) continue
+      if (step.kind === 'visit-planet') {
+        if (step.planetId !== planetId) continue
+        this.advanceStep(contract, instance, 1)
+        changed = true
+      } else if (step.kind === 'deliver-items') {
+        if (step.planetId !== planetId) continue
+        // Engine cannot touch the inventory module directly (kept pure for
+        // test isolation). Defer the actual consumption to the host hook;
+        // skip advancement when the host can't (or won't) commit.
+        const consumed = this.hooks.consumeItemsForDelivery?.(step.itemId, step.count) ?? false
+        if (!consumed) continue
+        this.advanceStep(contract, instance, 1)
+        changed = true
+      }
     }
     if (changed) this.afterChange()
   }

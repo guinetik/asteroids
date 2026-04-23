@@ -7,6 +7,10 @@
  *  - install-upgrade:    have an upgrade installed at >= minLevel
  *  - visit-planet:       enter orbit at a specific planet
  *  - orbital-mission:    complete a planetary shuttle mission targeting a planet
+ *  - trade-goods:        buy or sell N units of an item at a planet shop
+ *  - collect-drops:      collect N units of a dropped inventory item
+ *  - launch-from-body:   slingshot-launch out of orbit at a specific body
+ *  - deliver-items:      orbit a planet to consume N units of an item from inventory
  *
  * Steps are completed in order. Completion grants {@link RewardEffect}s
  * such as a fast-travel kiosk unlock or a per-planet pay multiplier.
@@ -170,6 +174,34 @@ export interface LaunchFromBodyStep extends ContractStepRewardMixin {
   flavor: string[]
 }
 
+/**
+ * Step that requires the player to **deliver** N units of an inventory item to
+ * a specific planet. Trigger is the existing planet-visit signal: when the
+ * player establishes orbit at `planetId` while this step is active, the engine
+ * asks the host (via {@link ContractSystemHooks.consumeItemsForDelivery}) to
+ * remove `count` units of `itemId` from the player's inventory. If the host
+ * confirms the consumption (i.e. inventory had enough), the step advances and
+ * the next flavor message arrives. If not, the step stays pending — the player
+ * gathers more and tries again on their next orbit.
+ *
+ * This is the explicit "turn-in" counterpart to {@link CollectDropsStep}: that
+ * step counts pickups; this one consumes them at a destination.
+ */
+export interface DeliverItemsStep extends ContractStepRewardMixin {
+  /** Discriminator. */
+  kind: 'deliver-items'
+  /** Planet id where delivery must take place (matches the orbit event). */
+  planetId: string
+  /** Inventory item id from `src/data/inventory/items.json`. */
+  itemId: string
+  /** Required units to consume from inventory on a successful delivery. */
+  count: number
+  /** Authored summary shown on the step's flavor message subject. */
+  subject: string
+  /** Authored body paragraphs for the step's flavor message. */
+  flavor: string[]
+}
+
 /** Event payload emitted when the player collects a drop pickup in the FPS layer. */
 export interface DropCollectedEvent {
   /** Inventory item id that was picked up (matches {@link CollectDropsStep.itemId}). */
@@ -193,6 +225,7 @@ export type ContractStep =
   | TradeGoodsStep
   | CollectDropsStep
   | LaunchFromBodyStep
+  | DeliverItemsStep
 
 /** Reward applied when a contract is completed. */
 export type RewardEffect =

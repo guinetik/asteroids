@@ -50,6 +50,9 @@ function stepLabel(step: ContractStep): string {
   if (step.kind === 'collect-drops') {
     return `Collect ${step.count} ${step.itemId}`
   }
+  if (step.kind === 'deliver-items') {
+    return `Deliver ${step.count} ${step.itemId} to ${step.planetId}`
+  }
   if (step.kind === 'launch-from-body') {
     return `Launch from ${step.planetId}`
   }

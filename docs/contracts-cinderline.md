@@ -1,7 +1,8 @@
 # The Cinderline contract
 
-> Five-step Mercury contract that introduces two new step kinds
-> (`collect-drops`, `launch-from-body`) and a contract-driven loot pipeline.
+> Five-observance Mercury contract (six engine steps; the second observance
+> has two parts) that introduces three new step kinds (`collect-drops`,
+> `deliver-items`, `launch-from-body`) and a contract-driven loot pipeline.
 
 The Cinderline is the first contract that demands gameplay outside the
 existing `complete-missions` / `install-upgrade` / `visit-planet` /
@@ -25,10 +26,11 @@ flowchart LR
   visit[Visit Mercury] --> offer[Cinderline offered]
   offer --> accept[Accept]
   accept --> s1["Step 1: complete asteroid mission"]
-  s1 --> s2["Step 2: collect-drops viroid-psychosphere x20"]
-  s2 -.activates.-> drops[Virus deaths spawn psychosphere pickups]
+  s1 --> s2a["Step 2A: collect-drops viroid-psychosphere x20"]
+  s2a -.activates.-> drops[Virus deaths spawn psychosphere pickups]
   drops --> pickup[Walk over pickup -&gt; inventory + notifyDropCollected]
-  s2 --> s3["Step 3: install-upgrade shuttleRadiationResistance Lv3"]
+  s2a --> s2b["Step 2B: deliver-items mercury (consume 20 from inventory on orbit)"]
+  s2b --> s3["Step 3: install-upgrade shuttleRadiationResistance Lv3"]
   s3 --> s4["Step 4: visit-planet sun"]
   s4 --> s5["Step 5: launch-from-body sun (slingshot release)"]
   s5 --> done["Rewards: fast-travel mercury, 2x Mercury contracts"]
@@ -50,6 +52,32 @@ Advances by `event.quantity` per `notifyDropCollected({ itemId, quantity })`
 event. Counter clamps at `count`, then the step satisfies. Only events whose
 `itemId` matches the active step are counted.
 
+### `deliver-items`
+
+```ts
+interface DeliverItemsStep extends ContractStepRewardMixin {
+  kind: 'deliver-items'
+  planetId: string
+  itemId: string
+  count: number
+}
+```
+
+The explicit "turn-in" counterpart to `collect-drops`. Reuses the existing
+`notifyPlanetVisited(planetId)` event: when the player orbits the matching
+body while this step is active, the engine asks the host to consume `count`
+units of `itemId` from the player's inventory via the new
+`ContractSystemHooks.consumeItemsForDelivery(itemId, count) → boolean` hook.
+
+- `true` → step advances, `creditsReward` pays out, next flavor message
+  arrives.
+- `false` → silent no-op; the step stays active and the player can retry
+  on a future orbit (e.g. after gathering more drops).
+
+`ContractSystem` itself never imports the inventory module — the inventory
+write lives in `src/lib/contracts/runtime.ts` (`consumeInventoryItems`),
+next to the existing wallet/profile mutators.
+
 ### `launch-from-body`
 
 ```ts
@@ -68,6 +96,7 @@ Bodies are addressed by their stable id (`'sun'`, `'mercury'`, etc).
 |-------|---------|-------|
 | `notifyDropCollected` | `{ itemId, quantity }` | Mirrors `notifyTradeTransaction` shape; advances any active `collect-drops` step whose `itemId` matches. |
 | `notifyOrbitalLaunched` | `{ planetId }` | Wired to the slingshot release path in `MapOrbitFacade`. The Sun is special-cased in `MapViewController.notifyOrbitalLaunchFromBodyName` because it lives outside the `PLANETS` array. |
+| `notifyPlanetVisited` (extended) | `planetId` | Also resolves active `deliver-items` steps. The engine consults `ContractSystemHooks.consumeItemsForDelivery(itemId, count)`; the runtime hook calls `removeItem` + `saveInventory` and returns the boolean. |
 
 ## Sun as a visitable body
 
@@ -106,7 +135,11 @@ Three calls drive it:
 - `spawnFor(itemId, position)` — attempted on every armed enemy death; gated
   by the policy.
 - `tick(dt, playerPosition)` — every EVA frame. Removes pickups within
-  `pickupRadius` of the player and fires `onPickup`.
+  `pickupRadius` of the player on the **XZ plane only** (the Y axis is
+  ignored on purpose: the player anchor is at the feet while pickups float
+  at chest height, and the enemy may have died on terrain at a different
+  elevation than the player's current footing). Fires `onPickup` on each
+  collection.
 - `clear()` — on level teardown.
 
 The `onPickup` callback is the only thing the FPS layer needs to wire into
@@ -128,7 +161,14 @@ to the scene is enough; teardown is via `dispose()`.
 `Enemy.addDeathListener(fn)` provides an auxiliary multicast hook so the
 drop system can subscribe without clobbering each controller's primary
 `onDeath` handler. `EnemyDirector.addSpawnListener(fn)` lets observers
-register globally per-director.
+register globally per-director with **subscribe-and-catch-up** semantics:
+the listener fires synchronously for every enemy already tracked by the
+director at the moment of subscription, then for every subsequent
+`spawn()`. This is required because `ExterminateMinigame` and
+`RescueMinigame` populate their encounter inside their constructors —
+without catch-up, the level controller would always wire the drop
+observer too late and the loot pipeline would silently no-op for the
+first wave.
 
 `ExterminateMinigame` and `RescueMinigame` both expose
 `installEnemySpawnObserver(listener)` which forwards to their internal

@@ -33,16 +33,31 @@
     {
       "kind": "collect-drops",
       "itemId": "viroid-psychosphere",
-      "count": 20,
+      "count": 5,
       "creditsReward": 2000,
-      "subject": "Second Observance — A Small Service",
+      "subject": "Second Observance, Part One — A Small Service",
       "flavor": [
         "Pilot,",
         "You came back. Good.",
         "I took a small liberty and had our engineer make a small adjustment to your sidearm. It is nothing you will feel in the grip. It changes nothing about how the weapon fires. It only allows the weapon to retrieve.",
         "The viroids carry something. We call it the psychosphere — a residue, a settling of what they were before the rot took them. Ordinary fire disperses it. Our modification does not. When you put a viroid down cleanly, the psychosphere will linger where the body fell, and you may gather it as you would any dropped thing.",
-        "We require twenty. Any combat or rescue contract will put you in the path of viroids; there is no need to seek them out specially. Take the work you would have taken anyway. Gather as you go.",
-        "Return when the count is met. The pigment room will be prepared.",
+        "We require five. Any combat or rescue contract will put you in the path of viroids; there is no need to seek them out specially. Take the work you would have taken anyway. Gather as you go.",
+        "When the count is met, bring it to us. The pigment room will be prepared.",
+        "— The Cinderline, at The Anvil"
+      ]
+    },
+    {
+      "kind": "deliver-items",
+      "planetId": "mercury",
+      "itemId": "viroid-psychosphere",
+      "count": 5,
+      "creditsReward": 500,
+      "subject": "Second Observance, Part Two — The Handoff",
+      "flavor": [
+        "Pilot,",
+        "The count is met. The pigment room is open.",
+        "Bring your hold to Mercury. The Anvil's intake will read your transponder the moment you drop into orbit; you do not need to dock. The encaustum render takes time, and the sooner the residue is in our hands the cleaner the result.",
+        "A small handling stipend has been credited against your trip in.",
         "— The Cinderline, at The Anvil"
       ]
     },
