@@ -197,6 +197,14 @@ export class UiAudioDirector {
   }
 
   /**
+   * A contract-origin ship message has arrived. Distinct cue from the regular
+   * inbox ping so players instantly recognise a contract update on the /map.
+   */
+  notifyContractUpdate(): void {
+    this.audio.play('sfx.contract', { volume: 0.7 })
+  }
+
+  /**
    * Player rotated a knob / dial — e.g. a relay-repair pipe node. Uses
    * `restart` playback so rapid spins don't stack overlapping samples.
    */

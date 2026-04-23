@@ -24,6 +24,7 @@ describe('audioManifest', () => {
       'sfx.upgrade.install',
       'sfx.ui.shuttleprogram.click',
       'sfx.inbox',
+      'sfx.contract',
       'sfx.knob',
       // shuttle propulsion
       'sfx.thrusterLoop',
@@ -36,6 +37,11 @@ describe('audioManifest', () => {
       'sfx.wormhole',
       'sfx.fuelWarning',
       'sfx.laserPulse',
+      'sfx.sizzle',
+      'sfx.sizzle.impact',
+      'sfx.rock.melt',
+      'sfx.heartbeat',
+      'sfx.flatline',
       // lander propulsion
       'sfx.lander.thrusterLoop',
       'sfx.lander.thrusterBurst',
@@ -77,6 +83,7 @@ describe('audioManifest', () => {
       'sfx.dockingClamp',
       // combat / EVA
       'sfx.tool.drill',
+      'sfx.impact.gun',
       'sfx.laserFire',
       'sfx.tool.heal',
       'sfx.projectileHit',
@@ -97,6 +104,8 @@ describe('audioManifest', () => {
       'sfx.jump.voice',
       'sfx.breathing.walk',
       'sfx.breathing.run',
+      'sfx.breathing.hard',
+      'sfx.oxygen.low',
       // music
       'music.menu',
       'music.level',

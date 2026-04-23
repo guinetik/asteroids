@@ -36,6 +36,7 @@ export const AUDIO_SOUND_IDS = [
   'sfx.upgrade.install',
   'sfx.ui.shuttleprogram.click',
   'sfx.inbox',
+  'sfx.contract',
   'sfx.knob',
   // SFX — shuttle propulsion
   'sfx.thrusterLoop',
@@ -256,6 +257,15 @@ const manifestById: ManifestById = {
   'sfx.inbox': {
     id: 'sfx.inbox',
     src: '/sound/sfx.inbox.mp3',
+    category: 'ui',
+    load: 'lazy',
+    playback: 'single-instance',
+    volume: 0.7,
+    effect: 'none',
+  },
+  'sfx.contract': {
+    id: 'sfx.contract',
+    src: '/sound/sfx.contract.mp3',
     category: 'ui',
     load: 'lazy',
     playback: 'single-instance',
