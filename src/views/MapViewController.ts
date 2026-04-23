@@ -2948,6 +2948,8 @@ export class MapViewController implements Tickable {
 
   /** Buy a trade good from the shop. */
   shopBuyTradeGood(slotIndex: number, quantity: number): void {
+    const session = this.shopFacade.session
+    const slot = session?.tradeSlots[slotIndex]
     const result = this.shopFacade.buyTradeGood(
       slotIndex,
       quantity,
@@ -2961,11 +2963,20 @@ export class MapViewController implements Tickable {
       this.emitShopState()
       this.onCreditsUpdate?.(this.playerProfile.credits)
       this.emitFuelCellCount()
+      if (session && slot) {
+        contractSystem.notifyTradeTransaction({
+          action: 'buy',
+          planetId: session.planetId,
+          itemId: slot.itemId,
+          quantity,
+        })
+      }
     }
   }
 
   /** Sell an item from inventory at the current planet. */
   shopSellItem(itemId: string, quantity: number): void {
+    const session = this.shopFacade.session
     const result = this.shopFacade.sellTradeGood(
       itemId,
       quantity,
@@ -2979,6 +2990,14 @@ export class MapViewController implements Tickable {
       this.emitShopState()
       this.onCreditsUpdate?.(this.playerProfile.credits)
       this.emitFuelCellCount()
+      if (session) {
+        contractSystem.notifyTradeTransaction({
+          action: 'sell',
+          planetId: session.planetId,
+          itemId,
+          quantity,
+        })
+      }
     }
   }
 
@@ -4147,6 +4166,14 @@ export class MapViewController implements Tickable {
       this.notifyJourneyTrigger('upgrade_installed:gravitySurfing')
     }
     this.maybeStageAct1Climax()
+    // Returning from /level remounts MapView and constructs a fresh controller:
+    // `journeyTrackerVisible` starts at its default (false). If the player has an
+    // active journey that's already been announced (so the replays above returned
+    // `changed: false` and skipped the visibility toggle), this call falls through
+    // `tryAnnounceNextJourneyStart`'s "no pending announcement" branch and flips
+    // the tracker back on. No banner fires because the journey is already in
+    // `announcedJourneyStartIds`.
+    this.tryAnnounceNextJourneyStart()
   }
 
   /** Dev-only: enqueue the Consortium message and start its authored special mission immediately. */
