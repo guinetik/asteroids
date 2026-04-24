@@ -14,9 +14,6 @@ import { DevConsole } from '@/lib/devConsole'
 import { LanderAudioDirector } from '@/audio/LanderAudioDirector'
 import { FpsAudioDirector } from '@/audio/FpsAudioDirector'
 import { LevelAudioDirector } from '@/audio/LevelAudioDirector'
-import { getAudioDefinition } from '@/audio/audioManifest'
-import type { AudioPlaybackHandle } from '@/audio/audioTypes'
-import { useAudio } from '@/audio/useAudio'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'
@@ -33,12 +30,8 @@ import { FpsPlayerController } from '@/three/FpsPlayerController'
 import { FpsCamera } from '@/three/FpsCamera'
 import { FLAT_ZONE_RADIUS } from '@/lib/terrain/terrainGenerator'
 import type { FlatZone } from '@/lib/terrain/terrainGenerator'
-import { getAsteroidById, ASTEROID_CATALOG } from '@/lib/asteroids/catalog'
-import type { AsteroidDefinition } from '@/lib/asteroids/types'
-import { loadActiveMission } from '@/lib/missions/missionStorage'
 import { persistCompletedAsteroidMissionRewards } from '@/lib/missions/asteroidMissionRewards'
-import { hasLevelRouteQueryOverrideFromSearchParams } from '@/lib/level/levelRouteAccess'
-import { LEVEL_GRID_SIZE, generateAsteroidMission } from '@/lib/missions/asteroidMissionGenerator'
+import { LEVEL_GRID_SIZE } from '@/lib/missions/asteroidMissionGenerator'
 import { getCurrentUpgradeValue, hydratePlayerUpgradeLevelsFromStorage } from '@/lib/upgrades'
 import type { GeneratedAsteroidMission, ConcreteObjective } from '@/lib/missions/types'
 import { Heightmap } from '@/lib/terrain/heightmap'
@@ -95,19 +88,33 @@ import { RescueMinigame } from '@/lib/minigame/RescueMinigame'
 import { CollectMinigame } from '@/lib/minigame/CollectMinigame'
 import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
-import { getSpecialMissionById } from '@/lib/missions/specialMissions'
 import { SurfaceRockController } from '@/three/controllers/SurfaceRockController'
 import { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
-import { addItem } from '@/lib/inventory/inventory'
-import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
-import { loadProfile, saveProfile } from '@/lib/player/profile'
+import { loadProfile } from '@/lib/player/profile'
 import { getItemDefinition } from '@/lib/inventory/catalog'
-import { worldPointToHearing } from '@/lib/audio/worldHearing'
 import { GatherMinigame } from '@/lib/minigame/GatherMinigame'
-import { Timer, type TimerHandle } from '@/lib/Timer'
 import { DropSystem, createContractDropPolicy } from '@/lib/fps/dropSystem'
 import { PsychospherePickupController } from '@/three/PsychospherePickupController'
 import { contractSystem } from '@/lib/contracts/runtime'
+import {
+  hashLevelSeed,
+  resolveLevelContext,
+  rotationFromSeed,
+} from '@/lib/level/levelContext'
+import {
+  flattenHeightmapDisk,
+  resampleObjectiveNearShip,
+  sampleSpawnOnSurface,
+} from '@/lib/level/levelObjectivePlacement'
+import { LevelPersistenceFacade } from '@/lib/level/LevelPersistenceFacade'
+import {
+  computeDeathPresentationState,
+  computeHypoxiaFadeOpacity,
+  computeKnockbackAwayFromSource,
+  computeNonLethalFallDamage,
+  computeRelativeDamageAngle,
+  stepDamageFlash,
+} from '@/lib/fps/fpsPresentation'
 
 /**
  * Inventory item id of the loot dropped by viroid (bacteriophage) deaths
@@ -181,16 +188,6 @@ const CONTACT_KNOCKBACK = 26
  * scene gets the same hit feedback as the standalone FPS demo.
  */
 const DAMAGE_FLASH_DURATION = 0.3
-/** Seconds a mining-hit sizzle should linger after the latest valid rock hit. */
-const MINING_SIZZLE_KEEPALIVE_SECONDS = 0.18
-/**
- * One-shot LAS/drill ground sizzle length (seconds) — short so it does not outlast the
- * impact spark burst; intentionally not tied to full MP3 decode length.
- */
-const SIZZLE_IMPACT_DURATION_SEC = 0.1
-/** Distance falloff for sizzle at impact: larger = softer with range. */
-const SIZZLE_SPATIAL_REF_DISTANCE = 10
-const SIZZLE_SPATIAL_MIN_VOLUME = 0.12
 
 /**
  * Strength of the random pitch/yaw camera flinch applied on every hit. Tuned
@@ -274,15 +271,6 @@ const LANDER_COLLIDER_MAX = new Vector3(9, 18, 9)
 const SHUTTLE_COLLIDER_MIN = new Vector3(-2.4, -0.9, -1.35)
 const SHUTTLE_COLLIDER_MAX = new Vector3(2.4, 0.9, 1.35)
 
-/** Simple string hash to derive a numeric seed from a mission id. */
-function hashSeed(str: string): number {
-  let hash = 0
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash * 31 + str.charCodeAt(i)) | 0
-  }
-  return Math.abs(hash)
-}
-
 /**
  * Boot / preload status emitted to {@link LevelView} while the level scene
  * warms up. `preparing` = still loading, `ready` = assets loaded + scene
@@ -300,117 +288,11 @@ export interface LevelViewBootState {
   missionName: string
 }
 
-/**
- * Pick a deterministic Euler rotation from a numeric seed. Used so each
- * mission's asteroid GLB lands in a different orientation — a different
- * slice of rock becomes the play surface, without the level re-rolling
- * the look on retry.
- *
- * @param seed - Mission seed (output of {@link hashSeed}).
- * @returns XYZ Euler rotation in radians, each axis uniform in [0, 2π).
- */
-function rotationFromSeed(seed: number): { x: number; y: number; z: number } {
-  // Mulberry32 PRNG
-  const seedBit = 0x9e3779b9
-  const myFavoriteNumber = 0x6d2b79f5
-  let s = (seed ^ seedBit) >>> 0
-  const next = (): number => {
-    s = (s + myFavoriteNumber) >>> 0
-    let t = s
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-  const tau = Math.PI * 2
-  return { x: next() * tau, y: next() * tau, z: next() * tau }
-}
-
 /** Applies the gameplay spawn offset so the lander clears the portal geometry. */
 function offsetGameplayLanderSpawn(position: Vector3): Vector3 {
   return position
     .clone()
     .add(new Vector3(LANDER_GAMEPLAY_START_OFFSET_X, LANDER_GAMEPLAY_START_OFFSET_Y, 0))
-}
-
-/** Resolved level context — asteroid definition + terrain seed + mission. */
-interface LevelContext {
-  asteroid: AsteroidDefinition
-  seed: number
-  mission: GeneratedAsteroidMission
-  /**
-   * True when the mission was loaded from persisted shuttle storage (not URL dev overrides).
-   * Completion should grant CR and clear active mission; false for `asteroidId` / query bypass runs.
-   */
-  persistCompletionRewards: boolean
-}
-
-/** Maximum attempts to generate a mission matching the requested type. */
-const MISSION_TYPE_RETRY_LIMIT = 20
-
-/**
- * Resolve the asteroid and terrain seed for the current level.
- *
- * Priority: `asteroidId` (ad-hoc) → query override (`difficulty` + `mission` type) → stored active
- * mission only (no silent procedural fallback when storage is missing).
- */
-function resolveLevelContext(): LevelContext {
-  const params = new URLSearchParams(window.location.search)
-  const paramId = params.get('asteroidId')
-  const missionType = params.get('mission')
-  const difficulty = Math.max(1, Math.min(10, Number(params.get('difficulty')) || 5))
-  const queryOverride = hasLevelRouteQueryOverrideFromSearchParams(params)
-
-  let mission: GeneratedAsteroidMission
-  let persistCompletionRewards = false
-  const specialMission = missionType ? getSpecialMissionById(missionType) : undefined
-
-  if (specialMission) {
-    mission = specialMission
-    persistCompletionRewards = true
-  } else if (paramId) {
-    mission = generateMissionWithType(difficulty, missionType)
-    mission.asteroidId = paramId
-  } else if (queryOverride) {
-    mission = generateMissionWithType(difficulty, missionType)
-  } else {
-    const stored = loadActiveMission()
-    if (!stored) {
-      throw new Error(
-        '[Level] No active mission in storage. Use /map to launch one, or open /level with ' +
-          '?mission=<special-id>, ?asteroidId=…, or both ?difficulty=1-10&mission=' +
-          'gather|exterminate|rescue|survey|collect',
-      )
-    }
-    mission = stored
-    persistCompletionRewards = true
-  }
-
-  const asteroid = getAsteroidById(mission.asteroidId) ?? ASTEROID_CATALOG[0]!
-  const seed = hashSeed(mission.id)
-
-  return { asteroid, seed, mission, persistCompletionRewards }
-}
-
-/**
- * Generate a mission, optionally forcing a specific objective type.
- * Retries until a mission with the requested type is found.
- *
- * @param difficulty - Mission difficulty (1-10).
- * @param type - Optional objective type to require (e.g. 'survey').
- * @returns Generated mission.
- */
-function generateMissionWithType(
-  difficulty: number,
-  type: string | null,
-): GeneratedAsteroidMission {
-  if (!type) return generateAsteroidMission(difficulty)
-
-  for (let i = 0; i < MISSION_TYPE_RETRY_LIMIT; i++) {
-    const mission = generateAsteroidMission(difficulty)
-    if (mission.objectives.some((o) => o.type === type)) return mission
-  }
-  // Fallback — return whatever was generated
-  return generateAsteroidMission(difficulty)
 }
 
 /**
@@ -476,6 +358,7 @@ export class LevelViewController implements Tickable {
    * curves and audio plumbing.
    */
   private readonly levelAudio = new LevelAudioDirector()
+  private readonly persistence = new LevelPersistenceFacade()
   private multiTool: MultiToolController | null = null
   private multiToolState: MultiToolState | null = null
   private projectileSystem: ProjectileSystem | null = null
@@ -542,13 +425,6 @@ export class LevelViewController implements Tickable {
   private readonly _tractorVel = new Vector3()
   /** Reused scratch — offset spawn position for consume vacuum particles. */
   private readonly _tractorSpawnPos = new Vector3()
-  /** Looping rock-contact bed sustained while mining hits keep landing. */
-  private miningSizzleHandle: AudioPlaybackHandle | null = null
-  /** Time threshold after which the mining-contact bed should stop. */
-  private miningSizzleKeepAliveUntil = 0
-  /** {@link Timer.after} handle that stops `sfx.sizzle.impact`; cleared on dispose / new impact. */
-  private sizzleImpactTimerHandle: TimerHandle | null = null
-
   // ── Arrival ──────────────────────────────────────────────────
   private arrivalSequence: ArrivalSequence | null = null
 
@@ -756,7 +632,9 @@ export class LevelViewController implements Tickable {
     this.sceneManager.mount(container)
 
     // ── Asteroid data ────────────────────────────────────────────
-    const { asteroid, seed, mission, persistCompletionRewards } = resolveLevelContext()
+    const { asteroid, seed, mission, persistCompletionRewards } = resolveLevelContext(
+      window.location.search,
+    )
 
     // Warm up minigame prop GLBs in parallel with the asteroid surface load
     // so nothing hitches the first time an exterminate, rescue, or virus
@@ -798,7 +676,10 @@ export class LevelViewController implements Tickable {
     // Pick a spawn cell that actually sits on the baked mesh — critical on GLB
     // terrain where most of the play area is void. Falls back to origin if the
     // centre of the world is somehow invalid (shouldn't happen at normal scales).
-    const spawn = this.sampleSpawnOnSurface()
+    const spawn = sampleSpawnOnSurface(this.heightmap, {
+      spawnPositionRange: SPAWN_POSITION_RANGE,
+      spawnSampleAttempts: SPAWN_SAMPLE_ATTEMPTS,
+    })
     const spawnX = spawn.x + LANDER_SPAWN_LIGHT_ALIGNMENT_X
     const spawnZ = spawn.z
     const groundY = spawn.y
@@ -811,7 +692,24 @@ export class LevelViewController implements Tickable {
     // spawners, waypoint markers, and rock exclusions all see the new pos.
     const claimedPositions: Array<{ x: number; z: number }> = [{ x: spawnX, z: spawnZ }]
     for (const obj of mission.objectives) {
-      this.resampleObjectiveNearShip(obj, spawnX, spawnZ, claimedPositions)
+      const resampled = resampleObjectiveNearShip(
+        this.heightmap,
+        obj,
+        { x: spawnX, z: spawnZ },
+        claimedPositions,
+        {
+          minDistanceFromShip: OBJECTIVE_MIN_DISTANCE_FROM_SHIP,
+          maxDistanceFromShip: OBJECTIVE_MAX_DISTANCE_FROM_SHIP,
+          minMutualSpacing: OBJECTIVE_MIN_MUTUAL_SPACING,
+          maxSlope: OBJECTIVE_MAX_SLOPE,
+          resampleAttempts: OBJECTIVE_RESAMPLE_ATTEMPTS,
+          fallbackPullAttempts: 12,
+          fallbackPullFactor: 0.9,
+          fallbackPullDecay: 0.9,
+        },
+      )
+      obj.x = resampled.x
+      obj.z = resampled.z
       claimedPositions.push({ x: obj.x, z: obj.z })
     }
 
@@ -820,10 +718,24 @@ export class LevelViewController implements Tickable {
     // disk sits flat but the visible rock still has peaks — props placed at
     // collision ground Y appear to float beneath visible terrain. Done after
     // resample so the flattened disks are centred on the final positions.
-    this.flattenHeightmapDisk(spawnX, spawnZ)
+    flattenHeightmapDisk(
+      this.heightmap,
+      { x: spawnX, z: spawnZ },
+      {
+        flattenRadius: OBJECTIVE_FLATTEN_RADIUS,
+        flattenFullRadius: OBJECTIVE_FLATTEN_FULL_RADIUS,
+      },
+    )
     this.flattenMeshDisk(spawnX, spawnZ)
     for (const obj of mission.objectives) {
-      this.flattenHeightmapDisk(obj.x, obj.z)
+      flattenHeightmapDisk(
+        this.heightmap,
+        { x: obj.x, z: obj.z },
+        {
+          flattenRadius: OBJECTIVE_FLATTEN_RADIUS,
+          flattenFullRadius: OBJECTIVE_FLATTEN_FULL_RADIUS,
+        },
+      )
       this.flattenMeshDisk(obj.x, obj.z)
     }
     // Rebuild the BVH on any mesh we touched so future raycasts see the
@@ -1082,7 +994,7 @@ export class LevelViewController implements Tickable {
     // ── Universal rock mining ───────────────────────────────────
     // Every surface rock can be drilled regardless of mission type;
     // gather objectives just listen to the same yield stream.
-    const miningSeed = hashSeed(mission.id)
+    const miningSeed = hashLevelSeed(mission.id)
     this.rockYieldSystem = new RockYieldSystem({
       composition: asteroid.composition,
       seed: miningSeed,
@@ -1105,30 +1017,25 @@ export class LevelViewController implements Tickable {
       }
     }
     this.rockYieldSystem.onConsume = (spawnIndex) => {
-      this.stopMiningSizzle()
-      useAudio().play('sfx.rock.melt')
+      this.levelAudio.stopMiningSizzle()
+      this.levelAudio.notifyRockMelt()
       this.spawnConsumeVacuumBurst(spawnIndex)
       this.surfaceRocks?.hideRock(spawnIndex)
       this.removeRockCollider(spawnIndex)
       this.projectileSystem?.removeRock(spawnIndex)
     }
     this.rockYieldSystem.onMineralExtracted = (itemId, kg) => {
-      const inventory = loadInventory()
-      if (!inventory) return
       const quantity = Math.max(1, Math.round(kg))
-      const def = getItemDefinition(itemId)
-      const label = def?.label ?? itemId
-      const result = addItem(inventory, itemId, quantity)
+      const result = this.persistence.persistInventoryPickup(itemId, quantity)
       if (!result.ok) {
         // Inventory full / over weight — surface a warning toast so the
         // player understands why this hit produced no pickup. The mineral
         // is still considered extracted by the gather minigame (which
         // listens upstream of this handler) so quotas keep advancing.
-        this.onResourcePickupFailed?.(label, result.reason ?? 'Inventory full')
+        this.onResourcePickupFailed?.(result.label, result.reason ?? 'Inventory full')
         return
       }
-      saveInventory(result.inventory)
-      this.onResourcePickup?.(itemId, quantity, label)
+      this.onResourcePickup?.(itemId, quantity, result.label)
       this.levelAudio.notifyResourcePickup()
     }
     this.projectileSystem.onRockHit = (spawnIndex, pos) => {
@@ -1164,7 +1071,7 @@ export class LevelViewController implements Tickable {
     this.tickHandler.register(this.psychospherePickupController, TICK_PRIORITY_RENDER)
 
     // ── Objective minigames ──────────────────────────────────────
-    const missionSeed = hashSeed(mission.id)
+    const missionSeed = hashLevelSeed(mission.id)
     for (let i = 0; i < mission.objectives.length; i++) {
       const obj = mission.objectives[i]!
       if (obj.type === 'survey') {
@@ -1697,8 +1604,7 @@ export class LevelViewController implements Tickable {
     // exitEva is skipped on the dead path so we must cut EVA audio here
     // explicitly. The director's stop() also resets footstep cadence.
     this.fpsAudio.stop()
-    useAudio().play('sfx.heartbeat')
-    useAudio().play('sfx.flatline')
+    this.levelAudio.notifyEvaDeath()
 
     // Fade + message are driven by the dead state tick, not set here
   }
@@ -1936,19 +1842,14 @@ export class LevelViewController implements Tickable {
       this.tickEva(dt)
 
       // Hypoxia visual — fade + pulse when O2 is empty and HP is draining
-      const o2Empty = this.playerController!.o2Level <= 0
-      const hpRatio = this.playerController!.hp / this.playerController!.maxHp
-      if (o2Empty) {
-        // Base fade from HP loss (0% HP → 0.7 opacity, 100% HP → 0)
-        const baseFade = (1 - hpRatio) * 0.7
-        // Breathing pulse that gets faster as HP drops
-        const pulseSpeed = 2 + (1 - hpRatio) * 4 // 2 Hz at full HP → 6 Hz near death
-        const pulse = Math.sin(performance.now() * 0.001 * pulseSpeed * Math.PI * 2)
-        const pulseAmount = 0.08 + (1 - hpRatio) * 0.12 // subtle at first, stronger near death
-        this.onDeathFade?.(Math.min(1, baseFade + pulse * pulseAmount))
-      } else {
-        this.onDeathFade?.(0)
-      }
+      this.onDeathFade?.(
+        computeHypoxiaFadeOpacity(
+          this.playerController!.o2Level,
+          this.playerController!.hp,
+          this.playerController!.maxHp,
+          performance.now() * 0.001,
+        ),
+      )
     }
 
     this.enforceLanderAltitudeCeiling()
@@ -1957,12 +1858,9 @@ export class LevelViewController implements Tickable {
     // Damage flash decay — same shape as `FpsViewController.tick`. The Vue
     // overlay reads this every frame so we always emit (0 once cleared) to
     // keep its `v-if` in sync.
-    if (this.damageFlashTimer > 0) {
-      this.damageFlashTimer = Math.max(0, this.damageFlashTimer - dt)
-      this.onDamageFlash?.(this.damageFlashTimer / DAMAGE_FLASH_DURATION)
-    } else {
-      this.onDamageFlash?.(0)
-    }
+    const flash = stepDamageFlash(this.damageFlashTimer, dt, DAMAGE_FLASH_DURATION)
+    this.damageFlashTimer = flash.timer
+    this.onDamageFlash?.(flash.opacity)
 
     // Dead: camera drops, screen fades, message appears
     if (this.stateMachine?.is('dead') && this.fpsCamera) {
@@ -1970,21 +1868,18 @@ export class LevelViewController implements Tickable {
       const DEATH_PITCH_TARGET = -1.4 // ~80 degrees down
       const FADE_DURATION = 2.0 // seconds to full black
       const MESSAGE_DELAY = 1.5 // seconds before showing YOU DIED
-
-      // Camera drops
-      if (this.fpsCamera.pitch > DEATH_PITCH_TARGET) {
-        this.fpsCamera.pitch -= DEATH_PITCH_SPEED * dt
-      }
-
-      // Gradual fade to black
-      const elapsed = this.stateMachine.stateTime
-      const fadeProgress = Math.min(1, elapsed / FADE_DURATION)
-      this.onDeathFade?.(fadeProgress)
-
-      // Show message after delay
-      if (elapsed >= MESSAGE_DELAY) {
-        this.onDeathMessage?.(true)
-      }
+      const deathState = computeDeathPresentationState(
+        this.fpsCamera.pitch,
+        dt,
+        this.stateMachine.stateTime,
+        DEATH_PITCH_SPEED,
+        DEATH_PITCH_TARGET,
+        FADE_DURATION,
+        MESSAGE_DELAY,
+      )
+      this.fpsCamera.pitch = deathState.pitch
+      this.onDeathFade?.(deathState.fadeOpacity)
+      if (deathState.showMessage) this.onDeathMessage?.(true)
     }
 
     // ── Atmosphere context update ──────────────────────────────
@@ -2601,13 +2496,17 @@ export class LevelViewController implements Tickable {
     const playerPos = this.playerController?.group.position
     if (!playerPos) return
 
-    const dx = playerPos.x - sourceX
-    const dz = playerPos.z - sourceZ
-    const dist = Math.sqrt(dx * dx + dz * dz)
-    if (dist > 0.01) {
+    const knockback = computeKnockbackAwayFromSource(
+      playerPos.x,
+      playerPos.z,
+      sourceX,
+      sourceZ,
+      CONTACT_KNOCKBACK,
+    )
+    if (knockback) {
       this.playerController?.applyLateralImpulse(
-        (dx / dist) * CONTACT_KNOCKBACK,
-        (dz / dist) * CONTACT_KNOCKBACK,
+        knockback.x,
+        knockback.z,
       )
     }
 
@@ -2618,8 +2517,13 @@ export class LevelViewController implements Tickable {
         (Math.random() - 0.5) * DAMAGE_FLINCH_STRENGTH,
         -Math.random() * DAMAGE_FLINCH_STRENGTH,
       )
-      const worldAngle = Math.atan2(sourceX - playerPos.x, sourceZ - playerPos.z)
-      const relAngle = worldAngle - this.fpsCamera.yaw
+      const relAngle = computeRelativeDamageAngle(
+        playerPos.x,
+        playerPos.z,
+        sourceX,
+        sourceZ,
+        this.fpsCamera.yaw,
+      )
       this.onDamageDirection?.(relAngle)
     }
   }
@@ -2655,18 +2559,12 @@ export class LevelViewController implements Tickable {
     if (!player || player.isDead) return
 
     const impactSpeed = Math.abs(player.body.impactVelocityY)
-    if (impactSpeed <= FALL_DAMAGE_SAFE_SPEED) return
-
-    const overshoot = impactSpeed - FALL_DAMAGE_SAFE_SPEED
-    const rawDamage = Math.min(overshoot * FALL_DAMAGE_PER_UNIT, FALL_DAMAGE_MAX)
-
-    // No-kill clamp — we only ever deal up to (currentHp - floor) damage,
-    // so the player always lives. Using the controller's `_hp` would be
-    // cleaner but it's private; the public `hp` getter is sufficient
-    // because both are in lock-step (no other code path mutates between
-    // the read and the takeDamage call within the same tick frame).
-    const survivableDamage = Math.max(0, player.hp - FALL_DAMAGE_MIN_HP_AFTER)
-    const damage = Math.min(rawDamage, survivableDamage)
+    const damage = computeNonLethalFallDamage(impactSpeed, player.hp, {
+      safeSpeed: FALL_DAMAGE_SAFE_SPEED,
+      damagePerUnit: FALL_DAMAGE_PER_UNIT,
+      maxDamage: FALL_DAMAGE_MAX,
+      minHpAfter: FALL_DAMAGE_MIN_HP_AFTER,
+    })
     if (damage <= 0) return
 
     player.takeDamage(damage)
@@ -2752,18 +2650,13 @@ export class LevelViewController implements Tickable {
    * @param pickup - Pickup entity collected this tick.
    */
   private handlePickupCollected(pickup: { itemId: string; quantity?: number }): void {
-    const inventory = loadInventory()
-    if (!inventory) return
     const quantity = pickup.quantity ?? 1
-    const def = getItemDefinition(pickup.itemId)
-    const label = def?.label ?? pickup.itemId
-    const result = addItem(inventory, pickup.itemId, quantity)
+    const result = this.persistence.persistInventoryPickup(pickup.itemId, quantity)
     if (!result.ok) {
-      this.onResourcePickupFailed?.(label, result.reason ?? 'Inventory full')
+      this.onResourcePickupFailed?.(result.label, result.reason ?? 'Inventory full')
       return
     }
-    saveInventory(result.inventory)
-    this.onResourcePickup?.(pickup.itemId, quantity, label)
+    this.onResourcePickup?.(pickup.itemId, quantity, result.label)
     this.levelAudio.notifyResourcePickup()
     contractSystem.notifyDropCollected({ itemId: pickup.itemId, quantity })
   }
@@ -2917,133 +2810,6 @@ export class LevelViewController implements Tickable {
     })
   }
 
-  /**
-   * Smooth the baked heightmap in a disk around (cx, cz) toward the centre
-   * height. Cells inside {@link OBJECTIVE_FLATTEN_FULL_RADIUS} become exactly
-   * the centre height; cells between that and {@link OBJECTIVE_FLATTEN_RADIUS}
-   * blend smoothly so there's no visible step. Skips invalid cells and
-   * preserves validity flags.
-   */
-  private flattenHeightmapDisk(cx: number, cz: number): void {
-    const hm = this.heightmap
-    if (!hm) return
-    if (!hm.isValidAt(cx, cz)) return
-
-    const centreHeight = hm.heightAt(cx, cz)
-    const cellSize = hm.worldSize / (hm.resolution - 1)
-    const half = hm.worldSize / 2
-    const cellRadius = Math.ceil(OBJECTIVE_FLATTEN_RADIUS / cellSize)
-    const gcx = Math.round(((cx + half) / hm.worldSize) * (hm.resolution - 1))
-    const gcz = Math.round(((cz + half) / hm.worldSize) * (hm.resolution - 1))
-
-    for (let dz = -cellRadius; dz <= cellRadius; dz++) {
-      for (let dx = -cellRadius; dx <= cellRadius; dx++) {
-        const gx = gcx + dx
-        const gz = gcz + dz
-        if (!hm.isValid(gx, gz)) continue
-
-        const wx = -half + gx * cellSize
-        const wz = -half + gz * cellSize
-        const worldDist = Math.hypot(wx - cx, wz - cz)
-        if (worldDist >= OBJECTIVE_FLATTEN_RADIUS) continue
-
-        let weight = 1
-        if (worldDist > OBJECTIVE_FLATTEN_FULL_RADIUS) {
-          const t =
-            (worldDist - OBJECTIVE_FLATTEN_FULL_RADIUS) /
-            (OBJECTIVE_FLATTEN_RADIUS - OBJECTIVE_FLATTEN_FULL_RADIUS)
-          // Smoothstep for a soft shoulder
-          weight = 1 - t * t * (3 - 2 * t)
-        }
-
-        const original = hm.get(gx, gz)
-        hm.set(gx, gz, original + (centreHeight - original) * weight)
-      }
-    }
-  }
-
-  /**
-   * Re-place an objective on a flat-ish, valid cell in a ring around the ship
-   * spawn, respecting mutual spacing against previously-claimed positions.
-   * Mutates the objective in place so minigame spawners, waypoint markers, and
-   * rock-exclusion zones all see the corrected coordinates.
-   *
-   * Falls back to pulling the original position toward origin if the ring
-   * sampling fails (pathological asteroids with no flat-ish face near the
-   * ship). Never silently leaves the objective on a void cell.
-   */
-  private resampleObjectiveNearShip(
-    obj: { x: number; z: number },
-    shipX: number,
-    shipZ: number,
-    claimed: ReadonlyArray<{ x: number; z: number }>,
-  ): void {
-    const hm = this.heightmap
-    if (!hm) return
-    const minDistSq = OBJECTIVE_MIN_MUTUAL_SPACING * OBJECTIVE_MIN_MUTUAL_SPACING
-
-    for (let i = 0; i < OBJECTIVE_RESAMPLE_ATTEMPTS; i++) {
-      const angle = Math.random() * Math.PI * 2
-      const radius =
-        OBJECTIVE_MIN_DISTANCE_FROM_SHIP +
-        Math.random() * (OBJECTIVE_MAX_DISTANCE_FROM_SHIP - OBJECTIVE_MIN_DISTANCE_FROM_SHIP)
-      const x = shipX + Math.cos(angle) * radius
-      const z = shipZ + Math.sin(angle) * radius
-      if (!hm.isValidAt(x, z)) continue
-      if (hm.slopeAt(x, z) > OBJECTIVE_MAX_SLOPE) continue
-
-      let tooClose = false
-      for (const c of claimed) {
-        const dx = x - c.x
-        const dz = z - c.z
-        if (dx * dx + dz * dz < minDistSq) {
-          tooClose = true
-          break
-        }
-      }
-      if (tooClose) continue
-
-      obj.x = x
-      obj.z = z
-      return
-    }
-
-    // Fallback: pull the original toward origin until it's a valid cell.
-    let factor = 0.9
-    for (let i = 0; i < 12; i++) {
-      const x = obj.x * factor
-      const z = obj.z * factor
-      if (hm.isValidAt(x, z)) {
-        obj.x = x
-        obj.z = z
-        return
-      }
-      factor *= 0.9
-    }
-    obj.x = 0
-    obj.z = 0
-  }
-
-  /**
-   * Pick a random (x, z) inside {@link SPAWN_POSITION_RANGE} that lies on valid
-   * baked surface, returning it with its ground Y. Retries {@link SPAWN_SAMPLE_ATTEMPTS}
-   * times before giving up and returning origin with whatever `heightAt(0,0)`
-   * resolves to — covers the pathological case where the asteroid GLB is
-   * mis-centred. The returned y is the baked mesh Y at the chosen cell.
-   */
-  private sampleSpawnOnSurface(): { x: number; y: number; z: number } {
-    const hm = this.heightmap
-    if (!hm) return { x: 0, y: 0, z: 0 }
-    for (let i = 0; i < SPAWN_SAMPLE_ATTEMPTS; i++) {
-      const x = (Math.random() - 0.5) * 2 * SPAWN_POSITION_RANGE
-      const z = (Math.random() - 0.5) * 2 * SPAWN_POSITION_RANGE
-      if (hm.isValidAt(x, z)) {
-        return { x, y: hm.heightAt(x, z), z }
-      }
-    }
-    return { x: 0, y: hm.heightAt(0, 0), z: 0 }
-  }
-
   private isPlayerAdrift(): boolean {
     if (!this.playerController || !this.heightmap) return false
     const pos = this.playerController.group.position
@@ -3134,12 +2900,8 @@ export class LevelViewController implements Tickable {
 
   /** Write lander HP into the player profile in localStorage. */
   private flushLanderHullToProfile(): void {
-    if (typeof localStorage === 'undefined' || !this.landerController) return
-    const stored = loadProfile()
-    if (!stored) return
-    const hp = this.landerController.hp
-    if (stored.landerHullHp === hp) return
-    saveProfile({ ...stored, landerHullHp: hp })
+    if (!this.landerController) return
+    this.persistence.flushLanderHullHp(this.landerController.hp)
   }
 
   /**
@@ -3162,12 +2924,7 @@ export class LevelViewController implements Tickable {
 
   /** Extend or start the looping sizzle that sells active rock contact while mining. */
   private keepMiningSizzleAlive(): void {
-    this.miningSizzleKeepAliveUntil = this.elapsed + MINING_SIZZLE_KEEPALIVE_SECONDS
-    if (this.miningSizzleHandle?.playing()) return
-
-    const audio = useAudio()
-    audio.unlock()
-    this.miningSizzleHandle = audio.play('sfx.sizzle', { loop: true })
+    this.levelAudio.keepMiningSizzleAlive(this.elapsed)
   }
 
   /**
@@ -3192,55 +2949,23 @@ export class LevelViewController implements Tickable {
     this.playShortSurfaceSizzle(impactWorld)
   }
 
-  /** Cancels the pending `sfx.sizzle.impact` stop from {@link playShortSurfaceSizzle}. */
-  private cancelSizzleImpactTimer(): void {
-    if (this.sizzleImpactTimerHandle === null) return
-    Timer.cancel(this.sizzleImpactTimerHandle)
-    this.sizzleImpactTimerHandle = null
-  }
-
   /**
-   * Plays a brief `sfx.sizzle.impact` at `impactWorld` with stereo + distance, stopped after
-   * {@link SIZZLE_IMPACT_DURATION_SEC} via {@link Timer.after}.
+   * Plays a brief `sfx.sizzle.impact` at `impactWorld` with stereo + distance.
    *
    * @param impactWorld - World-space contact point.
    */
   private playShortSurfaceSizzle(impactWorld: Vector3): void {
-    this.cancelSizzleImpactTimer()
-    const audio = useAudio()
-    audio.unlock()
-    const def = getAudioDefinition('sfx.sizzle.impact')
-    const camera = this.fpsCamera?.camera
-    let vol = def.volume
-    let pan = 0
-    if (camera) {
-      const w = worldPointToHearing(camera, impactWorld, {
-        refDistance: SIZZLE_SPATIAL_REF_DISTANCE,
-        minVolumeScale: SIZZLE_SPATIAL_MIN_VOLUME,
-      })
-      vol = def.volume * w.volumeScale
-      pan = w.pan
-    }
-    const h = audio.play('sfx.sizzle.impact', { loop: false, volume: vol })
-    h.setStereo(pan)
-    this.sizzleImpactTimerHandle = Timer.after(SIZZLE_IMPACT_DURATION_SEC, () => {
-      this.sizzleImpactTimerHandle = null
-      h.stop()
-    })
+    this.levelAudio.playShortSurfaceSizzle(this.fpsCamera?.camera ?? null, impactWorld)
   }
 
   /** Stop and forget the looping mining-contact sizzle. */
   private stopMiningSizzle(): void {
-    this.miningSizzleHandle?.stop()
-    this.miningSizzleHandle = null
-    this.miningSizzleKeepAliveUntil = 0
+    this.levelAudio.stopMiningSizzle()
   }
 
   /** Release the mining-contact loop once the recent-hit grace window expires. */
   private updateMiningSizzle(): void {
-    if (!this.miningSizzleHandle) return
-    if (this.elapsed <= this.miningSizzleKeepAliveUntil) return
-    this.stopMiningSizzle()
+    this.levelAudio.updateMiningSizzle(this.elapsed)
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -3265,7 +2990,6 @@ export class LevelViewController implements Tickable {
     this.fpsAudio.dispose()
     this.levelAudio.dispose()
     this.stopMiningSizzle()
-    this.cancelSizzleImpactTimer()
     this.teardownPointerLock()
     this.clearCollisionRegistrations()
     this.clearSurfaceRockCollisionRegistrations()

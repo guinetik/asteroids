@@ -46,6 +46,11 @@ import { EnemyProjectileMeshPool } from '@/three/EnemyProjectileMeshPool'
 import { FpsHostageController } from '@/three/FpsHostageController'
 import { VirusModel } from '@/three/VirusModel'
 import { FpsAudioDirector } from '@/audio/FpsAudioDirector'
+import {
+  computeKnockbackAwayFromSource,
+  computeRelativeDamageAngle,
+  stepDamageFlash,
+} from '@/lib/fps/fpsPresentation'
 
 const AMBIENT_LIGHT_INTENSITY = 0.4
 const DIR_LIGHT_INTENSITY = 1.2
@@ -350,14 +355,17 @@ export class FpsViewController implements Tickable {
         const pp = this.playerController!.group.position
         const ep = handle.enemy.position
 
-        // Knockback — push player away from enemy
-        const dx = pp.x - ep.x
-        const dz = pp.z - ep.z
-        const dist = Math.sqrt(dx * dx + dz * dz)
-        if (dist > 0.01) {
+        const knockback = computeKnockbackAwayFromSource(
+          pp.x,
+          pp.z,
+          ep.x,
+          ep.z,
+          CONTACT_KNOCKBACK,
+        )
+        if (knockback) {
           this.playerController!.applyLateralImpulse(
-            (dx / dist) * CONTACT_KNOCKBACK,
-            (dz / dist) * CONTACT_KNOCKBACK,
+            knockback.x,
+            knockback.z,
           )
         }
 
@@ -368,8 +376,7 @@ export class FpsViewController implements Tickable {
             -Math.random() * DAMAGE_FLINCH_STRENGTH,
           )
           // Directional indicator
-          const worldAngle = Math.atan2(ep.x - pp.x, ep.z - pp.z)
-          const relAngle = worldAngle - this.fpsCamera.yaw
+          const relAngle = computeRelativeDamageAngle(pp.x, pp.z, ep.x, ep.z, this.fpsCamera.yaw)
           this.onDamageDirection?.(relAngle)
         }
       }
@@ -395,14 +402,17 @@ export class FpsViewController implements Tickable {
         this.damageFlashTimer = DAMAGE_FLASH_DURATION
         this.fpsAudio.notifyProjectileDamage()
         const pp = this.playerController!.group.position
-        // Knockback away from projectile source
-        const dx = pp.x - sourceX
-        const dz = pp.z - sourceZ
-        const dist = Math.sqrt(dx * dx + dz * dz)
-        if (dist > 0.01) {
+        const knockback = computeKnockbackAwayFromSource(
+          pp.x,
+          pp.z,
+          sourceX,
+          sourceZ,
+          CONTACT_KNOCKBACK,
+        )
+        if (knockback) {
           this.playerController!.applyLateralImpulse(
-            (dx / dist) * CONTACT_KNOCKBACK,
-            (dz / dist) * CONTACT_KNOCKBACK,
+            knockback.x,
+            knockback.z,
           )
         }
         // Directional indicator
@@ -411,8 +421,13 @@ export class FpsViewController implements Tickable {
             (Math.random() - 0.5) * DAMAGE_FLINCH_STRENGTH,
             -Math.random() * DAMAGE_FLINCH_STRENGTH,
           )
-          const worldAngle = Math.atan2(sourceX - pp.x, sourceZ - pp.z)
-          const relAngle = worldAngle - this.fpsCamera.yaw
+          const relAngle = computeRelativeDamageAngle(
+            pp.x,
+            pp.z,
+            sourceX,
+            sourceZ,
+            this.fpsCamera.yaw,
+          )
           this.onDamageDirection?.(relAngle)
         }
       }
@@ -799,12 +814,9 @@ export class FpsViewController implements Tickable {
     }
 
     // --- Damage flash decay ---
-    if (this.damageFlashTimer > 0) {
-      this.damageFlashTimer -= _dt
-      this.onDamageFlash?.(Math.max(0, this.damageFlashTimer / DAMAGE_FLASH_DURATION))
-    } else {
-      this.onDamageFlash?.(0)
-    }
+    const flash = stepDamageFlash(this.damageFlashTimer, _dt, DAMAGE_FLASH_DURATION)
+    this.damageFlashTimer = flash.timer
+    this.onDamageFlash?.(flash.opacity)
 
     // FPS player audio (footsteps, breathing crossfade, floating onset,
     // contact-damage loop decay) is owned by the director. Reading

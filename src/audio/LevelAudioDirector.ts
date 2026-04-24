@@ -11,12 +11,13 @@
  * - {@link three.LanderController} — internal lander sounds (engine,
  *   RCS, alarms, gyro, touchdown, collision, explosion).
  *
- * That leaves the "miscellaneous level events" — resource pickups and
- * objective (nest / virus) explosions — which were the last two
- * `useAudio().play(...)` call sites left in the level controller.
- * Centralising them here keeps the director metaphor consistent: the
- * view fires `notify*` events, the director owns the volume curves and
- * audio plumbing.
+ * That leaves the "miscellaneous level events" — resource pickups,
+ * objective (nest / virus) explosions, EVA death stingers, rock-melt
+ * one-shots, and the mining/surface-sizzle plumbing that used to live
+ * directly in the level controller. Centralising them here keeps the
+ * director metaphor consistent: the view fires `notify*` events, the
+ * director owns the volume curves, playback handles, and audio
+ * plumbing.
  *
  * Unlike the other directors this one holds no loops and no per-frame
  * state, so there's no `update()` / `start()` / `stop()` lifecycle to
@@ -29,6 +30,11 @@
  */
 
 import { useAudio } from './useAudio'
+import { getAudioDefinition } from './audioManifest'
+import { worldPointToHearing } from '@/lib/audio/worldHearing'
+import { Timer, type TimerHandle } from '@/lib/Timer'
+import type { AudioPlaybackHandle } from './audioTypes'
+import type { PerspectiveCamera, Vector3 } from 'three'
 
 /** Resource pickup chime volume (constant; pickups don't scale by yield). */
 const PICKUP_VOLUME = 0.35
@@ -46,6 +52,14 @@ const EXPLOSION_VOL_BASE = 0.3
  * total is `EXPLOSION_VOL_BASE + EXPLOSION_VOL_RANGE` = 1.0.
  */
 const EXPLOSION_VOL_RANGE = 0.7
+/** Seconds the looping mining-contact sizzle is held after the latest hit. */
+const MINING_SIZZLE_KEEPALIVE_SECONDS = 0.18
+/** One-shot surface-sizzle duration in seconds before its handle is stopped. */
+const SIZZLE_IMPACT_DURATION_SEC = 0.1
+/** Spatial reference distance for the one-shot surface-sizzle cue. */
+const SIZZLE_SPATIAL_REF_DISTANCE = 10
+/** Lowest volume scale allowed for a distant one-shot surface-sizzle cue. */
+const SIZZLE_SPATIAL_MIN_VOLUME = 0.12
 
 /**
  * Audio orchestrator for miscellaneous level events. Single-instance
@@ -53,6 +67,12 @@ const EXPLOSION_VOL_RANGE = 0.7
  */
 export class LevelAudioDirector {
   private readonly audio = useAudio()
+  /** Looping rock-contact bed sustained while mining hits keep landing. */
+  private miningSizzleHandle: AudioPlaybackHandle | null = null
+  /** Time threshold after which the mining-contact bed should stop. */
+  private miningSizzleKeepAliveUntil = 0
+  /** Timer that stops the one-shot impact sizzle. */
+  private sizzleImpactTimerHandle: TimerHandle | null = null
 
   /**
    * Player just successfully picked up a mineral / resource. Plays the
@@ -84,6 +104,79 @@ export class LevelAudioDirector {
     this.audio.play('sfx.explosive', { volume })
   }
 
+  /** Player just died during EVA; play the death stingers. */
+  notifyEvaDeath(): void {
+    this.audio.play('sfx.heartbeat')
+    this.audio.play('sfx.flatline')
+  }
+
+  /** A rock was fully consumed by mining; play the melt one-shot. */
+  notifyRockMelt(): void {
+    this.audio.play('sfx.rock.melt')
+  }
+
+  /**
+   * Extend or start the looping rock-contact sizzle while mining hits keep landing.
+   *
+   * @param elapsedSeconds - Current controller elapsed time in seconds.
+   */
+  keepMiningSizzleAlive(elapsedSeconds: number): void {
+    this.miningSizzleKeepAliveUntil = elapsedSeconds + MINING_SIZZLE_KEEPALIVE_SECONDS
+    if (this.miningSizzleHandle?.playing()) return
+
+    this.audio.unlock()
+    this.miningSizzleHandle = this.audio.play('sfx.sizzle', { loop: true })
+  }
+
+  /**
+   * Stop the looping mining-contact sizzle immediately.
+   */
+  stopMiningSizzle(): void {
+    this.miningSizzleHandle?.stop()
+    this.miningSizzleHandle = null
+    this.miningSizzleKeepAliveUntil = 0
+  }
+
+  /**
+   * Release the mining-contact loop once the keepalive window expires.
+   *
+   * @param elapsedSeconds - Current controller elapsed time in seconds.
+   */
+  updateMiningSizzle(elapsedSeconds: number): void {
+    if (!this.miningSizzleHandle) return
+    if (elapsedSeconds <= this.miningSizzleKeepAliveUntil) return
+    this.stopMiningSizzle()
+  }
+
+  /**
+   * Play a brief, spatialized surface-sizzle one-shot at the impact point.
+   *
+   * @param camera - Active FPS camera for pan/distance hearing, or `null`.
+   * @param impactWorld - World-space impact point.
+   */
+  playShortSurfaceSizzle(camera: PerspectiveCamera | null, impactWorld: Vector3): void {
+    this.cancelSizzleImpactTimer()
+    this.audio.unlock()
+    const def = getAudioDefinition('sfx.sizzle.impact')
+    let volume = def.volume
+    let pan = 0
+    if (camera) {
+      const hearing = worldPointToHearing(camera, impactWorld, {
+        refDistance: SIZZLE_SPATIAL_REF_DISTANCE,
+        minVolumeScale: SIZZLE_SPATIAL_MIN_VOLUME,
+      })
+      volume = def.volume * hearing.volumeScale
+      pan = hearing.pan
+    }
+
+    const handle = this.audio.play('sfx.sizzle.impact', { loop: false, volume })
+    handle.setStereo(pan)
+    this.sizzleImpactTimerHandle = Timer.after(SIZZLE_IMPACT_DURATION_SEC, () => {
+      this.sizzleImpactTimerHandle = null
+      handle.stop()
+    })
+  }
+
   /**
    * Final cleanup. No-op today (the director holds no loops), but
    * provided for symmetry with {@link FpsAudioDirector.dispose} and
@@ -91,7 +184,15 @@ export class LevelAudioDirector {
    * directors uniformly in its own dispose path.
    */
   dispose(): void {
-    // Intentional no-op. Reserved for future loops / handles.
+    this.stopMiningSizzle()
+    this.cancelSizzleImpactTimer()
+  }
+
+  /** Cancel any pending delayed stop for the impact sizzle one-shot. */
+  private cancelSizzleImpactTimer(): void {
+    if (this.sizzleImpactTimerHandle === null) return
+    Timer.cancel(this.sizzleImpactTimerHandle)
+    this.sizzleImpactTimerHandle = null
   }
 }
 
