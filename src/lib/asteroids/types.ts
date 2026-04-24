@@ -48,6 +48,11 @@ export interface SurfaceFeatures {
   roughness: number
   /** How much loose dust/regolith blankets the surface. Higher values increase dust softening, damping sharp breakup detail before crater and ridge passes. */
   dustCoverage: number
+  /**
+   * Optional URL path to a GLB model used for the level surface. When omitted,
+   * the level view falls back to `DEFAULT_ASTEROID_MODEL_PATH`.
+   */
+  modelPath?: string
 }
 
 /** PBR material properties derived from real spectral data. Colors are RGB normalized 0–1. */

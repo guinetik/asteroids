@@ -25,7 +25,8 @@
     "boulderDensity": 0.0,
     "ridgeFrequency": 0.8,
     "roughness": 0.25,
-    "dustCoverage": 0.85
+    "dustCoverage": 0.85,
+    "modelPath": "/models/asteroid.glb"
   },
   "visual": {
     "albedo": 0.67,
