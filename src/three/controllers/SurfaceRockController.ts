@@ -67,9 +67,9 @@ const MINERAL_CATALOG: readonly MineralMaterialDef[] = [
   { key: 'olivine', folder: 'olivine', metalness: 0.05 },
   { key: 'pyroxene', folder: 'pyroxene', metalness: 0.05 },
   { key: 'plagioclase', folder: 'plagioclase', metalness: 0.02 },
-  { key: 'troilite', folder: 'troilite', metalness: 0.15 },
-  { key: 'nickel', folder: 'nickel', metalness: 0.75 },
-  { key: 'magnetite', folder: 'magnetite', metalness: 0.45 },
+  { key: 'troilite', folder: 'troilite', metalness: 0.03 },
+  { key: 'nickel', folder: 'nickel', metalness: 0.15 },
+  { key: 'magnetite', folder: 'magnetite', metalness: 0.09 },
   { key: 'silicates', folder: 'silicates', metalness: 0.02 },
   { key: 'organic', folder: 'organic', metalness: 0.02 },
   { key: 'carbonates', folder: 'carbonates', metalness: 0.02 },
@@ -80,8 +80,8 @@ const MINERAL_CATALOG: readonly MineralMaterialDef[] = [
   { key: 'halite', folder: 'halite', metalness: 0.02 },
   { key: 'lava', folder: 'lava', metalness: 0.05 },
   { key: 'sulfur', folder: 'sulfur', metalness: 0.02 },
-  { key: 'hematite', folder: 'hematite', metalness: 0.2 },
-  { key: 'obsidian', folder: 'obsidian', metalness: 0.1 },
+  { key: 'hematite', folder: 'hematite', metalness: 0.04 },
+  { key: 'obsidian', folder: 'obsidian', metalness: 0.02 },
 ]
 
 /**
