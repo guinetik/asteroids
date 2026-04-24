@@ -724,13 +724,20 @@ export class LevelViewController implements Tickable {
       claimedPositions.push({ x: obj.x, z: obj.z })
     }
 
-    // Soften the baked terrain around the ship and each waypoint so landing
-    // and mission setup have a proper flat-ish pad. Done after resample so
-    // the flattened disks are centred on the final objective positions.
+    // Soften BOTH the collision heightmap AND the visible GLB mesh around the
+    // ship and each waypoint. Without flattening the render mesh, the physics
+    // disk sits flat but the visible rock still has peaks — props placed at
+    // collision ground Y appear to float beneath visible terrain. Done after
+    // resample so the flattened disks are centred on the final positions.
     this.flattenHeightmapDisk(spawnX, spawnZ)
+    this.flattenMeshDisk(spawnX, spawnZ)
     for (const obj of mission.objectives) {
       this.flattenHeightmapDisk(obj.x, obj.z)
+      this.flattenMeshDisk(obj.x, obj.z)
     }
+    // Rebuild the BVH on any mesh we touched so future raycasts see the
+    // flattened geometry. Safe to call after all disks are done.
+    this.rebuildAsteroidSurfaceBvh()
 
     // `flatZones` is used for rock-spawn exclusions around objective sites —
     // built after resample so exclusions match the actual waypoint locations.
@@ -2694,6 +2701,85 @@ export class LevelViewController implements Tickable {
     const edgeTerrainY = this.heightmap.heightAt(clampedX, clampedZ)
 
     return landerPos.y < edgeTerrainY - ADRIFT_DEPTH_MARGIN
+  }
+
+  /**
+   * Push visible GLB vertices inside a disk around (cx, cz) toward the same
+   * centre height used by {@link flattenHeightmapDisk}. Works in world space
+   * (via each mesh's `matrixWorld`) so the disk is consistent regardless of
+   * the asteroid's applied scale / rotation. The BVH is not rebuilt here —
+   * call {@link rebuildAsteroidSurfaceBvh} once after every disk is done.
+   */
+  private flattenMeshDisk(cx: number, cz: number): void {
+    const hm = this.heightmap
+    const surface = this.asteroidSurface
+    if (!hm || !surface) return
+    if (!hm.isValidAt(cx, cz)) return
+
+    const centreHeight = hm.heightAt(cx, cz)
+    const flatRadiusSq = OBJECTIVE_FLATTEN_RADIUS * OBJECTIVE_FLATTEN_RADIUS
+    const vertex = new THREE.Vector3()
+    const worldToLocal = new THREE.Matrix4()
+
+    surface.group.traverse((child) => {
+      if (!(child as THREE.Mesh).isMesh) return
+      const mesh = child as THREE.Mesh
+      const positions = mesh.geometry.attributes.position as THREE.BufferAttribute
+      if (!positions) return
+
+      worldToLocal.copy(mesh.matrixWorld).invert()
+      let touched = false
+
+      for (let i = 0; i < positions.count; i++) {
+        vertex.fromBufferAttribute(positions, i).applyMatrix4(mesh.matrixWorld)
+        const dx = vertex.x - cx
+        const dz = vertex.z - cz
+        const distSq = dx * dx + dz * dz
+        if (distSq >= flatRadiusSq) continue
+
+        const dist = Math.sqrt(distSq)
+        let weight = 1
+        if (dist > OBJECTIVE_FLATTEN_FULL_RADIUS) {
+          const t =
+            (dist - OBJECTIVE_FLATTEN_FULL_RADIUS) /
+            (OBJECTIVE_FLATTEN_RADIUS - OBJECTIVE_FLATTEN_FULL_RADIUS)
+          weight = 1 - t * t * (3 - 2 * t)
+        }
+
+        vertex.y = vertex.y + (centreHeight - vertex.y) * weight
+        vertex.applyMatrix4(worldToLocal)
+        positions.setXYZ(i, vertex.x, vertex.y, vertex.z)
+        touched = true
+      }
+
+      if (touched) {
+        positions.needsUpdate = true
+      }
+    })
+  }
+
+  /**
+   * Recompute normals + bounding volumes + BVH on every mesh in the asteroid
+   * surface. Call once after all flatten disks have been applied so the
+   * visible shading and any future raycasts reflect the new geometry.
+   */
+  private rebuildAsteroidSurfaceBvh(): void {
+    const surface = this.asteroidSurface
+    if (!surface) return
+    surface.group.traverse((child) => {
+      if (!(child as THREE.Mesh).isMesh) return
+      const mesh = child as THREE.Mesh
+      const geom = mesh.geometry as THREE.BufferGeometry & {
+        boundsTree?: unknown
+        disposeBoundsTree?: () => void
+        computeBoundsTree?: () => void
+      }
+      mesh.geometry.computeVertexNormals()
+      mesh.geometry.computeBoundingBox()
+      mesh.geometry.computeBoundingSphere()
+      if (geom.boundsTree && geom.disposeBoundsTree) geom.disposeBoundsTree()
+      if (geom.computeBoundsTree) geom.computeBoundsTree()
+    })
   }
 
   /**
