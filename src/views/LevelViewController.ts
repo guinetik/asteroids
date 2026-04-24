@@ -719,6 +719,7 @@ export class LevelViewController implements Tickable {
       modelPath: asteroid.surface.modelPath,
       scale: asteroid.surface.modelScale,
       texturePath: asteroid.surface.texturePath,
+      textureRepeat: asteroid.surface.textureRepeat,
       rotation: rotationFromSeed(seed),
       bake: {
         resolution: TERRAIN_RESOLUTION,

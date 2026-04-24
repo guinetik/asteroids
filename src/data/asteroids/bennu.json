@@ -28,7 +28,8 @@
     "dustCoverage": 0.2,
     "modelPath": "/models/asteroid.glb",
     "modelScale": 1300,
-    "texturePath": "/texture.jpg"
+    "texturePath": "/texture.jpg",
+    "textureRepeat": 8
   },
   "visual": {
     "albedo": 0.044,

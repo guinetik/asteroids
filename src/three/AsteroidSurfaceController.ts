@@ -35,6 +35,11 @@ export interface AsteroidSurfaceControllerOptions {
    */
   texturePath?: string
   /**
+   * UV repeat factor for {@link texturePath}. Applied as `texture.repeat.set(n, n)`
+   * so the albedo tiles instead of stretching. Default 1 = no tiling.
+   */
+  textureRepeat?: number
+  /**
    * Optional Euler rotation (radians, XYZ order) applied to the asteroid
    * BEFORE the bake. Lets callers pick a different "up" face per mission via
    * a seeded rotation lottery so missions on the same GLB don't all land on
@@ -87,6 +92,8 @@ export async function createAsteroidSurface(
     overrideMap.colorSpace = THREE.SRGBColorSpace
     overrideMap.wrapS = THREE.RepeatWrapping
     overrideMap.wrapT = THREE.RepeatWrapping
+    const repeat = options.textureRepeat ?? 1
+    overrideMap.repeat.set(repeat, repeat)
     scene.traverse((child) => {
       if (!(child as THREE.Mesh).isMesh) return
       const material = (child as THREE.Mesh).material

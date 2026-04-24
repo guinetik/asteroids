@@ -68,6 +68,12 @@ export interface SurfaceFeatures {
    * without touching the shared GLB.
    */
   texturePath?: string
+  /**
+   * How many times {@link texturePath} repeats across the GLB's UV range
+   * (applied to both U and V). Higher = finer grain. Defaults to 1 (no tiling).
+   * A tileable texture at 6–10 reads well on a ~2600 unit asteroid.
+   */
+  textureRepeat?: number
 }
 
 /** PBR material properties derived from real spectral data. Colors are RGB normalized 0–1. */
