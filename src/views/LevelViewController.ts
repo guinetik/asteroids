@@ -107,7 +107,13 @@ import { contractSystem } from '@/lib/contracts/runtime'
 const VIROID_DROP_ITEM_ID = 'viroid-psychosphere'
 
 // ── Scene constants ─────────────────────────────────────────────
-const TERRAIN_RESOLUTION = 512
+/**
+ * Heightmap grid resolution. Used for both the raycast bake AND downstream
+ * queries (collision, rock slope check, minimap). 256 on a 3500u world gives
+ * ~13.7u per cell — plenty for character-footing collision on a ~2600u asteroid
+ * and keeps the BVH-accelerated bake under a frame.
+ */
+const TERRAIN_RESOLUTION = 256
 /** Y altitude from which bake rays start. Must sit above any asteroid geometry. */
 const TERRAIN_BAKE_START_ALTITUDE = 5000
 

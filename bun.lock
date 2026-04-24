@@ -8,6 +8,7 @@
         "howler": "^2.2.4",
         "pinia": "^3.0.4",
         "three": "^0.183.2",
+        "three-mesh-bvh": "^0.9.9",
         "vue": "^3.5.31",
         "vue-router": "^5.0.4",
       },
@@ -1123,6 +1124,8 @@
     "text-hex": ["text-hex@1.0.0", "", {}, "sha512-uuVGNWzgJ4yhRaNSiubPY7OjISw4sw4E5Uv0wbjp+OzcbmVU/rsT8ujgcXJhn9ypzsgr5vlzpPqP+MBBKcGvbg=="],
 
     "three": ["three@0.183.2", "", {}, "sha512-di3BsL2FEQ1PA7Hcvn4fyJOlxRRgFYBpMTcyOgkwJIaDOdJMebEFPA+t98EvjuljDx4hNulAGwF6KIjtwI5jgQ=="],
+
+    "three-mesh-bvh": ["three-mesh-bvh@0.9.9", "", { "peerDependencies": { "three": ">= 0.159.0" } }, "sha512-FJKitcjvbALmeQRK+Sc+nLGorCpkrZBrbgJZFzhdyWboak37DZikn46hvQkNqSbJPm227ahYmS6k3N/GXaAyXw=="],
 
     "tinybench": ["tinybench@2.9.0", "", {}, "sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg=="],
 
