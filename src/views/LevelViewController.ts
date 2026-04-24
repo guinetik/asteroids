@@ -141,6 +141,14 @@ const OBJECTIVE_MIN_MUTUAL_SPACING = 220
 const OBJECTIVE_MAX_SLOPE = 0.6
 /** Attempts used when resampling an objective onto the ship's face. */
 const OBJECTIVE_RESAMPLE_ATTEMPTS = 64
+/**
+ * Radius (world units) around each objective and the ship spawn inside which
+ * the baked heightmap is smoothed toward the centre height. Gives a clean
+ * landing/mission pad without deforming the asteroid's silhouette.
+ */
+const OBJECTIVE_FLATTEN_RADIUS = 110
+/** Inner radius fully flattened (no falloff); outside this fades smoothly. */
+const OBJECTIVE_FLATTEN_FULL_RADIUS = 55
 const LANDER_SPAWN_LIGHT_ALIGNMENT_X = 5
 const LANDER_GAMEPLAY_START_OFFSET_X = 0
 const LANDER_GAMEPLAY_START_OFFSET_Y = 0
@@ -713,6 +721,14 @@ export class LevelViewController implements Tickable {
     for (const obj of mission.objectives) {
       this.resampleObjectiveNearShip(obj, spawnX, spawnZ, claimedPositions)
       claimedPositions.push({ x: obj.x, z: obj.z })
+    }
+
+    // Soften the baked terrain around the ship and each waypoint so landing
+    // and mission setup have a proper flat-ish pad. Done after resample so
+    // the flattened disks are centred on the final objective positions.
+    this.flattenHeightmapDisk(spawnX, spawnZ)
+    for (const obj of mission.objectives) {
+      this.flattenHeightmapDisk(obj.x, obj.z)
     }
 
     // `flatZones` is used for rock-spawn exclusions around objective sites —
@@ -2677,6 +2693,51 @@ export class LevelViewController implements Tickable {
     const edgeTerrainY = this.heightmap.heightAt(clampedX, clampedZ)
 
     return landerPos.y < edgeTerrainY - ADRIFT_DEPTH_MARGIN
+  }
+
+  /**
+   * Smooth the baked heightmap in a disk around (cx, cz) toward the centre
+   * height. Cells inside {@link OBJECTIVE_FLATTEN_FULL_RADIUS} become exactly
+   * the centre height; cells between that and {@link OBJECTIVE_FLATTEN_RADIUS}
+   * blend smoothly so there's no visible step. Skips invalid cells and
+   * preserves validity flags.
+   */
+  private flattenHeightmapDisk(cx: number, cz: number): void {
+    const hm = this.heightmap
+    if (!hm) return
+    if (!hm.isValidAt(cx, cz)) return
+
+    const centreHeight = hm.heightAt(cx, cz)
+    const cellSize = hm.worldSize / (hm.resolution - 1)
+    const half = hm.worldSize / 2
+    const cellRadius = Math.ceil(OBJECTIVE_FLATTEN_RADIUS / cellSize)
+    const gcx = Math.round(((cx + half) / hm.worldSize) * (hm.resolution - 1))
+    const gcz = Math.round(((cz + half) / hm.worldSize) * (hm.resolution - 1))
+
+    for (let dz = -cellRadius; dz <= cellRadius; dz++) {
+      for (let dx = -cellRadius; dx <= cellRadius; dx++) {
+        const gx = gcx + dx
+        const gz = gcz + dz
+        if (!hm.isValid(gx, gz)) continue
+
+        const wx = -half + gx * cellSize
+        const wz = -half + gz * cellSize
+        const worldDist = Math.hypot(wx - cx, wz - cz)
+        if (worldDist >= OBJECTIVE_FLATTEN_RADIUS) continue
+
+        let weight = 1
+        if (worldDist > OBJECTIVE_FLATTEN_FULL_RADIUS) {
+          const t =
+            (worldDist - OBJECTIVE_FLATTEN_FULL_RADIUS) /
+            (OBJECTIVE_FLATTEN_RADIUS - OBJECTIVE_FLATTEN_FULL_RADIUS)
+          // Smoothstep for a soft shoulder
+          weight = 1 - t * t * (3 - 2 * t)
+        }
+
+        const original = hm.get(gx, gz)
+        hm.set(gx, gz, original + (centreHeight - original) * weight)
+      }
+    }
   }
 
   /**
