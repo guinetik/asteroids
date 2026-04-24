@@ -1400,6 +1400,11 @@ export class LevelViewController implements Tickable {
       this.fpsCamera?.camera ?? this.vehicleCamera?.camera ?? this.sceneManager.activeCamera
     if (!camera) return
 
+    // `renderer.compile` uses `traverseVisible` under the hood and skips any
+    // Object3D with `.visible === false`. The FPS view-model (player body +
+    // multi-tool) is staged invisible until the player presses F to exit the
+    // lander, so without flipping them on here their materials compile on the
+    // first EVA frame and hitch the transition. Flip on + restore.
     const restoreLightVisibility: Array<{ light: THREE.Light; visible: boolean }> = []
     scene.traverse((obj) => {
       const maybeLight = obj as THREE.Light
@@ -1408,6 +1413,18 @@ export class LevelViewController implements Tickable {
         maybeLight.visible = true
       }
     })
+
+    const stagedHidden: Array<{ obj: THREE.Object3D; visible: boolean }> = []
+    const stageVisible = (obj: THREE.Object3D | null | undefined): void => {
+      if (!obj) return
+      stagedHidden.push({ obj, visible: obj.visible })
+      obj.visible = true
+    }
+    stageVisible(this.playerController?.group)
+    // The multi-tool is always hidden right before precompile is called from
+    // init (line: `this.multiTool.setVisible(false)` just after GLB load).
+    // Flipping true here lets its view-model materials compile; restore false.
+    this.multiTool?.setVisible(true)
 
     try {
       if (typeof renderer.compileAsync === 'function') {
@@ -1424,6 +1441,10 @@ export class LevelViewController implements Tickable {
       for (const entry of restoreLightVisibility) {
         entry.light.visible = entry.visible
       }
+      for (const entry of stagedHidden) {
+        entry.obj.visible = entry.visible
+      }
+      this.multiTool?.setVisible(false)
     }
   }
 
