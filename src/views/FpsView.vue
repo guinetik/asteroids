@@ -11,8 +11,8 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { FpsViewController } from './FpsViewController'
 import FpsHud from '@/components/FpsHud.vue'
-import type { FpsTelemetry } from '@/components/FpsHud.vue'
 import { useAudio } from '@/audio/useAudio'
+import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 
 const container = ref<HTMLElement>()
 const viewController = new FpsViewController()

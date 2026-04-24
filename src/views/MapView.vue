@@ -3,7 +3,7 @@
 import { ref, shallowRef, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { MapViewController } from './MapViewController'
 import ShuttleHud from '@/components/ShuttleHud.vue'
-import FpsHud, { type FpsTelemetry } from '@/components/FpsHud.vue'
+import FpsHud from '@/components/FpsHud.vue'
 import HelmetVisor from '@/components/HelmetVisor.vue'
 import OrbitPrompt from '@/components/OrbitPrompt.vue'
 import GravityWarning from '@/components/GravityWarning.vue'
@@ -95,6 +95,7 @@ import {
   useBackgroundMusicGlobalState,
 } from '@/audio/backgroundMusic'
 import { uiAudio } from '@/audio/UiAudioDirector'
+import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 
 /** So Space Fabric gating matches storage before the first paint (also merged again in controller `init`). */
 hydratePlayerUpgradeLevelsFromStorage()

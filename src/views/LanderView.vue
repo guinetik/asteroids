@@ -3,7 +3,7 @@
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { LanderViewController } from './LanderViewController'
 import LanderHud from '@/components/LanderHud.vue'
-import type { LanderTelemetry } from '@/components/LanderHud.vue'
+import type { LanderTelemetry } from '@/lib/ui/landerHudTypes'
 
 const container = ref<HTMLElement>()
 const viewController = new LanderViewController()

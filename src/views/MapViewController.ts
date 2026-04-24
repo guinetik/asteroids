@@ -51,7 +51,7 @@ import {
   createCylinderColliderFromHullNodes,
   type EvaCollider,
 } from '@/lib/physics/evaCollisionResolver'
-import type { FpsTelemetry } from '@/components/FpsHud.vue'
+import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 import {
   VehicleCamera,
   MAP_CAMERA_CONFIG,

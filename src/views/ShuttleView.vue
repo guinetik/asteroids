@@ -4,9 +4,10 @@ import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ShuttleViewController } from './ShuttleViewController'
 import ShuttleHud from '@/components/ShuttleHud.vue'
-import FpsHud, { type FpsTelemetry } from '@/components/FpsHud.vue'
+import FpsHud from '@/components/FpsHud.vue'
 import HelmetVisor from '@/components/HelmetVisor.vue'
 import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
+import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 
 const route = useRoute()
 const container = ref<HTMLElement>()

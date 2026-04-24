@@ -7,7 +7,7 @@
  * @spec docs/asteroid-lander-gdd.md
  */
 import type { Tickable } from '@/lib/Tickable'
-import type { LanderTelemetry } from '@/components/LanderHud.vue'
+import type { LanderTelemetry } from '@/lib/ui/landerHudTypes'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'

@@ -7,7 +7,7 @@
  * @spec docs/superpowers/specs/2026-04-04-fps-movement-design.md
  */
 import type { Tickable } from '@/lib/Tickable'
-import type { FpsTelemetry } from '@/components/FpsHud.vue'
+import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 import { DevConsole } from '@/lib/devConsole'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
