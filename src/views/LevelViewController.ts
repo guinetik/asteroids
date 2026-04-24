@@ -1726,6 +1726,10 @@ export class LevelViewController implements Tickable {
       this.failLanderRun('Adrift')
     }
 
+    if (this.stateMachine?.is('eva') && this.isPlayerAdrift()) {
+      this.failLanderRun('Adrift')
+    }
+
     // F key → state triggers (only one can succeed per press)
     if (this.inputManager?.wasActionPressed('interact') && this.stateMachine && !this.landerDestroyed) {
       if (!this.stateMachine.trigger('exfiltrate')) {
@@ -2622,6 +2626,16 @@ export class LevelViewController implements Tickable {
     const edgeTerrainY = this.heightmap.heightAt(clampedX, clampedZ)
 
     return landerPos.y < edgeTerrainY - ADRIFT_DEPTH_MARGIN
+  }
+
+  private isPlayerAdrift(): boolean {
+    if (!this.playerController || !this.heightmap) return false
+    const pos = this.playerController.group.position
+    // Off-surface cell → the player walked over the edge.
+    if (!this.heightmap.isValidAt(pos.x, pos.z)) return true
+    // Below-surface → we somehow clipped through; treat as adrift too.
+    const groundY = this.heightmap.heightAt(pos.x, pos.z)
+    return pos.y < groundY - ADRIFT_DEPTH_MARGIN
   }
 
   // ═══════════════════════════════════════════════════════════════
