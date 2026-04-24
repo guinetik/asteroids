@@ -1,7 +1,7 @@
 <!-- src/components/FpsCompass.vue -->
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { CompassObjective } from './FpsHud.vue'
+import type { CompassObjective } from '@/lib/ui/fpsHudTypes'
 
 const props = defineProps<{
   headingRad: number
