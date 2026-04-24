@@ -677,6 +677,7 @@ export class LevelViewController implements Tickable {
     this.surfaceRocks = await SurfaceRockController.create({
       heightmap: this.heightmap,
       surface: asteroid.surface,
+      composition: asteroid.composition,
       seed,
       exclusions: [
         ...flatZones,

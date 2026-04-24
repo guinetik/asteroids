@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import type { WorldSphereCollider } from '@/lib/physics/worldCollision'
 import type { Heightmap } from '@/lib/terrain/heightmap'
-import type { SurfaceFeatures } from '@/lib/asteroids/types'
+import type { SurfaceFeatures, MineralEntry } from '@/lib/asteroids/types'
 import type { Tickable } from '@/lib/Tickable'
 import {
   generateAsteroidRockDistribution,
@@ -9,6 +9,7 @@ import {
   type RockExclusionZone,
 } from '@/lib/terrain/asteroidRockDistribution'
 import { loadGLB, fixMaterials } from '@/three/loadGLB'
+import { resolveCompositionItemId } from '@/lib/asteroids/mineralItemMap'
 
 /**
  * Instanced surface rocks on asteroid terrain with mining hit feedback.
@@ -37,39 +38,99 @@ const _neutralColor = new THREE.Color(1, 1, 1)
 
 const SURFACE_ROCK_GLB_URL = '/models/asteroids.glb'
 const ROCK_TEXTURE_REPEAT = 1.35
+const ROCK_TEXTURE_BASE_DIR = '/textures/rocks'
 
-/** Named material preset mapped to a tiled albedo texture. */
-interface RockLook {
-  name: string
-  textureUrl: string
-  color: number
-  roughness: number
+/**
+ * Per-mineral material definition. `folder` is the subdirectory under
+ * {@link ROCK_TEXTURE_BASE_DIR} that holds `color.jpg`, `gl.jpg`, and
+ * `roughness.jpg`. `metalness` is a scalar because the authored PBR
+ * sets are all dielectric; metallic minerals (iron-nickel, troilite)
+ * are tuned up via this value so the material reads correctly even
+ * without a dedicated metalness map.
+ */
+interface MineralMaterialDef {
+  /** Stable key matched against `composition[].name` strings. */
+  key: string
+  /** Folder under {@link ROCK_TEXTURE_BASE_DIR}. */
+  folder: string
+  /** Metalness scalar passed to {@link THREE.MeshStandardMaterial.metalness}. */
   metalness: number
 }
 
-const ROCK_LOOKS: readonly RockLook[] = [
-  {
-    name: 'basalt',
-    textureUrl: '/textures/rocks/basalt.jpg',
-    color: 0x5b4c42,
-    roughness: 0.94,
-    metalness: 0.03,
-  },
-  {
-    name: 'hematite',
-    textureUrl: '/textures/rocks/hematite.jpg',
-    color: 0x8a5a49,
-    roughness: 0.7,
-    metalness: 0.18,
-  },
-  {
-    name: 'olivine',
-    textureUrl: '/textures/rocks/olivine.jpg',
-    color: 0x6a7350,
-    roughness: 0.82,
-    metalness: 0.08,
-  },
+/**
+ * Catalog of every mineral texture set shipping under
+ * `public/textures/rocks/`. Keys are lower-case canonical identifiers;
+ * the {@link MINERAL_NAME_ALIASES} table maps display names from
+ * asteroid JSON composition arrays onto these keys.
+ */
+const MINERAL_CATALOG: readonly MineralMaterialDef[] = [
+  { key: 'olivine', folder: 'olivine', metalness: 0.05 },
+  { key: 'pyroxene', folder: 'pyroxene', metalness: 0.05 },
+  { key: 'plagioclase', folder: 'plagioclase', metalness: 0.02 },
+  { key: 'troilite', folder: 'troilite', metalness: 0.15 },
+  { key: 'nickel', folder: 'nickel', metalness: 0.75 },
+  { key: 'magnetite', folder: 'magnetite', metalness: 0.45 },
+  { key: 'silicates', folder: 'silicates', metalness: 0.02 },
+  { key: 'organic', folder: 'organic', metalness: 0.02 },
+  { key: 'carbonates', folder: 'carbonates', metalness: 0.02 },
+  { key: 'ice', folder: 'ice', metalness: 0.05 },
+  { key: 'co2', folder: 'co2', metalness: 0.02 },
+  { key: 'silicate', folder: 'silicate', metalness: 0.02 },
+  { key: 'ammonia', folder: 'ammonia', metalness: 0.02 },
+  { key: 'halite', folder: 'halite', metalness: 0.02 },
+  { key: 'lava', folder: 'lava', metalness: 0.05 },
+  { key: 'sulfur', folder: 'sulfur', metalness: 0.02 },
+  { key: 'hematite', folder: 'hematite', metalness: 0.2 },
+  { key: 'obsidian', folder: 'obsidian', metalness: 0.1 },
 ]
+
+/**
+ * Inventory item id → mineral catalog key. The yield system rolls an
+ * {@link resolveCompositionItemId} item id per spawn; this table maps
+ * that id onto the folder in {@link MINERAL_CATALOG}. Keeping the
+ * mapping keyed by item id (instead of display name) is what keeps
+ * the renderer and the mining system in perfect agreement — they
+ * both resolve a composition entry to the same id first, then the
+ * renderer looks up the folder from that id.
+ */
+const MINERAL_ITEM_ID_TO_KEY: ReadonlyMap<string, string> = new Map([
+  ['olivine', 'olivine'],
+  ['pyroxene', 'pyroxene'],
+  ['enstatite', 'pyroxene'],
+  ['plagioclase-feldspar', 'plagioclase'],
+  ['iron-sulfides', 'troilite'],
+  ['troilite', 'troilite'],
+  ['iron-nickel-alloy', 'nickel'],
+  ['magnetite', 'magnetite'],
+  ['hydrated-silicates', 'silicates'],
+  ['organic-compounds', 'organic'],
+  ['carbonates', 'carbonates'],
+  ['water-ice', 'ice'],
+  ['carbon-dioxide-ice', 'co2'],
+  ['silicate-dust', 'silicate'],
+  ['ammonia-hydrate', 'ammonia'],
+  ['sodium-chloride', 'halite'],
+  ['basaltic-lava', 'lava'],
+  ['sulfur-deposits', 'sulfur'],
+  ['iron-oxide', 'hematite'],
+  ['hematite', 'hematite'],
+  ['volcanic-glass', 'obsidian'],
+])
+
+/** Fallback mineral used when a composition entry has no catalog match. */
+const DEFAULT_MINERAL_KEY = 'olivine'
+
+/** Resolved to an entry in {@link MINERAL_CATALOG} keyed by mineral identifier. */
+const MINERAL_CATALOG_BY_KEY: ReadonlyMap<string, MineralMaterialDef> = new Map(
+  MINERAL_CATALOG.map((def) => [def.key, def]),
+)
+
+/** Loaded PBR texture triple for one mineral. */
+interface MineralTextureSet {
+  map: THREE.Texture
+  normalMap: THREE.Texture
+  roughnessMap: THREE.Texture
+}
 
 /** Normalized rock mesh template extracted from the shared GLB. */
 interface RockTemplate {
@@ -80,15 +141,22 @@ interface RockTemplate {
 
 /** Construction inputs for {@link SurfaceRockController.create}. */
 interface SurfaceRockControllerOptions {
+  /** Terrain heightmap used to plant rocks on the ground. */
   heightmap: Heightmap
+  /** Authored surface traits driving abundance / size distributions. */
   surface: SurfaceFeatures
+  /** Mineral breakdown of the host asteroid — drives per-spawn texture selection. */
+  composition: readonly MineralEntry[]
+  /** Deterministic seed for procedural placement. */
   seed: number
+  /** Optional exclusion zones (landing pad, mission POIs). */
   exclusions?: readonly RockExclusionZone[]
+  /** Optional subtle biome tint blended into every mineral albedo. */
   baseColor?: readonly [number, number, number]
 }
 
 let templateCachePromise: Promise<RockTemplate[]> | null = null
-let rockTextureCachePromise: Promise<readonly THREE.Texture[]> | null = null
+const mineralTextureCache = new Map<string, Promise<MineralTextureSet>>()
 
 /** Pulls normalized rock templates from every mesh in the asteroids GLB. */
 function extractTemplates(glbScene: THREE.Group): RockTemplate[] {
@@ -135,44 +203,77 @@ async function getRockTemplates(): Promise<RockTemplate[]> {
   return templateCachePromise
 }
 
-/** Loads and caches repeating albedo textures for each {@link ROCK_LOOKS} entry. */
-async function getRockTextures(): Promise<readonly THREE.Texture[]> {
-  if (!rockTextureCachePromise) {
-    const loader = new THREE.TextureLoader()
-    rockTextureCachePromise = Promise.resolve(
-      ROCK_LOOKS.map((look) => {
-        const texture = loader.load(look.textureUrl)
-        texture.wrapS = THREE.RepeatWrapping
-        texture.wrapT = THREE.RepeatWrapping
-        texture.repeat.set(ROCK_TEXTURE_REPEAT, ROCK_TEXTURE_REPEAT)
-        texture.colorSpace = THREE.SRGBColorSpace
-        texture.anisotropy = 8
-        return texture
-      }),
-    )
-  }
-  return rockTextureCachePromise
+/**
+ * Configure a freshly loaded tile on a rock surface — wraps, tiles, anisotropy.
+ * `isColor` flips the color-space so only albedos go through sRGB decoding.
+ *
+ * @param texture - Texture to configure in-place.
+ * @param isColor - Whether the texture is an sRGB albedo (`true`) or linear data (`false`).
+ */
+function configureRockTexture(texture: THREE.Texture, isColor: boolean): void {
+  texture.wrapS = THREE.RepeatWrapping
+  texture.wrapT = THREE.RepeatWrapping
+  texture.repeat.set(ROCK_TEXTURE_REPEAT, ROCK_TEXTURE_REPEAT)
+  texture.colorSpace = isColor ? THREE.SRGBColorSpace : THREE.NoColorSpace
+  texture.anisotropy = 8
 }
 
-/** Clones a template material, assigns albedo + optional mineral tint. */
+/**
+ * Load (and cache) the color / normal / roughness triple for a single
+ * mineral folder. Cached globally so repeated asteroid enters do not
+ * re-decode the same files.
+ *
+ * @param def - Catalog entry for the mineral.
+ * @returns Promise resolving to a ready-to-assign texture set.
+ */
+function getMineralTextureSet(def: MineralMaterialDef): Promise<MineralTextureSet> {
+  const cached = mineralTextureCache.get(def.key)
+  if (cached) return cached
+
+  const loader = new THREE.TextureLoader()
+  const base = `${ROCK_TEXTURE_BASE_DIR}/${def.folder}`
+  const map = loader.load(`${base}/color.jpg`)
+  const normalMap = loader.load(`${base}/gl.jpg`)
+  const roughnessMap = loader.load(`${base}/roughness.jpg`)
+  configureRockTexture(map, true)
+  configureRockTexture(normalMap, false)
+  configureRockTexture(roughnessMap, false)
+
+  const promise = Promise.resolve({ map, normalMap, roughnessMap })
+  mineralTextureCache.set(def.key, promise)
+  return promise
+}
+
+/**
+ * Clones a template material and wires the mineral PBR set (albedo +
+ * normal + roughness). Per-look scalars are gone — the authored maps
+ * drive surface response; metalness comes from {@link MineralMaterialDef}.
+ *
+ * @param source - Base material cloned from the GLB template.
+ * @param def - Mineral catalog entry (supplies metalness scalar).
+ * @param textures - Loaded color / normal / roughness triple.
+ * @param baseColor - Optional biome tint gently mixed into albedo.
+ */
 function tuneRockMaterial(
   source: THREE.Material,
-  look: RockLook,
-  map: THREE.Texture,
+  def: MineralMaterialDef,
+  textures: MineralTextureSet,
   baseColor?: readonly [number, number, number],
 ): THREE.Material {
   const material = source.clone()
 
   if (material instanceof THREE.MeshStandardMaterial) {
-    material.map = map
-    material.color.setHex(look.color)
-    material.roughness = look.roughness
-    material.metalness = look.metalness
+    material.map = textures.map
+    material.normalMap = textures.normalMap
+    material.roughnessMap = textures.roughnessMap
+    material.color.setRGB(1, 1, 1)
+    material.roughness = 1
+    material.metalness = def.metalness
+    material.emissive.setHex(0x000000)
+    material.emissiveIntensity = 0
     if (baseColor) {
       const tint = new THREE.Color(baseColor[0], baseColor[1], baseColor[2])
       material.color.lerp(tint, 0.08)
-      material.emissive.setHex(0x000000)
-      material.emissiveIntensity = 0
     }
   }
 
@@ -180,11 +281,94 @@ function tuneRockMaterial(
   return material
 }
 
-/** Stable rock palette index from spawn position and world seed. */
-function selectRockLookIndex(spawn: AsteroidRockSpawn, seed: number): number {
-  const mix = Math.sin(spawn.x * 0.0061 + spawn.z * 0.0047 + seed * 0.000013) * 43758.5453
-  const normalized = mix - Math.floor(mix)
-  return Math.min(ROCK_LOOKS.length - 1, Math.floor(normalized * ROCK_LOOKS.length))
+/**
+ * Cumulative weight table built from asteroid composition percentages,
+ * filtered to entries that resolve to a registered inventory item id.
+ * Matches the exact filter {@link RockYieldSystem} applies, so when
+ * both systems use the same seed + spawn index they pick the same
+ * mineral for every rock.
+ */
+interface WeightedMineralTable {
+  /** Mineral folder keys in selection order. */
+  keys: readonly string[]
+  /** Cumulative weights — last entry is the total usable probability mass. */
+  cumulative: readonly number[]
+}
+
+/**
+ * Build the weighted mineral table from an asteroid's composition using
+ * the same filter the yield system applies: `resolveCompositionItemId`
+ * must return a registered inventory id, and the item id must map to
+ * a texture folder via {@link MINERAL_ITEM_ID_TO_KEY}. Empty results
+ * collapse onto {@link DEFAULT_MINERAL_KEY}.
+ *
+ * @param composition - Mineral breakdown from asteroid JSON.
+ * @returns Cumulative weight table aligned with the yield system's picker.
+ */
+function buildWeightedMineralTable(composition: readonly MineralEntry[]): WeightedMineralTable {
+  const keys: string[] = []
+  const cumulative: number[] = []
+  let total = 0
+
+  for (const entry of composition) {
+    if (entry.percentage <= 0) continue
+    const itemId = resolveCompositionItemId(entry.name)
+    if (itemId === null) continue
+    const folderKey = MINERAL_ITEM_ID_TO_KEY.get(itemId)
+    if (!folderKey || !MINERAL_CATALOG_BY_KEY.has(folderKey)) continue
+    total += entry.percentage
+    keys.push(folderKey)
+    cumulative.push(total)
+  }
+
+  if (keys.length === 0) {
+    return { keys: [DEFAULT_MINERAL_KEY], cumulative: [1] }
+  }
+
+  return { keys, cumulative }
+}
+
+/**
+ * Deterministic float in [0, 1) from a seed and a salt integer.
+ * Mirrors {@link RockYieldSystem}'s internal `pseudoRandom` so the
+ * renderer and mining system produce identical mineral picks for
+ * the same `(seed, spawnIndex)` pair.
+ *
+ * @param seed - World/mission seed (integer).
+ * @param salt - Per-spawn integer (typically the spawn index).
+ * @returns Deterministic float in [0, 1).
+ */
+function mineralPseudoRandom(seed: number, salt: number): number {
+  let s = ((seed | 0) * 0x9e3779b1) ^ ((salt | 0) * 0x85ebca77)
+  s = (s + 0x6d2b79f5) | 0
+  let t = Math.imul(s ^ (s >>> 15), 1 | s)
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+}
+
+/**
+ * Deterministic weighted mineral pick for a given rock spawn. Uses the
+ * same hash and weight basis as the yield system so the picked folder
+ * always matches the mineral the drill extracts from that rock.
+ *
+ * @param spawnIndex - Stable index of the spawn in the distribution.
+ * @param seed - World/mission seed (same value the yield system gets).
+ * @param table - Weighted selection table from the composition.
+ * @returns Canonical mineral folder key picked for this rock.
+ */
+function selectMineralKeyForSpawn(
+  spawnIndex: number,
+  seed: number,
+  table: WeightedMineralTable,
+): string {
+  const total = table.cumulative[table.cumulative.length - 1] ?? 1
+  const target = mineralPseudoRandom(seed, spawnIndex) * total
+  for (let i = 0; i < table.keys.length; i++) {
+    if (target < table.cumulative[i]!) {
+      return table.keys[i]!
+    }
+  }
+  return table.keys[table.keys.length - 1]!
 }
 
 /** Maps a logical spawn index to its instanced mesh + instance id. */
@@ -210,7 +394,6 @@ export class SurfaceRockController implements Tickable {
 
   static async create(options: SurfaceRockControllerOptions): Promise<SurfaceRockController> {
     const templates = await getRockTemplates()
-    const rockTextures = await getRockTextures()
     const spawns = generateAsteroidRockDistribution({
       seed: options.seed,
       worldSize: options.heightmap.worldSize,
@@ -222,16 +405,29 @@ export class SurfaceRockController implements Tickable {
     const controller = new SurfaceRockController(spawns)
     if (templates.length === 0 || spawns.length === 0) return controller
 
+    const weightedMinerals = buildWeightedMineralTable(options.composition)
+    const mineralKeys = weightedMinerals.keys
+    const mineralIndexByKey = new Map<string, number>(mineralKeys.map((key, i) => [key, i]))
+
+    const mineralDefs: MineralMaterialDef[] = mineralKeys.map(
+      (key) => MINERAL_CATALOG_BY_KEY.get(key)!,
+    )
+    const mineralTextures = await Promise.all(mineralDefs.map((def) => getMineralTextureSet(def)))
+
     const groupedSpawns = Array.from(
-      { length: templates.length * ROCK_LOOKS.length },
+      { length: templates.length * mineralKeys.length },
       () => [] as { spawn: AsteroidRockSpawn; spawnIndex: number }[],
     )
 
     for (let i = 0; i < spawns.length; i++) {
       const spawn = spawns[i]!
       const templateIndex = i % templates.length
-      const lookIndex = selectRockLookIndex(spawn, options.seed)
-      groupedSpawns[lookIndex * templates.length + templateIndex]!.push({ spawn, spawnIndex: i })
+      const mineralKey = selectMineralKeyForSpawn(i, options.seed, weightedMinerals)
+      const mineralIndex = mineralIndexByKey.get(mineralKey) ?? 0
+      groupedSpawns[mineralIndex * templates.length + templateIndex]!.push({
+        spawn,
+        spawnIndex: i,
+      })
     }
 
     const reusablePos = new THREE.Vector3()
@@ -240,18 +436,18 @@ export class SurfaceRockController implements Tickable {
     const reusableEuler = new THREE.Euler()
     const reusableMatrix = new THREE.Matrix4()
 
-    for (let lookIndex = 0; lookIndex < ROCK_LOOKS.length; lookIndex++) {
-      const look = ROCK_LOOKS[lookIndex]!
-      const texture = rockTextures[lookIndex]!
+    for (let mineralIndex = 0; mineralIndex < mineralKeys.length; mineralIndex++) {
+      const def = mineralDefs[mineralIndex]!
+      const textures = mineralTextures[mineralIndex]!
 
       for (let ti = 0; ti < templates.length; ti++) {
-        const bucket = groupedSpawns[lookIndex * templates.length + ti]!
+        const bucket = groupedSpawns[mineralIndex * templates.length + ti]!
         if (bucket.length === 0) continue
 
         const template = templates[ti]!
-        const material = tuneRockMaterial(template.material, look, texture, options.baseColor)
+        const material = tuneRockMaterial(template.material, def, textures, options.baseColor)
         const mesh = new THREE.InstancedMesh(template.geometry.clone(), material, bucket.length)
-        mesh.name = `surfaceRock-${look.name}-${ti}`
+        mesh.name = `surfaceRock-${def.key}-${ti}`
         // Rocks no longer cast shadows. With 250–1000 instances across many
         // batches, the shadow pass was rendering each rock a second time
         // every frame; disabling halves the rock workload at the cost of
