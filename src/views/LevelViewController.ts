@@ -45,24 +45,35 @@ import { Heightmap } from '@/lib/terrain/heightmap'
 import { MultiToolController } from '@/three/MultiToolController'
 import { MultiToolState } from '@/lib/fps/multiToolState'
 import { CollisionWorld } from '@/lib/physics/worldCollision'
-import { createAsteroidSurface, type AsteroidSurfaceControllerResult } from '@/three/AsteroidSurfaceController'
-import type { LanderTelemetry } from '@/components/LanderHud.vue'
-import type { FpsTelemetry, CompassObjective, RockTargetInfo } from '@/components/FpsHud.vue'
-import { headingRadToCompassDeg, worldBearingDegTo, signedRelativeBearingDeg } from '@/lib/math/bearing'
+import {
+  createAsteroidSurface,
+  type AsteroidSurfaceControllerResult,
+} from '@/three/AsteroidSurfaceController'
+import type { LanderTelemetry } from '@/lib/ui/landerHudTypes'
+import type { FpsTelemetry, CompassObjective, RockTargetInfo } from '@/lib/ui/fpsHudTypes'
+import {
+  headingRadToCompassDeg,
+  worldBearingDegTo,
+  signedRelativeBearingDeg,
+} from '@/lib/math/bearing'
 import { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import type { ProjectileImpactContext } from '@/lib/fps/projectileSystem'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
-import { createLevelStateMachine, LANDER_INTERACT_RANGE, EXFIL_PROXIMITY_RANGE } from '@/lib/level/levelStateMachine'
+import {
+  createLevelStateMachine,
+  LANDER_INTERACT_RANGE,
+  EXFIL_PROXIMITY_RANGE,
+} from '@/lib/level/levelStateMachine'
 import type { LevelState } from '@/lib/level/levelStateMachine'
 import type { StateMachine } from '@/lib/stateMachine'
 import { ArrivalSequence } from '@/three/ArrivalSequence'
+import { NestModel } from '@/three/NestModel'
+import { VirusModel } from '@/three/VirusModel'
+import { HostageModel } from '@/three/HostageModel'
 import { LanderExplosion } from '@/three/LanderExplosion'
 import { StarFieldController } from '@/three/StarFieldController'
 import * as THREE from 'three'
-import {
-  Color,
-  Vector3,
-} from 'three'
+import { Color, Vector3 } from 'three'
 import { createAtmosphereContext } from '@/three/atmosphere/AtmosphereContext'
 import type { AtmosphereContext } from '@/three/atmosphere/AtmosphereContext'
 import { LevelLightingRig } from '@/three/atmosphere/LevelLightingRig'
@@ -263,7 +274,6 @@ const LANDER_COLLIDER_MAX = new Vector3(9, 18, 9)
 const SHUTTLE_COLLIDER_MIN = new Vector3(-2.4, -0.9, -1.35)
 const SHUTTLE_COLLIDER_MAX = new Vector3(2.4, 0.9, 1.35)
 
-
 /** Simple string hash to derive a numeric seed from a mission id. */
 function hashSeed(str: string): number {
   let hash = 0
@@ -271,6 +281,23 @@ function hashSeed(str: string): number {
     hash = (hash * 31 + str.charCodeAt(i)) | 0
   }
   return Math.abs(hash)
+}
+
+/**
+ * Boot / preload status emitted to {@link LevelView} while the level scene
+ * warms up. `preparing` = still loading, `ready` = assets loaded + scene
+ * ready (transient — the level auto-advances), `started` = arrival cinematic
+ * running, overlay should be gone.
+ */
+export interface LevelViewBootState {
+  /** Lifecycle phase. */
+  phase: 'preparing' | 'ready' | 'started'
+  /** Human-readable label for the current step. */
+  label: string
+  /** Asteroid name shown on the overlay (empty until mission resolves). */
+  asteroidName: string
+  /** Mission template/title shown on the overlay (empty until resolved). */
+  missionName: string
 }
 
 /**
@@ -283,10 +310,12 @@ function hashSeed(str: string): number {
  * @returns XYZ Euler rotation in radians, each axis uniform in [0, 2π).
  */
 function rotationFromSeed(seed: number): { x: number; y: number; z: number } {
-  // Mulberry32 — tiny, good distribution, deterministic.
-  let s = (seed ^ 0x9e3779b9) >>> 0
+  // Mulberry32 PRNG
+  const seedBit = 0x9e3779b9
+  const myFavoriteNumber = 0x6d2b79f5
+  let s = (seed ^ seedBit) >>> 0
   const next = (): number => {
-    s = (s + 0x6d2b79f5) >>> 0
+    s = (s + myFavoriteNumber) >>> 0
     let t = s
     t = Math.imul(t ^ (t >>> 15), t | 1)
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
@@ -298,11 +327,9 @@ function rotationFromSeed(seed: number): { x: number; y: number; z: number } {
 
 /** Applies the gameplay spawn offset so the lander clears the portal geometry. */
 function offsetGameplayLanderSpawn(position: Vector3): Vector3 {
-  return position.clone().add(new Vector3(
-    LANDER_GAMEPLAY_START_OFFSET_X,
-    LANDER_GAMEPLAY_START_OFFSET_Y,
-    0,
-  ))
+  return position
+    .clone()
+    .add(new Vector3(LANDER_GAMEPLAY_START_OFFSET_X, LANDER_GAMEPLAY_START_OFFSET_Y, 0))
 }
 
 /** Resolved level context — asteroid definition + terrain seed + mission. */
@@ -349,9 +376,9 @@ function resolveLevelContext(): LevelContext {
     const stored = loadActiveMission()
     if (!stored) {
       throw new Error(
-        '[Level] No active mission in storage. Use /map to launch one, or open /level with '
-          + '?mission=<special-id>, ?asteroidId=…, or both ?difficulty=1-10&mission='
-          + 'gather|exterminate|rescue|survey|collect',
+        '[Level] No active mission in storage. Use /map to launch one, or open /level with ' +
+          '?mission=<special-id>, ?asteroidId=…, or both ?difficulty=1-10&mission=' +
+          'gather|exterminate|rescue|survey|collect',
       )
     }
     mission = stored
@@ -624,7 +651,14 @@ export class LevelViewController implements Tickable {
   onLetterbox: ((visible: boolean) => void) | null = null
 
   /** Called each frame with current state + grounded + canExfil for HUD prompts. */
-  onStateInfo: ((info: { state: string; grounded: boolean; canExfil: boolean; canEnterLander: boolean }) => void) | null = null
+  onStateInfo:
+    | ((info: {
+        state: string
+        grounded: boolean
+        canExfil: boolean
+        canEnterLander: boolean
+      }) => void)
+    | null = null
 
   /** Called each frame during lander state with lander telemetry. */
   onLanderTelemetry: ((telemetry: LanderTelemetry) => void) | null = null
@@ -639,6 +673,13 @@ export class LevelViewController implements Tickable {
   onDeathMessage: ((visible: boolean) => void) | null = null
   /** Arrival fade to black (0 = clear, 1 = full black). */
   onArrivalFade: ((opacity: number) => void) | null = null
+
+  /**
+   * Boot / preload status for the level loader overlay.
+   * Emitted during {@link init} as the scene warms up; the view hides its
+   * overlay when phase becomes `'started'`.
+   */
+  onBootState: ((state: LevelViewBootState) => void) | null = null
 
   /** Called to show/hide the death overlay with a cause message. */
   onDeathOverlay: ((visible: boolean, cause: string) => void) | null = null
@@ -690,7 +731,18 @@ export class LevelViewController implements Tickable {
   }
 
   /** Initialise all systems and start the game loop. */
+  /** Emit a boot-phase update to the level view overlay. */
+  private emitBootState(phase: LevelViewBootState['phase'], label: string): void {
+    this.onBootState?.({
+      phase,
+      label,
+      asteroidName: this.asteroidName ?? '',
+      missionName: this.mission?.name ?? '',
+    })
+  }
+
   async init(container: HTMLElement): Promise<void> {
+    this.emitBootState('preparing', 'Syncing mission parameters')
     hydratePlayerUpgradeLevelsFromStorage()
     const playerConfig = buildFpsPlayerConfig()
 
@@ -705,6 +757,17 @@ export class LevelViewController implements Tickable {
 
     // ── Asteroid data ────────────────────────────────────────────
     const { asteroid, seed, mission, persistCompletionRewards } = resolveLevelContext()
+
+    // Warm up minigame prop GLBs in parallel with the asteroid surface load
+    // so nothing hitches the first time an exterminate, rescue, or virus
+    // encounter spawns mid-gameplay. Lander + shuttle are already cached from
+    // the map view that preceded us.
+    this.emitBootState('preparing', 'Warming surface props')
+    const propPreloads = Promise.all([
+      NestModel.preload(),
+      VirusModel.preload(),
+      HostageModel.preload(),
+    ])
     this.persistShuttleMissionRewards = persistCompletionRewards
     this.mission = mission
     this.missionObjectives = mission.objectives
@@ -715,6 +778,7 @@ export class LevelViewController implements Tickable {
     // lands on the same face but different missions pick different slices
     // of rock as "up". Applied BEFORE the bake so the heightmap / flatten
     // pipeline all see the rotated geometry.
+    this.emitBootState('preparing', 'Bringing asteroid online')
     this.asteroidSurface = await createAsteroidSurface({
       modelPath: asteroid.surface.modelPath,
       scale: asteroid.surface.modelScale,
@@ -745,9 +809,7 @@ export class LevelViewController implements Tickable {
     // steep flanks, or on the far side of the rock. Ring-sample a flat-ish
     // cell near the ship and mutate the objective in place so minigame
     // spawners, waypoint markers, and rock exclusions all see the new pos.
-    const claimedPositions: Array<{ x: number; z: number }> = [
-      { x: spawnX, z: spawnZ },
-    ]
+    const claimedPositions: Array<{ x: number; z: number }> = [{ x: spawnX, z: spawnZ }]
     for (const obj of mission.objectives) {
       this.resampleObjectiveNearShip(obj, spawnX, spawnZ, claimedPositions)
       claimedPositions.push({ x: obj.x, z: obj.z })
@@ -781,10 +843,7 @@ export class LevelViewController implements Tickable {
       surface: asteroid.surface,
       composition: asteroid.composition,
       seed,
-      exclusions: [
-        ...flatZones,
-        { x: spawnX, z: spawnZ, radius: FLAT_ZONE_RADIUS * 0.65 },
-      ],
+      exclusions: [...flatZones, { x: spawnX, z: spawnZ, radius: FLAT_ZONE_RADIUS * 0.65 }],
       baseColor: asteroid.visual.baseColor,
     })
     this.sceneManager.addToScene(this.surfaceRocks.group)
@@ -825,6 +884,7 @@ export class LevelViewController implements Tickable {
     this.lightingRig.addToScene(this.sceneManager.scene)
 
     // ── Lander (created once, stays in scene) ───────────────────
+    this.emitBootState('preparing', 'Fuelling lander')
     this.landerController = new LanderController(this.inputManager)
     this.landerController.setHeightmap(this.heightmap)
     this.landerController.setCollisionWorld(this.collisionWorld)
@@ -834,7 +894,9 @@ export class LevelViewController implements Tickable {
         child.castShadow = true
       }
     })
-    const gameplayStart = offsetGameplayLanderSpawn(new Vector3(spawnX, groundY + LANDER_SPAWN_HEIGHT, spawnZ))
+    const gameplayStart = offsetGameplayLanderSpawn(
+      new Vector3(spawnX, groundY + LANDER_SPAWN_HEIGHT, spawnZ),
+    )
     this.initialLanderSpawn.copy(gameplayStart)
     this.landerController.group.position.copy(gameplayStart)
 
@@ -855,11 +917,7 @@ export class LevelViewController implements Tickable {
 
     const storedProfile = typeof localStorage === 'undefined' ? null : loadProfile()
     const savedLanderHp = storedProfile?.landerHullHp
-    if (
-      savedLanderHp !== undefined
-      && savedLanderHp > 0
-      && this.landerController
-    ) {
+    if (savedLanderHp !== undefined && savedLanderHp > 0 && this.landerController) {
       this.landerController.setHullHpFromProfile(savedLanderHp)
     }
 
@@ -892,6 +950,7 @@ export class LevelViewController implements Tickable {
     this.vehicleCamera.setTarget(this.landerController.group)
 
     // ── Cinematic arrival sequence ─────────────────────────────
+    this.emitBootState('preparing', 'Linking orbital shuttle')
     const landerSpawn = new Vector3(spawnX, groundY, spawnZ)
     this.arrivalSequence = new ArrivalSequence(landerSpawn)
     await this.arrivalSequence.load()
@@ -1110,13 +1169,18 @@ export class LevelViewController implements Tickable {
       const obj = mission.objectives[i]!
       if (obj.type === 'survey') {
         const minigame = new SurveyMinigame(
-          i, obj, this.sceneManager!.scene, this.heightmap!, missionSeed,
+          i,
+          obj,
+          this.sceneManager!.scene,
+          this.heightmap!,
+          missionSeed,
         )
         minigame.onPrompt = (text) => this.onTerminalPrompt?.(text)
         minigame.onComplete = (idx) => this.onObjectiveComplete?.(idx)
         minigame.onStepChange = (idx, steps) => this.onStepChange?.(idx, steps)
         minigame.onRefuel = () => this.landerController?.thrusterSystem.refuel()
-        minigame.onRegisterTickable = (t) => this.tickHandler!.register(t, TICK_PRIORITY_PHYSICS + 4)
+        minigame.onRegisterTickable = (t) =>
+          this.tickHandler!.register(t, TICK_PRIORITY_PHYSICS + 4)
         minigame.onUnregisterTickable = (t) => this.tickHandler?.unregister(t)
         minigame.onProbeCollect = () => this.levelAudio.notifyResourcePickup()
         this.minigames.push(minigame)
@@ -1137,11 +1201,7 @@ export class LevelViewController implements Tickable {
         }
         minigame.onKillPlayer = () => {
           const playerPos = this.playerController?.group.position
-          this.applyPlayerDamageFeedback(
-            999,
-            playerPos?.x ?? 0,
-            (playerPos?.z ?? 0) - 1,
-          )
+          this.applyPlayerDamageFeedback(999, playerPos?.x ?? 0, (playerPos?.z ?? 0) - 1)
         }
         minigame.onDestroyLander = () => {
           this.failLanderRun('Lander Destroyed by Nest Blast', { explode: true, hideLander: true })
@@ -1168,11 +1228,7 @@ export class LevelViewController implements Tickable {
         }
         minigame.onKillPlayer = () => {
           const playerPos = this.playerController?.group.position
-          this.applyPlayerDamageFeedback(
-            999,
-            playerPos?.x ?? 0,
-            (playerPos?.z ?? 0) - 1,
-          )
+          this.applyPlayerDamageFeedback(999, playerPos?.x ?? 0, (playerPos?.z ?? 0) - 1)
         }
         minigame.onDestroyLander = () => {
           this.failLanderRun('Lander Destroyed by Virus Blast', { explode: true, hideLander: true })
@@ -1227,6 +1283,15 @@ export class LevelViewController implements Tickable {
     this.tickHandler.register(this.stateMachine, TICK_PRIORITY_INPUT + 1)
     this.tickHandler.register(this, TICK_PRIORITY_RENDER - 1)
     this.tickHandler.register(this.sceneManager, TICK_PRIORITY_RENDER)
+
+    // Make sure the in-parallel prop GLB preloads have landed before we
+    // let the arrival cinematic start ticking, so the first exterminate
+    // / rescue / virus mission doesn't hitch on a just-in-time GLB parse.
+    this.emitBootState('preparing', 'Calibrating surface operations')
+    await propPreloads
+
+    this.emitBootState('ready', 'Ready for drop')
+    this.emitBootState('started', 'Running')
 
     // ── Arrival state starts with lander physics + cinematic cam ─
     this.enterArrival()
@@ -1331,12 +1396,11 @@ export class LevelViewController implements Tickable {
     if (!this.sceneManager) return
     const renderer = this.sceneManager.renderer
     const scene = this.sceneManager.scene
-    const camera = this.fpsCamera?.camera
-      ?? this.vehicleCamera?.camera
-      ?? this.sceneManager.activeCamera
+    const camera =
+      this.fpsCamera?.camera ?? this.vehicleCamera?.camera ?? this.sceneManager.activeCamera
     if (!camera) return
 
-    const restoreLightVisibility: Array<{ light: THREE.Light, visible: boolean }> = []
+    const restoreLightVisibility: Array<{ light: THREE.Light; visible: boolean }> = []
     scene.traverse((obj) => {
       const maybeLight = obj as THREE.Light
       if (maybeLight.isLight) {
@@ -1352,7 +1416,10 @@ export class LevelViewController implements Tickable {
         renderer.compile(scene, camera)
       }
     } catch (err) {
-      console.warn('[LevelViewController] shader precompile failed; gameplay may hitch on first appearance of new materials', err)
+      console.warn(
+        '[LevelViewController] shader precompile failed; gameplay may hitch on first appearance of new materials',
+        err,
+      )
     } finally {
       for (const entry of restoreLightVisibility) {
         entry.light.visible = entry.visible
@@ -1681,11 +1748,7 @@ export class LevelViewController implements Tickable {
     this.clearLanderHullPersistTimer()
     this.flushLanderHullToProfile()
 
-    if (
-      this.persistShuttleMissionRewards
-      && this.mission
-      && this.allObjectivesComplete()
-    ) {
+    if (this.persistShuttleMissionRewards && this.mission && this.allObjectivesComplete()) {
       hydratePlayerUpgradeLevelsFromStorage()
       const rewardMult = getCurrentUpgradeValue('shuttleScienceStation')
       persistCompletedAsteroidMissionRewards(this.mission, rewardMult)
@@ -1835,7 +1898,11 @@ export class LevelViewController implements Tickable {
     }
 
     // F key → state triggers (only one can succeed per press)
-    if (this.inputManager?.wasActionPressed('interact') && this.stateMachine && !this.landerDestroyed) {
+    if (
+      this.inputManager?.wasActionPressed('interact') &&
+      this.stateMachine &&
+      !this.landerDestroyed
+    ) {
       if (!this.stateMachine.trigger('exfiltrate')) {
         if (!this.stateMachine.trigger('exitVehicle')) {
           this.stateMachine.trigger('enterVehicle')
@@ -1875,7 +1942,6 @@ export class LevelViewController implements Tickable {
     } else {
       this.onDamageFlash?.(0)
     }
-
 
     // Dead: camera drops, screen fades, message appears
     if (this.stateMachine?.is('dead') && this.fpsCamera) {
@@ -1921,7 +1987,8 @@ export class LevelViewController implements Tickable {
         if (engineFiring && this.vehicleCamera) {
           const alt = this.atmosphereCtx.landerAltitude
           const altFade = 1 - Math.min(1, alt / THRUST_VIBRATION_FADE_ALT)
-          const intensity = THRUST_VIBRATION_MIN + (THRUST_VIBRATION_MAX - THRUST_VIBRATION_MIN) * altFade * altFade
+          const intensity =
+            THRUST_VIBRATION_MIN + (THRUST_VIBRATION_MAX - THRUST_VIBRATION_MIN) * altFade * altFade
           this.vehicleCamera.shake(intensity, THRUST_VIBRATION_DURATION)
           vibrationFactor = intensity / THRUST_VIBRATION_MAX
         }
@@ -1941,9 +2008,8 @@ export class LevelViewController implements Tickable {
         this.atmosphereCtx.playerPosition.copy(player.group.position)
       }
 
-      this.atmosphereCtx.activeMode = currentState === 'eva' ? 'eva'
-        : currentState === 'lander' ? 'lander'
-        : 'cinematic'
+      this.atmosphereCtx.activeMode =
+        currentState === 'eva' ? 'eva' : currentState === 'lander' ? 'lander' : 'cinematic'
 
       // Update ground normal
       const activePos = currentState === 'eva' ? player?.group.position : lander?.position
@@ -1962,13 +2028,9 @@ export class LevelViewController implements Tickable {
       const grounded = this.landerController?.body.grounded ?? false
 
       const canExfil =
-        currentState === 'lander' &&
-        this.hasExitedVehicle &&
-        this.isLanderNearShuttle()
+        currentState === 'lander' && this.hasExitedVehicle && this.isLanderNearShuttle()
 
-      const canEnterLander =
-        currentState === 'eva' &&
-        this.isPlayerNearLander()
+      const canEnterLander = currentState === 'eva' && this.isPlayerNearLander()
 
       this.onStateInfo?.({ state: currentState, grounded, canExfil, canEnterLander })
 
@@ -1978,13 +2040,19 @@ export class LevelViewController implements Tickable {
       // jittery while enemies were on screen. State info above stays per-frame
       // because it drives the action prompts (canExfil/canEnterLander).
       this.telemetryAccumulator += dt
-      const shouldEmitTelemetry = this.telemetryAccumulator >= LevelViewController.TELEMETRY_INTERVAL_S
+      const shouldEmitTelemetry =
+        this.telemetryAccumulator >= LevelViewController.TELEMETRY_INTERVAL_S
       if (shouldEmitTelemetry) {
         this.telemetryAccumulator = 0
       }
 
       // Lander telemetry
-      if (shouldEmitTelemetry && currentState === 'lander' && this.onLanderTelemetry && this.landerController) {
+      if (
+        shouldEmitTelemetry &&
+        currentState === 'lander' &&
+        this.onLanderTelemetry &&
+        this.landerController
+      ) {
         const ts = this.landerController.thrusterSystem
         this.onLanderTelemetry({
           altitude: this.landerController.altitudeAboveGround,
@@ -2008,11 +2076,19 @@ export class LevelViewController implements Tickable {
           surveyProbesCollected: this.getActiveMinigame()?.progressCurrent ?? null,
           surveyProbesTotal: this.getActiveMinigame()?.progressTotal ?? null,
         })
-        this.onPlayerPosition?.(this.landerController!.group.position.x, this.landerController!.group.position.z)
+        this.onPlayerPosition?.(
+          this.landerController!.group.position.x,
+          this.landerController!.group.position.z,
+        )
       }
 
       // FPS telemetry
-      if (shouldEmitTelemetry && currentState === 'eva' && this.onFpsTelemetry && this.playerController) {
+      if (
+        shouldEmitTelemetry &&
+        currentState === 'eva' &&
+        this.onFpsTelemetry &&
+        this.playerController
+      ) {
         const ts = this.playerController.thrusterSystem
         const headingRad = this.fpsCamera!.camera.rotation.y
         const playerPos = this.playerController.group.position
@@ -2046,7 +2122,10 @@ export class LevelViewController implements Tickable {
           objectives,
           rockTarget: this.currentRockTarget,
         })
-        this.onPlayerPosition?.(this.playerController!.group.position.x, this.playerController!.group.position.z)
+        this.onPlayerPosition?.(
+          this.playerController!.group.position.x,
+          this.playerController!.group.position.z,
+        )
       }
     }
   }
@@ -2075,7 +2154,9 @@ export class LevelViewController implements Tickable {
       this.multiTool.setMode(this.multiToolState.modeConfig.color, this.multiToolState.mode)
       this.multiTool.setAiming(this.multiToolState.aiming)
       this.multiTool.setRtgLevel(this.multiToolState.rtgLevel / this.multiToolState.rtgCapacity)
-      this.multiTool.setModeChargeLevel(this.multiToolState.modeCharge / this.multiToolState.modeChargeCapacity)
+      this.multiTool.setModeChargeLevel(
+        this.multiToolState.modeCharge / this.multiToolState.modeChargeCapacity,
+      )
       this.playerController?.setAiming(this.multiToolState.aiming)
       if (this.multiToolState.isFiring) {
         this.multiTool.fire()
@@ -2085,11 +2166,7 @@ export class LevelViewController implements Tickable {
     // ADS camera zoom
     if (this.multiToolState && this.fpsCamera) {
       const ads = this.multiToolState.adsConfig
-      this.fpsCamera.setAiming(
-        this.multiToolState.aiming,
-        ads.fovMultiplier,
-        ads.zoomSpeed,
-      )
+      this.fpsCamera.setAiming(this.multiToolState.aiming, ads.fovMultiplier, ads.zoomSpeed)
     }
 
     // Camera bob from velocity
@@ -2200,7 +2277,6 @@ export class LevelViewController implements Tickable {
     }
   }
 
-
   /** Per-frame minigame logic — delegates to each minigame instance. */
   private tickMinigames(dt: number): void {
     const ctx = this.buildMinigameContext()
@@ -2221,11 +2297,14 @@ export class LevelViewController implements Tickable {
     const player = this.playerController
     return {
       levelState: state,
-      landerPosition: lander ? { x: lander.position.x, y: lander.position.y, z: lander.position.z } : null,
-      landerGrounded: lander?.body.grounded ?? false,
-      playerPosition: state === 'eva' && player
-        ? { x: player.group.position.x, y: player.group.position.y, z: player.group.position.z }
+      landerPosition: lander
+        ? { x: lander.position.x, y: lander.position.y, z: lander.position.z }
         : null,
+      landerGrounded: lander?.body.grounded ?? false,
+      playerPosition:
+        state === 'eva' && player
+          ? { x: player.group.position.x, y: player.group.position.y, z: player.group.position.z }
+          : null,
       interactPressed: this.inputManager?.wasActionPressed('interact') ?? false,
       terminalInteractPressed: this.inputManager?.wasActionPressed('terminalInteract') ?? false,
     }
@@ -2248,21 +2327,25 @@ export class LevelViewController implements Tickable {
     this.clearCollisionRegistrations()
 
     this.collisionCleanup.push(
-      this.collisionWorld.addCollider(
-        {
-          id: LANDER_COLLIDER_ID,
-          ...this.createLocalAabbCollider(this.landerController.group, LANDER_COLLIDER_MIN, LANDER_COLLIDER_MAX),
-        },
-      ),
+      this.collisionWorld.addCollider({
+        id: LANDER_COLLIDER_ID,
+        ...this.createLocalAabbCollider(
+          this.landerController.group,
+          LANDER_COLLIDER_MIN,
+          LANDER_COLLIDER_MAX,
+        ),
+      }),
     )
 
     this.collisionCleanup.push(
-      this.collisionWorld.addCollider(
-        {
-          id: SHUTTLE_COLLIDER_ID,
-          ...this.createLocalAabbCollider(this.arrivalSequence.shuttleGroup, SHUTTLE_COLLIDER_MIN, SHUTTLE_COLLIDER_MAX),
-        },
-      ),
+      this.collisionWorld.addCollider({
+        id: SHUTTLE_COLLIDER_ID,
+        ...this.createLocalAabbCollider(
+          this.arrivalSequence.shuttleGroup,
+          SHUTTLE_COLLIDER_MIN,
+          SHUTTLE_COLLIDER_MAX,
+        ),
+      }),
     )
   }
 
@@ -2313,7 +2396,11 @@ export class LevelViewController implements Tickable {
     if (!tractor || !tool || particleCount <= 0) return
     tool.getMuzzleWorldPosition(this._tractorMuzzle)
     if (useRockCenter && this.surfaceRocks && this.heightmap) {
-      const center = this.surfaceRocks.getRockCenter(spawnIndex, this.heightmap, this._tractorOrigin)
+      const center = this.surfaceRocks.getRockCenter(
+        spawnIndex,
+        this.heightmap,
+        this._tractorOrigin,
+      )
       if (!center) this._tractorOrigin.copy(impactPos)
     } else {
       this._tractorOrigin.copy(impactPos)
@@ -2337,24 +2424,25 @@ export class LevelViewController implements Tickable {
     tool.getMuzzleWorldPosition(this._tractorMuzzle)
 
     for (let i = 0; i < LevelViewController.TRACTOR_PARTICLES_ON_CONSUME; i++) {
-      this._tractorSpawnPos.copy(this._tractorOrigin).add(
-        this._impactVel.set(
-          (Math.random() - 0.5) * LevelViewController.TRACTOR_CONSUME_SPAWN_RADIUS,
-          (Math.random() - 0.5) * LevelViewController.TRACTOR_CONSUME_SPAWN_RADIUS,
-          (Math.random() - 0.5) * LevelViewController.TRACTOR_CONSUME_SPAWN_RADIUS,
-        ),
-      )
+      this._tractorSpawnPos
+        .copy(this._tractorOrigin)
+        .add(
+          this._impactVel.set(
+            (Math.random() - 0.5) * LevelViewController.TRACTOR_CONSUME_SPAWN_RADIUS,
+            (Math.random() - 0.5) * LevelViewController.TRACTOR_CONSUME_SPAWN_RADIUS,
+            (Math.random() - 0.5) * LevelViewController.TRACTOR_CONSUME_SPAWN_RADIUS,
+          ),
+        )
 
       this._tractorVel.copy(this._tractorMuzzle).sub(this._tractorSpawnPos)
       const distance = this._tractorVel.length()
       if (distance < 0.01) continue
 
-      const speedFraction = LevelViewController.TRACTOR_CONSUME_MIN_SPEED_FRACTION
-        + Math.random()
-          * (
-            LevelViewController.TRACTOR_CONSUME_MAX_SPEED_FRACTION
-            - LevelViewController.TRACTOR_CONSUME_MIN_SPEED_FRACTION
-          )
+      const speedFraction =
+        LevelViewController.TRACTOR_CONSUME_MIN_SPEED_FRACTION +
+        Math.random() *
+          (LevelViewController.TRACTOR_CONSUME_MAX_SPEED_FRACTION -
+            LevelViewController.TRACTOR_CONSUME_MIN_SPEED_FRACTION)
       const speed = (distance / LevelViewController.TRACTOR_LIFETIME_SEC) * speedFraction
       this._tractorVel.multiplyScalar(speed / distance)
       this._tractorVel.add(
@@ -2373,8 +2461,8 @@ export class LevelViewController implements Tickable {
     return Math.min(
       LevelViewController.MAX_MINING_IMPACT_PARTICLES_PER_HIT,
       Math.round(
-        LevelViewController.MINING_IMPACT_PARTICLES_PER_HIT
-          + radius * LevelViewController.MINING_IMPACT_PARTICLES_PER_RADIUS,
+        LevelViewController.MINING_IMPACT_PARTICLES_PER_HIT +
+          radius * LevelViewController.MINING_IMPACT_PARTICLES_PER_RADIUS,
       ),
     )
   }
@@ -2382,12 +2470,16 @@ export class LevelViewController implements Tickable {
   private getTractorParticleCount(spawnIndex: number): number {
     const radius = this.surfaceRocks?.getRockRadius(spawnIndex) ?? 0
     return Math.round(
-      LevelViewController.TRACTOR_PARTICLES_PER_HIT
-        + radius * LevelViewController.TRACTOR_PARTICLES_PER_RADIUS,
+      LevelViewController.TRACTOR_PARTICLES_PER_HIT +
+        radius * LevelViewController.TRACTOR_PARTICLES_PER_RADIUS,
     )
   }
 
-  private createLocalAabbCollider(object: THREE.Object3D, localMin: THREE.Vector3, localMax: THREE.Vector3) {
+  private createLocalAabbCollider(
+    object: THREE.Object3D,
+    localMin: THREE.Vector3,
+    localMax: THREE.Vector3,
+  ) {
     const min = new THREE.Vector3()
     const max = new THREE.Vector3()
     const corners = [
@@ -2685,16 +2777,9 @@ export class LevelViewController implements Tickable {
 
     this.levelAudio.notifyObjectiveExplosion(attenuation)
 
-    if (
-      attenuation > 0 &&
-      this.fpsCamera &&
-      this.stateMachine?.is('eva')
-    ) {
+    if (attenuation > 0 && this.fpsCamera && this.stateMachine?.is('eva')) {
       const kick = EXPLOSION_FLINCH_STRENGTH * attenuation
-      this.fpsCamera.applyMouseDelta(
-        (Math.random() - 0.5) * kick,
-        -Math.random() * kick,
-      )
+      this.fpsCamera.applyMouseDelta((Math.random() - 0.5) * kick, -Math.random() * kick)
     }
   }
 
@@ -2880,8 +2965,7 @@ export class LevelViewController implements Tickable {
       const angle = Math.random() * Math.PI * 2
       const radius =
         OBJECTIVE_MIN_DISTANCE_FROM_SHIP +
-        Math.random() *
-          (OBJECTIVE_MAX_DISTANCE_FROM_SHIP - OBJECTIVE_MIN_DISTANCE_FROM_SHIP)
+        Math.random() * (OBJECTIVE_MAX_DISTANCE_FROM_SHIP - OBJECTIVE_MIN_DISTANCE_FROM_SHIP)
       const x = shipX + Math.cos(angle) * radius
       const z = shipZ + Math.sin(angle) * radius
       if (!hm.isValidAt(x, z)) continue
@@ -2997,7 +3081,8 @@ export class LevelViewController implements Tickable {
     if (this.boundOnMouseMove) document.removeEventListener('mousemove', this.boundOnMouseMove)
     if (this.boundOnMouseDown) document.removeEventListener('mousedown', this.boundOnMouseDown)
     if (this.boundOnMouseUp) document.removeEventListener('mouseup', this.boundOnMouseUp)
-    if (this.boundOnLockChange) document.removeEventListener('pointerlockchange', this.boundOnLockChange)
+    if (this.boundOnLockChange)
+      document.removeEventListener('pointerlockchange', this.boundOnLockChange)
 
     const canvas = this.sceneManager?.renderer.domElement
     if (canvas) {
@@ -3079,7 +3164,8 @@ export class LevelViewController implements Tickable {
     if (context.kind === 'enemy' || context.kind === 'hostage') return
     if (context.boltKind === 'drill' && context.kind === 'drill_rock') return
     const isLasSurface =
-      context.boltKind === 'weapon' && (context.kind === 'terrain' || context.kind === 'weapon_rock')
+      context.boltKind === 'weapon' &&
+      (context.kind === 'terrain' || context.kind === 'weapon_rock')
     const isDrillGround = context.boltKind === 'drill' && context.kind === 'terrain'
     if (!isLasSurface && !isDrillGround) return
     this.playShortSurfaceSizzle(impactWorld)

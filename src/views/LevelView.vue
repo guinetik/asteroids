@@ -5,6 +5,8 @@ import { Timer } from '@/lib/Timer'
 import { LevelViewController } from './LevelViewController'
 import LanderHud from '@/components/LanderHud.vue'
 import MissionAnnouncement from '@/components/MissionAnnouncement.vue'
+import LevelLoadingOverlay from '@/components/LevelLoadingOverlay.vue'
+import type { LevelViewBootState } from './LevelViewController'
 import ObjectiveTracker from '@/components/ObjectiveTracker.vue'
 import type { ObjectiveTrackerEntry } from '@/components/ObjectiveTracker.vue'
 import FpsHud from '@/components/FpsHud.vue'
@@ -19,8 +21,8 @@ import LevelInventoryPanel from '@/components/LevelInventoryPanel.vue'
 import type { Inventory } from '@/lib/inventory/types'
 import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
 import { removeItem } from '@/lib/inventory/inventory'
-import type { LanderTelemetry } from '@/components/LanderHud.vue'
-import type { FpsTelemetry } from '@/components/FpsHud.vue'
+import type { LanderTelemetry } from '@/lib/ui/landerHudTypes'
+import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 import { OBJECTIVE_LABELS } from '@/lib/minigame/MiniGame'
 import {
   playBackgroundMusic,
@@ -33,6 +35,10 @@ import { LEVEL_GRID_SIZE } from '@/lib/missions/asteroidMissionGenerator'
 const container = ref<HTMLElement>()
 const viewController = new LevelViewController()
 const letterboxVisible = ref(true)
+const bootPhase = ref<LevelViewBootState['phase']>('preparing')
+const bootLabel = ref('Preparing')
+const bootAsteroid = ref('')
+const bootMission = ref('')
 const stateInfo = reactive({ state: '', grounded: false, canExfil: false, canEnterLander: false })
 const deathFade = ref(0)
 const deathMessage = ref(false)
@@ -200,6 +206,12 @@ const fpsTelemetry = reactive<FpsTelemetry>({
 onMounted(async () => {
   playBackgroundMusic('level')
   if (container.value) {
+    viewController.onBootState = (state) => {
+      bootPhase.value = state.phase
+      bootLabel.value = state.label
+      bootAsteroid.value = state.asteroidName
+      bootMission.value = state.missionName
+    }
     viewController.onLetterbox = (visible) => {
       letterboxVisible.value = visible
     }
@@ -546,6 +558,12 @@ function handleToggleMusic(): void {
   <div v-if="deathMessage" class="death-message">
     <span class="death-message__text">YOU DIED</span>
   </div>
+  <LevelLoadingOverlay
+    :phase="bootPhase"
+    :label="bootLabel"
+    :asteroid-name="bootAsteroid"
+    :mission-name="bootMission"
+  />
   <DeathOverlay
     :visible="deathOverlayVisible"
     :cause="deathOverlayCause"
