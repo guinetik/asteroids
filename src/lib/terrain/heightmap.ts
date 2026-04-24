@@ -40,11 +40,15 @@ export class Heightmap {
   readonly resolution: number
   /** World-space extent (centered at origin) */
   readonly worldSize: number
+  /** Per-cell validity (1 = surface hit, 0 = void). Index: validity[gz * resolution + gx]. */
+  readonly validity: Uint8Array
 
   constructor(resolution: number, worldSize: number) {
     this.resolution = resolution
     this.worldSize = worldSize
     this.grid = new Float32Array(resolution * resolution)
+    this.validity = new Uint8Array(resolution * resolution)
+    this.validity.fill(1)
   }
 
   /** Set height at grid coordinates. */
@@ -57,6 +61,28 @@ export class Heightmap {
   get(gx: number, gz: number): number {
     if (gx < 0 || gx >= this.resolution || gz < 0 || gz >= this.resolution) return 0
     return this.grid[gz * this.resolution + gx]!
+  }
+
+  /** Mark a grid cell as valid (surface hit) or invalid (void). */
+  setValid(gx: number, gz: number, valid: boolean): void {
+    if (gx < 0 || gx >= this.resolution || gz < 0 || gz >= this.resolution) return
+    this.validity[gz * this.resolution + gx] = valid ? 1 : 0
+  }
+
+  /** Whether the given grid cell represents real surface. */
+  isValid(gx: number, gz: number): boolean {
+    if (gx < 0 || gx >= this.resolution || gz < 0 || gz >= this.resolution) return false
+    return this.validity[gz * this.resolution + gx] === 1
+  }
+
+  /** Whether the given world coordinate falls inside a valid surface cell. */
+  isValidAt(x: number, z: number): boolean {
+    const half = this.worldSize / 2
+    const gx = ((x + half) / this.worldSize) * (this.resolution - 1)
+    const gz = ((z + half) / this.worldSize) * (this.resolution - 1)
+    const ix = Math.round(gx)
+    const iz = Math.round(gz)
+    return this.isValid(ix, iz)
   }
 
   /** Whether world coordinates are inside the interpolated terrain domain. */

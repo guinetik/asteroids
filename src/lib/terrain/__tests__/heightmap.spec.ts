@@ -48,4 +48,33 @@ describe('Heightmap', () => {
     }
     expect(hm.slopeAt(0, 0)).toBeGreaterThan(0)
   })
+
+  describe('validity tracking', () => {
+    it('defaults all cells to valid so procedural terrain paths are unaffected', () => {
+      const hm = new Heightmap(4, 100)
+      expect(hm.isValid(0, 0)).toBe(true)
+      expect(hm.isValid(3, 3)).toBe(true)
+      expect(hm.isValidAt(0, 0)).toBe(true)
+    })
+
+    it('marks cells invalid via setValid and reports them via isValid', () => {
+      const hm = new Heightmap(4, 100)
+      hm.setValid(1, 2, false)
+      expect(hm.isValid(1, 2)).toBe(false)
+      expect(hm.isValid(0, 0)).toBe(true)
+    })
+
+    it('isValidAt maps world coords to the nearest cell', () => {
+      const hm = new Heightmap(4, 100)
+      hm.setValid(0, 0, false)
+      // worldSize 100 centred at 0, resolution 4 → cell at (0,0) covers roughly (-50,-50)..(-16.67,-16.67)
+      expect(hm.isValidAt(-40, -40)).toBe(false)
+      expect(hm.isValidAt(40, 40)).toBe(true)
+    })
+
+    it('out-of-bounds isValidAt returns false', () => {
+      const hm = new Heightmap(4, 100)
+      expect(hm.isValidAt(9999, 9999)).toBe(false)
+    })
+  })
 })
