@@ -11,7 +11,6 @@
  * @spec docs/superpowers/specs/2026-04-05-map-shuttle-player-design.md
  */
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import type { Tickable } from '@/lib/Tickable'
 import type {
   ShuttleTelemetry,
@@ -30,7 +29,7 @@ import {
   TICK_PRIORITY_PHYSICS,
   TICK_PRIORITY_ANIMATION,
 } from '@/lib/tickPriorities'
-import { DEFAULT_TIME_SCALE, ORBIT_SCALE, SIZE_SCALE } from '@/lib/planets/constants'
+import { DEFAULT_TIME_SCALE, ORBIT_SCALE } from '@/lib/planets/constants'
 import { SUN, PLANETS } from '@/lib/planets/catalog'
 import type { MapSceneObjects } from '@/three/MapSceneSetup'
 import { SunController } from '@/three/controllers/SunController'
@@ -39,10 +38,6 @@ import { AsteroidBeltController } from '@/three/controllers/AsteroidBeltControll
 import { SpaceTimeGrid } from '@/three/SpaceTimeGrid'
 import * as THREE from 'three'
 import { OrbitCaptureSystem, type OrbitCaptureState, type OrbitHudState } from '@/lib/orbitCapture'
-import {
-  influenceRadius,
-  eventHorizonRadius,
-} from '@/lib/physics/gravity'
 import { ShuttleController, MAP_PHYSICS } from '@/three/ShuttleController'
 import { LANDER_BASE_HP } from '@/three/LanderController'
 import { EvaSession, type EvaHugeScaleTarget, type EvaSceneHost } from '@/three/EvaSession'
@@ -69,22 +64,21 @@ import {
   type MapIntroUiState,
 } from '@/lib/mapIntroState'
 import { MapCamera } from '@/three/MapCamera'
-import { findNearestBodies, formatDistance, type MapBody } from '@/lib/mapProjection'
-import type { MapOverlayState, MapThermalZone } from '@/lib/ShuttleTelemetry'
+import type { MapOverlayState } from '@/lib/ShuttleTelemetry'
 import { computeRelativeOrbitalSpeedMultiplier } from '@/lib/orbitSpeedProfile'
-import {
-  appendWorldLinePoint,
-  shouldRecordWorldLinePoint,
-  type WorldLineHistoryPoint,
-} from '@/lib/worldLineHistory'
 import mapOverlayData from '@/data/shuttle/map-overlay.json'
-import { DevConsole } from '@/lib/devConsole'
+import {
+  registerMapDevCommands,
+  unregisterMapDevCommands,
+} from '@/lib/map/dev/registerMapDevCommands'
 import { GravitationalEventManager } from '@/lib/physics/gravitationalEvent'
 import { computeShuttleBaseFuelDrain } from '@/lib/shuttleBaseFuelDrain'
-import { ShipHealth } from '@/lib/shipHealth'
 import type { ShipHealthConfig } from '@/lib/shipHealth'
-import { getThermalZoneBands } from '@/lib/mapThermalZones'
 import shipHealthData from '@/data/shuttle/ship-health.json'
+import {
+  IDLE_RADIATION_STATE,
+  MapShipHealthFacade,
+} from '@/lib/map/health/MapShipHealthFacade'
 import {
   getCurrentShuttleThrusterEfficiencyModifiers,
   getCurrentUpgradeValue,
@@ -101,7 +95,7 @@ import {
 } from '@/lib/upgrades'
 import { tryPurchaseNextUpgradeLevel } from '@/lib/upgradePurchase'
 import { HabitatState } from '@/lib/habitatState'
-import { HabitatInteriorScene } from '@/three/HabitatInteriorScene'
+import { MapHabitatFacade } from '@/lib/map/habitat/MapHabitatFacade'
 import {
   RESERVE_FUEL_ID,
   LANDER_FUEL_ID,
@@ -120,29 +114,21 @@ import {
 } from '@/lib/player/profile'
 import type { PlayerProfile } from '@/lib/player/types'
 import {
-  applyJourneyTrigger,
-  buildActiveJourneyTracker,
-  getJourneyDisplay,
-  getJourneyPendingStartAnnouncement,
   hasCompletedJourney,
-  getActiveJourneyNextStepLabel,
-  isJourneyFeatureUnlocked,
-  markJourneyStartAnnounced,
-  SLINGSHOT_JOURNEY_FEATURE_ID,
   WELCOME_JOURNEY_ID,
   ACT_1_CONTRACT_IDS,
   type JourneyTrackerState,
   type JourneyTriggerId,
 } from '@/lib/journeys'
+import { MapJourneyFacade } from '@/lib/map/journeys/MapJourneyFacade'
 import { orbitBodyKeyFromCaptureName } from '@/lib/player/orbitBodyKey'
+import { addItem, getStack, consumeItem } from '@/lib/inventory/inventory'
 import {
-  createInventory,
-  addItem,
-  getStack,
-  consumeItem,
-  DEFAULT_MAX_SLOTS,
-  DEFAULT_MAX_WEIGHT_KG,
-} from '@/lib/inventory/inventory'
+  applyCargoBayLimits as applyCargoBayLimitsHelper,
+  createInventoryForCargoBay,
+  ensureMinimumStarterFuelCells as ensureMinimumStarterFuelCellsHelper,
+  inventoryWithStarterFuelCells as inventoryWithStarterFuelCellsHelper,
+} from '@/lib/map/player/playerInventoryHelpers'
 import type { Inventory } from '@/lib/inventory/types'
 import { clearInventory, loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
 import '@/lib/shop/tradeGoods'
@@ -189,14 +175,12 @@ import { MapShuttleEffects } from '@/three/MapShuttleEffects'
 import { MapSceneVisuals } from '@/three/MapSceneVisuals'
 import { MAP_VIEW_CONTROLLER_CONFIG as MAP_CONFIG } from '@/lib/map/mapViewControllerConfig'
 import {
-  buildMapBodies,
   computeGravityProximity,
   computeMaxGravityProximity,
   getMapAsteroidBeltLodFraction,
   isEmissiveMaterial,
   makeGravityWell,
   mapWarpStandoffWorldUnits,
-  shouldShowAsteroidMissionMapSite,
 } from '@/lib/map/mapViewControllerHelpers'
 import { GravitySurfingController } from '@/lib/map/GravitySurfingController'
 import { OrbitalSurfingController, type OrbitalSurfingDeps } from '@/lib/map/OrbitalSurfingController'
@@ -205,6 +189,27 @@ import { ShuttleAudioDirector } from '@/audio/ShuttleAudioDirector'
 import { uiAudio } from '@/audio/UiAudioDirector'
 import { shipMessageSystem } from '@/lib/messages/runtime'
 import { contractSystem, onContractAccepted, onContractCompleted } from '@/lib/contracts/runtime'
+import {
+  COMPASS_LABELS,
+  computeCompassBearings,
+  type CompassTargetInput,
+} from '@/lib/map/compass/compassBearings'
+import { MapBloomController } from '@/three/MapBloomController'
+import { MapOverlayProjector } from '@/lib/map/overlay/MapOverlayProjector'
+import { AsteroidImpactSystem } from '@/lib/map/collisions/AsteroidImpactSystem'
+import {
+  findPlanetCollision,
+  type PlanetCollisionSample,
+} from '@/lib/map/collisions/planetCollision'
+import {
+  EVA_MAP_HELMET_LIGHT_SCALE,
+  EVA_MAP_HUGE_POI_BY_TYPE,
+  EVA_MAP_HUGE_SHUTTLE,
+  EVA_MAP_HUGE_SUN,
+  EVA_MAP_SPAWN_OFFSET_SCALE,
+  EVA_POI_PROMPT_BUFFER,
+  TURRET_FORCE_CLAMP_OVERSCALE,
+} from '@/lib/map/eva/evaMapConstants'
 
 /**
  * Orbit / grid / debris toggle snapshot for syncing the map HUD after intro suppression.
@@ -229,26 +234,8 @@ export interface MapViewBootState {
   label: string
 }
 
-/**
- * Seconds of quiet between a journey's "COMPLETE" banner dismissing and the
- * next journey's "BEGINS" banner opening — avoids banner whiplash.
- */
-const JOURNEY_INTERLUDE_SEC = 5
-
-/** Short compass labels for each planet + Sun. */
-const COMPASS_LABELS: Record<string, string> = {
-  sun: 'Sol',
-  mercury: 'Me',
-  venus: 'Ve',
-  earth: 'Ea',
-  mars: 'Ma',
-  ceres: 'Ce',
-  jupiter: 'Ju',
-  saturn: 'Sa',
-  uranus: 'Ur',
-  neptune: 'Ne',
-  pluto: 'Pl',
-}
+/** Warm yellow used for the Sun tick on the compass strip. */
+const COMPASS_SUN_COLOR = '#FFF0B0'
 
 /**
  * Bridges Vue lifecycle to the map scene with player shuttle.
@@ -269,8 +256,8 @@ export class MapViewController implements Tickable {
   private shuttleEffects: MapShuttleEffects | null = null
   private evaSession: EvaSession | null = null
   private currentEvaPrompt: string | null = null
-  /** Bloom pass knobs snapshotted when EVA begins so we can restore them on exit. */
-  private preEvaBloomState: { threshold: number; strength: number } | null = null
+  /** Owns the UnrealBloomPass tweaks for EVA override, inspect swaps, and orbit clamp. */
+  private readonly bloomController = new MapBloomController()
   onEvaTelemetry: ((telemetry: FpsTelemetry) => void) | null = null
   onEvaModeChange: ((active: boolean) => void) | null = null
   /**
@@ -323,7 +310,7 @@ export class MapViewController implements Tickable {
   private yRecovery = false
   private inspectMode = false
   private habitatState = new HabitatState()
-  private habitatScene: HabitatInteriorScene | null = null
+  private readonly habitatFacade = new MapHabitatFacade()
   private turretSessionController: TurretSessionController | null = null
   private shopFacade = new MapShopFacade()
   private pendingModuleInstallTimer: TimerHandle | null = null
@@ -333,9 +320,8 @@ export class MapViewController implements Tickable {
    * Starting placeholder matches fresh profile credits until init runs.
    */
   private playerProfile: PlayerProfile = createProfile('Pilot')
-  private playerInventory: Inventory = createInventory(
-    Math.round(DEFAULT_MAX_SLOTS * getCurrentUpgradeValue('shuttleCargoBay')),
-    Math.round(DEFAULT_MAX_WEIGHT_KG * getCurrentUpgradeValue('shuttleCargoBay')),
+  private playerInventory: Inventory = createInventoryForCargoBay(
+    getCurrentUpgradeValue('shuttleCargoBay'),
   )
   private portalArrival: PortalArrivalSequence | null = null
   private sceneEnvironment: MapSceneEnvironment | null = null
@@ -343,16 +329,15 @@ export class MapViewController implements Tickable {
   private gravitySurfPass: ShaderPass | null = null
   private slingshotSpeedPass: ShaderPass | null = null
   private adriftTimer = 0
-  private shipHealth: ShipHealth | null = null
-  /** Ship health config with all distance fields pre-scaled by ORBIT_SCALE. */
-  private shipHealthConfig: ShipHealthConfig | null = null
-  /** Throttled write of shuttle hull HP to {@link playerProfile}. */
-  private shuttleHullPersistTimer: ReturnType<typeof setTimeout> | null = null
+  /** Facade owning the {@link ShipHealth} instance, HP persist timer, and pagehide hook. */
+  private readonly healthFacade = new MapShipHealthFacade()
 
-  /** Flush hull to storage when the tab navigates away (refresh often skips Vue dispose). */
-  private readonly flushShuttleHullOnPageHide = (): void => {
-    this.clearShuttleHullPersistTimer()
-    this.flushShuttleHullToProfile()
+  private get shipHealth() {
+    return this.healthFacade.shipHealth
+  }
+
+  private get shipHealthConfig(): ShipHealthConfig | null {
+    return this.healthFacade.config
   }
   private mapState = new MapState()
   private mapIntro = new MapIntroState()
@@ -377,7 +362,7 @@ export class MapViewController implements Tickable {
   private suppressOrbitShuttleHudForEarthStartup = false
 
   private mapCamera: MapCamera | null = null
-  private worldLineHistory: WorldLineHistoryPoint[] = []
+  private readonly overlayProjector = new MapOverlayProjector()
   private messageFacade = new MapMessageFacade()
 
   /** Whether planet orbit lines are currently visible. */
@@ -422,17 +407,16 @@ export class MapViewController implements Tickable {
   private unsubscribeContractCompleted: (() => void) | null = null
   private unsubscribeContractAccepted: (() => void) | null = null
   private unsubscribeUpgradeInstalled: (() => void) | null = null
-  /** True after the first habitat entry post-intro — gates journey UI visibility. */
-  private journeyUiArmed = false
-  /** Active 5-second gap between a journey-complete banner and the next journey-start banner. */
-  private journeyInterludeTimer: TimerHandle | null = null
+  /**
+   * Journey UI coordinator — owns arming state, the completion→begin interlude timer,
+   * and the profile write that follows each trigger.
+   */
+  private readonly journeyFacade = new MapJourneyFacade()
 
   /** World-space shuttle position reused for asteroid belt nearby tumble (avoid per-frame alloc). */
   private readonly _beltShuttleWorldScratch = new THREE.Vector3()
-  /** Scratch vector for asteroid impact knockback direction. */
-  private readonly _asteroidImpactNormal = new THREE.Vector3()
-  /** Countdown until the next asteroid impact can damage the shuttle again. */
-  private asteroidImpactCooldown = 0
+  /** Cooldown-tracking impact system reused across every frame (stateful). */
+  private readonly asteroidImpactSystem = new AsteroidImpactSystem()
   private experienceStarted = false
 
   /**
@@ -679,6 +663,23 @@ export class MapViewController implements Tickable {
     // --- Input ---
     this.inputManager = new InputManager(DEFAULT_BINDINGS)
     hydratePlayerUpgradeLevelsFromStorage()
+    this.journeyFacade.attach({
+      getProfile: () => this.playerProfile,
+      setProfile: (profile) => {
+        this.playerProfile = profile
+      },
+      persistProfile: () => this.persistPlayerProfile(),
+      setTutorialMessagesUnlocked: (unlocked) =>
+        this.messageFacade.setTutorialMessagesUnlocked(unlocked),
+      callbacks: {
+        onJourneyTracker: (state) => this.onJourneyTracker?.(state),
+        onJourneyTrackerVisible: (visible) => this.onJourneyTrackerVisible?.(visible),
+        onJourneyCompletedAnnouncement: (eyebrow, title, meta) =>
+          this.onJourneyCompletedAnnouncement?.(eyebrow, title, meta),
+        onJourneyStartedAnnouncement: (eyebrow, title, meta) =>
+          this.onJourneyStartedAnnouncement?.(eyebrow, title, meta),
+      },
+    })
     this.unsubscribeJourneyMessageArchive?.()
     this.unsubscribeJourneyMessageArchive = shipMessageSystem.onMessageArchived((messageId) => {
       this.notifyJourneyTrigger(`message_archived:${messageId}`)
@@ -732,6 +733,10 @@ export class MapViewController implements Tickable {
     const planetarium = await this.planetariumScene.initialize(canvas, this.vehicleCamera.camera)
     this.emitBootState('preparing', 'Loading')
     this.sceneObjects = planetarium.sceneObjects
+    this.bloomController.setHost({
+      composer: this.sceneObjects.composer,
+      cameraLight: this.sceneObjects.cameraLight,
+    })
     this.sceneVisuals = new MapSceneVisuals(this.sceneObjects)
     this.sunController = planetarium.sunController
     this.planetControllers = planetarium.planetControllers
@@ -755,8 +760,28 @@ export class MapViewController implements Tickable {
 
     this.tickHandler.register(this.vehicleCamera, MAP_CONFIG.TICK_PRIORITY_COMPOSIT - 1)
 
-    // Habitat FPS camera mouse look
-    document.addEventListener('mousemove', this.onHabitatMouseMove)
+    // Habitat facade — owns the interior scene, pointer-lock session, and scene-swap tick.
+    this.habitatFacade.attach({
+      getSceneObjects: () => this.sceneObjects,
+      getVehicleCamera: () => this.vehicleCamera,
+      getShuttleEffects: () => this.shuttleEffects,
+      getShuttleController: () => this.shuttleController,
+      getInspectMode: () => this.inspectMode,
+      setInspectMode: (value) => {
+        this.inspectMode = value
+      },
+      shuttleAudio: this.shuttleAudio,
+      modeCoordinator: this.modeCoordinator,
+      armJourneyUiFromHabitatEntry: () => this.armJourneyUiFromHabitatEntry(),
+      setEarthStartupOrbitHudSuppressed: (suppressed) =>
+        this.setEarthStartupOrbitHudSuppressed(suppressed),
+      notifyJourneyTrigger: (trigger) => this.notifyJourneyTrigger(trigger),
+      callbacks: {
+        onHabitatActive: (active) => this.onHabitatActive?.(active),
+        onShuttleControl: (visible) => this.onShuttleControl?.(visible),
+        onHabitatPrompt: (prompt) => this.onHabitatPrompt?.(prompt),
+      },
+    })
 
     // --- Intro cinematic prop preloads (fire-and-forget) ---
     MapIntroFacade.preload()
@@ -821,45 +846,16 @@ export class MapViewController implements Tickable {
       this.shuttleAudio.notifyCargoDoorsToggled(open)
     }
 
-    // Ship health — temperature + radiation damage
-    // Scale maxHp by hull upgrade level (multiplier: 1.0 → 2.0).
-    // Distance-based boundaries are stored in ship-health.json as raw catalog units
-    // (matching semiMajorAxis values in planetarium.json). Multiply by ORBIT_SCALE here
-    // so shipHealth.ts always works in world-space — changing ORBIT_SCALE stays correct.
-    const hullMultiplier = getCurrentUpgradeValue('shuttleHull')
-    const rawHealthData = shipHealthData as ShipHealthConfig
-    const healthConfig: ShipHealthConfig = {
-      ...rawHealthData,
-      maxHp: rawHealthData.maxHp * hullMultiplier,
-      hotBoundary: rawHealthData.hotBoundary * ORBIT_SCALE,
-      heatZone2Boundary: rawHealthData.heatZone2Boundary * ORBIT_SCALE,
-      heatZone3Boundary: rawHealthData.heatZone3Boundary * ORBIT_SCALE,
-      coldBoundary: rawHealthData.coldBoundary * ORBIT_SCALE,
-      coldZone3Boundary: rawHealthData.coldZone3Boundary * ORBIT_SCALE,
-      radiationZone1Boundary: rawHealthData.radiationZone1Boundary * ORBIT_SCALE,
-      radiationZone2Boundary: rawHealthData.radiationZone2Boundary * ORBIT_SCALE,
-      radiationZone3Boundary: rawHealthData.radiationZone3Boundary * ORBIT_SCALE,
-    }
-    this.shipHealthConfig = healthConfig
-    this.shipHealth = new ShipHealth(healthConfig)
-    this.shipHealth.onDeath = (cause) => {
-      this.triggerDeath(cause)
-    }
-    const maxShuttleHp = healthConfig.maxHp
-    const savedShuttleHp = this.playerProfile.shuttleHullHp
-    const initialShuttleHp =
-      savedShuttleHp === undefined
-        ? maxShuttleHp
-        : savedShuttleHp <= 0
-          ? maxShuttleHp
-          : Math.min(savedShuttleHp, maxShuttleHp)
-    this.shipHealth.setPersistedHp(initialShuttleHp)
-    this.shipHealth.onHpChanged = () => {
-      this.scheduleShuttleHullPersist()
-    }
-    if (typeof window !== 'undefined') {
-      window.addEventListener('pagehide', this.flushShuttleHullOnPageHide)
-    }
+    // Ship health — temperature + radiation damage. The facade builds the world-scaled
+    // config, wires the throttled HP persist, and installs the `pagehide` flush.
+    this.healthFacade.initialize({
+      rawData: shipHealthData as ShipHealthConfig,
+      hullMultiplier: getCurrentUpgradeValue('shuttleHull'),
+      orbitScale: ORBIT_SCALE,
+      savedHp: this.playerProfile.shuttleHullHp,
+      onDeath: (cause) => this.triggerDeath(cause),
+      onPersistDue: () => this.flushShuttleHullToProfile(),
+    })
 
     this.emitBootState('preparing', 'Loading')
     await this.shuttleController.load()
@@ -1193,63 +1189,24 @@ export class MapViewController implements Tickable {
     window.addEventListener('resize', this.resizeHandler)
 
     // --- Dev tools ---
-    DevConsole.register('MapView', {
-      skipIntro: () => {
-        this.skipIntro()
-      },
-      toggleEvaColliders: () => {
-        const session = this.evaSession
-        if (!session) return
-        session.setColliderDebugVisible(!session.isColliderDebugVisible)
-      },
-      getShuttlePosition: () => {
-        const pos = this.shuttleController?.group.position
-        if (pos)
-          console.info(
-            `[MapView] Shuttle: x=${pos.x.toFixed(1)} y=${pos.y.toFixed(1)} z=${pos.z.toFixed(1)}`,
-          )
-      },
-      teleportToSun: () => {
-        if (this.sunController && this.shuttleController) {
-          this.shuttleController.group.position.set(
-            this.sunController.getWorldX() + 50,
-            0,
-            this.sunController.getWorldZ(),
-          )
-        }
-      },
-      warp: (bodyId: string) => {
-        this.devWarpNearBody(bodyId)
-      },
+    registerMapDevCommands({
+      skipIntro: () => this.skipIntro(),
+      getEvaSession: () => this.evaSession,
+      getShuttleController: () => this.shuttleController,
+      getSunController: () => this.sunController,
+      getGravitationalEventManager: () => this.gravitationalEventManager,
+      devWarpNearBody: (bodyId) => this.devWarpNearBody(bodyId),
       toggleOrbits: () => this.toggleOrbits(),
       toggleSpaceTimeGrid: () => this.toggleSpaceTimeGrid(),
       toggleAmbient: () => this.toggleAmbient(),
       toggleLabels: () => this.toggleLabels(),
-      spawnGravitationalEvent: () => this.gravitationalEventManager?.spawnRandomInWorld() ?? null,
-      spawnGravitationalEventNearPlayer: (maxOffset = 200) => {
-        if (!this.gravitationalEventManager || !this.shuttleController) return null
-        const p = this.shuttleController.group.position
-        return this.gravitationalEventManager.spawnNear(p.x, p.z, maxOffset)
-      },
-      clearGravitationalEvents: () => this.gravitationalEventManager?.clear(),
-      setGravitationalEventAutoSpawn: (enabled: boolean) => {
-        this.gravitationalEventManager?.setAutoSpawnEnabled(Boolean(enabled))
-      },
-      grantGravitySurfing: () => {
-        this.devSetPlayerUpgradeLevel('gravitySurfing', 1)
-      },
-      giveCredits: (amount = 1000) => {
-        this.giveCredits(amount)
-      },
-      setUpgradeLevel: (upgradeId: UpgradeId, level: number) => {
-        this.devSetPlayerUpgradeLevel(upgradeId, level)
-      },
-      startConsortiumCertificationMessage: () => {
-        this.devStartConsortiumCertificationMessage()
-      },
-      openMinigame: (gatherItem = 'venusian-gas', quantity = 5) => {
-        this.devOpenOrbitalMinigame(gatherItem, quantity)
-      },
+      devSetPlayerUpgradeLevel: (upgradeId, level) =>
+        this.devSetPlayerUpgradeLevel(upgradeId, level),
+      giveCredits: (amount) => this.giveCredits(amount),
+      devStartConsortiumCertificationMessage: () =>
+        this.devStartConsortiumCertificationMessage(),
+      devOpenOrbitalMinigame: (item, quantity) =>
+        this.devOpenOrbitalMinigame(item, quantity),
     })
 
     this.missionFacade.hydrateFromStorage(this.onMissionBoardUpdate)
@@ -1353,28 +1310,29 @@ export class MapViewController implements Tickable {
       this.habitatState.tick(dt)
 
       // Lazy-load scene on first entry
-      if (this.habitatState.phase !== 'map' && !this.habitatScene) {
-        this.ensureHabitatScene()
+      if (this.habitatState.phase !== 'map' && !this.habitatFacade.interiorScene) {
+        this.habitatFacade.ensureScene()
       }
 
-      this.tickHabitatTransition()
+      this.habitatFacade.tickTransition(this.habitatState.phase, this.habitatState.progress)
 
       // Detect waking_up → habitat (wake-up complete, give player control)
       if (prevPhase === 'waking_up' && this.habitatState.phase === 'habitat') {
-        this.onEnterHabitat()
+        this.habitatFacade.handleEnter()
       }
 
       // When exit completes, restore map state
       if (this.habitatState.phase === 'map') {
-        this.onExitHabitat()
+        this.habitatFacade.handleExit()
       }
 
       // While in habitat, tick the interior scene
-      if (this.habitatState.phase === 'habitat' && this.habitatScene) {
-        this.habitatScene.tick(dt)
+      const interior = this.habitatFacade.interiorScene
+      if (this.habitatState.phase === 'habitat' && interior) {
+        this.habitatFacade.tickScene(dt)
 
         // Check for exit via Escape/H inside the habitat's own input
-        if (this.habitatScene.inputManager.wasActionPressed('exitHabitat')) {
+        if (interior.inputManager.wasActionPressed('exitHabitat')) {
           if (this.canLeaveHabitatJourney()) {
             this.notifyJourneyTrigger('left_habitat')
             this.habitatState.leave()
@@ -1385,7 +1343,9 @@ export class MapViewController implements Tickable {
       }
 
       // Emit fade overlay state
-      this.onHabitatFade?.(this.getHabitatFadeOpacity())
+      this.onHabitatFade?.(
+        this.habitatFacade.getFadeOpacity(this.habitatState.phase, this.habitatState.progress),
+      )
 
       // Skip map gameplay while in habitat
       if (this.habitatState.phase !== 'map') return
@@ -1420,7 +1380,7 @@ export class MapViewController implements Tickable {
       // ship right in front of the map's base lights. Force the zoomed-in bloom clamp
       // (normally driven by tickShuttleScale, which we skip here) so cameraLight fades
       // to 0 and the bloom threshold rises past the hull's diffuse peak.
-      this.applyOrbitBloomClamp(MapViewController.TURRET_FORCE_CLAMP_OVERSCALE)
+      this.applyOrbitBloomClamp(TURRET_FORCE_CLAMP_OVERSCALE)
       // Push telemetry during the turret session so the HUD can swap to the
       // MINE gauge and show live charge depletion. The rest of the gameplay
       // tick (orrery sim, orbit transitions, damage, UI toggles) stays paused
@@ -1470,9 +1430,6 @@ export class MapViewController implements Tickable {
         this.shuttleController?.toggleDoors()
       }
       this.inspectMode = inspectToggle.nextInspectMode
-      const bloomPass = this.sceneObjects?.composer.passes.find(
-        (p) => p instanceof UnrealBloomPass,
-      ) as UnrealBloomPass | undefined
       if (inspectToggle.cameraMode === 'inspect') {
         this.vehicleCamera?.setConfig(MAP_INSPECT_CAMERA_CONFIG)
         if (this.vehicleCamera) {
@@ -1485,10 +1442,7 @@ export class MapViewController implements Tickable {
           this.vehicleCamera.controls.enableZoom = inspectToggle.enableZoom
         }
       }
-      if (bloomPass) {
-        bloomPass.threshold = inspectToggle.bloomThreshold
-        bloomPass.strength = inspectToggle.bloomStrength
-      }
+      this.bloomController.setRawBloom(inspectToggle.bloomThreshold, inspectToggle.bloomStrength)
     }
 
     // Habitat interior (H key) — enter/exit first-person interior
@@ -1716,7 +1670,8 @@ export class MapViewController implements Tickable {
       }
     }
 
-    // Ship health — temperature drift + radiation/temp damage
+    // Ship health — temperature drift + radiation/temp damage. Delegated to the facade,
+    // which returns the HUD + audio snapshot for this frame.
     if (
       this.shipHealth &&
       this.shuttleController &&
@@ -1729,40 +1684,26 @@ export class MapViewController implements Tickable {
       const sunDist = Math.sqrt(px * px + pz * pz)
       const isHealingAtEarth =
         orbitState === 'orbiting' && this.orbitSystem?.target?.name === 'Earth'
-      const heatMitigation = getCurrentUpgradeValue('shuttleHeatResistance')
-      const coldMitigation = getCurrentUpgradeValue('shuttleFreezeResistance')
-      const radiationLevel = CURRENT_PLAYER_UPGRADE_LEVELS.shuttleRadiationResistance ?? 0
-      const { heatCap, coldCap } = this.computeThermalCaps(sunDist)
-      this.shipHealth.tick(
+      const heatLevel = CURRENT_PLAYER_UPGRADE_LEVELS.shuttleHeatResistance ?? 0
+      const coldLevel = CURRENT_PLAYER_UPGRADE_LEVELS.shuttleFreezeResistance ?? 0
+      const tickOutput = this.healthFacade.tickHealth({
         dt,
         sunDist,
         isHealingAtEarth,
-        heatMitigation,
-        heatMitigation,
-        coldMitigation,
-        coldMitigation,
-        radiationLevel,
-        heatCap,
-        coldCap,
-      )
-      this.shuttleEffects?.setTemperature(this.shipHealth.temperature)
-
-      // Push the post-tick radiation snapshot to the HUD + audio director.
-      // Emitted every frame (even at zone 0) so consumers can clear stale
-      // banners and stop the geiger loop the instant the ship leaves a band.
-      const radZone = this.shipHealth.radiationZone
-      const radDamageActive = this.shipHealth.isTakingRadiationDamage
-      this.onRadiationWarning?.({
-        zone: radZone,
-        damageActive: radDamageActive,
-        visible: radZone > 0,
+        heatMitigation: getCurrentUpgradeValue('shuttleHeatResistance'),
+        coldMitigation: getCurrentUpgradeValue('shuttleFreezeResistance'),
+        radiationLevel: CURRENT_PLAYER_UPGRADE_LEVELS.shuttleRadiationResistance ?? 0,
+        heatZoneLevel: heatLevel,
+        coldZoneLevel: coldLevel,
       })
-      this.shuttleAudio.tickRadiationTelemetry(radDamageActive)
+      this.shuttleEffects?.setTemperature(tickOutput.temperature)
+      this.onRadiationWarning?.(tickOutput.radiation)
+      this.shuttleAudio.tickRadiationTelemetry(tickOutput.radiationDamageActive)
     } else {
       // Either the simulation is frozen, the shuttle is dead, or shipHealth
       // is missing — clear any latent radiation HUD/audio state so the
       // overlay doesn't get stuck on while time is paused.
-      this.onRadiationWarning?.({ zone: 0, damageActive: false, visible: false })
+      this.onRadiationWarning?.(IDLE_RADIATION_STATE)
       this.shuttleAudio.tickRadiationTelemetry(false)
     }
 
@@ -1772,17 +1713,16 @@ export class MapViewController implements Tickable {
       if (orbitState === 'free') {
         const px = this.shuttleController.position.x
         const pz = this.shuttleController.position.z
-        for (let i = 0; i < this.planetControllers.length; i++) {
-          const c = this.planetControllers[i]!
-          const dx = c.getWorldX() - px
-          const dz = c.getWorldZ() - pz
-          const dist = Math.sqrt(dx * dx + dz * dz)
-          const collisionRadius =
-            PLANETS[i]!.displayRadius * SIZE_SCALE + MAP_CONFIG.MAP_SHUTTLE_COLLISION_RADIUS
-          if (dist < collisionRadius) {
-            this.triggerDeath(`Crashed Into ${PLANETS[i]!.name}`)
-            return
-          }
+        const samples: PlanetCollisionSample[] = this.planetControllers.map((c, i) => ({
+          name: PLANETS[i]!.name,
+          displayRadius: PLANETS[i]!.displayRadius,
+          worldX: c.getWorldX(),
+          worldZ: c.getWorldZ(),
+        }))
+        const hit = findPlanetCollision(px, pz, samples)
+        if (hit) {
+          this.triggerDeath(`Crashed Into ${hit.planetName}`)
+          return
         }
       }
     }
@@ -2032,7 +1972,7 @@ export class MapViewController implements Tickable {
     this.recordWorldLinePoint()
     this.messageFacade.triggerRuntimeMessages({
       tutorialMessagesUnlocked: hasCompletedJourney(this.playerProfile, WELCOME_JOURNEY_ID),
-      worldLineHistoryLength: this.worldLineHistory.length,
+      worldLineHistoryLength: this.overlayProjector.worldLineLength,
       earthDepartureMinHistoryPoints: MAP_CONFIG.EARTH_DEPARTURE_MIN_HISTORY_POINTS,
       earthDistance: this.getDistanceToPlanet('earth'),
       earthDepartureDistance: MAP_CONFIG.EARTH_DEPARTURE_MESSAGE_DISTANCE,
@@ -2079,57 +2019,17 @@ export class MapViewController implements Tickable {
       return
     }
 
-    this.asteroidImpactCooldown = Math.max(0, this.asteroidImpactCooldown - dt)
-    if (this.asteroidImpactCooldown > 0) return
+    const resolved = this.asteroidImpactSystem.tick({
+      dt,
+      shuttlePosition: shuttleWorldPosition,
+      velocity: this.shuttleController.currentVelocity,
+      beltControllers: this.beltControllers,
+    })
+    if (!resolved) return
 
-    for (const controller of this.beltControllers) {
-      const impact = controller.findNearestImpact(
-        shuttleWorldPosition,
-        MAP_CONFIG.MAP_SHUTTLE_COLLISION_RADIUS,
-      )
-      if (!impact) continue
-
-      const velocity = this.shuttleController.currentVelocity
-      const speed = velocity.length()
-
-      this._asteroidImpactNormal.copy(shuttleWorldPosition).sub(impact.worldPosition)
-      if (this._asteroidImpactNormal.lengthSq() < 1e-6) {
-        if (speed > 0.001) {
-          this._asteroidImpactNormal.copy(velocity).multiplyScalar(-1)
-        } else {
-          this._asteroidImpactNormal.set(1, 0, 0)
-        }
-      }
-      this._asteroidImpactNormal.y = 0
-      this._asteroidImpactNormal.normalize()
-
-      const inboundSpeed = Math.max(0, -velocity.dot(this._asteroidImpactNormal))
-      const damageRatio = Math.min(1, Math.max(speed, inboundSpeed) / 6)
-      const damage =
-        MAP_CONFIG.ASTEROID_IMPACT_MIN_DAMAGE +
-        (MAP_CONFIG.ASTEROID_IMPACT_MAX_DAMAGE - MAP_CONFIG.ASTEROID_IMPACT_MIN_DAMAGE) *
-          damageRatio
-      this.shipHealth.applyDamage(damage, 'Asteroid Impact')
-      this.vehicleCamera?.shake(
-        MAP_CONFIG.ASTEROID_IMPACT_MIN_SHAKE +
-          (MAP_CONFIG.ASTEROID_IMPACT_MAX_SHAKE - MAP_CONFIG.ASTEROID_IMPACT_MIN_SHAKE) *
-            damageRatio,
-        MAP_CONFIG.ASTEROID_IMPACT_SHAKE_DURATION_SEC,
-      )
-
-      const impulseMagnitude = Math.max(
-        MAP_CONFIG.ASTEROID_IMPACT_MIN_IMPULSE,
-        inboundSpeed * MAP_CONFIG.ASTEROID_IMPACT_SPEED_TO_IMPULSE +
-          impact.asteroidRadius * MAP_CONFIG.ASTEROID_IMPACT_RADIUS_TO_IMPULSE,
-      )
-      velocity.addScaledVector(this._asteroidImpactNormal, impulseMagnitude)
-      if (inboundSpeed > 0) {
-        velocity.multiplyScalar(0.92)
-      }
-      this.shuttleController.setVelocity(velocity)
-      this.asteroidImpactCooldown = MAP_CONFIG.ASTEROID_IMPACT_COOLDOWN_SEC
-      return
-    }
+    this.shipHealth.applyDamage(resolved.damage, resolved.damageLabel)
+    this.vehicleCamera?.shake(resolved.shakeMagnitude, resolved.shakeDurationSec)
+    this.shuttleController.setVelocity(resolved.newVelocity)
   }
 
   /**
@@ -2381,131 +2281,43 @@ export class MapViewController implements Tickable {
     saveInventory(this.playerInventory)
   }
 
-  /** Persist shuttle hull HP to the profile (immediate). */
+  /** Persist shuttle hull HP to the profile (immediate). Invoked by the health facade. */
   private flushShuttleHullToProfile(): void {
-    if (!this.shipHealth) return
-    const hp = this.shipHealth.hp
+    const health = this.shipHealth
+    if (!health) return
+    const hp = health.hp
     if (this.playerProfile.shuttleHullHp === hp) return
     this.playerProfile = { ...this.playerProfile, shuttleHullHp: hp }
     saveProfile(this.playerProfile)
   }
 
-  /**
-   * Throttle hull writes (~5/s). A debounce would never fire while HP changed every frame
-   * (e.g. continuous cold damage at Neptune), so the save would never hit localStorage.
-   */
-  private scheduleShuttleHullPersist(): void {
-    if (this.shuttleHullPersistTimer !== null) return
-    this.shuttleHullPersistTimer = setTimeout(() => {
-      this.shuttleHullPersistTimer = null
-      this.flushShuttleHullToProfile()
-    }, 200)
-  }
-
   private clearShuttleHullPersistTimer(): void {
-    if (this.shuttleHullPersistTimer !== null) {
-      clearTimeout(this.shuttleHullPersistTimer)
-      this.shuttleHullPersistTimer = null
-    }
+    this.healthFacade.clearPersistTimer()
   }
 
   notifyJourneyTrigger(trigger: JourneyTriggerId): void {
-    const result = applyJourneyTrigger(this.playerProfile, trigger)
-    if (!result.changed) return
-    this.playerProfile = result.profile
-    this.persistPlayerProfile()
-    this.messageFacade.setTutorialMessagesUnlocked(
-      hasCompletedJourney(this.playerProfile, WELCOME_JOURNEY_ID),
-    )
-    for (const journeyId of result.completedJourneyIds) {
-      const display = getJourneyDisplay(journeyId)
-      if (!display) continue
-      this.onJourneyCompletedAnnouncement?.(display.eyebrow, display.title, display.objectiveLabel)
-    }
-    this.emitJourneyTracker()
-    if (result.completedJourneyIds.length > 0) {
-      this.hideJourneyTrackerAndScheduleNextStart()
-    } else if (result.newlyStartReadyJourneyIds.length > 0) {
-      // A journey's start gate just opened mid-session (e.g. player accepted
-      // the USC contract). Fire its "JOURNEY BEGINS" banner now.
-      this.tryAnnounceNextJourneyStart()
-    }
+    this.journeyFacade.notifyTrigger(trigger)
   }
 
   private emitJourneyTracker(): void {
-    this.onJourneyTracker?.(buildActiveJourneyTracker(this.playerProfile))
+    this.journeyFacade.emitTracker()
   }
 
-  /**
-   * Hide the objective tracker, let the completion banner finish, wait a beat,
-   * then fire the next journey's "JOURNEY BEGINS" banner (if any).
-   *
-   * Timing: completion banner is ~4.6s total (0.6s open + 3.2s hold + 0.8s close),
-   * and we want ~5s of quiet after it dismisses before the next banner opens.
-   */
-  private hideJourneyTrackerAndScheduleNextStart(): void {
-    this.onJourneyTrackerVisible?.(false)
-    this.clearJourneyInterludeTimer()
-    this.journeyInterludeTimer = Timer.after(JOURNEY_INTERLUDE_SEC, () => {
-      this.journeyInterludeTimer = null
-      this.tryAnnounceNextJourneyStart()
-    })
+  private canLeaveHabitatJourney(): boolean {
+    return this.journeyFacade.canLeaveHabitat()
   }
 
-  /** Cancel the pending interlude timer if one is in flight. */
-  private clearJourneyInterludeTimer(): void {
-    if (this.journeyInterludeTimer !== null) {
-      Timer.cancel(this.journeyInterludeTimer)
-      this.journeyInterludeTimer = null
-    }
-  }
-
-  /**
-   * Fire the pending "JOURNEY BEGINS" banner for the next un-announced active journey,
-   * or just reveal the tracker when there is no pending announcement.
-   * No-op when the journey UI has not yet been armed (pre-intro or pre-habitat).
-   */
-  private tryAnnounceNextJourneyStart(): void {
-    if (!this.journeyUiArmed) return
-    const pendingId = getJourneyPendingStartAnnouncement(this.playerProfile)
-    if (pendingId === null) {
-      this.onJourneyTrackerVisible?.(true)
-      return
-    }
-    const display = getJourneyDisplay(pendingId)
-    if (!display) {
-      this.onJourneyTrackerVisible?.(true)
-      return
-    }
-    this.playerProfile = markJourneyStartAnnounced(this.playerProfile, pendingId)
-    this.persistPlayerProfile()
-    this.onJourneyStartedAnnouncement?.(display.eyebrow, display.title, display.objectiveLabel)
-    this.onJourneyTrackerVisible?.(true)
+  private showJourneyLeaveBlockedPrompt(): void {
+    const prompt = this.journeyFacade.buildLeaveBlockedPrompt()
+    if (prompt) this.onHabitatPrompt?.(prompt)
   }
 
   /**
    * Arm the journey UI. Called the first time the player enters the habitat post-intro.
-   * Idempotent — re-arming is a no-op.
+   * Delegates to {@link MapJourneyFacade} — idempotent.
    */
   armJourneyUiFromHabitatEntry(): void {
-    if (this.journeyUiArmed) return
-    this.journeyUiArmed = true
-    this.tryAnnounceNextJourneyStart()
-  }
-
-  private canLeaveHabitatJourney(): boolean {
-    const nextLabel = getActiveJourneyNextStepLabel(this.playerProfile)
-    return nextLabel === null || nextLabel === 'Leave the Habitat'
-  }
-
-  private showJourneyLeaveBlockedPrompt(): void {
-    const nextLabel = getActiveJourneyNextStepLabel(this.playerProfile)
-    if (!nextLabel) return
-    this.onHabitatPrompt?.(`Complete Journey first: ${nextLabel}`)
-  }
-
-  private isSlingshotUnlocked(): boolean {
-    return isJourneyFeatureUnlocked(this.playerProfile, SLINGSHOT_JOURNEY_FEATURE_ID)
+    this.journeyFacade.armUiFromHabitatEntry()
   }
 
   /**
@@ -2548,59 +2360,29 @@ export class MapViewController implements Tickable {
 
   /** Build a fresh inventory using the current cargo-bay upgrade multiplier. */
   private createInventoryForCurrentCargoBayLevel(): Inventory {
-    const cargoMultiplier = getCurrentUpgradeValue('shuttleCargoBay')
-    return createInventory(
-      Math.round(DEFAULT_MAX_SLOTS * cargoMultiplier),
-      Math.round(DEFAULT_MAX_WEIGHT_KG * cargoMultiplier),
-    )
+    return createInventoryForCargoBay(getCurrentUpgradeValue('shuttleCargoBay'))
   }
 
-  /**
-   * Add starter shuttle and lander fuel cells to an empty cargo hold (new game or death respawn).
-   *
-   * @param emptyHold - Fresh inventory with correct bay limits and no stacks.
-   * @returns Inventory including one reserve shuttle cell and one lander cell when `addItem` succeeds.
-   */
+  /** Add starter shuttle + lander fuel cells to a fresh cargo hold (new game / death respawn). */
   private inventoryWithStarterFuelCells(emptyHold: Inventory): Inventory {
-    let inv = emptyHold
-    const addReserve = addItem(inv, RESERVE_FUEL_ID, MAP_CONFIG.STARTER_SHUTTLE_FUEL_CELL_COUNT)
-    if (!addReserve.ok) return inv
-    inv = addReserve.inventory
-    const addLander = addItem(inv, LANDER_FUEL_ID, MAP_CONFIG.STARTER_LANDER_FUEL_CELL_COUNT)
-    return addLander.ok ? addLander.inventory : inv
+    return inventoryWithStarterFuelCellsHelper(emptyHold, this.starterFuelCellCounts())
   }
 
-  /**
-   * Ensure at least one shuttle reserve and one lander fuel cell (e.g. after loading a save that
-   * predates fuel grants or had zero stacks).
-   *
-   * @param inventory - Current hold (already cargo-bay sized).
-   * @returns Updated inventory when adds succeed; otherwise the input reference.
-   */
+  /** Ensure the saved hold meets the minimum starter fuel cell quantities. */
   private ensureMinimumStarterFuelCells(inventory: Inventory): Inventory {
-    let inv = inventory
-    const reserveQty = getStack(inv, RESERVE_FUEL_ID)?.quantity ?? 0
-    if (reserveQty < MAP_CONFIG.STARTER_SHUTTLE_FUEL_CELL_COUNT) {
-      const delta = MAP_CONFIG.STARTER_SHUTTLE_FUEL_CELL_COUNT - reserveQty
-      const r = addItem(inv, RESERVE_FUEL_ID, delta)
-      if (r.ok) inv = r.inventory
-    }
-    const landerQty = getStack(inv, LANDER_FUEL_ID)?.quantity ?? 0
-    if (landerQty < MAP_CONFIG.STARTER_LANDER_FUEL_CELL_COUNT) {
-      const delta = MAP_CONFIG.STARTER_LANDER_FUEL_CELL_COUNT - landerQty
-      const r = addItem(inv, LANDER_FUEL_ID, delta)
-      if (r.ok) inv = r.inventory
-    }
-    return inv
+    return ensureMinimumStarterFuelCellsHelper(inventory, this.starterFuelCellCounts())
   }
 
-  /** Keep the current inventory contents but resize slot/weight caps to the installed cargo bay. */
+  /** Keep inventory contents but resize caps to match the current `shuttleCargoBay` level. */
   private applyCargoBayLimits(inventory: Inventory): Inventory {
-    const cargoMultiplier = getCurrentUpgradeValue('shuttleCargoBay')
+    return applyCargoBayLimitsHelper(inventory, getCurrentUpgradeValue('shuttleCargoBay'))
+  }
+
+  /** Current starter fuel cell counts from config. */
+  private starterFuelCellCounts() {
     return {
-      ...inventory,
-      maxSlots: Math.round(DEFAULT_MAX_SLOTS * cargoMultiplier),
-      maxWeightKg: Math.round(DEFAULT_MAX_WEIGHT_KG * cargoMultiplier),
+      shuttle: MAP_CONFIG.STARTER_SHUTTLE_FUEL_CELL_COUNT,
+      lander: MAP_CONFIG.STARTER_LANDER_FUEL_CELL_COUNT,
     }
   }
 
@@ -3443,44 +3225,9 @@ export class MapViewController implements Tickable {
    * @returns `heatCap` (positive clamp) and `coldCap` (negative clamp) for `tick()`
    */
   private computeThermalCaps(sunDist: number): { heatCap: number; coldCap: number } {
-    const cfg = this.shipHealthConfig!
     const heatLevel = CURRENT_PLAYER_UPGRADE_LEVELS.shuttleHeatResistance ?? 0
     const coldLevel = CURRENT_PLAYER_UPGRADE_LEVELS.shuttleFreezeResistance ?? 0
-    const partialCap = cfg.protectedTempCap
-
-    /** Temperature value used for full immunity — below displayThreshold so the bar stays dark. */
-    const IMMUNE_CAP = 0
-
-    const MAX_TEMP = 100
-    const MIN_TEMP = -100
-
-    // Determine heat zone level (0 = no heat, 1 = Venus, 2 = Mercury, 3 = Sun proximity)
-    let heatZone = 0
-    if (sunDist < cfg.hotBoundary) {
-      if (sunDist < cfg.heatZone3Boundary) heatZone = 3
-      else if (sunDist < cfg.heatZone2Boundary) heatZone = 2
-      else heatZone = 1
-    }
-
-    // Determine cold zone level (0 = no cold, 2 = Jupiter/Saturn, 3 = Uranus+)
-    let coldZone = 0
-    if (sunDist > cfg.coldBoundary) {
-      coldZone = sunDist > cfg.coldZone3Boundary ? 3 : 2
-    }
-
-    let heatCap = MAX_TEMP
-    if (heatZone > 0) {
-      if (heatLevel > heatZone) heatCap = IMMUNE_CAP
-      else if (heatLevel === heatZone) heatCap = partialCap
-    }
-
-    let coldCap = MIN_TEMP
-    if (coldZone > 0) {
-      if (coldLevel > coldZone) coldCap = -IMMUNE_CAP
-      else if (coldLevel === coldZone) coldCap = -partialCap
-    }
-
-    return { heatCap, coldCap }
+    return this.healthFacade.getThermalCaps(sunDist, heatLevel, coldLevel) ?? { heatCap: 100, coldCap: -100 }
   }
 
   /**
@@ -3778,42 +3525,15 @@ export class MapViewController implements Tickable {
     this.shuttleEffects?.setGravitySurfing(false, 0)
   }
 
-  /** Build projected persistent world-line points for the tactical map. */
-  private buildWorldLineTrajectory() {
-    if (!this.mapCamera || !this.shuttleController || this.shuttleController.dead) {
-      return []
-    }
-
-    const currentPoint = {
-      x: this.shuttleController.position.x,
-      z: this.shuttleController.position.z,
-    }
-    const lastPoint = this.worldLineHistory[this.worldLineHistory.length - 1]
-    const points =
-      lastPoint && lastPoint.x === currentPoint.x && lastPoint.z === currentPoint.z
-        ? this.worldLineHistory
-        : [...this.worldLineHistory, currentPoint]
-
-    return points.map((sample) => {
-      const projected = this.mapCamera!.projectToScreen(new THREE.Vector3(sample.x, 0, sample.z))
-      return {
-        screenX: projected.x * 100,
-        screenY: projected.y * 100,
-      }
-    })
-  }
-
   /** Record the current ship position into the persistent sampled world line. */
   private recordWorldLinePoint(): void {
     if (!this.shuttleController) return
-    const orbitState = this.orbitSystem?.state ?? 'free'
-    if (!shouldRecordWorldLinePoint(orbitState, this.shuttleController.dead)) return
-
-    this.worldLineHistory = appendWorldLinePoint(
-      this.worldLineHistory,
+    this.overlayProjector.recordWorldLinePoint(
       {
-        x: this.shuttleController.position.x,
-        z: this.shuttleController.position.z,
+        orbitState: this.orbitSystem?.state ?? 'free',
+        shipX: this.shuttleController.position.x,
+        shipZ: this.shuttleController.position.z,
+        shipDead: this.shuttleController.dead,
       },
       mapOverlayData.worldLineSampleDistance,
     )
@@ -3821,146 +3541,42 @@ export class MapViewController implements Tickable {
 
   /** Reset the world line at the start of a new run and seed it with the current ship position. */
   private resetWorldLineHistory(): void {
-    this.worldLineHistory = []
-    this.recordWorldLinePoint()
+    if (!this.shuttleController) {
+      this.overlayProjector.reset(
+        { orbitState: 'free', shipX: 0, shipZ: 0, shipDead: true },
+        mapOverlayData.worldLineSampleDistance,
+      )
+      return
+    }
+    this.overlayProjector.reset(
+      {
+        orbitState: this.orbitSystem?.state ?? 'free',
+        shipX: this.shuttleController.position.x,
+        shipZ: this.shuttleController.position.z,
+        shipDead: this.shuttleController.dead,
+      },
+      mapOverlayData.worldLineSampleDistance,
+    )
   }
 
   /** Compute and emit the full map overlay state for the Vue HUD. */
   private emitMapOverlay(): void {
     if (!this.mapCamera || !this.shuttleController || !this.onMapOverlay) return
-
-    const px = this.shuttleController.position.x
-    const pz = this.shuttleController.position.z
-
-    // Build body list from Sun + planets
-    const bodies: MapBody[] = buildMapBodies({
-      sun: this.sunController,
-      planets: this.planetControllers,
-    })
-
-    // Project ship position
-    const shipScreen = this.mapCamera.projectToScreen(new THREE.Vector3(px, 0, pz))
-
-    // Project body labels with distance
-    const labels = bodies.map((b) => {
-      const screen = this.mapCamera!.projectToScreen(new THREE.Vector3(b.x, 0, b.z))
-      const dx = b.x - px
-      const dz = b.z - pz
-      const dist = Math.sqrt(dx * dx + dz * dz)
-      return {
-        id: b.id,
-        name: b.name,
-        screenX: screen.x * 100,
-        screenY: screen.y * 100,
-        distance: formatDistance(dist),
-      }
-    })
-
-    // Nearest bodies for distance lines
-    const nearest = findNearestBodies(px, pz, bodies, mapOverlayData.nearestBodyCount)
-    const distances = nearest.map((b) => {
-      const bodyScreen = this.mapCamera!.projectToScreen(new THREE.Vector3(b.x, 0, b.z))
-      return {
-        name: b.name,
-        shipX: shipScreen.x * 100,
-        shipY: shipScreen.y * 100,
-        bodyX: bodyScreen.x * 100,
-        bodyY: bodyScreen.y * 100,
-        distance: formatDistance(b.distance),
-      }
-    })
-
-    // Heading arrow — convert 3D heading (rotation.y, forward=+X) to CSS rotation degrees.
-    // On the ortho map: +X = screen-right, -Z = screen-up.
-    // CSS rotate(0deg) = up, rotate(90deg) = right.
-    // rotation.y increases CCW (top-down), CSS rotate increases CW — opposite signs.
-    const heading = this.shuttleController.heading
-    const headingDeg = 90 - (heading * 180) / Math.PI
-
-    // Gravity rings — project influence and event horizon radii to screen %
-    const gravityRings = bodies
-      .filter((b) => b.mass >= mapOverlayData.influenceMassThreshold)
-      .map((b) => {
-        const center = this.mapCamera!.projectToScreen(new THREE.Vector3(b.x, 0, b.z))
-        const infR = influenceRadius(b.mass, MAP_CONFIG.MAP_GRAVITY_CONFIG)
-        const horR = eventHorizonRadius(b.mass, MAP_CONFIG.MAP_GRAVITY_CONFIG)
-
-        // Project radius: offset point vs center to get screen-space radius
-        const edgeInf = this.mapCamera!.projectToScreen(new THREE.Vector3(b.x + infR, 0, b.z))
-        const edgeHor = this.mapCamera!.projectToScreen(new THREE.Vector3(b.x + horR, 0, b.z))
-
-        return {
-          name: b.name,
-          centerX: center.x * 100,
-          centerY: center.y * 100,
-          influenceRadius: Math.abs(edgeInf.x - center.x) * 100,
-          horizonRadius: Math.abs(edgeHor.x - center.x) * 100,
-        }
-      })
-
-    // Thermal zones — project each annular band (from ship-health boundaries) to screen %.
-    // Separate X and Z offsets are projected so the overlay can render true screen-space
-    // circles: the ortho frustum is aspect-scaled (top/bottom = ±halfSize/aspect), so a
-    // world offset along Z maps to a different percentage of the viewport height than the
-    // same offset along X does of the viewport width.
-    const thermalZones: MapThermalZone[] = this.shipHealthConfig
-      ? getThermalZoneBands(this.shipHealthConfig).map((band) => {
-          const center = this.mapCamera!.projectToScreen(new THREE.Vector3(0, 0, 0))
-          const innerEdgeX = this.mapCamera!.projectToScreen(
-            new THREE.Vector3(band.innerWorldRadius, 0, 0),
-          )
-          const innerEdgeZ = this.mapCamera!.projectToScreen(
-            new THREE.Vector3(0, 0, band.innerWorldRadius),
-          )
-          const outerEdgeX = this.mapCamera!.projectToScreen(
-            new THREE.Vector3(band.outerWorldRadius, 0, 0),
-          )
-          const outerEdgeZ = this.mapCamera!.projectToScreen(
-            new THREE.Vector3(0, 0, band.outerWorldRadius),
-          )
-          return {
-            kind: band.kind,
-            centerX: center.x * 100,
-            centerY: center.y * 100,
-            innerRadiusX: Math.abs(innerEdgeX.x - center.x) * 100,
-            innerRadiusY: Math.abs(innerEdgeZ.y - center.y) * 100,
-            outerRadiusX: Math.abs(outerEdgeX.x - center.x) * 100,
-            outerRadiusY: Math.abs(outerEdgeZ.y - center.y) * 100,
-          }
-        })
-      : []
-
-    const trajectoryPoints = this.buildWorldLineTrajectory()
-
-    let missionWaypoint: MapOverlayState['missionWaypoint'] = null
-    const boardMission = this.missionBoard.activeAsteroidMission
-    if (shouldShowAsteroidMissionMapSite(boardMission)) {
-      const wp = boardMission!.waypoint
-      const wpScreen = this.mapCamera!.projectToScreen(new THREE.Vector3(wp.worldX, 0, wp.worldZ))
-      const dx = wp.worldX - px
-      const dz = wp.worldZ - pz
-      const dist = Math.sqrt(dx * dx + dz * dz)
-      missionWaypoint = {
-        screenX: wpScreen.x * 100,
-        screenY: wpScreen.y * 100,
-        name: boardMission!.name,
-        distance: formatDistance(dist),
-      }
-    }
-
-    this.onMapOverlay({
-      visible: true,
-      labels,
-      shipX: shipScreen.x * 100,
-      shipY: shipScreen.y * 100,
-      headingDeg,
+    const state = this.overlayProjector.buildOverlayState({
+      mapCamera: this.mapCamera,
+      shipX: this.shuttleController.position.x,
+      shipZ: this.shuttleController.position.z,
+      heading: this.shuttleController.heading,
       speed: this.shuttleController.speed,
-      distances,
-      gravityRings,
-      thermalZones,
-      trajectoryPoints,
-      missionWaypoint,
+      shipDead: this.shuttleController.dead,
+      sunController: this.sunController,
+      planetControllers: this.planetControllers,
+      shipHealthConfig: this.shipHealthConfig,
+      activeAsteroidMission: this.missionBoard.activeAsteroidMission,
+      gravityConfig: MAP_CONFIG.MAP_GRAVITY_CONFIG,
+      overlayData: mapOverlayData,
     })
+    if (state) this.onMapOverlay(state)
   }
 
   /** Open the startup ship message from the centered intro CTA. */
@@ -4225,7 +3841,7 @@ export class MapViewController implements Tickable {
     // so mid-session gate-opens (e.g. accepting USC from the map-side shuttle
     // overlay) can surface their banner without requiring a fresh habitat entry.
     if (this.playerProfile.hasSeenIntro) {
-      this.journeyUiArmed = true
+      this.journeyFacade.armed = true
     }
     for (const instance of contractSystem.listInstances()) {
       if (instance.status === 'active' || instance.status === 'completed') {
@@ -4245,10 +3861,9 @@ export class MapViewController implements Tickable {
     // `journeyTrackerVisible` starts at its default (false). If the player has an
     // active journey that's already been announced (so the replays above returned
     // `changed: false` and skipped the visibility toggle), this call falls through
-    // `tryAnnounceNextJourneyStart`'s "no pending announcement" branch and flips
-    // the tracker back on. No banner fires because the journey is already in
-    // `announcedJourneyStartIds`.
-    this.tryAnnounceNextJourneyStart()
+    // the facade's "no pending announcement" branch and flips the tracker back on.
+    // No banner fires because the journey is already in `announcedJourneyStartIds`.
+    this.journeyFacade.tryAnnounceNextStart()
   }
 
   /** Dev-only: enqueue the Consortium message and start its authored special mission immediately. */
@@ -4302,26 +3917,6 @@ export class MapViewController implements Tickable {
     return index >= 0 ? (this.planetControllers[index] ?? null) : null
   }
 
-  /** Lazy-load the habitat interior scene on first entry. */
-  private async ensureHabitatScene(): Promise<HabitatInteriorScene> {
-    if (!this.habitatScene) {
-      this.habitatScene = new HabitatInteriorScene()
-      await this.habitatScene.load()
-      this.habitatScene.onInteract = (target) => {
-        if (target === 'table') {
-          uiAudio.notifyType()
-          this.notifyJourneyTrigger('shuttle_control_opened')
-          this.onShuttleControl?.(true)
-          document.exitPointerLock()
-        }
-      }
-      this.habitatScene.onPrompt = (prompt) => {
-        this.onHabitatPrompt?.(prompt)
-      }
-    }
-    return this.habitatScene
-  }
-
   /** Lazy-init the turret session controller on first T press. Reuses the EVA scene-host adapter for camera swapping. */
   private ensureTurretSessionController(): TurretSessionController {
     if (!this.turretSessionController) {
@@ -4359,273 +3954,32 @@ export class MapViewController implements Tickable {
     return this.simFrozen || this.turretSimFrozen
   }
 
-  private tickHabitatTransition(): void {
-    if (!this.sceneObjects || !this.habitatScene) return
-
-    const renderPass = this.sceneObjects.composer.passes[0] as RenderPass
-
-    const renderState = this.modeCoordinator.resolveHabitatRenderState(
-      this.habitatState.phase,
-      this.habitatState.progress,
-    )
-    if (renderState.disableVehicleControls && this.vehicleCamera) {
-      this.vehicleCamera.controls.enabled = false
-    }
-
-    if (renderState.useHabitatScene) {
-      ;(renderPass as { scene: THREE.Scene }).scene = this.habitatScene.getScene()
-      renderPass.camera = this.habitatScene.getCamera()
-
-      if (renderState.wakeUpProgress !== null) {
-        const t = renderState.wakeUpProgress
-        const cam = this.habitatScene.fpsCamera
-        const spawn = this.habitatScene.getSpawnPosition()
-        cam.yaw = spawn.yaw
-        const START_PITCH = -Math.PI / 2
-        cam.pitch = START_PITCH * (1 - t)
-        const lyingHeight = 0.5
-        const standingHeight = spawn.position.y
-        cam.camera.position.y = lyingHeight + (standingHeight - lyingHeight) * t
-        cam.tick(0)
-      }
-    }
-  }
-
-  /** Compute the fade overlay opacity based on habitat state. */
-  private getHabitatFadeOpacity(): number {
-    return this.modeCoordinator.getHabitatFadeOpacity(
-      this.habitatState.phase,
-      this.habitatState.progress,
-    )
-  }
-
-  private onEnterHabitat(): void {
-    this.onHabitatActive?.(true)
-    this.armJourneyUiFromHabitatEntry()
-    this.setEarthStartupOrbitHudSuppressed(false)
-    this.shuttleEffects?.thrusterController.setAudioEnabled(false)
-    this.shuttleAudio.notifyEnterHabitat()
-    // Request pointer lock for FPS mouse look
-    const el = this.sceneObjects?.renderer.domElement
-    if (el) {
-      el.requestPointerLock()
-      // Re-acquire pointer lock on click (e.g. after alt-tab)
-      el.addEventListener('click', this.onHabitatClick)
-    }
-  }
-
-  private onExitHabitat(): void {
-    if (!this.sceneObjects) return
-
-    this.shuttleEffects?.thrusterController.setAudioEnabled(true)
-    this.shuttleAudio.notifyExitHabitat()
-
-    // Restore map scene + camera
-    const renderPass = this.sceneObjects.composer.passes[0] as RenderPass
-    ;(renderPass as { scene: THREE.Scene }).scene = this.sceneObjects.scene
-    if (this.vehicleCamera) {
-      renderPass.camera = this.vehicleCamera.camera
-      this.vehicleCamera.controls.enabled = true
-    }
-
-    // Close doors
-    if (this.inspectMode) {
-      this.shuttleController?.toggleDoors()
-      this.inspectMode = false
-    }
-
-    this.sceneObjects?.renderer.domElement.removeEventListener('click', this.onHabitatClick)
-    document.exitPointerLock()
-    this.onShuttleControl?.(false)
-    this.onHabitatActive?.(false)
-    this.onHabitatPrompt?.(null)
-    this.setEarthStartupOrbitHudSuppressed(false)
-  }
-
-  /** Re-acquire pointer lock after losing it (e.g. alt-tab). */
-  private onHabitatClick = (): void => {
-    if (this.habitatState.phase !== 'habitat') return
-    if (document.pointerLockElement) return
-    this.sceneObjects?.renderer.domElement.requestPointerLock()
-  }
-
-  /** Feed mouse deltas to the habitat FPS camera when pointer is locked. */
-  private onHabitatMouseMove = (e: MouseEvent): void => {
-    if (this.habitatState.phase !== 'habitat' || !this.habitatScene) return
-    if (!document.pointerLockElement) return
-    this.habitatScene.fpsCamera.applyMouseDelta(e.movementX, e.movementY)
-  }
-
   /**
    * Compute compass bearings from the shuttle to all planets and the Sun.
-   * Each bearing is relative to the shuttle's current heading.
+   * Each bearing is relative to the camera view direction projected onto XZ.
    */
   private computeCompassBearings(): CompassBearing[] {
     if (!this.shuttleController || !this.vehicleCamera) return []
-    const sx = this.shuttleController.position.x
-    const sz = this.shuttleController.position.z
-
-    // Use the camera's actual world-space look direction projected onto the XZ plane.
-    // This matches what the player sees on screen regardless of camera orbit angle.
     const cam = this.vehicleCamera.camera
     const target = this.vehicleCamera.controls.target
-    const lookX = target.x - cam.position.x
-    const lookZ = target.z - cam.position.z
-    const lookLen = Math.hypot(lookX, lookZ)
-    if (lookLen < 0.0001) return []
-    const fwdX = lookX / lookLen
-    const fwdZ = lookZ / lookLen
-    // Right vector is forward rotated 90° clockwise in XZ
-    const rightX = -fwdZ
-    const rightZ = fwdX
-
-    const bearings: CompassBearing[] = []
-
-    // Compute bearing using dot products: forward component and right component
-    // atan2(right dot, forward dot) gives signed angle from camera view direction
-    const addBearing = (label: string, color: string, tx: number, tz: number) => {
-      const dx = tx - sx
-      const dz = tz - sz
-      const fwd = dx * fwdX + dz * fwdZ
-      const rgt = dx * rightX + dz * rightZ
-      bearings.push({ label, bearingRad: Math.atan2(rgt, fwd), color })
-    }
-
-    // Sun at origin
-    addBearing(COMPASS_LABELS['sun']!, '#FFF0B0', 0, 0)
-
-    // Planets
-    for (const controller of this.planetControllers) {
-      addBearing(
-        COMPASS_LABELS[controller.id] ?? controller.id.slice(0, 2).toUpperCase(),
-        controller.accentColor,
-        controller.getWorldX(),
-        controller.getWorldZ(),
-      )
-    }
-
-    return bearings
-  }
-
-  /**
-   * Multiplier applied to the map shuttle when EVA starts. The map renders the shuttle at
-   * {@link MAP_SHUTTLE_SCALE} = 0.01 world units so it reads on the solar chart; EVA needs
-   * it back at roughly 1 world unit for the tether (radius 0.028) to sit correctly against
-   * the hull. 100× drops the native scale back into the shuttle-scene regime.
-   */
-  private static readonly EVA_MAP_HUGE_SHUTTLE = 100
-
-  /**
-   * Per-poiType huge-scale factor applied to the EVA POI container during EVA only.
-   * Base `MAP_POI_*_SCALE` values in {@link three.EvaMissionPoi} are tuned so POIs sit
-   * near shuttle silhouette on the /map AU view; these factors reconstitute real EVA
-   * close-up size (~1 world unit beside the ×100 shuttle for satellites/relays,
-   * real-Hubble proportion for the telescope).
-   */
-  private static readonly EVA_MAP_HUGE_POI_BY_TYPE: Record<string, number> = {
-    satellite: 20,
-    relay_antenna: 20,
-    telescope: 20,
-  }
-
-  /** Uniform scale applied to the sun mesh during EVA so it reads as a nearby star. */
-  private static readonly EVA_MAP_HUGE_SUN = 4
-
-  /**
-   * Helmet light intensity scale during EVA on the map. Default FPS intensity is tuned
-   * for the dim level scene; on the sunlit map the helmet flashlight blows out nearby
-   * props. 0.08 keeps the visor authentic (there is *some* forward spill) without
-   * overwhelming surfaces at close range.
-   */
-  private static readonly EVA_MAP_HELMET_LIGHT_SCALE = 0.08
-
-  /**
-   * Multiplier on the EVA spawn offset. The shuttle scene uses the shuttle huge factor
-   * (ship-scale coords), but here the shuttle is only stretched back to ~1 world unit, so
-   * the default offset `(0, 2.5, 6)` is already close to correct.
-   */
-  private static readonly EVA_MAP_SPAWN_OFFSET_SCALE = 1
-
-  /**
-   * Buffer (world units) added to the POI's largest half-extent when computing the
-   * "START MAINTENANCE [F]" prompt range. Keeps the trigger tight against small
-   * satellites (~2-unit half-extent → ~4-unit trigger) while giving the ×20 telescope
-   * enough approach room without a fixed fudge factor.
-   */
-  private static readonly EVA_POI_PROMPT_BUFFER = 2
-
-  /**
-   * Bloom threshold applied while EVA is active. The map's default threshold is tuned for
-   * a 0.01-unit shuttle seen from orbit; once we scale the ship up to ~1 world unit for
-   * EVA, its TRON-emissive panels fill the screen and bloom blows out to pure white. A
-   * higher threshold clamps the bloom contribution until the player returns to the cockpit.
-   */
-  private static readonly EVA_MAP_BLOOM_THRESHOLD = 1.2
-
-  /** Bloom strength applied while EVA is active. Paired with {@link EVA_MAP_BLOOM_THRESHOLD}. */
-  private static readonly EVA_MAP_BLOOM_STRENGTH = 0.35
-
-  /** Default tactical-map bloom threshold used outside inspect / EVA / orbit mitigation. */
-  private static readonly MAP_BLOOM_THRESHOLD = 0.45
-
-  /** Default tactical-map bloom strength used outside inspect / EVA / orbit mitigation. */
-  private static readonly MAP_BLOOM_STRENGTH = 0.72
-
-  /** Inspect-mode bloom threshold. Mirrors the inspect toggle output. */
-  private static readonly MAP_INSPECT_BLOOM_THRESHOLD = 1.5
-
-  /** Inspect-mode bloom strength. Mirrors the inspect toggle output. */
-  private static readonly MAP_INSPECT_BLOOM_STRENGTH = 0.2
-
-  /** Overscale where close-up shuttle bloom mitigation begins. */
-  private static readonly ORBIT_BLOOM_CLAMP_OVERSCALE_START = 1.05
-
-  /** Overscale where close-up shuttle bloom mitigation reaches full effect. */
-  private static readonly ORBIT_BLOOM_CLAMP_OVERSCALE_END = 1.8
-
-  /** Bloom threshold used at maximum parked/orbit bloom mitigation. */
-  private static readonly ORBIT_BLOOM_CLAMP_THRESHOLD = 1.9
-
-  /** Bloom strength used at maximum parked/orbit bloom mitigation. */
-  private static readonly ORBIT_BLOOM_CLAMP_STRENGTH = 0.08
-
-  /** Camera-attached fill light intensity used outside close-up shuttle suppression. */
-  private static readonly MAP_CAMERA_LIGHT_BASE_INTENSITY = 0.28
-
-  /**
-   * Overscale value fed into {@link applyOrbitBloomClamp} while the turret session is
-   * active — past {@link ORBIT_BLOOM_CLAMP_OVERSCALE_END} so the clamp lerp saturates
-   * (max threshold, min strength, cameraLight → 0).
-   */
-  private static readonly TURRET_FORCE_CLAMP_OVERSCALE = 2
-
-  /**
-   * Snapshot and override the bloom pass while EVA is active; restore previous values on
-   * exit. Keeps the tactical-map bloom tuning intact for everything outside the EVA flow.
-   */
-  private setEvaBloomOverride(active: boolean): void {
-    const bloomPass = this.sceneObjects?.composer.passes.find(
-      (p) => p instanceof UnrealBloomPass,
-    ) as UnrealBloomPass | undefined
-    if (!bloomPass) return
-
-    if (active) {
-      if (!this.preEvaBloomState) {
-        this.preEvaBloomState = {
-          threshold: bloomPass.threshold,
-          strength: bloomPass.strength,
-        }
-      }
-      bloomPass.threshold = MapViewController.EVA_MAP_BLOOM_THRESHOLD
-      bloomPass.strength = MapViewController.EVA_MAP_BLOOM_STRENGTH
-      return
-    }
-
-    if (this.preEvaBloomState) {
-      bloomPass.threshold = this.preEvaBloomState.threshold
-      bloomPass.strength = this.preEvaBloomState.strength
-      this.preEvaBloomState = null
-    }
+    const targets: CompassTargetInput[] = [
+      { label: COMPASS_LABELS['sun']!, color: COMPASS_SUN_COLOR, x: 0, z: 0 },
+      ...this.planetControllers.map((controller) => ({
+        label: COMPASS_LABELS[controller.id] ?? controller.id.slice(0, 2).toUpperCase(),
+        color: controller.accentColor,
+        x: controller.getWorldX(),
+        z: controller.getWorldZ(),
+      })),
+    ]
+    return computeCompassBearings({
+      shipX: this.shuttleController.position.x,
+      shipZ: this.shuttleController.position.z,
+      cameraX: cam.position.x,
+      cameraZ: cam.position.z,
+      targetX: target.x,
+      targetZ: target.z,
+      targets,
+    })
   }
 
   /**
@@ -4672,56 +4026,11 @@ export class MapViewController implements Tickable {
 
   /**
    * Clamp map bloom when the constant-screen-size shuttle scaler has pushed the ship far above
-   * its baseline map size. This keeps close zooms onto the player's own hull readable in both
-   * orbit and free roam, while preserving the normal tactical-map bloom look at typical scales.
+   * its baseline map size. Thin wrapper around {@link MapBloomController.applyOrbitClamp} so
+   * call sites don't need to thread inspect mode through separately.
    */
   private applyOrbitBloomClamp(overscale: number): void {
-    if (this.evaSession?.isActive) return
-
-    const bloomPass = this.sceneObjects?.composer.passes.find(
-      (p) => p instanceof UnrealBloomPass,
-    ) as UnrealBloomPass | undefined
-    if (!bloomPass) return
-
-    const baseThreshold = this.inspectMode
-      ? MapViewController.MAP_INSPECT_BLOOM_THRESHOLD
-      : MapViewController.MAP_BLOOM_THRESHOLD
-    const baseStrength = this.inspectMode
-      ? MapViewController.MAP_INSPECT_BLOOM_STRENGTH
-      : MapViewController.MAP_BLOOM_STRENGTH
-    const cameraLight = this.sceneObjects?.cameraLight
-
-    if (overscale <= MapViewController.ORBIT_BLOOM_CLAMP_OVERSCALE_START) {
-      bloomPass.threshold = baseThreshold
-      bloomPass.strength = baseStrength
-      if (cameraLight) {
-        cameraLight.intensity = MapViewController.MAP_CAMERA_LIGHT_BASE_INTENSITY
-      }
-      return
-    }
-
-    const clampT = THREE.MathUtils.smoothstep(
-      overscale,
-      MapViewController.ORBIT_BLOOM_CLAMP_OVERSCALE_START,
-      MapViewController.ORBIT_BLOOM_CLAMP_OVERSCALE_END,
-    )
-    bloomPass.threshold = THREE.MathUtils.lerp(
-      baseThreshold,
-      MapViewController.ORBIT_BLOOM_CLAMP_THRESHOLD,
-      clampT,
-    )
-    bloomPass.strength = THREE.MathUtils.lerp(
-      baseStrength,
-      MapViewController.ORBIT_BLOOM_CLAMP_STRENGTH,
-      clampT,
-    )
-    if (cameraLight) {
-      cameraLight.intensity = THREE.MathUtils.lerp(
-        MapViewController.MAP_CAMERA_LIGHT_BASE_INTENSITY,
-        0,
-        clampT,
-      )
-    }
+    this.bloomController.applyOrbitClamp({ overscale, inspectMode: this.inspectMode })
   }
 
   /**
@@ -4762,13 +4071,13 @@ export class MapViewController implements Tickable {
    */
   private handleEvaModeChange(active: boolean): void {
     this.setOrbitLinesVisible(!active)
-    this.setEvaBloomOverride(active)
+    this.bloomController.setEvaOverride(active)
     // Mirror the active-POI huge-scale onto completed-site POI containers, so a mission
     // that finishes mid-EVA doesn't spawn its "repaired" prop at 1× while everything else
     // is at ×20 (player perceives the sat shrinking + drifting away the instant it turns
     // green). Cleared on EVA exit so completed props revert to their map-view size.
     this.missionFacade.setEvaPoiScaleByType(
-      active ? MapViewController.EVA_MAP_HUGE_POI_BY_TYPE : null,
+      active ? EVA_MAP_HUGE_POI_BY_TYPE : null,
     )
     if (!active) {
       this.missionFacade.armCompletedEvaSiteCleanup()
@@ -4912,8 +4221,8 @@ export class MapViewController implements Tickable {
       getColliders: () => this.buildEvaColliders(),
       getPoiPromptRange: () => this.evaPoiPromptRange,
       getVehicleReturnBounds: () => this.evaVehicleReturnBounds,
-      spawnOffsetScale: MapViewController.EVA_MAP_SPAWN_OFFSET_SCALE,
-      helmetLightIntensityScale: MapViewController.EVA_MAP_HELMET_LIGHT_SCALE,
+      spawnOffsetScale: EVA_MAP_SPAWN_OFFSET_SCALE,
+      helmetLightIntensityScale: EVA_MAP_HELMET_LIGHT_SCALE,
       onEvaModeChange: (active) => {
         if (active) {
           this.maybeAttachSatelliteRepair()
@@ -4945,13 +4254,13 @@ export class MapViewController implements Tickable {
     if (this.shuttleController) {
       targets.push({
         object: this.shuttleController.group,
-        factor: MapViewController.EVA_MAP_HUGE_SHUTTLE,
+        factor: EVA_MAP_HUGE_SHUTTLE,
       })
     }
     const poiGroup = this.missionFacade.getEvaPoiGroup()
     const poiType = this.missionFacade.getEvaPoiType()
     if (poiGroup && poiType) {
-      const factor = MapViewController.EVA_MAP_HUGE_POI_BY_TYPE[poiType] ?? 1
+      const factor = EVA_MAP_HUGE_POI_BY_TYPE[poiType] ?? 1
       if (factor !== 1) {
         targets.push({ object: poiGroup, factor })
       }
@@ -4959,7 +4268,7 @@ export class MapViewController implements Tickable {
     if (this.sunController) {
       targets.push({
         object: this.sunController.group,
-        factor: MapViewController.EVA_MAP_HUGE_SUN,
+        factor: EVA_MAP_HUGE_SUN,
       })
     }
     return targets
@@ -5015,7 +4324,7 @@ export class MapViewController implements Tickable {
       if (!poiBox.isEmpty()) {
         const size = poiBox.getSize(new THREE.Vector3())
         const maxHalfExtent = Math.max(size.x, size.y, size.z) * 0.5
-        this.evaPoiPromptRange = maxHalfExtent + MapViewController.EVA_POI_PROMPT_BUFFER
+        this.evaPoiPromptRange = maxHalfExtent + EVA_POI_PROMPT_BUFFER
       }
       // Skip POI collision while a satellite-servicing minigame is active so
       // deployed solar panels / antennas don't block the raycast-aim approach.
@@ -5029,11 +4338,10 @@ export class MapViewController implements Tickable {
   }
 
   dispose(): void {
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('pagehide', this.flushShuttleHullOnPageHide)
-    }
-    this.clearShuttleHullPersistTimer()
+    // Flush before dispose so the final HP write lands in the profile; dispose then removes
+    // the pagehide listener and clears any pending throttled-persist timer.
     this.flushShuttleHullToProfile()
+    this.healthFacade.dispose()
     this.unsubscribeJourneyMessageArchive?.()
     this.unsubscribeJourneyMessageArchive = null
     this.unsubscribeContractCompleted?.()
@@ -5042,7 +4350,7 @@ export class MapViewController implements Tickable {
     this.unsubscribeContractAccepted = null
     this.unsubscribeUpgradeInstalled?.()
     this.unsubscribeUpgradeInstalled = null
-    this.clearJourneyInterludeTimer()
+    this.journeyFacade.dispose()
     this.evaSession?.dispose()
     this.evaSession = null
     this.shuttleAudio.dispose()
@@ -5051,11 +4359,8 @@ export class MapViewController implements Tickable {
       this.introFacade?.dispose(this.sceneObjects.scene)
     }
     this.missionFacade.dispose(this.sceneObjects?.scene ?? null)
-    document.removeEventListener('mousemove', this.onHabitatMouseMove)
-    this.sceneObjects?.renderer.domElement.removeEventListener('click', this.onHabitatClick)
-    this.habitatScene?.dispose()
-    this.habitatScene = null
-    DevConsole.unregister('MapView')
+    this.habitatFacade.dispose()
+    unregisterMapDevCommands()
     this.onUpgradeHudRefresh = null
     this.sceneEnvironment?.dispose()
     this.sceneEnvironment = null
