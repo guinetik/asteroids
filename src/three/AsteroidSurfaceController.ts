@@ -77,14 +77,16 @@ export async function createAsteroidSurface(
     heightmap,
     dispose: () => {
       group.traverse((child) => {
-        if ((child as THREE.Mesh).geometry) {
-          ;(child as THREE.Mesh).geometry?.dispose()
+        if ('geometry' in child) {
+          (child as THREE.Mesh).geometry?.dispose()
         }
-        const material = (child as THREE.Mesh).material
-        if (Array.isArray(material)) {
-          material.forEach((m) => m.dispose())
-        } else if (material) {
-          ;(material as THREE.Material).dispose()
+        if ('material' in child) {
+          const mat = (child as THREE.Mesh).material
+          if (Array.isArray(mat)) {
+            mat.forEach((m) => m.dispose())
+          } else if (mat) {
+            (mat as THREE.Material).dispose()
+          }
         }
       })
     },
