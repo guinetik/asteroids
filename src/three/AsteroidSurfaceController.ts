@@ -9,7 +9,7 @@
  * @spec docs/superpowers/plans/2026-04-23-mesh-asteroid-terrain.md
  */
 import * as THREE from 'three'
-import { loadGLB } from './loadGLB'
+import { fixMaterials, loadGLB } from './loadGLB'
 import {
   bakeHeightmapFromMesh,
   type BakeHeightmapFromMeshOptions,
@@ -57,6 +57,10 @@ export async function createAsteroidSurface(
   if (options.scale !== undefined && options.scale !== 1) {
     scene.scale.setScalar(options.scale)
   }
+  // Fix common GLB material issues (double-sided rendering, cap specular + env
+  // map intensity so the baked baseColor/normal textures aren't washed out by
+  // the scene environment map).
+  fixMaterials(scene)
   // Shadow flags mirror the old TerrainMesh defaults.
   scene.traverse((child) => {
     if ((child as THREE.Mesh).isMesh) {

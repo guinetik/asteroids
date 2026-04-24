@@ -669,12 +669,6 @@ export class LevelViewController implements Tickable {
     this.asteroidName = asteroid.name
 
     // ── Asteroid surface (GLB-backed) ───────────────────────────
-    // `flatZones` is still used for rock-spawn exclusions around objective sites.
-    const flatZones: FlatZone[] = mission.objectives.map((obj) => ({
-      x: obj.x,
-      z: obj.z,
-      radius: FLAT_ZONE_RADIUS,
-    }))
     this.asteroidSurface = await createAsteroidSurface({
       modelPath: asteroid.surface.modelPath,
       scale: asteroid.surface.modelScale,
@@ -687,6 +681,23 @@ export class LevelViewController implements Tickable {
     this.heightmap = this.asteroidSurface.heightmap
     this.collisionWorld = new CollisionWorld(this.heightmap)
     this.sceneManager.addToScene(this.asteroidSurface.group)
+
+    // Snap each objective onto the baked mesh before any downstream consumer
+    // reads its coordinates — mission-generator flat zones can land on void
+    // cells near the asteroid silhouette. Mutating here ensures minigame
+    // spawners, waypoint markers, and rock-exclusion zones all see the
+    // corrected positions.
+    for (const obj of mission.objectives) {
+      this.snapObjectiveToSurface(obj)
+    }
+
+    // `flatZones` is used for rock-spawn exclusions around objective sites —
+    // built after snap so exclusions match the actual waypoint locations.
+    const flatZones: FlatZone[] = mission.objectives.map((obj) => ({
+      x: obj.x,
+      z: obj.z,
+      radius: FLAT_ZONE_RADIUS,
+    }))
 
     // Pick a spawn cell that actually sits on the baked mesh — critical on GLB
     // terrain where most of the play area is void. Falls back to origin if the
@@ -715,10 +726,13 @@ export class LevelViewController implements Tickable {
     }
 
     // ── Objective waypoint markers ──────────────────────────────
+    // Objectives have already been snapped to valid surface above, so the
+    // baked ground Y is guaranteed to be a real surface hit, not the void
+    // sentinel.
     for (let i = 0; i < mission.objectives.length; i++) {
       const obj = mission.objectives[i]!
-      const groundY = this.heightmap.heightAt(obj.x, obj.z)
-      addWaypointMarker(`obj-${i}`, obj.x, obj.z, groundY, this.sceneManager!.scene)
+      const objectiveGroundY = this.heightmap.heightAt(obj.x, obj.z)
+      addWaypointMarker(`obj-${i}`, obj.x, obj.z, objectiveGroundY, this.sceneManager!.scene)
     }
 
     // ── Minimap canvas ─────────────────────────────────────────
@@ -2647,6 +2661,32 @@ export class LevelViewController implements Tickable {
     const edgeTerrainY = this.heightmap.heightAt(clampedX, clampedZ)
 
     return landerPos.y < edgeTerrainY - ADRIFT_DEPTH_MARGIN
+  }
+
+  /**
+   * Pull an objective's (x, z) toward origin until it sits on a valid baked
+   * surface cell. Mutates the objective in place so every downstream consumer
+   * (minigame spawners, waypoint markers, exclusion zones) sees the corrected
+   * position. No-op when the starting position is already valid.
+   */
+  private snapObjectiveToSurface(obj: { x: number; z: number }): void {
+    const hm = this.heightmap
+    if (!hm) return
+    if (hm.isValidAt(obj.x, obj.z)) return
+    let factor = 0.9
+    for (let i = 0; i < 12; i++) {
+      const x = obj.x * factor
+      const z = obj.z * factor
+      if (hm.isValidAt(x, z)) {
+        obj.x = x
+        obj.z = z
+        return
+      }
+      factor *= 0.9
+    }
+    // Fallback: place on the asteroid centre.
+    obj.x = 0
+    obj.z = 0
   }
 
   /**
