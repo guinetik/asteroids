@@ -60,6 +60,14 @@ export interface SurfaceFeatures {
    * the level's play area. Defaults to 1 when omitted.
    */
   modelScale?: number
+  /**
+   * Optional albedo texture URL applied to every mesh in the asteroid GLB,
+   * overriding whatever baseColor map was embedded. The GLB's normal and
+   * roughness maps are preserved so surface relief still reads. Lets each
+   * asteroid JSON swap its look (e.g. `/texture.jpg`, `/textures/rocks/basalt.jpg`)
+   * without touching the shared GLB.
+   */
+  texturePath?: string
 }
 
 /** PBR material properties derived from real spectral data. Colors are RGB normalized 0–1. */

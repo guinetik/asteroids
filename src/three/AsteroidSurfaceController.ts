@@ -27,6 +27,13 @@ export interface AsteroidSurfaceControllerOptions {
   bake: BakeHeightmapFromMeshOptions
   /** Uniform scale applied to the loaded model before baking. Default 1. */
   scale?: number
+  /**
+   * Optional albedo texture URL. When provided, overrides the GLB's embedded
+   * baseColor map on every mesh so each asteroid can have its own look while
+   * sharing one GLB. The GLB's normal / roughness / metallic maps are kept
+   * intact so surface relief still reads.
+   */
+  texturePath?: string
 }
 
 /** Result bundle from {@link createAsteroidSurface}. */
@@ -61,6 +68,31 @@ export async function createAsteroidSurface(
   // map intensity so the baked baseColor/normal textures aren't washed out by
   // the scene environment map).
   fixMaterials(scene)
+
+  // Optionally override the GLB's embedded baseColor map so each asteroid can
+  // have its own look. Normal / roughness stay intact so surface relief reads.
+  let overrideMap: THREE.Texture | null = null
+  if (options.texturePath) {
+    overrideMap = new THREE.TextureLoader().load(options.texturePath)
+    overrideMap.colorSpace = THREE.SRGBColorSpace
+    overrideMap.wrapS = THREE.RepeatWrapping
+    overrideMap.wrapT = THREE.RepeatWrapping
+    scene.traverse((child) => {
+      if (!(child as THREE.Mesh).isMesh) return
+      const material = (child as THREE.Mesh).material
+      const materials = Array.isArray(material) ? material : [material]
+      for (const mat of materials) {
+        if (!(mat instanceof THREE.MeshStandardMaterial)) continue
+        // Dispose the GLB's embedded baseColor — we're replacing it.
+        mat.map?.dispose()
+        mat.map = overrideMap
+        // Neutralise any baked-in tint so the texture renders true to source.
+        mat.color.setRGB(1, 1, 1)
+        mat.needsUpdate = true
+      }
+    })
+  }
+
   // Shadow flags mirror the old TerrainMesh defaults.
   scene.traverse((child) => {
     if ((child as THREE.Mesh).isMesh) {
@@ -93,6 +125,7 @@ export async function createAsteroidSurface(
           }
         }
       })
+      overrideMap?.dispose()
     },
   }
 }

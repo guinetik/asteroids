@@ -27,7 +27,8 @@
     "roughness": 0.8,
     "dustCoverage": 0.1,
     "modelPath": "/models/asteroid.glb",
-    "modelScale": 1300
+    "modelScale": 1300,
+    "texturePath": "/texture.jpg"
   },
   "visual": {
     "albedo": 0.09,

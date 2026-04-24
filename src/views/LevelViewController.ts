@@ -691,6 +691,7 @@ export class LevelViewController implements Tickable {
     this.asteroidSurface = await createAsteroidSurface({
       modelPath: asteroid.surface.modelPath,
       scale: asteroid.surface.modelScale,
+      texturePath: asteroid.surface.texturePath,
       bake: {
         resolution: TERRAIN_RESOLUTION,
         worldSize: LEVEL_GRID_SIZE,
