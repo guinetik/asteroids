@@ -720,7 +720,6 @@ export class MapViewController implements Tickable {
       ? this.ensureMinimumStarterFuelCells(this.applyCargoBayLimits(savedInventory))
       : this.inventoryWithStarterFuelCells(emptyHold)
     this.persistPlayerProfile()
-    this.replayAct1JourneyTriggers()
     this.emitFuelCellCount()
     this.tickHandler = new TickHandler()
     this.tickHandler.register(this.inputManager, TICK_PRIORITY_INPUT)
@@ -763,7 +762,6 @@ export class MapViewController implements Tickable {
     MapIntroFacade.preload()
     this.applyInitialSpaceFabricVisibilityFromUpgrades()
     this.emitMapViewLayerToggles()
-    this.emitJourneyTracker()
 
     this.gravitationalEventManager = new GravitationalEventManager({
       worldHalfExtent: this.mapGridSize / 2,
@@ -1255,6 +1253,15 @@ export class MapViewController implements Tickable {
     })
 
     this.missionFacade.hydrateFromStorage(this.onMissionBoardUpdate)
+    /**
+     * Act 1 climax staging must run *after* {@link MapMissionFacade.hydrateFromStorage}.
+     * If `replayAct1JourneyTriggers` runs earlier, `maybeStageAct1Climax` writes the
+     * consortium run to `saveActiveMission` only; hydration then loads a stale full
+     * board (without the active asteroid) and calls `clearActiveMission`, leaving
+     * the shuttle "Active Missions" empty after refresh.
+     */
+    this.replayAct1JourneyTriggers()
+    this.emitJourneyTracker()
     this.onCreditsUpdate?.(this.playerProfile.credits)
 
     this.gameLoop = new GameLoop(this.tickHandler)
@@ -4167,6 +4174,7 @@ export class MapViewController implements Tickable {
       activeAsteroidMission: acceptedMission,
     }
     saveActiveMission(acceptedMission)
+    saveMissionBoard(this.missionBoard)
     this.onMissionBoardUpdate?.(this.missionBoard)
   }
 
@@ -4175,6 +4183,10 @@ export class MapViewController implements Tickable {
    * acquired (or started acquiring) gravity surfing, stage the Consortium message
    * and active asteroid mission. Guarded on derived state only — idempotent across
    * repeat calls. Intended to be invoked after each `contract_completed` event.
+   *
+   * If the player already has the **Grid Coupling Module** in the shuttle hold, the
+   * pickup run is done — do not re-post the same mission (otherwise every map load
+   * after exfil re-spawns the belt waypoint and asteroid until the install step).
    */
   private maybeStageAct1Climax(): void {
     for (const id of ACT_1_CONTRACT_IDS) {
@@ -4184,6 +4196,10 @@ export class MapViewController implements Tickable {
 
     const gravitySurfingLevel = CURRENT_PLAYER_UPGRADE_LEVELS.gravitySurfing ?? 0
     if (gravitySurfingLevel >= 1) return
+
+    const hasGridCoupling =
+      (getStack(this.playerInventory, 'grid-coupling-module')?.quantity ?? 0) > 0
+    if (hasGridCoupling) return
 
     const activeMissionId = this.missionBoard.activeAsteroidMission?.id
     if (activeMissionId === 'consortium-certification') return

@@ -71,11 +71,11 @@ export function persistCompletedAsteroidMissionRewards(
   })
 
   const board = loadMissionBoard()
-  if (board?.activeAsteroidMission?.id === mission.id) {
-    saveMissionBoard({
-      ...board,
-      activeAsteroidMission: null,
-    })
+  if (board) {
+    const active = board.activeAsteroidMission
+    if (active == null || active.id === mission.id) {
+      saveMissionBoard({ ...board, activeAsteroidMission: null })
+    }
   }
 
   clearActiveMission()

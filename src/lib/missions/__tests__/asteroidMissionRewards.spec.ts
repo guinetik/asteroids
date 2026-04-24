@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { persistCompletedAsteroidMissionRewards } from '../asteroidMissionRewards'
-import { ACTIVE_MISSION_KEY, PENDING_MAP_RETURN_WORLD_KEY } from '../missionStorage'
+import { createMissionBoard } from '../shuttleMissionSession'
+import {
+  ACTIVE_MISSION_KEY,
+  MISSION_BOARD_KEY,
+  PENDING_MAP_RETURN_WORLD_KEY,
+} from '../missionStorage'
 import { PROFILE_STORAGE_KEY, loadProfile, createProfile, saveProfile } from '@/lib/player/profile'
 import { loadInventory } from '@/lib/inventory/inventoryStorage'
 import type { GeneratedAsteroidMission } from '../types'
@@ -59,6 +64,19 @@ describe('persistCompletedAsteroidMissionRewards', () => {
     localStorage.removeItem(PROFILE_STORAGE_KEY)
     persistCompletedAsteroidMissionRewards(BASE_MISSION, 1)
     expect(localStorage.getItem(ACTIVE_MISSION_KEY)).toBeNull()
+  })
+
+  it('clears full mission board when active slot is already null (matches completed mission id)', () => {
+    const board = createMissionBoard()
+    localStorage.setItem(
+      MISSION_BOARD_KEY,
+      JSON.stringify({ board, savedAt: Date.now() }),
+    )
+    persistCompletedAsteroidMissionRewards(BASE_MISSION, 1)
+    const raw = localStorage.getItem(MISSION_BOARD_KEY)
+    expect(raw).toBeTruthy()
+    const parsed = JSON.parse(raw!) as { board: { activeAsteroidMission: unknown } }
+    expect(parsed.board.activeAsteroidMission).toBeNull()
   })
 
   it('adds collect rewards to shuttle inventory', () => {
