@@ -31,8 +31,7 @@ import { VehicleCamera, LANDER_CAMERA_CONFIG } from '@/three/VehicleCamera'
 import { LanderController } from '@/three/LanderController'
 import { FpsPlayerController } from '@/three/FpsPlayerController'
 import { FpsCamera } from '@/three/FpsCamera'
-import { TerrainMesh } from '@/three/TerrainMesh'
-import { generateTerrain, FLAT_ZONE_RADIUS } from '@/lib/terrain/terrainGenerator'
+import { FLAT_ZONE_RADIUS } from '@/lib/terrain/terrainGenerator'
 import type { FlatZone } from '@/lib/terrain/terrainGenerator'
 import { getAsteroidById, ASTEROID_CATALOG } from '@/lib/asteroids/catalog'
 import type { AsteroidDefinition } from '@/lib/asteroids/types'
@@ -46,6 +45,7 @@ import { Heightmap } from '@/lib/terrain/heightmap'
 import { MultiToolController } from '@/three/MultiToolController'
 import { MultiToolState } from '@/lib/fps/multiToolState'
 import { CollisionWorld } from '@/lib/physics/worldCollision'
+import { createAsteroidSurface, type AsteroidSurfaceControllerResult } from '@/three/AsteroidSurfaceController'
 import type { LanderTelemetry } from '@/components/LanderHud.vue'
 import type { FpsTelemetry, CompassObjective, RockTargetInfo } from '@/components/FpsHud.vue'
 import { headingRadToCompassDeg, worldBearingDegTo, signedRelativeBearingDeg } from '@/lib/math/bearing'
@@ -108,6 +108,8 @@ const VIROID_DROP_ITEM_ID = 'viroid-psychosphere'
 
 // ── Scene constants ─────────────────────────────────────────────
 const TERRAIN_RESOLUTION = 512
+/** Y altitude from which bake rays start. Must sit above any asteroid geometry. */
+const TERRAIN_BAKE_START_ALTITUDE = 5000
 
 const LANDER_SPAWN_HEIGHT = 700
 
@@ -341,7 +343,7 @@ export class LevelViewController implements Tickable {
   private inputManager: InputManager | null = null
   private sceneManager: SceneManager | null = null
   private heightmap: Heightmap | null = null
-  private terrainMesh: TerrainMesh | null = null
+  private asteroidSurface: AsteroidSurfaceControllerResult | null = null
   private surfaceRocks: SurfaceRockController | null = null
   private collisionWorld: CollisionWorld | null = null
   private readonly collisionCleanup: Array<() => void> = []
@@ -654,26 +656,24 @@ export class LevelViewController implements Tickable {
     const spawnX = (Math.random() - 0.5) * 2 * SPAWN_POSITION_RANGE + LANDER_SPAWN_LIGHT_ALIGNMENT_X
     const spawnZ = (Math.random() - 0.5) * 2 * SPAWN_POSITION_RANGE
 
-    // ── Terrain ─────────────────────────────────────────────────
-    const flat = new URLSearchParams(window.location.search).has('flat')
+    // ── Asteroid surface (GLB-backed) ───────────────────────────
+    // `flatZones` is still computed for downstream consumers (waypoints, rock exclusions).
     const flatZones: FlatZone[] = mission.objectives.map((obj) => ({
       x: obj.x,
       z: obj.z,
       radius: FLAT_ZONE_RADIUS,
     }))
-    this.heightmap = flat
-      ? new Heightmap(TERRAIN_RESOLUTION, LEVEL_GRID_SIZE)
-      : generateTerrain(asteroid.surface, {
-          seed,
-          resolution: TERRAIN_RESOLUTION,
-          worldSize: LEVEL_GRID_SIZE,
-          flatZones,
-          biome: asteroid.biome,
-        })
-    this.terrainMesh = new TerrainMesh(this.heightmap)
+    this.asteroidSurface = await createAsteroidSurface({
+      modelPath: asteroid.surface.modelPath,
+      bake: {
+        resolution: TERRAIN_RESOLUTION,
+        worldSize: LEVEL_GRID_SIZE,
+        rayStartAltitude: TERRAIN_BAKE_START_ALTITUDE,
+      },
+    })
+    this.heightmap = this.asteroidSurface.heightmap
     this.collisionWorld = new CollisionWorld(this.heightmap)
-    this.sceneManager.addToScene(this.terrainMesh.mesh)
-    this.terrainMesh.mesh.receiveShadow = true
+    this.sceneManager.addToScene(this.asteroidSurface.group)
 
     this.surfaceRocks = await SurfaceRockController.create({
       heightmap: this.heightmap,
@@ -2858,7 +2858,7 @@ export class LevelViewController implements Tickable {
     this.landerExplosion?.dispose()
     this.landerController?.dispose()
     this.surfaceRocks?.dispose()
-    this.terrainMesh?.dispose()
+    this.asteroidSurface?.dispose()
     this.thrusterWash?.dispose()
     this.surfaceDust?.dispose()
     this.lightingRig?.dispose()

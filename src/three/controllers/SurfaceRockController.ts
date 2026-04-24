@@ -400,6 +400,7 @@ export class SurfaceRockController implements Tickable {
       surface: options.surface,
       exclusions: options.exclusions,
       slopeAt: (x, z) => options.heightmap.slopeAt(x, z),
+      isValidGround: (x, z) => options.heightmap.isValidAt(x, z),
     })
 
     const controller = new SurfaceRockController(spawns)
