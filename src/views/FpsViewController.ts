@@ -46,6 +46,7 @@ import { EnemyProjectileMeshPool } from '@/three/EnemyProjectileMeshPool'
 import { FpsHostageController } from '@/three/FpsHostageController'
 import { VirusModel } from '@/three/VirusModel'
 import { FpsAudioDirector } from '@/audio/FpsAudioDirector'
+import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
 import {
   computeKnockbackAwayFromSource,
   computeRelativeDamageAngle,
@@ -155,9 +156,7 @@ export class FpsViewController implements Tickable {
   private fpsHostageController: FpsHostageController | null = null
   /** GLB props from `?viruses` — disposed on teardown. */
   private readonly debugVirusModels: VirusModel[] = []
-  private leftMouseDown = false
-  private leftMouseJustPressed = false
-  private rightMouseDown = false
+  private readonly pointerLock = new FpsPointerLockSession()
 
   /** Called each frame with player telemetry for HUD display. */
   onTelemetry: ((telemetry: FpsTelemetry) => void) | null = null
@@ -571,10 +570,12 @@ export class FpsViewController implements Tickable {
       if (this.inputManager.wasActionPressed('toolHeal')) this.multiToolState.setMode('heal')
 
       // Feed mouse state + speed to tool
-      this.multiToolState.setAiming(this.rightMouseDown)
-      this.multiToolState.setInput(this.leftMouseDown, this.leftMouseJustPressed)
+      this.multiToolState.setAiming(this.pointerLock.isRightMouseDown)
+      this.multiToolState.setInput(
+        this.pointerLock.isLeftMouseDown,
+        this.pointerLock.consumeLeftMouseJustPressed(),
+      )
       this.multiToolState.setSpeed(this.playerController?.speed ?? 0)
-      this.leftMouseJustPressed = false
     }
 
     // --- Sync tool visuals ---
@@ -860,60 +861,20 @@ export class FpsViewController implements Tickable {
 
   /** Request pointer lock on the renderer canvas. */
   requestPointerLock(): void {
-    this.sceneManager?.renderer.domElement.requestPointerLock()
+    this.pointerLock.requestLock()
   }
 
   private setupPointerLock(): void {
     const canvas = this.sceneManager!.renderer.domElement
-
-    // Mouse move → camera look
-    const onMouseMove = (e: MouseEvent): void => {
-      if (document.pointerLockElement === canvas) {
-        this.fpsCamera?.applyMouseDelta(e.movementX, e.movementY)
-      }
-    }
-    document.addEventListener('mousemove', onMouseMove)
-
-    // Mouse buttons → tool state
-    const onMouseDown = (e: MouseEvent): void => {
-      if (document.pointerLockElement !== canvas) return
-      if (e.button === 0) {
-        this.leftMouseDown = true
-        this.leftMouseJustPressed = true
-      }
-      if (e.button === 2) this.rightMouseDown = true
-    }
-    const onMouseUp = (e: MouseEvent): void => {
-      if (e.button === 0) this.leftMouseDown = false
-      if (e.button === 2) this.rightMouseDown = false
-    }
-    document.addEventListener('mousedown', onMouseDown)
-    document.addEventListener('mouseup', onMouseUp)
-
-    // Prevent context menu on right-click
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault())
-
-    // Pointer lock change — reset mouse state on unlock
-    const onLockChange = (): void => {
-      const locked = document.pointerLockElement === canvas
-      if (!locked) {
-        this.leftMouseDown = false
-        this.leftMouseJustPressed = false
-        this.rightMouseDown = false
-      }
-      this.onPointerLockChange?.(locked)
-    }
-    document.addEventListener('pointerlockchange', onLockChange)
-
-    // Click to lock
-    canvas.addEventListener('click', () => {
-      if (document.pointerLockElement !== canvas) {
-        canvas.requestPointerLock()
-      }
+    this.pointerLock.attach(canvas, {
+      onMouseDelta: (movementX, movementY) => {
+        this.fpsCamera?.applyMouseDelta(movementX, movementY)
+      },
+      onLockChange: (locked) => {
+        this.onPointerLockChange?.(locked)
+      },
     })
-
-    // Auto-lock
-    canvas.requestPointerLock()
+    this.pointerLock.requestLock()
   }
 
   dispose(): void {
@@ -942,6 +903,8 @@ export class FpsViewController implements Tickable {
     this.playerController?.dispose()
     this.fpsCamera?.dispose()
     this.terrainGrid?.dispose()
+    this.pointerLock.releaseLock()
+    this.pointerLock.detach()
     this.sceneManager?.dispose()
     this.inputManager?.dispose()
     this.fpsAudio.dispose()
