@@ -657,7 +657,7 @@ export class LevelViewController implements Tickable {
     const spawnZ = (Math.random() - 0.5) * 2 * SPAWN_POSITION_RANGE
 
     // ── Asteroid surface (GLB-backed) ───────────────────────────
-    // `flatZones` is still computed for downstream consumers (waypoints, rock exclusions).
+    // `flatZones` is still used for rock-spawn exclusions around objective sites.
     const flatZones: FlatZone[] = mission.objectives.map((obj) => ({
       x: obj.x,
       z: obj.z,
