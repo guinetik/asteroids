@@ -52,6 +52,19 @@ export interface VehicleCameraConfig {
   dampingFactor?: number
   /** When true, keep OrbitControls drag momentum after pointer release. */
   preserveDragInertia?: boolean
+  /**
+   * OrbitControls max polar angle (radians, 0 = straight up, PI = straight down).
+   * Defaults to PI (no clamp). Setting it just under PI lets the player orbit
+   * nearly below the target (looking straight up through it) without the view
+   * flipping over. Tight verticality gameplay — tiny asteroid with shuttle
+   * overhead — benefits from values around `Math.PI * 0.95`.
+   */
+  maxPolarAngle?: number
+  /**
+   * OrbitControls min polar angle (radians). Defaults to 0 (straight up).
+   * Raising it prevents looking straight down onto the target's crown.
+   */
+  minPolarAngle?: number
 }
 
 /**
@@ -93,21 +106,20 @@ export const SHUTTLE_CAMERA_CONFIG: VehicleCameraConfig = {
 /**
  * Lander preset: in front (stairs side), higher angle.
  *
- * Uses {@link VehicleCameraConfig.minYRelativeToTarget} instead of an absolute
- * world floor so the camera follows the lander down into craters. The previous
- * `minY: 5` clamp pinned the camera above the world while the lander sank,
- * producing an extreme look-down angle and an apparent zoom-out. `-8` lets
- * the player orbit a small amount below the lander while still preventing the
- * camera from flipping past it.
+ * No vertical clamp — GLB-backed asteroid terrain makes the level heavily
+ * vertical (shuttle overhead, tiny rock underfoot), and the player needs to
+ * orbit nearly straight down under the lander to look up at the shuttle or
+ * the sky. Flip-past protection comes from {@link VehicleCameraConfig.maxPolarAngle}
+ * instead of a Y floor. Previous `-8` Y clamp made it impossible to look up.
  */
 export const LANDER_CAMERA_CONFIG: VehicleCameraConfig = {
   idleOffset: new THREE.Vector3(60, 40, 0),
   lerpSpeed: 5,
   idleTimeout: 1.0,
   minY: -Infinity,
-  minYRelativeToTarget: -8,
   fov: 60,
   maxDistance: 145,
+  maxPolarAngle: Math.PI * 0.96,
 }
 
 /** Map preset: same proportions as shuttle cam, scaled for ~0.14 unit ship. */
@@ -258,6 +270,12 @@ export class VehicleCamera implements Tickable {
     this.controls.dampingFactor = config.dampingFactor ?? 0.1
     this.controls.minDistance = config.minDistance ?? 0
     this.controls.maxDistance = config.maxDistance ?? Infinity
+    if (config.maxPolarAngle !== undefined) {
+      this.controls.maxPolarAngle = config.maxPolarAngle
+    }
+    if (config.minPolarAngle !== undefined) {
+      this.controls.minPolarAngle = config.minPolarAngle
+    }
 
     this.controls.addEventListener('start', this.onControlStart)
     this.controls.addEventListener('end', this.onControlEnd)
