@@ -34,6 +34,13 @@ export interface AsteroidSurfaceControllerOptions {
    * intact so surface relief still reads.
    */
   texturePath?: string
+  /**
+   * Optional Euler rotation (radians, XYZ order) applied to the asteroid
+   * BEFORE the bake. Lets callers pick a different "up" face per mission via
+   * a seeded rotation lottery so missions on the same GLB don't all land on
+   * the same slice of rock.
+   */
+  rotation?: { x: number; y: number; z: number }
 }
 
 /** Result bundle from {@link createAsteroidSurface}. */
@@ -61,6 +68,9 @@ export async function createAsteroidSurface(
 
   const group = new THREE.Group()
   group.name = 'asteroidSurface'
+  if (options.rotation) {
+    scene.rotation.set(options.rotation.x, options.rotation.y, options.rotation.z)
+  }
   if (options.scale !== undefined && options.scale !== 1) {
     scene.scale.setScalar(options.scale)
   }

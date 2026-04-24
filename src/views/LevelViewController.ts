@@ -273,6 +273,29 @@ function hashSeed(str: string): number {
   return Math.abs(hash)
 }
 
+/**
+ * Pick a deterministic Euler rotation from a numeric seed. Used so each
+ * mission's asteroid GLB lands in a different orientation — a different
+ * slice of rock becomes the play surface, without the level re-rolling
+ * the look on retry.
+ *
+ * @param seed - Mission seed (output of {@link hashSeed}).
+ * @returns XYZ Euler rotation in radians, each axis uniform in [0, 2π).
+ */
+function rotationFromSeed(seed: number): { x: number; y: number; z: number } {
+  // Mulberry32 — tiny, good distribution, deterministic.
+  let s = (seed ^ 0x9e3779b9) >>> 0
+  const next = (): number => {
+    s = (s + 0x6d2b79f5) >>> 0
+    let t = s
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+  const tau = Math.PI * 2
+  return { x: next() * tau, y: next() * tau, z: next() * tau }
+}
+
 /** Applies the gameplay spawn offset so the lander clears the portal geometry. */
 function offsetGameplayLanderSpawn(position: Vector3): Vector3 {
   return position.clone().add(new Vector3(
@@ -688,10 +711,15 @@ export class LevelViewController implements Tickable {
     this.asteroidName = asteroid.name
 
     // ── Asteroid surface (GLB-backed) ───────────────────────────
+    // Rotation lottery — seeded random Euler so the same mission always
+    // lands on the same face but different missions pick different slices
+    // of rock as "up". Applied BEFORE the bake so the heightmap / flatten
+    // pipeline all see the rotated geometry.
     this.asteroidSurface = await createAsteroidSurface({
       modelPath: asteroid.surface.modelPath,
       scale: asteroid.surface.modelScale,
       texturePath: asteroid.surface.texturePath,
+      rotation: rotationFromSeed(seed),
       bake: {
         resolution: TERRAIN_RESOLUTION,
         worldSize: LEVEL_GRID_SIZE,
