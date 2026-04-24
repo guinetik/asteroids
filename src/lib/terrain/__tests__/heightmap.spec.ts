@@ -76,5 +76,12 @@ describe('Heightmap', () => {
       const hm = new Heightmap(4, 100)
       expect(hm.isValidAt(9999, 9999)).toBe(false)
     })
+
+    it('setValid ignores out-of-bounds grid coordinates without throwing', () => {
+      const hm = new Heightmap(4, 100)
+      expect(() => hm.setValid(-1, 0, false)).not.toThrow()
+      expect(() => hm.setValid(4, 0, false)).not.toThrow()
+      expect(hm.isValid(0, 0)).toBe(true) // array was not corrupted
+    })
   })
 })
