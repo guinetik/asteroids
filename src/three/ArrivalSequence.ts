@@ -80,8 +80,8 @@ export const EXFIL_SEQUENCE_DURATION =
 const APPROACH_START_DISTANCE = 2000
 /** Shuttle stops this far from the lander spawn point. */
 const APPROACH_END_DISTANCE = 60
-/** Shuttle approach altitude (Y). */
-const APPROACH_ALTITUDE = 800
+/** Shuttle approach altitude measured ABOVE the landing point's ground Y. */
+const APPROACH_ALTITUDE_OFFSET = 800
 /** Shuttle scale during the cinematic approach (small, seen from distance). */
 const SHUTTLE_CINEMATIC_SCALE = 1.0
 
@@ -93,8 +93,8 @@ const SHUTTLE_CINEMATIC_SCALE = 1.0
  */
 const SHUTTLE_PARKED_SCALE = 15
 
-/** Absolute Y altitude for the parked shuttle (above lander spawn height of 600). */
-const LANDER_PARK_ALTITUDE = 875
+/** Parked shuttle altitude measured ABOVE the landing point's ground Y. */
+const LANDER_PARK_ALTITUDE_OFFSET = 875
 
 /** Centerline exfil floodlight so the parked shuttle reads from the ground. */
 const EXFIL_FLOODLIGHT_COLOR = 0xf4f7ff
@@ -201,12 +201,12 @@ export class ArrivalSequence {
 
     this.shuttleEndPos.set(
       landerSpawnTarget.x,
-      APPROACH_ALTITUDE,
+      landerSpawnTarget.y + APPROACH_ALTITUDE_OFFSET,
       landerSpawnTarget.z - APPROACH_END_DISTANCE,
     )
     this.shuttleStartPos.set(
       landerSpawnTarget.x,
-      APPROACH_ALTITUDE,
+      landerSpawnTarget.y + APPROACH_ALTITUDE_OFFSET,
       landerSpawnTarget.z - APPROACH_START_DISTANCE,
     )
     this.shuttleGroup.position.copy(this.shuttleStartPos)
@@ -412,7 +412,7 @@ export class ArrivalSequence {
     // Must be high enough to clear terrain AND be above the lander at all times.
     this.shuttleGroup.position.set(
       this.landerSpawnTarget.x,
-      LANDER_PARK_ALTITUDE,
+      this.landerSpawnTarget.y + LANDER_PARK_ALTITUDE_OFFSET,
       this.landerSpawnTarget.z,
     )
     // Flipped upside down — cargo bay faces the asteroid surface, doors open
