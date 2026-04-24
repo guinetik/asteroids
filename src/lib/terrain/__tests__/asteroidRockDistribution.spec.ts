@@ -82,4 +82,18 @@ describe('generateAsteroidRockDistribution', () => {
 
     expect(dense.length).toBeGreaterThan(sparse.length)
   })
+
+  it('rejects rocks whose position is off-surface', () => {
+    // Treat positive-X half of the world as off-surface.
+    const rocks = generateAsteroidRockDistribution({
+      seed: 13,
+      worldSize: 8000,
+      surface: SURFACE,
+      isValidGround: (x) => x <= 0,
+    })
+    expect(rocks.length).toBeGreaterThan(0)
+    for (const rock of rocks) {
+      expect(rock.x).toBeLessThanOrEqual(0)
+    }
+  })
 })

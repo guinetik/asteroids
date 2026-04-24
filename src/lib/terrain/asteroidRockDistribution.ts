@@ -43,6 +43,12 @@ export interface AsteroidRockDistributionOptions {
   surface: SurfaceFeatures
   exclusions?: readonly RockExclusionZone[]
   slopeAt?: (x: number, z: number) => number
+  /**
+   * Whether the given world coordinate is on real surface. When provided, rocks
+   * sampled to an invalid cell are rejected before any other check — ensures
+   * mesh-backed asteroid terrain doesn't spawn rocks floating in the void.
+   */
+  isValidGround?: (x: number, z: number) => boolean
 }
 
 const REFERENCE_WORLD_SIZE = 8000
@@ -206,7 +212,7 @@ function overlapsExisting(
 export function generateAsteroidRockDistribution(
   options: AsteroidRockDistributionOptions,
 ): AsteroidRockSpawn[] {
-  const { seed, worldSize, surface, slopeAt } = options
+  const { seed, worldSize, surface, slopeAt, isValidGround } = options
   const exclusions = options.exclusions ?? []
   const rng = seededRandom(seed + 4813)
   const noise = new SimplexNoise(seed + 777)
@@ -239,6 +245,7 @@ export function generateAsteroidRockDistribution(
     }
 
     const radius = diameter * 0.5
+    if (isValidGround && !isValidGround(x, z)) continue
     if (isInsideExclusion(x, z, radius, exclusions)) continue
     if (slopeAt && slopeAt(x, z) > maxSlope) continue
     if (overlapsExisting(x, z, radius, accepted)) continue
