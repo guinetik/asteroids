@@ -130,6 +130,17 @@ const SPAWN_POSITION_RANGE = 500
 
 /** Attempts used by {@link sampleSpawnOnSurface} before falling back to origin. */
 const SPAWN_SAMPLE_ATTEMPTS = 32
+
+/** Minimum radial distance from the ship spawn at which objectives can land. */
+const OBJECTIVE_MIN_DISTANCE_FROM_SHIP = 220
+/** Maximum radial distance — close enough to walk, far enough to feel separated. */
+const OBJECTIVE_MAX_DISTANCE_FROM_SHIP = 700
+/** Minimum spacing between objectives (and between objectives + ship). */
+const OBJECTIVE_MIN_MUTUAL_SPACING = 220
+/** Max absolute slope magnitude accepted for an objective cell (0 = flat). */
+const OBJECTIVE_MAX_SLOPE = 0.6
+/** Attempts used when resampling an objective onto the ship's face. */
+const OBJECTIVE_RESAMPLE_ATTEMPTS = 64
 const LANDER_SPAWN_LIGHT_ALIGNMENT_X = 5
 const LANDER_GAMEPLAY_START_OFFSET_X = 0
 const LANDER_GAMEPLAY_START_OFFSET_Y = 0
@@ -682,23 +693,6 @@ export class LevelViewController implements Tickable {
     this.collisionWorld = new CollisionWorld(this.heightmap)
     this.sceneManager.addToScene(this.asteroidSurface.group)
 
-    // Snap each objective onto the baked mesh before any downstream consumer
-    // reads its coordinates — mission-generator flat zones can land on void
-    // cells near the asteroid silhouette. Mutating here ensures minigame
-    // spawners, waypoint markers, and rock-exclusion zones all see the
-    // corrected positions.
-    for (const obj of mission.objectives) {
-      this.snapObjectiveToSurface(obj)
-    }
-
-    // `flatZones` is used for rock-spawn exclusions around objective sites —
-    // built after snap so exclusions match the actual waypoint locations.
-    const flatZones: FlatZone[] = mission.objectives.map((obj) => ({
-      x: obj.x,
-      z: obj.z,
-      radius: FLAT_ZONE_RADIUS,
-    }))
-
     // Pick a spawn cell that actually sits on the baked mesh — critical on GLB
     // terrain where most of the play area is void. Falls back to origin if the
     // centre of the world is somehow invalid (shouldn't happen at normal scales).
@@ -706,6 +700,28 @@ export class LevelViewController implements Tickable {
     const spawnX = spawn.x + LANDER_SPAWN_LIGHT_ALIGNMENT_X
     const spawnZ = spawn.z
     const groundY = spawn.y
+
+    // Resample each objective onto the same asteroid face the ship is parked
+    // on. Mission-generator flat zones are laid out in a 3500-unit world square
+    // without mesh awareness, so without this they can land in valleys, on
+    // steep flanks, or on the far side of the rock. Ring-sample a flat-ish
+    // cell near the ship and mutate the objective in place so minigame
+    // spawners, waypoint markers, and rock exclusions all see the new pos.
+    const claimedPositions: Array<{ x: number; z: number }> = [
+      { x: spawnX, z: spawnZ },
+    ]
+    for (const obj of mission.objectives) {
+      this.resampleObjectiveNearShip(obj, spawnX, spawnZ, claimedPositions)
+      claimedPositions.push({ x: obj.x, z: obj.z })
+    }
+
+    // `flatZones` is used for rock-spawn exclusions around objective sites —
+    // built after resample so exclusions match the actual waypoint locations.
+    const flatZones: FlatZone[] = mission.objectives.map((obj) => ({
+      x: obj.x,
+      z: obj.z,
+      radius: FLAT_ZONE_RADIUS,
+    }))
 
     this.surfaceRocks = await SurfaceRockController.create({
       heightmap: this.heightmap,
@@ -2664,15 +2680,53 @@ export class LevelViewController implements Tickable {
   }
 
   /**
-   * Pull an objective's (x, z) toward origin until it sits on a valid baked
-   * surface cell. Mutates the objective in place so every downstream consumer
-   * (minigame spawners, waypoint markers, exclusion zones) sees the corrected
-   * position. No-op when the starting position is already valid.
+   * Re-place an objective on a flat-ish, valid cell in a ring around the ship
+   * spawn, respecting mutual spacing against previously-claimed positions.
+   * Mutates the objective in place so minigame spawners, waypoint markers, and
+   * rock-exclusion zones all see the corrected coordinates.
+   *
+   * Falls back to pulling the original position toward origin if the ring
+   * sampling fails (pathological asteroids with no flat-ish face near the
+   * ship). Never silently leaves the objective on a void cell.
    */
-  private snapObjectiveToSurface(obj: { x: number; z: number }): void {
+  private resampleObjectiveNearShip(
+    obj: { x: number; z: number },
+    shipX: number,
+    shipZ: number,
+    claimed: ReadonlyArray<{ x: number; z: number }>,
+  ): void {
     const hm = this.heightmap
     if (!hm) return
-    if (hm.isValidAt(obj.x, obj.z)) return
+    const minDistSq = OBJECTIVE_MIN_MUTUAL_SPACING * OBJECTIVE_MIN_MUTUAL_SPACING
+
+    for (let i = 0; i < OBJECTIVE_RESAMPLE_ATTEMPTS; i++) {
+      const angle = Math.random() * Math.PI * 2
+      const radius =
+        OBJECTIVE_MIN_DISTANCE_FROM_SHIP +
+        Math.random() *
+          (OBJECTIVE_MAX_DISTANCE_FROM_SHIP - OBJECTIVE_MIN_DISTANCE_FROM_SHIP)
+      const x = shipX + Math.cos(angle) * radius
+      const z = shipZ + Math.sin(angle) * radius
+      if (!hm.isValidAt(x, z)) continue
+      if (hm.slopeAt(x, z) > OBJECTIVE_MAX_SLOPE) continue
+
+      let tooClose = false
+      for (const c of claimed) {
+        const dx = x - c.x
+        const dz = z - c.z
+        if (dx * dx + dz * dz < minDistSq) {
+          tooClose = true
+          break
+        }
+      }
+      if (tooClose) continue
+
+      obj.x = x
+      obj.z = z
+      return
+    }
+
+    // Fallback: pull the original toward origin until it's a valid cell.
     let factor = 0.9
     for (let i = 0; i < 12; i++) {
       const x = obj.x * factor
@@ -2684,7 +2738,6 @@ export class LevelViewController implements Tickable {
       }
       factor *= 0.9
     }
-    // Fallback: place on the asteroid centre.
     obj.x = 0
     obj.z = 0
   }
