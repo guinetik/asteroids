@@ -1,0 +1,92 @@
+/**
+ * GLB-backed asteroid surface. Loads a model, bakes a collision heightmap from
+ * its geometry via downward raycasting, and exposes both the render group and
+ * the baked heightmap. Replaces the procedural TerrainMesh + generateTerrain
+ * pair for the level scene.
+ *
+ * @author guinetik
+ * @date 2026-04-23
+ * @spec docs/superpowers/plans/2026-04-23-mesh-asteroid-terrain.md
+ */
+import * as THREE from 'three'
+import { loadGLB } from './loadGLB'
+import {
+  bakeHeightmapFromMesh,
+  type BakeHeightmapFromMeshOptions,
+} from '@/lib/terrain/meshHeightmap'
+import type { Heightmap } from '@/lib/terrain/heightmap'
+
+/** Public URL path for the default asteroid mesh. */
+export const DEFAULT_ASTEROID_MODEL_PATH = '/models/asteroid.glb'
+
+/** Options for constructing an {@link AsteroidSurfaceController}. */
+export interface AsteroidSurfaceControllerOptions {
+  /** URL path to the asteroid GLB. Defaults to {@link DEFAULT_ASTEROID_MODEL_PATH}. */
+  modelPath?: string
+  /** Heightmap bake parameters. */
+  bake: BakeHeightmapFromMeshOptions
+  /** Uniform scale applied to the loaded model before baking. Default 1. */
+  scale?: number
+}
+
+/** Result bundle from {@link createAsteroidSurface}. */
+export interface AsteroidSurfaceControllerResult {
+  /** Root scene group for the asteroid. Add this to the scene graph. */
+  group: THREE.Group
+  /** Baked heightmap for physics/queries. */
+  heightmap: Heightmap
+  /** Dispose GPU resources. */
+  dispose: () => void
+}
+
+/**
+ * Load the GLB, scale it, bake a heightmap from it, and return a render group
+ * plus the heightmap. The returned group is ready to be added to the scene.
+ *
+ * @param options - Model path, bake parameters, and optional uniform scale.
+ * @returns A group, heightmap, and dispose function.
+ */
+export async function createAsteroidSurface(
+  options: AsteroidSurfaceControllerOptions,
+): Promise<AsteroidSurfaceControllerResult> {
+  const modelPath = options.modelPath ?? DEFAULT_ASTEROID_MODEL_PATH
+  const scene = await loadGLB(modelPath)
+
+  const group = new THREE.Group()
+  group.name = 'asteroidSurface'
+  if (options.scale !== undefined && options.scale !== 1) {
+    scene.scale.setScalar(options.scale)
+  }
+  // Shadow flags mirror the old TerrainMesh defaults.
+  scene.traverse((child) => {
+    if ((child as THREE.Mesh).isMesh) {
+      const mesh = child as THREE.Mesh
+      mesh.castShadow = true
+      mesh.receiveShadow = true
+    }
+  })
+  scene.updateMatrixWorld(true)
+  group.add(scene)
+
+  // Raycast against the (already transformed) scene. bakeHeightmapFromMesh
+  // walks descendants via intersectObject(mesh, true).
+  const heightmap = bakeHeightmapFromMesh(scene, options.bake)
+
+  return {
+    group,
+    heightmap,
+    dispose: () => {
+      group.traverse((child) => {
+        if ((child as THREE.Mesh).geometry) {
+          ;(child as THREE.Mesh).geometry?.dispose()
+        }
+        const material = (child as THREE.Mesh).material
+        if (Array.isArray(material)) {
+          material.forEach((m) => m.dispose())
+        } else if (material) {
+          ;(material as THREE.Material).dispose()
+        }
+      })
+    },
+  }
+}
