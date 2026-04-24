@@ -2,6 +2,7 @@ GRAVITY SURFING SYSTEM — UNLOCK QUEST + MECHANIC SPEC
 Revision 2 — Space Jockey
 
 # ========================================
+
 ⚠ IMPORTANT NOTE
 
 The "Shuttle Handoff" and "First Flight Notes" message texts will need to
@@ -13,6 +14,7 @@ HUD elements must be revised to reflect that these features are not yet
 accessible to a new player.
 
 # ========================================
+
 PART 1: UNLOCK QUEST
 
 TRIGGER:
@@ -59,6 +61,7 @@ MISSION FLOW:
 3. Level loads: flat terrain, single objective marker
 4. Land, exit lander
 5. Walk to objective: a sealed cargo container (procedural geometry —
+
 BoxGeometry with Consortium branding, emissive cyan trim, locked indicator)
 6. "[E] COLLECT CONSORTIUM PACKAGE"
 7. Item added to shuttle inventory: "Grid Coupling Module" (special item,
@@ -71,7 +74,7 @@ cannot be sold, cannot be dropped)
 REWARDS (all applied immediately):
 
 - gravitySurfing upgrade unlocked (permanent)
-  → this also unlocks the Space Fabric toggle in the HUD for the first time
+→ this also unlocks the Space Fabric toggle in the HUD for the first time
 - Heat Shield Level 1 (if not already owned — worth 5,000 CR)
 - Cryo Insulation Level 1 (if not already owned — worth 5,000 CR)
 - 2,000 CR bonus
@@ -106,6 +109,7 @@ Do not make me regret the referral."
 ```
 
 # ========================================
+
 PART 2: GRAVITY SURFING MECHANIC
 
 OVERVIEW:
@@ -133,9 +137,9 @@ upgrade — it does not appear in the HUD until the upgrade is active.
 ACTIVATION:
 
 - Q key pressed while:
-  a. gravitySurfing upgrade is active
-  b. Space Fabric toggle is ON
-  c. Shuttle is within snapping distance of a grid line (~0.5 grid cells)
+a. gravitySurfing upgrade is active
+b. Space Fabric toggle is ON
+c. Shuttle is within snapping distance of a grid line (~0.5 grid cells)
 - If any condition is not met: Q does nothing (no feedback needed, or a
 subtle "NO GRID LINE IN RANGE" if the upgrade is active but no line is close)
 
@@ -194,11 +198,11 @@ DECOUPLE WAVE:
 - Size: fixed ~ship width (not speed-scaled — keep it visually consistent
 and easy to tune)
 - Parameters: exposed as tunable values for visual QA
-  waveRadius:       initial radius at spawn (default: ship width)
-  waveAmplitude:    Y-displacement height of the wave
-  wavePropagation:  outward travel speed
-  waveDamping:      amplitude falloff over distance
-  waveLifetime:     how long before the wave fully dissipates
+waveRadius:       initial radius at spawn (default: ship width)
+waveAmplitude:    Y-displacement height of the wave
+wavePropagation:  outward travel speed
+waveDamping:      amplitude falloff over distance
+waveLifetime:     how long before the wave fully dissipates
 - Always spawns. Regardless of decoupling speed. Small decouple = small visual,
 same geometry — just tune amplitude/damping lower if needed.
 - The wave can interact with other objects/debris in range the same way
@@ -296,6 +300,7 @@ UPGRADE TIERS (future, not for initial release):
           through mild gravity curves without ejection
 
 # ========================================
+
 PART 3: IMPLEMENTATION SHAPE
 
 GOAL OF THIS SECTION:
@@ -594,6 +599,7 @@ RECOMMENDED ANSWERS FOR FIRST RELEASE:
 existing authored Consortium copy
 
 # ========================================
+
 PART 4: CURRENT BUILD DELTA + NEXT PASS
 
 GOAL OF THIS SECTION:
