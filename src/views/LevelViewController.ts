@@ -47,12 +47,11 @@ import { MultiToolController } from '@/three/MultiToolController'
 import { MultiToolState } from '@/lib/fps/multiToolState'
 import { CollisionWorld } from '@/lib/physics/worldCollision'
 import type { LanderTelemetry } from '@/components/LanderHud.vue'
-import type { FpsTelemetry, CompassObjective } from '@/components/FpsHud.vue'
+import type { FpsTelemetry, CompassObjective, RockTargetInfo } from '@/components/FpsHud.vue'
 import { headingRadToCompassDeg, worldBearingDegTo, signedRelativeBearingDeg } from '@/lib/math/bearing'
 import { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import type { ProjectileImpactContext } from '@/lib/fps/projectileSystem'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
-import { RockTargetIndicator } from '@/three/RockTargetIndicator'
 import { createLevelStateMachine, LANDER_INTERACT_RANGE, EXFIL_PROXIMITY_RANGE } from '@/lib/level/levelStateMachine'
 import type { LevelState } from '@/lib/level/levelStateMachine'
 import type { StateMachine } from '@/lib/stateMachine'
@@ -395,13 +394,15 @@ export class LevelViewController implements Tickable {
   private multiToolState: MultiToolState | null = null
   private projectileSystem: ProjectileSystem | null = null
   private impactEmitter: ParticleEmitter | null = null
-  private rockTargetIndicator: RockTargetIndicator | null = null
+  /**
+   * Latest rock-target readout for the FPS HUD. Populated each tick by
+   * {@link updateRockTarget}; consumed by {@link onFpsTelemetry}.
+   */
+  private currentRockTarget: RockTargetInfo | null = null
   /** Reused scratch — camera world position used by rock target picking. */
   private readonly _rockPickOrigin = new Vector3()
   /** Reused scratch — camera forward used by rock target picking. */
   private readonly _rockPickDir = new Vector3()
-  /** Reused scratch — rock world center fed into the indicator sprite. */
-  private readonly _rockTargetCenter = new Vector3()
   /**
    * Maximum distance (world units) at which the drill targeting bar
    * appears for a rock. Beyond this the bar hides even if the rock
@@ -892,11 +893,6 @@ export class LevelViewController implements Tickable {
       sizeGrowth: 0.7,
     })
     this.sceneManager.addToScene(this.tractorEmitter.points)
-    // Rock target indicator — single shared sprite that hops between
-    // the rock the player is currently aiming at while drill mode is
-    // active. Hidden by default; visibility toggled in `tickEva`.
-    this.rockTargetIndicator = new RockTargetIndicator()
-    this.sceneManager.addToScene(this.rockTargetIndicator.sprite)
     this.projectileSystem.onImpact = (pos, context) => {
       for (let i = 0; i < 8; i++) {
         this._impactVel.copy(this._impactUp).multiplyScalar(5)
@@ -1457,7 +1453,7 @@ export class LevelViewController implements Tickable {
     this.tickHandler!.unregister(this.impactEmitter!)
     if (this.tractorEmitter) this.tickHandler!.unregister(this.tractorEmitter)
     if (this.surfaceRocks) this.tickHandler!.unregister(this.surfaceRocks)
-    this.rockTargetIndicator?.hide()
+    this.currentRockTarget = null
     this.tickHandler!.unregister(this.fpsCamera!)
     this.tickHandler!.unregister(this.multiTool!)
     this.fpsCamera!.helmetLightRig.visible = false
@@ -1489,7 +1485,7 @@ export class LevelViewController implements Tickable {
     this.tickHandler!.unregister(this.impactEmitter!)
     if (this.tractorEmitter) this.tickHandler!.unregister(this.tractorEmitter)
     if (this.surfaceRocks) this.tickHandler!.unregister(this.surfaceRocks)
-    this.rockTargetIndicator?.hide()
+    this.currentRockTarget = null
     this.tickHandler!.unregister(this.multiTool!)
     // NOTE: fpsCamera stays registered — it renders the death camera drop
     this.fpsCamera!.helmetLightRig.visible = false
@@ -1940,6 +1936,7 @@ export class LevelViewController implements Tickable {
           modeCapacity: this.multiToolState?.modeChargeCapacity ?? 1,
           headingRad,
           objectives,
+          rockTarget: this.currentRockTarget,
         })
         this.onPlayerPosition?.(this.playerController!.group.position.x, this.playerController!.group.position.z)
       }
@@ -2034,32 +2031,26 @@ export class LevelViewController implements Tickable {
       })
     }
 
-    this.updateRockTargetIndicator()
+    this.updateRockTarget()
   }
 
   /**
-   * Refresh the rock-targeting HP bar each frame. Only active while
-   * the multi-tool is in drill mode — the bar otherwise immediately
-   * hides regardless of where the camera is pointing.
+   * Refresh the rock-targeting readout each frame. Only active while
+   * the multi-tool is in drill mode — the readout otherwise clears
+   * regardless of where the camera is pointing. Output feeds the FPS
+   * HUD via {@link currentRockTarget}; no world-space geometry.
    *
    * Cheap path: a swept-sphere ray pick against the registered rock
    * collider list (already maintained by `ProjectileSystem` for drill
    * bolts), so we don't double-pay for spatial structures.
    */
-  private updateRockTargetIndicator(): void {
-    const indicator = this.rockTargetIndicator
+  private updateRockTarget(): void {
     const projectiles = this.projectileSystem
     const rockYield = this.rockYieldSystem
-    const rocks = this.surfaceRocks
-    const heightmap = this.heightmap
     const camera = this.fpsCamera?.camera
     const tool = this.multiToolState
-    if (!indicator || !projectiles || !rockYield || !rocks || !heightmap || !camera || !tool) {
-      this.rockTargetIndicator?.hide()
-      return
-    }
-    if (tool.mode !== 'drill') {
-      indicator.hide()
+    if (!projectiles || !rockYield || !camera || !tool || tool.mode !== 'drill') {
+      this.currentRockTarget = null
       return
     }
     this._rockPickOrigin.copy(camera.position)
@@ -2070,31 +2061,20 @@ export class LevelViewController implements Tickable {
       LevelViewController.ROCK_TARGET_PICK_RANGE,
     )
     if (!hit) {
-      indicator.hide()
+      this.currentRockTarget = null
       return
     }
     const roll = rockYield.peekRock(hit.spawnIndex)
     if (!roll) {
-      indicator.hide()
+      this.currentRockTarget = null
       return
     }
-    const center = rocks.getRockCenter(hit.spawnIndex, heightmap, this._rockTargetCenter)
-    if (!center) {
-      indicator.hide()
-      return
-    }
-    const radius = rocks.getRockRadius(hit.spawnIndex)
     const def = getItemDefinition(roll.itemId)
-    indicator.setTarget({
-      spawnIndex: hit.spawnIndex,
-      centerX: center.x,
-      centerY: center.y,
-      centerZ: center.z,
-      radius: radius ?? undefined,
+    this.currentRockTarget = {
+      label: def?.label ?? roll.itemId,
       remainingKg: roll.remainingKg,
       totalKg: roll.totalKg,
-      label: def?.label ?? roll.itemId,
-    })
+    }
   }
 
   private enforceLanderAltitudeCeiling(): void {
@@ -2870,8 +2850,7 @@ export class LevelViewController implements Tickable {
     this.psychospherePickupController = null
     this.dropSystem?.clear()
     this.dropSystem = null
-    this.rockTargetIndicator?.dispose()
-    this.rockTargetIndicator = null
+    this.currentRockTarget = null
     this.multiTool?.dispose()
     this.playerController?.dispose()
     this.fpsCamera?.dispose()

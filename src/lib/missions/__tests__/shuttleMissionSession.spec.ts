@@ -281,6 +281,34 @@ describe('offerAsteroidMission', () => {
     const updated = offerAsteroidMission(board, mission2)
     expect(updated.offeredAsteroidMission).toBeNull()
   })
+
+  it('replaces an offer pinned to a different host planet (no slot starvation)', () => {
+    /*
+     * Regression: Mercury's Cinderline contract used to "claim" the global asteroid
+     * offer slot on first dock. Subsequent visits to Earth/Mars/Venus saw nothing
+     * because the UI only renders the offer when `offeringAsteroidPlanet` matches
+     * the docked planet. The pure helper must therefore allow a fresh draft for a
+     * new host to overwrite the stale, off-planet one.
+     */
+    let board = createMissionBoard()
+    const mercuryHostR = 1
+    const mercuryMission = generateAsteroidMission(1, {
+      planetId: 'mercury',
+      worldX: mercuryHostR,
+      worldZ: 0,
+    })
+    board = offerAsteroidMission(board, mercuryMission)
+    expect(board.offeringAsteroidPlanet).toBe('mercury')
+
+    const earthMission = generateAsteroidMission(1, {
+      planetId: 'earth',
+      worldX: 1,
+      worldZ: 0,
+    })
+    const updated = offerAsteroidMission(board, earthMission)
+    expect(updated.offeringAsteroidPlanet).toBe('earth')
+    expect(updated.offeredAsteroidMission!.id).toBe(earthMission.id)
+  })
 })
 
 describe('acceptAsteroidMission', () => {

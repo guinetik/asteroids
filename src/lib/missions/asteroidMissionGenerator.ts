@@ -372,6 +372,22 @@ function isExterminateOrRescueOnlyTemplate(template: MissionGiverTemplate): bool
 }
 
 /**
+ * True when every slot on a giver template only rolls exterminate (bug-clearing) objectives.
+ *
+ * Used to keep nest-hunt / hive-assault contracts off civilian mission boards. Combat-only
+ * hosts (Mercury / Saturn) still surface them because their `combatOnlyHost` branch uses the
+ * positive `isExterminateOrRescueOnlyTemplate` filter; this predicate is the *negative*
+ * filter applied at every other planet so Colonial Guard's wide near-earth band cannot
+ * dominate the random pool at low difficulty.
+ *
+ * @param template - Giver mission entry from JSON.
+ * @returns Whether the template is restricted to extermination objectives.
+ */
+function isExterminateOnlyTemplate(template: MissionGiverTemplate): boolean {
+  return template.objectiveSlots.every((s) => s.type === 'exterminate')
+}
+
+/**
  * Station that posts a procedural asteroid contract — solar-map waypoint is anchored from
  * {@link worldX}/{@link worldZ} when the offer is drafted.
  */
@@ -619,6 +635,10 @@ export function generateAsteroidMission(
   for (const giver of givers) {
     for (const template of giver.missions) {
       if (combatOnlyHost && !isExterminateOrRescueOnlyTemplate(template)) continue
+      // Civilian (non-combat-only) boards never post pure extermination work — that flavor is
+      // reserved for Cinderline (Mercury) and the Saturn hazard cleanup boards. Without this
+      // filter, Colonial Guard's wide `near-earth` band swamps Earth/Mars/Venus at low diff.
+      if (!combatOnlyHost && isExterminateOnlyTemplate(template)) continue
       const region = findRegionForTemplate(template, difficulty)
       if (region) {
         candidates.push({ giver, template, region })

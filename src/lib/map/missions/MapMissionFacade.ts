@@ -254,12 +254,42 @@ export class MapMissionFacade {
     onMissionBoardUpdate?.(this.board)
   }
 
+  /**
+   * Offer (or re-offer) an asteroid contract for the docked planet.
+   *
+   * Re-offer rules — mirrors {@link offerEvaMission} so each planet's board feels
+   * "live" instead of stalled by a stale offer pinned to another world:
+   *
+   * - If a contract is already **accepted** (`activeAsteroidMission` set), do nothing.
+   *   The player can only juggle one asteroid mission at a time.
+   * - If the post-accept **restock cooldown** (`asteroidRestockTimer`) is running,
+   *   do nothing. Restock is intentionally global (you ran a job; the brokers need
+   *   a moment).
+   * - If the existing offer is **for this same planet**, keep it. Re-docking the
+   *   same station shouldn't reroll the contract.
+   * - Otherwise — there is a stale offer pinned to a *different* planet — drop it
+   *   and draft a fresh contract for the planet the player just docked at. Without
+   *   this, the first planet to claim the offer slot (Mercury, in the Cinderline
+   *   flow) starves every other station of asteroid work, because the UI hides
+   *   offers whose `offeringAsteroidPlanet` does not match the docked planet.
+   *
+   * @param host - Posting station planet + world position; waypoint is anchored
+   *   to that orbit by {@link generateAsteroidMission}.
+   * @param onMissionBoardUpdate - Callback invoked with the new board so reactive
+   *   UI (`missionBoard` ref in `MapView`) refreshes immediately.
+   */
   offerAsteroidMissionFromDifficulty(
     host: AsteroidMissionHostAnchor,
     onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null,
   ): void {
-    if (this.board.offeredAsteroidMission || this.board.activeAsteroidMission) return
+    if (this.board.activeAsteroidMission) return
     if (this.board.asteroidRestockTimer) return
+    if (
+      this.board.offeredAsteroidMission &&
+      this.board.offeringAsteroidPlanet === host.planetId
+    ) {
+      return
+    }
     const difficulty = computeMissionDifficulty(CURRENT_PLAYER_UPGRADE_LEVELS)
     let mission: ReturnType<typeof generateAsteroidMission>
     try {

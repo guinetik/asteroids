@@ -384,4 +384,27 @@ describe('generateAsteroidMission', () => {
     expect(mission.giverId).not.toBe('cinderline')
     expect(mission.giverName).not.toBe('The Cinderline')
   })
+
+  it('civilian hosts never post pure-extermination contracts (Cinderline flavor stays exclusive)', () => {
+    /*
+     * Regression: with Colonial Guard's `near-earth` band lowered to [1, 4] so Mercury could
+     * draft a contract at diff 1, every other planet started crowding the random pool with
+     * Nest Clearance — making Earth/Mars/Venus boards feel like they all serve the same
+     * exterminate work. Civilian boards must stay survey/gather/rescue.
+     */
+    const planets = ['earth', 'mars', 'venus'] as const
+    for (const planetId of planets) {
+      const planet = getPlanet(planetId)
+      const hostR = planet.orbit.semiMajorAxis * ORBIT_SCALE
+      const host = { planetId, worldX: hostR, worldZ: 0 }
+      for (let d = 1; d <= 10; d++) {
+        for (let i = 0; i < 16; i++) {
+          const mission = generateAsteroidMission(d, host)
+          for (const obj of mission.objectives) {
+            expect(obj.type).not.toBe('exterminate')
+          }
+        }
+      }
+    }
+  })
 })

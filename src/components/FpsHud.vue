@@ -12,6 +12,21 @@ export interface CompassObjective {
   type: 'gather' | 'exterminate' | 'rescue' | 'survey' | 'collect'
 }
 
+/**
+ * Diegetic rock-targeting readout shown above the drill reticle when
+ * the player is aiming at a mineable rock. Populated by the level
+ * controller from {@link RockYieldSystem.peekRock}; cleared (set to
+ * `null`) as soon as the reticle leaves the rock or the tool switches.
+ */
+export interface RockTargetInfo {
+  /** Human-readable mineral label (e.g. "Olivine"). */
+  label: string
+  /** Remaining drillable mass in kg. */
+  remainingKg: number
+  /** Rock's full mass in kg. */
+  totalKg: number
+}
+
 /** Telemetry data from FpsPlayerController for HUD display. */
 export interface FpsTelemetry {
   /** Current hit points */
@@ -48,6 +63,8 @@ export interface FpsTelemetry {
   headingRad: number
   /** Active objectives for compass display. */
   objectives: CompassObjective[]
+  /** Currently-targeted rock readout, or `null` when not aiming at one. */
+  rockTarget?: RockTargetInfo | null
 }
 
 const O2_COLOR_HIGH = '#3b82f6'
@@ -106,6 +123,20 @@ function o2Color(): string {
 function modeColor(): string {
   return MODE_LABELS[props.telemetry.activeMode]?.color ?? '#ffffff'
 }
+
+function rockTargetFillPct(): number {
+  const target = props.telemetry.rockTarget
+  if (!target || target.totalKg <= 0) return 0
+  return Math.max(0, Math.min(100, (target.remainingKg / target.totalKg) * 100))
+}
+
+function showRockTarget(): boolean {
+  return (
+    showCombatHud()
+    && props.telemetry.activeMode === 'drill'
+    && props.telemetry.rockTarget != null
+  )
+}
 </script>
 
 <template>
@@ -118,6 +149,36 @@ function modeColor(): string {
         <span class="tabular-nums text-white/70">{{ telemetry.speed.toFixed(1) }}</span>
         <span class="text-xs tracking-widest uppercase text-white/40">HDG</span>
         <span class="tabular-nums text-white/70">{{ formatHeadingDegFromRad(telemetry.headingRad) }}</span>
+      </div>
+    </div>
+
+    <!-- ═══ ROCK TARGET READOUT: floats above crosshair, drill mode only ═══ -->
+    <div
+      v-if="showRockTarget()"
+      class="pointer-events-none absolute inset-0 flex items-center justify-center select-none"
+      aria-hidden="true"
+    >
+      <div
+        class="-translate-y-10 flex flex-col items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.6)] backdrop-blur-md"
+        :style="{ borderColor: modeColor() + '30' }"
+      >
+        <span
+          class="text-[11px] font-mono tracking-[0.25em] uppercase drop-shadow-[0_0_6px_rgba(0,0,0,0.8)]"
+          :style="{ color: modeColor() }"
+        >
+          {{ telemetry.rockTarget!.label }}
+        </span>
+        <div class="flex items-center gap-1.5">
+          <div class="h-[3px] w-24 overflow-hidden rounded-sm bg-white/10">
+            <div
+              class="h-full transition-all duration-100"
+              :style="{ width: rockTargetFillPct() + '%', backgroundColor: modeColor() + 'cc' }"
+            />
+          </div>
+          <span class="w-12 text-[9px] font-mono tracking-wider tabular-nums text-white/60">
+            {{ Math.ceil(telemetry.rockTarget!.remainingKg) }}KG
+          </span>
+        </div>
       </div>
     </div>
 
