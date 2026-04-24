@@ -39,6 +39,10 @@ const _neutralColor = new THREE.Color(1, 1, 1)
 const SURFACE_ROCK_GLB_URL = '/models/asteroids.glb'
 const ROCK_TEXTURE_REPEAT = 1.35
 const ROCK_TEXTURE_BASE_DIR = '/textures/rocks'
+/** Rock-local reflection strength; keeps mineral highlights from mirror-glinting under PMREM. */
+const ROCK_ENV_MAP_INTENSITY = 0.32
+/** Upper metalness bound for mined rocks so metallic minerals stay mineral, not chrome. */
+const ROCK_MAX_METALNESS = 0.06
 
 /**
  * Per-mineral material definition. `folder` is the subdirectory under
@@ -268,7 +272,8 @@ function tuneRockMaterial(
     material.roughnessMap = textures.roughnessMap
     material.color.setRGB(1, 1, 1)
     material.roughness = 1
-    material.metalness = def.metalness
+    material.metalness = Math.min(def.metalness, ROCK_MAX_METALNESS)
+    material.envMapIntensity = ROCK_ENV_MAP_INTENSITY
     material.emissive.setHex(0x000000)
     material.emissiveIntensity = 0
     if (baseColor) {
@@ -512,7 +517,8 @@ export class SurfaceRockController implements Tickable {
     return this.spawns.map((spawn, index) => {
       const radius = Math.max(1.2, spawn.diameter * 0.34)
       const exposedHeight = spawn.diameter * spawn.heightRatio * (1 - spawn.burial * 0.35)
-      const centerY = heightmap.heightAt(spawn.x, spawn.z) + Math.max(radius * 0.7, exposedHeight * 0.45)
+      const centerY =
+        heightmap.heightAt(spawn.x, spawn.z) + Math.max(radius * 0.7, exposedHeight * 0.45)
       return {
         id: rockColliderId(index),
         kind: 'sphere',
@@ -623,12 +629,17 @@ export class SurfaceRockController implements Tickable {
    * level controller to spawn tractor particles that home toward the
    * player's gun. Returns `null` when the spawn is unknown.
    */
-  getRockCenter(spawnIndex: number, heightmap: Heightmap, out: THREE.Vector3): THREE.Vector3 | null {
+  getRockCenter(
+    spawnIndex: number,
+    heightmap: Heightmap,
+    out: THREE.Vector3,
+  ): THREE.Vector3 | null {
     const spawn = this.spawns[spawnIndex]
     if (!spawn) return null
     const radius = Math.max(1.2, spawn.diameter * 0.34)
     const exposedHeight = spawn.diameter * spawn.heightRatio * (1 - spawn.burial * 0.35)
-    const centerY = heightmap.heightAt(spawn.x, spawn.z) + Math.max(radius * 0.7, exposedHeight * 0.45)
+    const centerY =
+      heightmap.heightAt(spawn.x, spawn.z) + Math.max(radius * 0.7, exposedHeight * 0.45)
     return out.set(spawn.x, centerY, spawn.z)
   }
 

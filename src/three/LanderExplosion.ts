@@ -12,7 +12,7 @@ import type { Tickable } from '@/lib/Tickable'
 /** Minimum particles for a low-speed crash. */
 const MIN_PARTICLES = 8
 /** Maximum particles for a terminal-velocity crash. */
-const MAX_PARTICLES = 160
+const MAX_PARTICLES = 96
 /** Speed at which explosion is at full intensity. */
 const MAX_IMPACT_SPEED = 20
 /** Minimum burst force (gentle bump). */
@@ -36,11 +36,12 @@ export class LanderExplosion implements Tickable {
   constructor() {
     this.fireEmitter = new ParticleEmitter({
       poolSize: MAX_PARTICLES,
-      color: new Color(0xffaa44),
-      size: 3,
-      lifetime: 0.8,
+      color: new Color(0xff6a1f),
+      size: 2.2,
+      lifetime: 0.65,
       spread: 12,
-      opacity: 0.7,
+      opacity: 0.42,
+      soft: true,
     })
     this.debrisEmitter = new ParticleEmitter({
       poolSize: MAX_PARTICLES,

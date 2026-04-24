@@ -80,6 +80,13 @@ export const LEVEL_VIEW_CONTROLLER_CONFIG = {
     flattenRadius: 110,
     /** Inner radius fully flattened (no falloff); outside this fades smoothly. */
     flattenFullRadius: 55,
+    /**
+     * Extra radius applied only to the visible GLB deformation. The heightmap
+     * grid flattens exact cells, but model triangles can span across the pad
+     * from just outside the disk; this pulls those border vertices down too so
+     * the rendered surface does not sit above the collision plane.
+     */
+    visualMeshFlattenPadding: 28,
     /** Fallback pull attempts if ring sampling fails to find a suitable cell. */
     fallbackPullAttempts: 12,
     /** Per-attempt inward pull factor during fallback sampling. */

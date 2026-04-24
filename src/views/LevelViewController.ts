@@ -42,12 +42,7 @@ import {
   type AsteroidSurfaceControllerResult,
 } from '@/three/AsteroidSurfaceController'
 import type { LanderTelemetry } from '@/lib/ui/landerHudTypes'
-import type { FpsTelemetry, CompassObjective, RockTargetInfo } from '@/lib/ui/fpsHudTypes'
-import {
-  headingRadToCompassDeg,
-  worldBearingDegTo,
-  signedRelativeBearingDeg,
-} from '@/lib/math/bearing'
+import type { FpsTelemetry, RockTargetInfo } from '@/lib/ui/fpsHudTypes'
 import { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import type { ProjectileImpactContext } from '@/lib/fps/projectileSystem'
 import type { EnemyHandle } from '@/lib/fps/enemyDirector'
@@ -80,30 +75,29 @@ import {
   clearWaypointMarkers,
 } from '@/three/WaypointMarkers'
 import { generateMapCanvas } from '@/lib/terrain/mapColors'
-import { OBJECTIVE_LABELS } from '@/lib/minigame/MiniGame'
 import type { MiniGame, MiniGameStep } from '@/lib/minigame/MiniGame'
 import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
 import { SurfaceRockController } from '@/three/controllers/SurfaceRockController'
+import { createEnemyVisualWarmup, type EnemyVisualWarmup } from '@/three/EnemyVisualWarmup'
 import { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
 import { loadProfile } from '@/lib/player/profile'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 import { DropSystem, createContractDropPolicy } from '@/lib/fps/dropSystem'
 import { PsychospherePickupController } from '@/three/PsychospherePickupController'
 import { contractSystem } from '@/lib/contracts/runtime'
-import {
-  hashLevelSeed,
-  resolveLevelContext,
-  rotationFromSeed,
-} from '@/lib/level/levelContext'
+import { hashLevelSeed, resolveLevelContext, rotationFromSeed } from '@/lib/level/levelContext'
 import {
   flattenHeightmapDisk,
   resampleObjectiveNearShip,
   sampleSpawnOnSurface,
 } from '@/lib/level/levelObjectivePlacement'
 import { LevelCollisionFacade } from '@/lib/level/LevelCollisionFacade'
+import { LevelCombatMiningFacade } from '@/lib/level/LevelCombatMiningFacade'
 import { LevelPersistenceFacade } from '@/lib/level/LevelPersistenceFacade'
 import { LevelMinigameFacade } from '@/lib/level/LevelMinigameFacade'
+import { LevelStateLifecycleFacade } from '@/lib/level/LevelStateLifecycleFacade'
+import { LevelTelemetryFacade } from '@/lib/level/LevelTelemetryFacade'
 import { LEVEL_VIEW_CONTROLLER_CONFIG } from '@/lib/level/levelViewControllerConfig'
 import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
 import {
@@ -162,6 +156,7 @@ export class LevelViewController implements Tickable {
   private heightmap: Heightmap | null = null
   private asteroidSurface: AsteroidSurfaceControllerResult | null = null
   private surfaceRocks: SurfaceRockController | null = null
+  private enemyVisualWarmup: EnemyVisualWarmup | null = null
   private readonly collision = new LevelCollisionFacade()
   private rockYieldSystem: RockYieldSystem | null = null
   private stateMachine: StateMachine<LevelState> | null = null
@@ -203,6 +198,8 @@ export class LevelViewController implements Tickable {
    */
   private readonly levelAudio = new LevelAudioDirector()
   private readonly persistence = new LevelPersistenceFacade()
+  private readonly stateLifecycle = new LevelStateLifecycleFacade()
+  private combatMining: LevelCombatMiningFacade | null = null
   private multiTool: MultiToolController | null = null
   private multiToolState: MultiToolState | null = null
   private projectileSystem: ProjectileSystem | null = null
@@ -230,45 +227,6 @@ export class LevelViewController implements Tickable {
    * worth of movement, hiding the lack of true homing.
    */
   private tractorEmitter: ParticleEmitter | null = null
-  /**
-   * Particle lifetime for the tractor stream (seconds). Must match
-   * the value passed to `new ParticleEmitter({ lifetime })` below;
-   * the velocity is computed as `distance / lifetime` so the
-   * particle reaches the gun muzzle right as it dies.
-   */
-  private static readonly TRACTOR_LIFETIME_SEC = 0.58
-  /** Particles emitted per drill bolt impact. Keep small — pool is shared. */
-  private static readonly TRACTOR_PARTICLES_PER_HIT = 8
-  /** Visible chip burst count per mining hit now that drill shots are paced. */
-  private static readonly MINING_IMPACT_PARTICLES_PER_HIT = 12
-  /** Extra visible chip particles added for larger rocks. */
-  private static readonly MINING_IMPACT_PARTICLES_PER_RADIUS = 2.5
-  /** Ceiling for large-rock chip bursts so the shared pool stays healthy. */
-  private static readonly MAX_MINING_IMPACT_PARTICLES_PER_HIT = 28
-  /** Upward launch speed for mining chip particles. */
-  private static readonly MINING_IMPACT_VERTICAL_SPEED = 7.5
-  /** Random lateral scatter added to each mining chip particle. */
-  private static readonly MINING_IMPACT_LATERAL_SPEED = 2.2
-  /** Extra tractor particles added for larger rocks on each hit. */
-  private static readonly TRACTOR_PARTICLES_PER_RADIUS = 1.5
-  /** Strong one-shot vacuum burst when a rock is fully consumed. */
-  private static readonly TRACTOR_PARTICLES_ON_CONSUME = 52
-  /** Spawn-radius jitter for the final rock-to-gun vacuum cloud. */
-  private static readonly TRACTOR_CONSUME_SPAWN_RADIUS = 1.8
-  /** Minimum speed fraction used so consume particles arrive over a beat, not instantly. */
-  private static readonly TRACTOR_CONSUME_MIN_SPEED_FRACTION = 0.33
-  /** Maximum speed fraction for the faster front edge of the vacuum cloud. */
-  private static readonly TRACTOR_CONSUME_MAX_SPEED_FRACTION = 0.82
-  /** Lateral velocity jitter so the consume burst feels like a cloud, not a laser line. */
-  private static readonly TRACTOR_CONSUME_LATERAL_SPEED = 3.8
-  /** Reused scratch — gun muzzle world position for tractor velocity calc. */
-  private readonly _tractorMuzzle = new Vector3()
-  /** Reused scratch — rock center used as tractor spawn origin. */
-  private readonly _tractorOrigin = new Vector3()
-  /** Reused scratch — direction from rock to muzzle, scaled by speed. */
-  private readonly _tractorVel = new Vector3()
-  /** Reused scratch — offset spawn position for consume vacuum particles. */
-  private readonly _tractorSpawnPos = new Vector3()
   // ── Arrival ──────────────────────────────────────────────────
   private arrivalSequence: ArrivalSequence | null = null
 
@@ -342,19 +300,9 @@ export class LevelViewController implements Tickable {
   private elapsed = 0
 
   /**
-   * Throttle for HUD telemetry callbacks. The lander/EVA telemetry build
-   * allocates a fresh literal (and `objectives.map(...)` for EVA) every
-   * call, and Vue then reactivity-broadcasts it through every text node
-   * and `:style` binding in `FpsHud.vue`. Emitting that at 60 Hz produced
-   * visible camera-rotation hitching with enemies on screen.
-   *
-   * 15 Hz is imperceptible for HUD readouts and standard for telemetry
-   * overlays. Reset on EVA/lander enter so the first tick still emits.
-   *
-   * @spec docs/superpowers/specs/2026-04-18-fps-perf-fixes-design.md
+   * Throttles + emits level HUD telemetry/state prompts.
    */
-  private static readonly TELEMETRY_INTERVAL_S = 1 / 15
-  private telemetryAccumulator = LevelViewController.TELEMETRY_INTERVAL_S
+  private readonly telemetry = new LevelTelemetryFacade()
 
   // ── Mouse state (EVA) ────────────────────────────────────────
   private readonly pointerLock = new FpsPointerLockSession()
@@ -834,61 +782,28 @@ export class LevelViewController implements Tickable {
       seed: miningSeed,
     })
     if (this.surfaceRocks) {
-      const rockSpawns = this.surfaceRocks.spawns
-      const rockColliderEntries = this.surfaceRocks.buildColliders(this.heightmap)
-      for (let i = 0; i < rockSpawns.length; i++) {
-        const spawn = rockSpawns[i]!
-        const collider = rockColliderEntries[i]!
-        const center = typeof collider.center === 'function' ? collider.center() : collider.center
-        this.rockYieldSystem.registerRock({ spawnIndex: i, diameter: spawn.diameter })
-        this.projectileSystem.addRock({
-          spawnIndex: i,
-          cx: center.x,
-          cy: center.y,
-          cz: center.z,
-          radius: collider.radius,
-        })
-      }
-    }
-    this.rockYieldSystem.onConsume = (spawnIndex) => {
-      this.levelAudio.stopMiningSizzle()
-      this.levelAudio.notifyRockMelt()
-      this.spawnConsumeVacuumBurst(spawnIndex)
-      this.surfaceRocks?.hideRock(spawnIndex)
-      this.removeRockCollider(spawnIndex)
-      this.projectileSystem?.removeRock(spawnIndex)
-    }
-    this.rockYieldSystem.onMineralExtracted = (itemId, kg) => {
-      const quantity = Math.max(1, Math.round(kg))
-      const result = this.persistence.persistInventoryPickup(itemId, quantity)
-      if (!result.ok) {
-        // Inventory full / over weight — surface a warning toast so the
-        // player understands why this hit produced no pickup. The mineral
-        // is still considered extracted by the gather minigame (which
-        // listens upstream of this handler) so quotas keep advancing.
-        this.onResourcePickupFailed?.(result.label, result.reason ?? 'Inventory full')
-        return
-      }
-      this.onResourcePickup?.(itemId, quantity, result.label)
-      this.levelAudio.notifyResourcePickup()
-    }
-    this.projectileSystem.onRockHit = (spawnIndex, pos) => {
-      const result = this.rockYieldSystem?.mineRock(spawnIndex)
-      if (!result) return
-      if (!result.depleted) {
-        this.keepMiningSizzleAlive()
-      }
-      this.surfaceRocks?.flashRock(spawnIndex)
-      const impactParticleCount = this.getMiningImpactParticleCount(spawnIndex)
-      for (let i = 0; i < impactParticleCount; i++) {
-        this._impactVel.set(
-          (Math.random() - 0.5) * LevelViewController.MINING_IMPACT_LATERAL_SPEED,
-          LevelViewController.MINING_IMPACT_VERTICAL_SPEED + Math.random() * 1.5,
-          (Math.random() - 0.5) * LevelViewController.MINING_IMPACT_LATERAL_SPEED,
-        )
-        this.impactEmitter!.emit(pos, this._impactVel)
-      }
-      this.spawnTractorBurst(spawnIndex, pos, this.getTractorParticleCount(spawnIndex), false)
+      this.combatMining = new LevelCombatMiningFacade(
+        {
+          projectileSystem: this.projectileSystem,
+          rockYieldSystem: this.rockYieldSystem,
+          surfaceRocks: this.surfaceRocks,
+          heightmap: this.heightmap,
+          impactEmitter: this.impactEmitter,
+          tractorEmitter: this.tractorEmitter,
+          multiTool: this.multiTool,
+          persistence: this.persistence,
+          levelAudio: this.levelAudio,
+        },
+        {
+          onResourcePickup: (itemId, quantity, label) =>
+            this.onResourcePickup?.(itemId, quantity, label),
+          onResourcePickupFailed: (label, reason) => this.onResourcePickupFailed?.(label, reason),
+          onRemoveRockCollider: (spawnIndex) => this.removeRockCollider(spawnIndex),
+          getElapsedSeconds: () => this.elapsed,
+        },
+      )
+      this.combatMining.registerRocks()
+      this.combatMining.attach()
     }
 
     // ── Loot drop system ────────────────────────────────────────
@@ -932,7 +847,9 @@ export class LevelViewController implements Tickable {
         },
         onDestroyLander: (cause) => {
           this.failLanderRun(
-            cause === 'exterminate' ? 'Lander Destroyed by Nest Blast' : 'Lander Destroyed by Virus Blast',
+            cause === 'exterminate'
+              ? 'Lander Destroyed by Nest Blast'
+              : 'Lander Destroyed by Virus Blast',
             { explode: true, hideLander: true },
           )
         },
@@ -1112,6 +1029,10 @@ export class LevelViewController implements Tickable {
     // init (line: `this.multiTool.setVisible(false)` just after GLB load).
     // Flipping true here lets its view-model materials compile; restore false.
     this.multiTool?.setVisible(true)
+    this.enemyVisualWarmup ??= createEnemyVisualWarmup()
+    scene.add(this.enemyVisualWarmup.group)
+    this.enemyVisualWarmup.stageForCamera(camera)
+    stageVisible(this.enemyVisualWarmup.group)
 
     try {
       if (typeof renderer.compileAsync === 'function') {
@@ -1130,6 +1051,10 @@ export class LevelViewController implements Tickable {
       }
       for (const entry of stagedHidden) {
         entry.obj.visible = entry.visible
+      }
+      if (this.enemyVisualWarmup) {
+        this.enemyVisualWarmup.restoreFrustumCulling()
+        this.enemyVisualWarmup.group.visible = false
       }
       this.multiTool?.setVisible(false)
     }
@@ -1234,16 +1159,20 @@ export class LevelViewController implements Tickable {
   private enterLander(): void {
     // Force the throttled HUD telemetry to emit on the very next tick so the
     // lander HUD lights up immediately on state change.
-    this.telemetryAccumulator = LevelViewController.TELEMETRY_INTERVAL_S
-    this.tickHandler!.register(this.landerController!, TICK_PRIORITY_PHYSICS)
-    this.tickHandler!.register(this.vehicleCamera!, TICK_PRIORITY_RENDER - 2)
-    this.tickHandler!.register(this.landerExplosion!, TICK_PRIORITY_PHYSICS + 3)
-    this.vehicleCamera!.controls.enabled = true
-    this.sceneManager!.setCamera(this.vehicleCamera!)
-    this.sceneManager!.setActiveCamera(null)
-    if (this.postProcessing && this.vehicleCamera) {
-      this.postProcessing.setCamera(this.vehicleCamera.camera)
-    }
+    this.telemetry.resetThrottle()
+    this.stateLifecycle.enterLander(
+      {
+        tickHandler: this.tickHandler!,
+        sceneManager: this.sceneManager!,
+        postProcessing: this.postProcessing,
+        priorities: { physics: TICK_PRIORITY_PHYSICS, render: TICK_PRIORITY_RENDER },
+      },
+      {
+        landerController: this.landerController!,
+        vehicleCamera: this.vehicleCamera!,
+        landerExplosion: this.landerExplosion!,
+      },
+    )
 
     // Mission announcement — first lander entry only (after arrival cutscene)
     if (!this.missionAnnounced && this.mission) {
@@ -1253,16 +1182,19 @@ export class LevelViewController implements Tickable {
   }
 
   private exitLander(): void {
-    this.tickHandler!.unregister(this.landerController!)
-    this.tickHandler!.unregister(this.vehicleCamera!)
-    this.tickHandler!.unregister(this.landerExplosion!)
-    this.vehicleCamera!.controls.enabled = false
-
-    // Kill any lingering thruster particles so they don't freeze in the scene
-    this.landerController!.flameEmitter.reset()
-    for (const emitter of this.landerController!.rcsEmitters.values()) {
-      emitter.reset()
-    }
+    this.stateLifecycle.exitLander(
+      {
+        tickHandler: this.tickHandler!,
+        sceneManager: this.sceneManager!,
+        postProcessing: this.postProcessing,
+        priorities: { physics: TICK_PRIORITY_PHYSICS, render: TICK_PRIORITY_RENDER },
+      },
+      {
+        landerController: this.landerController!,
+        vehicleCamera: this.vehicleCamera!,
+        landerExplosion: this.landerExplosion!,
+      },
+    )
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1272,36 +1204,31 @@ export class LevelViewController implements Tickable {
   private enterEva(): void {
     // Force the throttled HUD telemetry to emit on the very next tick so the
     // EVA HUD lights up immediately on state change.
-    this.telemetryAccumulator = LevelViewController.TELEMETRY_INTERVAL_S
+    this.telemetry.resetThrottle()
     this.hasExitedVehicle = true
     this.playerController!.group.position.copy(this.findSafeEvaSpawnPosition())
 
-    // Show EVA visuals
-    this.playerController!.group.visible = true
-    this.multiTool!.setVisible(true)
-
-    // Register EVA tickables
-    this.tickHandler!.register(this.playerController!, TICK_PRIORITY_PHYSICS)
-    this.tickHandler!.register(this.multiToolState!, TICK_PRIORITY_PHYSICS + 1)
-    this.tickHandler!.register(this.projectileSystem!, TICK_PRIORITY_PHYSICS + 2)
-    this.tickHandler!.register(this.impactEmitter!, TICK_PRIORITY_PHYSICS + 3)
-    if (this.tractorEmitter) {
-      this.tickHandler!.register(this.tractorEmitter, TICK_PRIORITY_PHYSICS + 3)
-    }
-    if (this.surfaceRocks) {
-      this.tickHandler!.register(this.surfaceRocks, TICK_PRIORITY_PHYSICS + 3)
-    }
-    this.tickHandler!.register(this.fpsCamera!, TICK_PRIORITY_RENDER - 2)
-    this.tickHandler!.register(this.multiTool!, TICK_PRIORITY_RENDER - 2)
-    this.fpsCamera!.helmetLightRig.visible = true
-
-    // FPS camera
-    this.fpsCamera!.setTarget(this.playerController!.group)
-    this.sceneManager!.setActiveCamera(this.fpsCamera!.camera)
-    this.sceneManager!.setCamera(null)
-    if (this.postProcessing && this.fpsCamera) {
-      this.postProcessing.setCamera(this.fpsCamera.camera)
-    }
+    this.stateLifecycle.enterEva(
+      {
+        tickHandler: this.tickHandler!,
+        sceneManager: this.sceneManager!,
+        postProcessing: this.postProcessing,
+        priorities: { physics: TICK_PRIORITY_PHYSICS, render: TICK_PRIORITY_RENDER },
+      },
+      {
+        playerController: this.playerController!,
+        fpsCamera: this.fpsCamera!,
+        multiToolState: this.multiToolState!,
+        multiTool: this.multiTool!,
+        projectileSystem: this.projectileSystem!,
+        impactEmitter: this.impactEmitter!,
+        tractorEmitter: this.tractorEmitter,
+        surfaceRocks: this.surfaceRocks,
+        onClearRockTarget: () => {
+          this.currentRockTarget = null
+        },
+      },
+    )
 
     // Pointer lock
     this.setupPointerLock()
@@ -1321,21 +1248,27 @@ export class LevelViewController implements Tickable {
     this.playerController!.replenish()
     this.onDeathFade?.(0)
 
-    // Hide EVA visuals
-    this.playerController!.group.visible = false
-    this.multiTool!.setVisible(false)
-
-    // Unregister EVA tickables
-    this.tickHandler!.unregister(this.playerController!)
-    this.tickHandler!.unregister(this.multiToolState!)
-    this.tickHandler!.unregister(this.projectileSystem!)
-    this.tickHandler!.unregister(this.impactEmitter!)
-    if (this.tractorEmitter) this.tickHandler!.unregister(this.tractorEmitter)
-    if (this.surfaceRocks) this.tickHandler!.unregister(this.surfaceRocks)
-    this.currentRockTarget = null
-    this.tickHandler!.unregister(this.fpsCamera!)
-    this.tickHandler!.unregister(this.multiTool!)
-    this.fpsCamera!.helmetLightRig.visible = false
+    this.stateLifecycle.exitEva(
+      {
+        tickHandler: this.tickHandler!,
+        sceneManager: this.sceneManager!,
+        postProcessing: this.postProcessing,
+        priorities: { physics: TICK_PRIORITY_PHYSICS, render: TICK_PRIORITY_RENDER },
+      },
+      {
+        playerController: this.playerController!,
+        fpsCamera: this.fpsCamera!,
+        multiToolState: this.multiToolState!,
+        multiTool: this.multiTool!,
+        projectileSystem: this.projectileSystem!,
+        impactEmitter: this.impactEmitter!,
+        tractorEmitter: this.tractorEmitter,
+        surfaceRocks: this.surfaceRocks,
+        onClearRockTarget: () => {
+          this.currentRockTarget = null
+        },
+      },
+    )
 
     // Release pointer lock
     this.pointerLock.releaseLock()
@@ -1350,20 +1283,28 @@ export class LevelViewController implements Tickable {
   // ═══════════════════════════════════════════════════════════════
 
   private enterDead(): void {
-    // Stop player movement but keep fpsCamera ticking for the death pitch-down
-    this.tickHandler!.unregister(this.playerController!)
-    this.tickHandler!.unregister(this.multiToolState!)
-    this.tickHandler!.unregister(this.projectileSystem!)
-    this.tickHandler!.unregister(this.impactEmitter!)
-    if (this.tractorEmitter) this.tickHandler!.unregister(this.tractorEmitter)
-    if (this.surfaceRocks) this.tickHandler!.unregister(this.surfaceRocks)
-    this.currentRockTarget = null
-    this.tickHandler!.unregister(this.multiTool!)
-    // NOTE: fpsCamera stays registered — it renders the death camera drop
-    this.fpsCamera!.helmetLightRig.visible = false
-
-    // Hide the gun
-    this.multiTool!.setVisible(false)
+    // Stop player movement but keep fpsCamera ticking for the death pitch-down.
+    this.stateLifecycle.enterDead(
+      {
+        tickHandler: this.tickHandler!,
+        sceneManager: this.sceneManager!,
+        postProcessing: this.postProcessing,
+        priorities: { physics: TICK_PRIORITY_PHYSICS, render: TICK_PRIORITY_RENDER },
+      },
+      {
+        playerController: this.playerController!,
+        fpsCamera: this.fpsCamera!,
+        multiToolState: this.multiToolState!,
+        multiTool: this.multiTool!,
+        projectileSystem: this.projectileSystem!,
+        impactEmitter: this.impactEmitter!,
+        tractorEmitter: this.tractorEmitter,
+        surfaceRocks: this.surfaceRocks,
+        onClearRockTarget: () => {
+          this.currentRockTarget = null
+        },
+      },
+    )
 
     // Release pointer lock
     this.pointerLock.releaseLock()
@@ -1621,7 +1562,11 @@ export class LevelViewController implements Tickable {
     // Damage flash decay — same shape as `FpsViewController.tick`. The Vue
     // overlay reads this every frame so we always emit (0 once cleared) to
     // keep its `v-if` in sync.
-    const flash = stepDamageFlash(this.damageFlashTimer, dt, LEVEL_COMBAT_CONFIG.damageFlashDuration)
+    const flash = stepDamageFlash(
+      this.damageFlashTimer,
+      dt,
+      LEVEL_COMBAT_CONFIG.damageFlashDuration,
+    )
     this.damageFlashTimer = flash.timer
     this.onDamageFlash?.(flash.opacity)
 
@@ -1665,8 +1610,7 @@ export class LevelViewController implements Tickable {
         let vibrationFactor = 0
         if (engineFiring && this.vehicleCamera) {
           const alt = this.atmosphereCtx.landerAltitude
-          const altFade =
-            1 - Math.min(1, alt / LEVEL_ATMOSPHERE_CONFIG.thrustVibrationFadeAltitude)
+          const altFade = 1 - Math.min(1, alt / LEVEL_ATMOSPHERE_CONFIG.thrustVibrationFadeAltitude)
           const intensity =
             LEVEL_ATMOSPHERE_CONFIG.thrustVibrationMin +
             (LEVEL_ATMOSPHERE_CONFIG.thrustVibrationMax -
@@ -1709,36 +1653,16 @@ export class LevelViewController implements Tickable {
     // Broadcast state info for HUD
     if (this.stateMachine) {
       const currentState = this.stateMachine.state ?? ''
-      const grounded = this.landerController?.body.grounded ?? false
 
       const canExfil =
         currentState === 'lander' && this.hasExitedVehicle && this.isLanderNearShuttle()
 
       const canEnterLander = currentState === 'eva' && this.isPlayerNearLander()
 
-      this.onStateInfo?.({ state: currentState, grounded, canExfil, canEnterLander })
-
-      // Throttle the high-cardinality HUD payloads (lander/EVA telemetry +
-      // player-position) to TELEMETRY_INTERVAL_S. The Vue HUD bindings re-read
-      // every property on every callback, which made camera rotation feel
-      // jittery while enemies were on screen. State info above stays per-frame
-      // because it drives the action prompts (canExfil/canEnterLander).
-      this.telemetryAccumulator += dt
-      const shouldEmitTelemetry =
-        this.telemetryAccumulator >= LevelViewController.TELEMETRY_INTERVAL_S
-      if (shouldEmitTelemetry) {
-        this.telemetryAccumulator = 0
-      }
-
-      // Lander telemetry
-      if (
-        shouldEmitTelemetry &&
-        currentState === 'lander' &&
-        this.onLanderTelemetry &&
-        this.landerController
-      ) {
+      let landerTelemetry: LanderTelemetry | null = null
+      if (this.landerController) {
         const ts = this.landerController.thrusterSystem
-        this.onLanderTelemetry({
+        landerTelemetry = {
           altitude: this.landerController.altitudeAboveGround,
           velocityY: this.landerController.body.velocityY,
           posX: this.landerController.position.x,
@@ -1756,37 +1680,18 @@ export class LevelViewController implements Tickable {
           descentWarning: this.landerController.descentWarningLevel,
           attitudeWarning: this.landerController.attitudeWarningLevel,
           landingSafety: this.landerController.landingSafetyLevel,
-      surveyTimeRemaining: this.minigames.getActive()?.timeRemaining ?? null,
-      surveyProbesCollected: this.minigames.getActive()?.progressCurrent ?? null,
-      surveyProbesTotal: this.minigames.getActive()?.progressTotal ?? null,
-        })
-        this.onPlayerPosition?.(
-          this.landerController!.group.position.x,
-          this.landerController!.group.position.z,
-        )
+          surveyTimeRemaining: this.minigames.getActive()?.timeRemaining ?? null,
+          surveyProbesCollected: this.minigames.getActive()?.progressCurrent ?? null,
+          surveyProbesTotal: this.minigames.getActive()?.progressTotal ?? null,
+        }
       }
 
-      // FPS telemetry
-      if (
-        shouldEmitTelemetry &&
-        currentState === 'eva' &&
-        this.onFpsTelemetry &&
-        this.playerController
-      ) {
+      let fpsTelemetry: Omit<FpsTelemetry, 'headingRad' | 'objectives' | 'rockTarget'> | null = null
+      let fpsHeadingRad = 0
+      if (this.playerController && this.fpsCamera) {
         const ts = this.playerController.thrusterSystem
-        const headingRad = this.fpsCamera!.camera.rotation.y
-        const playerPos = this.playerController.group.position
-        const compassHeading = headingRadToCompassDeg(headingRad)
-        const objectives: CompassObjective[] = this.missionObjectives.map((obj, i) => ({
-          id: `obj-${i}`,
-          label: (OBJECTIVE_LABELS[obj.type] ?? obj.type).toUpperCase(),
-          relativeDeg: signedRelativeBearingDeg(
-            compassHeading,
-            worldBearingDegTo(playerPos.x, playerPos.z, obj.x, obj.z),
-          ),
-          type: obj.type,
-        }))
-        this.onFpsTelemetry({
+        fpsHeadingRad = this.fpsCamera.camera.rotation.y
+        fpsTelemetry = {
           hp: this.playerController.hp,
           maxHp: this.playerController.maxHp,
           o2Level: this.playerController.o2Level,
@@ -1802,15 +1707,42 @@ export class LevelViewController implements Tickable {
           rtgCapacity: this.multiToolState?.rtgCapacity ?? 1,
           modeCharge: this.multiToolState?.modeCharge ?? 0,
           modeCapacity: this.multiToolState?.modeChargeCapacity ?? 1,
-          headingRad,
-          objectives,
-          rockTarget: this.currentRockTarget,
-        })
-        this.onPlayerPosition?.(
-          this.playerController!.group.position.x,
-          this.playerController!.group.position.z,
-        )
+        }
       }
+
+      this.telemetry.tick(
+        {
+          onStateInfo: this.onStateInfo,
+          onLanderTelemetry: this.onLanderTelemetry,
+          onFpsTelemetry: this.onFpsTelemetry,
+          onPlayerPosition: this.onPlayerPosition,
+        },
+        {
+          dt,
+          state: currentState,
+          canExfil,
+          canEnterLander,
+          lander:
+            this.landerController && landerTelemetry
+              ? {
+                  telemetry: landerTelemetry,
+                  x: this.landerController.group.position.x,
+                  z: this.landerController.group.position.z,
+                }
+              : null,
+          fps:
+            this.playerController && fpsTelemetry
+              ? {
+                  telemetry: fpsTelemetry,
+                  headingRad: fpsHeadingRad,
+                  x: this.playerController.group.position.x,
+                  z: this.playerController.group.position.z,
+                  missionObjectives: this.missionObjectives,
+                  rockTarget: this.currentRockTarget,
+                }
+              : null,
+        },
+      )
     }
   }
 
@@ -2020,109 +1952,6 @@ export class LevelViewController implements Tickable {
     this.collision.removeSurfaceRockCollider(spawnIndex)
   }
 
-  /**
-   * Spawn a tiny burst of tractor-beam particles flying from the
-   * struck rock toward the player's gun muzzle. Sets each particle's
-   * velocity such that it covers the gap in roughly one emitter
-   * lifetime; minor mid-flight player movement is masked by the
-   * additive blending and short fade.
-   *
-   * Silent when any of the required systems are not initialised
-   * (e.g. mined while the EVA gun model is still streaming in).
-   *
-   * @param spawnIndex Surface rock spawn id.
-   * @param impactPos World-space hit position from the projectile system.
-   */
-  private spawnTractorBurst(
-    spawnIndex: number,
-    impactPos: THREE.Vector3,
-    particleCount: number,
-    useRockCenter: boolean,
-  ): void {
-    const tractor = this.tractorEmitter
-    const tool = this.multiTool
-    if (!tractor || !tool || particleCount <= 0) return
-    tool.getMuzzleWorldPosition(this._tractorMuzzle)
-    if (useRockCenter && this.surfaceRocks && this.heightmap) {
-      const center = this.surfaceRocks.getRockCenter(
-        spawnIndex,
-        this.heightmap,
-        this._tractorOrigin,
-      )
-      if (!center) this._tractorOrigin.copy(impactPos)
-    } else {
-      this._tractorOrigin.copy(impactPos)
-    }
-    this._tractorVel.copy(this._tractorMuzzle).sub(this._tractorOrigin)
-    const distance = this._tractorVel.length()
-    if (distance < 0.01) return
-    const speed = distance / LevelViewController.TRACTOR_LIFETIME_SEC
-    this._tractorVel.multiplyScalar(speed / distance)
-    for (let i = 0; i < particleCount; i++) {
-      tractor.emit(this._tractorOrigin, this._tractorVel)
-    }
-  }
-
-  private spawnConsumeVacuumBurst(spawnIndex: number): void {
-    const tractor = this.tractorEmitter
-    const tool = this.multiTool
-    if (!tractor || !tool || !this.surfaceRocks || !this.heightmap) return
-    const center = this.surfaceRocks.getRockCenter(spawnIndex, this.heightmap, this._tractorOrigin)
-    if (!center) return
-    tool.getMuzzleWorldPosition(this._tractorMuzzle)
-
-    for (let i = 0; i < LevelViewController.TRACTOR_PARTICLES_ON_CONSUME; i++) {
-      this._tractorSpawnPos
-        .copy(this._tractorOrigin)
-        .add(
-          this._impactVel.set(
-            (Math.random() - 0.5) * LevelViewController.TRACTOR_CONSUME_SPAWN_RADIUS,
-            (Math.random() - 0.5) * LevelViewController.TRACTOR_CONSUME_SPAWN_RADIUS,
-            (Math.random() - 0.5) * LevelViewController.TRACTOR_CONSUME_SPAWN_RADIUS,
-          ),
-        )
-
-      this._tractorVel.copy(this._tractorMuzzle).sub(this._tractorSpawnPos)
-      const distance = this._tractorVel.length()
-      if (distance < 0.01) continue
-
-      const speedFraction =
-        LevelViewController.TRACTOR_CONSUME_MIN_SPEED_FRACTION +
-        Math.random() *
-          (LevelViewController.TRACTOR_CONSUME_MAX_SPEED_FRACTION -
-            LevelViewController.TRACTOR_CONSUME_MIN_SPEED_FRACTION)
-      const speed = (distance / LevelViewController.TRACTOR_LIFETIME_SEC) * speedFraction
-      this._tractorVel.multiplyScalar(speed / distance)
-      this._tractorVel.add(
-        this._impactVel.set(
-          (Math.random() - 0.5) * LevelViewController.TRACTOR_CONSUME_LATERAL_SPEED,
-          (Math.random() - 0.5) * LevelViewController.TRACTOR_CONSUME_LATERAL_SPEED,
-          (Math.random() - 0.5) * LevelViewController.TRACTOR_CONSUME_LATERAL_SPEED,
-        ),
-      )
-      tractor.emit(this._tractorSpawnPos, this._tractorVel)
-    }
-  }
-
-  private getMiningImpactParticleCount(spawnIndex: number): number {
-    const radius = this.surfaceRocks?.getRockRadius(spawnIndex) ?? 0
-    return Math.min(
-      LevelViewController.MAX_MINING_IMPACT_PARTICLES_PER_HIT,
-      Math.round(
-        LevelViewController.MINING_IMPACT_PARTICLES_PER_HIT +
-          radius * LevelViewController.MINING_IMPACT_PARTICLES_PER_RADIUS,
-      ),
-    )
-  }
-
-  private getTractorParticleCount(spawnIndex: number): number {
-    const radius = this.surfaceRocks?.getRockRadius(spawnIndex) ?? 0
-    return Math.round(
-      LevelViewController.TRACTOR_PARTICLES_PER_HIT +
-        radius * LevelViewController.TRACTOR_PARTICLES_PER_RADIUS,
-    )
-  }
-
   private createLocalAabbCollider(
     object: THREE.Object3D,
     localMin: THREE.Vector3,
@@ -2179,11 +2008,7 @@ export class LevelViewController implements Tickable {
       fallbackOffsetX: LEVEL_TERRAIN_CONFIG.evaSpawnOffsetX,
       topYOffset: LEVEL_TERRAIN_CONFIG.evaSpawnTopYOffset,
     })
-    return new THREE.Vector3(
-      spawn.x,
-      spawn.y,
-      spawn.z,
-    )
+    return new THREE.Vector3(spawn.x, spawn.y, spawn.z)
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -2238,10 +2063,7 @@ export class LevelViewController implements Tickable {
       LEVEL_COMBAT_CONFIG.contactKnockback,
     )
     if (knockback) {
-      this.playerController?.applyLateralImpulse(
-        knockback.x,
-        knockback.z,
-      )
+      this.playerController?.applyLateralImpulse(knockback.x, knockback.z)
     }
 
     // Camera flinch + screen-space damage direction (only meaningful while
@@ -2481,7 +2303,11 @@ export class LevelViewController implements Tickable {
     if (!hm.isValidAt(cx, cz)) return
 
     const centreHeight = hm.heightAt(cx, cz)
-    const flatRadiusSq = LEVEL_OBJECTIVE_CONFIG.flattenRadius * LEVEL_OBJECTIVE_CONFIG.flattenRadius
+    const flattenRadius =
+      LEVEL_OBJECTIVE_CONFIG.flattenRadius + LEVEL_OBJECTIVE_CONFIG.visualMeshFlattenPadding
+    const flattenFullRadius =
+      LEVEL_OBJECTIVE_CONFIG.flattenFullRadius + LEVEL_OBJECTIVE_CONFIG.visualMeshFlattenPadding
+    const flatRadiusSq = flattenRadius * flattenRadius
     const vertex = new THREE.Vector3()
     const worldToLocal = new THREE.Matrix4()
 
@@ -2503,10 +2329,8 @@ export class LevelViewController implements Tickable {
 
         const dist = Math.sqrt(distSq)
         let weight = 1
-        if (dist > LEVEL_OBJECTIVE_CONFIG.flattenFullRadius) {
-          const t =
-            (dist - LEVEL_OBJECTIVE_CONFIG.flattenFullRadius) /
-            (LEVEL_OBJECTIVE_CONFIG.flattenRadius - LEVEL_OBJECTIVE_CONFIG.flattenFullRadius)
+        if (dist > flattenFullRadius) {
+          const t = (dist - flattenFullRadius) / (flattenRadius - flattenFullRadius)
           weight = 1 - t * t * (3 - 2 * t)
         }
 
@@ -2601,11 +2425,6 @@ export class LevelViewController implements Tickable {
     }
   }
 
-  /** Extend or start the looping sizzle that sells active rock contact while mining. */
-  private keepMiningSizzleAlive(): void {
-    this.levelAudio.keepMiningSizzleAlive(this.elapsed)
-  }
-
   /**
    * One-shot sizzle for LAS on terrain/rock and drill on terrain only. Uses `sfx.sizzle.impact`
    * (not the looping `sfx.sizzle`) and {@link worldPointToHearing} for pan + distance.
@@ -2669,6 +2488,8 @@ export class LevelViewController implements Tickable {
     this.pointerLock.releaseLock()
     this.teardownPointerLock()
     this.collision.dispose()
+    this.combatMining?.detach()
+    this.combatMining = null
     this.projectileSystem?.dispose()
     if (this.rockYieldSystem) {
       this.rockYieldSystem.onMineralExtracted = null
@@ -2689,6 +2510,8 @@ export class LevelViewController implements Tickable {
     this.arrivalSequence?.dispose()
     this.landerExplosion?.dispose()
     this.landerController?.dispose()
+    this.enemyVisualWarmup?.dispose()
+    this.enemyVisualWarmup = null
     this.surfaceRocks?.dispose()
     this.asteroidSurface?.dispose()
     this.thrusterWash?.dispose()

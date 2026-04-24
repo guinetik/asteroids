@@ -5,7 +5,7 @@ import { LevelCollisionFacade } from '../LevelCollisionFacade'
 function createHeightmap(height: number): Heightmap {
   return {
     heightAt: () => height,
-  } as Heightmap
+  } as unknown as Heightmap
 }
 
 describe('LevelCollisionFacade', () => {
@@ -89,10 +89,7 @@ describe('LevelCollisionFacade', () => {
     facade.initialize(createHeightmap(25))
 
     expect(
-      facade.buildEvaSpawnPosition(
-        { x: 4, y: 10, z: -3 },
-        { fallbackOffsetX: 8, topYOffset: 12 },
-      ),
+      facade.buildEvaSpawnPosition({ x: 4, y: 10, z: -3 }, { fallbackOffsetX: 8, topYOffset: 12 }),
     ).toEqual({ x: 4, y: 37, z: -3 })
   })
 
@@ -100,10 +97,7 @@ describe('LevelCollisionFacade', () => {
     const facade = new LevelCollisionFacade()
 
     expect(
-      facade.buildEvaSpawnPosition(
-        { x: 4, y: 10, z: -3 },
-        { fallbackOffsetX: 8, topYOffset: 12 },
-      ),
+      facade.buildEvaSpawnPosition({ x: 4, y: 10, z: -3 }, { fallbackOffsetX: 8, topYOffset: 12 }),
     ).toEqual({ x: 12, y: 10, z: -3 })
   })
 })
