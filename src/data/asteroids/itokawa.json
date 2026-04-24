@@ -26,7 +26,8 @@
     "ridgeFrequency": 0.2,
     "roughness": 0.5,
     "dustCoverage": 0.3,
-    "modelPath": "/models/asteroid.glb"
+    "modelPath": "/models/asteroid.glb",
+    "modelScale": 1300
   },
   "visual": {
     "albedo": 0.53,

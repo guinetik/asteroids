@@ -53,6 +53,13 @@ export interface SurfaceFeatures {
    * the level view falls back to `DEFAULT_ASTEROID_MODEL_PATH`.
    */
   modelPath?: string
+  /**
+   * Optional uniform scale applied to the GLB before baking the collision
+   * heightmap. GLBs in `public/models/*.glb` are authored near unit scale
+   * (~2 world units across), so a scale around 1200–1400 is needed to fill
+   * the level's play area. Defaults to 1 when omitted.
+   */
+  modelScale?: number
 }
 
 /** PBR material properties derived from real spectral data. Colors are RGB normalized 0–1. */

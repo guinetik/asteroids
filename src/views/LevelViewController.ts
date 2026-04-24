@@ -114,8 +114,16 @@ const TERRAIN_BAKE_START_ALTITUDE = 5000
 /** Drop altitude for the gameplay lander, measured ABOVE the baked ground Y at the spawn cell. */
 const LANDER_SPAWN_HEIGHT = 700
 
-/** Maximum random offset from center for lander spawn position (XZ). */
-const SPAWN_POSITION_RANGE = 2000
+/**
+ * Maximum random offset from center for lander spawn position (XZ). Kept well
+ * inside the asteroid silhouette so the spawn point lands on the baked mesh.
+ * With asteroid `modelScale` around 1300 the asteroid is roughly 2600 units
+ * across; a ±500 spawn disk sits comfortably inside that.
+ */
+const SPAWN_POSITION_RANGE = 500
+
+/** Attempts used by {@link sampleSpawnOnSurface} before falling back to origin. */
+const SPAWN_SAMPLE_ATTEMPTS = 32
 const LANDER_SPAWN_LIGHT_ALIGNMENT_X = 5
 const LANDER_GAMEPLAY_START_OFFSET_X = 0
 const LANDER_GAMEPLAY_START_OFFSET_Y = 0
@@ -654,9 +662,6 @@ export class LevelViewController implements Tickable {
     this.missionObjectives = mission.objectives
     this.asteroidName = asteroid.name
 
-    const spawnX = (Math.random() - 0.5) * 2 * SPAWN_POSITION_RANGE + LANDER_SPAWN_LIGHT_ALIGNMENT_X
-    const spawnZ = (Math.random() - 0.5) * 2 * SPAWN_POSITION_RANGE
-
     // ── Asteroid surface (GLB-backed) ───────────────────────────
     // `flatZones` is still used for rock-spawn exclusions around objective sites.
     const flatZones: FlatZone[] = mission.objectives.map((obj) => ({
@@ -666,6 +671,7 @@ export class LevelViewController implements Tickable {
     }))
     this.asteroidSurface = await createAsteroidSurface({
       modelPath: asteroid.surface.modelPath,
+      scale: asteroid.surface.modelScale,
       bake: {
         resolution: TERRAIN_RESOLUTION,
         worldSize: LEVEL_GRID_SIZE,
@@ -675,9 +681,14 @@ export class LevelViewController implements Tickable {
     this.heightmap = this.asteroidSurface.heightmap
     this.collisionWorld = new CollisionWorld(this.heightmap)
     this.sceneManager.addToScene(this.asteroidSurface.group)
-    // Real baked surface Y at the chosen spawn cell — used for both the gameplay
-    // lander drop altitude and the ArrivalSequence cinematic target.
-    const groundY = this.heightmap.heightAt(spawnX, spawnZ)
+
+    // Pick a spawn cell that actually sits on the baked mesh — critical on GLB
+    // terrain where most of the play area is void. Falls back to origin if the
+    // centre of the world is somehow invalid (shouldn't happen at normal scales).
+    const spawn = this.sampleSpawnOnSurface()
+    const spawnX = spawn.x + LANDER_SPAWN_LIGHT_ALIGNMENT_X
+    const spawnZ = spawn.z
+    const groundY = spawn.y
 
     this.surfaceRocks = await SurfaceRockController.create({
       heightmap: this.heightmap,
@@ -2630,6 +2641,26 @@ export class LevelViewController implements Tickable {
     const edgeTerrainY = this.heightmap.heightAt(clampedX, clampedZ)
 
     return landerPos.y < edgeTerrainY - ADRIFT_DEPTH_MARGIN
+  }
+
+  /**
+   * Pick a random (x, z) inside {@link SPAWN_POSITION_RANGE} that lies on valid
+   * baked surface, returning it with its ground Y. Retries {@link SPAWN_SAMPLE_ATTEMPTS}
+   * times before giving up and returning origin with whatever `heightAt(0,0)`
+   * resolves to — covers the pathological case where the asteroid GLB is
+   * mis-centred. The returned y is the baked mesh Y at the chosen cell.
+   */
+  private sampleSpawnOnSurface(): { x: number; y: number; z: number } {
+    const hm = this.heightmap
+    if (!hm) return { x: 0, y: 0, z: 0 }
+    for (let i = 0; i < SPAWN_SAMPLE_ATTEMPTS; i++) {
+      const x = (Math.random() - 0.5) * 2 * SPAWN_POSITION_RANGE
+      const z = (Math.random() - 0.5) * 2 * SPAWN_POSITION_RANGE
+      if (hm.isValidAt(x, z)) {
+        return { x, y: hm.heightAt(x, z), z }
+      }
+    }
+    return { x: 0, y: hm.heightAt(0, 0), z: 0 }
   }
 
   private isPlayerAdrift(): boolean {
