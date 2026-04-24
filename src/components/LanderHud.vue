@@ -1,32 +1,6 @@
 <!-- src/components/LanderHud.vue -->
 <script setup lang="ts">
-export type LandingWarningLevel = 'safe' | 'warn' | 'danger'
-
-export interface LanderTelemetry {
-  altitude: number
-  velocityY: number
-  posX: number
-  posZ: number
-  fuelLevel: number
-  fuelCapacity: number
-  mainEngineCharge: number
-  mainEngineCapacity: number
-  rcsCharge: number
-  rcsCapacity: number
-  hp: number
-  maxHp: number
-  tiltAngle: number
-  grounded: boolean
-  descentWarning: LandingWarningLevel
-  attitudeWarning: LandingWarningLevel
-  landingSafety: LandingWarningLevel
-  /** Survey timer remaining in seconds (null if no active survey). */
-  surveyTimeRemaining: number | null
-  /** Number of probes collected (null if no active survey). */
-  surveyProbesCollected: number | null
-  /** Total probes to collect (null if no active survey). */
-  surveyProbesTotal: number | null
-}
+import type { LanderTelemetry } from '@/lib/ui/landerHudTypes'
 
 const props = defineProps<{
   telemetry: LanderTelemetry

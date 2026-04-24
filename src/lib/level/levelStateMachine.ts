@@ -15,8 +15,9 @@ export type LevelState = 'arrival' | 'lander' | 'eva' | 'dead' | 'exfil' | 'comp
 /** Duration of the arrival cutscene in seconds. */
 export const ARRIVAL_DURATION = ARRIVAL_SEQUENCE_DURATION
 
-/** Seconds to hold on the death screen before redirecting. */
-export const DEAD_SCREEN_DURATION = 5.0
+/** Seconds to hold on the death screen before redirecting. Tuned to sit on
+ * top of the heartbeat + flatline SFX so the YOU DIED beat lands on the audio. */
+export const DEAD_SCREEN_DURATION = 7.0
 
 /** Distance threshold for entering the lander on foot (world units). */
 export const LANDER_INTERACT_RANGE = 15
