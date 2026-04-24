@@ -111,6 +111,7 @@ const TERRAIN_RESOLUTION = 512
 /** Y altitude from which bake rays start. Must sit above any asteroid geometry. */
 const TERRAIN_BAKE_START_ALTITUDE = 5000
 
+/** Drop altitude for the gameplay lander, measured ABOVE the baked ground Y at the spawn cell. */
 const LANDER_SPAWN_HEIGHT = 700
 
 /** Maximum random offset from center for lander spawn position (XZ). */
@@ -674,6 +675,9 @@ export class LevelViewController implements Tickable {
     this.heightmap = this.asteroidSurface.heightmap
     this.collisionWorld = new CollisionWorld(this.heightmap)
     this.sceneManager.addToScene(this.asteroidSurface.group)
+    // Real baked surface Y at the chosen spawn cell — used for both the gameplay
+    // lander drop altitude and the ArrivalSequence cinematic target.
+    const groundY = this.heightmap.heightAt(spawnX, spawnZ)
 
     this.surfaceRocks = await SurfaceRockController.create({
       heightmap: this.heightmap,
@@ -730,7 +734,7 @@ export class LevelViewController implements Tickable {
         child.castShadow = true
       }
     })
-    const gameplayStart = offsetGameplayLanderSpawn(new Vector3(spawnX, LANDER_SPAWN_HEIGHT, spawnZ))
+    const gameplayStart = offsetGameplayLanderSpawn(new Vector3(spawnX, groundY + LANDER_SPAWN_HEIGHT, spawnZ))
     this.initialLanderSpawn.copy(gameplayStart)
     this.landerController.group.position.copy(gameplayStart)
 
@@ -788,7 +792,7 @@ export class LevelViewController implements Tickable {
     this.vehicleCamera.setTarget(this.landerController.group)
 
     // ── Cinematic arrival sequence ─────────────────────────────
-    const landerSpawn = new Vector3(spawnX, LANDER_SPAWN_HEIGHT, spawnZ)
+    const landerSpawn = new Vector3(spawnX, groundY, spawnZ)
     this.arrivalSequence = new ArrivalSequence(landerSpawn)
     await this.arrivalSequence.load()
     this.sceneManager.scene.add(this.arrivalSequence.shuttleGroup)
