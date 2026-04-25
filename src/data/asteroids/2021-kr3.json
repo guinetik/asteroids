@@ -26,10 +26,10 @@
     "ridgeFrequency": 0.85,
     "roughness": 0.8,
     "dustCoverage": 0.1,
-    "modelPath": "/models/asteroid.glb",
+    "modelPath": "/models/asteroids/kr3.glb",
     "modelScale": 1300,
     "texturePath": "/texture.jpg",
-    "textureRepeat": 8
+    "textureRepeat": 1.5
   },
   "visual": {
     "albedo": 0.09,

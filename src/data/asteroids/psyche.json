@@ -26,10 +26,10 @@
     "ridgeFrequency": 0.6,
     "roughness": 0.35,
     "dustCoverage": 0.1,
-    "modelPath": "/models/asteroid.glb",
+    "modelPath": "/models/asteroids/psyche.glb",
     "modelScale": 1300,
     "texturePath": "/texture.jpg",
-    "textureRepeat": 8
+    "textureRepeat": 1.5
   },
   "visual": {
     "albedo": 0.15,

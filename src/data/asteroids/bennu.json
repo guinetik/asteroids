@@ -26,7 +26,7 @@
     "ridgeFrequency": 0.3,
     "roughness": 0.8,
     "dustCoverage": 0.2,
-    "modelPath": "/models/asteroid.glb",
+    "modelPath": "/models/asteroids/bennu.glb",
     "modelScale": 1300,
     "texturePath": "/texture.jpg",
     "textureRepeat": 8
@@ -51,6 +51,6 @@
     "sunElevation": 35,
     "sunColor": [1.0, 0.93, 0.82],
     "sunIntensity": 3.0,
-    "ambientIntensity": 0.6
+    "ambientIntensity": 1
   }
 }
