@@ -20,7 +20,7 @@ export const MINERAL_VISUALS: Record<string, MineralVisual> = {
     roughness: 0.9,
     emissive: false,
   },
-  Magnetite: { color: [0.05, 0.05, 0.05], metalness: 0.4, roughness: 0.6, emissive: false },
+  Magnetite: { color: [0.05, 0.05, 0.05], metalness: 0.8, roughness: 0.6, emissive: false },
   'Iron Sulfides': { color: [0.45, 0.35, 0.15], metalness: 0.3, roughness: 0.7, emissive: false },
   Carbonates: { color: [0.72, 0.68, 0.55], metalness: 0.05, roughness: 0.8, emissive: false },
   'Organic Compounds': {

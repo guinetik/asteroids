@@ -71,9 +71,18 @@ export interface SurfaceFeatures {
   /**
    * How many times {@link texturePath} repeats across the GLB's UV range
    * (applied to both U and V). Higher = finer grain. Defaults to 1 (no tiling).
-   * A tileable texture at 6–10 reads well on a ~2600 unit asteroid.
+   * A tileable texture at 6–10 reads well on a ~2600 unit asteroid. Also used
+   * as the EVA / on-foot triplanar repeat — the value the player sees while
+   * walking the surface.
    */
   textureRepeat?: number
+  /**
+   * Optional triplanar repeat used while in the lander/vehicle camera. At
+   * lander altitude a high {@link textureRepeat} reads as tiled noise; a
+   * lower value (e.g. 5) makes the macro read as broad terrain features.
+   * Falls back to {@link textureRepeat} when omitted.
+   */
+  textureRepeatLander?: number
   /**
    * Optional URL to a tileable detail texture multiplied on top of
    * {@link texturePath} via the same triplanar projection. Lets a low-frequency

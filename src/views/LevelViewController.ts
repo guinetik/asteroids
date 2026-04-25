@@ -155,6 +155,10 @@ export class LevelViewController implements Tickable {
   private sceneManager: SceneManager | null = null
   private heightmap: Heightmap | null = null
   private asteroidSurface: AsteroidSurfaceControllerResult | null = null
+  /** Triplanar repeat used while in lander/vehicle camera. */
+  private surfaceRepeatLander = 0
+  /** Triplanar repeat used while on foot (EVA). */
+  private surfaceRepeatEva = 0
   private surfaceRocks: SurfaceRockController | null = null
   private enemyVisualWarmup: EnemyVisualWarmup | null = null
   private readonly collision = new LevelCollisionFacade()
@@ -441,11 +445,16 @@ export class LevelViewController implements Tickable {
     // of rock as "up". Applied BEFORE the bake so the heightmap / flatten
     // pipeline all see the rotated geometry.
     this.emitBootState('preparing', 'Bringing asteroid online')
+    // Boot with the lander triplanar scale so the arrival cinematic and
+    // initial vehicle camera read correctly. enterEva() swaps to the
+    // EVA scale via the live uniform once the shader has compiled.
+    const initialTriplanarRepeat =
+      asteroid.surface.textureRepeatLander ?? asteroid.surface.textureRepeat
     this.asteroidSurface = await createAsteroidSurface({
       modelPath: asteroid.surface.modelPath,
       scale: asteroid.surface.modelScale,
       texturePath: asteroid.surface.texturePath,
-      textureRepeat: asteroid.surface.textureRepeat,
+      textureRepeat: initialTriplanarRepeat,
       detailTexturePath: asteroid.surface.detailTexturePath,
       detailRepeat: asteroid.surface.detailRepeat,
       detailStrength: asteroid.surface.detailStrength,
@@ -466,6 +475,11 @@ export class LevelViewController implements Tickable {
     this.heightmap = this.asteroidSurface.heightmap
     const collisionWorld = this.collision.initialize(this.heightmap)
     this.sceneManager.addToScene(this.asteroidSurface.group)
+    // Capture per-camera triplanar repeats. EVA uses textureRepeat (the
+    // value the player sees while walking); lander falls back to the same
+    // value when textureRepeatLander is omitted.
+    this.surfaceRepeatEva = asteroid.surface.textureRepeat ?? 1
+    this.surfaceRepeatLander = asteroid.surface.textureRepeatLander ?? this.surfaceRepeatEva
 
     // Pick a spawn cell that actually sits on the baked mesh — critical on GLB
     // terrain where most of the play area is void. Falls back to origin if the
@@ -911,6 +925,7 @@ export class LevelViewController implements Tickable {
     this.enterArrival()
 
     // ── Dev tools ────────────────────────────────────────────────
+    const surfaceControls = this.asteroidSurface?.controls ?? null
     DevConsole.register('LevelView', {
       takeDamage: (amount = 10) => this.playerController?.takeDamage(amount),
       heal: () => this.playerController?.replenish(),
@@ -921,6 +936,14 @@ export class LevelViewController implements Tickable {
         this.hasExitedVehicle = true
         this.stateMachine?.setState('exfil' as LevelState)
       },
+      // Live ground-shader tuning. Reads/writes uniforms on the patched
+      // triplanar materials so the surface re-tunes without reloading.
+      surfaceRead: () => surfaceControls?.read() ?? null,
+      surfaceTriplanarScale: (value: number) => surfaceControls?.setTriplanarScale(value),
+      surfaceDetailScale: (value: number) => surfaceControls?.setDetailScale(value),
+      surfaceDetailStrength: (value: number) => surfaceControls?.setDetailStrength(value),
+      surfaceDetailNormalStrength: (value: number) =>
+        surfaceControls?.setDetailNormalStrength(value),
     })
 
     // ── Post-processing (wraps renderer) ───────────────────────
@@ -1170,6 +1193,7 @@ export class LevelViewController implements Tickable {
     // Force the throttled HUD telemetry to emit on the very next tick so the
     // lander HUD lights up immediately on state change.
     this.telemetry.resetThrottle()
+    this.asteroidSurface?.controls?.setTriplanarScale(this.surfaceRepeatLander)
     this.stateLifecycle.enterLander(
       {
         tickHandler: this.tickHandler!,
@@ -1216,6 +1240,7 @@ export class LevelViewController implements Tickable {
     // EVA HUD lights up immediately on state change.
     this.telemetry.resetThrottle()
     this.hasExitedVehicle = true
+    this.asteroidSurface?.controls?.setTriplanarScale(this.surfaceRepeatEva)
     this.playerController!.group.position.copy(this.findSafeEvaSpawnPosition())
 
     this.stateLifecycle.enterEva(

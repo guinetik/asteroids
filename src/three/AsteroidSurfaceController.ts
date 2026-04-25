@@ -30,6 +30,13 @@ const DEFAULT_DETAIL_STRENGTH = 0.7
 /** Default strength of the detail normal map. */
 const DEFAULT_DETAIL_NORMAL_STRENGTH = 1.0
 /**
+ * Lower bound applied to the detail-color overlay before mixing with neutral
+ * white. Without this floor, near-black pixels in the detail albedo (rocky
+ * crevices) collapse the overlay to near-zero and stamp dark blotches onto the
+ * macro texture. `0.6` keeps the dark side visible without bruising the macro.
+ */
+const DETAIL_OVERLAY_DARK_FLOOR = '0.6'
+/**
  * Default softness factor mixing asteroid `visual.baseColor` with white so a
  * dark body still reads under the level's sun.
  */
@@ -88,6 +95,23 @@ function loadTilingTexture(url: string, colorSpace: THREE.ColorSpace): THREE.Tex
  * @param material - Material whose `map` should be sampled triplanar-style.
  * @param scale - Repeat factor in cycles per object-space unit.
  */
+/**
+ * Live references to the four scalar uniforms patched into a triplanar
+ * material. Shader programs are compiled lazily by Three.js, so these are
+ * collected via a sink array as each material's `onBeforeCompile` fires; the
+ * dev console mutates `.value` directly to retune at runtime without rebuild.
+ */
+interface TriplanarUniformRefs {
+  /** Macro `map` repeat factor (cycles per object-space unit). */
+  uTriplanarScale: { value: number }
+  /** Detail-layer repeat factor (cycles per object-space unit). */
+  uDetailScale: { value: number }
+  /** Detail color overlay strength, 0..1. */
+  uDetailStrength: { value: number }
+  /** Detail normal-map strength scalar. */
+  uDetailNormalStrength: { value: number }
+}
+
 interface TriplanarShaderOptions {
   /** Repeat factor for the macro `map` texture. */
   scale: number
@@ -118,17 +142,28 @@ interface TriplanarShaderOptions {
 function applyTriplanarMaterial(
   material: THREE.MeshStandardMaterial,
   opts: TriplanarShaderOptions,
+  uniformsSink?: TriplanarUniformRefs[],
 ): void {
   material.onBeforeCompile = (shader) => {
-    shader.uniforms.uTriplanarScale = { value: opts.scale }
-    shader.uniforms.uDetailScale = { value: opts.detailScale }
-    shader.uniforms.uDetailStrength = { value: opts.detailStrength }
-    shader.uniforms.uDetailNormalStrength = { value: opts.detailNormalStrength }
+    const uTriplanarScale = { value: opts.scale }
+    const uDetailScale = { value: opts.detailScale }
+    const uDetailStrength = { value: opts.detailStrength }
+    const uDetailNormalStrength = { value: opts.detailNormalStrength }
+    shader.uniforms.uTriplanarScale = uTriplanarScale
+    shader.uniforms.uDetailScale = uDetailScale
+    shader.uniforms.uDetailStrength = uDetailStrength
+    shader.uniforms.uDetailNormalStrength = uDetailNormalStrength
     if (opts.detailMap) shader.uniforms.uDetailMap = { value: opts.detailMap }
     if (opts.detailNormalMap) shader.uniforms.uDetailNormalMap = { value: opts.detailNormalMap }
     if (opts.detailRoughnessMap) {
       shader.uniforms.uDetailRoughnessMap = { value: opts.detailRoughnessMap }
     }
+    uniformsSink?.push({
+      uTriplanarScale,
+      uDetailScale,
+      uDetailStrength,
+      uDetailNormalStrength,
+    })
 
     shader.vertexShader = shader.vertexShader
       .replace(
@@ -184,7 +219,8 @@ function applyTriplanarMaterial(
             vec4 _tpDcy = texture2D(uDetailMap, _tpDy);
             vec4 _tpDcz = texture2D(uDetailMap, _tpDz);
             vec3 _tpDetail = (_tpDcx * _tpBlend.x + _tpDcy * _tpBlend.y + _tpDcz * _tpBlend.z).rgb;
-            vec3 _tpOverlay = mix(vec3(1.0), _tpDetail * 2.0, uDetailStrength);
+            // Floor the dark side so deep crevices in the detail texture can't crush the macro to near-black.
+            vec3 _tpOverlay = mix(vec3(1.0), max(_tpDetail * 2.0, vec3(${DETAIL_OVERLAY_DARK_FLOOR})), uDetailStrength);
             sampledDiffuseColor.rgb *= _tpOverlay;
           #endif
           diffuseColor *= sampledDiffuseColor;
@@ -309,12 +345,38 @@ export interface AsteroidSurfaceControllerOptions {
   rotation?: { x: number; y: number; z: number }
 }
 
+/**
+ * Live tuning handle for the asteroid's triplanar material. All setters apply
+ * to every patched material on the surface, so a single call retunes the
+ * whole asteroid in real time. Returned alongside the scene group from
+ * {@link createAsteroidSurface}; intended to be wired into the dev console.
+ */
+export interface AsteroidSurfaceControls {
+  /** Set macro texture repeat (cycles per object-space unit). */
+  setTriplanarScale(value: number): void
+  /** Set detail-layer repeat (cycles per object-space unit). */
+  setDetailScale(value: number): void
+  /** Set detail color overlay strength, clamped to `[0, 1]`. */
+  setDetailStrength(value: number): void
+  /** Set detail normal-map strength scalar. */
+  setDetailNormalStrength(value: number): void
+  /** Snapshot of the current uniform values across all patched materials. */
+  read(): {
+    triplanarScale: number
+    detailScale: number
+    detailStrength: number
+    detailNormalStrength: number
+  }
+}
+
 /** Result bundle from {@link createAsteroidSurface}. */
 export interface AsteroidSurfaceControllerResult {
   /** Root scene group for the asteroid. Add this to the scene graph. */
   group: THREE.Group
   /** Baked heightmap for physics/queries. */
   heightmap: Heightmap
+  /** Live runtime tuning handle. `null` when the GLB's embedded material is preserved. */
+  controls: AsteroidSurfaceControls | null
   /** Dispose GPU resources. */
   dispose: () => void
 }
@@ -365,6 +427,8 @@ export async function createAsteroidSurface(
   const tintG = tint ? 1 + (tint[1] - 1) * tintStrength : 1
   const tintB = tint ? 1 + (tint[2] - 1) * tintStrength : 1
 
+  const uniformRefs: TriplanarUniformRefs[] = []
+
   if (!useEmbedded) {
     scene.traverse((child) => {
       if (!(child as THREE.Mesh).isMesh) return
@@ -375,15 +439,19 @@ export async function createAsteroidSurface(
         mat.map?.dispose()
         if (albedoMap) {
           mat.map = albedoMap
-          applyTriplanarMaterial(mat, {
-            scale: repeat,
-            detailMap,
-            detailScale: detailRepeat,
-            detailStrength,
-            detailNormalMap,
-            detailNormalStrength,
-            detailRoughnessMap,
-          })
+          applyTriplanarMaterial(
+            mat,
+            {
+              scale: repeat,
+              detailMap,
+              detailScale: detailRepeat,
+              detailStrength,
+              detailNormalMap,
+              detailNormalStrength,
+              detailRoughnessMap,
+            },
+            uniformRefs,
+          )
         }
         mat.color.setRGB(tintR, tintG, tintB)
         if (options.metalness !== undefined) {
@@ -409,9 +477,37 @@ export async function createAsteroidSurface(
 
   const heightmap = bakeHeightmapFromMesh(scene, options.bake)
 
+  const controls: AsteroidSurfaceControls | null = useEmbedded
+    ? null
+    : {
+        setTriplanarScale: (value) => {
+          for (const u of uniformRefs) u.uTriplanarScale.value = value
+        },
+        setDetailScale: (value) => {
+          for (const u of uniformRefs) u.uDetailScale.value = value
+        },
+        setDetailStrength: (value) => {
+          const clamped = Math.max(0, Math.min(1, value))
+          for (const u of uniformRefs) u.uDetailStrength.value = clamped
+        },
+        setDetailNormalStrength: (value) => {
+          for (const u of uniformRefs) u.uDetailNormalStrength.value = value
+        },
+        read: () => {
+          const first = uniformRefs[0]
+          return {
+            triplanarScale: first?.uTriplanarScale.value ?? repeat,
+            detailScale: first?.uDetailScale.value ?? detailRepeat,
+            detailStrength: first?.uDetailStrength.value ?? detailStrength,
+            detailNormalStrength: first?.uDetailNormalStrength.value ?? detailNormalStrength,
+          }
+        },
+      }
+
   return {
     group,
     heightmap,
+    controls,
     dispose: () => {
       group.traverse((child) => {
         if ('geometry' in child) {

@@ -53,13 +53,20 @@ export interface AsteroidRockDistributionOptions {
 
 const REFERENCE_WORLD_SIZE = 8000
 const EDGE_MARGIN_FRACTION = 0.08
-const MIN_DIAMETER = 2.8
-const MAX_DIAMETER = 18
-const LARGE_BOULDER_DIAMETER = 34
-const MIN_ROCKS = 450
-const MAX_ROCKS = 1600
+const MIN_DIAMETER = 1.6
+const MAX_DIAMETER = 12.5
+const LARGE_BOULDER_DIAMETER = 22
+const MIN_ROCKS = 170
+const MAX_ROCKS = 680
 const MIN_SPACING_FACTOR = 0.58
 const MAX_ATTEMPTS_FACTOR = 12
+const MIN_BURIAL_FRACTION = 0.14
+const MAX_BURIAL_FRACTION = 0.38
+const BASE_BURIAL_FRACTION = 0.16
+const DUST_BURIAL_FRACTION = 0.14
+const CRATER_BURIAL_FRACTION = 0.05
+const RANDOM_BURIAL_FRACTION = 0.12
+const EJECTA_BURIAL_MULTIPLIER = 0.65
 
 /** Park–Miller style PRNG for deterministic rock placement. */
 function seededRandom(seed: number): () => number {
@@ -91,13 +98,15 @@ function sampleDiameter(k: number, minD: number, maxD: number, u: number): numbe
 /** Picks standard vs “hero” boulder sizes from surface traits and ejecta boost. */
 function sampleBoulderDiameter(surface: SurfaceFeatures, boost: number, rng: () => number): number {
   const bigChance =
-    0.08
-    + surface.boulderDensity * 0.18
-    + surface.roughness * 0.08
-    + clamp(boost * 0.22, 0, 0.18)
+    0.025 + surface.boulderDensity * 0.08 + surface.roughness * 0.035 + clamp(boost * 0.12, 0, 0.09)
 
-  if (rng() > clamp(bigChance, 0.08, 0.4)) {
-    return sampleDiameter(surface.boulderDensity + surface.roughness * 0.2, MIN_DIAMETER, MAX_DIAMETER, rng())
+  if (rng() > clamp(bigChance, 0.025, 0.18)) {
+    return sampleDiameter(
+      surface.boulderDensity + surface.roughness * 0.2,
+      MIN_DIAMETER,
+      MAX_DIAMETER,
+      rng(),
+    )
   }
 
   const t = Math.pow(rng(), 0.55)
@@ -107,11 +116,11 @@ function sampleBoulderDiameter(surface: SurfaceFeatures, boost: number, rng: () 
 /** Maps authored surface traits to a 0→1 rock-density scalar. */
 function effectiveRockAbundance(surface: SurfaceFeatures): number {
   const base =
-    0.02
-    + surface.boulderDensity * 0.18
-    + surface.roughness * 0.08
-    + surface.craterDensity * 0.05
-    - surface.dustCoverage * 0.08
+    0.012 +
+    surface.boulderDensity * 0.1 +
+    surface.roughness * 0.045 +
+    surface.craterDensity * 0.032 -
+    surface.dustCoverage * 0.065
   return clamp(base, 0.02, 0.28)
 }
 
@@ -252,9 +261,21 @@ export function generateAsteroidRockDistribution(
 
     const tiltStrength = 0.04 + surface.roughness * 0.12
     const hdNoise = noise.n2(attempt * 0.11, attempt * 0.07)
-    const heightRatio = clamp(baseHeightRatio + 0.1 + hdNoise * 0.08 + (isEjecta ? 0.05 : 0), 0.3, 0.88)
-    const burialChance = 0.02 + surface.dustCoverage * 0.14 + surface.craterDensity * 0.04
-    const burial = rng() < burialChance ? 0.04 + rng() * 0.12 : 0
+    const heightRatio = clamp(
+      baseHeightRatio + 0.1 + hdNoise * 0.08 + (isEjecta ? 0.05 : 0),
+      0.3,
+      0.88,
+    )
+    const burialBase =
+      BASE_BURIAL_FRACTION +
+      surface.dustCoverage * DUST_BURIAL_FRACTION +
+      surface.craterDensity * CRATER_BURIAL_FRACTION +
+      rng() * RANDOM_BURIAL_FRACTION
+    const burial = clamp(
+      burialBase * (isEjecta ? EJECTA_BURIAL_MULTIPLIER : 1),
+      MIN_BURIAL_FRACTION,
+      MAX_BURIAL_FRACTION,
+    )
 
     accepted.push({
       x,

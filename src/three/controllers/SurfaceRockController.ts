@@ -43,6 +43,12 @@ const ROCK_TEXTURE_BASE_DIR = '/textures/rocks'
 const ROCK_ENV_MAP_INTENSITY = 0.32
 /** Upper metalness bound for mined rocks so metallic minerals stay mineral, not chrome. */
 const ROCK_MAX_METALNESS = 0.06
+/** Always sink rock bases slightly so instances read as embedded in regolith. */
+const ROCK_BASE_SINK_FRACTION = 0.1
+/** Fraction of spawn burial applied to vertical planting depth. */
+const ROCK_BURIAL_SINK_MULTIPLIER = 0.92
+/** How much burial reduces the exposed visual/collision height. */
+const ROCK_EXPOSED_HEIGHT_BURIAL_MULTIPLIER = 0.68
 
 /**
  * Per-mineral material definition. `folder` is the subdirectory under
@@ -482,7 +488,10 @@ export class SurfaceRockController implements Tickable {
 
           reusablePos.set(
             spawn.x,
-            groundY - template.bottomY * scaleY - spawn.burial * scaleY * 0.45 - scaleY * 0.04,
+            groundY -
+              template.bottomY * scaleY -
+              scaleY * ROCK_BASE_SINK_FRACTION -
+              spawn.burial * scaleY * ROCK_BURIAL_SINK_MULTIPLIER,
             spawn.z,
           )
           reusableScale.set(scaleX, scaleY, scaleZ)
@@ -516,7 +525,10 @@ export class SurfaceRockController implements Tickable {
   buildColliders(heightmap: Heightmap): WorldSphereCollider[] {
     return this.spawns.map((spawn, index) => {
       const radius = Math.max(1.2, spawn.diameter * 0.34)
-      const exposedHeight = spawn.diameter * spawn.heightRatio * (1 - spawn.burial * 0.35)
+      const exposedHeight =
+        spawn.diameter *
+        spawn.heightRatio *
+        (1 - spawn.burial * ROCK_EXPOSED_HEIGHT_BURIAL_MULTIPLIER)
       const centerY =
         heightmap.heightAt(spawn.x, spawn.z) + Math.max(radius * 0.7, exposedHeight * 0.45)
       return {
@@ -637,7 +649,10 @@ export class SurfaceRockController implements Tickable {
     const spawn = this.spawns[spawnIndex]
     if (!spawn) return null
     const radius = Math.max(1.2, spawn.diameter * 0.34)
-    const exposedHeight = spawn.diameter * spawn.heightRatio * (1 - spawn.burial * 0.35)
+    const exposedHeight =
+      spawn.diameter *
+      spawn.heightRatio *
+      (1 - spawn.burial * ROCK_EXPOSED_HEIGHT_BURIAL_MULTIPLIER)
     const centerY =
       heightmap.heightAt(spawn.x, spawn.z) + Math.max(radius * 0.7, exposedHeight * 0.45)
     return out.set(spawn.x, centerY, spawn.z)
