@@ -74,6 +74,49 @@ export interface SurfaceFeatures {
    * A tileable texture at 6–10 reads well on a ~2600 unit asteroid.
    */
   textureRepeat?: number
+  /**
+   * Optional URL to a tileable detail texture multiplied on top of
+   * {@link texturePath} via the same triplanar projection. Lets a low-frequency
+   * macro texture (e.g. a NASA "view from space" image at 1–2 repeats) get
+   * grain and gravel detail when the player walks around in FPS without losing
+   * the asteroid's distinct silhouette identity at lander altitude. Recommended
+   * input: a seamless rocky-ground tile at 50–100 repeats.
+   */
+  detailTexturePath?: string
+  /**
+   * Repeat factor for {@link detailTexturePath} in cycles per object-space
+   * unit. High values (50+) keep the detail tile invisible at distance via
+   * mipmapping while showing crisp grain at FPS range. Defaults to 60.
+   */
+  detailRepeat?: number
+  /**
+   * Strength of the detail multiply blend, 0..1. `0` disables detail entirely
+   * (macro only). `1` is full overlay where neutral-grey detail leaves macro
+   * unchanged but light/dark spots brighten/darken the surface. Defaults to 0.7.
+   */
+  detailStrength?: number
+  /**
+   * Optional tangent-space normal map for the detail layer. Triplanar-applied
+   * via whiteout blending in object space. The single biggest visual upgrade
+   * for FPS close-ups: glancing sun light catches micro-relief that pure color
+   * detail can't convey. OpenGL-convention normal maps (green up).
+   */
+  detailNormalPath?: string
+  /** Detail normal-map strength scalar, 0..2. Defaults to 1. */
+  detailNormalStrength?: number
+  /**
+   * Optional roughness map for the detail layer. Triplanar-multiplied into the
+   * material roughness for spec variation across micro-terrain.
+   */
+  detailRoughnessPath?: string
+  /**
+   * When true, the runtime skips the material override entirely and lets the
+   * asteroid GLB render with whatever textures and material it ships with.
+   * Pair with running the normalization pipeline under
+   * `ASTEROID_PRESERVE_TEXTURES=1` so the embedded textures survive into the
+   * runtime model.
+   */
+  useEmbeddedTexture?: boolean
 }
 
 /** PBR material properties derived from real spectral data. Colors are RGB normalized 0–1. */

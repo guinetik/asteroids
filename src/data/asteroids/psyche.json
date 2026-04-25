@@ -28,7 +28,7 @@
     "dustCoverage": 0.1,
     "modelPath": "/models/asteroids/psyche.glb",
     "modelScale": 1300,
-    "texturePath": "/texture.jpg",
+    "texturePath": "/psyche.png",
     "textureRepeat": 1.5
   },
   "visual": {
@@ -36,7 +36,7 @@
     "baseColor": [0.6, 0.6, 0.62],
     "accentColor": [0.5, 0.4, 0.25],
     "emissive": false,
-    "metalness": 0.75,
+    "metalness": 0.55,
     "roughnessMap": 0.35
   },
   "physical": {

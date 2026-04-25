@@ -28,8 +28,14 @@
     "dustCoverage": 0.2,
     "modelPath": "/models/asteroids/bennu.glb",
     "modelScale": 1300,
-    "texturePath": "/texture.jpg",
-    "textureRepeat": 8
+    "texturePath": "/textures/asteroids/bennu-4k.jpg",
+    "textureRepeat": 2,
+    "detailTexturePath": "/textures/asteroids/default/color.jpg",
+    "detailNormalPath": "/textures/asteroids/default/normal.jpg",
+    "detailRoughnessPath": "/textures/asteroids/default/roughness.jpg",
+    "detailRepeat": 60,
+    "detailStrength": 0.5,
+    "detailNormalStrength": 1.2
   },
   "visual": {
     "albedo": 0.044,

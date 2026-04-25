@@ -330,8 +330,9 @@ async function normalizeAsteroidGlb(io, referenceBounds, inputPath, outputPath) 
   const error = Number(process.env.ASTEROID_SIMPLIFY_ERROR ?? DEFAULT_SIMPLIFY_ERROR)
 
   await MeshoptSimplifier.ready
-  await document.transform(
-    stripTexturesAndUseRuntimeMaterial(),
+  const preserveTextures = process.env.ASTEROID_PRESERVE_TEXTURES === '1'
+  const transforms = [
+    ...(preserveTextures ? [] : [stripTexturesAndUseRuntimeMaterial()]),
     center({ pivot: 'center' }),
     fitToReferenceBounds(referenceBounds),
     dedup(),
@@ -340,9 +341,10 @@ async function normalizeAsteroidGlb(io, referenceBounds, inputPath, outputPath) 
     stripNormalsForResmooth(),
     weld(),
     smoothNormalsTransform(),
-    prune({ keepAttributes: true, keepIndices: true, keepLeaves: true, keepSolidTextures: false }),
+    prune({ keepAttributes: true, keepIndices: true, keepLeaves: true, keepSolidTextures: preserveTextures }),
     sparse(),
-  )
+  ]
+  await document.transform(...transforms)
 
   await io.write(outputPath, document)
 }
