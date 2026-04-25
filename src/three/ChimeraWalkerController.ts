@@ -29,17 +29,17 @@ const LEG_TUBE_AXIAL_SEGMENTS = 6
 const LEG_TUBE_RADIAL_SEGMENTS = 4
 const LEG_TUBE_RADIUS_UPPER = 0.09
 const LEG_TUBE_RADIUS_LOWER = 0.075
-const TENTACLE_COUNT = 10
-const TENTACLE_SEGMENTS = 4
+const TENTACLE_COUNT = 6
+const TENTACLE_SEGMENTS = 3
 const TENTACLE_RADIAL_ATTACH = 0.72
 const TENTACLE_RADIUS_START = 0.055
 const TENTACLE_RADIUS_STEP = 0.01
-/** Leg curve rebake rate — tentacles dominate cost; legs can update slower. */
-const LEG_GEOMETRY_UPDATE_INTERVAL = 1 / 7
-/** Tentacle tubes are the hottest path (~40 meshes) — keep this low (~5 Hz). */
-const TENTACLE_GEOMETRY_UPDATE_INTERVAL = 1 / 5
+/** Leg curve rebake rate — rescue missions favor steady frames over limb fidelity. */
+const LEG_GEOMETRY_UPDATE_INTERVAL = 1 / 4
+/** Tentacle tubes are the hottest path; keep uploads sparse during enemy packs. */
+const TENTACLE_GEOMETRY_UPDATE_INTERVAL = 1 / 3
 /** Axial segments per tentacle quadratic span. */
-const TENTACLE_TUBE_AXIAL_SEGMENTS = 5
+const TENTACLE_TUBE_AXIAL_SEGMENTS = 4
 const TENTACLE_TUBE_RADIAL_SEGMENTS = 4
 
 const BODY_HEIGHT = 6.5

@@ -30,9 +30,9 @@ const LEG_TUBE_RADIUS = 0.025
 const LEG_TUBE_AXIAL_SEGMENTS = 8
 /**
  * Seconds between leg curve rebakes — lower frequency cuts alloc/GPU upload cost
- * (was ~15 Hz; ~6 Hz is enough for leg motion at typical scales).
+ * (was ~15 Hz; ~4 Hz is enough for leg motion during rescue packs).
  */
-const LEG_GEOMETRY_UPDATE_INTERVAL = 1 / 6
+const LEG_GEOMETRY_UPDATE_INTERVAL = 1 / 4
 
 const HIT_FLASH_DURATION = 0.08
 const HIT_RECOIL_DURATION = 0.25

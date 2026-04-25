@@ -10,10 +10,11 @@ import type { SpireController } from '@/three/SpireController'
  * `MutableTubeGeometry.update` calls (and the analytic-normal recompute)
  * for enemies the player can't see moving anyway.
  *
- * 50 world units feels right at the FPS player's typical FOV; tweak if
+ * 36 world units keeps close threats animated while avoiding camera-turn
+ * uploads for background rescue packs at the FPS player's typical FOV.
  * the player ends up close-zooming on distant enemies.
  */
-export const ENEMY_LOD_GEOMETRY_DISTANCE = 50
+export const ENEMY_LOD_GEOMETRY_DISTANCE = 36
 export const ENEMY_LOD_GEOMETRY_DISTANCE_SQ =
   ENEMY_LOD_GEOMETRY_DISTANCE * ENEMY_LOD_GEOMETRY_DISTANCE
 
@@ -28,7 +29,7 @@ export const ENEMY_LOD_GEOMETRY_DISTANCE_SQ =
  * `setLightsEnabled(false)` so their `THREE.PointLight.visible = false`
  * skips them at render time entirely.
  */
-export const ENEMY_MAX_LIVE_LIGHTS = 4
+export const ENEMY_MAX_LIVE_LIGHTS = 2
 
 /**
  * Minimal duck-typed interface the LOD helper needs from any enemy

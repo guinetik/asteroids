@@ -42,7 +42,7 @@ const HEAL_BOLT_AMOUNT = 25
  * Used for VFX and contact SFX; drill mining uses {@link ProjectileSystem.onRockHit} in addition
  * for `drill_rock`.
  */
-export type ProjectileImpactKind = 'terrain' | 'drill_rock' | 'weapon_rock' | 'enemy' | 'hostage'
+export type ProjectileImpactKind = 'terrain' | 'drill_rock' | 'enemy' | 'hostage'
 
 /**
  * Carried with {@link ProjectileSystem.onImpact} so listeners can style feedback per mode/surface
@@ -305,8 +305,6 @@ export class ProjectileSystem implements Tickable {
       let hitEnemy = false
       let hitHostage = false
       let hitRock = false
-      /** True when a LAS bolt hits a registered rock surface (VFX only; no mining). */
-      let hitWeaponRock = false
 
       if (p.boltKind === 'heal') {
         const healHit = this.closestHostageHealHit(this._prevPos, pos)
@@ -340,16 +338,6 @@ export class ProjectileSystem implements Tickable {
             hitRock = true
           }
         }
-
-        // Weapon bolts: rocks are solid for impact VFX (same spark burst as
-        // terrain) but do not mine — `onRockHit` is drill-only.
-        if (!hitEnemy && !hitHostage && !hitRock && p.boltKind === 'weapon') {
-          const rockHit = this.closestRockHit(this._prevPos, pos)
-          if (rockHit) {
-            this._callbackPos.lerpVectors(this._prevPos, pos, rockHit.t)
-            hitWeaponRock = true
-          }
-        }
       }
 
       // Terrain collision
@@ -357,18 +345,14 @@ export class ProjectileSystem implements Tickable {
       const hitTerrain = pos.y <= floorY + TERRAIN_HIT_MARGIN
 
       // Remove on hit or timeout
-      if (hitEnemy || hitHostage || hitRock || hitWeaponRock || hitTerrain || p.age >= BOLT_MAX_LIFETIME) {
-        if (hitTerrain || hitEnemy || hitHostage || hitRock || hitWeaponRock) {
-          if (!hitWeaponRock) {
-            this._callbackPos.copy(pos)
-          }
+      if (hitEnemy || hitHostage || hitRock || hitTerrain || p.age >= BOLT_MAX_LIFETIME) {
+        if (hitTerrain || hitEnemy || hitHostage || hitRock) {
+          this._callbackPos.copy(pos)
           let kind: ProjectileImpactKind
           if (hitEnemy) {
             kind = 'enemy'
           } else if (hitHostage) {
             kind = 'hostage'
-          } else if (hitWeaponRock) {
-            kind = 'weapon_rock'
           } else if (hitRock) {
             kind = 'drill_rock'
           } else {
