@@ -190,6 +190,11 @@ const _yAxis = new THREE.Vector3(0, 1, 0)
 const _qTilt = new THREE.Quaternion()
 const _euler = new THREE.Euler()
 const _qYaw = new THREE.Quaternion()
+const _qYawInv = new THREE.Quaternion()
+const _qSlope = new THREE.Quaternion()
+const _eulerSlope = new THREE.Euler()
+const _normalLocal = new THREE.Vector3()
+const _legLocal = new THREE.Vector3()
 const _sampleOffset = new THREE.Vector3()
 const _sampleWorld = new THREE.Vector3()
 
@@ -202,26 +207,27 @@ interface TerrainSupportSample {
 }
 
 /** Maximum safe landing speed (abs velocityY) — no damage below this. */
-const WARN_LANDING_SPEED = 5.0
-const SAFE_LANDING_SPEED = 8.0
+const WARN_LANDING_SPEED = 7.0
+const SAFE_LANDING_SPEED = 12.0
 
 /** Maximum safe landing angle (combined tilt magnitude, radians ~15°). */
 const WARN_LANDING_ANGLE = 0.17
 const SAFE_LANDING_ANGLE = 0.26
 
 /** HP damage per unit of excess landing speed. */
-const SPEED_DAMAGE_MULTIPLIER = 2.0
+const SPEED_DAMAGE_MULTIPLIER = 1.0
 
 /** HP damage per radian of excess landing tilt. */
-const ANGLE_DAMAGE_MULTIPLIER = 25.0
+const ANGLE_DAMAGE_MULTIPLIER = 15.0
 
 /**
  * HP damage per radian of surface slope beyond {@link SAFE_LANDING_ANGLE}
- * at the moment of touchdown. Tuned high enough that touching down onto a
- * near-vertical wall (slope ≈ π/2 rad) is fatal even at zero descent speed,
- * so the lander can no longer "stick" sideways to a cliff face.
+ * at the moment of touchdown. Combined with the impact-speed-scaled
+ * angular damage gate, a low-speed touchdown on any slope costs zero
+ * HP, while a sideways slam into a near-vertical wall still scales up
+ * fast enough to be fatal.
  */
-const SURFACE_SLOPE_DAMAGE_MULTIPLIER = 90.0
+const SURFACE_SLOPE_DAMAGE_MULTIPLIER = 50.0
 
 /** Impact speed (units/s) that maps to full touchdown volume (1.0). */
 const TOUCHDOWN_VOLUME_REF_SPEED = 20
@@ -237,6 +243,18 @@ const LANDING_BRAKING_DECELERATION = Math.max(0.01, MAIN_ENGINE_THRUST - GAMEPLA
 const LANDER_SUPPORT_SAMPLE_RADIUS = 9
 const LANDER_SUPPORT_SAMPLE_DIAGONAL = LANDER_SUPPORT_SAMPLE_RADIUS * 0.72
 const LANDER_SUPPORT_CONTACT_SAMPLE_COUNT = 3
+
+/**
+ * Lander corner mounts used as the four leg footprint anchors. Each is
+ * a downward-facing RCS node placed at a body corner — close enough to
+ * the actual leg foot for plane-fit purposes. Sampling terrain at these
+ * positions gives per-leg ground heights so the body can rest with all
+ * four feet planted instead of conforming to a noisy averaged normal.
+ */
+const LEG_NODE_FL = 'RCS_FL_Down'
+const LEG_NODE_FR = 'RCS_FR_Down'
+const LEG_NODE_BL = 'RCS_BL_Down'
+const LEG_NODE_BR = 'RCS_BR_Down'
 const LANDER_COLLISION_RADIUS = 8.5
 const LANDER_COLLISION_SUBSTEP_DISTANCE = 2
 const LANDER_COLLISION_SKIN_WIDTH = 0.1
@@ -675,15 +693,38 @@ export class LanderController implements Tickable {
       // tracks so a sideways slam into a cliff face or an inverted landing
       // both crash, even when the other channel is near zero.
       const landerTilt = Math.sqrt(this.tiltX * this.tiltX + this.tiltZ * this.tiltZ)
-      const supportNormalY = Math.max(-1, Math.min(1, this.sampleTerrainSupport().normal.y))
+      const support = this.sampleTerrainSupport()
+      const supportNormalY = Math.max(-1, Math.min(1, support.normal.y))
       const surfaceSlope = Math.acos(supportNormalY)
       const speedExcess = Math.max(0, impactSpeed - SAFE_LANDING_SPEED)
       const tiltExcess = Math.max(0, landerTilt - SAFE_LANDING_ANGLE)
       const slopeExcess = Math.max(0, surfaceSlope - SAFE_LANDING_ANGLE)
+      // Angle penalties only kick in once you're impacting hard enough to
+      // be a "crash" — gentle touchdowns (impactSpeed < WARN_LANDING_SPEED)
+      // get a free pass on the slope/tilt component, so parking on a hill
+      // at <1 m/s no longer chews HP. Cliff-slamming still scales fully
+      // because impactSpeed climbs the moment you're moving sideways into
+      // a wall.
+      const angularDamageScale = Math.max(
+        0,
+        Math.min(1, (impactSpeed - WARN_LANDING_SPEED) / SAFE_LANDING_SPEED),
+      )
       const damage =
         speedExcess * SPEED_DAMAGE_MULTIPLIER +
-        tiltExcess * ANGLE_DAMAGE_MULTIPLIER +
-        slopeExcess * SURFACE_SLOPE_DAMAGE_MULTIPLIER
+        (tiltExcess * ANGLE_DAMAGE_MULTIPLIER + slopeExcess * SURFACE_SLOPE_DAMAGE_MULTIPLIER) *
+          angularDamageScale
+      // Snap visual tilt to the surface normal on touchdown so the body
+      // sits parallel to the slope immediately instead of waiting for
+      // the per-frame conformance lerp to catch up. Yaw-correct the
+      // world-space normal into lander local frame before extracting
+      // tilt angles — same reasoning as the grounded conformance branch.
+      _qYaw.setFromAxisAngle(_yAxis, this.yaw)
+      _normalLocal
+        .set(support.normal.x, support.normal.y, support.normal.z)
+        .applyQuaternion(_qYawInv.copy(_qYaw).invert())
+      const safeNy = Math.max(1e-5, _normalLocal.y)
+      this.tiltX = Math.atan2(_normalLocal.z, safeNy)
+      this.tiltZ = Math.atan2(-_normalLocal.x, safeNy)
       // Touchdown thud on every landing — volume scales with impact speed, min 0.4
       const touchdownVol = Math.min(1.0, Math.max(0.4, impactSpeed / TOUCHDOWN_VOLUME_REF_SPEED))
       useAudio().play('sfx.touchdown', { volume: touchdownVol })
@@ -955,14 +996,19 @@ export class LanderController implements Tickable {
     let targetTiltZ = 0
     let speed: number
 
-    if (this.body.grounded && this.heightmap) {
-      // Grounded: conform to terrain slope via surface normal
+    if (this.body.grounded) {
+      // Grounded: conform to terrain slope via surface normal. Works for
+      // both heightmap-driven and collision-mesh-driven asteroids — the
+      // sample falls back to the collisionWorld normal when no heightmap
+      // is loaded. The sampler returns a world-space normal; q_tilt is
+      // applied in lander-local frame (post-yaw), so we yaw-correct to
+      // n_local = q_yaw⁻¹ · n_world before extracting tilt angles or
+      // the result rotates with yaw instead of with the slope.
       const n = this.sampleTerrainSupport().normal
-      // Normal (nx, ny, nz) → tilt angles:
-      //   tiltX (roll around X) = atan2(nz, ny) — slope along Z axis
-      //   tiltZ (pitch around Z) = atan2(-nx, ny) — slope along X axis
-      targetTiltX = Math.atan2(n.z, n.y)
-      targetTiltZ = Math.atan2(-n.x, n.y)
+      _qYaw.setFromAxisAngle(_yAxis, this.yaw)
+      _normalLocal.set(n.x, n.y, n.z).applyQuaternion(_qYawInv.copy(_qYaw).invert())
+      targetTiltX = Math.atan2(_normalLocal.z, _normalLocal.y)
+      targetTiltZ = Math.atan2(-_normalLocal.x, _normalLocal.y)
       speed = GROUND_TILT_LERP_SPEED
     } else {
       // Airborne: RCS input drives tilt
@@ -1019,88 +1065,82 @@ export class LanderController implements Tickable {
   }
 
   private sampleTerrainSupport(): TerrainSupportSample {
-    if (!this.heightmap) {
-      return {
-        height: DEFAULT_FLOOR_Y,
-        normal: { x: 0, y: 1, z: 0 },
-        colliderId: null,
-        hasSupport: true,
-      }
-    }
+    let supportHeight = -Infinity
+    let supportNormal: { x: number; y: number; z: number } = { x: 0, y: 1, z: 0 }
+    let hasSupport = false
 
-    const sampleOffsets = [
-      [0, 0],
-      [LANDER_SUPPORT_SAMPLE_RADIUS, 0],
-      [-LANDER_SUPPORT_SAMPLE_RADIUS, 0],
-      [0, LANDER_SUPPORT_SAMPLE_RADIUS],
-      [0, -LANDER_SUPPORT_SAMPLE_RADIUS],
-      [LANDER_SUPPORT_SAMPLE_DIAGONAL, LANDER_SUPPORT_SAMPLE_DIAGONAL],
-      [LANDER_SUPPORT_SAMPLE_DIAGONAL, -LANDER_SUPPORT_SAMPLE_DIAGONAL],
-      [-LANDER_SUPPORT_SAMPLE_DIAGONAL, LANDER_SUPPORT_SAMPLE_DIAGONAL],
-      [-LANDER_SUPPORT_SAMPLE_DIAGONAL, -LANDER_SUPPORT_SAMPLE_DIAGONAL],
-    ] as const
+    if (this.heightmap) {
+      const legSample = this.sampleLegFootprint()
+      if (legSample) {
+        supportHeight = legSample.height
+        supportNormal = legSample.normal
+        hasSupport = true
+      } else {
+        const sampleOffsets = [
+          [0, 0],
+          [LANDER_SUPPORT_SAMPLE_RADIUS, 0],
+          [-LANDER_SUPPORT_SAMPLE_RADIUS, 0],
+          [0, LANDER_SUPPORT_SAMPLE_RADIUS],
+          [0, -LANDER_SUPPORT_SAMPLE_RADIUS],
+          [LANDER_SUPPORT_SAMPLE_DIAGONAL, LANDER_SUPPORT_SAMPLE_DIAGONAL],
+          [LANDER_SUPPORT_SAMPLE_DIAGONAL, -LANDER_SUPPORT_SAMPLE_DIAGONAL],
+          [-LANDER_SUPPORT_SAMPLE_DIAGONAL, LANDER_SUPPORT_SAMPLE_DIAGONAL],
+          [-LANDER_SUPPORT_SAMPLE_DIAGONAL, -LANDER_SUPPORT_SAMPLE_DIAGONAL],
+        ] as const
 
-    _qYaw.setFromAxisAngle(_yAxis, this.yaw)
+        _qYaw.setFromAxisAngle(_yAxis, this.yaw)
 
-    const sampledHeights: number[] = []
-    let normalX = 0
-    let normalY = 0
-    let normalZ = 0
-    let sampledCount = 0
+        const sampledHeights: number[] = []
+        let normalX = 0
+        let normalY = 0
+        let normalZ = 0
+        let sampledCount = 0
 
-    for (const [offsetX, offsetZ] of sampleOffsets) {
-      _sampleOffset.set(offsetX, 0, offsetZ).applyQuaternion(_qYaw)
-      _sampleWorld.set(
-        this.group.position.x + _sampleOffset.x,
-        this.group.position.y,
-        this.group.position.z + _sampleOffset.z,
-      )
+        for (const [offsetX, offsetZ] of sampleOffsets) {
+          _sampleOffset.set(offsetX, 0, offsetZ).applyQuaternion(_qYaw)
+          _sampleWorld.set(
+            this.group.position.x + _sampleOffset.x,
+            this.group.position.y,
+            this.group.position.z + _sampleOffset.z,
+          )
 
-      const sampleHeight = this.heightmap.tryHeightAt(_sampleWorld.x, _sampleWorld.z)
-      if (sampleHeight == null) continue
-      const sampleNormal = this.heightmap.normalAt(_sampleWorld.x, _sampleWorld.z)
+          const sampleHeight = this.heightmap.tryHeightAt(_sampleWorld.x, _sampleWorld.z)
+          if (sampleHeight == null) continue
+          const sampleNormal = this.heightmap.normalAt(_sampleWorld.x, _sampleWorld.z)
 
-      sampledCount += 1
-      sampledHeights.push(sampleHeight)
-      normalX += sampleNormal.x
-      normalY += sampleNormal.y
-      normalZ += sampleNormal.z
-    }
+          sampledCount += 1
+          sampledHeights.push(sampleHeight)
+          normalX += sampleNormal.x
+          normalY += sampleNormal.y
+          normalZ += sampleNormal.z
+        }
 
-    if (sampledCount === 0) {
-      return {
-        height: -Infinity,
-        normal: { x: 0, y: 1, z: 0 },
-        colliderId: null,
-        hasSupport: false,
-      }
-    }
-
-    sampledHeights.sort((a, b) => b - a)
-    const contactCount = Math.min(LANDER_SUPPORT_CONTACT_SAMPLE_COUNT, sampledHeights.length)
-    const contactHeight =
-      sampledHeights.slice(0, contactCount).reduce((sum, height) => sum + height, 0) /
-      Math.max(1, contactCount)
-
-    let supportHeight = contactHeight
-    let supportNormal: { x: number; y: number; z: number }
-    const normalLength = Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ)
-    if (normalLength <= 1e-5) {
-      supportNormal = { x: 0, y: 1, z: 0 }
-    } else {
-      supportNormal = {
-        x: normalX / normalLength,
-        y: normalY / normalLength,
-        z: normalZ / normalLength,
+        if (sampledCount > 0) {
+          sampledHeights.sort((a, b) => b - a)
+          const contactCount = Math.min(LANDER_SUPPORT_CONTACT_SAMPLE_COUNT, sampledHeights.length)
+          supportHeight =
+            sampledHeights.slice(0, contactCount).reduce((sum, height) => sum + height, 0) /
+            Math.max(1, contactCount)
+          const normalLength = Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ)
+          if (normalLength > 1e-5) {
+            supportNormal = {
+              x: normalX / normalLength,
+              y: normalY / normalLength,
+              z: normalZ / normalLength,
+            }
+          }
+          hasSupport = true
+        }
       }
     }
 
     let colliderId: string | null = null
     if (this.collisionWorld) {
+      const probeFloor = supportHeight === -Infinity ? DEFAULT_FLOOR_Y : supportHeight - 1
       const colliderSupport = this.collisionWorld.getHighestSupportUnderDisc(
         this.group.position.x,
         this.group.position.z,
-        supportHeight - 1,
+        probeFloor,
         this.group.position.y + LANDER_SUPPORT_MAX_STEP_UP,
         LANDER_COLLISION_RADIUS,
         LANDER_COLLIDER_ID,
@@ -1109,14 +1149,123 @@ export class LanderController implements Tickable {
         supportHeight = colliderSupport.height
         supportNormal = colliderSupport.normal
         colliderId = colliderSupport.colliderId
+        hasSupport = true
+      }
+    }
+
+    if (!hasSupport && !this.heightmap && !this.collisionWorld) {
+      return {
+        height: DEFAULT_FLOOR_Y,
+        normal: { x: 0, y: 1, z: 0 },
+        colliderId: null,
+        hasSupport: true,
       }
     }
 
     return {
-      height: supportHeight,
+      height: hasSupport ? supportHeight : -Infinity,
       normal: supportNormal,
       colliderId,
-      hasSupport: true,
+      hasSupport,
+    }
+  }
+
+  /**
+   * Per-leg footprint sample: probes the heightmap at each of the four
+   * lander corner anchors (yaw-rotated to world space) and fits a plane
+   * through the resulting (X, height, Z) points. The plane's height at
+   * the body centroid is used as the support height; the plane normal
+   * gives a tilt that matches the macroscopic slope spanned by the
+   * legs, ignoring per-sample bumps that would otherwise over-rotate
+   * the body on noisy GLB terrain.
+   *
+   * Returns null if any of the four anchors is missing (not yet loaded
+   * from the GLB) or if any leg's terrain sample is out of bounds —
+   * caller falls back to the legacy 9-point square sampler in those
+   * cases.
+   */
+  private sampleLegFootprint(): { height: number; normal: { x: number; y: number; z: number } } | null {
+    if (!this.heightmap) return null
+    const fl = this.rcsLocalPositions.get(LEG_NODE_FL)
+    const fr = this.rcsLocalPositions.get(LEG_NODE_FR)
+    const bl = this.rcsLocalPositions.get(LEG_NODE_BL)
+    const br = this.rcsLocalPositions.get(LEG_NODE_BR)
+    if (!fl || !fr || !bl || !br) return null
+
+    _qYaw.setFromAxisAngle(_yAxis, this.yaw)
+
+    const sampleAt = (lx: number, lz: number): { x: number; y: number; z: number } | null => {
+      _sampleOffset.set(lx, 0, lz).applyQuaternion(_qYaw)
+      const wx = this.group.position.x + _sampleOffset.x
+      const wz = this.group.position.z + _sampleOffset.z
+      const h = this.heightmap!.tryHeightAt(wx, wz)
+      if (h == null) return null
+      return { x: wx, y: h, z: wz }
+    }
+
+    const pFL = sampleAt(fl.x, fl.z)
+    const pFR = sampleAt(fr.x, fr.z)
+    const pBL = sampleAt(bl.x, bl.z)
+    const pBR = sampleAt(br.x, br.z)
+    if (!pFL || !pFR || !pBL || !pBR) return null
+
+    // Plane normal via cross product of the two diagonals (FL→BR and
+    // FR→BL). Sign is flipped if the cross product points down so the
+    // result is always a +Y up-facing world-space normal.
+    const ux = pBR.x - pFL.x
+    const uy = pBR.y - pFL.y
+    const uz = pBR.z - pFL.z
+    const vx = pBL.x - pFR.x
+    const vy = pBL.y - pFR.y
+    const vz = pBL.z - pFR.z
+    let nWorldX = uy * vz - uz * vy
+    let nWorldY = uz * vx - ux * vz
+    let nWorldZ = ux * vy - uy * vx
+    if (nWorldY < 0) {
+      nWorldX = -nWorldX
+      nWorldY = -nWorldY
+      nWorldZ = -nWorldZ
+    }
+    const meanH = (pFL.y + pFR.y + pBL.y + pBR.y) * 0.25
+    const len = Math.sqrt(nWorldX * nWorldX + nWorldY * nWorldY + nWorldZ * nWorldZ)
+    if (len <= 1e-5) {
+      // Degenerate plane — fall back to flat. mean(H) is already the
+      // best available height.
+      return { height: meanH, normal: { x: 0, y: 1, z: 0 } }
+    }
+    nWorldX /= len
+    nWorldY /= len
+    nWorldZ /= len
+
+    // Convert the world-space plane normal into lander local frame
+    // (post-yaw). The rotation pipeline applies q_yaw then q_tilt, so
+    // q_tilt operates in lander-local space — extracting tilt angles
+    // from the world normal directly would be wrong on any non-zero
+    // yaw. n_local = q_yaw⁻¹ · n_world.
+    _normalLocal.set(nWorldX, nWorldY, nWorldZ).applyQuaternion(_qYawInv.copy(_qYaw).invert())
+
+    // Tilt angles that align lander-local +Y with the plane normal.
+    const targetTiltX = Math.atan2(_normalLocal.z, _normalLocal.y)
+    const targetTiltZ = Math.atan2(-_normalLocal.x, _normalLocal.y)
+    _qSlope.setFromEuler(_eulerSlope.set(targetTiltX, 0, targetTiltZ))
+
+    // For each leg, the world Y of (R · L_i) where R is the slope-aligning
+    // tilt rotation. Yaw doesn't affect the Y component, so applying just
+    // q_tilt (= q_slope) suffices. The body must sit at
+    //   body.y = mean(H_i) - mean((R · L_i).y)
+    // so that summing the per-leg constraint body.y + (R·L_i).y = H_i
+    // is satisfied. Equal for all four legs when R exactly fits the plane.
+    let dySum = 0
+    for (const L of [fl, fr, bl, br]) {
+      _legLocal.set(L.x, L.y, L.z).applyQuaternion(_qSlope)
+      dySum += _legLocal.y
+    }
+    const meanDy = dySum * 0.25
+    const supportHeight = meanH - meanDy
+
+    return {
+      height: supportHeight,
+      normal: { x: nWorldX, y: nWorldY, z: nWorldZ },
     }
   }
 
