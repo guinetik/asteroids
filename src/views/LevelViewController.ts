@@ -37,6 +37,7 @@ import { getCurrentUpgradeValue, hydratePlayerUpgradeLevelsFromStorage } from '@
 import type { GeneratedAsteroidMission, ConcreteObjective } from '@/lib/missions/types'
 import { Heightmap } from '@/lib/terrain/heightmap'
 import { MultiToolController } from '@/three/MultiToolController'
+import { ProspectOverlayController } from '@/three/ProspectOverlayController'
 import { MultiToolState } from '@/lib/fps/multiToolState'
 import {
   createAsteroidSurface,
@@ -158,6 +159,7 @@ export class LevelViewController implements Tickable {
   private heightmap: Heightmap | null = null
   private asteroidSurface: AsteroidSurfaceControllerResult | null = null
   private surfaceRocks: SurfaceRockController | null = null
+  private prospectOverlay: ProspectOverlayController | null = null
   private enemyVisualWarmup: EnemyVisualWarmup | null = null
   private readonly collision = new LevelCollisionFacade()
   private rockYieldSystem: RockYieldSystem | null = null
@@ -293,12 +295,23 @@ export class LevelViewController implements Tickable {
    */
   onResourcePickupFailed: ((label: string, reason: string) => void) | null = null
 
+  /**
+   * Called when a rock is fully analysed by the science gun. The host
+   * UI surfaces this as a green "✓ Analysed — <Mineral>-bearing rock"
+   * toast in the pickup stack.
+   *
+   * @param itemId Catalog item id of the rock's primary mineral.
+   */
+  onProspect: ((itemId: string) => void) | null = null
+
   private readonly initialLanderSpawn = new Vector3()
 
   /** Reused (0,1,0) seed for impact/explosion particle bursts. Treat as immutable. */
   private readonly _impactUp = new Vector3(0, 1, 0)
   /** Reused velocity scratch passed to `ParticleEmitter.emit` (which copies internally). */
   private readonly _impactVel = new Vector3()
+  /** Reused scratch — rock world center for prospect-complete audio cue. */
+  private readonly _prospectCenterScratch = new Vector3()
 
   // ── Elapsed time (seconds) ──────────────────────────────────
   private elapsed = 0
@@ -786,6 +799,11 @@ export class LevelViewController implements Tickable {
       seed: miningSeed,
     })
     if (this.surfaceRocks) {
+      this.prospectOverlay = new ProspectOverlayController(
+        this.sceneManager.scene,
+        this.surfaceRocks,
+        this.heightmap,
+      )
       this.combatMining = new LevelCombatMiningFacade(
         {
           projectileSystem: this.projectileSystem,
@@ -804,10 +822,35 @@ export class LevelViewController implements Tickable {
           onResourcePickupFailed: (label, reason) => this.onResourcePickupFailed?.(label, reason),
           onRemoveRockCollider: (spawnIndex) => this.removeRockCollider(spawnIndex),
           getElapsedSeconds: () => this.elapsed,
+          onProspectProgress: (spawnIndex, scienceHp, initialScienceHp) => {
+            this.prospectOverlay?.updateProgress(spawnIndex, scienceHp, initialScienceHp)
+          },
+          onProspectComplete: (spawnIndex, itemId) => {
+            this.prospectOverlay?.markProspected(spawnIndex)
+            if (this.surfaceRocks && this.heightmap && this.fpsCamera) {
+              const center = this.surfaceRocks.getRockCenter(
+                spawnIndex,
+                this.heightmap,
+                this._prospectCenterScratch,
+              )
+              if (center) {
+                this.levelAudio.notifyProspectComplete(center, this.fpsCamera.camera)
+              }
+            }
+            this.onProspect?.(itemId)
+          },
         },
       )
       this.combatMining.registerRocks()
       this.combatMining.attach()
+
+      // Chain overlay cleanup onto the facade's onConsume so a fully-mined
+      // rock disposes its wireframe alongside the surface-rock hide.
+      const previousConsume = this.rockYieldSystem!.onConsume
+      this.rockYieldSystem!.onConsume = (spawnIndex) => {
+        previousConsume?.(spawnIndex)
+        this.prospectOverlay?.remove(spawnIndex)
+      }
     }
 
     // ── Loot drop system ────────────────────────────────────────
@@ -2457,6 +2500,8 @@ export class LevelViewController implements Tickable {
     this.collision.dispose()
     this.combatMining?.detach()
     this.combatMining = null
+    this.prospectOverlay?.dispose()
+    this.prospectOverlay = null
     this.projectileSystem?.dispose()
     if (this.rockYieldSystem) {
       this.rockYieldSystem.onMineralExtracted = null

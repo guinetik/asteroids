@@ -38,6 +38,10 @@ export interface LevelCombatMiningBindings {
   onRemoveRockCollider: (spawnIndex: number) => void
   /** Read current level elapsed time in seconds (for sizzle keepalive). */
   getElapsedSeconds: () => number
+  /** Called on every science-bolt hit while the rock is being prospected (drives wireframe overlay). */
+  onProspectProgress: (spawnIndex: number, scienceHp: number, initialScienceHp: number) => void
+  /** Called exactly once when a rock has been fully analysed. */
+  onProspectComplete: (spawnIndex: number, itemId: string) => void
 }
 
 /**
@@ -75,6 +79,12 @@ const MAX_MINING_IMPACT_PARTICLES_PER_HIT = 28
 const MINING_IMPACT_VERTICAL_SPEED = 7.5
 /** Random lateral scatter added to each mining chip particle. */
 const MINING_IMPACT_LATERAL_SPEED = 2.2
+/** Vertical launch speed for science-hit chip particles (smaller than mining hits). */
+const SCIENCE_HIT_VERTICAL_SPEED = 2.5
+/** Random vertical jitter added to each science-hit chip. */
+const SCIENCE_HIT_VERTICAL_JITTER = 1.0
+/** Lateral scatter for science-hit chips (smaller than mining hits). */
+const SCIENCE_HIT_LATERAL_SPEED = 1.5
 /** Strong one-shot vacuum burst when a rock is fully consumed. */
 const TRACTOR_PARTICLES_ON_CONSUME = 52
 /** Spawn-radius jitter for the final rock-to-gun vacuum cloud. */
@@ -173,6 +183,28 @@ export class LevelCombatMiningFacade {
 
       this.spawnTractorBurst(spawnIndex, impactPos, this.getTractorParticleCount(spawnIndex))
     }
+
+    this.deps.projectileSystem.onScienceRockHit = (spawnIndex, impactPos) => {
+      const result = this.deps.rockYieldSystem.scienceHit(spawnIndex)
+      if (!result) return
+      // Reuse the drill flash for an immediate per-hit acknowledgement.
+      this.deps.surfaceRocks.flashRock(spawnIndex)
+      // Tiny chip burst at the impact point so the player sees they hit something.
+      this.impactVel.set(
+        (Math.random() - 0.5) * SCIENCE_HIT_LATERAL_SPEED,
+        SCIENCE_HIT_VERTICAL_SPEED + Math.random() * SCIENCE_HIT_VERTICAL_JITTER,
+        (Math.random() - 0.5) * SCIENCE_HIT_LATERAL_SPEED,
+      )
+      this.deps.impactEmitter.emit(impactPos, this.impactVel)
+    }
+
+    this.deps.rockYieldSystem.onScienceProgress = (spawnIndex, scienceHp, initialScienceHp) => {
+      this.bindings.onProspectProgress(spawnIndex, scienceHp, initialScienceHp)
+    }
+
+    this.deps.rockYieldSystem.onRockProspected = (spawnIndex, itemId) => {
+      this.bindings.onProspectComplete(spawnIndex, itemId)
+    }
   }
 
   /** Clear callbacks owned by this facade. */
@@ -180,6 +212,9 @@ export class LevelCombatMiningFacade {
     this.deps.rockYieldSystem.onConsume = null
     this.deps.rockYieldSystem.onMineralExtracted = null
     this.deps.projectileSystem.onRockHit = null
+    this.deps.projectileSystem.onScienceRockHit = null
+    this.deps.rockYieldSystem.onScienceProgress = null
+    this.deps.rockYieldSystem.onRockProspected = null
   }
 
   private getMiningImpactParticleCount(spawnIndex: number): number {

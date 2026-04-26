@@ -62,6 +62,8 @@ describe('LevelCombatMiningFacade', () => {
         onResourcePickupFailed: vi.fn(),
         onRemoveRockCollider: vi.fn(),
         getElapsedSeconds: () => 12.5,
+        onProspectProgress: vi.fn(),
+        onProspectComplete: vi.fn(),
       },
     )
 
