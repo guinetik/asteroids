@@ -71,8 +71,18 @@ export class LevelAudioDirector {
   private miningSizzleHandle: AudioPlaybackHandle | null = null
   /** Time threshold after which the mining-contact bed should stop. */
   private miningSizzleKeepAliveUntil = 0
-  /** Timer that stops the one-shot impact sizzle. */
-  private sizzleImpactTimerHandle: TimerHandle | null = null
+  /**
+   * Pending one-shot impact sizzle entries. Each gets its own
+   * audio handle and stop timer so rapid-fire weapon impacts don't
+   * leak handles past their {@link SIZZLE_IMPACT_DURATION_SEC}
+   * window — the previous implementation only tracked one timer
+   * which got cancelled on each new hit, leaving older handles to
+   * play out the full audio buffer length unchecked.
+   */
+  private readonly activeSizzles: Array<{
+    handle: AudioPlaybackHandle
+    timer: TimerHandle
+  }> = []
 
   /**
    * Player just successfully picked up a mineral / resource. Plays the
@@ -155,7 +165,6 @@ export class LevelAudioDirector {
    * @param impactWorld - World-space impact point.
    */
   playShortSurfaceSizzle(camera: PerspectiveCamera | null, impactWorld: Vector3): void {
-    this.cancelSizzleImpactTimer()
     this.audio.unlock()
     const def = getAudioDefinition('sfx.sizzle.impact')
     let volume = def.volume
@@ -171,10 +180,13 @@ export class LevelAudioDirector {
 
     const handle = this.audio.play('sfx.sizzle.impact', { loop: false, volume })
     handle.setStereo(pan)
-    this.sizzleImpactTimerHandle = Timer.after(SIZZLE_IMPACT_DURATION_SEC, () => {
-      this.sizzleImpactTimerHandle = null
+    const entry = { handle, timer: null as unknown as TimerHandle }
+    entry.timer = Timer.after(SIZZLE_IMPACT_DURATION_SEC, () => {
       handle.stop()
+      const i = this.activeSizzles.indexOf(entry)
+      if (i >= 0) this.activeSizzles.splice(i, 1)
     })
+    this.activeSizzles.push(entry)
   }
 
   /**
@@ -185,14 +197,16 @@ export class LevelAudioDirector {
    */
   dispose(): void {
     this.stopMiningSizzle()
-    this.cancelSizzleImpactTimer()
+    this.stopAllShortSurfaceSizzles()
   }
 
-  /** Cancel any pending delayed stop for the impact sizzle one-shot. */
-  private cancelSizzleImpactTimer(): void {
-    if (this.sizzleImpactTimerHandle === null) return
-    Timer.cancel(this.sizzleImpactTimerHandle)
-    this.sizzleImpactTimerHandle = null
+  /** Cancel timers and stop every in-flight short-sizzle handle. */
+  private stopAllShortSurfaceSizzles(): void {
+    for (const entry of this.activeSizzles) {
+      Timer.cancel(entry.timer)
+      entry.handle.stop()
+    }
+    this.activeSizzles.length = 0
   }
 }
 

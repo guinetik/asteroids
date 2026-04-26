@@ -328,13 +328,19 @@ export class ProjectileSystem implements Tickable {
           hitHostage = true
         }
 
-        // Drill bolts also mine registered rocks. Combat hits win first
-        // so a rock standing right next to an enemy doesn't eat the bolt.
-        if (!hitEnemy && !hitHostage && p.boltKind === 'drill') {
+        // Drill and weapon bolts both stop on rocks. Drill bolts trigger
+        // the mining callback; weapon bolts just register the impact
+        // (sparks + sizzle) so the player gets visual+audio feedback that
+        // their shot connected with a rock instead of passing through.
+        // Heal bolts continue to ignore rocks. Combat hits win first so a
+        // rock right next to an enemy doesn't eat the bolt.
+        if (!hitEnemy && !hitHostage && (p.boltKind === 'drill' || p.boltKind === 'weapon')) {
           const rockHit = this.closestRockHit(this._prevPos, pos)
           if (rockHit) {
             this._callbackPos.copy(pos)
-            this.onRockHit?.(rockHit.spawnIndex, this._callbackPos)
+            if (p.boltKind === 'drill') {
+              this.onRockHit?.(rockHit.spawnIndex, this._callbackPos)
+            }
             hitRock = true
           }
         }

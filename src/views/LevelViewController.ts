@@ -2353,8 +2353,9 @@ export class LevelViewController implements Tickable {
     if (context.kind === 'enemy' || context.kind === 'hostage') return
     if (context.boltKind === 'drill' && context.kind === 'drill_rock') return
     const isLasSurface = context.boltKind === 'weapon' && context.kind === 'terrain'
+    const isLasRock = context.boltKind === 'weapon' && context.kind === 'drill_rock'
     const isDrillGround = context.boltKind === 'drill' && context.kind === 'terrain'
-    if (!isLasSurface && !isDrillGround) return
+    if (!isLasSurface && !isLasRock && !isDrillGround) return
     this.playShortSurfaceSizzle(impactWorld)
   }
 
