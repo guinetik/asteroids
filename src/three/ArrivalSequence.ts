@@ -88,6 +88,11 @@ const APPROACH_ALTITUDE_OFFSET = 800
 /** Shuttle scale during the cinematic approach (small, seen from distance). */
 const SHUTTLE_CINEMATIC_SCALE = 1.0
 
+/** Camera position offset from the barycenter at the start of the establish phase. */
+const ESTABLISH_CAM_START_OFFSET = new THREE.Vector3(800, 600, -1200)
+/** Camera position offset from the barycenter at the end of the establish phase. */
+const ESTABLISH_CAM_END_OFFSET = new THREE.Vector3(680, 510, -1020)
+
 /**
  * Shuttle scale when parked hovering — large enough that the gameplay lander
  * (MODEL_SCALE=5) looks like it fits inside the cargo bay.
@@ -296,14 +301,6 @@ export class ArrivalSequence {
 
     this.ensureExfilFloodlight()
 
-    // Initial camera: wide establishing shot, far behind and above the shuttle
-    this.camera.position.set(
-      this.shuttleStartPos.x + 80,
-      this.shuttleStartPos.y + 100,
-      this.shuttleStartPos.z - 400,
-    )
-    this.camera.lookAt(this.shuttleStartPos)
-
     // Thruster nozzle sprites — idle glow at each engine nozzle
     // Positions in raw model coords (shuttleScene is scaled by MODEL_SCALE)
     const thrusterTexture = this.createThrusterTexture()
@@ -490,6 +487,17 @@ export class ArrivalSequence {
 
   private tickEstablish(): void {
     const t = Math.min(1, this.phaseElapsed / PHASE_ESTABLISH_DURATION)
+    const eased = this.easeInOut(t)
+
+    const target = this.landerSpawnTarget
+    const camPos = new THREE.Vector3().lerpVectors(
+      ESTABLISH_CAM_START_OFFSET,
+      ESTABLISH_CAM_END_OFFSET,
+      eased,
+    )
+    this.camera.position.set(target.x + camPos.x, target.y + camPos.y, target.z + camPos.z)
+    this.camera.lookAt(target)
+
     if (t >= 1) this.nextPhase('approach')
   }
 
