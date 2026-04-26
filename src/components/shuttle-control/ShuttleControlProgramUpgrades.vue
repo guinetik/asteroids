@@ -46,9 +46,7 @@ const categories = computed(() =>
       const cur = props.upgradeLevels[id] ?? 0
       const effectNow = formatUpgradeStatValue(statValueAtDisplayLevel(def, cur))
       const effectNext =
-        cur >= def.maxLevel
-          ? null
-          : formatUpgradeStatValue(statValueAtDisplayLevel(def, cur + 1))
+        cur >= def.maxLevel ? null : formatUpgradeStatValue(statValueAtDisplayLevel(def, cur + 1))
       return { def, id, effectNow, effectNext }
     })
     return {
@@ -94,28 +92,27 @@ function rowIconModifier(category: UpgradeCategory): string {
     <div class="upgrade-shop-program__header">
       <h2 class="shuttle-control-screen__title">Engineering bay</h2>
       <p class="upgrade-shop-program__credits">
-        Balance <span class="upgrade-shop-program__credits-value">CR {{ playerCredits.toLocaleString() }}</span>
+        Balance
+        <span class="upgrade-shop-program__credits-value"
+          >CR {{ playerCredits.toLocaleString() }}</span
+        >
       </p>
     </div>
     <p class="upgrade-shop-program__intro">
       You're hard-docked at the
       <span class="upgrade-shop-program__intro-em">orbital spaceport</span>
-      &mdash; same facility that handles fuel cells, trades, and the occasional hull patch. Port engineering keeps this
-      channel open for flight-certified refits:
+      &mdash; same facility that handles fuel cells, trades, and the occasional hull patch. Port
+      engineering keeps this channel open for flight-certified refits:
       <span class="upgrade-shop-program__intro-em">level&nbsp;0</span>
-      is whatever the frame shipped with from the yard; each paid tier bolts on a better coefficient in the readout.
-      Credits post the moment you confirm. Check
+      is whatever the frame shipped with from the yard; each paid tier bolts on a better coefficient
+      in the readout. Credits post the moment you confirm. Check
       <span class="upgrade-shop-program__intro-em">Now</span>
       and
       <span class="upgrade-shop-program__intro-em">Next tier</span>
       before you spend &mdash; no take-backs once the wire transfer clears.
     </p>
 
-    <div
-      v-for="block in categories"
-      :key="block.category"
-      class="upgrade-shop-program__category"
-    >
+    <div v-for="block in categories" :key="block.category" class="upgrade-shop-program__category">
       <div class="upgrade-shop-program__category-head">
         <div class="upgrade-shop-program__category-icon" aria-hidden="true">
           <!-- Shuttle -->
@@ -185,11 +182,7 @@ function rowIconModifier(category: UpgradeCategory): string {
         <h3 class="upgrade-shop-program__category-title">{{ block.label }}</h3>
       </div>
       <ul class="upgrade-shop-program__list" role="list">
-        <li
-          v-for="row in block.upgrades"
-          :key="row.def.id"
-          class="upgrade-shop-program__row"
-        >
+        <li v-for="row in block.upgrades" :key="row.def.id" class="upgrade-shop-program__row">
           <div
             class="upgrade-shop-program__row-icon"
             :class="rowIconModifier(row.def.category)"
@@ -208,18 +201,27 @@ function rowIconModifier(category: UpgradeCategory): string {
             </div>
             <div v-if="row.effectNext" class="upgrade-shop-program__effect-line">
               <span class="upgrade-shop-program__effect-label">Next tier</span>
-              <span class="upgrade-shop-program__effect-value upgrade-shop-program__effect-value--gain">
+              <span
+                class="upgrade-shop-program__effect-value upgrade-shop-program__effect-value--gain"
+              >
                 ×{{ row.effectNext }}
               </span>
             </div>
-            <div v-else class="upgrade-shop-program__effect-line upgrade-shop-program__effect-line--max">
+            <div
+              v-else
+              class="upgrade-shop-program__effect-line upgrade-shop-program__effect-line--max"
+            >
               <span class="upgrade-shop-program__effect-label">Next tier</span>
               <span class="upgrade-shop-program__effect-muted">Max</span>
             </div>
           </div>
           <div class="upgrade-shop-program__levels-wrap">
             <span class="upgrade-shop-program__levels-header">Levels</span>
-            <div class="upgrade-shop-program__levels" role="group" :aria-label="`${row.def.label} tiers`">
+            <div
+              class="upgrade-shop-program__levels"
+              role="group"
+              :aria-label="`${row.def.label} tiers`"
+            >
               <div
                 class="upgrade-shop-program__level upgrade-shop-program__level--baseline"
                 role="presentation"
@@ -233,12 +235,9 @@ function rowIconModifier(category: UpgradeCategory): string {
                 type="button"
                 class="upgrade-shop-program__level"
                 :class="{
-                  'upgrade-shop-program__level--owned':
-                    levelState(row.id, slotLevel) === 'owned',
-                  'upgrade-shop-program__level--next':
-                    levelState(row.id, slotLevel) === 'next',
-                  'upgrade-shop-program__level--locked':
-                    levelState(row.id, slotLevel) === 'locked',
+                  'upgrade-shop-program__level--owned': levelState(row.id, slotLevel) === 'owned',
+                  'upgrade-shop-program__level--next': levelState(row.id, slotLevel) === 'next',
+                  'upgrade-shop-program__level--locked': levelState(row.id, slotLevel) === 'locked',
                   'upgrade-shop-program__level--unaffordable':
                     levelState(row.id, slotLevel) === 'next' &&
                     playerCredits < getUpgradeCost(row.id, slotLevel),

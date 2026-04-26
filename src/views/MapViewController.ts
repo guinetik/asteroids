@@ -59,10 +59,7 @@ import { PortalArrivalSequence } from '@/three/PortalArrivalSequence'
 import type { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { VibePortal } from '@/lib/portal'
 import { MapState } from '@/lib/mapState'
-import {
-  MapIntroState,
-  type MapIntroUiState,
-} from '@/lib/mapIntroState'
+import { MapIntroState, type MapIntroUiState } from '@/lib/mapIntroState'
 import { MapCamera } from '@/three/MapCamera'
 import type { MapOverlayState } from '@/lib/ShuttleTelemetry'
 import { computeRelativeOrbitalSpeedMultiplier } from '@/lib/orbitSpeedProfile'
@@ -75,10 +72,7 @@ import { GravitationalEventManager } from '@/lib/physics/gravitationalEvent'
 import { computeShuttleBaseFuelDrain } from '@/lib/shuttleBaseFuelDrain'
 import type { ShipHealthConfig } from '@/lib/shipHealth'
 import shipHealthData from '@/data/shuttle/ship-health.json'
-import {
-  IDLE_RADIATION_STATE,
-  MapShipHealthFacade,
-} from '@/lib/map/health/MapShipHealthFacade'
+import { IDLE_RADIATION_STATE, MapShipHealthFacade } from '@/lib/map/health/MapShipHealthFacade'
 import {
   getCurrentShuttleThrusterEfficiencyModifiers,
   getCurrentUpgradeValue,
@@ -180,7 +174,10 @@ import {
   mapWarpStandoffWorldUnits,
 } from '@/lib/map/mapViewControllerHelpers'
 import { GravitySurfingController } from '@/lib/map/GravitySurfingController'
-import { OrbitalSurfingController, type OrbitalSurfingDeps } from '@/lib/map/OrbitalSurfingController'
+import {
+  OrbitalSurfingController,
+  type OrbitalSurfingDeps,
+} from '@/lib/map/OrbitalSurfingController'
 import { ManifoldSpline } from '@/three/ManifoldSpline'
 import { ShuttleAudioDirector } from '@/audio/ShuttleAudioDirector'
 import { uiAudio } from '@/audio/UiAudioDirector'
@@ -1200,10 +1197,8 @@ export class MapViewController implements Tickable {
       devSetPlayerUpgradeLevel: (upgradeId, level) =>
         this.devSetPlayerUpgradeLevel(upgradeId, level),
       giveCredits: (amount) => this.giveCredits(amount),
-      devStartConsortiumCertificationMessage: () =>
-        this.devStartConsortiumCertificationMessage(),
-      devOpenOrbitalMinigame: (item, quantity) =>
-        this.devOpenOrbitalMinigame(item, quantity),
+      devStartConsortiumCertificationMessage: () => this.devStartConsortiumCertificationMessage(),
+      devOpenOrbitalMinigame: (item, quantity) => this.devOpenOrbitalMinigame(item, quantity),
     })
 
     this.missionFacade.hydrateFromStorage(this.onMissionBoardUpdate)
@@ -1403,8 +1398,14 @@ export class MapViewController implements Tickable {
     this.manifoldSpline?.tick(dt)
 
     // Override ship position to follow the smooth CatmullRom spline (not raw arc points)
-    if (this.orbitalSurfingController.mode === 'diving' && this.manifoldSpline && this.shuttleController) {
-      const splinePos = this.manifoldSpline.getPositionAt(this.orbitalSurfingController.getSplineT())
+    if (
+      this.orbitalSurfingController.mode === 'diving' &&
+      this.manifoldSpline &&
+      this.shuttleController
+    ) {
+      const splinePos = this.manifoldSpline.getPositionAt(
+        this.orbitalSurfingController.getSplineT(),
+      )
       this.shuttleController.group.position.copy(splinePos)
     }
 
@@ -1613,9 +1614,9 @@ export class MapViewController implements Tickable {
     }
 
     if (
-      this.shuttleController
-      && !this.shuttleController.dead
-      && !(this.evaSession?.isActive ?? false)
+      this.shuttleController &&
+      !this.shuttleController.dead &&
+      !(this.evaSession?.isActive ?? false)
     ) {
       const orbitState = this.orbitSystem?.state ?? 'free'
       const passiveFuelMultiplier = this.gravitySurfingController.isActive()
@@ -1630,7 +1631,11 @@ export class MapViewController implements Tickable {
 
     if (this.shuttleController) {
       const ts = this.shuttleController.thrusterSystem
-      this.shuttleAudio.tickShuttleFuelTelemetry(ts.fuelLevel, ts.fuelCapacity, !this.shuttleController.dead)
+      this.shuttleAudio.tickShuttleFuelTelemetry(
+        ts.fuelLevel,
+        ts.fuelCapacity,
+        !this.shuttleController.dead,
+      )
     }
 
     // Telemetry
@@ -1823,9 +1828,10 @@ export class MapViewController implements Tickable {
     this.orbitFacade.tickExitCamera(dt, this.vehicleCamera)
 
     if (this.gravitySurfPass && this.shuttleController) {
-      const gravitySurfActive = this.gravitySurfingController.isActive() && !this.shuttleController.dead
+      const gravitySurfActive =
+        this.gravitySurfingController.isActive() && !this.shuttleController.dead
       const speedRatio = Math.min(1, this.shuttleController.speed / 20)
-      const targetIntensity = gravitySurfActive ? (0.35 + 0.65 * speedRatio) : 0
+      const targetIntensity = gravitySurfActive ? 0.35 + 0.65 * speedRatio : 0
       const nextIntensity = THREE.MathUtils.lerp(
         this.gravitySurfPass.uniforms.intensity!.value,
         targetIntensity,
@@ -1980,9 +1986,7 @@ export class MapViewController implements Tickable {
           burnRateMultiplier: getCurrentShuttleThrusterEfficiencyModifiers(),
         }) ?? false,
       shipSolarDistance: this.shuttleController
-        ? Math.sqrt(
-            this.shuttleController.position.x ** 2 + this.shuttleController.position.z ** 2,
-          )
+        ? Math.sqrt(this.shuttleController.position.x ** 2 + this.shuttleController.position.z ** 2)
         : null,
       venusOrbitRadius: (() => {
         const venusController = this.getPlanetControllerById('venus')
@@ -2926,7 +2930,9 @@ export class MapViewController implements Tickable {
     setPlayerUpgradeLevel(upgradeId, targetLevel)
     this.syncMapAfterExternalShuttleInstall(upgradeId, targetLevel, {
       defaultMeta: (defId, level) =>
-        defId === 'gravitySurfing' ? 'Tier 1 · Grid Coupling Module' : `Tier ${level} · Auto-install`,
+        defId === 'gravitySurfing'
+          ? 'Tier 1 · Grid Coupling Module'
+          : `Tier ${level} · Auto-install`,
     })
   }
 
@@ -3054,8 +3060,7 @@ export class MapViewController implements Tickable {
       this.shuttleController.group.position,
     )
     const halfFovRad = THREE.MathUtils.degToRad(this.vehicleCamera.camera.fov / 2)
-    const minWorldSize =
-      MAP_CONFIG.MAP_SHUTTLE_MIN_APPARENT_SIZE * 2 * dist * Math.tan(halfFovRad)
+    const minWorldSize = MAP_CONFIG.MAP_SHUTTLE_MIN_APPARENT_SIZE * 2 * dist * Math.tan(halfFovRad)
     const requiredScale = minWorldSize / MAP_CONFIG.MAP_SHUTTLE_BASE_SIZE
     const targetScale = Math.max(MAP_CONFIG.MAP_SHUTTLE_SCALE, requiredScale)
     const overscale = targetScale / MAP_CONFIG.MAP_SHUTTLE_SCALE
@@ -3224,7 +3229,12 @@ export class MapViewController implements Tickable {
   private computeThermalCaps(sunDist: number): { heatCap: number; coldCap: number } {
     const heatLevel = CURRENT_PLAYER_UPGRADE_LEVELS.shuttleHeatResistance ?? 0
     const coldLevel = CURRENT_PLAYER_UPGRADE_LEVELS.shuttleFreezeResistance ?? 0
-    return this.healthFacade.getThermalCaps(sunDist, heatLevel, coldLevel) ?? { heatCap: 100, coldCap: -100 }
+    return (
+      this.healthFacade.getThermalCaps(sunDist, heatLevel, coldLevel) ?? {
+        heatCap: 100,
+        coldCap: -100,
+      }
+    )
   }
 
   /**
@@ -3873,8 +3883,10 @@ export class MapViewController implements Tickable {
     if (!import.meta.env.DEV) return
     const entry = Object.values(PLANET_ORBITAL_CONFIGS).find((c) => c.gatherItem === gatherItem)
     if (!entry) {
-      console.warn(`[dev] Unknown gather item "${gatherItem}". Valid items:`,
-        Object.values(PLANET_ORBITAL_CONFIGS).map((c) => c.gatherItem))
+      console.warn(
+        `[dev] Unknown gather item "${gatherItem}". Valid items:`,
+        Object.values(PLANET_ORBITAL_CONFIGS).map((c) => c.gatherItem),
+      )
       return
     }
     const missionId = `dev-${entry.minigameType}-test`
@@ -3891,7 +3903,12 @@ export class MapViewController implements Tickable {
       status: 'active' as const,
     }
     this.missionFacade.activeMinigame?.dispose()
-    this.missionFacade.activeMinigame = createOrbitalMiniGame(missionId, entry.minigameType, quantity, entry.planetId)
+    this.missionFacade.activeMinigame = createOrbitalMiniGame(
+      missionId,
+      entry.minigameType,
+      quantity,
+      entry.planetId,
+    )
     this.missionFacade.overlayOpen = true
     this.onMissionOverlay?.(true, fakeMission, true)
   }
@@ -3987,11 +4004,14 @@ export class MapViewController implements Tickable {
   private emitShuttleTelemetry(): void {
     if (!this.shuttleController || !this.onTelemetry) return
     const ts = this.shuttleController.thrusterSystem
-    const manifoldPrompt = this.orbitalSurfingController.getAttachPrompt(this.getOrbitalSurfingDeps())
-    const gravitySurfPrompt = !manifoldPrompt
-      && this.gravitySurfingController.canShowAttachPrompt(this.getGravitySurfingDeps())
-      ? 'Q GRAVITY SURF'
-      : null
+    const manifoldPrompt = this.orbitalSurfingController.getAttachPrompt(
+      this.getOrbitalSurfingDeps(),
+    )
+    const gravitySurfPrompt =
+      !manifoldPrompt &&
+      this.gravitySurfingController.canShowAttachPrompt(this.getGravitySurfingDeps())
+        ? 'Q GRAVITY SURF'
+        : null
     const turretMining = ts.getState('turretMining')
     this.onTelemetry({
       speed: this.shuttleController.speed,
@@ -4010,8 +4030,7 @@ export class MapViewController implements Tickable {
       turretMiningCharge: turretMining.charge,
       turretMiningCapacity: turretMining.capacity,
       turretActive: this.turretSessionController?.isActive ?? false,
-      adriftCountdown:
-        this.adriftTimer > 0 ? MAP_CONFIG.ADRIFT_TIMEOUT - this.adriftTimer : -1,
+      adriftCountdown: this.adriftTimer > 0 ? MAP_CONFIG.ADRIFT_TIMEOUT - this.adriftTimer : -1,
       hp: this.shipHealth?.hp ?? 100,
       maxHp: this.shipHealth?.maxHp ?? 100,
       temperature: this.shipHealth?.temperature ?? 0,
@@ -4073,9 +4092,7 @@ export class MapViewController implements Tickable {
     // that finishes mid-EVA doesn't spawn its "repaired" prop at 1× while everything else
     // is at ×20 (player perceives the sat shrinking + drifting away the instant it turns
     // green). Cleared on EVA exit so completed props revert to their map-view size.
-    this.missionFacade.setEvaPoiScaleByType(
-      active ? EVA_MAP_HUGE_POI_BY_TYPE : null,
-    )
+    this.missionFacade.setEvaPoiScaleByType(active ? EVA_MAP_HUGE_POI_BY_TYPE : null)
     if (!active) {
       this.missionFacade.armCompletedEvaSiteCleanup()
       this.evaPoiPromptRange = null

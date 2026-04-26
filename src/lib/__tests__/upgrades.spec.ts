@@ -105,9 +105,13 @@ describe('getUpgradeValue', () => {
 
   it('resolves shuttle thruster efficiency multiplier', () => {
     expect(getUpgradeValue('shuttleThrusterEfficiency', { shuttleThrusterEfficiency: 0 })).toBe(1)
-    expect(getUpgradeValue('shuttleThrusterEfficiency', { shuttleThrusterEfficiency: 1 })).toBe(0.75)
+    expect(getUpgradeValue('shuttleThrusterEfficiency', { shuttleThrusterEfficiency: 1 })).toBe(
+      0.75,
+    )
     expect(getUpgradeValue('shuttleThrusterEfficiency', { shuttleThrusterEfficiency: 2 })).toBe(0.5)
-    expect(getUpgradeValue('shuttleThrusterEfficiency', { shuttleThrusterEfficiency: 3 })).toBe(0.25)
+    expect(getUpgradeValue('shuttleThrusterEfficiency', { shuttleThrusterEfficiency: 3 })).toBe(
+      0.25,
+    )
   })
 })
 
@@ -191,7 +195,9 @@ describe('getShuttleSlingshotCruiseSpeedMultiplier', () => {
     // burst 3 → 1 + (3-2)*0.25 = 1.25
     expect(getShuttleSlingshotCruiseSpeedMultiplier({ shuttleSlingshotSpeed: 1 })).toBeCloseTo(1.25)
     // burst 3.5 → 1 + 1.5*0.25 = 1.375
-    expect(getShuttleSlingshotCruiseSpeedMultiplier({ shuttleSlingshotSpeed: 2 })).toBeCloseTo(1.375)
+    expect(getShuttleSlingshotCruiseSpeedMultiplier({ shuttleSlingshotSpeed: 2 })).toBeCloseTo(
+      1.375,
+    )
     // burst 5 → 1 + 3*0.25 = 1.75
     expect(getShuttleSlingshotCruiseSpeedMultiplier({ shuttleSlingshotSpeed: 3 })).toBeCloseTo(1.75)
   })
@@ -199,9 +205,11 @@ describe('getShuttleSlingshotCruiseSpeedMultiplier', () => {
 
 describe('getShuttleThrusterEfficiencyModifiers', () => {
   it('returns unified multiplier for all three thruster groups', () => {
-    expect(getShuttleThrusterEfficiencyModifiers({
-      shuttleThrusterEfficiency: 2,
-    })).toEqual({
+    expect(
+      getShuttleThrusterEfficiencyModifiers({
+        shuttleThrusterEfficiency: 2,
+      }),
+    ).toEqual({
       thrust: 0.5,
       brake: 0.5,
       rcs: 0.5,

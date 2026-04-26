@@ -141,12 +141,7 @@ export class RelayAntennaController implements Tickable {
     this.modelRoot.add(bus)
 
     const capGeom = this.track(
-      new THREE.CylinderGeometry(
-        BUS_RADIUS * 0.95,
-        BUS_RADIUS * 0.95,
-        0.08,
-        BUS_RADIAL_SEGMENTS,
-      ),
+      new THREE.CylinderGeometry(BUS_RADIUS * 0.95, BUS_RADIUS * 0.95, 0.08, BUS_RADIAL_SEGMENTS),
     )
     const topCap = new THREE.Mesh(capGeom, busMat)
     topCap.position.y = BUS_HEIGHT * 0.5 + 0.04
@@ -207,12 +202,7 @@ export class RelayAntennaController implements Tickable {
     this.dishPivot.add(horn)
 
     const strutGeom = this.track(
-      new THREE.CylinderGeometry(
-        DISH_STRUT_RADIUS,
-        DISH_STRUT_RADIUS,
-        DISH_RADIUS * 0.95,
-        6,
-      ),
+      new THREE.CylinderGeometry(DISH_STRUT_RADIUS, DISH_STRUT_RADIUS, DISH_RADIUS * 0.95, 6),
     )
     const strutMat = this.track(
       new THREE.MeshStandardMaterial({
@@ -225,7 +215,11 @@ export class RelayAntennaController implements Tickable {
       const strut = new THREE.Mesh(strutGeom, strutMat)
       const a = (i / DISH_STRUT_COUNT) * Math.PI * 2
       const rimR = DISH_RADIUS * 0.85
-      strut.position.set(Math.cos(a) * rimR * 0.5, DISH_BACK_OFFSET - DISH_RADIUS * 0.45, Math.sin(a) * rimR * 0.5)
+      strut.position.set(
+        Math.cos(a) * rimR * 0.5,
+        DISH_BACK_OFFSET - DISH_RADIUS * 0.45,
+        Math.sin(a) * rimR * 0.5,
+      )
       strut.lookAt(Math.cos(a) * rimR, DISH_BACK_OFFSET, Math.sin(a) * rimR)
       strut.rotateX(Math.PI / 2)
       this.dishPivot.add(strut)
@@ -284,7 +278,11 @@ export class RelayAntennaController implements Tickable {
       new THREE.MeshStandardMaterial({ color: INSTRUMENT_COLOR, metalness: 0.5, roughness: 0.6 }),
     )
     const instGeom = this.track(
-      new THREE.BoxGeometry(SCIENCE_INSTRUMENT_SIZE, SCIENCE_INSTRUMENT_SIZE, SCIENCE_INSTRUMENT_SIZE),
+      new THREE.BoxGeometry(
+        SCIENCE_INSTRUMENT_SIZE,
+        SCIENCE_INSTRUMENT_SIZE,
+        SCIENCE_INSTRUMENT_SIZE,
+      ),
     )
     const inst1 = new THREE.Mesh(instGeom, instMat)
     inst1.position.set(-(BUS_RADIUS + SCIENCE_BOOM_LENGTH * 0.55), 0, 0.35)
@@ -298,7 +296,12 @@ export class RelayAntennaController implements Tickable {
     this.modelRoot.add(inst2)
 
     const magGeom = this.track(
-      new THREE.CylinderGeometry(MAGNETOMETER_RADIUS, MAGNETOMETER_RADIUS * 0.6, MAGNETOMETER_LENGTH, 6),
+      new THREE.CylinderGeometry(
+        MAGNETOMETER_RADIUS,
+        MAGNETOMETER_RADIUS * 0.6,
+        MAGNETOMETER_LENGTH,
+        6,
+      ),
     )
     const mag = new THREE.Mesh(magGeom, boomMat)
     mag.position.set(0, 0, -(BUS_RADIUS + MAGNETOMETER_LENGTH * 0.5))
@@ -318,7 +321,12 @@ export class RelayAntennaController implements Tickable {
     )
     const disc = new THREE.Mesh(
       this.track(
-        new THREE.CylinderGeometry(GOLDEN_RECORD_RADIUS, GOLDEN_RECORD_RADIUS, GOLDEN_RECORD_THICKNESS, 28),
+        new THREE.CylinderGeometry(
+          GOLDEN_RECORD_RADIUS,
+          GOLDEN_RECORD_RADIUS,
+          GOLDEN_RECORD_THICKNESS,
+          28,
+        ),
       ),
       goldMat,
     )

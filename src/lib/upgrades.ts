@@ -89,15 +89,17 @@ export type UpgradeLevels = Partial<Record<UpgradeId, number>>
 const definitions = upgradesData as unknown as NumericUpgradeDefinition[]
 
 /** All upgrade definitions keyed by id for O(1) lookup. */
-export const UPGRADE_DEFINITIONS: Record<UpgradeId, NumericUpgradeDefinition> =
-  Object.fromEntries(definitions.map((d) => [d.id, d])) as Record<UpgradeId, NumericUpgradeDefinition>
+export const UPGRADE_DEFINITIONS: Record<UpgradeId, NumericUpgradeDefinition> = Object.fromEntries(
+  definitions.map((d) => [d.id, d]),
+) as Record<UpgradeId, NumericUpgradeDefinition>
 
 /**
  * Current player upgrade levels.
  * All start at 0 — no purchase flow yet.
  */
-export const CURRENT_PLAYER_UPGRADE_LEVELS: Record<UpgradeId, number> =
-  Object.fromEntries(definitions.map((d) => [d.id, 0])) as Record<UpgradeId, number>
+export const CURRENT_PLAYER_UPGRADE_LEVELS: Record<UpgradeId, number> = Object.fromEntries(
+  definitions.map((d) => [d.id, 0]),
+) as Record<UpgradeId, number>
 
 /**
  * `gravitySurfing` value at tier 1 from catalog data — Space Fabric map control unlock threshold.
@@ -267,7 +269,9 @@ export function getUpgradesByCategory(category: UpgradeCategory): NumericUpgrade
  *
  * @param levels - Upgrade state to inspect (defaults to current persisted runtime).
  */
-export function hasGravitySurfingUnlock(levels: UpgradeLevels = CURRENT_PLAYER_UPGRADE_LEVELS): boolean {
+export function hasGravitySurfingUnlock(
+  levels: UpgradeLevels = CURRENT_PLAYER_UPGRADE_LEVELS,
+): boolean {
   return getUpgradeValue('gravitySurfing', levels) >= GRAVITY_SURFING_UNLOCK_VALUE
 }
 
@@ -276,7 +280,9 @@ export function hasGravitySurfingUnlock(levels: UpgradeLevels = CURRENT_PLAYER_U
  *
  * @param levels - Upgrade state to inspect (defaults to current persisted runtime).
  */
-export function hasOrbitalSurfingUnlock(levels: UpgradeLevels = CURRENT_PLAYER_UPGRADE_LEVELS): boolean {
+export function hasOrbitalSurfingUnlock(
+  levels: UpgradeLevels = CURRENT_PLAYER_UPGRADE_LEVELS,
+): boolean {
   return getUpgradeValue('orbitalSurfing', levels) >= ORBITAL_SURFING_UNLOCK_VALUE
 }
 
@@ -330,7 +336,9 @@ export interface ShuttleThrusterChargeModifiers {
  * @param levels - Runtime upgrade level state.
  * @returns Recharge-rate multipliers for shuttle thrusters.
  */
-export function getShuttleThrusterChargeModifiers(levels: UpgradeLevels): ShuttleThrusterChargeModifiers {
+export function getShuttleThrusterChargeModifiers(
+  levels: UpgradeLevels,
+): ShuttleThrusterChargeModifiers {
   const m = getUpgradeValue('shuttleThrusterCharge', levels)
   return { thrust: m, brake: m, rcs: m }
 }
@@ -380,7 +388,11 @@ const SLINGSHOT_CRUISE_BOOST_PER_BURST_EXCESS = 0.25
  */
 export function getShuttleSlingshotCruiseSpeedMultiplier(levels: UpgradeLevels): number {
   const burst = getShuttleSlingshotBurstMultiplier(levels)
-  return 1 + Math.max(0, burst - SLINGSHOT_BURST_BASELINE_FOR_CRUISE) * SLINGSHOT_CRUISE_BOOST_PER_BURST_EXCESS
+  return (
+    1 +
+    Math.max(0, burst - SLINGSHOT_BURST_BASELINE_FOR_CRUISE) *
+      SLINGSHOT_CRUISE_BOOST_PER_BURST_EXCESS
+  )
 }
 
 /**
