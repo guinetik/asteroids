@@ -1490,6 +1490,12 @@ export class LevelViewController implements Tickable {
       : this.landerController?.position
     updateWaypointMarkers(this.elapsed, activePos?.x, activePos?.z)
 
+    // Slide the sun shadow frustum to follow the active actor so the
+    // tight shadow camera always covers the lander/EVA player.
+    if (activePos) {
+      this.lightingRig?.setFocus(activePos)
+    }
+
     // ESC → skip arrival cinematic
     if (this.inputManager?.wasActionPressed('skipCinematic') && this.stateMachine?.is('arrival')) {
       this.arrivalSequence?.parkShuttle()

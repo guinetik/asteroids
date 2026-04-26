@@ -23,10 +23,28 @@ import { FPS_VIEWMODEL_LAYER } from '@/three/FpsCamera'
  * @spec docs/superpowers/specs/2026-04-18-fps-perf-fixes-design.md (v4)
  */
 const SHADOW_MAP_SIZE = 1024
-/** Shadow camera frustum half-size — covers the terrain area. */
-const SHADOW_FRUSTUM = 3000
-/** Shadow bias to prevent acne on terrain. */
-const SHADOW_BIAS = -0.0005
+/**
+ * Shadow camera frustum half-size in world units. The frustum follows
+ * the focus point set by {@link LevelLightingRig.setFocus}, so we can
+ * keep this tight — only fragments within ±SHADOW_FRUSTUM of the lander
+ * need to be in the depth pass for landing-altitude shadows to read.
+ * At 1024² shadow map size that's ~0.39 world units per texel, sharp
+ * enough for a readable lander silhouette during descent.
+ */
+const SHADOW_FRUSTUM = 200
+/**
+ * Shadow bias. Sized for the {@link SHADOW_FRUSTUM}/{@link SHADOW_MAP_SIZE}
+ * texel ratio — too tight (e.g. -0.0005 against the previous 3000-unit
+ * frustum) caused peter-panning where the shadow detached from the
+ * caster and never appeared on the ground.
+ */
+const SHADOW_BIAS = -0.001
+/**
+ * Bias applied along the surface normal — pushes the shadow sample
+ * point slightly off the surface to fight self-shadowing acne on
+ * grazing angles without re-introducing peter-panning.
+ */
+const SHADOW_NORMAL_BIAS = 0.05
 /** Rim light intensity — subtle backlight to separate silhouettes. */
 const RIM_INTENSITY = 0.3
 /** Rim light cool-blue tint. */
@@ -95,13 +113,15 @@ export class LevelLightingRig {
   readonly rim: THREE.DirectionalLight
   /** PMREM-convolved environment map for PBR reflections. */
   readonly environment: THREE.Texture
+  private readonly sunDirection = new THREE.Vector3()
   private readonly sourceEnvTexture: THREE.CanvasTexture
   private installedScene: THREE.Scene | null = null
 
   constructor(ctx: AtmosphereContext, renderer: THREE.WebGLRenderer) {
     // ── Sun ──
     this.sun = new THREE.DirectionalLight(ctx.sunColor, ctx.sunIntensity)
-    this.sun.position.copy(ctx.sunDirection).multiplyScalar(SUN_DISTANCE)
+    this.sunDirection.copy(ctx.sunDirection).normalize()
+    this.sun.position.copy(this.sunDirection).multiplyScalar(SUN_DISTANCE)
     this.sun.castShadow = true
     this.sun.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE)
     this.sun.shadow.camera.left = -SHADOW_FRUSTUM
@@ -111,6 +131,7 @@ export class LevelLightingRig {
     this.sun.shadow.camera.near = 1
     this.sun.shadow.camera.far = SUN_DISTANCE * 2
     this.sun.shadow.bias = SHADOW_BIAS
+    this.sun.shadow.normalBias = SHADOW_NORMAL_BIAS
 
     // ── Fill — hemisphere with desaturated sun color ──
     const skyColor = ctx.sunColor.clone().multiplyScalar(0.7)
@@ -141,11 +162,31 @@ export class LevelLightingRig {
   /** Add all lights and install the environment map on the scene. */
   addToScene(scene: THREE.Scene): void {
     scene.add(this.sun)
+    scene.add(this.sun.target)
     scene.add(this.fill)
     scene.add(this.rim)
     scene.environment = this.environment
     scene.environmentIntensity = ENV_SCENE_INTENSITY
     this.installedScene = scene
+  }
+
+  /**
+   * Re-center the shadow camera around a focus point (typically the
+   * lander). The directional light's view direction stays constant —
+   * only its world position and target slide so the tight shadow
+   * frustum keeps the lander and surrounding terrain inside the depth
+   * pass at every world location.
+   *
+   * Call once per frame from the level tick.
+   *
+   * @param focus - World position to keep centered in the shadow frustum.
+   */
+  setFocus(focus: THREE.Vector3): void {
+    this.sun.target.position.copy(focus)
+    this.sun.target.updateMatrixWorld()
+    this.sun.position.copy(this.sunDirection).multiplyScalar(SUN_DISTANCE).add(focus)
+    this.sun.updateMatrixWorld()
+    this.sun.shadow.camera.updateProjectionMatrix()
   }
 
   /** Remove all lights, clear scene environment, dispose GPU resources. */

@@ -93,20 +93,6 @@ const RCS_SPREAD = 1.5
 const RCS_PUSH_FORCE = 10
 const RCS_SPAWN_RATE = 250
 
-/** Lander floodlights mounted near the front legs to illuminate the terrain below. */
-const FLOODLIGHT_COLOR = 0xeef2ff
-const FLOODLIGHT_INTENSITY = 58
-const FLOODLIGHT_DISTANCE = 280
-const FLOODLIGHT_ANGLE = Math.PI * 0.28
-const FLOODLIGHT_PENUMBRA = 0.95
-const FLOODLIGHT_DECAY = 1.45
-const FLOODLIGHT_MOUNT_INSET = 0.6
-const FLOODLIGHT_AIM_DISTANCE = 180
-const FLOODLIGHT_OUTWARD_ANGLE = Math.PI * 0.15
-const FLOODLIGHT_FORWARD_ANGLE = Math.PI * 0.1
-const FLOODLIGHT_SHADOW_MAP_SIZE = 512
-const FLOODLIGHT_SHADOW_BIAS = -0.0008
-
 /** Small fill light so the lander hull stays legible in darkness. */
 const BODY_FILL_LIGHT_COLOR = 0xdde4f0
 const BODY_FILL_LIGHT_INTENSITY = 5
@@ -139,9 +125,6 @@ const NOZZLE_ACTIVE_OPACITY = 0.62
 const NOZZLE_ACTIVE_PULSE_OPACITY = 0.22
 /** Upper emissive intensity for the engine bell while firing. */
 const ENGINE_EMISSIVE_MAX_INTENSITY = 0.45
-
-/** Use the downward-facing RCS nodes as light mounts. */
-const FLOODLIGHT_MOUNT_NODES = ['RCS_FL_Down', 'RCS_BL_Down', 'RCS_BR_Down', 'RCS_FR_Down'] as const
 
 /**
  * Which RCS nodes fire for each input action.
@@ -279,7 +262,6 @@ export class LanderController implements Tickable {
   readonly thrusterSystem: ThrusterSystem<LanderThrusterName>
   readonly flameEmitter: ParticleEmitter
   readonly nozzleGlow: THREE.Sprite
-  readonly floodlights: THREE.SpotLight[] = []
   readonly bodyFillLight = new THREE.PointLight(
     BODY_FILL_LIGHT_COLOR,
     BODY_FILL_LIGHT_INTENSITY,
@@ -322,7 +304,6 @@ export class LanderController implements Tickable {
   /** Local-space positions of each RCS nozzle, keyed by node name */
   private readonly rcsLocalPositions = new Map<string, THREE.Vector3>()
   private readonly rcsSpawnAccumulators = new Map<string, number>()
-  private readonly floodlightTargets: THREE.Object3D[] = []
   private readonly rcsWorldPos = new THREE.Vector3()
   private liftoffBoostTimer = 0
 
@@ -552,7 +533,6 @@ export class LanderController implements Tickable {
       }
     }
 
-    this.createFloodlights()
   }
 
   /** Apply damage to the lander. Fires onDeath when HP reaches 0. */
@@ -869,10 +849,6 @@ export class LanderController implements Tickable {
     ;(this.nozzleGlow.material as THREE.SpriteMaterial).dispose()
     for (const emitter of this.rcsEmitters.values()) {
       emitter.dispose()
-    }
-    for (const floodlight of this.floodlights) {
-      floodlight.shadow.map?.dispose()
-      floodlight.dispose()
     }
     this.topWarningBeacon.dispose()
     this.group.traverse((child) => {
@@ -1231,55 +1207,11 @@ export class LanderController implements Tickable {
     }
   }
 
-  private createFloodlights(): void {
-    for (const nodeName of FLOODLIGHT_MOUNT_NODES) {
-      const mount = this.rcsLocalPositions.get(nodeName)
-      if (!mount) continue
-
-      const side = Math.sign(mount.x) || 1
-      const forward = Math.sign(mount.z) || 1
-      const origin = mount.clone()
-      origin.x *= FLOODLIGHT_MOUNT_INSET
-      origin.z *= FLOODLIGHT_MOUNT_INSET
-      const floodlight = new THREE.SpotLight(
-        FLOODLIGHT_COLOR,
-        FLOODLIGHT_INTENSITY,
-        FLOODLIGHT_DISTANCE,
-        FLOODLIGHT_ANGLE,
-        FLOODLIGHT_PENUMBRA,
-        FLOODLIGHT_DECAY,
-      )
-      floodlight.position.copy(origin)
-      floodlight.castShadow = false
-      floodlight.shadow.mapSize.set(FLOODLIGHT_SHADOW_MAP_SIZE, FLOODLIGHT_SHADOW_MAP_SIZE)
-      floodlight.shadow.bias = FLOODLIGHT_SHADOW_BIAS
-
-      const target = new THREE.Object3D()
-      const outward = Math.sin(FLOODLIGHT_OUTWARD_ANGLE) * FLOODLIGHT_AIM_DISTANCE
-      const forwardOffset = Math.sin(FLOODLIGHT_FORWARD_ANGLE) * FLOODLIGHT_AIM_DISTANCE
-      const downward =
-        Math.cos(FLOODLIGHT_OUTWARD_ANGLE) *
-        Math.cos(FLOODLIGHT_FORWARD_ANGLE) *
-        FLOODLIGHT_AIM_DISTANCE
-      target.position.set(
-        origin.x + side * outward,
-        origin.y - downward,
-        origin.z + forward * forwardOffset,
-      )
-
-      floodlight.target = target
-
-      this.group.add(floodlight)
-      this.group.add(target)
-
-      this.floodlights.push(floodlight)
-      this.floodlightTargets.push(target)
-    }
-  }
-
   private tuneLanderMaterials(scene: THREE.Object3D): void {
     scene.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return
+      child.castShadow = true
+      child.receiveShadow = true
       const materials = Array.isArray(child.material) ? child.material : [child.material]
       for (const material of materials) {
         if (!(material instanceof THREE.MeshStandardMaterial)) continue
