@@ -33,13 +33,16 @@ import { MeshoptSimplifier } from 'meshoptimizer'
 /** @type {string} */
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
-const SOURCE_DIR = join(REPO_ROOT, '3d')
+const SOURCE_DIR = join(REPO_ROOT, '3d', 'asteroids')
 const OUTPUT_DIR = join(REPO_ROOT, 'public', 'models', 'asteroids')
 const REFERENCE_MODEL = join(REPO_ROOT, 'public', 'models', 'asteroid.glb')
-const SOURCE_PREFIX = 'astro_'
 const SOURCE_EXTENSION = '.glb'
-const DEFAULT_TARGET_TRIANGLES = 60000
-const DEFAULT_SIMPLIFY_ERROR = 0.01
+// Bumped for FPS walkability. Players walk on these meshes at point-blank
+// range, so triangle density needs to support visible silhouette detail
+// rather than just lander-altitude readability. Override per-run with
+// ASTEROID_TARGET_TRIANGLES / ASTEROID_SIMPLIFY_ERROR env vars.
+const DEFAULT_TARGET_TRIANGLES = 200000
+const DEFAULT_SIMPLIFY_ERROR = 0.005
 const NORMALIZED_MATERIAL_NAME = 'runtimeTextureMaterial'
 
 /**
@@ -71,18 +74,17 @@ export function boundsCenter(bounds) {
 }
 
 /**
- * Converts a source `astro_*.glb` path into the normalized output file name.
+ * Converts a source asteroid GLB path into the normalized output file name.
  *
- * @param {string} inputPath - Source path such as `3d/astro_bennu.glb`.
+ * @param {string} inputPath - Source path such as `3d/asteroids/bennu.glb`.
  * @returns {string} Output file name such as `bennu.glb`.
  */
 export function outputNameForInput(inputPath) {
   const fileName = basename(inputPath)
-  if (!fileName.startsWith(SOURCE_PREFIX) || !fileName.endsWith(SOURCE_EXTENSION)) {
-    throw new Error(`Expected source file named ${SOURCE_PREFIX}*${SOURCE_EXTENSION}: ${inputPath}`)
+  if (!fileName.endsWith(SOURCE_EXTENSION)) {
+    throw new Error(`Expected source file ending in ${SOURCE_EXTENSION}: ${inputPath}`)
   }
-
-  return fileName.slice(SOURCE_PREFIX.length).toLowerCase()
+  return fileName.toLowerCase()
 }
 
 /**
@@ -160,8 +162,13 @@ function countDocumentTriangles(document) {
  * @returns {string[]} Absolute paths for source files.
  */
 function listSourceGlbs(sourceDir) {
+  // Optional filter: ASTEROID_ONLY=bennu,xg7 rebuilds just those IDs.
+  const onlyFilter = process.env.ASTEROID_ONLY
+    ? new Set(process.env.ASTEROID_ONLY.split(',').map((id) => `${id.trim()}${SOURCE_EXTENSION}`))
+    : null
   return readdirSync(sourceDir)
-    .filter((fileName) => fileName.startsWith(SOURCE_PREFIX) && fileName.endsWith(SOURCE_EXTENSION))
+    .filter((fileName) => fileName.endsWith(SOURCE_EXTENSION))
+    .filter((fileName) => !onlyFilter || onlyFilter.has(fileName))
     .sort()
     .map((fileName) => join(sourceDir, fileName))
 }
@@ -325,26 +332,51 @@ function fitToReferenceBounds(referenceBounds) {
 async function normalizeAsteroidGlb(io, referenceBounds, inputPath, outputPath) {
   const document = await io.read(inputPath)
   const sourceTriangles = countDocumentTriangles(document)
+  console.info(`[${basename(inputPath)}] source triangles: ${sourceTriangles}`)
   const targetTriangles = Number(process.env.ASTEROID_TARGET_TRIANGLES ?? DEFAULT_TARGET_TRIANGLES)
   const ratio = Math.min(1, targetTriangles / Math.max(1, sourceTriangles))
   const error = Number(process.env.ASTEROID_SIMPLIFY_ERROR ?? DEFAULT_SIMPLIFY_ERROR)
 
   await MeshoptSimplifier.ready
   const preserveTextures = process.env.ASTEROID_PRESERVE_TEXTURES === '1'
-  const transforms = [
-    ...(preserveTextures ? [] : [stripTexturesAndUseRuntimeMaterial()]),
-    center({ pivot: 'center' }),
-    fitToReferenceBounds(referenceBounds),
-    dedup(),
-    flatten(),
-    simplify({ simplifier: MeshoptSimplifier, ratio, error, lockBorder: false }),
-    stripNormalsForResmooth(),
-    weld(),
-    smoothNormalsTransform(),
-    prune({ keepAttributes: true, keepIndices: true, keepLeaves: true, keepSolidTextures: preserveTextures }),
-    sparse(),
-  ]
+  // When preserving textures, skip the simplify+resmooth pass entirely. Both
+  // steps can puncture holes: simplify collapses border vertices on multi-
+  // submesh GLBs (UV seams, material splits), and stripping normals before
+  // weld destroys the authored UV-aware welds, leaving cracks at seams. The
+  // procedural-material path still simplifies because it owns the look and
+  // can tolerate the topology damage.
+  const transforms = preserveTextures
+    ? [
+        center({ pivot: 'center' }),
+        fitToReferenceBounds(referenceBounds),
+        dedup(),
+        flatten(),
+        prune({
+          keepAttributes: true,
+          keepIndices: true,
+          keepLeaves: true,
+          keepSolidTextures: true,
+        }),
+        sparse(),
+      ]
+    : [
+        stripTexturesAndUseRuntimeMaterial(),
+        center({ pivot: 'center' }),
+        fitToReferenceBounds(referenceBounds),
+        dedup(),
+        flatten(),
+        // lockBorder: true keeps submesh borders intact so simplify can't
+        // open seams between primitives.
+        simplify({ simplifier: MeshoptSimplifier, ratio, error, lockBorder: true }),
+        stripNormalsForResmooth(),
+        weld(),
+        smoothNormalsTransform(),
+        prune({ keepAttributes: true, keepIndices: true, keepLeaves: true }),
+        sparse(),
+      ]
   await document.transform(...transforms)
+  const finalTriangles = countDocumentTriangles(document)
+  console.info(`[${basename(inputPath)}] final triangles:  ${finalTriangles}`)
 
   await io.write(outputPath, document)
 }

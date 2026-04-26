@@ -8,11 +8,11 @@ import {
 } from '../normalize-asteroid-glbs.mjs'
 
 describe('normalize asteroid GLBs helpers', () => {
-  it('maps astro source names to public asteroid model names', () => {
-    expect(outputNameForInput('3d/astro_bennu.glb')).toBe('bennu.glb')
-    expect(outputNameForInput('3d/astro_itokawa.glb')).toBe('itokawa.glb')
-    expect(outputNameForInput('3d/astro_kr3.glb')).toBe('kr3.glb')
-    expect(outputNameForInput('3d/astro_psyche.glb')).toBe('psyche.glb')
+  it('maps source names under 3d/asteroids/ to public asteroid model names', () => {
+    expect(outputNameForInput('3d/asteroids/bennu.glb')).toBe('bennu.glb')
+    expect(outputNameForInput('3d/asteroids/itokawa.glb')).toBe('itokawa.glb')
+    expect(outputNameForInput('3d/asteroids/kr3.glb')).toBe('kr3.glb')
+    expect(outputNameForInput('3d/asteroids/psyche.glb')).toBe('psyche.glb')
   })
 
   it('centers the fitted bounds on the reference center', () => {
