@@ -60,6 +60,10 @@ const SIZZLE_IMPACT_DURATION_SEC = 0.1
 const SIZZLE_SPATIAL_REF_DISTANCE = 10
 /** Lowest volume scale allowed for a distant one-shot surface-sizzle cue. */
 const SIZZLE_SPATIAL_MIN_VOLUME = 0.12
+/** Spatial reference distance for the prospect-complete positional cue. */
+const PROSPECT_SPATIAL_REF_DISTANCE = 50
+/** Lowest volume scale allowed for a distant prospect-complete cue. */
+const PROSPECT_SPATIAL_MIN_VOLUME = 0.7
 
 /**
  * Audio orchestrator for miscellaneous level events. Single-instance
@@ -91,6 +95,25 @@ export class LevelAudioDirector {
    */
   notifyResourcePickup(): void {
     this.audio.play('sfx.collect', { volume: PICKUP_VOLUME })
+  }
+
+  /**
+   * A rock was fully prospected; play the analytical-beep cue as a
+   * positional point source so it reads as coming from the rock.
+   *
+   * @param worldPos - World-space center of the prospected rock.
+   * @param camera - FPS camera (for `worldPointToHearing`).
+   */
+  notifyProspectComplete(worldPos: Vector3, camera: PerspectiveCamera): void {
+    const w = worldPointToHearing(camera, worldPos, {
+      refDistance: PROSPECT_SPATIAL_REF_DISTANCE,
+      minVolumeScale: PROSPECT_SPATIAL_MIN_VOLUME,
+    })
+    const def = getAudioDefinition('sfx.tool.prospectComplete')
+    const handle = this.audio.play('sfx.tool.prospectComplete', {
+      volume: def.volume * w.volumeScale,
+    })
+    handle.setStereo(w.pan)
   }
 
   /**
