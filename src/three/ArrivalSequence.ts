@@ -197,7 +197,12 @@ export class ArrivalSequence {
   onComplete: (() => void) | null = null
 
   constructor(private readonly landerSpawnTarget: THREE.Vector3) {
-    this.camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 15000)
+    this.camera = new THREE.PerspectiveCamera(
+      40,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      15000,
+    )
 
     this.shuttleEndPos.set(
       landerSpawnTarget.x,
@@ -421,6 +426,7 @@ export class ArrivalSequence {
     // Open cargo bay doors
     this.doorProgress = 1
     this.updateDoorRotation()
+    this.anchorExfilFloodlightUnderParkedShuttle()
 
     // Hide thruster sprites (parked, not thrusting)
     for (const sprite of this.thrusterSprites) {
@@ -444,7 +450,6 @@ export class ArrivalSequence {
     const engineGlow = new THREE.PointLight(0xff6633, 6, 500)
     engineGlow.position.set(-6, 0, 0)
     this.shuttleGroup.add(engineGlow)
-
   }
 
   /** Remove shuttle and falling lander from scene entirely. */
@@ -601,6 +606,7 @@ export class ArrivalSequence {
   playExfil(landerPosition: THREE.Vector3): void {
     this.exfilPhase = 'dock'
     this.exfilPhaseElapsed = 0
+    this.restoreExfilFloodlightTargetToShuttle()
 
     // Animate lander in world space (scene root), then reparent into cargo bay at the end.
     // This mirrors the arrival detach in reverse.
@@ -754,11 +760,7 @@ export class ArrivalSequence {
     const t = Math.min(1, this.exfilPhaseElapsed / EXFIL_DEPART_DURATION)
     const eased = this.easeInOut(t)
 
-    this.shuttleGroup.position.lerpVectors(
-      this.exfilDepartStartPos,
-      this.exfilDepartEndPos,
-      eased,
-    )
+    this.shuttleGroup.position.lerpVectors(this.exfilDepartStartPos, this.exfilDepartEndPos, eased)
 
     // Enable thruster sprites during departure
     this.updateThrusterSprites(true)
@@ -860,7 +862,10 @@ export class ArrivalSequence {
     )
     floodlight.position.set(EXFIL_FLOODLIGHT_X_OFFSET, EXFIL_FLOODLIGHT_Y_OFFSET, 0)
     floodlight.castShadow = false
-    floodlight.shadow.mapSize.set(EXFIL_FLOODLIGHT_SHADOW_MAP_SIZE, EXFIL_FLOODLIGHT_SHADOW_MAP_SIZE)
+    floodlight.shadow.mapSize.set(
+      EXFIL_FLOODLIGHT_SHADOW_MAP_SIZE,
+      EXFIL_FLOODLIGHT_SHADOW_MAP_SIZE,
+    )
     floodlight.shadow.bias = EXFIL_FLOODLIGHT_SHADOW_BIAS
 
     const target = new THREE.Object3D()
@@ -880,6 +885,7 @@ export class ArrivalSequence {
       color: EXFIL_FLOODLIGHT_COLOR,
       transparent: true,
       opacity: EXFIL_FLOODLIGHT_CONE_OPACITY,
+      depthTest: false,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
@@ -900,6 +906,29 @@ export class ArrivalSequence {
     this.exfilFloodlightTarget = target
     this.exfilFloodlightCone = cone
     this.updateExfilFloodlightVisibility()
+  }
+
+  private anchorExfilFloodlightUnderParkedShuttle(): void {
+    const target = this.exfilFloodlightTarget
+    const parent = this.shuttleGroup.parent
+    if (!target || !parent) return
+
+    parent.attach(target)
+    target.position.set(
+      this.shuttleGroup.position.x,
+      this.landerSpawnTarget.y,
+      this.shuttleGroup.position.z,
+    )
+    this.exfilFloodlight?.target.updateMatrixWorld()
+  }
+
+  private restoreExfilFloodlightTargetToShuttle(): void {
+    const target = this.exfilFloodlightTarget
+    if (!target) return
+
+    this.shuttleGroup.attach(target)
+    target.position.set(EXFIL_FLOODLIGHT_X_OFFSET, EXFIL_FLOODLIGHT_TARGET_Y, 0)
+    this.exfilFloodlight?.target.updateMatrixWorld()
   }
 
   private updateExfilFloodlightVisibility(): void {

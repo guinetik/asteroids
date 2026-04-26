@@ -106,6 +106,7 @@ function createBeamMaterial(color: number, opacity: number): THREE.MeshBasicMate
     color,
     transparent: true,
     opacity,
+    depthTest: false,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
@@ -113,10 +114,7 @@ function createBeamMaterial(color: number, opacity: number): THREE.MeshBasicMate
 }
 
 /** Assembles beam + cap geometry for one waypoint color/layout preset. */
-function buildMarkerGroupFromLayout(
-  color: number,
-  layout: WaypointMarkerLayout,
-): THREE.Group {
+function buildMarkerGroupFromLayout(color: number, layout: WaypointMarkerLayout): THREE.Group {
   const group = new THREE.Group()
   const H = layout.beamHeight
 
@@ -216,11 +214,7 @@ export function tickWaypointMarkerGroup(
   const pulse = 0.5 + 0.5 * Math.sin(elapsed * 3)
 
   let proximity = 1
-  if (
-    anim.useProximityFade
-    && playerX !== undefined
-    && playerZ !== undefined
-  ) {
+  if (anim.useProximityFade && playerX !== undefined && playerZ !== undefined) {
     const dx = group.position.x - playerX
     const dz = group.position.z - playerZ
     const dist = Math.sqrt(dx * dx + dz * dz)
