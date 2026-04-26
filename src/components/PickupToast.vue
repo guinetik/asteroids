@@ -37,9 +37,19 @@ export interface PickupEntry {
   pulse: number
 }
 
+/** A prospect-complete entry shown in the same toast stack. */
+export interface ProspectEntry {
+  /** Stable key for v-for diffing. */
+  id: string
+  /** Display label, e.g. "Olivine-bearing rock". */
+  label: string
+}
+
 const props = defineProps<{
-  /** Active pickups, oldest first. */
+  /** Active mineral pickups, oldest first. */
   pickups: readonly PickupEntry[]
+  /** Active prospect-complete entries, oldest first. */
+  prospectEntries?: readonly ProspectEntry[]
   /** Optional max number of toasts to render simultaneously. */
   maxVisible?: number
 }>()
@@ -48,6 +58,13 @@ const visiblePickups = computed(() => {
   const max = props.maxVisible ?? 5
   if (props.pickups.length <= max) return props.pickups
   return props.pickups.slice(props.pickups.length - max)
+})
+
+const visibleProspects = computed(() => {
+  const list = props.prospectEntries ?? []
+  const max = props.maxVisible ?? 5
+  if (list.length <= max) return list
+  return list.slice(list.length - max)
 })
 </script>
 
@@ -58,6 +75,14 @@ const visiblePickups = computed(() => {
         <span class="pickup-toast__plus">+</span>
         <span :key="entry.pulse" class="pickup-toast__qty">{{ entry.quantity }}</span>
         <span class="pickup-toast__label">{{ entry.label }}</span>
+      </div>
+      <div
+        v-for="entry in visibleProspects"
+        :key="entry.id"
+        class="pickup-toast__entry pickup-toast__entry--prospect"
+      >
+        <span class="pickup-toast__check">✓</span>
+        <span class="pickup-toast__prospect-label">Analysed — {{ entry.label }}</span>
       </div>
     </transition-group>
   </div>
@@ -111,6 +136,20 @@ const visiblePickups = computed(() => {
 }
 .pickup-toast__label {
   color: rgba(102, 255, 238, 0.85);
+}
+.pickup-toast__entry--prospect {
+  color: rgba(34, 197, 94, 0.95);
+  border-color: rgba(34, 197, 94, 0.45);
+  box-shadow:
+    0 0 12px rgba(34, 197, 94, 0.18),
+    inset 0 0 8px rgba(34, 197, 94, 0.05);
+}
+.pickup-toast__check {
+  color: rgba(34, 197, 94, 0.95);
+  font-size: 0.95rem;
+}
+.pickup-toast__prospect-label {
+  color: rgba(34, 197, 94, 0.92);
 }
 
 @keyframes pickup-toast-bump {

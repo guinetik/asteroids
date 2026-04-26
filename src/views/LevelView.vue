@@ -16,10 +16,11 @@ import DamageFeedback from '@/components/DamageFeedback.vue'
 import LevelMinimap from '@/components/LevelMinimap.vue'
 import type { MapMarker } from '@/components/LevelMinimap.vue'
 import PickupToast from '@/components/PickupToast.vue'
-import type { PickupEntry } from '@/components/PickupToast.vue'
+import type { PickupEntry, ProspectEntry } from '@/components/PickupToast.vue'
 import LevelInventoryPanel from '@/components/LevelInventoryPanel.vue'
 import type { Inventory } from '@/lib/inventory/types'
 import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
+import { getItemDefinition } from '@/lib/inventory/catalog'
 import { removeItem } from '@/lib/inventory/inventory'
 import type { LanderTelemetry } from '@/lib/ui/landerHudTypes'
 import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
@@ -108,10 +109,35 @@ function recordPickup(itemId: string, quantity: number, label: string): void {
   pickupTimers.set(entry.id, { handle, key: entry.id })
 }
 
+const prospectEntries = ref<ProspectEntry[]>([])
+const PROSPECT_TOAST_LIFETIME_SEC = 2.6
+const prospectTimers = new Map<string, ReturnType<typeof Timer.after>>()
+let prospectSeq = 0
+
+/**
+ * Push a prospect-complete entry that auto-removes after
+ * {@link PROSPECT_TOAST_LIFETIME_SEC}. Each call gets its own timer
+ * so back-to-back prospects don't clobber each other.
+ */
+function recordProspect(label: string): void {
+  prospectSeq += 1
+  const entry: ProspectEntry = { id: `prospect-${prospectSeq}`, label }
+  prospectEntries.value.push(entry)
+  const handle = Timer.after(PROSPECT_TOAST_LIFETIME_SEC, () => {
+    const idx = prospectEntries.value.findIndex((p) => p.id === entry.id)
+    if (idx >= 0) prospectEntries.value.splice(idx, 1)
+    prospectTimers.delete(entry.id)
+  })
+  prospectTimers.set(entry.id, handle)
+}
+
 function clearPickups(): void {
   for (const { handle } of pickupTimers.values()) Timer.cancel(handle)
   pickupTimers.clear()
   pickups.value = []
+  for (const handle of prospectTimers.values()) Timer.cancel(handle)
+  prospectTimers.clear()
+  prospectEntries.value = []
   for (const handle of pickupFailedTimers) Timer.cancel(handle)
   pickupFailedTimers.clear()
   pickupFailed.value = null
@@ -293,6 +319,11 @@ onMounted(async () => {
     viewController.onResourcePickupFailed = (label, reason) => {
       recordPickupFailed(label, reason)
       if (showInventory.value) refreshInventorySnapshot()
+    }
+    viewController.onProspect = (itemId) => {
+      const def = getItemDefinition(itemId)
+      const mineral = def?.label ?? itemId
+      recordProspect(`${mineral}-bearing rock`)
     }
     await viewController.init(container.value)
 
@@ -562,6 +593,7 @@ function handleToggleMusic(): void {
   <PickupToast
     v-if="stateInfo.state === 'eva' || stateInfo.state === 'lander'"
     :pickups="pickups"
+    :prospect-entries="prospectEntries"
   />
   <transition name="pickup-failed">
     <div
