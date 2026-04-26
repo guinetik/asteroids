@@ -11,6 +11,13 @@ import type { Tickable } from '@/lib/Tickable'
 import type { VehicleCamera } from './VehicleCamera'
 
 /**
+ * ACES Filmic exposure for the level scene. 1.0 is neutral; the engine
+ * flames, helmet spotlight, and additive emissives all rely on the
+ * filmic curve to roll off without clipping to white.
+ */
+const TONE_MAPPING_EXPOSURE = 1.0
+
+/**
  * Manages the Three.js renderer and scene graph.
  * Rendering uses the camera provided by the active {@link VehicleCamera}.
  *
@@ -47,6 +54,9 @@ export class SceneManager implements Tickable {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFShadowMap
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    this.renderer.toneMappingExposure = TONE_MAPPING_EXPOSURE
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace
 
     window.addEventListener('resize', this.onResize)
   }

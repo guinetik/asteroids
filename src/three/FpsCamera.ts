@@ -35,13 +35,13 @@ const TERRAIN_TILT_LERP_SPEED = 4
 /** Helmet light to keep the immediate look direction readable in EVA. */
 const HELMET_LIGHT_COLOR = 0xf4f7ff
 /**
- * Boosted from 110 → 280. Combined with the lower decay (was 1.35)
- * the spot now actually delivers usable lux at the 8–25u mining
- * range instead of fading into the ambient floor on dark asteroids.
- * Spotlight cost is fragment-in-cone bound, not intensity bound, so
- * boosting brightness is essentially free.
+ * With ACES tone mapping enabled on the renderer, raw radiance no
+ * longer clips to white — the filmic curve compresses highlights so
+ * we can run the beam hot without the pure-white blowout the old
+ * 180/decay-1.1 setup produced. 130 reads as a clear, punchy lantern
+ * cone after the filmic rolloff while keeping near-ground detail.
  */
-const HELMET_LIGHT_INTENSITY = 180
+const HELMET_LIGHT_INTENSITY = 130
 /**
  * Halved from 240 in the v4 perf pass. The previous range lit fragments
  * up to 240 units away — well past the player's typical interaction
@@ -61,10 +61,12 @@ const HELMET_LIGHT_ANGLE = Math.PI * 0.22
  */
 const HELMET_LIGHT_PENUMBRA = 0.55
 /**
- * Lowered from 1.35 → 0.95. Sub-quadratic falloff so the beam still
- * lights mineable rocks at 15–25u instead of decaying into nothing.
+ * Closer to physical (2.0) now that tone mapping handles the dynamic
+ * range — a steeper falloff stops the beam from saturating geometry
+ * a few meters in front of the muzzle while the lower decay made
+ * close ground read as a flat white pool.
  */
-const HELMET_LIGHT_DECAY = 1.1
+const HELMET_LIGHT_DECAY = 1.5
 /**
  * Light origin in camera-local space — modelled as an under-barrel
  * tactical lantern slung beneath the multitool, just below where
@@ -79,7 +81,7 @@ const HELMET_LIGHT_DECAY = 1.1
  */
 const HELMET_LIGHT_X_OFFSET = 0.34
 const HELMET_LIGHT_Y_OFFSET = -0.58
-const HELMET_LIGHT_Z_OFFSET = -1.94
+const HELMET_LIGHT_Z_OFFSET = -2.7
 /** Aim straight along camera forward — the lantern is bore-sighted with the gun. */
 const HELMET_LIGHT_TARGET_X = 0
 const HELMET_LIGHT_TARGET_Y = 0
@@ -100,12 +102,12 @@ const HELMET_LIGHT_CONE_VISIBLE = false
  * meters in front of you stays readable.
  */
 const HELMET_FILL_COLOR = 0xc8d6ff
-const HELMET_FILL_INTENSITY = 10
+const HELMET_FILL_INTENSITY = 6
 const HELMET_FILL_DISTANCE = 10
 const HELMET_FILL_DECAY = 1.6
 const HELMET_FILL_X_OFFSET = 0.32
 const HELMET_FILL_Y_OFFSET = -0.58
-const HELMET_FILL_Z_OFFSET = -1.94
+const HELMET_FILL_Z_OFFSET = -2.7
 
 /**
  * Render layer reserved for the FPS view-model (gun, hands, arm-
