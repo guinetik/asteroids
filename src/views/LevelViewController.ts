@@ -775,6 +775,7 @@ export class LevelViewController implements Tickable {
       }
     }
     this.multiTool.setProjectileSystem(this.projectileSystem)
+    this.projectileSystem.setLander(this.landerController)
 
     // ── Universal rock mining ───────────────────────────────────
     // Every surface rock can be drilled regardless of mission type;
@@ -1348,8 +1349,8 @@ export class LevelViewController implements Tickable {
   // ═══════════════════════════════════════════════════════════════
 
   private enterExfil(): void {
-    // Fire mission complete if all objectives done
-    // TODO: apply multitoolScience multiplier when FPS mission CR reward system is implemented
+    // Fire mission complete if all objectives done. multitoolScience multiplier
+    // is now applied in enterComplete via persistCompletedAsteroidMissionRewards.
     if (this.minigames.areAllComplete()) {
       this.onMissionComplete?.()
     }
@@ -1392,8 +1393,9 @@ export class LevelViewController implements Tickable {
 
     if (this.persistShuttleMissionRewards && this.mission && this.minigames.areAllComplete()) {
       hydratePlayerUpgradeLevelsFromStorage()
-      const rewardMult = getCurrentUpgradeValue('shuttleScienceStation')
-      persistCompletedAsteroidMissionRewards(this.mission, rewardMult)
+      const scienceMult =
+        getCurrentUpgradeValue('shuttleScienceStation') * getCurrentUpgradeValue('multitoolScience')
+      persistCompletedAsteroidMissionRewards(this.mission, scienceMult)
     }
 
     import('@/router').then(({ default: router }) => {
@@ -1508,6 +1510,10 @@ export class LevelViewController implements Tickable {
   tick(dt: number): void {
     this.elapsed += dt
     this.updateMiningSizzle()
+
+    // Heal-pulse emissive decay — runs always so the green flash fades
+    // even when the lander is not registered for ticking (EVA mode).
+    this.landerController?.tickFeedback(dt)
 
     // Tick arrival sequence if active
     if (this.arrivalSequence) {
@@ -1680,8 +1686,9 @@ export class LevelViewController implements Tickable {
       if (this.landerController) {
         const ts = this.landerController.thrusterSystem
         const activeMinigame = this.minigames.getActive()
-        const activeObjectiveType =
-          activeMinigame ? this.missionObjectives[activeMinigame.objectiveIndex]?.type : undefined
+        const activeObjectiveType = activeMinigame
+          ? this.missionObjectives[activeMinigame.objectiveIndex]?.type
+          : undefined
         const activeProgressTotal = activeMinigame?.progressTotal ?? null
         const progressLabel =
           activeObjectiveType === 'photometry'
@@ -1788,7 +1795,7 @@ export class LevelViewController implements Tickable {
     if (this.inputManager && this.multiToolState) {
       if (this.inputManager.wasActionPressed('toolDrill')) this.multiToolState.setMode('drill')
       if (this.inputManager.wasActionPressed('toolWeapon')) this.multiToolState.setMode('weapon')
-      if (this.inputManager.wasActionPressed('toolHeal')) this.multiToolState.setMode('heal')
+      if (this.inputManager.wasActionPressed('toolScience')) this.multiToolState.setMode('science')
 
       this.multiToolState.setAiming(this.pointerLock.isRightMouseDown)
       this.multiToolState.setInput(
@@ -2396,7 +2403,7 @@ export class LevelViewController implements Tickable {
     context: ProjectileImpactContext,
     impactWorld: Vector3,
   ): void {
-    if (context.boltKind === 'heal') return
+    if (context.boltKind === 'science') return
     if (context.kind === 'enemy' || context.kind === 'hostage') return
     if (context.boltKind === 'drill' && context.kind === 'drill_rock') return
     const isLasSurface = context.boltKind === 'weapon' && context.kind === 'terrain'

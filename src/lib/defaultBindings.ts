@@ -69,7 +69,7 @@ export const FPS_BINDINGS: Record<string, string[]> = {
   sprint: ['ShiftLeft'],
   toolDrill: ['Digit1'],
   toolWeapon: ['Digit2'],
-  toolHeal: ['Digit3'],
+  toolScience: ['Digit3'],
 }
 
 /** Level bindings — combines lander + FPS + interact (F key). */
@@ -93,7 +93,7 @@ export const LEVEL_BINDINGS: Record<string, string[]> = {
   sprint: ['ShiftLeft'],
   toolDrill: ['Digit1'],
   toolWeapon: ['Digit2'],
-  toolHeal: ['Digit3'],
+  toolScience: ['Digit3'],
   // Shared
   interact: ['KeyF'],
   terminalInteract: ['KeyE'],

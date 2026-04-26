@@ -37,8 +37,14 @@ export function buildMultiToolConfig(): MultiToolConfig {
           capacity: base.rtg.thrusters.drill.capacity * BASE_DRILL_CAPACITY_MULTIPLIER,
           burnRate: base.rtg.thrusters.drill.burnRate * efficiency,
         },
-        weapon: { ...base.rtg.thrusters.weapon, burnRate: base.rtg.thrusters.weapon.burnRate * efficiency },
-        heal: { ...base.rtg.thrusters.heal, burnRate: base.rtg.thrusters.heal.burnRate * efficiency },
+        weapon: {
+          ...base.rtg.thrusters.weapon,
+          burnRate: base.rtg.thrusters.weapon.burnRate * efficiency,
+        },
+        science: {
+          ...base.rtg.thrusters.science,
+          burnRate: base.rtg.thrusters.science.burnRate * efficiency,
+        },
       },
     },
   }

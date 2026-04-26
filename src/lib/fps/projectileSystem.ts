@@ -17,6 +17,7 @@ import type { Tickable } from '@/lib/Tickable'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import type { Enemy } from './enemy'
 import type { Hostage } from './hostage'
+import type { LanderController } from '@/three/LanderController'
 import type { MultiToolMode } from './multiToolState'
 import projectileBoltVertexShader from '@/three/shaders/effects/projectileBolt.vert.glsl?raw'
 import projectileBoltFragmentShader from '@/three/shaders/effects/projectileBolt.frag.glsl?raw'
@@ -34,7 +35,7 @@ const TERRAIN_HIT_MARGIN = 0.5
 /** Damage per weapon/drill bolt hit on enemies; weapon bolts also damage hostages (friendly fire). */
 const BOLT_DAMAGE = 25
 
-/** HP restored when a med bolt hits a hostage. */
+/** HP restored when a science bolt hits a hostage (initial behavior). */
 const HEAL_BOLT_AMOUNT = 25
 
 /**
@@ -71,7 +72,7 @@ interface Projectile {
   material: THREE.ShaderMaterial
   velocity: THREE.Vector3
   age: number
-  /** Which multi-tool mode spawned this bolt — drives damage vs heal. */
+  /** Which multi-tool mode spawned this bolt — drives damage vs science/heal effects. */
   boltKind: MultiToolMode
 }
 
@@ -90,8 +91,10 @@ export class ProjectileSystem implements Tickable {
   private readonly enemies: Enemy[] = []
   private readonly hostages: Hostage[] = []
   private readonly rocks: MineableRockEntry[] = []
+  private lander: LanderController | null = null
   private damageMultiplier = 1
   private readonly _hostageCenter = new THREE.Vector3()
+  private readonly _landerCenter = new THREE.Vector3()
   private static readonly boltGeometry = (() => {
     const geometry = new THREE.CylinderGeometry(BOLT_WIDTH, BOLT_WIDTH, BOLT_LENGTH, 6, 1, false)
     geometry.rotateX(Math.PI / 2)
@@ -105,10 +108,7 @@ export class ProjectileSystem implements Tickable {
    *   copy if you need to keep it past the synchronous handler body.
    * @param context - Which tool mode and surface/body; see {@link ProjectileImpactContext}.
    */
-  onImpact: ((
-    position: THREE.Vector3,
-    context: ProjectileImpactContext,
-  ) => void) | null = null
+  onImpact: ((position: THREE.Vector3, context: ProjectileImpactContext) => void) | null = null
   /**
    * Called when a projectile hits an enemy.
    *
@@ -119,18 +119,16 @@ export class ProjectileSystem implements Tickable {
   onEnemyHit: ((enemy: Enemy, position: THREE.Vector3) => void) | null = null
 
   /**
-   * Called when a player bolt hits a hostage — damage (weapon/drill) or heal (med).
+   * Called when a player bolt hits a hostage — damage (weapon/drill) or heal (science).
    *
    * @param hostage - Hit hostage
    * @param position - **Transient** impact point. Mutated on the next callback;
    *   copy if you need to keep it past the synchronous handler body.
    * @param effect - Whether the bolt hurt or healed
    */
-  onHostageBolt: ((
-    hostage: Hostage,
-    position: THREE.Vector3,
-    effect: 'damage' | 'heal',
-  ) => void) | null = null
+  onHostageBolt:
+    | ((hostage: Hostage, position: THREE.Vector3, effect: 'damage' | 'heal') => void)
+    | null = null
 
   /**
    * Called when a **drill** bolt hits a registered mineable rock.
@@ -176,7 +174,7 @@ export class ProjectileSystem implements Tickable {
     if (idx >= 0) this.enemies.splice(idx, 1)
   }
 
-  /** Register a hostage for bolt collision (weapon friendly fire + med heal; not drill). */
+  /** Register a hostage for bolt collision (weapon friendly fire + science heal; not drill). */
   addHostage(hostage: Hostage): void {
     this.hostages.push(hostage)
   }
@@ -199,6 +197,11 @@ export class ProjectileSystem implements Tickable {
   removeRock(spawnIndex: number): void {
     const idx = this.rocks.findIndex((r) => r.spawnIndex === spawnIndex)
     if (idx >= 0) this.rocks.splice(idx, 1)
+  }
+
+  /** Register the lander for science bolt healing detection (green hull pulse). */
+  setLander(lander: LanderController | null): void {
+    this.lander = lander
   }
 
   /**
@@ -229,8 +232,12 @@ export class ProjectileSystem implements Tickable {
     let best: { spawnIndex: number; distance: number } | null = null
     for (const rock of this.rocks) {
       const t = this.segmentEnterSphereT(
-        this._pickFrom, this._pickTo,
-        rock.cx, rock.cy, rock.cz, rock.radius,
+        this._pickFrom,
+        this._pickTo,
+        rock.cx,
+        rock.cy,
+        rock.cz,
+        rock.radius,
       )
       if (t === null) continue
       const distance = t * maxDistance
@@ -301,18 +308,35 @@ export class ProjectileSystem implements Tickable {
 
       const pos = p.mesh.position
 
-      // Med bolts: only hostages (closest along segment). Weapon/drill: enemies; weapon also contests hostages (friendly fire) with closest-hit wins.
+      // Science bolts: contextual Prey-style puzzle resolver with prioritized targets.
+      // Order: hostages (heal), lander hull, rocks (wireframe+yield boost), terminals (waypoints for gather missions),
+      // enemies (faction flip), terrain (small crater). See implement-specific-effects todo.
       let hitEnemy = false
       let hitHostage = false
       let hitRock = false
 
-      if (p.boltKind === 'heal') {
-        const healHit = this.closestHostageHealHit(this._prevPos, pos)
-        if (healHit) {
-          healHit.hostage.heal(HEAL_BOLT_AMOUNT)
+      if (p.boltKind === 'science') {
+        const hostageHit = this.closestHostageHealHit(this._prevPos, pos)
+        if (hostageHit) {
+          hostageHit.hostage.heal(HEAL_BOLT_AMOUNT)
           this._callbackPos.copy(pos)
-          this.onHostageBolt?.(healHit.hostage, this._callbackPos, 'heal')
+          this.onHostageBolt?.(hostageHit.hostage, this._callbackPos, 'heal')
           hitHostage = true
+        } else if (this.lander) {
+          // Science bolt hits lander → heal hull + green glow pulse (Prey-style)
+          this.lander.group.getWorldPosition(this._landerCenter)
+          const distSq = pos.distanceToSquared(this._landerCenter)
+          if (distSq < 180) {
+            // ~13.4 unit radius around lander center
+            const healAmount = HEAL_BOLT_AMOUNT
+            this.lander.healHull(healAmount)
+            this._callbackPos.copy(pos)
+            // Trigger impact for VFX (green sparks could be added in onImpact)
+            hitHostage = true // reuse flag to trigger onImpact
+          }
+        } else {
+          // TODO: full resolver for rocks, terminals, enemies, terrain crater
+          this._callbackPos.copy(pos)
         }
       } else {
         const combatHit = this.closestCombatBoltHit(this._prevPos, pos, p.boltKind)
@@ -332,7 +356,7 @@ export class ProjectileSystem implements Tickable {
         // the mining callback; weapon bolts just register the impact
         // (sparks + sizzle) so the player gets visual+audio feedback that
         // their shot connected with a rock instead of passing through.
-        // Heal bolts continue to ignore rocks. Combat hits win first so a
+        // Science bolts continue to ignore rocks. Combat hits win first so a
         // rock right next to an enemy doesn't eat the bolt.
         if (!hitEnemy && !hitHostage && (p.boltKind === 'drill' || p.boltKind === 'weapon')) {
           const rockHit = this.closestRockHit(this._prevPos, pos)
@@ -441,7 +465,7 @@ export class ProjectileSystem implements Tickable {
   }
 
   /**
-   * Closest hostage along the segment for a med bolt (heal).
+   * Closest hostage along the segment for a science bolt (heal effect).
    *
    * @param from - Segment start (previous projectile position)
    * @param to - Segment end (current projectile position)

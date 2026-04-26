@@ -9,13 +9,21 @@ import ShuttleControlProgramMail from './shuttle-control/ShuttleControlProgramMa
 import ShuttleControlProgramMissions from './shuttle-control/ShuttleControlProgramMissions.vue'
 import ShuttleControlProgramShuttle from './shuttle-control/ShuttleControlProgramShuttle.vue'
 import ShuttleControlProgramLander from './shuttle-control/ShuttleControlProgramLander.vue'
+import ShuttleControlProgramMultitool from './shuttle-control/ShuttleControlProgramMultitool.vue'
 import ShuttleControlProgramUpgrades from './shuttle-control/ShuttleControlProgramUpgrades.vue'
 import type { UpgradeId } from '@/lib/upgrades'
 import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
 import { uiAudio } from '@/audio/UiAudioDirector'
 
 /** Left-rail program in the shuttle control terminal. */
-type ControlScreen = 'shuttle' | 'lander' | 'mail' | 'missions' | 'inventory' | 'upgrades'
+type ControlScreen =
+  | 'shuttle'
+  | 'lander'
+  | 'multitool'
+  | 'mail'
+  | 'missions'
+  | 'inventory'
+  | 'upgrades'
 
 const props = defineProps<{
   visible: boolean
@@ -62,6 +70,7 @@ const activeScreen = ref<ControlScreen>('mail')
 const programByScreen: Record<ControlScreen, Component> = {
   shuttle: ShuttleControlProgramShuttle,
   lander: ShuttleControlProgramLander,
+  multitool: ShuttleControlProgramMultitool,
   mail: ShuttleControlProgramMail,
   missions: ShuttleControlProgramMissions,
   inventory: ShuttleControlProgramInventory,
@@ -104,12 +113,12 @@ watch(activeScreen, (screen, previous) => {
 })
 
 const screens = computed(() => {
-  const mailLabel =
-    mailPendingCount.value > 0 ? `Mail (${mailPendingCount.value})` : 'Mail'
+  const mailLabel = mailPendingCount.value > 0 ? `Mail (${mailPendingCount.value})` : 'Mail'
   return [
     { id: 'mail' as const, label: mailLabel },
     { id: 'shuttle' as const, label: 'Shuttle' },
     { id: 'lander' as const, label: 'Lander' },
+    { id: 'multitool' as const, label: 'Multitool' },
     { id: 'missions' as const, label: 'Missions' },
     { id: 'inventory' as const, label: 'Inventory' },
   ]
@@ -145,7 +154,10 @@ function onKeydown(e: KeyboardEvent) {
         <button
           type="button"
           class="ship-message-card__button"
-          @click="uiAudio.notifySwitch(); $emit('close')"
+          @click="
+            uiAudio.notifySwitch()
+            $emit('close')
+          "
         >
           Close
         </button>
@@ -153,11 +165,21 @@ function onKeydown(e: KeyboardEvent) {
 
       <!-- Header telemetry strip -->
       <div class="shuttle-control-header">
-        <span class="shuttle-control-header__item">SYS <span class="shuttle-control-header__value">NOMINAL</span></span>
-        <span class="shuttle-control-header__item">PWR <span class="shuttle-control-header__value">98.2%</span></span>
-        <span class="shuttle-control-header__item">HULL <span class="shuttle-control-header__value">100%</span></span>
-        <span class="shuttle-control-header__item">O2 <span class="shuttle-control-header__value">STABLE</span></span>
-        <span class="shuttle-control-header__item">NAV <span class="shuttle-control-header__value">ONLINE</span></span>
+        <span class="shuttle-control-header__item"
+          >SYS <span class="shuttle-control-header__value">NOMINAL</span></span
+        >
+        <span class="shuttle-control-header__item"
+          >PWR <span class="shuttle-control-header__value">98.2%</span></span
+        >
+        <span class="shuttle-control-header__item"
+          >HULL <span class="shuttle-control-header__value">100%</span></span
+        >
+        <span class="shuttle-control-header__item"
+          >O2 <span class="shuttle-control-header__value">STABLE</span></span
+        >
+        <span class="shuttle-control-header__item"
+          >NAV <span class="shuttle-control-header__value">ONLINE</span></span
+        >
       </div>
 
       <div class="shuttle-control-divider" />
@@ -181,7 +203,10 @@ function onKeydown(e: KeyboardEvent) {
             v-if="dockedPlanet"
             type="button"
             class="shuttle-control-nav-btn shuttle-control-nav-btn--shop"
-            @click="uiAudio.notifyButtonClick(); $emit('openShop')"
+            @click="
+              uiAudio.notifyButtonClick()
+              $emit('openShop')
+            "
           >
             Shop
           </button>
@@ -197,9 +222,11 @@ function onKeydown(e: KeyboardEvent) {
         </nav>
 
         <!-- Right content area -->
-        <div 
+        <div
           class="shuttle-control-content shuttle-control-content--programs"
-          :class="{ '!p-0 overflow-hidden': activeScreen === 'shuttle' || activeScreen === 'lander' }"
+          :class="{
+            '!p-0 overflow-hidden': activeScreen === 'shuttle' || activeScreen === 'lander',
+          }"
         >
           <ShuttleControlProgramMail
             v-if="activeScreen === 'mail'"
@@ -218,7 +245,9 @@ function onKeydown(e: KeyboardEvent) {
             @accept-asteroid-mission="$emit('acceptAsteroidMission')"
             @accept-eva-mission="$emit('acceptEvaMission')"
             @accept-mining-mission="$emit('acceptMiningMission')"
-            @deliver-mining-mission="(missionId: string) => $emit('deliverMiningMission', missionId)"
+            @deliver-mining-mission="
+              (missionId: string) => $emit('deliverMiningMission', missionId)
+            "
             @use-item="(itemId: string) => $emit('useItem', itemId)"
             @mail-changed="onMailProgramChanged"
             @purchase-upgrade="emitPurchaseUpgrade"
@@ -240,7 +269,9 @@ function onKeydown(e: KeyboardEvent) {
             @accept-asteroid-mission="$emit('acceptAsteroidMission')"
             @accept-eva-mission="$emit('acceptEvaMission')"
             @accept-mining-mission="$emit('acceptMiningMission')"
-            @deliver-mining-mission="(missionId: string) => $emit('deliverMiningMission', missionId)"
+            @deliver-mining-mission="
+              (missionId: string) => $emit('deliverMiningMission', missionId)
+            "
             @use-item="(itemId: string) => $emit('useItem', itemId)"
             @mail-changed="onMailProgramChanged"
             @purchase-upgrade="emitPurchaseUpgrade"
@@ -251,7 +282,7 @@ function onKeydown(e: KeyboardEvent) {
 
       <!-- Footer -->
       <div class="shuttle-control-footer">
-        <span class="ship-message-card__hint">ESC  Close</span>
+        <span class="ship-message-card__hint">ESC Close</span>
       </div>
     </div>
   </div>

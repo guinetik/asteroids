@@ -9,7 +9,6 @@
  * @date 2026-04-04
  * @spec docs/asteroid-lander-gdd.md
  */
-import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 import type { InputManager } from '@/lib/InputManager'
 import { loadGLB } from './loadGLB'
@@ -26,6 +25,7 @@ import { WarningBeacon } from './WarningBeacon'
 import { getCurrentUpgradeValue } from '@/lib/upgrades'
 import { useAudio } from '@/audio/useAudio'
 import { LanderRcsSound } from '@/audio/LanderRcsSound'
+import * as THREE from 'three' // already imported above, but ensure for Color
 
 const LANDER_MODEL_PATH = '/models/lander.glb'
 
@@ -137,6 +137,11 @@ const NOZZLE_ACTIVE_OPACITY = 0.62
 const NOZZLE_ACTIVE_PULSE_OPACITY = 0.22
 /** Upper emissive intensity for the engine bell while firing. */
 const ENGINE_EMISSIVE_MAX_INTENSITY = 0.45
+
+/** Duration of the green hull heal-pulse (seconds). Short = punchy flash. */
+const HEAL_PULSE_DURATION = 0.25
+/** Peak emissive intensity at the start of the heal pulse. */
+const HEAL_PULSE_PEAK_INTENSITY = 1.8
 
 /**
  * Which RCS nodes fire for each input action.
@@ -459,6 +464,11 @@ export class LanderController implements Tickable {
   /** Fired when {@link LanderController.hp} changes (damage, repair, respawn reset, persisted load). */
   onHullHpChanged: (() => void) | null = null
 
+  /** Timer for green heal emissive pulse (decays in tickFeedback). */
+  private feedbackTimer = 0
+  /** Cloned hull materials that support temporary green emissive feedback. */
+  private readonly feedbackMaterials: THREE.MeshStandardMaterial[] = []
+
   constructor(inputManager: InputManager) {
     this.inputManager = inputManager
     this.thrusterSystem = new ThrusterSystem<LanderThrusterName>({
@@ -476,6 +486,9 @@ export class LanderController implements Tickable {
     this.group.add(this.bodyFillLight)
     this.group.add(this.topWarningBeacon.group)
     this.updateWarningBeacon()
+
+    // Initialize heal feedback (materials cloned in load())
+    this.feedbackTimer = 0
 
     this.flameEmitter = new ParticleEmitter({
       poolSize: FLAME_POOL_SIZE,
@@ -562,7 +575,6 @@ export class LanderController implements Tickable {
         )
       }
     }
-
   }
 
   /** Apply damage to the lander. Fires onDeath when HP reaches 0. */
@@ -594,6 +606,29 @@ export class LanderController implements Tickable {
     this._hp = this.maxHp
     this.notifyHullHpChangedIfNeeded(previousHp)
     this.updateWarningBeacon()
+    this.pulseHealFeedback()
+  }
+
+  /**
+   * Incremental hull repair from science bolt (or other sources).
+   * Triggers green emissive pulse on hull like hostage heal feedback.
+   */
+  healHull(amount: number = 25): void {
+    const previousHp = this._hp
+    this._hp = Math.min(this.maxHp, this._hp + amount)
+    this.notifyHullHpChangedIfNeeded(previousHp)
+    this.pulseHealFeedback()
+    this.updateWarningBeacon()
+  }
+
+  /** Brief green emissive pulse on hull materials (exactly matches HostageModel). */
+  pulseHealFeedback(): void {
+    this.feedbackTimer = HEAL_PULSE_DURATION
+    const c = new THREE.Color(0x22ff88)
+    for (const mat of this.feedbackMaterials) {
+      mat.emissive.copy(c)
+      mat.emissiveIntensity = HEAL_PULSE_PEAK_INTENSITY
+    }
   }
 
   private notifyHullHpChangedIfNeeded(previousHp: number): void {
@@ -862,6 +897,9 @@ export class LanderController implements Tickable {
 
     this.updateWarningBeacon()
 
+    // Heal-pulse decay is driven by LevelViewController.tick so it keeps
+    // running during EVA when this controller is not registered.
+
     // Nozzle glow pulse — brighter when engine is firing
     this.nozzleGlowTime += dt
     const glowMat = this.nozzleGlow.material as THREE.SpriteMaterial
@@ -921,6 +959,7 @@ export class LanderController implements Tickable {
       emitter.dispose()
     }
     this.topWarningBeacon.dispose()
+    this.feedbackMaterials.length = 0
     this.group.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         if (this.topWarningBeacon.meshes.includes(child)) return
@@ -1217,7 +1256,10 @@ export class LanderController implements Tickable {
    * caller falls back to the legacy 9-point square sampler in those
    * cases.
    */
-  private sampleLegFootprint(): { height: number; normal: { x: number; y: number; z: number } } | null {
+  private sampleLegFootprint(): {
+    height: number
+    normal: { x: number; y: number; z: number }
+  } | null {
     if (!this.heightmap) return null
     const fl = this.rcsLocalPositions.get(LEG_NODE_FL)
     const fr = this.rcsLocalPositions.get(LEG_NODE_FR)
@@ -1403,6 +1445,28 @@ export class LanderController implements Tickable {
         material.needsUpdate = true
       }
     })
+
+    // Clone materials for per-instance heal feedback pulse (green emissive, matches HostageModel)
+    this.feedbackMaterials.length = 0
+    scene.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return
+      const originalMats = Array.isArray(child.material) ? child.material : [child.material]
+      const clonedMats: THREE.Material[] = []
+      for (const m of originalMats) {
+        if (m instanceof THREE.MeshStandardMaterial) {
+          const cloned = m.clone()
+          clonedMats.push(cloned)
+          this.feedbackMaterials.push(cloned)
+        } else {
+          clonedMats.push(m)
+        }
+      }
+      if (Array.isArray(child.material)) {
+        child.material = clonedMats
+      } else if (clonedMats.length > 0) {
+        child.material = clonedMats[0]
+      }
+    })
   }
 
   private findNode(root: THREE.Object3D, name: string): THREE.Object3D | null {
@@ -1413,6 +1477,28 @@ export class LanderController implements Tickable {
       }
     })
     return found
+  }
+
+  /**
+   * Decay green heal emissive feedback each frame (exactly matches HostageModel.tickFeedback).
+   *
+   * Public so {@link LevelViewController} can drive the decay during EVA, when the lander
+   * itself is not registered for ticking.
+   */
+  tickFeedback(dt: number): void {
+    if (this.feedbackTimer <= 0) return
+    this.feedbackTimer -= dt
+    const t = Math.max(0, this.feedbackTimer / HEAL_PULSE_DURATION)
+    for (const mat of this.feedbackMaterials) {
+      mat.emissiveIntensity = HEAL_PULSE_PEAK_INTENSITY * t
+      if (this.feedbackTimer <= 0) {
+        mat.emissive.setHex(0x000000)
+        mat.emissiveIntensity = 0
+      }
+    }
+    if (this.feedbackTimer <= 0) {
+      this.feedbackTimer = 0
+    }
   }
 }
 

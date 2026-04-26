@@ -2,7 +2,7 @@
   "modes": {
     "drill": { "label": "DRL", "color": "#3b82f6", "trigger": "hold", "fireRate": 12 },
     "weapon": { "label": "LAS", "color": "#ff00ff", "trigger": "auto", "fireRate": 5 },
-    "heal": { "label": "MED", "color": "#22c55e", "trigger": "click" }
+    "science": { "label": "SCI", "color": "#22c55e", "trigger": "click" }
   },
   "ads": {
     "fovMultiplier": 0.85,
@@ -16,7 +16,7 @@
     "thrusters": {
       "drill": { "capacity": 30, "burnRate": 100, "rechargeRate": 8, "fuelCostPerRecharge": 3.5 },
       "weapon": { "capacity": 20, "burnRate": 160, "rechargeRate": 18, "fuelCostPerRecharge": 4.0 },
-      "heal": { "capacity": 25, "burnRate": 50, "rechargeRate": 8, "fuelCostPerRecharge": 1.5 }
+      "science": { "capacity": 35, "burnRate": 250, "rechargeRate": 8, "fuelCostPerRecharge": 5.0 }
     }
   }
 }

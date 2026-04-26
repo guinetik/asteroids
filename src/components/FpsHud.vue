@@ -16,7 +16,7 @@ const LOW_OXYGEN_FRACTION = 0.2
 const MODE_LABELS: Record<string, { key: string; label: string; color: string }> = {
   drill: { key: '1', label: 'DRL', color: '#3b82f6' },
   weapon: { key: '2', label: 'LAS', color: '#ff00ff' },
-  heal: { key: '3', label: 'MED', color: '#22c55e' },
+  science: { key: '3', label: 'SCI', color: '#22c55e' },
 }
 
 /** Degrees in a full compass rotation (0–360°). */
@@ -86,23 +86,22 @@ function rockTargetFillPct(): number {
 
 function showRockTarget(): boolean {
   return (
-    showCombatHud()
-    && props.telemetry.activeMode === 'drill'
-    && props.telemetry.rockTarget != null
+    showCombatHud() && props.telemetry.activeMode === 'drill' && props.telemetry.rockTarget != null
   )
 }
 </script>
 
 <template>
   <div class="fixed inset-0 pointer-events-none font-mono text-white/90">
-
     <!-- ═══ TOP CENTER: Speed + heading (aligned with shuttle SPD / HDG row) ═══ -->
     <div class="absolute top-4 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-0.5">
       <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-0.5 text-sm">
         <span class="text-xs tracking-widest uppercase text-white/40">SPD</span>
         <span class="tabular-nums text-white/70">{{ telemetry.speed.toFixed(1) }}</span>
         <span class="text-xs tracking-widest uppercase text-white/40">HDG</span>
-        <span class="tabular-nums text-white/70">{{ formatHeadingDegFromRad(telemetry.headingRad) }}</span>
+        <span class="tabular-nums text-white/70">{{
+          formatHeadingDegFromRad(telemetry.headingRad)
+        }}</span>
       </div>
     </div>
 
@@ -159,8 +158,11 @@ function showRockTarget(): boolean {
     </div>
 
     <!-- ═══ CROSSHAIR: Center ═══ -->
-    <div v-if="showCombatHud()" class="absolute inset-0 flex items-center justify-center select-none"
-      :style="{ opacity: telemetry.aiming ? 1 : 0.4 }">
+    <div
+      v-if="showCombatHud()"
+      class="absolute inset-0 flex items-center justify-center select-none"
+      :style="{ opacity: telemetry.aiming ? 1 : 0.4 }"
+    >
       <svg v-if="telemetry.activeMode === 'drill'" width="32" height="32" viewBox="0 0 32 32">
         <circle cx="16" cy="16" r="12" fill="none" :stroke="modeColor()" stroke-width="1.5" />
         <line x1="16" y1="8" x2="16" y2="24" :stroke="modeColor()" stroke-width="1" />
@@ -194,7 +196,9 @@ function showRockTarget(): boolean {
       Bottom HUD: HP left and RTG right on the same baseline (parallel resource bars); center is
       O2/STA above mode charge + hotbar.
     -->
-    <div class="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-end justify-center gap-5">
+    <div
+      class="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-end justify-center gap-5"
+    >
       <div class="flex w-32 shrink-0 flex-col gap-1">
         <span class="text-[10px] tracking-widest uppercase text-red-400/80">HP</span>
         <div class="flex items-center gap-1">
@@ -204,7 +208,9 @@ function showRockTarget(): boolean {
               :style="{ width: pct(telemetry.hp, telemetry.maxHp) + '%' }"
             />
           </div>
-          <span class="shrink-0 text-[10px] tabular-nums text-white/40">{{ Math.ceil(telemetry.hp) }}</span>
+          <span class="shrink-0 text-[10px] tabular-nums text-white/40">{{
+            Math.ceil(telemetry.hp)
+          }}</span>
         </div>
       </div>
 
@@ -216,7 +222,10 @@ function showRockTarget(): boolean {
             <div class="flex h-16 w-2.5 flex-col-reverse overflow-hidden rounded-sm bg-white/10">
               <div
                 class="w-full rounded-sm transition-all duration-100"
-                :style="{ height: pct(telemetry.o2Level, telemetry.o2Capacity) + '%', backgroundColor: o2Color() }"
+                :style="{
+                  height: pct(telemetry.o2Level, telemetry.o2Capacity) + '%',
+                  backgroundColor: o2Color(),
+                }"
               />
             </div>
             <span class="text-[10px] tracking-widest uppercase text-white/50">O2</span>
@@ -233,7 +242,10 @@ function showRockTarget(): boolean {
         </div>
 
         <div v-if="showCombatHud()" class="flex items-center gap-1.5">
-          <span class="text-[10px] tracking-widest uppercase" :style="{ color: modeColor() + '80' }">
+          <span
+            class="text-[10px] tracking-widest uppercase"
+            :style="{ color: modeColor() + '80' }"
+          >
             {{ MODE_LABELS[telemetry.activeMode]?.label }}
           </span>
           <div class="h-2 w-20 overflow-hidden rounded-sm bg-white/10">
@@ -253,7 +265,11 @@ function showRockTarget(): boolean {
             :key="mode"
             class="flex items-center gap-1 rounded px-3 py-1.5 text-xs tracking-wider uppercase transition-all duration-150"
             :class="telemetry.activeMode === mode ? 'bg-white/15' : 'bg-white/5 opacity-50'"
-            :style="telemetry.activeMode === mode ? { borderBottom: '2px solid ' + cfg.color, color: cfg.color } : {}"
+            :style="
+              telemetry.activeMode === mode
+                ? { borderBottom: '2px solid ' + cfg.color, color: cfg.color }
+                : {}
+            "
           >
             <span class="text-white/40">{{ cfg.key }}</span>
             <span>{{ cfg.label }}</span>

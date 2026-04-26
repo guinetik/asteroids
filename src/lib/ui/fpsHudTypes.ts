@@ -65,7 +65,7 @@ export interface FpsTelemetry {
   /** Whether the player is grounded this frame. */
   grounded: boolean
   /** Current multi-tool mode selected by the player. */
-  activeMode: 'drill' | 'weapon' | 'heal'
+  activeMode: 'drill' | 'weapon' | 'science'
   /** Whether the player is aiming down sights / focused aim. */
   aiming: boolean
   /** Whether the active tool fired this frame. */

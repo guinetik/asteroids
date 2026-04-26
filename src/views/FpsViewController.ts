@@ -279,11 +279,7 @@ export class FpsViewController implements Tickable {
     }
 
     // Debug props — ?hostages[=n] and/or ?viruses[=n] (default counts when flag only)
-    const hostageSpawnCount = parseDebugPropCount(
-      params,
-      'hostages',
-      DEBUG_HOSTAGE_SPAWN_DEFAULT,
-    )
+    const hostageSpawnCount = parseDebugPropCount(params, 'hostages', DEBUG_HOSTAGE_SPAWN_DEFAULT)
     const virusSpawnCount = parseDebugPropCount(params, 'viruses', DEBUG_VIRUS_SPAWN_DEFAULT)
     const wantHostages = hostageSpawnCount !== undefined && hostageSpawnCount > 0
     const wantViruses = virusSpawnCount !== undefined && virusSpawnCount > 0
@@ -291,10 +287,7 @@ export class FpsViewController implements Tickable {
       await VirusModel.preload()
     }
     if (wantHostages && hostageSpawnCount !== undefined) {
-      this.fpsHostageController = new FpsHostageController(
-        this.sceneManager.scene,
-        heightmap,
-      )
+      this.fpsHostageController = new FpsHostageController(this.sceneManager.scene, heightmap)
       this.fpsHostageController.setProjectileSystem(this.projectileSystem)
       await this.fpsHostageController.spawnRing(hostageSpawnCount, DEBUG_HOSTAGE_SPAWN_RADIUS)
     }
@@ -356,18 +349,9 @@ export class FpsViewController implements Tickable {
         const pp = this.playerController!.group.position
         const ep = handle.enemy.position
 
-        const knockback = computeKnockbackAwayFromSource(
-          pp.x,
-          pp.z,
-          ep.x,
-          ep.z,
-          CONTACT_KNOCKBACK,
-        )
+        const knockback = computeKnockbackAwayFromSource(pp.x, pp.z, ep.x, ep.z, CONTACT_KNOCKBACK)
         if (knockback) {
-          this.playerController!.applyLateralImpulse(
-            knockback.x,
-            knockback.z,
-          )
+          this.playerController!.applyLateralImpulse(knockback.x, knockback.z)
         }
 
         // Camera flinch — random pitch/yaw jolt
@@ -411,10 +395,7 @@ export class FpsViewController implements Tickable {
           CONTACT_KNOCKBACK,
         )
         if (knockback) {
-          this.playerController!.applyLateralImpulse(
-            knockback.x,
-            knockback.z,
-          )
+          this.playerController!.applyLateralImpulse(knockback.x, knockback.z)
         }
         // Directional indicator
         if (this.fpsCamera) {
@@ -440,7 +421,8 @@ export class FpsViewController implements Tickable {
 
       for (let i = 0; i < ENEMY_SPAWN_COUNT; i++) {
         const angle = (i / ENEMY_SPAWN_COUNT) * Math.PI * 2
-        const radius = ENEMY_MIN_SPAWN_DISTANCE + Math.random() * (ENEMY_SPAWN_RADIUS - ENEMY_MIN_SPAWN_DISTANCE)
+        const radius =
+          ENEMY_MIN_SPAWN_DISTANCE + Math.random() * (ENEMY_SPAWN_RADIUS - ENEMY_MIN_SPAWN_DISTANCE)
         const x = Math.cos(angle) * radius
         const z = Math.sin(angle) * radius
         const y = heightmap.heightAt(x, z)
@@ -493,7 +475,8 @@ export class FpsViewController implements Tickable {
       // Spawn spires
       for (let i = 0; i < SPIRE_SPAWN_COUNT; i++) {
         const angle = (i / SPIRE_SPAWN_COUNT) * Math.PI * 2 + Math.PI / 4
-        const radius = SPIRE_MIN_SPAWN_DISTANCE + Math.random() * (SPIRE_SPAWN_RADIUS - SPIRE_MIN_SPAWN_DISTANCE)
+        const radius =
+          SPIRE_MIN_SPAWN_DISTANCE + Math.random() * (SPIRE_SPAWN_RADIUS - SPIRE_MIN_SPAWN_DISTANCE)
         const x = Math.cos(angle) * radius
         const z = Math.sin(angle) * radius
         const groundY = heightmap.heightAt(x, z)
@@ -510,7 +493,9 @@ export class FpsViewController implements Tickable {
       // Spawn chimera walkers
       for (let i = 0; i < CHIMERA_SPAWN_COUNT; i++) {
         const angle = (i / CHIMERA_SPAWN_COUNT) * Math.PI * 2 + Math.PI / 6
-        const radius = CHIMERA_MIN_SPAWN_DISTANCE + Math.random() * (CHIMERA_SPAWN_RADIUS - CHIMERA_MIN_SPAWN_DISTANCE)
+        const radius =
+          CHIMERA_MIN_SPAWN_DISTANCE +
+          Math.random() * (CHIMERA_SPAWN_RADIUS - CHIMERA_MIN_SPAWN_DISTANCE)
         const x = Math.cos(angle) * radius
         const z = Math.sin(angle) * radius
         const groundY = heightmap.heightAt(x, z)
@@ -569,7 +554,7 @@ export class FpsViewController implements Tickable {
     if (this.inputManager && this.multiToolState) {
       if (this.inputManager.wasActionPressed('toolDrill')) this.multiToolState.setMode('drill')
       if (this.inputManager.wasActionPressed('toolWeapon')) this.multiToolState.setMode('weapon')
-      if (this.inputManager.wasActionPressed('toolHeal')) this.multiToolState.setMode('heal')
+      if (this.inputManager.wasActionPressed('toolScience')) this.multiToolState.setMode('science')
 
       // Feed mouse state + speed to tool
       this.multiToolState.setAiming(this.pointerLock.isRightMouseDown)
@@ -585,7 +570,9 @@ export class FpsViewController implements Tickable {
       this.multiTool.setMode(this.multiToolState.modeConfig.color, this.multiToolState.mode)
       this.multiTool.setAiming(this.multiToolState.aiming)
       this.multiTool.setRtgLevel(this.multiToolState.rtgLevel / this.multiToolState.rtgCapacity)
-      this.multiTool.setModeChargeLevel(this.multiToolState.modeCharge / this.multiToolState.modeChargeCapacity)
+      this.multiTool.setModeChargeLevel(
+        this.multiToolState.modeCharge / this.multiToolState.modeChargeCapacity,
+      )
       this.playerController?.setAiming(this.multiToolState.aiming)
       if (this.multiToolState.isFiring) {
         this.multiTool.fire()
@@ -595,11 +582,7 @@ export class FpsViewController implements Tickable {
     // --- ADS camera zoom ---
     if (this.multiToolState && this.fpsCamera) {
       const ads = this.multiToolState.adsConfig
-      this.fpsCamera.setAiming(
-        this.multiToolState.aiming,
-        ads.fovMultiplier,
-        ads.zoomSpeed,
-      )
+      this.fpsCamera.setAiming(this.multiToolState.aiming, ads.fovMultiplier, ads.zoomSpeed)
     }
 
     // Feed player velocity to camera and multi-tool for bob/wobble
@@ -658,10 +641,8 @@ export class FpsViewController implements Tickable {
         ctrl.group.position.z = handle.enemy.position.z
 
         // Clamp Y to terrain — hit sphere centered at body, not ground
-        const groundY = this.heightmap?.heightAt(
-          handle.enemy.position.x,
-          handle.enemy.position.z,
-        ) ?? 0
+        const groundY =
+          this.heightmap?.heightAt(handle.enemy.position.x, handle.enemy.position.z) ?? 0
         ctrl.group.position.y = groundY
         handle.enemy.position.y = groundY + PHAGE_HIT_CENTER_Y
 
@@ -699,10 +680,8 @@ export class FpsViewController implements Tickable {
         ctrl.isAgitated = handle.lastOutput.isAgitated
 
         // Set target position — controller drifts toward it smoothly
-        const groundY = this.heightmap?.heightAt(
-          handle.enemy.position.x,
-          handle.enemy.position.z,
-        ) ?? 0
+        const groundY =
+          this.heightmap?.heightAt(handle.enemy.position.x, handle.enemy.position.z) ?? 0
         ctrl.targetPosition.set(
           handle.enemy.position.x,
           groundY + handle.config.floatHeight,
@@ -730,8 +709,12 @@ export class FpsViewController implements Tickable {
           const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
           if (dist > 0.01) {
             this.enemyProjectileSystem.spawn(
-              ep.x, ep.y, ep.z,
-              dx / dist, dy / dist, dz / dist,
+              ep.x,
+              ep.y,
+              ep.z,
+              dx / dist,
+              dy / dist,
+              dz / dist,
               handle.config.projectileSpeed,
               handle.config.projectileDamage,
             )
@@ -764,10 +747,8 @@ export class FpsViewController implements Tickable {
         ctrl.group.position.x = handle.enemy.position.x
         ctrl.group.position.z = handle.enemy.position.z
 
-        const groundY = this.heightmap?.heightAt(
-          handle.enemy.position.x,
-          handle.enemy.position.z,
-        ) ?? 0
+        const groundY =
+          this.heightmap?.heightAt(handle.enemy.position.x, handle.enemy.position.z) ?? 0
         ctrl.group.position.y = groundY
         handle.enemy.position.y = groundY + CHIMERA_HIT_CENTER_Y
 

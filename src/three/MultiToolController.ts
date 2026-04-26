@@ -35,7 +35,7 @@ import { FPS_VIEWMODEL_LAYER } from './FpsCamera'
 /** Position offset from camera origin (right, down, forward). */
 const OFFSET_X = 0.35
 const OFFSET_Y = -0.45
-const OFFSET_Z = -0.70
+const OFFSET_Z = -0.7
 
 const MODEL_SCALE = 0.01
 
@@ -57,7 +57,7 @@ const JUMP_TILT = 0.3
 /** ADS offset — gun moves to center screen. */
 const ADS_OFFSET_X = 0.0
 const ADS_OFFSET_Y = -0.35
-const ADS_OFFSET_Z = -0.50
+const ADS_OFFSET_Z = -0.5
 /** How fast the gun lerps to ADS position (per second). */
 const ADS_LERP_SPEED = 12
 /** How fast tilt lerps (per second). */
@@ -76,7 +76,12 @@ export class MultiToolController implements Tickable {
   private model: THREE.Group | null = null
   private camera: THREE.PerspectiveCamera | null = null
   private readonly ledMeshes: THREE.Mesh[] = []
-  private readonly powerIndicators: { node: THREE.Object3D; cylinder: THREE.Mesh; baseZ: number; slideZ: number }[] = []
+  private readonly powerIndicators: {
+    node: THREE.Object3D
+    cylinder: THREE.Mesh
+    baseZ: number
+    slideZ: number
+  }[] = []
   private triggerLock: THREE.Object3D | null = null
   private lockBaseX = 0
   private lockBaseZ = 0
@@ -86,7 +91,7 @@ export class MultiToolController implements Tickable {
   private scene: THREE.Scene | null = null
   private projectileSystem: ProjectileSystem | null = null
   private boltColor = new THREE.Color('#ff00ff')
-  /** Passed to {@link ProjectileSystem.spawn} for damage vs heal resolution. */
+  /** Passed to {@link ProjectileSystem.spawn} for damage vs science effect resolution. */
   private boltKind: MultiToolMode = 'weapon'
   private rtgRatio = 1
   private modeChargeRatio = 1
@@ -133,7 +138,10 @@ export class MultiToolController implements Tickable {
       if (POWER_NODE_NAMES.includes(child.name)) {
         // Add a small glowing cylinder at the indicator position
         const cylGeo = new THREE.CylinderGeometry(
-          POWER_CYLINDER_RADIUS, POWER_CYLINDER_RADIUS, POWER_CYLINDER_HEIGHT, 8,
+          POWER_CYLINDER_RADIUS,
+          POWER_CYLINDER_RADIUS,
+          POWER_CYLINDER_HEIGHT,
+          8,
         )
         // Shift pivot to bottom, rotate so cylinder grows along Z (gun's visual vertical)
         cylGeo.translate(0, POWER_CYLINDER_HEIGHT / 2, 0)
@@ -250,7 +258,7 @@ export class MultiToolController implements Tickable {
         }
         break
       }
-      case 'heal':
+      case 'science':
         audio.play('sfx.tool.heal')
         break
     }
@@ -304,8 +312,13 @@ export class MultiToolController implements Tickable {
     this.currentOffsetZ += (targetZ - this.currentOffsetZ) * lerpFactor
 
     // Holster tilt — sprint tilts down, jump tilts up, suppressed while ADS
-    const targetTilt = this.aiming ? 0
-      : (this.sprinting ? SPRINT_TILT : (!this.grounded ? JUMP_TILT : 0))
+    const targetTilt = this.aiming
+      ? 0
+      : this.sprinting
+        ? SPRINT_TILT
+        : !this.grounded
+          ? JUMP_TILT
+          : 0
     this.tilt += (targetTilt - this.tilt) * Math.min(1, TILT_LERP_SPEED * dt)
 
     // Idle sway — suppressed while ADS
@@ -315,7 +328,7 @@ export class MultiToolController implements Tickable {
 
     // Movement bob — only when grounded and not ADS
     const bobPhase = this.time * MOVE_BOB_SPEED
-    const bobScale = (this.grounded && !this.aiming) ? Math.min(1, this.lateralSpeed * 0.1) : 0
+    const bobScale = this.grounded && !this.aiming ? Math.min(1, this.lateralSpeed * 0.1) : 0
     const bobY = Math.sin(bobPhase) * MOVE_BOB_AMP * bobScale
     const bobX = Math.cos(bobPhase * 0.5) * MOVE_BOB_AMP * bobScale * 0.5
 

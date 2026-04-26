@@ -252,10 +252,10 @@ describe('MultiToolState', () => {
     expect(state.isFiring).toBe(true)
   })
 
-  // --- Trigger: click (heal) ---
+  // --- Trigger: click (science) ---
 
   it('click trigger: fires once on mouse down', () => {
-    state.setMode('heal')
+    state.setMode('science')
     state.setAiming(true)
     state.setInput(true, true)
     state.tick(0.016)
@@ -263,7 +263,7 @@ describe('MultiToolState', () => {
   })
 
   it('click trigger: does not fire while held (must release)', () => {
-    state.setMode('heal')
+    state.setMode('science')
     state.setAiming(true)
     state.setInput(true, true)
     state.tick(0.016)
@@ -274,7 +274,7 @@ describe('MultiToolState', () => {
   })
 
   it('click trigger: fires again after release + re-press', () => {
-    state.setMode('heal')
+    state.setMode('science')
     state.setAiming(true)
     state.setInput(true, true)
     state.tick(0.016)
