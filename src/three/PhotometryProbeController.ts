@@ -66,11 +66,38 @@ const SCAN_FLASH_COLOR = 0x66ffee
 /** Target marker sphere radius in world units. */
 const TARGET_MARKER_RADIUS = 14
 
-/** LOS beam opacity for a translucent laser-style guide. */
-const LOS_BEAM_OPACITY = 0.35
+/** Inner laser core radius in world units. Stays slim so the beam reads sharp. */
+const LOS_BEAM_CORE_RADIUS = 0.18
 
-/** LOS beam radius in world units. */
-const LOS_BEAM_RADIUS = 0.22
+/** Inner laser core opacity. Bright but still translucent so it does not block the asteroid. */
+const LOS_BEAM_CORE_OPACITY = 0.95
+
+/** Outer halo radius in world units. Wide soft sheath that sells the energy bloom. */
+const LOS_BEAM_GLOW_RADIUS = 2.4
+
+/** Base opacity of the outer halo sheath before per-frame pulse modulation. */
+const LOS_BEAM_GLOW_BASE_OPACITY = 0.22
+
+/** Peak-to-peak pulse amplitude added to the halo opacity to give the laser a live hum. */
+const LOS_BEAM_GLOW_PULSE_AMPLITUDE = 0.1
+
+/** Pulse speed for the halo modulation, in radians per second. */
+const LOS_BEAM_GLOW_PULSE_SPEED = 9
+
+/** Extra radial expansion applied to the glow when the beam is locked, in world units. */
+const LOS_BEAM_GLOW_LOCKED_RADIUS_BOOST = 0.6
+
+/** Muzzle flash sphere radius at the lander emitter, in world units. */
+const LOS_MUZZLE_RADIUS = 4
+
+/** Muzzle flash base opacity before pulse modulation. */
+const LOS_MUZZLE_BASE_OPACITY = 0.85
+
+/** Muzzle flash radial pulse magnitude, in world units. */
+const LOS_MUZZLE_PULSE_AMPLITUDE = 0.45
+
+/** Muzzle flash pulse speed in radians per second. */
+const LOS_MUZZLE_PULSE_SPEED = 14
 
 /** Forward scan beam length in world units. */
 const LOS_BEAM_LENGTH = 2600
@@ -138,6 +165,9 @@ export class PhotometryProbeController implements Tickable {
   private waypoint: THREE.Group | null = null
   private targetMarker: THREE.Mesh | null = null
   private losBeam: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshBasicMaterial> | null = null
+  private losBeamGlow: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshBasicMaterial> | null = null
+  private losMuzzle: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial> | null = null
+  private losBeamLocked = false
   private elapsed = 0
   private flightTime = 0
   private arrived = false
@@ -238,6 +268,7 @@ export class PhotometryProbeController implements Tickable {
     this.elapsed += dt
     this.collectEmitter.tick(dt)
     this.tickFlash(dt)
+    this.tickScanBeamPulse()
 
     if (!this.probeGroup.visible || this.isCollected) {
       this.tickWaypoint()
@@ -302,17 +333,55 @@ export class PhotometryProbeController implements Tickable {
     this.targetMarker.position.copy(targetPosition)
 
     if (!this.losBeam) {
-      const geometry = new THREE.CylinderGeometry(LOS_BEAM_RADIUS, LOS_BEAM_RADIUS, 1, 8)
-      const material = new THREE.MeshBasicMaterial({
+      const coreGeometry = new THREE.CylinderGeometry(
+        LOS_BEAM_CORE_RADIUS,
+        LOS_BEAM_CORE_RADIUS,
+        1,
+        12,
+      )
+      const coreMaterial = new THREE.MeshBasicMaterial({
         color: SCAN_COLOR,
         transparent: true,
-        opacity: LOS_BEAM_OPACITY,
+        opacity: LOS_BEAM_CORE_OPACITY,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       })
-      this.losBeam = new THREE.Mesh(geometry, material)
+      this.losBeam = new THREE.Mesh(coreGeometry, coreMaterial)
       this.losBeam.name = 'photometry-los-beam'
       this.scene.add(this.losBeam)
+    }
+
+    if (!this.losBeamGlow) {
+      const glowGeometry = new THREE.CylinderGeometry(
+        LOS_BEAM_GLOW_RADIUS,
+        LOS_BEAM_GLOW_RADIUS,
+        1,
+        16,
+      )
+      const glowMaterial = new THREE.MeshBasicMaterial({
+        color: SCAN_COLOR,
+        transparent: true,
+        opacity: LOS_BEAM_GLOW_BASE_OPACITY,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+      this.losBeamGlow = new THREE.Mesh(glowGeometry, glowMaterial)
+      this.losBeamGlow.name = 'photometry-los-beam-glow'
+      this.scene.add(this.losBeamGlow)
+    }
+
+    if (!this.losMuzzle) {
+      const muzzleGeometry = new THREE.SphereGeometry(LOS_MUZZLE_RADIUS, 16, 12)
+      const muzzleMaterial = new THREE.MeshBasicMaterial({
+        color: SCAN_COLOR,
+        transparent: true,
+        opacity: LOS_MUZZLE_BASE_OPACITY,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+      this.losMuzzle = new THREE.Mesh(muzzleGeometry, muzzleMaterial)
+      this.losMuzzle.name = 'photometry-los-muzzle'
+      this.scene.add(this.losMuzzle)
     }
   }
 
@@ -328,12 +397,29 @@ export class PhotometryProbeController implements Tickable {
     const length = delta.length()
     if (length <= 0) return
 
-    this.losBeam.position.copy(emitterPosition).addScaledVector(delta, 0.5)
-    this.losBeam.scale.set(1, length, 1)
-    this.losBeam.quaternion.setFromUnitVectors(
+    const center = emitterPosition.clone().addScaledVector(delta, 0.5)
+    const unit = delta.clone().multiplyScalar(1 / length)
+    const orientation = new THREE.Quaternion().setFromUnitVectors(
       new THREE.Vector3(0, 1, 0),
-      delta.multiplyScalar(1 / length),
+      unit,
     )
+
+    this.losBeam.position.copy(center)
+    this.losBeam.scale.set(1, length, 1)
+    this.losBeam.quaternion.copy(orientation)
+
+    if (this.losBeamGlow) {
+      this.losBeamGlow.position.copy(center)
+      const glowRadialScale = this.losBeamLocked
+        ? 1 + LOS_BEAM_GLOW_LOCKED_RADIUS_BOOST / LOS_BEAM_GLOW_RADIUS
+        : 1
+      this.losBeamGlow.scale.set(glowRadialScale, length, glowRadialScale)
+      this.losBeamGlow.quaternion.copy(orientation)
+    }
+
+    if (this.losMuzzle) {
+      this.losMuzzle.position.copy(emitterPosition)
+    }
   }
 
   /**
@@ -342,12 +428,14 @@ export class PhotometryProbeController implements Tickable {
    * @param locked - True when the lander is stable enough to advance the scan.
    */
   setScanLocked(locked: boolean): void {
-    if (!this.targetMarker || !(this.targetMarker.material instanceof THREE.MeshBasicMaterial)) {
-      return
-    }
+    this.losBeamLocked = locked
     const color = locked ? SCAN_LOCKED_COLOR : SCAN_COLOR
-    this.targetMarker.material.color.setHex(color)
+    if (this.targetMarker && this.targetMarker.material instanceof THREE.MeshBasicMaterial) {
+      this.targetMarker.material.color.setHex(color)
+    }
     this.losBeam?.material.color.setHex(color)
+    this.losBeamGlow?.material.color.setHex(color)
+    this.losMuzzle?.material.color.setHex(color)
   }
 
   /** Hide the waypoint marker once the standoff scan is complete. */
@@ -485,6 +573,34 @@ export class PhotometryProbeController implements Tickable {
       this.losBeam.geometry.dispose()
       this.losBeam.material.dispose()
       this.losBeam = null
+    }
+    if (this.losBeamGlow) {
+      this.scene.remove(this.losBeamGlow)
+      this.losBeamGlow.geometry.dispose()
+      this.losBeamGlow.material.dispose()
+      this.losBeamGlow = null
+    }
+    if (this.losMuzzle) {
+      this.scene.remove(this.losMuzzle)
+      this.losMuzzle.geometry.dispose()
+      this.losMuzzle.material.dispose()
+      this.losMuzzle = null
+    }
+    this.losBeamLocked = false
+  }
+
+  /** Modulate the halo and muzzle so the laser hums and pulses while active. */
+  private tickScanBeamPulse(): void {
+    if (this.losBeamGlow) {
+      const glowPulse = (Math.sin(this.elapsed * LOS_BEAM_GLOW_PULSE_SPEED) + 1) * 0.5
+      this.losBeamGlow.material.opacity =
+        LOS_BEAM_GLOW_BASE_OPACITY + glowPulse * LOS_BEAM_GLOW_PULSE_AMPLITUDE
+    }
+    if (this.losMuzzle) {
+      const muzzlePulse = (Math.sin(this.elapsed * LOS_MUZZLE_PULSE_SPEED) + 1) * 0.5
+      const scale = 1 + (muzzlePulse * LOS_MUZZLE_PULSE_AMPLITUDE) / LOS_MUZZLE_RADIUS
+      this.losMuzzle.scale.setScalar(scale)
+      this.losMuzzle.material.opacity = LOS_MUZZLE_BASE_OPACITY * (0.85 + 0.15 * muzzlePulse)
     }
   }
 
