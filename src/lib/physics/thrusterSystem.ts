@@ -21,6 +21,17 @@ export interface ThrusterConfig {
   rechargeRate: number
   /** Fuel consumed per unit of charge recharged */
   fuelCostPerRecharge: number
+  /**
+   * Optional recharge-lockout threshold expressed as a fraction of
+   * {@link capacity} (0–1). When set and the thruster fully depletes
+   * (charge hits 0 while firing), {@link ThrusterSystem.canFire} returns
+   * `false` until the bar refills back up to `capacity * lockoutFraction`.
+   * Mirrors the FPS sprint cooldown so depleted thrusters can't stutter
+   * back on for one frame as soon as a sliver of charge is recovered.
+   * Omit (or pass 0) to keep the legacy "fire as soon as one frame's
+   * worth of charge exists" behaviour.
+   */
+  lockoutFraction?: number
 }
 
 /** Full system config: one ThrusterConfig per named thruster + shared fuel tank. */
@@ -93,6 +104,19 @@ const ONE_FRAME_AT_60FPS = 1 / 60
 export class ThrusterSystem<T extends string = ShuttleThrusterName> {
   private readonly charges: Record<T, number>
   private activeState: Record<T, boolean>
+  private readonly locked: Record<T, boolean>
+  /**
+   * Per-thruster latch tracking whether raw input has been observed
+   * released since the most recent lockout. Defaults to `true` (no
+   * lockout in effect). Set to `false` the moment a lockout latches
+   * while the input is held; cleared back to `true` by
+   * {@link notifyInputIntent} when the caller reports the input as
+   * not held. Unlock requires both this flag and the recharge
+   * threshold so a held input can't auto-cycle through the lockout.
+   */
+  private readonly releasedSinceLockout: Record<T, boolean>
+  /** Last raw input intent reported via {@link notifyInputIntent}. */
+  private readonly inputIntent: Record<T, boolean>
   private readonly config: ThrusterSystemConfig<T>
   private readonly thrusterNames: T[]
   private fuel: number
@@ -111,17 +135,41 @@ export class ThrusterSystem<T extends string = ShuttleThrusterName> {
 
     this.charges = {} as Record<T, number>
     this.activeState = {} as Record<T, boolean>
+    this.locked = {} as Record<T, boolean>
+    this.releasedSinceLockout = {} as Record<T, boolean>
+    this.inputIntent = {} as Record<T, boolean>
     for (const name of this.thrusterNames) {
       this.charges[name] = config.thrusters[name].capacity
       this.activeState[name] = false
+      this.locked[name] = false
+      this.releasedSinceLockout[name] = true
+      this.inputIntent[name] = false
     }
+  }
+
+  /**
+   * Report raw input intent for a thruster. Used by the lockout state
+   * machine to detect button release after a depletion lockout — without
+   * this, holding the input through the recharge window would auto-fire
+   * the moment the bar crosses {@link ThrusterConfig.lockoutFraction}.
+   * Call this each frame the caller knows about input intent.
+   */
+  notifyInputIntent(thruster: T, held: boolean): void {
+    this.inputIntent[thruster] = held
+    if (!held) this.releasedSinceLockout[thruster] = true
   }
 
   /** Whether a thruster has enough charge for at least one frame of firing. */
   canFire(thruster: T, modifiers?: ThrusterRuntimeModifiers<T>): boolean {
+    if (this.locked[thruster]) return false
     const cfg = this.config.thrusters[thruster]
     const burnRateMultiplier = Math.max(0, modifiers?.burnRateMultiplier?.[thruster] ?? 1)
     return this.charges[thruster] >= cfg.burnRate * burnRateMultiplier * ONE_FRAME_AT_60FPS
+  }
+
+  /** Whether a thruster is currently locked out and waiting for recharge. */
+  isLocked(thruster: T): boolean {
+    return this.locked[thruster]
   }
 
   /** Snapshot of a single thruster's runtime state. */
@@ -185,6 +233,9 @@ export class ThrusterSystem<T extends string = ShuttleThrusterName> {
     for (const name of this.thrusterNames) {
       this.charges[name] = this.config.thrusters[name].capacity
       this.activeState[name] = false
+      this.locked[name] = false
+      this.releasedSinceLockout[name] = true
+      this.inputIntent[name] = false
     }
   }
 
@@ -216,6 +267,31 @@ export class ThrusterSystem<T extends string = ShuttleThrusterName> {
             fuelCostMultiplier > 0 ? actualFuelUsed / (cfg.fuelCostPerRecharge * fuelCostMultiplier) : 0
           this.charges[name] = Math.min(cfg.capacity, this.charges[name] + chargeFromFuel)
           this.fuel = Math.max(0, this.fuel - actualFuelUsed)
+        }
+      }
+
+      // Recharge lockout: once the bar can no longer sustain a single
+      // frame of firing, gate canFire until BOTH (a) the bar refills
+      // back up to lockoutFraction × capacity AND (b) the caller has
+      // reported the input as released since the lockout latched. The
+      // release requirement matters because the active-state branch
+      // above sets active=false when canFire returns false — without
+      // an explicit release latch, a held input would auto-cycle
+      // recharge → unlock → drain → lock the moment the bar crossed
+      // the threshold, producing the visible "thruster keeps firing
+      // with empty bar" stutter.
+      const lockFraction = cfg.lockoutFraction ?? 0
+      if (lockFraction > 0) {
+        const minFireCharge = cfg.burnRate * burnRateMultiplier * ONE_FRAME_AT_60FPS
+        if (!this.locked[name] && this.charges[name] < minFireCharge) {
+          this.locked[name] = true
+          this.releasedSinceLockout[name] = !this.inputIntent[name]
+        } else if (
+          this.locked[name] &&
+          this.releasedSinceLockout[name] &&
+          this.charges[name] >= cfg.capacity * lockFraction
+        ) {
+          this.locked[name] = false
         }
       }
     }

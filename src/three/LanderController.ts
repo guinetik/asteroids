@@ -48,13 +48,25 @@ const MAIN_ENGINE_THRUST = 10
 export type LanderThrusterName = 'mainEngine' | 'rcs'
 
 /** Base lander fuel tank at upgrade level 0 (before `landerFuelCapacity` shop multiplier). */
-const LANDER_BASE_FUEL_CAPACITY = 1000
+const LANDER_BASE_FUEL_CAPACITY = 500
 
 /** Lander thruster config — shared fuel tank */
 const LANDER_THRUSTER_CONFIG: ThrusterSystemConfig<LanderThrusterName> = {
   thrusters: {
-    mainEngine: { capacity: 120, burnRate: 18, rechargeRate: 14, fuelCostPerRecharge: 0.4 },
-    rcs: { capacity: 80, burnRate: 5, rechargeRate: 9, fuelCostPerRecharge: 0.12 },
+    mainEngine: {
+      capacity: 120,
+      burnRate: 18,
+      rechargeRate: 14,
+      fuelCostPerRecharge: 0.8,
+      lockoutFraction: 0.25,
+    },
+    rcs: {
+      capacity: 80,
+      burnRate: 5,
+      rechargeRate: 9,
+      fuelCostPerRecharge: 0.24,
+      lockoutFraction: 0.25,
+    },
   },
   fuelCapacity: LANDER_BASE_FUEL_CAPACITY,
 }
@@ -644,6 +656,23 @@ export class LanderController implements Tickable {
   }
 
   tick(dt: number): void {
+    // Report raw input intent so the thruster system's recharge lockout
+    // can detect button release after a depletion lockout. Without this,
+    // the gated isMainEngineActive / isAnyRcsActive getters return false
+    // while locked even when the player is still mashing the input — so
+    // the system can't tell "released" from "held but suppressed" and
+    // would auto-cycle the lock as soon as the bar crossed 25%.
+    const mainEngineHeld = this.inputManager.isActionActive('mainEngine')
+    const anyRcsHeld =
+      this.inputManager.isActionActive('rcsLeft') ||
+      this.inputManager.isActionActive('rcsRight') ||
+      this.inputManager.isActionActive('rcsFore') ||
+      this.inputManager.isActionActive('rcsAft') ||
+      this.inputManager.isActionActive('rcsAscend') ||
+      this.inputManager.isActionActive('rcsDescend')
+    this.thrusterSystem.notifyInputIntent('mainEngine', mainEngineHeld)
+    this.thrusterSystem.notifyInputIntent('rcs', anyRcsHeld)
+
     // Update tilt + yaw first so quaternion is current for thrust direction and flame
     this.tickTilt(dt)
 
@@ -1011,11 +1040,15 @@ export class LanderController implements Tickable {
       targetTiltZ = Math.atan2(-_normalLocal.x, _normalLocal.y)
       speed = GROUND_TILT_LERP_SPEED
     } else {
-      // Airborne: RCS input drives tilt
-      if (this.inputManager.isActionActive('rcsLeft')) targetTiltX += TILT_MAX_ANGLE
-      if (this.inputManager.isActionActive('rcsRight')) targetTiltX -= TILT_MAX_ANGLE
-      if (this.inputManager.isActionActive('rcsFore')) targetTiltZ += TILT_MAX_ANGLE
-      if (this.inputManager.isActionActive('rcsAft')) targetTiltZ -= TILT_MAX_ANGLE
+      // Airborne: RCS input drives tilt. Route through isRcsActionActive
+      // so the recharge lockout (and other gates) apply — without this
+      // the body keeps banking while the RCS bar is locked out, which
+      // reads as the input still working even though particles and
+      // lateral force have correctly stopped.
+      if (this.isRcsActionActive('rcsLeft')) targetTiltX += TILT_MAX_ANGLE
+      if (this.isRcsActionActive('rcsRight')) targetTiltX -= TILT_MAX_ANGLE
+      if (this.isRcsActionActive('rcsFore')) targetTiltZ += TILT_MAX_ANGLE
+      if (this.isRcsActionActive('rcsAft')) targetTiltZ -= TILT_MAX_ANGLE
       const hasInput = targetTiltX !== 0 || targetTiltZ !== 0
       speed = hasInput ? TILT_LERP_SPEED : TILT_RETURN_SPEED
     }

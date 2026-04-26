@@ -17,7 +17,7 @@
   "o2": {
     "fuelCapacity": 100,
     "baseDrainRate": 0.2,
-    "hoverDrainRate": 25,
+    "hoverDrainRate": 75,
     "deathTimerSeconds": 10,
     "thrusters": {
       "sprint": {
