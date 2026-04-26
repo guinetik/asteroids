@@ -182,8 +182,8 @@ const ALL_RCS_NODES = [...new Set(Object.values(RCS_ACTION_MAP).flatMap((a) => a
 /** RCS lateral movement — tilt + push */
 const RCS_LATERAL_FORCE = 14
 const TILT_MAX_ANGLE = 0.3 // ~17 degrees max tilt
-const LIFTOFF_BOOST = 2.0
-const LIFTOFF_BOOST_DURATION = 1.0
+const LIFTOFF_BOOST = 4.0
+const LIFTOFF_BOOST_DURATION = 2.0
 const RCS_LIFTOFF_BOOST = 3.0
 /** Surface normal Y must be above this to count as "flat" for full liftoff boost */
 const FLAT_GROUND_THRESHOLD = 0.95

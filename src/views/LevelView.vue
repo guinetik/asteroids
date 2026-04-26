@@ -752,8 +752,9 @@ function handleToggleMusic(): void {
   50% { opacity: 1; }
 }
 
-/* Landing warnings — dead center, large, impossible to miss */
+/* Landing warnings — slightly above center, large, impossible to miss */
 .landing-warnings {
+  --landing-warnings-vertical-nudge: -2.25rem;
   position: fixed;
   inset: 0;
   z-index: 35;
@@ -763,6 +764,7 @@ function handleToggleMusic(): void {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  transform: translateY(var(--landing-warnings-vertical-nudge));
 }
 .landing-warning {
   font-family: 'Datatype', ui-monospace, monospace;
@@ -775,14 +777,14 @@ function handleToggleMusic(): void {
 .landing-warning--warn {
   color: #eab308;
   border-color: rgba(234, 179, 8, 0.4);
-  background: rgba(234, 179, 8, 0.1);
+  background: rgba(234, 179, 8, 0.18);
   text-shadow: 0 0 8px rgba(234, 179, 8, 0.5);
   animation: warning-blink 1s ease-in-out infinite;
 }
 .landing-warning--danger {
   color: #ef4444;
   border-color: rgba(239, 68, 68, 0.5);
-  background: rgba(239, 68, 68, 0.15);
+  background: rgba(239, 68, 68, 0.24);
   text-shadow: 0 0 12px rgba(239, 68, 68, 0.7);
   animation: warning-blink 0.4s ease-in-out infinite;
 }
