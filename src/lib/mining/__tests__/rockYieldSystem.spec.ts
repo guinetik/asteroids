@@ -220,4 +220,17 @@ describe('RockYieldSystem.registerRock — overrides', () => {
     // totalKg computed from diameter — just verify it's set and positive
     expect(roll!.totalKg).toBeGreaterThan(0)
   })
+
+  it('seeds science HP at ceil(totalKg * SCIENCE_HP_RATIO) with a per-bolt floor', () => {
+    const sys = makeSystem()
+    sys.registerRock({ spawnIndex: 100, diameter: 5 })
+    const rock = sys.peekRock(100)!
+    const expectedRaw = Math.ceil(rock.totalKg * 0.33)
+    const expected = Math.max(BOLT_DAMAGE_KG_PER_HIT, expectedRaw)
+    const progress = sys.getScienceProgress(100)
+    expect(progress).not.toBeNull()
+    expect(progress!.scienceHp).toBe(expected)
+    expect(progress!.initialScienceHp).toBe(expected)
+    expect(progress!.prospected).toBe(false)
+  })
 })

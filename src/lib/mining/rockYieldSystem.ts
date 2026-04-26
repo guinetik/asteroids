@@ -25,6 +25,7 @@ import {
   MAX_ROCK_YIELD_KG,
   MINERAL_KG_PER_DIAMETER_UNIT,
   MIN_ROCK_YIELD_KG,
+  SCIENCE_HP_RATIO,
 } from './constants'
 
 /** Result of a single drill hit on a registered rock. */
@@ -39,9 +40,18 @@ export interface MineHitResult {
 
 /** Per-rock roll registered when the rock is spawned. */
 interface RockRoll {
+  /** Inventory item id for this rock (rolled at registration). */
   itemId: string
+  /** Total kg available at registration. */
   totalKg: number
+  /** Remaining kg after drill hits. Reaches 0 on depletion. */
   remainingKg: number
+  /** Remaining science HP for prospecting, in kg-equivalent units. */
+  scienceHp: number
+  /** Initial science HP, used to normalize wireframe-overlay opacity. */
+  initialScienceHp: number
+  /** Whether this rock has been fully analysed by the science gun. */
+  prospected: boolean
 }
 
 /** Spawn input for {@link RockYieldSystem.registerRock}. */
@@ -112,7 +122,18 @@ export class RockYieldSystem {
 
     const itemId = this.rollMineralFrom(weightedItems, spawn.spawnIndex)
     const totalKg = spawn.totalKgOverride ?? this.rollTotalKg(spawn.diameter)
-    this.rocks.set(spawn.spawnIndex, { itemId, totalKg, remainingKg: totalKg })
+    const initialScienceHp = Math.max(
+      BOLT_DAMAGE_KG_PER_HIT,
+      Math.ceil(totalKg * SCIENCE_HP_RATIO),
+    )
+    this.rocks.set(spawn.spawnIndex, {
+      itemId,
+      totalKg,
+      remainingKg: totalKg,
+      scienceHp: initialScienceHp,
+      initialScienceHp,
+      prospected: false,
+    })
   }
 
   /** Forget a rock (e.g. on dispose) without firing callbacks. */
@@ -154,6 +175,24 @@ export class RockYieldSystem {
     const roll = this.rocks.get(spawnIndex)
     if (!roll) return null
     return { itemId: roll.itemId, totalKg: roll.totalKg, remainingKg: roll.remainingKg }
+  }
+
+  /**
+   * Inspect the prospecting state for a rock without mutating it. Returns
+   * `null` when the rock is unknown.
+   */
+  getScienceProgress(spawnIndex: number): {
+    scienceHp: number
+    initialScienceHp: number
+    prospected: boolean
+  } | null {
+    const roll = this.rocks.get(spawnIndex)
+    if (!roll) return null
+    return {
+      scienceHp: roll.scienceHp,
+      initialScienceHp: roll.initialScienceHp,
+      prospected: roll.prospected,
+    }
   }
 
   /** Mineral ids actually present on this asteroid (after composition filter). */
