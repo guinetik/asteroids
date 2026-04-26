@@ -481,7 +481,13 @@ export class LevelViewController implements Tickable {
     })
     const spawnX = spawn.x + LEVEL_TERRAIN_CONFIG.landerSpawnLightAlignmentX
     const spawnZ = spawn.z
-    const groundY = this.heightmap.heightAt(spawnX, spawnZ)
+    // Ship parks at the asteroid's barycenter (world XZ origin). All
+    // asteroid GLBs are pivoted at the body center, so the rotated mesh
+    // guarantees rock directly under the shuttle's downward floodlight
+    // cone. Mission objectives still cluster around the sampled spawn
+    // cell below — the player flies from the ship spawn to the waypoints.
+    const shipBarycenterY = this.heightmap.heightAt(0, 0)
+    const shipSpawnXZ = { x: 0, z: 0 }
 
     // Resample each objective onto the same asteroid face the ship is parked
     // on. Mission-generator flat zones are laid out in a 3500-unit world square
@@ -582,7 +588,11 @@ export class LevelViewController implements Tickable {
       }
     })
     const gameplayStart = offsetGameplayLanderSpawn(
-      new Vector3(spawnX, groundY + LEVEL_TERRAIN_CONFIG.landerSpawnHeight, spawnZ),
+      new Vector3(
+        shipSpawnXZ.x,
+        shipBarycenterY + LEVEL_TERRAIN_CONFIG.landerSpawnHeight,
+        shipSpawnXZ.z,
+      ),
     )
     this.initialLanderSpawn.copy(gameplayStart)
     this.landerController.group.position.copy(gameplayStart)
@@ -638,7 +648,7 @@ export class LevelViewController implements Tickable {
 
     // ── Cinematic arrival sequence ─────────────────────────────
     this.emitBootState('preparing', 'Linking orbital shuttle')
-    const landerSpawn = new Vector3(spawnX, groundY, spawnZ)
+    const landerSpawn = new Vector3(shipSpawnXZ.x, shipBarycenterY, shipSpawnXZ.z)
     this.arrivalSequence = new ArrivalSequence(landerSpawn)
     await this.arrivalSequence.load()
     this.sceneManager.scene.add(this.arrivalSequence.shuttleGroup)
