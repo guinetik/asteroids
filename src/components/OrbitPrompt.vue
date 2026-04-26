@@ -74,7 +74,7 @@ const details = computed(() => {
       type="button"
       class="orbit-prompt-engineering-btn"
       @click="
-        uiAudio.notifyButtonClick()
+        uiAudio.notifyButtonClick();
         emit('openEngineeringBay')
       "
     >
@@ -85,7 +85,7 @@ const details = computed(() => {
       type="button"
       class="orbit-prompt-mission-board-btn"
       @click="
-        uiAudio.notifyButtonClick()
+        uiAudio.notifyButtonClick();
         emit('openMissionBoard')
       "
     >
@@ -96,7 +96,7 @@ const details = computed(() => {
       type="button"
       class="orbit-prompt-shop-btn"
       @click="
-        uiAudio.notifyButtonClick()
+        uiAudio.notifyButtonClick();
         emit('openShop')
       "
     >
@@ -107,7 +107,7 @@ const details = computed(() => {
       type="button"
       class="orbit-prompt-mission-btn"
       @click="
-        uiAudio.notifyButtonClick()
+        uiAudio.notifyButtonClick();
         emit('openMission')
       "
     >

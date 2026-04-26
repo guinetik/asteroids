@@ -125,7 +125,7 @@ const screens = computed(() => {
 })
 
 function selectScreen(id: ControlScreen): void {
-  uiAudio.notifyShuttleProgramClick()
+  uiAudio.notifyShuttleProgramClick();
   activeScreen.value = id
 }
 
@@ -155,7 +155,7 @@ function onKeydown(e: KeyboardEvent) {
           type="button"
           class="ship-message-card__button"
           @click="
-            uiAudio.notifySwitch()
+            uiAudio.notifySwitch();
             $emit('close')
           "
         >
@@ -204,7 +204,7 @@ function onKeydown(e: KeyboardEvent) {
             type="button"
             class="shuttle-control-nav-btn shuttle-control-nav-btn--shop"
             @click="
-              uiAudio.notifyButtonClick()
+              uiAudio.notifyButtonClick();
               $emit('openShop')
             "
           >

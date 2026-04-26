@@ -141,19 +141,19 @@ function refreshActiveMessage(): void {
       messageDialogVisible.value = false
     }
   }
-  if (pendingInboxCount.value > prevInboxCount) uiAudio.notifyInboxMessage()
+  if (pendingInboxCount.value > prevInboxCount) uiAudio.notifyInboxMessage();
 
   // Contract channel — independent from the inbox dialog state.
   const nextContract = shipMessageSystem.getActiveMessage(CONTRACT_FILTER)
   activeContractMessage.value = nextContract
   const nextContractId = nextContract?.id ?? null
   if (nextContractId && nextContractId !== prevContractId) {
-    uiAudio.notifyContractUpdate()
+    uiAudio.notifyContractUpdate();
   }
 }
 
 function openMessage(): void {
-  uiAudio.notifyConfirm()
+  uiAudio.notifyConfirm();
   if (activeInboxMessage.value?.status === 'pending') {
     shipMessageSystem.markShown(activeInboxMessage.value.id)
     activeInboxMessage.value = { ...activeInboxMessage.value, status: 'shown' }
@@ -203,7 +203,7 @@ const contractNoticePill = computed<string | null>(() => {
 function openContractMessage(): void {
   const readable = activeContractMessage.value
   if (!readable?.contractId) return
-  uiAudio.notifyConfirm()
+  uiAudio.notifyConfirm();
   shuttleControlMailFocusFolderId.value = readable.contractId
   shuttleControlMailFocusMessageId.value = readable.id
   shuttleControlProgramOnOpen.value = 'mail'
@@ -916,7 +916,7 @@ onMounted(async () => {
         showMissionNotification(
           `Contract step complete — +${payload.creditsReward.toLocaleString()} CR`,
         )
-        uiAudio.notifyCreditsAwarded()
+        uiAudio.notifyCreditsAwarded();
       }
     })
     syncPersistentProgressFromController()
@@ -977,17 +977,17 @@ function handleWindowKeydown(event: KeyboardEvent): void {
 }
 
 function handleToggleOrbits() {
-  uiAudio.notifySwitch()
+  uiAudio.notifySwitch();
   orbitsVisible.value = viewController.toggleOrbits()
 }
 
 function handleToggleGrid() {
-  uiAudio.notifySwitch()
+  uiAudio.notifySwitch();
   gridVisible.value = viewController.toggleSpaceTimeGrid()
 }
 
 function closeShuttleControl() {
-  uiAudio.notifyCancel()
+  uiAudio.notifyCancel();
   shuttleControlVisible.value = false
   // Habitat opens the terminal after `exitPointerLock`; map mode uses orbit drag without lock.
   if (habitatActive.value) {
@@ -1000,7 +1000,7 @@ function closeShuttleControl() {
  * Opens the shuttle terminal on a program, or switches to it if the terminal is already open.
  */
 function openProgramFromMap(program: ShuttleControlInitialProgram): void {
-  uiAudio.notifyButtonClick()
+  uiAudio.notifyButtonClick();
   if (shopDialogVisible.value) {
     viewController.closeShop()
   }
@@ -1022,12 +1022,12 @@ function stopShuttleMessageAudio(): void {
 }
 
 function handleToggleMusic(): void {
-  uiAudio.notifySwitch()
+  uiAudio.notifySwitch();
   toggleBackgroundMusic()
 }
 
 function openHabitatFromMap(): void {
-  uiAudio.notifyButtonClick()
+  uiAudio.notifyButtonClick();
   shuttleControlVisible.value = false
   viewController.enterHabitat()
 }
@@ -1049,7 +1049,7 @@ function handlePurchaseUpgrade(upgradeId: UpgradeId): void {
   upgradeInstalledCreditsSpent.value = getUpgradeCost(upgradeId, newLevel)
   upgradeInstalledMetaText.value = null
   upgradeInstalledVisible.value = true
-  uiAudio.notifyUpgradeInstalled()
+  uiAudio.notifyUpgradeInstalled();
   contractSystem.notifyUpgradeInstalled(upgradeId, newLevel)
 }
 
@@ -1067,12 +1067,12 @@ function onJourneyStartedDismissed(): void {
 }
 
 function handleToggleLabels() {
-  uiAudio.notifySwitch()
+  uiAudio.notifySwitch();
   labelsVisible.value = viewController.toggleLabels()
 }
 
 function handleToggleAmbient() {
-  uiAudio.notifySwitch()
+  uiAudio.notifySwitch();
   ambientVisible.value = viewController.toggleAmbient()
 }
 
@@ -1156,33 +1156,33 @@ function closeMissionOverlay() {
 function handleAcceptMission() {
   const result = viewController.missionAccept()
   if (!result.ok && result.reason) {
-    uiAudio.notifyError()
+    uiAudio.notifyError();
     showMissionNotification(result.reason)
   } else {
-    uiAudio.notifyMissionAccepted()
+    uiAudio.notifyMissionAccepted();
   }
 }
 
 function handleAcceptAsteroidMission() {
   viewController.asteroidMissionAccept()
-  uiAudio.notifyMissionAccepted()
+  uiAudio.notifyMissionAccepted();
   viewController.notifyJourneyTrigger('accepted_asteroid_mission')
 }
 
 function handleAcceptEvaMission() {
   viewController.evaMissionAccept()
-  uiAudio.notifyMissionAccepted()
+  uiAudio.notifyMissionAccepted();
   viewController.notifyJourneyTrigger('accepted_eva_mission')
 }
 
 function handleAcceptMiningMission() {
   viewController.miningMissionAccept()
-  uiAudio.notifyMissionAccepted()
+  uiAudio.notifyMissionAccepted();
 }
 
 function handleDeliverMiningMission(missionId: string) {
   viewController.miningMissionDeliver(missionId)
-  uiAudio.notifyMissionComplete()
+  uiAudio.notifyMissionComplete();
 }
 
 /** Player clicked the overlay's Complete button — pay reward and close. */
@@ -1197,7 +1197,7 @@ function handleEvaMinigameClose(): void {
 
 function handleDeliverMission(missionId: string) {
   viewController.missionDeliver(missionId)
-  uiAudio.notifyMissionComplete()
+  uiAudio.notifyMissionComplete();
 }
 
 function dockedPlanetId(): string | null {

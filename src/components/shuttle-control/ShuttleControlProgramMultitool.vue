@@ -75,14 +75,14 @@ const chapters = [
 
 const nextChapter = () => {
   if (currentChapter.value < chapters.length) {
-    uiAudio.notifyNavClick()
+    uiAudio.notifyNavClick();
     currentChapter.value++
   }
 }
 
 const prevChapter = () => {
   if (currentChapter.value > 1) {
-    uiAudio.notifyNavClick()
+    uiAudio.notifyNavClick();
     currentChapter.value--
   }
 }

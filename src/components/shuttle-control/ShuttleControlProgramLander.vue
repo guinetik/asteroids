@@ -72,14 +72,14 @@ const currentChapter = ref(1)
 
 const nextChapter = () => {
   if (currentChapter.value < chapters.length) {
-    uiAudio.notifyNavClick()
+    uiAudio.notifyNavClick();
     currentChapter.value++
   }
 }
 
 const prevChapter = () => {
   if (currentChapter.value > 1) {
-    uiAudio.notifyNavClick()
+    uiAudio.notifyNavClick();
     currentChapter.value--
   }
 }
@@ -119,7 +119,7 @@ const prevChapter = () => {
             :key="chapter.id"
             :class="['nav-item', { active: currentChapter === chapter.id }]"
             @click="
-              uiAudio.notifyNavClick()
+              uiAudio.notifyNavClick();
               currentChapter = chapter.id
             "
           >

@@ -94,17 +94,17 @@ const tradeOpen = ref(true)
 
 function toggleServices(): void {
   servicesOpen.value = !servicesOpen.value
-  uiAudio.notifySwitch()
+  uiAudio.notifySwitch();
 }
 
 function toggleFuel(): void {
   fuelOpen.value = !fuelOpen.value
-  uiAudio.notifySwitch()
+  uiAudio.notifySwitch();
 }
 
 function toggleTrade(): void {
   tradeOpen.value = !tradeOpen.value
-  uiAudio.notifySwitch()
+  uiAudio.notifySwitch();
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -125,7 +125,7 @@ function onKeydown(e: KeyboardEvent) {
           type="button"
           class="ship-message-card__button"
           @click="
-            uiAudio.notifyCancel()
+            uiAudio.notifyCancel();
             $emit('close')
           "
         >
@@ -168,7 +168,7 @@ function onKeydown(e: KeyboardEvent) {
                   class="planet-shop-item__buy-btn planet-shop-btn--service"
                   :disabled="!canAfford(REFUEL_COST) || fuelFull"
                   @click="
-                    uiAudio.notifyConfirm()
+                    uiAudio.notifyConfirm();
                     $emit('refuel')
                   "
                 >
@@ -191,7 +191,7 @@ function onKeydown(e: KeyboardEvent) {
                   class="planet-shop-item__buy-btn planet-shop-btn--service"
                   :disabled="!canAfford(REPAIR_COST) || hullFull"
                   @click="
-                    uiAudio.notifyConfirm()
+                    uiAudio.notifyConfirm();
                     $emit('repairHull')
                   "
                 >
@@ -214,7 +214,7 @@ function onKeydown(e: KeyboardEvent) {
                   class="planet-shop-item__buy-btn planet-shop-btn--service"
                   :disabled="!canAfford(LANDER_REPAIR_COST) || landerHullFull"
                   @click="
-                    uiAudio.notifyConfirm()
+                    uiAudio.notifyConfirm();
                     $emit('repairLander')
                   "
                 >
@@ -252,7 +252,7 @@ function onKeydown(e: KeyboardEvent) {
                   class="planet-shop-item__buy-btn planet-shop-btn--fuel"
                   :disabled="!canAfford(RESERVE_FUEL_COST)"
                   @click="
-                    uiAudio.notifyConfirm()
+                    uiAudio.notifyConfirm();
                     $emit('buyReserveFuel')
                   "
                 >
@@ -275,7 +275,7 @@ function onKeydown(e: KeyboardEvent) {
                   class="planet-shop-item__buy-btn planet-shop-btn--fuel"
                   :disabled="!canAfford(LANDER_FUEL_COST)"
                   @click="
-                    uiAudio.notifyConfirm()
+                    uiAudio.notifyConfirm();
                     $emit('buyLanderFuel')
                   "
                 >
@@ -326,7 +326,7 @@ function onKeydown(e: KeyboardEvent) {
                     class="planet-shop-item__buy-btn planet-shop-btn--trade"
                     :disabled="slot.stock <= 0 || !canAfford(slot.price)"
                     @click="
-                      uiAudio.notifyConfirm()
+                      uiAudio.notifyConfirm();
                       $emit('buyTradeGood', session.tradeSlots.indexOf(slot), 1)
                     "
                   >
@@ -360,7 +360,7 @@ function onKeydown(e: KeyboardEvent) {
                     class="planet-shop-item__buy-btn planet-shop-btn--trade"
                     :disabled="slot.stock <= 0 || !canAfford(slot.price)"
                     @click="
-                      uiAudio.notifyConfirm()
+                      uiAudio.notifyConfirm();
                       $emit('buyTradeGood', session.tradeSlots.indexOf(slot), 1)
                     "
                   >
@@ -392,7 +392,7 @@ function onKeydown(e: KeyboardEvent) {
                     class="planet-shop-item__buy-btn planet-shop-btn--trade"
                     :disabled="slot.stock <= 0 || !canAfford(slot.price)"
                     @click="
-                      uiAudio.notifyConfirm()
+                      uiAudio.notifyConfirm();
                       $emit('buyTradeGood', index, 1)
                     "
                   >

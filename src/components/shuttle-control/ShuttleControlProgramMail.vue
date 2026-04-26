@@ -126,14 +126,14 @@ function statusLabel(row: ShipMessageInboxRow): string {
 
 function selectFolder(folderId: string): void {
   if (selectedFolderId.value === folderId) return
-  uiAudio.notifyButtonClick()
+  uiAudio.notifyButtonClick();
   selectedFolderId.value = folderId
   selectedId.value = null
   refreshRows()
 }
 
 function selectRow(id: string, options: { autoplayAudio?: boolean } = {}): void {
-  uiAudio.notifyConfirm()
+  uiAudio.notifyConfirm();
   selectedId.value = id
   if (options.autoplayAudio) {
     selectedAudioAutoplayToken.value += 1
@@ -150,7 +150,7 @@ function dismissSelected(): void {
   if (!selectedId.value) return
   const r = shipMessageSystem.getReadableShipMessage(selectedId.value)
   if (!r || r.inboxStatus === 'dismissed') return
-  uiAudio.notifyScanComplete()
+  uiAudio.notifyScanComplete();
   shipMessageSystem.dismiss(selectedId.value)
   refreshAll()
   emit('mailChanged')
