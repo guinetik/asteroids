@@ -36,6 +36,8 @@ const CARGO_LANDER_SCALE = 30
 const CARGO_LANDER_OFFSET = new THREE.Vector3(-320, 0, 20)
 
 // ── Timeline phase durations (seconds) ──────────────────────────
+/** Establishing beauty shot of the full asteroid before the shuttle approaches. */
+const PHASE_ESTABLISH_DURATION = 2.0
 /** Shuttle approaches from distance. */
 const PHASE_APPROACH_DURATION = 6.0
 /** Shuttle rotates 180° (flip maneuver). */
@@ -49,6 +51,7 @@ const PHASE_FADEOUT_DURATION = 1.5
 
 /** Total sequence duration. */
 export const ARRIVAL_SEQUENCE_DURATION =
+  PHASE_ESTABLISH_DURATION +
   PHASE_APPROACH_DURATION +
   PHASE_FLIP_DURATION +
   PHASE_DOORS_DURATION +
@@ -122,7 +125,7 @@ const THRUSTER_SPRITE_SIZE = 140
 const THRUSTER_SPRITE_X_OFFSET = -80
 
 /** Timeline phase identifiers. */
-type ArrivalPhase = 'approach' | 'flip' | 'doors' | 'detach' | 'fadeout' | 'done'
+type ArrivalPhase = 'establish' | 'approach' | 'flip' | 'doors' | 'detach' | 'fadeout' | 'done'
 
 /** Exfil (reverse departure) phase identifiers. */
 type ExfilPhase = 'dock' | 'closeDoors' | 'flipBack' | 'depart' | 'exfilFadeout' | 'done'
@@ -150,7 +153,7 @@ export class ArrivalSequence {
     return this.landerWorldPos.clone()
   }
 
-  private phase: ArrivalPhase = 'approach'
+  private phase: ArrivalPhase = 'establish'
   private elapsed = 0
   private phaseElapsed = 0
 
@@ -378,6 +381,9 @@ export class ArrivalSequence {
     }
 
     switch (this.phase) {
+      case 'establish':
+        this.tickEstablish()
+        break
       case 'approach':
         this.tickApproach()
         break
@@ -481,6 +487,11 @@ export class ArrivalSequence {
   }
 
   // ── Phase tickers ─────────────────────────────────────────────
+
+  private tickEstablish(): void {
+    const t = Math.min(1, this.phaseElapsed / PHASE_ESTABLISH_DURATION)
+    if (t >= 1) this.nextPhase('approach')
+  }
 
   private tickApproach(): void {
     const t = Math.min(1, this.phaseElapsed / PHASE_APPROACH_DURATION)
