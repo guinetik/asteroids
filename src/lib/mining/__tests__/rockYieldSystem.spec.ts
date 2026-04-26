@@ -288,4 +288,76 @@ describe('RockYieldSystem.registerRock — overrides', () => {
     const sys = makeSystem()
     expect(sys.scienceHit(404)).toBeNull()
   })
+
+  it('fires no bonus grants when a non-prospected rock depletes', () => {
+    const sys = makeSystem({ boltDamageKg: MAX_ROCK_YIELD_KG })
+    const grants: { itemId: string; kg: number; idx: number }[] = []
+    sys.onMineralExtracted = (itemId, kg, idx) => grants.push({ itemId, kg, idx })
+    sys.registerRock({ spawnIndex: 1, diameter: 4 })
+    sys.mineRock(1)
+    expect(grants.length).toBe(1)
+  })
+
+  it('fires the guaranteed bonus on depletion of a prospected rock', () => {
+    const sys = new RockYieldSystem({
+      composition: COMPOSITION,
+      seed: 1,
+      boltDamageKg: MAX_ROCK_YIELD_KG,
+    })
+    const grants: { itemId: string; kg: number; idx: number }[] = []
+    sys.onMineralExtracted = (itemId, kg, idx) => grants.push({ itemId, kg, idx })
+    sys.registerRock({ spawnIndex: 0, diameter: 4 })
+    const rock = sys.peekRock(0)!
+    // Force prospected without simulating science hits.
+    ;(sys as unknown as { rocks: Map<number, { prospected: boolean }> }).rocks.get(0)!.prospected =
+      true
+    sys.mineRock(0)
+    // 1 normal grant + 1 guaranteed bonus = 2; trigger roll skips at (seed=1, idx=0).
+    expect(grants.length).toBe(2)
+    expect(grants[1]!.itemId).toBe(rock.itemId)
+    const expectedKg = Math.max(2, Math.ceil(rock.totalKg * 0.10))
+    expect(grants[1]!.kg).toBe(expectedKg)
+  })
+
+  it('fires both bonuses when the trigger roll lands below threshold', () => {
+    const sys = new RockYieldSystem({
+      composition: COMPOSITION,
+      seed: 1,
+      boltDamageKg: MAX_ROCK_YIELD_KG,
+    })
+    const grants: { itemId: string; kg: number; idx: number }[] = []
+    sys.onMineralExtracted = (itemId, kg, idx) => grants.push({ itemId, kg, idx })
+    sys.registerRock({ spawnIndex: 3, diameter: 4 })
+    ;(sys as unknown as { rocks: Map<number, { prospected: boolean }> }).rocks.get(3)!.prospected =
+      true
+    sys.mineRock(3)
+    // 1 normal grant + 1 guaranteed bonus + 1 jackpot = 3 (seed=1, idx=3 fires the trigger).
+    expect(grants.length).toBe(3)
+  })
+
+  it('produces the same bonus item id across runs of the same seed', () => {
+    const a = new RockYieldSystem({
+      composition: COMPOSITION,
+      seed: 1,
+      boltDamageKg: MAX_ROCK_YIELD_KG,
+    })
+    const b = new RockYieldSystem({
+      composition: COMPOSITION,
+      seed: 1,
+      boltDamageKg: MAX_ROCK_YIELD_KG,
+    })
+    const grantsA: string[] = []
+    const grantsB: string[] = []
+    a.onMineralExtracted = (itemId) => grantsA.push(itemId)
+    b.onMineralExtracted = (itemId) => grantsB.push(itemId)
+    a.registerRock({ spawnIndex: 3, diameter: 4 })
+    b.registerRock({ spawnIndex: 3, diameter: 4 })
+    ;(a as unknown as { rocks: Map<number, { prospected: boolean }> }).rocks.get(3)!.prospected =
+      true
+    ;(b as unknown as { rocks: Map<number, { prospected: boolean }> }).rocks.get(3)!.prospected =
+      true
+    a.mineRock(3)
+    b.mineRock(3)
+    expect(grantsA).toEqual(grantsB)
+  })
 })

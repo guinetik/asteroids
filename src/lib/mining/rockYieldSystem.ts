@@ -24,7 +24,12 @@ import {
   BOLT_DAMAGE_KG_PER_HIT,
   MAX_ROCK_YIELD_KG,
   MINERAL_KG_PER_DIAMETER_UNIT,
+  MIN_PROSPECT_BONUS_KG,
   MIN_ROCK_YIELD_KG,
+  PROSPECT_BONUS_RATIO,
+  PROSPECT_ITEM_SALT,
+  PROSPECT_SECOND_ROLL_CHANCE,
+  PROSPECT_TRIGGER_SALT,
   SCIENCE_HP_RATIO,
 } from './constants'
 
@@ -172,6 +177,26 @@ export class RockYieldSystem {
     if (depleted) roll.remainingKg = 0
 
     this.onMineralExtracted?.(roll.itemId, granted, spawnIndex)
+
+    if (depleted && roll.prospected) {
+      const bonusKg = Math.max(
+        MIN_PROSPECT_BONUS_KG,
+        Math.ceil(roll.totalKg * PROSPECT_BONUS_RATIO),
+      )
+      // Guaranteed: another grant of the rock's primary mineral.
+      this.onMineralExtracted?.(roll.itemId, bonusKg, spawnIndex)
+      // 25% chance: a second composition-weighted grant. Two distinct salts
+      // keep trigger and item-id draws statistically independent.
+      const trigger = pseudoRandom(this.seed, spawnIndex ^ PROSPECT_TRIGGER_SALT)
+      if (trigger < PROSPECT_SECOND_ROLL_CHANCE) {
+        const rolledItemId = this.rollMineralFromSalted(
+          this.weightedItems,
+          spawnIndex,
+          PROSPECT_ITEM_SALT,
+        )
+        this.onMineralExtracted?.(rolledItemId, bonusKg, spawnIndex)
+      }
+    }
 
     if (depleted) {
       this.rocks.delete(spawnIndex)
@@ -332,6 +357,27 @@ export class RockYieldSystem {
   /** Roll a mineral from an arbitrary weighted list using seed + spawn index. */
   private rollMineralFrom(items: { itemId: string; weight: number }[], spawnIndex: number): string {
     const r = pseudoRandom(this.seed, spawnIndex)
+    const totalWeight = items.reduce((sum, entry) => sum + entry.weight, 0)
+    const target = r * totalWeight
+    let acc = 0
+    for (const entry of items) {
+      acc += entry.weight
+      if (target < acc) return entry.itemId
+    }
+    return items[items.length - 1]!.itemId
+  }
+
+  /**
+   * Roll a mineral from a weighted list using a salted pseudo-random draw.
+   * Used by prospecting bonus rolls so the second grant's item-id draw is
+   * statistically independent of the primary roll for the same rock.
+   */
+  private rollMineralFromSalted(
+    items: { itemId: string; weight: number }[],
+    spawnIndex: number,
+    salt: number,
+  ): string {
+    const r = pseudoRandom(this.seed, spawnIndex ^ salt)
     const totalWeight = items.reduce((sum, entry) => sum + entry.weight, 0)
     const target = r * totalWeight
     let acc = 0
