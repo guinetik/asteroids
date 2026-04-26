@@ -130,7 +130,10 @@ export class ShuttleViewController implements Tickable {
     // Scene + camera
     this.sceneManager = new SceneManager()
     this.sceneManager.mount(container)
-    this.vehicleCamera = new VehicleCamera(SHUTTLE_CAMERA_CONFIG, this.sceneManager.renderer.domElement)
+    this.vehicleCamera = new VehicleCamera(
+      SHUTTLE_CAMERA_CONFIG,
+      this.sceneManager.renderer.domElement,
+    )
     this.sceneManager.setCamera(this.vehicleCamera)
     this.tickHandler.register(this.vehicleCamera, TICK_PRIORITY_RENDER - 1)
     this.tickHandler.register(this.sceneManager, TICK_PRIORITY_RENDER)
@@ -230,9 +233,13 @@ export class ShuttleViewController implements Tickable {
     })
     const lateral = new Vector3(-forward.z, 0, forward.x) // right-hand perpendicular on XZ
     this.satelliteModel.group.position.set(
-      shuttlePos.x + forward.x * GLB_SATELLITE_SPAWN_DISTANCE + lateral.x * GLB_SATELLITE_LATERAL_OFFSET,
+      shuttlePos.x +
+        forward.x * GLB_SATELLITE_SPAWN_DISTANCE +
+        lateral.x * GLB_SATELLITE_LATERAL_OFFSET,
       shuttlePos.y,
-      shuttlePos.z + forward.z * GLB_SATELLITE_SPAWN_DISTANCE + lateral.z * GLB_SATELLITE_LATERAL_OFFSET,
+      shuttlePos.z +
+        forward.z * GLB_SATELLITE_SPAWN_DISTANCE +
+        lateral.z * GLB_SATELLITE_LATERAL_OFFSET,
     )
     this.satelliteModel.group.lookAt(shuttlePos)
     this.sceneManager.addToScene(this.satelliteModel.group)
@@ -333,9 +340,11 @@ export class ShuttleViewController implements Tickable {
 
   private buildEvaHugeScaleTargets(): EvaHugeScaleTarget[] {
     const targets: EvaHugeScaleTarget[] = []
-    if (this.shuttleController) targets.push({ object: this.shuttleController.group, factor: EVA_HUGE_SHUTTLE })
+    if (this.shuttleController)
+      targets.push({ object: this.shuttleController.group, factor: EVA_HUGE_SHUTTLE })
     if (this.relayAntenna) targets.push({ object: this.relayAntenna.group, factor: EVA_HUGE_RELAY })
-    if (this.satelliteModel) targets.push({ object: this.satelliteModel.group, factor: EVA_HUGE_SATELLITE })
+    if (this.satelliteModel)
+      targets.push({ object: this.satelliteModel.group, factor: EVA_HUGE_SATELLITE })
     const sun = this.celestialBodies[0]
     if (sun) targets.push({ object: sun.group, factor: EVA_HUGE_SUN })
     return targets

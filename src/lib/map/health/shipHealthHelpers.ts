@@ -124,10 +124,7 @@ export function buildShipHealthConfig(
  *   bug that we heal on load.
  * - Any positive value → clamped to `maxHp`.
  */
-export function clampInitialHullHp(
-  savedHp: number | undefined,
-  maxHp: number,
-): number {
+export function clampInitialHullHp(savedHp: number | undefined, maxHp: number): number {
   if (savedHp === undefined) return maxHp
   if (savedHp <= 0) return maxHp
   return Math.min(savedHp, maxHp)

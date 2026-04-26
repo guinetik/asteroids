@@ -427,7 +427,8 @@ export function acceptAsteroidMission(board: ShuttleMissionBoard): ShuttleMissio
  * @returns Updated board.
  */
 export function beginAsteroidMission(board: ShuttleMissionBoard): ShuttleMissionBoard {
-  if (!board.activeAsteroidMission || board.activeAsteroidMission.status !== 'accepted') return board
+  if (!board.activeAsteroidMission || board.activeAsteroidMission.status !== 'accepted')
+    return board
   return {
     ...board,
     activeAsteroidMission: { ...board.activeAsteroidMission, status: 'in-transit' },
@@ -441,7 +442,10 @@ export function beginAsteroidMission(board: ShuttleMissionBoard): ShuttleMission
  * @param dt - Delta time in seconds.
  * @returns Updated board.
  */
-export function tickAsteroidMissionBoard(board: ShuttleMissionBoard, dt: number): ShuttleMissionBoard {
+export function tickAsteroidMissionBoard(
+  board: ShuttleMissionBoard,
+  dt: number,
+): ShuttleMissionBoard {
   if (!board.asteroidRestockTimer) return board
 
   const remaining = board.asteroidRestockTimer.remaining - dt
@@ -463,10 +467,7 @@ export function tickAsteroidMissionBoard(board: ShuttleMissionBoard, dt: number)
  * @param planetId - Planet the player is docked at.
  * @returns Updated board with an offered EVA mission (or unchanged).
  */
-export function offerEvaMission(
-  board: ShuttleMissionBoard,
-  planetId: string,
-): ShuttleMissionBoard {
+export function offerEvaMission(board: ShuttleMissionBoard, planetId: string): ShuttleMissionBoard {
   if (board.evaRestockTimer) return board
   if (board.offeredEvaMission && board.offeringEvaPlanet === planetId) return board
 
@@ -633,10 +634,7 @@ export function completeEvaMission(
     return { ok: false, board, profile, reason: 'EVA mission not found' }
   }
   const mission = board.activeEvaMissions[idx]!
-  const updatedProfile = addCredits(
-    profile,
-    Math.round(mission.template.reward * rewardMultiplier),
-  )
+  const updatedProfile = addCredits(profile, Math.round(mission.template.reward * rewardMultiplier))
   const updatedMissions = board.activeEvaMissions.filter((_, i) => i !== idx)
   return {
     ok: true,

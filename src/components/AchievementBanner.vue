@@ -7,12 +7,7 @@
       aria-live="polite"
       aria-relevant="additions"
     >
-      <div
-        v-for="item in visible"
-        :key="item.id"
-        class="achievement-banner"
-        role="status"
-      >
+      <div v-for="item in visible" :key="item.id" class="achievement-banner" role="status">
         <div class="achievement-banner__strip">
           <span class="achievement-banner__mark" aria-hidden="true">🏆</span>
           <span class="achievement-banner__label">Achievement unlocked</span>
@@ -86,8 +81,7 @@ defineExpose({ show })
   overflow: hidden;
   border: 1px solid rgba(245, 196, 92, 0.3);
   border-radius: 10px;
-  background:
-    linear-gradient(135deg, rgba(28, 18, 4, 0.98), rgba(13, 9, 3, 0.97));
+  background: linear-gradient(135deg, rgba(28, 18, 4, 0.98), rgba(13, 9, 3, 0.97));
   box-shadow:
     0 0 0 1px rgba(245, 196, 92, 0.08),
     0 14px 38px rgba(0, 0, 0, 0.45);

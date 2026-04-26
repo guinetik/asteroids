@@ -55,7 +55,14 @@ describe('GravitationalEventManager', () => {
       maxConcurrent: 5,
       autoSpawnEnabled: false,
     })
-    mgr.spawnRandomInWorld({ x: 0, z: 0, durationSec: 10, speed: 0, gridMass: 3e-5, wellWidthMultiplier: 3 })
+    mgr.spawnRandomInWorld({
+      x: 0,
+      z: 0,
+      durationSec: 10,
+      speed: 0,
+      gridMass: 3e-5,
+      wellWidthMultiplier: 3,
+    })
 
     const near = mgr.getGridSourcesNear(0, 0)
     expect(near).toHaveLength(1)

@@ -285,9 +285,7 @@ export class ChimeraWalkerController implements Tickable {
       this.bodyGroup.rotation.z += Math.sin(t * 35) * intensity
     }
 
-    const breathe = this.isAgitated
-      ? 1 + Math.sin(t * 4) * 0.06
-      : 1 + Math.sin(t * 1.2) * 0.02
+    const breathe = this.isAgitated ? 1 + Math.sin(t * 4) * 0.06 : 1 + Math.sin(t * 1.2) * 0.02
     this.headMembrane.scale.setScalar(breathe)
 
     this.dnaCore.rotation.y += 0.02
@@ -559,7 +557,11 @@ export class ChimeraWalkerController implements Tickable {
 
     const lowerCurve = new THREE.QuadraticBezierCurve3(
       knee,
-      new THREE.Vector3((knee.x + ankle.x) / 2, (knee.y + ankle.y) / 2 - 0.2, (knee.z + ankle.z) / 2),
+      new THREE.Vector3(
+        (knee.x + ankle.x) / 2,
+        (knee.y + ankle.y) / 2 - 0.2,
+        (knee.z + ankle.z) / 2,
+      ),
       ankle,
     )
     leg.lowerTube.update(lowerCurve)
@@ -593,9 +595,18 @@ export class ChimeraWalkerController implements Tickable {
       const curlR = tentacle.curl * 0.22 * progress * ampMult
 
       const segEnd = new THREE.Vector3(
-        prevEnd.x + tentacle.reachDir.x * segLen + Math.sin(tX) * amp * (0.3 + tipFactor * 0.6) + Math.cos(curlAngle) * curlR,
-        prevEnd.y + tentacle.reachDir.y * segLen + Math.sin(tY) * amp * (0.2 + tipFactor * 0.7) - segLen * 0.2,
-        prevEnd.z + tentacle.reachDir.z * segLen + Math.cos(tZ) * amp * (0.3 + tipFactor * 0.6) + Math.sin(curlAngle) * curlR,
+        prevEnd.x +
+          tentacle.reachDir.x * segLen +
+          Math.sin(tX) * amp * (0.3 + tipFactor * 0.6) +
+          Math.cos(curlAngle) * curlR,
+        prevEnd.y +
+          tentacle.reachDir.y * segLen +
+          Math.sin(tY) * amp * (0.2 + tipFactor * 0.7) -
+          segLen * 0.2,
+        prevEnd.z +
+          tentacle.reachDir.z * segLen +
+          Math.cos(tZ) * amp * (0.3 + tipFactor * 0.6) +
+          Math.sin(curlAngle) * curlR,
       )
 
       const mid = new THREE.Vector3(
@@ -638,12 +649,18 @@ export class ChimeraWalkerController implements Tickable {
 
         const upperCurve = new THREE.QuadraticBezierCurve3(
           hip,
-          hip.clone().lerp(knee, 0.5).add(new THREE.Vector3(0, 0.2, 0)),
+          hip
+            .clone()
+            .lerp(knee, 0.5)
+            .add(new THREE.Vector3(0, 0.2, 0)),
           knee,
         )
         const lowerCurve = new THREE.QuadraticBezierCurve3(
           knee,
-          knee.clone().lerp(foot, 0.5).add(new THREE.Vector3(0, -0.1, 0)),
+          knee
+            .clone()
+            .lerp(foot, 0.5)
+            .add(new THREE.Vector3(0, -0.1, 0)),
           foot,
         )
         leg.upperTube.update(upperCurve)

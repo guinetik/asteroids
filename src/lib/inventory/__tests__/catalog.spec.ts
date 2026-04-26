@@ -41,18 +41,14 @@ describe('ITEM_CATALOG', () => {
   })
 
   it('equipment has maxStack of 1', () => {
-    const nonStackable = Object.values(ITEM_CATALOG).filter(
-      (item) => item.category === 'equipment',
-    )
+    const nonStackable = Object.values(ITEM_CATALOG).filter((item) => item.category === 'equipment')
     for (const item of nonStackable) {
       expect(item.maxStack).toBe(1)
     }
   })
 
   it('all minerals are sellable', () => {
-    const minerals = Object.values(ITEM_CATALOG).filter(
-      (item) => item.category === 'mineral',
-    )
+    const minerals = Object.values(ITEM_CATALOG).filter((item) => item.category === 'mineral')
     for (const item of minerals) {
       expect(item.sellable).toBe(true)
     }
@@ -96,5 +92,4 @@ describe('getItemsByCategory', () => {
       expect(item.category).toBe('equipment')
     }
   })
-
 })

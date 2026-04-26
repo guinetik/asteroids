@@ -11,7 +11,12 @@
  */
 
 /** Possible phases of the habitat interior overlay. */
-export type HabitatPhase = 'map' | 'transitioning_in' | 'waking_up' | 'habitat' | 'transitioning_out'
+export type HabitatPhase =
+  | 'map'
+  | 'transitioning_in'
+  | 'waking_up'
+  | 'habitat'
+  | 'transitioning_out'
 
 /** Duration in seconds for the fade-out transition (map → interior). */
 const ENTER_DURATION = 0.8

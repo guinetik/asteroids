@@ -108,9 +108,7 @@ function applyMovementWithSeparation(handles: readonly EnemyHandle[], dt: number
     radius[i] = h.config.hitRadius
 
     const output = h.lastOutput
-    const speed = output.isMoving
-      ? (output.isChasing ? h.config.speed : h.config.wanderSpeed)
-      : 0
+    const speed = output.isMoving ? (output.isChasing ? h.config.speed : h.config.wanderSpeed) : 0
     if (output.isMoving && speed > 0) {
       intentX[i] = output.moveDir.x * speed * dt
       intentZ[i] = output.moveDir.z * speed * dt
@@ -214,7 +212,8 @@ export class EnemyDirector implements Tickable {
    * @param hostage - Damaged hostage entity
    * @param damage - Contact damage amount from enemy config
    */
-  onHostageContactDamage: ((handle: EnemyHandle, hostage: Hostage, damage: number) => void) | null = null
+  onHostageContactDamage: ((handle: EnemyHandle, hostage: Hostage, damage: number) => void) | null =
+    null
 
   /** All currently tracked enemy handles (alive and dead). */
   get enemies(): readonly EnemyHandle[] {
@@ -265,27 +264,28 @@ export class EnemyDirector implements Tickable {
           }
         : undefined
 
-    const behavior = config.preferredRange > 0
-      ? new RangedBehavior({
-          aggroRadius: config.aggroRadius,
-          leashRadius: config.leashRadius,
-          agitateRadius: config.agitateRadius,
-          wanderRadius: config.wanderRadius,
-          wanderSpeed: config.wanderSpeed,
-          speed: config.speed,
-          preferredRange: config.preferredRange,
-          minRange: config.minRange,
-          fireRate: config.fireRate,
-        })
-      : new AggroBehavior({
-          aggroRadius: config.aggroRadius,
-          leashRadius: config.leashRadius,
-          agitateRadius: config.agitateRadius,
-          wanderRadius: config.wanderRadius,
-          wanderSpeed: config.wanderSpeed,
-          speed: config.speed,
-          eyeProjectile,
-        })
+    const behavior =
+      config.preferredRange > 0
+        ? new RangedBehavior({
+            aggroRadius: config.aggroRadius,
+            leashRadius: config.leashRadius,
+            agitateRadius: config.agitateRadius,
+            wanderRadius: config.wanderRadius,
+            wanderSpeed: config.wanderSpeed,
+            speed: config.speed,
+            preferredRange: config.preferredRange,
+            minRange: config.minRange,
+            fireRate: config.fireRate,
+          })
+        : new AggroBehavior({
+            aggroRadius: config.aggroRadius,
+            leashRadius: config.leashRadius,
+            agitateRadius: config.agitateRadius,
+            wanderRadius: config.wanderRadius,
+            wanderSpeed: config.wanderSpeed,
+            speed: config.speed,
+            eyeProjectile,
+          })
 
     const handle: EnemyHandle = {
       id: this.nextId++,

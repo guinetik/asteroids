@@ -79,9 +79,7 @@ export function createAabbColliderFromObject(object: THREE.Object3D): EvaCollide
  * Prefer this over {@link createAabbColliderFromObject} when the visible target has
  * sibling props (cargo contents, FX emitters) that would otherwise inflate the bounds.
  */
-export function createAabbColliderFromObjects(
-  objects: readonly THREE.Object3D[],
-): EvaCollider {
+export function createAabbColliderFromObjects(objects: readonly THREE.Object3D[]): EvaCollider {
   const box = new THREE.Box3()
   box.makeEmpty()
   for (const obj of objects) {
@@ -123,11 +121,13 @@ export function createObbColliderFromHullNodes(
       if (!bb) return
       meshLocal.multiplyMatrices(parentInverse, mesh.matrixWorld)
       for (let i = 0; i < 8; i++) {
-        corner.set(
-          (i & 1) ? bb.max.x : bb.min.x,
-          (i & 2) ? bb.max.y : bb.min.y,
-          (i & 4) ? bb.max.z : bb.min.z,
-        ).applyMatrix4(meshLocal)
+        corner
+          .set(
+            i & 1 ? bb.max.x : bb.min.x,
+            i & 2 ? bb.max.y : bb.min.y,
+            i & 4 ? bb.max.z : bb.min.z,
+          )
+          .applyMatrix4(meshLocal)
         min.min(corner)
         max.max(corner)
       }
@@ -510,9 +510,9 @@ export class EvaCollisionResolver {
       // Vector from cylinder center to sphere center in cylinder local space.
       this.tmpLocalPos.sub(c.localCenter)
       const axial =
-        this.tmpLocalPos.x * c.localAxis.x
-        + this.tmpLocalPos.y * c.localAxis.y
-        + this.tmpLocalPos.z * c.localAxis.z
+        this.tmpLocalPos.x * c.localAxis.x +
+        this.tmpLocalPos.y * c.localAxis.y +
+        this.tmpLocalPos.z * c.localAxis.z
       // Radial component = local offset minus axial projection along the cylinder axis.
       const radialX = this.tmpLocalPos.x - c.localAxis.x * axial
       const radialY = this.tmpLocalPos.y - c.localAxis.y * axial

@@ -106,7 +106,8 @@ body {
 
 /* FPS HUD low-oxygen alert — pulses while warning, holds steady when depleted. */
 @keyframes fps-hud-oxygen-pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.55;
     box-shadow: 0 0 8px -2px rgba(239, 68, 68, 0.45);
   }
@@ -405,7 +406,9 @@ body {
 
 .radiation-warning-critical {
   @apply text-rose-500 text-base font-bold;
-  text-shadow: 0 0 10px rgba(244, 63, 94, 0.85), 0 0 18px rgba(244, 63, 94, 0.45);
+  text-shadow:
+    0 0 10px rgba(244, 63, 94, 0.85),
+    0 0 18px rgba(244, 63, 94, 0.45);
   animation: radiation-pulse 0.4s ease-in-out infinite;
   letter-spacing: 0.08em;
 }
@@ -615,7 +618,8 @@ body {
 }
 
 @keyframes map-fast-travel-pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
     opacity: 0.55;
   }
@@ -996,7 +1000,8 @@ body {
 }
 
 @keyframes map-contract-notice-pulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow:
       0 0 18px rgba(106, 232, 196, 0.25),
       0 10px 24px rgba(2, 6, 23, 0.35);
@@ -2965,7 +2970,9 @@ body {
 }
 .telescope-knob__dial {
   @apply w-[72px] h-[72px] border border-cyan-400/40 rounded-full self-center;
-  transition: border-color 180ms ease, box-shadow 180ms ease;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease;
 }
 .telescope-knob__label {
   @apply text-xs tracking-widest text-center;
@@ -3139,7 +3146,9 @@ body {
   fill: rgba(10, 15, 26, 0.92);
   stroke: rgba(34, 211, 238, 0.45);
   stroke-width: 1.5;
-  transition: stroke 160ms, fill 160ms;
+  transition:
+    stroke 160ms,
+    fill 160ms;
 }
 .relay-node-body--active {
   fill: rgba(34, 211, 238, 0.1);
@@ -3179,9 +3188,15 @@ body {
   @apply block h-full;
   transition: width 180ms ease-out;
 }
-.relay-bar-amber { @apply bg-amber-400; }
-.relay-bar-green { @apply bg-emerald-400; }
-.relay-bar-cyan { @apply bg-cyan-400; }
+.relay-bar-amber {
+  @apply bg-amber-400;
+}
+.relay-bar-green {
+  @apply bg-emerald-400;
+}
+.relay-bar-cyan {
+  @apply bg-cyan-400;
+}
 .relay-hints {
   @apply flex flex-wrap gap-4 text-[10px] tracking-widest text-cyan-200;
 }
@@ -3222,12 +3237,22 @@ body {
   @apply absolute inset-x-0 bottom-20 mx-auto w-fit border border-emerald-400/60
          bg-slate-950/80 px-6 py-3 text-center tracking-widest;
 }
-.relay-caption__label { @apply text-emerald-200; }
-.relay-caption__body { @apply text-cyan-100 text-xs; }
+.relay-caption__label {
+  @apply text-emerald-200;
+}
+.relay-caption__body {
+  @apply text-cyan-100 text-xs;
+}
 /* matches CAPTION_FADE_MS = 1200 */
-.relay-caption-enter-active { transition: opacity 1200ms ease-in; }
-.relay-caption-enter-from { opacity: 0; }
-.relay-caption-enter-to { opacity: 1; }
+.relay-caption-enter-active {
+  transition: opacity 1200ms ease-in;
+}
+.relay-caption-enter-from {
+  opacity: 0;
+}
+.relay-caption-enter-to {
+  opacity: 1;
+}
 .relay-terminal-line {
   stroke: rgba(103, 232, 249, 0.3);
   stroke-width: 3;

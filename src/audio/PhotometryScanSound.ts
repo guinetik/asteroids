@@ -182,7 +182,14 @@ export class PhotometryScanSound {
     const ctx = this.audioContext
     if (ctx) {
       const now = ctx.currentTime
-      automateParam(this.beamCoreGain?.gain ?? null, SILENCE_GAIN, now, BEAM_RAMP_SECONDS, SILENCE_GAIN, 1)
+      automateParam(
+        this.beamCoreGain?.gain ?? null,
+        SILENCE_GAIN,
+        now,
+        BEAM_RAMP_SECONDS,
+        SILENCE_GAIN,
+        1,
+      )
       automateParam(
         this.beamShimmerGain?.gain ?? null,
         SILENCE_GAIN,
@@ -191,7 +198,14 @@ export class PhotometryScanSound {
         SILENCE_GAIN,
         1,
       )
-      automateParam(this.melodyGain?.gain ?? null, SILENCE_GAIN, now, MELODY_RAMP_SECONDS, SILENCE_GAIN, 1)
+      automateParam(
+        this.melodyGain?.gain ?? null,
+        SILENCE_GAIN,
+        now,
+        MELODY_RAMP_SECONDS,
+        SILENCE_GAIN,
+        1,
+      )
       automateParam(
         this.melodyDetuneGain?.gain ?? null,
         SILENCE_GAIN,
@@ -200,7 +214,14 @@ export class PhotometryScanSound {
         SILENCE_GAIN,
         1,
       )
-      automateParam(this.noiseGain?.gain ?? null, SILENCE_GAIN, now, MELODY_RAMP_SECONDS, SILENCE_GAIN, 1)
+      automateParam(
+        this.noiseGain?.gain ?? null,
+        SILENCE_GAIN,
+        now,
+        MELODY_RAMP_SECONDS,
+        SILENCE_GAIN,
+        1,
+      )
     }
     this.alive = false
   }

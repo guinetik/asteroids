@@ -98,8 +98,8 @@ function buildSlot(tg: TradeGoodDefinition, isImported: boolean): TradeGoodSlot 
       ? STOCK_MIN + Math.floor(Math.random() * (STOCK_MAX - STOCK_MIN + 1))
       : STOCK_MIN + Math.floor(Math.random() * (STOCK_MAX / 2 - STOCK_MIN + 1))
   const price = Math.round(
-    tg.basePrice
-      * (isImported ? TRADE_GOOD_IMPORTED_BUY_PRICE_FRACTION : TRADE_GOOD_SOURCE_BUY_PRICE_FRACTION),
+    tg.basePrice *
+      (isImported ? TRADE_GOOD_IMPORTED_BUY_PRICE_FRACTION : TRADE_GOOD_SOURCE_BUY_PRICE_FRACTION),
   )
   return {
     itemId: tg.id,
@@ -181,7 +181,13 @@ export function buyTradeGood(
   inventory: Inventory,
   slotIndex: number,
   quantity: number,
-): { ok: boolean; session: ShopSession; profile: PlayerProfile; inventory: Inventory; reason?: string } {
+): {
+  ok: boolean
+  session: ShopSession
+  profile: PlayerProfile
+  inventory: Inventory
+  reason?: string
+} {
   const slot = session.tradeSlots[slotIndex]
   if (!slot) return { ok: false, session, profile, inventory, reason: 'Invalid slot index' }
 
@@ -209,7 +215,12 @@ export function buyTradeGood(
   updatedSlots[slotIndex] = { ...slot, stock: slot.stock - quantity }
   const updatedSession = { ...session, tradeSlots: updatedSlots }
 
-  return { ok: true, session: updatedSession, profile: updatedProfile, inventory: addResult.inventory }
+  return {
+    ok: true,
+    session: updatedSession,
+    profile: updatedProfile,
+    inventory: addResult.inventory,
+  }
 }
 
 /**

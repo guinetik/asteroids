@@ -186,7 +186,7 @@ const JUPITER_THEME: GasCollectionTheme = {
     icon: '⚠',
     title: 'HYDROGEN UPWELLING DETECTED',
     situation:
-      'A massive convection cell is pushing metallic hydrogen up through Jupiter\'s ' +
+      "A massive convection cell is pushing metallic hydrogen up through Jupiter's " +
       'cloud bands. Concentration levels are off the charts — move fast.',
     instructions:
       'The radiation belt will cook your hull if you drop too low. ' +
@@ -223,7 +223,7 @@ const MARS_THEME: GasCollectionTheme = {
     { xFrac: 0.22, width: 40, height: 15, flatTop: 20 },
     { xFrac: 0.38, width: 90, height: 35, flatTop: 50 },
     { xFrac: 0.55, width: 30, height: 12, flatTop: 18 },
-    { xFrac: 0.70, width: 70, height: 28, flatTop: 40 },
+    { xFrac: 0.7, width: 70, height: 28, flatTop: 40 },
     { xFrac: 0.88, width: 45, height: 18, flatTop: 25 },
   ],
   briefing: {

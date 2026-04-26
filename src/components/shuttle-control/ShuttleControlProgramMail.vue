@@ -20,7 +20,11 @@ import {
   type ShipMessageInboxRow,
   type ShipMessageReadable,
 } from '@/lib/messages/messageTypes'
-import { acceptContractWithRetroEval, contractSystem, onContractsChanged } from '@/lib/contracts/runtime'
+import {
+  acceptContractWithRetroEval,
+  contractSystem,
+  onContractsChanged,
+} from '@/lib/contracts/runtime'
 import ShipMessageAudioPlayer from './ShipMessageAudioPlayer.vue'
 import ContractAcceptCard from './ContractAcceptCard.vue'
 
@@ -242,7 +246,9 @@ watch(
           @click="selectRow(row.id, { autoplayAudio: true })"
         >
           <span class="shuttle-mail-program__row-from">
-            <span v-if="row.pinned" class="shuttle-mail-program__row-pin" aria-hidden="true">📌</span>
+            <span v-if="row.pinned" class="shuttle-mail-program__row-pin" aria-hidden="true"
+              >📌</span
+            >
             {{ row.from }}
           </span>
           <span class="shuttle-mail-program__row-subject">{{ row.subject }}</span>
@@ -262,7 +268,8 @@ watch(
         </template>
         <template v-else-if="!readable">
           <p class="shuttle-mail-program__reader-empty">
-            This message has not been delivered yet. It will appear after the matching in-flight event.
+            This message has not been delivered yet. It will appear after the matching in-flight
+            event.
           </p>
         </template>
         <template v-else>
@@ -281,14 +288,13 @@ watch(
                   </div>
                   <div class="shuttle-mail-program__reader-meta-row">
                     <span class="shuttle-mail-program__reader-label">Status</span>
-                    <span class="shuttle-mail-program__reader-value">{{ inboxStatusDisplay(readable) }}</span>
+                    <span class="shuttle-mail-program__reader-value">{{
+                      inboxStatusDisplay(readable)
+                    }}</span>
                   </div>
                 </div>
               </div>
-              <div
-                v-if="canAcknowledgeSelected"
-                class="shuttle-mail-program__reader-action"
-              >
+              <div v-if="canAcknowledgeSelected" class="shuttle-mail-program__reader-action">
                 <button
                   type="button"
                   class="shuttle-mail-program__acknowledge-button"
@@ -316,7 +322,11 @@ watch(
             :audio-url="readable.audioUrl"
             :autoplay-token="selectedAudioAutoplayToken"
           />
-          <div v-if="readable.audioUrl" class="shuttle-mail-program__audio-divider" aria-hidden="true" />
+          <div
+            v-if="readable.audioUrl"
+            class="shuttle-mail-program__audio-divider"
+            aria-hidden="true"
+          />
           <ContractAcceptCard
             v-if="activeContract && showContractCardAbove"
             :contract="activeContract.contract"

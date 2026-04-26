@@ -77,10 +77,13 @@ describe('PhotometryMinigame', () => {
     minigame.onRegisterTickable = onRegisterTickable
     minigame.onPrompt = onPrompt
 
-    minigame.tick(0, context({
-      playerPosition: { x: 5, y: 0, z: 0 },
-      terminalInteractPressed: true,
-    }))
+    minigame.tick(
+      0,
+      context({
+        playerPosition: { x: 5, y: 0, z: 0 },
+        terminalInteractPressed: true,
+      }),
+    )
 
     expect(minigame.status).toBe('active')
     expect(onPrompt).toHaveBeenCalledWith('[E] LAUNCH PHOTOMETRY PROBE')
@@ -98,33 +101,45 @@ describe('PhotometryMinigame', () => {
     minigame.onRegisterTickable = (tickable) => tickables.push(tickable)
     minigame.onComplete = onComplete
 
-    minigame.tick(0, context({
-      playerPosition: { x: 5, y: 0, z: 0 },
-      terminalInteractPressed: true,
-    }))
+    minigame.tick(
+      0,
+      context({
+        playerPosition: { x: 5, y: 0, z: 0 },
+        terminalInteractPressed: true,
+      }),
+    )
 
     const probeTarget = expectedProbeTarget()
     const landerPosition = { x: probeTarget.x, y: probeTarget.y, z: probeTarget.z }
     const landerForward = aimAtScanTarget(landerPosition)
     tickables[0]!.tick(14)
-    minigame.tick(0.1, context({
-      levelState: 'lander',
-      landerPosition,
-      landerForward,
-      landerUp: LANDER_UP,
-    }))
-    minigame.tick(1, context({
-      levelState: 'lander',
-      landerPosition,
-      landerForward,
-      landerUp: LANDER_UP,
-    }))
-    minigame.tick(1, context({
-      levelState: 'lander',
-      landerPosition,
-      landerForward,
-      landerUp: LANDER_UP,
-    }))
+    minigame.tick(
+      0.1,
+      context({
+        levelState: 'lander',
+        landerPosition,
+        landerForward,
+        landerUp: LANDER_UP,
+      }),
+    )
+    minigame.tick(
+      1,
+      context({
+        levelState: 'lander',
+        landerPosition,
+        landerForward,
+        landerUp: LANDER_UP,
+      }),
+    )
+    minigame.tick(
+      1,
+      context({
+        levelState: 'lander',
+        landerPosition,
+        landerForward,
+        landerUp: LANDER_UP,
+      }),
+    )
 
     expect(minigame.progressCurrent).toBe(2)
     expect(minigame.progressTotal).toBe(2)
@@ -132,10 +147,13 @@ describe('PhotometryMinigame', () => {
     expect(scene.getObjectByName('photometry-los-beam')).toBeUndefined()
     expect((tickables[0] as PhotometryProbeController).hasWaypoint).toBe(false)
 
-    minigame.tick(0, context({
-      playerPosition: { x: 5, y: 0, z: 0 },
-      terminalInteractPressed: true,
-    }))
+    minigame.tick(
+      0,
+      context({
+        playerPosition: { x: 5, y: 0, z: 0 },
+        terminalInteractPressed: true,
+      }),
+    )
 
     expect(minigame.status).toBe('completed')
     expect(onComplete).toHaveBeenCalledWith(0)
@@ -151,39 +169,54 @@ describe('PhotometryMinigame', () => {
     minigame.onRegisterTickable = onRegisterTickable
     minigame.onComplete = onComplete
 
-    minigame.tick(0, context({
-      playerPosition: { x: 5, y: 0, z: 0 },
-      terminalInteractPressed: true,
-    }))
+    minigame.tick(
+      0,
+      context({
+        playerPosition: { x: 5, y: 0, z: 0 },
+        terminalInteractPressed: true,
+      }),
+    )
 
     const probeTarget = expectedProbeTarget()
     const landerPosition = { x: probeTarget.x, y: probeTarget.y, z: probeTarget.z }
     const landerForward = aimAtScanTarget(landerPosition)
     tickables[0]!.tick(14)
-    minigame.tick(0.1, context({
-      levelState: 'lander',
-      landerPosition,
-      landerForward,
-      landerUp: LANDER_UP,
-    }))
-    minigame.tick(1, context({
-      levelState: 'lander',
-      landerPosition,
-      landerForward,
-      landerUp: LANDER_UP,
-    }))
-    minigame.tick(1, context({
-      levelState: 'lander',
-      landerPosition,
-      landerForward,
-      landerUp: LANDER_UP,
-    }))
+    minigame.tick(
+      0.1,
+      context({
+        levelState: 'lander',
+        landerPosition,
+        landerForward,
+        landerUp: LANDER_UP,
+      }),
+    )
+    minigame.tick(
+      1,
+      context({
+        levelState: 'lander',
+        landerPosition,
+        landerForward,
+        landerUp: LANDER_UP,
+      }),
+    )
+    minigame.tick(
+      1,
+      context({
+        levelState: 'lander',
+        landerPosition,
+        landerForward,
+        landerUp: LANDER_UP,
+      }),
+    )
 
     minigame.tick(10, context({ levelState: 'eva', playerPosition: { x: 5, y: 0, z: 0 } }))
-    minigame.tick(0, context({
-      playerPosition: { x: 5, y: 0, z: 0 },
-      terminalInteractPressed: true,
-    }))
+    minigame.tick(
+      0,
+      context({
+        playerPosition: { x: 5, y: 0, z: 0 },
+        terminalInteractPressed: true,
+      }),
+    )
 
     expect(minigame.status).toBe('completed')
     expect(onComplete).toHaveBeenCalledWith(0)
@@ -197,32 +230,41 @@ describe('PhotometryMinigame', () => {
     const tickables: Tickable[] = []
     minigame.onRegisterTickable = (tickable) => tickables.push(tickable)
 
-    minigame.tick(0, context({
-      playerPosition: { x: 5, y: 0, z: 0 },
-      terminalInteractPressed: true,
-    }))
+    minigame.tick(
+      0,
+      context({
+        playerPosition: { x: 5, y: 0, z: 0 },
+        terminalInteractPressed: true,
+      }),
+    )
 
     const probeTarget = expectedProbeTarget()
     const stablePosition = { x: probeTarget.x, y: probeTarget.y, z: probeTarget.z }
     const landerForward = aimAtScanTarget(stablePosition)
     tickables[0]!.tick(14)
-    minigame.tick(0.1, context({
-      levelState: 'lander',
-      landerPosition: stablePosition,
-      landerForward,
-      landerUp: LANDER_UP,
-    }))
+    minigame.tick(
+      0.1,
+      context({
+        levelState: 'lander',
+        landerPosition: stablePosition,
+        landerForward,
+        landerUp: LANDER_UP,
+      }),
+    )
 
     const marker = scene.getObjectByName('photometry-scan-target') as THREE.Mesh
     const material = marker.material as THREE.MeshBasicMaterial
     expect(material.color.g).toBeGreaterThan(material.color.r)
 
-    minigame.tick(1, context({
-      levelState: 'lander',
-      landerPosition: stablePosition,
-      landerForward: { x: 1, y: 0, z: 0 },
-      landerUp: LANDER_UP,
-    }))
+    minigame.tick(
+      1,
+      context({
+        levelState: 'lander',
+        landerPosition: stablePosition,
+        landerForward: { x: 1, y: 0, z: 0 },
+        landerUp: LANDER_UP,
+      }),
+    )
 
     expect(material.color.r).toBeGreaterThan(material.color.g)
     minigame.dispose()
@@ -234,22 +276,28 @@ describe('PhotometryMinigame', () => {
     const tickables: Tickable[] = []
     minigame.onRegisterTickable = (tickable) => tickables.push(tickable)
 
-    minigame.tick(0, context({
-      playerPosition: { x: 5, y: 0, z: 0 },
-      terminalInteractPressed: true,
-    }))
+    minigame.tick(
+      0,
+      context({
+        playerPosition: { x: 5, y: 0, z: 0 },
+        terminalInteractPressed: true,
+      }),
+    )
 
     const probeTarget = expectedProbeTarget()
     const landerPosition = { x: probeTarget.x, y: probeTarget.y, z: probeTarget.z }
     const landerForward = aimAtScanTarget(landerPosition)
     tickables[0]!.tick(14)
 
-    minigame.tick(0.1, context({
-      levelState: 'lander',
-      landerPosition,
-      landerForward,
-      landerUp: LANDER_UP,
-    }))
+    minigame.tick(
+      0.1,
+      context({
+        levelState: 'lander',
+        landerPosition,
+        landerForward,
+        landerUp: LANDER_UP,
+      }),
+    )
 
     const marker = scene.getObjectByName('photometry-scan-target') as THREE.Mesh
     expect(marker.position.y).toBeCloseTo(probeTarget.y)
@@ -262,10 +310,13 @@ describe('PhotometryMinigame', () => {
     const tickables: Tickable[] = []
     minigame.onRegisterTickable = (tickable) => tickables.push(tickable)
 
-    minigame.tick(0, context({
-      playerPosition: { x: 5, y: 0, z: 0 },
-      terminalInteractPressed: true,
-    }))
+    minigame.tick(
+      0,
+      context({
+        playerPosition: { x: 5, y: 0, z: 0 },
+        terminalInteractPressed: true,
+      }),
+    )
 
     const probeTarget = expectedProbeTarget()
     const collectionPosition = { x: probeTarget.x, y: probeTarget.y, z: probeTarget.z }
@@ -274,29 +325,38 @@ describe('PhotometryMinigame', () => {
     const landerForward = aimAtScanTarget(collectionPosition)
     tickables[0]!.tick(14)
 
-    minigame.tick(0.1, context({
-      levelState: 'lander',
-      landerPosition: collectionPosition,
-      landerForward,
-      landerUp: LANDER_UP,
-    }))
+    minigame.tick(
+      0.1,
+      context({
+        levelState: 'lander',
+        landerPosition: collectionPosition,
+        landerForward,
+        landerUp: LANDER_UP,
+      }),
+    )
 
-    minigame.tick(0.1, context({
-      levelState: 'lander',
-      landerPosition: lowerNearPosition,
-      landerForward,
-      landerUp: LANDER_UP,
-    }))
+    minigame.tick(
+      0.1,
+      context({
+        levelState: 'lander',
+        landerPosition: lowerNearPosition,
+        landerForward,
+        landerUp: LANDER_UP,
+      }),
+    )
 
     expect(scene.getObjectByName('photometry-scan-target')).toBeDefined()
     expect(scene.getObjectByName('photometry-los-beam')).toBeDefined()
 
-    minigame.tick(0.1, context({
-      levelState: 'lander',
-      landerPosition: farPosition,
-      landerForward,
-      landerUp: LANDER_UP,
-    }))
+    minigame.tick(
+      0.1,
+      context({
+        levelState: 'lander',
+        landerPosition: farPosition,
+        landerForward,
+        landerUp: LANDER_UP,
+      }),
+    )
 
     expect(scene.getObjectByName('photometry-scan-target')).toBeUndefined()
     expect(scene.getObjectByName('photometry-los-beam')).toBeUndefined()
@@ -309,10 +369,13 @@ describe('PhotometryMinigame', () => {
     const tickables: Tickable[] = []
     minigame.onRegisterTickable = (tickable) => tickables.push(tickable)
 
-    minigame.tick(0, context({
-      playerPosition: { x: 5, y: 0, z: 0 },
-      terminalInteractPressed: true,
-    }))
+    minigame.tick(
+      0,
+      context({
+        playerPosition: { x: 5, y: 0, z: 0 },
+        terminalInteractPressed: true,
+      }),
+    )
 
     expect(minigame.missionInstruction).toBe('FLY TO PHOTOMETRY PROBE')
 
@@ -322,60 +385,81 @@ describe('PhotometryMinigame', () => {
     const lockedForward = aimAtScanTarget(collectionPosition)
     tickables[0]!.tick(14)
 
-    minigame.tick(0.1, context({
-      levelState: 'lander',
-      landerPosition: collectionPosition,
-      landerForward: { x: 1, y: 0, z: 0 },
-      landerUp: LANDER_UP,
-    }))
+    minigame.tick(
+      0.1,
+      context({
+        levelState: 'lander',
+        landerPosition: collectionPosition,
+        landerForward: { x: 1, y: 0, z: 0 },
+        landerUp: LANDER_UP,
+      }),
+    )
 
     expect(minigame.missionInstruction).toBe('ALIGN WITH TARGET MARKER')
 
-    minigame.tick(0.1, context({
-      levelState: 'lander',
-      landerPosition: collectionPosition,
-      landerForward: lockedForward,
-      landerUp: LANDER_UP,
-    }))
+    minigame.tick(
+      0.1,
+      context({
+        levelState: 'lander',
+        landerPosition: collectionPosition,
+        landerForward: lockedForward,
+        landerUp: LANDER_UP,
+      }),
+    )
 
     expect(minigame.missionInstruction).toBe('FIRING X-RAY - HOLD POSITION')
 
-    minigame.tick(0.1, context({
-      levelState: 'lander',
-      landerPosition: farPosition,
-      landerForward: lockedForward,
-      landerUp: LANDER_UP,
-    }))
+    minigame.tick(
+      0.1,
+      context({
+        levelState: 'lander',
+        landerPosition: farPosition,
+        landerForward: lockedForward,
+        landerUp: LANDER_UP,
+      }),
+    )
 
     expect(minigame.missionInstruction).toBe('RETURN TO PHOTOMETRY STANDOFF')
 
-    minigame.tick(1, context({
-      levelState: 'lander',
-      landerPosition: collectionPosition,
-      landerForward: lockedForward,
-      landerUp: LANDER_UP,
-    }))
-    minigame.tick(1, context({
-      levelState: 'lander',
-      landerPosition: collectionPosition,
-      landerForward: lockedForward,
-      landerUp: LANDER_UP,
-    }))
-    minigame.tick(1, context({
-      levelState: 'lander',
-      landerPosition: collectionPosition,
-      landerForward: lockedForward,
-      landerUp: LANDER_UP,
-    }))
+    minigame.tick(
+      1,
+      context({
+        levelState: 'lander',
+        landerPosition: collectionPosition,
+        landerForward: lockedForward,
+        landerUp: LANDER_UP,
+      }),
+    )
+    minigame.tick(
+      1,
+      context({
+        levelState: 'lander',
+        landerPosition: collectionPosition,
+        landerForward: lockedForward,
+        landerUp: LANDER_UP,
+      }),
+    )
+    minigame.tick(
+      1,
+      context({
+        levelState: 'lander',
+        landerPosition: collectionPosition,
+        landerForward: lockedForward,
+        landerUp: LANDER_UP,
+      }),
+    )
 
     expect(minigame.missionInstruction).toBe('COLLECTING PHOTOMETRY DATA')
 
-    minigame.tick(5, context({
-      levelState: 'lander',
-      landerPosition: collectionPosition,
-      landerForward: lockedForward,
-      landerUp: LANDER_UP,
-    }))
+    minigame.tick(
+      5,
+      context({
+        levelState: 'lander',
+        landerPosition: collectionPosition,
+        landerForward: lockedForward,
+        landerUp: LANDER_UP,
+      }),
+    )
 
     expect(minigame.missionInstruction).toBe('RETURN TELEMETRY TO TERMINAL')
     minigame.dispose()
@@ -389,10 +473,13 @@ describe('PhotometryMinigame', () => {
     minigame.onRegisterTickable = (tickable) => tickables.push(tickable)
     minigame.onScanAudioState = (state) => audioStates.push(state)
 
-    minigame.tick(0, context({
-      playerPosition: { x: 5, y: 0, z: 0 },
-      terminalInteractPressed: true,
-    }))
+    minigame.tick(
+      0,
+      context({
+        playerPosition: { x: 5, y: 0, z: 0 },
+        terminalInteractPressed: true,
+      }),
+    )
 
     const probeTarget = expectedProbeTarget()
     const collectionPosition = { x: probeTarget.x, y: probeTarget.y, z: probeTarget.z }
@@ -400,32 +487,41 @@ describe('PhotometryMinigame', () => {
     const lockedForward = aimAtScanTarget(collectionPosition)
     tickables[0]!.tick(14)
 
-    minigame.tick(0.1, context({
-      levelState: 'lander',
-      landerPosition: collectionPosition,
-      landerForward: { x: 1, y: 0, z: 0 },
-      landerUp: LANDER_UP,
-    }))
+    minigame.tick(
+      0.1,
+      context({
+        levelState: 'lander',
+        landerPosition: collectionPosition,
+        landerForward: { x: 1, y: 0, z: 0 },
+        landerUp: LANDER_UP,
+      }),
+    )
 
     expect(audioStates[audioStates.length - 1]).toMatchObject({ visible: true, locked: false })
 
-    minigame.tick(0.1, context({
-      levelState: 'lander',
-      landerPosition: collectionPosition,
-      landerForward: lockedForward,
-      landerUp: LANDER_UP,
-    }))
+    minigame.tick(
+      0.1,
+      context({
+        levelState: 'lander',
+        landerPosition: collectionPosition,
+        landerForward: lockedForward,
+        landerUp: LANDER_UP,
+      }),
+    )
 
     expect(audioStates[audioStates.length - 1]?.visible).toBe(true)
     expect(audioStates[audioStates.length - 1]?.locked).toBe(true)
     expect(audioStates[audioStates.length - 1]?.progress).toBeGreaterThan(0)
 
-    minigame.tick(0.1, context({
-      levelState: 'lander',
-      landerPosition: farPosition,
-      landerForward: lockedForward,
-      landerUp: LANDER_UP,
-    }))
+    minigame.tick(
+      0.1,
+      context({
+        levelState: 'lander',
+        landerPosition: farPosition,
+        landerForward: lockedForward,
+        landerUp: LANDER_UP,
+      }),
+    )
 
     expect(audioStates[audioStates.length - 1]).toEqual({
       visible: false,

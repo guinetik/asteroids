@@ -133,9 +133,19 @@ export interface FpsPlayerConfig {
     /** Per-thruster configuration for sprint and jump. */
     thrusters: {
       /** Sprint thruster drains O2 while sprinting. */
-      sprint: { capacity: number; burnRate: number; rechargeRate: number; fuelCostPerRecharge: number }
+      sprint: {
+        capacity: number
+        burnRate: number
+        rechargeRate: number
+        fuelCostPerRecharge: number
+      }
       /** Jump thruster drains O2 on each jump. */
-      jump: { capacity: number; burnRate: number; rechargeRate: number; fuelCostPerRecharge: number }
+      jump: {
+        capacity: number
+        burnRate: number
+        rechargeRate: number
+        fuelCostPerRecharge: number
+      }
     }
   }
   /** Camera rig configuration. */
@@ -176,7 +186,10 @@ export class FpsPlayerController implements Tickable {
    * empty check used to gate hover engagement also follows the source,
    * so a depleted RTG cuts hover even with O2 in the tank.
    */
-  private hoverFuelSource: { consumeFuel(amount: number): void; readonly isFuelEmpty: boolean } | null = null
+  private hoverFuelSource: {
+    consumeFuel(amount: number): void
+    readonly isFuelEmpty: boolean
+  } | null = null
 
   private readonly inputManager: InputManager
   private readonly camera: FpsCamera
@@ -452,10 +465,7 @@ export class FpsPlayerController implements Tickable {
       this.sprintLocked = false
     }
 
-    const isSprinting =
-      sprintWantsEngage &&
-      !this.sprintLocked &&
-      sprintCanFire
+    const isSprinting = sprintWantsEngage && !this.sprintLocked && sprintCanFire
     this._isSprinting = isSprinting
 
     // --- Coyote time — track how long since last grounded ---
@@ -527,16 +537,20 @@ export class FpsPlayerController implements Tickable {
     let wishX = 0
     let wishZ = 0
     if (this.inputManager.isActionActive('moveForward')) {
-      wishX += forward.x; wishZ += forward.y
+      wishX += forward.x
+      wishZ += forward.y
     }
     if (this.inputManager.isActionActive('moveBack')) {
-      wishX -= forward.x; wishZ -= forward.y
+      wishX -= forward.x
+      wishZ -= forward.y
     }
     if (this.inputManager.isActionActive('moveLeft')) {
-      wishX -= right.x * strafe; wishZ -= right.y * strafe
+      wishX -= right.x * strafe
+      wishZ -= right.y * strafe
     }
     if (this.inputManager.isActionActive('moveRight')) {
-      wishX += right.x * strafe; wishZ += right.y * strafe
+      wishX += right.x * strafe
+      wishZ += right.y * strafe
     }
     const wishLen = Math.sqrt(wishX * wishX + wishZ * wishZ)
 
@@ -645,7 +659,10 @@ export class FpsPlayerController implements Tickable {
     )
     const wantsMovementBoots = wishLen > 0 && this.knockbackTimer <= 0
     const shouldBreakBoots =
-      canJump || hoverActive || this.knockbackTimer > 0 || this.body.velocityY > GRAVITY_BOOTS_UPWARD_BREAK_SPEED
+      canJump ||
+      hoverActive ||
+      this.knockbackTimer > 0 ||
+      this.body.velocityY > GRAVITY_BOOTS_UPWARD_BREAK_SPEED
     const supportGap = this.group.position.y - support.height
     const supportBelowFeet = support.height <= this.group.position.y
     const supportWalkable = support.normal.y >= Math.cos(PLAYER_COLLISION_CONFIG.maxClimbAngleRad)
@@ -665,9 +682,7 @@ export class FpsPlayerController implements Tickable {
       this.bootsGraceTimer = Math.max(0, this.bootsGraceTimer - dt)
     }
 
-    const shouldSnapToSupport =
-      canUseGravityBoots &&
-      supportGap <= GRAVITY_BOOTS_SNAP_DISTANCE
+    const shouldSnapToSupport = canUseGravityBoots && supportGap <= GRAVITY_BOOTS_SNAP_DISTANCE
 
     if (shouldSnapToSupport) {
       const snapDistance = Math.min(supportGap, GRAVITY_BOOTS_SNAP_SPEED * dt)
@@ -683,11 +698,7 @@ export class FpsPlayerController implements Tickable {
     this.group.position.y = this.body.tick(dt, this.group.position.y, support.height)
     this.bootsGrounded =
       this.body.grounded ||
-      (
-        this.bootsGraceTimer > 0 &&
-        canUseGravityBoots &&
-        supportGap <= GRAVITY_BOOTS_SNAP_DISTANCE
-      )
+      (this.bootsGraceTimer > 0 && canUseGravityBoots && supportGap <= GRAVITY_BOOTS_SNAP_DISTANCE)
 
     // --- Surface conforming (align up to terrain/support normal when grounded) ---
     if (this.grounded) {

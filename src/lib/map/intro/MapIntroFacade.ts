@@ -7,11 +7,7 @@ import type { PlanetSystemController } from '@/three/controllers/PlanetSystemCon
 import { VirusModel } from '@/three/VirusModel'
 import { CityModel } from '@/three/CityModel'
 import { easeInOut } from '@/three/MapCamera'
-import {
-  INTRO_ZOOM_STEPS,
-  type IntroCinematicStep,
-  type MapIntroState,
-} from '@/lib/mapIntroState'
+import { INTRO_ZOOM_STEPS, type IntroCinematicStep, type MapIntroState } from '@/lib/mapIntroState'
 import {
   EARTH_MOON_INDEX,
   PHOBOS_MOON_INDEX,
@@ -116,7 +112,14 @@ export class MapIntroFacade {
       const raw = mapIntro.cinematicStepProgress
       const t = INTRO_ZOOM_STEPS.has(step) ? easeInOut(raw) : raw
       this.tickIntroProps(step, sceneObjects.scene, params.findPlanetControllerById)
-      this.tickIntroStep(step, t, renderPass, vehicleCamera, shuttleController, params.findPlanetControllerById)
+      this.tickIntroStep(
+        step,
+        t,
+        renderPass,
+        vehicleCamera,
+        shuttleController,
+        params.findPlanetControllerById,
+      )
       return
     }
 
@@ -220,7 +223,10 @@ export class MapIntroFacade {
     }
   }
 
-  private spawnIntroVirus(scene: THREE.Scene, findPlanetControllerById: FindPlanetController): void {
+  private spawnIntroVirus(
+    scene: THREE.Scene,
+    findPlanetControllerById: FindPlanetController,
+  ): void {
     const mars = findPlanetControllerById('mars')
     if (!mars) return
     const pos = mars.getMoonWorldPosition(PHOBOS_MOON_INDEX, this.introMoonWorldPos)
@@ -277,14 +283,22 @@ export class MapIntroFacade {
     const phobos = this.getPhobosWorldPos(mars)
     if (!phobos) return
 
-    const marsCenter = this.tempMarsWorldPos.set(mars.getWorldX(), mars.getWorldY(), mars.getWorldZ())
+    const marsCenter = this.tempMarsWorldPos.set(
+      mars.getWorldX(),
+      mars.getWorldY(),
+      mars.getWorldZ(),
+    )
     const abovePhobos = phobos.clone().add(MAP_INTRO_PHOBOS_APPROACH_OFFSET)
     const camDest = this.tempToPosition.copy(marsCenter).add(MAP_INTRO_MARS_PHOBOS_CAMERA_OFFSET)
     const approachT = THREE.MathUtils.smoothstep(t, 0, 0.76)
     const descendT = THREE.MathUtils.smoothstep(t, 0.52, 1)
     this.introCamera.position.lerpVectors(MAP_INTRO_CAMERA_START_POSITION, abovePhobos, approachT)
     this.introCamera.position.lerp(camDest, descendT)
-    this.introCamera.fov = THREE.MathUtils.lerp(MAP_INTRO_CAMERA_START_FOV, MAP_INTRO_MARS_PHOBOS_FOV, t)
+    this.introCamera.fov = THREE.MathUtils.lerp(
+      MAP_INTRO_CAMERA_START_FOV,
+      MAP_INTRO_MARS_PHOBOS_FOV,
+      t,
+    )
     this.introCamera.updateProjectionMatrix()
     const look = new THREE.Vector3().lerpVectors(MAP_INTRO_CAMERA_START_TARGET, marsCenter, t)
     this.introCamera.lookAt(look)
@@ -305,7 +319,11 @@ export class MapIntroFacade {
   ): void {
     const mars = findPlanetControllerById('mars')
     if (!mars) return
-    const marsCenter = this.tempMarsWorldPos.set(mars.getWorldX(), mars.getWorldY(), mars.getWorldZ())
+    const marsCenter = this.tempMarsWorldPos.set(
+      mars.getWorldX(),
+      mars.getWorldY(),
+      mars.getWorldZ(),
+    )
     this.introCamera.position.copy(marsCenter).add(MAP_INTRO_MARS_PHOBOS_CAMERA_OFFSET)
     this.introCamera.fov = MAP_INTRO_MARS_PHOBOS_FOV
     this.introCamera.updateProjectionMatrix()
@@ -323,7 +341,11 @@ export class MapIntroFacade {
     const phobos = this.getPhobosWorldPos(mars)
     if (!phobos) return
 
-    const marsCenter = this.tempMarsWorldPos.set(mars.getWorldX(), mars.getWorldY(), mars.getWorldZ())
+    const marsCenter = this.tempMarsWorldPos.set(
+      mars.getWorldX(),
+      mars.getWorldY(),
+      mars.getWorldZ(),
+    )
     const widePos = this.tempFromPosition.copy(marsCenter).add(MAP_INTRO_MARS_PHOBOS_CAMERA_OFFSET)
     const closePos = this.tempToPosition.copy(phobos).add(MAP_INTRO_PHOBOS_CAMERA_OFFSET)
     this.introCamera.position.lerpVectors(widePos, closePos, t)
@@ -360,9 +382,17 @@ export class MapIntroFacade {
     if (!earth || !jupiter) return
     const moon = this.getEarthMoonWorldPos(earth)
     if (!moon) return
-    const earthCenter = this.tempFromLook.set(earth.getWorldX(), earth.getWorldY(), earth.getWorldZ())
+    const earthCenter = this.tempFromLook.set(
+      earth.getWorldX(),
+      earth.getWorldY(),
+      earth.getWorldZ(),
+    )
     const fromPos = this.tempFromPosition.copy(earthCenter).add(MAP_INTRO_MOON_CAMERA_OFFSET)
-    const jupiterCenter = this.tempToLook.set(jupiter.getWorldX(), jupiter.getWorldY(), jupiter.getWorldZ())
+    const jupiterCenter = this.tempToLook.set(
+      jupiter.getWorldX(),
+      jupiter.getWorldY(),
+      jupiter.getWorldZ(),
+    )
     const toPos = this.tempToPosition.copy(jupiterCenter).add(MAP_INTRO_JUPITER_CAMERA_OFFSET)
 
     const systemCenter = this.tempMidLook.copy(earthCenter).add(jupiterCenter).multiplyScalar(0.5)
@@ -382,7 +412,11 @@ export class MapIntroFacade {
   ): void {
     const jupiter = findPlanetControllerById('jupiter')
     if (!jupiter) return
-    const jupiterCenter = new THREE.Vector3(jupiter.getWorldX(), jupiter.getWorldY(), jupiter.getWorldZ())
+    const jupiterCenter = new THREE.Vector3(
+      jupiter.getWorldX(),
+      jupiter.getWorldY(),
+      jupiter.getWorldZ(),
+    )
     this.introCamera.position.copy(jupiterCenter).add(MAP_INTRO_JUPITER_CAMERA_OFFSET)
     this.introCamera.fov = MAP_INTRO_JUPITER_FOV
     this.introCamera.updateProjectionMatrix()
@@ -427,7 +461,11 @@ export class MapIntroFacade {
     if (!earth) return
     const moon = this.getEarthMoonWorldPos(earth)
     if (!moon) return
-    const earthCenter = this.tempFromLook.set(earth.getWorldX(), earth.getWorldY(), earth.getWorldZ())
+    const earthCenter = this.tempFromLook.set(
+      earth.getWorldX(),
+      earth.getWorldY(),
+      earth.getWorldZ(),
+    )
     this.introCamera.position.copy(earthCenter).add(MAP_INTRO_MOON_CAMERA_OFFSET)
     this.introCamera.fov = MAP_INTRO_MOON_FOV
     this.introCamera.updateProjectionMatrix()
@@ -444,15 +482,31 @@ export class MapIntroFacade {
     const saturn = findPlanetControllerById('saturn')
     if (!jupiter || !saturn) return
 
-    const jupiterCenter = this.tempFromLook.set(jupiter.getWorldX(), jupiter.getWorldY(), jupiter.getWorldZ())
-    const saturnCenter = this.tempToLook.set(saturn.getWorldX(), saturn.getWorldY(), saturn.getWorldZ())
+    const jupiterCenter = this.tempFromLook.set(
+      jupiter.getWorldX(),
+      jupiter.getWorldY(),
+      jupiter.getWorldZ(),
+    )
+    const saturnCenter = this.tempToLook.set(
+      saturn.getWorldX(),
+      saturn.getWorldY(),
+      saturn.getWorldZ(),
+    )
     const fromPos = this.tempFromPosition.copy(jupiterCenter).add(MAP_INTRO_JUPITER_CAMERA_OFFSET)
     const toPos = this.tempToPosition.copy(saturnCenter).add(MAP_INTRO_SATURN_CAMERA_OFFSET)
     const systemCenter = this.tempMidLook.copy(jupiterCenter).add(saturnCenter).multiplyScalar(0.5)
     const midPos = this.tempMidPosition.copy(systemCenter)
     midPos.y = Math.max(fromPos.y, toPos.y) + 180
 
-    this.applyArcQuaternionBlend(jupiterCenter, fromPos, systemCenter, midPos, saturnCenter, toPos, t)
+    this.applyArcQuaternionBlend(
+      jupiterCenter,
+      fromPos,
+      systemCenter,
+      midPos,
+      saturnCenter,
+      toPos,
+      t,
+    )
     this.introCamera.fov = THREE.MathUtils.lerp(MAP_INTRO_JUPITER_FOV, MAP_INTRO_SATURN_FOV, t)
     this.introCamera.updateProjectionMatrix()
     renderPass.camera = this.introCamera
@@ -465,7 +519,11 @@ export class MapIntroFacade {
     const saturn = findPlanetControllerById('saturn')
     if (!saturn) return
 
-    const saturnCenter = new THREE.Vector3(saturn.getWorldX(), saturn.getWorldY(), saturn.getWorldZ())
+    const saturnCenter = new THREE.Vector3(
+      saturn.getWorldX(),
+      saturn.getWorldY(),
+      saturn.getWorldZ(),
+    )
     this.introCamera.position.copy(saturnCenter).add(MAP_INTRO_SATURN_CAMERA_OFFSET)
     this.introCamera.fov = MAP_INTRO_SATURN_FOV
     this.introCamera.updateProjectionMatrix()
@@ -481,7 +539,11 @@ export class MapIntroFacade {
     const jupiter = findPlanetControllerById('jupiter')
     if (!jupiter) return
 
-    const jupiterCenter = new THREE.Vector3(jupiter.getWorldX(), jupiter.getWorldY(), jupiter.getWorldZ())
+    const jupiterCenter = new THREE.Vector3(
+      jupiter.getWorldX(),
+      jupiter.getWorldY(),
+      jupiter.getWorldZ(),
+    )
     const cityY = jupiterCenter.y + THREE.MathUtils.lerp(INTRO_CITY_START_Y, INTRO_CITY_END_Y, t)
     if (this.introCityModel) {
       this.introCityModel.group.position.y = cityY
@@ -493,9 +555,17 @@ export class MapIntroFacade {
       t,
     )
     this.introCamera.position.copy(jupiterCenter).add(offset)
-    this.introCamera.fov = THREE.MathUtils.lerp(MAP_INTRO_JUPITER_FOV, MAP_INTRO_JUPITER_CITY_FOV, t)
+    this.introCamera.fov = THREE.MathUtils.lerp(
+      MAP_INTRO_JUPITER_FOV,
+      MAP_INTRO_JUPITER_CITY_FOV,
+      t,
+    )
     this.introCamera.updateProjectionMatrix()
-    const look = new THREE.Vector3(jupiterCenter.x, cityY - INTRO_CITY_CAMERA_LOOK_DROP, jupiterCenter.z)
+    const look = new THREE.Vector3(
+      jupiterCenter.x,
+      cityY - INTRO_CITY_CAMERA_LOOK_DROP,
+      jupiterCenter.z,
+    )
     this.introCamera.lookAt(look)
     renderPass.camera = this.introCamera
   }
@@ -507,7 +577,11 @@ export class MapIntroFacade {
     const jupiter = findPlanetControllerById('jupiter')
     if (!jupiter) return
 
-    const jupiterCenter = new THREE.Vector3(jupiter.getWorldX(), jupiter.getWorldY(), jupiter.getWorldZ())
+    const jupiterCenter = new THREE.Vector3(
+      jupiter.getWorldX(),
+      jupiter.getWorldY(),
+      jupiter.getWorldZ(),
+    )
     this.introCamera.position.copy(jupiterCenter).add(MAP_INTRO_JUPITER_CLOSE_OFFSET)
     this.introCamera.fov = MAP_INTRO_JUPITER_CITY_FOV
     this.introCamera.updateProjectionMatrix()
@@ -533,11 +607,7 @@ export class MapIntroFacade {
           .add(MAP_INTRO_SATURN_CAMERA_OFFSET)
       : this.tempFromPosition.copy(MAP_INTRO_CAMERA_START_POSITION)
     const fromLook = saturn
-      ? this.tempFromLook.set(
-          saturn.getWorldX(),
-          saturn.getWorldY(),
-          saturn.getWorldZ(),
-        )
+      ? this.tempFromLook.set(saturn.getWorldX(), saturn.getWorldY(), saturn.getWorldZ())
       : this.tempFromLook.copy(MAP_INTRO_CAMERA_START_TARGET)
 
     const heroPos = shuttleController.group.position

@@ -1,4 +1,4 @@
-<script setup lang='ts'>
+<script setup lang="ts">
 import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
 import { ORBIT_SCALE } from '@/lib/planets/constants'
 import ShuttleCompass from '@/components/ShuttleCompass.vue'
@@ -11,7 +11,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   useFuelCell: []
 }>()
-
 
 function pct(value: number, max: number): number {
   return max > 0 ? (value / max) * 100 : 0
@@ -53,12 +52,15 @@ function tempLabelClass(): string {
         :bearings="props.telemetry.compassBearings"
       />
       <div class="hud-top-cluster__readout">
-        X:{{ (props.telemetry.posX / ORBIT_SCALE).toFixed(2) }}
-        Z:{{ (props.telemetry.posZ / ORBIT_SCALE).toFixed(2) }} AU
-        &middot;
-        SPD {{ props.telemetry.speed.toFixed(1) }}
+        X:{{ (props.telemetry.posX / ORBIT_SCALE).toFixed(2) }} Z:{{
+          (props.telemetry.posZ / ORBIT_SCALE).toFixed(2)
+        }}
+        AU &middot; SPD {{ props.telemetry.speed.toFixed(1) }}
       </div>
-      <div v-if="props.telemetry.actionPrompt" class="hud-top-cluster__line hud-top-cluster__line--action">
+      <div
+        v-if="props.telemetry.actionPrompt"
+        class="hud-top-cluster__line hud-top-cluster__line--action"
+      >
         {{ props.telemetry.actionPrompt }}
       </div>
       <div v-if="props.telemetry.adriftCountdown >= 0" class="hud-top-cluster__adrift">
@@ -107,7 +109,11 @@ function tempLabelClass(): string {
             <div class="hud-gauge-track">
               <div
                 class="hud-gauge-fill bg-cyan-400"
-                :style="{ height: pct(props.telemetry.turretMiningCharge, props.telemetry.turretMiningCapacity) + '%' }"
+                :style="{
+                  height:
+                    pct(props.telemetry.turretMiningCharge, props.telemetry.turretMiningCapacity) +
+                    '%',
+                }"
               ></div>
             </div>
             <span class="hud-gauge-label">MINE</span>
@@ -118,7 +124,9 @@ function tempLabelClass(): string {
             <div class="hud-gauge-track">
               <div
                 class="hud-gauge-fill bg-red-500"
-                :style="{ height: pct(props.telemetry.thrustCharge, props.telemetry.thrustCapacity) + '%' }"
+                :style="{
+                  height: pct(props.telemetry.thrustCharge, props.telemetry.thrustCapacity) + '%',
+                }"
               ></div>
             </div>
             <span class="hud-gauge-label">THR</span>
@@ -127,7 +135,9 @@ function tempLabelClass(): string {
             <div class="hud-gauge-track">
               <div
                 class="hud-gauge-fill bg-blue-500"
-                :style="{ height: pct(props.telemetry.brakeCharge, props.telemetry.brakeCapacity) + '%' }"
+                :style="{
+                  height: pct(props.telemetry.brakeCharge, props.telemetry.brakeCapacity) + '%',
+                }"
               ></div>
             </div>
             <span class="hud-gauge-label">BRK</span>
@@ -136,7 +146,9 @@ function tempLabelClass(): string {
             <div class="hud-gauge-track">
               <div
                 class="hud-gauge-fill bg-white"
-                :style="{ height: pct(props.telemetry.rcsCharge, props.telemetry.rcsCapacity) + '%' }"
+                :style="{
+                  height: pct(props.telemetry.rcsCharge, props.telemetry.rcsCapacity) + '%',
+                }"
               ></div>
             </div>
             <span class="hud-gauge-label">RCS</span>
@@ -154,7 +166,10 @@ function tempLabelClass(): string {
           ></div>
         </div>
         <button
-          v-if="(fuelCellCount ?? 0) > 0 && pct(props.telemetry.fuelLevel, props.telemetry.fuelCapacity) < 80"
+          v-if="
+            (fuelCellCount ?? 0) > 0 &&
+            pct(props.telemetry.fuelLevel, props.telemetry.fuelCapacity) < 80
+          "
           type="button"
           class="hud-dock-refuel-btn"
           @click.stop.prevent="emit('useFuelCell')"

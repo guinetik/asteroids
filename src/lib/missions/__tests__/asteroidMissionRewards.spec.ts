@@ -68,10 +68,7 @@ describe('persistCompletedAsteroidMissionRewards', () => {
 
   it('clears full mission board when active slot is already null (matches completed mission id)', () => {
     const board = createMissionBoard()
-    localStorage.setItem(
-      MISSION_BOARD_KEY,
-      JSON.stringify({ board, savedAt: Date.now() }),
-    )
+    localStorage.setItem(MISSION_BOARD_KEY, JSON.stringify({ board, savedAt: Date.now() }))
     persistCompletedAsteroidMissionRewards(BASE_MISSION, 1)
     const raw = localStorage.getItem(MISSION_BOARD_KEY)
     expect(raw).toBeTruthy()

@@ -156,10 +156,7 @@ export function applyAsteroidUVTextures(
     `${trimmedFolder}/${TEXTURE_FILES.roughness}`,
     THREE.NoColorSpace,
   )
-  const aoMap = loadOptionalUVTexture(
-    `${trimmedFolder}/${TEXTURE_FILES.ao}`,
-    THREE.NoColorSpace,
-  )
+  const aoMap = loadOptionalUVTexture(`${trimmedFolder}/${TEXTURE_FILES.ao}`, THREE.NoColorSpace)
   const metalnessMap = loadOptionalUVTexture(
     `${trimmedFolder}/${TEXTURE_FILES.metalness}`,
     THREE.NoColorSpace,

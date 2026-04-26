@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { RockYieldSystem } from '../rockYieldSystem'
-import {
-  BOLT_DAMAGE_KG_PER_HIT,
-  MAX_ROCK_YIELD_KG,
-  MIN_ROCK_YIELD_KG,
-} from '../constants'
+import { BOLT_DAMAGE_KG_PER_HIT, MAX_ROCK_YIELD_KG, MIN_ROCK_YIELD_KG } from '../constants'
 import type { MineralEntry } from '@/lib/asteroids/types'
 
 const COMPOSITION: MineralEntry[] = [

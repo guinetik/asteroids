@@ -15,17 +15,11 @@ import { getItemDefinition } from '@/lib/inventory/catalog'
 import { getCurrentTurretMiningChargeMultiplier, getCurrentUpgradeValue } from '@/lib/upgrades'
 import type { ThrusterRuntimeModifiers, ShuttleThrusterName } from '@/lib/physics/thrusterSystem'
 import { TurretSession, type TurretSessionTickInput, type TurretPhase } from './TurretSession'
-import {
-  TurretYieldCoordinator,
-  type TurretInstanceHandle,
-} from './TurretYieldCoordinator'
+import { TurretYieldCoordinator, type TurretInstanceHandle } from './TurretYieldCoordinator'
 import { createTurretAimState, tickTurretAim, type TurretAimState } from './TurretAimState'
 import { raycastBeam, type BeamTargetInstance } from './TurretBeamSystem'
 import { pickTier } from './turretTiers'
-import {
-  TURRET_BEAM_DPS,
-  TURRET_BEAM_MAX_RANGE,
-} from './turretConstants'
+import { TURRET_BEAM_DPS, TURRET_BEAM_MAX_RANGE } from './turretConstants'
 import {
   COMPOSITION_TINT_SEED,
   getCompositionTintColor,
@@ -373,8 +367,7 @@ export class TurretSessionController {
     const thrusterSystem = this.deps.shuttleController.thrusterSystem
     const modifiers = this.buildThrusterModifiers()
     const turretState = thrusterSystem.getState('turretMining' as ShuttleThrusterName)
-    const chargeRatio =
-      turretState.capacity > 0 ? turretState.charge / turretState.capacity : 0
+    const chargeRatio = turretState.capacity > 0 ? turretState.charge / turretState.capacity : 0
     if (this.overheatLocked && chargeRatio >= TurretSessionController.RELOCK_RATIO) {
       this.overheatLocked = false
     }
@@ -401,9 +394,9 @@ export class TurretSessionController {
       const length = hit?.distance ?? TURRET_BEAM_MAX_RANGE
       const impactInset = hit
         ? Math.min(
-          Math.max((this.coordinator.resolveInstance(hit.spawnIndex)?.radius ?? 0) * 0.35, 0.12),
-          0.75,
-        )
+            Math.max((this.coordinator.resolveInstance(hit.spawnIndex)?.radius ?? 0) * 0.35, 0.12),
+            0.75,
+          )
         : 0
       this.rig.showBeam(length, impactInset)
       if (hit && this.yieldSystem) {
@@ -433,8 +426,8 @@ export class TurretSessionController {
       ? `OVERHEATED - COOL TO ${Math.round(TurretSessionController.RELOCK_RATIO * 100)}%`
       : !this.beamLatched && this.firing && !thresholdReady
         ? `CHARGE ${Math.round(chargeRatio * 100)}% / ${Math.round(
-          TurretSessionController.RELOCK_RATIO * 100,
-        )}%`
+            TurretSessionController.RELOCK_RATIO * 100,
+          )}%`
         : null
     this.deps.onHudState?.({
       phase: this.session.phase,
@@ -483,7 +476,10 @@ export class TurretSessionController {
     if (this.sparkBurstCooldown > 0) return
     this.sparkBurstCooldown = TurretSessionController.IMPACT_SPARK_INTERVAL_SEC
 
-    this.impactPos.copy(this.rayDir).multiplyScalar(length + impactInset).add(this.rayOrigin)
+    this.impactPos
+      .copy(this.rayDir)
+      .multiplyScalar(length + impactInset)
+      .add(this.rayOrigin)
     this.impactRight.crossVectors(this.rayDir, THREE.Object3D.DEFAULT_UP)
     if (this.impactRight.lengthSq() < 1e-4) {
       this.impactRight.set(1, 0, 0)

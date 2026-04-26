@@ -7,11 +7,7 @@
  * @date 2026-04-20
  * @spec docs/superpowers/specs/2026-04-20-relay-repair-design.md
  */
-import {
-  IDEAL_PATH_LENGTH,
-  QUALITY_CAP_WITHOUT_SINK,
-  QUALITY_SCALE,
-} from './constants'
+import { IDEAL_PATH_LENGTH, QUALITY_CAP_WITHOUT_SINK, QUALITY_SCALE } from './constants'
 
 /**
  * Compute signal quality in [0, 1]. Returns 1 when the wave reaches the
@@ -24,8 +20,5 @@ import {
  */
 export function computeQuality(activeCellCount: number, sinkReached: boolean): number {
   if (sinkReached) return 1
-  return Math.min(
-    QUALITY_CAP_WITHOUT_SINK,
-    (activeCellCount / IDEAL_PATH_LENGTH) * QUALITY_SCALE,
-  )
+  return Math.min(QUALITY_CAP_WITHOUT_SINK, (activeCellCount / IDEAL_PATH_LENGTH) * QUALITY_SCALE)
 }

@@ -159,7 +159,7 @@ export function loadMissionBoard(): ShuttleMissionBoard | null {
       offeringAsteroidPlanet:
         typeof board.offeringAsteroidPlanet === 'string'
           ? board.offeringAsteroidPlanet
-          : board.offeredAsteroidMission?.originPlanetId ?? null,
+          : (board.offeredAsteroidMission?.originPlanetId ?? null),
       activeAsteroidMission: board.activeAsteroidMission ?? null,
       offeredEvaMission: board.offeredEvaMission ?? null,
       offeringEvaPlanet: board.offeringEvaPlanet ?? null,
@@ -233,32 +233,34 @@ export function loadCompletedEvaSites(): CompletedEvaSite[] {
       const candidate = entry as Record<string, unknown>
       const waypoint = candidate.waypoint
       if (
-        typeof candidate.key !== 'string'
-        || typeof candidate.poiType !== 'string'
-        || waypoint === null
-        || typeof waypoint !== 'object'
-        || Array.isArray(waypoint)
+        typeof candidate.key !== 'string' ||
+        typeof candidate.poiType !== 'string' ||
+        waypoint === null ||
+        typeof waypoint !== 'object' ||
+        Array.isArray(waypoint)
       ) {
         return []
       }
       const wp = waypoint as Record<string, unknown>
       if (
-        typeof wp.worldX !== 'number'
-        || typeof wp.worldZ !== 'number'
-        || typeof wp.poiLocalY !== 'number'
+        typeof wp.worldX !== 'number' ||
+        typeof wp.worldZ !== 'number' ||
+        typeof wp.poiLocalY !== 'number'
       ) {
         return []
       }
-      return [{
-        key: candidate.key,
-        poiType: candidate.poiType as EvaMissionPoiType,
-        waypoint: {
-          worldX: wp.worldX,
-          worldZ: wp.worldZ,
-          poiLocalY: wp.poiLocalY,
+      return [
+        {
+          key: candidate.key,
+          poiType: candidate.poiType as EvaMissionPoiType,
+          waypoint: {
+            worldX: wp.worldX,
+            worldZ: wp.worldZ,
+            poiLocalY: wp.poiLocalY,
+          },
+          cleanupArmed: candidate.cleanupArmed === true,
         },
-        cleanupArmed: candidate.cleanupArmed === true,
-      }]
+      ]
     })
   } catch {
     return []

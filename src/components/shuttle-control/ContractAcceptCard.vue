@@ -159,7 +159,9 @@ const headerLabel = computed(() => {
         :data-state="entry.state"
       >
         <span class="contract-accept-card__step-marker" aria-hidden="true">{{ entry.marker }}</span>
-        <span class="contract-accept-card__step-label">{{ entry.index + 1 }}. {{ entry.label }}</span>
+        <span class="contract-accept-card__step-label"
+          >{{ entry.index + 1 }}. {{ entry.label }}</span
+        >
         <span v-if="entry.progressLabel" class="contract-accept-card__step-progress">
           {{ entry.progressLabel }}
         </span>
@@ -199,13 +201,17 @@ const headerLabel = computed(() => {
         </button>
       </template>
       <template v-else-if="status === 'active'">
-        <span class="contract-accept-card__pill contract-accept-card__pill--active">In progress</span>
+        <span class="contract-accept-card__pill contract-accept-card__pill--active"
+          >In progress</span
+        >
       </template>
       <template v-else-if="status === 'completed'">
         <span class="contract-accept-card__pill contract-accept-card__pill--done">Completed</span>
       </template>
       <template v-else-if="status === 'declined'">
-        <span class="contract-accept-card__pill contract-accept-card__pill--declined">Declined</span>
+        <span class="contract-accept-card__pill contract-accept-card__pill--declined"
+          >Declined</span
+        >
       </template>
     </footer>
   </section>

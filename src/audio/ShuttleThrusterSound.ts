@@ -57,7 +57,14 @@ export class ShuttleThrusterSound {
     this.pan = damp(this.pan, panTarget, response * 1.2)
 
     automateParam(outputGain.gain, frame.sfxVolume, now, 0.04, 0.0001, 1)
-    automateParam(rcsNoiseGain.gain, 0.025 + this.rcsLevel * (0.18 + angularNorm * 0.08), now, 0.03, 0.0001, 1)
+    automateParam(
+      rcsNoiseGain.gain,
+      0.025 + this.rcsLevel * (0.18 + angularNorm * 0.08),
+      now,
+      0.03,
+      0.0001,
+      1,
+    )
     automateParam(airNoiseGain.gain, 0.0001 + airLevel * 0.04, now, 0.04, 0.0001, 1)
 
     automateParam(toneOsc.frequency, 210 + rcsTarget * 120 + angularNorm * 85, now, 0.05, 90, 720)

@@ -59,9 +59,7 @@ export class GravityRing {
       const localZ = Math.sin(angle) * this.radius
       const wx = parentX + localX
       const wz = parentZ + localZ
-      const wy = this.spaceTimeGrid
-        ? -this.spaceTimeGrid.getDepthAt(wx, wz) + 0.5
-        : 0.5
+      const wy = this.spaceTimeGrid ? -this.spaceTimeGrid.getDepthAt(wx, wz) + 0.5 : 0.5
 
       // Positions relative to parent
       positions[i * 3] = localX

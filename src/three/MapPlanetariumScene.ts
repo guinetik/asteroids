@@ -33,7 +33,10 @@ export interface MapPlanetariumSceneRefs {
 export class MapPlanetariumScene {
   private refs: MapPlanetariumSceneRefs | null = null
 
-  async initialize(canvas: HTMLCanvasElement, renderCamera: THREE.PerspectiveCamera): Promise<MapPlanetariumSceneRefs> {
+  async initialize(
+    canvas: HTMLCanvasElement,
+    renderCamera: THREE.PerspectiveCamera,
+  ): Promise<MapPlanetariumSceneRefs> {
     const sceneObjects = createMapScene(canvas)
     const scene = sceneObjects.scene
 

@@ -72,7 +72,11 @@ export class SurfaceDustController {
   private readonly driftPoolSize: number
 
   constructor(ctx: AtmosphereContext) {
-    const dustColor = new THREE.Color(ctx.baseColor[0], ctx.baseColor[1], ctx.baseColor[2]).multiplyScalar(1.3)
+    const dustColor = new THREE.Color(
+      ctx.baseColor[0],
+      ctx.baseColor[1],
+      ctx.baseColor[2],
+    ).multiplyScalar(1.3)
 
     const driftCount = Math.max(DRIFT_MIN_COUNT, Math.round(DRIFT_BASE_COUNT * ctx.dustCoverage))
     this.driftPoolSize = driftCount
@@ -95,7 +99,12 @@ export class SurfaceDustController {
     })
 
     // Drift direction from sun (solar radiation pressure pushes away from sun)
-    this.driftDirection.copy(ctx.sunDirection).negate().setY(0).normalize().multiplyScalar(DRIFT_SPEED)
+    this.driftDirection
+      .copy(ctx.sunDirection)
+      .negate()
+      .setY(0)
+      .normalize()
+      .multiplyScalar(DRIFT_SPEED)
   }
 
   /** Add emitters to scene. */
@@ -183,7 +192,9 @@ export class SurfaceDustController {
    * This is a velocity bias, not a physics simulation.
    */
   private pushParticlesFromWash(ctx: AtmosphereContext): void {
-    const posAttr = this.driftEmitter.points.geometry.getAttribute('position') as THREE.BufferAttribute
+    const posAttr = this.driftEmitter.points.geometry.getAttribute(
+      'position',
+    ) as THREE.BufferAttribute
     const count = posAttr.count
     for (let i = 0; i < count; i++) {
       const px = posAttr.getX(i)

@@ -95,8 +95,10 @@ describe('generateTerrain', () => {
   it('rocky surface has more height variation than icy surface', () => {
     const rocky = generateTerrain(ROCKY_SURFACE, { seed: 42, resolution: 64, worldSize: 500 })
     const icy = generateTerrain(ICY_SURFACE, { seed: 42, resolution: 64, worldSize: 500 })
-    let rockyMin = Infinity, rockyMax = -Infinity
-    let icyMin = Infinity, icyMax = -Infinity
+    let rockyMin = Infinity,
+      rockyMax = -Infinity
+    let icyMin = Infinity,
+      icyMax = -Infinity
     for (let i = 0; i < rocky.grid.length; i++) {
       rockyMin = Math.min(rockyMin, rocky.grid[i]!)
       rockyMax = Math.max(rockyMax, rocky.grid[i]!)
@@ -107,11 +109,20 @@ describe('generateTerrain', () => {
   })
 
   it('high craterDensity produces more negative heights (bowls)', () => {
-    const highCraters: SurfaceFeatures = { ...ROCKY_SURFACE, craterDensity: 0.9, craterMaxScale: 0.4 }
-    const lowCraters: SurfaceFeatures = { ...ROCKY_SURFACE, craterDensity: 0.1, craterMaxScale: 0.05 }
+    const highCraters: SurfaceFeatures = {
+      ...ROCKY_SURFACE,
+      craterDensity: 0.9,
+      craterMaxScale: 0.4,
+    }
+    const lowCraters: SurfaceFeatures = {
+      ...ROCKY_SURFACE,
+      craterDensity: 0.1,
+      craterMaxScale: 0.05,
+    }
     const high = generateTerrain(highCraters, { seed: 42, resolution: 64, worldSize: 500 })
     const low = generateTerrain(lowCraters, { seed: 42, resolution: 64, worldSize: 500 })
-    let highNeg = 0, lowNeg = 0
+    let highNeg = 0,
+      lowNeg = 0
     for (let i = 0; i < high.grid.length; i++) {
       if (high.grid[i]! < -1) highNeg++
       if (low.grid[i]! < -1) lowNeg++
@@ -129,22 +140,29 @@ describe('generateTerrain', () => {
     const dustyMacroRelief = percentileSpan(dustyHm.grid, 0.05, 0.95)
     const exposedMacroRelief = percentileSpan(exposedHm.grid, 0.05, 0.95)
 
-    expect(localRoughness(dustyHm.grid, dustyHm.resolution))
-      .toBeLessThan(localRoughness(exposedHm.grid, exposedHm.resolution))
+    expect(localRoughness(dustyHm.grid, dustyHm.resolution)).toBeLessThan(
+      localRoughness(exposedHm.grid, exposedHm.resolution),
+    )
     expect(dustyMacroRelief).toBeGreaterThan(exposedMacroRelief * DUSTY_RELIEF_RETENTION_RATIO)
   })
 
   it('higher boulderDensity increases local micro-detail without runaway roughness', () => {
     const lowBoulders: SurfaceFeatures = { ...ROCKY_SURFACE, boulderDensity: 0.05, roughness: 0.55 }
-    const highBoulders: SurfaceFeatures = { ...ROCKY_SURFACE, boulderDensity: 0.95, roughness: 0.55 }
+    const highBoulders: SurfaceFeatures = {
+      ...ROCKY_SURFACE,
+      boulderDensity: 0.95,
+      roughness: 0.55,
+    }
 
     const low = generateTerrain(lowBoulders, { seed: 77, resolution: 96, worldSize: 1200 })
     const high = generateTerrain(highBoulders, { seed: 77, resolution: 96, worldSize: 1200 })
 
-    expect(localDetailContrast(high.grid, high.resolution))
-      .toBeGreaterThan(localDetailContrast(low.grid, low.resolution))
-    expect(localRoughness(high.grid, high.resolution))
-      .toBeLessThan(localRoughness(low.grid, low.resolution) * BOULDER_ROUGHNESS_GROWTH_LIMIT)
+    expect(localDetailContrast(high.grid, high.resolution)).toBeGreaterThan(
+      localDetailContrast(low.grid, low.resolution),
+    )
+    expect(localRoughness(high.grid, high.resolution)).toBeLessThan(
+      localRoughness(low.grid, low.resolution) * BOULDER_ROUGHNESS_GROWTH_LIMIT,
+    )
   })
 
   it('roughness increases strong-detail count and local roughness', () => {
@@ -158,8 +176,9 @@ describe('generateTerrain', () => {
     const roughStrong = countAboveAbs(roughHm.grid, MODERATE_DETAIL_HEIGHT)
 
     expect(roughStrong).toBeGreaterThan(smoothStrong)
-    expect(localRoughness(roughHm.grid, roughHm.resolution))
-      .toBeGreaterThan(localRoughness(smoothHm.grid, smoothHm.resolution))
+    expect(localRoughness(roughHm.grid, roughHm.resolution)).toBeGreaterThan(
+      localRoughness(smoothHm.grid, smoothHm.resolution),
+    )
   })
 
   it('biome changes filler distribution without changing deterministic seeding', () => {
@@ -204,10 +223,12 @@ describe('generateTerrain', () => {
       biome: 'volcanic',
     })
 
-    expect(localRoughness(sandy.grid, sandy.resolution))
-      .toBeLessThan(localRoughness(rockyA.grid, rockyA.resolution))
-    expect(localRoughness(volcanicA.grid, volcanicA.resolution))
-      .toBeGreaterThan(localRoughness(sandy.grid, sandy.resolution))
+    expect(localRoughness(sandy.grid, sandy.resolution)).toBeLessThan(
+      localRoughness(rockyA.grid, rockyA.resolution),
+    )
+    expect(localRoughness(volcanicA.grid, volcanicA.resolution)).toBeGreaterThan(
+      localRoughness(sandy.grid, sandy.resolution),
+    )
     expect(neutralA.heightAt(100, -80)).toBe(neutralB.heightAt(100, -80))
     expect(rockyA.heightAt(100, -80)).toBe(rockyB.heightAt(100, -80))
     expect(volcanicA.heightAt(100, -80)).toBe(volcanicB.heightAt(100, -80))

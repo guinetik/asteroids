@@ -67,9 +67,9 @@ export function hasLevelRouteQueryOverrideFromSearchParams(params: URLSearchPara
 
   const difficulty = Number(rawDifficulty)
   if (
-    !Number.isInteger(difficulty)
-    || difficulty < LEVEL_ROUTE_DIFFICULTY_MIN
-    || difficulty > LEVEL_ROUTE_DIFFICULTY_MAX
+    !Number.isInteger(difficulty) ||
+    difficulty < LEVEL_ROUTE_DIFFICULTY_MIN ||
+    difficulty > LEVEL_ROUTE_DIFFICULTY_MAX
   ) {
     return false
   }

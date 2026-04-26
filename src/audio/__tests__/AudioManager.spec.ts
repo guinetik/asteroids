@@ -440,9 +440,9 @@ describe('AudioManager', () => {
     m.applyCategoryState('ui', { volume: 0.5 })
     m.play('ui.click')
     expect(mockHowlVolume).toHaveBeenCalledTimes(3)
-    expect(mockHowlVolume).toHaveBeenNthCalledWith(1, 0.35, 1)   // first play at full vol
-    expect(mockHowlVolume).toHaveBeenNthCalledWith(2, 0.175, 1)  // refresh first instance to new vol
-    expect(mockHowlVolume).toHaveBeenNthCalledWith(3, 0.175, 2)  // second play at new vol
+    expect(mockHowlVolume).toHaveBeenNthCalledWith(1, 0.35, 1) // first play at full vol
+    expect(mockHowlVolume).toHaveBeenNthCalledWith(2, 0.175, 1) // refresh first instance to new vol
+    expect(mockHowlVolume).toHaveBeenNthCalledWith(3, 0.175, 2) // second play at new vol
   })
 
   it('applies distinct per-play volume overrides per Howl play id on shared cached Howls', () => {
@@ -690,9 +690,7 @@ describe('AudioManager', () => {
     expect(mockCreateBiquadFilter).toHaveBeenCalledTimes(2)
     expect(mockCreateWaveShaper).toHaveBeenCalledTimes(1)
     const h = getLastMockHowl() as unknown as {
-      _soundById?: (
-        id: number,
-      ) => {
+      _soundById?: (id: number) => {
         _node: { disconnect: ReturnType<typeof vi.fn>; connect: ReturnType<typeof vi.fn> }
       } | null
     }
@@ -727,9 +725,7 @@ describe('AudioManager', () => {
       disconnect: vi.fn(),
     }))
     manager.unlock()
-    expect(() =>
-      manager.play('voice.comms', { src: '/comms/chain-fail.mp3' }),
-    ).not.toThrow()
+    expect(() => manager.play('voice.comms', { src: '/comms/chain-fail.mp3' })).not.toThrow()
   })
 
   it('releases the effect chain and reconnects the gain to the master bus when voice ends', () => {

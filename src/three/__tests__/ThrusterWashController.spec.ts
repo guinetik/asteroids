@@ -21,6 +21,8 @@ describe('ThrusterWashController', () => {
     expect(positionAttr.count).toBeGreaterThan(200)
     expect(baseSize).toBeLessThan(2.5)
     expect(opacity).toBeGreaterThan(0.35)
-    expect(Math.max(color.x, color.y, color.z) - Math.min(color.x, color.y, color.z)).toBeLessThan(0.08)
+    expect(Math.max(color.x, color.y, color.z) - Math.min(color.x, color.y, color.z)).toBeLessThan(
+      0.08,
+    )
   })
 })

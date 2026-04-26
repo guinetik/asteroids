@@ -120,11 +120,7 @@ export class TurretRigController {
       TURRET_LIGHT_PENUMBRA,
       TURRET_LIGHT_DECAY,
     )
-    this.workLight.position.set(
-      TURRET_LIGHT_X_OFFSET,
-      TURRET_LIGHT_Y_OFFSET,
-      TURRET_LIGHT_Z_OFFSET,
-    )
+    this.workLight.position.set(TURRET_LIGHT_X_OFFSET, TURRET_LIGHT_Y_OFFSET, TURRET_LIGHT_Z_OFFSET)
     this.workLight.layers.set(TURRET_MINING_LIGHT_LAYER)
     this.workLightTarget = new THREE.Object3D()
     this.workLightTarget.position.set(0, 0, -TURRET_LIGHT_TARGET_DISTANCE)
@@ -243,12 +239,28 @@ export class TurretRigController {
     const midZ = BEAM_MUZZLE_OFFSET.z - clamped * 0.5
     this.beamGroup.visible = true
     this.setRibbonLength(this.glowHorizontal, BEAM_GLOW_WIDTH * pulse, clamped, midZ, 'horizontal')
-    this.setRibbonLength(this.glowVertical, BEAM_GLOW_WIDTH * 0.72 * pulse, clamped, midZ, 'vertical')
+    this.setRibbonLength(
+      this.glowVertical,
+      BEAM_GLOW_WIDTH * 0.72 * pulse,
+      clamped,
+      midZ,
+      'vertical',
+    )
     this.setRibbonLength(this.coreHorizontal, BEAM_CORE_WIDTH * pulse, clamped, midZ, 'horizontal')
-    this.setRibbonLength(this.coreVertical, BEAM_CORE_WIDTH * 0.72 * pulse, clamped, midZ, 'vertical')
+    this.setRibbonLength(
+      this.coreVertical,
+      BEAM_CORE_WIDTH * 0.72 * pulse,
+      clamped,
+      midZ,
+      'vertical',
+    )
     this.glowMaterial.opacity = 0.34 * pulse
     this.coreMaterial.opacity = 0.9 + (pulse - 0.9) * 0.4
-    this.hitFlash.position.set(BEAM_MUZZLE_OFFSET.x, BEAM_MUZZLE_OFFSET.y, BEAM_MUZZLE_OFFSET.z - clamped)
+    this.hitFlash.position.set(
+      BEAM_MUZZLE_OFFSET.x,
+      BEAM_MUZZLE_OFFSET.y,
+      BEAM_MUZZLE_OFFSET.z - clamped,
+    )
     this.hitFlash.scale.setScalar(BEAM_HIT_FLASH_SCALE * (0.9 + pulse * 0.35))
     this.hitFlashMaterial.opacity = 0.72 * pulse
     this.muzzleFlash.scale.setScalar(BEAM_MUZZLE_FLASH_SCALE * (0.95 + pulse * 0.3))

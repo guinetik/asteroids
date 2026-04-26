@@ -105,8 +105,7 @@ export function gravitySurfDirectionFromHeading(
   axis: GravitySurfRailAxis,
   heading: number,
 ): number {
-  const forward = new THREE.Vector3(1, 0, 0)
-    .applyAxisAngle(new THREE.Vector3(0, 1, 0), heading)
+  const forward = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), heading)
   const component = axis === 'x' ? forward.x : forward.z
   return component >= 0 ? 1 : -1
 }
@@ -118,7 +117,5 @@ export function gravitySurfVelocityVector(
   axis: GravitySurfRailAxis,
   signedSpeed: number,
 ): THREE.Vector3 {
-  return axis === 'x'
-    ? new THREE.Vector3(signedSpeed, 0, 0)
-    : new THREE.Vector3(0, 0, signedSpeed)
+  return axis === 'x' ? new THREE.Vector3(signedSpeed, 0, 0) : new THREE.Vector3(0, 0, signedSpeed)
 }

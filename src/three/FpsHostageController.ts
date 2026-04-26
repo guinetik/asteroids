@@ -14,11 +14,7 @@ import type { Tickable } from '@/lib/Tickable'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import type { EnemyProjectileSystem } from '@/lib/fps/enemyProjectileSystem'
-import {
-  Hostage,
-  HOSTAGE_DEFAULT_HIT_RADIUS,
-  HOSTAGE_HIT_CENTER_Y,
-} from '@/lib/fps/hostage'
+import { Hostage, HOSTAGE_DEFAULT_HIT_RADIUS, HOSTAGE_HIT_CENTER_Y } from '@/lib/fps/hostage'
 
 import { HostageModel } from './HostageModel'
 
@@ -64,15 +60,9 @@ function computeHostageHpBarLocalY(hostageRoot: THREE.Group): number {
   if (box.isEmpty()) {
     return HP_BAR_FALLBACK_LOCAL_Y
   }
-  _barTopScratch.set(
-    (box.min.x + box.max.x) * 0.5,
-    box.max.y,
-    (box.min.z + box.max.z) * 0.5,
-  )
+  _barTopScratch.set((box.min.x + box.max.x) * 0.5, box.max.y, (box.min.z + box.max.z) * 0.5)
   hostageRoot.worldToLocal(_barTopScratch)
-  return (
-    _barTopScratch.y + HP_BAR_CLEARANCE_ABOVE_MESH + HP_BAR_SPRITE_H * 0.5
-  )
+  return _barTopScratch.y + HP_BAR_CLEARANCE_ABOVE_MESH + HP_BAR_SPRITE_H * 0.5
 }
 
 /** Fallback when the rig has no mesh child or empty bounds. */
@@ -433,7 +423,12 @@ export class FpsHostageController implements Tickable {
     this.clear()
   }
 
-  private async spawnAtPosition(x: number, z: number, yaw?: number, animateReveal = false): Promise<void> {
+  private async spawnAtPosition(
+    x: number,
+    z: number,
+    yaw?: number,
+    animateReveal = false,
+  ): Promise<void> {
     const y = this.heightmap.heightAt(x, z)
     const model = await HostageModel.create()
     model.placeAt(x, y, z)

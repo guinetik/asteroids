@@ -74,14 +74,35 @@ export class InertialDampenerSound {
       automateParam(energyGain.gain, 0.0001 + (0.008 + ratio * 0.02) * gate, now, 0.02, 0.0001, 1)
 
       automateParam(subOsc.frequency, lerp(40, 62, ratio), now, 0.025, 32, 90)
-      automateParam(subGain.gain, 0.0001 + (0.2 + ratio * 0.13) * (0.45 + pulse * 0.55 + impactBoost), now, 0.015, 0.0001, 1)
+      automateParam(
+        subGain.gain,
+        0.0001 + (0.2 + ratio * 0.13) * (0.45 + pulse * 0.55 + impactBoost),
+        now,
+        0.015,
+        0.0001,
+        1,
+      )
 
       automateParam(bodyOsc.frequency, 50, now, 0.035, 40, 120)
       automateParam(bodyFilter.frequency, lerp(74, 180, ratio), now, 0.035, 60, 1000)
-      automateParam(bodyGain.gain, 0.0001 + (0.13 + ratio * 0.16) * (0.5 + pulse * 0.5 + impactBoost * 0.65), now, 0.018, 0.0001, 1)
+      automateParam(
+        bodyGain.gain,
+        0.0001 + (0.13 + ratio * 0.16) * (0.5 + pulse * 0.5 + impactBoost * 0.65),
+        now,
+        0.018,
+        0.0001,
+        1,
+      )
 
       automateParam(gritPreGain.gain, 0.12 + decelNorm * 0.3 + ratio * 0.08, now, 0.018, 0.0001, 1)
-      automateParam(gritGain.gain, 0.0001 + (0.03 + decelNorm * 0.08) * (0.4 + pulse * 0.6), now, 0.018, 0.0001, 1)
+      automateParam(
+        gritGain.gain,
+        0.0001 + (0.03 + decelNorm * 0.08) * (0.4 + pulse * 0.6),
+        now,
+        0.018,
+        0.0001,
+        1,
+      )
 
       if (currentVelocity <= 0.35 || ratio <= 0.03) {
         this.active = false

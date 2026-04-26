@@ -31,26 +31,34 @@ describe('PLANETS', () => {
   })
 
   it('has unique ids', () => {
-    const ids = PLANETS.map(p => p.id)
+    const ids = PLANETS.map((p) => p.id)
     expect(new Set(ids).size).toBe(ids.length)
   })
 
   it('has the correct id sequence [mercury..pluto]', () => {
     const expectedIds = [
-      'mercury', 'venus', 'earth', 'mars', 'ceres',
-      'jupiter', 'saturn', 'uranus', 'neptune', 'pluto',
+      'mercury',
+      'venus',
+      'earth',
+      'mars',
+      'ceres',
+      'jupiter',
+      'saturn',
+      'uranus',
+      'neptune',
+      'pluto',
     ]
-    expect(PLANETS.map(p => p.id)).toEqual(expectedIds)
+    expect(PLANETS.map((p) => p.id)).toEqual(expectedIds)
   })
 
   it('has orbital angles in radians (Earth argumentOfPeriapsis ~1.797 rad, not ~102 deg)', () => {
-    const earth = PLANETS.find(p => p.id === 'earth')!
+    const earth = PLANETS.find((p) => p.id === 'earth')!
     expect(earth.orbit.argumentOfPeriapsis).toBeCloseTo(1.797, 2)
     expect(earth.orbit.argumentOfPeriapsis).toBeLessThan(Math.PI * 2)
   })
 
   it('has axial tilt in radians (Earth ~0.409 rad, not ~23.44 deg)', () => {
-    const earth = PLANETS.find(p => p.id === 'earth')!
+    const earth = PLANETS.find((p) => p.id === 'earth')!
     expect(earth.axialTilt).toBeCloseTo(0.409, 2)
     expect(earth.axialTilt).toBeLessThan(Math.PI * 2)
   })
@@ -68,21 +76,21 @@ describe('PLANETS', () => {
   })
 
   it('Saturn has a ring with positive innerRadius', () => {
-    const saturn = PLANETS.find(p => p.id === 'saturn')!
+    const saturn = PLANETS.find((p) => p.id === 'saturn')!
     expect(saturn.ring).toBeDefined()
     expect(saturn.ring!.innerRadius).toBeGreaterThan(0)
   })
 
   it('Earth has 1 moon named "Moon"', () => {
-    const earth = PLANETS.find(p => p.id === 'earth')!
+    const earth = PLANETS.find((p) => p.id === 'earth')!
     expect(earth.moons).toHaveLength(1)
     expect(earth.moons[0]!.name).toBe('Moon')
   })
 
   it('Jupiter has 4 moons: Io, Europa, Ganymede, Callisto', () => {
-    const jupiter = PLANETS.find(p => p.id === 'jupiter')!
+    const jupiter = PLANETS.find((p) => p.id === 'jupiter')!
     expect(jupiter.moons).toHaveLength(4)
-    const moonNames = jupiter.moons.map(m => m.name)
+    const moonNames = jupiter.moons.map((m) => m.name)
     expect(moonNames).toContain('Io')
     expect(moonNames).toContain('Europa')
     expect(moonNames).toContain('Ganymede')
@@ -108,7 +116,7 @@ describe('ASTEROID_BELTS', () => {
   })
 
   it('contains main-belt and kuiper-belt', () => {
-    const ids = ASTEROID_BELTS.map(b => b.id)
+    const ids = ASTEROID_BELTS.map((b) => b.id)
     expect(ids).toContain('main-belt')
     expect(ids).toContain('kuiper-belt')
   })

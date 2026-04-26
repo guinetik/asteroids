@@ -12,7 +12,13 @@ import type { ItemDefinition, ItemCategory } from './types'
 
 import itemsData from '@/data/inventory/items.json'
 
-const VALID_CATEGORIES = new Set<string>(['mineral', 'consumable', 'equipment', 'trade-good', 'mission-material'])
+const VALID_CATEGORIES = new Set<string>([
+  'mineral',
+  'consumable',
+  'equipment',
+  'trade-good',
+  'mission-material',
+])
 
 /** Validates a single item row from JSON; throws if any invariant is violated. */
 function validateItem(item: ItemDefinition): ItemDefinition {

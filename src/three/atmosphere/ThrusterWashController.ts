@@ -111,8 +111,10 @@ export class ThrusterWashController {
 
   constructor(baseColor: [number, number, number]) {
     // ── Dust emitter ──
-    const dustColor = new THREE.Color(baseColor[0], baseColor[1], baseColor[2])
-      .lerp(new THREE.Color(0.62, 0.62, 0.62), 0.7)
+    const dustColor = new THREE.Color(baseColor[0], baseColor[1], baseColor[2]).lerp(
+      new THREE.Color(0.62, 0.62, 0.62),
+      0.7,
+    )
     this.dustEmitter = new ParticleEmitter({
       poolSize: DUST_POOL_SIZE,
       color: dustColor,
@@ -177,7 +179,10 @@ export class ThrusterWashController {
       ? 1 -
         Math.max(
           0,
-          Math.min(1, (landerAltitude - WASH_FULL_ALTITUDE) / (WASH_MAX_ALTITUDE - WASH_FULL_ALTITUDE)),
+          Math.min(
+            1,
+            (landerAltitude - WASH_FULL_ALTITUDE) / (WASH_MAX_ALTITUDE - WASH_FULL_ALTITUDE),
+          ),
         )
       : 0
     const intensity = landerThrust * altFactor
@@ -188,7 +193,8 @@ export class ThrusterWashController {
     // ── Dust particles ──
     this.dustEmitter.tick(dt)
     if (active && intensity > 0) {
-      const spawnRate = DUST_MIN_SPAWN_RATE + (DUST_MAX_SPAWN_RATE - DUST_MIN_SPAWN_RATE) * intensity
+      const spawnRate =
+        DUST_MIN_SPAWN_RATE + (DUST_MAX_SPAWN_RATE - DUST_MIN_SPAWN_RATE) * intensity
       this.dustSpawnAccumulator += spawnRate * dt
       while (this.dustSpawnAccumulator >= 1) {
         this.dustSpawnAccumulator -= 1

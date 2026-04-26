@@ -101,7 +101,6 @@ const CLOUD_TINT_COLORS = [
 
 // ─── Gas cloud GLSL shaders ────────────────────────────────────────────────────
 
-
 // ─── Comet layer constants ─────────────────────────────────────────────────────
 
 /** Number of simultaneous comet streaks. */
@@ -179,7 +178,8 @@ function randomInForwardHemisphere(
   const sinTheta = Math.sin(theta)
 
   out
-    .copy(fwd).multiplyScalar(Math.cos(theta))
+    .copy(fwd)
+    .multiplyScalar(Math.cos(theta))
     .addScaledVector(_right, sinTheta * Math.cos(phi))
     .addScaledVector(_up, sinTheta * Math.sin(phi))
     .multiplyScalar(radius)
@@ -484,7 +484,8 @@ class CometLayer {
     const sinT = Math.sin(theta)
 
     comet.velocity
-      .copy(fwd).multiplyScalar(Math.cos(theta))
+      .copy(fwd)
+      .multiplyScalar(Math.cos(theta))
       .addScaledVector(_right, sinT * Math.cos(phi))
       .addScaledVector(_up, sinT * Math.sin(phi))
       .multiplyScalar(speed)

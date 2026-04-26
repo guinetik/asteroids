@@ -260,26 +260,17 @@ export class FpsCamera implements Tickable {
   applyMouseDelta(dx: number, dy: number): void {
     this.yaw -= dx * this.config.sensitivity
     this.pitch -= dy * this.config.sensitivity
-    this.pitch = Math.max(
-      -this.config.pitchClamp,
-      Math.min(this.config.pitchClamp, this.pitch),
-    )
+    this.pitch = Math.max(-this.config.pitchClamp, Math.min(this.config.pitchClamp, this.pitch))
   }
 
   /** Forward direction on the XZ plane (pitch stripped). */
   getForwardXZ(): THREE.Vector2 {
-    return new THREE.Vector2(
-      -Math.sin(this.yaw),
-      -Math.cos(this.yaw),
-    ).normalize()
+    return new THREE.Vector2(-Math.sin(this.yaw), -Math.cos(this.yaw)).normalize()
   }
 
   /** Right direction on the XZ plane. */
   getRightXZ(): THREE.Vector2 {
-    return new THREE.Vector2(
-      Math.cos(this.yaw),
-      -Math.sin(this.yaw),
-    ).normalize()
+    return new THREE.Vector2(Math.cos(this.yaw), -Math.sin(this.yaw)).normalize()
   }
 
   /**
@@ -330,8 +321,12 @@ export class FpsCamera implements Tickable {
     // Roll wobble — proportional to speed AND terrain roughness
     // Flat ground = minimal wobble, rough terrain = more wobble
     const slopeFactor = Math.min(1, this.terrainSlope * 3)
-    const targetRoll = -Math.sin(this.yaw * 2 + performance.now() * 0.003)
-      * this.lateralSpeed * MAX_ROLL_WOBBLE * 0.05 * slopeFactor
+    const targetRoll =
+      -Math.sin(this.yaw * 2 + performance.now() * 0.003) *
+      this.lateralSpeed *
+      MAX_ROLL_WOBBLE *
+      0.05 *
+      slopeFactor
     this.roll += (targetRoll - this.roll) * Math.min(1, ROLL_LERP_SPEED * dt)
 
     // Vertical bob from Y velocity — camera dips/rises with hops
@@ -348,22 +343,21 @@ export class FpsCamera implements Tickable {
     // Subtle terrain tilt — lerp toward a fraction of the player's terrain rotation
     const targetTerrainPitch = this.target.rotation.x * TERRAIN_TILT_FACTOR
     const targetTerrainRoll = this.target.rotation.z * TERRAIN_TILT_FACTOR
-    this.terrainPitch += (targetTerrainPitch - this.terrainPitch)
-      * Math.min(1, TERRAIN_TILT_LERP_SPEED * dt)
-    this.terrainRoll += (targetTerrainRoll - this.terrainRoll)
-      * Math.min(1, TERRAIN_TILT_LERP_SPEED * dt)
+    this.terrainPitch +=
+      (targetTerrainPitch - this.terrainPitch) * Math.min(1, TERRAIN_TILT_LERP_SPEED * dt)
+    this.terrainRoll +=
+      (targetTerrainRoll - this.terrainRoll) * Math.min(1, TERRAIN_TILT_LERP_SPEED * dt)
 
     // Apply yaw + pitch + roll + terrain tilt
-    this.euler.set(
-      this.pitch + this.terrainPitch,
-      this.yaw,
-      this.roll + this.terrainRoll,
-    )
+    this.euler.set(this.pitch + this.terrainPitch, this.yaw, this.roll + this.terrainRoll)
     this.camera.quaternion.setFromEuler(this.euler)
     this.helmetLightRig.position.copy(this.camera.position)
     this.helmetLightRig.quaternion.copy(this.camera.quaternion)
 
-    const beamDirection = this.helmetLightTarget.position.clone().sub(this.helmetLight.position).normalize()
+    const beamDirection = this.helmetLightTarget.position
+      .clone()
+      .sub(this.helmetLight.position)
+      .normalize()
     this.helmetLightCone.position.copy(this.helmetLight.position)
     this.helmetLightCone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), beamDirection)
   }

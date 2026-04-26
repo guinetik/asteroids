@@ -6,7 +6,12 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MessageSystem } from '@/lib/messages/messageSystem'
-import { ContractSystem, contractIntroMessageId, contractStepMessageId, contractCompletionMessageId } from '../ContractSystem'
+import {
+  ContractSystem,
+  contractIntroMessageId,
+  contractStepMessageId,
+  contractCompletionMessageId,
+} from '../ContractSystem'
 import type {
   Contract,
   ContractStoreSnapshot,
@@ -160,9 +165,7 @@ const messageTriggerContract: Contract = {
   triggerOnMessageArchived: 'jay-first-slingshot-contracts',
   introSubject: 'Stub',
   introBody: ['body'],
-  steps: [
-    { kind: 'visit-planet', planetId: 'earth', subject: 's', flavor: ['f'] },
-  ],
+  steps: [{ kind: 'visit-planet', planetId: 'earth', subject: 's', flavor: ['f'] }],
   completionSubject: 'Done',
   completionBody: ['d'],
   rewards: [],
@@ -221,13 +224,10 @@ function createHarness(
   }
   const granted: RewardEffect[] = []
 
-  const messages = new MessageSystem(
-    [triggerMessage],
-    {
-      load: () => ({}),
-      save: () => {},
-    },
-  )
+  const messages = new MessageSystem([triggerMessage], {
+    load: () => ({}),
+    save: () => {},
+  })
 
   const contracts = new ContractSystem(
     contractList,
@@ -327,10 +327,16 @@ describe('ContractSystem offer triggers (first mission & first asteroid)', () =>
   it('does not re-offer USC after the first asteroid', () => {
     const { contracts } = createHarness()
     contracts.notifyMissionCompleted({
-      kind: 'asteroid', giverPlanetId: null, giverId: 'jay', targetPlanetId: null,
+      kind: 'asteroid',
+      giverPlanetId: null,
+      giverId: 'jay',
+      targetPlanetId: null,
     })
     contracts.notifyMissionCompleted({
-      kind: 'asteroid', giverPlanetId: null, giverId: 'jay', targetPlanetId: null,
+      kind: 'asteroid',
+      giverPlanetId: null,
+      giverId: 'jay',
+      targetPlanetId: null,
     })
     const instance = contracts.getInstance(uscContract.id)
     expect(instance?.status).toBe('available')
@@ -407,12 +413,18 @@ describe('ContractSystem.advanceStep — complete-missions', () => {
     const { contracts } = createHarness()
     offerCowboys(contracts)
     contracts.notifyMissionCompleted({
-      kind: 'shuttle', giverPlanetId: 'earth', giverId: null, targetPlanetId: 'mars',
+      kind: 'shuttle',
+      giverPlanetId: 'earth',
+      giverId: null,
+      targetPlanetId: 'mars',
     })
     expect(contracts.getInstance(cowboysContract.id)?.stepCounters[0]).toBe(0)
     contracts.acceptContract(cowboysContract.id)
     contracts.notifyMissionCompleted({
-      kind: 'shuttle', giverPlanetId: 'earth', giverId: null, targetPlanetId: 'mars',
+      kind: 'shuttle',
+      giverPlanetId: 'earth',
+      giverId: null,
+      targetPlanetId: 'mars',
     })
     expect(contracts.getInstance(cowboysContract.id)?.stepCounters[0]).toBe(1)
   })
@@ -423,7 +435,10 @@ describe('ContractSystem.advanceStep — complete-missions', () => {
     contracts.acceptContract(cowboysContract.id)
     for (let i = 0; i < 3; i++) {
       contracts.notifyMissionCompleted({
-        kind: 'shuttle', giverPlanetId: 'earth', giverId: null, targetPlanetId: 'mars',
+        kind: 'shuttle',
+        giverPlanetId: 'earth',
+        giverId: null,
+        targetPlanetId: 'mars',
       })
     }
     expect(contracts.getInstance(cowboysContract.id)?.currentStepIndex).toBe(1)
@@ -440,7 +455,10 @@ describe('ContractSystem.advanceStep — install-upgrade and visit-planet', () =
     contracts.acceptContract(cowboysContract.id)
     for (let i = 0; i < 3; i++) {
       contracts.notifyMissionCompleted({
-        kind: 'shuttle', giverPlanetId: 'earth', giverId: null, targetPlanetId: 'mars',
+        kind: 'shuttle',
+        giverPlanetId: 'earth',
+        giverId: null,
+        targetPlanetId: 'mars',
       })
     }
     expect(contracts.getInstance(cowboysContract.id)?.currentStepIndex).toBe(1)
@@ -454,7 +472,10 @@ describe('ContractSystem.advanceStep — install-upgrade and visit-planet', () =
     contracts.acceptContract(cowboysContract.id)
     for (let i = 0; i < 3; i++) {
       contracts.notifyMissionCompleted({
-        kind: 'shuttle', giverPlanetId: 'earth', giverId: null, targetPlanetId: 'mars',
+        kind: 'shuttle',
+        giverPlanetId: 'earth',
+        giverId: null,
+        targetPlanetId: 'mars',
       })
     }
     contracts.notifyUpgradeInstalled('shuttleFreezeResistance', 1)
@@ -476,12 +497,18 @@ describe('ContractSystem mission filters', () => {
     contracts.acceptContract(uscContract.id)
 
     contracts.notifyMissionCompleted({
-      kind: 'shuttle', giverPlanetId: 'earth', giverId: null, targetPlanetId: 'mars',
+      kind: 'shuttle',
+      giverPlanetId: 'earth',
+      giverId: null,
+      targetPlanetId: 'mars',
     })
     expect(contracts.getInstance(uscContract.id)?.stepCounters[0]).toBe(0)
 
     contracts.notifyMissionCompleted({
-      kind: 'eva', giverPlanetId: 'earth', giverId: null, targetPlanetId: null,
+      kind: 'eva',
+      giverPlanetId: 'earth',
+      giverId: null,
+      targetPlanetId: null,
     })
     expect(contracts.getInstance(uscContract.id)?.stepCounters[0]).toBe(1)
   })
@@ -491,7 +518,10 @@ describe('ContractSystem mission filters', () => {
     offerCowboysThenUsc(contracts)
     contracts.acceptContract(uscContract.id)
     contracts.notifyMissionCompleted({
-      kind: 'eva', giverPlanetId: 'earth', giverId: null, targetPlanetId: null,
+      kind: 'eva',
+      giverPlanetId: 'earth',
+      giverId: null,
+      targetPlanetId: null,
     })
     contracts.notifyOrbitalMissionCompleted({ giverPlanetId: 'earth', targetPlanetId: 'mars' })
     expect(contracts.getInstance(uscContract.id)?.currentStepIndex).toBe(1)
@@ -640,9 +670,10 @@ describe('ContractSystem deliver-items steps', () => {
     rewards: [{ type: 'fast-travel', planetId: 'mercury' }],
   }
 
-  function buildDeliveryHarness(
-    consumeImpl: (itemId: string, count: number) => boolean,
-  ): { contracts: ContractSystem; consumeCalls: Array<{ itemId: string; count: number }> } {
+  function buildDeliveryHarness(consumeImpl: (itemId: string, count: number) => boolean): {
+    contracts: ContractSystem
+    consumeCalls: Array<{ itemId: string; count: number }>
+  } {
     const consumeCalls: Array<{ itemId: string; count: number }> = []
     const messages = new MessageSystem([triggerMessage], { load: () => ({}), save: () => {} })
     const snapshot = emptyContractSnapshot()
@@ -740,11 +771,10 @@ describe('ContractSystem persistence', () => {
   it('persists snapshot on every change', () => {
     const save = vi.fn()
     const messages = new MessageSystem([triggerMessage], { load: () => ({}), save: () => {} })
-    const sys = new ContractSystem(
-      [cowboysContract],
-      messages,
-      { load: () => emptyContractSnapshot(), save },
-    )
+    const sys = new ContractSystem([cowboysContract], messages, {
+      load: () => emptyContractSnapshot(),
+      save,
+    })
     sys.notifyMissionCompleted(sampleShuttleMission)
     sys.acceptContract(cowboysContract.id)
     expect(save).toHaveBeenCalled()
@@ -754,10 +784,7 @@ describe('ContractSystem persistence', () => {
 describe('onContractCompleted hook', () => {
   it('fires exactly once when a contract transitions from active to completed', () => {
     const completedIds: string[] = []
-    const messages = new MessageSystem(
-      [triggerMessage],
-      { load: () => ({}), save: () => {} },
-    )
+    const messages = new MessageSystem([triggerMessage], { load: () => ({}), save: () => {} })
     const snapshot: ContractStoreSnapshot = {
       ...emptyContractSnapshot(),
     }
@@ -803,10 +830,7 @@ describe('onContractCompleted hook', () => {
       },
     }
     const completedIds: string[] = []
-    const messages = new MessageSystem(
-      [triggerMessage],
-      { load: () => ({}), save: () => {} },
-    )
+    const messages = new MessageSystem([triggerMessage], { load: () => ({}), save: () => {} })
     const contracts = new ContractSystem(
       [cowboysContract],
       messages,
@@ -837,10 +861,7 @@ describe('onContractCompleted hook', () => {
       },
     }
     const completedIds: string[] = []
-    const messages = new MessageSystem(
-      [triggerMessage],
-      { load: () => ({}), save: () => {} },
-    )
+    const messages = new MessageSystem([triggerMessage], { load: () => ({}), save: () => {} })
     const contracts = new ContractSystem(
       [cowboysContract],
       messages,
@@ -943,9 +964,7 @@ describe('onContractStepCompleted hook', () => {
     expect(payouts).toEqual([])
 
     contracts.notifyMissionCompleted(sampleShuttleMission)
-    expect(payouts).toEqual([
-      { contractId: payoutContract.id, stepIndex: 0, creditsReward: 4000 },
-    ])
+    expect(payouts).toEqual([{ contractId: payoutContract.id, stepIndex: 0, creditsReward: 4000 }])
   })
 
   it('does not fire during replayCompletedRewards', () => {
@@ -1028,10 +1047,12 @@ describe('ContractSystem passive auto-advance (install-upgrade / visit-planet)',
    * orbited-body hooks so each test can flip the player's pre-state and
    * assert the expected snap/no-snap.
    */
-  function createPassiveHarness(opts: {
-    installedLevels?: Record<string, number>
-    orbitedPlanets?: Set<string>
-  } = {}): {
+  function createPassiveHarness(
+    opts: {
+      installedLevels?: Record<string, number>
+      orbitedPlanets?: Set<string>
+    } = {},
+  ): {
     contracts: ContractSystem
     payouts: ContractStepCompletedPayload[]
     installedLevels: Record<string, number>
@@ -1131,9 +1152,7 @@ describe('ContractSystem passive auto-advance (install-upgrade / visit-planet)',
     contracts.acceptContract(mmcLikeContract.id)
 
     expect(contracts.getInstance(mmcLikeContract.id)?.currentStepIndex).toBe(1)
-    expect(payouts).toEqual([
-      { contractId: mmcLikeContract.id, stepIndex: 0, creditsReward: 1000 },
-    ])
+    expect(payouts).toEqual([{ contractId: mmcLikeContract.id, stepIndex: 0, creditsReward: 1000 }])
   })
 
   it('snaps visit-planet when the chain advances into it and player already orbited the body', () => {
@@ -1203,9 +1222,7 @@ describe('ContractSystem passive auto-advance (install-upgrade / visit-planet)',
     expect(contracts.getInstance(passiveContract.id)?.currentStepIndex).toBe(1)
     contracts.evaluatePassiveStateForActiveContracts()
     expect(contracts.getInstance(passiveContract.id)?.currentStepIndex).toBe(2)
-    expect(payouts).toEqual([
-      { contractId: passiveContract.id, stepIndex: 1, creditsReward: 200 },
-    ])
+    expect(payouts).toEqual([{ contractId: passiveContract.id, stepIndex: 1, creditsReward: 200 }])
     expect(changeCount).toBe(1)
   })
 

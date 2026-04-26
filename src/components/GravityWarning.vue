@@ -1,4 +1,4 @@
-<script setup lang='ts'>
+<script setup lang="ts">
 import type { GravityWarningState } from '@/lib/ShuttleTelemetry'
 
 const props = defineProps<{

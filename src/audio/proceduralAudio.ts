@@ -36,8 +36,7 @@ export function playProceduralSound(args: ProceduralPlayArgs): AudioPlaybackHand
   if (!ctx || !masterGain) return null
 
   const output = ctx.createGain()
-  const panner =
-    typeof ctx.createStereoPanner === 'function' ? ctx.createStereoPanner() : undefined
+  const panner = typeof ctx.createStereoPanner === 'function' ? ctx.createStereoPanner() : undefined
 
   if (panner) {
     output.connect(panner)
@@ -51,9 +50,12 @@ export function playProceduralSound(args: ProceduralPlayArgs): AudioPlaybackHand
   const duration = buildProceduralRecipe(ctx, output, now, args.preset, args.volume, sources)
   output.gain.setValueAtTime(args.volume, now)
 
-  const timer = globalThis.setTimeout(() => {
-    cleanup(false)
-  }, Math.max(0, duration * 1000 + 50))
+  const timer = globalThis.setTimeout(
+    () => {
+      cleanup(false)
+    },
+    Math.max(0, duration * 1000 + 50),
+  )
 
   let stopped = false
   let ended = false

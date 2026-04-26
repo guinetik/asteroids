@@ -316,12 +316,7 @@ export type MiningMissionDifficulty = 'easy' | 'medium' | 'hard'
  * progress (easy tier). Specific IDs restrict progress tracking to that exact
  * catalog item from `src/data/inventory/items.json`.
  */
-export type MiningOreCategory =
-  | 'any'
-  | 'olivine'
-  | 'magnetite'
-  | 'iron-nickel-alloy'
-  | 'water-ice'
+export type MiningOreCategory = 'any' | 'olivine' | 'magnetite' | 'iron-nickel-alloy' | 'water-ice'
 
 /** A turret mining mission template from JSON — one entry in a giver planet's pool. */
 export interface TurretMiningMissionTemplate {

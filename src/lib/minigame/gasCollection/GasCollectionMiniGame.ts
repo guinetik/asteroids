@@ -227,10 +227,7 @@ export class GasCollectionMiniGame implements OrbitalMiniGame, OrbitalMiniGameEv
     this.shipY += this.shipVy * dt
 
     this.shipX = Math.max(SHIP_HALF_WIDTH, Math.min(CANVAS_WIDTH - SHIP_HALF_WIDTH, this.shipX))
-    this.shipY = Math.max(
-      SHIP_HALF_HEIGHT,
-      Math.min(CANVAS_HEIGHT - SHIP_HALF_HEIGHT, this.shipY),
-    )
+    this.shipY = Math.max(SHIP_HALF_HEIGHT, Math.min(CANVAS_HEIGHT - SHIP_HALF_HEIGHT, this.shipY))
   }
 
   /** Spawn and advance gas puffs rising from the atmosphere. */

@@ -80,7 +80,10 @@ function hasOrbitedSolarBody(profile: PlayerProfile, bodyKey: string): boolean {
 }
 
 /** Pure predicate — whether `progress` satisfies `definition` right now. */
-export function isAchievementUnlocked(definition: AchievementDefinition, progress: AchievementProgress): boolean {
+export function isAchievementUnlocked(
+  definition: AchievementDefinition,
+  progress: AchievementProgress,
+): boolean {
   switch (definition.kind) {
     case 'intro':
       return progress.profile.hasSeenIntro

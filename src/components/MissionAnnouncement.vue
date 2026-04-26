@@ -23,22 +23,36 @@ const emit = defineEmits<{
 const phase = ref<'closed' | 'opening' | 'open' | 'closing'>('closed')
 const removed = ref(false)
 
-watch(() => props.visible, async (val) => {
-  if (!val) return
-  await nextTick()
-  phase.value = 'opening'
-  Timer.sequence([
-    { delay: OPEN_DURATION / 1000, fn: () => { phase.value = 'open' } },
-    { delay: HOLD_DURATION / 1000, fn: () => { phase.value = 'closing' } },
-    {
-      delay: CLOSE_DURATION / 1000,
-      fn: () => {
-        removed.value = true
-        emit('dismissed')
+watch(
+  () => props.visible,
+  async (val) => {
+    if (!val) return
+    await nextTick()
+    phase.value = 'opening'
+    Timer.sequence([
+      {
+        delay: OPEN_DURATION / 1000,
+        fn: () => {
+          phase.value = 'open'
+        },
       },
-    },
-  ])
-}, { immediate: true })
+      {
+        delay: HOLD_DURATION / 1000,
+        fn: () => {
+          phase.value = 'closing'
+        },
+      },
+      {
+        delay: CLOSE_DURATION / 1000,
+        fn: () => {
+          removed.value = true
+          emit('dismissed')
+        },
+      },
+    ])
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -105,12 +119,7 @@ watch(() => props.visible, async (val) => {
 .announce-divider {
   width: 12rem;
   height: 1px;
-  background: linear-gradient(
-    to right,
-    transparent,
-    rgba(0, 255, 204, 0.6),
-    transparent
-  );
+  background: linear-gradient(to right, transparent, rgba(0, 255, 204, 0.6), transparent);
 }
 .announce-mission {
   font-family: 'Datatype', ui-monospace, monospace;

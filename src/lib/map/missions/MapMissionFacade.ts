@@ -23,7 +23,10 @@ import type {
   ShuttleMissionBoard,
 } from '@/lib/missions/types'
 import { getGatherItemForPlanet, getPlanetOrbitalConfig } from '@/lib/missions/planetOrbitalConfig'
-import { takeTurretMiningMission, tickTurretMiningRestock } from '@/lib/missions/turretMiningSession'
+import {
+  takeTurretMiningMission,
+  tickTurretMiningRestock,
+} from '@/lib/missions/turretMiningSession'
 import { deliverTurretMiningMission } from '@/lib/missions/turretMiningRewards'
 import type { ActiveTurretMiningMission } from '@/lib/missions/types'
 import { computeMissionDifficulty } from '@/lib/missions/missionDifficulty'
@@ -284,10 +287,7 @@ export class MapMissionFacade {
   ): void {
     if (this.board.activeAsteroidMission) return
     if (this.board.asteroidRestockTimer) return
-    if (
-      this.board.offeredAsteroidMission &&
-      this.board.offeringAsteroidPlanet === host.planetId
-    ) {
+    if (this.board.offeredAsteroidMission && this.board.offeringAsteroidPlanet === host.planetId) {
       return
     }
     const difficulty = computeMissionDifficulty(CURRENT_PLAYER_UPGRADE_LEVELS)
@@ -383,7 +383,8 @@ export class MapMissionFacade {
     params.onMissionOverlay?.(false, null, false)
     params.onMissionBoardUpdate?.(this.board)
     params.onMissionComplete?.(
-      result.board.activeMissions.find((mission) => mission.template.id === params.missionId) ?? null,
+      result.board.activeMissions.find((mission) => mission.template.id === params.missionId) ??
+        null,
     )
     params.audio.notifyMissionDelivered()
     return result.inventory
@@ -397,7 +398,9 @@ export class MapMissionFacade {
     onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null
     onMissionDeliver: ((mission: ActiveShuttleMission | null) => void) | null
   }): { profile: PlayerProfile; inventory: Inventory; creditsChanged: boolean } {
-    const mission = this.board.activeMissions.find((entry) => entry.template.id === params.missionId)
+    const mission = this.board.activeMissions.find(
+      (entry) => entry.template.id === params.missionId,
+    )
     const result = deliverMission(
       this.board,
       params.missionId,
@@ -423,7 +426,9 @@ export class MapMissionFacade {
       | null
   }): void {
     if (!this.buttonVisible || this.overlayOpen) return
-    const planet = params.targetName ? PLANETS.find((entry) => entry.name === params.targetName) : null
+    const planet = params.targetName
+      ? PLANETS.find((entry) => entry.name === params.targetName)
+      : null
     if (!planet) return
     const missions = getActiveMissionsForPlanet(this.board, planet.id)
     if (missions.length === 0) return
@@ -764,7 +769,8 @@ export class MapMissionFacade {
     onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null
   }): { profile: PlayerProfile; creditsChanged: boolean } {
     const completedMission =
-      this.board.activeEvaMissions.find((mission) => mission.template.id === params.missionId) ?? null
+      this.board.activeEvaMissions.find((mission) => mission.template.id === params.missionId) ??
+      null
     const result = completeEvaMission(
       this.board,
       params.missionId,
@@ -849,8 +855,8 @@ export class MapMissionFacade {
       // POI container already carries the Y offset; factory places the prop at origin.
       const instance = await createEvaMissionPoi(mission.template.poiType, 0)
       if (
-        this.evaPoiContainer !== container
-        || this.evaPoiRenderedMissionId !== mission.template.id
+        this.evaPoiContainer !== container ||
+        this.evaPoiRenderedMissionId !== mission.template.id
       ) {
         instance.dispose()
         return

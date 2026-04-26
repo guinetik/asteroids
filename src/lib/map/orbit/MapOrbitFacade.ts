@@ -2,11 +2,7 @@ import * as THREE from 'three'
 import orbitConfig from '@/data/shuttle/orbit-capture.json'
 import { type InputManager } from '@/lib/InputManager'
 import type { ShuttleAudioDirector } from '@/audio/ShuttleAudioDirector'
-import {
-  OrbitCaptureSystem,
-  type OrbitHudState,
-  type CaptureBody,
-} from '@/lib/orbitCapture'
+import { OrbitCaptureSystem, type OrbitHudState, type CaptureBody } from '@/lib/orbitCapture'
 import { canReleaseSlingshot } from '@/lib/slingshotLaunchPolicy'
 import {
   getCurrentShuttleSlingshotBurstMultiplier,
@@ -15,8 +11,16 @@ import {
 } from '@/lib/upgrades'
 import { MAP_VIEW_CONTROLLER_CONFIG as MAP_CONFIG } from '@/lib/map/mapViewControllerConfig'
 import { isShuttleAimingAtPlanet } from '@/lib/map/mapViewControllerHelpers'
-import { MAP_CAMERA_CONFIG, MAP_ORBIT_CAMERA_CONFIG, type VehicleCamera } from '@/three/VehicleCamera'
-import { buildSlingshotChargeCameraConfig, buildSlingshotExitCameraConfig, SLINGSHOT_EXIT_CAMERA_DURATION_SEC } from '@/three/slingshotChargeCamera'
+import {
+  MAP_CAMERA_CONFIG,
+  MAP_ORBIT_CAMERA_CONFIG,
+  type VehicleCamera,
+} from '@/three/VehicleCamera'
+import {
+  buildSlingshotChargeCameraConfig,
+  buildSlingshotExitCameraConfig,
+  SLINGSHOT_EXIT_CAMERA_DURATION_SEC,
+} from '@/three/slingshotChargeCamera'
 import { MAP_PHYSICS, type ShuttleController } from '@/three/ShuttleController'
 import type { MapSceneVisuals } from '@/three/MapSceneVisuals'
 
@@ -160,7 +164,14 @@ export class MapOrbitFacade {
   }
 
   handleOrbitInput(dt: number, deps: OrbitInputDeps): void {
-    const { shuttleController, inputManager, vehicleCamera, sceneVisuals, audio, onSlingshotReleased } = deps
+    const {
+      shuttleController,
+      inputManager,
+      vehicleCamera,
+      sceneVisuals,
+      audio,
+      onSlingshotReleased,
+    } = deps
     if (!this._system) return
 
     const state = this._system.state
@@ -222,7 +233,10 @@ export class MapOrbitFacade {
         this._isChargingSlingshot = true
         sceneVisuals?.showProgradeMarkers()
       }
-      this._slingshotCharge = Math.min(1, this._slingshotCharge + dt / MAP_CONFIG.SLINGSHOT_CHARGE_TIME)
+      this._slingshotCharge = Math.min(
+        1,
+        this._slingshotCharge + dt / MAP_CONFIG.SLINGSHOT_CHARGE_TIME,
+      )
       vehicleCamera?.applyConfigTuning(buildSlingshotChargeCameraConfig(this._slingshotCharge))
       this.updateLaunchArrow(shuttleController, sceneVisuals)
       // W/S snap nose toward prograde/retrograde while charging
@@ -236,8 +250,9 @@ export class MapOrbitFacade {
           if (targetHeading !== null) {
             const current = shuttleController.group.rotation.y
             let delta = targetHeading - current
-            delta = ((delta + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI
-            shuttleController.group.rotation.y = current + delta * Math.min(1, dt * orbitConfig.progradeSnapLerpSpeed)
+            delta = ((((delta + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI
+            shuttleController.group.rotation.y =
+              current + delta * Math.min(1, dt * orbitConfig.progradeSnapLerpSpeed)
             this.updateLaunchArrow(shuttleController, sceneVisuals)
           }
         }
@@ -365,7 +380,8 @@ export class MapOrbitFacade {
   }
 
   tickOrbit(dt: number, deps: OrbitTickDeps): boolean {
-    const { shuttleController, inputManager, vehicleCamera, sceneVisuals, mapIntroControlsLocked } = deps
+    const { shuttleController, inputManager, vehicleCamera, sceneVisuals, mapIntroControlsLocked } =
+      deps
     if (!this._system || this._system.state !== 'orbiting') return false
 
     const pos = this._system.tickOrbit(dt)
@@ -416,8 +432,16 @@ export class MapOrbitFacade {
         const by = this._system.target.getWorldY()
         const bz = this._system.target.getWorldZ()
         const r = this._system.targetOrbitRadius
-        const proPos = new THREE.Vector3(bx + Math.cos(proAngle) * r, by, bz + Math.sin(proAngle) * r)
-        const retroPos = new THREE.Vector3(bx + Math.cos(retroAngle) * r, by, bz + Math.sin(retroAngle) * r)
+        const proPos = new THREE.Vector3(
+          bx + Math.cos(proAngle) * r,
+          by,
+          bz + Math.sin(proAngle) * r,
+        )
+        const retroPos = new THREE.Vector3(
+          bx + Math.cos(retroAngle) * r,
+          by,
+          bz + Math.sin(retroAngle) * r,
+        )
         const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(shuttleController.group.quaternion)
         const heading = Math.atan2(-fwd.z, fwd.x)
         const alignment = this._system.getAlignment(heading)
@@ -434,7 +458,10 @@ export class MapOrbitFacade {
    */
   tickExitCamera(dt: number, vehicleCamera: VehicleCamera | null): void {
     if (!this._exitCameraActive) return
-    this._exitCameraProgress = Math.min(1, this._exitCameraProgress + dt / SLINGSHOT_EXIT_CAMERA_DURATION_SEC)
+    this._exitCameraProgress = Math.min(
+      1,
+      this._exitCameraProgress + dt / SLINGSHOT_EXIT_CAMERA_DURATION_SEC,
+    )
     vehicleCamera?.applyConfigTuning(buildSlingshotExitCameraConfig(this._exitCameraProgress))
     if (this._exitCameraProgress >= 1) {
       this._exitCameraActive = false
@@ -444,7 +471,10 @@ export class MapOrbitFacade {
 
   buildHudState(shuttleController: ShuttleController, inspectMode: boolean): OrbitHudState | null {
     if (!this._system) return null
-    const hudState = this._system.getHudState(shuttleController.position.x, shuttleController.position.z)
+    const hudState = this._system.getHudState(
+      shuttleController.position.x,
+      shuttleController.position.z,
+    )
     hudState.chargeLevel = this._slingshotCharge
     hudState.inspectMode = inspectMode
     // Compute live alignment from shuttle heading
@@ -496,7 +526,10 @@ export class MapOrbitFacade {
     })
   }
 
-  private updateLaunchArrow(shuttleController: ShuttleController, sceneVisuals: MapSceneVisuals | null): void {
+  private updateLaunchArrow(
+    shuttleController: ShuttleController,
+    sceneVisuals: MapSceneVisuals | null,
+  ): void {
     sceneVisuals?.updateLaunchArrow(this._slingshotCharge, this.isAimingAtPlanet(shuttleController))
   }
 

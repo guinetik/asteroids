@@ -231,13 +231,15 @@ export class LevelCombatMiningFacade {
     this.deps.multiTool.getMuzzleWorldPosition(this.tractorMuzzle)
 
     for (let i = 0; i < TRACTOR_PARTICLES_ON_CONSUME; i++) {
-      this.tractorSpawnPos.copy(this.tractorOrigin).add(
-        this.impactVel.set(
-          (Math.random() - 0.5) * TRACTOR_CONSUME_SPAWN_RADIUS,
-          (Math.random() - 0.5) * TRACTOR_CONSUME_SPAWN_RADIUS,
-          (Math.random() - 0.5) * TRACTOR_CONSUME_SPAWN_RADIUS,
-        ),
-      )
+      this.tractorSpawnPos
+        .copy(this.tractorOrigin)
+        .add(
+          this.impactVel.set(
+            (Math.random() - 0.5) * TRACTOR_CONSUME_SPAWN_RADIUS,
+            (Math.random() - 0.5) * TRACTOR_CONSUME_SPAWN_RADIUS,
+            (Math.random() - 0.5) * TRACTOR_CONSUME_SPAWN_RADIUS,
+          ),
+        )
 
       this.tractorVel.copy(this.tractorMuzzle).sub(this.tractorSpawnPos)
       const distance = this.tractorVel.length()

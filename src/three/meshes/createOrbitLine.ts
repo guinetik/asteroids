@@ -32,7 +32,7 @@ export function createOrbitLine(
 ): THREE.LineLoop {
   const rawPoints = orbitPathPoints(elements, ORBIT_PATH_SEGMENTS)
   // Convert from Kepler coordinate system (x,y,z) to Three.js (x = x, y = z, z = y)
-  const threePoints = rawPoints.map(p => new THREE.Vector3(p.x, p.z, p.y))
+  const threePoints = rawPoints.map((p) => new THREE.Vector3(p.x, p.z, p.y))
   const geometry = new THREE.BufferGeometry().setFromPoints(threePoints)
   const material = new THREE.LineBasicMaterial({
     color: ORBIT_LINE_COLOR,

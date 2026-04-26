@@ -55,7 +55,7 @@ describe('heightmapToGrayscaleRgba', () => {
       expect(rgba[i * 4]).toBe(20) // GRAY_MIN
     }
     // Valid range still uses the full band: lowest valid → GRAY_MIN, highest → 220
-    expect(rgba[(total / 2) * 4]).toBe(20)        // min valid height
-    expect(rgba[(total - 1) * 4]).toBe(220)        // max valid height
+    expect(rgba[(total / 2) * 4]).toBe(20) // min valid height
+    expect(rgba[(total - 1) * 4]).toBe(220) // max valid height
   })
 })

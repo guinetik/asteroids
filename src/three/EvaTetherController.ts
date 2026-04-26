@@ -258,18 +258,12 @@ export class EvaTetherController implements Tickable {
       -TETHER_PLAYER_LOOKDOWN_DROP * lookDownFactor,
       TETHER_PLAYER_LOOKDOWN_BACKSHIFT * lookDownFactor,
     )
-    this.playerAttachLocal
-      .copy(TETHER_PLAYER_ATTACH_LOCAL_OFFSET)
-      .add(this.playerLookDownOffset)
+    this.playerAttachLocal.copy(TETHER_PLAYER_ATTACH_LOCAL_OFFSET).add(this.playerLookDownOffset)
 
     this.playerAttachEuler.set(0, this.fpsCamera.yaw, 0)
     this.playerAttachQuat.setFromEuler(this.playerAttachEuler)
-    this.playerAttachOffsetWorld
-      .copy(this.playerAttachLocal)
-      .applyQuaternion(this.playerAttachQuat)
-    return this.playerAttachWorld
-      .copy(this.group.position)
-      .add(this.playerAttachOffsetWorld)
+    this.playerAttachOffsetWorld.copy(this.playerAttachLocal).applyQuaternion(this.playerAttachQuat)
+    return this.playerAttachWorld.copy(this.group.position).add(this.playerAttachOffsetWorld)
   }
 
   /** Hidden guide point behind the player used as the visible rope end in first person. */
@@ -284,17 +278,11 @@ export class EvaTetherController implements Tickable {
       -TETHER_PLAYER_GUIDE_LOOKDOWN_DROP * lookDownFactor,
       TETHER_PLAYER_GUIDE_LOOKDOWN_BACKSHIFT * lookDownFactor,
     )
-    this.playerGuideLocal
-      .copy(TETHER_PLAYER_GUIDE_LOCAL_OFFSET)
-      .add(this.playerGuideLookDownOffset)
+    this.playerGuideLocal.copy(TETHER_PLAYER_GUIDE_LOCAL_OFFSET).add(this.playerGuideLookDownOffset)
 
     this.playerAttachQuat.copy(this.fpsCamera.camera.quaternion)
-    this.playerGuideOffsetWorld
-      .copy(this.playerGuideLocal)
-      .applyQuaternion(this.playerAttachQuat)
-    return this.playerGuideWorld
-      .copy(this.group.position)
-      .add(this.playerGuideOffsetWorld)
+    this.playerGuideOffsetWorld.copy(this.playerGuideLocal).applyQuaternion(this.playerAttachQuat)
+    return this.playerGuideWorld.copy(this.group.position).add(this.playerGuideOffsetWorld)
   }
 
   /** Provide the input manager that supplies EVA action state, or null to lock input. */
@@ -415,7 +403,8 @@ export class EvaTetherController implements Tickable {
       if (this.input.isActionActive('evaForward')) this.thrustDir.add(this.forwardVec)
       if (this.input.isActionActive('evaBack')) this.thrustDir.addScaledVector(this.forwardVec, -1)
       if (this.input.isActionActive('evaStrafeRight')) this.thrustDir.add(this.rightVec)
-      if (this.input.isActionActive('evaStrafeLeft')) this.thrustDir.addScaledVector(this.rightVec, -1)
+      if (this.input.isActionActive('evaStrafeLeft'))
+        this.thrustDir.addScaledVector(this.rightVec, -1)
       if (this.input.isActionActive('evaUp')) this.thrustDir.add(this.upVec)
       if (this.input.isActionActive('evaDown')) this.thrustDir.addScaledVector(this.upVec, -1)
 
@@ -433,7 +422,10 @@ export class EvaTetherController implements Tickable {
     const dampingRate = this.thrusting ? EVA_ACTIVE_DAMPING : EVA_IDLE_DAMPING
     const dampingFactor = Math.max(0, 1 - dampingRate * dt)
     this.velocity.multiplyScalar(dampingFactor)
-    if (!this.thrusting && this.velocity.lengthSq() < EVA_ZERO_VELOCITY_EPSILON * EVA_ZERO_VELOCITY_EPSILON) {
+    if (
+      !this.thrusting &&
+      this.velocity.lengthSq() < EVA_ZERO_VELOCITY_EPSILON * EVA_ZERO_VELOCITY_EPSILON
+    ) {
       this.velocity.set(0, 0, 0)
     }
 
@@ -481,8 +473,7 @@ export class EvaTetherController implements Tickable {
           }
         }
         if (overshoot > EVA_TETHER_MAX_LENGTH * TETHER_HARD_STOP_OVERSHOOT) {
-          const scale =
-            (EVA_TETHER_MAX_LENGTH * (1 + TETHER_HARD_STOP_OVERSHOOT)) / dist
+          const scale = (EVA_TETHER_MAX_LENGTH * (1 + TETHER_HARD_STOP_OVERSHOOT)) / dist
           this.group.position.set(
             anchorPos.x + dx * scale,
             anchorPos.y + dy * scale,
@@ -533,7 +524,11 @@ export class EvaTetherController implements Tickable {
     }
 
     const tautRatio = THREE.MathUtils.clamp(distance / EVA_TETHER_MAX_LENGTH, 0, 1)
-    const slackRatio = THREE.MathUtils.lerp(TETHER_MAX_SLACK_RATIO, TETHER_MIN_SLACK_RATIO, tautRatio)
+    const slackRatio = THREE.MathUtils.lerp(
+      TETHER_MAX_SLACK_RATIO,
+      TETHER_MIN_SLACK_RATIO,
+      tautRatio,
+    )
     const ropeLength = distance * (1 + slackRatio)
     const segmentLength = ropeLength / TETHER_SEGMENTS
     this.ropeSegmentLengths.fill(segmentLength)
@@ -600,16 +595,19 @@ export class EvaTetherController implements Tickable {
 
   private rebuildTetherGeometry(): void {
     const visibleEnd = this.getPlayerGuideWorld()
-    const visiblePointCount = Math.max(2, this.tetherCurvePoints.length - TETHER_RENDER_HIDDEN_SEGMENTS)
-    const renderPoints = this.tetherCurvePoints
-      .slice(0, visiblePointCount)
-      .map((pt) => pt.clone())
+    const visiblePointCount = Math.max(
+      2,
+      this.tetherCurvePoints.length - TETHER_RENDER_HIDDEN_SEGMENTS,
+    )
+    const renderPoints = this.tetherCurvePoints.slice(0, visiblePointCount).map((pt) => pt.clone())
     const lastIndex = renderPoints.length - 1
     renderPoints[lastIndex] = visibleEnd.clone()
 
     const guideSegmentCount = Math.min(TETHER_RENDER_GUIDE_SEGMENTS, lastIndex)
     if (guideSegmentCount > 0) {
-      this.renderGuideStart.copy(renderPoints[Math.max(0, lastIndex - guideSegmentCount)] ?? renderPoints[0]!)
+      this.renderGuideStart.copy(
+        renderPoints[Math.max(0, lastIndex - guideSegmentCount)] ?? renderPoints[0]!,
+      )
       for (let step = 1; step <= guideSegmentCount; step++) {
         const pointIndex = lastIndex - guideSegmentCount + step
         const pt = renderPoints[pointIndex]

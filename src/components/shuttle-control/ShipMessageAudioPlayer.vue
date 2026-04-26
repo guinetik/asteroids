@@ -42,7 +42,10 @@ onMounted(() => {
       <span class="ship-message-audio-player__icon">{{ isPlaying ? '■' : '▶' }}</span>
       <span>{{ buttonLabel }}</span>
     </button>
-    <div class="ship-message-audio-player__progress" :aria-label="`Playback progress for ${messageId}`">
+    <div
+      class="ship-message-audio-player__progress"
+      :aria-label="`Playback progress for ${messageId}`"
+    >
       <div class="ship-message-audio-player__progress-fill" :style="{ width: progressPercent }" />
     </div>
   </div>

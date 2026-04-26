@@ -33,9 +33,7 @@ const statusSummary = computed(() => {
 
 const activeUpgrades = computed(() => {
   if (!props.upgradeLevels) return {}
-  return Object.fromEntries(
-    Object.entries(props.upgradeLevels).filter(([, level]) => level > 0)
-  )
+  return Object.fromEntries(Object.entries(props.upgradeLevels).filter(([, level]) => level > 0))
 })
 
 const thrusterGroups = [
@@ -53,7 +51,7 @@ const thrusterGroups = [
 [=======]
  \\ ||| /
   \\|||/
-   \\|/`
+   \\|/`,
   },
   {
     name: 'brake',
@@ -69,7 +67,7 @@ const thrusterGroups = [
  |  |  |
  |  |  |
   \\ | /
-   \\ /`
+   \\ /`,
   },
   {
     name: 'rcs',
@@ -82,7 +80,7 @@ const thrusterGroups = [
   | |
 ◄═[=]═►
   | |
-◄═[=]═►`
+◄═[=]═►`,
   },
 ]
 
@@ -145,11 +143,14 @@ const prevChapter = () => {
       <aside class="manual-nav">
         <div class="nav-title">INDEX</div>
         <ul class="nav-list">
-          <li 
-            v-for="chapter in chapters" 
+          <li
+            v-for="chapter in chapters"
             :key="chapter.id"
             :class="['nav-item', { active: currentChapter === chapter.id }]"
-            @click="uiAudio.notifyNavClick(); currentChapter = chapter.id"
+            @click="
+              uiAudio.notifyNavClick()
+              currentChapter = chapter.id
+            "
           >
             <span class="ch-num">0{{ chapter.id }}</span>
             <span class="ch-title">{{ chapter.title }}</span>
@@ -159,23 +160,24 @@ const prevChapter = () => {
 
       <!-- Content Area -->
       <main class="manual-content">
-        
         <!-- Chapter 1: Power & Propulsion -->
         <section v-if="currentChapter === 1" class="chapter-view fade-in">
           <div class="chapter-header">
             <h2>01 // POWER PLANT</h2>
             <p class="subtitle">Neutron Thruster System & Charge Management</p>
           </div>
-          
+
           <div class="content-grid">
             <div class="text-panel">
               <p>
-                Your shuttle utilizes a <strong class="text-cyan-400">shared fuel pool</strong> with per-group charge capacitors. 
-                All thrusters (main, brake, RCS) draw from the same primary tank. 
+                Your shuttle utilizes a <strong class="text-cyan-400">shared fuel pool</strong> with
+                per-group charge capacitors. All thrusters (main, brake, RCS) draw from the same
+                primary tank.
               </p>
               <p class="mt-4">
-                When idle, capacitors recharge automatically — but this recharge <strong class="text-amber-400">consumes fuel</strong>.
-                Full charge = zero fuel drain while firing. Depleted charge = direct fuel drain.
+                When idle, capacitors recharge automatically — but this recharge
+                <strong class="text-amber-400">consumes fuel</strong>. Full charge = zero fuel drain
+                while firing. Depleted charge = direct fuel drain.
               </p>
               <div class="marta-quote mt-6">
                 "Learn the rhythm. Waste shows up in your ledger before you feel it in the seat."
@@ -183,8 +185,8 @@ const prevChapter = () => {
             </div>
 
             <div class="thruster-schematics">
-              <div 
-                v-for="group in thrusterGroups" 
+              <div
+                v-for="group in thrusterGroups"
                 :key="group.name"
                 class="schematic-card"
                 :class="`schematic-card--${group.color}`"
@@ -209,18 +211,26 @@ const prevChapter = () => {
             <h2>02 // SLINGSHOT NAVIGATION</h2>
             <p class="subtitle">Gravity Well Exploitation</p>
           </div>
-          
+
           <div class="content-grid">
             <div class="text-panel">
               <p class="lead text-cyan-300">The planet does the work. You just point it.</p>
               <p class="mt-4">
-                Charge the slingshot drive while inside a gravity well. 
-                Alignment is indicated by HUD vectors:
+                Charge the slingshot drive while inside a gravity well. Alignment is indicated by
+                HUD vectors:
               </p>
               <ul class="data-list mt-4">
-                <li><span class="text-emerald-400">[GREEN]</span> Optimal alignment. Maximum velocity multiplier.</li>
-                <li><span class="text-amber-400">[YELLOW]</span> Sub-optimal. High fuel cost, low velocity.</li>
-                <li><span class="text-red-400">[RED]</span> Collision trajectory. Abort immediately.</li>
+                <li>
+                  <span class="text-emerald-400">[GREEN]</span> Optimal alignment. Maximum velocity
+                  multiplier.
+                </li>
+                <li>
+                  <span class="text-amber-400">[YELLOW]</span> Sub-optimal. High fuel cost, low
+                  velocity.
+                </li>
+                <li>
+                  <span class="text-red-400">[RED]</span> Collision trajectory. Abort immediately.
+                </li>
               </ul>
               <div class="marta-quote mt-6">
                 "Pro tip from Jay: Don't rush it. Impatient pilots buy fuel twice."
@@ -248,26 +258,43 @@ const prevChapter = () => {
             <h2>03 // FLIGHT CHARACTERISTICS</h2>
             <p class="subtitle">Newtonian Mechanics & Deep Space Hazards</p>
           </div>
-          
+
           <div class="content-grid">
             <div class="data-card">
               <h3>NEWTONIAN PHYSICS</h3>
               <div class="divider"></div>
               <ul class="data-list">
-                <li><strong>NO DRAG:</strong> Vacuum environment means momentum persists indefinitely.</li>
-                <li><strong>ROTATION:</strong> [A/D] keys rotate chassis independent of velocity vector.</li>
+                <li>
+                  <strong>NO DRAG:</strong> Vacuum environment means momentum persists indefinitely.
+                </li>
+                <li>
+                  <strong>ROTATION:</strong> [A/D] keys rotate chassis independent of velocity
+                  vector.
+                </li>
                 <li><strong>THRUST:</strong> [W] applies main thrust in nose direction.</li>
-                <li><strong>EFFICIENCY:</strong> Alignment matters. Thrusting perpendicular to velocity wastes energy.</li>
+                <li>
+                  <strong>EFFICIENCY:</strong> Alignment matters. Thrusting perpendicular to
+                  velocity wastes energy.
+                </li>
               </ul>
             </div>
-            
+
             <div class="data-card data-card--alert">
               <h3>ENVIRONMENTAL HAZARDS</h3>
               <div class="divider"></div>
               <ul class="data-list">
-                <li><strong>THERMAL:</strong> Extreme temperature swings. Hot near stellar bodies, freezing in the black.</li>
-                <li><strong>IMPACT:</strong> Kinetic damage scales exponentially with relative velocity.</li>
-                <li><strong>ADRIFT:</strong> Emergency beacon activates when fuel and charge are exhausted. Rescue is not guaranteed.</li>
+                <li>
+                  <strong>THERMAL:</strong> Extreme temperature swings. Hot near stellar bodies,
+                  freezing in the black.
+                </li>
+                <li>
+                  <strong>IMPACT:</strong> Kinetic damage scales exponentially with relative
+                  velocity.
+                </li>
+                <li>
+                  <strong>ADRIFT:</strong> Emergency beacon activates when fuel and charge are
+                  exhausted. Rescue is not guaranteed.
+                </li>
               </ul>
             </div>
           </div>
@@ -279,16 +306,18 @@ const prevChapter = () => {
             <h2>04 // SHUTTLE UPGRADES</h2>
             <p class="subtitle">Engineering Bay & Modifications</p>
           </div>
-          
+
           <div class="text-panel">
             <p>
-              The Upgrades terminal is your engineering bay. Level 0 is factory spec.
-              Every paid tier improves core coefficients: thrust efficiency, fuel capacity,
-              slingshot coupling strength, and thermal regulation.
+              The Upgrades terminal is your engineering bay. Level 0 is factory spec. Every paid
+              tier improves core coefficients: thrust efficiency, fuel capacity, slingshot coupling
+              strength, and thermal regulation.
             </p>
-            
+
             <div class="installed-tech mt-8">
-              <h3 class="text-amber-400 text-sm tracking-widest mb-4">CURRENT INSTALLED PACKAGES</h3>
+              <h3 class="text-amber-400 text-sm tracking-widest mb-4">
+                CURRENT INSTALLED PACKAGES
+              </h3>
               <div class="tech-grid">
                 <div v-for="(level, id) in activeUpgrades" :key="id" class="tech-module">
                   <span class="tech-id">{{ id }}</span>
@@ -312,27 +341,28 @@ const prevChapter = () => {
             <h2>05 // OPERATIONAL PROTOCOL</h2>
             <p class="subtitle">Pre-flight & Station Procedures</p>
           </div>
-          
+
           <div class="checklist-container">
             <div class="check-item">
               <div class="check-box">[ ]</div>
               <div class="check-text">
-                <strong>STATION SERVICES (B KEY)</strong><br>
+                <strong>STATION SERVICES (B KEY)</strong><br />
                 Refuel tanks, repair hull plating, offload mineral cargo, purchase reserve cells.
               </div>
             </div>
             <div class="check-item">
               <div class="check-box">[ ]</div>
               <div class="check-text">
-                <strong>VEHICLE SELECTION</strong><br>
+                <strong>VEHICLE SELECTION</strong><br />
                 Shuttle for orbital/interplanetary transit. Lander for surface extraction work.
               </div>
             </div>
             <div class="check-item">
               <div class="check-box">[ ]</div>
               <div class="check-text">
-                <strong>BIOLOGICAL ASSET</strong><br>
-                The feline unit is not decorative. Thermal output contributes to cabin regulation. Do not vent.
+                <strong>BIOLOGICAL ASSET</strong><br />
+                The feline unit is not decorative. Thermal output contributes to cabin regulation.
+                Do not vent.
               </div>
             </div>
           </div>
@@ -345,46 +375,48 @@ const prevChapter = () => {
               <span class="seal">VALE ORBITAL REFURB // 2306-04-05</span>
               <h2>CERTIFICATE OF OWNERSHIP</h2>
             </div>
-            
+
             <div class="deed-body">
               <p>
-                Be it known that on this day I, Marta Vale of Vale Orbital Refurb, do hereby transfer all right, title,
-                and interest in one (1) refurbished NASA-era lunar lander chassis (serial print-refurb #LM-7-Δ-8841),
-                together with all aftermarket neutron thrusters, slingshot coupling, and charge management systems, to:
+                Be it known that on this day I, Marta Vale of Vale Orbital Refurb, do hereby
+                transfer all right, title, and interest in one (1) refurbished NASA-era lunar lander
+                chassis (serial print-refurb #LM-7-Δ-8841), together with all aftermarket neutron
+                thrusters, slingshot coupling, and charge management systems, to:
               </p>
-              
+
               <div class="owner-name">
                 {{ playerName || 'UNREGISTERED PILOT' }}
               </div>
-              
+
               <p class="fine-print">
-                This vessel began as a 3D-printed copy of an old NASA design. It has since been heavily modified by people who needed it to keep flying. 
-                The frame is original. The soul is ours. She is paid off. She is yours now.
+                This vessel began as a 3D-printed copy of an old NASA design. It has since been
+                heavily modified by people who needed it to keep flying. The frame is original. The
+                soul is ours. She is paid off. She is yours now.
               </p>
             </div>
-            
+
             <div class="deed-footer">
               <div class="signature">
                 <span class="sign">Marta Vale</span>
                 <span class="title">Chief Engineer, V.O.R.</span>
               </div>
-              <div class="marta-quote">
-                "She's yours now, handsome. Don't break her."
-              </div>
+              <div class="marta-quote">"She's yours now, handsome. Don't break her."</div>
             </div>
           </div>
         </section>
-
       </main>
     </div>
 
     <!-- Footer Pagination -->
     <footer class="manual-footer">
-      <button class="nav-btn" :disabled="currentChapter === 1" @click="prevChapter">
-        ◄ PREV
-      </button>
+      <button class="nav-btn" :disabled="currentChapter === 1" @click="prevChapter">◄ PREV</button>
       <div class="progress-indicator">
-        <span v-for="n in chapters.length" :key="n" class="dot" :class="{ active: n === currentChapter }"></span>
+        <span
+          v-for="n in chapters.length"
+          :key="n"
+          class="dot"
+          :class="{ active: n === currentChapter }"
+        ></span>
       </div>
       <button class="nav-btn" :disabled="currentChapter === chapters.length" @click="nextChapter">
         NEXT ►
@@ -635,9 +667,15 @@ const prevChapter = () => {
   font-style: italic;
 }
 
-.schematic-card--cyan { color: #22d3ee; }
-.schematic-card--amber { color: #fbbf24; }
-.schematic-card--emerald { color: #34d399; }
+.schematic-card--cyan {
+  color: #22d3ee;
+}
+.schematic-card--amber {
+  color: #fbbf24;
+}
+.schematic-card--emerald {
+  color: #34d399;
+}
 
 /* --- DATA CARDS & LISTS --- */
 .data-card {
@@ -796,7 +834,10 @@ const prevChapter = () => {
 .deed-document::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: repeating-linear-gradient(
     0deg,
     transparent,
@@ -934,7 +975,13 @@ const prevChapter = () => {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

@@ -163,12 +163,16 @@ export class EnemyProjectileSystem implements Tickable {
       const b = 2 * (ox * segX + oy * segY + oz * segZ)
       const c = ox * ox + oy * oy + oz * oz - PLAYER_HIT_RADIUS * PLAYER_HIT_RADIUS
       const discriminant = b * b - 4 * a * c
-      const hitPlayer = discriminant >= 0 && (a === 0 ? c <= 0 : (() => {
-        const sqrtD = Math.sqrt(discriminant)
-        const t0 = (-b - sqrtD) / (2 * a)
-        const t1 = (-b + sqrtD) / (2 * a)
-        return t0 <= 1 && t1 >= 0
-      })())
+      const hitPlayer =
+        discriminant >= 0 &&
+        (a === 0
+          ? c <= 0
+          : (() => {
+              const sqrtD = Math.sqrt(discriminant)
+              const t0 = (-b - sqrtD) / (2 * a)
+              const t1 = (-b + sqrtD) / (2 * a)
+              return t0 <= 1 && t1 >= 0
+            })())
 
       // Move
       p.x += segX
@@ -196,12 +200,16 @@ export class EnemyProjectileSystem implements Tickable {
         const bh = 2 * (oxh * segX + oyh * segY + ozh * segZ)
         const ch = oxh * oxh + oyh * oyh + ozh * ozh - r * r
         const dh = bh * bh - 4 * ah * ch
-        const segHitsHostage = dh >= 0 && (ah === 0 ? ch <= 0 : (() => {
-          const sqrtDh = Math.sqrt(dh)
-          const t0h = (-bh - sqrtDh) / (2 * ah)
-          const t1h = (-bh + sqrtDh) / (2 * ah)
-          return t0h <= 1 && t1h >= 0
-        })())
+        const segHitsHostage =
+          dh >= 0 &&
+          (ah === 0
+            ? ch <= 0
+            : (() => {
+                const sqrtDh = Math.sqrt(dh)
+                const t0h = (-bh - sqrtDh) / (2 * ah)
+                const t1h = (-bh + sqrtDh) / (2 * ah)
+                return t0h <= 1 && t1h >= 0
+              })())
         if (segHitsHostage) {
           hitHostage = h
           break

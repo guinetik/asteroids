@@ -111,7 +111,11 @@ export function addItem(inventory: Inventory, itemId: string, quantity: number):
 }
 
 /** Remove items from the inventory. Removes the stack entirely if quantity reaches 0. */
-export function removeItem(inventory: Inventory, itemId: string, quantity: number): InventoryResult {
+export function removeItem(
+  inventory: Inventory,
+  itemId: string,
+  quantity: number,
+): InventoryResult {
   const existing = getStack(inventory, itemId)
   if (!existing) {
     return { ok: false, inventory, reason: `Item "${itemId}" not found in inventory` }

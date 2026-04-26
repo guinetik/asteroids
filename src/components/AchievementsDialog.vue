@@ -15,7 +15,12 @@
                 {{ unlockedIds.length }}/{{ totalCount }} unlocked
               </p>
             </div>
-            <button type="button" class="achievement-dialog__close" aria-label="Close" @click="emitClose">
+            <button
+              type="button"
+              class="achievement-dialog__close"
+              aria-label="Close"
+              @click="emitClose"
+            >
               &times;
             </button>
           </div>
@@ -40,7 +45,11 @@
                     <div class="achievement-dialog__row-title">{{ item.title }}</div>
                     <div class="achievement-dialog__row-subtitle">{{ item.subtitle }}</div>
                     <div class="achievement-dialog__row-description">
-                      {{ isUnlocked(item.id) ? item.description : getAchievementLockedHint(item, progress) }}
+                      {{
+                        isUnlocked(item.id)
+                          ? item.description
+                          : getAchievementLockedHint(item, progress)
+                      }}
                     </div>
                   </div>
                   <div class="achievement-dialog__meta">
@@ -59,7 +68,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useAudio } from '@/audio/useAudio'
-import { getAchievementGroups, getAchievementLockedHint, type AchievementGroup } from '@/lib/achievements'
+import {
+  getAchievementGroups,
+  getAchievementLockedHint,
+  type AchievementGroup,
+} from '@/lib/achievements'
 import type { AchievementProgress } from '@/data/achievements'
 
 const props = defineProps<{

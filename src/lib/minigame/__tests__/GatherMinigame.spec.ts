@@ -1,10 +1,6 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
-import {
-  GatherMinigame,
-  pickRequiredMinerals,
-  rollMineralCount,
-} from '../GatherMinigame'
+import { GatherMinigame, pickRequiredMinerals, rollMineralCount } from '../GatherMinigame'
 import { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
 import type { ConcreteObjective } from '@/lib/missions/types'
 import type { MineralEntry } from '@/lib/asteroids/types'
@@ -86,12 +82,7 @@ describe('pickRequiredMinerals', () => {
   })
 
   it('returns an empty array when no composition entries map to items', () => {
-    const picked = pickRequiredMinerals(
-      [{ name: 'Unobtanium', percentage: 100 }],
-      1,
-      1,
-      0,
-    )
+    const picked = pickRequiredMinerals([{ name: 'Unobtanium', percentage: 100 }], 1, 1, 0)
     expect(picked).toEqual([])
   })
 })
@@ -121,7 +112,7 @@ describe('GatherMinigame', () => {
     for (const quota of quotas) expect(quota.targetKg).toBe(30)
   })
 
-  it('cannot complete until quotas are met, even when standing on the crate', () => {
+  it('cannot complete until quotas are met, even when standing on the rocket', () => {
     const yieldSystem = new RockYieldSystem({ composition: COMPOSITION, seed: 42 })
     const mg = new GatherMinigame({
       objectiveIndex: 0,
@@ -148,7 +139,7 @@ describe('GatherMinigame', () => {
     expect(completed).toBe(false)
   })
 
-  it('completes once quotas are met and the player presses interact at the crate', () => {
+  it('completes once quotas are met and the player presses interact at the rocket', () => {
     const yieldSystem = new RockYieldSystem({ composition: COMPOSITION, seed: 42 })
     const mg = new GatherMinigame({
       objectiveIndex: 0,
@@ -178,6 +169,58 @@ describe('GatherMinigame', () => {
     })
     expect(completed).toBe(true)
     expect(mg.status).toBe('completed')
+  })
+
+  it('keeps the delivery rocket visible during the post-completion ignition hold', () => {
+    const scene = new THREE.Scene()
+    const yieldSystem = new RockYieldSystem({ composition: COMPOSITION, seed: 42 })
+    const mg = new GatherMinigame({
+      objectiveIndex: 0,
+      objective: makeObjective(20),
+      scene,
+      heightmap: makeHeightmap(),
+      composition: COMPOSITION,
+      difficulty: 1,
+      seed: 42,
+      rockYieldSystem: yieldSystem,
+    })
+    const rocketGroup = scene.children[0]!
+    const initialY = rocketGroup.position.y
+    const targetItem = mg.mineralQuotas[0]!.itemId
+    const target = mg.mineralQuotas[0]!.targetKg
+    yieldSystem.onMineralExtracted!(targetItem, target, 0)
+
+    mg.tick(0.016, {
+      levelState: 'eva',
+      landerPosition: null,
+      landerGrounded: false,
+      playerPosition: { x: 0, y: 0, z: 0 },
+      interactPressed: false,
+      terminalInteractPressed: true,
+    })
+    mg.tick(0.2, {
+      levelState: 'eva',
+      landerPosition: null,
+      landerGrounded: false,
+      playerPosition: { x: 0, y: 0, z: 0 },
+      interactPressed: false,
+      terminalInteractPressed: false,
+    })
+
+    expect(mg.status).toBe('completed')
+    expect(rocketGroup.visible).toBe(true)
+    expect(rocketGroup.position.y).toBe(initialY)
+
+    mg.tick(0.5, {
+      levelState: 'eva',
+      landerPosition: null,
+      landerGrounded: false,
+      playerPosition: { x: 0, y: 0, z: 0 },
+      interactPressed: false,
+      terminalInteractPressed: false,
+    })
+
+    expect(rocketGroup.position.y).toBeGreaterThan(initialY)
   })
 
   it('reports kg progress on the matching step', () => {

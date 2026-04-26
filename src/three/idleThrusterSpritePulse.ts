@@ -30,9 +30,8 @@ export function getIdleThrusterSpritePulse(elapsedTime: number): IdleThrusterSpr
   const wave = 0.5 + 0.5 * Math.cos(elapsedTime * IDLE_THRUSTER_PULSE_FREQUENCY * Math.PI * 2)
 
   return {
-    opacity: IDLE_THRUSTER_MIN_OPACITY
-      + (IDLE_THRUSTER_MAX_OPACITY - IDLE_THRUSTER_MIN_OPACITY) * wave,
-    scale: IDLE_THRUSTER_MIN_SCALE
-      + (IDLE_THRUSTER_MAX_SCALE - IDLE_THRUSTER_MIN_SCALE) * wave,
+    opacity:
+      IDLE_THRUSTER_MIN_OPACITY + (IDLE_THRUSTER_MAX_OPACITY - IDLE_THRUSTER_MIN_OPACITY) * wave,
+    scale: IDLE_THRUSTER_MIN_SCALE + (IDLE_THRUSTER_MAX_SCALE - IDLE_THRUSTER_MIN_SCALE) * wave,
   }
 }

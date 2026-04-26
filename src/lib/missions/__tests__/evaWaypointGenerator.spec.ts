@@ -17,10 +17,7 @@ describe('generateEvaWaypoint', () => {
 
     for (let i = 0; i < 40; i++) {
       const waypoint = generateEvaWaypoint(planetWorldX, 0, 'earth')
-      const distanceFromEarth = Math.hypot(
-        waypoint.worldX - planetWorldX,
-        waypoint.worldZ,
-      )
+      const distanceFromEarth = Math.hypot(waypoint.worldX - planetWorldX, waypoint.worldZ)
       expect(distanceFromEarth).toBeGreaterThanOrEqual(minDistance - 1e-6)
       expect(distanceFromEarth).toBeLessThanOrEqual(maxDistance + 1e-6)
     }

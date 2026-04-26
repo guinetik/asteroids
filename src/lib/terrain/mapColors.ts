@@ -35,7 +35,10 @@ export const SENTINEL_THRESHOLD = -1000
  * @param length - Total number of cells (resolution * resolution).
  * @returns Uint8ClampedArray of length*4 bytes in RGBA order.
  */
-export function heightmapToGrayscaleRgba(heightmap: Float32Array, length: number): Uint8ClampedArray {
+export function heightmapToGrayscaleRgba(
+  heightmap: Float32Array,
+  length: number,
+): Uint8ClampedArray {
   // Find height range — skip sentinel cells so void markers don't collapse the range
   let hMin = Infinity
   let hMax = -Infinity
@@ -69,10 +72,7 @@ export function heightmapToGrayscaleRgba(heightmap: Float32Array, length: number
  * @param resolution - Width/height of the square grid.
  * @returns HTMLCanvasElement with grayscale elevation rendering.
  */
-export function generateMapCanvas(
-  heightmap: Float32Array,
-  resolution: number,
-): HTMLCanvasElement {
+export function generateMapCanvas(heightmap: Float32Array, resolution: number): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
   canvas.width = resolution
   canvas.height = resolution

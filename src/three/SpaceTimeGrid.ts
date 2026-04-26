@@ -212,8 +212,7 @@ export class SpaceTimeGrid implements Tickable {
    */
   setVisualDeformBudget(budget: SpaceTimeGridVisualDeformBudget | null): void {
     this.visualBudget = budget
-    this.intervalScaleEffective =
-      budget === null ? 1 : Math.max(1, Math.ceil(budget.intervalScale))
+    this.intervalScaleEffective = budget === null ? 1 : Math.max(1, Math.ceil(budget.intervalScale))
   }
 
   /**
@@ -266,7 +265,8 @@ export class SpaceTimeGrid implements Tickable {
 
         const widthMul = source.wellWidthMultiplier ?? 1
         const depthMul = source.wellDepthMultiplier ?? 1
-        const massFactor = Math.sign(source.mass) * Math.pow(Math.abs(source.mass), this.massExponent)
+        const massFactor =
+          Math.sign(source.mass) * Math.pow(Math.abs(source.mass), this.massExponent)
         const sigma = this.widthScale * massFactor * widthMul
         const amplitude = this.depthScale * massFactor * amplitudePulse * depthMul
 
@@ -328,15 +328,16 @@ export class SpaceTimeGrid implements Tickable {
 
         const widthMul = source.wellWidthMultiplier ?? 1
         const depthMul = source.wellDepthMultiplier ?? 1
-        const massFactor = Math.sign(source.mass) * Math.pow(Math.abs(source.mass), this.massExponent)
+        const massFactor =
+          Math.sign(source.mass) * Math.pow(Math.abs(source.mass), this.massExponent)
         const sigma = this.widthScale * massFactor * widthMul
         const sigmaSq = sigma * sigma
         const amplitude = this.depthScale * massFactor * amplitudePulse * depthMul
         const depth = amplitude * Math.exp(-rSquared / (2 * sigmaSq))
 
         // Gradient points toward the source (downhill into the well)
-        gradX += depth * -dx / sigmaSq
-        gradZ += depth * -dz / sigmaSq
+        gradX += (depth * -dx) / sigmaSq
+        gradZ += (depth * -dz) / sigmaSq
       }
     }
 
@@ -369,10 +370,8 @@ export class SpaceTimeGrid implements Tickable {
       }
     }
 
-    const halfW =
-      budget === null ? 0 : Math.max(0, budget.cullHalfExtentX) * DEFORM_CULL_MARGIN
-    const halfH =
-      budget === null ? 0 : Math.max(0, budget.cullHalfExtentZ) * DEFORM_CULL_MARGIN
+    const halfW = budget === null ? 0 : Math.max(0, budget.cullHalfExtentX) * DEFORM_CULL_MARGIN
+    const halfH = budget === null ? 0 : Math.max(0, budget.cullHalfExtentZ) * DEFORM_CULL_MARGIN
     const cx = budget?.cullCenterX ?? 0
     const cz = budget?.cullCenterZ ?? 0
 

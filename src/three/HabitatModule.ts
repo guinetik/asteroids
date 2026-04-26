@@ -91,8 +91,12 @@ export class HabitatModule {
         const a1 = arcStart + (s / GIRDER_SEGMENTS_RADIAL) * arcEnd
         const a2 = arcStart + ((s + 1) / GIRDER_SEGMENTS_RADIAL) * arcEnd
         girderVerts.push(
-          Math.cos(a1) * r, y, Math.sin(a1) * r,
-          Math.cos(a2) * r, y, Math.sin(a2) * r,
+          Math.cos(a1) * r,
+          y,
+          Math.sin(a1) * r,
+          Math.cos(a2) * r,
+          y,
+          Math.sin(a2) * r,
         )
       }
     }

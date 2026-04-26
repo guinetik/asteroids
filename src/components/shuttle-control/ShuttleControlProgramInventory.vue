@@ -33,15 +33,18 @@ function classifyStack(stack: InventoryStack): CargoBandId {
   return 'other'
 }
 
-const resolvedInventory = computed<Inventory>(() =>
-  props.inventory ?? {
-    stacks: props.inventoryStacks ?? [],
-    maxSlots: Math.max((props.inventoryStacks ?? []).length, 0),
-    maxWeightKg: 0,
-  })
+const resolvedInventory = computed<Inventory>(
+  () =>
+    props.inventory ?? {
+      stacks: props.inventoryStacks ?? [],
+      maxSlots: Math.max((props.inventoryStacks ?? []).length, 0),
+      maxWeightKg: 0,
+    },
+)
 
 const totalWeightKg = computed(() =>
-  resolvedInventory.value.stacks.reduce((sum, stack) => sum + stack.totalWeightKg, 0))
+  resolvedInventory.value.stacks.reduce((sum, stack) => sum + stack.totalWeightKg, 0),
+)
 
 const slotUsage = computed(() => ({
   used: resolvedInventory.value.stacks.length,
@@ -118,7 +121,10 @@ const cargoBands = computed<CargoBand[]>(() => {
           class="cargo-capacity-legend__item"
           :class="{ 'cargo-capacity-legend__item--empty': band.weightKg <= 0 }"
         >
-          <span class="cargo-capacity-legend__swatch" :class="`cargo-capacity-legend__swatch--${band.id}`" />
+          <span
+            class="cargo-capacity-legend__swatch"
+            :class="`cargo-capacity-legend__swatch--${band.id}`"
+          />
           <span class="cargo-capacity-legend__label">{{ band.label }}</span>
           <span class="cargo-capacity-legend__value">{{ band.weightKg.toFixed(0) }} kg</span>
         </div>

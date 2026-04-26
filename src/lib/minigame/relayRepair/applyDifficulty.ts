@@ -47,9 +47,7 @@ export function applyRelayDifficulty(
     // I-shape cells only have two distinct port configs (rot 0/2 = E/W,
     // rot 1/3 = N/S), so a bump of 2 on an I is a silent no-op for the
     // player. Force odd bumps on I cells so every misrotation is visible.
-    const bump = cell.shape === 'I'
-      ? (rng() < 0.5 ? 1 : 3)
-      : 1 + Math.floor(rng() * 3)
+    const bump = cell.shape === 'I' ? (rng() < 0.5 ? 1 : 3) : 1 + Math.floor(rng() * 3)
     const nextRotation = (((cell.rotation + bump) % 4) + 4) % 4
     return {
       ...cell,

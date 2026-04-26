@@ -307,7 +307,11 @@ export class AudioManager {
     this.applyPlaybackLoopOption(howl, playback.howlPlayId, options.loop)
 
     const effectPreset = options.effect ?? def.effect
-    playback.effectRelease = this.tryApplyPlaybackEffectChain(howl, playback.howlPlayId, effectPreset)
+    playback.effectRelease = this.tryApplyPlaybackEffectChain(
+      howl,
+      playback.howlPlayId,
+      effectPreset,
+    )
 
     if (!options.loop) {
       this.registerEndListenerAfterPlay(howl, playback, playback.howlPlayId)
@@ -323,9 +327,7 @@ export class AudioManager {
         this.stopPlaybackInstance(playback)
       },
       playing: () =>
-        playback.howlPlayId !== undefined
-          ? howl.playing(playback.howlPlayId)
-          : howl.playing(),
+        playback.howlPlayId !== undefined ? howl.playing(playback.howlPlayId) : howl.playing(),
       progress: () => {
         try {
           const id = playback.howlPlayId
@@ -642,8 +644,7 @@ export class AudioManager {
    * releases.
    */
   private refreshDuckedCategoryVolumes(transition: 'duck' | 'unduck'): void {
-    const fadeMs =
-      transition === 'duck' ? VOICE_DUCK_FADE_ATTACK_MS : VOICE_DUCK_FADE_RELEASE_MS
+    const fadeMs = transition === 'duck' ? VOICE_DUCK_FADE_ATTACK_MS : VOICE_DUCK_FADE_RELEASE_MS
     for (const cat of ['ui', 'sfx'] as const) {
       const list = this.activeByCategory.get(cat)
       if (!list?.length) continue
@@ -854,7 +855,10 @@ export class AudioManager {
    * Reserves manifest prelude (voice exclusive stop), stores one pending request, returns a handle
    * that can cancel before unlock or delegate to the real playback after flush.
    */
-  private enqueueLockedVoicePlay(soundId: AudioSoundId, options: AudioPlayOptions): AudioPlaybackHandle {
+  private enqueueLockedVoicePlay(
+    soundId: AudioSoundId,
+    options: AudioPlayOptions,
+  ): AudioPlaybackHandle {
     const def = getAudioDefinition(soundId)
     this.applyPlaybackModePrelude(def, soundId)
     const stateRef: VoiceHandleState = {
@@ -899,7 +903,8 @@ export class AudioManager {
         }
         stateRef.kind = 'cancelled'
       },
-      playing: () => (stateRef.kind === 'active' ? (stateRef.realHandle?.playing() ?? false) : false),
+      playing: () =>
+        stateRef.kind === 'active' ? (stateRef.realHandle?.playing() ?? false) : false,
       progress: () => (stateRef.kind === 'active' ? (stateRef.realHandle?.progress() ?? 0) : 0),
       duration: () => (stateRef.kind === 'active' ? (stateRef.realHandle?.duration() ?? 0) : 0),
       setVolume: (vol: number) => {

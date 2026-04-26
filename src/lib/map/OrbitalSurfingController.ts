@@ -116,7 +116,12 @@ export class OrbitalSurfingController {
 
   /** Fired each frame during coupling with (shipPos, orbitPos, progress 0→1, dt). */
   onCouplingProgress:
-    | ((shipPosition: THREE.Vector3, orbitPosition: THREE.Vector3, progress: number, dt: number) => void)
+    | ((
+        shipPosition: THREE.Vector3,
+        orbitPosition: THREE.Vector3,
+        progress: number,
+        dt: number,
+      ) => void)
     | null = null
 
   /** Fired when coupling ends (transitions to diving or cancelled). */
@@ -230,12 +235,12 @@ export class OrbitalSurfingController {
     deps: OrbitalSurfingDeps,
   ): { snapResult: OrbitSnapResult; planetIndex: number; arcPoints: OrbitPoint2D[] } | null {
     if (
-      !deps.shuttleController
-      || !deps.hasOrbitalSurfingUnlock
-      || deps.orbitState !== 'free'
-      || deps.gravitySurfingActive
-      || deps.slingshotBurstActive
-      || deps.shuttleController.speed < ORBITAL_SURF_MIN_ATTACH_SPEED
+      !deps.shuttleController ||
+      !deps.hasOrbitalSurfingUnlock ||
+      deps.orbitState !== 'free' ||
+      deps.gravitySurfingActive ||
+      deps.slingshotBurstActive ||
+      deps.shuttleController.speed < ORBITAL_SURF_MIN_ATTACH_SPEED
     ) {
       return null
     }
@@ -248,7 +253,12 @@ export class OrbitalSurfingController {
 
     for (let i = 0; i < deps.planetOrbitPoints.length; i++) {
       const points = deps.planetOrbitPoints[i]!
-      const snap = findNearestOrbitPoint(shipX, shipZ, points, MAP_CONFIG.ORBITAL_SURF_SNAP_DISTANCE)
+      const snap = findNearestOrbitPoint(
+        shipX,
+        shipZ,
+        points,
+        MAP_CONFIG.ORBITAL_SURF_SNAP_DISTANCE,
+      )
       if (snap && (!bestSnap || snap.distance < bestSnap.distance)) {
         bestSnap = snap
         bestPlanetIndex = i

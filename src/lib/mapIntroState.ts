@@ -320,9 +320,7 @@ export class MapIntroState {
   /** Current UI snapshot for Vue. */
   get uiState(): MapIntroUiState {
     const cinematicCaption =
-      this.phase === 'cinematic_zoom'
-        ? mapIntroCaptionForStep(this.cinematicStep)
-        : ''
+      this.phase === 'cinematic_zoom' ? mapIntroCaptionForStep(this.cinematicStep) : ''
 
     return {
       phase: this.phase,

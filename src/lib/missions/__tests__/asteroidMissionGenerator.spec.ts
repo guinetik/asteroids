@@ -294,7 +294,8 @@ describe('generateWaypointInRegion', () => {
     const innerCatalog = nearEarthInnerCatalogForWaypointSpawn()
     const outerCatalog = nearEarthOuterCatalogForWaypointSpawn()
     const maxCatalog =
-      innerCatalog + (outerCatalog - innerCatalog) * WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY
+      innerCatalog +
+      (outerCatalog - innerCatalog) * WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY
     const innerWorld = innerCatalog * ORBIT_SCALE
     const maxWorld = maxCatalog * ORBIT_SCALE
     expect(dist).toBeGreaterThanOrEqual(innerWorld * 0.99)

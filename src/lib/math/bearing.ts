@@ -44,12 +44,7 @@ export function headingRadToCompassDeg(headingRad: number): number {
  * @param toZ - Target Z.
  * @returns Compass degrees [0, 360) from origin to target.
  */
-export function worldBearingDegTo(
-  fromX: number,
-  fromZ: number,
-  toX: number,
-  toZ: number,
-): number {
+export function worldBearingDegTo(fromX: number, fromZ: number, toX: number, toZ: number): number {
   const dx = toX - fromX
   const dz = toZ - fromZ
   const rad = Math.atan2(-dx, dz)

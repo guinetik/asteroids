@@ -294,7 +294,9 @@ describe('StateMachine', () => {
         initial: 'idle',
         states: {
           idle: {
-            enter() { (this as typeof ctx).captured = this },
+            enter() {
+              ;(this as typeof ctx).captured = this
+            },
           },
           walking: {},
           running: {},
@@ -369,10 +371,7 @@ describe('StateMachine', () => {
     it('calls onComplete at end of non-looping sequence', () => {
       type Phase = 'only'
       const onComplete = vi.fn()
-      const sm = StateMachine.fromSequence<Phase>(
-        [{ name: 'only', duration: 1.0 }],
-        { onComplete },
-      )
+      const sm = StateMachine.fromSequence<Phase>([{ name: 'only', duration: 1.0 }], { onComplete })
       sm.tick(1.1)
       expect(onComplete).toHaveBeenCalled()
     })

@@ -14,9 +14,7 @@ export const PLAYER_UPGRADES_STORAGE_SCHEMA_VERSION = 1
 export const PLAYER_UPGRADES_STORAGE_KEY = 'asteroid-lander-player-upgrades'
 
 /** Known upgrade ids from catalog JSON (used to validate stored keys). */
-const KNOWN_UPGRADE_IDS = new Set(
-  (upgradesData as readonly { id: string }[]).map((row) => row.id),
-)
+const KNOWN_UPGRADE_IDS = new Set((upgradesData as readonly { id: string }[]).map((row) => row.id))
 
 /** Wire format written to localStorage. */
 interface StoredPlayerUpgradesPayload {

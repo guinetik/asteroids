@@ -117,8 +117,7 @@ export class MaintenanceBeacon {
     }
     const blink = 0.5 + 0.5 * Math.sin(this.elapsed * this.blinkHz * Math.PI * 2)
     const pulse = blink * blink
-    this.light.intensity =
-      this.baseIntensity + (this.peakIntensity - this.baseIntensity) * pulse
+    this.light.intensity = this.baseIntensity + (this.peakIntensity - this.baseIntensity) * pulse
     this.material.emissiveIntensity =
       this.emissiveBase + (this.emissivePeak - this.emissiveBase) * pulse
   }

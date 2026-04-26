@@ -52,22 +52,23 @@ export function loadContractSnapshot(): ContractStoreSnapshot {
         ? (obj.instances as Record<string, ContractInstance>)
         : {}
     const observedMissionCompletions =
-      typeof obj.observedMissionCompletions === 'number' && Number.isFinite(obj.observedMissionCompletions)
+      typeof obj.observedMissionCompletions === 'number' &&
+      Number.isFinite(obj.observedMissionCompletions)
         ? obj.observedMissionCompletions
         : 0
     let giverPlanetCompletions: Record<string, number> = {}
     if (
-      obj.giverPlanetCompletions
-      && typeof obj.giverPlanetCompletions === 'object'
-      && !Array.isArray(obj.giverPlanetCompletions)
+      obj.giverPlanetCompletions &&
+      typeof obj.giverPlanetCompletions === 'object' &&
+      !Array.isArray(obj.giverPlanetCompletions)
     ) {
       giverPlanetCompletions = { ...(obj.giverPlanetCompletions as Record<string, number>) }
     }
     let missionCompletionsByKind: Partial<Record<string, number>> = {}
     if (
-      obj.missionCompletionsByKind
-      && typeof obj.missionCompletionsByKind === 'object'
-      && !Array.isArray(obj.missionCompletionsByKind)
+      obj.missionCompletionsByKind &&
+      typeof obj.missionCompletionsByKind === 'object' &&
+      !Array.isArray(obj.missionCompletionsByKind)
     ) {
       missionCompletionsByKind = { ...(obj.missionCompletionsByKind as Record<string, number>) }
     }
@@ -75,7 +76,8 @@ export function loadContractSnapshot(): ContractStoreSnapshot {
       instances,
       observedMissionCompletions,
       giverPlanetCompletions,
-      missionCompletionsByKind: missionCompletionsByKind as ContractStoreSnapshot['missionCompletionsByKind'],
+      missionCompletionsByKind:
+        missionCompletionsByKind as ContractStoreSnapshot['missionCompletionsByKind'],
       version: 1,
     }
   } catch {

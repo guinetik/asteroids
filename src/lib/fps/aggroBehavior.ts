@@ -107,9 +107,7 @@ export class AggroBehavior implements EnemyBehavior {
       this.pickWanderTarget()
     }
 
-    const nearest = pickNearestChaseSiteXZ(
-      enemyX, enemyZ, playerX, playerY, playerZ, hostageSites,
-    )
+    const nearest = pickNearestChaseSiteXZ(enemyX, enemyZ, playerX, playerY, playerZ, hostageSites)
     const distToNearest = Math.sqrt(distSqXZ(enemyX, enemyZ, nearest.x, nearest.z))
 
     // --- State transitions ---

@@ -54,7 +54,12 @@ export class EnemyTiltCache {
    * @param z - Enemy world Z position.
    * @param target - Object whose `rotation.x` / `rotation.z` should be set.
    */
-  applyTilt(id: number, x: number, z: number, target: { rotation: { x: number; z: number } }): void {
+  applyTilt(
+    id: number,
+    x: number,
+    z: number,
+    target: { rotation: { x: number; z: number } },
+  ): void {
     let sample = this.samples.get(id)
     if (!sample) {
       sample = { x, z, rotX: 0, rotZ: 0 }

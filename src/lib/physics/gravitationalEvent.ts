@@ -47,7 +47,9 @@ export interface GravitationalEventFinishDetail {
 }
 
 /** Strongly typed listeners for {@link GravitationalEvent}. */
-export type GravitationalEventStartListener = (ev: CustomEvent<GravitationalEventStartDetail>) => void
+export type GravitationalEventStartListener = (
+  ev: CustomEvent<GravitationalEventStartDetail>,
+) => void
 
 /** Strongly typed listeners for {@link GravitationalEvent} end. */
 export type GravitationalEventFinishListener = (

@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  acceptEvaMission,
-  createShuttleMissionBoard,
-} from '../shuttleMissionSession'
+import { acceptEvaMission, createShuttleMissionBoard } from '../shuttleMissionSession'
 import type { VisitRelayShuttleMissionTemplate } from '../types'
 
 function template(
@@ -20,10 +17,7 @@ function template(
   }
 }
 
-function boardWithOffer(
-  tmpl: VisitRelayShuttleMissionTemplate,
-  planetId: string,
-) {
+function boardWithOffer(tmpl: VisitRelayShuttleMissionTemplate, planetId: string) {
   return {
     ...createShuttleMissionBoard(),
     offeredEvaMission: tmpl,

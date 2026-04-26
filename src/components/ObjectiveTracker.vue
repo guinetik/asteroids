@@ -57,15 +57,8 @@ withDefaults(
       <div class="tracker-mission">{{ title }}</div>
     </div>
     <div class="tracker-objectives">
-      <div
-        v-for="obj in objectives"
-        :key="obj.id"
-        class="tracker-objective-group"
-      >
-        <div
-          class="tracker-objective"
-          :class="{ 'tracker-objective--complete': obj.complete }"
-        >
+      <div v-for="obj in objectives" :key="obj.id" class="tracker-objective-group">
+        <div class="tracker-objective" :class="{ 'tracker-objective--complete': obj.complete }">
           <span class="tracker-check">{{ obj.complete ? '\u2713' : '\u25CB' }}</span>
           <span class="tracker-label">{{ obj.label }}</span>
         </div>

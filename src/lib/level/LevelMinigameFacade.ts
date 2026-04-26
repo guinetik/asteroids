@@ -94,22 +94,23 @@ export interface LevelMinigameBindings {
   onPhotometryScanAudioState: ((state: PhotometryScanAudioState) => void) | null
   /** Route combat/hazard damage back into the level presentation layer. */
   onDamagePlayer:
-    | ((damage: number, sourceX: number, sourceZ: number, source?: 'projectile' | 'contact' | 'hazard') => void)
+    | ((
+        damage: number,
+        sourceX: number,
+        sourceZ: number,
+        source?: 'projectile' | 'contact' | 'hazard',
+      ) => void)
     | null
   /** Instantly kill the player using controller-owned presentation. */
   onKillPlayer: (() => void) | null
   /** Blow up / fail the lander run from a combat minigame. */
   onDestroyLander: ((cause: 'exterminate' | 'rescue') => void) | null
   /** Shared objective explosion presentation hook. */
-  onExplosion:
-    | ((kind: 'exterminate' | 'rescue', x: number, y: number, z: number) => void)
-    | null
+  onExplosion: ((kind: 'exterminate' | 'rescue', x: number, y: number, z: number) => void) | null
   /** Rescue-specific fail overlay hook. */
   onRescueFail: ((objectiveIndex: number, cause: string) => void) | null
   /** Install the combat loot/drop observer on a newly created combat minigame. */
-  onInstallCombatDropObserver:
-    | ((minigame: ExterminateMinigame | RescueMinigame) => void)
-    | null
+  onInstallCombatDropObserver: ((minigame: ExterminateMinigame | RescueMinigame) => void) | null
 }
 
 /**

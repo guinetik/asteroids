@@ -6,7 +6,11 @@
  * @spec docs/superpowers/specs/2026-04-05-map-shuttle-player-design.md
  */
 import * as THREE from 'three'
-import { MAP_ORBIT_CAMERA_CONFIG, MAP_CAMERA_CONFIG, type VehicleCameraConfig } from './VehicleCamera'
+import {
+  MAP_ORBIT_CAMERA_CONFIG,
+  MAP_CAMERA_CONFIG,
+  type VehicleCameraConfig,
+} from './VehicleCamera'
 
 /**
  * Full-charge camera preset: closer third-person framing behind the shuttle.
@@ -42,10 +46,7 @@ export function buildSlingshotExitCameraConfig(progress: number): VehicleCameraC
   const t = Math.max(0, Math.min(1, progress))
 
   return {
-    idleOffset: MAP_ORBIT_CAMERA_CONFIG.idleOffset.clone().lerp(
-      MAP_CAMERA_CONFIG.idleOffset,
-      t,
-    ),
+    idleOffset: MAP_ORBIT_CAMERA_CONFIG.idleOffset.clone().lerp(MAP_CAMERA_CONFIG.idleOffset, t),
     lerpSpeed: THREE.MathUtils.lerp(
       MAP_ORBIT_CAMERA_CONFIG.lerpSpeed,
       MAP_CAMERA_CONFIG.lerpSpeed,
@@ -63,11 +64,7 @@ export function buildSlingshotExitCameraConfig(progress: number): VehicleCameraC
       -1000,
       t,
     ),
-    fov: THREE.MathUtils.lerp(
-      MAP_ORBIT_CAMERA_CONFIG.fov,
-      MAP_CAMERA_CONFIG.fov,
-      t,
-    ),
+    fov: THREE.MathUtils.lerp(MAP_ORBIT_CAMERA_CONFIG.fov, MAP_CAMERA_CONFIG.fov, t),
     maxDistance: MAP_CAMERA_CONFIG.maxDistance,
   }
 }
@@ -93,10 +90,9 @@ export function buildSlingshotChargeCameraConfig(chargeLevel: number): VehicleCa
   const charge = Math.max(0, Math.min(1, chargeLevel))
 
   return {
-    idleOffset: MAP_ORBIT_CAMERA_CONFIG.idleOffset.clone().lerp(
-      MAP_ORBIT_CHARGE_CAMERA_CONFIG.idleOffset,
-      charge,
-    ),
+    idleOffset: MAP_ORBIT_CAMERA_CONFIG.idleOffset
+      .clone()
+      .lerp(MAP_ORBIT_CHARGE_CAMERA_CONFIG.idleOffset, charge),
     lerpSpeed: THREE.MathUtils.lerp(
       MAP_ORBIT_CAMERA_CONFIG.lerpSpeed,
       MAP_ORBIT_CHARGE_CAMERA_CONFIG.lerpSpeed,

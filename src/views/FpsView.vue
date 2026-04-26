@@ -293,24 +293,13 @@ function resumeLock() {
     controller, and tear this overlay down in the same tick the HUD
     appears.
   -->
-  <div
-    v-if="!started"
-    class="fps-start-overlay"
-    @click="start"
-  >
+  <div v-if="!started" class="fps-start-overlay" @click="start">
     <div class="fps-start-card">
       <div class="fps-start-eyebrow">FPS Sandbox</div>
-      <button
-        type="button"
-        class="fps-start-button"
-        :disabled="initializing"
-        @click.stop="start"
-      >
+      <button type="button" class="fps-start-button" :disabled="initializing" @click.stop="start">
         {{ initializing ? 'Booting…' : '▶ Play' }}
       </button>
-      <div class="fps-start-hint">
-        Click to unlock audio &amp; capture mouse
-      </div>
+      <div class="fps-start-hint">Click to unlock audio &amp; capture mouse</div>
     </div>
   </div>
 </template>
@@ -376,7 +365,10 @@ function resumeLock() {
   padding: 0.85rem 2.5rem;
   border-radius: 4px;
   cursor: pointer;
-  transition: background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+  transition:
+    background 120ms ease,
+    transform 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .fps-start-button:hover:not(:disabled) {

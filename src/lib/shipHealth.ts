@@ -374,15 +374,21 @@ export class ShipHealth {
       driftMultiplier = 1 + 3 * (1 - sunDistance / this.config.hotBoundary)
     } else if (sunDistance > this.config.coldBoundary) {
       targetTemp = COLD_ZONE_TARGET
-      driftMultiplier = 1 + 3 * Math.min(1, (sunDistance - this.config.coldBoundary) / this.config.coldBoundary)
+      driftMultiplier =
+        1 + 3 * Math.min(1, (sunDistance - this.config.coldBoundary) / this.config.coldBoundary)
     } else {
       targetTemp = SAFE_ZONE_TARGET
     }
 
     const diff = targetTemp - this._temperature
-    const resistanceFactor = targetTemp > 0 ? heatResistance : (targetTemp < 0 ? coldResistance : 1)
-    const drift = Math.sign(diff) * Math.min(Math.abs(diff), this.config.tempDriftRate * driftMultiplier * resistanceFactor * dt)
-    this._temperature = Math.max(MIN_TEMPERATURE, Math.min(MAX_TEMPERATURE, this._temperature + drift))
+    const resistanceFactor = targetTemp > 0 ? heatResistance : targetTemp < 0 ? coldResistance : 1
+    const drift =
+      Math.sign(diff) *
+      Math.min(Math.abs(diff), this.config.tempDriftRate * driftMultiplier * resistanceFactor * dt)
+    this._temperature = Math.max(
+      MIN_TEMPERATURE,
+      Math.min(MAX_TEMPERATURE, this._temperature + drift),
+    )
 
     const heatProtected = heatTempCap < MAX_TEMPERATURE
     const coldProtected = coldTempCap > MIN_TEMPERATURE
@@ -400,7 +406,8 @@ export class ShipHealth {
       const isColdDamage = this._temperature < 0
       const protectionBlocks = (isHeatDamage && heatProtected) || (isColdDamage && coldProtected)
       if (!protectionBlocks) {
-        const ratio = (absTemp - this.config.damageThreshold) / (MAX_TEMPERATURE - this.config.damageThreshold)
+        const ratio =
+          (absTemp - this.config.damageThreshold) / (MAX_TEMPERATURE - this.config.damageThreshold)
         const armorFactor = isHeatDamage ? heatArmor : isColdDamage ? coldArmor : 1
         tempDamage = ratio * this.config.maxTempDamage * armorFactor * dt
       }
@@ -421,9 +428,11 @@ export class ShipHealth {
     }
 
     const absTemp2 = Math.abs(this._temperature)
-    const tempIntensity = absTemp2 > this.config.displayThreshold
-      ? (absTemp2 - this.config.displayThreshold) / (MAX_TEMPERATURE - this.config.displayThreshold)
-      : 0
+    const tempIntensity =
+      absTemp2 > this.config.displayThreshold
+        ? (absTemp2 - this.config.displayThreshold) /
+          (MAX_TEMPERATURE - this.config.displayThreshold)
+        : 0
     const radIntensity = zone > 0 ? (zone / RADIATION_ZONE_COUNT) * radArmor : 0
     this._lastDamageIntensity = Math.min(1, Math.max(tempIntensity, radIntensity))
 

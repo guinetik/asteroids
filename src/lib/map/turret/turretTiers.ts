@@ -104,7 +104,10 @@ export const TURRET_TIERS: TurretTierSet = TURRET_TIER_SETS[DEFAULT_TURRET_BELT_
  * @param beltId - Which belt the instance belongs to. Defaults to main belt.
  * @returns The matching tier. Radii above all cutoffs fall into `large`.
  */
-export function pickTier(radius: number, beltId: TurretBeltId = DEFAULT_TURRET_BELT_ID): TurretTier {
+export function pickTier(
+  radius: number,
+  beltId: TurretBeltId = DEFAULT_TURRET_BELT_ID,
+): TurretTier {
   const tiers = TURRET_TIER_SETS[beltId]
   if (radius < tiers.small.radiusMax) return tiers.small
   if (radius < tiers.medium.radiusMax) return tiers.medium

@@ -95,10 +95,7 @@ describe('act-1-inner-system journey', () => {
     profile = applyJourneyTrigger(profile, 'left_habitat').profile
 
     // Player completes Jay's contract before ever accepting USC.
-    const jayCompletion = applyJourneyTrigger(
-      profile,
-      'contract_completed:space-cowboys-mars-hq',
-    )
+    const jayCompletion = applyJourneyTrigger(profile, 'contract_completed:space-cowboys-mars-hq')
     expect(jayCompletion.changed).toBe(true)
     profile = jayCompletion.profile
     expect(profile.journeyStepProgress['act-1-inner-system']).toContain('cowboys-hq')

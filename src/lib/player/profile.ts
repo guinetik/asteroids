@@ -11,10 +11,7 @@
  * @spec docs/superpowers/specs/2026-04-03-player-profile-design.md
  */
 import type { PlayerProfile } from './types'
-import {
-  SLINGSHOT_JOURNEY_FEATURE_ID,
-  WELCOME_JOURNEY_ID,
-} from '@/lib/journeys'
+import { SLINGSHOT_JOURNEY_FEATURE_ID, WELCOME_JOURNEY_ID } from '@/lib/journeys'
 
 /** localStorage key for the player profile. */
 export const PROFILE_STORAGE_KEY = 'asteroid-lander-profile'
@@ -81,23 +78,24 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
   const p = data as Partial<PlayerProfile>
   if (typeof p.name !== 'string' || typeof p.credits !== 'number') return null
 
-  const completedMissionCount = typeof p.completedMissionCount === 'number' ? p.completedMissionCount : 0
+  const completedMissionCount =
+    typeof p.completedMissionCount === 'number' ? p.completedMissionCount : 0
   let visitedAsteroids: Record<string, number> = {}
   if (
-    p.visitedAsteroids !== undefined
-    && p.visitedAsteroids !== null
-    && typeof p.visitedAsteroids === 'object'
-    && !Array.isArray(p.visitedAsteroids)
+    p.visitedAsteroids !== undefined &&
+    p.visitedAsteroids !== null &&
+    typeof p.visitedAsteroids === 'object' &&
+    !Array.isArray(p.visitedAsteroids)
   ) {
     visitedAsteroids = p.visitedAsteroids as Record<string, number>
   }
 
   let orbitedSolarBodies: Record<string, number> = {}
   if (
-    p.orbitedSolarBodies !== undefined
-    && p.orbitedSolarBodies !== null
-    && typeof p.orbitedSolarBodies === 'object'
-    && !Array.isArray(p.orbitedSolarBodies)
+    p.orbitedSolarBodies !== undefined &&
+    p.orbitedSolarBodies !== null &&
+    typeof p.orbitedSolarBodies === 'object' &&
+    !Array.isArray(p.orbitedSolarBodies)
   ) {
     orbitedSolarBodies = p.orbitedSolarBodies as Record<string, number>
   }
@@ -122,12 +120,14 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
 
   const missionPayMultipliers: Record<string, number> = {}
   if (
-    p.missionPayMultipliers !== undefined
-    && p.missionPayMultipliers !== null
-    && typeof p.missionPayMultipliers === 'object'
-    && !Array.isArray(p.missionPayMultipliers)
+    p.missionPayMultipliers !== undefined &&
+    p.missionPayMultipliers !== null &&
+    typeof p.missionPayMultipliers === 'object' &&
+    !Array.isArray(p.missionPayMultipliers)
   ) {
-    for (const [planetId, value] of Object.entries(p.missionPayMultipliers as Record<string, unknown>)) {
+    for (const [planetId, value] of Object.entries(
+      p.missionPayMultipliers as Record<string, unknown>,
+    )) {
       if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
         missionPayMultipliers[planetId] = value
       }
@@ -135,14 +135,12 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
   }
 
   const hasJourneyFields =
-    Array.isArray(p.completedJourneyIds)
-    || (
-      p.journeyStepProgress !== undefined
-      && p.journeyStepProgress !== null
-      && typeof p.journeyStepProgress === 'object'
-      && !Array.isArray(p.journeyStepProgress)
-    )
-    || Array.isArray(p.unlockedFeatureIds)
+    Array.isArray(p.completedJourneyIds) ||
+    (p.journeyStepProgress !== undefined &&
+      p.journeyStepProgress !== null &&
+      typeof p.journeyStepProgress === 'object' &&
+      !Array.isArray(p.journeyStepProgress)) ||
+    Array.isArray(p.unlockedFeatureIds)
 
   let completedJourneyIds: string[] = []
   if (Array.isArray(p.completedJourneyIds)) {
@@ -155,12 +153,14 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
 
   const journeyStepProgress: Record<string, string[]> = {}
   if (
-    p.journeyStepProgress !== undefined
-    && p.journeyStepProgress !== null
-    && typeof p.journeyStepProgress === 'object'
-    && !Array.isArray(p.journeyStepProgress)
+    p.journeyStepProgress !== undefined &&
+    p.journeyStepProgress !== null &&
+    typeof p.journeyStepProgress === 'object' &&
+    !Array.isArray(p.journeyStepProgress)
   ) {
-    for (const [journeyId, stepIds] of Object.entries(p.journeyStepProgress as Record<string, unknown>)) {
+    for (const [journeyId, stepIds] of Object.entries(
+      p.journeyStepProgress as Record<string, unknown>,
+    )) {
       if (!Array.isArray(stepIds)) continue
       journeyStepProgress[journeyId] = stepIds.filter(
         (entry): entry is string => typeof entry === 'string' && entry.length > 0,

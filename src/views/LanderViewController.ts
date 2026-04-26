@@ -71,7 +71,10 @@ export class LanderViewController implements Tickable {
     // Scene + camera
     this.sceneManager = new SceneManager()
     this.sceneManager.mount(container)
-    this.vehicleCamera = new VehicleCamera(LANDER_CAMERA_CONFIG, this.sceneManager.renderer.domElement)
+    this.vehicleCamera = new VehicleCamera(
+      LANDER_CAMERA_CONFIG,
+      this.sceneManager.renderer.domElement,
+    )
     this.sceneManager.setCamera(this.vehicleCamera)
     this.tickHandler.register(this.vehicleCamera, TICK_PRIORITY_RENDER - 1)
     this.tickHandler.register(this.sceneManager, TICK_PRIORITY_RENDER)

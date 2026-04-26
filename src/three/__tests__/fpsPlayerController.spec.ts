@@ -27,12 +27,7 @@ function createController(): {
   const input = new InputManager(FPS_BINDINGS)
   const cam = new FpsCamera(playerConfigJson.camera)
   const hm = flatHeightmap()
-  const ctrl = new FpsPlayerController(
-    input,
-    cam,
-    playerConfigJson as FpsPlayerConfig,
-    hm,
-  )
+  const ctrl = new FpsPlayerController(input, cam, playerConfigJson as FpsPlayerConfig, hm)
   cam.setTarget(ctrl.group)
   return { ctrl, input, cam }
 }
@@ -84,13 +79,7 @@ function createControllerWithCollisionWorld(world: CollisionWorld): {
   const input = new InputManager(FPS_BINDINGS)
   const cam = new FpsCamera(playerConfigJson.camera)
   const hm = flatHeightmap()
-  const ctrl = new FpsPlayerController(
-    input,
-    cam,
-    playerConfigJson as FpsPlayerConfig,
-    hm,
-    world,
-  )
+  const ctrl = new FpsPlayerController(input, cam, playerConfigJson as FpsPlayerConfig, hm, world)
   cam.setTarget(ctrl.group)
   return { ctrl, input, cam }
 }
@@ -166,7 +155,9 @@ describe('FpsPlayerController', () => {
   it('death fires when HP reaches zero from hypoxia', () => {
     const { ctrl } = createController()
     let died = false
-    ctrl.onDeath = () => { died = true }
+    ctrl.onDeath = () => {
+      died = true
+    }
     // Drain O2 then keep ticking until HP hits 0
     for (let i = 0; i < 1000; i++) ctrl.tick(1.0)
     expect(ctrl.hp).toBe(0)

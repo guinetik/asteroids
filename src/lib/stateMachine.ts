@@ -146,16 +146,24 @@ export class StateMachine<T extends string> implements Tickable {
   }
 
   /** The currently active state name, or `null` if no state has been entered. */
-  get state(): T | null { return this.currentState }
+  get state(): T | null {
+    return this.currentState
+  }
 
   /** The state that was active before the most recent transition, or `null`. */
-  get previousState(): T | null { return this._previousState }
+  get previousState(): T | null {
+    return this._previousState
+  }
 
   /** Seconds elapsed since the current state was entered. */
-  get stateTime(): number { return this._stateTime }
+  get stateTime(): number {
+    return this._stateTime
+  }
 
   /** `true` while the machine is paused; ticks are no-ops in this mode. */
-  get paused(): boolean { return this._paused }
+  get paused(): boolean {
+    return this._paused
+  }
 
   /**
    * Normalised progress through the current timed state, in `[0, 1]`.
@@ -194,7 +202,9 @@ export class StateMachine<T extends string> implements Tickable {
    *
    * @param stateName - State to test against.
    */
-  is(stateName: T): boolean { return this.currentState === stateName }
+  is(stateName: T): boolean {
+    return this.currentState === stateName
+  }
 
   /**
    * Returns `true` if the current state is any of the provided names.
@@ -286,10 +296,14 @@ export class StateMachine<T extends string> implements Tickable {
   }
 
   /** Pauses the machine. All subsequent `tick` calls are no-ops until `resume` is called. */
-  pause(): void { this._paused = true }
+  pause(): void {
+    this._paused = true
+  }
 
   /** Resumes the machine after a `pause`. */
-  resume(): void { this._paused = false }
+  resume(): void {
+    this._paused = false
+  }
 
   /**
    * Resets the machine to a clean state.
@@ -363,9 +377,7 @@ export class StateMachine<T extends string> implements Tickable {
     for (let i = 0; i < phases.length; i++) {
       const phase = phases[i]!
       const isLast = i === phases.length - 1
-      const nextPhase = isLast
-        ? (options.loop ? phases[0]!.name : undefined)
-        : phases[i + 1]!.name
+      const nextPhase = isLast ? (options.loop ? phases[0]!.name : undefined) : phases[i + 1]!.name
       states[phase.name] = {
         duration: phase.duration,
         next: nextPhase,
@@ -393,9 +405,7 @@ export class StateMachine<T extends string> implements Tickable {
   private call<R>(fn: (...args: never[]) => R, ...args: unknown[]): R | undefined {
     if (typeof fn === 'function') {
       const callable = fn as (...a: unknown[]) => R
-      return this.context
-        ? callable.call(this.context, ...args)
-        : callable(...args)
+      return this.context ? callable.call(this.context, ...args) : callable(...args)
     }
     return undefined
   }

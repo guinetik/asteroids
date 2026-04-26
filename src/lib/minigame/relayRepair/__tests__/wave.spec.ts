@@ -22,7 +22,11 @@ const INITIAL_CELLS: Cell[] = [
 function rotated(cells: Cell[], row: number, col: number, by: number): Cell[] {
   return cells.map((c) =>
     c.row === row && c.col === col
-      ? { ...c, rotation: (((c.rotation + by) % 4 + 4) % 4) as 0 | 1 | 2 | 3, visualRotation: c.visualRotation + by }
+      ? {
+          ...c,
+          rotation: ((((c.rotation + by) % 4) + 4) % 4) as 0 | 1 | 2 | 3,
+          visualRotation: c.visualRotation + by,
+        }
       : c,
   )
 }
@@ -44,9 +48,7 @@ describe('traceWave', () => {
   })
 
   it('records a blocked exit when the wave enters an empty cell', () => {
-    const cells: Cell[] = [
-      { row: 0, col: 0, shape: 'I', rotation: 0, visualRotation: 0 },
-    ]
+    const cells: Cell[] = [{ row: 0, col: 0, shape: 'I', rotation: 0, visualRotation: 0 }]
     const { exits } = traceWave(cells, 0, 0, 'E')
     const offGrid = exits.find((e) => e.row === 0 && e.col === 1)
     expect(offGrid).toBeDefined()
@@ -54,9 +56,7 @@ describe('traceWave', () => {
   })
 
   it('T-piece at rotation 0 with S-heading (N-incoming) branches to E and S', () => {
-    const cells: Cell[] = [
-      { row: 1, col: 1, shape: 'T', rotation: 0, visualRotation: 0 },
-    ]
+    const cells: Cell[] = [{ row: 1, col: 1, shape: 'T', rotation: 0, visualRotation: 0 }]
     // Wave heading S enters from N. T-rot-0 ports = [N, E, S] → N accepted,
     // exits E and S (both off a 1×1 virtual grid).
     const { activeSegments, exits } = traceWave(cells, 1, 1, 'S')
@@ -68,9 +68,7 @@ describe('traceWave', () => {
   })
 
   it('blocks when incoming direction has no matching port', () => {
-    const cells: Cell[] = [
-      { row: 1, col: 1, shape: 'T', rotation: 0, visualRotation: 0 },
-    ]
+    const cells: Cell[] = [{ row: 1, col: 1, shape: 'T', rotation: 0, visualRotation: 0 }]
     // Wave heading E enters from W. T-rot-0 ports = [N, E, S] — no W → blocked.
     const { activeCells, exits } = traceWave(cells, 1, 1, 'E')
     expect(activeCells.size).toBe(0)

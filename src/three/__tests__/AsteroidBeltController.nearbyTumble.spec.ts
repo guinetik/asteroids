@@ -141,7 +141,9 @@ function mockRandomSequence(values: number[]): void {
  * @param controller - Controller instance under test
  * @returns Typed view of the controller internals needed by the tests
  */
-function getControllerTestInternals(controller: AsteroidBeltController): BeltControllerTestInternals {
+function getControllerTestInternals(
+  controller: AsteroidBeltController,
+): BeltControllerTestInternals {
   return controller as unknown as BeltControllerTestInternals
 }
 

@@ -195,18 +195,15 @@ export class OrbitCaptureSystem {
   constructor(bodies: CaptureBody[]) {
     this.bodyData = bodies.map((body) => {
       const captureRadius = Math.max(
-        body.captureRadiusOverride
-          ?? (
-            body.displayRadius
-            * SIZE_SCALE
-            * orbitConfig.captureMultiplier
-            * (body.captureRadiusMultiplier ?? 1)
-          ),
+        body.captureRadiusOverride ??
+          body.displayRadius *
+            SIZE_SCALE *
+            orbitConfig.captureMultiplier *
+            (body.captureRadiusMultiplier ?? 1),
         orbitConfig.minCaptureRadius,
       )
       const orbitRadius = Math.max(
-        body.orbitRadiusOverride
-          ?? (body.displayRadius * SIZE_SCALE * orbitConfig.orbitMultiplier),
+        body.orbitRadiusOverride ?? body.displayRadius * SIZE_SCALE * orbitConfig.orbitMultiplier,
         orbitConfig.minOrbitRadius,
       )
       return {
@@ -473,11 +470,7 @@ export class OrbitCaptureSystem {
       this.targetData.orbitalSpeedMultiplier,
     )
     this.orbitAngle +=
-      (
-        orbitConfig.orbitVisualSpeed
-        * gameplaySpeedMultiplier
-        / this.targetData.orbitRadius
-      ) * dt
+      ((orbitConfig.orbitVisualSpeed * gameplaySpeedMultiplier) / this.targetData.orbitRadius) * dt
 
     return {
       x: bx + Math.cos(this.orbitAngle) * this.targetData.orbitRadius,
@@ -605,8 +598,8 @@ export class OrbitCaptureSystem {
     if (this.targetData) {
       const baseSpeed = orbitConfig.orbitLaunchSpeed * this.targetData.orbitalSpeedMultiplier
       const planetVel = Math.sqrt(
-        (this.targetData.body.getWorldX() - this.prevPlanetX) ** 2
-        + (this.targetData.body.getWorldZ() - this.prevPlanetZ) ** 2,
+        (this.targetData.body.getWorldX() - this.prevPlanetX) ** 2 +
+          (this.targetData.body.getWorldZ() - this.prevPlanetZ) ** 2,
       )
       orbitalSpeed = baseSpeed + planetVel
     }

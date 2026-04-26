@@ -94,11 +94,7 @@ export function lerpCameraAnchor(shipStart: number, t: number): number {
  * @param aspect - Viewport width / height
  * @returns Frustum half-size in world units for the fully-open state
  */
-export function computeTargetFrustumHalfSize(
-  shipX: number,
-  shipZ: number,
-  aspect: number,
-): number {
+export function computeTargetFrustumHalfSize(shipX: number, shipZ: number, aspect: number): number {
   const horizontalRequired = Math.abs(shipX)
   const verticalRequired = Math.abs(shipZ) * aspect
   const shipRequired = Math.max(horizontalRequired, verticalRequired) * FRUSTUM_SHIP_MARGIN
@@ -135,7 +131,6 @@ export class MapCamera {
 
   /** Ship Z position at the moment the map opened — start of the camera anchor lerp. */
   private openShipZ = 0
-
 
   constructor() {
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, CAMERA_HEIGHT + 100)

@@ -22,10 +22,10 @@ import { ProbeDeployMiniGame } from './probeDeploy/ProbeDeployMiniGame'
 export function isCanvasOrbitalMinigame(minigame: OrbitalMiniGame | null): boolean {
   if (!minigame) return false
   return (
-    minigame instanceof GasCollectionMiniGame
-    || minigame instanceof IceHarvestMiniGame
-    || minigame instanceof MaintenanceMiniGame
-    || minigame instanceof LogisticsRouteMiniGame
-    || minigame instanceof ProbeDeployMiniGame
+    minigame instanceof GasCollectionMiniGame ||
+    minigame instanceof IceHarvestMiniGame ||
+    minigame instanceof MaintenanceMiniGame ||
+    minigame instanceof LogisticsRouteMiniGame ||
+    minigame instanceof ProbeDeployMiniGame
   )
 }

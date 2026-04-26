@@ -252,11 +252,7 @@ export class BacteriophageController implements Tickable {
     if (!isMoving) {
       // Idle: planted legs with subtle knee twitch
       const foot = new THREE.Vector3(cx * 1.2, 0, cz * 1.2)
-      const knee = new THREE.Vector3(
-        cx * 0.7,
-        0.85 + Math.sin(time * 0.8 + phase) * 0.04,
-        cz * 0.7,
-      )
+      const knee = new THREE.Vector3(cx * 0.7, 0.85 + Math.sin(time * 0.8 + phase) * 0.04, cz * 0.7)
       return new THREE.QuadraticBezierCurve3(hip, knee, foot)
     }
 
@@ -398,11 +394,7 @@ export class BacteriophageController implements Tickable {
           legHeight * 0.5 + Math.sin(t * 8 + leg.phase) * 0.03 * (1 - ease),
           cz * (0.3 + legSpread * 0.4),
         )
-        const foot = new THREE.Vector3(
-          cx * legSpread,
-          footDrop,
-          cz * legSpread,
-        )
+        const foot = new THREE.Vector3(cx * legSpread, footDrop, cz * legSpread)
 
         const curve = new THREE.QuadraticBezierCurve3(hip, knee, foot)
         leg.tube.update(curve)

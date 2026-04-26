@@ -4,7 +4,9 @@ import { MessageSystem } from '../messageSystem'
 
 describe('SHIP_MESSAGE_CATALOG', () => {
   it('includes Marta audio on the startup seller message', () => {
-    const startup = SHIP_MESSAGE_CATALOG.find((message) => message.id === 'seller-welcome-earth-orbit')
+    const startup = SHIP_MESSAGE_CATALOG.find(
+      (message) => message.id === 'seller-welcome-earth-orbit',
+    )
 
     expect(startup?.audioUrl).toBe('/sound/marta-001.mp3')
     expect(startup?.enqueueOnDismiss).toEqual(['jay-so-you-actually-did-it'])
@@ -12,7 +14,9 @@ describe('SHIP_MESSAGE_CATALOG', () => {
   })
 
   it('includes the Jay startup follow-up with audio', () => {
-    const followUp = SHIP_MESSAGE_CATALOG.find((message) => message.id === 'jay-so-you-actually-did-it')
+    const followUp = SHIP_MESSAGE_CATALOG.find(
+      (message) => message.id === 'jay-so-you-actually-did-it',
+    )
 
     expect(followUp).toMatchObject({
       from: 'Jay Mercer',

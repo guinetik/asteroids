@@ -21,9 +21,9 @@ function normalizeLoadedInventory(data: unknown): Inventory | null {
 
   const parsed = data as Partial<Inventory>
   if (
-    typeof parsed.maxSlots !== 'number'
-    || typeof parsed.maxWeightKg !== 'number'
-    || !Array.isArray(parsed.stacks)
+    typeof parsed.maxSlots !== 'number' ||
+    typeof parsed.maxWeightKg !== 'number' ||
+    !Array.isArray(parsed.stacks)
   ) {
     return null
   }

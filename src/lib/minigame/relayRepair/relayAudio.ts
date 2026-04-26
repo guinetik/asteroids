@@ -215,22 +215,25 @@ export class RelayAudio {
       }
     }
 
-    globalThis.setTimeout(() => {
-      const nodes: Array<AudioNode | null> = [
-        this.toneGain,
-        this.wobbleDepth,
-        this.noiseFilter,
-        this.noiseGain,
-        this.output,
-      ]
-      for (const n of nodes) {
-        if (!n) continue
-        try {
-          n.disconnect()
-        } catch {
-          /* ignore disconnect races */
+    globalThis.setTimeout(
+      () => {
+        const nodes: Array<AudioNode | null> = [
+          this.toneGain,
+          this.wobbleDepth,
+          this.noiseFilter,
+          this.noiseGain,
+          this.output,
+        ]
+        for (const n of nodes) {
+          if (!n) continue
+          try {
+            n.disconnect()
+          } catch {
+            /* ignore disconnect races */
+          }
         }
-      }
-    }, (FADE_OUT_SEC + 0.1) * 1000)
+      },
+      (FADE_OUT_SEC + 0.1) * 1000,
+    )
   }
 }

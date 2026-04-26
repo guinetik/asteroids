@@ -93,7 +93,10 @@ export function getCompositionTintColor(itemId: string): THREE.Color {
   color.setHSL(
     hsl.h,
     Math.min(1, hsl.s * FALLBACK_SATURATION_BOOST + FALLBACK_SATURATION_OFFSET),
-    Math.min(FALLBACK_LIGHTNESS_CEILING, hsl.l * FALLBACK_LIGHTNESS_SCALE + FALLBACK_LIGHTNESS_OFFSET),
+    Math.min(
+      FALLBACK_LIGHTNESS_CEILING,
+      hsl.l * FALLBACK_LIGHTNESS_SCALE + FALLBACK_LIGHTNESS_OFFSET,
+    ),
   )
   return color
 }
@@ -118,14 +121,8 @@ const INSTANCE_HASH_MIX = 1000003
  * Compose a stable per-instance salt so (beltIndex, beltMeshIndex, localIndex)
  * always maps to the same roll, independent of enumeration order.
  */
-export function instanceSalt(
-  beltIndex: number,
-  beltMeshIndex: number,
-  localIndex: number,
-): number {
-  return (
-    ((beltIndex * INSTANCE_HASH_MIX + beltMeshIndex) * INSTANCE_HASH_MIX + localIndex) | 0
-  )
+export function instanceSalt(beltIndex: number, beltMeshIndex: number, localIndex: number): number {
+  return ((beltIndex * INSTANCE_HASH_MIX + beltMeshIndex) * INSTANCE_HASH_MIX + localIndex) | 0
 }
 
 /**

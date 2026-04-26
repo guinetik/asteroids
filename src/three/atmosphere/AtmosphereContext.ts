@@ -87,7 +87,12 @@ export function sunDirectionFromAngles(azimuthDeg: number, elevationDeg: number)
  */
 export function createAtmosphereContext(
   lighting: AsteroidLighting,
-  opts: { dustCoverage: number; albedo: number; biome: string; baseColor: [number, number, number] },
+  opts: {
+    dustCoverage: number
+    albedo: number
+    biome: string
+    baseColor: [number, number, number]
+  },
 ): AtmosphereContext {
   return {
     landerAltitude: 0,

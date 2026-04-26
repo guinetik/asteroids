@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import * as THREE from 'three'
-import {
-  getSatelliteManifest,
-  hasSatelliteManifest,
-  validateManifest,
-} from '../satelliteManifests'
+import { getSatelliteManifest, hasSatelliteManifest, validateManifest } from '../satelliteManifests'
 
 describe('satelliteManifests', () => {
   it('returns the component list for a known manifest key', () => {

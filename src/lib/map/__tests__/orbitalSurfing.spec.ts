@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  findNearestOrbitPoint,
-  extractOrbitArc,
-} from '../orbitalSurfing'
+import { findNearestOrbitPoint, extractOrbitArc } from '../orbitalSurfing'
 
 describe('findNearestOrbitPoint', () => {
   // Simple circular orbit: 8 points on a circle of radius 10

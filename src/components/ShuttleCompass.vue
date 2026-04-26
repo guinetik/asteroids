@@ -58,7 +58,8 @@ const markers = computed(() => {
         color: m.color,
         opacity: m.clamped ? 0.4 : 1,
       }"
-    >{{ m.label }}</span>
+      >{{ m.label }}</span
+    >
     <div class="shuttle-compass__pointer" />
   </div>
 </template>

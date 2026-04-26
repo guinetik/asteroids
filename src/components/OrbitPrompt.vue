@@ -64,39 +64,54 @@ const details = computed(() => {
     <span class="orbit-prompt-action">{{ action }}</span>
     <span v-for="line in details" :key="line" class="orbit-prompt-detail">{{ line }}</span>
     <div v-if="isCharging" class="orbit-prompt-bar">
-      <div class="orbit-prompt-bar-fill" :style="{ width: (props.orbitState.chargeLevel * 100) + '%' }"></div>
+      <div
+        class="orbit-prompt-bar-fill"
+        :style="{ width: props.orbitState.chargeLevel * 100 + '%' }"
+      ></div>
     </div>
     <button
       v-if="shopAvailable && orbitState.state === 'orbiting'"
       type="button"
       class="orbit-prompt-engineering-btn"
-      @click="uiAudio.notifyButtonClick(); emit('openEngineeringBay')"
+      @click="
+        uiAudio.notifyButtonClick()
+        emit('openEngineeringBay')
+      "
     >
-      U  Engineering Bay
+      U Engineering Bay
     </button>
     <button
       v-if="shopAvailable && orbitState.state === 'orbiting'"
       type="button"
       class="orbit-prompt-mission-board-btn"
-      @click="uiAudio.notifyButtonClick(); emit('openMissionBoard')"
+      @click="
+        uiAudio.notifyButtonClick()
+        emit('openMissionBoard')
+      "
     >
-      J  Mission Board
+      J Mission Board
     </button>
     <button
       v-if="shopAvailable && orbitState.state === 'orbiting'"
       type="button"
       class="orbit-prompt-shop-btn"
-      @click="uiAudio.notifyButtonClick(); emit('openShop')"
+      @click="
+        uiAudio.notifyButtonClick()
+        emit('openShop')
+      "
     >
-      B  Shop
+      B Shop
     </button>
     <button
       v-if="missionAvailable && orbitState.state === 'orbiting'"
       type="button"
       class="orbit-prompt-mission-btn"
-      @click="uiAudio.notifyButtonClick(); emit('openMission')"
+      @click="
+        uiAudio.notifyButtonClick()
+        emit('openMission')
+      "
     >
-      I  Mission
+      I Mission
     </button>
   </div>
 </template>

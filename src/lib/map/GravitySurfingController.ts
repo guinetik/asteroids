@@ -86,7 +86,12 @@ export class GravitySurfingController {
 
   /** Emitted each frame during coupling with (shipPos, railPos, progress 0→1). */
   onCouplingProgress:
-    | ((shipPosition: THREE.Vector3, railPosition: THREE.Vector3, progress: number, dt: number) => void)
+    | ((
+        shipPosition: THREE.Vector3,
+        railPosition: THREE.Vector3,
+        progress: number,
+        dt: number,
+      ) => void)
     | null = null
 
   /** Emitted when coupling starts. */
@@ -173,9 +178,9 @@ export class GravitySurfingController {
           directionSign: this.state.directionSign,
           cruiseSpeed: 0,
           targetCruiseSpeed:
-            this.state.directionSign
-            * MAP_PHYSICS.maxThrustSpeed
-            * MAP_CONFIG.GRAVITY_SURF_CRUISE_SPEED_MULTIPLIER,
+            this.state.directionSign *
+            MAP_PHYSICS.maxThrustSpeed *
+            MAP_CONFIG.GRAVITY_SURF_CRUISE_SPEED_MULTIPLIER,
         }
       }
     }
@@ -208,8 +213,9 @@ export class GravitySurfingController {
     }
 
     if (this.state.mode === 'decoupling') {
-      const brakeActive = this.state.useBrakeThruster
-        && shuttle.thrusterSystem.canFire('brake', shuttle.getThrusterRuntimeModifiers())
+      const brakeActive =
+        this.state.useBrakeThruster &&
+        shuttle.thrusterSystem.canFire('brake', shuttle.getThrusterRuntimeModifiers())
       shuttle.setExternalBrakeActive(brakeActive)
       const nextElapsed = Math.min(this.state.duration, this.state.elapsed + dt)
       const t = this.state.duration <= 0 ? 1 : nextElapsed / this.state.duration
@@ -244,12 +250,12 @@ export class GravitySurfingController {
 
   private getRailTarget(deps: GravitySurfingControllerDeps): GravitySurfRailTarget | null {
     if (
-      !deps.shuttleController
-      || !deps.gridVisible
-      || !deps.hasGravitySurfingUnlock
-      || deps.orbitState !== 'free'
-      || deps.slingshotBurstActive
-      || deps.shuttleController.speed < GRAVITY_SURF_MIN_ATTACH_SPEED
+      !deps.shuttleController ||
+      !deps.gridVisible ||
+      !deps.hasGravitySurfingUnlock ||
+      deps.orbitState !== 'free' ||
+      deps.slingshotBurstActive ||
+      deps.shuttleController.speed < GRAVITY_SURF_MIN_ATTACH_SPEED
     ) {
       return null
     }
@@ -332,10 +338,14 @@ export class GravitySurfingController {
     const shuttle = deps.shuttleController
     if (!shuttle) return
     if (spawnWave) {
-      const forward = new THREE.Vector3(1, 0, 0)
-        .applyAxisAngle(new THREE.Vector3(0, 1, 0), shuttle.heading)
-      const waveX = shuttle.position.x + forward.x * MAP_CONFIG.GRAVITY_SURF_DECOUPLE_WAVE_FORWARD_OFFSET
-      const waveZ = shuttle.position.z + forward.z * MAP_CONFIG.GRAVITY_SURF_DECOUPLE_WAVE_FORWARD_OFFSET
+      const forward = new THREE.Vector3(1, 0, 0).applyAxisAngle(
+        new THREE.Vector3(0, 1, 0),
+        shuttle.heading,
+      )
+      const waveX =
+        shuttle.position.x + forward.x * MAP_CONFIG.GRAVITY_SURF_DECOUPLE_WAVE_FORWARD_OFFSET
+      const waveZ =
+        shuttle.position.z + forward.z * MAP_CONFIG.GRAVITY_SURF_DECOUPLE_WAVE_FORWARD_OFFSET
       deps.gravitationalEventManager?.spawnRandomInWorld({
         x: waveX,
         z: waveZ,
@@ -358,13 +368,10 @@ export class GravitySurfingController {
     shuttle.group.rotation.z = 0
   }
 
-  private isBrakeActive(
-    shuttle: ShuttleController,
-    deps: GravitySurfingControllerDeps,
-  ): boolean {
+  private isBrakeActive(shuttle: ShuttleController, deps: GravitySurfingControllerDeps): boolean {
     return Boolean(
-      deps.inputManager?.isActionActive('brake')
-      && shuttle.thrusterSystem.canFire('brake', shuttle.getThrusterRuntimeModifiers()),
+      deps.inputManager?.isActionActive('brake') &&
+      shuttle.thrusterSystem.canFire('brake', shuttle.getThrusterRuntimeModifiers()),
     )
   }
 
@@ -378,21 +385,16 @@ export class GravitySurfingController {
       : { x: state.lineCoord, z: state.alongCoord }
   }
 
-  private applySurfTilt(
-    deps: GravitySurfingControllerDeps,
-    dt: number,
-    surfaceY: number,
-  ): void {
+  private applySurfTilt(deps: GravitySurfingControllerDeps, dt: number, surfaceY: number): void {
     const shuttle = deps.shuttleController
     const grid = deps.spaceTimeGrid
     if (!shuttle || !grid) return
 
-    const sampleDistance = Math.max(
-      2,
-      deps.mapGridSize / MAP_CONFIG.MAP_SPACE_TIME_GRID_RESOLUTION,
+    const sampleDistance = Math.max(2, deps.mapGridSize / MAP_CONFIG.MAP_SPACE_TIME_GRID_RESOLUTION)
+    const forwardDir = new THREE.Vector3(1, 0, 0).applyAxisAngle(
+      new THREE.Vector3(0, 1, 0),
+      shuttle.heading,
     )
-    const forwardDir = new THREE.Vector3(1, 0, 0)
-      .applyAxisAngle(new THREE.Vector3(0, 1, 0), shuttle.heading)
     const rightDir = new THREE.Vector3(forwardDir.z, 0, -forwardDir.x)
     const px = shuttle.group.position.x
     const pz = shuttle.group.position.z

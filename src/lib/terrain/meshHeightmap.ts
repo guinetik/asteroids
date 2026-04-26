@@ -18,12 +18,16 @@ import { Heightmap } from './heightmap'
 // Install BVH accelerators on Three.js prototypes. Safe to re-assign on
 // subsequent module loads — both `computeBoundsTree` and `acceleratedRaycast`
 // are the canonical three-mesh-bvh helpers.
-;(THREE.BufferGeometry.prototype as unknown as {
-  computeBoundsTree: typeof computeBoundsTree
-}).computeBoundsTree = computeBoundsTree
-;(THREE.BufferGeometry.prototype as unknown as {
-  disposeBoundsTree: typeof disposeBoundsTree
-}).disposeBoundsTree = disposeBoundsTree
+;(
+  THREE.BufferGeometry.prototype as unknown as {
+    computeBoundsTree: typeof computeBoundsTree
+  }
+).computeBoundsTree = computeBoundsTree
+;(
+  THREE.BufferGeometry.prototype as unknown as {
+    disposeBoundsTree: typeof disposeBoundsTree
+  }
+).disposeBoundsTree = disposeBoundsTree
 ;(THREE.Mesh.prototype as unknown as { raycast: typeof acceleratedRaycast }).raycast =
   acceleratedRaycast
 

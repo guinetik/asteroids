@@ -3,13 +3,13 @@
  *
  * The gather objective asks the player to mine `N` distinct minerals
  * (count scales with difficulty) up to a per-mineral kg quota, then
- * deposit them at a glowing crate at the flat zone. Mining is handled
+ * load them into a delivery rocket at the flat zone. Mining is handled
  * by the universal {@link RockYieldSystem} — this minigame just tracks
- * the listed quotas and spawns the deposit crate.
+ * the listed quotas and spawns the delivery rocket.
  *
  * The minigame never touches inventory directly: the rock yield system
  * already writes minerals into the shuttle inventory as soon as a
- * drill bolt extracts them. The crate interaction is a soft "ship it"
+ * drill bolt extracts them. The rocket interaction is a soft "ship it"
  * gate, not a transactional moment.
  *
  * @author guinetik
@@ -28,7 +28,7 @@ import type { ConcreteObjective } from '@/lib/missions/types'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import type { MineralEntry } from '@/lib/asteroids/types'
 import { TERMINAL_INTERACT_RANGE } from '@/three/TerminalModel'
-import { DepositCrateModel } from '@/three/DepositCrateModel'
+import { DepositRocketModel } from '@/three/DepositRocketModel'
 import { resolveCompositionItemId } from '@/lib/asteroids/mineralItemMap'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 import type { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
@@ -120,7 +120,7 @@ const MIN_ROCKS_PER_REQUIRED_MINERAL = 3
 
 /** Deterministic 0→1 PRNG for rock placement from a level seed. */
 function seededRng(seed: number): () => number {
-  let s = (seed | 0) || 1
+  let s = seed | 0 || 1
   return () => {
     s = (s + 0x6d2b79f5) | 0
     let t = Math.imul(s ^ (s >>> 15), 1 | s)
@@ -141,7 +141,7 @@ export interface GatherMinigameOptions {
   rockYieldSystem: RockYieldSystem
 }
 
-/** Mining quota minigame — surface rocks, yields, and deposit crate hand-in. */
+/** Mining quota minigame — surface rocks, yields, and delivery rocket hand-in. */
 export class GatherMinigame implements MiniGame, MiniGameEvents {
   readonly objectiveIndex: number
 
@@ -150,7 +150,7 @@ export class GatherMinigame implements MiniGame, MiniGameEvents {
   private _disposed = false
 
   private readonly scene: THREE.Scene
-  private readonly crate: DepositCrateModel
+  private readonly rocket: DepositRocketModel
   private readonly objective: ConcreteObjective
   private readonly rockYieldSystem: RockYieldSystem
   private readonly quotas: GatherMineralQuota[]
@@ -238,7 +238,7 @@ export class GatherMinigame implements MiniGame, MiniGameEvents {
         complete: true,
         active: false,
       })
-      this._steps.push({ label: 'Deposit at the crate', complete: false, active: true })
+      this._steps.push({ label: 'Deposit at the delivery rocket', complete: false, active: true })
     } else {
       const perMineral = Math.max(1, Math.ceil(totalKg / required.length))
       this.quotas = required.map((entry) => ({
@@ -255,14 +255,14 @@ export class GatherMinigame implements MiniGame, MiniGameEvents {
           progress: { current: 0, target: quota.targetKg, unit: 'kg' },
         })
       }
-      this._steps.push({ label: 'Deposit at the crate', complete: false, active: false })
+      this._steps.push({ label: 'Deposit at the delivery rocket', complete: false, active: false })
       this._steps[0]!.active = true
     }
 
-    this.crate = new DepositCrateModel({ baseColor: 0x2a1f10, trimColor: 0xffb347 })
+    this.rocket = new DepositRocketModel({ baseColor: 0xdddddd, trimColor: 0xff5500 })
     const groundY = options.heightmap.heightAt(options.objective.x, options.objective.z)
-    this.crate.placeAt(options.objective.x, options.objective.z, groundY)
-    this.scene.add(this.crate.group)
+    this.rocket.placeAt(options.objective.x, options.objective.z, groundY)
+    this.scene.add(this.rocket.group)
 
     this.listener = (itemId, kg) => this.handleExtraction(itemId, kg)
     const previous = this.rockYieldSystem.onMineralExtracted
@@ -322,13 +322,21 @@ export class GatherMinigame implements MiniGame, MiniGameEvents {
   }
 
   tick(_dt: number, ctx: MiniGameContext): void {
-    if (this._status === 'completed') return
+    if (this._status === 'completed') {
+      if (this.rocket.isTakingOff) {
+        const done = this.rocket.tick(_dt)
+        if (done) {
+          this.rocket.completeTakeoff()
+        }
+      }
+      return
+    }
 
     this._isPlayerNear = false
     if (ctx.levelState !== 'eva' || !ctx.playerPosition) return
 
-    const dx = ctx.playerPosition.x - this.crate.group.position.x
-    const dz = ctx.playerPosition.z - this.crate.group.position.z
+    const dx = ctx.playerPosition.x - this.rocket.group.position.x
+    const dz = ctx.playerPosition.z - this.rocket.group.position.z
     const dist = Math.sqrt(dx * dx + dz * dz)
     if (dist > TERMINAL_INTERACT_RANGE) return
 
@@ -347,15 +355,15 @@ export class GatherMinigame implements MiniGame, MiniGameEvents {
     depositStep.active = false
     this._status = 'completed'
     this.onPrompt?.(null)
-    this.crate.setVisible(false)
+    this.rocket.takeOff()
     this.onStepChange?.(this.objectiveIndex, this._steps)
     this.onComplete?.(this.objectiveIndex)
   }
 
   dispose(): void {
     this._disposed = true
-    this.scene.remove(this.crate.group)
-    this.crate.dispose()
+    this.scene.remove(this.rocket.group)
+    this.rocket.dispose()
     this.onPrompt = null
     this.onComplete = null
     this.onStepChange = null

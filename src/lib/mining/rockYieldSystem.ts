@@ -240,10 +240,7 @@ export class RockYieldSystem {
   }
 
   /** Roll a mineral from an arbitrary weighted list using seed + spawn index. */
-  private rollMineralFrom(
-    items: { itemId: string; weight: number }[],
-    spawnIndex: number,
-  ): string {
+  private rollMineralFrom(items: { itemId: string; weight: number }[], spawnIndex: number): string {
     const r = pseudoRandom(this.seed, spawnIndex)
     const totalWeight = items.reduce((sum, entry) => sum + entry.weight, 0)
     const target = r * totalWeight

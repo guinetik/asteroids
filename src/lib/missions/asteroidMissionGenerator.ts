@@ -267,9 +267,9 @@ export function isMissionWaypointSolarDistanceClearOfPlanets(
     const meshRadiusWorld = planet.displayRadius * SIZE_SCALE
     const eccRadialPadWorld = aCatalog * planet.orbit.eccentricity * ORBIT_SCALE
     const minGap =
-      meshRadiusWorld
-      + MISSION_WAYPOINT_PLANET_ORBIT_STANDOFF_WORLD * m
-      + eccRadialPadWorld * WAYPOINT_ORBIT_ECCENTRICITY_PAD_FRACTION * m
+      meshRadiusWorld +
+      MISSION_WAYPOINT_PLANET_ORBIT_STANDOFF_WORLD * m +
+      eccRadialPadWorld * WAYPOINT_ORBIT_ECCENTRICITY_PAD_FRACTION * m
     if (Math.abs(Rw - orbitRadiusWorld) < minGap) {
       return false
     }
@@ -623,8 +623,8 @@ export function generateWaypointInRegion(
   const band = outerRadius - innerRadius
   const reachT = missionDifficultyReachT(difficulty)
   const outerExtentFraction =
-    WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY
-    + (1 - WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY) * reachT
+    WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY +
+    (1 - WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY) * reachT
   const maxRadialOffsetCatalog = band * outerExtentFraction
 
   return pickWaypointWorldXZInAnnulus(innerRadius, outerRadius, maxRadialOffsetCatalog)
@@ -722,8 +722,8 @@ export function generateAsteroidMission(
       // filter, Colonial Guard's wide `near-earth` band swamps Earth/Mars/Venus at low diff.
       if (!combatOnlyHost && isExterminateOnlyTemplate(template)) continue
       if (
-        requiredObjectiveType
-        && !template.objectiveSlots.some((slot) => slot.type === requiredObjectiveType)
+        requiredObjectiveType &&
+        !template.objectiveSlots.some((slot) => slot.type === requiredObjectiveType)
       ) {
         continue
       }

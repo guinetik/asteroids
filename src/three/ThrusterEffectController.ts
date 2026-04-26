@@ -262,11 +262,14 @@ export class ThrusterEffectController implements Tickable {
       this.thrustSpawnAccumulator += THRUST_SPAWN_RATE * dt
       while (this.thrustSpawnAccumulator >= 1) {
         const nozzle = NOZZLE_OFFSETS[Math.floor(Math.random() * NOZZLE_OFFSETS.length)]!
-        const worldPos = nozzle.clone().multiplyScalar(scale)
+        const worldPos = nozzle
+          .clone()
+          .multiplyScalar(scale)
           .applyQuaternion(this.shuttle.group.quaternion)
           .add(this.shuttle.position)
-        const pushDir = new THREE.Vector3(-PUSH_FORCE * scale, 0, 0)
-          .applyQuaternion(this.shuttle.group.quaternion)
+        const pushDir = new THREE.Vector3(-PUSH_FORCE * scale, 0, 0).applyQuaternion(
+          this.shuttle.group.quaternion,
+        )
         this.thrustEmitter.emit(worldPos, pushDir)
         this.thrustSpawnAccumulator -= 1
       }
@@ -278,11 +281,14 @@ export class ThrusterEffectController implements Tickable {
       this.brakeSpawnAccumulator += BRAKE_SPAWN_RATE * dt
       while (this.brakeSpawnAccumulator >= 1) {
         const nozzle = NOZZLE_OFFSETS[Math.floor(Math.random() * NOZZLE_OFFSETS.length)]!
-        const worldPos = nozzle.clone().multiplyScalar(scale)
+        const worldPos = nozzle
+          .clone()
+          .multiplyScalar(scale)
           .applyQuaternion(this.shuttle.group.quaternion)
           .add(this.shuttle.position)
-        const pushDir = new THREE.Vector3(-PUSH_FORCE * scale, 0, 0)
-          .applyQuaternion(this.shuttle.group.quaternion)
+        const pushDir = new THREE.Vector3(-PUSH_FORCE * scale, 0, 0).applyQuaternion(
+          this.shuttle.group.quaternion,
+        )
         this.brakeEmitter.emit(worldPos, pushDir)
         this.brakeSpawnAccumulator -= 1
       }
@@ -296,7 +302,9 @@ export class ThrusterEffectController implements Tickable {
       this.rcsSpawnAccumulator += RCS_SPAWN_RATE * dt
       while (this.rcsSpawnAccumulator >= 1) {
         const wingtip = isYawingLeft ? RIGHT_WINGTIP : LEFT_WINGTIP
-        const worldPos = wingtip.clone().multiplyScalar(scale)
+        const worldPos = wingtip
+          .clone()
+          .multiplyScalar(scale)
           .applyQuaternion(this.shuttle.group.quaternion)
           .add(this.shuttle.position)
         const pushForce = RCS_PUSH_FORCE * scale

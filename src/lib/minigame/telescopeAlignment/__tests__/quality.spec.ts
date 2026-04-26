@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  computeQuality,
-  perKnobQuality,
-  ledColor,
-} from '../quality'
+import { computeQuality, perKnobQuality, ledColor } from '../quality'
 import {
   MAX_FOCUS,
   MAX_CHROMA,
@@ -68,10 +64,7 @@ describe('perKnobQuality', () => {
   })
 
   it('is symmetric around zero', () => {
-    expect(perKnobQuality(-10, MAX_POINTING)).toBeCloseTo(
-      perKnobQuality(10, MAX_POINTING),
-      6,
-    )
+    expect(perKnobQuality(-10, MAX_POINTING)).toBeCloseTo(perKnobQuality(10, MAX_POINTING), 6)
   })
 
   it('returns 1 for zero-range inputs (no division by zero)', () => {

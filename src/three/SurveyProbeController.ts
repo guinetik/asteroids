@@ -276,7 +276,9 @@ export class SurveyProbeController implements Tickable {
             (Math.random() - 0.5) * 2,
             Math.random() * 0.5 + 0.5,
             (Math.random() - 0.5) * 2,
-          ).normalize().multiplyScalar(12)
+          )
+            .normalize()
+            .multiplyScalar(12)
           this.collectEmitter.emit(probe.group.position, dir)
         }
 

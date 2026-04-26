@@ -53,7 +53,10 @@ describe('ensureMinimumStarterFuelCells', () => {
   })
 
   it('does nothing when stacks already meet the minimum', () => {
-    const seed = inventoryWithStarterFuelCells(createInventoryForCargoBay(1), { shuttle: 5, lander: 5 })
+    const seed = inventoryWithStarterFuelCells(createInventoryForCargoBay(1), {
+      shuttle: 5,
+      lander: 5,
+    })
     const inv = ensureMinimumStarterFuelCells(seed, counts)
     expect(getStack(inv, RESERVE_FUEL_ID)?.quantity).toBe(5)
     expect(getStack(inv, LANDER_FUEL_ID)?.quantity).toBe(5)

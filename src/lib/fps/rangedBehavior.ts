@@ -92,9 +92,7 @@ export class RangedBehavior implements EnemyBehavior {
       this.pickWanderTarget()
     }
 
-    const nearest = pickNearestChaseSiteXZ(
-      enemyX, enemyZ, playerX, playerY, playerZ, hostageSites,
-    )
+    const nearest = pickNearestChaseSiteXZ(enemyX, enemyZ, playerX, playerY, playerZ, hostageSites)
     const dx = nearest.x - enemyX
     const dz = nearest.z - enemyZ
     const distToNearest = Math.sqrt(distSqXZ(enemyX, enemyZ, nearest.x, nearest.z))
@@ -220,8 +218,7 @@ export class RangedBehavior implements EnemyBehavior {
     const wanderDist = Math.sqrt(wx * wx + wz * wz)
 
     if (wanderDist < WANDER_ARRIVE_THRESHOLD) {
-      this.wanderPause =
-        WANDER_PAUSE_MIN + Math.random() * (WANDER_PAUSE_MAX - WANDER_PAUSE_MIN)
+      this.wanderPause = WANDER_PAUSE_MIN + Math.random() * (WANDER_PAUSE_MAX - WANDER_PAUSE_MIN)
       this.pickWanderTarget()
       return {
         moveDir: { x: 0, z: 0 },

@@ -16,12 +16,7 @@ const emit = defineEmits<{
 
 <template>
   <div class="ship-message-dialog">
-    <section
-      class="ship-message-card"
-      role="dialog"
-      aria-modal="true"
-      :aria-labelledby="subjectId"
-    >
+    <section class="ship-message-card" role="dialog" aria-modal="true" :aria-labelledby="subjectId">
       <header class="ship-message-card__chrome">
         <span>ShipNet / Stored Message</span>
         <span>Link Stable</span>
@@ -56,7 +51,11 @@ const emit = defineEmits<{
               :autoplay-token="props.autoplayToken"
             />
           </div>
-          <div v-if="props.message.audioUrl" class="ship-message-card__audio-divider" aria-hidden="true" />
+          <div
+            v-if="props.message.audioUrl"
+            class="ship-message-card__audio-divider"
+            aria-hidden="true"
+          />
 
           <div class="ship-message-card__copy">
             <p
@@ -69,11 +68,7 @@ const emit = defineEmits<{
 
           <footer class="ship-message-card__footer">
             <span class="ship-message-card__hint">Stored aboard habitat shuttle memory</span>
-            <button
-              type="button"
-              class="ship-message-card__button"
-              @click="emit('dismiss')"
-            >
+            <button type="button" class="ship-message-card__button" @click="emit('dismiss')">
               Dismiss
             </button>
           </footer>

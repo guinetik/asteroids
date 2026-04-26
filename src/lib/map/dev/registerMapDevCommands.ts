@@ -83,8 +83,7 @@ export function registerMapDevCommands(ctx: MapDevCommandContext): void {
     toggleSpaceTimeGrid: () => ctx.toggleSpaceTimeGrid(),
     toggleAmbient: () => ctx.toggleAmbient(),
     toggleLabels: () => ctx.toggleLabels(),
-    spawnGravitationalEvent: () =>
-      ctx.getGravitationalEventManager()?.spawnRandomInWorld() ?? null,
+    spawnGravitationalEvent: () => ctx.getGravitationalEventManager()?.spawnRandomInWorld() ?? null,
     spawnGravitationalEventNearPlayer: (maxOffset = 200) => {
       const mgr = ctx.getGravitationalEventManager()
       const shuttle = ctx.getShuttleController()

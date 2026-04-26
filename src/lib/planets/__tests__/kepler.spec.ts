@@ -279,7 +279,7 @@ describe('orbitPathPoints', () => {
       epoch: 0,
     }
     const pts = orbitPathPoints(elliptical, 360)
-    const radii = pts.map(p => Math.sqrt(p.x ** 2 + p.y ** 2 + p.z ** 2))
+    const radii = pts.map((p) => Math.sqrt(p.x ** 2 + p.y ** 2 + p.z ** 2))
     const minR = Math.min(...radii)
     const maxR = Math.max(...radii)
     expect(minR).toBeCloseTo(10 * (1 - 0.4), 2)
@@ -301,7 +301,7 @@ describe('orbitPathPoints', () => {
       inclination: Math.PI / 6, // 30°
     }
     const pts = orbitPathPoints(inclined, 36)
-    const zValues = pts.map(p => p.z)
+    const zValues = pts.map((p) => p.z)
     const maxZ = Math.max(...zValues)
     const minZ = Math.min(...zValues)
     expect(maxZ - minZ).toBeGreaterThan(1)

@@ -95,11 +95,7 @@ onUnmounted(() => {
     <div v-else class="mission-minigame-card">
       <div class="mission-minigame-card__chrome">
         <span>EVA Maintenance Terminal</span>
-        <button
-          type="button"
-          class="ship-message-card__button"
-          @click="emit('close')"
-        >
+        <button type="button" class="ship-message-card__button" @click="emit('close')">
           Close
         </button>
       </div>
@@ -109,11 +105,7 @@ onUnmounted(() => {
         <div class="mission-minigame-card__details">
           Reward: +{{ mission.template.reward.toLocaleString() }} CR on completion
         </div>
-        <button
-          type="button"
-          class="mission-minigame-card__complete-btn"
-          @click="handleComplete"
-        >
+        <button type="button" class="mission-minigame-card__complete-btn" @click="handleComplete">
           Complete Maintenance
         </button>
       </div>

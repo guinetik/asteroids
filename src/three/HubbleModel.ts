@@ -49,8 +49,8 @@ async function ensureHubbleTemplate(): Promise<THREE.Group> {
         const size = new THREE.Vector3()
         box.getSize(size)
         console.info(
-          `[HubbleModel] loaded mesh list (raw size ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}):\n`
-          + parts.join('\n'),
+          `[HubbleModel] loaded mesh list (raw size ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}):\n` +
+            parts.join('\n'),
         )
       }
       return scene
@@ -127,11 +127,11 @@ export class HubbleModel {
     group.add(sceneClone)
     const beacon = options?.maintenanceState
       ? new MaintenanceBeacon(group, {
-        offset: HUBBLE_MAINTENANCE_BEACON_OFFSET,
-        initialState: options.maintenanceState,
-        radius: 0.022,
-        distance: 5,
-      })
+          offset: HUBBLE_MAINTENANCE_BEACON_OFFSET,
+          initialState: options.maintenanceState,
+          radius: 0.022,
+          distance: 5,
+        })
       : null
     return new HubbleModel(group, beacon)
   }

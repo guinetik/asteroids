@@ -72,9 +72,7 @@ function ellipseSubpath(cx: number, cy: number, rx: number, ry: number): string 
 }
 
 /** Bodies that already have a route line — don't duplicate the distance label. */
-const routeBodyNames = computed(() =>
-  new Set(props.overlay.distances.map((d) => d.name)),
-)
+const routeBodyNames = computed(() => new Set(props.overlay.distances.map((d) => d.name)))
 
 /** Consecutive line segments for the persistent world-line polyline. */
 const trajectorySegments = computed(() => {
@@ -108,11 +106,7 @@ const trajectorySegments = computed(() => {
     </svg>
 
     <!-- Gravity rings -->
-    <div
-      v-for="ring in overlay.gravityRings"
-      :key="'ring-' + ring.name"
-      class="map-gravity-ring"
-    >
+    <div v-for="ring in overlay.gravityRings" :key="'ring-' + ring.name" class="map-gravity-ring">
       <div
         class="map-influence-ring"
         :style="{
@@ -135,7 +129,11 @@ const trajectorySegments = computed(() => {
 
     <!-- Distance lines (SVG) -->
     <svg class="map-distance-svg">
-      <g v-if="worldLineVisible" v-for="(segment, index) in trajectorySegments" :key="'traj-' + index">
+      <g
+        v-if="worldLineVisible"
+        v-for="(segment, index) in trajectorySegments"
+        :key="'traj-' + index"
+      >
         <line
           :x1="segment.x1 + '%'"
           :y1="segment.y1 + '%'"
@@ -172,7 +170,9 @@ const trajectorySegments = computed(() => {
     >
       <div class="map-body-dot" />
       <span class="map-label">{{ label.name }}</span>
-      <span v-if="!routeBodyNames.has(label.name)" class="map-label-distance">{{ label.distance }}</span>
+      <span v-if="!routeBodyNames.has(label.name)" class="map-label-distance">{{
+        label.distance
+      }}</span>
       <button
         v-if="isFastTravelable(label.id)"
         type="button"
@@ -190,7 +190,10 @@ const trajectorySegments = computed(() => {
     <div
       v-if="overlay.missionWaypoint"
       class="map-waypoint-indicator"
-      :style="{ left: overlay.missionWaypoint.screenX + '%', top: overlay.missionWaypoint.screenY + '%' }"
+      :style="{
+        left: overlay.missionWaypoint.screenX + '%',
+        top: overlay.missionWaypoint.screenY + '%',
+      }"
     >
       <div class="map-waypoint-dot" />
       <span class="map-waypoint-label">{{ overlay.missionWaypoint.name }}</span>
@@ -198,14 +201,8 @@ const trajectorySegments = computed(() => {
     </div>
 
     <!-- Ship marker silhouette -->
-    <div
-      class="map-ship-marker"
-      :style="{ left: overlay.shipX + '%', top: overlay.shipY + '%' }"
-    >
-      <div
-        class="map-ship-rotator"
-        :style="{ transform: 'rotate(' + overlay.headingDeg + 'deg)' }"
-      >
+    <div class="map-ship-marker" :style="{ left: overlay.shipX + '%', top: overlay.shipY + '%' }">
+      <div class="map-ship-rotator" :style="{ transform: 'rotate(' + overlay.headingDeg + 'deg)' }">
         <div class="map-ship-icon" />
       </div>
     </div>

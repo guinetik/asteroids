@@ -263,7 +263,9 @@ onMounted(async () => {
         objCompleteLabel.value = obj.label
       }
       objCompleteVisible.value = true
-      Timer.after(5, () => { objCompleteVisible.value = false })
+      Timer.after(5, () => {
+        objCompleteVisible.value = false
+      })
     }
     viewController.onMissionComplete = () => {
       missionCompleteVisible.value = true
@@ -405,10 +407,7 @@ function handleToggleMusic(): void {
       @click="handleToggleMusic"
     >
       <svg viewBox="0 0 24 24" class="level-topbar__music-icon" aria-hidden="true">
-        <path
-          d="M5 9v6h4l5 4V5L9 9H5Z"
-          fill="currentColor"
-        />
+        <path d="M5 9v6h4l5 4V5L9 9H5Z" fill="currentColor" />
         <path
           v-if="musicEnabled"
           d="M17 9.5a4 4 0 0 1 0 5"
@@ -527,40 +526,20 @@ function handleToggleMusic(): void {
       ATTITUDE
     </div>
   </div>
-  <div
-    v-if="stateInfo.state === 'lander' && stateInfo.grounded"
-    class="exit-prompt"
-  >
+  <div v-if="stateInfo.state === 'lander' && stateInfo.grounded" class="exit-prompt">
     <span class="exit-prompt__text">EXIT (F)</span>
   </div>
-  <div
-    v-if="stateInfo.canEnterLander"
-    class="exit-prompt"
-  >
+  <div v-if="stateInfo.canEnterLander" class="exit-prompt">
     <span class="exit-prompt__text">ENTER (F)</span>
   </div>
-  <div
-    v-if="terminalPrompt"
-    class="exit-prompt"
-  >
+  <div v-if="terminalPrompt" class="exit-prompt">
     <span class="exit-prompt__text exit-prompt__text--terminal">{{ terminalPrompt }}</span>
   </div>
-  <div
-    v-if="stateInfo.canExfil"
-    class="exit-prompt"
-  >
+  <div v-if="stateInfo.canExfil" class="exit-prompt">
     <span class="exit-prompt__text">EXFILTRATE (F)</span>
   </div>
-  <div
-    v-if="arrivalFade > 0"
-    class="death-fade"
-    :style="{ opacity: arrivalFade }"
-  />
-  <div
-    v-if="deathFade > 0"
-    class="death-fade"
-    :style="{ opacity: deathFade }"
-  />
+  <div v-if="arrivalFade > 0" class="death-fade" :style="{ opacity: arrivalFade }" />
+  <div v-if="deathFade > 0" class="death-fade" :style="{ opacity: deathFade }" />
   <div v-if="deathMessage" class="death-message">
     <span class="death-message__text">YOU DIED</span>
   </div>
@@ -593,7 +572,9 @@ function handleToggleMusic(): void {
       aria-live="polite"
     >
       <span class="pickup-failed__head">CARGO FULL</span>
-      <span class="pickup-failed__body">{{ pickupFailed.label }} lost &mdash; {{ pickupFailed.reason }}</span>
+      <span class="pickup-failed__body"
+        >{{ pickupFailed.label }} lost &mdash; {{ pickupFailed.reason }}</span
+      >
     </div>
   </transition>
 </template>
@@ -751,8 +732,13 @@ function handleToggleMusic(): void {
   animation: death-pulse 2s ease-in-out infinite;
 }
 @keyframes death-pulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 /* Landing warnings — slightly above center, large, impossible to miss */
@@ -792,8 +778,13 @@ function handleToggleMusic(): void {
   animation: warning-blink 0.4s ease-in-out infinite;
 }
 @keyframes warning-blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 /* Helmet visor frame — EVA only, rounded viewport with opaque corners */
@@ -854,7 +845,9 @@ function handleToggleMusic(): void {
 }
 .pickup-failed-enter-active,
 .pickup-failed-leave-active {
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
 }
 .pickup-failed-enter-from,
 .pickup-failed-leave-to {

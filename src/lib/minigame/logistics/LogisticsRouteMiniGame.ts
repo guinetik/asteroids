@@ -318,8 +318,7 @@ export class LogisticsRouteMiniGame implements OrbitalMiniGame, OrbitalMiniGameE
       if (Math.abs(t.y) < MIN_TRAFFIC_GAP) return
     }
 
-    const speedFactor =
-      TRAFFIC_SPEED_MIN_FACTOR + Math.random() * TRAFFIC_SPEED_RANDOM_RANGE
+    const speedFactor = TRAFFIC_SPEED_MIN_FACTOR + Math.random() * TRAFFIC_SPEED_RANDOM_RANGE
     const speed = this.scrollSpeed * speedFactor
 
     this.traffic.push({
@@ -411,9 +410,7 @@ export class LogisticsRouteMiniGame implements OrbitalMiniGame, OrbitalMiniGameE
 
   /** Remove collected and off-screen symbols. */
   private cleanupSymbols(): void {
-    this.symbols = this.symbols.filter(
-      (s) => !s.collected && s.y < CANVAS_HEIGHT + 40,
-    )
+    this.symbols = this.symbols.filter((s) => !s.collected && s.y < CANVAS_HEIGHT + 40)
   }
 
   /** Remove off-screen traffic shuttles. */

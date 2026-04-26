@@ -62,8 +62,18 @@ watch(
     removed.value = false
     phase.value = 'opening'
     sequenceHandle = Timer.sequence([
-      { delay: OPEN_DURATION_SEC, fn: () => { phase.value = 'open' } },
-      { delay: HOLD_DURATION_SEC, fn: () => { phase.value = 'closing' } },
+      {
+        delay: OPEN_DURATION_SEC,
+        fn: () => {
+          phase.value = 'open'
+        },
+      },
+      {
+        delay: HOLD_DURATION_SEC,
+        fn: () => {
+          phase.value = 'closing'
+        },
+      },
       {
         delay: CLOSE_DURATION_SEC,
         fn: () => {

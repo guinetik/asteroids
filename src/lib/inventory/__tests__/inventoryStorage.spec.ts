@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { addItem, createInventory } from '../inventory'
-import { clearInventory, INVENTORY_STORAGE_KEY, loadInventory, saveInventory } from '../inventoryStorage'
+import {
+  clearInventory,
+  INVENTORY_STORAGE_KEY,
+  loadInventory,
+  saveInventory,
+} from '../inventoryStorage'
 
 describe('inventoryStorage', () => {
   beforeEach(() => {

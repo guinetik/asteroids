@@ -131,11 +131,7 @@ function handleBackdropClick(event: MouseEvent): void {
 <template>
   <Teleport to="body">
     <Transition name="inventory-panel-fade">
-      <div
-        v-if="open"
-        class="inventory-panel-overlay"
-        @click="handleBackdropClick"
-      >
+      <div v-if="open" class="inventory-panel-overlay" @click="handleBackdropClick">
         <div
           class="inventory-panel"
           role="dialog"
@@ -145,9 +141,7 @@ function handleBackdropClick(event: MouseEvent): void {
           <header class="inventory-panel__header">
             <div>
               <h2 id="inventory-panel-title" class="inventory-panel__title">CARGO HOLD</h2>
-              <p class="inventory-panel__subtitle">
-                Press <kbd>B</kbd> or <kbd>Esc</kbd> to close
-              </p>
+              <p class="inventory-panel__subtitle">Press <kbd>B</kbd> or <kbd>Esc</kbd> to close</p>
             </div>
             <button
               type="button"
@@ -199,15 +193,9 @@ function handleBackdropClick(event: MouseEvent): void {
           </section>
 
           <section class="inventory-panel__body">
-            <p v-if="rows.length === 0" class="inventory-panel__empty">
-              CARGO HOLD EMPTY
-            </p>
+            <p v-if="rows.length === 0" class="inventory-panel__empty">CARGO HOLD EMPTY</p>
             <ul v-else class="inventory-panel__list" role="list">
-              <li
-                v-for="row in rows"
-                :key="row.itemId"
-                class="inventory-panel__row"
-              >
+              <li v-for="row in rows" :key="row.itemId" class="inventory-panel__row">
                 <div class="inventory-panel__icon" aria-hidden="true">
                   {{ row.label.charAt(0) }}
                 </div>
@@ -232,7 +220,14 @@ function handleBackdropClick(event: MouseEvent): void {
                     :step="1"
                     :value="row.splitQty"
                     :disabled="row.quantity <= 1"
-                    @input="(e) => setSplit(row.itemId, Number((e.target as HTMLInputElement).value), row.quantity)"
+                    @input="
+                      (e) =>
+                        setSplit(
+                          row.itemId,
+                          Number((e.target as HTMLInputElement).value),
+                          row.quantity,
+                        )
+                    "
                   />
                   <input
                     type="number"
@@ -240,7 +235,14 @@ function handleBackdropClick(event: MouseEvent): void {
                     :min="1"
                     :max="row.quantity"
                     :value="row.splitQty"
-                    @input="(e) => setSplit(row.itemId, Number((e.target as HTMLInputElement).value), row.quantity)"
+                    @input="
+                      (e) =>
+                        setSplit(
+                          row.itemId,
+                          Number((e.target as HTMLInputElement).value),
+                          row.quantity,
+                        )
+                    "
                   />
                 </div>
                 <div class="inventory-panel__actions">

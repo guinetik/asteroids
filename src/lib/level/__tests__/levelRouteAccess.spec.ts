@@ -5,11 +5,7 @@ import {
   hasLevelRouteQueryOverride,
   canAccessLevelRoute,
 } from '../levelRouteAccess'
-import {
-  saveProfile,
-  createProfile,
-  PROFILE_STORAGE_KEY,
-} from '@/lib/player/profile'
+import { saveProfile, createProfile, PROFILE_STORAGE_KEY } from '@/lib/player/profile'
 import {
   saveActiveMission,
   ACTIVE_MISSION_KEY,

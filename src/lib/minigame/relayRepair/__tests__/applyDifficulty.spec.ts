@@ -6,7 +6,10 @@ import { traceWave } from '../wave'
 
 const base = getRelayPuzzle(DEFAULT_PUZZLE_KEY).cells
 
-function countDiffs(a: readonly { rotation: number }[], b: readonly { rotation: number }[]): number {
+function countDiffs(
+  a: readonly { rotation: number }[],
+  b: readonly { rotation: number }[],
+): number {
   let n = 0
   for (let i = 0; i < a.length; i++) if (a[i]!.rotation !== b[i]!.rotation) n++
   return n
@@ -63,11 +66,11 @@ describe('rolled puzzles are solvable by inverting misrotations', () => {
     const rolled = applyRelayDifficulty(base, 'mission-solve', 3)
     // Compute inverse rotations and apply them.
     const solved = rolled.map((c, i) => {
-      const bump = ((c.rotation - base[i]!.rotation) % 4 + 4) % 4
+      const bump = (((c.rotation - base[i]!.rotation) % 4) + 4) % 4
       const inverse = (4 - bump) % 4
       return {
         ...c,
-        rotation: (((c.rotation + inverse) % 4) + 4) % 4 as 0 | 1 | 2 | 3,
+        rotation: ((((c.rotation + inverse) % 4) + 4) % 4) as 0 | 1 | 2 | 3,
       }
     })
     const { exits } = traceWave(solved, 0, 0, 'E')

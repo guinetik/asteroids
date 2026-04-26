@@ -85,7 +85,10 @@ let hostageTemplatePromise: Promise<THREE.Group> | null = null
  * @param skeleton - Skin skeleton from a {@link THREE.SkinnedMesh}
  * @param boneName - Exact glTF joint name (e.g. `mixamorig:LeftArm`)
  */
-export function findHostageBone(skeleton: THREE.Skeleton, boneName: string): THREE.Bone | undefined {
+export function findHostageBone(
+  skeleton: THREE.Skeleton,
+  boneName: string,
+): THREE.Bone | undefined {
   return skeleton.bones.find((b) => b.name === boneName)
 }
 
@@ -178,7 +181,8 @@ export class HostageModel {
   readonly group = new THREE.Group()
 
   /** Materials that support emissive tint for hit/heal feedback. */
-  private readonly feedbackMaterials: (THREE.MeshStandardMaterial | THREE.MeshPhysicalMaterial)[] = []
+  private readonly feedbackMaterials: (THREE.MeshStandardMaterial | THREE.MeshPhysicalMaterial)[] =
+    []
   private feedbackTimer = 0
 
   private constructor(sceneClone: THREE.Group) {

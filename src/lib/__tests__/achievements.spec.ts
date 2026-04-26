@@ -54,7 +54,12 @@ describe('achievements', () => {
     const result = evaluateAchievementUnlocks(
       {
         profile,
-        upgradeLevels: { gravitySurfing: 1, shuttleCargoBay: 2, shuttleHull: 2, shuttleFuelCapacity: 1 },
+        upgradeLevels: {
+          gravitySurfing: 1,
+          shuttleCargoBay: 2,
+          shuttleHull: 2,
+          shuttleFuelCapacity: 1,
+        },
       },
       ['flight-first-launch', 'missions-first-contract', 'exploration-first-asteroid'],
     )

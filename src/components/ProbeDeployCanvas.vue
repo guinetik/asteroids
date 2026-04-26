@@ -73,8 +73,12 @@ const URANUS_RING_TILT = 0.15
 // ─── Pre-generated scene elements — Mercury ───────────────────────────────────
 
 interface StarMercury {
-  x: number; y: number; r: number; brightness: number
-  twinkleSpeed: number; twinkleOffset: number
+  x: number
+  y: number
+  r: number
+  brightness: number
+  twinkleSpeed: number
+  twinkleOffset: number
 }
 const mercuryStars: StarMercury[] = []
 for (let i = 0; i < 90; i++) {
@@ -89,8 +93,13 @@ for (let i = 0; i < 90; i++) {
 }
 
 interface SolarWindParticle {
-  x: number; y: number; length: number; speed: number
-  alpha: number; thickness: number; yDrift: number
+  x: number
+  y: number
+  length: number
+  speed: number
+  alpha: number
+  thickness: number
+  yDrift: number
 }
 const solarWind: SolarWindParticle[] = []
 for (let i = 0; i < 60; i++) {
@@ -106,8 +115,12 @@ for (let i = 0; i < 60; i++) {
 }
 
 interface Streamer {
-  angle: number; length: number; width: number; alpha: number
-  pulseSpeed: number; pulseOffset: number
+  angle: number
+  length: number
+  width: number
+  alpha: number
+  pulseSpeed: number
+  pulseOffset: number
 }
 const streamers: Streamer[] = []
 for (let i = 0; i < 8; i++) {
@@ -123,7 +136,12 @@ for (let i = 0; i < 8; i++) {
 }
 
 // Craters stored as angular positions on the sphere (drawn with rotation offset)
-interface Crater { angle: number; dist: number; r: number; depth: number }
+interface Crater {
+  angle: number
+  dist: number
+  r: number
+  depth: number
+}
 const craters: Crater[] = []
 for (let i = 0; i < 18; i++) {
   craters.push({
@@ -135,8 +153,13 @@ for (let i = 0; i < 18; i++) {
 }
 
 interface ShimmerPoint {
-  angle: number; dist: number; phase: number; speed: number
-  amplitude: number; size: number; alpha: number
+  angle: number
+  dist: number
+  phase: number
+  speed: number
+  amplitude: number
+  size: number
+  alpha: number
 }
 const shimmerPoints: ShimmerPoint[] = []
 for (let i = 0; i < 30; i++) {
@@ -154,8 +177,13 @@ for (let i = 0; i < 30; i++) {
 // ─── Pre-generated scene elements — Uranus ────────────────────────────────────
 
 interface StarUranus {
-  x: number; y: number; r: number; brightness: number
-  twinkleSpeed: number; twinkleOffset: number; hue: number
+  x: number
+  y: number
+  r: number
+  brightness: number
+  twinkleSpeed: number
+  twinkleOffset: number
+  hue: number
 }
 const uranusStars: StarUranus[] = []
 for (let i = 0; i < 220; i++) {
@@ -171,7 +199,12 @@ for (let i = 0; i < 220; i++) {
 }
 
 interface KuiperParticle {
-  x: number; y: number; size: number; brightness: number; drift: number; twinkle: number
+  x: number
+  y: number
+  size: number
+  brightness: number
+  drift: number
+  twinkle: number
 }
 const kuiperParticles: KuiperParticle[] = []
 for (let i = 0; i < 120; i++) {
@@ -185,7 +218,13 @@ for (let i = 0; i < 120; i++) {
   })
 }
 
-interface RingParticle { angle: number; dist: number; size: number; brightness: number; speed: number }
+interface RingParticle {
+  angle: number
+  dist: number
+  size: number
+  brightness: number
+  speed: number
+}
 const ringParticles: RingParticle[] = []
 for (let i = 0; i < 180; i++) {
   const angle = Math.random() * Math.PI * 2
@@ -200,8 +239,14 @@ for (let i = 0; i < 180; i++) {
 }
 
 interface IceCrystal {
-  x: number; y: number; size: number; speed: number; alpha: number
-  drift: number; sparkle: number; sparkleSpeed: number
+  x: number
+  y: number
+  size: number
+  speed: number
+  alpha: number
+  drift: number
+  sparkle: number
+  sparkleSpeed: number
 }
 const iceCrystals: IceCrystal[] = []
 for (let i = 0; i < 50; i++) {
@@ -221,8 +266,12 @@ for (let i = 0; i < 50; i++) {
 
 function drawMercuryBackground(ctx: CanvasRenderingContext2D) {
   const bg = ctx.createRadialGradient(
-    MERCURY_SUN_X + 60, MERCURY_SUN_Y + 60, 50,
-    MERCURY_SUN_X + 200, MERCURY_SUN_Y + 200, CANVAS_WIDTH * 1.2,
+    MERCURY_SUN_X + 60,
+    MERCURY_SUN_Y + 60,
+    50,
+    MERCURY_SUN_X + 200,
+    MERCURY_SUN_Y + 200,
+    CANVAS_WIDTH * 1.2,
   )
   bg.addColorStop(0, '#4a3018')
   bg.addColorStop(0.15, '#2a1a10')
@@ -237,8 +286,12 @@ function drawMercurySunGlow(ctx: CanvasRenderingContext2D) {
   ctx.save()
 
   const corona1 = ctx.createRadialGradient(
-    MERCURY_SUN_X, MERCURY_SUN_Y, MERCURY_SUN_R * 0.8,
-    MERCURY_SUN_X, MERCURY_SUN_Y, MERCURY_SUN_R * 2.5,
+    MERCURY_SUN_X,
+    MERCURY_SUN_Y,
+    MERCURY_SUN_R * 0.8,
+    MERCURY_SUN_X,
+    MERCURY_SUN_Y,
+    MERCURY_SUN_R * 2.5,
   )
   corona1.addColorStop(0, 'rgba(255,220,140,0.25)')
   corona1.addColorStop(0.3, 'rgba(255,180,80,0.08)')
@@ -249,8 +302,12 @@ function drawMercurySunGlow(ctx: CanvasRenderingContext2D) {
 
   const pulse = Math.sin(simTime * 1.2) * 0.02 + 0.98
   const corona2 = ctx.createRadialGradient(
-    MERCURY_SUN_X, MERCURY_SUN_Y, MERCURY_SUN_R * 0.5,
-    MERCURY_SUN_X, MERCURY_SUN_Y, MERCURY_SUN_R * 1.5 * pulse,
+    MERCURY_SUN_X,
+    MERCURY_SUN_Y,
+    MERCURY_SUN_R * 0.5,
+    MERCURY_SUN_X,
+    MERCURY_SUN_Y,
+    MERCURY_SUN_R * 1.5 * pulse,
   )
   corona2.addColorStop(0, 'rgba(255,240,200,0.4)')
   corona2.addColorStop(0.4, 'rgba(255,200,120,0.12)')
@@ -262,8 +319,12 @@ function drawMercurySunGlow(ctx: CanvasRenderingContext2D) {
   ctx.beginPath()
   ctx.arc(MERCURY_SUN_X, MERCURY_SUN_Y, MERCURY_SUN_R, 0, Math.PI * 2)
   const sunBody = ctx.createRadialGradient(
-    MERCURY_SUN_X, MERCURY_SUN_Y, MERCURY_SUN_R * 0.7,
-    MERCURY_SUN_X, MERCURY_SUN_Y, MERCURY_SUN_R,
+    MERCURY_SUN_X,
+    MERCURY_SUN_Y,
+    MERCURY_SUN_R * 0.7,
+    MERCURY_SUN_X,
+    MERCURY_SUN_Y,
+    MERCURY_SUN_R,
   )
   sunBody.addColorStop(0, 'rgba(255,250,230,0.9)')
   sunBody.addColorStop(0.6, 'rgba(255,230,170,0.8)')
@@ -348,8 +409,12 @@ function drawMercuryPlanet(ctx: CanvasRenderingContext2D) {
 
   // Base scorched-gray gradient
   const pg = ctx.createRadialGradient(
-    PLANET_X - PLANET_R * 0.3, PLANET_Y - PLANET_R * 0.3, PLANET_R * 0.1,
-    PLANET_X, PLANET_Y, PLANET_R,
+    PLANET_X - PLANET_R * 0.3,
+    PLANET_Y - PLANET_R * 0.3,
+    PLANET_R * 0.1,
+    PLANET_X,
+    PLANET_Y,
+    PLANET_R,
   )
   pg.addColorStop(0, '#a09080')
   pg.addColorStop(0.3, '#8a7568')
@@ -397,8 +462,12 @@ function drawMercuryPlanet(ctx: CanvasRenderingContext2D) {
 
   // Limb darkening
   const limb = ctx.createRadialGradient(
-    PLANET_X - PLANET_R * 0.2, PLANET_Y - PLANET_R * 0.15, PLANET_R * 0.3,
-    PLANET_X, PLANET_Y, PLANET_R,
+    PLANET_X - PLANET_R * 0.2,
+    PLANET_Y - PLANET_R * 0.15,
+    PLANET_R * 0.3,
+    PLANET_X,
+    PLANET_Y,
+    PLANET_R,
   )
   limb.addColorStop(0, 'rgba(0,0,0,0)')
   limb.addColorStop(0.6, 'rgba(0,0,0,0.1)')
@@ -410,7 +479,14 @@ function drawMercuryPlanet(ctx: CanvasRenderingContext2D) {
   ctx.restore()
 
   // Atmospheric heat glow
-  const glow = ctx.createRadialGradient(PLANET_X, PLANET_Y, PLANET_R - 5, PLANET_X, PLANET_Y, PLANET_R + 28)
+  const glow = ctx.createRadialGradient(
+    PLANET_X,
+    PLANET_Y,
+    PLANET_R - 5,
+    PLANET_X,
+    PLANET_Y,
+    PLANET_R + 28,
+  )
   glow.addColorStop(0, 'rgba(255,160,60,0)')
   glow.addColorStop(0.4, 'rgba(255,140,40,0.04)')
   glow.addColorStop(0.7, 'rgba(255,120,30,0.02)')
@@ -427,7 +503,10 @@ function drawMercuryHeatShimmer(ctx: CanvasRenderingContext2D) {
   for (const s of shimmerPoints) {
     const a = s.angle + rot
     const px = PLANET_X + Math.cos(a) * s.dist + Math.sin(simTime * s.speed + s.phase) * s.amplitude
-    const py = PLANET_Y + Math.sin(a) * s.dist + Math.cos(simTime * s.speed * 0.7 + s.phase) * s.amplitude * 0.5
+    const py =
+      PLANET_Y +
+      Math.sin(a) * s.dist +
+      Math.cos(simTime * s.speed * 0.7 + s.phase) * s.amplitude * 0.5
     ctx.beginPath()
     ctx.arc(px, py, s.size, 0, Math.PI * 2)
     ctx.fillStyle = `rgba(255,180,80,${s.alpha})`
@@ -444,8 +523,12 @@ function drawMercuryHeatOverlay(ctx: CanvasRenderingContext2D) {
 
 function drawMercuryVignette(ctx: CanvasRenderingContext2D) {
   const vg = ctx.createRadialGradient(
-    CANVAS_WIDTH * 0.15, CANVAS_HEIGHT * 0.15, CANVAS_WIDTH * 0.15,
-    CANVAS_WIDTH * 0.5, CANVAS_HEIGHT * 0.5, CANVAS_WIDTH * 0.75,
+    CANVAS_WIDTH * 0.15,
+    CANVAS_HEIGHT * 0.15,
+    CANVAS_WIDTH * 0.15,
+    CANVAS_WIDTH * 0.5,
+    CANVAS_HEIGHT * 0.5,
+    CANVAS_WIDTH * 0.75,
   )
   vg.addColorStop(0, 'rgba(0,0,0,0)')
   vg.addColorStop(0.5, 'rgba(0,0,0,0.05)')
@@ -458,8 +541,12 @@ function drawMercuryVignette(ctx: CanvasRenderingContext2D) {
 
 function drawUranusBackground(ctx: CanvasRenderingContext2D) {
   const bg = ctx.createRadialGradient(
-    PLANET_X - 150, PLANET_Y, 100,
-    CANVAS_WIDTH * 0.5, CANVAS_HEIGHT * 0.5, CANVAS_WIDTH,
+    PLANET_X - 150,
+    PLANET_Y,
+    100,
+    CANVAS_WIDTH * 0.5,
+    CANVAS_HEIGHT * 0.5,
+    CANVAS_WIDTH,
   )
   bg.addColorStop(0, '#0a1218')
   bg.addColorStop(0.2, '#080e14')
@@ -472,7 +559,12 @@ function drawUranusBackground(ctx: CanvasRenderingContext2D) {
 function drawUranusKuiperBelt(ctx: CanvasRenderingContext2D, dt: number) {
   ctx.save()
 
-  const beltGlow = ctx.createLinearGradient(CANVAS_WIDTH * 0.35, CANVAS_HEIGHT * 0.2, CANVAS_WIDTH, CANVAS_HEIGHT * 0.45)
+  const beltGlow = ctx.createLinearGradient(
+    CANVAS_WIDTH * 0.35,
+    CANVAS_HEIGHT * 0.2,
+    CANVAS_WIDTH,
+    CANVAS_HEIGHT * 0.45,
+  )
   beltGlow.addColorStop(0, 'rgba(80,100,130,0)')
   beltGlow.addColorStop(0.3, 'rgba(80,100,130,0.008)')
   beltGlow.addColorStop(0.5, 'rgba(90,110,140,0.012)')
@@ -526,7 +618,14 @@ function drawUranusStars(ctx: CanvasRenderingContext2D) {
 
 function drawUranusSun(ctx: CanvasRenderingContext2D) {
   ctx.save()
-  const glow = ctx.createRadialGradient(URANUS_SUN_X, URANUS_SUN_Y, 0, URANUS_SUN_X, URANUS_SUN_Y, 35)
+  const glow = ctx.createRadialGradient(
+    URANUS_SUN_X,
+    URANUS_SUN_Y,
+    0,
+    URANUS_SUN_X,
+    URANUS_SUN_Y,
+    35,
+  )
   glow.addColorStop(0, 'rgba(255,250,235,0.4)')
   glow.addColorStop(0.15, 'rgba(255,240,200,0.1)')
   glow.addColorStop(0.4, 'rgba(255,220,170,0.02)')
@@ -549,8 +648,12 @@ function drawUranusPlanet(ctx: CanvasRenderingContext2D) {
   ctx.clip()
 
   const pg = ctx.createRadialGradient(
-    PLANET_X + PLANET_R * 0.3, PLANET_Y - PLANET_R * 0.2, PLANET_R * 0.1,
-    PLANET_X, PLANET_Y, PLANET_R,
+    PLANET_X + PLANET_R * 0.3,
+    PLANET_Y - PLANET_R * 0.2,
+    PLANET_R * 0.1,
+    PLANET_X,
+    PLANET_Y,
+    PLANET_R,
   )
   pg.addColorStop(0, '#8ed4cc')
   pg.addColorStop(0.3, '#6dbfb8')
@@ -562,10 +665,10 @@ function drawUranusPlanet(ctx: CanvasRenderingContext2D) {
   ctx.fillRect(PLANET_X - PLANET_R, PLANET_Y - PLANET_R, PLANET_R * 2, PLANET_R * 2)
 
   // Very subtle horizontal bands — shift slightly with rotation for visual feedback
-  const bandShift = (props.minigame.planetRotation * PLANET_R * 0.05) % (PLANET_R * 2 / 8)
+  const bandShift = (props.minigame.planetRotation * PLANET_R * 0.05) % ((PLANET_R * 2) / 8)
   for (let i = 0; i < 8; i++) {
-    const bandY = PLANET_Y - PLANET_R + ((PLANET_R * 2 / 8) * i + bandShift) % (PLANET_R * 2)
-    const bandH = PLANET_R * 2 / 8
+    const bandY = PLANET_Y - PLANET_R + ((((PLANET_R * 2) / 8) * i + bandShift) % (PLANET_R * 2))
+    const bandH = (PLANET_R * 2) / 8
     const alpha = 0.015 + Math.sin(i * 2.1 + simTime * 0.1) * 0.005
     ctx.fillStyle = i % 2 === 0 ? `rgba(100,180,175,${alpha})` : `rgba(60,140,140,${alpha})`
     ctx.fillRect(PLANET_X - PLANET_R, bandY, PLANET_R * 2, bandH)
@@ -573,8 +676,12 @@ function drawUranusPlanet(ctx: CanvasRenderingContext2D) {
 
   // Limb darkening
   const limb = ctx.createRadialGradient(
-    PLANET_X + PLANET_R * 0.2, PLANET_Y - PLANET_R * 0.15, PLANET_R * 0.3,
-    PLANET_X, PLANET_Y, PLANET_R,
+    PLANET_X + PLANET_R * 0.2,
+    PLANET_Y - PLANET_R * 0.15,
+    PLANET_R * 0.3,
+    PLANET_X,
+    PLANET_Y,
+    PLANET_R,
   )
   limb.addColorStop(0, 'rgba(0,0,0,0)')
   limb.addColorStop(0.6, 'rgba(0,0,0,0.1)')
@@ -586,7 +693,14 @@ function drawUranusPlanet(ctx: CanvasRenderingContext2D) {
   ctx.restore()
 
   // Atmospheric glow
-  const glow = ctx.createRadialGradient(PLANET_X, PLANET_Y, PLANET_R - 5, PLANET_X, PLANET_Y, PLANET_R + 30)
+  const glow = ctx.createRadialGradient(
+    PLANET_X,
+    PLANET_Y,
+    PLANET_R - 5,
+    PLANET_X,
+    PLANET_Y,
+    PLANET_R + 30,
+  )
   glow.addColorStop(0, 'rgba(100,200,195,0)')
   glow.addColorStop(0.4, 'rgba(100,200,195,0.04)')
   glow.addColorStop(0.7, 'rgba(80,180,175,0.02)')
@@ -672,8 +786,12 @@ function drawUranusColdOverlay(ctx: CanvasRenderingContext2D) {
 
 function drawUranusVignette(ctx: CanvasRenderingContext2D) {
   const vg = ctx.createRadialGradient(
-    CANVAS_WIDTH * 0.45, CANVAS_HEIGHT * 0.45, CANVAS_WIDTH * 0.2,
-    CANVAS_WIDTH * 0.5, CANVAS_HEIGHT * 0.5, CANVAS_WIDTH * 0.72,
+    CANVAS_WIDTH * 0.45,
+    CANVAS_HEIGHT * 0.45,
+    CANVAS_WIDTH * 0.2,
+    CANVAS_WIDTH * 0.5,
+    CANVAS_HEIGHT * 0.5,
+    CANVAS_WIDTH * 0.72,
   )
   vg.addColorStop(0, 'rgba(0,0,0,0)')
   vg.addColorStop(0.6, 'rgba(0,0,0,0.12)')
@@ -923,13 +1041,13 @@ function drawShip(ctx: CanvasRenderingContext2D) {
   ctx.strokeStyle = '#888'
   ctx.lineWidth = 0.5
   ctx.beginPath()
-  ctx.moveTo(hw + 4, 0)                 // nose tip
-  ctx.lineTo(hw - 4, -hh * 0.5)         // upper nose curve
-  ctx.lineTo(-hw + 6, -hh * 0.55)       // upper body
-  ctx.lineTo(-hw, -hh * 0.4)            // rear top
-  ctx.lineTo(-hw, hh * 0.4)             // rear bottom
-  ctx.lineTo(-hw + 6, hh * 0.55)        // lower body
-  ctx.lineTo(hw - 4, hh * 0.5)          // lower nose curve
+  ctx.moveTo(hw + 4, 0) // nose tip
+  ctx.lineTo(hw - 4, -hh * 0.5) // upper nose curve
+  ctx.lineTo(-hw + 6, -hh * 0.55) // upper body
+  ctx.lineTo(-hw, -hh * 0.4) // rear top
+  ctx.lineTo(-hw, hh * 0.4) // rear bottom
+  ctx.lineTo(-hw + 6, hh * 0.55) // lower body
+  ctx.lineTo(hw - 4, hh * 0.5) // lower nose curve
   ctx.closePath()
   ctx.fill()
   ctx.stroke()
@@ -994,10 +1112,7 @@ function drawHUD(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = hudColor
   const probeHit = props.minigame.progressCurrent
   const probeTotal = props.minigame.progressTotal
-  ctx.fillText(
-    `PROBES: ${props.minigame.probesRemaining} / ${props.minigame.probeCount}`,
-    20, 20,
-  )
+  ctx.fillText(`PROBES: ${props.minigame.probesRemaining} / ${props.minigame.probeCount}`, 20, 20)
   ctx.fillText(`TARGETS: ${probeHit} / ${probeTotal}`, 20, 36)
 
   // Timer
@@ -1044,9 +1159,7 @@ function drawHUD(ctx: CanvasRenderingContext2D) {
 function drawDamageFlash(ctx: CanvasRenderingContext2D) {
   if (props.minigame.damageFlash <= 0) return
   const alpha = props.minigame.damageFlash * 0.45
-  ctx.fillStyle = isMercury
-    ? `rgba(255,80,0,${alpha})`
-    : `rgba(0,180,200,${alpha * 0.7})`
+  ctx.fillStyle = isMercury ? `rgba(255,80,0,${alpha})` : `rgba(0,180,200,${alpha * 0.7})`
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
 }
 
@@ -1218,14 +1331,14 @@ onUnmounted(() => {
           </h3>
           <p class="gas-collection-briefing__text">
             <template v-if="isMercury">
-              The sun-scorched surface of Mercury holds vital geological data. Deploy
-              surface probes to marked landing zones as the planet rotates — but watch out
-              for solar wind fragments blazing through the orbital lane.
+              The sun-scorched surface of Mercury holds vital geological data. Deploy surface probes
+              to marked landing zones as the planet rotates — but watch out for solar wind fragments
+              blazing through the orbital lane.
             </template>
             <template v-else>
-              The ice giant Uranus holds critical magnetic field data in its atmosphere.
-              Align your orbital path with the designated surface zones and launch probes
-              before the timer expires. Avoid the icy debris drifting through the rings.
+              The ice giant Uranus holds critical magnetic field data in its atmosphere. Align your
+              orbital path with the designated surface zones and launch probes before the timer
+              expires. Avoid the icy debris drifting through the rings.
             </template>
           </p>
           <div class="gas-collection-briefing__controls">
@@ -1234,16 +1347,10 @@ onUnmounted(() => {
             <span><b>SPACE</b> — deploy probe</span>
           </div>
           <p class="gas-collection-briefing__detail">
-            Hull: {{ minigame.hullMaxHp }} HP.
-            Probes: {{ minigame.probeCount }}.
-            Targets: {{ minigame.targetCount }}.
-            Time: {{ minigame.timeTotal }}s.
+            Hull: {{ minigame.hullMaxHp }} HP. Probes: {{ minigame.probeCount }}. Targets:
+            {{ minigame.targetCount }}. Time: {{ minigame.timeTotal }}s.
           </p>
-          <button
-            type="button"
-            class="gas-collection-briefing__start"
-            @click="startGame"
-          >
+          <button type="button" class="gas-collection-briefing__start" @click="startGame">
             {{ isMercury ? 'BEGIN DEPLOYMENT' : 'INITIATE DEPLOYMENT' }}
           </button>
         </div>

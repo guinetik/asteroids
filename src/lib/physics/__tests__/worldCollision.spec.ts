@@ -22,21 +22,14 @@ describe('CollisionWorld', () => {
   it('allows traversal across gentle terrain', () => {
     const world = new CollisionWorld(createRampHeightmap(0.2))
 
-    const result = world.moveCharacterXZ(
-      { x: -4, y: 0, z: 0 },
-      3,
-      0,
-      0,
-      1.7,
-      {
-        radius: 0.65,
-        maxStepHeight: 0.45,
-        maxClimbAngleRad: Math.PI * 0.24,
-        substepDistance: 0.35,
-        skinWidth: 0.05,
-        airborneClearance: 0.45,
-      },
-    )
+    const result = world.moveCharacterXZ({ x: -4, y: 0, z: 0 }, 3, 0, 0, 1.7, {
+      radius: 0.65,
+      maxStepHeight: 0.45,
+      maxClimbAngleRad: Math.PI * 0.24,
+      substepDistance: 0.35,
+      skinWidth: 0.05,
+      airborneClearance: 0.45,
+    })
 
     expect(result.x).toBeGreaterThan(-1.5)
     expect(result.blocked).toBe(false)
@@ -46,21 +39,14 @@ describe('CollisionWorld', () => {
   it('still reports steep terrain as non-walkable without hard-blocking movement', () => {
     const world = new CollisionWorld(createRampHeightmap(2.2))
 
-    const result = world.moveCharacterXZ(
-      { x: -3.8, y: 0.4, z: 0 },
-      2.8,
-      0,
-      0.4,
-      2.1,
-      {
-        radius: 0.65,
-        maxStepHeight: 0.45,
-        maxClimbAngleRad: Math.PI * 0.24,
-        substepDistance: 0.35,
-        skinWidth: 0.05,
-        airborneClearance: 0.45,
-      },
-    )
+    const result = world.moveCharacterXZ({ x: -3.8, y: 0.4, z: 0 }, 2.8, 0, 0.4, 2.1, {
+      radius: 0.65,
+      maxStepHeight: 0.45,
+      maxClimbAngleRad: Math.PI * 0.24,
+      substepDistance: 0.35,
+      skinWidth: 0.05,
+      airborneClearance: 0.45,
+    })
 
     expect(result.blocked).toBe(false)
     expect(result.x).toBeGreaterThan(-1.5)
@@ -77,21 +63,14 @@ describe('CollisionWorld', () => {
       maxY: 3,
     })
 
-    const result = world.moveCharacterXZ(
-      { x: -3, y: 0, z: 0 },
-      3.2,
-      0,
-      0,
-      1.7,
-      {
-        radius: 0.65,
-        maxStepHeight: 0.45,
-        maxClimbAngleRad: Math.PI * 0.24,
-        substepDistance: 0.35,
-        skinWidth: 0.05,
-        airborneClearance: 0.45,
-      },
-    )
+    const result = world.moveCharacterXZ({ x: -3, y: 0, z: 0 }, 3.2, 0, 0, 1.7, {
+      radius: 0.65,
+      maxStepHeight: 0.45,
+      maxClimbAngleRad: Math.PI * 0.24,
+      substepDistance: 0.35,
+      skinWidth: 0.05,
+      airborneClearance: 0.45,
+    })
 
     expect(result.touchedCollider).toBe(true)
     expect(result.x).toBeLessThanOrEqual(-1.95)
@@ -106,18 +85,11 @@ describe('CollisionWorld', () => {
       max: { x: 2, y: 4, z: 2 },
     })
 
-    const result = world.moveDiscXZ(
-      { x: -6, y: 0, z: 0 },
-      8,
-      0,
-      0,
-      6,
-      {
-        radius: 1.5,
-        skinWidth: 0.1,
-        substepDistance: 0.5,
-      },
-    )
+    const result = world.moveDiscXZ({ x: -6, y: 0, z: 0 }, 8, 0, 0, 6, {
+      radius: 1.5,
+      skinWidth: 0.1,
+      substepDistance: 0.5,
+    })
 
     expect(result.touchedCollider).toBe(true)
     expect(result.blocked).toBe(true)

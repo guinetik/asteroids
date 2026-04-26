@@ -35,9 +35,7 @@ const rows = computed<DisplayRow[]>(() => {
         ? getDesirabilityPips(props.planetId, stack.itemId)
         : 0
     const sellPrice =
-      props.mode === 'sell' && props.planetId
-        ? computeSellPrice(props.planetId, stack.itemId)
-        : 0
+      props.mode === 'sell' && props.planetId ? computeSellPrice(props.planetId, stack.itemId) : 0
     return {
       itemId: stack.itemId,
       label: def?.label ?? stack.itemId,
@@ -84,28 +82,26 @@ function handleUse(itemId: string) {
 
 <template>
   <div class="inventory-table">
-    <div v-if="rows.length === 0" class="inventory-table__empty">
-      Cargo hold is empty.
-    </div>
+    <div v-if="rows.length === 0" class="inventory-table__empty">Cargo hold is empty.</div>
     <div v-else class="inventory-table__grid">
-      <div
-        v-for="row in rows"
-        :key="row.itemId"
-        class="inventory-table__row"
-      >
+      <div v-for="row in rows" :key="row.itemId" class="inventory-table__row">
         <div class="inventory-table__icon-cell">
           <div class="inventory-table__icon-placeholder">{{ row.label.charAt(0) }}</div>
         </div>
         <div class="inventory-table__info">
           <span class="inventory-table__name">{{ row.label }}</span>
-          <span class="inventory-table__meta">{{ row.quantity }} units &middot; {{ row.weightKg.toFixed(0) }} kg</span>
+          <span class="inventory-table__meta"
+            >{{ row.quantity }} units &middot; {{ row.weightKg.toFixed(0) }} kg</span
+          >
         </div>
         <div v-if="mode === 'sell'" class="inventory-table__demand">
           <span
             v-for="p in 5"
             :key="p"
             class="inventory-table__pip"
-            :class="p <= row.pips ? 'inventory-table__pip--active' : 'inventory-table__pip--inactive'"
+            :class="
+              p <= row.pips ? 'inventory-table__pip--active' : 'inventory-table__pip--inactive'
+            "
           />
         </div>
         <span v-if="mode === 'sell'" class="inventory-table__price">{{ row.sellPrice }} CR</span>

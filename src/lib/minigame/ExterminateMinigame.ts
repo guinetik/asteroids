@@ -10,7 +10,13 @@
  * @spec docs/superpowers/specs/2026-04-05-enemy-system-design.md
  */
 import * as THREE from 'three'
-import type { MiniGame, MiniGameContext, MiniGameEvents, MiniGameStatus, MiniGameStep } from './MiniGame'
+import type {
+  MiniGame,
+  MiniGameContext,
+  MiniGameEvents,
+  MiniGameStatus,
+  MiniGameStep,
+} from './MiniGame'
 import type { ConcreteObjective } from '@/lib/missions/types'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import { FLAT_ZONE_RADIUS } from '@/lib/terrain/terrainGenerator'
@@ -506,7 +512,11 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
     this.spawnEnemiesOfType('spire', spireCount, SITE_RADIUS * 0.85)
   }
 
-  private spawnEnemiesOfType(type: 'bacteriophage' | 'chimera' | 'spire', count: number, radius: number): void {
+  private spawnEnemiesOfType(
+    type: 'bacteriophage' | 'chimera' | 'spire',
+    count: number,
+    radius: number,
+  ): void {
     if (count <= 0) return
     for (let i = 0; i < count; i++) {
       const angle = (i / count) * Math.PI * 2 + Math.random() * 0.9
@@ -594,8 +604,18 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
     this.enemyLodApplier.commit()
 
     for (const handle of this.enemyDirector.enemies) {
-      this.syncGroundController(this.groundControllers.get(handle.id), handle, dt, PHAGE_HIT_CENTER_Y)
-      this.syncGroundController(this.chimeraControllers.get(handle.id), handle, dt, CHIMERA_HIT_CENTER_Y)
+      this.syncGroundController(
+        this.groundControllers.get(handle.id),
+        handle,
+        dt,
+        PHAGE_HIT_CENTER_Y,
+      )
+      this.syncGroundController(
+        this.chimeraControllers.get(handle.id),
+        handle,
+        dt,
+        CHIMERA_HIT_CENTER_Y,
+      )
       this.syncSpireController(this.spireControllers.get(handle.id), handle, dt, player)
     }
   }
@@ -650,11 +670,7 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
 
     ctrl.tick(dt)
 
-    if (
-      handle.type === 'chimera' &&
-      handle.enemy.alive &&
-      handle.lastOutput.wantsToFire
-    ) {
+    if (handle.type === 'chimera' && handle.enemy.alive && handle.lastOutput.wantsToFire) {
       const chim = ctrl as ChimeraWalkerController
       chim.group.updateMatrixWorld(true)
       const muzzle = this.chimeraLaserOriginScratch
@@ -793,29 +809,47 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
     this.shockwaveTimer = SHOCKWAVE_DURATION
 
     this.explosionFlash.visible = true
-    this.explosionFlash.position.set(this.nestPosition.x, this.nestPosition.y + 2, this.nestPosition.z)
+    this.explosionFlash.position.set(
+      this.nestPosition.x,
+      this.nestPosition.y + 2,
+      this.nestPosition.z,
+    )
     this.explosionFlash.scale.setScalar(1)
     ;(this.explosionFlash.material as THREE.MeshBasicMaterial).opacity = 0.85
 
     this.explosionCore.visible = true
-    this.explosionCore.position.set(this.nestPosition.x, this.nestPosition.y + 2, this.nestPosition.z)
+    this.explosionCore.position.set(
+      this.nestPosition.x,
+      this.nestPosition.y + 2,
+      this.nestPosition.z,
+    )
     this.explosionCore.scale.setScalar(1)
     ;(this.explosionCore.material as THREE.MeshBasicMaterial).opacity = 1
 
     this.shockwave.visible = true
-    this.shockwave.position.set(this.nestPosition.x, this.nestPosition.y + 0.18, this.nestPosition.z)
+    this.shockwave.position.set(
+      this.nestPosition.x,
+      this.nestPosition.y + 0.18,
+      this.nestPosition.z,
+    )
     this.shockwave.scale.setScalar(1)
     ;(this.shockwave.material as THREE.MeshBasicMaterial).opacity = 0.9
 
     this.explosionLight.visible = true
-    this.explosionLight.position.set(this.nestPosition.x, this.nestPosition.y + 4, this.nestPosition.z)
+    this.explosionLight.position.set(
+      this.nestPosition.x,
+      this.nestPosition.y + 4,
+      this.nestPosition.z,
+    )
     this.explosionLight.intensity = EXPLOSION_LIGHT_INTENSITY
 
     this.onExplosion?.(this.nestPosition.clone())
 
-    const playerHit = !!ctx.playerPosition &&
+    const playerHit =
+      !!ctx.playerPosition &&
       this.distanceToNest(ctx.playerPosition.x, ctx.playerPosition.z) <= BLAST_RADIUS
-    const landerHit = !!ctx.landerPosition &&
+    const landerHit =
+      !!ctx.landerPosition &&
       this.distanceToNest(ctx.landerPosition.x, ctx.landerPosition.z) <= BLAST_RADIUS
 
     if (playerHit) {
@@ -870,12 +904,7 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
     if (this.nestHazardCooldown > 0) return
 
     this.nestHazardCooldown = NEST_HAZARD_TICK_INTERVAL
-    this.onDamagePlayer?.(
-      NEST_HAZARD_DAMAGE,
-      this.nestPosition.x,
-      this.nestPosition.z,
-      'hazard',
-    )
+    this.onDamagePlayer?.(NEST_HAZARD_DAMAGE, this.nestPosition.x, this.nestPosition.z, 'hazard')
   }
 
   private syncExplosionFlash(dt: number): void {

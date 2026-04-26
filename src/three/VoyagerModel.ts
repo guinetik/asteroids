@@ -49,8 +49,8 @@ async function ensureVoyagerTemplate(): Promise<THREE.Group> {
         const size = new THREE.Vector3()
         box.getSize(size)
         console.info(
-          `[VoyagerModel] loaded mesh list (raw size ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}):\n`
-          + parts.join('\n'),
+          `[VoyagerModel] loaded mesh list (raw size ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}):\n` +
+            parts.join('\n'),
         )
       }
       return scene
@@ -141,16 +141,16 @@ export class VoyagerModel {
     group.add(sceneClone)
     const beacon = options?.maintenanceState
       ? new MaintenanceBeacon(group, {
-        // Offset lives in `model.group` (scale 1) so it's in world units at attach time;
-        // multiply by `scale` so the beacon sits inside the (scaled) sceneClone rather
-        // than floating out in space when the model shrinks.
-        offset: VOYAGER_MAINTENANCE_BEACON_OFFSET_NATIVE.clone().multiplyScalar(scale),
-        initialState: options.maintenanceState,
-        // PointLight.distance is in world units and is NOT scaled by the parent; tie
-        // it to `scale` so the halo stays body-proportional at any model size.
-        distance: scale * VOYAGER_BEACON_DISTANCE_PER_SCALE,
-        radius: scale * VOYAGER_BEACON_RADIUS_PER_SCALE,
-      })
+          // Offset lives in `model.group` (scale 1) so it's in world units at attach time;
+          // multiply by `scale` so the beacon sits inside the (scaled) sceneClone rather
+          // than floating out in space when the model shrinks.
+          offset: VOYAGER_MAINTENANCE_BEACON_OFFSET_NATIVE.clone().multiplyScalar(scale),
+          initialState: options.maintenanceState,
+          // PointLight.distance is in world units and is NOT scaled by the parent; tie
+          // it to `scale` so the halo stays body-proportional at any model size.
+          distance: scale * VOYAGER_BEACON_DISTANCE_PER_SCALE,
+          radius: scale * VOYAGER_BEACON_RADIUS_PER_SCALE,
+        })
       : null
     return new VoyagerModel(group, beacon)
   }

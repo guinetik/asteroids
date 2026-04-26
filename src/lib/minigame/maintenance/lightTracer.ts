@@ -81,7 +81,12 @@ export function isInsidePlanet(x: number, y: number): boolean {
  * @param sunY - Sun world Y position
  * @returns Array of light beam segments for rendering
  */
-export function traceAllBeams(panels: SolarPanel[], targets: SurfaceTarget[], sunX: number, sunY: number): LightBeam[] {
+export function traceAllBeams(
+  panels: SolarPanel[],
+  targets: SurfaceTarget[],
+  sunX: number,
+  sunY: number,
+): LightBeam[] {
   const beams: LightBeam[] = []
 
   // Reset lit state
@@ -172,7 +177,12 @@ function traceBeamFromPanel(
 
   // Check planet intersection — if the beam enters the planet, clip it
   const planetHit = rayCircleIntersection(
-    panel.x, panel.y, panel.aimAngle, NEPTUNE_X, NEPTUNE_Y, NEPTUNE_R - 4,
+    panel.x,
+    panel.y,
+    panel.aimAngle,
+    NEPTUNE_X,
+    NEPTUNE_Y,
+    NEPTUNE_R - 4,
   )
   if (planetHit) {
     hitX = planetHit.x
@@ -238,8 +248,12 @@ function closestPointT(beam: LightBeam, px: number, py: number): number {
  * @returns Intersection point, or null if no hit
  */
 function rayCircleIntersection(
-  ox: number, oy: number, angle: number,
-  cx: number, cy: number, cr: number,
+  ox: number,
+  oy: number,
+  angle: number,
+  cx: number,
+  cy: number,
+  cr: number,
 ): { x: number; y: number } | null {
   const dx = Math.cos(angle)
   const dy = Math.sin(angle)

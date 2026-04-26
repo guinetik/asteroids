@@ -1,10 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import {
-  createShopSession,
-  tickShopSession,
-  buyTradeGood,
-  sellTradeGood,
-} from '../shopSession'
+import { createShopSession, tickShopSession, buyTradeGood, sellTradeGood } from '../shopSession'
 import { createProfile } from '@/lib/player/profile'
 import { createInventory, addItem } from '@/lib/inventory/inventory'
 import { resetDemand } from '../planetDemand'
@@ -41,8 +36,12 @@ describe('createShopSession', () => {
     const imported = session.tradeSlots.filter((slot) => slot.isImported)
     expect(local).toHaveLength(venusPool.length)
     expect(imported).toHaveLength(3)
-    expect(new Set(session.tradeSlots.map((slot) => slot.itemId)).size).toBe(session.tradeSlots.length)
-    expect(imported.every((slot) => slot.originPlanetId && slot.originPlanetId !== 'venus')).toBe(true)
+    expect(new Set(session.tradeSlots.map((slot) => slot.itemId)).size).toBe(
+      session.tradeSlots.length,
+    )
+    expect(imported.every((slot) => slot.originPlanetId && slot.originPlanetId !== 'venus')).toBe(
+      true,
+    )
   })
 })
 

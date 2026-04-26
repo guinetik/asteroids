@@ -50,7 +50,12 @@ describe('DropSystem', () => {
 
   it('removes collected pickups so the next tick will not double-fire', () => {
     const onPickup = vi.fn()
-    const system = new DropSystem({ policy: ALWAYS_ARMED, pickupRadius: 2, spawnYOffset: 0, onPickup })
+    const system = new DropSystem({
+      policy: ALWAYS_ARMED,
+      pickupRadius: 2,
+      spawnYOffset: 0,
+      onPickup,
+    })
     system.spawnFor('viroid-psychosphere', { x: 0, y: 0, z: 0 })
     system.tick(1 / 60, { x: 0, y: 0, z: 0 })
     system.tick(1 / 60, { x: 0, y: 0, z: 0 })
@@ -87,7 +92,12 @@ describe('DropSystem', () => {
     const onPickup = vi.fn(() => {
       throw new Error('host failure')
     })
-    const system = new DropSystem({ policy: ALWAYS_ARMED, pickupRadius: 2, spawnYOffset: 0, onPickup })
+    const system = new DropSystem({
+      policy: ALWAYS_ARMED,
+      pickupRadius: 2,
+      spawnYOffset: 0,
+      onPickup,
+    })
     system.spawnFor('viroid-psychosphere', { x: 0, y: 0, z: 0 })
     expect(() => system.tick(1 / 60, { x: 0, y: 0, z: 0 })).not.toThrow()
     expect(onPickup).toHaveBeenCalled()
@@ -113,7 +123,13 @@ describe('createContractDropPolicy', () => {
     introSubject: 'i',
     introBody: ['i'],
     steps: [
-      { kind: 'collect-drops', itemId: 'viroid-psychosphere', count: 5, subject: 's', flavor: ['f'] },
+      {
+        kind: 'collect-drops',
+        itemId: 'viroid-psychosphere',
+        count: 5,
+        subject: 's',
+        flavor: ['f'],
+      },
     ],
     completionSubject: 'c',
     completionBody: ['c'],
@@ -121,35 +137,37 @@ describe('createContractDropPolicy', () => {
   }
 
   it('returns true only when an active contract step matches the item id', () => {
-    const policy = createContractDropPolicy(buildContractSystemStub(
-      { [harvestContract.id]: harvestContract },
-      [{
-        contractId: harvestContract.id,
-        status: 'active',
-        currentStepIndex: 0,
-        stepCounters: [0],
-        offeredAt: '2306-04-05',
-        acceptedAt: '2306-04-05',
-        completedAt: null,
-      }],
-    ))
+    const policy = createContractDropPolicy(
+      buildContractSystemStub({ [harvestContract.id]: harvestContract }, [
+        {
+          contractId: harvestContract.id,
+          status: 'active',
+          currentStepIndex: 0,
+          stepCounters: [0],
+          offeredAt: '2306-04-05',
+          acceptedAt: '2306-04-05',
+          completedAt: null,
+        },
+      ]),
+    )
     expect(policy.isItemArmed('viroid-psychosphere')).toBe(true)
     expect(policy.isItemArmed('olivine')).toBe(false)
   })
 
   it('returns false when matching contract is not active', () => {
-    const policy = createContractDropPolicy(buildContractSystemStub(
-      { [harvestContract.id]: harvestContract },
-      [{
-        contractId: harvestContract.id,
-        status: 'completed',
-        currentStepIndex: 0,
-        stepCounters: [5],
-        offeredAt: '2306-04-05',
-        acceptedAt: '2306-04-05',
-        completedAt: '2306-04-05',
-      }],
-    ))
+    const policy = createContractDropPolicy(
+      buildContractSystemStub({ [harvestContract.id]: harvestContract }, [
+        {
+          contractId: harvestContract.id,
+          status: 'completed',
+          currentStepIndex: 0,
+          stepCounters: [5],
+          offeredAt: '2306-04-05',
+          acceptedAt: '2306-04-05',
+          completedAt: '2306-04-05',
+        },
+      ]),
+    )
     expect(policy.isItemArmed('viroid-psychosphere')).toBe(false)
   })
 

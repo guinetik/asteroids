@@ -98,14 +98,17 @@ export class GravitySurfEffectController implements Tickable {
   private resetStreak(index: number, scatter: boolean): void {
     const streak = this.streaks[index]!
     const intensitySpeed = THREE.MathUtils.lerp(20, 54, this.intensity)
-    const spawnX = scatter ? THREE.MathUtils.randFloat(-7, 5) : THREE.MathUtils.randFloat(-9.5, -6.5)
+    const spawnX = scatter
+      ? THREE.MathUtils.randFloat(-7, 5)
+      : THREE.MathUtils.randFloat(-9.5, -6.5)
     const spawnY = THREE.MathUtils.randFloatSpread(2.4)
     const spawnZ = THREE.MathUtils.randFloatSpread(7.2)
     streak.head.set(spawnX, spawnY, spawnZ)
 
     const lateral = THREE.MathUtils.randFloatSpread(1.8)
     const vertical = THREE.MathUtils.randFloatSpread(0.7)
-    streak.velocity.copy(LOCAL_FORWARD)
+    streak.velocity
+      .copy(LOCAL_FORWARD)
       .multiplyScalar(-intensitySpeed)
       .add(new THREE.Vector3(0, vertical, lateral))
     streak.length = THREE.MathUtils.lerp(1.8, 4.8, this.intensity) + Math.random() * 1.6
@@ -117,7 +120,9 @@ export class GravitySurfEffectController implements Tickable {
     for (let i = 0; i < this.streaks.length; i++) {
       const streak = this.streaks[i]!
       const base = i * 6
-      const tail = streak.head.clone().addScaledVector(streak.velocity, -streak.length / streak.velocity.length())
+      const tail = streak.head
+        .clone()
+        .addScaledVector(streak.velocity, -streak.length / streak.velocity.length())
       positions[base] = streak.head.x
       positions[base + 1] = streak.head.y
       positions[base + 2] = streak.head.z

@@ -31,8 +31,7 @@ describe('LevelStateLifecycleFacade', () => {
       priorities: { physics: 100, render: 300 },
     }
     const lander = {
-      landerController:
-        landerController as unknown as LevelLanderLifecycleDeps['landerController'],
+      landerController: landerController as unknown as LevelLanderLifecycleDeps['landerController'],
       vehicleCamera: vehicleCamera as unknown as LevelLanderLifecycleDeps['vehicleCamera'],
       landerExplosion: landerExplosion as unknown as LevelLanderLifecycleDeps['landerExplosion'],
     }

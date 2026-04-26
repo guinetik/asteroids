@@ -253,8 +253,7 @@ export class PortalArrivalSequence {
       // fires after wormhole collapse cleanup.
       this.wormhole.onEject = () => {
         vehicle.unfreeze()
-        const forward = new THREE.Vector3(1, 0, 0)
-          .applyQuaternion(vehicle.group.quaternion)
+        const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(vehicle.group.quaternion)
         forward.y = 0
         forward.normalize()
         const speed = this.portal.arrival.speed ?? PORTAL_DEFAULT_EJECT_SPEED

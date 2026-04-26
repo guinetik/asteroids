@@ -151,8 +151,12 @@ function drawEarth(ctx: CanvasRenderingContext2D) {
 
   // Atmosphere glow
   const atmoGlow = ctx.createRadialGradient(
-    EARTH_X, EARTH_Y, EARTH_R - 20,
-    EARTH_X, EARTH_Y, EARTH_R + 60,
+    EARTH_X,
+    EARTH_Y,
+    EARTH_R - 20,
+    EARTH_X,
+    EARTH_Y,
+    EARTH_R + 60,
   )
   atmoGlow.addColorStop(0, 'rgba(60,140,220,0)')
   atmoGlow.addColorStop(0.5, 'rgba(60,140,220,0.06)')
@@ -170,8 +174,12 @@ function drawEarth(ctx: CanvasRenderingContext2D) {
 
   // Base ocean gradient
   const pg = ctx.createRadialGradient(
-    EARTH_X - EARTH_R * 0.3, EARTH_Y - EARTH_R * 0.2, EARTH_R * 0.1,
-    EARTH_X, EARTH_Y, EARTH_R,
+    EARTH_X - EARTH_R * 0.3,
+    EARTH_Y - EARTH_R * 0.2,
+    EARTH_R * 0.1,
+    EARTH_X,
+    EARTH_Y,
+    EARTH_R,
   )
   pg.addColorStop(0, '#4a90d0')
   pg.addColorStop(0.3, '#3a78b8')
@@ -212,8 +220,12 @@ function drawEarth(ctx: CanvasRenderingContext2D) {
 
   // Limb darkening
   const limb = ctx.createRadialGradient(
-    EARTH_X - EARTH_R * 0.25, EARTH_Y - EARTH_R * 0.15, EARTH_R * 0.3,
-    EARTH_X, EARTH_Y, EARTH_R,
+    EARTH_X - EARTH_R * 0.25,
+    EARTH_Y - EARTH_R * 0.15,
+    EARTH_R * 0.3,
+    EARTH_X,
+    EARTH_Y,
+    EARTH_R,
   )
   limb.addColorStop(0, 'rgba(0,0,0,0)')
   limb.addColorStop(0.6, 'rgba(0,0,0,0.1)')
@@ -469,8 +481,7 @@ function drawPlayerShuttle(ctx: CanvasRenderingContext2D) {
 
   // Engine exhaust glow
   const speed = Math.sqrt(
-    props.minigame.shipVx * props.minigame.shipVx +
-    props.minigame.shipVy * props.minigame.shipVy,
+    props.minigame.shipVx * props.minigame.shipVx + props.minigame.shipVy * props.minigame.shipVy,
   )
   if (speed > 5) {
     const flameLen = 10 + (speed / 450) * 20 + Math.random() * 6
@@ -492,13 +503,13 @@ function drawPlayerShuttle(ctx: CanvasRenderingContext2D) {
   ctx.strokeStyle = '#888'
   ctx.lineWidth = 0.5
   ctx.beginPath()
-  ctx.moveTo(0, -hh - 4)                // nose tip
-  ctx.lineTo(hw * 0.5, -hh + 4)         // right nose curve
-  ctx.lineTo(hw * 0.55, hh - 6)         // right body
-  ctx.lineTo(hw * 0.4, hh)              // rear right
-  ctx.lineTo(-hw * 0.4, hh)             // rear left
-  ctx.lineTo(-hw * 0.55, hh - 6)        // left body
-  ctx.lineTo(-hw * 0.5, -hh + 4)        // left nose curve
+  ctx.moveTo(0, -hh - 4) // nose tip
+  ctx.lineTo(hw * 0.5, -hh + 4) // right nose curve
+  ctx.lineTo(hw * 0.55, hh - 6) // right body
+  ctx.lineTo(hw * 0.4, hh) // rear right
+  ctx.lineTo(-hw * 0.4, hh) // rear left
+  ctx.lineTo(-hw * 0.55, hh - 6) // left body
+  ctx.lineTo(-hw * 0.5, -hh + 4) // left nose curve
   ctx.closePath()
   ctx.fill()
   ctx.stroke()
@@ -625,7 +636,12 @@ function drawHUD(ctx: CanvasRenderingContext2D) {
   const barW = 115
   const barH = 6
   const hpRatio = props.minigame.hullHp / HULL_MAX_HP
-  const hpColor = hpRatio > 0.5 ? 'rgba(60,200,140,0.6)' : hpRatio > 0.25 ? 'rgba(255,170,0,0.6)' : 'rgba(255,60,60,0.6)'
+  const hpColor =
+    hpRatio > 0.5
+      ? 'rgba(60,200,140,0.6)'
+      : hpRatio > 0.25
+        ? 'rgba(255,170,0,0.6)'
+        : 'rgba(255,60,60,0.6)'
 
   ctx.fillStyle = 'rgba(20,40,60,0.5)'
   ctx.fillRect(barX, barY, barW, barH)
@@ -640,8 +656,12 @@ function drawHUD(ctx: CanvasRenderingContext2D) {
 
 function drawVignette(ctx: CanvasRenderingContext2D) {
   const vg = ctx.createRadialGradient(
-    CANVAS_WIDTH * 0.4, CANVAS_HEIGHT * 0.5, CANVAS_WIDTH * 0.2,
-    CANVAS_WIDTH * 0.45, CANVAS_HEIGHT * 0.5, CANVAS_WIDTH * 0.65,
+    CANVAS_WIDTH * 0.4,
+    CANVAS_HEIGHT * 0.5,
+    CANVAS_WIDTH * 0.2,
+    CANVAS_WIDTH * 0.45,
+    CANVAS_HEIGHT * 0.5,
+    CANVAS_WIDTH * 0.65,
   )
   vg.addColorStop(0, 'rgba(0,0,0,0)')
   vg.addColorStop(0.6, 'rgba(0,0,0,0.08)')
@@ -658,11 +678,7 @@ function drawEndScreen(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = completed ? '#00e8cc' : '#ff4444'
   ctx.font = 'bold 28px monospace'
   ctx.textAlign = 'center'
-  ctx.fillText(
-    completed ? 'ROUTE COMPLETE' : 'HULL BREACH',
-    CANVAS_WIDTH / 2,
-    CANVAS_HEIGHT / 2,
-  )
+  ctx.fillText(completed ? 'ROUTE COMPLETE' : 'HULL BREACH', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2)
 }
 
 // ─── Game loop ────────────────────────────────────────────────────────────────
@@ -776,26 +792,21 @@ onUnmounted(() => {
           <div class="gas-collection-briefing__icon">📦</div>
           <h3 class="gas-collection-briefing__title">EARTH ORBITAL LOGISTICS</h3>
           <p class="gas-collection-briefing__text">
-            Earth's orbital shipping lanes are busy. Fly your shuttle through the
-            traffic corridor and collect every symbol on your manifest — in order.
+            Earth's orbital shipping lanes are busy. Fly your shuttle through the traffic corridor
+            and collect every symbol on your manifest — in order.
           </p>
           <p class="gas-collection-briefing__text">
-            The manifest card (top-left) shows your next pickup symbol. Dodge
-            incoming traffic and protect your hull — one hull breach ends the route.
+            The manifest card (top-left) shows your next pickup symbol. Dodge incoming traffic and
+            protect your hull — one hull breach ends the route.
           </p>
           <div class="gas-collection-briefing__controls">
             <span><b>W A S D</b> or <b>Arrows</b> — fly</span>
           </div>
           <p class="gas-collection-briefing__detail">
-            Hull: {{ minigame.hullMaxHp }} HP.
-            Route: {{ minigame.manifest.length }} symbols.
-            Scroll speed: {{ minigame.scrollSpeed }} px/s.
+            Hull: {{ minigame.hullMaxHp }} HP. Route: {{ minigame.manifest.length }} symbols. Scroll
+            speed: {{ minigame.scrollSpeed }} px/s.
           </p>
-          <button
-            type="button"
-            class="gas-collection-briefing__start"
-            @click="startGame"
-          >
+          <button type="button" class="gas-collection-briefing__start" @click="startGame">
             BEGIN ROUTE
           </button>
         </div>

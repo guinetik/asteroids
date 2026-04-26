@@ -25,7 +25,9 @@ const gravityConfig: GravityConfig = {
   eventHorizonScale: 230,
 }
 
-function baseBuildInput(overrides: Partial<Parameters<MapOverlayProjector['buildOverlayState']>[0]> = {}) {
+function baseBuildInput(
+  overrides: Partial<Parameters<MapOverlayProjector['buildOverlayState']>[0]> = {},
+) {
   return {
     mapCamera: stubCamera(),
     shipX: 0,
@@ -94,7 +96,9 @@ describe('MapOverlayProjector.reset', () => {
 describe('MapOverlayProjector.buildOverlayState', () => {
   it('returns a visible state with shipScreen + heading projected correctly', () => {
     const proj = new MapOverlayProjector()
-    const state = proj.buildOverlayState(baseBuildInput({ shipX: 500, shipZ: 0, heading: 0, speed: 12 }))
+    const state = proj.buildOverlayState(
+      baseBuildInput({ shipX: 500, shipZ: 0, heading: 0, speed: 12 }),
+    )
     expect(state).not.toBeNull()
     expect(state!.visible).toBe(true)
     expect(state!.speed).toBe(12)

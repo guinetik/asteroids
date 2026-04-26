@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { MapJourneyFacade, type MapJourneyCallbacks, type MapJourneyFacadeDeps } from '../MapJourneyFacade'
+import {
+  MapJourneyFacade,
+  type MapJourneyCallbacks,
+  type MapJourneyFacadeDeps,
+} from '../MapJourneyFacade'
 import { createProfile } from '@/lib/player/profile'
 import { WELCOME_JOURNEY_ID, ACT_1_JOURNEY_ID } from '@/lib/journeys'
 import type { PlayerProfile } from '@/lib/player/types'
@@ -35,7 +39,14 @@ function buildFacade(initial: PlayerProfile = quietProfile()) {
   }
   const facade = new MapJourneyFacade()
   facade.attach(deps)
-  return { facade, deps, callbacks, persistProfile, setTutorialMessagesUnlocked, getProfile: () => profile }
+  return {
+    facade,
+    deps,
+    callbacks,
+    persistProfile,
+    setTutorialMessagesUnlocked,
+    getProfile: () => profile,
+  }
 }
 
 describe('MapJourneyFacade.armUiFromHabitatEntry', () => {
@@ -52,7 +63,9 @@ describe('MapJourneyFacade.armUiFromHabitatEntry', () => {
     facade.armUiFromHabitatEntry()
     // Should only invoke tryAnnounceNextStart once's tracker-visible side effect.
     // Without pending journeys, visibility flips once per arm.
-    expect((callbacks.onJourneyTrackerVisible as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1)
+    expect((callbacks.onJourneyTrackerVisible as ReturnType<typeof vi.fn>).mock.calls.length).toBe(
+      1,
+    )
   })
 })
 

@@ -190,7 +190,7 @@ export const SUN: SunData = data.sun
 export const PLANETS: readonly Planet[] = data.planets.map(convertPlanet)
 
 /** Array of planet id strings, in the same order as PLANETS. */
-export const PLANET_IDS: string[] = PLANETS.map(p => p.id)
+export const PLANET_IDS: string[] = PLANETS.map((p) => p.id)
 
 /** Main Belt and Kuiper Belt, with orbital angles in radians. */
 export const ASTEROID_BELTS: readonly AsteroidBelt[] = (data.asteroidBelts ?? []).map(
@@ -227,7 +227,7 @@ for (const planet of PLANETS) {
  * @throws {Error} If no planet with the given id exists in the catalog.
  */
 export function getPlanet(id: string): Planet {
-  const planet = PLANETS.find(p => p.id === id)
+  const planet = PLANETS.find((p) => p.id === id)
   if (!planet) {
     throw new Error(`Unknown planet id: "${id}"`)
   }

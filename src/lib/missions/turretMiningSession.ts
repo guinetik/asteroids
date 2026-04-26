@@ -13,11 +13,7 @@
  */
 import type { Inventory } from '@/lib/inventory/types'
 import { getStack } from '@/lib/inventory/inventory'
-import type {
-  ActiveTurretMiningMission,
-  MiningOreCategory,
-  ShuttleMissionBoard,
-} from './types'
+import type { ActiveTurretMiningMission, MiningOreCategory, ShuttleMissionBoard } from './types'
 import { getTurretMiningPool } from './turretMiningPools'
 
 /** Main-belt ore ids that count toward an `'any'` mining mission. */

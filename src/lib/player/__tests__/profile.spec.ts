@@ -99,13 +99,7 @@ describe('saveProfile / loadProfile', () => {
 
   it('persists complex profile state', () => {
     const profile = createProfile('Trucker Joe')
-    const updated = addCredits(
-      recordAsteroidVisit(
-        recordMissionComplete(profile),
-        'bennu',
-      ),
-      500,
-    )
+    const updated = addCredits(recordAsteroidVisit(recordMissionComplete(profile), 'bennu'), 500)
     saveProfile(updated)
     const loaded = loadProfile()
 

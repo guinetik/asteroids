@@ -3,8 +3,27 @@ import { LevelPersistenceFacade } from '../LevelPersistenceFacade'
 
 const itemDefinition = { label: 'Olivine' }
 const inventory = { stacks: [], maxSlots: 8, maxWeightKg: 500 }
-const updatedInventory = { stacks: [{ itemId: 'olivine', quantity: 2, totalWeightKg: 2 }], maxSlots: 8, maxWeightKg: 500 }
-const profile = { name: 'Pilot', credits: 1000, completedMissionCount: 0, visitedAsteroids: {}, orbitedSolarBodies: {}, lastDockedPlanetId: 'earth', hasSeenIntro: false, unlockedFastTravelPlanets: [], missionPayMultipliers: {}, completedJourneyIds: [], journeyStepProgress: {}, unlockedFeatureIds: [], announcedJourneyStartIds: [], journeyStartReadyIds: [] }
+const updatedInventory = {
+  stacks: [{ itemId: 'olivine', quantity: 2, totalWeightKg: 2 }],
+  maxSlots: 8,
+  maxWeightKg: 500,
+}
+const profile = {
+  name: 'Pilot',
+  credits: 1000,
+  completedMissionCount: 0,
+  visitedAsteroids: {},
+  orbitedSolarBodies: {},
+  lastDockedPlanetId: 'earth',
+  hasSeenIntro: false,
+  unlockedFastTravelPlanets: [],
+  missionPayMultipliers: {},
+  completedJourneyIds: [],
+  journeyStepProgress: {},
+  unlockedFeatureIds: [],
+  announcedJourneyStartIds: [],
+  journeyStartReadyIds: [],
+}
 
 vi.mock('@/lib/inventory/catalog', () => ({
   getItemDefinition: vi.fn(() => itemDefinition),

@@ -11,12 +11,7 @@
  * @spec docs/superpowers/specs/2026-04-04-planetarium-data-layer-design.md
  */
 import type { OrbitalElements } from './types'
-import {
-  meanAnomaly,
-  solveKeplerEquation,
-  trueAnomalyFromEccentric,
-  keplerRadius,
-} from './kepler'
+import { meanAnomaly, solveKeplerEquation, trueAnomalyFromEccentric, keplerRadius } from './kepler'
 
 /** Full circle in radians. */
 const TWO_PI = 2 * Math.PI
@@ -260,20 +255,20 @@ export function computeTelemetry(
   // GM = 4π² a³ / T²  (in AU³/day²)
   const realA_AU3 = realA_AU * realA_AU * realA_AU
   const T_days = REAL_PERIOD_DAYS[planetId] ?? period
-  const GM_AU3_day2 = 4 * Math.PI * Math.PI * realA_AU3 / (T_days * T_days)
+  const GM_AU3_day2 = (4 * Math.PI * Math.PI * realA_AU3) / (T_days * T_days)
   const v_AU_day = Math.sqrt(GM_AU3_day2 * (2 / currentAU - 1 / realA_AU))
   // Convert AU/day → km/s  (1 AU = 149 597 870.7 km, 1 day = 86400 s)
   const KM_PER_AU = 149597870.7
   const SEC_PER_DAY = 86400
-  const orbitalVelocityKmS = v_AU_day * KM_PER_AU / SEC_PER_DAY
+  const orbitalVelocityKmS = (v_AU_day * KM_PER_AU) / SEC_PER_DAY
 
   // --- Light travel time ---
   const lightTravelMin = currentAU / SPEED_OF_LIGHT_AU_PER_MIN
 
   // --- Angles ---
   const FULL_CIRCLE_DEG = 360
-  const trueAnomalyDeg = ((nu * DEG) % FULL_CIRCLE_DEG + FULL_CIRCLE_DEG) % FULL_CIRCLE_DEG
-  const meanAnomalyDeg = ((M * DEG) % FULL_CIRCLE_DEG + FULL_CIRCLE_DEG) % FULL_CIRCLE_DEG
+  const trueAnomalyDeg = (((nu * DEG) % FULL_CIRCLE_DEG) + FULL_CIRCLE_DEG) % FULL_CIRCLE_DEG
+  const meanAnomalyDeg = (((M * DEG) % FULL_CIRCLE_DEG) + FULL_CIRCLE_DEG) % FULL_CIRCLE_DEG
 
   // --- Local solar time ---
   const rotHours = REAL_ROTATION_HOURS[planetId] ?? 24
@@ -285,7 +280,9 @@ export function computeTelemetry(
   const HOURS_IN_DAY = 24
   const MINUTES_IN_HOUR = 60
   const SECONDS_IN_MINUTE = 60
-  const totalSeconds = Math.floor((normalised / TWO_PI) * HOURS_IN_DAY * MINUTES_IN_HOUR * SECONDS_IN_MINUTE)
+  const totalSeconds = Math.floor(
+    (normalised / TWO_PI) * HOURS_IN_DAY * MINUTES_IN_HOUR * SECONDS_IN_MINUTE,
+  )
   const hh = Math.floor(totalSeconds / (MINUTES_IN_HOUR * SECONDS_IN_MINUTE))
   const mm = Math.floor((totalSeconds % (MINUTES_IN_HOUR * SECONDS_IN_MINUTE)) / SECONDS_IN_MINUTE)
   const ss = totalSeconds % SECONDS_IN_MINUTE

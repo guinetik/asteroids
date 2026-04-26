@@ -25,12 +25,7 @@ const TWO_PI = 2 * Math.PI
  *
  * @author guinetik
  */
-export function solveKeplerEquation(
-  M: number,
-  e: number,
-  tolerance = 1e-10,
-  maxIter = 50,
-): number {
+export function solveKeplerEquation(M: number, e: number, tolerance = 1e-10, maxIter = 50): number {
   if (e === 0) return M
   let E = M
   for (let i = 0; i < maxIter; i++) {
@@ -106,8 +101,15 @@ export function keplerRadius(
  * @author guinetik
  */
 export function orbitalPosition3D(elements: OrbitalElements, time: number): Vec3 {
-  const { semiMajorAxis, eccentricity, inclination, longitudeOfAscendingNode, argumentOfPeriapsis,
-    period, epoch = 0 } = elements
+  const {
+    semiMajorAxis,
+    eccentricity,
+    inclination,
+    longitudeOfAscendingNode,
+    argumentOfPeriapsis,
+    period,
+    epoch = 0,
+  } = elements
 
   const M = meanAnomaly(period, time, epoch)
   const E = solveKeplerEquation(M, eccentricity)
@@ -127,11 +129,13 @@ export function orbitalPosition3D(elements: OrbitalElements, time: number): Vec3
   const sinW = Math.sin(argumentOfPeriapsis)
 
   // Rotate to ecliptic coordinates
-  const x = (cosOmega * cosW - sinOmega * sinW * cosI) * xOrb +
-            (-cosOmega * sinW - sinOmega * cosW * cosI) * yOrb
-  const y = (sinOmega * cosW + cosOmega * sinW * cosI) * xOrb +
-            (-sinOmega * sinW + cosOmega * cosW * cosI) * yOrb
-  const z = (sinW * sinI) * xOrb + (cosW * sinI) * yOrb
+  const x =
+    (cosOmega * cosW - sinOmega * sinW * cosI) * xOrb +
+    (-cosOmega * sinW - sinOmega * cosW * cosI) * yOrb
+  const y =
+    (sinOmega * cosW + cosOmega * sinW * cosI) * xOrb +
+    (-sinOmega * sinW + cosOmega * cosW * cosI) * yOrb
+  const z = sinW * sinI * xOrb + cosW * sinI * yOrb
 
   return { x, y, z }
 }
@@ -149,8 +153,13 @@ export function orbitalPosition3D(elements: OrbitalElements, time: number): Vec3
  * @author guinetik
  */
 export function orbitPathPoints(elements: OrbitalElements, numSegments = 128): Vec3[] {
-  const { semiMajorAxis, eccentricity, inclination, longitudeOfAscendingNode, argumentOfPeriapsis } =
-    elements
+  const {
+    semiMajorAxis,
+    eccentricity,
+    inclination,
+    longitudeOfAscendingNode,
+    argumentOfPeriapsis,
+  } = elements
 
   // Pre-compute trig values once for the rotation
   const cosOmega = Math.cos(longitudeOfAscendingNode)
@@ -171,11 +180,13 @@ export function orbitPathPoints(elements: OrbitalElements, numSegments = 128): V
     const xOrb = r * Math.cos(nu)
     const yOrb = r * Math.sin(nu)
 
-    const x = (cosOmega * cosW - sinOmega * sinW * cosI) * xOrb +
-              (-cosOmega * sinW - sinOmega * cosW * cosI) * yOrb
-    const y = (sinOmega * cosW + cosOmega * sinW * cosI) * xOrb +
-              (-sinOmega * sinW + cosOmega * cosW * cosI) * yOrb
-    const z = (sinW * sinI) * xOrb + (cosW * sinI) * yOrb
+    const x =
+      (cosOmega * cosW - sinOmega * sinW * cosI) * xOrb +
+      (-cosOmega * sinW - sinOmega * cosW * cosI) * yOrb
+    const y =
+      (sinOmega * cosW + cosOmega * sinW * cosI) * xOrb +
+      (-sinOmega * sinW + cosOmega * cosW * cosI) * yOrb
+    const z = sinW * sinI * xOrb + cosW * sinI * yOrb
 
     points.push({ x, y, z })
   }

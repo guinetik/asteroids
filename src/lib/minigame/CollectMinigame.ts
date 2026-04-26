@@ -10,7 +10,13 @@
  * @date 2026-04-07
  */
 import * as THREE from 'three'
-import type { MiniGame, MiniGameContext, MiniGameEvents, MiniGameStatus, MiniGameStep } from './MiniGame'
+import type {
+  MiniGame,
+  MiniGameContext,
+  MiniGameEvents,
+  MiniGameStatus,
+  MiniGameStep,
+} from './MiniGame'
 import type { ConcreteObjective } from '@/lib/missions/types'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import { TERMINAL_INTERACT_RANGE } from '@/three/TerminalModel'

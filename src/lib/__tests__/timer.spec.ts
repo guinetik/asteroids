@@ -54,7 +54,7 @@ describe('Timer', () => {
       Timer.after(0.2, fn)
 
       flushFrame(0)
-      flushFrame(80)  // dt = 0.08s
+      flushFrame(80) // dt = 0.08s
       flushFrame(160) // dt = 0.08s, total = 0.16s
 
       expect(fn).not.toHaveBeenCalled()
@@ -102,13 +102,13 @@ describe('Timer', () => {
       ])
 
       flushFrame(0)
-      flushFrame(60)   // 0.06s → step 1 fires
+      flushFrame(60) // 0.06s → step 1 fires
       expect(order).toEqual([1])
 
-      flushFrame(120)  // 0.06s after step 1 → step 2 fires
+      flushFrame(120) // 0.06s after step 1 → step 2 fires
       expect(order).toEqual([1, 2])
 
-      flushFrame(180)  // 0.06s after step 2 → step 3 fires
+      flushFrame(180) // 0.06s after step 2 → step 3 fires
       expect(order).toEqual([1, 2, 3])
     })
 
@@ -120,7 +120,7 @@ describe('Timer', () => {
       ])
 
       flushFrame(0)
-      flushFrame(60)  // step 1 fires
+      flushFrame(60) // step 1 fires
       Timer.cancel(handle)
       flushFrame(120) // step 2 should NOT fire
 

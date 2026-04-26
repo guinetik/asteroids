@@ -69,15 +69,15 @@ const tier = getRelayDifficulty(props.mission.giverPlanet)
 // Fresh PRNG seed per play so each session rerolls misrotations instead of
 // replaying the same deterministic hash-of-missionId layout every time.
 const rollSeed = Math.floor(Math.random() * 0x7fffffff)
-const cells = reactive(applyRelayDifficulty(puzzle.cells, props.mission.template.id, tier, rollSeed))
+const cells = reactive(
+  applyRelayDifficulty(puzzle.cells, props.mission.template.id, tier, rollSeed),
+)
 const selectedId = ref<string>(puzzle.startSelected)
 const hoveredId = ref<string | null>(null)
 
 const trace = computed(() => traceWave(cells, SOURCE_ROW, SOURCE_COL, SOURCE_DIR))
 const sinkReached = computed(() =>
-  trace.value.exits.some(
-    (e) => e.row === SINK_ROW && e.col === SINK_COL && e.dir === SINK_DIR,
-  ),
+  trace.value.exits.some((e) => e.row === SINK_ROW && e.col === SINK_COL && e.dir === SINK_DIR),
 )
 const quality = computed(() => computeQuality(trace.value.activeCells.size, sinkReached.value))
 const qualityPct = computed(() => Math.round(quality.value * 100))
@@ -92,7 +92,10 @@ let lastTs = 0
 
 /** RAF loop — advances wiggle time. Pauses when the player has locked in. */
 function tick(ts: number): void {
-  if (lockState.value === 'locked') { rafId = 0; return }
+  if (lockState.value === 'locked') {
+    rafId = 0
+    return
+  }
   if (lastTs === 0) lastTs = ts
   const dt = (ts - lastTs) / 1000
   lastTs = ts
@@ -202,7 +205,7 @@ function isHovered(cell: { row: number; col: number }): boolean {
 function rotateCell(id: string): void {
   const cell = cells.find((c) => cellId(c.row, c.col) === id)
   if (!cell) return
-  cell.rotation = (((cell.rotation + 1) % 4 + 4) % 4) as Rotation
+  cell.rotation = ((((cell.rotation + 1) % 4) + 4) % 4) as Rotation
   cell.visualRotation = cell.visualRotation + 1
   props.minigame.reportQuality(quality.value)
   uiAudio.notifyKnob()
@@ -213,7 +216,9 @@ function moveSelection(dir: Direction): void {
   const current = cells.find((c) => cellId(c.row, c.col) === selectedId.value)
   if (!current) return
   const delta = DIR_DELTA[dir]
-  const target = cells.find((c) => c.row === current.row + delta[0] && c.col === current.col + delta[1])
+  const target = cells.find(
+    (c) => c.row === current.row + delta[0] && c.col === current.col + delta[1],
+  )
   if (target) selectedId.value = cellId(target.row, target.col)
 }
 
@@ -240,12 +245,36 @@ function onKeyDown(e: KeyboardEvent): void {
     emit('close')
     return
   }
-  if (k === 'w' || e.key === 'ArrowUp') { e.preventDefault(); moveSelection('N'); return }
-  if (k === 's' || e.key === 'ArrowDown') { e.preventDefault(); moveSelection('S'); return }
-  if (k === 'a' || e.key === 'ArrowLeft') { e.preventDefault(); moveSelection('W'); return }
-  if (k === 'd' || e.key === 'ArrowRight') { e.preventDefault(); moveSelection('E'); return }
-  if (k === 'r') { e.preventDefault(); rotateCell(selectedId.value); return }
-  if (k === 'e' && canLock.value) { e.preventDefault(); handleLockIn(); return }
+  if (k === 'w' || e.key === 'ArrowUp') {
+    e.preventDefault()
+    moveSelection('N')
+    return
+  }
+  if (k === 's' || e.key === 'ArrowDown') {
+    e.preventDefault()
+    moveSelection('S')
+    return
+  }
+  if (k === 'a' || e.key === 'ArrowLeft') {
+    e.preventDefault()
+    moveSelection('W')
+    return
+  }
+  if (k === 'd' || e.key === 'ArrowRight') {
+    e.preventDefault()
+    moveSelection('E')
+    return
+  }
+  if (k === 'r') {
+    e.preventDefault()
+    rotateCell(selectedId.value)
+    return
+  }
+  if (k === 'e' && canLock.value) {
+    e.preventDefault()
+    handleLockIn()
+    return
+  }
 }
 
 /**
@@ -265,8 +294,7 @@ const oscPath = computed(() => {
     const phase = x * 0.06 + phaseJitter * Math.sin(t * 4.2 + x * 0.021)
     const base = Math.sin(phase) * amp
     const grain =
-      grainAmp *
-      (Math.sin(x * 2.13 + t * 11.3) * 0.5 + Math.sin(x * 0.71 + t * 3.1) * 0.5)
+      grainAmp * (Math.sin(x * 2.13 + t * 11.3) * 0.5 + Math.sin(x * 0.71 + t * 3.1) * 0.5)
     const y = 24 + base + grain
     pts.push(`${x},${y.toFixed(2)}`)
   }
@@ -334,7 +362,10 @@ onUnmounted(() => {
     <div class="relay-grid-panel">
       <div class="relay-grid-panel__header">
         <span>SIGNAL GRID · {{ puzzle.relay }}</span>
-        <span class="relay-grid-panel__state" :class="{ 'relay-grid-panel__state--ok': sinkReached }">
+        <span
+          class="relay-grid-panel__state"
+          :class="{ 'relay-grid-panel__state--ok': sinkReached }"
+        >
           {{ sinkReached ? '● BACKBONE RESTORED' : '⚠ PATH INCOMPLETE' }}
         </span>
       </div>
@@ -367,7 +398,10 @@ onUnmounted(() => {
         <g
           v-for="cell in cells"
           :key="`${cell.row}-${cell.col}`"
-          :class="{ 'relay-cell--selected': isSelected(cell), 'relay-cell--hovered': isHovered(cell) }"
+          :class="{
+            'relay-cell--selected': isSelected(cell),
+            'relay-cell--hovered': isHovered(cell),
+          }"
           role="button"
           tabindex="-1"
           aria-label="Pipe node"
@@ -397,7 +431,13 @@ onUnmounted(() => {
                 :x2="portStart(cell.row, cell.col, canonPort).x"
                 :y2="portStart(cell.row, cell.col, canonPort).y"
                 class="relay-hub-arm"
-                :class="{ 'relay-hub-arm--active': segmentActive(cell.row, cell.col, rotatedPortAt(cell, i) ?? 'N') }"
+                :class="{
+                  'relay-hub-arm--active': segmentActive(
+                    cell.row,
+                    cell.col,
+                    rotatedPortAt(cell, i) ?? 'N',
+                  ),
+                }"
               />
               <template v-if="segmentActive(cell.row, cell.col, rotatedPortAt(cell, i) ?? 'N')">
                 <path
@@ -422,7 +462,9 @@ onUnmounted(() => {
             :r="NODE_R"
             class="relay-node-body"
             :class="{
-              'relay-node-body--active': cellPorts(cell).some((p) => segmentActive(cell.row, cell.col, p)),
+              'relay-node-body--active': cellPorts(cell).some((p) =>
+                segmentActive(cell.row, cell.col, p),
+              ),
               'relay-node-body--hovered': isHovered(cell),
             }"
           />
@@ -431,7 +473,11 @@ onUnmounted(() => {
             :cy="cellCenter(cell.row, cell.col).cy"
             :r="cellPorts(cell).some((p) => segmentActive(cell.row, cell.col, p)) ? 3.5 : 2"
             class="relay-node-hub"
-            :class="{ 'relay-node-hub--active': cellPorts(cell).some((p) => segmentActive(cell.row, cell.col, p)) }"
+            :class="{
+              'relay-node-hub--active': cellPorts(cell).some((p) =>
+                segmentActive(cell.row, cell.col, p),
+              ),
+            }"
           />
           <text
             :x="cellCenter(cell.row, cell.col).cx + NODE_R - 4"
@@ -480,13 +526,17 @@ onUnmounted(() => {
             :y="portEdge(SOURCE_ROW, SOURCE_COL, 'W').y - 4"
             class="relay-terminal-label"
             text-anchor="end"
-          >IN</text>
+          >
+            IN
+          </text>
           <text
             :x="portEdge(SOURCE_ROW, SOURCE_COL, 'W').x - 28"
             :y="portEdge(SOURCE_ROW, SOURCE_COL, 'W').y + 10"
             class="relay-terminal-sublabel relay-terminal-sublabel--active"
             text-anchor="end"
-          >{{ puzzle.carrier }} · LOCKED</text>
+          >
+            {{ puzzle.carrier }} · LOCKED
+          </text>
         </g>
 
         <!-- Sink terminal (OUT) flanking cell (SINK_ROW, GRID_COLS - 1) at the grid's east edge -->
@@ -513,14 +563,18 @@ onUnmounted(() => {
             :y="portEdge(SINK_ROW, GRID_COLS - 1, 'E').y - 4"
             class="relay-terminal-label"
             text-anchor="start"
-          >OUT</text>
+          >
+            OUT
+          </text>
           <text
             :x="portEdge(SINK_ROW, GRID_COLS - 1, 'E').x + 38"
             :y="portEdge(SINK_ROW, GRID_COLS - 1, 'E').y + 10"
             class="relay-terminal-sublabel"
             :class="{ 'relay-terminal-sublabel--active': sinkReached }"
             text-anchor="start"
-          >{{ sinkReached ? 'CARRIER OK' : 'NO CARRIER' }}</text>
+          >
+            {{ sinkReached ? 'CARRIER OK' : 'NO CARRIER' }}
+          </text>
         </g>
       </svg>
     </div>
@@ -528,7 +582,10 @@ onUnmounted(() => {
     <div class="relay-quality">
       <div class="relay-quality__label">SIGNAL QUALITY</div>
       <div class="relay-quality__bar">
-        <span :style="{ width: `${qualityPct}%` }" :class="canLock ? 'relay-bar-green' : 'relay-bar-amber'" />
+        <span
+          :style="{ width: `${qualityPct}%` }"
+          :class="canLock ? 'relay-bar-green' : 'relay-bar-amber'"
+        />
       </div>
       <div class="relay-quality__pct">{{ qualityPct }}%</div>
     </div>

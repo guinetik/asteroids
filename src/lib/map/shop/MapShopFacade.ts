@@ -39,8 +39,15 @@ export class MapShopFacade {
     profile: PlayerProfile
     inventory: Inventory
   }): { openedPlanetId: string | null } {
-    const { orbitState, targetName, targetPlanetId, onShopButton, onShopState, profile, inventory } =
-      params
+    const {
+      orbitState,
+      targetName,
+      targetPlanetId,
+      onShopButton,
+      onShopState,
+      profile,
+      inventory,
+    } = params
 
     if (orbitState === 'orbiting' && targetName && targetPlanetId && !this.session) {
       this.session = createShopSession(targetPlanetId)
@@ -68,7 +75,13 @@ export class MapShopFacade {
     onShopState?.(this.dialogOpen ? this.session : null, profile, inventory)
   }
 
-  open(onShopState: ((session: ShopSession | null, profile: PlayerProfile, inventory: Inventory) => void) | null, profile: PlayerProfile, inventory: Inventory): void {
+  open(
+    onShopState:
+      | ((session: ShopSession | null, profile: PlayerProfile, inventory: Inventory) => void)
+      | null,
+    profile: PlayerProfile,
+    inventory: Inventory,
+  ): void {
     if (!this.session) return
     this.dialogOpen = true
     this.emitState(onShopState, profile, inventory)

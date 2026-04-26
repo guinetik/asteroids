@@ -11,7 +11,12 @@
       "name": "Standard Extraction",
       "briefing": "Contract #4471. Target asteroid tagged for mineral extraction. Standard rates apply. Fill your hold and return to any station.",
       "objectiveSlots": [
-        { "type": "gather", "weight": 1, "params": { "type": "gather", "resourceAmount": { "min": 100, "max": 300 } }, "reward": { "min": 800, "max": 2000 } }
+        {
+          "type": "gather",
+          "weight": 1,
+          "params": { "type": "gather", "resourceAmount": { "min": 100, "max": 300 } },
+          "reward": { "min": 800, "max": 2000 }
+        }
       ],
       "completionBonus": { "min": 300, "max": 1000 },
       "regionByDifficulty": { "asteroid-belt": [3, 7], "kuiper-belt": [8, 10] }
@@ -21,7 +26,12 @@
       "name": "Deep Belt Haul",
       "briefing": "Long-range extraction job. The ore is rich but the rock is far. Fuel up and bring a full hold back.",
       "objectiveSlots": [
-        { "type": "gather", "weight": 1, "params": { "type": "gather", "resourceAmount": { "min": 200, "max": 500 } }, "reward": { "min": 1500, "max": 3000 } }
+        {
+          "type": "gather",
+          "weight": 1,
+          "params": { "type": "gather", "resourceAmount": { "min": 200, "max": 500 } },
+          "reward": { "min": 1500, "max": 3000 }
+        }
       ],
       "completionBonus": { "min": 500, "max": 1500 },
       "regionByDifficulty": { "asteroid-belt": [5, 7], "kuiper-belt": [8, 10] }

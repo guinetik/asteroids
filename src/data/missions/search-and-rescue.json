@@ -5,9 +5,39 @@
   "minDifficulty": 3,
   "maxDifficulty": 10,
   "objectiveSlots": [
-    { "type": "rescue", "weight": 1, "params": { "type": "rescue", "colonistCount": { "min": 1, "max": 2 }, "oxygenTime": { "min": 120, "max": 60 }, "guardedChance": 0.0 }, "reward": { "min": 1000, "max": 2500 } },
-    { "type": "rescue", "weight": 0.6, "params": { "type": "rescue", "colonistCount": { "min": 2, "max": 3 }, "oxygenTime": { "min": 90, "max": 45 }, "guardedChance": 0.3 }, "reward": { "min": 2000, "max": 4000 } },
-    { "type": "rescue", "weight": 0.3, "params": { "type": "rescue", "colonistCount": { "min": 3, "max": 4 }, "oxygenTime": { "min": 60, "max": 30 }, "guardedChance": 0.7 }, "reward": { "min": 3500, "max": 5000 } }
+    {
+      "type": "rescue",
+      "weight": 1,
+      "params": {
+        "type": "rescue",
+        "colonistCount": { "min": 1, "max": 2 },
+        "oxygenTime": { "min": 120, "max": 60 },
+        "guardedChance": 0.0
+      },
+      "reward": { "min": 1000, "max": 2500 }
+    },
+    {
+      "type": "rescue",
+      "weight": 0.6,
+      "params": {
+        "type": "rescue",
+        "colonistCount": { "min": 2, "max": 3 },
+        "oxygenTime": { "min": 90, "max": 45 },
+        "guardedChance": 0.3
+      },
+      "reward": { "min": 2000, "max": 4000 }
+    },
+    {
+      "type": "rescue",
+      "weight": 0.3,
+      "params": {
+        "type": "rescue",
+        "colonistCount": { "min": 3, "max": 4 },
+        "oxygenTime": { "min": 60, "max": 30 },
+        "guardedChance": 0.7
+      },
+      "reward": { "min": 3500, "max": 5000 }
+    }
   ],
   "completionBonus": { "min": 800, "max": 3000 },
   "regionByDifficulty": {

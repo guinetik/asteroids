@@ -51,7 +51,8 @@ const fuelOk = computed(() => props.fuelRatio + 1e-6 >= props.requiredFuelRatio)
         <div class="fast-travel-card__body">
           <h1 class="fast-travel-card__title">Fast Travel</h1>
           <p class="fast-travel-card__prompt">
-            Do you wish to fast travel to <strong>{{ props.planetLabel }}</strong>?
+            Do you wish to fast travel to <strong>{{ props.planetLabel }}</strong
+            >?
           </p>
           <p class="fast-travel-card__hint">
             Your shuttle will jump to a stable orbit. Active mission timers continue.
@@ -59,13 +60,12 @@ const fuelOk = computed(() => props.fuelRatio + 1e-6 >= props.requiredFuelRatio)
           <div class="fast-travel-card__fuel" :class="{ 'fast-travel-card__fuel--low': !fuelOk }">
             <div class="fast-travel-card__fuel-row">
               <span class="fast-travel-card__fuel-label">Reactor charge</span>
-              <span class="fast-travel-card__fuel-value">{{ fuelPct }}% / {{ requiredPct }}% req</span>
+              <span class="fast-travel-card__fuel-value"
+                >{{ fuelPct }}% / {{ requiredPct }}% req</span
+              >
             </div>
             <div class="fast-travel-card__fuel-bar">
-              <div
-                class="fast-travel-card__fuel-bar-fill"
-                :style="{ width: fuelPct + '%' }"
-              />
+              <div class="fast-travel-card__fuel-bar-fill" :style="{ width: fuelPct + '%' }" />
               <div
                 class="fast-travel-card__fuel-bar-threshold"
                 :style="{ left: requiredPct + '%' }"
@@ -84,14 +84,20 @@ const fuelOk = computed(() => props.fuelRatio + 1e-6 >= props.requiredFuelRatio)
               type="button"
               class="fast-travel-card__btn fast-travel-card__btn--primary"
               :disabled="!fuelOk"
-              @click="uiAudio.notifyConfirm(); emit('confirm')"
+              @click="
+                uiAudio.notifyConfirm()
+                emit('confirm')
+              "
             >
               Confirm Jump
             </button>
             <button
               type="button"
               class="fast-travel-card__btn fast-travel-card__btn--secondary"
-              @click="uiAudio.notifyCancel(); emit('cancel')"
+              @click="
+                uiAudio.notifyCancel()
+                emit('cancel')
+              "
             >
               Cancel
             </button>
@@ -180,7 +186,9 @@ const fuelOk = computed(() => props.fuelRatio + 1e-6 >= props.requiredFuelRatio)
   letter-spacing: 0.16em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 
 .fast-travel-card__btn--primary {

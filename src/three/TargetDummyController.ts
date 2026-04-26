@@ -46,7 +46,9 @@ export class TargetDummyController implements Tickable {
     this.enemy.position.y = position.y + TARGET_HEIGHT / 2
 
     // Target board — wireframe square (black edges, no fill)
-    const boardGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(TARGET_SIZE, TARGET_HEIGHT, 0.05))
+    const boardGeo = new THREE.EdgesGeometry(
+      new THREE.BoxGeometry(TARGET_SIZE, TARGET_HEIGHT, 0.05),
+    )
     this.material = new THREE.LineBasicMaterial({ color: this.baseColor })
     const board = new THREE.LineSegments(boardGeo, this.material)
     this.group.add(board)
@@ -67,10 +69,7 @@ export class TargetDummyController implements Tickable {
 
     // Post — wireframe pole
     const postGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(0.1, TARGET_HEIGHT, 0.1))
-    const post = new THREE.LineSegments(
-      postGeo,
-      new THREE.LineBasicMaterial({ color: 0x665544 }),
-    )
+    const post = new THREE.LineSegments(postGeo, new THREE.LineBasicMaterial({ color: 0x665544 }))
     post.position.y = -TARGET_HEIGHT / 2
     this.group.add(post)
 

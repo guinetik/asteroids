@@ -1,25 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LevelAudioDirector } from '../LevelAudioDirector'
 
-const {
-  mockPlay,
-  mockUnlock,
-  mockStop,
-  mockSetStereo,
-  timerAfter,
-  timerCancel,
-} = vi.hoisted(() => ({
-  mockPlay: vi.fn(() => ({
-    stop: vi.fn(),
-    playing: vi.fn(() => false),
-    setStereo: vi.fn(),
-  })),
-  mockUnlock: vi.fn(),
-  mockStop: vi.fn(),
-  mockSetStereo: vi.fn(),
-  timerAfter: vi.fn(() => ({ id: 1 })),
-  timerCancel: vi.fn(),
-}))
+const { mockPlay, mockUnlock, mockStop, mockSetStereo, timerAfter, timerCancel } = vi.hoisted(
+  () => ({
+    mockPlay: vi.fn(() => ({
+      stop: vi.fn(),
+      playing: vi.fn(() => false),
+      setStereo: vi.fn(),
+    })),
+    mockUnlock: vi.fn(),
+    mockStop: vi.fn(),
+    mockSetStereo: vi.fn(),
+    timerAfter: vi.fn(() => ({ id: 1 })),
+    timerCancel: vi.fn(),
+  }),
+)
 
 vi.mock('../useAudio', () => ({
   useAudio: vi.fn(() => ({

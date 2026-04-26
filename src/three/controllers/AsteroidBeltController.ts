@@ -699,8 +699,11 @@ export class AsteroidBeltController {
       return null
     }
 
-    let nearestData: { localPosition: THREE.Vector3; asteroidRadius: number; distance: number } | null =
-      null
+    let nearestData: {
+      localPosition: THREE.Vector3
+      asteroidRadius: number
+      distance: number
+    } | null = null
 
     for (const data of this.instanceDataList) {
       const visibleCount = data.mesh.count

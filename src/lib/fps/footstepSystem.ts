@@ -11,10 +11,7 @@
  * @spec docs/superpowers/specs/2026-04-18-procedural-footsteps-design.md
  */
 import { useAudio } from '@/audio/useAudio'
-import {
-  type FootstepSurface,
-  playProceduralFootstep,
-} from '@/audio/proceduralFootstep'
+import { type FootstepSurface, playProceduralFootstep } from '@/audio/proceduralFootstep'
 
 /** Re-export so callers don't need to import the audio module directly. */
 export type { FootstepSurface }

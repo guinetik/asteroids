@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  buildShipHealthConfig,
-  clampInitialHullHp,
-  computeThermalCaps,
-} from '../shipHealthHelpers'
+import { buildShipHealthConfig, clampInitialHullHp, computeThermalCaps } from '../shipHealthHelpers'
 import type { ShipHealthConfig } from '@/lib/shipHealth'
 
 const rawConfig: ShipHealthConfig = {

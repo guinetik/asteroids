@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { MISSION_TEMPLATES, getTemplateById, getTemplatesForDifficulty, getRegionForDifficulty } from '../templates'
+import {
+  MISSION_TEMPLATES,
+  getTemplateById,
+  getTemplatesForDifficulty,
+  getRegionForDifficulty,
+} from '../templates'
 
 const VALID_TYPES = new Set(['gather', 'exterminate', 'rescue'])
 const DIFFICULTY_MIN = 1

@@ -21,14 +21,16 @@ describe('computePhotometryProbeTarget', () => {
     const dz = target.z - -40
     expect(Math.hypot(dx, dz)).toBeCloseTo(1000, 5)
     expect(target.y).toBe(0)
-    expect(computePhotometryProbeTarget({
-      objectiveX: 100,
-      objectiveZ: -40,
-      terminalY: 12,
-      asteroidMidY: 180,
-      probeDistance: 1000,
-      seed: 42,
-    })).toEqual(target)
+    expect(
+      computePhotometryProbeTarget({
+        objectiveX: 100,
+        objectiveZ: -40,
+        terminalY: 12,
+        asteroidMidY: 180,
+        probeDistance: 1000,
+        seed: 42,
+      }),
+    ).toEqual(target)
   })
 
   it('keeps the standoff below the launch apex after the probe arcs sideways', () => {
@@ -84,11 +86,7 @@ describe('findClosestPhotometrySurfacePoint', () => {
     heightmap.setValid(2, 1, true)
     heightmap.setValid(1, 1, false)
 
-    const point = findClosestPhotometrySurfacePoint(
-      heightmap,
-      { x: 220, y: 80, z: 0 },
-      12,
-    )
+    const point = findClosestPhotometrySurfacePoint(heightmap, { x: 220, y: 80, z: 0 }, 12)
 
     expect(point).toEqual({ x: 100, y: 62, z: 0 })
   })

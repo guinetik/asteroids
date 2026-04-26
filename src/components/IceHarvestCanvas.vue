@@ -71,7 +71,14 @@ const RING_TILT = 0.18
 
 // ─── Pre-generated scene elements ─────────────────────────────────────────────
 
-const stars: { x: number; y: number; r: number; bright: number; twinkleSpeed: number; twinkleOffset: number }[] = []
+const stars: {
+  x: number
+  y: number
+  r: number
+  bright: number
+  twinkleSpeed: number
+  twinkleOffset: number
+}[] = []
 for (let i = 0; i < 200; i++) {
   stars.push({
     x: Math.random() * CANVAS_WIDTH,
@@ -83,7 +90,14 @@ for (let i = 0; i < 200; i++) {
   })
 }
 
-interface RingParticle { angle: number; dist: number; size: number; brightness: number; speed: number; colorShift: number }
+interface RingParticle {
+  angle: number
+  dist: number
+  size: number
+  brightness: number
+  speed: number
+  colorShift: number
+}
 const ringParticles: RingParticle[] = []
 for (let i = 0; i < 300; i++) {
   const angle = Math.random() * Math.PI * 2
@@ -100,7 +114,13 @@ for (let i = 0; i < 300; i++) {
   })
 }
 
-interface Debris { x: number; y: number; size: number; speed: number; brightness: number }
+interface Debris {
+  x: number
+  y: number
+  size: number
+  speed: number
+  brightness: number
+}
 const debris: Debris[] = []
 for (let i = 0; i < 25; i++) {
   debris.push({
@@ -114,7 +134,15 @@ for (let i = 0; i < 25; i++) {
 
 // ─── Background rendering (from inspo) ───────────────────────────────────────
 
-function lerp3(r1: number, g1: number, b1: number, r2: number, g2: number, b2: number, t: number): [number, number, number] {
+function lerp3(
+  r1: number,
+  g1: number,
+  b1: number,
+  r2: number,
+  g2: number,
+  b2: number,
+  t: number,
+): [number, number, number] {
   return [r1 + (r2 - r1) * t, g1 + (g2 - g1) * t, b1 + (b2 - b1) * t]
 }
 
@@ -151,7 +179,12 @@ function drawSaturn(ctx: CanvasRenderingContext2D) {
   ctx.arc(SATURN_X, SATURN_Y, SATURN_R, 0, Math.PI * 2)
   ctx.clip()
 
-  const pg = ctx.createLinearGradient(SATURN_X - SATURN_R, SATURN_Y - SATURN_R, SATURN_X + SATURN_R, SATURN_Y + SATURN_R)
+  const pg = ctx.createLinearGradient(
+    SATURN_X - SATURN_R,
+    SATURN_Y - SATURN_R,
+    SATURN_X + SATURN_R,
+    SATURN_Y + SATURN_R,
+  )
   pg.addColorStop(0, '#c4a44a')
   pg.addColorStop(0.2, '#d4b870')
   pg.addColorStop(0.35, '#b89545')
@@ -164,8 +197,8 @@ function drawSaturn(ctx: CanvasRenderingContext2D) {
 
   // Horizontal bands
   for (let i = 0; i < 12; i++) {
-    const bandY = SATURN_Y - SATURN_R + (SATURN_R * 2 / 12) * i
-    const bandH = SATURN_R * 2 / 12
+    const bandY = SATURN_Y - SATURN_R + ((SATURN_R * 2) / 12) * i
+    const bandH = (SATURN_R * 2) / 12
     const hue = i % 3 === 0 ? '#8a6520' : '#d4b870'
     ctx.fillStyle = hue
     ctx.globalAlpha = (i % 2 === 0 ? 0.08 : 0.04) + Math.sin(i * 1.5 + simTime * 0.3) * 0.02
@@ -174,7 +207,14 @@ function drawSaturn(ctx: CanvasRenderingContext2D) {
   ctx.globalAlpha = 1
 
   // Limb darkening
-  const limb = ctx.createRadialGradient(SATURN_X - 30, SATURN_Y - 30, SATURN_R * 0.3, SATURN_X, SATURN_Y, SATURN_R)
+  const limb = ctx.createRadialGradient(
+    SATURN_X - 30,
+    SATURN_Y - 30,
+    SATURN_R * 0.3,
+    SATURN_X,
+    SATURN_Y,
+    SATURN_R,
+  )
   limb.addColorStop(0, 'rgba(0,0,0,0)')
   limb.addColorStop(0.7, 'rgba(0,0,0,0.15)')
   limb.addColorStop(1, 'rgba(0,0,0,0.5)')
@@ -183,7 +223,14 @@ function drawSaturn(ctx: CanvasRenderingContext2D) {
   ctx.restore()
 
   // Atmospheric glow
-  const glow = ctx.createRadialGradient(SATURN_X, SATURN_Y, SATURN_R - 5, SATURN_X, SATURN_Y, SATURN_R + 25)
+  const glow = ctx.createRadialGradient(
+    SATURN_X,
+    SATURN_Y,
+    SATURN_R - 5,
+    SATURN_X,
+    SATURN_Y,
+    SATURN_R + 25,
+  )
   glow.addColorStop(0, 'rgba(200,170,80,0)')
   glow.addColorStop(0.5, 'rgba(200,170,80,0.06)')
   glow.addColorStop(1, 'rgba(200,170,80,0)')
@@ -234,7 +281,16 @@ function drawRingsFront(ctx: CanvasRenderingContext2D) {
   ctx.beginPath()
   ctx.ellipse(SATURN_X, SATURN_Y - 10, RING_OUTER, RING_OUTER * RING_TILT, 0, 0.4, Math.PI - 0.4)
   ctx.lineTo(SATURN_X + RING_OUTER, SATURN_Y - 10 - 8)
-  ctx.ellipse(SATURN_X, SATURN_Y - 10 - 8, RING_OUTER, RING_OUTER * RING_TILT, 0, Math.PI - 0.4, 0.4, true)
+  ctx.ellipse(
+    SATURN_X,
+    SATURN_Y - 10 - 8,
+    RING_OUTER,
+    RING_OUTER * RING_TILT,
+    0,
+    Math.PI - 0.4,
+    0.4,
+    true,
+  )
   ctx.fill()
   ctx.restore()
 }
@@ -272,7 +328,7 @@ function drawCookZone(ctx: CanvasRenderingContext2D) {
 
   // Dense particle band
   for (let i = 0; i < 80; i++) {
-    const px = (i * 11.3 + simTime * 20) % (CANVAS_WIDTH + 40) - 20
+    const px = ((i * 11.3 + simTime * 20) % (CANVAS_WIDTH + 40)) - 20
     const py = COOK_ZONE_Y + 5 + Math.sin(i * 3.7) * 15 + ((i * 17) % 20)
     const size = 1 + ((i * 7) % 3)
     const alpha = 0.15 + ((i * 13) % 20) * 0.01
@@ -296,7 +352,14 @@ function drawCookZone(ctx: CanvasRenderingContext2D) {
 }
 
 function drawVignette(ctx: CanvasRenderingContext2D) {
-  const vg = ctx.createRadialGradient(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, CANVAS_WIDTH * 0.25, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, CANVAS_WIDTH * 0.7)
+  const vg = ctx.createRadialGradient(
+    CANVAS_WIDTH / 2,
+    CANVAS_HEIGHT / 2,
+    CANVAS_WIDTH * 0.25,
+    CANVAS_WIDTH / 2,
+    CANVAS_HEIGHT / 2,
+    CANVAS_WIDTH * 0.7,
+  )
   vg.addColorStop(0, 'rgba(0,0,0,0)')
   vg.addColorStop(1, 'rgba(0,0,0,0.35)')
   ctx.fillStyle = vg
@@ -420,7 +483,8 @@ function drawIceChunks(ctx: CanvasRenderingContext2D) {
     ctx.globalAlpha = 0.85
     const r = chunk.radius
     const sides = chunk.size === 'small' ? 5 : chunk.size === 'medium' ? 6 : 8
-    ctx.fillStyle = chunk.size === 'large' ? '#8ab4cc' : chunk.size === 'medium' ? '#9ac0d8' : '#b0d4e8'
+    ctx.fillStyle =
+      chunk.size === 'large' ? '#8ab4cc' : chunk.size === 'medium' ? '#9ac0d8' : '#b0d4e8'
     ctx.strokeStyle = '#cceeff'
     ctx.lineWidth = 1
     ctx.beginPath()
@@ -568,8 +632,11 @@ function drawHUD(ctx: CanvasRenderingContext2D) {
   ctx.font = '10px monospace'
   ctx.textAlign = 'left'
   ctx.fillText(
-    harpoonReady ? '[SPACE] FIRE HARPOON' : `HARPOON: ${(HARPOON_COOLDOWN - props.minigame.harpoonCooldown).toFixed(1)}s`,
-    hpBarX, hpBarY + hpBarH + 14,
+    harpoonReady
+      ? '[SPACE] FIRE HARPOON'
+      : `HARPOON: ${(HARPOON_COOLDOWN - props.minigame.harpoonCooldown).toFixed(1)}s`,
+    hpBarX,
+    hpBarY + hpBarH + 14,
   )
   if (!harpoonReady) {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'
@@ -599,7 +666,8 @@ function drawHUD(ctx: CanvasRenderingContext2D) {
   ctx.textAlign = 'center'
   ctx.fillText(
     `ICE: ${props.minigame.iceCollected.toFixed(1)} / ${props.minigame.targetIce}`,
-    CANVAS_WIDTH / 2, barY - 6,
+    CANVAS_WIDTH / 2,
+    barY - 6,
   )
 }
 
@@ -609,15 +677,16 @@ function drawHeatWarning(ctx: CanvasRenderingContext2D) {
   const heatRatio = props.minigame.heatTimer / COOK_ZONE_TOLERANCE
 
   if (shipBottom > warningStart || heatRatio > 0) {
-    const proximity = Math.max(
-      (shipBottom - warningStart) / HEAT_WARNING_OFFSET,
-      heatRatio,
-    )
+    const proximity = Math.max((shipBottom - warningStart) / HEAT_WARNING_OFFSET, heatRatio)
     const intensity = Math.min(1, proximity) * 0.4
 
     const vigGrad = ctx.createRadialGradient(
-      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, CANVAS_WIDTH * 0.25,
-      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, CANVAS_WIDTH * 0.6,
+      CANVAS_WIDTH / 2,
+      CANVAS_HEIGHT / 2,
+      CANVAS_WIDTH * 0.25,
+      CANVAS_WIDTH / 2,
+      CANVAS_HEIGHT / 2,
+      CANVAS_WIDTH * 0.6,
     )
     vigGrad.addColorStop(0, 'rgba(255, 0, 0, 0)')
     vigGrad.addColorStop(1, `rgba(255, 30, 0, ${intensity})`)
@@ -794,28 +863,23 @@ onUnmounted(() => {
           <div class="gas-collection-briefing__icon">💎</div>
           <h3 class="gas-collection-briefing__title">RING PLANE ICE FIELD</h3>
           <p class="gas-collection-briefing__text">
-            Saturn's rings are shedding pristine ice — high-purity crystals perfect
-            for cryo-lab experiments. But the ring debris is dense and moving fast.
+            Saturn's rings are shedding pristine ice — high-purity crystals perfect for cryo-lab
+            experiments. But the ring debris is dense and moving fast.
           </p>
           <p class="gas-collection-briefing__text">
-            Fire your titanium harpoon to shatter incoming ice chunks into collectible
-            shards. Fly through the scintillating fragments to bank them before they
-            evaporate. Watch your hull — unshattered rocks hit hard.
+            Fire your titanium harpoon to shatter incoming ice chunks into collectible shards. Fly
+            through the scintillating fragments to bank them before they evaporate. Watch your hull
+            — unshattered rocks hit hard.
           </p>
           <div class="gas-collection-briefing__controls">
             <span><b>W A S D</b> — fly</span>
             <span><b>SPACE</b> — fire harpoon</span>
           </div>
           <p class="gas-collection-briefing__detail">
-            Hull: {{ minigame.hullMaxHp }} HP.
-            Target: {{ minigame.targetIce }} ice units.
-            Harpoon cooldown: {{ HARPOON_COOLDOWN }}s.
+            Hull: {{ minigame.hullMaxHp }} HP. Target: {{ minigame.targetIce }} ice units. Harpoon
+            cooldown: {{ HARPOON_COOLDOWN }}s.
           </p>
-          <button
-            type="button"
-            class="gas-collection-briefing__start"
-            @click="startGame"
-          >
+          <button type="button" class="gas-collection-briefing__start" @click="startGame">
             BEGIN HARVEST
           </button>
         </div>

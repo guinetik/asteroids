@@ -71,8 +71,7 @@ onMounted(async () => {
       evaActive.value = active
     }
     const cityQuery = route.query.city
-    const city =
-      cityQuery === 'true' || (Array.isArray(cityQuery) && cityQuery.includes('true'))
+    const city = cityQuery === 'true' || (Array.isArray(cityQuery) && cityQuery.includes('true'))
     await viewController.init(container.value, { city })
   }
 })

@@ -137,9 +137,7 @@ export function computePhotometryProbeTarget(
  * @param heightmap - Heightmap containing asteroid surface samples and validity.
  * @returns Horizontal standoff distance from the asteroid center.
  */
-export function computePhotometryStandoffDistance(
-  heightmap: PhotometrySurfaceHeightmap,
-): number {
+export function computePhotometryStandoffDistance(heightmap: PhotometrySurfaceHeightmap): number {
   const resolution = heightmap.resolution
   if (resolution <= 1 || heightmap.grid.length === 0) return STANDOFF_FOOTPRINT_CLEARANCE
 

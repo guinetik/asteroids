@@ -2,7 +2,13 @@ import { describe, it, expect } from 'vitest'
 import { Vector3 } from 'three'
 import { raycastBeam, type BeamTargetInstance } from '../TurretBeamSystem'
 
-function makeInstance(spawnIndex: number, x: number, y: number, z: number, radius: number): BeamTargetInstance {
+function makeInstance(
+  spawnIndex: number,
+  x: number,
+  y: number,
+  z: number,
+  radius: number,
+): BeamTargetInstance {
   return { spawnIndex, worldPosition: new Vector3(x, y, z), radius }
 }
 

@@ -24,7 +24,11 @@ import type {
   RewardEffect,
   TradeTransactionEvent,
 } from './contractTypes'
-import { emptyContractSnapshot, loadContractSnapshot, saveContractSnapshot } from './contractStorage'
+import {
+  emptyContractSnapshot,
+  loadContractSnapshot,
+  saveContractSnapshot,
+} from './contractStorage'
 
 /** Persistence adapter for the contract snapshot; swap in tests. */
 export interface ContractPersistence {
@@ -319,7 +323,8 @@ export class ContractSystem {
 
     for (const contract of this.contracts.values()) {
       if (contract.triggerOnMissionCompletedNth === undefined) continue
-      if (this.snapshot.observedMissionCompletions !== contract.triggerOnMissionCompletedNth) continue
+      if (this.snapshot.observedMissionCompletions !== contract.triggerOnMissionCompletedNth)
+        continue
       if (this.snapshot.instances[contract.id]) continue
       this.offerContract(contract)
       changed = true

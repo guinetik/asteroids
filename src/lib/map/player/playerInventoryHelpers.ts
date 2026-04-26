@@ -51,10 +51,7 @@ export function createInventoryForCargoBay(cargoMultiplier: number): Inventory {
  * @param cargoMultiplier - Current `shuttleCargoBay` upgrade value.
  * @returns New inventory object with updated caps; stacks array is shared (shallow copy at top).
  */
-export function applyCargoBayLimits(
-  inventory: Inventory,
-  cargoMultiplier: number,
-): Inventory {
+export function applyCargoBayLimits(inventory: Inventory, cargoMultiplier: number): Inventory {
   return {
     ...inventory,
     maxSlots: Math.round(DEFAULT_MAX_SLOTS * cargoMultiplier),

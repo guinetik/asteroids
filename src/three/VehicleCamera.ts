@@ -425,9 +425,7 @@ export class VehicleCamera implements Tickable {
         const alpha = 1 - Math.exp(-dt / this.shipYawCouplingSmoothTauSec)
         this.yawCouplingSmoothedQuat.slerp(q, alpha)
         this.quatInvScratch.copy(this.yawCouplingPrevSmoothedQuat).invert()
-        this.quatDeltaScratch
-          .copy(this.yawCouplingSmoothedQuat)
-          .multiply(this.quatInvScratch)
+        this.quatDeltaScratch.copy(this.yawCouplingSmoothedQuat).multiply(this.quatInvScratch)
         this.scratchOffset.copy(this.camera.position).sub(targetPos)
         this.scratchOffset.applyQuaternion(this.quatDeltaScratch)
         this.camera.position.copy(targetPos).add(this.scratchOffset)
@@ -464,8 +462,7 @@ export class VehicleCamera implements Tickable {
           camDist + MAP_FREE_FLIGHT_CHASE_DISTANCE_EPSILON < idleChaseDistance
 
         if (!preserveCloseZoom) {
-          const idleOffset = this.config.idleOffset.clone()
-            .applyQuaternion(this.target.quaternion)
+          const idleOffset = this.config.idleOffset.clone().applyQuaternion(this.target.quaternion)
           const targetCamPos = targetPos.clone().add(idleOffset)
           targetCamPos.y = Math.max(targetCamPos.y, effectiveMinY)
 

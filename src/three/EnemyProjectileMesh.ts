@@ -18,7 +18,11 @@ const HALO_RADIUS = 0.9
 const HALO_OPACITY = 0.55
 
 /** Shared sphere geometry — every instance reuses the same buffer. */
-const projectileGeo = new THREE.SphereGeometry(PROJECTILE_RADIUS, PROJECTILE_SEGMENTS, PROJECTILE_SEGMENTS)
+const projectileGeo = new THREE.SphereGeometry(
+  PROJECTILE_RADIUS,
+  PROJECTILE_SEGMENTS,
+  PROJECTILE_SEGMENTS,
+)
 
 /** Shared core material — additive blend, depthWrite off so it doesn't cut into terrain. */
 const projectileMat = new THREE.MeshBasicMaterial({

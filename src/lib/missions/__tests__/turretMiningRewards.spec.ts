@@ -13,7 +13,9 @@ function profile(credits = 0): PlayerProfile {
   } as unknown as PlayerProfile
 }
 
-function template(overrides: Partial<TurretMiningMissionTemplate> = {}): TurretMiningMissionTemplate {
+function template(
+  overrides: Partial<TurretMiningMissionTemplate> = {},
+): TurretMiningMissionTemplate {
   return {
     id: overrides.id ?? 'test_mission',
     name: overrides.name ?? 'Test Mission',
@@ -25,7 +27,9 @@ function template(overrides: Partial<TurretMiningMissionTemplate> = {}): TurretM
   }
 }
 
-function activeMission(overrides: Partial<ActiveTurretMiningMission> = {}): ActiveTurretMiningMission {
+function activeMission(
+  overrides: Partial<ActiveTurretMiningMission> = {},
+): ActiveTurretMiningMission {
   return {
     template: overrides.template ?? template(),
     giverPlanet: overrides.giverPlanet ?? 'mars',

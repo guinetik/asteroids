@@ -47,44 +47,34 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onGlobalKeydown, true)
 })
 
-const isGasCollection = computed(
-  () => props.minigame instanceof GasCollectionMiniGame,
+const isGasCollection = computed(() => props.minigame instanceof GasCollectionMiniGame)
+
+const gasMinigame = computed(() =>
+  props.minigame instanceof GasCollectionMiniGame ? props.minigame : null,
 )
 
-const gasMinigame = computed(
-  () => (props.minigame instanceof GasCollectionMiniGame ? props.minigame : null),
+const isIceHarvest = computed(() => props.minigame instanceof IceHarvestMiniGame)
+
+const iceMinigame = computed(() =>
+  props.minigame instanceof IceHarvestMiniGame ? props.minigame : null,
 )
 
-const isIceHarvest = computed(
-  () => props.minigame instanceof IceHarvestMiniGame,
+const isMaintenance = computed(() => props.minigame instanceof MaintenanceMiniGame)
+
+const maintenanceMinigame = computed(() =>
+  props.minigame instanceof MaintenanceMiniGame ? props.minigame : null,
 )
 
-const iceMinigame = computed(
-  () => (props.minigame instanceof IceHarvestMiniGame ? props.minigame : null),
+const isLogistics = computed(() => props.minigame instanceof LogisticsRouteMiniGame)
+
+const logisticsMinigame = computed(() =>
+  props.minigame instanceof LogisticsRouteMiniGame ? props.minigame : null,
 )
 
-const isMaintenance = computed(
-  () => props.minigame instanceof MaintenanceMiniGame,
-)
+const isProbeDeploy = computed(() => props.minigame instanceof ProbeDeployMiniGame)
 
-const maintenanceMinigame = computed(
-  () => (props.minigame instanceof MaintenanceMiniGame ? props.minigame : null),
-)
-
-const isLogistics = computed(
-  () => props.minigame instanceof LogisticsRouteMiniGame,
-)
-
-const logisticsMinigame = computed(
-  () => (props.minigame instanceof LogisticsRouteMiniGame ? props.minigame : null),
-)
-
-const isProbeDeploy = computed(
-  () => props.minigame instanceof ProbeDeployMiniGame,
-)
-
-const probeMinigame = computed(
-  () => (props.minigame instanceof ProbeDeployMiniGame ? props.minigame : null),
+const probeMinigame = computed(() =>
+  props.minigame instanceof ProbeDeployMiniGame ? props.minigame : null,
 )
 
 const orbitalConfig = computed(() => getPlanetOrbitalConfig(props.mission.template.targetPlanet))
@@ -97,18 +87,14 @@ const gatherItemDef = computed(() => {
 <template>
   <!-- Gas Collection: fullscreen canvas -->
   <div v-if="isGasCollection && gasMinigame" class="mission-minigame-overlay">
-    <div class="mission-minigame-card" style="max-width: 850px;">
+    <div class="mission-minigame-card" style="max-width: 850px">
       <div class="mission-minigame-card__chrome">
         <span>{{ mission.template.name }}</span>
-        <button
-          type="button"
-          class="ship-message-card__button"
-          @click="emit('close')"
-        >
+        <button type="button" class="ship-message-card__button" @click="emit('close')">
           Close
         </button>
       </div>
-      <div class="mission-minigame-card__body" style="padding: 0.5rem;">
+      <div class="mission-minigame-card__body" style="padding: 0.5rem">
         <GasCollectionCanvas
           :minigame="gasMinigame"
           :planet-id="mission.template.targetPlanet"
@@ -121,41 +107,29 @@ const gatherItemDef = computed(() => {
 
   <!-- Ice Harvest: fullscreen canvas -->
   <div v-else-if="isIceHarvest && iceMinigame" class="mission-minigame-overlay">
-    <div class="mission-minigame-card" style="max-width: 850px;">
+    <div class="mission-minigame-card" style="max-width: 850px">
       <div class="mission-minigame-card__chrome">
         <span>{{ mission.template.name }}</span>
-        <button
-          type="button"
-          class="ship-message-card__button"
-          @click="emit('close')"
-        >
+        <button type="button" class="ship-message-card__button" @click="emit('close')">
           Close
         </button>
       </div>
-      <div class="mission-minigame-card__body" style="padding: 0.5rem;">
-        <IceHarvestCanvas
-          :minigame="iceMinigame"
-          @complete="emit('complete')"
-          @fail="() => {}"
-        />
+      <div class="mission-minigame-card__body" style="padding: 0.5rem">
+        <IceHarvestCanvas :minigame="iceMinigame" @complete="emit('complete')" @fail="() => {}" />
       </div>
     </div>
   </div>
 
   <!-- Maintenance: solar panel puzzle -->
   <div v-else-if="isMaintenance && maintenanceMinigame" class="mission-minigame-overlay">
-    <div class="mission-minigame-card" style="max-width: 850px;">
+    <div class="mission-minigame-card" style="max-width: 850px">
       <div class="mission-minigame-card__chrome">
         <span>{{ mission.template.name }}</span>
-        <button
-          type="button"
-          class="ship-message-card__button"
-          @click="emit('close')"
-        >
+        <button type="button" class="ship-message-card__button" @click="emit('close')">
           Close
         </button>
       </div>
-      <div class="mission-minigame-card__body" style="padding: 0.5rem;">
+      <div class="mission-minigame-card__body" style="padding: 0.5rem">
         <MaintenanceCanvas
           :minigame="maintenanceMinigame"
           @complete="emit('complete')"
@@ -167,18 +141,14 @@ const gatherItemDef = computed(() => {
 
   <!-- Logistics Route: fullscreen canvas -->
   <div v-else-if="isLogistics && logisticsMinigame" class="mission-minigame-overlay">
-    <div class="mission-minigame-card" style="max-width: 850px;">
+    <div class="mission-minigame-card" style="max-width: 850px">
       <div class="mission-minigame-card__chrome">
         <span>{{ mission.template.name }}</span>
-        <button
-          type="button"
-          class="ship-message-card__button"
-          @click="emit('close')"
-        >
+        <button type="button" class="ship-message-card__button" @click="emit('close')">
           Close
         </button>
       </div>
-      <div class="mission-minigame-card__body" style="padding: 0.5rem;">
+      <div class="mission-minigame-card__body" style="padding: 0.5rem">
         <LogisticsRouteCanvas
           :minigame="logisticsMinigame"
           @complete="emit('complete')"
@@ -190,18 +160,14 @@ const gatherItemDef = computed(() => {
 
   <!-- Probe Deploy: fullscreen canvas -->
   <div v-else-if="isProbeDeploy && probeMinigame" class="mission-minigame-overlay">
-    <div class="mission-minigame-card" style="max-width: 850px;">
+    <div class="mission-minigame-card" style="max-width: 850px">
       <div class="mission-minigame-card__chrome">
         <span>{{ mission.template.name }}</span>
-        <button
-          type="button"
-          class="ship-message-card__button"
-          @click="emit('close')"
-        >
+        <button type="button" class="ship-message-card__button" @click="emit('close')">
           Close
         </button>
       </div>
-      <div class="mission-minigame-card__body" style="padding: 0.5rem;">
+      <div class="mission-minigame-card__body" style="padding: 0.5rem">
         <ProbeDeployCanvas
           :minigame="probeMinigame"
           @complete="emit('complete')"
@@ -216,11 +182,7 @@ const gatherItemDef = computed(() => {
     <div class="mission-minigame-card">
       <div class="mission-minigame-card__chrome">
         <span>Orbital Mission</span>
-        <button
-          type="button"
-          class="ship-message-card__button"
-          @click="emit('close')"
-        >
+        <button type="button" class="ship-message-card__button" @click="emit('close')">
           Close
         </button>
       </div>
@@ -229,8 +191,10 @@ const gatherItemDef = computed(() => {
         <p class="mission-minigame-card__desc">{{ mission.template.description }}</p>
         <div class="mission-minigame-card__details">
           <span v-if="gatherItemDef">
-            Collect: {{ mission.template.gatherQuantity }}x {{ gatherItemDef.label }}
-            ({{ gatherItemDef.weightPerUnit * mission.template.gatherQuantity }} kg)
+            Collect: {{ mission.template.gatherQuantity }}x {{ gatherItemDef.label }} ({{
+              gatherItemDef.weightPerUnit * mission.template.gatherQuantity
+            }}
+            kg)
           </span>
         </div>
         <div v-if="!canFitCargo" class="mission-minigame-card__warning">

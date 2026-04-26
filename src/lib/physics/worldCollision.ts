@@ -274,7 +274,8 @@ export class CollisionWorld {
         ignoreColliderId,
       )
 
-      const moved = Math.abs(resolved.x - (x + stepX)) > 1e-4 || Math.abs(resolved.z - (z + stepZ)) > 1e-4
+      const moved =
+        Math.abs(resolved.x - (x + stepX)) > 1e-4 || Math.abs(resolved.z - (z + stepZ)) > 1e-4
       blocked = blocked || moved
       touchedCollider = touchedCollider || resolved.touchedCollider
       x = resolved.x
@@ -299,7 +300,12 @@ export class CollisionWorld {
 
     const resolved = this.resolveStaticColliders(targetX, targetZ, bodyBottomY, bodyTopY, config)
     if (!resolved.accepted) {
-      return { accepted: false, x: currentX, z: currentZ, touchedCollider: resolved.touchedCollider }
+      return {
+        accepted: false,
+        x: currentX,
+        z: currentZ,
+        touchedCollider: resolved.touchedCollider,
+      }
     }
 
     return resolved

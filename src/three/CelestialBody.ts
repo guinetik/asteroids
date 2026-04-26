@@ -1,5 +1,10 @@
 import * as THREE from 'three'
-import { gravityAt, influenceRadius, eventHorizonRadius, type GravitySource } from '@/lib/physics/gravity'
+import {
+  gravityAt,
+  influenceRadius,
+  eventHorizonRadius,
+  type GravitySource,
+} from '@/lib/physics/gravity'
 import { GravityRing } from './GravityRing'
 import type { SpaceTimeGrid } from './SpaceTimeGrid'
 

@@ -36,7 +36,6 @@ describe('FpsPointerLockSession', () => {
 
     document.dispatchEvent(new MouseEvent('mousemove', { movementX: 5, movementY: -3 }))
     expect(onMouseDelta).not.toHaveBeenCalled()
-
     ;(document as Document & { pointerLockElement: Element | null }).pointerLockElement = canvas
     document.dispatchEvent(new MouseEvent('mousemove', { movementX: 5, movementY: -3 }))
     expect(onMouseDelta).toHaveBeenCalledWith(5, -3)

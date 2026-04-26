@@ -292,9 +292,14 @@ export class HabitatInteriorScene {
   private buildCylinder(): void {
     // Top half — transparent glass canopy
     const glassGeo = new THREE.CylinderGeometry(
-      CYLINDER_RADIUS, CYLINDER_RADIUS, CYLINDER_LENGTH,
-      CYLINDER_RADIAL_SEGMENTS, 1, true,
-      Math.PI / 2, Math.PI,
+      CYLINDER_RADIUS,
+      CYLINDER_RADIUS,
+      CYLINDER_LENGTH,
+      CYLINDER_RADIAL_SEGMENTS,
+      1,
+      true,
+      Math.PI / 2,
+      Math.PI,
     )
     const glassMat = new THREE.MeshPhysicalMaterial({
       color: GLASS_COLOR,
@@ -312,9 +317,14 @@ export class HabitatInteriorScene {
 
     // Bottom half — opaque metallic hull
     const hullGeo = new THREE.CylinderGeometry(
-      CYLINDER_RADIUS, CYLINDER_RADIUS, CYLINDER_LENGTH,
-      CYLINDER_RADIAL_SEGMENTS, 1, true,
-      -Math.PI / 2, Math.PI,
+      CYLINDER_RADIUS,
+      CYLINDER_RADIUS,
+      CYLINDER_LENGTH,
+      CYLINDER_RADIAL_SEGMENTS,
+      1,
+      true,
+      -Math.PI / 2,
+      Math.PI,
     )
     const hullMat = new THREE.MeshStandardMaterial({
       color: 0xcccccc,
@@ -366,8 +376,12 @@ export class HabitatInteriorScene {
         const a1 = (s / GIRDER_SEGMENTS_RADIAL) * Math.PI * 2
         const a2 = ((s + 1) / GIRDER_SEGMENTS_RADIAL) * Math.PI * 2
         verts.push(
-          Math.cos(a1) * r, CYLINDER_RADIUS + Math.sin(a1) * r, z,
-          Math.cos(a2) * r, CYLINDER_RADIUS + Math.sin(a2) * r, z,
+          Math.cos(a1) * r,
+          CYLINDER_RADIUS + Math.sin(a1) * r,
+          z,
+          Math.cos(a2) * r,
+          CYLINDER_RADIUS + Math.sin(a2) * r,
+          z,
         )
       }
     }
@@ -468,10 +482,22 @@ export class HabitatInteriorScene {
     let dx = 0
     let dz = 0
 
-    if (forward) { dx += fwd.x; dz += fwd.y }
-    if (back)    { dx -= fwd.x; dz -= fwd.y }
-    if (left)    { dx -= rgt.x; dz -= rgt.y }
-    if (right)   { dx += rgt.x; dz += rgt.y }
+    if (forward) {
+      dx += fwd.x
+      dz += fwd.y
+    }
+    if (back) {
+      dx -= fwd.x
+      dz -= fwd.y
+    }
+    if (left) {
+      dx -= rgt.x
+      dz -= rgt.y
+    }
+    if (right) {
+      dx += rgt.x
+      dz += rgt.y
+    }
 
     // Normalize diagonal movement
     const len = Math.sqrt(dx * dx + dz * dz)

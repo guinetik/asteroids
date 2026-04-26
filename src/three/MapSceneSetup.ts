@@ -76,7 +76,9 @@ export function createMapScene(canvas: HTMLCanvasElement): MapSceneObjects {
 
   // Layered starlight fill
   scene.add(new THREE.AmbientLight(AMBIENT_COLOR, AMBIENT_INTENSITY))
-  scene.add(new THREE.HemisphereLight(HEMISPHERE_SKY_COLOR, HEMISPHERE_GROUND_COLOR, HEMISPHERE_INTENSITY))
+  scene.add(
+    new THREE.HemisphereLight(HEMISPHERE_SKY_COLOR, HEMISPHERE_GROUND_COLOR, HEMISPHERE_INTENSITY),
+  )
 
   const fillLight = new THREE.DirectionalLight(FILL_LIGHT_COLOR, FILL_LIGHT_INTENSITY)
   fillLight.position.set(-1.5, 0.8, -1.0)

@@ -11,7 +11,13 @@
  * @spec docs/asteroid-lander-gdd.md
  */
 import * as THREE from 'three'
-import type { MiniGame, MiniGameContext, MiniGameEvents, MiniGameStatus, MiniGameStep } from './MiniGame'
+import type {
+  MiniGame,
+  MiniGameContext,
+  MiniGameEvents,
+  MiniGameStatus,
+  MiniGameStep,
+} from './MiniGame'
 import type { ConcreteObjective } from '@/lib/missions/types'
 import { Timer, type TimerHandle } from '@/lib/Timer'
 import type { Heightmap } from '@/lib/terrain/heightmap'
@@ -395,11 +401,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     this.virusAnimTime += dt
     const virusY =
       this.virusBaseY + Math.sin(this.virusAnimTime * VIRUS_BOB_SPEED) * VIRUS_BOB_AMPLITUDE
-    this.virus.group.position.set(
-      this.virusPosition.x,
-      virusY,
-      this.virusPosition.z,
-    )
+    this.virus.group.position.set(this.virusPosition.x, virusY, this.virusPosition.z)
     this.virus.group.rotation.y += dt * VIRUS_ROTATION_SPEED
 
     for (const visual of this.containedHostages) {
@@ -506,7 +508,8 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
       this.containedHostages.push({
         model,
         angleOffset: (i / colonistCount) * Math.PI * 2,
-        verticalOffset: ((i / Math.max(1, colonistCount - 1)) - 0.5) * CONTAINED_HOSTAGE_VERTICAL_SPAN,
+        verticalOffset:
+          (i / Math.max(1, colonistCount - 1) - 0.5) * CONTAINED_HOSTAGE_VERTICAL_SPAN,
         bobPhase: Math.random() * Math.PI * 2,
       })
     }
@@ -533,10 +536,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
       2,
       Math.max(0, Math.floor((this.missionDifficulty - 3) / 3) + guardedBonus),
     )
-    const chimeraCount = Math.min(
-      2,
-      Math.max(0, Math.floor((this.missionDifficulty - 4) / 3)),
-    )
+    const chimeraCount = Math.min(2, Math.max(0, Math.floor((this.missionDifficulty - 4) / 3)))
     const phageCount = Math.max(
       3,
       Math.floor(this.missionDifficulty / 2) + Math.ceil(colonistCount / 2) + guardedBonus,
@@ -616,8 +616,18 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     this.enemyLodApplier.commit()
 
     for (const handle of this.enemyDirector.enemies) {
-      this.syncGroundController(this.groundControllers.get(handle.id), handle, dt, PHAGE_HIT_CENTER_Y)
-      this.syncGroundController(this.chimeraControllers.get(handle.id), handle, dt, CHIMERA_HIT_CENTER_Y)
+      this.syncGroundController(
+        this.groundControllers.get(handle.id),
+        handle,
+        dt,
+        PHAGE_HIT_CENTER_Y,
+      )
+      this.syncGroundController(
+        this.chimeraControllers.get(handle.id),
+        handle,
+        dt,
+        CHIMERA_HIT_CENTER_Y,
+      )
       this.syncSpireController(this.spireControllers.get(handle.id), handle, dt)
     }
   }
@@ -672,11 +682,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
 
     ctrl.tick(dt)
 
-    if (
-      handle.type === 'chimera' &&
-      handle.enemy.alive &&
-      handle.lastOutput.wantsToFire
-    ) {
+    if (handle.type === 'chimera' && handle.enemy.alive && handle.lastOutput.wantsToFire) {
       const chim = ctrl as ChimeraWalkerController
       chim.group.updateMatrixWorld(true)
       const muzzle = this.chimeraLaserOriginScratch
@@ -841,16 +847,26 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
 
     this.explosionFlashTimer = EXPLOSION_FLASH_DURATION
     this.explosionFlash.visible = true
-    this.explosionFlash.position.set(this.virusPosition.x, this.virusBaseY - 6, this.virusPosition.z)
+    this.explosionFlash.position.set(
+      this.virusPosition.x,
+      this.virusBaseY - 6,
+      this.virusPosition.z,
+    )
     this.explosionFlash.scale.setScalar(1)
     this.explosionLight.visible = true
-    this.explosionLight.position.set(this.virusPosition.x, this.virusBaseY - 4, this.virusPosition.z)
+    this.explosionLight.position.set(
+      this.virusPosition.x,
+      this.virusBaseY - 4,
+      this.virusPosition.z,
+    )
     this.explosionLight.intensity = EXPLOSION_LIGHT_INTENSITY
     this.onExplosion?.(this.virusPosition.clone())
 
-    const playerHit = !!ctx.playerPosition &&
+    const playerHit =
+      !!ctx.playerPosition &&
       this.distanceToVirus(ctx.playerPosition.x, ctx.playerPosition.z) <= BLAST_RADIUS
-    const landerHit = !!ctx.landerPosition &&
+    const landerHit =
+      !!ctx.landerPosition &&
       this.distanceToVirus(ctx.landerPosition.x, ctx.landerPosition.z) <= BLAST_RADIUS
 
     if (playerHit) {

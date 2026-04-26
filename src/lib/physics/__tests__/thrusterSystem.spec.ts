@@ -1,9 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import {
-  ThrusterSystem,
-  DEFAULT_SHUTTLE_CONFIG,
-  DEFAULT_THRUSTER_CONFIG,
-} from '../thrusterSystem'
+import { ThrusterSystem, DEFAULT_SHUTTLE_CONFIG, DEFAULT_THRUSTER_CONFIG } from '../thrusterSystem'
 import type {
   ShuttleThrusterName,
   ThrusterRuntimeModifiers,
@@ -47,9 +43,13 @@ describe('ThrusterSystem', () => {
   it('applies burn rate multipliers to active thruster drain', () => {
     const sys = createShuttleSystem()
     const before = sys.getState('thrust').charge
-    sys.tick(1, { thrust: true, brake: false, rcs: false, turretMining: false }, {
-      burnRateMultiplier: { thrust: 0.5 },
-    })
+    sys.tick(
+      1,
+      { thrust: true, brake: false, rcs: false, turretMining: false },
+      {
+        burnRateMultiplier: { thrust: 0.5 },
+      },
+    )
     expect(sys.getState('thrust').charge).toBe(
       before - DEFAULT_THRUSTER_CONFIG.thrust.burnRate * 0.5,
     )
@@ -93,9 +93,13 @@ describe('ThrusterSystem', () => {
     const sysDouble = createShuttleSystem()
     sysDouble.tick(drainSeconds, { thrust: true, brake: false, rcs: false, turretMining: false })
     expect(sysDouble.getState('thrust').charge).toBe(chargeAfterDrain)
-    sysDouble.tick(dt, { thrust: false, brake: false, rcs: false, turretMining: false }, {
-      rechargeRateMultiplier: { thrust: 2 },
-    })
+    sysDouble.tick(
+      dt,
+      { thrust: false, brake: false, rcs: false, turretMining: false },
+      {
+        rechargeRateMultiplier: { thrust: 2 },
+      },
+    )
     const gainDouble = sysDouble.getState('thrust').charge - chargeAfterDrain
 
     expect(gainDouble).toBeCloseTo(thrustCfg.rechargeRate * dt * 2, 10)
@@ -114,9 +118,13 @@ describe('ThrusterSystem', () => {
     const sysHalf = createShuttleSystem()
     sysHalf.tick(1, { thrust: true, brake: false, rcs: false, turretMining: false })
     expect(sysHalf.getState('thrust').charge).toBe(chargeAfterDrain)
-    sysHalf.tick(dt, { thrust: false, brake: false, rcs: false, turretMining: false }, {
-      rechargeRateMultiplier: { thrust: 0.5 },
-    })
+    sysHalf.tick(
+      dt,
+      { thrust: false, brake: false, rcs: false, turretMining: false },
+      {
+        rechargeRateMultiplier: { thrust: 0.5 },
+      },
+    )
     const gainHalf = sysHalf.getState('thrust').charge - chargeAfterDrain
 
     expect(gainHalf).toBeCloseTo(thrustCfg.rechargeRate * dt * 0.5, 10)
@@ -124,9 +132,7 @@ describe('ThrusterSystem', () => {
   })
 
   it('omitting rechargeRateMultiplier matches explicit 1.0', () => {
-    const runIdleRechargeTick = (
-      modifiers?: ThrusterRuntimeModifiers<ShuttleThrusterName>,
-    ) => {
+    const runIdleRechargeTick = (modifiers?: ThrusterRuntimeModifiers<ShuttleThrusterName>) => {
       const sys = createShuttleSystem()
       sys.tick(1, { thrust: true, brake: false, rcs: false, turretMining: false })
       sys.tick(1, { thrust: false, brake: false, rcs: false, turretMining: false }, modifiers)
@@ -227,9 +233,13 @@ describe('ThrusterSystem.tick — fuelCostMultiplier', () => {
     const before = system.fuelLevel
 
     // Tick idle for 1s with multiplier: a=0.5 (cheap), b=2 (expensive)
-    system.tick(1, { a: false, b: false }, {
-      fuelCostMultiplier: { a: 0.5, b: 2 },
-    })
+    system.tick(
+      1,
+      { a: false, b: false },
+      {
+        fuelCostMultiplier: { a: 0.5, b: 2 },
+      },
+    )
     const after = system.fuelLevel
     const drained = before - after
 

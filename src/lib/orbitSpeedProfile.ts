@@ -26,10 +26,10 @@ export function computeRelativeOrbitalSpeedMultiplier(
   referenceOrbit: OrbitalElements,
 ): number {
   if (
-    orbit.period <= 0
-    || referenceOrbit.period <= 0
-    || orbit.semiMajorAxis <= 0
-    || referenceOrbit.semiMajorAxis <= 0
+    orbit.period <= 0 ||
+    referenceOrbit.period <= 0 ||
+    orbit.semiMajorAxis <= 0 ||
+    referenceOrbit.semiMajorAxis <= 0
   ) {
     return DEFAULT_ORBITAL_SPEED_MULTIPLIER
   }

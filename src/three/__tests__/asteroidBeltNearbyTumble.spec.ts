@@ -12,7 +12,9 @@ import {
   isWithinNearbyTumbleRadius,
 } from '../controllers/asteroidBeltNearbyTumble'
 
-function windowIndices(window: NonNullable<ReturnType<typeof getNearbyTumbleSampleWindow>>): number[] {
+function windowIndices(
+  window: NonNullable<ReturnType<typeof getNearbyTumbleSampleWindow>>,
+): number[] {
   const out: number[] = []
   for (let i = 0; i < window.windowLength; i += 1) {
     out.push((window.startIndex + i) % window.visibleCount)

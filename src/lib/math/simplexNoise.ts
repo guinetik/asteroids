@@ -14,8 +14,14 @@ const F2 = 0.5 * (Math.sqrt(3) - 1)
 const G2 = (3 - Math.sqrt(3)) / 6
 /** Gradient vectors for 2D simplex noise — 8 directions at equal spacing. */
 const GRAD3: readonly [number, number][] = [
-  [1, 1], [-1, 1], [1, -1], [-1, -1],
-  [1, 0], [-1, 0], [0, 1], [0, -1],
+  [1, 1],
+  [-1, 1],
+  [1, -1],
+  [-1, -1],
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
 ]
 
 /**
@@ -78,13 +84,24 @@ export class SimplexNoise {
       const g = GRAD3[gi]!
       return g[0] * dx + g[1] * dy
     }
-    let n0 = 0, n1 = 0, n2 = 0
+    let n0 = 0,
+      n1 = 0,
+      n2 = 0
     let t0 = 0.5 - x0 * x0 - y0 * y0
-    if (t0 >= 0) { t0 *= t0; n0 = t0 * t0 * dot(this.pm8[ii + this.perm[jj]!]!, x0, y0) }
+    if (t0 >= 0) {
+      t0 *= t0
+      n0 = t0 * t0 * dot(this.pm8[ii + this.perm[jj]!]!, x0, y0)
+    }
     let t1 = 0.5 - x1 * x1 - y1 * y1
-    if (t1 >= 0) { t1 *= t1; n1 = t1 * t1 * dot(this.pm8[ii + i1 + this.perm[jj + j1]!]!, x1, y1) }
+    if (t1 >= 0) {
+      t1 *= t1
+      n1 = t1 * t1 * dot(this.pm8[ii + i1 + this.perm[jj + j1]!]!, x1, y1)
+    }
     let t2 = 0.5 - x2 * x2 - y2 * y2
-    if (t2 >= 0) { t2 *= t2; n2 = t2 * t2 * dot(this.pm8[ii + 1 + this.perm[jj + 1]!]!, x2, y2) }
+    if (t2 >= 0) {
+      t2 *= t2
+      n2 = t2 * t2 * dot(this.pm8[ii + 1 + this.perm[jj + 1]!]!, x2, y2)
+    }
     return 70 * (n0 + n1 + n2)
   }
 }

@@ -238,11 +238,16 @@ function sampleDisturbanceMask(
   tuning: TerrainBiomeTuning,
   frequencyScale: number,
 ): number {
-  const raw = noise.n2(
-    x * DISTURBANCE_MASK_FREQUENCY * frequencyScale,
-    z * DISTURBANCE_MASK_FREQUENCY * frequencyScale,
-  ) * 0.5 + 0.5
-  const contrasted = clamp01((raw - 0.5) * tuning.disturbanceContrast + 0.5 + tuning.disturbanceBias)
+  const raw =
+    noise.n2(
+      x * DISTURBANCE_MASK_FREQUENCY * frequencyScale,
+      z * DISTURBANCE_MASK_FREQUENCY * frequencyScale,
+    ) *
+      0.5 +
+    0.5
+  const contrasted = clamp01(
+    (raw - 0.5) * tuning.disturbanceContrast + 0.5 + tuning.disturbanceBias,
+  )
   const power = 1.8 - roughness * 0.6
   return Math.pow(contrasted, power)
 }
@@ -286,7 +291,7 @@ function craterCenterBounds(
   const cellSize = worldSize / (resolution - 1)
   const rimOuterCells = rimOuter / cellSize
   const min = rimOuterCells
-  const max = (resolution - 1) - rimOuterCells
+  const max = resolution - 1 - rimOuterCells
 
   if (max <= min) {
     const center = (resolution - 1) * 0.5
@@ -406,8 +411,11 @@ function applyRidge(
       const perpX = relX - along * ux
       const perpZ = relZ - along * uz
       // Noise warp on perpendicular distance
-      const warp = noise.n2(gx * invWorldSize * RIDGE_WARP_FREQUENCY * worldSize,
-        gz * invWorldSize * RIDGE_WARP_FREQUENCY * worldSize) * RIDGE_WARP_AMPLITUDE
+      const warp =
+        noise.n2(
+          gx * invWorldSize * RIDGE_WARP_FREQUENCY * worldSize,
+          gz * invWorldSize * RIDGE_WARP_FREQUENCY * worldSize,
+        ) * RIDGE_WARP_AMPLITUDE
       const perp = Math.sqrt(perpX * perpX + perpZ * perpZ) + warp * halfWidthCells
       if (perp >= halfWidthCells) continue
       // Cross-section: cosine bell
@@ -546,25 +554,19 @@ export function generateTerrain(surface: SurfaceFeatures, options: TerrainGenOpt
   // Pass 1: Broad support relief + masked breakup
   // -------------------------------------------------------------------------
   const broadReliefAmp =
-    BROAD_RELIEF_BASE_SCALE
-    * (0.35 + surface.roughness * 0.25)
-    * tuning.broadReliefScale
-    * reliefScale
+    BROAD_RELIEF_BASE_SCALE *
+    (0.35 + surface.roughness * 0.25) *
+    tuning.broadReliefScale *
+    reliefScale
 
   for (let gz = 0; gz < resolution; gz++) {
     for (let gx = 0; gx < resolution; gx++) {
       const worldX = gx * cellSize
       const worldZ = gz * cellSize
 
-      const broadRelief = fbm(
-        noise,
-        worldX,
-        worldZ,
-        BROAD_RELIEF_FREQUENCY * frequencyScale,
-        3,
-        0.55,
-        2.1,
-      ) * broadReliefAmp
+      const broadRelief =
+        fbm(noise, worldX, worldZ, BROAD_RELIEF_FREQUENCY * frequencyScale, 3, 0.55, 2.1) *
+        broadReliefAmp
 
       const disturbance = sampleDisturbanceMask(
         noise,
@@ -625,10 +627,7 @@ export function generateTerrain(surface: SurfaceFeatures, options: TerrainGenOpt
     const x1 = x0 + Math.cos(angle) * lengthCells
     const z1 = z0 + Math.sin(angle) * lengthCells
     const ridgeHeight =
-      RIDGE_BASE_HEIGHT
-      * (0.5 + rng() * 0.5)
-      * (0.3 + surface.ridgeFrequency * 0.7)
-      * reliefScale
+      RIDGE_BASE_HEIGHT * (0.5 + rng() * 0.5) * (0.3 + surface.ridgeFrequency * 0.7) * reliefScale
     applyRidge(hm.grid, resolution, worldSize, noise, x0, z0, x1, z1, ridgeHeight, halfWidthCells)
   }
 

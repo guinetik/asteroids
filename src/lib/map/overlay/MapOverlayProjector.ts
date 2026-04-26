@@ -16,13 +16,12 @@ import type { PlanetSystemController } from '@/three/controllers/PlanetSystemCon
 import type { MapCamera } from '@/three/MapCamera'
 import type { GeneratedAsteroidMission } from '@/lib/missions/types'
 import type { ShipHealthConfig } from '@/lib/shipHealth'
-import { buildMapBodies, shouldShowAsteroidMissionMapSite } from '@/lib/map/mapViewControllerHelpers'
-import { findNearestBodies, formatDistance, type MapBody } from '@/lib/mapProjection'
 import {
-  eventHorizonRadius,
-  influenceRadius,
-  type GravityConfig,
-} from '@/lib/physics/gravity'
+  buildMapBodies,
+  shouldShowAsteroidMissionMapSite,
+} from '@/lib/map/mapViewControllerHelpers'
+import { findNearestBodies, formatDistance, type MapBody } from '@/lib/mapProjection'
+import { eventHorizonRadius, influenceRadius, type GravityConfig } from '@/lib/physics/gravity'
 import { getThermalZoneBands } from '@/lib/mapThermalZones'
 import {
   appendWorldLinePoint,
@@ -125,7 +124,9 @@ export class MapOverlayProjector {
       planets: input.planetControllers,
     })
 
-    const shipScreen = input.mapCamera.projectToScreen(new THREE.Vector3(input.shipX, 0, input.shipZ))
+    const shipScreen = input.mapCamera.projectToScreen(
+      new THREE.Vector3(input.shipX, 0, input.shipZ),
+    )
 
     const labels = bodies.map((b) => {
       const screen = input.mapCamera.projectToScreen(new THREE.Vector3(b.x, 0, b.z))
@@ -141,7 +142,12 @@ export class MapOverlayProjector {
       }
     })
 
-    const nearest = findNearestBodies(input.shipX, input.shipZ, bodies, input.overlayData.nearestBodyCount)
+    const nearest = findNearestBodies(
+      input.shipX,
+      input.shipZ,
+      bodies,
+      input.overlayData.nearestBodyCount,
+    )
     const distances = nearest.map((b) => {
       const bodyScreen = input.mapCamera.projectToScreen(new THREE.Vector3(b.x, 0, b.z))
       return {
@@ -205,7 +211,12 @@ export class MapOverlayProjector {
         })
       : []
 
-    const trajectoryPoints = this.buildTrajectory(input.mapCamera, input.shipX, input.shipZ, input.shipDead)
+    const trajectoryPoints = this.buildTrajectory(
+      input.mapCamera,
+      input.shipX,
+      input.shipZ,
+      input.shipDead,
+    )
 
     let missionWaypoint: MapOverlayState['missionWaypoint'] = null
     if (shouldShowAsteroidMissionMapSite(input.activeAsteroidMission)) {

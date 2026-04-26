@@ -135,7 +135,11 @@ export class LevelLightingRig {
 
     // ── Fill — hemisphere with desaturated sun color ──
     const skyColor = ctx.sunColor.clone().multiplyScalar(0.7)
-    const groundColor = new THREE.Color(ctx.baseColor[0], ctx.baseColor[1], ctx.baseColor[2]).multiplyScalar(0.3)
+    const groundColor = new THREE.Color(
+      ctx.baseColor[0],
+      ctx.baseColor[1],
+      ctx.baseColor[2],
+    ).multiplyScalar(0.3)
     this.fill = new THREE.HemisphereLight(skyColor, groundColor, ctx.ambientIntensity)
 
     // ── Rim — opposite sun direction, cool blue ──

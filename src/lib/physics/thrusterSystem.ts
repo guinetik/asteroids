@@ -253,7 +253,10 @@ export class ThrusterSystem<T extends string = ShuttleThrusterName> {
       const burnRateMultiplier = Math.max(0, modifiers?.burnRateMultiplier?.[name] ?? 1)
 
       if (active[name]) {
-        this.charges[name] = Math.max(0, this.charges[name] - cfg.burnRate * burnRateMultiplier * dt)
+        this.charges[name] = Math.max(
+          0,
+          this.charges[name] - cfg.burnRate * burnRateMultiplier * dt,
+        )
       } else {
         if (this.fuel > 0 && this.charges[name] < cfg.capacity) {
           const rechargeMultiplier = Math.max(0, modifiers?.rechargeRateMultiplier?.[name] ?? 1)
@@ -261,10 +264,15 @@ export class ThrusterSystem<T extends string = ShuttleThrusterName> {
           const desiredRecharge = cfg.rechargeRate * rechargeMultiplier * dt
           const chargeSpace = cfg.capacity - this.charges[name]
           const actualRecharge = Math.min(desiredRecharge, chargeSpace)
-          const fuelCost = Math.max(0, actualRecharge * cfg.fuelCostPerRecharge * fuelCostMultiplier)
+          const fuelCost = Math.max(
+            0,
+            actualRecharge * cfg.fuelCostPerRecharge * fuelCostMultiplier,
+          )
           const actualFuelUsed = Math.min(fuelCost, this.fuel)
           const chargeFromFuel =
-            fuelCostMultiplier > 0 ? actualFuelUsed / (cfg.fuelCostPerRecharge * fuelCostMultiplier) : 0
+            fuelCostMultiplier > 0
+              ? actualFuelUsed / (cfg.fuelCostPerRecharge * fuelCostMultiplier)
+              : 0
           this.charges[name] = Math.min(cfg.capacity, this.charges[name] + chargeFromFuel)
           this.fuel = Math.max(0, this.fuel - actualFuelUsed)
         }

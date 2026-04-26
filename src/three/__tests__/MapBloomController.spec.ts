@@ -74,7 +74,10 @@ describe('MapBloomController.applyOrbitClamp', () => {
   })
 
   it('returns bloom to the normal base below the clamp start overscale', () => {
-    controller.applyOrbitClamp({ overscale: ORBIT_BLOOM_CLAMP_OVERSCALE_START - 0.01, inspectMode: false })
+    controller.applyOrbitClamp({
+      overscale: ORBIT_BLOOM_CLAMP_OVERSCALE_START - 0.01,
+      inspectMode: false,
+    })
     expect(ctx.bloomPass.threshold).toBeCloseTo(MAP_BLOOM_THRESHOLD, 5)
     expect(ctx.bloomPass.strength).toBeCloseTo(MAP_BLOOM_STRENGTH, 5)
     expect(ctx.cameraLight.intensity).toBeCloseTo(MAP_CAMERA_LIGHT_BASE_INTENSITY, 5)
@@ -87,7 +90,10 @@ describe('MapBloomController.applyOrbitClamp', () => {
   })
 
   it('saturates at the clamp max when overscale is past the end point', () => {
-    controller.applyOrbitClamp({ overscale: ORBIT_BLOOM_CLAMP_OVERSCALE_END + 1, inspectMode: false })
+    controller.applyOrbitClamp({
+      overscale: ORBIT_BLOOM_CLAMP_OVERSCALE_END + 1,
+      inspectMode: false,
+    })
     expect(ctx.bloomPass.threshold).toBeCloseTo(ORBIT_BLOOM_CLAMP_THRESHOLD, 5)
     expect(ctx.bloomPass.strength).toBeCloseTo(ORBIT_BLOOM_CLAMP_STRENGTH, 5)
     expect(ctx.cameraLight.intensity).toBeCloseTo(0, 5)
@@ -95,7 +101,10 @@ describe('MapBloomController.applyOrbitClamp', () => {
 
   it('is skipped while the EVA override is active', () => {
     controller.setEvaOverride(true)
-    controller.applyOrbitClamp({ overscale: ORBIT_BLOOM_CLAMP_OVERSCALE_END + 1, inspectMode: false })
+    controller.applyOrbitClamp({
+      overscale: ORBIT_BLOOM_CLAMP_OVERSCALE_END + 1,
+      inspectMode: false,
+    })
     // Still at EVA override values.
     expect(ctx.bloomPass.threshold).toBeCloseTo(EVA_MAP_BLOOM_THRESHOLD, 5)
     expect(ctx.bloomPass.strength).toBeCloseTo(EVA_MAP_BLOOM_STRENGTH, 5)

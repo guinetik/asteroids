@@ -1,12 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { computeDrift } from '../drift'
-import {
-  MAX_FOCUS,
-  MAX_POINTING,
-  DRIFT_FOCUS,
-  DRIFT_AZIMUTH,
-  DRIFT_AMP_PCT,
-} from '../constants'
+import { MAX_FOCUS, MAX_POINTING, DRIFT_FOCUS, DRIFT_AZIMUTH, DRIFT_AMP_PCT } from '../constants'
 
 describe('computeDrift', () => {
   it('returns zero drift at t=0 when phase aligns with sin(0)=0 for focus', () => {

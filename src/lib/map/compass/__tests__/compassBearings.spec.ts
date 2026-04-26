@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  computeCompassBearings,
-  COMPASS_LABELS,
-  type CompassTargetInput,
-} from '../compassBearings'
+import { computeCompassBearings, COMPASS_LABELS, type CompassTargetInput } from '../compassBearings'
 
 const sun: CompassTargetInput = { label: 'Sol', color: '#FFF0B0', x: 0, z: 0 }
 

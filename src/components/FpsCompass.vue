@@ -16,8 +16,14 @@ const MAX_POI_OFFSET = 150
 
 /** Cardinal/intercardinal labels at 45-degree intervals. */
 const LABELS: Record<number, string> = {
-  0: 'N', 45: 'NE', 90: 'E', 135: 'SE',
-  180: 'S', 225: 'SW', 270: 'W', 315: 'NW',
+  0: 'N',
+  45: 'NE',
+  90: 'E',
+  135: 'SE',
+  180: 'S',
+  225: 'SW',
+  270: 'W',
+  315: 'NW',
 }
 
 /** Color per objective type. */
@@ -29,7 +35,7 @@ const TYPE_COLORS: Record<string, string> = {
 }
 
 const headingDeg = computed(() => {
-  return (((-props.headingRad * 180) / Math.PI) % 360 + 360) % 360
+  return ((((-props.headingRad * 180) / Math.PI) % 360) + 360) % 360
 })
 
 const offset = computed(() => -headingDeg.value * TICK_SPACING)
@@ -123,7 +129,13 @@ const poiMarkers = computed(() => {
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.15);
   mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 15%,
+    black 85%,
+    transparent 100%
+  );
 }
 
 .compass__track {

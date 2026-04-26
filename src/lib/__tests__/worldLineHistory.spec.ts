@@ -24,17 +24,27 @@ describe('appendWorldLinePoint', () => {
   it('appends a point once the ship has moved far enough', () => {
     const history = appendWorldLinePoint([{ x: 0, z: 0 }], { x: 6, z: 8 }, 5)
 
-    expect(history).toEqual([{ x: 0, z: 0 }, { x: 6, z: 8 }])
+    expect(history).toEqual([
+      { x: 0, z: 0 },
+      { x: 6, z: 8 },
+    ])
   })
 
   it('preserves existing history order when appending new samples', () => {
     const history = appendWorldLinePoint(
-      [{ x: 0, z: 0 }, { x: 10, z: 0 }],
+      [
+        { x: 0, z: 0 },
+        { x: 10, z: 0 },
+      ],
       { x: 20, z: 0 },
       5,
     )
 
-    expect(history).toEqual([{ x: 0, z: 0 }, { x: 10, z: 0 }, { x: 20, z: 0 }])
+    expect(history).toEqual([
+      { x: 0, z: 0 },
+      { x: 10, z: 0 },
+      { x: 20, z: 0 },
+    ])
   })
 })
 

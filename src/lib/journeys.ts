@@ -218,10 +218,7 @@ function isJourneyComplete(profile: PlayerProfile, journeyId: JourneyId): boolea
  * `startTrigger` are always ready; journeys with one require the trigger to
  * have fired (recorded in `journeyStartReadyIds`).
  */
-function isJourneyStartReady(
-  profile: PlayerProfile,
-  definition: JourneyDefinition,
-): boolean {
+function isJourneyStartReady(profile: PlayerProfile, definition: JourneyDefinition): boolean {
   if (definition.startTrigger === undefined) return true
   return profile.journeyStartReadyIds.includes(definition.id)
 }

@@ -73,12 +73,7 @@ export class PortalBoundarySystem implements Tickable {
     // Check crossing on both axes
     const x = this.shuttlePosition.x
     const z = this.shuttlePosition.z
-    if (
-      x > this.halfSize ||
-      x < -this.halfSize ||
-      z > this.halfSize ||
-      z < -this.halfSize
-    ) {
+    if (x > this.halfSize || x < -this.halfSize || z > this.halfSize || z < -this.halfSize) {
       this.departed = true
       this.onDepart?.(this.getShuttleState())
     }

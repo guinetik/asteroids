@@ -59,7 +59,12 @@ export class FuelTank {
     // Fuel level indicator — slightly smaller cylinder inside the tank
     this.indicatorLength = length - 10
     const indicatorRadius = radius * 0.85
-    const indicatorGeo = new THREE.CylinderGeometry(indicatorRadius, indicatorRadius, this.indicatorLength, 16)
+    const indicatorGeo = new THREE.CylinderGeometry(
+      indicatorRadius,
+      indicatorRadius,
+      this.indicatorLength,
+      16,
+    )
     // Solid, depth-tested indicator. Previously used `depthTest: false` + `renderOrder`
     // to force the fuel colour to render on top of the tank shell (visible from inside
     // the cargo bay). That side effect also leaked the indicator through the shuttle

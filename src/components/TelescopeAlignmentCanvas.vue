@@ -229,8 +229,7 @@ function adjust(axis: keyof KnobState, dir: -1 | 1, fine: boolean): void {
   const next = knobs[axis] + dir * step
   if (axis === 'focus') knobs.focus = Math.max(0, Math.min(MAX_FOCUS, next))
   else if (axis === 'chroma') knobs.chroma = Math.max(0, Math.min(MAX_CHROMA, next))
-  else if (axis === 'azimuth')
-    knobs.azimuth = Math.max(-MAX_POINTING, Math.min(MAX_POINTING, next))
+  else if (axis === 'azimuth') knobs.azimuth = Math.max(-MAX_POINTING, Math.min(MAX_POINTING, next))
   else knobs.elevation = Math.max(-MAX_POINTING, Math.min(MAX_POINTING, next))
   props.minigame.reportQuality(computeQuality(knobs))
 }
@@ -340,12 +339,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div
-    class="telescope-overlay"
-    role="dialog"
-    aria-label="Telescope alignment"
-    tabindex="0"
-  >
+  <div class="telescope-overlay" role="dialog" aria-label="Telescope alignment" tabindex="0">
     <div class="telescope-status">
       <span class="telescope-status__location">{{ target.label }}</span>
       <span class="telescope-status__mission">{{ mission.template.name }}</span>
@@ -440,10 +434,7 @@ onUnmounted(() => {
         />
         <div class="telescope-knob__label">AZIMUTH · Z/X</div>
         <div class="telescope-knob__bar">
-          <span
-            :style="{ width: `${Math.round(azQ * 100)}%` }"
-            :class="`telescope-bar-${azLed}`"
-          />
+          <span :style="{ width: `${Math.round(azQ * 100)}%` }" :class="`telescope-bar-${azLed}`" />
         </div>
       </div>
 
@@ -456,10 +447,7 @@ onUnmounted(() => {
         />
         <div class="telescope-knob__label">ELEVATION · C/V</div>
         <div class="telescope-knob__bar">
-          <span
-            :style="{ width: `${Math.round(elQ * 100)}%` }"
-            :class="`telescope-bar-${elLed}`"
-          />
+          <span :style="{ width: `${Math.round(elQ * 100)}%` }" :class="`telescope-bar-${elLed}`" />
         </div>
       </div>
     </div>
@@ -483,4 +471,3 @@ onUnmounted(() => {
     </transition>
   </div>
 </template>
-

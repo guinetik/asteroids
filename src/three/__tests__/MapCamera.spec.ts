@@ -84,7 +84,7 @@ describe('computeTargetFrustumHalfSize', () => {
   it('scales by aspect when ship is displaced along Z (vertical screen axis)', () => {
     // Vertical extent is halfSize/aspect, so Z-displacement requires halfSize × aspect.
     // 4510 * (16/9) * 1.2 ≈ 9621
-    expect(computeTargetFrustumHalfSize(0, 4510, ASPECT)).toBeCloseTo((4510 * ASPECT) * 1.2)
+    expect(computeTargetFrustumHalfSize(0, 4510, ASPECT)).toBeCloseTo(4510 * ASPECT * 1.2)
   })
 
   it('picks the larger of the two axis requirements', () => {

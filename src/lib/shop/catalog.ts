@@ -41,9 +41,7 @@ function validateCatalog(catalog: ShopCatalog): ShopCatalog {
 }
 
 /** Validated shop catalog with buy listings and sell prices. */
-export const SHOP_CATALOG: ShopCatalog = validateCatalog(
-  shopData as unknown as ShopCatalog,
-)
+export const SHOP_CATALOG: ShopCatalog = validateCatalog(shopData as unknown as ShopCatalog)
 
 /** Get the buy price for an item, or undefined if not sold by the shop. */
 export function getBuyPrice(itemId: string): number | undefined {

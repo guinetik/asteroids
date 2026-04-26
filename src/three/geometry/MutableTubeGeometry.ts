@@ -77,12 +77,7 @@ export class MutableTubeGeometry extends THREE.BufferGeometry {
    * @param radius Tube radius in world units.
    * @param closed Whether the tube wraps; rarely used for limb animation.
    */
-  constructor(
-    tubularSegments: number,
-    radialSegments: number,
-    radius: number,
-    closed = false,
-  ) {
+  constructor(tubularSegments: number, radialSegments: number, radius: number, closed = false) {
     super()
     this.tubularSegments = tubularSegments
     this.radialSegments = radialSegments
@@ -92,18 +87,9 @@ export class MutableTubeGeometry extends THREE.BufferGeometry {
     const numVertices = (tubularSegments + 1) * (radialSegments + 1)
     const numIndices = tubularSegments * radialSegments * 6
 
-    this.setAttribute(
-      'position',
-      new THREE.BufferAttribute(new Float32Array(numVertices * 3), 3),
-    )
-    this.setAttribute(
-      'normal',
-      new THREE.BufferAttribute(new Float32Array(numVertices * 3), 3),
-    )
-    this.setAttribute(
-      'uv',
-      new THREE.BufferAttribute(new Float32Array(numVertices * 2), 2),
-    )
+    this.setAttribute('position', new THREE.BufferAttribute(new Float32Array(numVertices * 3), 3))
+    this.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(numVertices * 3), 3))
+    this.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(numVertices * 2), 2))
 
     const IndexArrayCtor = numVertices > 65535 ? Uint32Array : Uint16Array
     this.setIndex(new THREE.BufferAttribute(new IndexArrayCtor(numIndices), 1))

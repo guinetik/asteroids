@@ -241,7 +241,7 @@ export class PortalWormhole implements Tickable {
   /** Scale the group from 0 → 1 with an ease-out curve, then enter idle. */
   private tickRevealing(): void {
     const t = Math.min(this.phaseTimer / REVEAL_DURATION, 1)
-    const scale = 1 - (1 - t) * (1 - t)   // ease-out quad
+    const scale = 1 - (1 - t) * (1 - t) // ease-out quad
     this.group.scale.setScalar(scale)
 
     if (t >= 1) {

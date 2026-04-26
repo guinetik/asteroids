@@ -55,9 +55,7 @@ export function buildFpsPlayerConfig(): FpsPlayerConfig {
         sprint: {
           ...base.o2.thrusters.sprint,
           capacity:
-            base.o2.thrusters.sprint.capacity
-            * BASE_SPRINT_CAPACITY_MULTIPLIER
-            * staminaCapacity,
+            base.o2.thrusters.sprint.capacity * BASE_SPRINT_CAPACITY_MULTIPLIER * staminaCapacity,
           burnRate: base.o2.thrusters.sprint.burnRate * staminaEfficiency,
         },
         jump: {

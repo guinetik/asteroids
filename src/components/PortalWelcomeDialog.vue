@@ -23,9 +23,14 @@ const emit = defineEmits<{
 
 <template>
   <Transition name="portal-welcome">
-    <div v-if="props.visible" class="portal-welcome-backdrop" role="dialog" aria-modal="true" aria-label="Portal arrival welcome">
+    <div
+      v-if="props.visible"
+      class="portal-welcome-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Portal arrival welcome"
+    >
       <div class="portal-welcome-card">
-
         <header class="portal-welcome-card__chrome">
           <span class="portal-welcome-card__chrome-tag">Vibe Jam 2026 · Inter-Game Portal</span>
           <span class="portal-welcome-card__chrome-status">
@@ -84,9 +89,10 @@ const emit = defineEmits<{
         </div>
 
         <footer class="portal-welcome-card__footer">
-          <span class="portal-welcome-card__footer-hint">Press E to launch from orbit · M to open star map</span>
+          <span class="portal-welcome-card__footer-hint"
+            >Press E to launch from orbit · M to open star map</span
+          >
         </footer>
-
       </div>
     </div>
   </Transition>

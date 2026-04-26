@@ -91,7 +91,5 @@
     "Drinks at the kiosk. On me.",
     "— Jay"
   ],
-  "rewards": [
-    { "type": "fast-travel", "planetId": "mars" }
-  ]
+  "rewards": [{ "type": "fast-travel", "planetId": "mars" }]
 }

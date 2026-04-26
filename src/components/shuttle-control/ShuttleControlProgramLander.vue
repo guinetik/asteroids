@@ -21,8 +21,9 @@ defineEmits<{
 const activeUpgrades = computed(() => {
   if (!props.upgradeLevels) return {}
   return Object.fromEntries(
-    Object.entries(props.upgradeLevels)
-      .filter(([id, level]) => level > 0 && id.startsWith('lander'))
+    Object.entries(props.upgradeLevels).filter(
+      ([id, level]) => level > 0 && id.startsWith('lander'),
+    ),
   )
 })
 
@@ -41,20 +42,21 @@ const thrusterGroups = [
 [=======]
  \\ ||| /
   \\|||/
-   \\|/`
+   \\|/`,
   },
   {
     name: 'rcs',
     label: 'RCS MANEUVERING',
     color: 'emerald',
-    description: 'Lateral translation [W/A/S/D], Yaw rotation [Q/E], Ascend boost [Shift], Retro-brake [C].',
+    description:
+      'Lateral translation [W/A/S/D], Yaw rotation [Q/E], Ascend boost [Shift], Retro-brake [C].',
     martaNote: 'Use [C] to damp lateral velocity quickly. Saves you from sliding into a crater.',
     wireframe: `
 ◄═[=]═►
   | |
 ◄═[=]═►
   | |
-◄═[=]═►`
+◄═[=]═►`,
   },
 ]
 
@@ -112,11 +114,14 @@ const prevChapter = () => {
       <aside class="manual-nav">
         <div class="nav-title">INDEX</div>
         <ul class="nav-list">
-          <li 
-            v-for="chapter in chapters" 
+          <li
+            v-for="chapter in chapters"
             :key="chapter.id"
             :class="['nav-item', { active: currentChapter === chapter.id }]"
-            @click="uiAudio.notifyNavClick(); currentChapter = chapter.id"
+            @click="
+              uiAudio.notifyNavClick()
+              currentChapter = chapter.id
+            "
           >
             <span class="ch-num">0{{ chapter.id }}</span>
             <span class="ch-title">{{ chapter.title }}</span>
@@ -126,23 +131,25 @@ const prevChapter = () => {
 
       <!-- Content Area -->
       <main class="manual-content">
-        
         <!-- Chapter 1: Power & Propulsion -->
         <section v-if="currentChapter === 1" class="chapter-view fade-in">
           <div class="chapter-header">
             <h2>01 // POWER PLANT</h2>
             <p class="subtitle">Descent Engine & RCS Management</p>
           </div>
-          
+
           <div class="content-grid">
             <div class="text-panel">
               <p>
-                The surface lander utilizes a <strong class="text-cyan-400">shared fuel pool</strong> with per-group charge capacitors. 
-                Both the main descent engine and RCS thrusters draw from the same primary tank. 
+                The surface lander utilizes a
+                <strong class="text-cyan-400">shared fuel pool</strong> with per-group charge
+                capacitors. Both the main descent engine and RCS thrusters draw from the same
+                primary tank.
               </p>
               <p class="mt-4">
-                When idle, capacitors recharge automatically — but this recharge <strong class="text-amber-400">consumes fuel</strong>.
-                Full charge = zero fuel drain while firing. Depleted charge = direct fuel drain.
+                When idle, capacitors recharge automatically — but this recharge
+                <strong class="text-amber-400">consumes fuel</strong>. Full charge = zero fuel drain
+                while firing. Depleted charge = direct fuel drain.
               </p>
               <div class="marta-quote mt-6">
                 "It's a heavy bird. Keep an eye on the gauge, or you'll be walking home."
@@ -150,8 +157,8 @@ const prevChapter = () => {
             </div>
 
             <div class="thruster-schematics">
-              <div 
-                v-for="group in thrusterGroups" 
+              <div
+                v-for="group in thrusterGroups"
                 :key="group.name"
                 class="schematic-card"
                 :class="`schematic-card--${group.color}`"
@@ -176,17 +183,23 @@ const prevChapter = () => {
             <h2>02 // SURFACE LANDING</h2>
             <p class="subtitle">Touchdown Protocol & Tolerances</p>
           </div>
-          
+
           <div class="content-grid">
             <div class="text-panel">
-              <p class="lead text-cyan-300">The ground is not your friend. Approach with caution.</p>
+              <p class="lead text-cyan-300">
+                The ground is not your friend. Approach with caution.
+              </p>
               <p class="mt-4">
-                The lander's suspension can only absorb so much kinetic energy. Exceeding safe tolerances will result in catastrophic hull damage.
+                The lander's suspension can only absorb so much kinetic energy. Exceeding safe
+                tolerances will result in catastrophic hull damage.
               </p>
               <ul class="data-list mt-4">
                 <li><span class="text-emerald-400">MAX SAFE SPEED:</span> 8.0 m/s descent.</li>
                 <li><span class="text-amber-400">MAX SAFE TILT:</span> 15° from vertical.</li>
-                <li><span class="text-red-400">SURFACE SLOPE:</span> Landing on steep inclines or cliff faces is fatal, regardless of descent speed.</li>
+                <li>
+                  <span class="text-red-400">SURFACE SLOPE:</span> Landing on steep inclines or
+                  cliff faces is fatal, regardless of descent speed.
+                </li>
               </ul>
               <div class="marta-quote mt-6">
                 "If the alarm is screaming, you're coming in too hot. Burn the main engine."
@@ -214,26 +227,46 @@ const prevChapter = () => {
             <h2>03 // FLIGHT CHARACTERISTICS</h2>
             <p class="subtitle">Gravity & Atmospheric Conditions</p>
           </div>
-          
+
           <div class="content-grid">
             <div class="data-card">
               <h3>GRAVITY PROFILE</h3>
               <div class="divider"></div>
               <ul class="data-list">
-                <li><strong>3.0G STANDARD:</strong> Harsher than lunar gravity, but friendlier than Earth.</li>
-                <li><strong>MOMENTUM:</strong> Vacuum environment. Lateral drift persists until countered.</li>
-                <li><strong>RETRO-BRAKE:</strong> Press [C] to fire opposing RCS thrusters and damp lateral velocity.</li>
-                <li><strong>LIFTOFF BOOST:</strong> Firing thrusters from a flat surface provides a temporary thrust multiplier.</li>
+                <li>
+                  <strong>3.0G STANDARD:</strong> Harsher than lunar gravity, but friendlier than
+                  Earth.
+                </li>
+                <li>
+                  <strong>MOMENTUM:</strong> Vacuum environment. Lateral drift persists until
+                  countered.
+                </li>
+                <li>
+                  <strong>RETRO-BRAKE:</strong> Press [C] to fire opposing RCS thrusters and damp
+                  lateral velocity.
+                </li>
+                <li>
+                  <strong>LIFTOFF BOOST:</strong> Firing thrusters from a flat surface provides a
+                  temporary thrust multiplier.
+                </li>
               </ul>
             </div>
-            
+
             <div class="data-card data-card--alert">
               <h3>ENVIRONMENTAL HAZARDS</h3>
               <div class="divider"></div>
               <ul class="data-list">
-                <li><strong>IMPACT:</strong> Kinetic damage scales exponentially with relative velocity.</li>
-                <li><strong>SLOPES:</strong> The lander will attempt to conform to the terrain slope. Extreme slopes cause damage.</li>
-                <li><strong>ADRIFT:</strong> Running out of fuel mid-flight guarantees a hard landing.</li>
+                <li>
+                  <strong>IMPACT:</strong> Kinetic damage scales exponentially with relative
+                  velocity.
+                </li>
+                <li>
+                  <strong>SLOPES:</strong> The lander will attempt to conform to the terrain slope.
+                  Extreme slopes cause damage.
+                </li>
+                <li>
+                  <strong>ADRIFT:</strong> Running out of fuel mid-flight guarantees a hard landing.
+                </li>
               </ul>
             </div>
           </div>
@@ -245,16 +278,18 @@ const prevChapter = () => {
             <h2>04 // LANDER UPGRADES</h2>
             <p class="subtitle">Engineering Bay & Modifications</p>
           </div>
-          
+
           <div class="text-panel">
             <p>
-              The Upgrades terminal is your engineering bay. Level 0 is factory spec.
-              Every paid tier improves core coefficients: thrust efficiency, fuel capacity,
-              engine speed, and hull plating.
+              The Upgrades terminal is your engineering bay. Level 0 is factory spec. Every paid
+              tier improves core coefficients: thrust efficiency, fuel capacity, engine speed, and
+              hull plating.
             </p>
-            
+
             <div class="installed-tech mt-8">
-              <h3 class="text-amber-400 text-sm tracking-widest mb-4">CURRENT INSTALLED PACKAGES</h3>
+              <h3 class="text-amber-400 text-sm tracking-widest mb-4">
+                CURRENT INSTALLED PACKAGES
+              </h3>
               <div class="tech-grid">
                 <div v-for="(level, id) in activeUpgrades" :key="id" class="tech-module">
                   <span class="tech-id">{{ id }}</span>
@@ -278,42 +313,46 @@ const prevChapter = () => {
             <h2>05 // OPERATIONAL PROTOCOL</h2>
             <p class="subtitle">Surface Extraction Procedures</p>
           </div>
-          
+
           <div class="checklist-container">
             <div class="check-item">
               <div class="check-box">[ ]</div>
               <div class="check-text">
-                <strong>VEHICLE SELECTION</strong><br>
-                Lander is exclusively for surface extraction and exploration. Use the Shuttle for orbital transit.
+                <strong>VEHICLE SELECTION</strong><br />
+                Lander is exclusively for surface extraction and exploration. Use the Shuttle for
+                orbital transit.
               </div>
             </div>
             <div class="check-item">
               <div class="check-box">[ ]</div>
               <div class="check-text">
-                <strong>PRE-FLIGHT CHECK</strong><br>
-                Ensure fuel reserves are topped off before initiating descent. Gravity is unforgiving.
+                <strong>PRE-FLIGHT CHECK</strong><br />
+                Ensure fuel reserves are topped off before initiating descent. Gravity is
+                unforgiving.
               </div>
             </div>
             <div class="check-item">
               <div class="check-box">[ ]</div>
               <div class="check-text">
-                <strong>LANDING ZONE</strong><br>
+                <strong>LANDING ZONE</strong><br />
                 Identify flat terrain. Avoid craters, steep ridges, and hostile fauna.
               </div>
             </div>
           </div>
         </section>
-
       </main>
     </div>
 
     <!-- Footer Pagination -->
     <footer class="manual-footer">
-      <button class="nav-btn" :disabled="currentChapter === 1" @click="prevChapter">
-        ◄ PREV
-      </button>
+      <button class="nav-btn" :disabled="currentChapter === 1" @click="prevChapter">◄ PREV</button>
       <div class="progress-indicator">
-        <span v-for="n in chapters.length" :key="n" class="dot" :class="{ active: n === currentChapter }"></span>
+        <span
+          v-for="n in chapters.length"
+          :key="n"
+          class="dot"
+          :class="{ active: n === currentChapter }"
+        ></span>
       </div>
       <button class="nav-btn" :disabled="currentChapter === chapters.length" @click="nextChapter">
         NEXT ►
@@ -564,9 +603,15 @@ const prevChapter = () => {
   font-style: italic;
 }
 
-.schematic-card--cyan { color: #22d3ee; }
-.schematic-card--amber { color: #fbbf24; }
-.schematic-card--emerald { color: #34d399; }
+.schematic-card--cyan {
+  color: #22d3ee;
+}
+.schematic-card--amber {
+  color: #fbbf24;
+}
+.schematic-card--emerald {
+  color: #34d399;
+}
 
 /* --- DATA CARDS & LISTS --- */
 .data-card {
@@ -764,7 +809,13 @@ const prevChapter = () => {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

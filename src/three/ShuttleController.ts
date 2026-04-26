@@ -82,7 +82,8 @@ export interface ShuttlePhysicsConfig {
 }
 
 /** Default physics for the shuttle scene. */
-export const SHUTTLE_PHYSICS: ShuttlePhysicsConfig = shuttlePhysicsData.shuttle as ShuttlePhysicsConfig
+export const SHUTTLE_PHYSICS: ShuttlePhysicsConfig =
+  shuttlePhysicsData.shuttle as ShuttlePhysicsConfig
 
 /** Scaled-down physics for the map scene (solar system hub). */
 export const MAP_PHYSICS: ShuttlePhysicsConfig = shuttlePhysicsData.map as ShuttlePhysicsConfig
@@ -124,9 +125,9 @@ const MODEL_ROTATION_X = -Math.PI / 2
  * 3 SSME nozzles arranged in a triangle: one top-center, two bottom-sides.
  */
 const ENG_POSITIONS: [number, number, number][] = [
-  [-510, 0, 72],     // top center
-  [-510, -52, -46],  // bottom left
-  [-510, 52, -46],   // bottom right
+  [-510, 0, 72], // top center
+  [-510, -52, -46], // bottom left
+  [-510, 52, -46], // bottom right
 ]
 
 const DOOR_OPEN_ANGLE = Math.PI * 0.6 // ~108 degrees, payload bay doors open wide
@@ -211,8 +212,10 @@ export class ShuttleController implements Tickable, PortalVehicle {
 
   /** True while the slingshot burst is settling and input remains locked. */
   get slingshotBurstActive(): boolean {
-    return this._slingshotSettleDuration > 0
-      && this._slingshotSettleElapsed < this._slingshotSettleDuration
+    return (
+      this._slingshotSettleDuration > 0 &&
+      this._slingshotSettleElapsed < this._slingshotSettleDuration
+    )
   }
 
   /** True while the post-launch burst VFX should keep emitting. */
@@ -247,9 +250,8 @@ export class ShuttleController implements Tickable, PortalVehicle {
     this._slingshotFinalSpeed = finalSpeed * cruiseM
     this._slingshotSettleDuration = Math.max(0, settleDuration)
     this._slingshotSettleElapsed = 0
-    this._slingshotSpeed = this._slingshotSettleDuration > 0
-      ? this._slingshotBurstSpeed
-      : this._slingshotFinalSpeed
+    this._slingshotSpeed =
+      this._slingshotSettleDuration > 0 ? this._slingshotBurstSpeed : this._slingshotFinalSpeed
     this.angularVelocity = 0
     this._inputEnabled = this._slingshotSettleDuration <= 0
     return this._slingshotSpeed
@@ -288,7 +290,8 @@ export class ShuttleController implements Tickable, PortalVehicle {
   private readonly gravitySources: GravitySource[] = []
   readonly thrusterSystem = new ThrusterSystem<ShuttleThrusterName>({
     ...DEFAULT_SHUTTLE_CONFIG,
-    fuelCapacity: DEFAULT_SHUTTLE_CONFIG.fuelCapacity * getCurrentUpgradeValue('shuttleFuelCapacity'),
+    fuelCapacity:
+      DEFAULT_SHUTTLE_CONFIG.fuelCapacity * getCurrentUpgradeValue('shuttleFuelCapacity'),
   })
   private isDead = false
   private deathTarget: THREE.Vector3 | null = null
@@ -462,18 +465,20 @@ export class ShuttleController implements Tickable, PortalVehicle {
     return this.group.position
   }
 
-
   get isThrusting(): boolean {
-    return this._inputEnabled
-      && this.inputManager.isActionActive('thrust')
-      && this.thrusterSystem.canFire('thrust', this.getModifiers())
+    return (
+      this._inputEnabled &&
+      this.inputManager.isActionActive('thrust') &&
+      this.thrusterSystem.canFire('thrust', this.getModifiers())
+    )
   }
 
   get isBraking(): boolean {
-    return this.externalBrakeActive || (
-      this._inputEnabled
-      && this.inputManager.isActionActive('brake')
-      && this.thrusterSystem.canFire('brake', this.getModifiers())
+    return (
+      this.externalBrakeActive ||
+      (this._inputEnabled &&
+        this.inputManager.isActionActive('brake') &&
+        this.thrusterSystem.canFire('brake', this.getModifiers()))
     )
   }
 
@@ -496,21 +501,21 @@ export class ShuttleController implements Tickable, PortalVehicle {
   onDoorsToggled: ((open: boolean) => void) | null = null
 
   get isYawingLeft(): boolean {
-    return this.orbitYawLeft
-      || (
-        this._inputEnabled
-        && this.inputManager.isActionActive('yawLeft')
-        && this.thrusterSystem.canFire('rcs', this.getModifiers())
-      )
+    return (
+      this.orbitYawLeft ||
+      (this._inputEnabled &&
+        this.inputManager.isActionActive('yawLeft') &&
+        this.thrusterSystem.canFire('rcs', this.getModifiers()))
+    )
   }
 
   get isYawingRight(): boolean {
-    return this.orbitYawRight
-      || (
-        this._inputEnabled
-        && this.inputManager.isActionActive('yawRight')
-        && this.thrusterSystem.canFire('rcs', this.getModifiers())
-      )
+    return (
+      this.orbitYawRight ||
+      (this._inputEnabled &&
+        this.inputManager.isActionActive('yawRight') &&
+        this.thrusterSystem.canFire('rcs', this.getModifiers()))
+    )
   }
 
   get speed(): number {
@@ -571,9 +576,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
     }
 
     const step = Math.sign(diff) * DOOR_ANIM_SPEED * dt
-    this.doorProgress = Math.abs(step) > Math.abs(diff)
-      ? target
-      : this.doorProgress + step
+    this.doorProgress = Math.abs(step) > Math.abs(diff) ? target : this.doorProgress + step
 
     const angle = this.doorProgress * DOOR_OPEN_ANGLE
 
@@ -614,9 +617,10 @@ export class ShuttleController implements Tickable, PortalVehicle {
     // Shuttle fuel — live from thruster system
     if (this.shuttleFuelTank) {
       this.shuttleFuelTank.setVisible(doorsOpen)
-      const ratio = this.thrusterSystem.fuelCapacity > 0
-        ? this.thrusterSystem.fuelLevel / this.thrusterSystem.fuelCapacity
-        : 0
+      const ratio =
+        this.thrusterSystem.fuelCapacity > 0
+          ? this.thrusterSystem.fuelLevel / this.thrusterSystem.fuelCapacity
+          : 0
       this.shuttleFuelTank.update(ratio)
     }
   }
@@ -697,11 +701,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
 
     const angle = Math.random() * Math.PI * 2
     const radius = SPAWN_MIN_RADIUS + Math.random() * (SPAWN_MAX_RADIUS - SPAWN_MIN_RADIUS)
-    this.group.position.set(
-      Math.cos(angle) * radius,
-      0,
-      Math.sin(angle) * radius,
-    )
+    this.group.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius)
     this.group.rotation.set(0, Math.random() * Math.PI * 2, 0)
   }
 
@@ -746,11 +746,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
         const spd = Math.sqrt(vxr)
         const along = (pushSign * this.velocity.dot(right)) / spd
         const alongAbs = Math.min(1, Math.abs(along))
-        mult = THREE.MathUtils.lerp(
-          p.rcsAlignMinMultiplier,
-          p.rcsAlignMaxMultiplier,
-          alongAbs,
-        )
+        mult = THREE.MathUtils.lerp(p.rcsAlignMinMultiplier, p.rcsAlignMaxMultiplier, alongAbs)
       }
       this.velocity.addScaledVector(
         right,
@@ -781,10 +777,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
       if (planarSpeed <= upgradedMaxThrustSpeed + SHUTTLE_VELOCITY_ALIGN_EPSILON) {
         let thrustMultiplier = p.thrustAlignMaxMultiplier
         if (planarSpeed > SHUTTLE_VELOCITY_ALIGN_EPSILON) {
-          const forwardAlign = Math.max(
-            0,
-            Math.min(1, this.velocity.dot(forward) / planarSpeed),
-          )
+          const forwardAlign = Math.max(0, Math.min(1, this.velocity.dot(forward) / planarSpeed))
           thrustMultiplier = THREE.MathUtils.lerp(
             p.thrustAlignMinMultiplier,
             p.thrustAlignMaxMultiplier,
@@ -882,8 +875,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
       const spd = this.velocity.length()
       if (spd > upgradedCruiseEquilibrium + SHUTTLE_VELOCITY_ALIGN_EPSILON) {
         const excess = spd - upgradedCruiseEquilibrium
-        const newSpd =
-          upgradedCruiseEquilibrium + excess * Math.exp(-p.speedExcessReturnRate * dt)
+        const newSpd = upgradedCruiseEquilibrium + excess * Math.exp(-p.speedExcessReturnRate * dt)
         this.velocity.multiplyScalar(newSpd / spd)
       }
     }

@@ -104,13 +104,7 @@ describe('createOrbitalMiniGame', () => {
       status: 'active',
       brokenComponents: ['satellite_antenna', 'satellite_solar_A'],
     } as ActiveVisitRelayMission
-    const mg = createOrbitalMiniGame(
-      'earth_sat_patch',
-      'satellite_servicing',
-      0,
-      'earth',
-      mission,
-    )
+    const mg = createOrbitalMiniGame('earth_sat_patch', 'satellite_servicing', 0, 'earth', mission)
     expect(mg).toBeInstanceOf(SatelliteServicingMiniGame)
     expect((mg as SatelliteServicingMiniGame).brokenComponents).toEqual([
       'satellite_antenna',
@@ -134,13 +128,7 @@ describe('createOrbitalMiniGame', () => {
       status: 'active',
       // brokenComponents intentionally absent
     } as ActiveVisitRelayMission
-    const mg = createOrbitalMiniGame(
-      'earth_sat_patch',
-      'satellite_servicing',
-      0,
-      'earth',
-      mission,
-    )
+    const mg = createOrbitalMiniGame('earth_sat_patch', 'satellite_servicing', 0, 'earth', mission)
     expect(mg).toBeInstanceOf(DefaultOrbitalMiniGame)
   })
 

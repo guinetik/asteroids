@@ -103,7 +103,7 @@ export const JAY_CONTRACT_INCOMING_MESSAGE: ShipMessageDefinition = {
   priority: JAY_MESSAGE_PRIORITY,
   body: [
     'Hey, you got Jay.',
-    "I am not parking the real Space Cowboys, Inc. contract in your mail until you have one real job under your belt — shuttle, lander, anything that pays. Close something out, then the system will open a new folder with the partner offer.",
+    'I am not parking the real Space Cowboys, Inc. contract in your mail until you have one real job under your belt — shuttle, lander, anything that pays. Close something out, then the system will open a new folder with the partner offer.',
     'Until you see that, you are on starter boards only. The logo can wait. Your flight hours cannot.',
     'When the folder shows up, read it, accept it if you are still in, and we are fifty-fifty on everything after.',
     '— Jay',
@@ -128,8 +128,8 @@ export const COLONEL_SAMPAIO_MMC_HEADS_UP: ShipMessageDefinition = {
   priority: MMC_SAMPAIO_MESSAGE_PRIORITY,
   body: [
     "Phobos cleared your file. You closed the Space Cowboys' Mars charter and you already ran a line on red dirt — that means you are eligible for a proper Corps turret detachment, not a sticker on your window.",
-    "The packet starts with a hull mount, not a joyride. No turret, no mining line from the Corps. Already carrying one? The contract will log it. Before you go joyriding in the belt: there is a contract packet under MARTIAN MARINE CORPS in your shuttle mail. Not this inbox. The folder on the left. Open the terminal, hit Messages, read the offer, then hit Accept or Decline like you mean it.",
-    "If you can not find a mail folder, you are not ready for my ore runs. I am not re-explaining the UI in a second message.",
+    'The packet starts with a hull mount, not a joyride. No turret, no mining line from the Corps. Already carrying one? The contract will log it. Before you go joyriding in the belt: there is a contract packet under MARTIAN MARINE CORPS in your shuttle mail. Not this inbox. The folder on the left. Open the terminal, hit Messages, read the offer, then hit Accept or Decline like you mean it.',
+    'If you can not find a mail folder, you are not ready for my ore runs. I am not re-explaining the UI in a second message.',
     '— Sampaio. Move.',
   ],
 }

@@ -54,11 +54,7 @@ const visiblePickups = computed(() => {
 <template>
   <div class="pickup-toast" aria-live="polite">
     <transition-group name="pickup-toast" tag="div" class="pickup-toast__stack">
-      <div
-        v-for="entry in visiblePickups"
-        :key="entry.id"
-        class="pickup-toast__entry"
-      >
+      <div v-for="entry in visiblePickups" :key="entry.id" class="pickup-toast__entry">
         <span class="pickup-toast__plus">+</span>
         <span :key="entry.pulse" class="pickup-toast__qty">{{ entry.quantity }}</span>
         <span class="pickup-toast__label">{{ entry.label }}</span>
@@ -118,13 +114,21 @@ const visiblePickups = computed(() => {
 }
 
 @keyframes pickup-toast-bump {
-  0% { transform: translateY(-3px) scale(1.18); color: rgba(255, 255, 255, 1); }
-  100% { transform: translateY(0) scale(1); color: rgba(255, 255, 255, 0.95); }
+  0% {
+    transform: translateY(-3px) scale(1.18);
+    color: rgba(255, 255, 255, 1);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    color: rgba(255, 255, 255, 0.95);
+  }
 }
 
 .pickup-toast-enter-active,
 .pickup-toast-leave-active {
-  transition: opacity 0.4s ease, transform 0.4s ease;
+  transition:
+    opacity 0.4s ease,
+    transform 0.4s ease;
 }
 .pickup-toast-enter-from {
   opacity: 0;

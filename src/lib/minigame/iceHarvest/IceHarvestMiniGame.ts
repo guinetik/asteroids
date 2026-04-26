@@ -283,8 +283,8 @@ export class IceHarvestMiniGame implements OrbitalMiniGame, OrbitalMiniGameEvent
   private tickChunkSpawning(dt: number): void {
     // Ramp spawn rate over time
     const rampT = Math.min(1, this.elapsedTime / CHUNK_SPAWN_RAMP_DURATION)
-    const interval = CHUNK_SPAWN_INTERVAL_START +
-      (CHUNK_SPAWN_INTERVAL_MIN - CHUNK_SPAWN_INTERVAL_START) * rampT
+    const interval =
+      CHUNK_SPAWN_INTERVAL_START + (CHUNK_SPAWN_INTERVAL_MIN - CHUNK_SPAWN_INTERVAL_START) * rampT
 
     this.chunkSpawnTimer += dt
     while (this.chunkSpawnTimer >= interval) {
@@ -436,9 +436,7 @@ export class IceHarvestMiniGame implements OrbitalMiniGame, OrbitalMiniGameEvent
 
   /** Remove off-screen and shattered chunks. */
   private cleanupChunks(): void {
-    this.chunks = this.chunks.filter(
-      (c) => !c.shattered && c.x > -c.radius * 2,
-    )
+    this.chunks = this.chunks.filter((c) => !c.shattered && c.x > -c.radius * 2)
   }
 
   /** Remove collected and expired shards. */

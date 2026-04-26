@@ -432,8 +432,7 @@ export class PhotometryProbeController implements Tickable {
 
     if (this.flightTime < totalDuration) {
       const t =
-        (this.flightTime - LAUNCH_HOVER_DURATION - LAUNCH_CLIMB_DURATION) /
-        LAUNCH_SIDE_ARC_DURATION
+        (this.flightTime - LAUNCH_HOVER_DURATION - LAUNCH_CLIMB_DURATION) / LAUNCH_SIDE_ARC_DURATION
       const ease = t * t * (3 - 2 * t)
       this.probeGroup.position.lerpVectors(this.apex, this.target, ease)
       this.probeGroup.scale.setScalar(1)
@@ -445,10 +444,7 @@ export class PhotometryProbeController implements Tickable {
     this.probeGroup.scale.setScalar(1)
     this.createWaypoint()
     for (let i = 0; i < ARRIVAL_PARTICLE_COUNT; i++) {
-      this.collectEmitter.emit(
-        this.target,
-        new THREE.Vector3(0, ARRIVAL_PARTICLE_UP_VELOCITY, 0),
-      )
+      this.collectEmitter.emit(this.target, new THREE.Vector3(0, ARRIVAL_PARTICLE_UP_VELOCITY, 0))
     }
   }
 

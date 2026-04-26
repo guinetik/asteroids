@@ -117,10 +117,7 @@ export class SatelliteRepairController {
     const brokenList = cfg.minigame.brokenComponents
     const validation = validateManifest(cfg.poiObject, brokenList)
     if (!validation.ok) {
-      console.warn(
-        '[SatelliteRepairController] Missing components on POI:',
-        validation.missing,
-      )
+      console.warn('[SatelliteRepairController] Missing components on POI:', validation.missing)
     }
     for (const name of validation.found) {
       const source = cfg.poiObject.getObjectByName(name)

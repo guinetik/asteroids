@@ -14,7 +14,9 @@ import {
 import { getTurretMiningPool } from '../turretMiningPools'
 import type { ActiveTurretMiningMission, TurretMiningMissionTemplate } from '../types'
 
-function template(overrides: Partial<TurretMiningMissionTemplate> = {}): TurretMiningMissionTemplate {
+function template(
+  overrides: Partial<TurretMiningMissionTemplate> = {},
+): TurretMiningMissionTemplate {
   return {
     id: overrides.id ?? 'test',
     name: overrides.name ?? 'Test',
@@ -26,7 +28,9 @@ function template(overrides: Partial<TurretMiningMissionTemplate> = {}): TurretM
   }
 }
 
-function activeMission(overrides: Partial<ActiveTurretMiningMission> = {}): ActiveTurretMiningMission {
+function activeMission(
+  overrides: Partial<ActiveTurretMiningMission> = {},
+): ActiveTurretMiningMission {
   return {
     template: overrides.template ?? template(),
     giverPlanet: overrides.giverPlanet ?? 'mars',
@@ -158,7 +162,9 @@ describe('turretMiningSession', () => {
 
     it('returns 0 when the requested ore is absent', () => {
       const inv = createInventory()
-      const m = activeMission({ template: template({ oreCategory: 'iron-nickel-alloy', targetKg: 200 }) })
+      const m = activeMission({
+        template: template({ oreCategory: 'iron-nickel-alloy', targetKg: 200 }),
+      })
       expect(computeMiningProgressKg(inv, m)).toBe(0)
     })
   })

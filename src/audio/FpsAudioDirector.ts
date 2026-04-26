@@ -207,12 +207,7 @@ export class FpsAudioDirector {
     // ── Footsteps ───────────────────────────────────────────────
     // The synth itself debounces and ignores out-of-cadence ticks, so
     // we just hand it the raw movement state every frame.
-    this.footsteps.update(
-      dt,
-      state.speed > MIN_MOVE_SPEED,
-      state.grounded,
-      state.sprinting,
-    )
+    this.footsteps.update(dt, state.speed > MIN_MOVE_SPEED, state.grounded, state.sprinting)
 
     // ── Breathing crossfade ─────────────────────────────────────
     const o2Capacity = Math.max(0, state.o2Capacity)

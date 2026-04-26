@@ -151,13 +151,11 @@ export function isShuttleAimingAtPlanet(params: {
 
 /** Build map overlay body data from the active planetarium controllers. */
 export function buildMapBodies(params: {
-  sun:
-    | {
-        getWorldX(): number
-        getWorldZ(): number
-        mass: number
-      }
-    | null
+  sun: {
+    getWorldX(): number
+    getWorldZ(): number
+    mass: number
+  } | null
   planets: Array<{ getWorldX(): number; getWorldZ(): number; mass: number }>
 }): Array<{ id: string; name: string; x: number; z: number; mass: number }> {
   const bodies: Array<{ id: string; name: string; x: number; z: number; mass: number }> = []

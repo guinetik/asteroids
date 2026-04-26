@@ -76,7 +76,13 @@ for (let i = 0; i < 60; i++) {
 const PLANET_HORIZON_Y = CANVAS_HEIGHT * 0.72
 
 /** Wind/atmosphere particles — spawn at left, drift right. */
-interface WindParticle { x: number; y: number; speed: number; alpha: number; len: number }
+interface WindParticle {
+  x: number
+  y: number
+  speed: number
+  alpha: number
+  len: number
+}
 const windParticles: WindParticle[] = []
 const MAX_WIND_PARTICLES = 30
 
@@ -95,7 +101,7 @@ let planetScrollX = 0
 
 /** Simple hash for pseudo-random noise in the banded renderer. */
 function hash(n: number): number {
-  return ((Math.sin(n) * 43758.5453123) % 1 + 1) % 1
+  return (((Math.sin(n) * 43758.5453123) % 1) + 1) % 1
 }
 
 /** 2D value noise — cheap approximation of the GLSL noise3D. */
@@ -125,7 +131,7 @@ function drawFlatBands(ctx: CanvasRenderingContext2D, t: ReturnType<typeof getGa
     const bandY = PLANET_HORIZON_Y + 5 + i * 24
     const speed = 60 + i * 25
     const scrollWrap = CANVAS_WIDTH * 2
-    const offset = (planetScrollX * speed / 80) % scrollWrap
+    const offset = ((planetScrollX * speed) / 80) % scrollWrap
     const thickness = 10 + i * 5
     const alpha = 0.1 + (i % 3) * 0.05
 
@@ -136,7 +142,7 @@ function drawFlatBands(ctx: CanvasRenderingContext2D, t: ReturnType<typeof getGa
     if (i % 2 === 0) {
       ctx.globalAlpha = alpha * 0.5
       for (let wx = 0; wx < CANVAS_WIDTH; wx += 40) {
-        const waveY = bandY + Math.sin((wx + planetScrollX * speed / 80) * 0.03) * 6
+        const waveY = bandY + Math.sin((wx + (planetScrollX * speed) / 80) * 0.03) * 6
         ctx.fillRect(wx, waveY, 30, thickness * 0.4)
       }
     }
@@ -173,7 +179,10 @@ function getBandRGB(bands: [string, string, string]): RGB[] {
 }
 
 /** Gas giant banded surface — sine-wave bands with turbulence, mirroring the GLSL shader logic. */
-function drawBandedSurface(ctx: CanvasRenderingContext2D, t: ReturnType<typeof getGasCollectionTheme>) {
+function drawBandedSurface(
+  ctx: CanvasRenderingContext2D,
+  t: ReturnType<typeof getGasCollectionTheme>,
+) {
   const surfaceHeight = CANVAS_HEIGHT - PLANET_HORIZON_Y
   const step = 8 // px per scanline tile
   const rgb = getBandRGB(t.cloudBands)
@@ -238,7 +247,10 @@ function initTerrain() {
 }
 
 /** Rocky terrain surface — mesas, craters, rocks, dust bands (Mars-style). */
-function drawTerrainSurface(ctx: CanvasRenderingContext2D, t: ReturnType<typeof getGasCollectionTheme>) {
+function drawTerrainSurface(
+  ctx: CanvasRenderingContext2D,
+  t: ReturnType<typeof getGasCollectionTheme>,
+) {
   initTerrain()
 
   // Sun-lit highlight from upper right
@@ -299,15 +311,33 @@ function drawTerrainSurface(ctx: CanvasRenderingContext2D, t: ReturnType<typeof 
     const bandY = PLANET_HORIZON_Y * 0.6 + (i / 8) * PLANET_HORIZON_Y * 0.35
     const speed = 20 + i * 8
     const bandLen = CANVAS_WIDTH * 0.4 + (i % 3) * CANVAS_WIDTH * 0.2
-    const xOff = (simTime * speed + i * 200) % (CANVAS_WIDTH + bandLen) - bandLen * 0.5
+    const xOff = ((simTime * speed + i * 200) % (CANVAS_WIDTH + bandLen)) - bandLen * 0.5
     const alpha = 0.02 + (i % 3) * 0.015
     const bandH = 3 + (i % 4) * 3
 
     const grad = ctx.createLinearGradient(xOff, 0, xOff + bandLen, 0)
     grad.addColorStop(0, `${dustColor}00`)
-    grad.addColorStop(0.2, dustColor + Math.round(alpha * 255).toString(16).padStart(2, '0'))
-    grad.addColorStop(0.5, dustColor + Math.round(alpha * 1.2 * 255).toString(16).padStart(2, '0'))
-    grad.addColorStop(0.8, dustColor + Math.round(alpha * 255).toString(16).padStart(2, '0'))
+    grad.addColorStop(
+      0.2,
+      dustColor +
+        Math.round(alpha * 255)
+          .toString(16)
+          .padStart(2, '0'),
+    )
+    grad.addColorStop(
+      0.5,
+      dustColor +
+        Math.round(alpha * 1.2 * 255)
+          .toString(16)
+          .padStart(2, '0'),
+    )
+    grad.addColorStop(
+      0.8,
+      dustColor +
+        Math.round(alpha * 255)
+          .toString(16)
+          .padStart(2, '0'),
+    )
     grad.addColorStop(1, `${dustColor}00`)
     ctx.fillStyle = grad
     ctx.fillRect(xOff, bandY - bandH / 2, bandLen, bandH)
@@ -345,8 +375,12 @@ function drawBackground(ctx: CanvasRenderingContext2D, dt: number) {
   const curveRadius = CANVAS_WIDTH * 1.8
   const curveCenterY = PLANET_HORIZON_Y + curveRadius - 60
   const planetGrad = ctx.createRadialGradient(
-    CANVAS_WIDTH / 2, curveCenterY, curveRadius - 120,
-    CANVAS_WIDTH / 2, curveCenterY, curveRadius + 40,
+    CANVAS_WIDTH / 2,
+    curveCenterY,
+    curveRadius - 120,
+    CANVAS_WIDTH / 2,
+    curveCenterY,
+    curveRadius + 40,
   )
   planetGrad.addColorStop(0, t.surface.bright)
   planetGrad.addColorStop(0.4, t.surface.mid)
@@ -378,7 +412,9 @@ function drawBackground(ctx: CanvasRenderingContext2D, dt: number) {
     const scrollWrap = CANVAS_WIDTH * 2
     const featSpeed = 30 // slow drift — much slower than the cloud bands
     for (const feat of t.surfaceFeatures) {
-      const featX = ((feat.scrollPhase * scrollWrap + planetScrollX * featSpeed / 80) % scrollWrap) - scrollWrap * 0.25
+      const featX =
+        ((feat.scrollPhase * scrollWrap + (planetScrollX * featSpeed) / 80) % scrollWrap) -
+        scrollWrap * 0.25
       const featY = PLANET_HORIZON_Y + feat.yOffset
 
       // Only draw when on-screen (with generous margin)
@@ -388,7 +424,14 @@ function drawBackground(ctx: CanvasRenderingContext2D, dt: number) {
 
         // Outer halo — feathered glow, blends into the surface color
         ctx.globalAlpha = 0.2
-        const haloGrad = ctx.createRadialGradient(0, 0, feat.radiusX * 0.3, 0, 0, feat.radiusX * 1.6)
+        const haloGrad = ctx.createRadialGradient(
+          0,
+          0,
+          feat.radiusX * 0.3,
+          0,
+          0,
+          feat.radiusX * 1.6,
+        )
         haloGrad.addColorStop(0, feat.outerColor)
         haloGrad.addColorStop(0.6, feat.outerColor + '40')
         haloGrad.addColorStop(1, feat.outerColor + '00')
@@ -419,7 +462,15 @@ function drawBackground(ctx: CanvasRenderingContext2D, dt: number) {
           const ringScale = 0.25 + ring * 0.16
           const arcStart = swirlAngle + ring * 1.2
           ctx.beginPath()
-          ctx.ellipse(0, 0, feat.radiusX * ringScale, feat.radiusY * ringScale, swirlAngle * 0.3 + ring * 0.4, arcStart, arcStart + 2.5)
+          ctx.ellipse(
+            0,
+            0,
+            feat.radiusX * ringScale,
+            feat.radiusY * ringScale,
+            swirlAngle * 0.3 + ring * 0.4,
+            arcStart,
+            arcStart + 2.5,
+          )
           ctx.stroke()
         }
 
@@ -493,8 +544,7 @@ function drawShip(ctx: CanvasRenderingContext2D) {
 
   // Engine exhaust glow (behind everything)
   const speed = Math.sqrt(
-    props.minigame.shipVx * props.minigame.shipVx +
-    props.minigame.shipVy * props.minigame.shipVy,
+    props.minigame.shipVx * props.minigame.shipVx + props.minigame.shipVy * props.minigame.shipVy,
   )
   if (speed > 5) {
     const flameLen = 10 + (speed / 400) * 20 + Math.random() * 6
@@ -516,13 +566,13 @@ function drawShip(ctx: CanvasRenderingContext2D) {
   ctx.strokeStyle = '#888'
   ctx.lineWidth = 0.5
   ctx.beginPath()
-  ctx.moveTo(hw + 4, 0)                 // nose tip
-  ctx.lineTo(hw - 4, -hh * 0.5)         // upper nose curve
-  ctx.lineTo(-hw + 6, -hh * 0.55)       // upper body
-  ctx.lineTo(-hw, -hh * 0.4)            // rear top
-  ctx.lineTo(-hw, hh * 0.4)             // rear bottom
-  ctx.lineTo(-hw + 6, hh * 0.55)        // lower body
-  ctx.lineTo(hw - 4, hh * 0.5)          // lower nose curve
+  ctx.moveTo(hw + 4, 0) // nose tip
+  ctx.lineTo(hw - 4, -hh * 0.5) // upper nose curve
+  ctx.lineTo(-hw + 6, -hh * 0.55) // upper body
+  ctx.lineTo(-hw, -hh * 0.4) // rear top
+  ctx.lineTo(-hw, hh * 0.4) // rear bottom
+  ctx.lineTo(-hw + 6, hh * 0.55) // lower body
+  ctx.lineTo(hw - 4, hh * 0.5) // lower nose curve
   ctx.closePath()
   ctx.fill()
   ctx.stroke()
@@ -622,10 +672,7 @@ function drawDrones(ctx: CanvasRenderingContext2D) {
     ctx.strokeStyle = hasGas ? '#44ff44' : '#00ffcc'
     ctx.lineWidth = 2
     ctx.beginPath()
-    ctx.moveTo(
-      drone.x - drone.vx * 0.01 * trailLen,
-      drone.y - drone.vy * 0.01 * trailLen,
-    )
+    ctx.moveTo(drone.x - drone.vx * 0.01 * trailLen, drone.y - drone.vy * 0.01 * trailLen)
     ctx.lineTo(drone.x, drone.y)
     ctx.stroke()
     ctx.globalAlpha = 1.0
@@ -679,10 +726,7 @@ function drawGauge(ctx: CanvasRenderingContext2D) {
   ctx.fillRect(barX, barY, barWidth, barHeight)
 
   // Fill
-  const fill = Math.min(
-    props.minigame.gasCollected / props.minigame.targetGas,
-    1,
-  )
+  const fill = Math.min(props.minigame.gasCollected / props.minigame.targetGas, 1)
   ctx.fillStyle = fill >= 1 ? '#00ff88' : '#00ccff'
   ctx.fillRect(barX, barY, barWidth * fill, barHeight)
 
@@ -708,16 +752,17 @@ function drawHeatWarning(ctx: CanvasRenderingContext2D) {
 
   // Proximity-based warning — red vignette from edges
   if (shipBottom > warningStart || heatRatio > 0) {
-    const proximity = Math.max(
-      (shipBottom - warningStart) / HEAT_WARNING_OFFSET,
-      heatRatio,
-    )
+    const proximity = Math.max((shipBottom - warningStart) / HEAT_WARNING_OFFSET, heatRatio)
     const intensity = Math.min(1, proximity) * 0.4
 
     // Red vignette overlay — stronger edges
     const vigGrad = ctx.createRadialGradient(
-      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, CANVAS_WIDTH * 0.25,
-      CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, CANVAS_WIDTH * 0.6,
+      CANVAS_WIDTH / 2,
+      CANVAS_HEIGHT / 2,
+      CANVAS_WIDTH * 0.25,
+      CANVAS_WIDTH / 2,
+      CANVAS_HEIGHT / 2,
+      CANVAS_WIDTH * 0.6,
     )
     vigGrad.addColorStop(0, 'rgba(255, 0, 0, 0)')
     vigGrad.addColorStop(1, `rgba(255, 30, 0, ${intensity})`)
@@ -824,11 +869,7 @@ function loop(time: number) {
   ctx.fillStyle = timeLow ? '#ff4444' : '#ffffff'
   ctx.font = timeLow ? 'bold 16px monospace' : '14px monospace'
   ctx.textAlign = 'center'
-  ctx.fillText(
-    `${Math.ceil(timeLeft)}s`,
-    CANVAS_WIDTH / 2,
-    24,
-  )
+  ctx.fillText(`${Math.ceil(timeLeft)}s`, CANVAS_WIDTH / 2, 24)
 
   // Drone counter
   ctx.fillStyle = '#00ccff'
@@ -923,15 +964,10 @@ onUnmounted(() => {
             <span><b>Q</b> — launch drone</span>
           </div>
           <p class="gas-collection-briefing__detail">
-            Drones: {{ minigame.dronesRemaining }} available — reusable if caught.
-            Target: {{ minigame.targetGas }} gas units.
-            Time limit: {{ Math.ceil(minigame.timeTotal) }}s.
+            Drones: {{ minigame.dronesRemaining }} available — reusable if caught. Target:
+            {{ minigame.targetGas }} gas units. Time limit: {{ Math.ceil(minigame.timeTotal) }}s.
           </p>
-          <button
-            type="button"
-            class="gas-collection-briefing__start"
-            @click="startGame"
-          >
+          <button type="button" class="gas-collection-briefing__start" @click="startGame">
             BEGIN COLLECTION
           </button>
         </div>

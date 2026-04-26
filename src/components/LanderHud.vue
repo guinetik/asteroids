@@ -35,7 +35,9 @@ function timerColor(seconds: number): string {
     <!-- Readouts: top left -->
     <div class="hud-readout">ALT {{ props.telemetry.altitude.toFixed(1) }}</div>
     <div class="hud-readout">VEL {{ props.telemetry.velocityY.toFixed(1) }}</div>
-    <div class="hud-readout">X {{ props.telemetry.posX.toFixed(0) }} Z {{ props.telemetry.posZ.toFixed(0) }}</div>
+    <div class="hud-readout">
+      X {{ props.telemetry.posX.toFixed(0) }} Z {{ props.telemetry.posZ.toFixed(0) }}
+    </div>
 
     <!-- Fuel bar -->
     <div class="lander-hud-fuel">
@@ -67,7 +69,10 @@ function timerColor(seconds: number): string {
         <div class="hud-gauge-track">
           <div
             class="hud-gauge-fill bg-red-500"
-            :style="{ height: pct(props.telemetry.mainEngineCharge, props.telemetry.mainEngineCapacity) + '%' }"
+            :style="{
+              height:
+                pct(props.telemetry.mainEngineCharge, props.telemetry.mainEngineCapacity) + '%',
+            }"
           ></div>
         </div>
         <span class="hud-gauge-label">ENG</span>
@@ -89,7 +94,9 @@ function timerColor(seconds: number): string {
         {{ formatTimer(props.telemetry.surveyTimeRemaining ?? 0) }}
       </div>
       <div class="survey-probes">
-        {{ props.telemetry.surveyProbesCollected ?? 0 }}/{{ props.telemetry.surveyProbesTotal ?? 0 }}
+        {{ props.telemetry.surveyProbesCollected ?? 0 }}/{{
+          props.telemetry.surveyProbesTotal ?? 0
+        }}
         {{ props.telemetry.minigameProgressLabel ?? 'PROBES' }}
       </div>
       <div v-if="props.telemetry.missionInstruction" class="survey-instruction" aria-live="polite">

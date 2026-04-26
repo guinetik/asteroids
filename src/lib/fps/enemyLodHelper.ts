@@ -116,7 +116,8 @@ export class EnemyLodApplier {
     const distSq = dx * dx + dz * dz
 
     if ('lodSkipGeometry' in ctrl) {
-      ;(ctrl as { lodSkipGeometry: boolean }).lodSkipGeometry = distSq > ENEMY_LOD_GEOMETRY_DISTANCE_SQ
+      ;(ctrl as { lodSkipGeometry: boolean }).lodSkipGeometry =
+        distSq > ENEMY_LOD_GEOMETRY_DISTANCE_SQ
     }
 
     let entry = this.buffer[this.size]

@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import {
-  SHIP_MESSAGE_STORAGE_KEY,
-  loadMessageRecords,
-  saveMessageRecords,
-} from '../messageStorage'
+import { SHIP_MESSAGE_STORAGE_KEY, loadMessageRecords, saveMessageRecords } from '../messageStorage'
 import type { ShipMessageRecord } from '../messageTypes'
 
 const mockStorage: Record<string, string> = {}

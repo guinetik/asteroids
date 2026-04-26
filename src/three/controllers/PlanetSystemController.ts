@@ -60,7 +60,10 @@ const INDICATOR_FADE_BAND = 0.5
  * @param accentColor - CSS color string for the dot and text
  * @returns Canvas texture and sprite material
  */
-function createIndicatorSprite(name: string, accentColor: string): {
+function createIndicatorSprite(
+  name: string,
+  accentColor: string,
+): {
   sprite: THREE.Sprite
   texture: THREE.CanvasTexture
 } {
@@ -294,8 +297,7 @@ export class PlanetSystemController implements GravitySource {
     this.group.position.set(pos.x, pos.z, pos.y)
 
     // Self-rotation
-    this.planetMesh.mesh.rotation.y =
-      (simTime * this.planet.rotationSpeed) / ROTATION_SPEED_DIVISOR
+    this.planetMesh.mesh.rotation.y = (simTime * this.planet.rotationSpeed) / ROTATION_SPEED_DIVISOR
 
     // Shader time
     if (this.planetMesh.uniforms.uTime) {
@@ -332,7 +334,10 @@ export class PlanetSystemController implements GravitySource {
 
       if (apparentFraction < fadeThreshold) {
         // Hermite fade: 1 at fadeEnd, 0 at fadeThreshold
-        const t = Math.min(1, Math.max(0, (fadeThreshold - apparentFraction) / (fadeThreshold - fadeEnd)))
+        const t = Math.min(
+          1,
+          Math.max(0, (fadeThreshold - apparentFraction) / (fadeThreshold - fadeEnd)),
+        )
         const alpha = t * t * (3 - 2 * t)
 
         this.indicatorSprite.visible = true
@@ -355,14 +360,14 @@ export class PlanetSystemController implements GravitySource {
     const disposeMesh = (obj: THREE.Object3D) => {
       obj.traverse((child) => {
         if ('geometry' in child) {
-          (child as THREE.Mesh).geometry?.dispose()
+          ;(child as THREE.Mesh).geometry?.dispose()
         }
         if ('material' in child) {
           const mat = (child as THREE.Mesh).material
           if (Array.isArray(mat)) {
-            mat.forEach(m => m.dispose())
+            mat.forEach((m) => m.dispose())
           } else if (mat) {
-            (mat as THREE.Material).dispose()
+            ;(mat as THREE.Material).dispose()
           }
         }
       })

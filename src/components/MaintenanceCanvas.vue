@@ -32,8 +32,12 @@ let simTime = 0
 let isDragging = false
 
 /** Sun position — read from minigame (randomized per game). */
-function sunX() { return props.minigame.sunX }
-function sunY() { return props.minigame.sunY }
+function sunX() {
+  return props.minigame.sunX
+}
+function sunY() {
+  return props.minigame.sunY
+}
 
 const STUB_CTX: OrbitalMiniGameContext = {
   shipPosition: { x: 0, y: 0, z: 0 },
@@ -44,7 +48,15 @@ const STUB_CTX: OrbitalMiniGameContext = {
 
 // ─── Pre-generated scene elements (from inspo) ──────────────────────────────
 
-const stars: { x: number; y: number; r: number; bright: number; twinkleSpeed: number; twinkleOffset: number; hue: number }[] = []
+const stars: {
+  x: number
+  y: number
+  r: number
+  bright: number
+  twinkleSpeed: number
+  twinkleOffset: number
+  hue: number
+}[] = []
 for (let i = 0; i < 280; i++) {
   stars.push({
     x: Math.random() * CANVAS_WIDTH,
@@ -62,7 +74,13 @@ const RING_INNER = NEPTUNE_R + 18
 const RING_OUTER = NEPTUNE_R + 65
 const RING_TILT = 0.22
 
-interface RingParticle { angle: number; dist: number; size: number; brightness: number; speed: number }
+interface RingParticle {
+  angle: number
+  dist: number
+  size: number
+  brightness: number
+  speed: number
+}
 const ringParticles: RingParticle[] = []
 for (let i = 0; i < 200; i++) {
   const angle = Math.random() * Math.PI * 2
@@ -84,7 +102,14 @@ const TRITON_R = 6
 const TRITON_SPEED = 0.15
 
 // Ambient dust
-interface Dust { x: number; y: number; size: number; speed: number; alpha: number; drift: number }
+interface Dust {
+  x: number
+  y: number
+  size: number
+  speed: number
+  alpha: number
+  drift: number
+}
 const ambientDust: Dust[] = []
 for (let i = 0; i < 35; i++) {
   ambientDust.push({
@@ -100,7 +125,14 @@ for (let i = 0; i < 35; i++) {
 // ─── Background rendering ────────────────────────────────────────────────────
 
 function drawBackground(ctx: CanvasRenderingContext2D) {
-  const bg = ctx.createRadialGradient(NEPTUNE_X, NEPTUNE_Y, NEPTUNE_R * 0.5, NEPTUNE_X, NEPTUNE_Y, CANVAS_WIDTH * 0.9)
+  const bg = ctx.createRadialGradient(
+    NEPTUNE_X,
+    NEPTUNE_Y,
+    NEPTUNE_R * 0.5,
+    NEPTUNE_X,
+    NEPTUNE_Y,
+    CANVAS_WIDTH * 0.9,
+  )
   bg.addColorStop(0, '#08101a')
   bg.addColorStop(0.2, '#060c14')
   bg.addColorStop(0.5, '#040810')
@@ -170,7 +202,14 @@ function drawNeptune(ctx: CanvasRenderingContext2D) {
   ctx.clip()
 
   // Deep cobalt blue
-  const pg = ctx.createRadialGradient(NEPTUNE_X - NEPTUNE_R * 0.25, NEPTUNE_Y - NEPTUNE_R * 0.2, NEPTUNE_R * 0.1, NEPTUNE_X, NEPTUNE_Y, NEPTUNE_R)
+  const pg = ctx.createRadialGradient(
+    NEPTUNE_X - NEPTUNE_R * 0.25,
+    NEPTUNE_Y - NEPTUNE_R * 0.2,
+    NEPTUNE_R * 0.1,
+    NEPTUNE_X,
+    NEPTUNE_Y,
+    NEPTUNE_R,
+  )
   pg.addColorStop(0, '#5080d0')
   pg.addColorStop(0.2, '#4070c0')
   pg.addColorStop(0.4, '#3060b0')
@@ -182,8 +221,8 @@ function drawNeptune(ctx: CanvasRenderingContext2D) {
 
   // Storm bands
   for (let i = 0; i < 10; i++) {
-    const bandY = NEPTUNE_Y - NEPTUNE_R + (NEPTUNE_R * 2 / 10) * i
-    const bandH = NEPTUNE_R * 2 / 10
+    const bandY = NEPTUNE_Y - NEPTUNE_R + ((NEPTUNE_R * 2) / 10) * i
+    const bandH = (NEPTUNE_R * 2) / 10
     const drift = Math.sin(i * 1.8 + simTime * 0.15 * (1 + i * 0.1)) * 3
     const alpha = 0.03 + Math.sin(i * 2.5) * 0.015
     ctx.fillStyle = i % 2 === 0 ? `rgba(70,120,200,${alpha})` : `rgba(30,70,160,${alpha})`
@@ -212,7 +251,14 @@ function drawNeptune(ctx: CanvasRenderingContext2D) {
   ctx.fill()
 
   // Limb darkening
-  const limb = ctx.createRadialGradient(NEPTUNE_X - NEPTUNE_R * 0.2, NEPTUNE_Y - NEPTUNE_R * 0.15, NEPTUNE_R * 0.25, NEPTUNE_X, NEPTUNE_Y, NEPTUNE_R)
+  const limb = ctx.createRadialGradient(
+    NEPTUNE_X - NEPTUNE_R * 0.2,
+    NEPTUNE_Y - NEPTUNE_R * 0.15,
+    NEPTUNE_R * 0.25,
+    NEPTUNE_X,
+    NEPTUNE_Y,
+    NEPTUNE_R,
+  )
   limb.addColorStop(0, 'rgba(0,0,0,0)')
   limb.addColorStop(0.55, 'rgba(0,0,0,0.08)')
   limb.addColorStop(0.8, 'rgba(0,0,0,0.25)')
@@ -223,8 +269,10 @@ function drawNeptune(ctx: CanvasRenderingContext2D) {
   // Sunlit crescent
   const sunAngle = Math.atan2(NEPTUNE_Y - sunY(), NEPTUNE_X - sunX())
   const crescentGrad = ctx.createLinearGradient(
-    NEPTUNE_X - Math.cos(sunAngle) * NEPTUNE_R, NEPTUNE_Y - Math.sin(sunAngle) * NEPTUNE_R,
-    NEPTUNE_X + Math.cos(sunAngle) * NEPTUNE_R, NEPTUNE_Y + Math.sin(sunAngle) * NEPTUNE_R,
+    NEPTUNE_X - Math.cos(sunAngle) * NEPTUNE_R,
+    NEPTUNE_Y - Math.sin(sunAngle) * NEPTUNE_R,
+    NEPTUNE_X + Math.cos(sunAngle) * NEPTUNE_R,
+    NEPTUNE_Y + Math.sin(sunAngle) * NEPTUNE_R,
   )
   crescentGrad.addColorStop(0, 'rgba(120,160,230,0.12)')
   crescentGrad.addColorStop(0.4, 'rgba(0,0,0,0)')
@@ -234,7 +282,14 @@ function drawNeptune(ctx: CanvasRenderingContext2D) {
   ctx.restore()
 
   // Atmospheric glow
-  const glow = ctx.createRadialGradient(NEPTUNE_X, NEPTUNE_Y, NEPTUNE_R - 3, NEPTUNE_X, NEPTUNE_Y, NEPTUNE_R + 20)
+  const glow = ctx.createRadialGradient(
+    NEPTUNE_X,
+    NEPTUNE_Y,
+    NEPTUNE_R - 3,
+    NEPTUNE_X,
+    NEPTUNE_Y,
+    NEPTUNE_R + 20,
+  )
   glow.addColorStop(0, 'rgba(60,100,200,0)')
   glow.addColorStop(0.5, 'rgba(60,100,200,0.04)')
   glow.addColorStop(0.8, 'rgba(50,80,180,0.02)')
@@ -318,7 +373,10 @@ function drawAmbientDust(ctx: CanvasRenderingContext2D, dt: number) {
   for (const d of ambientDust) {
     d.x -= d.speed * dt
     d.y += d.drift * dt
-    if (d.x < -10) { d.x = CANVAS_WIDTH + 10; d.y = Math.random() * CANVAS_HEIGHT }
+    if (d.x < -10) {
+      d.x = CANVAS_WIDTH + 10
+      d.y = Math.random() * CANVAS_HEIGHT
+    }
     ctx.beginPath()
     ctx.arc(d.x, d.y, d.size, 0, Math.PI * 2)
     ctx.fillStyle = `rgba(100,130,180,${d.alpha})`
@@ -327,7 +385,14 @@ function drawAmbientDust(ctx: CanvasRenderingContext2D, dt: number) {
 }
 
 function drawVignette(ctx: CanvasRenderingContext2D) {
-  const vg = ctx.createRadialGradient(NEPTUNE_X, NEPTUNE_Y, NEPTUNE_R * 1.5, NEPTUNE_X, NEPTUNE_Y, CANVAS_WIDTH * 0.72)
+  const vg = ctx.createRadialGradient(
+    NEPTUNE_X,
+    NEPTUNE_Y,
+    NEPTUNE_R * 1.5,
+    NEPTUNE_X,
+    NEPTUNE_Y,
+    CANVAS_WIDTH * 0.72,
+  )
   vg.addColorStop(0, 'rgba(0,0,0,0)')
   vg.addColorStop(0.5, 'rgba(0,0,0,0.1)')
   vg.addColorStop(1, 'rgba(0,0,0,0.45)')
@@ -345,7 +410,14 @@ function drawSurfaceTargets(ctx: CanvasRenderingContext2D) {
     const litColor = target.lit ? '100,255,150' : '100,220,255'
 
     // Outer glow
-    const outerGlow = ctx.createRadialGradient(target.x, target.y, 0, target.x, target.y, target.radius * 2.5)
+    const outerGlow = ctx.createRadialGradient(
+      target.x,
+      target.y,
+      0,
+      target.x,
+      target.y,
+      target.radius * 2.5,
+    )
     outerGlow.addColorStop(0, `rgba(${litColor},${alpha * 0.3})`)
     outerGlow.addColorStop(0.4, `rgba(${litColor},${alpha * 0.1})`)
     outerGlow.addColorStop(1, `rgba(${litColor},0)`)
@@ -355,7 +427,14 @@ function drawSurfaceTargets(ctx: CanvasRenderingContext2D) {
     ctx.fill()
 
     // Core dot
-    const coreGlow = ctx.createRadialGradient(target.x, target.y, 0, target.x, target.y, target.radius)
+    const coreGlow = ctx.createRadialGradient(
+      target.x,
+      target.y,
+      0,
+      target.x,
+      target.y,
+      target.radius,
+    )
     coreGlow.addColorStop(0, `rgba(${litColor},${alpha * 0.7})`)
     coreGlow.addColorStop(0.5, `rgba(${litColor},${alpha * 0.4})`)
     coreGlow.addColorStop(1, `rgba(${litColor},${alpha * 0.1})`)
@@ -392,8 +471,12 @@ function drawPanels(ctx: CanvasRenderingContext2D) {
 
     // Panel body — small rectangle
     ctx.fillStyle = panel.lit
-      ? (isSelected ? '#88ddff' : '#5599cc')
-      : (isSelected ? '#667788' : '#3a4a5a')
+      ? isSelected
+        ? '#88ddff'
+        : '#5599cc'
+      : isSelected
+        ? '#667788'
+        : '#3a4a5a'
     ctx.strokeStyle = isSelected ? '#aaeeff' : 'rgba(100,160,200,0.3)'
     ctx.lineWidth = isSelected ? 1.5 : 0.8
     ctx.fillRect(-hs, -hs * 0.4, hs * 2, hs * 0.8)
@@ -470,8 +553,10 @@ function drawLightBeams(ctx: CanvasRenderingContext2D) {
     const outerW = 8
     ctx.globalAlpha = alpha * 0.12
     const prismGrad = ctx.createLinearGradient(
-      beam.x1 + nx * outerW, beam.y1 + ny * outerW,
-      beam.x1 - nx * outerW, beam.y1 - ny * outerW,
+      beam.x1 + nx * outerW,
+      beam.y1 + ny * outerW,
+      beam.x1 - nx * outerW,
+      beam.y1 - ny * outerW,
     )
     prismGrad.addColorStop(0, 'rgba(100,150,255,0)')
     prismGrad.addColorStop(0.2, 'rgba(120,180,255,1)')
@@ -543,7 +628,8 @@ function drawHUD(ctx: CanvasRenderingContext2D) {
   ctx.textAlign = 'right'
   ctx.fillText(
     `TARGETS: ${props.minigame.targetsLit} / ${props.minigame.targetCount}`,
-    CANVAS_WIDTH - 20, 24,
+    CANVAS_WIDTH - 20,
+    24,
   )
 
   // Progress bar (bottom)
@@ -567,7 +653,8 @@ function drawHUD(ctx: CanvasRenderingContext2D) {
   ctx.textAlign = 'center'
   ctx.fillText(
     `ALIGNMENT: ${props.minigame.targetsLit} / ${props.minigame.targetCount}`,
-    CANVAS_WIDTH / 2, barY - 6,
+    CANVAS_WIDTH / 2,
+    barY - 6,
   )
 
   // Instructions
@@ -592,7 +679,8 @@ function drawEndScreen(ctx: CanvasRenderingContext2D) {
   ctx.textAlign = 'center'
   ctx.fillText(
     props.minigame.status === 'completed' ? 'ALIGNMENT COMPLETE' : 'TIME EXPIRED — MISSION FAILED',
-    CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2,
+    CANVAS_WIDTH / 2,
+    CANVAS_HEIGHT / 2,
   )
 }
 
@@ -773,29 +861,23 @@ onUnmounted(() => {
           <div class="gas-collection-briefing__icon">☀</div>
           <h3 class="gas-collection-briefing__title">SOLAR MIRROR ARRAY OFFLINE</h3>
           <p class="gas-collection-briefing__text">
-            Neptune's orbital solar mirror array has drifted out of alignment.
-            Surface installations are losing power. The distant sun provides
-            barely enough light — every photon must be redirected precisely.
+            Neptune's orbital solar mirror array has drifted out of alignment. Surface installations
+            are losing power. The distant sun provides barely enough light — every photon must be
+            redirected precisely.
           </p>
           <p class="gas-collection-briefing__text">
-            Click each solar panel and drag to aim it. Chain panels to bounce
-            sunlight around the planet's shadow. Illuminate all surface targets
-            to restore power.
+            Click each solar panel and drag to aim it. Chain panels to bounce sunlight around the
+            planet's shadow. Illuminate all surface targets to restore power.
           </p>
           <div class="gas-collection-briefing__controls">
             <span><b>CLICK</b> — select panel</span>
             <span><b>DRAG</b> — aim panel</span>
           </div>
           <p class="gas-collection-briefing__detail">
-            Panels: {{ minigame.panels.length }}.
-            Targets: {{ minigame.targetCount }}.
-            Time limit: {{ Math.ceil(minigame.timeTotal) }}s.
+            Panels: {{ minigame.panels.length }}. Targets: {{ minigame.targetCount }}. Time limit:
+            {{ Math.ceil(minigame.timeTotal) }}s.
           </p>
-          <button
-            type="button"
-            class="gas-collection-briefing__start"
-            @click="startGame"
-          >
+          <button type="button" class="gas-collection-briefing__start" @click="startGame">
             BEGIN ALIGNMENT
           </button>
         </div>

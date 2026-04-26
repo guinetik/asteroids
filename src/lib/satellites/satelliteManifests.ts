@@ -33,8 +33,10 @@ export interface ManifestValidationResult {
   missing: string[]
 }
 
-const MANIFESTS: Record<string, SatelliteManifest> =
-  rawManifests satisfies Record<string, SatelliteManifest>
+const MANIFESTS: Record<string, SatelliteManifest> = rawManifests satisfies Record<
+  string,
+  SatelliteManifest
+>
 
 /**
  * Look up the manifest for a POI type.

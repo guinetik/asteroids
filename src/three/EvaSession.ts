@@ -22,10 +22,7 @@ import { useAudio } from '@/audio/useAudio'
 import { EvaRcsSound } from '@/audio/EvaRcsSound'
 import { EvaCollisionResolver, type EvaCollider } from '@/lib/physics/evaCollisionResolver'
 import { EvaTetherController } from './EvaTetherController'
-import {
-  buildEvaColliderWireframes,
-  type EvaColliderDebugHandle,
-} from './EvaColliderDebug'
+import { buildEvaColliderWireframes, type EvaColliderDebugHandle } from './EvaColliderDebug'
 
 /**
  * The surface EvaSession needs from its host scene. {@link SceneManager} satisfies this
@@ -407,9 +404,7 @@ export class EvaSession implements Tickable {
     const spawn = EVA_SPAWN_OFFSET.clone()
       .multiplyScalar(this.config.spawnOffsetScale)
       .applyQuaternion(vehicle.group.quaternion)
-    controller.setPosition(
-      new THREE.Vector3().copy(vehicle.group.position).add(spawn),
-    )
+    controller.setPosition(new THREE.Vector3().copy(vehicle.group.position).add(spawn))
     controller.fpsCamera.yaw = vehicle.heading
     controller.fpsCamera.pitch = 0
     controller.onDeath = () => {

@@ -10,7 +10,13 @@
  */
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
-import type { MiniGame, MiniGameStatus, MiniGameContext, MiniGameEvents, MiniGameStep } from './MiniGame'
+import type {
+  MiniGame,
+  MiniGameStatus,
+  MiniGameContext,
+  MiniGameEvents,
+  MiniGameStep,
+} from './MiniGame'
 import type { ConcreteObjective } from '@/lib/missions/types'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import { TerminalModel, TERMINAL_INTERACT_RANGE } from '@/three/TerminalModel'

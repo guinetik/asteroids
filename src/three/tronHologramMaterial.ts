@@ -185,7 +185,8 @@ export interface CreateTronHologramMaterialOptions {
 export function createTronHologramMaterial(
   options: CreateTronHologramMaterialOptions,
 ): THREE.ShaderMaterial {
-  const gridTint = options.gridTint !== undefined ? new THREE.Color(options.gridTint) : new THREE.Color(0x141414)
+  const gridTint =
+    options.gridTint !== undefined ? new THREE.Color(options.gridTint) : new THREE.Color(0x141414)
   const colorGain = options.colorGain ?? TRON_HOLOGRAM_DEFAULT_COLOR_GAIN
   const alphaGain = options.alphaGain ?? TRON_HOLOGRAM_DEFAULT_ALPHA_GAIN
   const opacity = options.opacity ?? TRON_HOLOGRAM_MATERIAL_OPACITY

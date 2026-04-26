@@ -274,10 +274,7 @@ export class MapSceneVisuals {
     const linePositions = new Float32Array(6)
     const lineGeometry = new THREE.BufferGeometry()
     lineGeometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3))
-    lineGeometry.setAttribute(
-      'lineU',
-      new THREE.BufferAttribute(new Float32Array([0, 1]), 1),
-    )
+    lineGeometry.setAttribute('lineU', new THREE.BufferAttribute(new Float32Array([0, 1]), 1))
 
     const lineUniforms: TetherLineUniforms = {
       uTime: { value: 0 },
@@ -419,8 +416,7 @@ export class MapSceneVisuals {
     if (update.isFreeFlight && reticleAlpha > 0.005) {
       this.shipReticleGroup.visible = true
       this.shipReticleGroup.position.copy(update.shuttlePosition)
-      const reticleWorld =
-        MAP_CONFIG.MAP_RETICLE_APPARENT_SIZE * 2 * dist * Math.tan(halfFovRad)
+      const reticleWorld = MAP_CONFIG.MAP_RETICLE_APPARENT_SIZE * 2 * dist * Math.tan(halfFovRad)
       this.shipReticleGroup.scale.setScalar(reticleWorld)
       this.shipReticleRing.visible = false
 
@@ -485,10 +481,7 @@ export class MapSceneVisuals {
     const linePositions = new Float32Array(6)
     const lineGeometry = new THREE.BufferGeometry()
     lineGeometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3))
-    lineGeometry.setAttribute(
-      'lineU',
-      new THREE.BufferAttribute(new Float32Array([0, 1]), 1),
-    )
+    lineGeometry.setAttribute('lineU', new THREE.BufferAttribute(new Float32Array([0, 1]), 1))
 
     const lineUniforms: TetherLineUniforms = {
       uTime: { value: 0 },

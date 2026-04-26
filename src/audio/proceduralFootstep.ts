@@ -88,8 +88,7 @@ export function playProceduralFootstep(args: ProceduralFootstepArgs): boolean {
   const output = ctx.createGain()
   output.gain.value = volume
 
-  const panner =
-    typeof ctx.createStereoPanner === 'function' ? ctx.createStereoPanner() : null
+  const panner = typeof ctx.createStereoPanner === 'function' ? ctx.createStereoPanner() : null
   if (panner) {
     panner.pan.value = stereo
     output.connect(panner)
@@ -168,10 +167,7 @@ function buildHabitatStep(
   const tapFilter = ctx.createBiquadFilter()
   tapFilter.type = 'bandpass'
   tapFilter.frequency.setValueAtTime(3000 * pitchScale, startTime)
-  tapFilter.frequency.exponentialRampToValueAtTime(
-    1400 * pitchScale,
-    startTime + tapDuration,
-  )
+  tapFilter.frequency.exponentialRampToValueAtTime(1400 * pitchScale, startTime + tapDuration)
   tapFilter.Q.value = 0.9
   const tapGain = ctx.createGain()
   applyKickEnvelope(tapGain.gain, startTime, tapDuration, 0.5 * (0.55 + intensity * 0.45))
@@ -206,7 +202,7 @@ function buildAsteroidStep(
   pitchScale: number,
 ): number {
   // ── Body kick ──────────────────────────────────────────────────
-  const bodyDuration = 0.10
+  const bodyDuration = 0.1
   const body = ctx.createOscillator()
   body.type = 'sine'
   body.frequency.setValueAtTime(140 * pitchScale, startTime)
@@ -224,18 +220,10 @@ function buildAsteroidStep(
   const crunchFilter = ctx.createBiquadFilter()
   crunchFilter.type = 'bandpass'
   crunchFilter.frequency.setValueAtTime(2200 * pitchScale, startTime)
-  crunchFilter.frequency.exponentialRampToValueAtTime(
-    900 * pitchScale,
-    startTime + crunchDuration,
-  )
+  crunchFilter.frequency.exponentialRampToValueAtTime(900 * pitchScale, startTime + crunchDuration)
   crunchFilter.Q.value = 1.2
   const crunchGain = ctx.createGain()
-  applyKickEnvelope(
-    crunchGain.gain,
-    startTime,
-    crunchDuration,
-    0.55 * (0.5 + intensity * 0.5),
-  )
+  applyKickEnvelope(crunchGain.gain, startTime, crunchDuration, 0.55 * (0.5 + intensity * 0.5))
   crunch.connect(crunchFilter)
   crunchFilter.connect(crunchGain)
   crunchGain.connect(output)
@@ -251,7 +239,7 @@ function buildAsteroidStep(
   tailFilter.frequency.value = 1200 * pitchScale
   tailFilter.Q.value = 0.5
   const tailGain = ctx.createGain()
-  applyTailEnvelope(tailGain.gain, tailStart, tailDuration, 0.10 * intensity)
+  applyTailEnvelope(tailGain.gain, tailStart, tailDuration, 0.1 * intensity)
   tail.connect(tailFilter)
   tailFilter.connect(tailGain)
   tailGain.connect(output)

@@ -324,9 +324,7 @@ export class SpireController implements Tickable {
     }
 
     // --- Membrane breathing ---
-    const breathe = this.isAgitated
-      ? 1 + Math.sin(t * 4) * 0.08
-      : 1 + Math.sin(t * 1.5) * 0.03
+    const breathe = this.isAgitated ? 1 + Math.sin(t * 4) * 0.08 : 1 + Math.sin(t * 1.5) * 0.03
     this.membrane.scale.setScalar(breathe)
 
     // --- Core pulse ---
@@ -493,9 +491,7 @@ export class SpireController implements Tickable {
 
     // Assign detach velocities and tumble speeds to each spike
     for (const spike of this.spikeData) {
-      spike.velocity = spike.dir
-        .clone()
-        .multiplyScalar(0.1 + Math.random() * 0.1)
+      spike.velocity = spike.dir.clone().multiplyScalar(0.1 + Math.random() * 0.1)
       spike.rotSpeed = new THREE.Vector3(
         (Math.random() - 0.5) * 0.3,
         (Math.random() - 0.5) * 0.3,

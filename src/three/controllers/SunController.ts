@@ -69,14 +69,14 @@ export class SunController implements GravitySource {
   dispose(): void {
     this.sunResult.group.traverse((child) => {
       if ('geometry' in child) {
-        (child as THREE.Mesh).geometry?.dispose()
+        ;(child as THREE.Mesh).geometry?.dispose()
       }
       if ('material' in child) {
         const mat = (child as THREE.Mesh).material
         if (Array.isArray(mat)) {
-          mat.forEach(m => m.dispose())
+          mat.forEach((m) => m.dispose())
         } else if (mat) {
-          (mat as THREE.Material).dispose()
+          ;(mat as THREE.Material).dispose()
         }
       }
     })

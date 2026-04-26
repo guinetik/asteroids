@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { ShipHealth, getRadiationZone, getRadiationArmor, type ShipHealthConfig } from '../shipHealth'
+import {
+  ShipHealth,
+  getRadiationZone,
+  getRadiationArmor,
+  type ShipHealthConfig,
+} from '../shipHealth'
 
 const config: ShipHealthConfig = {
   maxHp: 100,

@@ -58,11 +58,7 @@ describe('levelObjectivePlacement', () => {
     const heightmap = buildHeightmap()
     const before = heightmap.get(1, 2)
 
-    flattenHeightmapDisk(
-      heightmap,
-      { x: 0, z: 0 },
-      { flattenRadius: 12, flattenFullRadius: 4 },
-    )
+    flattenHeightmapDisk(heightmap, { x: 0, z: 0 }, { flattenRadius: 12, flattenFullRadius: 4 })
 
     expect(heightmap.get(1, 2)).not.toBe(before)
     expect(heightmap.heightAt(0, 0)).toBe(heightmap.heightAt(0, 0))

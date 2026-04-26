@@ -84,8 +84,8 @@ async function ensureSatelliteTemplate(): Promise<THREE.Group> {
         const size = new THREE.Vector3()
         box.getSize(size)
         console.info(
-          `[SatelliteModel] loaded mesh list (raw size ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}):\n`
-          + parts.join('\n'),
+          `[SatelliteModel] loaded mesh list (raw size ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}):\n` +
+            parts.join('\n'),
         )
       }
       return scene
@@ -146,18 +146,18 @@ export class SatelliteModel {
     group.add(sceneClone)
     const beacon = options?.maintenanceState
       ? new MaintenanceBeacon(group, {
-        // Offset lives in `model.group` (scale 1) so it's in world units at attach time;
-        // multiply by `scale` so the beacon sits inside the (scaled) sceneClone rather
-        // than floating out in space when the model shrinks.
-        offset: SATELLITE_MAINTENANCE_BEACON_OFFSET_NATIVE.clone().multiplyScalar(scale),
-        initialState: options.maintenanceState,
-        // PointLight.distance is in world units and is NOT scaled by the parent.
-        // Tied to `scale` here so a shrunken map-size satellite gets a proportionally
-        // small halo (avoids the "huge light blob disconnected from tiny sat" look)
-        // while the EVA ×20 container boost keeps it readable in close-up.
-        distance: scale * SATELLITE_BEACON_DISTANCE_PER_SCALE,
-        radius: scale * SATELLITE_BEACON_RADIUS_PER_SCALE,
-      })
+          // Offset lives in `model.group` (scale 1) so it's in world units at attach time;
+          // multiply by `scale` so the beacon sits inside the (scaled) sceneClone rather
+          // than floating out in space when the model shrinks.
+          offset: SATELLITE_MAINTENANCE_BEACON_OFFSET_NATIVE.clone().multiplyScalar(scale),
+          initialState: options.maintenanceState,
+          // PointLight.distance is in world units and is NOT scaled by the parent.
+          // Tied to `scale` here so a shrunken map-size satellite gets a proportionally
+          // small halo (avoids the "huge light blob disconnected from tiny sat" look)
+          // while the EVA ×20 container boost keeps it readable in close-up.
+          distance: scale * SATELLITE_BEACON_DISTANCE_PER_SCALE,
+          radius: scale * SATELLITE_BEACON_RADIUS_PER_SCALE,
+        })
       : null
     return new SatelliteModel(group, beacon)
   }

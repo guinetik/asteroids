@@ -14,11 +14,7 @@ import type { Inventory } from '@/lib/inventory/types'
 import { getStack, removeItem } from '@/lib/inventory/inventory'
 import type { PlayerProfile } from '@/lib/player/types'
 import { addCredits } from '@/lib/player/profile'
-import type {
-  ActiveTurretMiningMission,
-  MiningOreCategory,
-  ShuttleMissionBoard,
-} from './types'
+import type { ActiveTurretMiningMission, MiningOreCategory, ShuttleMissionBoard } from './types'
 import { MAIN_BELT_ORE_IDS } from './turretMiningSession'
 import { contractSystem } from '@/lib/contracts/runtime'
 import { getTurretMiningPool } from './turretMiningPools'
@@ -128,19 +124,14 @@ export function deliverTurretMiningMission(
   if (mission.giverPlanet !== planetId) {
     return { ok: false, board, inventory, profile, mission: null, creditsEarned: 0 }
   }
-  const drain = drainForCategory(
-    inventory,
-    mission.template.oreCategory,
-    mission.template.targetKg,
-  )
+  const drain = drainForCategory(inventory, mission.template.oreCategory, mission.template.targetKg)
   if (!drain.ok) {
     return { ok: false, board, inventory, profile, mission: null, creditsEarned: 0 }
   }
   const creditsEarned = Math.round(mission.template.reward * rewardMultiplier)
   const nextProfile = addCredits(profile, creditsEarned)
   const nextActives = board.activeMiningMissions.filter((_, i) => i !== idx)
-  const giverId =
-    mission.giverId ?? getTurretMiningPool(mission.giverPlanet)?.giverId ?? null
+  const giverId = mission.giverId ?? getTurretMiningPool(mission.giverPlanet)?.giverId ?? null
   contractSystem.notifyMissionCompleted({
     kind: 'mining',
     giverPlanetId: mission.giverPlanet,

@@ -35,7 +35,9 @@ import type { Contract, RewardEffect } from './contractTypes'
 const contractChangeListeners = new Set<() => void>()
 
 /** Fired when a `shuttle-upgrade` contract reward actually raised the stored level (not on replay no-ops). */
-const contractShuttleUpgradeListeners = new Set<(payload: ContractShuttleUpgradeGrantPayload) => void>()
+const contractShuttleUpgradeListeners = new Set<
+  (payload: ContractShuttleUpgradeGrantPayload) => void
+>()
 
 /** Subscribers notified once per contract that transitions to `completed`. */
 const contractCompletedListeners = new Set<(contractId: string) => void>()
@@ -96,54 +98,49 @@ function applyRewardToProfile(effect: RewardEffect, contract: Contract): void {
 }
 
 /** Singleton contract system bound to the shared message system. */
-export const contractSystem = new ContractSystem(
-  CONTRACT_CATALOG,
-  shipMessageSystem,
-  undefined,
-  {
-    onContractsChanged: () => {
-      for (const listener of contractChangeListeners) {
-        try {
-          listener()
-        } catch {
-          // listeners must not break the system; swallow to keep other subscribers alive
-        }
+export const contractSystem = new ContractSystem(CONTRACT_CATALOG, shipMessageSystem, undefined, {
+  onContractsChanged: () => {
+    for (const listener of contractChangeListeners) {
+      try {
+        listener()
+      } catch {
+        // listeners must not break the system; swallow to keep other subscribers alive
       }
-    },
-    onRewardGranted: (effect, c) => applyRewardToProfile(effect, c),
-    onContractCompleted: (id) => {
-      for (const listener of Array.from(contractCompletedListeners)) {
-        try {
-          listener(id)
-        } catch {
-          // listeners must not break the system
-        }
-      }
-    },
-    onContractAccepted: (id) => {
-      for (const listener of Array.from(contractAcceptedListeners)) {
-        try {
-          listener(id)
-        } catch {
-          // listeners must not break the system
-        }
-      }
-    },
-    onContractStepCompleted: (payload) => {
-      payContractStepCredits(payload.creditsReward)
-      for (const listener of Array.from(contractStepCompletedListeners)) {
-        try {
-          listener(payload)
-        } catch {
-          // listeners must not break the system
-        }
-      }
-    },
-    consumeItemsForDelivery: (itemId, count) => consumeInventoryItems(itemId, count),
-    getInstalledUpgradeLevel: (upgradeId) => getInstalledUpgradeLevelForContracts(upgradeId),
-    hasOrbitedPlanet: (planetId) => hasOrbitedPlanetForContracts(planetId),
+    }
   },
-)
+  onRewardGranted: (effect, c) => applyRewardToProfile(effect, c),
+  onContractCompleted: (id) => {
+    for (const listener of Array.from(contractCompletedListeners)) {
+      try {
+        listener(id)
+      } catch {
+        // listeners must not break the system
+      }
+    }
+  },
+  onContractAccepted: (id) => {
+    for (const listener of Array.from(contractAcceptedListeners)) {
+      try {
+        listener(id)
+      } catch {
+        // listeners must not break the system
+      }
+    }
+  },
+  onContractStepCompleted: (payload) => {
+    payContractStepCredits(payload.creditsReward)
+    for (const listener of Array.from(contractStepCompletedListeners)) {
+      try {
+        listener(payload)
+      } catch {
+        // listeners must not break the system
+      }
+    }
+  },
+  consumeItemsForDelivery: (itemId, count) => consumeInventoryItems(itemId, count),
+  getInstalledUpgradeLevel: (upgradeId) => getInstalledUpgradeLevelForContracts(upgradeId),
+  hasOrbitedPlanet: (planetId) => hasOrbitedPlanetForContracts(planetId),
+})
 
 /**
  * Look up the player's currently installed level for a shuttle upgrade so

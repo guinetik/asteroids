@@ -146,9 +146,9 @@ describe('LogisticsRouteMiniGame', () => {
 
     it('collecting the wrong symbol does not advance manifestIndex', () => {
       const targetType = game.manifest[0]!
-      const wrongTypes = (['star', 'diamond', 'circle', 'triangle', 'square'] as RouteSymbolType[]).filter(
-        (t) => t !== targetType,
-      )
+      const wrongTypes = (
+        ['star', 'diamond', 'circle', 'triangle', 'square'] as RouteSymbolType[]
+      ).filter((t) => t !== targetType)
       game.symbols.push({
         x: game.shipX,
         y: game.shipY,

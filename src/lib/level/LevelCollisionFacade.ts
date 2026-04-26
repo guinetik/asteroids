@@ -119,10 +119,7 @@ export class LevelCollisionFacade {
    * @param options - Spawn offsets/clearance used by the level controller.
    * @returns Spawn position for the EVA player.
    */
-  buildEvaSpawnPosition(
-    landerPosition: Vec3Like,
-    options: LevelEvaSpawnOptions,
-  ): Vec3Like {
+  buildEvaSpawnPosition(landerPosition: Vec3Like, options: LevelEvaSpawnOptions): Vec3Like {
     if (!this.world) {
       return {
         x: landerPosition.x + options.fallbackOffsetX,

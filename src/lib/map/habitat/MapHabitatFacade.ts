@@ -130,7 +130,6 @@ export class MapHabitatFacade {
     }
 
     if (!renderState.useHabitatScene) return
-
     ;(renderPass as { scene: THREE.Scene }).scene = this.scene.getScene()
     renderPass.camera = this.scene.getCamera()
 
@@ -140,8 +139,7 @@ export class MapHabitatFacade {
       const spawn = this.scene.getSpawnPosition()
       cam.yaw = spawn.yaw
       cam.pitch = WAKE_UP_START_PITCH * (1 - t)
-      cam.camera.position.y =
-        WAKE_UP_LYING_HEIGHT + (spawn.position.y - WAKE_UP_LYING_HEIGHT) * t
+      cam.camera.position.y = WAKE_UP_LYING_HEIGHT + (spawn.position.y - WAKE_UP_LYING_HEIGHT) * t
       cam.tick(0)
     }
   }
