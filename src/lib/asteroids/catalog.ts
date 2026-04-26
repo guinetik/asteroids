@@ -12,6 +12,7 @@
 import type { AsteroidDefinition } from './types'
 
 import bennuData from '@/data/asteroids/bennu.json'
+import erosData from '@/data/asteroids/eros.json'
 import itokawaData from '@/data/asteroids/itokawa.json'
 import psycheData from '@/data/asteroids/psyche.json'
 import xg7Data from '@/data/asteroids/2019-xg7.json'
@@ -28,9 +29,10 @@ function validateAsteroid(data: AsteroidDefinition): AsteroidDefinition {
   return data
 }
 
-/** All 5 playable asteroids, validated at load time. */
+/** All playable asteroids, validated at load time. */
 export const ASTEROID_CATALOG: AsteroidDefinition[] = [
   bennuData,
+  erosData,
   itokawaData,
   psycheData,
   xg7Data,

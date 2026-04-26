@@ -96,10 +96,7 @@ import {
 import { tryPurchaseNextUpgradeLevel } from '@/lib/upgradePurchase'
 import { HabitatState } from '@/lib/habitatState'
 import { MapHabitatFacade } from '@/lib/map/habitat/MapHabitatFacade'
-import {
-  RESERVE_FUEL_ID,
-  LANDER_FUEL_ID,
-} from '@/lib/shop/shopSession'
+import { RESERVE_FUEL_ID } from '@/lib/shop/shopSession'
 import type { ShopSession } from '@/lib/shop/tradeTypes'
 import { tickDemandTimer, resetDemand } from '@/lib/shop/planetDemand'
 import {

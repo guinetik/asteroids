@@ -115,8 +115,7 @@ describe('MapJourneyFacade.dispose', () => {
 describe('MapJourneyFacade.notifyTrigger', () => {
   it('is a no-op when no deps are attached', () => {
     const facade = new MapJourneyFacade()
-    // Should not throw:
-    facade.notifyTrigger('left_habitat')
+    expect(() => facade.notifyTrigger('left_habitat')).not.toThrow()
   })
 
   it('is a no-op when the trigger produces no profile change', () => {

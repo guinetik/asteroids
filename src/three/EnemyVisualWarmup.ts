@@ -92,6 +92,7 @@ export function createEnemyVisualWarmup(): EnemyVisualWarmup {
     },
   }
 
+  /** Disable mesh frustum culling so hidden warmup meshes compile reliably. */
   function disableFrustumCullingForCompile(): void {
     frustumCullState.length = 0
     group.traverse((obj) => {
@@ -102,6 +103,14 @@ export function createEnemyVisualWarmup(): EnemyVisualWarmup {
   }
 }
 
+/**
+ * Create a minimal enemy simulation object for visual controller construction.
+ *
+ * @param x - Warmup enemy X position.
+ * @param y - Warmup enemy Y position.
+ * @param z - Warmup enemy Z position.
+ * @returns Enemy instance with lightweight combat stats for shader warmup.
+ */
 function createWarmupEnemy(x: number, y: number, z: number): Enemy {
   const enemy = new Enemy({
     maxHp: WARMUP_ENEMY_MAX_HP,

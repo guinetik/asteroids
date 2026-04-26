@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { ORBIT_SCALE, SIZE_SCALE } from '@/lib/planets/constants'
 import { getPlanet } from '@/lib/planets/catalog'
 import shipHealthData from '@/data/shuttle/ship-health.json'
@@ -11,12 +11,19 @@ import {
   nearEarthInnerCatalogForWaypointSpawn,
   nearEarthOuterCatalogForWaypointSpawn,
   objectiveCountForDifficulty,
+  pickAsteroidForDifficulty,
   rollObjective,
   syntheticEarthHostAnchor,
   LEVEL_GRID_SIZE,
   MIN_ASTEROID_MISSION_REWARD,
   WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY,
 } from '../asteroidMissionGenerator'
+
+const SELECT_SECOND_ASTEROID_RANDOM = 0.75
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 describe('interpolateRange', () => {
   it('returns min at difficulty 1', () => {
@@ -106,6 +113,36 @@ describe('rollObjective', () => {
     expect(obj.timeLimit).toBeLessThanOrEqual(90)
     expect(obj.reward).toBeGreaterThanOrEqual(200)
     expect(obj.reward).toBeLessThanOrEqual(800)
+  })
+})
+
+describe('pickAsteroidForDifficulty', () => {
+  it('allows Eros for Earth-hosted early/mid missions', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(SELECT_SECOND_ASTEROID_RANDOM)
+
+    expect(pickAsteroidForDifficulty(3, 'earth')).toBe('eros')
+    randomSpy.mockRestore()
+  })
+
+  it('allows Eros for Mars-hosted early/mid missions', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(SELECT_SECOND_ASTEROID_RANDOM)
+
+    expect(pickAsteroidForDifficulty(3, 'mars')).toBe('eros')
+    randomSpy.mockRestore()
+  })
+
+  it('does not select Eros for unrelated hosts when global alternatives exist', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(SELECT_SECOND_ASTEROID_RANDOM)
+
+    expect(pickAsteroidForDifficulty(3, 'venus')).toBe('bennu')
+    randomSpy.mockRestore()
+  })
+
+  it('preserves global fallback when no host is supplied', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(SELECT_SECOND_ASTEROID_RANDOM)
+
+    expect(pickAsteroidForDifficulty(3)).toBe('bennu')
+    randomSpy.mockRestore()
   })
 })
 

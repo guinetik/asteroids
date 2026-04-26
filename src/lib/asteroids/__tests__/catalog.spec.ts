@@ -2,9 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { ASTEROID_CATALOG, getAsteroidById } from '../catalog'
 import { MINERAL_VISUALS } from '../minerals'
 
+const EXPECTED_ASTEROID_IDS = [['bennu'], ['eros'], ['itokawa'], ['psyche'], ['xg7'], ['kr3']]
+
 describe('ASTEROID_CATALOG', () => {
-  it('contains exactly 5 asteroids', () => {
-    expect(ASTEROID_CATALOG).toHaveLength(5)
+  it('contains all playable asteroids', () => {
+    expect(ASTEROID_CATALOG).toHaveLength(EXPECTED_ASTEROID_IDS.length)
   })
 
   it('has unique IDs', () => {
@@ -12,7 +14,7 @@ describe('ASTEROID_CATALOG', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
-  it.each([['bennu'], ['itokawa'], ['psyche'], ['xg7'], ['kr3']])(
+  it.each(EXPECTED_ASTEROID_IDS)(
     'asteroid "%s" has all required string fields',
     (id) => {
       const asteroid = ASTEROID_CATALOG.find((a) => a.id === id)
@@ -25,7 +27,7 @@ describe('ASTEROID_CATALOG', () => {
     },
   )
 
-  it.each([['bennu'], ['itokawa'], ['psyche'], ['xg7'], ['kr3']])(
+  it.each(EXPECTED_ASTEROID_IDS)(
     'asteroid "%s" composition sums to 100',
     (id) => {
       const asteroid = ASTEROID_CATALOG.find((a) => a.id === id)!
@@ -34,7 +36,7 @@ describe('ASTEROID_CATALOG', () => {
     },
   )
 
-  it.each([['bennu'], ['itokawa'], ['psyche'], ['xg7'], ['kr3']])(
+  it.each(EXPECTED_ASTEROID_IDS)(
     'asteroid "%s" has valid shape ranges',
     (id) => {
       const s = ASTEROID_CATALOG.find((a) => a.id === id)!.shape
@@ -48,7 +50,7 @@ describe('ASTEROID_CATALOG', () => {
     },
   )
 
-  it.each([['bennu'], ['itokawa'], ['psyche'], ['xg7'], ['kr3']])(
+  it.each(EXPECTED_ASTEROID_IDS)(
     'asteroid "%s" has valid surface ranges',
     (id) => {
       const s = ASTEROID_CATALOG.find((a) => a.id === id)!.surface
@@ -67,7 +69,7 @@ describe('ASTEROID_CATALOG', () => {
     },
   )
 
-  it.each([['bennu'], ['itokawa'], ['psyche'], ['xg7'], ['kr3']])(
+  it.each(EXPECTED_ASTEROID_IDS)(
     'asteroid "%s" has valid visual ranges',
     (id) => {
       const v = ASTEROID_CATALOG.find((a) => a.id === id)!.visual
@@ -82,7 +84,7 @@ describe('ASTEROID_CATALOG', () => {
     },
   )
 
-  it.each([['bennu'], ['itokawa'], ['psyche'], ['xg7'], ['kr3']])(
+  it.each(EXPECTED_ASTEROID_IDS)(
     'asteroid "%s" has valid physical ranges',
     (id) => {
       const p = ASTEROID_CATALOG.find((a) => a.id === id)!.physical
@@ -94,7 +96,7 @@ describe('ASTEROID_CATALOG', () => {
     },
   )
 
-  it.each([['bennu'], ['itokawa'], ['psyche'], ['xg7'], ['kr3']])(
+  it.each(EXPECTED_ASTEROID_IDS)(
     'asteroid "%s" minerals all exist in MINERAL_VISUALS',
     (id) => {
       const asteroid = ASTEROID_CATALOG.find((a) => a.id === id)!

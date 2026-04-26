@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Group, PerspectiveCamera } from 'three'
 import { LevelStateLifecycleFacade } from '../LevelStateLifecycleFacade'
+import type {
+  LevelEvaLifecycleDeps,
+  LevelLanderLifecycleDeps,
+  LevelStateLifecycleSceneDeps,
+} from '../LevelStateLifecycleFacade'
 
 describe('LevelStateLifecycleFacade', () => {
   it('enters and exits lander runtime with tick/camera choreography', () => {
@@ -20,15 +25,16 @@ describe('LevelStateLifecycleFacade', () => {
     const landerExplosion = {}
 
     const scene = {
-      tickHandler: tickHandler as any,
-      sceneManager: sceneManager as any,
-      postProcessing: postProcessing as any,
+      tickHandler: tickHandler as unknown as LevelStateLifecycleSceneDeps['tickHandler'],
+      sceneManager: sceneManager as unknown as LevelStateLifecycleSceneDeps['sceneManager'],
+      postProcessing: postProcessing as unknown as LevelStateLifecycleSceneDeps['postProcessing'],
       priorities: { physics: 100, render: 300 },
     }
     const lander = {
-      landerController: landerController as any,
-      vehicleCamera: vehicleCamera as any,
-      landerExplosion: landerExplosion as any,
+      landerController:
+        landerController as unknown as LevelLanderLifecycleDeps['landerController'],
+      vehicleCamera: vehicleCamera as unknown as LevelLanderLifecycleDeps['vehicleCamera'],
+      landerExplosion: landerExplosion as unknown as LevelLanderLifecycleDeps['landerExplosion'],
     }
 
     facade.enterLander(scene, lander)
@@ -49,21 +55,32 @@ describe('LevelStateLifecycleFacade', () => {
     const facade = new LevelStateLifecycleFacade()
     const tickHandler = { register: vi.fn(), unregister: vi.fn() }
     const scene = {
-      tickHandler: tickHandler as any,
-      sceneManager: { setCamera: vi.fn(), setActiveCamera: vi.fn() } as any,
-      postProcessing: { setCamera: vi.fn() } as any,
+      tickHandler: tickHandler as unknown as LevelStateLifecycleSceneDeps['tickHandler'],
+      sceneManager: {
+        setCamera: vi.fn(),
+        setActiveCamera: vi.fn(),
+      } as unknown as LevelStateLifecycleSceneDeps['sceneManager'],
+      postProcessing: {
+        setCamera: vi.fn(),
+      } as unknown as LevelStateLifecycleSceneDeps['postProcessing'],
       priorities: { physics: 100, render: 300 },
     }
 
     const eva = {
-      playerController: { group: new Group() } as any,
-      fpsCamera: { helmetLightRig: { visible: true } } as any,
-      multiToolState: {} as any,
-      multiTool: { setVisible: vi.fn() } as any,
-      projectileSystem: {} as any,
-      impactEmitter: {} as any,
-      tractorEmitter: {} as any,
-      surfaceRocks: {} as any,
+      playerController: {
+        group: new Group(),
+      } as unknown as LevelEvaLifecycleDeps['playerController'],
+      fpsCamera: {
+        helmetLightRig: { visible: true },
+      } as unknown as LevelEvaLifecycleDeps['fpsCamera'],
+      multiToolState: {} as unknown as LevelEvaLifecycleDeps['multiToolState'],
+      multiTool: {
+        setVisible: vi.fn(),
+      } as unknown as LevelEvaLifecycleDeps['multiTool'],
+      projectileSystem: {} as unknown as LevelEvaLifecycleDeps['projectileSystem'],
+      impactEmitter: {} as unknown as LevelEvaLifecycleDeps['impactEmitter'],
+      tractorEmitter: {} as unknown as LevelEvaLifecycleDeps['tractorEmitter'],
+      surfaceRocks: {} as unknown as LevelEvaLifecycleDeps['surfaceRocks'],
       onClearRockTarget: vi.fn(),
     }
 

@@ -1,0 +1,59 @@
+{
+  "id": "eros",
+  "name": "Eros",
+  "designation": "433 Eros",
+  "type": "Siliceous (S-type)",
+  "biome": "sandy",
+  "description": "A large elongated near-Earth asteroid visited by NASA's NEAR Shoemaker mission. Its stony surface is rich in olivine and pyroxene, marked by impact craters, ridges, and warm dust-toned regolith.",
+  "composition": [
+    { "name": "Olivine", "formula": "(Mg,Fe)2SiO4", "percentage": 34 },
+    { "name": "Pyroxene", "formula": "(Mg,Fe)SiO3", "percentage": 32 },
+    { "name": "Plagioclase Feldspar", "formula": "(Na,Ca)(Al,Si)4O8", "percentage": 12 },
+    { "name": "Iron-Nickel Alloy", "formula": "Fe-Ni", "percentage": 10 },
+    { "name": "Iron Sulfides", "formula": "FeS", "percentage": 7 },
+    { "name": "Magnetite", "formula": "Fe3O4", "percentage": 5 }
+  ],
+  "shape": {
+    "dimensions": [34400, 11200, 11200],
+    "elongation": 3.07,
+    "lobeCount": 1,
+    "irregularity": 0.55,
+    "rotationLottery": { "x": 0, "z": 0 }
+  },
+  "surface": {
+    "craterDensity": 0.6,
+    "craterMaxScale": 0.28,
+    "boulderDensity": 0.35,
+    "ridgeFrequency": 0.55,
+    "roughness": 0.55,
+    "dustCoverage": 0.35,
+    "modelPath": "/models/asteroids/eros.glb",
+    "modelScale": 1300,
+    "surfaceTextures": "/textures/asteroids/sandy",
+    "surfaceTextureRepeat": 0.75,
+    "surfaceModulatorStrength": 0.45,
+    "surfaceModulatorColorBlend": 0.15,
+    "surfaceAOStrength": 1.55,
+    "surfaceEmissionStrength": 0.5
+  },
+  "visual": {
+    "albedo": 0.25,
+    "baseColor": [0.62, 0.53, 0.39],
+    "valleyTone": 0.45,
+    "peakTone": 1.35
+  },
+  "physical": {
+    "mass": 6.687e15,
+    "density": 2670,
+    "surfaceGravity": 0.006,
+    "rotationPeriod": 5.27,
+    "surfaceTemperature": 248
+  },
+  "lighting": {
+    "sunAzimuth": 135,
+    "sunElevation": 38,
+    "sunColor": [1.0, 0.96, 0.88],
+    "sunIntensity": 1.6,
+    "ambientIntensity": 1.35
+  }
+}

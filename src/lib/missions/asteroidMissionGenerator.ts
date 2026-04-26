@@ -69,21 +69,55 @@ interface DifficultyMapEntry {
   asteroidId: string
   minDifficulty: number
   maxDifficulty: number
+  planetIds?: string[]
 }
 
 /**
- * Pick a random asteroid template that fits the given difficulty.
+ * Whether a difficulty-map entry is available for a host planet.
+ *
+ * Entries without `planetIds` stay globally available.
+ *
+ * @param entry - Candidate asteroid map entry.
+ * @param hostPlanetId - Mission board planet id, when known.
+ * @returns `true` when the entry can be selected for the host.
+ */
+function isAsteroidEntryAvailableForHost(
+  entry: DifficultyMapEntry,
+  hostPlanetId?: string,
+): boolean {
+  if (!entry.planetIds) return true
+  if (!hostPlanetId) return false
+  return entry.planetIds.includes(hostPlanetId)
+}
+
+/**
+ * Pick a random asteroid template that fits the given difficulty and host planet.
+ *
+ * Host-specific entries only appear for listed planets. Global entries remain available
+ * everywhere, and are used as a fallback if the host has no matching specific entries.
  *
  * @param difficulty - Mission difficulty (1-10).
+ * @param hostPlanetId - Optional planet id for the board posting the mission.
  * @returns Asteroid id from the catalog.
  */
-export function pickAsteroidForDifficulty(difficulty: number): string {
-  const entries = (difficultyMap as DifficultyMapEntry[]).filter(
+export function pickAsteroidForDifficulty(difficulty: number, hostPlanetId?: string): string {
+  const difficultyEntries = (difficultyMap as DifficultyMapEntry[]).filter(
     (e) => difficulty >= e.minDifficulty && difficulty <= e.maxDifficulty,
   )
+  if (difficultyEntries.length === 0) {
+    return (difficultyMap as DifficultyMapEntry[])[0]!.asteroidId
+  }
+
+  const hostEntries = difficultyEntries.filter((entry) =>
+    isAsteroidEntryAvailableForHost(entry, hostPlanetId),
+  )
+  const entries =
+    hostEntries.length > 0 ? hostEntries : difficultyEntries.filter((entry) => !entry.planetIds)
+
   if (entries.length === 0) {
     return (difficultyMap as DifficultyMapEntry[])[0]!.asteroidId
   }
+
   return entries[Math.floor(Math.random() * entries.length)]!.asteroidId
 }
 
@@ -685,7 +719,7 @@ export function generateAsteroidMission(
     anchor.planetId,
   )
 
-  const asteroidId = pickAsteroidForDifficulty(difficulty)
+  const asteroidId = pickAsteroidForDifficulty(difficulty, anchor.planetId)
   const hostGiverOverride = getHostGiverOverride(anchor.planetId)
 
   return {
