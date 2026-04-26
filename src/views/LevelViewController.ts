@@ -1459,6 +1459,11 @@ export class LevelViewController implements Tickable {
 
     // Stop lander physics/input — the run is over.
     this.tickHandler!.unregister(this.landerController)
+    // Release pointer lock so the death overlay is interactive. Without
+    // this, dying mid-EVA leaves the cursor captured and the player
+    // can't click the overlay buttons. Idempotent when no lock is held
+    // (lander-mode deaths, where the canvas isn't pointer-locked).
+    this.pointerLock.releaseLock()
     this.onDeathOverlay?.(true, cause)
 
     // Cut all in-flight gameplay sounds (sfx — engine, RCS, alarms,
