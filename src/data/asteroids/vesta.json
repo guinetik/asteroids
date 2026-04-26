@@ -28,18 +28,18 @@
     "roughness": 0.6,
     "dustCoverage": 0.28,
     "modelPath": "/models/asteroids/vesta.glb",
-    "modelScale": 1300,
+    "modelScale": 1000,
     "surfaceTextures": "/textures/asteroids/rocky",
-    "surfaceTextureRepeat": 0.6,
-    "surfaceModulatorStrength": 0.5,
-    "surfaceModulatorColorBlend": 0.12,
-    "surfaceAOStrength": 1.4,
+    "surfaceTextureRepeat": 0.01,
+    "surfaceModulatorStrength": 1.0,
+    "surfaceModulatorColorBlend": 0.5,
+    "surfaceAOStrength": 0.5,
     "surfaceEmissionStrength": 0.5
   },
   "visual": {
-    "albedo": 0.42,
-    "baseColor": [0.7, 0.66, 0.55],
-    "valleyTone": 0.4,
+    "albedo": 0.33,
+    "baseColor": [0.77, 0.78, 0.82],
+    "valleyTone": 0.125,
     "peakTone": 1.45
   },
   "physical": {
@@ -53,7 +53,7 @@
     "sunAzimuth": 165,
     "sunElevation": 34,
     "sunColor": [1.0, 0.98, 0.92],
-    "sunIntensity": 1.45,
-    "ambientIntensity": 0.95
+    "sunIntensity": 2.15,
+    "ambientIntensity": 1.95
   }
 }
