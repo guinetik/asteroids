@@ -49,7 +49,7 @@ const SPRINT_INTENSITY = 1
  * are short transients and can read quiet at unity, so we scale them up here
  * to sit at a similar perceived level as recorded sfx.
  */
-const FOOTSTEP_OUTPUT_GAIN = 1.4
+const FOOTSTEP_OUTPUT_GAIN = 0.9
 /**
  * Hard floor on the gap between two consecutive steps, regardless of what
  * triggers them (rising edge of `isMoving`, scheduled timer, surface change,

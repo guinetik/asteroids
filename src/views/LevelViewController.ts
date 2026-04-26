@@ -545,7 +545,12 @@ export class LevelViewController implements Tickable {
     this.onMapCanvas?.(mapCanvas)
 
     // ── Starfield ────────────────────────────────────────────────
-    const starField = new StarFieldController({ count: 2000, size: 1.5 })
+    // Radius 4000 sits inside the FpsCamera's 5000-unit far plane so
+    // stars stay visible during EVA (the lander VehicleCamera has a
+    // 50000 far plane and would render them at any radius). With
+    // sizeAttenuation: false on the stars, pulling the sphere in
+    // doesn't change how big they look on screen.
+    const starField = new StarFieldController({ count: 2000, size: 1.5, radius: 4000 })
     this.sceneManager.addToScene(starField.points)
 
     // ── Atmosphere context (per-asteroid config) ───────────────

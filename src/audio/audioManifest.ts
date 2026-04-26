@@ -1005,7 +1005,7 @@ const manifestById: ManifestById = {
     category: 'sfx',
     load: 'lazy',
     playback: 'single-instance',
-    volume: 0.4,
+    volume: 0.32,
     effect: 'none',
   },
   'sfx.breathing.run': {
@@ -1014,7 +1014,7 @@ const manifestById: ManifestById = {
     category: 'sfx',
     load: 'lazy',
     playback: 'single-instance',
-    volume: 0.5,
+    volume: 0.4,
     effect: 'none',
   },
   'sfx.breathing.hard': {
@@ -1023,7 +1023,7 @@ const manifestById: ManifestById = {
     category: 'sfx',
     load: 'lazy',
     playback: 'single-instance',
-    volume: 0.6,
+    volume: 0.48,
     effect: 'none',
   },
   'sfx.oxygen.low': {
