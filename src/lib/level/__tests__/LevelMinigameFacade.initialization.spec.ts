@@ -27,6 +27,10 @@ interface MockSurveyMinigame extends MockBasicMinigame {
   onProbeCollect: unknown
 }
 
+interface MockPhotometryMinigame extends MockSurveyMinigame {
+  onScanAudioState: unknown
+}
+
 interface MockCombatMinigame extends MockBasicMinigame {
   onDamagePlayer: unknown
   onKillPlayer: unknown
@@ -41,6 +45,7 @@ interface MockRescueMinigame extends MockCombatMinigame {
 
 const stores = vi.hoisted(() => ({
   surveys: [] as MockSurveyMinigame[],
+  photometries: [] as MockPhotometryMinigame[],
   exterminates: [] as MockCombatMinigame[],
   rescues: [] as MockRescueMinigame[],
   collects: [] as MockBasicMinigame[],
@@ -52,6 +57,7 @@ vi.mock('@/lib/minigame/SurveyMinigame', () => ({
     onRegisterTickable = null
     onUnregisterTickable = null
     onProbeCollect = null
+    onScanAudioState = null
     onPrompt = null
     onComplete = null
     onStepChange = null
@@ -68,6 +74,33 @@ vi.mock('@/lib/minigame/SurveyMinigame', () => ({
     constructor(objectiveIndex: number) {
       this.objectiveIndex = objectiveIndex
       stores.surveys.push(this)
+    }
+  },
+}))
+
+vi.mock('@/lib/minigame/PhotometryMinigame', () => ({
+  PhotometryMinigame: class {
+    onRefuel = null
+    onRegisterTickable = null
+    onUnregisterTickable = null
+    onProbeCollect = null
+    onScanAudioState = null
+    onPrompt = null
+    onComplete = null
+    onStepChange = null
+    objectiveIndex: number
+    status = 'idle' as const
+    isPlayerNearInteraction = false
+    timeRemaining = null
+    progressCurrent = null
+    progressTotal = null
+    steps: [] = []
+    tick = vi.fn()
+    dispose = vi.fn()
+
+    constructor(objectiveIndex: number) {
+      this.objectiveIndex = objectiveIndex
+      stores.photometries.push(this)
     }
   },
 }))
@@ -184,6 +217,7 @@ import { LevelMinigameFacade } from '@/lib/level/LevelMinigameFacade'
 describe('LevelMinigameFacade initialization', () => {
   it('creates objective minigames and wires shared/controller callbacks', async () => {
     stores.surveys.length = 0
+    stores.photometries.length = 0
     stores.exterminates.length = 0
     stores.rescues.length = 0
     stores.collects.length = 0
@@ -197,6 +231,7 @@ describe('LevelMinigameFacade initialization', () => {
     const onRegisterTickable = vi.fn()
     const onUnregisterTickable = vi.fn()
     const onSurveyProbeCollect = vi.fn()
+    const onPhotometryScanAudioState = vi.fn()
     const onDamagePlayer = vi.fn()
     const onKillPlayer = vi.fn()
     const onDestroyLander = vi.fn()
@@ -209,6 +244,7 @@ describe('LevelMinigameFacade initialization', () => {
         difficulty: 3,
         objectives: [
           { type: 'survey' },
+          { type: 'photometry' },
           { type: 'exterminate' },
           { type: 'rescue' },
           { type: 'collect' },
@@ -229,6 +265,7 @@ describe('LevelMinigameFacade initialization', () => {
         onRegisterTickable,
         onUnregisterTickable,
         onSurveyProbeCollect,
+        onPhotometryScanAudioState,
         onDamagePlayer,
         onKillPlayer,
         onDestroyLander,
@@ -239,12 +276,14 @@ describe('LevelMinigameFacade initialization', () => {
     })
 
     expect(stores.surveys).toHaveLength(1)
+    expect(stores.photometries).toHaveLength(1)
     expect(stores.exterminates).toHaveLength(1)
     expect(stores.rescues).toHaveLength(1)
     expect(stores.collects).toHaveLength(1)
     expect(stores.gathers).toHaveLength(1)
 
     const survey = stores.surveys[0]!
+    const photometry = stores.photometries[0]!
     const exterminate = stores.exterminates[0]!
     const rescue = stores.rescues[0]!
 
@@ -255,6 +294,15 @@ describe('LevelMinigameFacade initialization', () => {
     expect(survey.onRegisterTickable).toBe(onRegisterTickable)
     expect(survey.onUnregisterTickable).toBe(onUnregisterTickable)
     expect(survey.onProbeCollect).toBe(onSurveyProbeCollect)
+
+    expect(photometry.onPrompt).toBe(onPrompt)
+    expect(photometry.onComplete).toBe(onComplete)
+    expect(photometry.onStepChange).toBe(onStepChange)
+    expect(photometry.onRefuel).toBe(onSurveyRefuel)
+    expect(photometry.onRegisterTickable).toBe(onRegisterTickable)
+    expect(photometry.onUnregisterTickable).toBe(onUnregisterTickable)
+    expect(photometry.onProbeCollect).toBe(onSurveyProbeCollect)
+    expect(photometry.onScanAudioState).toBe(onPhotometryScanAudioState)
 
     expect(exterminate.onDamagePlayer).toBe(onDamagePlayer)
     expect(exterminate.onKillPlayer).toBe(onKillPlayer)
@@ -297,6 +345,7 @@ describe('LevelMinigameFacade initialization', () => {
         onRegisterTickable: null,
         onUnregisterTickable: null,
         onSurveyProbeCollect: null,
+        onPhotometryScanAudioState: null,
         onDamagePlayer: null,
         onKillPlayer: null,
         onDestroyLander: null,

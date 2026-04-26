@@ -35,14 +35,19 @@ interface WaypointMarkerLayout {
 }
 
 /** Full-size markers on asteroid terrain / lander approach. */
+export const WAYPOINT_SURFACE_BEAM_HEIGHT = 900
+
+/** Full-size marker diamond height offset above the beam top. */
+export const WAYPOINT_SURFACE_DIAMOND_TIP_OFFSET = 40
+
 const SURFACE_LAYOUT: WaypointMarkerLayout = {
-  beamHeight: 900,
+  beamHeight: WAYPOINT_SURFACE_BEAM_HEIGHT,
   beamCoreRadius: 1.5,
   beamGlowRadius: 4,
   ringRadius: 12,
   ringTube: 0.6,
   diamondSize: 3,
-  diamondTipOffset: 40,
+  diamondTipOffset: WAYPOINT_SURFACE_DIAMOND_TIP_OFFSET,
   diamondBobAmp: 2,
   useProximityFade: true,
   fadeStartDistance: 300,

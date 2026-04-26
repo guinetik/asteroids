@@ -21,6 +21,10 @@ export interface MiniGameContext {
   levelState: string
   /** Lander world position (null if not available). */
   landerPosition: { x: number; y: number; z: number } | null
+  /** Lander forward direction in world space (null if not available). */
+  landerForward?: { x: number; y: number; z: number } | null
+  /** Lander up direction in world space (null if not available). */
+  landerUp?: { x: number; y: number; z: number } | null
   /** Whether the lander is currently grounded on the surface. */
   landerGrounded: boolean
   /** EVA player world position (null if not in EVA). */
@@ -78,6 +82,7 @@ export const OBJECTIVE_LABELS: Record<string, string> = {
   exterminate: 'Exterminate',
   rescue: 'Rescue',
   survey: 'Survey',
+  photometry: 'Photometry',
   collect: 'Collect',
 }
 
@@ -102,6 +107,8 @@ export interface MiniGame {
   readonly progressTotal: number | null
   /** Ordered steps for the tracker HUD. */
   readonly steps: readonly MiniGameStep[]
+  /** Optional short instruction shown in the mission HUD, or `null` when idle. */
+  readonly missionInstruction?: string | null
 
   /** Per-frame update. */
   tick(dt: number, ctx: MiniGameContext): void

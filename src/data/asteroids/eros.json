@@ -30,7 +30,7 @@
     "modelPath": "/models/asteroids/eros.glb",
     "modelScale": 1300,
     "surfaceTextures": "/textures/asteroids/sandy",
-    "surfaceTextureRepeat": 0.75,
+    "surfaceTextureRepeat": 0.5,
     "surfaceModulatorStrength": 0.45,
     "surfaceModulatorColorBlend": 0.15,
     "surfaceAOStrength": 1.55,

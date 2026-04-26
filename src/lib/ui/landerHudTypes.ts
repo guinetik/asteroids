@@ -63,4 +63,8 @@ export interface LanderTelemetry {
   surveyProbesCollected: number | null
   /** Total probes required, or `null` when no survey objective is active. */
   surveyProbesTotal: number | null
+  /** Label for the active minigame progress denominator, for example `PROBES` or `SCAN`. */
+  minigameProgressLabel: string | null
+  /** Short active mission instruction, for example `ALIGN WITH TARGET MARKER`. */
+  missionInstruction: string | null
 }

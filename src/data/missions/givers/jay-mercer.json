@@ -11,7 +11,12 @@
       "name": "Mineral Survey",
       "briefing": "There is a rock out near the belt tagged for survey. Grab samples and bring them back. Easy money.",
       "objectiveSlots": [
-        { "type": "gather", "weight": 1, "params": { "type": "gather", "resourceAmount": { "min": 50, "max": 100 } }, "reward": { "min": 300, "max": 600 } }
+        {
+          "type": "gather",
+          "weight": 1,
+          "params": { "type": "gather", "resourceAmount": { "min": 50, "max": 100 } },
+          "reward": { "min": 300, "max": 600 }
+        }
       ],
       "completionBonus": { "min": 100, "max": 300 },
       "regionByDifficulty": { "near-earth": [1, 2], "asteroid-belt": [3, 5] }
@@ -21,7 +26,12 @@
       "name": "Deep Core Sample",
       "briefing": "Science division wants a heavy extraction. Drill deep, fill the hold. The rock is further out this time.",
       "objectiveSlots": [
-        { "type": "gather", "weight": 1, "params": { "type": "gather", "resourceAmount": { "min": 80, "max": 150 } }, "reward": { "min": 500, "max": 900 } }
+        {
+          "type": "gather",
+          "weight": 1,
+          "params": { "type": "gather", "resourceAmount": { "min": 80, "max": 150 } },
+          "reward": { "min": 500, "max": 900 }
+        }
       ],
       "completionBonus": { "min": 200, "max": 500 },
       "regionByDifficulty": { "asteroid-belt": [3, 5] }

@@ -137,6 +137,8 @@ export class LanderViewController implements Tickable {
         surveyTimeRemaining: null,
         surveyProbesCollected: null,
         surveyProbesTotal: null,
+        minigameProgressLabel: null,
+        missionInstruction: null,
       })
     }
   }

@@ -14,6 +14,7 @@ import { DevConsole } from '@/lib/devConsole'
 import { LanderAudioDirector } from '@/audio/LanderAudioDirector'
 import { FpsAudioDirector } from '@/audio/FpsAudioDirector'
 import { LevelAudioDirector } from '@/audio/LevelAudioDirector'
+import { PhotometryScanSound } from '@/audio/PhotometryScanSound'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'
@@ -116,6 +117,8 @@ const LEVEL_ATMOSPHERE_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.atmosphere
 const LEVEL_BOUNDS_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.bounds
 const LEVEL_COLLISION_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.collision
 const LEVEL_LOOT_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.loot
+const LANDER_LOCAL_FORWARD = new THREE.Vector3(-1, 0, 0)
+const LANDER_LOCAL_UP = new THREE.Vector3(0, 1, 0)
 
 /**
  * Boot / preload status emitted to {@link LevelView} while the level scene
@@ -196,6 +199,8 @@ export class LevelViewController implements Tickable {
    * curves and audio plumbing.
    */
   private readonly levelAudio = new LevelAudioDirector()
+  /** Continuous two-layer audio feedback for the photometry scan beam. */
+  private readonly photometryScanAudio = new PhotometryScanSound()
   private readonly persistence = new LevelPersistenceFacade()
   private readonly stateLifecycle = new LevelStateLifecycleFacade()
   private combatMining: LevelCombatMiningFacade | null = null
@@ -812,6 +817,7 @@ export class LevelViewController implements Tickable {
     await this.minigames.initializeObjectives({
       mission,
       scene: this.sceneManager!.scene,
+      asteroidRoot: this.asteroidSurface?.group ?? null,
       heightmap: this.heightmap!,
       projectileSystem: this.projectileSystem,
       rockYieldSystem: this.rockYieldSystem,
@@ -826,6 +832,8 @@ export class LevelViewController implements Tickable {
           this.tickHandler!.register(tickable, TICK_PRIORITY_PHYSICS + 4),
         onUnregisterTickable: (tickable) => this.tickHandler?.unregister(tickable),
         onSurveyProbeCollect: () => this.levelAudio.notifyResourcePickup(),
+        onPhotometryScanAudioState: (state) =>
+          this.photometryScanAudio.update({ ...state, sfxVolume: 1 }, 0),
         onDamagePlayer: (damage, sourceX, sourceZ, source) => {
           this.applyPlayerDamageFeedback(damage, sourceX, sourceZ, source)
         },
@@ -1661,6 +1669,18 @@ export class LevelViewController implements Tickable {
       let landerTelemetry: LanderTelemetry | null = null
       if (this.landerController) {
         const ts = this.landerController.thrusterSystem
+        const activeMinigame = this.minigames.getActive()
+        const activeObjectiveType =
+          activeMinigame ? this.missionObjectives[activeMinigame.objectiveIndex]?.type : undefined
+        const activeProgressTotal = activeMinigame?.progressTotal ?? null
+        const progressLabel =
+          activeObjectiveType === 'photometry'
+            ? activeProgressTotal === 1
+              ? 'PROBE'
+              : 'SCAN'
+            : activeMinigame
+              ? 'PROBES'
+              : null
         landerTelemetry = {
           altitude: this.landerController.altitudeAboveGround,
           velocityY: this.landerController.body.velocityY,
@@ -1679,9 +1699,11 @@ export class LevelViewController implements Tickable {
           descentWarning: this.landerController.descentWarningLevel,
           attitudeWarning: this.landerController.attitudeWarningLevel,
           landingSafety: this.landerController.landingSafetyLevel,
-          surveyTimeRemaining: this.minigames.getActive()?.timeRemaining ?? null,
-          surveyProbesCollected: this.minigames.getActive()?.progressCurrent ?? null,
-          surveyProbesTotal: this.minigames.getActive()?.progressTotal ?? null,
+          surveyTimeRemaining: activeMinigame?.timeRemaining ?? null,
+          surveyProbesCollected: activeMinigame?.progressCurrent ?? null,
+          surveyProbesTotal: activeProgressTotal,
+          minigameProgressLabel: progressLabel,
+          missionInstruction: activeMinigame?.missionInstruction ?? null,
         }
       }
 
@@ -1900,6 +1922,12 @@ export class LevelViewController implements Tickable {
     const state = this.stateMachine?.state ?? ''
     const lander = this.landerController
     const player = this.playerController
+    const landerForward = lander
+      ? LANDER_LOCAL_FORWARD.clone().applyQuaternion(lander.group.quaternion).normalize()
+      : null
+    const landerUp = lander
+      ? LANDER_LOCAL_UP.clone().applyQuaternion(lander.group.quaternion).normalize()
+      : null
     this.minigames.tick(
       dt,
       {
@@ -1907,6 +1935,10 @@ export class LevelViewController implements Tickable {
         landerPosition: lander
           ? { x: lander.position.x, y: lander.position.y, z: lander.position.z }
           : null,
+        landerForward: landerForward
+          ? { x: landerForward.x, y: landerForward.y, z: landerForward.z }
+          : null,
+        landerUp: landerUp ? { x: landerUp.x, y: landerUp.y, z: landerUp.z } : null,
         landerGrounded: lander?.body.grounded ?? false,
         playerPosition:
           state === 'eva' && player
@@ -2401,6 +2433,7 @@ export class LevelViewController implements Tickable {
     this.landerAudio.dispose()
     this.fpsAudio.dispose()
     this.levelAudio.dispose()
+    this.photometryScanAudio.dispose()
     this.stopMiningSizzle()
     this.pointerLock.releaseLock()
     this.teardownPointerLock()

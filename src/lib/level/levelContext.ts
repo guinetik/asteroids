@@ -12,7 +12,7 @@ import { hasLevelRouteQueryOverrideFromSearchParams } from '@/lib/level/levelRou
 import { generateAsteroidMission } from '@/lib/missions/asteroidMissionGenerator'
 import { getSpecialMissionById } from '@/lib/missions/specialMissions'
 import { loadActiveMission } from '@/lib/missions/missionStorage'
-import type { GeneratedAsteroidMission } from '@/lib/missions/types'
+import type { GeneratedAsteroidMission, ObjectiveType } from '@/lib/missions/types'
 
 /** Maximum attempts to generate a mission matching the requested objective type. */
 export const LEVEL_MISSION_TYPE_RETRY_LIMIT = 20
@@ -104,8 +104,9 @@ export function generateMissionWithType(
 ): GeneratedAsteroidMission {
   if (!type) return generateAsteroidMission(difficulty)
 
+  const requiredType = type as ObjectiveType
   for (let i = 0; i < LEVEL_MISSION_TYPE_RETRY_LIMIT; i++) {
-    const mission = generateAsteroidMission(difficulty)
+    const mission = generateAsteroidMission(difficulty, null, Math.random, requiredType)
     if (mission.objectives.some((objective) => objective.type === type)) return mission
   }
 
@@ -146,7 +147,7 @@ export function resolveLevelContext(search: string): LevelContext {
       throw new Error(
         '[Level] No active mission in storage. Use /map to launch one, or open /level with ' +
           '?mission=<special-id>, ?asteroidId=…, or both ?difficulty=1-10&mission=' +
-          'gather|exterminate|rescue|survey|collect',
+          'gather|exterminate|rescue|survey|photometry|collect',
       )
     }
     mission = stored

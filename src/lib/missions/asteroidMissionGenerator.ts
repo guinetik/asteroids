@@ -49,6 +49,15 @@ const OBJECTIVE_COUNT_BY_DIFFICULTY: [number, number, number][] = [
   [7, 10, 3],
 ]
 
+/** Easiest difficulty where Jovian photometry contracts appear. */
+const PHOTOMETRY_MIN_DIFFICULTY = 3
+
+/** Difficulty that should feel like the midpoint of photometry tuning. */
+const PHOTOMETRY_MID_DIFFICULTY = 5
+
+/** Hardest authored photometry difficulty. */
+const PHOTOMETRY_MAX_DIFFICULTY = 10
+
 /**
  * Determine number of objectives based on mission difficulty.
  *
@@ -62,6 +71,32 @@ export function objectiveCountForDifficulty(difficulty: number): number {
     if (difficulty >= min && difficulty <= max) return count
   }
   return 1
+}
+
+/**
+ * Interpolate photometry-specific values around its intended band: 3 is the
+ * easiest value, 5 is the midpoint, and 10 is the hardest value.
+ *
+ * @param range - Tunable value range from easiest to hardest.
+ * @param difficulty - Mission difficulty.
+ * @returns Integer-scaled concrete value for photometry objectives.
+ */
+function interpolatePhotometryRange(range: NumberRange, difficulty: number): number {
+  const clamped = Math.max(
+    PHOTOMETRY_MIN_DIFFICULTY,
+    Math.min(PHOTOMETRY_MAX_DIFFICULTY, difficulty),
+  )
+  const t =
+    clamped <= PHOTOMETRY_MID_DIFFICULTY
+      ? ((clamped - PHOTOMETRY_MIN_DIFFICULTY) /
+          (PHOTOMETRY_MID_DIFFICULTY - PHOTOMETRY_MIN_DIFFICULTY)) *
+        0.5
+      : 0.5 +
+        ((clamped - PHOTOMETRY_MID_DIFFICULTY) /
+          (PHOTOMETRY_MAX_DIFFICULTY - PHOTOMETRY_MID_DIFFICULTY)) *
+          0.5
+
+  return Math.round(range.min + (range.max - range.min) * t)
 }
 
 /** Entry from the difficulty-map JSON. */
@@ -366,6 +401,17 @@ export function rollObjective(slot: ObjectiveSlot, difficulty: number): Concrete
         timeLimit: interpolateRange(slot.params.timeLimit, difficulty),
         reward,
       }
+    case 'photometry':
+      return {
+        type: 'photometry',
+        x: 0,
+        z: 0,
+        probeCount: 1,
+        timeLimit: interpolatePhotometryRange(slot.params.timeLimit, difficulty),
+        scanHoldSeconds: interpolatePhotometryRange(slot.params.scanHoldSeconds, difficulty),
+        probeDistance: interpolatePhotometryRange(slot.params.probeDistance, difficulty),
+        reward,
+      }
     case 'collect':
       return {
         type: 'collect',
@@ -641,12 +687,14 @@ function getHostGiverOverride(planetId: string): HostGiverOverride | undefined {
  * @param host - Station planet and world position when the contract is drafted; waypoint is
  *   generated near that orbit. When omitted (tests, level URL overrides), uses Earth @ 1 AU.
  * @param rand - Optional RNG for deterministic tests.
+ * @param requiredObjectiveType - Optional objective type the generated mission must include.
  * @returns Fully generated mission ready for the mission board.
  */
 export function generateAsteroidMission(
   difficulty: number,
   host: AsteroidMissionHostAnchor | null = null,
   rand: () => number = Math.random,
+  requiredObjectiveType: ConcreteObjective['type'] | null = null,
 ): GeneratedAsteroidMission {
   const anchor = host ?? syntheticEarthHostAnchor()
   const combatOnlyHost = isCombatOnlyHostPlanet(anchor.planetId)
@@ -673,6 +721,12 @@ export function generateAsteroidMission(
       // reserved for Cinderline (Mercury) and the Saturn hazard cleanup boards. Without this
       // filter, Colonial Guard's wide `near-earth` band swamps Earth/Mars/Venus at low diff.
       if (!combatOnlyHost && isExterminateOnlyTemplate(template)) continue
+      if (
+        requiredObjectiveType
+        && !template.objectiveSlots.some((slot) => slot.type === requiredObjectiveType)
+      ) {
+        continue
+      }
       const region = findRegionForTemplate(template, difficulty)
       if (region) {
         candidates.push({ giver, template, region })
@@ -697,7 +751,14 @@ export function generateAsteroidMission(
   const missionId = `${pick.template.id}_${Date.now()}`
   const count = objectiveCountForDifficulty(difficulty)
   const slots = [...pick.template.objectiveSlots]
-    .sort((a, b) => b.weight - a.weight)
+    .sort((a, b) => {
+      if (requiredObjectiveType) {
+        const aMatches = a.type === requiredObjectiveType
+        const bMatches = b.type === requiredObjectiveType
+        if (aMatches !== bMatches) return aMatches ? -1 : 1
+      }
+      return b.weight - a.weight
+    })
     .slice(0, count)
   const objectives = slots.map((s) => rollObjective(s, difficulty))
 

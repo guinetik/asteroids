@@ -115,6 +115,54 @@ describe('rollObjective', () => {
     expect(obj.reward).toBeGreaterThanOrEqual(200)
     expect(obj.reward).toBeLessThanOrEqual(800)
   })
+
+  it('rolls photometry objective with one probe and scan timing', () => {
+    const slot = {
+      type: 'photometry' as const,
+      weight: 1,
+      params: {
+        type: 'photometry' as const,
+        timeLimit: { min: 240, max: 180 },
+        scanHoldSeconds: { min: 8, max: 12 },
+        probeDistance: { min: 2200, max: 2800 },
+      },
+      reward: { min: 500, max: 900 },
+    }
+    const obj = rollObjective(slot, 5)
+    expect(obj.type).toBe('photometry')
+    expect(obj.probeCount).toBe(1)
+    expect(obj.timeLimit).toBeGreaterThanOrEqual(180)
+    expect(obj.timeLimit).toBeLessThanOrEqual(240)
+    expect(obj.scanHoldSeconds).toBeGreaterThanOrEqual(8)
+    expect(obj.scanHoldSeconds).toBeLessThanOrEqual(12)
+    expect(obj.probeDistance).toBeGreaterThanOrEqual(2200)
+    expect(obj.probeDistance).toBeLessThanOrEqual(2800)
+  })
+
+  it('scales photometry around difficulty 3 minimum, 5 midpoint, and 10 maximum', () => {
+    const slot = {
+      type: 'photometry' as const,
+      weight: 1,
+      params: {
+        type: 'photometry' as const,
+        timeLimit: { min: 270, max: 170 },
+        scanHoldSeconds: { min: 6, max: 14 },
+        probeDistance: { min: 2400, max: 3400 },
+      },
+      reward: { min: 500, max: 900 },
+    }
+
+    const easy = rollObjective(slot, 3)
+    const middle = rollObjective(slot, 5)
+    const hard = rollObjective(slot, 10)
+
+    expect(easy.timeLimit).toBe(270)
+    expect(easy.scanHoldSeconds).toBe(6)
+    expect(middle.timeLimit).toBe(220)
+    expect(middle.scanHoldSeconds).toBe(10)
+    expect(hard.timeLimit).toBe(170)
+    expect(hard.scanHoldSeconds).toBe(14)
+  })
 })
 
 describe('pickAsteroidForDifficulty', () => {
@@ -342,7 +390,26 @@ describe('generateAsteroidMission', () => {
   it('generates a valid mission at difficulty 5', () => {
     const mission = generateAsteroidMission(5)
     expect(mission.difficulty).toBe(5)
-    expect(['near-earth', 'asteroid-belt', 'kuiper-belt']).toContain(mission.region)
+    expect(['near-earth', 'asteroid-belt', 'kuiper-belt', 'jovian-trojans']).toContain(
+      mission.region,
+    )
+  })
+
+  it('can force a photometry mission for level query overrides', () => {
+    const mission = generateAsteroidMission(5, null, () => 0, 'photometry')
+
+    expect(mission.giverId).toBe('jovian-society')
+    expect(mission.objectives.some((objective) => objective.type === 'photometry')).toBe(true)
+  })
+
+  it('can force photometry across its full difficulty band', () => {
+    for (const difficulty of [3, 5, 10]) {
+      const mission = generateAsteroidMission(difficulty, null, () => 0, 'photometry')
+
+      expect(mission.giverId).toBe('jovian-society')
+      expect(mission.difficulty).toBe(difficulty)
+      expect(mission.objectives.some((objective) => objective.type === 'photometry')).toBe(true)
+    }
   })
 
   it('generates a valid mission at difficulty 10', () => {

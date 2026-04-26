@@ -13,8 +13,14 @@
 
 import type { RestockTimer } from '@/lib/shop/tradeTypes'
 
-/** The four objective types a mission can contain. */
-export type ObjectiveType = 'gather' | 'exterminate' | 'rescue' | 'survey' | 'collect'
+/** The asteroid objective types a mission can contain. */
+export type ObjectiveType =
+  | 'gather'
+  | 'exterminate'
+  | 'rescue'
+  | 'survey'
+  | 'photometry'
+  | 'collect'
 
 /** Solar system region where missions spawn. Determines fuel cost and distance. */
 export type MissionRegion = 'near-earth' | 'asteroid-belt' | 'kuiper-belt'
@@ -69,6 +75,18 @@ export interface SurveyScalableParams {
   timeLimit: NumberRange
 }
 
+/** Scalable params for PHOTOMETRY objectives. */
+export interface PhotometryScalableParams {
+  /** Discriminator for the union type. */
+  type: 'photometry'
+  /** Seconds to complete the probe flight, scan, and telemetry return. */
+  timeLimit: NumberRange
+  /** Seconds the pilot must hold the lander stable for the X-ray exposure. */
+  scanHoldSeconds: NumberRange
+  /** Distance from the asteroid objective site to the side standoff probe point. */
+  probeDistance: NumberRange
+}
+
 /** Scalable params for COLLECT objectives. Currently authored-only. */
 export interface CollectScalableParams {
   /** Discriminator for the union type. */
@@ -83,6 +101,7 @@ export type ScalableParams =
   | ExterminateScalableParams
   | RescueScalableParams
   | SurveyScalableParams
+  | PhotometryScalableParams
   | CollectScalableParams
 
 /** A slot in a mission template that the generator fills with a concrete objective. */
@@ -419,6 +438,10 @@ export interface ConcreteObjective {
   probeCount?: number
   /** For survey: time limit in seconds. */
   timeLimit?: number
+  /** For photometry: seconds of stable lander hold required for the exposure. */
+  scanHoldSeconds?: number
+  /** For photometry: distance from objective site to the side standoff probe point. */
+  probeDistance?: number
   /** For collect: stable inventory/item id granted by the pickup. */
   collectItemId?: string
   /** For collect: UI-facing item label. */

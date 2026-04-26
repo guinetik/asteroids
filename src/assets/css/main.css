@@ -104,6 +104,27 @@ body {
   }
 }
 
+/* FPS HUD low-oxygen alert — pulses while warning, holds steady when depleted. */
+@keyframes fps-hud-oxygen-pulse {
+  0%, 100% {
+    opacity: 0.55;
+    box-shadow: 0 0 8px -2px rgba(239, 68, 68, 0.45);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 18px 0 rgba(239, 68, 68, 0.85);
+  }
+}
+
+.fps-hud-oxygen--warn {
+  @apply border-red-500/70 bg-red-500/10 text-red-300;
+  animation: fps-hud-oxygen-pulse 0.9s ease-in-out infinite;
+}
+
+.fps-hud-oxygen--depleted {
+  @apply border-red-500 bg-red-500/25 text-red-100;
+}
+
 /* Helmet visor frame — rounded viewport with opaque corners. */
 .helmet-visor {
   position: fixed;
@@ -2771,6 +2792,12 @@ body {
 .survey-probes {
   @apply font-mono text-sm tracking-wider text-cyan-400;
   font-family: 'Datatype', ui-monospace, monospace;
+}
+.survey-instruction {
+  @apply rounded-sm border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 font-mono text-xs
+    tracking-[0.22em] text-cyan-200 uppercase;
+  font-family: 'Datatype', ui-monospace, monospace;
+  text-shadow: 0 0 10px rgba(34, 211, 238, 0.7);
 }
 
 /* ── Portal Welcome Dialog ─────────────────────────────────────────────────── */

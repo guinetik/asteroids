@@ -89,7 +89,11 @@ function timerColor(seconds: number): string {
         {{ formatTimer(props.telemetry.surveyTimeRemaining ?? 0) }}
       </div>
       <div class="survey-probes">
-        {{ props.telemetry.surveyProbesCollected ?? 0 }}/{{ props.telemetry.surveyProbesTotal ?? 0 }} PROBES
+        {{ props.telemetry.surveyProbesCollected ?? 0 }}/{{ props.telemetry.surveyProbesTotal ?? 0 }}
+        {{ props.telemetry.minigameProgressLabel ?? 'PROBES' }}
+      </div>
+      <div v-if="props.telemetry.missionInstruction" class="survey-instruction" aria-live="polite">
+        {{ props.telemetry.missionInstruction }}
       </div>
     </div>
   </div>

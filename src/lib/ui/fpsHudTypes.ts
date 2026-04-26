@@ -21,7 +21,7 @@ export interface CompassObjective {
   /** Bearing delta from the player's heading in degrees, constrained to `[-180, 180]`. */
   relativeDeg: number
   /** Objective category used to color the compass marker. */
-  type: 'gather' | 'exterminate' | 'rescue' | 'survey' | 'collect'
+  type: 'gather' | 'exterminate' | 'rescue' | 'survey' | 'photometry' | 'collect'
 }
 
 /**

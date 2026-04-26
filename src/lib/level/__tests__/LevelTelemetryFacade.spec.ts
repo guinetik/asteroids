@@ -24,6 +24,8 @@ const landerTelemetry: LanderTelemetry = {
   surveyTimeRemaining: null,
   surveyProbesCollected: null,
   surveyProbesTotal: null,
+  minigameProgressLabel: null,
+  missionInstruction: null,
 }
 
 const fpsBaseTelemetry: Omit<FpsTelemetry, 'headingRad' | 'objectives' | 'rockTarget'> = {

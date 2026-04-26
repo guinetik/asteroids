@@ -149,6 +149,7 @@ const OBJECTIVE_COLORS: Record<string, string> = {
   exterminate: '#ff4444',
   rescue: '#ffcc44',
   survey: '#00ffcc',
+  photometry: '#b388ff',
   collect: '#66d9ff',
 }
 
@@ -181,6 +182,8 @@ const landerTelemetry = reactive<LanderTelemetry>({
   surveyTimeRemaining: null,
   surveyProbesCollected: null,
   surveyProbesTotal: null,
+  minigameProgressLabel: null,
+  missionInstruction: null,
 })
 
 const fpsTelemetry = reactive<FpsTelemetry>({
@@ -749,17 +752,16 @@ function handleToggleMusic(): void {
   50% { opacity: 1; }
 }
 
-/* Landing warnings — centered, large, impossible to miss */
+/* Landing warnings — dead center, large, impossible to miss */
 .landing-warnings {
   position: fixed;
-  top: max(1.5rem, env(safe-area-inset-top, 0px) + 1rem);
-  left: 50%;
-  transform: translateX(-50%);
+  inset: 0;
   z-index: 35;
   pointer-events: none;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
 }
 .landing-warning {

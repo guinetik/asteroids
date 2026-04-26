@@ -1,0 +1,50 @@
+{
+  "id": "jovian-society",
+  "name": "Vance Holroyd",
+  "title": "Senior Asset Officer",
+  "objectiveTypes": ["photometry"],
+  "minDifficulty": 3,
+  "maxDifficulty": 10,
+  "missions": [
+    {
+      "id": "jovian_prelim_eval",
+      "name": "Preliminary Asset Evaluation",
+      "briefing": "Per current portfolio review, the Society requires preliminary photometric data on a candidate body. Standard pass: deploy probe, hold standoff, capture telemetry, file to the desk on close. Several assets are under simultaneous review this cycle. Clean data advances yours in queue.",
+      "objectiveSlots": [
+        {
+          "type": "photometry",
+          "weight": 1.0,
+          "params": {
+            "type": "photometry",
+            "timeLimit": { "min": 270, "max": 210 },
+            "scanHoldSeconds": { "min": 6, "max": 10 },
+            "probeDistance": { "min": 2400, "max": 3000 }
+          },
+          "reward": { "min": 2500, "max": 5000 }
+        }
+      ],
+      "completionBonus": { "min": 250, "max": 450 },
+      "regionByDifficulty": { "jovian-trojans": [3, 5] }
+    },
+    {
+      "id": "jovian_phase_two_scan",
+      "name": "Phase II Verification Scan",
+      "briefing": "Subject body has cleared preliminary screening. Phase II photometric pass required at extraction-grade precision: standoff tighter, hold longer, variance window narrower. Phase II compensation rates apply on close. Stakeholders are watching this one.",
+      "objectiveSlots": [
+        {
+          "type": "photometry",
+          "weight": 1.0,
+          "params": {
+            "type": "photometry",
+            "timeLimit": { "min": 240, "max": 170 },
+            "scanHoldSeconds": { "min": 8, "max": 14 },
+            "probeDistance": { "min": 2800, "max": 3400 }
+          },
+          "reward": { "min": 3000, "max": 7500 }
+        }
+      ],
+      "completionBonus": { "min": 1500, "max": 2500 },
+      "regionByDifficulty": { "jovian-trojans": [6, 10] }
+    }
+  ]
+}

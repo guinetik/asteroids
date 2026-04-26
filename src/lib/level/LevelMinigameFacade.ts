@@ -14,13 +14,17 @@ import type { Heightmap } from '@/lib/terrain/heightmap'
 import type { MiniGame, MiniGameContext } from '@/lib/minigame/MiniGame'
 import type { MiniGameStep } from '@/lib/minigame/MiniGame'
 import { SurveyMinigame } from '@/lib/minigame/SurveyMinigame'
+import {
+  PhotometryMinigame,
+  type PhotometryScanAudioState,
+} from '@/lib/minigame/PhotometryMinigame'
 import { ExterminateMinigame } from '@/lib/minigame/ExterminateMinigame'
 import { RescueMinigame } from '@/lib/minigame/RescueMinigame'
 import { CollectMinigame } from '@/lib/minigame/CollectMinigame'
 import { GatherMinigame } from '@/lib/minigame/GatherMinigame'
 import type { Tickable } from '@/lib/Tickable'
 import type { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
-import type { Scene } from 'three'
+import type { Object3D, Scene } from 'three'
 
 /**
  * Flat world position snapshot passed into the minigame facade each frame.
@@ -50,6 +54,10 @@ export interface LevelMinigameTickState {
   levelState: string
   /** Lander world position, if available. */
   landerPosition: LevelMinigamePosition | null
+  /** Lander forward direction in world space, if available. */
+  landerForward?: LevelMinigamePosition | null
+  /** Lander up direction in world space, if available. */
+  landerUp?: LevelMinigamePosition | null
   /** Whether the lander is currently grounded. */
   landerGrounded: boolean
   /** EVA player world position, if available. */
@@ -82,6 +90,8 @@ export interface LevelMinigameBindings {
   onUnregisterTickable: ((tickable: Tickable) => void) | null
   /** Resource pickup cue used when a survey probe is collected. */
   onSurveyProbeCollect: (() => void) | null
+  /** Photometry scan audio state sink used while the X-ray beam is active. */
+  onPhotometryScanAudioState: ((state: PhotometryScanAudioState) => void) | null
   /** Route combat/hazard damage back into the level presentation layer. */
   onDamagePlayer:
     | ((damage: number, sourceX: number, sourceZ: number, source?: 'projectile' | 'contact' | 'hazard') => void)
@@ -114,6 +124,8 @@ export interface LevelMinigameInitParams {
   mission: GeneratedAsteroidMission
   /** Shared level scene that owns minigame props/controllers. */
   scene: Scene
+  /** Asteroid render root used by science minigame scan effects. */
+  asteroidRoot?: Object3D | null
   /** Heightmap used by objective props and AI placement. */
   heightmap: Heightmap
   /** Player projectile system, required by combat rescue/exterminate logic. */
@@ -153,6 +165,7 @@ export class LevelMinigameFacade {
     const {
       mission,
       scene,
+      asteroidRoot,
       heightmap,
       projectileSystem,
       rockYieldSystem,
@@ -171,6 +184,22 @@ export class LevelMinigameFacade {
         minigame.onRegisterTickable = bindings.onRegisterTickable
         minigame.onUnregisterTickable = bindings.onUnregisterTickable
         minigame.onProbeCollect = bindings.onSurveyProbeCollect
+        this.add(minigame)
+      } else if (objective.type === 'photometry') {
+        const minigame = new PhotometryMinigame(
+          i,
+          objective,
+          scene,
+          heightmap,
+          missionSeed,
+          asteroidRoot ?? null,
+        )
+        this.applySharedBindings(minigame, bindings)
+        minigame.onRefuel = bindings.onSurveyRefuel
+        minigame.onRegisterTickable = bindings.onRegisterTickable
+        minigame.onUnregisterTickable = bindings.onUnregisterTickable
+        minigame.onProbeCollect = bindings.onSurveyProbeCollect
+        minigame.onScanAudioState = bindings.onPhotometryScanAudioState
         this.add(minigame)
       } else if (objective.type === 'exterminate') {
         const minigame = await ExterminateMinigame.create(
@@ -331,6 +360,8 @@ export class LevelMinigameFacade {
     return {
       levelState: state.levelState,
       landerPosition: state.landerPosition,
+      landerForward: state.landerForward,
+      landerUp: state.landerUp,
       landerGrounded: state.landerGrounded,
       playerPosition: state.playerPosition,
       interactPressed: state.interactPressed,

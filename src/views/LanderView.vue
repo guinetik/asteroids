@@ -28,6 +28,8 @@ const telemetry = reactive<LanderTelemetry>({
   surveyTimeRemaining: null,
   surveyProbesCollected: null,
   surveyProbesTotal: null,
+  minigameProgressLabel: null,
+  missionInstruction: null,
 })
 
 onMounted(async () => {

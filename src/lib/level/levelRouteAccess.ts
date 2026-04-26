@@ -18,6 +18,7 @@ const LEVEL_ROUTE_OBJECTIVE_TYPES: readonly ObjectiveType[] = [
   'exterminate',
   'rescue',
   'survey',
+  'photometry',
   'collect',
 ]
 

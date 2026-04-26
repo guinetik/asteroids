@@ -6,6 +6,13 @@ const O2_COLOR_HIGH = '#3b82f6'
 const O2_COLOR_MID = '#f59e0b'
 const O2_COLOR_LOW = '#ef4444'
 
+/**
+ * O2 fraction at or below which the low-oxygen prompt is shown.
+ * Matches the audio cue threshold in FpsAudioDirector.LOW_OXYGEN_FRACTION
+ * so the warning text and the breathing-distress loop appear together.
+ */
+const LOW_OXYGEN_FRACTION = 0.2
+
 const MODE_LABELS: Record<string, { key: string; label: string; color: string }> = {
   drill: { key: '1', label: 'DRL', color: '#3b82f6' },
   weapon: { key: '2', label: 'LAS', color: '#ff00ff' },
@@ -55,6 +62,18 @@ function o2Color(): string {
   return O2_COLOR_LOW
 }
 
+/** True when O2 is at or below the warning threshold (and the player still has air to lose). */
+function showLowOxygenWarning(): boolean {
+  if (props.telemetry.o2Capacity <= 0) return false
+  const ratio = props.telemetry.o2Level / props.telemetry.o2Capacity
+  return ratio <= LOW_OXYGEN_FRACTION
+}
+
+/** Empty O2 → suffocation; severity bumps to a sharper readout when truly out. */
+function isOxygenEmpty(): boolean {
+  return props.telemetry.o2Level <= 0
+}
+
 function modeColor(): string {
   return MODE_LABELS[props.telemetry.activeMode]?.color ?? '#ffffff'
 }
@@ -84,6 +103,28 @@ function showRockTarget(): boolean {
         <span class="tabular-nums text-white/70">{{ telemetry.speed.toFixed(1) }}</span>
         <span class="text-xs tracking-widest uppercase text-white/40">HDG</span>
         <span class="tabular-nums text-white/70">{{ formatHeadingDegFromRad(telemetry.headingRad) }}</span>
+      </div>
+    </div>
+
+    <!--
+      Low-oxygen warning. Sits below the FpsCompass strip (which is
+      top: 1rem with ~48px combined height including its readout)
+      so the prompt anchors visually under the compass without
+      overlapping it. Pulses in red while O2 is below the warning
+      threshold; switches to a static "OXYGEN DEPLETED" readout once
+      the tank is empty so the cue still reads when the pulse stops.
+    -->
+    <div
+      v-if="showLowOxygenWarning()"
+      class="absolute top-20 left-1/2 z-20 -translate-x-1/2 select-none"
+      role="alert"
+      aria-live="assertive"
+    >
+      <div
+        class="rounded-sm border px-3 py-1 text-center font-mono text-[11px] tracking-[0.3em] uppercase shadow-[0_0_12px_-2px_rgba(239,68,68,0.6)] backdrop-blur-sm"
+        :class="isOxygenEmpty() ? 'fps-hud-oxygen--depleted' : 'fps-hud-oxygen--warn'"
+      >
+        {{ isOxygenEmpty() ? 'Oxygen Depleted' : 'Low Oxygen' }}
       </div>
     </div>
 
