@@ -29,11 +29,13 @@ const BLOOM_THRESHOLD = 0.9
 
 // ── Color grade ──
 /** How much to desaturate the image (0 = none, 1 = full grayscale). */
-const DESATURATION = 0.15
-/** Cool blue tint blended into shadow regions. */
-const SHADOW_TINT_R = 0.6
-const SHADOW_TINT_G = 0.7
-const SHADOW_TINT_B = 0.9
+const DESATURATION = 0.08
+/** Cool blue tint blended into shadow regions. Softer than 0.6/0.7/0.9 — the
+ *  aggressive cool tint was darkening lander-altitude surface views where
+ *  most of the frame is shadow-tinted ground. */
+const SHADOW_TINT_R = 0.85
+const SHADOW_TINT_G = 0.9
+const SHADOW_TINT_B = 0.95
 /** Contrast S-curve intensity (1.0 = neutral). */
 const CONTRAST = 1.05
 
@@ -43,7 +45,10 @@ const CA_AMOUNT = 0.0005
 
 // ── Vignette ──
 const VIGNETTE_OFFSET = 1.2
-const VIGNETTE_DARKNESS = 0.6
+/** Corner darkness. 0.6 was strong enough to noticeably darken lander-
+ *  altitude surface views; 0.3 keeps the cinematic edge fall-off without
+ *  eating playable terrain. */
+const VIGNETTE_DARKNESS = 0.3
 
 /**
  * Custom color-grade shader: desaturation + cool shadow tint + contrast.
