@@ -106,7 +106,6 @@ function createBeamMaterial(color: number, opacity: number): THREE.MeshBasicMate
     color,
     transparent: true,
     opacity,
-    depthTest: false,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,

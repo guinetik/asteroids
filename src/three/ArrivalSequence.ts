@@ -885,7 +885,6 @@ export class ArrivalSequence {
       color: EXFIL_FLOODLIGHT_COLOR,
       transparent: true,
       opacity: EXFIL_FLOODLIGHT_CONE_OPACITY,
-      depthTest: false,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
