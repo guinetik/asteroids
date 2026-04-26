@@ -29,7 +29,7 @@
     "modelPath": "/models/asteroids/bennu.glb",
     "modelScale": 1300,
     "surfaceTextures": "/textures/asteroids/rocky",
-    "surfaceTextureRepeat": 0.25,
+    "surfaceTextureRepeat": 13,
     "surfaceModulatorStrength": 1.0,
     "surfaceModulatorColorBlend": 0.1,
     "surfaceAOStrength": 0.5,
