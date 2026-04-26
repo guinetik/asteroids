@@ -1,0 +1,208 @@
+{
+  "id": "jovian-society-prospection",
+  "inboxName": "Jovian Society",
+  "from": "Vance Hoyt, Senior Asset Officer (Cloud City)",
+  "sentAt": "2306-05-02 14:30 UTC",
+  "offerWhenPrerequisites": {
+    "requiredCompletedContractId": "martian-marine-corps-cohort",
+    "triggerOnPlanetVisited": "jupiter"
+  },
+  "pinnedAssets": [
+    {
+      "assetRef": "jovian-prospectus-target-jupiter",
+      "region": "jovian-trojans",
+      "label": "Asset 2306-J"
+    }
+  ],
+  "introSubject": "Cohort Invitation — Q4 Portfolio Review (Jovian Society)",
+  "introBody": [
+    "Pilot,",
+    "Thank you for taking the call. I'm Vance Hoyt from Asset Strategy at the Jovian Society, reaching out from our Cloud City offices. Hope this finds you between contracts.",
+    "We're putting together a small contractor cohort for Q4 portfolio review work — preliminary screening, photometric assessment, and select subsurface survey deliverables. Your name came up in our routing review, and the Society is impressed by your throughput. We'd love to bring you into the fold.",
+    "The work breaks down into nine deliverables, sequenced for instrumentation onboarding. Standard rates apply step-by-step, with closeout compensation calibrated to the portfolio impact of the final report. Successful completion places you on our preferred contractor manifest, which carries — and I quote our HR materials directly — meaningful longitudinal benefits.",
+    "One thing worth flagging up front: the Society values discretion. Some of what we'll ask is preliminary and exploratory in nature. Please understand that acceptance affirms a non-disclosure that runs through the work and, frankly, the rest of your career.",
+    "Take your time with it. The cohort window is open through end of quarter.",
+    "Warm regards,",
+    "— Vance Hoyt, Senior Asset Officer"
+  ],
+  "steps": [
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "missionType": "asteroid",
+      "objectiveType": "gather",
+      "giverId": "jovian-society",
+      "creditsReward": 1500,
+      "subject": "OP 1 — Demonstration Run, Surface Gather",
+      "flavor": [
+        "Pilot,",
+        "Welcome to the cohort. First deliverable is light: any Society-board asteroid contract, surface gather variant. We need a baseline reading on your extraction methodology before we route specialty work to you.",
+        "Pick one off our Cloud City kiosk, complete it cleanly, file the receipt. Standard rates on close. The Society pays on receipt, not on promise.",
+        "— Vance"
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "missionType": "mining",
+      "giverId": "jovian-society",
+      "creditsReward": 1500,
+      "subject": "OP 2 — Demonstration Run, Belt Operations",
+      "flavor": [
+        "Pilot,",
+        "Strong return on the surface gather. Second deliverable: a Society-issued belt mining run, turret-operated. Our underwriters require demonstrated competence in shuttle-grade extraction before we route specialty instrumentation work to your contracts.",
+        "If your shuttle is not turret-equipped, please advise — Procurement maintains relationships with several financing partners and can route you to a competitive offer.",
+        "One contract, our board, clean closeout. You know the rhythm by now.",
+        "— Vance"
+      ]
+    },
+    {
+      "kind": "collect-drops",
+      "itemId": "viroid-psychosphere",
+      "count": 3,
+      "creditsReward": 1500,
+      "subject": "OP 3 — Instrumentation Calibration, Photometry Series",
+      "flavor": [
+        "Pilot,",
+        "You're cleared for specialty work. Before we route photometry contracts to you, our Instrumentation Bay needs to ship a small calibration unit to your assigned lander. Standard procedure for the photometry series.",
+        "Per the manual, the calibration draws on what our research division calls 'stabilized psychosphere residue' — trace material recoverable from viroid contacts during ordinary combat or rescue contracts. The Society sources this material at scale and prices it into contractor compensation. Three units will suffice for the photometry instrumentation.",
+        "I'm told the residue is harmless in handled quantities. I have not personally handled it.",
+        "Take whatever combat or rescue work fits your schedule and gather as you go. Bring three units to any Cloud City intake bay when ready.",
+        "— Vance"
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "missionType": "asteroid",
+      "objectiveType": "photometry",
+      "giverId": "jovian-society",
+      "pinnedAssetRef": "jovian-prospectus-target-jupiter",
+      "creditsReward": 2500,
+      "subject": "OP 4 — Photometric Assessment, Asset 2306-J",
+      "flavor": [
+        "Pilot,",
+        "Calibration unit registers green. You're cleared for photometry tasking.",
+        "First assignment: a candidate body in the Jovian Trojans, currently flagged 'preliminary review' in our portfolio. We're calling it Asset 2306-J for ledger purposes. Single photometric pass, standard deliverable. The Society values clean telemetry; please prioritize signal quality over speed.",
+        "Pick the listing off our board and run it. The body will be marked on your nav.",
+        "— Vance"
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "missionType": "asteroid",
+      "objectiveType": "photometry",
+      "giverId": "jovian-society",
+      "targetRegion": "saturn-trojans",
+      "creditsReward": 3000,
+      "subject": "OP 5 — Photometric Assessment, Asset 2306-S",
+      "flavor": [
+        "Pilot,",
+        "Strong returns on the Jovian pass. Routing you to a sister asset in the Saturn co-orbital region — yes, slightly outside our usual operating envelope, but the portfolio review is system-wide this quarter and we like the way you fly.",
+        "Travel premium is included in the line item. Please do not cite the figure to other contractors.",
+        "Same instrumentation, same protocol, longer trip. Asset 2306-S. Single photometric pass.",
+        "— Vance"
+      ]
+    },
+    {
+      "kind": "collect-drops",
+      "itemId": "viroid-psychosphere",
+      "count": 8,
+      "creditsReward": 2000,
+      "subject": "OP 6 — Instrumentation Recalibration, DAN Series",
+      "flavor": [
+        "Pilot,",
+        "The Society is moving your file to the next instrumentation tier. Dynamic Albedo of Neutrons surveys are the deeper-look complement to photometry — surface composition is one variable; subsurface volatiles are quite another. The full prospectus on a candidate body reads better with both.",
+        "DAN instrumentation requires substantially more psychosphere mass than photometry — eight units, per the manual. The Society apologizes for the recurring acquisition request and reminds you that combat and rescue contracts pay their own freight.",
+        "Source the material at your convenience. Bring eight units to any Cloud City intake when ready.",
+        "— Vance"
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "missionType": "asteroid",
+      "objectiveType": "dan",
+      "giverId": "jovian-society",
+      "pinnedAssetRef": "jovian-prospectus-target-jupiter",
+      "creditsReward": 3000,
+      "subject": "OP 7 — Subsurface Survey, Asset 2306-J",
+      "flavor": [
+        "Pilot,",
+        "DAN instrument is shipped and registered to your lander. First subsurface pass: the same Jovian Trojan candidate from the photometry series. You'll find the body familiar. Park in the center of the impact crater the Society marked during your earlier visit, switch to science mode, and run the scan.",
+        "A note from the instrumentation team: the neutron pulse occasionally registers ambient disturbance during operation. They assure us this is sensor cross-talk and not a hazard. Please complete the survey regardless.",
+        "— Vance"
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "missionType": "asteroid",
+      "objectiveType": "dan",
+      "giverId": "jovian-society",
+      "targetRegion": "saturn-trojans",
+      "creditsReward": 3500,
+      "subject": "OP 8 — Subsurface Survey, Asset 2306-S",
+      "flavor": [
+        "Pilot,",
+        "Final survey deliverable. Saturn co-orbital body — Asset 2306-S, the same body you photometry'd in OP 5. DAN protocol, same procedure as the Jovian pass.",
+        "I will note that several pilots in the cohort have reported elevated 'sensor cross-talk' on subsurface passes near gas-giant assets. The instrumentation team continues to investigate. You are cleared to proceed at your discretion.",
+        "Travel premium applies on this leg as well. Bring the data home and we'll begin compiling the full prospectus.",
+        "— Vance"
+      ]
+    },
+    {
+      "kind": "choice-mission",
+      "missionId": "jovian_final_prospectus",
+      "minigameType": "terminal-prospectus",
+      "pinnedAssetRef": "jovian-prospectus-target-jupiter",
+      "outcomes": [
+        { "outcomeId": "transmit", "label": "Transmit Report", "creditsReward": 5000 },
+        { "outcomeId": "tamper", "label": "Tamper Report", "creditsReward": 0 }
+      ],
+      "subject": "OP 9 — Prospectus Compilation & Transmission",
+      "flavor": [
+        "Pilot,",
+        "Eight deliverables clean. The Society is grateful for the data quality you've returned across both instrumentation series.",
+        "Final assignment: travel to Asset 2306-J in the Jovian Trojans. There is a Society-provisioned terminal on the surface, near your previous landing zone. Approach the terminal and review the assembled report — your readings, our analysis, the recommended disposition. Confirm transmission to Cloud City Asset Strategy at your discretion.",
+        "The Society will be reviewing the asset for full extraction queueing on receipt of your confirmation. You'll find a closeout bonus structure attached commensurate with the size of the asset class.",
+        "There is no further fieldwork after this step. Welcome, in advance, to the manifest.",
+        "— Vance"
+      ]
+    }
+  ],
+  "completionByOutcome": {
+    "transmit": {
+      "completionSubject": "Welcome To The Manifest",
+      "completionBody": [
+        "Pilot,",
+        "Receipt confirmed. The Society is processing your file for cohort graduation. Closeout compensation has been credited.",
+        "Asset 2306-J has been queued for full extraction. Demolition charges are scheduled within the standard window. By the time you next pass through the Jovian Trojans, the body will not be there. This is normal and reflects the efficient closure of the portfolio cycle.",
+        "In recognition of your service, the Society's Field Engineering division has uplifted your shuttle to Cohort Standard. The performance envelope across all systems is now elevated to reflect Society-grade tasking. We expect to see you on more contracts — at higher rates — as the year progresses.",
+        "Welcome to the manifest. The Society is family.",
+        "— Vance Hoyt, Senior Asset Officer"
+      ],
+      "rewards": [
+        { "type": "shuttle-buff", "buffId": "jovianEmpowerment", "multiplier": 1.5 },
+        { "type": "destroy-body", "assetRef": "jovian-prospectus-target-jupiter" },
+        { "type": "mission-pay-multiplier", "planetId": "jupiter", "multiplier": 2 },
+        { "type": "faction-standing", "factionId": "jovian-society", "standing": "cohort-member" }
+      ]
+    },
+    "tamper": {
+      "completionSubject": "Cohort Departure Confirmed",
+      "completionBody": [
+        "Pilot,",
+        "Asset Strategy has flagged a discrepancy in the transmitted prospectus. Cross-reference with raw telemetry indicates your DAN readings were materially altered prior to transmission.",
+        "The Society does not levy criminal action at this time — your prior step closeouts stand at standard rates — but your file is removed from the cohort manifest. Effective immediately. We will not be retaining you for further work.",
+        "A note for the record: the Society's analysts disagree with your determination. The asset remains under review pending an alternate assessment.",
+        "We wish you well in your future endeavors.",
+        "— Vance Hoyt, Senior Asset Officer"
+      ],
+      "rewards": [
+        { "type": "faction-standing", "factionId": "jovian-society", "standing": "blacklisted" }
+      ]
+    }
+  }
+}
