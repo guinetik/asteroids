@@ -28,18 +28,18 @@
     "dustCoverage": 0.1,
     "modelPath": "/models/asteroids/kr3.glb",
     "modelScale": 1300,
-    "texturePath": "/texture.jpg",
-    "textureRepeat": 1.5
+    "surfaceTextures": "/textures/asteroids/volcanic",
+    "surfaceTextureRepeat": 0.1,
+    "surfaceModulatorStrength": 0.9,
+    "surfaceModulatorColorBlend": 0.33,
+    "surfaceAOStrength": 1.0,
+    "surfaceEmissionStrength": 0.3
   },
   "visual": {
     "albedo": 0.09,
-    "baseColor": [0.12, 0.04, 0.02],
-    "accentColor": [0.9, 0.6, 0.05],
-    "emissive": true,
-    "emissiveColor": [0.95, 0.3, 0.02],
-    "emissiveIntensity": 0.6,
-    "metalness": 0.12,
-    "roughnessMap": 0.85
+    "baseColor": [0.8, 0.7, 0.7],
+    "valleyTone": 0.1,
+    "peakTone": 2.05
   },
   "physical": {
     "mass": 6.1e10,
@@ -51,8 +51,8 @@
   "lighting": {
     "sunAzimuth": 80,
     "sunElevation": 30,
-    "sunColor": [1.0, 0.75, 0.5],
-    "sunIntensity": 2.5,
-    "ambientIntensity": 0.55
+    "sunColor": [1.05, 1.0, 1.0],
+    "sunIntensity": 1.45,
+    "ambientIntensity": 0.75
   }
 }

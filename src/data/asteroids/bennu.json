@@ -28,23 +28,18 @@
     "dustCoverage": 0.2,
     "modelPath": "/models/asteroids/bennu.glb",
     "modelScale": 1300,
-    "texturePath": "/textures/asteroids/bennu-4k.jpg",
-    "textureRepeat": 100,
-    "textureRepeatLander": 5,
-    "detailTexturePath": "/textures/asteroids/gravel3/color.jpg",
-    "detailNormalPath": "/textures/asteroids/gravel3/normal.jpg",
-    "detailRoughnessPath": "/textures/asteroids/gravel3/roughness.jpg",
-    "detailRepeat": 500,
-    "detailStrength": 0.5,
-    "detailNormalStrength": 0.5
+    "surfaceTextures": "/textures/asteroids/rocky",
+    "surfaceTextureRepeat": 100,
+    "surfaceModulatorStrength": 0.5,
+    "surfaceModulatorColorBlend": 0.5,
+    "surfaceAOStrength": 2.0,
+    "surfaceEmissionStrength": 2.0
   },
   "visual": {
     "albedo": 0.044,
-    "baseColor": [0.45, 0.4, 0.3],
-    "accentColor": [0.2, 0.18, 0.12],
-    "emissive": false,
-    "metalness": 0.15,
-    "roughnessMap": 0.9
+    "baseColor": [0.25, 0.25, 0.3],
+    "valleyTone": 0.1,
+    "peakTone": 2.05
   },
   "physical": {
     "mass": 7.329e10,
@@ -57,7 +52,7 @@
     "sunAzimuth": 45,
     "sunElevation": 35,
     "sunColor": [1.0, 0.93, 0.82],
-    "sunIntensity": 3.0,
-    "ambientIntensity": 3
+    "sunIntensity": 1,
+    "ambientIntensity": 2
   }
 }

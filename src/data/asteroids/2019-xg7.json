@@ -26,18 +26,20 @@
     "ridgeFrequency": 0.8,
     "roughness": 0.25,
     "dustCoverage": 0.85,
-    "modelPath": "/models/asteroid.glb",
-    "modelScale": 1300,
-    "texturePath": "/texture.jpg",
-    "textureRepeat": 1.5
+    "modelPath": "/models/asteroids/xg7.glb",
+    "modelScale": 1000,
+    "surfaceTextures": "/textures/asteroids/icy",
+    "surfaceTextureRepeat": 8,
+    "surfaceModulatorStrength": 0.5,
+    "surfaceModulatorColorBlend": 0.5,
+    "surfaceAOStrength": 1.0,
+    "surfaceEmissionStrength": 1.0
   },
   "visual": {
-    "albedo": 0.67,
-    "baseColor": [0.8, 0.88, 0.95],
-    "accentColor": [0.65, 0.6, 0.5],
-    "emissive": false,
-    "metalness": 0.0,
-    "roughnessMap": 0.2
+    "albedo": 0.1,
+    "baseColor": [0.8, 0.85, 0.9],
+    "valleyTone": 0.1,
+    "peakTone": 1.05
   },
   "physical": {
     "mass": 2.5e9,
@@ -50,7 +52,7 @@
     "sunAzimuth": 300,
     "sunElevation": 45,
     "sunColor": [0.85, 0.92, 1.0],
-    "sunIntensity": 2.5,
-    "ambientIntensity": 0.65
+    "sunIntensity": 1.25,
+    "ambientIntensity": 1.15
   }
 }

@@ -17,7 +17,8 @@
     "dimensions": [535, 209, 294],
     "elongation": 2.56,
     "lobeCount": 2,
-    "irregularity": 0.75
+    "irregularity": 0.75,
+    "rotationLottery": { "x": 0, "z": 0 }
   },
   "surface": {
     "craterDensity": 0.2,
@@ -28,16 +29,18 @@
     "dustCoverage": 0.3,
     "modelPath": "/models/asteroids/itokawa.glb",
     "modelScale": 1300,
-    "texturePath": "/texture.jpg",
-    "textureRepeat": 2
+    "surfaceTextures": "/textures/asteroids/sandy",
+    "surfaceTextureRepeat": 1000,
+    "surfaceModulatorStrength": 0.45,
+    "surfaceModulatorColorBlend": 0.0,
+    "surfaceAOStrength": 1.0,
+    "surfaceEmissionStrength": 1.0
   },
   "visual": {
     "albedo": 0.53,
     "baseColor": [0.5, 0.48, 0.38],
-    "accentColor": [0.6, 0.55, 0.4],
-    "emissive": false,
-    "metalness": 0.1,
-    "roughnessMap": 0.65
+    "valleyTone": 0.55,
+    "peakTone": 1.25
   },
   "physical": {
     "mass": 3.51e10,
