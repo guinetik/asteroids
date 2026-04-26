@@ -88,7 +88,6 @@ import { PsychospherePickupController } from '@/three/PsychospherePickupControll
 import { contractSystem } from '@/lib/contracts/runtime'
 import { hashLevelSeed, resolveLevelContext, rotationFromSeed } from '@/lib/level/levelContext'
 import {
-  flattenHeightmapDisk,
   resampleObjectiveNearShip,
   sampleSpawnOnSurface,
 } from '@/lib/level/levelObjectivePlacement'
@@ -155,10 +154,6 @@ export class LevelViewController implements Tickable {
   private sceneManager: SceneManager | null = null
   private heightmap: Heightmap | null = null
   private asteroidSurface: AsteroidSurfaceControllerResult | null = null
-  /** Triplanar repeat used while in lander/vehicle camera. */
-  private surfaceRepeatLander = 0
-  /** Triplanar repeat used while on foot (EVA). */
-  private surfaceRepeatEva = 0
   private surfaceRocks: SurfaceRockController | null = null
   private enemyVisualWarmup: EnemyVisualWarmup | null = null
   private readonly collision = new LevelCollisionFacade()
@@ -445,27 +440,23 @@ export class LevelViewController implements Tickable {
     // of rock as "up". Applied BEFORE the bake so the heightmap / flatten
     // pipeline all see the rotated geometry.
     this.emitBootState('preparing', 'Bringing asteroid online')
-    // Boot with the lander triplanar scale so the arrival cinematic and
-    // initial vehicle camera read correctly. enterEva() swaps to the
-    // EVA scale via the live uniform once the shader has compiled.
-    const initialTriplanarRepeat =
-      asteroid.surface.textureRepeatLander ?? asteroid.surface.textureRepeat
     this.asteroidSurface = await createAsteroidSurface({
       modelPath: asteroid.surface.modelPath,
       scale: asteroid.surface.modelScale,
-      texturePath: asteroid.surface.texturePath,
-      textureRepeat: initialTriplanarRepeat,
-      detailTexturePath: asteroid.surface.detailTexturePath,
-      detailRepeat: asteroid.surface.detailRepeat,
-      detailStrength: asteroid.surface.detailStrength,
-      detailNormalPath: asteroid.surface.detailNormalPath,
-      detailNormalStrength: asteroid.surface.detailNormalStrength,
-      detailRoughnessPath: asteroid.surface.detailRoughnessPath,
-      useEmbeddedTexture: asteroid.surface.useEmbeddedTexture,
-      materialTint: asteroid.visual.baseColor,
-      metalness: asteroid.visual.metalness,
-      roughness: asteroid.visual.roughnessMap,
-      rotation: rotationFromSeed(seed),
+      rotation: rotationFromSeed(seed, asteroid.shape.rotationLottery),
+      baseColor: asteroid.visual.baseColor,
+      valleyTone: asteroid.visual.valleyTone,
+      peakTone: asteroid.visual.peakTone,
+      surfaceTextures: asteroid.surface.surfaceTextures,
+      surfaceUseEmbeddedUVs: asteroid.surface.surfaceUseEmbeddedUVs,
+      surfaceDetailFolder: asteroid.surface.surfaceDetailFolder,
+      surfaceDetailRepeat: asteroid.surface.surfaceDetailRepeat,
+      surfaceDetailNormalStrength: asteroid.surface.surfaceDetailNormalStrength,
+      surfaceTextureRepeat: asteroid.surface.surfaceTextureRepeat,
+      surfaceModulatorStrength: asteroid.surface.surfaceModulatorStrength,
+      surfaceModulatorColorBlend: asteroid.surface.surfaceModulatorColorBlend,
+      surfaceAOStrength: asteroid.surface.surfaceAOStrength,
+      surfaceEmissionStrength: asteroid.surface.surfaceEmissionStrength,
       bake: {
         resolution: LEVEL_TERRAIN_CONFIG.resolution,
         worldSize: LEVEL_GRID_SIZE,
@@ -475,11 +466,6 @@ export class LevelViewController implements Tickable {
     this.heightmap = this.asteroidSurface.heightmap
     const collisionWorld = this.collision.initialize(this.heightmap)
     this.sceneManager.addToScene(this.asteroidSurface.group)
-    // Capture per-camera triplanar repeats. EVA uses textureRepeat (the
-    // value the player sees while walking); lander falls back to the same
-    // value when textureRepeatLander is omitted.
-    this.surfaceRepeatEva = asteroid.surface.textureRepeat ?? 1
-    this.surfaceRepeatLander = asteroid.surface.textureRepeatLander ?? this.surfaceRepeatEva
 
     // Pick a spawn cell that actually sits on the baked mesh — critical on GLB
     // terrain where most of the play area is void. Falls back to origin if the
@@ -490,7 +476,7 @@ export class LevelViewController implements Tickable {
     })
     const spawnX = spawn.x + LEVEL_TERRAIN_CONFIG.landerSpawnLightAlignmentX
     const spawnZ = spawn.z
-    const groundY = spawn.y
+    const groundY = this.heightmap.heightAt(spawnX, spawnZ)
 
     // Resample each objective onto the same asteroid face the ship is parked
     // on. Mission-generator flat zones are laid out in a 3500-unit world square
@@ -520,35 +506,6 @@ export class LevelViewController implements Tickable {
       obj.z = resampled.z
       claimedPositions.push({ x: obj.x, z: obj.z })
     }
-
-    // Soften BOTH the collision heightmap AND the visible GLB mesh around the
-    // ship and each waypoint. Without flattening the render mesh, the physics
-    // disk sits flat but the visible rock still has peaks — props placed at
-    // collision ground Y appear to float beneath visible terrain. Done after
-    // resample so the flattened disks are centred on the final positions.
-    flattenHeightmapDisk(
-      this.heightmap,
-      { x: spawnX, z: spawnZ },
-      {
-        flattenRadius: LEVEL_OBJECTIVE_CONFIG.flattenRadius,
-        flattenFullRadius: LEVEL_OBJECTIVE_CONFIG.flattenFullRadius,
-      },
-    )
-    this.flattenMeshDisk(spawnX, spawnZ)
-    for (const obj of mission.objectives) {
-      flattenHeightmapDisk(
-        this.heightmap,
-        { x: obj.x, z: obj.z },
-        {
-          flattenRadius: LEVEL_OBJECTIVE_CONFIG.flattenRadius,
-          flattenFullRadius: LEVEL_OBJECTIVE_CONFIG.flattenFullRadius,
-        },
-      )
-      this.flattenMeshDisk(obj.x, obj.z)
-    }
-    // Rebuild the BVH on any mesh we touched so future raycasts see the
-    // flattened geometry. Safe to call after all disks are done.
-    this.rebuildAsteroidSurfaceBvh()
 
     // `flatZones` is used for rock-spawn exclusions around objective sites —
     // built after resample so exclusions match the actual waypoint locations.
@@ -925,7 +882,6 @@ export class LevelViewController implements Tickable {
     this.enterArrival()
 
     // ── Dev tools ────────────────────────────────────────────────
-    const surfaceControls = this.asteroidSurface?.controls ?? null
     DevConsole.register('LevelView', {
       takeDamage: (amount = 10) => this.playerController?.takeDamage(amount),
       heal: () => this.playerController?.replenish(),
@@ -936,14 +892,6 @@ export class LevelViewController implements Tickable {
         this.hasExitedVehicle = true
         this.stateMachine?.setState('exfil' as LevelState)
       },
-      // Live ground-shader tuning. Reads/writes uniforms on the patched
-      // triplanar materials so the surface re-tunes without reloading.
-      surfaceRead: () => surfaceControls?.read() ?? null,
-      surfaceTriplanarScale: (value: number) => surfaceControls?.setTriplanarScale(value),
-      surfaceDetailScale: (value: number) => surfaceControls?.setDetailScale(value),
-      surfaceDetailStrength: (value: number) => surfaceControls?.setDetailStrength(value),
-      surfaceDetailNormalStrength: (value: number) =>
-        surfaceControls?.setDetailNormalStrength(value),
     })
 
     // ── Post-processing (wraps renderer) ───────────────────────
@@ -1193,7 +1141,6 @@ export class LevelViewController implements Tickable {
     // Force the throttled HUD telemetry to emit on the very next tick so the
     // lander HUD lights up immediately on state change.
     this.telemetry.resetThrottle()
-    this.asteroidSurface?.controls?.setTriplanarScale(this.surfaceRepeatLander)
     this.stateLifecycle.enterLander(
       {
         tickHandler: this.tickHandler!,
@@ -1240,7 +1187,6 @@ export class LevelViewController implements Tickable {
     // EVA HUD lights up immediately on state change.
     this.telemetry.resetThrottle()
     this.hasExitedVehicle = true
-    this.asteroidSurface?.controls?.setTriplanarScale(this.surfaceRepeatEva)
     this.playerController!.group.position.copy(this.findSafeEvaSpawnPosition())
 
     this.stateLifecycle.enterEva(
@@ -2322,87 +2268,6 @@ export class LevelViewController implements Tickable {
     const edgeTerrainY = this.heightmap.heightAt(clampedX, clampedZ)
 
     return landerPos.y < edgeTerrainY - LEVEL_BOUNDS_CONFIG.adriftDepthMargin
-  }
-
-  /**
-   * Push visible GLB vertices inside a disk around (cx, cz) toward the same
-   * centre height used by {@link flattenHeightmapDisk}. Works in world space
-   * (via each mesh's `matrixWorld`) so the disk is consistent regardless of
-   * the asteroid's applied scale / rotation. The BVH is not rebuilt here —
-   * call {@link rebuildAsteroidSurfaceBvh} once after every disk is done.
-   */
-  private flattenMeshDisk(cx: number, cz: number): void {
-    const hm = this.heightmap
-    const surface = this.asteroidSurface
-    if (!hm || !surface) return
-    if (!hm.isValidAt(cx, cz)) return
-
-    const centreHeight = hm.heightAt(cx, cz)
-    const flattenRadius =
-      LEVEL_OBJECTIVE_CONFIG.flattenRadius + LEVEL_OBJECTIVE_CONFIG.visualMeshFlattenPadding
-    const flattenFullRadius =
-      LEVEL_OBJECTIVE_CONFIG.flattenFullRadius + LEVEL_OBJECTIVE_CONFIG.visualMeshFlattenPadding
-    const flatRadiusSq = flattenRadius * flattenRadius
-    const vertex = new THREE.Vector3()
-    const worldToLocal = new THREE.Matrix4()
-
-    surface.group.traverse((child) => {
-      if (!(child as THREE.Mesh).isMesh) return
-      const mesh = child as THREE.Mesh
-      const positions = mesh.geometry.attributes.position as THREE.BufferAttribute
-      if (!positions) return
-
-      worldToLocal.copy(mesh.matrixWorld).invert()
-      let touched = false
-
-      for (let i = 0; i < positions.count; i++) {
-        vertex.fromBufferAttribute(positions, i).applyMatrix4(mesh.matrixWorld)
-        const dx = vertex.x - cx
-        const dz = vertex.z - cz
-        const distSq = dx * dx + dz * dz
-        if (distSq >= flatRadiusSq) continue
-
-        const dist = Math.sqrt(distSq)
-        let weight = 1
-        if (dist > flattenFullRadius) {
-          const t = (dist - flattenFullRadius) / (flattenRadius - flattenFullRadius)
-          weight = 1 - t * t * (3 - 2 * t)
-        }
-
-        vertex.y = vertex.y + (centreHeight - vertex.y) * weight
-        vertex.applyMatrix4(worldToLocal)
-        positions.setXYZ(i, vertex.x, vertex.y, vertex.z)
-        touched = true
-      }
-
-      if (touched) {
-        positions.needsUpdate = true
-      }
-    })
-  }
-
-  /**
-   * Recompute normals + bounding volumes + BVH on every mesh in the asteroid
-   * surface. Call once after all flatten disks have been applied so the
-   * visible shading and any future raycasts reflect the new geometry.
-   */
-  private rebuildAsteroidSurfaceBvh(): void {
-    const surface = this.asteroidSurface
-    if (!surface) return
-    surface.group.traverse((child) => {
-      if (!(child as THREE.Mesh).isMesh) return
-      const mesh = child as THREE.Mesh
-      const geom = mesh.geometry as THREE.BufferGeometry & {
-        boundsTree?: unknown
-        disposeBoundsTree?: () => void
-        computeBoundsTree?: () => void
-      }
-      mesh.geometry.computeVertexNormals()
-      mesh.geometry.computeBoundingBox()
-      mesh.geometry.computeBoundingSphere()
-      if (geom.boundsTree && geom.disposeBoundsTree) geom.disposeBoundsTree()
-      if (geom.computeBoundsTree) geom.computeBoundsTree()
-    })
   }
 
   private isPlayerAdrift(): boolean {

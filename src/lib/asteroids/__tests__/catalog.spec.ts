@@ -73,31 +73,14 @@ describe('ASTEROID_CATALOG', () => {
       const v = ASTEROID_CATALOG.find((a) => a.id === id)!.visual
       expect(v.albedo).toBeGreaterThanOrEqual(0)
       expect(v.albedo).toBeLessThanOrEqual(1)
-      expect(v.metalness).toBeGreaterThanOrEqual(0)
-      expect(v.metalness).toBeLessThanOrEqual(1)
-      expect(v.roughnessMap).toBeGreaterThanOrEqual(0)
-      expect(v.roughnessMap).toBeLessThanOrEqual(1)
+      // baseColor channels are unbounded above — they double as a tint
+      // multiplier in UV mode (e.g. Psyche's gold tint goes >1 to push
+      // warmer than the texture's RGB allows on its own).
       for (const ch of v.baseColor) {
         expect(ch).toBeGreaterThanOrEqual(0)
-        expect(ch).toBeLessThanOrEqual(1)
-      }
-      for (const ch of v.accentColor) {
-        expect(ch).toBeGreaterThanOrEqual(0)
-        expect(ch).toBeLessThanOrEqual(1)
       }
     },
   )
-
-  it('volcanic asteroid kr3 has valid emissive properties', () => {
-    const v = ASTEROID_CATALOG.find((a) => a.id === 'kr3')!.visual
-    expect(v.emissive).toBe(true)
-    expect(v.emissiveColor).toBeDefined()
-    expect(v.emissiveIntensity).toBeDefined()
-    for (const ch of v.emissiveColor!) {
-      expect(ch).toBeGreaterThanOrEqual(0)
-      expect(ch).toBeLessThanOrEqual(1)
-    }
-  })
 
   it.each([['bennu'], ['itokawa'], ['psyche'], ['xg7'], ['kr3']])(
     'asteroid "%s" has valid physical ranges',

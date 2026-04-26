@@ -32,6 +32,30 @@ export interface AsteroidShape {
   lobeCount: number
   /** How far the shape deviates from a smooth ellipsoid (0 = smooth, 1 = very lumpy). */
   irregularity: number
+  /**
+   * Optional per-axis constraint on the seeded rotation lottery applied
+   * before the heightmap bake. Each axis is either a fixed Euler radian
+   * value (axis stays locked across every mission) or omitted (axis spins
+   * randomly per mission). Used for elongated bodies like Itokawa where a
+   * vertical long axis collapses the playable surface to a tiny patch —
+   * locking X and Z to 0 there keeps the long axis horizontal while still
+   * letting Y rotate freely. Omit the whole field for full random rotation.
+   */
+  rotationLottery?: RotationLottery
+}
+
+/**
+ * Per-axis rotation lottery override. Each present axis is locked to its
+ * literal radian value; omitted axes are sampled from the seeded uniform
+ * `[0, 2π)` distribution.
+ */
+export interface RotationLottery {
+  /** Fixed X-axis Euler in radians. Omit for random per mission. */
+  x?: number
+  /** Fixed Y-axis Euler in radians. Omit for random per mission. */
+  y?: number
+  /** Fixed Z-axis Euler in radians. Omit for random per mission. */
+  z?: number
 }
 
 /** Surface detail parameters that drive procedural terrain generation. All values 0–1. */
@@ -61,91 +85,108 @@ export interface SurfaceFeatures {
    */
   modelScale?: number
   /**
-   * Optional albedo texture URL applied to every mesh in the asteroid GLB,
-   * overriding whatever baseColor map was embedded. The GLB's normal and
-   * roughness maps are preserved so surface relief still reads. Lets each
-   * asteroid JSON swap its look (e.g. `/texture.jpg`, `/textures/rocks/basalt.jpg`)
-   * without touching the shared GLB.
+   * Optional path to a folder containing a triplet of tileable surface
+   * textures: `color.jpg`, `normal.png`, `roughness.jpg`. The color sample
+   * is desaturated and used as a brightness modulator over the painted
+   * vertex colors (never tints, never blows out). The normal and roughness
+   * maps drive PBR relief and spec variation. Triplanar-sampled in object
+   * space because asteroid GLBs ship with degenerate UVs.
+   *
+   * @example "/textures/asteroids/default"
    */
-  texturePath?: string
+  surfaceTextures?: string
   /**
-   * How many times {@link texturePath} repeats across the GLB's UV range
-   * (applied to both U and V). Higher = finer grain. Defaults to 1 (no tiling).
-   * A tileable texture at 6–10 reads well on a ~2600 unit asteroid. Also used
-   * as the EVA / on-foot triplanar repeat — the value the player sees while
-   * walking the surface.
+   * When `true`, applies {@link surfaceTextures} via the GLB's authored
+   * UV coordinates instead of triplanar tiling. Use for matched
+   * model+texture packs (e.g. a paid asteroid model that ships with
+   * uniquely-painted textures meant to land at specific spots on the
+   * mesh). Implies no vertex-color paint and no triplanar — the artist's
+   * authored look passes through directly. Triplanar-only fields
+   * (`surfaceTextureRepeat`, `surfaceModulator*`) are ignored when this is
+   * set.
    */
-  textureRepeat?: number
+  surfaceUseEmbeddedUVs?: boolean
   /**
-   * Optional triplanar repeat used while in the lander/vehicle camera. At
-   * lander altitude a high {@link textureRepeat} reads as tiled noise; a
-   * lower value (e.g. 5) makes the macro read as broad terrain features.
-   * Falls back to {@link textureRepeat} when omitted.
+   * Optional detail-normal folder used only in UV mode. Adds high-frequency
+   * triplanar bump grain on top of the artist's UV macro so FPS-range
+   * close-ups don't read as low-resolution. Only `normal.jpg` is consumed
+   * from this folder; color/roughness stay UV-mapped.
    */
-  textureRepeatLander?: number
+  surfaceDetailFolder?: string
+  /** Triplanar repeat for {@link surfaceDetailFolder}. Defaults to 80. */
+  surfaceDetailRepeat?: number
+  /** Detail-normal blend strength, 0..1. Defaults to 0.6. */
+  surfaceDetailNormalStrength?: number
   /**
-   * Optional URL to a tileable detail texture multiplied on top of
-   * {@link texturePath} via the same triplanar projection. Lets a low-frequency
-   * macro texture (e.g. a NASA "view from space" image at 1–2 repeats) get
-   * grain and gravel detail when the player walks around in FPS without losing
-   * the asteroid's distinct silhouette identity at lander altitude. Recommended
-   * input: a seamless rocky-ground tile at 50–100 repeats.
+   * Triplanar repeat factor for {@link surfaceTextures} — cycles per
+   * object-space unit. Higher = finer grain. GLBs are unit-scale in their
+   * own space, so a value around 60–100 reads well at FPS range while
+   * mipmapping calmly at lander altitude. Defaults to 80.
    */
-  detailTexturePath?: string
+  surfaceTextureRepeat?: number
   /**
-   * Repeat factor for {@link detailTexturePath} in cycles per object-space
-   * unit. High values (50+) keep the detail tile invisible at distance via
-   * mipmapping while showing crisp grain at FPS range. Defaults to 60.
+   * Strength of the color modulator overlay, 0..1. `0` = vertex colors
+   * untouched. `1` = full multiply-overlay; bright pixels of the texture
+   * brighten the vertex color, dark pixels dim it. Defaults to 0.45.
    */
-  detailRepeat?: number
+  surfaceModulatorStrength?: number
   /**
-   * Strength of the detail multiply blend, 0..1. `0` disables detail entirely
-   * (macro only). `1` is full overlay where neutral-grey detail leaves macro
-   * unchanged but light/dark spots brighten/darken the surface. Defaults to 0.7.
+   * Fraction of the modulator sample's chroma that bleeds through, 0..1.
+   * `0` (default) desaturates the texture to grayscale before overlay so
+   * the JSON `baseColor` controls the hue. `1` lets the texture's RGB tint
+   * the surface — useful when you WANT the texture's hue (icy green, lava
+   * red, sandy ochre).
    */
-  detailStrength?: number
+  surfaceModulatorColorBlend?: number
   /**
-   * Optional tangent-space normal map for the detail layer. Triplanar-applied
-   * via whiteout blending in object space. The single biggest visual upgrade
-   * for FPS close-ups: glancing sun light catches micro-relief that pure color
-   * detail can't convey. OpenGL-convention normal maps (green up).
+   * Optional ambient-occlusion blend strength, 0..1. The folder may include
+   * an `ao.jpg` (grayscale baked occlusion) — when present and this value
+   * is greater than 0, dark pixels of the AO sample darken the diffuse to
+   * give "free" crevice shadows. Missing `ao.jpg` is silently treated as
+   * fully white (no-op). Defaults to 1.
    */
-  detailNormalPath?: string
-  /** Detail normal-map strength scalar, 0..2. Defaults to 1. */
-  detailNormalStrength?: number
+  surfaceAOStrength?: number
   /**
-   * Optional roughness map for the detail layer. Triplanar-multiplied into the
-   * material roughness for spec variation across micro-terrain.
+   * Optional `emission.jpg` strength multiplier. The folder may include an
+   * emission map (e.g. lava cracks for volcanic biomes). When present and
+   * this value is greater than 0, emission is added on top of the lit
+   * color per-pixel — only the bright pixels of the emission map glow.
+   * Defaults to 1.
    */
-  detailRoughnessPath?: string
-  /**
-   * When true, the runtime skips the material override entirely and lets the
-   * asteroid GLB render with whatever textures and material it ships with.
-   * Pair with running the normalization pipeline under
-   * `ASTEROID_PRESERVE_TEXTURES=1` so the embedded textures survive into the
-   * runtime model.
-   */
-  useEmbeddedTexture?: boolean
+  surfaceEmissionStrength?: number
 }
 
-/** PBR material properties derived from real spectral data. Colors are RGB normalized 0–1. */
+/**
+ * Visual properties for the asteroid surface. Drives the runtime paint
+ * gradient and atmosphere context. Material PBR (metalness/roughness/etc.)
+ * is now embedded in the GLB or supplied by the surface texture pack —
+ * not by JSON — so those fields no longer live here.
+ */
 export interface VisualProperties {
-  /** Overall surface reflectivity. Bennu is 0.044 (very dark), icy XG7 is 0.67 (bright). */
+  /**
+   * Overall surface reflectivity, used by the atmosphere context for sky
+   * tint and dust scatter. Bennu is 0.044 (very dark), icy XG7 is 0.67
+   * (bright).
+   */
   albedo: number
-  /** Primary surface color as [R, G, B] normalized 0–1. Dominates the material. */
+  /**
+   * Primary surface color as `[R, G, B]` normalized 0–1. Drives the
+   * vertex-color paint gradient (modulator mode) or the per-pixel tint
+   * multiplier (UV mode).
+   */
   baseColor: [number, number, number]
-  /** Secondary color for variation/detail as [R, G, B] normalized 0–1. Used for noise blending. */
-  accentColor: [number, number, number]
-  /** Whether the surface glows (true only for volcanic — lava flows emit light). */
-  emissive: boolean
-  /** Glow color as [R, G, B] normalized 0–1. Required when {@link emissive} is true. */
-  emissiveColor?: [number, number, number]
-  /** Glow brightness (0–1). 0.6 for KR3's lava. Required when {@link emissive} is true. */
-  emissiveIntensity?: number
-  /** PBR metalness. 0 = dielectric (rock, ice), 0.85 = polished metal (Iron-Nickel). */
-  metalness: number
-  /** PBR roughness for the material shader. 0 = mirror, 1 = fully diffuse. */
-  roughnessMap: number
+  /**
+   * Optional multiplier on {@link baseColor} at the darkest vertex of the
+   * surface paint gradient. Defaults to 0.55 (rocky / asteroid-typical).
+   * Bump toward 1.0 for uniformly-bright bodies like ice or fresh snow.
+   * Ignored in UV mode.
+   */
+  valleyTone?: number
+  /**
+   * Optional multiplier on {@link baseColor} at the brightest vertex.
+   * Defaults to 1.25. Ignored in UV mode.
+   */
+  peakTone?: number
 }
 
 /** Real-world physical constants used for gameplay physics and UI display. */

@@ -7,7 +7,7 @@
  */
 
 import { getAsteroidById, ASTEROID_CATALOG } from '@/lib/asteroids/catalog'
-import type { AsteroidDefinition } from '@/lib/asteroids/types'
+import type { AsteroidDefinition, RotationLottery } from '@/lib/asteroids/types'
 import { hasLevelRouteQueryOverrideFromSearchParams } from '@/lib/level/levelRouteAccess'
 import { generateAsteroidMission } from '@/lib/missions/asteroidMissionGenerator'
 import { getSpecialMissionById } from '@/lib/missions/specialMissions'
@@ -54,12 +54,20 @@ export function hashLevelSeed(value: string): number {
 
 /**
  * Pick a deterministic Euler rotation from a numeric seed. Used so each
- * mission's asteroid GLB lands in a different orientation.
+ * mission's asteroid GLB lands in a different orientation. An optional
+ * per-axis lottery override locks specific axes to fixed radians, leaving
+ * the remaining axes seeded — used for elongated bodies (e.g. Itokawa)
+ * where rotating the long axis vertical collapses the playable surface.
  *
  * @param seed - Mission seed (typically from {@link hashLevelSeed}).
- * @returns XYZ Euler rotation in radians, each axis uniform in `[0, 2π)`.
+ * @param lottery - Optional axis locks. Present axes use their literal
+ * radian value; omitted axes are sampled from `[0, 2π)`.
+ * @returns XYZ Euler rotation in radians.
  */
-export function rotationFromSeed(seed: number): { x: number; y: number; z: number } {
+export function rotationFromSeed(
+  seed: number,
+  lottery?: RotationLottery,
+): { x: number; y: number; z: number } {
   const goldenRatioSeed = 0x9e3779b9
   const mulberryIncrement = 0x6d2b79f5
   let s = (seed ^ goldenRatioSeed) >>> 0
@@ -71,7 +79,16 @@ export function rotationFromSeed(seed: number): { x: number; y: number; z: numbe
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
   const tau = Math.PI * 2
-  return { x: next() * tau, y: next() * tau, z: next() * tau }
+  // Always advance the PRNG for each axis so locking one axis doesn't
+  // shift the seeded value of the next axis (keeps existing seeds stable).
+  const xRand = next() * tau
+  const yRand = next() * tau
+  const zRand = next() * tau
+  return {
+    x: lottery?.x ?? xRand,
+    y: lottery?.y ?? yRand,
+    z: lottery?.z ?? zRand,
+  }
 }
 
 /**
