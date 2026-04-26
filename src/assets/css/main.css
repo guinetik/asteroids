@@ -302,20 +302,8 @@ body {
 }
 
 .lander-hud {
-  @apply fixed top-4 left-4 pointer-events-none font-mono text-xs text-green-400 flex flex-col gap-1;
+  @apply fixed inset-0 pointer-events-none font-mono text-xs text-green-400 z-30;
   text-shadow: 0 0 4px rgba(0, 255, 0, 0.5);
-}
-
-.hud-readout {
-  @apply text-green-400;
-}
-
-.lander-hud-fuel {
-  @apply flex items-center gap-2 mt-2;
-}
-
-.lander-hud-gauges {
-  @apply flex gap-3 items-end mt-3;
 }
 
 .orbit-prompt {
@@ -2787,8 +2775,9 @@ body {
 
 /* Survey HUD — timer + probe count overlay during active surveys */
 .survey-hud {
-  @apply fixed top-4 left-1/2 z-30 flex flex-col items-center gap-1 pointer-events-none;
-  transform: translateX(-50%);
+  @apply absolute bottom-28 left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-1
+         rounded border border-cyan-300/30 bg-black/40 px-4 py-2 text-center pointer-events-none
+         backdrop-blur-sm;
 }
 .survey-timer {
   @apply font-mono text-3xl tracking-widest;

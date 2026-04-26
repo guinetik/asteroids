@@ -32,63 +32,64 @@ function timerColor(seconds: number): string {
 
 <template>
   <div class="lander-hud">
-    <!-- Readouts: top left -->
-    <div class="hud-readout">ALT {{ props.telemetry.altitude.toFixed(1) }}</div>
-    <div class="hud-readout">VEL {{ props.telemetry.velocityY.toFixed(1) }}</div>
-    <div class="hud-readout">
-      X {{ props.telemetry.posX.toFixed(0) }} Z {{ props.telemetry.posZ.toFixed(0) }}
-    </div>
-
-    <!-- Fuel bar -->
-    <div class="lander-hud-fuel">
-      <span class="hud-readout">FUEL</span>
-      <div class="hud-fuel-track">
-        <div
-          class="hud-fuel-fill"
-          :class="fuelColor(props.telemetry.fuelLevel, props.telemetry.fuelCapacity)"
-          :style="{ width: pct(props.telemetry.fuelLevel, props.telemetry.fuelCapacity) + '%' }"
-        ></div>
+    <div class="hud-top-cluster">
+      <div class="hud-top-cluster__readout">
+        ALT {{ props.telemetry.altitude.toFixed(1) }} &middot; VEL
+        {{ props.telemetry.velocityY.toFixed(1) }}
+      </div>
+      <div class="hud-top-cluster__readout">
+        X {{ props.telemetry.posX.toFixed(0) }} Z {{ props.telemetry.posZ.toFixed(0) }}
       </div>
     </div>
 
-    <!-- Hull HP bar -->
-    <div class="lander-hud-fuel">
-      <span class="hud-readout">HULL</span>
-      <div class="hud-fuel-track">
-        <div
-          class="hud-fuel-fill"
-          :class="fuelColor(props.telemetry.hp, props.telemetry.maxHp)"
-          :style="{ width: pct(props.telemetry.hp, props.telemetry.maxHp) + '%' }"
-        ></div>
-      </div>
-    </div>
-
-    <!-- Thruster gauges -->
-    <div class="lander-hud-gauges">
-      <div class="hud-gauge">
-        <div class="hud-gauge-track">
+    <div class="hud-bottom-dock">
+      <div class="hud-bottom-dock__column hud-bottom-dock__column--hull">
+        <span class="hud-hull-label">HULL</span>
+        <div class="hud-hull-track">
           <div
-            class="hud-gauge-fill bg-red-500"
-            :style="{
-              height:
-                pct(props.telemetry.mainEngineCharge, props.telemetry.mainEngineCapacity) + '%',
-            }"
+            class="hud-hull-fill"
+            :class="fuelColor(props.telemetry.hp, props.telemetry.maxHp)"
+            :style="{ width: pct(props.telemetry.hp, props.telemetry.maxHp) + '%' }"
           ></div>
         </div>
-        <span class="hud-gauge-label">ENG</span>
       </div>
-      <div class="hud-gauge">
-        <div class="hud-gauge-track">
+
+      <div class="hud-thruster-gauges">
+        <div class="hud-gauge">
+          <div class="hud-gauge-track">
+            <div
+              class="hud-gauge-fill bg-red-500"
+              :style="{
+                height:
+                  pct(props.telemetry.mainEngineCharge, props.telemetry.mainEngineCapacity) + '%',
+              }"
+            ></div>
+          </div>
+          <span class="hud-gauge-label">ENG</span>
+        </div>
+        <div class="hud-gauge">
+          <div class="hud-gauge-track">
+            <div
+              class="hud-gauge-fill bg-white"
+              :style="{ height: pct(props.telemetry.rcsCharge, props.telemetry.rcsCapacity) + '%' }"
+            ></div>
+          </div>
+          <span class="hud-gauge-label">RCS</span>
+        </div>
+      </div>
+
+      <div class="hud-bottom-dock__column hud-bottom-dock__column--fuel">
+        <span class="hud-fuel-label">FUEL</span>
+        <div class="hud-fuel-track">
           <div
-            class="hud-gauge-fill bg-white"
-            :style="{ height: pct(props.telemetry.rcsCharge, props.telemetry.rcsCapacity) + '%' }"
+            class="hud-fuel-fill"
+            :class="fuelColor(props.telemetry.fuelLevel, props.telemetry.fuelCapacity)"
+            :style="{ width: pct(props.telemetry.fuelLevel, props.telemetry.fuelCapacity) + '%' }"
           ></div>
         </div>
-        <span class="hud-gauge-label">RCS</span>
       </div>
     </div>
 
-    <!-- Survey overlay -->
     <div v-if="props.telemetry.surveyTimeRemaining !== null" class="survey-hud">
       <div class="survey-timer" :class="timerColor(props.telemetry.surveyTimeRemaining ?? 0)">
         {{ formatTimer(props.telemetry.surveyTimeRemaining ?? 0) }}
