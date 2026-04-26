@@ -33,13 +33,13 @@ export const MAX_ROCK_YIELD_KG = 240
 export const BOLT_DAMAGE_KG_PER_HIT = 4
 
 /** Fraction of total kg used to derive a rock's science HP (prospecting). */
-export const SCIENCE_HP_RATIO = 0.33
+export const SCIENCE_HP_RATIO = 0.1
 
 /** Lower clamp on the bonus grant kg from a depleted prospected rock. */
 export const MIN_PROSPECT_BONUS_KG = 2
 
 /** Bonus grant kg = max(MIN_PROSPECT_BONUS_KG, ceil(totalKg * PROSPECT_BONUS_RATIO)). */
-export const PROSPECT_BONUS_RATIO = 0.10
+export const PROSPECT_BONUS_RATIO = 0.1
 
 /** Probability that a depleted prospected rock fires a second composition-weighted grant. */
 export const PROSPECT_SECOND_ROLL_CHANCE = 0.25

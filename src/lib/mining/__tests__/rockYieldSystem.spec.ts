@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { RockYieldSystem } from '../rockYieldSystem'
-import { BOLT_DAMAGE_KG_PER_HIT, MAX_ROCK_YIELD_KG, MIN_ROCK_YIELD_KG } from '../constants'
+import {
+  BOLT_DAMAGE_KG_PER_HIT,
+  MAX_ROCK_YIELD_KG,
+  MIN_ROCK_YIELD_KG,
+  SCIENCE_HP_RATIO,
+} from '../constants'
 import type { MineralEntry } from '@/lib/asteroids/types'
 
 const COMPOSITION: MineralEntry[] = [
@@ -225,7 +230,7 @@ describe('RockYieldSystem.registerRock — overrides', () => {
     const sys = makeSystem()
     sys.registerRock({ spawnIndex: 100, diameter: 5 })
     const rock = sys.peekRock(100)!
-    const expectedRaw = Math.ceil(rock.totalKg * 0.33)
+    const expectedRaw = Math.ceil(rock.totalKg * SCIENCE_HP_RATIO)
     const expected = Math.max(BOLT_DAMAGE_KG_PER_HIT, expectedRaw)
     const progress = sys.getScienceProgress(100)
     expect(progress).not.toBeNull()

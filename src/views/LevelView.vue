@@ -110,7 +110,7 @@ function recordPickup(itemId: string, quantity: number, label: string): void {
 }
 
 const prospectEntries = ref<ProspectEntry[]>([])
-const PROSPECT_TOAST_LIFETIME_SEC = 2.6
+const PROSPECT_TOAST_LIFETIME_SEC = 5.0
 const prospectTimers = new Map<string, ReturnType<typeof Timer.after>>()
 let prospectSeq = 0
 

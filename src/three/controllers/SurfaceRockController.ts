@@ -669,6 +669,29 @@ export class SurfaceRockController implements Tickable {
     if (!spawn) return null
     return Math.max(1.2, spawn.diameter * 0.34)
   }
+
+  /**
+   * Per-instance world-space transform and geometry reference for the
+   * rock at `spawnIndex`. Used by overlay controllers (e.g. prospect
+   * wireframe) that need to mirror the exact silhouette, position,
+   * rotation, and scale of the visible rock instance instead of
+   * approximating with a sphere.
+   *
+   * The returned `matrix` is a fresh copy — safe for the caller to
+   * decompose. The `geometry` reference is shared (do not dispose it).
+   *
+   * @param spawnIndex Logical spawn id.
+   * @returns `{ geometry, matrix }` or `null` when the spawn is unknown.
+   */
+  getRockInstanceTransform(
+    spawnIndex: number,
+  ): { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 } | null {
+    const location = this.instanceLocations.get(spawnIndex)
+    if (!location) return null
+    const matrix = new THREE.Matrix4()
+    location.mesh.getMatrixAt(location.localIndex, matrix)
+    return { geometry: location.mesh.geometry, matrix }
+  }
 }
 
 /**

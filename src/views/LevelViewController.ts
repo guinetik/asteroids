@@ -802,7 +802,6 @@ export class LevelViewController implements Tickable {
       this.prospectOverlay = new ProspectOverlayController(
         this.sceneManager.scene,
         this.surfaceRocks,
-        this.heightmap,
       )
       this.combatMining = new LevelCombatMiningFacade(
         {

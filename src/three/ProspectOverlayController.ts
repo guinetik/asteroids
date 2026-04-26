@@ -3,11 +3,11 @@
  * prospects it, locks at full opacity once analysed, and disposes when
  * the rock is consumed.
  *
- * The overlay is a per-rock {@link THREE.Mesh} parented to the scene at
- * the rock's world position. Geometry is cloned from the rock instance's
- * source `THREE.InstancedMesh` so the wireframe traces the actual rock
- * silhouette. Lazily created on first science hit — rocks the player
- * never scans cost nothing.
+ * The overlay is a per-rock {@link THREE.Mesh} that shares geometry
+ * with the underlying {@link THREE.InstancedMesh} and applies the
+ * exact per-instance matrix, so the wireframe traces the visible rock
+ * silhouette / position / rotation / scale precisely. Lazily created
+ * on first science hit — rocks the player never scans cost nothing.
  *
  * @author guinetik
  * @date 2026-04-26
@@ -15,7 +15,6 @@
  */
 import * as THREE from 'three'
 import type { SurfaceRockController } from '@/three/controllers/SurfaceRockController'
-import type { Heightmap } from '@/lib/terrain/heightmap'
 
 /** Wireframe overlay color (matches science mode green). */
 const WIREFRAME_COLOR = 0x22c55e
@@ -23,9 +22,12 @@ const WIREFRAME_COLOR = 0x22c55e
 const WIREFRAME_MAX_OPACITY = 0.7
 /** Final opacity when the rock is fully prospected. */
 const WIREFRAME_FULL_OPACITY = 0.9
-/** Polygon offset factor / units to lift wireframe above the rock surface. */
+/** Polygon offset factor — keeps the wireframe from z-fighting the rock surface. */
 const POLYGON_OFFSET_FACTOR = -1
+/** Polygon offset units — keeps the wireframe from z-fighting the rock surface. */
 const POLYGON_OFFSET_UNITS = -1
+/** Per-axis scale factor applied to the overlay so it sits just outside the rock skin. */
+const WIREFRAME_SCALE_PADDING = 1.02
 
 /**
  * Per-rock prospect wireframe overlay.
@@ -37,19 +39,15 @@ const POLYGON_OFFSET_UNITS = -1
 export class ProspectOverlayController {
   private readonly scene: THREE.Scene
   private readonly surfaceRocks: SurfaceRockController
-  private readonly heightmap: Heightmap
   /** spawnIndex → overlay mesh + material. */
   private readonly overlays = new Map<
     number,
     { mesh: THREE.Mesh; material: THREE.MeshBasicMaterial }
   >()
-  /** Reused scratch — rock world center. */
-  private readonly _center = new THREE.Vector3()
 
-  constructor(scene: THREE.Scene, surfaceRocks: SurfaceRockController, heightmap: Heightmap) {
+  constructor(scene: THREE.Scene, surfaceRocks: SurfaceRockController) {
     this.scene = scene
     this.surfaceRocks = surfaceRocks
-    this.heightmap = heightmap
   }
 
   /**
@@ -76,13 +74,16 @@ export class ProspectOverlayController {
     overlay.material.needsUpdate = true
   }
 
-  /** Tear down the overlay for a consumed rock. */
+  /**
+   * Tear down the overlay for a consumed rock. The overlay's geometry
+   * is borrowed from the {@link THREE.InstancedMesh} so it is *not*
+   * disposed here — only the wireframe material we own.
+   */
   remove(spawnIndex: number): void {
     const overlay = this.overlays.get(spawnIndex)
     if (!overlay) return
     this.scene.remove(overlay.mesh)
     overlay.material.dispose()
-    overlay.mesh.geometry.dispose()
     this.overlays.delete(spawnIndex)
   }
 
@@ -97,15 +98,8 @@ export class ProspectOverlayController {
   private createOverlay(
     spawnIndex: number,
   ): { mesh: THREE.Mesh; material: THREE.MeshBasicMaterial } | null {
-    const center = this.surfaceRocks.getRockCenter(spawnIndex, this.heightmap, this._center)
-    if (!center) return null
-    const radius = this.surfaceRocks.getRockRadius(spawnIndex)
-    if (radius === null) return null
-
-    // A low-poly icosphere is enough to read as "wireframe scan" without
-    // duplicating the GLB instance geometry. Rotated subtly per-rock so
-    // adjacent prospected rocks don't form a pattern.
-    const geometry = new THREE.IcosahedronGeometry(radius, 1)
+    const transform = this.surfaceRocks.getRockInstanceTransform(spawnIndex)
+    if (!transform) return null
 
     const material = new THREE.MeshBasicMaterial({
       color: WIREFRAME_COLOR,
@@ -118,13 +112,13 @@ export class ProspectOverlayController {
       polygonOffsetUnits: POLYGON_OFFSET_UNITS,
     })
 
-    const mesh = new THREE.Mesh(geometry, material)
-    mesh.position.copy(center)
-    mesh.rotation.set(
-      (spawnIndex * 0.317) % (Math.PI * 2),
-      (spawnIndex * 0.521) % (Math.PI * 2),
-      (spawnIndex * 0.733) % (Math.PI * 2),
-    )
+    const mesh = new THREE.Mesh(transform.geometry, material)
+    mesh.matrixAutoUpdate = false
+    mesh.applyMatrix4(transform.matrix)
+    // Tiny outward scale so the wireframe sits just outside the rock skin
+    // even when the polygon offset isn't enough on extreme angles.
+    mesh.scale.multiplyScalar(WIREFRAME_SCALE_PADDING)
+    mesh.updateMatrix()
     mesh.frustumCulled = true
     this.scene.add(mesh)
 
