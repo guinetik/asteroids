@@ -694,6 +694,8 @@ export class LevelViewController implements Tickable {
     await this.multiTool.load(this.fpsCamera.camera, this.sceneManager.scene)
     this.multiTool.setVisible(false)
     this.multiToolState = new MultiToolState(buildMultiToolConfig())
+    // Hover thrust pulls from the RTG instead of breathable O2.
+    this.playerController.setHoverFuelSource(this.multiToolState.thrusterSystem)
 
     // ── Projectile system + particles ───────────────────────────
     this.projectileSystem = new ProjectileSystem(this.sceneManager.scene, this.heightmap)

@@ -235,6 +235,8 @@ export class FpsViewController implements Tickable {
 
     // Multi-tool state
     this.multiToolState = new MultiToolState(buildMultiToolConfig())
+    // Hover thrust pulls from the RTG instead of breathable O2.
+    this.playerController.setHoverFuelSource(this.multiToolState.thrusterSystem)
 
     this.enemyTiltCache = new EnemyTiltCache(heightmap)
 

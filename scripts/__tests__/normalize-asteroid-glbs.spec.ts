@@ -13,6 +13,7 @@ describe('normalize asteroid GLBs helpers', () => {
     expect(outputNameForInput('3d/asteroids/itokawa.glb')).toBe('itokawa.glb')
     expect(outputNameForInput('3d/asteroids/kr3.glb')).toBe('kr3.glb')
     expect(outputNameForInput('3d/asteroids/psyche.glb')).toBe('psyche.glb')
+    expect(outputNameForInput('3d/asteroids/vesta.glb')).toBe('vesta.glb')
   })
 
   it('centers the fitted bounds on the reference center', () => {

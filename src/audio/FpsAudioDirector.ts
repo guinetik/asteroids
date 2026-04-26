@@ -35,7 +35,7 @@ const FLOAT_SOUND_DELAY = 0.5
 /** Fade-in duration (ms) for the floating ambient loop. */
 const FLOAT_FADE_IN_MS = 600
 /** Master SFX gain applied to the procedural hover-RCS bed. */
-const FPS_HOVER_RCS_VOLUME = 0.26
+const FPS_HOVER_RCS_VOLUME = 0.31
 /** Oxygen fraction threshold at or below which the low-O2 loop should sound. */
 const LOW_OXYGEN_FRACTION = 0.2
 /**

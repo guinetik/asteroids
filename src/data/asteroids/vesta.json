@@ -1,0 +1,59 @@
+{
+  "id": "vesta",
+  "name": "Vesta",
+  "designation": "4 Vesta",
+  "type": "Basaltic achondrite (V-type)",
+  "biome": "rocky",
+  "description": "A bright differentiated protoplanet visited by NASA's Dawn mission. Vesta's basaltic crust is carved by huge impact basins, equatorial troughs, and ancient crater fields that expose the history of the early asteroid belt.",
+  "composition": [
+    { "name": "Basaltic Lava", "percentage": 30 },
+    { "name": "Pyroxene", "formula": "(Mg,Fe)SiO3", "percentage": 25 },
+    { "name": "Plagioclase Feldspar", "formula": "(Na,Ca)(Al,Si)4O8", "percentage": 18 },
+    { "name": "Olivine", "formula": "(Mg,Fe)2SiO4", "percentage": 10 },
+    { "name": "Iron-Nickel Alloy", "formula": "Fe-Ni", "percentage": 8 },
+    { "name": "Magnetite", "formula": "Fe3O4", "percentage": 5 },
+    { "name": "Iron Sulfides", "formula": "FeS", "percentage": 4 }
+  ],
+  "shape": {
+    "dimensions": [572600, 557200, 446400],
+    "elongation": 1.28,
+    "lobeCount": 1,
+    "irregularity": 0.42
+  },
+  "surface": {
+    "craterDensity": 0.8,
+    "craterMaxScale": 0.35,
+    "boulderDensity": 0.25,
+    "ridgeFrequency": 0.75,
+    "roughness": 0.6,
+    "dustCoverage": 0.28,
+    "modelPath": "/models/asteroids/vesta.glb",
+    "modelScale": 1300,
+    "surfaceTextures": "/textures/asteroids/rocky",
+    "surfaceTextureRepeat": 0.6,
+    "surfaceModulatorStrength": 0.5,
+    "surfaceModulatorColorBlend": 0.12,
+    "surfaceAOStrength": 1.4,
+    "surfaceEmissionStrength": 0.5
+  },
+  "visual": {
+    "albedo": 0.42,
+    "baseColor": [0.7, 0.66, 0.55],
+    "valleyTone": 0.4,
+    "peakTone": 1.45
+  },
+  "physical": {
+    "mass": 2.59027e20,
+    "density": 3456,
+    "surfaceGravity": 0.22,
+    "rotationPeriod": 5.342,
+    "surfaceTemperature": 190
+  },
+  "lighting": {
+    "sunAzimuth": 165,
+    "sunElevation": 34,
+    "sunColor": [1.0, 0.98, 0.92],
+    "sunIntensity": 1.45,
+    "ambientIntensity": 0.95
+  }
+}

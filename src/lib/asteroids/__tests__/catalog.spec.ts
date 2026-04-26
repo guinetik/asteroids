@@ -2,7 +2,15 @@ import { describe, it, expect } from 'vitest'
 import { ASTEROID_CATALOG, getAsteroidById } from '../catalog'
 import { MINERAL_VISUALS } from '../minerals'
 
-const EXPECTED_ASTEROID_IDS = [['bennu'], ['eros'], ['itokawa'], ['psyche'], ['xg7'], ['kr3']]
+const EXPECTED_ASTEROID_IDS = [
+  ['bennu'],
+  ['eros'],
+  ['itokawa'],
+  ['vesta'],
+  ['psyche'],
+  ['xg7'],
+  ['kr3'],
+]
 
 describe('ASTEROID_CATALOG', () => {
   it('contains all playable asteroids', () => {

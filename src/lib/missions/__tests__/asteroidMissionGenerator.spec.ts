@@ -19,7 +19,8 @@ import {
   WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY,
 } from '../asteroidMissionGenerator'
 
-const SELECT_SECOND_ASTEROID_RANDOM = 0.75
+const SELECT_FIRST_ASTEROID_RANDOM = 0.25
+const SELECT_SECOND_ASTEROID_RANDOM = 0.5
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -142,6 +143,41 @@ describe('pickAsteroidForDifficulty', () => {
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(SELECT_SECOND_ASTEROID_RANDOM)
 
     expect(pickAsteroidForDifficulty(3)).toBe('bennu')
+    randomSpy.mockRestore()
+  })
+
+  it('allows Vesta for Mars-hosted main-belt missions', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(SELECT_FIRST_ASTEROID_RANDOM)
+
+    expect(pickAsteroidForDifficulty(5, 'mars')).toBe('vesta')
+    randomSpy.mockRestore()
+  })
+
+  it('allows Vesta for Jupiter-hosted main-belt missions', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(SELECT_FIRST_ASTEROID_RANDOM)
+
+    expect(pickAsteroidForDifficulty(5, 'jupiter')).toBe('vesta')
+    randomSpy.mockRestore()
+  })
+
+  it('allows Vesta for Saturn-hosted main-belt missions', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(SELECT_FIRST_ASTEROID_RANDOM)
+
+    expect(pickAsteroidForDifficulty(5, 'saturn')).toBe('vesta')
+    randomSpy.mockRestore()
+  })
+
+  it('does not select Vesta for unrelated hosts when global alternatives exist', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(SELECT_FIRST_ASTEROID_RANDOM)
+
+    expect(pickAsteroidForDifficulty(5, 'earth')).toBe('psyche')
+    randomSpy.mockRestore()
+  })
+
+  it('keeps Vesta out of no-host fallback selection', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(SELECT_FIRST_ASTEROID_RANDOM)
+
+    expect(pickAsteroidForDifficulty(5)).toBe('psyche')
     randomSpy.mockRestore()
   })
 })

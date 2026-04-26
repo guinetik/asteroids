@@ -15,6 +15,7 @@ import bennuData from '@/data/asteroids/bennu.json'
 import erosData from '@/data/asteroids/eros.json'
 import itokawaData from '@/data/asteroids/itokawa.json'
 import psycheData from '@/data/asteroids/psyche.json'
+import vestaData from '@/data/asteroids/vesta.json'
 import xg7Data from '@/data/asteroids/2019-xg7.json'
 import kr3Data from '@/data/asteroids/2021-kr3.json'
 
@@ -34,6 +35,7 @@ export const ASTEROID_CATALOG: AsteroidDefinition[] = [
   bennuData,
   erosData,
   itokawaData,
+  vestaData,
   psycheData,
   xg7Data,
   kr3Data,

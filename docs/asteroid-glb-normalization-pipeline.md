@@ -41,6 +41,7 @@ The current source files produce:
 - `public/models/asteroids/itokawa.glb`
 - `public/models/asteroids/kr3.glb`
 - `public/models/asteroids/psyche.glb`
+- `public/models/asteroids/vesta.glb`
 
 To swap Bennu to its normalized model:
 

@@ -32,10 +32,18 @@ const ADS_STRAFE_SPEED_SCALE = 0.8
 const AIR_CONTROL_ACCEL_FRACTION = 0.22
 /** Caps how much speed input can add while airborne. */
 const AIR_CONTROL_SPEED_FRACTION = 0.2
-/** Slightly stronger air control while the jump thrusters are held to hover. */
-const HOVER_AIR_CONTROL_ACCEL_FRACTION = 0.4
-/** Hovering still drifts, but gives a little more mid-air steering than a plain jump arc. */
-const HOVER_AIR_CONTROL_SPEED_FRACTION = 0.35
+/**
+ * Air-control acceleration fraction while hovering — the multitool RTG
+ * is supplying the thrust now, so aerial mobility can be much closer
+ * to grounded responsiveness without trivialising plain jump arcs.
+ */
+const HOVER_AIR_CONTROL_ACCEL_FRACTION = 0.7
+/**
+ * Speed cap for hover-driven air control. Pushed up alongside the
+ * accel fraction so the player can actually reach a meaningful
+ * lateral velocity from a standing jump while holding hover.
+ */
+const HOVER_AIR_CONTROL_SPEED_FRACTION = 0.6
 /** Maximum vertical gap (units) the boots will snap downward over while walking. */
 const GRAVITY_BOOTS_SNAP_DISTANCE = 0.18
 /** Maximum ledge drop (units) the boots will briefly mask before declaring a fall. */
@@ -161,6 +169,15 @@ export class FpsPlayerController implements Tickable {
   /** O2-fueled thruster system (sprint + jump). */
   readonly thrusterSystem: ThrusterSystem<FpsThrusterName>
 
+  /**
+   * Optional fuel pool the airborne hover thrusters drain from instead
+   * of O2. When set (typically the multitool's RTG), holding jump in
+   * mid-air no longer steals breathable oxygen — it costs power. The
+   * empty check used to gate hover engagement also follows the source,
+   * so a depleted RTG cuts hover even with O2 in the tank.
+   */
+  private hoverFuelSource: { consumeFuel(amount: number): void; readonly isFuelEmpty: boolean } | null = null
+
   private readonly inputManager: InputManager
   private readonly camera: FpsCamera
   private readonly config: FpsPlayerConfig
@@ -278,6 +295,17 @@ export class FpsPlayerController implements Tickable {
   /** Whether the player is actively holding hover thrust in mid-air this frame. */
   get isHovering(): boolean {
     return this._isHovering
+  }
+
+  /**
+   * Route hover-thruster fuel cost away from O2 and into the supplied
+   * pool (typically `MultiToolState.thrusterSystem` for the RTG).
+   * Pass `null` to revert to draining the O2 tank.
+   */
+  setHoverFuelSource(
+    source: { consumeFuel(amount: number): void; readonly isFuelEmpty: boolean } | null,
+  ): void {
+    this.hoverFuelSource = source
   }
 
   /** Current lateral speed magnitude (XZ plane only). */
@@ -467,15 +495,22 @@ export class FpsPlayerController implements Tickable {
     // --- Base O2 drain (breathing) ---
     this.thrusterSystem.consumeFuel(this.config.o2.baseDrainRate * dt)
 
-    const hoverActive =
-      jumpHeld &&
-      !canJump &&
-      !this.grounded &&
-      !this.thrusterSystem.isFuelEmpty
+    // Hover gate: if a separate fuel source is wired up (RTG), require
+    // its tank to be non-empty instead of the O2 tank. Without an
+    // override, breathable oxygen still doubles as the energy reserve.
+    const hoverFuelEmpty = this.hoverFuelSource
+      ? this.hoverFuelSource.isFuelEmpty
+      : this.thrusterSystem.isFuelEmpty
+    const hoverActive = jumpHeld && !canJump && !this.grounded && !hoverFuelEmpty
     this._isHovering = hoverActive
     if (hoverActive) {
       this.body.impulse(this.config.movement.hoverForce * dt)
-      this.thrusterSystem.consumeFuel(this.config.o2.hoverDrainRate * dt)
+      const drain = this.config.o2.hoverDrainRate * dt
+      if (this.hoverFuelSource) {
+        this.hoverFuelSource.consumeFuel(drain)
+      } else {
+        this.thrusterSystem.consumeFuel(drain)
+      }
       this.breakGravityBoots()
     }
 

@@ -12,12 +12,12 @@
     "maxSprintSpeed": 24.0,
     "jumpForce": 12.0,
     "gravity": 4.0,
-    "hoverForce": 3.2
+    "hoverForce": 4.5
   },
   "o2": {
     "fuelCapacity": 100,
     "baseDrainRate": 0.2,
-    "hoverDrainRate": 2.5,
+    "hoverDrainRate": 25,
     "deathTimerSeconds": 10,
     "thrusters": {
       "sprint": {
