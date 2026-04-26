@@ -22,6 +22,7 @@ import type { Heightmap } from '@/lib/terrain/heightmap'
 import { TerminalModel, TERMINAL_INTERACT_RANGE } from '@/three/TerminalModel'
 import { SurveyProbeController } from '@/three/SurveyProbeController'
 import { generateProbePositions } from '@/lib/survey/probePositions'
+import type { WorldCollider } from '@/lib/physics/worldCollision'
 
 /** Default time limit if objective doesn't specify one. */
 const DEFAULT_TIME_LIMIT = 90
@@ -51,6 +52,8 @@ export class SurveyMinigame implements MiniGame, MiniGameEvents {
   ]
 
   private readonly terminal: TerminalModel
+  /** Static collision volumes owned by this survey objective. */
+  readonly worldColliders: readonly WorldCollider[]
   private probeController: SurveyProbeController | null = null
   private readonly scene: THREE.Scene
   private readonly heightmap: Heightmap
@@ -127,11 +130,13 @@ export class SurveyMinigame implements MiniGame, MiniGameEvents {
     const groundY = heightmap.heightAt(objective.x, objective.z)
     this.terminal = new TerminalModel()
     this.terminal.placeAt(objective.x + 5, groundY, objective.z)
+    this.worldColliders = [this.terminal.createWorldCollider(`survey-terminal-${objectiveIndex}`)]
     scene.add(this.terminal.group)
   }
 
   /** Per-frame update. */
   tick(dt: number, ctx: MiniGameContext): void {
+    this.terminal.tick(dt)
     if (this._status === 'completed') return
 
     // Timer countdown

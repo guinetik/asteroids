@@ -12,6 +12,7 @@
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
+import { TERMINAL_BODY_HEIGHT } from '@/three/TerminalModel'
 
 /** Diamond radius in world units. */
 const PROBE_RADIUS = 5
@@ -51,6 +52,9 @@ const LAUNCH_ARC_HEIGHT = 120
 
 /** Scale at launch origin (grows to 1.0 during hover). */
 const LAUNCH_START_SCALE = 0.2
+
+/** Extra clearance above the terminal top before survey probes fan out. */
+const LAUNCH_ORIGIN_CLEARANCE = 1
 
 /** Fast spin speed during launch (rad/s). */
 const LAUNCH_SPIN_SPEED = 8.0
@@ -137,8 +141,8 @@ export class SurveyProbeController implements Tickable {
    */
   spawn(positions: THREE.Vector3[], terminalPosition: THREE.Vector3): void {
     this.origin.copy(terminalPosition)
-    // Raise the origin slightly above the terminal top
-    this.origin.y += 4
+    // Raise the origin slightly above the terminal top.
+    this.origin.y += TERMINAL_BODY_HEIGHT + LAUNCH_ORIGIN_CLEARANCE
     this.hoverPoint.copy(this.origin)
     this.hoverPoint.y += LAUNCH_HOVER_HEIGHT
 

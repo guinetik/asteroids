@@ -11,6 +11,7 @@
  * @spec docs/superpowers/specs/2026-04-07-survey-objective-design.md
  */
 import type { Enemy } from '@/lib/fps/enemy'
+import type { WorldCollider } from '@/lib/physics/worldCollision'
 
 /** Minigame lifecycle status. */
 export type MiniGameStatus = 'idle' | 'active' | 'completed' | 'failed'
@@ -109,6 +110,8 @@ export interface MiniGame {
   readonly steps: readonly MiniGameStep[]
   /** Optional short instruction shown in the mission HUD, or `null` when idle. */
   readonly missionInstruction?: string | null
+  /** Optional static colliders owned by this minigame's scene props. */
+  readonly worldColliders?: readonly WorldCollider[]
 
   /** Per-frame update. */
   tick(dt: number, ctx: MiniGameContext): void

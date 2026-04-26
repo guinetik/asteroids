@@ -99,6 +99,7 @@ import { LevelPersistenceFacade } from '@/lib/level/LevelPersistenceFacade'
 import { LevelMinigameFacade } from '@/lib/level/LevelMinigameFacade'
 import { LevelStateLifecycleFacade } from '@/lib/level/LevelStateLifecycleFacade'
 import { LevelTelemetryFacade } from '@/lib/level/LevelTelemetryFacade'
+import type { WorldCollider } from '@/lib/physics/worldCollision'
 import { LEVEL_VIEW_CONTROLLER_CONFIG } from '@/lib/level/levelViewControllerConfig'
 import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
 import {
@@ -914,6 +915,9 @@ export class LevelViewController implements Tickable {
         },
         onInstallCombatDropObserver: (minigame) => {
           this.installDropObserver(minigame)
+        },
+        onRegisterObjectiveColliders: (colliders: readonly WorldCollider[]) => {
+          this.collision.registerObjectiveColliders(colliders)
         },
       },
     })

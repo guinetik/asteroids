@@ -13,6 +13,7 @@ import type { MineralEntry } from '@/lib/asteroids/types'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import type { MiniGame, MiniGameContext } from '@/lib/minigame/MiniGame'
 import type { MiniGameStep } from '@/lib/minigame/MiniGame'
+import type { WorldCollider } from '@/lib/physics/worldCollision'
 import { SurveyMinigame } from '@/lib/minigame/SurveyMinigame'
 import {
   PhotometryMinigame,
@@ -111,6 +112,8 @@ export interface LevelMinigameBindings {
   onRescueFail: ((objectiveIndex: number, cause: string) => void) | null
   /** Install the combat loot/drop observer on a newly created combat minigame. */
   onInstallCombatDropObserver: ((minigame: ExterminateMinigame | RescueMinigame) => void) | null
+  /** Register static objective prop colliders after minigames create their scene props. */
+  onRegisterObjectiveColliders: ((colliders: readonly WorldCollider[]) => void) | null
 }
 
 /**
@@ -174,6 +177,7 @@ export class LevelMinigameFacade {
       missionSeed,
       bindings,
     } = params
+    const objectiveColliders: WorldCollider[] = []
 
     for (let i = 0; i < mission.objectives.length; i++) {
       const objective = mission.objectives[i]!
@@ -185,6 +189,7 @@ export class LevelMinigameFacade {
         minigame.onRegisterTickable = bindings.onRegisterTickable
         minigame.onUnregisterTickable = bindings.onUnregisterTickable
         minigame.onProbeCollect = bindings.onSurveyProbeCollect
+        objectiveColliders.push(...(minigame.worldColliders ?? []))
         this.add(minigame)
       } else if (objective.type === 'photometry') {
         const minigame = new PhotometryMinigame(
@@ -201,6 +206,7 @@ export class LevelMinigameFacade {
         minigame.onUnregisterTickable = bindings.onUnregisterTickable
         minigame.onProbeCollect = bindings.onSurveyProbeCollect
         minigame.onScanAudioState = bindings.onPhotometryScanAudioState
+        objectiveColliders.push(...(minigame.worldColliders ?? []))
         this.add(minigame)
       } else if (objective.type === 'exterminate') {
         const minigame = await ExterminateMinigame.create(
@@ -256,6 +262,7 @@ export class LevelMinigameFacade {
         this.add(minigame)
       }
     }
+    bindings.onRegisterObjectiveColliders?.(objectiveColliders)
   }
 
   /**

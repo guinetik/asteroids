@@ -18,6 +18,7 @@ import type { ConcreteObjective } from '@/lib/missions/types'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import { TerminalModel, TERMINAL_INTERACT_RANGE } from '@/three/TerminalModel'
 import { PhotometryProbeController } from '@/three/PhotometryProbeController'
+import type { WorldCollider } from '@/lib/physics/worldCollision'
 import {
   computePhotometryProbeTarget,
   computePhotometryStandoffDistance,
@@ -114,6 +115,8 @@ export class PhotometryMinigame implements MiniGame, MiniGameEvents {
   ]
 
   private readonly terminal: TerminalModel
+  /** Static collision volumes owned by this photometry objective. */
+  readonly worldColliders: readonly WorldCollider[]
   private probeController: PhotometryProbeController | null = null
   private readonly scene: THREE.Scene
   private readonly heightmap: Heightmap
@@ -227,6 +230,7 @@ export class PhotometryMinigame implements MiniGame, MiniGameEvents {
     const groundY = heightmap.heightAt(objective.x, objective.z)
     this.terminal = new TerminalModel()
     this.terminal.placeAt(objective.x + TERMINAL_OFFSET_X, groundY, objective.z)
+    this.worldColliders = [this.terminal.createWorldCollider(`photometry-terminal-${objectiveIndex}`)]
     scene.add(this.terminal.group)
   }
 
@@ -237,6 +241,7 @@ export class PhotometryMinigame implements MiniGame, MiniGameEvents {
    * @param ctx - Shared minigame context from the level controller.
    */
   tick(dt: number, ctx: MiniGameContext): void {
+    this.terminal.tick(dt)
     if (this._status === 'completed') return
 
     if (this._status === 'active') {

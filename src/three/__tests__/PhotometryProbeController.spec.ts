@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import * as THREE from 'three'
 import { PhotometryProbeController } from '@/three/PhotometryProbeController'
+import { TERMINAL_BODY_HEIGHT } from '@/three/TerminalModel'
 import { WAYPOINT_SURFACE_BEAM_HEIGHT } from '@/three/WaypointMarkers'
 
 describe('PhotometryProbeController', () => {
@@ -16,7 +17,7 @@ describe('PhotometryProbeController', () => {
     controller.tick(0.5)
 
     const probe = scene.children.find((child) => child instanceof THREE.Group) as THREE.Group
-    expect(probe.position.y).toBeCloseTo(18)
+    expect(probe.position.y).toBeCloseTo(10 + TERMINAL_BODY_HEIGHT + 5)
     expect(controller.isArrived).toBe(false)
     controller.dispose()
   })

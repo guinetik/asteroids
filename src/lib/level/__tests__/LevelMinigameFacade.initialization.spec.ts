@@ -68,6 +68,7 @@ vi.mock('@/lib/minigame/SurveyMinigame', () => ({
     progressCurrent = null
     progressTotal = null
     steps: [] = []
+    worldColliders = [{ id: 'survey-terminal', kind: 'aabb' as const }]
     tick = vi.fn()
     dispose = vi.fn()
 
@@ -95,6 +96,7 @@ vi.mock('@/lib/minigame/PhotometryMinigame', () => ({
     progressCurrent = null
     progressTotal = null
     steps: [] = []
+    worldColliders = [{ id: 'photometry-terminal', kind: 'aabb' as const }]
     tick = vi.fn()
     dispose = vi.fn()
 
@@ -238,6 +240,7 @@ describe('LevelMinigameFacade initialization', () => {
     const onExplosion = vi.fn()
     const onRescueFail = vi.fn()
     const onInstallCombatDropObserver = vi.fn()
+    const onRegisterObjectiveColliders = vi.fn()
 
     await facade.initializeObjectives({
       mission: {
@@ -272,6 +275,7 @@ describe('LevelMinigameFacade initialization', () => {
         onExplosion,
         onRescueFail,
         onInstallCombatDropObserver,
+        onRegisterObjectiveColliders,
       },
     })
 
@@ -310,6 +314,10 @@ describe('LevelMinigameFacade initialization', () => {
     expect(rescue.onKillPlayer).toBe(onKillPlayer)
     expect(rescue.onFail).toBe(onRescueFail)
     expect(onInstallCombatDropObserver).toHaveBeenCalledTimes(2)
+    expect(onRegisterObjectiveColliders).toHaveBeenCalledWith([
+      { id: 'survey-terminal', kind: 'aabb' },
+      { id: 'photometry-terminal', kind: 'aabb' },
+    ])
 
     exterminate.onDestroyLander?.()
     rescue.onDestroyLander?.()
@@ -352,6 +360,7 @@ describe('LevelMinigameFacade initialization', () => {
         onExplosion: null,
         onRescueFail: null,
         onInstallCombatDropObserver: null,
+        onRegisterObjectiveColliders: null,
       },
     })
 

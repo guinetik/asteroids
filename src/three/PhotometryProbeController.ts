@@ -14,6 +14,7 @@ import {
   WAYPOINT_SURFACE_BEAM_HEIGHT,
 } from '@/three/WaypointMarkers'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
+import { TERMINAL_BODY_HEIGHT } from '@/three/TerminalModel'
 
 /** Probe octahedron radius in world units. */
 const PROBE_RADIUS = 5
@@ -32,9 +33,6 @@ const LAUNCH_SIDE_ARC_DURATION = 7
 
 /** Probe scale at the terminal before it grows during launch. */
 const LAUNCH_START_SCALE = 0.2
-
-/** Terminal body height in world units. */
-const TERMINAL_BODY_HEIGHT = 3
 
 /** World-space probe center offset so its bottom touches the terminal top. */
 const LAUNCH_HOVER_HEIGHT = TERMINAL_BODY_HEIGHT + PROBE_RADIUS

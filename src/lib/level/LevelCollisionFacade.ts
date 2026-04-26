@@ -35,6 +35,7 @@ export interface LevelEvaSpawnOptions {
 export class LevelCollisionFacade {
   private world: CollisionWorld | null = null
   private readonly staticColliderCleanup: Array<() => void> = []
+  private readonly objectiveColliderCleanup: Array<() => void> = []
   private readonly surfaceRockColliderCleanup = new Map<number, () => void>()
 
   /**
@@ -75,6 +76,26 @@ export class LevelCollisionFacade {
   clearStaticColliders(): void {
     while (this.staticColliderCleanup.length > 0) {
       this.staticColliderCleanup.pop()?.()
+    }
+  }
+
+  /**
+   * Replace the current objective prop collider set.
+   *
+   * @param colliders - Static objective props such as survey terminals.
+   */
+  registerObjectiveColliders(colliders: readonly WorldCollider[]): void {
+    if (!this.world) return
+    this.clearObjectiveColliders()
+    for (const collider of colliders) {
+      this.objectiveColliderCleanup.push(this.world.addCollider(collider))
+    }
+  }
+
+  /** Remove all registered objective prop colliders. */
+  clearObjectiveColliders(): void {
+    while (this.objectiveColliderCleanup.length > 0) {
+      this.objectiveColliderCleanup.pop()?.()
     }
   }
 
@@ -139,6 +160,7 @@ export class LevelCollisionFacade {
   /** Tear down the world and every registered collider. */
   dispose(): void {
     this.clearStaticColliders()
+    this.clearObjectiveColliders()
     this.clearSurfaceRockColliders()
     this.world = null
   }

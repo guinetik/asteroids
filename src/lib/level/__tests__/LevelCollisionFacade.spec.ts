@@ -84,6 +84,103 @@ describe('LevelCollisionFacade', () => {
     ).toBe(false)
   })
 
+  it('registers and clears objective prop colliders separately from rocks', () => {
+    const facade = new LevelCollisionFacade()
+    const world = facade.initialize(createHeightmap(0))
+
+    facade.registerSurfaceRockCollider(1, {
+      id: 'rock-1',
+      kind: 'aabb',
+      min: { x: 10, y: 0, z: 10 },
+      max: { x: 12, y: 2, z: 12 },
+    })
+    facade.registerObjectiveColliders([
+      {
+        id: 'terminal-1',
+        kind: 'aabb',
+        min: { x: -1, y: 0, z: -1 },
+        max: { x: 1, y: 3, z: 1 },
+      },
+    ])
+
+    expect(
+      world.moveDiscXZ({ x: 0, y: 0, z: 0 }, 0, 0, 0, 2, {
+        radius: 0.5,
+        skinWidth: 0,
+        substepDistance: 1,
+      }).touchedCollider,
+    ).toBe(true)
+
+    facade.clearObjectiveColliders()
+
+    expect(
+      world.moveDiscXZ({ x: 0, y: 0, z: 0 }, 0, 0, 0, 2, {
+        radius: 0.5,
+        skinWidth: 0,
+        substepDistance: 1,
+      }).touchedCollider,
+    ).toBe(false)
+    expect(
+      world.moveDiscXZ({ x: 11, y: 0, z: 11 }, 0, 0, 0, 2, {
+        radius: 0.5,
+        skinWidth: 0,
+        substepDistance: 1,
+      }).touchedCollider,
+    ).toBe(true)
+  })
+
+  it('replaces objective prop colliders without clearing static colliders', () => {
+    const facade = new LevelCollisionFacade()
+    const world = facade.initialize(createHeightmap(0))
+
+    facade.registerStaticColliders([
+      {
+        id: 'lander',
+        kind: 'aabb',
+        min: { x: 20, y: 0, z: 20 },
+        max: { x: 22, y: 2, z: 22 },
+      },
+    ])
+    facade.registerObjectiveColliders([
+      {
+        id: 'terminal-old',
+        kind: 'aabb',
+        min: { x: -1, y: 0, z: -1 },
+        max: { x: 1, y: 3, z: 1 },
+      },
+    ])
+    facade.registerObjectiveColliders([
+      {
+        id: 'terminal-new',
+        kind: 'aabb',
+        min: { x: 5, y: 0, z: 5 },
+        max: { x: 7, y: 3, z: 7 },
+      },
+    ])
+
+    expect(
+      world.moveDiscXZ({ x: 0, y: 0, z: 0 }, 0, 0, 0, 2, {
+        radius: 0.5,
+        skinWidth: 0,
+        substepDistance: 1,
+      }).touchedCollider,
+    ).toBe(false)
+    expect(
+      world.moveDiscXZ({ x: 6, y: 0, z: 6 }, 0, 0, 0, 2, {
+        radius: 0.5,
+        skinWidth: 0,
+        substepDistance: 1,
+      }).touchedCollider,
+    ).toBe(true)
+    expect(
+      world.moveDiscXZ({ x: 21, y: 0, z: 21 }, 0, 0, 0, 2, {
+        radius: 0.5,
+        skinWidth: 0,
+        substepDistance: 1,
+      }).touchedCollider,
+    ).toBe(true)
+  })
+
   it('builds an EVA spawn from terrain support when the world exists', () => {
     const facade = new LevelCollisionFacade()
     facade.initialize(createHeightmap(25))
