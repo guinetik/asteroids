@@ -43,7 +43,7 @@ const HEAL_BOLT_AMOUNT = 25
  * Used for VFX and contact SFX; drill mining uses {@link ProjectileSystem.onRockHit} in addition
  * for `drill_rock`.
  */
-export type ProjectileImpactKind = 'terrain' | 'drill_rock' | 'enemy' | 'hostage'
+export type ProjectileImpactKind = 'terrain' | 'drill_rock' | 'science_rock' | 'enemy' | 'hostage'
 
 /**
  * Carried with {@link ProjectileSystem.onImpact} so listeners can style feedback per mode/surface
@@ -139,6 +139,15 @@ export class ProjectileSystem implements Tickable {
    *   callback; copy if you need to keep it past the synchronous handler body.
    */
   onRockHit: ((spawnIndex: number, position: THREE.Vector3) => void) | null = null
+
+  /**
+   * Called when a **science** bolt hits a registered mineable rock.
+   *
+   * @param spawnIndex - Stable id of the hit rock.
+   * @param position - **Transient** impact point. Mutated on the next
+   *   callback; copy if you need to keep it past the synchronous handler body.
+   */
+  onScienceRockHit: ((spawnIndex: number, position: THREE.Vector3) => void) | null = null
 
   /**
    * Reused scratch position for impact/hit callbacks. Allocated once per
