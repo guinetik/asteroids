@@ -31,3 +31,21 @@ export const MAX_ROCK_YIELD_KG = 240
 
 /** Kilograms removed by a single drill bolt impact. */
 export const BOLT_DAMAGE_KG_PER_HIT = 4
+
+/** Fraction of total kg used to derive a rock's science HP (prospecting). */
+export const SCIENCE_HP_RATIO = 0.33
+
+/** Lower clamp on the bonus grant kg from a depleted prospected rock. */
+export const MIN_PROSPECT_BONUS_KG = 2
+
+/** Bonus grant kg = max(MIN_PROSPECT_BONUS_KG, ceil(totalKg * PROSPECT_BONUS_RATIO)). */
+export const PROSPECT_BONUS_RATIO = 0.10
+
+/** Probability that a depleted prospected rock fires a second composition-weighted grant. */
+export const PROSPECT_SECOND_ROLL_CHANCE = 0.25
+
+/** Salt for the trigger draw that decides whether the second roll fires. */
+export const PROSPECT_TRIGGER_SALT = 0x9e3779b9
+
+/** Salt for the bonus item-id draw, distinct from PROSPECT_TRIGGER_SALT so the two are uncorrelated. */
+export const PROSPECT_ITEM_SALT = 0x85ebca77
