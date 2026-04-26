@@ -17,7 +17,7 @@ The feature also needs a clean dispatch path so future objectives ("prospect 5 r
 ## Goals
 
 - Make science bolts a **multi-hit prospecting action** on rocks, with a visible wireframe overlay that ramps up across hits and locks in on completion.
-- On the **drill-mining depletion** of a prospected rock, fire a guaranteed bonus mineral grant of the rock's primary mineral, plus a 25% chance of a second weighted-roll grant from the asteroid composition.
+- On the **drill-mining depletion** of a prospected rock — and only on that hit, exactly once per rock — fire a guaranteed bonus mineral grant of the rock's primary mineral, plus a 25% chance of a second weighted-roll grant from the asteroid composition. No bonus fires on intermediate drill hits, on science hits, or on rocks that were never fully prospected.
 - Emit a structured **`onRockProspected(spawnIndex, itemId)`** callback so missions can hook in via the same chain pattern `GatherMinigame` already uses for `onMineralExtracted`.
 - Surface the moment with a small **PickupToast-style corner notification** (`✓ Analysed — Olivine-bearing rock`) and a distinct **soft analytical beep**, positionally panned via `worldPointToHearing`.
 - Reuse the existing `RockYieldSystem` data model and asteroid composition — no new authoring per asteroid.
@@ -239,7 +239,7 @@ const WIREFRAME_FULL_OPACITY = 0.9
 ## Edge Cases
 
 - **Rock consumed mid-prospect.** If a player's drill destroys a rock that has partial `scienceHp`, the overlay controller hears `onConsume` and disposes the overlay. No `onRockProspected` fires — partial science work yields nothing.
-- **Prospected then mined to depletion in the same FPS pass.** Bonus rolls are gated only on `prospected === true && depleted === true`; mining order doesn't matter.
+- **Prospected then mined to depletion in the same FPS pass.** Bonus rolls are gated only on `prospected === true && depleted === true`; mining order doesn't matter. The bonus fires exactly once — on the destroying hit — and the rock is then deleted from the map, so re-entering the branch is impossible.
 - **Bonus roll lands on the same itemId as the guaranteed roll.** Allowed. The player sees two `+N Olivine` toasts; the existing pickup-toast aggregator may collapse them into one entry depending on its aggregation window. Acceptable behavior.
 - **Already-prospected science hit.** Bolt stops, RTG fuel burned, no callbacks fire, no toast, no audio cue beyond the standard impact. The wireframe is the player's pre-fire warning.
 - **Rock with `compositionOverride`.** Prospect bonus rolls use whatever weighted-items array was registered for that rock — overrides flow through naturally.
