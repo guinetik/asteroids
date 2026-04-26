@@ -95,9 +95,35 @@ export class Heightmap {
     return ix >= 0 && ix < this.resolution - 1 && iz >= 0 && iz < this.resolution - 1
   }
 
-  /** Bilinear-interpolated height at world coordinates, or null when outside bounds. */
+  /**
+   * Bilinear-interpolated height at world coordinates, or null when there is no
+   * real surface here.
+   *
+   * Returns null when the sample is outside the heightmap domain or when any of
+   * the four cells touched by the bilinear interpolation is marked invalid in
+   * the validity mask. The second case prevents callers from inheriting the
+   * `OFF_SURFACE_HEIGHT` sentinel (used by mesh-baked heightmaps for void
+   * cells) as if it were real terrain.
+   *
+   * @param x - World X coordinate.
+   * @param z - World Z coordinate.
+   * @returns Interpolated height when all four touched cells are valid, otherwise null.
+   */
   tryHeightAt(x: number, z: number): number | null {
     if (!this.contains(x, z)) return null
+    const half = this.worldSize / 2
+    const gx = ((x + half) / this.worldSize) * (this.resolution - 1)
+    const gz = ((z + half) / this.worldSize) * (this.resolution - 1)
+    const ix = Math.floor(gx)
+    const iz = Math.floor(gz)
+    if (
+      !this.isValid(ix, iz) ||
+      !this.isValid(ix + 1, iz) ||
+      !this.isValid(ix, iz + 1) ||
+      !this.isValid(ix + 1, iz + 1)
+    ) {
+      return null
+    }
     return this.heightAt(x, z)
   }
 

@@ -126,4 +126,22 @@ describe('CollisionWorld', () => {
     expect(support.colliderId).toBe(null)
     expect(support.height).toBe(0)
   })
+
+  it('returns -Infinity support over invalid heightmap cells with no colliders', () => {
+    const heightmap = createRampHeightmap(0)
+    // Invalidate every cell that the (0,0) bilinear interpolation would touch.
+    const half = heightmap.worldSize / 2
+    const gxFloor = Math.floor(((0 + half) / heightmap.worldSize) * (heightmap.resolution - 1))
+    const gzFloor = Math.floor(((0 + half) / heightmap.worldSize) * (heightmap.resolution - 1))
+    heightmap.setValid(gxFloor, gzFloor, false)
+    heightmap.setValid(gxFloor + 1, gzFloor, false)
+    heightmap.setValid(gxFloor, gzFloor + 1, false)
+    heightmap.setValid(gxFloor + 1, gzFloor + 1, false)
+    const world = new CollisionWorld(heightmap)
+
+    const support = world.getHighestSupportUnderDisc(0, 0, -100, 100, 1.5)
+
+    expect(support.colliderId).toBe(null)
+    expect(support.height).toBe(Number.NEGATIVE_INFINITY)
+  })
 })

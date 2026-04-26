@@ -84,4 +84,25 @@ describe('Heightmap', () => {
       expect(hm.isValid(0, 0)).toBe(true) // array was not corrupted
     })
   })
+
+  describe('tryHeightAt', () => {
+    it('returns null for samples outside the heightmap domain', () => {
+      const hm = new Heightmap(4, 100)
+      expect(hm.tryHeightAt(9999, 9999)).toBeNull()
+      expect(hm.tryHeightAt(-9999, 0)).toBeNull()
+    })
+
+    it('returns null when any of the four interpolation cells is invalid', () => {
+      const hm = new Heightmap(4, 100)
+      for (let gz = 0; gz < 4; gz++) {
+        for (let gx = 0; gx < 4; gx++) {
+          hm.set(gx, gz, 12)
+        }
+      }
+      // Invalidate the cell that the (0,0) interpolation reaches at gx=2,gz=2.
+      hm.setValid(2, 2, false)
+      expect(hm.tryHeightAt(0, 0)).toBeNull()
+      expect(hm.tryHeightAt(-40, -40)).toBeCloseTo(12, 5)
+    })
+  })
 })

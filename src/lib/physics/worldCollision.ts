@@ -134,8 +134,13 @@ export class CollisionWorld {
     radius: number,
     ignoreColliderId?: string,
   ): SupportSurfaceResult {
-    let bestHeight = this.getGroundHeight(x, z)
-    let bestNormal = this.getGroundNormal(x, z)
+    // Only seed `bestHeight` from terrain when there is real surface here.
+    // `getGroundHeight` coerces missing terrain (out-of-bounds, void cells) to
+    // 0, which would otherwise become a phantom Y=0 floor in space and crash
+    // the lander when it flies past the asteroid silhouette.
+    const terrainHeight = this.heightmap?.tryHeightAt(x, z) ?? null
+    let bestHeight = terrainHeight ?? Number.NEGATIVE_INFINITY
+    let bestNormal = terrainHeight !== null ? this.getGroundNormal(x, z) : DEFAULT_GROUND_NORMAL
     let bestColliderId: string | null = null
 
     for (const collider of this.colliders) {
