@@ -95,6 +95,20 @@ export class RockYieldSystem {
    */
   onMineralExtracted: ((itemId: string, kg: number, spawnIndex: number) => void) | null = null
 
+  /**
+   * Fired on every science-hit while not yet prospected. Drives the
+   * wireframe-overlay opacity ramp.
+   */
+  onScienceProgress:
+    ((spawnIndex: number, scienceHp: number, initialScienceHp: number) => void) | null = null
+
+  /**
+   * Fired exactly once per rock when scienceHp first reaches 0.
+   * Listeners chain themselves with the same wrap-and-call pattern
+   * `onMineralExtracted` already uses.
+   */
+  onRockProspected: ((spawnIndex: number, itemId: string) => void) | null = null
+
   constructor(options: RockYieldSystemOptions) {
     this.seed = options.seed | 0
     this.boltDamageKg = Math.max(0.1, options.boltDamageKg ?? BOLT_DAMAGE_KG_PER_HIT)
@@ -193,6 +207,43 @@ export class RockYieldSystem {
       initialScienceHp: roll.initialScienceHp,
       prospected: roll.prospected,
     }
+  }
+
+  /**
+   * Apply one science-bolt hit to the rock at `spawnIndex`. No-op (returns
+   * `null`) when the rock is unknown or already prospected. Returns the
+   * updated state on success — callers use `prospected` to know whether
+   * THIS hit completed the analysis.
+   */
+  scienceHit(spawnIndex: number): {
+    prospected: boolean
+    scienceHp: number
+    initialScienceHp: number
+  } | null {
+    const roll = this.rocks.get(spawnIndex)
+    if (!roll) return null
+    if (roll.prospected) return null
+
+    roll.scienceHp = Math.max(0, roll.scienceHp - this.boltDamageKg)
+    const justProspected = roll.scienceHp <= 0
+    if (justProspected) {
+      roll.prospected = true
+    }
+
+    this.onScienceProgress?.(spawnIndex, roll.scienceHp, roll.initialScienceHp)
+    if (justProspected) {
+      this.onRockProspected?.(spawnIndex, roll.itemId)
+    }
+    return {
+      prospected: roll.prospected,
+      scienceHp: roll.scienceHp,
+      initialScienceHp: roll.initialScienceHp,
+    }
+  }
+
+  /** Whether this rock has been fully analysed. */
+  isProspected(spawnIndex: number): boolean {
+    return this.rocks.get(spawnIndex)?.prospected ?? false
   }
 
   /** Mineral ids actually present on this asteroid (after composition filter). */

@@ -233,4 +233,59 @@ describe('RockYieldSystem.registerRock — overrides', () => {
     expect(progress!.initialScienceHp).toBe(expected)
     expect(progress!.prospected).toBe(false)
   })
+
+  it('decrements science HP per scienceHit and fires onScienceProgress', () => {
+    const sys = makeSystem()
+    const events: { idx: number; hp: number; initial: number }[] = []
+    sys.onScienceProgress = (idx, hp, initial) => events.push({ idx, hp, initial })
+    sys.registerRock({ spawnIndex: 5, diameter: 1 })
+    const initial = sys.getScienceProgress(5)!.initialScienceHp
+    const result = sys.scienceHit(5)
+    expect(result).not.toBeNull()
+    expect(result!.scienceHp).toBe(Math.max(0, initial - BOLT_DAMAGE_KG_PER_HIT))
+    expect(result!.initialScienceHp).toBe(initial)
+    expect(events).toEqual([{ idx: 5, hp: result!.scienceHp, initial }])
+  })
+
+  it('flips prospected exactly once when scienceHp reaches zero', () => {
+    const sys = makeSystem({ boltDamageKg: 4 })
+    const prospects: { idx: number; itemId: string }[] = []
+    sys.onRockProspected = (idx, itemId) => prospects.push({ idx, itemId })
+    sys.registerRock({ spawnIndex: 7, diameter: 5 })
+    const initial = sys.getScienceProgress(7)!.initialScienceHp
+
+    let safety = 100
+    let lastResult = sys.scienceHit(7)
+    while (lastResult && !lastResult.prospected && safety-- > 0) {
+      lastResult = sys.scienceHit(7)
+    }
+    expect(lastResult?.prospected).toBe(true)
+    expect(prospects.length).toBe(1)
+    expect(prospects[0]!.idx).toBe(7)
+    expect(prospects[0]!.itemId).toBe(sys.peekRock(7)!.itemId)
+    expect(sys.isProspected(7)).toBe(true)
+    expect(initial).toBeGreaterThan(0)
+  })
+
+  it('returns null and fires no callbacks for science hits on already-prospected rocks', () => {
+    const sys = makeSystem()
+    sys.registerRock({ spawnIndex: 9, diameter: 1 })
+    const initial = sys.getScienceProgress(9)!.initialScienceHp
+    const hits = Math.ceil(initial / BOLT_DAMAGE_KG_PER_HIT)
+    for (let i = 0; i < hits; i++) sys.scienceHit(9)
+    expect(sys.isProspected(9)).toBe(true)
+
+    let progressCount = 0
+    let prospectCount = 0
+    sys.onScienceProgress = () => progressCount++
+    sys.onRockProspected = () => prospectCount++
+    expect(sys.scienceHit(9)).toBeNull()
+    expect(progressCount).toBe(0)
+    expect(prospectCount).toBe(0)
+  })
+
+  it('returns null for scienceHit on unknown spawn indices', () => {
+    const sys = makeSystem()
+    expect(sys.scienceHit(404)).toBeNull()
+  })
 })
