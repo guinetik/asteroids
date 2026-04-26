@@ -42,7 +42,10 @@ const bootMission = ref('')
 const stateInfo = reactive({ state: '', grounded: false, canExfil: false, canEnterLander: false })
 const deathFade = ref(0)
 const deathMessage = ref(false)
-const arrivalFade = ref(0)
+// Start fully black so the canvas never flashes white between the loading
+// screen and the cutscene's first frame. ArrivalSequence.tickEstablish drives
+// it back to 0 during the establish phase.
+const arrivalFade = ref(1)
 const deathOverlayVisible = ref(false)
 const deathOverlayCause = ref('')
 const showMap = ref(false)

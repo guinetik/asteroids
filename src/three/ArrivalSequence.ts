@@ -36,22 +36,31 @@ const CARGO_LANDER_SCALE = 30
 const CARGO_LANDER_OFFSET = new THREE.Vector3(-320, 0, 20)
 
 // ── Timeline phase durations (seconds) ──────────────────────────
-/** Establishing beauty shot of the full asteroid before the shuttle approaches. */
-const PHASE_ESTABLISH_DURATION = 2.0
+/** Static beauty shot of the asteroid before the camera glides toward the shuttle. */
+const PHASE_ESTABLISH_DURATION = 1.5
+/**
+ * Time spent fading from full black to clear at the very start of the
+ * establish phase. Must be <= PHASE_ESTABLISH_DURATION so the asteroid is
+ * fully visible before the transition phase begins.
+ */
+const ESTABLISH_FADE_IN_DURATION = 1.0
+/** Long, smooth glide from the asteroid framing to the approach-phase opening frame. */
+const PHASE_TRANSITION_DURATION = 4.0
 /** Shuttle approaches from distance. */
-const PHASE_APPROACH_DURATION = 6.0
+const PHASE_APPROACH_DURATION = 3.5
 /** Shuttle rotates 180° (flip maneuver). */
-const PHASE_FLIP_DURATION = 2.5
+const PHASE_FLIP_DURATION = 1.5
 /** Doors open, brief pause. */
-const PHASE_DOORS_DURATION = 2.5
+const PHASE_DOORS_DURATION = 1.5
 /** Lander detaches, falls with gravity, camera follows. */
-const PHASE_DETACH_DURATION = 3.0
+const PHASE_DETACH_DURATION = 1.8
 /** Fade to black while lander falls. */
-const PHASE_FADEOUT_DURATION = 1.5
+const PHASE_FADEOUT_DURATION = 1.0
 
 /** Total sequence duration. */
 export const ARRIVAL_SEQUENCE_DURATION =
   PHASE_ESTABLISH_DURATION +
+  PHASE_TRANSITION_DURATION +
   PHASE_APPROACH_DURATION +
   PHASE_FLIP_DURATION +
   PHASE_DOORS_DURATION +
@@ -88,10 +97,36 @@ const APPROACH_ALTITUDE_OFFSET = 800
 /** Shuttle scale during the cinematic approach (small, seen from distance). */
 const SHUTTLE_CINEMATIC_SCALE = 1.0
 
-/** Camera position offset from the barycenter at the start of the establish phase. */
-const ESTABLISH_CAM_START_OFFSET = new THREE.Vector3(800, 600, -1200)
-/** Camera position offset from the barycenter at the end of the establish phase. */
-const ESTABLISH_CAM_END_OFFSET = new THREE.Vector3(680, 510, -1020)
+/**
+ * Absolute world position of the camera during the static establish shot.
+ * Centered on Y=0 (the asteroid's equator — its GLB pivot lives at world
+ * origin), so the body fills the frame symmetrically rather than sitting in
+ * the lower half. Distance ~3605 — inside the level starfield radius (4000).
+ */
+const ESTABLISH_CAM_POSITION = new THREE.Vector3(2000, 0, -3000)
+/** Point the establish-phase camera looks at — the asteroid's geometric center. */
+const ESTABLISH_LOOKAT = new THREE.Vector3(0, 0, 0)
+/** Default perspective FOV used by every phase except establish. */
+const BASE_CAMERA_FOV = 40
+/**
+ * Wide cinematic FOV used during the establish beauty shot so the full
+ * asteroid (3500-unit bake region) fits in frame from inside the starfield.
+ */
+const ESTABLISH_FOV = 70
+
+// ── Approach-phase camera arc (also the transition target frame) ─
+/** Approach-phase camera distance behind the shuttle at t=0 (pulls in to APPROACH_CAM_END_DISTANCE). */
+const APPROACH_CAM_START_DISTANCE = 400
+/** Approach-phase camera height above the shuttle at t=0. */
+const APPROACH_CAM_START_HEIGHT = 100
+/** Approach-phase camera lateral offset from the shuttle at t=0. */
+const APPROACH_CAM_START_SIDE = 80
+/** Approach-phase camera distance behind the shuttle at t=1. */
+const APPROACH_CAM_END_DISTANCE = 80
+/** Approach-phase camera height above the shuttle at t=1. */
+const APPROACH_CAM_END_HEIGHT = 25
+/** Approach-phase camera lateral offset from the shuttle at t=1. */
+const APPROACH_CAM_END_SIDE = 20
 
 /**
  * Shuttle scale when parked hovering — large enough that the gameplay lander
@@ -130,7 +165,15 @@ const THRUSTER_SPRITE_SIZE = 140
 const THRUSTER_SPRITE_X_OFFSET = -80
 
 /** Timeline phase identifiers. */
-type ArrivalPhase = 'establish' | 'approach' | 'flip' | 'doors' | 'detach' | 'fadeout' | 'done'
+type ArrivalPhase =
+  | 'establish'
+  | 'transition'
+  | 'approach'
+  | 'flip'
+  | 'doors'
+  | 'detach'
+  | 'fadeout'
+  | 'done'
 
 /** Exfil (reverse departure) phase identifiers. */
 type ExfilPhase = 'dock' | 'closeDoors' | 'flipBack' | 'depart' | 'exfilFadeout' | 'done'
@@ -161,6 +204,12 @@ export class ArrivalSequence {
   private phase: ArrivalPhase = 'establish'
   private elapsed = 0
   private phaseElapsed = 0
+
+  // Captured at the moment the transition phase starts so it can lerp from
+  // wherever the establish phase left the camera to the approach-phase frame.
+  private readonly transitionCamStart = new THREE.Vector3()
+  private readonly transitionLookAtStart = new THREE.Vector3()
+  private transitionFovStart = ESTABLISH_FOV
 
   // Model nodes
   private shuttleScene: THREE.Object3D | null = null
@@ -205,8 +254,10 @@ export class ArrivalSequence {
   onComplete: (() => void) | null = null
 
   constructor(private readonly landerSpawnTarget: THREE.Vector3) {
+    // Initial phase is 'establish', so the camera starts at the wide
+    // cinematic FOV. nextPhase('approach') swaps it back to BASE_CAMERA_FOV.
     this.camera = new THREE.PerspectiveCamera(
-      40,
+      ESTABLISH_FOV,
       window.innerWidth / window.innerHeight,
       0.1,
       15000,
@@ -381,6 +432,9 @@ export class ArrivalSequence {
       case 'establish':
         this.tickEstablish()
         break
+      case 'transition':
+        this.tickTransition()
+        break
       case 'approach':
         this.tickApproach()
         break
@@ -486,17 +540,42 @@ export class ArrivalSequence {
   // ── Phase tickers ─────────────────────────────────────────────
 
   private tickEstablish(): void {
-    const t = Math.min(1, this.phaseElapsed / PHASE_ESTABLISH_DURATION)
+    // Pure static beauty shot — camera locked at ESTABLISH_CAM_POSITION
+    // looking at the asteroid's geometric center. The transition phase owns
+    // all camera motion.
+    this.camera.position.copy(ESTABLISH_CAM_POSITION)
+    this.camera.lookAt(ESTABLISH_LOOKAT)
+
+    // Fade in from black at the start so the canvas never flashes white
+    // between the loading screen and the first rendered frame.
+    const fadeT = Math.min(1, this.phaseElapsed / ESTABLISH_FADE_IN_DURATION)
+    this.onFadeOut?.(1 - fadeT)
+
+    if (this.phaseElapsed >= PHASE_ESTABLISH_DURATION) this.nextPhase('transition')
+  }
+
+  private tickTransition(): void {
+    const t = Math.min(1, this.phaseElapsed / PHASE_TRANSITION_DURATION)
     const eased = this.easeInOut(t)
 
-    const target = this.landerSpawnTarget
-    const camPos = new THREE.Vector3().lerpVectors(
-      ESTABLISH_CAM_START_OFFSET,
-      ESTABLISH_CAM_END_OFFSET,
-      eased,
+    // Approach-phase opening frame — camera relative to the shuttle's start
+    // pose, looking at the shuttle. Same math as tickApproach at t=0.
+    const approachCamX = this.shuttleStartPos.x + APPROACH_CAM_START_SIDE
+    const approachCamY = this.shuttleStartPos.y + APPROACH_CAM_START_HEIGHT
+    const approachCamZ = this.shuttleStartPos.z - APPROACH_CAM_START_DISTANCE
+
+    this.camera.position.set(
+      THREE.MathUtils.lerp(this.transitionCamStart.x, approachCamX, eased),
+      THREE.MathUtils.lerp(this.transitionCamStart.y, approachCamY, eased),
+      THREE.MathUtils.lerp(this.transitionCamStart.z, approachCamZ, eased),
     )
-    this.camera.position.set(target.x + camPos.x, target.y + camPos.y, target.z + camPos.z)
-    this.camera.lookAt(target)
+    this.camera.lookAt(
+      THREE.MathUtils.lerp(this.transitionLookAtStart.x, this.shuttleStartPos.x, eased),
+      THREE.MathUtils.lerp(this.transitionLookAtStart.y, this.shuttleStartPos.y, eased),
+      THREE.MathUtils.lerp(this.transitionLookAtStart.z, this.shuttleStartPos.z, eased),
+    )
+    this.camera.fov = THREE.MathUtils.lerp(this.transitionFovStart, BASE_CAMERA_FOV, eased)
+    this.camera.updateProjectionMatrix()
 
     if (t >= 1) this.nextPhase('approach')
   }
@@ -508,9 +587,17 @@ export class ArrivalSequence {
     this.shuttleGroup.position.lerpVectors(this.shuttleStartPos, this.shuttleEndPos, eased)
 
     // Camera starts wide and far, pulls in as shuttle approaches
-    const camDistance = THREE.MathUtils.lerp(400, 80, eased)
-    const camHeight = THREE.MathUtils.lerp(100, 25, eased)
-    const camSide = THREE.MathUtils.lerp(80, 20, eased)
+    const camDistance = THREE.MathUtils.lerp(
+      APPROACH_CAM_START_DISTANCE,
+      APPROACH_CAM_END_DISTANCE,
+      eased,
+    )
+    const camHeight = THREE.MathUtils.lerp(
+      APPROACH_CAM_START_HEIGHT,
+      APPROACH_CAM_END_HEIGHT,
+      eased,
+    )
+    const camSide = THREE.MathUtils.lerp(APPROACH_CAM_START_SIDE, APPROACH_CAM_END_SIDE, eased)
     this.camera.position.set(
       this.shuttleGroup.position.x + camSide,
       this.shuttleGroup.position.y + camHeight,
@@ -831,6 +918,19 @@ export class ArrivalSequence {
   private nextPhase(next: ArrivalPhase): void {
     this.phase = next
     this.phaseElapsed = 0
+    if (next === 'transition') {
+      // Snapshot wherever the establish phase left the camera; tickTransition
+      // lerps from this snapshot to the approach-phase opening frame.
+      this.transitionCamStart.copy(this.camera.position)
+      this.transitionLookAtStart.copy(ESTABLISH_LOOKAT)
+      this.transitionFovStart = this.camera.fov
+    }
+    if (next === 'approach') {
+      // Safety net in case approach is entered without going through
+      // transition — tickTransition already drives FOV to BASE_CAMERA_FOV.
+      this.camera.fov = BASE_CAMERA_FOV
+      this.camera.updateProjectionMatrix()
+    }
     if (next === 'doors') {
       useAudio().play('sfx.cargo.open')
     }
