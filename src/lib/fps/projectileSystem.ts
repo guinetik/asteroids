@@ -331,21 +331,27 @@ export class ProjectileSystem implements Tickable {
           this._callbackPos.copy(pos)
           this.onHostageBolt?.(hostageHit.hostage, this._callbackPos, 'heal')
           hitHostage = true
-        } else if (this.lander) {
-          // Science bolt hits lander → heal hull + green glow pulse (Prey-style)
-          this.lander.group.getWorldPosition(this._landerCenter)
-          const distSq = pos.distanceToSquared(this._landerCenter)
-          if (distSq < 180) {
-            // ~13.4 unit radius around lander center
-            const healAmount = HEAL_BOLT_AMOUNT
-            this.lander.healHull(healAmount)
-            this._callbackPos.copy(pos)
-            // Trigger impact for VFX (green sparks could be added in onImpact)
-            hitHostage = true // reuse flag to trigger onImpact
-          }
         } else {
-          // TODO: full resolver for rocks, terminals, enemies, terrain crater
-          this._callbackPos.copy(pos)
+          let landerHit = false
+          if (this.lander) {
+            this.lander.group.getWorldPosition(this._landerCenter)
+            const distSq = pos.distanceToSquared(this._landerCenter)
+            // ~13.4 unit radius around lander center
+            if (distSq < 180) {
+              this.lander.healHull(HEAL_BOLT_AMOUNT)
+              this._callbackPos.copy(pos)
+              hitHostage = true // reuse flag so onImpact fires for VFX
+              landerHit = true
+            }
+          }
+          if (!landerHit) {
+            const rockHit = this.closestRockHit(this._prevPos, pos)
+            if (rockHit) {
+              this._callbackPos.copy(pos)
+              this.onScienceRockHit?.(rockHit.spawnIndex, this._callbackPos)
+              hitRock = true
+            }
+          }
         }
       } else {
         const combatHit = this.closestCombatBoltHit(this._prevPos, pos, p.boltKind)
@@ -361,12 +367,12 @@ export class ProjectileSystem implements Tickable {
           hitHostage = true
         }
 
-        // Drill and weapon bolts both stop on rocks. Drill bolts trigger
-        // the mining callback; weapon bolts just register the impact
-        // (sparks + sizzle) so the player gets visual+audio feedback that
-        // their shot connected with a rock instead of passing through.
-        // Science bolts continue to ignore rocks. Combat hits win first so a
-        // rock right next to an enemy doesn't eat the bolt.
+        // Drill and weapon bolts both stop on rocks here. Drill bolts trigger
+        // the mining callback; weapon bolts just register the impact (sparks +
+        // sizzle) so the player gets visual+audio feedback that their shot
+        // connected with a rock instead of passing through. Science bolts are
+        // routed earlier (above) into the prospect path. Combat hits win first
+        // so a rock right next to an enemy doesn't eat the bolt.
         if (!hitEnemy && !hitHostage && (p.boltKind === 'drill' || p.boltKind === 'weapon')) {
           const rockHit = this.closestRockHit(this._prevPos, pos)
           if (rockHit) {
@@ -393,7 +399,9 @@ export class ProjectileSystem implements Tickable {
           } else if (hitHostage) {
             kind = 'hostage'
           } else if (hitRock) {
-            kind = 'drill_rock'
+            if (p.boltKind === 'drill') kind = 'drill_rock'
+            else if (p.boltKind === 'science') kind = 'science_rock'
+            else kind = 'terrain'
           } else {
             kind = 'terrain'
           }
