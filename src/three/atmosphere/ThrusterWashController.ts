@@ -51,8 +51,24 @@ const WASH_LIGHT_DISTANCE = 60
 // ── Scorch glow ──
 const SCORCH_RADIUS = 12
 const SCORCH_SEGMENTS = 32
+/**
+ * Vertical lift above the contact point in world units. The scorch is
+ * a flat disc; on bumpy GLB terrain the disc edge needs a small gap
+ * over the local ground or it z-fights into hill ridges. Combined with
+ * the polygonOffset on the material this is enough to keep the glow
+ * readable on uneven surfaces.
+ */
+const SCORCH_GROUND_LIFT = 0.4
 /** Seconds for scorch to fade out after engines cut. */
 const SCORCH_FADE_DURATION = 1.0
+/**
+ * Negative polygonOffset pulls the scorch fragments toward the camera
+ * in the depth buffer so terrain mesh underneath never wins the depth
+ * test. Without this, the disc gets clipped where it intersects bumps,
+ * leaving a half-rendered glow that breaks the heat-bloom illusion.
+ */
+const SCORCH_POLY_OFFSET_FACTOR = -1
+const SCORCH_POLY_OFFSET_UNITS = -1
 
 // ── Ground wash audio ──
 /** intensity threshold above which the ground-wash sound starts. */
@@ -129,6 +145,9 @@ export class ThrusterWashController {
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: SCORCH_POLY_OFFSET_FACTOR,
+      polygonOffsetUnits: SCORCH_POLY_OFFSET_UNITS,
     })
     scorchMat.uniforms['baseColor']!.value = new THREE.Vector3(
       baseColor[0] * 2,
@@ -209,7 +228,7 @@ export class ThrusterWashController {
     }
     this.scorchMesh.visible = this.scorchIntensity > 0.01
     if (this.scorchMesh.visible) {
-      this.scorchMesh.position.set(landerPosition.x, groundY + 0.15, landerPosition.z)
+      this.scorchMesh.position.set(landerPosition.x, groundY + SCORCH_GROUND_LIFT, landerPosition.z)
       // Orient disc to terrain slope
       this.scorchMesh.quaternion.setFromUnitVectors(this._zFace, ctx.groundNormal)
       const mat = this.scorchMesh.material
