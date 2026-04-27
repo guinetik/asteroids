@@ -358,7 +358,12 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
       return
     }
 
-    const survivorsStable = this.hostages.areAllLivingHostagesAtFullHealth()
+    // Once the heal step is complete, never re-run the heal gate. Otherwise
+    // the moment the last survivor boards (living === 0 → areAllLiving returns
+    // false), the early return below would fire forever and step 3 → step 4
+    // would never advance.
+    const healStepAlreadyDone = this._steps[2]?.complete === true
+    const survivorsStable = healStepAlreadyDone || this.hostages.areAllLivingHostagesAtFullHealth()
     if (!survivorsStable) {
       this.updateHealPrompt(ctx)
       return
@@ -954,7 +959,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
 
     for (const hostage of this.hostages.getHostages()) {
       // Only kneeling hostages are recruitable. (Walkers and dying are out.)
-      const inst = this.hostages.getInstanceForDebug(hostage)
+      const inst = this.hostages.getInstanceFor(hostage)
       if (inst && inst.model.getState() !== 'praying') continue
 
       const cx = hostage.position.x

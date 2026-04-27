@@ -362,9 +362,11 @@ export class FpsHostageController implements Tickable {
   }
 
   /**
-   * Currently-alive hostages that have not yet boarded the lander. This is the
-   * working number for both the HUD and the `RescueMinigame` step-3 completion
-   * check (`alive === 0` while step 3 is active).
+   * Currently-alive hostages that have not yet boarded the lander. The "not
+   * aboard" half is enforced inside {@link HostageInstance.isActive}, which
+   * returns false during the board fade — so a plain `getAliveCount()` already
+   * excludes boarders. This getter exists as a named alias to make the intent
+   * explicit at call sites in `RescueMinigame`.
    */
   get aliveCountNotAboard(): number {
     return this.getAliveCount()
@@ -412,9 +414,9 @@ export class FpsHostageController implements Tickable {
   /**
    * Look up a {@link HostageInstance} for a given {@link Hostage} (or undefined).
    * Used by `RescueMinigame.findExtractTarget` to filter kneeling hostages by
-   * animation state.
+   * animation state — the state lives on the model, not the domain entity.
    */
-  getInstanceForDebug(hostage: Hostage): HostageInstance | undefined {
+  getInstanceFor(hostage: Hostage): HostageInstance | undefined {
     return this.instances.find((i) => i.hostage === hostage)
   }
 
