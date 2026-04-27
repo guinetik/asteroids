@@ -32,7 +32,7 @@
     "surfaceUseEmbeddedUVs": true,
     "surfaceDetailFolder": "/textures/asteroids/rocky",
     "surfaceDetailRepeat": 500,
-    "surfaceDetailNormalStrength": 0.85
+    "surfaceDetailNormalStrength": 1.85
   },
   "visual": {
     "albedo": 0.15,
