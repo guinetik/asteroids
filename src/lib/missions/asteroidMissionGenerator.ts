@@ -452,13 +452,17 @@ function findRegionForTemplate(
 }
 
 /**
- * True when every slot on a giver template only rolls exterminate or rescue objectives.
+ * Whether a template is eligible to roll at a combat-only host planet — i.e. its slots are
+ * all combat-flavored types (exterminate / rescue / bunker). Bunker missions stage waves of
+ * viroid enemies inside an arena, so combat-host gating permits them alongside SAR work.
  *
  * @param template - Giver mission entry from JSON.
- * @returns Whether the template is restricted to those objective types.
+ * @returns Whether the template is restricted to combat-flavored objective types.
  */
-function isExterminateOrRescueOnlyTemplate(template: MissionGiverTemplate): boolean {
-  return template.objectiveSlots.every((s) => s.type === 'exterminate' || s.type === 'rescue')
+function isCombatHostEligibleTemplate(template: MissionGiverTemplate): boolean {
+  return template.objectiveSlots.every(
+    (s) => s.type === 'exterminate' || s.type === 'rescue' || s.type === 'bunker',
+  )
 }
 
 /**
@@ -466,7 +470,7 @@ function isExterminateOrRescueOnlyTemplate(template: MissionGiverTemplate): bool
  *
  * Used to keep nest-hunt / hive-assault contracts off civilian mission boards. Combat-only
  * hosts (Mercury / Saturn) still surface them because their `combatOnlyHost` branch uses the
- * positive `isExterminateOrRescueOnlyTemplate` filter; this predicate is the *negative*
+ * positive `isCombatHostEligibleTemplate` filter; this predicate is the *negative*
  * filter applied at every other planet so Colonial Guard's wide near-earth band cannot
  * dominate the random pool at low difficulty.
  *
@@ -711,7 +715,7 @@ export function generateAsteroidMission(
   /**
    * Combat-only hosts use the full giver catalog so Colonial Guard / Frontier Rescue are not
    * squeezed out by low-tier miners and surveyors that share the same difficulty band; the
-   * subsequent template loop drops anything that is not exterminate/rescue.
+   * subsequent template loop drops anything that is not exterminate/rescue/bunker.
    */
   const givers = combatOnlyHost ? MISSION_GIVERS : getGiversForDifficulty(difficulty)
   if (givers.length === 0) {
@@ -731,7 +735,7 @@ export function generateAsteroidMission(
       if (template.planetIds && !template.planetIds.includes(anchor.planetId)) {
         continue
       }
-      if (combatOnlyHost && !isExterminateOrRescueOnlyTemplate(template)) continue
+      if (combatOnlyHost && !isCombatHostEligibleTemplate(template)) continue
       // Civilian (non-combat-only) boards never post pure extermination work — that flavor is
       // reserved for Cinderline (Mercury) and the Saturn hazard cleanup boards. Without this
       // filter, Colonial Guard's wide `near-earth` band swamps Earth/Mars/Venus at low diff.
@@ -750,7 +754,9 @@ export function generateAsteroidMission(
   }
 
   if (candidates.length === 0) {
-    const planetSuffix = combatOnlyHost ? ` for ${anchor.planetId} (exterminate/rescue only)` : ''
+    const planetSuffix = combatOnlyHost
+      ? ` for ${anchor.planetId} (exterminate/rescue/bunker only)`
+      : ''
     throw new Error(`No templates match difficulty ${difficulty}${planetSuffix}`)
   }
 

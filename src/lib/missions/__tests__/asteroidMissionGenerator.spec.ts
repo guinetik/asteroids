@@ -675,4 +675,61 @@ describe('per-template planetIds filter', () => {
       expect(sawUnrestricted).toBe(true)
     })
   })
+
+  /** Build a bunker-only slot template carrying a stable id we can detect. */
+  function buildBunkerTemplate(
+    id: string,
+    overrides: Partial<MissionGiverTemplate> = {},
+  ): MissionGiverTemplate {
+    return {
+      id,
+      name: `Template ${id}`,
+      briefing: 'briefing',
+      objectiveSlots: [
+        {
+          type: 'bunker',
+          weight: 1,
+          params: { type: 'bunker' },
+          reward: { min: 1000, max: 4000 },
+        },
+      ],
+      completionBonus: { min: 100, max: 200 },
+      regionByDifficulty: { 'near-earth': [1, 10] },
+      ...overrides,
+    }
+  }
+
+  it('admits bunker templates at combat-only host planets (e.g. Mercury)', () => {
+    /*
+     * Regression: Mercury is in COMBAT_ONLY_HOST_PLANET_IDS, and the combat-host predicate
+     * used to admit only `exterminate`/`rescue` slots — a Cinderline-style bunker giver
+     * pinned to Mercury would have been filtered out at every roll, throwing
+     * "No templates match difficulty N for mercury (...)". Bunker is combat-flavored
+     * (waves of viroid enemies in an arena), so the predicate must include it.
+     */
+    const bunkerId = 'combat_host_bunker_test'
+    const giver: MissionGiver = {
+      id: 'combat_host_bunker_test_giver',
+      name: 'Test Cinderline',
+      title: 'Test',
+      objectiveTypes: ['bunker'],
+      minDifficulty: 1,
+      maxDifficulty: 10,
+      missions: [buildBunkerTemplate(bunkerId, { planetIds: ['mercury'] })],
+    }
+
+    withSyntheticGiver(giver, () => {
+      const mercury = getPlanet('mercury')
+      const hostR = mercury.orbit.semiMajorAxis * ORBIT_SCALE
+      const host = { planetId: 'mercury' as const, worldX: hostR, worldZ: 0 }
+      let bunkerMission: ReturnType<typeof generateAsteroidMission> | undefined
+      for (let i = 0; i < 80 && !bunkerMission; i++) {
+        const mission = generateAsteroidMission(4, host)
+        if (mission.templateId === bunkerId) bunkerMission = mission
+      }
+      expect(bunkerMission).toBeDefined()
+      expect(bunkerMission!.objectives.length).toBeGreaterThan(0)
+      expect(bunkerMission!.objectives[0]!.type).toBe('bunker')
+    })
+  })
 })
