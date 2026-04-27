@@ -16,7 +16,7 @@ import DamageFeedback from '@/components/DamageFeedback.vue'
 import LevelMinimap from '@/components/LevelMinimap.vue'
 import type { MapMarker } from '@/components/LevelMinimap.vue'
 import PickupToast from '@/components/PickupToast.vue'
-import type { PickupEntry, ProspectEntry } from '@/components/PickupToast.vue'
+import type { PickupEntry, ProspectEntry, SurveyEntry } from '@/components/PickupToast.vue'
 import LevelInventoryPanel from '@/components/LevelInventoryPanel.vue'
 import type { Inventory } from '@/lib/inventory/types'
 import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
@@ -131,6 +131,28 @@ function recordProspect(label: string): void {
   prospectTimers.set(entry.id, handle)
 }
 
+const surveyEntries = ref<SurveyEntry[]>([])
+const SURVEY_TOAST_LIFETIME_SEC = 5.0
+const surveyTimers = new Map<string, ReturnType<typeof Timer.after>>()
+let surveySeq = 0
+
+/**
+ * Push a survey-reveal entry that auto-removes after
+ * {@link SURVEY_TOAST_LIFETIME_SEC}. Each call gets its own timer so
+ * back-to-back reveals don't clobber each other.
+ */
+function recordSurvey(label: string): void {
+  surveySeq += 1
+  const entry: SurveyEntry = { id: `survey-${surveySeq}`, label }
+  surveyEntries.value.push(entry)
+  const handle = Timer.after(SURVEY_TOAST_LIFETIME_SEC, () => {
+    const idx = surveyEntries.value.findIndex((p) => p.id === entry.id)
+    if (idx >= 0) surveyEntries.value.splice(idx, 1)
+    surveyTimers.delete(entry.id)
+  })
+  surveyTimers.set(entry.id, handle)
+}
+
 function clearPickups(): void {
   for (const { handle } of pickupTimers.values()) Timer.cancel(handle)
   pickupTimers.clear()
@@ -138,6 +160,9 @@ function clearPickups(): void {
   for (const handle of prospectTimers.values()) Timer.cancel(handle)
   prospectTimers.clear()
   prospectEntries.value = []
+  for (const handle of surveyTimers.values()) Timer.cancel(handle)
+  surveyTimers.clear()
+  surveyEntries.value = []
   for (const handle of pickupFailedTimers) Timer.cancel(handle)
   pickupFailedTimers.clear()
   pickupFailed.value = null
@@ -324,6 +349,9 @@ onMounted(async () => {
       const def = getItemDefinition(itemId)
       const mineral = def?.label ?? itemId
       recordProspect(`${mineral}-bearing rock`)
+    }
+    viewController.onSurvey = (label) => {
+      recordSurvey(label)
     }
     await viewController.init(container.value)
 
@@ -594,6 +622,7 @@ function handleToggleMusic(): void {
     v-if="stateInfo.state === 'eva' || stateInfo.state === 'lander'"
     :pickups="pickups"
     :prospect-entries="prospectEntries"
+    :survey-entries="surveyEntries"
   />
   <transition name="pickup-failed">
     <div
