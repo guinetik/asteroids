@@ -92,7 +92,7 @@ class HostageWalker {
 
 - `FpsHostageController` plays a 0.4s scale-down + opacity fade on `model.group`, then removes from scene.
 - Increments `RescueMinigame.aboardSurvivors`.
-- Fires `onSurvivorAboard(aboardCount, total)`.
+- Fires `onSurvivorAboard(aboardCount)`.
 
 **Ownership:** `FpsHostageController` owns a `Map<Hostage, HostageWalker>`. New public method `recruit(hostage, targetProvider)` creates the walker, calls `instance.model.playStandUp()`, and registers it. The walker's `tick` runs after the existing `instance.tick(dt)` inside the controller's tick loop.
 
@@ -127,9 +127,11 @@ if (hit) {
 **Two new event hooks on `RescueMinigame`:**
 
 ```ts
-onSurvivorLost: ((aliveRemaining: number, total: number) => void) | null = null
-onSurvivorAboard: ((aboardCount: number, total: number) => void) | null = null
+onSurvivorLost: ((aliveRemaining: number) => void) | null = null
+onSurvivorAboard: ((aboardCount: number) => void) | null = null
 ```
+
+`total` is intentionally omitted from both callback payloads. The toast labels (`SURVIVOR LOST` / `SURVIVOR ABOARD`) show no count decoration, so subscribers never need it. Consumers that do need `total` — namely the persistent `RescueSurvivorPanel` — read it directly from `RescueMinigame.totalSurvivors` via the polling pattern in `LevelView.vue`. Passing `total` through the hook would be redundant in every subscriber.
 
 `onSurvivorLost` fires from inside the existing `hostage.onDeath` chain (bubbled up via a new controller-level `onSurvivorLost` callback added to `FpsHostageController`). `onSurvivorAboard` fires from the walker's board-radius check.
 
@@ -252,7 +254,7 @@ HostageWalker fires onBoarded(hostage)
     ▼
 FpsHostageController fades model out, removes from scene
     │   increments aboardSurvivors
-    │   fires RescueMinigame.onSurvivorAboard
+    │   fires RescueMinigame.onSurvivorAboard(aboardCount)
     │
     ▼
 LevelView toast + RescueSurvivorPanel re-render
@@ -270,7 +272,7 @@ HostageInstance.markDead() — sprite hidden, model.playDying(), removed from co
 FpsHostageController.onSurvivorLost(hostage) callback
     │
     ▼
-RescueMinigame fires onSurvivorLost(aliveRemaining, total)
+RescueMinigame fires onSurvivorLost(aliveRemaining)
     │   (no separate counter — death is implicit in totalSurvivors - alive - aboard)
     │
     ▼
