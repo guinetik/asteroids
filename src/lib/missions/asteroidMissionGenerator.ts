@@ -419,6 +419,13 @@ export function rollObjective(slot: ObjectiveSlot, difficulty: number): Concrete
         z: 0,
         reward,
       }
+    case 'bunker':
+      return {
+        type: 'bunker',
+        x: 0,
+        z: 0,
+        reward,
+      }
   }
 }
 

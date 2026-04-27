@@ -229,6 +229,8 @@ function objectiveSummary(mission: GeneratedAsteroidMission): string {
       const item = obj.collectItemLabel ?? obj.collectItemId ?? 'designated cargo'
       return `Collect ${item}`
     }
+    case 'bunker':
+      return `Clear bunker (${obj.waveCount ?? 0} waves)`
   }
 }
 

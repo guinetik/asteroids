@@ -21,6 +21,7 @@ export type ObjectiveType =
   | 'survey'
   | 'photometry'
   | 'collect'
+  | 'bunker'
 
 /** Solar system region where missions spawn. Determines fuel cost and distance. */
 export type MissionRegion = 'near-earth' | 'asteroid-belt' | 'kuiper-belt'
@@ -95,6 +96,16 @@ export interface CollectScalableParams {
   pickupCount: NumberRange
 }
 
+/**
+ * Scalable params for BUNKER objectives. Wave count is not authored per
+ * template — the generator picks 3 / 5 / 7 waves from the rolled mission
+ * difficulty band (1–4 / 5–7 / 8–10). Slice 1 has no other knobs.
+ */
+export interface BunkerScalableParams {
+  /** Discriminator for the union type. */
+  type: 'bunker'
+}
+
 /** Union of all objective-specific scalable parameters. */
 export type ScalableParams =
   | GatherScalableParams
@@ -103,6 +114,7 @@ export type ScalableParams =
   | SurveyScalableParams
   | PhotometryScalableParams
   | CollectScalableParams
+  | BunkerScalableParams
 
 /** A slot in a mission template that the generator fills with a concrete objective. */
 export interface ObjectiveSlot {
@@ -405,6 +417,12 @@ export interface MissionGiverTemplate {
   completionBonus: NumberRange
   /** Maps region to difficulty range. */
   regionByDifficulty: Partial<Record<MissionRegion, [number, number]>>
+  /**
+   * Optional planet-id allowlist. When set, this template only rolls when the
+   * asteroid mission is generated at one of these planets. Templates without
+   * `planetIds` remain globally available (current default behavior).
+   */
+  planetIds?: string[]
 }
 
 /** Concrete rolled objective values for a generated mission. */
@@ -443,6 +461,8 @@ export interface ConcreteObjective {
   collectItemLabel?: string
   /** For collect: prompt shown when in interaction range. */
   interactionLabel?: string
+  /** For bunker: number of waves to clear, stamped from the rolled difficulty band (3 / 5 / 7). */
+  waveCount?: number
   /** Credit reward for this objective. */
   reward: number
 }
