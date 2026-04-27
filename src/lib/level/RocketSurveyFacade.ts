@@ -22,11 +22,12 @@ import type { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
 import type { SurfaceRockController } from '@/three/controllers/SurfaceRockController'
 import type { ParticleEmitter } from '@/three/ParticleEmitter'
 import type { FpsCamera } from '@/three/FpsCamera'
-import { removeWaypointMarker } from '@/three/WaypointMarkers'
+import { addWaypointMarker, removeWaypointMarker } from '@/three/WaypointMarkers'
 import { RocketSurveyState } from './rocketSurveyState'
 import {
   ROCKET_SURVEY_FLASH_HIT_DURATION,
   ROCKET_SURVEY_FLASH_REVEAL_DURATION,
+  ROCKET_SURVEY_MARKER_COLOR,
   ROCKET_SURVEY_TOAST_LABEL,
 } from './rocketSurveyConstants'
 
@@ -36,6 +37,12 @@ const ROCKET_AABB_HALF_X = 1.4
 const ROCKET_AABB_HALF_Y = 6.0
 /** Half-extent Z (world units) for the rocket AABB. */
 const ROCKET_AABB_HALF_Z = 1.4
+/** Particles emitted at each science-bolt rocket hit. */
+const SURVEY_IMPACT_PARTICLES = 6
+/** Vertical launch speed for survey impact chips. */
+const SURVEY_IMPACT_VERTICAL_SPEED = 2.5
+/** Lateral scatter for survey impact chips. */
+const SURVEY_IMPACT_LATERAL_SPEED = 1.5
 /** Host bindings the facade needs. */
 export interface RocketSurveyBindings {
   /** Toast sink: the survey successfully revealed a marker. */
@@ -82,6 +89,9 @@ export class RocketSurveyFacade {
   private previousOnConsume: ((spawnIndex: number) => void) | null = null
   private hadPreviousOnConsume = false
   private readonly _scratchCenter = new THREE.Vector3()
+  private readonly _scratchRocketPos = new THREE.Vector3()
+  private readonly _scratchCandidate = new THREE.Vector3()
+  private readonly _impactVel = new THREE.Vector3()
 
   /**
    * @param deps - Runtime collaborators the facade coordinates.
@@ -144,14 +154,99 @@ export class RocketSurveyFacade {
     this.state.detach()
   }
 
-  /** Per-bolt rocket hit handler. Implementation lands in Task 13. */
-  private onBoltHit(_impactPos: THREE.Vector3): void {
-    // Implemented in Task 13.
+  /**
+   * Each science-bolt impact on the rocket. Drives the per-hit flash,
+   * impact sparks, and (on the reveal step) the marker placement +
+   * toast + audio.
+   *
+   * @param impactPos - World-space impact point passed by the projectile system (transient).
+   */
+  private onBoltHit(impactPos: THREE.Vector3): void {
+    // Per-hit chip burst for tactile feedback.
+    this._impactVel.set(
+      (Math.random() - 0.5) * SURVEY_IMPACT_LATERAL_SPEED,
+      SURVEY_IMPACT_VERTICAL_SPEED + Math.random(),
+      (Math.random() - 0.5) * SURVEY_IMPACT_LATERAL_SPEED,
+    )
+    for (let i = 0; i < SURVEY_IMPACT_PARTICLES; i++) {
+      this.deps.impactEmitter.emit(impactPos, this._impactVel)
+    }
+
+    const result = this.state.scienceHit()
+    if (result === null) return
+
+    const rocketModel = this.deps.gather.rocketGroup.userData['__rocketModel'] as
+      | { flash?: (duration: number) => void }
+      | undefined
+    if (result.justRevealed) {
+      rocketModel?.flash?.(ROCKET_SURVEY_FLASH_REVEAL_DURATION)
+    } else {
+      rocketModel?.flash?.(ROCKET_SURVEY_FLASH_HIT_DURATION)
+    }
+
+    if (!result.justRevealed) return
+    if (result.targetItemId === null || result.targetSpawnIndex === null) return
+
+    // Place the surface waypoint at the rock.
+    const rockCenter = this.deps.surfaceRocks.getRockCenter(
+      result.targetSpawnIndex,
+      this.deps.heightmap,
+      this._scratchCenter,
+    )
+    if (!rockCenter) return
+    const groundY = this.deps.heightmap.heightAt(rockCenter.x, rockCenter.z)
+    addWaypointMarker(
+      `rocket-survey-${result.targetSpawnIndex}`,
+      rockCenter.x,
+      rockCenter.z,
+      groundY,
+      this.deps.scene,
+      ROCKET_SURVEY_MARKER_COLOR,
+    )
+    this.activeMarkerSpawnIndex = result.targetSpawnIndex
+    this.activeMarkerItemId = result.targetItemId
+
+    // Toast + audio.
+    this.bindings.onSurvey(ROCKET_SURVEY_TOAST_LABEL)
+    const rocketPos = this._scratchRocketPos
+    this.deps.gather.rocketGroup.getWorldPosition(rocketPos)
+    this.deps.levelAudio.notifySurveyReveal(rocketPos, this.deps.fpsCamera.camera)
   }
 
-  /** Closest-rock-by-itemId helper for the state machine. Implementation lands in Task 13. */
-  private findClosestRock(_itemId: string): { spawnIndex: number } | null {
-    return null
+  /**
+   * Find the closest still-mineable rock with the given itemId to the
+   * rocket's world position. Returns `null` when no candidate exists.
+   *
+   * @param itemId - Inventory item id to look up.
+   * @returns The closest matching rock's spawn index, or `null`.
+   */
+  private findClosestRock(itemId: string): { spawnIndex: number } | null {
+    const candidates = this.deps.rockYieldSystem.findActiveRocksByItemId(itemId)
+    if (candidates.length === 0) return null
+
+    const rocketPos = this._scratchRocketPos
+    this.deps.gather.rocketGroup.getWorldPosition(rocketPos)
+    const candidateCenter = this._scratchCandidate
+
+    let bestSpawnIndex = -1
+    let bestDistSq = Number.POSITIVE_INFINITY
+    for (const spawnIndex of candidates) {
+      const center = this.deps.surfaceRocks.getRockCenter(
+        spawnIndex,
+        this.deps.heightmap,
+        candidateCenter,
+      )
+      if (!center) continue
+      const dx = center.x - rocketPos.x
+      const dy = center.y - rocketPos.y
+      const dz = center.z - rocketPos.z
+      const distSq = dx * dx + dy * dy + dz * dz
+      if (distSq < bestDistSq) {
+        bestDistSq = distSq
+        bestSpawnIndex = spawnIndex
+      }
+    }
+    return bestSpawnIndex >= 0 ? { spawnIndex: bestSpawnIndex } : null
   }
 
   /** onConsume chain — release the lockout when the marked rock is mined. */
