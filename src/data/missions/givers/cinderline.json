@@ -5,7 +5,6 @@
   "objectiveTypes": ["bunker"],
   "minDifficulty": 1,
   "maxDifficulty": 10,
-  "planetIds": ["mercury"],
   "missions": [
     {
       "id": "cinderline_anvil_substation",

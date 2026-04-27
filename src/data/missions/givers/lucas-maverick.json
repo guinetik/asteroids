@@ -5,7 +5,6 @@
   "objectiveTypes": ["bunker"],
   "minDifficulty": 1,
   "maxDifficulty": 10,
-  "planetIds": ["venus"],
   "missions": [
     {
       "id": "maverick_safehouse_ledger",
