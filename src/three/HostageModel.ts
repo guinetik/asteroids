@@ -95,6 +95,30 @@ const FEEDBACK_FLASH_DURATION = 0.35
 /** Emissive tint strength during feedback. */
 const FEEDBACK_EMISSIVE_INTENSITY = 0.85
 
+/** Mixamo bone names for the wrist cuffs. */
+const CUFF_BONE_NAMES = ['mixamorig:LeftHand', 'mixamorig:RightHand'] as const
+
+/**
+ * Shared cuff geometry — a torus (ring) shape so it reads as a wristband
+ * regardless of viewing angle. Sized in bone-local units; the bone itself
+ * lives inside the cm-scale Mixamo skeleton, so we draw it large in the
+ * local space — the parent scale chain shrinks it down to a sane wrist size.
+ */
+const cuffGeometry = new THREE.TorusGeometry(4, 1.4, 8, 16)
+
+/**
+ * Shared cuff material — opaque-ish bright cyan that reads against any
+ * background (additive blending was invisible on bright snow surfaces).
+ * `depthTest: false` + high `renderOrder` ensure the cuff draws over the
+ * skinned mesh even when the wrist bone clips into the body.
+ */
+const cuffMaterial = new THREE.MeshBasicMaterial({
+  color: 0x00ffcc,
+  transparent: true,
+  opacity: 0.9,
+  depthTest: false,
+})
+
 /**
  * Animation state for a hostage rig.
  *
@@ -127,6 +151,14 @@ export class HostageModel {
     []
   private feedbackTimer = 0
 
+  /**
+   * Energy cuffs parented to the wrist bones. Visible only while the hostage
+   * is in the `'praying'` state (captive); hidden the moment the player
+   * presses E (state → `'standing-up'`) — that snap-off is the visual payoff
+   * of pressing release.
+   */
+  private readonly cuffMeshes: THREE.Mesh[] = []
+
   /** Root the mixer drives — the cloned skinned scene under {@link group}. */
   private readonly skinnedRoot: THREE.Object3D
   /** Lazily created on first `play*()` call so T-pose hostages pay nothing. */
@@ -147,6 +179,52 @@ export class HostageModel {
         }
       }
     })
+    this.attachCuffs()
+  }
+
+  /**
+   * Find the LeftHand / RightHand bones on the cloned skeleton and parent a
+   * cuff mesh to each. Body and helmet share the same bone instances after
+   * `SkeletonUtils.clone`, so we only need to find them on the first
+   * SkinnedMesh we hit. Cuffs start hidden — `transitionTo` switches them on
+   * when state becomes `'praying'`.
+   */
+  private attachCuffs(): void {
+    let found = false
+    this.skinnedRoot.traverse((obj) => {
+      if (found) return
+      const mesh = obj as THREE.SkinnedMesh
+      if (!mesh.isSkinnedMesh) return
+      for (const boneName of CUFF_BONE_NAMES) {
+        const bone = mesh.skeleton.bones.find((b) => b.name === boneName)
+        if (!bone) continue
+        const cuff = new THREE.Mesh(cuffGeometry, cuffMaterial)
+        cuff.visible = false
+        // Wrist bones are oriented along the forearm axis; rotate the torus
+        // so the ring wraps the wrist instead of pointing along it.
+        cuff.rotation.set(Math.PI / 2, 0, 0)
+        // Bone bounding boxes don't include child mesh extents — disable
+        // frustum culling so the cuff can't be culled when the camera is
+        // close. High render order so it draws over the skinned hand mesh.
+        cuff.frustumCulled = false
+        cuff.renderOrder = 999
+        bone.add(cuff)
+        this.cuffMeshes.push(cuff)
+      }
+      found = true
+    })
+  }
+
+  /**
+   * Toggle cuff visibility. Called from {@link transitionTo} so the cuffs
+   * follow the animation state lifecycle.
+   *
+   * @param visible - True to show the cuffs (captive look), false to hide
+   */
+  private setCuffsVisible(visible: boolean): void {
+    for (const cuff of this.cuffMeshes) {
+      cuff.visible = visible
+    }
   }
 
   /**
@@ -333,6 +411,12 @@ export class HostageModel {
       this.mixer.uncacheRoot(this.skinnedRoot)
       this.mixer = null
     }
+    // Cuffs share geometry/material module-wide; just detach the per-instance
+    // meshes from their bones so the GC can reclaim them.
+    for (const cuff of this.cuffMeshes) {
+      cuff.removeFromParent()
+    }
+    this.cuffMeshes.length = 0
     this.currentAction = null
     this.feedbackMaterials.length = 0
     this.group.clear()
@@ -385,5 +469,6 @@ export class HostageModel {
 
     this.currentAction = next
     this.state = state
+    this.setCuffsVisible(state === 'praying')
   }
 }

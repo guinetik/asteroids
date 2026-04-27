@@ -40,6 +40,41 @@ const HOSTAGE_REVEAL_START_DEPTH = 2.6
 /** Duration of the scale + opacity fade when a recruited hostage reaches the lander (s). */
 const HOSTAGE_BOARD_FADE_DURATION = 0.4
 
+/**
+ * Radius (m) sampled around the spawn anchor when picking a ground Y.
+ * The praying pose drops the hips below the feet, so on a slope the uphill
+ * side of the model footprint can sit above the single-point heightAt and the
+ * rig clips into the terrain. Anchoring at the *max* height under the
+ * footprint keeps the visible mesh above ground at the cost of a tiny float on
+ * the downhill side — acceptable cosmetic trade for not phasing through dirt.
+ */
+const HOSTAGE_GROUND_SAMPLE_RADIUS = 1.0
+
+/** Cardinal samples around the spawn anchor — N/E/S/W is enough for slope detection. */
+const HOSTAGE_GROUND_SAMPLE_COUNT = 4
+
+/**
+ * Oversample the heightmap in a ring around `(cx, cz)` and return the highest
+ * ground Y under the model's footprint. See {@link HOSTAGE_GROUND_SAMPLE_RADIUS}
+ * for why the max (not the center) is the right anchor for kneeling rigs.
+ *
+ * @param heightmap - Terrain to sample
+ * @param cx        - Footprint center X
+ * @param cz        - Footprint center Z
+ * @returns Max ground Y across the center plus four cardinal offsets
+ */
+function sampleMaxGroundHeight(heightmap: Heightmap, cx: number, cz: number): number {
+  let maxY = heightmap.heightAt(cx, cz)
+  for (let i = 0; i < HOSTAGE_GROUND_SAMPLE_COUNT; i++) {
+    const angle = (i / HOSTAGE_GROUND_SAMPLE_COUNT) * Math.PI * 2
+    const sx = cx + Math.cos(angle) * HOSTAGE_GROUND_SAMPLE_RADIUS
+    const sz = cz + Math.sin(angle) * HOSTAGE_GROUND_SAMPLE_RADIUS
+    const y = heightmap.heightAt(sx, sz)
+    if (y > maxY) maxY = y
+  }
+  return maxY
+}
+
 /** HP ratio above this uses the “healthy” bar color. */
 const HP_PCT_HIGH = 0.55
 /** HP ratio above this uses the mid warning color. */
@@ -421,6 +456,20 @@ export class FpsHostageController implements Tickable {
   }
 
   /**
+   * Currently-walking hostages (mid-extraction). Used by `RescueMinigame` to
+   * pick a target for chase-enemy spawns during step 3.
+   */
+  getWalkingHostages(): readonly Hostage[] {
+    const result: Hostage[] = []
+    for (const inst of this.instances) {
+      if (inst.isActive() && inst.model.getState() === 'walking') {
+        result.push(inst.hostage)
+      }
+    }
+    return result
+  }
+
+  /**
    * Remove every hostage from the scene and combat systems, but keep the controller alive.
    */
   clear(): void {
@@ -560,7 +609,7 @@ export class FpsHostageController implements Tickable {
     yaw?: number,
     animateReveal = false,
   ): Promise<void> {
-    const y = this.heightmap.heightAt(x, z)
+    const y = sampleMaxGroundHeight(this.heightmap, x, z)
     const model = await HostageModel.create()
     model.placeAt(x, y, z)
     model.setYaw(yaw ?? 0)

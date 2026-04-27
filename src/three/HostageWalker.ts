@@ -17,8 +17,8 @@ import type { Heightmap } from '@/lib/terrain/heightmap'
 import type { Hostage } from '@/lib/fps/hostage'
 import type { HostageModel } from './HostageModel'
 
-/** Forward XZ speed during extraction walk (m/s — slightly slower than the player). */
-export const HOSTAGE_WALK_SPEED = 3.5
+/** Forward XZ speed during extraction walk (m/s). */
+export const HOSTAGE_WALK_SPEED = 5.0
 
 /** Distance from the lander at which a walker boards and despawns (m). */
 export const HOSTAGE_BOARD_RADIUS = 6
