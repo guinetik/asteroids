@@ -133,6 +133,10 @@ const ENG_POSITIONS: [number, number, number][] = [
 const DOOR_OPEN_ANGLE = Math.PI * 0.6 // ~108 degrees, payload bay doors open wide
 const DOOR_ANIM_SPEED = 2 // radians per second
 
+/** Map EVA science-bolt hull repair — green emissive flash (see {@link LanderController} heal). */
+const HULL_HEAL_PULSE_DURATION = 0.25
+const HULL_HEAL_PULSE_PEAK_INTENSITY = 1.6
+
 const LANDER_MODEL_PATH = '/models/lander.glb'
 /** Scale the lander to fit inside the cargo bay (in raw shuttle cm space) */
 const CARGO_LANDER_SCALE = 30
@@ -304,6 +308,9 @@ export class ShuttleController implements Tickable, PortalVehicle {
    * props that live inside the cargo bay.
    */
   private readonly hullNodes: THREE.Object3D[] = []
+  /** Hull-only materials for the green science-heal emissive pulse (map EVA). */
+  private readonly hullHealFeedbackMaterials: THREE.MeshStandardMaterial[] = []
+  private hullHealFeedbackTimer = 0
   private landerFuelTank: FuelTank | null = null
   private shuttleFuelTank: FuelTank | null = null
   private cargoLight: THREE.PointLight | null = null
@@ -355,6 +362,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
     // Snapshot hull nodes BEFORE any runtime props are parented onto gltf.scene.
     // Used by EVA collision to build a tight hull AABB; see hullNodes field docs.
     this.hullNodes.push(...gltf.scene.children)
+    this.collectHullHealFeedbackMaterials()
 
     // Cargo bay fuel tanks: lander fuel (static display) + shuttle fuel (live)
     const landerTankLength = 120
@@ -545,6 +553,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
     // Doors and fuel indicators always update (even while frozen/orbiting)
     this.updateDoors(dt)
     this.updateFuelIndicator()
+    this.tickHullHealFeedback(dt)
     if (this.frozen) return
     if (this.isDead) {
       this.updateDeath(dt)
@@ -960,6 +969,60 @@ export class ShuttleController implements Tickable, PortalVehicle {
       }
     })
     return found
+  }
+
+  /**
+   * Walk {@link hullNodes} and cache {@link MeshStandardMaterial} for heal pulse — excludes
+   * cargo / habitat props parented after snapshot.
+   */
+  private collectHullHealFeedbackMaterials(): void {
+    this.hullHealFeedbackMaterials.length = 0
+    for (const root of this.hullNodes) {
+      root.traverse((child) => {
+        if (!(child instanceof THREE.Mesh) || !child.material) return
+        const materials = Array.isArray(child.material) ? child.material : [child.material]
+        for (const m of materials) {
+          if (m instanceof THREE.MeshStandardMaterial) {
+            this.hullHealFeedbackMaterials.push(m)
+          }
+        }
+      })
+    }
+  }
+
+  /**
+   * Green emissive pulse on the hull (map EVA science repair). Safe to call while frozen.
+   */
+  pulseHullHealFeedback(): void {
+    this.hullHealFeedbackTimer = HULL_HEAL_PULSE_DURATION
+    const c = new THREE.Color(0x22ff88)
+    for (const mat of this.hullHealFeedbackMaterials) {
+      if (mat.emissive) {
+        mat.emissive.copy(c)
+      }
+      mat.emissiveIntensity = HULL_HEAL_PULSE_PEAK_INTENSITY
+    }
+  }
+
+  /**
+   * Decay heal emissive. Runs every frame; cheap when the timer is zero.
+   */
+  private tickHullHealFeedback(dt: number): void {
+    if (this.hullHealFeedbackTimer <= 0) return
+    this.hullHealFeedbackTimer -= dt
+    const t = Math.max(0, this.hullHealFeedbackTimer / HULL_HEAL_PULSE_DURATION)
+    for (const mat of this.hullHealFeedbackMaterials) {
+      mat.emissiveIntensity = HULL_HEAL_PULSE_PEAK_INTENSITY * t
+      if (this.hullHealFeedbackTimer <= 0) {
+        if (mat.emissive) {
+          mat.emissive.setHex(0x000000)
+        }
+        mat.emissiveIntensity = 0
+      }
+    }
+    if (this.hullHealFeedbackTimer <= 0) {
+      this.hullHealFeedbackTimer = 0
+    }
   }
 
   /**

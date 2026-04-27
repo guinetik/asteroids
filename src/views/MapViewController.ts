@@ -208,6 +208,7 @@ import {
   EVA_MAP_MULTITOOL_FRAME_SYNC_PRIORITY,
   MapEvaMultitoolFacade,
 } from '@/lib/map/eva/MapEvaMultitoolFacade'
+import type { MapEvaShuttleHullHealTarget } from '@/lib/fps/projectileSystem'
 
 /**
  * Orbit / grid / debris toggle snapshot for syncing the map HUD after intro suppression.
@@ -257,6 +258,8 @@ export class MapViewController implements Tickable {
   /** Owns the UnrealBloomPass tweaks for EVA override, inspect swaps, and orbit clamp. */
   private readonly bloomController = new MapBloomController()
   onEvaTelemetry: ((telemetry: FpsTelemetry) => void) | null = null
+  /** Short map toast (e.g. hull fully repaired) during map EVA. */
+  onEvaToast: ((message: string) => void) | null = null
   onEvaModeChange: ((active: boolean) => void) | null = null
   /**
    * Fired when the EVA player opens a terminal minigame overlay. Payload is the active
@@ -290,6 +293,33 @@ export class MapViewController implements Tickable {
    * cargo bay). Null outside EVA.
    */
   private evaVehicleReturnBounds: { min: THREE.Vector3; max: THREE.Vector3 } | null = null
+  /**
+   * Stable delegate for map EVA science bolts: reads {@link evaVehicleReturnBounds} and
+   * {@link MapShipHealthFacade} state each time the multitool's projectile system queries it.
+   */
+  private readonly evaMapHullHealTarget: MapEvaShuttleHullHealTarget = {
+    isHullFull: () => {
+      const s = this.shipHealth
+      return !s || s.hp >= s.maxHp
+    },
+    getHullAabb: () => this.evaVehicleReturnBounds,
+    onHealFromBolt: (amount) => {
+      const h = this.shipHealth
+      const s = this.shuttleController
+      if (!h || !s) {
+        return { becameFull: false }
+      }
+      const { applied, becameFull } = h.applyHullHeal(amount)
+      if (applied > 0) {
+        s.pulseHullHealFeedback()
+        this.flushShuttleHullToProfile()
+      }
+      if (becameFull) {
+        this.onEvaToast?.('Hull fully repaired')
+      }
+      return { becameFull }
+    },
+  }
   private planetariumScene: MapPlanetariumScene | null = null
   private sunController: SunController | null = null
   private planetControllers: PlanetSystemController[] = []
@@ -788,6 +818,7 @@ export class MapViewController implements Tickable {
       getSceneObjects: () => this.sceneObjects,
       getTickHandler: () => this.tickHandler,
       getMultitoolDamageMultiplier: () => getCurrentUpgradeValue('multitoolDamage'),
+      getEvaMapHullHealTarget: () => this.evaMapHullHealTarget,
     })
 
     // --- Intro cinematic prop preloads (fire-and-forget) ---

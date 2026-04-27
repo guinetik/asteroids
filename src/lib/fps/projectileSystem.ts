@@ -18,6 +18,7 @@ import type { Heightmap } from '@/lib/terrain/heightmap'
 import type { Enemy } from './enemy'
 import type { Hostage } from './hostage'
 import type { LanderController } from '@/three/LanderController'
+import { segmentIntersectsAabb3 } from '@/lib/physics/segmentAabb3'
 import type { MultiToolMode } from './multiToolState'
 import projectileBoltVertexShader from '@/three/shaders/effects/projectileBolt.vert.glsl?raw'
 import projectileBoltFragmentShader from '@/three/shaders/effects/projectileBolt.frag.glsl?raw'
@@ -50,6 +51,8 @@ export type ProjectileImpactKind =
   | 'science_rocket'
   | 'enemy'
   | 'hostage'
+  /** Map EVA: science bolt struck the player shuttle hull AABB and applied hull repair. */
+  | 'shuttle_hull'
 
 /**
  * Carried with {@link ProjectileSystem.onImpact} so listeners can style feedback per mode/surface
@@ -58,6 +61,28 @@ export type ProjectileImpactKind =
 export interface ProjectileImpactContext {
   boltKind: MultiToolMode
   kind: ProjectileImpactKind
+}
+
+/**
+ * Map EVA: science-bolt repair vs the tactical shuttle. Swept AABB of the huge-scale hull;
+ * when {@link isHullFull} is true, bolts do not stop or heal.
+ */
+export interface MapEvaShuttleHullHealTarget {
+  /**
+   * @returns True when no further repair should register (hull at max) — projectiles pass through.
+   */
+  isHullFull(): boolean
+  /**
+   * @returns Tight world-space AABB of the EVA-scaled shuttle hull, or null when not available.
+   */
+  getHullAabb(): { min: THREE.Vector3; max: THREE.Vector3 } | null
+  /**
+   * Apply one heal tick after AABB contact; host drives HP + VFX + persist.
+   *
+   * @param amount - Same as hostage/lander ({@link HEAL_BOLT_AMOUNT}).
+   * @returns Whether hull became 100% this frame.
+   */
+  onHealFromBolt(amount: number): { becameFull: boolean }
 }
 
 /** Sphere registration for a mineable surface rock. */
@@ -104,6 +129,7 @@ export class ProjectileSystem implements Tickable {
   private readonly hostages: Hostage[] = []
   private readonly rocks: MineableRockEntry[] = []
   private lander: LanderController | null = null
+  private mapEvaShuttleHullHeal: MapEvaShuttleHullHealTarget | null = null
   /** Registered survey target (gather-mission rocket). Null when no gather mission is active. */
   private surveyTarget: THREE.Object3D | null = null
   /** Survey-target half extents (X, Y, Z) used for AABB hit testing. */
@@ -242,6 +268,14 @@ export class ProjectileSystem implements Tickable {
   }
 
   /**
+   * Register map EVA shuttle hull repair, or `null` to clear. Only science bolts; skipped when
+   * {@link MapEvaShuttleHullHealTarget.isHullFull} is true.
+   */
+  setMapEvaShuttleHullHeal(target: MapEvaShuttleHullHealTarget | null): void {
+    this.mapEvaShuttleHullHeal = target
+  }
+
+  /**
    * Register (or clear) the rocket-survey target. Pass `null` to clear.
    * Half extents define a local-axis AABB around the rocket world
    * position; the science-bolt branch checks this AABB before falling
@@ -370,6 +404,7 @@ export class ProjectileSystem implements Tickable {
       let hitHostage = false
       let hitRock = false
       let hitRocket = false
+      let hitMapShuttleHull = false
 
       if (p.boltKind === 'science') {
         const hostageHit = this.closestHostageHealHit(this._prevPos, pos)
@@ -379,29 +414,49 @@ export class ProjectileSystem implements Tickable {
           this.onHostageBolt?.(hostageHit.hostage, this._callbackPos, 'heal')
           hitHostage = true
         } else {
-          let landerHit = false
-          if (this.lander) {
-            this.lander.group.getWorldPosition(this._landerCenter)
-            const distSq = pos.distanceToSquared(this._landerCenter)
-            // ~13.4 unit radius around lander center
-            if (distSq < 180) {
-              this.lander.healHull(HEAL_BOLT_AMOUNT)
-              this._callbackPos.copy(pos)
-              hitHostage = true // reuse flag so onImpact fires for VFX
-              landerHit = true
+          const healTgt = this.mapEvaShuttleHullHeal
+          if (healTgt && !healTgt.isHullFull()) {
+            const aabb = healTgt.getHullAabb()
+            if (
+              aabb &&
+              segmentIntersectsAabb3(
+                this._prevPos,
+                pos,
+                aabb.min,
+                aabb.max,
+                this._callbackPos,
+              )
+            ) {
+              healTgt.onHealFromBolt(HEAL_BOLT_AMOUNT)
+              hitMapShuttleHull = true
+              hitHostage = true
             }
           }
-          if (!landerHit) {
-            const surveyImpact = this.surveyTargetHit(this._prevPos, pos, this._callbackPos)
-            if (surveyImpact !== null) {
-              this.onScienceRocketHit?.(this._callbackPos)
-              hitRocket = true
-            } else {
-              const rockHit = this.closestRockHit(this._prevPos, pos)
-              if (rockHit) {
+          let landerHit = false
+          if (!hitMapShuttleHull) {
+            if (this.lander) {
+              this.lander.group.getWorldPosition(this._landerCenter)
+              const distSq = pos.distanceToSquared(this._landerCenter)
+              // ~13.4 unit radius around lander center
+              if (distSq < 180) {
+                this.lander.healHull(HEAL_BOLT_AMOUNT)
                 this._callbackPos.copy(pos)
-                this.onScienceRockHit?.(rockHit.spawnIndex, this._callbackPos)
-                hitRock = true
+                hitHostage = true // reuse flag so onImpact fires for VFX
+                landerHit = true
+              }
+            }
+            if (!landerHit) {
+              const surveyImpact = this.surveyTargetHit(this._prevPos, pos, this._callbackPos)
+              if (surveyImpact !== null) {
+                this.onScienceRocketHit?.(this._callbackPos)
+                hitRocket = true
+              } else {
+                const rockHit = this.closestRockHit(this._prevPos, pos)
+                if (rockHit) {
+                  this._callbackPos.copy(pos)
+                  this.onScienceRockHit?.(rockHit.spawnIndex, this._callbackPos)
+                  hitRock = true
+                }
               }
             }
           }
@@ -452,10 +507,14 @@ export class ProjectileSystem implements Tickable {
         p.age >= BOLT_MAX_LIFETIME
       ) {
         if (hitTerrain || hitEnemy || hitHostage || hitRock || hitRocket) {
-          this._callbackPos.copy(pos)
+          if (!hitMapShuttleHull) {
+            this._callbackPos.copy(pos)
+          }
           let kind: ProjectileImpactKind
           if (hitEnemy) {
             kind = 'enemy'
+          } else if (hitMapShuttleHull) {
+            kind = 'shuttle_hull'
           } else if (hitRocket) {
             kind = 'science_rocket'
           } else if (hitHostage) {

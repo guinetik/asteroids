@@ -18,7 +18,11 @@ import { TICK_PRIORITY_PHYSICS, TICK_PRIORITY_RENDER } from '@/lib/tickPrioritie
 import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
 import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
 import { MultiToolState } from '@/lib/fps/multiToolState'
-import { ProjectileSystem } from '@/lib/fps/projectileSystem'
+import {
+  type MapEvaShuttleHullHealTarget,
+  type ProjectileImpactContext,
+  ProjectileSystem,
+} from '@/lib/fps/projectileSystem'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
 import { MultiToolController } from '@/three/MultiToolController'
 import type { EvaSession } from '@/three/EvaSession'
@@ -32,6 +36,12 @@ const EVA_MAP_IMPACT_EMITTER_POOL = 64
 
 /** Spark burst count on synthetic terrain impact. */
 const EVA_MAP_IMPACT_SPARK_COUNT = 8
+/** Sparks on science-bolt contact with the EVA-scaled shuttle hull (repair). */
+const EVA_HULL_HEAL_IMPACT_SPARK_COUNT = 8
+/** Muted green, distinct from the default EVA map impact amber. */
+const EVA_HULL_HEAL_IMPACT_COLOR = 0x55ee99
+/** Pool for hull-heal impact sparks. */
+const EVA_HULL_HEAL_IMPACT_EMITTER_POOL = 48
 
 /** deps for {@link MapEvaMultitoolFacade}. */
 export interface MapEvaMultitoolFacadeDeps {
@@ -46,6 +56,11 @@ export interface MapEvaMultitoolFacadeDeps {
    * Example: `getCurrentUpgradeValue('multitoolDamage')`.
    */
   getMultitoolDamageMultiplier: () => number
+  /**
+   * Science-bolt repair vs the tactical shuttle hull during map EVA; return null to skip
+   * registration. Methods read live `evaVehicleReturnBounds` and {@link ShipHealth} each tick.
+   */
+  getEvaMapHullHealTarget: () => MapEvaShuttleHullHealTarget | null
 }
 
 /**
@@ -59,6 +74,8 @@ export class MapEvaMultitoolFacade {
   private multiToolState: MultiToolState | null = null
   private projectileSystem: ProjectileSystem | null = null
   private impactEmitter: ParticleEmitter | null = null
+  /** Green sparks when a science bolt repairs the huge-scale shuttle hull. */
+  private hullHealImpactEmitter: ParticleEmitter | null = null
   private projectileHeightmap: Heightmap | null = null
   private readonly impactVel = new THREE.Vector3()
   private readonly impactUp = new THREE.Vector3(0, 1, 0)
@@ -136,17 +153,42 @@ export class MapEvaMultitoolFacade {
       th.register(this.impactEmitter, TICK_PRIORITY_PHYSICS + 3)
     }
 
+    if (!this.hullHealImpactEmitter) {
+      this.hullHealImpactEmitter = new ParticleEmitter({
+        poolSize: EVA_HULL_HEAL_IMPACT_EMITTER_POOL,
+        color: new THREE.Color(EVA_HULL_HEAL_IMPACT_COLOR),
+        size: 6.5,
+        lifetime: 0.55,
+        spread: 12,
+        opacity: 1,
+        soft: true,
+        sizeGrowth: 1.4,
+      })
+      scene.add(this.hullHealImpactEmitter.points)
+      th.register(this.hullHealImpactEmitter, TICK_PRIORITY_PHYSICS + 3)
+    }
+
     if (!this.projectileSystem) {
       this.projectileSystem = new ProjectileSystem(scene, this.projectileHeightmap)
       this.projectileSystem.setDamageMultiplier(d.getMultitoolDamageMultiplier())
+      this.projectileSystem.setMapEvaShuttleHullHeal(d.getEvaMapHullHealTarget())
       this.projectileSystem.prewarmPool()
-      this.projectileSystem.onImpact = (pos) => {
-        for (let i = 0; i < EVA_MAP_IMPACT_SPARK_COUNT; i += 1) {
-          this.impactVel.copy(this.impactUp).multiplyScalar(5)
-          this.impactEmitter?.emit(pos, this.impactVel)
+      this.projectileSystem.onImpact = (pos, context: ProjectileImpactContext) => {
+        if (context.kind === 'shuttle_hull') {
+          for (let i = 0; i < EVA_HULL_HEAL_IMPACT_SPARK_COUNT; i += 1) {
+            this.impactVel.copy(this.impactUp).multiplyScalar(5)
+            this.hullHealImpactEmitter?.emit(pos, this.impactVel)
+          }
+        } else {
+          for (let i = 0; i < EVA_MAP_IMPACT_SPARK_COUNT; i += 1) {
+            this.impactVel.copy(this.impactUp).multiplyScalar(5)
+            this.impactEmitter?.emit(pos, this.impactVel)
+          }
         }
       }
       th.register(this.projectileSystem, TICK_PRIORITY_PHYSICS + 2)
+    } else {
+      this.projectileSystem.setMapEvaShuttleHullHeal(d.getEvaMapHullHealTarget())
     }
 
     const canvas = d.getSceneObjects()?.renderer.domElement
@@ -169,6 +211,7 @@ export class MapEvaMultitoolFacade {
         this.multiToolState = null
       }
       if (this.projectileSystem) {
+        this.projectileSystem.setMapEvaShuttleHullHeal(null)
         this.projectileSystem.onImpact = null
         th.unregister(this.projectileSystem)
         this.projectileSystem.dispose()
@@ -182,6 +225,15 @@ export class MapEvaMultitoolFacade {
         }
         this.impactEmitter.dispose()
         this.impactEmitter = null
+      }
+      if (this.hullHealImpactEmitter) {
+        th.unregister(this.hullHealImpactEmitter)
+        const so = d?.getSceneObjects()
+        if (so?.scene) {
+          so.scene.remove(this.hullHealImpactEmitter.points)
+        }
+        this.hullHealImpactEmitter.dispose()
+        this.hullHealImpactEmitter = null
       }
     }
     this.disposeViewModel()

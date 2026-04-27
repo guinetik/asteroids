@@ -329,6 +329,25 @@ export class ShipHealth {
   }
 
   /**
+   * Instant hull repair from an external source (e.g. map EVA science bolt on the shuttle).
+   *
+   * @param amount - HP to add (clamped to max; no-op if dead or `amount` ≤ 0).
+   * @returns How many HP were applied and whether the hull is now at maximum.
+   */
+  applyHullHeal(amount: number): { applied: number; becameFull: boolean } {
+    if (this._dead || amount <= 0) {
+      return { applied: 0, becameFull: this._hp >= this.config.maxHp }
+    }
+    const previousHp = this._hp
+    this._hp = Math.min(this.config.maxHp, this._hp + amount)
+    this.notifyHpChangedIfNeeded(previousHp)
+    return {
+      applied: this._hp - previousHp,
+      becameFull: this._hp >= this.config.maxHp,
+    }
+  }
+
+  /**
    * Advance health simulation by dt seconds.
    *
    * The `heatTempCap` and `coldTempCap` parameters implement zone-based thermal

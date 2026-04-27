@@ -4,10 +4,10 @@
 > (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Redesign the Shuttle, Lander, and Multitool tutorial programs as standard-issued manuals
-with shared diagnostic-card UI inside the existing shuttle terminal.
+**Goal:** Redesign the Shuttle, Lander, Multitool, and Suit tutorial programs as standard-issued
+manuals with shared diagnostic-card UI inside the existing shuttle terminal.
 
-**Architecture:** Keep the existing shuttle terminal launcher unchanged. Replace the three program
+**Architecture:** Keep the existing shuttle terminal launcher unchanged. Replace the tutorial program
 screens with a shared `TutorialProgramManual.vue` presentational shell, shared typed content models,
 and per-program data in each existing program component. Put reusable styling in
 `src/assets/css/main.css` so the programs look like the same terminal OS.
@@ -51,6 +51,12 @@ and per-program data in each existing program component. Put reusable styling in
   - Preserve props: `upgradeLevels`, `dockedPlanet`.
   - Preserve `switch-to-upgrades` emit.
   - Issuer: Martian Marine Corps.
+
+- Create `src/components/shuttle-control/ShuttleControlProgramSuit.vue`
+  - Add a Suit tutorial using the shared manual data.
+  - Preserve props: `upgradeLevels`, `dockedPlanet`.
+  - Preserve `switch-to-upgrades` emit.
+  - Teach asteroid EVA and space EVA mechanics.
 
 ## Task 1: Shared Content Types
 
@@ -174,20 +180,34 @@ Expected: no TypeScript errors in `ShuttleControlProgramMultitool.vue`.
 ## Task 6: Polish, Validation, And Cleanup
 
 **Files:**
+- Create: `src/components/shuttle-control/ShuttleControlProgramSuit.vue`
+- Modify: `src/components/ShuttleControlOverlay.vue`
+- Modify: `src/components/shuttle-control/tutorialProgramTypes.ts`
+- Modify: `src/assets/css/main.css`
+
+- [ ] **Step 0: Add Suit tutorial program**
+
+Create the Suit program using `TutorialProgramManual`, add a `suit` accent, wire `Suit` into the
+left-rail terminal program list, and cover asteroid EVA, space EVA, O2/hypoxia, gravity boots,
+sprint/jump/hover, RCS controls, maintenance prompts, return prompts, and suit upgrades.
+
+**Files:**
 - Verify: `src/components/shuttle-control/TutorialProgramManual.vue`
 - Verify: `src/components/shuttle-control/ShuttleControlProgramShuttle.vue`
 - Verify: `src/components/shuttle-control/ShuttleControlProgramLander.vue`
 - Verify: `src/components/shuttle-control/ShuttleControlProgramMultitool.vue`
+- Verify: `src/components/shuttle-control/ShuttleControlProgramSuit.vue`
 - Verify: `src/assets/css/main.css`
 
 - [ ] **Step 1: Check visual integration in dev server**
 
 Run: `bun dev`
 
-Expected: dev server starts. Open the shuttle terminal and verify the existing launcher/menu is
-unchanged, the three programs share the same issued-manual layout, chapter rail/footer/action work,
-the shuttle certificate of ownership remains readable, and issuers are Vale, Jovian Society /
-Cloud City Field Engineering, and Martian Marine Corps.
+Expected: dev server starts. Open the shuttle terminal and verify the existing launcher/menu remains
+stable, the tutorial programs share the same issued-manual layout, the Suit program appears in the
+left rail, chapter rail/footer/action work, the shuttle certificate of ownership remains readable,
+and issuers are Vale, Jovian Society / Cloud City Field Engineering, Martian Marine Corps, and Vale
+Orbital Refurb / Contractor Life Support.
 
 - [ ] **Step 2: Run linter**
 
@@ -215,10 +235,10 @@ Expected: diff only contains the tutorial program redesign, shared styling, spec
 
 ## Self-Review
 
-- Spec coverage: The plan preserves the existing launcher, standardizes the three opened program
-  screens, assigns the correct issuers, preserves the shuttle ownership certificate, updates
-  player-facing mechanics, removes Multitool implementation-note copy, and requires final Bun
-  verification.
+- Spec coverage: The plan preserves the existing launcher, standardizes the opened tutorial program
+  screens, adds Suit EVA coverage, assigns the correct issuers, preserves the shuttle ownership
+  certificate, updates player-facing mechanics, removes Multitool implementation-note copy, and
+  requires final Bun verification.
 - Placeholder scan: No `TBD`, `TODO`, or unspecified implementation steps are intentionally left in
   the plan.
 - Type consistency: `TutorialProgramManualModel`, chapter/card/readout/checklist interfaces, and the

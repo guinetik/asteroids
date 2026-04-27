@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Inventory, InventoryStack } from '@/lib/inventory/types'
 import type { ShuttleMissionBoard } from '@/lib/missions/types'
 import { shipMessageSystem } from '@/lib/messages/runtime'
@@ -26,6 +26,20 @@ type ControlScreen =
   | 'missions'
   | 'inventory'
   | 'upgrades'
+
+type ControlNavItem =
+  | {
+      readonly kind: 'screen'
+      readonly id: ControlScreen
+      readonly label: string
+    }
+  | {
+      readonly kind: 'divider'
+      readonly id: string
+    }
+
+const PROGRAM_HEIGHT_TRANSITION_MS = 240
+const CONTROL_PANEL_VIEWPORT_HEIGHT_FRACTION = 0.9
 
 const props = defineProps<{
   visible: boolean
@@ -68,6 +82,9 @@ const emit = defineEmits<{
 }>()
 
 const activeScreen = ref<ControlScreen>('mail')
+const controlPanelCard = ref<HTMLElement | null>(null)
+let controlPanelHeightFrame: number | null = null
+let controlPanelHeightResetTimer: number | null = null
 
 const programByScreen: Record<ControlScreen, Component> = {
   shuttle: ShuttleControlProgramShuttle,
@@ -115,21 +132,22 @@ watch(activeScreen, (screen, previous) => {
   emit('screen-change', screen)
 })
 
-const screens = computed(() => {
+const navItems = computed<readonly ControlNavItem[]>(() => {
   const mailLabel = mailPendingCount.value > 0 ? `Mail (${mailPendingCount.value})` : 'Mail'
   return [
-    { id: 'mail' as const, label: mailLabel },
-    { id: 'shuttle' as const, label: 'Shuttle' },
-    { id: 'lander' as const, label: 'Lander' },
-    { id: 'multitool' as const, label: 'Multitool' },
-    { id: 'suit' as const, label: 'Suit' },
-    { id: 'missions' as const, label: 'Missions' },
-    { id: 'inventory' as const, label: 'Inventory' },
+    { kind: 'screen', id: 'missions', label: 'Missions' },
+    { kind: 'screen', id: 'mail', label: mailLabel },
+    { kind: 'screen', id: 'inventory', label: 'Inventory' },
+    { kind: 'divider', id: 'divider-equipment' },
+    { kind: 'screen', id: 'shuttle', label: 'Shuttle' },
+    { kind: 'screen', id: 'lander', label: 'Lander' },
+    { kind: 'screen', id: 'multitool', label: 'Multitool' },
+    { kind: 'screen', id: 'suit', label: 'Suit' },
   ]
 })
 
 function selectScreen(id: ControlScreen): void {
-  uiAudio.notifyShuttleProgramClick();
+  uiAudio.notifyShuttleProgramClick()
   activeScreen.value = id
 }
 
@@ -147,11 +165,64 @@ function onKeydown(e: KeyboardEvent) {
     emit('close')
   }
 }
+
+function cancelControlPanelHeightReset(): void {
+  if (controlPanelHeightFrame !== null) {
+    window.cancelAnimationFrame(controlPanelHeightFrame)
+    controlPanelHeightFrame = null
+  }
+  if (controlPanelHeightResetTimer !== null) {
+    window.clearTimeout(controlPanelHeightResetTimer)
+    controlPanelHeightResetTimer = null
+  }
+}
+
+function lockControlPanelHeight(): void {
+  const card = controlPanelCard.value
+  if (!card) return
+
+  cancelControlPanelHeightReset()
+  card.style.blockSize = `${card.getBoundingClientRect().height}px`
+}
+
+function releaseControlPanelHeight(): void {
+  cancelControlPanelHeightReset()
+  if (controlPanelCard.value) {
+    controlPanelCard.value.style.blockSize = ''
+  }
+}
+
+function getControlPanelTargetHeight(card: HTMLElement): number {
+  const viewportMax = window.innerHeight * CONTROL_PANEL_VIEWPORT_HEIGHT_FRACTION
+  return Math.min(card.scrollHeight, viewportMax)
+}
+
+function animateControlPanelHeightToContent(): void {
+  const card = controlPanelCard.value
+  if (!card) return
+
+  const currentHeight = card.getBoundingClientRect().height
+  card.style.blockSize = `${currentHeight}px`
+
+  // Force layout before asking the card to interpolate to the newly mounted program height.
+  void card.offsetHeight
+
+  controlPanelHeightFrame = window.requestAnimationFrame(() => {
+    controlPanelHeightFrame = null
+    card.style.blockSize = `${getControlPanelTargetHeight(card)}px`
+    controlPanelHeightResetTimer = window.setTimeout(
+      releaseControlPanelHeight,
+      PROGRAM_HEIGHT_TRANSITION_MS,
+    )
+  })
+}
+
+onBeforeUnmount(releaseControlPanelHeight)
 </script>
 
 <template>
   <div v-if="visible" class="shuttle-control-overlay" @keydown="onKeydown" tabindex="0">
-    <div class="shuttle-control-card">
+    <div ref="controlPanelCard" class="shuttle-control-card">
       <!-- Chrome bar -->
       <div class="shuttle-control-chrome">
         <span>Control Panel</span>
@@ -192,17 +263,19 @@ function onKeydown(e: KeyboardEvent) {
       <div class="shuttle-control-body">
         <!-- Left sidebar — program buttons -->
         <nav class="shuttle-control-sidebar">
-          <button
-            v-for="screen in screens"
-            :key="screen.id"
-            type="button"
-            class="shuttle-control-nav-btn"
-            :class="{ 'shuttle-control-nav-btn--active': activeScreen === screen.id }"
-            @click="selectScreen(screen.id)"
-          >
-            {{ screen.label }}
-          </button>
-          <div class="shuttle-control-sidebar-divider" />
+          <template v-for="item in navItems" :key="item.id">
+            <div v-if="item.kind === 'divider'" class="shuttle-control-sidebar-divider" />
+            <button
+              v-else
+              type="button"
+              class="shuttle-control-nav-btn"
+              :class="{ 'shuttle-control-nav-btn--active': activeScreen === item.id }"
+              @click="selectScreen(item.id)"
+            >
+              {{ item.label }}
+            </button>
+          </template>
+          <div v-if="dockedPlanet" class="shuttle-control-sidebar-divider" />
           <button
             v-if="dockedPlanet"
             type="button"
@@ -221,7 +294,7 @@ function onKeydown(e: KeyboardEvent) {
             :class="{ 'shuttle-control-nav-btn--active': activeScreen === 'upgrades' }"
             @click="selectScreen('upgrades')"
           >
-            UPGRADES SHOP
+            Engineering Bay (Upgrades)
           </button>
         </nav>
 
@@ -236,7 +309,12 @@ function onKeydown(e: KeyboardEvent) {
               activeScreen === 'suit',
           }"
         >
-          <Transition name="shuttle-program-swap" mode="out-in">
+          <Transition
+            name="shuttle-program-swap"
+            mode="out-in"
+            @before-leave="lockControlPanelHeight"
+            @enter="animateControlPanelHeightToContent"
+          >
             <ShuttleControlProgramMail
               v-if="activeScreen === 'mail'"
               :key="activeScreen"

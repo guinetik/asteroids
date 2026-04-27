@@ -7,6 +7,11 @@ import type { TutorialProgramBadge, TutorialProgramManualModel } from './tutoria
 
 const NO_SUIT_UPGRADES_INSTALLED =
   'Installed suit packages: none. Visit the Engineering Bay at a station or spaceport.'
+const SPACE_EVA_O2_CAPACITY = 180
+const SPACE_EVA_O2_DRAIN_PER_SECOND = 1
+const SPACE_EVA_RTG_CAPACITY = 100
+const SPACE_EVA_RTG_DRAIN_PER_SECOND = 6
+const SPACE_EVA_RTG_RECHARGE_PER_SECOND = 4
 
 const props = defineProps<{
   upgradeLevels?: Partial<Record<UpgradeId, number>>
@@ -27,7 +32,7 @@ const headerBadges = computed<readonly TutorialProgramBadge[]>(() => {
       value: 'EVA Suit',
     },
     {
-      label: 'Base O2',
+      label: 'Surface O2',
       value: `${playerConfig.o2.fuelCapacity} stock`,
     },
   ]
@@ -221,14 +226,26 @@ const manual = computed<TutorialProgramManualModel>(() => ({
       subtitle: 'The suit has separate survival and mobility budgets, but O2 is always the clock.',
       readouts: [
         {
-          label: 'Base O2 tank',
+          label: 'Asteroid O2 tank',
           value: String(playerConfig.o2.fuelCapacity),
           caption: 'Stock reserve before O2 capacity upgrades.',
         },
         {
-          label: 'Base drain',
+          label: 'Asteroid drain',
           value: `${playerConfig.o2.baseDrainRate}/s`,
           caption: 'Passive breathing drain while active in suit mode.',
+        },
+        {
+          label: 'Space EVA O2',
+          value: String(SPACE_EVA_O2_CAPACITY),
+          caption: `${SPACE_EVA_O2_DRAIN_PER_SECOND}/s vacuum drain in tethered EVA.`,
+        },
+        {
+          label: 'Space EVA RTG',
+          value: String(SPACE_EVA_RTG_CAPACITY),
+          caption:
+            `${SPACE_EVA_RTG_DRAIN_PER_SECOND}/s while thrusting; ` +
+            `${SPACE_EVA_RTG_RECHARGE_PER_SECOND}/s recovery while idle.`,
         },
         {
           label: 'Hypoxia damage',
@@ -241,8 +258,8 @@ const manual = computed<TutorialProgramManualModel>(() => ({
           label: 'O2',
           title: 'Oxygen drains continuously',
           body:
-            'Even calm suit work consumes O2. Sprinting and charge recovery affect suit endurance, ' +
-            'but the tank is still your hard mission timer.',
+            'Even calm suit work consumes O2. Asteroid EVA uses the surface suit reserve; space ' +
+            'EVA uses its tethered vacuum reserve. Either way, the tank is the hard mission timer.',
           tone: 'warning',
         },
         {
@@ -324,6 +341,18 @@ const manual = computed<TutorialProgramManualModel>(() => ({
         {
           title: 'Stop the vehicle before space EVA',
           body: 'If the terminal says STOP SHIP TO EVA, kill speed before pressing V again.',
+        },
+        {
+          title: 'Exit orbit before leaving the ship',
+          body:
+            'Space EVA is blocked while orbiting or approaching. Clear the orbit/approach state ' +
+            'before expecting the EVA prompt.',
+        },
+        {
+          title: 'Respect hull thermal stress',
+          body:
+            'If the terminal reports THERMAL STRESS or CRYO STRESS, cool or warm the hull before ' +
+            'opening the bay.',
         },
         {
           title: 'Track the return prompt',

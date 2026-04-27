@@ -677,6 +677,9 @@ onMounted(async () => {
     viewController.onEvaTelemetry = (t) => {
       Object.assign(evaTelemetry, t)
     }
+    viewController.onEvaToast = (message) => {
+      showMissionNotification(message)
+    }
     viewController.onEvaModeChange = (active) => {
       evaActive.value = active
     }

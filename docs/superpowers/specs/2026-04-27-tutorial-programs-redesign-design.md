@@ -13,7 +13,7 @@ programs running inside the same ship computer. `ShuttleControlProgramShuttle.vu
 player-facing implementation notes. Several chapters are also out of date with current mechanics.
 
 The launcher/menu itself is not part of this redesign. The work applies only to the opened program
-content for Shuttle, Lander, and Multitool.
+content for Shuttle, Lander, Multitool, and Suit.
 
 ## Direction
 
@@ -56,7 +56,7 @@ inherit that context and read like standard field kit documentation.
 
 ## Shared Program Structure
 
-All three programs use the same visual and interaction grammar:
+All tutorial programs use the same visual and interaction grammar:
 
 1. **Program header**
    - Issuing organization.
@@ -136,6 +136,21 @@ Must teach:
 The multitool manual should remove implementation-facing text such as references to future
 expansions, Prey inspiration, and internal generic names unless they are actual player mechanics.
 
+### Suit Program
+
+Must teach:
+
+- Suit role: contractor EVA life support for asteroid surface EVA and space EVA servicing.
+- Asteroid EVA controls: W/A/S/D movement, Shift sprint, Space jump/hover, right/left mouse where
+  multitool usage applies.
+- Space EVA controls: V to enter/return/start maintenance when prompted, W/A/S/D suit RCS,
+  Space up, Shift down.
+- EVA entry gates: shuttle must be nearly stopped; mission sites may show STOP SHIP TO EVA.
+- Space EVA return: Return to Shuttle [V] prompt appears near the shuttle hull/return bounds.
+- O2 as the hard life-support clock, low-O2 warning, and hypoxia HP damage at empty O2.
+- Gravity boots, sprint lockout, jump/hover behavior, and RTG-powered hover where applicable.
+- Suit upgrades affecting armor, mobility, O2 capacity, stamina capacity, and stamina efficiency.
+
 ## Visual Language
 
 The programs should look like screens from the same shuttle terminal OS:
@@ -159,6 +174,7 @@ large independent layouts. A good implementation target is:
   - Shuttle: telemetry, upgrade levels, docked planet, player name if still needed.
   - Lander: upgrade levels and docked planet.
   - Multitool: upgrade levels and docked planet.
+  - Suit: upgrade levels and docked planet.
 - Existing `switch-to-upgrades` event preserved.
 - Keep logic light in the Vue components. If shared behavior becomes non-trivial, use the
   ViewController pattern.
@@ -166,8 +182,9 @@ large independent layouts. A good implementation target is:
 ## Acceptance Criteria
 
 - The existing shuttle terminal menu/launcher is unchanged.
-- Shuttle, Lander, and Multitool opened program screens share the same program grammar.
-- Each program has the correct issuer: Vale, Jovian Society/Cloud City Field Engineering, MMC.
+- Shuttle, Lander, Multitool, and Suit opened program screens share the same program grammar.
+- Each program has the correct issuer: Vale, Jovian Society/Cloud City Field Engineering, MMC, and
+  Vale Orbital Refurb / Contractor Life Support for Suit.
 - Player-facing copy reflects current mechanics and controls.
 - The shuttle certificate of ownership remains available and readable after the redesign.
 - Multitool no longer reads like a Vale product or an implementation/design note.
