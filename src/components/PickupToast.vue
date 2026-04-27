@@ -98,7 +98,9 @@ const visibleSurveys = computed(() => {
 
 const visibleSurvivors = computed(() => {
   const list = props.survivorEntries ?? []
-  return props.maxVisible == null ? list : list.slice(-props.maxVisible)
+  const max = props.maxVisible ?? 5
+  if (list.length <= max) return list
+  return list.slice(list.length - max)
 })
 </script>
 
