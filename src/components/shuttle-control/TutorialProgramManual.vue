@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { uiAudio } from '@/audio/UiAudioDirector'
 import type {
   TutorialProgramCard,
@@ -15,7 +15,12 @@ const emit = defineEmits<{
   'switch-to-upgrades': []
 }>()
 
+const CHAPTER_HEIGHT_TRANSITION_MS = 220
+
 const currentChapterIndex = ref(0)
+let previousChapterPanelHeight = 0
+let chapterHeightFrame: number | null = null
+let chapterHeightResetTimer: number | null = null
 
 const chapterCount = computed(() => props.manual.chapters.length)
 const currentChapter = computed<TutorialProgramChapter | undefined>(
@@ -74,6 +79,51 @@ const goToNextChapter = () => {
 const switchToUpgrades = () => {
   emit('switch-to-upgrades')
 }
+
+function cancelChapterHeightReset(): void {
+  if (chapterHeightFrame !== null) {
+    window.cancelAnimationFrame(chapterHeightFrame)
+    chapterHeightFrame = null
+  }
+
+  if (chapterHeightResetTimer !== null) {
+    window.clearTimeout(chapterHeightResetTimer)
+    chapterHeightResetTimer = null
+  }
+}
+
+function prepareChapterPanelLeave(element: Element): void {
+  const panel = element as HTMLElement
+  cancelChapterHeightReset()
+  previousChapterPanelHeight = panel.getBoundingClientRect().height
+}
+
+function animateChapterPanelEnter(element: Element): void {
+  const panel = element as HTMLElement
+  const startHeight = previousChapterPanelHeight || panel.getBoundingClientRect().height
+  panel.style.overflow = 'hidden'
+  panel.style.blockSize = `${startHeight}px`
+
+  // Force layout so the browser interpolates from the previous chapter height.
+  void panel.offsetHeight
+
+  chapterHeightFrame = window.requestAnimationFrame(() => {
+    chapterHeightFrame = null
+    panel.style.blockSize = `${panel.scrollHeight}px`
+    chapterHeightResetTimer = window.setTimeout(() => {
+      releaseChapterPanelHeight(panel)
+    }, CHAPTER_HEIGHT_TRANSITION_MS)
+  })
+}
+
+function releaseChapterPanelHeight(element: Element): void {
+  cancelChapterHeightReset()
+  const panel = element as HTMLElement
+  panel.style.blockSize = ''
+  panel.style.overflow = ''
+}
+
+onBeforeUnmount(cancelChapterHeightReset)
 </script>
 
 <template>
@@ -116,101 +166,110 @@ const switchToUpgrades = () => {
         </button>
       </nav>
 
-      <article v-if="currentChapter" class="tutorial-program-content">
-        <p class="tutorial-program-content__kicker">
-          Chapter {{ formatChapterNumber(currentChapterIndex) }} / {{ currentChapter.navLabel }}
-        </p>
-        <div class="tutorial-program-content__heading">
-          <h3 class="tutorial-program-content__title">{{ currentChapter.title }}</h3>
-          <p v-if="currentChapter.subtitle" class="tutorial-program-content__subtitle">
-            {{ currentChapter.subtitle }}
+      <Transition
+        name="tutorial-chapter-swap"
+        mode="out-in"
+        @before-leave="prepareChapterPanelLeave"
+        @enter="animateChapterPanelEnter"
+        @after-enter="releaseChapterPanelHeight"
+        @enter-cancelled="releaseChapterPanelHeight"
+      >
+        <article v-if="currentChapter" :key="currentChapter.id" class="tutorial-program-content">
+          <p class="tutorial-program-content__kicker">
+            Chapter {{ formatChapterNumber(currentChapterIndex) }} / {{ currentChapter.navLabel }}
           </p>
-        </div>
-
-        <dl v-if="currentReadouts.length > 0" class="tutorial-program-readouts">
-          <div
-            v-for="readout in currentReadouts"
-            :key="`${readout.label}:${readout.value}`"
-            class="tutorial-program-readout"
-          >
-            <dt class="tutorial-program-readout__label">{{ readout.label }}</dt>
-            <dd class="tutorial-program-readout__value">{{ readout.value }}</dd>
-            <dd v-if="readout.caption" class="tutorial-program-readout__caption">
-              {{ readout.caption }}
-            </dd>
-          </div>
-        </dl>
-
-        <div v-if="currentCards.length > 0" class="tutorial-program-card-grid">
-          <section
-            v-for="card in currentCards"
-            :key="`${card.label ?? 'card'}:${card.title}`"
-            :class="['tutorial-program-card', cardToneClass(card)]"
-          >
-            <p v-if="card.label" class="tutorial-program-card__label">{{ card.label }}</p>
-            <h4 class="tutorial-program-card__title">{{ card.title }}</h4>
-            <p class="tutorial-program-card__body">{{ card.body }}</p>
-          </section>
-        </div>
-
-        <aside v-if="currentChapter.note" class="tutorial-program-note">
-          <p class="tutorial-program-note__label">Issuer Note</p>
-          <p class="tutorial-program-note__body">{{ currentChapter.note }}</p>
-        </aside>
-
-        <ol v-if="currentChecklist.length > 0" class="tutorial-program-checklist">
-          <li
-            v-for="(item, index) in currentChecklist"
-            :key="`${item.title}:${index}`"
-            class="tutorial-program-checklist__item"
-          >
-            <span class="tutorial-program-checklist__mark">{{ formatChapterNumber(index) }}</span>
-            <span class="tutorial-program-checklist__copy">
-              <strong class="tutorial-program-checklist__title">{{ item.title }}</strong>
-              <span class="tutorial-program-checklist__body">{{ item.body }}</span>
-            </span>
-          </li>
-        </ol>
-
-        <section v-if="currentCertificate" class="tutorial-program-certificate">
-          <div class="tutorial-program-certificate__header">
-            <p class="tutorial-program-certificate__seal">{{ currentCertificate.seal }}</p>
-            <h4 class="tutorial-program-certificate__title">{{ currentCertificate.title }}</h4>
-          </div>
-
-          <div class="tutorial-program-certificate__body">
-            <p>{{ currentCertificate.body }}</p>
-            <p class="tutorial-program-certificate__owner">{{ currentCertificate.ownerName }}</p>
-            <p class="tutorial-program-certificate__fine-print">
-              {{ currentCertificate.finePrint }}
+          <div class="tutorial-program-content__heading">
+            <h3 class="tutorial-program-content__title">{{ currentChapter.title }}</h3>
+            <p v-if="currentChapter.subtitle" class="tutorial-program-content__subtitle">
+              {{ currentChapter.subtitle }}
             </p>
           </div>
 
-          <footer class="tutorial-program-certificate__footer">
-            <div class="tutorial-program-certificate__signature">
-              <span>{{ currentCertificate.signatureName }}</span>
-              <small>{{ currentCertificate.signatureTitle }}</small>
+          <dl v-if="currentReadouts.length > 0" class="tutorial-program-readouts">
+            <div
+              v-for="readout in currentReadouts"
+              :key="`${readout.label}:${readout.value}`"
+              class="tutorial-program-readout"
+            >
+              <dt class="tutorial-program-readout__label">{{ readout.label }}</dt>
+              <dd class="tutorial-program-readout__value">{{ readout.value }}</dd>
+              <dd v-if="readout.caption" class="tutorial-program-readout__caption">
+                {{ readout.caption }}
+              </dd>
             </div>
-            <p v-if="currentCertificate.quote" class="tutorial-program-certificate__quote">
-              {{ currentCertificate.quote }}
-            </p>
-          </footer>
-        </section>
+          </dl>
 
-        <button
-          v-if="currentChapter.showUpgradeAction"
-          type="button"
-          class="tutorial-program-upgrade-action"
-          @click="switchToUpgrades"
-        >
-          Open Engineering Bay Upgrades
-        </button>
-      </article>
+          <div v-if="currentCards.length > 0" class="tutorial-program-card-grid">
+            <section
+              v-for="card in currentCards"
+              :key="`${card.label ?? 'card'}:${card.title}`"
+              :class="['tutorial-program-card', cardToneClass(card)]"
+            >
+              <p v-if="card.label" class="tutorial-program-card__label">{{ card.label }}</p>
+              <h4 class="tutorial-program-card__title">{{ card.title }}</h4>
+              <p class="tutorial-program-card__body">{{ card.body }}</p>
+            </section>
+          </div>
 
-      <article v-else class="tutorial-program-content tutorial-program-content--empty">
-        <p class="tutorial-program-content__kicker">No chapters loaded</p>
-        <h3 class="tutorial-program-content__title">Manual data unavailable</h3>
-      </article>
+          <aside v-if="currentChapter.note" class="tutorial-program-note">
+            <p class="tutorial-program-note__label">Issuer Note</p>
+            <p class="tutorial-program-note__body">{{ currentChapter.note }}</p>
+          </aside>
+
+          <ol v-if="currentChecklist.length > 0" class="tutorial-program-checklist">
+            <li
+              v-for="(item, index) in currentChecklist"
+              :key="`${item.title}:${index}`"
+              class="tutorial-program-checklist__item"
+            >
+              <span class="tutorial-program-checklist__mark">{{ formatChapterNumber(index) }}</span>
+              <span class="tutorial-program-checklist__copy">
+                <strong class="tutorial-program-checklist__title">{{ item.title }}</strong>
+                <span class="tutorial-program-checklist__body">{{ item.body }}</span>
+              </span>
+            </li>
+          </ol>
+
+          <section v-if="currentCertificate" class="tutorial-program-certificate">
+            <div class="tutorial-program-certificate__header">
+              <p class="tutorial-program-certificate__seal">{{ currentCertificate.seal }}</p>
+              <h4 class="tutorial-program-certificate__title">{{ currentCertificate.title }}</h4>
+            </div>
+
+            <div class="tutorial-program-certificate__body">
+              <p>{{ currentCertificate.body }}</p>
+              <p class="tutorial-program-certificate__owner">{{ currentCertificate.ownerName }}</p>
+              <p class="tutorial-program-certificate__fine-print">
+                {{ currentCertificate.finePrint }}
+              </p>
+            </div>
+
+            <footer class="tutorial-program-certificate__footer">
+              <div class="tutorial-program-certificate__signature">
+                <span>{{ currentCertificate.signatureName }}</span>
+                <small>{{ currentCertificate.signatureTitle }}</small>
+              </div>
+              <p v-if="currentCertificate.quote" class="tutorial-program-certificate__quote">
+                {{ currentCertificate.quote }}
+              </p>
+            </footer>
+          </section>
+
+          <button
+            v-if="currentChapter.showUpgradeAction"
+            type="button"
+            class="tutorial-program-upgrade-action"
+            @click="switchToUpgrades"
+          >
+            Open Engineering Bay Upgrades
+          </button>
+        </article>
+
+        <article v-else key="empty" class="tutorial-program-content tutorial-program-content--empty">
+          <p class="tutorial-program-content__kicker">No chapters loaded</p>
+          <h3 class="tutorial-program-content__title">Manual data unavailable</h3>
+        </article>
+      </Transition>
     </div>
 
     <footer v-if="chapterCount > 0" class="tutorial-program-footer">

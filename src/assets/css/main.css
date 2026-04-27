@@ -1805,6 +1805,28 @@ body {
   @apply flex flex-col justify-center text-center;
 }
 
+.tutorial-chapter-swap-enter-active,
+.tutorial-chapter-swap-leave-active {
+  transform-origin: top center;
+  transition:
+    block-size 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 150ms ease,
+    transform 170ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 170ms ease;
+}
+
+.tutorial-chapter-swap-enter-from {
+  opacity: 0;
+  filter: blur(1.5px);
+  transform: translateY(0.35rem) scaleY(0.99);
+}
+
+.tutorial-chapter-swap-leave-to {
+  opacity: 0;
+  filter: blur(1px);
+  transform: translateY(-0.25rem) scaleY(0.995);
+}
+
 .tutorial-program-content__kicker {
   @apply mb-2 font-mono text-[10px] uppercase tracking-[0.3em];
   color: rgb(var(--tutorial-accent) / 0.82);
