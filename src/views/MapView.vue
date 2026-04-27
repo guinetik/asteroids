@@ -274,7 +274,7 @@ const evaTelemetry = reactive<FpsTelemetry>({
   sprintCapacity: 0,
   speed: 0,
   grounded: false,
-  activeMode: 'drill',
+  activeMode: 'science',
   aiming: false,
   isFiring: false,
   rtgLevel: 0,
@@ -375,7 +375,7 @@ const shopLanderHullFull = computed(() => {
   return v === undefined || v >= maxHp * 0.99
 })
 /**
- * EVA terminal minigame state. Populated when the EVA player presses F at a POI
+ * EVA terminal minigame state. Populated when the EVA player presses V at a POI
  * terminal; cleared when they Complete or Close the overlay (or the EVA session
  * ends). Both refs flip together so the overlay never sees a mismatched pair.
  */
@@ -1396,7 +1396,7 @@ watch(
       @use-fuel-cell="handleUseFuelCell"
     />
     <HelmetVisor v-if="evaActive" />
-    <FpsHud v-if="evaActive" :telemetry="evaTelemetry" variant="eva" />
+    <FpsHud v-if="evaActive" :telemetry="evaTelemetry" variant="evaMap" />
     <OrbitPrompt
       v-show="
         !mapOverlay.visible &&
@@ -1746,7 +1746,7 @@ watch(
         !shuttleControlVisible &&
         !deathVisible
       "
-      class="pointer-events-none fixed inset-x-0 bottom-24 z-30 flex justify-center px-6"
+      class="pointer-events-none fixed inset-x-0 bottom-48 z-30 flex justify-center px-6"
     >
       <div
         class="rounded-full border border-cyan-300/45 bg-slate-950/68 px-5 py-2 font-mono text-xs uppercase tracking-[0.28em] text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.18)] backdrop-blur-sm"

@@ -22,6 +22,7 @@ import { useAudio } from '@/audio/useAudio'
 import { EvaRcsSound } from '@/audio/EvaRcsSound'
 import { EvaCollisionResolver, type EvaCollider } from '@/lib/physics/evaCollisionResolver'
 import { EvaTetherController } from './EvaTetherController'
+import type { FpsCamera } from './FpsCamera'
 import { buildEvaColliderWireframes, type EvaColliderDebugHandle } from './EvaColliderDebug'
 
 /**
@@ -40,15 +41,23 @@ export interface EvaSceneHost {
   readonly renderer: { domElement: HTMLElement }
 }
 
-/**
- * Horizontal (XZ) distance at which the player can initiate EVA near the POI. Uses
- * planar distance rather than 3D so the vertical `poiLocalY` offset doesn't push the
- * prompt out of range — the player parks right over the waypoint column and climbs.
- */
-const EVA_TRIGGER_RANGE = 8
-
 /** Horizontal (XZ) distance at which the EVA player can re-enter the vehicle. */
 const EVA_RETURN_RANGE = 5
+
+/**
+ * Horizontal (XZ) radius around the mission POI: only inside this disk does the idle HUD
+ * show "STOP SHIP TO EVA" when over speed. Outside it, moving fast shows no EVA callout.
+ */
+const EVA_MISSION_SITE_STOP_SHIP_RANGE = 8
+
+/**
+ * @returns True if `vehicle` is within {@link EVA_MISSION_SITE_STOP_SHIP_RANGE} of `poi` on XZ.
+ */
+function isWithinMissionSiteStopShipDisk(vehicle: EvaSessionVehicle, poi: THREE.Vector3): boolean {
+  const dx = vehicle.group.position.x - poi.x
+  const dz = vehicle.group.position.z - poi.z
+  return Math.sqrt(dx * dx + dz * dz) < EVA_MISSION_SITE_STOP_SHIP_RANGE
+}
 
 /** Vehicle must be slower than this (world units / s) to initiate EVA. */
 const EVA_MAX_VEHICLE_SPEED = 0.5
@@ -64,7 +73,7 @@ const EVA_RCS_AUDIO_VOLUME = 0.42
 
 /**
  * Fallback 3D distance (world units) at which the EVA player sees the
- * "START MAINTENANCE [F]" prompt near a POI. Applies only when the host view
+ * "START MAINTENANCE [V]" prompt near a POI. Applies only when the host view
  * does not supply a size-aware override via
  * {@link EvaSessionConfig.getPoiPromptRange}. Hosts that mix POI scales
  * (e.g. a ~1-unit satellite next to a ×20 telescope) should always provide
@@ -74,7 +83,7 @@ const EVA_RCS_AUDIO_VOLUME = 0.42
 const EVA_TERMINAL_PROMPT_RANGE = 6
 
 /**
- * Buffer (world units) added to the shuttle hull AABB for the "Return to Shuttle [F]"
+ * Buffer (world units) added to the shuttle hull AABB for the "Return to Shuttle [V]"
  * prompt when a host provides return bounds. Chosen so the player sees the prompt
  * once they're within arm's reach of the hull, not when they've drifted near the
  * ship's floating pivot. Falls back to {@link EVA_RETURN_RANGE} (XZ-from-center)
@@ -127,12 +136,17 @@ export interface EvaSessionConfig {
   inputManager: InputManager
   /** Resolve the player vehicle. Returning null is treated as "no EVA possible". */
   getVehicle: () => EvaSessionVehicle | null
-  /** World-space POI position for the proximity check (null = no POI active). */
+  /**
+   * Mission POI world position: used while EVA is active for terminal proximity, and in
+   * idle for the "mission site" disk that gates the "STOP SHIP TO EVA" callout (see
+   * {@link EVA_MISSION_SITE_STOP_SHIP_RANGE}). Null when there is no mission POI; idle
+   * EVA entry does not require a POI.
+   */
   getPoi: () => THREE.Vector3 | null
   /**
    * Optional gate: return false while external state forbids EVA (e.g. the shuttle is
    * captured in a planetary orbit). The session shows a blocking prompt instead of the
-   * "EVA [F]" offer unless `suppressActionPrompt` is set — e.g. while orbiting, the player
+   * "EVA [V]" offer unless `suppressActionPrompt` is set — e.g. while orbiting, the player
    * already has orbit/terminal prompts and should not see duplicate callouts. Defaults
    * to always-allowed when not supplied.
    */
@@ -152,7 +166,7 @@ export interface EvaSessionConfig {
   onStartEvaMinigame?: () => void
   /**
    * Optional predicate. When it returns true, the POI terminal prompt and the
-   * F-press that would call `beginMinigame` are suppressed — the session stays
+   * V-press that would call `beginMinigame` are suppressed — the session stays
    * in its `active` sub-state. Used for in-scene minigames (satellite servicing)
    * where the host attaches a controller on EVA-enter and drives repairs inline,
    * so entering the "minigame" sub-state (which releases pointer lock for a Vue
@@ -176,14 +190,14 @@ export interface EvaSessionConfig {
    */
   getColliders?: () => EvaCollider[]
   /**
-   * World-space 3D distance at which the "START MAINTENANCE [F]" prompt shows near
+   * World-space 3D distance at which the "START MAINTENANCE [V]" prompt shows near
    * the POI. Called each tick so the host can scale with POI size (e.g. ~3 units for
    * a stock satellite, ~50 for a ×20 telescope). When omitted or null, the fallback
    * {@link EVA_TERMINAL_PROMPT_RANGE} is used.
    */
   getPoiPromptRange?: () => number | null
   /**
-   * World-space AABB used for the "Return to Shuttle [F]" prompt check. When provided,
+   * World-space AABB used for the "Return to Shuttle [V]" prompt check. When provided,
    * the session uses point-to-AABB 3D distance with a small buffer so the trigger
    * wraps the hull instead of pivoting on `vehicle.group.position`, which may not
    * coincide with the cargo bay (the intuitive re-entry point). Sampled each tick
@@ -198,7 +212,7 @@ export interface EvaSessionConfig {
   onEvaModeChange?: (active: boolean) => void
   /** Per-frame FPS HUD telemetry while EVA is active. */
   onEvaTelemetry?: (telemetry: FpsTelemetry) => void
-  /** Prompt text for the view-level HUD ("EVA [F]", "Return to Shuttle [F]", etc.). */
+  /** Prompt text for the view-level HUD ("EVA [V]", "Return to Shuttle [V]", etc.). */
   onActionPrompt?: (prompt: string | null) => void
   /** Fired when the EVA player dies (e.g. hypoxia). */
   onDeath?: (cause: string) => void
@@ -239,6 +253,38 @@ export class EvaSession implements Tickable {
   }
 
   /**
+   * The active EVA first-person camera while the tether session runs.
+   * Null in idle, opening, or before {@link startSession} completes.
+   */
+  getEvaFpsCamera(): THREE.PerspectiveCamera | null {
+    return this.controller?.fpsCamera.camera ?? null
+  }
+
+  /**
+   * The EVA first-person {@link FpsCamera} (ADS, bob) while the tether session runs.
+   * Null in idle, opening, or before the controller is created.
+   */
+  getEvaFpsRig(): FpsCamera | null {
+    return this.controller?.fpsCamera ?? null
+  }
+
+  /**
+   * Suit RTG as a 0–1 fraction for view-model or HUD readouts. Zero when not in EVA.
+   */
+  getEvaRtgLevelFraction(): number {
+    if (!this.controller) return 0
+    return this.controller.rtgLevel / this.controller.rtgCapacity
+  }
+
+  /**
+   * Lateral / EVA player speed (world units/s) for view-model idle bob.
+   * Zero when not in the tethered EVA state.
+   */
+  getEvaPlayerSpeed(): number {
+    return this.controller?.speed ?? 0
+  }
+
+  /**
    * Show or hide the bright-green debug wireframes drawn around every registered
    * EVA collider. Hidden by default; wire a DevConsole command on the host view
    * (e.g. `toggleEvaColliders`) that calls this with the negated current state
@@ -270,22 +316,6 @@ export class EvaSession implements Tickable {
     }
 
     if (this.mode === 'idle') {
-      const poi = this.config.getPoi()
-      if (!poi) {
-        this.setPrompt(null)
-        return
-      }
-      const dx = vehicle.group.position.x - poi.x
-      const dz = vehicle.group.position.z - poi.z
-      const distToPoiXZ = Math.sqrt(dx * dx + dz * dz)
-      if (distToPoiXZ >= EVA_TRIGGER_RANGE) {
-        this.setPrompt(null)
-        return
-      }
-      if (vehicle.speed > EVA_MAX_VEHICLE_SPEED) {
-        this.setPrompt('STOP SHIP TO EVA')
-        return
-      }
       const gate = this.config.canEva?.() ?? { allowed: true }
       if (!gate.allowed) {
         this.setPrompt(
@@ -293,7 +323,16 @@ export class EvaSession implements Tickable {
         )
         return
       }
-      this.setPrompt('EVA [F]')
+
+      const poi = this.config.getPoi()
+      const atMissionSite = poi !== null && isWithinMissionSiteStopShipDisk(vehicle, poi)
+
+      if (vehicle.speed > EVA_MAX_VEHICLE_SPEED) {
+        this.setPrompt(atMissionSite ? 'STOP SHIP TO EVA' : null)
+        return
+      }
+
+      this.setPrompt('EVA [V]')
       if (this.config.inputManager.wasActionPressed('evaToggle')) {
         this.beginOpening(vehicle)
       }
@@ -323,11 +362,11 @@ export class EvaSession implements Tickable {
       if (distToPoi < poiPromptRange) {
         // In-scene minigames (e.g. satellite servicing) attach their controller on
         // EVA-enter and drive repairs inline with pointer lock held. Skip the
-        // terminal prompt + F-press so the player isn't told to press F and so F
-        // doesn't accidentally transition us into the overlay-oriented sub-state.
+        // terminal prompt + V-press so the player isn't told to press V and so
+        // interact (F) doesn't accidentally transition us into the overlay sub-state.
         const inSceneActive = this.config.isInSceneMinigameActive?.() ?? false
         if (!inSceneActive) {
-          this.setPrompt('START MAINTENANCE [F]')
+          this.setPrompt('START MAINTENANCE [V]')
           if (this.config.inputManager.wasActionPressed('evaToggle')) {
             this.beginMinigame()
           }
@@ -373,7 +412,7 @@ export class EvaSession implements Tickable {
       canReturn = distToVehicleXZ < EVA_RETURN_RANGE
     }
     if (canReturn) {
-      this.setPrompt('Return to Shuttle [F]')
+      this.setPrompt('Return to Shuttle [V]')
       if (this.config.inputManager.wasActionPressed('evaToggle')) {
         this.endSession(vehicle)
         return
@@ -550,13 +589,15 @@ export class EvaSession implements Tickable {
       sprintCapacity: 0,
       speed: this.controller.speed,
       grounded: false,
-      activeMode: 'drill',
+      // Map + shuttle EVA: science multitool is the canonical presentation (see map viewmodel).
+      activeMode: 'science',
       aiming: false,
       isFiring: false,
       rtgLevel: this.controller.rtgLevel,
       rtgCapacity: this.controller.rtgCapacity,
-      modeCharge: 0,
-      modeCapacity: 0,
+      // Science mode readout: full on HUD — suit RTG (thrust) is separate, see rtg* above.
+      modeCharge: this.controller.rtgCapacity,
+      modeCapacity: this.controller.rtgCapacity,
       headingRad: this.controller.headingRad,
       objectives: [],
     })

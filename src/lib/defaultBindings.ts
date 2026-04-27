@@ -17,13 +17,11 @@ export const DEFAULT_BINDINGS: Record<string, string[]> = {
   toggleCamera: ['KeyC'],
   gravitySurfingToggle: ['KeyQ'],
   orbitAction: ['KeyE'],
-  // Begin/end EVA when within range of a POI. Shares KeyF with `beginMission` since both
-  // are "engage the mission prop in range" actions — an asteroid mission waypoint and an
-  // EVA POI never coexist at the same spot.
-  evaToggle: ['KeyF'],
+  // Begin/end EVA when within range of a POI. Default `V`; `beginMission` and `interact` stay
+  // on `F` (waypoint + in-scene repair) so EVA can use its own key on the map.
+  evaToggle: ['KeyV'],
   // In-scene minigame interaction — fires when the player is aimed at a broken
-  // satellite component and wants to repair it. Shares KeyF with `evaToggle` and
-  // `beginMission`; the one active at the moment of press wins based on context.
+  // satellite component and wants to repair it. Shares KeyF with `beginMission`.
   interact: ['KeyF'],
   // EVA movement (only read while in EVA mode; keys reused from the shuttle set).
   evaForward: ['KeyW'],

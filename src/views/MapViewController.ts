@@ -28,6 +28,7 @@ import {
   TICK_PRIORITY_INPUT,
   TICK_PRIORITY_PHYSICS,
   TICK_PRIORITY_ANIMATION,
+  TICK_PRIORITY_RENDER,
 } from '@/lib/tickPriorities'
 import { DEFAULT_TIME_SCALE, ORBIT_SCALE } from '@/lib/planets/constants'
 import { SUN, PLANETS } from '@/lib/planets/catalog'
@@ -70,6 +71,8 @@ import {
 } from '@/lib/map/dev/registerMapDevCommands'
 import { GravitationalEventManager } from '@/lib/physics/gravitationalEvent'
 import { computeShuttleBaseFuelDrain } from '@/lib/shuttleBaseFuelDrain'
+import { MultiToolController } from '@/three/MultiToolController'
+import multiToolConfigJson from '@/data/fps/multitool-config.json'
 import type { ShipHealthConfig } from '@/lib/shipHealth'
 import shipHealthData from '@/data/shuttle/ship-health.json'
 import { IDLE_RADIATION_STATE, MapShipHealthFacade } from '@/lib/map/health/MapShipHealthFacade'
@@ -204,6 +207,13 @@ import {
   EVA_POI_PROMPT_BUFFER,
   TURRET_FORCE_CLAMP_OVERSCALE,
 } from '@/lib/map/eva/evaMapConstants'
+import { createEvaMapProjectileHeightmap } from '@/lib/map/eva/evaMapProjectileHeightmap'
+import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
+import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
+import { MultiToolState } from '@/lib/fps/multiToolState'
+import { ProjectileSystem } from '@/lib/fps/projectileSystem'
+import { ParticleEmitter } from '@/three/ParticleEmitter'
+import type { Heightmap } from '@/lib/terrain/heightmap'
 
 /**
  * Orbit / grid / debris toggle snapshot for syncing the map HUD after intro suppression.
@@ -278,8 +288,26 @@ export class MapViewController implements Tickable {
    */
   private evaPoiPromptRange: number | null = null
   /**
+   * First-person science multitool on map EVA only (3D viewmodel, SCI tint).
+   * {@link evaMapMultitoolFrameSync} drives {@link MultiToolController.tick} after the EVA
+   * camera runs each frame.
+   */
+  private evaMapMultitool: MultiToolController | null = null
+  /** Canceled in-flight async loads by incrementing; stale completions dispose their tool. */
+  private evaMapMultitoolLoadGeneration = 0
+  /** Mouse buttons + lock scope for map EVA multitool fire / ADS (mirrors level FPS). */
+  private readonly evaMapPointerLock = new FpsPointerLockSession()
+  /** Domain logic for mode, trigger, and RTG — science-only on map EVA. */
+  private evaMapMultiToolState: MultiToolState | null = null
+  private evaMapProjectileSystem: ProjectileSystem | null = null
+  private evaMapImpactEmitter: ParticleEmitter | null = null
+  private evaMapProjectileHeightmap: Heightmap | null = null
+  private readonly evaMapImpactVel = new THREE.Vector3()
+  private readonly evaMapImpactUp = new THREE.Vector3(0, 1, 0)
+  private readonly evaMapMultitoolFrameSync: Tickable = { tick: (dt) => this.syncEvaMapMultitoolFrame(dt) }
+  /**
    * Shuttle hull world-space AABB cached at EVA session start. Fed to
-   * {@link EvaSession} via `getVehicleReturnBounds` so the "Return to Shuttle [F]"
+   * {@link EvaSession} via `getVehicleReturnBounds` so the "Return to Shuttle [V]"
    * prompt wraps the visible hull (not the group origin, which may not sit at the
    * cargo bay). Null outside EVA.
    */
@@ -1154,6 +1182,7 @@ export class MapViewController implements Tickable {
     if (this.evaSession) {
       this.tickHandler.register(this.evaSession, MAP_CONFIG.ONE_SHOT_PRIORITY + 1)
     }
+    this.tickHandler.register(this.evaMapMultitoolFrameSync, TICK_PRIORITY_RENDER - 1)
 
     // --- Register orrery animation tick ---
     const orreryTickable: Tickable = {
@@ -4078,6 +4107,209 @@ export class MapViewController implements Tickable {
   }
 
   /**
+   * Load the first-person multi-tool in science tint for map EVA. Safe to re-call; stale
+   * async loads self-dispose. Wires the level-style {@link ProjectileSystem} when
+   * {@link setupEvaMapFiring} has run.
+   */
+  private async loadEvaMapMultitool(): Promise<void> {
+    const session = this.evaSession
+    const scene = this.sceneObjects?.scene
+    if (!session || !scene) return
+    const camera = session.getEvaFpsCamera()
+    if (!camera) return
+    const loadId = ++this.evaMapMultitoolLoadGeneration
+    if (this.evaMapMultitool) {
+      this.evaMapMultitool.dispose()
+      this.evaMapMultitool = null
+    }
+    const tool = new MultiToolController()
+    await tool.load(camera, scene)
+    if (loadId !== this.evaMapMultitoolLoadGeneration) {
+      tool.dispose()
+      return
+    }
+    const scienceColor = (multiToolConfigJson as { modes: { science: { color: string } } }).modes
+      .science.color
+    tool.setMode(scienceColor, 'science')
+    tool.setAiming(false)
+    tool.setRtgLevel(1)
+    tool.setModeChargeLevel(1)
+    tool.setState(0, false, false)
+    if (this.evaMapProjectileSystem) {
+      tool.setProjectileSystem(this.evaMapProjectileSystem)
+    }
+    this.evaMapMultitool = tool
+  }
+
+  /**
+   * Unregisters the map EVA multitool, increments the async generation, and disposes
+   * the viewmodel.
+   */
+  private disposeEvaMapMultitool(): void {
+    this.evaMapMultitoolLoadGeneration += 1
+    if (this.evaMapMultitool) {
+      this.evaMapMultitool.dispose()
+      this.evaMapMultitool = null
+    }
+  }
+
+  /**
+   * Merges suit telemetry from {@link EvaSession} with multi-tool state so the map EVA
+   * HUD shows weapon RTG, mode charge, ADS, and firing like the level FPS.
+   */
+  private mergeEvaMapToolTelemetry(base: FpsTelemetry): FpsTelemetry {
+    const mt = this.evaMapMultiToolState
+    if (!this.evaSession?.isActive || !mt) {
+      return base
+    }
+    return {
+      ...base,
+      activeMode: 'science',
+      aiming: mt.aiming,
+      isFiring: mt.isFiring,
+      rtgLevel: mt.rtgLevel,
+      rtgCapacity: mt.rtgCapacity,
+      modeCharge: mt.modeCharge,
+      modeCapacity: mt.modeChargeCapacity,
+    }
+  }
+
+  /**
+   * Creates pointer-lock + multitool state + projectiles for map EVA (level-parity shooting).
+   * Idempotent while resources already exist.
+   */
+  private setupEvaMapFiring(): void {
+    const scene = this.sceneObjects?.scene
+    const th = this.tickHandler
+    if (!scene || !th) {
+      return
+    }
+
+    if (!this.evaMapProjectileHeightmap) {
+      this.evaMapProjectileHeightmap = createEvaMapProjectileHeightmap()
+    }
+    if (!this.evaMapMultiToolState) {
+      this.evaMapMultiToolState = new MultiToolState(buildMultiToolConfig())
+      this.evaMapMultiToolState.setMode('science')
+      th.register(this.evaMapMultiToolState, TICK_PRIORITY_PHYSICS + 1)
+    }
+
+    if (!this.evaMapImpactEmitter) {
+      this.evaMapImpactEmitter = new ParticleEmitter({
+        poolSize: 64,
+        color: new THREE.Color(0xffaa44),
+        size: 6.5,
+        lifetime: 0.6,
+        spread: 12,
+        opacity: 1,
+        soft: true,
+        sizeGrowth: 1.55,
+      })
+      scene.add(this.evaMapImpactEmitter.points)
+      th.register(this.evaMapImpactEmitter, TICK_PRIORITY_PHYSICS + 3)
+    }
+
+    if (!this.evaMapProjectileSystem) {
+      this.evaMapProjectileSystem = new ProjectileSystem(scene, this.evaMapProjectileHeightmap)
+      this.evaMapProjectileSystem.setDamageMultiplier(getCurrentUpgradeValue('multitoolDamage'))
+      this.evaMapProjectileSystem.prewarmPool()
+      this.evaMapProjectileSystem.onImpact = (pos) => {
+        for (let i = 0; i < 8; i += 1) {
+          this.evaMapImpactVel.copy(this.evaMapImpactUp).multiplyScalar(5)
+          this.evaMapImpactEmitter?.emit(pos, this.evaMapImpactVel)
+        }
+      }
+      th.register(this.evaMapProjectileSystem, TICK_PRIORITY_PHYSICS + 2)
+    }
+
+    const canvas = this.sceneObjects?.renderer.domElement
+    if (canvas) {
+      this.evaMapPointerLock.attach(canvas, {})
+    }
+  }
+
+  /**
+   * Tears down map EVA shooting (pointer lock, tool state, projectiles, impact VFX).
+   */
+  private disposeEvaMapFiring(): void {
+    this.evaMapPointerLock.releaseLock()
+    this.evaMapPointerLock.detach()
+    const th = this.tickHandler
+    if (th) {
+      if (this.evaMapMultiToolState) {
+        th.unregister(this.evaMapMultiToolState)
+        this.evaMapMultiToolState = null
+      }
+      if (this.evaMapProjectileSystem) {
+        this.evaMapProjectileSystem.onImpact = null
+        th.unregister(this.evaMapProjectileSystem)
+        this.evaMapProjectileSystem.dispose()
+        this.evaMapProjectileSystem = null
+      }
+      if (this.evaMapImpactEmitter) {
+        th.unregister(this.evaMapImpactEmitter)
+        if (this.sceneObjects?.scene) {
+          this.sceneObjects.scene.remove(this.evaMapImpactEmitter.points)
+        }
+        this.evaMapImpactEmitter.dispose()
+        this.evaMapImpactEmitter = null
+      }
+    }
+    this.disposeEvaMapMultitool()
+  }
+
+  /**
+   * Drives level-parity multitool input (pointer lock), viewmodel, ADS on the EVA
+   * {@link FpsCamera}, and muzzle fire. Hides the gun while a minigame overlay is open.
+   */
+  private syncEvaMapMultitoolFrame(dt: number): void {
+    const session = this.evaSession
+    const pl = this.evaMapPointerLock
+    const mt = this.evaMapMultiToolState
+    if (!session?.isActive || !pl || !mt) {
+      return
+    }
+
+    if (session.isMinigameOpen) {
+      mt.setAiming(false)
+      mt.setInput(false, pl.consumeLeftMouseJustPressed())
+      mt.setSpeed(session.getEvaPlayerSpeed())
+      this.evaMapMultitool?.setVisible(false)
+      return
+    }
+
+    mt.setMode('science')
+    mt.setAiming(pl.isRightMouseDown)
+    mt.setInput(pl.isLeftMouseDown, pl.consumeLeftMouseJustPressed())
+    mt.setSpeed(session.getEvaPlayerSpeed())
+
+    const tool = this.evaMapMultitool
+    if (!tool) {
+      return
+    }
+
+    tool.setVisible(true)
+    const scienceColor = (multiToolConfigJson as { modes: { science: { color: string } } }).modes
+      .science.color
+    tool.setMode(scienceColor, mt.mode)
+    tool.setAiming(mt.aiming)
+    tool.setRtgLevel(mt.rtgLevel / mt.rtgCapacity)
+    tool.setModeChargeLevel(mt.modeCharge / mt.modeChargeCapacity)
+    if (mt.isFiring) {
+      tool.fire()
+    }
+
+    const rig = session.getEvaFpsRig()
+    if (rig) {
+      const ads = mt.adsConfig
+      rig.setAiming(mt.aiming, ads.fovMultiplier, ads.zoomSpeed)
+    }
+
+    tool.setState(session.getEvaPlayerSpeed(), false, false)
+    tool.tick(dt)
+  }
+
+  /**
    * Handles scene bookkeeping when EVA mode changes — bloom swap, fuel-pause,
    * and forwarding to the external callback. Extracted from the inline
    * `onEvaModeChange` lambda so `createEvaSession` can also call
@@ -4086,6 +4318,9 @@ export class MapViewController implements Tickable {
    * @param active - True when EVA is starting; false when it is ending.
    */
   private handleEvaModeChange(active: boolean): void {
+    if (!active) {
+      this.disposeEvaMapFiring()
+    }
     this.setOrbitLinesVisible(!active)
     this.bloomController.setEvaOverride(active)
     // Mirror the active-POI huge-scale onto completed-site POI containers, so a mission
@@ -4099,6 +4334,10 @@ export class MapViewController implements Tickable {
       this.evaVehicleReturnBounds = null
     }
     this.onEvaModeChange?.(active)
+    if (active) {
+      this.setupEvaMapFiring()
+      void this.loadEvaMapMultitool()
+    }
   }
 
   /**
@@ -4245,7 +4484,7 @@ export class MapViewController implements Tickable {
         }
         this.handleEvaModeChange(active)
       },
-      onEvaTelemetry: (t) => this.onEvaTelemetry?.(t),
+      onEvaTelemetry: (t) => this.onEvaTelemetry?.(this.mergeEvaMapToolTelemetry(t)),
       onActionPrompt: (p) => {
         this.currentEvaPrompt = p
       },
@@ -4317,7 +4556,7 @@ export class MapViewController implements Tickable {
         ),
       )
       // Snapshot the shuttle hull's world-space AABB for the bounds-aware "Return to
-      // Shuttle [F]" prompt. Using bounds (not group.position) keeps the trigger zone
+      // Shuttle [V]" prompt. Using bounds (not group.position) keeps the trigger zone
       // wrapped around the visible hull regardless of where the group origin sits.
       this.shuttleController.group.updateMatrixWorld(true)
       const hullBox = new THREE.Box3()
@@ -4365,6 +4604,8 @@ export class MapViewController implements Tickable {
     this.unsubscribeUpgradeInstalled?.()
     this.unsubscribeUpgradeInstalled = null
     this.journeyFacade.dispose()
+    this.disposeEvaMapFiring()
+    this.tickHandler?.unregister(this.evaMapMultitoolFrameSync)
     this.evaSession?.dispose()
     this.evaSession = null
     this.shuttleAudio.dispose()

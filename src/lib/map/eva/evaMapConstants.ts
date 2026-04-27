@@ -51,7 +51,7 @@ export const EVA_MAP_SPAWN_OFFSET_SCALE = 1
 
 /**
  * Buffer (world units) added to the POI's largest half-extent when computing the
- * "START MAINTENANCE [F]" prompt range. Keeps the trigger tight against small
+ * "START MAINTENANCE [V]" prompt range. Keeps the trigger tight against small
  * satellites (~2-unit half-extent → ~4-unit trigger) while giving the ×20 telescope
  * enough approach room without a fixed fudge factor.
  */

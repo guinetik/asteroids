@@ -19,6 +19,13 @@ const MODE_LABELS: Record<string, { key: string; label: string; color: string }>
   science: { key: '3', label: 'SCI', color: '#22c55e' },
 }
 
+/** Hotbar row for map EVA: single SCI entry (no DRL/LAS). */
+const EVA_MAP_SCI_MODE_LABEL: { key: string; label: string; color: string } = {
+  key: '3',
+  label: 'SCI',
+  color: '#22c55e',
+}
+
 /** Degrees in a full compass rotation (0–360°). */
 const COMPASS_DEGREES_FULL = 360
 
@@ -31,14 +38,18 @@ const props = withDefaults(
     /**
      * HUD variant. `'level'` (default) shows all elements including crosshair,
      * mode charge, hotbar, and sprint stamina. `'eva'` hides combat/tool UI
-     * and keeps HP / O2 / RTG / SPD / HDG only.
+     * and keeps HP / O2 / RTG / SPD / HDG only. `'evaMap'` is map EVA: science
+     * reticle, SCI-only hotbar, no mining/laser.
      */
-    variant?: 'level' | 'eva'
+    variant?: 'level' | 'eva' | 'evaMap'
   }>(),
   { variant: 'level' },
 )
 
 const showCombatHud = (): boolean => props.variant !== 'eva'
+
+/** Map EVA: science tool HUD without DRL/LAS hotkeys. */
+const showEvaMapToolHud = (): boolean => props.variant === 'evaMap'
 
 function pct(value: number, max: number): number {
   return max > 0 ? (value / max) * 100 : 0
@@ -159,16 +170,21 @@ function showRockTarget(): boolean {
 
     <!-- ═══ CROSSHAIR: Center ═══ -->
     <div
-      v-if="showCombatHud()"
+      v-if="showCombatHud() || showEvaMapToolHud()"
       class="absolute inset-0 flex items-center justify-center select-none"
       :style="{ opacity: telemetry.aiming ? 1 : 0.4 }"
     >
-      <svg v-if="telemetry.activeMode === 'drill'" width="32" height="32" viewBox="0 0 32 32">
+      <svg v-if="!showEvaMapToolHud() && telemetry.activeMode === 'drill'" width="32" height="32" viewBox="0 0 32 32">
         <circle cx="16" cy="16" r="12" fill="none" :stroke="modeColor()" stroke-width="1.5" />
         <line x1="16" y1="8" x2="16" y2="24" :stroke="modeColor()" stroke-width="1" />
         <line x1="8" y1="16" x2="24" y2="16" :stroke="modeColor()" stroke-width="1" />
       </svg>
-      <svg v-else-if="telemetry.activeMode === 'weapon'" width="32" height="32" viewBox="0 0 32 32">
+      <svg
+        v-else-if="!showEvaMapToolHud() && telemetry.activeMode === 'weapon'"
+        width="32"
+        height="32"
+        viewBox="0 0 32 32"
+      >
         <line x1="16" y1="6" x2="16" y2="13" :stroke="modeColor()" stroke-width="2" />
         <line x1="16" y1="19" x2="16" y2="26" :stroke="modeColor()" stroke-width="2" />
         <line x1="6" y1="16" x2="13" y2="16" :stroke="modeColor()" stroke-width="2" />
@@ -180,8 +196,11 @@ function showRockTarget(): boolean {
       </svg>
     </div>
 
-    <!-- ═══ EVA CROSSHAIR: soft cyan reticle, no tool ═══ -->
-    <div v-else class="absolute inset-0 flex items-center justify-center select-none opacity-60">
+    <!-- ═══ EVA CROSSHAIR: soft cyan reticle, no tool (shuttle scene EVA) ═══ -->
+    <div
+      v-else-if="!showEvaMapToolHud()"
+      class="absolute inset-0 flex items-center justify-center select-none opacity-60"
+    >
       <svg width="28" height="28" viewBox="0 0 28 28">
         <circle cx="14" cy="14" r="9" fill="none" stroke="#00e5ff" stroke-width="1" />
         <circle cx="14" cy="14" r="1.2" fill="#00e5ff" />
@@ -230,7 +249,10 @@ function showRockTarget(): boolean {
             </div>
             <span class="text-[10px] tracking-widest uppercase text-white/50">O2</span>
           </div>
-          <div v-if="showCombatHud()" class="flex flex-col items-center gap-0.5">
+          <div
+            v-if="showCombatHud() && !showEvaMapToolHud()"
+            class="flex flex-col items-center gap-0.5"
+          >
             <div class="h-16 w-2.5 flex flex-col-reverse overflow-hidden rounded-sm bg-white/10">
               <div
                 class="w-full rounded-sm bg-green-400/80 transition-all duration-100"
@@ -241,7 +263,7 @@ function showRockTarget(): boolean {
           </div>
         </div>
 
-        <div v-if="showCombatHud()" class="flex items-center gap-1.5">
+        <div v-if="showCombatHud() || showEvaMapToolHud()" class="flex items-center gap-1.5">
           <span
             class="text-[10px] tracking-widest uppercase"
             :style="{ color: modeColor() + '80' }"
@@ -259,7 +281,19 @@ function showRockTarget(): boolean {
           </div>
         </div>
 
-        <div v-if="showCombatHud()" class="flex gap-1">
+        <div v-if="showEvaMapToolHud()" class="flex gap-1">
+          <div
+            class="flex items-center gap-1 rounded border-b-2 border-white/15 bg-white/15 px-3 py-1.5 text-xs tracking-wider uppercase"
+            :style="{
+              borderBottomColor: EVA_MAP_SCI_MODE_LABEL.color,
+              color: EVA_MAP_SCI_MODE_LABEL.color,
+            }"
+          >
+            <span class="text-white/40">{{ EVA_MAP_SCI_MODE_LABEL.key }}</span>
+            <span>{{ EVA_MAP_SCI_MODE_LABEL.label }}</span>
+          </div>
+        </div>
+        <div v-else-if="showCombatHud()" class="flex gap-1">
           <div
             v-for="(cfg, mode) in MODE_LABELS"
             :key="mode"
