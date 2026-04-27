@@ -1,14 +1,12 @@
 /**
  * @vitest-environment node
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { RocketSurveyState, type SurveyQuotaSnapshot } from '../rocketSurveyState'
 
 const ALWAYS_FOUND = (itemId: string) => ({ spawnIndex: itemId === 'olivine' ? 1 : 2 })
-const NEVER_FOUND = () => null
 
 const QUOTA_OLIVINE_PENDING: SurveyQuotaSnapshot = { itemId: 'olivine', minedKg: 0, targetKg: 10 }
-const QUOTA_IRON_PENDING: SurveyQuotaSnapshot = { itemId: 'iron', minedKg: 0, targetKg: 10 }
 const QUOTA_OLIVINE_COMPLETE: SurveyQuotaSnapshot = {
   itemId: 'olivine',
   minedKg: 10,
