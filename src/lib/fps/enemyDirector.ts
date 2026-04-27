@@ -16,7 +16,7 @@ import { RangedBehavior } from './rangedBehavior'
 import { getEnemyTypeConfig } from './enemyTypes'
 import type { EnemyTypeConfig } from './enemyTypes'
 import type { Hostage } from './hostage'
-import type { ChaseTargetSite } from './chaseTargeting'
+import { distSqXZ, type ChaseTargetSite } from './chaseTargeting'
 
 /** Handle returned by spawn — used by the VC to bridge domain ↔ visuals. */
 export interface EnemyHandle {
@@ -167,8 +167,19 @@ export class EnemyDirector implements Tickable {
   private playerY = 0
   private playerZ = 0
   private hostageEntities: readonly Hostage[] = EMPTY_HOSTAGES
-  /** Rebuilt each tick from {@link hostageEntities} — passed to behaviors. */
+  /**
+   * Single-element scratch reused per enemy each tick. Holds that enemy's
+   * assigned hostage (if any). Behaviors then pick between the player and
+   * this site, so each enemy commits to its own target instead of all of
+   * them clustering on the geometrically nearest survivor.
+   */
   private readonly chaseSiteScratch: ChaseTargetSite[] = []
+  /**
+   * Per-enemy hostage assignment, keyed by {@link EnemyHandle.id}. Set lazily
+   * on the first tick after spawn (or after a previous target dies) by
+   * {@link ensureAssignment}. Cleared on despawn.
+   */
+  private readonly assignedHostage = new Map<number, Hostage>()
 
   /** Fired when an enemy touches the player. */
   onContactDamage: ((handle: EnemyHandle, damage: number) => void) | null = null
@@ -312,27 +323,79 @@ export class EnemyDirector implements Tickable {
   despawn(handle: EnemyHandle): void {
     const idx = this.handles.indexOf(handle)
     if (idx >= 0) this.handles.splice(idx, 1)
+    this.assignedHostage.delete(handle.id)
   }
 
   /** Remove all enemies. */
   despawnAll(): void {
     this.handles.length = 0
+    this.assignedHostage.clear()
+  }
+
+  /**
+   * Return this enemy's committed hostage target, picking a new one if it has
+   * none yet or the previous assignment has died. Selection is least-loaded
+   * across alive hostages (so attackers spread instead of dogpiling), with
+   * ties broken by XZ distance. Returns `null` when no hostages are alive.
+   *
+   * @param handle - Enemy that needs a target this tick
+   */
+  private ensureAssignment(handle: EnemyHandle): Hostage | null {
+    const existing = this.assignedHostage.get(handle.id)
+    if (existing && existing.alive) return existing
+
+    let liveCount = 0
+    for (const h of this.hostageEntities) {
+      if (h.alive) liveCount++
+    }
+    if (liveCount === 0) {
+      this.assignedHostage.delete(handle.id)
+      return null
+    }
+
+    const load = new Map<Hostage, number>()
+    for (const other of this.handles) {
+      if (other.id === handle.id) continue
+      if (!other.enemy.alive) continue
+      const a = this.assignedHostage.get(other.id)
+      if (a && a.alive) load.set(a, (load.get(a) ?? 0) + 1)
+    }
+
+    let best: Hostage | null = null
+    let bestLoad = Number.POSITIVE_INFINITY
+    let bestDistSq = Number.POSITIVE_INFINITY
+    const ex = handle.enemy.position.x
+    const ez = handle.enemy.position.z
+    for (const h of this.hostageEntities) {
+      if (!h.alive) continue
+      const l = load.get(h) ?? 0
+      const d = distSqXZ(ex, ez, h.position.x, h.position.z)
+      if (l < bestLoad || (l === bestLoad && d < bestDistSq)) {
+        best = h
+        bestLoad = l
+        bestDistSq = d
+      }
+    }
+
+    if (best) this.assignedHostage.set(handle.id, best)
+    else this.assignedHostage.delete(handle.id)
+    return best
   }
 
   /** @inheritdoc */
   tick(dt: number): void {
-    this.chaseSiteScratch.length = 0
-    for (const h of this.hostageEntities) {
-      if (!h.alive) continue
-      this.chaseSiteScratch.push({
-        x: h.position.x,
-        y: h.hitCenterWorldY,
-        z: h.position.z,
-      })
-    }
-
     for (const handle of this.handles) {
       if (!handle.enemy.alive) continue
+
+      const target = this.ensureAssignment(handle)
+      this.chaseSiteScratch.length = 0
+      if (target) {
+        this.chaseSiteScratch.push({
+          x: target.position.x,
+          y: target.hitCenterWorldY,
+          z: target.position.z,
+        })
+      }
 
       // Tick behavior (movement applied below with pairwise separation)
       const output = handle.behavior.tick(
