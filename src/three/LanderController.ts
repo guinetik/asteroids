@@ -670,7 +670,34 @@ export class LanderController implements Tickable {
     return this.group.position
   }
 
+  /**
+   * External liftoff lock. When true, {@link isMainEngineActive} reports false
+   * regardless of input — used by `RescueMinigame` to prevent the player from
+   * stranding survivors mid-extraction. RCS is intentionally unaffected so the
+   * player can still rotate and settle the grounded lander.
+   */
+  private _liftoffBlocked = false
+
+  /**
+   * Set the liftoff-lock state. The level VC writes this each tick from the
+   * active minigame's `isLiftoffLocked` predicate.
+   *
+   * @param blocked - True to clamp main-engine output to nothing
+   */
+  setLiftoffBlocked(blocked: boolean): void {
+    this._liftoffBlocked = blocked
+  }
+
+  /**
+   * True when the player is mashing main-engine input but the lock is
+   * suppressing it. Drives the level VC's `notifyLiftoffAttemptBlocked` call.
+   */
+  get isLiftoffAttemptedWhileBlocked(): boolean {
+    return this._liftoffBlocked && this.inputManager.isActionActive('mainEngine')
+  }
+
   get isMainEngineActive(): boolean {
+    if (this._liftoffBlocked) return false
     return (
       this.inputManager.isActionActive('mainEngine') &&
       this.thrusterSystem.canFire('mainEngine', this.landerBurnRateModifiers())
