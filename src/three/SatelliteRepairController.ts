@@ -2,32 +2,34 @@
  * In-scene controller for the satellite servicing minigame.
  *
  * Attaches to a satellite POI during EVA, applies a red wireframe overlay to
- * each broken component, and runs a forward raycast from the FPS camera to
- * detect aim. The aimed component's wireframe turns orange; pressing F while
- * aimed flips the wireframe to green, holds for {@link REPAIR_HOLD_SECONDS},
- * then removes it and marks the component repaired. Prompt text is surfaced
- * through the EVA HUD via the {@link SatelliteRepairControllerConfig.onAimPromptChange}
- * callback rather than a 3D billboard. Completing all repairs fires
- * `minigame.onComplete`, which the host pipes into its reward chain.
+ * each broken component, and registers with the map EVA
+ * {@link ProjectileSystem} so **science** bolts swept against per-component
+ * AABBs reduce “damage” until each part is fully repaired. Wireframe color
+ * moves red → orange → near-green with progress; a final short green hold
+ * plays before the overlay is removed and `markRepaired` runs.
  *
  * @author guinetik
  * @date 2026-04-19
  * @spec docs/superpowers/specs/2026-04-19-eva-minigame-wiring-design.md
  */
 import * as THREE from 'three'
+import { segmentIntersectsAabb3 } from '@/lib/physics/segmentAabb3'
 import type { SatelliteServicingMiniGame } from '@/lib/minigame/satelliteServicing/SatelliteServicingMiniGame'
 import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 import { validateManifest } from '@/lib/satellites/satelliteManifests'
 import { Timer } from '@/lib/Timer'
 
-/** Maximum raycast distance (world units) for aim detection. Rays longer than this don't highlight a component. */
-const AIM_RAYCAST_MAX_DISTANCE = 15
+/** Orange wireframe — mid progress while shooting a panel. */
+const AIM_ORANGE = 0xfb923c
 
-/** Orange emissive color applied to the wireframe of the currently aimed-at broken component. */
-const AIM_HIGHLIGHT_COLOR = 0xfb923c
-
-/** Red emissive wireframe color for damaged components. */
+/** Red emissive wireframe for fresh damage. */
 const DAMAGE_WIREFRAME_COLOR = 0xf87171
+
+/**
+ * Last repair stage before completion — one more science hit finishes the
+ * part (turns the solid celebration green in `REPAIR_COMPLETE_COLOR`).
+ */
+const ALMOST_REPAIRED_WIREFRAME_COLOR = 0x84cc16
 
 /** Wireframe overlay opacity — fixed, no fade. */
 const WIREFRAME_OPACITY = 0.9
@@ -38,23 +40,28 @@ const REPAIR_HOLD_SECONDS = 2
 /** Green color applied to a component's wireframe during the post-repair hold. */
 const REPAIR_COMPLETE_COLOR = 0x4ade80
 
+/** How many successful science-bolt hits on a part are required to finish it. */
+const SCIENCE_REPAIR_HITS_PER_COMPONENT = 3
+
 /** Configuration passed to `SatelliteRepairController.attach`. */
 export interface SatelliteRepairControllerConfig {
   /** POI root — walked for named rigged sub-objects. */
   poiObject: THREE.Object3D
-  /** Provider of the FPS camera used for raycast aim detection. May return null between frames if the camera is being swapped. */
-  getCamera: () => THREE.Camera | null
-  /** True while the F-press should register as a repair attempt. */
-  isFixKeyPressed: () => boolean
-  /** The minigame instance — controller calls `markRepaired(name)` on success. */
+  /** The minigame instance — controller calls `markRepaired(name)` after the green hold. */
   minigame: SatelliteServicingMiniGame
   /** The active mission — reserved for future use (mission-specific tuning). */
   mission: ActiveVisitRelayMission
   /**
-   * Called when the aim state transitions between "nothing aimed" and "aimed
-   * at a broken component". Host routes the payload into the EVA HUD prompt
-   * channel so the player sees "[F] FIX" only while aiming at a fixable part.
-   * Fires with null to clear the prompt.
+   * Fires when a sub-object has absorbed enough science hits — good for a HUD
+   * toast. Not called for unknown names.
+   *
+   * @param componentName - Manifest name (e.g. `satellite_solar_A`).
+   */
+  onComponentFullyRepaired?: (componentName: string) => void
+  /**
+   * Clear any stale aim prompt; kept for host parity with other EVA flows.
+   *
+   * @param prompt - null when the controller disposes.
    */
   onAimPromptChange?: (prompt: string | null) => void
 }
@@ -67,24 +74,23 @@ interface DamagedComponent {
   source: THREE.Object3D
   /** Red (or orange when aimed, green when repaired) wireframe overlay group. */
   wireframe: THREE.Object3D
-  /** Set to true when repair is initiated; prevents further aim-pick and normal logic. */
+  /**
+   * World-space bounds for swept science-bolt tests. Snapshot after the EVA
+   * huge-scale pass so the AABB matches the on-screen model.
+   */
+  worldBounds: THREE.Box3
+  /** Set to true when the final hit triggers the green-hold sequence. */
   fading: boolean
-  /** Whether this component is the current aim target — drives wireframe color. */
-  aimed: boolean
+  /**
+   * Remaining science hits before `fading` — starts at
+   * {@link SCIENCE_REPAIR_HITS_PER_COMPONENT}.
+   */
+  scienceHitsRemaining: number
 }
 
 /**
- * Controller-side skeleton for the satellite servicing minigame.
- *
- * Usage:
- * ```ts
- * const controller = new SatelliteRepairController()
- * controller.attach({ poiObject, getCamera, isFixKeyPressed, minigame, mission })
- * // …later, per frame…
- * controller.tick(dt)
- * // …on minigame.onComplete or forced abort…
- * controller.dispose()
- * ```
+ * Drives 3D satellite damage/repair; wire `tryScienceRepairSegment` into the map
+ * EVA `ProjectileSystem` via `setEvaSatelliteServicingScience`.
  *
  * @author guinetik
  * @date 2026-04-19
@@ -93,16 +99,7 @@ interface DamagedComponent {
 export class SatelliteRepairController {
   private cfg: SatelliteRepairControllerConfig | null = null
   private components: DamagedComponent[] = []
-  private prevFixKey = false
-
-  /** Tracks whether any component was aimed at on the previous frame. */
-  private prevHasAimed = false
-
-  /** Reused raycaster for per-frame aim detection. */
-  private readonly _raycaster = new THREE.Raycaster()
-
-  /** Reused forward vector sampled from the camera each frame. */
-  private readonly _forward = new THREE.Vector3()
+  private readonly _hitScratch = new THREE.Vector3()
 
   /**
    * Attach to a scene + POI. Looks up each broken component by name and applies
@@ -124,136 +121,97 @@ export class SatelliteRepairController {
       if (!source) continue
       const wireframe = this.buildWireframe(source)
       source.add(wireframe)
+      const worldBounds = new THREE.Box3()
+      source.updateMatrixWorld(true)
+      worldBounds.setFromObject(source)
       this.components.push({
         name,
         source,
         wireframe,
+        worldBounds,
         fading: false,
-        aimed: false,
+        scienceHitsRemaining: SCIENCE_REPAIR_HITS_PER_COMPONENT,
       })
+      this.setWireframeProgressColor(wireframe, SCIENCE_REPAIR_HITS_PER_COMPONENT)
     }
   }
 
   /**
-   * Per-frame update. Runs a forward raycast from the FPS camera to detect
-   * which broken component the player is aiming at, turns its wireframe orange,
-   * and on F-press triggers the green-hold repair sequence.
-   *
-   * @param dt - Delta time in seconds (unused post-fade-removal; kept for interface symmetry).
+   * No per-frame work — repair is multitool projectiles. Map view still calls
+   * this so the contract matches other in-scene EVA drivers.
    */
   tick(_dt: number): void {
-    if (!this.cfg) return
-    const camera = this.cfg.getCamera()
-
-    // Find the aimed-at component via a forward raycast from the camera. The
-    // raycast hits MESH descendants of each component's source node; we match
-    // back to the component by ancestry.
-    let aimed: DamagedComponent | null = null
-    if (camera) {
-      camera.getWorldDirection(this._forward)
-      this._raycaster.set(camera.position, this._forward)
-      this._raycaster.far = AIM_RAYCAST_MAX_DISTANCE
-      aimed = this.pickAimedComponent()
-    }
-
-    // Apply aim state changes — swap wireframe color when entering/leaving aim.
-    for (const c of this.components) {
-      if (c.fading) {
-        c.aimed = false
-        continue
-      }
-      const nowAimed = c === aimed
-      if (nowAimed !== c.aimed) {
-        c.aimed = nowAimed
-        this.setWireframeColor(c.wireframe, nowAimed ? AIM_HIGHLIGHT_COLOR : DAMAGE_WIREFRAME_COLOR)
-      }
-    }
-
-    // Emit aim-prompt transitions to the host so the EVA HUD shows "[F] FIX"
-    // only while the player is looking at a repairable component.
-    const hasAimed = aimed != null
-    if (hasAimed !== this.prevHasAimed) {
-      this.prevHasAimed = hasAimed
-      this.cfg.onAimPromptChange?.(hasAimed ? '[F] FIX' : null)
-    }
-
-    // F edge-trigger: while aimed at a broken component, flip it to the
-    // green "repaired" state, hold for REPAIR_HOLD_SECONDS, then remove the
-    // wireframe and mark the repair. Deferring `markRepaired` until after the
-    // hold lets the green celebration play out before the mission completes
-    // and the controller is disposed.
-    const fixPressed = this.cfg.isFixKeyPressed()
-    const fixJustPressed = fixPressed && !this.prevFixKey
-    this.prevFixKey = fixPressed
-    if (fixJustPressed && aimed) {
-      aimed.fading = true
-      aimed.aimed = false
-      this.setWireframeColor(aimed.wireframe, REPAIR_COMPLETE_COLOR)
-      const name = aimed.name
-      const wireframeRef = aimed.wireframe
-      Timer.after(REPAIR_HOLD_SECONDS, () => {
-        if (wireframeRef.parent) wireframeRef.parent.remove(wireframeRef)
-        // If the controller was disposed during the hold (player exited EVA),
-        // `this.cfg` is null — skip the repair mark so the mission state stays
-        // consistent with "no partial progress persisted."
-        if (this.cfg) this.cfg.minigame.markRepaired(name)
-      })
-    }
+    void _dt
   }
 
   /**
-   * Raycast against every non-fading damaged component's source subtree and
-   * return the component whose source tree has the closest mesh intersection.
-   * Returns null if no broken component is in the ray's path.
+   * Map EVA science bolt: first AABB along the segment wins one repair step.
    *
-   * @returns The aimed-at component, or null when no broken component is hit.
+   * @param from - Previous bolt position, world space.
+   * @param to - Current bolt position, world space.
+   * @param outEntry - First hit point on the box, for impact VFX.
+   * @returns True when a bolt should be consumed.
    */
-  private pickAimedComponent(): DamagedComponent | null {
-    let nearest: DamagedComponent | null = null
-    let nearestDistance = Number.POSITIVE_INFINITY
+  tryScienceRepairSegment(from: THREE.Vector3, to: THREE.Vector3, outEntry: THREE.Vector3): boolean {
+    if (!this.cfg) return false
+    let best: DamagedComponent | null = null
+    let bestDistSq = Number.POSITIVE_INFINITY
     for (const c of this.components) {
       if (c.fading) continue
-      const hits = this._raycaster.intersectObject(c.source, true)
-      // Filter hits that actually belong to the source mesh — exclude wireframe
-      // overlay geometry so the raycast doesn't self-hit our own red mesh clones.
-      for (const hit of hits) {
-        if (this.isWireframeDescendant(hit.object)) continue
-        if (hit.distance < nearestDistance) {
-          nearestDistance = hit.distance
-          nearest = c
-        }
-        // Take only the closest surface point for this component; don't scan deeper.
-        break
+      const b = c.worldBounds
+      if (b.isEmpty()) continue
+      if (!segmentIntersectsAabb3(from, to, b.min, b.max, this._hitScratch)) continue
+      const d = this._hitScratch.distanceToSquared(from)
+      if (d < bestDistSq) {
+        bestDistSq = d
+        best = c
+        outEntry.copy(this._hitScratch)
       }
     }
-    return nearest
+    if (!best) return false
+    this.applyScienceHit(best)
+    return true
   }
 
   /**
-   * True when `obj` lives under any component's wireframe group. Used to
-   * reject self-hits during the aim raycast.
-   *
-   * @param obj - Object3D to test.
-   * @returns Whether the object is inside a wireframe overlay.
+   * One science impact: decrement HP, refresh wireframe, or start completion.
    */
-  private isWireframeDescendant(obj: THREE.Object3D): boolean {
-    for (const c of this.components) {
-      let cur: THREE.Object3D | null = obj
-      while (cur) {
-        if (cur === c.wireframe) return true
-        cur = cur.parent
-      }
+  private applyScienceHit(c: DamagedComponent): void {
+    if (!this.cfg || c.fading) return
+    c.scienceHitsRemaining = Math.max(0, c.scienceHitsRemaining - 1)
+    if (c.scienceHitsRemaining > 0) {
+      this.setWireframeProgressColor(c.wireframe, c.scienceHitsRemaining)
+      return
     }
-    return false
+    c.fading = true
+    this.setWireframeColor(c.wireframe, REPAIR_COMPLETE_COLOR)
+    this.cfg.onComponentFullyRepaired?.(c.name)
+    const name = c.name
+    const wireframeRef = c.wireframe
+    Timer.after(REPAIR_HOLD_SECONDS, () => {
+      if (wireframeRef.parent) wireframeRef.parent.remove(wireframeRef)
+      if (this.cfg) this.cfg.minigame.markRepaired(name)
+    })
+  }
+
+  /**
+   * Wireframe tint from remaining science hits (3=red, 2=orange, 1=lime).
+   */
+  private setWireframeProgressColor(wireframe: THREE.Object3D, hitsRemaining: number): void {
+    if (hitsRemaining >= 3) {
+      this.setWireframeColor(wireframe, DAMAGE_WIREFRAME_COLOR)
+    } else if (hitsRemaining === 2) {
+      this.setWireframeColor(wireframe, AIM_ORANGE)
+    } else {
+      this.setWireframeColor(wireframe, ALMOST_REPAIRED_WIREFRAME_COLOR)
+    }
   }
 
   /**
    * Detach and dispose every overlay. Safe to call multiple times.
    */
   dispose(): void {
-    // Tell the host to clear any aim prompt it was displaying for us.
     this.cfg?.onAimPromptChange?.(null)
-    this.prevHasAimed = false
     for (const c of this.components) {
       if (c.wireframe.parent) c.wireframe.parent.remove(c.wireframe)
       this.disposeObject(c.wireframe)
@@ -266,9 +224,6 @@ export class SatelliteRepairController {
    * Walk `source`, clone each mesh, swap in a red wireframe material, and
    * return the group. Transforms follow because the group is parented to
    * `source` at attach time.
-   *
-   * @param source - Component root to mirror as a wireframe overlay.
-   * @returns Group of wireframe clones in source-local space.
    */
   private buildWireframe(source: THREE.Object3D): THREE.Object3D {
     const group = new THREE.Group()
@@ -287,8 +242,6 @@ export class SatelliteRepairController {
         }),
       )
       clone.matrixAutoUpdate = false
-      // Copy world transform into the clone, then invert the source world so
-      // the overlay sits exactly on top when added as a child of `source`.
       mesh.updateWorldMatrix(true, false)
       source.updateWorldMatrix(true, false)
       const inv = new THREE.Matrix4().copy(source.matrixWorld).invert()
@@ -298,12 +251,6 @@ export class SatelliteRepairController {
     return group
   }
 
-  /**
-   * Set every wireframe mesh material's base color.
-   *
-   * @param wireframe - Overlay group previously built by `buildWireframe`.
-   * @param hex - Target color as a 24-bit hex number.
-   */
   private setWireframeColor(wireframe: THREE.Object3D, hex: number): void {
     wireframe.traverse((obj) => {
       const mesh = obj as THREE.Mesh
@@ -313,17 +260,10 @@ export class SatelliteRepairController {
     })
   }
 
-  /**
-   * Dispose geometry + materials under `obj`. Shared geometry is NOT disposed
-   * because the base mesh still uses it.
-   *
-   * @param obj - Object3D whose descendants should have materials/textures freed.
-   */
   private disposeObject(obj: THREE.Object3D): void {
     obj.traverse((child) => {
       const mesh = child as THREE.Mesh
       if (mesh.isMesh) {
-        // Geometry is shared with the source mesh — do not dispose here.
         const mat = mesh.material
         if (Array.isArray(mat)) mat.forEach((m) => m.dispose())
         else if (mat) mat.dispose()

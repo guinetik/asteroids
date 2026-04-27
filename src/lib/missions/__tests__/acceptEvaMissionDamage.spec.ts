@@ -34,7 +34,7 @@ describe('acceptEvaMission damage roll', () => {
     const result = acceptEvaMission(board, WAYPOINT)
     const [active] = result.activeEvaMissions
     expect(active!.brokenComponents).toBeDefined()
-    expect(active!.brokenComponents!.length).toBeGreaterThanOrEqual(1)
+    expect(active!.brokenComponents!.length).toBeGreaterThanOrEqual(2)
   })
 
   it('produces the same brokenComponents for the same mission id', () => {
@@ -53,7 +53,7 @@ describe('acceptEvaMission damage roll', () => {
     const neptune = template('neptune_sat_1', 'satellite', 'satellite_servicing')
     const e = acceptEvaMission(boardWithOffer(earth, 'earth'), WAYPOINT)
     const n = acceptEvaMission(boardWithOffer(neptune, 'neptune'), WAYPOINT)
-    expect(e.activeEvaMissions[0]!.brokenComponents!.length).toBe(1)
+    expect(e.activeEvaMissions[0]!.brokenComponents!.length).toBe(2)
     expect(n.activeEvaMissions[0]!.brokenComponents!.length).toBe(3)
   })
 

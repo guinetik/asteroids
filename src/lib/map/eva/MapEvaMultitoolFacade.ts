@@ -19,6 +19,7 @@ import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
 import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
 import { MultiToolState } from '@/lib/fps/multiToolState'
 import {
+  type EvaSatelliteServicingScienceBoltTarget,
   type MapEvaShuttleHullHealTarget,
   type ProjectileImpactContext,
   ProjectileSystem,
@@ -98,6 +99,16 @@ export class MapEvaMultitoolFacade {
    * @param base - Payload from {@link EvaSession} before tool overlay.
    * @returns HUD telemetry with tool RTG, mode charge, ADS, and firing.
    */
+  /**
+   * Wire the satellite-servicing science-bolt path on the current projectile
+   * system, or clear it when the in-scene minigame ends.
+   *
+   * @param target - In-scene repair target implementation, or null.
+   */
+  setEvaSatelliteServicingScience(target: EvaSatelliteServicingScienceBoltTarget | null): void {
+    this.projectileSystem?.setEvaSatelliteServicingScience(target)
+  }
+
   mergeToolTelemetry(base: FpsTelemetry): FpsTelemetry {
     const mt = this.multiToolState
     const session = this.deps?.getEvaSession() ?? null
@@ -174,7 +185,7 @@ export class MapEvaMultitoolFacade {
       this.projectileSystem.setMapEvaShuttleHullHeal(d.getEvaMapHullHealTarget())
       this.projectileSystem.prewarmPool()
       this.projectileSystem.onImpact = (pos, context: ProjectileImpactContext) => {
-        if (context.kind === 'shuttle_hull') {
+        if (context.kind === 'shuttle_hull' || context.kind === 'satellite_repair') {
           for (let i = 0; i < EVA_HULL_HEAL_IMPACT_SPARK_COUNT; i += 1) {
             this.impactVel.copy(this.impactUp).multiplyScalar(5)
             this.hullHealImpactEmitter?.emit(pos, this.impactVel)
@@ -212,6 +223,7 @@ export class MapEvaMultitoolFacade {
       }
       if (this.projectileSystem) {
         this.projectileSystem.setMapEvaShuttleHullHeal(null)
+        this.projectileSystem.setEvaSatelliteServicingScience(null)
         this.projectileSystem.onImpact = null
         th.unregister(this.projectileSystem)
         this.projectileSystem.dispose()

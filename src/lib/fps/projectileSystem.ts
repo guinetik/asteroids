@@ -53,6 +53,8 @@ export type ProjectileImpactKind =
   | 'hostage'
   /** Map EVA: science bolt struck the player shuttle hull AABB and applied hull repair. */
   | 'shuttle_hull'
+  /** Map EVA: science bolt advanced satellite servicing repair on a rigged sub-object. */
+  | 'satellite_repair'
 
 /**
  * Carried with {@link ProjectileSystem.onImpact} so listeners can style feedback per mode/surface
@@ -83,6 +85,20 @@ export interface MapEvaShuttleHullHealTarget {
    * @returns Whether hull became 100% this frame.
    */
   onHealFromBolt(amount: number): { becameFull: boolean }
+}
+
+/**
+ * Map EVA: science multitool vs the in-scene satellite repair controller
+ * (swept AABB per damaged part).
+ */
+export interface EvaSatelliteServicingScienceBoltTarget {
+  /**
+   * @param from - Previous bolt position, world space.
+   * @param to - New bolt position, world space.
+   * @param outEntry - First entry point on a damaged part’s AABB, for impact VFX.
+   * @returns True when a bolt was consumed.
+   */
+  tryScienceRepairSegment(from: THREE.Vector3, to: THREE.Vector3, outEntry: THREE.Vector3): boolean
 }
 
 /** Sphere registration for a mineable surface rock. */
@@ -130,6 +146,8 @@ export class ProjectileSystem implements Tickable {
   private readonly rocks: MineableRockEntry[] = []
   private lander: LanderController | null = null
   private mapEvaShuttleHullHeal: MapEvaShuttleHullHealTarget | null = null
+  /** Map EVA satellite-servicing minigame — science bolts repair rigged sub-objects. */
+  private evaSatelliteServicingScience: EvaSatelliteServicingScienceBoltTarget | null = null
   /** Registered survey target (gather-mission rocket). Null when no gather mission is active. */
   private surveyTarget: THREE.Object3D | null = null
   /** Survey-target half extents (X, Y, Z) used for AABB hit testing. */
@@ -276,6 +294,14 @@ export class ProjectileSystem implements Tickable {
   }
 
   /**
+   * Register the EVA satellite-servicing science-bolt path, or `null` for map EVA without
+   * an active in-scene repair minigame.
+   */
+  setEvaSatelliteServicingScience(target: EvaSatelliteServicingScienceBoltTarget | null): void {
+    this.evaSatelliteServicingScience = target
+  }
+
+  /**
    * Register (or clear) the rocket-survey target. Pass `null` to clear.
    * Half extents define a local-axis AABB around the rocket world
    * position; the science-bolt branch checks this AABB before falling
@@ -405,6 +431,7 @@ export class ProjectileSystem implements Tickable {
       let hitRock = false
       let hitRocket = false
       let hitMapShuttleHull = false
+      let hitSatelliteRepair = false
 
       if (p.boltKind === 'science') {
         const hostageHit = this.closestHostageHealHit(this._prevPos, pos)
@@ -434,7 +461,16 @@ export class ProjectileSystem implements Tickable {
           }
           let landerHit = false
           if (!hitMapShuttleHull) {
-            if (this.lander) {
+            if (
+              this.evaSatelliteServicingScience?.tryScienceRepairSegment(
+                this._prevPos,
+                pos,
+                this._callbackPos,
+              ) === true
+            ) {
+              hitSatelliteRepair = true
+              hitHostage = true
+            } else if (this.lander) {
               this.lander.group.getWorldPosition(this._landerCenter)
               const distSq = pos.distanceToSquared(this._landerCenter)
               // ~13.4 unit radius around lander center
@@ -445,7 +481,7 @@ export class ProjectileSystem implements Tickable {
                 landerHit = true
               }
             }
-            if (!landerHit) {
+            if (!hitSatelliteRepair && !landerHit) {
               const surveyImpact = this.surveyTargetHit(this._prevPos, pos, this._callbackPos)
               if (surveyImpact !== null) {
                 this.onScienceRocketHit?.(this._callbackPos)
@@ -507,7 +543,7 @@ export class ProjectileSystem implements Tickable {
         p.age >= BOLT_MAX_LIFETIME
       ) {
         if (hitTerrain || hitEnemy || hitHostage || hitRock || hitRocket) {
-          if (!hitMapShuttleHull) {
+          if (!hitMapShuttleHull && !hitSatelliteRepair) {
             this._callbackPos.copy(pos)
           }
           let kind: ProjectileImpactKind
@@ -515,6 +551,8 @@ export class ProjectileSystem implements Tickable {
             kind = 'enemy'
           } else if (hitMapShuttleHull) {
             kind = 'shuttle_hull'
+          } else if (hitSatelliteRepair) {
+            kind = 'satellite_repair'
           } else if (hitRocket) {
             kind = 'science_rocket'
           } else if (hitHostage) {
@@ -742,6 +780,7 @@ export class ProjectileSystem implements Tickable {
   }
 
   dispose(): void {
+    this.evaSatelliteServicingScience = null
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       this.removeProjectile(i)
     }

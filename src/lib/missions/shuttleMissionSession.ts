@@ -500,6 +500,13 @@ const DAMAGE_COUNT_BY_PLANET: Record<string, number> = {
   neptune: 3,
 }
 
+/**
+ * At least this many unique components are damaged when the manifest has enough
+ * parts (satellite servicing uses the science multitool, so easy-tier planets
+ * still get two panels/antennas to fix).
+ */
+const MIN_BROKEN_SATELLITE_COMPONENTS = 2
+
 /** Default to hard (3) if a planet id isn't in the tier table — safer than crashing. */
 const DEFAULT_DAMAGE_COUNT = 3
 
@@ -553,9 +560,13 @@ function rollBrokenComponents(
   if (tmpl.minigameType !== 'satellite_servicing') return undefined
   const manifest = getSatelliteManifest(tmpl.poiType)
   if (!manifest || manifest.components.length === 0) return undefined
-  const count = Math.min(
+  const tierCount = Math.min(
     DAMAGE_COUNT_BY_PLANET[planetId] ?? DEFAULT_DAMAGE_COUNT,
     manifest.components.length,
+  )
+  const count = Math.min(
+    manifest.components.length,
+    Math.max(MIN_BROKEN_SATELLITE_COMPONENTS, tierCount),
   )
   const rng = mulberry32(hashMissionId(tmpl.id))
   // Fisher-Yates partial shuffle — take first `count` after shuffling.

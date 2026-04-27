@@ -2721,6 +2721,7 @@ export class MapViewController implements Tickable {
     if (!this.activeEvaMinigame) return
     this.activeEvaMinigame.dispose()
     this.activeEvaMinigame = null
+    this.evaMapMultitoolFacade.setEvaSatelliteServicingScience(null)
     this.satelliteRepairController?.dispose()
     this.satelliteRepairController = null
     if (this.vehicleCamera) this.vehicleCamera.controls.enabled = true
@@ -2758,6 +2759,7 @@ export class MapViewController implements Tickable {
     }
     this.activeEvaMinigame?.dispose()
     this.activeEvaMinigame = null
+    this.evaMapMultitoolFacade.setEvaSatelliteServicingScience(null)
     this.satelliteRepairController?.dispose()
     this.satelliteRepairController = null
     this.currentAimPrompt = null
@@ -4153,6 +4155,12 @@ export class MapViewController implements Tickable {
     if (active) {
       this.evaMapMultitoolFacade.setupEvaFiring()
       void this.evaMapMultitoolFacade.loadViewModel()
+      if (this.satelliteRepairController) {
+        this.evaMapMultitoolFacade.setEvaSatelliteServicingScience(this.satelliteRepairController)
+      }
+      if (this.getActiveSatelliteServicingMission()) {
+        this.onEvaToast?.('USE THE MULTITOOL TO FIX THE BROKEN SATELLITE PARTS')
+      }
     }
   }
 
@@ -4221,15 +4229,14 @@ export class MapViewController implements Tickable {
     this.satelliteRepairController = new SatelliteRepairController()
     this.satelliteRepairController.attach({
       poiObject,
-      getCamera: () => {
-        const pass = this.sceneObjects?.composer.passes[0] as RenderPass | undefined
-        return pass?.camera ?? null
-      },
-      isFixKeyPressed: () => this.inputManager?.isActionActive('interact') ?? false,
       minigame,
       mission,
       onAimPromptChange: (prompt: string | null) => {
         this.currentAimPrompt = prompt
+      },
+      onComponentFullyRepaired: (componentName: string) => {
+        const label = componentName.replaceAll('_', ' ')
+        this.onEvaToast?.(`Part repaired: ${label}`)
       },
     })
   }
@@ -4245,6 +4252,7 @@ export class MapViewController implements Tickable {
    */
   private teardownSatelliteRepairOnExit(): void {
     if (!this.satelliteRepairController) return
+    this.evaMapMultitoolFacade.setEvaSatelliteServicingScience(null)
     this.satelliteRepairController.dispose()
     this.satelliteRepairController = null
     this.activeEvaMinigame?.dispose()

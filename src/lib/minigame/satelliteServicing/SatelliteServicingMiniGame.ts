@@ -1,11 +1,10 @@
 /**
  * Satellite servicing minigame — in-scene 3D minigame where the player EVAs
- * up to 1–3 broken components on a satellite and repairs each via a screen-
- * space drag interaction. This class is the OrbitalMiniGame contract bridge:
- * it tracks the damaged component list, exposes progress, and fires
- * onComplete when every component has been repaired. The 3D scene work —
- * wireframe overlays, camera lock, drag mechanic — lives in
- * SatelliteRepairController.
+ * broken components on a satellite; each part is repaired by shooting it with
+ * the map EVA science multitool until its health is restored. This class is
+ * the OrbitalMiniGame contract bridge: it tracks the damaged component list,
+ * exposes progress, and fires onComplete when every component has been repaired.
+ * Wireframe overlays and hit testing live in `SatelliteRepairController`.
  *
  * @author guinetik
  * @date 2026-04-19
