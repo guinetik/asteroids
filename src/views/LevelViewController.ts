@@ -1456,6 +1456,11 @@ export class LevelViewController implements Tickable {
     return this.minigames.getByObjectiveIndex(objectiveIndex)
   }
 
+  /** Active minigame (first one with `status === 'active'`), if any. */
+  getActiveMinigame(): MiniGame | undefined {
+    return this.minigames.getActive()
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // Exfil / Complete states
   // ═══════════════════════════════════════════════════════════════

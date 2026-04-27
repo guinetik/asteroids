@@ -33,6 +33,8 @@ import { removeItem } from '@/lib/inventory/inventory'
 import type { LanderTelemetry } from '@/lib/ui/landerHudTypes'
 import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 import { OBJECTIVE_LABELS } from '@/lib/minigame/MiniGame'
+import RescueSurvivorPanel from '@/components/RescueSurvivorPanel.vue'
+import { RescueMinigame } from '@/lib/minigame/RescueMinigame'
 import {
   playBackgroundMusic,
   stopBackgroundMusic,
@@ -233,6 +235,11 @@ function recordPickupFailed(label: string, reason: string): void {
   })
   pickupFailedTimers.add(handle)
 }
+const rescueTotal = ref(0)
+const rescueAlive = ref(0)
+const rescueAboard = ref(0)
+const rescueActive = ref(false)
+
 const backgroundMusic = useBackgroundMusicGlobalState()
 const musicEnabled = computed(() => backgroundMusic.isEnabled.value)
 
@@ -393,9 +400,27 @@ onMounted(async () => {
     }
     viewController.onSurvivorLost = () => {
       recordSurvivor('lost')
+      const active = viewController.getActiveMinigame()
+      if (active instanceof RescueMinigame) {
+        rescueActive.value = true
+        rescueTotal.value = active.totalSurvivors
+        rescueAlive.value = active.aliveSurvivors
+        rescueAboard.value = active.aboardSurvivors
+      } else {
+        rescueActive.value = false
+      }
     }
     viewController.onSurvivorAboard = () => {
       recordSurvivor('aboard')
+      const active = viewController.getActiveMinigame()
+      if (active instanceof RescueMinigame) {
+        rescueActive.value = true
+        rescueTotal.value = active.totalSurvivors
+        rescueAlive.value = active.aliveSurvivors
+        rescueAboard.value = active.aboardSurvivors
+      } else {
+        rescueActive.value = false
+      }
     }
     await viewController.init(container.value)
 
@@ -418,6 +443,14 @@ onMounted(async () => {
           steps: mg?.steps ?? [],
         }
       })
+      // Seed rescue panel if this is a rescue mission
+      const active = viewController.getActiveMinigame()
+      if (active instanceof RescueMinigame) {
+        rescueActive.value = true
+        rescueTotal.value = active.totalSurvivors
+        rescueAlive.value = active.aliveSurvivors
+        rescueAboard.value = active.aboardSurvivors
+      }
     }
 
     window.addEventListener('keydown', handleGlobalKeydown)
@@ -590,6 +623,12 @@ function handleToggleMusic(): void {
     :eyebrow="trackerAsteroid"
     :title="trackerMission"
     :objectives="trackerObjectives"
+  />
+  <RescueSurvivorPanel
+    v-if="rescueActive"
+    :total="rescueTotal"
+    :alive="rescueAlive"
+    :aboard="rescueAboard"
   />
   <LanderHud v-if="stateInfo.state === 'lander'" :telemetry="landerTelemetry" />
   <FpsHud v-if="stateInfo.state === 'eva'" :telemetry="fpsTelemetry" />
