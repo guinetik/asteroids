@@ -17,6 +17,7 @@ import type { EnemyProjectileSystem } from '@/lib/fps/enemyProjectileSystem'
 import { Hostage, HOSTAGE_DEFAULT_HIT_RADIUS, HOSTAGE_HIT_CENTER_Y } from '@/lib/fps/hostage'
 
 import { HostageModel } from './HostageModel'
+import { HostageWalker } from './HostageWalker'
 
 /** Canvas width for generated HP bar texture (pixels). */
 const HP_BAR_CANVAS_W = 128
@@ -36,6 +37,8 @@ const HP_BAR_FALLBACK_LOCAL_Y = 2.15
 const HOSTAGE_REVEAL_DURATION = 0.9
 const HOSTAGE_REVEAL_START_SCALE = 0.18
 const HOSTAGE_REVEAL_START_DEPTH = 2.6
+/** Duration of the scale + opacity fade when a recruited hostage reaches the lander (s). */
+const HOSTAGE_BOARD_FADE_DURATION = 0.4
 
 /** HP ratio above this uses the “healthy” bar color. */
 const HP_PCT_HIGH = 0.55
@@ -124,6 +127,7 @@ class HostageInstance {
   private readonly ctx: CanvasRenderingContext2D
   private readonly texture: THREE.CanvasTexture
   private dead = false
+  private boardFadeTimer = 0
   private revealTimer = HOSTAGE_REVEAL_DURATION
   private targetY = 0
   /** Rounded HP label — avoids redrawing when unchanged. */
@@ -168,6 +172,27 @@ class HostageInstance {
     this.hostage.onDeath = () => {
       this.markDead()
     }
+  }
+
+  /**
+   * Begin the board fade. After {@link HOSTAGE_BOARD_FADE_DURATION} the
+   * controller removes the instance entirely; until then the model scales
+   * and fades out smoothly. Idempotent.
+   */
+  beginBoardFade(): void {
+    if (this.boardFadeTimer > 0 || this.dead) return
+    this.boardFadeTimer = HOSTAGE_BOARD_FADE_DURATION
+    this.sprite.visible = false
+  }
+
+  /** True when the board fade has fully played out and the controller can remove this instance. */
+  get isBoardFadeComplete(): boolean {
+    return this.boardFadeTimer < 0
+  }
+
+  /** True if the board fade is active (used by tick to drive the visual). */
+  get isBoarding(): boolean {
+    return this.boardFadeTimer > 0
   }
 
   /**
@@ -241,9 +266,14 @@ class HostageInstance {
       this.model.group.position.y = this.targetY - (1 - eased) * HOSTAGE_REVEAL_START_DEPTH
       const scale = HOSTAGE_REVEAL_START_SCALE + eased * (1 - HOSTAGE_REVEAL_START_SCALE)
       this.model.group.scale.setScalar(scale)
-      this.sprite.visible = eased >= 0.45
+      this.sprite.visible = eased >= 0.45 && !this.dead
+    } else if (this.boardFadeTimer > 0) {
+      this.boardFadeTimer -= dt
+      const t = Math.max(0, 1 - this.boardFadeTimer / HOSTAGE_BOARD_FADE_DURATION)
+      const scale = 1 - t
+      this.model.group.scale.setScalar(Math.max(0.001, scale))
+      // Walker drives Y/X/Z; sprite already hidden by beginBoardFade.
     } else {
-      this.model.group.position.y = this.targetY
       this.model.group.scale.setScalar(1)
       this.sprite.visible = !this.dead
     }
@@ -280,8 +310,20 @@ export class FpsHostageController implements Tickable {
   private readonly scene: THREE.Scene
   private readonly heightmap: Heightmap
   private readonly instances: HostageInstance[] = []
+  private readonly walkers = new Map<Hostage, HostageWalker>()
   private projectileSystem: ProjectileSystem | null = null
   private enemyProjectileSystem: EnemyProjectileSystem | null = null
+  private _aboardCount = 0
+
+  /**
+   * Fired when a hostage dies (HP hits 0 from any source). Receives the count of
+   * survivors still alive AND not yet aboard, so the level VC can route a toast
+   * + counter refresh without recomputing.
+   */
+  onSurvivorLost: ((aliveRemaining: number) => void) | null = null
+
+  /** Fired when a recruited walker boards the lander. */
+  onSurvivorAboard: ((aboardCount: number) => void) | null = null
 
   /**
    * @param scene - Scene the hostage groups are added to
@@ -307,6 +349,20 @@ export class FpsHostageController implements Tickable {
    */
   getTotalCount(): number {
     return this.instances.length
+  }
+
+  /** Count of recruited hostages that have walked into the lander. Monotonic per mission. */
+  get aboardCount(): number {
+    return this._aboardCount
+  }
+
+  /**
+   * Currently-alive hostages that have not yet boarded the lander. This is the
+   * working number for both the HUD and the `RescueMinigame` step-3 completion
+   * check (`alive === 0` while step 3 is active).
+   */
+  get aliveCountNotAboard(): number {
+    return this.getAliveCount()
   }
 
   /**
@@ -359,6 +415,8 @@ export class FpsHostageController implements Tickable {
       this.scene.remove(inst.model.group)
     }
     this.instances.length = 0
+    this.walkers.clear()
+    this._aboardCount = 0
   }
 
   /**
@@ -413,6 +471,38 @@ export class FpsHostageController implements Tickable {
     inst?.syncHpBarIfNeeded(true)
   }
 
+  /**
+   * Recruit a hostage for extraction: kick off the stand-up animation and create
+   * a walker that will steer the rig to the live lander position. The
+   * `targetProvider` closure is called every tick so the walker tracks the
+   * lander even if it moves (relevant once the liftoff lock auto-clears).
+   *
+   * @param hostage        - Domain entity to recruit
+   * @param targetProvider - Live lander XZ provider (returns a fresh `Vector3`)
+   */
+  recruit(hostage: Hostage, targetProvider: () => THREE.Vector3): void {
+    if (this.walkers.has(hostage)) return
+    const inst = this.instances.find((i) => i.hostage === hostage)
+    if (!inst || !inst.isActive()) return
+    void inst.model.playStandUp()
+    const walker = new HostageWalker(hostage, inst.model, targetProvider, (h) => this.handleBoard(h))
+    this.walkers.set(hostage, walker)
+  }
+
+  private handleBoard(hostage: Hostage): void {
+    const inst = this.instances.find((i) => i.hostage === hostage)
+    if (!inst) return
+    inst.beginBoardFade()
+    this._aboardCount += 1
+    // Remove from collision lists immediately so the dead virus / charges flow
+    // doesn't see the boarded hostage as a target. The visual finishes its fade
+    // over HOSTAGE_BOARD_FADE_DURATION; the controller removes the scene node
+    // once isBoardFadeComplete is true.
+    this.projectileSystem?.removeHostage(hostage)
+    this.enemyProjectileSystem?.removeHostage(hostage)
+    this.onSurvivorAboard?.(this._aboardCount)
+  }
+
   /** @inheritdoc */
   tick(_dt: number): void {
     for (const inst of this.instances) {
@@ -420,6 +510,25 @@ export class FpsHostageController implements Tickable {
       inst.tick(_dt)
       if (inst.isActive()) {
         inst.syncHpBarIfNeeded()
+      }
+    }
+    for (const walker of this.walkers.values()) {
+      walker.tick(_dt, this.heightmap)
+    }
+    // Remove walkers + instances that finished boarding.
+    for (const [hostage, walker] of this.walkers) {
+      if (!walker.finished) continue
+      const idx = this.instances.findIndex((i) => i.hostage === hostage)
+      if (idx >= 0) {
+        const inst = this.instances[idx]!
+        if (inst.isBoardFadeComplete) {
+          inst.dispose()
+          this.scene.remove(inst.model.group)
+          this.instances.splice(idx, 1)
+          this.walkers.delete(hostage)
+        }
+      } else {
+        this.walkers.delete(hostage)
       }
     }
   }
@@ -446,6 +555,12 @@ export class FpsHostageController implements Tickable {
     const inst = new HostageInstance(hostage, model, (h) => {
       this.projectileSystem?.removeHostage(h)
       this.enemyProjectileSystem?.removeHostage(h)
+      const walker = this.walkers.get(h)
+      if (walker) {
+        walker.finished = true
+        this.walkers.delete(h)
+      }
+      this.onSurvivorLost?.(this.aliveCountNotAboard)
     })
     inst.syncAnchorToGroup()
 
