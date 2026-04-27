@@ -17,7 +17,7 @@
 import * as THREE from 'three'
 import { clone as cloneSkinnedScene } from 'three/addons/utils/SkeletonUtils.js'
 import { loadGLB } from './loadGLB'
-import { loadHostageClips } from './HostageAnimations'
+import { HOSTAGE_CLIP_PRAYING_STAND_UP, loadHostageClips } from './HostageAnimations'
 
 /** Public URL path served from `public/models/hostage.glb`. */
 export const HOSTAGE_MODEL_PUBLIC_PATH = '/models/hostage.glb'
@@ -328,6 +328,7 @@ export class HostageModel {
    */
   dispose(): void {
     if (this.mixer) {
+      this.mixer.removeEventListener('finished', this.handleMixerFinished)
       this.mixer.stopAllAction()
       this.mixer.uncacheRoot(this.skinnedRoot)
       this.mixer = null
@@ -337,10 +338,22 @@ export class HostageModel {
     this.group.clear()
   }
 
+  /**
+   * Auto-promote `standing-up → walking` when the stand-up clip's last
+   * frame fires. Other clips (praying ping-pong loop, dying clamp) emit
+   * `'finished'` too, but those names don't match so they're ignored.
+   */
+  private readonly handleMixerFinished = (event: { action: THREE.AnimationAction }): void => {
+    const clip = event.action.getClip()
+    if (clip.name !== HOSTAGE_CLIP_PRAYING_STAND_UP) return
+    void this.playWalking()
+  }
+
   /** Lazily build the per-instance mixer the first time a clip is requested. */
   private ensureMixer(): THREE.AnimationMixer {
     if (!this.mixer) {
       this.mixer = new THREE.AnimationMixer(this.skinnedRoot)
+      this.mixer.addEventListener('finished', this.handleMixerFinished)
     }
     return this.mixer
   }
