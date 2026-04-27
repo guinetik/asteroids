@@ -2046,6 +2046,11 @@ export class LevelViewController implements Tickable {
     const landerUp = lander
       ? LANDER_LOCAL_UP.clone().applyQuaternion(lander.group.quaternion).normalize()
       : null
+    let playerForwardSnap: { x: number; y: number; z: number } | null = null
+    if (state === 'eva' && this.fpsCamera) {
+      const v = this.fpsCamera.getForward(this._playerForwardScratch)
+      playerForwardSnap = { x: v.x, y: v.y, z: v.z }
+    }
     this.minigames.tick(
       dt,
       {
@@ -2062,13 +2067,7 @@ export class LevelViewController implements Tickable {
           state === 'eva' && player
             ? { x: player.group.position.x, y: player.group.position.y, z: player.group.position.z }
             : null,
-        playerForward:
-          state === 'eva' && this.fpsCamera
-            ? (() => {
-                const v = this.fpsCamera.getForward(this._playerForwardScratch)
-                return { x: v.x, y: v.y, z: v.z }
-              })()
-            : null,
+        playerForward: playerForwardSnap,
         interactPressed: this.inputManager?.wasActionPressed('interact') ?? false,
         terminalInteractPressed: this.inputManager?.wasActionPressed('terminalInteract') ?? false,
       },

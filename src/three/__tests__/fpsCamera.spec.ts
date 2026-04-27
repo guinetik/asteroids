@@ -60,4 +60,48 @@ describe('FpsCamera', () => {
     const dot = fwd.x * right.x + fwd.y * right.y
     expect(dot).toBeCloseTo(0, 3)
   })
+
+  describe('getForward', () => {
+    it('returns unit length at arbitrary yaw and pitch', () => {
+      cam.yaw = 0.7
+      cam.pitch = -0.3
+      const out = new THREE.Vector3()
+      cam.getForward(out)
+      expect(out.length()).toBeCloseTo(1, 6)
+    })
+
+    it('encodes pitch — Y component equals sin(pitch) at yaw 0', () => {
+      cam.yaw = 0
+      cam.pitch = Math.PI / 6
+      const out = new THREE.Vector3()
+      cam.getForward(out)
+      expect(out.y).toBeCloseTo(Math.sin(Math.PI / 6), 6)
+    })
+
+    it('returns (0, 0, -1) at yaw 0 and pitch 0', () => {
+      cam.yaw = 0
+      cam.pitch = 0
+      const out = new THREE.Vector3()
+      cam.getForward(out)
+      expect(out.x).toBeCloseTo(0, 6)
+      expect(out.y).toBeCloseTo(0, 6)
+      expect(out.z).toBeCloseTo(-1, 6)
+    })
+
+    it('mutates and returns the same scratch vector on repeated calls', () => {
+      const scratch = new THREE.Vector3()
+      cam.yaw = 1.0
+      cam.pitch = 0.2
+      const ref1 = cam.getForward(scratch)
+      expect(ref1).toBe(scratch)
+
+      cam.yaw = 2.0
+      cam.pitch = -0.1
+      const ref2 = cam.getForward(scratch)
+      expect(ref2).toBe(scratch)
+
+      // vector should now reflect the second call's values
+      expect(scratch.x).toBeCloseTo(-Math.sin(2.0) * Math.cos(-0.1), 6)
+    })
+  })
 })

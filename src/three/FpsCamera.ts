@@ -271,8 +271,9 @@ export class FpsCamera implements Tickable {
    */
   getForward(out: THREE.Vector3): THREE.Vector3 {
     const cosPitch = Math.cos(this.pitch)
+    // Spherical-coordinate formula — unit length by construction; no normalize needed.
     out.set(-Math.sin(this.yaw) * cosPitch, Math.sin(this.pitch), -Math.cos(this.yaw) * cosPitch)
-    return out.normalize()
+    return out
   }
 
   /** Forward direction on the XZ plane (pitch stripped). */
