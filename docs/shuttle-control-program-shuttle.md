@@ -20,7 +20,7 @@ This turns a placeholder tab into a valuable onboarding and reference tool that 
 
 The manual acknowledges:
 - The shuttle is a **refurbished NASA-era lunar lander chassis** from the boom years.
-- Major aftermarket upgrades include the **neutron thruster system** (Enceladus-derived) and **slingshot/gravity-assist coupling**.
+- Major aftermarket upgrades include the **neutron thruster system** (Phobos-derived) and **slingshot/gravity-assist coupling**.
 - It is held together with stubbornness, aftermarket parts, and Marta's people.
 
 ## Content Sections

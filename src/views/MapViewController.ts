@@ -3722,8 +3722,8 @@ export class MapViewController implements Tickable {
   /**
    * Animate the intro camera through 6 cinematic beats.
    *
-   * Beat 1: Wide solar system → Saturn/Enceladus
-   * Beat 2: Hold on Enceladus (discovery)
+   * Beat 1: Wide solar system → Phobos
+   * Beat 2: Hold on Phobos (discovery)
    * Beat 3: Viroid reveal (VirusModel prop)
    * Beat 4a: Sweep to Jupiter
    * Beat 4b: Cloud city reveal (CityModel prop)

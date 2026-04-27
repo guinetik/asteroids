@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Expand the map intro cinematic from 3 beats / 14s to 6 visual moments / ~30s, adding Enceladus discovery, Viroid reveal (VirusModel), Jupiter approach, and cloud city reveal (CityModel) camera beats.
+**Goal:** Expand the map intro cinematic from 3 beats / 14s to 6 visual moments / ~30s, adding Phobos discovery, Viroid reveal (VirusModel), Jupiter approach, and cloud city reveal (CityModel) camera beats.
 
-**Architecture:** The intro state machine (`mapIntroState.ts`) drives caption selection and beat boundaries. The camera animation (`MapViewController.tickStartupIntroCamera()`) reads the eased progress to lerp between planet positions. Two 3D props (VirusModel, CityModel) spawn/dispose at beat boundaries. A small getter is added to `PlanetSystemController` so the camera can track Enceladus's world position.
+**Architecture:** The intro state machine (`mapIntroState.ts`) drives caption selection and beat boundaries. The camera animation (`MapViewController.tickStartupIntroCamera()`) reads the eased progress to lerp between planet positions. Two 3D props (VirusModel, CityModel) spawn/dispose at beat boundaries. A small getter is added to `PlanetSystemController` so the camera can track Phobos's world position.
 
 **Tech Stack:** TypeScript, Three.js, Vitest
 
@@ -36,13 +36,13 @@ Replace the existing caption test and add a new one that covers all 6 boundaries
 import { describe, expect, it } from 'vitest'
 import {
   MAP_INTRO_CAPTION_SOLAR_SYSTEM,
-  MAP_INTRO_CAPTION_ENCELADUS,
+  MAP_INTRO_CAPTION_PHOBOS,
   MAP_INTRO_CAPTION_VIROIDS,
   MAP_INTRO_CAPTION_JUPITER_MATERIALS,
   MAP_INTRO_CAPTION_CLOUD_CITY,
   MAP_INTRO_CAPTION_RETIRED_OPERATOR,
   MAP_INTRO_CINEMATIC_DURATION,
-  MAP_INTRO_BEAT_ENCELADUS,
+  MAP_INTRO_BEAT_PHOBOS,
   MAP_INTRO_BEAT_VIROIDS,
   MAP_INTRO_BEAT_JUPITER,
   MAP_INTRO_BEAT_CLOUD_CITY,
@@ -56,18 +56,18 @@ Replace the caption order test (`it('shows the three cinematic captions...')`) w
 
 ```ts
 it('shows the six cinematic captions in order by eased progress', () => {
-  // Beat 1: Solar system (0 to BEAT_ENCELADUS)
+  // Beat 1: Solar system (0 to BEAT_PHOBOS)
   expect(mapIntroCaptionForEasedProgress(0)).toBe(MAP_INTRO_CAPTION_SOLAR_SYSTEM)
-  expect(mapIntroCaptionForEasedProgress(MAP_INTRO_BEAT_ENCELADUS - 0.01)).toBe(
+  expect(mapIntroCaptionForEasedProgress(MAP_INTRO_BEAT_PHOBOS - 0.01)).toBe(
     MAP_INTRO_CAPTION_SOLAR_SYSTEM,
   )
 
-  // Beat 2: Enceladus discovery
-  expect(mapIntroCaptionForEasedProgress(MAP_INTRO_BEAT_ENCELADUS)).toBe(
-    MAP_INTRO_CAPTION_ENCELADUS,
+  // Beat 2: Phobos discovery
+  expect(mapIntroCaptionForEasedProgress(MAP_INTRO_BEAT_PHOBOS)).toBe(
+    MAP_INTRO_CAPTION_PHOBOS,
   )
   expect(mapIntroCaptionForEasedProgress(MAP_INTRO_BEAT_VIROIDS - 0.01)).toBe(
-    MAP_INTRO_CAPTION_ENCELADUS,
+    MAP_INTRO_CAPTION_PHOBOS,
   )
 
   // Beat 3: Viroid reveal
@@ -117,8 +117,8 @@ In `src/lib/mapIntroState.ts`, replace the existing duration, boundary, and capt
 /** Duration in seconds for the opening cinematic (6 visual beats). */
 export const MAP_INTRO_CINEMATIC_DURATION = 30
 
-/** Eased progress boundary: start of Enceladus discovery beat. */
-export const MAP_INTRO_BEAT_ENCELADUS = 0.12
+/** Eased progress boundary: start of Phobos discovery beat. */
+export const MAP_INTRO_BEAT_PHOBOS = 0.12
 
 /** Eased progress boundary: start of Viroid reveal beat. */
 export const MAP_INTRO_BEAT_VIROIDS = 0.28
@@ -135,11 +135,11 @@ export const MAP_INTRO_BEAT_EARTH = 0.70
 /** Caption: wide solar system establishing shot. */
 export const MAP_INTRO_CAPTION_SOLAR_SYSTEM = 'SOLAR SYSTEM, 2299 AD.'
 
-/** Caption: Enceladus neutron thruster discovery. */
-export const MAP_INTRO_CAPTION_ENCELADUS =
-  'A DISCOVERY ON ENCELADUS UNLOCKED RELATIVISTIC ACCELERATION AT OUR FINGERTIPS: THE NEUTRON THRUSTER.'
+/** Caption: Phobos neutron thruster discovery. */
+export const MAP_INTRO_CAPTION_PHOBOS =
+  'A DISCOVERY ON PHOBOS UNLOCKED RELATIVISTIC ACCELERATION AT OUR FINGERTIPS: THE NEUTRON THRUSTER.'
 
-/** Caption: Viroid reveal on Enceladus. */
+/** Caption: Viroid reveal on Phobos. */
 export const MAP_INTRO_CAPTION_VIROIDS =
   'BUT IT WAS HOME TO SOMETHING ELSE. SILICATE CREATURES FROM INTERSTELLAR SPACE. TERRITORIAL AND LETHAL. WE CALL THEM VIROIDS.'
 
@@ -169,8 +169,8 @@ Replace the `mapIntroCaptionForEasedProgress` function (lines 44–48) with:
  * @date 2026-04-09
  */
 export function mapIntroCaptionForEasedProgress(easedProgress: number): string {
-  if (easedProgress < MAP_INTRO_BEAT_ENCELADUS) return MAP_INTRO_CAPTION_SOLAR_SYSTEM
-  if (easedProgress < MAP_INTRO_BEAT_VIROIDS) return MAP_INTRO_CAPTION_ENCELADUS
+  if (easedProgress < MAP_INTRO_BEAT_PHOBOS) return MAP_INTRO_CAPTION_SOLAR_SYSTEM
+  if (easedProgress < MAP_INTRO_BEAT_VIROIDS) return MAP_INTRO_CAPTION_PHOBOS
   if (easedProgress < MAP_INTRO_BEAT_JUPITER) return MAP_INTRO_CAPTION_VIROIDS
   if (easedProgress < MAP_INTRO_BEAT_CLOUD_CITY) return MAP_INTRO_CAPTION_JUPITER_MATERIALS
   if (easedProgress < MAP_INTRO_BEAT_EARTH) return MAP_INTRO_CAPTION_CLOUD_CITY
@@ -196,7 +196,7 @@ git commit -m "feat: expand intro captions to 6 beats / 30s cinematic"
 
 ### Task 2: Add getMoonWorldPosition to PlanetSystemController
 
-The camera needs to track Enceladus during beats 2–3. Moon meshes are children of the planet group but `moonEntries` is private. Add a getter.
+The camera needs to track Phobos during beats 2–3. Moon meshes are children of the planet group but `moonEntries` is private. Add a getter.
 
 **Files:**
 - Modify: `src/three/controllers/PlanetSystemController.ts`
@@ -260,7 +260,7 @@ Update the mapIntroState imports to use the new beat boundary names:
 import {
   MapIntroState,
   MAP_INTRO_CINEMATIC_DURATION,
-  MAP_INTRO_BEAT_ENCELADUS,
+  MAP_INTRO_BEAT_PHOBOS,
   MAP_INTRO_BEAT_VIROIDS,
   MAP_INTRO_BEAT_JUPITER,
   MAP_INTRO_BEAT_CLOUD_CITY,
@@ -278,9 +278,9 @@ const MAP_INTRO_CAMERA_START_POSITION = new THREE.Vector3(0, 320, 900)
 const MAP_INTRO_CAMERA_START_TARGET = new THREE.Vector3(0, 0, 0)
 const MAP_INTRO_CAMERA_START_FOV = 32
 
-/** Camera offset from Enceladus for the discovery/viroid beats. */
-const MAP_INTRO_ENCELADUS_CAMERA_OFFSET = new THREE.Vector3(0.4, 0.3, 0.8)
-const MAP_INTRO_ENCELADUS_FOV = 28
+/** Camera offset from Phobos for the discovery/viroid beats. */
+const MAP_INTRO_PHOBOS_CAMERA_OFFSET = new THREE.Vector3(0.4, 0.3, 0.8)
+const MAP_INTRO_PHOBOS_FOV = 28
 
 /** Camera offset from Jupiter for the shipyard / cloud city beats. */
 const MAP_INTRO_JUPITER_CAMERA_OFFSET = new THREE.Vector3(4, 3, 8)
@@ -304,8 +304,8 @@ const INTRO_CITY_YAW_SPEED = 0.2
 const INTRO_CITY_START_Y = -0.5
 const INTRO_CITY_END_Y = 1.5
 
-/** Enceladus is the 2nd moon of Saturn (index 1 in planetarium.json). */
-const ENCELADUS_MOON_INDEX = 1
+/** Phobos is the first moon of Mars (index 0 in planetarium.json). */
+const PHOBOS_MOON_INDEX = 0
 ```
 
 - [ ] **Step 2: Add prop instance fields**
@@ -341,8 +341,8 @@ Replace the entire `tickStartupIntroCamera()` method (lines 3479–3562) with:
 /**
  * Animate the intro camera through 6 cinematic beats.
  *
- * Beat 1: Wide solar system → Saturn/Enceladus
- * Beat 2: Hold on Enceladus (discovery)
+ * Beat 1: Wide solar system → Mars/Phobos
+ * Beat 2: Hold on Phobos (discovery)
  * Beat 3: Viroid reveal (VirusModel prop)
  * Beat 4a: Sweep to Jupiter
  * Beat 4b: Cloud city reveal (CityModel prop)
@@ -389,10 +389,10 @@ private tickIntroBeat(progress: number, renderPass: RenderPass): void {
   this.tickIntroProps(progress)
 
   // --- Camera routing ---
-  if (progress < MAP_INTRO_BEAT_ENCELADUS) {
-    this.tickIntroBeatWideToEnceladus(progress, renderPass)
+  if (progress < MAP_INTRO_BEAT_PHOBOS) {
+    this.tickIntroBeatWideToPhobos(progress, renderPass)
   } else if (progress < MAP_INTRO_BEAT_VIROIDS) {
-    this.tickIntroBeatEnceladusHold(progress, renderPass)
+    this.tickIntroBeatPhobosHold(progress, renderPass)
   } else if (progress < MAP_INTRO_BEAT_JUPITER) {
     this.tickIntroBeatViroidReveal(progress, renderPass)
   } else if (progress < MAP_INTRO_BEAT_CLOUD_CITY) {
@@ -432,17 +432,17 @@ private tickIntroProps(progress: number): void {
   }
 }
 
-/** Spawn the VirusModel near Enceladus. */
+/** Spawn the VirusModel near Phobos. */
 private spawnIntroVirus(scene: THREE.Scene): void {
-  const saturn = this.getPlanetControllerById('saturn')
-  if (!saturn) return
-  const enceladusPos = saturn.getMoonWorldPosition(ENCELADUS_MOON_INDEX, this.introMoonWorldPos)
-  if (!enceladusPos) return
+  const mars = this.getPlanetControllerById('mars')
+  if (!mars) return
+  const phobosPos = mars.getMoonWorldPosition(PHOBOS_MOON_INDEX, this.introMoonWorldPos)
+  if (!phobosPos) return
 
   VirusModel.create({ scale: 8 }).then((virus) => {
     if (this.introVirusModel) return // guard against double-spawn
     this.introVirusModel = virus
-    virus.placeAt(enceladusPos.x + 0.15, enceladusPos.y + 0.1, enceladusPos.z)
+    virus.placeAt(phobosPos.x + 0.15, phobosPos.y + 0.1, phobosPos.z)
     scene.add(virus.group)
   })
 }
@@ -484,65 +484,65 @@ private disposeIntroCity(scene: THREE.Scene): void {
 Add these methods to MapViewController, right after `disposeIntroCity`:
 
 ```ts
-/** Beat 1 (0–0.12): Wide solar system zoom toward Saturn/Enceladus. */
-private tickIntroBeatWideToEnceladus(progress: number, renderPass: RenderPass): void {
-  const saturn = this.getPlanetControllerById('saturn')
-  if (!saturn || !this.introCamera) return
+/** Beat 1 (0–0.12): Wide solar system zoom toward Mars/Phobos. */
+private tickIntroBeatWideToPhobos(progress: number, renderPass: RenderPass): void {
+  const mars = this.getPlanetControllerById('mars')
+  if (!mars || !this.introCamera) return
 
-  const enceladusTarget = this.getEnceladusWorldPos(saturn)
-  if (!enceladusTarget) return
-  const cameraTarget = enceladusTarget.clone().add(MAP_INTRO_ENCELADUS_CAMERA_OFFSET)
+  const phobosTarget = this.getPhobosWorldPos(mars)
+  if (!phobosTarget) return
+  const cameraTarget = phobosTarget.clone().add(MAP_INTRO_PHOBOS_CAMERA_OFFSET)
 
-  const t = easeInOut(progress / MAP_INTRO_BEAT_ENCELADUS)
+  const t = easeInOut(progress / MAP_INTRO_BEAT_PHOBOS)
   this.introCamera.position.lerpVectors(MAP_INTRO_CAMERA_START_POSITION, cameraTarget, t)
-  this.introCamera.fov = THREE.MathUtils.lerp(MAP_INTRO_CAMERA_START_FOV, MAP_INTRO_ENCELADUS_FOV, t)
+  this.introCamera.fov = THREE.MathUtils.lerp(MAP_INTRO_CAMERA_START_FOV, MAP_INTRO_PHOBOS_FOV, t)
   this.introCamera.updateProjectionMatrix()
-  const lookTarget = new THREE.Vector3().lerpVectors(MAP_INTRO_CAMERA_START_TARGET, enceladusTarget, t)
+  const lookTarget = new THREE.Vector3().lerpVectors(MAP_INTRO_CAMERA_START_TARGET, phobosTarget, t)
   this.introCamera.lookAt(lookTarget)
   renderPass.camera = this.introCamera
 }
 
-/** Beat 2 (0.12–0.28): Hold on Enceladus — discovery caption. */
-private tickIntroBeatEnceladusHold(progress: number, renderPass: RenderPass): void {
-  const saturn = this.getPlanetControllerById('saturn')
-  if (!saturn || !this.introCamera) return
+/** Beat 2 (0.12–0.28): Hold on Phobos — discovery caption. */
+private tickIntroBeatPhobosHold(progress: number, renderPass: RenderPass): void {
+  const mars = this.getPlanetControllerById('mars')
+  if (!mars || !this.introCamera) return
 
-  const enceladusTarget = this.getEnceladusWorldPos(saturn)
-  if (!enceladusTarget) return
+  const phobosTarget = this.getPhobosWorldPos(mars)
+  if (!phobosTarget) return
 
-  this.introCamera.position.copy(enceladusTarget).add(MAP_INTRO_ENCELADUS_CAMERA_OFFSET)
-  this.introCamera.fov = MAP_INTRO_ENCELADUS_FOV
+  this.introCamera.position.copy(phobosTarget).add(MAP_INTRO_PHOBOS_CAMERA_OFFSET)
+  this.introCamera.fov = MAP_INTRO_PHOBOS_FOV
   this.introCamera.updateProjectionMatrix()
-  this.introCamera.lookAt(enceladusTarget)
+  this.introCamera.lookAt(phobosTarget)
   renderPass.camera = this.introCamera
 }
 
-/** Beat 3 (0.28–0.42): Viroid reveal — camera pulls slightly closer to Enceladus. */
+/** Beat 3 (0.28–0.42): Viroid reveal — camera pulls slightly closer to Phobos. */
 private tickIntroBeatViroidReveal(progress: number, renderPass: RenderPass): void {
-  const saturn = this.getPlanetControllerById('saturn')
-  if (!saturn || !this.introCamera) return
+  const mars = this.getPlanetControllerById('mars')
+  if (!mars || !this.introCamera) return
 
-  const enceladusTarget = this.getEnceladusWorldPos(saturn)
-  if (!enceladusTarget) return
+  const phobosTarget = this.getPhobosWorldPos(mars)
+  if (!phobosTarget) return
 
   const t = (progress - MAP_INTRO_BEAT_VIROIDS) / (MAP_INTRO_BEAT_JUPITER - MAP_INTRO_BEAT_VIROIDS)
-  const closeOffset = MAP_INTRO_ENCELADUS_CAMERA_OFFSET.clone().multiplyScalar(1 - t * 0.3)
-  this.introCamera.position.copy(enceladusTarget).add(closeOffset)
-  this.introCamera.fov = MAP_INTRO_ENCELADUS_FOV
+  const closeOffset = MAP_INTRO_PHOBOS_CAMERA_OFFSET.clone().multiplyScalar(1 - t * 0.3)
+  this.introCamera.position.copy(phobosTarget).add(closeOffset)
+  this.introCamera.fov = MAP_INTRO_PHOBOS_FOV
   this.introCamera.updateProjectionMatrix()
-  this.introCamera.lookAt(enceladusTarget)
+  this.introCamera.lookAt(phobosTarget)
   renderPass.camera = this.introCamera
 }
 
-/** Beat 4a (0.42–0.56): Sweep from Saturn/Enceladus to Jupiter. */
+/** Beat 4a (0.42–0.56): Sweep from Mars/Phobos to Jupiter. */
 private tickIntroBeatJupiterApproach(progress: number, renderPass: RenderPass): void {
-  const saturn = this.getPlanetControllerById('saturn')
+  const mars = this.getPlanetControllerById('mars')
   const jupiter = this.getPlanetControllerById('jupiter')
-  if (!saturn || !jupiter || !this.introCamera) return
+  if (!mars || !jupiter || !this.introCamera) return
 
-  const enceladusPos = this.getEnceladusWorldPos(saturn)
-  if (!enceladusPos) return
-  const fromPos = enceladusPos.clone().add(MAP_INTRO_ENCELADUS_CAMERA_OFFSET.clone().multiplyScalar(0.7))
+  const phobosPos = this.getPhobosWorldPos(mars)
+  if (!phobosPos) return
+  const fromPos = phobosPos.clone().add(MAP_INTRO_PHOBOS_CAMERA_OFFSET.clone().multiplyScalar(0.7))
   const jupiterTarget = new THREE.Vector3(jupiter.getWorldX(), 0, jupiter.getWorldZ())
   const toPos = jupiterTarget.clone().add(MAP_INTRO_JUPITER_CAMERA_OFFSET)
 
@@ -550,9 +550,9 @@ private tickIntroBeatJupiterApproach(progress: number, renderPass: RenderPass): 
     (progress - MAP_INTRO_BEAT_JUPITER) / (MAP_INTRO_BEAT_CLOUD_CITY - MAP_INTRO_BEAT_JUPITER),
   )
   this.introCamera.position.lerpVectors(fromPos, toPos, t)
-  this.introCamera.fov = THREE.MathUtils.lerp(MAP_INTRO_ENCELADUS_FOV, MAP_INTRO_JUPITER_FOV, t)
+  this.introCamera.fov = THREE.MathUtils.lerp(MAP_INTRO_PHOBOS_FOV, MAP_INTRO_JUPITER_FOV, t)
   this.introCamera.updateProjectionMatrix()
-  const lookTarget = new THREE.Vector3().lerpVectors(enceladusPos, jupiterTarget, t)
+  const lookTarget = new THREE.Vector3().lerpVectors(phobosPos, jupiterTarget, t)
   this.introCamera.lookAt(lookTarget)
   renderPass.camera = this.introCamera
 }
@@ -644,9 +644,9 @@ private tickIntroBeatEarthPlayer(progress: number, renderPass: RenderPass): void
   renderPass.camera = this.introCamera
 }
 
-/** Helper: get Enceladus world position from Saturn controller. */
-private getEnceladusWorldPos(saturn: PlanetSystemController): THREE.Vector3 | null {
-  return saturn.getMoonWorldPosition(ENCELADUS_MOON_INDEX, this.introMoonWorldPos)
+/** Helper: get Phobos world position from Mars controller. */
+private getPhobosWorldPos(mars: PlanetSystemController): THREE.Vector3 | null {
+  return mars.getMoonWorldPosition(PHOBOS_MOON_INDEX, this.introMoonWorldPos)
 }
 ```
 
@@ -690,9 +690,9 @@ git commit -m "feat: 6-beat intro camera with VirusModel and CityModel props"
 In `docs/asteroid-lander-gdd.md`, find the "### The World" section (around line 17). After the first paragraph about the 2300s, insert the following new paragraphs before the "Then the bubble collapsed" paragraph:
 
 ```markdown
-It started on Enceladus. A geological survey team drilling through the ice shell found something that shouldn't have existed: a crystalline lattice structure that, when energized, produced thrust at relativistic scales. The neutron thruster. Suddenly, interplanetary travel wasn't measured in months — it was measured in days.
+It started on Phobos. A geological survey team drilling into the Martian moon found something that shouldn't have existed: a crystalline lattice structure that, when energized, produced thrust at relativistic scales. The neutron thruster. Suddenly, interplanetary travel wasn't measured in months — it was measured in days.
 
-But Enceladus wasn't empty. The drilling woke something. Silicate creatures — ancient, from interstellar space, territorial and lethal. Humanity calls them Viroids. They'd been slumbering in the ice for millennia, and they didn't appreciate the company.
+But Phobos wasn't empty. The drilling woke something. Silicate creatures — ancient, from interstellar space, territorial and lethal. Humanity calls them Viroids. They'd been slumbering in the regolith for millennia, and they didn't appreciate the company.
 
 The neutron thruster fit remarkably well with 21st-century space tech. NASA-era lander designs, mothballed for two centuries, turned out to be the perfect chassis. Jupiter became the industrial heart of the expansion — its moons supplied raw materials, and a cloud city above the surface housed 3D-printing assembly lines that churned out ships by the thousands. Humanity spread fast.
 ```
@@ -707,7 +707,7 @@ Earth-born, Moon-raised. You spent decades running lander ops for belt mining ou
 
 ```bash
 git add docs/asteroid-lander-gdd.md
-git commit -m "docs: canonize Enceladus, Viroids, Jupiter cloud city lore in GDD"
+git commit -m "docs: canonize Phobos, Viroids, Jupiter cloud city lore in GDD"
 ```
 
 ---
@@ -725,13 +725,13 @@ Run: `bun dev`
 
 Clear your player profile in localStorage (delete `asteroid-lander-profile`) to ensure `hasSeenIntro` is false, then reload the page and enter a name.
 
-- [ ] **Step 2: Tune Enceladus framing (Beat 2)**
+- [ ] **Step 2: Tune Phobos framing (Beat 2)**
 
-Adjust `MAP_INTRO_ENCELADUS_CAMERA_OFFSET` and `MAP_INTRO_ENCELADUS_FOV` until Saturn is visible in background and Enceladus is prominent. The moon is tiny (displayRadius 0.0008 × SIZE_SCALE 80 = 0.064 world units), so the camera needs to be very close.
+Adjust `MAP_INTRO_PHOBOS_CAMERA_OFFSET` and `MAP_INTRO_PHOBOS_FOV` until Mars is visible in background and Phobos is prominent. The moon is tiny (displayRadius 0.0008 × SIZE_SCALE 80 = 0.064 world units), so the camera needs to be very close.
 
 - [ ] **Step 3: Tune VirusModel scale and placement (Beat 3)**
 
-Adjust the `scale` parameter in `spawnIntroVirus` (currently `8`) and the position offset (`0.15, 0.1, 0`) until the virus reads clearly against Enceladus without clipping.
+Adjust the `scale` parameter in `spawnIntroVirus` (currently `8`) and the position offset (`0.15, 0.1, 0`) until the virus reads clearly against Phobos without clipping.
 
 - [ ] **Step 4: Tune Jupiter framing (Beat 4a/4b)**
 
