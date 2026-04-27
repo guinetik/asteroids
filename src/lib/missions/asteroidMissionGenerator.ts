@@ -420,6 +420,8 @@ export function rollObjective(slot: ObjectiveSlot, difficulty: number): Concrete
         reward,
       }
     case 'bunker':
+      // TODO(task-4): stamp waveCount from difficulty band (3 / 5 / 7) and
+      // place x/z via mission flat-zone selection — see plan Task 4.
       return {
         type: 'bunker',
         x: 0,
