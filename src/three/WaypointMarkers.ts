@@ -273,11 +273,12 @@ export function disposeWaypointMarkerGroup(group: THREE.Group): void {
 /**
  * Add a waypoint marker to the scene at the given world position.
  *
- * @param id - Unique marker id (objective id).
+ * @param id - Unique marker id.
  * @param x - World X position.
  * @param z - World Z position.
  * @param groundY - Terrain height at (x, z).
  * @param scene - Three.js scene to add marker to.
+ * @param color - Optional hex color; defaults to {@link WAYPOINT_MARKER_DEFAULT_COLOR}.
  */
 export function addWaypointMarker(
   id: string,
@@ -285,9 +286,10 @@ export function addWaypointMarker(
   z: number,
   groundY: number,
   scene: THREE.Scene,
+  color: number = WAYPOINT_MARKER_DEFAULT_COLOR,
 ): void {
   if (markers.find((m) => m.id === id)) return
-  const group = createWaypointMarkerGroup(WAYPOINT_MARKER_DEFAULT_COLOR, 'surface')
+  const group = createWaypointMarkerGroup(color, 'surface')
   group.position.set(x, groundY, z)
   scene.add(group)
   markers.push({ id, group })
