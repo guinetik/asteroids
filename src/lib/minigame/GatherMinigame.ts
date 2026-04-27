@@ -334,13 +334,11 @@ export class GatherMinigame implements MiniGame, MiniGameEvents {
     return true
   }
 
-  tick(_dt: number, ctx: MiniGameContext): void {
+  tick(dt: number, ctx: MiniGameContext): void {
+    const launchDone = this.rocket.tick(dt)
     if (this._status === 'completed') {
-      if (this.rocket.isTakingOff) {
-        const done = this.rocket.tick(_dt)
-        if (done) {
-          this.rocket.completeTakeoff()
-        }
+      if (this.rocket.isTakingOff && launchDone) {
+        this.rocket.completeTakeoff()
       }
       return
     }
