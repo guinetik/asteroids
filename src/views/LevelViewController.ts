@@ -177,6 +177,8 @@ export class LevelViewController implements Tickable {
   // ── EVA ──────────────────────────────────────────────────────
   private fpsCamera: FpsCamera | null = null
   private playerController: FpsPlayerController | null = null
+  /** Scratch vector for allocation-free camera-forward reads each tick. */
+  private _playerForwardScratch = new THREE.Vector3()
   /**
    * Single owner for lander cinematic + environmental audio: the
    * level-wide asteroid wind bed, the cockpit hum during arrival /
@@ -2059,6 +2061,13 @@ export class LevelViewController implements Tickable {
         playerPosition:
           state === 'eva' && player
             ? { x: player.group.position.x, y: player.group.position.y, z: player.group.position.z }
+            : null,
+        playerForward:
+          state === 'eva' && this.fpsCamera
+            ? (() => {
+                const v = this.fpsCamera.getForward(this._playerForwardScratch)
+                return { x: v.x, y: v.y, z: v.z }
+              })()
             : null,
         interactPressed: this.inputManager?.wasActionPressed('interact') ?? false,
         terminalInteractPressed: this.inputManager?.wasActionPressed('terminalInteract') ?? false,

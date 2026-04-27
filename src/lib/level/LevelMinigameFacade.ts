@@ -63,6 +63,8 @@ export interface LevelMinigameTickState {
   landerGrounded: boolean
   /** EVA player world position, if available. */
   playerPosition: LevelMinigamePosition | null
+  /** EVA player camera-forward direction in world space, if available. */
+  playerForward?: LevelMinigamePosition | null
   /** Whether the interact action fired this frame. */
   interactPressed: boolean
   /** Whether the terminal interact action fired this frame. */
@@ -386,6 +388,7 @@ export class LevelMinigameFacade {
       landerUp: state.landerUp,
       landerGrounded: state.landerGrounded,
       playerPosition: state.playerPosition,
+      playerForward: state.playerForward,
       interactPressed: state.interactPressed,
       terminalInteractPressed: state.terminalInteractPressed,
     }

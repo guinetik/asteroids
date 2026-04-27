@@ -30,6 +30,12 @@ export interface MiniGameContext {
   landerGrounded: boolean
   /** EVA player world position (null if not in EVA). */
   playerPosition: { x: number; y: number; z: number } | null
+  /**
+   * Unit-length camera-forward direction in world space when the player is in
+   * EVA (null otherwise). Used by minigames that raycast from the crosshair
+   * (e.g. rescue extraction).
+   */
+  playerForward?: { x: number; y: number; z: number } | null
   /** Whether the interact key (F) was just pressed this frame. */
   interactPressed: boolean
   /** Whether the terminal interact key (E) was just pressed this frame. */

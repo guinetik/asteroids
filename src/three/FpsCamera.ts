@@ -263,6 +263,18 @@ export class FpsCamera implements Tickable {
     this.pitch = Math.max(-this.config.pitchClamp, Math.min(this.config.pitchClamp, this.pitch))
   }
 
+  /**
+   * Full 3D camera forward (pitch included). Allocation-free — fills `out`.
+   *
+   * @param out - Vector to write into
+   * @returns The same `out` reference for chaining
+   */
+  getForward(out: THREE.Vector3): THREE.Vector3 {
+    const cosPitch = Math.cos(this.pitch)
+    out.set(-Math.sin(this.yaw) * cosPitch, Math.sin(this.pitch), -Math.cos(this.yaw) * cosPitch)
+    return out.normalize()
+  }
+
   /** Forward direction on the XZ plane (pitch stripped). */
   getForwardXZ(): THREE.Vector2 {
     return new THREE.Vector2(-Math.sin(this.yaw), -Math.cos(this.yaw)).normalize()
