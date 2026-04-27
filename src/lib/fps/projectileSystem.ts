@@ -43,7 +43,13 @@ const HEAL_BOLT_AMOUNT = 25
  * Used for VFX and contact SFX; drill mining uses {@link ProjectileSystem.onRockHit} in addition
  * for `drill_rock`.
  */
-export type ProjectileImpactKind = 'terrain' | 'drill_rock' | 'science_rock' | 'enemy' | 'hostage'
+export type ProjectileImpactKind =
+  | 'terrain'
+  | 'drill_rock'
+  | 'science_rock'
+  | 'science_rocket'
+  | 'enemy'
+  | 'hostage'
 
 /**
  * Carried with {@link ProjectileSystem.onImpact} so listeners can style feedback per mode/surface
@@ -92,6 +98,12 @@ export class ProjectileSystem implements Tickable {
   private readonly hostages: Hostage[] = []
   private readonly rocks: MineableRockEntry[] = []
   private lander: LanderController | null = null
+  /** Registered survey target (gather-mission rocket). Null when no gather mission is active. */
+  private surveyTarget: THREE.Object3D | null = null
+  /** Survey-target half extents (X, Y, Z) used for AABB hit testing. */
+  private readonly _surveyHalfExtents = new THREE.Vector3()
+  /** Reused scratch — survey target world position. */
+  private readonly _surveyCenter = new THREE.Vector3()
   private damageMultiplier = 1
   private readonly _hostageCenter = new THREE.Vector3()
   private readonly _landerCenter = new THREE.Vector3()
@@ -148,6 +160,16 @@ export class ProjectileSystem implements Tickable {
    *   callback; copy if you need to keep it past the synchronous handler body.
    */
   onScienceRockHit: ((spawnIndex: number, position: THREE.Vector3) => void) | null = null
+
+  /**
+   * Called when a **science** bolt hits the registered survey target
+   * (the gather-mission delivery rocket). Hidden mechanic — never
+   * surfaced via HUD.
+   *
+   * @param position - **Transient** impact point. Mutated on the next
+   *   callback; copy if you need to keep it past the synchronous handler body.
+   */
+  onScienceRocketHit: ((position: THREE.Vector3) => void) | null = null
 
   /**
    * Reused scratch position for impact/hit callbacks. Allocated once per
@@ -211,6 +233,24 @@ export class ProjectileSystem implements Tickable {
   /** Register the lander for science bolt healing detection (green hull pulse). */
   setLander(lander: LanderController | null): void {
     this.lander = lander
+  }
+
+  /**
+   * Register (or clear) the rocket-survey target. Pass `null` to clear.
+   * Half extents define a local-axis AABB around the rocket world
+   * position; the science-bolt branch checks this AABB before falling
+   * through to the rock cascade.
+   *
+   * @param target - Object3D whose world position centers the AABB; pass `null` to clear.
+   * @param halfExtents - Vector3 of half-extents (X, Y, Z) on the AABB; pass `null` to clear.
+   */
+  setSurveyTarget(target: THREE.Object3D | null, halfExtents: THREE.Vector3 | null): void {
+    this.surveyTarget = target
+    if (halfExtents) {
+      this._surveyHalfExtents.copy(halfExtents)
+    } else {
+      this._surveyHalfExtents.set(0, 0, 0)
+    }
   }
 
   /**
@@ -323,6 +363,7 @@ export class ProjectileSystem implements Tickable {
       let hitEnemy = false
       let hitHostage = false
       let hitRock = false
+      let hitRocket = false
 
       if (p.boltKind === 'science') {
         const hostageHit = this.closestHostageHealHit(this._prevPos, pos)
@@ -345,11 +386,17 @@ export class ProjectileSystem implements Tickable {
             }
           }
           if (!landerHit) {
-            const rockHit = this.closestRockHit(this._prevPos, pos)
-            if (rockHit) {
-              this._callbackPos.copy(pos)
-              this.onScienceRockHit?.(rockHit.spawnIndex, this._callbackPos)
-              hitRock = true
+            const surveyImpact = this.surveyTargetHit(this._prevPos, pos, this._callbackPos)
+            if (surveyImpact !== null) {
+              this.onScienceRocketHit?.(this._callbackPos)
+              hitRocket = true
+            } else {
+              const rockHit = this.closestRockHit(this._prevPos, pos)
+              if (rockHit) {
+                this._callbackPos.copy(pos)
+                this.onScienceRockHit?.(rockHit.spawnIndex, this._callbackPos)
+                hitRock = true
+              }
             }
           }
         }
@@ -390,12 +437,21 @@ export class ProjectileSystem implements Tickable {
       const hitTerrain = pos.y <= floorY + TERRAIN_HIT_MARGIN
 
       // Remove on hit or timeout
-      if (hitEnemy || hitHostage || hitRock || hitTerrain || p.age >= BOLT_MAX_LIFETIME) {
-        if (hitTerrain || hitEnemy || hitHostage || hitRock) {
+      if (
+        hitEnemy ||
+        hitHostage ||
+        hitRock ||
+        hitRocket ||
+        hitTerrain ||
+        p.age >= BOLT_MAX_LIFETIME
+      ) {
+        if (hitTerrain || hitEnemy || hitHostage || hitRock || hitRocket) {
           this._callbackPos.copy(pos)
           let kind: ProjectileImpactKind
           if (hitEnemy) {
             kind = 'enemy'
+          } else if (hitRocket) {
+            kind = 'science_rocket'
           } else if (hitHostage) {
             kind = 'hostage'
           } else if (hitRock) {
@@ -410,6 +466,53 @@ export class ProjectileSystem implements Tickable {
         this.removeProjectile(i)
       }
     }
+  }
+
+  /**
+   * Whether the swept segment from `from` to `to` intersects the
+   * registered survey target AABB. Returns the (clamped) impact point
+   * via `out`, or `null` when no intersection.
+   *
+   * @param from - Segment start in world space.
+   * @param to - Segment end in world space.
+   * @param out - Reused Vector3 written with the impact point on hit.
+   * @returns The same `out` reference on hit, or `null` when no intersection.
+   */
+  private surveyTargetHit(
+    from: THREE.Vector3,
+    to: THREE.Vector3,
+    out: THREE.Vector3,
+  ): THREE.Vector3 | null {
+    if (!this.surveyTarget) return null
+    this.surveyTarget.getWorldPosition(this._surveyCenter)
+    const minX = this._surveyCenter.x - this._surveyHalfExtents.x
+    const maxX = this._surveyCenter.x + this._surveyHalfExtents.x
+    const minY = this._surveyCenter.y - this._surveyHalfExtents.y
+    const maxY = this._surveyCenter.y + this._surveyHalfExtents.y
+    const minZ = this._surveyCenter.z - this._surveyHalfExtents.z
+    const maxZ = this._surveyCenter.z + this._surveyHalfExtents.z
+    // Slab method — axis-aligned box / segment intersection.
+    const dx = to.x - from.x
+    const dy = to.y - from.y
+    const dz = to.z - from.z
+    let tEnter = 0
+    let tExit = 1
+    const slab = (origin: number, delta: number, lo: number, hi: number): boolean => {
+      if (Math.abs(delta) < 1e-6) return origin >= lo && origin <= hi
+      const t1 = (lo - origin) / delta
+      const t2 = (hi - origin) / delta
+      const tMin = Math.min(t1, t2)
+      const tMax = Math.max(t1, t2)
+      if (tMin > tEnter) tEnter = tMin
+      if (tMax < tExit) tExit = tMax
+      return tEnter <= tExit
+    }
+    if (!slab(from.x, dx, minX, maxX)) return null
+    if (!slab(from.y, dy, minY, maxY)) return null
+    if (!slab(from.z, dz, minZ, maxZ)) return null
+    if (tEnter > 1 || tExit < 0) return null
+    out.set(from.x + dx * tEnter, from.y + dy * tEnter, from.z + dz * tEnter)
+    return out
   }
 
   /**
