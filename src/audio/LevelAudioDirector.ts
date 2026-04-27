@@ -117,6 +117,26 @@ export class LevelAudioDirector {
   }
 
   /**
+   * The rocket-survey scan revealed a marker; play the analytical-beep
+   * cue as a positional point source so it reads as coming from the
+   * rocket itself.
+   *
+   * @param worldPos - World-space position of the rocket group.
+   * @param camera - FPS camera (for `worldPointToHearing`).
+   */
+  notifySurveyReveal(worldPos: Vector3, camera: PerspectiveCamera): void {
+    const w = worldPointToHearing(camera, worldPos, {
+      refDistance: PROSPECT_SPATIAL_REF_DISTANCE,
+      minVolumeScale: PROSPECT_SPATIAL_MIN_VOLUME,
+    })
+    const def = getAudioDefinition('sfx.tool.surveyReveal')
+    const handle = this.audio.play('sfx.tool.surveyReveal', {
+      volume: def.volume * w.volumeScale,
+    })
+    handle.setStereo(w.pan)
+  }
+
+  /**
    * An objective (nest, virus, etc.) just detonated. Plays the
    * explosion one-shot volume-scaled by the player's distance-derived
    * attenuation factor so close blasts hit hard and far blasts read as

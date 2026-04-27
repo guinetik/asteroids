@@ -89,6 +89,7 @@ describe('audioManifest', () => {
       'sfx.laserFire',
       'sfx.tool.heal',
       'sfx.tool.prospectComplete',
+      'sfx.tool.surveyReveal',
       'sfx.projectileHit',
       'sfx.shieldHit',
       'sfx.pickup',
