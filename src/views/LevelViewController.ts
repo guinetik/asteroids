@@ -95,6 +95,8 @@ import {
 } from '@/lib/level/levelObjectivePlacement'
 import { LevelCollisionFacade } from '@/lib/level/LevelCollisionFacade'
 import { LevelCombatMiningFacade } from '@/lib/level/LevelCombatMiningFacade'
+import { RocketSurveyFacade } from '@/lib/level/RocketSurveyFacade'
+import { GatherMinigame } from '@/lib/minigame/GatherMinigame'
 import { LevelPersistenceFacade } from '@/lib/level/LevelPersistenceFacade'
 import { LevelMinigameFacade } from '@/lib/level/LevelMinigameFacade'
 import { LevelStateLifecycleFacade } from '@/lib/level/LevelStateLifecycleFacade'
@@ -207,6 +209,7 @@ export class LevelViewController implements Tickable {
   private readonly persistence = new LevelPersistenceFacade()
   private readonly stateLifecycle = new LevelStateLifecycleFacade()
   private combatMining: LevelCombatMiningFacade | null = null
+  private rocketSurvey: RocketSurveyFacade | null = null
   private multiTool: MultiToolController | null = null
   private multiToolState: MultiToolState | null = null
   private projectileSystem: ProjectileSystem | null = null
@@ -304,6 +307,8 @@ export class LevelViewController implements Tickable {
    * @param itemId Catalog item id of the rock's primary mineral.
    */
   onProspect: ((itemId: string) => void) | null = null
+  /** Called when the rocket-survey scan reveals a marker. Host shows the survey toast. */
+  onSurvey: ((label: string) => void) | null = null
 
   private readonly initialLanderSpawn = new Vector3()
 
@@ -921,6 +926,39 @@ export class LevelViewController implements Tickable {
         },
       },
     })
+
+    // ── Rocket-survey hidden utility for gather missions ─────────
+    if (
+      this.surfaceRocks &&
+      this.heightmap &&
+      this.fpsCamera &&
+      this.rockYieldSystem &&
+      this.projectileSystem &&
+      this.impactEmitter
+    ) {
+      const gatherMinigame = mission.objectives
+        .map((_, idx) => this.getMinigame(idx))
+        .find((mg): mg is GatherMinigame => mg instanceof GatherMinigame)
+      if (gatherMinigame) {
+        this.rocketSurvey = new RocketSurveyFacade(
+          {
+            scene: this.sceneManager.scene,
+            projectileSystem: this.projectileSystem,
+            rockYieldSystem: this.rockYieldSystem,
+            surfaceRocks: this.surfaceRocks,
+            heightmap: this.heightmap,
+            impactEmitter: this.impactEmitter,
+            fpsCamera: this.fpsCamera,
+            levelAudio: this.levelAudio,
+            gather: gatherMinigame,
+          },
+          {
+            onSurvey: (label) => this.onSurvey?.(label),
+          },
+        )
+        this.rocketSurvey.attach()
+      }
+    }
 
     // ── Lander explosion VFX ───────────────────────────────────────
     this.landerExplosion = new LanderExplosion()
@@ -2503,6 +2541,8 @@ export class LevelViewController implements Tickable {
     this.collision.dispose()
     this.combatMining?.detach()
     this.combatMining = null
+    this.rocketSurvey?.detach()
+    this.rocketSurvey = null
     this.prospectOverlay?.dispose()
     this.prospectOverlay = null
     this.projectileSystem?.dispose()
