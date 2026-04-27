@@ -905,7 +905,6 @@ Create `src/data/missions/givers/cinderline.json`:
   "objectiveTypes": ["bunker"],
   "minDifficulty": 1,
   "maxDifficulty": 10,
-  "planetIds": ["mercury"],
   "missions": [
     {
       "id": "cinderline_anvil_substation",
@@ -924,7 +923,8 @@ Create `src/data/missions/givers/cinderline.json`:
         "near-earth": [1, 4],
         "asteroid-belt": [4, 7],
         "kuiper-belt": [7, 10]
-      }
+      },
+      "planetIds": ["mercury"]
     }
   ]
 }
@@ -942,7 +942,6 @@ Create `src/data/missions/givers/lucas-maverick.json`:
   "objectiveTypes": ["bunker"],
   "minDifficulty": 1,
   "maxDifficulty": 10,
-  "planetIds": ["venus"],
   "missions": [
     {
       "id": "maverick_safehouse_ledger",
@@ -961,7 +960,8 @@ Create `src/data/missions/givers/lucas-maverick.json`:
         "near-earth": [1, 4],
         "asteroid-belt": [4, 7],
         "kuiper-belt": [7, 10]
-      }
+      },
+      "planetIds": ["venus"]
     }
   ]
 }
@@ -979,7 +979,6 @@ Create `src/data/missions/givers/martian-marines-bunker.json`:
   "objectiveTypes": ["bunker"],
   "minDifficulty": 1,
   "maxDifficulty": 10,
-  "planetIds": ["mars"],
   "missions": [
     {
       "id": "mmc_forward_bunker_recon",
@@ -998,7 +997,8 @@ Create `src/data/missions/givers/martian-marines-bunker.json`:
         "near-earth": [1, 4],
         "asteroid-belt": [4, 7],
         "kuiper-belt": [7, 10]
-      }
+      },
+      "planetIds": ["mars"]
     }
   ]
 }

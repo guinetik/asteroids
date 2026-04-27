@@ -454,7 +454,7 @@ describe('generateAsteroidMission', () => {
     expect(hard.objectives.length).toBeLessThanOrEqual(objectiveCountForDifficulty(8))
   })
 
-  it('Saturn host only offers exterminate or rescue asteroid objectives', () => {
+  it('Saturn host only offers exterminate, rescue, or bunker asteroid objectives', () => {
     const saturn = getPlanet('saturn')
     const hostR = saturn.orbit.semiMajorAxis * ORBIT_SCALE
     const host = { planetId: 'saturn' as const, worldX: hostR, worldZ: 0 }
@@ -463,7 +463,9 @@ describe('generateAsteroidMission', () => {
         const mission = generateAsteroidMission(d, host)
         expect(mission.originPlanetId).toBe('saturn')
         for (const obj of mission.objectives) {
-          expect(obj.type === 'exterminate' || obj.type === 'rescue').toBe(true)
+          expect(
+            obj.type === 'exterminate' || obj.type === 'rescue' || obj.type === 'bunker',
+          ).toBe(true)
         }
       }
     }
@@ -476,7 +478,9 @@ describe('generateAsteroidMission', () => {
     const mission = generateAsteroidMission(1, host)
     expect(mission.originPlanetId).toBe('saturn')
     for (const obj of mission.objectives) {
-      expect(obj.type === 'exterminate' || obj.type === 'rescue').toBe(true)
+      expect(
+        obj.type === 'exterminate' || obj.type === 'rescue' || obj.type === 'bunker',
+      ).toBe(true)
     }
   })
 
