@@ -43,6 +43,13 @@ export class PsychospherePickupController implements Tickable {
   private readonly visuals = new Map<number, PickupVisual>()
   private readonly geometry: THREE.SphereGeometry
   private readonly material: THREE.MeshStandardMaterial
+  /**
+   * Hidden mesh staged at construction so the renderer's shader precompile
+   * pass sees the standard material variant. Without this, the first real
+   * pickup spawn would compile the program on first draw — a multi-hundred
+   * millisecond stall mid-combat.
+   */
+  private readonly warmupMesh: THREE.Mesh
   private elapsed = 0
 
   constructor(private readonly dropSystem: DropSystem) {
@@ -54,6 +61,10 @@ export class PsychospherePickupController implements Tickable {
       metalness: 0.1,
       roughness: 0.35,
     })
+    this.warmupMesh = new THREE.Mesh(this.geometry, this.material)
+    this.warmupMesh.visible = false
+    this.warmupMesh.frustumCulled = false
+    this.group.add(this.warmupMesh)
   }
 
   /**
@@ -89,6 +100,7 @@ export class PsychospherePickupController implements Tickable {
 
   /** Dispose all materials, geometry, and meshes (call on level teardown). */
   dispose(): void {
+    this.group.remove(this.warmupMesh)
     for (const visual of this.visuals.values()) {
       this.group.remove(visual.mesh)
     }

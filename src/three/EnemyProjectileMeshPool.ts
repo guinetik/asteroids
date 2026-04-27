@@ -41,8 +41,12 @@ export class EnemyProjectileMeshPool {
   }
 
   /**
-   * Pre-allocate a batch of meshes so the first burst of projectile
-   * spawns does not trigger garbage-collected allocations.
+   * Pre-allocate a batch of meshes and attach them to the scene up-front
+   * (hidden) so the renderer's shader precompile pass walks their
+   * materials. Without this, the additive-blend `MeshBasicMaterial`
+   * variant would compile on the first projectile spawn — a multi-hundred
+   * millisecond stall mid-combat. Acquire/release now toggle visibility
+   * instead of churning scene-graph membership per shot.
    *
    * @param count - Number of meshes to construct up-front (defaults to 32).
    */
@@ -50,6 +54,7 @@ export class EnemyProjectileMeshPool {
     for (let i = 0; i < count; i++) {
       const mesh = new EnemyProjectileMesh()
       mesh.setVisible(false)
+      this.scene.add(mesh.group)
       this.free.push(mesh)
     }
   }
@@ -67,9 +72,17 @@ export class EnemyProjectileMeshPool {
   acquire = (id: number, x: number, y: number, z: number): void => {
     let mesh = this.active.get(id)
     if (!mesh) {
-      mesh = this.free.pop() ?? new EnemyProjectileMesh()
+      const reused = this.free.pop()
+      if (reused) {
+        mesh = reused
+      } else {
+        // Free list exhausted — pool is undersized for the current
+        // encounter. Construct on demand and keep the mesh in the
+        // scene for future reuse.
+        mesh = new EnemyProjectileMesh()
+        this.scene.add(mesh.group)
+      }
       mesh.reset()
-      this.scene.add(mesh.group)
       this.active.set(id, mesh)
     }
     mesh.setPosition(x, y, z)
@@ -77,7 +90,8 @@ export class EnemyProjectileMeshPool {
 
   /**
    * Return a mesh to the free list. Wire this directly to
-   * `EnemyProjectileSystem.onProjectileRemoved`.
+   * `EnemyProjectileSystem.onProjectileRemoved`. The mesh stays attached
+   * to the scene so it can be reused without touching scene-graph state.
    *
    * @param id - Projectile id provided by the system.
    */
@@ -85,7 +99,6 @@ export class EnemyProjectileMeshPool {
     const mesh = this.active.get(id)
     if (!mesh) return
     this.active.delete(id)
-    this.scene.remove(mesh.group)
     mesh.setVisible(false)
     this.free.push(mesh)
   }
