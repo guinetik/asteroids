@@ -27,11 +27,11 @@
     "roughness": 0.35,
     "dustCoverage": 0.1,
     "modelPath": "/models/asteroids/psyche.glb",
-    "modelScale": 1300,
+    "modelScale": 1500,
     "surfaceTextures": "/textures/asteroids/psyche",
     "surfaceUseEmbeddedUVs": true,
-    "surfaceDetailFolder": "/textures/asteroids/metallic",
-    "surfaceDetailRepeat": 50,
+    "surfaceDetailFolder": "/textures/asteroids/rocky",
+    "surfaceDetailRepeat": 500,
     "surfaceDetailNormalStrength": 0.85
   },
   "visual": {
@@ -49,7 +49,7 @@
     "sunAzimuth": 200,
     "sunElevation": 30,
     "sunColor": [0.9, 0.95, 1.0],
-    "sunIntensity": 1.33,
+    "sunIntensity": 0.83,
     "ambientIntensity": 0.33
   }
 }

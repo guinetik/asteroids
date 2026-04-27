@@ -24,7 +24,7 @@
         "capacity": 50,
         "burnRate": 25,
         "rechargeRate": 15,
-        "fuelCostPerRecharge": 0.15
+        "fuelCostPerRecharge": 0.05
       },
       "jump": {
         "capacity": 10,
