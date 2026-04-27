@@ -55,6 +55,12 @@ export class HostageWalker {
    */
   tick(dt: number, heightmap: Heightmap): void {
     if (this.finished) return
+    if (!this.hostage.alive) {
+      // Hostage died mid-walk. Self-mark for removal without firing onBoarded;
+      // the death path drives the lost toast independently.
+      this.finished = true
+      return
+    }
     if (this.model.getState() !== 'walking') return
 
     const target = this.targetProvider()
