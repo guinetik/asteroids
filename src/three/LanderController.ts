@@ -689,11 +689,17 @@ export class LanderController implements Tickable {
   }
 
   /**
-   * True when the player is mashing main-engine input but the lock is
-   * suppressing it. Drives the level VC's `notifyLiftoffAttemptBlocked` call.
+   * True when the player is pressing any upward-thrust input (main engine OR
+   * rcsAscend) while the lock is suppressing it. Drives the level VC's
+   * `notifyLiftoffAttemptBlocked` call so Shift-to-ascend also surfaces the
+   * "LIFTOFF LOCKED" prompt, not just the main engine.
    */
   get isLiftoffAttemptedWhileBlocked(): boolean {
-    return this._liftoffBlocked && this.inputManager.isActionActive('mainEngine')
+    if (!this._liftoffBlocked) return false
+    return (
+      this.inputManager.isActionActive('mainEngine') ||
+      this.inputManager.isActionActive('rcsAscend')
+    )
   }
 
   get isMainEngineActive(): boolean {
@@ -752,8 +758,11 @@ export class LanderController implements Tickable {
       this.flameSpawnAccumulator = 0
     }
 
-    // RCS ascend boost — works from ground (big boost) and air
+    // RCS ascend boost — works from ground (big boost) and air. Suppressed when
+    // the rescue minigame's liftoff lock is engaged (otherwise Shift-to-ascend
+    // bypasses the main-engine gate and players could strand survivors).
     if (
+      !this._liftoffBlocked &&
       this.inputManager.isActionActive('rcsAscend') &&
       this.thrusterSystem.canFire('rcs', this.landerBurnRateModifiers())
     ) {

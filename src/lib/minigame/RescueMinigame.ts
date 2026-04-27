@@ -59,8 +59,26 @@ const EXPLOSION_FLASH_DURATION = 0.45
 const EXPLOSION_FLASH_MAX_SCALE = 36
 const EXPLOSION_LIGHT_INTENSITY = 6.5
 const EXPLOSION_LIGHT_DISTANCE = 88
-const RESCUE_RAYCAST_RANGE = 12
-const LIFTOFF_LOCK_PROMPT_DURATION = 2.0
+/** XZ distance (m) within which a kneeling hostage is recruitable via E. */
+const RECRUIT_PROXIMITY_RANGE = 8.0
+
+/** How long the "LIFTOFF LOCKED" alert stays on screen per attempt (s). */
+const LIFTOFF_LOCK_PROMPT_DURATION = 3.5
+
+/** Seconds between dice rolls for spawning a chase enemy during step 3. */
+const CHASE_ROLL_INTERVAL = 7.0
+
+/** Probability per roll that a chase enemy actually spawns (0..1). */
+const CHASE_SPAWN_PROBABILITY = 0.6
+
+/** Distance behind a walker (m, opposite the lander direction) where the chaser spawns. */
+const CHASE_SPAWN_DISTANCE = 18
+
+/** Cap on simultaneously-alive chase enemies during extraction. */
+const CHASE_MAX_ACTIVE = 2
+
+/** How long the "VIROID HIVE RESISTS" alert stays on screen (s). */
+const CHASE_ALERT_DURATION = 4.0
 
 const explosionFlashMat = new THREE.MeshBasicMaterial({
   color: 0x66ffcc,
@@ -91,7 +109,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     { label: 'Land in the outbreak zone', complete: false, active: true },
     { label: 'Eliminate the attackers', complete: false, active: false },
     { label: 'Heal the survivors', complete: false, active: false },
-    { label: 'Extract the survivors', complete: false, active: false },
+    { label: 'Release the hostages', complete: false, active: false },
     { label: 'Destroy the virus infestation', complete: false, active: false },
   ]
 
@@ -146,7 +164,14 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
   private virusBaseY = 0
   private virusAnimTime = 0
   private readonly lastLanderPosition = new THREE.Vector3()
-  private liftoffLockPromptTimer = 0
+  /**
+   * Generic alert timer used by both the liftoff-lock prompt and the chase
+   * alert. While > 0, `updateExtractInteraction` skips its prompt so the
+   * alert isn't clobbered by the recruit reticle text.
+   */
+  private alertTimer = 0
+  /** Seconds until the next chase dice roll (only ticks when a walker exists). */
+  private chaseRollTimer = CHASE_ROLL_INTERVAL
   /** Snapshot of total hostages released, captured inside `releaseHostagesToGround`. */
   private _totalSurvivorsSnapshot = 0
 
@@ -301,7 +326,11 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
   }
 
   tick(dt: number, ctx: MiniGameContext): void {
-    this._isPlayerNear = this.armed
+    // _isPlayerNear gates whether `LevelMinigameFacade` keeps our prompt on
+    // screen. While an alert is up, force it true regardless of physical
+    // proximity, otherwise the facade's "no interaction in range → clear
+    // prompt" sweep wipes the alert one frame after fireAlert sets it.
+    this._isPlayerNear = this.armed || this.alertTimer > 0
     this.hostages.tick(dt)
     this.syncVirusVisual(dt)
     this.syncEnemySimulation(dt, ctx)
@@ -314,9 +343,10 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
         ctx.landerPosition.z,
       )
     }
-    if (this.liftoffLockPromptTimer > 0) {
-      this.liftoffLockPromptTimer = Math.max(0, this.liftoffLockPromptTimer - dt)
+    if (this.alertTimer > 0) {
+      this.alertTimer = Math.max(0, this.alertTimer - dt)
     }
+    this.tickChaseRoll(dt)
 
     if (this._status === 'completed' || this._status === 'failed') {
       return
@@ -353,7 +383,11 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
       this.advanceStep(1)
     }
 
-    if (!allEnemiesDead) {
+    // Combat prompt only during the initial Eliminate phase. Once step 1 has
+    // completed, chase enemies spawned during extraction are alive but the
+    // player should still see the recruit reticle / chase alert — not the
+    // generic "PROTECT THE SURVIVORS" combat text every frame.
+    if (!allEnemiesDead && this._steps[1]?.complete !== true) {
       this.updateCombatPrompt(ctx)
       return
     }
@@ -427,9 +461,75 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
    * {@link LIFTOFF_LOCK_PROMPT_DURATION} so holding the throttle doesn't spam.
    */
   notifyLiftoffAttemptBlocked(): void {
-    if (this.liftoffLockPromptTimer > 0) return
-    this.liftoffLockPromptTimer = LIFTOFF_LOCK_PROMPT_DURATION
-    this.onPrompt?.('LIFTOFF LOCKED — EXTRACT ALL SURVIVORS')
+    if (this.alertTimer > 0) return
+    this.fireAlert('LIFTOFF LOCKED — RELEASE ALL HOSTAGES', LIFTOFF_LOCK_PROMPT_DURATION)
+  }
+
+  /**
+   * Show a transient alert prompt for `duration` seconds. While the alert is
+   * up, `updateExtractInteraction` skips its own prompt update so the alert
+   * is not clobbered by the recruit reticle text.
+   *
+   * @param text     - Prompt text (uppercase reads best in this HUD)
+   * @param duration - Lifetime in seconds
+   */
+  private fireAlert(text: string, duration: number): void {
+    this.alertTimer = duration
+    // Same reason as the tick-top _isPlayerNear assignment: without this, the
+    // facade clears the prompt the same frame the alert fires.
+    this._isPlayerNear = true
+    this.onPrompt?.(text)
+  }
+
+  /**
+   * Once per `CHASE_ROLL_INTERVAL` (only while at least one hostage is walking
+   * mid-extraction), roll the dice. On success, spawn a chase enemy a few
+   * meters behind a random walker and fire the chase alert. The cap on
+   * simultaneously-alive chasers is enforced via {@link liveEnemyCount}, which
+   * is zero by step 3 unless we just spawned chasers ourselves.
+   *
+   * @param dt - Frame delta time in seconds
+   */
+  private tickChaseRoll(dt: number): void {
+    if (this._status !== 'active') return
+    if (this._steps[3]?.active !== true) return
+    const walkers = this.hostages.getWalkingHostages()
+    if (walkers.length === 0) return
+
+    this.chaseRollTimer = Math.max(0, this.chaseRollTimer - dt)
+    if (this.chaseRollTimer > 0) return
+    this.chaseRollTimer = CHASE_ROLL_INTERVAL
+
+    if (this.liveEnemyCount() >= CHASE_MAX_ACTIVE) return
+    if (Math.random() >= CHASE_SPAWN_PROBABILITY) return
+
+    this.spawnChaser(walkers)
+  }
+
+  /**
+   * Spawn one bacteriophage `CHASE_SPAWN_DISTANCE` meters behind a random
+   * walking hostage (opposite the lander direction), then fire the alert.
+   * The bacteriophage's existing AI takes over from there — the
+   * `EnemyDirector` already has the walker registered as a hostage target.
+   *
+   * @param walkers - Snapshot of currently-walking hostages (non-empty)
+   */
+  private spawnChaser(walkers: readonly Hostage[]): void {
+    const target = walkers[Math.floor(Math.random() * walkers.length)]
+    if (!target) return
+    const tx = target.position.x
+    const tz = target.position.z
+
+    const dx = this.lastLanderPosition.x - tx
+    const dz = this.lastLanderPosition.z - tz
+    const dist = Math.sqrt(dx * dx + dz * dz)
+    if (dist < 0.01) return
+
+    const spawnX = tx - (dx / dist) * CHASE_SPAWN_DISTANCE
+    const spawnZ = tz - (dz / dist) * CHASE_SPAWN_DISTANCE
+
+    this.spawnEnemiesOfType('bacteriophage', 1, spawnX, spawnZ)
+    this.fireAlert('THE VIROID HIVE RESISTS YOUR RESCUE', CHASE_ALERT_DURATION)
   }
 
   dispose(): void {
@@ -645,11 +745,16 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     this.spawnEnemiesOfType('spire', spireCount)
   }
 
-  private spawnEnemiesOfType(type: 'bacteriophage' | 'chimera' | 'spire', count: number): void {
+  private spawnEnemiesOfType(
+    type: 'bacteriophage' | 'chimera' | 'spire',
+    count: number,
+    spawnX = this.objective.x,
+    spawnZ = this.objective.z,
+  ): void {
     if (count <= 0) return
     for (let i = 0; i < count; i++) {
-      const x = this.objective.x
-      const z = this.objective.z
+      const x = spawnX
+      const z = spawnZ
       const groundY = this.heightmap.heightAt(x, z)
       const handle = this.enemyDirector.spawn(type, x, groundY, z)
       this.enemyByHandleId.set(handle.id, handle.enemy)
@@ -918,7 +1023,12 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
    * and recruit on press.
    */
   private updateExtractInteraction(ctx: MiniGameContext): void {
-    if (ctx.levelState !== 'eva' || !ctx.playerPosition || !ctx.playerForward) {
+    // While a transient alert (liftoff lock or chase) is showing, don't
+    // overwrite its prompt with the recruit text — the alert needs its full
+    // duration on screen to register.
+    if (this.alertTimer > 0) return
+
+    if (ctx.levelState !== 'eva' || !ctx.playerPosition) {
       this.onPrompt?.(null)
       return
     }
@@ -926,7 +1036,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     const hit = this.findExtractTarget(ctx)
     if (hit) {
       this._isPlayerNear = true
-      this.onPrompt?.('[E] EXTRACT SURVIVOR')
+      this.onPrompt?.('[E] RELEASE HOSTAGE')
       if (ctx.terminalInteractPressed) {
         const captured = this.lastLanderPosition.clone()
         this.hostages.recruit(hit, () => {
@@ -935,49 +1045,40 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
           return captured
         })
       }
-    } else {
-      this.onPrompt?.('LOOK AT A SURVIVOR. PRESS [E] TO EXTRACT')
+      return
     }
+    // Out of range: don't fire a prompt at all. Setting one without also
+    // marking the player "near" would just be cleared by the facade sweep
+    // (same mechanism that bit the chase/lock alerts before fireAlert was
+    // taught to set _isPlayerNear). The HP bars over the kneeling hostages
+    // are sufficient on-screen guidance to walk closer.
+    this.onPrompt?.(null)
   }
 
   /**
-   * Sphere-intersect the player's look ray against every kneeling hostage's
-   * existing hit sphere. Returns the closest live hit within
-   * {@link RESCUE_RAYCAST_RANGE}, or `null`.
+   * Closest kneeling hostage within {@link RECRUIT_PROXIMITY_RANGE} of the
+   * player on the XZ plane (Y ignored — slopes shouldn't punish the player for
+   * being slightly above or below the survivor). Returns `null` when no
+   * praying hostage is in range. Walkers, dying, and standing-up hostages are
+   * never returned.
    */
   private findExtractTarget(ctx: MiniGameContext): Hostage | null {
-    if (!ctx.playerPosition || !ctx.playerForward) return null
-    const ox = ctx.playerPosition.x
-    const oy = ctx.playerPosition.y
-    const oz = ctx.playerPosition.z
-    const dx = ctx.playerForward.x
-    const dy = ctx.playerForward.y
-    const dz = ctx.playerForward.z
+    if (!ctx.playerPosition) return null
+    const px = ctx.playerPosition.x
+    const pz = ctx.playerPosition.z
 
-    let bestT = RESCUE_RAYCAST_RANGE
+    let bestDistSq = RECRUIT_PROXIMITY_RANGE * RECRUIT_PROXIMITY_RANGE
     let best: Hostage | null = null
 
     for (const hostage of this.hostages.getHostages()) {
-      // Only kneeling hostages are recruitable. (Walkers and dying are out.)
       const inst = this.hostages.getInstanceFor(hostage)
       if (inst && inst.model.getState() !== 'praying') continue
 
-      const cx = hostage.position.x
-      const cy = hostage.position.y
-      const cz = hostage.position.z
-      const r = hostage.hitRadius
-
-      // Ray-sphere intersection: |o + t*d - c|^2 = r^2
-      const ex = ox - cx
-      const ey = oy - cy
-      const ez = oz - cz
-      const b = ex * dx + ey * dy + ez * dz
-      const c = ex * ex + ey * ey + ez * ez - r * r
-      const disc = b * b - c
-      if (disc < 0) continue
-      const t = -b - Math.sqrt(disc)
-      if (t < 0 || t > bestT) continue
-      bestT = t
+      const dx = hostage.position.x - px
+      const dz = hostage.position.z - pz
+      const distSq = dx * dx + dz * dz
+      if (distSq > bestDistSq) continue
+      bestDistSq = distSq
       best = hostage
     }
 
