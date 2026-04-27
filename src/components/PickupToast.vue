@@ -45,11 +45,21 @@ export interface ProspectEntry {
   label: string
 }
 
+/** A survey-reveal entry shown alongside mineral pickups and prospect completes. */
+export interface SurveyEntry {
+  /** Stable v-for key. */
+  id: string
+  /** Display label — vague RP-flavored text. */
+  label: string
+}
+
 const props = defineProps<{
   /** Active mineral pickups, oldest first. */
   pickups: readonly PickupEntry[]
   /** Active prospect-complete entries, oldest first. */
   prospectEntries?: readonly ProspectEntry[]
+  /** Active survey-reveal entries, oldest first. */
+  surveyEntries?: readonly SurveyEntry[]
   /** Optional max number of toasts to render simultaneously. */
   maxVisible?: number
 }>()
@@ -62,6 +72,13 @@ const visiblePickups = computed(() => {
 
 const visibleProspects = computed(() => {
   const list = props.prospectEntries ?? []
+  const max = props.maxVisible ?? 5
+  if (list.length <= max) return list
+  return list.slice(list.length - max)
+})
+
+const visibleSurveys = computed(() => {
+  const list = props.surveyEntries ?? []
   const max = props.maxVisible ?? 5
   if (list.length <= max) return list
   return list.slice(list.length - max)
@@ -83,6 +100,14 @@ const visibleProspects = computed(() => {
       >
         <span class="pickup-toast__check">✓</span>
         <span class="pickup-toast__prospect-label">Analysed — {{ entry.label }}</span>
+      </div>
+      <div
+        v-for="entry in visibleSurveys"
+        :key="entry.id"
+        class="pickup-toast__entry pickup-toast__entry--survey"
+      >
+        <span class="pickup-toast__check">▲</span>
+        <span class="pickup-toast__survey-label">{{ entry.label }}</span>
       </div>
     </transition-group>
   </div>
@@ -150,6 +175,18 @@ const visibleProspects = computed(() => {
 }
 .pickup-toast__prospect-label {
   color: rgba(34, 197, 94, 0.92);
+}
+.pickup-toast__entry--survey {
+  color: rgba(34, 197, 94, 0.95);
+  border-color: rgba(34, 197, 94, 0.55);
+  background: rgba(2, 32, 14, 0.62);
+  box-shadow:
+    0 0 14px rgba(34, 197, 94, 0.22),
+    inset 0 0 8px rgba(34, 197, 94, 0.08);
+}
+.pickup-toast__survey-label {
+  color: rgba(34, 197, 94, 0.95);
+  letter-spacing: 0.18em;
 }
 
 @keyframes pickup-toast-bump {
