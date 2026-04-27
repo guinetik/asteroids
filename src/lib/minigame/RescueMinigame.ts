@@ -339,7 +339,11 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
       return
     }
 
-    if (this.hostages.getAliveCount() === 0) {
+    // Only fail when no one was alive AND no one was rescued. With extraction,
+    // a successful last-survivor board momentarily reports getAliveCount() === 0
+    // (because mid-fade boarders are excluded from isActive); guard on aboardCount
+    // so that path completes step 3 cleanly instead of failing.
+    if (this.hostages.getAliveCount() === 0 && this.hostages.aboardCount === 0) {
       this.fail('All Survivors Lost')
       return
     }
