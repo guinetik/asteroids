@@ -43,6 +43,21 @@ const REPAIR_COMPLETE_COLOR = 0x4ade80
 /** How many successful science-bolt hits on a part are required to finish it. */
 const SCIENCE_REPAIR_HITS_PER_COMPONENT = 3
 
+/**
+ * Inflates each part’s AABB for hit tests so thin solar meshes (paper-thin in
+ * world space) still register against the science bolt step.
+ */
+const SATELLITE_REPAIR_AABB_SLACK_UNITS = 14
+
+/**
+ * When two overlapping AABBs share the same segment entry (common for nested
+ * rigs), treat `t` equal within this epsilon and pick the smaller box.
+ */
+const SEGMENT_ENTRY_T_EPSILON = 1e-5
+
+/** Ignore near-zero-length bolt steps (avoids NaNs in `t` selection). */
+const MIN_BOLT_SEGMENT_LENGTH_SQ = 1e-14
+
 /** Configuration passed to `SatelliteRepairController.attach`. */
 export interface SatelliteRepairControllerConfig {
   /** POI root — walked for named rigged sub-objects. */
@@ -100,6 +115,9 @@ export class SatelliteRepairController {
   private cfg: SatelliteRepairControllerConfig | null = null
   private components: DamagedComponent[] = []
   private readonly _hitScratch = new THREE.Vector3()
+  private readonly _segDelta = new THREE.Vector3()
+  private readonly _towardHit = new THREE.Vector3()
+  private readonly _boundsSize = new THREE.Vector3()
 
   /**
    * Attach to a scene + POI. Looks up each broken component by name and applies
@@ -119,11 +137,11 @@ export class SatelliteRepairController {
     for (const name of validation.found) {
       const source = cfg.poiObject.getObjectByName(name)
       if (!source) continue
+      // Bounds from mesh only — wireframe clones are parented after so they
+      // cannot inflate or duplicate the AABB used for ray/swept tests.
+      const worldBounds = this.buildWorldBoundsForRepair(source)
       const wireframe = this.buildWireframe(source)
       source.add(wireframe)
-      const worldBounds = new THREE.Box3()
-      source.updateMatrixWorld(true)
-      worldBounds.setFromObject(source)
       this.components.push({
         name,
         source,
@@ -154,23 +172,83 @@ export class SatelliteRepairController {
    */
   tryScienceRepairSegment(from: THREE.Vector3, to: THREE.Vector3, outEntry: THREE.Vector3): boolean {
     if (!this.cfg) return false
+    const best = this.pickFirstSegmentHit(from, to, outEntry)
+    if (!best) return false
+    this.applyScienceHit(best)
+    return true
+  }
+
+  /**
+   * World-space bounds for repair, before wireframe overlay; slight inflation
+   * on thin parts.
+   *
+   * @param source - Rigged sub-object root.
+   */
+  private buildWorldBoundsForRepair(source: THREE.Object3D): THREE.Box3 {
+    const box = new THREE.Box3()
+    source.updateMatrixWorld(true)
+    box.setFromObject(source)
+    if (box.isEmpty()) {
+      console.warn('[SatelliteRepairController] Empty AABB for part', source.name)
+    } else {
+      box.expandByScalar(SATELLITE_REPAIR_AABB_SLACK_UNITS)
+    }
+    return box
+  }
+
+  /**
+   * @returns Product of AABB edge lengths — prefers smaller boxes when two
+   *   siblings share the same swept-segment entry parameter.
+   */
+  private aabbVolume(box: THREE.Box3): number {
+    if (box.isEmpty()) return Number.POSITIVE_INFINITY
+    box.getSize(this._boundsSize)
+    return this._boundsSize.x * this._boundsSize.y * this._boundsSize.z
+  }
+
+  /**
+   * Pick the **first** component along the bolt chord (smallest parametric
+   * `t` in [0, 1]). Removes “stuck on one part” when two AABBs overlap: same
+   * `t` → smaller volume (tighter part).
+   */
+  private pickFirstSegmentHit(
+    from: THREE.Vector3,
+    to: THREE.Vector3,
+    outEntry: THREE.Vector3,
+  ): DamagedComponent | null {
+    this._segDelta.subVectors(to, from)
+    const segLenSq = this._segDelta.lengthSq()
+    if (segLenSq < MIN_BOLT_SEGMENT_LENGTH_SQ) return null
+
     let best: DamagedComponent | null = null
-    let bestDistSq = Number.POSITIVE_INFINITY
+    let bestT = Number.POSITIVE_INFINITY
+    let bestVol = Number.POSITIVE_INFINITY
+
     for (const c of this.components) {
       if (c.fading) continue
       const b = c.worldBounds
       if (b.isEmpty()) continue
       if (!segmentIntersectsAabb3(from, to, b.min, b.max, this._hitScratch)) continue
-      const d = this._hitScratch.distanceToSquared(from)
-      if (d < bestDistSq) {
-        bestDistSq = d
-        best = c
-        outEntry.copy(this._hitScratch)
-      }
+
+      this._towardHit.subVectors(this._hitScratch, from)
+      let tAlong = this._towardHit.dot(this._segDelta) / segLenSq
+      if (tAlong < 0) tAlong = 0
+      if (tAlong > 1) tAlong = 1
+
+      const vol = this.aabbVolume(b)
+      const earlierAlongBolt = best === null || tAlong < bestT - SEGMENT_ENTRY_T_EPSILON
+      const tieBreakSmallerPart =
+        best !== null &&
+        Math.abs(tAlong - bestT) <= SEGMENT_ENTRY_T_EPSILON &&
+        vol < bestVol
+      if (!(earlierAlongBolt || tieBreakSmallerPart)) continue
+
+      bestT = tAlong
+      bestVol = vol
+      best = c
+      outEntry.copy(this._hitScratch)
     }
-    if (!best) return false
-    this.applyScienceHit(best)
-    return true
+    return best
   }
 
   /**
