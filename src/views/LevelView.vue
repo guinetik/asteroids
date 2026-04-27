@@ -19,7 +19,12 @@ import DamageFeedback from '@/components/DamageFeedback.vue'
 import LevelMinimap from '@/components/LevelMinimap.vue'
 import type { MapMarker } from '@/components/LevelMinimap.vue'
 import PickupToast from '@/components/PickupToast.vue'
-import type { PickupEntry, ProspectEntry, SurveyEntry } from '@/components/PickupToast.vue'
+import type {
+  PickupEntry,
+  ProspectEntry,
+  SurveyEntry,
+  SurvivorEventEntry,
+} from '@/components/PickupToast.vue'
 import LevelInventoryPanel from '@/components/LevelInventoryPanel.vue'
 import type { Inventory } from '@/lib/inventory/types'
 import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
@@ -160,6 +165,29 @@ function recordSurvey(label: string): void {
   surveyTimers.set(entry.id, handle)
 }
 
+const survivorEntries = ref<SurvivorEventEntry[]>([])
+const SURVIVOR_TOAST_LIFETIME_SEC = 1.8
+const survivorTimers = new Map<string, ReturnType<typeof Timer.after>>()
+let survivorSeq = 0
+
+/**
+ * Push a survivor event toast (lost or aboard) and auto-remove it after
+ * {@link SURVIVOR_TOAST_LIFETIME_SEC}. Each call gets its own timer so
+ * back-to-back events don't clobber each other.
+ */
+function recordSurvivor(kind: 'lost' | 'aboard'): void {
+  survivorSeq += 1
+  const label = kind === 'lost' ? 'Survivor Lost' : 'Survivor Aboard'
+  const entry: SurvivorEventEntry = { id: `survivor-${survivorSeq}`, kind, label }
+  survivorEntries.value.push(entry)
+  const handle = Timer.after(SURVIVOR_TOAST_LIFETIME_SEC, () => {
+    const idx = survivorEntries.value.findIndex((p) => p.id === entry.id)
+    if (idx >= 0) survivorEntries.value.splice(idx, 1)
+    survivorTimers.delete(entry.id)
+  })
+  survivorTimers.set(entry.id, handle)
+}
+
 function clearPickups(): void {
   for (const { handle } of pickupTimers.values()) Timer.cancel(handle)
   pickupTimers.clear()
@@ -170,6 +198,9 @@ function clearPickups(): void {
   for (const handle of surveyTimers.values()) Timer.cancel(handle)
   surveyTimers.clear()
   surveyEntries.value = []
+  for (const handle of survivorTimers.values()) Timer.cancel(handle)
+  survivorTimers.clear()
+  survivorEntries.value = []
   for (const handle of pickupFailedTimers) Timer.cancel(handle)
   pickupFailedTimers.clear()
   pickupFailed.value = null
@@ -359,6 +390,12 @@ onMounted(async () => {
     }
     viewController.onSurvey = (label) => {
       recordSurvey(label)
+    }
+    viewController.onSurvivorLost = () => {
+      recordSurvivor('lost')
+    }
+    viewController.onSurvivorAboard = () => {
+      recordSurvivor('aboard')
     }
     await viewController.init(container.value)
 
@@ -631,6 +668,7 @@ function handleToggleMusic(): void {
     :pickups="pickups"
     :prospect-entries="prospectEntries"
     :survey-entries="surveyEntries"
+    :survivor-entries="survivorEntries"
   />
   <transition name="pickup-failed">
     <div

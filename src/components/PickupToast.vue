@@ -53,6 +53,16 @@ export interface SurveyEntry {
   label: string
 }
 
+/** A rescue-survivor event (lost or aboard) shown in the same toast stack. */
+export interface SurvivorEventEntry {
+  /** Stable v-for key. */
+  id: string
+  /** `'lost'` = red death toast; `'aboard'` = green board toast. */
+  kind: 'lost' | 'aboard'
+  /** Display label, e.g. `'Survivor Lost'` or `'Survivor Aboard'`. */
+  label: string
+}
+
 const props = defineProps<{
   /** Active mineral pickups, oldest first. */
   pickups: readonly PickupEntry[]
@@ -60,6 +70,8 @@ const props = defineProps<{
   prospectEntries?: readonly ProspectEntry[]
   /** Active survey-reveal entries, oldest first. */
   surveyEntries?: readonly SurveyEntry[]
+  /** Active survivor-event entries, oldest first. */
+  survivorEntries?: readonly SurvivorEventEntry[]
   /** Optional max number of toasts to render simultaneously. */
   maxVisible?: number
 }>()
@@ -82,6 +94,11 @@ const visibleSurveys = computed(() => {
   const max = props.maxVisible ?? 5
   if (list.length <= max) return list
   return list.slice(list.length - max)
+})
+
+const visibleSurvivors = computed(() => {
+  const list = props.survivorEntries ?? []
+  return props.maxVisible == null ? list : list.slice(-props.maxVisible)
 })
 </script>
 
@@ -108,6 +125,19 @@ const visibleSurveys = computed(() => {
       >
         <span class="pickup-toast__check">▲</span>
         <span class="pickup-toast__survey-label">{{ entry.label }}</span>
+      </div>
+      <div
+        v-for="entry in visibleSurvivors"
+        :key="entry.id"
+        :class="[
+          'pickup-toast__entry',
+          entry.kind === 'lost'
+            ? 'pickup-toast__entry--survivor-lost'
+            : 'pickup-toast__entry--survivor-aboard',
+        ]"
+      >
+        <span class="pickup-toast__check">{{ entry.kind === 'lost' ? '✕' : '✓' }}</span>
+        <span class="pickup-toast__survivor-label">{{ entry.label }}</span>
       </div>
     </transition-group>
   </div>
@@ -186,6 +216,25 @@ const visibleSurveys = computed(() => {
 }
 .pickup-toast__survey-label {
   color: rgba(34, 197, 94, 0.95);
+  letter-spacing: 0.18em;
+}
+.pickup-toast__entry--survivor-lost {
+  color: rgba(239, 68, 68, 0.95);
+  border-color: rgba(239, 68, 68, 0.55);
+  background: rgba(36, 6, 6, 0.62);
+  box-shadow:
+    0 0 14px rgba(239, 68, 68, 0.22),
+    inset 0 0 8px rgba(239, 68, 68, 0.08);
+}
+.pickup-toast__entry--survivor-aboard {
+  color: rgba(34, 197, 94, 0.95);
+  border-color: rgba(34, 197, 94, 0.55);
+  background: rgba(2, 32, 14, 0.62);
+  box-shadow:
+    0 0 14px rgba(34, 197, 94, 0.22),
+    inset 0 0 8px rgba(34, 197, 94, 0.08);
+}
+.pickup-toast__survivor-label {
   letter-spacing: 0.18em;
 }
 
