@@ -59,6 +59,8 @@ const EXPLOSION_FLASH_DURATION = 0.45
 const EXPLOSION_FLASH_MAX_SCALE = 36
 const EXPLOSION_LIGHT_INTENSITY = 6.5
 const EXPLOSION_LIGHT_DISTANCE = 88
+const RESCUE_RAYCAST_RANGE = 12
+const LIFTOFF_LOCK_PROMPT_DURATION = 2.0
 
 const explosionFlashMat = new THREE.MeshBasicMaterial({
   color: 0x66ffcc,
@@ -89,6 +91,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     { label: 'Land in the outbreak zone', complete: false, active: true },
     { label: 'Eliminate the attackers', complete: false, active: false },
     { label: 'Heal the survivors', complete: false, active: false },
+    { label: 'Extract the survivors', complete: false, active: false },
     { label: 'Destroy the virus infestation', complete: false, active: false },
   ]
 
@@ -142,6 +145,10 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
   private explosionFlashTimer = 0
   private virusBaseY = 0
   private virusAnimTime = 0
+  private readonly lastLanderPosition = new THREE.Vector3()
+  private liftoffLockPromptTimer = 0
+  /** Snapshot of total hostages released, captured inside `releaseHostagesToGround`. */
+  private _totalSurvivorsSnapshot = 0
 
   /**
    * Called when the player should take direct damage.
@@ -170,6 +177,11 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
   onComplete: ((objectiveIndex: number) => void) | null = null
   onStepChange: ((objectiveIndex: number, steps: readonly MiniGameStep[]) => void) | null = null
 
+  /** Fired whenever a hostage dies (combat or extraction). Argument: alive-not-aboard count. */
+  onSurvivorLost: ((aliveRemaining: number) => void) | null = null
+  /** Fired when a recruited walker boards the lander. Argument: cumulative aboard count. */
+  onSurvivorAboard: ((aboardCount: number) => void) | null = null
+
   get status(): MiniGameStatus {
     return this._status
   }
@@ -191,6 +203,39 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
 
   get progressTotal(): number | null {
     return this.encounterEnemies.length
+  }
+
+  /**
+   * Total survivors released onto the ground in step 0. Snapshotted inside
+   * `releaseHostagesToGround` so it stays stable even after instances are
+   * spliced out of the controller post-board-fade. The HUD's `TOTAL` field.
+   */
+  get totalSurvivors(): number {
+    return this._totalSurvivorsSnapshot
+  }
+
+  /** Currently-alive survivors that have not yet boarded the lander. */
+  get aliveSurvivors(): number {
+    return this.hostages.aliveCountNotAboard
+  }
+
+  /** Survivors who have walked into the lander. Monotonic. */
+  get aboardSurvivors(): number {
+    return this.hostages.aboardCount
+  }
+
+  /**
+   * True while the extract step is active and there are still survivors who
+   * have not boarded. Drives a thrust gate on `LanderController`.
+   * Also gated on `_status === 'active'` so a `'failed'` mission never reports
+   * locked.
+   */
+  get isLiftoffLocked(): boolean {
+    return (
+      this._status === 'active' &&
+      this._steps[3]?.active === true &&
+      this.aliveSurvivors > 0
+    )
   }
 
   get steps(): readonly MiniGameStep[] {
@@ -262,6 +307,17 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     this.syncEnemySimulation(dt, ctx)
     this.syncExplosionFlash(dt)
 
+    if (ctx.landerPosition) {
+      this.lastLanderPosition.set(
+        ctx.landerPosition.x,
+        ctx.landerPosition.y,
+        ctx.landerPosition.z,
+      )
+    }
+    if (this.liftoffLockPromptTimer > 0) {
+      this.liftoffLockPromptTimer = Math.max(0, this.liftoffLockPromptTimer - dt)
+    }
+
     if (this._status === 'completed' || this._status === 'failed') {
       return
     }
@@ -305,6 +361,15 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     }
     this.advanceStep(2)
 
+    // Step 3: Extract. Player aims at a kneeling hostage and presses E to send
+    // them walking to the lander. Step completes when no alive non-aboard
+    // survivors remain.
+    if (this.aliveSurvivors > 0) {
+      this.updateExtractInteraction(ctx)
+      return
+    }
+    this.advanceStep(3)
+
     if (!this.armed) {
       this.updateVirusInteraction(ctx)
       return
@@ -345,6 +410,17 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
         return
       }
     }
+  }
+
+  /**
+   * Called by the level VC when the player tries to lift off while the rescue
+   * lock is active. Rate-limited internally to one prompt per
+   * {@link LIFTOFF_LOCK_PROMPT_DURATION} so holding the throttle doesn't spam.
+   */
+  notifyLiftoffAttemptBlocked(): void {
+    if (this.liftoffLockPromptTimer > 0) return
+    this.liftoffLockPromptTimer = LIFTOFF_LOCK_PROMPT_DURATION
+    this.onPrompt?.('LIFTOFF LOCKED — EXTRACT ALL SURVIVORS')
   }
 
   dispose(): void {
@@ -400,6 +476,13 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
 
     this.enemyProjectileSystem.onProjectileMove = this.enemyProjectileMeshPool.acquire
     this.enemyProjectileSystem.onProjectileRemoved = this.enemyProjectileMeshPool.release
+
+    this.hostages.onSurvivorLost = (aliveRemaining) => {
+      this.onSurvivorLost?.(aliveRemaining)
+    }
+    this.hostages.onSurvivorAboard = (aboardCount) => {
+      this.onSurvivorAboard?.(aboardCount)
+    }
   }
 
   private syncVirusVisual(dt: number): void {
@@ -472,6 +555,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
   private async releaseHostagesToGround(): Promise<void> {
     if (this._status !== 'active' || this.hostagesReleased) return
     await this.spawnHostages()
+    this._totalSurvivorsSnapshot = this.hostages.getTotalCount()
     this.hostagesReleased = true
     this.onPrompt?.('SURVIVORS RELEASED. EXIT THE LANDER')
   }
@@ -819,6 +903,78 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     }
   }
 
+  /**
+   * Step-3 prompt + recruit handler. Raycasts from the player camera; if it hits
+   * a kneeling hostage within {@link RESCUE_RAYCAST_RANGE}, prompt to press E
+   * and recruit on press.
+   */
+  private updateExtractInteraction(ctx: MiniGameContext): void {
+    if (ctx.levelState !== 'eva' || !ctx.playerPosition || !ctx.playerForward) {
+      this.onPrompt?.(null)
+      return
+    }
+
+    const hit = this.findExtractTarget(ctx)
+    if (hit) {
+      this._isPlayerNear = true
+      this.onPrompt?.('[E] EXTRACT SURVIVOR')
+      if (ctx.terminalInteractPressed) {
+        const captured = this.lastLanderPosition.clone()
+        this.hostages.recruit(hit, () => {
+          // Update the captured vector each tick to match the live lander pos.
+          captured.copy(this.lastLanderPosition)
+          return captured
+        })
+      }
+    } else {
+      this.onPrompt?.('LOOK AT A SURVIVOR. PRESS [E] TO EXTRACT')
+    }
+  }
+
+  /**
+   * Sphere-intersect the player's look ray against every kneeling hostage's
+   * existing hit sphere. Returns the closest live hit within
+   * {@link RESCUE_RAYCAST_RANGE}, or `null`.
+   */
+  private findExtractTarget(ctx: MiniGameContext): Hostage | null {
+    if (!ctx.playerPosition || !ctx.playerForward) return null
+    const ox = ctx.playerPosition.x
+    const oy = ctx.playerPosition.y
+    const oz = ctx.playerPosition.z
+    const dx = ctx.playerForward.x
+    const dy = ctx.playerForward.y
+    const dz = ctx.playerForward.z
+
+    let bestT = RESCUE_RAYCAST_RANGE
+    let best: Hostage | null = null
+
+    for (const hostage of this.hostages.getHostages()) {
+      // Only kneeling hostages are recruitable. (Walkers and dying are out.)
+      const inst = this.hostages.getInstanceForDebug(hostage)
+      if (inst && inst.model.getState() !== 'praying') continue
+
+      const cx = hostage.position.x
+      const cy = hostage.position.y
+      const cz = hostage.position.z
+      const r = hostage.hitRadius
+
+      // Ray-sphere intersection: |o + t*d - c|^2 = r^2
+      const ex = ox - cx
+      const ey = oy - cy
+      const ez = oz - cz
+      const b = ex * dx + ey * dy + ez * dz
+      const c = ex * ex + ey * ey + ez * ez - r * r
+      const disc = b * b - c
+      if (disc < 0) continue
+      const t = -b - Math.sqrt(disc)
+      if (t < 0 || t > bestT) continue
+      bestT = t
+      best = hostage
+    }
+
+    return best
+  }
+
   private updateVirusInteraction(ctx: MiniGameContext): void {
     if (ctx.levelState !== 'eva' || !ctx.playerPosition) {
       this.onPrompt?.(null)
@@ -841,7 +997,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
   private armCharges(): void {
     this.armed = true
     this.countdownRemaining = COUNTDOWN_DURATION
-    this.advanceStep(3)
+    this.advanceStep(4)
   }
 
   private detonate(ctx: MiniGameContext): void {

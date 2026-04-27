@@ -119,7 +119,7 @@ function computeHostageHitFromMeshRoot(model: HostageModel): {
 /**
  * One hostage instance — domain entity, model, and billboard HP bar.
  */
-class HostageInstance {
+export class HostageInstance {
   readonly hostage: Hostage
   readonly model: HostageModel
   private readonly sprite: THREE.Sprite
@@ -407,6 +407,15 @@ export class FpsHostageController implements Tickable {
    */
   getHostageEntitiesForDirector(): readonly Hostage[] {
     return this.instances.map((i) => i.hostage)
+  }
+
+  /**
+   * Look up a {@link HostageInstance} for a given {@link Hostage} (or undefined).
+   * Used by `RescueMinigame.findExtractTarget` to filter kneeling hostages by
+   * animation state.
+   */
+  getInstanceForDebug(hostage: Hostage): HostageInstance | undefined {
+    return this.instances.find((i) => i.hostage === hostage)
   }
 
   /**
