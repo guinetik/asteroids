@@ -60,12 +60,53 @@ What the Society avoids saying:
 - The player is not just collecting data. They are ringing a dinner bell and
   guarding the bell.
 
-The game text should teach this in layers. Early DAN missions can be mostly
-practical: "shoot the return particles, defend the lander." Jovian Society
-missions should add the economic motive: "we are looking for buried lattice
-families relevant to neutron-thruster manufacturing." Later or higher-tier
-missions can let the lie show: Vance keeps calling attacks "cross-talk" even
-after the player knows exactly what is happening.
+The game text should teach this through faction voice rather than exposition.
+The player already has the Phobos origin from the intro; DAN mission board copy
+should assume the basics and let each faction's worldview reshape the same
+mechanic. Pilots reading both mission boards should feel the same job described
+in incompatible languages.
+
+Psychosphere is viroid drop residue: consciousness fragments of an interstellar
+alien species. The Cinderline considers psychosphere sacred. The Jovian Society
+considers it sensor calibration material.
+
+### Faction Ontology
+
+The same DAN scan must read differently depending on who posts the mission:
+
+| Beat | Jovian Society Reads It As | Cinderline Reads It As |
+|------|----------------------------|------------------------|
+| The pulse | Subsurface volatile survey | A question put to the rock |
+| Return particles | Telemetry data | The rock's reply |
+| Viroid attacks | Sensor cross-talk | A wakeful presence answering the call |
+| Killing viroids | Hazard mitigation | A regrettable necessity, not a victory |
+| Successful scan | Asset classification advanced | The rock has spoken; the line listens |
+
+**Jovian Society:** corporate-banal, late-capitalism cloud-city manufacturers.
+Voice is signed by Vance Hoyt, Senior Asset Officer. Vance says asset,
+portfolio, instrumentation envelope, longitudinal benefits, stakeholder, line
+item, and warm regards. He is courteous, never openly sinister, and absolutely
+the villain. The Society is hunting Phobos-family lattice for neutron-thruster
+manufacturing. Vance must never honestly name danger; viroid response is
+"sensor cross-talk," "elevated ambient disturbance," or "instrumentation
+interference." The horror lives in the spreadsheet.
+
+**The Cinderline:** solar-mystic order based at The Anvil on Mercury. Voice is
+liturgical, patient, certain, and slightly archaic. Sentences are short.
+Silences are intentional. They view DAN as a listening rite: the neutron pulse
+asks the asteroid whether something inside is awake. They do not deny viroids;
+they acknowledge presences. The pilot is not defending a scanner. The pilot is
+holding a vigil. Signoffs may include "A seat will be kept" or "Walk in the
+light." The Cinderline's gravity is the silence.
+
+Forbidden voice moves:
+
+- Vance must not acknowledge the Phobos viroid origin or name viroid attacks
+  honestly. He calls the response cross-talk or interference.
+- The Cinderline must not sound mournful, vague, or generic-spooky. They are
+  calm because they are certain.
+- Neither faction should explain the whole lore in a briefing. Keep mission
+  board copy to 2-4 sentences; the voice does the heavy lifting.
 
 ## Goals
 
@@ -98,11 +139,11 @@ after the player knows exactly what is happening.
 
 ## Player Flow
 
-1. Player accepts a DAN asteroid mission, most commonly from the Jovian Society.
+1. Player accepts a DAN asteroid mission from the Jovian Society or the Cinderline.
 2. Map waypoint and `/level` transition follow the existing asteroid mission
    path.
 3. Level generation places the lander in a crater-like objective site and spawns
-   a Society terminal near the parked lander.
+   a faction terminal near the parked lander.
 4. Player EVAs, approaches the terminal, and presses `E`.
 5. The DAN scan starts:
    - timer counts down from `scanDurationSeconds` (default 45)
@@ -183,13 +224,15 @@ types:
 "objectiveTypes": ["photometry", "dan"]
 ```
 
-Add at least two DAN templates:
+Add two Jovian Society DAN templates. The Society copy must keep the corporate
+euphemism intact: attacks are cross-talk, interference, disturbance, or a quirk
+of the instrumentation envelope.
 
 ```json
 {
   "id": "jovian_subsurface_pass",
   "name": "Subsurface Verification Pass",
-  "briefing": "The asset has cleared preliminary light-return review. Next step is DAN: Dynamic Albedo of Neutrons. Your lander will pulse the crater floor and read the return scatter for buried volatiles and neutron-reactive lattice traces. Those traces are why neutron thrusters exist at all, so clean data commands clean rates. Capture the return particles with science mode before they decay, and keep the scanner intact if local fauna mistake the pulse for company.",
+  "briefing": "Per current portfolio review, this asset has cleared preliminary photometric screening. Next step is DAN: Dynamic Albedo of Neutrons, with emphasis on buried volatiles and lattice traces relevant to neutron-thruster production. Kindly capture clean return particles and disregard any sensor cross-talk inside the instrumentation envelope. Warm regards, Vance Hoyt.",
   "objectiveSlots": [
     {
       "type": "dan",
@@ -214,7 +257,72 @@ Add at least two DAN templates:
 {
   "id": "jovian_extraction_grade_dan",
   "name": "Extraction-Grade DAN Survey",
-  "briefing": "Stakeholders require extraction-grade subsurface confidence before this body advances. Run a full Dynamic Albedo of Neutrons pass: pulse, capture return particles, and classify any lattice-positive bands against the Phobos reference family. Be advised that elevated sensor cross-talk has been observed when DAN pulses intersect viroid-bearing material. Continue the pass unless the hull is compromised.",
+  "briefing": "Stakeholders require extraction-grade subsurface confidence before this body advances. Run a full Dynamic Albedo of Neutrons pass and classify any lattice-positive bands against the Phobos reference family. Please advise if elevated ambient disturbance compromises telemetry quality; otherwise continue the pass unless the hull is compromised. Warm regards, Vance Hoyt.",
+  "objectiveSlots": [
+    {
+      "type": "dan",
+      "weight": 1,
+      "params": {
+        "type": "dan",
+        "scanDurationSeconds": { "min": 45, "max": 45 },
+        "requiredParticleHits": { "min": 55, "max": 65 },
+        "enemyGraceSeconds": { "min": 9, "max": 6 },
+        "particleTier": "high",
+        "enemyTier": "high"
+      },
+      "reward": { "min": 5000, "max": 9000 }
+    }
+  ],
+  "completionBonus": { "min": 1500, "max": 2500 },
+  "regionByDifficulty": { "jovian-trojans": [8, 10] }
+}
+```
+
+Add `src/data/missions/givers/cinderline.json` if it does not already exist,
+and import it into `src/lib/missions/giverCatalog.ts`. The Cinderline should be
+available in the same broad difficulty range as its DAN templates and can be
+host-attributed at Mercury/The Anvil in later board routing work. The first data
+slice only needs the giver to generate valid asteroid missions.
+
+The Cinderline giver should advertise DAN:
+
+```json
+"objectiveTypes": ["dan"]
+```
+
+Add two Cinderline DAN templates. Their copy must frame the same mechanic as a
+listening rite. Do not use asset, data, portfolio, or telemetry language.
+
+```json
+{
+  "id": "cinderline_first_listening",
+  "name": "The First Listening",
+  "briefing": "Pilot, the body has been listened to before from a distance. It is time to listen again. Set the pulse into the regolith and gather what reply the stone chooses to give. Hold your vigil until the answer is complete. A seat will be kept.",
+  "objectiveSlots": [
+    {
+      "type": "dan",
+      "weight": 1,
+      "params": {
+        "type": "dan",
+        "scanDurationSeconds": { "min": 45, "max": 45 },
+        "requiredParticleHits": { "min": 40, "max": 55 },
+        "enemyGraceSeconds": { "min": 10, "max": 8 },
+        "particleTier": "medium",
+        "enemyTier": "medium"
+      },
+      "reward": { "min": 3000, "max": 6500 }
+    }
+  ],
+  "completionBonus": { "min": 500, "max": 1500 },
+  "regionByDifficulty": { "jovian-trojans": [4, 7] }
+}
+```
+
+```json
+{
+  "id": "cinderline_vigil_threshold",
+  "name": "Vigil at the Threshold",
+  "briefing": "Pilot, this body is close to waking without our call. We do not require speed. We require attention. What replies will reply; meet it with restraint, and withdraw cleanly when the listening is done. Walk in the light.",
   "objectiveSlots": [
     {
       "type": "dan",
@@ -571,7 +679,9 @@ Modified files:
 
 - `src/lib/missions/types.ts` - add `dan` objective type and params
 - `src/lib/missions/asteroidMissionGenerator.ts` - roll DAN concrete fields
-- `src/data/missions/givers/jovian-society.json` - add DAN mission templates
+- `src/data/missions/givers/jovian-society.json` - add Society DAN mission templates
+- `src/data/missions/givers/cinderline.json` - add Cinderline DAN mission templates
+- `src/lib/missions/giverCatalog.ts` - register Cinderline giver data
 - `src/data/contracts/jovian-society-prospection.json` - no structural change
   expected; existing `objectiveType: "dan"` should begin matching
 - `src/lib/fps/projectileSystem.ts` - science projectile hit tests for active
