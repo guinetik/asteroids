@@ -34,10 +34,18 @@ The `RescueMinigame._steps` list grows from 4 to 5:
 [4] Destroy the virus infestation
 ```
 
+**Counter model — single source of truth.** Three counts are tracked, all derived from controller state so they can never disagree:
+
+- **`totalSurvivors`** — `FpsHostageController.getTotalCount()`. Snapshotted in effect at the moment hostages are released to the ground in step 0; never re-read or decremented. This is the number the HUD displays as `TOTAL`.
+- **`aboardSurvivors`** — increments inside `FpsHostageController` when a walker boards. Monotonic.
+- **`aliveSurvivors`** — `FpsHostageController.getAliveCount() - aboardSurvivors`. Derived. (Boarded hostages are removed from the controller's active list, so `getAliveCount()` doesn't include them; `aliveSurvivors` is "alive AND not yet aboard.")
+
+The number of dead is derived: `lostSurvivors = totalSurvivors - aliveSurvivors - aboardSurvivors`. This count rolls up *every* death — combat deaths in steps 1–2 and walker deaths in step 3 — into a single bucket. We never need to distinguish "lost during combat" from "lost during extraction" anywhere in logic; the rescue-phase toast just fires off the death event regardless of which step is active.
+
 **Gating:**
 
 - Step 3 unlocks when step 2 completes (`areAllLivingHostagesAtFullHealth()` returns true).
-- Step 3 completes when `aboardCount + lostDuringExtractCount === aliveAtRescueStartCount` — i.e., every survivor that was alive at the moment step 3 became active has either walked into the lander or died walking.
+- Step 3 completes when `aliveSurvivors === 0` while step 3 is active — i.e., every remaining hostage has either boarded or died. This is the same condition that auto-clears the liftoff lock, so the two stay aligned by construction.
 - Step 4 (charges) unlocks only after step 3 completes. The existing `armed` / countdown logic does not change.
 
 **Failure modes (additive to current).**
@@ -72,12 +80,13 @@ class HostageWalker {
 
 **Per-tick behavior:**
 
-1. Read target XZ from `targetProvider()`.
-2. Compute XZ delta to target. If `distance <= HOSTAGE_BOARD_RADIUS` (6m), fire `onBoarded(hostage)` and self-mark for removal.
-3. Otherwise, advance XZ by `HOSTAGE_WALK_SPEED * dt` (~3.5 m/s — slightly slower than player) toward target.
-4. Sample `heightmap.heightAt(x, z)` for ground Y; set `model.group.position.y = groundY`. (No kneel offset is applied here — by the time the walker exists the stand-up clip is playing, so the model is rising back to standing height under its own animation. The kneel offset only matters for the fallback path in §"Kneel Pose Fix" and would be zero during walking anyway.)
-5. Set `model.group.rotation.y = atan2(dx, dz)` so the walker faces its travel direction.
-6. No steering, no obstacle avoidance. Straight-line walk with heightmap follow. The virus is tall enough to walk under and the lander is a single landing pad. We can add avoidance later if playtest demands it.
+1. **Movement gate.** If `instance.model.getState() !== 'walking'` (i.e., the stand-up clip is still playing), do nothing this tick. The model stays at its anchor while bone rotations rise the rig from kneel to standing. Without this gate the root would slide laterally during stand-up — looks like ice-skating. Movement only begins once `HostageModel`'s mixer-finished listener promotes state to `'walking'`.
+2. Read target XZ from `targetProvider()`.
+3. Compute XZ delta to target. If `distance <= HOSTAGE_BOARD_RADIUS` (6m), fire `onBoarded(hostage)` and self-mark for removal.
+4. Otherwise, advance XZ by `HOSTAGE_WALK_SPEED * dt` (~3.5 m/s — slightly slower than player) toward target.
+5. Sample `heightmap.heightAt(x, z)` for ground Y; set `model.group.position.y = groundY`. (No kneel offset is applied here — by the time the walker is moving, state is `'walking'` and the model is at full standing height. The kneel offset only matters for the fallback path in §"Kneel Pose Fix".)
+6. Set `model.group.rotation.y = atan2(dx, dz)` so the walker faces its travel direction.
+7. No steering, no obstacle avoidance. Straight-line walk with heightmap follow. The virus is tall enough to walk under and the lander is a single landing pad. We can add avoidance later if playtest demands it.
 
 **On board (within `HOSTAGE_BOARD_RADIUS`):**
 
@@ -134,23 +143,35 @@ Reuses the existing toast component — no new toast infrastructure.
 **Persistent counter.** New tiny Vue overlay `RescueSurvivorPanel.vue`, anchored top-left under the existing objective list, only visible while `RescueMinigame` is the active minigame. Reads three new getters off the minigame:
 
 ```ts
-get totalSurvivors(): number       // count at the moment hostages were released
-get aliveSurvivors(): number       // currently alive, not yet aboard
+get totalSurvivors(): number       // total released on the ground in step 0; never decremented
+get aliveSurvivors(): number       // currently alive AND not yet aboard
 get aboardSurvivors(): number      // walked into the lander
 ```
 
-Renders one line: `SURVIVORS: 3 ALIVE · 2 ABOARD · 5 TOTAL`. The `ALIVE` segment is amber when `aliveSurvivors / totalSurvivors < 0.5`, red when `aliveSurvivors <= 1`.
+See §"Mission Flow Change → Counter model" for the full derivation. `lostSurvivors` is implied (`total - alive - aboard`) and isn't a separate counter.
+
+Renders one line: `SURVIVORS: 3 ALIVE · 2 ABOARD · 5 TOTAL`. The `ALIVE` segment is amber when `aliveSurvivors / totalSurvivors < 0.5`, red when `aliveSurvivors <= 1`. `TOTAL` never changes during a mission, so the player's mental math is always `alive + aboard ≤ total`, with the gap being the dead.
 
 ## Liftoff Lock
 
 **On `RescueMinigame`:**
 
 ```ts
-/** True while step 3 is active and there are still survivors not yet aboard. */
+/**
+ * True while step 3 is active and there are still survivors not yet aboard.
+ * Also gated on `_status === 'active'` so a `'failed'` mission never reports
+ * locked (defensive — the level VC should already be tearing down on fail).
+ */
 get isLiftoffLocked(): boolean {
-  return this._steps[3]?.active === true && this.aliveSurvivors > 0
+  return (
+    this._status === 'active' &&
+    this._steps[3]?.active === true &&
+    this.aliveSurvivors > 0
+  )
 }
 ```
+
+**Order on the death-of-the-last-survivor frame.** Both `aliveSurvivors === 0` and the existing `if (this.hostages.getAliveCount() === 0) this.fail(...)` evaluate inside the same `RescueMinigame.tick` call. The fail branch runs first (it's the existing top-of-tick check after `activated`), which sets `_status = 'failed'` — `isLiftoffLocked` then returns false because of the `_status` guard, but the lander never sees the unlocked state because the level VC observes `_status === 'failed'` on the same frame and ends the mission. Worst case if controller order ever slips: one frame of unblocked thrust before the mission-end overlay covers the screen — visually moot.
 
 **LanderController integration.** The level controller already feeds `MiniGameContext` to the active minigame and ticks the lander; it consults `isLiftoffLocked` each tick. When true, it clamps the lander's main-engine thrust input to 0 before passing it to the lander. RCS still works (so the player isn't fully frozen — they can rotate, settle). The lander is physically incapable of leaving the ground.
 
@@ -249,8 +270,8 @@ HostageInstance.markDead() — sprite hidden, model.playDying(), removed from co
 FpsHostageController.onSurvivorLost(hostage) callback
     │
     ▼
-RescueMinigame increments lostDuringExtractCount (if step 3 active)
-    │   fires onSurvivorLost(aliveRemaining, total)
+RescueMinigame fires onSurvivorLost(aliveRemaining, total)
+    │   (no separate counter — death is implicit in totalSurvivors - alive - aboard)
     │
     ▼
 LevelView red toast + RescueSurvivorPanel re-render
