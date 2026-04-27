@@ -160,6 +160,12 @@ export class GatherMinigame implements MiniGame, MiniGameEvents {
   onPrompt: ((text: string | null) => void) | null = null
   onComplete: ((objectiveIndex: number) => void) | null = null
   onStepChange: ((objectiveIndex: number, steps: readonly MiniGameStep[]) => void) | null = null
+  /**
+   * Fired whenever any mineral quota changes (mining grant or
+   * deposit). The rocket-survey facade subscribes to this so it
+   * can refresh the state machine's quota snapshot.
+   */
+  onQuotaChange: ((quotas: readonly GatherMineralQuota[]) => void) | null = null
 
   get status(): MiniGameStatus {
     return this._status
@@ -192,6 +198,11 @@ export class GatherMinigame implements MiniGame, MiniGameEvents {
   /** Per-mineral quotas (snapshot — exposed for tests + UI). */
   get mineralQuotas(): readonly GatherMineralQuota[] {
     return this.quotas
+  }
+
+  /** The rocket Three.js group for the rocket-survey facade. */
+  get rocketGroup(): THREE.Group {
+    return this.rocket.group
   }
 
   constructor(options: GatherMinigameOptions) {
@@ -293,6 +304,7 @@ export class GatherMinigame implements MiniGame, MiniGameEvents {
     }
     if (!updated) return
     this.refreshActiveStep()
+    this.onQuotaChange?.(this.quotas)
     this.onStepChange?.(this.objectiveIndex, this._steps)
   }
 
@@ -356,6 +368,7 @@ export class GatherMinigame implements MiniGame, MiniGameEvents {
     this._status = 'completed'
     this.onPrompt?.(null)
     this.rocket.takeOff()
+    this.onQuotaChange?.(this.quotas)
     this.onStepChange?.(this.objectiveIndex, this._steps)
     this.onComplete?.(this.objectiveIndex)
   }
@@ -367,6 +380,7 @@ export class GatherMinigame implements MiniGame, MiniGameEvents {
     this.onPrompt = null
     this.onComplete = null
     this.onStepChange = null
+    this.onQuotaChange = null
   }
 }
 
