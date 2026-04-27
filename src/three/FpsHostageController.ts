@@ -208,9 +208,9 @@ class HostageInstance {
     void this.model.playDying()
   }
 
-  /** @returns Whether this instance is still an active rescue target */
+  /** @returns Whether this instance is still an active rescue target (excludes mid-board fade) */
   isActive(): boolean {
-    return !this.dead && this.hostage.alive
+    return !this.dead && this.hostage.alive && !this.isBoarding
   }
 
   syncAnchorToGroup(): void {
@@ -345,7 +345,12 @@ export class FpsHostageController implements Tickable {
   }
 
   /**
-   * Total spawned hostages, including dead/inactive ones.
+   * Total hostages currently tracked by the controller (live + dead corpses).
+   *
+   * NOTE: this count decrements when boarded instances finish their fade and
+   * get spliced out of `instances`. It is **not** a stable total-for-display.
+   * For the persistent HUD `TOTAL` field, snapshot this value at release time
+   * inside the consuming minigame (e.g. `RescueMinigame.totalSurvivors`).
    */
   getTotalCount(): number {
     return this.instances.length
