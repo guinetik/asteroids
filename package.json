@@ -18,6 +18,7 @@
     "lint:eslint": "eslint . --fix --cache --max-warnings 0",
     "lint:shaders": "node scripts/lint-shaders.mjs",
     "format": "prettier --write --experimental-cli src/",
+    "sound:build": "node scripts/optimize-sound.mjs",
     "models:shuttle:merge": "node scripts/merge-shuttle-glb.mjs",
     "models:shuttle:inspect": "gltf-transform inspect \"public/models/Space Shuttle (D).glb\"",
     "models:shuttle:prune": "gltf-transform prune \"public/models/shuttle.glb\" \"public/models/shuttle.pruned.glb\"",
