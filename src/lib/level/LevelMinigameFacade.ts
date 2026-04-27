@@ -294,6 +294,20 @@ export class LevelMinigameFacade {
   }
 
   /**
+   * Live enemy count summed across every registered minigame. Returns 0 when
+   * no combat minigame is active. Used by the debug HUD aggregator.
+   *
+   * @returns Sum of `enemyCount` across all registered minigames.
+   */
+  get enemyCount(): number {
+    let total = 0
+    for (const minigame of this.minigames) {
+      total += minigame.enemyCount ?? 0
+    }
+    return total
+  }
+
+  /**
    * Whether every registered objective minigame has completed.
    *
    * Returns false when no minigames were registered so the level cannot

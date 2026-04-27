@@ -101,6 +101,11 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
   private readonly virusPosition = new THREE.Vector3()
   private readonly enemyDirector = new EnemyDirector()
 
+  /** Live enemy count for the debug HUD. Read-only. */
+  get enemyCount(): number {
+    return this.enemyDirector.enemies.length
+  }
+
   /**
    * Subscribe an observer to every enemy this minigame spawns. Used by the
    * level VC to wire the loot drop system without exposing the director.

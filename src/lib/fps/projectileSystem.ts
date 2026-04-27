@@ -92,6 +92,12 @@ interface Projectile {
 export class ProjectileSystem implements Tickable {
   private readonly projectiles: Projectile[] = []
   private readonly pool: Projectile[] = []
+
+  /** Live count of in-flight projectiles. Read-only; consumed by the debug HUD. */
+  get projectileCount(): number {
+    return this.projectiles.length
+  }
+
   private readonly scene: THREE.Scene
   private readonly heightmap: Heightmap
   private readonly enemies: Enemy[] = []

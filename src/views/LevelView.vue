@@ -1,7 +1,10 @@
 <!-- src/views/LevelView.vue -->
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { Timer } from '@/lib/Timer'
+import DebugHud from '@/components/DebugHud.vue'
+import { isDebugHudEnabled } from '@/lib/debug/debugMetrics'
 import { LevelViewController } from './LevelViewController'
 import LanderHud from '@/components/LanderHud.vue'
 import MissionAnnouncement from '@/components/MissionAnnouncement.vue'
@@ -33,6 +36,10 @@ import {
 } from '@/audio/backgroundMusic'
 import { LEVEL_GRID_SIZE } from '@/lib/missions/asteroidMissionGenerator'
 
+const route = useRoute()
+const debugHudVisible = computed(
+  () => route.query.debug === '1' || route.query.debug === 'true' || isDebugHudEnabled(),
+)
 const container = ref<HTMLElement>()
 const viewController = new LevelViewController()
 const letterboxVisible = ref(true)
@@ -618,6 +625,7 @@ function handleToggleMusic(): void {
     ref="damageFeedback"
     :flash-opacity="damageFlash"
   />
+  <DebugHud v-if="debugHudVisible" />
   <PickupToast
     v-if="stateInfo.state === 'eva' || stateInfo.state === 'lander'"
     :pickups="pickups"

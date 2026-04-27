@@ -112,6 +112,12 @@ export interface MiniGame {
   readonly missionInstruction?: string | null
   /** Optional static colliders owned by this minigame's scene props. */
   readonly worldColliders?: readonly WorldCollider[]
+  /**
+   * Optional live enemy count owned by this minigame. Combat minigames
+   * (exterminate, rescue) override; non-combat objectives leave it
+   * undefined and are treated as zero by the debug HUD aggregator.
+   */
+  readonly enemyCount?: number
 
   /** Per-frame update. */
   tick(dt: number, ctx: MiniGameContext): void

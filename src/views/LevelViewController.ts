@@ -104,6 +104,8 @@ import { LevelTelemetryFacade } from '@/lib/level/LevelTelemetryFacade'
 import type { WorldCollider } from '@/lib/physics/worldCollision'
 import { LEVEL_VIEW_CONTROLLER_CONFIG } from '@/lib/level/levelViewControllerConfig'
 import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
+import { isDebugHudEnabled } from '@/lib/debug/debugMetrics'
+import { DebugMetricsTracker } from '@/lib/debug/DebugMetricsTracker'
 import {
   computeDeathPresentationState,
   computeHypoxiaFadeOpacity,
@@ -213,6 +215,7 @@ export class LevelViewController implements Tickable {
   private multiTool: MultiToolController | null = null
   private multiToolState: MultiToolState | null = null
   private projectileSystem: ProjectileSystem | null = null
+  private debugMetricsTracker: DebugMetricsTracker | null = null
   private impactEmitter: ParticleEmitter | null = null
   /**
    * Latest rock-target readout for the FPS HUD. Populated each tick by
@@ -978,6 +981,18 @@ export class LevelViewController implements Tickable {
     this.tickHandler.register(this.stateMachine, TICK_PRIORITY_INPUT + 1)
     this.tickHandler.register(this, TICK_PRIORITY_RENDER - 1)
     this.tickHandler.register(this.sceneManager, TICK_PRIORITY_RENDER)
+
+    // Debug HUD instrumentation. Sits at RENDER + 1 so renderer.info reflects
+    // the frame that was just submitted by the SceneManager / postprocessor.
+    if (isDebugHudEnabled()) {
+      this.debugMetricsTracker = new DebugMetricsTracker({
+        renderer: this.sceneManager.renderer,
+        tickHandler: this.tickHandler,
+        getEnemyCount: () => this.minigames.enemyCount,
+        getProjectileCount: () => this.projectileSystem?.projectileCount ?? 0,
+      })
+      this.tickHandler.register(this.debugMetricsTracker, TICK_PRIORITY_RENDER + 1)
+    }
 
     // Make sure the in-parallel prop GLB preloads have landed before we
     // let the arrival cinematic start ticking, so the first exterminate
@@ -2545,6 +2560,11 @@ export class LevelViewController implements Tickable {
     this.rocketSurvey = null
     this.prospectOverlay?.dispose()
     this.prospectOverlay = null
+    if (this.debugMetricsTracker && this.tickHandler) {
+      this.tickHandler.unregister(this.debugMetricsTracker)
+    }
+    this.debugMetricsTracker?.dispose()
+    this.debugMetricsTracker = null
     this.projectileSystem?.dispose()
     if (this.rockYieldSystem) {
       this.rockYieldSystem.onMineralExtracted = null
