@@ -15,6 +15,9 @@ import beltMiningData from '@/data/missions/givers/belt-mining-corp.json'
 import frontierRescueData from '@/data/missions/givers/frontier-rescue.json'
 import colonialGuardData from '@/data/missions/givers/colonial-guard.json'
 import jovianSocietyData from '@/data/missions/givers/jovian-society.json'
+import cinderlineData from '@/data/missions/givers/cinderline.json'
+import lucasMaverickData from '@/data/missions/givers/lucas-maverick.json'
+import martianMarinesBunkerData from '@/data/missions/givers/martian-marines-bunker.json'
 
 /** All mission givers loaded from JSON. */
 export const MISSION_GIVERS: MissionGiver[] = [
@@ -23,6 +26,9 @@ export const MISSION_GIVERS: MissionGiver[] = [
   frontierRescueData,
   colonialGuardData,
   jovianSocietyData,
+  cinderlineData,
+  lucasMaverickData,
+  martianMarinesBunkerData,
 ] as unknown as MissionGiver[]
 
 /** Mission givers keyed by id. */

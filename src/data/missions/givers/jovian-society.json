@@ -2,7 +2,7 @@
   "id": "jovian-society",
   "name": "Vance Hoyt",
   "title": "Senior Asset Officer",
-  "objectiveTypes": ["photometry"],
+  "objectiveTypes": ["photometry", "bunker"],
   "minDifficulty": 3,
   "maxDifficulty": 10,
   "missions": [
@@ -45,6 +45,25 @@
       ],
       "completionBonus": { "min": 1500, "max": 2500 },
       "regionByDifficulty": { "jovian-trojans": [6, 10] }
+    },
+    {
+      "id": "jovian_asset_substrate_recovery",
+      "name": "Asset Substrate Recovery",
+      "briefing": "Pilot. The Society maintains an asset bunker on the body in question. A viroid incursion has compromised it. Per portfolio terms, we require descent, neutralization, and recovery of the substrate before the next review cycle. Standard pass: clear the floor, walk out. — Vance Hoyt",
+      "objectiveSlots": [
+        {
+          "type": "bunker",
+          "weight": 1.0,
+          "params": { "type": "bunker" },
+          "reward": { "min": 3500, "max": 9000 }
+        }
+      ],
+      "completionBonus": { "min": 2500, "max": 4000 },
+      "regionByDifficulty": {
+        "asteroid-belt": [3, 7],
+        "kuiper-belt": [7, 10]
+      },
+      "planetIds": ["jupiter"]
     }
   ]
 }

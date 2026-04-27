@@ -1,0 +1,31 @@
+{
+  "id": "martian-marines-bunker",
+  "name": "Martian Marines Corps",
+  "title": "Cohort Operations, Mars",
+  "objectiveTypes": ["bunker"],
+  "minDifficulty": 1,
+  "maxDifficulty": 10,
+  "planetIds": ["mars"],
+  "missions": [
+    {
+      "id": "mmc_forward_bunker_recon",
+      "name": "Forward Bunker — Recon and Reclaim",
+      "briefing": "Operator. Forward bunker on the rock has gone dark. Viroid signature inside. Recon-and-reclaim: descend, neutralize, recover the position. Cohort cannot dispatch hard at distance — that's why we contract pilots like you. Hold the door. Make it ours.",
+      "objectiveSlots": [
+        {
+          "type": "bunker",
+          "weight": 1.0,
+          "params": { "type": "bunker" },
+          "reward": { "min": 3500, "max": 8500 }
+        }
+      ],
+      "completionBonus": { "min": 2000, "max": 4000 },
+      "regionByDifficulty": {
+        "near-earth": [1, 4],
+        "asteroid-belt": [4, 7],
+        "kuiper-belt": [7, 10]
+      },
+      "planetIds": ["mars"]
+    }
+  ]
+}

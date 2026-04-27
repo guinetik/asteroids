@@ -1,0 +1,31 @@
+{
+  "id": "cinderline",
+  "name": "The Cinderline, at The Anvil",
+  "title": "Standing Order, Mercury",
+  "objectiveTypes": ["bunker"],
+  "minDifficulty": 1,
+  "maxDifficulty": 10,
+  "planetIds": ["mercury"],
+  "missions": [
+    {
+      "id": "cinderline_anvil_substation",
+      "name": "Anvil Substation, Sealed",
+      "briefing": "Pilot, an Anvil substation has gone quiet. Viroids inside the door, the work inside the viroids. We do not abandon a sealed room. Take the descent. Walk the work. Return when the room is ours again. A seat will be kept.",
+      "objectiveSlots": [
+        {
+          "type": "bunker",
+          "weight": 1.0,
+          "params": { "type": "bunker" },
+          "reward": { "min": 3000, "max": 7500 }
+        }
+      ],
+      "completionBonus": { "min": 1500, "max": 3000 },
+      "regionByDifficulty": {
+        "near-earth": [1, 4],
+        "asteroid-belt": [4, 7],
+        "kuiper-belt": [7, 10]
+      },
+      "planetIds": ["mercury"]
+    }
+  ]
+}

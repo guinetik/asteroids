@@ -1,0 +1,31 @@
+{
+  "id": "lucas-maverick",
+  "name": "Lucas Maverick",
+  "title": "Exchange Floor Boss, Venus",
+  "objectiveTypes": ["bunker"],
+  "minDifficulty": 1,
+  "maxDifficulty": 10,
+  "planetIds": ["venus"],
+  "missions": [
+    {
+      "id": "maverick_safehouse_ledger",
+      "name": "Safehouse Ledger Recovery",
+      "briefing": "Pilot — got a private safehouse on a rock that just flipped on me. Viroids in the vault, ledger inside the viroids. Standard hand: descend, clear the table, walk out. House rule: lose your shuttle and you lose the cargo with it. Ante up clean and you get the doubled lane on the way back. — Lucas",
+      "objectiveSlots": [
+        {
+          "type": "bunker",
+          "weight": 1.0,
+          "params": { "type": "bunker" },
+          "reward": { "min": 3500, "max": 8000 }
+        }
+      ],
+      "completionBonus": { "min": 2000, "max": 3500 },
+      "regionByDifficulty": {
+        "near-earth": [1, 4],
+        "asteroid-belt": [4, 7],
+        "kuiper-belt": [7, 10]
+      },
+      "planetIds": ["venus"]
+    }
+  ]
+}

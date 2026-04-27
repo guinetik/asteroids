@@ -480,7 +480,7 @@ describe('generateAsteroidMission', () => {
     }
   })
 
-  it('Mercury host only offers exterminate or rescue asteroid objectives', () => {
+  it('Mercury host only offers exterminate, rescue, or bunker asteroid objectives', () => {
     const mercury = getPlanet('mercury')
     const hostR = mercury.orbit.semiMajorAxis * ORBIT_SCALE
     const host = { planetId: 'mercury' as const, worldX: hostR, worldZ: 0 }
@@ -489,7 +489,9 @@ describe('generateAsteroidMission', () => {
         const mission = generateAsteroidMission(d, host)
         expect(mission.originPlanetId).toBe('mercury')
         for (const obj of mission.objectives) {
-          expect(obj.type === 'exterminate' || obj.type === 'rescue').toBe(true)
+          expect(
+            obj.type === 'exterminate' || obj.type === 'rescue' || obj.type === 'bunker',
+          ).toBe(true)
         }
       }
     }
@@ -502,7 +504,9 @@ describe('generateAsteroidMission', () => {
     const mission = generateAsteroidMission(1, host)
     expect(mission.originPlanetId).toBe('mercury')
     for (const obj of mission.objectives) {
-      expect(obj.type === 'exterminate' || obj.type === 'rescue').toBe(true)
+      expect(
+        obj.type === 'exterminate' || obj.type === 'rescue' || obj.type === 'bunker',
+      ).toBe(true)
     }
   })
 
