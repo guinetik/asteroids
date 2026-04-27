@@ -18,6 +18,8 @@ import {
   MIN_ASTEROID_MISSION_REWARD,
   WAYPOINT_ANNULUS_INNER_FRACTION_AT_MIN_DIFFICULTY,
 } from '../asteroidMissionGenerator'
+import { MISSION_GIVERS } from '../giverCatalog'
+import type { MissionGiver, MissionGiverTemplate, ObjectiveSlot } from '../types'
 
 const SELECT_FIRST_ASTEROID_RANDOM = 0.25
 const SELECT_SECOND_ASTEROID_RANDOM = 0.5
@@ -547,5 +549,130 @@ describe('generateAsteroidMission', () => {
         }
       }
     }
+  })
+})
+
+describe('rollObjective bunker materialization', () => {
+  /** Synthetic bunker slot — no scalable knobs other than reward. */
+  const bunkerSlot: ObjectiveSlot = {
+    type: 'bunker',
+    weight: 1,
+    params: { type: 'bunker' },
+    reward: { min: 1000, max: 4000 },
+  }
+
+  it('stamps waveCount=3 across difficulty band 1-4', () => {
+    for (const d of [1, 2, 3, 4]) {
+      const obj = rollObjective(bunkerSlot, d)
+      expect(obj.type).toBe('bunker')
+      expect(obj.waveCount).toBe(3)
+    }
+  })
+
+  it('stamps waveCount=5 across difficulty band 5-7', () => {
+    for (const d of [5, 6, 7]) {
+      const obj = rollObjective(bunkerSlot, d)
+      expect(obj.type).toBe('bunker')
+      expect(obj.waveCount).toBe(5)
+    }
+  })
+
+  it('stamps waveCount=7 across difficulty band 8-10', () => {
+    for (const d of [8, 9, 10]) {
+      const obj = rollObjective(bunkerSlot, d)
+      expect(obj.type).toBe('bunker')
+      expect(obj.waveCount).toBe(7)
+    }
+  })
+})
+
+describe('per-template planetIds filter', () => {
+  /**
+   * Build a synthetic giver scoped to a single test, push it onto MISSION_GIVERS,
+   * and remove it on cleanup so other tests are unaffected.
+   */
+  function withSyntheticGiver<T>(giver: MissionGiver, fn: () => T): T {
+    MISSION_GIVERS.push(giver)
+    try {
+      return fn()
+    } finally {
+      const idx = MISSION_GIVERS.indexOf(giver)
+      if (idx >= 0) MISSION_GIVERS.splice(idx, 1)
+    }
+  }
+
+  /** Build a gather slot template carrying a stable id we can detect. */
+  function buildGatherTemplate(
+    id: string,
+    overrides: Partial<MissionGiverTemplate> = {},
+  ): MissionGiverTemplate {
+    return {
+      id,
+      name: `Template ${id}`,
+      briefing: 'briefing',
+      objectiveSlots: [
+        {
+          type: 'gather',
+          weight: 1,
+          params: { type: 'gather', resourceAmount: { min: 50, max: 150 } },
+          reward: { min: 300, max: 600 },
+        },
+      ],
+      completionBonus: { min: 100, max: 200 },
+      regionByDifficulty: { 'near-earth': [1, 10] },
+      ...overrides,
+    }
+  }
+
+  it('skips a template with planetIds=["jupiter"] when host is not Jupiter', () => {
+    const restrictedId = 'planetids_test_restricted_only'
+    const giver: MissionGiver = {
+      id: 'planetids_test_giver_jupiter_only',
+      name: 'PlanetIds Test Giver',
+      title: 'Test',
+      objectiveTypes: ['gather'],
+      minDifficulty: 1,
+      maxDifficulty: 10,
+      missions: [buildGatherTemplate(restrictedId, { planetIds: ['jupiter'] })],
+    }
+
+    withSyntheticGiver(giver, () => {
+      const earth = getPlanet('earth')
+      const hostR = earth.orbit.semiMajorAxis * ORBIT_SCALE
+      const host = { planetId: 'earth' as const, worldX: hostR, worldZ: 0 }
+      for (let i = 0; i < 40; i++) {
+        const mission = generateAsteroidMission(5, host)
+        expect(mission.templateId).not.toBe(restrictedId)
+      }
+    })
+  })
+
+  it('still rolls a template without planetIds (regression: dormant field)', () => {
+    const unrestrictedId = 'planetids_test_unrestricted_only'
+    const giver: MissionGiver = {
+      id: 'planetids_test_giver_global_only',
+      name: 'PlanetIds Test Giver Global',
+      title: 'Test',
+      objectiveTypes: ['gather'],
+      minDifficulty: 5,
+      maxDifficulty: 5,
+      // Single template with NO planetIds — should still appear in the pool.
+      missions: [buildGatherTemplate(unrestrictedId)],
+    }
+
+    withSyntheticGiver(giver, () => {
+      const venus = getPlanet('venus')
+      const hostR = venus.orbit.semiMajorAxis * ORBIT_SCALE
+      const host = { planetId: 'venus' as const, worldX: hostR, worldZ: 0 }
+      let sawUnrestricted = false
+      for (let i = 0; i < 80; i++) {
+        const mission = generateAsteroidMission(5, host)
+        if (mission.templateId === unrestrictedId) {
+          sawUnrestricted = true
+          break
+        }
+      }
+      expect(sawUnrestricted).toBe(true)
+    })
   })
 })

@@ -419,15 +419,16 @@ export function rollObjective(slot: ObjectiveSlot, difficulty: number): Concrete
         z: 0,
         reward,
       }
-    case 'bunker':
-      // TODO(task-4): stamp waveCount from difficulty band (3 / 5 / 7) and
-      // place x/z via mission flat-zone selection — see plan Task 4.
+    case 'bunker': {
+      const waveCount = difficulty <= 4 ? 3 : difficulty <= 7 ? 5 : 7
       return {
         type: 'bunker',
         x: 0,
         z: 0,
+        waveCount,
         reward,
       }
+    }
   }
 }
 
@@ -725,6 +726,11 @@ export function generateAsteroidMission(
 
   for (const giver of givers) {
     for (const template of giver.missions) {
+      // Per-template planet filter — when set, the template only rolls at the
+      // listed host planets. Templates without `planetIds` remain global.
+      if (template.planetIds && !template.planetIds.includes(anchor.planetId)) {
+        continue
+      }
       if (combatOnlyHost && !isExterminateOrRescueOnlyTemplate(template)) continue
       // Civilian (non-combat-only) boards never post pure extermination work — that flavor is
       // reserved for Cinderline (Mercury) and the Saturn hazard cleanup boards. Without this
