@@ -11,10 +11,6 @@
  * @date 2026-04-27
  * @spec docs/superpowers/specs/2026-04-26-rocket-survey-design.md
  */
-import {
-  ROCKET_SURVEY_DAMAGE_PER_HIT,
-  ROCKET_SURVEY_HP,
-} from './rocketSurveyConstants'
 
 /** Lifecycle phase reported by {@link RocketSurveyState}. */
 export type RocketSurveyPhase = 'idle' | 'ramping' | 'awaitingMarkerConsume' | 'exhausted'
@@ -115,8 +111,3 @@ export class RocketSurveyState {
     return true
   }
 }
-
-// Reference constants to avoid unused-import lint errors in future tasks.
-// These will be actively used when scienceHit is implemented in Task 3.
-void ROCKET_SURVEY_HP
-void ROCKET_SURVEY_DAMAGE_PER_HIT
