@@ -311,6 +311,23 @@ export class RockYieldSystem {
   }
 
   /**
+   * Return spawn indices for every currently registered rock whose
+   * itemId matches `itemId` and has remaining kg. Used by the rocket-
+   * survey facade to find candidates before picking the closest to
+   * the rocket. Cheap — the rocks map is bounded to a few hundred
+   * entries.
+   */
+  findActiveRocksByItemId(itemId: string): readonly number[] {
+    const matches: number[] = []
+    for (const [spawnIndex, roll] of this.rocks.entries()) {
+      if (roll.itemId !== itemId) continue
+      if (roll.remainingKg <= 0) continue
+      matches.push(spawnIndex)
+    }
+    return matches
+  }
+
+  /**
    * Override the mineral on rocks that haven't been mined yet so a
    * required mineral is guaranteed to be obtainable. Used by the
    * gather minigame when the natural roll left a quota-mineral with
