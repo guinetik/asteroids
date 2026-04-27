@@ -424,8 +424,8 @@ export class ProjectileSystem implements Tickable {
       const pos = p.mesh.position
 
       // Science bolts: contextual Prey-style puzzle resolver with prioritized targets.
-      // Order: hostages (heal), lander hull, rocks (wireframe+yield boost), terminals (waypoints for gather missions),
-      // enemies (faction flip), terrain (small crater). See implement-specific-effects todo.
+      // Order: hostages (heal), satellite POI repair (before shuttle hull — otherwise the
+      // huge-scale shuttle AABB eats shots toward the satellite), lander, survey, rocks.
       let hitEnemy = false
       let hitHostage = false
       let hitRock = false
@@ -441,57 +441,59 @@ export class ProjectileSystem implements Tickable {
           this.onHostageBolt?.(hostageHit.hostage, this._callbackPos, 'heal')
           hitHostage = true
         } else {
-          const healTgt = this.mapEvaShuttleHullHeal
-          if (healTgt && !healTgt.isHullFull()) {
-            const aabb = healTgt.getHullAabb()
-            if (
-              aabb &&
-              segmentIntersectsAabb3(
-                this._prevPos,
-                pos,
-                aabb.min,
-                aabb.max,
-                this._callbackPos,
-              )
-            ) {
-              healTgt.onHealFromBolt(HEAL_BOLT_AMOUNT)
-              hitMapShuttleHull = true
-              hitHostage = true
-            }
-          }
           let landerHit = false
-          if (!hitMapShuttleHull) {
-            if (
-              this.evaSatelliteServicingScience?.tryScienceRepairSegment(
-                this._prevPos,
-                pos,
-                this._callbackPos,
-              ) === true
-            ) {
-              hitSatelliteRepair = true
-              hitHostage = true
-            } else if (this.lander) {
-              this.lander.group.getWorldPosition(this._landerCenter)
-              const distSq = pos.distanceToSquared(this._landerCenter)
-              // ~13.4 unit radius around lander center
-              if (distSq < 180) {
-                this.lander.healHull(HEAL_BOLT_AMOUNT)
-                this._callbackPos.copy(pos)
-                hitHostage = true // reuse flag so onImpact fires for VFX
-                landerHit = true
+          if (
+            this.evaSatelliteServicingScience?.tryScienceRepairSegment(
+              this._prevPos,
+              pos,
+              this._callbackPos,
+            ) === true
+          ) {
+            hitSatelliteRepair = true
+            hitHostage = true
+          } else {
+            const healTgt = this.mapEvaShuttleHullHeal
+            if (healTgt && !healTgt.isHullFull()) {
+              const aabb = healTgt.getHullAabb()
+              if (
+                aabb &&
+                segmentIntersectsAabb3(
+                  this._prevPos,
+                  pos,
+                  aabb.min,
+                  aabb.max,
+                  this._callbackPos,
+                )
+              ) {
+                healTgt.onHealFromBolt(HEAL_BOLT_AMOUNT)
+                hitMapShuttleHull = true
+                hitHostage = true
               }
             }
-            if (!hitSatelliteRepair && !landerHit) {
-              const surveyImpact = this.surveyTargetHit(this._prevPos, pos, this._callbackPos)
-              if (surveyImpact !== null) {
-                this.onScienceRocketHit?.(this._callbackPos)
-                hitRocket = true
-              } else {
-                const rockHit = this.closestRockHit(this._prevPos, pos)
-                if (rockHit) {
+            if (!hitMapShuttleHull) {
+              if (this.lander) {
+                this.lander.group.getWorldPosition(this._landerCenter)
+                const distSq = pos.distanceToSquared(this._landerCenter)
+                // ~13.4 unit radius around lander center
+                if (distSq < 180) {
+                  this.lander.healHull(HEAL_BOLT_AMOUNT)
                   this._callbackPos.copy(pos)
-                  this.onScienceRockHit?.(rockHit.spawnIndex, this._callbackPos)
-                  hitRock = true
+                  hitHostage = true // reuse flag so onImpact fires for VFX
+                  landerHit = true
+                }
+              }
+              if (!landerHit) {
+                const surveyImpact = this.surveyTargetHit(this._prevPos, pos, this._callbackPos)
+                if (surveyImpact !== null) {
+                  this.onScienceRocketHit?.(this._callbackPos)
+                  hitRocket = true
+                } else {
+                  const rockHit = this.closestRockHit(this._prevPos, pos)
+                  if (rockHit) {
+                    this._callbackPos.copy(pos)
+                    this.onScienceRockHit?.(rockHit.spawnIndex, this._callbackPos)
+                    hitRock = true
+                  }
                 }
               }
             }
