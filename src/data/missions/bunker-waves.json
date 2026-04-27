@@ -1,0 +1,112 @@
+{
+  "easy": [
+    {
+      "fixed": [{ "type": "bacteriophage", "count": 3 }],
+      "fillPool": ["bacteriophage"]
+    },
+    {
+      "fixed": [
+        { "type": "bacteriophage", "count": 3 },
+        { "type": "spire", "count": 1 }
+      ],
+      "fillPool": ["bacteriophage"]
+    },
+    {
+      "fixed": [
+        { "type": "chimera", "count": 1 },
+        { "type": "spire", "count": 1 },
+        { "type": "bacteriophage", "count": 4 }
+      ],
+      "fillPool": ["bacteriophage", "spire"]
+    }
+  ],
+  "medium": [
+    {
+      "fixed": [{ "type": "bacteriophage", "count": 4 }],
+      "fillPool": ["bacteriophage"]
+    },
+    {
+      "fixed": [
+        { "type": "bacteriophage", "count": 4 },
+        { "type": "spire", "count": 1 }
+      ],
+      "fillPool": ["bacteriophage"]
+    },
+    {
+      "fixed": [
+        { "type": "chimera", "count": 1 },
+        { "type": "bacteriophage", "count": 4 }
+      ],
+      "fillPool": ["bacteriophage", "spire"]
+    },
+    {
+      "fixed": [
+        { "type": "chimera", "count": 1 },
+        { "type": "spire", "count": 2 },
+        { "type": "bacteriophage", "count": 3 }
+      ],
+      "fillPool": ["bacteriophage"]
+    },
+    {
+      "fixed": [
+        { "type": "chimera", "count": 2 },
+        { "type": "spire", "count": 2 },
+        { "type": "bacteriophage", "count": 5 }
+      ],
+      "fillPool": ["bacteriophage", "spire", "chimera"]
+    }
+  ],
+  "hard": [
+    {
+      "fixed": [{ "type": "bacteriophage", "count": 5 }],
+      "fillPool": ["bacteriophage"]
+    },
+    {
+      "fixed": [
+        { "type": "bacteriophage", "count": 5 },
+        { "type": "spire", "count": 1 }
+      ],
+      "fillPool": ["bacteriophage"]
+    },
+    {
+      "fixed": [
+        { "type": "chimera", "count": 1 },
+        { "type": "spire", "count": 1 },
+        { "type": "bacteriophage", "count": 5 }
+      ],
+      "fillPool": ["bacteriophage"]
+    },
+    {
+      "fixed": [
+        { "type": "chimera", "count": 1 },
+        { "type": "spire", "count": 2 },
+        { "type": "bacteriophage", "count": 5 }
+      ],
+      "fillPool": ["bacteriophage", "spire"]
+    },
+    {
+      "fixed": [
+        { "type": "chimera", "count": 2 },
+        { "type": "spire", "count": 2 },
+        { "type": "bacteriophage", "count": 6 }
+      ],
+      "fillPool": ["bacteriophage", "spire"]
+    },
+    {
+      "fixed": [
+        { "type": "chimera", "count": 2 },
+        { "type": "spire", "count": 3 },
+        { "type": "bacteriophage", "count": 6 }
+      ],
+      "fillPool": ["bacteriophage", "spire", "chimera"]
+    },
+    {
+      "fixed": [
+        { "type": "chimera", "count": 3 },
+        { "type": "spire", "count": 3 },
+        { "type": "bacteriophage", "count": 8 }
+      ],
+      "fillPool": ["bacteriophage", "spire", "chimera"]
+    }
+  ]
+}
