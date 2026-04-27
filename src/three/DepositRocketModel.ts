@@ -85,6 +85,10 @@ const ANTENNA_TIP_RADIUS = 0.11
 const ANTENNA_TIP_WIDTH_SEGMENTS = 10
 const ANTENNA_TIP_HEIGHT_SEGMENTS = 6
 const EXHAUST_RADIUS_MULTIPLIER = 0.62
+const SURVEY_FLASH_BASE_EMISSIVE = 0x25ffd0
+const SURVEY_FLASH_GREEN_EMISSIVE = 0x22c55e
+const SURVEY_FLASH_BASE_INTENSITY = 1.7
+const SURVEY_FLASH_PEAK_INTENSITY = 4.5
 
 /** Visual / material overrides for {@link DepositRocketModel}. */
 export interface DepositRocketOptions {
@@ -117,6 +121,10 @@ export class DepositRocketModel {
   private _isTakingOff = false
   private velocityY = 0
   private flightTime = 0
+  /** Active green-flash decay timer in seconds; 0 = idle. */
+  private surveyFlashTimer = 0
+  /** Total decay duration of the active flash (so we can normalise progress). */
+  private surveyFlashDuration = 0
 
   /** Whether the delivery rocket is currently running its takeoff animation. */
   get isTakingOff(): boolean {
@@ -377,6 +385,21 @@ export class DepositRocketModel {
     this.group.visible = visible
   }
 
+  /**
+   * Trigger a green emissive pulse on the screen + antenna tip. Driven
+   * by the SCI-gun rocket-survey facade per bolt hit. The flash uses an
+   * exponential-style decay over `duration` seconds.
+   *
+   * @param duration - Decay duration in seconds. Higher = brighter / longer.
+   */
+  flash(duration: number): void {
+    const safeDuration = Math.max(0.05, duration)
+    if (safeDuration > this.surveyFlashTimer) {
+      this.surveyFlashTimer = safeDuration
+      this.surveyFlashDuration = safeDuration
+    }
+  }
+
   /** Trigger the takeoff animation. */
   takeOff(): void {
     if (this._isTakingOff) return
@@ -389,6 +412,7 @@ export class DepositRocketModel {
 
   /** Update the takeoff animation. Returns true if the rocket has flown far enough to be removed. */
   tick(dt: number): boolean {
+    this.advanceSurveyFlash(dt)
     if (!this._isTakingOff) return false
 
     const previousFlightTime = this.flightTime
@@ -411,6 +435,30 @@ export class DepositRocketModel {
 
     const visibleWindowElapsed = this.flightTime > LAUNCH_MIN_VISIBLE_SECONDS
     return visibleWindowElapsed && this.group.position.y > LAUNCH_DONE_HEIGHT
+  }
+
+  /**
+   * Decay the active green flash and apply the resulting emissive
+   * intensity / color to the screen material. Reverts to the default
+   * cyan emissive when the flash timer reaches zero.
+   */
+  private advanceSurveyFlash(dt: number): void {
+    if (this.surveyFlashTimer <= 0) {
+      // Idle — ensure default cyan
+      this.screenMaterial.emissive.setHex(SURVEY_FLASH_BASE_EMISSIVE)
+      this.screenMaterial.emissiveIntensity = SURVEY_FLASH_BASE_INTENSITY
+      return
+    }
+    this.surveyFlashTimer = Math.max(0, this.surveyFlashTimer - dt)
+    const progress = this.surveyFlashDuration > 0
+      ? this.surveyFlashTimer / this.surveyFlashDuration
+      : 0
+    // Lerp green→cyan over the decay; interpolate intensity peak→base
+    this.screenMaterial.emissive.setHex(SURVEY_FLASH_GREEN_EMISSIVE)
+    const intensity =
+      SURVEY_FLASH_BASE_INTENSITY +
+      (SURVEY_FLASH_PEAK_INTENSITY - SURVEY_FLASH_BASE_INTENSITY) * progress
+    this.screenMaterial.emissiveIntensity = intensity
   }
 
   /** Hide the rocket and clear its launch state after `tick()` reports completion. */
