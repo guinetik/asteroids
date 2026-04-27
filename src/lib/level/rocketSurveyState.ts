@@ -195,6 +195,34 @@ export class RocketSurveyState {
   }
 
   /**
+   * The marker placed for `itemId` has been consumed (its rock was mined).
+   * Releases the lockout so the next bolt re-enters ramping for the next
+   * still-needed mineral. Clears the entire skipped set so all minerals
+   * are re-eligible — new rocks may have spawned since the last skip.
+   */
+  notifyMarkerConsumed(itemId: string): void {
+    if (this._phase !== 'awaitingMarkerConsume') return
+    if (this._targetItemId !== itemId) return
+    this._skipped.clear()
+    this._phase = 'idle'
+    this._targetItemId = null
+    this._surveyHp = 0
+    this._surveyHpInitial = 0
+  }
+
+  /**
+   * Tear down state for a level exit / mission completion. Clears
+   * skipped tracking and any in-progress ramp.
+   */
+  detach(): void {
+    this._phase = 'idle'
+    this._targetItemId = null
+    this._surveyHp = 0
+    this._surveyHpInitial = 0
+    this._skipped.clear()
+  }
+
+  /**
    * Pick the first quota in mission order with remaining work that
    * isn't currently in {@link _skipped}. Returns `null` when no
    * scannable mineral exists.

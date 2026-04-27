@@ -117,4 +117,62 @@ describe('RocketSurveyState', () => {
     expect(state.targetItemId).toBeNull()
     expect(state.scienceHit()).toBeNull()
   })
+
+  it('returns to idle when the placed marker is consumed', () => {
+    state.setQuotas([QUOTA_OLIVINE_PENDING, QUOTA_IRON_PENDING])
+    for (let i = 0; i < 8; i++) state.scienceHit()
+    expect(state.phase).toBe('awaitingMarkerConsume')
+    state.notifyMarkerConsumed('olivine')
+    expect(state.phase).toBe('idle')
+    expect(state.targetItemId).toBeNull()
+  })
+
+  it('clears the consumed itemId from the skip set so future scans may re-target it', () => {
+    const fn = vi
+      .fn<(itemId: string) => { spawnIndex: number } | null>()
+      .mockReturnValueOnce(null) // first reveal: olivine skipped
+      .mockReturnValueOnce({ spawnIndex: 5 }) // first reveal: iron found
+      .mockReturnValueOnce({ spawnIndex: 1 }) // post-consume: olivine found again
+    state = new RocketSurveyState({ rockAvailability: fn })
+    state.setQuotas([QUOTA_OLIVINE_PENDING, QUOTA_IRON_PENDING])
+    for (let i = 0; i < 8; i++) state.scienceHit() // olivine skipped, ramping for iron
+    for (let i = 0; i < 8; i++) state.scienceHit() // iron revealed
+    expect(state.phase).toBe('awaitingMarkerConsume')
+    expect(state.targetItemId).toBe('iron')
+    state.notifyMarkerConsumed('iron')
+    expect(state.phase).toBe('idle')
+    // Now scan again — olivine should be considered, not stuck in skipped
+    const next = state.scienceHit()
+    expect(next!.targetItemId).toBe('olivine')
+  })
+
+  it('ignores notifyMarkerConsumed when the itemId does not match the active target', () => {
+    state.setQuotas([QUOTA_OLIVINE_PENDING])
+    for (let i = 0; i < 8; i++) state.scienceHit()
+    expect(state.phase).toBe('awaitingMarkerConsume')
+    state.notifyMarkerConsumed('iron')
+    expect(state.phase).toBe('awaitingMarkerConsume')
+  })
+
+  it('detach resets phase, target, and skipped set', () => {
+    const neverFound = vi.fn(() => null)
+    state = new RocketSurveyState({ rockAvailability: neverFound })
+    state.setQuotas([QUOTA_OLIVINE_PENDING])
+    for (let i = 0; i < 8; i++) state.scienceHit() // olivine -> skipped, idle
+    state.detach()
+    expect(state.phase).toBe('idle')
+    expect(state.targetItemId).toBeNull()
+    // After detach the skipped set is cleared — set quotas back and verify
+    state.setQuotas([QUOTA_OLIVINE_PENDING])
+    const result = state.scienceHit()
+    expect(result!.targetItemId).toBe('olivine')
+  })
+
+  it('moves to exhausted when setQuotas reports all met after a delivery', () => {
+    state.setQuotas([QUOTA_OLIVINE_PENDING])
+    expect(state.phase).toBe('idle')
+    state.setQuotas([QUOTA_OLIVINE_COMPLETE])
+    expect(state.phase).toBe('exhausted')
+    expect(state.scienceHit()).toBeNull()
+  })
 })
