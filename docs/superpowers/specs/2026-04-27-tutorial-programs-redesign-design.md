@@ -95,6 +95,8 @@ Must teach:
 - Temperature risk near the sun and in outer-system cold zones.
 - Hull/fuel repair, refuel, cargo, shop, mission board, and upgrade access where relevant.
 - Shuttle upgrades affecting thrust, fuel, slingshot coupling, thermal protection, and hull.
+- Existing certificate of ownership/provenance for the shuttle. It should remain available as its
+  own chapter or equivalent document view inside the redesigned shuttle program.
 
 Use live telemetry where already available: fuel percentage, hull, temperature, docked planet, and
 installed upgrades.
@@ -167,6 +169,7 @@ large independent layouts. A good implementation target is:
 - Shuttle, Lander, and Multitool opened program screens share the same program grammar.
 - Each program has the correct issuer: Vale, Jovian Society/Cloud City Field Engineering, MMC.
 - Player-facing copy reflects current mechanics and controls.
+- The shuttle certificate of ownership remains available and readable after the redesign.
 - Multitool no longer reads like a Vale product or an implementation/design note.
 - The implementation avoids hardcoded TypeScript content objects where game data already exists, but
   small UI chapter descriptors in the component layer are acceptable for this terminal manual.

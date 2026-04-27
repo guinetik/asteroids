@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Asteroid Lander - a 2.5D physics-driven lander game for the Vibe Coding Game Jam 2026 (deadline: May 1, 2026). Built with Vue 3 + TypeScript + Vite. Game design document lives in `docs/asteroid-lander-gdd.md`. Game jam rules are in `docs/game-jam.md`.
+Asteroid Lander - a 3D physics-driven lander game for the Vibe Coding Game Jam 2026 (deadline: May 1, 2026). Built with Vue 3 + TypeScript + Vite. Game design document lives in `docs/asteroid-lander-gdd.md`. Game jam rules are in `docs/game-jam.md`.
 
 ## Commands
 

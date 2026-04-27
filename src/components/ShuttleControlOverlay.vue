@@ -10,6 +10,7 @@ import ShuttleControlProgramMissions from './shuttle-control/ShuttleControlProgr
 import ShuttleControlProgramShuttle from './shuttle-control/ShuttleControlProgramShuttle.vue'
 import ShuttleControlProgramLander from './shuttle-control/ShuttleControlProgramLander.vue'
 import ShuttleControlProgramMultitool from './shuttle-control/ShuttleControlProgramMultitool.vue'
+import ShuttleControlProgramSuit from './shuttle-control/ShuttleControlProgramSuit.vue'
 import ShuttleControlProgramUpgrades from './shuttle-control/ShuttleControlProgramUpgrades.vue'
 import type { UpgradeId } from '@/lib/upgrades'
 import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
@@ -20,6 +21,7 @@ type ControlScreen =
   | 'shuttle'
   | 'lander'
   | 'multitool'
+  | 'suit'
   | 'mail'
   | 'missions'
   | 'inventory'
@@ -71,6 +73,7 @@ const programByScreen: Record<ControlScreen, Component> = {
   shuttle: ShuttleControlProgramShuttle,
   lander: ShuttleControlProgramLander,
   multitool: ShuttleControlProgramMultitool,
+  suit: ShuttleControlProgramSuit,
   mail: ShuttleControlProgramMail,
   missions: ShuttleControlProgramMissions,
   inventory: ShuttleControlProgramInventory,
@@ -119,6 +122,7 @@ const screens = computed(() => {
     { id: 'shuttle' as const, label: 'Shuttle' },
     { id: 'lander' as const, label: 'Lander' },
     { id: 'multitool' as const, label: 'Multitool' },
+    { id: 'suit' as const, label: 'Suit' },
     { id: 'missions' as const, label: 'Missions' },
     { id: 'inventory' as const, label: 'Inventory' },
   ]
@@ -225,58 +229,66 @@ function onKeydown(e: KeyboardEvent) {
         <div
           class="shuttle-control-content shuttle-control-content--programs"
           :class="{
-            '!p-0 overflow-hidden': activeScreen === 'shuttle' || activeScreen === 'lander',
+            '!p-0 overflow-hidden':
+              activeScreen === 'shuttle' ||
+              activeScreen === 'lander' ||
+              activeScreen === 'multitool' ||
+              activeScreen === 'suit',
           }"
         >
-          <ShuttleControlProgramMail
-            v-if="activeScreen === 'mail'"
-            :inventory="inventory"
-            :inventory-stacks="inventoryStacks"
-            :board="missionBoard"
-            :docked-planet="dockedPlanet"
-            :upgrade-levels="upgradeLevels ?? {}"
-            :player-credits="playerCredits ?? 0"
-            :telemetry="telemetry"
-            :player-name="playerName"
-            :focus-folder-id="mailFocusFolderId"
-            :focus-message-id="mailFocusMessageId"
-            @accept-mission="$emit('acceptMission')"
-            @deliver-mission="(id: string) => $emit('deliverMission', id)"
-            @accept-asteroid-mission="$emit('acceptAsteroidMission')"
-            @accept-eva-mission="$emit('acceptEvaMission')"
-            @accept-mining-mission="$emit('acceptMiningMission')"
-            @deliver-mining-mission="
-              (missionId: string) => $emit('deliverMiningMission', missionId)
-            "
-            @use-item="(itemId: string) => $emit('useItem', itemId)"
-            @mail-changed="onMailProgramChanged"
-            @purchase-upgrade="emitPurchaseUpgrade"
-            @switch-to-upgrades="activeScreen = 'upgrades'"
-          />
-          <component
-            v-else
-            :is="activeProgram"
-            :inventory="inventory"
-            :inventory-stacks="inventoryStacks"
-            :board="missionBoard"
-            :docked-planet="dockedPlanet"
-            :upgrade-levels="upgradeLevels ?? {}"
-            :player-credits="playerCredits ?? 0"
-            :telemetry="telemetry"
-            :player-name="playerName"
-            @accept-mission="$emit('acceptMission')"
-            @deliver-mission="(id: string) => $emit('deliverMission', id)"
-            @accept-asteroid-mission="$emit('acceptAsteroidMission')"
-            @accept-eva-mission="$emit('acceptEvaMission')"
-            @accept-mining-mission="$emit('acceptMiningMission')"
-            @deliver-mining-mission="
-              (missionId: string) => $emit('deliverMiningMission', missionId)
-            "
-            @use-item="(itemId: string) => $emit('useItem', itemId)"
-            @mail-changed="onMailProgramChanged"
-            @purchase-upgrade="emitPurchaseUpgrade"
-            @switch-to-upgrades="activeScreen = 'upgrades'"
-          />
+          <Transition name="shuttle-program-swap" mode="out-in">
+            <ShuttleControlProgramMail
+              v-if="activeScreen === 'mail'"
+              :key="activeScreen"
+              :inventory="inventory"
+              :inventory-stacks="inventoryStacks"
+              :board="missionBoard"
+              :docked-planet="dockedPlanet"
+              :upgrade-levels="upgradeLevels ?? {}"
+              :player-credits="playerCredits ?? 0"
+              :telemetry="telemetry"
+              :player-name="playerName"
+              :focus-folder-id="mailFocusFolderId"
+              :focus-message-id="mailFocusMessageId"
+              @accept-mission="$emit('acceptMission')"
+              @deliver-mission="(id: string) => $emit('deliverMission', id)"
+              @accept-asteroid-mission="$emit('acceptAsteroidMission')"
+              @accept-eva-mission="$emit('acceptEvaMission')"
+              @accept-mining-mission="$emit('acceptMiningMission')"
+              @deliver-mining-mission="
+                (missionId: string) => $emit('deliverMiningMission', missionId)
+              "
+              @use-item="(itemId: string) => $emit('useItem', itemId)"
+              @mail-changed="onMailProgramChanged"
+              @purchase-upgrade="emitPurchaseUpgrade"
+              @switch-to-upgrades="activeScreen = 'upgrades'"
+            />
+            <component
+              v-else
+              :is="activeProgram"
+              :key="activeScreen"
+              :inventory="inventory"
+              :inventory-stacks="inventoryStacks"
+              :board="missionBoard"
+              :docked-planet="dockedPlanet"
+              :upgrade-levels="upgradeLevels ?? {}"
+              :player-credits="playerCredits ?? 0"
+              :telemetry="telemetry"
+              :player-name="playerName"
+              @accept-mission="$emit('acceptMission')"
+              @deliver-mission="(id: string) => $emit('deliverMission', id)"
+              @accept-asteroid-mission="$emit('acceptAsteroidMission')"
+              @accept-eva-mission="$emit('acceptEvaMission')"
+              @accept-mining-mission="$emit('acceptMiningMission')"
+              @deliver-mining-mission="
+                (missionId: string) => $emit('deliverMiningMission', missionId)
+              "
+              @use-item="(itemId: string) => $emit('useItem', itemId)"
+              @mail-changed="onMailProgramChanged"
+              @purchase-upgrade="emitPurchaseUpgrade"
+              @switch-to-upgrades="activeScreen = 'upgrades'"
+            />
+          </Transition>
         </div>
       </div>
 

@@ -38,6 +38,7 @@ and per-program data in each existing program component. Put reusable styling in
   - Replace bespoke manual layout with data passed into `TutorialProgramManual`.
   - Preserve props: `telemetry`, `upgradeLevels`, `dockedPlanet`, `playerName`.
   - Preserve `switch-to-upgrades` emit.
+  - Preserve the certificate of ownership as a readable chapter/document view.
   - Issuer: Vale Orbital Refurb.
 
 - Modify `src/components/shuttle-control/ShuttleControlProgramLander.vue`
@@ -110,9 +111,10 @@ model must use:
 - Document code: `VOR-SHUTTLE-OPS-0.8`
 - Accent: `vale`
 
-Include chapters for summary, controls, power, slingshot, hazards, and upgrades. Preserve live
-telemetry badges for fuel, hull, temperature, and docked planet. Preserve installed upgrade display
-through the upgrades chapter note and preserve `switch-to-upgrades`.
+Include chapters for summary, controls, power, slingshot, hazards, upgrades, and certificate.
+Preserve live telemetry badges for fuel, hull, temperature, and docked planet. Preserve installed
+upgrade display through the upgrades chapter note, preserve `switch-to-upgrades`, and preserve the
+certificate of ownership/provenance from the existing shuttle manual.
 
 - [ ] **Step 2: Run focused checks**
 
@@ -184,7 +186,8 @@ Run: `bun dev`
 
 Expected: dev server starts. Open the shuttle terminal and verify the existing launcher/menu is
 unchanged, the three programs share the same issued-manual layout, chapter rail/footer/action work,
-and issuers are Vale, Jovian Society / Cloud City Field Engineering, and Martian Marine Corps.
+the shuttle certificate of ownership remains readable, and issuers are Vale, Jovian Society /
+Cloud City Field Engineering, and Martian Marine Corps.
 
 - [ ] **Step 2: Run linter**
 
@@ -213,8 +216,9 @@ Expected: diff only contains the tutorial program redesign, shared styling, spec
 ## Self-Review
 
 - Spec coverage: The plan preserves the existing launcher, standardizes the three opened program
-  screens, assigns the correct issuers, updates player-facing mechanics, removes Multitool
-  implementation-note copy, and requires final Bun verification.
+  screens, assigns the correct issuers, preserves the shuttle ownership certificate, updates
+  player-facing mechanics, removes Multitool implementation-note copy, and requires final Bun
+  verification.
 - Placeholder scan: No `TBD`, `TODO`, or unspecified implementation steps are intentionally left in
   the plan.
 - Type consistency: `TutorialProgramManualModel`, chapter/card/readout/checklist interfaces, and the
