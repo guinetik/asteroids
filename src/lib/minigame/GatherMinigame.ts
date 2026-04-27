@@ -271,6 +271,7 @@ export class GatherMinigame implements MiniGame, MiniGameEvents {
     }
 
     this.rocket = new DepositRocketModel({ baseColor: 0xdddddd, trimColor: 0xff5500 })
+    this.rocket.group.userData['__rocketModel'] = this.rocket
     const groundY = options.heightmap.heightAt(options.objective.x, options.objective.z)
     this.rocket.placeAt(options.objective.x, options.objective.z, groundY)
     this.scene.add(this.rocket.group)
