@@ -12,6 +12,11 @@
  * @spec docs/superpowers/specs/2026-04-26-rocket-survey-design.md
  */
 
+import {
+  ROCKET_SURVEY_DAMAGE_PER_HIT,
+  ROCKET_SURVEY_HP,
+} from './rocketSurveyConstants'
+
 /** Lifecycle phase reported by {@link RocketSurveyState}. */
 export type RocketSurveyPhase = 'idle' | 'ramping' | 'awaitingMarkerConsume' | 'exhausted'
 
@@ -101,6 +106,63 @@ export class RocketSurveyState {
       this._surveyHp = 0
       this._targetItemId = null
     }
+  }
+
+  /**
+   * Apply one science-bolt hit to the rocket. Returns `null` when the
+   * state is `exhausted` or no scannable mineral exists. Otherwise
+   * returns the post-hit snapshot — callers use `justRevealed` to know
+   * whether THIS hit placed a marker.
+   */
+  scienceHit(): ScienceHitResult | null {
+    if (this._phase === 'exhausted') return null
+    if (this._phase === 'awaitingMarkerConsume') return null
+
+    if (this._phase === 'idle') {
+      const next = this.pickScannableItemId()
+      if (next === null) return null
+      this._phase = 'ramping'
+      this._targetItemId = next
+      this._surveyHp = ROCKET_SURVEY_HP
+      this._surveyHpInitial = ROCKET_SURVEY_HP
+    }
+
+    // ramping
+    this._surveyHp = Math.max(0, this._surveyHp - ROCKET_SURVEY_DAMAGE_PER_HIT)
+    if (this._surveyHp > 0) {
+      return {
+        phase: this._phase,
+        surveyHp: this._surveyHp,
+        surveyHpInitial: this._surveyHpInitial,
+        justRevealed: false,
+        targetItemId: this._targetItemId,
+        targetSpawnIndex: null,
+      }
+    }
+
+    // surveyHp reached zero — reveal step handled in Task 4
+    return {
+      phase: this._phase,
+      surveyHp: this._surveyHp,
+      surveyHpInitial: this._surveyHpInitial,
+      justRevealed: false,
+      targetItemId: this._targetItemId,
+      targetSpawnIndex: null,
+    }
+  }
+
+  /**
+   * Pick the first quota in mission order with remaining work that
+   * isn't currently in {@link _skipped}. Returns `null` when no
+   * scannable mineral exists.
+   */
+  private pickScannableItemId(): string | null {
+    for (const quota of this._quotas) {
+      if (quota.minedKg >= quota.targetKg) continue
+      if (this._skipped.has(quota.itemId)) continue
+      return quota.itemId
+    }
+    return null
   }
 
   private allQuotasMet(): boolean {
