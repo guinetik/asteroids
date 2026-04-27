@@ -355,6 +355,12 @@ onMounted(async () => {
     viewController.onDeathOverlay = (visible, cause) => {
       deathOverlayVisible.value = visible
       deathOverlayCause.value = cause
+      // Death overlay needs a clickable Restart button — release pointer lock
+      // so the cursor isn't captured by the FPS camera. Same pattern used by
+      // the inventory open handler below.
+      if (visible && typeof document !== 'undefined' && document.pointerLockElement) {
+        document.exitPointerLock()
+      }
     }
     viewController.onMissionAnnounce = (asteroid, mission) => {
       announceAsteroid.value = asteroid
@@ -475,7 +481,18 @@ onMounted(async () => {
   }
 })
 
+/** Substring match for the rescue-mission fail cause that should hard-reload. */
+const RESCUE_FAIL_CAUSE_FRAGMENT = 'survivors lost'
+
 function handleRestart() {
+  // Rescue missions reuse a lot of stateful controllers (hostages, walkers,
+  // chasers, liftoff lock) that the in-place restart path doesn't fully reset.
+  // For "All Survivors Lost" specifically, hard-reload the page so the player
+  // gets a clean run instead of a half-initialized rescue state.
+  if (deathOverlayCause.value.toLowerCase().includes(RESCUE_FAIL_CAUSE_FRAGMENT)) {
+    window.location.reload()
+    return
+  }
   viewController.restart()
 }
 
@@ -690,16 +707,19 @@ function handleToggleMusic(): void {
       ATTITUDE
     </div>
   </div>
-  <div v-if="stateInfo.state === 'lander' && stateInfo.grounded" class="exit-prompt">
+  <div
+    v-if="stateInfo.state === 'lander' && stateInfo.grounded"
+    class="exit-prompt exit-prompt--vehicle"
+  >
     <span class="exit-prompt__text">EXIT (F)</span>
   </div>
-  <div v-if="stateInfo.canEnterLander" class="exit-prompt">
+  <div v-if="stateInfo.canEnterLander" class="exit-prompt exit-prompt--vehicle">
     <span class="exit-prompt__text">ENTER (F)</span>
   </div>
   <div v-if="terminalPrompt" class="exit-prompt">
     <span class="exit-prompt__text exit-prompt__text--terminal">{{ terminalPrompt }}</span>
   </div>
-  <div v-if="stateInfo.canExfil" class="exit-prompt">
+  <div v-if="stateInfo.canExfil" class="exit-prompt exit-prompt--vehicle">
     <span class="exit-prompt__text">EXFILTRATE (F)</span>
   </div>
   <div v-if="arrivalFade > 0" class="death-fade" :style="{ opacity: arrivalFade }" />
@@ -854,7 +874,9 @@ function handleToggleMusic(): void {
 }
 .exit-prompt {
   position: fixed;
-  bottom: 15%;
+  /* Cyan terminal/mission-context prompt anchor — sits in the upper-middle
+     band so it's clearly readable above the action prompt. */
+  bottom: 22%;
   left: 50%;
   transform: translateX(-50%);
   z-index: 30;
@@ -869,6 +891,12 @@ function handleToggleMusic(): void {
   background: rgba(0, 0, 0, 0.5);
   padding: 0.4rem 1.2rem;
   border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.exit-prompt--vehicle {
+  /* Vehicle action prompts sit just above the EVA O2/STA numeric labels
+     (the O2 reading sits ~15% from bottom) and the lander thruster dock,
+     while still leaving the cyan mission-context prompt readable above. */
+  bottom: 18%;
 }
 .exit-prompt__text--terminal {
   border-color: rgba(0, 255, 204, 0.5);

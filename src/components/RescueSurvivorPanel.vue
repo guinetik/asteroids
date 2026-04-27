@@ -40,16 +40,9 @@ const aliveColor = computed(() => {
   </div>
 </template>
 
-<style scoped>
-.rescue-survivor-panel {
-  @apply absolute top-24 left-4 z-30 px-3 py-1.5 rounded bg-black/55 border border-white/10
-         font-mono text-sm tracking-wider text-white/85 select-none flex items-center gap-2;
-}
-.rescue-label { @apply text-white/55; }
-.rescue-alive-high { @apply text-emerald-400; }
-.rescue-alive-mid  { @apply text-amber-300; }
-.rescue-alive-low  { @apply text-red-400 font-semibold; }
-.rescue-aboard     { @apply text-sky-300; }
-.rescue-total      { @apply text-white/65; }
-.rescue-sep        { @apply text-white/30; }
-</style>
+<!--
+  Styles live in `src/assets/css/rescue-survivor-panel.css` (imported by main.css).
+  Tailwind v4 + Vue scoped <style> can't resolve @apply, so per project convention
+  utility-class rules go in a sibling .css file rather than a <style scoped> block.
+-->
+

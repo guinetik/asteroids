@@ -1,0 +1,33 @@
+/*
+ * RescueSurvivorPanel — persistent rescue-mission HUD overlay.
+ *
+ * Lives here (not in the .vue) because Tailwind v4 + Vue scoped <style> blocks
+ * cannot resolve @apply utility classes. Kept separate from main.css so the
+ * file map stays readable.
+ */
+
+.rescue-survivor-panel {
+  @apply absolute top-24 left-4 z-30 px-3 py-1.5 rounded bg-black/55 border border-white/10
+         font-mono text-sm tracking-wider text-white/85 select-none flex items-center gap-2;
+}
+.rescue-label {
+  @apply text-white/55;
+}
+.rescue-alive-high {
+  @apply text-emerald-400;
+}
+.rescue-alive-mid {
+  @apply text-amber-300;
+}
+.rescue-alive-low {
+  @apply text-red-400 font-semibold;
+}
+.rescue-aboard {
+  @apply text-sky-300;
+}
+.rescue-total {
+  @apply text-white/65;
+}
+.rescue-sep {
+  @apply text-white/30;
+}
