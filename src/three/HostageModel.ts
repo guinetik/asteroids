@@ -1,8 +1,14 @@
 /**
- * Instanced GLB for cuffed hostages (`public/models/hostage.glb`).
+ * Instanced GLB for hostages (`public/models/hostage.glb`).
  *
- * Mixamo-rigged mesh with no embedded clips; {@link applyCuffedStandingPoseToObject}
- * applies local rotation deltas so arms hang beside the body instead of a T-pose.
+ * Mixamo-rigged mesh with no embedded clips. Animations come from
+ * {@link HostageAnimations} — three FBX clips (praying / walking / dying) borrowed
+ * onto the GLB's skeleton via a per-instance {@link THREE.AnimationMixer}.
+ *
+ * The default state is `'tpose'` (raw bind pose, mixer idle) which the rescue
+ * minigame uses to convey "something is wrong" while hostages are contained
+ * inside the virus. {@link FpsHostageController} flips them to `'praying'` once
+ * they hit the ground.
  *
  * @author guinetik
  * @date 2026-04-08
@@ -11,6 +17,7 @@
 import * as THREE from 'three'
 import { clone as cloneSkinnedScene } from 'three/addons/utils/SkeletonUtils.js'
 import { loadGLB } from './loadGLB'
+import { loadHostageClips } from './HostageAnimations'
 
 /** Public URL path served from `public/models/hostage.glb`. */
 export const HOSTAGE_MODEL_PUBLIC_PATH = '/models/hostage.glb'
@@ -29,37 +36,8 @@ const DEFAULT_HOSTAGE_SCALE = 1
 const DEFAULT_CAST_SHADOW = true
 const DEFAULT_RECEIVE_SHADOW = true
 
-/** Euler order for procedural pose deltas (matches typical Mixamo export). */
-const HOSTAGE_POSE_EULER_ORDER: THREE.EulerOrder = 'XYZ'
-
-const DEG = THREE.MathUtils.degToRad
-
-/**
- * Ordered local-space rotation deltas (radians) applied on top of the bind T-pose.
- * Tune these if the rig export or cuffs clip; names match Mixamo `mixamorig:` bones.
- */
-const HOSTAGE_CUFFED_POSE_STEPS: ReadonlyArray<{
-  /** Mixamo joint name */
-  name: string
-  /** Local Euler X delta */
-  x: number
-  /** Local Euler Y delta */
-  y: number
-  /** Local Euler Z delta */
-  z: number
-}> = [
-  { name: 'mixamorig:LeftShoulder', x: DEG(8), y: 0, z: DEG(-14) },
-  { name: 'mixamorig:RightShoulder', x: DEG(8), y: 0, z: DEG(14) },
-  { name: 'mixamorig:LeftArm', x: DEG(82), y: DEG(10), z: DEG(-26) },
-  { name: 'mixamorig:RightArm', x: DEG(82), y: DEG(-10), z: DEG(26) },
-  { name: 'mixamorig:LeftForeArm', x: DEG(32), y: DEG(6), z: 0 },
-  { name: 'mixamorig:RightForeArm', x: DEG(32), y: DEG(-6), z: 0 },
-  { name: 'mixamorig:LeftHand', x: DEG(4), y: DEG(22), z: DEG(12) },
-  { name: 'mixamorig:RightHand', x: DEG(4), y: DEG(-22), z: DEG(-12) },
-]
-
-const poseEulerScratch = new THREE.Euler(0, 0, 0, HOSTAGE_POSE_EULER_ORDER)
-const poseDeltaQuatScratch = new THREE.Quaternion()
+/** Default crossfade between animation states (seconds). */
+const STATE_CROSSFADE_DURATION = 0.25
 
 /** Options for {@link HostageModel.create}. */
 export interface HostageModelCreateOptions {
@@ -69,64 +47,10 @@ export interface HostageModelCreateOptions {
   castShadow?: boolean
   /** When false, meshes do not receive shadows (default {@link DEFAULT_RECEIVE_SHADOW}). */
   receiveShadow?: boolean
-  /**
-   * When true (default), applies {@link applyCuffedStandingPoseToObject} after clone.
-   * Set false to keep the raw GLB bind pose (e.g. T-pose).
-   */
-  applyCuffedStandingPose?: boolean
 }
 
 let hostageTemplate: THREE.Group | null = null
 let hostageTemplatePromise: Promise<THREE.Group> | null = null
-
-/**
- * Find a bone by name on a skeleton.
- *
- * @param skeleton - Skin skeleton from a {@link THREE.SkinnedMesh}
- * @param boneName - Exact glTF joint name (e.g. `mixamorig:LeftArm`)
- */
-export function findHostageBone(
-  skeleton: THREE.Skeleton,
-  boneName: string,
-): THREE.Bone | undefined {
-  return skeleton.bones.find((b) => b.name === boneName)
-}
-
-/**
- * Apply cuffed standing arm pose to every unique armature under `root`.
- *
- * Uses {@link THREE.SkinnedMesh.isSkinnedMesh} (not `instanceof`) so posing still runs when
- * the bundler dedupes Three differently than this module. Body + helmet each own a
- * {@link THREE.Skeleton} instance but share the same cloned {@link THREE.Bone} objects;
- * dedupe by the `mixamorig:Hips` bone so deltas are not applied twice.
- *
- * @param root - Cloned scene or group containing skinned meshes
- */
-export function applyCuffedStandingPoseToObject(root: THREE.Object3D): void {
-  const posedHipBones = new WeakSet<THREE.Bone>()
-
-  root.traverse((obj) => {
-    const mesh = obj as THREE.SkinnedMesh
-    if (!mesh.isSkinnedMesh) return
-
-    const { skeleton } = mesh
-    const hips = findHostageBone(skeleton, 'mixamorig:Hips')
-    const armatureKey = hips ?? skeleton.bones[0]
-    if (!armatureKey || posedHipBones.has(armatureKey)) return
-    posedHipBones.add(armatureKey)
-
-    for (const step of HOSTAGE_CUFFED_POSE_STEPS) {
-      const bone = findHostageBone(skeleton, step.name)
-      if (!bone) continue
-      poseEulerScratch.set(step.x, step.y, step.z)
-      poseDeltaQuatScratch.setFromEuler(poseEulerScratch)
-      bone.quaternion.multiply(poseDeltaQuatScratch)
-    }
-
-    hips?.updateMatrixWorld(true)
-    skeleton.update()
-  })
-}
 
 /**
  * Load the hostage GLB once and cache the root group for cloning.
@@ -172,9 +96,27 @@ const FEEDBACK_FLASH_DURATION = 0.35
 const FEEDBACK_EMISSIVE_INTENSITY = 0.85
 
 /**
+ * Animation state for a hostage rig.
+ *
+ * - `'tpose'`: raw bind pose, mixer never started — the contained-in-virus look.
+ * - `'praying'`: bow-down loop on a ping-pong cycle (frames 0-125 of `praying.fbx`).
+ * - `'standing-up'`: one-shot rise from kneel (frames 126-206), clamps on last frame.
+ * - `'walking'`: forward walk cycle with hips translation stripped.
+ * - `'dying'`: one-shot collapse, clamps on last frame so the corpse stays grounded.
+ */
+export type HostageAnimationState =
+  | 'tpose'
+  | 'praying'
+  | 'standing-up'
+  | 'walking'
+  | 'dying'
+
+/**
  * Mixamo hostage prop — add {@link group} to the scene after {@link HostageModel.create}.
  *
  * Materials are cloned per instance so damage/heal emissive pulses stay local.
+ * Animation state defaults to {@link HostageAnimationState} `'tpose'`; call
+ * {@link playPraying} / {@link playDying} / etc. to drive the rig.
  */
 export class HostageModel {
   /** Parent group for placement. */
@@ -185,7 +127,15 @@ export class HostageModel {
     []
   private feedbackTimer = 0
 
+  /** Root the mixer drives — the cloned skinned scene under {@link group}. */
+  private readonly skinnedRoot: THREE.Object3D
+  /** Lazily created on first `play*()` call so T-pose hostages pay nothing. */
+  private mixer: THREE.AnimationMixer | null = null
+  private currentAction: THREE.AnimationAction | null = null
+  private state: HostageAnimationState = 'tpose'
+
   private constructor(sceneClone: THREE.Group) {
+    this.skinnedRoot = sceneClone
     this.group.add(sceneClone)
     sceneClone.traverse((child) => {
       if (child instanceof THREE.SkinnedMesh && child.material) {
@@ -200,26 +150,25 @@ export class HostageModel {
   }
 
   /**
-   * Warm the hostage GLB so the first {@link HostageModel.create} does not hitch.
+   * Warm the hostage GLB and FBX clips so the first {@link HostageModel.create} and
+   * first state transition do not hitch.
    */
   static async preload(): Promise<void> {
-    await ensureHostageTemplate()
+    await Promise.all([ensureHostageTemplate(), loadHostageClips()])
   }
 
   /**
-   * Spawn a hostage instance with optional cuffed arm pose.
+   * Spawn a hostage instance.
    *
-   * @param options - Scale, shadows, and pose toggles
+   * Newly created hostages are in `'tpose'`; nothing animates until a `play*()`
+   * call promotes them to a state that drives a clip.
+   *
+   * @param options - Scale and shadow toggles
    * @returns Ready-to-place hostage
    */
   static async create(options?: HostageModelCreateOptions): Promise<HostageModel> {
     const template = await ensureHostageTemplate()
     const sceneClone = cloneSkinnedScene(template) as THREE.Group
-
-    const wantPose = options?.applyCuffedStandingPose ?? true
-    if (wantPose) {
-      applyCuffedStandingPoseToObject(sceneClone)
-    }
 
     const scale = options?.scale ?? DEFAULT_HOSTAGE_SCALE
     sceneClone.scale.setScalar(BASE_HOSTAGE_ASSET_SCALE * scale)
@@ -257,6 +206,76 @@ export class HostageModel {
    */
   setYaw(yawRadians: number): void {
     this.group.rotation.y = yawRadians
+  }
+
+  /** Current animation state. */
+  getState(): HostageAnimationState {
+    return this.state
+  }
+
+  /**
+   * Loop the praying bow on ping-pong (0 → 125 → 0 → 125 …).
+   * Hard cut from `'tpose'` (the release moment is supposed to feel sudden);
+   * crossfade from any other state.
+   */
+  async playPraying(): Promise<void> {
+    if (this.state === 'praying') return
+    const clips = await loadHostageClips()
+    const action = this.ensureMixer().clipAction(clips.prayingLoop)
+    action.loop = THREE.LoopPingPong
+    action.clampWhenFinished = false
+    action.repetitions = Infinity
+    const hardCut = this.state === 'tpose'
+    this.transitionTo(action, 'praying', hardCut)
+  }
+
+  /**
+   * Play the kneel-to-stand rise once and clamp. Intended as the lead-in to
+   * {@link playWalking} when the rescue follow behaviour exists.
+   */
+  async playStandUp(): Promise<void> {
+    if (this.state === 'standing-up') return
+    const clips = await loadHostageClips()
+    const action = this.ensureMixer().clipAction(clips.prayingStandUp)
+    action.loop = THREE.LoopOnce
+    action.clampWhenFinished = true
+    action.repetitions = 1
+    this.transitionTo(action, 'standing-up', false)
+  }
+
+  /** Loop the walk cycle. */
+  async playWalking(): Promise<void> {
+    if (this.state === 'walking') return
+    const clips = await loadHostageClips()
+    const action = this.ensureMixer().clipAction(clips.walking)
+    action.loop = THREE.LoopRepeat
+    action.clampWhenFinished = false
+    action.repetitions = Infinity
+    this.transitionTo(action, 'walking', false)
+  }
+
+  /**
+   * Play the death collapse once and clamp. Mixer continues to update so the
+   * pose is held on the last frame.
+   */
+  async playDying(): Promise<void> {
+    if (this.state === 'dying') return
+    const clips = await loadHostageClips()
+    const action = this.ensureMixer().clipAction(clips.dying)
+    action.loop = THREE.LoopOnce
+    action.clampWhenFinished = true
+    action.repetitions = 1
+    this.transitionTo(action, 'dying', false)
+  }
+
+  /**
+   * Advance the per-instance mixer. No-op while in `'tpose'` (mixer is null).
+   * Safe to call every frame from a controller tick.
+   *
+   * @param dt - Delta time in seconds
+   */
+  tickAnimation(dt: number): void {
+    this.mixer?.update(dt)
   }
 
   /**
@@ -305,10 +324,53 @@ export class HostageModel {
    * Detach this instance from the scene graph.
    *
    * Does not {@link THREE.Material.dispose} cloned materials — they still reference the
-   * cached GLB’s textures; disposing would break the template and other instances.
+   * cached GLB's textures; disposing would break the template and other instances.
    */
   dispose(): void {
+    if (this.mixer) {
+      this.mixer.stopAllAction()
+      this.mixer.uncacheRoot(this.skinnedRoot)
+      this.mixer = null
+    }
+    this.currentAction = null
     this.feedbackMaterials.length = 0
     this.group.clear()
+  }
+
+  /** Lazily build the per-instance mixer the first time a clip is requested. */
+  private ensureMixer(): THREE.AnimationMixer {
+    if (!this.mixer) {
+      this.mixer = new THREE.AnimationMixer(this.skinnedRoot)
+    }
+    return this.mixer
+  }
+
+  /**
+   * Swap the active action, optionally crossfading from the previous one.
+   *
+   * @param next     - New action to drive the rig
+   * @param state    - State label to record after the swap
+   * @param hardCut  - Skip the crossfade (used for `tpose → praying` release moment)
+   */
+  private transitionTo(
+    next: THREE.AnimationAction,
+    state: HostageAnimationState,
+    hardCut: boolean,
+  ): void {
+    const previous = this.currentAction
+    next.reset()
+    next.enabled = true
+    next.setEffectiveTimeScale(1)
+    next.setEffectiveWeight(1)
+    next.play()
+
+    if (previous && previous !== next && !hardCut) {
+      previous.crossFadeTo(next, STATE_CROSSFADE_DURATION, true)
+    } else if (previous && previous !== next) {
+      previous.stop()
+    }
+
+    this.currentAction = next
+    this.state = state
   }
 }

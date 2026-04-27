@@ -24,7 +24,8 @@ const BASE_SPRINT_CAPACITY_MULTIPLIER = 2
  * - `suitMobility`          → `movement.maxSpeed`, `maxSprintSpeed`, `jumpForce`
  * - `suitO2Capacity`        → `o2.fuelCapacity`
  * - `suitStaminaCapacity`   → `o2.thrusters.sprint.capacity`, `jump.capacity`
- * - `suitStaminaEfficiency` → `o2.thrusters.sprint.burnRate` (lower = more efficient)
+ * - `suitStaminaEfficiency` → `o2.thrusters.sprint.burnRate` and
+ *   `sprint.fuelCostPerRecharge` (lower scale = less drain / less O2 to recharge)
  *
  * @returns A new config object — the base JSON is not mutated.
  */
@@ -57,6 +58,8 @@ export function buildFpsPlayerConfig(): FpsPlayerConfig {
           capacity:
             base.o2.thrusters.sprint.capacity * BASE_SPRINT_CAPACITY_MULTIPLIER * staminaCapacity,
           burnRate: base.o2.thrusters.sprint.burnRate * staminaEfficiency,
+          fuelCostPerRecharge:
+            base.o2.thrusters.sprint.fuelCostPerRecharge * staminaEfficiency,
         },
         jump: {
           ...base.o2.thrusters.jump,

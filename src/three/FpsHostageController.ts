@@ -170,12 +170,17 @@ class HostageInstance {
     }
   }
 
-  /** Hide visuals and unregister from projectile collision. */
+  /**
+   * Mark the instance as dead: drop projectile collisions and HP bar, then play
+   * the dying clip. The model itself stays visible so the corpse remains in the
+   * scene (the dying clip clamps on its last frame).
+   */
   markDead(): void {
     if (this.dead) return
     this.dead = true
     this.onRemoveFromSystems(this.hostage)
-    this.model.group.visible = false
+    this.sprite.visible = false
+    void this.model.playDying()
   }
 
   /** @returns Whether this instance is still an active rescue target */
@@ -245,6 +250,7 @@ class HostageInstance {
     if (!this.dead && this.hostage.alive) {
       this.model.tickFeedback(dt)
     }
+    this.model.tickAnimation(dt)
   }
 
   pulseHeal(): void {
@@ -433,6 +439,7 @@ export class FpsHostageController implements Tickable {
     const model = await HostageModel.create()
     model.placeAt(x, y, z)
     model.setYaw(yaw ?? 0)
+    void model.playPraying()
 
     const { hitCenterOffsetY, hitRadius } = computeHostageHitFromMeshRoot(model)
     const hostage = new Hostage({ hitCenterOffsetY, hitRadius })
