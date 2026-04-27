@@ -85,9 +85,7 @@ const ANTENNA_TIP_RADIUS = 0.11
 const ANTENNA_TIP_WIDTH_SEGMENTS = 10
 const ANTENNA_TIP_HEIGHT_SEGMENTS = 6
 const EXHAUST_RADIUS_MULTIPLIER = 0.62
-const SURVEY_FLASH_BASE_EMISSIVE = 0x25ffd0
 const SURVEY_FLASH_GREEN_EMISSIVE = 0x22c55e
-const SURVEY_FLASH_BASE_INTENSITY = 1.7
 const SURVEY_FLASH_PEAK_INTENSITY = 4.5
 
 /** Visual / material overrides for {@link DepositRocketModel}. */
@@ -125,6 +123,16 @@ export class DepositRocketModel {
   private surveyFlashTimer = 0
   /** Total decay duration of the active flash (so we can normalise progress). */
   private surveyFlashDuration = 0
+  /**
+   * Emissive baselines captured at construction so the survey flash
+   * can lerp back to each material's original look (most are black/0,
+   * the screen is cyan/1.7).
+   */
+  private readonly surveyFlashTargets: {
+    material: THREE.MeshStandardMaterial
+    baselineColor: number
+    baselineIntensity: number
+  }[] = []
 
   /** Whether the delivery rocket is currently running its takeoff animation. */
   get isTakingOff(): boolean {
@@ -373,6 +381,25 @@ export class DepositRocketModel {
     this.exhaustMesh.rotation.x = Math.PI
     this.exhaustMesh.visible = false
     this.group.add(this.exhaustMesh)
+
+    // Capture every body material's original emissive so the survey flash
+    // can lerp ALL of them on each science-bolt hit and restore correctly.
+    const flashedMaterials: THREE.MeshStandardMaterial[] = [
+      this.bodyMaterial,
+      this.trimMaterial,
+      this.darkMaterial,
+      this.bandMaterial,
+      this.panelMaterial,
+      this.screenMaterial,
+      this.slotMaterial,
+    ]
+    for (const material of flashedMaterials) {
+      this.surveyFlashTargets.push({
+        material,
+        baselineColor: material.emissive.getHex(),
+        baselineIntensity: material.emissiveIntensity,
+      })
+    }
   }
 
   /** Plant the rocket on the surface at world coords `(x, z)` with `groundY` as base. */
@@ -439,26 +466,27 @@ export class DepositRocketModel {
 
   /**
    * Decay the active green flash and apply the resulting emissive
-   * intensity / color to the screen material. Reverts to the default
-   * cyan emissive when the flash timer reaches zero.
+   * color/intensity to every captured body material. When the timer
+   * reaches zero each material reverts to the baseline captured at
+   * construction (screen → cyan, others → black).
    */
   private advanceSurveyFlash(dt: number): void {
     if (this.surveyFlashTimer <= 0) {
-      // Idle — ensure default cyan
-      this.screenMaterial.emissive.setHex(SURVEY_FLASH_BASE_EMISSIVE)
-      this.screenMaterial.emissiveIntensity = SURVEY_FLASH_BASE_INTENSITY
+      for (const target of this.surveyFlashTargets) {
+        target.material.emissive.setHex(target.baselineColor)
+        target.material.emissiveIntensity = target.baselineIntensity
+      }
       return
     }
     this.surveyFlashTimer = Math.max(0, this.surveyFlashTimer - dt)
-    const progress = this.surveyFlashDuration > 0
-      ? this.surveyFlashTimer / this.surveyFlashDuration
-      : 0
-    // Lerp green→cyan over the decay; interpolate intensity peak→base
-    this.screenMaterial.emissive.setHex(SURVEY_FLASH_GREEN_EMISSIVE)
-    const intensity =
-      SURVEY_FLASH_BASE_INTENSITY +
-      (SURVEY_FLASH_PEAK_INTENSITY - SURVEY_FLASH_BASE_INTENSITY) * progress
-    this.screenMaterial.emissiveIntensity = intensity
+    const progress =
+      this.surveyFlashDuration > 0 ? this.surveyFlashTimer / this.surveyFlashDuration : 0
+    for (const target of this.surveyFlashTargets) {
+      target.material.emissive.setHex(SURVEY_FLASH_GREEN_EMISSIVE)
+      target.material.emissiveIntensity =
+        target.baselineIntensity +
+        (SURVEY_FLASH_PEAK_INTENSITY - target.baselineIntensity) * progress
+    }
   }
 
   /** Hide the rocket and clear its launch state after `tick()` reports completion. */
