@@ -1,7 +1,7 @@
 <!-- src/components/RescueSurvivorPanel.vue -->
 <script setup lang="ts">
 /**
- * Persistent rescue-mission HUD: TOTAL · ALIVE · ABOARD.
+ * Persistent rescue-mission HUD: ALIVE · ABOARD · TOTAL.
  *
  * Mounted by `LevelView.vue` whenever the active minigame is a `RescueMinigame`.
  * Reads three reactive count refs from the parent — the parent polls the

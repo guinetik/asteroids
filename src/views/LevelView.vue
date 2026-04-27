@@ -241,7 +241,10 @@ const rescueAboard = ref(0)
 const rescueActive = ref(false)
 let rescuePollHandle: ReturnType<typeof setInterval> | null = null
 
-/** Poll the active minigame every 500 ms so the rescue panel reflects the correct counts during combat, before any survivor event fires. */
+/**
+ * Poll the active minigame every 500ms so the rescue panel reflects the
+ * correct counts during combat, before any survivor event fires.
+ */
 function refreshRescueRefs(): void {
   const active = viewController.getActiveMinigame()
   if (active instanceof RescueMinigame) {
