@@ -90,3 +90,20 @@ describe('BunkerWaveTier', () => {
     expect(t).toBe('easy')
   })
 })
+
+describe('bunker-waves.json drift guard', () => {
+  const VALID_TYPES: ReadonlySet<string> = new Set(['bacteriophage', 'spire', 'chimera'])
+
+  for (const tier of ['easy', 'medium', 'hard'] as const) {
+    it(`every authored type in ${tier} is a known BunkerEnemyType`, () => {
+      for (let waveIndex = 0; waveIndex < totalWavesForTier(tier); waveIndex++) {
+        // rollWave is the only public way to materialize a roster, so we use
+        // it to exercise both the fixed and fill paths in the JSON.
+        const roster = rollWave(tier, waveIndex, `drift-${tier}-${waveIndex}`)
+        for (const unit of roster) {
+          expect(VALID_TYPES.has(unit)).toBe(true)
+        }
+      }
+    })
+  }
+})

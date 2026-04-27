@@ -20,13 +20,17 @@ export type BunkerWaveTier = 'easy' | 'medium' | 'hard'
 
 /** A single fixed roster entry: spawn `count` of `type`. */
 interface WaveFixedEntry {
+  /** Enemy archetype to spawn for this fixed slot. */
   type: BunkerEnemyType
+  /** Number of instances of `type` to spawn. */
   count: number
 }
 
 /** One authored wave skeleton: fixed roster + a fill pool. */
 interface WaveSkeleton {
+  /** Always-spawned roster — emitted in array order. */
   fixed: WaveFixedEntry[]
+  /** Pool the random fill units are drawn from. May overlap with `fixed.type`. */
   fillPool: BunkerEnemyType[]
 }
 
@@ -97,7 +101,8 @@ function mulberry32(seed: number): () => number {
  * @param tier      - Difficulty tier
  * @param waveIndex - Zero-based wave index
  * @param missionId - Stable mission instance id, used as PRNG seed
- * @returns Flat list of enemy type strings; spawn order = list order
+ * @returns Flat list of enemy type strings; spawn order = list order. Fixed
+ *          entries are always emitted before random fill units.
  */
 export function rollWave(
   tier: BunkerWaveTier,
