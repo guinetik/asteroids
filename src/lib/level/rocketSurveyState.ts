@@ -140,15 +140,58 @@ export class RocketSurveyState {
       }
     }
 
-    // surveyHp reached zero — reveal step handled in Task 4
-    return {
-      phase: this._phase,
-      surveyHp: this._surveyHp,
-      surveyHpInitial: this._surveyHpInitial,
-      justRevealed: false,
-      targetItemId: this._targetItemId,
-      targetSpawnIndex: null,
+    // surveyHp reached zero — reveal step.
+    while (this._targetItemId !== null) {
+      const found = this._rockAvailability(this._targetItemId)
+      if (found !== null) {
+        const revealed = this._targetItemId
+        this._phase = 'awaitingMarkerConsume'
+        return {
+          phase: this._phase,
+          surveyHp: this._surveyHp,
+          surveyHpInitial: this._surveyHpInitial,
+          justRevealed: true,
+          targetItemId: revealed,
+          targetSpawnIndex: found.spawnIndex,
+        }
+      }
+
+      // No rock for this itemId. Skip it and try the next still-needed mineral.
+      this._skipped.add(this._targetItemId)
+      const next = this.pickScannableItemId()
+      if (next === null) {
+        this._phase = 'idle'
+        this._targetItemId = null
+        this._surveyHp = 0
+        this._surveyHpInitial = 0
+        return {
+          phase: this._phase,
+          surveyHp: this._surveyHp,
+          surveyHpInitial: this._surveyHpInitial,
+          justRevealed: false,
+          targetItemId: null,
+          targetSpawnIndex: null,
+        }
+      }
+      this._targetItemId = next
+      this._phase = 'ramping'
+      this._surveyHp = ROCKET_SURVEY_HP
+      this._surveyHpInitial = ROCKET_SURVEY_HP
+      return {
+        phase: this._phase,
+        surveyHp: this._surveyHp,
+        surveyHpInitial: this._surveyHpInitial,
+        justRevealed: false,
+        targetItemId: this._targetItemId,
+        targetSpawnIndex: null,
+      }
     }
+
+    // Defensive: targetItemId went null mid-flight. Drop to idle.
+    this._phase = 'idle'
+    this._surveyHp = 0
+    this._surveyHpInitial = 0
+    return null
   }
 
   /**

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  */
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RocketSurveyState, type SurveyQuotaSnapshot } from '../rocketSurveyState'
 
 const ALWAYS_FOUND = (itemId: string) => ({ spawnIndex: itemId === 'olivine' ? 1 : 2 })
@@ -69,6 +69,52 @@ describe('RocketSurveyState', () => {
 
   it('returns null while exhausted', () => {
     state.setQuotas([QUOTA_OLIVINE_COMPLETE])
+    expect(state.scienceHit()).toBeNull()
+  })
+
+  it('reveals a marker when HP reaches zero and a rock is available', () => {
+    state.setQuotas([QUOTA_OLIVINE_PENDING])
+    // 32 HP / 4 per hit = 8 hits to reveal
+    let result: ReturnType<typeof state.scienceHit> = null
+    for (let i = 0; i < 8; i++) result = state.scienceHit()
+    expect(result!.justRevealed).toBe(true)
+    expect(result!.phase).toBe('awaitingMarkerConsume')
+    expect(result!.targetItemId).toBe('olivine')
+    expect(result!.targetSpawnIndex).toBe(1)
+    expect(state.phase).toBe('awaitingMarkerConsume')
+  })
+
+  it('returns null while awaitingMarkerConsume so further hits no-op', () => {
+    state.setQuotas([QUOTA_OLIVINE_PENDING])
+    for (let i = 0; i < 8; i++) state.scienceHit()
+    expect(state.phase).toBe('awaitingMarkerConsume')
+    expect(state.scienceHit()).toBeNull()
+  })
+
+  it('skips an itemId with no available rock and re-picks the next still-needed mineral', () => {
+    const skipFn = vi.fn((itemId: string): { spawnIndex: number } | null => {
+      return itemId === 'olivine' ? null : { spawnIndex: 9 }
+    })
+    state = new RocketSurveyState({ rockAvailability: skipFn })
+    state.setQuotas([QUOTA_OLIVINE_PENDING, QUOTA_IRON_PENDING])
+    let result: ReturnType<typeof state.scienceHit> = null
+    for (let i = 0; i < 8; i++) result = state.scienceHit()
+    // Reveal step: olivine has no rock -> skip; next quota is iron -> ramping resumes for iron.
+    expect(result!.justRevealed).toBe(false)
+    expect(result!.phase).toBe('ramping')
+    expect(result!.surveyHp).toBe(32)
+    expect(state.targetItemId).toBe('iron')
+  })
+
+  it('returns to idle when the last scannable itemId is skipped', () => {
+    const neverFound = vi.fn(() => null)
+    state = new RocketSurveyState({ rockAvailability: neverFound })
+    state.setQuotas([QUOTA_OLIVINE_PENDING])
+    let result: ReturnType<typeof state.scienceHit> = null
+    for (let i = 0; i < 8; i++) result = state.scienceHit()
+    expect(result!.justRevealed).toBe(false)
+    expect(result!.phase).toBe('idle')
+    expect(state.targetItemId).toBeNull()
     expect(state.scienceHit()).toBeNull()
   })
 })
