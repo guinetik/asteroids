@@ -112,6 +112,10 @@ export interface LevelMinigameBindings {
   onExplosion: ((kind: 'exterminate' | 'rescue', x: number, y: number, z: number) => void) | null
   /** Rescue-specific fail overlay hook. */
   onRescueFail: ((objectiveIndex: number, cause: string) => void) | null
+  /** Fired by RescueMinigame when a hostage dies (combat or extraction). */
+  onSurvivorLost: ((aliveRemaining: number) => void) | null
+  /** Fired by RescueMinigame when a recruited walker boards the lander. */
+  onSurvivorAboard: ((aboardCount: number) => void) | null
   /** Install the combat loot/drop observer on a newly created combat minigame. */
   onInstallCombatDropObserver: ((minigame: ExterminateMinigame | RescueMinigame) => void) | null
   /** Register static objective prop colliders after minigames create their scene props. */
@@ -243,6 +247,8 @@ export class LevelMinigameFacade {
         minigame.onExplosion = (position) =>
           bindings.onExplosion?.('rescue', position.x, position.y, position.z)
         minigame.onFail = bindings.onRescueFail
+        minigame.onSurvivorLost = bindings.onSurvivorLost
+        minigame.onSurvivorAboard = bindings.onSurvivorAboard
         bindings.onInstallCombatDropObserver?.(minigame)
         this.add(minigame)
       } else if (objective.type === 'collect') {

@@ -97,6 +97,7 @@ import { LevelCollisionFacade } from '@/lib/level/LevelCollisionFacade'
 import { LevelCombatMiningFacade } from '@/lib/level/LevelCombatMiningFacade'
 import { RocketSurveyFacade } from '@/lib/level/RocketSurveyFacade'
 import { GatherMinigame } from '@/lib/minigame/GatherMinigame'
+import { RescueMinigame } from '@/lib/minigame/RescueMinigame'
 import { LevelPersistenceFacade } from '@/lib/level/LevelPersistenceFacade'
 import { LevelMinigameFacade } from '@/lib/level/LevelMinigameFacade'
 import { LevelStateLifecycleFacade } from '@/lib/level/LevelStateLifecycleFacade'
@@ -314,6 +315,10 @@ export class LevelViewController implements Tickable {
   onProspect: ((itemId: string) => void) | null = null
   /** Called when the rocket-survey scan reveals a marker. Host shows the survey toast. */
   onSurvey: ((label: string) => void) | null = null
+  /** Vue layer subscribes to fire the red survivor-lost toast + counter refresh. */
+  onSurvivorLost: ((aliveRemaining: number) => void) | null = null
+  /** Vue layer subscribes to fire the green survivor-aboard toast + counter refresh. */
+  onSurvivorAboard: ((aboardCount: number) => void) | null = null
 
   private readonly initialLanderSpawn = new Vector3()
 
@@ -922,6 +927,12 @@ export class LevelViewController implements Tickable {
         },
         onRescueFail: (_idx, cause) => {
           this.onDeathOverlay?.(true, cause)
+        },
+        onSurvivorLost: (aliveRemaining: number) => {
+          this.onSurvivorLost?.(aliveRemaining)
+        },
+        onSurvivorAboard: (aboardCount: number) => {
+          this.onSurvivorAboard?.(aboardCount)
         },
         onInstallCombatDropObserver: (minigame) => {
           this.installDropObserver(minigame)
@@ -2073,6 +2084,16 @@ export class LevelViewController implements Tickable {
       },
       this.onTerminalPrompt,
     )
+    const activeMinigame = this.minigames.getActive()
+    if (activeMinigame instanceof RescueMinigame && this.landerController) {
+      const locked = activeMinigame.isLiftoffLocked
+      this.landerController.setLiftoffBlocked(locked)
+      if (locked && this.landerController.isLiftoffAttemptedWhileBlocked) {
+        activeMinigame.notifyLiftoffAttemptBlocked()
+      }
+    } else if (this.landerController) {
+      this.landerController.setLiftoffBlocked(false)
+    }
   }
 
   private registerLevelColliders(): void {
