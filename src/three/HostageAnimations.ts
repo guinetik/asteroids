@@ -52,12 +52,11 @@ let clipsCache: HostageClips | null = null
 let clipsPromise: Promise<HostageClips> | null = null
 
 /**
- * Drop the `mixamorig:Hips.position` track. Mixamo FBX exports record this in
- * centimeters while the GLB hostage rig is in meters, so playing the raw track
- * teleports the rig ~80m off-screen. The hips *quaternion* track is preserved
- * (units don't matter for rotation), so kneel/collapse poses still read fine
- * from the leg + spine bends. We also lose the controller-vs-clip double
- * translation issue that affects walking.
+ * Drop the `mixamorig:Hips.position` track entirely. Use only when the controller
+ * drives forward translation (walking) and we want to suppress any baked-in
+ * locomotion to avoid double translation. For clips that need vertical hip
+ * motion (kneel / rise / collapse), use {@link scaleHipsTranslation} instead so
+ * the motion is preserved at the correct magnitude.
  *
  * @param clip - Clip to mutate in place
  */
@@ -66,6 +65,27 @@ function stripHipsTranslation(clip: THREE.AnimationClip): void {
     const isHipsPosition = track.name.endsWith('.position') && track.name.includes('Hips')
     return !isHipsPosition
   })
+}
+
+/** Mixamo FBX exports record hip translation in centimeters; the GLB rig is in meters. */
+const MIXAMO_HIPS_CM_TO_M = 0.01
+
+/**
+ * Multiply every value of the `mixamorig:Hips.position` track by `factor`.
+ * Use 0.01 to convert Mixamo's centimeter-scaled hips translation to meters
+ * so kneel / rise / collapse motions read at the right magnitude on the GLB rig.
+ *
+ * @param clip   - Clip to mutate in place
+ * @param factor - Multiplier applied to every component of every keyframe
+ */
+function scaleHipsTranslation(clip: THREE.AnimationClip, factor: number): void {
+  for (const track of clip.tracks) {
+    if (!(track.name.endsWith('.position') && track.name.includes('Hips'))) continue
+    const values = track.values
+    for (let i = 0; i < values.length; i++) {
+      values[i] = values[i]! * factor
+    }
+  }
 }
 
 /**
@@ -121,10 +141,10 @@ export async function loadHostageClips(): Promise<HostageClips> {
     walking.name = HOSTAGE_CLIP_WALKING
     dying.name = HOSTAGE_CLIP_DYING
 
-    stripHipsTranslation(prayingLoop)
-    stripHipsTranslation(prayingStandUp)
+    scaleHipsTranslation(prayingLoop, MIXAMO_HIPS_CM_TO_M)
+    scaleHipsTranslation(prayingStandUp, MIXAMO_HIPS_CM_TO_M)
     stripHipsTranslation(walking)
-    stripHipsTranslation(dying)
+    scaleHipsTranslation(dying, MIXAMO_HIPS_CM_TO_M)
 
     clipsCache = { prayingLoop, prayingStandUp, walking, dying }
     return clipsCache
