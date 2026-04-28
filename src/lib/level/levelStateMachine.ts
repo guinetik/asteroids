@@ -90,13 +90,13 @@ export function createLevelStateMachine(
             target: 'lander',
             guard: () => isNearLander(),
           },
-          'enter-bunker': 'bunker-interior',
+          enterBunker: 'bunker-interior',
           die: 'dead',
         },
       },
       'bunker-interior': {
         on: {
-          'exit-bunker': 'eva',
+          exitBunker: 'eva',
           die: 'dead',
         },
       },
