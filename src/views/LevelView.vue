@@ -34,7 +34,10 @@ import type { LanderTelemetry } from '@/lib/ui/landerHudTypes'
 import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 import { OBJECTIVE_LABELS } from '@/lib/minigame/MiniGame'
 import RescueSurvivorPanel from '@/components/RescueSurvivorPanel.vue'
+import BunkerWaveHud from '@/components/BunkerWaveHud.vue'
 import { RescueMinigame } from '@/lib/minigame/RescueMinigame'
+import { BunkerMinigame } from '@/lib/minigame/BunkerMinigame'
+import type { BunkerSubState } from '@/lib/bunker/bunkerSceneState'
 import {
   playBackgroundMusic,
   stopBackgroundMusic,
@@ -242,8 +245,44 @@ const rescueActive = ref(false)
 let rescuePollHandle: ReturnType<typeof setInterval> | null = null
 
 /**
- * Poll the active minigame every 500ms so the rescue panel reflects the
- * correct counts during combat, before any survivor event fires.
+ * Sub-states that the {@link BunkerWaveHud} renders. The bunker FSM has more
+ * states than these (e.g. `entering`, `antechamber-idle`, `exiting`); during
+ * those phases the HUD stays hidden and the player follows mission-instruction
+ * prompts instead.
+ */
+type BunkerWaveHudPhase = Extract<
+  BunkerSubState,
+  'wave-active' | 'wave-breather' | 'final-clear' | 'exit-prompt'
+>
+
+/** Props snapshot driving the {@link BunkerWaveHud}, refreshed on the same poll cadence as rescue. */
+interface BunkerHudSnapshot {
+  /** Zero-based current wave index. */
+  waveIndex: number
+  /** Total waves the player must clear in this bunker run. */
+  totalWaves: number
+  /** Live alive-enemy count for the hostile counter. */
+  hostiles: number
+  /** Current sub-state — only the four combat/exit phases are rendered. */
+  phase: BunkerWaveHudPhase
+}
+
+const bunkerHudProps = ref<BunkerHudSnapshot | null>(null)
+const inBunker = computed(() => stateInfo.state === 'bunker-interior')
+
+/** True when the bunker FSM is in a phase the wave HUD knows how to render. */
+function isBunkerHudPhase(phase: BunkerSubState): phase is BunkerWaveHudPhase {
+  return (
+    phase === 'wave-active' ||
+    phase === 'wave-breather' ||
+    phase === 'final-clear' ||
+    phase === 'exit-prompt'
+  )
+}
+
+/**
+ * Poll the active minigame every 500ms so the rescue panel + bunker HUD
+ * reflect the correct counts during combat, before any event fires.
  */
 function refreshRescueRefs(): void {
   const active = viewController.getActiveMinigame()
@@ -254,6 +293,21 @@ function refreshRescueRefs(): void {
     rescueAboard.value = active.aboardSurvivors
   } else {
     rescueActive.value = false
+  }
+  if (active instanceof BunkerMinigame) {
+    const phase = active.bunkerPhase
+    if (isBunkerHudPhase(phase) && active.progressTotal !== null) {
+      bunkerHudProps.value = {
+        waveIndex: active.currentWaveIndex,
+        totalWaves: active.progressTotal,
+        hostiles: active.hostiles,
+        phase,
+      }
+    } else {
+      bunkerHudProps.value = null
+    }
+  } else {
+    bunkerHudProps.value = null
   }
 }
 
@@ -550,7 +604,7 @@ function handleGlobalKeydown(e: KeyboardEvent): void {
     closeInventoryPanel()
     return
   }
-  if (e.code === 'KeyM' && !showInventory.value) {
+  if (e.code === 'KeyM' && !showInventory.value && !inBunker.value) {
     showMap.value = !showMap.value
   }
 }
@@ -631,8 +685,8 @@ function handleToggleMusic(): void {
       <span class="level-topbar__cargo-key" aria-hidden="true">B</span>
     </button>
   </div>
-  <!-- Helmet visor overlay — always visible, frames the view -->
-  <div v-if="stateInfo.state === 'eva'" class="helmet-visor" />
+  <!-- Helmet visor overlay — frames the view in any first-person scene -->
+  <div v-if="stateInfo.state === 'eva' || inBunker" class="helmet-visor" />
   <div
     class="letterbox-bar letterbox-bar--top"
     :class="{ 'letterbox-bar--hidden': !letterboxVisible }"
@@ -658,7 +712,9 @@ function handleToggleMusic(): void {
     :mission-name="trackerMission"
   />
   <ObjectiveTracker
-    v-if="trackerVisible && (stateInfo.state === 'lander' || stateInfo.state === 'eva')"
+    v-if="
+      trackerVisible && (stateInfo.state === 'lander' || stateInfo.state === 'eva' || inBunker)
+    "
     :eyebrow="trackerAsteroid"
     :title="trackerMission"
     :objectives="trackerObjectives"
@@ -670,14 +726,21 @@ function handleToggleMusic(): void {
     :aboard="rescueAboard"
   />
   <LanderHud v-if="stateInfo.state === 'lander'" :telemetry="landerTelemetry" />
-  <FpsHud v-if="stateInfo.state === 'eva'" :telemetry="fpsTelemetry" />
+  <FpsHud v-if="stateInfo.state === 'eva' || inBunker" :telemetry="fpsTelemetry" />
   <FpsCompass
-    v-if="stateInfo.state === 'eva'"
+    v-if="stateInfo.state === 'eva' && !inBunker"
     :heading-rad="fpsTelemetry.headingRad"
     :objectives="fpsTelemetry.objectives"
   />
+  <BunkerWaveHud
+    v-if="inBunker && bunkerHudProps"
+    :wave-index="bunkerHudProps.waveIndex"
+    :total-waves="bunkerHudProps.totalWaves"
+    :hostiles="bunkerHudProps.hostiles"
+    :phase="bunkerHudProps.phase"
+  />
   <LevelMinimap
-    v-if="showMap"
+    v-if="showMap && !inBunker"
     :map-canvas="mapCanvas"
     :player-x="playerX"
     :player-z="playerZ"
@@ -713,13 +776,13 @@ function handleToggleMusic(): void {
   >
     <span class="exit-prompt__text">EXIT (F)</span>
   </div>
-  <div v-if="stateInfo.canEnterLander" class="exit-prompt exit-prompt--vehicle">
+  <div v-if="stateInfo.canEnterLander && !inBunker" class="exit-prompt exit-prompt--vehicle">
     <span class="exit-prompt__text">ENTER (F)</span>
   </div>
   <div v-if="terminalPrompt" class="exit-prompt">
     <span class="exit-prompt__text exit-prompt__text--terminal">{{ terminalPrompt }}</span>
   </div>
-  <div v-if="stateInfo.canExfil" class="exit-prompt exit-prompt--vehicle">
+  <div v-if="stateInfo.canExfil && !inBunker" class="exit-prompt exit-prompt--vehicle">
     <span class="exit-prompt__text">EXFILTRATE (F)</span>
   </div>
   <div v-if="arrivalFade > 0" class="death-fade" :style="{ opacity: arrivalFade }" />
@@ -739,7 +802,7 @@ function handleToggleMusic(): void {
     @restart="handleRestart"
   />
   <DamageFeedback
-    v-if="stateInfo.state === 'eva'"
+    v-if="stateInfo.state === 'eva' || inBunker"
     ref="damageFeedback"
     :flash-opacity="damageFlash"
   />

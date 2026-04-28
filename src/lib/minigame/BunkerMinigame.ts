@@ -200,6 +200,27 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
     return this.state.currentWaveIndex
   }
 
+  /**
+   * Live alive-enemy count read off the bunker scene's enemy director.
+   * Returns 0 when the minigame has no scene (test seam) or no enemies have
+   * been spawned yet. Used by the bunker wave HUD to render the hostile
+   * counter row during `wave-active`.
+   */
+  get hostiles(): number {
+    if (!this.scene) return 0
+    return this.scene.enemyDirector.enemies.filter((h) => h.enemy.alive).length
+  }
+
+  /**
+   * Current sub-FSM state of the bunker interior. Mirrors
+   * {@link BunkerSceneState.current} so the level view can gate the wave HUD
+   * and interaction prompts without reaching into the minigame's private
+   * state machine reference.
+   */
+  get bunkerPhase(): BunkerSubState {
+    return this.state.current
+  }
+
   /** @inheritdoc */
   tick(dt: number, _ctx: MiniGameContext): void {
     if (this._status !== 'active') return
