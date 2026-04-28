@@ -10,6 +10,7 @@
  * @spec docs/superpowers/specs/2026-04-27-bunker-mission-design.md
  */
 import * as THREE from 'three'
+import { applyBunkerMeshStandardSpecularSoften } from '@/three/bunker/bunkerMeshStandardSpecularSoften'
 import { ANTECHAMBER, ARENA, CORRIDOR, WALL_THICKNESS } from './BunkerWallBuilder'
 
 /** Door slab width: corridor opening plus wall overlap on both sides. */
@@ -37,6 +38,14 @@ const SEAM_AMPLITUDE_FRACTION = 0.18
 const SEAM_MAX_OPACITY = 0.85
 /** Tiny forward offset preventing z-fighting between the seam plane and the slab front face. */
 const SEAM_Z_BIAS = 0.001
+/** Textured metal slab (antechamber arena door) — base roughness before packed map. */
+const ARENA_METAL_SLAB_ROUGHNESS = 0.76
+/** Reduced from 0.8 so the brushed map does not read as mirror under EVA light. */
+const ARENA_METAL_SLAB_METALNESS = 0.38
+const ARENA_METAL_SLAB_ENV_MAP_INTENSITY = 0.16
+/** Shader mix after roughness map for the same metal set as {@link BunkerHatchModel} pipe. */
+const ARENA_METAL_SLAB_SHADER_ROUGH_MIX = 0.44
+const ARENA_METAL_SLAB_SHADER_METAL_SCALE = 0.5
 
 /** A single locking door across the bunker corridor. */
 export class BunkerDoorController {
@@ -88,11 +97,18 @@ export class BunkerDoorController {
       matOpts.normalMap = normalMap
       matOpts.roughnessMap = roughnessMap
       matOpts.metalnessMap = metalnessMap
-      matOpts.metalness = 0.8
-      matOpts.roughness = 0.4
+      matOpts.metalness = ARENA_METAL_SLAB_METALNESS
+      matOpts.roughness = ARENA_METAL_SLAB_ROUGHNESS
+      matOpts.envMapIntensity = ARENA_METAL_SLAB_ENV_MAP_INTENSITY
     }
 
     this.slabMat = new THREE.MeshStandardMaterial(matOpts)
+    if (useMetallicTexture) {
+      applyBunkerMeshStandardSpecularSoften(this.slabMat, {
+        roughnessMixTowardMatte: ARENA_METAL_SLAB_SHADER_ROUGH_MIX,
+        metalnessResponseScale: ARENA_METAL_SLAB_SHADER_METAL_SCALE,
+      })
+    }
     this.slab = new THREE.Mesh(
       new THREE.BoxGeometry(DOOR_WIDTH, DOOR_HEIGHT, DOOR_THICKNESS),
       this.slabMat,

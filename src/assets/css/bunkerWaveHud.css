@@ -7,14 +7,21 @@
 
 .bunker-wave-hud {
   @apply pointer-events-none fixed top-6 left-1/2 z-40 flex -translate-x-1/2 flex-col items-center
-         gap-1 text-center font-mono;
+         gap-1 rounded-lg border border-white/10 bg-black/55 px-5 py-2.5 text-center font-mono
+         shadow-[0_4px_24px_rgba(0,0,0,0.75)] ring-1 ring-black/40 backdrop-blur-sm;
 }
 
 .bunker-wave-hud__title {
-  @apply text-2xl font-bold tracking-[0.2em] text-emerald-300
-         drop-shadow-[0_0_8px_rgba(110,231,183,0.6)];
+  @apply text-2xl font-bold tracking-[0.2em] text-emerald-200;
+  text-shadow:
+    0 0 1px rgb(0 0 0),
+    0 2px 8px rgb(0 0 0),
+    0 0 18px rgb(0 0 0);
 }
 
 .bunker-wave-hud__sub {
-  @apply text-sm tracking-[0.3em] text-emerald-200/80;
+  @apply text-sm tracking-[0.3em] text-emerald-50/95;
+  text-shadow:
+    0 0 1px rgb(0 0 0),
+    0 1px 6px rgb(0 0 0);
 }

@@ -13,12 +13,14 @@ import { CollisionWorld } from '@/lib/physics/worldCollision'
 
 const TINT = 0x66ccff
 const MIN_CHUNKY_ENTRANCE_DIAMETER = 16
+/** Must match {@link BunkerHatchModel} pipe rise vs lander collision height. */
+const HATCH_PIPE_LANDER_HEIGHT_FRACTION = 2.5 as const
 const BURIED_DEPTH = 6
 const DOOR_MIN_BOTTOM_ABOVE_GROUND = 1
 const DOOR_MAX_BOTTOM_ABOVE_GROUND = 2
 const MIN_DOOR_WIDTH = 4
 const MIN_DOOR_HEIGHT = 9
-const MAX_PIPE_HEIGHT = LANDER_COLLISION_TOP_OFFSET * 2
+const MAX_PIPE_HEIGHT = LANDER_COLLISION_TOP_OFFSET * HATCH_PIPE_LANDER_HEIGHT_FRACTION
 const MIN_PIPE_HEIGHT = LANDER_COLLISION_TOP_OFFSET * 1.5
 const MIN_PIPE_COLOR_CHANNEL = 0.35
 const MAX_PIPE_METALNESS = 0.65
@@ -71,7 +73,7 @@ describe('BunkerHatchModel', () => {
     expect(size.z).toBeGreaterThanOrEqual(MIN_CHUNKY_ENTRANCE_DIAMETER)
     expect(bounds.min.y).toBeLessThanOrEqual(-BURIED_DEPTH + FLOAT_EPSILON)
     expect(size.y).toBeGreaterThanOrEqual(MIN_PIPE_HEIGHT)
-    expect(size.y).toBeLessThan(MAX_PIPE_HEIGHT)
+    expect(size.y).toBeLessThanOrEqual(MAX_PIPE_HEIGHT + FLOAT_EPSILON)
     expect(doorSize.x).toBeGreaterThanOrEqual(MIN_DOOR_WIDTH)
     expect(doorSize.y).toBeGreaterThanOrEqual(MIN_DOOR_HEIGHT)
     expect(doorBounds.min.y).toBeGreaterThanOrEqual(DOOR_MIN_BOTTOM_ABOVE_GROUND)
@@ -114,11 +116,13 @@ describe('BunkerHatchModel', () => {
         substepDistance: 1,
       },
     )
+    /** Top of hatch AABB (`localMax.y` after world transform at `group.y = 4`). */
+    const hatchColliderTopY = 4 + MAX_PIPE_HEIGHT - BURIED_DEPTH
     const support = world.getHighestSupportUnderDisc(
       12,
       -8,
       4 - BURIED_DEPTH,
-      4 + LANDER_COLLISION_TOP_OFFSET * 2,
+      hatchColliderTopY,
       9,
     )
 

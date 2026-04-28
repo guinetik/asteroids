@@ -6,6 +6,7 @@
  * `window.AsteroidDev` so commands are available from the browser console:
  *
  * ```js
+ * AsteroidDev.LevelView.landNearObjective(0, 20)
  * AsteroidDev.LevelView.takeDamage(25)
  * AsteroidDev.MapView.skipIntro()
  * AsteroidDev.MapView.warp('earth')

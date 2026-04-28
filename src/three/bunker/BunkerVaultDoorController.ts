@@ -9,7 +9,19 @@
  * @spec docs/superpowers/specs/2026-04-27-bunker-mission-design.md
  */
 import * as THREE from 'three'
+import { applyBunkerMeshStandardSpecularSoften } from '@/three/bunker/bunkerMeshStandardSpecularSoften'
 import { ANTECHAMBER, ARENA, CORRIDOR, WALL_THICKNESS } from './BunkerWallBuilder'
+
+/** Base metalness for packed `/textures/metal` on the vault — kept low; map scales up. */
+const VAULT_METALNESS = 0.06
+/** Uniform roughness before map; mixed with shader soften for mirror-like texels. */
+const VAULT_ROUGHNESS = 0.82
+/** Tone down IBL on interior metal slabs. */
+const VAULT_ENV_MAP_INTENSITY = 0.2
+/** Post–roughness-map mix toward diffuse (vault faces helmet light directly). */
+const VAULT_SHADER_ROUGH_MIX = 0.38
+/** Scale metal channel after sampling (vault wheel/frame share the material). */
+const VAULT_SHADER_METAL_SCALE = 0.62
 
 /** Total width of the door frame to cover the corridor gap. */
 const FRAME_WIDTH = CORRIDOR.width + WALL_THICKNESS * 2
@@ -76,8 +88,13 @@ export class BunkerVaultDoorController {
       normalMap: normalMap,
       roughnessMap: roughnessMap,
       metalnessMap: metalnessMap,
-      metalness: 0.1,
-      roughness: 0.4,
+      metalness: VAULT_METALNESS,
+      roughness: VAULT_ROUGHNESS,
+      envMapIntensity: VAULT_ENV_MAP_INTENSITY,
+    })
+    applyBunkerMeshStandardSpecularSoften(this.mat, {
+      roughnessMixTowardMatte: VAULT_SHADER_ROUGH_MIX,
+      metalnessResponseScale: VAULT_SHADER_METAL_SCALE,
     })
 
     // 1. Build the frame (a square with a circular hole)

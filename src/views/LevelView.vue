@@ -723,7 +723,11 @@ function handleToggleMusic(): void {
     :aboard="rescueAboard"
   />
   <LanderHud v-if="stateInfo.state === 'lander'" :telemetry="landerTelemetry" />
-  <FpsHud v-if="stateInfo.state === 'eva' || inBunker" :telemetry="fpsTelemetry" />
+  <FpsHud
+    v-if="stateInfo.state === 'eva' || inBunker"
+    :telemetry="fpsTelemetry"
+    :hide-movement-readout="inBunker"
+  />
   <FpsCompass
     v-if="stateInfo.state === 'eva' && !inBunker"
     :heading-rad="fpsTelemetry.headingRad"

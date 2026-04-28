@@ -84,6 +84,10 @@ export class LevelPostProcessing {
   private readonly composer: EffectComposer
   private readonly fxaaPass: ShaderPass
   private readonly bloomPass: UnrealBloomPass
+  private readonly chromaticPass: ShaderPass
+  private readonly vignettePass: ShaderPass
+  /** True while `bunker-interior` — cheap chain (no bloom / CA / vignette). */
+  private bunkerInteriorReduced = false
 
   constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
     this.composer = new EffectComposer(renderer)
@@ -100,18 +104,36 @@ export class LevelPostProcessing {
     this.composer.addPass(new ShaderPass(ColorGradeShader))
 
     // 4. Chromatic aberration
-    this.composer.addPass(new ShaderPass(ChromaticAberrationShader))
+    this.chromaticPass = new ShaderPass(ChromaticAberrationShader)
+    this.composer.addPass(this.chromaticPass)
 
     // 5. Vignette
-    const vignettePass = new ShaderPass(VignetteShader)
-    vignettePass.uniforms['offset']!.value = VIGNETTE_OFFSET
-    vignettePass.uniforms['darkness']!.value = VIGNETTE_DARKNESS
-    this.composer.addPass(vignettePass)
+    this.vignettePass = new ShaderPass(VignetteShader)
+    this.vignettePass.uniforms['offset']!.value = VIGNETTE_OFFSET
+    this.vignettePass.uniforms['darkness']!.value = VIGNETTE_DARKNESS
+    this.composer.addPass(this.vignettePass)
 
     // 6. FXAA (last)
     this.fxaaPass = new ShaderPass(FXAAShader)
     this.updateFxaaResolution(renderer)
     this.composer.addPass(this.fxaaPass)
+  }
+
+  /**
+   * Bunker interiors are already dark and tight; {@link UnrealBloomPass} and
+   * extra fullscreen passes dominated frame time. Skips bloom, chromatic
+   * aberration, and vignette while active — keeps color grade + FXAA for tone
+   * continuity with EVA.
+   *
+   * @param active - When true, expensive passes are disabled via `Pass.enabled`.
+   */
+  setBunkerInteriorReducedPipeline(active: boolean): void {
+    if (this.bunkerInteriorReduced === active) return
+    this.bunkerInteriorReduced = active
+    const on = !active
+    this.bloomPass.enabled = on
+    this.chromaticPass.enabled = on
+    this.vignettePass.enabled = on
   }
 
   /** Call this instead of renderer.render(). */

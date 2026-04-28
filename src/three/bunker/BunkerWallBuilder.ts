@@ -1,15 +1,26 @@
 /**
  * Procedural bunker geometry — antechamber + corridor + arena.
  *
- * Builds box meshes around three rectangular volumes whose dimensions match
- * the spec. All meshes share one {@link createBunkerGridMaterial} instance
- * via the `material` argument so the breathing animation stays coherent.
+ * Builds box meshes around rectangular volumes whose dimensions match the spec.
+ * Floor, ceiling, and wall families come from {@link BunkerInteriorMaterialSet}:
+ * one floor + one ceiling atlas for all rooms, concrete for the foyer (antechamber) and
+ * enemy staging rooms; foam for the loot room; blackwall for the corridor only; combat arena
+ * walls use untextured matte black (floor/ceiling share the global floor/ceiling atlases).
  *
  * @author guinetik
  * @date 2026-04-27
  * @spec docs/superpowers/specs/2026-04-27-bunker-mission-design.md
  */
 import * as THREE from 'three'
+
+import {
+  createBunkerTiledInteriorMaterialFromTemplate,
+  BUNKER_TILE_CEILING_CYCLES_PER_METER,
+  BUNKER_TILE_FLOOR_CYCLES_PER_METER,
+  BUNKER_TILE_WALL_CYCLES_PER_METER,
+  BUNKER_TEXTURE_CEILING_MAP_ANISOTROPY,
+  type BunkerInteriorMaterialSet,
+} from './BunkerInteriorMaterials'
 
 /** Antechamber inner dimensions (world units). */
 export const ANTECHAMBER = { width: 14, depth: 12, height: 11 }
@@ -23,10 +34,25 @@ export const ENEMY_ROOM = { width: 16, depth: 16, height: ARENA.height }
 export const LOOT_ROOM = { width: ARENA.width / 2, depth: ARENA.depth / 2, height: ARENA.height }
 /** Wall thickness for all six faces of every volume. */
 export const WALL_THICKNESS = 0.4
+/** Combat arena interior — flat matte black, no tiling (see {@link buildRoom}). */
+const ARENA_MATTE_COMBAT_HEX = 0x000000
+/** Full roughness — diffuse black shell without spec highlights. */
+const ARENA_MATTE_COMBAT_ROUGHNESS = 1
+/** Non-metallic matte paint read. */
+const ARENA_MATTE_COMBAT_METALNESS = 0
 /** Inset from each arena corner (world units) where spawn pads sit. */
 export const SPAWN_PAD_INSET = 7
 /** Player capsule-center inset used when exposing walkable bunker bounds. */
 export const WALKABLE_INSET = 0.6
+
+/** Which packed wall texture set vertical faces use (floor/ceiling are shared). */
+export type BunkerRoomWallKind =
+  /** Antechamber — concrete (foyer before corridor / arena). */
+  | 'foyer'
+  /** Loot / reward room — foam. */
+  | 'loot'
+  /** Corridor only — textured blackwall (arena combat shell overrides with matte solid). */
+  | 'default'
 
 /** Axis-aligned walkable rectangle in bunker-local or world XZ space. */
 export interface BunkerWalkableBounds {
@@ -88,17 +114,107 @@ export interface BunkerGeometry {
   walkableBounds: readonly BunkerWalkableBounds[]
   /** Flat list of every wall mesh built by {@link buildBunkerGeometry} — used by the scene controller for explicit geometry disposal. */
   wallMeshes: ReadonlyArray<THREE.Mesh>
+  /**
+   * Per-mesh PBR clones with world-derived UV repeat — dispose before templates in
+   * {@link BunkerSceneController.dispose}.
+   */
+  interiorMeshMaterials: ReadonlyArray<THREE.MeshStandardMaterial>
+  /**
+   * Shared untextured material for arena combat-shell meshes (`matteBlackInterior` option);
+   * dispose via {@link THREE.MeshStandardMaterial.dispose} only — no packed maps.
+   */
+  arenaCombatSolidMaterial?: THREE.MeshStandardMaterial
+}
+
+/**
+ * Copies `uv` to `uv2` when missing so Three.js `aoMap` shading works on box meshes.
+ *
+ * @param geometry - Closed box primitive from {@link THREE.BoxGeometry}.
+ */
+function ensureUv2ForAoMap(geometry: THREE.BufferGeometry): void {
+  const uv = geometry.getAttribute('uv')
+  if (uv && !geometry.getAttribute('uv2')) {
+    geometry.setAttribute('uv2', uv.clone())
+  }
+}
+
+/**
+ * Builds a box mesh whose maps tile with **`repeat ≈ metersOnAxis × cyclesPerMeter`**
+ * so tiny rooms and the arena retain the same physical tile size despite shared atlases.
+ *
+ * @param width  - `BoxGeometry` X extent (m).
+ * @param height - `BoxGeometry` Y extent (m).
+ * @param depth  - `BoxGeometry` Z extent (m).
+ * @param template - Loaded template ({@link BunkerInteriorMaterialSet} slot); not used directly on the mesh.
+ * @param repeatU - Multiplicative UV repeat across the primary horizontal span of large faces (`width`-like).
+ * @param repeatV - Multiplicative UV repeat across the secondary span (`depth` or height).
+ * @param disposableMats - Pushes the new material clone for teardown.
+ * @param mapAnisotropyMax - Pass {@link BUNKER_TEXTURE_CEILING_MAP_ANISOTROPY} for ceiling templates only.
+ */
+function meshFromBoxWorldTiled(
+  width: number,
+  height: number,
+  depth: number,
+  template: THREE.MeshStandardMaterial,
+  repeatU: number,
+  repeatV: number,
+  disposableMats: THREE.MeshStandardMaterial[],
+  mapAnisotropyMax?: number,
+): THREE.Mesh {
+  const material = createBunkerTiledInteriorMaterialFromTemplate(
+    template,
+    repeatU,
+    repeatV,
+    mapAnisotropyMax,
+  )
+  disposableMats.push(material)
+  const geom = new THREE.BoxGeometry(width, height, depth)
+  ensureUv2ForAoMap(geom)
+  return new THREE.Mesh(geom, material)
+}
+
+/**
+ * Untextured interior shell mesh — arena combat room matte black slab.
+ *
+ * @param material - Shared instance (no AO map; UV2 omitted).
+ */
+function meshFromSolidInteriorBox(
+  material: THREE.MeshStandardMaterial,
+  width: number,
+  height: number,
+  depth: number,
+): THREE.Mesh {
+  const geom = new THREE.BoxGeometry(width, height, depth)
+  return new THREE.Mesh(geom, material)
+}
+
+/**
+ * One {@link THREE.MeshStandardMaterial} for floor, ceiling, and walls — no textures to dispose beyond the material itself.
+ *
+ * @returns Single-sided inverted box material suitable for inward-facing shells.
+ */
+function createArenaCombatMatteBlackMaterial(): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    color: ARENA_MATTE_COMBAT_HEX,
+    roughness: ARENA_MATTE_COMBAT_ROUGHNESS,
+    metalness: ARENA_MATTE_COMBAT_METALNESS,
+    side: THREE.BackSide,
+    envMapIntensity: 0,
+  })
 }
 
 /**
  * Build the bunker geometry rooted at the world origin. The arena is placed
  * north of the antechamber with the corridor between them.
  *
- * @param material - Shared grid material for all six faces of every volume
+ * @param materials - Packed PBR sets (floor / ceiling / per-wall flavor)
  */
-export function buildBunkerGeometry(material: THREE.ShaderMaterial): BunkerGeometry {
+export function buildBunkerGeometry(materials: BunkerInteriorMaterialSet): BunkerGeometry {
   const root = new THREE.Group()
   root.name = 'bunkerRoot'
+  const interiorMeshMaterials: THREE.MeshStandardMaterial[] = []
+  /** Shared with arena shell + enemy-room door jambs — one GPU material, diffuse-only. */
+  const sharedCombatShellMatte = createArenaCombatMatteBlackMaterial()
 
   // Lay out z-axis as "depth" with antechamber at z=0, corridor next, arena last.
   const anteCenterZ = 0
@@ -113,33 +229,55 @@ export function buildBunkerGeometry(material: THREE.ShaderMaterial): BunkerGeome
   // (north end), causing z-fighting under BackSide rendering. The adjacent
   // room end walls are split around the corridor width so opening the door
   // reveals the next space instead of a sealed wall.
-  const ante = buildRoom('antechamber', ANTECHAMBER, 0, anteCenterZ, material, {
+  const ante = buildRoom('antechamber', ANTECHAMBER, 0, anteCenterZ, materials, interiorMeshMaterials, 'foyer', {
     northOpeningWidth: CORRIDOR.width,
     southOpeningWidth: CORRIDOR.width,
   })
-  const corr = buildRoom('corridor', CORRIDOR, 0, corrCenterZ, material, {
+  const corr = buildRoom('corridor', CORRIDOR, 0, corrCenterZ, materials, interiorMeshMaterials, 'default', {
     skipNorth: true,
     skipSouth: true,
   })
-  const arena = buildRoom('arena', ARENA, 0, arenaCenterZ, material, {
+  const arena = buildRoom('arena', ARENA, 0, arenaCenterZ, materials, interiorMeshMaterials, 'default', {
     northOpeningWidth: CORRIDOR.width,
     southOpeningWidth: CORRIDOR.width,
     eastOpeningWidth: CORRIDOR.width,
     eastOpeningCenterZ: arenaCenterZ,
     westOpeningWidth: CORRIDOR.width,
     westOpeningCenterZ: arenaCenterZ,
+    matteBlackInterior: true,
+    sharedMatteShellMaterial: sharedCombatShellMatte,
   })
-  const northRoom = buildRoom('lootRoom', LOOT_ROOM, 0, northRoomCenterZ, material, {
+  const northRoom = buildRoom('lootRoom', LOOT_ROOM, 0, northRoomCenterZ, materials, interiorMeshMaterials, 'loot', {
     southOpeningWidth: CORRIDOR.width,
   })
-  const eastRoom = buildRoom('enemyRoomEast', ENEMY_ROOM, eastRoomCenterX, arenaCenterZ, material, {
-    westOpeningWidth: CORRIDOR.width,
-    westOpeningCenterZ: arenaCenterZ,
-  })
-  const westRoom = buildRoom('enemyRoomWest', ENEMY_ROOM, westRoomCenterX, arenaCenterZ, material, {
-    eastOpeningWidth: CORRIDOR.width,
-    eastOpeningCenterZ: arenaCenterZ,
-  })
+  const eastRoom = buildRoom(
+    'enemyRoomEast',
+    ENEMY_ROOM,
+    eastRoomCenterX,
+    arenaCenterZ,
+    materials,
+    interiorMeshMaterials,
+    'foyer',
+    {
+      westOpeningWidth: CORRIDOR.width,
+      westOpeningCenterZ: arenaCenterZ,
+      matteFlankWestWallOpening: sharedCombatShellMatte,
+    },
+  )
+  const westRoom = buildRoom(
+    'enemyRoomWest',
+    ENEMY_ROOM,
+    westRoomCenterX,
+    arenaCenterZ,
+    materials,
+    interiorMeshMaterials,
+    'foyer',
+    {
+      eastOpeningWidth: CORRIDOR.width,
+      eastOpeningCenterZ: arenaCenterZ,
+      matteFlankEastWallOpening: sharedCombatShellMatte,
+    },
+  )
   root.add(ante.group, corr.group, arena.group, northRoom.group, eastRoom.group, westRoom.group)
   const wallMeshes = [
     ...ante.meshes,
@@ -251,6 +389,8 @@ export function buildBunkerGeometry(material: THREE.ShaderMaterial): BunkerGeome
       ),
     ],
     wallMeshes,
+    interiorMeshMaterials,
+    arenaCombatSolidMaterial: arena.sharedMatteMaterial ?? sharedCombatShellMatte,
   }
 }
 
@@ -268,15 +408,20 @@ export function buildBunkerGeometry(material: THREE.ShaderMaterial): BunkerGeome
  * @param dims     - Inner width / depth / height in world units.
  * @param cx       - Center X.
  * @param cz       - Center Z.
- * @param material - Shared grid material applied to every face.
+ * @param materials - Floor / ceiling / wall families from the interior loader.
+ * @param disposableMats - Accumulates per-mesh material clones for GPU disposal.
+ * @param wallKind - Vertical surface texture (foyer / loot / default).
  * @param options  - Optional flags to skip or split the north / south end walls.
+ * Arena may set `matteBlackInterior` for an untextured combat shell (shared matte black).
  */
 function buildRoom(
   name: string,
   dims: { width: number; depth: number; height: number },
   cx: number,
   cz: number,
-  material: THREE.ShaderMaterial,
+  materials: BunkerInteriorMaterialSet,
+  disposableMats: THREE.MeshStandardMaterial[],
+  wallKind: BunkerRoomWallKind,
   options: {
     skipNorth?: boolean
     skipSouth?: boolean
@@ -286,20 +431,158 @@ function buildRoom(
     eastOpeningCenterZ?: number
     westOpeningWidth?: number
     westOpeningCenterZ?: number
+    matteBlackInterior?: boolean
+    /**
+     * Arena-only: reuse one matte shell instance from {@link buildBunkerGeometry} so staging
+     * doors can share the same material for flanking strips (see matte flank fields).
+     */
+    sharedMatteShellMaterial?: THREE.MeshStandardMaterial
+    /**
+     * Enemy staging rooms — east wall (positive local X): segments beside the arena doorway use
+     * diffuse matte (`solidMode`) instead of tiled blackwall.
+     */
+    matteFlankEastWallOpening?: THREE.MeshStandardMaterial
+    /** Same pattern for the west wall (arena opening on west side). */
+    matteFlankWestWallOpening?: THREE.MeshStandardMaterial
   } = {},
-): { group: THREE.Group; meshes: THREE.Mesh[] } {
+): { group: THREE.Group; meshes: THREE.Mesh[]; sharedMatteMaterial?: THREE.MeshStandardMaterial } {
   const g = new THREE.Group()
   g.name = name
   const t = WALL_THICKNESS
   const meshes: THREE.Mesh[] = []
 
+  if (options.matteBlackInterior) {
+    const combatMat = options.sharedMatteShellMaterial ?? createArenaCombatMatteBlackMaterial()
+    /** Floor + ceiling reuse the packed atlases; walls only stay matte solid black. */
+    const floorRepeatUArena = dims.width * BUNKER_TILE_FLOOR_CYCLES_PER_METER
+    const floorRepeatVArena = dims.depth * BUNKER_TILE_FLOOR_CYCLES_PER_METER
+    const floor = meshFromBoxWorldTiled(
+      dims.width,
+      t,
+      dims.depth,
+      materials.floor,
+      floorRepeatUArena,
+      floorRepeatVArena,
+      disposableMats,
+    )
+    floor.position.set(cx, -t / 2, cz)
+    g.add(floor)
+    meshes.push(floor)
+
+    const ceilRepeatUArena = dims.width * BUNKER_TILE_CEILING_CYCLES_PER_METER
+    const ceilRepeatVArena = dims.depth * BUNKER_TILE_CEILING_CYCLES_PER_METER
+    const ceil = meshFromBoxWorldTiled(
+      dims.width,
+      t,
+      dims.depth,
+      materials.ceiling,
+      ceilRepeatUArena,
+      ceilRepeatVArena,
+      disposableMats,
+      BUNKER_TEXTURE_CEILING_MAP_ANISOTROPY,
+    )
+    ceil.position.set(cx, dims.height + t / 2, cz)
+    g.add(ceil)
+    meshes.push(ceil)
+
+    if (!options.skipNorth) {
+      addEndWallSegments({
+        group: g,
+        meshes,
+        disposableMats,
+        material: combatMat,
+        solidMode: true,
+        width: dims.width,
+        height: dims.height,
+        centerX: cx,
+        centerZ: cz + dims.depth / 2 + t / 2,
+        openingWidth: options.northOpeningWidth,
+      })
+    }
+
+    if (!options.skipSouth) {
+      addEndWallSegments({
+        group: g,
+        meshes,
+        disposableMats,
+        material: combatMat,
+        solidMode: true,
+        width: dims.width,
+        height: dims.height,
+        centerX: cx,
+        centerZ: cz - dims.depth / 2 - t / 2,
+        openingWidth: options.southOpeningWidth,
+      })
+    }
+
+    addSideWallSegments({
+      group: g,
+      meshes,
+      disposableMats,
+      material: combatMat,
+      solidMode: true,
+      depth: dims.depth,
+      height: dims.height,
+      centerX: cx + dims.width / 2 + t / 2,
+      centerZ: cz,
+      openingWidth: options.eastOpeningWidth,
+      openingCenterZ: options.eastOpeningCenterZ,
+    })
+
+    addSideWallSegments({
+      group: g,
+      meshes,
+      disposableMats,
+      material: combatMat,
+      solidMode: true,
+      depth: dims.depth,
+      height: dims.height,
+      centerX: cx - dims.width / 2 - t / 2,
+      centerZ: cz,
+      openingWidth: options.westOpeningWidth,
+      openingCenterZ: options.westOpeningCenterZ,
+    })
+
+    return { group: g, meshes, sharedMatteMaterial: combatMat }
+  }
+
+  const wallMat =
+    wallKind === 'foyer'
+      ? materials.wallFoyer
+      : wallKind === 'loot'
+        ? materials.wallLoot
+        : materials.wallDefault
+
+  const floorRepeatU = dims.width * BUNKER_TILE_FLOOR_CYCLES_PER_METER
+  const floorRepeatV = dims.depth * BUNKER_TILE_FLOOR_CYCLES_PER_METER
+
   // Floor + ceiling
-  const floor = new THREE.Mesh(new THREE.BoxGeometry(dims.width, t, dims.depth), material)
+  const floor = meshFromBoxWorldTiled(
+    dims.width,
+    t,
+    dims.depth,
+    materials.floor,
+    floorRepeatU,
+    floorRepeatV,
+    disposableMats,
+  )
   floor.position.set(cx, -t / 2, cz)
   g.add(floor)
   meshes.push(floor)
 
-  const ceil = new THREE.Mesh(new THREE.BoxGeometry(dims.width, t, dims.depth), material)
+  const ceilRepeatU = dims.width * BUNKER_TILE_CEILING_CYCLES_PER_METER
+  const ceilRepeatV = dims.depth * BUNKER_TILE_CEILING_CYCLES_PER_METER
+
+  const ceil = meshFromBoxWorldTiled(
+    dims.width,
+    t,
+    dims.depth,
+    materials.ceiling,
+    ceilRepeatU,
+    ceilRepeatV,
+    disposableMats,
+    BUNKER_TEXTURE_CEILING_MAP_ANISOTROPY,
+  )
   ceil.position.set(cx, dims.height + t / 2, cz)
   g.add(ceil)
   meshes.push(ceil)
@@ -310,7 +593,8 @@ function buildRoom(
     addEndWallSegments({
       group: g,
       meshes,
-      material,
+      disposableMats,
+      material: wallMat,
       width: dims.width,
       height: dims.height,
       centerX: cx,
@@ -323,7 +607,8 @@ function buildRoom(
     addEndWallSegments({
       group: g,
       meshes,
-      material,
+      disposableMats,
+      material: wallMat,
       width: dims.width,
       height: dims.height,
       centerX: cx,
@@ -336,25 +621,31 @@ function buildRoom(
   addSideWallSegments({
     group: g,
     meshes,
-    material,
+    disposableMats,
+    material: wallMat,
     depth: dims.depth,
     height: dims.height,
     centerX: cx + dims.width / 2 + t / 2,
     centerZ: cz,
     openingWidth: options.eastOpeningWidth,
     openingCenterZ: options.eastOpeningCenterZ,
+    openingFlankMaterial: options.matteFlankEastWallOpening,
+    openingFlankSolidMode: Boolean(options.matteFlankEastWallOpening),
   })
 
   addSideWallSegments({
     group: g,
     meshes,
-    material,
+    disposableMats,
+    material: wallMat,
     depth: dims.depth,
     height: dims.height,
     centerX: cx - dims.width / 2 - t / 2,
     centerZ: cz,
     openingWidth: options.westOpeningWidth,
     openingCenterZ: options.westOpeningCenterZ,
+    openingFlankMaterial: options.matteFlankWestWallOpening,
+    openingFlankSolidMode: Boolean(options.matteFlankWestWallOpening),
   })
 
   return { group: g, meshes }
@@ -364,23 +655,38 @@ function buildRoom(
  * Create one solid east/west wall or two split segments around a doorway.
  *
  * @param opts - Wall dimensions, parent, material, and optional opening.
+ * @param opts.solidMode - When true, `material` is a shared matte shell (no per-face texture clones).
  */
 function addSideWallSegments(opts: {
   group: THREE.Group
   meshes: THREE.Mesh[]
-  material: THREE.ShaderMaterial
+  disposableMats: THREE.MeshStandardMaterial[]
+  material: THREE.MeshStandardMaterial
+  solidMode?: boolean
   depth: number
   height: number
   centerX: number
   centerZ: number
   openingWidth?: number
   openingCenterZ?: number
+  /** Replaces `material`/`solidMode` for split segments only (door jambs to arena combat box). */
+  openingFlankMaterial?: THREE.MeshStandardMaterial
+  openingFlankSolidMode?: boolean
 }): void {
   const openingWidth = opts.openingWidth ?? 0
   if (openingWidth <= 0 || opts.openingCenterZ === undefined) {
     addSideWallMesh(opts, opts.depth, opts.centerZ)
     return
   }
+
+  const flankMat = opts.openingFlankMaterial
+  const flankOpts = flankMat
+    ? {
+        ...opts,
+        material: flankMat,
+        solidMode: opts.openingFlankSolidMode ?? false,
+      }
+    : opts
 
   const wallMinZ = opts.centerZ - opts.depth / 2
   const wallMaxZ = opts.centerZ + opts.depth / 2
@@ -389,8 +695,8 @@ function addSideWallSegments(opts: {
   const southDepth = openingMinZ - wallMinZ
   const northDepth = wallMaxZ - openingMaxZ
 
-  if (southDepth > 0) addSideWallMesh(opts, southDepth, wallMinZ + southDepth / 2)
-  if (northDepth > 0) addSideWallMesh(opts, northDepth, openingMaxZ + northDepth / 2)
+  if (southDepth > 0) addSideWallMesh(flankOpts, southDepth, wallMinZ + southDepth / 2)
+  if (northDepth > 0) addSideWallMesh(flankOpts, northDepth, openingMaxZ + northDepth / 2)
 }
 
 /**
@@ -404,14 +710,30 @@ function addSideWallMesh(
   opts: {
     group: THREE.Group
     meshes: THREE.Mesh[]
-    material: THREE.ShaderMaterial
+    disposableMats: THREE.MeshStandardMaterial[]
+    material: THREE.MeshStandardMaterial
+    solidMode?: boolean
     height: number
     centerX: number
   },
   depth: number,
   centerZ: number,
 ): void {
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(WALL_THICKNESS, opts.height, depth), opts.material)
+  let wall: THREE.Mesh
+  if (opts.solidMode) {
+    wall = meshFromSolidInteriorBox(opts.material, WALL_THICKNESS, opts.height, depth)
+  } else {
+    const rw = BUNKER_TILE_WALL_CYCLES_PER_METER
+    wall = meshFromBoxWorldTiled(
+      WALL_THICKNESS,
+      opts.height,
+      depth,
+      opts.material,
+      depth * rw,
+      opts.height * rw,
+      opts.disposableMats,
+    )
+  }
   wall.position.set(opts.centerX, opts.height / 2, centerZ)
   opts.group.add(wall)
   opts.meshes.push(wall)
@@ -425,7 +747,9 @@ function addSideWallMesh(
 function addEndWallSegments(opts: {
   group: THREE.Group
   meshes: THREE.Mesh[]
-  material: THREE.ShaderMaterial
+  disposableMats: THREE.MeshStandardMaterial[]
+  material: THREE.MeshStandardMaterial
+  solidMode?: boolean
   width: number
   height: number
   centerX: number
@@ -456,14 +780,30 @@ function addEndWallMesh(
   opts: {
     group: THREE.Group
     meshes: THREE.Mesh[]
-    material: THREE.ShaderMaterial
+    disposableMats: THREE.MeshStandardMaterial[]
+    material: THREE.MeshStandardMaterial
+    solidMode?: boolean
     height: number
     centerZ: number
   },
   width: number,
   centerX: number,
 ): void {
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(width, opts.height, WALL_THICKNESS), opts.material)
+  let wall: THREE.Mesh
+  if (opts.solidMode) {
+    wall = meshFromSolidInteriorBox(opts.material, width, opts.height, WALL_THICKNESS)
+  } else {
+    const rw = BUNKER_TILE_WALL_CYCLES_PER_METER
+    wall = meshFromBoxWorldTiled(
+      width,
+      opts.height,
+      WALL_THICKNESS,
+      opts.material,
+      width * rw,
+      opts.height * rw,
+      opts.disposableMats,
+    )
+  }
   wall.position.set(centerX, opts.height / 2, opts.centerZ)
   opts.group.add(wall)
   opts.meshes.push(wall)

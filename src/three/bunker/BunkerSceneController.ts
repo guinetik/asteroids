@@ -18,7 +18,10 @@ import {
   type BunkerGeometry,
   type BunkerWalkableBounds,
 } from './BunkerWallBuilder'
-import { createBunkerGridMaterial } from './BunkerGridMaterial'
+import {
+  disposeBunkerTiledInteriorMaterialInstance,
+  type BunkerInteriorMaterialSet,
+} from './BunkerInteriorMaterials'
 import { BunkerDoorController } from './BunkerDoorController'
 import { BunkerVaultDoorController } from './BunkerVaultDoorController'
 import type { BunkerEnemyType } from '@/lib/bunker/bunkerWaveSchedule'
@@ -36,14 +39,17 @@ import { BunkerChestModel } from './BunkerChestModel'
 
 /** Distance for the per-corner arena lights (world units). */
 const CORNER_LIGHT_DISTANCE = 14
-/** Intensity for the per-corner arena lights. */
-const CORNER_LIGHT_INTENSITY = 1.6
+/**
+ * Intensity when using two diagonal corner fills — each approximates two of the legacy
+ * four-corner fills so total arena lift stays similar with fewer point lights in the PBR loop.
+ */
+const CORNER_LIGHT_INTENSITY_DIAGONAL = 3.4
 /** Intensity for the door light (slightly brighter than corners). */
-const DOOR_LIGHT_INTENSITY = 2.2
+const DOOR_LIGHT_INTENSITY = 2.38
 /** Distance for the door point light. Same value as corner lights today; named separately for tuning clarity. */
 const DOOR_LIGHT_DISTANCE = 14
-/** Intensity for the ambient light. */
-const AMBIENT_INTENSITY = 0.25
+/** Intensity for the ambient light — modest fill so corridors read without washing PBR contrast. */
+const AMBIENT_INTENSITY = 0.31
 /** Y position of the four corner point lights. */
 const CORNER_LIGHT_Y = 4
 /** Y position of the door point light. */
@@ -109,7 +115,7 @@ function bunkerEnemyVisualTier(difficulty: number): EnemyVisualTier {
 
 /** Constructor opts for {@link BunkerSceneController}. */
 export interface BunkerSceneControllerOptions {
-  /** Faction tint hex (e.g. `0x66ccff`). Drives grid material + light colors. */
+  /** Faction tint hex (e.g. `0x66ccff`). Drives arena point lights + props. */
   tint: number
   /** Parent THREE scene the bunker root attaches to on `activate`. */
   scene: THREE.Scene
@@ -117,6 +123,11 @@ export interface BunkerSceneControllerOptions {
   projectileSystem?: ProjectileSystem
   /** Mission difficulty in the 1-10 range, used for bunker-only enemy HP scaling. */
   difficulty?: number
+  /**
+   * Packed PBR shell materials for procedural walls (see {@link loadBunkerInteriorMaterials}
+   * or {@link createTestBunkerInteriorMaterialSet} for tests).
+   */
+  interiorMaterials: BunkerInteriorMaterialSet
 }
 
 /** Interior scene wrapper — the level view treats this as a black box. */
@@ -144,7 +155,7 @@ export class BunkerSceneController {
   private readonly enemyHealthMultiplier: number
   private readonly enemyVisualTier: EnemyVisualTier
   private readonly enemyProjectileMeshPool: EnemyProjectileMeshPool
-  private readonly material: THREE.ShaderMaterial
+  private readonly interiorMaterials: BunkerInteriorMaterialSet
   private readonly geometry: BunkerGeometry
   private readonly phageControllers = new Map<number, BacteriophageController>()
   private readonly chimeraControllers = new Map<number, ChimeraWalkerController>()
@@ -167,8 +178,8 @@ export class BunkerSceneController {
     this.enemyVisualTier = bunkerEnemyVisualTier(opts.difficulty ?? BUNKER_MIN_DIFFICULTY)
     this.enemyProjectileMeshPool = new EnemyProjectileMeshPool(opts.scene)
     this.enemyProjectileMeshPool.prewarm()
-    this.material = createBunkerGridMaterial({ tint: opts.tint })
-    this.geometry = buildBunkerGeometry(this.material)
+    this.interiorMaterials = opts.interiorMaterials
+    this.geometry = buildBunkerGeometry(this.interiorMaterials)
     this.hatch = new BunkerVaultDoorController(opts.tint)
     this.door = new BunkerDoorController(opts.tint)
     this.lootDoor = new BunkerDoorController(opts.tint)
@@ -421,7 +432,6 @@ export class BunkerSceneController {
    * @param dt - Delta time in seconds
    */
   tick(dt: number): void {
-    ;(this.material.userData.tick as ((dt: number) => void) | undefined)?.(dt)
     this.hatch.tick(dt)
     this.door.tick(dt)
     this.lootDoor.tick(dt)
@@ -477,7 +487,11 @@ export class BunkerSceneController {
     }
     this.enemyProjectileSystem.dispose()
     this.enemyProjectileMeshPool.disposeAll()
-    this.material.dispose()
+    for (const mat of this.geometry.interiorMeshMaterials) {
+      disposeBunkerTiledInteriorMaterialInstance(mat)
+    }
+    this.geometry.arenaCombatSolidMaterial?.dispose()
+    this.interiorMaterials.dispose()
     for (const mesh of this.geometry.wallMeshes) {
       mesh.geometry.dispose()
     }
@@ -490,9 +504,12 @@ export class BunkerSceneController {
     const ambient = new THREE.AmbientLight(0xffffff, AMBIENT_INTENSITY)
     this.geometry.root.add(ambient)
 
-    const corners = this.geometry.spawnPadCenters
-    for (const c of corners) {
-      const l = new THREE.PointLight(this.tint, CORNER_LIGHT_INTENSITY, CORNER_LIGHT_DISTANCE)
+    // Two diagonals (indices 0 and 3) — halves arena point-light count vs four corners.
+    const cornerPads = this.geometry.spawnPadCenters
+    const diagonalPairs: [number, number] = [0, 3]
+    for (const idx of diagonalPairs) {
+      const c = cornerPads[idx]!
+      const l = new THREE.PointLight(this.tint, CORNER_LIGHT_INTENSITY_DIAGONAL, CORNER_LIGHT_DISTANCE)
       l.position.set(c.x, CORNER_LIGHT_Y, c.z)
       this.geometry.root.add(l)
     }

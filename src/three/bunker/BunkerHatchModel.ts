@@ -11,6 +11,7 @@
  */
 import * as THREE from 'three'
 import { LANDER_COLLISION_TOP_OFFSET } from '@/three/landerDimensions'
+import { applyBunkerMeshStandardSpecularSoften } from '@/three/bunker/bunkerMeshStandardSpecularSoften'
 import type { WorldCollider } from '@/lib/physics/worldCollision'
 
 /** Radius of the chunky metal pipe entrance in world units. */
@@ -63,16 +64,22 @@ const HATCH_PIPE_TEXTURE_REPEAT_Y = 4
 const HATCH_PIPE_DISPLACEMENT_SCALE = 0.08
 /** Dark panel color used by the door. */
 const HATCH_DOOR_COLOR = 0x121821
-/** Metalness for the pipe body. */
-const HATCH_PIPE_METALNESS = 0.05
-/** Roughness for the pipe body. */
-const HATCH_PIPE_ROUGHNESS = 0.72
+/** Metalness for the pipe body (uniform; map modulates additionally). */
+const HATCH_PIPE_METALNESS = 0.035
+/** Roughness for the pipe body (uniform; map modulates additionally). */
+const HATCH_PIPE_ROUGHNESS = 0.9
 /** Environment reflection multiplier for the pipe body. */
-const HATCH_PIPE_ENV_MAP_INTENSITY = 0.35
-/** Metalness for the side door. */
-const HATCH_DOOR_METALNESS = 0.45
+const HATCH_PIPE_ENV_MAP_INTENSITY = 0.14
+/** Metalness for the side door — no roughness map, so scalars do the work. */
+const HATCH_DOOR_METALNESS = 0.2
 /** Roughness for the side door. */
-const HATCH_DOOR_ROUGHNESS = 0.55
+const HATCH_DOOR_ROUGHNESS = 0.82
+/** Low env response — door is tinted emissive, not a chrome plate. */
+const HATCH_DOOR_ENV_MAP_INTENSITY = 0.12
+/** Mix toward matte after hatch pipe roughness map (see {@link applyBunkerMeshStandardSpecularSoften}). */
+const HATCH_PIPE_SHADER_ROUGH_MIX = 0.36
+/** Scales hatch pipe metallic response after metalness map. */
+const HATCH_PIPE_SHADER_METAL_SCALE = 0.68
 /** Door emissive intensity while idle. */
 const HATCH_DOOR_IDLE_EMISSIVE = 0.08
 /** Door emissive pulse center while interactable. */
@@ -168,6 +175,10 @@ export class BunkerHatchModel {
       envMapIntensity: HATCH_PIPE_ENV_MAP_INTENSITY,
       side: THREE.DoubleSide,
     })
+    applyBunkerMeshStandardSpecularSoften(this.bodyMat, {
+      roughnessMixTowardMatte: HATCH_PIPE_SHADER_ROUGH_MIX,
+      metalnessResponseScale: HATCH_PIPE_SHADER_METAL_SCALE,
+    })
     const bodyGeo = new THREE.CylinderGeometry(
       HATCH_PIPE_RADIUS,
       HATCH_PIPE_RADIUS,
@@ -192,6 +203,7 @@ export class BunkerHatchModel {
       emissiveIntensity: HATCH_DOOR_IDLE_EMISSIVE,
       metalness: HATCH_DOOR_METALNESS,
       roughness: HATCH_DOOR_ROUGHNESS,
+      envMapIntensity: HATCH_DOOR_ENV_MAP_INTENSITY,
     })
     const doorGeo = new THREE.BoxGeometry(HATCH_DOOR_WIDTH, HATCH_DOOR_HEIGHT, HATCH_DOOR_DEPTH)
     this.door = new THREE.Mesh(doorGeo, this.doorMat)

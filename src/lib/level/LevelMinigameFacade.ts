@@ -258,7 +258,7 @@ export class LevelMinigameFacade {
         bindings.onInstallCombatDropObserver?.(minigame)
         this.add(minigame)
       } else if (objective.type === 'bunker') {
-        const minigame = BunkerMinigame.create({
+        const minigame = await BunkerMinigame.create({
           objectiveIndex: i,
           objective,
           missionId: mission.id,

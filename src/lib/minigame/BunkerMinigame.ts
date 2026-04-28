@@ -21,6 +21,7 @@ import type {
 } from './MiniGame'
 import type { ConcreteObjective } from '@/lib/missions/types'
 import { BunkerSceneController } from '@/three/bunker/BunkerSceneController'
+import { loadBunkerInteriorMaterials } from '@/three/bunker/BunkerInteriorMaterials'
 import type { BunkerHatchModel } from '@/three/bunker/BunkerHatchModel'
 import type { EnemyHandle } from '@/lib/fps/enemyDirector'
 import { BunkerSceneState, type BunkerSubState } from '@/lib/bunker/bunkerSceneState'
@@ -149,14 +150,19 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
   /**
    * Build a minigame with a real scene controller. Used by `LevelMinigameFacade`.
    *
+   * Awaits async load of bunker interior PBR textures (see `bun run textures:build`).
+   *
    * @param params - Scene + objective metadata
+   * @returns Resolved minigame after {@link BunkerSceneController} construction.
    */
-  static create(params: BunkerMinigameCreateOptions): BunkerMinigame {
+  static async create(params: BunkerMinigameCreateOptions): Promise<BunkerMinigame> {
+    const interiorMaterials = await loadBunkerInteriorMaterials()
     const scene = new BunkerSceneController({
       tint: params.factionTint,
       scene: params.threeScene,
       projectileSystem: params.projectileSystem,
       difficulty: params.difficulty,
+      interiorMaterials,
     })
     return new BunkerMinigame(
       params.objectiveIndex,

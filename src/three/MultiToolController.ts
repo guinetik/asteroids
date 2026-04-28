@@ -169,6 +169,13 @@ export class MultiToolController implements Tickable {
   }
 
   /**
+   * Whether the GLB is currently shown (true while player is in EVA or bunker interior).
+   */
+  getVisible(): boolean {
+    return this.model?.visible ?? false
+  }
+
+  /**
    * Feed current player state for movement bob and holster tilt.
    *
    * @param speed - Player's XZ speed magnitude

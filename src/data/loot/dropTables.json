@@ -1,0 +1,39 @@
+{
+  "version": "2026-04-28",
+  "tables": {
+    "bacteriophage": {
+      "baseChance": 0.35,
+      "difficultyMultiplier": 0.08,
+      "biasedDrops": {
+        "health": 0.15,
+        "oxygen": 0.25,
+        "rtg": 0.20,
+        "psychosphere": 0.40
+      }
+    },
+    "spire": {
+      "baseChance": 0.40,
+      "difficultyMultiplier": 0.10,
+      "biasedDrops": {
+        "health": 0.10,
+        "oxygen": 0.45,
+        "rtg": 0.20,
+        "psychosphere": 0.25
+      }
+    },
+    "chimera": {
+      "baseChance": 0.45,
+      "difficultyMultiplier": 0.12,
+      "biasedDrops": {
+        "health": 0.50,
+        "oxygen": 0.15,
+        "rtg": 0.15,
+        "psychosphere": 0.20
+      }
+    }
+  },
+  "globalSettings": {
+    "maxDropsPerKill": 1,
+    "minDifficultyForBonus": 4
+  }
+}

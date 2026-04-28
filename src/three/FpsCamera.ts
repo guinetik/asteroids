@@ -35,13 +35,15 @@ const TERRAIN_TILT_LERP_SPEED = 4
 /** Helmet light to keep the immediate look direction readable in EVA. */
 const HELMET_LIGHT_COLOR = 0xf4f7ff
 /**
- * With ACES tone mapping enabled on the renderer, raw radiance no
- * longer clips to white — the filmic curve compresses highlights so
- * we can run the beam hot without the pure-white blowout the old
- * 180/decay-1.1 setup produced. 130 reads as a clear, punchy lantern
- * cone after the filmic rolloff while keeping near-ground detail.
+ * Peak radiance for the tactical spotlight. The v4 value (130) still
+ * drove a harsh, tight specular core on glossy PBR (lander foil, hatch
+ * metal, bunker floors) — the BRDF concentrates energy when roughness map
+ * samples go dark. This v5 tier keeps the lantern readable without that
+ * "burning hotspot" everywhere EVA lights hit geometry.
+ *
+ * @spec docs/superpowers/specs/2026-04-18-fps-perf-fixes-design.md (v5 helmet soften)
  */
-const HELMET_LIGHT_INTENSITY = 130
+const HELMET_LIGHT_INTENSITY = 72
 /**
  * Halved from 240 in the v4 perf pass. The previous range lit fragments
  * up to 240 units away — well past the player's typical interaction
@@ -51,15 +53,18 @@ const HELMET_LIGHT_INTENSITY = 130
  * @spec docs/superpowers/specs/2026-04-18-fps-perf-fixes-design.md (v4)
  */
 const HELMET_LIGHT_DISTANCE = 120
-/** Widened from π*0.16 (~29°) → π*0.22 (~40°) so peripheral rocks aren't black. */
-const HELMET_LIGHT_ANGLE = Math.PI * 0.22
 /**
- * Tightened from 0.9 → 0.55. With 0.9 only a tiny inner pinhole was
- * at full brightness and most of the visible cone sat in the soft
- * fade band, which is why rocks "right in front of you" still looked
- * dark. 0.55 gives a solid hotspot with a soft outer feather.
+ * Lantern half-angle (~50° vs v4 ~40°). Wider cone so illumination reads
+ * as area fill on props and verticals, not a single bright disc.
+ *
+ * @spec docs/superpowers/specs/2026-04-18-fps-perf-fixes-design.md (v5 helmet soften)
  */
-const HELMET_LIGHT_PENUMBRA = 0.55
+const HELMET_LIGHT_ANGLE = Math.PI * 0.28
+/**
+ * Softer cone edge than v4 (0.55) — less of a hard inner "pinhole" on
+ * nearby surfaces when combined with the lower {@link HELMET_LIGHT_INTENSITY}.
+ */
+const HELMET_LIGHT_PENUMBRA = 0.78
 /**
  * Closer to physical (2.0) now that tone mapping handles the dynamic
  * range — a steeper falloff stops the beam from saturating geometry
@@ -102,8 +107,12 @@ const HELMET_LIGHT_CONE_VISIBLE = false
  * meters in front of you stays readable.
  */
 const HELMET_FILL_COLOR = 0xc8d6ff
-const HELMET_FILL_INTENSITY = 6
-const HELMET_FILL_DISTANCE = 10
+/**
+ * Short-range fill bumped with v5 spotlight soften so mid-distance EVA
+ * reads even when the spot peak was reduced.
+ */
+const HELMET_FILL_INTENSITY = 9
+const HELMET_FILL_DISTANCE = 12
 const HELMET_FILL_DECAY = 1.6
 const HELMET_FILL_X_OFFSET = 0.32
 const HELMET_FILL_Y_OFFSET = -0.58

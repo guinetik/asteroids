@@ -32,6 +32,8 @@ import {
 } from '@/three/landerDimensions'
 import * as THREE from 'three' // already imported above, but ensure for Color
 
+import { applyBunkerMeshStandardSpecularSoften } from '@/three/bunker/bunkerMeshStandardSpecularSoften'
+
 const LANDER_MODEL_PATH = '/models/lander.glb'
 
 /** Lander model scale — adjust to match game units */
@@ -127,11 +129,20 @@ const TOP_BEACON_WARN_COLOR = 0xeab308
 const TOP_BEACON_DANGER_COLOR = 0xef4444
 
 /** Minimum hull roughness so the GLB panels don't blow out under helmet/flood lights. */
-const LANDER_MATERIAL_MIN_ROUGHNESS = 0.52
+const LANDER_MATERIAL_MIN_ROUGHNESS = 0.78
 /** Lander-local environment reflection strength; lower than scene default for matte hardware. */
-const LANDER_ENV_MAP_INTENSITY = 0.38
+const LANDER_ENV_MAP_INTENSITY = 0.18
 /** Upper metalness bound for the lander hull to avoid chrome-like crash highlights. */
-const LANDER_MAX_METALNESS = 0.22
+const LANDER_MAX_METALNESS = 0.12
+/**
+ * After packed roughness-map sampling, mix toward fully rough — foil textures still have
+ * glossy texels that multiply into the standard BRDF despite {@link LANDER_MATERIAL_MIN_ROUGHNESS}.
+ */
+const LANDER_PACKED_PBR_ROUGHNESS_MIX = 0.64
+/**
+ * After metalness-map sampling on the GLB hull — shrinks mirror-like response from metal channels.
+ */
+const LANDER_PACKED_PBR_METALNESS_SCALE = 0.4
 /** Max idle nozzle sprite opacity. */
 const NOZZLE_IDLE_OPACITY = 0.26
 /** Extra opacity added by idle nozzle pulse. */
@@ -1474,17 +1485,10 @@ export class LanderController implements Tickable {
       if (!(child instanceof THREE.Mesh)) return
       child.castShadow = true
       child.receiveShadow = true
-      const materials = Array.isArray(child.material) ? child.material : [child.material]
-      for (const material of materials) {
-        if (!(material instanceof THREE.MeshStandardMaterial)) continue
-        material.roughness = Math.max(material.roughness, LANDER_MATERIAL_MIN_ROUGHNESS)
-        material.metalness = Math.min(material.metalness, LANDER_MAX_METALNESS)
-        material.envMapIntensity = LANDER_ENV_MAP_INTENSITY
-        material.needsUpdate = true
-      }
     })
 
-    // Clone materials for per-instance heal feedback pulse (green emissive, matches HostageModel)
+    // Clone materials for per-instance heal feedback pulse (green emissive, matches HostageModel).
+    // Tuned + softened hull lives on clones only — the GLB originals are superseded below.
     this.feedbackMaterials.length = 0
     scene.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return
@@ -1493,6 +1497,14 @@ export class LanderController implements Tickable {
       for (const m of originalMats) {
         if (m instanceof THREE.MeshStandardMaterial) {
           const cloned = m.clone()
+          cloned.roughness = Math.max(cloned.roughness, LANDER_MATERIAL_MIN_ROUGHNESS)
+          cloned.metalness = Math.min(cloned.metalness, LANDER_MAX_METALNESS)
+          cloned.envMapIntensity = LANDER_ENV_MAP_INTENSITY
+          applyBunkerMeshStandardSpecularSoften(cloned, {
+            roughnessMixTowardMatte: LANDER_PACKED_PBR_ROUGHNESS_MIX,
+            metalnessResponseScale: LANDER_PACKED_PBR_METALNESS_SCALE,
+          })
+          cloned.needsUpdate = true
           clonedMats.push(cloned)
           this.feedbackMaterials.push(cloned)
         } else {
