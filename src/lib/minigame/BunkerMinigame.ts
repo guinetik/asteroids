@@ -21,6 +21,7 @@ import type {
 } from './MiniGame'
 import type { ConcreteObjective } from '@/lib/missions/types'
 import { BunkerSceneController } from '@/three/bunker/BunkerSceneController'
+import type { EnemyHandle } from '@/lib/fps/enemyDirector'
 import { BunkerSceneState, type BunkerSubState } from '@/lib/bunker/bunkerSceneState'
 import {
   difficultyToTier,
@@ -245,6 +246,19 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
   /** @inheritdoc */
   dispose(): void {
     this.scene?.dispose()
+  }
+
+  /**
+   * Register a listener fired for every enemy spawned by the bunker director.
+   * Delegates to {@link BunkerSceneController.installEnemySpawnObserver} so the
+   * level-side loot drop pipeline can attach death listeners to bunker mobs the
+   * same way it does for rescue and exterminate minigames.
+   *
+   * @param listener - Fired with the enemy handle on every spawn
+   * @returns Unsubscribe function (no-op when the minigame has no scene, e.g. tests)
+   */
+  installEnemySpawnObserver(listener: (handle: EnemyHandle) => void): () => void {
+    return this.scene?.installEnemySpawnObserver(listener) ?? (() => {})
   }
 
   // ----------------- Step driving (called by LevelView) -----------------

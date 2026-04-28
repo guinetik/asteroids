@@ -21,11 +21,32 @@ import {
 } from '@/lib/minigame/PhotometryMinigame'
 import { ExterminateMinigame } from '@/lib/minigame/ExterminateMinigame'
 import { RescueMinigame } from '@/lib/minigame/RescueMinigame'
+import { BunkerMinigame } from '@/lib/minigame/BunkerMinigame'
 import { CollectMinigame } from '@/lib/minigame/CollectMinigame'
 import { GatherMinigame } from '@/lib/minigame/GatherMinigame'
 import type { Tickable } from '@/lib/Tickable'
 import type { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
 import type { Object3D, Scene } from 'three'
+
+/** Faction tints used by bunker missions. Falls back to white for unknown givers. */
+const BUNKER_FACTION_TINTS: Record<string, number> = {
+  cinderline: 0xff5a1a,
+  'lucas-maverick': 0x22d3a8,
+  'martian-marines-bunker': 0x7afca7,
+  'jovian-society': 0x5cc8ff,
+}
+
+/**
+ * Resolve a faction tint hex from a giver id. Returns white for unknown
+ * givers, which keeps the bunker visually intact even if a future mission
+ * arrives without a tint registered.
+ *
+ * @param giverId - Giver id from the active mission
+ */
+function tintForGiver(giverId: string | undefined): number {
+  if (!giverId) return 0xffffff
+  return BUNKER_FACTION_TINTS[giverId] ?? 0xffffff
+}
 
 /**
  * Flat world position snapshot passed into the minigame facade each frame.
@@ -107,7 +128,7 @@ export interface LevelMinigameBindings {
   /** Instantly kill the player using controller-owned presentation. */
   onKillPlayer: (() => void) | null
   /** Blow up / fail the lander run from a combat minigame. */
-  onDestroyLander: ((cause: 'exterminate' | 'rescue') => void) | null
+  onDestroyLander: ((cause: 'exterminate' | 'rescue' | 'bunker') => void) | null
   /** Shared objective explosion presentation hook. */
   onExplosion: ((kind: 'exterminate' | 'rescue', x: number, y: number, z: number) => void) | null
   /** Rescue-specific fail overlay hook. */
@@ -117,7 +138,9 @@ export interface LevelMinigameBindings {
   /** Fired by RescueMinigame when a recruited walker boards the lander. */
   onSurvivorAboard: ((aboardCount: number) => void) | null
   /** Install the combat loot/drop observer on a newly created combat minigame. */
-  onInstallCombatDropObserver: ((minigame: ExterminateMinigame | RescueMinigame) => void) | null
+  onInstallCombatDropObserver:
+    | ((minigame: ExterminateMinigame | RescueMinigame | BunkerMinigame) => void)
+    | null
   /** Register static objective prop colliders after minigames create their scene props. */
   onRegisterObjectiveColliders: ((colliders: readonly WorldCollider[]) => void) | null
 }
@@ -249,6 +272,22 @@ export class LevelMinigameFacade {
         minigame.onFail = bindings.onRescueFail
         minigame.onSurvivorLost = bindings.onSurvivorLost
         minigame.onSurvivorAboard = bindings.onSurvivorAboard
+        bindings.onInstallCombatDropObserver?.(minigame)
+        this.add(minigame)
+      } else if (objective.type === 'bunker') {
+        const minigame = BunkerMinigame.create({
+          objectiveIndex: i,
+          objective,
+          missionId: mission.id,
+          factionTint: tintForGiver(mission.giverId),
+          threeScene: scene,
+          difficulty: mission.difficulty,
+        })
+        this.applySharedBindings(minigame, bindings)
+        minigame.onDamagePlayer = bindings.onDamagePlayer
+        minigame.onKillPlayer = bindings.onKillPlayer
+        minigame.onDestroyLander = () => bindings.onDestroyLander?.('bunker')
+        minigame.onFail = bindings.onRescueFail // reuse rescue's fail pipeline
         bindings.onInstallCombatDropObserver?.(minigame)
         this.add(minigame)
       } else if (objective.type === 'collect') {
