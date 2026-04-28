@@ -46,7 +46,7 @@ import {
 import type { LanderTelemetry } from '@/lib/ui/landerHudTypes'
 import type { FpsTelemetry, RockTargetInfo } from '@/lib/ui/fpsHudTypes'
 import { ProjectileSystem } from '@/lib/fps/projectileSystem'
-import type { ProjectileImpactContext } from '@/lib/fps/projectileSystem'
+import { SCIENCE_ENEMY_HEAL_AMOUNT, type ProjectileImpactContext } from '@/lib/fps/projectileSystem'
 import type { EnemyHandle } from '@/lib/fps/enemyDirector'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
 import {
@@ -852,12 +852,15 @@ export class LevelViewController implements Tickable {
       }
       this.maybePlayShortSurfaceSizzle(context, pos)
     }
-    this.projectileSystem.onEnemyHit = (enemy, pos) => {
+    this.projectileSystem.onEnemyHit = (enemy, pos, boltKind, firstScienceHit) => {
       // Fan the hit out to whichever minigame owns this enemy so the matching
       // visual controller plays its hit-flash. Mirrors the bookkeeping in
       // `FpsViewController` where a single `onEnemyHit` callback dispatches
       // to all controller maps.
       this.minigames.notifyEnemyHit(enemy)
+      if (boltKind === 'science' && firstScienceHit) {
+        this.playerController?.heal(SCIENCE_ENEMY_HEAL_AMOUNT)
+      }
       // Impact spark burst at the contact point — same magnitude as FpsView.
       for (let i = 0; i < 12; i++) {
         this._impactVel.copy(this._impactUp).multiplyScalar(8)

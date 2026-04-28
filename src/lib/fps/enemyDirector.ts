@@ -90,7 +90,7 @@ const ENEMY_SEPARATION_COINCIDENT_ANGLE_STEP = 2.399963229728653
 function applyMovementWithSeparation(handles: readonly EnemyHandle[], dt: number): void {
   const alive: EnemyHandle[] = []
   for (const h of handles) {
-    if (h.enemy.alive) alive.push(h)
+    if (h.enemy.alive && !h.enemy.frozen) alive.push(h)
   }
   const n = alive.length
   if (n === 0) return
@@ -255,10 +255,17 @@ export class EnemyDirector implements Tickable {
    * @param x - World X position
    * @param y - World Y position
    * @param z - World Z position
+   * @param configOverrides - Optional per-spawn config overrides, e.g. bunker-only HP scaling.
    * @returns Handle for the spawned enemy
    */
-  spawn(type: string, x: number, y: number, z: number): EnemyHandle {
-    const config = getEnemyTypeConfig(type)
+  spawn(
+    type: string,
+    x: number,
+    y: number,
+    z: number,
+    configOverrides: Partial<EnemyTypeConfig> = {},
+  ): EnemyHandle {
+    const config = { ...getEnemyTypeConfig(type), ...configOverrides }
 
     const enemy = new Enemy({ maxHp: config.maxHp, hitRadius: config.hitRadius })
     enemy.position.set(x, y, z)
@@ -386,6 +393,11 @@ export class EnemyDirector implements Tickable {
   tick(dt: number): void {
     for (const handle of this.handles) {
       if (!handle.enemy.alive) continue
+      handle.enemy.tickStatus(dt)
+      if (handle.enemy.frozen) {
+        handle.lastOutput = INITIAL_BEHAVIOR_OUTPUT
+        continue
+      }
 
       const target = this.ensureAssignment(handle)
       this.chaseSiteScratch.length = 0
@@ -414,6 +426,7 @@ export class EnemyDirector implements Tickable {
 
     for (const handle of this.handles) {
       if (!handle.enemy.alive) continue
+      if (handle.enemy.frozen) continue
 
       // Contact damage — player first, then nearest alive hostage
       handle.contactCooldown = Math.max(0, handle.contactCooldown - dt)

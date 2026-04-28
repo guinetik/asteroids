@@ -215,4 +215,33 @@ describe('EnemyDirector', () => {
     director.tick(0.016)
     expect(onContact).not.toHaveBeenCalled()
   })
+
+  it('should skip movement and contact damage while an enemy is frozen', () => {
+    const onContact = vi.fn()
+    const handle = director.spawn('bacteriophage', 0, 0, 0)
+
+    director.onContactDamage = onContact
+    director.setPlayerPosition(20, 0, 0)
+    expect(handle.enemy.applyFirstScienceHit(2)).toBe(true)
+
+    director.tick(1)
+
+    expect(handle.enemy.position.x).toBe(0)
+    expect(handle.enemy.frozen).toBe(true)
+
+    director.setPlayerPosition(0, 0, 0)
+    director.tick(0.5)
+    expect(onContact).not.toHaveBeenCalled()
+
+    director.tick(0.6)
+    expect(handle.enemy.frozen).toBe(false)
+    expect(onContact).toHaveBeenCalledWith(handle, 15)
+  })
+
+  it('should only accept the first science hit per enemy', () => {
+    const handle = director.spawn('bacteriophage', 0, 0, 0)
+
+    expect(handle.enemy.applyFirstScienceHit(2)).toBe(true)
+    expect(handle.enemy.applyFirstScienceHit(2)).toBe(false)
+  })
 })

@@ -39,6 +39,12 @@ const BOLT_DAMAGE = 25
 /** HP restored when a science bolt hits a hostage (initial behavior). */
 const HEAL_BOLT_AMOUNT = 25
 
+/** HP restored when a science bolt triggers its first enemy hit reward. */
+export const SCIENCE_ENEMY_HEAL_AMOUNT = 10
+
+/** Seconds an enemy is frozen after its first science-bolt hit. */
+export const SCIENCE_ENEMY_FREEZE_SECONDS = 2
+
 /**
  * What surface or body a bolt struck when {@link ProjectileSystem.onImpact} runs.
  * Used for VFX and contact SFX; drill mining uses {@link ProjectileSystem.onRockHit} in addition
@@ -179,7 +185,14 @@ export class ProjectileSystem implements Tickable {
    * @param position - **Transient** impact point. Mutated on the next callback;
    *   copy if you need to keep it past the synchronous handler body.
    */
-  onEnemyHit: ((enemy: Enemy, position: THREE.Vector3) => void) | null = null
+  onEnemyHit:
+    | ((
+        enemy: Enemy,
+        position: THREE.Vector3,
+        boltKind: MultiToolMode,
+        firstScienceHit: boolean,
+      ) => void)
+    | null = null
 
   /**
    * Called when a player bolt hits a hostage — damage (weapon/drill) or heal (science).
@@ -438,8 +451,9 @@ export class ProjectileSystem implements Tickable {
       const pos = p.mesh.position
 
       // Science bolts: contextual Prey-style puzzle resolver with prioritized targets.
-      // Order: hostages (heal), satellite POI repair (before shuttle hull — otherwise the
-      // huge-scale shuttle AABB eats shots toward the satellite), lander, survey, rocks.
+      // Order: hostages (heal), enemies (one-time status), satellite POI repair (before
+      // shuttle hull — otherwise the huge-scale shuttle AABB eats shots toward the
+      // satellite), lander, survey, rocks.
       let hitEnemy = false
       let hitHostage = false
       let hitRock = false
@@ -455,6 +469,17 @@ export class ProjectileSystem implements Tickable {
           this.onHostageBolt?.(hostageHit.hostage, this._callbackPos, 'heal')
           hitHostage = true
         } else {
+          const scienceEnemyHit = this.closestEnemyHit(this._prevPos, pos)
+          if (scienceEnemyHit) {
+            const firstScienceHit = scienceEnemyHit.enemy.applyFirstScienceHit(
+              SCIENCE_ENEMY_FREEZE_SECONDS,
+            )
+            this._callbackPos.copy(pos)
+            this.onEnemyHit?.(scienceEnemyHit.enemy, this._callbackPos, p.boltKind, firstScienceHit)
+            hitEnemy = true
+          }
+        }
+        if (!hitEnemy && !hitHostage) {
           let landerHit = false
           if (
             this.evaSatelliteServicingScience?.tryScienceRepairSegment(
@@ -471,13 +496,7 @@ export class ProjectileSystem implements Tickable {
               const aabb = healTgt.getHullAabb()
               if (
                 aabb &&
-                segmentIntersectsAabb3(
-                  this._prevPos,
-                  pos,
-                  aabb.min,
-                  aabb.max,
-                  this._callbackPos,
-                )
+                segmentIntersectsAabb3(this._prevPos, pos, aabb.min, aabb.max, this._callbackPos)
               ) {
                 healTgt.onHealFromBolt(HEAL_BOLT_AMOUNT)
                 hitMapShuttleHull = true
@@ -518,7 +537,7 @@ export class ProjectileSystem implements Tickable {
         if (combatHit?.kind === 'enemy') {
           combatHit.enemy.takeDamage(BOLT_DAMAGE * this.damageMultiplier)
           this._callbackPos.copy(pos)
-          this.onEnemyHit?.(combatHit.enemy, this._callbackPos)
+          this.onEnemyHit?.(combatHit.enemy, this._callbackPos, p.boltKind, false)
           hitEnemy = true
         } else if (combatHit?.kind === 'hostage') {
           combatHit.hostage.takeDamage(BOLT_DAMAGE * this.damageMultiplier)
@@ -727,6 +746,34 @@ export class ProjectileSystem implements Tickable {
       )
       if (t !== null && (best === null || t < best.t)) {
         best = { hostage, t }
+      }
+    }
+    return best
+  }
+
+  /**
+   * Closest enemy along the segment for a science bolt status effect.
+   *
+   * @param from - Segment start (previous projectile position).
+   * @param to - Segment end (current projectile position).
+   */
+  private closestEnemyHit(
+    from: THREE.Vector3,
+    to: THREE.Vector3,
+  ): { enemy: Enemy; t: number } | null {
+    let best: { enemy: Enemy; t: number } | null = null
+    for (const enemy of this.enemies) {
+      if (!enemy.alive) continue
+      const t = this.segmentEnterSphereT(
+        from,
+        to,
+        enemy.position.x,
+        enemy.position.y,
+        enemy.position.z,
+        enemy.hitRadius,
+      )
+      if (t !== null && (best === null || t < best.t)) {
+        best = { enemy, t }
       }
     }
     return best

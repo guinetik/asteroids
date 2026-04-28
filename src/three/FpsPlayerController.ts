@@ -376,6 +376,16 @@ export class FpsPlayerController implements Tickable {
     }
   }
 
+  /**
+   * Restore a bounded amount of player health without refilling suit resources.
+   *
+   * @param amount - HP to add, clamped to {@link maxHp}.
+   */
+  heal(amount: number): void {
+    if (this._dead) return
+    this._hp = Math.min(this.maxHp, this._hp + amount)
+  }
+
   /** Restore O2, stamina, and health (e.g. returning to lander). */
   replenish(): void {
     this.thrusterSystem.refuel()

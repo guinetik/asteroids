@@ -36,6 +36,10 @@ export class Enemy {
   readonly maxHp: number
   /** Collision radius for projectile hit checks. */
   readonly hitRadius: number
+  /** Seconds remaining on the science-bolt freeze effect. */
+  private freezeRemainingSeconds = 0
+  /** Whether this enemy has already granted its once-per-life science reward. */
+  private scienceRewardClaimed = false
 
   /**
    * Primary death hook — typically used by the controller that owns this
@@ -57,6 +61,33 @@ export class Enemy {
   /** Whether the enemy is still alive. */
   get alive(): boolean {
     return this.hp > 0
+  }
+
+  /** Whether movement, attacks, and contact damage are currently disabled. */
+  get frozen(): boolean {
+    return this.freezeRemainingSeconds > 0
+  }
+
+  /**
+   * Advance transient enemy status effects.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  tickStatus(dt: number): void {
+    this.freezeRemainingSeconds = Math.max(0, this.freezeRemainingSeconds - dt)
+  }
+
+  /**
+   * Apply the one-time science-bolt reward and freeze to this enemy.
+   *
+   * @param freezeSeconds - Duration for the enemy freeze, in seconds.
+   * @returns True only the first time a science projectile ever affects this enemy.
+   */
+  applyFirstScienceHit(freezeSeconds: number): boolean {
+    if (this.scienceRewardClaimed || !this.alive) return false
+    this.scienceRewardClaimed = true
+    this.freezeRemainingSeconds = Math.max(this.freezeRemainingSeconds, freezeSeconds)
+    return true
   }
 
   /**

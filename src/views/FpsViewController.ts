@@ -29,7 +29,7 @@ import { AmbientLight, DirectionalLight, Color, Vector3 } from 'three'
 import { Heightmap } from '@/lib/terrain/heightmap'
 import { MultiToolController } from '@/three/MultiToolController'
 import { MultiToolState } from '@/lib/fps/multiToolState'
-import { ProjectileSystem } from '@/lib/fps/projectileSystem'
+import { ProjectileSystem, SCIENCE_ENEMY_HEAL_AMOUNT } from '@/lib/fps/projectileSystem'
 import { ParticleEmitter } from '@/three/ParticleEmitter'
 import { TargetDummyController } from '@/three/TargetDummyController'
 import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
@@ -307,9 +307,12 @@ export class FpsViewController implements Tickable {
     }
 
     // Enemy hit → flash + particles
-    this.projectileSystem.onEnemyHit = (enemy, pos) => {
+    this.projectileSystem.onEnemyHit = (enemy, pos, boltKind, firstScienceHit) => {
       const dummy = this.targetDummies.find((d) => d.enemy === enemy)
       dummy?.flash()
+      if (boltKind === 'science' && firstScienceHit) {
+        this.playerController?.heal(SCIENCE_ENEMY_HEAL_AMOUNT)
+      }
       for (let i = 0; i < 12; i++) {
         this._impactVel.copy(this._impactUp).multiplyScalar(8)
         this.impactEmitter!.emit(pos, this._impactVel)
@@ -439,8 +442,8 @@ export class FpsViewController implements Tickable {
 
       // Enemy hit → flash + particles (extend existing onEnemyHit)
       const existingOnEnemyHit = this.projectileSystem!.onEnemyHit
-      this.projectileSystem!.onEnemyHit = (enemy, pos) => {
-        existingOnEnemyHit?.call(this.projectileSystem, enemy, pos)
+      this.projectileSystem!.onEnemyHit = (enemy, pos, boltKind, firstScienceHit) => {
+        existingOnEnemyHit?.call(this.projectileSystem, enemy, pos, boltKind, firstScienceHit)
         // Find matching controller and flash it
         for (const [, ctrl] of this.enemyControllers) {
           if (ctrl.enemy === enemy) {
