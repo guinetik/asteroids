@@ -100,6 +100,7 @@ import { LevelCombatMiningFacade } from '@/lib/level/LevelCombatMiningFacade'
 import { RocketSurveyFacade } from '@/lib/level/RocketSurveyFacade'
 import { GatherMinigame } from '@/lib/minigame/GatherMinigame'
 import { RescueMinigame } from '@/lib/minigame/RescueMinigame'
+import { BunkerMinigame } from '@/lib/minigame/BunkerMinigame'
 import { LevelPersistenceFacade } from '@/lib/level/LevelPersistenceFacade'
 import { LevelMinigameFacade } from '@/lib/level/LevelMinigameFacade'
 import { LevelStateLifecycleFacade } from '@/lib/level/LevelStateLifecycleFacade'
@@ -128,6 +129,10 @@ const LEVEL_COLLISION_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.collision
 const LEVEL_LOOT_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.loot
 const LANDER_LOCAL_FORWARD = new THREE.Vector3(-1, 0, 0)
 const LANDER_LOCAL_UP = new THREE.Vector3(0, 1, 0)
+/** Seconds to fade to black before performing a bunker scene swap. */
+const BUNKER_SWAP_FADE_OUT_SECONDS = 0.5
+/** Seconds to fade back from black after the swap. */
+const BUNKER_SWAP_FADE_IN_SECONDS = 0.5
 
 /**
  * Boot / preload status emitted to {@link LevelView} while the level scene
@@ -173,6 +178,18 @@ export class LevelViewController implements Tickable {
    * is the prop the player walks up to and presses E on (descent).
    */
   private surfaceBunkerHatch: BunkerHatchModel | null = null
+  /**
+   * World-space position of the surface bunker hatch (set when the hatch is
+   * spawned). The player is teleported back to this point when extracting
+   * from the bunker so they exit right next to the surface prop.
+   */
+  private readonly surfaceHatchWorldPos = new THREE.Vector3()
+  /**
+   * Snapshot of the player's surface position taken on bunker descent. Used
+   * to restore the player when they extract back to the asteroid; falls back
+   * to {@link surfaceHatchWorldPos} when null.
+   */
+  private surfacePlayerSnapshot: THREE.Vector3 | null = null
   private prospectOverlay: ProspectOverlayController | null = null
   private enemyVisualWarmup: EnemyVisualWarmup | null = null
   private readonly collision = new LevelCollisionFacade()
@@ -339,6 +356,20 @@ export class LevelViewController implements Tickable {
 
   // ── Elapsed time (seconds) ──────────────────────────────────
   private elapsed = 0
+
+  /**
+   * Active bunker swap fade animator. Non-null while a descent or extract
+   * fade-to-black + fade-back-in is in progress; null otherwise. Driven
+   * forward each frame from {@link tick}.
+   */
+  private bunkerSwapFade: {
+    /** Total seconds elapsed since the fade started. */
+    elapsed: number
+    /** Whether the mid-swap callback has fired yet. */
+    swapped: boolean
+    /** One-shot callback fired at peak black to perform the actual swap. */
+    swap: () => void
+  } | null = null
 
   /**
    * Throttles + emits level HUD telemetry/state prompts.
@@ -961,9 +992,17 @@ export class LevelViewController implements Tickable {
       const hatch = new BunkerHatchModel(tint)
       const hatchY = this.heightmap.heightAt(firstObjective.x, firstObjective.z)
       hatch.group.position.set(firstObjective.x, hatchY, firstObjective.z)
-      hatch.active = true
+      // Pulse activation is driven by proximity inside `BunkerMinigame.tick`.
+      hatch.active = false
       this.asteroidSurface.group.add(hatch.group)
       this.surfaceBunkerHatch = hatch
+      this.surfaceHatchWorldPos.set(firstObjective.x, hatchY, firstObjective.z)
+      const bunkerMinigame = this.minigames.getByObjectiveIndex(0)
+      if (bunkerMinigame instanceof BunkerMinigame) {
+        bunkerMinigame.setSurfaceHatch(hatch, { x: firstObjective.x, z: firstObjective.z })
+        bunkerMinigame.onDescend = () => this.handleBunkerDescend()
+        bunkerMinigame.onExit = () => this.handleBunkerExit()
+      }
     }
 
     // ── Rocket-survey hidden utility for gather missions ─────────
@@ -1215,8 +1254,11 @@ export class LevelViewController implements Tickable {
         this.exitLander()
         break
       case 'eva':
-        // Don't run normal exitEva when dying — enterDead handles its own cleanup
-        if (current !== 'dead') this.exitEva()
+        // Don't run normal exitEva when dying (enterDead handles its own cleanup)
+        // or when transitioning into the bunker — the bunker scene reuses the
+        // EVA tick chain (player movement + tools + camera) and only swaps the
+        // visible scene roots.
+        if (current !== 'dead' && current !== 'bunker-interior') this.exitEva()
         break
     }
 
@@ -1225,7 +1267,9 @@ export class LevelViewController implements Tickable {
         this.enterLander()
         break
       case 'eva':
-        this.enterEva()
+        // Coming back from the bunker also lands here — the EVA tick chain
+        // is already registered, so re-running enterEva would double-register.
+        if (_previous !== 'bunker-interior') this.enterEva()
         break
       case 'dead':
         this.enterDead()
@@ -1418,6 +1462,105 @@ export class LevelViewController implements Tickable {
 
     // Cuts breathing, floating, and any in-flight contact-damage loop.
     this.fpsAudio.stop()
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Bunker scene swap (descent + extract)
+  // ═══════════════════════════════════════════════════════════════
+
+  /**
+   * Player pressed E on the surface hatch within range. Snapshot the player
+   * position, fade to black, swap to the bunker scene at peak black, fade
+   * back in. Wired by {@link BunkerMinigame.onDescend}.
+   */
+  private handleBunkerDescend(): void {
+    if (this.bunkerSwapFade) return
+    const minigame = this.minigames.getByObjectiveIndex(0)
+    if (!(minigame instanceof BunkerMinigame)) return
+    if (!this.playerController || !this.stateMachine) return
+
+    this.surfacePlayerSnapshot = this.playerController.group.position.clone()
+    this.startBunkerSwapFade(() => {
+      // Swap scenes at peak black.
+      if (this.asteroidSurface) this.asteroidSurface.group.visible = false
+      if (this.surfaceRocks) this.surfaceRocks.group.visible = false
+      minigame.notifyDescended()
+      const spawn = minigame.playerSpawn
+      if (spawn && this.playerController) {
+        this.playerController.group.position.copy(spawn)
+        this.playerController.body.velocityY = 0
+      }
+      this.stateMachine?.trigger('enterBunker')
+    })
+  }
+
+  /**
+   * Player pressed E on the antechamber exit hatch while the FSM is in
+   * `exit-prompt`. Mirror of {@link handleBunkerDescend}: fade out, restore
+   * the asteroid scene, place the player back at their surface snapshot,
+   * fade in. Wired by {@link BunkerMinigame.onExit}.
+   */
+  private handleBunkerExit(): void {
+    if (this.bunkerSwapFade) return
+    const minigame = this.minigames.getByObjectiveIndex(0)
+    if (!(minigame instanceof BunkerMinigame)) return
+    if (!this.playerController || !this.stateMachine) return
+
+    this.startBunkerSwapFade(() => {
+      minigame.notifyExitInteract()
+      if (this.asteroidSurface) this.asteroidSurface.group.visible = true
+      if (this.surfaceRocks) this.surfaceRocks.group.visible = true
+      const restore = this.surfacePlayerSnapshot ?? this.surfaceHatchWorldPos
+      if (this.playerController) {
+        this.playerController.group.position.copy(restore)
+        this.playerController.body.velocityY = 0
+      }
+      this.surfacePlayerSnapshot = null
+      this.stateMachine?.trigger('exitBunker')
+    })
+  }
+
+  /**
+   * Begin a black-fade swap. Drives the fade through {@link tick}; the
+   * supplied `swap` callback fires once at peak black. Subsequent descent /
+   * exit requests are ignored while a swap is already in flight.
+   *
+   * @param swap - Function to run while the screen is fully black
+   */
+  private startBunkerSwapFade(swap: () => void): void {
+    this.bunkerSwapFade = { elapsed: 0, swapped: false, swap }
+    this.onArrivalFade?.(0)
+  }
+
+  /**
+   * Per-frame driver for the bunker descent / extract fade. Runs the
+   * 0→1→0 ramp on the shared arrival-fade overlay and fires the swap
+   * callback at peak black.
+   *
+   * @param dt - Frame delta in seconds
+   */
+  private tickBunkerSwapFade(dt: number): void {
+    const fade = this.bunkerSwapFade
+    if (!fade) return
+    fade.elapsed += dt
+    if (fade.elapsed < BUNKER_SWAP_FADE_OUT_SECONDS) {
+      const t = fade.elapsed / BUNKER_SWAP_FADE_OUT_SECONDS
+      this.onArrivalFade?.(Math.min(1, t))
+      return
+    }
+    if (!fade.swapped) {
+      this.onArrivalFade?.(1)
+      fade.swap()
+      fade.swapped = true
+      return
+    }
+    const inT = (fade.elapsed - BUNKER_SWAP_FADE_OUT_SECONDS) / BUNKER_SWAP_FADE_IN_SECONDS
+    if (inT >= 1) {
+      this.onArrivalFade?.(0)
+      this.bunkerSwapFade = null
+      return
+    }
+    this.onArrivalFade?.(Math.max(0, 1 - inT))
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1704,8 +1847,8 @@ export class LevelViewController implements Tickable {
       }
     }
 
-    // EVA: feed inputs to tool + camera
-    if (this.stateMachine?.is('eva')) {
+    // EVA + bunker share the FPS player tick (movement, tools, camera, audio).
+    if (this.stateMachine?.is('eva') || this.stateMachine?.is('bunker-interior')) {
       this.tickEva(dt)
 
       // Hypoxia visual — fade + pulse when O2 is empty and HP is draining
@@ -1720,6 +1863,7 @@ export class LevelViewController implements Tickable {
     }
 
     this.enforceLanderAltitudeCeiling()
+    this.tickBunkerSwapFade(dt)
     this.tickMinigames(dt)
 
     // Damage flash decay — same shape as `FpsViewController.tick`. The Vue
@@ -2086,7 +2230,7 @@ export class LevelViewController implements Tickable {
       ? LANDER_LOCAL_UP.clone().applyQuaternion(lander.group.quaternion).normalize()
       : null
     let playerForwardSnap: { x: number; y: number; z: number } | null = null
-    if (state === 'eva' && this.fpsCamera) {
+    if ((state === 'eva' || state === 'bunker-interior') && this.fpsCamera) {
       const v = this.fpsCamera.getForward(this._playerForwardScratch)
       playerForwardSnap = { x: v.x, y: v.y, z: v.z }
     }
@@ -2103,7 +2247,7 @@ export class LevelViewController implements Tickable {
         landerUp: landerUp ? { x: landerUp.x, y: landerUp.y, z: landerUp.z } : null,
         landerGrounded: lander?.body.grounded ?? false,
         playerPosition:
-          state === 'eva' && player
+          (state === 'eva' || state === 'bunker-interior') && player
             ? { x: player.group.position.x, y: player.group.position.y, z: player.group.position.z }
             : null,
         playerForward: playerForwardSnap,
@@ -2272,8 +2416,12 @@ export class LevelViewController implements Tickable {
     }
 
     // Camera flinch + screen-space damage direction (only meaningful while
-    // the FPS camera is active; the lander-cam path just skips it).
-    if (this.fpsCamera && this.stateMachine?.is('eva')) {
+    // the FPS camera is active; the lander-cam path just skips it). Bunker
+    // combat uses the same FPS rig, so include `bunker-interior` here.
+    if (
+      this.fpsCamera &&
+      (this.stateMachine?.is('eva') || this.stateMachine?.is('bunker-interior'))
+    ) {
       this.fpsCamera.applyMouseDelta(
         (Math.random() - 0.5) * LEVEL_COMBAT_CONFIG.damageFlinchStrength,
         -Math.random() * LEVEL_COMBAT_CONFIG.damageFlinchStrength,

@@ -21,6 +21,7 @@ import type {
 } from './MiniGame'
 import type { ConcreteObjective } from '@/lib/missions/types'
 import { BunkerSceneController } from '@/three/bunker/BunkerSceneController'
+import type { BunkerHatchModel } from '@/three/bunker/BunkerHatchModel'
 import type { EnemyHandle } from '@/lib/fps/enemyDirector'
 import { BunkerSceneState, type BunkerSubState } from '@/lib/bunker/bunkerSceneState'
 import {
@@ -29,6 +30,13 @@ import {
   totalWavesForTier,
   type BunkerWaveTier,
 } from '@/lib/bunker/bunkerWaveSchedule'
+
+/** XZ distance threshold (world units) for surface-hatch interaction prompt. */
+const SURFACE_HATCH_INTERACT_RANGE = 2.5
+/** XZ distance threshold (world units) for the antechamber arena door. */
+const ARENA_DOOR_INTERACT_RANGE = 2.5
+/** XZ distance threshold (world units) for the antechamber exit hatch. */
+const EXIT_HATCH_INTERACT_RANGE = 2.5
 
 /** Test seam — internal options for {@link BunkerMinigame.createForTest}. */
 export interface BunkerMinigameTestOptions {
@@ -73,6 +81,8 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
   private spawnedWaveIndex = -1
   private _status: MiniGameStatus = 'active'
   private _isPlayerNear = false
+  private surfaceHatch: BunkerHatchModel | null = null
+  private surfaceHatchPos: { x: number; z: number } | null = null
 
   private readonly _steps: MiniGameStep[] = [
     { label: 'Travel to the asteroid', complete: false, active: true },
@@ -109,6 +119,20 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
   onDestroyLander: (() => void) | null = null
   /** Forwarded explosion VFX hook (parity with rescue facade plumbing). */
   onExplosion: ((position: THREE.Vector3) => void) | null = null
+  /**
+   * Player pressed E on the surface hatch within range. The level view runs
+   * the descent flow (fade, hide asteroid, place player at antechamber spawn,
+   * fire `enterBunker`) and then calls {@link notifyDescended} once the swap
+   * is complete.
+   */
+  onDescend: (() => void) | null = null
+  /**
+   * Player pressed E on the antechamber exit hatch while in `exit-prompt`.
+   * The level view runs the extract flow (fade, deactivate bunker scene,
+   * restore asteroid, place player back at the surface hatch, fire
+   * `exitBunker`).
+   */
+  onExit: (() => void) | null = null
 
   /**
    * Build a minigame with a real scene controller. Used by `LevelMinigameFacade`.
@@ -195,6 +219,15 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
     return this.tier
   }
 
+  /**
+   * World-space player spawn point inside the antechamber. Returns `null`
+   * when the minigame has no scene (test seam). Read by the level view to
+   * teleport the FPS controller after the descent fade-to-black.
+   */
+  get playerSpawn(): THREE.Vector3 | null {
+    return this.scene?.playerSpawn ?? null
+  }
+
   /** Currently-active wave index (zero-based) — for HUD. */
   get currentWaveIndex(): number {
     return this.state.currentWaveIndex
@@ -222,11 +255,13 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
   }
 
   /** @inheritdoc */
-  tick(dt: number, _ctx: MiniGameContext): void {
+  tick(dt: number, ctx: MiniGameContext): void {
     if (this._status !== 'active') return
     this.state.tick(dt)
     this.scene?.tick(dt)
     this.scene?.enemyDirector.tick(dt)
+
+    this.updateInteractionPrompts(ctx)
 
     // Spawn the wave roster once on entry to a fresh wave-active state. The
     // spawnedWaveIndex tracker prevents respawning every tick while enemies
@@ -280,6 +315,87 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
    */
   installEnemySpawnObserver(listener: (handle: EnemyHandle) => void): () => void {
     return this.scene?.installEnemySpawnObserver(listener) ?? (() => {})
+  }
+
+  /**
+   * Wire the level-side surface hatch prop and its world XZ position so the
+   * minigame can drive the descent prompt + interaction. Called once after
+   * the level view spawns the surface hatch.
+   *
+   * @param hatch - Surface hatch model (animated when descent fires)
+   * @param position - World XZ of the hatch (used for proximity tests)
+   */
+  setSurfaceHatch(hatch: BunkerHatchModel, position: { x: number; z: number }): void {
+    this.surfaceHatch = hatch
+    this.surfaceHatchPos = { x: position.x, z: position.z }
+  }
+
+  /**
+   * Drive the surface-hatch / arena-door / exit-hatch prompts and trigger the
+   * matching action callbacks on press. Run at the end of every tick.
+   *
+   * @param ctx - Per-frame minigame context (player position, key edges)
+   */
+  private updateInteractionPrompts(ctx: MiniGameContext): void {
+    this._isPlayerNear = false
+
+    // Surface hatch — only relevant before the player has descended.
+    if (
+      this.state.current === 'entering' &&
+      this.surfaceHatch &&
+      this.surfaceHatchPos &&
+      ctx.playerPosition &&
+      ctx.levelState === 'eva'
+    ) {
+      const dx = ctx.playerPosition.x - this.surfaceHatchPos.x
+      const dz = ctx.playerPosition.z - this.surfaceHatchPos.z
+      const inRange = dx * dx + dz * dz <= SURFACE_HATCH_INTERACT_RANGE * SURFACE_HATCH_INTERACT_RANGE
+      this.surfaceHatch.active = inRange
+      if (inRange) {
+        this._isPlayerNear = true
+        this.onPrompt?.('[E] DESCEND')
+        if (ctx.terminalInteractPressed) {
+          this.surfaceHatch.setOpen(true)
+          this.onDescend?.()
+        }
+      }
+      return
+    }
+
+    // Inside the bunker — door and exit hatch prompts.
+    if (!this.scene || ctx.levelState !== 'bunker-interior' || !ctx.playerPosition) {
+      return
+    }
+    const px = ctx.playerPosition.x
+    const pz = ctx.playerPosition.z
+
+    if (this.state.current === 'antechamber-idle') {
+      const dp = this.scene.doorPosition
+      const dx = px - dp.x
+      const dz = pz - dp.z
+      if (dx * dx + dz * dz <= ARENA_DOOR_INTERACT_RANGE * ARENA_DOOR_INTERACT_RANGE) {
+        this._isPlayerNear = true
+        this.onPrompt?.('[E] OPEN DOOR')
+        if (ctx.terminalInteractPressed) {
+          this.scene.door.setOpen(true)
+          this.notifyArenaDoorInteract()
+        }
+      }
+      return
+    }
+
+    if (this.state.current === 'exit-prompt') {
+      const hp = this.scene.hatchPosition
+      const dx = px - hp.x
+      const dz = pz - hp.z
+      if (dx * dx + dz * dz <= EXIT_HATCH_INTERACT_RANGE * EXIT_HATCH_INTERACT_RANGE) {
+        this._isPlayerNear = true
+        this.onPrompt?.('[E] EXIT BUNKER')
+        if (ctx.terminalInteractPressed) {
+          this.onExit?.()
+        }
+      }
+    }
   }
 
   // ----------------- Step driving (called by LevelView) -----------------

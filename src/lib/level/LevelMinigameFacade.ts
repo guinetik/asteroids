@@ -383,7 +383,7 @@ export class LevelMinigameFacade {
     }
 
     if (
-      context.levelState === 'eva' &&
+      (context.levelState === 'eva' || context.levelState === 'bunker-interior') &&
       !this.minigames.some((minigame) => minigame.isPlayerNearInteraction)
     ) {
       onTerminalPrompt?.(null)
