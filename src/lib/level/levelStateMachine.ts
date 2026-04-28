@@ -10,7 +10,15 @@ import { StateMachine } from '@/lib/stateMachine'
 import { ARRIVAL_SEQUENCE_DURATION } from '@/three/ArrivalSequence'
 
 /** All possible states for an asteroid level. */
-export type LevelState = 'arrival' | 'lander' | 'eva' | 'dead' | 'exfil' | 'complete' | 'failed'
+export type LevelState =
+  | 'arrival'
+  | 'lander'
+  | 'eva'
+  | 'bunker-interior'
+  | 'dead'
+  | 'exfil'
+  | 'complete'
+  | 'failed'
 
 /** Duration of the arrival cutscene in seconds. */
 export const ARRIVAL_DURATION = ARRIVAL_SEQUENCE_DURATION
@@ -82,6 +90,13 @@ export function createLevelStateMachine(
             target: 'lander',
             guard: () => isNearLander(),
           },
+          'enter-bunker': 'bunker-interior',
+          die: 'dead',
+        },
+      },
+      'bunker-interior': {
+        on: {
+          'exit-bunker': 'eva',
           die: 'dead',
         },
       },
