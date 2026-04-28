@@ -874,8 +874,14 @@ export class LevelViewController implements Tickable {
       // managed to climb back into the cockpit: replenish life support and
       // transition into the lander instead of the dead state. Prevents the
       // case where the player walks the last meter to the airlock and dies
-      // mid-press of the interact key.
-      if (this.isPlayerNearLander() && this.stateMachine?.is('eva')) {
+      // mid-press of the interact key. Suppressed while a DAN scan is
+      // running — the encounter requires the player to die or recover on
+      // foot, not duck into the lander on a free pass.
+      if (
+        this.isPlayerNearLander() &&
+        this.stateMachine?.is('eva') &&
+        !this.isLanderEntryBlockedByDan()
+      ) {
         this.playerController!.replenish()
         this.onDeathFade?.(0)
         this.stateMachine.trigger('enterVehicle')
@@ -2156,7 +2162,12 @@ export class LevelViewController implements Tickable {
     ) {
       if (!this.stateMachine.trigger('exfiltrate')) {
         if (!this.stateMachine.trigger('exitVehicle')) {
-          this.stateMachine.trigger('enterVehicle')
+          // Suppress lander entry while a DAN scan is underway — the lander is
+          // the defended asset and stepping inside it would skip the EVA combat
+          // phase. Failure paths still flow through the existing UX.
+          if (!this.isLanderEntryBlockedByDan()) {
+            this.stateMachine.trigger('enterVehicle')
+          }
         }
       }
     }
@@ -2323,7 +2334,8 @@ export class LevelViewController implements Tickable {
       const canExfil =
         currentState === 'lander' && this.hasExitedVehicle && this.isLanderNearShuttle()
 
-      const canEnterLander = currentState === 'eva' && this.isPlayerNearLander()
+      const canEnterLander =
+        currentState === 'eva' && this.isPlayerNearLander() && !this.isLanderEntryBlockedByDan()
 
       let landerTelemetry: LanderTelemetry | null = null
       if (this.landerController) {
@@ -3039,6 +3051,20 @@ export class LevelViewController implements Tickable {
     const dx = playerPos.x - landerPos.x
     const dz = playerPos.z - landerPos.z
     return Math.sqrt(dx * dx + dz * dz) <= LANDER_INTERACT_RANGE
+  }
+
+  /**
+   * True while a DAN scan or telemetry walk-back is underway. Used to lock
+   * the player out of re-entering the lander during the encounter — the
+   * lander is the defended asset for this minigame and stepping inside it
+   * would skip the EVA combat phase entirely. Failure paths (death, hull
+   * destruction) still resolve through the existing fail UX rather than the
+   * normal interact-key flow.
+   */
+  private isLanderEntryBlockedByDan(): boolean {
+    const active = this.minigames.getActive()
+    if (!(active instanceof DanMinigame)) return false
+    return active.phase === 'scanning' || active.phase === 'awaiting-delivery'
   }
 
   /** Check if the lander is within exfil range of the parked shuttle. */
