@@ -39,14 +39,14 @@ const DEFAULT_AO_STRENGTH = 1.0
 const TRIPLANAR_BLEND_POWER = 16
 
 /**
- * Convention: every asteroid surface-texture folder ships these files,
- * exact names, all `.jpg`:
+ * Convention: every asteroid surface-texture folder ships these files under
+ * matching base names ending in `.webp`:
  *
- *   - `color.jpg` (required) — albedo
- *   - `normal.jpg` (required) — tangent-space normal map
- *   - `roughness.jpg` (required) — grayscale roughness
- *   - `ao.jpg` (optional) — ambient occlusion; silent white fallback if absent
- *   - `metalness.jpg` (optional) — silent white fallback if absent
+ *   - `color.webp` (required) — albedo
+ *   - `normal.webp` (required) — tangent-space normal map
+ *   - `roughness.webp` (required) — grayscale roughness
+ *   - `ao.webp` (optional) — ambient occlusion; silent white fallback if absent
+ *   - `metalness.webp` (optional) — silent white fallback if absent
  *
  * Vendors using different naming (`albedo`, `metallic`, `.png`) need to
  * be renamed/converted before dropping in the folder. Keeps the loader
@@ -122,7 +122,7 @@ function loadTilingTexture(url: string, colorSpace: THREE.ColorSpace): THREE.Tex
  * IMMEDIATELY usable: its initial image is a 1×1 white canvas (neutral
  * multiply, no effect). On successful load the image is swapped to the
  * real asset. On 404 / decode error the texture stays white — silent
- * fallback. Used for `ao.jpg` and `metalness.jpg`.
+ * fallback. Used for `ao.webp` and `metalness.webp`.
  *
  * @param url - Texture URL that may or may not exist.
  * @param colorSpace - Three.js color space.
@@ -165,19 +165,19 @@ export interface AsteroidSurfaceModulatorTextures {
   normalMap: THREE.Texture
   /** Loaded roughness texture. */
   roughnessMap: THREE.Texture
-  /** Loaded ambient-occlusion texture (white-fallback if `ao.jpg` is missing). */
+  /** Loaded ambient-occlusion texture (white-fallback if `ao.webp` is missing). */
   aoMap: THREE.Texture
-  /** Loaded metalness texture (white-fallback if `metalness.jpg` is missing). */
+  /** Loaded metalness texture (white-fallback if `metalness.webp` is missing). */
   metalnessMap: THREE.Texture
-  /** Loaded emission texture (black-fallback if `emission.jpg` is missing). */
+  /** Loaded emission texture (black-fallback if `emission.webp` is missing). */
   emissionMap: THREE.Texture
 }
 
 /** Configuration for the modulator patch. */
 export interface AsteroidSurfaceModulatorOptions {
   /**
-   * Folder containing `color.jpg`, `normal.png`, `roughness.jpg`. Files
-   * are loaded as `${folder}/color.jpg` etc.
+   * Folder containing `color.webp`, `normal.webp`, `roughness.webp`. Files
+   * are loaded as `${folder}/color.webp` etc.
    */
   folder: string
   /** Triplanar repeat factor. Defaults to {@link DEFAULT_TEXTURE_REPEAT}. */
@@ -192,13 +192,13 @@ export interface AsteroidSurfaceModulatorOptions {
   colorBlend?: number
   /**
    * Ambient-occlusion blend strength, 0..1. `0` disables AO entirely. `1`
-   * applies the AO sample at full effect (dark pixels of `ao.jpg` darken
+   * applies the AO sample at full effect (dark pixels of `ao.webp` darken
    * the diffuse, bright pixels leave it untouched). Defaults to 1.
    */
   aoStrength?: number
   /**
    * Emission contribution multiplier. `0` disables the emission map. `1+`
-   * brightens the lava-glow (or whatever emission.jpg encodes) added on
+   * brightens the lava-glow (or whatever emission.webp encodes) added on
    * top of the lit color. Defaults to 1.
    */
   emissionStrength?: number
@@ -224,15 +224,15 @@ export function applyAsteroidSurfaceModulator(
   const aoStrength = options.aoStrength ?? DEFAULT_AO_STRENGTH
   const emissionStrength = options.emissionStrength ?? 1
 
-  // Strict naming convention — folder must contain color.jpg, normal.jpg,
-  // roughness.jpg. ao.jpg and metalness.jpg are optional (white fallback).
-  const colorMap = loadTilingTexture(`${folder}/color.jpg`, THREE.SRGBColorSpace)
-  const normalMap = loadTilingTexture(`${folder}/normal.jpg`, THREE.NoColorSpace)
-  const roughnessMap = loadTilingTexture(`${folder}/roughness.jpg`, THREE.NoColorSpace)
-  const aoMap = loadOptionalTexture(`${folder}/ao.jpg`, THREE.NoColorSpace)
-  const metalnessMap = loadOptionalTexture(`${folder}/metalness.jpg`, THREE.NoColorSpace)
+  // Strict naming convention — folder must contain color/normal/roughness `.webp`;
+  // ao/metalness are optional (white fallback).
+  const colorMap = loadTilingTexture(`${folder}/color.webp`, THREE.SRGBColorSpace)
+  const normalMap = loadTilingTexture(`${folder}/normal.webp`, THREE.NoColorSpace)
+  const roughnessMap = loadTilingTexture(`${folder}/roughness.webp`, THREE.NoColorSpace)
+  const aoMap = loadOptionalTexture(`${folder}/ao.webp`, THREE.NoColorSpace)
+  const metalnessMap = loadOptionalTexture(`${folder}/metalness.webp`, THREE.NoColorSpace)
   const emissionMap = loadOptionalTexture(
-    `${folder}/emission.jpg`,
+    `${folder}/emission.webp`,
     THREE.SRGBColorSpace,
     makeBlackPixelCanvas(),
   )
@@ -349,7 +349,7 @@ export function applyAsteroidSurfaceModulator(
           .replace(
             '#include <emissivemap_fragment>',
             `#include <emissivemap_fragment>
-            // Triplanar emission map — only the lit areas of emission.jpg
+            // Triplanar emission map — only the lit areas of emission.webp
             // glow (typically lava cracks). Added to totalEmissiveRadiance
             // so it survives even when the material has no uniform emissive.
             vec3 _emAbsN = abs(normalize(vModNormal));

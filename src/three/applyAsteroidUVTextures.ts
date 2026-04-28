@@ -19,12 +19,12 @@ import * as THREE from 'three'
 
 /** File-name convention shared with `applyAsteroidSurfaceModulator`. */
 const TEXTURE_FILES = {
-  color: 'color.jpg',
-  normal: 'normal.jpg',
-  roughness: 'roughness.jpg',
-  ao: 'ao.jpg',
-  metalness: 'metalness.jpg',
-  emission: 'emission.jpg',
+  color: 'color.webp',
+  normal: 'normal.webp',
+  roughness: 'roughness.webp',
+  ao: 'ao.webp',
+  metalness: 'metalness.webp',
+  emission: 'emission.webp',
 } as const
 
 /**
@@ -50,7 +50,7 @@ function loadUVTexture(url: string, colorSpace: THREE.ColorSpace): THREE.Texture
 
 /**
  * Tries to load an optional UV texture; returns `null` if it 404s. Used
- * for `ao.jpg` and `metalness.jpg` which not every pack ships.
+ * for `ao.webp` and `metalness.webp` which not every pack ships.
  *
  * @param url - Texture URL that may or may not exist.
  * @param colorSpace - Three.js color space.
@@ -111,8 +111,8 @@ const DEFAULT_DETAIL_NORMAL_STRENGTH = 0.6
  */
 export interface AsteroidUVDetailOptions {
   /**
-   * Folder containing a tileable `normal.jpg` (same convention as the main
-   * surfaceTextures folder, but only `normal.jpg` is consumed).
+   * Folder containing a tileable `normal.webp` (same convention as the main
+   * surfaceTextures folder, but only `normal.webp` is consumed).
    */
   folder: string
   /**
@@ -132,7 +132,7 @@ export interface AsteroidUVDetailOptions {
 /**
  * Apply the five-slot PBR texture set to every `MeshStandardMaterial`
  * under `root`, using the GLB's authored UV coordinates. Replaces any
- * embedded color map with the loaded `color.jpg`. Each texture lands
+ * embedded color map with the loaded `color.webp`. Each texture lands
  * exactly where the artist painted it.
  *
  * @param root - Asteroid scene root.

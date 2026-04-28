@@ -63,7 +63,7 @@ export interface AsteroidSurfaceControllerOptions {
   peakTone?: number
   /**
    * Optional folder containing a triplet of tileable surface textures
-   * (`color.jpg`, `normal.png`, `roughness.jpg`). When provided, applied as
+   * (`color.webp`, `normal.webp`, `roughness.webp`). When provided, applied as
    * a triplanar overlay on top of the painted vertex colors — color is
    * desaturated to a brightness modulator, normal/roughness drive PBR relief.
    */
@@ -82,7 +82,7 @@ export interface AsteroidSurfaceControllerOptions {
   surfaceUseEmbeddedUVs?: boolean
   /**
    * Optional folder for an FPS-range detail layer used in UV mode. Only
-   * the folder's `normal.jpg` is consumed and is sampled triplanar at
+   * the folder's `normal.webp` is consumed and is sampled triplanar at
    * high frequency to add micro-relief at close range without tiling
    * away the artist's macro pattern.
    */
@@ -104,7 +104,7 @@ export interface AsteroidSurfaceControllerOptions {
   /** Ambient-occlusion strength, 0..1. Defaults to 1. */
   surfaceAOStrength?: number
   /**
-   * Emission contribution multiplier for the optional `emission.jpg`. `0`
+   * Emission contribution multiplier for the optional `emission.webp`. `0`
    * disables emission entirely. `1` is the natural texture brightness;
    * push above 1 to make lava cracks pop. Defaults to 1.
    */

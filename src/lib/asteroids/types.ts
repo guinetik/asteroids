@@ -86,7 +86,7 @@ export interface SurfaceFeatures {
   modelScale?: number
   /**
    * Optional path to a folder containing a triplet of tileable surface
-   * textures: `color.jpg`, `normal.png`, `roughness.jpg`. The color sample
+   * textures: `color.webp`, `normal.webp`, `roughness.webp`. The color sample
    * is desaturated and used as a brightness modulator over the painted
    * vertex colors (never tints, never blows out). The normal and roughness
    * maps drive PBR relief and spec variation. Triplanar-sampled in object
@@ -109,7 +109,7 @@ export interface SurfaceFeatures {
   /**
    * Optional detail-normal folder used only in UV mode. Adds high-frequency
    * triplanar bump grain on top of the artist's UV macro so FPS-range
-   * close-ups don't read as low-resolution. Only `normal.jpg` is consumed
+   * close-ups don't read as low-resolution. Only `normal.webp` is consumed
    * from this folder; color/roughness stay UV-mapped.
    */
   surfaceDetailFolder?: string
@@ -140,14 +140,14 @@ export interface SurfaceFeatures {
   surfaceModulatorColorBlend?: number
   /**
    * Optional ambient-occlusion blend strength, 0..1. The folder may include
-   * an `ao.jpg` (grayscale baked occlusion) — when present and this value
+   * an `ao.webp` (grayscale baked occlusion) — when present and this value
    * is greater than 0, dark pixels of the AO sample darken the diffuse to
-   * give "free" crevice shadows. Missing `ao.jpg` is silently treated as
+   * give "free" crevice shadows. Missing `ao.webp` is silently treated as
    * fully white (no-op). Defaults to 1.
    */
   surfaceAOStrength?: number
   /**
-   * Optional `emission.jpg` strength multiplier. The folder may include an
+   * Optional `emission.webp` strength multiplier. The folder may include an
    * emission map (e.g. lava cracks for volcanic biomes). When present and
    * this value is greater than 0, emission is added on top of the lit
    * color per-pixel — only the bright pixels of the emission map glow.

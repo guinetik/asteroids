@@ -66,7 +66,7 @@ export function createPlanetMesh(planet: Planet): PlanetMeshResult {
   }
 
   if (PLANET_TEXTURES.has(planet.id)) {
-    const surfaceTexture = textureLoader.load(`/textures/${planet.id}.jpg`)
+    const surfaceTexture = textureLoader.load(`/textures/${planet.id}.webp`)
     surfaceTexture.colorSpace = THREE.SRGBColorSpace
     uniforms.uSurfaceTexture = { value: surfaceTexture }
     const useSurfaceTextureUniform = uniforms.uUseSurfaceTexture
@@ -77,7 +77,7 @@ export function createPlanetMesh(planet: Planet): PlanetMeshResult {
   }
 
   if (planet.id === 'earth') {
-    const nightTexture = textureLoader.load('/textures/earth-night.jpg')
+    const nightTexture = textureLoader.load('/textures/earth-night.webp')
     nightTexture.colorSpace = THREE.SRGBColorSpace
     uniforms.uNightTexture = { value: nightTexture }
     uniforms.uUseNightTexture = { value: 1 }

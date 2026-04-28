@@ -31,7 +31,7 @@ export class TerrainMesh implements Tickable {
   private readonly material: THREE.MeshStandardMaterial
   private readonly heightmap: Heightmap
 
-  constructor(heightmap: Heightmap, texturePath = '/texture.jpg') {
+  constructor(heightmap: Heightmap, texturePath = '/texture.webp') {
     this.heightmap = heightmap
 
     const size = heightmap.worldSize

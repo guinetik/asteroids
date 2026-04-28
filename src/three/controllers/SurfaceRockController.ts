@@ -52,8 +52,8 @@ const ROCK_EXPOSED_HEIGHT_BURIAL_MULTIPLIER = 0.68
 
 /**
  * Per-mineral material definition. `folder` is the subdirectory under
- * {@link ROCK_TEXTURE_BASE_DIR} that holds `color.jpg`, `gl.jpg`, and
- * `roughness.jpg`. `metalness` is a scalar because the authored PBR
+ * {@link ROCK_TEXTURE_BASE_DIR} that holds `color.webp`, `gl.webp`, and
+ * `roughness.webp`. `metalness` is a scalar because the authored PBR
  * sets are all dielectric; metallic minerals (iron-nickel, troilite)
  * are tuned up via this value so the material reads correctly even
  * without a dedicated metalness map.
@@ -242,9 +242,9 @@ function getMineralTextureSet(def: MineralMaterialDef): Promise<MineralTextureSe
 
   const loader = new THREE.TextureLoader()
   const base = `${ROCK_TEXTURE_BASE_DIR}/${def.folder}`
-  const map = loader.load(`${base}/color.jpg`)
-  const normalMap = loader.load(`${base}/gl.jpg`)
-  const roughnessMap = loader.load(`${base}/roughness.jpg`)
+  const map = loader.load(`${base}/color.webp`)
+  const normalMap = loader.load(`${base}/gl.webp`)
+  const roughnessMap = loader.load(`${base}/roughness.webp`)
   configureRockTexture(map, true)
   configureRockTexture(normalMap, false)
   configureRockTexture(roughnessMap, false)

@@ -30,7 +30,7 @@ export interface DriftConfig {
 
 /** Static info about a telescope target shown in the eyepiece. */
 export interface TelescopeTarget {
-  /** Public image filename under `/minigames/telescope/`. */
+  /** Filename under `public/telescope/` (e.g. `deep_field.webp`). */
   image: string
   /** Large label shown above the eyepiece — e.g. `JWST L2 — DEEP FIELD`. */
   label: string

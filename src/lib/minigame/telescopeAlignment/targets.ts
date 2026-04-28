@@ -13,7 +13,7 @@ import type { TelescopeTarget } from './types'
 
 /** Fallback target used for unregistered mission ids (e.g. legacy earth spec alias). */
 export const FALLBACK_TARGET: TelescopeTarget = {
-  image: 'deep_field.jpg',
+  image: 'deep_field.webp',
   label: 'DEEP FIELD — ARCHIVAL',
   caption: 'archival composite · no target metadata available',
 }
