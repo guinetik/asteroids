@@ -27,26 +27,7 @@ import { GatherMinigame } from '@/lib/minigame/GatherMinigame'
 import type { Tickable } from '@/lib/Tickable'
 import type { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
 import type { Object3D, Scene } from 'three'
-
-/** Faction tints used by bunker missions. Falls back to white for unknown givers. */
-const BUNKER_FACTION_TINTS: Record<string, number> = {
-  cinderline: 0xff5a1a,
-  'lucas-maverick': 0x22d3a8,
-  'martian-marines-bunker': 0x7afca7,
-  'jovian-society': 0x5cc8ff,
-}
-
-/**
- * Resolve a faction tint hex from a giver id. Returns white for unknown
- * givers, which keeps the bunker visually intact even if a future mission
- * arrives without a tint registered.
- *
- * @param giverId - Giver id from the active mission
- */
-function tintForGiver(giverId: string | undefined): number {
-  if (!giverId) return 0xffffff
-  return BUNKER_FACTION_TINTS[giverId] ?? 0xffffff
-}
+import { tintForGiver } from '@/lib/level/bunkerFactionTint'
 
 /**
  * Flat world position snapshot passed into the minigame facade each frame.

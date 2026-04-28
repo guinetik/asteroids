@@ -57,6 +57,8 @@ import {
 import type { LevelState } from '@/lib/level/levelStateMachine'
 import type { StateMachine } from '@/lib/stateMachine'
 import { ArrivalSequence } from '@/three/ArrivalSequence'
+import { BunkerHatchModel } from '@/three/bunker/BunkerHatchModel'
+import { tintForGiver } from '@/lib/level/bunkerFactionTint'
 import { NestModel } from '@/three/NestModel'
 import { VirusModel } from '@/three/VirusModel'
 import { HostageModel } from '@/three/HostageModel'
@@ -165,6 +167,12 @@ export class LevelViewController implements Tickable {
   private heightmap: Heightmap | null = null
   private asteroidSurface: AsteroidSurfaceControllerResult | null = null
   private surfaceRocks: SurfaceRockController | null = null
+  /**
+   * Surface hatch prop spawned on bunker missions. Sits at the first
+   * objective's XZ on the asteroid surface, animates an idle pulse, and
+   * is the prop the player walks up to and presses E on (descent).
+   */
+  private surfaceBunkerHatch: BunkerHatchModel | null = null
   private prospectOverlay: ProspectOverlayController | null = null
   private enemyVisualWarmup: EnemyVisualWarmup | null = null
   private readonly collision = new LevelCollisionFacade()
@@ -942,6 +950,21 @@ export class LevelViewController implements Tickable {
         },
       },
     })
+
+    // ── Surface bunker hatch prop ────────────────────────────────
+    // For bunker missions, drop the surface-side hatch prop at the
+    // first objective's XZ. The interior antechamber hatch is owned
+    // by the BunkerSceneController; this one lives on the asteroid.
+    const firstObjective = mission.objectives[0]
+    if (firstObjective?.type === 'bunker' && this.heightmap && this.asteroidSurface) {
+      const tint = tintForGiver(mission.giverId)
+      const hatch = new BunkerHatchModel(tint)
+      const hatchY = this.heightmap.heightAt(firstObjective.x, firstObjective.z)
+      hatch.group.position.set(firstObjective.x, hatchY, firstObjective.z)
+      hatch.active = true
+      this.asteroidSurface.group.add(hatch.group)
+      this.surfaceBunkerHatch = hatch
+    }
 
     // ── Rocket-survey hidden utility for gather missions ─────────
     if (
@@ -2089,6 +2112,7 @@ export class LevelViewController implements Tickable {
       },
       this.onTerminalPrompt,
     )
+    this.surfaceBunkerHatch?.tick(dt)
     const activeMinigame = this.minigames.getActive()
     if (activeMinigame instanceof RescueMinigame && this.landerController) {
       const locked = activeMinigame.isLiftoffLocked
@@ -2621,6 +2645,11 @@ export class LevelViewController implements Tickable {
     this.landerController?.dispose()
     this.enemyVisualWarmup?.dispose()
     this.enemyVisualWarmup = null
+    if (this.surfaceBunkerHatch) {
+      this.surfaceBunkerHatch.group.removeFromParent()
+      this.surfaceBunkerHatch.dispose()
+      this.surfaceBunkerHatch = null
+    }
     this.surfaceRocks?.dispose()
     this.asteroidSurface?.dispose()
     this.thrusterWash?.dispose()
