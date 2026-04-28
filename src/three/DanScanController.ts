@@ -19,11 +19,15 @@ import type { DanTierTuning } from '@/lib/minigame/DanMinigame'
 /** Maximum number of live DAN neutron particles allocated in the pool. */
 const MAX_DAN_PARTICLES = 64
 
-/** Hit-sphere radius used when registering particles with the projectile system. */
-export const DAN_PARTICLE_HIT_RADIUS = 0.7
+/**
+ * Hit-sphere radius used when registering particles with the projectile
+ * system. Generous so SCI bolts feel forgiving — the player is firing at
+ * moving targets in low gravity from variable EVA distances.
+ */
+export const DAN_PARTICLE_HIT_RADIUS = 2.2
 
-/** Particle marker geometry radius, in world units. */
-const DAN_PARTICLE_RADIUS = 0.55
+/** Particle marker geometry radius, in world units. Sized to read clearly from EVA distances. */
+const DAN_PARTICLE_RADIUS = 1.6
 
 /** Cyan-green particle accent color. */
 const DAN_PARTICLE_COLOR = 0x66ffd9

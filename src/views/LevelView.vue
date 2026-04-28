@@ -34,8 +34,10 @@ import type { LanderTelemetry } from '@/lib/ui/landerHudTypes'
 import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 import { OBJECTIVE_LABELS } from '@/lib/minigame/MiniGame'
 import RescueSurvivorPanel from '@/components/RescueSurvivorPanel.vue'
+import DanScanPanel from '@/components/DanScanPanel.vue'
 import BunkerWaveHud from '@/components/BunkerWaveHud.vue'
 import { RescueMinigame } from '@/lib/minigame/RescueMinigame'
+import { DanMinigame } from '@/lib/minigame/DanMinigame'
 import { BunkerMinigame } from '@/lib/minigame/BunkerMinigame'
 import type { BunkerSubState } from '@/lib/bunker/bunkerSceneState'
 import { shouldHardReloadLevelRestart } from '@/lib/level/levelRestartPolicy'
@@ -243,6 +245,12 @@ const rescueTotal = ref(0)
 const rescueAlive = ref(0)
 const rescueAboard = ref(0)
 const rescueActive = ref(false)
+const danActive = ref(false)
+const danTimeRemaining = ref(0)
+const danCaptured = ref(0)
+const danRequired = ref(0)
+const danInstruction = ref<string | null>(null)
+const danScanning = ref(false)
 let rescuePollHandle: ReturnType<typeof setInterval> | null = null
 
 /**
@@ -294,6 +302,16 @@ function refreshRescueRefs(): void {
     rescueAboard.value = active.aboardSurvivors
   } else {
     rescueActive.value = false
+  }
+  if (active instanceof DanMinigame) {
+    danActive.value = true
+    danTimeRemaining.value = active.timeRemaining ?? 0
+    danCaptured.value = active.progressCurrent ?? 0
+    danRequired.value = active.progressTotal ?? 0
+    danInstruction.value = active.missionInstruction
+    danScanning.value = active.phase === 'scanning'
+  } else {
+    danActive.value = false
   }
   if (active instanceof BunkerMinigame) {
     const phase = active.bunkerPhase
@@ -531,7 +549,9 @@ onMounted(async () => {
       }
     }
 
-    rescuePollHandle = setInterval(refreshRescueRefs, 500)
+    // 200ms is fast enough for the DAN scan timer to tick visibly without
+    // adding meaningful overhead for rescue/bunker observers.
+    rescuePollHandle = setInterval(refreshRescueRefs, 200)
     window.addEventListener('keydown', handleGlobalKeydown)
   }
 })
@@ -721,6 +741,14 @@ function handleToggleMusic(): void {
     :total="rescueTotal"
     :alive="rescueAlive"
     :aboard="rescueAboard"
+  />
+  <DanScanPanel
+    v-if="danActive"
+    :time-remaining="danTimeRemaining"
+    :captured="danCaptured"
+    :required="danRequired"
+    :instruction="danInstruction"
+    :scanning="danScanning"
   />
   <LanderHud v-if="stateInfo.state === 'lander'" :telemetry="landerTelemetry" />
   <FpsHud

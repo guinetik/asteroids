@@ -1,0 +1,60 @@
+/*
+ * DanScanPanel — persistent DAN-mission HUD overlay.
+ *
+ * Mirrors the rescue-survivor-panel pattern: separate .css file because
+ * Tailwind v4 + Vue scoped <style> can't resolve @apply utility classes.
+ */
+
+.dan-scan-panel {
+  @apply absolute top-24 left-1/2 -translate-x-1/2 z-30 px-4 py-2.5 rounded-md
+         bg-black/65 border border-cyan-400/30 font-mono text-white/90 select-none
+         flex flex-col items-stretch gap-1.5 min-w-[280px]
+         shadow-[0_0_18px_-2px_rgba(34,211,238,0.35)] backdrop-blur-sm;
+}
+
+.dan-scan-header {
+  @apply flex items-baseline justify-between gap-3;
+}
+
+.dan-scan-label {
+  @apply text-[11px] tracking-[0.3em] uppercase text-cyan-300/80;
+}
+
+.dan-scan-timer {
+  @apply text-lg font-semibold tabular-nums;
+}
+.dan-timer-high {
+  @apply text-cyan-300;
+}
+.dan-timer-mid {
+  @apply text-amber-300;
+}
+.dan-timer-low {
+  @apply text-red-400;
+}
+.dan-timer-done {
+  @apply text-white/60;
+}
+
+.dan-scan-meter-row {
+  @apply flex items-center gap-2;
+}
+
+.dan-scan-meter {
+  @apply h-2 flex-1 overflow-hidden rounded-sm bg-white/10 border border-white/10;
+}
+
+.dan-scan-meter-fill {
+  @apply h-full bg-cyan-400/85 transition-all duration-150;
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.6);
+}
+
+.dan-scan-counter {
+  @apply text-[10px] tracking-[0.2em] uppercase text-cyan-200/80 tabular-nums;
+}
+
+.dan-scan-instruction {
+  @apply text-[12px] tracking-[0.18em] uppercase text-amber-200/95 text-center
+         font-semibold mt-0.5;
+  text-shadow: 0 0 8px rgba(252, 211, 77, 0.45);
+}
