@@ -496,6 +496,17 @@ export interface ConcreteObjective {
   waveCount?: number
   /** Credit reward for this objective. */
   reward: number
+  /**
+   * Lower bound of reward when the objective supports partial credit (DAN).
+   * Omitted = binary objective; full {@link reward} always granted on completion.
+   */
+  rewardMin?: number
+  /**
+   * Reward actually granted at completion time. Set by the level controller when
+   * partial-credit objectives finish. Falls back to {@link reward} for binary
+   * objectives at persist time.
+   */
+  actualReward?: number
 }
 
 /** Status of an asteroid mission. */

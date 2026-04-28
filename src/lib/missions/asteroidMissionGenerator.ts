@@ -49,6 +49,14 @@ const OBJECTIVE_COUNT_BY_DIFFICULTY: [number, number, number][] = [
   [7, 10, 3],
 ]
 
+/**
+ * Floor ratio for DAN partial-credit rewards. A completed DAN objective with
+ * minimal capture quality still pays this fraction of the rolled `reward`,
+ * because the player committed time to land at the crater and walk back to the
+ * terminal — full no-show is the only zero. Quality at 100% pays template max.
+ */
+const DAN_REWARD_FLOOR_RATIO = 0.25
+
 /** Easiest difficulty where Jovian photometry contracts appear. */
 const PHOTOMETRY_MIN_DIFFICULTY = 3
 
@@ -423,6 +431,7 @@ export function rollObjective(slot: ObjectiveSlot, difficulty: number): Concrete
         particleTier: slot.params.particleTier,
         enemyTier: slot.params.enemyTier,
         reward,
+        rewardMin: Math.round(reward * DAN_REWARD_FLOOR_RATIO),
       }
     case 'collect':
       return {

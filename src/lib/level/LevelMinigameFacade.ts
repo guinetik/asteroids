@@ -19,6 +19,8 @@ import {
   PhotometryMinigame,
   type PhotometryScanAudioState,
 } from '@/lib/minigame/PhotometryMinigame'
+import { DanMinigame, type DanScanAudioState } from '@/lib/minigame/DanMinigame'
+import type { DanCraterPlacement } from '@/lib/level/danCraterPlacement'
 import { ExterminateMinigame } from '@/lib/minigame/ExterminateMinigame'
 import { RescueMinigame } from '@/lib/minigame/RescueMinigame'
 import { BunkerMinigame } from '@/lib/minigame/BunkerMinigame'
@@ -97,6 +99,12 @@ export interface LevelMinigameBindings {
   onSurveyProbeCollect: (() => void) | null
   /** Photometry scan audio state sink used while the X-ray beam is active. */
   onPhotometryScanAudioState: ((state: PhotometryScanAudioState) => void) | null
+  /** DAN scan audio state sink used while the neutron scan beam is active. */
+  onDanScanAudioState: ((state: DanScanAudioState) => void) | null
+  /** DAN particle capture cue — short click + spark when SCI bolt registers a hit. */
+  onDanParticleHit: (() => void) | null
+  /** DAN completion pulse cue fired when telemetry delivery succeeds. */
+  onDanCompletionPulse: (() => void) | null
   /** Route combat/hazard damage back into the level presentation layer. */
   onDamagePlayer:
     | ((
@@ -152,6 +160,12 @@ export interface LevelMinigameInitParams {
   composition: readonly MineralEntry[]
   /** Deterministic mission seed used by survey/gather setup. */
   missionSeed: number
+  /**
+   * Crater placement chosen at level boot for the DAN objective, when one is
+   * present. Required to construct {@link DanMinigame}. Null when the mission
+   * has no DAN objective.
+   */
+  danCraterPlacement?: DanCraterPlacement | null
   /** Controller-owned callback bindings. */
   bindings: LevelMinigameBindings
 }
@@ -187,6 +201,7 @@ export class LevelMinigameFacade {
       rockYieldSystem,
       composition,
       missionSeed,
+      danCraterPlacement,
       bindings,
     } = params
     const objectiveColliders: WorldCollider[] = []
@@ -218,6 +233,30 @@ export class LevelMinigameFacade {
         minigame.onUnregisterTickable = bindings.onUnregisterTickable
         minigame.onProbeCollect = bindings.onSurveyProbeCollect
         minigame.onScanAudioState = bindings.onPhotometryScanAudioState
+        objectiveColliders.push(...(minigame.worldColliders ?? []))
+        this.add(minigame)
+      } else if (objective.type === 'dan') {
+        if (!danCraterPlacement) {
+          throw new Error(
+            '[LevelMinigameFacade] dan objective requires danCraterPlacement on init params',
+          )
+        }
+        const minigame = new DanMinigame({
+          objectiveIndex: i,
+          objective,
+          scene,
+          heightmap,
+          craterPlacement: danCraterPlacement,
+          projectileSystem,
+          seed: missionSeed,
+        })
+        this.applySharedBindings(minigame, bindings)
+        minigame.onRefuel = bindings.onSurveyRefuel
+        minigame.onRegisterTickable = bindings.onRegisterTickable
+        minigame.onUnregisterTickable = bindings.onUnregisterTickable
+        minigame.onScanAudioState = bindings.onDanScanAudioState
+        minigame.onParticleHit = bindings.onDanParticleHit
+        minigame.onCompletionPulse = bindings.onDanCompletionPulse
         objectiveColliders.push(...(minigame.worldColliders ?? []))
         this.add(minigame)
       } else if (objective.type === 'exterminate') {
