@@ -36,8 +36,8 @@
           "weight": 1.0,
           "params": {
             "type": "dan",
-            "scanDurationSeconds": { "min": 35, "max": 50 },
-            "requiredParticleHits": { "min": 40, "max": 55 },
+            "scanDurationSeconds": { "min": 50, "max": 70 },
+            "requiredParticleHits": { "min": 22, "max": 30 },
             "enemyGraceSeconds": { "min": 10, "max": 8 },
             "particleTier": "medium",
             "enemyTier": "medium"
@@ -58,8 +58,8 @@
           "weight": 1.0,
           "params": {
             "type": "dan",
-            "scanDurationSeconds": { "min": 45, "max": 65 },
-            "requiredParticleHits": { "min": 55, "max": 65 },
+            "scanDurationSeconds": { "min": 60, "max": 90 },
+            "requiredParticleHits": { "min": 30, "max": 38 },
             "enemyGraceSeconds": { "min": 9, "max": 6 },
             "particleTier": "high",
             "enemyTier": "high"
