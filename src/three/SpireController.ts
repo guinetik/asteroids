@@ -21,6 +21,11 @@ import {
   TRON_HOLOGRAM_ENEMY_COLOR_GAIN,
   TRON_HOLOGRAM_ENEMY_MATERIAL_OPACITY,
 } from '@/three/tronHologramMaterial'
+import {
+  enemyVisualPaletteForTier,
+  type EnemyVisualControllerOptions,
+  type EnemyVisualPalette,
+} from '@/three/enemyVisualPalette'
 
 // ── Visual constants ────────────────────────────────────────────
 const SPIRE_SCALE = 2.0
@@ -59,14 +64,8 @@ const DRIFT_SWAY_FREQ = 0.5
  */
 export const SPIRE_HIT_CENTER_Y = 0
 
-/** TRON outer membrane shell. */
-const SPIRE_TRON_MEMBRANE = 0xff3d6b
 /** TRON inner core sphere. */
 const SPIRE_TRON_CORE = 0xff0066
-/** TRON spike stalks. */
-const SPIRE_TRON_STALK = 0xffcc00
-/** TRON spike bulbs. */
-const SPIRE_TRON_BULB = 0xffee44
 /** TRON RNA torus. */
 const SPIRE_TRON_RNA = 0xff2266
 
@@ -146,6 +145,7 @@ export class SpireController implements Tickable {
   /** Shared spike bulb shader for fire-flash restore. */
   private bulbTronMat!: THREE.ShaderMaterial
   private readonly tronMaterials: THREE.ShaderMaterial[] = []
+  private readonly visualPalette: EnemyVisualPalette
   /** Reused in spike tick to avoid `basePos.clone()` allocations per spike per frame. */
   private readonly spikePosScratch = new THREE.Vector3()
 
@@ -183,8 +183,9 @@ export class SpireController implements Tickable {
     return this.dead && this.deathTimer >= DEATH_ANIM_DURATION
   }
 
-  constructor(enemy: Enemy) {
+  constructor(enemy: Enemy, options: EnemyVisualControllerOptions = {}) {
     this.enemy = enemy
+    this.visualPalette = enemyVisualPaletteForTier(options.visualTier)
     this.timeOffset = Math.random() * 10
 
     this.group.add(this.bodyGroup)
@@ -220,7 +221,7 @@ export class SpireController implements Tickable {
   // ═══════════════════════════════════════════════════════════════
 
   private buildBody(): void {
-    this.membraneTronMat = this.makeTron(SPIRE_TRON_MEMBRANE)
+    this.membraneTronMat = this.makeTron(this.visualPalette.silhouette)
     const coreTron = this.makeTron(SPIRE_TRON_CORE)
     const rnaTron = this.makeTron(SPIRE_TRON_RNA)
 
@@ -241,8 +242,8 @@ export class SpireController implements Tickable {
   }
 
   private buildSpikes(): void {
-    const stalkTron = this.makeTron(SPIRE_TRON_STALK)
-    this.bulbTronMat = this.makeTron(SPIRE_TRON_BULB)
+    const stalkTron = this.makeTron(this.visualPalette.feature)
+    this.bulbTronMat = this.makeTron(this.visualPalette.featureBright)
     const points = fibonacciSphere(SPIKE_COUNT)
 
     for (let i = 0; i < points.length; i++) {

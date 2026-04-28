@@ -225,6 +225,8 @@ function objectiveSummary(mission: GeneratedAsteroidMission): string {
       return `Calibrate ${obj.probeCount} gravitometric probe${obj.probeCount !== 1 ? 's' : ''} (${obj.timeLimit}s)`
     case 'photometry':
       return `Capture photometry exposure (${obj.timeLimit}s)`
+    case 'dan':
+      return `Run DAN subsurface scan (${obj.scanDurationSeconds}s)`
     case 'collect': {
       const item = obj.collectItemLabel ?? obj.collectItemId ?? 'designated cargo'
       return `Collect ${item}`
@@ -250,6 +252,8 @@ function regionLabel(region: MissionRegion): string {
       return 'Asteroid Belt'
     case 'kuiper-belt':
       return 'Kuiper Belt'
+    case 'jovian-trojans':
+      return 'Jovian Trojans'
   }
 }
 

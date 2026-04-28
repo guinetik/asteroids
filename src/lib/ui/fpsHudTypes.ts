@@ -6,6 +6,8 @@
  * @spec docs/superpowers/specs/2026-04-04-level-state-machine-design.md
  */
 
+import type { ObjectiveType } from '@/lib/missions/types'
+
 /**
  * Objective marker shown on the compass strip.
  *
@@ -21,7 +23,7 @@ export interface CompassObjective {
   /** Bearing delta from the player's heading in degrees, constrained to `[-180, 180]`. */
   relativeDeg: number
   /** Objective category used to color the compass marker. */
-  type: 'gather' | 'exterminate' | 'rescue' | 'survey' | 'photometry' | 'collect' | 'bunker'
+  type: ObjectiveType
 }
 
 /**

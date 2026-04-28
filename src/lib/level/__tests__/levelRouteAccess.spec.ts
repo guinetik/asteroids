@@ -74,6 +74,11 @@ describe('hasLevelRouteQueryOverrideFromSearchParams', () => {
     expect(hasLevelRouteQueryOverrideFromSearchParams(p)).toBe(true)
   })
 
+  it('allows ?difficulty=5&mission=dan as an override', () => {
+    const p = new URLSearchParams('difficulty=5&mission=dan')
+    expect(hasLevelRouteQueryOverrideFromSearchParams(p)).toBe(true)
+  })
+
   it('is true when mission is a known special mission id', () => {
     const p = new URLSearchParams('mission=consortium-certification')
     expect(hasLevelRouteQueryOverrideFromSearchParams(p)).toBe(true)

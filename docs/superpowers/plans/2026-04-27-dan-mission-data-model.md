@@ -43,7 +43,11 @@ This slice does **not** wire any runtime behavior: no level orchestration, no mi
 | `src/lib/missions/asteroidMissionGenerator.ts` | Modify | Roll concrete DAN values via `interpolateRange` |
 | `src/data/missions/givers/jovian-society.json` | Modify | Add `'dan'` to `objectiveTypes`; append two DAN templates |
 | `src/data/missions/givers/cinderline.json` | Modify | Add `'dan'` to `objectiveTypes`; append two DAN templates |
+| `src/lib/level/levelRouteAccess.ts` | Modify | Add `'dan'` to URL-launch allowlist so `?mission=dan&difficulty=5` is accepted |
+| `src/lib/level/levelContext.ts` | Modify | Add `dan` to the no-active-mission error string listing valid `?mission=` values |
 | `src/lib/missions/__tests__/asteroidMissionGenerator.spec.ts` | Modify | Add DAN roll/generation coverage |
+| `src/lib/level/__tests__/levelRouteAccess.spec.ts` | Modify | Confirm `?difficulty=5&mission=dan` is an allowed override |
+| `src/lib/level/__tests__/levelContext.spec.ts` | Modify | Confirm `generateMissionWithType(_, 'dan')` returns a DAN mission |
 | `docs/superpowers/specs/2026-04-27-dan-mission-design.md` | Reference only | Mission design intent |
 
 `src/lib/missions/giverCatalog.ts` already imports and registers `cinderline.json` (line 18). **No change needed.** Earlier drafts of this plan assumed the file did not exist; it does, with a single bunker template. We are extending it, not creating it.
@@ -292,13 +296,57 @@ DAN templates do **not** set `planetIds` — they roll from any host whose diffi
 
 The existing `cinderline_anvil_substation` bunker template has `"planetIds": ["mercury"]` — leave that untouched. Cinderline DAN templates intentionally have no host gate so they appear at any DAN-capable board.
 
+**Known caveat — does not block this plan:** `COMBAT_ONLY_HOST_PLANET_IDS` (`asteroidMissionGenerator.ts:654`) gates Mercury and Saturn to combat-flavored templates only. So Cinderline DAN templates will not actually surface at Mercury's procedural mission board until the combat-only filter is broadened (or DAN is added as an exception). For testing via URL launch we default to Earth host, so this does not affect the generator tests or `?mission=dan&difficulty=5` runs. Flag it for the eventual host-attribution slice.
+
 - [ ] **Step 6: Validate JSON**
 
 Vite's JSON imports surface parse errors at type-check time. No comments in JSON. Ensure trailing commas are absent and that the new objects are inserted with the correct preceding/following commas.
 
 ---
 
-## Task 4: Add Generator Tests
+## Task 4: Enable URL-Launch Testing For DAN Missions
+
+The bunker mission needed two pieces of plumbing on top of the data model to be testable via `?asteroidId=psyche&mission=bunker&difficulty=5`. DAN needs the same plumbing so the user can iterate via `?mission=dan&difficulty=5&asteroidId=<id>` without going through the map → board → accept flow.
+
+Bunker also needed `pickBunkerHostAnchor` (`levelContext.ts:31`) because bunker templates are planet-restricted via `planetIds`. **DAN does not need a synthetic host anchor** — its templates have no `planetIds` filter, so the default Earth host (`syntheticEarthHostAnchor()`, `asteroidMissionGenerator.ts:497`) rolls DAN cleanly. The mission's `region` is set from the template's `regionByDifficulty` (so the field reads `'jovian-trojans'`) regardless of host; only the waypoint world position is host-anchored.
+
+- [ ] **Step 1: Add `'dan'` to the URL-launch allowlist**
+
+In `src/lib/level/levelRouteAccess.ts`, extend `LEVEL_ROUTE_OBJECTIVE_TYPES`:
+
+```ts
+const LEVEL_ROUTE_OBJECTIVE_TYPES: readonly ObjectiveType[] = [
+  'gather',
+  'exterminate',
+  'rescue',
+  'survey',
+  'photometry',
+  'dan',
+  'collect',
+]
+```
+
+This is what unblocks `?mission=dan&difficulty=5` without an `asteroidId`. (When `asteroidId` is present the override returns true earlier regardless, so `?mission=dan&difficulty=5&asteroidId=psyche` already works after the rest of this plan ships — but adding to the allowlist makes URL launches without `asteroidId` legal too.)
+
+- [ ] **Step 2: Update the "no active mission" error message**
+
+In `src/lib/level/levelContext.ts`, the error string thrown when navigating to `/level` with no profile + no active mission + no override (around lines 175–180) lists valid `?mission=` values. Add `dan`:
+
+```ts
+'gather|exterminate|rescue|survey|photometry|dan|collect'
+```
+
+(Bunker is also missing from this string today — leaving it alone is fine; do not expand scope to fix unrelated stale strings.)
+
+- [ ] **Step 3: No host-anchor change needed**
+
+Confirm `generateMissionWithType(difficulty, 'dan')` does **not** need a special host anchor. The function (`levelContext.ts:126`) currently switches `'bunker' → pickBunkerHostAnchor()`, defaults to `null` host for everything else. DAN takes the default path. No change.
+
+If a future tuning pass decides DAN should be host-anchored at Jovian Trojan planets (Jupiter), add a `pickJovianHostAnchor()` helper following the bunker pattern. Out of scope for this slice.
+
+---
+
+## Task 5: Add Generator Tests
 
 - [ ] **Step 1: Add `rollObjective` DAN test**
 
@@ -366,9 +414,32 @@ it('can force DAN across its authored difficulty band', () => {
 
 The candidate sort in `generateAsteroidMission` already prefers slots whose type matches `requiredObjectiveType` before slicing by `objectiveCountForDifficulty`, so DAN slots survive the slice even when a giver's other templates would otherwise dominate.
 
+- [ ] **Step 4: Add URL-launch tests**
+
+In `src/lib/level/__tests__/levelRouteAccess.spec.ts`, mirror the existing photometry/survey override tests (around lines 68–73):
+
+```ts
+it('allows ?difficulty=5&mission=dan as an override', () => {
+  const p = new URLSearchParams('difficulty=5&mission=dan')
+  expect(hasLevelRouteQueryOverrideFromSearchParams(p)).toBe(true)
+})
+```
+
+In `src/lib/level/__tests__/levelContext.spec.ts`, mirror the bunker test at line 65 with a DAN equivalent that does **not** assert a special host anchor (because DAN doesn't get one):
+
+```ts
+it('generateMissionWithType returns a DAN mission when type is dan', () => {
+  const mission = generateMissionWithType(5, 'dan')
+  expect(mission.objectives.some((o) => o.type === 'dan')).toBe(true)
+  expect(mission.region).toBe('jovian-trojans')
+})
+```
+
+If `generateMissionWithType` is mocked or wrapped in the existing test file, follow the same setup pattern the bunker test uses.
+
 ---
 
-## Task 5: Verify
+## Task 6: Verify
 
 - [ ] **Step 1: Run targeted mission tests**
 
@@ -397,10 +468,22 @@ Zero oxlint errors, zero ESLint warnings (max-warnings 0). New types and interfa
 - [ ] **Step 4: Optional full mission test sweep**
 
 ```bash
-bun test:unit src/lib/missions/
+bun test:unit src/lib/missions/ src/lib/level/
 ```
 
-All mission-domain tests pass.
+All mission-domain and level-context tests pass.
+
+- [ ] **Step 5: Manual URL-launch smoke test**
+
+After all the above passes, boot the dev server (`bun dev`) and open:
+
+```
+http://localhost:9988/level?asteroidId=psyche&mission=dan&difficulty=5
+```
+
+Expect: the level loads without throwing, an asteroid appears, and the mission HUD shows a DAN objective. The encounter itself will not yet be playable (no terminal interact, no scan, no particles, no enemies — that's B2). What we are confirming here is that the data model and route plumbing are wired through end-to-end so the implementing agent for B1 and B2 has a working harness to iterate against.
+
+If the level throws or fails to surface a DAN objective in the HUD, debug before declaring this slice complete.
 
 ---
 

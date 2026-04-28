@@ -412,6 +412,18 @@ export function rollObjective(slot: ObjectiveSlot, difficulty: number): Concrete
         probeDistance: interpolatePhotometryRange(slot.params.probeDistance, difficulty),
         reward,
       }
+    case 'dan':
+      return {
+        type: 'dan',
+        x: 0,
+        z: 0,
+        scanDurationSeconds: interpolateRange(slot.params.scanDurationSeconds, difficulty),
+        requiredParticleHits: interpolateRange(slot.params.requiredParticleHits, difficulty),
+        enemyGraceSeconds: interpolateRange(slot.params.enemyGraceSeconds, difficulty),
+        particleTier: slot.params.particleTier,
+        enemyTier: slot.params.enemyTier,
+        reward,
+      }
     case 'collect':
       return {
         type: 'collect',

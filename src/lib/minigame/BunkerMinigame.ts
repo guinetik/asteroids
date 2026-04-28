@@ -152,6 +152,7 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
       tint: params.factionTint,
       scene: params.threeScene,
       projectileSystem: params.projectileSystem,
+      difficulty: params.difficulty,
     })
     return new BunkerMinigame(
       params.objectiveIndex,

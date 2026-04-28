@@ -21,6 +21,11 @@ import {
   TRON_HOLOGRAM_ENEMY_MATERIAL_OPACITY,
 } from '@/three/tronHologramMaterial'
 import { MutableTubeGeometry } from '@/three/geometry/MutableTubeGeometry'
+import {
+  enemyVisualPaletteForTier,
+  type EnemyVisualControllerOptions,
+  type EnemyVisualPalette,
+} from '@/three/enemyVisualPalette'
 
 // ── Visual constants ────────────────────────────────────────────
 const PHAGE_SCALE = 2.0
@@ -46,16 +51,8 @@ const DEATH_ANIM_DURATION = 1.2
  */
 export const PHAGE_HIT_CENTER_Y = 0.8 * PHAGE_SCALE
 
-/** TRON base plate + trunk. */
-const PHAGE_TRON_HULL = 0x00d8f0
-/** TRON collar / neck rings. */
-const PHAGE_TRON_NECK = 0x00a8c8
-/** TRON capsid shell. */
-const PHAGE_TRON_HEAD = 0xff3dad
 /** TRON inner torus core. */
 const PHAGE_TRON_CORE = 0x39ff14
-/** TRON legs. */
-const PHAGE_TRON_LEG = 0x00ffcc
 
 const flashMat = new THREE.MeshBasicMaterial({ color: 0xff00ff })
 
@@ -94,6 +91,7 @@ export class BacteriophageController implements Tickable {
   /** Capsid material restored after hit flash. */
   private headTronMat!: THREE.ShaderMaterial
   private readonly tronMaterials: THREE.ShaderMaterial[] = []
+  private readonly visualPalette: EnemyVisualPalette
 
   private elapsed = 0
   private readonly timeOffset: number
@@ -119,8 +117,9 @@ export class BacteriophageController implements Tickable {
     return this.dead && this.deathTimer >= DEATH_ANIM_DURATION
   }
 
-  constructor(enemy: Enemy) {
+  constructor(enemy: Enemy, options: EnemyVisualControllerOptions = {}) {
     this.enemy = enemy
+    this.visualPalette = enemyVisualPaletteForTier(options.visualTier)
     this.timeOffset = Math.random() * 10
 
     this.group.add(this.bodyGroup)
@@ -160,9 +159,9 @@ export class BacteriophageController implements Tickable {
   // ═══════════════════════════════════════════════════════════════
 
   private buildBody(): void {
-    const hullTron = this.makeTron(PHAGE_TRON_HULL)
-    const neckTron = this.makeTron(PHAGE_TRON_NECK)
-    this.headTronMat = this.makeTron(PHAGE_TRON_HEAD)
+    const hullTron = this.makeTron(this.visualPalette.silhouette)
+    const neckTron = this.makeTron(this.visualPalette.silhouetteDark)
+    this.headTronMat = this.makeTron(this.visualPalette.feature)
     const coreTron = this.makeTron(PHAGE_TRON_CORE)
 
     // Baseplate
@@ -218,7 +217,7 @@ export class BacteriophageController implements Tickable {
   }
 
   private buildLegs(): void {
-    const legTron = this.makeTron(PHAGE_TRON_LEG)
+    const legTron = this.makeTron(this.visualPalette.featureBright)
     for (let i = 0; i < LEG_COUNT; i++) {
       const angle = (i / LEG_COUNT) * Math.PI * 2
       const phase = i % 2 === 0 ? 0 : Math.PI

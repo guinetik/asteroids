@@ -25,10 +25,12 @@ import type { BunkerEnemyType } from '@/lib/bunker/bunkerWaveSchedule'
 import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import { EnemyProjectileSystem } from '@/lib/fps/enemyProjectileSystem'
 import { spawnChimeraProjectileBurst } from '@/lib/fps/chimeraProjectileBurst'
+import { getEnemyTypeConfig } from '@/lib/fps/enemyTypes'
 import { BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/BacteriophageController'
 import { ChimeraWalkerController, CHIMERA_HIT_CENTER_Y } from '@/three/ChimeraWalkerController'
 import { SpireController, SPIRE_HIT_CENTER_Y } from '@/three/SpireController'
 import { EnemyProjectileMeshPool } from '@/three/EnemyProjectileMeshPool'
+import type { EnemyVisualTier } from '@/three/enemyVisualPalette'
 
 /** Distance for the per-corner arena lights (world units). */
 const CORNER_LIGHT_DISTANCE = 14
@@ -50,6 +52,58 @@ const DOOR_LIGHT_Z_OFFSET = 1.5
 const WAVE_STAGED_SPAWN_SECONDS = 1.25
 /** Minimum aim distance before spawning an enemy projectile. */
 const ENEMY_PROJECTILE_MIN_AIM_DISTANCE = 0.001
+/** Lowest mission difficulty that keeps base bunker enemy HP unchanged. */
+const BUNKER_MIN_DIFFICULTY = 1
+/** Difficulty where bunker enemies reach the middle HP multiplier. */
+const BUNKER_MID_DIFFICULTY = 5
+/** Highest authored mission difficulty. */
+const BUNKER_MAX_DIFFICULTY = 10
+/** HP multiplier at {@link BUNKER_MIN_DIFFICULTY}. */
+const BUNKER_MIN_HP_MULTIPLIER = 1
+/** HP multiplier at {@link BUNKER_MID_DIFFICULTY}. */
+const BUNKER_MID_HP_MULTIPLIER = 3
+/** HP multiplier at {@link BUNKER_MAX_DIFFICULTY}. */
+const BUNKER_MAX_HP_MULTIPLIER = 5
+
+/**
+ * Convert mission difficulty to bunker-only enemy HP multiplier.
+ *
+ * Tuning anchors:
+ * difficulty 1 = 1x, difficulty 5 = 3x, difficulty 10 = 5x.
+ *
+ * @param difficulty - Mission difficulty, usually in the 1-10 range.
+ */
+function bunkerEnemyHealthMultiplier(difficulty: number): number {
+  const clamped = Math.max(BUNKER_MIN_DIFFICULTY, Math.min(BUNKER_MAX_DIFFICULTY, difficulty))
+  if (clamped <= BUNKER_MID_DIFFICULTY) {
+    const t = (clamped - BUNKER_MIN_DIFFICULTY) / (BUNKER_MID_DIFFICULTY - BUNKER_MIN_DIFFICULTY)
+    return BUNKER_MIN_HP_MULTIPLIER + t * (BUNKER_MID_HP_MULTIPLIER - BUNKER_MIN_HP_MULTIPLIER)
+  }
+
+  const t = (clamped - BUNKER_MID_DIFFICULTY) / (BUNKER_MAX_DIFFICULTY - BUNKER_MID_DIFFICULTY)
+  return BUNKER_MID_HP_MULTIPLIER + t * (BUNKER_MAX_HP_MULTIPLIER - BUNKER_MID_HP_MULTIPLIER)
+}
+
+/**
+ * Read an enemy's base config and apply the bunker HP multiplier.
+ *
+ * @param type - Enemy type key from `enemy-types.json`.
+ * @param multiplier - Bunker mission HP multiplier.
+ */
+function scaledBunkerEnemyHp(type: BunkerEnemyType, multiplier: number): number {
+  return Math.round(getEnemyTypeConfig(type).maxHp * multiplier)
+}
+
+/**
+ * Convert mission difficulty to bunker enemy visual palette tier.
+ *
+ * @param difficulty - Mission difficulty, usually in the 1-10 range.
+ */
+function bunkerEnemyVisualTier(difficulty: number): EnemyVisualTier {
+  if (difficulty <= 4) return 'default'
+  if (difficulty <= 7) return 'medium'
+  return 'hard'
+}
 
 /** Constructor opts for {@link BunkerSceneController}. */
 export interface BunkerSceneControllerOptions {
@@ -59,6 +113,8 @@ export interface BunkerSceneControllerOptions {
   scene: THREE.Scene
   /** Player projectile system used for bunker enemy hit registration. */
   projectileSystem?: ProjectileSystem
+  /** Mission difficulty in the 1-10 range, used for bunker-only enemy HP scaling. */
+  difficulty?: number
 }
 
 /** Interior scene wrapper — the level view treats this as a black box. */
@@ -77,6 +133,8 @@ export class BunkerSceneController {
   private readonly tint: number
   private readonly scene: THREE.Scene
   private readonly projectileSystem: ProjectileSystem | null
+  private readonly enemyHealthMultiplier: number
+  private readonly enemyVisualTier: EnemyVisualTier
   private readonly enemyProjectileMeshPool: EnemyProjectileMeshPool
   private readonly material: THREE.ShaderMaterial
   private readonly geometry: BunkerGeometry
@@ -97,6 +155,8 @@ export class BunkerSceneController {
     this.tint = opts.tint
     this.scene = opts.scene
     this.projectileSystem = opts.projectileSystem ?? null
+    this.enemyHealthMultiplier = bunkerEnemyHealthMultiplier(opts.difficulty ?? BUNKER_MIN_DIFFICULTY)
+    this.enemyVisualTier = bunkerEnemyVisualTier(opts.difficulty ?? BUNKER_MIN_DIFFICULTY)
     this.enemyProjectileMeshPool = new EnemyProjectileMeshPool(opts.scene)
     this.enemyProjectileMeshPool.prewarm()
     this.material = createBunkerGridMaterial({ tint: opts.tint })
@@ -408,15 +468,15 @@ export class BunkerSceneController {
    */
   private createEnemyController(handle: EnemyHandle): void {
     if (handle.type === 'bacteriophage') {
-      const ctrl = new BacteriophageController(handle.enemy)
+      const ctrl = new BacteriophageController(handle.enemy, { visualTier: this.enemyVisualTier })
       this.geometry.root.add(ctrl.group)
       this.phageControllers.set(handle.id, ctrl)
     } else if (handle.type === 'chimera') {
-      const ctrl = new ChimeraWalkerController(handle.enemy)
+      const ctrl = new ChimeraWalkerController(handle.enemy, { visualTier: this.enemyVisualTier })
       this.geometry.root.add(ctrl.group)
       this.chimeraControllers.set(handle.id, ctrl)
     } else {
-      const ctrl = new SpireController(handle.enemy)
+      const ctrl = new SpireController(handle.enemy, { visualTier: this.enemyVisualTier })
       this.geometry.root.add(ctrl.group)
       this.spireControllers.set(handle.id, ctrl)
     }
@@ -439,7 +499,9 @@ export class BunkerSceneController {
       this.pendingWaveRoomCursor = roomIndex + 1
     }
 
-    const handle = this.enemyDirector.spawn(type, root.x + pad.x, root.y, root.z + pad.z)
+    const handle = this.enemyDirector.spawn(type, root.x + pad.x, root.y, root.z + pad.z, {
+      maxHp: scaledBunkerEnemyHp(type, this.enemyHealthMultiplier),
+    })
     this.setInitialEnemyHitCenter(handle)
     this.projectileSystem?.addEnemy(handle.enemy)
     this.createEnemyController(handle)

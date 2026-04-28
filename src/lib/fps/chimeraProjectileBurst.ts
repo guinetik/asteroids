@@ -7,7 +7,7 @@
  */
 
 const CHIMERA_PROJECTILE_BURST_COUNT = 3
-const CHIMERA_PROJECTILE_BURST_INTERVAL_SECONDS = 0.06
+const CHIMERA_PROJECTILE_BURST_INTERVAL_SECONDS = 0.14
 const AIM_EPSILON = 0.01
 
 /**
@@ -55,7 +55,7 @@ export type ChimeraProjectileBurstSpawn = (
    */
   count: number,
   /**
-   * Seconds between shots, e.g. `0.06`.
+   * Seconds between shots, e.g. `0.14`.
    */
   intervalSeconds: number,
 ) => unknown

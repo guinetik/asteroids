@@ -18,6 +18,6 @@ describe('spawnChimeraProjectileBurst', () => {
     })
 
     expect(spawnBurst).toHaveBeenCalledOnce()
-    expect(spawnBurst.mock.calls[0]).toEqual([0, 2, 0, 0, 0, 1, 18, 7, 3, 0.06])
+    expect(spawnBurst.mock.calls[0]).toEqual([0, 2, 0, 0, 0, 1, 18, 7, 3, 0.14])
   })
 })

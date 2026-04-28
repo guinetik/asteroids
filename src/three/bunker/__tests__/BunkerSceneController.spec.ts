@@ -33,6 +33,9 @@ const PREVIOUS_ARENA_WIDTH = 58
 const PREVIOUS_ARENA_DEPTH = 60
 const ENEMY_ROOM_COUNT = 3
 const STAGED_SPAWN_STEP_SECONDS = 1.25
+const BASE_BACTERIOPHAGE_HP = 75
+const HARD_MAGENTA_SILHOUETTE = 0xb000ff
+const HARD_AMBER_FEATURE = 0xff9d00
 
 describe('BunkerSceneController', () => {
   it('keeps the extraction hatch hidden until the minigame reveals it', () => {
@@ -136,10 +139,45 @@ describe('BunkerSceneController', () => {
     controller.tick(0.016)
 
     expect(enemyProjectileSystem!.projectileCount).toBe(1)
-    enemyProjectileSystem!.tick(0.06)
+    enemyProjectileSystem!.tick(0.14)
     expect(enemyProjectileSystem!.projectileCount).toBe(2)
-    enemyProjectileSystem!.tick(0.06)
+    enemyProjectileSystem!.tick(0.14)
     expect(enemyProjectileSystem!.projectileCount).toBe(3)
+  })
+
+  it('scales bunker enemy health by mission difficulty', () => {
+    const mediumController = new BunkerSceneController({
+      tint: TINT,
+      scene: new THREE.Scene(),
+      difficulty: 5,
+    })
+    const hardController = new BunkerSceneController({
+      tint: TINT,
+      scene: new THREE.Scene(),
+      difficulty: 10,
+    })
+
+    mediumController.spawnWave(['bacteriophage'])
+    hardController.spawnWave(['bacteriophage'])
+
+    expect(mediumController.enemyDirector.enemies[0]!.enemy.maxHp).toBe(BASE_BACTERIOPHAGE_HP * 3)
+    expect(mediumController.enemyDirector.enemies[0]!.enemy.hp).toBe(BASE_BACTERIOPHAGE_HP * 3)
+    expect(hardController.enemyDirector.enemies[0]!.enemy.maxHp).toBe(BASE_BACTERIOPHAGE_HP * 5)
+    expect(hardController.enemyDirector.enemies[0]!.enemy.hp).toBe(BASE_BACTERIOPHAGE_HP * 5)
+  })
+
+  it('passes hard visual palettes to bunker enemy controllers at high difficulty', () => {
+    const controller = new BunkerSceneController({
+      tint: TINT,
+      scene: new THREE.Scene(),
+      difficulty: 10,
+    })
+
+    controller.spawnWave(['spire'])
+
+    expect(shaderColors(controller)).toEqual(
+      expect.arrayContaining([HARD_MAGENTA_SILHOUETTE, HARD_AMBER_FEATURE]),
+    )
   })
 
   it('spawns wave enemies on world-space arena pads after moving the bunker root', () => {
@@ -248,6 +286,26 @@ function hasWallAt(meshes: readonly THREE.Mesh[], x: number, z: number): boolean
     if (x >= box.min.x && x <= box.max.x && z >= box.min.z && z <= box.max.z) return true
   }
   return false
+}
+
+/**
+ * Collect TRON shader primary colors from a bunker scene controller.
+ *
+ * @param controller - Controller whose private geometry root is inspected.
+ */
+function shaderColors(controller: BunkerSceneController): number[] {
+  const root = (controller as unknown as { geometry: { root: THREE.Object3D } }).geometry.root
+  const colors: number[] = []
+  root.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return
+    const materials = Array.isArray(child.material) ? child.material : [child.material]
+    for (const material of materials) {
+      if (!(material instanceof THREE.ShaderMaterial)) continue
+      const color = material.uniforms['uColor']?.value
+      if (color instanceof THREE.Color) colors.push(color.getHex())
+    }
+  })
+  return colors
 }
 
 /**

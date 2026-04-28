@@ -2,7 +2,7 @@
   "id": "cinderline",
   "name": "The Cinderline, at The Anvil",
   "title": "Standing Order, Mercury",
-  "objectiveTypes": ["bunker"],
+  "objectiveTypes": ["bunker", "dan"],
   "minDifficulty": 1,
   "maxDifficulty": 10,
   "missions": [
@@ -25,6 +25,50 @@
         "kuiper-belt": [7, 10]
       },
       "planetIds": ["mercury"]
+    },
+    {
+      "id": "cinderline_first_listening",
+      "name": "The First Listening",
+      "briefing": "Pilot, the body has been listened to before from a distance. It is time to listen again. Set the pulse into the regolith and gather what reply the stone chooses to give. Hold your vigil until the answer is complete. A seat will be kept.",
+      "objectiveSlots": [
+        {
+          "type": "dan",
+          "weight": 1.0,
+          "params": {
+            "type": "dan",
+            "scanDurationSeconds": { "min": 35, "max": 50 },
+            "requiredParticleHits": { "min": 40, "max": 55 },
+            "enemyGraceSeconds": { "min": 10, "max": 8 },
+            "particleTier": "medium",
+            "enemyTier": "medium"
+          },
+          "reward": { "min": 3000, "max": 6500 }
+        }
+      ],
+      "completionBonus": { "min": 500, "max": 1500 },
+      "regionByDifficulty": { "jovian-trojans": [4, 7] }
+    },
+    {
+      "id": "cinderline_vigil_threshold",
+      "name": "Vigil at the Threshold",
+      "briefing": "Pilot, this body is close to waking without our call. We do not require speed. We require attention. What replies will reply; meet it with restraint, and withdraw cleanly when the listening is done. Walk in the light.",
+      "objectiveSlots": [
+        {
+          "type": "dan",
+          "weight": 1.0,
+          "params": {
+            "type": "dan",
+            "scanDurationSeconds": { "min": 45, "max": 65 },
+            "requiredParticleHits": { "min": 55, "max": 65 },
+            "enemyGraceSeconds": { "min": 9, "max": 6 },
+            "particleTier": "high",
+            "enemyTier": "high"
+          },
+          "reward": { "min": 5000, "max": 9000 }
+        }
+      ],
+      "completionBonus": { "min": 1500, "max": 2500 },
+      "regionByDifficulty": { "jovian-trojans": [8, 10] }
     }
   ]
 }

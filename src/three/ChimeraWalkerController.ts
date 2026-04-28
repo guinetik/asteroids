@@ -22,6 +22,11 @@ import {
   TRON_HOLOGRAM_ENEMY_MATERIAL_OPACITY,
 } from '@/three/tronHologramMaterial'
 import { MutableTubeGeometry } from '@/three/geometry/MutableTubeGeometry'
+import {
+  enemyVisualPaletteForTier,
+  type EnemyVisualControllerOptions,
+  type EnemyVisualPalette,
+} from '@/three/enemyVisualPalette'
 
 const CHIMERA_SCALE = 0.9
 /** Axial segments per leg tube — lower = cheaper {@link THREE.TubeGeometry} rebuilds. */
@@ -52,6 +57,10 @@ const HIT_FLASH_DURATION = 0.08
 const HIT_RECOIL_DURATION = 0.25
 const HIT_RECOIL_INTENSITY = 0.14
 const DEATH_ANIM_DURATION = 1.35
+/** Default walker eye/hair feature color. */
+const CHIMERA_DEFAULT_FEATURE = 0xff2200
+/** Brighter default walker hair-tip feature color. */
+const CHIMERA_DEFAULT_FEATURE_BRIGHT = 0xff6644
 
 /**
  * Y offset from group origin to body center in world units.
@@ -59,23 +68,12 @@ const DEATH_ANIM_DURATION = 1.35
  */
 export const CHIMERA_HIT_CENTER_Y = BODY_HEIGHT * CHIMERA_SCALE
 
-/** TRON hull — legs, joints, toes, hip. */
-const CHIMERA_TRON_HULL = 0x00d4e8
-/** TRON torso + spine stack. */
-const CHIMERA_TRON_BODY = 0x00a8c4
-/** TRON head outer shell. */
-const CHIMERA_TRON_HEAD_MEMBRANE = 0xff2a7a
 /** TRON head inner core. */
 const CHIMERA_TRON_HEAD_CORE = 0xff0066
 /** TRON DNA torus accent. */
 const CHIMERA_TRON_DNA = 0x39ff14
 /** TRON RNA torus accent. */
 const CHIMERA_TRON_RNA = 0xff3366
-/** TRON tentacle shaft. */
-const CHIMERA_TRON_TENTACLE = 0xff00cc
-/** TRON tentacle tip. */
-const CHIMERA_TRON_TENTACLE_TIP = 0xff66dd
-
 const flashMat = new THREE.MeshBasicMaterial({ color: 0xff00ff })
 
 const torsoGeo = new THREE.IcosahedronGeometry(1.2, 1)
@@ -158,6 +156,7 @@ export class ChimeraWalkerController implements Tickable {
   /** Restores head shell after hit / death flash (shared TRON shader). */
   private headMembraneMat!: THREE.ShaderMaterial
   private readonly tronMaterials: THREE.ShaderMaterial[] = []
+  private readonly visualPalette: EnemyVisualPalette
   /** Eye emissives — disposed with this instance. */
   private readonly disposableBasicMaterials: THREE.MeshBasicMaterial[] = []
   private leftEye!: THREE.Mesh
@@ -195,8 +194,17 @@ export class ChimeraWalkerController implements Tickable {
     return this.dead && this.deathTimer >= DEATH_ANIM_DURATION
   }
 
-  constructor(enemy: Enemy) {
+  constructor(enemy: Enemy, options: EnemyVisualControllerOptions = {}) {
     this.enemy = enemy
+    const palette = enemyVisualPaletteForTier(options.visualTier)
+    this.visualPalette =
+      options.visualTier === undefined || options.visualTier === 'default'
+        ? {
+            ...palette,
+            feature: CHIMERA_DEFAULT_FEATURE,
+            featureBright: CHIMERA_DEFAULT_FEATURE_BRIGHT,
+          }
+        : palette
 
     this.group.add(this.legsGroup)
     this.group.add(this.bodyGroup)
@@ -363,9 +371,9 @@ export class ChimeraWalkerController implements Tickable {
   }
 
   private buildBody(): void {
-    const bodyTron = this.makeTron(CHIMERA_TRON_BODY)
-    const hullTron = this.makeTron(CHIMERA_TRON_HULL)
-    const neckTron = this.makeTron(CHIMERA_TRON_BODY)
+    const bodyTron = this.makeTron(this.visualPalette.silhouette)
+    const hullTron = this.makeTron(this.visualPalette.silhouette)
+    const neckTron = this.makeTron(this.visualPalette.silhouetteDark)
     const dnaTron = this.makeTron(CHIMERA_TRON_DNA)
     const rnaTron = this.makeTron(CHIMERA_TRON_RNA)
 
@@ -400,7 +408,7 @@ export class ChimeraWalkerController implements Tickable {
   }
 
   private buildHead(): void {
-    this.headMembraneMat = this.makeTron(CHIMERA_TRON_HEAD_MEMBRANE)
+    this.headMembraneMat = this.makeTron(this.visualPalette.silhouette)
     this.headMembrane = new THREE.Mesh(headMembraneGeo, this.headMembraneMat)
     this.headMembrane.position.y = HEAD_HEIGHT
     this.headGroup.add(this.headMembrane)
@@ -414,7 +422,7 @@ export class ChimeraWalkerController implements Tickable {
     this.headGroup.add(this.headLight)
 
     for (const side of [-1, 1] as const) {
-      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2200 })
+      const eyeMat = new THREE.MeshBasicMaterial({ color: this.visualPalette.feature })
       this.disposableBasicMaterials.push(eyeMat)
       const eye = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 4), eyeMat)
       eye.position.set(side * 0.35, 8.95, 0.65)
@@ -430,8 +438,8 @@ export class ChimeraWalkerController implements Tickable {
   }
 
   private buildLegs(): void {
-    const legTron = this.makeTron(CHIMERA_TRON_HULL)
-    const toeTron = this.makeTron(CHIMERA_TRON_HULL)
+    const legTron = this.makeTron(this.visualPalette.silhouette)
+    const toeTron = this.makeTron(this.visualPalette.silhouette)
     for (const side of [-1, 1] as const) {
       const upperTube = new MutableTubeGeometry(
         LEG_TUBE_AXIAL_SEGMENTS,
@@ -482,8 +490,8 @@ export class ChimeraWalkerController implements Tickable {
   }
 
   private buildTentacles(): void {
-    const tentacleTron = this.makeTron(CHIMERA_TRON_TENTACLE)
-    const tentacleTipTron = this.makeTron(CHIMERA_TRON_TENTACLE_TIP)
+    const tentacleTron = this.makeTron(this.visualPalette.feature)
+    const tentacleTipTron = this.makeTron(this.visualPalette.featureBright)
     const initCurve = new THREE.LineCurve3(new THREE.Vector3(), new THREE.Vector3(0, -1, 0))
     for (let i = 0; i < TENTACLE_COUNT; i++) {
       const angle = (i / TENTACLE_COUNT) * Math.PI * 2

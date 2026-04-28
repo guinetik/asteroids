@@ -30,9 +30,9 @@
     "modelScale": 1500,
     "surfaceTextures": "/textures/asteroids/psyche",
     "surfaceUseEmbeddedUVs": true,
-    "surfaceDetailFolder": "/textures/asteroids/rocky",
-    "surfaceDetailRepeat": 500,
-    "surfaceDetailNormalStrength": 1.85
+    "surfaceDetailFolder": "/textures/asteroids/default",
+    "surfaceDetailRepeat": 10,
+    "surfaceDetailNormalStrength": 3.85
   },
   "visual": {
     "albedo": 0.15,

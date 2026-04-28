@@ -20,11 +20,12 @@ export type ObjectiveType =
   | 'rescue'
   | 'survey'
   | 'photometry'
+  | 'dan'
   | 'collect'
   | 'bunker'
 
 /** Solar system region where missions spawn. Determines fuel cost and distance. */
-export type MissionRegion = 'near-earth' | 'asteroid-belt' | 'kuiper-belt'
+export type MissionRegion = 'near-earth' | 'asteroid-belt' | 'kuiper-belt' | 'jovian-trojans'
 
 /** A min/max range for procedural generation. Generator interpolates based on difficulty. */
 export interface NumberRange {
@@ -88,6 +89,25 @@ export interface PhotometryScalableParams {
   probeDistance: NumberRange
 }
 
+/** Difficulty bucket for DAN particle and enemy pressure. */
+export type DanPressureTier = 'low' | 'medium' | 'high'
+
+/** Scalable params for DAN subsurface survey objectives. */
+export interface DanScalableParams {
+  /** Discriminator for the union type. */
+  type: 'dan'
+  /** Active scan duration, in seconds. Scales up with difficulty. */
+  scanDurationSeconds: NumberRange
+  /** Particle hits required to complete the scan meter. Scales up with difficulty. */
+  requiredParticleHits: NumberRange
+  /** Seconds before viroid pressure starts after scan activation. Inverted for harder bands. */
+  enemyGraceSeconds: NumberRange
+  /** Particle pressure preset for the runtime DAN system. */
+  particleTier: DanPressureTier
+  /** Enemy pressure preset for the runtime DAN system. */
+  enemyTier: DanPressureTier
+}
+
 /** Scalable params for COLLECT objectives. Currently authored-only. */
 export interface CollectScalableParams {
   /** Discriminator for the union type. */
@@ -113,6 +133,7 @@ export type ScalableParams =
   | RescueScalableParams
   | SurveyScalableParams
   | PhotometryScalableParams
+  | DanScalableParams
   | CollectScalableParams
   | BunkerScalableParams
 
@@ -455,6 +476,16 @@ export interface ConcreteObjective {
   scanHoldSeconds?: number
   /** For photometry: distance from objective site to the side standoff probe point. */
   probeDistance?: number
+  /** For DAN: active scan duration, in seconds. */
+  scanDurationSeconds?: number
+  /** For DAN: particle hits needed to complete the scan meter. */
+  requiredParticleHits?: number
+  /** For DAN: seconds before viroid spawns begin. */
+  enemyGraceSeconds?: number
+  /** For DAN: particle pressure preset, consumed by runtime tuning. */
+  particleTier?: DanPressureTier
+  /** For DAN: enemy pressure preset, consumed by runtime tuning. */
+  enemyTier?: DanPressureTier
   /** For collect: stable inventory/item id granted by the pickup. */
   collectItemId?: string
   /** For collect: UI-facing item label. */

@@ -2,7 +2,7 @@
   "id": "jovian-society",
   "name": "Vance Hoyt",
   "title": "Senior Asset Officer",
-  "objectiveTypes": ["photometry", "bunker"],
+  "objectiveTypes": ["photometry", "bunker", "dan"],
   "minDifficulty": 3,
   "maxDifficulty": 10,
   "missions": [
@@ -47,6 +47,28 @@
       "regionByDifficulty": { "jovian-trojans": [6, 10] }
     },
     {
+      "id": "jovian_subsurface_pass",
+      "name": "Subsurface Verification Pass",
+      "briefing": "Per current portfolio review, this asset has cleared preliminary photometric screening. Next step is DAN: Dynamic Albedo of Neutrons, with emphasis on buried volatiles and lattice traces relevant to neutron-thruster production. Kindly capture clean return particles and disregard any sensor cross-talk inside the instrumentation envelope. Warm regards, Vance Hoyt.",
+      "objectiveSlots": [
+        {
+          "type": "dan",
+          "weight": 1.0,
+          "params": {
+            "type": "dan",
+            "scanDurationSeconds": { "min": 35, "max": 50 },
+            "requiredParticleHits": { "min": 40, "max": 55 },
+            "enemyGraceSeconds": { "min": 10, "max": 8 },
+            "particleTier": "medium",
+            "enemyTier": "medium"
+          },
+          "reward": { "min": 3000, "max": 6500 }
+        }
+      ],
+      "completionBonus": { "min": 500, "max": 1500 },
+      "regionByDifficulty": { "jovian-trojans": [4, 7] }
+    },
+    {
       "id": "jovian_asset_substrate_recovery",
       "name": "Asset Substrate Recovery",
       "briefing": "Pilot. The Society maintains an asset bunker on the body in question. A viroid incursion has compromised it. Per portfolio terms, we require descent, neutralization, and recovery of the substrate before the next review cycle. Standard pass: clear the floor, walk out. — Vance Hoyt",
@@ -64,6 +86,28 @@
         "kuiper-belt": [7, 10]
       },
       "planetIds": ["jupiter"]
+    },
+    {
+      "id": "jovian_extraction_grade_dan",
+      "name": "Extraction-Grade DAN Survey",
+      "briefing": "Stakeholders require extraction-grade subsurface confidence before this body advances. Run a full Dynamic Albedo of Neutrons pass and classify any lattice-positive bands against the Phobos reference family. Please advise if elevated ambient disturbance compromises telemetry quality; otherwise continue the pass unless the hull is compromised. Warm regards, Vance Hoyt.",
+      "objectiveSlots": [
+        {
+          "type": "dan",
+          "weight": 1.0,
+          "params": {
+            "type": "dan",
+            "scanDurationSeconds": { "min": 45, "max": 65 },
+            "requiredParticleHits": { "min": 55, "max": 65 },
+            "enemyGraceSeconds": { "min": 9, "max": 6 },
+            "particleTier": "high",
+            "enemyTier": "high"
+          },
+          "reward": { "min": 5000, "max": 9000 }
+        }
+      ],
+      "completionBonus": { "min": 1500, "max": 2500 },
+      "regionByDifficulty": { "jovian-trojans": [8, 10] }
     }
   ]
 }

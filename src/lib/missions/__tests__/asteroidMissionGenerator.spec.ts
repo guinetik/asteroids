@@ -165,6 +165,36 @@ describe('rollObjective', () => {
     expect(hard.timeLimit).toBe(170)
     expect(hard.scanHoldSeconds).toBe(14)
   })
+
+  it('rolls DAN objective with concrete scan values', () => {
+    const slot = {
+      type: 'dan' as const,
+      weight: 1,
+      params: {
+        type: 'dan' as const,
+        scanDurationSeconds: { min: 35, max: 50 },
+        requiredParticleHits: { min: 40, max: 55 },
+        enemyGraceSeconds: { min: 10, max: 8 },
+        particleTier: 'medium' as const,
+        enemyTier: 'medium' as const,
+      },
+      reward: { min: 3000, max: 6500 },
+    }
+
+    const obj = rollObjective(slot, 5)
+
+    expect(obj.type).toBe('dan')
+    expect(obj.scanDurationSeconds).toBeGreaterThanOrEqual(35)
+    expect(obj.scanDurationSeconds).toBeLessThanOrEqual(50)
+    expect(obj.requiredParticleHits).toBeGreaterThanOrEqual(40)
+    expect(obj.requiredParticleHits).toBeLessThanOrEqual(55)
+    expect(obj.enemyGraceSeconds).toBeGreaterThanOrEqual(8)
+    expect(obj.enemyGraceSeconds).toBeLessThanOrEqual(10)
+    expect(obj.particleTier).toBe('medium')
+    expect(obj.enemyTier).toBe('medium')
+    expect(obj.reward).toBeGreaterThanOrEqual(3000)
+    expect(obj.reward).toBeLessThanOrEqual(6500)
+  })
 })
 
 describe('pickAsteroidForDifficulty', () => {
@@ -412,6 +442,24 @@ describe('generateAsteroidMission', () => {
       expect(mission.giverId).toBe('jovian-society')
       expect(mission.difficulty).toBe(difficulty)
       expect(mission.objectives.some((objective) => objective.type === 'photometry')).toBe(true)
+    }
+  })
+
+  it('can force a DAN mission for DAN-capable givers', () => {
+    const mission = generateAsteroidMission(6, null, () => 0, 'dan')
+
+    expect(['jovian-society', 'cinderline']).toContain(mission.giverId)
+    expect(mission.region).toBe('jovian-trojans')
+    expect(mission.objectives.some((objective) => objective.type === 'dan')).toBe(true)
+  })
+
+  it('can force DAN across its authored difficulty band', () => {
+    for (const difficulty of [4, 7, 8, 10]) {
+      const mission = generateAsteroidMission(difficulty, null, () => 0, 'dan')
+
+      expect(['jovian-society', 'cinderline']).toContain(mission.giverId)
+      expect(mission.difficulty).toBe(difficulty)
+      expect(mission.objectives.some((objective) => objective.type === 'dan')).toBe(true)
     }
   })
 
