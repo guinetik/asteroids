@@ -428,6 +428,19 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
     this.onStepChange?.(this.objectiveIndex, this._steps)
   }
 
+  /**
+   * Reposition the bunker scene root. Called by the level view before the
+   * descent swap so the bunker materializes around the player's surface
+   * position rather than at world origin.
+   *
+   * @param x - World X
+   * @param y - World Y
+   * @param z - World Z
+   */
+  setSceneRootWorldPosition(x: number, y: number, z: number): void {
+    this.scene?.setRootWorldPosition(x, y, z)
+  }
+
   /** Called when the player presses E on the surface hatch. Caller swaps scene. */
   notifyDescended(): void {
     this.advanceStep(2) // Enter the bunker

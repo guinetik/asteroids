@@ -1494,14 +1494,22 @@ export class LevelViewController implements Tickable {
     if (!this.playerController || !this.stateMachine) return
 
     this.surfacePlayerSnapshot = this.playerController.group.position.clone()
+    const descentPos = this.surfacePlayerSnapshot
     this.startBunkerSwapFade(() => {
       // Swap scenes at peak black.
       if (this.asteroidSurface) this.asteroidSurface.group.visible = false
       if (this.surfaceRocks) this.surfaceRocks.group.visible = false
+      minigame.setSceneRootWorldPosition(descentPos.x, descentPos.y, descentPos.z)
       minigame.notifyDescended()
       const spawn = minigame.playerSpawn
       if (spawn && this.playerController) {
-        this.playerController.group.position.copy(spawn)
+        // playerSpawn is in bunker-local coords; adding the descent position
+        // (which is now the bunker root's world position) gives the world spawn.
+        this.playerController.group.position.set(
+          descentPos.x + spawn.x,
+          descentPos.y + spawn.y,
+          descentPos.z + spawn.z,
+        )
         this.playerController.body.velocityY = 0
       }
       this.stateMachine?.trigger('enterBunker')

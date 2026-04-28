@@ -122,6 +122,21 @@ export class BunkerSceneController {
     return this.enemyDirector.addSpawnListener(listener)
   }
 
+  /**
+   * Move the bunker scene root to a specific world position. Called by the
+   * level controller before {@link activate} so the bunker materializes around
+   * the player's descent point on the asteroid surface — the scene's local
+   * `playerSpawn` then resolves to a world position close to where the player
+   * was standing, instead of teleporting them to world origin.
+   *
+   * @param x - World X
+   * @param y - World Y (set to the player's foot Y so `bunkerFloorY` matches the surface)
+   * @param z - World Z
+   */
+  setRootWorldPosition(x: number, y: number, z: number): void {
+    this.geometry.root.position.set(x, y, z)
+  }
+
   /** Add the bunker root to the scene. */
   activate(): void {
     if (this.active) return
