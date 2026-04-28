@@ -15,7 +15,7 @@ Acceptance checks:
 
 - The cylinder is large enough for a suited person to plausibly fit inside.
 - The metal pipe is chunky, 16 units across, and extrudes upward from a buried base.
-- The pipe uses bright steel coloring with high metalness so it reads as metal, not obsidian.
-- A raised, lit side door/frame on the cylinder communicates how the player enters.
+- The pipe uses the `/textures/metal` PBR set with muted reflections so it reads as textured metal, not chrome or obsidian.
+- A taller raised, lit side door/frame on the cylinder communicates how the player enters.
 - The pipe renders both sides and has a visible top cap.
 - The change is visual only; interaction ranges and bunker minigame state stay unchanged.

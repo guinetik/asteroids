@@ -26,7 +26,7 @@ const HATCH_PIPE_SEGMENTS = 48
 /** Width of the side door panel. */
 const HATCH_DOOR_WIDTH = 4.6
 /** Height of the side door panel. */
-const HATCH_DOOR_HEIGHT = 7.4
+const HATCH_DOOR_HEIGHT = 9.2
 /** Thickness of the side door panel. */
 const HATCH_DOOR_DEPTH = 0.08
 /** Gap from visible ground to the bottom of the side door panel. */
@@ -53,12 +53,22 @@ const HATCH_DOOR_LIGHT_DISTANCE = 18
 const HATCH_COLLIDER_HALF_EXTENT = HATCH_PIPE_RADIUS
 /** Brighter steel used by the pipe body. */
 const HATCH_PIPE_COLOR = 0xb6bec8
+/** Folder containing the hatch pipe PBR texture set. */
+const HATCH_PIPE_TEXTURE_DIR = '/textures/metal'
+/** Texture tiling around/across the hatch pipe. */
+const HATCH_PIPE_TEXTURE_REPEAT_X = 2
+/** Texture tiling vertically along the hatch pipe. */
+const HATCH_PIPE_TEXTURE_REPEAT_Y = 4
+/** Strength of the metal displacement map. Kept small so the cylinder silhouette stays stable. */
+const HATCH_PIPE_DISPLACEMENT_SCALE = 0.08
 /** Dark panel color used by the door. */
 const HATCH_DOOR_COLOR = 0x121821
 /** Metalness for the pipe body. */
-const HATCH_PIPE_METALNESS = 0.9
+const HATCH_PIPE_METALNESS = 0.55
 /** Roughness for the pipe body. */
-const HATCH_PIPE_ROUGHNESS = 0.32
+const HATCH_PIPE_ROUGHNESS = 0.72
+/** Environment reflection multiplier for the pipe body. */
+const HATCH_PIPE_ENV_MAP_INTENSITY = 0.35
 /** Metalness for the side door. */
 const HATCH_DOOR_METALNESS = 0.45
 /** Roughness for the side door. */
@@ -74,6 +84,53 @@ const HATCH_DOOR_PULSE_SPEED = 3
 /** Tween duration for open/close in seconds. */
 const TWEEN_DURATION = 0.6
 
+/** GPU textures for the repeating steel pipe around the hatch bore. */
+interface HatchPipeTextures {
+  /** Surface albedo sampled with {@link HATCH_PIPE_TEXTURE_REPEAT_X/Y}. */
+  map: THREE.Texture
+  /** Packed normal / height style map used as `normalMap`. */
+  normalMap: THREE.Texture
+  /** Per-pixel roughness modulation. */
+  roughnessMap: THREE.Texture
+  /** Optional metalness channel (here always present for brushed metal). */
+  metalnessMap: THREE.Texture
+  /** Small-scale height for parallax-style displacement. */
+  displacementMap: THREE.Texture
+}
+
+/**
+ * Load one hatch pipe texture and configure it for repeated PBR sampling.
+ *
+ * @param filename - Texture file name within {@link HATCH_PIPE_TEXTURE_DIR}.
+ * @param colorSpace - `SRGBColorSpace` for albedo, `NoColorSpace` for data maps.
+ */
+function loadHatchPipeTexture(filename: string, colorSpace: THREE.ColorSpace): THREE.Texture {
+  const texture = new THREE.TextureLoader().load(`${HATCH_PIPE_TEXTURE_DIR}/${filename}`, () => {
+    texture.needsUpdate = true
+  })
+  texture.wrapS = THREE.RepeatWrapping
+  texture.wrapT = THREE.RepeatWrapping
+  texture.repeat.set(HATCH_PIPE_TEXTURE_REPEAT_X, HATCH_PIPE_TEXTURE_REPEAT_Y)
+  texture.colorSpace = colorSpace
+  texture.anisotropy = 8
+  return texture
+}
+
+/**
+ * Load the metal PBR texture set used by the hatch pipe body.
+ *
+ * @returns PBR maps wired into {@link THREE.MeshStandardMaterial}.
+ */
+function loadHatchPipeTextures(): HatchPipeTextures {
+  return {
+    map: loadHatchPipeTexture('color.webp', THREE.SRGBColorSpace),
+    normalMap: loadHatchPipeTexture('normal.webp', THREE.NoColorSpace),
+    roughnessMap: loadHatchPipeTexture('roughness.webp', THREE.NoColorSpace),
+    metalnessMap: loadHatchPipeTexture('metalness.webp', THREE.NoColorSpace),
+    displacementMap: loadHatchPipeTexture('displacement.webp', THREE.NoColorSpace),
+  }
+}
+
 /** A single bunker hatch (surface or antechamber). */
 export class BunkerHatchModel {
   /** Add this group to the parent scene/group. */
@@ -85,6 +142,7 @@ export class BunkerHatchModel {
   private readonly bodyMat: THREE.MeshStandardMaterial
   private readonly doorMat: THREE.MeshStandardMaterial
   private readonly frameMat: THREE.MeshBasicMaterial
+  private readonly bodyTextures: THREE.Texture[]
   private targetOpen = 0
   private currentOpen = 0
   private idlePhase = 0
@@ -95,10 +153,19 @@ export class BunkerHatchModel {
    * @param tint - Faction tint hex
    */
   constructor(tint: number) {
+    const pipeTextures = loadHatchPipeTextures()
+    this.bodyTextures = Object.values(pipeTextures)
     this.bodyMat = new THREE.MeshStandardMaterial({
       color: HATCH_PIPE_COLOR,
+      map: pipeTextures.map,
+      normalMap: pipeTextures.normalMap,
+      roughnessMap: pipeTextures.roughnessMap,
+      metalnessMap: pipeTextures.metalnessMap,
+      displacementMap: pipeTextures.displacementMap,
+      displacementScale: HATCH_PIPE_DISPLACEMENT_SCALE,
       metalness: HATCH_PIPE_METALNESS,
       roughness: HATCH_PIPE_ROUGHNESS,
+      envMapIntensity: HATCH_PIPE_ENV_MAP_INTENSITY,
       side: THREE.DoubleSide,
     })
     const bodyGeo = new THREE.CylinderGeometry(
@@ -106,7 +173,7 @@ export class BunkerHatchModel {
       HATCH_PIPE_RADIUS,
       HATCH_PIPE_HEIGHT,
       HATCH_PIPE_SEGMENTS,
-      1,
+      8,
       false,
     )
     this.body = new THREE.Mesh(bodyGeo, this.bodyMat)
@@ -272,6 +339,7 @@ export class BunkerHatchModel {
   dispose(): void {
     this.body.geometry.dispose()
     this.bodyMat.dispose()
+    for (const texture of this.bodyTextures) texture.dispose()
     this.door.geometry.dispose()
     this.doorMat.dispose()
     for (const child of this.frame.children) {

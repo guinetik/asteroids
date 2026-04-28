@@ -17,12 +17,13 @@ const BURIED_DEPTH = 6
 const DOOR_MIN_BOTTOM_ABOVE_GROUND = 1
 const DOOR_MAX_BOTTOM_ABOVE_GROUND = 2
 const MIN_DOOR_WIDTH = 4
-const MIN_DOOR_HEIGHT = 7
+const MIN_DOOR_HEIGHT = 9
 const MAX_PIPE_HEIGHT = LANDER_COLLISION_TOP_OFFSET * 2
 const MIN_PIPE_HEIGHT = LANDER_COLLISION_TOP_OFFSET * 1.5
 const MIN_PIPE_COLOR_CHANNEL = 0.35
-const MIN_PIPE_METALNESS = 0.8
-const MAX_PIPE_ROUGHNESS = 0.4
+const MAX_PIPE_METALNESS = 0.65
+const MIN_PIPE_ROUGHNESS = 0.65
+const MAX_PIPE_ENV_MAP_INTENSITY = 0.5
 const FLOAT_EPSILON = 1e-4
 
 describe('BunkerHatchModel', () => {
@@ -45,8 +46,18 @@ describe('BunkerHatchModel', () => {
     expect(bodyMesh.material.color.r).toBeGreaterThanOrEqual(MIN_PIPE_COLOR_CHANNEL)
     expect(bodyMesh.material.color.g).toBeGreaterThanOrEqual(MIN_PIPE_COLOR_CHANNEL)
     expect(bodyMesh.material.color.b).toBeGreaterThanOrEqual(MIN_PIPE_COLOR_CHANNEL)
-    expect(bodyMesh.material.metalness).toBeGreaterThanOrEqual(MIN_PIPE_METALNESS)
-    expect(bodyMesh.material.roughness).toBeLessThanOrEqual(MAX_PIPE_ROUGHNESS)
+    expect(bodyMesh.material.metalness).toBeLessThanOrEqual(MAX_PIPE_METALNESS)
+    expect(bodyMesh.material.roughness).toBeGreaterThanOrEqual(MIN_PIPE_ROUGHNESS)
+    expect(bodyMesh.material.envMapIntensity).toBeLessThanOrEqual(MAX_PIPE_ENV_MAP_INTENSITY)
+    expect(bodyMesh.material.map).toBeInstanceOf(THREE.Texture)
+    expect(bodyMesh.material.normalMap).toBeInstanceOf(THREE.Texture)
+    expect(bodyMesh.material.roughnessMap).toBeInstanceOf(THREE.Texture)
+    expect(bodyMesh.material.metalnessMap).toBeInstanceOf(THREE.Texture)
+    expect(bodyMesh.material.displacementMap).toBeInstanceOf(THREE.Texture)
+    expect(bodyMesh.material.map?.colorSpace).toBe(THREE.SRGBColorSpace)
+    expect(bodyMesh.material.normalMap?.colorSpace).toBe(THREE.NoColorSpace)
+    expect(bodyMesh.material.map?.wrapS).toBe(THREE.RepeatWrapping)
+    expect(bodyMesh.material.map?.wrapT).toBe(THREE.RepeatWrapping)
     expect(frame).toBeInstanceOf(THREE.Group)
     expect(light).toBeInstanceOf(THREE.PointLight)
     expect(hatch.group.getObjectByName('bunkerHatchRing')).toBeUndefined()
