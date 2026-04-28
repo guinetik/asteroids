@@ -13,7 +13,10 @@
  */
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
-import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
+import type {
+  DanParticleEntry as ProjectileDanParticleEntry,
+  ProjectileSystem,
+} from '@/lib/fps/projectileSystem'
 import type { DanTierTuning } from '@/lib/minigame/DanMinigame'
 
 /** Maximum number of live DAN neutron particles allocated in the pool. */
@@ -90,6 +93,15 @@ interface DanParticleEntry {
   lifetimeRemaining: number
   /** True while the particle is active and registered in the projectile system. */
   alive: boolean
+  /**
+   * Same object reference handed to {@link ProjectileSystem.addDanParticle}.
+   * Mutating its `cx/cy/cz` each tick keeps the projectile-system hit sphere
+   * locked to the visible mesh — without this, the registry would freeze the
+   * hitbox at the spawn position while the visual drifts outward, and SCI
+   * bolts would pass through the (visible) particle into a (registered)
+   * sphere that no longer exists where the player is aiming.
+   */
+  registryEntry: ProjectileDanParticleEntry
 }
 
 /**
@@ -319,6 +331,7 @@ export class DanScanController implements Tickable {
         velocity: new THREE.Vector3(),
         lifetimeRemaining: 0,
         alive: false,
+        registryEntry: { spawnIndex: i, cx: 0, cy: 0, cz: 0, radius: DAN_PARTICLE_HIT_RADIUS },
       })
     }
   }
@@ -353,6 +366,11 @@ export class DanScanController implements Tickable {
       entry.mesh.position.x += entry.velocity.x * dt
       entry.mesh.position.y += entry.velocity.y * dt
       entry.mesh.position.z += entry.velocity.z * dt
+      // Keep the projectile-system hit sphere locked to the visible mesh
+      // (the registry stores this object by reference).
+      entry.registryEntry.cx = entry.mesh.position.x
+      entry.registryEntry.cy = entry.mesh.position.y
+      entry.registryEntry.cz = entry.mesh.position.z
     }
   }
 
@@ -388,13 +406,14 @@ export class DanScanController implements Tickable {
           this.options.particleTuning.particleLifetimeMin)
     slot.alive = true
 
-    this.options.projectileSystem.addDanParticle({
-      spawnIndex: slot.spawnIndex,
-      cx: x,
-      cy: y,
-      cz: z,
-      radius: DAN_PARTICLE_HIT_RADIUS,
-    })
+    // Seed the (shared) registry entry at the spawn position. `tickParticles`
+    // updates cx/cy/cz every frame so the projectile system's hit-sphere
+    // stays locked to the moving mesh.
+    slot.registryEntry.cx = x
+    slot.registryEntry.cy = y
+    slot.registryEntry.cz = z
+    slot.registryEntry.radius = DAN_PARTICLE_HIT_RADIUS
+    this.options.projectileSystem.addDanParticle(slot.registryEntry)
   }
 
   /** Hide and unregister one entry; keep the mesh allocated for reuse. */
