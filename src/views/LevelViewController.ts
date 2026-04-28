@@ -99,6 +99,15 @@ import {
   resampleObjectiveNearShip,
   sampleSpawnOnSurface,
 } from '@/lib/level/levelObjectivePlacement'
+import {
+  chooseDanCraterPlacement,
+  type DanCraterPlacement,
+  DEFAULT_DAN_CRATER_RADIUS,
+  DEFAULT_DAN_CRATER_MIN_DEPTH,
+  DEFAULT_DAN_CRATER_MIN_QUALITY_SCORE,
+} from '@/lib/level/danCraterPlacement'
+import { applyCraterToHeightmap } from '@/lib/terrain/craterSynthesis'
+import { DanMinigame } from '@/lib/minigame/DanMinigame'
 import { LevelCollisionFacade } from '@/lib/level/LevelCollisionFacade'
 import { LevelCombatMiningFacade } from '@/lib/level/LevelCombatMiningFacade'
 import { RocketSurveyFacade } from '@/lib/level/RocketSurveyFacade'
@@ -292,6 +301,12 @@ export class LevelViewController implements Tickable {
   // ── Mission ─────────────────────────────────────────────────
   private mission: GeneratedAsteroidMission | null = null
   private missionObjectives: ConcreteObjective[] = []
+  /**
+   * Crater placement chosen at boot for the DAN objective, when one is in
+   * the mission. Null otherwise. Drives lander spawn, terminal placement,
+   * and the scan controller's bowl coordinates — all read once during init.
+   */
+  private danPlacement: DanCraterPlacement | null = null
   private asteroidName = ''
   private missionAnnounced = false
 
@@ -526,16 +541,41 @@ export class LevelViewController implements Tickable {
     this.missionObjectives = mission.objectives
     this.asteroidName = asteroid.name
 
+    // ── DAN crater placement (mission-driven rotation override) ───
+    // Resolved before `createAsteroidSurface` so the rotation chosen by the
+    // crater chooser flows through the bake pipeline. Synthesized fallback
+    // applies the crater dent to the heightmap after the bake (the visible
+    // GLB stays flat in that case — see plan risk note).
+    const danObjective = mission.objectives.find((o) => o.type === 'dan')
+    const danPlacement: DanCraterPlacement | null = danObjective
+      ? await chooseDanCraterPlacement(
+          asteroid,
+          seed,
+          {
+            targetRadius: DEFAULT_DAN_CRATER_RADIUS,
+            minDepth: DEFAULT_DAN_CRATER_MIN_DEPTH,
+            minQualityScore: DEFAULT_DAN_CRATER_MIN_QUALITY_SCORE,
+          },
+          {
+            resolution: LEVEL_TERRAIN_CONFIG.resolution,
+            worldSize: LEVEL_GRID_SIZE,
+            rayStartAltitude: LEVEL_TERRAIN_CONFIG.bakeRayStartAltitude,
+          },
+        )
+      : null
+    this.danPlacement = danPlacement
+
     // ── Asteroid surface (GLB-backed) ───────────────────────────
     // Rotation lottery — seeded random Euler so the same mission always
     // lands on the same face but different missions pick different slices
     // of rock as "up". Applied BEFORE the bake so the heightmap / flatten
-    // pipeline all see the rotated geometry.
+    // pipeline all see the rotated geometry. DAN missions override the
+    // rotation with the chooser's selection so the chosen crater faces up.
     this.emitBootState('preparing', 'Bringing asteroid online')
     this.asteroidSurface = await createAsteroidSurface({
       modelPath: asteroid.surface.modelPath,
       scale: asteroid.surface.modelScale,
-      rotation: rotationFromSeed(seed, asteroid.shape.rotationLottery),
+      rotation: danPlacement?.rotation ?? rotationFromSeed(seed, asteroid.shape.rotationLottery),
       baseColor: asteroid.visual.baseColor,
       valleyTone: asteroid.visual.valleyTone,
       peakTone: asteroid.visual.peakTone,
@@ -556,25 +596,41 @@ export class LevelViewController implements Tickable {
       },
     })
     this.heightmap = this.asteroidSurface.heightmap
+    // Synthesized DAN craters apply a parabolic bowl + raised rim to the
+    // baked heightmap in place. The visible GLB mesh stays flat in this
+    // path — first-cut acceptance per plan; mesh deformation polish later.
+    if (danPlacement && danPlacement.source === 'synthesized') {
+      applyCraterToHeightmap(this.heightmap, {
+        x: danPlacement.crater.x,
+        z: danPlacement.crater.z,
+        radius: danPlacement.crater.radius,
+        depth: danPlacement.crater.depth,
+      })
+    }
     const collisionWorld = this.collision.initialize(this.heightmap)
     this.sceneManager.addToScene(this.asteroidSurface.group)
 
     // Pick a spawn cell that actually sits on the baked mesh — critical on GLB
     // terrain where most of the play area is void. Falls back to origin if the
     // centre of the world is somehow invalid (shouldn't happen at normal scales).
+    // DAN missions override both the sampled cell and the ship park so the
+    // lander touches down at the chosen crater center, where the encounter
+    // actually plays out.
     const spawn = sampleSpawnOnSurface(this.heightmap, {
       spawnPositionRange: LEVEL_TERRAIN_CONFIG.spawnPositionRange,
       spawnSampleAttempts: LEVEL_TERRAIN_CONFIG.spawnSampleAttempts,
     })
-    const spawnX = spawn.x + LEVEL_TERRAIN_CONFIG.landerSpawnLightAlignmentX
-    const spawnZ = spawn.z
-    // Ship parks at the asteroid's barycenter (world XZ origin). All
-    // asteroid GLBs are pivoted at the body center, so the rotated mesh
-    // guarantees rock directly under the shuttle's downward floodlight
-    // cone. Mission objectives still cluster around the sampled spawn
-    // cell below — the player flies from the ship spawn to the waypoints.
-    const shipBarycenterY = this.heightmap.heightAt(0, 0)
-    const shipSpawnXZ = { x: 0, z: 0 }
+    const spawnX = danPlacement
+      ? danPlacement.crater.x
+      : spawn.x + LEVEL_TERRAIN_CONFIG.landerSpawnLightAlignmentX
+    const spawnZ = danPlacement ? danPlacement.crater.z : spawn.z
+    // Ship parks at the asteroid's barycenter (world XZ origin) by default.
+    // For DAN, the ship parks at the crater center so the player can EVA out
+    // and walk straight to the terminal next to the bowl.
+    const shipSpawnXZ = danPlacement
+      ? { x: danPlacement.crater.x, z: danPlacement.crater.z }
+      : { x: 0, z: 0 }
+    const shipBarycenterY = this.heightmap.heightAt(shipSpawnXZ.x, shipSpawnXZ.z)
 
     // Resample each objective onto the same asteroid face the ship is parked
     // on. Mission-generator flat zones are laid out in a 3500-unit world square
@@ -584,6 +640,15 @@ export class LevelViewController implements Tickable {
     // spawners, waypoint markers, and rock exclusions all see the new pos.
     const claimedPositions: Array<{ x: number; z: number }> = [{ x: spawnX, z: spawnZ }]
     for (const obj of mission.objectives) {
+      if (obj.type === 'dan' && danPlacement) {
+        // DAN sits at the crater center chosen by chooseDanCraterPlacement
+        // — never resample, otherwise the terminal, scan bowl, and lander
+        // spawn would drift apart.
+        obj.x = danPlacement.crater.x
+        obj.z = danPlacement.crater.z
+        claimedPositions.push({ x: obj.x, z: obj.z })
+        continue
+      }
       const resampled = resampleObjectiveNearShip(
         this.heightmap,
         obj,
@@ -692,6 +757,13 @@ export class LevelViewController implements Tickable {
     }
 
     this.landerController.onDeath = () => {
+      // DAN missions need to flag the active scan as failed before the
+      // failure UX runs — otherwise the player could exfil and still be
+      // counted as completing the objective.
+      const active = this.minigames.getActive()
+      if (active instanceof DanMinigame) {
+        active.notifyLanderDestroyed()
+      }
       this.failLanderRun('Lander Destroyed', { explode: true, hideLander: true })
     }
 
@@ -872,6 +944,15 @@ export class LevelViewController implements Tickable {
     }
     this.multiTool.setProjectileSystem(this.projectileSystem)
     this.projectileSystem.setLander(this.landerController)
+    this.projectileSystem.onScienceDanParticleHit = (spawnIndex) => {
+      // Route the captured spawn index through the active DAN minigame so its
+      // scan controller despawns the visual + registry entry, and the state
+      // machine ticks the particle hit counter.
+      const active = this.minigames.getActive()
+      if (active instanceof DanMinigame) {
+        active.controller?.captureParticle(spawnIndex)
+      }
+    }
 
     // ── Universal rock mining ───────────────────────────────────
     // Every surface rock can be drilled regardless of mission type;
@@ -959,6 +1040,7 @@ export class LevelViewController implements Tickable {
       rockYieldSystem: this.rockYieldSystem,
       composition: asteroid.composition,
       missionSeed,
+      danCraterPlacement: this.danPlacement,
       bindings: {
         onPrompt: this.onTerminalPrompt,
         onComplete: this.onObjectiveComplete,
@@ -1648,6 +1730,12 @@ export class LevelViewController implements Tickable {
   // ═══════════════════════════════════════════════════════════════
 
   private enterDead(): void {
+    // Notify the active DAN scan so its state machine flips to failed before
+    // the death overlay routes through the existing fail UX.
+    const active = this.minigames.getActive()
+    if (active instanceof DanMinigame) {
+      active.notifyPlayerDied()
+    }
     // Stop player movement but keep fpsCamera ticking for the death pitch-down.
     this.stateLifecycle.enterDead(
       {
