@@ -13,8 +13,8 @@ import * as THREE from 'three'
 
 /** Hatch outer diameter in world units. */
 export const HATCH_OUTER_RADIUS = 1.25
-/** Open-state radial offset of each half-leaf (world units). */
-const OPEN_OFFSET = 1.25
+/** Open-state radial offset of each half-leaf — equals the outer radius so leaves clear the rim. */
+const OPEN_OFFSET = HATCH_OUTER_RADIUS
 /** Tween duration for open/close in seconds. */
 const TWEEN_DURATION = 0.6
 
@@ -27,7 +27,7 @@ export class BunkerHatchModel {
   private readonly leafB: THREE.Mesh
   private readonly ring: THREE.Mesh
   private readonly ringMat: THREE.MeshBasicMaterial
-  private readonly tint: number
+  private readonly leafMat: THREE.MeshStandardMaterial
   private targetOpen = 0
   private currentOpen = 0
   private idlePhase = 0
@@ -38,7 +38,6 @@ export class BunkerHatchModel {
    * @param tint - Faction tint hex
    */
   constructor(tint: number) {
-    this.tint = tint
     this.ringMat = new THREE.MeshBasicMaterial({
       color: tint,
       transparent: true,
@@ -50,7 +49,7 @@ export class BunkerHatchModel {
     this.ring.position.y = 0.02
     this.group.add(this.ring)
 
-    const leafMat = new THREE.MeshStandardMaterial({
+    this.leafMat = new THREE.MeshStandardMaterial({
       color: 0x121821,
       emissive: tint,
       emissiveIntensity: 0.15,
@@ -67,9 +66,9 @@ export class BunkerHatchModel {
       0,
       Math.PI,
     )
-    this.leafA = new THREE.Mesh(leafGeo, leafMat)
+    this.leafA = new THREE.Mesh(leafGeo, this.leafMat)
     this.leafA.position.y = -0.1
-    this.leafB = new THREE.Mesh(leafGeo.clone(), leafMat)
+    this.leafB = new THREE.Mesh(leafGeo.clone(), this.leafMat)
     this.leafB.rotation.y = Math.PI
     this.leafB.position.y = -0.1
     this.group.add(this.leafA, this.leafB)
@@ -105,7 +104,7 @@ export class BunkerHatchModel {
   dispose(): void {
     this.leafA.geometry.dispose()
     this.leafB.geometry.dispose()
-    ;(this.leafA.material as THREE.Material).dispose()
+    this.leafMat.dispose()
     this.ring.geometry.dispose()
     this.ringMat.dispose()
   }
