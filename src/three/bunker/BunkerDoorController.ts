@@ -15,10 +15,25 @@ import * as THREE from 'three'
 const DOOR_WIDTH = 3
 /** Door height (world units). */
 const DOOR_HEIGHT = 4
-/** Door thickness (world units). */
+/**
+ * Door thickness (world units). Must stay below {@link WALL_THICKNESS} (0.4)
+ * so the slab fits inside the antechamber's north wall band when centered on
+ * `arenaDoorAnchor` per the Task 7 geometry contract — slab z extends ±DOOR_THICKNESS/2
+ * from the anchor; wall band extends ±WALL_THICKNESS/2.
+ */
 const DOOR_THICKNESS = 0.3
 /** Tween duration for open/close in seconds. */
 const TWEEN_DURATION = 0.8
+/** Vertical fraction of door height where the seam sits at rest (0 = floor, 1 = top). */
+const SEAM_REST_Y_FRACTION = 0.25
+/** Seam scanline oscillation frequency (radians/second). */
+const SEAM_OSCILLATION_RATE = 4.0
+/** Seam scanline travel amplitude as a fraction of door height. */
+const SEAM_AMPLITUDE_FRACTION = 0.18
+/** Seam scanline maximum opacity when the door is fully closed. */
+const SEAM_MAX_OPACITY = 0.85
+/** Tiny forward offset preventing z-fighting between the seam plane and the slab front face. */
+const SEAM_Z_BIAS = 0.001
 
 /** A single locking door across the bunker corridor. */
 export class BunkerDoorController {
@@ -54,15 +69,18 @@ export class BunkerDoorController {
     this.seamMat = new THREE.MeshBasicMaterial({
       color: tint,
       transparent: true,
-      opacity: 0.85,
+      opacity: SEAM_MAX_OPACITY,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
+    // PlaneGeometry is front-face-only; player approaches from -z and the seam
+    // fades to 0 before they pass through, so the corridor-side view never needs
+    // it. See spec section "Visual style — arena door".
     this.seam = new THREE.Mesh(
       new THREE.PlaneGeometry(DOOR_WIDTH, 0.06),
       this.seamMat,
     )
-    this.seam.position.set(0, DOOR_HEIGHT * 0.25, DOOR_THICKNESS / 2 + 0.001)
+    this.seam.position.set(0, DOOR_HEIGHT * SEAM_REST_Y_FRACTION, DOOR_THICKNESS / 2 + SEAM_Z_BIAS)
     this.group.add(this.seam)
   }
 
@@ -86,8 +104,10 @@ export class BunkerDoorController {
     }
     const eased = easeOut(this.currentOpen)
     this.slab.position.y = DOOR_HEIGHT / 2 + eased * DOOR_HEIGHT
-    this.seam.position.y = DOOR_HEIGHT * 0.25 + Math.sin(this.elapsed * 4.0) * (DOOR_HEIGHT * 0.18)
-    this.seamMat.opacity = (1 - this.currentOpen) * 0.85
+    this.seam.position.y =
+      DOOR_HEIGHT * SEAM_REST_Y_FRACTION +
+      Math.sin(this.elapsed * SEAM_OSCILLATION_RATE) * (DOOR_HEIGHT * SEAM_AMPLITUDE_FRACTION)
+    this.seamMat.opacity = (1 - this.currentOpen) * SEAM_MAX_OPACITY
   }
 
   /** Free GPU resources. */
