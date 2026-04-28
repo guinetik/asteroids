@@ -27,15 +27,24 @@ const MAX_DAN_PARTICLES = 64
  * system. Generous so SCI bolts feel forgiving — the player is firing at
  * moving targets in low gravity from variable EVA distances.
  */
-export const DAN_PARTICLE_HIT_RADIUS = 2.2
+export const DAN_PARTICLE_HIT_RADIUS = 1.4
 
-/** Particle marker geometry radius, in world units. Sized to read clearly from EVA distances. */
-const DAN_PARTICLE_RADIUS = 1.6
+/** Particle marker geometry radius, in world units. Neutron-sized so the bowl reads as a shower. */
+const DAN_PARTICLE_RADIUS = 0.55
 
-/** Cyan-green particle accent color. */
-const DAN_PARTICLE_COLOR = 0x66ffd9
+/** Chemistry-textbook neutron blue; warm enough not to clash with the cyan beam. */
+const DAN_PARTICLE_COLOR = 0x4477ff
 
-/** Beam outer color while the scan is running. */
+/** Deeper-blue emissive glow that gives the particle its inner pulse. */
+const DAN_PARTICLE_EMISSIVE = 0x1a3399
+
+/** Pulse amplitude (emissive multiplier) so each neutron breathes in/out. */
+const DAN_PARTICLE_PULSE_AMPLITUDE = 0.55
+
+/** Pulse cycles per second. */
+const DAN_PARTICLE_PULSE_SPEED = 4.2
+
+/** Cyan beam color (tuned to read against the deep-blue neutrons). */
 const DAN_BEAM_COLOR = 0x88ffe6
 
 /** Beam core radius in world units. */
@@ -65,6 +74,9 @@ const BEAM_FADE_OUT_SECONDS = 0.6
 /** Lander emitter offset along the lander up axis used as the beam origin. */
 const DAN_LANDER_EMITTER_DOWN_OFFSET = 4
 
+/** Beam length when the lander is parked over the bowl — long enough to bury inside the floor. */
+const DAN_BEAM_LENGTH = 200
+
 /** Default vertical thickness used when sampling the bowl floor for spawn Y. */
 const PARTICLE_SPAWN_FLOOR_OFFSET = 0.5
 
@@ -86,13 +98,15 @@ interface DanParticleEntry {
   /** Pool slot index, also used as the projectile registry spawn index. */
   spawnIndex: number
   /** Visible mesh placed at world coordinates while alive. */
-  mesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>
+  mesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial>
   /** Reused velocity vector. */
   velocity: THREE.Vector3
   /** Time remaining before the particle expires (seconds). */
   lifetimeRemaining: number
   /** True while the particle is active and registered in the projectile system. */
   alive: boolean
+  /** Per-particle pulse phase offset (radians) so neutrons don't breathe in lockstep. */
+  pulsePhase: number
   /**
    * Same object reference handed to {@link ProjectileSystem.addDanParticle}.
    * Mutating its `cx/cy/cz` each tick keeps the projectile-system hit sphere
@@ -312,14 +326,18 @@ export class DanScanController implements Tickable {
 
   /** Allocate the full particle pool up-front so spawn cost stays uniform. */
   private preallocateParticles(): void {
-    const geometry = new THREE.SphereGeometry(DAN_PARTICLE_RADIUS, 8, 6)
+    const geometry = new THREE.SphereGeometry(DAN_PARTICLE_RADIUS, 16, 12)
     for (let i = 0; i < MAX_DAN_PARTICLES; i++) {
-      const material = new THREE.MeshBasicMaterial({
+      // Same material idiom as LootPickupController — emissive PBR sphere so
+      // neutrons read as glowing physical particles in the level lighting,
+      // not flat additive billboards. Per-instance material so we can pulse
+      // emissive intensity independently.
+      const material = new THREE.MeshStandardMaterial({
         color: DAN_PARTICLE_COLOR,
-        transparent: true,
-        opacity: 0.95,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
+        emissive: DAN_PARTICLE_EMISSIVE,
+        emissiveIntensity: 1.4,
+        metalness: 0.1,
+        roughness: 0.4,
       })
       const mesh = new THREE.Mesh(geometry, material)
       mesh.name = `dan-particle-${i}`
@@ -331,6 +349,7 @@ export class DanScanController implements Tickable {
         velocity: new THREE.Vector3(),
         lifetimeRemaining: 0,
         alive: false,
+        pulsePhase: 0,
         registryEntry: { spawnIndex: i, cx: 0, cy: 0, cz: 0, radius: DAN_PARTICLE_HIT_RADIUS },
       })
     }
@@ -371,6 +390,10 @@ export class DanScanController implements Tickable {
       entry.registryEntry.cx = entry.mesh.position.x
       entry.registryEntry.cy = entry.mesh.position.y
       entry.registryEntry.cz = entry.mesh.position.z
+      // Emissive pulse — gives each neutron a "live" breathing glow keyed
+      // to its own phase so the bowl sparkles instead of strobing in unison.
+      const pulse = Math.sin(this.elapsed * DAN_PARTICLE_PULSE_SPEED + entry.pulsePhase)
+      entry.mesh.material.emissiveIntensity = 1.4 + pulse * DAN_PARTICLE_PULSE_AMPLITUDE
     }
   }
 
@@ -404,6 +427,7 @@ export class DanScanController implements Tickable {
       this.rng() *
         (this.options.particleTuning.particleLifetimeMax -
           this.options.particleTuning.particleLifetimeMin)
+    slot.pulsePhase = this.rng() * Math.PI * 2
     slot.alive = true
 
     // Seed the (shared) registry entry at the spawn position. `tickParticles`
@@ -440,10 +464,18 @@ export class DanScanController implements Tickable {
       this._emitter.set(this.options.craterX, this.options.craterY + 30, this.options.craterZ)
       this._beamEnd.set(this.options.craterX, this.options.craterY, this.options.craterZ)
     } else {
+      // Beam fires straight down from the lander like a thruster — the
+      // emitter sits below the hull along the lander's up axis, and the
+      // beam end is a fixed length further down. Aiming at the crater
+      // center caused the beam to tilt sideways whenever the lander
+      // drifted off-axis; locking it to the lander's local down axis
+      // makes the visual read like a probe drilling straight into the
+      // bowl regardless of small parking offsets.
+      const up = this.landerUp ?? new THREE.Vector3(0, 1, 0)
       this._emitter
         .copy(this.landerPosition)
-        .addScaledVector(this.landerUp ?? new THREE.Vector3(0, 1, 0), -DAN_LANDER_EMITTER_DOWN_OFFSET)
-      this._beamEnd.set(this.options.craterX, this.options.craterY, this.options.craterZ)
+        .addScaledVector(up, -DAN_LANDER_EMITTER_DOWN_OFFSET)
+      this._beamEnd.copy(this._emitter).addScaledVector(up, -DAN_BEAM_LENGTH)
     }
 
     const delta = this._beamEnd.clone().sub(this._emitter)

@@ -46,6 +46,23 @@ const DEFAULT_DAN_ENEMY_GRACE_SECONDS = 9
  */
 export const DAN_MIN_QUALITY_FOR_COMPLETION = 0.05
 
+/**
+ * Maximum XZ distance from the lander to the terminal at which the player
+ * can press [E] to start the scan. Mirrors the rescue-mission landing
+ * discipline — players must commit to parking at the crater before they
+ * can EVA out and trigger the encounter, otherwise nothing prevents them
+ * from cheesing the scan from a safer parking spot far from the bowl.
+ *
+ * Sized for the default crater layout: lander parks at the crater center
+ * and the terminal is `TERMINAL_OFFSET_X` units away, so a 30-unit gate
+ * easily accommodates the natural park-and-EVA distance while blocking
+ * remote activation.
+ */
+export const DAN_LANDER_TO_TERMINAL_MAX_DISTANCE = 30
+
+/** HUD prompt shown at the terminal when the lander is parked too far away. */
+const DAN_INSTRUCTION_PARK_LANDER = 'PARK LANDER NEAR DAN TERMINAL'
+
 /** Terminal X offset from the crater center, matching photometry's footprint. */
 const TERMINAL_OFFSET_X = 14
 
@@ -532,15 +549,39 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
     this.advanceStep(0)
 
     if (this._phase === 'idle') {
+      // Pre-scan also gates on the lander being parked nearby — players have
+      // to commit to landing at the crater before they can EVA out and start
+      // the scan, mirroring the rescue mission's landing discipline.
+      if (!this.isLanderNearTerminal(ctx)) {
+        this.onPrompt?.(DAN_INSTRUCTION_PARK_LANDER)
+        return
+      }
       this.onPrompt?.(DAN_INSTRUCTION_PRESCAN)
       if (ctx.terminalInteractPressed) this.start()
     } else if (this._phase === 'awaiting-delivery') {
       this.onPrompt?.(DAN_INSTRUCTION_DELIVER)
       if (ctx.terminalInteractPressed) this.deliver()
     } else if (this._phase === 'failed' && this.failureReason === 'no-data-captured') {
+      if (!this.isLanderNearTerminal(ctx)) {
+        this.onPrompt?.(DAN_INSTRUCTION_PARK_LANDER)
+        return
+      }
       this.onPrompt?.(DAN_INSTRUCTION_RETRY)
       if (ctx.terminalInteractPressed) this.start()
     }
+  }
+
+  /**
+   * True while the lander is parked within {@link DAN_LANDER_TO_TERMINAL_MAX_DISTANCE}
+   * of the DAN terminal on the XZ plane (vertical drift is ignored — the
+   * encounter cares about parking footprint, not altitude). Falls back to
+   * `false` when no lander telemetry is available so the gate fails closed.
+   */
+  private isLanderNearTerminal(ctx: MiniGameContext): boolean {
+    if (!ctx.landerPosition) return false
+    const dx = ctx.landerPosition.x - this.terminal.position.x
+    const dz = ctx.landerPosition.z - this.terminal.position.z
+    return Math.sqrt(dx * dx + dz * dz) <= DAN_LANDER_TO_TERMINAL_MAX_DISTANCE
   }
 
   /** Internal failure routing — preserves the first reason if multiple fire. */

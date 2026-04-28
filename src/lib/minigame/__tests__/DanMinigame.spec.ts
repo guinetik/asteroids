@@ -47,8 +47,11 @@ function makePlacement(): DanCraterPlacement {
 function context(overrides: Partial<MiniGameContext> = {}): MiniGameContext {
   return {
     levelState: 'eva',
-    landerPosition: null,
-    landerGrounded: false,
+    // Lander parked at the crater center by default (the LevelViewController
+    // overrides ship spawn to the crater origin for DAN missions). Tests
+    // override to null when verifying the lander-proximity gate.
+    landerPosition: { x: 0, y: 0, z: 0 },
+    landerGrounded: true,
     playerPosition: null,
     interactPressed: false,
     terminalInteractPressed: false,
@@ -105,6 +108,48 @@ describe('DanMinigame', () => {
       expect(minigame.timeRemaining).toBeGreaterThan(0)
       expect(minigame.progressCurrent).toBe(0)
       expect(minigame.progressTotal).toBe(50)
+      minigame.dispose()
+    })
+
+    it('refuses to start when the lander is parked far from the terminal', () => {
+      const { minigame } = setup()
+      const onRefuel = vi.fn()
+      const onPrompt = vi.fn()
+      minigame.onRefuel = onRefuel
+      minigame.onPrompt = onPrompt
+
+      // Lander stranded ~80 units from the terminal at (14, 0, 0).
+      minigame.tick(
+        0,
+        context({
+          playerPosition: nearTerminal(),
+          landerPosition: { x: 100, y: 0, z: 0 },
+          terminalInteractPressed: true,
+        }),
+      )
+
+      expect(minigame.status).toBe('idle')
+      expect(onRefuel).not.toHaveBeenCalled()
+      expect(onPrompt).toHaveBeenCalledWith('PARK LANDER NEAR DAN TERMINAL')
+      minigame.dispose()
+    })
+
+    it('refuses to start when no lander telemetry is available (fail closed)', () => {
+      const { minigame } = setup()
+      const onRefuel = vi.fn()
+      minigame.onRefuel = onRefuel
+
+      minigame.tick(
+        0,
+        context({
+          playerPosition: nearTerminal(),
+          landerPosition: null,
+          terminalInteractPressed: true,
+        }),
+      )
+
+      expect(minigame.status).toBe('idle')
+      expect(onRefuel).not.toHaveBeenCalled()
       minigame.dispose()
     })
 
