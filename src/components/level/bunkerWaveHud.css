@@ -1,0 +1,20 @@
+/*
+ * BunkerWaveHud — top-center overlay shown only while the player is inside the bunker.
+ *
+ * Lives here (not in the .vue) because Tailwind v4 + Vue scoped <style> blocks
+ * cannot resolve @apply utility classes.
+ */
+
+.bunker-wave-hud {
+  @apply pointer-events-none fixed top-6 left-1/2 z-40 flex -translate-x-1/2 flex-col items-center
+         gap-1 text-center font-mono;
+}
+
+.bunker-wave-hud__title {
+  @apply text-2xl font-bold tracking-[0.2em] text-emerald-300
+         drop-shadow-[0_0_8px_rgba(110,231,183,0.6)];
+}
+
+.bunker-wave-hud__sub {
+  @apply text-sm tracking-[0.3em] text-emerald-200/80;
+}
