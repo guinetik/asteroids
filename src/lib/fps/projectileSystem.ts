@@ -61,6 +61,8 @@ export type ProjectileImpactKind =
   | 'shuttle_hull'
   /** Map EVA: science bolt advanced satellite servicing repair on a rigged sub-object. */
   | 'satellite_repair'
+  /** DAN encounter: science bolt captured a neutron-return particle from the crater bowl. */
+  | 'dan_particle'
 
 /**
  * Carried with {@link ProjectileSystem.onImpact} so listeners can style feedback per mode/surface
@@ -250,6 +252,18 @@ export class ProjectileSystem implements Tickable {
    *   callback; copy if you need to keep it past the synchronous handler body.
    */
   onScienceRocketHit: ((position: THREE.Vector3) => void) | null = null
+
+  /**
+   * Called when a **science** bolt captures a registered DAN neutron particle.
+   *
+   * @param spawnIndex - Pool slot index of the captured particle (mirrors the
+   *   value passed to {@link addDanParticle}). The level layer routes this to
+   *   `DanScanController.captureParticle()` so the visual despawns and the
+   *   minigame counts the hit.
+   * @param position - **Transient** impact point. Mutated on the next callback;
+   *   copy if you need to keep it past the synchronous handler body.
+   */
+  onScienceDanParticleHit: ((spawnIndex: number, position: THREE.Vector3) => void) | null = null
 
   /**
    * Reused scratch position for impact/hit callbacks. Allocated once per
@@ -497,6 +511,7 @@ export class ProjectileSystem implements Tickable {
       let hitRocket = false
       let hitMapShuttleHull = false
       let hitSatelliteRepair = false
+      let hitDanParticle = false
 
       if (p.boltKind === 'science') {
         const hostageHit = this.closestHostageHealHit(this._prevPos, pos)
@@ -558,11 +573,21 @@ export class ProjectileSystem implements Tickable {
                   this.onScienceRocketHit?.(this._callbackPos)
                   hitRocket = true
                 } else {
-                  const rockHit = this.closestRockHit(this._prevPos, pos)
-                  if (rockHit) {
+                  // DAN neutron particle capture wins over rocks so a particle
+                  // spawning next to a surface rock cannot be eaten by the rock
+                  // cascade. Particles are SCI-only and despawn on hit.
+                  const danHit = this.closestDanParticleHit(this._prevPos, pos)
+                  if (danHit) {
                     this._callbackPos.copy(pos)
-                    this.onScienceRockHit?.(rockHit.spawnIndex, this._callbackPos)
-                    hitRock = true
+                    this.onScienceDanParticleHit?.(danHit.spawnIndex, this._callbackPos)
+                    hitDanParticle = true
+                  } else {
+                    const rockHit = this.closestRockHit(this._prevPos, pos)
+                    if (rockHit) {
+                      this._callbackPos.copy(pos)
+                      this.onScienceRockHit?.(rockHit.spawnIndex, this._callbackPos)
+                      hitRock = true
+                    }
                   }
                 }
               }
@@ -611,10 +636,11 @@ export class ProjectileSystem implements Tickable {
         hitHostage ||
         hitRock ||
         hitRocket ||
+        hitDanParticle ||
         hitTerrain ||
         p.age >= BOLT_MAX_LIFETIME
       ) {
-        if (hitTerrain || hitEnemy || hitHostage || hitRock || hitRocket) {
+        if (hitTerrain || hitEnemy || hitHostage || hitRock || hitRocket || hitDanParticle) {
           if (!hitMapShuttleHull && !hitSatelliteRepair) {
             this._callbackPos.copy(pos)
           }
@@ -627,6 +653,8 @@ export class ProjectileSystem implements Tickable {
             kind = 'satellite_repair'
           } else if (hitRocket) {
             kind = 'science_rocket'
+          } else if (hitDanParticle) {
+            kind = 'dan_particle'
           } else if (hitHostage) {
             kind = 'hostage'
           } else if (hitRock) {
@@ -703,6 +731,32 @@ export class ProjectileSystem implements Tickable {
       const t = this.segmentEnterSphereT(from, to, rock.cx, rock.cy, rock.cz, rock.radius)
       if (t !== null && (best === null || t < best.t)) {
         best = { spawnIndex: rock.spawnIndex, t }
+      }
+    }
+    return best
+  }
+
+  /**
+   * Closest DAN neutron particle along the swept segment. Only science bolts
+   * route through this branch; weapon and drill bolts pass through particles
+   * untouched so the SCI multitool keeps its capture role exclusive.
+   */
+  private closestDanParticleHit(
+    from: THREE.Vector3,
+    to: THREE.Vector3,
+  ): { spawnIndex: number; t: number } | null {
+    let best: { spawnIndex: number; t: number } | null = null
+    for (const particle of this.danParticles) {
+      const t = this.segmentEnterSphereT(
+        from,
+        to,
+        particle.cx,
+        particle.cy,
+        particle.cz,
+        particle.radius,
+      )
+      if (t !== null && (best === null || t < best.t)) {
+        best = { spawnIndex: particle.spawnIndex, t }
       }
     }
     return best
