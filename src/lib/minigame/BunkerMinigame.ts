@@ -21,17 +21,13 @@ import type {
 } from './MiniGame'
 import type { ConcreteObjective } from '@/lib/missions/types'
 import { BunkerSceneController } from '@/three/bunker/BunkerSceneController'
-import { BunkerSceneState } from '@/lib/bunker/bunkerSceneState'
+import { BunkerSceneState, type BunkerSubState } from '@/lib/bunker/bunkerSceneState'
 import {
+  difficultyToTier,
   rollWave,
   totalWavesForTier,
   type BunkerWaveTier,
 } from '@/lib/bunker/bunkerWaveSchedule'
-
-/** Wave count for the easy tier (3-wave bunker). */
-const WAVE_COUNT_EASY = 3
-/** Wave count for the medium tier (5-wave bunker). */
-const WAVE_COUNT_MEDIUM = 5
 
 /** Test seam — internal options for {@link BunkerMinigame.createForTest}. */
 export interface BunkerMinigameTestOptions {
@@ -43,6 +39,8 @@ export interface BunkerMinigameTestOptions {
   missionId: string
   /** Faction tint hex passed to the scene controller. */
   factionTint: number
+  /** Rolled mission difficulty (1-10) — used to pick the bunker tier. */
+  difficulty: number
 }
 
 /** Production constructor params for {@link BunkerMinigame.create}. */
@@ -57,6 +55,8 @@ export interface BunkerMinigameCreateOptions {
   factionTint: number
   /** Parent THREE scene the bunker root attaches to on `activate`. */
   threeScene: THREE.Scene
+  /** Rolled mission difficulty (1-10) — used to pick the bunker tier. */
+  difficulty: number
 }
 
 /** Bunker minigame implementation. */
@@ -101,9 +101,9 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
       ) => void)
     | null = null
   /** Player HP reached zero. Default handler marks this minigame failed. */
-  onKillPlayer: (() => void) | null = (() => {
+  onKillPlayer: (() => void) | null = () => {
     this.fail('Operator KIA')
-  }).bind(this)
+  }
   /** Lander was destroyed (for parity with rescue; bunker doesn't currently fire it). */
   onDestroyLander: (() => void) | null = null
   /** Forwarded explosion VFX hook (parity with rescue facade plumbing). */
@@ -124,6 +124,7 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
       params.objective,
       params.missionId,
       scene,
+      params.difficulty,
     )
   }
 
@@ -133,7 +134,13 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
    * @param opts - Test seam args
    */
   static createForTest(opts: BunkerMinigameTestOptions): BunkerMinigame {
-    return new BunkerMinigame(opts.objectiveIndex, opts.objective, opts.missionId, null)
+    return new BunkerMinigame(
+      opts.objectiveIndex,
+      opts.objective,
+      opts.missionId,
+      null,
+      opts.difficulty,
+    )
   }
 
   private constructor(
@@ -141,17 +148,13 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
     objective: ConcreteObjective,
     missionId: string,
     scene: BunkerSceneController | null,
+    difficulty: number,
   ) {
     this.objectiveIndex = objectiveIndex
     this.objective = objective
     this.missionId = missionId
     this.scene = scene
-    this.tier =
-      objective.waveCount === WAVE_COUNT_EASY
-        ? 'easy'
-        : objective.waveCount === WAVE_COUNT_MEDIUM
-          ? 'medium'
-          : 'hard'
+    this.tier = difficultyToTier(difficulty)
     this.totalWaves = totalWavesForTier(this.tier)
     this.state = new BunkerSceneState({ totalWaves: this.totalWaves })
   }
@@ -228,8 +231,11 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
     ) {
       this.wavesCleared += 1
       this.state.notifyWaveCleared()
-      const postClearState: string = this.state.current
-      if (postClearState === 'exit-prompt' || postClearState === 'final-clear') {
+      // Re-read the FSM state after `notifyWaveCleared()` mutates it. TS
+      // carries the prior 'wave-active' narrowing through the getter call,
+      // so we widen via `as BunkerSubState` to restore the full union.
+      const after = this.state.current as BunkerSubState
+      if (after === 'exit-prompt' || after === 'final-clear') {
         this.scene.hatch.active = true
         this.scene.hatch.setOpen(true)
       }
