@@ -406,9 +406,15 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
     return this._phase === 'awaiting-delivery'
   }
 
-  /** True while the EVA player is within terminal interaction range. */
+  /**
+   * True while the EVA player is within terminal interaction range, or a
+   * viroid-alert flair is currently flashing. The flair branch keeps the
+   * shared facade from clearing the bottom terminal prompt mid-flash —
+   * the alert reads on the same UI element as the [E] interact prompts,
+   * so it must survive even when the player is far from the terminal.
+   */
   get isPlayerNearInteraction(): boolean {
-    return this._isPlayerNear
+    return this._isPlayerNear || this.viroidAlertRemaining > 0
   }
 
   /**
@@ -445,9 +451,7 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
    * Short instruction shown in the lander/EVA HUD across every encounter
    * phase so the player always knows the next action. The text is short
    * and imperative: it names the tool (SCI) and the target (NEUTRONS) so
-   * a fresh player can read once and play. Viroid-alert flair temporarily
-   * overrides the scanning instruction for {@link DAN_VIROID_ALERT_DURATION_SECONDS}
-   * after a spawn so the player gets a heads-up that something dropped in.
+   * a fresh player can read once and play.
    */
   get missionInstruction(): string | null {
     if (this._phase === 'completed') return null
@@ -455,10 +459,7 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
     if (this._phase === 'failed') {
       return this.failureReason === 'no-data-captured' ? DAN_INSTRUCTION_RETRY_HUD : null
     }
-    if (this._phase === 'scanning') {
-      if (this.viroidAlertRemaining > 0) return DAN_INSTRUCTION_VIROID_ALERT
-      return DAN_INSTRUCTION_SCAN_RUNNING
-    }
+    if (this._phase === 'scanning') return DAN_INSTRUCTION_SCAN_RUNNING
     return DAN_INSTRUCTION_RETURN_TELEMETRY
   }
 
@@ -500,6 +501,14 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
     }
 
     this.tickTerminal(ctx)
+
+    // Viroid alert flair overrides whatever tickTerminal just emitted —
+    // shows on the bottom terminal-prompt UI for a few seconds after each
+    // spawn so the player gets a diegetic heads-up regardless of whether
+    // they happen to be standing next to the terminal at the moment.
+    if (this.viroidAlertRemaining > 0) {
+      this.onPrompt?.(DAN_INSTRUCTION_VIROID_ALERT)
+    }
   }
 
   /** Begin or restart the DAN scan window. */
