@@ -911,12 +911,12 @@ export class LevelViewController implements Tickable {
           this.applyPlayerDamageFeedback(999, playerPos?.x ?? 0, (playerPos?.z ?? 0) - 1)
         },
         onDestroyLander: (cause) => {
-          this.failLanderRun(
-            cause === 'exterminate'
-              ? 'Lander Destroyed by Nest Blast'
-              : 'Lander Destroyed by Virus Blast',
-            { explode: true, hideLander: true },
-          )
+          const messageByCause: Record<'exterminate' | 'rescue' | 'bunker', string> = {
+            exterminate: 'Lander Destroyed by Nest Blast',
+            rescue: 'Lander Destroyed by Virus Blast',
+            bunker: 'Lander Destroyed in Bunker Collapse',
+          }
+          this.failLanderRun(messageByCause[cause], { explode: true, hideLander: true })
         },
         onExplosion: (kind, x, y, z) => {
           this.triggerObjectiveExplosion(
