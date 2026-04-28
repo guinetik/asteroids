@@ -297,6 +297,19 @@ export class MultiToolState implements Tickable {
   }
 
   /**
+   * Full RTG + thruster charge refill for loot powerups. Uses existing
+   * {@link ThrusterSystem#refuel} pattern (restores fuel pool, charges,
+   * resets all latches and flags). Clean minimal addition.
+   *
+   * @author guinetik
+   * @date 2026-04-28
+   * @spec docs/superpowers/specs/2026-04-28-loot-drop-system-design.md
+   */
+  fullRefill(): void {
+    this.thrusterSystem.refuel()
+  }
+
+  /**
    * Drill recharge has two recovery lanes:
    * - if the player fully bottoms out, keep the default recharge rate until
    *   the standard 50% recovery threshold is reached

@@ -23,6 +23,7 @@ import {
   WALL_THICKNESS,
   buildBunkerGeometry,
 } from '../BunkerWallBuilder'
+import { createTestBunkerInteriorMaterialSet } from '../BunkerInteriorMaterials'
 
 const TINT = 0x66ccff
 const ROOT_X = 100
@@ -44,7 +45,11 @@ const HARD_AMBER_FEATURE = 0xff9d00
 
 describe('BunkerSceneController', () => {
   it('keeps the entrance vault door visible and closed initially', () => {
-    const controller = new BunkerSceneController({ tint: TINT, scene: new THREE.Scene() })
+    const controller = new BunkerSceneController({
+      tint: TINT,
+      scene: new THREE.Scene(),
+      interiorMaterials: createTestBunkerInteriorMaterialSet(),
+    })
 
     expect(controller.hatch.group.visible).toBe(true)
     // Testing targetOpen is hard without exposing it, but we know it's not open.
@@ -57,9 +62,7 @@ describe('BunkerSceneController', () => {
   })
 
   it('builds three enemy staging rooms on the non-entry arena walls', () => {
-    const geometry = buildBunkerGeometry(
-      new THREE.ShaderMaterial({ side: THREE.BackSide }),
-    )
+    const geometry = buildBunkerGeometry(createTestBunkerInteriorMaterialSet())
     const enemyRooms =
       (
         geometry as {
@@ -79,7 +82,11 @@ describe('BunkerSceneController', () => {
   })
 
   it('opens a different staging door for each wave split', () => {
-    const controller = new BunkerSceneController({ tint: TINT, scene: new THREE.Scene() })
+    const controller = new BunkerSceneController({
+      tint: TINT,
+      scene: new THREE.Scene(),
+      interiorMaterials: createTestBunkerInteriorMaterialSet(),
+    })
     controller.setRootWorldPosition(ROOT_X, ROOT_Y, ROOT_Z)
 
     controller.openWaveRoom(0)
@@ -104,7 +111,11 @@ describe('BunkerSceneController', () => {
   })
 
   it('fires enemy projectiles from ranged bunker enemies', () => {
-    const controller = new BunkerSceneController({ tint: TINT, scene: new THREE.Scene() })
+    const controller = new BunkerSceneController({
+      tint: TINT,
+      scene: new THREE.Scene(),
+      interiorMaterials: createTestBunkerInteriorMaterialSet(),
+    })
     controller.spawnWave(['spire'])
     const handle = controller.enemyDirector.enemies[0]!
     handle.lastOutput = {
@@ -126,7 +137,11 @@ describe('BunkerSceneController', () => {
   })
 
   it('fires bunker chimera walkers as a visible three-shot burst', () => {
-    const controller = new BunkerSceneController({ tint: TINT, scene: new THREE.Scene() })
+    const controller = new BunkerSceneController({
+      tint: TINT,
+      scene: new THREE.Scene(),
+      interiorMaterials: createTestBunkerInteriorMaterialSet(),
+    })
     controller.spawnWave(['chimera'])
     const handle = controller.enemyDirector.enemies[0]!
     handle.lastOutput = {
@@ -156,11 +171,13 @@ describe('BunkerSceneController', () => {
       tint: TINT,
       scene: new THREE.Scene(),
       difficulty: 5,
+      interiorMaterials: createTestBunkerInteriorMaterialSet(),
     })
     const hardController = new BunkerSceneController({
       tint: TINT,
       scene: new THREE.Scene(),
       difficulty: 10,
+      interiorMaterials: createTestBunkerInteriorMaterialSet(),
     })
 
     mediumController.spawnWave(['bacteriophage'])
@@ -177,6 +194,7 @@ describe('BunkerSceneController', () => {
       tint: TINT,
       scene: new THREE.Scene(),
       difficulty: 10,
+      interiorMaterials: createTestBunkerInteriorMaterialSet(),
     })
 
     controller.spawnWave(['spire'])
@@ -187,7 +205,11 @@ describe('BunkerSceneController', () => {
   })
 
   it('spawns wave enemies on world-space arena pads after moving the bunker root', () => {
-    const controller = new BunkerSceneController({ tint: TINT, scene: new THREE.Scene() })
+    const controller = new BunkerSceneController({
+      tint: TINT,
+      scene: new THREE.Scene(),
+      interiorMaterials: createTestBunkerInteriorMaterialSet(),
+    })
     controller.setRootWorldPosition(ROOT_X, ROOT_Y, ROOT_Z)
 
     controller.spawnWave(['bacteriophage'])
@@ -203,7 +225,11 @@ describe('BunkerSceneController', () => {
   })
 
   it('exposes walkable bounds per room so narrow spaces do not inherit arena width', () => {
-    const controller = new BunkerSceneController({ tint: TINT, scene: new THREE.Scene() })
+    const controller = new BunkerSceneController({
+      tint: TINT,
+      scene: new THREE.Scene(),
+      interiorMaterials: createTestBunkerInteriorMaterialSet(),
+    })
     controller.setRootWorldPosition(ROOT_X, ROOT_Y, ROOT_Z)
 
     const expected = [
@@ -241,16 +267,18 @@ describe('BunkerSceneController', () => {
   })
 
   it('leaves doorway openings instead of sealing the corridor behind doors', () => {
-    const geometry = buildBunkerGeometry(
-      new THREE.ShaderMaterial({ side: THREE.BackSide }),
-    )
+    const geometry = buildBunkerGeometry(createTestBunkerInteriorMaterialSet())
 
     expect(hasWallAt(geometry.wallMeshes, 0, DOORWAY_Z)).toBe(false)
     expect(hasWallAt(geometry.wallMeshes, 0, ARENA_ENTRY_Z)).toBe(false)
   })
 
   it('detects arena entry only after the player crosses into the arena room', () => {
-    const controller = new BunkerSceneController({ tint: TINT, scene: new THREE.Scene() })
+    const controller = new BunkerSceneController({
+      tint: TINT,
+      scene: new THREE.Scene(),
+      interiorMaterials: createTestBunkerInteriorMaterialSet(),
+    })
     controller.setRootWorldPosition(ROOT_X, ROOT_Y, ROOT_Z)
     const arenaStartZ = ROOT_Z + ANTECHAMBER.depth / 2 + CORRIDOR.depth
 
@@ -267,6 +295,7 @@ describe('BunkerSceneController', () => {
       tint: TINT,
       scene: new THREE.Scene(),
       projectileSystem: projectileSystem as never,
+      interiorMaterials: createTestBunkerInteriorMaterialSet(),
     })
     controller.spawnWave(['bacteriophage'])
     const handle = controller.enemyDirector.enemies[0]!

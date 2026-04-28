@@ -69,6 +69,16 @@ vi.mock('@/three/bunker/BunkerSceneController', () => ({
   }),
 }))
 
+vi.mock('@/three/bunker/BunkerInteriorMaterials', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@/three/bunker/BunkerInteriorMaterials')>()
+  return {
+    ...mod,
+    loadBunkerInteriorMaterials: vi.fn(() =>
+      Promise.resolve(mod.createTestBunkerInteriorMaterialSet()),
+    ),
+  }
+})
+
 const baseObjective: ConcreteObjective = {
   type: 'bunker',
   x: 0,
@@ -161,13 +171,13 @@ describe('BunkerMinigame', () => {
     expect(hatch.group.visible).toBe(true)
   })
 
-  it('keeps the interior extraction hatch hidden until the player exits', () => {
+  it('keeps the interior extraction hatch hidden until the player exits', async () => {
     fakeSceneInstance.hatch.group.visible = false
     fakeSceneInstance.hatch.setOpen.mockClear()
     fakeSceneInstance.isPlayerInArena.mockReset()
     fakeSceneInstance.isPlayerInArena.mockReturnValue(true)
     fakeSceneInstance.enemyDirector.enemies = []
-    const m = BunkerMinigame.create({
+    const m = await BunkerMinigame.create({
       objectiveIndex: 0,
       objective: baseObjective,
       missionId: 'test-mission',
@@ -238,9 +248,9 @@ describe('BunkerMinigame', () => {
     expect(fakeSceneInstance.hatch.setOpen).toHaveBeenCalledWith(true)
   })
 
-  it('deactivates the bunker scene and clears the prompt after extracting', () => {
+  it('deactivates the bunker scene and clears the prompt after extracting', async () => {
     const prompt = vi.fn()
-    const m = BunkerMinigame.create({
+    const m = await BunkerMinigame.create({
       objectiveIndex: 0,
       objective: baseObjective,
       missionId: 'test-mission',
@@ -281,14 +291,14 @@ describe('BunkerMinigame', () => {
     expect(m.status).toBe('failed')
   })
 
-  it('opens the door without spawning until the player enters the arena', () => {
+  it('opens the door without spawning until the player enters the arena', async () => {
     fakeSceneInstance.spawnWave.mockClear()
     fakeSceneInstance.enemyDirector.enemies = []
     // The test-seam factory wires `null` as the scene, so wave-active spawn
     // branches can't fire through it. Use the production `create()` path —
     // the BunkerSceneController is module-mocked above, so we still get a
     // hermetic instance.
-    const m = BunkerMinigame.create({
+    const m = await BunkerMinigame.create({
       objectiveIndex: 0,
       objective: baseObjective,
       missionId: 'test-mission',
@@ -320,8 +330,8 @@ describe('BunkerMinigame', () => {
     expect(fakeSceneInstance.spawnWave).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps the corridor out of walkable bounds until the door opens', () => {
-    const m = BunkerMinigame.create({
+  it('keeps the corridor out of walkable bounds until the door opens', async () => {
+    const m = await BunkerMinigame.create({
       objectiveIndex: 0,
       objective: baseObjective,
       missionId: 'test-mission',
@@ -338,9 +348,9 @@ describe('BunkerMinigame', () => {
     expect(m.bunkerWalkableBounds).toEqual(fakeSceneInstance.walkableBounds)
   })
 
-  it('opens the current wave staging room and exposes it for collision', () => {
+  it('opens the current wave staging room and exposes it for collision', async () => {
     const stagingBounds = { minX: 8, maxX: 14, minZ: 14, maxZ: 24 }
-    const m = BunkerMinigame.create({
+    const m = await BunkerMinigame.create({
       objectiveIndex: 0,
       objective: baseObjective,
       missionId: 'test-mission',
@@ -363,8 +373,8 @@ describe('BunkerMinigame', () => {
     expect(m.bunkerWalkableBounds).toContain(stagingBounds)
   })
 
-  it('closes the wave staging room after the wave is cleared', () => {
-    const m = BunkerMinigame.create({
+  it('closes the wave staging room after the wave is cleared', async () => {
+    const m = await BunkerMinigame.create({
       objectiveIndex: 0,
       objective: baseObjective,
       missionId: 'test-mission',
@@ -391,8 +401,8 @@ describe('BunkerMinigame', () => {
     expect(fakeSceneInstance.closeWaveRoom).toHaveBeenCalled()
   })
 
-  it('does not clear a wave while staged enemies are still queued', () => {
-    const m = BunkerMinigame.create({
+  it('does not clear a wave while staged enemies are still queued', async () => {
+    const m = await BunkerMinigame.create({
       objectiveIndex: 0,
       objective: baseObjective,
       missionId: 'test-mission',
@@ -421,9 +431,9 @@ describe('BunkerMinigame', () => {
     expect(fakeSceneInstance.closeWaveRoom).not.toHaveBeenCalled()
   })
 
-  it('feeds the bunker player position into the enemy director', () => {
+  it('feeds the bunker player position into the enemy director', async () => {
     fakeSceneInstance.enemyDirector.setPlayerPosition.mockClear()
-    const m = BunkerMinigame.create({
+    const m = await BunkerMinigame.create({
       objectiveIndex: 0,
       objective: baseObjective,
       missionId: 'test-mission',
@@ -442,9 +452,9 @@ describe('BunkerMinigame', () => {
     expect(fakeSceneInstance.enemyDirector.setPlayerPosition).toHaveBeenCalledWith(11, 2, 13)
   })
 
-  it('forwards bunker contact damage to the player damage callback', () => {
+  it('forwards bunker contact damage to the player damage callback', async () => {
     const onDamagePlayer = vi.fn()
-    const m = BunkerMinigame.create({
+    const m = await BunkerMinigame.create({
       objectiveIndex: 0,
       objective: baseObjective,
       missionId: 'test-mission',
@@ -463,9 +473,9 @@ describe('BunkerMinigame', () => {
     expect(onDamagePlayer).toHaveBeenCalledWith(12, 4, 9, 'contact')
   })
 
-  it('forwards bunker enemy projectile damage to the player damage callback', () => {
+  it('forwards bunker enemy projectile damage to the player damage callback', async () => {
     const onDamagePlayer = vi.fn()
-    const m = BunkerMinigame.create({
+    const m = await BunkerMinigame.create({
       objectiveIndex: 0,
       objective: baseObjective,
       missionId: 'test-mission',
@@ -481,8 +491,8 @@ describe('BunkerMinigame', () => {
     expect(onDamagePlayer).toHaveBeenCalledWith(9, 7, 11, 'projectile')
   })
 
-  it('feeds bunker player position into enemy projectile collision', () => {
-    const m = BunkerMinigame.create({
+  it('feeds bunker player position into enemy projectile collision', async () => {
+    const m = await BunkerMinigame.create({
       objectiveIndex: 0,
       objective: baseObjective,
       missionId: 'test-mission',
@@ -502,11 +512,11 @@ describe('BunkerMinigame', () => {
     expect(fakeSceneInstance.enemyProjectileSystem.tick).toHaveBeenCalledWith(0.016)
   })
 
-  it('fires wave-cleared when all enemies are dead and progress increments', () => {
+  it('fires wave-cleared when all enemies are dead and progress increments', async () => {
     fakeSceneInstance.spawnWave.mockClear()
     fakeSceneInstance.enemyDirector.enemies = []
     fakeSceneInstance.hasPendingWaveSpawns = false
-    const m = BunkerMinigame.create({
+    const m = await BunkerMinigame.create({
       objectiveIndex: 0,
       objective: baseObjective,
       missionId: 'test-mission',

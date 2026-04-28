@@ -42,8 +42,13 @@ const props = withDefaults(
      * reticle, SCI-only hotbar, no mining/laser.
      */
     variant?: 'level' | 'eva' | 'evaMap'
+    /**
+     * When true, hides the top-center SPD / HDG row — used in bunker interior
+     * where {@link BunkerWaveHud} occupies the same band.
+     */
+    hideMovementReadout?: boolean
   }>(),
-  { variant: 'level' },
+  { variant: 'level', hideMovementReadout: false },
 )
 
 const showCombatHud = (): boolean => props.variant !== 'eva'
@@ -105,7 +110,10 @@ function showRockTarget(): boolean {
 <template>
   <div class="fixed inset-0 pointer-events-none font-mono text-white/90">
     <!-- ═══ TOP CENTER: Speed + heading (aligned with shuttle SPD / HDG row) ═══ -->
-    <div class="absolute top-4 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-0.5">
+    <div
+      v-if="!props.hideMovementReadout"
+      class="absolute top-4 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-0.5"
+    >
       <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-0.5 text-sm">
         <span class="text-xs tracking-widest uppercase text-white/40">SPD</span>
         <span class="tabular-nums text-white/70">{{ telemetry.speed.toFixed(1) }}</span>

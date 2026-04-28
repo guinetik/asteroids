@@ -88,11 +88,11 @@ import { createEnemyVisualWarmup, type EnemyVisualWarmup } from '@/three/EnemyVi
 import { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
 import { loadProfile } from '@/lib/player/profile'
 import { getItemDefinition } from '@/lib/inventory/catalog'
-import { DropSystem, createContractDropPolicy } from '@/lib/fps/dropSystem'
+import { LootSystem, type LootPickup, type LootType, createContractLootPolicy } from '@/lib/fps/lootSystem'
 import { TRADE_GOODS } from '@/lib/shop/tradeGoods'
 import { addItem } from '@/lib/inventory/inventory'
 import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
-import { PsychospherePickupController } from '@/three/PsychospherePickupController'
+import { LootPickupController } from '@/three/LootPickupController'
 import { contractSystem } from '@/lib/contracts/runtime'
 import { hashLevelSeed, resolveLevelContext, rotationFromSeed } from '@/lib/level/levelContext'
 import {
@@ -139,7 +139,10 @@ const LEVEL_FALL_DAMAGE_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.fallDamage
 const LEVEL_ATMOSPHERE_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.atmosphere
 const LEVEL_BOUNDS_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.bounds
 const LEVEL_COLLISION_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.collision
-const LEVEL_LOOT_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.loot
+/** Dev-console `landNearObjective`: offset from waypoint toward ship (along ground XZ). */
+const DEV_LAND_NEAR_OBJECTIVE_OFFSET_M = 16
+/** Terrain clearance above the height sample so physics settles rather than spawning inside dirt. */
+const DEV_LAND_SPAWN_CLEARANCE_ABOVE_GROUND_M = 2.75
 const LANDER_LOCAL_FORWARD = new THREE.Vector3(-1, 0, 0)
 const LANDER_LOCAL_UP = new THREE.Vector3(0, 1, 0)
 /** Seconds to fade to black before performing a bunker scene swap. */
@@ -320,10 +323,10 @@ export class LevelViewController implements Tickable {
    * {@link ExterminateMinigame.installEnemySpawnObserver} /
    * {@link RescueMinigame.installEnemySpawnObserver}.
    */
-  private dropSystem: DropSystem | null = null
+  private dropSystem: LootSystem | null = null
 
-  /** Visual layer for {@link dropSystem}; reads pickups each frame. */
-  private psychospherePickupController: PsychospherePickupController | null = null
+  /** Visual layer for {@link LootSystem}; renders colored pickups (dynamic root for bunker). */
+  private lootPickupController: LootPickupController | null = null
 
   /** Called each frame during EVA with terminal prompt text (null to hide). */
   onTerminalPrompt: ((text: string | null) => void) | null = null
@@ -367,6 +370,12 @@ export class LevelViewController implements Tickable {
   onSurvivorAboard: ((aboardCount: number) => void) | null = null
 
   private readonly initialLanderSpawn = new Vector3()
+
+  /**
+   * When set before {@link ArrivalSequence} calls `onLanderDetach`, replaces the
+   * cinematic drop position so `AsteroidDev.LevelView.landNearObjective()` spawns by the mission waypoint.
+   */
+  private devConsoleForcedLanderSpawn: Vector3 | null = null
 
   /** Reused (0,1,0) seed for impact/explosion particle bursts. Treat as immutable. */
   private readonly _impactUp = new Vector3(0, 1, 0)
@@ -815,7 +824,9 @@ export class LevelViewController implements Tickable {
 
     this.arrivalSequence.onLanderDetach = (position) => {
       if (this.landerController) {
-        const gameplayStart = offsetGameplayLanderSpawn(position)
+        const source = this.devConsoleForcedLanderSpawn ?? position
+        this.devConsoleForcedLanderSpawn = null
+        const gameplayStart = offsetGameplayLanderSpawn(source)
         this.initialLanderSpawn.copy(gameplayStart)
         this.landerController.group.position.copy(gameplayStart)
       }
@@ -1020,14 +1031,15 @@ export class LevelViewController implements Tickable {
     // Created before the minigames so each one can register its enemy
     // director with the spawn observer below. Policy is contract-driven:
     // pickups only materialize when an active contract has a matching
-    // `collect-drops` step.
-    this.dropSystem = new DropSystem({
-      policy: createContractDropPolicy(contractSystem),
+    // `collect-drops` step. Now supports colored powerups via LootSystem.
+    this.dropSystem = new LootSystem({
+      policy: createContractLootPolicy(contractSystem),
       onPickup: (pickup) => this.handlePickupCollected(pickup),
+      onPowerupCollected: (type) => this.applyLootEffect(type),
     })
-    this.psychospherePickupController = new PsychospherePickupController(this.dropSystem)
-    this.sceneManager.addToScene(this.psychospherePickupController.group)
-    this.tickHandler.register(this.psychospherePickupController, TICK_PRIORITY_RENDER)
+    this.lootPickupController = new LootPickupController(this.dropSystem)
+    this.sceneManager.addToScene(this.lootPickupController.group)
+    this.tickHandler.register(this.lootPickupController, TICK_PRIORITY_RENDER)
 
     // ── Objective minigames ──────────────────────────────────────
     const missionSeed = hashLevelSeed(mission.id)
@@ -1208,6 +1220,9 @@ export class LevelViewController implements Tickable {
       kill: () => this.playerController?.takeDamage(999),
       landerDamage: (amount = 20) => this.landerController?.takeDamage(amount),
       landerDestroy: () => this.landerController?.takeDamage(999),
+      // Spawn near waypoint (see devLandNearObjective)
+      landNearObjective: (objectiveIndex = 0, offsetMeters = DEV_LAND_NEAR_OBJECTIVE_OFFSET_M) =>
+        this.devLandNearObjective(objectiveIndex, offsetMeters),
       exfil: () => {
         this.hasExitedVehicle = true
         this.stateMachine?.setState('exfil' as LevelState)
@@ -1326,9 +1341,11 @@ export class LevelViewController implements Tickable {
       obj.visible = true
     }
     stageVisible(this.playerController?.group)
-    // The multi-tool is always hidden right before precompile is called from
-    // init (line: `this.multiTool.setVisible(false)` just after GLB load).
-    // Flipping true here lets its view-model materials compile; restore false.
+    // The multi-tool is hidden after GLB load until `enterEva`; a second
+    // `precompileShaders` runs after bunker descent while the tool is still
+    // visible. Snapshot + restore — do not force false in `finally` or the gun
+    // disappears for the rest of the bunker run.
+    const multiToolWasVisible = this.multiTool?.getVisible() ?? false
     this.multiTool?.setVisible(true)
     this.enemyVisualWarmup ??= createEnemyVisualWarmup()
     scene.add(this.enemyVisualWarmup.group)
@@ -1357,7 +1374,7 @@ export class LevelViewController implements Tickable {
         this.enemyVisualWarmup.restoreFrustumCulling()
         this.enemyVisualWarmup.group.visible = false
       }
-      this.multiTool?.setVisible(false)
+      this.multiTool?.setVisible(multiToolWasVisible)
     }
   }
 
@@ -1404,6 +1421,15 @@ export class LevelViewController implements Tickable {
         this.enterComplete()
         break
     }
+
+    this.syncBunkerInteriorPostProcessing(current)
+  }
+
+  /**
+   * Bunker EVA reuses the level composer; drop bloom/CA/vignette there only.
+   */
+  private syncBunkerInteriorPostProcessing(levelState: LevelState): void {
+    this.postProcessing?.setBunkerInteriorReducedPipeline(levelState === 'bunker-interior')
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1456,6 +1482,101 @@ export class LevelViewController implements Tickable {
 
     // Letterbox starts closing
     this.onLetterbox?.(false)
+  }
+
+  /**
+   * Dev-console: teleport the lander to a surface point near `mission.objectives[i]`,
+   * offset radially inward toward `(0,0)` (parked shuttle) so the playable craft sits between the ship and the site.
+   *
+   * @param objectiveIndex - 0-based mission objective slot.
+   * @param offsetMeters - How far toward the ship from the waypoint (XZ plane).
+   */
+  private devLandNearObjective(objectiveIndex: number, offsetMeters: number): string | undefined {
+    if (!this.mission?.objectives.length) {
+      const msg = '[AsteroidDev] landNearObjective: no mission objectives'
+      console.warn(msg)
+      return msg
+    }
+    if (!this.heightmap) {
+      const msg = '[AsteroidDev] landNearObjective: heightmap unavailable'
+      console.warn(msg)
+      return msg
+    }
+    if (!this.landerController) {
+      const msg = '[AsteroidDev] landNearObjective: lander unavailable'
+      console.warn(msg)
+      return msg
+    }
+    const objectives = this.mission.objectives
+    const idx = Math.max(0, Math.min(Math.floor(Number(objectiveIndex)), objectives.length - 1))
+    const spawn = this.computeDevLandingWorldNearObjective(objectives[idx]!, offsetMeters)
+    if (!spawn) {
+      const msg = '[AsteroidDev] landNearObjective: could not sample terrain near objective'
+      console.warn(msg)
+      return msg
+    }
+
+    if (this.stateMachine?.is('arrival')) {
+      this.devConsoleForcedLanderSpawn = spawn.clone()
+      console.info(
+        `[AsteroidDev] landNearObjective: scheduled OBJ ${idx} (~${spawn.x.toFixed(0)}, ${spawn.y.toFixed(0)}, ${spawn.z.toFixed(0)}) for arrival detach`,
+      )
+      return `[scheduled] OBJ ${idx} near (${spawn.x.toFixed(1)}, ${spawn.z.toFixed(1)})`
+    }
+
+    const bad =
+      this.stateMachine?.is('exfil') ||
+      this.stateMachine?.is('complete') ||
+      this.stateMachine?.is('dead') ||
+      this.stateMachine?.is('failed') ||
+      this.stateMachine?.is('bunker-interior')
+    if (bad) {
+      const msg =
+        `[AsteroidDev] landNearObjective: not supported in state '${String(this.stateMachine?.state ?? 'null')}'`
+      console.warn(msg)
+      return msg
+    }
+
+    const gameplayStart = offsetGameplayLanderSpawn(spawn.clone())
+    this.initialLanderSpawn.copy(gameplayStart)
+    this.landerController.resetForRespawn(gameplayStart)
+    console.info(
+      `[AsteroidDev] landNearObjective: moved OBJ ${idx} (~${gameplayStart.x.toFixed(0)}, ${gameplayStart.y.toFixed(0)}, ${gameplayStart.z.toFixed(0)})`,
+    )
+    return `[moved] OBJ ${idx} near (${gameplayStart.x.toFixed(1)}, ${gameplayStart.z.toFixed(1)})`
+  }
+
+  /**
+   * World-space spawn position (before {@link offsetGameplayLanderSpawn}) slightly above baked terrain near an objective waypoint.
+   *
+   * @param objective - Resampled waypoint with `.x`, `.z` on the playable face.
+   * @param offsetMeters - Horizontal pull toward `(0,0)`.
+   * @returns `null` when the height probe fails outright.
+   */
+  private computeDevLandingWorldNearObjective(objective: ConcreteObjective, offsetMeters: number): Vector3 | null {
+    const ox = objective.x
+    const oz = objective.z
+    let nx = -ox
+    let nz = -oz
+    const planarLen = Math.hypot(nx, nz)
+    if (planarLen < 1e-3) {
+      nx = 1
+      nz = 0
+    } else {
+      nx /= planarLen
+      nz /= planarLen
+    }
+    let tx = ox + nx * offsetMeters
+    let tz = oz + nz * offsetMeters
+    tx = THREE.MathUtils.clamp(tx, -LEVEL_GRID_SIZE / 2, LEVEL_GRID_SIZE / 2)
+    tz = THREE.MathUtils.clamp(tz, -LEVEL_GRID_SIZE / 2, LEVEL_GRID_SIZE / 2)
+    const gh = this.heightmap!.tryHeightAt(tx, tz) ?? this.heightmap!.tryHeightAt(ox, oz)
+    if (gh == null) {
+      return null
+    }
+
+    const y = gh + DEV_LAND_SPAWN_CLEARANCE_ABOVE_GROUND_M
+    return new Vector3(tx, y, tz)
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1628,6 +1749,11 @@ export class LevelViewController implements Tickable {
       setWaypointMarkersVisible(false)
       minigame.setSceneRootWorldPosition(descentPos.x, descentPos.y, descentPos.z)
       minigame.notifyDescended()
+      // Bunker `activate()` adds five arena PointLights that were not in the scene at initial
+      // `precompileShaders` — without a second pass, Three.js recompiles PBR the first time that
+      // light count hits materials (often on look-strafe), matching multi-frame stalls in
+      // docs/superpowers/specs/2026-04-18-fps-perf-fixes-design.md (v3).
+      void this.precompileShaders()
       // The bunker antechamber's floor sits at the bunker root, which equals
       // `descentPos.y`. Override the player's ground sampler so the asteroid
       // heightmap (which doesn't model the interior) doesn't leak through.
@@ -2785,25 +2911,11 @@ export class LevelViewController implements Tickable {
    *   max is base + 10 with random jitter).
    */
   /**
-   * Map an enemy type key to the inventory item it can drop (when armed by
-   * an active contract). New loot kinds get added here; the rest of the
-   * pipeline is data-driven via {@link DropPolicy}.
-   *
-   * @param enemyType - The `type` field on an {@link EnemyHandle}.
-   * @returns Item id (e.g. `'viroid-psychosphere'`) or null if no drop is associated.
-   */
-  private dropItemForEnemyType(enemyType: string): string | null {
-    if (enemyType === 'bacteriophage') return LEVEL_LOOT_CONFIG.viroidDropItemId
-    return null
-  }
-
-  /**
    * Wire the level's loot pipeline into a freshly created combat minigame.
-   * Each enemy spawn registers an auxiliary death listener (so the
-   * controller's primary `onDeath` is preserved) that asks the drop system
-   * to spawn a pickup at the enemy's last position. The system gates the
-   * spawn through its policy, so contracts decide whether the loot
-   * actually appears.
+   * Each enemy spawn registers an auxiliary death listener that calls
+   * {@link LootSystem.trySpawnLoot} with the enemy type (data-driven bias,
+   * policy-gated for psychosphere). Supports colored powerups in both
+   * surface and bunker.
    *
    * @param minigame - Combat minigame whose enemy director should feed loot drops.
    */
@@ -2811,27 +2923,26 @@ export class LevelViewController implements Tickable {
     installEnemySpawnObserver(listener: (handle: EnemyHandle) => void): () => void
   }): void {
     if (!this.dropSystem) return
-    const dropSystem = this.dropSystem
+    const lootSystem = this.dropSystem
     minigame.installEnemySpawnObserver((handle) => {
-      const itemId = this.dropItemForEnemyType(handle.type)
-      if (!itemId) return
       handle.enemy.addDeathListener(() => {
         const pos = handle.enemy.position
-        dropSystem.spawnFor(itemId, { x: pos.x, y: pos.y, z: pos.z })
+        // difficulty defaults to 1; higher waves in bunker will bias toward
+        // powerups per dropTables.json (Task 4 will tune per-wave difficulty)
+        lootSystem.trySpawnLoot(handle.type, { x: pos.x, y: pos.y, z: pos.z })
       })
     })
   }
 
   /**
-   * Bridge a drop-system pickup event into the player's inventory and the
-   * contract step counter. Failures (inventory full / over weight) surface
-   * the same warning toast as failed mining pickups so the player knows the
-   * loot was lost.
+   * Bridge a loot pickup event (psychosphere only) into the player's inventory
+   * and contract counter. Powerups use separate onPowerupCollected path.
    *
-   * @param pickup - Pickup entity collected this tick.
+   * @param pickup - LootPickup from LootSystem (has itemId only for psychosphere).
    */
-  private handlePickupCollected(pickup: { itemId: string; quantity?: number }): void {
-    const quantity = pickup.quantity ?? 1
+  private handlePickupCollected(pickup: LootPickup): void {
+    if (!pickup.itemId) return
+    const quantity = 1
     const result = this.persistence.persistInventoryPickup(pickup.itemId, quantity)
     if (!result.ok) {
       this.onResourcePickupFailed?.(result.label, result.reason ?? 'Inventory full')
@@ -2840,6 +2951,48 @@ export class LevelViewController implements Tickable {
     this.onResourcePickup?.(pickup.itemId, quantity, result.label)
     this.levelAudio.notifyResourcePickup()
     contractSystem.notifyDropCollected({ itemId: pickup.itemId, quantity })
+  }
+
+  /**
+   * Apply immediate powerup effect and trigger colored HUD toast.
+   * Uses existing ThrusterSystem.refuel() via fullRefill(), player.heal(),
+   * and addFuel patterns. Minimal implementation per Task 4. Toasts use
+   * itemId/label matching for distinct colored styling in PickupToast.
+   *
+   * @param type - Determines effect and visual (red=health, blue=oxygen,
+   *               yellow=RTG).
+   */
+  private applyLootEffect(type: LootType): void {
+    if (type === 'psychosphere') return
+
+    const POWERUP_HEALTH_PCT = 0.1
+    const POWERUP_OXYGEN_PCT = 0.25
+
+    switch (type) {
+      case 'health':
+        if (this.playerController) {
+          const amount = this.playerController.maxHp * POWERUP_HEALTH_PCT
+          this.playerController.heal(amount)
+        }
+        this.onResourcePickup?.('health', 1, 'Health')
+        this.levelAudio.notifyResourcePickup()
+        break
+
+      case 'oxygen':
+        if (this.playerController) {
+          const amount = this.playerController.o2Capacity * POWERUP_OXYGEN_PCT
+          this.playerController.thrusterSystem.addFuel(amount)
+        }
+        this.onResourcePickup?.('oxygen', 1, 'Oxygen')
+        this.levelAudio.notifyResourcePickup()
+        break
+
+      case 'rtg':
+        this.multiToolState?.fullRefill()
+        this.onResourcePickup?.('rtg', 1, 'RTG')
+        this.levelAudio.notifyResourcePickup()
+        break
+    }
   }
 
   private triggerObjectiveExplosion(
@@ -3050,8 +3203,11 @@ export class LevelViewController implements Tickable {
     this.impactEmitter?.dispose()
     this.tractorEmitter?.dispose()
     this.tractorEmitter = null
-    this.psychospherePickupController?.dispose()
-    this.psychospherePickupController = null
+    if (this.tickHandler && this.lootPickupController) {
+      this.tickHandler.unregister(this.lootPickupController)
+    }
+    this.lootPickupController?.dispose()
+    this.lootPickupController = null
     this.dropSystem?.clear()
     this.dropSystem = null
     this.currentRockTarget = null

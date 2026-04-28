@@ -102,12 +102,30 @@ const visibleSurvivors = computed(() => {
   if (list.length <= max) return list
   return list.slice(list.length - max)
 })
+
+/** Returns additional class for powerup toasts to make them visually distinct (colored). */
+const getPowerupClass = (label: string): string => {
+  switch (label) {
+    case 'Health':
+      return 'pickup-toast__entry--health'
+    case 'Oxygen':
+      return 'pickup-toast__entry--oxygen'
+    case 'RTG':
+      return 'pickup-toast__entry--rtg'
+    default:
+      return ''
+  }
+}
 </script>
 
 <template>
   <div class="pickup-toast" aria-live="polite">
     <transition-group name="pickup-toast" tag="div" class="pickup-toast__stack">
-      <div v-for="entry in visiblePickups" :key="entry.id" class="pickup-toast__entry">
+      <div
+        v-for="entry in visiblePickups"
+        :key="entry.id"
+        :class="['pickup-toast__entry', getPowerupClass(entry.label)]"
+      >
         <span class="pickup-toast__plus">+</span>
         <span :key="entry.pulse" class="pickup-toast__qty">{{ entry.quantity }}</span>
         <span class="pickup-toast__label">{{ entry.label }}</span>
@@ -238,6 +256,49 @@ const visibleSurvivors = computed(() => {
 }
 .pickup-toast__survivor-label {
   letter-spacing: 0.18em;
+}
+
+/* Powerup toasts - visually distinct colored variants matching LootPickupController orbs */
+.pickup-toast__entry--health {
+  color: rgba(239, 68, 68, 0.95);
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(36, 6, 6, 0.62);
+  box-shadow:
+    0 0 12px rgba(239, 68, 68, 0.18),
+    inset 0 0 8px rgba(239, 68, 68, 0.05);
+}
+
+.pickup-toast__entry--health .pickup-toast__plus,
+.pickup-toast__entry--health .pickup-toast__label {
+  color: rgba(239, 68, 68, 0.85);
+}
+
+.pickup-toast__entry--oxygen {
+  color: rgba(59, 130, 246, 0.95);
+  border-color: rgba(59, 130, 246, 0.45);
+  background: rgba(3, 15, 45, 0.62);
+  box-shadow:
+    0 0 12px rgba(59, 130, 246, 0.18),
+    inset 0 0 8px rgba(59, 130, 246, 0.05);
+}
+
+.pickup-toast__entry--oxygen .pickup-toast__plus,
+.pickup-toast__entry--oxygen .pickup-toast__label {
+  color: rgba(59, 130, 246, 0.85);
+}
+
+.pickup-toast__entry--rtg {
+  color: rgba(234, 179, 8, 0.95);
+  border-color: rgba(234, 179, 8, 0.45);
+  background: rgba(45, 30, 5, 0.62);
+  box-shadow:
+    0 0 12px rgba(234, 179, 8, 0.18),
+    inset 0 0 8px rgba(234, 179, 8, 0.05);
+}
+
+.pickup-toast__entry--rtg .pickup-toast__plus,
+.pickup-toast__entry--rtg .pickup-toast__label {
+  color: rgba(234, 179, 8, 0.85);
 }
 
 @keyframes pickup-toast-bump {
