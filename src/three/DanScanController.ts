@@ -47,17 +47,35 @@ const DAN_PARTICLE_PULSE_SPEED = 4.2
 /** Cyan beam color (tuned to read against the deep-blue neutrons). */
 const DAN_BEAM_COLOR = 0x88ffe6
 
-/** Beam core radius in world units. */
-const DAN_BEAM_CORE_RADIUS = 0.6
+/** Beam core radius in world units. Mirrors photometry's slim laser core. */
+const DAN_BEAM_CORE_RADIUS = 0.18
 
-/** Beam glow halo radius in world units. */
-const DAN_BEAM_GLOW_RADIUS = 4.0
+/** Beam glow halo radius in world units. Soft sheath that sells the energy bloom. */
+const DAN_BEAM_GLOW_RADIUS = 2.4
 
 /** Beam core opacity at full scan intensity. */
-const DAN_BEAM_CORE_OPACITY = 0.88
+const DAN_BEAM_CORE_OPACITY = 0.95
 
-/** Beam glow opacity at full scan intensity. */
-const DAN_BEAM_GLOW_OPACITY = 0.22
+/** Base beam glow opacity before per-frame pulse modulation. */
+const DAN_BEAM_GLOW_BASE_OPACITY = 0.22
+
+/** Peak-to-peak pulse amplitude added to the halo opacity to give the laser a live hum. */
+const DAN_BEAM_GLOW_PULSE_AMPLITUDE = 0.1
+
+/** Glow pulse speed, in radians per second. */
+const DAN_BEAM_GLOW_PULSE_SPEED = 9
+
+/** Muzzle flash sphere radius at the lander beacon emitter, in world units. */
+const DAN_MUZZLE_RADIUS = 1.6
+
+/** Muzzle flash base opacity before pulse modulation. */
+const DAN_MUZZLE_BASE_OPACITY = 0.85
+
+/** Muzzle flash pulse magnitude, in world units. */
+const DAN_MUZZLE_PULSE_AMPLITUDE = 0.4
+
+/** Muzzle flash pulse speed in radians per second. */
+const DAN_MUZZLE_PULSE_SPEED = 14
 
 /** Pulse-ring radius animation top, in world units. */
 const COMPLETION_PULSE_RADIUS = 38
@@ -179,6 +197,7 @@ export class DanScanController implements Tickable {
   // Beam visuals
   private beamCore: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshBasicMaterial> | null = null
   private beamGlow: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshBasicMaterial> | null = null
+  private beamMuzzle: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial> | null = null
   private beamFadeRemaining = 0
   private beamVisible = false
   private landerPosition: THREE.Vector3 | null = null
@@ -330,6 +349,12 @@ export class DanScanController implements Tickable {
       this.beamGlow.geometry.dispose()
       this.beamGlow.material.dispose()
       this.beamGlow = null
+    }
+    if (this.beamMuzzle) {
+      this.options.scene.remove(this.beamMuzzle)
+      this.beamMuzzle.geometry.dispose()
+      this.beamMuzzle.material.dispose()
+      this.beamMuzzle = null
     }
     if (this.completionPulse) {
       this.options.scene.remove(this.completionPulse)
@@ -517,13 +542,26 @@ export class DanScanController implements Tickable {
 
     const fade =
       this.beamFadeRemaining > 0 ? Math.max(0, this.beamFadeRemaining / BEAM_FADE_OUT_SECONDS) : 1
+    // Glow opacity hums on a sine so the laser has a live shimmer instead of a
+    // dead constant. Same pattern as photometry's LOS beam.
+    const glowPulse = (Math.sin(this.elapsed * DAN_BEAM_GLOW_PULSE_SPEED) + 1) * 0.5
+    const glowOpacity = DAN_BEAM_GLOW_BASE_OPACITY + glowPulse * DAN_BEAM_GLOW_PULSE_AMPLITUDE
     this.beamCore.material.opacity = DAN_BEAM_CORE_OPACITY * fade
-    this.beamGlow.material.opacity = DAN_BEAM_GLOW_OPACITY * fade
+    this.beamGlow.material.opacity = glowOpacity * fade
+
+    if (this.beamMuzzle) {
+      this.beamMuzzle.position.copy(this._emitter)
+      const muzzlePulse = (Math.sin(this.elapsed * DAN_MUZZLE_PULSE_SPEED) + 1) * 0.5
+      const scale = 1 + (muzzlePulse * DAN_MUZZLE_PULSE_AMPLITUDE) / DAN_MUZZLE_RADIUS
+      this.beamMuzzle.scale.setScalar(scale)
+      this.beamMuzzle.material.opacity =
+        DAN_MUZZLE_BASE_OPACITY * (0.85 + 0.15 * muzzlePulse) * fade
+    }
   }
 
   /** Allocate beam meshes lazily so disposal of inactive minigames is cheap. */
   private ensureBeam(): void {
-    if (this.beamCore && this.beamGlow) return
+    if (this.beamCore && this.beamGlow && this.beamMuzzle) return
     const coreGeometry = new THREE.CylinderGeometry(
       DAN_BEAM_CORE_RADIUS,
       DAN_BEAM_CORE_RADIUS,
@@ -550,19 +588,32 @@ export class DanScanController implements Tickable {
     const glowMaterial = new THREE.MeshBasicMaterial({
       color: DAN_BEAM_COLOR,
       transparent: true,
-      opacity: DAN_BEAM_GLOW_OPACITY,
+      opacity: DAN_BEAM_GLOW_BASE_OPACITY,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
     this.beamGlow = new THREE.Mesh(glowGeometry, glowMaterial)
     this.beamGlow.name = 'dan-scan-beam-glow'
     this.options.scene.add(this.beamGlow)
+
+    const muzzleGeometry = new THREE.SphereGeometry(DAN_MUZZLE_RADIUS, 16, 12)
+    const muzzleMaterial = new THREE.MeshBasicMaterial({
+      color: DAN_BEAM_COLOR,
+      transparent: true,
+      opacity: DAN_MUZZLE_BASE_OPACITY,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+    this.beamMuzzle = new THREE.Mesh(muzzleGeometry, muzzleMaterial)
+    this.beamMuzzle.name = 'dan-scan-beam-muzzle'
+    this.options.scene.add(this.beamMuzzle)
   }
 
   /** Hide beam meshes without disposing them (kept for reuse on retry). */
   private hideBeam(): void {
     if (this.beamCore) this.beamCore.material.opacity = 0
     if (this.beamGlow) this.beamGlow.material.opacity = 0
+    if (this.beamMuzzle) this.beamMuzzle.material.opacity = 0
   }
 
   /** Animate completion pulse expansion + fade. */
