@@ -15,6 +15,8 @@ import { LanderAudioDirector } from '@/audio/LanderAudioDirector'
 import { FpsAudioDirector } from '@/audio/FpsAudioDirector'
 import { LevelAudioDirector } from '@/audio/LevelAudioDirector'
 import { PhotometryScanSound } from '@/audio/PhotometryScanSound'
+import { useAudio } from '@/audio/useAudio'
+import type { AudioPlaybackHandle } from '@/audio/audioTypes'
 import { GameLoop } from '@/lib/GameLoop'
 import { TickHandler } from '@/lib/TickHandler'
 import { InputManager } from '@/lib/InputManager'
@@ -254,6 +256,13 @@ export class LevelViewController implements Tickable {
   private readonly levelAudio = new LevelAudioDirector()
   /** Continuous two-layer audio feedback for the photometry scan beam. */
   private readonly photometryScanAudio = new PhotometryScanSound()
+  /**
+   * DAN scan loop handle. The scan hum (`sfx.dan`) starts when the minigame
+   * reports `visible: true` and stops when the audio frame goes quiet —
+   * tied directly to scan window + fade. Capture clicks (`sfx.dan.hit`)
+   * are one-shots fired per particle, so they do not need a handle.
+   */
+  private danScanLoopHandle: AudioPlaybackHandle | null = null
   private readonly persistence = new LevelPersistenceFacade()
   private readonly stateLifecycle = new LevelStateLifecycleFacade()
   private combatMining: LevelCombatMiningFacade | null = null
@@ -1070,10 +1079,22 @@ export class LevelViewController implements Tickable {
         onSurveyProbeCollect: () => this.levelAudio.notifyResourcePickup(),
         onPhotometryScanAudioState: (state) =>
           this.photometryScanAudio.update({ ...state, sfxVolume: 1 }, 0),
-        // DAN audio bindings come online when the audio module lands; for now
-        // route to no-op sinks so the minigame's procedural calls cost nothing.
-        onDanScanAudioState: null,
-        onDanParticleHit: null,
+        onDanScanAudioState: (state) => {
+          // Drive the scan hum from the minigame's audio frame. `visible`
+          // covers active scanning AND the fade-out tail at window close;
+          // when it flips false, stop the loop and clear the handle.
+          if (state.visible) {
+            if (!this.danScanLoopHandle) {
+              this.danScanLoopHandle = useAudio().play('sfx.dan', { loop: true })
+            }
+          } else if (this.danScanLoopHandle) {
+            this.danScanLoopHandle.stop()
+            this.danScanLoopHandle = null
+          }
+        },
+        onDanParticleHit: () => {
+          useAudio().play('sfx.dan.hit')
+        },
         onDanCompletionPulse: null,
         onDamagePlayer: (damage, sourceX, sourceZ, source) => {
           this.applyPlayerDamageFeedback(damage, sourceX, sourceZ, source)

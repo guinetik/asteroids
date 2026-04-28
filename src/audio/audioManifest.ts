@@ -104,6 +104,8 @@ export const AUDIO_SOUND_IDS = [
   'sfx.tool.surveyReveal',
   'sfx.projectileHit',
   'sfx.shieldHit',
+  'sfx.dan',
+  'sfx.dan.hit',
   'sfx.pickup',
   'sfx.grunt',
   // Ambient
@@ -887,6 +889,24 @@ const manifestById: ManifestById = {
     volume: 0.5,
     effect: 'none',
     procedural: 'shield-hit',
+  },
+  'sfx.dan': {
+    id: 'sfx.dan',
+    src: '/sound/sfx.dan.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'single-instance',
+    volume: 0.45,
+    effect: 'none',
+  },
+  'sfx.dan.hit': {
+    id: 'sfx.dan.hit',
+    src: '/sound/sfx.dan.hit.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'overlap',
+    volume: 0.55,
+    effect: 'none',
   },
   'sfx.pickup': {
     id: 'sfx.pickup',

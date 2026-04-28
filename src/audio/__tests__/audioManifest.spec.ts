@@ -92,6 +92,8 @@ describe('audioManifest', () => {
       'sfx.tool.surveyReveal',
       'sfx.projectileHit',
       'sfx.shieldHit',
+      'sfx.dan',
+      'sfx.dan.hit',
       'sfx.pickup',
       'sfx.grunt',
       // ambient
