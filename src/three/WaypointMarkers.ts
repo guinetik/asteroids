@@ -44,7 +44,7 @@ const SURFACE_LAYOUT: WaypointMarkerLayout = {
   beamHeight: WAYPOINT_SURFACE_BEAM_HEIGHT,
   beamCoreRadius: 1.5,
   beamGlowRadius: 4,
-  ringRadius: 12,
+  ringRadius: 18,
   ringTube: 0.6,
   diamondSize: 3,
   diamondTipOffset: WAYPOINT_SURFACE_DIAMOND_TIP_OFFSET,

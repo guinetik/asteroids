@@ -805,7 +805,7 @@ function handleToggleMusic(): void {
   />
   <DebugHud v-if="debugHudVisible" />
   <PickupToast
-    v-if="stateInfo.state === 'eva' || stateInfo.state === 'lander'"
+    v-if="stateInfo.state === 'eva' || stateInfo.state === 'lander' || inBunker"
     :pickups="pickups"
     :prospect-entries="prospectEntries"
     :survey-entries="surveyEntries"
@@ -813,7 +813,7 @@ function handleToggleMusic(): void {
   />
   <transition name="pickup-failed">
     <div
-      v-if="pickupFailed && (stateInfo.state === 'eva' || stateInfo.state === 'lander')"
+      v-if="pickupFailed && (stateInfo.state === 'eva' || stateInfo.state === 'lander' || inBunker)"
       :key="pickupFailed.id"
       class="pickup-failed"
       role="status"

@@ -19,8 +19,8 @@ import {
   type BunkerWalkableBounds,
 } from './BunkerWallBuilder'
 import { createBunkerGridMaterial } from './BunkerGridMaterial'
-import { BunkerHatchModel } from './BunkerHatchModel'
 import { BunkerDoorController } from './BunkerDoorController'
+import { BunkerVaultDoorController } from './BunkerVaultDoorController'
 import type { BunkerEnemyType } from '@/lib/bunker/bunkerWaveSchedule'
 import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import { EnemyProjectileSystem } from '@/lib/fps/enemyProjectileSystem'
@@ -31,6 +31,8 @@ import { ChimeraWalkerController, CHIMERA_HIT_CENTER_Y } from '@/three/ChimeraWa
 import { SpireController, SPIRE_HIT_CENTER_Y } from '@/three/SpireController'
 import { EnemyProjectileMeshPool } from '@/three/EnemyProjectileMeshPool'
 import type { EnemyVisualTier } from '@/three/enemyVisualPalette'
+import { BunkerTableModel } from './BunkerTableModel'
+import { BunkerChestModel } from './BunkerChestModel'
 
 /** Distance for the per-corner arena lights (world units). */
 const CORNER_LIGHT_DISTANCE = 14
@@ -123,12 +125,18 @@ export class BunkerSceneController {
   readonly enemyDirector = new EnemyDirector()
   /** Enemy-fired projectiles used by bunker ranged enemies. */
   readonly enemyProjectileSystem = new EnemyProjectileSystem()
-  /** Antechamber exit hatch (player extracts through this on completion). */
-  readonly hatch: BunkerHatchModel
+  /** Antechamber exit door (player extracts through this on completion). */
+  readonly hatch: BunkerVaultDoorController
   /** Arena door (gates the player from entering combat). */
   readonly door: BunkerDoorController
   /** Enemy-room doors opened one at a time as waves begin. */
   readonly enemyDoors: readonly BunkerDoorController[]
+  /** Door to the loot room, opens after waves clear. */
+  readonly lootDoor: BunkerDoorController
+  /** Extract terminal inside the loot room. */
+  readonly table = new BunkerTableModel()
+  /** Chests inside the loot room. */
+  readonly chests: [BunkerChestModel, BunkerChestModel] = [new BunkerChestModel(), new BunkerChestModel()]
 
   private readonly tint: number
   private readonly scene: THREE.Scene
@@ -161,8 +169,30 @@ export class BunkerSceneController {
     this.enemyProjectileMeshPool.prewarm()
     this.material = createBunkerGridMaterial({ tint: opts.tint })
     this.geometry = buildBunkerGeometry(this.material)
-    this.hatch = new BunkerHatchModel(opts.tint)
+    this.hatch = new BunkerVaultDoorController(opts.tint)
     this.door = new BunkerDoorController(opts.tint)
+    this.lootDoor = new BunkerDoorController(opts.tint)
+    this.lootDoor.group.position.copy(this.geometry.lootRoom.doorAnchor.position)
+    this.lootDoor.group.rotation.copy(this.geometry.lootRoom.doorAnchor.rotation)
+    
+    // Position table at the far end of the loot room
+    const doorZ = this.geometry.lootRoom.doorAnchor.position.z
+    const lootDepth = 43 // ARENA.depth / 2
+    const lootWidth = 41 // ARENA.width / 2
+    
+    // Tucked at the end of the room
+    this.table.group.position.set(0, 0, doorZ + lootDepth - 4)
+    // Rotate table so it faces the player (assuming it was facing away)
+    this.table.group.rotation.y = Math.PI
+
+    // Chests against the left and right walls
+    this.chests[0].group.position.set(-lootWidth / 2 + 4, 0, doorZ + lootDepth - 4)
+    this.chests[1].group.position.set(lootWidth / 2 - 4, 0, doorZ + lootDepth - 4)
+    
+    // Rotate chests to be parallel to the walls (facing inward)
+    this.chests[0].group.rotation.y = Math.PI / 2
+    this.chests[1].group.rotation.y = -Math.PI / 2
+    
     this.enemyDoors = this.geometry.enemyRooms.map((room) => {
       const door = new BunkerDoorController(opts.tint)
       door.group.position.copy(room.doorAnchor.position)
@@ -170,14 +200,10 @@ export class BunkerSceneController {
       return door
     })
 
-    this.hatch.group.position.set(
-      this.geometry.antechamberHatch.x,
-      0,
-      this.geometry.antechamberHatch.z,
-    )
-    this.hatch.group.visible = false
+    this.hatch.group.position.copy(this.geometry.entranceDoorAnchor.position)
+    this.hatch.group.rotation.copy(this.geometry.entranceDoorAnchor.rotation)
     this.door.group.position.copy(this.geometry.arenaDoorAnchor.position)
-    this.geometry.root.add(this.hatch.group, this.door.group)
+    this.geometry.root.add(this.hatch.group, this.door.group, this.lootDoor.group, this.table.group, this.chests[0].group, this.chests[1].group)
     for (const door of this.enemyDoors) {
       this.geometry.root.add(door.group)
     }
@@ -211,8 +237,8 @@ export class BunkerSceneController {
    */
   get hatchPosition(): { x: number; z: number } {
     return {
-      x: this.geometry.root.position.x + this.geometry.antechamberHatch.x,
-      z: this.geometry.root.position.z + this.geometry.antechamberHatch.z,
+      x: this.geometry.root.position.x + this.geometry.entranceDoorAnchor.position.x,
+      z: this.geometry.root.position.z + this.geometry.entranceDoorAnchor.position.z,
     }
   }
 
@@ -255,6 +281,20 @@ export class BunkerSceneController {
       minZ: root.z + bounds.minZ,
       maxZ: root.z + bounds.maxZ,
     }))
+  }
+
+  /**
+   * World-space walkable bounds for the loot room.
+   */
+  get lootRoomBounds(): BunkerWalkableBounds {
+    const root = this.geometry.root.position
+    const bounds = this.geometry.lootRoom.walkableBounds
+    return {
+      minX: root.x + bounds.minX,
+      maxX: root.x + bounds.maxX,
+      minZ: root.z + bounds.minZ,
+      maxZ: root.z + bounds.maxZ,
+    }
   }
 
   /**
@@ -384,6 +424,7 @@ export class BunkerSceneController {
     ;(this.material.userData.tick as ((dt: number) => void) | undefined)?.(dt)
     this.hatch.tick(dt)
     this.door.tick(dt)
+    this.lootDoor.tick(dt)
     for (const door of this.enemyDoors) {
       door.tick(dt)
     }
@@ -427,6 +468,10 @@ export class BunkerSceneController {
     this.deactivate()
     this.hatch.dispose()
     this.door.dispose()
+    this.lootDoor.dispose()
+    this.table.dispose()
+    this.chests[0].dispose()
+    this.chests[1].dispose()
     for (const door of this.enemyDoors) {
       door.dispose()
     }

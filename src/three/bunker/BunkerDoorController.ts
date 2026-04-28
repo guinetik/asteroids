@@ -53,15 +53,46 @@ export class BunkerDoorController {
 
   /**
    * @param tint - Faction tint hex
+   * @param useMetallicTexture - Whether to apply the hatch pipe metallic texture to the door slab
    */
-  constructor(tint: number) {
-    this.slabMat = new THREE.MeshStandardMaterial({
+  constructor(tint: number, useMetallicTexture: boolean = false) {
+    const matOpts: THREE.MeshStandardMaterialParameters = {
       color: 0x101620,
       emissive: tint,
       emissiveIntensity: 0.08,
       metalness: 0.5,
       roughness: 0.55,
-    })
+    }
+    
+    if (useMetallicTexture) {
+      const texLoader = new THREE.TextureLoader()
+      const colorMap = texLoader.load('/textures/metal/color.webp', (t) => { t.needsUpdate = true })
+      const normalMap = texLoader.load('/textures/metal/normal.webp', (t) => { t.needsUpdate = true })
+      const roughnessMap = texLoader.load('/textures/metal/roughness.webp', (t) => { t.needsUpdate = true })
+      const metalnessMap = texLoader.load('/textures/metal/metalness.webp', (t) => { t.needsUpdate = true })
+      
+      const setupTex = (t: THREE.Texture) => {
+        t.wrapS = THREE.RepeatWrapping
+        t.wrapT = THREE.RepeatWrapping
+        t.repeat.set(2, 2)
+      }
+      
+      setupTex(colorMap)
+      colorMap.colorSpace = THREE.SRGBColorSpace
+      setupTex(normalMap)
+      setupTex(roughnessMap)
+      setupTex(metalnessMap)
+      
+      matOpts.color = 0xb6bec8
+      matOpts.map = colorMap
+      matOpts.normalMap = normalMap
+      matOpts.roughnessMap = roughnessMap
+      matOpts.metalnessMap = metalnessMap
+      matOpts.metalness = 0.8
+      matOpts.roughness = 0.4
+    }
+
+    this.slabMat = new THREE.MeshStandardMaterial(matOpts)
     this.slab = new THREE.Mesh(
       new THREE.BoxGeometry(DOOR_WIDTH, DOOR_HEIGHT, DOOR_THICKNESS),
       this.slabMat,

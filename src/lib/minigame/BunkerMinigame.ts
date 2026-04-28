@@ -40,7 +40,7 @@ import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
  * with the visual cue. Indoor doors stay tight (see
  * {@link ARENA_DOOR_INTERACT_RANGE} and {@link EXIT_HATCH_INTERACT_RANGE}).
  */
-const SURFACE_HATCH_INTERACT_RANGE = 12
+const SURFACE_HATCH_INTERACT_RANGE = 18
 /** XZ distance threshold (world units) for the antechamber arena door. */
 const ARENA_DOOR_INTERACT_RANGE = 2.5
 /** XZ distance threshold (world units) for the antechamber exit hatch. */
@@ -91,6 +91,7 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
   private spawnedWaveIndex = -1
   private _status: MiniGameStatus = 'active'
   private _isPlayerNear = false
+  private _terminalInteracted = false
   private surfaceHatch: BunkerHatchModel | null = null
   private surfaceHatchPos: { x: number; z: number } | null = null
 
@@ -98,7 +99,8 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
     { label: 'Land in the bunker zone', complete: false, active: true },
     { label: 'Enter the bunker', complete: false, active: false },
     { label: 'Clear the waves', complete: false, active: false },
-    { label: 'Extract from the bunker', complete: false, active: false },
+    { label: 'Extract data from terminal', complete: false, active: false },
+    { label: 'Leave the bunker', complete: false, active: false },
   ]
 
   // --- MiniGameEvents ---
@@ -106,6 +108,8 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
   onPrompt: ((text: string | null) => void) | null = null
   /** @inheritdoc */
   onComplete: ((objectiveIndex: number) => void) | null = null
+  /** @inheritdoc */
+  onLootChest: ((tier: BunkerWaveTier) => boolean) | null = null
   /** @inheritdoc */
   onStepChange: ((objectiveIndex: number, steps: readonly MiniGameStep[]) => void) | null = null
   /** Fired when the mission can no longer be completed. */
@@ -271,9 +275,15 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
       const [antechamberBounds] = walkableBounds
       return antechamberBounds ? [antechamberBounds] : []
     }
+    const bounds = [...walkableBounds]
     const activeEnemyRoomBounds = this.scene?.activeEnemyRoomBounds
-    if (activeEnemyRoomBounds) return [...walkableBounds, activeEnemyRoomBounds]
-    return walkableBounds
+    if (activeEnemyRoomBounds) bounds.push(activeEnemyRoomBounds)
+    
+    if (this.state.current === 'final-clear' || this.state.current === 'exit-prompt') {
+      if (this.scene) bounds.push(this.scene.lootRoomBounds)
+    }
+    
+    return bounds
   }
 
   /** Currently-active wave index (zero-based) — for HUD. */
@@ -367,9 +377,9 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
       // so we widen via `as BunkerSubState` to restore the full union.
       const after = this.state.current as BunkerSubState
       if (after === 'exit-prompt' || after === 'final-clear') {
-        this.scene.hatch.active = false
-        this.scene.hatch.group.visible = false
         this.scene.hatch.setOpen(false)
+        this.scene.lootDoor.setOpen(true)
+        this.advanceStep(2) // Clear the waves
       }
     }
   }
@@ -469,17 +479,57 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
     }
 
     if (this.state.current === 'exit-prompt') {
-      const hp = this.scene.hatchPosition
-      const dx = px - hp.x
-      const dz = pz - hp.z
-      if (dx * dx + dz * dz <= EXIT_HATCH_INTERACT_RANGE * EXIT_HATCH_INTERACT_RANGE) {
-        this._isPlayerNear = true
-        this.onPrompt?.('[E] EXIT BUNKER')
-        if (ctx.terminalInteractPressed) {
-          this.scene.hatch.active = true
-          this.scene.hatch.group.visible = true
-          this.scene.hatch.setOpen(true)
-          this.onExit?.()
+      // Check chests
+      for (const chest of this.scene.chests) {
+        if (chest.opened) continue
+        
+        // We get local coordinates for distance check or world coords?
+        // Chest position is relative to root. We need world coords.
+        const cx = this.scene.rootWorldPosition.x + chest.group.position.x
+        const cz = this.scene.rootWorldPosition.z + chest.group.position.z
+        
+        const dx = px - cx
+        const dz = pz - cz
+        if (dx * dx + dz * dz <= 5 * 5) {
+          this._isPlayerNear = true
+          this.onPrompt?.('[E] OPEN CHEST')
+          if (ctx.terminalInteractPressed) {
+            const success = this.onLootChest?.(this.tier) ?? false
+            if (success) chest.open()
+          }
+          return
+        }
+      }
+
+      // Check terminal
+      if (!this._terminalInteracted) {
+        const tx = this.scene.rootWorldPosition.x + this.scene.table.group.position.x
+        const tz = this.scene.rootWorldPosition.z + this.scene.table.group.position.z
+        const dx = px - tx
+        const dz = pz - tz
+        if (dx * dx + dz * dz <= 5 * 5) {
+          this._isPlayerNear = true
+          this.onPrompt?.('[E] EXTRACT DATA')
+          if (ctx.terminalInteractPressed) {
+            this._terminalInteracted = true
+            this.advanceStep(3) // Advance 'Extract data from terminal'
+          }
+          return
+        }
+      }
+
+      // Check exit hatch (only if terminal interacted)
+      if (this._terminalInteracted) {
+        const hp = this.scene.hatchPosition
+        const dx = px - hp.x
+        const dz = pz - hp.z
+        if (dx * dx + dz * dz <= EXIT_HATCH_INTERACT_RANGE * EXIT_HATCH_INTERACT_RANGE) {
+          this._isPlayerNear = true
+          this.onPrompt?.('[E] LEAVE BUNKER')
+          if (ctx.terminalInteractPressed) {
+            this.scene.hatch.setOpen(true)
+            this.onExit?.()
+          }
         }
       }
     }
@@ -525,8 +575,6 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
       this.surfaceHatch.group.visible = false
     }
     if (this.scene) {
-      this.scene.hatch.active = false
-      this.scene.hatch.group.visible = false
       this.scene.hatch.setOpen(false)
     }
     this.scene?.activate()
@@ -543,8 +591,7 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
     this.state.notifyHatchInteracted()
     if (this.state.current === 'exiting') {
       if (this.scene) {
-        this.scene.hatch.active = false
-        this.scene.hatch.group.visible = true
+        this.scene.hatch.setOpen(true)
       }
       this.scene?.deactivate()
       this.scene?.hatch.setOpen(false)
@@ -555,8 +602,9 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
         this.surfaceHatch.setOpen(false)
       }
       this.onPrompt?.(null)
-      this.advanceStep(2) // Clear the waves
-      this.advanceStep(3) // Extract
+      this.advanceStep(2) // Clear the waves (usually already done by notifyWaveCleared, but safe to call)
+      this.advanceStep(3) // Extract data
+      this.advanceStep(4) // Leave bunker
       this._status = 'completed'
       this.onComplete?.(this.objectiveIndex)
     }

@@ -37,10 +37,17 @@ const { fakeSceneInstance } = vi.hoisted(() => {
       },
       hatch: { setOpen: vi.fn(), active: false, group: { visible: false } },
       door: { setOpen: vi.fn() },
+      lootDoor: { setOpen: vi.fn() },
+      table: { group: { position: { x: 0, z: 0 } } },
+      chests: [
+        { opened: false, open: vi.fn(), group: { position: { x: 100, z: 100 } } },
+        { opened: false, open: vi.fn(), group: { position: { x: 100, z: 100 } } }
+      ],
       openWaveRoom: vi.fn(),
       closeWaveRoom: vi.fn(),
       hasPendingWaveSpawns: false,
       activeEnemyRoomBounds: null as { minX: number; maxX: number; minZ: number; maxZ: number } | null,
+      lootRoomBounds: { minX: -5, maxX: 5, minZ: 30, maxZ: 40 },
       playerSpawn: { x: 0, y: 0, z: 0 },
       rootWorldPosition: { x: 0, y: 0, z: 0 },
       hatchPosition: { x: 0, z: 0 },
@@ -110,7 +117,7 @@ function buildMinigame(): BunkerMinigame {
 describe('BunkerMinigame', () => {
   it('starts with all 4 steps, first one active', () => {
     const m = buildMinigame()
-    expect(m.steps.length).toBe(4)
+    expect(m.steps.length).toBe(5)
     expect(m.steps[0]!.active).toBe(true)
     expect(m.steps[0]!.complete).toBe(false)
   })
@@ -170,7 +177,7 @@ describe('BunkerMinigame', () => {
       difficulty: 1,
     })
     m.notifyDescended()
-    expect(fakeSceneInstance.hatch.group.visible).toBe(false)
+    expect(fakeSceneInstance.hatch.setOpen).toHaveBeenCalledWith(false)
 
     m.notifyArenaDoorInteract()
     for (let wave = 0; wave < 3; wave++) {
@@ -193,7 +200,7 @@ describe('BunkerMinigame', () => {
       })
     }
 
-    expect(fakeSceneInstance.hatch.group.visible).toBe(false)
+    expect(fakeSceneInstance.hatch.setOpen).toHaveBeenCalledWith(false)
 
     m.tick(999, {
       levelState: 'bunker-interior',
@@ -203,8 +210,21 @@ describe('BunkerMinigame', () => {
       interactPressed: false,
       terminalInteractPressed: false,
     })
+    
+    // First interact with the terminal
+    m.tick(0.016, {
+      levelState: 'bunker-interior',
+      landerPosition: null,
+      landerGrounded: false,
+      playerPosition: { x: 0, y: 0, z: 0 },
+      interactPressed: false,
+      terminalInteractPressed: true,
+    })
+
     const exit = vi.fn()
     m.onExit = exit
+    
+    // Next interact with the exit hatch
     m.tick(0.016, {
       levelState: 'bunker-interior',
       landerPosition: null,
@@ -215,7 +235,7 @@ describe('BunkerMinigame', () => {
     })
 
     expect(exit).toHaveBeenCalledTimes(1)
-    expect(fakeSceneInstance.hatch.group.visible).toBe(true)
+    expect(fakeSceneInstance.hatch.setOpen).toHaveBeenCalledWith(true)
   })
 
   it('deactivates the bunker scene and clears the prompt after extracting', () => {

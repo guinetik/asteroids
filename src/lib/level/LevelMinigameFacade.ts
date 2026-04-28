@@ -122,6 +122,8 @@ export interface LevelMinigameBindings {
   onInstallCombatDropObserver:
     | ((minigame: ExterminateMinigame | RescueMinigame | BunkerMinigame) => void)
     | null
+  /** Attempt to open a loot chest based on bunker tier. Returns true if granted. */
+  onLootChest: ((tier: string) => boolean) | null
   /** Register static objective prop colliders after minigames create their scene props. */
   onRegisterObjectiveColliders: ((colliders: readonly WorldCollider[]) => void) | null
 }
@@ -270,6 +272,7 @@ export class LevelMinigameFacade {
         minigame.onKillPlayer = bindings.onKillPlayer
         minigame.onDestroyLander = () => bindings.onDestroyLander?.('bunker')
         minigame.onFail = bindings.onRescueFail // reuse rescue's fail pipeline
+        minigame.onLootChest = bindings.onLootChest
         bindings.onInstallCombatDropObserver?.(minigame)
         this.add(minigame)
       } else if (objective.type === 'collect') {

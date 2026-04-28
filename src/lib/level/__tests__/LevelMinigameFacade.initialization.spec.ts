@@ -284,6 +284,7 @@ describe('LevelMinigameFacade initialization', () => {
         onSurvivorAboard,
         onInstallCombatDropObserver,
         onRegisterObjectiveColliders,
+        onLootChest: vi.fn(),
       },
     })
 
@@ -373,6 +374,7 @@ describe('LevelMinigameFacade initialization', () => {
         onSurvivorAboard: null,
         onInstallCombatDropObserver: null,
         onRegisterObjectiveColliders: null,
+        onLootChest: null,
       },
     })
 

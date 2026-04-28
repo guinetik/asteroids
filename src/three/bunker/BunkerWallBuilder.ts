@@ -19,6 +19,8 @@ export const CORRIDOR = { width: 6, depth: 8, height: 11 }
 export const ARENA = { width: 82, depth: 86, height: 13 }
 /** Enemy staging room inner dimensions. */
 export const ENEMY_ROOM = { width: 16, depth: 16, height: ARENA.height }
+/** Loot room inner dimensions. */
+export const LOOT_ROOM = { width: ARENA.width / 2, depth: ARENA.depth / 2, height: ARENA.height }
 /** Wall thickness for all six faces of every volume. */
 export const WALL_THICKNESS = 0.4
 /** Inset from each arena corner (world units) where spawn pads sit. */
@@ -39,7 +41,14 @@ export interface BunkerWalkableBounds {
 }
 
 /** Directional staging rooms connected to arena walls. */
-export type BunkerEnemyRoomId = 'north' | 'east' | 'west'
+export type BunkerEnemyRoomId = 'east' | 'west'
+
+/** Built geometry metadata for the loot room. */
+export interface BunkerLootRoomGeometry {
+  group: THREE.Group
+  doorAnchor: THREE.Object3D
+  walkableBounds: BunkerWalkableBounds
+}
 
 /** Built geometry metadata for one enemy staging room. */
 export interface BunkerEnemyRoomGeometry {
@@ -63,12 +72,16 @@ export interface BunkerGeometry {
   rooms: { antechamber: THREE.Group; corridor: THREE.Group; arena: THREE.Group }
   /** XZ centers of the four arena spawn pads in world space. */
   spawnPadCenters: ReadonlyArray<{ x: number; z: number }>
-  /** Enemy staging rooms connected to the arena's north/east/west walls. */
+  /** Enemy staging rooms connected to the arena's east/west walls. */
   enemyRooms: readonly BunkerEnemyRoomGeometry[]
+  /** Loot room connected to the arena's north wall. */
+  lootRoom: BunkerLootRoomGeometry
   /** XZ position of the antechamber's exit hatch (floor center). */
   antechamberHatch: { x: number; z: number }
   /** Door slot — the scene controller fills this with a `BunkerDoorController`. */
   arenaDoorAnchor: THREE.Object3D
+  /** Door slot — the scene controller fills this with an entrance door at the south wall of the antechamber. */
+  entranceDoorAnchor: THREE.Object3D
   /** Player spawn point inside the antechamber when entering the bunker. */
   playerSpawn: THREE.Vector3
   /** Walkable room rectangles in bunker-local XZ space. */
@@ -91,7 +104,7 @@ export function buildBunkerGeometry(material: THREE.ShaderMaterial): BunkerGeome
   const anteCenterZ = 0
   const corrCenterZ = ANTECHAMBER.depth / 2 + CORRIDOR.depth / 2
   const arenaCenterZ = corrCenterZ + CORRIDOR.depth / 2 + ARENA.depth / 2
-  const northRoomCenterZ = arenaCenterZ + ARENA.depth / 2 + ENEMY_ROOM.depth / 2
+  const northRoomCenterZ = arenaCenterZ + ARENA.depth / 2 + LOOT_ROOM.depth / 2
   const eastRoomCenterX = ARENA.width / 2 + ENEMY_ROOM.width / 2
   const westRoomCenterX = -eastRoomCenterX
 
@@ -102,6 +115,7 @@ export function buildBunkerGeometry(material: THREE.ShaderMaterial): BunkerGeome
   // reveals the next space instead of a sealed wall.
   const ante = buildRoom('antechamber', ANTECHAMBER, 0, anteCenterZ, material, {
     northOpeningWidth: CORRIDOR.width,
+    southOpeningWidth: CORRIDOR.width,
   })
   const corr = buildRoom('corridor', CORRIDOR, 0, corrCenterZ, material, {
     skipNorth: true,
@@ -115,7 +129,7 @@ export function buildBunkerGeometry(material: THREE.ShaderMaterial): BunkerGeome
     westOpeningWidth: CORRIDOR.width,
     westOpeningCenterZ: arenaCenterZ,
   })
-  const northRoom = buildRoom('enemyRoomNorth', ENEMY_ROOM, 0, northRoomCenterZ, material, {
+  const northRoom = buildRoom('lootRoom', LOOT_ROOM, 0, northRoomCenterZ, material, {
     southOpeningWidth: CORRIDOR.width,
   })
   const eastRoom = buildRoom('enemyRoomEast', ENEMY_ROOM, eastRoomCenterX, arenaCenterZ, material, {
@@ -143,6 +157,10 @@ export function buildBunkerGeometry(material: THREE.ShaderMaterial): BunkerGeome
   arenaDoorAnchor.position.set(0, 0, ANTECHAMBER.depth / 2 + WALL_THICKNESS / 2)
   root.add(arenaDoorAnchor)
 
+  const entranceDoorAnchor = new THREE.Object3D()
+  entranceDoorAnchor.position.set(0, 0, -ANTECHAMBER.depth / 2 - WALL_THICKNESS / 2)
+  root.add(entranceDoorAnchor)
+
   const northDoorAnchor = new THREE.Object3D()
   northDoorAnchor.position.set(0, 0, arenaCenterZ + ARENA.depth / 2 + WALL_THICKNESS / 2)
   root.add(northDoorAnchor)
@@ -168,19 +186,6 @@ export function buildBunkerGeometry(material: THREE.ShaderMaterial): BunkerGeome
   ]
 
   const enemyRooms: readonly BunkerEnemyRoomGeometry[] = [
-    {
-      id: 'north',
-      group: northRoom.group,
-      doorAnchor: northDoorAnchor,
-      spawnPadCenter: { x: 0, z: northRoomCenterZ },
-      walkableBounds: insetBounds(
-        -ENEMY_ROOM.width / 2,
-        ENEMY_ROOM.width / 2,
-        arenaCenterZ + ARENA.depth / 2,
-        northRoomCenterZ + ENEMY_ROOM.depth / 2,
-        -WALKABLE_INSET,
-      ),
-    },
     {
       id: 'east',
       group: eastRoom.group,
@@ -208,13 +213,26 @@ export function buildBunkerGeometry(material: THREE.ShaderMaterial): BunkerGeome
     },
   ]
 
+  const lootRoomGeom: BunkerLootRoomGeometry = {
+    group: northRoom.group,
+    doorAnchor: northDoorAnchor,
+    walkableBounds: {
+      minX: -LOOT_ROOM.width / 2 + WALKABLE_INSET,
+      maxX: LOOT_ROOM.width / 2 - WALKABLE_INSET,
+      minZ: arenaCenterZ + ARENA.depth / 2 - WALKABLE_INSET,
+      maxZ: northRoomCenterZ + LOOT_ROOM.depth / 2 - 8, // Leave room for table/chests collision
+    },
+  }
+
   return {
     root,
     rooms: { antechamber: ante.group, corridor: corr.group, arena: arena.group },
     spawnPadCenters,
     enemyRooms,
+    lootRoom: lootRoomGeom,
     antechamberHatch: { x: 0, z: anteCenterZ },
     arenaDoorAnchor,
+    entranceDoorAnchor,
     playerSpawn: new THREE.Vector3(0, 0, anteCenterZ - ANTECHAMBER.depth / 2 + 1.5),
     walkableBounds: [
       insetBounds(-ANTECHAMBER.width / 2, ANTECHAMBER.width / 2, -ANTECHAMBER.depth / 2, ANTECHAMBER.depth / 2),

@@ -12,6 +12,7 @@
  */
 import type { Enemy } from '@/lib/fps/enemy'
 import type { WorldCollider } from '@/lib/physics/worldCollision'
+import type { BunkerWaveTier } from '@/lib/bunker/bunkerWaveSchedule'
 
 /** Minigame lifecycle status. */
 export type MiniGameStatus = 'idle' | 'active' | 'completed' | 'failed'
@@ -48,6 +49,8 @@ export interface MiniGameEvents {
   onPrompt: ((text: string | null) => void) | null
   /** Objective completed. */
   onComplete: ((objectiveIndex: number) => void) | null
+  /** Attempt to open a loot chest based on bunker tier. Returns true if granted. */
+  onLootChest?: ((tier: BunkerWaveTier) => boolean) | null
   /** A step advanced — pass updated steps for reactivity. */
   onStepChange: ((objectiveIndex: number, steps: readonly MiniGameStep[]) => void) | null
 }

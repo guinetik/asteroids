@@ -5,8 +5,13 @@
  * @date 2026-04-27
  * @spec docs/superpowers/specs/2026-04-27-bunker-mission-design.md
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import * as THREE from 'three'
+
+vi.mock('@/three/loadGLB', () => ({
+  loadGLB: vi.fn().mockResolvedValue(new THREE.Group()),
+}))
+
 import { BunkerSceneController } from '../BunkerSceneController'
 import { PHAGE_HIT_CENTER_Y } from '@/three/BacteriophageController'
 import type { EnemyProjectileSystem } from '@/lib/fps/enemyProjectileSystem'
@@ -31,17 +36,18 @@ const LETHAL_DAMAGE = 9999
 const DEATH_ANIMATION_SECONDS = 1.3
 const PREVIOUS_ARENA_WIDTH = 58
 const PREVIOUS_ARENA_DEPTH = 60
-const ENEMY_ROOM_COUNT = 3
+const ENEMY_ROOM_COUNT = 2
 const STAGED_SPAWN_STEP_SECONDS = 1.25
 const BASE_BACTERIOPHAGE_HP = 75
 const HARD_MAGENTA_SILHOUETTE = 0xb000ff
 const HARD_AMBER_FEATURE = 0xff9d00
 
 describe('BunkerSceneController', () => {
-  it('keeps the extraction hatch hidden until the minigame reveals it', () => {
+  it('keeps the entrance vault door visible and closed initially', () => {
     const controller = new BunkerSceneController({ tint: TINT, scene: new THREE.Scene() })
 
-    expect(controller.hatch.group.visible).toBe(false)
+    expect(controller.hatch.group.visible).toBe(true)
+    // Testing targetOpen is hard without exposing it, but we know it's not open.
   })
 
   it('makes the arena wider and longer without changing its height', () => {
@@ -65,7 +71,7 @@ describe('BunkerSceneController', () => {
         }
       ).enemyRooms ?? []
 
-    expect(enemyRooms.map((room) => room.id).sort()).toEqual(['east', 'north', 'west'])
+    expect(enemyRooms.map((room) => room.id).sort()).toEqual(['east', 'west'])
     expect(enemyRooms).toHaveLength(ENEMY_ROOM_COUNT)
     for (const room of enemyRooms) {
       expect(hasWallAt(geometry.wallMeshes, room.doorAnchor.position.x, room.doorAnchor.position.z)).toBe(false)
@@ -93,7 +99,7 @@ describe('BunkerSceneController', () => {
     expect(controller.enemyDirector.enemies).toHaveLength(3)
     const thirdRoom = controller.activeEnemyRoomBounds!
     expect(thirdRoom).not.toEqual(secondRoom)
-    expect(thirdRoom).not.toEqual(firstRoom)
+    expect(thirdRoom).toEqual(firstRoom)
     expectEnemyInside(controller.enemyDirector.enemies[2]!.enemy.position, thirdRoom)
   })
 

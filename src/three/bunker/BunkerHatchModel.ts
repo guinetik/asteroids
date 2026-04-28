@@ -14,9 +14,9 @@ import { LANDER_COLLISION_TOP_OFFSET } from '@/three/landerDimensions'
 import type { WorldCollider } from '@/lib/physics/worldCollision'
 
 /** Radius of the chunky metal pipe entrance in world units. */
-export const HATCH_PIPE_RADIUS = 8
+export const HATCH_PIPE_RADIUS = 10
 /** Pipe height as a fraction of the lander's above-ground collision height. */
-const HATCH_PIPE_LANDER_HEIGHT_FRACTION = 1.65
+const HATCH_PIPE_LANDER_HEIGHT_FRACTION = 2.5
 /** Height of the pipe entrance rising from the floor. */
 const HATCH_PIPE_HEIGHT = LANDER_COLLISION_TOP_OFFSET * HATCH_PIPE_LANDER_HEIGHT_FRACTION
 /** How far the pipe body extends below its placement Y to survive uneven terrain. */
@@ -26,7 +26,7 @@ const HATCH_PIPE_SEGMENTS = 48
 /** Width of the side door panel. */
 const HATCH_DOOR_WIDTH = 4.6
 /** Height of the side door panel. */
-const HATCH_DOOR_HEIGHT = 9.2
+const HATCH_DOOR_HEIGHT = 10.2
 /** Thickness of the side door panel. */
 const HATCH_DOOR_DEPTH = 0.08
 /** Gap from visible ground to the bottom of the side door panel. */
@@ -64,7 +64,7 @@ const HATCH_PIPE_DISPLACEMENT_SCALE = 0.08
 /** Dark panel color used by the door. */
 const HATCH_DOOR_COLOR = 0x121821
 /** Metalness for the pipe body. */
-const HATCH_PIPE_METALNESS = 0.55
+const HATCH_PIPE_METALNESS = 0.05
 /** Roughness for the pipe body. */
 const HATCH_PIPE_ROUGHNESS = 0.72
 /** Environment reflection multiplier for the pipe body. */
@@ -193,11 +193,7 @@ export class BunkerHatchModel {
       metalness: HATCH_DOOR_METALNESS,
       roughness: HATCH_DOOR_ROUGHNESS,
     })
-    const doorGeo = new THREE.BoxGeometry(
-      HATCH_DOOR_WIDTH,
-      HATCH_DOOR_HEIGHT,
-      HATCH_DOOR_DEPTH,
-    )
+    const doorGeo = new THREE.BoxGeometry(HATCH_DOOR_WIDTH, HATCH_DOOR_HEIGHT, HATCH_DOOR_DEPTH)
     this.door = new THREE.Mesh(doorGeo, this.doorMat)
     this.door.name = 'bunkerHatchDoor'
     this.door.position.set(
@@ -207,11 +203,7 @@ export class BunkerHatchModel {
     )
 
     this.frame.name = 'bunkerHatchDoorFrame'
-    this.frame.position.set(
-      0,
-      this.door.position.y,
-      this.door.position.z - HATCH_FRAME_Z_BIAS,
-    )
+    this.frame.position.set(0, this.door.position.y, this.door.position.z - HATCH_FRAME_Z_BIAS)
     const frameWidth = HATCH_DOOR_WIDTH + HATCH_FRAME_WIDTH_PADDING
     const frameHeight = HATCH_DOOR_HEIGHT + HATCH_FRAME_HEIGHT_PADDING
     const verticalBarGeo = new THREE.BoxGeometry(

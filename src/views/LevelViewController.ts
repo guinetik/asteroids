@@ -89,6 +89,9 @@ import { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
 import { loadProfile } from '@/lib/player/profile'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 import { DropSystem, createContractDropPolicy } from '@/lib/fps/dropSystem'
+import { TRADE_GOODS } from '@/lib/shop/tradeGoods'
+import { addItem } from '@/lib/inventory/inventory'
+import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
 import { PsychospherePickupController } from '@/three/PsychospherePickupController'
 import { contractSystem } from '@/lib/contracts/runtime'
 import { hashLevelSeed, resolveLevelContext, rotationFromSeed } from '@/lib/level/levelContext'
@@ -1000,6 +1003,9 @@ export class LevelViewController implements Tickable {
         },
         onInstallCombatDropObserver: (minigame) => {
           this.installDropObserver(minigame)
+        },
+        onLootChest: (tier) => {
+          return this.handleLootChest(tier)
         },
         onRegisterObjectiveColliders: (colliders: readonly WorldCollider[]) => {
           this.collision.registerObjectiveColliders(colliders)
@@ -2497,6 +2503,41 @@ export class LevelViewController implements Tickable {
   // ═══════════════════════════════════════════════════════════════
   // Helpers
   // ═══════════════════════════════════════════════════════════════
+
+  /**
+   * Handle the player opening a loot chest in the bunker.
+   * Randomly rewards trade goods based on tier, checks inventory via onResourcePickup.
+   *
+   * @param tier - Bunker wave tier.
+   * @returns True if items were granted and the chest should visually open.
+   */
+  private handleLootChest(tier: string): boolean {
+    if (!this.onResourcePickup) return false
+
+    const keys = Object.keys(TRADE_GOODS)
+    if (keys.length === 0) return false
+    const randomKey = keys[Math.floor(Math.random() * keys.length)] as string
+    const tradeGood = TRADE_GOODS[randomKey]
+    if (!tradeGood) return false
+
+    let quantity = 1
+    if (tier === 'medium') quantity = 2
+    if (tier === 'hard') quantity = 3
+
+    const inventory = loadInventory()
+    if (!inventory) return false
+
+    const addResult = addItem(inventory, randomKey, quantity)
+    if (!addResult.ok) {
+      this.onResourcePickupFailed?.(tradeGood.label, addResult.reason ?? 'Inventory full')
+      return false
+    }
+
+    saveInventory(addResult.inventory)
+    this.onResourcePickup(randomKey, quantity, tradeGood.label)
+
+    return true
+  }
 
   /**
    * Apply the full hit-feedback bundle when the player takes damage:
