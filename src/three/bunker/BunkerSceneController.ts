@@ -25,6 +25,8 @@ const CORNER_LIGHT_DISTANCE = 14
 const CORNER_LIGHT_INTENSITY = 1.6
 /** Intensity for the door light (slightly brighter than corners). */
 const DOOR_LIGHT_INTENSITY = 2.2
+/** Distance for the door point light. Same value as corner lights today; named separately for tuning clarity. */
+const DOOR_LIGHT_DISTANCE = 14
 /** Intensity for the ambient light. */
 const AMBIENT_INTENSITY = 0.25
 /** Y position of the four corner point lights. */
@@ -55,7 +57,6 @@ export class BunkerSceneController {
   private readonly scene: THREE.Scene
   private readonly material: THREE.ShaderMaterial
   private readonly geometry: BunkerGeometry
-  private readonly enemySpawnObservers = new Set<(handle: EnemyHandle) => void>()
   private spawnPadCursor = 0
   private active = false
 
@@ -107,8 +108,7 @@ export class BunkerSceneController {
    * @returns Unsubscribe
    */
   installEnemySpawnObserver(listener: (handle: EnemyHandle) => void): () => void {
-    this.enemySpawnObservers.add(listener)
-    return () => this.enemySpawnObservers.delete(listener)
+    return this.enemyDirector.addSpawnListener(listener)
   }
 
   /** Add the bunker root to the scene. */
@@ -132,19 +132,12 @@ export class BunkerSceneController {
    * @param roster - Flat list of enemy types
    */
   spawnWave(roster: readonly BunkerEnemyType[]): void {
-    const pads = this.geometry.spawnPadCenters
     for (const type of roster) {
+      const pads = this.geometry.spawnPadCenters
       // Modulo of array length always produces a valid index; safe to assert non-null.
       const pad = pads[this.spawnPadCursor % pads.length]!
       this.spawnPadCursor++
-      const handle = this.enemyDirector.spawn(type, pad.x, 0, pad.z)
-      for (const obs of this.enemySpawnObservers) {
-        try {
-          obs(handle)
-        } catch {
-          // observer-side errors must not break spawning
-        }
-      }
+      this.enemyDirector.spawn(type, pad.x, 0, pad.z)
     }
   }
 
@@ -167,12 +160,9 @@ export class BunkerSceneController {
     this.hatch.dispose()
     this.door.dispose()
     this.material.dispose()
-    this.geometry.root.traverse((obj) => {
-      if ((obj as THREE.Mesh).isMesh) {
-        const m = obj as THREE.Mesh
-        m.geometry.dispose()
-      }
-    })
+    for (const mesh of this.geometry.wallMeshes) {
+      mesh.geometry.dispose()
+    }
     this.enemyDirector.despawnAll()
   }
 
@@ -188,7 +178,7 @@ export class BunkerSceneController {
       this.geometry.root.add(l)
     }
 
-    const doorLight = new THREE.PointLight(this.tint, DOOR_LIGHT_INTENSITY, CORNER_LIGHT_DISTANCE)
+    const doorLight = new THREE.PointLight(this.tint, DOOR_LIGHT_INTENSITY, DOOR_LIGHT_DISTANCE)
     doorLight.position.set(
       this.geometry.arenaDoorAnchor.position.x,
       DOOR_LIGHT_Y,

@@ -36,6 +36,8 @@ export interface BunkerGeometry {
   arenaDoorAnchor: THREE.Object3D
   /** Player spawn point inside the antechamber when entering the bunker. */
   playerSpawn: THREE.Vector3
+  /** Flat list of every wall mesh built by {@link buildBunkerGeometry} — used by the scene controller for explicit geometry disposal. */
+  wallMeshes: ReadonlyArray<THREE.Mesh>
 }
 
 /**
@@ -68,7 +70,8 @@ export function buildBunkerGeometry(material: THREE.ShaderMaterial): BunkerGeome
     skipSouth: true,
   })
   const arena = buildRoom('arena', ARENA, 0, arenaCenterZ, material)
-  root.add(ante, corr, arena)
+  root.add(ante.group, corr.group, arena.group)
+  const wallMeshes = [...ante.meshes, ...corr.meshes, ...arena.meshes]
 
   // Door anchor sits on the centerline of the antechamber's north wall band
   // (z ∈ [ANTECHAMBER.depth/2, ANTECHAMBER.depth/2 + WALL_THICKNESS]) so a
@@ -89,11 +92,12 @@ export function buildBunkerGeometry(material: THREE.ShaderMaterial): BunkerGeome
 
   return {
     root,
-    rooms: { antechamber: ante, corridor: corr, arena },
+    rooms: { antechamber: ante.group, corridor: corr.group, arena: arena.group },
     spawnPadCenters,
     antechamberHatch: { x: 0, z: anteCenterZ },
     arenaDoorAnchor,
     playerSpawn: new THREE.Vector3(0, 0, anteCenterZ - ANTECHAMBER.depth / 2 + 1.5),
+    wallMeshes,
   }
 }
 
@@ -118,19 +122,22 @@ function buildRoom(
   cz: number,
   material: THREE.ShaderMaterial,
   options: { skipNorth?: boolean; skipSouth?: boolean } = {},
-): THREE.Group {
+): { group: THREE.Group; meshes: THREE.Mesh[] } {
   const g = new THREE.Group()
   g.name = name
   const t = WALL_THICKNESS
+  const meshes: THREE.Mesh[] = []
 
   // Floor + ceiling
   const floor = new THREE.Mesh(new THREE.BoxGeometry(dims.width, t, dims.depth), material)
   floor.position.set(cx, -t / 2, cz)
   g.add(floor)
+  meshes.push(floor)
 
   const ceil = new THREE.Mesh(new THREE.BoxGeometry(dims.width, t, dims.depth), material)
   ceil.position.set(cx, dims.height + t / 2, cz)
   g.add(ceil)
+  meshes.push(ceil)
 
   // North + south walls (along x-axis) — optional so adjacent rooms can
   // close off the end without coplanar z-fighting.
@@ -138,22 +145,26 @@ function buildRoom(
     const north = new THREE.Mesh(new THREE.BoxGeometry(dims.width, dims.height, t), material)
     north.position.set(cx, dims.height / 2, cz + dims.depth / 2 + t / 2)
     g.add(north)
+    meshes.push(north)
   }
 
   if (!options.skipSouth) {
     const south = new THREE.Mesh(new THREE.BoxGeometry(dims.width, dims.height, t), material)
     south.position.set(cx, dims.height / 2, cz - dims.depth / 2 - t / 2)
     g.add(south)
+    meshes.push(south)
   }
 
   // East + west walls (along z-axis)
   const east = new THREE.Mesh(new THREE.BoxGeometry(t, dims.height, dims.depth), material)
   east.position.set(cx + dims.width / 2 + t / 2, dims.height / 2, cz)
   g.add(east)
+  meshes.push(east)
 
   const west = new THREE.Mesh(new THREE.BoxGeometry(t, dims.height, dims.depth), material)
   west.position.set(cx - dims.width / 2 - t / 2, dims.height / 2, cz)
   g.add(west)
+  meshes.push(west)
 
-  return g
+  return { group: g, meshes }
 }
