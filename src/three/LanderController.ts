@@ -25,6 +25,11 @@ import { WarningBeacon } from './WarningBeacon'
 import { getCurrentUpgradeValue } from '@/lib/upgrades'
 import { useAudio } from '@/audio/useAudio'
 import { LanderRcsSound } from '@/audio/LanderRcsSound'
+import {
+  LANDER_COLLISION_BOTTOM_OFFSET,
+  LANDER_COLLISION_RADIUS,
+  LANDER_COLLISION_TOP_OFFSET,
+} from '@/three/landerDimensions'
 import * as THREE from 'three' // already imported above, but ensure for Color
 
 const LANDER_MODEL_PATH = '/models/lander.glb'
@@ -272,11 +277,8 @@ const LEG_NODE_FL = 'RCS_FL_Down'
 const LEG_NODE_FR = 'RCS_FR_Down'
 const LEG_NODE_BL = 'RCS_BL_Down'
 const LEG_NODE_BR = 'RCS_BR_Down'
-const LANDER_COLLISION_RADIUS = 8.5
 const LANDER_COLLISION_SUBSTEP_DISTANCE = 2
 const LANDER_COLLISION_SKIN_WIDTH = 0.1
-const LANDER_COLLISION_BOTTOM_OFFSET = 2
-const LANDER_COLLISION_TOP_OFFSET = 18
 const LANDER_SUPPORT_MAX_STEP_UP = 6
 const LANDER_COLLIDER_ID = 'lander'
 

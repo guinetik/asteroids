@@ -92,6 +92,19 @@ export class LevelCollisionFacade {
     }
   }
 
+  /**
+   * Add one objective prop collider without replacing the existing objective set.
+   *
+   * Used for objective props that are created by the level view after the
+   * minigame facade has registered its own terminal and prop colliders.
+   *
+   * @param collider - Static objective prop collider to append.
+   */
+  addObjectiveCollider(collider: WorldCollider): void {
+    if (!this.world) return
+    this.objectiveColliderCleanup.push(this.world.addCollider(collider))
+  }
+
   /** Remove all registered objective prop colliders. */
   clearObjectiveColliders(): void {
     while (this.objectiveColliderCleanup.length > 0) {

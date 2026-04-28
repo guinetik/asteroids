@@ -30,6 +30,8 @@ import {
   totalWavesForTier,
   type BunkerWaveTier,
 } from '@/lib/bunker/bunkerWaveSchedule'
+import type { BunkerWalkableBounds } from '@/three/bunker/BunkerWallBuilder'
+import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
 
 /**
  * XZ-distance from the surface hatch within which the descent prompt fires.
@@ -70,6 +72,8 @@ export interface BunkerMinigameCreateOptions {
   factionTint: number
   /** Parent THREE scene the bunker root attaches to on `activate`. */
   threeScene: THREE.Scene
+  /** Player projectile system used for bunker enemy hit registration. */
+  projectileSystem: ProjectileSystem
   /** Rolled mission difficulty (1-10) — used to pick the bunker tier. */
   difficulty: number
 }
@@ -147,6 +151,7 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
     const scene = new BunkerSceneController({
       tint: params.factionTint,
       scene: params.threeScene,
+      projectileSystem: params.projectileSystem,
     })
     return new BunkerMinigame(
       params.objectiveIndex,
@@ -186,6 +191,14 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
     this.tier = difficultyToTier(difficulty)
     this.totalWaves = totalWavesForTier(this.tier)
     this.state = new BunkerSceneState({ totalWaves: this.totalWaves })
+    if (this.scene) {
+      this.scene.enemyDirector.onContactDamage = (handle, damage) => {
+        this.onDamagePlayer?.(damage, handle.enemy.position.x, handle.enemy.position.z, 'contact')
+      }
+      this.scene.enemyProjectileSystem.onPlayerHit = (damage, sourceX, sourceZ) => {
+        this.onDamagePlayer?.(damage, sourceX, sourceZ, 'projectile')
+      }
+    }
   }
 
   /** @inheritdoc */
@@ -245,38 +258,21 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
   }
 
   /**
-   * World-space XZ AABB the player must stay inside while in the bunker.
-   * Slice 1 returns the union of antechamber + corridor + arena as a single
-   * rectangle — the corridor's open longitudinal ends connect them, so a
-   * conservative single rectangle keeps the player inside the outer walls
-   * without registering wall colliders. The level controller clamps the
-   * player's XZ each tick using this rectangle.
+   * World-space XZ rectangles the player may stand inside while in the bunker.
+   * Separate rectangles preserve the narrow antechamber/corridor widths
+   * instead of letting those spaces inherit the arena's broad bounds.
    *
-   * Returned as world-space `[minX, maxX] × [minZ, maxZ]`. Returns `null`
-   * in test seams without a scene.
+   * Returns an empty list in test seams without a scene.
    */
-  get bunkerXZBounds(): {
-    minX: number
-    maxX: number
-    minZ: number
-    maxZ: number
-  } | null {
-    if (!this.scene) return null
-    const root = this.scene.rootWorldPosition
-    /** Wall-thickness inset so the player capsule center doesn't clip into walls. */
-    const inset = 0.6
-    /** Half-width of the widest room (arena = 30 wide). */
-    const halfW = 15
-    /** Antechamber's south wall in bunker-local Z. */
-    const minLocalZ = -4
-    /** Arena's north wall in bunker-local Z (corridor + arena depth). */
-    const maxLocalZ = 38
-    return {
-      minX: root.x - halfW + inset,
-      maxX: root.x + halfW - inset,
-      minZ: root.z + minLocalZ + inset,
-      maxZ: root.z + maxLocalZ - inset,
+  get bunkerWalkableBounds(): readonly BunkerWalkableBounds[] {
+    const walkableBounds = this.scene?.walkableBounds ?? []
+    if (this.state.current === 'antechamber-idle') {
+      const [antechamberBounds] = walkableBounds
+      return antechamberBounds ? [antechamberBounds] : []
     }
+    const activeEnemyRoomBounds = this.scene?.activeEnemyRoomBounds
+    if (activeEnemyRoomBounds) return [...walkableBounds, activeEnemyRoomBounds]
+    return walkableBounds
   }
 
   /** Currently-active wave index (zero-based) — for HUD. */
@@ -309,10 +305,33 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
   tick(dt: number, ctx: MiniGameContext): void {
     if (this._status !== 'active') return
     this.state.tick(dt)
-    this.scene?.tick(dt)
+    if (ctx.playerPosition && ctx.levelState === 'bunker-interior') {
+      this.scene?.enemyDirector.setPlayerPosition(
+        ctx.playerPosition.x,
+        ctx.playerPosition.y,
+        ctx.playerPosition.z,
+      )
+      this.scene?.enemyProjectileSystem.setPlayerPosition(
+        ctx.playerPosition.x,
+        ctx.playerPosition.y,
+        ctx.playerPosition.z,
+      )
+    }
     this.scene?.enemyDirector.tick(dt)
+    this.scene?.enemyProjectileSystem.tick(dt)
+    this.scene?.tick(dt)
 
     this.updateInteractionPrompts(ctx)
+
+    if (
+      this.state.current === 'arena-entry' &&
+      this.scene &&
+      ctx.playerPosition &&
+      ctx.levelState === 'bunker-interior' &&
+      this.scene.isPlayerInArena(ctx.playerPosition.x, ctx.playerPosition.z)
+    ) {
+      this.state.notifyArenaEntered()
+    }
 
     // Spawn the wave roster once on entry to a fresh wave-active state. The
     // spawnedWaveIndex tracker prevents respawning every tick while enemies
@@ -323,6 +342,7 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
       this.spawnedWaveIndex !== this.state.currentWaveIndex
     ) {
       const roster = rollWave(this.tier, this.state.currentWaveIndex, this.missionId)
+      this.scene.openWaveRoom(this.state.currentWaveIndex)
       this.scene.spawnWave(roster)
       this.spawnedWaveIndex = this.state.currentWaveIndex
     }
@@ -334,18 +354,21 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
       this.state.current === 'wave-active' &&
       this.scene &&
       this.spawnedWaveIndex === this.state.currentWaveIndex &&
+      !this.scene.hasPendingWaveSpawns &&
       this.scene.enemyDirector.enemies.length > 0 &&
       this.scene.enemyDirector.enemies.every((h) => !h.enemy.alive)
     ) {
       this.wavesCleared += 1
+      this.scene.closeWaveRoom()
       this.state.notifyWaveCleared()
       // Re-read the FSM state after `notifyWaveCleared()` mutates it. TS
       // carries the prior 'wave-active' narrowing through the getter call,
       // so we widen via `as BunkerSubState` to restore the full union.
       const after = this.state.current as BunkerSubState
       if (after === 'exit-prompt' || after === 'final-clear') {
-        this.scene.hatch.active = true
-        this.scene.hatch.setOpen(true)
+        this.scene.hatch.active = false
+        this.scene.hatch.group.visible = false
+        this.scene.hatch.setOpen(false)
       }
     }
   }
@@ -366,6 +389,15 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
    */
   installEnemySpawnObserver(listener: (handle: EnemyHandle) => void): () => void {
     return this.scene?.installEnemySpawnObserver(listener) ?? (() => {})
+  }
+
+  /**
+   * Flash the bunker enemy visual after a player projectile hit.
+   *
+   * @param enemy - Enemy domain object that took damage.
+   */
+  notifyEnemyHit(enemy: EnemyHandle['enemy']): void {
+    this.scene?.notifyEnemyHit(enemy)
   }
 
   /**
@@ -443,6 +475,9 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
         this._isPlayerNear = true
         this.onPrompt?.('[E] EXIT BUNKER')
         if (ctx.terminalInteractPressed) {
+          this.scene.hatch.active = true
+          this.scene.hatch.group.visible = true
+          this.scene.hatch.setOpen(true)
           this.onExit?.()
         }
       }
@@ -484,6 +519,15 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
   notifyDescended(): void {
     this.advanceStep(0) // Land in the bunker zone (auto-completed on descent)
     this.advanceStep(1) // Enter the bunker
+    if (this.surfaceHatch) {
+      this.surfaceHatch.active = false
+      this.surfaceHatch.group.visible = false
+    }
+    if (this.scene) {
+      this.scene.hatch.active = false
+      this.scene.hatch.group.visible = false
+      this.scene.hatch.setOpen(false)
+    }
     this.scene?.activate()
     this.state.notifyActivated()
   }
@@ -497,6 +541,19 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
   notifyExitInteract(): void {
     this.state.notifyHatchInteracted()
     if (this.state.current === 'exiting') {
+      if (this.scene) {
+        this.scene.hatch.active = false
+        this.scene.hatch.group.visible = true
+      }
+      this.scene?.deactivate()
+      this.scene?.hatch.setOpen(false)
+      this.scene?.closeWaveRoom()
+      if (this.surfaceHatch) {
+        this.surfaceHatch.active = false
+        this.surfaceHatch.group.visible = true
+        this.surfaceHatch.setOpen(false)
+      }
+      this.onPrompt?.(null)
       this.advanceStep(2) // Clear the waves
       this.advanceStep(3) // Extract
       this._status = 'completed'
@@ -537,5 +594,8 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
   /** @internal used by tests only. */
   completeForTest(): void {
     this._status = 'completed'
+    if (this.surfaceHatch) {
+      this.surfaceHatch.group.visible = true
+    }
   }
 }

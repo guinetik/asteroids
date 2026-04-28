@@ -10,11 +10,14 @@
  * @spec docs/superpowers/specs/2026-04-27-bunker-mission-design.md
  */
 import * as THREE from 'three'
+import { ANTECHAMBER, ARENA, CORRIDOR, WALL_THICKNESS } from './BunkerWallBuilder'
 
-/** Door clear width (world units). */
-const DOOR_WIDTH = 3
-/** Door height (world units). */
-const DOOR_HEIGHT = 4
+/** Door slab width: corridor opening plus wall overlap on both sides. */
+const DOOR_WIDTH = CORRIDOR.width + WALL_THICKNESS * 2
+/** Door slab height: covers the full antechamber/corridor doorway. */
+const DOOR_HEIGHT = Math.max(ANTECHAMBER.height, ARENA.height)
+/** Extra vertical clearance after the door reaches its open state. */
+const DOOR_OPEN_CLEARANCE = 2.5
 /**
  * Door thickness (world units). Must stay below {@link WALL_THICKNESS} (0.4)
  * so the slab fits inside the antechamber's north wall band when centered on
@@ -103,11 +106,14 @@ export class BunkerDoorController {
       this.currentOpen = Math.max(this.targetOpen, this.currentOpen - step)
     }
     const eased = easeOut(this.currentOpen)
-    this.slab.position.y = DOOR_HEIGHT / 2 + eased * DOOR_HEIGHT
+    this.slab.position.y = DOOR_HEIGHT / 2 + eased * (DOOR_HEIGHT + DOOR_OPEN_CLEARANCE)
     this.seam.position.y =
+      this.slab.position.y -
+      DOOR_HEIGHT / 2 +
       DOOR_HEIGHT * SEAM_REST_Y_FRACTION +
       Math.sin(this.elapsed * SEAM_OSCILLATION_RATE) * (DOOR_HEIGHT * SEAM_AMPLITUDE_FRACTION)
     this.seamMat.opacity = (1 - this.currentOpen) * SEAM_MAX_OPACITY
+    this.seam.visible = this.currentOpen < 1
   }
 
   /** Free GPU resources. */

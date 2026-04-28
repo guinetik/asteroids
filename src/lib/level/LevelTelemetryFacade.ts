@@ -163,7 +163,7 @@ export class LevelTelemetryFacade {
       return
     }
 
-    if (snapshot.state !== 'eva' || !snapshot.fps) return
+    if ((snapshot.state !== 'eva' && snapshot.state !== 'bunker-interior') || !snapshot.fps) return
 
     const fps = snapshot.fps
     const compassHeading = headingRadToCompassDeg(fps.headingRad)

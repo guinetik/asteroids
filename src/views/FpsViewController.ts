@@ -37,6 +37,7 @@ import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
 import { getCurrentUpgradeValue } from '@/lib/upgrades'
 import { EnemyDirector } from '@/lib/fps/enemyDirector'
 import { EnemyLodApplier } from '@/lib/fps/enemyLodHelper'
+import { spawnChimeraProjectileBurst } from '@/lib/fps/chimeraProjectileBurst'
 import { BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/BacteriophageController'
 import { EnemyProjectileSystem } from '@/lib/fps/enemyProjectileSystem'
 import { EnemyTiltCache } from '@/lib/fps/enemyTiltCache'
@@ -776,21 +777,18 @@ export class FpsViewController implements Tickable {
           ctrl.group.updateMatrixWorld(true)
           const muzzle = this.chimeraLaserOriginScratch
           ctrl.getEyeLaserMuzzle(muzzle)
-          const ddx = aimX - muzzle.x
-          const ddy = aimY - muzzle.y
-          const ddz = aimZ - muzzle.z
-          const dist = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz)
-          if (dist > 0.01) {
-            this.enemyProjectileSystem.spawn(
-              muzzle.x,
-              muzzle.y,
-              muzzle.z,
-              ddx / dist,
-              ddy / dist,
-              ddz / dist,
-              handle.config.projectileSpeed,
-              handle.config.projectileDamage,
-            )
+          const spawnedCount = spawnChimeraProjectileBurst({
+            originX: muzzle.x,
+            originY: muzzle.y,
+            originZ: muzzle.z,
+            targetX: aimX,
+            targetY: aimY,
+            targetZ: aimZ,
+            projectileSpeed: handle.config.projectileSpeed,
+            projectileDamage: handle.config.projectileDamage,
+            spawnBurst: this.enemyProjectileSystem.spawnBurst.bind(this.enemyProjectileSystem),
+          })
+          if (spawnedCount > 0) {
             ctrl.pulseEyeLaser()
           }
         }

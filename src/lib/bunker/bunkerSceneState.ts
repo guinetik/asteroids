@@ -14,6 +14,7 @@
 export type BunkerSubState =
   | 'entering'
   | 'antechamber-idle'
+  | 'arena-entry'
   | 'wave-active'
   | 'wave-breather'
   | 'final-clear'
@@ -98,6 +99,12 @@ export class BunkerSceneState {
   /** Called when the player presses E on the arena door. */
   notifyDoorInteracted(): void {
     if (this._current !== 'antechamber-idle') return
+    this.transition('arena-entry')
+  }
+
+  /** Called after the door is open and the player crosses into the arena. */
+  notifyArenaEntered(): void {
+    if (this._current !== 'arena-entry') return
     this._currentWaveIndex = 0
     this.transition('wave-active')
   }

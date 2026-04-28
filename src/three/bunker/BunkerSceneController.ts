@@ -13,11 +13,21 @@
  */
 import * as THREE from 'three'
 import { EnemyDirector, type EnemyHandle } from '@/lib/fps/enemyDirector'
-import { buildBunkerGeometry, type BunkerGeometry } from './BunkerWallBuilder'
+import {
+  buildBunkerGeometry,
+  type BunkerGeometry,
+  type BunkerWalkableBounds,
+} from './BunkerWallBuilder'
 import { createBunkerGridMaterial } from './BunkerGridMaterial'
 import { BunkerHatchModel } from './BunkerHatchModel'
 import { BunkerDoorController } from './BunkerDoorController'
 import type { BunkerEnemyType } from '@/lib/bunker/bunkerWaveSchedule'
+import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
+import { EnemyProjectileSystem } from '@/lib/fps/enemyProjectileSystem'
+import { BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/BacteriophageController'
+import { ChimeraWalkerController, CHIMERA_HIT_CENTER_Y } from '@/three/ChimeraWalkerController'
+import { SpireController, SPIRE_HIT_CENTER_Y } from '@/three/SpireController'
+import { EnemyProjectileMeshPool } from '@/three/EnemyProjectileMeshPool'
 
 /** Distance for the per-corner arena lights (world units). */
 const CORNER_LIGHT_DISTANCE = 14
@@ -35,6 +45,10 @@ const CORNER_LIGHT_Y = 4
 const DOOR_LIGHT_Y = 3
 /** Forward (-z toward antechamber) offset of the door light from the door anchor. */
 const DOOR_LIGHT_Z_OFFSET = 1.5
+/** Delay between one wave enemy leaving a staging room and the next door opening. */
+const WAVE_STAGED_SPAWN_SECONDS = 1.25
+/** Minimum aim distance before spawning an enemy projectile. */
+const ENEMY_PROJECTILE_MIN_AIM_DISTANCE = 0.001
 
 /** Constructor opts for {@link BunkerSceneController}. */
 export interface BunkerSceneControllerOptions {
@@ -42,22 +56,37 @@ export interface BunkerSceneControllerOptions {
   tint: number
   /** Parent THREE scene the bunker root attaches to on `activate`. */
   scene: THREE.Scene
+  /** Player projectile system used for bunker enemy hit registration. */
+  projectileSystem?: ProjectileSystem
 }
 
 /** Interior scene wrapper — the level view treats this as a black box. */
 export class BunkerSceneController {
   /** Bunker-side enemy director. Separate from any surface director. */
   readonly enemyDirector = new EnemyDirector()
+  /** Enemy-fired projectiles used by bunker ranged enemies. */
+  readonly enemyProjectileSystem = new EnemyProjectileSystem()
   /** Antechamber exit hatch (player extracts through this on completion). */
   readonly hatch: BunkerHatchModel
   /** Arena door (gates the player from entering combat). */
   readonly door: BunkerDoorController
+  /** Enemy-room doors opened one at a time as waves begin. */
+  readonly enemyDoors: readonly BunkerDoorController[]
 
   private readonly tint: number
   private readonly scene: THREE.Scene
+  private readonly projectileSystem: ProjectileSystem | null
+  private readonly enemyProjectileMeshPool: EnemyProjectileMeshPool
   private readonly material: THREE.ShaderMaterial
   private readonly geometry: BunkerGeometry
+  private readonly phageControllers = new Map<number, BacteriophageController>()
+  private readonly chimeraControllers = new Map<number, ChimeraWalkerController>()
+  private readonly spireControllers = new Map<number, SpireController>()
+  private pendingWaveRoster: BunkerEnemyType[] = []
+  private pendingWaveRoomCursor: number | null = null
+  private pendingWaveSpawnTimer = 0
   private spawnPadCursor = 0
+  private activeWaveRoomIndex: number | null = null
   private active = false
 
   /**
@@ -66,18 +95,33 @@ export class BunkerSceneController {
   constructor(opts: BunkerSceneControllerOptions) {
     this.tint = opts.tint
     this.scene = opts.scene
+    this.projectileSystem = opts.projectileSystem ?? null
+    this.enemyProjectileMeshPool = new EnemyProjectileMeshPool(opts.scene)
+    this.enemyProjectileMeshPool.prewarm()
     this.material = createBunkerGridMaterial({ tint: opts.tint })
     this.geometry = buildBunkerGeometry(this.material)
     this.hatch = new BunkerHatchModel(opts.tint)
     this.door = new BunkerDoorController(opts.tint)
+    this.enemyDoors = this.geometry.enemyRooms.map((room) => {
+      const door = new BunkerDoorController(opts.tint)
+      door.group.position.copy(room.doorAnchor.position)
+      door.group.rotation.copy(room.doorAnchor.rotation)
+      return door
+    })
 
     this.hatch.group.position.set(
       this.geometry.antechamberHatch.x,
       0,
       this.geometry.antechamberHatch.z,
     )
+    this.hatch.group.visible = false
     this.door.group.position.copy(this.geometry.arenaDoorAnchor.position)
     this.geometry.root.add(this.hatch.group, this.door.group)
+    for (const door of this.enemyDoors) {
+      this.geometry.root.add(door.group)
+    }
+    this.enemyProjectileSystem.onProjectileMove = this.enemyProjectileMeshPool.acquire
+    this.enemyProjectileSystem.onProjectileRemoved = this.enemyProjectileMeshPool.release
 
     this.buildLights()
   }
@@ -138,6 +182,64 @@ export class BunkerSceneController {
   }
 
   /**
+   * World-space walkable rectangles for bunker wall collision. The controller
+   * keeps these as separate room/corridor rectangles so narrow connector
+   * spaces do not inherit the arena's width.
+   */
+  get walkableBounds(): readonly BunkerWalkableBounds[] {
+    const root = this.geometry.root.position
+    return this.geometry.walkableBounds.map((bounds) => ({
+      minX: root.x + bounds.minX,
+      maxX: root.x + bounds.maxX,
+      minZ: root.z + bounds.minZ,
+      maxZ: root.z + bounds.maxZ,
+    }))
+  }
+
+  /**
+   * World-space walkable bounds for the currently opened enemy staging room.
+   * Returns `null` while no wave-room door is open.
+   */
+  get activeEnemyRoomBounds(): BunkerWalkableBounds | null {
+    if (this.activeWaveRoomIndex === null) return null
+    const room = this.geometry.enemyRooms[this.activeWaveRoomIndex]
+    if (!room) return null
+    const root = this.geometry.root.position
+    return {
+      minX: root.x + room.walkableBounds.minX,
+      maxX: root.x + room.walkableBounds.maxX,
+      minZ: root.z + room.walkableBounds.minZ,
+      maxZ: root.z + room.walkableBounds.maxZ,
+    }
+  }
+
+  /** Whether the scene still has delayed wave enemies waiting behind doors. */
+  get hasPendingWaveSpawns(): boolean {
+    return this.pendingWaveRoster.length > 0
+  }
+
+  /**
+   * Whether a world-space player XZ point has crossed into the arena room.
+   *
+   * Used by {@link BunkerMinigame} to delay the first enemy wave until the
+   * player has walked through the opened corridor door instead of spawning
+   * hostiles while the player is still in the choke point.
+   *
+   * @param x - Player world X coordinate.
+   * @param z - Player world Z coordinate.
+   */
+  isPlayerInArena(x: number, z: number): boolean {
+    const arenaBounds = this.walkableBounds[2]
+    if (!arenaBounds) return false
+    return (
+      x >= arenaBounds.minX &&
+      x <= arenaBounds.maxX &&
+      z >= arenaBounds.minZ &&
+      z <= arenaBounds.maxZ
+    )
+  }
+
+  /**
    * Register an observer for every enemy spawned by the bunker director.
    * Used by the loot drop pipeline.
    *
@@ -146,6 +248,26 @@ export class BunkerSceneController {
    */
   installEnemySpawnObserver(listener: (handle: EnemyHandle) => void): () => void {
     return this.enemyDirector.addSpawnListener(listener)
+  }
+
+  /**
+   * Open the enemy staging room assigned to a wave.
+   *
+   * @param waveIndex - Zero-based wave index.
+   */
+  openWaveRoom(waveIndex: number): void {
+    if (this.geometry.enemyRooms.length === 0) return
+    this.closeWaveRoom()
+    this.activeWaveRoomIndex = waveIndex % this.geometry.enemyRooms.length
+    this.enemyDoors[this.activeWaveRoomIndex]?.setOpen(true)
+  }
+
+  /** Close the currently open enemy staging room door. */
+  closeWaveRoom(): void {
+    if (this.activeWaveRoomIndex !== null) {
+      this.enemyDoors[this.activeWaveRoomIndex]?.setOpen(false)
+    }
+    this.activeWaveRoomIndex = null
   }
 
   /**
@@ -184,13 +306,10 @@ export class BunkerSceneController {
    * @param roster - Flat list of enemy types
    */
   spawnWave(roster: readonly BunkerEnemyType[]): void {
-    for (const type of roster) {
-      const pads = this.geometry.spawnPadCenters
-      // Modulo of array length always produces a valid index; safe to assert non-null.
-      const pad = pads[this.spawnPadCursor % pads.length]!
-      this.spawnPadCursor++
-      this.enemyDirector.spawn(type, pad.x, 0, pad.z)
-    }
+    this.pendingWaveRoster = [...roster]
+    this.pendingWaveRoomCursor = this.activeWaveRoomIndex
+    this.pendingWaveSpawnTimer = 0
+    this.releaseNextWaveSpawn()
   }
 
   /**
@@ -204,6 +323,42 @@ export class BunkerSceneController {
     ;(this.material.userData.tick as ((dt: number) => void) | undefined)?.(dt)
     this.hatch.tick(dt)
     this.door.tick(dt)
+    for (const door of this.enemyDoors) {
+      door.tick(dt)
+    }
+    if (this.pendingWaveRoster.length > 0) {
+      this.pendingWaveSpawnTimer = Math.max(0, this.pendingWaveSpawnTimer - dt)
+      if (this.pendingWaveSpawnTimer <= 0) {
+        this.releaseNextWaveSpawn()
+      }
+    }
+    this.syncEnemyControllers(dt)
+  }
+
+  /**
+   * Flash the matching visual controller after a projectile hit.
+   *
+   * @param enemy - Enemy domain object that was hit.
+   */
+  notifyEnemyHit(enemy: EnemyHandle['enemy']): void {
+    for (const ctrl of this.phageControllers.values()) {
+      if (ctrl.enemy === enemy) {
+        ctrl.flash()
+        return
+      }
+    }
+    for (const ctrl of this.chimeraControllers.values()) {
+      if (ctrl.enemy === enemy) {
+        ctrl.flash()
+        return
+      }
+    }
+    for (const ctrl of this.spireControllers.values()) {
+      if (ctrl.enemy === enemy) {
+        ctrl.flash()
+        return
+      }
+    }
   }
 
   /** Free all GPU resources. */
@@ -211,10 +366,16 @@ export class BunkerSceneController {
     this.deactivate()
     this.hatch.dispose()
     this.door.dispose()
+    for (const door of this.enemyDoors) {
+      door.dispose()
+    }
+    this.enemyProjectileSystem.dispose()
+    this.enemyProjectileMeshPool.disposeAll()
     this.material.dispose()
     for (const mesh of this.geometry.wallMeshes) {
       mesh.geometry.dispose()
     }
+    this.disposeEnemyControllers()
     this.enemyDirector.despawnAll()
   }
 
@@ -237,5 +398,278 @@ export class BunkerSceneController {
       this.geometry.arenaDoorAnchor.position.z + DOOR_LIGHT_Z_OFFSET,
     )
     this.geometry.root.add(doorLight)
+  }
+
+  /**
+   * Create and parent the visual controller matching an enemy handle.
+   *
+   * @param handle - Newly spawned enemy handle.
+   */
+  private createEnemyController(handle: EnemyHandle): void {
+    if (handle.type === 'bacteriophage') {
+      const ctrl = new BacteriophageController(handle.enemy)
+      this.geometry.root.add(ctrl.group)
+      this.phageControllers.set(handle.id, ctrl)
+    } else if (handle.type === 'chimera') {
+      const ctrl = new ChimeraWalkerController(handle.enemy)
+      this.geometry.root.add(ctrl.group)
+      this.chimeraControllers.set(handle.id, ctrl)
+    } else {
+      const ctrl = new SpireController(handle.enemy)
+      this.geometry.root.add(ctrl.group)
+      this.spireControllers.set(handle.id, ctrl)
+    }
+  }
+
+  /** Release one queued wave enemy through the next staging-room door. */
+  private releaseNextWaveSpawn(): void {
+    const type = this.pendingWaveRoster.shift()
+    if (!type) return
+
+    const root = this.geometry.root.position
+    let pad: { x: number; z: number }
+    if (this.pendingWaveRoomCursor === null || this.geometry.enemyRooms.length === 0) {
+      pad = this.geometry.spawnPadCenters[this.spawnPadCursor % this.geometry.spawnPadCenters.length]!
+      this.spawnPadCursor++
+    } else {
+      const roomIndex = this.pendingWaveRoomCursor % this.geometry.enemyRooms.length
+      this.openWaveRoom(roomIndex)
+      pad = this.geometry.enemyRooms[roomIndex]!.spawnPadCenter
+      this.pendingWaveRoomCursor = roomIndex + 1
+    }
+
+    const handle = this.enemyDirector.spawn(type, root.x + pad.x, root.y, root.z + pad.z)
+    this.setInitialEnemyHitCenter(handle)
+    this.projectileSystem?.addEnemy(handle.enemy)
+    this.createEnemyController(handle)
+    this.pendingWaveSpawnTimer = WAVE_STAGED_SPAWN_SECONDS
+  }
+
+  /**
+   * Put the collision sphere at the visible body center immediately on spawn,
+   * before the first controller sync tick runs.
+   *
+   * @param handle - Newly spawned enemy handle.
+   */
+  private setInitialEnemyHitCenter(handle: EnemyHandle): void {
+    const rootY = this.geometry.root.position.y
+    if (handle.type === 'bacteriophage') {
+      handle.enemy.position.y = rootY + PHAGE_HIT_CENTER_Y
+    } else if (handle.type === 'chimera') {
+      handle.enemy.position.y = rootY + CHIMERA_HIT_CENTER_Y
+    } else {
+      handle.enemy.position.y = rootY + handle.config.floatHeight + SPIRE_HIT_CENTER_Y
+    }
+  }
+
+  /**
+   * Sync all bunker enemy visual controllers from their world-space domain positions.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  private syncEnemyControllers(dt: number): void {
+    for (const handle of Array.from(this.enemyDirector.enemies)) {
+      this.syncGroundController(this.phageControllers.get(handle.id), handle, PHAGE_HIT_CENTER_Y, dt)
+      this.syncGroundController(this.chimeraControllers.get(handle.id), handle, CHIMERA_HIT_CENTER_Y, dt)
+      this.syncSpireController(this.spireControllers.get(handle.id), handle, dt)
+    }
+  }
+
+  /**
+   * Sync a ground enemy controller, or clean it up after death animation.
+   *
+   * @param ctrl - Matching visual controller, if this handle uses one.
+   * @param handle - Enemy handle from the director.
+   * @param hitCenterY - Vertical hit-center offset for the enemy model.
+   * @param dt - Delta time in seconds.
+   */
+  private syncGroundController(
+    ctrl: BacteriophageController | ChimeraWalkerController | undefined,
+    handle: EnemyHandle,
+    hitCenterY: number,
+    dt: number,
+  ): void {
+    if (!ctrl) return
+    if (ctrl.deathComplete) {
+      this.removeEnemyController(handle)
+      return
+    }
+    if (handle.enemy.alive) {
+      const local = this.toLocalXZ(handle.enemy.position.x, handle.enemy.position.z)
+      ctrl.isMoving = handle.lastOutput.isMoving
+      ctrl.isAgitated = handle.lastOutput.isAgitated
+      ctrl.group.position.set(local.x, 0, local.z)
+      handle.enemy.position.y = this.geometry.root.position.y + hitCenterY
+      if (handle.lastOutput.isMoving) {
+        const dir = handle.lastOutput.moveDir
+        ctrl.group.rotation.y = Math.atan2(dir.x, dir.z)
+      }
+      this.fireChimeraProjectileIfReady(ctrl, handle)
+    }
+    ctrl.tick(dt)
+    if (ctrl.deathComplete) {
+      this.removeEnemyController(handle)
+    }
+  }
+
+  /**
+   * Sync a ranged spire controller, or clean it up after death animation.
+   *
+   * @param ctrl - Matching visual controller, if this handle uses one.
+   * @param handle - Enemy handle from the director.
+   * @param dt - Delta time in seconds.
+   */
+  private syncSpireController(ctrl: SpireController | undefined, handle: EnemyHandle, dt: number): void {
+    if (!ctrl) return
+    if (ctrl.deathComplete) {
+      this.removeEnemyController(handle)
+      return
+    }
+    if (handle.enemy.alive) {
+      const local = this.toLocalXZ(handle.enemy.position.x, handle.enemy.position.z)
+      ctrl.isMoving = handle.lastOutput.isMoving
+      ctrl.isAgitated = handle.lastOutput.isAgitated
+      ctrl.targetPosition.set(local.x, handle.config.floatHeight, local.z)
+      handle.enemy.position.y =
+        this.geometry.root.position.y + handle.config.floatHeight + SPIRE_HIT_CENTER_Y
+      if (handle.lastOutput.isChasing) {
+        const dx = handle.lastOutput.aimTargetX - handle.enemy.position.x
+        const dz = handle.lastOutput.aimTargetZ - handle.enemy.position.z
+        ctrl.group.rotation.y = Math.atan2(dx, dz)
+      }
+      this.fireSpireProjectileIfReady(ctrl, handle)
+    }
+    ctrl.tick(dt)
+    if (ctrl.deathComplete) {
+      this.removeEnemyController(handle)
+    }
+  }
+
+  /**
+   * Convert a world XZ point into bunker-root local XZ coordinates.
+   *
+   * @param x - World X.
+   * @param z - World Z.
+   */
+  private toLocalXZ(x: number, z: number): { x: number; z: number } {
+    const root = this.geometry.root.position
+    return { x: x - root.x, z: z - root.z }
+  }
+
+  /**
+   * Fire a chimera eye projectile when its behavior requests a shot.
+   *
+   * @param ctrl - Chimera visual controller.
+   * @param handle - Enemy handle whose behavior produced fire intent.
+   */
+  private fireChimeraProjectileIfReady(
+    ctrl: BacteriophageController | ChimeraWalkerController,
+    handle: EnemyHandle,
+  ): void {
+    if (handle.type !== 'chimera' || !handle.lastOutput.wantsToFire) return
+    if (!(ctrl instanceof ChimeraWalkerController)) return
+    ctrl.group.updateMatrixWorld(true)
+    const muzzle = new THREE.Vector3()
+    ctrl.getEyeLaserMuzzle(muzzle)
+    this.fireEnemyProjectileFrom(
+      muzzle.x,
+      muzzle.y,
+      muzzle.z,
+      handle.lastOutput.aimTargetX,
+      handle.lastOutput.aimTargetY,
+      handle.lastOutput.aimTargetZ,
+      handle,
+    )
+    ctrl.pulseEyeLaser()
+  }
+
+  /**
+   * Fire a spire projectile when its ranged behavior requests a shot.
+   *
+   * @param ctrl - Spire visual controller.
+   * @param handle - Enemy handle whose behavior produced fire intent.
+   */
+  private fireSpireProjectileIfReady(ctrl: SpireController, handle: EnemyHandle): void {
+    if (handle.type !== 'spire' || !handle.lastOutput.wantsToFire) return
+    const origin = handle.enemy.position
+    this.fireEnemyProjectileFrom(
+      origin.x,
+      origin.y,
+      origin.z,
+      handle.lastOutput.aimTargetX,
+      handle.lastOutput.aimTargetY,
+      handle.lastOutput.aimTargetZ,
+      handle,
+    )
+    ctrl.fireFlash(handle.lastOutput.aimTargetX, handle.lastOutput.aimTargetZ)
+  }
+
+  /**
+   * Spawn a damaging enemy projectile toward a behavior aim target.
+   *
+   * @param originX - Projectile origin X.
+   * @param originY - Projectile origin Y.
+   * @param originZ - Projectile origin Z.
+   * @param targetX - Aim target X.
+   * @param targetY - Aim target Y.
+   * @param targetZ - Aim target Z.
+   * @param handle - Enemy handle supplying projectile stats.
+   */
+  private fireEnemyProjectileFrom(
+    originX: number,
+    originY: number,
+    originZ: number,
+    targetX: number,
+    targetY: number,
+    targetZ: number,
+    handle: EnemyHandle,
+  ): void {
+    const dx = targetX - originX
+    const dy = targetY - originY
+    const dz = targetZ - originZ
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
+    if (dist <= ENEMY_PROJECTILE_MIN_AIM_DISTANCE) return
+    this.enemyProjectileSystem.spawn(
+      originX,
+      originY,
+      originZ,
+      dx / dist,
+      dy / dist,
+      dz / dist,
+      handle.config.projectileSpeed,
+      handle.config.projectileDamage,
+    )
+  }
+
+  /**
+   * Remove an enemy's visual controller and projectile collision registration.
+   *
+   * @param handle - Enemy handle being removed.
+   */
+  private removeEnemyController(handle: EnemyHandle): void {
+    const ctrl =
+      this.phageControllers.get(handle.id) ??
+      this.chimeraControllers.get(handle.id) ??
+      this.spireControllers.get(handle.id)
+    ctrl?.group.removeFromParent()
+    ctrl?.dispose()
+    this.projectileSystem?.removeEnemy(handle.enemy)
+    this.phageControllers.delete(handle.id)
+    this.chimeraControllers.delete(handle.id)
+    this.spireControllers.delete(handle.id)
+    this.enemyDirector.despawn(handle)
+  }
+
+  /** Dispose every visual enemy controller still owned by the bunker scene. */
+  private disposeEnemyControllers(): void {
+    for (const handle of Array.from(this.enemyDirector.enemies)) {
+      this.projectileSystem?.removeEnemy(handle.enemy)
+    }
+    for (const ctrl of this.phageControllers.values()) ctrl.dispose()
+    for (const ctrl of this.chimeraControllers.values()) ctrl.dispose()
+    for (const ctrl of this.spireControllers.values()) ctrl.dispose()
+    this.phageControllers.clear()
+    this.chimeraControllers.clear()
+    this.spireControllers.clear()
   }
 }

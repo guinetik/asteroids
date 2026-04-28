@@ -13,6 +13,18 @@ describe('EnemyProjectileSystem', () => {
     expect(system.projectileCount).toBe(1)
   })
 
+  it('should spawn burst projectiles one at a time', () => {
+    system.spawnBurst(0, 5, 0, 1, 0, 0, 30, 10, 3, 0.05)
+
+    expect(system.projectileCount).toBe(1)
+    system.tick(0.049)
+    expect(system.projectileCount).toBe(1)
+    system.tick(0.001)
+    expect(system.projectileCount).toBe(2)
+    system.tick(0.05)
+    expect(system.projectileCount).toBe(3)
+  })
+
   it('should move projectiles along their direction', () => {
     const onMove = vi.fn()
     system.onProjectileMove = onMove

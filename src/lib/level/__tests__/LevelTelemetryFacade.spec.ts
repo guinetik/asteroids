@@ -158,4 +158,34 @@ describe('LevelTelemetryFacade', () => {
     expect(payload.rockTarget).toEqual({ label: 'Olivine', remainingKg: 12, totalKg: 30 })
     expect(callbacks.onPlayerPosition).toHaveBeenCalledWith(0, 0)
   })
+
+  it('emits fps telemetry while inside the bunker interior', () => {
+    const facade = new LevelTelemetryFacade()
+    const callbacks = {
+      onStateInfo: vi.fn(),
+      onLanderTelemetry: vi.fn(),
+      onFpsTelemetry: vi.fn(),
+      onPlayerPosition: vi.fn(),
+    }
+
+    facade.tick(callbacks, {
+      dt: 0.02,
+      state: 'bunker-interior',
+      canExfil: false,
+      canEnterLander: false,
+      lander: null,
+      fps: {
+        telemetry: { ...fpsBaseTelemetry, hp: 42 },
+        headingRad: 0,
+        x: 5,
+        z: 6,
+        missionObjectives: [{ type: 'bunker', x: 10, z: 0, reward: 100 }],
+        rockTarget: null,
+      },
+    })
+
+    expect(callbacks.onFpsTelemetry).toHaveBeenCalledTimes(1)
+    expect(callbacks.onFpsTelemetry.mock.calls[0]?.[0]).toMatchObject({ hp: 42 })
+    expect(callbacks.onPlayerPosition).toHaveBeenCalledWith(5, 6)
+  })
 })

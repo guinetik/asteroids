@@ -38,6 +38,7 @@ import BunkerWaveHud from '@/components/BunkerWaveHud.vue'
 import { RescueMinigame } from '@/lib/minigame/RescueMinigame'
 import { BunkerMinigame } from '@/lib/minigame/BunkerMinigame'
 import type { BunkerSubState } from '@/lib/bunker/bunkerSceneState'
+import { shouldHardReloadLevelRestart } from '@/lib/level/levelRestartPolicy'
 import {
   playBackgroundMusic,
   stopBackgroundMusic,
@@ -535,15 +536,11 @@ onMounted(async () => {
   }
 })
 
-/** Substring match for the rescue-mission fail cause that should hard-reload. */
-const RESCUE_FAIL_CAUSE_FRAGMENT = 'survivors lost'
-
 function handleRestart() {
-  // Rescue missions reuse a lot of stateful controllers (hostages, walkers,
-  // chasers, liftoff lock) that the in-place restart path doesn't fully reset.
-  // For "All Survivors Lost" specifically, hard-reload the page so the player
-  // gets a clean run instead of a half-initialized rescue state.
-  if (deathOverlayCause.value.toLowerCase().includes(RESCUE_FAIL_CAUSE_FRAGMENT)) {
+  // Rescue and bunker interiors own stateful scene/controller graphs that the
+  // in-place lander restart path cannot safely rebuild. Hard-reload those
+  // failure cases for a clean run.
+  if (shouldHardReloadLevelRestart(deathOverlayCause.value)) {
     window.location.reload()
     return
   }

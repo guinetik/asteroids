@@ -17,6 +17,8 @@ const MAX_LIFETIME = 4.0
 
 /** Sphere radius (units) used for player-projectile collision detection. */
 const PLAYER_HIT_RADIUS = 1.5
+/** Tolerance for burst timers landing exactly on a frame boundary. */
+const BURST_TIMER_EPSILON_SECONDS = 1e-9
 
 /**
  * Internal state for a single enemy-fired projectile.
@@ -47,6 +49,34 @@ interface EnemyProjectile {
 }
 
 /**
+ * Internal queue entry for a short sequential projectile burst.
+ */
+interface EnemyProjectileBurst {
+  /** World X coordinate where every burst shot spawns. */
+  x: number
+  /** World Y coordinate where every burst shot spawns. */
+  y: number
+  /** World Z coordinate where every burst shot spawns. */
+  z: number
+  /** Normalized X direction shared by all burst shots. */
+  dirX: number
+  /** Normalized Y direction shared by all burst shots. */
+  dirY: number
+  /** Normalized Z direction shared by all burst shots. */
+  dirZ: number
+  /** Projectile speed applied to each shot. */
+  speed: number
+  /** Projectile damage applied to each shot. */
+  damage: number
+  /** Shots left to spawn after the immediate first shot. */
+  remaining: number
+  /** Seconds between queued shots. */
+  intervalSeconds: number
+  /** Seconds until the next queued shot should spawn. */
+  timerSeconds: number
+}
+
+/**
  * Manages enemy-fired projectiles with player collision detection.
  *
  * @author guinetik
@@ -55,6 +85,7 @@ interface EnemyProjectile {
  */
 export class EnemyProjectileSystem implements Tickable {
   private readonly projectiles: EnemyProjectile[] = []
+  private readonly bursts: EnemyProjectileBurst[] = []
   private nextId = 1
   private playerX = 0
   private playerY = 0
@@ -145,8 +176,71 @@ export class EnemyProjectileSystem implements Tickable {
     return id
   }
 
+  /**
+   * Spawn an enemy projectile burst in quick succession.
+   *
+   * The first shot is created immediately so firing feedback happens on the
+   * trigger frame. Remaining shots are queued into {@link tick}, which makes
+   * fast bursts visible as distinct projectiles instead of stacked duplicates.
+   *
+   * @param x - Spawn X position shared by every burst shot.
+   * @param y - Spawn Y position shared by every burst shot.
+   * @param z - Spawn Z position shared by every burst shot.
+   * @param dirX - Normalized direction X shared by every burst shot.
+   * @param dirY - Normalized direction Y shared by every burst shot.
+   * @param dirZ - Normalized direction Z shared by every burst shot.
+   * @param speed - Projectile speed in units/s.
+   * @param damage - Damage on player or hostage hit.
+   * @param count - Number of shots in the burst, e.g. `3`.
+   * @param intervalSeconds - Delay between shots, e.g. `0.06`.
+   * @returns Number of shots accepted for spawning.
+   */
+  spawnBurst(
+    x: number,
+    y: number,
+    z: number,
+    dirX: number,
+    dirY: number,
+    dirZ: number,
+    speed: number,
+    damage: number,
+    count: number,
+    intervalSeconds: number,
+  ): number {
+    const shotCount = Math.max(0, Math.floor(count))
+    if (shotCount === 0) return 0
+
+    this.spawn(x, y, z, dirX, dirY, dirZ, speed, damage)
+    const remaining = shotCount - 1
+    if (remaining === 0) return shotCount
+
+    if (intervalSeconds <= 0) {
+      for (let i = 0; i < remaining; i++) {
+        this.spawn(x, y, z, dirX, dirY, dirZ, speed, damage)
+      }
+      return shotCount
+    }
+
+    this.bursts.push({
+      x,
+      y,
+      z,
+      dirX,
+      dirY,
+      dirZ,
+      speed,
+      damage,
+      remaining,
+      intervalSeconds,
+      timerSeconds: intervalSeconds,
+    })
+    return shotCount
+  }
+
   /** @inheritdoc */
   tick(dt: number): void {
+    this.tickBursts(dt)
+
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i]!
       p.age += dt
@@ -236,8 +330,33 @@ export class EnemyProjectileSystem implements Tickable {
     }
   }
 
+  private tickBursts(dt: number): void {
+    for (let i = this.bursts.length - 1; i >= 0; i--) {
+      const burst = this.bursts[i]!
+      burst.timerSeconds -= dt
+      while (burst.remaining > 0 && burst.timerSeconds <= BURST_TIMER_EPSILON_SECONDS) {
+        this.spawn(
+          burst.x,
+          burst.y,
+          burst.z,
+          burst.dirX,
+          burst.dirY,
+          burst.dirZ,
+          burst.speed,
+          burst.damage,
+        )
+        burst.remaining--
+        burst.timerSeconds += burst.intervalSeconds
+      }
+      if (burst.remaining === 0) {
+        this.bursts.splice(i, 1)
+      }
+    }
+  }
+
   /** Remove all active projectiles and fire onProjectileRemoved for each. */
   dispose(): void {
+    this.bursts.length = 0
     for (const p of this.projectiles) {
       this.onProjectileRemoved?.(p.id)
     }

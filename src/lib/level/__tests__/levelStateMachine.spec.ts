@@ -85,6 +85,23 @@ describe('Level State Machine', () => {
     })
   })
 
+  describe('bunker death', () => {
+    it('transitions bunker-interior → dead through the normal die event', () => {
+      const sm = createLevelStateMachine({
+        onStateChange: vi.fn(),
+        isLanderGrounded: () => true,
+      })
+      sm.tick(ARRIVAL_DURATION + 0.1)
+      sm.trigger('exitVehicle')
+      sm.trigger('enterBunker')
+
+      const result = sm.trigger('die')
+
+      expect(result).toBe(true)
+      expect(sm.state).toBe('dead')
+    })
+  })
+
   describe('callbacks', () => {
     it('fires onStateChange on every transition', () => {
       const onChange = vi.fn()

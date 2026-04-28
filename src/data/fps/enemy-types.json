@@ -1,7 +1,7 @@
 {
   "bacteriophage": {
     "maxHp": 75,
-    "hitRadius": 2.5,
+    "hitRadius": 3.4,
     "speed": 8,
     "aggroRadius": 220,
     "leashRadius": 320,
@@ -22,7 +22,7 @@
   },
   "spire": {
     "maxHp": 50,
-    "hitRadius": 2.0,
+    "hitRadius": 3.0,
     "speed": 4,
     "aggroRadius": 220,
     "leashRadius": 320,
@@ -43,7 +43,7 @@
   },
   "chimera": {
     "maxHp": 120,
-    "hitRadius": 3.2,
+    "hitRadius": 4.4,
     "speed": 5,
     "aggroRadius": 220,
     "leashRadius": 320,

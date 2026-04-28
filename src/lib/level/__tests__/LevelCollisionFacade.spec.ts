@@ -181,6 +181,41 @@ describe('LevelCollisionFacade', () => {
     ).toBe(true)
   })
 
+  it('appends objective prop colliders without clearing existing objective blockers', () => {
+    const facade = new LevelCollisionFacade()
+    const world = facade.initialize(createHeightmap(0))
+
+    facade.registerObjectiveColliders([
+      {
+        id: 'terminal',
+        kind: 'aabb',
+        min: { x: -1, y: 0, z: -1 },
+        max: { x: 1, y: 3, z: 1 },
+      },
+    ])
+    facade.addObjectiveCollider({
+      id: 'surface-hatch',
+      kind: 'aabb',
+      min: { x: 9, y: 0, z: 9 },
+      max: { x: 11, y: 8, z: 11 },
+    })
+
+    expect(
+      world.moveDiscXZ({ x: 0, y: 0, z: 0 }, 0, 0, 0, 2, {
+        radius: 0.5,
+        skinWidth: 0,
+        substepDistance: 1,
+      }).touchedCollider,
+    ).toBe(true)
+    expect(
+      world.moveDiscXZ({ x: 10, y: 0, z: 10 }, 0, 0, 0, 2, {
+        radius: 0.5,
+        skinWidth: 0,
+        substepDistance: 1,
+      }).touchedCollider,
+    ).toBe(true)
+  })
+
   it('builds an EVA spawn from terrain support when the world exists', () => {
     const facade = new LevelCollisionFacade()
     facade.initialize(createHeightmap(25))

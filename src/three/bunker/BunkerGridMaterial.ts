@@ -26,13 +26,19 @@ export interface BunkerGridMaterialOptions {
 /** Default cell size in world units. */
 const DEFAULT_CELL_SIZE = 2.0
 /** Default line half-width relative to cell. */
-const DEFAULT_LINE_WIDTH = 0.04
+const DEFAULT_LINE_WIDTH = 0.03
 /** Default emissive multiplier. */
-const DEFAULT_EMISSIVE = 1.6
+const DEFAULT_EMISSIVE = 0.85
 /** Idle breathing cadence in Hz. */
 const BREATHE_HZ = 0.5
 /** Minimum emissive multiplier during the breath cycle. */
-const BREATHE_MIN_FACTOR = 0.85
+const BREATHE_MIN_FACTOR = 0.7
+/** Strength of the procedural panel shading in non-grid areas. */
+const PANEL_SHADE_STRENGTH = 0.22
+/** Frequency of broad wall panels between grid lines. */
+const PANEL_SHADE_SCALE = 0.5
+/** Extra light on upward-facing surfaces so floor/ceiling are not flat black. */
+const NORMAL_SHADE_GAIN = 0.18
 
 const VERT = /* glsl */ `
   varying vec3 vWorldPos;
@@ -56,6 +62,10 @@ const FRAG = /* glsl */ `
   uniform float uEmissive;
   uniform float uTime;
 
+  float panelHash(vec2 cell) {
+    return fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453123);
+  }
+
   // Pick two world axes by face normal — the largest absolute component is
   // the face normal axis; the other two are the in-plane UVs.
   vec2 worldUV(vec3 pos, vec3 n) {
@@ -70,7 +80,12 @@ const FRAG = /* glsl */ `
     vec2 g = abs(fract(uv) - 0.5) - (0.5 - uLineWidth);
     float line = step(0.0, max(g.x, g.y));
     float breathe = mix(${BREATHE_MIN_FACTOR.toFixed(3)}, 1.0, 0.5 + 0.5 * sin(uTime * 6.2831853 * ${BREATHE_HZ.toFixed(3)}));
-    vec3 col = mix(uColorBase, uColorGrid * uEmissive * breathe, line);
+    float panel = panelHash(floor(uv * ${PANEL_SHADE_SCALE.toFixed(3)}));
+    float panelShade = 1.0 + (panel - 0.5) * ${PANEL_SHADE_STRENGTH.toFixed(3)};
+    float normalShade = 1.0 + abs(vWorldNormal.y) * ${NORMAL_SHADE_GAIN.toFixed(3)};
+    vec3 shadedBase = uColorBase * panelShade * normalShade;
+    vec3 gridColor = uColorGrid * uEmissive * breathe;
+    vec3 col = mix(shadedBase, gridColor, line);
     gl_FragColor = vec4(col, 1.0);
   }
 `
@@ -86,7 +101,7 @@ const FRAG = /* glsl */ `
  * @param opts - Tint + tuning
  */
 export function createBunkerGridMaterial(opts: BunkerGridMaterialOptions): THREE.ShaderMaterial {
-  const colorBase = new THREE.Color(0x0a0e14)
+  const colorBase = new THREE.Color(0x111925)
   const colorGrid = new THREE.Color(opts.tint)
   const mat = new THREE.ShaderMaterial({
     uniforms: {

@@ -25,6 +25,7 @@ import { EnemyDirector, type EnemyHandle } from '@/lib/fps/enemyDirector'
 import { EnemyProjectileSystem } from '@/lib/fps/enemyProjectileSystem'
 import { EnemyTiltCache } from '@/lib/fps/enemyTiltCache'
 import { EnemyLodApplier } from '@/lib/fps/enemyLodHelper'
+import { spawnChimeraProjectileBurst } from '@/lib/fps/chimeraProjectileBurst'
 import { NestModel } from '@/three/NestModel'
 import { BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/BacteriophageController'
 import { SpireController, SPIRE_HIT_CENTER_Y } from '@/three/SpireController'
@@ -683,21 +684,18 @@ export class ExterminateMinigame implements MiniGame, MiniGameEvents {
       const aimX = handle.lastOutput.aimTargetX
       const aimY = handle.lastOutput.aimTargetY
       const aimZ = handle.lastOutput.aimTargetZ
-      const ddx = aimX - muzzle.x
-      const ddy = aimY - muzzle.y
-      const ddz = aimZ - muzzle.z
-      const dist = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz)
-      if (dist > 0.01) {
-        this.enemyProjectileSystem.spawn(
-          muzzle.x,
-          muzzle.y,
-          muzzle.z,
-          ddx / dist,
-          ddy / dist,
-          ddz / dist,
-          handle.config.projectileSpeed,
-          handle.config.projectileDamage,
-        )
+      const spawnedCount = spawnChimeraProjectileBurst({
+        originX: muzzle.x,
+        originY: muzzle.y,
+        originZ: muzzle.z,
+        targetX: aimX,
+        targetY: aimY,
+        targetZ: aimZ,
+        projectileSpeed: handle.config.projectileSpeed,
+        projectileDamage: handle.config.projectileDamage,
+        spawnBurst: this.enemyProjectileSystem.spawnBurst.bind(this.enemyProjectileSystem),
+      })
+      if (spawnedCount > 0) {
         chim.pulseEyeLaser()
       }
     }

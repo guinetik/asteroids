@@ -262,6 +262,7 @@ export class LevelMinigameFacade {
           missionId: mission.id,
           factionTint: tintForGiver(mission.giverId),
           threeScene: scene,
+          projectileSystem,
           difficulty: mission.difficulty,
         })
         this.applySharedBindings(minigame, bindings)

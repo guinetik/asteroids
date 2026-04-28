@@ -144,6 +144,7 @@ export class ProjectileSystem implements Tickable {
   private readonly enemies: Enemy[] = []
   private readonly hostages: Hostage[] = []
   private readonly rocks: MineableRockEntry[] = []
+  private terrainCollisionEnabled = true
   private lander: LanderController | null = null
   private mapEvaShuttleHullHeal: MapEvaShuttleHullHealTarget | null = null
   /** Map EVA satellite-servicing minigame — science bolts repair rigged sub-objects. */
@@ -237,6 +238,19 @@ export class ProjectileSystem implements Tickable {
   /** Register an enemy for projectile collision checks. */
   addEnemy(enemy: Enemy): void {
     this.enemies.push(enemy)
+  }
+
+  /**
+   * Enable or disable terrain-heightmap collision for player bolts.
+   *
+   * The bunker interior hides the asteroid surface but still reuses this
+   * projectile system; disabling terrain collision there prevents invisible
+   * asteroid geometry from eating shots and spawning terrain impact VFX.
+   *
+   * @param enabled - True for surface EVA, false while inside bunker interiors.
+   */
+  setTerrainCollisionEnabled(enabled: boolean): void {
+    this.terrainCollisionEnabled = enabled
   }
 
   /**
@@ -532,8 +546,8 @@ export class ProjectileSystem implements Tickable {
       }
 
       // Terrain collision
-      const floorY = this.heightmap.heightAt(pos.x, pos.z)
-      const hitTerrain = pos.y <= floorY + TERRAIN_HIT_MARGIN
+      const floorY = this.terrainCollisionEnabled ? this.heightmap.heightAt(pos.x, pos.z) : null
+      const hitTerrain = floorY !== null && pos.y <= floorY + TERRAIN_HIT_MARGIN
 
       // Remove on hit or timeout
       if (

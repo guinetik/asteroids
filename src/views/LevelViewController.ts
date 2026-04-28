@@ -134,6 +134,8 @@ const LANDER_LOCAL_UP = new THREE.Vector3(0, 1, 0)
 const BUNKER_SWAP_FADE_OUT_SECONDS = 0.5
 /** Seconds to fade back from black after the swap. */
 const BUNKER_SWAP_FADE_IN_SECONDS = 0.5
+/** Cause shown after the normal dead-state presentation finishes in the bunker. */
+const BUNKER_OPERATOR_DEATH_CAUSE = 'Operator KIA'
 
 /**
  * Boot / preload status emitted to {@link LevelView} while the level scene
@@ -371,6 +373,19 @@ export class LevelViewController implements Tickable {
     /** One-shot callback fired at peak black to perform the actual swap. */
     swap: () => void
   } | null = null
+
+  /**
+   * Cause to show on the clickable death overlay after the normal FPS death
+   * fade/message sequence reaches its message beat. `null` for deaths that
+   * only use the regular YOU DIED presentation.
+   */
+  private pendingDeathOverlayCause: string | null = null
+
+  /**
+   * True after a bunker death has shown a manual restart overlay. Prevents the
+   * dead state's timeout from taking the normal in-place failed restart path.
+   */
+  private manualDeathRestartOverlayActive = false
 
   /**
    * Throttles + emits level HUD telemetry/state prompts.
@@ -762,6 +777,12 @@ export class LevelViewController implements Tickable {
     )
     this.playerController.group.visible = false
     this.playerController.onDeath = () => {
+      if (this.stateMachine?.is('bunker-interior')) {
+        this.pendingDeathOverlayCause = BUNKER_OPERATOR_DEATH_CAUSE
+        this.stateMachine.trigger('die')
+        return
+      }
+
       // Lander rescue — if the player dies while standing next to the lander
       // (typically hypoxia after running the O2 tank dry), treat it as if they
       // managed to climb back into the cockpit: replenish life support and
@@ -966,7 +987,7 @@ export class LevelViewController implements Tickable {
           )
         },
         onRescueFail: (_idx, cause) => {
-          this.onDeathOverlay?.(true, cause)
+          this.showDeathOverlay(cause)
         },
         onSurvivorLost: (aliveRemaining: number) => {
           this.onSurvivorLost?.(aliveRemaining)
@@ -996,6 +1017,8 @@ export class LevelViewController implements Tickable {
       // Pulse activation is driven by proximity inside `BunkerMinigame.tick`.
       hatch.active = false
       this.asteroidSurface.group.add(hatch.group)
+      hatch.group.updateWorldMatrix(true, true)
+      this.collision.addObjectiveCollider(hatch.createWorldCollider('surface-bunker-hatch'))
       this.surfaceBunkerHatch = hatch
       this.surfaceHatchWorldPos.set(firstObjective.x, hatchY, firstObjective.z)
       const bunkerMinigame = this.minigames.getByObjectiveIndex(0)
@@ -1504,6 +1527,8 @@ export class LevelViewController implements Tickable {
       // the lander, the orbital shuttle, and the objective waypoint beam.
       if (this.landerController) this.landerController.group.visible = false
       if (this.arrivalSequence) this.arrivalSequence.shuttleGroup.visible = false
+      if (this.surfaceBunkerHatch) this.surfaceBunkerHatch.group.visible = false
+      this.projectileSystem?.setTerrainCollisionEnabled(false)
       setWaypointMarkersVisible(false)
       minigame.setSceneRootWorldPosition(descentPos.x, descentPos.y, descentPos.z)
       minigame.notifyDescended()
@@ -1545,6 +1570,8 @@ export class LevelViewController implements Tickable {
       // Restore surface props hidden on descent.
       if (this.landerController) this.landerController.group.visible = true
       if (this.arrivalSequence) this.arrivalSequence.shuttleGroup.visible = true
+      if (this.surfaceBunkerHatch) this.surfaceBunkerHatch.group.visible = true
+      this.projectileSystem?.setTerrainCollisionEnabled(true)
       setWaypointMarkersVisible(true)
       const restore = this.surfacePlayerSnapshot ?? this.surfaceHatchWorldPos
       if (this.playerController) {
@@ -1554,6 +1581,7 @@ export class LevelViewController implements Tickable {
       // Restore terrain-based ground sampling now we're back on the surface.
       this.playerController?.setGroundYOverride(null)
       this.surfacePlayerSnapshot = null
+      this.onTerminalPrompt?.(null)
       this.stateMachine?.trigger('exitBunker')
     })
   }
@@ -1642,7 +1670,24 @@ export class LevelViewController implements Tickable {
   }
 
   private enterFailed(): void {
+    if (this.manualDeathRestartOverlayActive) return
     this.restartLevel()
+  }
+
+  /**
+   * Show the clickable death overlay and release FPS input capture.
+   *
+   * Rescue and bunker objective failures can occur while the FPS pointer lock
+   * is active. Releasing it here keeps the overlay button interactive even
+   * when the controller does not transition through the normal dead state.
+   *
+   * @param cause - Failure cause shown on the overlay.
+   */
+  private showDeathOverlay(cause: string): void {
+    this.pointerLock.releaseLock()
+    this.teardownPointerLock()
+    this.fpsAudio.stop()
+    this.onDeathOverlay?.(true, cause)
   }
 
   /** Called from the death overlay restart button. */
@@ -1726,6 +1771,8 @@ export class LevelViewController implements Tickable {
 
   private restartLevel(): void {
     this.clearLanderHullPersistTimer()
+    this.pendingDeathOverlayCause = null
+    this.manualDeathRestartOverlayActive = false
 
     this.onDeathOverlay?.(false, '')
     this.onDeathFade?.(0)
@@ -1735,6 +1782,7 @@ export class LevelViewController implements Tickable {
 
     this.pointerLock.releaseLock()
     this.teardownPointerLock()
+    this.projectileSystem?.setTerrainCollisionEnabled(true)
 
     this.landerDestroyed = false
     this.hasExitedVehicle = false
@@ -1901,19 +1949,29 @@ export class LevelViewController implements Tickable {
         if (floorY !== null && floorY !== undefined) {
           this.playerController.group.position.y = floorY
         }
-        // Slice-1 wall collision: clamp the player's XZ to the bunker's
-        // outer AABB so they can't walk through walls. A real solution
-        // would register wall colliders with the FPS collision world, but
-        // a single rectangle covering all three rooms (the corridor's open
-        // ends connect them) is enough to keep the player contained for
-        // the encounter.
-        const bounds = bunkerMinigame?.bunkerXZBounds
-        if (bounds) {
+        // Clamp to the nearest room/corridor walkable rectangle. Keeping the
+        // rectangles separate prevents the narrow entry spaces from inheriting
+        // the arena's width.
+        const bounds = bunkerMinigame?.bunkerWalkableBounds ?? []
+        if (bounds.length > 0) {
           const p = this.playerController.group.position
-          if (p.x < bounds.minX) p.x = bounds.minX
-          else if (p.x > bounds.maxX) p.x = bounds.maxX
-          if (p.z < bounds.minZ) p.z = bounds.minZ
-          else if (p.z > bounds.maxZ) p.z = bounds.maxZ
+          let bestX = p.x
+          let bestZ = p.z
+          let bestDistSq = Number.POSITIVE_INFINITY
+          for (const rect of bounds) {
+            const x = Math.max(rect.minX, Math.min(rect.maxX, p.x))
+            const z = Math.max(rect.minZ, Math.min(rect.maxZ, p.z))
+            const dx = x - p.x
+            const dz = z - p.z
+            const distSq = dx * dx + dz * dz
+            if (distSq < bestDistSq) {
+              bestDistSq = distSq
+              bestX = x
+              bestZ = z
+            }
+          }
+          p.x = bestX
+          p.z = bestZ
         }
       }
 
@@ -1960,7 +2018,14 @@ export class LevelViewController implements Tickable {
       )
       this.fpsCamera.pitch = deathState.pitch
       this.onDeathFade?.(deathState.fadeOpacity)
-      if (deathState.showMessage) this.onDeathMessage?.(true)
+      if (deathState.showMessage) {
+        this.onDeathMessage?.(true)
+        if (this.pendingDeathOverlayCause) {
+          this.manualDeathRestartOverlayActive = true
+          this.showDeathOverlay(this.pendingDeathOverlayCause)
+          this.pendingDeathOverlayCause = null
+        }
+      }
     }
 
     // ── Atmosphere context update ──────────────────────────────
