@@ -62,14 +62,26 @@ export const DAN_MIN_QUALITY_FOR_COMPLETION = 0.05
  * from cheesing the scan from a safer parking spot far from the bowl.
  *
  * Sized for the default crater layout: lander parks at the crater center
- * and the terminal is `TERMINAL_OFFSET_X` units away, so a 30-unit gate
- * easily accommodates the natural park-and-EVA distance while blocking
- * remote activation.
+ * and the terminal is `TERMINAL_OFFSET_X` units away. 50 units gives the
+ * pilot a comfortable margin around the natural park spot — enough to
+ * forgive a sloppy touchdown without letting the player set up shop on
+ * the rim and EVA in.
  */
-export const DAN_LANDER_TO_TERMINAL_MAX_DISTANCE = 30
+export const DAN_LANDER_TO_TERMINAL_MAX_DISTANCE = 50
 
 /** HUD prompt shown at the terminal when the lander is parked too far away. */
 const DAN_INSTRUCTION_PARK_LANDER = 'PARK LANDER NEAR DAN TERMINAL'
+
+/**
+ * Flair message flashed on the DAN HUD when a viroid spawns. The DAN scan
+ * fires neutrons that read across the asteroid surface as albedo — the
+ * lore hook is that this signal attracts viroid attention. Reads to the
+ * player as "something just happened, look up".
+ */
+const DAN_INSTRUCTION_VIROID_ALERT = 'THE ALBEDO OF NEUTRONS ATTRACTS A NEARBY VIROID'
+
+/** Seconds the viroid-alert flair stays on the HUD before reverting to the scan instruction. */
+const DAN_VIROID_ALERT_DURATION_SECONDS = 3
 
 /**
  * Per-tier viroid spawn budget. The DAN scan attracts a small number of
@@ -297,6 +309,8 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
   private readonly viroidControllers = new Map<number, BacteriophageController>()
   /** Sorted seconds-into-scan when the next viroid spawn fires. */
   private spawnSchedule: number[] = []
+  /** Seconds remaining on the viroid-alert flair message; 0 = not flashing. */
+  private viroidAlertRemaining = 0
   /** Mulberry32 state — seeded from mission seed so spawn rolls stay deterministic per run. */
   private rngState: number
 
@@ -431,7 +445,9 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
    * Short instruction shown in the lander/EVA HUD across every encounter
    * phase so the player always knows the next action. The text is short
    * and imperative: it names the tool (SCI) and the target (NEUTRONS) so
-   * a fresh player can read once and play.
+   * a fresh player can read once and play. Viroid-alert flair temporarily
+   * overrides the scanning instruction for {@link DAN_VIROID_ALERT_DURATION_SECONDS}
+   * after a spawn so the player gets a heads-up that something dropped in.
    */
   get missionInstruction(): string | null {
     if (this._phase === 'completed') return null
@@ -439,7 +455,10 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
     if (this._phase === 'failed') {
       return this.failureReason === 'no-data-captured' ? DAN_INSTRUCTION_RETRY_HUD : null
     }
-    if (this._phase === 'scanning') return DAN_INSTRUCTION_SCAN_RUNNING
+    if (this._phase === 'scanning') {
+      if (this.viroidAlertRemaining > 0) return DAN_INSTRUCTION_VIROID_ALERT
+      return DAN_INSTRUCTION_SCAN_RUNNING
+    }
     return DAN_INSTRUCTION_RETURN_TELEMETRY
   }
 
@@ -495,6 +514,7 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
     this.particleHits = 0
     this.graceRemaining = this.graceSeconds
     this.failureReason = null
+    this.viroidAlertRemaining = 0
     this.objective.actualReward = undefined
     this.onRefuel?.()
 
@@ -637,10 +657,15 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
 
   /** Fire any scheduled spawns whose time has come, then tick the director. */
   private tickViroidSpawns(dt: number, ctx: MiniGameContext): void {
+    if (this.viroidAlertRemaining > 0) {
+      this.viroidAlertRemaining = Math.max(0, this.viroidAlertRemaining - dt)
+    }
+
     const elapsedScan = this.scanDuration - this._timeRemaining
     while (this.spawnSchedule.length > 0 && this.spawnSchedule[0]! <= elapsedScan) {
       this.spawnSchedule.shift()
       this.spawnViroidAtRim()
+      this.viroidAlertRemaining = DAN_VIROID_ALERT_DURATION_SECONDS
     }
 
     if (ctx.playerPosition) {
