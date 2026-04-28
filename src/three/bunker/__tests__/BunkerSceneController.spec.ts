@@ -116,6 +116,32 @@ describe('BunkerSceneController', () => {
     expect(enemyProjectileSystem!.projectileCount).toBe(1)
   })
 
+  it('fires bunker chimera walkers as a visible three-shot burst', () => {
+    const controller = new BunkerSceneController({ tint: TINT, scene: new THREE.Scene() })
+    controller.spawnWave(['chimera'])
+    const handle = controller.enemyDirector.enemies[0]!
+    handle.lastOutput = {
+      ...handle.lastOutput,
+      wantsToFire: true,
+      isChasing: true,
+      aimTargetX: handle.enemy.position.x + 20,
+      aimTargetY: handle.enemy.position.y,
+      aimTargetZ: handle.enemy.position.z,
+    }
+
+    const enemyProjectileSystem = (
+      controller as unknown as { enemyProjectileSystem?: EnemyProjectileSystem }
+    ).enemyProjectileSystem
+    expect(enemyProjectileSystem).toBeDefined()
+    controller.tick(0.016)
+
+    expect(enemyProjectileSystem!.projectileCount).toBe(1)
+    enemyProjectileSystem!.tick(0.06)
+    expect(enemyProjectileSystem!.projectileCount).toBe(2)
+    enemyProjectileSystem!.tick(0.06)
+    expect(enemyProjectileSystem!.projectileCount).toBe(3)
+  })
+
   it('spawns wave enemies on world-space arena pads after moving the bunker root', () => {
     const controller = new BunkerSceneController({ tint: TINT, scene: new THREE.Scene() })
     controller.setRootWorldPosition(ROOT_X, ROOT_Y, ROOT_Z)

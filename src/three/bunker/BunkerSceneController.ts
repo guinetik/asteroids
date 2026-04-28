@@ -24,6 +24,7 @@ import { BunkerDoorController } from './BunkerDoorController'
 import type { BunkerEnemyType } from '@/lib/bunker/bunkerWaveSchedule'
 import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import { EnemyProjectileSystem } from '@/lib/fps/enemyProjectileSystem'
+import { spawnChimeraProjectileBurst } from '@/lib/fps/chimeraProjectileBurst'
 import { BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/BacteriophageController'
 import { ChimeraWalkerController, CHIMERA_HIT_CENTER_Y } from '@/three/ChimeraWalkerController'
 import { SpireController, SPIRE_HIT_CENTER_Y } from '@/three/SpireController'
@@ -571,16 +572,20 @@ export class BunkerSceneController {
     ctrl.group.updateMatrixWorld(true)
     const muzzle = new THREE.Vector3()
     ctrl.getEyeLaserMuzzle(muzzle)
-    this.fireEnemyProjectileFrom(
-      muzzle.x,
-      muzzle.y,
-      muzzle.z,
-      handle.lastOutput.aimTargetX,
-      handle.lastOutput.aimTargetY,
-      handle.lastOutput.aimTargetZ,
-      handle,
-    )
-    ctrl.pulseEyeLaser()
+    const spawnedCount = spawnChimeraProjectileBurst({
+      originX: muzzle.x,
+      originY: muzzle.y,
+      originZ: muzzle.z,
+      targetX: handle.lastOutput.aimTargetX,
+      targetY: handle.lastOutput.aimTargetY,
+      targetZ: handle.lastOutput.aimTargetZ,
+      projectileSpeed: handle.config.projectileSpeed,
+      projectileDamage: handle.config.projectileDamage,
+      spawnBurst: this.enemyProjectileSystem.spawnBurst.bind(this.enemyProjectileSystem),
+    })
+    if (spawnedCount > 0) {
+      ctrl.pulseEyeLaser()
+    }
   }
 
   /**
