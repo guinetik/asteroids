@@ -9,13 +9,38 @@
 import { getAsteroidById, ASTEROID_CATALOG } from '@/lib/asteroids/catalog'
 import type { AsteroidDefinition, RotationLottery } from '@/lib/asteroids/types'
 import { hasLevelRouteQueryOverrideFromSearchParams } from '@/lib/level/levelRouteAccess'
-import { generateAsteroidMission } from '@/lib/missions/asteroidMissionGenerator'
+import {
+  generateAsteroidMission,
+  type AsteroidMissionHostAnchor,
+} from '@/lib/missions/asteroidMissionGenerator'
 import { getSpecialMissionById } from '@/lib/missions/specialMissions'
 import { loadActiveMission } from '@/lib/missions/missionStorage'
 import type { GeneratedAsteroidMission, ObjectiveType } from '@/lib/missions/types'
 
 /** Maximum attempts to generate a mission matching the requested objective type. */
 export const LEVEL_MISSION_TYPE_RETRY_LIMIT = 20
+
+/**
+ * Bunker-anchored host planets. Bunker mission templates carry per-template
+ * `planetIds` filters that reject the default earth host, so the URL-launch
+ * path must pick one of these as the host when `?mission=bunker` is requested.
+ */
+const BUNKER_HOST_PLANETS: ReadonlyArray<string> = ['mercury', 'venus', 'mars', 'jupiter']
+
+/**
+ * Pick a synthetic host anchor for a URL-launched bunker mission. World XZ
+ * are best-effort defaults — the URL launch typically also forces an
+ * `?asteroidId=…`, so the generated waypoint is decorative rather than
+ * player-visible. Only used by the `/level?mission=bunker` developer/test
+ * entry path.
+ *
+ * @param rand - RNG in `[0, 1)`; injectable for deterministic tests.
+ * @returns Host anchor whose `planetId` is one of the bunker-anchored planets.
+ */
+function pickBunkerHostAnchor(rand: () => number = Math.random): AsteroidMissionHostAnchor {
+  const planetId = BUNKER_HOST_PLANETS[Math.floor(rand() * BUNKER_HOST_PLANETS.length)]!
+  return { planetId, worldX: 0, worldZ: 0 }
+}
 
 /**
  * Resolved level boot context.
@@ -105,8 +130,11 @@ export function generateMissionWithType(
   if (!type) return generateAsteroidMission(difficulty)
 
   const requiredType = type as ObjectiveType
+  const host: AsteroidMissionHostAnchor | null =
+    requiredType === 'bunker' ? pickBunkerHostAnchor() : null
+
   for (let i = 0; i < LEVEL_MISSION_TYPE_RETRY_LIMIT; i++) {
-    const mission = generateAsteroidMission(difficulty, null, Math.random, requiredType)
+    const mission = generateAsteroidMission(difficulty, host, Math.random, requiredType)
     if (mission.objectives.some((objective) => objective.type === type)) return mission
   }
 

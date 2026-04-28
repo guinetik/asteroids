@@ -62,6 +62,24 @@ describe('levelContext', () => {
     expect(rotationFromSeed(42)).toEqual(rotationFromSeed(42))
   })
 
+  it('generateMissionWithType passes a bunker-anchored host when type is bunker', async () => {
+    const { generateAsteroidMission } = await import('@/lib/missions/asteroidMissionGenerator')
+    vi.mocked(generateAsteroidMission).mockReturnValueOnce({
+      id: 'bunker-mission',
+      asteroidId: 'asteroid-bunker',
+      objectives: [{ type: 'bunker', x: 0, z: 0 }],
+      originPlanetId: 'mars',
+    } as unknown as GeneratedAsteroidMission)
+
+    const mission = generateMissionWithType(5, 'bunker')
+
+    expect(mission.objectives[0]!.type).toBe('bunker')
+    const firstCall = vi.mocked(generateAsteroidMission).mock.calls[0]!
+    const hostArg = firstCall[1] as { planetId: string } | null
+    expect(hostArg).not.toBeNull()
+    expect(['mercury', 'venus', 'mars', 'jupiter']).toContain(hostArg!.planetId)
+  })
+
   it('generateMissionWithType retries until a matching objective appears', async () => {
     const { generateAsteroidMission } = await import('@/lib/missions/asteroidMissionGenerator')
     vi.mocked(generateAsteroidMission)
