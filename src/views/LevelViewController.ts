@@ -2212,9 +2212,11 @@ export class LevelViewController implements Tickable {
             ? activeProgressTotal === 1
               ? 'PROBE'
               : 'SCAN'
-            : activeMinigame
-              ? 'PROBES'
-              : null
+            : activeObjectiveType === 'dan'
+              ? 'PARTICLES'
+              : activeMinigame
+                ? 'PROBES'
+                : null
         landerTelemetry = {
           altitude: this.landerController.altitudeAboveGround,
           velocityY: this.landerController.body.velocityY,
