@@ -970,6 +970,11 @@ export class LevelViewController implements Tickable {
         onSurveyProbeCollect: () => this.levelAudio.notifyResourcePickup(),
         onPhotometryScanAudioState: (state) =>
           this.photometryScanAudio.update({ ...state, sfxVolume: 1 }, 0),
+        // DAN audio bindings come online when the audio module lands; for now
+        // route to no-op sinks so the minigame's procedural calls cost nothing.
+        onDanScanAudioState: null,
+        onDanParticleHit: null,
+        onDanCompletionPulse: null,
         onDamagePlayer: (damage, sourceX, sourceZ, source) => {
           this.applyPlayerDamageFeedback(damage, sourceX, sourceZ, source)
         },
