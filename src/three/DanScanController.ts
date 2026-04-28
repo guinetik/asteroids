@@ -71,11 +71,16 @@ const COMPLETION_PULSE_TUBE = 0.8
 /** Beam fade-out window after `endScan`, in seconds. */
 const BEAM_FADE_OUT_SECONDS = 0.6
 
-/** Lander emitter offset along the lander up axis used as the beam origin. */
-const DAN_LANDER_EMITTER_DOWN_OFFSET = 4
-
-/** Beam length when the lander is parked over the bowl — long enough to bury inside the floor. */
-const DAN_BEAM_LENGTH = 200
+/**
+ * Beam emitter offset along the lander's up axis. Matches the top warning
+ * beacon's Y offset (`TOP_BEACON_Y_OFFSET` in `LanderController`) so the
+ * scan beam reads as if it's coming out of the green landing-guide light
+ * on top of the lander. Kept as a separate constant here so the visuals
+ * stay decoupled — the LanderController is free to move its beacon without
+ * coupling DAN to its internals; if they drift apart it is a quick visual
+ * fix in one place.
+ */
+const DAN_LANDER_BEACON_HEIGHT_OFFSET = 22
 
 /** Default vertical thickness used when sampling the bowl floor for spawn Y. */
 const PARTICLE_SPAWN_FLOOR_OFFSET = 0.5
@@ -137,6 +142,16 @@ export interface DanScanControllerOptions {
   craterRadius: number
   /** Crater depth in world units, used to size the spawn cone height. */
   craterDepth: number
+  /**
+   * Beam target X in world space — the beam fires diagonally from the lander
+   * beacon roof down to this point. Set to the terminal's world X so the
+   * scan reads as "lander scanning terminal area".
+   */
+  beamTargetX: number
+  /** Beam target Y in world space (terminal ground level). */
+  beamTargetY: number
+  /** Beam target Z in world space. */
+  beamTargetZ: number
   /** Particle tuning preset rolled by the mission generator. */
   particleTuning: DanTierTuning
   /** Projectile system used to register particle hit spheres. */
@@ -462,20 +477,25 @@ export class DanScanController implements Tickable {
     if (!this.landerPosition) {
       // No lander anchor — render the beam as a vertical column above the crater.
       this._emitter.set(this.options.craterX, this.options.craterY + 30, this.options.craterZ)
-      this._beamEnd.set(this.options.craterX, this.options.craterY, this.options.craterZ)
+      this._beamEnd.set(
+        this.options.beamTargetX,
+        this.options.beamTargetY,
+        this.options.beamTargetZ,
+      )
     } else {
-      // Beam fires straight down from the lander like a thruster — the
-      // emitter sits below the hull along the lander's up axis, and the
-      // beam end is a fixed length further down. Aiming at the crater
-      // center caused the beam to tilt sideways whenever the lander
-      // drifted off-axis; locking it to the lander's local down axis
-      // makes the visual read like a probe drilling straight into the
-      // bowl regardless of small parking offsets.
+      // Beam emerges from the green landing-guide beacon on top of the
+      // lander (offset along the lander's up axis) and reaches diagonally
+      // to the terminal ground. Reads as "the lander is scanning the
+      // terminal site" rather than a thruster column dumped into the floor.
       const up = this.landerUp ?? new THREE.Vector3(0, 1, 0)
       this._emitter
         .copy(this.landerPosition)
-        .addScaledVector(up, -DAN_LANDER_EMITTER_DOWN_OFFSET)
-      this._beamEnd.copy(this._emitter).addScaledVector(up, -DAN_BEAM_LENGTH)
+        .addScaledVector(up, DAN_LANDER_BEACON_HEIGHT_OFFSET)
+      this._beamEnd.set(
+        this.options.beamTargetX,
+        this.options.beamTargetY,
+        this.options.beamTargetZ,
+      )
     }
 
     const delta = this._beamEnd.clone().sub(this._emitter)

@@ -32,8 +32,14 @@ import { DanScanController } from '@/three/DanScanController'
 /** Default DAN scan duration when the objective omits it. Seconds. */
 const DEFAULT_DAN_SCAN_DURATION_SECONDS = 45
 
-/** Default required particle hits when the objective omits it. */
-const DEFAULT_DAN_REQUIRED_PARTICLE_HITS = 50
+/**
+ * Default required particle hits when the objective omits it. Halved from
+ * the original 50 because SCI bolts cost RTG, and 50 captures inside a
+ * 45-second window left almost no margin for missed shots — playtest
+ * showed the score basically required full meter cap with optimal aim.
+ * 25 keeps the scan tense without forcing perfect play.
+ */
+const DEFAULT_DAN_REQUIRED_PARTICLE_HITS = 25
 
 /** Default grace seconds before viroid pressure begins after scan activation. */
 const DEFAULT_DAN_ENEMY_GRACE_SECONDS = 9
@@ -436,6 +442,12 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
       craterZ: this.placement.crater.z,
       craterRadius: this.placement.crater.radius,
       craterDepth: this.placement.crater.depth,
+      // Beam fires diagonally from the lander beacon roof down to the terminal
+      // ground — looks like the lander is scanning the terminal site rather
+      // than a vertical thruster column.
+      beamTargetX: this.terminal.position.x,
+      beamTargetY: this.terminal.position.y,
+      beamTargetZ: this.terminal.position.z,
       particleTuning: this.tuning,
       projectileSystem: this.projectileSystem,
       onParticleHit: () => this.recordParticleHit(),
