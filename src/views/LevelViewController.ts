@@ -77,6 +77,7 @@ import {
   addWaypointMarker,
   updateWaypointMarkers,
   clearWaypointMarkers,
+  setWaypointMarkersVisible,
 } from '@/three/WaypointMarkers'
 import { generateMapCanvas } from '@/lib/terrain/mapColors'
 import type { MiniGame, MiniGameStep } from '@/lib/minigame/MiniGame'
@@ -1499,6 +1500,11 @@ export class LevelViewController implements Tickable {
       // Swap scenes at peak black.
       if (this.asteroidSurface) this.asteroidSurface.group.visible = false
       if (this.surfaceRocks) this.surfaceRocks.group.visible = false
+      // Hide surface props the player shouldn't see while inside the bunker:
+      // the lander, the orbital shuttle, and the objective waypoint beam.
+      if (this.landerController) this.landerController.group.visible = false
+      if (this.arrivalSequence) this.arrivalSequence.shuttleGroup.visible = false
+      setWaypointMarkersVisible(false)
       minigame.setSceneRootWorldPosition(descentPos.x, descentPos.y, descentPos.z)
       minigame.notifyDescended()
       // The bunker antechamber's floor sits at the bunker root, which equals
@@ -1536,6 +1542,10 @@ export class LevelViewController implements Tickable {
       minigame.notifyExitInteract()
       if (this.asteroidSurface) this.asteroidSurface.group.visible = true
       if (this.surfaceRocks) this.surfaceRocks.group.visible = true
+      // Restore surface props hidden on descent.
+      if (this.landerController) this.landerController.group.visible = true
+      if (this.arrivalSequence) this.arrivalSequence.shuttleGroup.visible = true
+      setWaypointMarkersVisible(true)
       const restore = this.surfacePlayerSnapshot ?? this.surfaceHatchWorldPos
       if (this.playerController) {
         this.playerController.group.position.copy(restore)
@@ -1890,6 +1900,20 @@ export class LevelViewController implements Tickable {
         const floorY = bunkerMinigame?.bunkerFloorY
         if (floorY !== null && floorY !== undefined) {
           this.playerController.group.position.y = floorY
+        }
+        // Slice-1 wall collision: clamp the player's XZ to the bunker's
+        // outer AABB so they can't walk through walls. A real solution
+        // would register wall colliders with the FPS collision world, but
+        // a single rectangle covering all three rooms (the corridor's open
+        // ends connect them) is enough to keep the player contained for
+        // the encounter.
+        const bounds = bunkerMinigame?.bunkerXZBounds
+        if (bounds) {
+          const p = this.playerController.group.position
+          if (p.x < bounds.minX) p.x = bounds.minX
+          else if (p.x > bounds.maxX) p.x = bounds.maxX
+          if (p.z < bounds.minZ) p.z = bounds.minZ
+          else if (p.z > bounds.maxZ) p.z = bounds.maxZ
         }
       }
 

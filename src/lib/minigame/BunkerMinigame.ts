@@ -2,9 +2,9 @@
  * Bunker minigame — descend through the hatch, clear authored waves in the
  * arena, walk back out.
  *
- * Mirrors {@link RescueMinigame}'s shape: 6-step list, status flag,
- * scene-and-director ownership, callback bag for the level facade. The
- * interior scene is owned by {@link BunkerSceneController}; this class
+ * Mirrors {@link RescueMinigame}'s shape: in-asteroid step list, status
+ * flag, scene-and-director ownership, callback bag for the level facade.
+ * The interior scene is owned by {@link BunkerSceneController}; this class
  * drives the FSM ({@link BunkerSceneState}) and the wave scheduler.
  *
  * @author guinetik
@@ -91,12 +91,10 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
   private surfaceHatchPos: { x: number; z: number } | null = null
 
   private readonly _steps: MiniGameStep[] = [
-    { label: 'Travel to the asteroid', complete: false, active: true },
-    { label: 'Land in the bunker zone', complete: false, active: false },
+    { label: 'Land in the bunker zone', complete: false, active: true },
     { label: 'Enter the bunker', complete: false, active: false },
     { label: 'Clear the waves', complete: false, active: false },
     { label: 'Extract from the bunker', complete: false, active: false },
-    { label: 'Return to the giver planet', complete: false, active: false },
   ]
 
   // --- MiniGameEvents ---
@@ -244,6 +242,41 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
    */
   get bunkerFloorY(): number | null {
     return this.scene?.floorY ?? null
+  }
+
+  /**
+   * World-space XZ AABB the player must stay inside while in the bunker.
+   * Slice 1 returns the union of antechamber + corridor + arena as a single
+   * rectangle — the corridor's open longitudinal ends connect them, so a
+   * conservative single rectangle keeps the player inside the outer walls
+   * without registering wall colliders. The level controller clamps the
+   * player's XZ each tick using this rectangle.
+   *
+   * Returned as world-space `[minX, maxX] × [minZ, maxZ]`. Returns `null`
+   * in test seams without a scene.
+   */
+  get bunkerXZBounds(): {
+    minX: number
+    maxX: number
+    minZ: number
+    maxZ: number
+  } | null {
+    if (!this.scene) return null
+    const root = this.scene.rootWorldPosition
+    /** Wall-thickness inset so the player capsule center doesn't clip into walls. */
+    const inset = 0.6
+    /** Half-width of the widest room (arena = 30 wide). */
+    const halfW = 15
+    /** Antechamber's south wall in bunker-local Z. */
+    const minLocalZ = -4
+    /** Arena's north wall in bunker-local Z (corridor + arena depth). */
+    const maxLocalZ = 38
+    return {
+      minX: root.x - halfW + inset,
+      maxX: root.x + halfW - inset,
+      minZ: root.z + minLocalZ + inset,
+      maxZ: root.z + maxLocalZ - inset,
+    }
   }
 
   /** Currently-active wave index (zero-based) — for HUD. */
@@ -449,7 +482,8 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
 
   /** Called when the player presses E on the surface hatch. Caller swaps scene. */
   notifyDescended(): void {
-    this.advanceStep(2) // Enter the bunker
+    this.advanceStep(0) // Land in the bunker zone (auto-completed on descent)
+    this.advanceStep(1) // Enter the bunker
     this.scene?.activate()
     this.state.notifyActivated()
   }
@@ -463,8 +497,8 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
   notifyExitInteract(): void {
     this.state.notifyHatchInteracted()
     if (this.state.current === 'exiting') {
-      this.advanceStep(3) // Clear the waves
-      this.advanceStep(4) // Extract
+      this.advanceStep(2) // Clear the waves
+      this.advanceStep(3) // Extract
       this._status = 'completed'
       this.onComplete?.(this.objectiveIndex)
     }

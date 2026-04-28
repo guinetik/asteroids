@@ -98,16 +98,42 @@ export class BunkerSceneController {
     return this.geometry.root.position.y
   }
 
-  /** XZ center of the antechamber's exit hatch (for interaction range checks). */
+  /**
+   * World-space XZ center of the antechamber's exit hatch (for interaction
+   * range checks). The geometry stores the hatch in bunker-local coords; we
+   * add the root's world XZ so the prompt logic can compare against the
+   * player's world-space position directly.
+   */
   get hatchPosition(): { x: number; z: number } {
-    return this.geometry.antechamberHatch
+    return {
+      x: this.geometry.root.position.x + this.geometry.antechamberHatch.x,
+      z: this.geometry.root.position.z + this.geometry.antechamberHatch.z,
+    }
   }
 
-  /** XZ center of the arena door (for interaction range checks). */
+  /**
+   * World-space XZ center of the arena door (for interaction range checks).
+   * Mirrors {@link hatchPosition}: the door anchor lives in bunker-local
+   * space, so we lift it into world coords for parity with the player's
+   * world position.
+   */
   get doorPosition(): { x: number; z: number } {
     return {
-      x: this.geometry.arenaDoorAnchor.position.x,
-      z: this.geometry.arenaDoorAnchor.position.z,
+      x: this.geometry.root.position.x + this.geometry.arenaDoorAnchor.position.x,
+      z: this.geometry.root.position.z + this.geometry.arenaDoorAnchor.position.z,
+    }
+  }
+
+  /**
+   * World-space position of the bunker root group. Used by the level view
+   * to compute the world-space AABB clamp that keeps the player inside the
+   * bunker walls (slice-1 cheap collision).
+   */
+  get rootWorldPosition(): { x: number; y: number; z: number } {
+    return {
+      x: this.geometry.root.position.x,
+      y: this.geometry.root.position.y,
+      z: this.geometry.root.position.z,
     }
   }
 

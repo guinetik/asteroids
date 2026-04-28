@@ -322,6 +322,20 @@ export function clearWaypointMarkers(_scene: THREE.Scene): void {
 }
 
 /**
+ * Toggle visibility of all live waypoint marker groups. Used by the level
+ * view to hide objective beams while the player is inside the bunker
+ * interior (the asteroid surface scene is hidden, but the markers were
+ * added directly to the THREE scene so they need their own toggle).
+ *
+ * @param visible - True to show all markers, false to hide them.
+ */
+export function setWaypointMarkersVisible(visible: boolean): void {
+  for (const marker of markers) {
+    marker.group.visible = visible
+  }
+}
+
+/**
  * Animate all markers. Call each frame with elapsed scene time.
  * Pulses the ring, modulates beam opacity, rotates the diamond,
  * and fades markers when the player is nearby.

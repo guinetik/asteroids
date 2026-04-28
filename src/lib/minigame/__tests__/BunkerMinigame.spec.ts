@@ -68,18 +68,18 @@ function buildMinigame(): BunkerMinigame {
 }
 
 describe('BunkerMinigame', () => {
-  it('starts with all 6 steps, first one active', () => {
+  it('starts with all 4 steps, first one active', () => {
     const m = buildMinigame()
-    expect(m.steps.length).toBe(6)
+    expect(m.steps.length).toBe(4)
     expect(m.steps[0]!.active).toBe(true)
     expect(m.steps[0]!.complete).toBe(false)
   })
 
   it('advances steps as the player progresses', () => {
     const m = buildMinigame()
-    m.advanceStepForTest(0) // travel
-    m.advanceStepForTest(1) // land
-    m.advanceStepForTest(2) // enter
+    m.advanceStepForTest(0) // land
+    m.advanceStepForTest(1) // enter
+    m.advanceStepForTest(2) // clear waves
     expect(m.steps[3]!.active).toBe(true)
   })
 
@@ -120,7 +120,7 @@ describe('BunkerMinigame', () => {
       difficulty: 1,
     })
 
-    m.notifyDescended() // step 2 + activate + state → antechamber-idle
+    m.notifyDescended() // steps 0+1 complete + activate + state → antechamber-idle
     m.notifyArenaDoorInteract() // state → wave-active
 
     // First tick: should spawn the wave roster.
