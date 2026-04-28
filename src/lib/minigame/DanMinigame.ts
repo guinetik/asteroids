@@ -49,13 +49,20 @@ export const DAN_MIN_QUALITY_FOR_COMPLETION = 0.05
 /** Terminal X offset from the crater center, matching photometry's footprint. */
 const TERMINAL_OFFSET_X = 14
 
-/** HUD instruction shown before the scan starts. */
+/** EVA terminal prompt shown when standing at the terminal pre-scan. */
 const DAN_INSTRUCTION_PRESCAN = '[E] START DAN SCAN'
 
-/** HUD instruction shown while the scan window is active. */
-const DAN_INSTRUCTION_SCAN_RUNNING = 'CAPTURE NEUTRON RETURNS'
+/** Lander/EVA HUD instruction shown before the scan starts. */
+const DAN_INSTRUCTION_LOCATE_TERMINAL = 'EVA TO DAN TERMINAL TO START SCAN'
 
-/** HUD instruction shown after the scan window closes, before delivery. */
+/**
+ * Lander/EVA HUD instruction shown while the scan window is active. Tells the
+ * player exactly which tool they need — SCI bolts capture neutrons, all other
+ * multitool modes pass through them.
+ */
+const DAN_INSTRUCTION_SCAN_RUNNING = 'SHOOT NEUTRONS WITH SCI MULTITOOL'
+
+/** Lander/EVA HUD instruction shown after the scan window closes, before delivery. */
 const DAN_INSTRUCTION_RETURN_TELEMETRY = 'RETURN DAN TELEMETRY TO TERMINAL'
 
 /** EVA terminal prompt shown when ready to deliver. */
@@ -63,6 +70,9 @@ const DAN_INSTRUCTION_DELIVER = '[E] DELIVER DAN TELEMETRY'
 
 /** EVA terminal prompt shown after a failure that permits a retry. */
 const DAN_INSTRUCTION_RETRY = '[E] RETRY DAN SCAN'
+
+/** Lander/EVA HUD instruction shown after a no-data failure, on the way back to the terminal. */
+const DAN_INSTRUCTION_RETRY_HUD = 'RETRY DAN SCAN AT TERMINAL'
 
 /** Failure cause exposed by the minigame. */
 export type DanFailureReason = 'lander-destroyed' | 'player-died' | 'no-data-captured'
@@ -116,15 +126,21 @@ export interface DanTierTuning {
   enemySpawnProbability: number
 }
 
-/** Fixed tier presets for DAN particle + enemy pressure. */
+/**
+ * Fixed tier presets for DAN particle + enemy pressure. Speeds are tuned
+ * for the ~zero asteroid gravity in {@link DanScanController}: particles
+ * launch from the bowl floor and travel outward to space rather than
+ * arcing back. Lifetimes are sized so the player has time to track each
+ * neutron with the SCI multitool before it drifts out of reach.
+ */
 export const DAN_TIER_TUNING: Record<DanPressureTier, DanTierTuning> = {
   low: {
     particleSpawnProbability: 0.45,
     particleBurstChance: 0.1,
     particleSpeedMin: 8,
     particleSpeedMax: 14,
-    particleLifetimeMin: 1.6,
-    particleLifetimeMax: 2.4,
+    particleLifetimeMin: 4.5,
+    particleLifetimeMax: 6.0,
     tickIntervalSeconds: 0.3,
     enemySpawnProbability: 0.15,
   },
@@ -132,9 +148,9 @@ export const DAN_TIER_TUNING: Record<DanPressureTier, DanTierTuning> = {
     particleSpawnProbability: 0.65,
     particleBurstChance: 0.18,
     particleSpeedMin: 10,
-    particleSpeedMax: 18,
-    particleLifetimeMin: 1.5,
-    particleLifetimeMax: 2.3,
+    particleSpeedMax: 16,
+    particleLifetimeMin: 4.0,
+    particleLifetimeMax: 5.5,
     tickIntervalSeconds: 0.25,
     enemySpawnProbability: 0.28,
   },
@@ -142,9 +158,9 @@ export const DAN_TIER_TUNING: Record<DanPressureTier, DanTierTuning> = {
     particleSpawnProbability: 0.85,
     particleBurstChance: 0.32,
     particleSpeedMin: 12,
-    particleSpeedMax: 22,
-    particleLifetimeMin: 1.4,
-    particleLifetimeMax: 2.1,
+    particleSpeedMax: 18,
+    particleLifetimeMin: 3.5,
+    particleLifetimeMax: 5.0,
     tickIntervalSeconds: 0.2,
     enemySpawnProbability: 0.45,
   },
@@ -198,10 +214,10 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
   private graceRemaining = 0
   private failureReason: DanFailureReason | null = null
   private readonly _steps: MiniGameStep[] = [
-    { label: 'Locate the terminal', complete: false, active: true },
-    { label: 'Start the DAN scan', complete: false, active: false },
-    { label: 'Capture neutron returns', complete: false, active: false },
-    { label: 'Return DAN telemetry', complete: false, active: false },
+    { label: 'Locate the DAN terminal', complete: false, active: true },
+    { label: 'Press [E] to start the DAN scan', complete: false, active: false },
+    { label: 'Shoot neutrons with the SCI multitool', complete: false, active: false },
+    { label: 'Return DAN telemetry to the terminal', complete: false, active: false },
   ]
 
   private readonly objective: ConcreteObjective
@@ -296,11 +312,16 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
   }
 
   /**
-   * Time remaining in the active scan window, in seconds. Becomes `null` once
-   * the window closes (transition to `awaiting-delivery`).
+   * Time remaining in the active scan window, in seconds. Returns `0` (not
+   * null) during `awaiting-delivery` so the lander HUD stays mounted with
+   * its mission instruction visible while the player walks back to the
+   * terminal — the survey HUD gates on `timeRemaining !== null`, and a null
+   * here would hide both the timer and the deliver-telemetry instruction.
    */
   get timeRemaining(): number | null {
-    return this._phase === 'scanning' ? this._timeRemaining : null
+    if (this._phase === 'scanning') return this._timeRemaining
+    if (this._phase === 'awaiting-delivery') return 0
+    return null
   }
 
   /** Particle capture count, exposed via the shared `survey*` HUD field. */
@@ -320,13 +341,17 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
     return this._steps
   }
 
-  /** Short instruction shown in the lander HUD while the encounter runs. */
+  /**
+   * Short instruction shown in the lander/EVA HUD across every encounter
+   * phase so the player always knows the next action. The text is short
+   * and imperative: it names the tool (SCI) and the target (NEUTRONS) so
+   * a fresh player can read once and play.
+   */
   get missionInstruction(): string | null {
-    if (this._phase === 'idle' || this._phase === 'completed') return null
+    if (this._phase === 'completed') return null
+    if (this._phase === 'idle') return DAN_INSTRUCTION_LOCATE_TERMINAL
     if (this._phase === 'failed') {
-      return this.failureReason === 'no-data-captured'
-        ? DAN_INSTRUCTION_RETRY.replace('[E] ', '')
-        : null
+      return this.failureReason === 'no-data-captured' ? DAN_INSTRUCTION_RETRY_HUD : null
     }
     if (this._phase === 'scanning') return DAN_INSTRUCTION_SCAN_RUNNING
     return DAN_INSTRUCTION_RETURN_TELEMETRY

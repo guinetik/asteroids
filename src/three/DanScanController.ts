@@ -61,8 +61,13 @@ const DAN_LANDER_EMITTER_DOWN_OFFSET = 4
 /** Default vertical thickness used when sampling the bowl floor for spawn Y. */
 const PARTICLE_SPAWN_FLOOR_OFFSET = 0.5
 
-/** Multiplier applied to particle speed to size its outward arc. */
-const PARTICLE_GRAVITY_DOWN = 6.5
+/**
+ * Downward acceleration applied to particles each tick. Asteroids have
+ * essentially zero gravity, so neutrons fly outward to space instead of
+ * arcing back to the bowl floor. A tiny non-zero value keeps the spread
+ * cone honest without yanking particles out of the player's reach.
+ */
+const PARTICLE_GRAVITY_DOWN = 0.4
 
 /**
  * Particle-pool entry. One per allocated mesh; recycled on expiry or capture.

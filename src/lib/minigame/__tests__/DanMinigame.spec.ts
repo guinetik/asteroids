@@ -134,7 +134,8 @@ describe('DanMinigame', () => {
 
       expect(minigame.phase).toBe('awaiting-delivery')
       expect(minigame.status).toBe('active')
-      expect(minigame.timeRemaining).toBeNull()
+      // Window closed — timer reads 0 (HUD stays mounted with deliver prompt).
+      expect(minigame.timeRemaining).toBe(0)
       expect(minigame.failure).toBeNull()
       minigame.dispose()
     })

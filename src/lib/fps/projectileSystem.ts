@@ -556,31 +556,34 @@ export class ProjectileSystem implements Tickable {
               }
             }
             if (!hitMapShuttleHull) {
-              if (this.lander) {
-                this.lander.group.getWorldPosition(this._landerCenter)
-                const distSq = pos.distanceToSquared(this._landerCenter)
-                // ~13.4 unit radius around lander center
-                if (distSq < 180) {
-                  this.lander.healHull(HEAL_BOLT_AMOUNT)
-                  this._callbackPos.copy(pos)
-                  hitHostage = true // reuse flag so onImpact fires for VFX
-                  landerHit = true
-                }
-              }
-              if (!landerHit) {
-                const surveyImpact = this.surveyTargetHit(this._prevPos, pos, this._callbackPos)
-                if (surveyImpact !== null) {
-                  this.onScienceRocketHit?.(this._callbackPos)
-                  hitRocket = true
-                } else {
-                  // DAN neutron particle capture wins over rocks so a particle
-                  // spawning next to a surface rock cannot be eaten by the rock
-                  // cascade. Particles are SCI-only and despawn on hit.
-                  const danHit = this.closestDanParticleHit(this._prevPos, pos)
-                  if (danHit) {
+              // DAN neutron particle capture wins over the lander-heal branch
+              // because the DAN encounter parks the lander AT the crater
+              // center where particles spawn — without particle priority, the
+              // ~13-unit lander-heal radius would eat every SCI shot and the
+              // capture meter would never tick. Particles are SCI-only and
+              // despawn on hit.
+              const danHit = this.closestDanParticleHit(this._prevPos, pos)
+              if (danHit) {
+                this._callbackPos.copy(pos)
+                this.onScienceDanParticleHit?.(danHit.spawnIndex, this._callbackPos)
+                hitDanParticle = true
+              } else {
+                if (this.lander) {
+                  this.lander.group.getWorldPosition(this._landerCenter)
+                  const distSq = pos.distanceToSquared(this._landerCenter)
+                  // ~13.4 unit radius around lander center
+                  if (distSq < 180) {
+                    this.lander.healHull(HEAL_BOLT_AMOUNT)
                     this._callbackPos.copy(pos)
-                    this.onScienceDanParticleHit?.(danHit.spawnIndex, this._callbackPos)
-                    hitDanParticle = true
+                    hitHostage = true // reuse flag so onImpact fires for VFX
+                    landerHit = true
+                  }
+                }
+                if (!landerHit) {
+                  const surveyImpact = this.surveyTargetHit(this._prevPos, pos, this._callbackPos)
+                  if (surveyImpact !== null) {
+                    this.onScienceRocketHit?.(this._callbackPos)
+                    hitRocket = true
                   } else {
                     const rockHit = this.closestRockHit(this._prevPos, pos)
                     if (rockHit) {
