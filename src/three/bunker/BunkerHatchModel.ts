@@ -26,7 +26,7 @@ const HATCH_PIPE_SEGMENTS = 48
 /** Width of the side door panel. */
 const HATCH_DOOR_WIDTH = 4.6
 /** Height of the side door panel. */
-const HATCH_DOOR_HEIGHT = 10.2
+const HATCH_DOOR_HEIGHT = 12
 /** Thickness of the side door panel. */
 const HATCH_DOOR_DEPTH = 0.08
 /** Gap from visible ground to the bottom of the side door panel. */
