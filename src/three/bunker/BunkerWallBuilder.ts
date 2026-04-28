@@ -53,14 +53,28 @@ export function buildBunkerGeometry(material: THREE.ShaderMaterial): BunkerGeome
   const corrCenterZ = ANTECHAMBER.depth / 2 + CORRIDOR.depth / 2
   const arenaCenterZ = corrCenterZ + CORRIDOR.depth / 2 + ARENA.depth / 2
 
+  // The corridor skips its north + south walls because they would be coplanar
+  // with the antechamber's north wall (south end) and the arena's south wall
+  // (north end), causing z-fighting under BackSide rendering. The antechamber
+  // and arena walls close off the corridor's longitudinal ends instead.
+  // TODO(slice-2): when the door slides open, the antechamber-north wall still
+  // occludes the view into the corridor/arena. A future slice should carve a
+  // doorway opening (CSG cut or wall-skip in the door region) so opening the
+  // door reveals the next room. For slice 1, the corridor is intentionally a
+  // visually-closed shaft — the door is the gate, not a window.
   const ante = buildRoom('antechamber', ANTECHAMBER, 0, anteCenterZ, material)
-  const corr = buildRoom('corridor', CORRIDOR, 0, corrCenterZ, material)
+  const corr = buildRoom('corridor', CORRIDOR, 0, corrCenterZ, material, {
+    skipNorth: true,
+    skipSouth: true,
+  })
   const arena = buildRoom('arena', ARENA, 0, arenaCenterZ, material)
   root.add(ante, corr, arena)
 
-  // Door anchor sits on the corridor's antechamber-facing wall (between ante and corridor).
+  // Door anchor sits on the centerline of the antechamber's north wall band
+  // (z ∈ [ANTECHAMBER.depth/2, ANTECHAMBER.depth/2 + WALL_THICKNESS]) so a
+  // door mesh parented here doesn't overlap/z-fight with the wall faces.
   const arenaDoorAnchor = new THREE.Object3D()
-  arenaDoorAnchor.position.set(0, 0, ANTECHAMBER.depth / 2)
+  arenaDoorAnchor.position.set(0, 0, ANTECHAMBER.depth / 2 + WALL_THICKNESS / 2)
   root.add(arenaDoorAnchor)
 
   // Spawn pads inset from the four arena corners.
@@ -84,14 +98,18 @@ export function buildBunkerGeometry(material: THREE.ShaderMaterial): BunkerGeome
 }
 
 /**
- * Build the six wall meshes for one rectangular room centered at (cx, cz)
- * with floor at y=0 and ceiling at y=`dims.height`.
+ * Build the wall meshes for one rectangular room centered at (cx, cz)
+ * with floor at y=0 and ceiling at y=`dims.height`. By default all six
+ * faces (floor, ceiling, N, S, E, W) are emitted; pass `skipNorth` /
+ * `skipSouth` to omit a longitudinal end wall when the caller knows an
+ * adjacent room will close it off (avoids coplanar z-fighting).
  *
  * @param name     - Room name, set as the THREE.Group `name` for hide/show.
  * @param dims     - Inner width / depth / height in world units.
  * @param cx       - Center X.
  * @param cz       - Center Z.
  * @param material - Shared grid material applied to every face.
+ * @param options  - Optional flags to skip the north / south end walls.
  */
 function buildRoom(
   name: string,
@@ -99,6 +117,7 @@ function buildRoom(
   cx: number,
   cz: number,
   material: THREE.ShaderMaterial,
+  options: { skipNorth?: boolean; skipSouth?: boolean } = {},
 ): THREE.Group {
   const g = new THREE.Group()
   g.name = name
@@ -113,14 +132,19 @@ function buildRoom(
   ceil.position.set(cx, dims.height + t / 2, cz)
   g.add(ceil)
 
-  // North + south walls (along x-axis)
-  const north = new THREE.Mesh(new THREE.BoxGeometry(dims.width, dims.height, t), material)
-  north.position.set(cx, dims.height / 2, cz + dims.depth / 2 + t / 2)
-  g.add(north)
+  // North + south walls (along x-axis) — optional so adjacent rooms can
+  // close off the end without coplanar z-fighting.
+  if (!options.skipNorth) {
+    const north = new THREE.Mesh(new THREE.BoxGeometry(dims.width, dims.height, t), material)
+    north.position.set(cx, dims.height / 2, cz + dims.depth / 2 + t / 2)
+    g.add(north)
+  }
 
-  const south = new THREE.Mesh(new THREE.BoxGeometry(dims.width, dims.height, t), material)
-  south.position.set(cx, dims.height / 2, cz - dims.depth / 2 - t / 2)
-  g.add(south)
+  if (!options.skipSouth) {
+    const south = new THREE.Mesh(new THREE.BoxGeometry(dims.width, dims.height, t), material)
+    south.position.set(cx, dims.height / 2, cz - dims.depth / 2 - t / 2)
+    g.add(south)
+  }
 
   // East + west walls (along z-axis)
   const east = new THREE.Mesh(new THREE.BoxGeometry(t, dims.height, dims.depth), material)
