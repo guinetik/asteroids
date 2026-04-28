@@ -76,6 +76,106 @@ describe('persistCompletedAsteroidMissionRewards', () => {
     expect(parsed.board.activeAsteroidMission).toBeNull()
   })
 
+  describe('partial-credit reward interpolation', () => {
+    it('pays each objective its full rolled reward when actualReward is unset', () => {
+      const mission: GeneratedAsteroidMission = {
+        ...BASE_MISSION,
+        objectives: [
+          { type: 'gather', x: 0, z: 0, resourceAmount: 100, reward: 1200 },
+          { type: 'survey', x: 0, z: 0, probeCount: 5, timeLimit: 90, reward: 800 },
+        ],
+        totalReward: 2200, // 1200 + 800 + 200 completion bonus
+      }
+
+      persistCompletedAsteroidMissionRewards(mission, 1)
+
+      // 1000 starting + 2200 (full objectives + bonus) = 3200
+      expect(loadProfile()!.credits).toBe(3200)
+    })
+
+    it('substitutes actualReward and preserves the completion bonus', () => {
+      const mission: GeneratedAsteroidMission = {
+        ...BASE_MISSION,
+        objectives: [
+          {
+            type: 'dan',
+            x: 0,
+            z: 0,
+            scanDurationSeconds: 45,
+            requiredParticleHits: 50,
+            enemyGraceSeconds: 9,
+            particleTier: 'medium',
+            enemyTier: 'medium',
+            reward: 6000,
+            rewardMin: 1500,
+            actualReward: 1500,
+          },
+        ],
+        totalReward: 7000, // 6000 rolled + 1000 completion bonus
+      }
+
+      persistCompletedAsteroidMissionRewards(mission, 1)
+
+      // 1000 starting + (1500 actual + 1000 bonus) = 3500
+      expect(loadProfile()!.credits).toBe(3500)
+    })
+
+    it('pays the same as binary when actualReward equals the rolled reward', () => {
+      const mission: GeneratedAsteroidMission = {
+        ...BASE_MISSION,
+        objectives: [
+          {
+            type: 'dan',
+            x: 0,
+            z: 0,
+            scanDurationSeconds: 45,
+            requiredParticleHits: 50,
+            enemyGraceSeconds: 9,
+            particleTier: 'medium',
+            enemyTier: 'medium',
+            reward: 6000,
+            rewardMin: 1500,
+            actualReward: 6000,
+          },
+        ],
+        totalReward: 7000,
+      }
+
+      persistCompletedAsteroidMissionRewards(mission, 1)
+
+      // 1000 starting + (6000 actual + 1000 bonus) = 8000 — same as the binary path
+      expect(loadProfile()!.credits).toBe(8000)
+    })
+
+    it('sums multiple objectives with mixed quality and applies the multiplier', () => {
+      const mission: GeneratedAsteroidMission = {
+        ...BASE_MISSION,
+        objectives: [
+          { type: 'gather', x: 0, z: 0, resourceAmount: 100, reward: 1000 },
+          {
+            type: 'dan',
+            x: 0,
+            z: 0,
+            scanDurationSeconds: 45,
+            requiredParticleHits: 50,
+            enemyGraceSeconds: 9,
+            particleTier: 'medium',
+            enemyTier: 'medium',
+            reward: 4000,
+            rewardMin: 1000,
+            actualReward: 3000, // 50% above floor → mid-quality
+          },
+        ],
+        totalReward: 5500, // 1000 + 4000 + 500 completion bonus
+      }
+
+      persistCompletedAsteroidMissionRewards(mission, 2)
+
+      // earned = 1000 + 3000 = 4000, plus 500 bonus, ×2 = 9000. Starting 1000 → 10000.
+      expect(loadProfile()!.credits).toBe(10000)
+    })
+  })
+
   it('adds collect rewards to shuttle inventory', () => {
     const mission: GeneratedAsteroidMission = {
       ...BASE_MISSION,

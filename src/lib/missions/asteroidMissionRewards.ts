@@ -44,7 +44,20 @@ export function persistCompletedAsteroidMissionRewards(
 
   const profile = loadProfile()
   if (profile) {
-    const credits = Math.round(mission.totalReward * rewardMultiplier)
+    /**
+     * Substitute per-objective `actualReward` (set by partial-credit minigames like DAN)
+     * for the rolled `reward` while preserving the completion bonus baked into
+     * `mission.totalReward = sum(reward) + completionBonus` at generation time.
+     * Backing the bonus out of the difference is correct because no objective is
+     * allowed to overpay above its rolled `reward`.
+     */
+    const rolledObjectiveTotal = mission.objectives.reduce((sum, o) => sum + o.reward, 0)
+    const completionBonus = mission.totalReward - rolledObjectiveTotal
+    const earnedObjectiveTotal = mission.objectives.reduce(
+      (sum, o) => sum + (o.actualReward ?? o.reward),
+      0,
+    )
+    const credits = Math.round((earnedObjectiveTotal + completionBonus) * rewardMultiplier)
     let next = addCredits(profile, credits)
     next = recordMissionComplete(next)
     next = recordAsteroidVisit(next, mission.asteroidId)
