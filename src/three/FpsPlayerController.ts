@@ -18,7 +18,11 @@ import { PlatformerBody } from '@/lib/physics/platformerBody'
 import { ThrusterSystem } from '@/lib/physics/thrusterSystem'
 import type { ThrusterSystemConfig } from '@/lib/physics/thrusterSystem'
 import type { Heightmap } from '@/lib/terrain/heightmap'
-import { CollisionWorld, type CharacterCollisionConfig } from '@/lib/physics/worldCollision'
+import {
+  CollisionWorld,
+  type CharacterCollisionConfig,
+  type SupportSurfaceResult,
+} from '@/lib/physics/worldCollision'
 
 /** How long after leaving the ground the player can still jump (coyote time). */
 const COYOTE_TIME = 0.15
@@ -246,6 +250,15 @@ export class FpsPlayerController implements Tickable {
   private bootsGrounded = false
   /** Short grace window so tiny support ambiguity does not flicker grounded state. */
   private bootsGraceTimer = 0
+
+  /**
+   * When set, overrides the collision-world ground sampler in `tick()` —
+   * the player walks on a flat plane at this world Y. Used by the level
+   * controller during `bunker-interior` to bypass the asteroid heightmap
+   * (which doesn't model the bunker floor). Set to `null` to restore
+   * normal terrain-driven ground sampling.
+   */
+  private groundYOverride: number | null = null
 
   /** Fired when health reaches zero. */
   onDeath: (() => void) | null = null
@@ -650,13 +663,20 @@ export class FpsPlayerController implements Tickable {
     this.group.position.z = horizontalMove.z
 
     // --- Gravity + grounding ---
-    const support = this.collisionWorld.getHighestSupportUnderDisc(
-      this.group.position.x,
-      this.group.position.z,
-      this.group.position.y - PLAYER_COLLISION_CONFIG.airborneClearance,
-      this.group.position.y + PLAYER_COLLISION_CONFIG.maxStepHeight,
-      PLAYER_COLLISION_CONFIG.radius,
-    )
+    const support: SupportSurfaceResult =
+      this.groundYOverride !== null
+        ? {
+            height: this.groundYOverride,
+            normal: { x: 0, y: 1, z: 0 },
+            colliderId: null,
+          }
+        : this.collisionWorld.getHighestSupportUnderDisc(
+            this.group.position.x,
+            this.group.position.z,
+            this.group.position.y - PLAYER_COLLISION_CONFIG.airborneClearance,
+            this.group.position.y + PLAYER_COLLISION_CONFIG.maxStepHeight,
+            PLAYER_COLLISION_CONFIG.radius,
+          )
     const wantsMovementBoots = wishLen > 0 && this.knockbackTimer <= 0
     const shouldBreakBoots =
       canJump ||
@@ -713,6 +733,16 @@ export class FpsPlayerController implements Tickable {
   private breakGravityBoots(): void {
     this.bootsGrounded = false
     this.bootsGraceTimer = 0
+  }
+
+  /**
+   * Override the ground Y the player physics samples each tick. Pass `null`
+   * to restore terrain-based ground sampling.
+   *
+   * @param y - World Y of the override floor, or null to clear
+   */
+  setGroundYOverride(y: number | null): void {
+    this.groundYOverride = y
   }
 
   /** Release resources. No owned listeners — pointer lock handled by ViewController. */

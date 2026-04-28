@@ -31,8 +31,14 @@ import {
   type BunkerWaveTier,
 } from '@/lib/bunker/bunkerWaveSchedule'
 
-/** XZ distance threshold (world units) for surface-hatch interaction prompt. */
-const SURFACE_HATCH_INTERACT_RANGE = 2.5
+/**
+ * XZ-distance from the surface hatch within which the descent prompt fires.
+ * Matches the waypoint ring radius drawn on the asteroid surface
+ * (`WaypointMarkers.layout.ringRadius = 12`) so the interact range agrees
+ * with the visual cue. Indoor doors stay tight (see
+ * {@link ARENA_DOOR_INTERACT_RANGE} and {@link EXIT_HATCH_INTERACT_RANGE}).
+ */
+const SURFACE_HATCH_INTERACT_RANGE = 12
 /** XZ distance threshold (world units) for the antechamber arena door. */
 const ARENA_DOOR_INTERACT_RANGE = 2.5
 /** XZ distance threshold (world units) for the antechamber exit hatch. */

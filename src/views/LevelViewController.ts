@@ -1501,6 +1501,10 @@ export class LevelViewController implements Tickable {
       if (this.surfaceRocks) this.surfaceRocks.group.visible = false
       minigame.setSceneRootWorldPosition(descentPos.x, descentPos.y, descentPos.z)
       minigame.notifyDescended()
+      // The bunker antechamber's floor sits at the bunker root, which equals
+      // `descentPos.y`. Override the player's ground sampler so the asteroid
+      // heightmap (which doesn't model the interior) doesn't leak through.
+      this.playerController?.setGroundYOverride(descentPos.y)
       const spawn = minigame.playerSpawn
       if (spawn && this.playerController) {
         // playerSpawn is in bunker-local coords; adding the descent position
@@ -1537,6 +1541,8 @@ export class LevelViewController implements Tickable {
         this.playerController.group.position.copy(restore)
         this.playerController.body.velocityY = 0
       }
+      // Restore terrain-based ground sampling now we're back on the surface.
+      this.playerController?.setGroundYOverride(null)
       this.surfacePlayerSnapshot = null
       this.stateMachine?.trigger('exitBunker')
     })
