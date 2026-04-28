@@ -257,6 +257,9 @@ export class LevelMinigameFacade {
         minigame.onScanAudioState = bindings.onDanScanAudioState
         minigame.onParticleHit = bindings.onDanParticleHit
         minigame.onCompletionPulse = bindings.onDanCompletionPulse
+        // Viroid contact damage flows through the standard combat damage pipe
+        // so the lander HUD's red flash + knockback feedback fires.
+        minigame.onDamagePlayer = bindings.onDamagePlayer
         objectiveColliders.push(...(minigame.worldColliders ?? []))
         this.add(minigame)
       } else if (objective.type === 'exterminate') {

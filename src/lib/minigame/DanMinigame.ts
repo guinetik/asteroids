@@ -28,6 +28,8 @@ import type { WorldCollider } from '@/lib/physics/worldCollision'
 import type { DanCraterPlacement } from '@/lib/level/danCraterPlacement'
 import { TerminalModel, TERMINAL_INTERACT_RANGE } from '@/three/TerminalModel'
 import { DanScanController } from '@/three/DanScanController'
+import { EnemyDirector, type EnemyHandle } from '@/lib/fps/enemyDirector'
+import { BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/BacteriophageController'
 
 /** Default DAN scan duration when the objective omits it. Seconds. */
 const DEFAULT_DAN_SCAN_DURATION_SECONDS = 45
@@ -68,6 +70,42 @@ export const DAN_LANDER_TO_TERMINAL_MAX_DISTANCE = 30
 
 /** HUD prompt shown at the terminal when the lander is parked too far away. */
 const DAN_INSTRUCTION_PARK_LANDER = 'PARK LANDER NEAR DAN TERMINAL'
+
+/**
+ * Per-tier viroid spawn budget. The DAN scan attracts a small number of
+ * viroids over the course of the window — atmosphere/pressure rather than
+ * a full combat encounter. `zeroChance` lets some scans resolve clean
+ * (no spawns at all) so the tension feels rolled rather than scripted.
+ */
+interface DanSpawnBudget {
+  /** Min/max enemies rolled when a non-zero spawn budget hits. */
+  countRange: [number, number]
+  /** Probability the encounter rolls a flat zero (no viroids). */
+  zeroChance: number
+}
+
+/** Spawn budget presets keyed on the objective's enemyTier. */
+const DAN_SPAWN_BUDGET_BY_TIER: Record<DanPressureTier, DanSpawnBudget> = {
+  low: { countRange: [1, 2], zeroChance: 0.4 },
+  medium: { countRange: [2, 3], zeroChance: 0.25 },
+  high: { countRange: [3, 4], zeroChance: 0.1 },
+}
+
+/**
+ * Multiplier applied to crater radius when picking a viroid spawn point on
+ * the rim. Slightly outside the bowl so viroids descend toward the player
+ * rather than spawning right on top of them.
+ */
+const DAN_VIROID_RIM_RADIUS_MULTIPLIER = 1.05
+
+/** Earliest fraction of the scan window where viroid spawns can begin (after grace). */
+const DAN_VIROID_SPAWN_WINDOW_START_FRACTION = 0.25
+
+/**
+ * Latest fraction of the scan window where viroid spawns can end. Late
+ * spawns are unfair — leaves no time to engage before the timer closes.
+ */
+const DAN_VIROID_SPAWN_WINDOW_END_FRACTION = 0.85
 
 /** Terminal X offset from the crater center, matching photometry's footprint. */
 const TERMINAL_OFFSET_X = 14
@@ -255,9 +293,25 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
   readonly worldColliders: readonly WorldCollider[]
 
   private scanController: DanScanController | null = null
+  private readonly enemyDirector = new EnemyDirector()
+  private readonly viroidControllers = new Map<number, BacteriophageController>()
+  /** Sorted seconds-into-scan when the next viroid spawn fires. */
+  private spawnSchedule: number[] = []
+  /** Mulberry32 state — seeded from mission seed so spawn rolls stay deterministic per run. */
+  private rngState: number
 
   /** Refuel callback — called when the scan starts, mirrors photometry. */
   onRefuel: (() => void) | null = null
+
+  /** Damage routing — fires when a viroid contacts the EVA player. */
+  onDamagePlayer:
+    | ((
+        damage: number,
+        sourceX: number,
+        sourceZ: number,
+        source?: 'projectile' | 'contact' | 'hazard',
+      ) => void)
+    | null = null
 
   /** Register a transient tickable owned by this minigame (the scan controller). */
   onRegisterTickable: ((tickable: Tickable) => void) | null = null
@@ -309,6 +363,15 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
     this.terminal.placeAt(terminalX, terminalY, craterZ)
     this.worldColliders = [this.terminal.createWorldCollider(`dan-terminal-${params.objectiveIndex}`)]
     this.scene.add(this.terminal.group)
+
+    this.rngState = Math.max(1, Math.floor(params.seed + params.objectiveIndex) | 0)
+
+    // Viroid contact damage routes through the standard combat damage pipe so
+    // the level controller's existing red-flash + knockback feedback fires.
+    this.enemyDirector.onContactDamage = (handle, damage) => {
+      if (!handle.enemy.alive) return
+      this.onDamagePlayer?.(damage, handle.enemy.position.x, handle.enemy.position.z, 'contact')
+    }
   }
 
   /** Current minigame status — collapses scan + awaiting-delivery into `'active'`. */
@@ -455,7 +518,36 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
     })
     this.scanController.beginScan()
     this.onRegisterTickable?.(this.scanController)
+    this.scheduleViroidSpawns()
     this.emitScanAudio(true)
+  }
+
+  /**
+   * Roll a viroid spawn budget for this scan and distribute spawn times across
+   * the back ~60% of the window. Some scans roll zero — keeps the encounter
+   * tense without scripting every run identically.
+   */
+  private scheduleViroidSpawns(): void {
+    this.spawnSchedule = []
+    const enemyTier: DanPressureTier = this.objective.enemyTier ?? 'medium'
+    const budget = DAN_SPAWN_BUDGET_BY_TIER[enemyTier]
+    if (this.rng() < budget.zeroChance) return
+
+    const [minCount, maxCount] = budget.countRange
+    const count = minCount + Math.floor(this.rng() * (maxCount - minCount + 1))
+    if (count <= 0) return
+
+    const windowStart = Math.max(
+      this.graceSeconds,
+      this.scanDuration * DAN_VIROID_SPAWN_WINDOW_START_FRACTION,
+    )
+    const windowEnd = this.scanDuration * DAN_VIROID_SPAWN_WINDOW_END_FRACTION
+    if (windowEnd <= windowStart) return
+
+    for (let i = 0; i < count; i++) {
+      this.spawnSchedule.push(windowStart + this.rng() * (windowEnd - windowStart))
+    }
+    this.spawnSchedule.sort((a, b) => a - b)
   }
 
   /**
@@ -539,6 +631,69 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
     if (ctx.landerPosition) {
       this.scanController?.setLanderAnchor(ctx.landerPosition, ctx.landerUp ?? null)
     }
+
+    this.tickViroidSpawns(dt, ctx)
+  }
+
+  /** Fire any scheduled spawns whose time has come, then tick the director. */
+  private tickViroidSpawns(dt: number, ctx: MiniGameContext): void {
+    const elapsedScan = this.scanDuration - this._timeRemaining
+    while (this.spawnSchedule.length > 0 && this.spawnSchedule[0]! <= elapsedScan) {
+      this.spawnSchedule.shift()
+      this.spawnViroidAtRim()
+    }
+
+    if (ctx.playerPosition) {
+      this.enemyDirector.setPlayerPosition(
+        ctx.playerPosition.x,
+        ctx.playerPosition.y,
+        ctx.playerPosition.z,
+      )
+    }
+    this.enemyDirector.tick(dt)
+
+    for (const handle of this.enemyDirector.enemies) {
+      this.syncViroidController(handle, dt)
+    }
+  }
+
+  /** Spawn one bacteriophage viroid on the crater rim and wire it up. */
+  private spawnViroidAtRim(): void {
+    const angle = this.rng() * Math.PI * 2
+    const r = this.placement.crater.radius * DAN_VIROID_RIM_RADIUS_MULTIPLIER
+    const x = this.placement.crater.x + Math.cos(angle) * r
+    const z = this.placement.crater.z + Math.sin(angle) * r
+    const groundY = this.heightmap.heightAt(x, z)
+    const handle = this.enemyDirector.spawn('bacteriophage', x, groundY, z)
+    this.projectileSystem.addEnemy(handle.enemy)
+    const ctrl = new BacteriophageController(handle.enemy)
+    ctrl.group.position.set(x, groundY, z)
+    this.scene.add(ctrl.group)
+    this.viroidControllers.set(handle.id, ctrl)
+  }
+
+  /** Sync one viroid's visual controller to its director state; despawn on death. */
+  private syncViroidController(handle: EnemyHandle, dt: number): void {
+    const ctrl = this.viroidControllers.get(handle.id)
+    if (!ctrl) return
+    if (ctrl.deathComplete) {
+      ctrl.group.removeFromParent()
+      ctrl.dispose()
+      this.projectileSystem.removeEnemy(handle.enemy)
+      this.enemyDirector.despawn(handle)
+      this.viroidControllers.delete(handle.id)
+      return
+    }
+    if (handle.enemy.alive) {
+      ctrl.isMoving = handle.lastOutput.isMoving
+      ctrl.isAgitated = handle.lastOutput.isAgitated
+      ctrl.group.position.x = handle.enemy.position.x
+      ctrl.group.position.z = handle.enemy.position.z
+      const groundY = this.heightmap.heightAt(handle.enemy.position.x, handle.enemy.position.z)
+      ctrl.group.position.y = groundY
+      handle.enemy.position.y = groundY + PHAGE_HIT_CENTER_Y
+    }
+    ctrl.tick(dt)
   }
 
   /** Drive the EVA terminal proximity prompt + interact handling. */
@@ -633,6 +788,33 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
     this.onUnregisterTickable?.(this.scanController)
     this.scanController.dispose()
     this.scanController = null
+    this.cleanupViroids()
+  }
+
+  /** Despawn all viroids and dispose their controllers. */
+  private cleanupViroids(): void {
+    for (const ctrl of this.viroidControllers.values()) {
+      ctrl.group.removeFromParent()
+      ctrl.dispose()
+    }
+    // Pull each enemy out of the projectile registry before the director
+    // resets its handle list — `despawnAll` clears positions in place, so
+    // walk a snapshot of enemy refs first.
+    const enemyRefs = this.enemyDirector.enemies.map((handle) => handle.enemy)
+    for (const enemy of enemyRefs) {
+      this.projectileSystem.removeEnemy(enemy)
+    }
+    this.enemyDirector.despawnAll()
+    this.viroidControllers.clear()
+    this.spawnSchedule = []
+  }
+
+  /** Mulberry32 — small deterministic RNG seeded from the mission seed. */
+  private rng(): number {
+    let state = (this.rngState += 0x6d2b79f5)
+    state = Math.imul(state ^ (state >>> 15), state | 1)
+    state ^= state + Math.imul(state ^ (state >>> 7), state | 61)
+    return ((state ^ (state >>> 14)) >>> 0) / 4294967296
   }
 
   /** Emit a scan audio frame keyed on whether the beam should be audible. */
