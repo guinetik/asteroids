@@ -1469,6 +1469,20 @@ export class LevelViewController implements Tickable {
   // ═══════════════════════════════════════════════════════════════
 
   /**
+   * Look up the currently-active {@link BunkerMinigame}, if one exists.
+   * Returns `null` when the active minigame is some other type (rescue,
+   * exterminate, etc.) or when no minigame is active. Used by the per-frame
+   * tick to read bunker-specific state (e.g. {@link BunkerMinigame.bunkerFloorY})
+   * without the call site needing to know about the minigame facade shape.
+   *
+   * @returns Active bunker minigame, or `null`.
+   */
+  private getActiveBunkerMinigame(): BunkerMinigame | null {
+    const active = this.minigames.getActive()
+    return active instanceof BunkerMinigame ? active : null
+  }
+
+  /**
    * Player pressed E on the surface hatch within range. Snapshot the player
    * position, fade to black, swap to the bunker scene at peak black, fade
    * back in. Wired by {@link BunkerMinigame.onDescend}.
@@ -1850,6 +1864,20 @@ export class LevelViewController implements Tickable {
     // EVA + bunker share the FPS player tick (movement, tools, camera, audio).
     if (this.stateMachine?.is('eva') || this.stateMachine?.is('bunker-interior')) {
       this.tickEva(dt)
+
+      // While inside the bunker, the asteroid heightmap doesn't model the
+      // bunker floor — the player would sink or float at the heightfield
+      // value sampled at the bunker's world XZ. Pin the player's foot to
+      // the bunker antechamber floor while `bunker-interior` is active.
+      // This loses any in-bunker vertical movement, but slice 1 has no
+      // vertical bunker geometry so the clamp is correct.
+      if (this.stateMachine?.is('bunker-interior') && this.playerController) {
+        const bunkerMinigame = this.getActiveBunkerMinigame()
+        const floorY = bunkerMinigame?.bunkerFloorY
+        if (floorY !== null && floorY !== undefined) {
+          this.playerController.group.position.y = floorY
+        }
+      }
 
       // Hypoxia visual — fade + pulse when O2 is empty and HP is draining
       this.onDeathFade?.(

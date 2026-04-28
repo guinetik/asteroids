@@ -228,6 +228,18 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
     return this.scene?.playerSpawn ?? null
   }
 
+  /**
+   * Y-coordinate of the bunker antechamber's floor in world space. Used by
+   * the level controller to clamp the player's foot position while inside
+   * `bunker-interior` — the asteroid heightmap doesn't model the bunker
+   * floor, so without this clamp the player would sink or float at the
+   * heightfield value for the bunker's world XZ. Returns `null` in test
+   * seams without a scene.
+   */
+  get bunkerFloorY(): number | null {
+    return this.scene?.floorY ?? null
+  }
+
   /** Currently-active wave index (zero-based) — for HUD. */
   get currentWaveIndex(): number {
     return this.state.currentWaveIndex

@@ -87,6 +87,17 @@ export class BunkerSceneController {
     return this.geometry.playerSpawn
   }
 
+  /**
+   * World-space Y of the antechamber floor's top surface. The floor mesh is
+   * centered at `-WALL_THICKNESS / 2` with a thickness of `WALL_THICKNESS`,
+   * so the walkable surface sits at `root.y + 0`. Used by the level view to
+   * clamp the player's foot position while inside `bunker-interior` (the
+   * asteroid heightmap doesn't model the bunker floor).
+   */
+  get floorY(): number {
+    return this.geometry.root.position.y
+  }
+
   /** XZ center of the antechamber's exit hatch (for interaction range checks). */
   get hatchPosition(): { x: number; z: number } {
     return this.geometry.antechamberHatch
