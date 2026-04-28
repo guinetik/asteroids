@@ -119,6 +119,21 @@ export interface MineableRockEntry {
   radius: number
 }
 
+/**
+ * Sphere registration for a DAN neutron particle. Mirrors {@link MineableRockEntry}
+ * but is checked only by science bolts and despawned on hit.
+ */
+export interface DanParticleEntry {
+  /** Pool slot index (also used by `DanScanController` for despawn). */
+  spawnIndex: number
+  /** Sphere center in world space. */
+  cx: number
+  cy: number
+  cz: number
+  /** Sphere radius for swept collision. */
+  radius: number
+}
+
 /** Internal projectile state. */
 interface Projectile {
   mesh: THREE.Mesh
@@ -150,6 +165,7 @@ export class ProjectileSystem implements Tickable {
   private readonly enemies: Enemy[] = []
   private readonly hostages: Hostage[] = []
   private readonly rocks: MineableRockEntry[] = []
+  private readonly danParticles: DanParticleEntry[] = []
   private terrainCollisionEnabled = true
   private lander: LanderController | null = null
   private mapEvaShuttleHullHeal: MapEvaShuttleHullHealTarget | null = null
@@ -305,6 +321,27 @@ export class ProjectileSystem implements Tickable {
   removeRock(spawnIndex: number): void {
     const idx = this.rocks.findIndex((r) => r.spawnIndex === spawnIndex)
     if (idx >= 0) this.rocks.splice(idx, 1)
+  }
+
+  /**
+   * Register a DAN neutron particle for science-bolt collision. Particles
+   * spawn from a DAN crater bowl and despawn on capture or lifetime expiry.
+   *
+   * @param entry - Sphere registration matching the visual particle.
+   */
+  addDanParticle(entry: DanParticleEntry): void {
+    this.danParticles.push(entry)
+  }
+
+  /**
+   * Unregister a DAN neutron particle by spawn index. Safe to call if the
+   * particle was never registered or was already removed.
+   *
+   * @param spawnIndex - Pool slot index originally registered.
+   */
+  removeDanParticle(spawnIndex: number): void {
+    const idx = this.danParticles.findIndex((p) => p.spawnIndex === spawnIndex)
+    if (idx >= 0) this.danParticles.splice(idx, 1)
   }
 
   /** Register the lander for science bolt healing detection (green hull pulse). */

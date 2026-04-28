@@ -1,0 +1,567 @@
+/**
+ * DAN runtime encounter minigame.
+ *
+ * Land at a real crater, interact with the terminal to start a 45-second
+ * neutron scan, capture neutron returns with the SCI multitool while LASER
+ * defends the parked lander from viroid pressure, then walk back to the
+ * terminal to deliver telemetry. Mirrors {@link PhotometryMinigame}'s
+ * "deliver to terminal" pattern with partial-credit rewards interpolated
+ * by capture quality.
+ *
+ * @author guinetik
+ * @date 2026-04-28
+ * @spec docs/superpowers/specs/2026-04-27-dan-mission-design.md
+ */
+import * as THREE from 'three'
+import type { Tickable } from '@/lib/Tickable'
+import type {
+  MiniGame,
+  MiniGameStatus,
+  MiniGameContext,
+  MiniGameEvents,
+  MiniGameStep,
+} from './MiniGame'
+import type { ConcreteObjective, DanPressureTier } from '@/lib/missions/types'
+import type { Heightmap } from '@/lib/terrain/heightmap'
+import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
+import type { WorldCollider } from '@/lib/physics/worldCollision'
+import type { DanCraterPlacement } from '@/lib/level/danCraterPlacement'
+import { TerminalModel, TERMINAL_INTERACT_RANGE } from '@/three/TerminalModel'
+import { DanScanController } from '@/three/DanScanController'
+
+/** Default DAN scan duration when the objective omits it. Seconds. */
+const DEFAULT_DAN_SCAN_DURATION_SECONDS = 45
+
+/** Default required particle hits when the objective omits it. */
+const DEFAULT_DAN_REQUIRED_PARTICLE_HITS = 50
+
+/** Default grace seconds before viroid pressure begins after scan activation. */
+const DEFAULT_DAN_ENEMY_GRACE_SECONDS = 9
+
+/**
+ * Minimum capture ratio (0–1) for a DAN delivery to count as completion.
+ * Below this floor the scan fails with `'no-data-captured'` and the player
+ * can retry from the terminal — preserves a quality floor so a no-fire
+ * walk-back does not award the rewardMin floor.
+ */
+export const DAN_MIN_QUALITY_FOR_COMPLETION = 0.05
+
+/** Terminal X offset from the crater center, matching photometry's footprint. */
+const TERMINAL_OFFSET_X = 14
+
+/** HUD instruction shown before the scan starts. */
+const DAN_INSTRUCTION_PRESCAN = '[E] START DAN SCAN'
+
+/** HUD instruction shown while the scan window is active. */
+const DAN_INSTRUCTION_SCAN_RUNNING = 'CAPTURE NEUTRON RETURNS'
+
+/** HUD instruction shown after the scan window closes, before delivery. */
+const DAN_INSTRUCTION_RETURN_TELEMETRY = 'RETURN DAN TELEMETRY TO TERMINAL'
+
+/** EVA terminal prompt shown when ready to deliver. */
+const DAN_INSTRUCTION_DELIVER = '[E] DELIVER DAN TELEMETRY'
+
+/** EVA terminal prompt shown after a failure that permits a retry. */
+const DAN_INSTRUCTION_RETRY = '[E] RETRY DAN SCAN'
+
+/** Failure cause exposed by the minigame. */
+export type DanFailureReason = 'lander-destroyed' | 'player-died' | 'no-data-captured'
+
+/**
+ * Internal phase tracking inside `DanMinigame`. Public `MiniGameStatus`
+ * collapses `scanning` and `awaiting-delivery` into `'active'` because the
+ * shared base interface does not model the post-window walk-back.
+ */
+type DanPhase = 'idle' | 'scanning' | 'awaiting-delivery' | 'completed' | 'failed'
+
+/**
+ * Audio frame emitted by {@link DanMinigame.onScanAudioState} so the level
+ * audio director can drive the scan hum and pulse cues.
+ *
+ * @author guinetik
+ * @date 2026-04-28
+ */
+export interface DanScanAudioState {
+  /** True while the scan beam is rendered (active or fading out). */
+  visible: boolean
+  /** Capture progress fraction in `[0, 1]`. */
+  intensity: number
+  /** Estimated particle spawn rate in particles per second. */
+  particleSpawnRate: number
+}
+
+/**
+ * Tuning bundle for one DAN pressure tier. Drives particle pacing in the
+ * scan controller and enemy spawn pacing in the level director.
+ *
+ * @author guinetik
+ * @date 2026-04-28
+ */
+export interface DanTierTuning {
+  /** Probability per tick interval that a single particle spawns. `[0, 1]`. */
+  particleSpawnProbability: number
+  /** Independent probability per tick that an extra burst (2 particles) spawns. `[0, 1]`. */
+  particleBurstChance: number
+  /** Lower bound of particle initial speed in world units/sec. */
+  particleSpeedMin: number
+  /** Upper bound of particle initial speed in world units/sec. */
+  particleSpeedMax: number
+  /** Lower bound of particle lifetime in seconds. */
+  particleLifetimeMin: number
+  /** Upper bound of particle lifetime in seconds. */
+  particleLifetimeMax: number
+  /** Tick cadence for spawn rolls, in seconds. */
+  tickIntervalSeconds: number
+  /** Probability per enemy roll interval that a viroid spawns (after grace). `[0, 1]`. */
+  enemySpawnProbability: number
+}
+
+/** Fixed tier presets for DAN particle + enemy pressure. */
+export const DAN_TIER_TUNING: Record<DanPressureTier, DanTierTuning> = {
+  low: {
+    particleSpawnProbability: 0.45,
+    particleBurstChance: 0.1,
+    particleSpeedMin: 8,
+    particleSpeedMax: 14,
+    particleLifetimeMin: 1.6,
+    particleLifetimeMax: 2.4,
+    tickIntervalSeconds: 0.3,
+    enemySpawnProbability: 0.15,
+  },
+  medium: {
+    particleSpawnProbability: 0.65,
+    particleBurstChance: 0.18,
+    particleSpeedMin: 10,
+    particleSpeedMax: 18,
+    particleLifetimeMin: 1.5,
+    particleLifetimeMax: 2.3,
+    tickIntervalSeconds: 0.25,
+    enemySpawnProbability: 0.28,
+  },
+  high: {
+    particleSpawnProbability: 0.85,
+    particleBurstChance: 0.32,
+    particleSpeedMin: 12,
+    particleSpeedMax: 22,
+    particleLifetimeMin: 1.4,
+    particleLifetimeMax: 2.1,
+    tickIntervalSeconds: 0.2,
+    enemySpawnProbability: 0.45,
+  },
+}
+
+/**
+ * Constructor parameters for {@link DanMinigame}. Mirrors photometry but
+ * threads the crater placement chosen at level boot so the encounter knows
+ * where to anchor the terminal, scan beam, and particle bowl.
+ *
+ * @author guinetik
+ * @date 2026-04-28
+ */
+export interface DanMinigameInitParams {
+  /** Mission objective index in the parent mission. */
+  objectiveIndex: number
+  /** Concrete DAN objective (must have `type === 'dan'`). */
+  objective: ConcreteObjective
+  /** Three.js scene receiving the terminal and scan visuals. */
+  scene: THREE.Scene
+  /** Heightmap used to ground the terminal and sample the bowl floor. */
+  heightmap: Heightmap
+  /** Crater placement chosen by `chooseDanCraterPlacement` at level boot. */
+  craterPlacement: DanCraterPlacement
+  /** Player projectile system used by particle hit registration. */
+  projectileSystem: ProjectileSystem
+  /** Deterministic mission seed for spawn jitter. */
+  seed: number
+}
+
+/**
+ * DAN runtime encounter state machine.
+ *
+ * Phases: `idle → active → awaitingDelivery → completed`, with `failed`
+ * branches off `active`/`awaitingDelivery`. Failure permits retry from the
+ * terminal mirroring photometry's `[E] RETRY` flow.
+ *
+ * @author guinetik
+ * @date 2026-04-28
+ */
+export class DanMinigame implements MiniGame, MiniGameEvents {
+  readonly objectiveIndex: number
+
+  private _phase: DanPhase = 'idle'
+  private _timeRemaining: number
+  private _isPlayerNear = false
+  private particleHits = 0
+  private readonly requiredHits: number
+  private readonly scanDuration: number
+  private readonly graceSeconds: number
+  private graceRemaining = 0
+  private failureReason: DanFailureReason | null = null
+  private readonly _steps: MiniGameStep[] = [
+    { label: 'Locate the terminal', complete: false, active: true },
+    { label: 'Start the DAN scan', complete: false, active: false },
+    { label: 'Capture neutron returns', complete: false, active: false },
+    { label: 'Return DAN telemetry', complete: false, active: false },
+  ]
+
+  private readonly objective: ConcreteObjective
+  private readonly scene: THREE.Scene
+  private readonly heightmap: Heightmap
+  private readonly projectileSystem: ProjectileSystem
+  private readonly seed: number
+  private readonly placement: DanCraterPlacement
+  private readonly tuning: DanTierTuning
+  private readonly terminal: TerminalModel
+  /** Static collision volumes owned by this DAN objective. */
+  readonly worldColliders: readonly WorldCollider[]
+
+  private scanController: DanScanController | null = null
+
+  /** Refuel callback — called when the scan starts, mirrors photometry. */
+  onRefuel: (() => void) | null = null
+
+  /** Register a transient tickable owned by this minigame (the scan controller). */
+  onRegisterTickable: ((tickable: Tickable) => void) | null = null
+
+  /** Unregister the scan controller tickable when scanning ends. */
+  onUnregisterTickable: ((tickable: Tickable) => void) | null = null
+
+  /** Audio sink for the procedural DAN scan hum. */
+  onScanAudioState: ((state: DanScanAudioState) => void) | null = null
+
+  /** One-shot cue fired each time SCI bolts capture a neutron particle. */
+  onParticleHit: (() => void) | null = null
+
+  /** One-shot cue fired when delivery succeeds and the completion pulse triggers. */
+  onCompletionPulse: (() => void) | null = null
+
+  // ── MiniGameEvents ──────────────────────────────────────────
+  onPrompt: ((text: string | null) => void) | null = null
+  onComplete: ((objectiveIndex: number) => void) | null = null
+  onStepChange: ((objectiveIndex: number, steps: readonly MiniGameStep[]) => void) | null = null
+
+  /**
+   * Construct a DAN encounter for one objective.
+   *
+   * @param params - Mission objective + scene + crater context.
+   */
+  constructor(params: DanMinigameInitParams) {
+    this.objectiveIndex = params.objectiveIndex
+    this.objective = params.objective
+    this.scene = params.scene
+    this.heightmap = params.heightmap
+    this.placement = params.craterPlacement
+    this.projectileSystem = params.projectileSystem
+    this.seed = params.seed
+    const particleTier: DanPressureTier = params.objective.particleTier ?? 'medium'
+    this.tuning = DAN_TIER_TUNING[particleTier]
+    this.scanDuration = params.objective.scanDurationSeconds ?? DEFAULT_DAN_SCAN_DURATION_SECONDS
+    this.requiredHits = params.objective.requiredParticleHits ?? DEFAULT_DAN_REQUIRED_PARTICLE_HITS
+    this.graceSeconds = params.objective.enemyGraceSeconds ?? DEFAULT_DAN_ENEMY_GRACE_SECONDS
+    this._timeRemaining = this.scanDuration
+
+    // Place the terminal a short walk from the crater center so the player has
+    // a clear sightline to the bowl while interacting.
+    const craterX = params.craterPlacement.crater.x
+    const craterZ = params.craterPlacement.crater.z
+    const terminalX = craterX + TERMINAL_OFFSET_X
+    const terminalY = params.heightmap.heightAt(terminalX, craterZ)
+    this.terminal = new TerminalModel()
+    this.terminal.placeAt(terminalX, terminalY, craterZ)
+    this.worldColliders = [this.terminal.createWorldCollider(`dan-terminal-${params.objectiveIndex}`)]
+    this.scene.add(this.terminal.group)
+  }
+
+  /** Current minigame status — collapses scan + awaiting-delivery into `'active'`. */
+  get status(): MiniGameStatus {
+    if (this._phase === 'idle') return 'idle'
+    if (this._phase === 'completed') return 'completed'
+    if (this._phase === 'failed') return 'failed'
+    return 'active'
+  }
+
+  /** Internal phase, exposed for tests and the level controller. */
+  get phase(): DanPhase {
+    return this._phase
+  }
+
+  /** Whether the post-window walk-back is in progress. */
+  get isAwaitingDelivery(): boolean {
+    return this._phase === 'awaiting-delivery'
+  }
+
+  /** True while the EVA player is within terminal interaction range. */
+  get isPlayerNearInteraction(): boolean {
+    return this._isPlayerNear
+  }
+
+  /**
+   * Time remaining in the active scan window, in seconds. Becomes `null` once
+   * the window closes (transition to `awaiting-delivery`).
+   */
+  get timeRemaining(): number | null {
+    return this._phase === 'scanning' ? this._timeRemaining : null
+  }
+
+  /** Particle capture count, exposed via the shared `survey*` HUD field. */
+  get progressCurrent(): number | null {
+    if (this._phase === 'idle' || this._phase === 'completed') return null
+    return this.particleHits
+  }
+
+  /** Required particle hits, exposed via the shared `survey*` HUD field. */
+  get progressTotal(): number | null {
+    if (this._phase === 'idle' || this._phase === 'completed') return null
+    return this.requiredHits
+  }
+
+  /** Ordered tracker steps. */
+  get steps(): readonly MiniGameStep[] {
+    return this._steps
+  }
+
+  /** Short instruction shown in the lander HUD while the encounter runs. */
+  get missionInstruction(): string | null {
+    if (this._phase === 'idle' || this._phase === 'completed') return null
+    if (this._phase === 'failed') {
+      return this.failureReason === 'no-data-captured'
+        ? DAN_INSTRUCTION_RETRY.replace('[E] ', '')
+        : null
+    }
+    if (this._phase === 'scanning') return DAN_INSTRUCTION_SCAN_RUNNING
+    return DAN_INSTRUCTION_RETURN_TELEMETRY
+  }
+
+  /** Retrieve the recorded failure reason, or `null` if none. */
+  get failure(): DanFailureReason | null {
+    return this.failureReason
+  }
+
+  /**
+   * True while viroid pressure should be active — after the grace window has
+   * expired and before the scan window closes. The level controller polls
+   * this each frame to drive the enemy director.
+   */
+  get shouldSpawnEnemies(): boolean {
+    return this._phase === 'scanning' && this.graceRemaining <= 0
+  }
+
+  /** Grace time remaining before viroid spawns can begin. */
+  get enemyGraceRemaining(): number {
+    return this.graceRemaining
+  }
+
+  /** Underlying scan controller — exposed so the level controller can wire callbacks. */
+  get controller(): DanScanController | null {
+    return this.scanController
+  }
+
+  /**
+   * Per-frame update.
+   *
+   * @param dt - Delta time in seconds.
+   * @param ctx - Shared minigame frame context from the level controller.
+   */
+  tick(dt: number, ctx: MiniGameContext): void {
+    this.terminal.tick(dt)
+
+    if (this._phase === 'scanning') {
+      this.tickActive(dt, ctx)
+    }
+
+    this.tickTerminal(ctx)
+  }
+
+  /** Begin or restart the DAN scan window. */
+  start(): void {
+    if (this._phase === 'scanning' || this._phase === 'awaiting-delivery') return
+    this.cleanupScanController()
+    this.resetSteps()
+    this.advanceStep(0)
+    this.advanceStep(1)
+    this._phase = 'scanning'
+    this._timeRemaining = this.scanDuration
+    this.particleHits = 0
+    this.graceRemaining = this.graceSeconds
+    this.failureReason = null
+    this.objective.actualReward = undefined
+    this.onRefuel?.()
+
+    this.scanController = new DanScanController({
+      scene: this.scene,
+      craterX: this.placement.crater.x,
+      craterY: this.heightmap.heightAt(this.placement.crater.x, this.placement.crater.z),
+      craterZ: this.placement.crater.z,
+      craterRadius: this.placement.crater.radius,
+      craterDepth: this.placement.crater.depth,
+      particleTuning: this.tuning,
+      projectileSystem: this.projectileSystem,
+      onParticleHit: () => this.recordParticleHit(),
+      seed: this.seed + this.objectiveIndex,
+    })
+    this.scanController.beginScan()
+    this.onRegisterTickable?.(this.scanController)
+    this.emitScanAudio(true)
+  }
+
+  /**
+   * Record one captured neutron particle. Called when a SCI projectile passes
+   * through a registered DAN particle. No-op outside the active phase so a
+   * stray bolt fired during awaitingDelivery cannot inflate capture quality.
+   */
+  recordParticleHit(): void {
+    if (this._phase !== 'scanning') return
+    this.particleHits++
+    this.onParticleHit?.()
+    this.emitScanAudio(true)
+  }
+
+  /**
+   * Deliver telemetry at the terminal after the scan window closes. Computes
+   * capture quality, stamps the partial-credit `actualReward`, and fires the
+   * completion pulse.
+   */
+  deliver(): void {
+    if (this._phase !== 'awaiting-delivery') return
+    const quality = this.requiredHits > 0 ? Math.min(1, this.particleHits / this.requiredHits) : 0
+    if (quality < DAN_MIN_QUALITY_FOR_COMPLETION) {
+      this.failWithReason('no-data-captured')
+      return
+    }
+
+    const rewardMax = this.objective.reward
+    const rewardMin = this.objective.rewardMin ?? rewardMax
+    const interpolated = rewardMin + (rewardMax - rewardMin) * quality
+    this.objective.actualReward = Math.round(interpolated)
+
+    this.advanceStep(3)
+    this._phase = 'completed'
+    this.scanController?.triggerCompletionPulse()
+    this.onCompletionPulse?.()
+    this.cleanupScanController()
+    this.emitScanAudio(false)
+    this.onPrompt?.(null)
+    this.onComplete?.(this.objectiveIndex)
+  }
+
+  /**
+   * Mark the scan as failed because the parked lander hull reached zero. The
+   * level controller routes the existing fail UX; the player can retry the
+   * scan from the terminal once the run has been recovered.
+   */
+  notifyLanderDestroyed(): void {
+    if (this._phase !== 'scanning' && this._phase !== 'awaiting-delivery') return
+    this.failWithReason('lander-destroyed')
+  }
+
+  /** Mark the scan as failed because the EVA suit reached zero HP. */
+  notifyPlayerDied(): void {
+    if (this._phase !== 'scanning' && this._phase !== 'awaiting-delivery') return
+    this.failWithReason('player-died')
+  }
+
+  /** Tear down all 3D resources and clear callbacks. */
+  dispose(): void {
+    this.cleanupScanController()
+    this.terminal.dispose()
+    this.scene.remove(this.terminal.group)
+  }
+
+  /** Drive the timer and grace clock while the scan window is open. */
+  private tickActive(dt: number, ctx: MiniGameContext): void {
+    if (this._timeRemaining > 0) {
+      this._timeRemaining = Math.max(0, this._timeRemaining - dt)
+      this.graceRemaining = Math.max(0, this.graceRemaining - dt)
+      if (this._timeRemaining <= 0) {
+        // Window closes — particles stop, beam fades, viroid rolls stop. The
+        // player still has to walk back to the terminal; this is NOT failure.
+        this._phase = 'awaiting-delivery'
+        this.scanController?.endScan()
+        this.advanceStep(2)
+        this.emitScanAudio(true) // beam still fading; audio handles its own fade
+      }
+    }
+
+    if (ctx.landerPosition) {
+      this.scanController?.setLanderAnchor(ctx.landerPosition, ctx.landerUp ?? null)
+    }
+  }
+
+  /** Drive the EVA terminal proximity prompt + interact handling. */
+  private tickTerminal(ctx: MiniGameContext): void {
+    this._isPlayerNear = false
+    if (ctx.levelState !== 'eva' || !ctx.playerPosition) {
+      if (this._phase === 'idle') this.onPrompt?.(null)
+      return
+    }
+
+    const dx = ctx.playerPosition.x - this.terminal.position.x
+    const dz = ctx.playerPosition.z - this.terminal.position.z
+    const dist = Math.sqrt(dx * dx + dz * dz)
+    if (dist > TERMINAL_INTERACT_RANGE) {
+      if (this._phase === 'idle') this.onPrompt?.(null)
+      return
+    }
+
+    this._isPlayerNear = true
+    this.advanceStep(0)
+
+    if (this._phase === 'idle') {
+      this.onPrompt?.(DAN_INSTRUCTION_PRESCAN)
+      if (ctx.terminalInteractPressed) this.start()
+    } else if (this._phase === 'awaiting-delivery') {
+      this.onPrompt?.(DAN_INSTRUCTION_DELIVER)
+      if (ctx.terminalInteractPressed) this.deliver()
+    } else if (this._phase === 'failed' && this.failureReason === 'no-data-captured') {
+      this.onPrompt?.(DAN_INSTRUCTION_RETRY)
+      if (ctx.terminalInteractPressed) this.start()
+    }
+  }
+
+  /** Internal failure routing — preserves the first reason if multiple fire. */
+  private failWithReason(reason: DanFailureReason): void {
+    if (this.failureReason) return
+    this.failureReason = reason
+    this._phase = 'failed'
+    this.objective.actualReward = 0
+    this.cleanupScanController()
+    this.emitScanAudio(false)
+    this.onPrompt?.(null)
+  }
+
+  /** Mark a step complete and activate the next incomplete step. */
+  private advanceStep(index: number): void {
+    const step = this._steps[index]
+    if (!step || step.complete) return
+    step.complete = true
+    step.active = false
+    const next = this._steps.find((candidate) => !candidate.complete)
+    if (next) next.active = true
+    this.onStepChange?.(this.objectiveIndex, this._steps)
+  }
+
+  /** Reset all tracker steps for a retry. */
+  private resetSteps(): void {
+    for (const step of this._steps) {
+      step.complete = false
+      step.active = false
+    }
+    this._steps[0]!.active = true
+  }
+
+  /** Tear down the scan controller if one is active. */
+  private cleanupScanController(): void {
+    if (!this.scanController) return
+    this.onUnregisterTickable?.(this.scanController)
+    this.scanController.dispose()
+    this.scanController = null
+  }
+
+  /** Emit a scan audio frame keyed on whether the beam should be audible. */
+  private emitScanAudio(visible: boolean): void {
+    const intensity =
+      this.requiredHits > 0 ? Math.min(1, this.particleHits / this.requiredHits) : 0
+    const spawnRate = visible ? this.tuning.particleSpawnProbability / this.tuning.tickIntervalSeconds : 0
+    this.onScanAudioState?.({ visible, intensity, particleSpawnRate: spawnRate })
+  }
+}
