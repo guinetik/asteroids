@@ -60,8 +60,8 @@ const FRAG = /* glsl */ `
   // the face normal axis; the other two are the in-plane UVs.
   vec2 worldUV(vec3 pos, vec3 n) {
     vec3 a = abs(n);
-    if (a.x > a.y && a.x > a.z) return pos.yz;
-    if (a.y > a.x && a.y > a.z) return pos.xz;
+    if (a.x >= a.y && a.x >= a.z) return pos.yz;
+    if (a.y >= a.z) return pos.xz;
     return pos.xy;
   }
 
@@ -80,6 +80,9 @@ const FRAG = /* glsl */ `
  * `userData.tick(dt)` hook the scene controller calls each frame to advance
  * the breathing animation.
  *
+ * Renders with `THREE.BackSide` because bunker geometry uses standard
+ * outward-facing `BoxGeometry` and the camera sits inside the room.
+ *
  * @param opts - Tint + tuning
  */
 export function createBunkerGridMaterial(opts: BunkerGridMaterialOptions): THREE.ShaderMaterial {
@@ -96,7 +99,7 @@ export function createBunkerGridMaterial(opts: BunkerGridMaterialOptions): THREE
     },
     vertexShader: VERT,
     fragmentShader: FRAG,
-    side: THREE.FrontSide,
+    side: THREE.BackSide,
   })
   const uTime = mat.uniforms.uTime as { value: number }
   mat.userData.tick = (dt: number) => {
