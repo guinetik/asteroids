@@ -31,7 +31,7 @@
     "surfaceTextures": "/textures/asteroids/psyche",
     "surfaceUseEmbeddedUVs": true,
     "surfaceDetailFolder": "/textures/asteroids/default",
-    "surfaceDetailRepeat": 5,
+    "surfaceDetailRepeat": 50,
     "surfaceDetailNormalStrength": 2
   },
   "visual": {
