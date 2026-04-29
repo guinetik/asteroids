@@ -103,8 +103,8 @@ export const MAP_SHUTTLE_MIN_APPARENT_SIZE = 0.012
 /** How fast the shuttle scale lerps toward its target. */
 export const MAP_SHUTTLE_SCALE_LERP = 8
 
-/** Fixed apparent size of the tactical reticle as a fraction of screen height. */
-export const MAP_RETICLE_APPARENT_SIZE = 0.06
+/** Heading marker size relative to the shuttle's current rendered map length. */
+export const MAP_RETICLE_SIZE_MULTIPLIER = 0.9
 
 /** Shuttle overscale multiplier at which the reticle begins fading in. */
 export const MAP_RETICLE_FADE_START = 0.8
@@ -122,14 +122,12 @@ export const MAP_RETICLE_MIN_SPEED = 0.135
 export const MAP_RETICLE_MIN_SPEED_OFF = 0.045
 
 /**
- * World-space distance ahead of the shuttle where the planar-velocity travel marker sits.
- * Keep modest relative to map scale so it reads as a local direction cue.
+ * Distance ahead of the shuttle nose for the heading marker, as a multiplier of rendered shuttle length.
  */
-export const MAP_RETICLE_WEDGE_PROJECT_OFFSET = 280
+export const MAP_RETICLE_WEDGE_OFFSET_MULTIPLIER = 1.15
 
 /**
- * Low-pass (seconds) on wedge mesh rotation after planar world-velocity heading resolution.
- * Reduces jitter when gravity or player inputs nudge the travel vector frame-to-frame.
+ * Kept for config compatibility with older motion-wedge tuning; the heading marker is unsmoothed.
  */
 export const MAP_RETICLE_WEDGE_ROTATION_SMOOTH_TAU_SEC = 0.055
 
@@ -513,12 +511,12 @@ export const MAP_VIEW_CONTROLLER_CONFIG = {
   MAP_INTRO_MOON_FOV,
   MAP_INTRO_SATURN_CAMERA_OFFSET,
   MAP_INTRO_SATURN_FOV,
-  MAP_RETICLE_APPARENT_SIZE,
+  MAP_RETICLE_SIZE_MULTIPLIER,
   MAP_RETICLE_FADE_END,
   MAP_RETICLE_FADE_START,
   MAP_RETICLE_MIN_SPEED,
   MAP_RETICLE_MIN_SPEED_OFF,
-  MAP_RETICLE_WEDGE_PROJECT_OFFSET,
+  MAP_RETICLE_WEDGE_OFFSET_MULTIPLIER,
   MAP_RETICLE_WEDGE_ROTATION_SMOOTH_TAU_SEC,
   MAP_RETICLE_ALPHA_SMOOTH_TAU_SEC,
   MAP_PROGRADE_MARKER_OPACITY_SMOOTH_TAU_SEC,

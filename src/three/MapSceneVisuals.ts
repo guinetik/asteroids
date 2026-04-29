@@ -13,67 +13,31 @@ import lockDiscVertexShader from '@/three/shaders/map/lockDisc.vert.glsl?raw'
 import approachLockDiscFragmentShader from '@/three/shaders/map/approachLockDisc.frag.glsl?raw'
 import surfLockDiscFragmentShader from '@/three/shaders/map/surfLockDisc.frag.glsl?raw'
 
-/** Below this planar velocity, the travel marker keeps its previous state. */
-const RETICLE_VELOCITY_EPSILON = 1e-8
-
-/** Local-space X coordinate for the travel marker tip. */
+/** Local-space X coordinate for the heading marker tip. */
 const RETICLE_POINTER_TIP_X = 0.52
 
-/** Local-space X coordinate for the travel marker base. */
+/** Local-space X coordinate for the heading marker base. */
 const RETICLE_POINTER_BASE_X = -0.28
 
-/** Local-space half-width for the travel marker base. */
+/** Local-space half-width for the heading marker base. */
 const RETICLE_POINTER_HALF_WIDTH = 0.2
 
-/** World-space lift so the flat travel marker does not intersect the grid. */
+/** World-space lift so the flat heading marker does not intersect the grid. */
 const RETICLE_POINTER_Y_OFFSET = 0.15
 
-/** Additive cyan used for the travel marker mesh. */
+/** Additive cyan used for the heading marker mesh. */
 const RETICLE_POINTER_COLOR = 0x00e6ff
 
 /** Render above map tethers and below prograde markers. */
 const RETICLE_POINTER_RENDER_ORDER = 12
 
-/**
- * Interpolate from `a` toward `b` along the shortest arc (radians).
- *
- * @param a - Start angle
- * @param b - Target angle
- * @param t - Mix factor in `[0, 1]`
- */
-function lerpAngleRadShortest(a: number, b: number, t: number): number {
-  let d = b - a
-  if (d > Math.PI) d -= 2 * Math.PI
-  if (d < -Math.PI) d += 2 * Math.PI
-  return a + d * t
-}
-
-/**
- * Sprite rotation (radians) that aligns the velocity wedge with planar world motion.
- *
- * @param velocity - World velocity (XZ used; Y ignored for direction)
- * @param velPlanar - Scratch (mutated)
- * @returns Rotation in sprite texture space, or `null` if velocity is degenerate
- */
-function computeReticleWedgeWorldRotation(
-  velocity: THREE.Vector3,
-  velPlanar: THREE.Vector3,
-): number | null {
-  velPlanar.set(velocity.x, 0, velocity.z)
-  const speed = velPlanar.length()
-  if (speed < RETICLE_VELOCITY_EPSILON) return null
-  return Math.atan2(-velocity.z, velocity.x)
-}
-
 /** Camera-relative data for the ship HUD reticle each frame. */
 export interface ShipReticleUpdate {
   shuttlePosition: THREE.Vector3
-  shuttleVelocity: THREE.Vector3
+  shuttleHeadingRad: number
   shuttleScale: number
-  /** Map view camera (projection used for wedge rotation and FOV). */
-  camera: THREE.PerspectiveCamera
   isFreeFlight: boolean
-  /** Delta time in seconds (heading smooth / hysteresis timing). */
+  /** Delta time in seconds (opacity smoothing). */
   dt: number
 }
 
@@ -125,13 +89,8 @@ export class MapSceneVisuals {
   private shuttleGroup: THREE.Group | null = null
   private orbitRing: THREE.LineLoop | null = null
   private launchArrow: THREE.Group | null = null
-  /** Hysteresis: once planar speed crosses "on", require lower speed to hide the wedge. */
-  private reticleWedgeSpeedGate = false
-  /** Low-pass filtered world-velocity wedge rotation (rad); cleared when wedge hides. */
-  private reticleWedgeRotationSmooth: number | null = null
   /** Low-pass filtered reticle alpha when scale-driven fade jitters. */
   private reticleAlphaSmooth: number | null = null
-  private readonly reticleVelocityPlanar = new THREE.Vector3()
   private progradeMarkerOpacitySmooth: number | null = null
   private retrogradeMarkerOpacitySmooth: number | null = null
   private progradePosSmooth: THREE.Vector3 | null = null
@@ -387,9 +346,6 @@ export class MapSceneVisuals {
   updateShipReticle(update: ShipReticleUpdate): void {
     if (!this.shipReticleGroup || !this.shipReticleRing || !this.shipReticlePointer) return
 
-    const cam = update.camera
-    const dist = cam.position.distanceTo(update.shuttlePosition)
-    const halfFovRad = THREE.MathUtils.degToRad(cam.fov / 2)
     const overscale = update.shuttleScale / MAP_CONFIG.MAP_SHUTTLE_SCALE
     const t = THREE.MathUtils.clamp(
       (overscale - MAP_CONFIG.MAP_RETICLE_FADE_START) /
@@ -414,62 +370,24 @@ export class MapSceneVisuals {
     if (update.isFreeFlight && reticleAlpha > 0.005) {
       this.shipReticleGroup.visible = true
       this.shipReticleGroup.position.copy(update.shuttlePosition)
-      const reticleWorld = MAP_CONFIG.MAP_RETICLE_APPARENT_SIZE * 2 * dist * Math.tan(halfFovRad)
+      const shuttleWorldLength = MAP_CONFIG.MAP_SHUTTLE_BASE_SIZE * update.shuttleScale
+      const reticleWorld = shuttleWorldLength * MAP_CONFIG.MAP_RETICLE_SIZE_MULTIPLIER
       this.shipReticleGroup.scale.setScalar(reticleWorld)
       this.shipReticleRing.visible = false
 
-      const speed = Math.hypot(update.shuttleVelocity.x, update.shuttleVelocity.z)
-      const speedOn = MAP_CONFIG.MAP_RETICLE_MIN_SPEED
-      const speedOff = MAP_CONFIG.MAP_RETICLE_MIN_SPEED_OFF
-
-      if (!this.reticleWedgeSpeedGate && speed >= speedOn) {
-        this.reticleWedgeSpeedGate = true
-      }
-      if (this.reticleWedgeSpeedGate && speed < speedOff) {
-        this.reticleWedgeSpeedGate = false
-        this.reticleWedgeRotationSmooth = null
-      }
-
-      if (this.reticleWedgeSpeedGate) {
-        const rawAngle = computeReticleWedgeWorldRotation(
-          update.shuttleVelocity,
-          this.reticleVelocityPlanar,
-        )
-        if (rawAngle !== null) {
-          this.shipReticleGroup.position.copy(update.shuttlePosition).addScaledVector(
-            this.reticleVelocityPlanar,
-            MAP_CONFIG.MAP_RETICLE_WEDGE_PROJECT_OFFSET / this.reticleVelocityPlanar.length(),
-          )
-          this.shipReticleGroup.position.y += RETICLE_POINTER_Y_OFFSET
-        }
-        const tauRot = MAP_CONFIG.MAP_RETICLE_WEDGE_ROTATION_SMOOTH_TAU_SEC
-        if (rawAngle !== null) {
-          if (this.reticleWedgeRotationSmooth === null) {
-            this.reticleWedgeRotationSmooth = rawAngle
-          } else if (tauRot > 0) {
-            const aR = 1 - Math.exp(-dt / tauRot)
-            this.reticleWedgeRotationSmooth = lerpAngleRadShortest(
-              this.reticleWedgeRotationSmooth,
-              rawAngle,
-              aR,
-            )
-          } else {
-            this.reticleWedgeRotationSmooth = rawAngle
-          }
-        }
-        this.shipReticlePointer.visible = this.reticleWedgeRotationSmooth !== null
-        if (this.reticleWedgeRotationSmooth !== null) {
-          this.shipReticlePointer.rotation.y = this.reticleWedgeRotationSmooth
-        }
-        this.shipReticlePointer.material.opacity = reticleAlpha
-      } else {
-        this.shipReticlePointer.visible = false
-        this.reticleWedgeRotationSmooth = null
-      }
+      const headingX = Math.cos(update.shuttleHeadingRad)
+      const headingZ = -Math.sin(update.shuttleHeadingRad)
+      const markerOffset = shuttleWorldLength * MAP_CONFIG.MAP_RETICLE_WEDGE_OFFSET_MULTIPLIER
+      this.shipReticleGroup.position.set(
+        update.shuttlePosition.x + headingX * markerOffset,
+        update.shuttlePosition.y + RETICLE_POINTER_Y_OFFSET,
+        update.shuttlePosition.z + headingZ * markerOffset,
+      )
+      this.shipReticlePointer.visible = true
+      this.shipReticlePointer.rotation.y = update.shuttleHeadingRad
+      this.shipReticlePointer.material.opacity = reticleAlpha
     } else {
       this.shipReticleGroup.visible = false
-      this.reticleWedgeSpeedGate = false
-      this.reticleWedgeRotationSmooth = null
       this.reticleAlphaSmooth = null
     }
   }
