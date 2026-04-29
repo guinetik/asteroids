@@ -18,16 +18,44 @@ export const GRID_MASS_THRESHOLD = 4e-5
 /** Wider map-only grid wells for gas giants. */
 export const MAP_GRID_GAS_GIANT_WELL_WIDTH_MULT = 1.85
 
-/** Baseline wireframe segments per axis on the map space-time grid. */
-export const MAP_SPACE_TIME_GRID_BASE_RESOLUTION = 200
+/**
+ * Baseline wireframe segments per axis on the map space-time grid. Total line segments
+ * scale ~N² in {@link MAP_SPACE_TIME_GRID_RESOLUTION}; high N heavily loads
+ * `EffectComposer` when Space Fabric is visible.
+ */
+export const MAP_SPACE_TIME_GRID_BASE_RESOLUTION = 400
 
-/** Density multiplier on segment count. */
-export const MAP_SPACE_TIME_GRID_RESOLUTION_BOOST = 1.5
+/** Density multiplier on segment count (see {@link MAP_SPACE_TIME_GRID_RESOLUTION}). */
+export const MAP_SPACE_TIME_GRID_RESOLUTION_BOOST = 2
 
 /** Resolved segment count for the map space-time grid wireframe. */
 export const MAP_SPACE_TIME_GRID_RESOLUTION = Math.round(
   MAP_SPACE_TIME_GRID_BASE_RESOLUTION * MAP_SPACE_TIME_GRID_RESOLUTION_BOOST,
 )
+
+/**
+ * Instanced asteroid belts share high-polygon GLB meshes; exposing the full particle
+ * budget at closest camera orbit was producing instrumented totals on the order of tens
+ * of millions of triangles per frame. Used as {@link MAP_ASTEROID_BELT_NEAR_LOD_CAP} in the
+ * lowest camera-height band (~|y| below 2.5).
+ *
+ * Typical range **0.35–0.55**. Lower favors frame time during tight zoom orbit; higher
+ * shows more rocky detail close up.
+ *
+ * @constant
+ */
+export const MAP_ASTEROID_BELT_NEAR_LOD_CAP = 0.45
+
+/**
+ * Instance fraction drawn while the fullscreen tactical raster map overlay hides the belts.
+ * The orbit scene continues to compose behind translucent UI paths, so a low draw cost
+ * avoids paying for unseen belt geometry during path planning.
+ *
+ * Typical range **0.02–0.12**.
+ *
+ * @constant
+ */
+export const MAP_ASTEROID_BELT_TACMAP_LOD_FRAC = 0.06
 
 /** Visual scale for the shuttle in the map view. */
 export const MAP_SHUTTLE_SCALE = 0.01

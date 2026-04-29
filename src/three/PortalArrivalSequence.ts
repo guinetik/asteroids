@@ -220,6 +220,7 @@ export class PortalArrivalSequence {
         let elapsed = 0
 
         this.descentTickable = {
+          tickDebugLabel: 'PortalElevatedDescent',
           tick: (dt: number) => {
             elapsed += dt
             const t = Math.min(elapsed / PORTAL_DESCENT_DURATION, 1)

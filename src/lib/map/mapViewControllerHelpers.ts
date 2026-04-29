@@ -8,15 +8,16 @@
  */
 import * as THREE from 'three'
 import { PLANETS } from '@/lib/planets/catalog'
+import {
+  AIM_BLOCK_THRESHOLD,
+  EARTH_CATALOG_DISPLAY_RADIUS,
+  MAP_ASTEROID_BELT_NEAR_LOD_CAP,
+  SPAWN_OFFSET_BEHIND_EARTH,
+} from '@/lib/map/mapViewControllerConfig'
 import type { ActiveVisitRelayMission, GeneratedAsteroidMission } from '@/lib/missions/types'
 import type { GravityConfig, GravitySource } from '@/lib/physics/gravity'
 import { eventHorizonRadius, gravityAt, influenceRadius } from '@/lib/physics/gravity'
 import type { GravityWell } from '@/three/ShuttleController'
-import {
-  AIM_BLOCK_THRESHOLD,
-  EARTH_CATALOG_DISPLAY_RADIUS,
-  SPAWN_OFFSET_BEHIND_EARTH,
-} from '@/lib/map/mapViewControllerConfig'
 
 /** Three.js mesh materials that expose `emissive` for manual glow control. */
 export type EmissiveMaterial =
@@ -119,11 +120,13 @@ export function computeMaxGravityProximity(
  *
  * The default orbit camera opens around y=3, so we intentionally avoid
  * full-density belts there to keep the initial map view responsive. The
- * densest presentation is reserved for deliberate close inspection.
+ * closest zoom band is capped at {@link MAP_ASTEROID_BELT_NEAR_LOD_CAP} — uncapped density
+ * from data `maxParticles` plus multi-mesh GLB geometry produced GPU workloads in the tens
+ * of millions of triangles.
  */
 export function getMapAsteroidBeltLodFraction(cameraY: number): number {
   const y = Math.abs(cameraY)
-  if (y < 2.5) return 1
+  if (y < 2.5) return MAP_ASTEROID_BELT_NEAR_LOD_CAP
   if (y < 8) return 0.35
   if (y < 20) return 0.2
   if (y < 50) return 0.1

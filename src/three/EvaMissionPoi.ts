@@ -11,6 +11,7 @@
  * @spec docs/superpowers/specs/2026-04-18-visit-relay-mission-design.md
  */
 import * as THREE from 'three'
+import type { Tickable } from '@/lib/Tickable'
 import type { EvaMissionPoiType } from '@/lib/missions/types'
 import { SatelliteModel } from './SatelliteModel'
 import { VoyagerModel } from './VoyagerModel'
@@ -53,11 +54,9 @@ const MAP_POI_TELESCOPE_SCALE = 0.06
 const MAP_POI_LOCAL_OFFSET_X = 0
 
 /** An EVA mission POI ready to be attached under a waypoint root. */
-export interface EvaMissionPoiInstance {
+export interface EvaMissionPoiInstance extends Tickable {
   /** Three.js object to add as a child of the waypoint root group. */
   object: THREE.Object3D
-  /** Per-frame update; no-op for static props. */
-  tick(dt: number): void
   /** Switch beacon status without rebuilding the prop. */
   setMaintenanceState(state: MaintenanceBeaconState): void
   /** Release geometries, materials, and detach from parent. */
@@ -76,6 +75,7 @@ async function createSatellitePoi(
   model.group.position.set(MAP_POI_LOCAL_OFFSET_X, localY, 0)
   return {
     object: model.group,
+    tickDebugLabel: 'EvaMissionPoiSatellite',
     tick: (dt) => model.tick(dt),
     setMaintenanceState: (state) => model.setMaintenanceState(state),
     dispose: () => {
@@ -97,6 +97,7 @@ async function createRelayAntennaPoi(
   model.group.position.set(MAP_POI_LOCAL_OFFSET_X, localY, 0)
   return {
     object: model.group,
+    tickDebugLabel: 'EvaMissionPoiRelayAntenna',
     tick: (dt) => model.tick(dt),
     setMaintenanceState: (state) => model.setMaintenanceState(state),
     dispose: () => {
@@ -118,6 +119,7 @@ async function createTelescopePoi(
   model.group.position.set(MAP_POI_LOCAL_OFFSET_X, localY, 0)
   return {
     object: model.group,
+    tickDebugLabel: 'EvaMissionPoiTelescope',
     tick: (dt) => model.tick(dt),
     setMaintenanceState: (state) => model.setMaintenanceState(state),
     dispose: () => {

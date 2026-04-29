@@ -68,4 +68,41 @@ describe('TickHandler', () => {
 
     expect(a.tick).toHaveBeenCalledTimes(1)
   })
+
+  it('records constructor.name for class tickables when profiling', () => {
+    const handler = new TickHandler()
+    class NamedTick implements Tickable {
+      tick(): void {}
+    }
+    handler.register(new NamedTick())
+    handler.setProfilingEnabled(true)
+    handler.tick(0.016)
+    expect(handler.getLastTickTimings()[0]?.name).toBe('NamedTick')
+    handler.setProfilingEnabled(false)
+  })
+
+  it('uses tickDebugLabel for plain-object tickables when profiling', () => {
+    const handler = new TickHandler()
+    const t: Tickable = {
+      tickDebugLabel: 'MapCompositorRender',
+      tick: vi.fn(),
+    }
+    handler.register(t)
+    handler.setProfilingEnabled(true)
+    handler.tick(0.016)
+    expect(handler.getLastTickTimings()[0]?.name).toBe('MapCompositorRender')
+    handler.setProfilingEnabled(false)
+  })
+
+  it('falls back to AnonymousTickable for unlabeled plain objects when profiling', () => {
+    const handler = new TickHandler()
+    const t: Tickable = {
+      tick: vi.fn(),
+    }
+    handler.register(t)
+    handler.setProfilingEnabled(true)
+    handler.tick(0.016)
+    expect(handler.getLastTickTimings()[0]?.name).toBe('AnonymousTickable')
+    handler.setProfilingEnabled(false)
+  })
 })

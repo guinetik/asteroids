@@ -28,7 +28,10 @@ import {
   TICK_PRIORITY_INPUT,
   TICK_PRIORITY_PHYSICS,
   TICK_PRIORITY_ANIMATION,
+  TICK_PRIORITY_RENDER,
 } from '@/lib/tickPriorities'
+import { isDebugHudEnabled } from '@/lib/debug/debugMetrics'
+import { DebugMetricsTracker } from '@/lib/debug/DebugMetricsTracker'
 import { DEFAULT_TIME_SCALE, ORBIT_SCALE } from '@/lib/planets/constants'
 import { SUN, PLANETS } from '@/lib/planets/catalog'
 import type { MapSceneObjects } from '@/three/MapSceneSetup'
@@ -164,7 +167,10 @@ import { MapPlanetariumScene } from '@/three/MapPlanetariumScene'
 import { MapSceneEnvironment } from '@/three/MapSceneEnvironment'
 import { MapShuttleEffects } from '@/three/MapShuttleEffects'
 import { MapSceneVisuals } from '@/three/MapSceneVisuals'
-import { MAP_VIEW_CONTROLLER_CONFIG as MAP_CONFIG } from '@/lib/map/mapViewControllerConfig'
+import {
+  MAP_ASTEROID_BELT_TACMAP_LOD_FRAC,
+  MAP_VIEW_CONTROLLER_CONFIG as MAP_CONFIG,
+} from '@/lib/map/mapViewControllerConfig'
 import {
   computeGravityProximity,
   computeMaxGravityProximity,
@@ -246,6 +252,7 @@ const COMPASS_SUN_COLOR = '#FFF0B0'
 export class MapViewController implements Tickable {
   private gameLoop: GameLoop | null = null
   private tickHandler: TickHandler | null = null
+  private debugMetricsTracker: DebugMetricsTracker | null = null
   private inputManager: InputManager | null = null
   private sceneObjects: MapSceneObjects | null = null
   private vehicleCamera: VehicleCamera | null = null
@@ -406,6 +413,9 @@ export class MapViewController implements Tickable {
 
   /** Saved layer toggles while the opening intro suppresses orbit lines / fabric / debris. */
   private introLayerRestore: MapViewLayerToggleState | null = null
+
+  /** Saved layer toggles while EVA forces orbit lines / fabric / labels off (ambient debris unchanged). */
+  private evaLayerRestore: MapViewLayerToggleState | null = null
 
   /** Current shuttle display scale, lerped each frame toward the screen-size target. */
   private currentShuttleScale: number = MAP_CONFIG.MAP_SHUTTLE_SCALE
@@ -1117,6 +1127,7 @@ export class MapViewController implements Tickable {
       let phaseIndex = 0
 
       const cinematicTimerTickable: Tickable = {
+        tickDebugLabel: 'MapPortalIntroTimer',
         tick: (dt: number) => {
           phaseTimer += dt
           if (phaseIndex === 0 && phaseTimer >= MAP_CONFIG.PORTAL_EARTH_HOLD_DURATION) {
@@ -1205,12 +1216,14 @@ export class MapViewController implements Tickable {
 
     // --- Register orrery animation tick ---
     const orreryTickable: Tickable = {
+      tickDebugLabel: 'MapOrrery',
       tick: (dt: number) => this.tickOrrery(dt),
     }
     this.tickHandler.register(orreryTickable, TICK_PRIORITY_ANIMATION)
 
     // --- Compositor: renders via EffectComposer ---
     const compositorTickable: Tickable = {
+      tickDebugLabel: 'MapCompositorRender',
       tick: () => {
         // Intro / startup camera must sync after orrery (animation) and VehicleCamera tick, or the
         // render camera lags planets by a frame and Earth appears to twitch (angle jitter).
@@ -1219,6 +1232,18 @@ export class MapViewController implements Tickable {
       },
     }
     this.tickHandler.register(compositorTickable, MAP_CONFIG.TICK_PRIORITY_COMPOSIT)
+
+    // Debug HUD instrumentation. Sits at RENDER + 1 so renderer.info reflects
+    // the frame that was just submitted by the EffectComposer.
+    if (isDebugHudEnabled()) {
+      this.debugMetricsTracker = new DebugMetricsTracker({
+        renderer: this.sceneObjects.renderer,
+        tickHandler: this.tickHandler,
+        getEnemyCount: () => 0,
+        getProjectileCount: () => 0,
+      })
+      this.tickHandler.register(this.debugMetricsTracker, TICK_PRIORITY_RENDER + 1)
+    }
 
     // --- Resize ---
     this.resizeHandler = () => {
@@ -1897,10 +1922,15 @@ export class MapViewController implements Tickable {
    * Advance the orrery simulation and update gravity grid sources.
    */
   private tickOrrery(dt: number): void {
-    // Hide planet indicator labels while the tactical map overlay is open
+    // Hide planet indicator labels while the tactical map overlay is open.
+    // Belt instancing dominates GPU triangle cost — slash visible instances while the
+    // raster tacmap covers most of the view (planetarium often still composites behind UI).
     if (this.mapState.isOpen) {
       for (const controller of this.planetControllers) {
         controller.setIndicatorVisible(false)
+      }
+      for (const controller of this.beltControllers) {
+        controller.setLodFraction(MAP_ASTEROID_BELT_TACMAP_LOD_FRAC)
       }
       return
     }
@@ -2234,6 +2264,40 @@ export class MapViewController implements Tickable {
     this.applyGridVisible(saved.gridVisible)
     this.labelsVisible = saved.labelsVisible
     this.sceneEnvironment?.setMapIntroSuppressed(false)
+    if (this.evaSession?.isActive) {
+      this.applyOrbitsVisible(false)
+      this.applyGridVisible(false)
+      this.labelsVisible = false
+    }
+    this.emitMapViewLayerToggles()
+  }
+
+  /**
+   * Turns off orbital paths, space-time fabric mesh, and planet labels for FPS EVA; leaves
+   * ambient debris unchanged. Snapshots prefs for {@link endEvaMapLayerSuppression}.
+   */
+  private beginEvaMapLayerSuppression(): void {
+    if (this.evaLayerRestore !== null) return
+    this.evaLayerRestore = {
+      orbitsVisible: this.orbitsVisible,
+      gridVisible: this.gridVisible,
+      labelsVisible: this.labelsVisible,
+      ambientVisible: this.sceneEnvironment?.ambientVisible ?? true,
+    }
+    this.applyOrbitsVisible(false)
+    this.applyGridVisible(false)
+    this.labelsVisible = false
+    this.emitMapViewLayerToggles()
+  }
+
+  /** Restores HUD layer toggles from {@link beginEvaMapLayerSuppression}. */
+  private endEvaMapLayerSuppression(): void {
+    if (this.evaLayerRestore === null) return
+    const saved = this.evaLayerRestore
+    this.evaLayerRestore = null
+    this.applyOrbitsVisible(saved.orbitsVisible)
+    this.applyGridVisible(saved.gridVisible)
+    this.labelsVisible = saved.labelsVisible
     this.emitMapViewLayerToggles()
   }
 
@@ -4128,9 +4192,10 @@ export class MapViewController implements Tickable {
   }
 
   /**
-   * Handles scene bookkeeping when EVA mode changes — bloom swap, fuel-pause,
-   * and forwarding to the external callback. Extracted from the inline
-   * `onEvaModeChange` lambda so `createEvaSession` can also call
+   * Handles scene bookkeeping when EVA mode changes — bloom swap,
+   * orbit / fabric / label HUD suppression ({@link beginEvaMapLayerSuppression} /
+   * {@link endEvaMapLayerSuppression}), and forwarding to the external callback.
+   * Extracted from the inline `onEvaModeChange` lambda so `createEvaSession` can also call
    * `maybeAttachSatelliteRepair` / `teardownSatelliteRepairOnExit` before it.
    *
    * @param active - True when EVA is starting; false when it is ending.
@@ -4138,8 +4203,10 @@ export class MapViewController implements Tickable {
   private handleEvaModeChange(active: boolean): void {
     if (!active) {
       this.evaMapMultitoolFacade.disposeEvaFiring()
+      this.endEvaMapLayerSuppression()
+    } else {
+      this.beginEvaMapLayerSuppression()
     }
-    this.setOrbitLinesVisible(!active)
     this.bloomController.setEvaOverride(active)
     // Mirror the active-POI huge-scale onto completed-site POI containers, so a mission
     // that finishes mid-EVA doesn't spawn its "repaired" prop at 1× while everything else
@@ -4160,23 +4227,6 @@ export class MapViewController implements Tickable {
       }
       if (this.getActiveSatelliteServicingMission()) {
         this.onEvaToast?.('USE THE MULTITOOL TO FIX THE BROKEN SATELLITE PARTS')
-      }
-    }
-  }
-
-  /**
-   * Toggle the tactical-map orbital path lines. Hidden during EVA so the
-   * astronaut isn't looking at a ship-HUD sensor overlay through their helmet;
-   * restored on exit. Iterates every `PlanetSystemController`'s `orbitLines`.
-   * Does not modify `this.orbitsVisible` so the user's toggle preference is
-   * preserved across EVA sessions.
-   *
-   * @param visible - True to show orbit lines, false to hide.
-   */
-  private setOrbitLinesVisible(visible: boolean): void {
-    for (const controller of this.planetControllers) {
-      for (const line of controller.orbitLines) {
-        line.visible = visible
       }
     }
   }
@@ -4446,6 +4496,11 @@ export class MapViewController implements Tickable {
     this.sceneEnvironment = null
     this.sceneVisuals?.dispose()
     this.sceneVisuals = null
+    if (this.debugMetricsTracker && this.tickHandler) {
+      this.tickHandler.unregister(this.debugMetricsTracker)
+    }
+    this.debugMetricsTracker?.dispose()
+    this.debugMetricsTracker = null
     this.gameLoop?.stop()
 
     if (this.resizeHandler) {

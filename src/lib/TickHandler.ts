@@ -11,13 +11,28 @@ interface TickEntry {
  * instance is reused across frames — copy if you need to hold onto a snapshot.
  */
 export interface TickProfileSample {
-  /** `tickable.constructor.name`, used as a stable display label. */
+  /**
+   * {@link Tickable.tickDebugLabel}, else `constructor.name`, else `AnonymousTickable`
+   * for plain object tickables.
+   */
   name: string
   /** Wall-clock milliseconds spent inside this tickable's `tick()` call. */
   ms: number
 }
 
 const DEFAULT_PRIORITY = 0
+
+/**
+ * Display string for one tickable in profiling output. Plain object literals get
+ * `Object` from `constructor.name` — use {@link Tickable.tickDebugLabel} instead.
+ */
+function tickProfileDisplayName(tickable: Tickable): string {
+  const custom = tickable.tickDebugLabel?.trim()
+  if (custom) return custom
+  const ctor = tickable.constructor?.name ?? ''
+  if (ctor && ctor !== 'Object') return ctor
+  return 'AnonymousTickable'
+}
 
 /**
  * Central registry for per-frame update callbacks, dispatched in priority order.
@@ -77,7 +92,7 @@ export class TickHandler {
       const start = performance.now()
       entry.tickable.tick(dt)
       const ms = performance.now() - start
-      samples.push({ name: entry.tickable.constructor.name, ms })
+      samples.push({ name: tickProfileDisplayName(entry.tickable), ms })
     }
   }
 }

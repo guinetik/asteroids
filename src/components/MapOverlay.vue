@@ -3,17 +3,30 @@
 import { ref, computed } from 'vue'
 import type { MapOverlayState } from '@/lib/ShuttleTelemetry'
 
-const props = defineProps<{
-  overlay: MapOverlayState
-  /**
-   * Set of planet ids that the player can fast travel to. Each label whose `id`
-   * is in this set is rendered with a clickable hotspot overlay.
-   */
-  fastTravelablePlanetIds?: Set<string>
-}>()
+const props = withDefaults(
+  defineProps<{
+    overlay: MapOverlayState
+    /**
+     * Set of planet ids that the player can fast travel to. Each label whose `id`
+     * is in this set is rendered with a clickable hotspot overlay.
+     */
+    fastTravelablePlanetIds?: Set<string>
+    /** When true, show Space Fabric toggle (requires Gravity Surfing unlock — same rule as main map). */
+    spaceFabricUnlocked?: boolean
+    /** Mirrors 3D grid on/off; synced from {@link MapViewController} like main HUD. */
+    spaceFabricVisible?: boolean
+  }>(),
+  {
+    fastTravelablePlanetIds: undefined,
+    spaceFabricUnlocked: false,
+    spaceFabricVisible: false,
+  },
+)
 
 const emit = defineEmits<{
   'planet-click': [planetId: string, planetName: string]
+  /** User toggled Space Fabric from the tactical overlay (parent calls `toggleSpaceTimeGrid`). */
+  'toggle-space-fabric': []
 }>()
 
 const fastTravelable = computed(() => props.fastTravelablePlanetIds ?? new Set<string>())
@@ -221,6 +234,16 @@ const trajectorySegments = computed(() => {
       >
         <span class="map-toggle-btn__dot" />
         Thermal
+      </button>
+      <button
+        v-if="spaceFabricUnlocked"
+        type="button"
+        class="map-toggle-btn"
+        :class="spaceFabricVisible ? 'map-toggle-btn--active' : 'map-toggle-btn--inactive'"
+        @click="emit('toggle-space-fabric')"
+      >
+        <span class="map-toggle-btn__dot" />
+        Space Fabric
       </button>
       <button
         type="button"

@@ -7,4 +7,10 @@
  */
 export interface Tickable {
   tick(dt: number): void
+  /**
+   * Stable label for debug profilers when this instance is a plain object literal
+   * (`constructor.name` is `Object`). Classes should omit this — the profiler uses
+   * `constructor.name` instead.
+   */
+  tickDebugLabel?: string
 }

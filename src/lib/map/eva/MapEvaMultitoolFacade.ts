@@ -82,7 +82,10 @@ export class MapEvaMultitoolFacade {
   private readonly impactUp = new THREE.Vector3(0, 1, 0)
 
   /** Per-frame viewmodel + input sync; register at `TICK_PRIORITY_RENDER - 1`. */
-  readonly frameSync: Tickable = { tick: (dt) => this.syncFrame(dt) }
+  readonly frameSync: Tickable = {
+    tickDebugLabel: 'MapEvaMultitoolFrameSync',
+    tick: (dt) => this.syncFrame(dt),
+  }
 
   /**
    * Wire the facade; safe to call once after {@link MapSceneObjects} exists.

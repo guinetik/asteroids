@@ -136,6 +136,12 @@ export class SpaceTimeGrid implements Tickable {
   private intervalScaleEffective = 1
   private visualBudget: SpaceTimeGridVisualDeformBudget | null = null
   private spatialCullPassCounter = 0
+  /**
+   * True if the previous deform pass wrote anomaly-tinted colors. Used to skip the
+   * color attribute upload entirely when no source has {@link GravitySource.isFabricAnomaly}
+   * and the last pass already left the buffer at baseline tint.
+   */
+  private lastPassHadAnomalyTint = false
   private readonly gridSize: number
   private readonly gridResolution: number
   private readonly depthScale: number
@@ -358,6 +364,19 @@ export class SpaceTimeGrid implements Tickable {
     const colorAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute
     const [br, bg, bb] = this.baselineLineRgb
 
+    // Anomaly tint is the only reason to touch the color buffer. When no source has
+    // isFabricAnomaly, every vertex resolves to baseline RGB, so we can skip the per-
+    // vertex color writes and the GPU upload entirely. We still do one cleanup pass
+    // the frame after anomalies disappear, to reset any leftover white from the buffer.
+    let hasAnomalySource = false
+    for (const src of this.sources) {
+      if (src.isFabricAnomaly) {
+        hasAnomalySource = true
+        break
+      }
+    }
+    const writeColors = hasAnomalySource || this.lastPassHadAnomalyTint
+
     const budget = this.visualBudget
     const useCull = !forceAllVertices && budget !== null && budget.useSpatialCull
     let doFull = forceAllVertices || !useCull
@@ -382,8 +401,10 @@ export class SpaceTimeGrid implements Tickable {
       if (!doFull && useCull) {
         const inBox = Math.abs(x - cx) <= halfW && Math.abs(z - cz) <= halfH
         if (!inBox && !this.isNearGravitySource(x, z)) {
-          const viSkip = i / 3
-          colorAttr.setXYZ(viSkip, br, bg, bb)
+          if (writeColors) {
+            const viSkip = i / 3
+            colorAttr.setXYZ(viSkip, br, bg, bb)
+          }
           continue
         }
       }
@@ -393,8 +414,12 @@ export class SpaceTimeGrid implements Tickable {
       positions[i + 1] = -totalD
       positions[i + 2] = z
 
+      if (!writeColors) {
+        continue
+      }
+
       const vi = i / 3
-      const anomD = this.getFabricAnomalyDepthAt(x, z)
+      const anomD = hasAnomalySource ? this.getFabricAnomalyDepthAt(x, z) : 0
       if (anomD < 1e-10) {
         colorAttr.setXYZ(vi, br, bg, bb)
       } else {
@@ -414,7 +439,10 @@ export class SpaceTimeGrid implements Tickable {
     }
 
     posAttr.needsUpdate = true
-    colorAttr.needsUpdate = true
+    if (writeColors) {
+      colorAttr.needsUpdate = true
+    }
+    this.lastPassHadAnomalyTint = hasAnomalySource
   }
 
   /** True if (x,z) lies inside an influence disk of any current gravity source. */
