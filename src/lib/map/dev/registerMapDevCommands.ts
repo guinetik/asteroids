@@ -49,6 +49,10 @@ export interface MapDevCommandContext {
   devStartConsortiumCertificationMessage: () => void
   /** Open any orbital-minigame overlay by gather-item id (DEV only). */
   devOpenOrbitalMinigame: (gatherItem: string, quantity: number) => void
+  /** Unlocks Hektor orbital capture for local contract-gate testing. */
+  unlockHektor: () => void
+  /** Restores Hektor orbital capture to the default restricted state. */
+  restrictHektor: () => void
 }
 
 /** Register the map-view dev-console commands. Idempotent across session restarts. */
@@ -109,6 +113,12 @@ export function registerMapDevCommands(ctx: MapDevCommandContext): void {
     },
     openMinigame: (gatherItem = 'venusian-gas', quantity = 5) => {
       ctx.devOpenOrbitalMinigame(gatherItem, quantity)
+    },
+    unlockHektor: () => {
+      ctx.unlockHektor()
+    },
+    restrictHektor: () => {
+      ctx.restrictHektor()
     },
   })
 }

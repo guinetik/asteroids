@@ -761,6 +761,38 @@
       "mass": 6.58e-9
     }
   ],
+  "pinnedBodies": [
+    {
+      "id": "hektor",
+      "name": "624 Hektor",
+      "order": 6.1,
+      "type": "Jupiter Trojan",
+      "accentColor": "#3a322a",
+      "orbit": {
+        "semiMajorAxis": 5.235,
+        "eccentricity": 0.0244,
+        "inclination": 18.16,
+        "longitudeOfAscendingNode": 342.75,
+        "argumentOfPeriapsis": 184.6,
+        "meanAnomalyOffset": 60,
+        "period": 4348
+      },
+      "displayRadius": 0.002,
+      "axialTilt": 78,
+      "rotationSpeed": 0.0857,
+      "modelUrl": "/models/hektor.glb",
+      "shader": {
+        "type": "rockyPlanet",
+        "uniforms": {
+          "uBaseColor": [0.23, 0.2, 0.17],
+          "uHasAtmosphere": 0,
+          "uSeed": 624
+        }
+      },
+      "moons": [],
+      "mass": 3.97e-12
+    }
+  ],
   "asteroidBelts": [
     {
       "id": "main-belt",

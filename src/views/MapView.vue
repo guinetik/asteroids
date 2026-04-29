@@ -35,9 +35,9 @@ import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
 import { isCanvasOrbitalMinigame } from '@/lib/minigame/canvasOrbitalMinigames'
 import MissionMiniGameOverlay from '@/components/MissionMiniGameOverlay.vue'
 import EvaMinigameOverlay from '@/components/EvaMinigameOverlay.vue'
-import { PLANETS, SUN } from '@/lib/planets/catalog'
+import { PINNED_BODIES, PLANETS, SUN } from '@/lib/planets/catalog'
 import type { ShopSession } from '@/lib/shop/tradeTypes'
-import type { PlayerProfile } from '@/lib/player/types'
+import type { BodyAccessState, PlayerProfile } from '@/lib/player/types'
 import type { Inventory } from '@/lib/inventory/types'
 import { createProfile } from '@/lib/player/profile'
 import { createInventory } from '@/lib/inventory/inventory'
@@ -249,6 +249,7 @@ const telemetry = reactive<ShuttleTelemetry>({
 })
 const orbitState = reactive<OrbitHudState>({
   state: 'free',
+  nearestBodyId: null,
   nearestBodyName: null,
   orbitalSpeed: 0,
   slingshotSpeed: 0,
@@ -371,6 +372,12 @@ const missionOverlayVisible = ref(false)
 const missionOverlayMission = ref<ActiveShuttleMission | null>(null)
 const missionOverlayCanFit = ref(false)
 const activeOrbitalMinigame = shallowRef<OrbitalMiniGame | null>(null)
+const PINNED_BODY_ID_SET = new Set(PINNED_BODIES.map((body) => body.id))
+const nearestBodyAccess = computed<BodyAccessState | undefined>(() => {
+  const bodyId = orbitState.nearestBodyId
+  if (!bodyId || !PINNED_BODY_ID_SET.has(bodyId)) return undefined
+  return playerProfileSnapshot.value.bodyAccess[bodyId] ?? 'restricted'
+})
 
 watch([missionOverlayVisible, activeOrbitalMinigame], ([visible, mg]) => {
   viewController.setShuttleMissionMinigameBed(Boolean(visible && isCanvasOrbitalMinigame(mg)))
@@ -1421,6 +1428,8 @@ watch(
       :orbitState="orbitState"
       :shop-available="shopButtonVisible && !shopDialogVisible && !shuttleControlVisible"
       :mission-available="missionButtonVisible && !missionOverlayVisible && !shuttleControlVisible"
+      :body-access="nearestBodyAccess"
+      :mission-callout-visible="false"
       @open-engineering-bay="() => openProgramFromMap('upgrades')"
       @open-mission-board="() => openProgramFromMap('missions')"
       @open-shop="openShop"

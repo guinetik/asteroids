@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import type { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
-import { ASTEROID_BELTS, PLANETS, SUN } from '@/lib/planets/catalog'
+import { ASTEROID_BELTS, SOLAR_BODIES, SUN } from '@/lib/planets/catalog'
 import { ORBIT_SCALE } from '@/lib/planets/constants'
 import { MAP_VIEW_CONTROLLER_CONFIG as MAP_CONFIG } from '@/lib/map/mapViewControllerConfig'
 import { createMapScene, handleMapResize, type MapSceneObjects } from '@/three/MapSceneSetup'
@@ -63,7 +63,7 @@ export class MapPlanetariumScene {
       jupiter: 0,
       saturn: 0.5,
     }
-    const planetControllers = PLANETS.map((planet) => {
+    const planetControllers = SOLAR_BODIES.map((planet) => {
       const controller = new PlanetSystemController(planet, initialPhases[planet.id])
       scene.add(controller.group)
       for (const line of controller.orbitLines) {

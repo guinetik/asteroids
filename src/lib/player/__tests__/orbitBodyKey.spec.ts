@@ -12,6 +12,10 @@ describe('orbitBodyKeyFromCaptureName', () => {
     expect(orbitBodyKeyFromCaptureName('Jupiter')).toBe('jupiter')
   })
 
+  it('maps pinned body display names to pinned body ids', () => {
+    expect(orbitBodyKeyFromCaptureName('624 Hektor')).toBe('hektor')
+  })
+
   it('returns null for unknown bodies', () => {
     expect(orbitBodyKeyFromCaptureName('Nope')).toBeNull()
   })

@@ -10,6 +10,9 @@
  * @spec docs/superpowers/specs/2026-04-03-player-profile-design.md
  */
 
+/** Per-body access state for contract-pinned bodies. */
+export type BodyAccessState = 'restricted' | 'unrestricted' | 'liberated' | 'destroyed'
+
 /** Player save data persisted to localStorage. */
 export interface PlayerProfile {
   /** Player display name. Set at profile creation. */
@@ -45,6 +48,11 @@ export interface PlayerProfile {
    * Defaults to `1` for missing entries; `2` after USC partnership unlocks Earth, etc.
    */
   missionPayMultipliers: Record<string, number>
+  /**
+   * Pinned body id to access state. Example: `{ hektor: 'restricted' }` blocks orbit capture
+   * around 624 Hektor until contract state flips it.
+   */
+  bodyAccess: Record<string, BodyAccessState>
   /** Journey ids already completed. */
   completedJourneyIds: string[]
   /** Per-journey completed step ids for resumable journey progress. */

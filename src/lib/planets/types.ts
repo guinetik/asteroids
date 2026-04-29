@@ -40,6 +40,8 @@ export interface OrbitalElements {
   readonly period: number
   /** Optional time offset for mean anomaly calculation. */
   readonly epoch?: number
+  /** Optional starting phase offset in radians. Example: Hektor leads Jupiter by ~1.047 rad. */
+  readonly meanAnomalyOffset?: number
 }
 
 /** Shader program selector for procedural rendering. */
@@ -80,7 +82,12 @@ export interface Moon {
 }
 
 /** Planetary classification. */
-export type PlanetType = 'Terrestrial' | 'Gas Giant' | 'Ice Giant' | 'Dwarf Planet'
+export type PlanetType =
+  | 'Terrestrial'
+  | 'Gas Giant'
+  | 'Ice Giant'
+  | 'Dwarf Planet'
+  | 'Jupiter Trojan'
 
 /** A planet or dwarf planet in the solar system. */
 export interface Planet {
@@ -100,6 +107,8 @@ export interface Planet {
   readonly displayRadius: number
   /** Shader program and uniforms for procedural rendering. */
   readonly shader: ShaderConfig
+  /** Optional GLB model URL. When set, this body uses the model instead of procedural geometry. */
+  readonly modelUrl?: string
   /** Optional ring system (Saturn, Uranus). */
   readonly ring?: RingConfig
   /** Natural satellites. Empty array if none. */
@@ -111,6 +120,9 @@ export interface Planet {
   /** Mass in solar masses (M☉). Earth ~3.00e-6, Jupiter ~9.55e-4. */
   readonly mass: number
 }
+
+/** Contract-pinned body that is always rendered but whose orbit access is save-gated. */
+export type PinnedBody = Planet
 
 /** Solar data — the central star. */
 export interface SunData {

@@ -31,6 +31,8 @@ export type OrbitCaptureState = 'free' | 'approaching' | 'orbiting'
  * works with up-to-date planet positions even while planets are moving.
  */
 export interface CaptureBody {
+  /** Stable catalog id used for save-data gates, or `undefined` for anonymous bodies. */
+  readonly id?: string
   /** Human-readable body name shown in the HUD. */
   readonly name: string
   /**
@@ -80,6 +82,8 @@ export interface Vel2 {
 export interface OrbitHudState {
   /** Current FSM state. */
   state: OrbitCaptureState
+  /** Stable id of the nearest or targeted body, or `null` when no body is in range. */
+  nearestBodyId: string | null
   /** Name of the nearest body within capture range, or `null`. */
   nearestBodyName: string | null
   /** Tangential orbital speed (world units per second) at the current orbit radius. */
@@ -590,7 +594,9 @@ export class OrbitCaptureSystem {
   getHudState(px: number, pz: number): OrbitHudState {
     const nearest = this.findNearestInRange(px, pz)
     // Show target body name when approaching/orbiting, nearest when free
-    const bodyName = this.targetData?.body.name ?? nearest?.name ?? null
+    const body = this.targetData?.body ?? nearest
+    const bodyId = body?.id ?? null
+    const bodyName = body?.name ?? null
     // Linear orbital speed = angular speed. Larger planets = larger orbit radius = more distance
     // covered per revolution, but angular speed is constant, so linear speed = orbitLaunchSpeed.
     // To differentiate: include planet velocity estimate from prevPlanet tracking.
@@ -605,6 +611,7 @@ export class OrbitCaptureSystem {
     }
     return {
       state: this.state,
+      nearestBodyId: bodyId,
       nearestBodyName: bodyName,
       orbitalSpeed,
       slingshotSpeed: orbitalSpeed,

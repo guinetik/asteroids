@@ -32,8 +32,8 @@ const PLANET_TEXTURES = new Set([
 
 /** Return value from createPlanetMesh — the mesh and its shader uniforms. */
 export interface PlanetMeshResult {
-  /** The Three.js mesh, scaled and tilted. */
-  mesh: THREE.Mesh
+  /** The Three.js object, scaled and tilted. */
+  mesh: THREE.Object3D
   /** Shader uniforms for per-frame updates (uTime, etc.). */
   uniforms: Record<string, THREE.IUniform>
   /** Release any textures created for the shader overlay. */

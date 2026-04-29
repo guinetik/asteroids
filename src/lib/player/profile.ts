@@ -10,14 +10,18 @@
  * @date 2026-04-03
  * @spec docs/superpowers/specs/2026-04-03-player-profile-design.md
  */
-import type { PlayerProfile } from './types'
+import type { BodyAccessState, PlayerProfile } from './types'
 import { SLINGSHOT_JOURNEY_FEATURE_ID, WELCOME_JOURNEY_ID } from '@/lib/journeys'
+import { PINNED_BODIES } from '@/lib/planets/catalog'
 
 /** localStorage key for the player profile. */
 export const PROFILE_STORAGE_KEY = 'asteroid-lander-profile'
 
 /** Starting credits for a new player. */
 const STARTING_CREDITS = 1000
+
+/** Default access state assigned to every pinned body in fresh and migrated saves. */
+const DEFAULT_BODY_ACCESS_STATE: BodyAccessState = 'restricted'
 
 /** Display name used when the player submits empty whitespace (matches legacy map default). */
 export const DEFAULT_PLAYER_DISPLAY_NAME = 'Pilot'
@@ -134,6 +138,8 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     }
   }
 
+  const bodyAccess = normalizeBodyAccess(p.bodyAccess)
+
   const hasJourneyFields =
     Array.isArray(p.completedJourneyIds) ||
     (p.journeyStepProgress !== undefined &&
@@ -216,6 +222,7 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     hasSeenIntro,
     unlockedFastTravelPlanets,
     missionPayMultipliers,
+    bodyAccess,
     completedJourneyIds,
     journeyStepProgress,
     unlockedFeatureIds,
@@ -224,6 +231,40 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     ...(shuttleHullHp !== undefined ? { shuttleHullHp } : {}),
     ...(landerHullHp !== undefined ? { landerHullHp } : {}),
   }
+}
+
+/**
+ * Normalize persisted body-access state and seed missing pinned body ids.
+ *
+ * @param raw - Unknown save field from localStorage.
+ * @returns A complete pinned-body access map.
+ */
+function normalizeBodyAccess(raw: unknown): Record<string, BodyAccessState> {
+  const access: Record<string, BodyAccessState> = {}
+  if (raw !== undefined && raw !== null && typeof raw === 'object' && !Array.isArray(raw)) {
+    for (const [bodyId, value] of Object.entries(raw as Record<string, unknown>)) {
+      if (isBodyAccessState(value)) access[bodyId] = value
+    }
+  }
+  for (const body of PINNED_BODIES) {
+    access[body.id] ??= DEFAULT_BODY_ACCESS_STATE
+  }
+  return access
+}
+
+/**
+ * Runtime guard for persisted body access values.
+ *
+ * @param value - Unknown saved value.
+ * @returns True when value is a supported {@link BodyAccessState}.
+ */
+function isBodyAccessState(value: unknown): value is BodyAccessState {
+  return (
+    value === 'restricted' ||
+    value === 'unrestricted' ||
+    value === 'liberated' ||
+    value === 'destroyed'
+  )
 }
 
 /** Create a fresh profile with starting credits. */
@@ -238,6 +279,7 @@ export function createProfile(name: string): PlayerProfile {
     hasSeenIntro: false,
     unlockedFastTravelPlanets: [],
     missionPayMultipliers: {},
+    bodyAccess: normalizeBodyAccess(undefined),
     completedJourneyIds: [],
     journeyStepProgress: {},
     unlockedFeatureIds: [],
@@ -253,6 +295,40 @@ export function createProfile(name: string): PlayerProfile {
  */
 export function markMapIntroSeen(profile: PlayerProfile): PlayerProfile {
   return { ...profile, hasSeenIntro: true }
+}
+
+/**
+ * Read the access state for a pinned body from a profile.
+ *
+ * @param profile - Current profile.
+ * @param bodyId - Pinned body id, e.g. `'hektor'`.
+ * @returns Access state, defaulting to `'restricted'` when absent.
+ */
+export function getBodyAccess(profile: PlayerProfile, bodyId: string): BodyAccessState {
+  return profile.bodyAccess[bodyId] ?? DEFAULT_BODY_ACCESS_STATE
+}
+
+/**
+ * Return a copy of the profile with a pinned body's access state updated.
+ *
+ * @param profile - Current profile.
+ * @param bodyId - Pinned body id, e.g. `'hektor'`.
+ * @param state - New body access state.
+ * @returns Updated profile.
+ */
+export function setBodyAccess(
+  profile: PlayerProfile,
+  bodyId: string,
+  state: BodyAccessState,
+): PlayerProfile {
+  if (profile.bodyAccess[bodyId] === state) return profile
+  return {
+    ...profile,
+    bodyAccess: {
+      ...profile.bodyAccess,
+      [bodyId]: state,
+    },
+  }
 }
 
 /** Serialize and save the profile to localStorage. */

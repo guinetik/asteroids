@@ -15,6 +15,7 @@ import type {
   ShaderConfig,
   Moon,
   Planet,
+  PinnedBody,
   SunData,
   RingConfig,
   KirkwoodGap,
@@ -39,6 +40,7 @@ interface OrbitJSON {
   readonly argumentOfPeriapsis: number
   readonly period: number
   readonly epoch?: number
+  readonly meanAnomalyOffset?: number
 }
 
 /** Raw moon data as stored in JSON. */
@@ -63,6 +65,7 @@ interface PlanetJSON {
   readonly rotationSpeed: number
   readonly mass: number
   readonly shader: ShaderConfig
+  readonly modelUrl?: string
   readonly ring?: RingConfig
   readonly moons: readonly MoonJSON[]
 }
@@ -88,6 +91,7 @@ interface AsteroidBeltJSON {
 interface PlanetariumJSON {
   readonly sun: SunData
   readonly planets: readonly PlanetJSON[]
+  readonly pinnedBodies?: readonly PlanetJSON[]
   readonly asteroidBelts?: readonly AsteroidBeltJSON[]
 }
 
@@ -110,6 +114,7 @@ function convertOrbit(o: OrbitJSON): OrbitalElements {
     argumentOfPeriapsis: o.argumentOfPeriapsis * DEG,
     period: o.period,
     ...(o.epoch !== undefined ? { epoch: o.epoch } : {}),
+    ...(o.meanAnomalyOffset !== undefined ? { meanAnomalyOffset: o.meanAnomalyOffset * DEG } : {}),
   }
 }
 
@@ -148,6 +153,7 @@ function convertPlanet(p: PlanetJSON): Planet {
     rotationSpeed: p.rotationSpeed,
     mass: p.mass,
     shader: p.shader,
+    ...(p.modelUrl !== undefined ? { modelUrl: p.modelUrl } : {}),
     ...(p.ring !== undefined ? { ring: p.ring } : {}),
     moons: p.moons.map(convertMoon),
   }
@@ -189,8 +195,17 @@ export const SUN: SunData = data.sun
 /** All planets (and Pluto), ordered by distance from the Sun. */
 export const PLANETS: readonly Planet[] = data.planets.map(convertPlanet)
 
+/** Contract-pinned bodies, ordered by their authored order field. */
+export const PINNED_BODIES: readonly PinnedBody[] = (data.pinnedBodies ?? []).map(convertPlanet)
+
+/** All orbit-capturable solar bodies excluding the Sun. */
+export const SOLAR_BODIES: readonly Planet[] = [...PLANETS, ...PINNED_BODIES]
+
 /** Array of planet id strings, in the same order as PLANETS. */
 export const PLANET_IDS: string[] = PLANETS.map((p) => p.id)
+
+/** Array of pinned body id strings, in the same order as PINNED_BODIES. */
+export const PINNED_BODY_IDS: string[] = PINNED_BODIES.map((p) => p.id)
 
 /** Main Belt and Kuiper Belt, with orbital angles in radians. */
 export const ASTEROID_BELTS: readonly AsteroidBelt[] = (data.asteroidBelts ?? []).map(
@@ -214,6 +229,12 @@ for (const planet of PLANETS) {
   }
   _seenOrders.add(planet.order)
 }
+for (const body of PINNED_BODIES) {
+  if (_seenIds.has(body.id)) {
+    throw new Error(`Duplicate pinned body id in planetarium.json: "${body.id}"`)
+  }
+  _seenIds.add(body.id)
+}
 
 // ---------------------------------------------------------------------------
 // Lookup helpers
@@ -232,4 +253,19 @@ export function getPlanet(id: string): Planet {
     throw new Error(`Unknown planet id: "${id}"`)
   }
   return planet
+}
+
+/**
+ * Look up a pinned body by its unique id string.
+ *
+ * @param id - The pinned body id (e.g. `"hektor"`).
+ * @returns The matching pinned body.
+ * @throws {Error} If no pinned body with the given id exists in the catalog.
+ */
+export function getPinnedBody(id: string): PinnedBody {
+  const body = PINNED_BODIES.find((p) => p.id === id)
+  if (!body) {
+    throw new Error(`Unknown pinned body id: "${id}"`)
+  }
+  return body
 }

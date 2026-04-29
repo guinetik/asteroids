@@ -15,6 +15,8 @@ import {
   markMapIntroSeen,
   DEFAULT_PLAYER_DISPLAY_NAME,
   MAX_PLAYER_DISPLAY_NAME_LENGTH,
+  getBodyAccess,
+  setBodyAccess,
 } from '../profile'
 
 const mockStorage: Record<string, string> = {}
@@ -46,6 +48,7 @@ describe('createProfile', () => {
     expect(profile.completedMissionCount).toBe(0)
     expect(profile.visitedAsteroids).toEqual({})
     expect(profile.orbitedSolarBodies).toEqual({})
+    expect(profile.bodyAccess['hektor']).toBe('restricted')
     expect(profile.hasSeenIntro).toBe(false)
   })
 
@@ -84,6 +87,20 @@ describe('saveProfile / loadProfile', () => {
     expect(loaded?.hasSeenIntro).toBe(true)
     expect(loaded?.name).toBe('Legacy')
     expect(loaded?.orbitedSolarBodies).toEqual({})
+    expect(loaded?.bodyAccess['hektor']).toBe('restricted')
+  })
+
+  it('migrates legacy JSON without bodyAccess to restricted pinned bodies', () => {
+    mockStorage[PROFILE_STORAGE_KEY] = JSON.stringify({
+      name: 'LegacyHektor',
+      credits: 500,
+      completedMissionCount: 2,
+      visitedAsteroids: {},
+      orbitedSolarBodies: {},
+      hasSeenIntro: true,
+    })
+    const loaded = loadProfile()
+    expect(loaded?.bodyAccess['hektor']).toBe('restricted')
   })
 
   it('preserves explicit hasSeenIntro false from storage', () => {
@@ -283,6 +300,22 @@ describe('markMapIntroSeen', () => {
     const updated = markMapIntroSeen(profile)
     expect(updated.hasSeenIntro).toBe(true)
     expect(profile.hasSeenIntro).toBe(false)
+  })
+})
+
+describe('body access', () => {
+  it('gets and sets pinned body access without mutating the original profile', () => {
+    const profile = createProfile('Ada')
+    const updated = setBodyAccess(profile, 'hektor', 'unrestricted')
+
+    expect(getBodyAccess(updated, 'hektor')).toBe('unrestricted')
+    expect(getBodyAccess(profile, 'hektor')).toBe('restricted')
+  })
+
+  it('persists pinned body access through localStorage', () => {
+    const profile = setBodyAccess(createProfile('Ada'), 'hektor', 'unrestricted')
+    saveProfile(profile)
+    expect(loadProfile()?.bodyAccess['hektor']).toBe('unrestricted')
   })
 })
 

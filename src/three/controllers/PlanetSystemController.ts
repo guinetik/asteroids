@@ -25,6 +25,7 @@ import { createPlanetMesh, type PlanetMeshResult } from '@/three/meshes/createPl
 import { createMoonMesh, type MoonMeshResult } from '@/three/meshes/createMoonMesh'
 import { createRingMesh } from '@/three/meshes/createRingMesh'
 import { createOrbitLine, MOON_ORBIT_OPACITY } from '@/three/meshes/createOrbitLine'
+import { fixMaterials, loadGLB } from '@/three/loadGLB'
 
 /** Simulation time to shader time divisor. */
 const SHADER_TIME_DIVISOR = 365.25
@@ -52,6 +53,9 @@ const INDICATOR_TEXT_OFFSET_X = INDICATOR_LEFT_PAD + INDICATOR_DOT_RADIUS * 2 + 
 
 /** Fade-out band width as a fraction of the fade threshold. */
 const INDICATOR_FADE_BAND = 0.5
+
+/** Fallback dimension used to avoid divide-by-zero while scaling model-only bodies. */
+const MODEL_SCALE_FALLBACK_SIZE = 1
 
 /**
  * Draw a planet indicator sprite: colored dot + name label.
@@ -168,6 +172,9 @@ export class PlanetSystemController implements GravitySource {
     // Planet mesh
     this.planetMesh = createPlanetMesh(planet)
     this.group.add(this.planetMesh.mesh)
+    if (planet.modelUrl) {
+      void this.loadModelMesh(planet)
+    }
 
     // Scale orbit for scene
     const phase = initialPhase ?? Math.random()
@@ -350,6 +357,37 @@ export class PlanetSystemController implements GravitySource {
       } else {
         this.indicatorSprite.visible = false
       }
+    }
+  }
+
+  /**
+   * Replace the procedural placeholder with the authored GLB model for model-backed bodies.
+   *
+   * @param planet - Body definition with a {@link Planet.modelUrl}.
+   */
+  private async loadModelMesh(planet: Planet): Promise<void> {
+    if (!planet.modelUrl) return
+    try {
+      const model = await loadGLB(planet.modelUrl)
+      fixMaterials(model)
+      const box = new THREE.Box3().setFromObject(model)
+      const size = box.getSize(new THREE.Vector3())
+      const maxSize = Math.max(size.x, size.y, size.z, MODEL_SCALE_FALLBACK_SIZE)
+      const targetDiameter = planet.displayRadius * SIZE_SCALE * 2
+      model.scale.setScalar(targetDiameter / maxSize)
+      const center = box.getCenter(new THREE.Vector3())
+      model.position.set(
+        -center.x * model.scale.x,
+        -center.y * model.scale.y,
+        -center.z * model.scale.z,
+      )
+      model.rotation.order = 'ZYX'
+      model.rotation.z = planet.axialTilt
+      this.group.remove(this.planetMesh.mesh)
+      this.group.add(model)
+      this.planetMesh.mesh = model
+    } catch (error) {
+      console.warn(`[PlanetSystemController] Failed to load model for ${planet.id}`, error)
     }
   }
 

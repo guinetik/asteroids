@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { SUN, PLANETS, PLANET_IDS, ASTEROID_BELTS, getPlanet } from '../catalog'
+import {
+  SUN,
+  PLANETS,
+  PLANET_IDS,
+  PINNED_BODIES,
+  PINNED_BODY_IDS,
+  ASTEROID_BELTS,
+  getPinnedBody,
+  getPlanet,
+} from '../catalog'
 
 describe('SUN', () => {
   it('has id "sun"', () => {
@@ -110,6 +119,25 @@ describe('PLANET_IDS', () => {
   })
 })
 
+describe('PINNED_BODIES', () => {
+  it('contains Hektor as a pinned GLB-backed body', () => {
+    const hektor = getPinnedBody('hektor')
+
+    expect(PINNED_BODIES).toHaveLength(1)
+    expect(PINNED_BODY_IDS).toEqual(['hektor'])
+    expect(hektor.name).toBe('624 Hektor')
+    expect(hektor.type).toBe('Jupiter Trojan')
+    expect(hektor.modelUrl).toBe('/models/hektor.glb')
+  })
+
+  it('converts Hektor orbital phase and tilt from degrees to radians', () => {
+    const hektor = getPinnedBody('hektor')
+
+    expect(hektor.orbit.meanAnomalyOffset).toBeCloseTo(Math.PI / 3)
+    expect(hektor.axialTilt).toBeCloseTo((78 * Math.PI) / 180)
+  })
+})
+
 describe('ASTEROID_BELTS', () => {
   it('has length 2', () => {
     expect(ASTEROID_BELTS).toHaveLength(2)
@@ -145,5 +173,11 @@ describe('getPlanet', () => {
 
   it('throws for an unknown id', () => {
     expect(() => getPlanet('unknown-planet')).toThrow('Unknown planet id: "unknown-planet"')
+  })
+})
+
+describe('getPinnedBody', () => {
+  it('throws for an unknown id', () => {
+    expect(() => getPinnedBody('unknown-body')).toThrow('Unknown pinned body id: "unknown-body"')
   })
 })

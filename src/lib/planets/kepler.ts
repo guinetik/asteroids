@@ -109,9 +109,10 @@ export function orbitalPosition3D(elements: OrbitalElements, time: number): Vec3
     argumentOfPeriapsis,
     period,
     epoch = 0,
+    meanAnomalyOffset = 0,
   } = elements
 
-  const M = meanAnomaly(period, time, epoch)
+  const M = meanAnomaly(period, time, epoch) + meanAnomalyOffset
   const E = solveKeplerEquation(M, eccentricity)
   const nu = trueAnomalyFromEccentric(E, eccentricity)
   const r = keplerRadius(semiMajorAxis, eccentricity, nu)

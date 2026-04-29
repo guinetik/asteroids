@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import MissionCallout from '@/components/MissionCallout.vue'
 import type { OrbitHudState } from '@/lib/orbitCapture'
+import type { BodyAccessState } from '@/lib/player/types'
 import { uiAudio } from '@/audio/UiAudioDirector'
 
 const props = defineProps<{
@@ -8,6 +10,9 @@ const props = defineProps<{
   shopAvailable?: boolean
   shopPlanet?: string
   missionAvailable?: boolean
+  bodyAccess?: BodyAccessState
+  missionCalloutVisible?: boolean
+  missionCalloutStepSubject?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -29,6 +34,10 @@ const isCharging = computed(() => {
   return props.orbitState.state === 'orbiting' && props.orbitState.chargeLevel > 0
 })
 
+const restricted = computed(() => {
+  return props.orbitState.state === 'free' && props.bodyAccess === 'restricted'
+})
+
 const title = computed(() => {
   const s = props.orbitState
   if (s.state === 'free' && s.nearestBodyName) return s.nearestBodyName
@@ -39,6 +48,7 @@ const title = computed(() => {
 
 const action = computed(() => {
   const s = props.orbitState
+  if (restricted.value) return 'RESTRICTED'
   if (s.state === 'free') return 'E  Orbit'
   if (s.state === 'approaching') return 'E  Cancel'
   if (s.state === 'orbiting' && s.chargeLevel > 0) {
@@ -59,59 +69,68 @@ const details = computed(() => {
 </script>
 
 <template>
-  <div v-if="visible" class="orbit-prompt" :class="{ 'orbit-prompt-charging': isCharging }">
-    <span class="orbit-prompt-title">{{ title }}</span>
-    <span class="orbit-prompt-action">{{ action }}</span>
-    <span v-for="line in details" :key="line" class="orbit-prompt-detail">{{ line }}</span>
-    <div v-if="isCharging" class="orbit-prompt-bar">
-      <div
-        class="orbit-prompt-bar-fill"
-        :style="{ width: props.orbitState.chargeLevel * 100 + '%' }"
-      ></div>
+  <div>
+    <div v-if="visible" class="orbit-prompt" :class="{ 'orbit-prompt-charging': isCharging }">
+      <span class="orbit-prompt-title">{{ title }}</span>
+      <span class="orbit-prompt-action" :class="{ 'orbit-prompt-action--restricted': restricted }">
+        {{ action }}
+      </span>
+      <span v-for="line in details" :key="line" class="orbit-prompt-detail">{{ line }}</span>
+      <div v-if="isCharging" class="orbit-prompt-bar">
+        <div
+          class="orbit-prompt-bar-fill"
+          :style="{ width: props.orbitState.chargeLevel * 100 + '%' }"
+        ></div>
+      </div>
+      <button
+        v-if="shopAvailable && orbitState.state === 'orbiting'"
+        type="button"
+        class="orbit-prompt-engineering-btn"
+        @click="
+          uiAudio.notifyButtonClick();
+          emit('openEngineeringBay')
+        "
+      >
+        U Engineering Bay
+      </button>
+      <button
+        v-if="shopAvailable && orbitState.state === 'orbiting'"
+        type="button"
+        class="orbit-prompt-mission-board-btn"
+        @click="
+          uiAudio.notifyButtonClick();
+          emit('openMissionBoard')
+        "
+      >
+        J Mission Board
+      </button>
+      <button
+        v-if="shopAvailable && orbitState.state === 'orbiting'"
+        type="button"
+        class="orbit-prompt-shop-btn"
+        @click="
+          uiAudio.notifyButtonClick();
+          emit('openShop')
+        "
+      >
+        B Shop
+      </button>
+      <button
+        v-if="missionAvailable && orbitState.state === 'orbiting'"
+        type="button"
+        class="orbit-prompt-mission-btn"
+        @click="
+          uiAudio.notifyButtonClick();
+          emit('openMission')
+        "
+      >
+        I Mission
+      </button>
     </div>
-    <button
-      v-if="shopAvailable && orbitState.state === 'orbiting'"
-      type="button"
-      class="orbit-prompt-engineering-btn"
-      @click="
-        uiAudio.notifyButtonClick();
-        emit('openEngineeringBay')
-      "
-    >
-      U Engineering Bay
-    </button>
-    <button
-      v-if="shopAvailable && orbitState.state === 'orbiting'"
-      type="button"
-      class="orbit-prompt-mission-board-btn"
-      @click="
-        uiAudio.notifyButtonClick();
-        emit('openMissionBoard')
-      "
-    >
-      J Mission Board
-    </button>
-    <button
-      v-if="shopAvailable && orbitState.state === 'orbiting'"
-      type="button"
-      class="orbit-prompt-shop-btn"
-      @click="
-        uiAudio.notifyButtonClick();
-        emit('openShop')
-      "
-    >
-      B Shop
-    </button>
-    <button
-      v-if="missionAvailable && orbitState.state === 'orbiting'"
-      type="button"
-      class="orbit-prompt-mission-btn"
-      @click="
-        uiAudio.notifyButtonClick();
-        emit('openMission')
-      "
-    >
-      I Mission
-    </button>
+    <MissionCallout
+      v-if="missionCalloutVisible && title"
+      :body-name="title"
+      :step-subject="missionCalloutStepSubject"
+    />
   </div>
 </template>
