@@ -21,6 +21,19 @@ const STANDOFF_FOOTPRINT_RADIUS_MULTIPLIER = 1.45
 /** Extra X/Z clearance beyond the scaled asteroid footprint. */
 const STANDOFF_FOOTPRINT_CLEARANCE = 250
 
+/**
+ * Allowed horizontal reach beyond the mission photometry standoff D before drifting
+ * when terrain support reads as ∞ (void / off-body). Matches D + D/2 = 1.5D outer bound.
+ *
+ * Example: photometry authored at {@link computePhotometryStandoffDistance} = 20u → playable
+ * envelope radius ≈ 30u before adrift fails the run for non-finite ALT.
+ *
+ * @author guinetik
+ * @date 2026-04-29
+ * @spec docs/superpowers/specs/2026-04-26-photometry-minigame-design.md
+ */
+export const PHOTOMETRY_ADRIFT_EXTRA_STANDOFF_FRAC = 0.5
+
 /** Golden-ratio-derived bit mixer seed. */
 const HASH_MIX_A = 0x9e3779b9
 
@@ -154,6 +167,25 @@ export function computePhotometryStandoffDistance(heightmap: PhotometrySurfaceHe
   }
 
   return maxRadius * STANDOFF_FOOTPRINT_RADIUS_MULTIPLIER + STANDOFF_FOOTPRINT_CLEARANCE
+}
+
+/**
+ * Maximum horizontal radial distance from asteroid center (xz origin) playable while ALT is
+ * non-finite. Uses authored photometry standoff D × (1 + {@link PHOTOMETRY_ADRIFT_EXTRA_STANDOFF_FRAC}),
+ * aligning off-body photometry probes with drift failure thresholds.
+ *
+ * @author guinetik
+ * @date 2026-04-29
+ * @spec docs/superpowers/specs/2026-04-26-photometry-minigame-design.md
+ *
+ * @param heightmap - Same surface descriptor used by {@link computePhotometryStandoffDistance}.
+ * @returns Radius in world units from (0,y,0): beyond this reads as adrift alongside ∞ ALT.
+ */
+export function computePhotometryAdriftRadialLimit(
+  heightmap: PhotometrySurfaceHeightmap,
+): number {
+  const standoffDistance = computePhotometryStandoffDistance(heightmap)
+  return standoffDistance * (1 + PHOTOMETRY_ADRIFT_EXTRA_STANDOFF_FRAC)
 }
 
 /**

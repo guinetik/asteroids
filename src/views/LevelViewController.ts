@@ -37,6 +37,7 @@ import { persistCompletedAsteroidMissionRewards } from '@/lib/missions/asteroidM
 import { LEVEL_GRID_SIZE } from '@/lib/missions/asteroidMissionGenerator'
 import { getCurrentUpgradeValue, hydratePlayerUpgradeLevelsFromStorage } from '@/lib/upgrades'
 import type { GeneratedAsteroidMission, ConcreteObjective } from '@/lib/missions/types'
+import { computePhotometryAdriftRadialLimit } from '@/lib/photometry/photometryGeometry'
 import { Heightmap } from '@/lib/terrain/heightmap'
 import { MultiToolController } from '@/three/MultiToolController'
 import { ProspectOverlayController } from '@/three/ProspectOverlayController'
@@ -3104,9 +3105,17 @@ export class LevelViewController implements Tickable {
   }
 
   private isLanderAdrift(): boolean {
-    if (!this.landerController || !this.heightmap || this.landerDestroyed) return false
+    if (!this.landerController || this.landerDestroyed) return false
+    if (!this.heightmap) return false
 
     const landerPos = this.landerController.group.position
+    const altitudeAboveGround = this.landerController.altitudeAboveGround
+    // ∞ ALT off-body remains playable inside photometry authored radius (~D + D/2 from center).
+    if (!Number.isFinite(altitudeAboveGround)) {
+      const maxReachFromOrigin = computePhotometryAdriftRadialLimit(this.heightmap)
+      const radialFromOrigin = Math.hypot(landerPos.x, landerPos.z)
+      return radialFromOrigin > maxReachFromOrigin
+    }
     const halfSize = this.heightmap.worldSize / 2
     const outsideX = Math.abs(landerPos.x) > halfSize + LEVEL_BOUNDS_CONFIG.adriftBoundsMargin
     const outsideZ = Math.abs(landerPos.z) > halfSize + LEVEL_BOUNDS_CONFIG.adriftBoundsMargin

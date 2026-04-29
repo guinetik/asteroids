@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  computePhotometryAdriftRadialLimit,
   computePhotometryProbeTarget,
   computePhotometryStandoffDistance,
   findClosestPhotometrySurfacePoint,
@@ -74,6 +75,22 @@ describe('computePhotometryStandoffDistance', () => {
     heightmap.setValid(4, 2, true)
 
     expect(computePhotometryStandoffDistance(heightmap)).toBeCloseTo(540)
+  })
+})
+
+describe('computePhotometryAdriftRadialLimit', () => {
+  it('equals photometry standoff D plus half D (~1.5×) radially from xz origin before ∞ ALT drifts', () => {
+    const heightmap = new Heightmap(5, 400)
+    for (let gz = 0; gz < heightmap.resolution; gz++) {
+      for (let gx = 0; gx < heightmap.resolution; gx++) {
+        heightmap.setValid(gx, gz, false)
+      }
+    }
+    heightmap.setValid(2, 2, true)
+    heightmap.setValid(4, 2, true)
+
+    const photometryReach = computePhotometryStandoffDistance(heightmap)
+    expect(computePhotometryAdriftRadialLimit(heightmap)).toBeCloseTo(photometryReach * 1.5)
   })
 })
 
