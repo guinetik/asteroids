@@ -87,6 +87,22 @@ function ellipseSubpath(cx: number, cy: number, rx: number, ry: number): string 
 /** Bodies that already have a route line — don't duplicate the distance label. */
 const routeBodyNames = computed(() => new Set(props.overlay.distances.map((d) => d.name)))
 
+/** Pick the per-belt CSS modifier — falls back to `main` for unknown belt ids. */
+function beltCssVariant(beltId: string): string {
+  if (beltId === 'kuiper-belt') return 'kuiper'
+  return 'main'
+}
+
+/**
+ * Inner radius as a fraction (%) of the outer radius — drives the radial-gradient
+ * hole. Same ratio holds in X and Y because the source belt is a true world circle,
+ * so we sample the X axis (Y would yield the same value).
+ */
+function beltInnerFrac(belt: { innerRadiusX: number; outerRadiusX: number }): number {
+  if (belt.outerRadiusX <= 0) return 0
+  return Math.max(0, Math.min(99, (belt.innerRadiusX / belt.outerRadiusX) * 100))
+}
+
 /** Consecutive line segments for the persistent world-line polyline. */
 const trajectorySegments = computed(() => {
   const points = props.overlay.trajectoryPoints
@@ -102,6 +118,9 @@ const trajectorySegments = computed(() => {
 
 <template>
   <div v-if="overlay.visible" class="map-overlay">
+    <!-- Authored CSS grid backdrop — purely visual, independent of world coordinates. -->
+    <div class="map-tac-grid" />
+
     <!-- Thermal zone rings (hot/cold) — toggled discreet layer, rendered below gravity rings -->
     <svg
       v-if="thermalZonesVisible"
@@ -117,6 +136,22 @@ const trajectorySegments = computed(() => {
         :class="['map-thermal-ring', 'map-thermal-ring--' + zone.kind]"
       />
     </svg>
+
+    <!-- Asteroid belt annuli (Main Belt, Kuiper Belt) — CSS-authored over the tac map.
+         X and Y radii are projected independently so the annulus stays a true screen-
+         space circle on widescreen viewports (matches thermal-zone projection). -->
+    <div
+      v-for="belt in overlay.asteroidBelts"
+      :key="'belt-' + belt.id"
+      :class="['map-belt-ring', 'map-belt-ring--' + beltCssVariant(belt.id)]"
+      :style="{
+        left: belt.centerX + '%',
+        top: belt.centerY + '%',
+        width: belt.outerRadiusX * 2 + '%',
+        height: belt.outerRadiusY * 2 + '%',
+        '--belt-inner-frac': beltInnerFrac(belt) + '%',
+      }"
+    />
 
     <!-- Gravity rings -->
     <div v-for="ring in overlay.gravityRings" :key="'ring-' + ring.name" class="map-gravity-ring">

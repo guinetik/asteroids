@@ -122,14 +122,14 @@ export const MAP_RETICLE_MIN_SPEED = 0.135
 export const MAP_RETICLE_MIN_SPEED_OFF = 0.045
 
 /**
- * World-space distance along planar velocity for building a second projected point (NDC delta).
- * Larger values reduce numeric noise; keep modest relative to map scale.
+ * World-space distance ahead of the shuttle where the planar-velocity travel marker sits.
+ * Keep modest relative to map scale so it reads as a local direction cue.
  */
 export const MAP_RETICLE_WEDGE_PROJECT_OFFSET = 280
 
 /**
- * Low-pass (seconds) on wedge sprite rotation after screen-space velocity projection.
- * Replaces separate heading + azimuth filters so camera pitch/orbit does not desync the wedge.
+ * Low-pass (seconds) on wedge mesh rotation after planar world-velocity heading resolution.
+ * Reduces jitter when gravity or player inputs nudge the travel vector frame-to-frame.
  */
 export const MAP_RETICLE_WEDGE_ROTATION_SMOOTH_TAU_SEC = 0.055
 

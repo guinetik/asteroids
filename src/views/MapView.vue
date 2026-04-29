@@ -424,6 +424,7 @@ const mapOverlay = reactive<MapOverlayState>({
   speed: 0,
   distances: [],
   gravityRings: [],
+  asteroidBelts: [],
   thermalZones: [],
   trajectoryPoints: [],
   missionWaypoint: null,

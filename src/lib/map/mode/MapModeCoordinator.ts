@@ -112,6 +112,7 @@ const HIDDEN_MAP_OVERLAY_STATE: MapOverlayState = {
   speed: 0,
   distances: [],
   gravityRings: [],
+  asteroidBelts: [],
   thermalZones: [],
   trajectoryPoints: [],
   missionWaypoint: null,

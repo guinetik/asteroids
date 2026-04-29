@@ -13,6 +13,27 @@ import lockDiscVertexShader from '@/three/shaders/map/lockDisc.vert.glsl?raw'
 import approachLockDiscFragmentShader from '@/three/shaders/map/approachLockDisc.frag.glsl?raw'
 import surfLockDiscFragmentShader from '@/three/shaders/map/surfLockDisc.frag.glsl?raw'
 
+/** Below this planar velocity, the travel marker keeps its previous state. */
+const RETICLE_VELOCITY_EPSILON = 1e-8
+
+/** Local-space X coordinate for the travel marker tip. */
+const RETICLE_POINTER_TIP_X = 0.52
+
+/** Local-space X coordinate for the travel marker base. */
+const RETICLE_POINTER_BASE_X = -0.28
+
+/** Local-space half-width for the travel marker base. */
+const RETICLE_POINTER_HALF_WIDTH = 0.2
+
+/** World-space lift so the flat travel marker does not intersect the grid. */
+const RETICLE_POINTER_Y_OFFSET = 0.15
+
+/** Additive cyan used for the travel marker mesh. */
+const RETICLE_POINTER_COLOR = 0x00e6ff
+
+/** Render above map tethers and below prograde markers. */
+const RETICLE_POINTER_RENDER_ORDER = 12
+
 /**
  * Interpolate from `a` toward `b` along the shortest arc (radians).
  *
@@ -28,41 +49,20 @@ function lerpAngleRadShortest(a: number, b: number, t: number): number {
 }
 
 /**
- * Sprite rotation (radians) that aligns the velocity wedge with planar motion as seen on screen.
- * Uses two perspective projections so camera pitch and orbit match the HUD arrow.
+ * Sprite rotation (radians) that aligns the velocity wedge with planar world motion.
  *
- * @param camera - Active map camera
- * @param shuttlePos - Shuttle world position
  * @param velocity - World velocity (XZ used; Y ignored for direction)
- * @param offset - World units along velocity toward the second sample point
- * @param p0 - Scratch (mutated)
- * @param p1 - Scratch (mutated)
  * @param velPlanar - Scratch (mutated)
- * @returns `atan2` in screen space, or `null` if degenerate
+ * @returns Rotation in sprite texture space, or `null` if velocity is degenerate
  */
-function computeReticleWedgeScreenRotation(
-  camera: THREE.PerspectiveCamera,
-  shuttlePos: THREE.Vector3,
+function computeReticleWedgeWorldRotation(
   velocity: THREE.Vector3,
-  offset: number,
-  p0: THREE.Vector3,
-  p1: THREE.Vector3,
   velPlanar: THREE.Vector3,
 ): number | null {
   velPlanar.set(velocity.x, 0, velocity.z)
   const speed = velPlanar.length()
-  if (speed < 1e-8) return null
-  velPlanar.multiplyScalar(offset / speed)
-
-  p0.copy(shuttlePos)
-  p0.project(camera)
-  p1.copy(shuttlePos).add(velPlanar)
-  p1.project(camera)
-
-  const dx = p1.x - p0.x
-  const dy = p1.y - p0.y
-  if (dx * dx + dy * dy < 1e-14) return null
-  return Math.atan2(dy, dx)
+  if (speed < RETICLE_VELOCITY_EPSILON) return null
+  return Math.atan2(-velocity.z, velocity.x)
 }
 
 /** Camera-relative data for the ship HUD reticle each frame. */
@@ -127,12 +127,10 @@ export class MapSceneVisuals {
   private launchArrow: THREE.Group | null = null
   /** Hysteresis: once planar speed crosses "on", require lower speed to hide the wedge. */
   private reticleWedgeSpeedGate = false
-  /** Low-pass filtered screen-space wedge rotation (rad); cleared when wedge hides. */
+  /** Low-pass filtered world-velocity wedge rotation (rad); cleared when wedge hides. */
   private reticleWedgeRotationSmooth: number | null = null
   /** Low-pass filtered reticle alpha when scale-driven fade jitters. */
   private reticleAlphaSmooth: number | null = null
-  private readonly reticleProjectScratch0 = new THREE.Vector3()
-  private readonly reticleProjectScratch1 = new THREE.Vector3()
   private readonly reticleVelocityPlanar = new THREE.Vector3()
   private progradeMarkerOpacitySmooth: number | null = null
   private retrogradeMarkerOpacitySmooth: number | null = null
@@ -141,7 +139,7 @@ export class MapSceneVisuals {
   private launchArrowMaterials: THREE.ShaderMaterial[] = []
   private shipReticleGroup: THREE.Group | null = null
   private shipReticleRing: THREE.Sprite | null = null
-  private shipReticlePointer: THREE.Sprite | null = null
+  private shipReticlePointer: THREE.Mesh<THREE.ShapeGeometry, THREE.MeshBasicMaterial> | null = null
   private approachTether: ApproachTetherVisuals | null = null
   private surfCouplingTether: SurfCouplingTetherVisuals | null = null
   private progradeMarkers: ProgradeMarkerVisuals | null = null
@@ -433,15 +431,17 @@ export class MapSceneVisuals {
       }
 
       if (this.reticleWedgeSpeedGate) {
-        const rawAngle = computeReticleWedgeScreenRotation(
-          cam,
-          update.shuttlePosition,
+        const rawAngle = computeReticleWedgeWorldRotation(
           update.shuttleVelocity,
-          MAP_CONFIG.MAP_RETICLE_WEDGE_PROJECT_OFFSET,
-          this.reticleProjectScratch0,
-          this.reticleProjectScratch1,
           this.reticleVelocityPlanar,
         )
+        if (rawAngle !== null) {
+          this.shipReticleGroup.position.copy(update.shuttlePosition).addScaledVector(
+            this.reticleVelocityPlanar,
+            MAP_CONFIG.MAP_RETICLE_WEDGE_PROJECT_OFFSET / this.reticleVelocityPlanar.length(),
+          )
+          this.shipReticleGroup.position.y += RETICLE_POINTER_Y_OFFSET
+        }
         const tauRot = MAP_CONFIG.MAP_RETICLE_WEDGE_ROTATION_SMOOTH_TAU_SEC
         if (rawAngle !== null) {
           if (this.reticleWedgeRotationSmooth === null) {
@@ -459,10 +459,9 @@ export class MapSceneVisuals {
         }
         this.shipReticlePointer.visible = this.reticleWedgeRotationSmooth !== null
         if (this.reticleWedgeRotationSmooth !== null) {
-          ;(this.shipReticlePointer.material as THREE.SpriteMaterial).rotation =
-            this.reticleWedgeRotationSmooth
+          this.shipReticlePointer.rotation.y = this.reticleWedgeRotationSmooth
         }
-        ;(this.shipReticlePointer.material as THREE.SpriteMaterial).opacity = reticleAlpha
+        this.shipReticlePointer.material.opacity = reticleAlpha
       } else {
         this.shipReticlePointer.visible = false
         this.reticleWedgeRotationSmooth = null
@@ -710,7 +709,10 @@ export class MapSceneVisuals {
         material.dispose()
       }
       if (this.shipReticleRing) disposeSprite(this.shipReticleRing)
-      if (this.shipReticlePointer) disposeSprite(this.shipReticlePointer)
+      if (this.shipReticlePointer) {
+        this.shipReticlePointer.geometry.dispose()
+        this.shipReticlePointer.material.dispose()
+      }
       this.scene.remove(this.shipReticleGroup)
       this.shipReticleGroup = null
       this.shipReticleRing = null
@@ -768,36 +770,24 @@ export class MapSceneVisuals {
     })
     this.shipReticleRing = new THREE.Sprite(ringMat)
 
-    const wedgeCanvas = document.createElement('canvas')
-    wedgeCanvas.width = size
-    wedgeCanvas.height = size
-    const wctx = wedgeCanvas.getContext('2d')
-    if (!wctx) return
-
-    const tipX = cx + 62
-    const baseX = cx + 34
-    const halfW = 13
-    wctx.beginPath()
-    wctx.moveTo(tipX, cy)
-    wctx.lineTo(baseX, cy - halfW)
-    wctx.lineTo(baseX, cy + halfW)
-    wctx.closePath()
-    wctx.fillStyle = 'rgba(0, 235, 255, 0.92)'
-    wctx.fill()
-    wctx.strokeStyle = 'rgba(255, 255, 255, 0.35)'
-    wctx.lineWidth = 1
-    wctx.stroke()
-
-    const wedgeTex = new THREE.CanvasTexture(wedgeCanvas)
-    wedgeTex.needsUpdate = true
-    const wedgeMat = new THREE.SpriteMaterial({
-      map: wedgeTex,
+    const wedgeShape = new THREE.Shape()
+    wedgeShape.moveTo(RETICLE_POINTER_TIP_X, 0)
+    wedgeShape.lineTo(RETICLE_POINTER_BASE_X, RETICLE_POINTER_HALF_WIDTH)
+    wedgeShape.lineTo(RETICLE_POINTER_BASE_X, -RETICLE_POINTER_HALF_WIDTH)
+    wedgeShape.lineTo(RETICLE_POINTER_TIP_X, 0)
+    const wedgeGeometry = new THREE.ShapeGeometry(wedgeShape)
+    wedgeGeometry.rotateX(-Math.PI / 2)
+    const wedgeMat = new THREE.MeshBasicMaterial({
+      color: RETICLE_POINTER_COLOR,
       transparent: true,
       opacity: 0,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
+      depthTest: false,
+      side: THREE.DoubleSide,
     })
-    this.shipReticlePointer = new THREE.Sprite(wedgeMat)
+    this.shipReticlePointer = new THREE.Mesh(wedgeGeometry, wedgeMat)
+    this.shipReticlePointer.renderOrder = RETICLE_POINTER_RENDER_ORDER
     this.shipReticlePointer.visible = false
 
     this.shipReticleGroup = new THREE.Group()

@@ -10,7 +10,13 @@
  * @spec docs/superpowers/specs/2026-04-05-map-overlay-design.md
  */
 import * as THREE from 'three'
-import type { MapOverlayState, MapThermalZone } from '@/lib/ShuttleTelemetry'
+import type {
+  MapAsteroidBelt,
+  MapOverlayState,
+  MapThermalZone,
+} from '@/lib/ShuttleTelemetry'
+import { ASTEROID_BELTS } from '@/lib/planets/catalog'
+import { ORBIT_SCALE } from '@/lib/planets/constants'
 import type { SunController } from '@/three/controllers/SunController'
 import type { PlanetSystemController } from '@/three/controllers/PlanetSystemController'
 import type { MapCamera } from '@/three/MapCamera'
@@ -233,6 +239,8 @@ export class MapOverlayProjector {
       }
     }
 
+    const asteroidBelts = this.buildAsteroidBelts(input.mapCamera)
+
     return {
       visible: true,
       labels,
@@ -242,10 +250,41 @@ export class MapOverlayProjector {
       speed: input.speed,
       distances,
       gravityRings,
+      asteroidBelts,
       thermalZones,
       trajectoryPoints,
       missionWaypoint,
     }
+  }
+
+  /**
+   * Project each asteroid belt's inner/outer radius to screen-space %, centered
+   * on the Sun (world origin). Both radii are derived from belt.{inner,outer}Radius
+   * (AU) × ORBIT_SCALE — same convention used by the 3D belt controllers.
+   */
+  private buildAsteroidBelts(mapCamera: MapCamera): MapAsteroidBelt[] {
+    const sunCenter = mapCamera.projectToScreen(new THREE.Vector3(0, 0, 0))
+    return ASTEROID_BELTS.map((belt) => {
+      const innerWorld = belt.innerRadius * ORBIT_SCALE
+      const outerWorld = belt.outerRadius * ORBIT_SCALE
+      // Project X and Z offsets separately. CSS width % references viewport width
+      // and height % references viewport height — using a single radius would
+      // stretch the annulus into a stadium on non-square viewports.
+      const outerEdgeX = mapCamera.projectToScreen(new THREE.Vector3(outerWorld, 0, 0))
+      const outerEdgeZ = mapCamera.projectToScreen(new THREE.Vector3(0, 0, outerWorld))
+      const innerEdgeX = mapCamera.projectToScreen(new THREE.Vector3(innerWorld, 0, 0))
+      const innerEdgeZ = mapCamera.projectToScreen(new THREE.Vector3(0, 0, innerWorld))
+      return {
+        id: belt.id,
+        name: belt.name,
+        centerX: sunCenter.x * PERCENT,
+        centerY: sunCenter.y * PERCENT,
+        outerRadiusX: Math.abs(outerEdgeX.x - sunCenter.x) * PERCENT,
+        outerRadiusY: Math.abs(outerEdgeZ.y - sunCenter.y) * PERCENT,
+        innerRadiusX: Math.abs(innerEdgeX.x - sunCenter.x) * PERCENT,
+        innerRadiusY: Math.abs(innerEdgeZ.y - sunCenter.y) * PERCENT,
+      }
+    })
   }
 
   /** Project the persistent world line to screen space, appending the current ship point. */

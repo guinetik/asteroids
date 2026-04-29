@@ -346,6 +346,8 @@ export class MapViewController implements Tickable {
   private modeCoordinator = new MapModeCoordinator()
   private yRecovery = false
   private inspectMode = false
+  /** Pre-tac-map visibility of the space-time grid mesh, restored on map close. */
+  private spaceTimeGridVisibleBeforeTacMap: boolean | null = null
   private habitatState = new HabitatState()
   private readonly habitatFacade = new MapHabitatFacade()
   private turretSessionController: TurretSessionController | null = null
@@ -3563,11 +3565,12 @@ export class MapViewController implements Tickable {
       this.vehicleCamera.controls.enabled = false
     }
 
-    // Dim the spacetime grid so labels are readable
+    // Hide the world-space fabric grid for tac map — the overlay draws its own
+    // CSS backdrop. Player's grid toggle preference is captured here so it can be
+    // restored unchanged when the map closes.
     if (this.spaceTimeGrid) {
-      const mat = this.spaceTimeGrid.mesh.material as THREE.LineBasicMaterial
-      mat.opacity = 0.15
-      mat.transparent = true
+      this.spaceTimeGridVisibleBeforeTacMap = this.spaceTimeGrid.mesh.visible
+      this.spaceTimeGrid.mesh.visible = false
     }
 
     // Position ortho camera above ship
@@ -3634,6 +3637,12 @@ export class MapViewController implements Tickable {
 
     // Restore grid color/opacity (fabric stress cleared until next orrery tick)
     this.spaceTimeGrid?.applyBaselineLineAppearance()
+
+    // Restore the pre-tac-map grid visibility — preserves the player's toggle.
+    if (this.spaceTimeGrid && this.spaceTimeGridVisibleBeforeTacMap !== null) {
+      this.spaceTimeGrid.mesh.visible = this.spaceTimeGridVisibleBeforeTacMap
+      this.spaceTimeGridVisibleBeforeTacMap = null
+    }
 
     // Hide overlay
     this.onMapOverlay?.(this.modeCoordinator.buildHiddenMapOverlayState())

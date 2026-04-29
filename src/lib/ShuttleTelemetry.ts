@@ -141,6 +141,29 @@ export interface MapGravityRing {
   horizonRadius: number
 }
 
+/**
+ * Screen-projected asteroid belt annulus, centered on the Sun. Both radii are
+ * in viewport % so the renderer can place an absolutely-positioned div directly.
+ */
+export interface MapAsteroidBelt {
+  /** Belt id (e.g. `main-belt`, `kuiper-belt`) — drives the per-belt CSS class. */
+  id: string
+  /** Belt display name — rendered as a label along the ring. */
+  name: string
+  /** Sun screen X (%) — annulus center. */
+  centerX: number
+  /** Sun screen Y (%) — annulus center. */
+  centerY: number
+  /** Outer radius along the viewport X axis, in % of viewport width. */
+  outerRadiusX: number
+  /** Outer radius along the viewport Y axis, in % of viewport height. */
+  outerRadiusY: number
+  /** Inner radius along the viewport X axis, in % of viewport width. */
+  innerRadiusX: number
+  /** Inner radius along the viewport Y axis, in % of viewport height. */
+  innerRadiusY: number
+}
+
 /** Screen-projected point along the persistent ship world line. */
 export interface MapTrajectoryPoint {
   /** Sample screen X (%) */
@@ -194,6 +217,8 @@ export interface MapOverlayState {
   distances: MapDistanceLine[]
   /** Gravity influence + event horizon rings */
   gravityRings: MapGravityRing[]
+  /** Asteroid belt annuli centered on the Sun (Main Belt, Kuiper Belt). */
+  asteroidBelts: MapAsteroidBelt[]
   /** Thermal zone bands around the Sun (hot and cold protection zones). */
   thermalZones: MapThermalZone[]
   /** Persistent run-long world line in screen space */

@@ -1,0 +1,83 @@
+/* Tactical-map backdrop layers authored in CSS so cell sizes and belt visuals
+   can be tuned without touching the WebGL pipeline. */
+
+:root {
+  /* Grid backdrop tuning. Override in DevTools to iterate live. */
+  --map-tac-grid-cell: 28px;
+  --map-tac-grid-line-color: rgba(70, 110, 160, 0.18);
+  --map-tac-grid-line-width: 1px;
+
+  /* Belt ring tuning. Colors per belt id, alpha controls fill density. */
+  --map-belt-main-color: rgba(220, 165, 90, 0.34);
+  --map-belt-main-border: rgba(220, 165, 90, 0.78);
+  --map-belt-kuiper-color: rgba(110, 170, 220, 0.28);
+  --map-belt-kuiper-border: rgba(110, 170, 220, 0.7);
+}
+
+.map-tac-grid {
+  @apply absolute inset-0 pointer-events-none;
+  z-index: 0;
+  background-image:
+    repeating-linear-gradient(
+      to right,
+      var(--map-tac-grid-line-color) 0,
+      var(--map-tac-grid-line-color) var(--map-tac-grid-line-width),
+      transparent var(--map-tac-grid-line-width),
+      transparent var(--map-tac-grid-cell)
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      var(--map-tac-grid-line-color) 0,
+      var(--map-tac-grid-line-color) var(--map-tac-grid-line-width),
+      transparent var(--map-tac-grid-line-width),
+      transparent var(--map-tac-grid-cell)
+    );
+}
+
+.map-belt-ring {
+  @apply absolute pointer-events-none rounded-full;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+  /* The annulus look — solid border for the inner edge, soft tint via background.
+     Outer edge is implicit at the element's own size; inner edge is the box-shadow inset. */
+}
+
+.map-belt-ring--main {
+  background: radial-gradient(
+    circle,
+    transparent 0,
+    transparent var(--belt-inner-frac, 60%),
+    var(--map-belt-main-color) calc(var(--belt-inner-frac, 60%) + 1%),
+    var(--map-belt-main-color) 100%
+  );
+  border: 1px solid var(--map-belt-main-border);
+  box-shadow: inset 0 0 0 1px var(--map-belt-main-border);
+}
+
+.map-belt-ring--kuiper {
+  background: radial-gradient(
+    circle,
+    transparent 0,
+    transparent var(--belt-inner-frac, 60%),
+    var(--map-belt-kuiper-color) calc(var(--belt-inner-frac, 60%) + 1%),
+    var(--map-belt-kuiper-color) 100%
+  );
+  border: 1px solid var(--map-belt-kuiper-border);
+  box-shadow: inset 0 0 0 1px var(--map-belt-kuiper-border);
+}
+
+.map-belt-label {
+  @apply absolute font-mono text-xs pointer-events-none;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+}
+
+.map-belt-label--main {
+  color: rgba(220, 165, 90, 0.85);
+}
+
+.map-belt-label--kuiper {
+  color: rgba(110, 170, 220, 0.85);
+}
