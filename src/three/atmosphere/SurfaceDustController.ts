@@ -19,18 +19,37 @@ import type { AtmosphereContext } from './AtmosphereContext'
 
 // ── Ambient drift ──
 /** Base particle count at dustCoverage = 1.0. Actual count is this * dustCoverage. */
-const DRIFT_BASE_COUNT = 220
+const DRIFT_BASE_COUNT = 1000
 /** Minimum particles even on low-dust asteroids. */
 const DRIFT_MIN_COUNT = 70
-/** Particle size in world units (sizeAttenuation = true). */
-const DRIFT_PARTICLE_SIZE = 0.08
+/**
+ * Default drift particle size in world units (sizeAttenuation = true). The
+ * actual size is mode-dependent — see DRIFT_SIZE_LANDER / DRIFT_SIZE_EVA below
+ * — because the lander third-person camera sits ~75u from the slab while the
+ * FPS camera is ~5u away. One size cannot work at both distances.
+ */
+const DRIFT_PARTICLE_SIZE = 0.2
+/** Drift size when in lander or cinematic mode (third-person camera, far). */
+const DRIFT_SIZE_LANDER = 0.6
+/** Drift size when in EVA mode (first-person camera, close). */
+const DRIFT_SIZE_EVA = 0.15
 const DRIFT_LIFETIME = 6
 const DRIFT_OPACITY = 0.5
-const DRIFT_SPREAD = 0.5
+const DRIFT_SPREAD = 0.1
 /** Half-size of the volume box around the camera (world units). */
-const DRIFT_VOLUME_HALF = 32
-/** Slow drift speed from solar radiation. */
-const DRIFT_SPEED = 1.5
+const DRIFT_VOLUME_HALF = 38
+/**
+ * Vertical offset (fraction of DRIFT_MAX_HEIGHT) at which the lander-mode
+ * slab starts below the lander. EVA always uses 0 (no underground spawning).
+ * 0.5 = half above, half below the lander.
+ */
+const DRIFT_LANDER_BELOW_FRAC = 0.5
+/**
+ * Bulk drift speed (units/s) along the sun-anti direction. Set to 0 to keep
+ * the field static — particles still wander via DRIFT_SPREAD jitter, but no
+ * collective "wind" direction, matching the airless asteroid setting.
+ */
+const DRIFT_SPEED = 0
 /** Height range above ground for ambient particles (world units). */
 const DRIFT_MAX_HEIGHT = 14
 /**
@@ -77,9 +96,9 @@ const WASH_PUSH_STRENGTH = 6
 
 // ── Eye-level motes (EVA only) ──
 /**
- * Tiny suspended motes drifting through the player's field of view in EVA.
- * Sells low-G "stuff hanging in the not-quite-vacuum" without contradicting
- * the airless setting. Discreet — barely noticeable until you focus.
+ * Motion-driven motes streaming past the FPS camera. Spawn rate scales with
+ * player movement — almost none when standing still, full rate when running,
+ * with a bonus while airborne to sell jetpack/floating air-mobility.
  */
 const EYE_MOTE_COUNT = 150
 /** Particle size in world units (sizeAttenuation = true). */
@@ -94,6 +113,12 @@ const EYE_MOTE_BUBBLE = 6
 const EYE_MOTE_HEIGHT = 1.5
 /** Forward-bias fraction of EYE_MOTE_BUBBLE applied while the player moves. */
 const EYE_MOTE_FORWARD_BIAS = 0.6
+/** Player ground speed (m/s) at which the spawn rate reaches its base value. */
+const EYE_MOTE_SPEED_FULL = 3.0
+/** Multiplier on spawn rate when airborne (jetpack / jump). */
+const EYE_MOTE_AIRBORNE_GAIN = 1.6
+/** Floor on motion intensity so a few motes still appear when standing still. */
+const EYE_MOTE_IDLE_FLOOR = 0.08
 
 /**
  * Manages ambient surface dust drift and EVA footstep puffs.
@@ -122,16 +147,18 @@ export class SurfaceDustController {
   private readonly driftPoolSize: number
 
   constructor(ctx: AtmosphereContext) {
-    const dustColor = new THREE.Color(ctx.baseColor[0], ctx.baseColor[1], ctx.baseColor[2]).lerp(
-      DUST_NEUTRAL_COLOR,
-      DUST_NEUTRAL_BLEND,
-    )
+    // Asteroid-tinted color (used for footstep puffs — kicked-up surface material).
+    const asteroidColor = new THREE.Color(ctx.baseColor[0], ctx.baseColor[1], ctx.baseColor[2])
+    // Neutral grayish dust (used for ambient drift — generic loose grit, not asteroid-specific).
+    const driftColor = DUST_NEUTRAL_COLOR.clone()
+    // Eye-level motes use the neutral-blended look so they don't dominate the view.
+    const eyeColor = asteroidColor.clone().lerp(DUST_NEUTRAL_COLOR, DUST_NEUTRAL_BLEND)
 
     const driftCount = Math.max(DRIFT_MIN_COUNT, Math.round(DRIFT_BASE_COUNT * ctx.dustCoverage))
     this.driftPoolSize = driftCount
     this.driftEmitter = new ParticleEmitter({
       poolSize: driftCount,
-      color: dustColor,
+      color: driftColor,
       size: DRIFT_PARTICLE_SIZE,
       lifetime: DRIFT_LIFETIME,
       spread: DRIFT_SPREAD,
@@ -142,7 +169,7 @@ export class SurfaceDustController {
 
     this.puffEmitter = new ParticleEmitter({
       poolSize: PUFF_POOL_SIZE,
-      color: dustColor,
+      color: asteroidColor,
       size: PUFF_PARTICLE_SIZE,
       lifetime: PUFF_LIFETIME,
       spread: PUFF_SPREAD,
@@ -153,7 +180,7 @@ export class SurfaceDustController {
 
     this.eyeMoteEmitter = new ParticleEmitter({
       poolSize: EYE_MOTE_COUNT,
-      color: dustColor,
+      color: eyeColor,
       size: EYE_MOTE_SIZE,
       lifetime: EYE_MOTE_LIFETIME,
       spread: EYE_MOTE_SPREAD,
@@ -184,15 +211,24 @@ export class SurfaceDustController {
     this.puffEmitter.tick(dt)
     this.eyeMoteEmitter.tick(dt)
 
+    // Per-mode drift size — third-person camera needs bigger particles to
+    // overcome point-sprite size attenuation at ~75u, FPS needs smaller so
+    // close particles don't look like blobs.
+    const driftMaterial = this.driftEmitter.points.material as THREE.ShaderMaterial
+    const sizeUniform = driftMaterial.uniforms.uBaseSize
+    if (sizeUniform) {
+      sizeUniform.value = ctx.activeMode === 'eva' ? DRIFT_SIZE_EVA : DRIFT_SIZE_LANDER
+    }
+
     // Determine active camera position (follow whichever mode is active)
     const camPos = ctx.activeMode === 'eva' ? ctx.playerPosition : ctx.landerPosition
 
-    // Anchor the spawn slab to the ground under the lander when flying so the
-    // dust field stays at the surface regardless of altitude. In EVA mode the
-    // player is close to the surface anyway, so use their position directly.
-    const groundY =
-      ctx.activeMode === 'lander' ? ctx.landerPosition.y - ctx.landerAltitude : ctx.playerPosition.y
-    this.spawnScratch.set(camPos.x, groundY, camPos.z)
+    // Anchor the slab to the active actor itself, so dust forms a bubble
+    // around the lander (or player) wherever they are — including high above
+    // ground while descending or hovering. spawnDriftParticles places most
+    // particles above this Y so EVA dust still sits above the surface, not
+    // buried in it.
+    this.spawnScratch.set(camPos.x, camPos.y, camPos.z)
     const spawnCenter = this.spawnScratch
 
     // Smoothed XZ heading derived from the anchor's per-frame motion. Used to
@@ -212,7 +248,7 @@ export class SurfaceDustController {
     this.lastAnchorPos.copy(camPos)
 
     // ── Ambient drift: continuously spawn to maintain density ──
-    this.spawnDriftParticles(spawnCenter, dt)
+    this.spawnDriftParticles(spawnCenter, ctx.activeMode, dt)
 
     // ── Eye-level motes: only when on foot, anchored to the FPS camera ──
     if (ctx.activeMode === 'eva') {
@@ -247,22 +283,36 @@ export class SurfaceDustController {
     }
   }
 
-  private spawnDriftParticles(groundCenter: THREE.Vector3, dt: number): void {
+  private spawnDriftParticles(
+    anchorCenter: THREE.Vector3,
+    mode: AtmosphereContext['activeMode'],
+    dt: number,
+  ): void {
     // Spawn a few particles per frame to maintain the cloud
     const spawnCount = Math.ceil((this.driftPoolSize / DRIFT_LIFETIME) * dt)
-    // Forward bias offsets the box center along the heading so spawns lead
-    // the moving anchor; magnitude scales with the smoothed heading length.
-    const biasMag = DRIFT_VOLUME_HALF * DRIFT_FORWARD_BIAS * this.anchorHeading.length()
+    // Forward bias is useful in EVA (camera = player, particles ahead are in
+    // your view) but counter-productive in lander mode where the camera sits
+    // *behind* the lander — biasing forward pushes particles further from the
+    // camera. Skip the bias for lander mode entirely.
+    const useBias = mode === 'eva'
+    const biasMag = useBias
+      ? DRIFT_VOLUME_HALF * DRIFT_FORWARD_BIAS * this.anchorHeading.length()
+      : 0
     const biasX = this.anchorHeading.x * biasMag
     const biasZ = this.anchorHeading.z * biasMag
-    // Cache groundCenter coords because spawnScratch is reused below.
-    const cx = groundCenter.x
-    const cy = groundCenter.y
-    const cz = groundCenter.z
+    // Cache anchorCenter coords because spawnScratch is reused below.
+    const cx = anchorCenter.x
+    const cy = anchorCenter.y
+    const cz = anchorCenter.z
+    // EVA spawns entirely above the player to avoid burying particles in
+    // terrain; lander mode lets particles extend below the lander into the
+    // air space the third-person camera looks down through.
+    const yLow = mode === 'eva' ? 0 : -DRIFT_MAX_HEIGHT * DRIFT_LANDER_BELOW_FRAC
+    const yRange = DRIFT_MAX_HEIGHT
     for (let i = 0; i < spawnCount; i++) {
       this.spawnScratch.set(
         cx + biasX + (Math.random() - 0.5) * DRIFT_VOLUME_HALF * 2,
-        cy + Math.random() * DRIFT_MAX_HEIGHT,
+        cy + yLow + Math.random() * yRange,
         cz + biasZ + (Math.random() - 0.5) * DRIFT_VOLUME_HALF * 2,
       )
       this.driftEmitter.emit(this.spawnScratch, this.driftDirection.clone())
@@ -270,12 +320,17 @@ export class SurfaceDustController {
   }
 
   /**
-   * Spawn discreet airborne motes in a sphere around the EVA camera.
-   * Slow random drift; biased forward when the player is moving so motes
-   * appear to drift past from in front rather than lagging behind.
+   * Spawn motion-driven motes in a sphere around the EVA camera. Spawn rate
+   * scales with the player's ground speed and gets a bonus while airborne, so
+   * the field of motes feels tied to walking and jetpack/floating mobility
+   * rather than always-on. A small idle floor keeps a hint of motes when
+   * standing still.
    */
   private spawnEyeMotes(ctx: AtmosphereContext, dt: number): void {
-    const spawnCount = Math.ceil((EYE_MOTE_COUNT / EYE_MOTE_LIFETIME) * dt)
+    const speedFactor = Math.min(1.5, ctx.playerSpeed / EYE_MOTE_SPEED_FULL)
+    const airBonus = ctx.playerGrounded ? 1 : EYE_MOTE_AIRBORNE_GAIN
+    const motionIntensity = Math.max(EYE_MOTE_IDLE_FLOOR, speedFactor * airBonus)
+    const spawnCount = Math.ceil((EYE_MOTE_COUNT / EYE_MOTE_LIFETIME) * dt * motionIntensity)
     const biasMag = EYE_MOTE_BUBBLE * EYE_MOTE_FORWARD_BIAS * this.anchorHeading.length()
     const biasX = this.anchorHeading.x * biasMag
     const biasZ = this.anchorHeading.z * biasMag

@@ -25,7 +25,7 @@
     "boulderDensity": 0.15,
     "ridgeFrequency": 0.6,
     "roughness": 0.35,
-    "dustCoverage": 0.1,
+    "dustCoverage": 0.3,
     "modelPath": "/models/asteroids/psyche.glb",
     "modelScale": 1500,
     "surfaceTextures": "/textures/asteroids/psyche",

@@ -25,7 +25,7 @@
     "boulderDensity": 0.85,
     "ridgeFrequency": 0.3,
     "roughness": 0.8,
-    "dustCoverage": 0.2,
+    "dustCoverage": 0.5,
     "modelPath": "/models/asteroids/bennu.glb",
     "modelScale": 1300,
     "surfaceTextures": "/textures/asteroids/rocky",
