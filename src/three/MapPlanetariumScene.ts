@@ -89,7 +89,7 @@ export class MapPlanetariumScene {
       0.2,
     )
     scene.add(spaceTimeGrid.mesh)
-    spaceTimeGrid.addStaticSource({ x: 0, z: 0, mass: SUN.mass })
+    spaceTimeGrid.addStaticSource({ x: 0, z: 0, mass: SUN.mass, wellWidthMultiplier: 0.85 })
 
     const gravityPass = createGravityDistortionPass(
       mapGravityData.lensStrength,

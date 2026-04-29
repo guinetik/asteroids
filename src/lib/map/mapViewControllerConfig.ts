@@ -12,8 +12,12 @@ export const TICK_PRIORITY_COMPOSIT = TICK_PRIORITY_RENDER - 1
 /** One-shot action bridge runs just after input. */
 export const ONE_SHOT_PRIORITY = TICK_PRIORITY_INPUT + 1
 
-/** Sun + gas/ice giants only deform the space-time grid (Jupiter, Saturn, Uranus, Neptune). */
-export const GRID_MASS_THRESHOLD = 4e-5
+/**
+ * Minimum mass (M☉) for a body to be added as a space-time grid source. Set to 0
+ * so every catalog planet contributes a well — shader-based deform makes the per-
+ * source cost negligible. Raise above 0 to suppress visually-tiny rocky bodies.
+ */
+export const GRID_MASS_THRESHOLD = 0
 
 /** Wider map-only grid wells for gas giants. */
 export const MAP_GRID_GAS_GIANT_WELL_WIDTH_MULT = 1.85
@@ -23,7 +27,7 @@ export const MAP_GRID_GAS_GIANT_WELL_WIDTH_MULT = 1.85
  * scale ~N² in {@link MAP_SPACE_TIME_GRID_RESOLUTION}; high N heavily loads
  * `EffectComposer` when Space Fabric is visible.
  */
-export const MAP_SPACE_TIME_GRID_BASE_RESOLUTION = 400
+export const MAP_SPACE_TIME_GRID_BASE_RESOLUTION = 500
 
 /** Density multiplier on segment count (see {@link MAP_SPACE_TIME_GRID_RESOLUTION}). */
 export const MAP_SPACE_TIME_GRID_RESOLUTION_BOOST = 2
@@ -44,7 +48,7 @@ export const MAP_SPACE_TIME_GRID_RESOLUTION = Math.round(
  *
  * @constant
  */
-export const MAP_ASTEROID_BELT_NEAR_LOD_CAP = 0.45
+export const MAP_ASTEROID_BELT_NEAR_LOD_CAP = 0.5
 
 /**
  * Instance fraction drawn while the fullscreen tactical raster map overlay hides the belts.

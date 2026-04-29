@@ -1,5 +1,21 @@
+/**
+ * Space-time grid on the XZ plane with gravitational well deformation.
+ * Vertices warp downward near massive bodies using a Gaussian profile,
+ * creating the classic "rubber sheet" visualization of curved spacetime.
+ *
+ * Deformation runs entirely on the GPU via a ShaderMaterial — the CPU only
+ * keeps the source list in sync via uniform packing each frame. Analytical
+ * helpers ({@link SpaceTimeGrid.getDepthAt}, {@link SpaceTimeGrid.getSlopeAt})
+ * stay on the CPU for physics consumers (gravity-surfing, ship Y-follow).
+ *
+ * @author guinetik
+ * @date 2026-04-29
+ * @spec docs/superpowers/specs/2026-04-04-shuttle-scene-design.md
+ */
 import * as THREE from 'three'
 import type { Tickable } from '@/lib/Tickable'
+import spaceTimeGridVertexShader from '@/three/shaders/spaceTimeGrid.vert.glsl?raw'
+import spaceTimeGridFragmentShader from '@/three/shaders/spaceTimeGrid.frag.glsl?raw'
 
 const DEFAULT_GRID_SIZE = 2000
 const DEFAULT_GRID_RESOLUTION = 80
@@ -33,14 +49,33 @@ const WELL_PULSE_SPEED = 1.5
 const WELL_PULSE_AMOUNT = 0.08
 
 /**
+ * Radial vignette: alpha holds at 1 until {@link EDGE_FADE_START_RATIO} × halfGridSize,
+ * then smooth-fades to 0 by {@link EDGE_FADE_END_RATIO} × halfGridSize. Hides the square
+ * 2000-unit grid boundary at extreme camera angles by feathering it into a soft disk.
+ */
+const EDGE_FADE_START_RATIO = 0.5
+/** Outer fade radius — beyond this, the grid is fully transparent. */
+const EDGE_FADE_END_RATIO = 0.92
+
+/**
+ * Hard cap matching `MAX_SOURCES` in `spaceTimeGrid.vert.glsl`. Sources past this
+ * index are dropped from the visual pass only — CPU getters still see them all,
+ * so physics never diverges from the rendered grid except in the (rare) overflow.
+ */
+const MAX_SHADER_SOURCES = 32
+
+/**
  * Mass in solar masses (M☉). Real ratios between bodies:
  * Sun = 1.0, Jupiter = 0.000955, Saturn = 0.000286, Earth = 0.000003
  * The visual deformation uses sqrt(mass) so even small planets show some effect.
  */
 export interface GravitySource {
+  /** World-space X coordinate of the source on the XZ plane. */
   x: number
+  /** World-space Z coordinate of the source on the XZ plane. */
   z: number
-  mass: number // in solar masses (M☉)
+  /** Mass in solar masses (M☉). Negative values produce upward bulges (e.g. portals). */
+  mass: number
   /**
    * Multiplies Gaussian σ (well radius on the sheet) for this source only; depth at the
    * center stays the same. Default 1. Map scene uses &gt;1 for gas giants.
@@ -58,49 +93,28 @@ export interface GravitySource {
 }
 
 /**
- * Per-frame tuning for wireframe deformation (map view passes camera-derived bounds).
- * Analytical {@link SpaceTimeGrid.getDepthAt} / {@link SpaceTimeGrid.getSlopeAt} ignore this;
- * only the line-mesh vertex pass uses it.
+ * Per-frame tuning for wireframe deformation. Retained for API compatibility — the
+ * GPU shader runs every visible frame at full resolution, so culling and interval
+ * scaling are unnecessary and ignored.
  *
  * @author guinetik
- * @date 2026-04-06
+ * @date 2026-04-29
  * @spec docs/superpowers/specs/2026-04-04-shuttle-scene-design.md
  */
 export interface SpaceTimeGridVisualDeformBudget {
-  /**
-   * Multiplies the resolution-based deform interval (integer, ≥1).
-   * Use >1 when the camera is far (whole grid visible) to skip redundant work.
-   */
+  /** Multiplies the resolution-based deform interval (ignored under shader deform). */
   intervalScale: number
-  /**
-   * When true, only vertices inside the XZ cull rectangle (plus gravity wells) are
-   * updated each pass; outer vertices are occasionally refreshed on a slower cycle.
-   */
+  /** When true, only vertices near the camera are updated (ignored under shader deform). */
   useSpatialCull: boolean
-  /** Center X of the view cull rectangle in world space. */
+  /** Center X of the view cull rectangle in world space (ignored). */
   cullCenterX: number
-  /** Center Z of the view cull rectangle in world space. */
+  /** Center Z of the view cull rectangle in world space (ignored). */
   cullCenterZ: number
-  /** Half-width in X of the cull rectangle (before margin). */
+  /** Half-width in X of the cull rectangle (ignored). */
   cullHalfExtentX: number
-  /** Half-depth in Z of the cull rectangle (before margin). */
+  /** Half-depth in Z of the cull rectangle (ignored). */
   cullHalfExtentZ: number
 }
-
-/** Expands the cull box so edge lines are less likely to “detach” from the frustum. */
-const DEFORM_CULL_MARGIN = 1.22
-
-/**
- * While spatial culling is on, run a full-grid deform every N deform passes so distant
- * wire does not stay stale if the camera or bodies change.
- */
-const FULL_DEFORM_REFRESH_INTERVAL = 56
-
-/** Minimum world radius around a body that always receives deform updates when culling. */
-const SOURCE_INFLUENCE_RADIUS_MIN = 55
-
-/** Multiplier on Gaussian σ (via width scale) for the always-update disk around a source. */
-const SOURCE_INFLUENCE_SIGMA_MULT = 4.25
 
 /** Converts a 24-bit RGB hex to normalized `[r,g,b]` for grid tinting. */
 function gridHexToRgbUnit(hex: number): [number, number, number] {
@@ -111,43 +125,27 @@ function gridHexToRgbUnit(hex: number): [number, number, number] {
 }
 
 /**
- * Space-time grid on the XZ plane with gravitational well deformation.
- * Vertices warp downward near massive bodies using a Gaussian profile,
- * creating the classic "rubber sheet" visualization of curved spacetime.
- *
- * Math ported from gcanvas spacetime demo (Gaussian well model).
- *
- * @author guinetik
- * @date 2026-04-04
- * @spec docs/superpowers/specs/2026-04-04-shuttle-scene-design.md
+ * GPU-deformed space-time grid. Geometry is uploaded once at construction;
+ * per-frame work is just packing the source list into two `vec4` uniform arrays
+ * and bumping a time uniform.
  */
 export class SpaceTimeGrid implements Tickable {
   readonly mesh: THREE.LineSegments
 
   private readonly geometry: THREE.BufferGeometry
-  private readonly basePositions: Float32Array
+  private readonly material: THREE.ShaderMaterial
   private readonly sources: GravitySource[] = []
   private readonly staticSources: GravitySource[] = []
   private time = 0
-  private frameCounter = 0
-  /** Base deform cadence from resolution (see constructor). */
-  private readonly baseUpdateInterval: number
-  /** Integer ≥1 — set from {@link SpaceTimeGrid.setVisualDeformBudget}. */
-  private intervalScaleEffective = 1
-  private visualBudget: SpaceTimeGridVisualDeformBudget | null = null
-  private spatialCullPassCounter = 0
-  /**
-   * True if the previous deform pass wrote anomaly-tinted colors. Used to skip the
-   * color attribute upload entirely when no source has {@link GravitySource.isFabricAnomaly}
-   * and the last pass already left the buffer at baseline tint.
-   */
-  private lastPassHadAnomalyTint = false
   private readonly gridSize: number
   private readonly gridResolution: number
   private readonly depthScale: number
   private readonly widthScale: number
   private readonly massExponent: number
-  private readonly baselineLineRgb: [number, number, number]
+  /** Packed `(x, z, mass, depthMul)` × MAX_SHADER_SOURCES — backing store for `uSourceA`. */
+  private readonly uSourceA: Float32Array
+  /** Packed `(widthMul, isMoving, isAnomaly, _pad)` × MAX_SHADER_SOURCES — backing store for `uSourceB`. */
+  private readonly uSourceB: Float32Array
 
   constructor(
     gridSize = DEFAULT_GRID_SIZE,
@@ -161,101 +159,112 @@ export class SpaceTimeGrid implements Tickable {
     this.depthScale = depthScale
     this.widthScale = widthScale
     this.massExponent = massExponent
-    this.baselineLineRgb = gridHexToRgbUnit(GRID_COLOR)
-    // Deform every Nth frame. Higher resolution grids can skip more frames.
-    // Gravity wells move at orbital speed so even 1fps deformation looks smooth.
-    this.baseUpdateInterval = gridResolution > 150 ? 4 : gridResolution > 100 ? 3 : 1
-    this.geometry = this.createGridGeometry()
-    const posAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute
-    this.basePositions = new Float32Array(posAttr.array as Float32Array)
+    this.uSourceA = new Float32Array(MAX_SHADER_SOURCES * 4)
+    this.uSourceB = new Float32Array(MAX_SHADER_SOURCES * 4)
 
-    const material = new THREE.LineBasicMaterial({
-      vertexColors: true,
-      color: 0xffffff,
+    this.geometry = this.createGridGeometry()
+
+    const halfGrid = gridSize / 2
+    const [br, bg, bb] = gridHexToRgbUnit(GRID_COLOR)
+    this.material = new THREE.ShaderMaterial({
+      vertexShader: spaceTimeGridVertexShader,
+      fragmentShader: spaceTimeGridFragmentShader,
       transparent: true,
-      opacity: GRID_OPACITY,
+      uniforms: {
+        uTime: { value: 0 },
+        uDepthScale: { value: depthScale },
+        uWidthScale: { value: widthScale },
+        uMassExponent: { value: massExponent },
+        uPulseSpeed: { value: WELL_PULSE_SPEED },
+        uPulseAmount: { value: WELL_PULSE_AMOUNT },
+        uSourceCount: { value: 0 },
+        uSourceA: { value: this.uSourceA },
+        uSourceB: { value: this.uSourceB },
+        uBaselineColor: { value: new THREE.Vector3(br, bg, bb) },
+        uOpacity: { value: GRID_OPACITY },
+        uAnomFracScale: { value: ANOMALY_LINE_WHITE_FRAC_SCALE },
+        uAnomDepthScale: { value: ANOMALY_LINE_WHITE_DEPTH_SCALE },
+        uAnomAbsWeight: { value: ANOMALY_LINE_WHITE_ABS_WEIGHT },
+        uFadeStart: { value: halfGrid * EDGE_FADE_START_RATIO },
+        uFadeEnd: { value: halfGrid * EDGE_FADE_END_RATIO },
+      },
     })
 
-    this.mesh = new THREE.LineSegments(this.geometry, material)
+    this.mesh = new THREE.LineSegments(this.geometry, this.material)
   }
 
+  /** Append a moving gravity source — receives the orbital pulse modulation. */
   addSource(source: GravitySource): void {
     this.sources.push(source)
   }
 
-  /** Add a source that persists across clearSources() calls (e.g. the Sun). */
+  /** Add a source that persists across {@link SpaceTimeGrid.clearSources} calls (e.g. the Sun). */
   addStaticSource(source: GravitySource): void {
     this.staticSources.push(source)
   }
 
+  /** Remove all moving sources; static sources are untouched. */
   clearSources(): void {
     this.sources.length = 0
   }
 
   /**
-   * Restores default line opacity and baseline per-vertex slate tint (e.g. tactical map closed).
+   * Restores default line opacity and baseline tint (e.g. tactical map closed).
+   * With shader deform, anomaly tinting is recomputed every frame from the
+   * current source list, so this only resets the material-level overrides.
    */
   applyBaselineLineAppearance(): void {
-    const mat = this.mesh.material as THREE.LineBasicMaterial
-    mat.color.setHex(0xffffff)
-    mat.opacity = GRID_OPACITY
-    mat.transparent = true
-    mat.vertexColors = true
-
-    const colorAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute
-    const [br, bg, bb] = this.baselineLineRgb
-    for (let vi = 0; vi < colorAttr.count; vi++) {
-      colorAttr.setXYZ(vi, br, bg, bb)
-    }
-    colorAttr.needsUpdate = true
+    this.material.uniforms.uOpacity!.value = GRID_OPACITY
+    const baselineColor = this.material.uniforms.uBaselineColor!.value as THREE.Vector3
+    const [br, bg, bb] = gridHexToRgbUnit(GRID_COLOR)
+    baselineColor.set(br, bg, bb)
+    this.material.transparent = true
   }
 
   /**
-   * Sets how aggressively the wireframe vertex pass skips work (map view).
-   * Pass `null` to restore defaults (full grid, minimum interval).
+   * Retained for API compatibility. Shader deform runs every visible frame at full
+   * resolution, so the budget is ignored.
    *
-   * @param budget - Camera-driven LOD, or `null` for shuttle / other scenes.
+   * @param _budget - Camera-driven LOD hint, no longer consumed.
    */
-  setVisualDeformBudget(budget: SpaceTimeGridVisualDeformBudget | null): void {
-    this.visualBudget = budget
-    this.intervalScaleEffective = budget === null ? 1 : Math.max(1, Math.ceil(budget.intervalScale))
+  setVisualDeformBudget(_budget: SpaceTimeGridVisualDeformBudget | null): void {
+    // No-op: shader-based deform processes all vertices on the GPU each frame.
   }
 
   /**
-   * Rebuilds all line vertices immediately (e.g. grid toggled visible).
+   * Forces an immediate uniform resync. Cheap; mostly preserved so callers that
+   * toggled grid visibility do not need conditional logic.
    */
   forceFullVisualDeform(): void {
-    this.frameCounter = 0
-    this.spatialCullPassCounter = 0
     if (this.mesh.visible) {
-      this.deformGrid(true)
+      this.syncSourceUniforms()
     }
   }
 
+  /** Frame tick — advances animation time and repacks the source uniform arrays. */
   tick(dt: number): void {
     this.time += dt
     if (!this.mesh.visible) {
       return
     }
-
-    this.frameCounter++
-    const threshold = this.baseUpdateInterval * this.intervalScaleEffective
-    if (this.frameCounter >= threshold) {
-      this.frameCounter = 0
-      this.deformGrid(false)
-    }
+    this.material.uniforms.uTime!.value = this.time
+    this.syncSourceUniforms()
   }
 
+  /** Releases GPU resources held by the grid mesh. */
   dispose(): void {
     this.geometry.dispose()
-    ;(this.mesh.material as THREE.LineBasicMaterial).dispose()
+    this.material.dispose()
   }
 
   /**
-   * Gaussian well depth at a point.
+   * Gaussian well depth at a point (CPU mirror of the vertex shader sum).
    * depth = A * exp(-r²/2σ²)
    * More mass = wider and deeper well (pow(mass, exponent) scaling).
    * Moving bodies use a subtle amplitude pulse; static sources (Sun) do not.
+   *
+   * @param x - World-space X position to sample.
+   * @param z - World-space Z position to sample.
    */
   getDepthAt(x: number, z: number): number {
     let totalDepth = 0
@@ -281,31 +290,6 @@ export class SpaceTimeGrid implements Tickable {
     }
 
     return totalDepth
-  }
-
-  /**
-   * Depth contributed only by travelling fabric anomalies (for wire vertex tint).
-   */
-  private getFabricAnomalyDepthAt(x: number, z: number): number {
-    let depth = 0
-    const movingPulse = 1 + WELL_PULSE_AMOUNT * Math.sin(this.time * WELL_PULSE_SPEED)
-
-    for (const source of this.sources) {
-      if (!source.isFabricAnomaly) {
-        continue
-      }
-      const dx = x - source.x
-      const dz = z - source.z
-      const rSquared = dx * dx + dz * dz
-      const widthMul = source.wellWidthMultiplier ?? 1
-      const depthMul = source.wellDepthMultiplier ?? 1
-      const massFactor = Math.sign(source.mass) * Math.pow(Math.abs(source.mass), this.massExponent)
-      const sigma = this.widthScale * massFactor * widthMul
-      const amplitude = this.depthScale * massFactor * movingPulse * depthMul
-      depth += amplitude * Math.exp(-rSquared / (2 * sigma * sigma))
-    }
-
-    return depth
   }
 
   /**
@@ -352,129 +336,56 @@ export class SpaceTimeGrid implements Tickable {
   }
 
   /**
-   * @param forceAllVertices - When true, ignores spatial cull (full refresh).
+   * Packs `staticSources` then `sources` into the uniform Float32Arrays. Called
+   * every visible tick — the underlying typed arrays are referenced by the
+   * uniform `value` slots, so mutating them in place is sufficient for upload.
    */
-  private deformGrid(forceAllVertices: boolean): void {
-    if (!this.mesh.visible) {
-      return
-    }
+  private syncSourceUniforms(): void {
+    const a = this.uSourceA
+    const b = this.uSourceB
+    let idx = 0
 
-    const posAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute
-    const positions = posAttr.array as Float32Array
-    const colorAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute
-    const [br, bg, bb] = this.baselineLineRgb
-
-    // Anomaly tint is the only reason to touch the color buffer. When no source has
-    // isFabricAnomaly, every vertex resolves to baseline RGB, so we can skip the per-
-    // vertex color writes and the GPU upload entirely. We still do one cleanup pass
-    // the frame after anomalies disappear, to reset any leftover white from the buffer.
-    let hasAnomalySource = false
-    for (const src of this.sources) {
-      if (src.isFabricAnomaly) {
-        hasAnomalySource = true
+    for (const source of this.staticSources) {
+      if (idx >= MAX_SHADER_SOURCES) {
         break
       }
+      this.writeSourceSlot(a, b, idx, source, false)
+      idx++
     }
-    const writeColors = hasAnomalySource || this.lastPassHadAnomalyTint
-
-    const budget = this.visualBudget
-    const useCull = !forceAllVertices && budget !== null && budget.useSpatialCull
-    let doFull = forceAllVertices || !useCull
-
-    if (useCull) {
-      this.spatialCullPassCounter++
-      if (this.spatialCullPassCounter >= FULL_DEFORM_REFRESH_INTERVAL) {
-        this.spatialCullPassCounter = 0
-        doFull = true
+    for (const source of this.sources) {
+      if (idx >= MAX_SHADER_SOURCES) {
+        break
       }
+      this.writeSourceSlot(a, b, idx, source, true)
+      idx++
     }
 
-    const halfW = budget === null ? 0 : Math.max(0, budget.cullHalfExtentX) * DEFORM_CULL_MARGIN
-    const halfH = budget === null ? 0 : Math.max(0, budget.cullHalfExtentZ) * DEFORM_CULL_MARGIN
-    const cx = budget?.cullCenterX ?? 0
-    const cz = budget?.cullCenterZ ?? 0
-
-    for (let i = 0; i < positions.length; i += 3) {
-      const x = this.basePositions[i]!
-      const z = this.basePositions[i + 2]!
-
-      if (!doFull && useCull) {
-        const inBox = Math.abs(x - cx) <= halfW && Math.abs(z - cz) <= halfH
-        if (!inBox && !this.isNearGravitySource(x, z)) {
-          if (writeColors) {
-            const viSkip = i / 3
-            colorAttr.setXYZ(viSkip, br, bg, bb)
-          }
-          continue
-        }
-      }
-
-      const totalD = this.getDepthAt(x, z)
-      positions[i] = x
-      positions[i + 1] = -totalD
-      positions[i + 2] = z
-
-      if (!writeColors) {
-        continue
-      }
-
-      const vi = i / 3
-      const anomD = hasAnomalySource ? this.getFabricAnomalyDepthAt(x, z) : 0
-      if (anomD < 1e-10) {
-        colorAttr.setXYZ(vi, br, bg, bb)
-      } else {
-        const frac = anomD / Math.max(totalD, 1e-10)
-        const blendFromFrac = THREE.MathUtils.clamp(frac * ANOMALY_LINE_WHITE_FRAC_SCALE, 0, 1)
-        const blendFromAbs = THREE.MathUtils.clamp(
-          anomD / (this.depthScale * ANOMALY_LINE_WHITE_DEPTH_SCALE),
-          0,
-          1,
-        )
-        const blend = Math.max(blendFromFrac, blendFromAbs * ANOMALY_LINE_WHITE_ABS_WEIGHT)
-        const r = br + (1 - br) * blend
-        const g = bg + (1 - bg) * blend
-        const colB = bb + (1 - bb) * blend
-        colorAttr.setXYZ(vi, r, g, colB)
-      }
-    }
-
-    posAttr.needsUpdate = true
-    if (writeColors) {
-      colorAttr.needsUpdate = true
-    }
-    this.lastPassHadAnomalyTint = hasAnomalySource
+    this.material.uniforms.uSourceCount!.value = idx
   }
 
-  /** True if (x,z) lies inside an influence disk of any current gravity source. */
-  private isNearGravitySource(x: number, z: number): boolean {
-    for (let s = 0; s < 2; s++) {
-      const arr = s === 0 ? this.staticSources : this.sources
-      for (const source of arr) {
-        const dx = x - source.x
-        const dz = z - source.z
-        const rSquared = dx * dx + dz * dz
-        const widthMul = source.wellWidthMultiplier ?? 1
-        const depthMul = source.wellDepthMultiplier ?? 1
-        const massFactor = Math.pow(Math.abs(source.mass), this.massExponent)
-        const radius = Math.max(
-          SOURCE_INFLUENCE_RADIUS_MIN,
-          SOURCE_INFLUENCE_SIGMA_MULT *
-            this.widthScale *
-            massFactor *
-            widthMul *
-            Math.sqrt(depthMul),
-        )
-        if (rSquared <= radius * radius) {
-          return true
-        }
-      }
-    }
-    return false
+  /** Writes one source into slot `idx` of the packed uniform arrays. */
+  private writeSourceSlot(
+    a: Float32Array,
+    b: Float32Array,
+    idx: number,
+    source: GravitySource,
+    isMoving: boolean,
+  ): void {
+    const off = idx * 4
+    a[off] = source.x
+    a[off + 1] = source.z
+    a[off + 2] = source.mass
+    a[off + 3] = source.wellDepthMultiplier ?? 1
+    b[off] = source.wellWidthMultiplier ?? 1
+    b[off + 1] = isMoving ? 1 : 0
+    b[off + 2] = source.isFabricAnomaly ? 1 : 0
+    b[off + 3] = 0
   }
 
   /**
-   * Build a grid of line segments on the XZ plane.
-   * Creates both horizontal and vertical lines as LineSegments pairs.
+   * Build a flat grid of line segments on the XZ plane. The geometry is
+   * uploaded once and never re-touched — vertex deformation happens in the
+   * vertex shader using the source uniform arrays.
    */
   private createGridGeometry(): THREE.BufferGeometry {
     const halfSize = this.gridSize / 2
@@ -503,15 +414,6 @@ export class SpaceTimeGrid implements Tickable {
 
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
-    const vCount = vertices.length / 3
-    const colors = new Float32Array(vCount * 3)
-    const [r, g, b] = this.baselineLineRgb
-    for (let vi = 0; vi < vCount; vi++) {
-      colors[vi * 3] = r
-      colors[vi * 3 + 1] = g
-      colors[vi * 3 + 2] = b
-    }
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
     return geometry
   }
 }
