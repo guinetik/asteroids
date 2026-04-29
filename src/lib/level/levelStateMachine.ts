@@ -46,7 +46,11 @@ export interface LevelStateMachineOptions {
   isPlayerNearLander?: () => boolean
   /** Guard: is the lander within exfil range of the shuttle? Defaults to () => false. */
   isLanderNearShuttle?: () => boolean
-  /** Guard: has the player completed at least one EVA? Defaults to () => false. */
+  /**
+   * Guard: has the player satisfied the exfil prerequisite (typical: at least one EVA)?
+   * Levels may also return true when every mission objective is finished so lander-only
+   * runs can exfil without exiting the cockpit. Defaults to () => false.
+   */
   hasCompletedEva?: () => boolean
 }
 

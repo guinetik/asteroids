@@ -1214,7 +1214,7 @@ export class LevelViewController implements Tickable {
       isLanderGrounded: () => this.landerController?.body.grounded ?? false,
       isPlayerNearLander: () => this.isPlayerNearLander(),
       isLanderNearShuttle: () => this.isLanderNearShuttle(),
-      hasCompletedEva: () => this.hasExitedVehicle,
+      hasCompletedEva: () => this.isEligibleForExfil(),
     })
 
     // ── Always-active tickables ─────────────────────────────────
@@ -2048,7 +2048,13 @@ export class LevelViewController implements Tickable {
     this.projectileSystem?.setTerrainCollisionEnabled(true)
 
     this.landerDestroyed = false
-    this.hasExitedVehicle = false
+    // Hull / fuel failure after objectives are done calls this path with every
+    // minigame still `completed`. Do not wipe EVA history then — it would block
+    // exfil until we also treat `areAllComplete()` as qualification (see
+    // `isEligibleForExfil`). Fresh failed runs (not all objectives done) reset.
+    if (!this.minigames.areAllComplete()) {
+      this.hasExitedVehicle = false
+    }
 
     if (this.landerController) {
       this.landerController.group.visible = true
@@ -2361,7 +2367,7 @@ export class LevelViewController implements Tickable {
       const currentState = this.stateMachine.state ?? ''
 
       const canExfil =
-        currentState === 'lander' && this.hasExitedVehicle && this.isLanderNearShuttle()
+        currentState === 'lander' && this.isEligibleForExfil() && this.isLanderNearShuttle()
 
       const canEnterLander =
         currentState === 'eva' && this.isPlayerNearLander() && !this.isLanderEntryBlockedByDan()
@@ -3094,6 +3100,20 @@ export class LevelViewController implements Tickable {
     const active = this.minigames.getActive()
     if (!(active instanceof DanMinigame)) return false
     return active.phase === 'scanning' || active.phase === 'awaiting-delivery'
+  }
+
+  /**
+   * Whether exfiltration is unlocked: at least one EVA (`hasExitedVehicle`) or
+   * every objective session completed (lander-only contracts may never set the former).
+   *
+   * Soft `restartLevel()` after out-of-fuel or hull loss used to clear only
+   * `hasExitedVehicle` while objectives stayed complete; `areAllComplete()` covers that
+   * plus `restartLevel` no longer clears the EVA flag when the mission is still won.
+   *
+   * @returns True when the state machine may accept `exfiltrate`.
+   */
+  private isEligibleForExfil(): boolean {
+    return this.hasExitedVehicle || this.minigames.areAllComplete()
   }
 
   /** Check if the lander is within exfil range of the parked shuttle. */
