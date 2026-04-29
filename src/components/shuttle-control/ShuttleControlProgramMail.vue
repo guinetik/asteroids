@@ -14,12 +14,12 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { shipMessageSystem } from '@/lib/messages/runtime'
 import { uiAudio } from '@/audio/UiAudioDirector'
-import {
-  DEFAULT_INBOX_FOLDER_ID,
-  type ShipMessageFolder,
-  type ShipMessageInboxRow,
-  type ShipMessageReadable,
+import type {
+  ShipMessageFolder,
+  ShipMessageInboxRow,
+  ShipMessageReadable,
 } from '@/lib/messages/messageTypes'
+import { buildMailFolderSections } from '@/lib/messages/mailFolderSections'
 import {
   acceptContractWithRetroEval,
   contractSystem,
@@ -40,8 +40,8 @@ const props = defineProps<{
 }>()
 
 const folders = ref<ShipMessageFolder[]>(shipMessageSystem.listFolders())
-const selectedFolderId = ref<string>(DEFAULT_INBOX_FOLDER_ID)
-const rows = ref<ShipMessageInboxRow[]>(shipMessageSystem.listInboxRows(selectedFolderId.value))
+const rowsByFolderId = ref<Record<string, ShipMessageInboxRow[]>>({})
+const expandedFolderIds = ref<Set<string>>(new Set())
 const selectedId = ref<string | null>(null)
 const selectedAudioAutoplayToken = ref(0)
 const readerRefreshToken = ref(0)
@@ -50,13 +50,15 @@ function refreshFolders(): void {
   folders.value = shipMessageSystem.listFolders()
 }
 
-function refreshRows(): void {
-  rows.value = shipMessageSystem.listInboxRows(selectedFolderId.value)
+function refreshRowsByFolder(): void {
+  rowsByFolderId.value = Object.fromEntries(
+    folders.value.map((folder) => [folder.id, shipMessageSystem.listInboxRows(folder.id)]),
+  )
 }
 
 function refreshAll(): void {
   refreshFolders()
-  refreshRows()
+  refreshRowsByFolder()
   readerRefreshToken.value += 1
 }
 
@@ -78,6 +80,15 @@ const activeContract = computed(() => {
     instance: contractSystem.getInstance(r.contractId),
   }
 })
+
+const sections = computed(() =>
+  buildMailFolderSections({
+    folders: folders.value,
+    rowsByFolderId: rowsByFolderId.value,
+    expandedFolderIds: expandedFolderIds.value,
+    selectedMessageId: selectedId.value,
+  }),
+)
 
 /**
  * The accept/decline card is intentionally surfaced only on the two
@@ -124,16 +135,24 @@ function statusLabel(row: ShipMessageInboxRow): string {
   return 'Archived'
 }
 
-function selectFolder(folderId: string): void {
-  if (selectedFolderId.value === folderId) return
-  uiAudio.notifyButtonClick();
-  selectedFolderId.value = folderId
-  selectedId.value = null
-  refreshRows()
+function openFolder(folderId: string): void {
+  if (expandedFolderIds.value.has(folderId)) return
+  expandedFolderIds.value = new Set([...expandedFolderIds.value, folderId])
+}
+
+function toggleFolder(folderId: string): void {
+  uiAudio.notifyButtonClick()
+  const next = new Set(expandedFolderIds.value)
+  if (next.has(folderId)) {
+    next.delete(folderId)
+  } else {
+    next.add(folderId)
+  }
+  expandedFolderIds.value = next
 }
 
 function selectRow(id: string, options: { autoplayAudio?: boolean } = {}): void {
-  uiAudio.notifyConfirm();
+  uiAudio.notifyConfirm()
   selectedId.value = id
   if (options.autoplayAudio) {
     selectedAudioAutoplayToken.value += 1
@@ -150,7 +169,7 @@ function dismissSelected(): void {
   if (!selectedId.value) return
   const r = shipMessageSystem.getReadableShipMessage(selectedId.value)
   if (!r || r.inboxStatus === 'dismissed') return
-  uiAudio.notifyScanComplete();
+  uiAudio.notifyScanComplete()
   shipMessageSystem.dismiss(selectedId.value)
   refreshAll()
   emit('mailChanged')
@@ -189,10 +208,7 @@ watch(
   () => [props.focusFolderId, props.focusMessageId] as const,
   ([folderId, messageId]) => {
     if (!folderId || !messageId) return
-    if (selectedFolderId.value !== folderId) {
-      selectedFolderId.value = folderId
-      refreshRows()
-    }
+    openFolder(folderId)
     selectRow(messageId, { autoplayAudio: true })
   },
   { immediate: true },
@@ -201,65 +217,78 @@ watch(
 
 <template>
   <div class="shuttle-mail-program">
-    <div class="shuttle-mail-program__tabs" role="tablist">
-      <div class="shuttle-mail-program__tabs-scroll">
-        <button
-          v-for="folder in folders"
-          :key="folder.id"
-          type="button"
-          class="shuttle-mail-program__tab"
-          :class="{ 'shuttle-mail-program__tab--active': selectedFolderId === folder.id }"
-          role="tab"
-          :aria-selected="selectedFolderId === folder.id"
-          @click="selectFolder(folder.id)"
-        >
-          <span class="shuttle-mail-program__tab-label">{{ folder.label }}</span>
-          <span
-            v-if="folder.unread > 0"
-            class="shuttle-mail-program__tab-badge"
-            :title="`${folder.unread} unread`"
-          >
-            {{ folder.unread }}
-          </span>
-        </button>
-      </div>
-      <div class="shuttle-mail-program__tabs-hint">
-        Archived mail stays readable here. Contract folders appear when offered.
-      </div>
-    </div>
-
     <div class="shuttle-mail-program__content">
-      <div class="shuttle-mail-program__list" role="listbox" :aria-label="'Ship messages'">
-        <button
-          v-for="row in rows"
-          :key="row.id"
-          type="button"
-          role="option"
-          class="shuttle-mail-program__row"
+      <div class="shuttle-mail-program__list" aria-label="Ship messages">
+        <section
+          v-for="section in sections"
+          :key="section.folder.id"
+          class="shuttle-mail-program__section"
           :class="{
-            'shuttle-mail-program__row--active': selectedId === row.id,
-            'shuttle-mail-program__row--unread': row.isUnread,
-            'shuttle-mail-program__row--locked': row.status === 'locked',
-            'shuttle-mail-program__row--pinned': row.pinned,
+            'shuttle-mail-program__section--expanded': section.isExpanded,
           }"
-          :aria-selected="selectedId === row.id"
-          @click="selectRow(row.id, { autoplayAudio: true })"
         >
-          <span class="shuttle-mail-program__row-from">
-            <span v-if="row.pinned" class="shuttle-mail-program__row-pin" aria-hidden="true"
-              >📌</span
+          <button
+            type="button"
+            class="shuttle-mail-program__section-header"
+            :aria-expanded="section.isExpanded"
+            @click="toggleFolder(section.folder.id)"
+          >
+            <span class="shuttle-mail-program__section-title">
+              <span class="shuttle-mail-program__section-chevron" aria-hidden="true">
+                {{ section.isExpanded ? 'v' : '>' }}
+              </span>
+              {{ section.folder.label }}
+            </span>
+            <span class="shuttle-mail-program__section-meta">
+              {{ section.folder.total }} {{ section.folder.total === 1 ? 'message' : 'messages' }}
+            </span>
+            <span
+              v-if="section.folder.unread > 0"
+              class="shuttle-mail-program__section-badge"
+              :title="`${section.folder.unread} unread`"
             >
-            {{ row.from }}
-          </span>
-          <span class="shuttle-mail-program__row-subject">{{ row.subject }}</span>
-          <span class="shuttle-mail-program__row-meta">
-            <span v-if="row.pinned">Pinned · </span>{{ row.sentAt }} · {{ statusLabel(row) }}
-          </span>
-          <span class="shuttle-mail-program__row-preview">{{ row.preview }}</span>
-        </button>
-        <p v-if="rows.length === 0" class="shuttle-mail-program__row-empty">
-          No messages in this folder yet.
-        </p>
+              {{ section.folder.unread }}
+            </span>
+          </button>
+
+          <div
+            v-if="section.isExpanded"
+            class="shuttle-mail-program__section-rows"
+            role="listbox"
+            :aria-label="`${section.folder.label} messages`"
+          >
+            <button
+              v-for="row in section.rows"
+              :key="row.id"
+              type="button"
+              role="option"
+              class="shuttle-mail-program__row"
+              :class="{
+                'shuttle-mail-program__row--active': selectedId === row.id,
+                'shuttle-mail-program__row--unread': row.isUnread,
+                'shuttle-mail-program__row--locked': row.status === 'locked',
+                'shuttle-mail-program__row--pinned': row.pinned,
+              }"
+              :aria-selected="selectedId === row.id"
+              @click="selectRow(row.id, { autoplayAudio: true })"
+            >
+              <span class="shuttle-mail-program__row-from">
+                <span v-if="row.pinned" class="shuttle-mail-program__row-pin" aria-hidden="true">
+                  📌
+                </span>
+                {{ row.from }}
+              </span>
+              <span class="shuttle-mail-program__row-subject">{{ row.subject }}</span>
+              <span class="shuttle-mail-program__row-meta">
+                <span v-if="row.pinned">Pinned · </span>{{ row.sentAt }} · {{ statusLabel(row) }}
+              </span>
+              <span class="shuttle-mail-program__row-preview">{{ row.preview }}</span>
+            </button>
+            <p v-if="section.rows.length === 0" class="shuttle-mail-program__row-empty">
+              No messages in this folder yet.
+            </p>
+          </div>
+        </section>
       </div>
 
       <div class="shuttle-mail-program__reader">
@@ -361,75 +390,6 @@ watch(
   overflow: hidden;
 }
 
-.shuttle-mail-program__tabs {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid rgba(106, 232, 196, 0.15);
-  padding: 0 16px;
-  background: rgba(106, 232, 196, 0.02);
-  flex-shrink: 0;
-}
-
-.shuttle-mail-program__tabs-scroll {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.shuttle-mail-program__tabs-scroll::-webkit-scrollbar {
-  display: none;
-}
-
-.shuttle-mail-program__tab {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  appearance: none;
-  background: transparent;
-  border: none;
-  color: rgba(177, 228, 214, 0.6);
-  padding: 16px 12px;
-  font-family: inherit;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: all 120ms ease;
-  white-space: nowrap;
-}
-
-.shuttle-mail-program__tab:hover {
-  color: #b1e4d6;
-  background: rgba(106, 232, 196, 0.05);
-}
-
-.shuttle-mail-program__tab--active {
-  color: #6ae8c4;
-  border-bottom-color: #6ae8c4;
-  background: rgba(106, 232, 196, 0.08);
-}
-
-.shuttle-mail-program__tab-badge {
-  background: rgba(106, 232, 196, 0.2);
-  color: #6ae8c4;
-  border-radius: 2px;
-  padding: 2px 6px;
-  font-size: 10px;
-  font-weight: 600;
-}
-
-.shuttle-mail-program__tabs-hint {
-  font-size: 10px;
-  color: rgba(177, 228, 214, 0.3);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-  margin-left: 16px;
-}
-
 .shuttle-mail-program__content {
   display: grid;
   grid-template-columns: 320px 1fr;
@@ -443,13 +403,84 @@ watch(
   background: rgba(106, 232, 196, 0.01);
 }
 
+.shuttle-mail-program__section {
+  border-bottom: 1px solid rgba(106, 232, 196, 0.12);
+}
+
+.shuttle-mail-program__section-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 10px;
+  align-items: center;
+  appearance: none;
+  width: 100%;
+  background: rgba(106, 232, 196, 0.025);
+  border: none;
+  color: rgba(220, 248, 240, 0.82);
+  padding: 14px 16px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.shuttle-mail-program__section-header:hover {
+  color: #b1e4d6;
+  background: rgba(106, 232, 196, 0.07);
+}
+
+.shuttle-mail-program__section--expanded .shuttle-mail-program__section-header {
+  background: rgba(106, 232, 196, 0.055);
+}
+
+.shuttle-mail-program__section-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: #6ae8c4;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.shuttle-mail-program__section-chevron {
+  width: 12px;
+  color: rgba(106, 232, 196, 0.7);
+  font-size: 12px;
+}
+
+.shuttle-mail-program__section-meta {
+  color: rgba(177, 228, 214, 0.42);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.shuttle-mail-program__section-badge {
+  grid-column: 2;
+  justify-self: end;
+  background: rgba(106, 232, 196, 0.2);
+  color: #6ae8c4;
+  border-radius: 2px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.shuttle-mail-program__section-rows {
+  border-top: 1px solid rgba(106, 232, 196, 0.08);
+}
+
 .shuttle-mail-program__row {
   display: flex;
   flex-direction: column;
   appearance: none;
   background: transparent;
   border: none;
-  border-bottom: 1px solid rgba(106, 232, 196, 0.1);
+  border-bottom: 1px solid rgba(106, 232, 196, 0.08);
   color: inherit;
   padding: 16px;
   font-family: inherit;
@@ -464,8 +495,12 @@ watch(
 }
 
 .shuttle-mail-program__row--active {
-  background: rgba(106, 232, 196, 0.08);
-  box-shadow: inset 2px 0 0 #6ae8c4;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(106, 232, 196, 0.16), transparent 58%),
+    rgba(106, 232, 196, 0.07);
+  box-shadow:
+    inset 0 0 0 1px rgba(106, 232, 196, 0.42),
+    0 0 18px rgba(106, 232, 196, 0.08);
 }
 
 .shuttle-mail-program__row--unread {
@@ -488,7 +523,9 @@ watch(
 }
 
 .shuttle-mail-program__row--pinned.shuttle-mail-program__row--active {
-  box-shadow: inset 3px 0 0 #6ae8c4;
+  box-shadow:
+    inset 0 0 0 1px rgba(106, 232, 196, 0.5),
+    0 0 18px rgba(106, 232, 196, 0.1);
 }
 
 .shuttle-mail-program__row--pinned .shuttle-mail-program__row-subject {
