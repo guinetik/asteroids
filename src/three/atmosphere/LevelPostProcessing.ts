@@ -1,139 +1,172 @@
 /**
- * Post-processing pipeline for the level scene.
+ * Post-processing pipeline for the level scene — "Mass Effect" look.
  *
- * Cold, clinical tone: subtle bloom on emissives, desaturated color grade
- * with cool shadow tint, mild chromatic aberration, vignette, and FXAA.
+ * Pipeline (fused into one `EffectPass`, single fullscreen draw):
+ *   bloom (mipmap blur) → ACES filmic tonemap → 3D LUT → saturation → contrast → vignette
+ *
+ * The HDR linear buffer + ACES tonemap is what gives bright lights a filmic
+ * roll-off into white. Bloom runs on linear HDR; tonemap converts to LDR;
+ * the LUT (loaded async from `/lut.CUBE`) re-grades the LDR image; saturation
+ * and contrast then sit at low values for fine touch-up; vignette frames the
+ * shot. Until the LUT finishes loading the pipeline runs without it.
  *
  * @author guinetik
- * @date 2026-04-06
+ * @date 2026-04-28
  * @spec docs/superpowers/specs/2026-04-06-atmosphere-effects-design.md
  */
 import * as THREE from 'three'
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
-import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
-import { FXAAShader } from 'three/addons/shaders/FXAAShader.js'
-import { VignetteShader } from 'three/addons/shaders/VignetteShader.js'
-import fullscreenQuadVertexShader from '@/three/shaders/postprocessing/fullscreenQuad.vert.glsl?raw'
-import colorGradeFragmentShader from '@/three/shaders/postprocessing/colorGrade.frag.glsl?raw'
-import chromaticAberrationFragmentShader from '@/three/shaders/postprocessing/chromaticAberration.frag.glsl?raw'
+import {
+  BlendFunction,
+  BloomEffect,
+  BrightnessContrastEffect,
+  EffectComposer,
+  EffectPass,
+  HueSaturationEffect,
+  LUT3DEffect,
+  LUTCubeLoader,
+  RenderPass,
+  ToneMappingEffect,
+  ToneMappingMode,
+  VignetteEffect,
+  VignetteTechnique,
+} from 'postprocessing'
 
 // ── Bloom ──
-/** Bloom intensity. Low — only bright emissives glow. */
-const BLOOM_STRENGTH = 0.3
-/** Bloom spread radius. */
-const BLOOM_RADIUS = 0.3
-/** Minimum brightness for bloom. Only engine flames / lights bloom. */
-const BLOOM_THRESHOLD = 0.9
+/** Bloom intensity. Subtle halo on emissives only. */
+const BLOOM_INTENSITY = 0.35
+/** Threshold at which pixels start to bloom. ACES already lifts highlights. */
+const BLOOM_LUMINANCE_THRESHOLD = 0.25
+/** Soft transition around the threshold so bloom doesn't pop on/off. */
+const BLOOM_LUMINANCE_SMOOTHING = 0.15
+/** Bloom kernel radius (smaller = tighter halo). */
+const BLOOM_RADIUS = 0.5
 
-// ── Color grade ──
-/** How much to desaturate the image (0 = none, 1 = full grayscale). */
-const DESATURATION = 0.08
-/** Cool blue tint blended into shadow regions. Softer than 0.6/0.7/0.9 — the
- *  aggressive cool tint was darkening lander-altitude surface views where
- *  most of the frame is shadow-tinted ground. */
-const SHADOW_TINT_R = 0.85
-const SHADOW_TINT_G = 0.9
-const SHADOW_TINT_B = 0.95
-/** Contrast S-curve intensity (1.0 = neutral). */
-const CONTRAST = 1.05
-
-// ── Chromatic aberration ──
-/** Base CA offset. Very subtle — too high and stars turn magenta from RGB split. */
-const CA_AMOUNT = 0.0005
+// ── Saturation / brightness / contrast ──
+/** Range -1..+1. AGX preserves chroma better than ACES — keep a real lift. */
+const SATURATION = 0.5
+/** Range -1..+1. Slight negative trim. */
+const BRIGHTNESS = 0.1
+/** Range -1..+1. Mid contrast bump. */
+const CONTRAST = 0.25
 
 // ── Vignette ──
-const VIGNETTE_OFFSET = 1.2
-/** Corner darkness. 0.6 was strong enough to noticeably darken lander-
- *  altitude surface views; 0.3 keeps the cinematic edge fall-off without
- *  eating playable terrain. */
-const VIGNETTE_DARKNESS = 0.3
+/** Where the vignette starts to fall off (lower = larger dark ring). */
+const VIGNETTE_OFFSET = 0.25
+/** Darkness at the corners. Subtle so playable terrain stays readable. */
+const VIGNETTE_DARKNESS = 0.75
+
+// ── LUT ──
+/** Public-folder URL for the 3D color LUT. Loaded async. */
+const LUT_URL = '/lut.CUBE'
 
 /**
- * Custom color-grade shader: desaturation + cool shadow tint + contrast.
- */
-const ColorGradeShader = {
-  uniforms: {
-    tDiffuse: { value: null as THREE.Texture | null },
-    desaturation: { value: DESATURATION },
-    shadowTint: { value: new THREE.Vector3(SHADOW_TINT_R, SHADOW_TINT_G, SHADOW_TINT_B) },
-    contrast: { value: CONTRAST },
-  },
-  vertexShader: fullscreenQuadVertexShader,
-  fragmentShader: colorGradeFragmentShader,
-}
-
-/**
- * Custom chromatic aberration shader — radial RGB split from center.
- */
-const ChromaticAberrationShader = {
-  uniforms: {
-    tDiffuse: { value: null as THREE.Texture | null },
-    amount: { value: CA_AMOUNT },
-  },
-  vertexShader: fullscreenQuadVertexShader,
-  fragmentShader: chromaticAberrationFragmentShader,
-}
-
-/**
- * Manages the EffectComposer pipeline for the level scene.
+ * Manages the pmndrs `EffectComposer` pipeline for the level scene.
  * Call {@link render} each frame instead of `renderer.render()`.
  */
 export class LevelPostProcessing {
   private readonly composer: EffectComposer
-  private readonly fxaaPass: ShaderPass
-  private readonly bloomPass: UnrealBloomPass
-  private readonly chromaticPass: ShaderPass
-  private readonly vignettePass: ShaderPass
-  /** True while `bunker-interior` — cheap chain (no bloom / CA / vignette). */
-  private bunkerInteriorReduced = false
+  private readonly renderPass: RenderPass
+  private readonly bloom: BloomEffect
+  private readonly tonemap: ToneMappingEffect
+  private readonly saturation: HueSaturationEffect
+  private readonly contrast: BrightnessContrastEffect
+  private readonly vignette: VignetteEffect
+  private readonly bloomDefaultBlend: BlendFunction
+  private effectPass: EffectPass
+  private lut: LUT3DEffect | null = null
+  private currentCamera: THREE.Camera
+  private disposed = false
 
   constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
-    this.composer = new EffectComposer(renderer)
+    this.currentCamera = camera
 
-    // 1. Render scene
-    this.composer.addPass(new RenderPass(scene, camera))
+    // HDR target — bright lights can exceed 1.0 in linear space so the ACES
+    // tonemap gets real highlight data to roll off, instead of clamped 8-bit.
+    this.composer = new EffectComposer(renderer, {
+      frameBufferType: THREE.HalfFloatType,
+    })
 
-    // 2. Bloom
-    const size = renderer.getSize(new THREE.Vector2())
-    this.bloomPass = new UnrealBloomPass(size, BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD)
-    this.composer.addPass(this.bloomPass)
+    this.renderPass = new RenderPass(scene, camera)
+    this.composer.addPass(this.renderPass)
 
-    // 3. Color grade
-    this.composer.addPass(new ShaderPass(ColorGradeShader))
+    this.bloom = new BloomEffect({
+      intensity: BLOOM_INTENSITY,
+      luminanceThreshold: BLOOM_LUMINANCE_THRESHOLD,
+      luminanceSmoothing: BLOOM_LUMINANCE_SMOOTHING,
+      mipmapBlur: true,
+      radius: BLOOM_RADIUS,
+    })
+    this.bloomDefaultBlend = this.bloom.blendMode.blendFunction
 
-    // 4. Chromatic aberration
-    this.chromaticPass = new ShaderPass(ChromaticAberrationShader)
-    this.composer.addPass(this.chromaticPass)
+    // AGX preserves color saturation better than ACES_FILMIC, which famously
+    // desaturates bright colors as part of its film-safe range compression.
+    // For a vibrant ME look, AGX > ACES.
+    this.tonemap = new ToneMappingEffect({
+      mode: ToneMappingMode.UNCHARTED2,
+    })
 
-    // 5. Vignette
-    this.vignettePass = new ShaderPass(VignetteShader)
-    this.vignettePass.uniforms['offset']!.value = VIGNETTE_OFFSET
-    this.vignettePass.uniforms['darkness']!.value = VIGNETTE_DARKNESS
-    this.composer.addPass(this.vignettePass)
+    this.saturation = new HueSaturationEffect({
+      saturation: SATURATION,
+    })
 
-    // 6. FXAA (last)
-    this.fxaaPass = new ShaderPass(FXAAShader)
-    this.updateFxaaResolution(renderer)
-    this.composer.addPass(this.fxaaPass)
+    this.contrast = new BrightnessContrastEffect({
+      brightness: BRIGHTNESS,
+      contrast: CONTRAST,
+    })
+
+    this.vignette = new VignetteEffect({
+      technique: VignetteTechnique.DEFAULT,
+      offset: VIGNETTE_OFFSET,
+      darkness: VIGNETTE_DARKNESS,
+    })
+
+    this.effectPass = this.buildEffectPass()
+    this.composer.addPass(this.effectPass)
+
+    void this.loadLUT()
   }
 
   /**
-   * Bunker interiors are already dark and tight; {@link UnrealBloomPass} and
-   * extra fullscreen passes dominated frame time. Skips bloom, chromatic
-   * aberration, and vignette while active — keeps color grade + FXAA for tone
-   * continuity with EVA.
-   *
-   * @param active - When true, expensive passes are disabled via `Pass.enabled`.
+   * Loads the 3D LUT and rebuilds the effect pass with it spliced in after
+   * the tonemap. Failures are non-fatal — the pipeline keeps running with
+   * the un-LUT'd look.
    */
-  setBunkerInteriorReducedPipeline(active: boolean): void {
-    if (this.bunkerInteriorReduced === active) return
-    this.bunkerInteriorReduced = active
-    const on = !active
-    this.bloomPass.enabled = on
-    this.chromaticPass.enabled = on
-    this.vignettePass.enabled = on
+  private async loadLUT(): Promise<void> {
+    try {
+      const lutTexture = await new LUTCubeLoader().loadAsync(LUT_URL)
+      if (this.disposed) return
+      // Tetrahedral interpolation gives smoother transitions between LUT
+      // cells — subtle LUT character shows through instead of being averaged
+      // out by trilinear sampling.
+      this.lut = new LUT3DEffect(lutTexture, { tetrahedralInterpolation: true })
+      this.composer.removePass(this.effectPass)
+      this.effectPass.dispose()
+      this.effectPass = this.buildEffectPass()
+      this.composer.addPass(this.effectPass)
+      console.info('[LevelPostProcessing] LUT applied:', LUT_URL)
+    } catch (err) {
+      console.warn('[LevelPostProcessing] LUT load failed', err)
+    }
+  }
+
+  private buildEffectPass(): EffectPass {
+    const effects = this.lut
+      ? [this.bloom, this.tonemap, this.lut, this.saturation, this.contrast, this.vignette]
+      : [this.bloom, this.tonemap, this.saturation, this.contrast, this.vignette]
+    return new EffectPass(this.currentCamera, ...effects)
+  }
+
+  /**
+   * Bunker interiors are dark and tight; the bloom mip pyramid still costs
+   * bandwidth even when nothing is bright. Skips bloom while active by
+   * setting its blend function to {@link BlendFunction.SKIP}; everything
+   * else stays so tone continuity with EVA holds.
+   *
+   * @param _active - When true, bloom is skipped inside the fused pass.
+   */
+  setBunkerInteriorReducedPipeline(_active: boolean): void {
+    //this.bloom.blendMode.blendFunction = _active ? BlendFunction.SKIP : this.bloomDefaultBlend
+    this.bloom.blendMode.blendFunction = this.bloomDefaultBlend
   }
 
   /** Call this instead of renderer.render(). */
@@ -143,32 +176,19 @@ export class LevelPostProcessing {
 
   /** Update the render pass camera (e.g. when switching lander ↔ FPS). */
   setCamera(camera: THREE.Camera): void {
-    const renderPass = this.composer.passes[0] as RenderPass
-    renderPass.camera = camera
+    this.currentCamera = camera
+    this.renderPass.mainCamera = camera
+    this.effectPass.mainCamera = camera
   }
 
   /** Must be called on window resize. */
   resize(width: number, height: number): void {
     this.composer.setSize(width, height)
-    this.bloomPass.resolution.set(width, height)
-    const pixelRatio = this.composer.renderer.getPixelRatio()
-    this.fxaaPass.material.uniforms['resolution']!.value.set(
-      1 / (width * pixelRatio),
-      1 / (height * pixelRatio),
-    )
   }
 
   /** Release GPU resources. */
   dispose(): void {
+    this.disposed = true
     this.composer.dispose()
-  }
-
-  private updateFxaaResolution(renderer: THREE.WebGLRenderer): void {
-    const size = renderer.getSize(new THREE.Vector2())
-    const pixelRatio = renderer.getPixelRatio()
-    this.fxaaPass.material.uniforms['resolution']!.value.set(
-      1 / (size.x * pixelRatio),
-      1 / (size.y * pixelRatio),
-    )
   }
 }

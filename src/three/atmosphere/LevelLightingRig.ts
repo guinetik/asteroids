@@ -61,6 +61,17 @@ const ENV_GROUND_MIN = 0.1
 const ENV_GROUND_INTENSITY = 0.35
 /** Overall envmap contribution to PBR materials. 1.0 = native, <1 = dimmer. */
 const ENV_SCENE_INTENSITY = 0.7
+/**
+ * Sun disc radius as a fraction of envmap width. A small bright spot reads
+ * as the sun in reflection — even after PMREM convolves it across high
+ * roughness mips, the integrated brightness stays as a directional "hot zone"
+ * which is what tells the eye "this is a metal surface" rather than paint.
+ */
+const ENV_SUN_DISC_RADIUS_FRAC = 0.045
+/** Number of star specks to sprinkle in the sky band. */
+const ENV_STAR_COUNT = 80
+/** Maximum star speck radius in pixels (minimum is 0.4). */
+const ENV_STAR_MAX_RADIUS = 1.4
 
 /**
  * Generate a procedural equirectangular environment texture for the level scene.
@@ -94,10 +105,77 @@ function createEnvironmentTexture(ctx: AtmosphereContext): THREE.CanvasTexture {
   c.fillStyle = gradient
   c.fillRect(0, 0, width, height)
 
+  // Star specks across the sky band. Mostly disappear after PMREM blurs
+  // the envmap for high-roughness mips, but survive at low roughness so
+  // glossy hardware (HUD glass, gun rails, etc.) can pick up subtle moving
+  // sparkles as the camera rotates.
+  c.fillStyle = 'rgba(255, 255, 255, 0.85)'
+  for (let i = 0; i < ENV_STAR_COUNT; i++) {
+    const sx = Math.random() * width
+    const sy = Math.random() * (height * 0.48)
+    const r = 0.4 + Math.random() * ENV_STAR_MAX_RADIUS
+    c.beginPath()
+    c.arc(sx, sy, r, 0, Math.PI * 2)
+    c.fill()
+  }
+
+  // Sun disc — projected from world sun direction onto the equirect UV.
+  // Three's `EquirectangularReflectionMapping` samples
+  //   u = atan2(d.z, d.x) / (2π) + 0.5
+  //   v = asin(d.y) / π + 0.5
+  // and the canvas uploads with `flipY=true`, which means canvas pixel
+  // (0,0) corresponds to texture v=1 — the zenith — so we project with
+  // `canvas_y = (0.5 - asin(d.y)/π) · height`.
+  const sunDir = ctx.sunDirection.clone().normalize()
+  const sunLon = Math.atan2(sunDir.z, sunDir.x)
+  const sunLat = Math.asin(THREE.MathUtils.clamp(sunDir.y, -1, 1))
+  const sunU = sunLon / (Math.PI * 2) + 0.5
+  const sunV = 0.5 - sunLat / Math.PI
+  const sunX = sunU * width
+  const sunY = sunV * height
+  const sunRadius = width * ENV_SUN_DISC_RADIUS_FRAC
+
+  drawEnvSunDisc(c, sunX, sunY, sunRadius, ctx)
+  // Wrap horizontally — equirect U is periodic, the seam is at u=0/1.
+  if (sunX < sunRadius) drawEnvSunDisc(c, sunX + width, sunY, sunRadius, ctx)
+  else if (sunX > width - sunRadius) drawEnvSunDisc(c, sunX - width, sunY, sunRadius, ctx)
+
   const texture = new THREE.CanvasTexture(canvas)
   texture.mapping = THREE.EquirectangularReflectionMapping
   texture.colorSpace = THREE.SRGBColorSpace
   return texture
+}
+
+/**
+ * Paint a radial-gradient sun disc with a hot white core fading through
+ * the asteroid's sun color to transparent. Concentrating brightness in a
+ * small spot survives PMREM convolution as a directional hot zone in
+ * reflection — what makes metal read as metal.
+ *
+ * @param c - 2D canvas context to paint into.
+ * @param x - Disc center X in canvas pixels.
+ * @param y - Disc center Y in canvas pixels.
+ * @param radius - Disc outer radius in canvas pixels.
+ * @param ctx - Atmosphere context (for the sun's color tint).
+ */
+function drawEnvSunDisc(
+  c: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  ctx: AtmosphereContext,
+): void {
+  const sunR = Math.round(ctx.sunColor.r * 255)
+  const sunG = Math.round(ctx.sunColor.g * 255)
+  const sunB = Math.round(ctx.sunColor.b * 255)
+  const grad = c.createRadialGradient(x, y, 0, x, y, radius)
+  grad.addColorStop(0, 'rgb(255, 250, 240)')
+  grad.addColorStop(0.35, `rgb(${sunR}, ${sunG}, ${sunB})`)
+  grad.addColorStop(1, `rgba(${sunR}, ${sunG}, ${sunB}, 0)`)
+  c.fillStyle = grad
+  c.beginPath()
+  c.arc(x, y, radius, 0, Math.PI * 2)
+  c.fill()
 }
 
 /**

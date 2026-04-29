@@ -128,21 +128,39 @@ const TOP_BEACON_SAFE_COLOR = 0x22c55e
 const TOP_BEACON_WARN_COLOR = 0xeab308
 const TOP_BEACON_DANGER_COLOR = 0xef4444
 
-/** Minimum hull roughness so the GLB panels don't blow out under helmet/flood lights. */
-const LANDER_MATERIAL_MIN_ROUGHNESS = 0.78
-/** Lander-local environment reflection strength; lower than scene default for matte hardware. */
-const LANDER_ENV_MAP_INTENSITY = 0.18
-/** Upper metalness bound for the lander hull to avoid chrome-like crash highlights. */
-const LANDER_MAX_METALNESS = 0.12
 /**
- * After packed roughness-map sampling, mix toward fully rough — foil textures still have
- * glossy texels that multiply into the standard BRDF despite {@link LANDER_MATERIAL_MIN_ROUGHNESS}.
+ * Minimum hull roughness. Lowered from 0.78 so the aluminum panels pick
+ * up real specular highlights against the enriched envmap (sun disc +
+ * stars) instead of reading as matte plastic. Watch for blow-out under
+ * close helmet light during EVA — if it returns, lift back toward 0.7.
  */
-const LANDER_PACKED_PBR_ROUGHNESS_MIX = 0.64
+const LANDER_MATERIAL_MIN_ROUGHNESS = 0.55
 /**
- * After metalness-map sampling on the GLB hull — shrinks mirror-like response from metal channels.
+ * Lander-local environment reflection strength. Lifted from 0.18 to let
+ * the procedural envmap actually shape the metal — at 0.18 reflections
+ * were nearly invisible regardless of envmap content.
  */
-const LANDER_PACKED_PBR_METALNESS_SCALE = 0.4
+const LANDER_ENV_MAP_INTENSITY = 0.55
+/**
+ * Upper metalness bound for the lander hull. Raised from 0.12 so panels
+ * authored as metal can read as metal — at 0.12 even fully-metallic
+ * GLTF channels collapsed into a slightly-shiny dielectric look.
+ */
+const LANDER_MAX_METALNESS = 0.4
+/**
+ * After packed roughness-map sampling, mix toward fully rough. Lowered
+ * from 0.64 so glossy texels in the foil textures still contribute
+ * meaningful specular variation instead of being averaged toward matte.
+ */
+const LANDER_PACKED_PBR_ROUGHNESS_MIX = 0.35
+/**
+ * After metalness-map sampling on the GLB hull. Raised from 0.4 so the
+ * authored metal channels actually contribute — combined with the higher
+ * {@link LANDER_MAX_METALNESS} ceiling this restores the metal/non-metal
+ * material contrast that makes the lander read as built hardware, not
+ * a single-shader plastic prop.
+ */
+const LANDER_PACKED_PBR_METALNESS_SCALE = 0.7
 /** Max idle nozzle sprite opacity. */
 const NOZZLE_IDLE_OPACITY = 0.26
 /** Extra opacity added by idle nozzle pulse. */

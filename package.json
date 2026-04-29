@@ -33,6 +33,7 @@
   "dependencies": {
     "howler": "^2.2.4",
     "pinia": "^3.0.4",
+    "postprocessing": "^6.39.1",
     "three": "^0.183.2",
     "three-mesh-bvh": "^0.9.9",
     "vue": "^3.5.31",

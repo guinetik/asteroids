@@ -31,11 +31,11 @@
     "surfaceTextures": "/textures/asteroids/psyche",
     "surfaceUseEmbeddedUVs": true,
     "surfaceDetailFolder": "/textures/asteroids/default",
-    "surfaceDetailRepeat": 10,
-    "surfaceDetailNormalStrength": 3.85
+    "surfaceDetailRepeat": 5,
+    "surfaceDetailNormalStrength": 2
   },
   "visual": {
-    "albedo": 0.15,
+    "albedo": 0.55,
     "baseColor": [1.4, 1.15, 0.6]
   },
   "physical": {
@@ -49,7 +49,7 @@
     "sunAzimuth": 200,
     "sunElevation": 30,
     "sunColor": [0.9, 0.95, 1.0],
-    "sunIntensity": 0.83,
-    "ambientIntensity": 0.33
+    "sunIntensity": 0.85,
+    "ambientIntensity": 0.5
   }
 }
