@@ -30,9 +30,9 @@
     "modelPath": "/models/asteroids/itokawa.glb",
     "modelScale": 1300,
     "surfaceTextures": "/textures/asteroids/sandy",
-    "surfaceTextureRepeat": 16,
-    "surfaceModulatorStrength": 0.45,
-    "surfaceModulatorColorBlend": 0.0,
+    "surfaceTextureRepeat": 30,
+    "surfaceModulatorStrength": 0.5,
+    "surfaceModulatorColorBlend": 0.2,
     "surfaceAOStrength": 1.0,
     "surfaceEmissionStrength": 1.0
   },

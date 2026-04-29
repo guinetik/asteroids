@@ -31,8 +31,11 @@
     "surfaceTextures": "/textures/asteroids/psyche",
     "surfaceUseEmbeddedUVs": true,
     "surfaceDetailFolder": "/textures/asteroids/default",
-    "surfaceDetailRepeat": 50,
-    "surfaceDetailNormalStrength": 2
+    "surfaceDetailRepeat": 25,
+    "surfaceDetailNormalStrength": 2,
+    "surfaceModulatorColorBlend": 0.2,
+    "surfaceAOStrength": 2.0,
+    "surfaceEmissionStrength": 1.0
   },
   "visual": {
     "albedo": 0.55,

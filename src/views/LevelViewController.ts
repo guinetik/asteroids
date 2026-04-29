@@ -90,7 +90,12 @@ import { createEnemyVisualWarmup, type EnemyVisualWarmup } from '@/three/EnemyVi
 import { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
 import { loadProfile } from '@/lib/player/profile'
 import { getItemDefinition } from '@/lib/inventory/catalog'
-import { LootSystem, type LootPickup, type LootType, createContractLootPolicy } from '@/lib/fps/lootSystem'
+import {
+  LootSystem,
+  type LootPickup,
+  type LootType,
+  createContractLootPolicy,
+} from '@/lib/fps/lootSystem'
 import { TRADE_GOODS } from '@/lib/shop/tradeGoods'
 import { addItem } from '@/lib/inventory/inventory'
 import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
@@ -1558,8 +1563,7 @@ export class LevelViewController implements Tickable {
       this.stateMachine?.is('failed') ||
       this.stateMachine?.is('bunker-interior')
     if (bad) {
-      const msg =
-        `[AsteroidDev] landNearObjective: not supported in state '${String(this.stateMachine?.state ?? 'null')}'`
+      const msg = `[AsteroidDev] landNearObjective: not supported in state '${String(this.stateMachine?.state ?? 'null')}'`
       console.warn(msg)
       return msg
     }
@@ -1580,7 +1584,10 @@ export class LevelViewController implements Tickable {
    * @param offsetMeters - Horizontal pull toward `(0,0)`.
    * @returns `null` when the height probe fails outright.
    */
-  private computeDevLandingWorldNearObjective(objective: ConcreteObjective, offsetMeters: number): Vector3 | null {
+  private computeDevLandingWorldNearObjective(
+    objective: ConcreteObjective,
+    offsetMeters: number,
+  ): Vector3 | null {
     const ox = objective.x
     const oz = objective.z
     let nx = -ox
