@@ -1,0 +1,68 @@
+{
+  "id": "mr-finch",
+  "name": "Mr. Finch",
+  "title": "Saturn's Handler",
+  "objectiveTypes": ["gather", "survey", "photometry"],
+  "minDifficulty": 4,
+  "maxDifficulty": 9,
+  "requiresFlag": "jovianContractTampered",
+  "missions": [
+    {
+      "id": "finch_saturn_gather",
+      "name": "Saturn Haul Cycle",
+      "briefing": "Pilot. Got a standard gather cycle out in the Saturn co-orbitals — heavy regolith, routine volume, good rates if you move clean. Not a complicated job. Land, fill the hold, come back. Comm me when you dock. — Finch",
+      "objectiveSlots": [
+        {
+          "type": "gather",
+          "weight": 1.0,
+          "params": {
+            "type": "gather",
+            "resourceAmount": { "min": 90, "max": 160 }
+          },
+          "reward": { "min": 3500, "max": 5500 }
+        }
+      ],
+      "completionBonus": { "min": 600, "max": 1200 },
+      "regionByDifficulty": { "saturn-trojans": [4, 9] }
+    },
+    {
+      "id": "finch_saturn_survey",
+      "name": "Gravimetric Pass, Saturn Trojans",
+      "briefing": "Pilot. Three-stage gravimetric pass on a candidate body in the Saturn co-orbitals. Probe calibration, standard hold times. The rock's well-behaved — good surface, clean approach. If the data comes back clean I've got more of the same. Standard rate plus travel. — Finch",
+      "objectiveSlots": [
+        {
+          "type": "survey",
+          "weight": 1.0,
+          "params": {
+            "type": "survey",
+            "probeCount": { "min": 6, "max": 12 },
+            "timeLimit": { "min": 150, "max": 90 }
+          },
+          "reward": { "min": 4000, "max": 6500 }
+        }
+      ],
+      "completionBonus": { "min": 800, "max": 1500 },
+      "regionByDifficulty": { "saturn-trojans": [5, 9] }
+    },
+    {
+      "id": "finch_saturn_photometry",
+      "name": "Photometric Certification Run",
+      "briefing": "Pilot. Buyer wants a certified photometric pass before they commit to extraction. Standoff approach, probe deploy, hold the lander stable through the exposure. Nothing unusual about the body — just needs a clean telemetry packet. Pays above standard because of the distance. Come back with good data. — Finch",
+      "objectiveSlots": [
+        {
+          "type": "photometry",
+          "weight": 1.0,
+          "params": {
+            "type": "photometry",
+            "timeLimit": { "min": 240, "max": 180 },
+            "scanHoldSeconds": { "min": 8, "max": 13 },
+            "probeDistance": { "min": 2600, "max": 3200 }
+          },
+          "reward": { "min": 5000, "max": 8000 }
+        }
+      ],
+      "completionBonus": { "min": 1000, "max": 2000 },
+      "regionByDifficulty": { "saturn-trojans": [6, 9] }
+    }
+  ]
+}

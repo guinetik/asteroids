@@ -1,5 +1,6 @@
 /**
  * Tests for getGiversForDifficulty: difficulty range, disabledGiverIds, and requiresFlag filters.
+ * Includes Mr. Finch surfacing tests (post-tamper, jovianContractTampered flag).
  *
  * @author guinetik
  * @date 2026-04-30
@@ -7,6 +8,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { getGiversForDifficulty } from '@/lib/missions/giverCatalog'
+import { setStoryFlag, createProfile } from '@/lib/player/profile'
 import type { PlayerProfile } from '@/lib/player/types'
 import type { MissionGiver } from '@/lib/missions/types'
 
@@ -95,5 +97,31 @@ describe('getGiversForDifficulty surfacing filters', () => {
     })
     const result = getGiversForDifficulty(5, profile, givers)
     expect(result.map((g) => g.id)).toEqual(['flagged-one', 'plain-one'])
+  })
+})
+
+describe('Mr. Finch surfacing', () => {
+  it('does not surface without the jovianContractTampered flag', () => {
+    const profile = createProfile('test-pilot')
+    const givers = getGiversForDifficulty(5, profile)
+    expect(givers.find((g) => g.id === 'mr-finch')).toBeUndefined()
+  })
+
+  it('surfaces when jovianContractTampered is set', () => {
+    const profile = setStoryFlag(createProfile('test-pilot'), 'jovianContractTampered')
+    const givers = getGiversForDifficulty(5, profile)
+    expect(givers.find((g) => g.id === 'mr-finch')).toBeDefined()
+  })
+
+  it('does not surface below minDifficulty 4 even with the flag set', () => {
+    const profile = setStoryFlag(createProfile('test-pilot'), 'jovianContractTampered')
+    const givers = getGiversForDifficulty(3, profile)
+    expect(givers.find((g) => g.id === 'mr-finch')).toBeUndefined()
+  })
+
+  it('does not surface above maxDifficulty 9 even with the flag set', () => {
+    const profile = setStoryFlag(createProfile('test-pilot'), 'jovianContractTampered')
+    const givers = getGiversForDifficulty(10, profile)
+    expect(givers.find((g) => g.id === 'mr-finch')).toBeUndefined()
   })
 })

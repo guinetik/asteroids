@@ -20,6 +20,7 @@ import jovianSocietyData from '@/data/missions/givers/jovian-society.json'
 import cinderlineData from '@/data/missions/givers/cinderline.json'
 import lucasMaverickData from '@/data/missions/givers/lucas-maverick.json'
 import martianMarinesBunkerData from '@/data/missions/givers/martian-marines-bunker.json'
+import mrFinchData from '@/data/missions/givers/mr-finch.json'
 
 /** All mission givers loaded from JSON. */
 export const MISSION_GIVERS: MissionGiver[] = [
@@ -31,6 +32,7 @@ export const MISSION_GIVERS: MissionGiver[] = [
   cinderlineData,
   lucasMaverickData,
   martianMarinesBunkerData,
+  mrFinchData,
 ] as unknown as MissionGiver[]
 
 /** Mission givers keyed by id. */
