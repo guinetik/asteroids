@@ -21,7 +21,7 @@ import type {
 } from './types'
 import { getGiversForDifficulty, MISSION_GIVERS } from './giverCatalog'
 import type { PlayerProfile } from '@/lib/player/types'
-import { hasStoryFlag } from '@/lib/player/profile'
+import { getBodyAccess, hasStoryFlag } from '@/lib/player/profile'
 import { ASTEROID_BELTS, getPlanet, PLANETS } from '@/lib/planets/catalog'
 import { ORBIT_SCALE, SIZE_SCALE } from '@/lib/planets/constants'
 import { generateFlatZones } from '@/lib/terrain/terrainGenerator'
@@ -111,10 +111,23 @@ function interpolatePhotometryRange(range: NumberRange, difficulty: number): num
 
 /** Entry from the difficulty-map JSON. */
 interface DifficultyMapEntry {
+  /** Asteroid catalog id. */
   asteroidId: string
+  /** Minimum mission difficulty for this entry to be eligible. */
   minDifficulty: number
+  /** Maximum mission difficulty for this entry to be eligible. */
   maxDifficulty: number
+  /**
+   * When set, the entry is only eligible for missions posted at one of these planet ids.
+   * Entries without `planetIds` are globally available.
+   */
   planetIds?: string[]
+  /**
+   * When `true`, the entry is only included in the procedural pool when the player has
+   * `bodyAccess[asteroidId] === 'liberated'`. Used for named pinned bodies (e.g. Hektor)
+   * that become procedural targets only after tamper resolution, not during the active contract.
+   */
+  requiresLiberated?: boolean
 }
 
 /**
@@ -141,14 +154,31 @@ function isAsteroidEntryAvailableForHost(
  * Host-specific entries only appear for listed planets. Global entries remain available
  * everywhere, and are used as a fallback if the host has no matching specific entries.
  *
+ * Entries marked `requiresLiberated` are only included when
+ * `profile.bodyAccess[asteroidId] === 'liberated'`. This is intentionally asymmetric:
+ * a pinned body like Hektor is excluded at `'unrestricted'` (contract active) and only joins
+ * the pool at `'liberated'` (tamper resolved). `'restricted'` and `'destroyed'` also exclude it.
+ *
  * @param difficulty - Mission difficulty (1-10).
  * @param hostPlanetId - Optional planet id for the board posting the mission.
+ * @param profile - Optional player profile used to unlock liberated named bodies in the pool.
  * @returns Asteroid id from the catalog.
  */
-export function pickAsteroidForDifficulty(difficulty: number, hostPlanetId?: string): string {
-  const difficultyEntries = (difficultyMap as DifficultyMapEntry[]).filter(
-    (e) => difficulty >= e.minDifficulty && difficulty <= e.maxDifficulty,
-  )
+export function pickAsteroidForDifficulty(
+  difficulty: number,
+  hostPlanetId?: string,
+  profile?: PlayerProfile,
+): string {
+  const difficultyEntries = (difficultyMap as DifficultyMapEntry[]).filter((e) => {
+    if (difficulty < e.minDifficulty || difficulty > e.maxDifficulty) return false
+    // Entries gated on liberation are only eligible when the player has liberated that body.
+    if (e.requiresLiberated) {
+      const access =
+        profile?.bodyAccess != null ? getBodyAccess(profile, e.asteroidId) : 'restricted'
+      if (access !== 'liberated') return false
+    }
+    return true
+  })
   if (difficultyEntries.length === 0) {
     return (difficultyMap as DifficultyMapEntry[])[0]!.asteroidId
   }
@@ -877,7 +907,7 @@ export function generateAsteroidMission(
     anchor.planetId,
   )
 
-  const asteroidId = pickAsteroidForDifficulty(difficulty, anchor.planetId)
+  const asteroidId = pickAsteroidForDifficulty(difficulty, anchor.planetId, profile)
   const hostGiverOverride = getHostGiverOverride(anchor.planetId)
 
   return {

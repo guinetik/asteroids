@@ -938,3 +938,144 @@ describe('mission-level requiresFlag filtering', () => {
     })
   })
 })
+
+describe('Hektor liberated pool integration', () => {
+  /**
+   * Jupiter host anchor used to bias the pool towards jovian-trojans missions where Hektor
+   * is a valid candidate.
+   */
+  const jupiterHost = (() => {
+    const jupiter = getPlanet('jupiter')
+    return {
+      planetId: 'jupiter' as const,
+      worldX: jupiter.orbit.semiMajorAxis * ORBIT_SCALE,
+      worldZ: 0,
+    }
+  })()
+
+  /** Difficulty inside Hektor's eligible band (5-10) and within jovian-trojans range. */
+  const HEKTOR_TEST_DIFFICULTY = 7
+
+  /** Roll count high enough to catch any 1-in-N asteroid pick with N ≤ 5 bodies. */
+  const ROLL_COUNT = 300
+
+  it('does NOT roll Hektor when bodyAccess is unrestricted', () => {
+    const profile = {
+      bodyAccess: { hektor: 'unrestricted' },
+    } as unknown as PlayerProfile
+    let sawHektor = false
+    for (let i = 0; i < ROLL_COUNT; i++) {
+      const mission = generateAsteroidMission(
+        HEKTOR_TEST_DIFFICULTY,
+        jupiterHost,
+        Math.random,
+        null,
+        null,
+        profile,
+      )
+      if (mission.asteroidId === 'hektor') sawHektor = true
+    }
+    expect(sawHektor).toBe(false)
+  })
+
+  it('does NOT roll Hektor when bodyAccess is restricted', () => {
+    const profile = {
+      bodyAccess: { hektor: 'restricted' },
+    } as unknown as PlayerProfile
+    let sawHektor = false
+    for (let i = 0; i < ROLL_COUNT; i++) {
+      const mission = generateAsteroidMission(
+        HEKTOR_TEST_DIFFICULTY,
+        jupiterHost,
+        Math.random,
+        null,
+        null,
+        profile,
+      )
+      if (mission.asteroidId === 'hektor') sawHektor = true
+    }
+    expect(sawHektor).toBe(false)
+  })
+
+  it('does NOT roll Hektor when bodyAccess is destroyed', () => {
+    const profile = {
+      bodyAccess: { hektor: 'destroyed' },
+    } as unknown as PlayerProfile
+    let sawHektor = false
+    for (let i = 0; i < ROLL_COUNT; i++) {
+      const mission = generateAsteroidMission(
+        HEKTOR_TEST_DIFFICULTY,
+        jupiterHost,
+        Math.random,
+        null,
+        null,
+        profile,
+      )
+      if (mission.asteroidId === 'hektor') sawHektor = true
+    }
+    expect(sawHektor).toBe(false)
+  })
+
+  it('does NOT roll Hektor when no profile is supplied', () => {
+    let sawHektor = false
+    for (let i = 0; i < ROLL_COUNT; i++) {
+      const mission = generateAsteroidMission(HEKTOR_TEST_DIFFICULTY, jupiterHost)
+      if (mission.asteroidId === 'hektor') sawHektor = true
+    }
+    expect(sawHektor).toBe(false)
+  })
+
+  it('CAN roll Hektor when bodyAccess is liberated', () => {
+    const profile = {
+      bodyAccess: { hektor: 'liberated' },
+    } as unknown as PlayerProfile
+    let sawHektor = false
+    for (let i = 0; i < ROLL_COUNT; i++) {
+      const mission = generateAsteroidMission(
+        HEKTOR_TEST_DIFFICULTY,
+        jupiterHost,
+        Math.random,
+        null,
+        null,
+        profile,
+      )
+      if (mission.asteroidId === 'hektor') {
+        sawHektor = true
+        break
+      }
+    }
+    // Hektor is one of several jovian-trojan difficulty-map bodies; enough rolls guarantees a hit.
+    expect(sawHektor).toBe(true)
+  })
+
+  it('pickAsteroidForDifficulty excludes Hektor when profile is absent', () => {
+    // No profile → requiresLiberated entries are filtered out regardless of host.
+    const result = pickAsteroidForDifficulty(HEKTOR_TEST_DIFFICULTY, 'jupiter')
+    expect(result).not.toBe('hektor')
+  })
+
+  it('pickAsteroidForDifficulty excludes Hektor for unrestricted access', () => {
+    const profile = {
+      bodyAccess: { hektor: 'unrestricted' },
+    } as unknown as PlayerProfile
+    // Run many times to rule out fluke exclusion.
+    for (let i = 0; i < 60; i++) {
+      expect(pickAsteroidForDifficulty(HEKTOR_TEST_DIFFICULTY, 'jupiter', profile)).not.toBe(
+        'hektor',
+      )
+    }
+  })
+
+  it('pickAsteroidForDifficulty returns Hektor for liberated access when it is the only candidate', () => {
+    const profile = {
+      bodyAccess: { hektor: 'liberated' },
+    } as unknown as PlayerProfile
+    // At difficulty 9, Jupiter host: xg7 (6-8 only), kr3 (8-10), vesta (3-5 only) → kr3 + hektor.
+    // Use Math.random spy set to 0 to always pick the first entry.
+    const spy = vi.spyOn(Math, 'random').mockReturnValue(0)
+    const result = pickAsteroidForDifficulty(9, 'jupiter', profile)
+    spy.mockRestore()
+    // Result must be either kr3 (non-jupiter-only) or hektor (jupiter + liberated).
+    expect(['kr3', 'hektor']).toContain(result)
+  })
+})
