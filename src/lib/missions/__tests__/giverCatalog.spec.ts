@@ -100,6 +100,32 @@ describe('getGiversForDifficulty surfacing filters', () => {
   })
 })
 
+describe('Cloud City Ops surfacing', () => {
+  it('does not surface without the jovianContractTampered flag', () => {
+    const profile = createProfile('test-pilot')
+    const givers = getGiversForDifficulty(5, profile)
+    expect(givers.find((g) => g.id === 'cloud-city-ops')).toBeUndefined()
+  })
+
+  it('surfaces when jovianContractTampered is set', () => {
+    const profile = setStoryFlag(createProfile('test-pilot'), 'jovianContractTampered')
+    const givers = getGiversForDifficulty(5, profile)
+    expect(givers.find((g) => g.id === 'cloud-city-ops')).toBeDefined()
+  })
+
+  it('respects minDifficulty 3 — does not surface below it', () => {
+    const profile = setStoryFlag(createProfile('test-pilot'), 'jovianContractTampered')
+    const givers = getGiversForDifficulty(2, profile)
+    expect(givers.find((g) => g.id === 'cloud-city-ops')).toBeUndefined()
+  })
+
+  it('respects maxDifficulty 7 — does not surface above it', () => {
+    const profile = setStoryFlag(createProfile('test-pilot'), 'jovianContractTampered')
+    const givers = getGiversForDifficulty(8, profile)
+    expect(givers.find((g) => g.id === 'cloud-city-ops')).toBeUndefined()
+  })
+})
+
 describe('Mr. Finch surfacing', () => {
   it('does not surface without the jovianContractTampered flag', () => {
     const profile = createProfile('test-pilot')

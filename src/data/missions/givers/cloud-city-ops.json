@@ -1,0 +1,66 @@
+{
+  "id": "cloud-city-ops",
+  "name": "Cloud City Operations",
+  "title": "Operations Bureau",
+  "objectiveTypes": ["gather", "survey"],
+  "minDifficulty": 3,
+  "maxDifficulty": 7,
+  "requiresFlag": "jovianContractTampered",
+  "missions": [
+    {
+      "id": "cco_anchor_maintenance",
+      "name": "Lower-Band Anchor Maintenance",
+      "briefing": "Cloud City Operations Bureau, contractor desk. Standing call: maintenance pass on lower-band atmospheric anchors, low-priority. Standard cycle. Collect the listed supply manifest from the designated body, deliver to anchor grid on approach. File the receipt at any kiosk. — Operations.",
+      "objectiveSlots": [
+        {
+          "type": "gather",
+          "weight": 1.0,
+          "params": {
+            "type": "gather",
+            "resourceAmount": { "min": 60, "max": 110 }
+          },
+          "reward": { "min": 2800, "max": 4500 }
+        }
+      ],
+      "completionBonus": { "min": 400, "max": 900 },
+      "regionByDifficulty": { "jovian-trojans": [3, 7] }
+    },
+    {
+      "id": "cco_upper_band_survey",
+      "name": "Upper-Band Atmospheric Survey",
+      "briefing": "Operations, contractor desk. Survey pass requested on upper-band atmospheric strata. Deploy probes at prescribed hold altitudes, recover telemetry packet before return. Standard rate. No special handling required. — Operations.",
+      "objectiveSlots": [
+        {
+          "type": "survey",
+          "weight": 1.0,
+          "params": {
+            "type": "survey",
+            "probeCount": { "min": 4, "max": 9 },
+            "timeLimit": { "min": 180, "max": 120 }
+          },
+          "reward": { "min": 3200, "max": 5500 }
+        }
+      ],
+      "completionBonus": { "min": 500, "max": 1100 },
+      "regionByDifficulty": { "jovian-trojans": [4, 7] }
+    },
+    {
+      "id": "cco_anchor_resupply",
+      "name": "Anchor Grid Resupply Run",
+      "briefing": "Operations. Atmospheric anchor maintenance. Standard cycle. Resupply run to co-orbital body, materials listed in manifest. Return with confirmation receipt. Rated low-complexity. — Operations.",
+      "objectiveSlots": [
+        {
+          "type": "gather",
+          "weight": 1.0,
+          "params": {
+            "type": "gather",
+            "resourceAmount": { "min": 80, "max": 140 }
+          },
+          "reward": { "min": 3000, "max": 5000 }
+        }
+      ],
+      "completionBonus": { "min": 450, "max": 1000 },
+      "regionByDifficulty": { "jovian-trojans": [3, 6] }
+    }
+  ]
+}
