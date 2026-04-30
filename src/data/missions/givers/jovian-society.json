@@ -7,9 +7,9 @@
   "maxDifficulty": 10,
   "missions": [
     {
-      "id": "jovian_prelim_eval",
-      "name": "Preliminary Asset Evaluation",
-      "briefing": "Per current portfolio review, the Society requires preliminary photometric data on a candidate body. Standard pass: deploy probe, hold standoff, capture telemetry, file to the desk on close. Several assets are under simultaneous review this cycle. Clean data advances yours in queue.",
+      "id": "jovian_routine_telemetry",
+      "name": "Routine Asset Telemetry",
+      "briefing": "Per current portfolio review, the Society routes ad-hoc photometric coverage to qualified contractors. Standard pass: deploy probe, hold standoff, capture telemetry. Rates per the standing kiosk schedule. — Vance Hoyt, Asset Strategy.",
       "objectiveSlots": [
         {
           "type": "photometry",
@@ -27,9 +27,9 @@
       "regionByDifficulty": { "jovian-trojans": [3, 5] }
     },
     {
-      "id": "jovian_phase_two_scan",
-      "name": "Phase II Verification Scan",
-      "briefing": "Subject body has cleared preliminary screening. Phase II photometric pass required at extraction-grade precision: standoff tighter, hold longer, variance window narrower. Phase II compensation rates apply on close. Stakeholders are watching this one.",
+      "id": "jovian_extraction_grade_telemetry",
+      "name": "Extraction-Grade Telemetry",
+      "briefing": "Higher tier, same protocol — extraction-grade tolerance for standoff drift and hold variance. Rates scale accordingly. Good telemetry returns advance the contractor's standing on our manifest. — Vance",
       "objectiveSlots": [
         {
           "type": "photometry",
@@ -49,7 +49,7 @@
     {
       "id": "jovian_subsurface_pass",
       "name": "Subsurface Verification Pass",
-      "briefing": "Per current portfolio review, this asset has cleared preliminary photometric screening. Next step is DAN: Dynamic Albedo of Neutrons, with emphasis on buried volatiles and lattice traces relevant to neutron-thruster production. Kindly capture clean return particles and disregard any sensor cross-talk inside the instrumentation envelope. Warm regards, Vance Hoyt.",
+      "briefing": "Per current portfolio review, the Society routes Dynamic Albedo of Neutrons surveys to qualified contractors. Emphasis on buried volatiles and lattice traces relevant to neutron-thruster production. Kindly capture clean return particles and disregard any sensor cross-talk inside the instrumentation envelope. Warm regards, Vance Hoyt.",
       "objectiveSlots": [
         {
           "type": "dan",
@@ -88,9 +88,9 @@
       "planetIds": ["jupiter"]
     },
     {
-      "id": "jovian_extraction_grade_dan",
-      "name": "Extraction-Grade DAN Survey",
-      "briefing": "Stakeholders require extraction-grade subsurface confidence before this body advances. Run a full Dynamic Albedo of Neutrons pass and classify any lattice-positive bands against the Phobos reference family. Please advise if elevated ambient disturbance compromises telemetry quality; otherwise continue the pass unless the hull is compromised. Warm regards, Vance Hoyt.",
+      "id": "jovian_high_tier_dan",
+      "name": "High-Tier DAN Survey",
+      "briefing": "High-tier subsurface coverage at extraction-grade tolerance. Run a full Dynamic Albedo of Neutrons pass and classify any lattice-positive bands against the Phobos reference family. Please advise if elevated ambient disturbance compromises telemetry quality; otherwise continue the pass unless the hull is compromised. Warm regards, Vance Hoyt.",
       "objectiveSlots": [
         {
           "type": "dan",
