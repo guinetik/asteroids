@@ -1,0 +1,26 @@
+{
+  "kind": "special",
+  "id": "jovian-prospection-saturn-photometry",
+  "asteroidId": "asset-2306-s",
+  "giverId": "jovian-society",
+  "giverName": "Jovian Society",
+  "templateId": "jovian-prospection-saturn-photometry",
+  "name": "OP 5 — Photometric Assessment, Asset 2306-S",
+  "briefing": "Pilot, strong returns on the Jovian pass. Routing you to a sister asset in the Saturn co-orbital region — yes, slightly outside our usual operating envelope, but the portfolio review is system-wide this quarter and we like the way you fly. Travel premium is included in the line item. Please do not cite the figure to other contractors. Same instrumentation, same protocol, longer trip. Asset 2306-S. Single photometric pass. — Vance",
+  "difficulty": 6,
+  "region": "saturn-trojans",
+  "objectives": [
+    {
+      "type": "photometry",
+      "x": 0,
+      "z": 0,
+      "scanHoldSeconds": 9,
+      "probeDistance": 2900,
+      "timeLimit": 230,
+      "reward": 6000
+    }
+  ],
+  "totalReward": 6000,
+  "waypoint": { "worldX": 0, "worldZ": 0 },
+  "status": "available"
+}

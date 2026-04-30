@@ -1,0 +1,28 @@
+{
+  "kind": "special",
+  "id": "jovian-prospection-saturn-dan",
+  "asteroidId": "asset-2306-s",
+  "giverId": "jovian-society",
+  "giverName": "Jovian Society",
+  "templateId": "jovian-prospection-saturn-dan",
+  "name": "OP 8 — Subsurface Survey, Asset 2306-S",
+  "briefing": "Pilot, final survey deliverable. Saturn co-orbital body — Asset 2306-S, the same body you photometry'd in OP 5. DAN protocol, same procedure as the Jovian pass. I will note that several pilots in the cohort have reported elevated 'sensor cross-talk' on subsurface passes near gas-giant assets. The instrumentation team continues to investigate. You are cleared to proceed at your discretion. Travel premium applies on this leg as well. Bring the data home and we'll begin compiling the prospectus. — Vance",
+  "difficulty": 8,
+  "region": "saturn-trojans",
+  "objectives": [
+    {
+      "type": "dan",
+      "x": 0,
+      "z": 0,
+      "scanDurationSeconds": 90,
+      "requiredParticleHits": 34,
+      "enemyGraceSeconds": 7,
+      "particleTier": "high",
+      "enemyTier": "high",
+      "reward": 7500
+    }
+  ],
+  "totalReward": 7500,
+  "waypoint": { "worldX": 0, "worldZ": 0 },
+  "status": "available"
+}

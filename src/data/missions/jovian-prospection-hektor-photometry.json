@@ -1,0 +1,26 @@
+{
+  "kind": "special",
+  "id": "jovian-prospection-hektor-photometry",
+  "asteroidId": "hektor",
+  "giverId": "jovian-society",
+  "giverName": "Jovian Society",
+  "templateId": "jovian-prospection-hektor-photometry",
+  "name": "OP 4 — Photometric Assessment, Asset 2306-J",
+  "briefing": "Pilot, calibration unit registers green. You're cleared for photometry tasking. First assignment: a candidate body in the Jovian Trojans, currently flagged 'preliminary review' in our portfolio. We're calling it Asset 2306-J for ledger purposes. Single photometric pass, standard deliverable. The Society values clean telemetry; please prioritize signal quality over speed. — Vance",
+  "difficulty": 5,
+  "region": "jovian-trojans",
+  "objectives": [
+    {
+      "type": "photometry",
+      "x": 0,
+      "z": 0,
+      "scanHoldSeconds": 8,
+      "probeDistance": 2700,
+      "timeLimit": 240,
+      "reward": 4500
+    }
+  ],
+  "totalReward": 4500,
+  "waypoint": { "worldX": 0, "worldZ": 0 },
+  "status": "available"
+}

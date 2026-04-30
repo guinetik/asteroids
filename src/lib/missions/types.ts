@@ -25,7 +25,12 @@ export type ObjectiveType =
   | 'bunker'
 
 /** Solar system region where missions spawn. Determines fuel cost and distance. */
-export type MissionRegion = 'near-earth' | 'asteroid-belt' | 'kuiper-belt' | 'jovian-trojans'
+export type MissionRegion =
+  | 'near-earth'
+  | 'asteroid-belt'
+  | 'kuiper-belt'
+  | 'jovian-trojans'
+  | 'saturn-trojans'
 
 /** A min/max range for procedural generation. Generator interpolates based on difficulty. */
 export interface NumberRange {

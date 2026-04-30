@@ -1,0 +1,28 @@
+{
+  "kind": "special",
+  "id": "jovian-prospection-hektor-dan",
+  "asteroidId": "hektor",
+  "giverId": "jovian-society",
+  "giverName": "Jovian Society",
+  "templateId": "jovian-prospection-hektor-dan",
+  "name": "OP 7 — Subsurface Survey, Asset 2306-J",
+  "briefing": "Pilot, DAN instrument is shipped and registered to your lander. First subsurface pass: the same Jovian Trojan candidate from the photometry series. You'll find the body familiar. Park in the center of the impact crater the Society marked during your earlier visit, switch to science mode, and run the scan. A note from the instrumentation team: the neutron pulse occasionally registers ambient disturbance during operation. They assure us this is sensor cross-talk and not a hazard. Please complete the survey regardless. — Vance",
+  "difficulty": 6,
+  "region": "jovian-trojans",
+  "objectives": [
+    {
+      "type": "dan",
+      "x": 0,
+      "z": 0,
+      "scanDurationSeconds": 70,
+      "requiredParticleHits": 28,
+      "enemyGraceSeconds": 9,
+      "particleTier": "medium",
+      "enemyTier": "medium",
+      "reward": 6000
+    }
+  ],
+  "totalReward": 6000,
+  "waypoint": { "worldX": 0, "worldZ": 0 },
+  "status": "available"
+}

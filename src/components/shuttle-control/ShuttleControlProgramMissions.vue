@@ -254,6 +254,8 @@ function regionLabel(region: MissionRegion): string {
       return 'Kuiper Belt'
     case 'jovian-trojans':
       return 'Jovian Trojans'
+    case 'saturn-trojans':
+      return 'Saturn Trojans'
   }
 }
 
