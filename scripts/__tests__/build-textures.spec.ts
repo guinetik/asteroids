@@ -9,6 +9,7 @@ import {
   pickPreferredRasterPath,
   rasterExtensionRank,
   rasterGroupKey,
+  shouldRebuildTextureWebp,
 } from '../build-textures.mjs'
 
 describe('texture webp helpers', () => {
@@ -59,5 +60,13 @@ describe('texture webp helpers', () => {
     /** @type {readonly number[]} */
     const short = lossyWebpQualityLadder(82, 80, 1)
     expect(short).toEqual([82, 81, 80])
+  })
+
+  it('rebuild decision prefers skipping fresh webp but catches newer sources', () => {
+    expect(shouldRebuildTextureWebp(300, 400, false)).toBe(false)
+    expect(shouldRebuildTextureWebp(400, 400, false)).toBe(false)
+    expect(shouldRebuildTextureWebp(500, 400, false)).toBe(true)
+    expect(shouldRebuildTextureWebp(100, null, false)).toBe(true)
+    expect(shouldRebuildTextureWebp(100, 900, true)).toBe(true)
   })
 })
