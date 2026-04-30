@@ -1,14 +1,18 @@
 /**
  * Tests for getGiversForDifficulty: difficulty range, disabledGiverIds, and requiresFlag filters.
- * Includes Mr. Finch surfacing tests (post-tamper, jovianContractTampered flag).
+ * Includes Mr. Finch, Cloud City Ops, and Jay Mercer expansion surfacing tests
+ * (post-tamper, jovianContractTampered flag).
  *
  * @author guinetik
  * @date 2026-04-30
  * @spec docs/superpowers/specs/2026-04-29-jovian-prospectus-minigame-design.md
  */
 import { describe, it, expect } from 'vitest'
-import { getGiversForDifficulty } from '@/lib/missions/giverCatalog'
+import { getGiversForDifficulty, MISSION_GIVERS } from '@/lib/missions/giverCatalog'
 import { setStoryFlag, createProfile } from '@/lib/player/profile'
+import { generateAsteroidMission } from '@/lib/missions/asteroidMissionGenerator'
+import { getPlanet } from '@/lib/planets/catalog'
+import { ORBIT_SCALE } from '@/lib/planets/constants'
 import type { PlayerProfile } from '@/lib/player/types'
 import type { MissionGiver } from '@/lib/missions/types'
 
@@ -149,5 +153,64 @@ describe('Mr. Finch surfacing', () => {
     const profile = setStoryFlag(createProfile('test-pilot'), 'jovianContractTampered')
     const givers = getGiversForDifficulty(10, profile)
     expect(givers.find((g) => g.id === 'mr-finch')).toBeUndefined()
+  })
+})
+
+describe('Jay Mercer expansion missions', () => {
+  /** Minimal profile stub — only activeStoryFlags matters here. */
+  const stubProfile = (overrides: Partial<PlayerProfile> = {}): PlayerProfile =>
+    ({ ...overrides }) as unknown as PlayerProfile
+
+  it('Jay surfaces always (giver-level always-on)', () => {
+    expect(getGiversForDifficulty(3, createProfile('test-pilot')).find((g) => g.id === 'jay')).toBeDefined()
+  })
+
+  it('Jays existing missions surface without the flag', () => {
+    // jay has no requiresFlag at the giver level; at least one always-on template exists
+    const jay = MISSION_GIVERS.find((g) => g.id === 'jay')
+    expect(jay).toBeDefined()
+    const alwaysOn = jay!.missions.filter((m) => m.requiresFlag === undefined)
+    expect(alwaysOn.length).toBeGreaterThan(0)
+  })
+
+  it('Jays expansion templates are absent from generated pool when flag is unset', () => {
+    // Run 60 generations at the Jupiter host without the flag — expansion template ids must
+    // never appear, since they all carry requiresFlag: 'jovianContractTampered'.
+    const expansionIds = new Set([
+      'jay_jupiter_belt_cycle',
+      'jay_jupiter_asteroid_listing',
+      'jay_jupiter_grav_sweep',
+    ])
+    const jupiter = getPlanet('jupiter')
+    const hostR = jupiter.orbit.semiMajorAxis * ORBIT_SCALE
+    const host = { planetId: 'jupiter' as const, worldX: hostR, worldZ: 0 }
+    const profile = stubProfile()
+    for (let i = 0; i < 60; i++) {
+      const mission = generateAsteroidMission(6, host, Math.random, null, null, profile)
+      expect(expansionIds.has(mission.templateId)).toBe(false)
+    }
+  })
+
+  it('Jays expansion templates surface when jovianContractTampered is set', () => {
+    // Run 80 generations at the Jupiter host with the flag set — at least one expansion
+    // template must appear, confirming the flag gate opens.
+    const expansionIds = new Set([
+      'jay_jupiter_belt_cycle',
+      'jay_jupiter_asteroid_listing',
+      'jay_jupiter_grav_sweep',
+    ])
+    const jupiter = getPlanet('jupiter')
+    const hostR = jupiter.orbit.semiMajorAxis * ORBIT_SCALE
+    const host = { planetId: 'jupiter' as const, worldX: hostR, worldZ: 0 }
+    const profile = stubProfile({ activeStoryFlags: { jovianContractTampered: true } })
+    let sawExpansion = false
+    for (let i = 0; i < 80; i++) {
+      const mission = generateAsteroidMission(6, host, Math.random, null, null, profile)
+      if (expansionIds.has(mission.templateId)) {
+        sawExpansion = true
+        break
+      }
+    }
+    expect(sawExpansion).toBe(true)
   })
 })
