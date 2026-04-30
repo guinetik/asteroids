@@ -15,9 +15,12 @@ import { removeItem } from '@/lib/inventory/inventory'
 import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
 import {
   addCredits,
+  disableGiver,
   loadProfile,
   saveProfile,
+  setBodyAccess,
   setMissionPayMultiplier,
+  setShuttleBuff,
   unlockFastTravelPlanet,
 } from '@/lib/player/profile'
 import {
@@ -63,9 +66,11 @@ export interface ContractShuttleUpgradeGrantPayload {
 /**
  * Apply a contract reward effect to the persisted player profile. Idempotent:
  * unlocking the same planet twice is a no-op, raising a multiplier never
- * regresses an existing bonus.
+ * regresses an existing bonus, replaying body-access transitions just rewrites
+ * to the same state.
  *
- * @param effect - Reward effect drawn from `Contract.rewards`.
+ * @param effect - Reward effect drawn from `Contract.rewards` or
+ *   `Contract.completionByOutcome[outcomeId].rewards`.
  * @param contract - Contract that produced this effect (for shuttle-upgrade UI meta).
  */
 function applyRewardToProfile(effect: RewardEffect, contract: Contract): void {
@@ -93,6 +98,12 @@ function applyRewardToProfile(effect: RewardEffect, contract: Contract): void {
         }
       }
     }
+  } else if (effect.type === 'shuttle-buff') {
+    next = setShuttleBuff(next, effect.buffId, effect.multiplier)
+  } else if (effect.type === 'disable-giver') {
+    next = disableGiver(next, effect.giverId)
+  } else if (effect.type === 'set-body-access') {
+    next = setBodyAccess(next, effect.bodyId, effect.state)
   }
   if (next !== profile) saveProfile(next)
 }
@@ -136,6 +147,9 @@ export const contractSystem = new ContractSystem(CONTRACT_CATALOG, shipMessageSy
         // listeners must not break the system
       }
     }
+  },
+  onChoiceOutcomeResolved: (payload) => {
+    payContractStepCredits(payload.creditsReward)
   },
   consumeItemsForDelivery: (itemId, count) => consumeInventoryItems(itemId, count),
   getInstalledUpgradeLevel: (upgradeId) => getInstalledUpgradeLevelForContracts(upgradeId),
@@ -330,4 +344,20 @@ export function acceptContractWithRetroEval(contractId: string): boolean {
   }
 
   return true
+}
+
+/**
+ * Dev console hook: resolve a `'choice-mission'` step by hand. Gated by
+ * `import.meta.env.DEV`. The user can run e.g.
+ * `window.__contracts.resolveChoice('jovian_final_prospectus', 'transmit')`
+ * to drive a contract to completion without the canvas terminal overlay.
+ */
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  const winAsHost = window as unknown as {
+    __contracts?: { resolveChoice: (missionId: string, outcomeId: string) => boolean }
+  }
+  winAsHost.__contracts = {
+    resolveChoice: (missionId, outcomeId) =>
+      contractSystem.notifyChoiceResolved(missionId, outcomeId),
+  }
 }
