@@ -230,6 +230,12 @@ export class LevelViewController implements Tickable {
    */
   private prospectusInteractReady = false
   /**
+   * Set to `true` after the player resolves the prospectus overlay (transmit /
+   * tamper). Used as the completion sentinel for `'prospectus-terminal'`
+   * objectives, which have no registered {@link MiniGame} instance.
+   */
+  private prospectusObjectiveComplete = false
+  /**
    * World-space position of the surface bunker hatch (set when the hatch is
    * spawned). The player is teleported back to this point when extracting
    * from the bunker so they exit right next to the surface prop.
@@ -392,6 +398,25 @@ export class LevelViewController implements Tickable {
     this.prospectusTerminal.setScreenEmissive(
       outcomeId === 'transmit' ? TRANSMIT_COLOR : TAMPER_COLOR,
     )
+  }
+
+  /**
+   * Mark the `'prospectus-terminal'` objective complete and fire mission-success
+   * callbacks downstream. Called by `LevelView.vue` after
+   * {@link notifyChoiceResolved} resolves the contract step.
+   *
+   * Idempotent — a second call is a no-op.
+   */
+  notifyProspectusObjectiveComplete(): void {
+    if (this.prospectusObjectiveComplete) return
+    this.prospectusObjectiveComplete = true
+    const prospectusIndex = this.missionObjectives.findIndex(
+      (o) => o.type === 'prospectus-terminal',
+    )
+    if (prospectusIndex >= 0) {
+      this.onObjectiveComplete?.(prospectusIndex)
+    }
+    this.onMissionComplete?.()
   }
 
   /**
@@ -2096,7 +2121,9 @@ export class LevelViewController implements Tickable {
   private enterExfil(): void {
     // Fire mission complete if all objectives done. multitoolScience multiplier
     // is now applied in enterComplete via persistCompletedAsteroidMissionRewards.
-    if (this.minigames.areAllComplete()) {
+    // Prospectus missions have no registered MiniGame, so also gate on the
+    // prospectusObjectiveComplete flag set by notifyProspectusObjectiveComplete().
+    if (this.minigames.areAllComplete() || this.prospectusObjectiveComplete) {
       this.onMissionComplete?.()
     }
 
@@ -2136,7 +2163,11 @@ export class LevelViewController implements Tickable {
     this.clearLanderHullPersistTimer()
     this.flushLanderHullToProfile()
 
-    if (this.persistShuttleMissionRewards && this.mission && this.minigames.areAllComplete()) {
+    if (
+      this.persistShuttleMissionRewards &&
+      this.mission &&
+      (this.minigames.areAllComplete() || this.prospectusObjectiveComplete)
+    ) {
       hydratePlayerUpgradeLevelsFromStorage()
       const scienceMult =
         getCurrentUpgradeValue('shuttleScienceStation') * getCurrentUpgradeValue('multitoolScience')
@@ -3248,7 +3279,11 @@ export class LevelViewController implements Tickable {
    * @returns True when the state machine may accept `exfiltrate`.
    */
   private isEligibleForExfil(): boolean {
-    return this.hasExitedVehicle || this.minigames.areAllComplete()
+    return (
+      this.hasExitedVehicle ||
+      this.minigames.areAllComplete() ||
+      this.prospectusObjectiveComplete
+    )
   }
 
   /** Check if the lander is within exfil range of the parked shuttle. */

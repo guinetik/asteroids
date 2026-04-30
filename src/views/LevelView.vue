@@ -642,6 +642,7 @@ function handleProspectusResolve(outcomeId: 'transmit' | 'tamper'): void {
   contractSystem.notifyChoiceResolved('jovian_final_prospectus', outcomeId)
   prospectusVisible.value = false
   viewController.flipProspectusTerminalScreen(outcomeId)
+  viewController.notifyProspectusObjectiveComplete()
 }
 
 function handleGlobalKeydown(e: KeyboardEvent): void {
