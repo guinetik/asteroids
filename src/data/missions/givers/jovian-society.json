@@ -2,7 +2,7 @@
   "id": "jovian-society",
   "name": "Vance Hoyt",
   "title": "Senior Asset Officer",
-  "objectiveTypes": ["photometry", "bunker", "dan"],
+  "objectiveTypes": ["photometry", "bunker", "dan", "gather"],
   "minDifficulty": 3,
   "maxDifficulty": 10,
   "missions": [
@@ -108,6 +108,45 @@
       ],
       "completionBonus": { "min": 1500, "max": 2500 },
       "regionByDifficulty": { "jovian-trojans": [8, 10] }
+    },
+    {
+      "id": "jovian_substrate_gather",
+      "name": "Substrate Acquisition Run",
+      "briefing": "Per current portfolio review, the Society maintains a rolling acquisition queue for surface-recovered substrate from candidate bodies. Standard pass: land, gather, return to any Cloud City intake. Rates per the standing kiosk schedule. — Vance Hoyt, Asset Strategy.",
+      "objectiveSlots": [
+        {
+          "type": "gather",
+          "weight": 1.0,
+          "params": {
+            "type": "gather",
+            "resourceAmount": { "min": 60, "max": 110 }
+          },
+          "reward": { "min": 2400, "max": 5000 }
+        }
+      ],
+      "completionBonus": { "min": 400, "max": 800 },
+      "regionByDifficulty": { "jovian-trojans": [4, 7] }
+    },
+    {
+      "id": "jovian_belt_gather",
+      "name": "Deep-Cycle Substrate Run",
+      "briefing": "Higher acquisition volume, deeper cycle, same compensation tier. Some pilots prefer the longer cycle for the quiet. Compensate yourself accordingly. — Vance",
+      "objectiveSlots": [
+        {
+          "type": "gather",
+          "weight": 1.0,
+          "params": {
+            "type": "gather",
+            "resourceAmount": { "min": 90, "max": 160 }
+          },
+          "reward": { "min": 3200, "max": 6400 }
+        }
+      ],
+      "completionBonus": { "min": 600, "max": 1200 },
+      "regionByDifficulty": {
+        "asteroid-belt": [5, 7],
+        "jovian-trojans": [7, 9]
+      }
     }
   ]
 }
