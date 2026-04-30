@@ -411,6 +411,13 @@ export interface Contract {
    * console warning.
    */
   completionByOutcome?: Record<string, ContractCompletionArm>
+  /**
+   * Home planet for the contract. When set, completing the contract auto-grants
+   * `unlockFastTravelPlanet(profile, homePlanet)` regardless of authored rewards
+   * or which `completionByOutcome` arm resolved. Idempotent — re-grants no-op.
+   * When unset (legacy), no-op; explicit `fast-travel` rewards still work.
+   */
+  homePlanet?: string
 }
 
 /** Lifecycle of a {@link Contract} for one player save. */
