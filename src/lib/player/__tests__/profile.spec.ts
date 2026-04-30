@@ -18,6 +18,7 @@ import {
   getBodyAccess,
   setBodyAccess,
 } from '../profile'
+import type { PlayerProfile } from '../types'
 
 const mockStorage: Record<string, string> = {}
 
@@ -336,5 +337,39 @@ describe('savePlayerDisplayName', () => {
     expect(result.credits).toBe(1250)
     expect(loadProfile()?.name).toBe('B')
     expect(result.hasSeenIntro).toBe(false)
+  })
+})
+
+describe('shuttleBuffs and disabledGiverIds', () => {
+  beforeEach(() => {
+    for (const key of Object.keys(mockStorage)) {
+      delete mockStorage[key]
+    }
+  })
+
+  it('createProfile defaults shuttleBuffs and disabledGiverIds to empty maps', () => {
+    const profile = createProfile('Pilot')
+    expect(profile.shuttleBuffs).toEqual({})
+    expect(profile.disabledGiverIds).toEqual({})
+  })
+
+  it('round-trips shuttleBuffs and disabledGiverIds through localStorage', () => {
+    const profile = createProfile('Pilot')
+    const next: PlayerProfile = {
+      ...profile,
+      shuttleBuffs: { jovianEmpowerment: 1.5 },
+      disabledGiverIds: { 'jovian-society': true },
+    }
+    saveProfile(next)
+    const loaded = loadProfile()
+    expect(loaded?.shuttleBuffs).toEqual({ jovianEmpowerment: 1.5 })
+    expect(loaded?.disabledGiverIds).toEqual({ 'jovian-society': true })
+  })
+
+  it('legacy saves missing the fields normalize to empty maps', () => {
+    mockStorage[PROFILE_STORAGE_KEY] = JSON.stringify({ name: 'Old', credits: 100 })
+    const loaded = loadProfile()
+    expect(loaded?.shuttleBuffs).toEqual({})
+    expect(loaded?.disabledGiverIds).toEqual({})
   })
 })

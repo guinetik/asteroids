@@ -80,4 +80,16 @@ export interface PlayerProfile {
    * Omitted or `undefined` in older saves — treated as full on next landing.
    */
   landerHullHp?: number
+  /**
+   * Permanent multiplicative buffs granted by contract reward effects of type
+   * `'shuttle-buff'`. Keyed by buffId (e.g. `'jovianEmpowerment'`). Plan 7
+   * applies the math; this plan only persists.
+   */
+  shuttleBuffs?: Record<string, number>
+  /**
+   * Giver ids disabled by contract reward effects of type `'disable-giver'`.
+   * Plan 7 enforces the suppression at the mission-board level; this plan
+   * only persists.
+   */
+  disabledGiverIds?: Record<string, true>
 }

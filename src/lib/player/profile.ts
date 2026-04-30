@@ -140,6 +140,34 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
 
   const bodyAccess = normalizeBodyAccess(p.bodyAccess)
 
+  const shuttleBuffs: Record<string, number> = {}
+  if (
+    p.shuttleBuffs !== undefined &&
+    p.shuttleBuffs !== null &&
+    typeof p.shuttleBuffs === 'object' &&
+    !Array.isArray(p.shuttleBuffs)
+  ) {
+    for (const [buffId, value] of Object.entries(p.shuttleBuffs as Record<string, unknown>)) {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        shuttleBuffs[buffId] = value
+      }
+    }
+  }
+
+  const disabledGiverIds: Record<string, true> = {}
+  if (
+    p.disabledGiverIds !== undefined &&
+    p.disabledGiverIds !== null &&
+    typeof p.disabledGiverIds === 'object' &&
+    !Array.isArray(p.disabledGiverIds)
+  ) {
+    for (const [giverId, value] of Object.entries(
+      p.disabledGiverIds as Record<string, unknown>,
+    )) {
+      if (value === true) disabledGiverIds[giverId] = true
+    }
+  }
+
   const hasJourneyFields =
     Array.isArray(p.completedJourneyIds) ||
     (p.journeyStepProgress !== undefined &&
@@ -228,6 +256,8 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     unlockedFeatureIds,
     announcedJourneyStartIds,
     journeyStartReadyIds,
+    shuttleBuffs,
+    disabledGiverIds,
     ...(shuttleHullHp !== undefined ? { shuttleHullHp } : {}),
     ...(landerHullHp !== undefined ? { landerHullHp } : {}),
   }
@@ -285,6 +315,8 @@ export function createProfile(name: string): PlayerProfile {
     unlockedFeatureIds: [],
     announcedJourneyStartIds: [],
     journeyStartReadyIds: [],
+    shuttleBuffs: {},
+    disabledGiverIds: {},
   }
 }
 
@@ -449,4 +481,34 @@ export function setMissionPayMultiplier(
 export function getMissionPayMultiplier(profile: PlayerProfile, planetId: string | null): number {
   if (!planetId) return 1
   return profile.missionPayMultipliers[planetId] ?? 1
+}
+
+/**
+ * Set or replace a shuttle-buff multiplier on the profile.
+ *
+ * @param profile - Current profile.
+ * @param buffId - Buff id from the reward effect (e.g. `'jovianEmpowerment'`).
+ * @param multiplier - New multiplier value.
+ * @returns Profile with the buff applied (existing entry replaced).
+ */
+export function setShuttleBuff(
+  profile: PlayerProfile,
+  buffId: string,
+  multiplier: number,
+): PlayerProfile {
+  const next: Record<string, number> = { ...profile.shuttleBuffs, [buffId]: multiplier }
+  return { ...profile, shuttleBuffs: next }
+}
+
+/**
+ * Mark a giver id as disabled (plan 7 reads this to suppress mission board entries).
+ *
+ * @param profile - Current profile.
+ * @param giverId - Giver id from the reward effect (e.g. `'jovian-society'`).
+ * @returns Profile with the giver disabled.
+ */
+export function disableGiver(profile: PlayerProfile, giverId: string): PlayerProfile {
+  if (profile.disabledGiverIds?.[giverId] === true) return profile
+  const next: Record<string, true> = { ...profile.disabledGiverIds, [giverId]: true }
+  return { ...profile, disabledGiverIds: next }
 }
