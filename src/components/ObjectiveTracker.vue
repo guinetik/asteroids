@@ -37,21 +37,30 @@ export interface ObjectiveTrackerEntry {
 /** Color theme for the tracker. `mission` = cyan (level missions); `journey` = amber (meta journeys). */
 export type ObjectiveTrackerVariant = 'mission' | 'journey'
 
+/** How the tracker is positioned: `fixed` (default HUD) or `inline` inside the map HUD stack. */
+export type ObjectiveTrackerDock = 'fixed' | 'inline'
+
 withDefaults(
   defineProps<{
     eyebrow: string
     title: string
     objectives: ObjectiveTrackerEntry[]
     variant?: ObjectiveTrackerVariant
+    /** When `inline`, drops fixed positioning so a parent stack controls layout. */
+    dock?: ObjectiveTrackerDock
   }>(),
   {
     variant: 'mission',
+    dock: 'fixed',
   },
 )
 </script>
 
 <template>
-  <div class="mission-tracker" :class="`mission-tracker--${variant}`">
+  <div
+    class="mission-tracker"
+    :class="[`mission-tracker--${variant}`, dock === 'inline' ? 'mission-tracker--dock-inline' : '']"
+  >
     <div class="tracker-header">
       <div class="tracker-asteroid">{{ eyebrow }}</div>
       <div class="tracker-mission">{{ title }}</div>
@@ -121,6 +130,14 @@ withDefaults(
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   min-width: 10rem;
+}
+.mission-tracker--dock-inline {
+  position: relative;
+  top: auto;
+  right: auto;
+  width: 100%;
+  min-width: 0;
+  z-index: auto;
 }
 .mission-tracker--journey {
   --tracker-bg: rgba(16, 10, 0, 0.55);

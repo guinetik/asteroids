@@ -15,7 +15,6 @@ import type { ShipMessageDefinition } from '@/lib/messages/messageTypes'
 import type {
   Contract,
   ContractInstance,
-  ContractStep,
   ContractStoreSnapshot,
   DropCollectedEvent,
   MissionCompletedEvent,
@@ -29,6 +28,7 @@ import {
   loadContractSnapshot,
   saveContractSnapshot,
 } from './contractStorage'
+import { contractStepRequiredCount } from './contractStepProgress'
 
 /** Persistence adapter for the contract snapshot; swap in tests. */
 export interface ContractPersistence {
@@ -711,7 +711,7 @@ export class ContractSystem {
     const stepIndex = instance.currentStepIndex
     const step = contract.steps[stepIndex]
     if (!step) return
-    const required = requiredCount(step)
+    const required = contractStepRequiredCount(step)
     const counters = [...instance.stepCounters]
     counters[stepIndex] = Math.min(required, (counters[stepIndex] ?? 0) + amount)
 
@@ -770,7 +770,7 @@ export class ContractSystem {
    * Always reads the live instance from `this.snapshot` (not a stale
    * caller copy) so cascading writes operate on the freshest state.
    * Bounded by `contract.steps.length` — each call advances at most one
-   * step, and `requiredCount` for both passive kinds is `1`, so there
+   * step, and `contractStepRequiredCount` for both passive kinds is `1`, so there
    * is no infinite loop risk.
    *
    * `deliver-items` is intentionally excluded: consumption is a
@@ -915,7 +915,7 @@ export class ContractSystem {
     if (!contract) return false
     const step = contract.steps[instance.currentStepIndex]
     if (!step) return false
-    const required = requiredCount(step)
+    const required = contractStepRequiredCount(step)
     const current = instance.stepCounters[instance.currentStepIndex] ?? 0
     const remaining = Math.max(0, required - current)
     if (remaining <= 0) return false
@@ -973,14 +973,6 @@ function resolveRewardEffects(contract: Contract, instance: ContractInstance): R
     return arm?.rewards ?? []
   }
   return contract.rewards ?? []
-}
-
-/** Required completion count for a step (1 unless the step is `complete-missions`). */
-function requiredCount(step: ContractStep): number {
-  if (step.kind === 'complete-missions') return step.count
-  if (step.kind === 'trade-goods') return step.count
-  if (step.kind === 'collect-drops') return step.count
-  return 1
 }
 
 /** True when a `complete-missions` step matches the supplied event filters. */

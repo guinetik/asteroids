@@ -426,7 +426,7 @@ export interface ContractInstance {
   currentStepIndex: number
   /**
    * Per-step counter (length === steps.length). Step is satisfied when
-   * `stepCounters[i] >= requiredCount(steps[i])`. Counters only advance
+   * `stepCounters[i] >= contractStepRequiredCount(steps[i])`. Counters only advance
    * for events that occur AFTER the contract is accepted.
    */
   stepCounters: number[]

@@ -24,6 +24,7 @@ import AchievementBanner from '@/components/AchievementBanner.vue'
 import AchievementsDialog from '@/components/AchievementsDialog.vue'
 import PortalWelcomeDialog from '@/components/PortalWelcomeDialog.vue'
 import ObjectiveTracker from '@/components/ObjectiveTracker.vue'
+import ContractTrackerPanel from '@/components/ContractTrackerPanel.vue'
 import PickupToast from '@/components/PickupToast.vue'
 import type { PickupEntry } from '@/components/PickupToast.vue'
 import type {
@@ -48,6 +49,8 @@ import {
   onContractStepCompleted,
   onContractsChanged,
 } from '@/lib/contracts/runtime'
+import { contractStepMessageId } from '@/lib/contracts/ContractSystem'
+import { buildActiveContractHudRows } from '@/lib/contracts/contractHudRows'
 import type { ContractStoreSnapshot } from '@/lib/contracts/contractTypes'
 import { emptyContractSnapshot } from '@/lib/contracts/contractStorage'
 import {
@@ -209,19 +212,39 @@ const contractNoticePill = computed<string | null>(() => {
   return contractNoticeLabel({ ...readable, inboxStatus: readable.status })
 })
 
+/** Opens shuttle terminal mail with folder + message deep-link (shared by pill + contract HUD). */
+function openShuttleMailDeepLink(folderId: string, messageId: string): void {
+  uiAudio.notifyConfirm()
+  shuttleControlMailFocusFolderId.value = folderId
+  shuttleControlMailFocusMessageId.value = messageId
+  shuttleControlProgramOnOpen.value = 'mail'
+  shuttleControlVisible.value = true
+}
+
 /** Opens the shuttle terminal mail tab deep-linked to the contract folder + message. */
 function openContractMessage(): void {
   const readable = activeContractMessage.value
   if (!readable?.contractId) return
-  uiAudio.notifyConfirm()
-  shuttleControlMailFocusFolderId.value = readable.contractId
-  shuttleControlMailFocusMessageId.value = readable.id
-  shuttleControlProgramOnOpen.value = 'mail'
-  shuttleControlVisible.value = true
+  openShuttleMailDeepLink(readable.contractId, readable.id)
   if (readable.status === 'pending') {
     shipMessageSystem.markShown(readable.id)
   }
   refreshActiveMessage()
+}
+
+/** Opens mail at the flavor message for an active contract step (HUD objective tap). */
+function openContractStepMessage(contractId: string, stepIndex: number): void {
+  const messageId = contractStepMessageId(contractId, stepIndex)
+  openShuttleMailDeepLink(contractId, messageId)
+  const record = shipMessageSystem.getRecord(messageId)
+  if (record?.status === 'pending') {
+    shipMessageSystem.markShown(messageId)
+  }
+  refreshActiveMessage()
+}
+
+function handleContractTrackerObjective(payload: { contractId: string; stepIndex: number }): void {
+  openContractStepMessage(payload.contractId, payload.stepIndex)
 }
 
 const telemetry = reactive<ShuttleTelemetry>({
@@ -420,6 +443,19 @@ const mapExperienceStarted = ref(false)
 const journeyTracker = ref<JourneyTrackerState | null>(null)
 
 const mapBootOverlayVisible = computed(() => !mapExperienceStarted.value)
+
+const activeContractHudRows = computed(() =>
+  buildActiveContractHudRows(Object.values(contractSnapshot.value.instances), (id) =>
+    contractSystem.getContract(id),
+  ),
+)
+
+const mapHudTrackerStackVisible = computed(
+  () =>
+    !mapBootOverlayVisible.value &&
+    (Boolean(journeyTracker.value && journeyTrackerVisible.value) ||
+      activeContractHudRows.value.length > 0),
+)
 const mapBootReady = computed(() => mapBootState.phase === 'ready')
 const turretTargetRatio = computed(() => {
   if (!turretTarget.value || turretTarget.value.totalKg <= 0) return 0
@@ -1564,13 +1600,21 @@ watch(
       :autoplay-token="messageAudioAutoplayToken"
       @dismiss="dismissActiveMessage"
     />
-    <ObjectiveTracker
-      v-if="journeyTracker && journeyTrackerVisible && !mapBootOverlayVisible"
-      :eyebrow="journeyTracker.eyebrow"
-      :title="journeyTracker.title"
-      :objectives="journeyTracker.objectives"
-      variant="journey"
-    />
+    <div v-if="mapHudTrackerStackVisible" class="map-hud-tracker-stack">
+      <ObjectiveTracker
+        v-if="journeyTracker && journeyTrackerVisible"
+        dock="inline"
+        :eyebrow="journeyTracker.eyebrow"
+        :title="journeyTracker.title"
+        :objectives="journeyTracker.objectives"
+        variant="journey"
+      />
+      <ContractTrackerPanel
+        v-if="activeContractHudRows.length > 0"
+        :contracts="activeContractHudRows"
+        @open-objective="handleContractTrackerObjective"
+      />
+    </div>
     <div
       v-show="
         !mapOverlay.visible &&

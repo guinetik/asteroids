@@ -880,6 +880,12 @@ body {
   @apply pointer-events-none fixed bottom-[14%] left-0 right-0 z-[32] mx-auto max-w-3xl px-8 text-center font-mono text-sm font-medium uppercase leading-snug tracking-[0.18em] text-cyan-100/95 drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] md:text-base md:tracking-[0.22em];
 }
 
+/* Journey ObjectiveTracker + contract HUD column under top chrome (matches ObjectiveTracker offset). */
+.map-hud-tracker-stack {
+  @apply pointer-events-none fixed right-4 z-[65] flex max-w-[min(22rem,calc(100vw-2rem))] flex-col gap-2;
+  top: 5.5rem;
+}
+
 /* Map route: title + quick access (habitat / missions / shuttle terminal). */
 .map-screen-nav {
   @apply fixed left-0 right-0 top-0 z-20 flex items-center justify-between gap-4
