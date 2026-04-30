@@ -25,6 +25,8 @@ import {
   recordManifoldRide,
   recordPortalDeparture,
   recordWorldLineDistance,
+  setStoryFlag,
+  hasStoryFlag,
 } from '../profile'
 import type { PlayerProfile } from '../types'
 
@@ -464,5 +466,29 @@ describe('shuttleBuffs and disabledGiverIds', () => {
     const loaded = loadProfile()
     expect(loaded?.shuttleBuffs).toEqual({})
     expect(loaded?.disabledGiverIds).toEqual({})
+  })
+})
+
+describe('story flags', () => {
+  it('hasStoryFlag returns false on a fresh profile', () => {
+    const p = createProfile('Pilot')
+    expect(hasStoryFlag(p, 'jovianContractTampered')).toBe(false)
+  })
+
+  it('setStoryFlag persists the flag', () => {
+    const p = setStoryFlag(createProfile('Pilot'), 'jovianContractTampered')
+    expect(hasStoryFlag(p, 'jovianContractTampered')).toBe(true)
+  })
+
+  it('setStoryFlag is idempotent', () => {
+    let p = createProfile('Pilot')
+    p = setStoryFlag(p, 'x')
+    p = setStoryFlag(p, 'x')
+    expect(Object.keys(p.activeStoryFlags ?? {})).toEqual(['x'])
+  })
+
+  it('seenJovianEpilogue defaults to false', () => {
+    const p = createProfile('Pilot')
+    expect(p.seenJovianEpilogue).toBeFalsy()
   })
 })

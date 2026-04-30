@@ -141,6 +141,16 @@ export interface PlayerProfile {
    * only persists.
    */
   disabledGiverIds?: Record<string, true>
+  /**
+   * Story flags set by contract outcomes (and future Act 3 events). Read by
+   * giver/mission surfacing to gate post-resolution content.
+   */
+  activeStoryFlags?: Record<string, true>
+  /**
+   * Whether the player has seen the Jovian transmit epilogue video. Set on
+   * Continue. Once `true`, the video never replays — even on save reload.
+   */
+  seenJovianEpilogue?: boolean
   /** Cosmetic selections for Pimp My Shuttle! (persisted with credits spend). */
   cosmetics?: PlayerCosmetics
   /**

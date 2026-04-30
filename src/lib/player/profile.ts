@@ -834,3 +834,31 @@ export function disableGiver(profile: PlayerProfile, giverId: string): PlayerPro
   const next: Record<string, true> = { ...profile.disabledGiverIds, [giverId]: true }
   return { ...profile, disabledGiverIds: next }
 }
+
+/**
+ * Set a story flag on the player profile. Idempotent — re-setting an existing
+ * flag is a no-op. Returns a new profile object (does not mutate input).
+ *
+ * @param profile - Source profile.
+ * @param flag - Stable string id (e.g. `'jovianContractTampered'`).
+ * @returns Profile with `activeStoryFlags[flag] = true`.
+ */
+export function setStoryFlag(profile: PlayerProfile, flag: string): PlayerProfile {
+  const existing = profile.activeStoryFlags ?? {}
+  if (existing[flag] === true) return profile
+  return {
+    ...profile,
+    activeStoryFlags: { ...existing, [flag]: true as const },
+  }
+}
+
+/**
+ * Check whether a story flag is set on the player profile.
+ *
+ * @param profile - Profile to check.
+ * @param flag - Flag id.
+ * @returns `true` when the flag is set, `false` otherwise.
+ */
+export function hasStoryFlag(profile: PlayerProfile, flag: string): boolean {
+  return profile.activeStoryFlags?.[flag] === true
+}
