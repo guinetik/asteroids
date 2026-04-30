@@ -17,6 +17,31 @@ import { getSpecialMissionById } from '@/lib/missions/specialMissions'
 import { loadActiveMission } from '@/lib/missions/missionStorage'
 import type { GeneratedAsteroidMission, ObjectiveType } from '@/lib/missions/types'
 
+/** Default public-folder 3D LUT when an asteroid JSON omits `lighting.lutUrl`. */
+export const DEFAULT_LEVEL_LUT_URL = '/lut.CUBE'
+
+/** Warmer color grade for levels launched from Mercury / Venus contract boards. */
+export const INNER_PLANET_CONTRACT_LUT_URL = '/orange.CUBE'
+
+/**
+ * Pick the level color LUT: per-asteroid `lutUrl` wins; otherwise Mercury/Venus postings use
+ * {@link INNER_PLANET_CONTRACT_LUT_URL}; everything else uses {@link DEFAULT_LEVEL_LUT_URL}.
+ *
+ * @param mission - Active mission (origin board drives the inner-planet override).
+ * @param asteroidLutUrl - Optional `lighting.lutUrl` from the asteroid catalog entry.
+ * @returns Path passed to {@link LevelPostProcessing}.
+ */
+export function resolveLevelLutUrl(
+  mission: GeneratedAsteroidMission,
+  asteroidLutUrl: string | undefined,
+): string {
+  if (asteroidLutUrl) return asteroidLutUrl
+  if (mission.originPlanetId === 'mercury' || mission.originPlanetId === 'venus') {
+    return INNER_PLANET_CONTRACT_LUT_URL
+  }
+  return DEFAULT_LEVEL_LUT_URL
+}
+
 /** Maximum attempts to generate a mission matching the requested objective type. */
 export const LEVEL_MISSION_TYPE_RETRY_LIMIT = 20
 

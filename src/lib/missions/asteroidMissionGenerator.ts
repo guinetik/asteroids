@@ -532,6 +532,24 @@ const HOST_ASTEROID_RADIAL_JITTER_BASE = 20
 
 const HOST_ASTEROID_RADIAL_JITTER_SPAN = 95
 
+/**
+ * Extra world-units beyond Mercury perihelion so inner-planet contract markers never sit sunward
+ * of the innermost orbit ring (radial jitter otherwise clamped to ~0 via {@link Math.max}(1e-3, …)).
+ */
+const INNER_HOST_WAYPOINT_PERIHELION_STANDOFF_WORLD = 18
+
+/**
+ * Smallest allowed solar distance (XZ, world units) for asteroid waypoints posted from Mercury or
+ * Venus: Mercury perihelion × {@link ORBIT_SCALE} + {@link INNER_HOST_WAYPOINT_PERIHELION_STANDOFF_WORLD}.
+ *
+ * @returns Heliocentric radius floor matching the inner orbit line on the map + corona clearance.
+ */
+export function minHeliocentricWorldForInnerPlanetAsteroidContracts(): number {
+  const mercury = getPlanet('mercury')
+  const perihelionCatalog = mercury.orbit.semiMajorAxis * (1 - mercury.orbit.eccentricity)
+  return perihelionCatalog * ORBIT_SCALE + INNER_HOST_WAYPOINT_PERIHELION_STANDOFF_WORLD
+}
+
 /** Moon semi-major axes are rendered locally around their parent, not in solar AU space. */
 const LOCAL_MOON_ORBIT_SCALE_DIVISOR = 150
 
@@ -592,6 +610,11 @@ export function generateAsteroidWaypointNearHostPlanet(
     }
   }
 
+  const innerHostMinWorldR =
+    hostPlanetId === 'mercury' || hostPlanetId === 'venus'
+      ? minHeliocentricWorldForInnerPlanetAsteroidContracts()
+      : null
+
   const hostAngle = Math.atan2(hostWorldZ, hostWorldX)
   const hostR = Math.hypot(hostWorldX, hostWorldZ)
   const t = missionDifficultyReachT(difficulty)
@@ -599,10 +622,15 @@ export function generateAsteroidWaypointNearHostPlanet(
     ((HOST_ASTEROID_MAX_ANGLE_DEG_BASE + t * HOST_ASTEROID_MAX_ANGLE_DEG_SPAN) * Math.PI) / 180
   const maxRadialJitter = HOST_ASTEROID_RADIAL_JITTER_BASE + t * HOST_ASTEROID_RADIAL_JITTER_SPAN
 
+  const clampHeliocentricRadius = (r: number): number => {
+    if (innerHostMinWorldR !== null) return Math.max(innerHostMinWorldR, r)
+    return Math.max(1e-3, r)
+  }
+
   const tryPick = (): { worldX: number; worldZ: number } | null => {
     const deltaAngle = (rand() * 2 - 1) * maxAngleRad
     const deltaR = (rand() * 2 - 1) * maxRadialJitter
-    const newR = Math.max(1e-3, hostR + deltaR)
+    const newR = clampHeliocentricRadius(hostR + deltaR)
     const wx = Math.cos(hostAngle + deltaAngle) * newR
     const wz = Math.sin(hostAngle + deltaAngle) * newR
     const Rw = Math.hypot(wx, wz)
@@ -618,7 +646,7 @@ export function generateAsteroidWaypointNearHostPlanet(
   // Last resort: tiny jitter only (still host-local).
   const tinyAngle = ((rand() * 2 - 1) * maxAngleRad) / 4
   const tinyR = (rand() * 2 - 1) * Math.min(maxRadialJitter, 40)
-  const r0 = Math.max(1e-3, hostR + tinyR)
+  const r0 = clampHeliocentricRadius(hostR + tinyR)
   return {
     worldX: Math.cos(hostAngle + tinyAngle) * r0,
     worldZ: Math.sin(hostAngle + tinyAngle) * r0,

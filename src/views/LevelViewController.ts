@@ -102,7 +102,12 @@ import { addItem } from '@/lib/inventory/inventory'
 import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
 import { LootPickupController } from '@/three/LootPickupController'
 import { contractSystem } from '@/lib/contracts/runtime'
-import { hashLevelSeed, resolveLevelContext, rotationFromSeed } from '@/lib/level/levelContext'
+import {
+  hashLevelSeed,
+  resolveLevelContext,
+  resolveLevelLutUrl,
+  rotationFromSeed,
+} from '@/lib/level/levelContext'
 import {
   resampleObjectiveNearShip,
   sampleSpawnOnSurface,
@@ -1269,7 +1274,7 @@ export class LevelViewController implements Tickable {
         this.sceneManager.renderer,
         this.sceneManager.scene,
         initialCam,
-        { lutUrl: asteroid.lighting.lutUrl },
+        { lutUrl: resolveLevelLutUrl(mission, asteroid.lighting.lutUrl) },
       )
       this.sceneManager.renderOverride = () => {
         const cam = this.sceneManager!.activeCamera

@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GeneratedAsteroidMission } from '@/lib/missions/types'
 import {
+  DEFAULT_LEVEL_LUT_URL,
+  INNER_PLANET_CONTRACT_LUT_URL,
   generateMissionWithType,
   hashLevelSeed,
   resolveLevelContext,
+  resolveLevelLutUrl,
   rotationFromSeed,
 } from '../levelContext'
 
@@ -137,5 +140,32 @@ describe('levelContext', () => {
 
     expect(context.mission.asteroidId).toBe('adhoc-rock')
     expect(context.persistCompletionRewards).toBe(false)
+  })
+
+  it('resolveLevelLutUrl uses orange LUT for Mercury/Venus boards when asteroid omits lutUrl', () => {
+    const base = {
+      id: 'm1',
+      objectives: [],
+    } as unknown as GeneratedAsteroidMission
+
+    expect(
+      resolveLevelLutUrl({ ...base, originPlanetId: 'mercury' } as GeneratedAsteroidMission, undefined),
+    ).toBe(INNER_PLANET_CONTRACT_LUT_URL)
+    expect(
+      resolveLevelLutUrl({ ...base, originPlanetId: 'venus' } as GeneratedAsteroidMission, undefined),
+    ).toBe(INNER_PLANET_CONTRACT_LUT_URL)
+    expect(
+      resolveLevelLutUrl({ ...base, originPlanetId: 'earth' } as GeneratedAsteroidMission, undefined),
+    ).toBe(DEFAULT_LEVEL_LUT_URL)
+  })
+
+  it('resolveLevelLutUrl keeps asteroid lighting.lutUrl over inner-planet override', () => {
+    const mission = {
+      id: 'm1',
+      originPlanetId: 'mercury',
+      objectives: [],
+    } as unknown as GeneratedAsteroidMission
+
+    expect(resolveLevelLutUrl(mission, '/hektor.CUBE')).toBe('/hektor.CUBE')
   })
 })

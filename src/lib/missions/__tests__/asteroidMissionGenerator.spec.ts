@@ -8,6 +8,7 @@ import {
   generateWaypointInRegion,
   interpolateRange,
   isMissionWaypointSolarDistanceClearOfPlanets,
+  minHeliocentricWorldForInnerPlanetAsteroidContracts,
   nearEarthInnerCatalogForWaypointSpawn,
   nearEarthOuterCatalogForWaypointSpawn,
   objectiveCountForDifficulty,
@@ -287,6 +288,31 @@ describe('generateAsteroidWaypointNearHostPlanet', () => {
       const wp = generateAsteroidWaypointNearHostPlanet(hostR, 0, 10)
       const Rw = Math.hypot(wp.worldX, wp.worldZ)
       expect(Math.abs(Rw - hostR)).toBeLessThanOrEqual(maxJitter + 1e-3)
+    }
+  })
+
+  it('keeps Mercury and Venus host waypoints outside Mercury perihelion + standoff', () => {
+    const minR = minHeliocentricWorldForInnerPlanetAsteroidContracts()
+    const inwardRand = () => 0
+
+    const mercury = getPlanet('mercury')
+    const hostMercuryR = mercury.orbit.semiMajorAxis * ORBIT_SCALE
+    for (let i = 0; i < 60; i++) {
+      const wp = generateAsteroidWaypointNearHostPlanet(
+        hostMercuryR,
+        0,
+        10,
+        inwardRand,
+        'mercury',
+      )
+      expect(Math.hypot(wp.worldX, wp.worldZ)).toBeGreaterThanOrEqual(minR - 1e-6)
+    }
+
+    const venus = getPlanet('venus')
+    const hostVenusR = venus.orbit.semiMajorAxis * ORBIT_SCALE
+    for (let i = 0; i < 60; i++) {
+      const wp = generateAsteroidWaypointNearHostPlanet(hostVenusR, 0, 10, inwardRand, 'venus')
+      expect(Math.hypot(wp.worldX, wp.worldZ)).toBeGreaterThanOrEqual(minR - 1e-6)
     }
   })
 
