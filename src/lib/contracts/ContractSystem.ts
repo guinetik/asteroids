@@ -887,6 +887,32 @@ export class ContractSystem {
   }
 
   /**
+   * Test seam: force-advance the active contract's current step by exactly
+   * what it needs to satisfy. Bypasses every matcher (no event filtering),
+   * so the dev console can drive any step kind to completion regardless of
+   * its filters. Cascades — when the satisfied step transitions, the
+   * passive-state evaluator and onStepActivated hooks fire normally.
+   *
+   * @param contractId - Contract id whose active step should be force-advanced.
+   * @returns Whether the advance applied (false if the contract is not active).
+   */
+  advanceStepForTests(contractId: string): boolean {
+    const instance = this.snapshot.instances[contractId]
+    if (!instance || instance.status !== 'active') return false
+    const contract = this.contracts.get(contractId)
+    if (!contract) return false
+    const step = contract.steps[instance.currentStepIndex]
+    if (!step) return false
+    const required = requiredCount(step)
+    const current = instance.stepCounters[instance.currentStepIndex] ?? 0
+    const remaining = Math.max(0, required - current)
+    if (remaining <= 0) return false
+    this.advanceStep(contract, instance, remaining)
+    this.afterChange()
+    return true
+  }
+
+  /**
    * Offer contracts whose `offerWhenPrerequisites` gates are all satisfied.
    * Every present sub-field is AND-ed. Order of qualifying events does not
    * matter — the evaluator runs after every relevant signal.

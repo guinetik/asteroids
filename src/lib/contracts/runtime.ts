@@ -429,6 +429,17 @@ DevConsole.register('Contracts', {
    */
   resolveChoice: (missionId: string, outcomeId: string) =>
     contractSystem.notifyChoiceResolved(missionId, outcomeId),
+  /**
+   * Force-advance the active contract's current step (bypasses every matcher).
+   * Cascades — passive auto-snap and `onStepActivated` hooks fire normally as
+   * the contract walks forward. Run repeatedly to skip multiple steps.
+   *
+   * @param contractId - Contract id from `CONTRACT_CATALOG`.
+   */
+  advanceStep: (contractId: string) => {
+    const ok = contractSystem.advanceStepForTests(contractId)
+    return { advanced: ok, instance: contractSystem.getInstance(contractId) }
+  },
   /** Snapshot every contract instance for debugging. */
   listInstances: () => contractSystem.listInstances(),
   /** Look up a single contract instance by id. */
