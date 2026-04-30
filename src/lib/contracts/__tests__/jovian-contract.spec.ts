@@ -49,20 +49,46 @@ const asteroidGather: MissionCompletedEvent = {
   objectiveType: 'gather',
 }
 
-const asteroidPhotometry: MissionCompletedEvent = {
+const hektorPhotometryEvent: MissionCompletedEvent = {
   kind: 'asteroid',
-  giverPlanetId: 'jupiter',
+  giverPlanetId: null,
   giverId: 'jovian-society',
   targetPlanetId: null,
   objectiveType: 'photometry',
+  region: 'jovian-trojans',
+  pinnedAssetRef: 'hektor',
+  specialMissionId: 'jovian-prospection-hektor-photometry',
 }
 
-const asteroidDan: MissionCompletedEvent = {
+const saturnPhotometryEvent: MissionCompletedEvent = {
   kind: 'asteroid',
-  giverPlanetId: 'jupiter',
+  giverPlanetId: null,
+  giverId: 'jovian-society',
+  targetPlanetId: null,
+  objectiveType: 'photometry',
+  region: 'saturn-trojans',
+  specialMissionId: 'jovian-prospection-saturn-photometry',
+}
+
+const hektorDanEvent: MissionCompletedEvent = {
+  kind: 'asteroid',
+  giverPlanetId: null,
   giverId: 'jovian-society',
   targetPlanetId: null,
   objectiveType: 'dan',
+  region: 'jovian-trojans',
+  pinnedAssetRef: 'hektor',
+  specialMissionId: 'jovian-prospection-hektor-dan',
+}
+
+const saturnDanEvent: MissionCompletedEvent = {
+  kind: 'asteroid',
+  giverPlanetId: null,
+  giverId: 'jovian-society',
+  targetPlanetId: null,
+  objectiveType: 'dan',
+  region: 'saturn-trojans',
+  specialMissionId: 'jovian-prospection-saturn-dan',
 }
 
 describe('jovian-society-prospection schema', () => {
@@ -111,18 +137,18 @@ describe('jovian-society-prospection walkability', () => {
     for (let i = 0; i < 3; i++) {
       contracts.notifyDropCollected({ itemId: 'viroid-psychosphere', quantity: 1 })
     }
-    // Step 4 (OP 4): asteroid + photometry
-    contracts.notifyMissionCompleted(asteroidPhotometry)
-    // Step 5 (OP 5): asteroid + photometry (Saturn region; targetRegion still ignored per plan 5)
-    contracts.notifyMissionCompleted(asteroidPhotometry)
+    // Step 4 (OP 4): special mission, Hektor photometry
+    contracts.notifyMissionCompleted(hektorPhotometryEvent)
+    // Step 5 (OP 5): special mission, Saturn photometry
+    contracts.notifyMissionCompleted(saturnPhotometryEvent)
     // Step 6 (OP 6): collect-drops 8
     for (let i = 0; i < 8; i++) {
       contracts.notifyDropCollected({ itemId: 'viroid-psychosphere', quantity: 1 })
     }
-    // Step 7 (OP 7): asteroid + dan
-    contracts.notifyMissionCompleted(asteroidDan)
-    // Step 8 (OP 8): asteroid + dan (Saturn region; targetRegion still ignored)
-    contracts.notifyMissionCompleted(asteroidDan)
+    // Step 7 (OP 7): special mission, Hektor DAN
+    contracts.notifyMissionCompleted(hektorDanEvent)
+    // Step 8 (OP 8): special mission, Saturn DAN
+    contracts.notifyMissionCompleted(saturnDanEvent)
   }
 
   it('drives transmit arm end-to-end', () => {
