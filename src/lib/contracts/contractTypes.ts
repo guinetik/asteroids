@@ -79,6 +79,18 @@ export interface CompleteMissionsStep extends ContractStepRewardMixin {
    * Accepted by the type, ignored by the matcher in this plan — later plans tighten.
    */
   pinnedAssetRef?: string
+  /**
+   * When set, step activation auto-activates a specific entry from
+   * `SPECIAL_MISSIONS`. Plan 4 wires the activation; this plan stores the
+   * field.
+   */
+  specialMissionId?: string
+  /**
+   * When set, step activation flips `bodyAccess[revealsBody]` to
+   * `'unrestricted'` so a pinned body becomes visible and orbit-able. Plan 4
+   * wires the activation; this plan stores the field.
+   */
+  revealsBody?: string
   /** Authored summary shown on the step's flavor message subject. */
   subject: string
   /** Authored body paragraphs for the step's flavor message. */
