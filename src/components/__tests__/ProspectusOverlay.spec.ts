@@ -14,6 +14,6 @@ describe('ProspectusOverlay', () => {
     expect(html).toContain('624 HEKTOR')
     expect(html).toContain('extraction queue')
     expect(html).toContain('TRANSMIT')
-    expect(html).toContain('TAMPER')
+    expect(html).toContain('Tamper')
   })
 })

@@ -174,7 +174,7 @@ function resolve(outcomeId: 'transmit' | 'tamper'): void {
           :disabled="phase !== 'awaiting-choice'"
           @click="resolve('tamper')"
         >
-          [Q] TAMPER Report
+          [Q] Tamper Report
         </button>
       </footer>
     </div>
