@@ -11,6 +11,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { buildProspectusAssetCard } from '@/lib/minigame/prospectus/prospectusAssetCard'
 import { generatePhotometryLightcurve } from '@/lib/minigame/prospectus/photometryLightcurve'
 import { generateDanHistogram } from '@/lib/minigame/prospectus/danHistogram'
+import { ProspectusAudio } from '@/lib/minigame/prospectus/prospectusAudio'
 
 const props = defineProps<{
   /** Asteroid catalog id (drives asset-card binding). */
@@ -34,6 +35,15 @@ type OverlayPhase = 'idle' | 'awaiting-choice' | 'resolving' | 'resolved'
 /** Current phase of the overlay interaction state machine. */
 const phase = ref<OverlayPhase>('idle')
 
+/**
+ * Synthesized audio engine for this overlay instance.
+ * Created on mount, nulled on unmount. `let` (not `const`) because it is
+ * reassigned to `null` during cleanup to release the reference.
+ * In JSDOM (tests), `ProspectusAudio.ensureGraph()` returns false and all
+ * play methods become no-ops — nothing here throws without a real AudioContext.
+ */
+let audio: ProspectusAudio | null = null
+
 /** Society blue accent used for the photometry stroke and DAN bars. */
 const SOCIETY_BLUE = '#2C5BB0'
 
@@ -47,6 +57,8 @@ const SETTLE_MS = 1500
 const RESOLVING_MS = 1500
 
 onMounted(() => {
+  audio = new ProspectusAudio()
+  audio.playAmbient()
   drawLightcurve()
   drawHistogram()
   window.setTimeout(() => {
@@ -56,6 +68,9 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  audio?.stopAmbient()
+  audio?.dispose()
+  audio = null
   window.removeEventListener('keydown', onKeydown, true)
 })
 
@@ -108,6 +123,9 @@ function onKeydown(e: KeyboardEvent): void {
 function resolve(outcomeId: 'transmit' | 'tamper'): void {
   if (phase.value !== 'awaiting-choice') return
   phase.value = 'resolving'
+  audio?.stopAmbient()
+  if (outcomeId === 'transmit') audio?.playTransmit()
+  else audio?.playTamper()
   window.setTimeout(() => {
     phase.value = 'resolved'
     props.onResolve(outcomeId)
