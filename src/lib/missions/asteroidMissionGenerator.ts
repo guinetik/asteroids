@@ -21,6 +21,7 @@ import type {
 } from './types'
 import { getGiversForDifficulty, MISSION_GIVERS } from './giverCatalog'
 import type { PlayerProfile } from '@/lib/player/types'
+import { hasStoryFlag } from '@/lib/player/profile'
 import { ASTEROID_BELTS, getPlanet, PLANETS } from '@/lib/planets/catalog'
 import { ORBIT_SCALE, SIZE_SCALE } from '@/lib/planets/constants'
 import { generateFlatZones } from '@/lib/terrain/terrainGenerator'
@@ -803,6 +804,11 @@ export function generateAsteroidMission(
       // Per-template planet filter — when set, the template only rolls at the
       // listed host planets. Templates without `planetIds` remain global.
       if (template.planetIds && !template.planetIds.includes(anchor.planetId)) {
+        continue
+      }
+      // Story-flag gate — skip templates whose `requiresFlag` is not yet set on
+      // the player profile. Unflagged templates are always eligible.
+      if (template.requiresFlag !== undefined && !hasStoryFlag(profile, template.requiresFlag)) {
         continue
       }
       if (combatOnlyHost && !isCombatHostEligibleTemplate(template)) continue

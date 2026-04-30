@@ -21,6 +21,7 @@ import {
 } from '../asteroidMissionGenerator'
 import { MISSION_GIVERS } from '../giverCatalog'
 import type { MissionGiver, MissionGiverTemplate, ObjectiveSlot } from '../types'
+import type { PlayerProfile } from '@/lib/player/types'
 
 const SELECT_FIRST_ASTEROID_RANDOM = 0.25
 const SELECT_SECOND_ASTEROID_RANDOM = 0.5
@@ -836,5 +837,104 @@ describe('generateAsteroidMission requiredGiverId filter', () => {
       samples.push(m.giverId)
     }
     expect(samples.every((g) => g === 'cinderline')).toBe(true)
+  })
+})
+
+describe('mission-level requiresFlag filtering', () => {
+  /**
+   * Inject a synthetic giver, run fn, then clean up regardless of outcome.
+   */
+  function withSyntheticGiver<T>(giver: MissionGiver, fn: () => T): T {
+    MISSION_GIVERS.push(giver)
+    try {
+      return fn()
+    } finally {
+      const idx = MISSION_GIVERS.indexOf(giver)
+      if (idx >= 0) MISSION_GIVERS.splice(idx, 1)
+    }
+  }
+
+  /** Minimal gather template fixture. */
+  function makeGatherTemplate(id: string, overrides: Partial<MissionGiverTemplate> = {}): MissionGiverTemplate {
+    return {
+      id,
+      name: `Template ${id}`,
+      briefing: 'briefing',
+      objectiveSlots: [
+        {
+          type: 'gather',
+          weight: 1,
+          params: { type: 'gather', resourceAmount: { min: 50, max: 150 } },
+          reward: { min: 300, max: 600 },
+        },
+      ],
+      completionBonus: { min: 100, max: 200 },
+      regionByDifficulty: { 'near-earth': [1, 10] },
+      ...overrides,
+    }
+  }
+
+  /** Minimal profile stub — only activeStoryFlags matters here. */
+  const stubProfile = (overrides: Partial<PlayerProfile> = {}): PlayerProfile =>
+    ({ ...overrides }) as unknown as PlayerProfile
+
+  it('flagged mission templates are absent from the candidate pool when story flag is unset', () => {
+    const flaggedId = 'req_flag_test_flagged'
+    const unflaggedId = 'req_flag_test_unflagged'
+
+    const giver: MissionGiver = {
+      id: 'req_flag_test_giver',
+      name: 'ReqFlag Test Giver',
+      title: 'Test',
+      objectiveTypes: ['gather'],
+      minDifficulty: 1,
+      maxDifficulty: 10,
+      missions: [
+        makeGatherTemplate(flaggedId, { requiresFlag: 'jovianContractTampered' }),
+        makeGatherTemplate(unflaggedId),
+      ],
+    }
+
+    withSyntheticGiver(giver, () => {
+      const earth = getPlanet('earth')
+      const hostR = earth.orbit.semiMajorAxis * ORBIT_SCALE
+      const host = { planetId: 'earth' as const, worldX: hostR, worldZ: 0 }
+      // Profile without the flag — only the unflagged template should ever roll.
+      const profile = stubProfile()
+      for (let i = 0; i < 60; i++) {
+        const mission = generateAsteroidMission(5, host, Math.random, null, null, profile)
+        expect(mission.templateId).not.toBe(flaggedId)
+      }
+    })
+  })
+
+  it('flagged mission templates appear in the candidate pool when story flag is set', () => {
+    const flaggedId = 'req_flag_test_flagged_present'
+    const giver: MissionGiver = {
+      id: 'req_flag_test_giver_present',
+      name: 'ReqFlag Present Giver',
+      title: 'Test',
+      objectiveTypes: ['gather'],
+      // Narrow difficulty band so this giver is the only one in the pool.
+      minDifficulty: 5,
+      maxDifficulty: 5,
+      missions: [makeGatherTemplate(flaggedId, { requiresFlag: 'jovianContractTampered' })],
+    }
+
+    withSyntheticGiver(giver, () => {
+      const earth = getPlanet('earth')
+      const hostR = earth.orbit.semiMajorAxis * ORBIT_SCALE
+      const host = { planetId: 'earth' as const, worldX: hostR, worldZ: 0 }
+      const profile = stubProfile({ activeStoryFlags: { jovianContractTampered: true } })
+      let sawFlagged = false
+      for (let i = 0; i < 80; i++) {
+        const mission = generateAsteroidMission(5, host, Math.random, null, null, profile)
+        if (mission.templateId === flaggedId) {
+          sawFlagged = true
+          break
+        }
+      }
+      expect(sawFlagged).toBe(true)
+    })
   })
 })
