@@ -60,6 +60,45 @@ const contractStepCompletedListeners = new Set<(payload: ContractStepCompletedPa
 const contractStepActivatedListeners = new Set<(payload: ContractStepActivatedPayload) => void>()
 
 /**
+ * Synthetically re-fire `onStepActivated` for every active contract instance's
+ * current step. Used by dev console (and could be used as a self-heal
+ * mechanism). Each subscriber's handler is called once per active instance —
+ * idempotent guards in `MapViewController.handleContractStepActivated` ensure
+ * already-staged missions are skipped.
+ */
+function replayActiveStepActivations(): number {
+  let fired = 0
+  for (const instance of contractSystem.listInstances()) {
+    if (instance.status !== 'active') continue
+    const contract = contractSystem.getContract(instance.contractId)
+    if (!contract) continue
+    const step = contract.steps[instance.currentStepIndex]
+    if (!step) continue
+    let specialMissionId: string | null = null
+    let revealsBody: string | null = null
+    if (step.kind === 'complete-missions') {
+      specialMissionId = step.specialMissionId ?? null
+      revealsBody = step.revealsBody ?? null
+    }
+    const payload: ContractStepActivatedPayload = {
+      contractId: contract.id,
+      stepIndex: instance.currentStepIndex,
+      specialMissionId,
+      revealsBody,
+    }
+    for (const listener of Array.from(contractStepActivatedListeners)) {
+      try {
+        listener(payload)
+      } catch {
+        // listeners must not break replay
+      }
+    }
+    fired += 1
+  }
+  return fired
+}
+
+/**
  * Upgrade grant from a completed contract, after `ensureUpgradeAtLeast` has persisted.
  */
 export interface ContractShuttleUpgradeGrantPayload {
@@ -440,6 +479,15 @@ DevConsole.register('Contracts', {
     const ok = contractSystem.advanceStepForTests(contractId)
     return { advanced: ok, instance: contractSystem.getInstance(contractId) }
   },
+  /**
+   * Re-fire `onStepActivated` for every active contract's current step. Use
+   * when the asteroid mission slot is unexpectedly empty (e.g. the original
+   * step transition fired while MapViewController was unmounted and the
+   * mount-time self-heal didn't run for some reason).
+   *
+   * @returns Number of activation payloads dispatched (one per active instance).
+   */
+  restageActive: () => replayActiveStepActivations(),
   /** Snapshot every contract instance for debugging. */
   listInstances: () => contractSystem.listInstances(),
   /** Look up a single contract instance by id. */
