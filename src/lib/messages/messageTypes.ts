@@ -17,6 +17,8 @@ export type ShipMessageTrigger =
   | 'map_first_slingshot'
   | 'viroid_envoy_initial_contact'
   | 'viroid_envoy_ceres_rendezvous'
+  /** Reserved scripted delivery — never routed through {@link MessageSystem.notifyTrigger}; `enqueueById` only. */
+  | 'map_cosmetic_shop_intro_scripted'
   | 'contract'
 
 /** Built-in inbox folder id used by all general ship comms (default sidebar entry). */

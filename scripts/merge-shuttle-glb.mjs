@@ -30,8 +30,9 @@ const SHUTTLE_INPUTS = [
   'Space Shuttle (D).glb',
   'Space Shuttle (D) door-prt.glb',
   'Space Shuttle (D) door-stb.glb',
-  'Space Shuttle (D) eng.glb',
-  'Space Shuttle (D) rcs.glb',
+  /** NASA add-on merges ship under short names (`eng.glb` / `rcs.glb`). */
+  'eng.glb',
+  'rcs.glb',
 ];
 
 /** JPEGs required on disk for door GLBs that reference external URIs. */

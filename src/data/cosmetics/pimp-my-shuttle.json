@@ -1,0 +1,332 @@
+{
+  "id": "pimp-my-shuttle",
+  "label": "Pimp My Shuttle!",
+  "theme": "magenta",
+  "availablePlanetIds": ["mars", "jupiter", "saturn"],
+  "premiumTrade": {
+    "acceptedCategories": ["trade-good"],
+    "minimumPipBonus": 2,
+    "visitMargin": {
+      "minMultiplier": 1.08,
+      "maxMultiplier": 1.65
+    }
+  },
+  "options": [
+    {
+      "id": "shuttle-paintjob-factory-stock",
+      "category": "shuttle-paintjob",
+      "label": "Factory Stock",
+      "description": "Unpainted shuttle delivery finish—cold white ceramics, graphite sealant, faint assembly-handling scuffs.",
+      "price": 0,
+      "gradientStops": ["#f1f5f9", "#cbd5e1", "#475569"]
+    },
+    {
+      "id": "shuttle-paintjob-neon-comet",
+      "category": "shuttle-paintjob",
+      "label": "Neon Comet",
+      "description": "Hot magenta, electric cyan, and deep graphite.",
+      "price": 20000,
+      "gradientStops": ["#ff2bd6", "#22d3ee", "#111827"]
+    },
+    {
+      "id": "shuttle-paintjob-europa-velvet",
+      "category": "shuttle-paintjob",
+      "label": "Europa Velvet",
+      "description": "Teal depth, frosted ice, and a whisper of royal violet.",
+      "price": 20000,
+      "gradientStops": ["#0d9488", "#e0f2fe", "#5b21b6"]
+    },
+    {
+      "id": "shuttle-paintjob-solar-vice",
+      "category": "shuttle-paintjob",
+      "label": "Solar Vice",
+      "description": "Sunrise gold bleeding into chrome and blood orange.",
+      "price": 20000,
+      "gradientStops": ["#fbbf24", "#f97316", "#e5e7eb"]
+    },
+    {
+      "id": "shuttle-paintjob-void-chrome",
+      "category": "shuttle-paintjob",
+      "label": "Void Chrome",
+      "description": "Near-black metal with a single violet edge light.",
+      "price": 20000,
+      "gradientStops": ["#020617", "#4c1d95", "#94a3b8"]
+    },
+    {
+      "id": "shuttle-paintjob-cinderline-gold",
+      "category": "shuttle-paintjob",
+      "label": "Cinderline Gold",
+      "description": "Brushed brass over ash with ember undertones.",
+      "price": 20000,
+      "gradientStops": ["#78350f", "#f59e0b", "#1c1917"]
+    },
+    {
+      "id": "shuttle-paintjob-saturn-club",
+      "category": "shuttle-paintjob",
+      "label": "Saturn Club",
+      "description": "Champagne panels, ring-dust silver, deep space ink.",
+      "price": 20000,
+      "gradientStops": ["#faf7e8", "#a8a29e", "#0f172a"]
+    },
+    {
+      "id": "lander-paintjob-factory-stock",
+      "category": "lander-paintjob",
+      "label": "Factory Stock",
+      "description": "Stock lander aeroshell—muted bone epoxy, soot near the APS ports, boring in the best way.",
+      "price": 0,
+      "gradientStops": ["#fafaf9", "#d6d3d1", "#57534e"]
+    },
+    {
+      "id": "lander-paintjob-dust-angel",
+      "category": "lander-paintjob",
+      "label": "Dust Angel",
+      "description": "Soft bone white with rose dust weathering.",
+      "price": 20000,
+      "gradientStops": ["#fef3c7", "#fda4af", "#d6d3d1"]
+    },
+    {
+      "id": "lander-paintjob-frostbite-safety",
+      "category": "lander-paintjob",
+      "label": "Frostbite Safety",
+      "description": "High-vis arctic cyan and safety yellow trim.",
+      "price": 20000,
+      "gradientStops": ["#22d3ee", "#fef08a", "#0ea5e9"]
+    },
+    {
+      "id": "lander-paintjob-mariner-red",
+      "category": "lander-paintjob",
+      "label": "Mariner Red",
+      "description": "Heritage crimson with graphite panel breaks.",
+      "price": 20000,
+      "gradientStops": ["#b91c1c", "#7f1d1d", "#1f2937"]
+    },
+    {
+      "id": "lander-paintjob-hazard-bloom",
+      "category": "lander-paintjob",
+      "label": "Hazard Bloom",
+      "description": "Striped hazard tape energy with acid green bloom.",
+      "price": 20000,
+      "gradientStops": ["#eab308", "#000000", "#84cc16"]
+    },
+    {
+      "id": "shuttle-thruster-trail-factory-stock",
+      "category": "shuttle-thruster-trail",
+      "label": "Factory Plum",
+      "description": "Regulatory tame—pale plasma wash with grey falloff straight from OEM acceptance burns.",
+      "price": 0,
+      "gradientStops": ["#f8fafc", "#94a3b8", "#1e293b"]
+    },
+    {
+      "id": "shuttle-trail-plasma-kiss",
+      "category": "shuttle-thruster-trail",
+      "label": "Plasma Kiss",
+      "description": "Magenta-white core with electric violet falloff.",
+      "price": 10000,
+      "gradientStops": ["#fdf4ff", "#e879f9", "#701a75"]
+    },
+    {
+      "id": "shuttle-trail-blue-shift",
+      "category": "shuttle-thruster-trail",
+      "label": "Blue Shift",
+      "description": "Cool ion blue skewed hard toward UV.",
+      "price": 10000,
+      "gradientStops": ["#e0f2fe", "#38bdf8", "#1e3a8a"]
+    },
+    {
+      "id": "shuttle-trail-ember-wake",
+      "category": "shuttle-thruster-trail",
+      "label": "Ember Wake",
+      "description": "Smoldering orange coals trailing into smoke.",
+      "price": 10000,
+      "gradientStops": ["#ffedd5", "#fb923c", "#431407"]
+    },
+    {
+      "id": "lander-thruster-trail-factory-stock",
+      "category": "lander-thruster-trail",
+      "label": "RCS Default",
+      "description": "Documented cold-gas puff—dusty ivory core, slight oxide fringe, paperwork approved.",
+      "price": 0,
+      "gradientStops": ["#fafaf9", "#a8a29e", "#44403c"]
+    },
+    {
+      "id": "lander-trail-cyan-rcs",
+      "category": "lander-thruster-trail",
+      "label": "Cyan RCS",
+      "description": "Crisp station-ops cyan puffs for tight burns.",
+      "price": 10000,
+      "gradientStops": ["#ecfeff", "#06b6d4", "#164e63"]
+    },
+    {
+      "id": "lander-trail-magenta-rcs",
+      "category": "lander-thruster-trail",
+      "label": "Magenta RCS",
+      "description": "Fantasia’s signature hot pink micro-thrust haze.",
+      "price": 10000,
+      "gradientStops": ["#ffe4e6", "#ec4899", "#831843"]
+    },
+    {
+      "id": "lander-trail-amber-rcs",
+      "category": "lander-thruster-trail",
+      "label": "Amber RCS",
+      "description": "Warm descent amber that reads clean in dust.",
+      "price": 10000,
+      "gradientStops": ["#fffbeb", "#f59e0b", "#78350f"]
+    },
+    {
+      "id": "multitool-paintjob-factory-stock",
+      "category": "multitool-paintjob",
+      "label": "Fleet Issue",
+      "description": "Unbadged multitool tinsel—the grey chassis every bay forgets exists until diagnostics scream.",
+      "price": 0,
+      "gradientStops": ["#e7e5e4", "#78716c", "#292524"]
+    },
+    {
+      "id": "multitool-paint-arcade-relic",
+      "category": "multitool-paintjob",
+      "label": "Arcade Relic",
+      "description": "Bezel purple, CRT green glass, worn plastic cream.",
+      "price": 5000,
+      "gradientStops": ["#7c3aed", "#22c55e", "#fef9c3"]
+    },
+    {
+      "id": "multitool-paint-surgical-pink",
+      "category": "multitool-paintjob",
+      "label": "Surgical Pink",
+      "description": "Clinic sterile white with shock pink grip panels.",
+      "price": 5000,
+      "gradientStops": ["#ffffff", "#f472b6", "#fda4af"]
+    },
+    {
+      "id": "multitool-paint-graphite-bloom",
+      "category": "multitool-paintjob",
+      "label": "Graphite Bloom",
+      "description": "Matte graphite with thin oil-slick highlights.",
+      "price": 5000,
+      "gradientStops": ["#111827", "#64748b", "#c084fc"]
+    },
+    {
+      "id": "shuttle-title-registry",
+      "category": "shuttle-title",
+      "label": "Hull Title Registry",
+      "description": "Register a custom shuttle title on your transponder (24 characters max).",
+      "price": 5000,
+      "gradientStops": ["#fae8ff", "#d946ef", "#4a044e"]
+    },
+    {
+      "id": "vehicle-flag-none",
+      "category": "vehicle-flag",
+      "label": "No Pennant",
+      "description": "Clear the decal package—bare airframe etiquette for shuttle and lander.",
+      "price": 0,
+      "gradientStops": ["#334155", "#64748b", "#0f172a"]
+    },
+    {
+      "id": "vehicle-flag-canada",
+      "category": "vehicle-flag",
+      "label": "Canada",
+      "description": "Shared flag decal for shuttle and lander.",
+      "price": 5000,
+      "gradientStops": ["#ef4444", "#ffffff", "#ef4444"],
+      "emoji": "🇨🇦"
+    },
+    {
+      "id": "vehicle-flag-brazil",
+      "category": "vehicle-flag",
+      "label": "Brazil",
+      "description": "Shared flag decal for shuttle and lander.",
+      "price": 5000,
+      "gradientStops": ["#22c55e", "#facc15", "#2563eb"],
+      "emoji": "🇧🇷"
+    },
+    {
+      "id": "vehicle-flag-japan",
+      "category": "vehicle-flag",
+      "label": "Japan",
+      "description": "Shared flag decal for shuttle and lander.",
+      "price": 5000,
+      "gradientStops": ["#ffffff", "#ef4444", "#ffffff"],
+      "emoji": "🇯🇵"
+    },
+    {
+      "id": "vehicle-flag-france",
+      "category": "vehicle-flag",
+      "label": "France",
+      "description": "Shared flag decal for shuttle and lander.",
+      "price": 5000,
+      "gradientStops": ["#2563eb", "#ffffff", "#ef4444"],
+      "emoji": "🇫🇷"
+    },
+    {
+      "id": "vehicle-flag-germany",
+      "category": "vehicle-flag",
+      "label": "Germany",
+      "description": "Shared flag decal for shuttle and lander.",
+      "price": 5000,
+      "gradientStops": ["#000000", "#ef4444", "#facc15"],
+      "emoji": "🇩🇪"
+    },
+    {
+      "id": "vehicle-flag-italy",
+      "category": "vehicle-flag",
+      "label": "Italy",
+      "description": "Shared flag decal for shuttle and lander.",
+      "price": 5000,
+      "gradientStops": ["#22c55e", "#ffffff", "#ef4444"],
+      "emoji": "🇮🇹"
+    },
+    {
+      "id": "vehicle-flag-usa",
+      "category": "vehicle-flag",
+      "label": "United States",
+      "description": "Shared flag decal for shuttle and lander.",
+      "price": 5000,
+      "gradientStops": ["#1d4ed8", "#ffffff", "#ef4444"],
+      "emoji": "🇺🇸"
+    },
+    {
+      "id": "vehicle-flag-uk",
+      "category": "vehicle-flag",
+      "label": "United Kingdom",
+      "description": "Shared flag decal for shuttle and lander.",
+      "price": 5000,
+      "gradientStops": ["#1e3a8a", "#ffffff", "#dc2626"],
+      "emoji": "🇬🇧"
+    },
+    {
+      "id": "vehicle-flag-korea",
+      "category": "vehicle-flag",
+      "label": "Korea",
+      "description": "Shared flag decal for shuttle and lander.",
+      "price": 5000,
+      "gradientStops": ["#ffffff", "#2563eb", "#ef4444"],
+      "emoji": "🇰🇷"
+    },
+    {
+      "id": "vehicle-flag-mexico",
+      "category": "vehicle-flag",
+      "label": "Mexico",
+      "description": "Shared flag decal for shuttle and lander.",
+      "price": 5000,
+      "gradientStops": ["#22c55e", "#ffffff", "#ef4444"],
+      "emoji": "🇲🇽"
+    },
+    {
+      "id": "vehicle-flag-portugal",
+      "category": "vehicle-flag",
+      "label": "Portugal",
+      "description": "Shared flag decal for shuttle and lander.",
+      "price": 5000,
+      "gradientStops": ["#22c55e", "#ef4444"],
+      "emoji": "🇵🇹"
+    },
+    {
+      "id": "vehicle-flag-nz",
+      "category": "vehicle-flag",
+      "label": "New Zealand",
+      "description": "Shared flag decal for shuttle and lander.",
+      "price": 5000,
+      "gradientStops": ["#1e3a8a", "#ef4444", "#ffffff"],
+      "emoji": "🇳🇿"
+    }
+  ]
+}

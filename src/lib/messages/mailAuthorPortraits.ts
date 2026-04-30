@@ -25,6 +25,7 @@ export const MAIL_AUTHOR_PORTRAIT_BY_FROM: Readonly<Record<string, string>> = {
   'The Cinderline, at The Anvil': `${MAIL_AUTHOR_PORTRAIT_BASE_PATH}/cinderline.webp`,
   'Mr. Finch, Saturn Ringside Estate': `${MAIL_AUTHOR_PORTRAIT_BASE_PATH}/finch.webp`,
   'Carmen Sedna-Deimos · Neptune Commune': `${MAIL_AUTHOR_PORTRAIT_BASE_PATH}/carmen.webp`,
+  'Fantasia Mira-Io': `${MAIL_AUTHOR_PORTRAIT_BASE_PATH}/fantasia.webp`,
 }
 
 /**

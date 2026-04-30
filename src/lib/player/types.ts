@@ -8,6 +8,7 @@
  * @author guinetik
  * @date 2026-04-03
  * @spec docs/superpowers/specs/2026-04-03-player-profile-design.md
+ * @spec docs/superpowers/specs/2026-04-30-pimp-my-shuttle-shop-design.md
  */
 
 /** Per-body access state for contract-pinned bodies. */
@@ -37,6 +38,26 @@ export interface PlayerAchievementStats {
   lifetimeWorldLineDistance: number
   /** Longest finite positive single-run world-line distance reached, e.g. `250`. */
   maxSingleRunWorldLineDistance: number
+}
+
+/** Owned + active cosmetic selections for Pimp My Shuttle! (persisted on {@link PlayerProfile}). */
+export interface PlayerCosmetics {
+  /** Option ids purchased or seeded as starter defaults. */
+  readonly ownedOptionIds: readonly string[]
+  /** Active shuttle paint catalog id. */
+  readonly shuttlePaintjobId: string
+  /** Active lander paint catalog id. */
+  readonly landerPaintjobId: string
+  /** Custom transponder title (normalized empty string allowed when unset). */
+  readonly shuttleTitle: string
+  /** Shuttle + lander shared flag decal id. */
+  readonly vehicleFlagId: string
+  /** Active shuttle thruster trail id. */
+  readonly shuttleThrusterTrailId: string
+  /** Active lander thruster trail id. */
+  readonly landerThrusterTrailId: string
+  /** Active multitool paint row id (future binding). */
+  readonly multitoolPaintjobId: string
 }
 
 /** Player save data persisted to localStorage. */
@@ -120,4 +141,11 @@ export interface PlayerProfile {
    * only persists.
    */
   disabledGiverIds?: Record<string, true>
+  /** Cosmetic selections for Pimp My Shuttle! (persisted with credits spend). */
+  cosmetics?: PlayerCosmetics
+  /**
+   * When true, Fantasia's one-time magenta shop intro mail has been queued for this profile.
+   * Cleared only by profile resets — prevents duplicate transmissions on later eligible orbits.
+   */
+  fantasiaCosmeticIntroSent?: boolean
 }

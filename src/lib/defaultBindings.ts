@@ -34,7 +34,8 @@ export const DEFAULT_BINDINGS: Record<string, string[]> = {
   beginMission: ['KeyF'],
   toggleMap: ['KeyM'],
   focusHabitat: ['KeyH'],
-  shopAction: ['KeyB'],
+  /** Map-only magenta cosmetic terminal while docked at Fantasia's serviced worlds. */
+  cosmeticShopAction: ['KeyP'],
   /** Shuttle terminal: Engineering Bay (upgrades) while orbiting a serviced planet. */
   engineeringBayAction: ['KeyU'],
   /** Shuttle terminal: Mission Board while orbiting a serviced planet. */

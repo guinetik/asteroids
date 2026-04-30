@@ -1,7 +1,7 @@
 <!-- src/views/LevelView.vue -->
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Timer } from '@/lib/Timer'
 import DebugHud from '@/components/DebugHud.vue'
 import { isDebugHudEnabled } from '@/lib/debug/debugMetrics'
@@ -52,6 +52,7 @@ import {
 import { LEVEL_GRID_SIZE } from '@/lib/missions/asteroidMissionGenerator'
 
 const route = useRoute()
+const router = useRouter()
 const debugHudVisible = computed(
   () => route.query.debug === '1' || route.query.debug === 'true' || isDebugHudEnabled(),
 )
@@ -401,6 +402,9 @@ const fpsTelemetry = reactive<FpsTelemetry>({
 
 onMounted(async () => {
   playBackgroundMusic('level')
+  viewController.setNavigateToMap(() => {
+    void router.push('/map')
+  })
   if (container.value) {
     viewController.onBootState = (state) => {
       bootPhase.value = state.phase

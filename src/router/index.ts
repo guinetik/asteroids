@@ -1,9 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
-import ShuttleView from '@/views/ShuttleView.vue'
-import LanderView from '@/views/LanderView.vue'
-import FpsView from '@/views/FpsView.vue'
-import LevelView from '@/views/LevelView.vue'
 import { canAccessLevelRoute } from '@/lib/level/levelRouteAccess'
 import { canAccessMapRoute } from '@/lib/map/mapRouteAccess'
 
@@ -18,12 +14,12 @@ const router = createRouter({
     {
       path: '/shuttle',
       name: 'shuttle',
-      component: ShuttleView,
+      component: () => import('@/views/ShuttleView.vue'),
     },
     {
       path: '/lander',
       name: 'lander',
-      component: LanderView,
+      component: () => import('@/views/LanderView.vue'),
     },
     {
       path: '/map',
@@ -33,12 +29,12 @@ const router = createRouter({
     {
       path: '/fps',
       name: 'fps',
-      component: FpsView,
+      component: () => import('@/views/FpsView.vue'),
     },
     {
       path: '/level',
       name: 'level',
-      component: LevelView,
+      component: () => import('@/views/LevelView.vue'),
     },
   ],
 })

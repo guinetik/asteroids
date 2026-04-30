@@ -59,6 +59,8 @@ describe('createProfile', () => {
     expect(profile.orbitedSolarBodies).toEqual({})
     expect(profile.bodyAccess['hektor']).toBe('restricted')
     expect(profile.hasSeenIntro).toBe(false)
+    expect(profile.fantasiaCosmeticIntroSent).toBe(false)
+    expect(profile.cosmetics?.ownedOptionIds.length).toBeGreaterThan(1)
   })
 
   it('creates profiles with zeroed achievement stats', () => {

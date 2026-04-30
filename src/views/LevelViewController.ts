@@ -202,6 +202,12 @@ export class LevelViewController implements Tickable {
   // ── Core ─────────────────────────────────────────────────────
   private gameLoop: GameLoop | null = null
   private tickHandler: TickHandler | null = null
+  /**
+   * Invokes SPA navigation to `/map` after exfil / mission handoff. Set once from
+   * {@link LevelView} so this module never imports `router/index` (router already
+   * imports the level route, which pulls in this controller).
+   */
+  private navigateToMap: (() => void) | null = null
   private inputManager: InputManager | null = null
   private sceneManager: SceneManager | null = null
   private heightmap: Heightmap | null = null
@@ -398,6 +404,21 @@ export class LevelViewController implements Tickable {
   refreshLanderFuelCellCount(): void {
     const inventory = loadInventory()
     this.onLanderFuelCellCount?.(inventory ? countLanderFuelCells(inventory) : 0)
+  }
+
+  /**
+   * Wires navigation back to the solar map (typically `router.push('/map')`).
+   * Called once from {@link LevelView} setup to avoid a circular import of
+   * `router/index` from this file.
+   *
+   * @param fn - Zero-arg callback that performs the SPA transition.
+   *
+   * @author guinetik
+   * @date 2026-04-30
+   * @spec docs/asteroid-lander-gdd.md
+   */
+  setNavigateToMap(fn: () => void): void {
+    this.navigateToMap = fn
   }
 
   /**
@@ -2122,9 +2143,7 @@ export class LevelViewController implements Tickable {
       persistCompletedAsteroidMissionRewards(this.mission, scienceMult)
     }
 
-    import('@/router').then(({ default: router }) => {
-      router.push('/map')
-    })
+    this.navigateToMap?.()
   }
 
   private restartLevel(): void {

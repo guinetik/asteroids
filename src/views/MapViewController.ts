@@ -96,6 +96,7 @@ import { HabitatState } from '@/lib/habitatState'
 import { MapHabitatFacade } from '@/lib/map/habitat/MapHabitatFacade'
 import { RESERVE_FUEL_ID } from '@/lib/shop/shopSession'
 import type { ShopSession } from '@/lib/shop/tradeTypes'
+import type { ShopResult } from '@/lib/shop/types'
 import { tickDemandTimer, resetDemand } from '@/lib/shop/planetDemand'
 import {
   createProfile,
@@ -172,6 +173,22 @@ import { PLANET_ORBITAL_CONFIGS } from '@/lib/missions/planetOrbitalConfig'
 import { MapModeCoordinator } from '@/lib/map/mode/MapModeCoordinator'
 import { MapOrbitFacade } from '@/lib/map/orbit/MapOrbitFacade'
 import { MapShopFacade } from '@/lib/map/shop/MapShopFacade'
+import { MapCosmeticShopFacade } from '@/lib/map/shop/MapCosmeticShopFacade'
+import {
+  applyOwnedCosmetic,
+  purchaseCosmeticOption,
+  purchaseShuttleTitle,
+} from '@/lib/cosmetics/purchase'
+import { sellPremiumTradeGood } from '@/lib/cosmetics/premiumTrade'
+import {
+  FANTASIA_INTRO_MESSAGE_ID,
+  markFantasiaCosmeticIntroIfNeeded,
+} from '@/lib/cosmetics/fantasiaIntro'
+import type {
+  CosmeticPurchaseResult,
+  PremiumTradeSession,
+  ShuttleTitlePurchaseResult,
+} from '@/lib/cosmetics/types'
 import {
   TurretSessionController,
   type TurretHudState,
@@ -384,6 +401,7 @@ export class MapViewController implements Tickable {
   private readonly habitatFacade = new MapHabitatFacade()
   private turretSessionController: TurretSessionController | null = null
   private shopFacade = new MapShopFacade()
+  private cosmeticShopFacade = new MapCosmeticShopFacade()
   private pendingModuleInstallTimer: TimerHandle | null = null
   private missionFacade = new MapMissionFacade()
   /**
@@ -566,6 +584,18 @@ export class MapViewController implements Tickable {
   /** Fired when the shop dialog state changes. */
   onShopState:
     | ((session: ShopSession | null, profile: PlayerProfile, inventory: Inventory) => void)
+    | null = null
+  /** Orbital magenta `Pimp My Shuttle!` button visibility while docked over eligible worlds. */
+  onCosmeticShopButton: ((visible: boolean, planetName: string) => void) | null = null
+  /**
+   * When non-null premium session accompanies an open magenta dialog; callers mirror yellow shop HUD sync.
+   */
+  onCosmeticShopState:
+    | ((
+        session: PremiumTradeSession | null,
+        profile: PlayerProfile,
+        inventory: Inventory,
+      ) => void)
     | null = null
   /**
    * While orbiting a planet with port services, the player used the Engineering Bay
@@ -1648,6 +1678,19 @@ export class MapViewController implements Tickable {
       }
     }
 
+    if (
+      !shuttleDead &&
+      this.inputManager?.wasActionPressed('cosmeticShopAction') &&
+      this.orbitSystem?.state === 'orbiting' &&
+      this.cosmeticShopFacade.premiumSession
+    ) {
+      if (this.cosmeticShopFacade.dialogOpen) {
+        this.closeCosmeticShop()
+      } else {
+        this.openCosmeticShop()
+      }
+    }
+
     // Engineering Bay (U key) — open shuttle terminal upgrades while orbiting
     if (
       !shuttleDead &&
@@ -2073,6 +2116,7 @@ export class MapViewController implements Tickable {
     // still shows Earth's stock.
     if (this.orbitSystem) {
       this.updateShopSession()
+      this.updateCosmeticShopSession()
       this.updateMissionState()
     }
 
@@ -2530,6 +2574,18 @@ export class MapViewController implements Tickable {
   }
 
   /**
+   * Fantasia mails the player once overall when they berth at Mars, Jupiter, or Saturn orbit.
+   */
+  private tryEnqueueFantasiaIntroMail(planetBodyKey: string): void {
+    const queuedProfile = markFantasiaCosmeticIntroIfNeeded(this.playerProfile, planetBodyKey)
+    if (queuedProfile === this.playerProfile) return
+    if (!shipMessageSystem.enqueueById(FANTASIA_INTRO_MESSAGE_ID)) return
+    this.playerProfile = queuedProfile
+    this.persistPlayerProfile()
+    this.onMessageUpdate?.()
+  }
+
+  /**
    * When the shuttle enters `orbiting`, persist a first-time flag for that body (Sun or planet).
    * Drives exploration achievements and syncs profile to Vue.
    */
@@ -2541,6 +2597,7 @@ export class MapViewController implements Tickable {
     if (!becameOrbiting || !system?.target) return
     const key = orbitBodyKeyFromCaptureName(system.target.name)
     if (!key) return
+    this.tryEnqueueFantasiaIntroMail(key)
     let next = recordSolarBodyFirstOrbit(this.playerProfile, key)
     if (key !== 'sun') {
       next = setLastDockedPlanet(next, key)
@@ -2562,9 +2619,19 @@ export class MapViewController implements Tickable {
     this.emitShopState()
   }
 
+  /** Sync Vue inventory / credits panels for magenta cargo + shader purchases. */
+  private emitCosmeticShopState(): void {
+    this.cosmeticShopFacade.emitState(
+      this.onCosmeticShopState,
+      this.playerProfile,
+      this.playerInventory,
+    )
+  }
+
   /** Sync latest profile/inventory to Vue without implicitly opening the shop overlay. */
   private emitShopState(): void {
     this.shopFacade.emitState(this.onShopState, this.playerProfile, this.playerInventory)
+    this.emitCosmeticShopState()
   }
 
   /** Build a fresh inventory using the current cargo-bay upgrade multiplier. */
@@ -2624,6 +2691,24 @@ export class MapViewController implements Tickable {
     if (orbitState === 'orbiting' && targetPlanetId) {
       this.offerMissionAtPlanet(targetPlanetId)
     }
+  }
+
+  /** Update magenta cosmetic kiosk availability keyed to orbit target planets ids. */
+  private updateCosmeticShopSession(): void {
+    const targetName = this.orbitSystem?.target?.name ?? null
+    const targetPlanetId = targetName
+      ? (PLANETS.find((planet) => planet.name === targetName)?.id ?? null)
+      : null
+    const orbitState = this.orbitSystem?.state ?? 'free'
+    this.cosmeticShopFacade.updateOrbitState({
+      orbitState,
+      targetName,
+      targetPlanetId,
+      onCosmeticShopButton: this.onCosmeticShopButton,
+      onCosmeticShopState: this.onCosmeticShopState,
+      profile: this.playerProfile,
+      inventory: this.playerInventory,
+    })
   }
 
   /** Update mission button visibility based on orbit state. */
@@ -2740,6 +2825,98 @@ export class MapViewController implements Tickable {
   /** Close the shop dialog (called by Vue). */
   closeShop(): void {
     this.shopFacade.close()
+  }
+
+  /** Open the magenta cosmetic kiosk while Fantasia's premium multiplier is armed. */
+  openCosmeticShop(): void {
+    this.cosmeticShopFacade.open(
+      this.onCosmeticShopState,
+      this.playerProfile,
+      this.playerInventory,
+    )
+  }
+
+  /** Close the magenta dialog without clearing the underlying premium visit roll. */
+  closeCosmeticShop(): void {
+    this.cosmeticShopFacade.close()
+    this.onCosmeticShopState?.(null, this.playerProfile, this.playerInventory)
+  }
+
+  /**
+   * Attempt to buy (or free-apply) a catalog cosmetic option through the map shell.
+   *
+   * @param optionId - Cosmetic row id from `pimp-my-shuttle.json`.
+   */
+  cosmeticPurchaseOption(optionId: string): CosmeticPurchaseResult {
+    const result = purchaseCosmeticOption(this.playerProfile, optionId)
+    if (!result.ok) return result
+    this.playerProfile = result.profile
+    this.persistPlayerProfile()
+    this.onCreditsUpdate?.(this.playerProfile.credits)
+    this.emitShopState()
+    return result
+  }
+
+  /**
+   * Switch to an already-owned shader without spending credits.
+   *
+   * @param optionId - Cosmetic row id.
+   */
+  cosmeticApplyOption(optionId: string): CosmeticPurchaseResult {
+    const result = applyOwnedCosmetic(this.playerProfile, optionId)
+    if (!result.ok) return result
+    this.playerProfile = result.profile
+    this.persistPlayerProfile()
+    this.emitShopState()
+    return result
+  }
+
+  /**
+   * Spend registry fees to change the shuttle title when the normalized string changes.
+   *
+   * @param rawTitle - Player typed title before normalization.
+   */
+  cosmeticRenameShuttle(rawTitle: string): ShuttleTitlePurchaseResult {
+    const result = purchaseShuttleTitle(this.playerProfile, rawTitle)
+    if (!result.ok) return result
+    this.playerProfile = result.profile
+    this.persistPlayerProfile()
+    this.onCreditsUpdate?.(this.playerProfile.credits)
+    this.emitShopState()
+    return result
+  }
+
+  /**
+   * Sell trade goods through Fantasia's premium intake wrapper.
+   *
+   * @param itemId - Stack id backed by trade-good definitions only.
+   * @param quantity - Units attempting to offload.
+   */
+  cosmeticSellPremiumCargo(itemId: string, quantity: number): ShopResult {
+    const session = this.cosmeticShopFacade.premiumSession
+    if (!session) {
+      return {
+        ok: false,
+        profile: this.playerProfile,
+        inventory: this.playerInventory,
+        reason: 'No premium buyer session active',
+      }
+    }
+
+    const result = sellPremiumTradeGood(
+      session,
+      this.playerProfile,
+      this.playerInventory,
+      itemId,
+      quantity,
+    )
+    if (!result.ok) return result
+    this.playerProfile = result.profile
+    this.playerInventory = result.inventory
+    this.persistPlayerProfile()
+    this.onCreditsUpdate?.(this.playerProfile.credits)
+    this.emitShopState()
+    return result
   }
 
   /** Offer a mission when docking at a planet. */
@@ -3339,6 +3516,12 @@ export class MapViewController implements Tickable {
       this.playerProfile,
       this.playerInventory,
     )
+    this.cosmeticShopFacade.clear(
+      this.onCosmeticShopButton,
+      this.onCosmeticShopState,
+      this.playerProfile,
+      this.playerInventory,
+    )
     const respawnState = this.lifeCycleFacade.buildRespawnPlayerState(this.playerProfile, () =>
       this.inventoryWithStarterFuelCells(this.createInventoryForCurrentCargoBayLevel()),
     )
@@ -3657,6 +3840,7 @@ export class MapViewController implements Tickable {
       this.persistPlayerProfile()
       this.emitShopState()
     }
+    this.tryEnqueueFantasiaIntroMail(key)
     return true
   }
 

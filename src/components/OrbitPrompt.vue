@@ -7,6 +7,7 @@ const props = defineProps<{
   orbitState: OrbitHudState
   shopAvailable?: boolean
   shopPlanet?: string
+  cosmeticShopAvailable?: boolean
   missionAvailable?: boolean
   suppressKiosks?: boolean
 }>()
@@ -15,6 +16,7 @@ const emit = defineEmits<{
   openEngineeringBay: []
   openMissionBoard: []
   openShop: []
+  openCosmeticShop: []
   openMission: []
 }>()
 
@@ -103,6 +105,19 @@ const details = computed(() => {
         "
       >
         B Shop
+      </button>
+      <button
+        v-if="
+          !suppressKiosks && cosmeticShopAvailable && orbitState.state === 'orbiting'
+        "
+        type="button"
+        class="orbit-prompt-cosmetic-btn"
+        @click="
+          uiAudio.notifyButtonClick();
+          emit('openCosmeticShop')
+        "
+      >
+        P Pimp My Shuttle!
       </button>
       <button
         v-if="!suppressKiosks && missionAvailable && orbitState.state === 'orbiting'"

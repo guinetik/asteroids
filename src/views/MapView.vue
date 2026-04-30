@@ -1,7 +1,7 @@
 <!-- src/views/MapView.vue -->
 <script setup lang="ts">
 import { ref, shallowRef, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import DebugHud from '@/components/DebugHud.vue'
 import { isDebugHudEnabled } from '@/lib/debug/debugMetrics'
 import { MapViewController } from './MapViewController'
@@ -19,6 +19,7 @@ import FastTravelConfirmDialog from '@/components/FastTravelConfirmDialog.vue'
 import ShipMessageDialog from '@/components/ShipMessageDialog.vue'
 import ShuttleControlOverlay from '@/components/ShuttleControlOverlay.vue'
 import PlanetShopDialog from '@/components/shop/PlanetShopDialog.vue'
+import PimpMyShuttleDialog from '@/components/shop/PimpMyShuttleDialog.vue'
 import CreditsBadge from '@/components/hud/CreditsBadge.vue'
 import AchievementBanner from '@/components/AchievementBanner.vue'
 import AchievementsDialog from '@/components/AchievementsDialog.vue'
@@ -37,9 +38,10 @@ import { isCanvasOrbitalMinigame } from '@/lib/minigame/canvasOrbitalMinigames'
 import MissionMiniGameOverlay from '@/components/MissionMiniGameOverlay.vue'
 import EvaMinigameOverlay from '@/components/EvaMinigameOverlay.vue'
 import { PINNED_BODIES, PLANETS, SUN } from '@/lib/planets/catalog'
-import type { ShopSession } from '@/lib/shop/tradeTypes'
+import type { PremiumTradeSession } from '@/lib/cosmetics/types'
 import type { PlayerProfile } from '@/lib/player/types'
 import type { Inventory } from '@/lib/inventory/types'
+import type { ShopSession } from '@/lib/shop/tradeTypes'
 import { createProfile } from '@/lib/player/profile'
 import { createInventory } from '@/lib/inventory/inventory'
 import { shipMessageSystem, setShipMessageFollowUpDeliveryListener } from '@/lib/messages/runtime'
@@ -106,6 +108,7 @@ import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 hydratePlayerUpgradeLevelsFromStorage()
 
 const route = useRoute()
+const router = useRouter()
 const debugHudVisible = computed(
   () => route.query.debug === '1' || route.query.debug === 'true' || isDebugHudEnabled(),
 )
@@ -386,6 +389,9 @@ const ambientVisible = ref(true)
 const shopButtonVisible = ref(false)
 const shopButtonPlanet = ref('')
 const shopDialogVisible = ref(false)
+const cosmeticShopDialogVisible = ref(false)
+const cosmeticPremiumSession = shallowRef<PremiumTradeSession | null>(null)
+const cosmeticShopButtonVisible = ref(false)
 const shopSession = ref<ShopSession | null>(null)
 const shopProfile = ref<PlayerProfile>(createProfile('Pilot'))
 const playerProfileSnapshot = ref<PlayerProfile>(createProfile('Pilot'))
@@ -888,6 +894,24 @@ onMounted(async () => {
         shopDialogVisible.value = false
       }
     }
+    viewController.onCosmeticShopButton = (visible) => {
+      cosmeticShopButtonVisible.value = visible
+      if (!visible) {
+        cosmeticShopDialogVisible.value = false
+      }
+    }
+    viewController.onCosmeticShopState = (session, profile, inventory) => {
+      shopProfile.value = profile
+      playerProfileSnapshot.value = { ...profile }
+      shopInventory.value = inventory
+      if (session) {
+        cosmeticPremiumSession.value = session
+        cosmeticShopDialogVisible.value = true
+      } else {
+        cosmeticPremiumSession.value = null
+        cosmeticShopDialogVisible.value = false
+      }
+    }
     viewController.onCreditsUpdate = (credits) => {
       playerCredits.value = credits
       playerProfileSnapshot.value = {
@@ -948,9 +972,7 @@ onMounted(async () => {
       syncPersistentProgressFromController()
     }
     viewController.onBeginAsteroidMission = () => {
-      import('@/router').then((mod) => {
-        mod.default.push('/level')
-      })
+      void router.push('/level')
     }
     viewController.onPortalWelcome = () => {
       portalWelcomeIsFirstVisit.value = !viewController.getPlayerProfileSnapshot().hasSeenIntro
@@ -1150,6 +1172,35 @@ function handleToggleLabels() {
 function handleToggleAmbient() {
   uiAudio.notifySwitch()
   ambientVisible.value = viewController.toggleAmbient()
+}
+
+function openCosmeticShop(): void {
+  viewController.openCosmeticShop()
+}
+
+function closeCosmeticShop(): void {
+  cosmeticShopDialogVisible.value = false
+  viewController.closeCosmeticShop()
+}
+
+function handleCosmeticPurchaseOption(optionId: string): void {
+  viewController.cosmeticPurchaseOption(optionId)
+  syncPersistentProgressFromController()
+}
+
+function handleCosmeticApplyOption(optionId: string): void {
+  viewController.cosmeticApplyOption(optionId)
+  syncPersistentProgressFromController()
+}
+
+function handleCosmeticRenameShuttle(rawTitle: string): void {
+  viewController.cosmeticRenameShuttle(rawTitle)
+  syncPersistentProgressFromController()
+}
+
+function handleCosmeticSellPremium(itemId: string, quantity: number): void {
+  viewController.cosmeticSellPremiumCargo(itemId, quantity)
+  syncPersistentProgressFromController()
 }
 
 function openShop() {
@@ -1494,12 +1545,16 @@ watch(
         !evaActive
       "
       :orbitState="orbitState"
-      :shop-available="shopButtonVisible && !shopDialogVisible && !shuttleControlVisible"
+      :shop-available="shopButtonVisible && !shopDialogVisible && !cosmeticShopDialogVisible && !shuttleControlVisible"
+      :cosmetic-shop-available="
+        cosmeticShopButtonVisible && !shopDialogVisible && !cosmeticShopDialogVisible && !shuttleControlVisible
+      "
       :mission-available="missionButtonVisible && !missionOverlayVisible && !shuttleControlVisible"
       :suppress-kiosks="suppressOrbitKiosks"
       @open-engineering-bay="() => openProgramFromMap('upgrades')"
       @open-mission-board="() => openProgramFromMap('missions')"
       @open-shop="openShop"
+      @open-cosmetic-shop="openCosmeticShop"
       @open-mission="openMissionOverlay"
     />
     <GravityWarning
@@ -1820,6 +1875,17 @@ watch(
       @buy-lander-fuel="handleShopBuyLanderFuel"
       @repair-hull="handleRepairHull"
       @repair-lander="handleRepairLander"
+    />
+    <PimpMyShuttleDialog
+      v-if="cosmeticShopDialogVisible && cosmeticPremiumSession"
+      :profile="shopProfile"
+      :inventory="shopInventory"
+      :premium-session="cosmeticPremiumSession"
+      @close="closeCosmeticShop"
+      @purchase-option="handleCosmeticPurchaseOption"
+      @apply-option="handleCosmeticApplyOption"
+      @rename-shuttle="handleCosmeticRenameShuttle"
+      @sell-premium="handleCosmeticSellPremium"
     />
     <MissionMiniGameOverlay
       v-if="missionOverlayVisible && missionOverlayMission"

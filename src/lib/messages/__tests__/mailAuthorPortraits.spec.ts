@@ -13,6 +13,7 @@ describe('mailAuthorPortraits', () => {
     expect(resolveMailAuthorPortraitHref('Carmen Sedna-Deimos · Neptune Commune')).toBe(
       '/portraits/carmen.webp',
     )
+    expect(resolveMailAuthorPortraitHref('Fantasia Mira-Io')).toBe('/portraits/fantasia.webp')
   })
 
   it('returns null for unknown senders', () => {

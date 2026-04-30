@@ -368,6 +368,37 @@ export const VIROID_ENVOY_CERES_RENDEZVOUS: ShipMessageDefinition = {
   ],
 }
 
+/** Cosmetologist + premium cargo buyer stationed at Mars, Jupiter, and Saturn magenta docks. */
+const FANTASIA_COSMETIC_MESSAGE_PRIORITY = 48
+
+/** One-time magenta shop intro — delivered via `enqueueById` while orbiting an eligible outer world. */
+export const FANTASIA_PIMP_MY_SHUTTLE_INTRO_MESSAGE: ShipMessageDefinition = {
+  id: 'fantasia-pimp-my-shuttle-intro',
+  from: 'Fantasia Mira-Io',
+  subject: 'Lindo, your shuttle needs a color',
+  sentAt: '2306-04-30 14:00 UTC',
+  trigger: 'map_cosmetic_shop_intro_scripted',
+  delivery: 'inbox_prompt',
+  priority: FANTASIA_COSMETIC_MESSAGE_PRIORITY,
+  folderId: 'station-comms',
+  folderLabel: 'Station Comms',
+  body: [
+    'Lindo, finally.',
+    '',
+    'I saw your transponder squawk online and caught myself staring—default hull, factory panels, untouched registry typeface. In THIS economy?',
+    '',
+    'When you berth with my ring, chase the magenta wash on the truss. Dock there. Hit the P bind (Fantasia insists on P—pretty, paint, please sit still) so BayComms knows which hatch to warm up. That magenta pulse is my wave hello.',
+    '',
+    'I sell hull shaders every bit as extra as Destiny shaders, tandem flags so your lander stops pretending it belongs to somebody else, custom titles whispered sweet on the ticker, multitool tinsel—you name the vanity, darling, we encode it polite.',
+    '',
+    'Blank hold? Wrong season. Shovel whatever tradeable tinsel you scraped off the polite yellow desks into my scale—I always skim richer than Mars routing math ever admits on the beige screens.',
+    '',
+    'Ping me anytime the bay hums magenta. ',
+    '',
+    '—Fantasia • Pimp My Shuttle!',
+  ],
+}
+
 /** Full message catalog for the current build. */
 export const SHIP_MESSAGE_CATALOG: ShipMessageDefinition[] = [
   STARTUP_SELLER_MESSAGE,
@@ -388,4 +419,5 @@ export const SHIP_MESSAGE_CATALOG: ShipMessageDefinition[] = [
   JAY_VENUS_WARNING_MESSAGE,
   VIROID_ENVOY_INITIAL_CONTACT,
   VIROID_ENVOY_CERES_RENDEZVOUS,
+  FANTASIA_PIMP_MY_SHUTTLE_INTRO_MESSAGE,
 ]

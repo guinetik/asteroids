@@ -12,6 +12,7 @@
  */
 import type { BodyAccessState, PlayerAchievementStats, PlayerProfile } from './types'
 import { SLINGSHOT_JOURNEY_FEATURE_ID, WELCOME_JOURNEY_ID } from '@/lib/journeys'
+import { createDefaultPlayerCosmetics, normalizePlayerCosmetics } from '@/lib/cosmetics/profileCosmetics'
 import { PINNED_BODIES } from '@/lib/planets/catalog'
 
 /** localStorage key for the player profile. */
@@ -367,6 +368,10 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
       ? p.landerHullHp
       : undefined
 
+  const cosmetics = normalizePlayerCosmetics(p.cosmetics)
+  const fantasiaCosmeticIntroSent =
+    typeof p.fantasiaCosmeticIntroSent === 'boolean' ? p.fantasiaCosmeticIntroSent : false
+
   return {
     name: p.name,
     credits: p.credits,
@@ -386,6 +391,8 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     journeyStartReadyIds,
     shuttleBuffs,
     disabledGiverIds,
+    cosmetics,
+    fantasiaCosmeticIntroSent,
     ...(shuttleHullHp !== undefined ? { shuttleHullHp } : {}),
     ...(landerHullHp !== undefined ? { landerHullHp } : {}),
   }
@@ -446,6 +453,8 @@ export function createProfile(name: string): PlayerProfile {
     journeyStartReadyIds: [],
     shuttleBuffs: {},
     disabledGiverIds: {},
+    cosmetics: createDefaultPlayerCosmetics(),
+    fantasiaCosmeticIntroSent: false,
   }
 }
 
