@@ -3899,8 +3899,6 @@ body {
 
 .cosmetic-flag-btn__price {
   @apply text-[10px] text-slate-400;
-}
-
   @apply text-sm font-mono uppercase tracking-[0.35em] text-fuchsia-100;
 }
 

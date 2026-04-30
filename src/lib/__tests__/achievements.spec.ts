@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { createProfile } from '@/lib/player/profile'
-import { ACT_1_JOURNEY_ID, WELCOME_JOURNEY_ID } from '@/lib/journeys'
+import { ACT_1_JOURNEY_ID, ACT_2_JOURNEY_ID, WELCOME_JOURNEY_ID } from '@/lib/journeys'
 import { ACHIEVEMENT_DEFINITIONS, type AchievementProgress } from '@/data/achievements'
 import { emptyContractSnapshot } from '@/lib/contracts/contractStorage'
 import type { ContractStoreSnapshot } from '@/lib/contracts/contractTypes'
@@ -217,13 +217,21 @@ describe('achievements', () => {
   })
 
   it('uses journey-specific locked hints', () => {
-    const hint = getAchievementLockedHint(
+    const act1Hint = getAchievementLockedHint(
       ACHIEVEMENT_DEFINITIONS.find((definition) => definition.id === 'journey-act-1-inner-system')!,
       progress(),
     )
 
-    expect(hint).toContain('Act I')
-    expect(hint).toContain('Inner System')
+    expect(act1Hint).toContain('Act I')
+    expect(act1Hint).toContain('Inner System')
+
+    const act2Hint = getAchievementLockedHint(
+      ACHIEVEMENT_DEFINITIONS.find((definition) => definition.id === 'journey-act-2-jovian-arrival')!,
+      progress(),
+    )
+
+    expect(act2Hint).toContain('Act II')
+    expect(act2Hint).toContain('Jovian Arrival')
   })
 
   it('unlocks expanded economy achievements from profile stats', () => {
@@ -282,6 +290,17 @@ describe('achievements', () => {
     const ids = evaluateAchievementUnlocks(progress(profile), []).newlyUnlocked.map((a) => a.id)
 
     expect(ids).toContain('journey-act-1-inner-system')
+  })
+
+  it('unlocks Act II from the completed Act II journey', () => {
+    const profile = {
+      ...createProfile('Pilot'),
+      completedJourneyIds: [ACT_2_JOURNEY_ID],
+    }
+
+    const ids = evaluateAchievementUnlocks(progress(profile), []).newlyUnlocked.map((a) => a.id)
+
+    expect(ids).toContain('journey-act-2-jovian-arrival')
   })
 
   it('unlocks mission objective achievements from profile stats', () => {
@@ -386,9 +405,10 @@ describe('achievements', () => {
     expect(destroyedIds).toContain('contracts-hektor-destroyed')
   })
 
-  it('does not include unreachable Act II achievements yet', () => {
-    const ids = ACHIEVEMENT_DEFINITIONS.map((definition) => definition.id)
-
-    expect(ids.some((id) => id.includes('act-2'))).toBe(false)
+  it('registers the Act II journey achievement in the catalog', () => {
+    const entry = ACHIEVEMENT_DEFINITIONS.find(
+      (definition) => definition.id === 'journey-act-2-jovian-arrival',
+    )
+    expect(entry?.kind).toBe('journey_completed')
   })
 })

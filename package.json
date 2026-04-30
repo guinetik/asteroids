@@ -35,9 +35,9 @@
     "models:table:build": "gltf-transform optimize \"3d/table.glb\" \"public/models/table.glb\" --texture-compress webp --texture-size 2048 --simplify-ratio 0.55 --simplify-error 0.001 --meshopt-level high",
     "models:city:build": "gltf-transform optimize \"3d/city.glb\" \"public/models/city.glb\" --texture-compress webp --texture-size 2048 --simplify-ratio 0.62 --simplify-error 0.001 --meshopt-level high",
     "models:asteroid:build": "gltf-transform optimize \"3d/asteroid.glb\" \"public/models/asteroid.glb\" --texture-compress webp --texture-size 2048 --simplify-ratio 0.62 --simplify-error 0.0008 --meshopt-level high",
-    "models:hubble:build": "gltf-transform optimize \"3d/hubble_rigged.glb\" \"public/models/hubble.glb\" --texture-compress webp --texture-size 2048 --simplify-ratio 0.6 --simplify-error 0.001 --meshopt-level high",
-    "models:voyager:build": "gltf-transform optimize \"3d/voyager_rigged.glb\" \"public/models/voyager.glb\" --texture-compress webp --texture-size 2048 --simplify-ratio 0.62 --simplify-error 0.001 --meshopt-level high",
-    "models:satellite:build": "gltf-transform optimize \"3d/satellite.glb\" \"public/models/satellite.glb\" --texture-compress webp --texture-size 2048 --simplify-ratio 0.58 --simplify-error 0.001 --meshopt-level high",
+    "models:hubble:build": "gltf-transform optimize \"3d/hubble_rigged.glb\" \"public/models/hubble.glb\" --join false --flatten false --simplify false --texture-compress webp --texture-size 2048 --meshopt-level high",
+    "models:voyager:build": "gltf-transform optimize \"3d/voyager_rigged.glb\" \"public/models/voyager.glb\" --join false --flatten false --simplify false --texture-compress webp --texture-size 2048 --meshopt-level high",
+    "models:satellite:build": "node scripts/build-satellite-glb.mjs",
     "models:heavy-runtime:build": "run-s models:bootstrap-heavy-sources models:bed:build models:table:build models:city:build models:asteroid:build models:hubble:build models:voyager:build models:satellite:build models:virus:build",
     "models:virus:build": "node scripts/optimize-virus-glb.mjs",
     "models:virus:center": "node scripts/center-virus-glb.mjs"

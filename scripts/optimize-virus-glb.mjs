@@ -79,8 +79,11 @@ const DEFAULT_VIRUS_TEXTURE_SIZE = 512
 const DEFAULT_VIRUS_APPLY_DRACO = true
 
 /**
- * Strips NORMAL attributes so buffers only carry POSITION; Three.js computes normals on load.
- * Large win for transmission size on dense meshes.
+ * Strips NORMAL attributes so buffers only carry POSITION. **Default off** — the
+ * in-game {@link VirusModel} uses {@link createTronHologramMaterial}, whose vertex
+ * shader reads `normal` for fresnel; stripped normals read as zero and the mesh
+ * renders black. Opt in with `VIRUS_STRIP_NORMALS=true` only if the runtime
+ * material changes to one that recomputes normals per frame.
  *
  * @returns {import('@gltf-transform/core').Transform}
  */
@@ -129,7 +132,7 @@ async function main(inputPath, outputPath) {
   )
   const textureSize = Number(process.env.VIRUS_TEXTURE_SIZE ?? DEFAULT_VIRUS_TEXTURE_SIZE)
   const stripNormals =
-    (process.env.VIRUS_STRIP_NORMALS ?? 'true').toLowerCase() !== 'false'
+    (process.env.VIRUS_STRIP_NORMALS ?? 'false').toLowerCase() === 'true'
   const applyDraco = (process.env.VIRUS_APPLY_DRACO ?? String(DEFAULT_VIRUS_APPLY_DRACO))
     .toLowerCase() !== 'false'
 

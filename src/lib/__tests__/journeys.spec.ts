@@ -1,10 +1,37 @@
 import { describe, expect, it } from 'vitest'
+import type { PlayerProfile } from '../player/types'
 import { createProfile } from '../player/profile'
 import {
   applyJourneyTrigger,
   buildActiveJourneyTracker,
   isJourneyFeatureUnlocked,
 } from '../journeys'
+
+/**
+ * Walk Welcome and Act I through completion so subsequent tests only observe Act II gating.
+ *
+ * @param profile - Seed profile from {@link createProfile}.
+ * @returns Profile with `welcome` + `act-1-inner-system` in completed journey ids.
+ */
+function profileAfterAct1Complete(profile: PlayerProfile = createProfile('Pilot')) {
+  let p = profile
+  p = applyJourneyTrigger(p, 'message_archived:seller-welcome-earth-orbit').profile
+  p = applyJourneyTrigger(p, 'message_archived:jay-so-you-actually-did-it').profile
+  p = applyJourneyTrigger(p, 'shuttle_control_opened').profile
+  p = applyJourneyTrigger(p, 'shuttle_program_opened').profile
+  p = applyJourneyTrigger(p, 'lander_program_opened').profile
+  p = applyJourneyTrigger(p, 'inventory_opened').profile
+  p = applyJourneyTrigger(p, 'upgrades_opened').profile
+  p = applyJourneyTrigger(p, 'accepted_asteroid_mission').profile
+  p = applyJourneyTrigger(p, 'accepted_eva_mission').profile
+  p = applyJourneyTrigger(p, 'bought_shuttle_fuel').profile
+  p = applyJourneyTrigger(p, 'left_habitat').profile
+  p = applyJourneyTrigger(p, 'contract_accepted:usc-venus-certification').profile
+  p = applyJourneyTrigger(p, 'contract_completed:usc-venus-certification').profile
+  p = applyJourneyTrigger(p, 'contract_completed:space-cowboys-mars-hq').profile
+  p = applyJourneyTrigger(p, 'contract_completed:martian-marine-corps-cohort').profile
+  return applyJourneyTrigger(p, 'upgrade_installed:gravitySurfing').profile
+}
 
 describe('journeys', () => {
   it('tracks the welcome journey and unlocks slingshot on completion', () => {
@@ -48,6 +75,12 @@ describe('journeys', () => {
     expect(upgradeResult.changed).toBe(false)
     expect(upgradeResult.completedJourneyIds).toEqual([])
     expect(upgradeResult.unlockedFeatureIds).toEqual([])
+  })
+
+  it('accepts first_orbit triggers with no matching authored start gate', () => {
+    const profile = createProfile('Pilot')
+    const result = applyJourneyTrigger(profile, 'first_orbit:pluto')
+    expect(result.changed).toBe(false)
   })
 })
 
@@ -194,5 +227,51 @@ describe('act-1-inner-system journey', () => {
     profile = first.profile
     const second = applyJourneyTrigger(profile, 'contract_completed:usc-venus-certification')
     expect(second.changed).toBe(false)
+  })
+})
+
+describe('act-2-jovian-arrival journey', () => {
+  it('is hidden until first_orbit:jupiter even when contract steps have fired', () => {
+    let profile = profileAfterAct1Complete()
+    profile = applyJourneyTrigger(profile, 'contract_completed:venusian-zeppelin-trade-loop').profile
+    profile = applyJourneyTrigger(profile, 'contract_completed:cinderline-mercury-consecration').profile
+    expect(profile.journeyStepProgress['act-2-jovian-arrival']).toBeDefined()
+    expect(buildActiveJourneyTracker(profile)).toBeNull()
+
+    profile = applyJourneyTrigger(profile, 'first_orbit:jupiter').profile
+    expect(profile.journeyStartReadyIds).toContain('act-2-jovian-arrival')
+    const tracker = buildActiveJourneyTracker(profile)
+    expect(tracker?.title).toBe('Jovian Arrival')
+    const zeppelin = tracker?.objectives[0]?.steps[0]
+    expect(zeppelin?.complete).toBe(true)
+  })
+
+  it('completes instantly when all contracts finished before the Jupiter gate opens', () => {
+    let profile = profileAfterAct1Complete()
+    profile = applyJourneyTrigger(profile, 'contract_completed:venusian-zeppelin-trade-loop').profile
+    profile = applyJourneyTrigger(profile, 'contract_completed:cinderline-mercury-consecration').profile
+    profile = applyJourneyTrigger(profile, 'contract_completed:jovian-society-prospection').profile
+    expect(profile.completedJourneyIds).not.toContain('act-2-jovian-arrival')
+
+    const result = applyJourneyTrigger(profile, 'first_orbit:jupiter')
+    expect(result.completedJourneyIds).toContain('act-2-jovian-arrival')
+  })
+
+  it('completes when the last contract closes after the gate is open', () => {
+    let profile = profileAfterAct1Complete()
+    profile = applyJourneyTrigger(profile, 'first_orbit:jupiter').profile
+    profile = applyJourneyTrigger(profile, 'contract_completed:venusian-zeppelin-trade-loop').profile
+    profile = applyJourneyTrigger(profile, 'contract_completed:cinderline-mercury-consecration').profile
+    profile = applyJourneyTrigger(profile, 'contract_completed:jovian-society-prospection').profile
+    expect(profile.completedJourneyIds).toContain('act-2-jovian-arrival')
+  })
+
+  it('is insensitive to contract completion order once the gate is open', () => {
+    let profile = profileAfterAct1Complete()
+    profile = applyJourneyTrigger(profile, 'first_orbit:jupiter').profile
+    profile = applyJourneyTrigger(profile, 'contract_completed:jovian-society-prospection').profile
+    profile = applyJourneyTrigger(profile, 'contract_completed:cinderline-mercury-consecration').profile
+    profile = applyJourneyTrigger(profile, 'contract_completed:venusian-zeppelin-trade-loop').profile
+    expect(profile.completedJourneyIds).toContain('act-2-jovian-arrival')
   })
 })

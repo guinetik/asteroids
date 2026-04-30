@@ -2,7 +2,7 @@ import type { PlayerProfile } from '@/lib/player/types'
 import type { UpgradeId } from '@/lib/upgrades'
 
 /** Stable ids for journey definitions persisted on the player profile. */
-export type JourneyId = 'welcome' | 'act-1-inner-system'
+export type JourneyId = 'welcome' | 'act-1-inner-system' | 'act-2-jovian-arrival'
 /** Feature unlock ids granted by completing journeys. */
 export type JourneyFeatureId = 'slingshot'
 /** Runtime trigger ids that can advance one or more journey steps. */
@@ -21,6 +21,11 @@ export type JourneyTriggerId =
   | 'accepted_asteroid_mission'
   | 'accepted_eva_mission'
   | 'left_habitat'
+  /**
+   * First persisted orbit at a catalog body key (`jupiter`, `mars`, …).
+   * Emitted from the map when solar first-orbit persistence newly records that body.
+   */
+  | `first_orbit:${string}`
 
 /** Progress meter metadata for a tracker step when a step needs sub-progress. */
 export interface JourneyTrackerStepProgress {
@@ -80,11 +85,24 @@ interface JourneyDefinition {
 export const WELCOME_JOURNEY_ID: JourneyId = 'welcome'
 /** Canonical id for the Act 1 inner-system arc. */
 export const ACT_1_JOURNEY_ID: JourneyId = 'act-1-inner-system'
+/** Canonical id for the Act 2 three-contract Jupiter gate arc. */
+export const ACT_2_JOURNEY_ID: JourneyId = 'act-2-jovian-arrival'
+
 /** Contract ids that must all complete to unlock the Act 1 climax (Consortium Certification). */
 export const ACT_1_CONTRACT_IDS = [
   'usc-venus-certification',
   'space-cowboys-mars-hq',
   'martian-marine-corps-cohort',
+] as const
+
+/**
+ * Contract ids whose completion satisfies Act II journey steps once the Jupiter first-orbit gate
+ * is open ({@link ACT_2_JOURNEY_ID}).
+ */
+export const ACT_2_CONTRACT_IDS = [
+  'venusian-zeppelin-trade-loop',
+  'cinderline-mercury-consecration',
+  'jovian-society-prospection',
 ] as const
 /** Unlock granted after the onboarding journey completes. */
 export const SLINGSHOT_JOURNEY_FEATURE_ID: JourneyFeatureId = 'slingshot'
@@ -183,6 +201,31 @@ const JOURNEY_DEFINITIONS: readonly JourneyDefinition[] = [
         id: 'grid-coupling',
         label: 'Install the USC Module',
         trigger: 'upgrade_installed:gravitySurfing',
+      },
+    ],
+  },
+  {
+    id: ACT_2_JOURNEY_ID,
+    eyebrow: 'Act II',
+    title: 'Jovian Arrival',
+    objectiveLabel: 'Close the belts before Jupiter forgets your name',
+    unlocks: [],
+    startTrigger: 'first_orbit:jupiter',
+    steps: [
+      {
+        id: `contract-${ACT_2_CONTRACT_IDS[0]}`,
+        label: 'Complete Venusian Zeppelin Trade Loop',
+        trigger: `contract_completed:${ACT_2_CONTRACT_IDS[0]}`,
+      },
+      {
+        id: `contract-${ACT_2_CONTRACT_IDS[1]}`,
+        label: 'Complete The Cinderline (Mercury Consecration)',
+        trigger: `contract_completed:${ACT_2_CONTRACT_IDS[1]}`,
+      },
+      {
+        id: `contract-${ACT_2_CONTRACT_IDS[2]}`,
+        label: 'Complete Jovian Society Prospection',
+        trigger: `contract_completed:${ACT_2_CONTRACT_IDS[2]}`,
       },
     ],
   },

@@ -2565,6 +2565,19 @@ export class MapViewController implements Tickable {
     this.journeyFacade.notifyTrigger(trigger)
   }
 
+  /**
+   * When Jupiter is newly written into {@link PlayerProfile.orbitedSolarBodies}, notifies
+   * `first_orbit:jupiter` for the journey system. No-op when Jupiter was already counted or still
+   * uncounted after the preceding write.
+   *
+   * @param profileBeforeOrbitRecord - Snapshot immediately before the first-orbit write.
+   */
+  private maybeNotifyFirstJupiterOrbitJourneyTrigger(profileBeforeOrbitRecord: PlayerProfile): void {
+    if ((profileBeforeOrbitRecord.orbitedSolarBodies['jupiter'] ?? 0) > 0) return
+    if ((this.playerProfile.orbitedSolarBodies['jupiter'] ?? 0) === 0) return
+    this.notifyJourneyTrigger('first_orbit:jupiter')
+  }
+
   private emitJourneyTracker(): void {
     this.journeyFacade.emitTracker()
   }
@@ -2611,6 +2624,7 @@ export class MapViewController implements Tickable {
     const key = orbitBodyKeyFromCaptureName(system.target.name)
     if (!key) return
     this.tryEnqueueFantasiaIntroMail(key)
+    const profileBeforeOrbitRecord = this.playerProfile
     let next = recordSolarBodyFirstOrbit(this.playerProfile, key)
     if (key !== 'sun') {
       next = setLastDockedPlanet(next, key)
@@ -2619,6 +2633,7 @@ export class MapViewController implements Tickable {
     this.playerProfile = next
     this.persistPlayerProfile()
     this.emitShopState()
+    this.maybeNotifyFirstJupiterOrbitJourneyTrigger(profileBeforeOrbitRecord)
   }
 
   /**
@@ -3847,6 +3862,7 @@ export class MapViewController implements Tickable {
     // Going through the achievement tracker isn't enough — fast travel doesn't
     // exit the `orbiting` capture state (player jumps planet→planet), so the
     // non-orbiting → orbiting transition that normally records this never fires.
+    const profileBeforeOrbitRecord = this.playerProfile
     let next = recordSolarBodyFirstOrbit(this.playerProfile, key)
     next = setLastDockedPlanet(next, key)
     if (next !== this.playerProfile) {
@@ -3854,6 +3870,7 @@ export class MapViewController implements Tickable {
       this.persistPlayerProfile()
       this.emitShopState()
     }
+    this.maybeNotifyFirstJupiterOrbitJourneyTrigger(profileBeforeOrbitRecord)
     this.tryEnqueueFantasiaIntroMail(key)
     return true
   }
@@ -4398,14 +4415,12 @@ export class MapViewController implements Tickable {
   }
 
   /**
-   * Replay `contract_accepted`, `contract_completed`, and
-   * `upgrade_installed:gravitySurfing` triggers for a profile loaded from disk.
-   * Makes the Act 1 journey self-heal when the save predates the journey (or
-   * when the player completed contracts in a prior build). Invoked once during
-   * controller init, after the contract system has hydrated.
+   * Replay journey triggers for saves loaded mid-progress: contract accept/completion,
+   * first Jupiter orbit (Act II gate), and Act 1's gravity-surfing climax key.
    *
    * `contract_accepted` is fired before `contract_completed` so the Act 1
    * `startTrigger` gate opens before any step-advance triggers run.
+   * `first_orbit:jupiter` replays before `contract_completed` so Act II's start gate opens first.
    */
   private replayAct1JourneyTriggers(): void {
     // Returning saves (past the opening cinematic) arm the journey UI immediately
@@ -4418,6 +4433,10 @@ export class MapViewController implements Tickable {
       if (instance.status === 'active' || instance.status === 'completed') {
         this.notifyJourneyTrigger(`contract_accepted:${instance.contractId}`)
       }
+    }
+    // Act II start gate — before `contract_completed` replay so the gate opens first.
+    if ((this.playerProfile.orbitedSolarBodies['jupiter'] ?? 0) > 0) {
+      this.notifyJourneyTrigger('first_orbit:jupiter')
     }
     for (const instance of contractSystem.listInstances()) {
       if (instance.status === 'completed') {

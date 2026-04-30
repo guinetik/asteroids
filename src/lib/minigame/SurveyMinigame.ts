@@ -21,7 +21,7 @@ import type { ConcreteObjective } from '@/lib/missions/types'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import { TerminalModel, TERMINAL_INTERACT_RANGE } from '@/three/TerminalModel'
 import { SurveyProbeController } from '@/three/SurveyProbeController'
-import { generateProbePositions } from '@/lib/survey/probePositions'
+import { generateValidatedProbePositions } from '@/lib/survey/probePositions'
 import type { WorldCollider } from '@/lib/physics/worldCollision'
 
 /** Default time limit if objective doesn't specify one. */
@@ -225,14 +225,20 @@ export class SurveyMinigame implements MiniGame, MiniGameEvents {
     this.onRefuel?.()
 
     // Generate probe positions
-    const probePositions = generateProbePositions(
+    const probePositions = generateValidatedProbePositions(
       this.objective.probeCount ?? DEFAULT_PROBE_COUNT,
       this.objective.x,
       this.objective.z,
       this.seed + this.objectiveIndex,
+      this.heightmap,
     )
     const positions = probePositions.map((p) => {
-      const groundY = this.heightmap.heightAt(p.x, p.z)
+      const groundY = this.heightmap.tryHeightAt(p.x, p.z)
+      if (groundY === null) {
+        throw new Error(
+          `[SurveyMinigame] Validated survey column unexpectedly invalid at (${String(p.x)}, ${String(p.z)}).`,
+        )
+      }
       return new THREE.Vector3(p.x, groundY + p.y, p.z)
     })
 

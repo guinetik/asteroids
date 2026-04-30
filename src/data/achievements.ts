@@ -8,7 +8,12 @@
 import type { UpgradeId, UpgradeLevels } from '@/lib/upgrades'
 import type { BodyAccessState, PlayerProfile } from '@/lib/player/types'
 import { PLANETS } from '@/lib/planets/catalog'
-import { ACT_1_JOURNEY_ID, WELCOME_JOURNEY_ID, type JourneyId } from '@/lib/journeys'
+import {
+  ACT_1_JOURNEY_ID,
+  ACT_2_JOURNEY_ID,
+  WELCOME_JOURNEY_ID,
+  type JourneyId,
+} from '@/lib/journeys'
 import type { ContractMissionType, ContractStoreSnapshot } from '@/lib/contracts/contractTypes'
 
 /** High-level achievement tab / grouping key used in the player profile UI. */
@@ -557,6 +562,18 @@ export const ACHIEVEMENT_DEFINITIONS: readonly AchievementDefinition[] = [
     rewardCredits: REWARD_MAJOR,
     kind: 'journey_completed',
     journeyId: ACT_1_JOURNEY_ID,
+  },
+  {
+    id: 'journey-act-2-jovian-arrival',
+    category: 'contracts',
+    icon: '\u{1FA90}',
+    title: 'ACT II: JOVIAN ARRIVAL',
+    subtitle: 'Three ledgers reconciled · the giant noticed',
+    description: 'Complete the Act II Jovian Arrival journey.',
+    type: 'JOURNEY',
+    rewardCredits: REWARD_MAJOR,
+    kind: 'journey_completed',
+    journeyId: ACT_2_JOURNEY_ID,
   },
   {
     id: 'flight-first-slingshot',

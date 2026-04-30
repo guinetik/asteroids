@@ -28,8 +28,10 @@ Runs bootstrap, then `gltf-transform optimize` for habitat / intro / mission pro
 | `models:asteroid:build` | `asteroid.glb` | `asteroid.glb` (`normalize-asteroid-glbs.mjs` uses this as bbox reference — re-run **`models:asteroids:normalize`** if you materially change bounds) |
 | `models:hubble:build` | `hubble_rigged.glb` | `hubble.glb` |
 | `models:voyager:build` | `voyager_rigged.glb` | `voyager.glb` |
-| `models:satellite:build` | `satellite.glb` | `satellite.glb` |
+| `models:satellite:build` | `satellite_rigged.glb` (else `satellite.glb`) | `satellite.glb` — see [`satellite-rig-glb.md`](./satellite-rig-glb.md) |
 | `models:virus:build` | `virus.glb` | `virus.glb` |
+
+Hubble / Voyager / satellite runtime builds share **`--join false --flatten false --simplify false`** so named sub-pieces stay addressable (`voyager_*`, etc.). Optimize may prune **unused** empty helper nodes — game code should anchor on deliberate labels such as **`voyager_antenna`**, not transient Blender scaffold names.
 
 ## Already documented elsewhere
 
