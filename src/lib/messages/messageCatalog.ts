@@ -217,6 +217,82 @@ export const CONSORTIUM_CERTIFICATION_MESSAGE: ShipMessageDefinition = {
   ],
 }
 
+/** Jovian Step 4 — Hektor photometry offer. */
+export const JOVIAN_HEKTOR_PHOTOMETRY_OFFER: ShipMessageDefinition = {
+  id: 'jovian-prospection-hektor-photometry-offer',
+  from: 'Vance Hoyt, Senior Asset Officer (Cloud City)',
+  subject: 'Tasking: Photometric Pass — Asset 2306-J',
+  sentAt: '2306-05-04 09:18 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: 80,
+  folderId: 'jovian-society-prospection',
+  folderLabel: 'Jovian Society',
+  body: [
+    'Pilot,',
+    'Calibration cleared. The Society has staged Asset 2306-J on your active mission ledger — Jovian Trojans, L4 cluster, leading Jupiter by approximately sixty degrees. You will see the body on your nav momentarily.',
+    'Standard photometric protocol. Hold standoff, capture telemetry, return for processing. Travel safe.',
+    '— Vance',
+  ],
+}
+
+/** Jovian Step 5 — Saturn photometry offer. */
+export const JOVIAN_SATURN_PHOTOMETRY_OFFER: ShipMessageDefinition = {
+  id: 'jovian-prospection-saturn-photometry-offer',
+  from: 'Vance Hoyt, Senior Asset Officer (Cloud City)',
+  subject: 'Tasking: Photometric Pass — Asset 2306-S',
+  sentAt: '2306-05-09 11:42 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: 80,
+  folderId: 'jovian-society-prospection',
+  folderLabel: 'Jovian Society',
+  body: [
+    'Pilot,',
+    'Routing you outsystem on this one. Asset 2306-S is staged in the Saturn co-orbital region. Travel premium is in the line item.',
+    'Same protocol as the Jovian pass. Bring back clean telemetry.',
+    '— Vance',
+  ],
+}
+
+/** Jovian Step 7 — Hektor DAN offer. */
+export const JOVIAN_HEKTOR_DAN_OFFER: ShipMessageDefinition = {
+  id: 'jovian-prospection-hektor-dan-offer',
+  from: 'Vance Hoyt, Senior Asset Officer (Cloud City)',
+  subject: 'Tasking: Subsurface Survey — Asset 2306-J',
+  sentAt: '2306-05-15 14:08 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: 80,
+  folderId: 'jovian-society-prospection',
+  folderLabel: 'Jovian Society',
+  body: [
+    'Pilot,',
+    'Instrumentation Bay confirms DAN unit registered to your lander. The Society has staged the subsurface pass on Asset 2306-J — same body you photometry-d in OP 4. Familiar territory.',
+    'Park in the marked crater, switch to science mode, run the pulse. Disregard ambient cross-talk per prior guidance.',
+    '— Vance',
+  ],
+}
+
+/** Jovian Step 8 — Saturn DAN offer. */
+export const JOVIAN_SATURN_DAN_OFFER: ShipMessageDefinition = {
+  id: 'jovian-prospection-saturn-dan-offer',
+  from: 'Vance Hoyt, Senior Asset Officer (Cloud City)',
+  subject: 'Tasking: Subsurface Survey — Asset 2306-S',
+  sentAt: '2306-05-21 10:30 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: 80,
+  folderId: 'jovian-society-prospection',
+  folderLabel: 'Jovian Society',
+  body: [
+    'Pilot,',
+    'Final survey deliverable. Asset 2306-S is staged for DAN. Saturn co-orbital body — same one you photometry-d in OP 5.',
+    'Travel premium applies on this leg as well. Bring the data home and we will begin compiling the prospectus.',
+    '— Vance',
+  ],
+}
+
 /** Jay's warning when the player starts flirting with Venus' orbital lane. */
 export const JAY_VENUS_WARNING_MESSAGE: ShipMessageDefinition = {
   id: 'jay-venus-orbit-warning',
@@ -275,6 +351,10 @@ export const VIROID_ENVOY_CERES_RENDEZVOUS: ShipMessageDefinition = {
 export const SHIP_MESSAGE_CATALOG: ShipMessageDefinition[] = [
   STARTUP_SELLER_MESSAGE,
   CONSORTIUM_CERTIFICATION_MESSAGE,
+  JOVIAN_HEKTOR_PHOTOMETRY_OFFER,
+  JOVIAN_SATURN_PHOTOMETRY_OFFER,
+  JOVIAN_HEKTOR_DAN_OFFER,
+  JOVIAN_SATURN_DAN_OFFER,
   JAY_STARTUP_FOLLOW_UP_MESSAGE,
   JAY_FIRST_SLINGSHOT_MESSAGE,
   JAY_CONTRACT_INCOMING_MESSAGE,

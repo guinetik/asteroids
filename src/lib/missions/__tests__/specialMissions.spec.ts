@@ -21,7 +21,8 @@ describe('SPECIAL_MISSIONS registry', () => {
       'jovian-prospection-saturn-dan',
     ]
     for (const id of ids) {
-      expect(getSpecialMissionById(id), `expected ${id} in registry`).toBeTruthy()
+      const mission = getSpecialMissionById(id)
+      expect(mission).toBeTruthy()
     }
   })
 
