@@ -242,4 +242,59 @@ describe('persistCompletedAsteroidMissionRewards', () => {
     expect(callArg?.objectiveType).toBe('')
     spy.mockRestore()
   })
+
+  it('emits specialMissionId and pinnedAssetRef when a special Hektor mission completes', () => {
+    const mission: GeneratedAsteroidMission = {
+      ...BASE_MISSION,
+      kind: 'special',
+      id: 'jovian-prospection-hektor-photometry',
+      asteroidId: 'hektor',
+      region: 'jovian-trojans',
+      objectives: [{ type: 'photometry', x: 0, z: 0 }],
+    } as GeneratedAsteroidMission
+    localStorage.setItem(ACTIVE_MISSION_KEY, JSON.stringify(mission))
+    const spy = vi.spyOn(contractSystem, 'notifyMissionCompleted')
+    persistCompletedAsteroidMissionRewards(mission, 1)
+    const callArg = spy.mock.calls[0]?.[0]
+    expect(callArg?.specialMissionId).toBe('jovian-prospection-hektor-photometry')
+    expect(callArg?.pinnedAssetRef).toBe('hektor')
+    expect(callArg?.region).toBe('jovian-trojans')
+    spy.mockRestore()
+  })
+
+  it('emits specialMissionId without pinnedAssetRef for a non-pinned special mission', () => {
+    const mission: GeneratedAsteroidMission = {
+      ...BASE_MISSION,
+      kind: 'special',
+      id: 'jovian-prospection-saturn-photometry',
+      asteroidId: 'asset-2306-s',
+      region: 'saturn-trojans',
+      objectives: [{ type: 'photometry', x: 0, z: 0 }],
+    } as GeneratedAsteroidMission
+    localStorage.setItem(ACTIVE_MISSION_KEY, JSON.stringify(mission))
+    const spy = vi.spyOn(contractSystem, 'notifyMissionCompleted')
+    persistCompletedAsteroidMissionRewards(mission, 1)
+    const callArg = spy.mock.calls[0]?.[0]
+    expect(callArg?.specialMissionId).toBe('jovian-prospection-saturn-photometry')
+    expect(callArg?.pinnedAssetRef).toBeUndefined()
+    expect(callArg?.region).toBe('saturn-trojans')
+    spy.mockRestore()
+  })
+
+  it('emits region but no specialMissionId for non-special asteroid missions', () => {
+    const mission: GeneratedAsteroidMission = {
+      ...BASE_MISSION,
+      id: 'standard-mission-1',
+      region: 'near-earth',
+      objectives: [{ type: 'gather', x: 0, z: 0, reward: 500 }],
+    }
+    localStorage.setItem(ACTIVE_MISSION_KEY, JSON.stringify(mission))
+    const spy = vi.spyOn(contractSystem, 'notifyMissionCompleted')
+    persistCompletedAsteroidMissionRewards(mission, 1)
+    const callArg = spy.mock.calls[0]?.[0]
+    expect(callArg?.specialMissionId).toBeUndefined()
+    expect(callArg?.pinnedAssetRef).toBeUndefined()
+    expect(callArg?.region).toBe('near-earth')
+    spy.mockRestore()
+  })
 })

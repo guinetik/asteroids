@@ -99,5 +99,23 @@ export function persistCompletedAsteroidMissionRewards(
     giverId: mission.giverId ?? null,
     targetPlanetId: null,
     objectiveType: mission.objectives[0]?.type ?? '',
+    region: mission.region,
+    pinnedAssetRef:
+      mission.kind === 'special' ? pinnedAssetRefForAsteroid(mission.asteroidId) : undefined,
+    specialMissionId: mission.kind === 'special' ? mission.id : undefined,
   })
+}
+
+/**
+ * Map an asteroid id to its pinned-asset ref. Currently only Hektor is a
+ * pinned body — Asset 2306-S is a regular catalog body, not pinned. Returns
+ * `undefined` for non-pinned ids so the contract matcher's `pinnedAssetRef`
+ * filter only narrows when the body is genuinely pinned.
+ *
+ * @param asteroidId - Asteroid catalog id (e.g. `'hektor'`).
+ * @returns Pinned-asset ref or `undefined`.
+ */
+function pinnedAssetRefForAsteroid(asteroidId: string): string | undefined {
+  if (asteroidId === 'hektor') return 'hektor'
+  return undefined
 }
