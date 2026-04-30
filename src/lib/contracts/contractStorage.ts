@@ -47,10 +47,10 @@ export function loadContractSnapshot(): ContractStoreSnapshot {
       return emptyContractSnapshot()
     }
     const obj = parsed as Partial<ContractStoreSnapshot>
-    let instances: Record<string, ContractInstance> = {}
+    const instances: Record<string, ContractInstance> = {}
     if (obj.instances && typeof obj.instances === 'object' && !Array.isArray(obj.instances)) {
-      const raw = obj.instances as Record<string, Partial<ContractInstance>>
-      for (const [id, entry] of Object.entries(raw)) {
+      const rawInstances = obj.instances as Record<string, Partial<ContractInstance>>
+      for (const [id, entry] of Object.entries(rawInstances)) {
         if (entry === null || typeof entry !== 'object') continue
         instances[id] = {
           contractId: entry.contractId ?? id,
