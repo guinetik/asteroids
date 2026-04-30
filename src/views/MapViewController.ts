@@ -137,6 +137,10 @@ import type {
   GeneratedAsteroidMission,
 } from '@/lib/missions/types'
 import { getSpecialMissionById } from '@/lib/missions/specialMissions'
+import {
+  resolveSpecialMissionWaypoint,
+  type WorldPositionXZ,
+} from '@/lib/missions/specialMissionWaypoint'
 import { generateEvaWaypoint } from '@/lib/missions/evaWaypointGenerator'
 import {
   clearActiveMission,
@@ -3967,6 +3971,24 @@ export class MapViewController implements Tickable {
    * @param missionId - Special mission id from `SPECIAL_MISSIONS`.
    * @param offerMessageId - Message id from the catalog enqueued before staging.
    */
+  /**
+   * Snapshot the current world XZ position of every planet controller
+   * (planets + pinned bodies). Used by `resolveSpecialMissionWaypoint` to
+   * overlay an accurate target position on the special mission's pre-baked
+   * waypoint.
+   *
+   * @returns Map from body id to world XZ.
+   */
+  private snapshotBodyWorldPositions(): Map<string, WorldPositionXZ> {
+    const map = new Map<string, WorldPositionXZ>()
+    for (const controller of this.planetControllers) {
+      const id = controller.id
+      if (typeof id !== 'string' || id.length === 0) continue
+      map.set(id, { x: controller.getWorldX(), z: controller.getWorldZ() })
+    }
+    return map
+  }
+
   private stageSpecialMission(missionId: string, offerMessageId: string): void {
     const mission = getSpecialMissionById(missionId)
     if (!mission) {
@@ -3976,9 +3998,17 @@ export class MapViewController implements Tickable {
 
     this.messageFacade.enqueueById(offerMessageId, this.onMessageUpdate)
 
+    const positions = this.snapshotBodyWorldPositions()
+    const resolvedWaypoint = resolveSpecialMissionWaypoint(
+      mission.asteroidId,
+      positions,
+      mission.waypoint,
+    )
+
     const acceptedMission: GeneratedAsteroidMission = {
       ...mission,
       status: 'accepted',
+      waypoint: resolvedWaypoint,
     }
     this.missionBoard = {
       ...this.missionBoard,
