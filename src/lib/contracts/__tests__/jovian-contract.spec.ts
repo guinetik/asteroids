@@ -1,16 +1,19 @@
 /**
  * Tests for the jovian-society-prospection contract: schema parses, end-to-end
- * walkability with stub events, and per-outcome arm dispatch.
+ * walkability with stub events, per-outcome arm dispatch, and auto-grant of
+ * Jupiter fast-travel on completion via the runtime singleton.
  *
  * @author guinetik
- * @date 2026-04-29
+ * @date 2026-04-30
  * @spec docs/superpowers/specs/2026-04-29-jovian-contract-schema-parity-design.md
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { MessageSystem } from '@/lib/messages/messageSystem'
 import jovianRaw from '@/data/contracts/jovian-society-prospection.json'
 import { ContractSystem } from '../ContractSystem'
 import { emptyContractSnapshot } from '../contractStorage'
+import { contractSystem } from '../runtime'
+import { createProfile, loadProfile, saveProfile } from '@/lib/player/profile'
 import type {
   ChoiceMissionStep,
   Contract,
@@ -228,5 +231,33 @@ describe('jovian-society-prospection step activation', () => {
     const last = events[events.length - 1]
     expect(last?.stepIndex).toBe(8)
     expect(last?.specialMissionId).toBe('jovian-prospection-hektor-prospectus')
+  })
+})
+
+describe('jovian-society-prospection auto-grants Jupiter fast-travel (runtime)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    saveProfile(createProfile('Test'))
+    contractSystem.resetForTests()
+    contractSystem.offerForTests(jovian.id)
+    contractSystem.acceptContract(jovian.id)
+    for (let i = 0; i < 8; i++) contractSystem.advanceStepForTests(jovian.id)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    localStorage.clear()
+  })
+
+  it('grants Jupiter fast-travel on transmit completion', () => {
+    contractSystem.notifyChoiceResolved('jovian_final_prospectus', 'transmit')
+    const profile = loadProfile()
+    expect(profile?.unlockedFastTravelPlanets).toContain('jupiter')
+  })
+
+  it('grants Jupiter fast-travel on tamper completion', () => {
+    contractSystem.notifyChoiceResolved('jovian_final_prospectus', 'tamper')
+    const profile = loadProfile()
+    expect(profile?.unlockedFastTravelPlanets).toContain('jupiter')
   })
 })

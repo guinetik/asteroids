@@ -173,6 +173,14 @@ export const contractSystem = new ContractSystem(CONTRACT_CATALOG, shipMessageSy
   },
   onRewardGranted: (effect, c) => applyRewardToProfile(effect, c),
   onContractCompleted: (id) => {
+    const completedContract = CONTRACT_CATALOG.find((c) => c.id === id)
+    if (completedContract?.homePlanet) {
+      let profile = loadProfile()
+      if (profile) {
+        profile = unlockFastTravelPlanet(profile, completedContract.homePlanet)
+        saveProfile(profile)
+      }
+    }
     for (const listener of Array.from(contractCompletedListeners)) {
       try {
         listener(id)

@@ -1,5 +1,6 @@
 {
   "id": "venusian-zeppelin-trade-loop",
+  "homePlanet": "venus",
   "inboxName": "Venusian Zeppelin Exchange",
   "from": "Lucas Maverick, Exchange Floor Boss",
   "sentAt": "2306-04-14 18:20 UTC",

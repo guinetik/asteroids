@@ -1,5 +1,6 @@
 {
   "id": "martian-marine-corps-cohort",
+  "homePlanet": "mars",
   "inboxName": "Martian Marine Corps",
   "from": "Col. Hélder Sampaio, MMC (Engineering & Mining Liaison)",
   "sentAt": "2306-04-10 11:00 UTC",
