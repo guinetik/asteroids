@@ -229,27 +229,63 @@ export function buildBunkerGeometry(materials: BunkerInteriorMaterialSet): Bunke
   // (north end), causing z-fighting under BackSide rendering. The adjacent
   // room end walls are split around the corridor width so opening the door
   // reveals the next space instead of a sealed wall.
-  const ante = buildRoom('antechamber', ANTECHAMBER, 0, anteCenterZ, materials, interiorMeshMaterials, 'foyer', {
-    northOpeningWidth: CORRIDOR.width,
-    southOpeningWidth: CORRIDOR.width,
-  })
-  const corr = buildRoom('corridor', CORRIDOR, 0, corrCenterZ, materials, interiorMeshMaterials, 'default', {
-    skipNorth: true,
-    skipSouth: true,
-  })
-  const arena = buildRoom('arena', ARENA, 0, arenaCenterZ, materials, interiorMeshMaterials, 'default', {
-    northOpeningWidth: CORRIDOR.width,
-    southOpeningWidth: CORRIDOR.width,
-    eastOpeningWidth: CORRIDOR.width,
-    eastOpeningCenterZ: arenaCenterZ,
-    westOpeningWidth: CORRIDOR.width,
-    westOpeningCenterZ: arenaCenterZ,
-    matteBlackInterior: true,
-    sharedMatteShellMaterial: sharedCombatShellMatte,
-  })
-  const northRoom = buildRoom('lootRoom', LOOT_ROOM, 0, northRoomCenterZ, materials, interiorMeshMaterials, 'loot', {
-    southOpeningWidth: CORRIDOR.width,
-  })
+  const ante = buildRoom(
+    'antechamber',
+    ANTECHAMBER,
+    0,
+    anteCenterZ,
+    materials,
+    interiorMeshMaterials,
+    'foyer',
+    {
+      northOpeningWidth: CORRIDOR.width,
+      southOpeningWidth: CORRIDOR.width,
+    },
+  )
+  const corr = buildRoom(
+    'corridor',
+    CORRIDOR,
+    0,
+    corrCenterZ,
+    materials,
+    interiorMeshMaterials,
+    'default',
+    {
+      skipNorth: true,
+      skipSouth: true,
+    },
+  )
+  const arena = buildRoom(
+    'arena',
+    ARENA,
+    0,
+    arenaCenterZ,
+    materials,
+    interiorMeshMaterials,
+    'default',
+    {
+      northOpeningWidth: CORRIDOR.width,
+      southOpeningWidth: CORRIDOR.width,
+      eastOpeningWidth: CORRIDOR.width,
+      eastOpeningCenterZ: arenaCenterZ,
+      westOpeningWidth: CORRIDOR.width,
+      westOpeningCenterZ: arenaCenterZ,
+      matteBlackInterior: true,
+      sharedMatteShellMaterial: sharedCombatShellMatte,
+    },
+  )
+  const northRoom = buildRoom(
+    'lootRoom',
+    LOOT_ROOM,
+    0,
+    northRoomCenterZ,
+    materials,
+    interiorMeshMaterials,
+    'loot',
+    {
+      southOpeningWidth: CORRIDOR.width,
+    },
+  )
   const eastRoom = buildRoom(
     'enemyRoomEast',
     ENEMY_ROOM,
@@ -373,7 +409,12 @@ export function buildBunkerGeometry(materials: BunkerInteriorMaterialSet): Bunke
     entranceDoorAnchor,
     playerSpawn: new THREE.Vector3(0, 0, anteCenterZ - ANTECHAMBER.depth / 2 + 1.5),
     walkableBounds: [
-      insetBounds(-ANTECHAMBER.width / 2, ANTECHAMBER.width / 2, -ANTECHAMBER.depth / 2, ANTECHAMBER.depth / 2),
+      insetBounds(
+        -ANTECHAMBER.width / 2,
+        ANTECHAMBER.width / 2,
+        -ANTECHAMBER.depth / 2,
+        ANTECHAMBER.depth / 2,
+      ),
       insetBounds(
         -CORRIDOR.width / 2,
         CORRIDOR.width / 2,

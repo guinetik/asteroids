@@ -3,6 +3,7 @@
   "inboxName": "Mr. Finch",
   "from": "Mr. Finch, Saturn Ringside Estate",
   "sentAt": "2306-05-18 22:14 UTC",
+  "homePlanet": "saturn",
   "offerWhenPrerequisites": {
     "minGiverPlanetCompletions": { "planetId": "saturn", "min": 1 },
     "triggerOnPlanetVisited": "saturn"
@@ -141,13 +142,11 @@
     "— Mr. Finch"
   ],
   "rewards": [
-    { "type": "fast-travel", "planetId": "saturn" },
-    { "type": "mission-pay-multiplier", "planetId": "saturn", "multiplier": 2 },
-    { "type": "faction-standing", "factionId": "finch", "standing": "recovered" },
+    { "type": "set-story-flag", "flag": "finchRecovered" },
     {
       "type": "delayed-inbox",
-      "messageId": "carmen-neptune-offer",
-      "delayDays": 3,
+      "messageId": "carmen-recruitment",
+      "delayDays": 1,
       "message": {
         "inboxName": "Carmen Sedna-Deimos",
         "from": "Carmen Sedna-Deimos · Neptune Commune",
@@ -155,16 +154,11 @@
         "body": [
           "Hi.",
           "Carmen. Properly, this time. Thanks for not making me kill anyone at Neptune — I was prepared to and I would have hated it. The bunker was a lot of fun to set up. I hope it was a little fun to clear.",
-          "I owe you context. Some of it is not going to make immediate sense and I won't try to make it.",
-          "The wallet had cryptocurrency, which was real, and which I kept. Recovery fee. Mr. Finch can afford it and he knows he can.",
-          "It also had a personal archive. I read it. I will tell you what was on it because you delivered it back, and you are owed a partial accounting for that, and also because I'd like you to understand who you just helped.",
-          "Mr. Finch is not Mr. Finch. He is the fourth name he has used in his second life, and his second life has been long. Before Finch he was Owl, who drafted regulatory frameworks the Jovian Society now operates inside. Before Owl he was Magpie, who served on the committee that authorized the Phobos mission. Before Magpie he was Sparrow, who came up through the academy in the early 21st century with paperwork that was good enough to pass and slightly too tidy to question. None of those four men are listed in the same database as the same person. The drive is the only document anywhere in the solar system that joins them.",
-          "Before Sparrow he was Harold. Apollo crew. The mission that came back missing one. He has not used that name in three hundred years. I am using it once now, to you, in private, because I want you to know that I read deep enough to find it.",
-          "I am not going to do anything with what I read. I returned the drive intact. I kept no copies. I have no interest in exposing him; the man has done more useful work in three centuries than the rest of his peers combined and the universe is not improved by knowing his actual name. I assume, when you delivered it, he understood that I had read it, and I assume he was relieved to find it had come back from someone who had read it without making it her business. He hired you, in part, because you would deliver it without reading it. That is also what he was paying for. Both of us, in our way, gave him what he asked for.",
-          "Why I am writing.",
-          "I work out of Neptune. There is a research commune here — food crops, vegetable cloning, 3D-printed protein, closed-loop thermodynamics. Boring, beautiful work. Tomatoes, mostly. The aristocracy thinks we are charming. The Jovian Society thinks we are a tax problem. The Cinderline does not think about us at all. We are, in the way that matters, building.",
-          "I do procurement. I am, professionally, a thief. The commune does not love this about me. They do appreciate the funding.",
-          "We have work for you, if you want it. Different work than you have been doing. The pay is honest, the briefings are short, and the people you will be helping cannot afford anyone else. I argued the council into authorizing this offer. They argued back. I won. There is a small credit gift attached as a gesture; I sent it before the council could vote on the gesture.",
+          "I would offer you context about what was on the wallet. He asked me not to and I think he was right to. So I won't.",
+          "What I will offer is work.",
+          "I run procurement for a research commune at Neptune — food crops, vegetable cloning, 3D-printed protein, closed-loop thermodynamics. Boring, beautiful work. Tomatoes, mostly. The aristocracy thinks we are charming. The Jovian Society thinks we are a tax problem. The Cinderline does not think about us at all. We are, in the way that matters, building.",
+          "I do the procurement. I am, professionally, a thief. The commune does not love this about me. They do appreciate the funding.",
+          "We have work for you, if you want it. Different work than you have been doing. The pay is honest, the briefings are short, and the people you will be helping cannot afford anyone else. I argued the council into authorizing this offer. They argued back. I won. Small credit gift attached; I sent it before the council could vote on the gesture.",
           "If you accept, the giver line opens at Neptune. Mission board posts under my name.",
           "See you around either way.",
           "— C."
@@ -172,6 +166,47 @@
         "rewards": [
           { "type": "open-giver-line", "giverId": "neptune-commune" },
           { "type": "credits", "amount": 3000 }
+        ]
+      }
+    },
+    {
+      "type": "delayed-inbox",
+      "messageId": "carmen-grappling-hook",
+      "delayDays": 3,
+      "message": {
+        "inboxName": "Carmen Sedna-Deimos",
+        "from": "Carmen Sedna-Deimos · Neptune Commune",
+        "subject": "A Small Demonstration",
+        "body": [
+          "Hi again.",
+          "Thinking about you and a question I assume you have not asked yet but should: how was I as quick around corners as I was. You watched me through six bunkers and never quite caught me getting through a wall, around a wall, or off a roof. The polite assumption would be parkour. I am okay at parkour. The bigger answer is I have a piece of Neptune tech that is not, currently, available to anyone outside the commune.",
+          "If you would like one of your own, there is a unit our techs left in storage. Bunker. Overrun, as bunkers are. The unit is in the chest at the end. The bunker is yours if you want it; the listing is on your board under my name.",
+          "Consider it an enticement. Neptune tech is worth seeing. Come up sometime.",
+          "— C."
+        ],
+        "rewards": [
+          { "type": "offer-special-mission", "missionId": "carmen-grappling-hook-bunker" }
+        ]
+      }
+    },
+    {
+      "type": "delayed-inbox",
+      "messageId": "carmen-archive-tool",
+      "delayDays": 14,
+      "message": {
+        "inboxName": "Carmen Sedna-Deimos",
+        "from": "Carmen Sedna-Deimos · Neptune Commune",
+        "subject": "Something Else, While We're Talking",
+        "body": [
+          "Hi.",
+          "Separate matter. Possibly unrelated. I have a habit of thinking about people for a long time after I have finished thinking about them.",
+          "The man you helped — Mr. Finch — has more history available than what was on the wallet. He had distributed an archive across satellite networks over a long time, encrypted. I found the caches in my research and chose not to look at most of them. The pieces I did look at were enough.",
+          "If you ever wanted to understand who you helped, the caches are still there. I have installed a decryption tool on your suit, dormant, optional. The next five EVA missions you run targeting satellites will return one of his archive entries each. Reverse-chronological, the order I found him. He is, in his own voice, in five pieces.",
+          "If you do not want this, do not service satellites. He will not know either way.",
+          "— C."
+        ],
+        "rewards": [
+          { "type": "install-suit-tool", "toolId": "deep-archive-decrypt" }
         ]
       }
     }

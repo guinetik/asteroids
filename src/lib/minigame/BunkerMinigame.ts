@@ -284,11 +284,11 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
     const bounds = [...walkableBounds]
     const activeEnemyRoomBounds = this.scene?.activeEnemyRoomBounds
     if (activeEnemyRoomBounds) bounds.push(activeEnemyRoomBounds)
-    
+
     if (this.state.current === 'final-clear' || this.state.current === 'exit-prompt') {
       if (this.scene) bounds.push(this.scene.lootRoomBounds)
     }
-    
+
     return bounds
   }
 
@@ -449,7 +449,8 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
     ) {
       const dx = ctx.playerPosition.x - this.surfaceHatchPos.x
       const dz = ctx.playerPosition.z - this.surfaceHatchPos.z
-      const inRange = dx * dx + dz * dz <= SURFACE_HATCH_INTERACT_RANGE * SURFACE_HATCH_INTERACT_RANGE
+      const inRange =
+        dx * dx + dz * dz <= SURFACE_HATCH_INTERACT_RANGE * SURFACE_HATCH_INTERACT_RANGE
       this.surfaceHatch.active = inRange
       if (inRange) {
         this._isPlayerNear = true
@@ -488,12 +489,12 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
       // Check chests
       for (const chest of this.scene.chests) {
         if (chest.opened) continue
-        
+
         // We get local coordinates for distance check or world coords?
         // Chest position is relative to root. We need world coords.
         const cx = this.scene.rootWorldPosition.x + chest.group.position.x
         const cz = this.scene.rootWorldPosition.z + chest.group.position.z
-        
+
         const dx = px - cx
         const dz = pz - cz
         if (dx * dx + dz * dz <= 5 * 5) {

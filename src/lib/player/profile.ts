@@ -10,7 +10,7 @@
  * @date 2026-04-03
  * @spec docs/superpowers/specs/2026-04-03-player-profile-design.md
  */
-import type { BodyAccessState, PlayerProfile } from './types'
+import type { BodyAccessState, PlayerAchievementStats, PlayerProfile } from './types'
 import { SLINGSHOT_JOURNEY_FEATURE_ID, WELCOME_JOURNEY_ID } from '@/lib/journeys'
 import { PINNED_BODIES } from '@/lib/planets/catalog'
 
@@ -19,6 +19,9 @@ export const PROFILE_STORAGE_KEY = 'asteroid-lander-profile'
 
 /** Starting credits for a new player. */
 const STARTING_CREDITS = 1000
+
+/** Amount added to event counters when a single achievement event is recorded. */
+const ACHIEVEMENT_COUNTER_INCREMENT = 1
 
 /** Default access state assigned to every pinned body in fresh and migrated saves. */
 const DEFAULT_BODY_ACCESS_STATE: BodyAccessState = 'restricted'
@@ -69,6 +72,132 @@ export function savePlayerDisplayName(raw: string): PlayerProfile {
   const profile = existing ? { ...existing, name } : createProfile(name)
   saveProfile(profile)
   return profile
+}
+
+/**
+ * Create the zeroed achievement stats block used by fresh and migrated profiles.
+ *
+ * @returns A new achievement stats object with mutable maps isolated per profile.
+ */
+function createDefaultAchievementStats(): PlayerAchievementStats {
+  return {
+    lifetimeCreditsEarned: 0,
+    lifetimeCreditsSpent: 0,
+    lifetimeTradeCreditsEarned: 0,
+    missionObjectivesCompletedByType: {},
+    slingshotLaunches: 0,
+    slingshotLaunchesByBody: {},
+    gravitySurfStarts: 0,
+    manifoldRides: 0,
+    portalDepartures: 0,
+    lifetimeWorldLineDistance: 0,
+    maxSingleRunWorldLineDistance: 0,
+  }
+}
+
+/**
+ * Normalize persisted achievement stats, dropping malformed values.
+ *
+ * @param raw - Unknown save field from localStorage.
+ * @returns A complete achievement stats block with finite non-negative numbers.
+ */
+function normalizeAchievementStats(raw: unknown): PlayerAchievementStats {
+  const defaults = createDefaultAchievementStats()
+  if (raw === undefined || raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    return defaults
+  }
+
+  const stats = raw as Record<string, unknown>
+  return {
+    lifetimeCreditsEarned:
+      normalizeNonNegativeNumber(stats['lifetimeCreditsEarned']) ?? defaults.lifetimeCreditsEarned,
+    lifetimeCreditsSpent:
+      normalizeNonNegativeNumber(stats['lifetimeCreditsSpent']) ?? defaults.lifetimeCreditsSpent,
+    lifetimeTradeCreditsEarned:
+      normalizeNonNegativeNumber(stats['lifetimeTradeCreditsEarned']) ??
+      defaults.lifetimeTradeCreditsEarned,
+    missionObjectivesCompletedByType: normalizeNumericMap(
+      stats['missionObjectivesCompletedByType'],
+    ),
+    slingshotLaunches:
+      normalizeNonNegativeNumber(stats['slingshotLaunches']) ?? defaults.slingshotLaunches,
+    slingshotLaunchesByBody: normalizeNumericMap(stats['slingshotLaunchesByBody']),
+    gravitySurfStarts:
+      normalizeNonNegativeNumber(stats['gravitySurfStarts']) ?? defaults.gravitySurfStarts,
+    manifoldRides: normalizeNonNegativeNumber(stats['manifoldRides']) ?? defaults.manifoldRides,
+    portalDepartures:
+      normalizeNonNegativeNumber(stats['portalDepartures']) ?? defaults.portalDepartures,
+    lifetimeWorldLineDistance:
+      normalizeNonNegativeNumber(stats['lifetimeWorldLineDistance']) ??
+      defaults.lifetimeWorldLineDistance,
+    maxSingleRunWorldLineDistance:
+      normalizeNonNegativeNumber(stats['maxSingleRunWorldLineDistance']) ??
+      defaults.maxSingleRunWorldLineDistance,
+  }
+}
+
+/**
+ * Normalize a number from persisted profile state.
+ *
+ * @param value - Unknown saved value.
+ * @returns The value when finite and non-negative, otherwise null.
+ */
+function normalizeNonNegativeNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
+}
+
+/**
+ * Copy a persisted string-keyed numeric map, excluding malformed entries.
+ *
+ * @param raw - Unknown save field from localStorage.
+ * @returns A new map containing only finite non-negative numeric values.
+ */
+function normalizeNumericMap(raw: unknown): Record<string, number> {
+  const result: Record<string, number> = {}
+  if (raw === undefined || raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    return result
+  }
+
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+      result[key] = value
+    }
+  }
+  return result
+}
+
+/**
+ * Check whether a profile stat delta is finite and positive.
+ *
+ * @param amount - Candidate stat delta.
+ * @returns True when the amount should be recorded.
+ */
+function isPositiveFiniteAmount(amount: number): boolean {
+  return Number.isFinite(amount) && amount > 0
+}
+
+/**
+ * Return a string-keyed count map with one key incremented.
+ *
+ * @param map - Existing count map.
+ * @param key - Map key to increment.
+ * @returns A new map with the key's count incremented by one.
+ */
+function incrementCountMap(map: Record<string, number>, key: string): Record<string, number> {
+  return {
+    ...map,
+    [key]: (map[key] ?? 0) + ACHIEVEMENT_COUNTER_INCREMENT,
+  }
+}
+
+/**
+ * Read achievement stats from a profile-like object and seed defaults when absent.
+ *
+ * @param profile - Current profile, possibly from a legacy in-memory test fixture.
+ * @returns Existing stats or a fresh zeroed stats block.
+ */
+function getAchievementStats(profile: PlayerProfile): PlayerAchievementStats {
+  return (profile as Partial<PlayerProfile>).achievementStats ?? createDefaultAchievementStats()
 }
 
 /**
@@ -161,9 +290,7 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     typeof p.disabledGiverIds === 'object' &&
     !Array.isArray(p.disabledGiverIds)
   ) {
-    for (const [giverId, value] of Object.entries(
-      p.disabledGiverIds as Record<string, unknown>,
-    )) {
+    for (const [giverId, value] of Object.entries(p.disabledGiverIds as Record<string, unknown>)) {
       if (value === true) disabledGiverIds[giverId] = true
     }
   }
@@ -245,6 +372,7 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     credits: p.credits,
     completedMissionCount,
     visitedAsteroids,
+    achievementStats: normalizeAchievementStats(p.achievementStats),
     orbitedSolarBodies,
     lastDockedPlanetId,
     hasSeenIntro,
@@ -304,6 +432,7 @@ export function createProfile(name: string): PlayerProfile {
     credits: STARTING_CREDITS,
     completedMissionCount: 0,
     visitedAsteroids: {},
+    achievementStats: createDefaultAchievementStats(),
     orbitedSolarBodies: {},
     lastDockedPlanetId: 'earth',
     hasSeenIntro: false,
@@ -389,15 +518,189 @@ export function loadProfile(): PlayerProfile | null {
   }
 }
 
-/** Return a new profile with credits increased by the given amount. */
+/**
+ * Return a new profile with credits increased by a finite positive amount.
+ *
+ * @param profile - Current profile.
+ * @param amount - Credits to add, e.g. `500` for a mission payout.
+ * @returns Updated profile, or the same profile when amount is not positive and finite.
+ */
 export function addCredits(profile: PlayerProfile, amount: number): PlayerProfile {
-  return { ...profile, credits: profile.credits + amount }
+  if (!isPositiveFiniteAmount(amount)) return profile
+  const achievementStats = getAchievementStats(profile)
+  return {
+    ...profile,
+    credits: profile.credits + amount,
+    achievementStats: {
+      ...achievementStats,
+      lifetimeCreditsEarned: achievementStats.lifetimeCreditsEarned + amount,
+    },
+  }
 }
 
-/** Return a new profile with credits decreased, or null if insufficient balance. */
+/**
+ * Return a new profile with credits decreased when the player can afford the purchase.
+ *
+ * @param profile - Current profile.
+ * @param amount - Credits to spend, e.g. `300` for a shop purchase.
+ * @returns Updated profile, or null when amount is invalid or balance is insufficient.
+ */
 export function spendCredits(profile: PlayerProfile, amount: number): PlayerProfile | null {
-  if (profile.credits < amount) return null
-  return { ...profile, credits: profile.credits - amount }
+  if (!isPositiveFiniteAmount(amount) || profile.credits < amount) return null
+  const achievementStats = getAchievementStats(profile)
+  return {
+    ...profile,
+    credits: profile.credits - amount,
+    achievementStats: {
+      ...achievementStats,
+      lifetimeCreditsSpent: achievementStats.lifetimeCreditsSpent + amount,
+    },
+  }
+}
+
+/**
+ * Record credits earned from trade without changing the current balance.
+ *
+ * @param profile - Current profile.
+ * @param amount - Trade credits earned, e.g. `250` from selling cargo.
+ * @returns Updated profile, or the same profile when amount is not positive and finite.
+ */
+export function recordTradeCreditsEarned(profile: PlayerProfile, amount: number): PlayerProfile {
+  if (!isPositiveFiniteAmount(amount)) return profile
+  const achievementStats = getAchievementStats(profile)
+  return {
+    ...profile,
+    achievementStats: {
+      ...achievementStats,
+      lifetimeTradeCreditsEarned: achievementStats.lifetimeTradeCreditsEarned + amount,
+    },
+  }
+}
+
+/**
+ * Record one completed mission objective of a specific type.
+ *
+ * @param profile - Current profile.
+ * @param objectiveType - Objective type id, e.g. `'survey'`.
+ * @returns Updated profile, or the same profile when objectiveType is blank.
+ */
+export function recordMissionObjectiveComplete(
+  profile: PlayerProfile,
+  objectiveType: string,
+): PlayerProfile {
+  if (objectiveType.trim().length === 0) return profile
+  const achievementStats = getAchievementStats(profile)
+  return {
+    ...profile,
+    achievementStats: {
+      ...achievementStats,
+      missionObjectivesCompletedByType: incrementCountMap(
+        achievementStats.missionObjectivesCompletedByType,
+        objectiveType,
+      ),
+    },
+  }
+}
+
+/**
+ * Record one successful slingshot launch around a gravity body.
+ *
+ * @param profile - Current profile.
+ * @param bodyId - Gravity body id, e.g. `'sun'`.
+ * @returns Updated profile, or the same profile when bodyId is blank.
+ */
+export function recordSlingshotLaunch(profile: PlayerProfile, bodyId: string): PlayerProfile {
+  if (bodyId.trim().length === 0) return profile
+  const achievementStats = getAchievementStats(profile)
+  return {
+    ...profile,
+    achievementStats: {
+      ...achievementStats,
+      slingshotLaunches: achievementStats.slingshotLaunches + ACHIEVEMENT_COUNTER_INCREMENT,
+      slingshotLaunchesByBody: incrementCountMap(achievementStats.slingshotLaunchesByBody, bodyId),
+    },
+  }
+}
+
+/**
+ * Record one gravity-surf start event.
+ *
+ * @param profile - Current profile.
+ * @returns Updated profile with only achievement stats changed.
+ */
+export function recordGravitySurfStart(profile: PlayerProfile): PlayerProfile {
+  const achievementStats = getAchievementStats(profile)
+  return {
+    ...profile,
+    achievementStats: {
+      ...achievementStats,
+      gravitySurfStarts: achievementStats.gravitySurfStarts + ACHIEVEMENT_COUNTER_INCREMENT,
+    },
+  }
+}
+
+/**
+ * Record one manifold ride event.
+ *
+ * @param profile - Current profile.
+ * @returns Updated profile with only achievement stats changed.
+ */
+export function recordManifoldRide(profile: PlayerProfile): PlayerProfile {
+  const achievementStats = getAchievementStats(profile)
+  return {
+    ...profile,
+    achievementStats: {
+      ...achievementStats,
+      manifoldRides: achievementStats.manifoldRides + ACHIEVEMENT_COUNTER_INCREMENT,
+    },
+  }
+}
+
+/**
+ * Record one portal departure event.
+ *
+ * @param profile - Current profile.
+ * @returns Updated profile with only achievement stats changed.
+ */
+export function recordPortalDeparture(profile: PlayerProfile): PlayerProfile {
+  const achievementStats = getAchievementStats(profile)
+  return {
+    ...profile,
+    achievementStats: {
+      ...achievementStats,
+      portalDepartures: achievementStats.portalDepartures + ACHIEVEMENT_COUNTER_INCREMENT,
+    },
+  }
+}
+
+/**
+ * Record world-line travel distance totals for achievement evaluation.
+ *
+ * @param profile - Current profile.
+ * @param segmentDistance - Distance traveled by the latest segment, e.g. `100`.
+ * @param currentRunDistance - Total distance reached by the current run, e.g. `250`.
+ * @returns Updated profile, or the same profile when either distance is not positive and finite.
+ */
+export function recordWorldLineDistance(
+  profile: PlayerProfile,
+  segmentDistance: number,
+  currentRunDistance: number,
+): PlayerProfile {
+  if (!isPositiveFiniteAmount(segmentDistance) || !isPositiveFiniteAmount(currentRunDistance)) {
+    return profile
+  }
+  const achievementStats = getAchievementStats(profile)
+  return {
+    ...profile,
+    achievementStats: {
+      ...achievementStats,
+      lifetimeWorldLineDistance: achievementStats.lifetimeWorldLineDistance + segmentDistance,
+      maxSingleRunWorldLineDistance: Math.max(
+        achievementStats.maxSingleRunWorldLineDistance,
+        currentRunDistance,
+      ),
+    },
+  }
 }
 
 /** Return a new profile with completedMissionCount incremented by 1. */

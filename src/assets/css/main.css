@@ -332,8 +332,8 @@ body {
 }
 
 .orbit-prompt-action {
-    @apply text-sm text-cyan-400;
-  }
+  @apply text-sm text-cyan-400;
+}
 
 .orbit-prompt-detail {
   @apply text-xs text-cyan-600;

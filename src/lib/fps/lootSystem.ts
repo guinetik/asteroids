@@ -173,9 +173,7 @@ export class LootSystem {
     // PSYCHOSPHERE_ARMED_WEIGHT and renormalize the remaining powerups so the
     // total stays at 1.
     const psychosphereArmed = this.policy.isItemArmed(PSYCHOSPHERE_ITEM_ID)
-    const weights = psychosphereArmed
-      ? armedDropWeights(table.biasedDrops)
-      : table.biasedDrops
+    const weights = psychosphereArmed ? armedDropWeights(table.biasedDrops) : table.biasedDrops
 
     // Weighted random selection using cumulative probabilities
     const roll = Math.random()

@@ -105,7 +105,8 @@ export class RockYieldSystem {
    * wireframe-overlay opacity ramp.
    */
   onScienceProgress:
-    ((spawnIndex: number, scienceHp: number, initialScienceHp: number) => void) | null = null
+    | ((spawnIndex: number, scienceHp: number, initialScienceHp: number) => void)
+    | null = null
 
   /**
    * Fired exactly once per rock when scienceHp first reaches 0.
@@ -141,10 +142,7 @@ export class RockYieldSystem {
 
     const itemId = this.rollMineralFrom(weightedItems, spawn.spawnIndex)
     const totalKg = spawn.totalKgOverride ?? this.rollTotalKg(spawn.diameter)
-    const initialScienceHp = Math.max(
-      BOLT_DAMAGE_KG_PER_HIT,
-      Math.ceil(totalKg * SCIENCE_HP_RATIO),
-    )
+    const initialScienceHp = Math.max(BOLT_DAMAGE_KG_PER_HIT, Math.ceil(totalKg * SCIENCE_HP_RATIO))
     this.rocks.set(spawn.spawnIndex, {
       itemId,
       totalKg,

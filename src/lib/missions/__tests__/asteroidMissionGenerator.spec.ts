@@ -298,13 +298,7 @@ describe('generateAsteroidWaypointNearHostPlanet', () => {
     const mercury = getPlanet('mercury')
     const hostMercuryR = mercury.orbit.semiMajorAxis * ORBIT_SCALE
     for (let i = 0; i < 60; i++) {
-      const wp = generateAsteroidWaypointNearHostPlanet(
-        hostMercuryR,
-        0,
-        10,
-        inwardRand,
-        'mercury',
-      )
+      const wp = generateAsteroidWaypointNearHostPlanet(hostMercuryR, 0, 10, inwardRand, 'mercury')
       expect(Math.hypot(wp.worldX, wp.worldZ)).toBeGreaterThanOrEqual(minR - 1e-6)
     }
 
@@ -537,9 +531,9 @@ describe('generateAsteroidMission', () => {
         const mission = generateAsteroidMission(d, host)
         expect(mission.originPlanetId).toBe('saturn')
         for (const obj of mission.objectives) {
-          expect(
-            obj.type === 'exterminate' || obj.type === 'rescue' || obj.type === 'bunker',
-          ).toBe(true)
+          expect(obj.type === 'exterminate' || obj.type === 'rescue' || obj.type === 'bunker').toBe(
+            true,
+          )
         }
       }
     }
@@ -552,9 +546,9 @@ describe('generateAsteroidMission', () => {
     const mission = generateAsteroidMission(1, host)
     expect(mission.originPlanetId).toBe('saturn')
     for (const obj of mission.objectives) {
-      expect(
-        obj.type === 'exterminate' || obj.type === 'rescue' || obj.type === 'bunker',
-      ).toBe(true)
+      expect(obj.type === 'exterminate' || obj.type === 'rescue' || obj.type === 'bunker').toBe(
+        true,
+      )
     }
   })
 
@@ -567,9 +561,9 @@ describe('generateAsteroidMission', () => {
         const mission = generateAsteroidMission(d, host)
         expect(mission.originPlanetId).toBe('mercury')
         for (const obj of mission.objectives) {
-          expect(
-            obj.type === 'exterminate' || obj.type === 'rescue' || obj.type === 'bunker',
-          ).toBe(true)
+          expect(obj.type === 'exterminate' || obj.type === 'rescue' || obj.type === 'bunker').toBe(
+            true,
+          )
         }
       }
     }
@@ -582,9 +576,9 @@ describe('generateAsteroidMission', () => {
     const mission = generateAsteroidMission(1, host)
     expect(mission.originPlanetId).toBe('mercury')
     for (const obj of mission.objectives) {
-      expect(
-        obj.type === 'exterminate' || obj.type === 'rescue' || obj.type === 'bunker',
-      ).toBe(true)
+      expect(obj.type === 'exterminate' || obj.type === 'rescue' || obj.type === 'bunker').toBe(
+        true,
+      )
     }
   })
 

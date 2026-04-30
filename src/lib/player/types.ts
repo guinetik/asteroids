@@ -13,6 +13,32 @@
 /** Per-body access state for contract-pinned bodies. */
 export type BodyAccessState = 'restricted' | 'unrestricted' | 'liberated' | 'destroyed'
 
+/** Lifetime counters used by achievement evaluators. */
+export interface PlayerAchievementStats {
+  /** Total finite positive credits granted to the player, e.g. `500` after one mission payout. */
+  lifetimeCreditsEarned: number
+  /** Total finite positive credits successfully spent by the player, e.g. `300` after one shop buy. */
+  lifetimeCreditsSpent: number
+  /** Total finite positive credits earned specifically through trade, e.g. `250` from a route sale. */
+  lifetimeTradeCreditsEarned: number
+  /** Mission objective type → completion count, e.g. `{ survey: 2 }` after two survey objectives. */
+  missionObjectivesCompletedByType: Record<string, number>
+  /** Total successful slingshot launches across all gravity bodies, e.g. `3`. */
+  slingshotLaunches: number
+  /** Gravity body id → slingshot launch count, e.g. `{ sun: 1 }`. */
+  slingshotLaunchesByBody: Record<string, number>
+  /** Total gravity-surf start events, e.g. `1` when the player begins one surf. */
+  gravitySurfStarts: number
+  /** Total manifold ride events, e.g. `4` after four rides. */
+  manifoldRides: number
+  /** Total portal departures, e.g. `2` after leaving through two portals. */
+  portalDepartures: number
+  /** Sum of finite positive world-line segment distances traveled, e.g. `1200`. */
+  lifetimeWorldLineDistance: number
+  /** Longest finite positive single-run world-line distance reached, e.g. `250`. */
+  maxSingleRunWorldLineDistance: number
+}
+
 /** Player save data persisted to localStorage. */
 export interface PlayerProfile {
   /** Player display name. Set at profile creation. */
@@ -23,6 +49,8 @@ export interface PlayerProfile {
   completedMissionCount: number
   /** Asteroid ID → mission visit count. Incremented once per mission, not per landing. */
   visitedAsteroids: Record<string, number>
+  /** Lifetime achievement counters persisted with the profile and migrated for legacy saves. */
+  achievementStats: PlayerAchievementStats
   /**
    * Planet id or `"sun"` → 1 after the player has entered orbit around that body at least once on
    * the solar map. Used for exploration achievements only; not incremented on repeat visits.

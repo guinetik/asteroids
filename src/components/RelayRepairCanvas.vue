@@ -114,7 +114,7 @@ function wigglePathD(row: number, col: number, port: Direction): string {
 function handleLockIn(): void {
   if (quality.value < LOCK_THRESHOLD || lockState.value !== 'calibrating') return
   lockState.value = 'locking'
-  uiAudio.notifyConfirm();
+  uiAudio.notifyConfirm()
   setTimeout(() => {
     lockState.value = 'locked'
     props.minigame.complete()
@@ -208,7 +208,7 @@ function rotateCell(id: string): void {
   cell.rotation = ((((cell.rotation + 1) % 4) + 4) % 4) as Rotation
   cell.visualRotation = cell.visualRotation + 1
   props.minigame.reportQuality(quality.value)
-  uiAudio.notifyKnob();
+  uiAudio.notifyKnob()
 }
 
 /** Move the selection one cell in the given grid direction, skipping empties. */

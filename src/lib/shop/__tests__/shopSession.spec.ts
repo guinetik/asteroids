@@ -110,6 +110,49 @@ describe('sellTradeGood', () => {
     expect(result.inventory.stacks[0]!.quantity).toBe(5)
   })
 
+  it('tracks trade-only credits from successful sales', () => {
+    const session = createShopSession('earth')
+    const profile = createProfile('Joe')
+    const inventory = addItem(createInventory(), 'cryogenic-coolants', 10).inventory
+
+    const result = sellTradeGood(session, profile, inventory, 'cryogenic-coolants', 5)
+
+    expect(result.ok).toBe(true)
+    expect(result.profile.achievementStats.lifetimeTradeCreditsEarned).toBe(
+      result.profile.credits - profile.credits,
+    )
+  })
+
+  it('rejects zero-quantity sales without changing profile or inventory', () => {
+    const session = createShopSession('earth')
+    const profile = createProfile('Joe')
+    const inventory = addItem(createInventory(), 'cryogenic-coolants', 10).inventory
+
+    const result = sellTradeGood(session, profile, inventory, 'cryogenic-coolants', 0)
+
+    expect(result.ok).toBe(false)
+    expect(result.profile.credits).toBe(profile.credits)
+    expect(result.profile.achievementStats.lifetimeTradeCreditsEarned).toBe(
+      profile.achievementStats.lifetimeTradeCreditsEarned,
+    )
+    expect(result.inventory).toEqual(inventory)
+  })
+
+  it('rejects negative-quantity sales without changing profile or inventory', () => {
+    const session = createShopSession('earth')
+    const profile = createProfile('Joe')
+    const inventory = addItem(createInventory(), 'cryogenic-coolants', 10).inventory
+
+    const result = sellTradeGood(session, profile, inventory, 'cryogenic-coolants', -1)
+
+    expect(result.ok).toBe(false)
+    expect(result.profile.credits).toBe(profile.credits)
+    expect(result.profile.achievementStats.lifetimeTradeCreditsEarned).toBe(
+      profile.achievementStats.lifetimeTradeCreditsEarned,
+    )
+    expect(result.inventory).toEqual(inventory)
+  })
+
   it('fails when item not in inventory', () => {
     const session = createShopSession('mercury')
     const profile = createProfile('Joe')

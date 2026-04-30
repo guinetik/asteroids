@@ -69,9 +69,7 @@ describe('createAsteroidSurface', () => {
 
     expect(patch).toBeInstanceOf(THREE.Mesh)
     expect(result.heightmap.heightAt(0, 0)).toBeCloseTo(-CRATER_DEPTH, 3)
-    expect(positions.getY(0)).toBeLessThan(
-      result.heightmap.heightAt(0, 0) - PATCH_SETTLE_MINIMUM,
-    )
+    expect(positions.getY(0)).toBeLessThan(result.heightmap.heightAt(0, 0) - PATCH_SETTLE_MINIMUM)
     expect(result.heightmap.heightAt(OUTSIDE_CRATER_SAMPLE_X, 0)).toBeCloseTo(0, 3)
 
     result.dispose()

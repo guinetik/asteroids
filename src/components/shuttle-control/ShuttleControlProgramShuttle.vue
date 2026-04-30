@@ -188,8 +188,7 @@ const manual = computed<TutorialProgramManualModel>(() => ({
           tone: 'safe',
         },
       ],
-      note:
-        'Marta says: the shuttle goes where the math says, not where your hand wishes it would go.',
+      note: 'Marta says: the shuttle goes where the math says, not where your hand wishes it would go.',
     },
     {
       id: 'power',

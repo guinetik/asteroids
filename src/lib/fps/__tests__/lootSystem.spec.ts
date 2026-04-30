@@ -74,9 +74,7 @@ describe('LootSystem', () => {
       onPickup: vi.fn<(pickup: LootPickup) => void>(),
     })
     // Mock chance pass (0.1 < 0.35) then selection toward psychosphere (0.9)
-    vi.spyOn(Math, 'random')
-      .mockReturnValueOnce(0.1)
-      .mockReturnValueOnce(0.9)
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.1).mockReturnValueOnce(0.9)
     const pickup = noPsychoSystem.trySpawnLoot('bacteriophage', { x: 0, y: 0, z: 0 }, 1)
     expect(pickup).not.toBeNull()
     expect(pickup!.type).not.toBe('psychosphere')

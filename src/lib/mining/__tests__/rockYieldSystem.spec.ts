@@ -320,7 +320,7 @@ describe('RockYieldSystem.registerRock — overrides', () => {
     // 1 normal grant + 1 guaranteed bonus = 2; trigger roll skips at (seed=1, idx=0).
     expect(grants.length).toBe(2)
     expect(grants[1]!.itemId).toBe(rock.itemId)
-    const expectedKg = Math.max(2, Math.ceil(rock.totalKg * 0.10))
+    const expectedKg = Math.max(2, Math.ceil(rock.totalKg * 0.1))
     expect(grants[1]!.kg).toBe(expectedKg)
   })
 

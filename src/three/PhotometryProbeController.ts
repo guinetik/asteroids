@@ -397,10 +397,7 @@ export class PhotometryProbeController implements Tickable {
 
     const center = emitterPosition.clone().addScaledVector(delta, 0.5)
     const unit = delta.clone().multiplyScalar(1 / length)
-    const orientation = new THREE.Quaternion().setFromUnitVectors(
-      new THREE.Vector3(0, 1, 0),
-      unit,
-    )
+    const orientation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), unit)
 
     this.losBeam.position.copy(center)
     this.losBeam.scale.set(1, length, 1)

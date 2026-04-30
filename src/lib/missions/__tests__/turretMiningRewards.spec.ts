@@ -141,7 +141,7 @@ describe('deliverTurretMiningMission', () => {
     expect(result.profile.credits).toBe(0)
   })
 
-  it('emits MissionCompletedEvent with objectiveType: "mining" and giverPlanetId from the mission', () => {
+  it('returns a mining contract event without notifying contracts synchronously', () => {
     const mission = activeMission({
       template: template({ oreCategory: 'olivine', targetKg: 150, reward: 1200 }),
       giverPlanet: 'jupiter',
@@ -149,11 +149,23 @@ describe('deliverTurretMiningMission', () => {
     const board = { ...createMissionBoard(), activeMiningMissions: [mission] }
     const withOre = addItem(createInventory(), 'olivine', 200).inventory
     const spy = vi.spyOn(contractSystem, 'notifyMissionCompleted')
-    deliverTurretMiningMission(board, mission.template.id, 'jupiter', withOre, profile(0), 1)
-    const callArg = spy.mock.calls[0]?.[0]
-    expect(callArg?.kind).toBe('mining')
-    expect(callArg?.objectiveType).toBe('mining')
-    expect(callArg?.giverPlanetId).toBe('jupiter')
+    const result = deliverTurretMiningMission(
+      board,
+      mission.template.id,
+      'jupiter',
+      withOre,
+      profile(0),
+      1,
+    )
+
+    expect(result).toMatchObject({
+      contractEvent: {
+        kind: 'mining',
+        objectiveType: 'mining',
+        giverPlanetId: 'jupiter',
+      },
+    })
+    expect(spy).not.toHaveBeenCalled()
     spy.mockRestore()
   })
 })

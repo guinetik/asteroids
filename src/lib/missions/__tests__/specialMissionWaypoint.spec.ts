@@ -28,12 +28,7 @@ describe('resolveSpecialMissionWaypoint', () => {
 
   it('places asset-2306-s near Saturn at a deterministic angle when rand is fixed', () => {
     const positions = new Map([['saturn', { x: 1000, z: 0 }]])
-    const result = resolveSpecialMissionWaypoint(
-      'asset-2306-s',
-      positions,
-      fallback,
-      () => 0,
-    )
+    const result = resolveSpecialMissionWaypoint('asset-2306-s', positions, fallback, () => 0)
     // Must be near Saturn (within 100 world units) but not exactly on it.
     const dx = result.worldX - 1000
     const dz = result.worldZ - 0

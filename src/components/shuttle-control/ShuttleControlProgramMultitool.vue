@@ -237,8 +237,7 @@ const manual = computed<TutorialProgramManualModel>(() => ({
           tone: 'safe',
         },
       ],
-      note:
-        'MMC field doctrine treats missed shots as power leaks. Aim first, then spend the charge.',
+      note: 'MMC field doctrine treats missed shots as power leaks. Aim first, then spend the charge.',
     },
     {
       id: 'upgrades',
@@ -305,8 +304,7 @@ const manual = computed<TutorialProgramManualModel>(() => ({
       checklist: [
         {
           title: 'Confirm the head',
-          body:
-            'Check DRL, LAS, or SCI before aiming. Digit 1 mines, Digit 2 fights, and Digit 3 scans.',
+          body: 'Check DRL, LAS, or SCI before aiming. Digit 1 mines, Digit 2 fights, and Digit 3 scans.',
         },
         {
           title: 'Aim before firing',

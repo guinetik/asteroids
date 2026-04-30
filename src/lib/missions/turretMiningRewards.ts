@@ -16,7 +16,7 @@ import type { PlayerProfile } from '@/lib/player/types'
 import { addCredits } from '@/lib/player/profile'
 import type { ActiveTurretMiningMission, MiningOreCategory, ShuttleMissionBoard } from './types'
 import { MAIN_BELT_ORE_IDS } from './turretMiningSession'
-import { contractSystem } from '@/lib/contracts/runtime'
+import type { MissionCompletedEvent } from '@/lib/contracts/contractTypes'
 import { getTurretMiningPool } from './turretMiningPools'
 
 /** Outcome of delivering one mining mission. */
@@ -33,6 +33,8 @@ export interface TurretMiningDeliveryResult {
   mission: ActiveTurretMiningMission | null
   /** Credits awarded after the multiplier (0 on failure). */
   creditsEarned: number
+  /** Contract event the caller should emit after persisting the returned profile. */
+  contractEvent: MissionCompletedEvent | null
 }
 
 /**
@@ -118,27 +120,51 @@ export function deliverTurretMiningMission(
 ): TurretMiningDeliveryResult {
   const idx = board.activeMiningMissions.findIndex((m) => m.template.id === missionId)
   if (idx === -1) {
-    return { ok: false, board, inventory, profile, mission: null, creditsEarned: 0 }
+    return {
+      ok: false,
+      board,
+      inventory,
+      profile,
+      mission: null,
+      creditsEarned: 0,
+      contractEvent: null,
+    }
   }
   const mission = board.activeMiningMissions[idx]!
   if (mission.giverPlanet !== planetId) {
-    return { ok: false, board, inventory, profile, mission: null, creditsEarned: 0 }
+    return {
+      ok: false,
+      board,
+      inventory,
+      profile,
+      mission: null,
+      creditsEarned: 0,
+      contractEvent: null,
+    }
   }
   const drain = drainForCategory(inventory, mission.template.oreCategory, mission.template.targetKg)
   if (!drain.ok) {
-    return { ok: false, board, inventory, profile, mission: null, creditsEarned: 0 }
+    return {
+      ok: false,
+      board,
+      inventory,
+      profile,
+      mission: null,
+      creditsEarned: 0,
+      contractEvent: null,
+    }
   }
   const creditsEarned = Math.round(mission.template.reward * rewardMultiplier)
   const nextProfile = addCredits(profile, creditsEarned)
   const nextActives = board.activeMiningMissions.filter((_, i) => i !== idx)
   const giverId = mission.giverId ?? getTurretMiningPool(mission.giverPlanet)?.giverId ?? null
-  contractSystem.notifyMissionCompleted({
+  const contractEvent: MissionCompletedEvent = {
     kind: 'mining',
     giverPlanetId: mission.giverPlanet,
     giverId,
     targetPlanetId: null,
     objectiveType: 'mining',
-  })
+  }
   return {
     ok: true,
     board: { ...board, activeMiningMissions: nextActives },
@@ -146,5 +172,6 @@ export function deliverTurretMiningMission(
     profile: nextProfile,
     mission,
     creditsEarned,
+    contractEvent,
   }
 }

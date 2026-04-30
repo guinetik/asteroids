@@ -72,26 +72,34 @@ export class BunkerDoorController {
       metalness: 0.5,
       roughness: 0.55,
     }
-    
+
     if (useMetallicTexture) {
       const texLoader = new THREE.TextureLoader()
-      const colorMap = texLoader.load('/textures/metal/color.webp', (t) => { t.needsUpdate = true })
-      const normalMap = texLoader.load('/textures/metal/normal.webp', (t) => { t.needsUpdate = true })
-      const roughnessMap = texLoader.load('/textures/metal/roughness.webp', (t) => { t.needsUpdate = true })
-      const metalnessMap = texLoader.load('/textures/metal/metalness.webp', (t) => { t.needsUpdate = true })
-      
+      const colorMap = texLoader.load('/textures/metal/color.webp', (t) => {
+        t.needsUpdate = true
+      })
+      const normalMap = texLoader.load('/textures/metal/normal.webp', (t) => {
+        t.needsUpdate = true
+      })
+      const roughnessMap = texLoader.load('/textures/metal/roughness.webp', (t) => {
+        t.needsUpdate = true
+      })
+      const metalnessMap = texLoader.load('/textures/metal/metalness.webp', (t) => {
+        t.needsUpdate = true
+      })
+
       const setupTex = (t: THREE.Texture) => {
         t.wrapS = THREE.RepeatWrapping
         t.wrapT = THREE.RepeatWrapping
         t.repeat.set(2, 2)
       }
-      
+
       setupTex(colorMap)
       colorMap.colorSpace = THREE.SRGBColorSpace
       setupTex(normalMap)
       setupTex(roughnessMap)
       setupTex(metalnessMap)
-      
+
       matOpts.color = 0xb6bec8
       matOpts.map = colorMap
       matOpts.normalMap = normalMap
@@ -126,10 +134,7 @@ export class BunkerDoorController {
     // PlaneGeometry is front-face-only; player approaches from -z and the seam
     // fades to 0 before they pass through, so the corridor-side view never needs
     // it. See spec section "Visual style — arena door".
-    this.seam = new THREE.Mesh(
-      new THREE.PlaneGeometry(DOOR_WIDTH, 0.06),
-      this.seamMat,
-    )
+    this.seam = new THREE.Mesh(new THREE.PlaneGeometry(DOOR_WIDTH, 0.06), this.seamMat)
     this.seam.position.set(0, DOOR_HEIGHT * SEAM_REST_Y_FRACTION, DOOR_THICKNESS / 2 + SEAM_Z_BIAS)
     this.group.add(this.seam)
   }

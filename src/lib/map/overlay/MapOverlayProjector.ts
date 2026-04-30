@@ -10,11 +10,7 @@
  * @spec docs/superpowers/specs/2026-04-05-map-overlay-design.md
  */
 import * as THREE from 'three'
-import type {
-  MapAsteroidBelt,
-  MapOverlayState,
-  MapThermalZone,
-} from '@/lib/ShuttleTelemetry'
+import type { MapAsteroidBelt, MapOverlayState, MapThermalZone } from '@/lib/ShuttleTelemetry'
 import { ASTEROID_BELTS } from '@/lib/planets/catalog'
 import { ORBIT_SCALE } from '@/lib/planets/constants'
 import type { SunController } from '@/three/controllers/SunController'
@@ -102,14 +98,21 @@ export class MapOverlayProjector {
     return this.worldLineHistory.length
   }
 
-  /** Sample the current ship position into the world line when orbit state permits. */
-  recordWorldLinePoint(input: MapOverlayRecordInput, minDistance: number): void {
-    if (!shouldRecordWorldLinePoint(input.orbitState, input.shipDead)) return
-    this.worldLineHistory = appendWorldLinePoint(
+  /** Sample the current ship position and return the appended segment distance, if any. */
+  recordWorldLinePoint(input: MapOverlayRecordInput, minDistance: number): number {
+    if (!shouldRecordWorldLinePoint(input.orbitState, input.shipDead)) return 0
+
+    const previous = this.worldLineHistory[this.worldLineHistory.length - 1]
+    const next = appendWorldLinePoint(
       this.worldLineHistory,
       { x: input.shipX, z: input.shipZ },
       minDistance,
     )
+    const appended = next.length > this.worldLineHistory.length
+    this.worldLineHistory = next
+
+    if (!appended || !previous) return 0
+    return Math.hypot(input.shipX - previous.x, input.shipZ - previous.z)
   }
 
   /** Clear history and seed it with the current ship position (new run / respawn). */

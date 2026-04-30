@@ -2818,6 +2818,12 @@ export class MapViewController implements Tickable {
     saveInventory(result.inventory)
     this.persistPlayerProfile()
     this.onCreditsUpdate?.(this.playerProfile.credits)
+    if (result.contractEvent) {
+      contractSystem.notifyMissionCompleted(result.contractEvent)
+      this.refreshPlayerProfileFromStorage()
+      this.onPersistentProgressUpdate?.()
+      this.onCreditsUpdate?.(this.playerProfile.credits)
+    }
   }
 
   /**

@@ -18,6 +18,13 @@ import {
   getBodyAccess,
   isBodyRendered,
   setBodyAccess,
+  recordTradeCreditsEarned,
+  recordMissionObjectiveComplete,
+  recordSlingshotLaunch,
+  recordGravitySurfStart,
+  recordManifoldRide,
+  recordPortalDeparture,
+  recordWorldLineDistance,
 } from '../profile'
 import type { PlayerProfile } from '../types'
 
@@ -52,6 +59,24 @@ describe('createProfile', () => {
     expect(profile.orbitedSolarBodies).toEqual({})
     expect(profile.bodyAccess['hektor']).toBe('restricted')
     expect(profile.hasSeenIntro).toBe(false)
+  })
+
+  it('creates profiles with zeroed achievement stats', () => {
+    const profile = createProfile('Pilot')
+
+    expect(profile.achievementStats).toEqual({
+      lifetimeCreditsEarned: 0,
+      lifetimeCreditsSpent: 0,
+      lifetimeTradeCreditsEarned: 0,
+      missionObjectivesCompletedByType: {},
+      slingshotLaunches: 0,
+      slingshotLaunchesByBody: {},
+      gravitySurfStarts: 0,
+      manifoldRides: 0,
+      portalDepartures: 0,
+      lifetimeWorldLineDistance: 0,
+      maxSingleRunWorldLineDistance: 0,
+    })
   })
 
   it('preserves the name exactly as given', () => {
@@ -103,6 +128,21 @@ describe('saveProfile / loadProfile', () => {
     })
     const loaded = loadProfile()
     expect(loaded?.bodyAccess['hektor']).toBe('restricted')
+  })
+
+  it('migrates legacy profiles without achievement stats', () => {
+    localStorage.setItem(
+      PROFILE_STORAGE_KEY,
+      JSON.stringify({
+        name: 'Legacy',
+        credits: 1234,
+        completedMissionCount: 2,
+        visitedAsteroids: { bennu: 1 },
+      }),
+    )
+
+    expect(loadProfile()?.achievementStats.lifetimeCreditsEarned).toBe(0)
+    expect(loadProfile()?.achievementStats.slingshotLaunchesByBody).toEqual({})
   })
 
   it('preserves explicit hasSeenIntro false from storage', () => {
@@ -194,6 +234,49 @@ describe('spendCredits', () => {
     spendCredits(profile, 300)
 
     expect(profile.credits).toBe(1000)
+  })
+})
+
+describe('achievement stats', () => {
+  it('tracks earned and spent lifetime credits', () => {
+    const earned = addCredits(createProfile('Pilot'), 500)
+    expect(earned.credits).toBe(1500)
+    expect(earned.achievementStats.lifetimeCreditsEarned).toBe(500)
+
+    const spent = spendCredits(earned, 300)
+    expect(spent?.achievementStats.lifetimeCreditsSpent).toBe(300)
+    expect(spendCredits(earned, 999999)).toBeNull()
+  })
+
+  it('updates achievement stats through focused helpers', () => {
+    let profile = createProfile('Pilot')
+    profile = recordTradeCreditsEarned(profile, 250)
+    profile = recordMissionObjectiveComplete(profile, 'survey')
+    profile = recordSlingshotLaunch(profile, 'sun')
+    profile = recordGravitySurfStart(profile)
+    profile = recordManifoldRide(profile)
+    profile = recordPortalDeparture(profile)
+    profile = recordWorldLineDistance(profile, 100, 250)
+
+    expect(profile.achievementStats.lifetimeTradeCreditsEarned).toBe(250)
+    expect(profile.achievementStats.missionObjectivesCompletedByType.survey).toBe(1)
+    expect(profile.achievementStats.slingshotLaunches).toBe(1)
+    expect(profile.achievementStats.slingshotLaunchesByBody.sun).toBe(1)
+    expect(profile.achievementStats.gravitySurfStarts).toBe(1)
+    expect(profile.achievementStats.manifoldRides).toBe(1)
+    expect(profile.achievementStats.portalDepartures).toBe(1)
+    expect(profile.achievementStats.lifetimeWorldLineDistance).toBe(100)
+    expect(profile.achievementStats.maxSingleRunWorldLineDistance).toBe(250)
+  })
+
+  it('returns the same profile for invalid achievement stat inputs', () => {
+    const profile = createProfile('Pilot')
+
+    expect(recordTradeCreditsEarned(profile, 0)).toBe(profile)
+    expect(recordMissionObjectiveComplete(profile, '')).toBe(profile)
+    expect(recordSlingshotLaunch(profile, '')).toBe(profile)
+    expect(recordWorldLineDistance(profile, -1, 100)).toBe(profile)
+    expect(recordWorldLineDistance(profile, 100, Number.POSITIVE_INFINITY)).toBe(profile)
   })
 })
 

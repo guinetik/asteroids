@@ -147,7 +147,10 @@ export class BunkerSceneController {
   /** Extract terminal inside the loot room. */
   readonly table = new BunkerTableModel()
   /** Chests inside the loot room. */
-  readonly chests: [BunkerChestModel, BunkerChestModel] = [new BunkerChestModel(), new BunkerChestModel()]
+  readonly chests: [BunkerChestModel, BunkerChestModel] = [
+    new BunkerChestModel(),
+    new BunkerChestModel(),
+  ]
 
   private readonly tint: number
   private readonly scene: THREE.Scene
@@ -174,7 +177,9 @@ export class BunkerSceneController {
     this.tint = opts.tint
     this.scene = opts.scene
     this.projectileSystem = opts.projectileSystem ?? null
-    this.enemyHealthMultiplier = bunkerEnemyHealthMultiplier(opts.difficulty ?? BUNKER_MIN_DIFFICULTY)
+    this.enemyHealthMultiplier = bunkerEnemyHealthMultiplier(
+      opts.difficulty ?? BUNKER_MIN_DIFFICULTY,
+    )
     this.enemyVisualTier = bunkerEnemyVisualTier(opts.difficulty ?? BUNKER_MIN_DIFFICULTY)
     this.enemyProjectileMeshPool = new EnemyProjectileMeshPool(opts.scene)
     this.enemyProjectileMeshPool.prewarm()
@@ -185,12 +190,12 @@ export class BunkerSceneController {
     this.lootDoor = new BunkerDoorController(opts.tint)
     this.lootDoor.group.position.copy(this.geometry.lootRoom.doorAnchor.position)
     this.lootDoor.group.rotation.copy(this.geometry.lootRoom.doorAnchor.rotation)
-    
+
     // Position table at the far end of the loot room
     const doorZ = this.geometry.lootRoom.doorAnchor.position.z
     const lootDepth = 43 // ARENA.depth / 2
     const lootWidth = 41 // ARENA.width / 2
-    
+
     // Tucked at the end of the room
     this.table.group.position.set(0, 0, doorZ + lootDepth - 4)
     // Rotate table so it faces the player (assuming it was facing away)
@@ -199,11 +204,11 @@ export class BunkerSceneController {
     // Chests against the left and right walls
     this.chests[0].group.position.set(-lootWidth / 2 + 4, 0, doorZ + lootDepth - 4)
     this.chests[1].group.position.set(lootWidth / 2 - 4, 0, doorZ + lootDepth - 4)
-    
+
     // Rotate chests to be parallel to the walls (facing inward)
     this.chests[0].group.rotation.y = Math.PI / 2
     this.chests[1].group.rotation.y = -Math.PI / 2
-    
+
     this.enemyDoors = this.geometry.enemyRooms.map((room) => {
       const door = new BunkerDoorController(opts.tint)
       door.group.position.copy(room.doorAnchor.position)
@@ -214,7 +219,14 @@ export class BunkerSceneController {
     this.hatch.group.position.copy(this.geometry.entranceDoorAnchor.position)
     this.hatch.group.rotation.copy(this.geometry.entranceDoorAnchor.rotation)
     this.door.group.position.copy(this.geometry.arenaDoorAnchor.position)
-    this.geometry.root.add(this.hatch.group, this.door.group, this.lootDoor.group, this.table.group, this.chests[0].group, this.chests[1].group)
+    this.geometry.root.add(
+      this.hatch.group,
+      this.door.group,
+      this.lootDoor.group,
+      this.table.group,
+      this.chests[0].group,
+      this.chests[1].group,
+    )
     for (const door of this.enemyDoors) {
       this.geometry.root.add(door.group)
     }
@@ -509,7 +521,11 @@ export class BunkerSceneController {
     const diagonalPairs: [number, number] = [0, 3]
     for (const idx of diagonalPairs) {
       const c = cornerPads[idx]!
-      const l = new THREE.PointLight(this.tint, CORNER_LIGHT_INTENSITY_DIAGONAL, CORNER_LIGHT_DISTANCE)
+      const l = new THREE.PointLight(
+        this.tint,
+        CORNER_LIGHT_INTENSITY_DIAGONAL,
+        CORNER_LIGHT_DISTANCE,
+      )
       l.position.set(c.x, CORNER_LIGHT_Y, c.z)
       this.geometry.root.add(l)
     }
@@ -552,7 +568,8 @@ export class BunkerSceneController {
     const root = this.geometry.root.position
     let pad: { x: number; z: number }
     if (this.pendingWaveRoomCursor === null || this.geometry.enemyRooms.length === 0) {
-      pad = this.geometry.spawnPadCenters[this.spawnPadCursor % this.geometry.spawnPadCenters.length]!
+      pad =
+        this.geometry.spawnPadCenters[this.spawnPadCursor % this.geometry.spawnPadCenters.length]!
       this.spawnPadCursor++
     } else {
       const roomIndex = this.pendingWaveRoomCursor % this.geometry.enemyRooms.length
@@ -594,8 +611,18 @@ export class BunkerSceneController {
    */
   private syncEnemyControllers(dt: number): void {
     for (const handle of Array.from(this.enemyDirector.enemies)) {
-      this.syncGroundController(this.phageControllers.get(handle.id), handle, PHAGE_HIT_CENTER_Y, dt)
-      this.syncGroundController(this.chimeraControllers.get(handle.id), handle, CHIMERA_HIT_CENTER_Y, dt)
+      this.syncGroundController(
+        this.phageControllers.get(handle.id),
+        handle,
+        PHAGE_HIT_CENTER_Y,
+        dt,
+      )
+      this.syncGroundController(
+        this.chimeraControllers.get(handle.id),
+        handle,
+        CHIMERA_HIT_CENTER_Y,
+        dt,
+      )
       this.syncSpireController(this.spireControllers.get(handle.id), handle, dt)
     }
   }
@@ -644,7 +671,11 @@ export class BunkerSceneController {
    * @param handle - Enemy handle from the director.
    * @param dt - Delta time in seconds.
    */
-  private syncSpireController(ctrl: SpireController | undefined, handle: EnemyHandle, dt: number): void {
+  private syncSpireController(
+    ctrl: SpireController | undefined,
+    handle: EnemyHandle,
+    dt: number,
+  ): void {
     if (!ctrl) return
     if (ctrl.deathComplete) {
       this.removeEnemyController(handle)

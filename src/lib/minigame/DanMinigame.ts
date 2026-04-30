@@ -375,7 +375,9 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
     const terminalY = params.heightmap.heightAt(terminalX, craterZ)
     this.terminal = new TerminalModel()
     this.terminal.placeAt(terminalX, terminalY, craterZ)
-    this.worldColliders = [this.terminal.createWorldCollider(`dan-terminal-${params.objectiveIndex}`)]
+    this.worldColliders = [
+      this.terminal.createWorldCollider(`dan-terminal-${params.objectiveIndex}`),
+    ]
     this.scene.add(this.terminal.group)
 
     this.rngState = Math.max(1, Math.floor(params.seed + params.objectiveIndex) | 0)
@@ -853,9 +855,10 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
 
   /** Emit a scan audio frame keyed on whether the beam should be audible. */
   private emitScanAudio(visible: boolean): void {
-    const intensity =
-      this.requiredHits > 0 ? Math.min(1, this.particleHits / this.requiredHits) : 0
-    const spawnRate = visible ? this.tuning.particleSpawnProbability / this.tuning.tickIntervalSeconds : 0
+    const intensity = this.requiredHits > 0 ? Math.min(1, this.particleHits / this.requiredHits) : 0
+    const spawnRate = visible
+      ? this.tuning.particleSpawnProbability / this.tuning.tickIntervalSeconds
+      : 0
     this.onScanAudioState?.({ visible, intensity, particleSpawnRate: spawnRate })
   }
 }

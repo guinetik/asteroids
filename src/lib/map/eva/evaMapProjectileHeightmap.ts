@@ -28,7 +28,10 @@ const EVA_MAP_PROJECTILE_FLOOR_Y = -500_000_000
  * @returns A shared pattern heightmap; safe to reuse for the map session lifetime.
  */
 export function createEvaMapProjectileHeightmap(): Heightmap {
-  const h = new Heightmap(EVA_MAP_PROJECTILE_HEIGHTMAP_RESOLUTION, EVA_MAP_PROJECTILE_HEIGHTMAP_WORLD_SIZE)
+  const h = new Heightmap(
+    EVA_MAP_PROJECTILE_HEIGHTMAP_RESOLUTION,
+    EVA_MAP_PROJECTILE_HEIGHTMAP_WORLD_SIZE,
+  )
   for (let gz = 0; gz < EVA_MAP_PROJECTILE_HEIGHTMAP_RESOLUTION; gz += 1) {
     for (let gx = 0; gx < EVA_MAP_PROJECTILE_HEIGHTMAP_RESOLUTION; gx += 1) {
       h.set(gx, gz, EVA_MAP_PROJECTILE_FLOOR_Y)

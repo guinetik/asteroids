@@ -246,7 +246,9 @@ interface BunkerPbrFolderSpec {
  *
  * @param spec - Subfolder + optional normal basename override.
  */
-async function loadPbrInteriorMaterial(spec: BunkerPbrFolderSpec): Promise<THREE.MeshStandardMaterial> {
+async function loadPbrInteriorMaterial(
+  spec: BunkerPbrFolderSpec,
+): Promise<THREE.MeshStandardMaterial> {
   const prefix = `${BUNKER_TEX}/${spec.folderName}`
   const normalName = spec.normalMapBase === 'normalgl' ? 'normalgl' : 'normal'
 
@@ -304,7 +306,11 @@ function applyCeilingPackedTemplateAnisotropy(mat: THREE.MeshStandardMaterial): 
 export async function loadBunkerInteriorMaterials(): Promise<BunkerInteriorMaterialSet> {
   const [floor, ceiling, wallFoyer, wallLoot, wallDefault] = await Promise.all([
     loadPbrInteriorMaterial({ folderName: 'floor' }),
-    loadPbrInteriorMaterial({ folderName: 'ceiling', normalMapBase: 'normalgl', includeEmissive: true }),
+    loadPbrInteriorMaterial({
+      folderName: 'ceiling',
+      normalMapBase: 'normalgl',
+      includeEmissive: true,
+    }),
     loadPbrInteriorMaterial({ folderName: 'concrete' }),
     loadPbrInteriorMaterial({ folderName: 'foam' }),
     loadPbrInteriorMaterial({ folderName: 'blackwall' }),

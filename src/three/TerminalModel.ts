@@ -363,7 +363,8 @@ export class TerminalModel {
     body.receiveShadow = true
     this.group.add(body)
 
-    const screenCenterY = TERMINAL_BASE_HEIGHT + TERMINAL_BODY_HEIGHT * SCREEN_CENTER_HEIGHT_FRACTION
+    const screenCenterY =
+      TERMINAL_BASE_HEIGHT + TERMINAL_BODY_HEIGHT * SCREEN_CENTER_HEIGHT_FRACTION
     const frontZ = TERMINAL_DEPTH / 2
     const frame = new THREE.Mesh(frameGeo, frameMat)
     frame.name = 'survey-terminal-screen-frame'

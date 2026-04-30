@@ -37,6 +37,7 @@ describe('persistCompletedAsteroidMissionRewards', () => {
   })
 
   afterEach(() => {
+    vi.restoreAllMocks()
     localStorage.clear()
     vi.unstubAllGlobals()
   })
@@ -52,6 +53,70 @@ describe('persistCompletedAsteroidMissionRewards', () => {
     expect(localStorage.getItem(PENDING_MAP_RETURN_WORLD_KEY)).toBe(
       JSON.stringify({ worldX: 0, worldZ: 0 }),
     )
+  })
+
+  it('records each completed asteroid objective type once in achievement stats', () => {
+    const mission: GeneratedAsteroidMission = {
+      ...BASE_MISSION,
+      id: 'multi-objective-stats',
+      objectives: [
+        { type: 'gather', x: 0, z: 0, resourceAmount: 100, reward: 100 },
+        { type: 'survey', x: 0, z: 0, probeCount: 3, timeLimit: 60, reward: 100 },
+        { type: 'photometry', x: 0, z: 0, reward: 100 },
+      ],
+      totalReward: 300,
+    }
+    localStorage.setItem(ACTIVE_MISSION_KEY, JSON.stringify(mission))
+
+    persistCompletedAsteroidMissionRewards(mission, 1)
+
+    expect(loadProfile()!.achievementStats.missionObjectivesCompletedByType).toMatchObject({
+      gather: 1,
+      survey: 1,
+      photometry: 1,
+    })
+  })
+
+  it('does not apply rewards or emit contracts twice for the same completed mission', () => {
+    const mission: GeneratedAsteroidMission = {
+      ...BASE_MISSION,
+      id: 'idempotent-rewards',
+      objectives: [
+        { type: 'gather', x: 0, z: 0, resourceAmount: 100, reward: 500 },
+        {
+          type: 'collect',
+          x: 0,
+          z: 0,
+          collectItemId: 'grid-coupling-module',
+          collectItemLabel: 'Grid Coupling Module',
+          reward: 0,
+        },
+      ],
+      totalReward: 500,
+    }
+    localStorage.setItem(ACTIVE_MISSION_KEY, JSON.stringify(mission))
+    const spy = vi.spyOn(contractSystem, 'notifyMissionCompleted')
+
+    persistCompletedAsteroidMissionRewards(mission, 1)
+    persistCompletedAsteroidMissionRewards(mission, 1)
+
+    const updated = loadProfile()!
+    expect(updated.credits).toBe(1500)
+    expect(updated.completedMissionCount).toBe(1)
+    expect(updated.visitedAsteroids['bennu']).toBe(1)
+    expect(updated.achievementStats.missionObjectivesCompletedByType).toMatchObject({
+      gather: 1,
+      collect: 1,
+    })
+    expect(loadInventory()?.stacks).toEqual([
+      {
+        itemId: 'grid-coupling-module',
+        quantity: 1,
+        totalWeightKg: 12,
+      },
+    ])
+    expect(spy).toHaveBeenCalledTimes(1)
+    spy.mockRestore()
   })
 
   it('applies reward multiplier', () => {

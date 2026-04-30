@@ -41,12 +41,17 @@ const { fakeSceneInstance } = vi.hoisted(() => {
       table: { group: { position: { x: 0, z: 0 } } },
       chests: [
         { opened: false, open: vi.fn(), group: { position: { x: 100, z: 100 } } },
-        { opened: false, open: vi.fn(), group: { position: { x: 100, z: 100 } } }
+        { opened: false, open: vi.fn(), group: { position: { x: 100, z: 100 } } },
       ],
       openWaveRoom: vi.fn(),
       closeWaveRoom: vi.fn(),
       hasPendingWaveSpawns: false,
-      activeEnemyRoomBounds: null as { minX: number; maxX: number; minZ: number; maxZ: number } | null,
+      activeEnemyRoomBounds: null as {
+        minX: number
+        maxX: number
+        minZ: number
+        maxZ: number
+      } | null,
       lootRoomBounds: { minX: -5, maxX: 5, minZ: 30, maxZ: 40 },
       playerSpawn: { x: 0, y: 0, z: 0 },
       rootWorldPosition: { x: 0, y: 0, z: 0 },
@@ -109,9 +114,9 @@ function buildMinigame(): BunkerMinigame {
   fakeSceneInstance.isPlayerInArena.mockReturnValue(false)
   fakeSceneInstance.openWaveRoom.mockClear()
   fakeSceneInstance.closeWaveRoom.mockClear()
-    fakeSceneInstance.hatch.setOpen.mockClear()
-    fakeSceneInstance.hatch.active = false
-    fakeSceneInstance.hatch.group.visible = false
+  fakeSceneInstance.hatch.setOpen.mockClear()
+  fakeSceneInstance.hatch.active = false
+  fakeSceneInstance.hatch.group.visible = false
   fakeSceneInstance.hasPendingWaveSpawns = false
   fakeSceneInstance.activeEnemyRoomBounds = null
   fakeSceneInstance.enemyDirector.enemies = []
@@ -220,7 +225,7 @@ describe('BunkerMinigame', () => {
       interactPressed: false,
       terminalInteractPressed: false,
     })
-    
+
     // First interact with the terminal
     m.tick(0.016, {
       levelState: 'bunker-interior',
@@ -233,7 +238,7 @@ describe('BunkerMinigame', () => {
 
     const exit = vi.fn()
     m.onExit = exit
-    
+
     // Next interact with the exit hatch
     m.tick(0.016, {
       levelState: 'bunker-interior',
@@ -260,16 +265,18 @@ describe('BunkerMinigame', () => {
       difficulty: 1,
     })
     m.onPrompt = prompt
-    const state = (m as unknown as {
-      state: {
-        current: string
-        notifyActivated(): void
-        notifyDoorInteracted(): void
-        notifyArenaEntered(): void
-        notifyWaveCleared(): void
-        tick(dt: number): void
+    const state = (
+      m as unknown as {
+        state: {
+          current: string
+          notifyActivated(): void
+          notifyDoorInteracted(): void
+          notifyArenaEntered(): void
+          notifyWaveCleared(): void
+          tick(dt: number): void
+        }
       }
-    }).state
+    ).state
     state.notifyActivated()
     state.notifyDoorInteracted()
     state.notifyArenaEntered()
@@ -465,10 +472,7 @@ describe('BunkerMinigame', () => {
     })
     m.onDamagePlayer = onDamagePlayer
 
-    fakeSceneInstance.enemyDirector.onContactDamage?.(
-      { enemy: { position: { x: 4, z: 9 } } },
-      12,
-    )
+    fakeSceneInstance.enemyDirector.onContactDamage?.({ enemy: { position: { x: 4, z: 9 } } }, 12)
 
     expect(onDamagePlayer).toHaveBeenCalledWith(12, 4, 9, 'contact')
   })
@@ -508,7 +512,11 @@ describe('BunkerMinigame', () => {
       playerPosition: { x: 11, y: 2, z: 13 },
     } as never)
 
-    expect(fakeSceneInstance.enemyProjectileSystem.setPlayerPosition).toHaveBeenCalledWith(11, 2, 13)
+    expect(fakeSceneInstance.enemyProjectileSystem.setPlayerPosition).toHaveBeenCalledWith(
+      11,
+      2,
+      13,
+    )
     expect(fakeSceneInstance.enemyProjectileSystem.tick).toHaveBeenCalledWith(0.016)
   })
 

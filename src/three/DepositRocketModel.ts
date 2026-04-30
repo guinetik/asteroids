@@ -247,7 +247,9 @@ export class DepositRocketModel {
     for (let i = 0; i < PANEL_SEAM_COUNT; i++) {
       const seam = new THREE.Mesh(seamGeo, this.panelMaterial)
       seam.position.y =
-        CLEARANCE + FIRST_SEAM_Y_OFFSET + i * ((BODY_HEIGHT - SEAM_SPAN_TRIM) / (PANEL_SEAM_COUNT - 1))
+        CLEARANCE +
+        FIRST_SEAM_Y_OFFSET +
+        i * ((BODY_HEIGHT - SEAM_SPAN_TRIM) / (PANEL_SEAM_COUNT - 1))
       seam.castShadow = true
       this.group.add(seam)
     }
@@ -307,7 +309,11 @@ export class DepositRocketModel {
 
     // Forward cargo terminal / hatch.
     const hatchGroup = new THREE.Group()
-    hatchGroup.position.set(0, CLEARANCE + TERMINAL_Y_OFFSET, ROCKET_RADIUS + TERMINAL_FRAME_DEPTH / 2)
+    hatchGroup.position.set(
+      0,
+      CLEARANCE + TERMINAL_Y_OFFSET,
+      ROCKET_RADIUS + TERMINAL_FRAME_DEPTH / 2,
+    )
 
     const hatchFrameGeo = new THREE.BoxGeometry(
       TERMINAL_FRAME_WIDTH,
@@ -444,10 +450,9 @@ export class DepositRocketModel {
 
     const previousFlightTime = this.flightTime
     this.flightTime += dt
-    const activeFlightDt = Math.max(0, this.flightTime - IGNITION_HOLD_SECONDS) - Math.max(
-      0,
-      previousFlightTime - IGNITION_HOLD_SECONDS,
-    )
+    const activeFlightDt =
+      Math.max(0, this.flightTime - IGNITION_HOLD_SECONDS) -
+      Math.max(0, previousFlightTime - IGNITION_HOLD_SECONDS)
 
     if (activeFlightDt > 0) {
       this.velocityY += LAUNCH_ACCELERATION * activeFlightDt

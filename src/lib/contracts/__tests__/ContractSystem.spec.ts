@@ -255,6 +255,39 @@ function createHarness(
   return { contracts, messages, snapshot, granted }
 }
 
+describe('ContractSystem public snapshots', () => {
+  it('returns defensive copies from instance accessors', () => {
+    const { contracts } = createHarness()
+    offerCowboys(contracts)
+    contracts.acceptContract(cowboysContract.id)
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+
+    const fromList = contracts.listInstances()[0]
+    const direct = contracts.getInstance(cowboysContract.id)
+    expect(fromList).toBeDefined()
+    expect(direct).toBeDefined()
+
+    fromList!.stepCounters[0] = 99
+    direct!.stepCounters[0] = 88
+
+    expect(contracts.getInstance(cowboysContract.id)?.stepCounters[0]).toBe(1)
+  })
+
+  it('returns a defensive copy from the full snapshot accessor', () => {
+    const { contracts } = createHarness()
+    offerCowboys(contracts)
+    contracts.acceptContract(cowboysContract.id)
+
+    const snapshot = contracts.getSnapshot()
+    snapshot.instances[cowboysContract.id]!.stepCounters[0] = 77
+    snapshot.observedMissionCompletions = 77
+
+    const current = contracts.getSnapshot()
+    expect(current.instances[cowboysContract.id]?.stepCounters[0]).toBe(0)
+    expect(current.observedMissionCompletions).toBe(1)
+  })
+})
+
 describe('ContractSystem.notifyMessageArchived', () => {
   it('offers a contract when its trigger message is archived', () => {
     const { contracts, messages } = createHarness([messageTriggerContract])
@@ -1476,14 +1509,9 @@ describe('choice-mission step', () => {
     const messages = new MessageSystem([], emptyMessageStore())
     const persistence = inMemoryPersistence()
 
-    const contracts = new ContractSystem(
-      [choiceContract],
-      messages,
-      persistence,
-      {
-        onChoiceOutcomeResolved: (payload) => choiceOutcomes.push(payload),
-      },
-    )
+    const contracts = new ContractSystem([choiceContract], messages, persistence, {
+      onChoiceOutcomeResolved: (payload) => choiceOutcomes.push(payload),
+    })
 
     contracts.offerForTests(choiceContract.id)
     contracts.acceptContract(choiceContract.id)

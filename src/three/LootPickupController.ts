@@ -61,7 +61,7 @@ export class LootPickupController implements Tickable {
   constructor(
     private readonly lootSystem: LootSystem,
     /** Optional initial root (e.g. bunker.geometry.root). Caller can use setRoot later. */
-    root?: THREE.Object3D
+    root?: THREE.Object3D,
   ) {
     this.geometry = new THREE.SphereGeometry(PICKUP_RADIUS, 16, 12)
 

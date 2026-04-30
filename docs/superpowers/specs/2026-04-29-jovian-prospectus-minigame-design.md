@@ -4,13 +4,23 @@ _Plan 6 of the Jovian Society Prospection contract rollout. Step 9 routing + can
 
 ---
 
+## Revision note (2026-04-30)
+
+This spec was rewritten after plan 4 landed with the auto-activation pattern. Original plan 6 referenced an "orbit Hektor → mission-callout slot → press I" flow; the actual shipped pattern (consortium-certification precedent) auto-queues the special mission when its step activates, with the waypoint pointing at Hektor. The player flies there directly — there's no callout slot, no orbit-then-accept step.
+
+**For Jovian Step 9 specifically:** when the contract step activates, the prospectus special mission auto-queues with Hektor as the waypoint. Player flies to Hektor, lands, the special mission engages on landing (same path as Steps 4 and 7's photometry / DAN special missions), and the terrain spawns a terminal POI instead of a scan objective. Player walks to the POI, `E` interacts, the overlay opens.
+
+The minigame UX (overlay layout, asymmetric CTAs, `notifyChoiceResolved` wiring, audio) is unchanged. Only the routing into `/level` differs from the original spec.
+
+---
+
 ## Premise
 
 Plans 1-5 build the contract's body — gather, mining, photometry on Hektor, psychosphere, DAN on Hektor, photometry on saturn-trojans, DAN on saturn-trojans. Step 9 is its head: the player flies to Hektor one last time, lands, walks to a Society-provisioned terminal, and is shown — for the first time, in the Society's internal language — what the contract has been compiling.
 
 Up to this point Vance's flavor has used words like "portfolio review," "longitudinal benefits," "preferred contractor manifest." The terminal screen uses words like "full extraction queue" and "demolition cycle." That shift is the dramatic beat. The minigame is **non-interactive in the gameplay sense** — there is no skill check, no puzzle, no wave. The player reads the screen, makes one binary choice, and lives with it. The asymmetry of the prompts is the design: TRANSMIT is default-highlighted, TAMPER is small and gray. First-time players on rails will hit TRANSMIT. That training is the trap.
 
-The minigame is built on infrastructure plans 1-5 already established: plan 1's Hektor body, plan 2's `'choice-mission'` step kind + `completionByOutcome` plumbing, plan 4's mission-callout slot and `/level` boot path. Plan 6 spawns the terminal POI in `/level`, builds the canvas overlay, wires the two outcomes, and exits cleanly back to the map where plan 2's completion handler dispatches the chosen arm.
+The minigame is built on infrastructure plans 1-5 already established: plan 1's Hektor body, plan 2's `'choice-mission'` step kind + `completionByOutcome` plumbing, plan 4's special-mission auto-activation hook and `/level` boot path. Plan 6 authors the prospectus special mission, spawns the terminal POI in `/level` (instead of a scan objective), builds the canvas overlay, wires the two outcomes, and exits cleanly back to the map where plan 2's completion handler dispatches the chosen arm.
 
 This plan does **not** apply outcome side effects (shuttle-buff math, body destruction, giver blacklist) — that's plan 7. Plan 6's job ends when `notifyChoiceResolved(missionId, outcomeId)` is called. The contract system handles the rest.
 
@@ -20,8 +30,8 @@ This plan does **not** apply outcome side effects (shuttle-buff math, body destr
 
 **In scope**
 
-1. **Step 9 mission-callout fill** on Hektor orbit. When the contract is active and on step 9 (the choice-mission), orbiting Hektor surfaces a single callout: subject `"OP 9 — Prospectus Compilation"`, CTA `"Press I to begin"`. Accepting routes to `/level` on Hektor, same boot path plan 4 established for steps 4 and 7, but with a flag indicating "this is a choice-mission run, spawn the terminal POI, no scan objective."
-2. **Terminal POI on Hektor surface** in `/level`. Spawn point is procedurally placed at the asteroid landing zone (same place plan 4's photometry and DAN spawned), styled visually as a Society-branded terminal pylon — clean Cloud City logo, blue accent. The implementer reuses whatever the existing terminal-prompt mechanic looks like (`E to interact` per existing convention).
+1. **Author the prospectus special mission.** New file `src/data/contracts/missions/jovian-society-prospection/hektor-prospectus.json`, registered in `SPECIAL_MISSIONS` (or sibling array per plan 4). `asteroidId: 'hektor'`, fixed waypoint, single objective of a new shape (terminal interaction, not scan). The contract's Step 9 carries `specialMissionId: 'jovian-prospection-hektor-prospectus'`. Step activation auto-queues it via the same hook plans 4's missions use — waypoint to Hektor appears, player flies there directly, no callout fill on orbit, no separate "accept" beat.
+2. **`/level` choice-mission boot.** When the active mission entering `/level` is the prospectus special mission, the level scene boots on Hektor with the standard procedural terrain (seed-stable per plan 4) but spawns a **Society-branded terminal pylon** at the asteroid landing-zone POI position instead of a scan objective. Visually a clean blue panel mounted on a pylon, glowing softly, Cloud City logo. The terminal POI registers an `E to interact` prompt with the existing terminal-prompt system. The interaction handler opens `ProspectusOverlay`.
 3. **Prospectus canvas overlay** — a new Vue component `ProspectusOverlay.vue` (sibling to existing minigame overlays). Terminal-style readout, monospaced, Society blue accent. Sections detailed below.
 4. **Outcome resolution.** TRANSMIT (E) and TAMPER (Q) calls `contractSystem.notifyChoiceResolved('jovian_final_prospectus', 'transmit' | 'tamper')`. Plan 2's runtime advances the step, sets `instance.resolvedOutcomeId`, and dispatches the matching `completionByOutcome` arm. The overlay closes, `/level` exits, the player lands back on the map, and the completion message arrives in the Society inbox.
 5. **Procedurally generated photometry and DAN graphs** seeded by `'hektor'`. Per GDD's open question 4, plan 6 picks **procedural over actual return data** — saves having to store player telemetry per run, the visual reads as "scientific scan output" without needing real fidelity, and seeded-by-Hektor means it's stable across reloads.
@@ -41,19 +51,14 @@ This plan does **not** apply outcome side effects (shuttle-buff math, body destr
 
 ## Player flow
 
-1. Contract is on step 9. Inbox shows OP 9 flavor: "There is a Society-provisioned terminal on the surface, near your previous landing zone…"
-2. Player flies to Hektor on the map. Approaches → orbits.
-3. Mission-callout slot fills:
-
-   > **OP 9 — Prospectus Compilation**
-   > _Press I to begin_
-
-4. `I` → `/level` loads on Hektor. Same procedural terrain as plans 4's photometry/DAN runs (seed-stable). Lander touches down. Player EVAs.
-5. Walking out from the lander, the player sees a Society-branded terminal pylon at the existing asteroid POI position — clean blue panel mounted on a pylon, glowing softly. Existing `E to interact` prompt fires.
-6. `E` → canvas overlay opens. The world behind dims and pauses. Audio: ambient hum loop fades in.
-7. Player reads the screen (sections below). Two CTAs at bottom: green E TRANSMIT default-highlighted, small gray Q TAMPER.
-8. Player picks one. Audio cue fires (transmit chord OR tamper glitch). Overlay closes. The terminal screen flips to a "Transmission Complete" / "Report Tampered" static state for a beat.
-9. Player walks back to the lander, launches, exits `/level` to the map. Inbox shows the matching `completionByOutcome` message. Plan 2's reward dispatch fires (plan 7 makes those rewards mean something mechanical; plan 6 just calls the dispatch).
+1. Contract is on step 9. Inbox shows OP 9 flavor: "There is a Society-provisioned terminal on the surface, near your previous landing zone…" The prospectus special mission auto-queues; the active-mission HUD now shows "OP 9 — Prospectus Compilation" with a waypoint at Hektor.
+2. Player flies to Hektor on the map. Approaches, orbits, lands — same flow as Steps 4 and 7. Once `/level` boots on Hektor with the prospectus mission active, terrain generates per the seed but **no scan objective spawns**; instead a Society-branded terminal pylon stands at the landing-zone POI position.
+3. Lander touches down. Player EVAs.
+4. Walking out from the lander, the player sees the terminal — clean blue panel mounted on a pylon, glowing softly. Existing `E to interact` prompt fires.
+5. `E` → canvas overlay opens. The world behind dims and pauses. Audio: ambient hum loop fades in.
+6. Player reads the screen (sections below). Two CTAs at bottom: green E TRANSMIT default-highlighted, small gray Q TAMPER.
+7. Player picks one. Audio cue fires (transmit chord OR tamper glitch). Overlay closes. The terminal screen flips to a "Transmission Complete" / "Report Tampered" static state for a beat.
+8. Player walks back to the lander, launches, exits `/level` to the map. Inbox shows the matching `completionByOutcome` message. Plan 2's reward dispatch fires (plan 7 makes those rewards mean something mechanical; plan 6 just calls the dispatch).
 
 ---
 
@@ -126,15 +131,49 @@ The asymmetry is intentional. TRANSMIT is the default — the prompt the player'
 
 ## Engine work
 
-### 1. Step 9 callout fill
+### 1. Special mission authoring
 
-`MapViewController` (per plan 4) fills the mission-callout slot when orbiting Hektor with an active contract step that targets it. Plan 6 extends the same logic to handle the `'choice-mission'` step kind. Subject + CTA pulled from the step's `subject`. The `I` keypress accepts a special "choice-mission acceptance" path that boots `/level` with a flag indicating choice-mission mode.
+New file `src/data/contracts/missions/jovian-society-prospection/hektor-prospectus.json`. Same shape as plans 4's `hektor-photometry.json` and `hektor-dan.json`, but the objective is a terminal interaction instead of a scan:
 
-### 2. `/level` choice-mission boot
+```jsonc
+{
+  "kind": "special",
+  "id": "jovian-prospection-hektor-prospectus",
+  "asteroidId": "hektor",
+  "giverId": "jovian-society",
+  "giverName": "Jovian Society",
+  "templateId": "jovian-prospection-hektor-prospectus",
+  "name": "OP 9 — Prospectus Compilation",
+  "briefing": "Pilot, eight deliverables clean. Final assignment: travel to Asset 2306-J. There is a Society-provisioned terminal on the surface, near your previous landing zone. Approach the terminal and review the assembled report — your readings, our analysis, the recommended disposition. Confirm transmission to Cloud City Asset Strategy at your discretion. — Vance",
+  "difficulty": 5,
+  "region": "jovian-trojans",
+  "objectives": [
+    {
+      "type": "prospectus-terminal",
+      "x": 0,
+      "z": 0,
+      "interactionLabel": "[E] OPEN PROSPECTUS",
+      "reward": 0
+    }
+  ],
+  "totalReward": 0,
+  "waypoint": { "worldX": 0, "worldZ": 0 },
+  "status": "available"
+}
+```
 
-When `/level` loads with the choice-mission flag set:
-- Standard asteroid terrain generates as plan 4 does. No scan objective spawns.
-- A Society terminal POI is placed at the asteroid landing zone (same coordinate convention plans 4's photometry uses for objective placement).
+Reward is 0 because the contract step's per-outcome `creditsReward` (5000 on transmit, 0 on tamper) is paid via plan 2's choice resolution — plan 6 doesn't pay anything from the special mission itself.
+
+The new `objectives[0].type === 'prospectus-terminal'` is a plan-6-specific objective kind. The level scene's objective-spawn logic dispatches on this type to spawn the terminal pylon instead of a scan/gather/etc. apparatus. Any sane fallback — e.g. treating it as a `'collect'` with no item — would also work; the implementer picks the cleanest extension.
+
+Register in `SPECIAL_MISSIONS` (or sibling array). Step 9 of the contract carries `specialMissionId: 'jovian-prospection-hektor-prospectus'`, and the existing auto-activation hook from plan 4 fires on step entry — no new runtime code path. The mission queues, the waypoint posts, the player flies to Hektor.
+
+### 2. `/level` terminal POI spawn
+
+When the active mission entering `/level` is `jovian-prospection-hektor-prospectus`:
+
+- Standard asteroid terrain generates per the asteroid catalog entry (seed-stable, same path plan 4 uses).
+- Instead of a scan/gather objective apparatus, the level scene reads the special mission's objective array, finds `type: 'prospectus-terminal'`, and spawns a Society-branded terminal pylon at the corresponding `(x, z)` (the landing-zone POI position).
 - The terminal POI registers an `E to interact` prompt with the existing terminal-prompt system. The interaction handler opens `ProspectusOverlay`.
 
 The implementer audits how DAN's "walk to terminal after the scan" works (per the cinderline references). The same POI + prompt pattern likely applies; if not, a small extension to the terminal-prompt registry covers the case.
@@ -188,7 +227,7 @@ Plan 6 doesn't need to do anything more — call `notifyChoiceResolved` and exit
 
 ### 7. Re-entry
 
-If the overlay is closed without resolving (e.g. player exits `/level` via lander launch before pressing E or Q), the contract stays on step 9. Next time the player orbits Hektor, the callout fills again, accepting routes to `/level` again, the terminal POI is there again. No state to clean up — the contract instance hasn't advanced.
+If the overlay is closed without resolving (e.g. player exits `/level` via lander launch before pressing E or Q), the contract stays on step 9. The special mission stays queued — the active-mission HUD still shows OP 9 with Hektor as the waypoint. Player flies back to Hektor whenever they want; the level boots again, the terminal POI is there again, the overlay re-opens on `E`. No state to clean up — the contract instance hasn't advanced.
 
 The choice, once resolved, is irreversible. The completion message arrives, the contract is `completed`, and the inbox shows the matching arm.
 
@@ -215,9 +254,9 @@ Component / view layer (Vue + JSDOM):
 
 Manual:
 
-9. **End-to-end.** Drive the contract to step 9, orbit Hektor, accept callout, walk to terminal, E to interact, read screen, pick TRANSMIT, see ambient hum stop, see confirm chord, see overlay close, walk to lander, exit /level, see "Welcome To The Manifest" message arrive in inbox.
+9. **End-to-end.** Drive the contract to step 9. Verify the active-mission HUD shows OP 9 with a Hektor waypoint as soon as Step 8 closes. Fly to Hektor, land, walk to terminal pylon, E to interact, read screen, pick TRANSMIT, see ambient hum stop, see confirm chord, see overlay close, walk to lander, exit /level, see "Welcome To The Manifest" message arrive in inbox.
 10. **Tamper round-trip.** Same with TAMPER (different chord/glitch, "Cohort Departure Confirmed" message).
-11. **Re-entry.** Open the overlay, exit /level without picking, return to Hektor — terminal works, choice still available.
+11. **Re-entry.** Open the overlay, exit /level without picking, fly back to Hektor — terminal works, choice still available, active mission is still OP 9.
 
 ---
 

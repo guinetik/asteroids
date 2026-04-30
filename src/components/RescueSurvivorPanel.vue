@@ -45,4 +45,3 @@ const aliveColor = computed(() => {
   Tailwind v4 + Vue scoped <style> can't resolve @apply, so per project convention
   utility-class rules go in a sibling .css file rather than a <style scoped> block.
 -->
-

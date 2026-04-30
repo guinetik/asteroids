@@ -293,7 +293,11 @@ export class DanScanController implements Tickable {
       this.completionPulse.rotation.x = Math.PI / 2
       this.options.scene.add(this.completionPulse)
     }
-    this.completionPulse.position.set(this.options.craterX, this.options.craterY, this.options.craterZ)
+    this.completionPulse.position.set(
+      this.options.craterX,
+      this.options.craterY,
+      this.options.craterZ,
+    )
     this.completionPulse.scale.setScalar(1)
     this.completionPulse.material.opacity = 1
     this.completionPulseRemaining = COMPLETION_PULSE_DURATION
@@ -513,9 +517,7 @@ export class DanScanController implements Tickable {
       // to the terminal ground. Reads as "the lander is scanning the
       // terminal site" rather than a thruster column dumped into the floor.
       const up = this.landerUp ?? new THREE.Vector3(0, 1, 0)
-      this._emitter
-        .copy(this.landerPosition)
-        .addScaledVector(up, DAN_LANDER_BEACON_HEIGHT_OFFSET)
+      this._emitter.copy(this.landerPosition).addScaledVector(up, DAN_LANDER_BEACON_HEIGHT_OFFSET)
       this._beamEnd.set(
         this.options.beamTargetX,
         this.options.beamTargetY,
@@ -529,10 +531,7 @@ export class DanScanController implements Tickable {
 
     const center = this._emitter.clone().addScaledVector(delta, 0.5)
     const unit = delta.clone().multiplyScalar(1 / length)
-    const orientation = new THREE.Quaternion().setFromUnitVectors(
-      new THREE.Vector3(0, 1, 0),
-      unit,
-    )
+    const orientation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), unit)
     this.beamCore.position.copy(center)
     this.beamCore.scale.set(1, length, 1)
     this.beamCore.quaternion.copy(orientation)

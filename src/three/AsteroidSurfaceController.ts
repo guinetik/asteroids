@@ -136,7 +136,9 @@ function syntheticCraterVertexColor(radiusRatio: number): THREE.Color {
 }
 
 /** Clone the first asteroid material so crater patches reuse already-loaded texture shaders. */
-function cloneFirstAsteroidSurfaceMaterial(scene: THREE.Object3D): THREE.MeshStandardMaterial | null {
+function cloneFirstAsteroidSurfaceMaterial(
+  scene: THREE.Object3D,
+): THREE.MeshStandardMaterial | null {
   let cloned: THREE.MeshStandardMaterial | null = null
   scene.traverse((child) => {
     if (cloned || !(child as THREE.Mesh).isMesh) return
@@ -395,7 +397,12 @@ export async function createAsteroidSurface(
     const patchMaterial = cloneFirstAsteroidSurfaceMaterial(scene)
     applySyntheticCraterClip(scene, options.syntheticCrater)
     applyCraterToHeightmap(heightmap, options.syntheticCrater)
-    const patch = createSyntheticCraterPatch(heightmap, options.syntheticCrater, patchMaterial, scene)
+    const patch = createSyntheticCraterPatch(
+      heightmap,
+      options.syntheticCrater,
+      patchMaterial,
+      scene,
+    )
     scene.add(patch)
   }
 

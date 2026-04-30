@@ -149,13 +149,22 @@ describe('levelContext', () => {
     } as unknown as GeneratedAsteroidMission
 
     expect(
-      resolveLevelLutUrl({ ...base, originPlanetId: 'mercury' } as GeneratedAsteroidMission, undefined),
+      resolveLevelLutUrl(
+        { ...base, originPlanetId: 'mercury' } as GeneratedAsteroidMission,
+        undefined,
+      ),
     ).toBe(INNER_PLANET_CONTRACT_LUT_URL)
     expect(
-      resolveLevelLutUrl({ ...base, originPlanetId: 'venus' } as GeneratedAsteroidMission, undefined),
+      resolveLevelLutUrl(
+        { ...base, originPlanetId: 'venus' } as GeneratedAsteroidMission,
+        undefined,
+      ),
     ).toBe(INNER_PLANET_CONTRACT_LUT_URL)
     expect(
-      resolveLevelLutUrl({ ...base, originPlanetId: 'earth' } as GeneratedAsteroidMission, undefined),
+      resolveLevelLutUrl(
+        { ...base, originPlanetId: 'earth' } as GeneratedAsteroidMission,
+        undefined,
+      ),
     ).toBe(DEFAULT_LEVEL_LUT_URL)
   })
 

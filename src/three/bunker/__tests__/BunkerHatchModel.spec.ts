@@ -118,13 +118,7 @@ describe('BunkerHatchModel', () => {
     )
     /** Top of hatch AABB (`localMax.y` after world transform at `group.y = 4`). */
     const hatchColliderTopY = 4 + MAX_PIPE_HEIGHT - BURIED_DEPTH
-    const support = world.getHighestSupportUnderDisc(
-      12,
-      -8,
-      4 - BURIED_DEPTH,
-      hatchColliderTopY,
-      9,
-    )
+    const support = world.getHighestSupportUnderDisc(12, -8, 4 - BURIED_DEPTH, hatchColliderTopY, 9)
 
     expect(playerMove.touchedCollider).toBe(true)
     expect(playerMove.x).toBeLessThan(12)

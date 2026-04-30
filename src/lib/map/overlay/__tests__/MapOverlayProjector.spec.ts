@@ -53,25 +53,38 @@ describe('MapOverlayProjector.recordWorldLinePoint', () => {
   })
 
   it('records the first free-flight sample', () => {
-    proj.recordWorldLinePoint({ orbitState: 'free', shipX: 100, shipZ: 0, shipDead: false }, 10)
+    expect(
+      proj.recordWorldLinePoint({ orbitState: 'free', shipX: 100, shipZ: 0, shipDead: false }, 10),
+    ).toBe(0)
     expect(proj.worldLineLength).toBe(1)
   })
 
   it('skips recording while orbiting', () => {
-    proj.recordWorldLinePoint({ orbitState: 'orbiting', shipX: 100, shipZ: 0, shipDead: false }, 10)
+    expect(
+      proj.recordWorldLinePoint(
+        { orbitState: 'orbiting', shipX: 100, shipZ: 0, shipDead: false },
+        10,
+      ),
+    ).toBe(0)
     expect(proj.worldLineLength).toBe(0)
   })
 
   it('skips recording while dead', () => {
-    proj.recordWorldLinePoint({ orbitState: 'free', shipX: 100, shipZ: 0, shipDead: true }, 10)
+    expect(
+      proj.recordWorldLinePoint({ orbitState: 'free', shipX: 100, shipZ: 0, shipDead: true }, 10),
+    ).toBe(0)
     expect(proj.worldLineLength).toBe(0)
   })
 
   it('coalesces samples until the ship has moved min-distance', () => {
     proj.recordWorldLinePoint({ orbitState: 'free', shipX: 0, shipZ: 0, shipDead: false }, 10)
-    proj.recordWorldLinePoint({ orbitState: 'free', shipX: 5, shipZ: 0, shipDead: false }, 10)
+    expect(
+      proj.recordWorldLinePoint({ orbitState: 'free', shipX: 5, shipZ: 0, shipDead: false }, 10),
+    ).toBe(0)
     expect(proj.worldLineLength).toBe(1)
-    proj.recordWorldLinePoint({ orbitState: 'free', shipX: 20, shipZ: 0, shipDead: false }, 10)
+    expect(
+      proj.recordWorldLinePoint({ orbitState: 'free', shipX: 20, shipZ: 0, shipDead: false }, 10),
+    ).toBe(20)
     expect(proj.worldLineLength).toBe(2)
   })
 })

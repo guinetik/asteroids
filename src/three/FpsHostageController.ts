@@ -550,7 +550,9 @@ export class FpsHostageController implements Tickable {
     const inst = this.instances.find((i) => i.hostage === hostage)
     if (!inst || !inst.isActive()) return
     void inst.model.playStandUp()
-    const walker = new HostageWalker(hostage, inst.model, targetProvider, (h) => this.handleBoard(h))
+    const walker = new HostageWalker(hostage, inst.model, targetProvider, (h) =>
+      this.handleBoard(h),
+    )
     this.walkers.set(hostage, walker)
   }
 

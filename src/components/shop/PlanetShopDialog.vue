@@ -94,17 +94,17 @@ const tradeOpen = ref(true)
 
 function toggleServices(): void {
   servicesOpen.value = !servicesOpen.value
-  uiAudio.notifySwitch();
+  uiAudio.notifySwitch()
 }
 
 function toggleFuel(): void {
   fuelOpen.value = !fuelOpen.value
-  uiAudio.notifySwitch();
+  uiAudio.notifySwitch()
 }
 
 function toggleTrade(): void {
   tradeOpen.value = !tradeOpen.value
-  uiAudio.notifySwitch();
+  uiAudio.notifySwitch()
 }
 
 function onKeydown(e: KeyboardEvent) {

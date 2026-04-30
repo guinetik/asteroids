@@ -257,11 +257,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
    * locked.
    */
   get isLiftoffLocked(): boolean {
-    return (
-      this._status === 'active' &&
-      this._steps[3]?.active === true &&
-      this.aliveSurvivors > 0
-    )
+    return this._status === 'active' && this._steps[3]?.active === true && this.aliveSurvivors > 0
   }
 
   get steps(): readonly MiniGameStep[] {
@@ -338,11 +334,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     this.syncExplosionFlash(dt)
 
     if (ctx.landerPosition) {
-      this.lastLanderPosition.set(
-        ctx.landerPosition.x,
-        ctx.landerPosition.y,
-        ctx.landerPosition.z,
-      )
+      this.lastLanderPosition.set(ctx.landerPosition.x, ctx.landerPosition.y, ctx.landerPosition.z)
     }
     if (this.alertTimer > 0) {
       this.alertTimer = Math.max(0, this.alertTimer - dt)

@@ -181,9 +181,7 @@ export function computePhotometryStandoffDistance(heightmap: PhotometrySurfaceHe
  * @param heightmap - Same surface descriptor used by {@link computePhotometryStandoffDistance}.
  * @returns Radius in world units from (0,y,0): beyond this reads as adrift alongside ∞ ALT.
  */
-export function computePhotometryAdriftRadialLimit(
-  heightmap: PhotometrySurfaceHeightmap,
-): number {
+export function computePhotometryAdriftRadialLimit(heightmap: PhotometrySurfaceHeightmap): number {
   const standoffDistance = computePhotometryStandoffDistance(heightmap)
   return standoffDistance * (1 + PHOTOMETRY_ADRIFT_EXTRA_STANDOFF_FRAC)
 }

@@ -23,7 +23,7 @@ const emit = defineEmits<{
 }>()
 
 function onClick(): void {
-  uiAudio.notifyConfirm();
+  uiAudio.notifyConfirm()
   emit('click')
 }
 </script>

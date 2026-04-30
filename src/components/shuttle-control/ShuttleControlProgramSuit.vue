@@ -79,7 +79,8 @@ const manual = computed<TutorialProgramManualModel>(() => ({
       id: 'summary',
       navLabel: 'Summary',
       title: 'Suit Operations Summary',
-      subtitle: 'Standard contractor life-support and mobility procedures for surface and space EVA.',
+      subtitle:
+        'Standard contractor life-support and mobility procedures for surface and space EVA.',
       readouts: [
         {
           label: 'Primary reserve',
@@ -135,12 +136,14 @@ const manual = computed<TutorialProgramManualModel>(() => ({
         {
           label: 'Sprint',
           value: 'Shift',
-          caption: 'Consumes sprint charge and locks out until released and refilled after depletion.',
+          caption:
+            'Consumes sprint charge and locks out until released and refilled after depletion.',
         },
         {
           label: 'Jump / hover',
           value: 'Space',
-          caption: 'Jump uses suit charge; hover uses RTG when the multitool power source is wired in.',
+          caption:
+            'Jump uses suit charge; hover uses RTG when the multitool power source is wired in.',
         },
       ],
       cards: [
@@ -174,7 +177,8 @@ const manual = computed<TutorialProgramManualModel>(() => ({
       id: 'space-eva',
       navLabel: 'Space EVA',
       title: 'Space EVA And Service Sites',
-      subtitle: 'Exit only when the shuttle is stopped, then use suit RCS and prompts to work the site.',
+      subtitle:
+        'Exit only when the shuttle is stopped, then use suit RCS and prompts to work the site.',
       readouts: [
         {
           label: 'Entry prompt',
@@ -310,8 +314,7 @@ const manual = computed<TutorialProgramManualModel>(() => ({
         {
           label: 'MOBILITY',
           title: 'Faster movement and stronger jumps',
-          body:
-            'Mobility tiers improve walking speed, sprint speed, and jump force for surface EVA.',
+          body: 'Mobility tiers improve walking speed, sprint speed, and jump force for surface EVA.',
           tone: 'neutral',
         },
         {

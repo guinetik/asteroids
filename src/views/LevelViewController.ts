@@ -1211,9 +1211,7 @@ export class LevelViewController implements Tickable {
       const SOCIETY_BLUE = 0x2c5bb0
       terminal.setScreenEmissive(SOCIETY_BLUE)
       this.asteroidSurface.group.add(terminal.group)
-      this.collision.addObjectiveCollider(
-        terminal.createWorldCollider('prospectus-terminal'),
-      )
+      this.collision.addObjectiveCollider(terminal.createWorldCollider('prospectus-terminal'))
       this.prospectusTerminal = terminal
     }
 
@@ -2690,8 +2688,7 @@ export class LevelViewController implements Tickable {
       const v = this.fpsCamera.getForward(this._playerForwardScratch)
       playerForwardSnap = { x: v.x, y: v.y, z: v.z }
     }
-    const terminalInteractPressed =
-      this.inputManager?.wasActionPressed('terminalInteract') ?? false
+    const terminalInteractPressed = this.inputManager?.wasActionPressed('terminalInteract') ?? false
     this.minigames.tick(
       dt,
       {

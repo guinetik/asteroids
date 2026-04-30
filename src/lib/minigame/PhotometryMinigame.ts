@@ -230,7 +230,9 @@ export class PhotometryMinigame implements MiniGame, MiniGameEvents {
     const groundY = heightmap.heightAt(objective.x, objective.z)
     this.terminal = new TerminalModel()
     this.terminal.placeAt(objective.x + TERMINAL_OFFSET_X, groundY, objective.z)
-    this.worldColliders = [this.terminal.createWorldCollider(`photometry-terminal-${objectiveIndex}`)]
+    this.worldColliders = [
+      this.terminal.createWorldCollider(`photometry-terminal-${objectiveIndex}`),
+    ]
     scene.add(this.terminal.group)
   }
 

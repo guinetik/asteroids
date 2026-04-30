@@ -12,10 +12,7 @@
  * @spec docs/superpowers/specs/2026-04-26-rocket-survey-design.md
  */
 
-import {
-  ROCKET_SURVEY_DAMAGE_PER_HIT,
-  ROCKET_SURVEY_HP,
-} from './rocketSurveyConstants'
+import { ROCKET_SURVEY_DAMAGE_PER_HIT, ROCKET_SURVEY_HP } from './rocketSurveyConstants'
 
 /** Lifecycle phase reported by {@link RocketSurveyState}. */
 export type RocketSurveyPhase = 'idle' | 'ramping' | 'awaitingMarkerConsume' | 'exhausted'

@@ -274,11 +274,6 @@ onUnmounted(() => {
 .debug-hud__sep {
   height: 1px;
   margin: 0.35rem 0;
-  background: linear-gradient(
-    to right,
-    transparent,
-    rgba(34, 211, 238, 0.35),
-    transparent
-  );
+  background: linear-gradient(to right, transparent, rgba(34, 211, 238, 0.35), transparent);
 }
 </style>

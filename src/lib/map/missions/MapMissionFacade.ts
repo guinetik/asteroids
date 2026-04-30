@@ -76,6 +76,7 @@ import type { VehicleCamera } from '@/three/VehicleCamera'
 import { createOrbitalMiniGame } from '@/lib/minigame/orbitalMiniGameFactory'
 import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
 import { contractSystem } from '@/lib/contracts/runtime'
+import type { MissionCompletedEvent } from '@/lib/contracts/contractTypes'
 import {
   getActiveAsteroidContractConstraints,
   type AsteroidContractConstraints,
@@ -381,7 +382,12 @@ export class MapMissionFacade {
     onMiningMissionDeliver:
       | ((mission: ActiveTurretMiningMission, creditsEarned: number) => void)
       | null
-  }): { profile: PlayerProfile; inventory: Inventory; creditsChanged: boolean } {
+  }): {
+    profile: PlayerProfile
+    inventory: Inventory
+    creditsChanged: boolean
+    contractEvent: MissionCompletedEvent | null
+  } {
     const result = deliverTurretMiningMission(
       this.board,
       params.missionId,
@@ -391,13 +397,23 @@ export class MapMissionFacade {
       params.rewardMultiplier,
     )
     if (!result.ok || !result.mission) {
-      return { profile: params.profile, inventory: params.inventory, creditsChanged: false }
+      return {
+        profile: params.profile,
+        inventory: params.inventory,
+        creditsChanged: false,
+        contractEvent: null,
+      }
     }
     this.board = result.board
     this.persistBoard()
     params.onMissionBoardUpdate?.(this.board)
     params.onMiningMissionDeliver?.(result.mission, result.creditsEarned)
-    return { profile: result.profile, inventory: result.inventory, creditsChanged: true }
+    return {
+      profile: result.profile,
+      inventory: result.inventory,
+      creditsChanged: true,
+      contractEvent: result.contractEvent,
+    }
   }
 
   missionComplete(params: {
@@ -525,10 +541,7 @@ export class MapMissionFacade {
     this.openMissionOverlay(params)
   }
 
-  syncWaypointSite(
-    scene: THREE.Scene,
-    livePosition: { x: number; z: number } | null = null,
-  ): void {
+  syncWaypointSite(scene: THREE.Scene, livePosition: { x: number; z: number } | null = null): void {
     const mission = this.board.activeAsteroidMission
 
     // When the mission targets a renderable body (Hektor, etc.), the body

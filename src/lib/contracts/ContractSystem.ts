@@ -247,7 +247,16 @@ export class ContractSystem {
    * @returns Cloned `instances` map suitable for UI consumption.
    */
   listInstances(): ContractInstance[] {
-    return Object.values(this.snapshot.instances).map((entry) => ({ ...entry }))
+    return Object.values(this.snapshot.instances).map((entry) => structuredClone(entry))
+  }
+
+  /**
+   * Full persisted contract snapshot for read-only consumers such as achievement evaluators.
+   *
+   * @returns Defensive copy of the current contract store snapshot.
+   */
+  getSnapshot(): ContractStoreSnapshot {
+    return structuredClone(this.snapshot)
   }
 
   /** Lookup a contract definition by id. */
@@ -257,7 +266,8 @@ export class ContractSystem {
 
   /** Lookup the persisted instance for a contract id. */
   getInstance(id: string): ContractInstance | null {
-    return this.snapshot.instances[id] ?? null
+    const instance = this.snapshot.instances[id]
+    return instance ? structuredClone(instance) : null
   }
 
   /**

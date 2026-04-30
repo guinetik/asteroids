@@ -40,9 +40,7 @@ export interface MailFolderSection {
  * @param input - Folders, rows, expansion state, and selected message id.
  * @returns Immutable-friendly section view models for the Vue mail program.
  */
-export function buildMailFolderSections(
-  input: BuildMailFolderSectionsInput,
-): MailFolderSection[] {
+export function buildMailFolderSections(input: BuildMailFolderSectionsInput): MailFolderSection[] {
   return input.folders.map((folder) => {
     const rows = input.rowsByFolderId[folder.id] ?? []
     const containsSelectedMessage =

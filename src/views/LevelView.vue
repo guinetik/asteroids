@@ -747,9 +747,7 @@ function handleToggleMusic(): void {
     :mission-name="trackerMission"
   />
   <ObjectiveTracker
-    v-if="
-      trackerVisible && (stateInfo.state === 'lander' || stateInfo.state === 'eva' || inBunker)
-    "
+    v-if="trackerVisible && (stateInfo.state === 'lander' || stateInfo.state === 'eva' || inBunker)"
     :eyebrow="trackerAsteroid"
     :title="trackerMission"
     :objectives="trackerObjectives"

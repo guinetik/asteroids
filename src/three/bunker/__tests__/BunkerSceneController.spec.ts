@@ -77,7 +77,9 @@ describe('BunkerSceneController', () => {
     expect(enemyRooms.map((room) => room.id).sort()).toEqual(['east', 'west'])
     expect(enemyRooms).toHaveLength(ENEMY_ROOM_COUNT)
     for (const room of enemyRooms) {
-      expect(hasWallAt(geometry.wallMeshes, room.doorAnchor.position.x, room.doorAnchor.position.z)).toBe(false)
+      expect(
+        hasWallAt(geometry.wallMeshes, room.doorAnchor.position.x, room.doorAnchor.position.z),
+      ).toBe(false)
     }
   })
 
@@ -215,8 +217,7 @@ describe('BunkerSceneController', () => {
     controller.spawnWave(['bacteriophage'])
 
     const enemy = controller.enemyDirector.enemies[0]!.enemy
-    const arenaCenterZ =
-      ANTECHAMBER.depth / 2 + CORRIDOR.depth + ARENA.depth / 2
+    const arenaCenterZ = ANTECHAMBER.depth / 2 + CORRIDOR.depth + ARENA.depth / 2
     const firstPadX = -(ARENA.width / 2 - SPAWN_PAD_INSET)
     const firstPadZ = arenaCenterZ - (ARENA.depth / 2 - SPAWN_PAD_INSET)
     expect(enemy.position.x).toBe(ROOT_X + firstPadX)
@@ -249,12 +250,7 @@ describe('BunkerSceneController', () => {
         minX: ROOT_X - ARENA.width / 2 + PLAYER_RADIUS_INSET,
         maxX: ROOT_X + ARENA.width / 2 - PLAYER_RADIUS_INSET,
         minZ: ROOT_Z + ANTECHAMBER.depth / 2 + CORRIDOR.depth + PLAYER_RADIUS_INSET,
-        maxZ:
-          ROOT_Z +
-          ANTECHAMBER.depth / 2 +
-          CORRIDOR.depth +
-          ARENA.depth -
-          PLAYER_RADIUS_INSET,
+        maxZ: ROOT_Z + ANTECHAMBER.depth / 2 + CORRIDOR.depth + ARENA.depth - PLAYER_RADIUS_INSET,
       },
     ]
     expect(controller.walkableBounds.length).toBe(expected.length)

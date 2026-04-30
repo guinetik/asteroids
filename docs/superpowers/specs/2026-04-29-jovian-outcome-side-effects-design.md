@@ -23,7 +23,7 @@ This is the last plan. After it lands, the contract is fully playable from offer
 **In scope**
 
 1. **`shuttle-buff` math** — read `profile.shuttleBuffs.jovianEmpowerment` (or any registered buff) and apply the multiplier to the relevant shuttle stats at runtime.
-2. **Hektor `destroyed` visual** — one-time debris field on first flyby through Hektor's former L4 position after the contract resolves with TRANSMIT, then nothing on subsequent passes. (Authored memory, per GDD Q7.) Falls back to "just gone" if the debris-field implementation runs long.
+2. **Hektor `destroyed` video epilogue** — one-time full-screen video (`public/jupiter-ending.mp4`) plays immediately on transmit outcome resolution. Subtitle line in the Society's corporate-banal voice. Continue button dismisses. Flagged via `seenJovianEpilogue` so it never replays. Replaces the original debris-field idea entirely; map afterward shows nothing where Hektor was, and that absence is the punctuation.
 3. **Hektor `liberated` integration** — when `bodyAccess['hektor'] === 'liberated'`, Hektor becomes a candidate body for procedural Jupiter-giver missions (mining, photometry, DAN, gather). The asteroid mission generator includes it in its pool of named bodies in `jovian-trojans` region.
 4. **`disable-giver` enforcement** — when `profile.disabledGiverIds['jovian-society'] === true`, the Jovian Society giver does not surface on the Jupiter mission board. Their missions don't roll up in the procedural board generation. Their giver entry in the kiosk listing disappears.
 5. **Auto-grant fast-travel on completion.** New `homePlanet?: string` field on `Contract`; runtime auto-grants `unlockFastTravelPlanet(profile, contract.homePlanet)` on completion regardless of arm. Audit all six contracts to set `homePlanet`. See *Auto-grant fast-travel on completion* below.
@@ -101,19 +101,55 @@ Edge case: when the buff is granted, the player's *current* fuel level / hull HP
 
 ---
 
-## Hektor `destroyed` — visual punctuation
+## Hektor `destroyed` — video epilogue
 
-Plan 1's renderer skips bodies whose `bodyAccess` is `'destroyed'`, so Hektor is gone from the map by default. Plan 7 adds a small authored beat: **the first time the player flies through Hektor's former L4 region after the destroyed transition, a debris field renders for that one approach.** Subsequent passes show nothing.
+Plan 1's renderer skips bodies whose `bodyAccess` is `'destroyed'`, so Hektor is gone from the map by default. Plan 7 adds a single authored beat at the moment of transition: **a full-screen video epilogue plays once, immediately after the transmit outcome resolves.** No procedural debris field on the map. No first-flyby trigger. The video carries the moment; the absence on the map afterward speaks for itself.
 
-Implementation:
+### Video asset
 
-- New profile field: `seenHektorDebris: boolean` (default `false`).
-- When `bodyAccess['hektor'] === 'destroyed'` AND `seenHektorDebris === false` AND the player's map position enters a radius around Hektor's former orbital position: render a debris field (procedural particle cloud at Hektor's last-known orbital coords, ~1.5x the body's display radius, colored from the body's `accentColor`). On exit from the trigger radius, set `seenHektorDebris = true` and persist.
-- After flagged: skip the debris render. Hektor is gone, the moment was authored.
+`public/jupiter-ending.mp4` — already authored. Shipped with the game.
 
-The "former orbital position" is a bit fuzzy because Hektor was on Jupiter's orbital ring at L4 — it would have moved over time. For game purposes the renderer can just use the orbital elements from `planetarium.json` to compute where Hektor *would* be right now; the debris field renders there, then disappears.
+### Trigger
 
-If the debris field implementation feels heavy for plan 7, the fallback is "just gone" — `bodyAccess === 'destroyed'` skips the body, no debris, and the absence speaks for itself. That's acceptable. The debris field is polish, not load-bearing.
+Fires exactly once, on the **transmit completion path**. Sequence:
+
+1. Player picks TRANSMIT in the prospectus overlay (plan 6).
+2. Plan 2's runtime resolves the choice, dispatches the `completionByOutcome.transmit` arm, and emits the `'completed'` event.
+3. `runtime.ts → onContractCompleted` sees the contract resolved with outcome `transmit` AND the player has not yet seen the epilogue. Triggers the video.
+4. Video plays full-screen with **subtitle text** explaining what the player is seeing (in-fiction Society demolition footage, asset processing report, whatever the authored copy lands on — see *Subtitle copy* below).
+5. **Continue button** dismisses the overlay. World resumes — player lands back on the map. Inbox shows the "Welcome To The Manifest" message.
+6. `profile.seenJovianEpilogue` flag is set so the video never plays again, even on save reload.
+
+The tamper outcome does **not** trigger the video. Hektor stays on the map (`'liberated'`), so there's no transition to punctuate. Tamper's authored beat is the absence of the cohort-member rewards and the Society listings vanishing — the world changes quietly.
+
+### Subtitle copy
+
+One subtitle line on the video. Suggested register: corporate-banal, Society-internal, deliberately matter-of-fact about what the player just authorized. Author the line so it lands as the *contract revealing what the player did* — not melodramatic, not condemning, just the Society naming what extraction looks like.
+
+Example direction (final copy is the implementer's call):
+
+> *Asset 2306-J · processing cycle initiated · estimated yield 2.8B CR · 14-month demolition schedule · Cohort: Q4 / 2306*
+
+The Society's voice. The same numbers from the prospectus terminal recommendation block. The player saw these words on a screen; now they're seeing the work the words authorized. That's the beat.
+
+### Implementation
+
+- New profile field: `seenJovianEpilogue: boolean` (default `false`).
+- New Vue overlay component: `JovianEpilogueOverlay.vue` (sibling to existing minigame/canvas overlays). Plays an HTML5 `<video>` element with the asset, subtitle text overlaid (lower-third, monospaced or in-keeping with the prospectus terminal styling), Continue button bottom-center.
+- Hook into the contract completion handler: when `contractId === 'jovian-society-prospection'` AND `instance.resolvedOutcomeId === 'transmit'` AND `profile.seenJovianEpilogue === false`, mount the overlay and pause world updates until Continue dismisses.
+- On Continue: set `seenJovianEpilogue = true`, persist profile, unmount overlay, world resumes.
+
+### Save-state behavior
+
+- Replay-safe by construction: `replayCompletedRewards` re-fires the completion handler, but the `seenJovianEpilogue` guard prevents the video from re-playing. The flag is the source of truth.
+- Player can't retrigger the video by reloading mid-resolution — once the flag is set, that's it. (If they really want to see it again, that's a dev console hook, not a player-facing feature.)
+
+### Tests
+
+- `seenJovianEpilogue` defaults to `false` on fresh profile.
+- Triggering the transmit outcome flips the flag and mounts the overlay (mock the Vue mount; assert the call).
+- Replaying the completion with the flag already `true` does NOT re-mount the overlay.
+- Tamper outcome does NOT mount the overlay regardless of the flag state.
 
 ---
 
@@ -349,7 +385,7 @@ In `src/lib/missions/__tests__/`:
 
 Manual:
 
-8. **Transmit playthrough.** Complete the contract with TRANSMIT. Verify the shuttle feels significantly more capable (fuel lasts longer, hull is harder to damage, thrusters charge faster, top speed is higher). Verify Hektor is gone on next pass; first flyby through L4 shows debris briefly, subsequent passes show nothing. Verify Society listings persist on the Jupiter board (cohort-member, not blacklisted).
+8. **Transmit playthrough.** Complete the contract with TRANSMIT. **Video epilogue plays full-screen with subtitle and Continue button on outcome resolution; dismissing returns the player to the map.** Verify the shuttle feels significantly more capable (fuel lasts longer, hull is harder to damage, thrusters charge faster, top speed is higher). Verify Hektor is gone on next pass and stays gone — the video does not re-trigger on subsequent transitions or save reloads. Verify Society listings persist on the Jupiter board (cohort-member, not blacklisted).
 9. **Tamper playthrough.** Complete with TAMPER. Verify shuttle stats are unchanged. Verify Hektor stays visible and orbit-able. Verify Hektor occasionally rolls up as a target for Jupiter giver missions (mining, photometry from non-Society givers). Verify Society listings vanish from the Jupiter board. Verify Mr. Finch, Cloud City Ops, and Jay's expansion missions appear on the Jupiter board with their distinct voices.
 10. **Pre-tamper baseline.** Before the contract resolves, verify Mr. Finch and Cloud City Ops do NOT appear on the Jupiter board, and Jay's expansion missions don't surface. Only after the tamper outcome do they appear.
 
@@ -370,7 +406,7 @@ Manual:
 ## Open questions for the implementer
 
 1. **Buff scope tuning.** I argued for full scope. Playtest may show a particular stat (probably top speed or slingshot) is broken at +50%. Narrow inline if so; document which stats were excluded.
-2. **Debris field implementation.** Procedural particle cloud or a small canvas overlay? If the existing rendering toolkit has a particle system, prefer that. If not, the fallback is "just gone."
+2. **Subtitle copy for the epilogue video.** The spec proposes a Society-voiced asset-processing line (`Asset 2306-J · processing cycle initiated · estimated yield 2.8B CR · 14-month demolition schedule · Cohort: Q4 / 2306`). If the implementer wants something more cinematic or more cold, that's an authoring call. One short line, monospaced, lower-third over the video.
 3. **Liberated body in pre-flag state.** Should the procedural Jupiter pool ever include Hektor *before* `liberated` (e.g. during the contract's Movement 2-3, while Hektor is `unrestricted`)? My instinct: no — only contract missions target Hektor while the contract is active. After resolution it's available either way (destroyed = gone, liberated = open pool). If the implementer thinks pre-resolution access is fine, that's a tunable; doesn't change the spec.
 4. **Cinderline follow-up.** Defer unless the scheduling primitive is trivially available.
 5. **Multi-buff interaction.** The current `applyShuttleBuffs` compounds multiplicatively. If Act 3 introduces a second buff that should additive-stack instead, the implementer adapts then; plan 7 doesn't need to anticipate.

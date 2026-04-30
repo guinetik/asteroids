@@ -15,7 +15,7 @@ import type { ShopResult } from './types'
 import type { TradeGoodDefinition } from './tradeTypes'
 import { getTradeGoodsByPlanet, getTradeGoodsExcludingPlanet } from './tradeGoods'
 import { addItem, canFitItem, removeItem } from '@/lib/inventory/inventory'
-import { spendCredits, addCredits } from '@/lib/player/profile'
+import { spendCredits, addCredits, recordTradeCreditsEarned } from '@/lib/player/profile'
 import { computeSellPrice } from './planetDemand'
 
 /** Minimum restock timer duration in seconds. */
@@ -240,6 +240,10 @@ export function sellTradeGood(
   itemId: string,
   quantity: number,
 ): ShopResult {
+  if (quantity <= 0) {
+    return { ok: false, profile, inventory, reason: 'Quantity must be positive' }
+  }
+
   const removeResult = removeItem(inventory, itemId, quantity)
   if (!removeResult.ok) {
     return { ok: false, profile, inventory, reason: removeResult.reason }
@@ -251,7 +255,8 @@ export function sellTradeGood(
   }
 
   const totalPayout = pricePerUnit * quantity
-  const updatedProfile = addCredits(profile, totalPayout)
+  const creditedProfile = addCredits(profile, totalPayout)
+  const updatedProfile = recordTradeCreditsEarned(creditedProfile, totalPayout)
 
   return { ok: true, profile: updatedProfile, inventory: removeResult.inventory }
 }

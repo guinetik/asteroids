@@ -182,7 +182,12 @@ function showRockTarget(): boolean {
       class="absolute inset-0 flex items-center justify-center select-none"
       :style="{ opacity: telemetry.aiming ? 1 : 0.4 }"
     >
-      <svg v-if="!showEvaMapToolHud() && telemetry.activeMode === 'drill'" width="32" height="32" viewBox="0 0 32 32">
+      <svg
+        v-if="!showEvaMapToolHud() && telemetry.activeMode === 'drill'"
+        width="32"
+        height="32"
+        viewBox="0 0 32 32"
+      >
         <circle cx="16" cy="16" r="12" fill="none" :stroke="modeColor()" stroke-width="1.5" />
         <line x1="16" y1="8" x2="16" y2="24" :stroke="modeColor()" stroke-width="1" />
         <line x1="8" y1="16" x2="24" y2="16" :stroke="modeColor()" stroke-width="1" />

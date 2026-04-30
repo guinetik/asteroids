@@ -7,17 +7,17 @@
       "biasedDrops": {
         "health": 0.15,
         "oxygen": 0.25,
-        "rtg": 0.20,
-        "psychosphere": 0.40
+        "rtg": 0.2,
+        "psychosphere": 0.4
       }
     },
     "spire": {
-      "baseChance": 0.40,
-      "difficultyMultiplier": 0.10,
+      "baseChance": 0.4,
+      "difficultyMultiplier": 0.1,
       "biasedDrops": {
-        "health": 0.10,
+        "health": 0.1,
         "oxygen": 0.45,
-        "rtg": 0.20,
+        "rtg": 0.2,
         "psychosphere": 0.25
       }
     },
@@ -25,10 +25,10 @@
       "baseChance": 0.45,
       "difficultyMultiplier": 0.12,
       "biasedDrops": {
-        "health": 0.50,
+        "health": 0.5,
         "oxygen": 0.15,
         "rtg": 0.15,
-        "psychosphere": 0.20
+        "psychosphere": 0.2
       }
     }
   },

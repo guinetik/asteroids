@@ -14,6 +14,7 @@ import { addItem, createInventory } from '@/lib/inventory/inventory'
 import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
 import {
   clearActiveMission,
+  loadActiveMission,
   loadMissionBoard,
   saveMissionBoard,
   savePendingMapReturnWorld,
@@ -23,6 +24,7 @@ import {
   loadProfile,
   recordAsteroidVisit,
   recordMissionComplete,
+  recordMissionObjectiveComplete,
   saveProfile,
 } from '@/lib/player/profile'
 import { contractSystem } from '@/lib/contracts/runtime'
@@ -41,6 +43,9 @@ export function persistCompletedAsteroidMissionRewards(
   rewardMultiplier: number,
 ): void {
   if (typeof localStorage === 'undefined') return
+
+  const activeMission = loadActiveMission()
+  if (activeMission?.id !== mission.id) return
 
   const profile = loadProfile()
   if (profile) {
@@ -61,6 +66,9 @@ export function persistCompletedAsteroidMissionRewards(
     let next = addCredits(profile, credits)
     next = recordMissionComplete(next)
     next = recordAsteroidVisit(next, mission.asteroidId)
+    for (const objective of mission.objectives) {
+      next = recordMissionObjectiveComplete(next, objective.type)
+    }
     saveProfile(next)
   }
 

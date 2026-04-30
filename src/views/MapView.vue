@@ -48,6 +48,8 @@ import {
   onContractStepCompleted,
   onContractsChanged,
 } from '@/lib/contracts/runtime'
+import type { ContractStoreSnapshot } from '@/lib/contracts/contractTypes'
+import { emptyContractSnapshot } from '@/lib/contracts/contractStorage'
 import {
   getCurrentUpgradeValue,
   getUpgradeCost,
@@ -149,19 +151,19 @@ function refreshActiveMessage(): void {
       messageDialogVisible.value = false
     }
   }
-  if (pendingInboxCount.value > prevInboxCount) uiAudio.notifyInboxMessage();
+  if (pendingInboxCount.value > prevInboxCount) uiAudio.notifyInboxMessage()
 
   // Contract channel — independent from the inbox dialog state.
   const nextContract = shipMessageSystem.getActiveMessage(CONTRACT_FILTER)
   activeContractMessage.value = nextContract
   const nextContractId = nextContract?.id ?? null
   if (nextContractId && nextContractId !== prevContractId) {
-    uiAudio.notifyContractUpdate();
+    uiAudio.notifyContractUpdate()
   }
 }
 
 function openMessage(): void {
-  uiAudio.notifyConfirm();
+  uiAudio.notifyConfirm()
   if (activeInboxMessage.value?.status === 'pending') {
     shipMessageSystem.markShown(activeInboxMessage.value.id)
     activeInboxMessage.value = { ...activeInboxMessage.value, status: 'shown' }
@@ -211,7 +213,7 @@ const contractNoticePill = computed<string | null>(() => {
 function openContractMessage(): void {
   const readable = activeContractMessage.value
   if (!readable?.contractId) return
-  uiAudio.notifyConfirm();
+  uiAudio.notifyConfirm()
   shuttleControlMailFocusFolderId.value = readable.contractId
   shuttleControlMailFocusMessageId.value = readable.id
   shuttleControlProgramOnOpen.value = 'mail'
@@ -364,6 +366,7 @@ const shopDialogVisible = ref(false)
 const shopSession = ref<ShopSession | null>(null)
 const shopProfile = ref<PlayerProfile>(createProfile('Pilot'))
 const playerProfileSnapshot = ref<PlayerProfile>(createProfile('Pilot'))
+const contractSnapshot = ref<ContractStoreSnapshot>(emptyContractSnapshot())
 const shopInventory = ref<Inventory>(createInventory())
 const playerCredits = ref(1000)
 const fuelCellCount = ref(0)
@@ -589,6 +592,7 @@ const spaceFabricControlUnlocked = computed(() =>
 const achievementProgress = computed<AchievementProgress>(() => ({
   profile: playerProfileSnapshot.value,
   upgradeLevels: upgradeLevelsUi.value,
+  contractSnapshot: contractSnapshot.value,
 }))
 
 watch(
@@ -669,6 +673,7 @@ function showMissionNotification(text: string): void {
 function syncPersistentProgressFromController(): void {
   playerProfileSnapshot.value = viewController.getPlayerProfileSnapshot()
   upgradeLevelsUi.value = viewController.getUpgradeLevelsSnapshot()
+  contractSnapshot.value = viewController.getContractSnapshot()
   playerCredits.value = playerProfileSnapshot.value.credits
 }
 
@@ -727,6 +732,7 @@ onMounted(async () => {
         targetPlanetId: null,
         objectiveType: '',
       })
+      syncPersistentProgressFromController()
     }
     viewController.onMapIntro = (state) => {
       Object.assign(mapIntro, state)
@@ -741,6 +747,9 @@ onMounted(async () => {
       Object.assign(mapBootState, state)
     }
     viewController.onUpgradeHudRefresh = () => {
+      syncPersistentProgressFromController()
+    }
+    viewController.onPersistentProgressUpdate = () => {
       syncPersistentProgressFromController()
     }
     viewController.onUpgradeInstalledAnnouncement = (
@@ -881,6 +890,7 @@ onMounted(async () => {
           giverPlanetId: mission.giverPlanet,
           targetPlanetId: mission.template.targetPlanet,
         })
+        syncPersistentProgressFromController()
       }
     }
     viewController.onMissionDeliver = (mission) => {
@@ -894,6 +904,7 @@ onMounted(async () => {
           targetPlanetId: mission.template.targetPlanet,
           objectiveType: '',
         })
+        syncPersistentProgressFromController()
       }
     }
     viewController.onMiningMissionDeliver = (mission, creditsEarned) => {
@@ -944,7 +955,7 @@ onMounted(async () => {
         showMissionNotification(
           `Contract step complete — +${payload.creditsReward.toLocaleString()} CR`,
         )
-        uiAudio.notifyCreditsAwarded();
+        uiAudio.notifyCreditsAwarded()
       }
     })
     syncPersistentProgressFromController()
@@ -1005,17 +1016,17 @@ function handleWindowKeydown(event: KeyboardEvent): void {
 }
 
 function handleToggleOrbits() {
-  uiAudio.notifySwitch();
+  uiAudio.notifySwitch()
   orbitsVisible.value = viewController.toggleOrbits()
 }
 
 function handleToggleGrid() {
-  uiAudio.notifySwitch();
+  uiAudio.notifySwitch()
   gridVisible.value = viewController.toggleSpaceTimeGrid()
 }
 
 function closeShuttleControl() {
-  uiAudio.notifyCancel();
+  uiAudio.notifyCancel()
   shuttleControlVisible.value = false
   // Habitat opens the terminal after `exitPointerLock`; map mode uses orbit drag without lock.
   if (habitatActive.value) {
@@ -1028,7 +1039,7 @@ function closeShuttleControl() {
  * Opens the shuttle terminal on a program, or switches to it if the terminal is already open.
  */
 function openProgramFromMap(program: ShuttleControlInitialProgram): void {
-  uiAudio.notifyButtonClick();
+  uiAudio.notifyButtonClick()
   if (shopDialogVisible.value) {
     viewController.closeShop()
   }
@@ -1050,12 +1061,12 @@ function stopShuttleMessageAudio(): void {
 }
 
 function handleToggleMusic(): void {
-  uiAudio.notifySwitch();
+  uiAudio.notifySwitch()
   toggleBackgroundMusic()
 }
 
 function openHabitatFromMap(): void {
-  uiAudio.notifyButtonClick();
+  uiAudio.notifyButtonClick()
   shuttleControlVisible.value = false
   viewController.enterHabitat()
 }
@@ -1077,8 +1088,9 @@ function handlePurchaseUpgrade(upgradeId: UpgradeId): void {
   upgradeInstalledCreditsSpent.value = getUpgradeCost(upgradeId, newLevel)
   upgradeInstalledMetaText.value = null
   upgradeInstalledVisible.value = true
-  uiAudio.notifyUpgradeInstalled();
+  uiAudio.notifyUpgradeInstalled()
   contractSystem.notifyUpgradeInstalled(upgradeId, newLevel)
+  syncPersistentProgressFromController()
 }
 
 function onUpgradeInstalledDismissed(): void {
@@ -1095,12 +1107,12 @@ function onJourneyStartedDismissed(): void {
 }
 
 function handleToggleLabels() {
-  uiAudio.notifySwitch();
+  uiAudio.notifySwitch()
   labelsVisible.value = viewController.toggleLabels()
 }
 
 function handleToggleAmbient() {
-  uiAudio.notifySwitch();
+  uiAudio.notifySwitch()
   ambientVisible.value = viewController.toggleAmbient()
 }
 
@@ -1115,10 +1127,12 @@ function closeShop() {
 
 function handleShopBuyTradeGood(slotIndex: number, quantity: number) {
   viewController.shopBuyTradeGood(slotIndex, quantity)
+  syncPersistentProgressFromController()
 }
 
 function handleShopSellItem(itemId: string, quantity: number) {
   viewController.shopSellItem(itemId, quantity)
+  syncPersistentProgressFromController()
 }
 
 function handleShopRefuel() {
@@ -1184,33 +1198,34 @@ function closeMissionOverlay() {
 function handleAcceptMission() {
   const result = viewController.missionAccept()
   if (!result.ok && result.reason) {
-    uiAudio.notifyError();
+    uiAudio.notifyError()
     showMissionNotification(result.reason)
   } else {
-    uiAudio.notifyMissionAccepted();
+    uiAudio.notifyMissionAccepted()
   }
 }
 
 function handleAcceptAsteroidMission() {
   viewController.asteroidMissionAccept()
-  uiAudio.notifyMissionAccepted();
+  uiAudio.notifyMissionAccepted()
   viewController.notifyJourneyTrigger('accepted_asteroid_mission')
 }
 
 function handleAcceptEvaMission() {
   viewController.evaMissionAccept()
-  uiAudio.notifyMissionAccepted();
+  uiAudio.notifyMissionAccepted()
   viewController.notifyJourneyTrigger('accepted_eva_mission')
 }
 
 function handleAcceptMiningMission() {
   viewController.miningMissionAccept()
-  uiAudio.notifyMissionAccepted();
+  uiAudio.notifyMissionAccepted()
 }
 
 function handleDeliverMiningMission(missionId: string) {
   viewController.miningMissionDeliver(missionId)
-  uiAudio.notifyMissionComplete();
+  uiAudio.notifyMissionComplete()
+  syncPersistentProgressFromController()
 }
 
 /** Player clicked the overlay's Complete button — pay reward and close. */
@@ -1225,7 +1240,7 @@ function handleEvaMinigameClose(): void {
 
 function handleDeliverMission(missionId: string) {
   viewController.missionDeliver(missionId)
-  uiAudio.notifyMissionComplete();
+  uiAudio.notifyMissionComplete()
 }
 
 function dockedPlanetId(): string | null {
@@ -1234,23 +1249,31 @@ function dockedPlanetId(): string | null {
   return planet?.id ?? null
 }
 
+function notifyContractPlanetVisitedByName(bodyName: string): void {
+  if (bodyName === SUN.name) {
+    contractSystem.notifyPlanetVisited(SUN.id)
+    syncPersistentProgressFromController()
+    return
+  }
+  const planet = PLANETS.find((p) => p.name === bodyName)
+  if (!planet) return
+  contractSystem.notifyPlanetVisited(planet.id)
+  syncPersistentProgressFromController()
+}
+
 /**
- * Notify the contract system whenever the shuttle transitions into an
- * `orbiting` state at a planet. The watcher uses an `oldState` signature so a
- * single visit only fires the notification once until the player breaks orbit.
+ * Notify the contract system whenever the shuttle establishes orbit at a body
+ * or fast-travel swaps the target while already orbiting.
  */
 watch(
   () => ({ state: orbitState.state, name: orbitState.nearestBodyName }),
   (next, prev) => {
-    if (next.state !== 'orbiting' || prev?.state === 'orbiting') return
     if (!next.name) return
-    if (next.name === SUN.name) {
-      contractSystem.notifyPlanetVisited(SUN.id)
-      return
-    }
-    const planet = PLANETS.find((p) => p.name === next.name)
-    if (!planet) return
-    contractSystem.notifyPlanetVisited(planet.id)
+    const enteredOrbit = next.state === 'orbiting' && prev?.state !== 'orbiting'
+    const changedOrbitTarget =
+      next.state === 'orbiting' && prev?.state === 'orbiting' && prev.name !== next.name
+    if (!enteredOrbit && !changedOrbitTarget) return
+    notifyContractPlanetVisitedByName(next.name)
   },
 )
 </script>

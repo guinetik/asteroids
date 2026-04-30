@@ -170,7 +170,11 @@ export class SatelliteRepairController {
    * @param outEntry - First hit point on the box, for impact VFX.
    * @returns True when a bolt should be consumed.
    */
-  tryScienceRepairSegment(from: THREE.Vector3, to: THREE.Vector3, outEntry: THREE.Vector3): boolean {
+  tryScienceRepairSegment(
+    from: THREE.Vector3,
+    to: THREE.Vector3,
+    outEntry: THREE.Vector3,
+  ): boolean {
     if (!this.cfg) return false
     const best = this.pickFirstSegmentHit(from, to, outEntry)
     if (!best) return false
@@ -238,9 +242,7 @@ export class SatelliteRepairController {
       const vol = this.aabbVolume(b)
       const earlierAlongBolt = best === null || tAlong < bestT - SEGMENT_ENTRY_T_EPSILON
       const tieBreakSmallerPart =
-        best !== null &&
-        Math.abs(tAlong - bestT) <= SEGMENT_ENTRY_T_EPSILON &&
-        vol < bestVol
+        best !== null && Math.abs(tAlong - bestT) <= SEGMENT_ENTRY_T_EPSILON && vol < bestVol
       if (!(earlierAlongBolt || tieBreakSmallerPart)) continue
 
       bestT = tAlong

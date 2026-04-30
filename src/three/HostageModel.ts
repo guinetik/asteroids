@@ -128,12 +128,7 @@ const cuffMaterial = new THREE.MeshBasicMaterial({
  * - `'walking'`: forward walk cycle with hips translation stripped.
  * - `'dying'`: one-shot collapse, clamps on last frame so the corpse stays grounded.
  */
-export type HostageAnimationState =
-  | 'tpose'
-  | 'praying'
-  | 'standing-up'
-  | 'walking'
-  | 'dying'
+export type HostageAnimationState = 'tpose' | 'praying' | 'standing-up' | 'walking' | 'dying'
 
 /**
  * Mixamo hostage prop — add {@link group} to the scene after {@link HostageModel.create}.

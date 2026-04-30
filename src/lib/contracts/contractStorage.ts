@@ -56,8 +56,7 @@ export function loadContractSnapshot(): ContractStoreSnapshot {
         instances[id] = {
           contractId: entry.contractId ?? id,
           status: (entry.status as ContractInstance['status']) ?? 'available',
-          currentStepIndex:
-            typeof entry.currentStepIndex === 'number' ? entry.currentStepIndex : 0,
+          currentStepIndex: typeof entry.currentStepIndex === 'number' ? entry.currentStepIndex : 0,
           stepCounters: Array.isArray(entry.stepCounters)
             ? entry.stepCounters.filter((n): n is number => typeof n === 'number')
             : [],

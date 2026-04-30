@@ -265,7 +265,11 @@ onBeforeUnmount(cancelChapterHeightReset)
           </button>
         </article>
 
-        <article v-else key="empty" class="tutorial-program-content tutorial-program-content--empty">
+        <article
+          v-else
+          key="empty"
+          class="tutorial-program-content tutorial-program-content--empty"
+        >
           <p class="tutorial-program-content__kicker">No chapters loaded</p>
           <h3 class="tutorial-program-content__title">Manual data unavailable</h3>
         </article>
