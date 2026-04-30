@@ -232,6 +232,13 @@ export type RewardEffect =
   | { type: 'fast-travel'; planetId: string }
   | { type: 'mission-pay-multiplier'; planetId: string; multiplier: number }
   | { type: 'shuttle-upgrade'; upgradeId: UpgradeId; minLevel: number }
+  | { type: 'shuttle-buff'; buffId: string; multiplier: number }
+  | { type: 'disable-giver'; giverId: string }
+  | {
+      type: 'set-body-access'
+      bodyId: string
+      state: 'restricted' | 'unrestricted' | 'liberated' | 'destroyed'
+    }
 
 /** Static contract definition authored as JSON. */
 export interface Contract {
