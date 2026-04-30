@@ -37,7 +37,7 @@ import MissionMiniGameOverlay from '@/components/MissionMiniGameOverlay.vue'
 import EvaMinigameOverlay from '@/components/EvaMinigameOverlay.vue'
 import { PINNED_BODIES, PLANETS, SUN } from '@/lib/planets/catalog'
 import type { ShopSession } from '@/lib/shop/tradeTypes'
-import type { BodyAccessState, PlayerProfile } from '@/lib/player/types'
+import type { PlayerProfile } from '@/lib/player/types'
 import type { Inventory } from '@/lib/inventory/types'
 import { createProfile } from '@/lib/player/profile'
 import { createInventory } from '@/lib/inventory/inventory'
@@ -372,11 +372,12 @@ const missionOverlayVisible = ref(false)
 const missionOverlayMission = ref<ActiveShuttleMission | null>(null)
 const missionOverlayCanFit = ref(false)
 const activeOrbitalMinigame = shallowRef<OrbitalMiniGame | null>(null)
-const PINNED_BODY_ID_SET = new Set(PINNED_BODIES.map((body) => body.id))
-const nearestBodyAccess = computed<BodyAccessState | undefined>(() => {
+const PINNED_BODY_NO_KIOSK_IDS = new Set(
+  PINNED_BODIES.filter((body) => body.noKiosks).map((body) => body.id),
+)
+const suppressOrbitKiosks = computed(() => {
   const bodyId = orbitState.nearestBodyId
-  if (!bodyId || !PINNED_BODY_ID_SET.has(bodyId)) return undefined
-  return playerProfileSnapshot.value.bodyAccess[bodyId] ?? 'restricted'
+  return orbitState.state === 'orbiting' && Boolean(bodyId && PINNED_BODY_NO_KIOSK_IDS.has(bodyId))
 })
 
 watch([missionOverlayVisible, activeOrbitalMinigame], ([visible, mg]) => {
@@ -718,6 +719,7 @@ onMounted(async () => {
         giverPlanetId: mission.giverPlanet,
         giverId: null,
         targetPlanetId: null,
+        objectiveType: '',
       })
     }
     viewController.onMapIntro = (state) => {
@@ -884,6 +886,7 @@ onMounted(async () => {
           giverPlanetId: mission.giverPlanet,
           giverId: null,
           targetPlanetId: mission.template.targetPlanet,
+          objectiveType: '',
         })
       }
     }
@@ -1428,8 +1431,7 @@ watch(
       :orbitState="orbitState"
       :shop-available="shopButtonVisible && !shopDialogVisible && !shuttleControlVisible"
       :mission-available="missionButtonVisible && !missionOverlayVisible && !shuttleControlVisible"
-      :body-access="nearestBodyAccess"
-      :mission-callout-visible="false"
+      :suppress-kiosks="suppressOrbitKiosks"
       @open-engineering-bay="() => openProgramFromMap('upgrades')"
       @open-mission-board="() => openProgramFromMap('missions')"
       @open-shop="openShop"

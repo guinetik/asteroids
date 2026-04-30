@@ -137,6 +137,7 @@ export function deliverTurretMiningMission(
     giverPlanetId: mission.giverPlanet,
     giverId,
     targetPlanetId: null,
+    objectiveType: 'mining',
   })
   return {
     ok: true,

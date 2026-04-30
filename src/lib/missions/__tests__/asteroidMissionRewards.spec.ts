@@ -9,6 +9,7 @@ import {
 import { PROFILE_STORAGE_KEY, loadProfile, createProfile, saveProfile } from '@/lib/player/profile'
 import { loadInventory } from '@/lib/inventory/inventoryStorage'
 import type { GeneratedAsteroidMission } from '../types'
+import { contractSystem } from '@/lib/contracts/runtime'
 
 const BASE_MISSION: GeneratedAsteroidMission = {
   kind: 'standard',
@@ -205,5 +206,40 @@ describe('persistCompletedAsteroidMissionRewards', () => {
         },
       ],
     })
+  })
+
+  it('emits MissionCompletedEvent with objectiveType drawn from the primary objective slot', () => {
+    const mission: GeneratedAsteroidMission = {
+      ...BASE_MISSION,
+      id: 'objtype-test',
+      objectives: [
+        {
+          type: 'photometry',
+          x: 0,
+          z: 0,
+          reward: 500,
+        },
+      ],
+    }
+    localStorage.setItem(ACTIVE_MISSION_KEY, JSON.stringify(mission))
+    const spy = vi.spyOn(contractSystem, 'notifyMissionCompleted')
+    persistCompletedAsteroidMissionRewards(mission, 1)
+    const callArg = spy.mock.calls[0]?.[0]
+    expect(callArg?.objectiveType).toBe('photometry')
+    spy.mockRestore()
+  })
+
+  it('emits objectiveType: "" when objectives array is empty', () => {
+    const mission: GeneratedAsteroidMission = {
+      ...BASE_MISSION,
+      id: 'objtype-empty',
+      objectives: [],
+    }
+    localStorage.setItem(ACTIVE_MISSION_KEY, JSON.stringify(mission))
+    const spy = vi.spyOn(contractSystem, 'notifyMissionCompleted')
+    persistCompletedAsteroidMissionRewards(mission, 1)
+    const callArg = spy.mock.calls[0]?.[0]
+    expect(callArg?.objectiveType).toBe('')
+    spy.mockRestore()
   })
 })

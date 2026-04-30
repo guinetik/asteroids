@@ -98,5 +98,6 @@ export function persistCompletedAsteroidMissionRewards(
     giverPlanetId: null,
     giverId: mission.giverId ?? null,
     targetPlanetId: null,
+    objectiveType: mission.objectives[0]?.type ?? '',
   })
 }
