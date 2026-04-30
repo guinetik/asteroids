@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 import type { Inventory, InventoryStack } from '@/lib/inventory/types'
 import InventoryTable from '@/components/shop/InventoryTable.vue'
+import ShuttleProgramCover from '@/components/ShuttleProgramCover.vue'
 
 const props = defineProps<{
   inventory?: Inventory | null
@@ -87,53 +88,69 @@ const cargoBands = computed<CargoBand[]>(() => {
 
 <template>
   <div class="shuttle-control-screen">
-    <h2 class="shuttle-control-screen__title">Inventory</h2>
-    <section class="cargo-capacity-panel">
-      <div class="cargo-capacity-panel__header">
-        <div>
-          <p class="cargo-capacity-panel__eyebrow">Cargo Capacity</p>
-          <p class="cargo-capacity-panel__reading">
-            {{ totalWeightKg.toFixed(0) }} / {{ resolvedInventory.maxWeightKg.toFixed(0) }} kg
-          </p>
+    <ShuttleProgramCover variant="inventory">
+      <h2 class="shuttle-control-screen__title">Inventory</h2>
+      <p class="shuttle-program-intro">
+        Whatever is ratcheted into the hold surfaces here as your live
+        <span class="shuttle-program-intro-em">cargo manifest</span>
+        &mdash; minerals, fuel cells, trade crates, and mission payloads all chew through
+        <span class="shuttle-program-intro-em">slots</span>
+        and
+        <span class="shuttle-program-intro-em">mass headroom</span>. Telemetry matches intake locks;
+        exceed either and fresh pickups bounce at the collar. The
+        <span class="shuttle-program-intro-em">Use</span>
+        action spends certified consumables when you're flight-ready. Need clearance? Lighten the stack
+        from the station
+        <span class="shuttle-program-intro-em">Shop</span>
+        before the next contract closes intake.
+      </p>
+      <section class="cargo-capacity-panel shuttle-program-ambient__cargo-panel">
+        <div class="cargo-capacity-panel__header">
+          <div>
+            <p class="cargo-capacity-panel__eyebrow">Cargo Capacity</p>
+            <p class="cargo-capacity-panel__reading">
+              {{ totalWeightKg.toFixed(0) }} / {{ resolvedInventory.maxWeightKg.toFixed(0) }} kg
+            </p>
+          </div>
+          <div class="cargo-capacity-panel__slot-readout">
+            {{ slotUsage.used }} / {{ slotUsage.max }} slots
+          </div>
         </div>
-        <div class="cargo-capacity-panel__slot-readout">
-          {{ slotUsage.used }} / {{ slotUsage.max }} slots
-        </div>
-      </div>
-      <div class="cargo-capacity-bar">
-        <span
-          v-for="band in cargoBands.filter((entry) => entry.weightKg > 0)"
-          :key="band.id"
-          class="cargo-capacity-bar__segment"
-          :class="`cargo-capacity-bar__segment--${band.id}`"
-          :style="{ width: `${band.percent}%` }"
-        />
-        <span
-          v-if="weightUsagePercent < 100"
-          class="cargo-capacity-bar__remaining"
-          :style="{ width: `${100 - weightUsagePercent}%` }"
-        />
-      </div>
-      <div class="cargo-capacity-legend">
-        <div
-          v-for="band in cargoBands"
-          :key="band.id"
-          class="cargo-capacity-legend__item"
-          :class="{ 'cargo-capacity-legend__item--empty': band.weightKg <= 0 }"
-        >
+        <div class="cargo-capacity-bar">
           <span
-            class="cargo-capacity-legend__swatch"
-            :class="`cargo-capacity-legend__swatch--${band.id}`"
+            v-for="band in cargoBands.filter((entry) => entry.weightKg > 0)"
+            :key="band.id"
+            class="cargo-capacity-bar__segment"
+            :class="`cargo-capacity-bar__segment--${band.id}`"
+            :style="{ width: `${band.percent}%` }"
           />
-          <span class="cargo-capacity-legend__label">{{ band.label }}</span>
-          <span class="cargo-capacity-legend__value">{{ band.weightKg.toFixed(0) }} kg</span>
+          <span
+            v-if="weightUsagePercent < 100"
+            class="cargo-capacity-bar__remaining"
+            :style="{ width: `${100 - weightUsagePercent}%` }"
+          />
         </div>
-      </div>
-    </section>
-    <InventoryTable
-      :items="resolvedInventory.stacks"
-      mode="view"
-      @use="(itemId) => emit('use-item', itemId)"
-    />
+        <div class="cargo-capacity-legend">
+          <div
+            v-for="band in cargoBands"
+            :key="band.id"
+            class="cargo-capacity-legend__item"
+            :class="{ 'cargo-capacity-legend__item--empty': band.weightKg <= 0 }"
+          >
+            <span
+              class="cargo-capacity-legend__swatch"
+              :class="`cargo-capacity-legend__swatch--${band.id}`"
+            />
+            <span class="cargo-capacity-legend__label">{{ band.label }}</span>
+            <span class="cargo-capacity-legend__value">{{ band.weightKg.toFixed(0) }} kg</span>
+          </div>
+        </div>
+      </section>
+      <InventoryTable
+        :items="resolvedInventory.stacks"
+        mode="view"
+        @use="(itemId) => emit('use-item', itemId)"
+      />
+    </ShuttleProgramCover>
   </div>
 </template>

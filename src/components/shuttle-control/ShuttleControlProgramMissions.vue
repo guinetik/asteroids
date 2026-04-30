@@ -21,6 +21,7 @@ import { getMissionPool } from '@/lib/missions/shuttleMissionPools'
 import { getEvaMissionPool } from '@/lib/missions/evaMissionPools'
 import { getTurretMiningPool } from '@/lib/missions/turretMiningPools'
 import type { EvaMissionPoiType } from '@/lib/missions/types'
+import ShuttleProgramCover from '@/components/ShuttleProgramCover.vue'
 
 const props = defineProps<{
   board: ShuttleMissionBoard | null
@@ -332,9 +333,24 @@ function evaTypeLabel(poiType: EvaMissionPoiType): string {
 
 <template>
   <div class="shuttle-control-screen">
-    <h2 class="shuttle-control-screen__title">Missions</h2>
+    <ShuttleProgramCover variant="missions">
+      <h2 class="shuttle-control-screen__title">Missions</h2>
+      <p class="shuttle-program-intro">
+        Docked postings aggregate here: quick
+        <span class="shuttle-program-intro-em">EVA</span>
+        tickets,
+        <span class="shuttle-program-intro-em">belt mining</span>
+        allotments,
+        <span class="shuttle-program-intro-em">asteroid</span>
+        contracts, and rare
+        <span class="shuttle-program-intro-em">planetary haulage</span>. Each card lists issuer, theater, reward, and whether your hold can swallow the cargo clause.
+        <span class="shuttle-program-intro-em">Accept</span>
+        moves work into
+        <span class="shuttle-program-intro-em">Active</span>
+        &mdash; finish the leg, deliver where instructed, and credits post when telemetry clears.
+      </p>
 
-    <!-- Shuttle EVA Missions (first — quick local spacewalk jobs) -->
+      <!-- Shuttle EVA Missions (first — quick local spacewalk jobs) -->
     <div v-if="evaSectionVisible" class="mission-board-section">
       <h3 class="mission-board-section__heading">Shuttle EVA Missions</h3>
       <p class="mission-board-section__descriptor">
@@ -596,5 +612,6 @@ function evaTypeLabel(poiType: EvaMissionPoiType): string {
         </div>
       </div>
     </div>
+    </ShuttleProgramCover>
   </div>
 </template>

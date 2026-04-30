@@ -8,6 +8,7 @@ import {
   type UpgradeId,
 } from '@/lib/upgrades'
 import { formatUpgradeStatValue, statValueAtDisplayLevel } from '@/lib/upgrades/upgradeUiFormat'
+import ShuttleProgramCover from '@/components/ShuttleProgramCover.vue'
 
 const props = defineProps<{
   /** Current credit balance (same source as map HUD). */
@@ -88,31 +89,33 @@ function rowIconModifier(category: UpgradeCategory): string {
 </script>
 
 <template>
-  <div class="shuttle-control-screen upgrade-shop-program">
-    <div class="upgrade-shop-program__header">
-      <h2 class="shuttle-control-screen__title">Engineering bay</h2>
-      <p class="upgrade-shop-program__credits">
-        Balance
-        <span class="upgrade-shop-program__credits-value"
-          >CR {{ playerCredits.toLocaleString() }}</span
-        >
+  <div class="shuttle-control-screen">
+    <ShuttleProgramCover variant="engineering-bay">
+      <div class="upgrade-shop-program">
+        <div class="upgrade-shop-program__header">
+        <h2 class="shuttle-control-screen__title">Engineering bay</h2>
+        <p class="upgrade-shop-program__credits">
+          Balance
+          <span class="upgrade-shop-program__credits-value"
+            >CR {{ playerCredits.toLocaleString() }}</span
+          >
+        </p>
+      </div>
+      <p class="shuttle-program-intro">
+        You're hard-docked at the
+        <span class="shuttle-program-intro-em">orbital spaceport</span>
+        &mdash; same facility that handles fuel cells, trades, and the occasional hull patch. Port
+        engineering keeps this channel open for flight-certified refits:
+        <span class="shuttle-program-intro-em">level&nbsp;0</span>
+        is whatever the frame shipped with from the yard; each paid tier bolts on a better coefficient
+        in the readout. Credits post the moment you confirm. Check
+        <span class="shuttle-program-intro-em">Now</span>
+        and
+        <span class="shuttle-program-intro-em">Next tier</span>
+        before you spend &mdash; no take-backs once the wire transfer clears.
       </p>
-    </div>
-    <p class="upgrade-shop-program__intro">
-      You're hard-docked at the
-      <span class="upgrade-shop-program__intro-em">orbital spaceport</span>
-      &mdash; same facility that handles fuel cells, trades, and the occasional hull patch. Port
-      engineering keeps this channel open for flight-certified refits:
-      <span class="upgrade-shop-program__intro-em">level&nbsp;0</span>
-      is whatever the frame shipped with from the yard; each paid tier bolts on a better coefficient
-      in the readout. Credits post the moment you confirm. Check
-      <span class="upgrade-shop-program__intro-em">Now</span>
-      and
-      <span class="upgrade-shop-program__intro-em">Next tier</span>
-      before you spend &mdash; no take-backs once the wire transfer clears.
-    </p>
 
-    <div v-for="block in categories" :key="block.category" class="upgrade-shop-program__category">
+      <div v-for="block in categories" :key="block.category" class="upgrade-shop-program__category">
       <div class="upgrade-shop-program__category-head">
         <div class="upgrade-shop-program__category-icon" aria-hidden="true">
           <!-- Shuttle -->
@@ -259,5 +262,7 @@ function rowIconModifier(category: UpgradeCategory): string {
         </li>
       </ul>
     </div>
+      </div>
+    </ShuttleProgramCover>
   </div>
 </template>

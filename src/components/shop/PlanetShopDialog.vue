@@ -117,26 +117,26 @@ function onKeydown(e: KeyboardEvent) {
 <template>
   <div class="planet-shop-overlay" @keydown="onKeydown" tabindex="0">
     <div class="planet-shop-card">
-      <!-- Header -->
-      <div class="planet-shop-header">
-        <span class="planet-shop-header__title">{{ planetName }} Trading Post</span>
-        <span class="planet-shop-header__credits">CR {{ profile.credits.toLocaleString() }}</span>
-        <button
-          type="button"
-          class="ship-message-card__button"
-          @click="
-            uiAudio.notifyCancel();
-            $emit('close')
-          "
-        >
-          Close
-        </button>
-      </div>
+      <div class="planet-shop-ambient">
+        <div class="planet-shop-ambient__backdrop" aria-hidden="true" />
+        <div class="planet-shop-ambient__stack">
+          <div class="planet-shop-header">
+            <span class="planet-shop-header__title">{{ planetName }} Trading Post</span>
+            <span class="planet-shop-header__credits">CR {{ profile.credits.toLocaleString() }}</span>
+            <button
+              type="button"
+              class="ship-message-card__button"
+              @click="
+                uiAudio.notifyCancel();
+                $emit('close')
+              "
+            >
+              Close
+            </button>
+          </div>
 
-      <div class="shuttle-control-divider" />
-
-      <!-- Body: buy + sell columns -->
-      <div class="planet-shop-body">
+          <!-- Body: buy + sell columns (scroll layer sits over faded cover art) -->
+          <div class="planet-shop-body">
         <!-- Buy column -->
         <div class="planet-shop-column planet-shop-column--buy">
           <h3 class="planet-shop-column__title">Buy</h3>
@@ -414,11 +414,12 @@ function onKeydown(e: KeyboardEvent) {
             @sell="(itemId, qty) => $emit('sellItem', itemId, qty)"
           />
         </div>
-      </div>
+          </div>
 
-      <!-- Footer -->
-      <div class="shuttle-control-footer">
-        <span class="ship-message-card__hint">ESC / B Close</span>
+          <div class="shuttle-control-footer planet-shop-ambient__footer">
+            <span class="ship-message-card__hint">ESC / B Close</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>

@@ -1385,8 +1385,134 @@ body {
   @apply text-sm text-slate-500;
 }
 
+/*
+ * Shuttle programs: top-mounted wide cover art — `background-size: cover` spans the content width;
+ * height is capped (`clamp`) so long lists do not stretch the photo down the whole scroll column.
+ * Solid `bg-slate-950` continues underneath (`planet-shop-ambient` still fills its dialog instead).
+ */
+.shuttle-program-ambient {
+  /*
+   * Negative margins cancel `shuttle-control-content--programs` padding so cover art spans full pane
+   * width and sits flush under the chrome divider; stack restores inset for typography.
+   */
+  @apply relative isolate mb-4 flex w-auto max-w-none flex-col overflow-hidden rounded-xl bg-slate-950
+         -mx-4 -mt-4 sm:-mx-5 sm:-mt-5;
+}
+
+.shuttle-program-ambient__backdrop {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: clamp(12rem, 42vh, 28rem);
+  z-index: 0;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center top;
+}
+
+.shuttle-program-ambient__stack {
+  @apply relative z-[1] flex flex-col gap-4 px-4 pt-4 sm:px-5 sm:pt-5;
+}
+
+.shuttle-program-ambient--inventory .shuttle-program-ambient__backdrop {
+  background-image:
+    linear-gradient(
+      180deg,
+      rgb(2 6 23 / 0.06) 0%,
+      rgb(2 6 23 / 0.26) 38%,
+      rgb(2 6 23 / 0.72) 72%,
+      rgb(2 6 23 / 1) 100%
+    ),
+    linear-gradient(
+      90deg,
+      rgb(2 6 23 / 0.72) 0%,
+      rgb(2 6 23 / 0.22) 52%,
+      rgb(2 6 23 / 0.06) 100%
+    ),
+    url('/inventory.webp');
+}
+
+.shuttle-program-ambient--missions .shuttle-program-ambient__backdrop {
+  background-image:
+    linear-gradient(
+      180deg,
+      rgb(2 6 23 / 0.06) 0%,
+      rgb(2 6 23 / 0.26) 38%,
+      rgb(2 6 23 / 0.72) 72%,
+      rgb(2 6 23 / 1) 100%
+    ),
+    linear-gradient(
+      90deg,
+      rgb(2 6 23 / 0.72) 0%,
+      rgb(2 6 23 / 0.22) 52%,
+      rgb(2 6 23 / 0.06) 100%
+    ),
+    url('/missions.webp');
+}
+
+.shuttle-program-ambient--engineering-bay .shuttle-program-ambient__backdrop {
+  background-image:
+    linear-gradient(
+      180deg,
+      rgb(2 6 23 / 0.06) 0%,
+      rgb(2 6 23 / 0.26) 38%,
+      rgb(2 6 23 / 0.72) 72%,
+      rgb(2 6 23 / 1) 100%
+    ),
+    linear-gradient(
+      90deg,
+      rgb(2 6 23 / 0.72) 0%,
+      rgb(2 6 23 / 0.22) 52%,
+      rgb(2 6 23 / 0.06) 100%
+    ),
+    url('/engineering-bay.webp');
+}
+
+.shuttle-program-ambient .shuttle-control-screen__title {
+  @apply mb-0 text-cyan-100/95;
+  text-shadow:
+    0 1px 3px rgb(2 6 23 / 1),
+    0 0 22px rgb(2 6 23 / 0.88),
+    0 2px 32px rgb(2 6 23 / 0.65);
+}
+
+.shuttle-program-intro {
+  @apply max-w-3xl text-sm leading-relaxed text-slate-200/95;
+  text-shadow:
+    0 1px 4px rgb(2 6 23 / 1),
+    0 0 18px rgb(2 6 23 / 0.78),
+    0 2px 26px rgb(2 6 23 / 0.58);
+}
+
+.shuttle-program-intro-em {
+  @apply font-medium text-cyan-100/95;
+  text-shadow:
+    0 1px 3px rgb(2 6 23 / 1),
+    0 0 14px rgb(2 6 23 / 0.82),
+    0 0 28px rgb(34 211 238 / 0.22);
+}
+
+.shuttle-program-ambient .upgrade-shop-program__credits {
+  text-shadow:
+    0 1px 3px rgb(2 6 23 / 1),
+    0 0 14px rgb(2 6 23 / 0.72);
+}
+
+.shuttle-program-ambient .upgrade-shop-program__credits-value {
+  text-shadow:
+    0 1px 3px rgb(2 6 23 / 1),
+    0 0 16px rgb(2 6 23 / 0.78),
+    0 0 22px rgb(34 211 238 / 0.18);
+}
+
 .cargo-capacity-panel {
   @apply mb-4 rounded-xl border border-cyan-400/15 bg-cyan-500/5 p-4;
+}
+
+.cargo-capacity-panel.shuttle-program-ambient__cargo-panel {
+  @apply mb-0 border-cyan-400/28 bg-slate-950/45 backdrop-blur-md;
 }
 
 .cargo-capacity-panel__header {
@@ -1496,14 +1622,6 @@ body {
 
 .upgrade-shop-program__credits-value {
   @apply ml-2 text-cyan-300/90 tabular-nums;
-}
-
-.upgrade-shop-program__intro {
-  @apply max-w-3xl text-sm leading-relaxed text-slate-500;
-}
-
-.upgrade-shop-program__intro-em {
-  @apply font-medium text-cyan-200/85;
 }
 
 .upgrade-shop-program__category {
@@ -2649,14 +2767,49 @@ body {
 
 .planet-shop-card {
   @apply flex w-full max-w-6xl flex-col overflow-hidden rounded-2xl
-         border border-amber-400/25 bg-slate-950/95 text-slate-100 shadow-2xl;
+         border border-amber-400/25 bg-slate-950 text-slate-100 shadow-2xl;
   max-height: 85vh;
 }
 
+.planet-shop-ambient {
+  @apply relative isolate flex min-h-0 flex-1 flex-col overflow-hidden;
+}
+
+.planet-shop-ambient__backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: cover, cover, cover;
+  background-position: center top, center, center top;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgb(2 6 23 / 0.06) 0%,
+      rgb(2 6 23 / 0.22) 26%,
+      rgb(2 6 23 / 0.42) 42%,
+      rgb(2 6 23 / 0.62) 58%,
+      rgb(2 6 23 / 0.82) 76%,
+      rgb(2 6 23 / 0.92) 100%
+    ),
+    linear-gradient(
+      90deg,
+      rgb(2 6 23 / 0.72) 0%,
+      rgb(2 6 23 / 0.22) 52%,
+      rgb(2 6 23 / 0.06) 100%
+    ),
+    url('/shop.webp');
+}
+
+.planet-shop-ambient__stack {
+  @apply relative z-[1] flex min-h-0 flex-1 flex-col;
+}
+
 .planet-shop-header {
-  @apply flex items-center justify-between border-b border-white/10
-         bg-white/5 px-5 py-3 font-mono text-[11px] uppercase
-         tracking-widest text-slate-400;
+  @apply flex shrink-0 items-center justify-between border-b border-amber-400/25
+         bg-slate-950/45 px-5 py-3 font-mono text-[11px] uppercase tracking-widest
+         text-slate-400 backdrop-blur-sm;
 }
 
 .planet-shop-header__title {
@@ -2668,7 +2821,11 @@ body {
 }
 
 .planet-shop-body {
-  @apply grid min-h-0 flex-1 grid-cols-2 gap-4 overflow-hidden p-5;
+  @apply relative z-[1] grid min-h-0 flex-1 grid-cols-2 gap-4 overflow-hidden p-5;
+}
+
+.planet-shop-ambient__footer.shuttle-control-footer {
+  @apply shrink-0 bg-slate-950/70 backdrop-blur-md;
 }
 
 .planet-shop-column {
