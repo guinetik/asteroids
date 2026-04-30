@@ -1,0 +1,85 @@
+/*
+ * ProspectusOverlay — Jovian Society terminal readout overlay.
+ *
+ * Mirrors the dan-scan-panel pattern: separate .css file because
+ * Tailwind v4 + Vue scoped <style> can't resolve @apply utility classes.
+ */
+
+.prospectus-overlay {
+  @apply fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm;
+}
+
+.prospectus-overlay__panel {
+  @apply font-mono text-stone-100 bg-stone-950 border border-blue-700/60 rounded-md p-6 max-w-2xl w-full;
+}
+
+/* Header */
+.prospectus-overlay__header {
+  @apply flex gap-3 items-start mb-4 pb-3 border-b border-blue-800/50;
+}
+
+.prospectus-overlay__logo {
+  @apply text-3xl text-blue-400;
+}
+
+.prospectus-overlay__brand {
+  @apply text-blue-300 font-bold tracking-wider;
+}
+
+.prospectus-overlay__subbrand {
+  @apply text-stone-400 text-xs tracking-widest;
+}
+
+.prospectus-overlay__title {
+  @apply text-lg mt-1;
+}
+
+.prospectus-overlay__cohort {
+  @apply text-stone-500 text-xs;
+}
+
+/* Asset card */
+.prospectus-overlay__asset-card {
+  @apply text-sm leading-6 mb-4 p-3 bg-stone-900/60 rounded;
+}
+
+.prospectus-overlay__asset-ref {
+  @apply text-blue-300 font-bold mb-1;
+}
+
+/* Photometry / DAN sections */
+.prospectus-overlay__photometry,
+.prospectus-overlay__dan {
+  @apply mb-3 grid grid-cols-[280px_1fr] gap-4 items-start;
+}
+
+.prospectus-overlay__composition,
+.prospectus-overlay__dan-labels {
+  @apply text-xs text-stone-300 list-none;
+}
+
+/* Recommendation */
+.prospectus-overlay__recommendation {
+  @apply mb-4 p-3 border border-blue-700/60 rounded bg-blue-950/30;
+}
+
+.prospectus-overlay__recommendation h3 {
+  @apply text-blue-300 text-sm font-bold mb-2 tracking-widest;
+}
+
+.prospectus-overlay__recommendation p {
+  @apply text-sm leading-6;
+}
+
+/* CTAs */
+.prospectus-overlay__ctas {
+  @apply flex items-center gap-3 justify-end;
+}
+
+.prospectus-overlay__cta--transmit {
+  @apply bg-emerald-600/90 hover:bg-emerald-500 text-white px-4 py-2 rounded font-bold disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.prospectus-overlay__cta--tamper {
+  @apply bg-stone-800 hover:bg-stone-700 text-stone-400 px-3 py-1 text-sm rounded disabled:opacity-50 disabled:cursor-not-allowed;
+}

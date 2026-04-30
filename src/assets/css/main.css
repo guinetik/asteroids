@@ -3,6 +3,7 @@
 @import './dan-scan-panel.css';
 @import './bunkerWaveHud.css';
 @import './mapTacOverlay.css';
+@import './prospectus-overlay.css';
 
 /*
  * Reusable utility classes via @apply.
