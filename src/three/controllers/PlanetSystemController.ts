@@ -265,6 +265,11 @@ export class PlanetSystemController implements GravitySource {
     return this.planet.id
   }
 
+  /** The planet's display name from the catalog. */
+  get name(): string {
+    return this.planet.name
+  }
+
   /** The planet's accent color from the catalog. */
   get accentColor(): string {
     return this.planet.accentColor

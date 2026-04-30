@@ -7,7 +7,6 @@
  * @spec docs/asteroid-lander-gdd.md
  */
 import * as THREE from 'three'
-import { PLANETS } from '@/lib/planets/catalog'
 import {
   AIM_BLOCK_THRESHOLD,
   EARTH_CATALOG_DISPLAY_RADIUS,
@@ -159,7 +158,13 @@ export function buildMapBodies(params: {
     getWorldZ(): number
     mass: number
   } | null
-  planets: Array<{ getWorldX(): number; getWorldZ(): number; mass: number }>
+  planets: Array<{
+    id: string
+    name: string
+    getWorldX(): number
+    getWorldZ(): number
+    mass: number
+  }>
 }): Array<{ id: string; name: string; x: number; z: number; mass: number }> {
   const bodies: Array<{ id: string; name: string; x: number; z: number; mass: number }> = []
 
@@ -173,12 +178,15 @@ export function buildMapBodies(params: {
     })
   }
 
+  // Read id/name directly from the controller (works for both regular planets
+  // and pinned bodies — whichever set the caller passed in). Avoids the old
+  // index-into-PLANETS lookup, which dropped labels for pinned bodies appended
+  // beyond `PLANETS.length` in the controllers array.
   for (let i = 0; i < params.planets.length; i++) {
     const planet = params.planets[i]!
-    const def = PLANETS[i]
     bodies.push({
-      id: def?.id ?? '',
-      name: def?.name ?? '',
+      id: planet.id,
+      name: planet.name,
       x: planet.getWorldX(),
       z: planet.getWorldZ(),
       mass: planet.mass,
