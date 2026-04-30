@@ -36,7 +36,7 @@ function inMemoryPersistence(): {
 const mining: MissionCompletedEvent = {
   kind: 'mining',
   giverPlanetId: 'jupiter',
-  giverId: 'jovian-society',
+  giverId: null,
   targetPlanetId: null,
 }
 const asteroid: MissionCompletedEvent = {

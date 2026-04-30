@@ -45,7 +45,7 @@
       "kind": "complete-missions",
       "count": 1,
       "missionType": "mining",
-      "giverId": "jovian-society",
+      "giverPlanetId": "jupiter",
       "creditsReward": 1500,
       "subject": "OP 2 — Demonstration Run, Belt Operations",
       "flavor": [
