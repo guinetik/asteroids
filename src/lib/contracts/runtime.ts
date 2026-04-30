@@ -10,6 +10,7 @@
  * @date 2026-04-20
  * @spec docs/superpowers/specs/2026-04-20-contracts-design.md
  */
+import { DevConsole } from '@/lib/devConsole'
 import { shipMessageSystem } from '@/lib/messages/runtime'
 import { removeItem } from '@/lib/inventory/inventory'
 import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
@@ -383,17 +384,53 @@ export function acceptContractWithRetroEval(contractId: string): boolean {
 }
 
 /**
- * Dev console hook: resolve a `'choice-mission'` step by hand. Gated by
- * `import.meta.env.DEV`. The user can run e.g.
- * `window.__contracts.resolveChoice('jovian_final_prospectus', 'transmit')`
- * to drive a contract to completion without the canvas terminal overlay.
+ * Dev console hooks for the contract system. Registered under
+ * `AsteroidDev.Contracts` via the shared {@link DevConsole}. Available only
+ * in DEV builds.
+ *
+ * Examples:
+ * ```js
+ * AsteroidDev.Contracts.forceOffer('jovian-society-prospection')
+ * AsteroidDev.Contracts.forceAccept('jovian-society-prospection')
+ * AsteroidDev.Contracts.resolveChoice('jovian_final_prospectus', 'transmit')
+ * AsteroidDev.Contracts.listInstances()
+ * ```
  */
-if (import.meta.env.DEV && typeof window !== 'undefined') {
-  const winAsHost = window as unknown as {
-    __contracts?: { resolveChoice: (missionId: string, outcomeId: string) => boolean }
-  }
-  winAsHost.__contracts = {
-    resolveChoice: (missionId, outcomeId) =>
-      contractSystem.notifyChoiceResolved(missionId, outcomeId),
-  }
-}
+DevConsole.register('Contracts', {
+  /**
+   * Bypass `offerWhenPrerequisites` and force a contract into the `available`
+   * state so its intro message arrives in the inbox.
+   *
+   * @param contractId - Contract id from `CONTRACT_CATALOG`.
+   */
+  forceOffer: (contractId: string) => {
+    contractSystem.offerForTests(contractId)
+    return contractSystem.getInstance(contractId)
+  },
+  /**
+   * Force-accept a contract. If it isn't already offered, offers it first.
+   * Useful for skipping the inbox-accept click during dev playthroughs.
+   *
+   * @param contractId - Contract id from `CONTRACT_CATALOG`.
+   */
+  forceAccept: (contractId: string) => {
+    if (!contractSystem.getInstance(contractId)) {
+      contractSystem.offerForTests(contractId)
+    }
+    contractSystem.acceptContract(contractId)
+    return contractSystem.getInstance(contractId)
+  },
+  /**
+   * Resolve a `'choice-mission'` step by hand. Plan 6 will replace this with
+   * the prospectus terminal canvas overlay.
+   *
+   * @param missionId - Choice-mission id (e.g. `'jovian_final_prospectus'`).
+   * @param outcomeId - Selected outcome id (e.g. `'transmit'` or `'tamper'`).
+   */
+  resolveChoice: (missionId: string, outcomeId: string) =>
+    contractSystem.notifyChoiceResolved(missionId, outcomeId),
+  /** Snapshot every contract instance for debugging. */
+  listInstances: () => contractSystem.listInstances(),
+  /** Look up a single contract instance by id. */
+  getInstance: (contractId: string) => contractSystem.getInstance(contractId),
+})
