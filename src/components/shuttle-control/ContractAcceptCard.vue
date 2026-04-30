@@ -57,7 +57,7 @@ function stepLabel(step: ContractStep): string {
     return `Launch from ${step.planetId}`
   }
   if (step.kind === 'choice-mission') {
-    return `Complete choice mission: ${step.missionId}`
+    return `Complete Mission: ${step.missionId}`
   }
   const orbitalBits: string[] = []
   if (step.giverPlanetId) orbitalBits.push(`from ${step.giverPlanetId}`)
@@ -222,13 +222,13 @@ const headerLabel = computed(() => {
 
 <style scoped>
 .contract-accept-card {
-  margin: 32px 0 16px;
-  padding: 20px;
+  margin: calc(18px * var(--mail-type-scale, 1)) 0 calc(12px * var(--mail-type-scale, 1));
+  padding: calc(16px * var(--mail-type-scale, 1));
   border: 1px solid rgba(106, 232, 196, 0.2);
   background: rgba(106, 232, 196, 0.03);
-  border-radius: 4px;
+  border-radius: calc(4px * var(--mail-type-scale, 1));
   display: grid;
-  gap: 16px;
+  gap: calc(12px * var(--mail-type-scale, 1));
   position: relative;
 }
 
@@ -237,8 +237,8 @@ const headerLabel = computed(() => {
   position: absolute;
   top: -1px;
   left: -1px;
-  width: 8px;
-  height: 8px;
+  width: calc(8px * var(--mail-type-scale, 1));
+  height: calc(8px * var(--mail-type-scale, 1));
   border-top: 2px solid #6ae8c4;
   border-left: 2px solid #6ae8c4;
 }
@@ -248,8 +248,8 @@ const headerLabel = computed(() => {
   position: absolute;
   bottom: -1px;
   right: -1px;
-  width: 8px;
-  height: 8px;
+  width: calc(8px * var(--mail-type-scale, 1));
+  height: calc(8px * var(--mail-type-scale, 1));
   border-bottom: 2px solid #6ae8c4;
   border-right: 2px solid #6ae8c4;
 }
@@ -257,12 +257,12 @@ const headerLabel = computed(() => {
 .contract-accept-card__header {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: calc(11px * var(--mail-type-scale, 1));
   letter-spacing: 0.15em;
   text-transform: uppercase;
   color: rgba(106, 232, 196, 0.6);
   border-bottom: 1px solid rgba(106, 232, 196, 0.15);
-  padding-bottom: 12px;
+  padding-bottom: calc(12px * var(--mail-type-scale, 1));
 }
 
 .contract-accept-card__steps {
@@ -270,22 +270,22 @@ const headerLabel = computed(() => {
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 8px;
-  font-size: 13px;
+  gap: calc(8px * var(--mail-type-scale, 1));
+  font-size: calc(13px * var(--mail-type-scale, 1));
   color: rgba(220, 248, 240, 0.9);
 }
 
 .contract-accept-card__step {
   display: grid;
-  grid-template-columns: 16px 1fr auto;
+  grid-template-columns: calc(16px * var(--mail-type-scale, 1)) 1fr auto;
   align-items: baseline;
-  gap: 10px;
-  padding: 2px 0;
+  gap: calc(10px * var(--mail-type-scale, 1));
+  padding: calc(2px * var(--mail-type-scale, 1)) 0;
 }
 
 .contract-accept-card__step-marker {
   font-family: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--mail-type-scale, 1));
   text-align: center;
   color: rgba(177, 228, 214, 0.35);
 }
@@ -295,7 +295,7 @@ const headerLabel = computed(() => {
 }
 
 .contract-accept-card__step-progress {
-  font-size: 11px;
+  font-size: calc(11px * var(--mail-type-scale, 1));
   letter-spacing: 0.1em;
   color: rgba(177, 228, 214, 0.5);
   font-variant-numeric: tabular-nums;
@@ -330,14 +330,14 @@ const headerLabel = computed(() => {
 .contract-accept-card__rewards {
   list-style: none;
   margin: 0;
-  padding: 12px;
+  padding: calc(12px * var(--mail-type-scale, 1));
   border: 1px solid rgba(106, 232, 196, 0.15);
   background: rgba(106, 232, 196, 0.05);
-  border-radius: 2px;
-  font-size: 12px;
+  border-radius: calc(2px * var(--mail-type-scale, 1));
+  font-size: calc(12px * var(--mail-type-scale, 1));
   color: rgba(177, 228, 214, 0.9);
   display: grid;
-  gap: 6px;
+  gap: calc(6px * var(--mail-type-scale, 1));
 }
 
 .contract-accept-card__rewards strong {
@@ -348,8 +348,8 @@ const headerLabel = computed(() => {
 .contract-accept-card__footer {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 4px;
+  gap: calc(12px * var(--mail-type-scale, 1));
+  margin-top: calc(4px * var(--mail-type-scale, 1));
 }
 
 .contract-accept-card__btn {
@@ -357,15 +357,15 @@ const headerLabel = computed(() => {
   background: transparent;
   border: 1px solid rgba(106, 232, 196, 0.3);
   color: rgba(177, 228, 214, 0.8);
-  padding: 8px 16px;
+  padding: calc(8px * var(--mail-type-scale, 1)) calc(16px * var(--mail-type-scale, 1));
   font-family: inherit;
-  font-size: 11px;
+  font-size: calc(11px * var(--mail-type-scale, 1));
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   cursor: pointer;
   transition: all 120ms ease;
-  border-radius: 2px;
+  border-radius: calc(2px * var(--mail-type-scale, 1));
 }
 
 .contract-accept-card__btn--primary {
@@ -377,7 +377,7 @@ const headerLabel = computed(() => {
 .contract-accept-card__btn--primary:hover {
   background: rgba(106, 232, 196, 0.25);
   border-color: #6ae8c4;
-  box-shadow: 0 0 12px rgba(106, 232, 196, 0.2);
+  box-shadow: 0 0 calc(12px * var(--mail-type-scale, 1)) rgba(106, 232, 196, 0.2);
 }
 
 .contract-accept-card__btn--secondary:hover {
@@ -387,12 +387,12 @@ const headerLabel = computed(() => {
 
 .contract-accept-card__pill {
   display: inline-flex;
-  padding: 4px 10px;
-  font-size: 10px;
+  padding: calc(4px * var(--mail-type-scale, 1)) calc(10px * var(--mail-type-scale, 1));
+  font-size: calc(10px * var(--mail-type-scale, 1));
   font-weight: 600;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  border-radius: 2px;
+  border-radius: calc(2px * var(--mail-type-scale, 1));
 }
 
 .contract-accept-card__pill--active {

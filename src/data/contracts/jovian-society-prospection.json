@@ -180,7 +180,8 @@
       "rewards": [
         { "type": "shuttle-buff", "buffId": "jovianEmpowerment", "multiplier": 1.5 },
         { "type": "set-body-access", "bodyId": "hektor", "state": "destroyed" },
-        { "type": "mission-pay-multiplier", "planetId": "jupiter", "multiplier": 2 }
+        { "type": "mission-pay-multiplier", "planetId": "jupiter", "multiplier": 2 },
+        { "type": "fast-travel", "planetId": "jupiter" }
       ]
     },
     "tamper": {
@@ -195,6 +196,7 @@
       ],
       "rewards": [
         { "type": "disable-giver", "giverId": "jovian-society" },
+        { "type": "fast-travel", "planetId": "jupiter" },
         { "type": "set-body-access", "bodyId": "hektor", "state": "liberated" }
       ]
     }

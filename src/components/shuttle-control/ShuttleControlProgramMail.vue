@@ -20,6 +20,7 @@ import type {
   ShipMessageReadable,
 } from '@/lib/messages/messageTypes'
 import { buildMailFolderSections } from '@/lib/messages/mailFolderSections'
+import { resolveMailAuthorPortraitHref } from '@/lib/messages/mailAuthorPortraits'
 import {
   acceptContractWithRetroEval,
   contractSystem,
@@ -67,6 +68,13 @@ const readable = computed<ShipMessageReadable | null>(() => {
   void readerRefreshToken.value
   if (!selectedId.value) return null
   return shipMessageSystem.getReadableShipMessage(selectedId.value)
+})
+
+/** Resolved portrait for the open message reader (`null` keeps the reader full-width). */
+const readerAuthorPortraitHref = computed(() => {
+  const r = readable.value
+  if (!r) return null
+  return resolveMailAuthorPortraitHref(r.from)
 })
 
 const activeContract = computed(() => {
@@ -272,17 +280,33 @@ watch(
               :aria-selected="selectedId === row.id"
               @click="selectRow(row.id, { autoplayAudio: true })"
             >
-              <span class="shuttle-mail-program__row-from">
-                <span v-if="row.pinned" class="shuttle-mail-program__row-pin" aria-hidden="true">
-                  📌
+              <div class="shuttle-mail-program__row-avatar-wrap" aria-hidden="true">
+                <div
+                  v-if="resolveMailAuthorPortraitHref(row.from)"
+                  class="shuttle-mail-program__author-portrait-frame shuttle-mail-program__author-portrait-frame--list"
+                >
+                  <img
+                    class="shuttle-mail-program__author-portrait-img"
+                    :src="resolveMailAuthorPortraitHref(row.from)!"
+                    alt=""
+                  />
+                </div>
+              </div>
+              <div class="shuttle-mail-program__row-main">
+                <span class="shuttle-mail-program__row-from">
+                  <span v-if="row.pinned" class="shuttle-mail-program__row-pin" aria-hidden="true">
+                    📌
+                  </span>
+                  {{ row.from }}
                 </span>
-                {{ row.from }}
-              </span>
-              <span class="shuttle-mail-program__row-subject">{{ row.subject }}</span>
-              <span class="shuttle-mail-program__row-meta">
-                <span v-if="row.pinned">Pinned · </span>{{ row.sentAt }} · {{ statusLabel(row) }}
-              </span>
-              <span class="shuttle-mail-program__row-preview">{{ row.preview }}</span>
+                <span class="shuttle-mail-program__row-subject">{{ row.subject }}</span>
+                <span
+                  v-if="row.pinned || row.status !== 'shown'"
+                  class="shuttle-mail-program__row-meta"
+                >
+                  <span v-if="row.pinned">Pinned · </span>{{ statusLabel(row) }}
+                </span>
+              </div>
             </button>
             <p v-if="section.rows.length === 0" class="shuttle-mail-program__row-empty">
               No messages in this folder yet.
@@ -363,7 +387,27 @@ watch(
             @accept="acceptContract"
             @decline="declineContract"
           />
-          <div class="shuttle-mail-program__reader-body">
+          <div
+            class="shuttle-mail-program__reader-body"
+            :class="{
+              'shuttle-mail-program__reader-body--with-portrait': readerAuthorPortraitHref,
+            }"
+          >
+            <div
+              v-if="readerAuthorPortraitHref"
+              class="shuttle-mail-program__reader-float-portrait"
+              aria-hidden="true"
+            >
+              <div
+                class="shuttle-mail-program__author-portrait-frame shuttle-mail-program__author-portrait-frame--reader"
+              >
+                <img
+                  class="shuttle-mail-program__author-portrait-img"
+                  :src="readerAuthorPortraitHref"
+                  alt=""
+                />
+              </div>
+            </div>
             <p v-for="(paragraph, index) in readable.body" :key="`${readable.id}-${index}`">
               {{ paragraph }}
             </p>
@@ -383,6 +427,20 @@ watch(
 
 <style scoped>
 .shuttle-mail-program {
+  /** ~10% step-up for inbox typography + matching rhythm (padding, gaps, portraits). */
+  --mail-type-scale: 1.1;
+  --mail-author-portrait-list: calc(52px * var(--mail-type-scale));
+  --mail-author-portrait-frame-padding: calc(2px * var(--mail-type-scale));
+  /** Reader-only: enlarges portrait beside message body (list thumbnails use `--mail-author-portrait-list` only). */
+  --mail-author-portrait-reader-content-scale: 1.1;
+  --mail-author-portrait-reader: calc(
+    144px * var(--mail-type-scale) * var(--mail-author-portrait-reader-content-scale)
+  );
+  /** Pixel width of the middle inbox list column (folders + rows), before `--mail-type-scale`. */
+  --mail-inbox-list-width: calc(340px * var(--mail-type-scale));
+  --mail-program-reader-padding-block: calc(14px * var(--mail-type-scale));
+  --mail-program-reader-padding-inline-end: calc(22px * var(--mail-type-scale));
+  --mail-program-reader-padding-inline-start: calc(14px * var(--mail-type-scale));
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -392,12 +450,14 @@ watch(
 
 .shuttle-mail-program__content {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: var(--mail-inbox-list-width) minmax(0, 1fr);
   flex: 1;
   overflow: hidden;
 }
 
 .shuttle-mail-program__list {
+  min-width: 0;
+  width: 100%;
   border-right: 1px solid rgba(106, 232, 196, 0.15);
   overflow-y: auto;
   background: rgba(106, 232, 196, 0.01);
@@ -410,14 +470,14 @@ watch(
 .shuttle-mail-program__section-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px 10px;
+  gap: calc(6px * var(--mail-type-scale)) calc(10px * var(--mail-type-scale));
   align-items: center;
   appearance: none;
   width: 100%;
   background: rgba(106, 232, 196, 0.025);
   border: none;
   color: rgba(220, 248, 240, 0.82);
-  padding: 14px 16px;
+  padding: calc(12px * var(--mail-type-scale)) calc(16px * var(--mail-type-scale));
   font-family: inherit;
   text-align: left;
   cursor: pointer;
@@ -439,22 +499,22 @@ watch(
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 8px;
+  gap: calc(8px * var(--mail-type-scale));
   color: #6ae8c4;
-  font-size: 12px;
+  font-size: calc(12px * var(--mail-type-scale));
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
 .shuttle-mail-program__section-chevron {
-  width: 12px;
+  width: calc(12px * var(--mail-type-scale));
   color: rgba(106, 232, 196, 0.7);
-  font-size: 12px;
+  font-size: calc(12px * var(--mail-type-scale));
 }
 
 .shuttle-mail-program__section-meta {
   color: rgba(177, 228, 214, 0.42);
-  font-size: 10px;
+  font-size: calc(10px * var(--mail-type-scale));
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -464,9 +524,9 @@ watch(
   justify-self: end;
   background: rgba(106, 232, 196, 0.2);
   color: #6ae8c4;
-  border-radius: 2px;
-  padding: 2px 6px;
-  font-size: 10px;
+  border-radius: calc(2px * var(--mail-type-scale));
+  padding: calc(2px * var(--mail-type-scale)) calc(6px * var(--mail-type-scale));
+  font-size: calc(10px * var(--mail-type-scale));
   font-weight: 600;
 }
 
@@ -476,13 +536,15 @@ watch(
 
 .shuttle-mail-program__row {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: calc(12px * var(--mail-type-scale));
   appearance: none;
   background: transparent;
   border: none;
   border-bottom: 1px solid rgba(106, 232, 196, 0.08);
   color: inherit;
-  padding: 16px;
+  padding: calc(14px * var(--mail-type-scale));
   font-family: inherit;
   text-align: left;
   cursor: pointer;
@@ -535,52 +597,115 @@ watch(
 
 .shuttle-mail-program__row-pin {
   display: inline-block;
-  margin-right: 6px;
-  font-size: 11px;
+  margin-right: calc(6px * var(--mail-type-scale));
+  font-size: calc(11px * var(--mail-type-scale));
   filter: hue-rotate(120deg) saturate(0.8);
 }
 
 .shuttle-mail-program__row-from {
-  font-size: 10px;
+  font-size: calc(10px * var(--mail-type-scale));
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: rgba(177, 228, 214, 0.5);
-  margin-bottom: 6px;
+  margin-bottom: 0;
+}
+
+.shuttle-mail-program__row-avatar-wrap {
+  flex-shrink: 0;
+  width: var(--mail-author-portrait-list);
+  height: var(--mail-author-portrait-list);
+}
+
+.shuttle-mail-program__row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(6px * var(--mail-type-scale));
 }
 
 .shuttle-mail-program__row-subject {
-  font-size: 14px;
-  margin-bottom: 8px;
+  font-size: calc(14px * var(--mail-type-scale));
+  margin-bottom: 0;
   line-height: 1.3;
 }
 
 .shuttle-mail-program__row-meta {
-  font-size: 10px;
+  font-size: calc(10px * var(--mail-type-scale));
   color: rgba(177, 228, 214, 0.4);
-  margin-bottom: 8px;
-}
-
-.shuttle-mail-program__row-preview {
-  font-size: 12px;
-  color: rgba(177, 228, 214, 0.5);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: 1.5;
+  margin-bottom: 0;
 }
 
 .shuttle-mail-program__row-empty {
-  padding: 24px;
-  font-size: 12px;
+  padding: calc(18px * var(--mail-type-scale));
+  font-size: calc(12px * var(--mail-type-scale));
   color: rgba(177, 228, 214, 0.4);
   text-align: center;
   font-style: italic;
 }
 
 .shuttle-mail-program__reader {
-  padding: 24px 32px;
+  min-width: 0;
+  padding: var(--mail-program-reader-padding-block) var(--mail-program-reader-padding-inline-end)
+    var(--mail-program-reader-padding-block) var(--mail-program-reader-padding-inline-start);
   overflow-y: auto;
+}
+
+/**
+ * Float portrait inside the body container so paragraphs participate in the same block
+ * formatting context — lines wrap beside the image, then use the full width below it.
+ */
+.shuttle-mail-program__reader-body {
+  display: flow-root;
+  font-size: calc(14px * var(--mail-type-scale));
+  line-height: 1.6;
+  color: rgba(220, 248, 240, 0.9);
+  min-width: 0;
+}
+
+.shuttle-mail-program__reader-body--with-portrait .shuttle-mail-program__reader-float-portrait {
+  float: left;
+  width: var(--mail-author-portrait-reader);
+  margin-right: calc(18px * var(--mail-type-scale));
+  margin-bottom: calc(12px * var(--mail-type-scale));
+  shape-outside: margin-box;
+}
+
+.shuttle-mail-program__author-portrait-frame {
+  padding: var(--mail-author-portrait-frame-padding);
+  border-radius: calc(4px * var(--mail-type-scale));
+  background: linear-gradient(
+    145deg,
+    rgba(106, 232, 196, 0.95) 0%,
+    rgba(106, 232, 196, 0.35) 38%,
+    rgba(96, 165, 250, 0.55) 72%,
+    rgba(106, 232, 196, 0.65) 100%
+  );
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 0 18px rgba(106, 232, 196, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.shuttle-mail-program__author-portrait-frame--reader {
+  width: var(--mail-author-portrait-reader);
+  height: var(--mail-author-portrait-reader);
+  box-sizing: border-box;
+}
+
+.shuttle-mail-program__author-portrait-frame--list {
+  width: var(--mail-author-portrait-list);
+  height: var(--mail-author-portrait-list);
+  box-sizing: border-box;
+}
+
+.shuttle-mail-program__author-portrait-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  border-radius: calc(2px * var(--mail-type-scale));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45);
 }
 
 .shuttle-mail-program__reader-empty {
@@ -589,14 +714,14 @@ watch(
   justify-content: center;
   height: 100%;
   color: rgba(177, 228, 214, 0.3);
-  font-size: 12px;
+  font-size: calc(12px * var(--mail-type-scale));
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .shuttle-mail-program__reader-header {
-  margin-bottom: 24px;
-  padding-bottom: 16px;
+  margin-bottom: calc(16px * var(--mail-type-scale));
+  padding-bottom: calc(12px * var(--mail-type-scale));
   border-bottom: 1px solid rgba(106, 232, 196, 0.15);
 }
 
@@ -604,13 +729,13 @@ watch(
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 24px;
+  gap: calc(24px * var(--mail-type-scale));
 }
 
 .shuttle-mail-program__reader-subject {
-  font-size: 20px;
+  font-size: calc(20px * var(--mail-type-scale));
   color: #6ae8c4;
-  margin: 0 0 16px 0;
+  margin: 0 0 calc(12px * var(--mail-type-scale)) 0;
   font-weight: 400;
   letter-spacing: 0.02em;
 }
@@ -618,8 +743,8 @@ watch(
 .shuttle-mail-program__reader-meta {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  font-size: 12px;
+  gap: calc(8px * var(--mail-type-scale));
+  font-size: calc(12px * var(--mail-type-scale));
   color: rgba(177, 228, 214, 0.8);
 }
 
@@ -632,8 +757,8 @@ watch(
   color: rgba(177, 228, 214, 0.4);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  font-size: 10px;
-  width: 64px;
+  font-size: calc(10px * var(--mail-type-scale));
+  width: calc(64px * var(--mail-type-scale));
   flex-shrink: 0;
 }
 
@@ -645,7 +770,7 @@ watch(
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 8px;
+  gap: calc(8px * var(--mail-type-scale));
 }
 
 .shuttle-mail-program__acknowledge-button {
@@ -653,14 +778,14 @@ watch(
   background: rgba(106, 232, 196, 0.08);
   border: 1px solid rgba(106, 232, 196, 0.3);
   color: #6ae8c4;
-  padding: 6px 12px;
+  padding: calc(6px * var(--mail-type-scale)) calc(12px * var(--mail-type-scale));
   font-family: inherit;
-  font-size: 11px;
+  font-size: calc(11px * var(--mail-type-scale));
   text-transform: uppercase;
   letter-spacing: 0.1em;
   cursor: pointer;
   transition: all 120ms ease;
-  border-radius: 2px;
+  border-radius: calc(2px * var(--mail-type-scale));
 }
 
 .shuttle-mail-program__acknowledge-button:hover {
@@ -669,27 +794,20 @@ watch(
 }
 
 .shuttle-mail-program__acknowledge-hint {
-  font-size: 10px;
+  font-size: calc(10px * var(--mail-type-scale));
   color: rgba(177, 228, 214, 0.4);
-  max-width: 150px;
+  max-width: calc(150px * var(--mail-type-scale));
   text-align: right;
   line-height: 1.3;
 }
 
 .shuttle-mail-program__audio-divider {
-  margin: 24px 0;
+  margin: calc(16px * var(--mail-type-scale)) 0;
   border-top: 1px solid rgba(106, 232, 196, 0.15);
 }
 
-.shuttle-mail-program__reader-body {
-  font-size: 14px;
-  line-height: 1.6;
-  color: rgba(220, 248, 240, 0.9);
-  max-width: 65ch;
-}
-
 .shuttle-mail-program__reader-body p {
-  margin: 0 0 16px 0;
+  margin: 0 0 calc(12px * var(--mail-type-scale)) 0;
 }
 
 .shuttle-mail-program__reader-body p:last-child {

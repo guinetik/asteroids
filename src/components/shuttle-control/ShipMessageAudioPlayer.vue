@@ -53,11 +53,11 @@ onMounted(() => {
 
 <style scoped>
 .ship-message-audio-player {
-  margin-top: 16px;
-  padding: 12px 16px;
+  margin-top: calc(12px * var(--mail-type-scale, 1));
+  padding: calc(12px * var(--mail-type-scale, 1)) calc(16px * var(--mail-type-scale, 1));
   background: rgba(106, 232, 196, 0.03);
   border: 1px solid rgba(106, 232, 196, 0.15);
-  border-radius: 4px;
+  border-radius: calc(4px * var(--mail-type-scale, 1));
   position: relative;
 }
 
@@ -67,17 +67,17 @@ onMounted(() => {
   left: 0;
   top: 0;
   bottom: 0;
-  width: 3px;
+  width: calc(3px * var(--mail-type-scale, 1));
   background: rgba(106, 232, 196, 0.4);
 }
 
 .ship-message-audio-player__button {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: calc(12px * var(--mail-type-scale, 1));
   padding: 0;
   font: inherit;
-  font-size: 11px;
+  font-size: calc(11px * var(--mail-type-scale, 1));
   font-weight: 600;
   letter-spacing: 0.15em;
   text-transform: uppercase;
@@ -99,11 +99,11 @@ onMounted(() => {
 .ship-message-audio-player__icon {
   width: 1.2em;
   text-align: center;
-  font-size: 14px;
+  font-size: calc(14px * var(--mail-type-scale, 1));
 }
 
 .ship-message-audio-player__progress {
-  margin-top: 12px;
+  margin-top: calc(12px * var(--mail-type-scale, 1));
   height: 2px;
   background: rgba(106, 232, 196, 0.15);
   position: relative;
