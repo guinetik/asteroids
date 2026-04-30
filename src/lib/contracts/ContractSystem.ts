@@ -714,7 +714,7 @@ export class ContractSystem {
   /** Fan reward effects out to the registered hook. */
   private applyRewards(contract: Contract): void {
     if (!this.hooks.onRewardGranted) return
-    for (const effect of contract.rewards) {
+    for (const effect of contract.rewards ?? []) {
       this.hooks.onRewardGranted(effect, contract)
     }
   }
@@ -748,6 +748,8 @@ export class ContractSystem {
       const p = contract.offerWhenPrerequisites
       if (!p) continue
       if (this.snapshot.instances[contract.id]) continue
+      if (p.requiredCompletedContractId === undefined) continue
+      if (p.minGiverPlanetCompletions === undefined) continue
       const req = p.requiredCompletedContractId
       const pre = this.snapshot.instances[req]
       if (!pre || pre.status !== 'completed') continue
@@ -862,8 +864,8 @@ export function buildContractMessageDefinitions(contract: Contract): ShipMessage
   const completion: ShipMessageDefinition = {
     ...base,
     id: contractCompletionMessageId(contract.id),
-    subject: contract.completionSubject,
-    body: contract.completionBody,
+    subject: contract.completionSubject ?? '',
+    body: contract.completionBody ?? [],
     contractMessageKind: 'completion',
   }
 

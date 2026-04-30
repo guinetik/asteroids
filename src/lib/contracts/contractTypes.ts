@@ -305,6 +305,16 @@ export interface PinnedAsset {
   label: string
 }
 
+/** One completion arm per outcome id of a contained `'choice-mission'` step. */
+export interface ContractCompletionArm {
+  /** Subject line for this outcome's completion message. */
+  completionSubject: string
+  /** Body paragraphs for this outcome's completion message. */
+  completionBody: string[]
+  /** Reward effects applied when this arm resolves. */
+  rewards: RewardEffect[]
+}
+
 /** Static contract definition authored as JSON. */
 export interface Contract {
   /** Stable id used for persistence and folder routing. */
@@ -328,16 +338,16 @@ export interface Contract {
   /** Offer this contract when the player first enters orbit at this planet id. */
   triggerOnPlanetVisited?: string
   /**
-   * When set, the intro is offered after another contract is `completed` and
-   * the player has hit the min mission count for a given giver planet (see
-   * `giverPlanetCompletions` in the contract snapshot). Checked at mission
-   * complete and when any contract instance transitions to `completed`.
+   * Combined offer gate. The runtime AND-s every present sub-field. Authoring
+   * just one of these fields makes the gate degenerate to a single check.
    */
   offerWhenPrerequisites?: {
-    /** Id of a contract the player must have finished. */
-    requiredCompletedContractId: string
-    /** Giver planet (posting world) and how many completed missions to require. */
-    minGiverPlanetCompletions: { planetId: string; min: number }
+    /** Optional — id of a contract the player must have finished. */
+    requiredCompletedContractId?: string
+    /** Optional — giver-planet completion gate (legacy combined gate). */
+    minGiverPlanetCompletions?: { planetId: string; min: number }
+    /** Optional — fires when the player orbits this planet, with all other gates met. */
+    triggerOnPlanetVisited?: string
   }
   /**
    * When set, {@link ContractSystem} enqueues this catalog id into the main inbox
@@ -355,12 +365,20 @@ export interface Contract {
   introAudioUrl?: string
   /** Ordered list of steps. */
   steps: ContractStep[]
-  /** Subject for the contract-completion message. */
-  completionSubject: string
-  /** Body paragraphs for the contract-completion message. */
-  completionBody: string[]
-  /** Reward effects applied on completion. */
-  rewards: RewardEffect[]
+  /** Subject for the contract-completion message (legacy single-arm). */
+  completionSubject?: string
+  /** Body paragraphs for the contract-completion message (legacy single-arm). */
+  completionBody?: string[]
+  /** Reward effects applied on completion (legacy single-arm). */
+  rewards?: RewardEffect[]
+  /**
+   * Mutually exclusive with the legacy `completionSubject / completionBody / rewards`
+   * triple. When present, the completion handler reads
+   * `instance.resolvedOutcomeId` and dispatches the matching arm. When neither
+   * block resolves, the contract still completes but emits no rewards and a
+   * console warning.
+   */
+  completionByOutcome?: Record<string, ContractCompletionArm>
 }
 
 /** Lifecycle of a {@link Contract} for one player save. */
