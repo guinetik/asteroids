@@ -258,7 +258,7 @@ export class ContractSystem {
       if (instance.status !== 'completed') continue
       const contract = this.contracts.get(instance.contractId)
       if (!contract) continue
-      this.applyRewards(contract)
+      this.applyRewards(contract, instance)
       this.hooks.onContractCompleted?.(contract.id)
     }
   }
@@ -686,8 +686,8 @@ export class ContractSystem {
           ...this.snapshot,
           instances: { ...this.snapshot.instances, [contract.id]: updated },
         }
-        this.deliverCompletionMessage(contract)
-        this.applyRewards(contract)
+        this.deliverCompletionMessage(contract, updated)
+        this.applyRewards(contract, updated)
         this.hooks.onContractCompleted?.(contract.id)
         this.evaluatePrerequisiteContractOffers()
       } else {
@@ -768,15 +768,28 @@ export class ContractSystem {
     this.messageSystem.enqueueById(contractBriefMessageId(contract.id))
   }
 
-  /** Deliver the completion message into the contract folder. */
-  private deliverCompletionMessage(contract: Contract): void {
+  /** Deliver the completion message into the contract folder, picking the right arm. */
+  private deliverCompletionMessage(contract: Contract, instance: ContractInstance): void {
+    if (contract.completionByOutcome) {
+      const outcomeId = instance.resolvedOutcomeId
+      if (outcomeId && contract.completionByOutcome[outcomeId]) {
+        this.messageSystem.enqueueById(contractCompletionMessageId(contract.id, outcomeId))
+        return
+      }
+      // No resolved outcome but completionByOutcome present — log and skip.
+      console.warn(
+        `Contract ${contract.id} completed without a resolvedOutcomeId; no completion message delivered.`,
+      )
+      return
+    }
     this.messageSystem.enqueueById(contractCompletionMessageId(contract.id))
   }
 
   /** Fan reward effects out to the registered hook. */
-  private applyRewards(contract: Contract): void {
+  private applyRewards(contract: Contract, instance: ContractInstance): void {
     if (!this.hooks.onRewardGranted) return
-    for (const effect of contract.rewards ?? []) {
+    const effects = resolveRewardEffects(contract, instance)
+    for (const effect of effects) {
       this.hooks.onRewardGranted(effect, contract)
     }
   }
@@ -841,6 +854,26 @@ export class ContractSystem {
   }
 }
 
+/**
+ * Pick the rewards array for a completed contract, branching on
+ * `completionByOutcome` when present. Returns `[]` when the contract uses
+ * outcome arms but no outcome resolved (defensive: completion still fires but
+ * no rewards).
+ *
+ * @param contract - Completed contract definition.
+ * @param instance - Instance whose `resolvedOutcomeId` selects the arm.
+ * @returns Reward effects to dispatch (possibly empty).
+ */
+function resolveRewardEffects(contract: Contract, instance: ContractInstance): RewardEffect[] {
+  if (contract.completionByOutcome) {
+    const outcomeId = instance.resolvedOutcomeId
+    if (!outcomeId) return []
+    const arm = contract.completionByOutcome[outcomeId]
+    return arm?.rewards ?? []
+  }
+  return contract.rewards ?? []
+}
+
 /** Required completion count for a step (1 unless the step is `complete-missions`). */
 function requiredCount(step: ContractStep): number {
   if (step.kind === 'complete-missions') return step.count
@@ -886,14 +919,15 @@ export function contractStepMessageId(contractId: string, stepIndex: number): st
   return `contract.${contractId}.step.${stepIndex}`
 }
 
-/** Stable id for a contract's completion message. */
-export function contractCompletionMessageId(contractId: string): string {
+/** Stable id for a contract's completion message (per-outcome when provided). */
+export function contractCompletionMessageId(contractId: string, outcomeId?: string): string {
+  if (outcomeId) return `contract.${contractId}.completion.${outcomeId}`
   return `contract.${contractId}.completion`
 }
 
 /**
- * Build the full set of message definitions for one contract: intro + per-step flavor +
- * completion. All messages share the contract's folder, sender, and date.
+ * Build the full set of message definitions for one contract: intro + per-step
+ * flavor + completion (or one completion per `completionByOutcome` arm).
  *
  * @param contract - Contract whose messages should be materialized.
  * @returns Array of message definitions to register with the {@link MessageSystem}.
@@ -938,15 +972,28 @@ export function buildContractMessageDefinitions(contract: Contract): ShipMessage
     contractStepIndex: index,
   }))
 
-  const completion: ShipMessageDefinition = {
-    ...base,
-    id: contractCompletionMessageId(contract.id),
-    subject: contract.completionSubject ?? '',
-    body: contract.completionBody ?? [],
-    contractMessageKind: 'completion',
+  const completions: ShipMessageDefinition[] = []
+  if (contract.completionByOutcome) {
+    for (const [outcomeId, arm] of Object.entries(contract.completionByOutcome)) {
+      completions.push({
+        ...base,
+        id: contractCompletionMessageId(contract.id, outcomeId),
+        subject: arm.completionSubject,
+        body: arm.completionBody,
+        contractMessageKind: 'completion',
+      })
+    }
+  } else if (contract.completionSubject !== undefined && contract.completionBody !== undefined) {
+    completions.push({
+      ...base,
+      id: contractCompletionMessageId(contract.id),
+      subject: contract.completionSubject,
+      body: contract.completionBody,
+      contractMessageKind: 'completion',
+    })
   }
 
-  return [intro, brief, ...stepMessages, completion]
+  return [intro, brief, ...stepMessages, ...completions]
 }
 
 /**
