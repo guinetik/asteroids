@@ -79,6 +79,8 @@ function replayActiveStepActivations(): number {
     if (step.kind === 'complete-missions') {
       specialMissionId = step.specialMissionId ?? null
       revealsBody = step.revealsBody ?? null
+    } else if (step.kind === 'choice-mission') {
+      specialMissionId = step.specialMissionId ?? null
     }
     const payload: ContractStepActivatedPayload = {
       contractId: contract.id,

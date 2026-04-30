@@ -792,8 +792,8 @@ export class ContractSystem {
   /**
    * Fire the `onStepActivated` hook for the step at `stepIndex`. Reads the
    * step's `specialMissionId` and `revealsBody` to populate the payload.
-   * Only `'complete-missions'` steps carry these directives today; other
-   * step kinds emit `null` for both.
+   * Both `'complete-missions'` and `'choice-mission'` steps may carry a
+   * `specialMissionId`; `revealsBody` is only on `'complete-missions'`.
    *
    * @param contract - Contract whose step just became current.
    * @param stepIndex - Index of the activated step.
@@ -806,6 +806,8 @@ export class ContractSystem {
     if (step.kind === 'complete-missions') {
       specialMissionId = step.specialMissionId ?? null
       revealsBody = step.revealsBody ?? null
+    } else if (step.kind === 'choice-mission') {
+      specialMissionId = step.specialMissionId ?? null
     }
     this.hooks.onStepActivated?.({
       contractId: contract.id,

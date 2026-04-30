@@ -150,6 +150,7 @@
       "missionId": "jovian_final_prospectus",
       "minigameType": "terminal-prospectus",
       "pinnedAssetRef": "hektor",
+      "specialMissionId": "jovian-prospection-hektor-prospectus",
       "outcomes": [
         { "outcomeId": "transmit", "label": "Transmit Report", "creditsReward": 5000 },
         { "outcomeId": "tamper", "label": "Tamper Report", "creditsReward": 0 }

@@ -18,6 +18,7 @@ import type {
   MissionCompletedEvent,
   RewardEffect,
 } from '../contractTypes'
+import type { ContractStepActivatedPayload } from '../ContractSystem'
 
 const jovian = jovianRaw as Contract
 
@@ -203,5 +204,26 @@ describe('jovian-society-prospection walkability', () => {
     }
     expect(parsed.instances[jovian.id]?.resolvedOutcomeId).toBe('tamper')
     expect(parsed.instances[jovian.id]?.status).toBe('completed')
+  })
+})
+
+describe('jovian-society-prospection step activation', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('emits specialMissionId on activation of step 9 (choice-mission)', () => {
+    const messages = new MessageSystem([], emptyMessageStore())
+    const events: ContractStepActivatedPayload[] = []
+    const contracts = new ContractSystem([jovian], messages, inMemoryPersistence(), {
+      onStepActivated: (p) => events.push(p),
+    })
+    contracts.resetForTests()
+    contracts.offerForTests(jovian.id)
+    contracts.acceptContract(jovian.id)
+    for (let i = 0; i < 8; i++) contracts.advanceStepForTests(jovian.id)
+    const last = events[events.length - 1]
+    expect(last?.stepIndex).toBe(8)
+    expect(last?.specialMissionId).toBe('jovian-prospection-hektor-prospectus')
   })
 })

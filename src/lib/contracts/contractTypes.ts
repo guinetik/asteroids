@@ -285,6 +285,12 @@ export interface ChoiceMissionStep {
   minigameType: string
   /** Asset ref the choice-mission spawns at (matches `Contract.pinnedAssets[].assetRef`). */
   pinnedAssetRef?: string
+  /**
+   * Special asteroid mission id that auto-stages on step activation. The
+   * mission's objective spawns the terminal POI in `/level`; the overlay's
+   * resolve callback fires `notifyChoiceResolved`.
+   */
+  specialMissionId?: string
   /** Authored outcomes; one is selected by the player. */
   outcomes: ChoiceMissionOutcome[]
   /** Authored summary for the step's flavor message subject. */
