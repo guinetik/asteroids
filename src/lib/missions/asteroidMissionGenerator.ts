@@ -29,7 +29,7 @@ import hostGiverOverridesData from '@/data/missions/host-giver-overrides.json'
 import { MIN_ASTEROID_MISSION_REWARD } from './missionEconomy'
 
 /** Simple string hash to derive a numeric seed. */
-function hashSeed(str: string): number {
+export function hashSeed(str: string): number {
   let hash = 0
   for (let i = 0; i < str.length; i++) {
     hash = (hash * 31 + str.charCodeAt(i)) | 0
