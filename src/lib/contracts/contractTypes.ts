@@ -237,6 +237,36 @@ export interface OrbitalLaunchEvent {
   planetId: string
 }
 
+/** Outcome option presented to the player at a choice-mission terminal. */
+export interface ChoiceMissionOutcome extends ContractStepRewardMixin {
+  /** Stable id (e.g. `'transmit'`, `'tamper'`). */
+  outcomeId: string
+  /** Display label (e.g. `'Transmit Report'`). */
+  label: string
+}
+
+/**
+ * Step that requires the player to pick one of N authored outcomes at a special
+ * mission. This plan resolves it via a dev picker; later plans wire the actual
+ * canvas overlay. Per-outcome `creditsReward` is paid when the choice resolves.
+ */
+export interface ChoiceMissionStep {
+  /** Discriminator. */
+  kind: 'choice-mission'
+  /** Mission id presented to the choice-mission runner. */
+  missionId: string
+  /** Authored kind name for the runner (e.g. `'terminal-prospectus'`). */
+  minigameType: string
+  /** Asset ref the choice-mission spawns at (matches `Contract.pinnedAssets[].assetRef`). */
+  pinnedAssetRef?: string
+  /** Authored outcomes; one is selected by the player. */
+  outcomes: ChoiceMissionOutcome[]
+  /** Authored summary for the step's flavor message subject. */
+  subject: string
+  /** Authored body paragraphs for the step's flavor message. */
+  flavor: string[]
+}
+
 /** Discriminated union of all supported contract steps. */
 export type ContractStep =
   | CompleteMissionsStep
@@ -247,6 +277,7 @@ export type ContractStep =
   | CollectDropsStep
   | LaunchFromBodyStep
   | DeliverItemsStep
+  | ChoiceMissionStep
 
 /** Reward applied when a contract is completed. */
 export type RewardEffect =
@@ -355,6 +386,12 @@ export interface ContractInstance {
   acceptedAt: string | null
   /** ISO timestamp set when all steps were satisfied. */
   completedAt: string | null
+  /**
+   * Outcome id resolved by a `'choice-mission'` step, or `null` if none has
+   * resolved yet. Read by the completion handler to dispatch the matching
+   * `completionByOutcome` arm.
+   */
+  resolvedOutcomeId: string | null
 }
 
 /** Persisted contract bundle stored on disk under one localStorage key. */

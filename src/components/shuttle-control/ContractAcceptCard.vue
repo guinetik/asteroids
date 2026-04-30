@@ -56,6 +56,9 @@ function stepLabel(step: ContractStep): string {
   if (step.kind === 'launch-from-body') {
     return `Launch from ${step.planetId}`
   }
+  if (step.kind === 'choice-mission') {
+    return `Complete choice mission: ${step.missionId}`
+  }
   const orbitalBits: string[] = []
   if (step.giverPlanetId) orbitalBits.push(`from ${step.giverPlanetId}`)
   if (step.targetPlanetId) orbitalBits.push(`at ${step.targetPlanetId}`)

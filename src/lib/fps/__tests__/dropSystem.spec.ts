@@ -147,6 +147,7 @@ describe('createContractDropPolicy', () => {
           offeredAt: '2306-04-05',
           acceptedAt: '2306-04-05',
           completedAt: null,
+          resolvedOutcomeId: null,
         },
       ]),
     )
@@ -165,6 +166,7 @@ describe('createContractDropPolicy', () => {
           offeredAt: '2306-04-05',
           acceptedAt: '2306-04-05',
           completedAt: '2306-04-05',
+          resolvedOutcomeId: null,
         },
       ]),
     )

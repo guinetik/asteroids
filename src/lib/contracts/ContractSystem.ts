@@ -580,6 +580,7 @@ export class ContractSystem {
       offeredAt: new Date().toISOString(),
       acceptedAt: null,
       completedAt: null,
+      resolvedOutcomeId: null,
     }
     this.snapshot = {
       ...this.snapshot,
@@ -614,7 +615,7 @@ export class ContractSystem {
       this.hooks.onContractStepCompleted?.({
         contractId: contract.id,
         stepIndex,
-        creditsReward: step.creditsReward ?? 0,
+        creditsReward: 'creditsReward' in step ? (step.creditsReward ?? 0) : 0,
       })
       const nextIndex = stepIndex + 1
       if (nextIndex >= contract.steps.length) {

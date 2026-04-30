@@ -47,10 +47,27 @@ export function loadContractSnapshot(): ContractStoreSnapshot {
       return emptyContractSnapshot()
     }
     const obj = parsed as Partial<ContractStoreSnapshot>
-    const instances: Record<string, ContractInstance> =
-      obj.instances && typeof obj.instances === 'object' && !Array.isArray(obj.instances)
-        ? (obj.instances as Record<string, ContractInstance>)
-        : {}
+    let instances: Record<string, ContractInstance> = {}
+    if (obj.instances && typeof obj.instances === 'object' && !Array.isArray(obj.instances)) {
+      const raw = obj.instances as Record<string, Partial<ContractInstance>>
+      for (const [id, entry] of Object.entries(raw)) {
+        if (entry === null || typeof entry !== 'object') continue
+        instances[id] = {
+          contractId: entry.contractId ?? id,
+          status: (entry.status as ContractInstance['status']) ?? 'available',
+          currentStepIndex:
+            typeof entry.currentStepIndex === 'number' ? entry.currentStepIndex : 0,
+          stepCounters: Array.isArray(entry.stepCounters)
+            ? entry.stepCounters.filter((n): n is number => typeof n === 'number')
+            : [],
+          offeredAt: typeof entry.offeredAt === 'string' ? entry.offeredAt : null,
+          acceptedAt: typeof entry.acceptedAt === 'string' ? entry.acceptedAt : null,
+          completedAt: typeof entry.completedAt === 'string' ? entry.completedAt : null,
+          resolvedOutcomeId:
+            typeof entry.resolvedOutcomeId === 'string' ? entry.resolvedOutcomeId : null,
+        }
+      }
+    }
     const observedMissionCompletions =
       typeof obj.observedMissionCompletions === 'number' &&
       Number.isFinite(obj.observedMissionCompletions)

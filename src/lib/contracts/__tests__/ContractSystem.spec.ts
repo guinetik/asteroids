@@ -359,6 +359,7 @@ describe('ContractSystem.offerWhenPrerequisites', () => {
             offeredAt: 't0',
             acceptedAt: 't0',
             completedAt: 't0',
+            resolvedOutcomeId: null,
           },
         },
         giverPlanetCompletions: { mars: 1 },
@@ -826,6 +827,7 @@ describe('onContractCompleted hook', () => {
           offeredAt: now,
           acceptedAt: now,
           completedAt: now,
+          resolvedOutcomeId: null,
         },
       },
     }
@@ -857,6 +859,7 @@ describe('onContractCompleted hook', () => {
           offeredAt: now,
           acceptedAt: now,
           completedAt: now,
+          resolvedOutcomeId: null,
         },
       },
     }
@@ -980,6 +983,7 @@ describe('onContractStepCompleted hook', () => {
           offeredAt: now,
           acceptedAt: now,
           completedAt: now,
+          resolvedOutcomeId: null,
         },
       },
     }
@@ -1199,6 +1203,7 @@ describe('ContractSystem passive auto-advance (install-upgrade / visit-planet)',
           offeredAt: now,
           acceptedAt: now,
           completedAt: null,
+          resolvedOutcomeId: null,
         },
       },
     }
@@ -1241,6 +1246,7 @@ describe('ContractSystem passive auto-advance (install-upgrade / visit-planet)',
           offeredAt: now,
           acceptedAt: now,
           completedAt: null,
+          resolvedOutcomeId: null,
         },
       },
     }
