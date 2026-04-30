@@ -4,6 +4,7 @@
 @import './bunkerWaveHud.css';
 @import './mapTacOverlay.css';
 @import './prospectus-overlay.css';
+@import './jovian-epilogue-overlay.css';
 
 /*
  * Reusable utility classes via @apply.

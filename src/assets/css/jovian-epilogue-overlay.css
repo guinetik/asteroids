@@ -1,0 +1,15 @@
+.jovian-epilogue-overlay {
+  @apply fixed inset-0 z-[60] bg-black flex items-center justify-center;
+}
+
+.jovian-epilogue-overlay__video {
+  @apply absolute inset-0 w-full h-full object-cover;
+}
+
+.jovian-epilogue-overlay__subtitle {
+  @apply absolute bottom-32 left-0 right-0 text-center font-mono text-base text-stone-100 tracking-wider px-8 drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)];
+}
+
+.jovian-epilogue-overlay__continue {
+  @apply absolute bottom-8 left-1/2 -translate-x-1/2 bg-blue-700/90 hover:bg-blue-600 text-white font-bold px-8 py-3 rounded shadow-lg disabled:opacity-50 disabled:cursor-not-allowed;
+}
