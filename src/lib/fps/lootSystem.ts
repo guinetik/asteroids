@@ -22,6 +22,14 @@ const DEFAULT_PICKUP_RADIUS = 2.5
 const DEFAULT_SPAWN_Y_OFFSET = 0.6
 const PSYCHOSPHERE_ITEM_ID = 'viroid-psychosphere'
 const EMPTY_LOOT_PICKUPS: readonly LootPickup[] = []
+/**
+ * Psychosphere drop weight applied when an active contract step needs the
+ * item (`policy.isItemArmed('viroid-psychosphere') === true`). Replaces the
+ * table's natural psychosphere weight; the remaining `1 - PSYCHOSPHERE_ARMED_WEIGHT`
+ * is split across `health` / `oxygen` / `rtg` proportional to their original
+ * shares. Tuned so an 8-pickup contract step closes in a single combat run.
+ */
+const PSYCHOSPHERE_ARMED_WEIGHT = 0.7
 
 /** All supported loot/powerup types. Psychosphere remains contract-driven. */
 export type LootType = 'health' | 'oxygen' | 'rtg' | 'psychosphere'
@@ -72,6 +80,37 @@ export interface LootSystemOptions {
 }
 
 const DROP_TABLES: LootDropTables = lootDropTablesJson as LootDropTables
+
+/**
+ * Compute renormalized drop weights when psychosphere is armed by an active
+ * contract step. Sets psychosphere to {@link PSYCHOSPHERE_ARMED_WEIGHT} and
+ * scales the other powerups proportionally so the total stays at 1.
+ *
+ * If the table's other-powerup weights sum to 0 (degenerate case), the entire
+ * remainder lumps onto `health` to keep cumulative selection valid.
+ *
+ * @param baseWeights - Table's natural `biasedDrops` shape.
+ * @returns Adjusted weights summing to 1 with psychosphere boosted.
+ */
+function armedDropWeights(baseWeights: Record<LootType, number>): Record<LootType, number> {
+  const otherSum = baseWeights.health + baseWeights.oxygen + baseWeights.rtg
+  const otherTarget = 1 - PSYCHOSPHERE_ARMED_WEIGHT
+  if (otherSum <= 0) {
+    return {
+      health: otherTarget,
+      oxygen: 0,
+      rtg: 0,
+      psychosphere: PSYCHOSPHERE_ARMED_WEIGHT,
+    }
+  }
+  const scale = otherTarget / otherSum
+  return {
+    health: baseWeights.health * scale,
+    oxygen: baseWeights.oxygen * scale,
+    rtg: baseWeights.rtg * scale,
+    psychosphere: PSYCHOSPHERE_ARMED_WEIGHT,
+  }
+}
 
 /**
  * Creates a policy compatible with LootSystem by delegating to the existing
@@ -129,12 +168,21 @@ export class LootSystem {
     const chance = Math.min(1, table.baseChance + (difficulty - 1) * table.difficultyMultiplier)
     if (Math.random() > chance) return null
 
-    // Weighted random selection using cumulative probabilities from biasedDrops
+    // Pick the active weights table. When the contract policy arms
+    // psychosphere, override the table's psychosphere weight to
+    // PSYCHOSPHERE_ARMED_WEIGHT and renormalize the remaining powerups so the
+    // total stays at 1.
+    const psychosphereArmed = this.policy.isItemArmed(PSYCHOSPHERE_ITEM_ID)
+    const weights = psychosphereArmed
+      ? armedDropWeights(table.biasedDrops)
+      : table.biasedDrops
+
+    // Weighted random selection using cumulative probabilities
     const roll = Math.random()
     let cumulative = 0
     let selectedType: LootType = 'psychosphere'
 
-    for (const [lootType, weight] of Object.entries(table.biasedDrops)) {
+    for (const [lootType, weight] of Object.entries(weights)) {
       cumulative += weight
       if (roll <= cumulative) {
         selectedType = lootType as LootType
@@ -142,9 +190,10 @@ export class LootSystem {
       }
     }
 
-    // Psychosphere still respects contract policy (decoupled via DropPolicy)
-    if (selectedType === 'psychosphere' && !this.policy.isItemArmed(PSYCHOSPHERE_ITEM_ID)) {
-      selectedType = 'health' // fallback to a powerup for minimal passing test
+    // When the contract is not armed, any psychosphere roll falls back to a
+    // powerup (psychosphere doesn't drop without a contract step asking for it).
+    if (selectedType === 'psychosphere' && !psychosphereArmed) {
+      selectedType = 'health'
     }
 
     const pickup: LootPickup = {
