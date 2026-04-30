@@ -64,4 +64,16 @@ export const MINERAL_VISUALS: Record<string, MineralVisual> = {
   'Sulfur Deposits': { color: [0.85, 0.82, 0.1], metalness: 0.0, roughness: 0.6, emissive: false },
   'Iron Oxide': { color: [0.55, 0.15, 0.05], metalness: 0.2, roughness: 0.75, emissive: false },
   'Volcanic Glass': { color: [0.08, 0.07, 0.1], metalness: 0.15, roughness: 0.2, emissive: false },
+  'Carbonaceous Chondrite': {
+    color: [0.12, 0.1, 0.09],
+    metalness: 0.0,
+    roughness: 0.95,
+    emissive: false,
+  },
+  'Organic Macromolecules': {
+    color: [0.08, 0.06, 0.04],
+    metalness: 0.0,
+    roughness: 0.98,
+    emissive: false,
+  },
 }

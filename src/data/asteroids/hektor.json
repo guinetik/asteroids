@@ -1,0 +1,58 @@
+{
+  "id": "hektor",
+  "name": "Hektor",
+  "designation": "624 Hektor",
+  "type": "Dark D-type Trojan",
+  "biome": "rocky",
+  "description": "The largest Jupiter Trojan and a contact-binary asteroid leading the L4 Lagrange cluster. D-type spectrum, vanishingly low albedo, primordial Solar System material thought to have settled at the L4 point billions of years ago.",
+  "composition": [
+    { "name": "Carbonaceous Chondrite", "percentage": 38 },
+    { "name": "Organic Macromolecules", "percentage": 22 },
+    { "name": "Hydrated Silicates", "formula": "Mg3Si2O5(OH)4", "percentage": 18 },
+    { "name": "Water Ice", "formula": "H2O", "percentage": 14 },
+    { "name": "Magnetite", "formula": "Fe3O4", "percentage": 5 },
+    { "name": "Iron-Nickel Alloy", "formula": "Fe-Ni", "percentage": 3 }
+  ],
+  "shape": {
+    "dimensions": [37000, 19500, 19500],
+    "elongation": 1.9,
+    "lobeCount": 2,
+    "irregularity": 0.65
+  },
+  "surface": {
+    "craterDensity": 0.85,
+    "craterMaxScale": 0.4,
+    "boulderDensity": 0.55,
+    "ridgeFrequency": 0.4,
+    "roughness": 0.7,
+    "dustCoverage": 0.6,
+    "modelPath": "/models/hektor.glb",
+    "modelScale": 1300,
+    "surfaceTextures": "/textures/asteroids/rocky",
+    "surfaceTextureRepeat": 13,
+    "surfaceModulatorStrength": 0.9,
+    "surfaceModulatorColorBlend": 0.1,
+    "surfaceAOStrength": 0.6,
+    "surfaceEmissionStrength": 0.4
+  },
+  "visual": {
+    "albedo": 0.025,
+    "baseColor": [0.18, 0.16, 0.14],
+    "valleyTone": 0.05,
+    "peakTone": 1.6
+  },
+  "physical": {
+    "mass": 7.9e18,
+    "density": 1000,
+    "surfaceGravity": 0.018,
+    "rotationPeriod": 6.92,
+    "surfaceTemperature": 125
+  },
+  "lighting": {
+    "sunAzimuth": 45,
+    "sunElevation": 35,
+    "sunColor": [0.95, 0.96, 1.0],
+    "sunIntensity": 1.1,
+    "ambientIntensity": 0.7
+  }
+}

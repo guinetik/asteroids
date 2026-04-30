@@ -10,6 +10,8 @@ const EXPECTED_ASTEROID_IDS = [
   ['psyche'],
   ['xg7'],
   ['kr3'],
+  ['hektor'],
+  ['asset-2306-s'],
 ]
 
 describe('ASTEROID_CATALOG', () => {

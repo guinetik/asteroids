@@ -18,6 +18,8 @@ import psycheData from '@/data/asteroids/psyche.json'
 import vestaData from '@/data/asteroids/vesta.json'
 import xg7Data from '@/data/asteroids/2019-xg7.json'
 import kr3Data from '@/data/asteroids/2021-kr3.json'
+import hektorData from '@/data/asteroids/hektor.json'
+import asset2306SData from '@/data/asteroids/asset-2306-s.json'
 
 const COMPOSITION_SUM = 100
 
@@ -39,6 +41,8 @@ export const ASTEROID_CATALOG: AsteroidDefinition[] = [
   psycheData,
   xg7Data,
   kr3Data,
+  hektorData,
+  asset2306SData,
 ].map((data) => validateAsteroid(data as unknown as AsteroidDefinition))
 
 /** Look up an asteroid by its unique ID. Returns `undefined` if not found. */

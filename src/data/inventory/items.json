@@ -190,6 +190,26 @@
     "sellable": true
   },
   {
+    "id": "carbonaceous-chondrite",
+    "category": "mineral",
+    "label": "Carbonaceous Chondrite",
+    "description": "Primordial carbon-rich matrix from the earliest Solar System. Rare scientific commodity and carbon feedstock for organic synthesis.",
+    "icon": "carbonaceous-chondrite.png",
+    "weightPerUnit": 1,
+    "maxStack": 500,
+    "sellable": true
+  },
+  {
+    "id": "organic-macromolecules",
+    "category": "mineral",
+    "label": "Organic Macromolecules",
+    "description": "Complex prebiotic carbon chains preserved in D-type asteroid regolith. Extreme scientific and pharmaceutical value.",
+    "icon": "organic-macromolecules.png",
+    "weightPerUnit": 1,
+    "maxStack": 500,
+    "sellable": true
+  },
+  {
     "id": "volcanic-glass",
     "category": "mineral",
     "label": "Volcanic Glass",
