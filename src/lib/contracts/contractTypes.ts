@@ -34,7 +34,15 @@ export interface MissionCompletedEvent {
   giverId: string | null
   /** For shuttle planetary missions, the planet the mission targets. */
   targetPlanetId: string | null
-  /** Optional objective subtype (e.g. `'photometry'`). Plan 3+ populates and matches. */
+  /**
+   * Objective subtype emitted by the mission session (e.g. `'photometry'`,
+   * `'dan'`, `'gather'`, `'mining'`). Asteroid missions emit the primary
+   * `objectives[0]?.type`; turret mining emits `'mining'`; planetary shuttle
+   * and EVA emissions currently emit `''` (no clear slot type). Contract
+   * steps that filter on `objectiveType` will reject events with `''` — to
+   * filter on a shuttle/eva slot type, populate the relevant emission site
+   * first.
+   */
   objectiveType?: string
   /** Optional region tag (e.g. `'jovian-trojans'`). Plan 5 populates and matches. */
   region?: string
@@ -66,7 +74,7 @@ export interface CompleteMissionsStep extends ContractStepRewardMixin {
   giverPlanetId?: string
   /**
    * Restrict to a single objective type (e.g. `'photometry'`, `'dan'`, `'gather'`).
-   * Accepted by the type, ignored by the matcher in this plan — later plans tighten.
+   * Honored by the matcher — only events with matching `objectiveType` advance.
    */
   objectiveType?: string
   /**
