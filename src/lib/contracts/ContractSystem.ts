@@ -413,6 +413,13 @@ export class ContractSystem {
    */
   notifyPlanetVisited(planetId: string): void {
     let changed = false
+    const visited = this.snapshot.visitedPlanetIds ?? {}
+    if (visited[planetId] !== true) {
+      this.snapshot = {
+        ...this.snapshot,
+        visitedPlanetIds: { ...visited, [planetId]: true },
+      }
+    }
     for (const contract of this.contracts.values()) {
       if (contract.triggerOnPlanetVisited !== planetId) continue
       if (this.snapshot.instances[contract.id]) continue
@@ -440,6 +447,10 @@ export class ContractSystem {
         changed = true
       }
     }
+    if (this.evaluatePrerequisiteContractOffers()) {
+      changed = true
+    }
+    this.persist()
     if (changed) this.afterChange()
   }
 
@@ -826,9 +837,9 @@ export class ContractSystem {
   }
 
   /**
-   * Offer contracts that list {@link Contract.offerWhenPrerequisites} when
-   * the required contract is completed and giver-planet mission counts
-   * satisfy the minima.
+   * Offer contracts whose `offerWhenPrerequisites` gates are all satisfied.
+   * Every present sub-field is AND-ed. Order of qualifying events does not
+   * matter — the evaluator runs after every relevant signal.
    *
    * @returns True if at least one new contract was offered.
    */
@@ -838,14 +849,16 @@ export class ContractSystem {
       const p = contract.offerWhenPrerequisites
       if (!p) continue
       if (this.snapshot.instances[contract.id]) continue
-      if (p.requiredCompletedContractId === undefined) continue
-      if (p.minGiverPlanetCompletions === undefined) continue
-      const req = p.requiredCompletedContractId
-      const pre = this.snapshot.instances[req]
-      if (!pre || pre.status !== 'completed') continue
-      const { planetId, min: minCount } = p.minGiverPlanetCompletions
-      if ((this.snapshot.giverPlanetCompletions[planetId] ?? 0) < minCount) {
-        continue
+      if (p.requiredCompletedContractId !== undefined) {
+        const pre = this.snapshot.instances[p.requiredCompletedContractId]
+        if (!pre || pre.status !== 'completed') continue
+      }
+      if (p.minGiverPlanetCompletions !== undefined) {
+        const { planetId, min: minCount } = p.minGiverPlanetCompletions
+        if ((this.snapshot.giverPlanetCompletions[planetId] ?? 0) < minCount) continue
+      }
+      if (p.triggerOnPlanetVisited !== undefined) {
+        if (this.snapshot.visitedPlanetIds?.[p.triggerOnPlanetVisited] !== true) continue
       }
       this.offerContract(contract)
       offered = true

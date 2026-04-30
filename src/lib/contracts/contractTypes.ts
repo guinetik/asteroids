@@ -429,6 +429,11 @@ export interface ContractStoreSnapshot {
    * `triggerOnMissionOfKind` and for diagnostics).
    */
   missionCompletionsByKind: Partial<Record<ContractMissionType, number>>
+  /**
+   * Planet ids the player has orbited at least once since the contract system
+   * started observing. Drives `offerWhenPrerequisites.triggerOnPlanetVisited`.
+   */
+  visitedPlanetIds?: Record<string, true>
   /** Schema version for forward-compatible migrations. */
   version: 1
 }

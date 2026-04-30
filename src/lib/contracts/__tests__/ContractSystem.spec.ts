@@ -1337,6 +1337,105 @@ function inMemoryPersistence(): {
   return { load: () => snap, save: (next) => (snap = next) }
 }
 
+describe('offerWhenPrerequisites combined gate', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('fires when both requiredCompletedContractId and triggerOnPlanetVisited met', () => {
+    const A: Contract = {
+      id: 'aaa',
+      inboxName: 'A',
+      from: 't',
+      sentAt: TEST_DATE,
+      triggerOnMissionCompletedNth: 1,
+      introSubject: 'A',
+      introBody: ['a'],
+      steps: [{ kind: 'visit-planet', planetId: 'mars', subject: 's', flavor: ['f'] }],
+      completionSubject: 'A done',
+      completionBody: ['ad'],
+      rewards: [],
+    }
+    const B: Contract = {
+      id: 'bbb',
+      inboxName: 'B',
+      from: 't',
+      sentAt: TEST_DATE,
+      offerWhenPrerequisites: {
+        requiredCompletedContractId: 'aaa',
+        triggerOnPlanetVisited: 'jupiter',
+      },
+      introSubject: 'B',
+      introBody: ['b'],
+      steps: [{ kind: 'visit-planet', planetId: 'earth', subject: 's', flavor: ['f'] }],
+      completionSubject: 'B done',
+      completionBody: ['bd'],
+      rewards: [],
+    }
+    const messages = new MessageSystem([], emptyMessageStore())
+    const contracts = new ContractSystem([A, B], messages, inMemoryPersistence(), {
+      hasOrbitedPlanet: () => false,
+    })
+    contracts.resetForTests()
+
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+    contracts.acceptContract('aaa')
+    contracts.notifyPlanetVisited('mars') // completes A
+
+    // B prereq met but planet-visit gate not — should not be offered yet.
+    expect(contracts.getInstance('bbb')).toBeNull()
+
+    // Visiting jupiter now offers B.
+    contracts.notifyPlanetVisited('jupiter')
+    expect(contracts.getInstance('bbb')?.status).toBe('available')
+  })
+
+  it('respects order: planet visited before required contract completed', () => {
+    const A: Contract = {
+      id: 'a2',
+      inboxName: 'A',
+      from: 't',
+      sentAt: TEST_DATE,
+      triggerOnMissionCompletedNth: 1,
+      introSubject: 'A',
+      introBody: ['a'],
+      steps: [{ kind: 'visit-planet', planetId: 'mars', subject: 's', flavor: ['f'] }],
+      completionSubject: 'A done',
+      completionBody: ['ad'],
+      rewards: [],
+    }
+    const B: Contract = {
+      id: 'b2',
+      inboxName: 'B',
+      from: 't',
+      sentAt: TEST_DATE,
+      offerWhenPrerequisites: {
+        requiredCompletedContractId: 'a2',
+        triggerOnPlanetVisited: 'jupiter',
+      },
+      introSubject: 'B',
+      introBody: ['b'],
+      steps: [{ kind: 'visit-planet', planetId: 'earth', subject: 's', flavor: ['f'] }],
+      completionSubject: 'B done',
+      completionBody: ['bd'],
+      rewards: [],
+    }
+    const messages = new MessageSystem([], emptyMessageStore())
+    const contracts = new ContractSystem([A, B], messages, inMemoryPersistence(), {
+      hasOrbitedPlanet: () => false,
+    })
+    contracts.resetForTests()
+
+    contracts.notifyPlanetVisited('jupiter')
+    expect(contracts.getInstance('b2')).toBeNull()
+
+    contracts.notifyMissionCompleted(sampleShuttleMission)
+    contracts.acceptContract('a2')
+    contracts.notifyPlanetVisited('mars')
+    expect(contracts.getInstance('b2')?.status).toBe('available')
+  })
+})
+
 describe('choice-mission step', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
