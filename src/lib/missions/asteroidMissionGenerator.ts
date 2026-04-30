@@ -723,6 +723,10 @@ function getHostGiverOverride(planetId: string): HostGiverOverride | undefined {
  *   generated near that orbit. When omitted (tests, level URL overrides), uses Earth @ 1 AU.
  * @param rand - Optional RNG for deterministic tests.
  * @param requiredObjectiveType - Optional objective type the generated mission must include.
+ * @param requiredGiverId - Optional giver id constraint. When set, the candidate pool is
+ *   narrowed to templates whose giver matches — unless the host has a host-giver-override
+ *   whose `giverId` already equals `requiredGiverId`, in which case every template is
+ *   eligible (all of them will be re-stamped to the override at output time).
  * @returns Fully generated mission ready for the mission board.
  */
 export function generateAsteroidMission(
@@ -730,6 +734,7 @@ export function generateAsteroidMission(
   host: AsteroidMissionHostAnchor | null = null,
   rand: () => number = Math.random,
   requiredObjectiveType: ConcreteObjective['type'] | null = null,
+  requiredGiverId: string | null = null,
 ): GeneratedAsteroidMission {
   const anchor = host ?? syntheticEarthHostAnchor()
   const combatOnlyHost = isCombatOnlyHostPlanet(anchor.planetId)
@@ -749,7 +754,19 @@ export function generateAsteroidMission(
     region: MissionRegion
   }[] = []
 
+  const hostOverride = getHostGiverOverride(anchor.planetId)
+  const hostEffectiveGiverId = hostOverride?.giverId ?? null
+
   for (const giver of givers) {
+    // requiredGiverId narrows the pool unless the host override re-stamps every
+    // mission to the requested giver — in which case all templates are eligible.
+    if (
+      requiredGiverId !== null &&
+      hostEffectiveGiverId !== requiredGiverId &&
+      giver.id !== requiredGiverId
+    ) {
+      continue
+    }
     for (const template of giver.missions) {
       // Per-template planet filter — when set, the template only rolls at the
       // listed host planets. Templates without `planetIds` remain global.

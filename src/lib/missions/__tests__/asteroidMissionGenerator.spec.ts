@@ -789,3 +789,32 @@ describe('per-template planetIds filter', () => {
     })
   })
 })
+
+describe('generateAsteroidMission requiredGiverId filter', () => {
+  it('biases the candidate pool to the requested giver when no host override applies', () => {
+    const host = { planetId: 'jupiter', worldX: 0, worldZ: 0 }
+    const samples: string[] = []
+    for (let i = 0; i < 20; i++) {
+      const m = generateAsteroidMission(5, host, Math.random, null, 'jovian-society')
+      samples.push(m.giverId)
+    }
+    expect(samples.every((g) => g === 'jovian-society')).toBe(true)
+  })
+
+  it('throws a clear error when no template matches the requiredGiverId at this planet', () => {
+    const host = { planetId: 'jupiter', worldX: 0, worldZ: 0 }
+    expect(() =>
+      generateAsteroidMission(5, host, Math.random, null, 'this-giver-does-not-exist'),
+    ).toThrow(/No templates match/)
+  })
+
+  it('respects host-giver-override: at Mercury, requiredGiverId="cinderline" allows any template', () => {
+    const host = { planetId: 'mercury', worldX: 0, worldZ: 0 }
+    const samples: string[] = []
+    for (let i = 0; i < 10; i++) {
+      const m = generateAsteroidMission(3, host, Math.random, null, 'cinderline')
+      samples.push(m.giverId)
+    }
+    expect(samples.every((g) => g === 'cinderline')).toBe(true)
+  })
+})
