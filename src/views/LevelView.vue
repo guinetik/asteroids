@@ -377,6 +377,7 @@ const landerTelemetry = reactive<LanderTelemetry>({
   minigameProgressLabel: null,
   missionInstruction: null,
 })
+const landerFuelCellCount = ref(0)
 
 const fpsTelemetry = reactive<FpsTelemetry>({
   hp: 100,
@@ -486,11 +487,15 @@ onMounted(async () => {
     }
     viewController.onResourcePickup = (itemId, quantity, label) => {
       recordPickup(itemId, quantity, label)
+      viewController.refreshLanderFuelCellCount()
       if (showInventory.value) refreshInventorySnapshot()
     }
     viewController.onResourcePickupFailed = (label, reason) => {
       recordPickupFailed(label, reason)
       if (showInventory.value) refreshInventorySnapshot()
+    }
+    viewController.onLanderFuelCellCount = (count) => {
+      landerFuelCellCount.value = count
     }
     viewController.onProspect = (itemId) => {
       const def = getItemDefinition(itemId)
@@ -525,6 +530,7 @@ onMounted(async () => {
       }
     }
     await viewController.init(container.value)
+    viewController.refreshLanderFuelCellCount()
 
     // Map markers + tracker from mission objectives
     const mission = viewController.getMission()
@@ -613,6 +619,13 @@ function handleJettison(itemId: string, quantity: number): void {
   if (!result.ok) return
   saveInventory(result.inventory)
   inventorySnapshot.value = result.inventory
+  viewController.refreshLanderFuelCellCount()
+}
+
+/** Consume one carried lander fuel cell from the HUD refuel button. */
+function handleUseLanderFuelCell(): void {
+  viewController.useLanderFuelCell()
+  if (showInventory.value) refreshInventorySnapshot()
 }
 
 /**
@@ -771,7 +784,12 @@ function handleToggleMusic(): void {
     body-id="hektor"
     :on-resolve="handleProspectusResolve"
   />
-  <LanderHud v-if="stateInfo.state === 'lander'" :telemetry="landerTelemetry" />
+  <LanderHud
+    v-if="stateInfo.state === 'lander'"
+    :telemetry="landerTelemetry"
+    :fuel-cell-count="landerFuelCellCount"
+    @use-fuel-cell="handleUseLanderFuelCell"
+  />
   <FpsHud
     v-if="stateInfo.state === 'eva' || inBunker"
     :telemetry="fpsTelemetry"

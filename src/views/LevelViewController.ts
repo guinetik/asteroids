@@ -104,6 +104,10 @@ import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
 import { LootPickupController } from '@/three/LootPickupController'
 import { contractSystem } from '@/lib/contracts/runtime'
 import {
+  countLanderFuelCells,
+  useLanderFuelCell as consumeLanderFuelCell,
+} from '@/lib/level/landerFuelCell'
+import {
   hashLevelSeed,
   resolveLevelContext,
   resolveLevelLutUrl,
@@ -385,6 +389,48 @@ export class LevelViewController implements Tickable {
   }
 
   /**
+   * Emit the current persisted lander fuel-cell count to the Vue HUD.
+   *
+   * @author guinetik
+   * @date 2026-04-30
+   * @spec docs/superpowers/specs/2026-04-30-lander-fuel-cell-refuel-design.md
+   */
+  refreshLanderFuelCellCount(): void {
+    const inventory = loadInventory()
+    this.onLanderFuelCellCount?.(inventory ? countLanderFuelCells(inventory) : 0)
+  }
+
+  /**
+   * Consume one carried lander fuel cell and add half a tank to the active lander.
+   *
+   * @author guinetik
+   * @date 2026-04-30
+   * @spec docs/superpowers/specs/2026-04-30-lander-fuel-cell-refuel-design.md
+   */
+  useLanderFuelCell(): void {
+    if (!this.landerController) return
+
+    const inventory = loadInventory()
+    if (!inventory) {
+      this.onLanderFuelCellCount?.(0)
+      return
+    }
+
+    const result = consumeLanderFuelCell(
+      inventory,
+      this.landerController.thrusterSystem.fuelCapacity,
+    )
+    if (!result.ok) {
+      this.onLanderFuelCellCount?.(result.remainingFuelCells)
+      return
+    }
+
+    saveInventory(result.inventory)
+    this.landerController.thrusterSystem.addFuel(result.fuelToAdd)
+    this.onLanderFuelCellCount?.(result.remainingFuelCells)
+  }
+
+  /**
    * Called when a unit of resource is *successfully* added to the
    * player inventory in-mission (currently fired by rock mining).
    * The host UI surfaces this to the player as a stacking pickup
@@ -406,6 +452,9 @@ export class LevelViewController implements Tickable {
    * @param reason Short reason string from the inventory layer.
    */
   onResourcePickupFailed: ((label: string, reason: string) => void) | null = null
+
+  /** Fired when carried lander fuel-cell count changes for the HUD refuel button. */
+  onLanderFuelCellCount: ((count: number) => void) | null = null
 
   /**
    * Called when a rock is fully analysed by the science gun. The host

@@ -4,7 +4,14 @@ import type { LanderTelemetry } from '@/lib/ui/landerHudTypes'
 
 const props = defineProps<{
   telemetry: LanderTelemetry
+  fuelCellCount?: number
 }>()
+
+const emit = defineEmits<{
+  useFuelCell: []
+}>()
+
+const REFUEL_BUTTON_VISIBLE_BELOW_PERCENT = 80
 
 function pct(value: number, max: number): number {
   return max > 0 ? (value / max) * 100 : 0
@@ -87,6 +94,20 @@ function timerColor(seconds: number): string {
             :style="{ width: pct(props.telemetry.fuelLevel, props.telemetry.fuelCapacity) + '%' }"
           ></div>
         </div>
+        <button
+          v-if="
+            (fuelCellCount ?? 0) > 0 &&
+            pct(props.telemetry.fuelLevel, props.telemetry.fuelCapacity) <
+              REFUEL_BUTTON_VISIBLE_BELOW_PERCENT
+          "
+          type="button"
+          class="hud-dock-refuel-btn"
+          @click.stop.prevent="emit('useFuelCell')"
+          @mousedown.stop
+          @pointerdown.stop
+        >
+          REFUEL ({{ fuelCellCount }})
+        </button>
       </div>
     </div>
 
