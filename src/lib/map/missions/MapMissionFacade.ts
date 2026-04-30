@@ -684,13 +684,28 @@ export class MapMissionFacade {
   }): GeneratedAsteroidMission | null {
     const activeAsteroid = this.board.activeAsteroidMission
     if (!activeAsteroid || activeAsteroid.status !== 'accepted') return null
+    if (!params.beginMissionPressed) return null
+
+    const orbitState = params.orbitSystem?.state ?? 'free'
+    const orbitedBodyId = params.orbitSystem?.target?.id ?? null
+    const orbitMatchesAsteroid =
+      orbitState === 'orbiting' && orbitedBodyId === activeAsteroid.asteroidId
+
+    if (orbitMatchesAsteroid) {
+      // Special-mission path: orbiting the body the mission targets. The
+      // orbit ring IS the approach — skip the procedural waypoint distance
+      // check and don't require free flight.
+      this.board = beginAsteroidMission(this.board)
+      this.persistBoard()
+      return activeAsteroid
+    }
+
     const inApproachRadius = isWithinAsteroidMissionApproachRadius(
       params.shuttlePosition.x,
       params.shuttlePosition.z,
       activeAsteroid.waypoint,
     )
-    const orbitState = params.orbitSystem?.state ?? 'free'
-    if (!inApproachRadius || !params.beginMissionPressed) return null
+    if (!inApproachRadius) return null
     if (orbitState === 'approaching') {
       params.cancelOrbitApproachFromMap()
     }

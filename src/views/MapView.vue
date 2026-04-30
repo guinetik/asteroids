@@ -632,18 +632,24 @@ const missionApproachHud = computed(() => {
   ) {
     return { visible: false as const, name: '' }
   }
-  // Same rule as `MapMissionFacade.tryBeginAsteroidMission`: only free flight may engage
-  // the landing approach; hide the prompt while captured so orbit/terminal UI isn't
-  // overlaid when a waypoint shares Earth (or any body) space with the orbit ring.
-  if (orbitState.state !== 'free') {
-    return { visible: false as const, name: '' }
-  }
   const board = missionBoard.value
   const m = board?.activeAsteroidMission
   if (!m || m.status !== 'accepted') {
     return { visible: false as const, name: '' }
   }
   if (telemetry.hp <= 0) {
+    return { visible: false as const, name: '' }
+  }
+  // Special-mission path: when orbiting the body the mission targets (e.g. Hektor
+  // for the Jovian photometry/DAN missions), show the prompt regardless of the
+  // procedural waypoint distance. The orbit ring IS the approach.
+  if (orbitState.state === 'orbiting' && orbitState.nearestBodyId === m.asteroidId) {
+    return { visible: true as const, name: m.name }
+  }
+  // Legacy procedural path: free flight near the waypoint marker. Hidden while
+  // captured so orbit/terminal UI doesn't overlap a waypoint that happens to
+  // share orbit-ring space with another body.
+  if (orbitState.state !== 'free') {
     return { visible: false as const, name: '' }
   }
   if (!isWithinAsteroidMissionApproachRadius(telemetry.posX, telemetry.posZ, m.waypoint)) {
