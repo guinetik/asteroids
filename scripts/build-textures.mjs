@@ -5,17 +5,22 @@
  * `image/jovian-ending.png`) are converted into lossy or lossless WebPs under matching
  * paths under `public/`.
  *
+ * Skips an asset when the destination `.webp` already exists and its modification time is
+ * greater than or equal to the chosen source raster (incremental runs). Set environment variable
+ * `TEXTURES_FORCE_REBUILD=1` (or `true`) to encode every raster regardless.
+ *
  * @author guinetik
  * @date 2026-04-30
  * @see docs/superpowers/specs/2026-04-28-texture-webp-pipeline-design.md
  */
 
 import { spawn } from 'node:child_process'
-import { unlinkSync } from 'node:fs'
 import {
+  existsSync,
   mkdirSync,
   readdirSync,
   statSync,
+  unlinkSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, relative, resolve } from 'node:path'
@@ -125,6 +130,24 @@ export function formatBytes(bytes) {
   }
 
   return `${(kilobytes / BYTE_UNIT).toFixed(1)} MB`
+}
+
+/**
+ * Whether a texture WebP needs to be encoded from source vs destination mtimes.
+ *
+ * @param {number} sourceMtimeMs - `mtimeMs` of the authoritative raster under `image/`.
+ * @param {number | null} outputMtimeMs - `mtimeMs` of the destination `.webp` under `public/`, or `null` if absent.
+ * @param {boolean} forceRebuild - When true, always treat as needing a rebuild.
+ * @returns {boolean} True when {@link encodeWebpUntilUnderCap} should run.
+ */
+export function shouldRebuildTextureWebp(sourceMtimeMs, outputMtimeMs, forceRebuild) {
+  if (forceRebuild) {
+    return true
+  }
+  if (outputMtimeMs === null) {
+    return true
+  }
+  return sourceMtimeMs > outputMtimeMs
 }
 
 /**
@@ -278,6 +301,18 @@ async function spawnMagick(magickArgs) {
  */
 async function encodeWebpOnce(inputPath, outputPath, mode, lossyQuality) {
   mkdirSync(dirname(outputPath), { recursive: true })
+
+  /*
+   * Windows ImageMagick intermittently fails with OpenBlob "Invalid argument" when overwriting
+   * an existing destination `.webp`. Remove first so each encode is a fresh write.
+   */
+  try {
+    if (existsSync(outputPath)) {
+      unlinkSync(outputPath)
+    }
+  } catch {
+    // Best-effort — encoder still tries `outputPath`.
+  }
 
   /** @type {string[]} */
   const args = [inputPath]
@@ -477,6 +512,10 @@ function removeStaleRastersSameBase(outputDirectory, baseWithoutExt) {
  * @returns {Promise<void>}
  */
 async function main() {
+  const forceRebuild =
+    process.env.TEXTURES_FORCE_REBUILD === '1' ||
+    process.env.TEXTURES_FORCE_REBUILD === 'true'
+
   /** @type {readonly string[]} */
   const scanRoots = [
     join(IMAGE_ROOT, 'textures'),
@@ -538,7 +577,25 @@ async function main() {
     }
 
     const outputPath = outputWebpPathForSource(chosen, IMAGE_ROOT, PUBLIC_ROOT)
-    const beforeBytes = statSync(chosen).size
+    const sourceStat = statSync(chosen)
+    const sourceMtimeMs = sourceStat.mtimeMs
+
+    /** @type {number | null} */
+    let outputMtimeMs = null
+    try {
+      outputMtimeMs = statSync(outputPath).mtimeMs
+    } catch {
+      outputMtimeMs = null
+    }
+
+    if (!shouldRebuildTextureWebp(sourceMtimeMs, outputMtimeMs, forceRebuild)) {
+      console.info(
+        `Skip up-to-date: ${relative(REPO_ROOT, chosen)} → ${relative(PUBLIC_ROOT, outputPath)}`,
+      )
+      continue
+    }
+
+    const beforeBytes = sourceStat.size
 
     const encodeHint = await encodeWebpUntilUnderCap(chosen, outputPath)
 

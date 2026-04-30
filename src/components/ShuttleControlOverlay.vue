@@ -307,6 +307,7 @@ onBeforeUnmount(releaseControlPanelHeight)
               activeScreen === 'lander' ||
               activeScreen === 'multitool' ||
               activeScreen === 'suit',
+            'shuttle-control-content--programs-mail': activeScreen === 'mail',
           }"
         >
           <Transition
