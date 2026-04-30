@@ -8,7 +8,7 @@ This note describes how to combine NASA’s split Shuttle assets into a **single
 |--------|------|
 | `Space Shuttle (D).glb` | Main orbiter: Draco-compressed mesh, embedded WebP/JPEG textures, **animations** `shutAction` and `shut.layerAction` (Blender export; also uses `KHR_draco_mesh_compression`, `KHR_materials_specular`, `EXT_texture_webp`). |
 | `Space Shuttle (D) door-prt.glb` / `door-stb.glb` | Small add-on meshes; **invalid for portable GLB** until fixed: they reference **external** `SHUT-DOO.JPG` and `SHUT-DOA.JPG` via `images[].uri` inside a `.glb` (validator flags `URI_GLB`). |
-| `Space Shuttle (D) eng.glb` / `rcs.glb` | Additional geometry; validate clean aside from optional `FB_ngon_encoding` (Blender) and unused materials. |
+| `eng.glb` / `rcs.glb` (`public/models/`) | Same NASA add-ons as **`Space Shuttle (D) eng.glb` / `rcs.glb`**; filenames are shortened in-repo. `merge-shuttle-glb.mjs` merges these alongside the main hull and doors. |
 
 ### Aft thruster add-ons (`eng.glb`, `rcs.glb`) — why they are not “on the back” after merge
 

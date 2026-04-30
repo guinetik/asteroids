@@ -3,6 +3,7 @@
 ## Source
 
 - **Authoring export:** `3d/virus.glb` (e.g. Sketchfab). Replace when you update the asset.
+- Fresh checkouts that only ship `public/models/virus.glb` can seed the source once with **`bun run models:bootstrap-heavy-sources`** (copies several heavy props from `public/models/` → `3d/` when missing), or copy `virus.glb` manually into `3d/`.
 
 ## Game build: `public/models/virus.glb`
 
