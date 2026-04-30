@@ -27,7 +27,7 @@
     "ridgeFrequency": 0.4,
     "roughness": 0.7,
     "dustCoverage": 0.6,
-    "modelPath": "/models/asteroids/itokawa.glb",
+    "modelPath": "/models/hektor.glb",
     "modelScale": 1300,
     "surfaceTextures": "/textures/asteroids/default",
     "surfaceTextureRepeat": 13,
@@ -37,7 +37,7 @@
     "surfaceEmissionStrength": 0.4
   },
   "visual": {
-    "albedo": 0.025,
+    "albedo": 0.055,
     "baseColor": [0.18, 0.16, 0.14],
     "valleyTone": 0.05,
     "peakTone": 1.6
@@ -53,8 +53,8 @@
     "sunAzimuth": 45,
     "sunElevation": 35,
     "sunColor": [0.95, 0.96, 1.0],
-    "sunIntensity": 1.1,
-    "ambientIntensity": 0.7,
+    "sunIntensity": 1.9,
+    "ambientIntensity": 1.7,
     "lutUrl": "/hektor.CUBE"
   }
 }
