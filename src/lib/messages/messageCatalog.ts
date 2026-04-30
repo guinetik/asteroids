@@ -293,6 +293,27 @@ export const JOVIAN_SATURN_DAN_OFFER: ShipMessageDefinition = {
   ],
 }
 
+/** Jovian Step 9 — Hektor prospectus compilation and transmission offer. */
+export const JOVIAN_HEKTOR_PROSPECTUS_OFFER: ShipMessageDefinition = {
+  id: 'jovian-prospection-hektor-prospectus-offer',
+  from: 'Vance Hoyt, Senior Asset Officer (Cloud City)',
+  subject: 'OP 9 — Prospectus Compilation & Transmission',
+  sentAt: '2306-05-28 09:15 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: 80,
+  folderId: 'jovian-society-prospection',
+  folderLabel: 'Jovian Society',
+  body: [
+    'Pilot,',
+    "Eight deliverables clean. The Society is grateful for the data quality you've returned across both instrumentation series.",
+    'Final assignment: travel to Asset 2306-J in the Jovian Trojans. There is a Society-provisioned terminal on the surface, near your previous landing zone. Approach the terminal and review the assembled report — your readings, our analysis, the recommended disposition. Confirm transmission to Cloud City Asset Strategy at your discretion.',
+    "The Society will be reviewing the asset for full extraction queueing on receipt of your confirmation. You'll find a closeout bonus structure attached commensurate with the size of the asset class.",
+    'There is no further fieldwork after this step. Welcome, in advance, to the manifest.',
+    '— Vance',
+  ],
+}
+
 /** Jay's warning when the player starts flirting with Venus' orbital lane. */
 export const JAY_VENUS_WARNING_MESSAGE: ShipMessageDefinition = {
   id: 'jay-venus-orbit-warning',
@@ -355,6 +376,7 @@ export const SHIP_MESSAGE_CATALOG: ShipMessageDefinition[] = [
   JOVIAN_SATURN_PHOTOMETRY_OFFER,
   JOVIAN_HEKTOR_DAN_OFFER,
   JOVIAN_SATURN_DAN_OFFER,
+  JOVIAN_HEKTOR_PROSPECTUS_OFFER,
   JAY_STARTUP_FOLLOW_UP_MESSAGE,
   JAY_FIRST_SLINGSHOT_MESSAGE,
   JAY_CONTRACT_INCOMING_MESSAGE,
