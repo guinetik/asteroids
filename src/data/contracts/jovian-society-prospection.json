@@ -9,7 +9,7 @@
   },
   "pinnedAssets": [
     {
-      "assetRef": "jovian-prospectus-target-jupiter",
+      "assetRef": "hektor",
       "region": "jovian-trojans",
       "label": "Asset 2306-J"
     }
@@ -77,7 +77,7 @@
       "missionType": "asteroid",
       "objectiveType": "photometry",
       "giverId": "jovian-society",
-      "pinnedAssetRef": "jovian-prospectus-target-jupiter",
+      "pinnedAssetRef": "hektor",
       "creditsReward": 2500,
       "subject": "OP 4 — Photometric Assessment, Asset 2306-J",
       "flavor": [
@@ -125,7 +125,7 @@
       "missionType": "asteroid",
       "objectiveType": "dan",
       "giverId": "jovian-society",
-      "pinnedAssetRef": "jovian-prospectus-target-jupiter",
+      "pinnedAssetRef": "hektor",
       "creditsReward": 3000,
       "subject": "OP 7 — Subsurface Survey, Asset 2306-J",
       "flavor": [
@@ -156,7 +156,7 @@
       "kind": "choice-mission",
       "missionId": "jovian_final_prospectus",
       "minigameType": "terminal-prospectus",
-      "pinnedAssetRef": "jovian-prospectus-target-jupiter",
+      "pinnedAssetRef": "hektor",
       "outcomes": [
         { "outcomeId": "transmit", "label": "Transmit Report", "creditsReward": 5000 },
         { "outcomeId": "tamper", "label": "Tamper Report", "creditsReward": 0 }
@@ -185,9 +185,8 @@
       ],
       "rewards": [
         { "type": "shuttle-buff", "buffId": "jovianEmpowerment", "multiplier": 1.5 },
-        { "type": "destroy-body", "assetRef": "jovian-prospectus-target-jupiter" },
-        { "type": "mission-pay-multiplier", "planetId": "jupiter", "multiplier": 2 },
-        { "type": "faction-standing", "factionId": "jovian-society", "standing": "cohort-member" }
+        { "type": "set-body-access", "bodyId": "hektor", "state": "destroyed" },
+        { "type": "mission-pay-multiplier", "planetId": "jupiter", "multiplier": 2 }
       ]
     },
     "tamper": {
@@ -201,7 +200,8 @@
         "— Vance Hoyt, Senior Asset Officer"
       ],
       "rewards": [
-        { "type": "faction-standing", "factionId": "jovian-society", "standing": "blacklisted" }
+        { "type": "disable-giver", "giverId": "jovian-society" },
+        { "type": "set-body-access", "bodyId": "hektor", "state": "liberated" }
       ]
     }
   }
