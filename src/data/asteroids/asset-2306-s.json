@@ -17,7 +17,8 @@
     "dimensions": [12000, 9500, 8800],
     "elongation": 1.2,
     "lobeCount": 1,
-    "irregularity": 0.55
+    "irregularity": 0.55,
+    "rotationLottery": { "x": 0, "z": 0 }
   },
   "surface": {
     "craterDensity": 0.7,
