@@ -525,26 +525,47 @@ export class MapMissionFacade {
     this.openMissionOverlay(params)
   }
 
-  syncWaypointSite(scene: THREE.Scene): void {
+  syncWaypointSite(
+    scene: THREE.Scene,
+    livePosition: { x: number; z: number } | null = null,
+  ): void {
     const mission = this.board.activeAsteroidMission
+
+    // When the mission targets a renderable body (Hektor, etc.), the body
+    // itself is the visual target. Use its live position for the waypoint
+    // marker and keep `mission.waypoint` synced in-memory so distance-based
+    // systems (overlay projector, proximity check) track the body's drift.
+    const wpX = livePosition?.x ?? mission?.waypoint.worldX ?? 0
+    const wpZ = livePosition?.z ?? mission?.waypoint.worldZ ?? 0
+
     if (shouldShowAsteroidMissionMapSite(mission) && !this.missionWaypointRoot) {
       const root = new THREE.Group()
-      root.position.set(mission!.waypoint.worldX, 0, mission!.waypoint.worldZ)
+      root.position.set(wpX, 0, wpZ)
       const waypoint = createWaypointMarkerGroup(WAYPOINT_MARKER_DEFAULT_COLOR, 'orbitMap')
       root.add(waypoint)
       scene.add(root)
       this.missionWaypointRoot = root
       this.missionOrbitWaypointMarker = waypoint
-      const previewRoot = new THREE.Group()
-      previewRoot.position.copy(root.position)
-      scene.add(previewRoot)
-      this.missionAsteroidPreviewRoot = previewRoot
+      // Skip the procedural preview asteroid when the mission is anchored
+      // to a real body — no fake duplicate next to the actual mesh.
+      if (livePosition === null) {
+        const previewRoot = new THREE.Group()
+        previewRoot.position.copy(root.position)
+        scene.add(previewRoot)
+        this.missionAsteroidPreviewRoot = previewRoot
+        void this.spawnMissionAsteroidPreview(previewRoot, mission!)
+      }
       console.warn(
-        `[MapMissionFacade] Spawned asteroid mission site "${mission!.name}" at ${formatWaypointDebug(mission!.waypoint.worldX, mission!.waypoint.worldZ)}`,
+        `[MapMissionFacade] Spawned asteroid mission site "${mission!.name}" at ${formatWaypointDebug(wpX, wpZ)}`,
       )
-      void this.spawnMissionAsteroidPreview(previewRoot, mission!)
     } else if (!shouldShowAsteroidMissionMapSite(mission) && this.missionWaypointRoot) {
       this.disposeWaypointSite(scene)
+    } else if (this.missionWaypointRoot && livePosition !== null && mission) {
+      // Maintain: glue the waypoint marker to the body's live position and
+      // update the active mission's waypoint coords in-memory.
+      this.missionWaypointRoot.position.set(wpX, 0, wpZ)
+      mission.waypoint.worldX = wpX
+      mission.waypoint.worldZ = wpZ
     }
 
     this.syncEvaWaypointSite(scene)
@@ -625,8 +646,20 @@ export class MapMissionFacade {
     dt: number
     /** Suspend per-frame auto-rescales of the waypoint roots (EvaSession owns the scale). */
     freezeScales?: boolean
+    /**
+     * Optional live-body lookup. When provided and the active asteroid
+     * mission's `asteroidId` matches a rendered body, the waypoint is
+     * anchored to the body's current world position and the procedural
+     * preview asteroid is suppressed.
+     */
+    getBodyPosition?: (id: string) => { x: number; z: number } | null
   }): void {
-    this.syncWaypointSite(params.scene)
+    const activeMission = this.board.activeAsteroidMission
+    const livePosition =
+      activeMission && params.getBodyPosition
+        ? params.getBodyPosition(activeMission.asteroidId)
+        : null
+    this.syncWaypointSite(params.scene, livePosition)
     this.pruneCompletedEvaSites(params.scene, params.shuttlePosition)
 
     const halfFovRad = THREE.MathUtils.degToRad(params.vehicleCamera.camera.fov / 2)

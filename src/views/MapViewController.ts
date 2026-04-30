@@ -2070,6 +2070,12 @@ export class MapViewController implements Tickable {
         apparentSize: MAP_CONFIG.WAYPOINT_APPARENT_SIZE,
         dt,
         freezeScales: this.evaSession?.isActive ?? false,
+        getBodyPosition: (id) => {
+          for (const c of this.planetControllers) {
+            if (c.id === id) return { x: c.getWorldX(), z: c.getWorldZ() }
+          }
+          return null
+        },
       })
     }
 
