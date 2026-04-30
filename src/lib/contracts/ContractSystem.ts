@@ -80,6 +80,14 @@ export interface ContractSystemHooks {
    */
   onContractStepCompleted?: (payload: ContractStepCompletedPayload) => void
   /**
+   * Called when a `'choice-mission'` step's outcome resolves. Receivers credit
+   * the per-outcome `creditsReward` (the engine does not — `choice-mission` has
+   * no mixin reward to fire through `onContractStepCompleted`).
+   *
+   * @param payload - Identifies the contract + step + selected outcome and CR payout.
+   */
+  onChoiceOutcomeResolved?: (payload: ChoiceOutcomeResolvedPayload) => void
+  /**
    * Asked by the engine when the player orbits the destination of an active
    * `deliver-items` step. The host (typically the inventory bridge in
    * `runtime.ts`) attempts to remove `count` units of `itemId` from the
@@ -142,6 +150,18 @@ export interface ContractStepCompletedPayload {
   /** Index into `Contract.steps` of the step that just satisfied. */
   stepIndex: number
   /** Authored CR payout for the step (`0` when omitted). Fractional values preserved. */
+  creditsReward: number
+}
+
+/** Payload for {@link ContractSystemHooks.onChoiceOutcomeResolved}. */
+export interface ChoiceOutcomeResolvedPayload {
+  /** Contract whose choice resolved. */
+  contractId: string
+  /** Step index where the choice lives. */
+  stepIndex: number
+  /** Selected outcome id. */
+  outcomeId: string
+  /** Authored CR payout for this outcome. Fractional preserved. */
   creditsReward: number
 }
 
@@ -514,6 +534,48 @@ export class ContractSystem {
   }
 
   /**
+   * Notify the system that the player picked an outcome at a `'choice-mission'` step.
+   * Validates the outcome against the active step's `outcomes[]`, sets
+   * `resolvedOutcomeId`, fires `onChoiceOutcomeResolved` (which pays the
+   * per-outcome `creditsReward`), and advances the step (which fires the
+   * completion handler).
+   *
+   * Plan 2 wires this to a dev console hook. Later plans wire it to the canvas
+   * terminal overlay.
+   *
+   * @param missionId - The choice-mission's `missionId` (e.g. `'jovian_final_prospectus'`).
+   * @param outcomeId - Selected outcome id (must match `step.outcomes[].outcomeId`).
+   * @returns `true` when the choice was applied.
+   */
+  notifyChoiceResolved(missionId: string, outcomeId: string): boolean {
+    for (const instance of Object.values(this.snapshot.instances)) {
+      if (instance.status !== 'active') continue
+      const contract = this.contracts.get(instance.contractId)
+      if (!contract) continue
+      const step = contract.steps[instance.currentStepIndex]
+      if (!step || step.kind !== 'choice-mission') continue
+      if (step.missionId !== missionId) continue
+      const outcome = step.outcomes.find((o) => o.outcomeId === outcomeId)
+      if (!outcome) return false
+      const updated: ContractInstance = { ...instance, resolvedOutcomeId: outcomeId }
+      this.snapshot = {
+        ...this.snapshot,
+        instances: { ...this.snapshot.instances, [contract.id]: updated },
+      }
+      this.hooks.onChoiceOutcomeResolved?.({
+        contractId: contract.id,
+        stepIndex: instance.currentStepIndex,
+        outcomeId,
+        creditsReward: outcome.creditsReward ?? 0,
+      })
+      this.advanceStep(contract, updated, 1)
+      this.afterChange()
+      return true
+    }
+    return false
+  }
+
+  /**
    * Player accepted a contract from the mail reader. Transitions to `active`,
    * stamps `acceptedAt`, and delivers the first step's flavor message.
    *
@@ -727,6 +789,21 @@ export class ContractSystem {
   /** Notify subscribers that contract state changed. */
   private afterChange(): void {
     this.hooks.onContractsChanged?.()
+  }
+
+  /**
+   * Test seam: synthetically place a contract in the `available` state without
+   * needing a real trigger. Production code does NOT call this — the method
+   * exists so unit tests can drive the lifecycle from a known starting state.
+   *
+   * @param contractId - Contract id to offer.
+   */
+  offerForTests(contractId: string): void {
+    const contract = this.contracts.get(contractId)
+    if (!contract) return
+    if (this.snapshot.instances[contractId]) return
+    this.offerContract(contract)
+    this.afterChange()
   }
 
   /** Reset the in-memory snapshot to empty (used by tests). */

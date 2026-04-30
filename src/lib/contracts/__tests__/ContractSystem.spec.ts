@@ -18,7 +18,7 @@ import type {
   MissionCompletedEvent,
   RewardEffect,
 } from '../contractTypes'
-import type { ContractStepCompletedPayload } from '../ContractSystem'
+import type { ContractStepCompletedPayload, ChoiceOutcomeResolvedPayload } from '../ContractSystem'
 import { emptyContractSnapshot } from '../contractStorage'
 
 const TEST_DATE = '2306-04-05 09:12 UTC'
@@ -1321,4 +1321,80 @@ describe('ContractSystem passive auto-advance (install-upgrade / visit-planet)',
 
 beforeEach(() => {
   vi.restoreAllMocks()
+})
+
+/** Minimal MessageSystem persistence stub — no inbox messages needed for choice tests. */
+function emptyMessageStore() {
+  return { load: () => ({}), save: () => undefined }
+}
+
+/** In-memory ContractPersistence stub that survives across calls in one test. */
+function inMemoryPersistence(): {
+  load: () => ContractStoreSnapshot
+  save: (snap: ContractStoreSnapshot) => void
+} {
+  let snap = emptyContractSnapshot()
+  return { load: () => snap, save: (next) => (snap = next) }
+}
+
+describe('choice-mission step', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('resolves on a single notifyChoiceResolved call (requiredCount === 1)', () => {
+    const choiceContract: Contract = {
+      id: 'choice-stub',
+      inboxName: 'Choice Stub',
+      from: 'Test',
+      sentAt: TEST_DATE,
+      introSubject: 'Choose',
+      introBody: ['intro'],
+      steps: [
+        {
+          kind: 'choice-mission',
+          missionId: 'stub-choice',
+          minigameType: 'terminal-stub',
+          outcomes: [
+            { outcomeId: 'a', label: 'A', creditsReward: 100 },
+            { outcomeId: 'b', label: 'B', creditsReward: 0 },
+          ],
+          subject: 'Choose',
+          flavor: ['choose'],
+        },
+      ],
+      completionByOutcome: {
+        a: { completionSubject: 'Picked A', completionBody: ['a'], rewards: [] },
+        b: { completionSubject: 'Picked B', completionBody: ['b'], rewards: [] },
+      },
+    }
+
+    const choiceOutcomes: ChoiceOutcomeResolvedPayload[] = []
+    const messages = new MessageSystem([], emptyMessageStore())
+    const persistence = inMemoryPersistence()
+
+    const contracts = new ContractSystem(
+      [choiceContract],
+      messages,
+      persistence,
+      {
+        onChoiceOutcomeResolved: (payload) => choiceOutcomes.push(payload),
+      },
+    )
+
+    contracts.offerForTests(choiceContract.id)
+    contracts.acceptContract(choiceContract.id)
+    contracts.notifyChoiceResolved('stub-choice', 'a')
+
+    expect(contracts.getInstance(choiceContract.id)?.status).toBe('completed')
+    expect(contracts.getInstance(choiceContract.id)?.resolvedOutcomeId).toBe('a')
+    expect(choiceOutcomes).toEqual([
+      {
+        contractId: choiceContract.id,
+        stepIndex: 0,
+        outcomeId: 'a',
+        creditsReward: 100,
+      },
+    ])
+  })
 })
