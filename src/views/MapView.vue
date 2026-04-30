@@ -24,6 +24,7 @@ import CreditsBadge from '@/components/hud/CreditsBadge.vue'
 import AchievementBanner from '@/components/AchievementBanner.vue'
 import AchievementsDialog from '@/components/AchievementsDialog.vue'
 import PortalWelcomeDialog from '@/components/PortalWelcomeDialog.vue'
+import JovianEpilogueOverlay from '@/components/JovianEpilogueOverlay.vue'
 import ObjectiveTracker from '@/components/ObjectiveTracker.vue'
 import ContractTrackerPanel from '@/components/ContractTrackerPanel.vue'
 import PickupToast from '@/components/PickupToast.vue'
@@ -42,7 +43,7 @@ import type { PremiumTradeSession } from '@/lib/cosmetics/types'
 import type { PlayerProfile } from '@/lib/player/types'
 import type { Inventory } from '@/lib/inventory/types'
 import type { ShopSession } from '@/lib/shop/tradeTypes'
-import { createProfile } from '@/lib/player/profile'
+import { createProfile, loadProfile, saveProfile } from '@/lib/player/profile'
 import { createInventory } from '@/lib/inventory/inventory'
 import { shipMessageSystem, setShipMessageFollowUpDeliveryListener } from '@/lib/messages/runtime'
 import {
@@ -372,6 +373,8 @@ const deathCause = ref('')
 const achievementsOpen = ref(false)
 const portalWelcomeVisible = ref(false)
 const portalWelcomeIsFirstVisit = ref(false)
+/** True while the Jovian transmit epilogue overlay is mounted. */
+const epilogueVisible = ref(false)
 /**
  * Hidden for portal arrivals until the welcome dialog is dismissed.
  * Initialised from the URL at setup time (before any async init) so the
@@ -978,6 +981,9 @@ onMounted(async () => {
       portalWelcomeIsFirstVisit.value = !viewController.getPlayerProfileSnapshot().hasSeenIntro
       portalWelcomeVisible.value = true
     }
+    viewController.onJovianEpilogueDue = () => {
+      epilogueVisible.value = true
+    }
     setShipMessageFollowUpDeliveryListener(() => {
       refreshActiveMessage()
     })
@@ -1058,6 +1064,15 @@ function handlePortalSkip(): void {
   portalWelcomeVisible.value = false
   portalCinematicActive.value = false
   viewController.portalSkipIntro()
+}
+
+/** Persist the seen flag and unmount the Jovian epilogue overlay. */
+function handleEpilogueContinue(): void {
+  const profile = loadProfile()
+  if (profile) {
+    saveProfile({ ...profile, seenJovianEpilogue: true })
+  }
+  epilogueVisible.value = false
 }
 
 function handleWindowKeydown(event: KeyboardEvent): void {
@@ -1998,6 +2013,10 @@ watch(
       :is-first-visit="portalWelcomeIsFirstVisit"
       @watch-intro="handlePortalWatchIntro"
       @skip="handlePortalSkip"
+    />
+    <JovianEpilogueOverlay
+      v-if="epilogueVisible"
+      :on-continue="handleEpilogueContinue"
     />
   </template>
   <DebugHud v-if="debugHudVisible" />

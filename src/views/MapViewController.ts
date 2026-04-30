@@ -638,6 +638,13 @@ export class MapViewController implements Tickable {
   /** Fired when fuel cell count changes (for HUD refuel button). */
   onFuelCellCount: ((count: number) => void) | null = null
 
+  /**
+   * Callback fired when the player should see the Jovian epilogue video. Set
+   * by `MapView.vue` to mount `JovianEpilogueOverlay` after a 5-second delay.
+   * `null` until wired by the Vue owner.
+   */
+  onJovianEpilogueDue: (() => void) | null = null
+
   private get missionBoard(): ShuttleMissionBoard {
     return this.missionFacade.board
   }
@@ -1378,6 +1385,7 @@ export class MapViewController implements Tickable {
      */
     this.replayAct1JourneyTriggers()
     this.replayActiveContractStepStaging()
+    this.scheduleJovianEpilogueIfDue()
     this.emitJourneyTracker()
     this.onCreditsUpdate?.(this.playerProfile.credits)
 
@@ -4323,6 +4331,38 @@ export class MapViewController implements Tickable {
 
       this.stageSpecialMission(missionId, null)
     }
+  }
+
+  /**
+   * Read-only check: should the Jovian epilogue fire on this map mount?
+   * Returns `true` when the contract resolved with the `transmit` outcome AND
+   * the player has not yet seen the video. Idempotent — safe to call repeatedly.
+   */
+  shouldFireJovianEpilogue(): boolean {
+    const profile =
+      typeof localStorage === 'undefined' ? null : loadProfile()
+    if (!profile) return false
+    if (profile.seenJovianEpilogue === true) return false
+    const instance = contractSystem.getInstance('jovian-society-prospection')
+    if (!instance) return false
+    if (instance.status !== 'completed') return false
+    if (instance.resolvedOutcomeId !== 'transmit') return false
+    return true
+  }
+
+  /**
+   * If {@link shouldFireJovianEpilogue} is true, schedule a 5-second
+   * {@link Timer.after} that fires {@link onJovianEpilogueDue}. The callback
+   * re-checks the condition at fire time so a double-mount within the delay
+   * window does not show the video twice.
+   */
+  private scheduleJovianEpilogueIfDue(): void {
+    if (!this.shouldFireJovianEpilogue()) return
+    Timer.after(5, () => {
+      if (this.shouldFireJovianEpilogue()) {
+        this.onJovianEpilogueDue?.()
+      }
+    })
   }
 
   /**
