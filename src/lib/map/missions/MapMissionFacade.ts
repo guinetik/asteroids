@@ -75,6 +75,12 @@ import type { ActiveVisitRelayMission } from '@/lib/missions/types'
 import type { VehicleCamera } from '@/three/VehicleCamera'
 import { createOrbitalMiniGame } from '@/lib/minigame/orbitalMiniGameFactory'
 import type { OrbitalMiniGame } from '@/lib/minigame/OrbitalMiniGame'
+import { contractSystem } from '@/lib/contracts/runtime'
+import {
+  getActiveAsteroidContractConstraints,
+  type AsteroidContractConstraints,
+} from '@/lib/contracts/contractMissionConstraints'
+import type { ConcreteObjective } from '@/lib/missions/types'
 
 const COMPLETED_EVA_SITE_DESPAWN_DISTANCE = 180
 
@@ -82,6 +88,29 @@ const COMPLETED_EVA_SITE_DESPAWN_DISTANCE = 180
 function formatWaypointDebug(worldX: number, worldZ: number): string {
   const radiusWorld = Math.hypot(worldX, worldZ)
   return `world=(${worldX.toFixed(2)}, ${worldZ.toFixed(2)}) au=(${(worldX / ORBIT_SCALE).toFixed(3)}, ${(worldZ / ORBIT_SCALE).toFixed(3)}) r=${radiusWorld.toFixed(2)} (${(radiusWorld / ORBIT_SCALE).toFixed(3)} AU)`
+}
+
+/**
+ * Whether an offered asteroid mission satisfies a contract's active constraints.
+ * Returns `true` when no constraints exist (nothing to satisfy).
+ *
+ * @param mission - Currently offered asteroid mission.
+ * @param constraints - Active contract constraints for this planet, or null.
+ * @returns Whether the existing offer can be kept.
+ */
+function offerSatisfiesContractConstraints(
+  mission: GeneratedAsteroidMission,
+  constraints: AsteroidContractConstraints | null,
+): boolean {
+  if (!constraints) return true
+  if (constraints.giverId !== undefined && mission.giverId !== constraints.giverId) return false
+  if (
+    constraints.objectiveType !== undefined &&
+    !mission.objectives.some((o) => o.type === constraints.objectiveType)
+  ) {
+    return false
+  }
+  return true
 }
 
 /** Mission board UI, waypoints, EVA POIs, and orbital minigame wiring for the map. */
@@ -287,19 +316,33 @@ export class MapMissionFacade {
   ): void {
     if (this.board.activeAsteroidMission) return
     if (this.board.asteroidRestockTimer) return
-    if (this.board.offeredAsteroidMission && this.board.offeringAsteroidPlanet === host.planetId) {
+
+    const constraints = getActiveAsteroidContractConstraints(contractSystem, host.planetId)
+
+    if (
+      this.board.offeredAsteroidMission &&
+      this.board.offeringAsteroidPlanet === host.planetId &&
+      offerSatisfiesContractConstraints(this.board.offeredAsteroidMission, constraints)
+    ) {
       return
     }
+
     const difficulty = computeMissionDifficulty(CURRENT_PLAYER_UPGRADE_LEVELS)
     let mission: ReturnType<typeof generateAsteroidMission>
     try {
-      mission = generateAsteroidMission(difficulty, host)
+      mission = generateAsteroidMission(
+        difficulty,
+        host,
+        Math.random,
+        (constraints?.objectiveType as ConcreteObjective['type'] | undefined) ?? null,
+        constraints?.giverId ?? null,
+      )
     } catch (err) {
       console.warn('[MapMissionFacade] No asteroid contract drafted:', err)
       return
     }
     console.warn(
-      `[MapMissionFacade] Drafted asteroid mission "${mission.name}" from ${host.planetId} @ ${formatWaypointDebug(host.worldX, host.worldZ)} -> waypoint ${formatWaypointDebug(mission.waypoint.worldX, mission.waypoint.worldZ)} difficulty=${difficulty} region=${mission.region}`,
+      `[MapMissionFacade] Drafted asteroid mission "${mission.name}" from ${host.planetId} @ ${formatWaypointDebug(host.worldX, host.worldZ)} -> waypoint ${formatWaypointDebug(mission.waypoint.worldX, mission.waypoint.worldZ)} difficulty=${difficulty} region=${mission.region}${constraints ? ` (constrained: giverId=${constraints.giverId ?? '*'} objectiveType=${constraints.objectiveType ?? '*'})` : ''}`,
     )
     this.board = offerAsteroidMission(this.board, mission)
     onMissionBoardUpdate?.(this.board)
