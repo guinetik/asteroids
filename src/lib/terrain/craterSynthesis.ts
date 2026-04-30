@@ -31,6 +31,36 @@ export interface ApplyCraterOptions {
 }
 
 /**
+ * Sample the vertical world-space delta contributed by a synthesized crater.
+ *
+ * @param x - World-space X coordinate to sample.
+ * @param z - World-space Z coordinate to sample.
+ * @param options - World-space crater center, radius, and optional depth.
+ * @returns Vertical height delta in world units; negative inside the bowl, positive on the rim.
+ */
+export function sampleCraterHeightDelta(x: number, z: number, options: ApplyCraterOptions): number {
+  const depth = options.depth ?? options.radius * DEFAULT_CRATER_DEPTH_RATIO
+  if (options.radius <= 0 || depth <= 0) return 0
+
+  const dx = x - options.x
+  const dz = z - options.z
+  const dist = Math.sqrt(dx * dx + dz * dz)
+  const rimOuter = options.radius * CRATER_RIM_EXTENT
+
+  if (dist <= options.radius) {
+    const t = dist / options.radius
+    return -depth * (1 - t * t)
+  }
+
+  if (dist <= rimOuter) {
+    const rimT = (dist - options.radius) / (rimOuter - options.radius)
+    return depth * CRATER_RIM_HEIGHT_RATIO * (1 - rimT)
+  }
+
+  return 0
+}
+
+/**
  * Apply a parabolic crater bowl and raised rim to an existing heightmap.
  *
  * @param heightmap - Heightmap whose grid should receive the crater delta.
@@ -53,7 +83,6 @@ export function applyCraterToHeightmap(heightmap: Heightmap, options: ApplyCrate
   const cz = ((options.z + half) / worldSize) * (resolution - 1)
   const radiusCells = options.radius / cellSize
   const rimOuterCells = radiusCells * CRATER_RIM_EXTENT
-  const rimHeight = depth * CRATER_RIM_HEIGHT_RATIO
   const minGx = Math.max(0, Math.floor(cx - rimOuterCells - 1))
   const maxGx = Math.min(resolution - 1, Math.ceil(cx + rimOuterCells + 1))
   const minGz = Math.max(0, Math.floor(cz - rimOuterCells - 1))
@@ -63,18 +92,9 @@ export function applyCraterToHeightmap(heightmap: Heightmap, options: ApplyCrate
     for (let gx = minGx; gx <= maxGx; gx++) {
       if (!heightmap.isValid(gx, gz)) continue
 
-      const dx = gx - cx
-      const dz = gz - cz
-      const dist = Math.sqrt(dx * dx + dz * dz)
-      const t = dist / radiusCells
-      let delta = 0
-
-      if (t <= 1) {
-        delta = -depth * (1 - t * t)
-      } else if (dist <= rimOuterCells) {
-        const rimT = (dist - radiusCells) / (rimOuterCells - radiusCells)
-        delta = rimHeight * (1 - rimT)
-      }
+      const x = -half + gx * cellSize
+      const z = -half + gz * cellSize
+      const delta = sampleCraterHeightDelta(x, z, crater)
 
       heightmap.grid[gz * resolution + gx]! += delta
     }

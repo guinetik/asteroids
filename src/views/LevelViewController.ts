@@ -119,7 +119,6 @@ import {
   DEFAULT_DAN_CRATER_MIN_DEPTH,
   DEFAULT_DAN_CRATER_MIN_QUALITY_SCORE,
 } from '@/lib/level/danCraterPlacement'
-import { applyCraterToHeightmap } from '@/lib/terrain/craterSynthesis'
 import { DanMinigame } from '@/lib/minigame/DanMinigame'
 import { LevelCollisionFacade } from '@/lib/level/LevelCollisionFacade'
 import { LevelCombatMiningFacade } from '@/lib/level/LevelCombatMiningFacade'
@@ -573,8 +572,8 @@ export class LevelViewController implements Tickable {
     // ── DAN crater placement (mission-driven rotation override) ───
     // Resolved before `createAsteroidSurface` so the rotation chosen by the
     // crater chooser flows through the bake pipeline. Synthesized fallback
-    // applies the crater dent to the heightmap after the bake (the visible
-    // GLB stays flat in that case — see plan risk note).
+    // renders a crater patch and applies the same bowl to collision heights,
+    // keeping visuals and collision aligned at the scan site.
     const danObjective = mission.objectives.find((o) => o.type === 'dan')
     const danPlacement: DanCraterPlacement | null = danObjective
       ? await chooseDanCraterPlacement(
@@ -618,6 +617,7 @@ export class LevelViewController implements Tickable {
       surfaceModulatorColorBlend: asteroid.surface.surfaceModulatorColorBlend,
       surfaceAOStrength: asteroid.surface.surfaceAOStrength,
       surfaceEmissionStrength: asteroid.surface.surfaceEmissionStrength,
+      syntheticCrater: danPlacement?.source === 'synthesized' ? danPlacement.crater : undefined,
       bake: {
         resolution: LEVEL_TERRAIN_CONFIG.resolution,
         worldSize: LEVEL_GRID_SIZE,
@@ -625,17 +625,6 @@ export class LevelViewController implements Tickable {
       },
     })
     this.heightmap = this.asteroidSurface.heightmap
-    // Synthesized DAN craters apply a parabolic bowl + raised rim to the
-    // baked heightmap in place. The visible GLB mesh stays flat in this
-    // path — first-cut acceptance per plan; mesh deformation polish later.
-    if (danPlacement && danPlacement.source === 'synthesized') {
-      applyCraterToHeightmap(this.heightmap, {
-        x: danPlacement.crater.x,
-        z: danPlacement.crater.z,
-        radius: danPlacement.crater.radius,
-        depth: danPlacement.crater.depth,
-      })
-    }
     const collisionWorld = this.collision.initialize(this.heightmap)
     this.sceneManager.addToScene(this.asteroidSurface.group)
 

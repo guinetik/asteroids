@@ -8,6 +8,7 @@ import {
   DEFAULT_DAN_CRATER_MIN_DEPTH,
   DEFAULT_DAN_CRATER_MIN_QUALITY_SCORE,
   DEFAULT_DAN_CRATER_RADIUS,
+  SYNTHETIC_DAN_CRATER_DEPTH_RATIO,
   chooseDanCraterPlacement,
   deriveCandidateRotations,
   type DanCraterSpec,
@@ -137,5 +138,6 @@ describe('chooseDanCraterPlacement', () => {
     expect(result.crater.x).toBe(0)
     expect(result.crater.z).toBe(0)
     expect(result.crater.radius).toBe(DEFAULT_DAN_CRATER_RADIUS)
+    expect(result.crater.depth).toBe(DEFAULT_DAN_CRATER_RADIUS * SYNTHETIC_DAN_CRATER_DEPTH_RATIO)
   })
 })

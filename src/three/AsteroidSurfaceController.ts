@@ -25,6 +25,11 @@ import {
   type BakeHeightmapFromMeshOptions,
 } from '@/lib/terrain/meshHeightmap'
 import type { Heightmap } from '@/lib/terrain/heightmap'
+import {
+  applyCraterToHeightmap,
+  CRATER_RIM_EXTENT,
+  type ApplyCraterOptions,
+} from '@/lib/terrain/craterSynthesis'
 
 /** Public URL path for the default asteroid mesh. */
 export const DEFAULT_ASTEROID_MODEL_PATH = '/models/asteroid.glb'
@@ -35,6 +40,11 @@ export interface AsteroidSurfaceControllerOptions {
   modelPath?: string
   /** Heightmap bake parameters. */
   bake: BakeHeightmapFromMeshOptions
+  /**
+   * Optional synthesized crater to render as a dense patch and apply to
+   * collision heights. Coordinates and depth are in world units.
+   */
+  syntheticCrater?: ApplyCraterOptions
   /** Uniform scale applied to the loaded model before baking. Default 1. */
   scale?: number
   /**
@@ -109,6 +119,187 @@ export interface AsteroidSurfaceControllerOptions {
    * push above 1 to make lava cracks pop. Defaults to 1.
    */
   surfaceEmissionStrength?: number
+}
+
+const SYNTHETIC_CRATER_PATCH_RADIAL_SEGMENTS = 24
+const SYNTHETIC_CRATER_PATCH_ANGULAR_SEGMENTS = 96
+const SYNTHETIC_CRATER_PATCH_SURFACE_OFFSET = -0.15
+const SYNTHETIC_CRATER_PATCH_EDGE_OVERLAP = 2
+const CRATER_FLOOR_COLOR = new THREE.Color().setRGB(0.01, 0.01, 0.01)
+const CRATER_RIM_COLOR = new THREE.Color().setRGB(0.42, 0.44, 0.46)
+const CRATER_GRADIENT_POWER = 0.45
+
+/** Tone-map the crater patch radially so the bowl reads deeper at FPS scale. */
+function syntheticCraterVertexColor(radiusRatio: number): THREE.Color {
+  const t = Math.pow(THREE.MathUtils.clamp(radiusRatio, 0, 1), CRATER_GRADIENT_POWER)
+  return CRATER_FLOOR_COLOR.clone().lerp(CRATER_RIM_COLOR, t)
+}
+
+/** Clone the first asteroid material so crater patches reuse already-loaded texture shaders. */
+function cloneFirstAsteroidSurfaceMaterial(scene: THREE.Object3D): THREE.MeshStandardMaterial | null {
+  let cloned: THREE.MeshStandardMaterial | null = null
+  scene.traverse((child) => {
+    if (cloned || !(child as THREE.Mesh).isMesh) return
+
+    const material = (child as THREE.Mesh).material
+    const candidates = Array.isArray(material) ? material : [material]
+    const source = candidates.find((entry) => entry instanceof THREE.MeshStandardMaterial)
+    if (!source) return
+
+    cloned = source.clone()
+    cloned.onBeforeCompile = source.onBeforeCompile
+    cloned.vertexColors = true
+    cloned.color.setRGB(1, 1, 1)
+    cloned.side = THREE.FrontSide
+    cloned.needsUpdate = true
+  })
+  return cloned
+}
+
+/** Clip the source asteroid material where a synthesized crater patch replaces it. */
+function applySyntheticCraterClip(scene: THREE.Object3D, crater: ApplyCraterOptions): void {
+  const clipRadius = Math.max(
+    crater.radius,
+    crater.radius * CRATER_RIM_EXTENT - SYNTHETIC_CRATER_PATCH_EDGE_OVERLAP,
+  )
+  const patchedMaterials = new Set<THREE.Material>()
+  scene.traverse((child) => {
+    if (!(child as THREE.Mesh).isMesh) return
+
+    const mesh = child as THREE.Mesh
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+    for (const material of materials) {
+      if (!(material instanceof THREE.MeshStandardMaterial)) continue
+      if (patchedMaterials.has(material)) continue
+      patchedMaterials.add(material)
+
+      const previousOnBeforeCompile = material.onBeforeCompile.bind(material)
+      material.onBeforeCompile = (shader, renderer) => {
+        previousOnBeforeCompile(shader, renderer)
+        shader.uniforms.uSyntheticCraterCenter = {
+          value: new THREE.Vector2(crater.x, crater.z),
+        }
+        shader.uniforms.uSyntheticCraterClipRadius = { value: clipRadius }
+        shader.vertexShader = shader.vertexShader
+          .replace(
+            '#include <common>',
+            '#include <common>\nvarying vec3 vSyntheticCraterWorldPosition;',
+          )
+          .replace(
+            '#include <begin_vertex>',
+            '#include <begin_vertex>\n' +
+              'vSyntheticCraterWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;',
+          )
+        shader.fragmentShader = shader.fragmentShader
+          .replace(
+            '#include <common>',
+            '#include <common>\n' +
+              'uniform vec2 uSyntheticCraterCenter;\n' +
+              'uniform float uSyntheticCraterClipRadius;\n' +
+              'varying vec3 vSyntheticCraterWorldPosition;',
+          )
+          .replace(
+            '#include <clipping_planes_fragment>',
+            '#include <clipping_planes_fragment>\n' +
+              'if (distance(vSyntheticCraterWorldPosition.xz, uSyntheticCraterCenter) ' +
+              '< uSyntheticCraterClipRadius) discard;',
+          )
+      }
+      material.needsUpdate = true
+    }
+  })
+}
+
+/** Build the high-resolution visible crater floor that replaces clipped GLB triangles. */
+function createSyntheticCraterPatch(
+  heightmap: Heightmap,
+  crater: ApplyCraterOptions,
+  material: THREE.MeshStandardMaterial | null,
+  surfaceRoot: THREE.Object3D,
+): THREE.Mesh {
+  const outerRadius = crater.radius * CRATER_RIM_EXTENT
+  const positions: number[] = []
+  const uvs: number[] = []
+  const colors: number[] = []
+  const indices: number[] = []
+  const centerColor = syntheticCraterVertexColor(0)
+  const worldPosition = new THREE.Vector3()
+  const localPosition = new THREE.Vector3()
+
+  worldPosition.set(
+    crater.x,
+    heightmap.heightAt(crater.x, crater.z) + SYNTHETIC_CRATER_PATCH_SURFACE_OFFSET,
+    crater.z,
+  )
+  localPosition.copy(worldPosition)
+  surfaceRoot.worldToLocal(localPosition)
+  positions.push(localPosition.x, localPosition.y, localPosition.z)
+  uvs.push(0.5, 0.5)
+  colors.push(centerColor.r, centerColor.g, centerColor.b)
+
+  for (let ring = 1; ring <= SYNTHETIC_CRATER_PATCH_RADIAL_SEGMENTS; ring++) {
+    const ringRadius = (outerRadius * ring) / SYNTHETIC_CRATER_PATCH_RADIAL_SEGMENTS
+    const uvRadius = ring / SYNTHETIC_CRATER_PATCH_RADIAL_SEGMENTS / 2
+    const ringColor = syntheticCraterVertexColor(ring / SYNTHETIC_CRATER_PATCH_RADIAL_SEGMENTS)
+    for (let segment = 0; segment < SYNTHETIC_CRATER_PATCH_ANGULAR_SEGMENTS; segment++) {
+      const angle = (segment / SYNTHETIC_CRATER_PATCH_ANGULAR_SEGMENTS) * Math.PI * 2
+      const x = crater.x + Math.cos(angle) * ringRadius
+      const z = crater.z + Math.sin(angle) * ringRadius
+      const y = heightmap.heightAt(x, z) + SYNTHETIC_CRATER_PATCH_SURFACE_OFFSET
+      worldPosition.set(x, y, z)
+      localPosition.copy(worldPosition)
+      surfaceRoot.worldToLocal(localPosition)
+      positions.push(localPosition.x, localPosition.y, localPosition.z)
+      uvs.push(0.5 + Math.cos(angle) * uvRadius, 0.5 + Math.sin(angle) * uvRadius)
+      colors.push(ringColor.r, ringColor.g, ringColor.b)
+    }
+  }
+
+  for (let segment = 0; segment < SYNTHETIC_CRATER_PATCH_ANGULAR_SEGMENTS; segment++) {
+    const next = (segment + 1) % SYNTHETIC_CRATER_PATCH_ANGULAR_SEGMENTS
+    indices.push(0, next + 1, segment + 1)
+  }
+
+  for (let ring = 1; ring < SYNTHETIC_CRATER_PATCH_RADIAL_SEGMENTS; ring++) {
+    const currentStart = 1 + (ring - 1) * SYNTHETIC_CRATER_PATCH_ANGULAR_SEGMENTS
+    const nextStart = currentStart + SYNTHETIC_CRATER_PATCH_ANGULAR_SEGMENTS
+    for (let segment = 0; segment < SYNTHETIC_CRATER_PATCH_ANGULAR_SEGMENTS; segment++) {
+      const nextSegment = (segment + 1) % SYNTHETIC_CRATER_PATCH_ANGULAR_SEGMENTS
+      const a = currentStart + segment
+      const b = currentStart + nextSegment
+      const c = nextStart + segment
+      const d = nextStart + nextSegment
+      indices.push(a, b, c, b, d, c)
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  geometry.computeBoundingBox()
+  geometry.computeBoundingSphere()
+
+  const patchMaterial =
+    material ??
+    new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      vertexColors: true,
+      roughness: 0.92,
+      metalness: 0.08,
+      side: THREE.FrontSide,
+    })
+  patchMaterial.vertexColors = true
+  patchMaterial.color.setRGB(1, 1, 1)
+  patchMaterial.side = THREE.FrontSide
+  patchMaterial.needsUpdate = true
+  const mesh = new THREE.Mesh(geometry, patchMaterial)
+  mesh.name = 'synthetic-crater-patch'
+  mesh.receiveShadow = true
+  mesh.castShadow = true
+  return mesh
 }
 
 /** Result bundle from {@link createAsteroidSurface}. */
@@ -195,10 +386,18 @@ export async function createAsteroidSurface(
       mesh.receiveShadow = true
     }
   })
+
   scene.updateMatrixWorld(true)
   group.add(scene)
 
   const heightmap = bakeHeightmapFromMesh(scene, options.bake)
+  if (options.syntheticCrater) {
+    const patchMaterial = cloneFirstAsteroidSurfaceMaterial(scene)
+    applySyntheticCraterClip(scene, options.syntheticCrater)
+    applyCraterToHeightmap(heightmap, options.syntheticCrater)
+    const patch = createSyntheticCraterPatch(heightmap, options.syntheticCrater, patchMaterial, scene)
+    scene.add(patch)
+  }
 
   return {
     group,

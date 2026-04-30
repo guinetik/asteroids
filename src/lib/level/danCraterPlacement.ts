@@ -14,12 +14,14 @@ import {
   type BakeHeightmapFromMeshOptions,
 } from '@/lib/terrain/meshHeightmap'
 import { findCratersInHeightmap, type Crater } from '@/lib/terrain/craterDetection'
-import { DEFAULT_CRATER_DEPTH_RATIO } from '@/lib/terrain/craterSynthesis'
 import { DEFAULT_ASTEROID_MODEL_PATH } from '@/three/AsteroidSurfaceController'
 import { loadGLB } from '@/three/loadGLB'
 
 /** Default DAN crater target radius in world units. Sized for the lander + EVA combat space. */
 export const DEFAULT_DAN_CRATER_RADIUS = 60
+
+/** Synthetic DAN crater depth as a fraction of radius, exaggerated for FPS readability. */
+export const SYNTHETIC_DAN_CRATER_DEPTH_RATIO = 0.85
 
 /** Default minimum depth for a natural crater to qualify (world units). */
 export const DEFAULT_DAN_CRATER_MIN_DEPTH = 8
@@ -193,7 +195,7 @@ export async function chooseDanCraterPlacement(
         x: 0,
         z: 0,
         radius: spec.targetRadius,
-        depth: spec.targetRadius * DEFAULT_CRATER_DEPTH_RATIO,
+        depth: spec.targetRadius * SYNTHETIC_DAN_CRATER_DEPTH_RATIO,
       },
       source: 'synthesized',
     }
