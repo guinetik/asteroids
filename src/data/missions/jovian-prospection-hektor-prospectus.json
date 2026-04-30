@@ -1,0 +1,24 @@
+{
+  "kind": "special",
+  "id": "jovian-prospection-hektor-prospectus",
+  "asteroidId": "hektor",
+  "giverId": "jovian-society",
+  "giverName": "Jovian Society",
+  "templateId": "jovian-prospection-hektor-prospectus",
+  "name": "OP 9 — Prospectus Compilation",
+  "briefing": "Pilot, eight deliverables clean. Final assignment: travel to Asset 2306-J. There is a Society-provisioned terminal on the surface, near your previous landing zone. Approach the terminal and review the assembled report — your readings, our analysis, the recommended disposition. Confirm transmission to Cloud City Asset Strategy at your discretion. — Vance",
+  "difficulty": 5,
+  "region": "jovian-trojans",
+  "objectives": [
+    {
+      "type": "prospectus-terminal",
+      "x": 0,
+      "z": 0,
+      "interactionLabel": "[E] OPEN PROSPECTUS",
+      "reward": 0
+    }
+  ],
+  "totalReward": 0,
+  "waypoint": { "worldX": 0, "worldZ": 0 },
+  "status": "available"
+}

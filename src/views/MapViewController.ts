@@ -261,6 +261,7 @@ const SPECIAL_MISSION_OFFER_IDS: Record<string, string> = {
   'consortium-certification': 'consortium-certification-offer',
   'jovian-prospection-hektor-photometry': 'jovian-prospection-hektor-photometry-offer',
   'jovian-prospection-hektor-dan': 'jovian-prospection-hektor-dan-offer',
+  'jovian-prospection-hektor-prospectus': 'jovian-prospection-hektor-prospectus-offer',
   'jovian-prospection-saturn-photometry': 'jovian-prospection-saturn-photometry-offer',
   'jovian-prospection-saturn-dan': 'jovian-prospection-saturn-dan-offer',
 }
