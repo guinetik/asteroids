@@ -428,6 +428,12 @@ export interface MissionGiver {
   maxDifficulty: number
   /** The mission templates this giver can offer. */
   missions: MissionGiverTemplate[]
+  /**
+   * Optional story flag gating this giver. When set, the giver only surfaces
+   * if `profile.activeStoryFlags[requiresFlag] === true`. Use for post-outcome
+   * content (e.g. Mr. Finch and Cloud City Ops, post-tamper).
+   */
+  requiresFlag?: string
 }
 
 /** A mission template within a giver's manifest. */
@@ -450,6 +456,12 @@ export interface MissionGiverTemplate {
    * `planetIds` remain globally available (current default behavior).
    */
   planetIds?: string[]
+  /**
+   * Optional story flag gating this individual mission entry. Use when the
+   * giver itself is always-on but a subset of missions is post-outcome
+   * (e.g. Jay Mercer's Jupiter expansion entries gated by `'jovianContractTampered'`).
+   */
+  requiresFlag?: string
 }
 
 /** Concrete rolled objective values for a generated mission. */
