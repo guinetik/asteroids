@@ -20,6 +20,7 @@ import type {
   GeneratedAsteroidMission,
 } from './types'
 import { getGiversForDifficulty, MISSION_GIVERS } from './giverCatalog'
+import type { PlayerProfile } from '@/lib/player/types'
 import { ASTEROID_BELTS, getPlanet, PLANETS } from '@/lib/planets/catalog'
 import { ORBIT_SCALE, SIZE_SCALE } from '@/lib/planets/constants'
 import { generateFlatZones } from '@/lib/terrain/terrainGenerator'
@@ -755,6 +756,8 @@ function getHostGiverOverride(planetId: string): HostGiverOverride | undefined {
  *   narrowed to templates whose giver matches — unless the host has a host-giver-override
  *   whose `giverId` already equals `requiredGiverId`, in which case every template is
  *   eligible (all of them will be re-stamped to the override at output time).
+ * @param profile - Player profile used to filter givers by `disabledGiverIds` and story flags.
+ *   Defaults to an empty profile (no filtering) when omitted, for legacy callers.
  * @returns Fully generated mission ready for the mission board.
  */
 export function generateAsteroidMission(
@@ -763,6 +766,7 @@ export function generateAsteroidMission(
   rand: () => number = Math.random,
   requiredObjectiveType: ConcreteObjective['type'] | null = null,
   requiredGiverId: string | null = null,
+  profile: PlayerProfile = {} as PlayerProfile,
 ): GeneratedAsteroidMission {
   const anchor = host ?? syntheticEarthHostAnchor()
   const combatOnlyHost = isCombatOnlyHostPlanet(anchor.planetId)
@@ -771,7 +775,7 @@ export function generateAsteroidMission(
    * squeezed out by low-tier miners and surveyors that share the same difficulty band; the
    * subsequent template loop drops anything that is not exterminate/rescue/bunker.
    */
-  const givers = combatOnlyHost ? MISSION_GIVERS : getGiversForDifficulty(difficulty)
+  const givers = combatOnlyHost ? MISSION_GIVERS : getGiversForDifficulty(difficulty, profile)
   if (givers.length === 0) {
     throw new Error(`No givers available for difficulty ${difficulty}`)
   }

@@ -9,6 +9,8 @@
  * @spec docs/superpowers/specs/2026-04-06-asteroid-missions-design.md
  */
 import type { MissionGiver } from './types'
+import type { PlayerProfile } from '@/lib/player/types'
+import { hasStoryFlag } from '@/lib/player/profile'
 
 import jayData from '@/data/missions/givers/jay-mercer.json'
 import beltMiningData from '@/data/missions/givers/belt-mining-corp.json'
@@ -47,13 +49,25 @@ export function getGiverById(id: string): MissionGiver | undefined {
 }
 
 /**
- * Get all givers whose difficulty range covers the given difficulty.
+ * Surfaces all givers eligible at `difficulty`, filtered by:
+ * - `profile.disabledGiverIds` — skip blacklisted givers (e.g. post-tamper Jovian Society).
+ * - giver-level `requiresFlag` — skip when the named story flag is absent.
  *
- * @param difficulty - Player mission difficulty (1-10).
- * @returns Givers that operate at this difficulty level.
+ * @param difficulty - Mission difficulty in the `[1, 10]` range.
+ * @param profile - Player profile (drives `disabledGiverIds` and story flags).
+ * @param givers - Optional override (for tests). Defaults to `MISSION_GIVERS`.
+ * @returns Filtered, eligible givers.
  */
-export function getGiversForDifficulty(difficulty: number): MissionGiver[] {
-  return MISSION_GIVERS.filter(
-    (g) => g.minDifficulty <= difficulty && g.maxDifficulty >= difficulty,
-  )
+export function getGiversForDifficulty(
+  difficulty: number,
+  profile: PlayerProfile = {} as PlayerProfile,
+  givers: readonly MissionGiver[] = MISSION_GIVERS,
+): MissionGiver[] {
+  return givers.filter((g) => {
+    if (g.minDifficulty > difficulty) return false
+    if (g.maxDifficulty < difficulty) return false
+    if (profile.disabledGiverIds?.[g.id]) return false
+    if (g.requiresFlag !== undefined && !hasStoryFlag(profile, g.requiresFlag)) return false
+    return true
+  })
 }

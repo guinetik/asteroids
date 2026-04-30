@@ -314,6 +314,7 @@ export class MapMissionFacade {
   offerAsteroidMissionFromDifficulty(
     host: AsteroidMissionHostAnchor,
     onMissionBoardUpdate: ((board: ShuttleMissionBoard) => void) | null,
+    profile: PlayerProfile = {} as PlayerProfile,
   ): void {
     if (this.board.activeAsteroidMission) return
     if (this.board.asteroidRestockTimer) return
@@ -337,6 +338,7 @@ export class MapMissionFacade {
         Math.random,
         (constraints?.objectiveType as ConcreteObjective['type'] | undefined) ?? null,
         constraints?.giverId ?? null,
+        profile,
       )
     } catch (err) {
       console.warn('[MapMissionFacade] No asteroid contract drafted:', err)

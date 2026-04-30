@@ -2947,6 +2947,7 @@ export class MapViewController implements Tickable {
         worldZ: controller.getWorldZ(),
       },
       this.onMissionBoardUpdate,
+      this.playerProfile,
     )
   }
 
