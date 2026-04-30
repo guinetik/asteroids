@@ -61,6 +61,7 @@ import type { LevelState } from '@/lib/level/levelStateMachine'
 import type { StateMachine } from '@/lib/stateMachine'
 import { ArrivalSequence } from '@/three/ArrivalSequence'
 import { BunkerHatchModel } from '@/three/bunker/BunkerHatchModel'
+import { TerminalModel, TERMINAL_INTERACT_RANGE } from '@/three/TerminalModel'
 import { tintForGiver } from '@/lib/level/bunkerFactionTint'
 import { NestModel } from '@/three/NestModel'
 import { VirusModel } from '@/three/VirusModel'
@@ -209,6 +210,16 @@ export class LevelViewController implements Tickable {
    */
   private surfaceBunkerHatch: BunkerHatchModel | null = null
   /**
+   * Prospectus-terminal kiosk spawned for `'prospectus-terminal'` objectives.
+   * Null when the active mission has no such objective.
+   */
+  private prospectusTerminal: TerminalModel | null = null
+  /**
+   * True this frame when the EVA player is within interaction range of the
+   * prospectus terminal and the overlay has not yet been opened.
+   */
+  private prospectusInteractReady = false
+  /**
    * World-space position of the surface bunker hatch (set when the hatch is
    * spawned). The player is teleported back to this point when extracting
    * from the bunker so they exit right next to the surface prop.
@@ -349,6 +360,29 @@ export class LevelViewController implements Tickable {
 
   /** Called each frame during EVA with terminal prompt text (null to hide). */
   onTerminalPrompt: ((text: string | null) => void) | null = null
+
+  /**
+   * Fired when the player presses E while in range of the prospectus terminal.
+   * The Vue layer mounts `ProspectusOverlay` in response.
+   */
+  onProspectusOpen: (() => void) | null = null
+
+  /**
+   * Called by the Vue layer after the overlay resolves to flip the terminal
+   * screen color — green for transmit, red for tamper.
+   *
+   * @param outcomeId - The chosen outcome (`'transmit'` or `'tamper'`).
+   */
+  flipProspectusTerminalScreen(outcomeId: 'transmit' | 'tamper'): void {
+    if (!this.prospectusTerminal) return
+    /** Society green on transmit, Society red on tamper. */
+    const TRANSMIT_COLOR = 0x00cc66
+    /** Danger red on tamper. */
+    const TAMPER_COLOR = 0xff2244
+    this.prospectusTerminal.setScreenEmissive(
+      outcomeId === 'transmit' ? TRANSMIT_COLOR : TAMPER_COLOR,
+    )
+  }
 
   /**
    * Called when a unit of resource is *successfully* added to the
@@ -1162,6 +1196,25 @@ export class LevelViewController implements Tickable {
         bunkerMinigame.onDescend = () => this.handleBunkerDescend()
         bunkerMinigame.onExit = () => this.handleBunkerExit()
       }
+    }
+
+    // ── Prospectus terminal kiosk ────────────────────────────────
+    // For prospectus-terminal missions, place a Society-blue terminal kiosk
+    // at the objective's XZ. The kiosk has no associated minigame; proximity
+    // detection and E-key handling run in tickMinigames after the facade tick.
+    const prospectusObjective = mission.objectives.find((o) => o.type === 'prospectus-terminal')
+    if (prospectusObjective && this.heightmap && this.asteroidSurface) {
+      const terminal = new TerminalModel()
+      const terminalGroundY = this.heightmap.heightAt(prospectusObjective.x, prospectusObjective.z)
+      terminal.placeAt(prospectusObjective.x, terminalGroundY, prospectusObjective.z)
+      /** Society blue emissive tint to distinguish this kiosk from survey/DAN terminals. */
+      const SOCIETY_BLUE = 0x2c5bb0
+      terminal.setScreenEmissive(SOCIETY_BLUE)
+      this.asteroidSurface.group.add(terminal.group)
+      this.collision.addObjectiveCollider(
+        terminal.createWorldCollider('prospectus-terminal'),
+      )
+      this.prospectusTerminal = terminal
     }
 
     // ── Rocket-survey hidden utility for gather missions ─────────
@@ -2637,6 +2690,8 @@ export class LevelViewController implements Tickable {
       const v = this.fpsCamera.getForward(this._playerForwardScratch)
       playerForwardSnap = { x: v.x, y: v.y, z: v.z }
     }
+    const terminalInteractPressed =
+      this.inputManager?.wasActionPressed('terminalInteract') ?? false
     this.minigames.tick(
       dt,
       {
@@ -2655,10 +2710,30 @@ export class LevelViewController implements Tickable {
             : null,
         playerForward: playerForwardSnap,
         interactPressed: this.inputManager?.wasActionPressed('interact') ?? false,
-        terminalInteractPressed: this.inputManager?.wasActionPressed('terminalInteract') ?? false,
+        terminalInteractPressed,
       },
       this.onTerminalPrompt,
     )
+    // ── Prospectus terminal proximity — runs after the facade tick so our
+    // prompt assignment wins over the facade's null-clear when no minigame is
+    // near.
+    if (this.prospectusTerminal && state === 'eva' && player) {
+      const dx = player.group.position.x - this.prospectusTerminal.position.x
+      const dz = player.group.position.z - this.prospectusTerminal.position.z
+      const dist = Math.sqrt(dx * dx + dz * dz)
+      if (dist <= TERMINAL_INTERACT_RANGE) {
+        this.prospectusInteractReady = true
+        this.onTerminalPrompt?.('[E] OPEN PROSPECTUS')
+        if (terminalInteractPressed && this.onProspectusOpen) {
+          this.onProspectusOpen()
+        }
+      } else {
+        this.prospectusInteractReady = false
+      }
+    } else {
+      this.prospectusInteractReady = false
+    }
+    this.prospectusTerminal?.tick(dt)
     this.surfaceBunkerHatch?.tick(dt)
     const activeMinigame = this.minigames.getActive()
     if (activeMinigame instanceof RescueMinigame && this.landerController) {
@@ -3301,6 +3376,11 @@ export class LevelViewController implements Tickable {
       this.surfaceBunkerHatch.group.removeFromParent()
       this.surfaceBunkerHatch.dispose()
       this.surfaceBunkerHatch = null
+    }
+    if (this.prospectusTerminal) {
+      this.prospectusTerminal.group.removeFromParent()
+      this.prospectusTerminal.dispose()
+      this.prospectusTerminal = null
     }
     this.surfaceRocks?.dispose()
     this.asteroidSurface?.dispose()

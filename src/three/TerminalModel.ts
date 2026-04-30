@@ -284,6 +284,8 @@ export class TerminalModel {
   private readonly glyphSymbols: THREE.Group[] = []
   private glyphElapsed = 0
   private glyphIndex = 0
+  /** The emissive screen panel mesh — used by {@link setScreenEmissive}. */
+  private readonly screenMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial>
 
   /** World-space position of this terminal. */
   get position(): THREE.Vector3 {
@@ -373,6 +375,7 @@ export class TerminalModel {
     screen.name = 'survey-terminal-screen'
     screen.position.set(0, screenCenterY, frontZ + SCREEN_FRAME_DEPTH / 2 + SCREEN_FRONT_OFFSET)
     this.group.add(screen)
+    this.screenMesh = screen
 
     this.glyphSymbols.push(
       createOrbitGlyphSymbol(glyphMat),
@@ -461,6 +464,18 @@ export class TerminalModel {
       }),
       enabled: () => this.group.visible,
     }
+  }
+
+  /**
+   * Override the screen emissive color at runtime.
+   *
+   * Used by the prospectus-terminal flow to tint the kiosk Society blue
+   * on open, green on transmit, and red on tamper.
+   *
+   * @param hex - 24-bit RGB hex color (e.g. `0x2c5bb0`).
+   */
+  setScreenEmissive(hex: number): void {
+    this.screenMesh.material.emissive.setHex(hex)
   }
 
   /** Dispose geometry and materials. */

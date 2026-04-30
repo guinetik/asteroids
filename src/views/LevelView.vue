@@ -41,6 +41,8 @@ import { DanMinigame } from '@/lib/minigame/DanMinigame'
 import { BunkerMinigame } from '@/lib/minigame/BunkerMinigame'
 import type { BunkerSubState } from '@/lib/bunker/bunkerSceneState'
 import { shouldHardReloadLevelRestart } from '@/lib/level/levelRestartPolicy'
+import ProspectusOverlay from '@/components/ProspectusOverlay.vue'
+import { contractSystem } from '@/lib/contracts/runtime'
 import {
   playBackgroundMusic,
   stopBackgroundMusic,
@@ -251,6 +253,7 @@ const danCaptured = ref(0)
 const danRequired = ref(0)
 const danInstruction = ref<string | null>(null)
 const danScanning = ref(false)
+const prospectusVisible = ref(false)
 let rescuePollHandle: ReturnType<typeof setInterval> | null = null
 
 /**
@@ -465,6 +468,9 @@ onMounted(async () => {
     viewController.onTerminalPrompt = (text) => {
       terminalPrompt.value = text
     }
+    viewController.onProspectusOpen = () => {
+      prospectusVisible.value = true
+    }
     viewController.onMapCanvas = (canvas) => {
       mapCanvas.value = canvas
     }
@@ -609,6 +615,18 @@ function handleJettison(itemId: string, quantity: number): void {
   inventorySnapshot.value = result.inventory
 }
 
+/**
+ * Handle a prospectus outcome from the overlay. Notifies the contract system,
+ * closes the overlay, and optionally flips the terminal screen color.
+ *
+ * @param outcomeId - The player's choice (`'transmit'` or `'tamper'`).
+ */
+function handleProspectusResolve(outcomeId: 'transmit' | 'tamper'): void {
+  contractSystem.notifyChoiceResolved('jovian_final_prospectus', outcomeId)
+  prospectusVisible.value = false
+  viewController.flipProspectusTerminalScreen(outcomeId)
+}
+
 function handleGlobalKeydown(e: KeyboardEvent): void {
   if (e.code === 'KeyB') {
     if (stateInfo.state !== 'eva' && stateInfo.state !== 'lander') return
@@ -749,6 +767,11 @@ function handleToggleMusic(): void {
     :required="danRequired"
     :instruction="danInstruction"
     :scanning="danScanning"
+  />
+  <ProspectusOverlay
+    v-if="prospectusVisible"
+    body-id="hektor"
+    :on-resolve="handleProspectusResolve"
   />
   <LanderHud v-if="stateInfo.state === 'lander'" :telemetry="landerTelemetry" />
   <FpsHud
