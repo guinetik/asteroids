@@ -1497,3 +1497,123 @@ describe('choice-mission step', () => {
     ])
   })
 })
+
+/** In-memory storage map shared by `objectiveType filter` tests. */
+const mockStorage: Record<string, string> = {}
+
+describe('objectiveType filter', () => {
+  beforeEach(() => {
+    // Mirror the file's existing storage-reset pattern.
+    for (const key of Object.keys(mockStorage)) delete mockStorage[key]
+  })
+
+  it('advances when the event objectiveType matches the step filter', () => {
+    const c: Contract = {
+      id: 'objtype-match',
+      inboxName: 'OT',
+      from: 't',
+      sentAt: TEST_DATE,
+      introSubject: 'OT',
+      introBody: ['ot'],
+      steps: [
+        {
+          kind: 'complete-missions',
+          count: 1,
+          missionType: 'asteroid',
+          objectiveType: 'photometry',
+          subject: 's',
+          flavor: ['f'],
+        },
+      ],
+      completionSubject: 'd',
+      completionBody: ['d'],
+      rewards: [],
+    }
+    const messages = new MessageSystem([], emptyMessageStore())
+    const contracts = new ContractSystem([c], messages, inMemoryPersistence())
+    contracts.resetForTests()
+    contracts.offerForTests('objtype-match')
+    contracts.acceptContract('objtype-match')
+    contracts.notifyMissionCompleted({
+      kind: 'asteroid',
+      giverPlanetId: null,
+      giverId: null,
+      targetPlanetId: null,
+      objectiveType: 'photometry',
+    })
+    expect(contracts.getInstance('objtype-match')?.status).toBe('completed')
+  })
+
+  it('does NOT advance when the event objectiveType differs from the filter', () => {
+    const c: Contract = {
+      id: 'objtype-miss',
+      inboxName: 'OT',
+      from: 't',
+      sentAt: TEST_DATE,
+      introSubject: 'OT',
+      introBody: ['ot'],
+      steps: [
+        {
+          kind: 'complete-missions',
+          count: 1,
+          missionType: 'asteroid',
+          objectiveType: 'photometry',
+          subject: 's',
+          flavor: ['f'],
+        },
+      ],
+      completionSubject: 'd',
+      completionBody: ['d'],
+      rewards: [],
+    }
+    const messages = new MessageSystem([], emptyMessageStore())
+    const contracts = new ContractSystem([c], messages, inMemoryPersistence())
+    contracts.resetForTests()
+    contracts.offerForTests('objtype-miss')
+    contracts.acceptContract('objtype-miss')
+    contracts.notifyMissionCompleted({
+      kind: 'asteroid',
+      giverPlanetId: null,
+      giverId: null,
+      targetPlanetId: null,
+      objectiveType: 'dan',
+    })
+    expect(contracts.getInstance('objtype-miss')?.status).toBe('active')
+  })
+
+  it('advances when the step has NO objectiveType filter (legacy behavior unchanged)', () => {
+    const c: Contract = {
+      id: 'objtype-omitted',
+      inboxName: 'OT',
+      from: 't',
+      sentAt: TEST_DATE,
+      introSubject: 'OT',
+      introBody: ['ot'],
+      steps: [
+        {
+          kind: 'complete-missions',
+          count: 1,
+          missionType: 'asteroid',
+          subject: 's',
+          flavor: ['f'],
+        },
+      ],
+      completionSubject: 'd',
+      completionBody: ['d'],
+      rewards: [],
+    }
+    const messages = new MessageSystem([], emptyMessageStore())
+    const contracts = new ContractSystem([c], messages, inMemoryPersistence())
+    contracts.resetForTests()
+    contracts.offerForTests('objtype-omitted')
+    contracts.acceptContract('objtype-omitted')
+    contracts.notifyMissionCompleted({
+      kind: 'asteroid',
+      giverPlanetId: null,
+      giverId: null,
+      targetPlanetId: null,
+      // No objectiveType — should still advance because the step doesn't filter.
+    })
+    expect(contracts.getInstance('objtype-omitted')?.status).toBe('completed')
+  })
+})

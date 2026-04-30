@@ -897,12 +897,18 @@ function requiredCount(step: ContractStep): number {
 
 /** True when a `complete-missions` step matches the supplied event filters. */
 function matchesMissionEvent(
-  step: { missionType?: string; giverId?: string; giverPlanetId?: string },
+  step: {
+    missionType?: string
+    giverId?: string
+    giverPlanetId?: string
+    objectiveType?: string
+  },
   event: MissionCompletedEvent,
 ): boolean {
   if (step.missionType !== undefined && step.missionType !== event.kind) return false
   if (step.giverId !== undefined && step.giverId !== event.giverId) return false
   if (step.giverPlanetId !== undefined && step.giverPlanetId !== event.giverPlanetId) return false
+  if (step.objectiveType !== undefined && step.objectiveType !== event.objectiveType) return false
   return true
 }
 
