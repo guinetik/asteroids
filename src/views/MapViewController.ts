@@ -192,7 +192,13 @@ import { ManifoldSpline } from '@/three/ManifoldSpline'
 import { ShuttleAudioDirector } from '@/audio/ShuttleAudioDirector'
 import { uiAudio } from '@/audio/UiAudioDirector'
 import { shipMessageSystem } from '@/lib/messages/runtime'
-import { contractSystem, onContractAccepted, onContractCompleted } from '@/lib/contracts/runtime'
+import {
+  contractSystem,
+  onContractAccepted,
+  onContractCompleted,
+  onContractStepActivated,
+} from '@/lib/contracts/runtime'
+import type { ContractStepActivatedPayload } from '@/lib/contracts/ContractSystem'
 import {
   COMPASS_LABELS,
   computeCompassBearings,
@@ -245,6 +251,15 @@ export interface MapViewBootState {
 
 /** Warm yellow used for the Sun tick on the compass strip. */
 const COMPASS_SUN_COLOR = '#FFF0B0'
+
+/** Special mission id → offer-message id used for auto-staging. */
+const SPECIAL_MISSION_OFFER_IDS: Record<string, string> = {
+  'consortium-certification': 'consortium-certification-offer',
+  'jovian-prospection-hektor-photometry': 'jovian-prospection-hektor-photometry-offer',
+  'jovian-prospection-hektor-dan': 'jovian-prospection-hektor-dan-offer',
+  'jovian-prospection-saturn-photometry': 'jovian-prospection-saturn-photometry-offer',
+  'jovian-prospection-saturn-dan': 'jovian-prospection-saturn-dan-offer',
+}
 
 /**
  * Bridges Vue lifecycle to the map scene with player shuttle.
@@ -454,6 +469,7 @@ export class MapViewController implements Tickable {
   private unsubscribeContractCompleted: (() => void) | null = null
   private unsubscribeContractAccepted: (() => void) | null = null
   private unsubscribeUpgradeInstalled: (() => void) | null = null
+  private unsubscribeContractStepActivated: (() => void) | null = null
   /**
    * Journey UI coordinator — owns arming state, the completion→begin interlude timer,
    * and the profile write that follows each trigger.
@@ -744,6 +760,10 @@ export class MapViewController implements Tickable {
     this.unsubscribeUpgradeInstalled = onUpgradeInstalled((upgradeId) => {
       this.notifyJourneyTrigger(`upgrade_installed:${upgradeId}`)
     })
+    this.unsubscribeContractStepActivated?.()
+    this.unsubscribeContractStepActivated = onContractStepActivated((payload) =>
+      this.handleContractStepActivated(payload),
+    )
     this.messageFacade.setTutorialMessagesUnlocked(
       hasCompletedJourney(this.playerProfile, WELCOME_JOURNEY_ID),
     )
@@ -3940,18 +3960,21 @@ export class MapViewController implements Tickable {
   }
 
   /**
-   * Enqueue the Consortium Certification inbox message and force its authored special
-   * mission as the active asteroid mission, with the authored waypoint already placed
-   * on the star map. Shared by the Act 1 climax staging path and the dev console helper.
+   * Stage a special mission as the active asteroid mission and enqueue its
+   * offer message into the relevant inbox folder. Overwrites any existing
+   * offered/active asteroid mission slot.
+   *
+   * @param missionId - Special mission id from `SPECIAL_MISSIONS`.
+   * @param offerMessageId - Message id from the catalog enqueued before staging.
    */
-  private stageConsortiumCertification(): void {
-    const mission = getSpecialMissionById('consortium-certification')
+  private stageSpecialMission(missionId: string, offerMessageId: string): void {
+    const mission = getSpecialMissionById(missionId)
     if (!mission) {
-      console.warn('[MapView] Special mission consortium-certification not found.')
+      console.warn(`[MapView] Special mission not found: ${missionId}`)
       return
     }
 
-    this.messageFacade.enqueueById('consortium-certification-offer', this.onMessageUpdate)
+    this.messageFacade.enqueueById(offerMessageId, this.onMessageUpdate)
 
     const acceptedMission: GeneratedAsteroidMission = {
       ...mission,
@@ -3965,6 +3988,37 @@ export class MapViewController implements Tickable {
     saveActiveMission(acceptedMission)
     saveMissionBoard(this.missionBoard)
     this.onMissionBoardUpdate?.(this.missionBoard)
+  }
+
+  /** Stage the Act 1 climax Consortium Certification mission. */
+  private stageConsortiumCertification(): void {
+    this.stageSpecialMission('consortium-certification', 'consortium-certification-offer')
+  }
+
+  /**
+   * Auto-stage a special mission when a contract step that carries
+   * `specialMissionId` becomes the current step. Idempotent: skips if the
+   * same special mission is already the active asteroid mission, on the
+   * board, or persisted from a prior session.
+   *
+   * @param payload - The activation payload from `ContractSystem`.
+   */
+  private handleContractStepActivated(payload: ContractStepActivatedPayload): void {
+    const missionId = payload.specialMissionId
+    if (!missionId) return
+
+    const offerMessageId = SPECIAL_MISSION_OFFER_IDS[missionId]
+    if (!offerMessageId) {
+      console.warn(`[MapView] No offer-message id for special mission: ${missionId}`)
+      return
+    }
+
+    const activeId = this.missionBoard.activeAsteroidMission?.id
+    if (activeId === missionId) return
+    const stored = loadActiveMission()
+    if (stored?.id === missionId) return
+
+    this.stageSpecialMission(missionId, offerMessageId)
   }
 
   /**
@@ -4530,6 +4584,8 @@ export class MapViewController implements Tickable {
     this.unsubscribeContractAccepted = null
     this.unsubscribeUpgradeInstalled?.()
     this.unsubscribeUpgradeInstalled = null
+    this.unsubscribeContractStepActivated?.()
+    this.unsubscribeContractStepActivated = null
     this.journeyFacade.dispose()
     this.evaMapMultitoolFacade.disposeEvaFiring()
     this.tickHandler?.unregister(this.evaMapMultitoolFacade.frameSync)
