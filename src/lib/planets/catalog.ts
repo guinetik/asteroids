@@ -66,6 +66,7 @@ interface PlanetJSON {
   readonly mass: number
   readonly shader: ShaderConfig
   readonly modelUrl?: string
+  readonly noKiosks?: boolean
   readonly ring?: RingConfig
   readonly moons: readonly MoonJSON[]
 }
@@ -154,6 +155,7 @@ function convertPlanet(p: PlanetJSON): Planet {
     mass: p.mass,
     shader: p.shader,
     ...(p.modelUrl !== undefined ? { modelUrl: p.modelUrl } : {}),
+    ...(p.noKiosks !== undefined ? { noKiosks: p.noKiosks } : {}),
     ...(p.ring !== undefined ? { ring: p.ring } : {}),
     moons: p.moons.map(convertMoon),
   }

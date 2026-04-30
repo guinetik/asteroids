@@ -16,6 +16,7 @@ import {
   DEFAULT_PLAYER_DISPLAY_NAME,
   MAX_PLAYER_DISPLAY_NAME_LENGTH,
   getBodyAccess,
+  isBodyRendered,
   setBodyAccess,
 } from '../profile'
 import type { PlayerProfile } from '../types'
@@ -317,6 +318,13 @@ describe('body access', () => {
     const profile = setBodyAccess(createProfile('Ada'), 'hektor', 'unrestricted')
     saveProfile(profile)
     expect(loadProfile()?.bodyAccess['hektor']).toBe('unrestricted')
+  })
+
+  it('renders only unrestricted or liberated pinned body states', () => {
+    expect(isBodyRendered('restricted')).toBe(false)
+    expect(isBodyRendered('destroyed')).toBe(false)
+    expect(isBodyRendered('unrestricted')).toBe(true)
+    expect(isBodyRendered('liberated')).toBe(true)
   })
 })
 

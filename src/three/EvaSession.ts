@@ -59,8 +59,8 @@ function isWithinMissionSiteStopShipDisk(vehicle: EvaSessionVehicle, poi: THREE.
   return Math.sqrt(dx * dx + dz * dz) < EVA_MISSION_SITE_STOP_SHIP_RANGE
 }
 
-/** Vehicle must be slower than this (world units / s) to initiate EVA. */
-const EVA_MAX_VEHICLE_SPEED = 0.5
+/** Vehicle must be at or below this speed (world units/s) to offer EVA from idle. */
+const EVA_MAX_VEHICLE_SPEED = 0.2
 
 /** Door open progress (0..1) at which EVA egress is allowed. */
 const EVA_DOOR_OPEN_THRESHOLD = 0.98

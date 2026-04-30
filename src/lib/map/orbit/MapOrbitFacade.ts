@@ -35,8 +35,6 @@ interface SharedDeps {
 interface OrbitInputDeps extends SharedDeps {
   inputManager: InputManager
   mapIntroControlsLocked: boolean
-  /** Returns `false` when the nearest capture body is visible but gated by profile state. */
-  canCaptureBody?: (body: CaptureBody) => boolean
   /**
    * Audio orchestrator that owns the orbit-capture sting, slingshot
    * release stings, and the slingshot charge loop. The facade no
@@ -173,7 +171,6 @@ export class MapOrbitFacade {
       sceneVisuals,
       audio,
       onSlingshotReleased,
-      canCaptureBody,
     } = deps
     if (!this._system) return
 
@@ -206,7 +203,6 @@ export class MapOrbitFacade {
       const px = shuttleController.position.x
       const pz = shuttleController.position.z
       const nearest = this._system.findNearestInRange(px, pz)
-      if (nearest && canCaptureBody && !canCaptureBody(nearest)) return
       if (nearest && this._system.beginCapture(px, pz)) {
         audio.notifyOrbitCapture()
         shuttleController.cancelSlingshotBurst()

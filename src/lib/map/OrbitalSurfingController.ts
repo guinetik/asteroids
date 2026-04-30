@@ -59,9 +59,6 @@ type OrbitalSurfState =
       startY: number
     }
 
-/** Minimum shuttle speed to allow orbital surf attachment. */
-const ORBITAL_SURF_MIN_ATTACH_SPEED = 0.15
-
 /** Dependencies injected each tick from MapViewController. */
 export interface OrbitalSurfingDeps {
   /** The shuttle controller. */
@@ -240,7 +237,7 @@ export class OrbitalSurfingController {
       deps.orbitState !== 'free' ||
       deps.gravitySurfingActive ||
       deps.slingshotBurstActive ||
-      deps.shuttleController.speed < ORBITAL_SURF_MIN_ATTACH_SPEED
+      deps.shuttleController.speed < MAP_CONFIG.ORBITAL_SURF_MIN_ATTACH_SPEED
     ) {
       return null
     }

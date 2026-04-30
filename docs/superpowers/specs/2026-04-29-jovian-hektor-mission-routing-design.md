@@ -274,16 +274,15 @@ Remove the contract's `pinnedAssets` block (was `[{ assetRef: 'hektor', ... }]`)
 
 ---
 
-## Optional: Steps 1 and 2 as special missions
+## Why Steps 1 and 2 stay generic (NOT special missions)
 
-Steps 1 (gather) and 2 (mining) currently rely on the giver pool path (plan 3). The implementer may choose to migrate them to special missions in this plan instead — for narrative consistency with the rest of the cohort arc:
+It might be tempting to lift Steps 1 and 2 (gather demo + mining demo) into special missions for architectural symmetry with the rest of the contract. **Don't.**
 
-- `jovian-prospection-cohort-gather.json` — "OP 1 — Demonstration Run, Surface Gather" with hand-authored Vance briefing matching the contract's existing flavor. Asteroid id: any small named body in jovian-trojans (or invent a second fictional one — `cohort-demo-rock`).
-- `jovian-prospection-cohort-mining.json` — "OP 2 — Demonstration Run, Belt Operations." Mining mission, attribution sidesteps the giver-pool/turret-pool question entirely.
+The narrative frame of Movement 1 is *"you are one of many cohort applicants, prove yourself on standard work like everyone else in the candidate pool."* Vance is testing throughput before trusting the player with bespoke specialty assignments. Special missions are addressed-to-you affairs — they imply the Society singled the player out and authored a mission for them specifically. That's the wrong tonal frame for the demo run.
 
-Adopting this option means plan 3's mining-attribution open question disappears, and plan 4's special-mission count grows to 6 (steps 1, 2, 4, 5, 7, 8). The giver pool stays purely generic.
+The hand-off from "generic recruiting" to "addressed-to-you specialty work" happens at **Step 4** — that's the moment Vance calibrates the player and routes them to Hektor by name. Before that, the player is doing exactly the kind of repeatable Society work plan 3 authors in the giver pool. After that, they're doing hand-authored special missions only they receive.
 
-**Recommendation:** adopt this option. It cleanly resolves the mining attribution issue, makes Movement 1's narrative consistent with the rest of the cohort arc, and the authoring cost is two more JSON files. The simpler `jovian-society-prospection.json` carries fewer filter fields per step.
+**Steps 1 and 2 stay on the giver pool track per plan 3.** Plan 4 owns Steps 4, 5, 7, 8 (and via plan 6, Step 9). Six steps total span the giver pool; four-plus-one span special missions. The split mirrors the contract's narrative arc.
 
 ---
 

@@ -14,6 +14,7 @@ import { createGravityDistortionPass } from '@/three/GravityDistortionPass'
 import { createGravitySurfPass } from '@/three/GravitySurfPass'
 import { createSlingshotSpeedPass } from '@/three/SlingshotSpeedPass'
 import mapGravityData from '@/data/shuttle/map-gravity.json'
+import type { Planet } from '@/lib/planets/types'
 
 /** Strong handles returned from {@link MapPlanetariumScene.initialize}. */
 export interface MapPlanetariumSceneRefs {
@@ -36,6 +37,7 @@ export class MapPlanetariumScene {
   async initialize(
     canvas: HTMLCanvasElement,
     renderCamera: THREE.PerspectiveCamera,
+    solarBodies: readonly Planet[] = SOLAR_BODIES,
   ): Promise<MapPlanetariumSceneRefs> {
     const sceneObjects = createMapScene(canvas)
     const scene = sceneObjects.scene
@@ -63,7 +65,7 @@ export class MapPlanetariumScene {
       jupiter: 0,
       saturn: 0.5,
     }
-    const planetControllers = SOLAR_BODIES.map((planet) => {
+    const planetControllers = solarBodies.map((planet) => {
       const controller = new PlanetSystemController(planet, initialPhases[planet.id])
       scene.add(controller.group)
       for (const line of controller.orbitLines) {
@@ -84,7 +86,7 @@ export class MapPlanetariumScene {
     const spaceTimeGrid = new SpaceTimeGrid(
       mapGridSize,
       MAP_CONFIG.MAP_SPACE_TIME_GRID_RESOLUTION,
-      80,
+      40,
       40,
       0.2,
     )

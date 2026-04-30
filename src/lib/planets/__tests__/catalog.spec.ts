@@ -128,6 +128,14 @@ describe('PINNED_BODIES', () => {
     expect(hektor.name).toBe('624 Hektor')
     expect(hektor.type).toBe('Jupiter Trojan')
     expect(hektor.modelUrl).toBe('/models/hektor.glb')
+    expect(hektor.noKiosks).toBe(true)
+  })
+
+  it('sizes Hektor smaller than Ceres', () => {
+    const hektor = getPinnedBody('hektor')
+    const ceres = getPlanet('ceres')
+
+    expect(hektor.displayRadius).toBeLessThan(ceres.displayRadius)
   })
 
   it('converts Hektor orbital phase and tilt from degrees to radians', () => {

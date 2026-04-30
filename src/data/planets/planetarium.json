@@ -777,10 +777,11 @@
         "meanAnomalyOffset": 60,
         "period": 4348
       },
-      "displayRadius": 0.002,
+      "displayRadius": 0.00045,
       "axialTilt": 78,
       "rotationSpeed": 0.0857,
       "modelUrl": "/models/hektor.glb",
+      "noKiosks": true,
       "shader": {
         "type": "rockyPlanet",
         "uniforms": {

@@ -33,7 +33,8 @@ import {
 import { isDebugHudEnabled } from '@/lib/debug/debugMetrics'
 import { DebugMetricsTracker } from '@/lib/debug/DebugMetricsTracker'
 import { DEFAULT_TIME_SCALE, ORBIT_SCALE } from '@/lib/planets/constants'
-import { PINNED_BODIES, PLANETS, SOLAR_BODIES, SUN } from '@/lib/planets/catalog'
+import { PINNED_BODIES, PLANETS, SUN } from '@/lib/planets/catalog'
+import type { Planet } from '@/lib/planets/types'
 import type { MapSceneObjects } from '@/three/MapSceneSetup'
 import { SunController } from '@/three/controllers/SunController'
 import { PlanetSystemController } from '@/three/controllers/PlanetSystemController'
@@ -100,6 +101,7 @@ import {
   createProfile,
   getBodyAccess,
   getMissionPayMultiplier,
+  isBodyRendered,
   loadProfile,
   markMapIntroSeen,
   saveProfile,
@@ -332,6 +334,7 @@ export class MapViewController implements Tickable {
   private planetariumScene: MapPlanetariumScene | null = null
   private sunController: SunController | null = null
   private planetControllers: PlanetSystemController[] = []
+  private renderedSolarBodies: readonly Planet[] = PLANETS
   private beltControllers: AsteroidBeltController[] = []
   private spaceTimeGrid: SpaceTimeGrid | null = null
   /** Transient spacetime “depressions” that drift across the sheet near the shuttle. */
@@ -774,7 +777,12 @@ export class MapViewController implements Tickable {
     this.vehicleCamera = new VehicleCamera(MAP_CAMERA_CONFIG, canvas)
     this.vehicleCamera.setShipYawCouplingSmoothing(MAP_CONFIG.MAP_SHIP_YAW_CAMERA_SMOOTH_TAU_SEC)
     this.planetariumScene = new MapPlanetariumScene()
-    const planetarium = await this.planetariumScene.initialize(canvas, this.vehicleCamera.camera)
+    this.renderedSolarBodies = this.getRenderedSolarBodies()
+    const planetarium = await this.planetariumScene.initialize(
+      canvas,
+      this.vehicleCamera.camera,
+      this.renderedSolarBodies,
+    )
     this.emitBootState('preparing', 'Loading')
     this.sceneObjects = planetarium.sceneObjects
     this.bloomController.setHost({
@@ -1030,7 +1038,7 @@ export class MapViewController implements Tickable {
         getWorldY: () => this.sunController!.group.position.y,
         getWorldZ: () => this.sunController!.getWorldZ(),
       },
-      ...SOLAR_BODIES.map((planet, i) => ({
+      ...this.renderedSolarBodies.map((planet, i) => ({
         id: planet.id,
         name: planet.name,
         displayRadius: planet.displayRadius,
@@ -1574,7 +1582,6 @@ export class MapViewController implements Tickable {
         audio: this.shuttleAudio,
         mapIntroControlsLocked: this.mapIntro.controlsLocked,
         onSlingshotReleased: (bodyName) => this.notifyOrbitalLaunchFromBodyName(bodyName),
-        canCaptureBody: (body) => this.canCaptureBody(body.id),
       })
       if (previousCharge > 0 && this.slingshotCharge === 0 && this.orbitSystem?.state === 'free') {
         this.yRecovery = true
@@ -1798,8 +1805,8 @@ export class MapViewController implements Tickable {
         const px = this.shuttleController.position.x
         const pz = this.shuttleController.position.z
         const samples: PlanetCollisionSample[] = this.planetControllers.map((c, i) => ({
-          name: SOLAR_BODIES[i]!.name,
-          displayRadius: SOLAR_BODIES[i]!.displayRadius,
+          name: this.renderedSolarBodies[i]!.name,
+          displayRadius: this.renderedSolarBodies[i]!.displayRadius,
           worldX: c.getWorldX(),
           worldZ: c.getWorldZ(),
         }))
@@ -1848,7 +1855,7 @@ export class MapViewController implements Tickable {
             maxProximity = prox
             nearestSourceX = c.getWorldX()
             nearestSourceZ = c.getWorldZ()
-            nearestName = SOLAR_BODIES[i]?.name ?? null
+            nearestName = this.renderedSolarBodies[i]?.name ?? null
           }
         }
 
@@ -1986,7 +1993,7 @@ export class MapViewController implements Tickable {
       for (let i = 0; i < this.planetControllers.length; i++) {
         const controller = this.planetControllers[i]!
         if (controller.mass < MAP_CONFIG.GRID_MASS_THRESHOLD) continue
-        const planetId = SOLAR_BODIES[i]?.id
+        const planetId = this.renderedSolarBodies[i]?.id
         const gasGiantWideWell = planetId === 'jupiter' || planetId === 'saturn'
         this.spaceTimeGrid.addSource({
           x: controller.getWorldX(),
@@ -2240,7 +2247,7 @@ export class MapViewController implements Tickable {
         x: c.getWorldX(),
         z: c.getWorldZ(),
       })),
-      planetNames: SOLAR_BODIES.map((p) => p.name),
+      planetNames: this.renderedSolarBodies.map((p) => p.name),
     }
   }
 
@@ -2404,26 +2411,15 @@ export class MapViewController implements Tickable {
   }
 
   /**
-   * Return access state for a pinned body id, or `undefined` for regular solar bodies.
+   * Build the renderable solar-body list from static planets plus unlocked pinned bodies.
    *
-   * @param bodyId - Catalog body id from the orbit-capture target.
-   * @returns Pinned body access state, or `undefined` when the id is not gated.
+   * @returns Bodies in controller order for map rendering, gravity, and orbit capture.
    */
-  private getPinnedBodyAccess(bodyId: string | undefined): BodyAccessState | undefined {
-    if (!bodyId || !PINNED_BODIES.some((body) => body.id === bodyId)) return undefined
-    return getBodyAccess(this.playerProfile, bodyId)
-  }
-
-  /**
-   * Determine whether the active profile may start orbit capture for a body.
-   *
-   * @param bodyId - Catalog body id from the nearest capture body.
-   * @returns `true` when the body is ungated or unlocked for orbit capture.
-   */
-  private canCaptureBody(bodyId: string | undefined): boolean {
-    const access = this.getPinnedBodyAccess(bodyId)
-    if (access === undefined) return true
-    return access === 'unrestricted' || access === 'liberated'
+  private getRenderedSolarBodies(): readonly Planet[] {
+    const renderedPinnedBodies = PINNED_BODIES.filter((body) =>
+      isBodyRendered(getBodyAccess(this.playerProfile, body.id)),
+    )
+    return [...PLANETS, ...renderedPinnedBodies]
   }
 
   /**
@@ -2437,7 +2433,7 @@ export class MapViewController implements Tickable {
     this.playerProfile = setBodyAccess(this.playerProfile, bodyId, state)
     this.persistPlayerProfile()
     this.emitShopState()
-    console.info(`[MapView] ${bodyId} access -> ${state}`)
+    console.info(`[MapView] ${bodyId} access -> ${state}; reload map to apply visibility`)
   }
 
   /** Persist shuttle hull HP to the profile (immediate). Invoked by the health facade. */
@@ -3461,7 +3457,9 @@ export class MapViewController implements Tickable {
     const key = bodyId.trim().toLowerCase()
     if (!key) {
       console.info(
-        `[MapView] warp("earth") - ids: sun, ${SOLAR_BODIES.map((p) => p.id).join(', ')}`,
+        `[MapView] warp("earth") - ids: sun, ${this.renderedSolarBodies
+          .map((p) => p.id)
+          .join(', ')}`,
       )
       return
     }
@@ -3480,14 +3478,14 @@ export class MapViewController implements Tickable {
       return
     }
 
-    const planet = SOLAR_BODIES.find((p) => p.id === key)
+    const planet = this.renderedSolarBodies.find((p) => p.id === key)
     if (!planet) {
       console.warn(`[MapView] warp: unknown body "${bodyId}"`)
-      console.info(`[MapView] Try: sun, ${SOLAR_BODIES.map((p) => p.id).join(', ')}`)
+      console.info(`[MapView] Try: sun, ${this.renderedSolarBodies.map((p) => p.id).join(', ')}`)
       return
     }
 
-    const idx = SOLAR_BODIES.indexOf(planet)
+    const idx = this.renderedSolarBodies.indexOf(planet)
     const ctrl = this.planetControllers[idx]
     if (!ctrl) return
 

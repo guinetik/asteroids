@@ -334,17 +334,6 @@ body {
     @apply text-sm text-cyan-400;
   }
 
-  .orbit-prompt-action--restricted {
-    @apply text-red-300;
-    text-shadow: 0 0 10px rgba(252, 165, 165, 0.5);
-  }
-
-  .mission-callout {
-    @apply fixed top-1/2 right-8 z-20 pointer-events-none;
-    min-width: min(20rem, calc(100vw - 2rem));
-    transform: translateY(-50%);
-  }
-
 .orbit-prompt-detail {
   @apply text-xs text-cyan-600;
 }

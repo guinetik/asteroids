@@ -341,6 +341,16 @@ export function getBodyAccess(profile: PlayerProfile, bodyId: string): BodyAcces
 }
 
 /**
+ * Determine whether a contract-pinned body should exist in the planetarium scene.
+ *
+ * @param state - Current saved access state for the pinned body.
+ * @returns True for rendered states, false when the body should be absent from map systems.
+ */
+export function isBodyRendered(state: BodyAccessState): boolean {
+  return state === 'unrestricted' || state === 'liberated'
+}
+
+/**
  * Return a copy of the profile with a pinned body's access state updated.
  *
  * @param profile - Current profile.

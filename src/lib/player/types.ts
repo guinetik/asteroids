@@ -49,8 +49,8 @@ export interface PlayerProfile {
    */
   missionPayMultipliers: Record<string, number>
   /**
-   * Pinned body id to access state. Example: `{ hektor: 'restricted' }` blocks orbit capture
-   * around 624 Hektor until contract state flips it.
+   * Pinned body id to access state. Example: `{ hektor: 'restricted' }` keeps 624 Hektor absent
+   * from the rendered map until contract state flips it.
    */
   bodyAccess: Record<string, BodyAccessState>
   /** Journey ids already completed. */

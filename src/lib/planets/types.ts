@@ -109,6 +109,8 @@ export interface Planet {
   readonly shader: ShaderConfig
   /** Optional GLB model URL. When set, this body uses the model instead of procedural geometry. */
   readonly modelUrl?: string
+  /** True when this body has no orbit kiosks, e.g. contract-only asteroid 624 Hektor. */
+  readonly noKiosks?: boolean
   /** Optional ring system (Saturn, Uranus). */
   readonly ring?: RingConfig
   /** Natural satellites. Empty array if none. */
@@ -121,7 +123,7 @@ export interface Planet {
   readonly mass: number
 }
 
-/** Contract-pinned body that is always rendered but whose orbit access is save-gated. */
+/** Contract-pinned body whose render visibility is controlled by player profile access state. */
 export type PinnedBody = Planet
 
 /** Solar data — the central star. */

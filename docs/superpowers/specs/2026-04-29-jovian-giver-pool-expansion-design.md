@@ -92,23 +92,17 @@ Add `'gather'` to the giver's `objectiveTypes` array.
 
 ---
 
-## Mining attribution — open question
+## Mining attribution
 
 Step 2 of the Jovian contract authors `missionType: 'mining'` + `giverId: 'jovian-society'`. Existing turret mining is per-planet, not per-giver, so the matcher would reject as-is.
 
-Two paths (carried over from the original plan 3 brainstorm):
+**Resolution: loosen Step 2's filter** to `giverPlanetId: 'jupiter'`. Edit `jovian-society-prospection.json` Step 2 to drop `giverId: 'jovian-society'`; require only `missionType: 'mining'` + `giverPlanetId: 'jupiter'`. No new content needed.
 
-**A. Loosen Step 2's filter** to `giverPlanetId: 'jupiter'`. Edit the contract JSON to drop `giverId: 'jovian-society'` for that one step. No new content. The narrative reads "any Jupiter belt run from the cohort era counts."
+This fits the narrative direction confirmed for Movement 1: Steps 1 and 2 are generic recruiting work — the Society wants the player to prove throughput on standard cohort-applicant work, not bespoke addressed-to-you assignments. "Any Jupiter belt run from the cohort era counts" is on-tone. The cohort-branding kicks in at Step 4 when Vance calibrates the player and routes them to Hektor by name.
 
-**B. Author a `giverIdHint?: string` field** on individual mining mission entries, plumb it through to `event.giverId` on completion. Add 1-2 Vance-voiced mining variants in `jupiter.json` with `giverIdHint: 'jovian-society'`. Stronger fiction, more work.
+**Alternative path** (deferred): a `giverIdHint?: string` field on turret-mining entries that propagates to `event.giverId` on completion, with 1-2 Vance-voiced mining variants in `jupiter.json`. Stronger fiction, more work. Worth considering for plan 7 if cohort-branded mining feels worth differentiating after the contract resolves; not required for plan 3.
 
-**Default: A.** B is reasonable to layer in plan 7 if cohort-branded mining feels worth differentiating.
-
-### Or — make Step 2 a special mission instead
-
-A third option, surfaced after the brainstorm shifted: Step 2 might be more naturally a **special mission** (plan 4) than a giver-pool match. A one-shot Society demo run — "Cohort Belt Cycle, Demonstration Pass" — with hand-authored briefing referencing the cohort, attributed to a fixed jovian-trojans asteroid. This eliminates the attribution question entirely.
-
-Recommendation: defer this decision to plan 4. If plan 4's special-mission count grows from 4 (steps 4, 5, 7, 8 — and 9 via plan 6) to 6 (adding 1, 2), authoring stays bounded and the giver pool is purely generic. Plan 3's mining work then becomes "do nothing" — the giver pool gets two generic mining entries only if path B feels right; otherwise nothing.
+**Steps 1 and 2 remain giver-pool work, not special missions.** This was confirmed during the architecture brainstorm — Movement 1's tone is "you are one of many candidates," which special missions break by implying the Society singled the player out. See plan 4's "Why Steps 1 and 2 stay generic" section.
 
 ---
 

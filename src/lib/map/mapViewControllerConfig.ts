@@ -27,7 +27,7 @@ export const MAP_GRID_GAS_GIANT_WELL_WIDTH_MULT = 1.85
  * scale ~N² in {@link MAP_SPACE_TIME_GRID_RESOLUTION}; high N heavily loads
  * `EffectComposer` when Space Fabric is visible.
  */
-export const MAP_SPACE_TIME_GRID_BASE_RESOLUTION = 500
+export const MAP_SPACE_TIME_GRID_BASE_RESOLUTION = 600
 
 /** Density multiplier on segment count (see {@link MAP_SPACE_TIME_GRID_RESOLUTION}). */
 export const MAP_SPACE_TIME_GRID_RESOLUTION_BOOST = 2
@@ -236,7 +236,13 @@ export const ORBITAL_SURF_RAMP_DURATION_SEC = 1.2
 export const ORBITAL_SURF_COUPLE_DURATION_SEC = 1.0
 
 /** Max world units from an orbit ellipse point to allow attach. */
-export const ORBITAL_SURF_SNAP_DISTANCE = 5
+export const ORBITAL_SURF_SNAP_DISTANCE = 8
+
+/**
+ * Minimum shuttle speed (world units/s) before manifold attach is allowed.
+ * Below this, snap targeting and {@link OrbitalSurfingController} attach prompts stay inactive.
+ */
+export const ORBITAL_SURF_MIN_ATTACH_SPEED = 0.2
 
 /** Passive fuel drain multiplier while orbital surfing (same as gravity surfing). */
 export const ORBITAL_SURF_FUEL_MULTIPLIER = 3
@@ -550,6 +556,7 @@ export const MAP_VIEW_CONTROLLER_CONFIG = {
   ORBITAL_SURF_COUPLE_DURATION_SEC,
   ORBITAL_SURF_CRUISE_SPEED_MULTIPLIER,
   ORBITAL_SURF_FUEL_MULTIPLIER,
+  ORBITAL_SURF_MIN_ATTACH_SPEED,
   ORBITAL_SURF_PULSE_SPEED,
   ORBITAL_SURF_RAMP_DURATION_SEC,
   ORBITAL_SURF_SNAP_DISTANCE,
