@@ -475,6 +475,11 @@ onMounted(async () => {
     }
     viewController.onProspectusOpen = () => {
       prospectusVisible.value = true
+      // Release the FPS pointer lock so the player can click the overlay buttons.
+      // Same pattern used by the death overlay handler above.
+      if (typeof document !== 'undefined' && document.pointerLockElement) {
+        document.exitPointerLock()
+      }
     }
     viewController.onMapCanvas = (canvas) => {
       mapCanvas.value = canvas

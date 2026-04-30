@@ -401,9 +401,13 @@ export class LevelViewController implements Tickable {
   }
 
   /**
-   * Mark the `'prospectus-terminal'` objective complete and fire mission-success
-   * callbacks downstream. Called by `LevelView.vue` after
+   * Mark the `'prospectus-terminal'` objective complete and fire the
+   * per-objective callback. Called by `LevelView.vue` after
    * {@link notifyChoiceResolved} resolves the contract step.
+   *
+   * Does **not** fire `onMissionComplete` — that callback is reserved for the
+   * exfil flow (`enterExfil` → `enterComplete`) so the mission-complete banner
+   * only appears after the player has actually left the asteroid.
    *
    * Idempotent — a second call is a no-op.
    */
@@ -416,7 +420,6 @@ export class LevelViewController implements Tickable {
     if (prospectusIndex >= 0) {
       this.onObjectiveComplete?.(prospectusIndex)
     }
-    this.onMissionComplete?.()
   }
 
   /**
