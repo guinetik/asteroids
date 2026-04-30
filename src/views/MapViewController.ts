@@ -1323,6 +1323,7 @@ export class MapViewController implements Tickable {
      * the shuttle "Active Missions" empty after refresh.
      */
     this.replayAct1JourneyTriggers()
+    this.replayActiveContractStepStaging()
     this.emitJourneyTracker()
     this.onCreditsUpdate?.(this.playerProfile.credits)
 
@@ -3989,14 +3990,16 @@ export class MapViewController implements Tickable {
     return map
   }
 
-  private stageSpecialMission(missionId: string, offerMessageId: string): void {
+  private stageSpecialMission(missionId: string, offerMessageId: string | null): void {
     const mission = getSpecialMissionById(missionId)
     if (!mission) {
       console.warn(`[MapView] Special mission not found: ${missionId}`)
       return
     }
 
-    this.messageFacade.enqueueById(offerMessageId, this.onMessageUpdate)
+    if (offerMessageId !== null) {
+      this.messageFacade.enqueueById(offerMessageId, this.onMessageUpdate)
+    }
 
     const positions = this.snapshotBodyWorldPositions()
     const resolvedWaypoint = resolveSpecialMissionWaypoint(
@@ -4049,6 +4052,36 @@ export class MapViewController implements Tickable {
     if (stored?.id === missionId) return
 
     this.stageSpecialMission(missionId, offerMessageId)
+  }
+
+  /**
+   * Self-heal: walk active contract instances and re-stage any
+   * `specialMissionId`-bearing current step whose mission isn't currently in
+   * the active asteroid slot. Covers the case where the original step
+   * transition fired while MapViewController was unmounted (e.g. while the
+   * player was in `/level` completing the prior special mission). Replay
+   * does NOT re-enqueue the offer message — the player already received it
+   * at the original transition.
+   *
+   * Idempotent: skips when the slot already holds the right mission.
+   */
+  private replayActiveContractStepStaging(): void {
+    for (const instance of contractSystem.listInstances()) {
+      if (instance.status !== 'active') continue
+      const contract = contractSystem.getContract(instance.contractId)
+      if (!contract) continue
+      const step = contract.steps[instance.currentStepIndex]
+      if (!step || step.kind !== 'complete-missions') continue
+      if (step.specialMissionId === undefined) continue
+
+      const missionId = step.specialMissionId
+      if (!SPECIAL_MISSION_OFFER_IDS[missionId]) continue
+
+      const activeId = this.missionBoard.activeAsteroidMission?.id
+      if (activeId === missionId) continue
+
+      this.stageSpecialMission(missionId, null)
+    }
   }
 
   /**
