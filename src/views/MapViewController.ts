@@ -106,7 +106,13 @@ import {
   markMapIntroSeen,
   saveProfile,
   addCredits,
+  recordGravitySurfStart,
+  recordManifoldRide,
+  recordMissionObjectiveComplete,
+  recordPortalDeparture,
   recordSolarBodyFirstOrbit,
+  recordSlingshotLaunch,
+  recordWorldLineDistance,
   setBodyAccess,
   setLastDockedPlanet,
 } from '@/lib/player/profile'
@@ -202,6 +208,7 @@ import {
   onContractCompleted,
   onContractStepActivated,
 } from '@/lib/contracts/runtime'
+import type { ContractStoreSnapshot } from '@/lib/contracts/contractTypes'
 import type { ContractStepActivatedPayload } from '@/lib/contracts/ContractSystem'
 import {
   COMPASS_LABELS,
@@ -427,6 +434,7 @@ export class MapViewController implements Tickable {
 
   private mapCamera: MapCamera | null = null
   private readonly overlayProjector = new MapOverlayProjector()
+  private currentRunWorldLineDistance = 0
   private messageFacade = new MapMessageFacade()
 
   /** Whether planet orbit lines are currently visible. */
@@ -658,6 +666,9 @@ export class MapViewController implements Tickable {
   onMiningMissionDeliver:
     | ((mission: ActiveTurretMiningMission, creditsEarned: number) => void)
     | null = null
+
+  /** Called after controller-side persisted progress changes outside Vue handlers. */
+  onPersistentProgressUpdate: (() => void) | null = null
 
   /**
    * Called when an EVA (visit-relay) mission is completed at the in-EVA terminal.
@@ -965,6 +976,8 @@ export class MapViewController implements Tickable {
 
     // --- Gravity surf coupling tether visuals ---
     this.gravitySurfingController.onCouplingStart = () => {
+      this.playerProfile = recordGravitySurfStart(this.playerProfile)
+      this.persistPlayerProfileAndSyncProgress()
       this.sceneVisuals?.showSurfCouplingTether()
     }
     this.gravitySurfingController.onCouplingProgress = (shipPos, railPos, progress, dt) => {
@@ -1018,6 +1031,9 @@ export class MapViewController implements Tickable {
     this.orbitalSurfingController.onComplete = (planetIndex) => {
       const controller = this.planetControllers[planetIndex]
       if (!controller || !this.shuttleController) return
+
+      this.playerProfile = recordManifoldRide(this.playerProfile)
+      this.persistPlayerProfileAndSyncProgress()
 
       // Position the shuttle near the planet so normal E-key capture can engage
       const bx = controller.getWorldX()
@@ -1236,6 +1252,8 @@ export class MapViewController implements Tickable {
       this.tickHandler.register(tickable, TICK_PRIORITY_ANIMATION)
     }
     this.sceneEnvironment.boundarySystem.onDepart = (state) => {
+      this.playerProfile = recordPortalDeparture(this.playerProfile)
+      this.persistPlayerProfileAndSyncProgress()
       new VibePortal().depart(state as Record<string, string | number>)
     }
 
@@ -2200,13 +2218,11 @@ export class MapViewController implements Tickable {
    * @param bodyName - Body display name from the orbit-capture system (e.g. `'Sun'`, `'Mars'`).
    */
   private notifyOrbitalLaunchFromBodyName(bodyName: string): void {
-    if (bodyName === SUN.name) {
-      contractSystem.notifyOrbitalLaunched({ planetId: SUN.id })
-      return
-    }
-    const planet = PLANETS.find((p) => p.name === bodyName)
-    if (!planet) return
-    contractSystem.notifyOrbitalLaunched({ planetId: planet.id })
+    const bodyId = bodyName === SUN.name ? SUN.id : PLANETS.find((p) => p.name === bodyName)?.id
+    if (!bodyId) return
+    contractSystem.notifyOrbitalLaunched({ planetId: bodyId })
+    this.playerProfile = recordSlingshotLaunch(this.playerProfile, bodyId)
+    this.persistPlayerProfileAndSyncProgress()
   }
 
   /**
@@ -2442,6 +2458,12 @@ export class MapViewController implements Tickable {
     saveInventory(this.playerInventory)
   }
 
+  /** Persist profile/inventory and refresh Vue achievement progress immediately. */
+  private persistPlayerProfileAndSyncProgress(): void {
+    this.persistPlayerProfile()
+    this.onPersistentProgressUpdate?.()
+  }
+
   /**
    * Build the renderable solar-body list from static planets plus unlocked pinned bodies.
    *
@@ -2627,6 +2649,11 @@ export class MapViewController implements Tickable {
     return { ...this.playerProfile }
   }
 
+  /** Current contract store snapshot for Vue/UI sync. */
+  getContractSnapshot(): ContractStoreSnapshot {
+    return structuredClone(contractSystem.getSnapshot())
+  }
+
   /**
    * Re-read the persisted profile from storage and adopt it as the controller's
    * in-memory copy. Used after external mutators (e.g. contract reward effects)
@@ -2787,7 +2814,7 @@ export class MapViewController implements Tickable {
     })
     if (!result.creditsChanged) return
     this.playerInventory = result.inventory
-    this.playerProfile = result.profile
+    this.playerProfile = recordMissionObjectiveComplete(result.profile, 'mining')
     saveInventory(result.inventory)
     this.persistPlayerProfile()
     this.onCreditsUpdate?.(this.playerProfile.credits)
@@ -3733,7 +3760,7 @@ export class MapViewController implements Tickable {
   /** Record the current ship position into the persistent sampled world line. */
   private recordWorldLinePoint(): void {
     if (!this.shuttleController) return
-    this.overlayProjector.recordWorldLinePoint(
+    const segmentDistance = this.overlayProjector.recordWorldLinePoint(
       {
         orbitState: this.orbitSystem?.state ?? 'free',
         shipX: this.shuttleController.position.x,
@@ -3742,6 +3769,15 @@ export class MapViewController implements Tickable {
       },
       mapOverlayData.worldLineSampleDistance,
     )
+    if (segmentDistance > 0) {
+      this.currentRunWorldLineDistance += segmentDistance
+      this.playerProfile = recordWorldLineDistance(
+        this.playerProfile,
+        segmentDistance,
+        this.currentRunWorldLineDistance,
+      )
+      this.persistPlayerProfileAndSyncProgress()
+    }
   }
 
   /** Reset the world line at the start of a new run and seed it with the current ship position. */
@@ -3751,6 +3787,7 @@ export class MapViewController implements Tickable {
         { orbitState: 'free', shipX: 0, shipZ: 0, shipDead: true },
         mapOverlayData.worldLineSampleDistance,
       )
+      this.currentRunWorldLineDistance = 0
       return
     }
     this.overlayProjector.reset(
@@ -3762,6 +3799,7 @@ export class MapViewController implements Tickable {
       },
       mapOverlayData.worldLineSampleDistance,
     )
+    this.currentRunWorldLineDistance = 0
   }
 
   /** Compute and emit the full map overlay state for the Vue HUD. */
@@ -4078,7 +4116,7 @@ export class MapViewController implements Tickable {
       const contract = contractSystem.getContract(instance.contractId)
       if (!contract) continue
       const step = contract.steps[instance.currentStepIndex]
-      if (!step || step.kind !== 'complete-missions') continue
+      if (!step || (step.kind !== 'complete-missions' && step.kind !== 'choice-mission')) continue
       if (step.specialMissionId === undefined) continue
 
       const missionId = step.specialMissionId
