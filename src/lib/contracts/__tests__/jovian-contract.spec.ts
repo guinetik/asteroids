@@ -13,7 +13,7 @@ import jovianRaw from '@/data/contracts/jovian-society-prospection.json'
 import { ContractSystem } from '../ContractSystem'
 import { emptyContractSnapshot } from '../contractStorage'
 import { contractSystem } from '../runtime'
-import { createProfile, loadProfile, saveProfile } from '@/lib/player/profile'
+import { createProfile, hasStoryFlag, loadProfile, saveProfile } from '@/lib/player/profile'
 import type {
   ChoiceMissionStep,
   Contract,
@@ -259,5 +259,36 @@ describe('jovian-society-prospection auto-grants Jupiter fast-travel (runtime)',
     contractSystem.notifyChoiceResolved('jovian_final_prospectus', 'tamper')
     const profile = loadProfile()
     expect(profile?.unlockedFastTravelPlanets).toContain('jupiter')
+  })
+})
+
+describe('jovian-society-prospection story-flag rewards (runtime)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    saveProfile(createProfile('Test'))
+    contractSystem.resetForTests()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    localStorage.clear()
+  })
+
+  it('tamper outcome sets the jovianContractTampered story flag', () => {
+    contractSystem.offerForTests('jovian-society-prospection')
+    contractSystem.acceptContract('jovian-society-prospection')
+    for (let i = 0; i < 8; i++) contractSystem.advanceStepForTests('jovian-society-prospection')
+    contractSystem.notifyChoiceResolved('jovian_final_prospectus', 'tamper')
+    const profile = loadProfile()
+    expect(profile && hasStoryFlag(profile, 'jovianContractTampered')).toBe(true)
+  })
+
+  it('transmit outcome does NOT set the tamper flag', () => {
+    contractSystem.offerForTests('jovian-society-prospection')
+    contractSystem.acceptContract('jovian-society-prospection')
+    for (let i = 0; i < 8; i++) contractSystem.advanceStepForTests('jovian-society-prospection')
+    contractSystem.notifyChoiceResolved('jovian_final_prospectus', 'transmit')
+    const profile = loadProfile()
+    expect(profile && hasStoryFlag(profile, 'jovianContractTampered')).toBe(false)
   })
 })

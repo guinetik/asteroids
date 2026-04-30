@@ -198,7 +198,8 @@
       "rewards": [
         { "type": "disable-giver", "giverId": "jovian-society" },
         { "type": "fast-travel", "planetId": "jupiter" },
-        { "type": "set-body-access", "bodyId": "hektor", "state": "liberated" }
+        { "type": "set-body-access", "bodyId": "hektor", "state": "liberated" },
+        { "type": "set-story-flag", "flag": "jovianContractTampered" }
       ]
     }
   }

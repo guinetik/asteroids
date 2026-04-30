@@ -296,6 +296,18 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     }
   }
 
+  const activeStoryFlags: Record<string, true> = {}
+  if (
+    p.activeStoryFlags !== undefined &&
+    p.activeStoryFlags !== null &&
+    typeof p.activeStoryFlags === 'object' &&
+    !Array.isArray(p.activeStoryFlags)
+  ) {
+    for (const [flag, value] of Object.entries(p.activeStoryFlags as Record<string, unknown>)) {
+      if (value === true) activeStoryFlags[flag] = true
+    }
+  }
+
   const hasJourneyFields =
     Array.isArray(p.completedJourneyIds) ||
     (p.journeyStepProgress !== undefined &&
@@ -391,6 +403,7 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     journeyStartReadyIds,
     shuttleBuffs,
     disabledGiverIds,
+    activeStoryFlags: Object.keys(activeStoryFlags).length > 0 ? activeStoryFlags : undefined,
     cosmetics,
     fantasiaCosmeticIntroSent,
     ...(shuttleHullHp !== undefined ? { shuttleHullHp } : {}),
