@@ -233,6 +233,9 @@ function objectiveSummary(mission: GeneratedAsteroidMission): string {
     }
     case 'bunker':
       return `Clear bunker (${obj.waveCount ?? 0} waves)`
+    default:
+      // special-mission only — never generated; no summary needed
+      return ''
   }
 }
 

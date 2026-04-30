@@ -23,6 +23,7 @@ export type ObjectiveType =
   | 'dan'
   | 'collect'
   | 'bunker'
+  | 'prospectus-terminal'
 
 /** Solar system region where missions spawn. Determines fuel cost and distance. */
 export type MissionRegion =
