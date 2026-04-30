@@ -1269,6 +1269,7 @@ export class LevelViewController implements Tickable {
         this.sceneManager.renderer,
         this.sceneManager.scene,
         initialCam,
+        { lutUrl: asteroid.lighting.lutUrl },
       )
       this.sceneManager.renderOverride = () => {
         const cam = this.sceneManager!.activeCamera

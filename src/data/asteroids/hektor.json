@@ -27,9 +27,9 @@
     "ridgeFrequency": 0.4,
     "roughness": 0.7,
     "dustCoverage": 0.6,
-    "modelPath": "/models/hektor.glb",
+    "modelPath": "/models/asteroids/itokawa.glb",
     "modelScale": 1300,
-    "surfaceTextures": "/textures/asteroids/rocky",
+    "surfaceTextures": "/textures/asteroids/default",
     "surfaceTextureRepeat": 13,
     "surfaceModulatorStrength": 0.9,
     "surfaceModulatorColorBlend": 0.1,
@@ -54,6 +54,7 @@
     "sunElevation": 35,
     "sunColor": [0.95, 0.96, 1.0],
     "sunIntensity": 1.1,
-    "ambientIntensity": 0.7
+    "ambientIntensity": 0.7,
+    "lutUrl": "/hektor.CUBE"
   }
 }

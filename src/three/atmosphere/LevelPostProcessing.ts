@@ -56,8 +56,8 @@ const VIGNETTE_OFFSET = 0.25
 const VIGNETTE_DARKNESS = 0.75
 
 // ── LUT ──
-/** Public-folder URL for the 3D color LUT. Loaded async. */
-const LUT_URL = '/lut.CUBE'
+/** Default public-folder URL for the 3D color LUT. Loaded async. */
+const DEFAULT_LUT_URL = '/lut.CUBE'
 
 /**
  * Manages the pmndrs `EffectComposer` pipeline for the level scene.
@@ -76,9 +76,16 @@ export class LevelPostProcessing {
   private lut: LUT3DEffect | null = null
   private currentCamera: THREE.Camera
   private disposed = false
+  private readonly lutUrl: string
 
-  constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
+  constructor(
+    renderer: THREE.WebGLRenderer,
+    scene: THREE.Scene,
+    camera: THREE.Camera,
+    options: { lutUrl?: string } = {},
+  ) {
     this.currentCamera = camera
+    this.lutUrl = options.lutUrl ?? DEFAULT_LUT_URL
 
     // HDR target — bright lights can exceed 1.0 in linear space so the ACES
     // tonemap gets real highlight data to roll off, instead of clamped 8-bit.
@@ -133,7 +140,7 @@ export class LevelPostProcessing {
    */
   private async loadLUT(): Promise<void> {
     try {
-      const lutTexture = await new LUTCubeLoader().loadAsync(LUT_URL)
+      const lutTexture = await new LUTCubeLoader().loadAsync(this.lutUrl)
       if (this.disposed) return
       // Tetrahedral interpolation gives smoother transitions between LUT
       // cells — subtle LUT character shows through instead of being averaged
@@ -143,7 +150,7 @@ export class LevelPostProcessing {
       this.effectPass.dispose()
       this.effectPass = this.buildEffectPass()
       this.composer.addPass(this.effectPass)
-      console.info('[LevelPostProcessing] LUT applied:', LUT_URL)
+      console.info('[LevelPostProcessing] LUT applied:', this.lutUrl)
     } catch (err) {
       console.warn('[LevelPostProcessing] LUT load failed', err)
     }

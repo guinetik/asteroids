@@ -19,6 +19,13 @@ export interface AsteroidLighting {
   sunIntensity: number
   /** Hemisphere/ambient fill intensity. Range: 0.05-0.4. */
   ambientIntensity: number
+  /**
+   * Optional asteroid-specific 3D color LUT (`.CUBE`) URL applied by the
+   * level post-processing pipeline. When omitted, the default
+   * `/lut.CUBE` is used. Use to give a body a distinctive grade —
+   * e.g. Hektor's deep-cold D-type tint via `/hektor.CUBE`.
+   */
+  lutUrl?: string
 }
 
 /** Shared atmosphere state populated each frame by LevelViewController. */
