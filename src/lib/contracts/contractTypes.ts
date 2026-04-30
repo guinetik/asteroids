@@ -323,6 +323,7 @@ export type RewardEffect =
       bodyId: string
       state: 'restricted' | 'unrestricted' | 'liberated' | 'destroyed'
     }
+  | { type: 'set-story-flag'; flag: string }
 
 /**
  * Body the contract pins for its duration. Plan 2 stores; later plans route

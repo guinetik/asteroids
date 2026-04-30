@@ -22,6 +22,7 @@ import {
   setBodyAccess,
   setMissionPayMultiplier,
   setShuttleBuff,
+  setStoryFlag,
   unlockFastTravelPlanet,
 } from '@/lib/player/profile'
 import {
@@ -153,6 +154,8 @@ function applyRewardToProfile(effect: RewardEffect, contract: Contract): void {
     next = disableGiver(next, effect.giverId)
   } else if (effect.type === 'set-body-access') {
     next = setBodyAccess(next, effect.bodyId, effect.state)
+  } else if (effect.type === 'set-story-flag') {
+    next = setStoryFlag(next, effect.flag)
   }
   if (next !== profile) saveProfile(next)
 }
