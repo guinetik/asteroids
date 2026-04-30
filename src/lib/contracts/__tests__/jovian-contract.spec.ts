@@ -292,3 +292,55 @@ describe('jovian-society-prospection story-flag rewards (runtime)', () => {
     expect(profile && hasStoryFlag(profile, 'jovianContractTampered')).toBe(false)
   })
 })
+
+describe('Jovian outcome side effects', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    saveProfile(createProfile('Test'))
+    contractSystem.resetForTests()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    localStorage.clear()
+  })
+
+  it('transmit: sets all transmit-side profile state', () => {
+    contractSystem.offerForTests('jovian-society-prospection')
+    contractSystem.acceptContract('jovian-society-prospection')
+    for (let i = 0; i < 8; i++) contractSystem.advanceStepForTests('jovian-society-prospection')
+    contractSystem.notifyChoiceResolved('jovian_final_prospectus', 'transmit')
+    const profile = loadProfile()!
+    expect(profile.bodyAccess?.hektor).toBe('destroyed')
+    expect(profile.shuttleBuffs?.jovianEmpowerment).toBe(1.5)
+    expect(profile.unlockedFastTravelPlanets).toContain('jupiter')
+    expect(profile.disabledGiverIds?.['jovian-society']).toBeUndefined()
+    expect(hasStoryFlag(profile, 'jovianContractTampered')).toBe(false)
+  })
+
+  it('tamper: sets all tamper-side profile state', () => {
+    contractSystem.offerForTests('jovian-society-prospection')
+    contractSystem.acceptContract('jovian-society-prospection')
+    for (let i = 0; i < 8; i++) contractSystem.advanceStepForTests('jovian-society-prospection')
+    contractSystem.notifyChoiceResolved('jovian_final_prospectus', 'tamper')
+    const profile = loadProfile()!
+    expect(profile.bodyAccess?.hektor).toBe('liberated')
+    expect(profile.shuttleBuffs?.jovianEmpowerment).toBeUndefined()
+    expect(profile.unlockedFastTravelPlanets).toContain('jupiter')
+    expect(profile.disabledGiverIds?.['jovian-society']).toBe(true)
+    expect(hasStoryFlag(profile, 'jovianContractTampered')).toBe(true)
+  })
+
+  it('replay safety: persisted profile recovers all flags after re-init', () => {
+    contractSystem.offerForTests('jovian-society-prospection')
+    contractSystem.acceptContract('jovian-society-prospection')
+    for (let i = 0; i < 8; i++) contractSystem.advanceStepForTests('jovian-society-prospection')
+    contractSystem.notifyChoiceResolved('jovian_final_prospectus', 'tamper')
+    contractSystem.replayCompletedRewards()
+    const afterReload = loadProfile()
+    // Flags survive replay (because they're idempotent and persist on disk)
+    expect(afterReload?.bodyAccess?.hektor).toBe('liberated')
+    expect(afterReload?.disabledGiverIds?.['jovian-society']).toBe(true)
+    expect(afterReload && hasStoryFlag(afterReload, 'jovianContractTampered')).toBe(true)
+  })
+})
