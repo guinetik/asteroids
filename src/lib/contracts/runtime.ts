@@ -31,7 +31,11 @@ import {
   type UpgradeId,
 } from '@/lib/upgrades'
 import { CONTRACT_CATALOG } from './contractCatalog'
-import { ContractSystem, type ContractStepCompletedPayload } from './ContractSystem'
+import {
+  ContractSystem,
+  type ContractStepCompletedPayload,
+  type ContractStepActivatedPayload,
+} from './ContractSystem'
 import type { Contract, RewardEffect } from './contractTypes'
 
 /** Subscribers notified whenever a contract state mutation occurs. */
@@ -50,6 +54,9 @@ const contractAcceptedListeners = new Set<(contractId: string) => void>()
 
 /** Subscribers notified when a contract step crosses its completion threshold. */
 const contractStepCompletedListeners = new Set<(payload: ContractStepCompletedPayload) => void>()
+
+/** Subscribers notified when a contract step transitions to current. */
+const contractStepActivatedListeners = new Set<(payload: ContractStepActivatedPayload) => void>()
 
 /**
  * Upgrade grant from a completed contract, after `ensureUpgradeAtLeast` has persisted.
@@ -150,6 +157,21 @@ export const contractSystem = new ContractSystem(CONTRACT_CATALOG, shipMessageSy
   },
   onChoiceOutcomeResolved: (payload) => {
     payContractStepCredits(payload.creditsReward)
+  },
+  onStepActivated: (payload) => {
+    if (payload.revealsBody) {
+      const profile = loadProfile()
+      if (profile) {
+        saveProfile(setBodyAccess(profile, payload.revealsBody, 'unrestricted'))
+      }
+    }
+    for (const listener of Array.from(contractStepActivatedListeners)) {
+      try {
+        listener(payload)
+      } catch {
+        // listeners must not break the system
+      }
+    }
   },
   consumeItemsForDelivery: (itemId, count) => consumeInventoryItems(itemId, count),
   getInstalledUpgradeLevel: (upgradeId) => getInstalledUpgradeLevelForContracts(upgradeId),
@@ -312,6 +334,20 @@ export function onContractStepCompleted(
 ): () => void {
   contractStepCompletedListeners.add(listener)
   return () => contractStepCompletedListeners.delete(listener)
+}
+
+/**
+ * Subscribe to "a contract step just transitioned to current". Receivers
+ * typically auto-activate special missions, refresh active-mission UI, etc.
+ *
+ * @param listener - Receives the activation payload.
+ * @returns Unsubscribe function. Calling it removes the listener.
+ */
+export function onContractStepActivated(
+  listener: (payload: ContractStepActivatedPayload) => void,
+): () => void {
+  contractStepActivatedListeners.add(listener)
+  return () => contractStepActivatedListeners.delete(listener)
 }
 
 /**

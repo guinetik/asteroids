@@ -88,6 +88,16 @@ export interface ContractSystemHooks {
    */
   onChoiceOutcomeResolved?: (payload: ChoiceOutcomeResolvedPayload) => void
   /**
+   * Called when a contract step transitions from "not current" to "current"
+   * (both at acceptance for step 0 and on every advance for the next step).
+   * Receivers handle side effects — auto-activating special missions, flipping
+   * `bodyAccess` for `revealsBody` steps, etc.
+   *
+   * @param payload - Contract id, step index, and the activation directives
+   *   from the step (`specialMissionId`, `revealsBody`).
+   */
+  onStepActivated?: (payload: ContractStepActivatedPayload) => void
+  /**
    * Asked by the engine when the player orbits the destination of an active
    * `deliver-items` step. The host (typically the inventory bridge in
    * `runtime.ts`) attempts to remove `count` units of `itemId` from the
@@ -163,6 +173,18 @@ export interface ChoiceOutcomeResolvedPayload {
   outcomeId: string
   /** Authored CR payout for this outcome. Fractional preserved. */
   creditsReward: number
+}
+
+/** Payload for {@link ContractSystemHooks.onStepActivated}. */
+export interface ContractStepActivatedPayload {
+  /** Contract whose step just became current. */
+  contractId: string
+  /** Step index that just activated. */
+  stepIndex: number
+  /** When set, runtime should auto-activate this special mission. */
+  specialMissionId: string | null
+  /** When set, runtime should call `setBodyAccess(profile, body, 'unrestricted')`. */
+  revealsBody: string | null
 }
 
 /** Default persistence backed by `loadContractSnapshot`/`saveContractSnapshot`. */
@@ -610,6 +632,7 @@ export class ContractSystem {
       instances: { ...this.snapshot.instances, [contractId]: updated },
     }
     this.deliverBriefMessage(contract)
+    this.notifyStepActivated(contract, 0)
     this.deliverStepMessage(contract, 0)
     this.evaluatePassiveCurrentStep(contract)
     this.persist()
@@ -707,6 +730,7 @@ export class ContractSystem {
           ...this.snapshot,
           instances: { ...this.snapshot.instances, [contract.id]: updated },
         }
+        this.notifyStepActivated(contract, nextIndex)
         this.deliverStepMessage(contract, nextIndex)
         this.evaluatePassiveCurrentStep(contract)
       }
@@ -763,6 +787,32 @@ export class ContractSystem {
       if (!visited) return
       this.advanceStep(contract, instance, 1)
     }
+  }
+
+  /**
+   * Fire the `onStepActivated` hook for the step at `stepIndex`. Reads the
+   * step's `specialMissionId` and `revealsBody` to populate the payload.
+   * Only `'complete-missions'` steps carry these directives today; other
+   * step kinds emit `null` for both.
+   *
+   * @param contract - Contract whose step just became current.
+   * @param stepIndex - Index of the activated step.
+   */
+  private notifyStepActivated(contract: Contract, stepIndex: number): void {
+    const step = contract.steps[stepIndex]
+    if (!step) return
+    let specialMissionId: string | null = null
+    let revealsBody: string | null = null
+    if (step.kind === 'complete-missions') {
+      specialMissionId = step.specialMissionId ?? null
+      revealsBody = step.revealsBody ?? null
+    }
+    this.hooks.onStepActivated?.({
+      contractId: contract.id,
+      stepIndex,
+      specialMissionId,
+      revealsBody,
+    })
   }
 
   /** Deliver a step's flavor message into the contract folder. */

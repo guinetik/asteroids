@@ -18,7 +18,11 @@ import type {
   MissionCompletedEvent,
   RewardEffect,
 } from '../contractTypes'
-import type { ContractStepCompletedPayload, ChoiceOutcomeResolvedPayload } from '../ContractSystem'
+import type {
+  ContractStepCompletedPayload,
+  ChoiceOutcomeResolvedPayload,
+  ContractStepActivatedPayload,
+} from '../ContractSystem'
 import { emptyContractSnapshot } from '../contractStorage'
 
 const TEST_DATE = '2306-04-05 09:12 UTC'
@@ -1745,5 +1749,130 @@ describe('matcher full filter set', () => {
       region: 'jovian-trojans',
     })
     expect(contracts.getInstance(c.id)?.status).toBe('active')
+  })
+})
+
+describe('onStepActivated hook', () => {
+  beforeEach(() => {
+    for (const key of Object.keys(mockStorage)) delete mockStorage[key]
+  })
+
+  it('fires when a contract is accepted (step 0)', () => {
+    const c: Contract = {
+      id: 'sa-accept',
+      inboxName: 'SA',
+      from: 't',
+      sentAt: TEST_DATE,
+      introSubject: 'SA',
+      introBody: ['s'],
+      steps: [
+        {
+          kind: 'complete-missions',
+          count: 1,
+          missionType: 'asteroid',
+          specialMissionId: 'jovian-prospection-hektor-photometry',
+          revealsBody: 'hektor',
+          subject: 's',
+          flavor: ['f'],
+        },
+      ],
+      completionSubject: 'd',
+      completionBody: ['d'],
+      rewards: [],
+    }
+    const messages = new MessageSystem([], emptyMessageStore())
+    const events: ContractStepActivatedPayload[] = []
+    const contracts = new ContractSystem([c], messages, inMemoryPersistence(), {
+      onStepActivated: (p) => events.push(p),
+    })
+    contracts.resetForTests()
+    contracts.offerForTests('sa-accept')
+    contracts.acceptContract('sa-accept')
+    expect(events).toHaveLength(1)
+    expect(events[0]?.stepIndex).toBe(0)
+    expect(events[0]?.specialMissionId).toBe('jovian-prospection-hektor-photometry')
+    expect(events[0]?.revealsBody).toBe('hektor')
+  })
+
+  it('fires when a step advances (step 1)', () => {
+    const c: Contract = {
+      id: 'sa-advance',
+      inboxName: 'SA',
+      from: 't',
+      sentAt: TEST_DATE,
+      introSubject: 'SA',
+      introBody: ['s'],
+      steps: [
+        {
+          kind: 'complete-missions',
+          count: 1,
+          missionType: 'asteroid',
+          subject: 's0',
+          flavor: ['f'],
+        },
+        {
+          kind: 'complete-missions',
+          count: 1,
+          missionType: 'asteroid',
+          specialMissionId: 'jovian-prospection-hektor-dan',
+          subject: 's1',
+          flavor: ['f'],
+        },
+      ],
+      completionSubject: 'd',
+      completionBody: ['d'],
+      rewards: [],
+    }
+    const messages = new MessageSystem([], emptyMessageStore())
+    const events: ContractStepActivatedPayload[] = []
+    const contracts = new ContractSystem([c], messages, inMemoryPersistence(), {
+      onStepActivated: (p) => events.push(p),
+    })
+    contracts.resetForTests()
+    contracts.offerForTests('sa-advance')
+    contracts.acceptContract('sa-advance')
+    contracts.notifyMissionCompleted({
+      kind: 'asteroid',
+      giverPlanetId: null,
+      giverId: null,
+      targetPlanetId: null,
+    })
+    expect(events.map((e) => e.stepIndex)).toEqual([0, 1])
+    expect(events[1]?.specialMissionId).toBe('jovian-prospection-hektor-dan')
+    expect(events[1]?.revealsBody).toBeNull()
+  })
+
+  it('emits null specialMissionId / revealsBody for vanilla steps', () => {
+    const c: Contract = {
+      id: 'sa-vanilla',
+      inboxName: 'SA',
+      from: 't',
+      sentAt: TEST_DATE,
+      introSubject: 'SA',
+      introBody: ['s'],
+      steps: [
+        {
+          kind: 'complete-missions',
+          count: 1,
+          missionType: 'asteroid',
+          subject: 's',
+          flavor: ['f'],
+        },
+      ],
+      completionSubject: 'd',
+      completionBody: ['d'],
+      rewards: [],
+    }
+    const messages = new MessageSystem([], emptyMessageStore())
+    const events: ContractStepActivatedPayload[] = []
+    const contracts = new ContractSystem([c], messages, inMemoryPersistence(), {
+      onStepActivated: (p) => events.push(p),
+    })
+    contracts.resetForTests()
+    contracts.offerForTests('sa-vanilla')
+    contracts.acceptContract('sa-vanilla')
+    expect(events).toHaveLength(1)
+    expect(events[0]?.specialMissionId).toBeNull()
+    expect(events[0]?.revealsBody).toBeNull()
   })
 })
