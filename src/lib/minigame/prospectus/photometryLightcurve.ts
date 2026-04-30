@@ -7,6 +7,7 @@
  * @spec docs/superpowers/specs/2026-04-29-jovian-prospectus-minigame-design.md
  */
 import { hashSeed } from '@/lib/missions/asteroidMissionGenerator'
+import { mulberry32 } from '@/lib/minigame/relayRepair/rng'
 
 /** Number of samples in the default lightcurve render. */
 export const DEFAULT_LIGHTCURVE_SAMPLE_COUNT = 64
@@ -41,14 +42,7 @@ export function generatePhotometryLightcurve(
   sampleCount: number = DEFAULT_LIGHTCURVE_SAMPLE_COUNT,
 ): number[] {
   const seed = hashSeed(seedString)
-  let s = (seed ^ 0x9e3779b9) >>> 0
-  const next = (): number => {
-    s = (s + 0x6d2b79f5) >>> 0
-    let t = s
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
+  const next = mulberry32((seed ^ 0x9e3779b9) >>> 0)
   const phase = next() * Math.PI * 2
   const out: number[] = Array.from({ length: sampleCount })
   for (let i = 0; i < sampleCount; i++) {
