@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * Raster sources under `image/textures/` and `image/telescope/` (optional top-level
- * `image/texture.jpg`) are converted into lossy or lossless WebPs under matching
+ * Raster sources under `image/textures/`, `image/telescope/`, `image/portraits/`, and
+ * any top-level raster files directly in `image/` (e.g. `image/texture.jpg`,
+ * `image/jovian-ending.png`) are converted into lossy or lossless WebPs under matching
  * paths under `public/`.
  *
  * @author guinetik
- * @date 2026-04-28
+ * @date 2026-04-30
  * @see docs/superpowers/specs/2026-04-28-texture-webp-pipeline-design.md
  */
 
@@ -477,7 +478,11 @@ function removeStaleRastersSameBase(outputDirectory, baseWithoutExt) {
  */
 async function main() {
   /** @type {readonly string[]} */
-  const scanRoots = [join(IMAGE_ROOT, 'textures'), join(IMAGE_ROOT, 'telescope')]
+  const scanRoots = [
+    join(IMAGE_ROOT, 'textures'),
+    join(IMAGE_ROOT, 'telescope'),
+    join(IMAGE_ROOT, 'portraits'),
+  ]
 
   /** @type {string[]} */
   const allFiles = []
@@ -495,13 +500,17 @@ async function main() {
     allFiles.push(...listRasterSources(sub))
   }
 
-  const topTexture = join(IMAGE_ROOT, 'texture.jpg')
+  // Pick up any top-level raster files directly in `image/` (e.g. texture.jpg, jovian-ending.png).
+  // Non-recursive — subdirectories are already handled by scanRoots above.
   try {
-    if (statSync(topTexture).isFile()) {
-      allFiles.push(topTexture)
+    for (const entry of readdirSync(IMAGE_ROOT, { withFileTypes: true })) {
+      if (!entry.isFile()) continue
+      const ext = extname(entry.name).toLowerCase()
+      if (!RASTER_EXTENSIONS.includes(ext)) continue
+      allFiles.push(join(IMAGE_ROOT, entry.name))
     }
   } catch {
-    // Root terrain texture absent — TerrainMesh fallback must point at an authored file elsewhere.
+    // image/ root unreadable — skip top-level rasters.
   }
 
   if (allFiles.length === 0) {
