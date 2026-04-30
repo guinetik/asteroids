@@ -34,6 +34,12 @@ export interface MissionCompletedEvent {
   giverId: string | null
   /** For shuttle planetary missions, the planet the mission targets. */
   targetPlanetId: string | null
+  /** Optional objective subtype (e.g. `'photometry'`). Plan 3+ populates and matches. */
+  objectiveType?: string
+  /** Optional region tag (e.g. `'jovian-trojans'`). Plan 5 populates and matches. */
+  region?: string
+  /** Optional pinned-asset ref the mission targets. Plan 4 populates and matches. */
+  pinnedAssetRef?: string
 }
 
 /**
@@ -58,6 +64,21 @@ export interface CompleteMissionsStep extends ContractStepRewardMixin {
   giverId?: string
   /** Restrict to a single giver planet (matches {@link MissionCompletedEvent.giverPlanetId}). */
   giverPlanetId?: string
+  /**
+   * Restrict to a single objective type (e.g. `'photometry'`, `'dan'`, `'gather'`).
+   * Accepted by the type, ignored by the matcher in this plan — later plans tighten.
+   */
+  objectiveType?: string
+  /**
+   * Restrict to missions spawned in this region (e.g. `'saturn-trojans'`).
+   * Accepted by the type, ignored by the matcher in this plan — later plans tighten.
+   */
+  targetRegion?: string
+  /**
+   * Restrict to missions targeting the contract's pinned body with this ref.
+   * Accepted by the type, ignored by the matcher in this plan — later plans tighten.
+   */
+  pinnedAssetRef?: string
   /** Authored summary shown on the step's flavor message subject. */
   subject: string
   /** Authored body paragraphs for the step's flavor message. */
@@ -240,6 +261,19 @@ export type RewardEffect =
       state: 'restricted' | 'unrestricted' | 'liberated' | 'destroyed'
     }
 
+/**
+ * Body the contract pins for its duration. Plan 2 stores; later plans route
+ * mission generation to it.
+ */
+export interface PinnedAsset {
+  /** Stable ref used by step `pinnedAssetRef` lookups (e.g. `'hektor'`). */
+  assetRef: string
+  /** Region the body lives in (e.g. `'jovian-trojans'`). */
+  region: string
+  /** Display label for inbox flavor and asset cards (e.g. `'Asset 2306-J'`). */
+  label: string
+}
+
 /** Static contract definition authored as JSON. */
 export interface Contract {
   /** Stable id used for persistence and folder routing. */
@@ -280,6 +314,8 @@ export interface Contract {
    * style messages so the player has a default-folder prompt to open mail.
    */
   headsUpInboxMessageId?: string
+  /** Bodies pinned at acceptance. Empty/absent for non-pinning contracts. */
+  pinnedAssets?: PinnedAsset[]
   /** Subject for the offer/intro message. */
   introSubject: string
   /** Body paragraphs for the offer/intro message (rendered above the Accept button). */
