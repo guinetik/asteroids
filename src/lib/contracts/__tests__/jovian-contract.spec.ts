@@ -38,12 +38,31 @@ const mining: MissionCompletedEvent = {
   giverPlanetId: 'jupiter',
   giverId: null,
   targetPlanetId: null,
+  objectiveType: 'mining',
 }
-const asteroid: MissionCompletedEvent = {
+
+const asteroidGather: MissionCompletedEvent = {
   kind: 'asteroid',
   giverPlanetId: 'jupiter',
   giverId: 'jovian-society',
   targetPlanetId: null,
+  objectiveType: 'gather',
+}
+
+const asteroidPhotometry: MissionCompletedEvent = {
+  kind: 'asteroid',
+  giverPlanetId: 'jupiter',
+  giverId: 'jovian-society',
+  targetPlanetId: null,
+  objectiveType: 'photometry',
+}
+
+const asteroidDan: MissionCompletedEvent = {
+  kind: 'asteroid',
+  giverPlanetId: 'jupiter',
+  giverId: 'jovian-society',
+  targetPlanetId: null,
+  objectiveType: 'dan',
 }
 
 describe('jovian-society-prospection schema', () => {
@@ -84,25 +103,26 @@ describe('jovian-society-prospection walkability', () => {
   }
 
   function driveToChoice(contracts: ContractSystem) {
-    // Steps 1, 2: complete-missions (asteroid/gather + mining).
-    contracts.notifyMissionCompleted(asteroid)
+    // Step 1 (OP 1): asteroid + gather
+    contracts.notifyMissionCompleted(asteroidGather)
+    // Step 2 (OP 2): mining + Jupiter board
     contracts.notifyMissionCompleted(mining)
-    // Step 3: collect-drops 3 viroid-psychosphere
+    // Step 3 (OP 3): collect-drops 3 viroid-psychosphere
     for (let i = 0; i < 3; i++) {
       contracts.notifyDropCollected({ itemId: 'viroid-psychosphere', quantity: 1 })
     }
-    // Step 4: photometry asteroid (matcher loose).
-    contracts.notifyMissionCompleted(asteroid)
-    // Step 5: photometry asteroid in Saturn region (loose).
-    contracts.notifyMissionCompleted(asteroid)
-    // Step 6: collect-drops 8.
+    // Step 4 (OP 4): asteroid + photometry
+    contracts.notifyMissionCompleted(asteroidPhotometry)
+    // Step 5 (OP 5): asteroid + photometry (Saturn region; targetRegion still ignored per plan 5)
+    contracts.notifyMissionCompleted(asteroidPhotometry)
+    // Step 6 (OP 6): collect-drops 8
     for (let i = 0; i < 8; i++) {
       contracts.notifyDropCollected({ itemId: 'viroid-psychosphere', quantity: 1 })
     }
-    // Step 7: DAN asteroid (loose).
-    contracts.notifyMissionCompleted(asteroid)
-    // Step 8: DAN asteroid Saturn region (loose).
-    contracts.notifyMissionCompleted(asteroid)
+    // Step 7 (OP 7): asteroid + dan
+    contracts.notifyMissionCompleted(asteroidDan)
+    // Step 8 (OP 8): asteroid + dan (Saturn region; targetRegion still ignored)
+    contracts.notifyMissionCompleted(asteroidDan)
   }
 
   it('drives transmit arm end-to-end', () => {
