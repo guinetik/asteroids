@@ -19,6 +19,8 @@ import {
   type ThrusterRuntimeModifiers,
   type ThrusterSystemConfig,
 } from '@/lib/physics/thrusterSystem'
+import { applyShuttleBuffs } from '@/lib/shuttle/buffs'
+import { loadProfile } from '@/lib/player/profile'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import { ParticleEmitter } from './ParticleEmitter'
 import { WarningBeacon } from './WarningBeacon'
@@ -502,12 +504,28 @@ export class LanderController implements Tickable {
 
   constructor(inputManager: InputManager) {
     this.inputManager = inputManager
+
+    // Read profile once at construction so buffs are idempotent and applied only at init.
+    const profile = typeof localStorage === 'undefined' ? null : loadProfile()
+    const buffMult = profile ? applyShuttleBuffs(profile, 1, 'fuel') : 1
+    const hullBuffMult = profile ? applyShuttleBuffs(profile, 1, 'hull') : 1
+    const base = LANDER_THRUSTER_CONFIG
     this.thrusterSystem = new ThrusterSystem<LanderThrusterName>({
-      ...LANDER_THRUSTER_CONFIG,
-      fuelCapacity:
-        LANDER_THRUSTER_CONFIG.fuelCapacity * getCurrentUpgradeValue('landerFuelCapacity'),
+      thrusters: {
+        mainEngine: {
+          ...base.thrusters.mainEngine,
+          capacity: base.thrusters.mainEngine.capacity * buffMult,
+          rechargeRate: base.thrusters.mainEngine.rechargeRate * buffMult,
+        },
+        rcs: {
+          ...base.thrusters.rcs,
+          capacity: base.thrusters.rcs.capacity * buffMult,
+          rechargeRate: base.thrusters.rcs.rechargeRate * buffMult,
+        },
+      },
+      fuelCapacity: base.fuelCapacity * getCurrentUpgradeValue('landerFuelCapacity') * buffMult,
     })
-    this.maxHp = LANDER_BASE_HP * getCurrentUpgradeValue('landerHull')
+    this.maxHp = LANDER_BASE_HP * getCurrentUpgradeValue('landerHull') * hullBuffMult
     this._hp = this.maxHp
     this.thrusterSystem.onFuelEmpty = () => {
       this.onFuelEmpty?.()

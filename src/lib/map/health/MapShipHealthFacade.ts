@@ -33,6 +33,12 @@ export interface MapShipHealthInitInput {
   rawData: ShipHealthConfig
   /** Current `shuttleHull` upgrade value (1.0..2.0). */
   hullMultiplier: number
+  /**
+   * Additional buff multiplier applied on top of `hullMultiplier`.
+   * Pass the result of `applyShuttleBuffs(profile, 1, 'hull')`.
+   * Defaults to `1` (no buff) when omitted.
+   */
+  hullBuffMultiplier?: number
   /** Catalog→world scale factor (`ORBIT_SCALE`). */
   orbitScale: number
   /** Persisted hull HP from the player profile; `undefined` when no save exists. */
@@ -109,7 +115,8 @@ export class MapShipHealthFacade {
 
   /** Build the ship-health instance and wire the throttled-persist + pagehide listeners. */
   initialize(input: MapShipHealthInitInput): void {
-    const config = buildShipHealthConfig(input.rawData, input.hullMultiplier, input.orbitScale)
+    const totalHullMultiplier = input.hullMultiplier * (input.hullBuffMultiplier ?? 1)
+    const config = buildShipHealthConfig(input.rawData, totalHullMultiplier, input.orbitScale)
     this.configValue = config
     this.onPersistDue = input.onPersistDue
 

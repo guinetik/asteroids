@@ -253,6 +253,7 @@ import {
   MapEvaMultitoolFacade,
 } from '@/lib/map/eva/MapEvaMultitoolFacade'
 import type { MapEvaShuttleHullHealTarget } from '@/lib/fps/projectileSystem'
+import { applyShuttleBuffs } from '@/lib/shuttle/buffs'
 
 /**
  * Orbit / grid / debris toggle snapshot for syncing the map HUD after intro suppression.
@@ -977,6 +978,7 @@ export class MapViewController implements Tickable {
     this.healthFacade.initialize({
       rawData: shipHealthData as ShipHealthConfig,
       hullMultiplier: getCurrentUpgradeValue('shuttleHull'),
+      hullBuffMultiplier: applyShuttleBuffs(this.playerProfile, 1, 'hull'),
       orbitScale: ORBIT_SCALE,
       savedHp: this.playerProfile.shuttleHullHp,
       onDeath: (cause) => this.triggerDeath(cause),
@@ -1122,6 +1124,9 @@ export class MapViewController implements Tickable {
       })),
     ]
     this.orbitFacade.initialize(captureBodies)
+    this.orbitFacade.setSlingshotBuffMultiplier(
+      applyShuttleBuffs(this.playerProfile, 1, 'slingshot'),
+    )
 
     // Portal arrival, completed-mission return at waypoint, or default saved orbit
     this.portalArrival = new PortalArrivalSequence()

@@ -6,8 +6,10 @@ import type { Tickable } from '@/lib/Tickable'
 import type { InputManager } from '@/lib/InputManager'
 import type { SpaceTimeGrid } from './SpaceTimeGrid'
 import { checkEventHorizon, type GravitySource, type GravityConfig } from '@/lib/physics/gravity'
-import { ThrusterSystem, DEFAULT_SHUTTLE_CONFIG } from '@/lib/physics/thrusterSystem'
+import { ThrusterSystem, buildBuffedShuttleConfig } from '@/lib/physics/thrusterSystem'
 import type { ShuttleThrusterName, ThrusterRuntimeModifiers } from '@/lib/physics/thrusterSystem'
+import { applyShuttleBuffs } from '@/lib/shuttle/buffs'
+import { loadProfile } from '@/lib/player/profile'
 import { loadGLB } from './loadGLB'
 import { FuelTank } from './FuelTank'
 import { HabitatModule } from './HabitatModule'
@@ -292,11 +294,12 @@ export class ShuttleController implements Tickable, PortalVehicle {
   private spaceTimeGrid: SpaceTimeGrid | null = null
   private readonly gravityWells: GravityWell[] = []
   private readonly gravitySources: GravitySource[] = []
-  readonly thrusterSystem = new ThrusterSystem<ShuttleThrusterName>({
-    ...DEFAULT_SHUTTLE_CONFIG,
-    fuelCapacity:
-      DEFAULT_SHUTTLE_CONFIG.fuelCapacity * getCurrentUpgradeValue('shuttleFuelCapacity'),
-  })
+  readonly thrusterSystem: ThrusterSystem<ShuttleThrusterName>
+  /**
+   * Cached shuttle-buff speed multiplier. Read from profile once at construction;
+   * applied on top of the `shuttleThrusterSpeed` upgrade in `updateMovement`.
+   */
+  private readonly _speedBuffMultiplier: number
   private isDead = false
   private deathTarget: THREE.Vector3 | null = null
   private deathSpeed = 0
@@ -327,6 +330,14 @@ export class ShuttleController implements Tickable, PortalVehicle {
     this.inputManager = inputManager
     this.physics = physics
     this.gravityConfig = gravityConfig
+
+    // Read profile once at construction so buffs are idempotent and init-time only.
+    const profile = typeof localStorage === 'undefined' ? null : loadProfile()
+    const buffMult = profile ? applyShuttleBuffs(profile, 1, 'fuel') : 1
+    this.thrusterSystem = new ThrusterSystem<ShuttleThrusterName>(
+      buildBuffedShuttleConfig(getCurrentUpgradeValue('shuttleFuelCapacity'), buffMult),
+    )
+    this._speedBuffMultiplier = profile ? applyShuttleBuffs(profile, 1, 'speed') : 1
   }
 
   setSpaceTimeGrid(grid: SpaceTimeGrid): void {
@@ -716,7 +727,10 @@ export class ShuttleController implements Tickable, PortalVehicle {
 
   private updateMovement(dt: number): void {
     const p = this.physics
-    const speedUpgradeMultiplier = getCurrentUpgradeValue('shuttleThrusterSpeed')
+    // Upgrade multiplier is read per-frame (upgrades can be installed at runtime).
+    // Buff multiplier is cached at init (idempotent, applied once at construction).
+    const speedUpgradeMultiplier =
+      getCurrentUpgradeValue('shuttleThrusterSpeed') * this._speedBuffMultiplier
     /** Baseline caps from JSON — slingshot protection/decay must not depend on thruster upgrades. */
     const baseMaxThrustSpeed = p.maxThrustSpeed
     const baseMaxGravitySpeed = p.maxGravitySpeed

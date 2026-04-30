@@ -91,6 +91,53 @@ export const DEFAULT_THRUSTER_CONFIG = {
   fuelCapacity: DEFAULT_SHUTTLE_CONFIG.fuelCapacity,
 }
 
+/**
+ * Build a shuttle {@link ThrusterSystemConfig} that applies an upgrade multiplier and
+ * an optional buff multiplier on top of {@link DEFAULT_SHUTTLE_CONFIG}.
+ *
+ * - `fuelCapacity` = base × upgradeMultiplier × buffMultiplier
+ * - `capacity` = base × buffMultiplier  (charge bars grow with the buff)
+ * - `rechargeRate` = base × buffMultiplier  (charge refills faster with the buff)
+ * - All other per-thruster fields (`burnRate`, `fuelCostPerRecharge`, `lockoutFraction`)
+ *   are left unchanged — burn rate is already capped by charge capacity.
+ *
+ * @param fuelUpgradeMultiplier - Current `shuttleFuelCapacity` upgrade value (e.g. 1.0..2.0).
+ * @param buffMultiplier - Compounded shuttle-buff multiplier (e.g. from `applyShuttleBuffs`). Pass `1`
+ *   when no buff is active.
+ * @returns Fully-scaled config ready for `new ThrusterSystem(config)`.
+ */
+export function buildBuffedShuttleConfig(
+  fuelUpgradeMultiplier: number,
+  buffMultiplier: number,
+): ThrusterSystemConfig<ShuttleThrusterName> {
+  const base = DEFAULT_SHUTTLE_CONFIG
+  return {
+    thrusters: {
+      thrust: {
+        ...base.thrusters.thrust,
+        capacity: base.thrusters.thrust.capacity * buffMultiplier,
+        rechargeRate: base.thrusters.thrust.rechargeRate * buffMultiplier,
+      },
+      brake: {
+        ...base.thrusters.brake,
+        capacity: base.thrusters.brake.capacity * buffMultiplier,
+        rechargeRate: base.thrusters.brake.rechargeRate * buffMultiplier,
+      },
+      rcs: {
+        ...base.thrusters.rcs,
+        capacity: base.thrusters.rcs.capacity * buffMultiplier,
+        rechargeRate: base.thrusters.rcs.rechargeRate * buffMultiplier,
+      },
+      turretMining: {
+        ...base.thrusters.turretMining,
+        capacity: base.thrusters.turretMining.capacity * buffMultiplier,
+        rechargeRate: base.thrusters.turretMining.rechargeRate * buffMultiplier,
+      },
+    },
+    fuelCapacity: SHUTTLE_BASE_FUEL_CAPACITY * fuelUpgradeMultiplier * buffMultiplier,
+  }
+}
+
 const ONE_FRAME_AT_60FPS = 1 / 60
 
 /**

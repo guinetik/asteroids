@@ -66,6 +66,12 @@ export class MapOrbitFacade {
   private _slingshotCharge = 0
   private _orbitRingIsPreview = false
   /**
+   * Buff multiplier applied to slingshot charge rate. A value of `1.5` means charge builds
+   * 1.5× faster than base (effective charge time = `SLINGSHOT_CHARGE_TIME / 1.5`). Set
+   * once at map init via {@link setSlingshotBuffMultiplier}; default is `1`.
+   */
+  private _slingshotBuffMultiplier = 1
+  /**
    * True while the slingshot charge whine should be looping (E held
    * while orbiting). Read by {@link MapViewController} every frame and
    * passed into {@link ShuttleAudioDirector.update} for edge-detection
@@ -137,6 +143,17 @@ export class MapOrbitFacade {
 
   initialize(captureBodies: CaptureBody[]): void {
     this._system = new OrbitCaptureSystem(captureBodies)
+  }
+
+  /**
+   * Set the slingshot-charge-rate buff multiplier (1 = no buff). Call once at map init
+   * from the result of `applyShuttleBuffs(profile, 1, 'slingshot')`. Idempotent — safe
+   * to call multiple times but should only be called at init per spec.
+   *
+   * @param multiplier - Values > 1 make slingshot charge faster (e.g. 1.5 = 50% faster).
+   */
+  setSlingshotBuffMultiplier(multiplier: number): void {
+    this._slingshotBuffMultiplier = multiplier
   }
 
   beginForcedOrbit(
@@ -236,7 +253,7 @@ export class MapOrbitFacade {
       }
       this._slingshotCharge = Math.min(
         1,
-        this._slingshotCharge + dt / MAP_CONFIG.SLINGSHOT_CHARGE_TIME,
+        this._slingshotCharge + (dt * this._slingshotBuffMultiplier) / MAP_CONFIG.SLINGSHOT_CHARGE_TIME,
       )
       vehicleCamera?.applyConfigTuning(buildSlingshotChargeCameraConfig(this._slingshotCharge))
       this.updateLaunchArrow(shuttleController, sceneVisuals)
