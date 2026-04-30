@@ -48,6 +48,12 @@ export interface MissionCompletedEvent {
   region?: string
   /** Optional pinned-asset ref the mission targets. Plan 4 populates and matches. */
   pinnedAssetRef?: string
+  /**
+   * Optional special-mission id the completed mission carries (e.g.
+   * `'jovian-prospection-hektor-photometry'`). Plan 4 populates from the
+   * asteroid mission completion path when the active mission is `kind: 'special'`.
+   */
+  specialMissionId?: string
 }
 
 /**
@@ -79,12 +85,12 @@ export interface CompleteMissionsStep extends ContractStepRewardMixin {
   objectiveType?: string
   /**
    * Restrict to missions spawned in this region (e.g. `'saturn-trojans'`).
-   * Accepted by the type, ignored by the matcher in this plan — later plans tighten.
+   * Honored by the matcher — only events whose `region` matches advance.
    */
   targetRegion?: string
   /**
    * Restrict to missions targeting the contract's pinned body with this ref.
-   * Accepted by the type, ignored by the matcher in this plan — later plans tighten.
+   * Honored by the matcher — only events with the matching `pinnedAssetRef` advance.
    */
   pinnedAssetRef?: string
   /**

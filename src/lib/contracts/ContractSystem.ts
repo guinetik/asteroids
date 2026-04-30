@@ -902,6 +902,9 @@ function matchesMissionEvent(
     giverId?: string
     giverPlanetId?: string
     objectiveType?: string
+    pinnedAssetRef?: string
+    targetRegion?: string
+    specialMissionId?: string
   },
   event: MissionCompletedEvent,
 ): boolean {
@@ -909,6 +912,13 @@ function matchesMissionEvent(
   if (step.giverId !== undefined && step.giverId !== event.giverId) return false
   if (step.giverPlanetId !== undefined && step.giverPlanetId !== event.giverPlanetId) return false
   if (step.objectiveType !== undefined && step.objectiveType !== event.objectiveType) return false
+  if (step.pinnedAssetRef !== undefined && step.pinnedAssetRef !== event.pinnedAssetRef) {
+    return false
+  }
+  if (step.targetRegion !== undefined && step.targetRegion !== event.region) return false
+  if (step.specialMissionId !== undefined && step.specialMissionId !== event.specialMissionId) {
+    return false
+  }
   return true
 }
 

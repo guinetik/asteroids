@@ -1617,3 +1617,133 @@ describe('objectiveType filter', () => {
     expect(contracts.getInstance('objtype-omitted')?.status).toBe('completed')
   })
 })
+
+import type { ContractMissionType } from '../contractTypes'
+
+describe('matcher full filter set', () => {
+  beforeEach(() => {
+    for (const key of Object.keys(mockStorage)) delete mockStorage[key]
+  })
+
+  function buildContract(stepFilters: {
+    missionType?: ContractMissionType
+    pinnedAssetRef?: string
+    targetRegion?: string
+    specialMissionId?: string
+  }): Contract {
+    const id = `match-${stepFilters.specialMissionId ?? stepFilters.pinnedAssetRef ?? stepFilters.targetRegion ?? 'x'}`
+    return {
+      id,
+      inboxName: 'M',
+      from: 't',
+      sentAt: TEST_DATE,
+      introSubject: 'M',
+      introBody: ['m'],
+      steps: [
+        {
+          kind: 'complete-missions',
+          count: 1,
+          ...stepFilters,
+          subject: 's',
+          flavor: ['f'],
+        },
+      ],
+      completionSubject: 'd',
+      completionBody: ['d'],
+      rewards: [],
+    }
+  }
+
+  function buildSystem(c: Contract) {
+    const messages = new MessageSystem([], emptyMessageStore())
+    const contracts = new ContractSystem([c], messages, inMemoryPersistence())
+    contracts.resetForTests()
+    contracts.offerForTests(c.id)
+    contracts.acceptContract(c.id)
+    return contracts
+  }
+
+  it('advances when specialMissionId matches', () => {
+    const c = buildContract({
+      missionType: 'asteroid',
+      specialMissionId: 'jovian-prospection-hektor-photometry',
+    })
+    const contracts = buildSystem(c)
+    contracts.notifyMissionCompleted({
+      kind: 'asteroid',
+      giverPlanetId: null,
+      giverId: null,
+      targetPlanetId: null,
+      specialMissionId: 'jovian-prospection-hektor-photometry',
+    })
+    expect(contracts.getInstance(c.id)?.status).toBe('completed')
+  })
+
+  it('does NOT advance when specialMissionId differs', () => {
+    const c = buildContract({
+      missionType: 'asteroid',
+      specialMissionId: 'jovian-prospection-hektor-photometry',
+    })
+    const contracts = buildSystem(c)
+    contracts.notifyMissionCompleted({
+      kind: 'asteroid',
+      giverPlanetId: null,
+      giverId: null,
+      targetPlanetId: null,
+      specialMissionId: 'jovian-prospection-saturn-photometry',
+    })
+    expect(contracts.getInstance(c.id)?.status).toBe('active')
+  })
+
+  it('advances when pinnedAssetRef matches', () => {
+    const c = buildContract({ missionType: 'asteroid', pinnedAssetRef: 'hektor' })
+    const contracts = buildSystem(c)
+    contracts.notifyMissionCompleted({
+      kind: 'asteroid',
+      giverPlanetId: null,
+      giverId: null,
+      targetPlanetId: null,
+      pinnedAssetRef: 'hektor',
+    })
+    expect(contracts.getInstance(c.id)?.status).toBe('completed')
+  })
+
+  it('does NOT advance when pinnedAssetRef differs', () => {
+    const c = buildContract({ missionType: 'asteroid', pinnedAssetRef: 'hektor' })
+    const contracts = buildSystem(c)
+    contracts.notifyMissionCompleted({
+      kind: 'asteroid',
+      giverPlanetId: null,
+      giverId: null,
+      targetPlanetId: null,
+      pinnedAssetRef: 'asset-2306-s',
+    })
+    expect(contracts.getInstance(c.id)?.status).toBe('active')
+  })
+
+  it('advances when targetRegion matches event.region', () => {
+    const c = buildContract({ missionType: 'asteroid', targetRegion: 'saturn-trojans' })
+    const contracts = buildSystem(c)
+    contracts.notifyMissionCompleted({
+      kind: 'asteroid',
+      giverPlanetId: null,
+      giverId: null,
+      targetPlanetId: null,
+      region: 'saturn-trojans',
+    })
+    expect(contracts.getInstance(c.id)?.status).toBe('completed')
+  })
+
+  it('does NOT advance when targetRegion differs from event.region', () => {
+    const c = buildContract({ missionType: 'asteroid', targetRegion: 'saturn-trojans' })
+    const contracts = buildSystem(c)
+    contracts.notifyMissionCompleted({
+      kind: 'asteroid',
+      giverPlanetId: null,
+      giverId: null,
+      targetPlanetId: null,
+      region: 'jovian-trojans',
+    })
+    expect(contracts.getInstance(c.id)?.status).toBe('active')
+  })
+})
