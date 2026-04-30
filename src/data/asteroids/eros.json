@@ -47,7 +47,8 @@
     "density": 2670,
     "surfaceGravity": 0.006,
     "rotationPeriod": 5.27,
-    "surfaceTemperature": 248
+    "surfaceTemperature": 248,
+    "meanDiameterKm": 16.84
   },
   "lighting": {
     "sunAzimuth": 135,

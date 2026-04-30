@@ -8,7 +8,7 @@ describe('buildProspectusAssetCard', () => {
     expect(card!.assetRef).toBe('ASSET 2306-J')
     expect(card!.crossRef).toContain('624 HEKTOR')
     expect(card!.region).toMatch(/Jovian Trojans/i)
-    expect(card!.diameterKm).toBeGreaterThan(0)
+    expect(card!.diameterKm).toBe(230)
     expect(card!.composition).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: expect.any(String), percentage: expect.any(Number) }),

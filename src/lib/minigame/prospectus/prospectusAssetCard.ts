@@ -10,12 +10,6 @@ import { getAsteroidById } from '@/lib/asteroids/catalog'
 /** Hardcoded Society ledger ref for Hektor (per spec asset-card section). */
 const HEKTOR_ASSET_REF = 'ASSET 2306-J'
 
-/** Number of meters per kilometer, used for dimension conversion. */
-const METERS_PER_KM = 1000
-
-/** Divisor to compute mean from three axis values. */
-const THREE_AXES = 3
-
 /** Hardcoded recommendation copy — the dramatic beat. */
 const RECOMMENDATION_BODY =
   'Asset is composition-rich and volatiles-positive. Asset is recommended for full extraction queue. Estimated yield value: ~2.8B credits over a 14-month demolition cycle. No habitation. No biological signature. No protected status.'
@@ -38,26 +32,12 @@ export interface ProspectusAssetCard {
   region: string
   /** Composition class string (e.g. `'D-type · contact binary'`). */
   classLabel: string
-  /** Mean diameter in km, derived from the catalog's shape dimensions semi-axes. */
+  /** Mean diameter in km (real-world IAU value, not in-game geometry). */
   diameterKm: number
   /** Composition rows for the photometry/DAN summary text. */
   composition: ProspectusCompositionRow[]
   /** Fixed recommendation flavor body. */
   recommendation: string
-}
-
-/**
- * Compute mean diameter in km from the asteroid's shape dimension semi-axes.
- *
- * The catalog stores dimensions as `[x, y, z]` semi-axes in meters.
- * Mean diameter = 2 * (mean of the three semi-axes) / METERS_PER_KM.
- *
- * @param dimensions - Semi-axes tuple `[x, y, z]` in meters.
- * @returns Mean diameter in km.
- */
-function computeMeanDiameterKm(dimensions: [number, number, number]): number {
-  const meanSemiAxisM = (dimensions[0] + dimensions[1] + dimensions[2]) / THREE_AXES
-  return (meanSemiAxisM * 2) / METERS_PER_KM
 }
 
 /**
@@ -75,7 +55,7 @@ export function buildProspectusAssetCard(bodyId: string): ProspectusAssetCard | 
     crossRef: `Cross-ref: ${def.designation.toUpperCase()} (L4)`,
     region: 'Jovian Trojans · L4 leading cluster',
     classLabel: 'D-type · contact binary',
-    diameterKm: computeMeanDiameterKm(def.shape.dimensions),
+    diameterKm: def.physical.meanDiameterKm,
     composition: def.composition.map((c) => ({ name: c.name, percentage: c.percentage })),
     recommendation: RECOMMENDATION_BODY,
   }

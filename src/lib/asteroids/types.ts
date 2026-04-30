@@ -201,6 +201,17 @@ export interface PhysicalProperties {
   rotationPeriod: number
   /** Average surface temperature in Kelvin. 110K (icy) to 450K (volcanic). */
   surfaceTemperature: number
+  /**
+   * Real-world mean diameter in kilometres as published by the IAU / NASA
+   * small-body database. This is the astronomical figure and is intentionally
+   * distinct from `shape.dimensions`, which encodes the in-game gameplay
+   * geometry (typically scaled down ~10× relative to reality for the larger
+   * bodies). Used for UI display — e.g. the Jovian Prospectus asset card.
+   *
+   * @example 230   // 624 Hektor
+   * @example 0.33  // 25143 Itokawa (330 m)
+   */
+  meanDiameterKm: number
 }
 
 /** Complete asteroid definition as loaded from a JSON data file. */
