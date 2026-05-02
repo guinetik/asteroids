@@ -672,13 +672,16 @@
             this.lastFireTime = -Infinity;
             this.score = 0;
             this.invulnerableUntil = 0;
+            this.destination = null;
+            this.exitStartTime = 0;
+            this.shipAlpha = 1;
+            this.fallingStartTime = performance.now();
 
             this._boundKeyDown = this._handleKeyDown.bind(this);
             this._boundKeyUp = this._handleKeyUp.bind(this);
           }
 
           ready() {
-            // No falling beat yet — show PLAY as soon as the host is ready.
             this.readyPending = true;
             this.playBtn.style.display = 'block';
           }
@@ -933,6 +936,7 @@
           _updateBulletAsteroidCollisions() {
             for (let bi = this.bullets.length - 1; bi >= 0; bi--) {
               const b = this.bullets[bi];
+              let consumed = false;
               for (let ai = this.asteroids.length - 1; ai >= 0; ai--) {
                 const a = this.asteroids[ai];
                 const dx = a.x - b.x;
@@ -941,10 +945,78 @@
                   this.score += ShuttleGame.SCORE[a.size];
                   this._splitAsteroid(a);
                   this.asteroids.splice(ai, 1);
-                  this.bullets.splice(bi, 1);
+                  consumed = true;
                   break;
                 }
               }
+              if (!consumed && this.destination) {
+                const dx = this.destination.x - b.x;
+                const dy = this.destination.y - b.y;
+                if (dx * dx + dy * dy <= this.destination.radius * this.destination.radius) {
+                  for (let k = 0; k < 4; k++) {
+                    this.particles.push({
+                      x: b.x, y: b.y,
+                      vx: (Math.random() - 0.5) * 120,
+                      vy: (Math.random() - 0.5) * 120,
+                      life: ShuttleGame.PARTICLE_LIFE_S * 0.5,
+                    });
+                  }
+                  consumed = true;
+                }
+              }
+              if (consumed) this.bullets.splice(bi, 1);
+            }
+          }
+
+          _tryEnterFinale() {
+            if (this.state !== 'cruising') return;
+            if (!this.readyPending) return;
+            if (performance.now() - this.fallingStartTime < ShuttleGame.MIN_RUN_MS) return;
+            this.state = 'finale';
+            const radius = ShuttleGame.DESTINATION_RADIUS;
+            this.destination = {
+              x: this.width / 2,
+              y: -radius - 20,
+              vy: ShuttleGame.DESTINATION_DRIFT_SPEED,
+              radius,
+              settledAt: 0,
+            };
+          }
+
+          _updateFinale(deltaSec) {
+            if (this.state !== 'finale') return;
+            const targetY = this.height * ShuttleGame.DESTINATION_TARGET_Y_RATIO;
+            if (this.destination.y < targetY) {
+              this.destination.y += this.destination.vy * deltaSec;
+              if (this.destination.y >= targetY) {
+                this.destination.y = targetY;
+                this.destination.settledAt = this.elapsed;
+              }
+            } else if (
+              this.destination.settledAt > 0 &&
+              this.elapsed - this.destination.settledAt >= ShuttleGame.DESTINATION_LINGER_MS
+            ) {
+              this.state = 'exit';
+              this.exitStartTime = this.elapsed;
+              this.shipVX = 0;
+              this.shipVY = 0;
+            }
+          }
+
+          _updateExit(deltaSec) {
+            if (this.state !== 'exit') return;
+            this.shipVY -= ShuttleGame.EXIT_ACCEL * deltaSec;
+            this.shipVY = Math.max(-ShuttleGame.EXIT_MAX_SPEED, this.shipVY);
+            this.shipY += this.shipVY * deltaSec;
+            if (this.destination) {
+              const dx = this.destination.x - this.shipX;
+              this.shipX += Math.sign(dx) * Math.min(Math.abs(dx), ShuttleGame.EXIT_MAX_SPEED * deltaSec * 0.5);
+            }
+            const t = Math.min(1, (this.elapsed - this.exitStartTime) / ShuttleGame.EXIT_FADE_MS);
+            this.shipAlpha = 1 - t;
+            if (this.shipAlpha <= 0 || this.shipY < -ShuttleGame.SHIP_EDGE_INSET) {
+              this.stop();
+              window.dispatchEvent(new Event('prelude-play'));
             }
           }
 
@@ -985,11 +1057,37 @@
             this.elapsed += dt;
             const deltaSec = dt / 1000;
             this._updateStarfield(deltaSec);
-            this._updateShuttle(deltaSec);
+            if (this.state !== 'exit') this._updateShuttle(deltaSec);
             this._updateAsteroids(deltaSec);
             this._updateBullets(deltaSec);
             this._updateBulletAsteroidCollisions();
             this._updateShuttleAsteroidCollisions();
+            this._tryEnterFinale();
+            this._updateFinale(deltaSec);
+            this._updateExit(deltaSec);
+          }
+
+          _drawDestination() {
+            if (!this.destination) return;
+            const ctx = this.ctx;
+            const pulse = 0.6 + 0.4 * Math.sin(this.elapsed / 250);
+            ctx.save();
+            ctx.translate(this.destination.x, this.destination.y);
+            ctx.strokeStyle = `rgba(255,255,255,${pulse})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            const verts = 16;
+            for (let i = 0; i < verts; i++) {
+              const angle = (i / verts) * Math.PI * 2;
+              const r = this.destination.radius * (0.92 + 0.08 * Math.sin(angle * 3));
+              const px = Math.cos(angle) * r;
+              const py = Math.sin(angle) * r;
+              if (i === 0) ctx.moveTo(px, py);
+              else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.stroke();
+            ctx.restore();
           }
 
           _draw() {
@@ -1007,7 +1105,10 @@
             ctx.fillStyle = '#ffffff';
             ctx.font = '16px monospace';
             ctx.textAlign = 'left';
-            ctx.fillText('TRAVELLING TO MISSION DESTINATION', 20, 30);
+            const headerText = (this.state === 'finale' || this.state === 'exit')
+              ? 'DESTINATION REACHED'
+              : 'TRAVELLING TO MISSION DESTINATION';
+            ctx.fillText(headerText, 20, 30);
             ctx.textAlign = 'right';
             ctx.fillText(`SCORE ${this.score.toString().padStart(5, '0')}`, this.width - 20, 30);
 
@@ -1018,6 +1119,7 @@
             }
             ctx.globalAlpha = 1.0;
 
+            this._drawDestination();
             this._drawAsteroids();
 
             ctx.fillStyle = '#ffffff';
@@ -1032,7 +1134,7 @@
             const blinkAlpha = this._isInvulnerable()
               ? (Math.floor(this.elapsed / ShuttleGame.BLINK_PERIOD_MS) % 2 === 0 ? 0.3 : 0.8)
               : 1.0;
-            ctx.globalAlpha = blinkAlpha;
+            ctx.globalAlpha = blinkAlpha * this.shipAlpha;
             ctx.save();
             ctx.translate(this.shipX, this.shipY);
             ctx.scale(scale, scale);
@@ -1080,6 +1182,14 @@
         ShuttleGame.RESPAWN_BLINK_MS = 1500;
         ShuttleGame.RESPAWN_CLEAR_RADIUS = 110;
         ShuttleGame.BLINK_PERIOD_MS = 120;
+        ShuttleGame.MIN_RUN_MS = 4500;
+        ShuttleGame.DESTINATION_RADIUS = 110;
+        ShuttleGame.DESTINATION_TARGET_Y_RATIO = 0.45;
+        ShuttleGame.DESTINATION_DRIFT_SPEED = 50;
+        ShuttleGame.DESTINATION_LINGER_MS = 2000;
+        ShuttleGame.EXIT_ACCEL = 800;
+        ShuttleGame.EXIT_MAX_SPEED = 900;
+        ShuttleGame.EXIT_FADE_MS = 900;
         // Source-space bbox of the shuttle paths AFTER per-part transform-origin
         // pivots are applied. Pulled from the SVG bounds; close enough for centering.
         ShuttleGame.SOURCE_BBOX_MIN_X = -2;
