@@ -24,6 +24,7 @@ describe('audioManifest', () => {
       'sfx.upgrade.install',
       'sfx.ui.shuttleprogram.click',
       'sfx.inbox',
+      'sfx.tracker',
       'sfx.contract',
       'sfx.money',
       'sfx.knob',

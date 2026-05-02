@@ -53,6 +53,8 @@ const SHUTTLE_PROGRAM_CLICK_VOLUME = 0.6
 const KNOB_VOLUME = 0.45
 /** Volume for inbox message arrival ping. */
 const INBOX_VOLUME = 0.7
+/** Volume for in-level tracker message arrival ping. */
+const TRACKER_VOLUME = 0.62
 /** Volume for contract-update arrival ping (paired with {@link INBOX_VOLUME} — distinct channel, same level by default). */
 const CONTRACT_VOLUME = 0.7
 /** Volume for the credits-awarded chime fired on every contract step payout. */
@@ -200,6 +202,13 @@ export class UiAudioDirector {
    */
   notifyInboxMessage(): void {
     this.audio.play('sfx.inbox', { volume: INBOX_VOLUME })
+  }
+
+  /**
+   * A new in-level tracker message arrived in the lander or FPS visor.
+   */
+  notifyTrackerMessage(): void {
+    this.audio.play('sfx.tracker', { volume: TRACKER_VOLUME })
   }
 
   /**

@@ -1,10 +1,17 @@
 <!-- src/components/MissionTipMarquee.vue -->
 <script setup lang="ts">
+import { onMounted } from 'vue'
+import { uiAudio } from '@/audio/UiAudioDirector'
 import type { MissionTipTransmission } from '@/lib/level/missionTips'
+import ScrambleText from '@/components/shuttle-control/ScrambleText.vue'
 
 defineProps<{
   transmission: MissionTipTransmission
 }>()
+
+onMounted(() => {
+  uiAudio.notifyTrackerMessage()
+})
 </script>
 
 <template>
@@ -26,7 +33,12 @@ defineProps<{
       </div>
       <p class="mission-tip__message">
         <span class="mission-tip__speaker">{{ transmission.speaker }}:</span>
-        {{ transmission.message }}
+        <ScrambleText
+          :text="transmission.message"
+          :speed="24"
+          :scramble-frames="7"
+          :stagger="1"
+        />
       </p>
     </div>
   </aside>

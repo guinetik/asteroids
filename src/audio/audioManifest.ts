@@ -36,6 +36,7 @@ export const AUDIO_SOUND_IDS = [
   'sfx.upgrade.install',
   'sfx.ui.shuttleprogram.click',
   'sfx.inbox',
+  'sfx.tracker',
   'sfx.contract',
   'sfx.money',
   'sfx.knob',
@@ -267,6 +268,15 @@ const manifestById: ManifestById = {
     load: 'lazy',
     playback: 'single-instance',
     volume: 0.7,
+    effect: 'none',
+  },
+  'sfx.tracker': {
+    id: 'sfx.tracker',
+    src: '/sound/sfx.tracker.mp3',
+    category: 'ui',
+    load: 'lazy',
+    playback: 'restart',
+    volume: 0.62,
     effect: 'none',
   },
   'sfx.contract': {
