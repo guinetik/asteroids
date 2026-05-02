@@ -53,11 +53,14 @@ export interface AsteroidRockDistributionOptions {
 
 const REFERENCE_WORLD_SIZE = 8000
 const EDGE_MARGIN_FRACTION = 0.08
-const MIN_DIAMETER = 1.6
+/** Smallest plausible surface boulder (world units); below this FPS mining reads as gravel. */
+const MIN_DIAMETER = 2.35
 const MAX_DIAMETER = 12.5
 const LARGE_BOULDER_DIAMETER = 22
-const MIN_ROCKS = 170
-const MAX_ROCKS = 680
+/** Rock count when `targetRockCount` interpolation hits its sparse extreme (`densityT === 0`). */
+const MIN_ROCKS = 200
+/** Rock count when `targetRockCount` interpolation hits its dense extreme (`densityT === 1`). */
+const MAX_ROCKS = 785
 const MIN_SPACING_FACTOR = 0.58
 const MAX_ATTEMPTS_FACTOR = 12
 const MIN_BURIAL_FRACTION = 0.14
