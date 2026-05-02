@@ -17,6 +17,14 @@ import partsJson from '@/data/multitool/identified-parts.json'
 import { getAudioDefinition } from '@/audio/audioManifest'
 import { useAudio } from '@/audio/useAudio'
 import { worldPointToHearing } from '@/lib/audio/worldHearing'
+import { loadProfile } from '@/lib/player/profile'
+import {
+  applyMultitoolPaintMaterials,
+  applyMultitoolPaintMaterialsFromProfile,
+  cloneAndCollectMultitoolPaintMaterials,
+  type MultitoolPaintMaterialTarget,
+} from '@/three/cosmetics/multitoolPaintMaterials'
+import type { PlayerProfile } from '@/lib/player/types'
 
 const MODEL_PATH = '/models/multitool.glb'
 
@@ -76,6 +84,7 @@ export class MultiToolController implements Tickable {
   private model: THREE.Group | null = null
   private camera: THREE.PerspectiveCamera | null = null
   private readonly ledMeshes: THREE.Mesh[] = []
+  private readonly paintMaterials: MultitoolPaintMaterialTarget[] = []
   private readonly powerIndicators: {
     node: THREE.Object3D
     cylinder: THREE.Mesh
@@ -124,6 +133,8 @@ export class MultiToolController implements Tickable {
     this.scene = scene
     this.model = await loadGLB(MODEL_PATH)
     this.model.scale.setScalar(MODEL_SCALE)
+    this.paintMaterials.push(...cloneAndCollectMultitoolPaintMaterials(this.model))
+    this.applySavedMultitoolPaintjob()
     this.model.traverse((child) => {
       child.frustumCulled = false
       if (child instanceof THREE.Mesh && LED_NODE_NAMES.includes(child.name)) {
@@ -161,6 +172,24 @@ export class MultiToolController implements Tickable {
     this.model.traverse((child) => {
       child.layers.set(FPS_VIEWMODEL_LAYER)
     })
+  }
+
+  /**
+   * Apply the active multitool paint row from a profile snapshot.
+   *
+   * @param profile - Player profile carrying active cosmetics.
+   */
+  applyMultitoolPaintjobFromProfile(profile: PlayerProfile): void {
+    applyMultitoolPaintMaterialsFromProfile(this.paintMaterials, profile)
+  }
+
+  /**
+   * Apply a multitool paint catalog option directly.
+   *
+   * @param optionId - `multitool-paintjob` catalog row id.
+   */
+  applyMultitoolPaintjob(optionId: string): void {
+    applyMultitoolPaintMaterials(this.paintMaterials, optionId)
   }
 
   /** Show or hide the multi-tool model. */
@@ -390,6 +419,14 @@ export class MultiToolController implements Tickable {
     if (this.model) {
       this.model.parent?.remove(this.model)
     }
+    this.paintMaterials.length = 0
+  }
+
+  private applySavedMultitoolPaintjob(): void {
+    if (typeof localStorage === 'undefined') return
+    const profile = loadProfile()
+    if (!profile) return
+    this.applyMultitoolPaintjobFromProfile(profile)
   }
 
   private stopDrillAudio(): void {

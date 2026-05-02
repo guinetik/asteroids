@@ -33,6 +33,14 @@ import {
   LANDER_COLLISION_TOP_OFFSET,
 } from '@/three/landerDimensions'
 import * as THREE from 'three' // already imported above, but ensure for Color
+import {
+  applyLanderPaintMaterials,
+  applyLanderPaintMaterialsFromProfile,
+  collectLanderPaintMaterial,
+  getLanderPaintChannelForObjectName,
+  type LanderPaintMaterialTarget,
+} from '@/three/cosmetics/landerPaintMaterials'
+import type { PlayerProfile } from '@/lib/player/types'
 
 import { applyBunkerMeshStandardSpecularSoften } from '@/three/bunker/bunkerMeshStandardSpecularSoften'
 
@@ -501,6 +509,8 @@ export class LanderController implements Tickable {
   private feedbackTimer = 0
   /** Cloned hull materials that support temporary green emissive feedback. */
   private readonly feedbackMaterials: THREE.MeshStandardMaterial[] = []
+  /** Cloned material targets that can receive a cosmetic lander paintjob. */
+  private readonly paintMaterials: LanderPaintMaterialTarget[] = []
 
   constructor(inputManager: InputManager) {
     this.inputManager = inputManager
@@ -601,12 +611,22 @@ export class LanderController implements Tickable {
       // Store engine mesh for emissive glow when firing
       // Clone the material so we don't affect other meshes sharing it
       if (engineNode instanceof THREE.Mesh) {
-        engineNode.material = (engineNode.material as THREE.Material).clone()
+        const cloned = (engineNode.material as THREE.Material).clone()
+        engineNode.material = cloned
+        const paintChannel = getLanderPaintChannelForObjectName(engineNode.name)
+        if (paintChannel) {
+          collectLanderPaintMaterial(cloned, paintChannel, this.paintMaterials)
+        }
         this.engineMesh = engineNode
       } else {
         engineNode.traverse((child) => {
           if (child instanceof THREE.Mesh && !this.engineMesh) {
-            child.material = (child.material as THREE.Material).clone()
+            const cloned = (child.material as THREE.Material).clone()
+            child.material = cloned
+            const paintChannel = getLanderPaintChannelForObjectName(child.name)
+            if (paintChannel) {
+              collectLanderPaintMaterial(cloned, paintChannel, this.paintMaterials)
+            }
             this.engineMesh = child
           }
         })
@@ -624,6 +644,7 @@ export class LanderController implements Tickable {
         )
       }
     }
+    this.applySavedLanderPaintjob()
   }
 
   /** Apply damage to the lander. Fires onDeath when HP reaches 0. */
@@ -678,6 +699,24 @@ export class LanderController implements Tickable {
       mat.emissive.copy(c)
       mat.emissiveIntensity = HEAL_PULSE_PEAK_INTENSITY
     }
+  }
+
+  /**
+   * Apply the active lander paint row from a profile snapshot.
+   *
+   * @param profile - Player profile carrying active cosmetics.
+   */
+  applyLanderPaintjobFromProfile(profile: PlayerProfile): void {
+    applyLanderPaintMaterialsFromProfile(this.paintMaterials, profile)
+  }
+
+  /**
+   * Apply a lander paint catalog option directly.
+   *
+   * @param optionId - `lander-paintjob` catalog row id.
+   */
+  applyLanderPaintjob(optionId: string): void {
+    applyLanderPaintMaterials(this.paintMaterials, optionId)
   }
 
   private notifyHullHpChangedIfNeeded(previousHp: number): void {
@@ -1045,6 +1084,7 @@ export class LanderController implements Tickable {
     }
     this.topWarningBeacon.dispose()
     this.feedbackMaterials.length = 0
+    this.paintMaterials.length = 0
     this.group.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         if (this.topWarningBeacon.meshes.includes(child)) return
@@ -1526,10 +1566,12 @@ export class LanderController implements Tickable {
     // Clone materials for per-instance heal feedback pulse (green emissive, matches HostageModel).
     // Tuned + softened hull lives on clones only — the GLB originals are superseded below.
     this.feedbackMaterials.length = 0
+    this.paintMaterials.length = 0
     scene.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return
       const originalMats = Array.isArray(child.material) ? child.material : [child.material]
       const clonedMats: THREE.Material[] = []
+      const paintChannel = getLanderPaintChannelForObjectName(child.name)
       for (const m of originalMats) {
         if (m instanceof THREE.MeshStandardMaterial) {
           const cloned = m.clone()
@@ -1543,6 +1585,9 @@ export class LanderController implements Tickable {
           cloned.needsUpdate = true
           clonedMats.push(cloned)
           this.feedbackMaterials.push(cloned)
+          if (paintChannel) {
+            collectLanderPaintMaterial(cloned, paintChannel, this.paintMaterials)
+          }
         } else {
           clonedMats.push(m)
         }
@@ -1553,6 +1598,13 @@ export class LanderController implements Tickable {
         child.material = clonedMats[0]
       }
     })
+  }
+
+  private applySavedLanderPaintjob(): void {
+    if (typeof localStorage === 'undefined') return
+    const profile = loadProfile()
+    if (!profile) return
+    this.applyLanderPaintjobFromProfile(profile)
   }
 
   private findNode(root: THREE.Object3D, name: string): THREE.Object3D | null {

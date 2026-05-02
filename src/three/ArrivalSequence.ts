@@ -13,6 +13,12 @@ import { loadGLB } from './loadGLB'
 import { FuelTank } from './FuelTank'
 import { HabitatModule } from './HabitatModule'
 import { useAudio } from '@/audio/useAudio'
+import { loadProfile } from '@/lib/player/profile'
+import {
+  applyShuttlePaintMaterialsFromProfile,
+  cloneAndCollectShuttlePaintMaterials,
+  type ShuttlePaintMaterialTarget,
+} from '@/three/cosmetics/shuttlePaintMaterials'
 
 const SHUTTLE_MODEL_PATH = '/models/shuttle.glb'
 const LANDER_MODEL_PATH = '/models/lander.glb'
@@ -218,6 +224,7 @@ export class ArrivalSequence {
   private doorPortClosedRotX = 0
   private doorStbClosedRotX = 0
   private doorProgress = 0
+  private readonly shuttlePaintMaterials: ShuttlePaintMaterialTarget[] = []
   private landerModel: THREE.Object3D | null = null
   private landerDetached = false
   private landerWorldPos = new THREE.Vector3()
@@ -283,6 +290,8 @@ export class ArrivalSequence {
     this.shuttleScene = await loadGLB(SHUTTLE_MODEL_PATH)
     this.shuttleScene.scale.setScalar(MODEL_SCALE)
     this.shuttleScene.rotation.x = MODEL_ROTATION_X
+    this.shuttlePaintMaterials.push(...cloneAndCollectShuttlePaintMaterials(this.shuttleScene))
+    this.applySavedShuttlePaintjob()
     this.shuttleGroup.add(this.shuttleScene)
     this.shuttleScene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
@@ -451,6 +460,14 @@ export class ArrivalSequence {
         this.tickFadeout()
         break
     }
+  }
+
+  /** Apply the saved shuttle paintjob to the arrival sequence shuttle model. */
+  private applySavedShuttlePaintjob(): void {
+    if (typeof localStorage === 'undefined') return
+    const profile = loadProfile()
+    if (!profile) return
+    applyShuttlePaintMaterialsFromProfile(this.shuttlePaintMaterials, profile)
   }
 
   /**

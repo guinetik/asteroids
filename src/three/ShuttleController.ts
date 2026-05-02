@@ -24,6 +24,14 @@ import {
   getCurrentShuttleSlingshotCruiseSpeedMultiplier,
   getCurrentUpgradeValue,
 } from '@/lib/upgrades'
+import { findCosmeticOptionById } from '@/lib/cosmetics/catalog'
+import { getPlayerCosmetics } from '@/lib/cosmetics/profileCosmetics'
+import type { PlayerProfile } from '@/lib/player/types'
+import {
+  applyLanderPaintMaterialsFromProfile,
+  cloneAndCollectLanderPaintMaterials,
+  type LanderPaintMaterialTarget,
+} from '@/three/cosmetics/landerPaintMaterials'
 /** Any object that can exert gravity on the shuttle */
 export interface GravityWell {
   getGravityAt(position: THREE.Vector3): THREE.Vector3
@@ -158,6 +166,46 @@ const SHUTTLE_HULL_PHONG_SPECULAR_SCALE = 0.12
  * threshold when the turret camera is mounted on the nose and yawed back at the hull.
  */
 const SHUTTLE_HULL_COLOR_SCALE = 0.7
+const SHUTTLE_PAINT_PRIMARY_MATERIALS = new Set([
+  'wingtop',
+  'wing flap top',
+  'nose top',
+  'side stb',
+  'side prt',
+  'OMS pod stb',
+  'OMS pod prt',
+  'tail',
+  'shut-doors-top',
+  'shut-doors-side',
+])
+const SHUTTLE_PAINT_SECONDARY_MATERIALS = new Set([
+  'belly',
+  'belly flap',
+  'fusolage aft eng',
+  'OMS pod prt back',
+  'OMS pod stb back',
+  'RCS aft stb',
+  'RCS aft prt',
+])
+const SHUTTLE_PAINT_TRIM_MATERIALS = new Set([
+  'nose tip',
+  'bay prt wedges',
+  'bay stb wedges',
+  'bay prt edges',
+  'bay stb edges',
+  'doors edge',
+  'cockpit side',
+])
+const SHUTTLE_PAINT_ACCENT_MATERIALS = new Set([
+  'shut-handrails',
+  'arrows top',
+  'shut-cam-cargo',
+  'bay prt evarail',
+  'bay stb evarail',
+  'bay prt doorlatc',
+  'bay stb doorlatc',
+])
+const SHUTTLE_PAINT_COLOR_STRENGTH = 0.88
 
 /**
  * Controls the shuttle model — loading, door animation, movement, and nozzle placement.
@@ -313,6 +361,8 @@ export class ShuttleController implements Tickable, PortalVehicle {
   private readonly hullNodes: THREE.Object3D[] = []
   /** Hull-only materials for the green science-heal emissive pulse (map EVA). */
   private readonly hullHealFeedbackMaterials: THREE.MeshStandardMaterial[] = []
+  private readonly paintableMaterialBaseColors = new Map<THREE.Material, THREE.Color>()
+  private cargoLanderPaintMaterials: LanderPaintMaterialTarget[] = []
   private hullHealFeedbackTimer = 0
   private landerFuelTank: FuelTank | null = null
   private shuttleFuelTank: FuelTank | null = null
@@ -360,6 +410,8 @@ export class ShuttleController implements Tickable, PortalVehicle {
     gltf.scene.scale.setScalar(MODEL_SCALE)
     gltf.scene.rotation.x = MODEL_ROTATION_X
     this.tuneHullMaterials(gltf.scene)
+    this.preparePaintableMaterials(gltf.scene)
+    this.applySavedShuttlePaintjob()
     this.group.add(gltf.scene)
 
     // Find door nodes for programmatic animation
@@ -440,6 +492,8 @@ export class ShuttleController implements Tickable, PortalVehicle {
     landerScene.scale.setScalar(CARGO_LANDER_SCALE)
     landerScene.position.copy(CARGO_LANDER_OFFSET)
     landerScene.rotation.set(0, 0, -Math.PI / 2)
+    this.cargoLanderPaintMaterials = cloneAndCollectLanderPaintMaterials(landerScene)
+    this.applySavedLanderPaintjob()
     gltf.scene.add(landerScene)
 
     dracoLoader.dispose()
@@ -482,6 +536,56 @@ export class ShuttleController implements Tickable, PortalVehicle {
 
   get position(): THREE.Vector3 {
     return this.group.position
+  }
+
+  /**
+   * Apply the active shuttle paint row from a profile snapshot.
+   *
+   * @param profile - Player profile carrying active cosmetics.
+   */
+  applyShuttlePaintjobFromProfile(profile: PlayerProfile): void {
+    const optionId = getPlayerCosmetics(profile).shuttlePaintjobId
+    this.applyShuttlePaintjob(optionId)
+  }
+
+  /**
+   * Apply a shuttle paint catalog option directly.
+   *
+   * @param optionId - `shuttle-paintjob` catalog row id.
+   */
+  applyShuttlePaintjob(optionId: string): void {
+    const option = findCosmeticOptionById(optionId)
+    if (!option || option.category !== 'shuttle-paintjob') return
+    const primary = new THREE.Color(option.gradientStops[0] ?? '#ffffff')
+    const secondary = new THREE.Color(
+      option.gradientStops[1] ?? option.gradientStops[0] ?? '#ffffff',
+    )
+    const trim = new THREE.Color(
+      option.gradientStops[2] ?? option.gradientStops[1] ?? option.gradientStops[0] ?? '#ffffff',
+    )
+    const accent = new THREE.Color(
+      option.gradientStops[2] ?? option.gradientStops[1] ?? option.gradientStops[0] ?? '#ffffff',
+    )
+
+    for (const [material, baseColor] of this.paintableMaterialBaseColors) {
+      const zoneColor = this.getPaintColorForMaterialName(material.name, {
+        primary,
+        secondary,
+        trim,
+        accent,
+      })
+      if (!zoneColor) continue
+      this.applyMaterialPaintColor(material, baseColor, zoneColor)
+    }
+  }
+
+  /**
+   * Apply the active lander paint row to the cargo-bay lander from a profile snapshot.
+   *
+   * @param profile - Player profile carrying active cosmetics.
+   */
+  applyLanderPaintjobFromProfile(profile: PlayerProfile): void {
+    applyLanderPaintMaterialsFromProfile(this.cargoLanderPaintMaterials, profile)
   }
 
   get isThrusting(): boolean {
@@ -1002,6 +1106,95 @@ export class ShuttleController implements Tickable, PortalVehicle {
         }
       })
     }
+  }
+
+  private applySavedShuttlePaintjob(): void {
+    if (typeof localStorage === 'undefined') return
+    const profile = loadProfile()
+    if (!profile) return
+    this.applyShuttlePaintjobFromProfile(profile)
+  }
+
+  private applySavedLanderPaintjob(): void {
+    if (typeof localStorage === 'undefined') return
+    const profile = loadProfile()
+    if (!profile) return
+    this.applyLanderPaintjobFromProfile(profile)
+  }
+
+  private preparePaintableMaterials(root: THREE.Object3D): void {
+    this.paintableMaterialBaseColors.clear()
+    root.traverse((child) => {
+      if (!(child instanceof THREE.Mesh) || !child.material) return
+
+      if (Array.isArray(child.material)) {
+        child.material = child.material.map((material) => this.preparePaintableMaterial(material))
+        return
+      }
+      child.material = this.preparePaintableMaterial(child.material)
+    })
+  }
+
+  private preparePaintableMaterial(material: THREE.Material): THREE.Material {
+    if (!this.getPaintChannelForMaterialName(material.name)) return material
+    const cloned = material.clone()
+    const baseColor = this.getMaterialColor(cloned)
+    if (baseColor) {
+      this.paintableMaterialBaseColors.set(cloned, baseColor.clone())
+    }
+    return cloned
+  }
+
+  private getPaintChannelForMaterialName(
+    materialName: string,
+  ): 'primary' | 'secondary' | 'trim' | 'accent' | null {
+    if (SHUTTLE_PAINT_PRIMARY_MATERIALS.has(materialName)) return 'primary'
+    if (SHUTTLE_PAINT_SECONDARY_MATERIALS.has(materialName)) return 'secondary'
+    if (SHUTTLE_PAINT_TRIM_MATERIALS.has(materialName)) return 'trim'
+    if (SHUTTLE_PAINT_ACCENT_MATERIALS.has(materialName)) return 'accent'
+    return null
+  }
+
+  private getPaintColorForMaterialName(
+    materialName: string,
+    colors: {
+      primary: THREE.Color
+      secondary: THREE.Color
+      trim: THREE.Color
+      accent: THREE.Color
+    },
+  ): THREE.Color | null {
+    const channel = this.getPaintChannelForMaterialName(materialName)
+    return channel ? colors[channel] : null
+  }
+
+  private getMaterialColor(material: THREE.Material): THREE.Color | null {
+    if (
+      material instanceof THREE.MeshStandardMaterial ||
+      material instanceof THREE.MeshPhysicalMaterial ||
+      material instanceof THREE.MeshPhongMaterial ||
+      material instanceof THREE.MeshLambertMaterial ||
+      material instanceof THREE.MeshBasicMaterial
+    ) {
+      return material.color
+    }
+    return null
+  }
+
+  private applyMaterialPaintColor(
+    material: THREE.Material,
+    baseColor: THREE.Color,
+    paintColor: THREE.Color,
+  ): void {
+    const materialColor = this.getMaterialColor(material)
+    if (!materialColor) return
+    materialColor
+      .copy(baseColor)
+      .lerp(
+        baseColor.clone().multiply(paintColor).multiplyScalar(1 / SHUTTLE_HULL_COLOR_SCALE),
+        SHUTTLE_PAINT_COLOR_STRENGTH,
+      )
+    material.needsUpdate = true
   }
 
   /**
