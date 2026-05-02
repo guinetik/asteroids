@@ -58,7 +58,9 @@ function ensureUnlockListeners(): void {
 
   const unlockAndReplay = (): void => {
     audio.unlock()
-    if (!currentHandle || !currentHandle.playing()) {
+    // Do not replay when a handle already exists — Howler may still be decoding (`playing()`
+    // is false during load); replay would stop/restart and flood duplicate XHR loads.
+    if (!currentHandle) {
       replayCurrentSceneTrack()
     }
   }
@@ -87,10 +89,15 @@ export function playBackgroundMusic(
     nextLevelMusicId = options.levelTrackSoundId
   }
 
+  /**
+   * One bed per scene: avoid stop/play while decode is still in flight. `{@link AudioPlaybackHandle.playing}`
+   * is often false until Howler buffers the mp3, which was spawning overlapping loads of large level loops.
+   */
   const redundantContinuance =
     activeScene === scene &&
-    currentHandle?.playing() &&
-    (scene !== 'level' || nextLevelMusicId === activeLevelMusicSoundId)
+    currentHandle !== null &&
+    (scene === 'map' ||
+      (scene === 'level' && nextLevelMusicId === activeLevelMusicSoundId))
 
   if (redundantContinuance) {
     return
