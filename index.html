@@ -628,8 +628,13 @@
         // Shuttle prelude — used while the host is loading the /level route.
         // For now, just draws the shuttle SVG centered with a gentle bob — no gameplay yet.
         class ShuttleGame extends PreludeGame {
-          constructor(elements) {
+          constructor(elements, mode = 'outbound') {
             super(elements);
+
+            // 'outbound' = travelling to a mission (full finale with the
+            // big asteroid). 'return' = coming back from /level (no
+            // asteroid finale; just shoot rocks until the map's ready).
+            this.mode = mode;
 
             // Three layers from docs/inspo/shuttle.svg. Each path in the source SVG
             // carries the SAME rotation matrix (~48°) but a DIFFERENT transform-origin,
@@ -964,6 +969,17 @@
             if (this.state !== 'cruising') return;
             if (!this.readyPending) return;
             if (performance.now() - this.fallingStartTime < ShuttleGame.MIN_RUN_MS) return;
+            this.keys.left = false;
+            this.keys.right = false;
+            this.keys.fire = false;
+            // Return-from-mission flow has no destination asteroid — once
+            // the map is ready, just freeze the field and exit upward.
+            if (this.mode === 'return') {
+              this.state = 'exit';
+              this.exitStartTime = this.elapsed;
+              this.bgScale = 0;
+              return;
+            }
             this.state = 'finale';
             this.finaleStartTime = this.elapsed;
             const radius = Math.max(this.width, this.height) * ShuttleGame.DESTINATION_RADIUS_SCALE;
@@ -975,9 +991,6 @@
               radius,
               settledAt: 0,
             };
-            this.keys.left = false;
-            this.keys.right = false;
-            this.keys.fire = false;
           }
 
           _updateFinale(deltaSec) {
@@ -1117,9 +1130,11 @@
             ctx.fillStyle = '#ffffff';
             ctx.font = '16px monospace';
             ctx.textAlign = 'left';
-            const headerText = (this.state === 'finale' || this.state === 'exit')
-              ? 'DESTINATION REACHED'
-              : 'TRAVELLING TO MISSION DESTINATION';
+            const headerText = this.mode === 'return'
+              ? 'RETURNING FROM MISSION'
+              : (this.state === 'finale' || this.state === 'exit')
+                ? 'DESTINATION REACHED'
+                : 'TRAVELLING TO MISSION DESTINATION';
             ctx.fillText(headerText, 20, 30);
             if (this.state === 'cruising') {
               ctx.font = '12px monospace';
@@ -1233,13 +1248,25 @@
         ShuttleGame.REAR_THRUSTER_SPAWN_CHANCE = 0.9;
         ShuttleGame.REAR_THRUSTER_VY = 220;
 
-        // Route gateway. /level → ShuttleGame, everything else → LanderGame.
-        // We check both pathname and hash so it works whether router is in history
-        // or hash mode (Vue Router default is history, but hash routes still match).
+        // Route gateway. /level → outbound ShuttleGame (full asteroid finale).
+        // /map with a pending mission-return handoff in localStorage →
+        // return-flow ShuttleGame (no big asteroid, "RETURNING FROM MISSION"
+        // header). Everything else → LanderGame.
+        // We check both pathname and hash so it works whether router is in
+        // history or hash mode (Vue Router default is history, but hash
+        // routes still match). The localStorage peek does NOT consume the
+        // key — MapViewController.consumePendingMapReturnWorld() owns that.
         function isLevelRoute() {
           const path = window.location.pathname || '';
           const hash = window.location.hash || '';
           return path.includes('/level') || hash.includes('/level');
+        }
+        function isReturningFromLevel() {
+          try {
+            return localStorage.getItem('asteroid-lander-map-return-world-v1') !== null;
+          } catch (_e) {
+            return false;
+          }
         }
 
         const elements = {
@@ -1249,7 +1276,14 @@
           playBtn: document.getElementById('prelude-play-btn'),
         };
 
-        const game = isLevelRoute() ? new ShuttleGame(elements) : new LanderGame(elements);
+        let game;
+        if (isLevelRoute()) {
+          game = new ShuttleGame(elements, 'outbound');
+        } else if (isReturningFromLevel()) {
+          game = new ShuttleGame(elements, 'return');
+        } else {
+          game = new LanderGame(elements);
+        }
         game.start();
 
         elements.playBtn.addEventListener('click', () => {
