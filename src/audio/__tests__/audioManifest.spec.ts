@@ -115,7 +115,10 @@ describe('audioManifest', () => {
       'sfx.oxygen.low',
       // music
       'music.menu',
-      'music.level',
+      'music.levelCombat',
+      'music.levelGather',
+      'music.levelRescue',
+      'music.levelGravity',
       'music.gameover',
       // voice
       'voice.comms',
@@ -139,7 +142,10 @@ describe('audioManifest', () => {
 
   it('points the shipped music cues at the bundled loop assets', () => {
     expect(getAudioDefinition('music.menu').src).toBe('/sound/theme.mp3')
-    expect(getAudioDefinition('music.level').src).toBe('/sound/level.mp3')
+    expect(getAudioDefinition('music.levelCombat').src).toBe('/sound/level_combat.mp3')
+    expect(getAudioDefinition('music.levelGather').src).toBe('/sound/level_gather.mp3')
+    expect(getAudioDefinition('music.levelRescue').src).toBe('/sound/level_rescue.mp3')
+    expect(getAudioDefinition('music.levelGravity').src).toBe('/sound/level_gravity.mp3')
   })
 
   it('keeps record keys and definition ids aligned for every sound', () => {

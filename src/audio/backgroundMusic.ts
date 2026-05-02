@@ -10,14 +10,15 @@ import type { AudioSoundId } from './audioManifest'
 import type { AudioPlaybackHandle } from './audioTypes'
 import { useAudio } from './useAudio'
 
+/** Default asteroid bed when objectives are unresolved (matches combat intensity). */
+const DEFAULT_LEVEL_MUSIC_SOUND_ID: AudioSoundId = 'music.levelCombat'
+
 /** Which high-level game context is driving the looping music track. */
 export type BackgroundMusicScene = 'map' | 'level'
 
 const MUSIC_STORAGE_KEY = 'asteroids.music.enabled'
-const TRACK_BY_SCENE: Record<BackgroundMusicScene, AudioSoundId> = {
-  map: 'music.menu',
-  level: 'music.level',
-}
+/** Map atlas bed only — asteroid loops are chosen via {@link playBackgroundMusic} options. */
+const MAP_SCENE_TRACK_ID: AudioSoundId = 'music.menu'
 
 const audio = useAudio()
 const musicEnabled = ref(readStoredMusicEnabled())
@@ -25,6 +26,8 @@ const musicEnabled = ref(readStoredMusicEnabled())
 let activeScene: BackgroundMusicScene | null = null
 let currentHandle: AudioPlaybackHandle | null = null
 let unlockListenersInstalled = false
+/** Last asteroid looping bed id driven by resolver (replay / unmute restores this track). */
+let activeLevelMusicSoundId: AudioSoundId = DEFAULT_LEVEL_MUSIC_SOUND_ID
 
 audio.applyCategoryState('music', { muted: !musicEnabled.value })
 
@@ -44,7 +47,7 @@ function persistMusicEnabled(enabled: boolean): void {
 /** Restarts the loop for whatever scene is currently active (if any). */
 function replayCurrentSceneTrack(): void {
   if (!activeScene) return
-  const soundId = TRACK_BY_SCENE[activeScene]
+  const soundId = activeScene === 'map' ? MAP_SCENE_TRACK_ID : activeLevelMusicSoundId
   currentHandle = audio.play(soundId, { loop: true })
 }
 
@@ -65,13 +68,36 @@ function ensureUnlockListeners(): void {
   window.addEventListener('touchstart', unlockAndReplay, { once: true })
 }
 
-/** Starts (or continues) looping music for `scene`, respecting mute state. */
-export function playBackgroundMusic(scene: BackgroundMusicScene): void {
+/**
+ * Starts (or continues) looping music for `scene`, respecting mute state.
+ *
+ * @param scene - Map atlas vs asteroid gameplay.
+ * @param options.levelTrackSoundId - Which `music.level*` bed (from objective resolver).
+ *   Omit to keep the previously chosen asteroid loop when revisiting playback (e.g. unmute).
+ */
+export function playBackgroundMusic(
+  scene: BackgroundMusicScene,
+  options?: { levelTrackSoundId?: AudioSoundId },
+): void {
   ensureUnlockListeners()
   audio.unlock()
 
-  if (activeScene === scene && currentHandle?.playing()) {
+  let nextLevelMusicId = activeLevelMusicSoundId
+  if (scene === 'level' && options?.levelTrackSoundId) {
+    nextLevelMusicId = options.levelTrackSoundId
+  }
+
+  const redundantContinuance =
+    activeScene === scene &&
+    currentHandle?.playing() &&
+    (scene !== 'level' || nextLevelMusicId === activeLevelMusicSoundId)
+
+  if (redundantContinuance) {
     return
+  }
+
+  if (scene === 'level') {
+    activeLevelMusicSoundId = nextLevelMusicId
   }
 
   currentHandle?.stop()
@@ -114,5 +140,6 @@ export function useBackgroundMusicGlobalState() {
 export function resetBackgroundMusicForTests(): void {
   stopBackgroundMusic()
   setBackgroundMusicEnabled(true)
+  activeLevelMusicSoundId = DEFAULT_LEVEL_MUSIC_SOUND_ID
   unlockListenersInstalled = false
 }

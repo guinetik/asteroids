@@ -64,6 +64,7 @@ import { DanMinigame } from '@/lib/minigame/DanMinigame'
 import { BunkerMinigame } from '@/lib/minigame/BunkerMinigame'
 import type { BunkerSubState } from '@/lib/bunker/bunkerSceneState'
 import { shouldHardReloadLevelRestart } from '@/lib/level/levelRestartPolicy'
+import { resolveLevelBackgroundMusicSoundId } from '@/lib/level/levelBackgroundMusic'
 import ProspectusOverlay from '@/components/ProspectusOverlay.vue'
 import { contractSystem } from '@/lib/contracts/runtime'
 import {
@@ -564,7 +565,10 @@ watch(bootPhase, (phase) => {
 })
 
 const handlePreludePlay = () => {
-  playBackgroundMusic('level')
+  const objectives = viewController.getMission()?.objectives ?? []
+  playBackgroundMusic('level', {
+    levelTrackSoundId: resolveLevelBackgroundMusicSoundId(objectives),
+  })
   resolvePreludeGate?.()
   resolvePreludeGate = null
 }
