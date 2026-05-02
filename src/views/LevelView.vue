@@ -1135,14 +1135,14 @@ function handleToggleMusic(): void {
 <style>
 .level-topbar {
   position: fixed;
-  bottom: max(1rem, env(safe-area-inset-bottom, 0px) + 0.5rem);
-  left: max(1rem, env(safe-area-inset-left, 0px) + 0.5rem);
+  inset: 0;
   z-index: 35;
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
+  pointer-events: none;
 }
 .level-topbar__cargo-btn {
+  position: absolute;
+  bottom: max(1rem, env(safe-area-inset-bottom, 0px) + 0.5rem);
+  left: max(1rem, env(safe-area-inset-left, 0px) + 0.5rem);
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -1156,6 +1156,7 @@ function handleToggleMusic(): void {
   font-size: 0.78rem;
   letter-spacing: 0.18em;
   cursor: pointer;
+  pointer-events: auto;
   transition:
     background-color 0.18s ease,
     border-color 0.18s ease,
@@ -1190,6 +1191,9 @@ function handleToggleMusic(): void {
   color: rgba(102, 255, 238, 0.95);
 }
 .level-topbar__music-btn {
+  position: absolute;
+  top: max(1rem, env(safe-area-inset-top, 0px) + 0.5rem);
+  right: max(1rem, env(safe-area-inset-right, 0px) + 0.5rem);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1199,6 +1203,8 @@ function handleToggleMusic(): void {
   border-radius: 9999px;
   background: rgba(2, 6, 23, 0.76);
   color: rgba(186, 230, 253, 0.92);
+  cursor: pointer;
+  pointer-events: auto;
   box-shadow:
     0 0 0 1px rgba(34, 211, 238, 0.06),
     0 10px 24px rgba(2, 6, 23, 0.45);
