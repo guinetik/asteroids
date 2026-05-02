@@ -115,6 +115,10 @@ const PRESETS: Record<AudioEffectPreset, AudioEffectConfig> = {
     highpassHz: 80,
     distortion: 0.1,
   },
+  /** Specialized band-pass+LFO sweep; handled in createEffectChain, not HP/LP ladder. */
+  'mining-beam': {
+    id: 'mining-beam',
+  },
 }
 
 /**
@@ -126,10 +130,75 @@ export function getAudioEffectConfig(id: AudioEffectPreset): AudioEffectConfig {
   return PRESETS[id]
 }
 
+/** LFO speed for "wah" motion on sustained mining beam playback (cycles per second). */
+const MINING_BEAM_WAH_RATE_HZ = 1.75
+/** Idle center frequency for the swept band-pass (Hz). */
+const MINING_BEAM_FILTER_CENTER_HZ = 840
+/** LFO modulation depth summed into band-pass cutoff (Hz). */
+const MINING_BEAM_WAH_DEPTH_HZ = 480
+/** Peaking resonance of the vowel-shaped filter sweep. */
+const MINING_BEAM_FILTER_Q = 7.25
+
+/**
+ * Wah-style band-pass: sine LFO modulates band-pass cutoff for the drill beam loop bed.
+ *
+ * @param ctx - Shared Howler/Web Audio context.
+ */
+function createMiningBeamWahChain(ctx: AudioContext): AudioEffectChain {
+  const input = ctx.createGain()
+  const output = ctx.createGain()
+  const filter = ctx.createBiquadFilter()
+  filter.type = 'bandpass'
+  filter.Q.value = MINING_BEAM_FILTER_Q
+  filter.frequency.value = MINING_BEAM_FILTER_CENTER_HZ
+
+  const lfo = ctx.createOscillator()
+  lfo.type = 'sine'
+  lfo.frequency.value = MINING_BEAM_WAH_RATE_HZ
+  const depth = ctx.createGain()
+  depth.gain.value = MINING_BEAM_WAH_DEPTH_HZ
+  lfo.connect(depth)
+  depth.connect(filter.frequency)
+
+  input.connect(filter)
+  filter.connect(output)
+  lfo.start()
+
+  return {
+    input,
+    output,
+    dispose: () => {
+      try {
+        lfo.stop()
+      } catch {
+        /* already stopped */
+      }
+      try {
+        lfo.disconnect()
+        depth.disconnect()
+      } catch {
+        /* ignore */
+      }
+      try {
+        filter.disconnect()
+      } catch {
+        /* ignore */
+      }
+      try {
+        input.disconnect()
+        output.disconnect()
+      } catch {
+        /* ignore */
+      }
+    },
+  }
+}
+
 /**
  * Builds the DSP chain for the given preset, or `null` for `none`.
  *
- * Topology:
+ * Topology (except `mining-beam` — band-pass+LFO only):
+ *
  * ```
  * input → hp → lp → ws ─┬─────────────────────→ output (dry path)
  *                       └─→ delay → wet ──────→ output (optional, when delaySeconds > 0)
@@ -137,18 +206,19 @@ export function getAudioEffectConfig(id: AudioEffectPreset): AudioEffectConfig {
  *                              └─ feedback ─┘
  * ```
  *
- * `input` and `output` are wrapping {@link GainNode}s so callers can connect
- * a single source/sink pair regardless of whether the wet bus is active.
- * When the preset has no delay configured the wet bus is skipped entirely
- * and the chain collapses to the original linear band-limited form.
+ * `input` and `output` are wrapping {@link GainNode}s so callers can connect a single source/sink
+ * pair regardless of whether the wet bus is active.
  *
- * @param ctx      - Shared {@link AudioContext} (Howler's context).
+ * @param ctx - Shared {@link AudioContext} (Howler's context).
  * @param effectId - Preset to instantiate.
  */
 export function createEffectChain(
   ctx: AudioContext,
   effectId: AudioEffectPreset,
 ): AudioEffectChain | null {
+  if (effectId === 'mining-beam') {
+    return createMiningBeamWahChain(ctx)
+  }
   if (effectId === 'none') return null
   const config = getAudioEffectConfig(effectId)
   if (config.id === 'none') return null

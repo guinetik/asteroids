@@ -140,8 +140,6 @@ function buildProceduralRecipe(
   switch (preset) {
     case 'tool-drill':
       return buildToolDrill(ctx, output, startTime, volume, sources)
-    case 'laser-fire':
-      return buildLaserFire(ctx, output, startTime, volume, sources)
     case 'tool-heal':
       return buildToolHeal(ctx, output, startTime, volume, sources)
     case 'projectile-hit':
@@ -212,75 +210,6 @@ function buildToolDrill(
   scheduleSource(air, startTime, airDuration + 0.02, sources)
 
   return duration
-}
-
-/** Short laser burst with sizzle and decay echoes. */
-function buildLaserFire(
-  ctx: AudioContext,
-  output: GainNode,
-  startTime: number,
-  volume: number,
-  sources: StoppableNode[],
-): number {
-  const duration = 0.16
-
-  const body = ctx.createOscillator()
-  const bodyGain = ctx.createGain()
-  body.type = 'sawtooth'
-  body.frequency.setValueAtTime(1680, startTime)
-  body.frequency.exponentialRampToValueAtTime(260, startTime + duration)
-  applyPercussiveEnvelope(bodyGain.gain, startTime, duration, volume * 0.54)
-  body.connect(bodyGain)
-  bodyGain.connect(output)
-  scheduleSource(body, startTime, duration + 0.025, sources)
-
-  const bite = ctx.createOscillator()
-  const biteGain = ctx.createGain()
-  bite.type = 'square'
-  bite.frequency.setValueAtTime(920, startTime)
-  bite.frequency.exponentialRampToValueAtTime(180, startTime + duration * 0.82)
-  applyNoiseEnvelope(biteGain.gain, startTime, duration * 0.82, volume * 0.16)
-  bite.connect(biteGain)
-  biteGain.connect(output)
-  scheduleSource(bite, startTime, duration * 0.82 + 0.025, sources)
-
-  const sizzleDuration = 0.055
-  const sizzle = createNoiseSource(ctx, sizzleDuration, 'white')
-  const sizzleFilter = ctx.createBiquadFilter()
-  sizzleFilter.type = 'bandpass'
-  sizzleFilter.frequency.setValueAtTime(2600, startTime)
-  sizzleFilter.frequency.exponentialRampToValueAtTime(1400, startTime + sizzleDuration)
-  sizzleFilter.Q.value = 1.6
-  const sizzleGain = ctx.createGain()
-  applyNoiseEnvelope(sizzleGain.gain, startTime, sizzleDuration, volume * 0.08)
-  sizzle.connect(sizzleFilter)
-  sizzleFilter.connect(sizzleGain)
-  sizzleGain.connect(output)
-  scheduleSource(sizzle, startTime, sizzleDuration + 0.01, sources)
-
-  const echoStart = startTime + 0.07
-  const echo = ctx.createOscillator()
-  const echoGain = ctx.createGain()
-  echo.type = 'triangle'
-  echo.frequency.setValueAtTime(720, echoStart)
-  echo.frequency.exponentialRampToValueAtTime(210, echoStart + 0.11)
-  applyNoiseEnvelope(echoGain.gain, echoStart, 0.11, volume * 0.16)
-  echo.connect(echoGain)
-  echoGain.connect(output)
-  scheduleSource(echo, echoStart, 0.13, sources)
-
-  const echo2Start = startTime + 0.135
-  const echo2 = ctx.createOscillator()
-  const echo2Gain = ctx.createGain()
-  echo2.type = 'triangle'
-  echo2.frequency.setValueAtTime(420, echo2Start)
-  echo2.frequency.exponentialRampToValueAtTime(150, echo2Start + 0.09)
-  applyNoiseEnvelope(echo2Gain.gain, echo2Start, 0.09, volume * 0.09)
-  echo2.connect(echo2Gain)
-  echo2Gain.connect(output)
-  scheduleSource(echo2, echo2Start, 0.11, sources)
-
-  return 0.28
 }
 
 /** Impact thud plus filtered noise for projectile hits. */

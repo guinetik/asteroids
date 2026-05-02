@@ -23,6 +23,8 @@ export const AUDIO_EFFECT_PRESETS = [
   'helmet-echo',
   'terminal-beep',
   'hull-exterior',
+  /** Band-pass swept by sine LFO — multitool drill mining beam loop only (see manifest / play options). */
+  'mining-beam',
 ] as const
 
 /** Union of {@link AUDIO_EFFECT_PRESETS} values. */
@@ -61,7 +63,6 @@ export type AudioPlaybackMode = (typeof AUDIO_PLAYBACK_MODES)[number]
  */
 export const AUDIO_PROCEDURAL_PRESETS = [
   'tool-drill',
-  'laser-fire',
   'tool-heal',
   'projectile-hit',
   'shield-hit',

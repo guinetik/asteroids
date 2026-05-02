@@ -43,8 +43,8 @@ const MISSION_ACCEPT_VOLUME = 0.45
 const MISSION_COMPLETE_VOLUME = 0.6
 /** Volume for reward-received chime. */
 const REWARD_VOLUME = 0.6
-/** Volume for laser-pulse SFX. */
-const LASER_VOLUME = 0.5
+/** Volume for laser-pulse SFX (shuttle/turret bursts). */
+const LASER_VOLUME = 0.6
 /** Volume for upgrade installation fanfare. */
 const UPGRADE_INSTALL_VOLUME = 0.7
 /** Volume for shuttle control program tab click. */

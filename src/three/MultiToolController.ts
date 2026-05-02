@@ -28,6 +28,9 @@ import type { PlayerProfile } from '@/lib/player/types'
 
 const MODEL_PATH = '/models/multitool.glb'
 
+/** Web Audio preset for looping drill/mining beam (LFO swept band-pass "wah"). */
+const MINING_BEAM_LOOP_AUDIO_EFFECT = 'mining-beam' as const
+
 /** Node names for the status LEDs that change color per mode. */
 const LED_NODE_NAMES = partsJson.statusLeds.map((led) => led.nodeName)
 /** Node names for the power indicator slots. */
@@ -276,7 +279,10 @@ export class MultiToolController implements Tickable {
       case 'drill':
         this.drillAudioKeepAliveUntil = this.time + DRILL_AUDIO_KEEPALIVE_SECONDS
         if (!this.drillLoop?.playing()) {
-          this.drillLoop = audio.play('sfx.laserPulse', { loop: true })
+          this.drillLoop = audio.play('sfx.laserPulse', {
+            loop: true,
+            effect: MINING_BEAM_LOOP_AUDIO_EFFECT,
+          })
         }
         break
       case 'weapon': {
@@ -286,11 +292,11 @@ export class MultiToolController implements Tickable {
             refDistance: 50,
             minVolumeScale: 0.88,
           })
-          const def = getAudioDefinition('sfx.impact.gun')
-          const h = audio.play('sfx.impact.gun', { volume: def.volume * w.volumeScale })
+          const def = getAudioDefinition('sfx.laserFire')
+          const h = audio.play('sfx.laserFire', { volume: def.volume * w.volumeScale })
           h.setStereo(w.pan)
         } else {
-          audio.play('sfx.impact.gun')
+          audio.play('sfx.laserFire')
         }
         break
       }
