@@ -335,6 +335,13 @@ export class LevelViewController implements Tickable {
   // ── Arrival ──────────────────────────────────────────────────
   private arrivalSequence: ArrivalSequence | null = null
 
+  /**
+   * Gate that blocks gameplay startup until the prelude finishes its
+   * cinematic. Set by the view before calling `init()`. Default resolves
+   * immediately so non-prelude paths are unaffected.
+   */
+  private preludeGate: Promise<void> = Promise.resolve()
+
   // ── Exfil tracking ────────────────────────────────────────────
   private hasExitedVehicle = false
   private landerDestroyed = false
@@ -447,6 +454,17 @@ export class LevelViewController implements Tickable {
    */
   setNavigateToMap(fn: () => void): void {
     this.navigateToMap = fn
+  }
+
+  /**
+   * Install a promise that the controller awaits before starting the
+   * arrival cinematic and audio. Lets the shuttle prelude play its
+   * finale without the 3D scene running underneath it.
+   *
+   * @param gate - Promise that resolves when the prelude is done.
+   */
+  setPreludeGate(gate: Promise<void>): void {
+    this.preludeGate = gate
   }
 
   /**
@@ -1450,6 +1468,10 @@ export class LevelViewController implements Tickable {
     // earlier kicks off the loader fade while the main thread is still blocked
     // on shader precompile, so the user never sees the transition animate.
     this.emitBootState('started', 'Running')
+    // Hold the cinematic + audio until the prelude has finished. Without
+    // this the shuttle prelude plays on top of an already-running arrival
+    // sequence, so the cutscene is mid-flight when the prelude unmounts.
+    await this.preludeGate
     this.gameLoop.start()
     this.landerAudio.start()
   }

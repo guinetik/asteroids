@@ -541,11 +541,17 @@ const fpsTelemetry = reactive<FpsTelemetry>({
   objectives: [],
 })
 
-// /level uses the global Prelude as its loader. When the 3D scene is ready
-// ('started' phase) we signal the shuttle prelude that it can play its
-// finale (big asteroid → orbital match → exit). The prelude dispatches
-// 'prelude-play' once the shuttle has flown off the top, and only then do
-// we kick the level music — otherwise audio would bleed under the finale.
+// /level uses the global Prelude as its loader. The controller awaits the
+// preludeGate promise before starting the arrival cinematic + audio, so the
+// shuttle finale plays alone instead of on top of a mid-flight cutscene.
+// We resolve the gate when the prelude dispatches 'prelude-play' (its
+// natural end signal, fired after the shuttle clears the top edge).
+let resolvePreludeGate: (() => void) | null = null
+const preludeGate = new Promise<void>((resolve) => {
+  resolvePreludeGate = resolve
+})
+viewController.setPreludeGate(preludeGate)
+
 watch(bootPhase, (phase) => {
   if (phase !== 'started') return
   if (typeof window !== 'undefined' && window.Prelude) {
@@ -555,6 +561,8 @@ watch(bootPhase, (phase) => {
 
 const handlePreludePlay = () => {
   playBackgroundMusic('level')
+  resolvePreludeGate?.()
+  resolvePreludeGate = null
 }
 if (typeof window !== 'undefined') {
   window.addEventListener('prelude-play', handlePreludePlay)

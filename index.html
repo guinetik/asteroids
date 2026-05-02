@@ -966,10 +966,11 @@
             if (performance.now() - this.fallingStartTime < ShuttleGame.MIN_RUN_MS) return;
             this.state = 'finale';
             this.finaleStartTime = this.elapsed;
-            const radius = ShuttleGame.DESTINATION_START_RADIUS;
+            const radius = Math.max(this.width, this.height) * ShuttleGame.DESTINATION_RADIUS_SCALE;
             this.destination = {
               x: this.width / 2,
-              y: -radius - 20,
+              y: -radius * 1.5,
+              targetY: -radius * 0.5,
               vy: ShuttleGame.DESTINATION_DRIFT_SPEED,
               radius,
               settledAt: 0,
@@ -981,23 +982,25 @@
 
           _updateFinale(deltaSec) {
             if (this.state !== 'finale') return;
-            const finaleT = Math.min(1, (this.elapsed - this.finaleStartTime) / ShuttleGame.FINALE_BG_FREEZE_MS);
-            this.bgScale = 1 - finaleT;
 
-            const targetY = this.height * ShuttleGame.DESTINATION_TARGET_Y_RATIO;
-            if (this.destination.y < targetY) {
+            if (this.destination.y < this.destination.targetY) {
               this.destination.y += this.destination.vy * deltaSec;
-              if (this.destination.y >= targetY) {
-                this.destination.y = targetY;
+              if (this.destination.y >= this.destination.targetY) {
+                this.destination.y = this.destination.targetY;
                 this.destination.settledAt = this.elapsed;
               }
             }
 
-            if (this.destination.radius < ShuttleGame.DESTINATION_FINAL_RADIUS) {
-              this.destination.radius = Math.min(
-                ShuttleGame.DESTINATION_FINAL_RADIUS,
-                this.destination.radius + ShuttleGame.DESTINATION_GROW_RATE * deltaSec
+            // Background freeze starts the instant the asteroid is on-screen,
+            // not on a fixed timer. Bottom edge of the rock = y + radius.
+            const visible = this.destination.y + this.destination.radius > 0;
+            if (visible) {
+              this.bgScale = Math.max(0, this.bgScale - deltaSec / (ShuttleGame.FINALE_BG_FREEZE_MS / 1000));
+              this.shipVY = Math.max(
+                -ShuttleGame.EXIT_MAX_SPEED,
+                this.shipVY - ShuttleGame.EXIT_ACCEL * deltaSec
               );
+              this.shipY += this.shipVY * deltaSec;
             }
 
             if (
@@ -1006,21 +1009,17 @@
             ) {
               this.state = 'exit';
               this.exitStartTime = this.elapsed;
-              this.shipVX = 0;
-              this.shipVY = 0;
             }
           }
 
           _updateExit(deltaSec) {
             if (this.state !== 'exit') return;
             this.bgScale = 0;
-            this.shipVY -= ShuttleGame.EXIT_ACCEL * deltaSec;
-            this.shipVY = Math.max(-ShuttleGame.EXIT_MAX_SPEED, this.shipVY);
+            this.shipVY = Math.max(
+              -ShuttleGame.EXIT_MAX_SPEED,
+              this.shipVY - ShuttleGame.EXIT_ACCEL * deltaSec
+            );
             this.shipY += this.shipVY * deltaSec;
-            if (this.destination) {
-              const dx = this.destination.x - this.shipX;
-              this.shipX += Math.sign(dx) * Math.min(Math.abs(dx), ShuttleGame.EXIT_MAX_SPEED * deltaSec * 0.5);
-            }
             if (this.shipY < -ShuttleGame.SHIP_EDGE_INSET * 2) {
               this.stop();
               window.dispatchEvent(new Event('prelude-play'));
@@ -1078,22 +1077,27 @@
           _drawDestination() {
             if (!this.destination) return;
             const ctx = this.ctx;
-            const pulse = 0.6 + 0.4 * Math.sin(this.elapsed / 250);
             ctx.save();
             ctx.translate(this.destination.x, this.destination.y);
-            ctx.strokeStyle = `rgba(255,255,255,${pulse})`;
-            ctx.lineWidth = 2;
             ctx.beginPath();
-            const verts = 16;
+            const verts = 48;
             for (let i = 0; i < verts; i++) {
               const angle = (i / verts) * Math.PI * 2;
-              const r = this.destination.radius * (0.92 + 0.08 * Math.sin(angle * 3));
+              const r = this.destination.radius * (
+                0.96
+                + 0.025 * Math.sin(angle * 7)
+                + 0.015 * Math.sin(angle * 13 + 1.3)
+              );
               const px = Math.cos(angle) * r;
               const py = Math.sin(angle) * r;
               if (i === 0) ctx.moveTo(px, py);
               else ctx.lineTo(px, py);
             }
             ctx.closePath();
+            ctx.fillStyle = '#000';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
             ctx.stroke();
             ctx.restore();
           }
@@ -1198,16 +1202,15 @@
         ShuttleGame.RESPAWN_CLEAR_RADIUS = 110;
         ShuttleGame.BLINK_PERIOD_MS = 120;
         ShuttleGame.MIN_RUN_MS = 4500;
-        ShuttleGame.DESTINATION_RADIUS = 110;
-        ShuttleGame.DESTINATION_START_RADIUS = 40;
-        ShuttleGame.DESTINATION_FINAL_RADIUS = 260;
-        ShuttleGame.DESTINATION_GROW_RATE = 90;
-        ShuttleGame.DESTINATION_TARGET_Y_RATIO = 0.4;
-        ShuttleGame.DESTINATION_DRIFT_SPEED = 80;
-        ShuttleGame.DESTINATION_LINGER_MS = 1600;
-        ShuttleGame.FINALE_BG_FREEZE_MS = 1200;
-        ShuttleGame.EXIT_ACCEL = 1200;
-        ShuttleGame.EXIT_MAX_SPEED = 1400;
+        // Destination asteroid is intentionally huge — diameter ~= max(w,h)
+        // so it spans the full screen width. Center settles at -radius/2 so
+        // we only ever see its bottom half cresting over the top edge.
+        ShuttleGame.DESTINATION_RADIUS_SCALE = 0.95;
+        ShuttleGame.DESTINATION_DRIFT_SPEED = 220;
+        ShuttleGame.DESTINATION_LINGER_MS = 1400;
+        ShuttleGame.FINALE_BG_FREEZE_MS = 1000;
+        ShuttleGame.EXIT_ACCEL = 1400;
+        ShuttleGame.EXIT_MAX_SPEED = 1800;
         // Source-space bbox of the shuttle paths AFTER per-part transform-origin
         // pivots are applied. Pulled from the SVG bounds; close enough for centering.
         ShuttleGame.SOURCE_BBOX_MIN_X = -2;
