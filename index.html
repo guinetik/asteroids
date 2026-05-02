@@ -665,6 +665,9 @@
 
             this.particles = [];
 
+            this.asteroids = [];
+            this.lastAsteroidSpawn = 0;
+
             this._boundKeyDown = this._handleKeyDown.bind(this);
             this._boundKeyUp = this._handleKeyUp.bind(this);
           }
@@ -798,11 +801,91 @@
             }
           }
 
+          _makeAsteroidVertices(radius) {
+            const count = ShuttleGame.ASTEROID_VERTEX_MIN
+              + Math.floor(Math.random() * (ShuttleGame.ASTEROID_VERTEX_MAX - ShuttleGame.ASTEROID_VERTEX_MIN + 1));
+            const verts = [];
+            for (let i = 0; i < count; i++) {
+              const angle = (i / count) * Math.PI * 2;
+              const jitter = 1 + (Math.random() * 2 - 1) * ShuttleGame.ASTEROID_VERTEX_JITTER;
+              verts.push({ angle, distance: radius * jitter });
+            }
+            return verts;
+          }
+
+          _spawnAsteroid(size) {
+            const radius = ShuttleGame.ASTEROID_RADII[size];
+            const x = Math.random() * (this.width - radius * 2) + radius;
+            const y = -radius - 10;
+            const vy = ShuttleGame.ASTEROID_VY_MIN + Math.random() * (ShuttleGame.ASTEROID_VY_MAX - ShuttleGame.ASTEROID_VY_MIN);
+            const vx = (Math.random() * 2 - 1) * ShuttleGame.ASTEROID_VX_RANGE;
+            this.asteroids.push({
+              x, y, vx, vy,
+              size,
+              radius,
+              vertices: this._makeAsteroidVertices(radius),
+              rotation: Math.random() * Math.PI * 2,
+              rotationVel: (Math.random() * 2 - 1) * ShuttleGame.ASTEROID_ROT_VEL_RANGE,
+            });
+          }
+
+          _currentSpawnInterval() {
+            const t = Math.min(1, this.elapsed / ShuttleGame.ASTEROID_RAMP_MS);
+            return ShuttleGame.ASTEROID_BASE_SPAWN_MS
+              + (ShuttleGame.ASTEROID_MIN_SPAWN_MS - ShuttleGame.ASTEROID_BASE_SPAWN_MS) * t;
+          }
+
+          _pickSpawnSize() {
+            const r = Math.random();
+            if (r < ShuttleGame.ASTEROID_SPAWN_BIG_PROB) return 'big';
+            if (r < ShuttleGame.ASTEROID_SPAWN_BIG_PROB + ShuttleGame.ASTEROID_SPAWN_MED_PROB) return 'med';
+            return 'small';
+          }
+
+          _updateAsteroids(deltaSec) {
+            if (this.state === 'cruising' && this.elapsed - this.lastAsteroidSpawn >= this._currentSpawnInterval()) {
+              this._spawnAsteroid(this._pickSpawnSize());
+              this.lastAsteroidSpawn = this.elapsed;
+            }
+            for (let i = this.asteroids.length - 1; i >= 0; i--) {
+              const a = this.asteroids[i];
+              a.x += a.vx * deltaSec;
+              a.y += a.vy * deltaSec;
+              a.rotation += a.rotationVel * deltaSec;
+              if (a.x < -a.radius) a.x = this.width + a.radius;
+              if (a.x > this.width + a.radius) a.x = -a.radius;
+              if (a.y > this.height + a.radius) this.asteroids.splice(i, 1);
+            }
+          }
+
+          _drawAsteroids() {
+            const ctx = this.ctx;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            for (const a of this.asteroids) {
+              ctx.save();
+              ctx.translate(a.x, a.y);
+              ctx.rotate(a.rotation);
+              ctx.beginPath();
+              for (let i = 0; i < a.vertices.length; i++) {
+                const v = a.vertices[i];
+                const px = Math.cos(v.angle) * v.distance;
+                const py = Math.sin(v.angle) * v.distance;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+              }
+              ctx.closePath();
+              ctx.stroke();
+              ctx.restore();
+            }
+          }
+
           _update(dt) {
             this.elapsed += dt;
             const deltaSec = dt / 1000;
             this._updateStarfield(deltaSec);
             this._updateShuttle(deltaSec);
+            this._updateAsteroids(deltaSec);
           }
 
           _draw() {
@@ -828,6 +911,8 @@
               ctx.fillRect(p.x, p.y, 2, 2);
             }
             ctx.globalAlpha = 1.0;
+
+            this._drawAsteroids();
 
             const scale = Math.min(this.width, this.height) / ShuttleGame.SHUTTLE_FIT_DIVISOR;
             const sourceCenterX = (ShuttleGame.SOURCE_BBOX_MIN_X + ShuttleGame.SOURCE_BBOX_MAX_X) / 2;
@@ -855,6 +940,19 @@
         ShuttleGame.STAR_COUNT_PER_LAYER = [60, 40, 25];
         ShuttleGame.STAR_LAYER_SPEEDS = [180, 90, 35];
         ShuttleGame.STAR_LAYER_SIZES = [2, 1, 1];
+        ShuttleGame.ASTEROID_RADII = { big: 38, med: 24, small: 14 };
+        ShuttleGame.ASTEROID_VERTEX_MIN = 8;
+        ShuttleGame.ASTEROID_VERTEX_MAX = 12;
+        ShuttleGame.ASTEROID_VERTEX_JITTER = 0.25;
+        ShuttleGame.ASTEROID_VY_MIN = 60;
+        ShuttleGame.ASTEROID_VY_MAX = 130;
+        ShuttleGame.ASTEROID_VX_RANGE = 40;
+        ShuttleGame.ASTEROID_ROT_VEL_RANGE = 1.2;
+        ShuttleGame.ASTEROID_BASE_SPAWN_MS = 1400;
+        ShuttleGame.ASTEROID_MIN_SPAWN_MS = 450;
+        ShuttleGame.ASTEROID_RAMP_MS = 25000;
+        ShuttleGame.ASTEROID_SPAWN_BIG_PROB = 0.35;
+        ShuttleGame.ASTEROID_SPAWN_MED_PROB = 0.40;
         // Source-space bbox of the shuttle paths AFTER per-part transform-origin
         // pivots are applied. Pulled from the SVG bounds; close enough for centering.
         ShuttleGame.SOURCE_BBOX_MIN_X = -2;
