@@ -671,6 +671,7 @@
             this.bullets = [];
             this.lastFireTime = -Infinity;
             this.score = 0;
+            this.invulnerableUntil = 0;
 
             this._boundKeyDown = this._handleKeyDown.bind(this);
             this._boundKeyUp = this._handleKeyUp.bind(this);
@@ -947,6 +948,39 @@
             }
           }
 
+          _isInvulnerable() {
+            return this.elapsed < this.invulnerableUntil;
+          }
+
+          _respawnShuttle() {
+            this.shipX = this.width / 2;
+            this.shipY = this.height * ShuttleGame.SHIP_SPAWN_Y_RATIO;
+            this.shipVX = 0;
+            this.shipVY = 0;
+            this.invulnerableUntil = this.elapsed + ShuttleGame.RESPAWN_BLINK_MS;
+
+            const r2 = ShuttleGame.RESPAWN_CLEAR_RADIUS * ShuttleGame.RESPAWN_CLEAR_RADIUS;
+            for (let i = this.asteroids.length - 1; i >= 0; i--) {
+              const a = this.asteroids[i];
+              const dx = a.x - this.shipX;
+              const dy = a.y - this.shipY;
+              if (dx * dx + dy * dy <= r2) this.asteroids.splice(i, 1);
+            }
+          }
+
+          _updateShuttleAsteroidCollisions() {
+            if (this._isInvulnerable()) return;
+            for (const a of this.asteroids) {
+              const dx = a.x - this.shipX;
+              const dy = a.y - this.shipY;
+              const hitR = a.radius + ShuttleGame.SHIP_COLLIDER_RADIUS;
+              if (dx * dx + dy * dy <= hitR * hitR) {
+                this._respawnShuttle();
+                return;
+              }
+            }
+          }
+
           _update(dt) {
             this.elapsed += dt;
             const deltaSec = dt / 1000;
@@ -955,6 +989,7 @@
             this._updateAsteroids(deltaSec);
             this._updateBullets(deltaSec);
             this._updateBulletAsteroidCollisions();
+            this._updateShuttleAsteroidCollisions();
           }
 
           _draw() {
@@ -994,6 +1029,10 @@
             const sourceCenterX = (ShuttleGame.SOURCE_BBOX_MIN_X + ShuttleGame.SOURCE_BBOX_MAX_X) / 2;
             const sourceCenterY = (ShuttleGame.SOURCE_BBOX_MIN_Y + ShuttleGame.SOURCE_BBOX_MAX_Y) / 2;
 
+            const blinkAlpha = this._isInvulnerable()
+              ? (Math.floor(this.elapsed / ShuttleGame.BLINK_PERIOD_MS) % 2 === 0 ? 0.3 : 0.8)
+              : 1.0;
+            ctx.globalAlpha = blinkAlpha;
             ctx.save();
             ctx.translate(this.shipX, this.shipY);
             ctx.scale(scale, scale);
@@ -1009,6 +1048,7 @@
               ctx.restore();
             }
             ctx.restore();
+            ctx.globalAlpha = 1.0;
           }
         }
 
@@ -1036,6 +1076,10 @@
         ShuttleGame.BULLET_NOSE_OFFSET = 22;
         ShuttleGame.SPLIT_SPEED = 80;
         ShuttleGame.SCORE = { big: 20, med: 50, small: 100 };
+        ShuttleGame.SHIP_COLLIDER_RADIUS = 18;
+        ShuttleGame.RESPAWN_BLINK_MS = 1500;
+        ShuttleGame.RESPAWN_CLEAR_RADIUS = 110;
+        ShuttleGame.BLINK_PERIOD_MS = 120;
         // Source-space bbox of the shuttle paths AFTER per-part transform-origin
         // pivots are applied. Pulled from the SVG bounds; close enough for centering.
         ShuttleGame.SOURCE_BBOX_MIN_X = -2;
