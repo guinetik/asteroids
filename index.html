@@ -661,7 +661,7 @@
             this.shipVX = 0;
             this.shipVY = 0;
 
-            this.keys = { up: false, down: false, left: false, right: false, fire: false };
+            this.keys = { left: false, right: false, fire: false };
 
             this.particles = [];
 
@@ -734,8 +734,6 @@
           }
 
           _handleKeyDown(e) {
-            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') this.keys.up = true;
-            if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') this.keys.down = true;
             if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') this.keys.left = true;
             if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this.keys.right = true;
             if (e.key === ' ' || e.code === 'Space') {
@@ -745,8 +743,6 @@
           }
 
           _handleKeyUp(e) {
-            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') this.keys.up = false;
-            if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') this.keys.down = false;
             if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') this.keys.left = false;
             if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this.keys.right = false;
             if (e.key === ' ' || e.code === 'Space') this.keys.fire = false;
@@ -762,40 +758,25 @@
             } else if (this.shipVX < 0) {
               this.shipVX = Math.min(0, this.shipVX + ShuttleGame.SHUTTLE_DRAG * deltaSec);
             }
-            if (this.keys.up) {
-              this.shipVY -= ShuttleGame.SHUTTLE_ACCEL * deltaSec;
-            } else if (this.keys.down) {
-              this.shipVY += ShuttleGame.SHUTTLE_ACCEL * deltaSec;
-            } else if (this.shipVY > 0) {
-              this.shipVY = Math.max(0, this.shipVY - ShuttleGame.SHUTTLE_DRAG * deltaSec);
-            } else if (this.shipVY < 0) {
-              this.shipVY = Math.min(0, this.shipVY + ShuttleGame.SHUTTLE_DRAG * deltaSec);
-            }
 
             this.shipVX = Math.max(-ShuttleGame.SHUTTLE_MAX_SPEED, Math.min(ShuttleGame.SHUTTLE_MAX_SPEED, this.shipVX));
-            this.shipVY = Math.max(-ShuttleGame.SHUTTLE_MAX_SPEED, Math.min(ShuttleGame.SHUTTLE_MAX_SPEED, this.shipVY));
 
             this.shipX += this.shipVX * deltaSec;
-            this.shipY += this.shipVY * deltaSec;
 
             const inset = ShuttleGame.SHIP_EDGE_INSET;
             if (this.shipX < inset) { this.shipX = inset; this.shipVX = 0; }
             if (this.shipX > this.width - inset) { this.shipX = this.width - inset; this.shipVX = 0; }
-            if (this.shipY < inset) { this.shipY = inset; this.shipVY = 0; }
-            if (this.shipY > this.height - inset) { this.shipY = this.height - inset; this.shipVY = 0; }
 
-            const thrusting = this.keys.up || this.keys.down || this.keys.left || this.keys.right;
+            const thrusting = this.keys.left || this.keys.right;
             if (thrusting && Math.random() < ShuttleGame.PARTICLE_SPAWN_CHANCE) {
-              let px = 0, py = 0;
-              if (this.keys.up)    { py =  ShuttleGame.PARTICLE_OFFSET; }
-              if (this.keys.down)  { py = -ShuttleGame.PARTICLE_OFFSET; }
+              let px = 0;
               if (this.keys.left)  { px =  ShuttleGame.PARTICLE_OFFSET; }
               if (this.keys.right) { px = -ShuttleGame.PARTICLE_OFFSET; }
               this.particles.push({
                 x: this.shipX + px + (Math.random() - 0.5) * 6,
-                y: this.shipY + py + (Math.random() - 0.5) * 6,
+                y: this.shipY + (Math.random() - 0.5) * 6,
                 vx: -this.shipVX * 0.3 + (Math.random() - 0.5) * 40,
-                vy: -this.shipVY * 0.3 + (Math.random() - 0.5) * 40,
+                vy: (Math.random() - 0.5) * 40,
                 life: ShuttleGame.PARTICLE_LIFE_S,
               });
             }
