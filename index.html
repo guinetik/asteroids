@@ -77,13 +77,13 @@
         box-shadow: 0 0 1.5rem rgba(34, 211, 238, 0.18);
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-DvIdj5pW.js"></script>
+    <script type="module" crossorigin src="/assets/index-DANswA6b.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/specialMissions-DjSPLIre.js">
     <link rel="modulepreload" crossorigin href="/assets/vendor-pinia-DSmCRyVf.js">
     <link rel="modulepreload" crossorigin href="/assets/vendor-vue-iVKUiCKN.js">
     <link rel="modulepreload" crossorigin href="/assets/vendor-vue-router-BzB1D7NX.js">
     <link rel="modulepreload" crossorigin href="/assets/profile-BXvo8esA.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-BClXuJVr.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-CD98d31Z.css">
   </head>
   <body>
     <div id="prelude-container">
@@ -94,35 +94,534 @@
         <button id="prelude-play-btn">PLAY</button>
       </div>
     </div>
-    
+
     <script>
-      (function() {
-        const container = document.getElementById('prelude-container');
-        const wrapper = document.getElementById('prelude-canvas-wrapper');
-        const canvas = document.getElementById('prelude-canvas');
-        const playBtn = document.getElementById('prelude-play-btn');
-        const ctx = canvas.getContext('2d');
+      (function () {
+        // Base class — owns canvas sizing, the rAF loop, and lifecycle.
+        // Subclasses implement _onCanvasInit / _attachInput / _detachInput / _update / _draw / ready.
+        class PreludeGame {
+          constructor(elements) {
+            this.container = elements.container;
+            this.wrapper = elements.wrapper;
+            this.canvas = elements.canvas;
+            this.playBtn = elements.playBtn;
+            this.ctx = this.canvas.getContext('2d');
+            this.width = 0;
+            this.height = 0;
+            this.lastTime = 0;
+            this.animationFrameId = 0;
+            this._boundLoop = this._loop.bind(this);
+            this._boundResize = this._handleResize.bind(this);
+          }
 
-        let state = 'falling'; // falling, landing, landed
-        let landerX = 0;
-        let landerY = 0;
-        let landerVelocityX = 0;
-        let landerVelocityY = 0;
-        let score = 0;
-        let coins = [];
-        let stars = [];
-        let particles = [];
+          start() {
+            this._initCanvas();
+            window.addEventListener('resize', this._boundResize);
+            this._attachInput();
+            this.animationFrameId = requestAnimationFrame(this._boundLoop);
+          }
 
-        let landingTime = 0;
-        let landingFrozen = false; // true once the ship has fallen past the pad — skip physics
-        let terrainVisible = false; // true once we've started the rising-terrain landing beat
-        let landerRotation = 0; // radians, set on touchdown to match terrain slope
+          stop() {
+            this.container.style.display = 'none';
+            cancelAnimationFrame(this.animationFrameId);
+            window.removeEventListener('resize', this._boundResize);
+            this._detachInput();
+          }
 
-        // Terrain ridge as (xRatio, yOffsetRatio) pairs. The pad spans 0.4–0.6
-        // (yOffset = 0). Y on screen = terrainPadY + yOffsetRatio * height.
-        // Used by both the draw pass and the slope/height query helpers so the
-        // visual and the physics agree on where the ground is at any X.
-        const TERRAIN_POINTS = [
+          ready() {}
+
+          _initCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            const rect = this.wrapper.getBoundingClientRect();
+            this.width = rect.width;
+            this.height = rect.height;
+            this.canvas.width = this.width * dpr;
+            this.canvas.height = this.height * dpr;
+            this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+            this.ctx.scale(dpr, dpr);
+            this._onCanvasInit();
+          }
+
+          _handleResize() {
+            this._initCanvas();
+          }
+
+          _loop(time) {
+            if (!this.lastTime) this.lastTime = time;
+            const dt = time - this.lastTime;
+            this.lastTime = time;
+            this._update(dt);
+            this._draw();
+            this.animationFrameId = requestAnimationFrame(this._boundLoop);
+          }
+
+          _onCanvasInit() {}
+          _attachInput() {}
+          _detachInput() {}
+          _update(_dt) {}
+          _draw() {}
+        }
+
+        // Lander prelude — original "buy a shuttle on the moon" home-screen game.
+        // Player falls from above, can steer + thrust, terrain rises, lander touches down.
+        class LanderGame extends PreludeGame {
+          constructor(elements) {
+            super(elements);
+
+            this.state = 'falling'; // falling, landing, landed
+            this.landerX = 0;
+            this.landerY = 0;
+            this.landerVelocityX = 0;
+            this.landerVelocityY = 0;
+            this.score = 0;
+            this.coins = [];
+            this.stars = [];
+            this.particles = [];
+
+            this.landingTime = 0;
+            this.landingFrozen = false;
+            this.terrainVisible = false;
+            this.landerRotation = 0;
+            this.terrainPadY = 0;
+
+            this.keys = { left: false, right: false, thrust: false };
+            this.isPointerDown = false;
+            this.lastMouseX = null;
+            this.lastCoinSpawn = 0;
+
+            this.fallingStartTime = 0;
+            this.readyPending = false;
+
+            this.landerPath1 = new Path2D("m79.863 77.492h-1.1328l-6.1094-12.168v-7.7266c0-0.58594-0.23438-1.1484-0.64844-1.5625-0.41406-0.41406-0.97656-0.64453-1.5625-0.64453h-40.82c-0.58594 0-1.1484 0.23047-1.5625 0.64453-0.41406 0.41406-0.64844 0.97656-0.64844 1.5625v7.7266l-6.1094 12.168h-1.1328c-0.84766-0.015626-1.5586 0.625-1.6328 1.4648-0.023437 0.42578 0.12891 0.83984 0.42188 1.1484 0.28906 0.30859 0.69531 0.48047 1.1211 0.48047h5.7344c0.84375 0.019531 1.5586-0.62109 1.6328-1.4609 0.023438-0.42578-0.12891-0.83984-0.42187-1.1484-0.29297-0.30859-0.69922-0.48437-1.125-0.48437h-1.0469l5.7812-8.5859-0.003906 0.003906c0.26953 1.5938 1.6484 2.7617 3.2656 2.7617h11.293l-0.30859-2.6875c-0.17188-1.4727 0.29688-2.9453 1.2812-4.0469 0.98438-1.1055 2.3945-1.7383 3.8711-1.7383 1.4805 0 2.8906 0.63281 3.875 1.7383 0.98438 1.1016 1.4531 2.5742 1.2812 4.0469l-0.30859 2.6875h11.293-0.003906c1.6172 0 2.9961-1.168 3.2656-2.7617l5.7773 8.582h-0.96094c-0.84375-0.015626-1.5586 0.625-1.6328 1.4648-0.023438 0.42578 0.12891 0.83984 0.42187 1.1484 0.29297 0.30859 0.69922 0.48047 1.125 0.48047h5.8203c0.42578 0 0.83203-0.17188 1.1211-0.48047 0.29297-0.30859 0.44531-0.72266 0.42188-1.1484-0.074219-0.83984-0.78516-1.4805-1.6328-1.4648z");
+            this.landerPath2 = new Path2D("m52.91 77.492h-1.1836l1.0156-8.7891h-0.003907c0.09375-0.78125-0.15625-1.5625-0.67969-2.1484-0.52344-0.58984-1.2734-0.92578-2.0586-0.92578s-1.5352 0.33594-2.0586 0.92578c-0.52344 0.58594-0.77344 1.3672-0.67969 2.1484l1.0156 8.7891h-1.1875c-0.41016 0-0.80469 0.16406-1.0977 0.45312-0.28906 0.28906-0.45313 0.68359-0.45313 1.0938 0 0.41016 0.16406 0.80469 0.45313 1.0977 0.29297 0.28906 0.6875 0.45312 1.0977 0.44922h5.8203c0.41016 0.003906 0.80469-0.16016 1.0977-0.44922 0.28906-0.29297 0.45313-0.6875 0.45313-1.0977 0-0.41016-0.16406-0.80469-0.45313-1.0938-0.29297-0.28906-0.6875-0.45312-1.0977-0.45312z");
+            this.landerPath3 = new Path2D("m35.879 52.586h28.246-0.003906c0.53125 0 1.0352-0.23828 1.3711-0.64844 0.33594-0.41016 0.46875-0.94922 0.36328-1.4688l-0.51172-2.5352h0.003906c-0.13672-0.67188 0.12891-1.3594 0.67578-1.7695l0.86328-0.64062h0.003906c0.54688-0.41016 0.8125-1.0977 0.67578-1.7695l-1.1602-5.7422c-0.13281-0.67188-0.64453-1.207-1.3125-1.3711l-1.0352-0.25391v0.003906c-0.66406-0.16406-1.1797-0.69922-1.3125-1.3711l-0.44922-2.2344c-0.16406-0.82422-0.89062-1.4219-1.7344-1.4219h-9.5312v-6.5c0.98047-0.41406 1.6445-1.3438 1.7227-2.4023 0.039063-0.77734-0.23438-1.5352-0.75781-2.1055-0.52344-0.57422-1.2539-0.91406-2.0273-0.94141-1.3594-0.019531-2.5391 0.92578-2.8203 2.25-0.27734 1.3281 0.42187 2.668 1.6719 3.1992v6.5h-9.3828c-0.84375 0-1.5703 0.59766-1.7344 1.4219l-3.5586 17.684c-0.10547 0.51953 0.027344 1.0586 0.36328 1.4688 0.33594 0.41016 0.83984 0.64844 1.3711 0.64844zm14.121-15.031c2.0859 0 3.9688 1.2578 4.7656 3.1836 0.79688 1.9297 0.35547 4.1484-1.1172 5.6211-1.4766 1.4766-3.6953 1.918-5.6211 1.1211-1.9297-0.80078-3.1836-2.6797-3.1836-4.7656 0-2.8477 2.3086-5.1602 5.1562-5.1602z");
+
+            this._boundKeyDown = this._handleKeyDown.bind(this);
+            this._boundKeyUp = this._handleKeyUp.bind(this);
+            this._boundPointerDown = this._handlePointerDown.bind(this);
+            this._boundPointerUp = this._handlePointerUp.bind(this);
+            this._boundMouseMove = this._handleMouseMove.bind(this);
+            this._boundMouseLeave = this._handleMouseLeaveCanvas.bind(this);
+            this._boundTouchStart = (e) => { e.preventDefault(); this._handlePointerDown(); };
+          }
+
+          ready() {
+            // Defer the actual transition until MIN_FALLING_MS has elapsed,
+            // so the player always gets a real falling beat.
+            this.readyPending = true;
+          }
+
+          _onCanvasInit() {
+            this._resetRun();
+            this.fallingStartTime = performance.now();
+
+            this.stars = [];
+            for (let i = 0; i < LanderGame.STAR_COUNT; i++) {
+              this.stars.push({
+                x: Math.random() * this.width,
+                y: Math.random() * this.height,
+                brightness: Math.random() * 0.8 + 0.2,
+              });
+            }
+          }
+
+          _attachInput() {
+            window.addEventListener('keydown', this._boundKeyDown);
+            window.addEventListener('keyup', this._boundKeyUp);
+            this.container.addEventListener('mousedown', this._boundPointerDown);
+            this.container.addEventListener('mouseup', this._boundPointerUp);
+            this.container.addEventListener('mousemove', this._boundMouseMove);
+            this.container.addEventListener('mouseleave', this._boundMouseLeave);
+            this.container.addEventListener('touchstart', this._boundTouchStart, { passive: false });
+            this.container.addEventListener('touchend', this._boundPointerUp);
+            this.container.addEventListener('touchcancel', this._boundPointerUp);
+          }
+
+          _detachInput() {
+            window.removeEventListener('keydown', this._boundKeyDown);
+            window.removeEventListener('keyup', this._boundKeyUp);
+            this.container.removeEventListener('mousedown', this._boundPointerDown);
+            this.container.removeEventListener('mouseup', this._boundPointerUp);
+            this.container.removeEventListener('mousemove', this._boundMouseMove);
+            this.container.removeEventListener('mouseleave', this._boundMouseLeave);
+            this.container.removeEventListener('touchstart', this._boundTouchStart);
+            this.container.removeEventListener('touchend', this._boundPointerUp);
+            this.container.removeEventListener('touchcancel', this._boundPointerUp);
+          }
+
+          _resetRun() {
+            this.landerX = this.width / 2;
+            this.landerY = LanderGame.LANDER_HEIGHT;
+            this.landerVelocityX = 0;
+            this.landerVelocityY = 0;
+            this.score = 0;
+            this.coins = [];
+            this.lastCoinSpawn = 0;
+            this.terrainVisible = false;
+            this.landingFrozen = false;
+            this.landerRotation = 0;
+          }
+
+          _handleKeyDown(e) {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') this.keys.left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this.keys.right = true;
+            if (e.key === ' ' || e.code === 'Space') {
+              this.keys.thrust = true;
+              e.preventDefault();
+            }
+          }
+
+          _handleKeyUp(e) {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') this.keys.left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this.keys.right = false;
+            if (e.key === ' ' || e.code === 'Space') this.keys.thrust = false;
+          }
+
+          _handlePointerDown() {
+            this.isPointerDown = true;
+          }
+
+          _handlePointerUp() {
+            this.isPointerDown = false;
+          }
+
+          _handleMouseMove(e) {
+            if (this.state !== 'falling' && this.state !== 'landing') return;
+            if (this.lastMouseX !== null) {
+              // Nudge lateral velocity by the cursor delta. Drag and the velocity
+              // clamp tame it; gives an analog feel where fast swipes accelerate
+              // hard and slow drifts barely move you.
+              this.landerVelocityX += (e.clientX - this.lastMouseX) * LanderGame.MOUSE_STEER_GAIN;
+            }
+            this.lastMouseX = e.clientX;
+          }
+
+          _handleMouseLeaveCanvas() {
+            this.lastMouseX = null;
+            this.isPointerDown = false;
+          }
+
+          _terrainSegmentAt(x) {
+            const xr = x / this.width;
+            for (let i = 0; i < LanderGame.TERRAIN_POINTS.length - 1; i++) {
+              if (xr >= LanderGame.TERRAIN_POINTS[i][0] && xr <= LanderGame.TERRAIN_POINTS[i + 1][0]) {
+                return i;
+              }
+            }
+            return LanderGame.TERRAIN_POINTS.length - 2;
+          }
+
+          _terrainHeightAt(x, padY) {
+            const i = this._terrainSegmentAt(x);
+            const [x0r, y0r] = LanderGame.TERRAIN_POINTS[i];
+            const [x1r, y1r] = LanderGame.TERRAIN_POINTS[i + 1];
+            const x0 = x0r * this.width;
+            const x1 = x1r * this.width;
+            const y0 = padY + y0r * this.height;
+            const y1 = padY + y1r * this.height;
+            const t = (x - x0) / (x1 - x0);
+            return y0 + (y1 - y0) * t;
+          }
+
+          _terrainSlopeAt(x) {
+            const i = this._terrainSegmentAt(x);
+            const [x0r, y0r] = LanderGame.TERRAIN_POINTS[i];
+            const [x1r, y1r] = LanderGame.TERRAIN_POINTS[i + 1];
+            const dx = (x1r - x0r) * this.width;
+            const dy = (y1r - y0r) * this.height;
+            return Math.atan2(dy, dx);
+          }
+
+          _updateCoins(deltaSec) {
+            if (this.lastTime - this.lastCoinSpawn > LanderGame.COIN_SPAWN_RATE) {
+              this.coins.push({
+                x: Math.random() * (this.width - 40) + 20,
+                y: this.height + 20,
+                collected: false,
+              });
+              this.lastCoinSpawn = this.lastTime;
+            }
+
+            for (let i = this.coins.length - 1; i >= 0; i--) {
+              const coin = this.coins[i];
+              coin.y -= 150 * deltaSec;
+
+              if (!coin.collected) {
+                const dx = coin.x - this.landerX;
+                const dy = coin.y - this.landerY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 24) {
+                  coin.collected = true;
+                  this.score += 10;
+                }
+              }
+
+              if (coin.y < -20 || coin.collected) {
+                this.coins.splice(i, 1);
+              }
+            }
+          }
+
+          _update(dt) {
+            const deltaSec = dt / 1000;
+
+            if (this.state === 'falling') {
+              const lateralAccel = 600;
+              const lateralMax = 240;
+              const lateralDrag = 320;
+              if (this.keys.left) {
+                this.landerVelocityX -= lateralAccel * deltaSec;
+              } else if (this.keys.right) {
+                this.landerVelocityX += lateralAccel * deltaSec;
+              } else {
+                if (this.landerVelocityX > 0) this.landerVelocityX = Math.max(0, this.landerVelocityX - lateralDrag * deltaSec);
+                if (this.landerVelocityX < 0) this.landerVelocityX = Math.min(0, this.landerVelocityX + lateralDrag * deltaSec);
+              }
+
+              this.landerVelocityX = Math.max(-lateralMax, Math.min(lateralMax, this.landerVelocityX));
+              this.landerX += this.landerVelocityX * deltaSec;
+
+              if (this.landerX < LanderGame.LANDER_WIDTH / 2) {
+                this.landerX = LanderGame.LANDER_WIDTH / 2;
+                this.landerVelocityX = 0;
+              }
+              if (this.landerX > this.width - LanderGame.LANDER_WIDTH / 2) {
+                this.landerX = this.width - LanderGame.LANDER_WIDTH / 2;
+                this.landerVelocityX = 0;
+              }
+
+              const thrusting = this.keys.thrust || this.isPointerDown;
+              this.landerVelocityY += LanderGame.GRAVITY * deltaSec;
+              if (thrusting) this.landerVelocityY -= LanderGame.THRUST * deltaSec;
+              this.landerVelocityY = Math.max(-LanderGame.MAX_RISE_SPEED, Math.min(LanderGame.MAX_FALL_SPEED, this.landerVelocityY));
+              this.landerY += this.landerVelocityY * deltaSec;
+
+              if (this.landerY < LanderGame.LANDER_HEIGHT / 2) {
+                this.landerY = LanderGame.LANDER_HEIGHT / 2;
+                this.landerVelocityY = 0;
+              }
+
+              if (this.landerY > this.height + LanderGame.LANDER_HEIGHT) {
+                this._resetRun();
+              }
+
+              if (thrusting && Math.random() < 0.6) {
+                this.particles.push({
+                  x: this.landerX + (Math.random() - 0.5) * 8,
+                  y: this.landerY + LanderGame.LANDER_HEIGHT / 2,
+                  vx: (Math.random() - 0.5) * 60,
+                  vy: Math.random() * 80 + 40,
+                  life: 0.8,
+                });
+              }
+
+              if (
+                this.readyPending &&
+                performance.now() - this.fallingStartTime >= LanderGame.MIN_FALLING_MS &&
+                this.landerY > this.height * 0.25
+              ) {
+                const padFinalY = this.height * LanderGame.TERRAIN_PAD_FINAL_RATIO;
+                if (this.landerY + LanderGame.LANDER_HEIGHT / 2 > padFinalY - LanderGame.LANDER_HEIGHT) {
+                  this.state = 'landed';
+                  this.playBtn.style.display = 'block';
+                } else {
+                  this.state = 'landing';
+                  this.landingTime = 0;
+                  this.terrainVisible = true;
+                  this.terrainPadY = this.height + 80;
+                }
+              }
+
+              this._updateCoins(deltaSec);
+            } else if (this.state === 'landing') {
+              this.landingTime += dt;
+
+              const t = Math.min(1, this.landingTime / LanderGame.TERRAIN_RISE_MS);
+              const easeT = 1 - Math.pow(1 - t, 3);
+              const padStart = this.height + 80;
+              const padEnd = this.height * LanderGame.TERRAIN_PAD_FINAL_RATIO;
+              this.terrainPadY = padStart + (padEnd - padStart) * easeT;
+
+              if (this.landingFrozen) {
+                const ridingGroundY = this._terrainHeightAt(this.landerX, this.terrainPadY);
+                if (ridingGroundY <= this.landerY + LanderGame.LANDER_HEIGHT / 2) {
+                  this.landerY = ridingGroundY - LanderGame.LANDER_HEIGHT / 2;
+                  this.landerRotation = this._terrainSlopeAt(this.landerX);
+                }
+                return;
+              }
+
+              const thrusting = this.keys.thrust || this.isPointerDown;
+              this.landerVelocityY += LanderGame.GRAVITY * LanderGame.LANDING_GRAVITY_SCALE * deltaSec;
+              if (thrusting) this.landerVelocityY -= LanderGame.THRUST * deltaSec;
+              this.landerVelocityY = Math.max(-LanderGame.MAX_RISE_SPEED, Math.min(LanderGame.MAX_FALL_SPEED, this.landerVelocityY));
+              this.landerY += this.landerVelocityY * deltaSec;
+              if (this.landerY < LanderGame.LANDER_HEIGHT / 2) {
+                this.landerY = LanderGame.LANDER_HEIGHT / 2;
+                this.landerVelocityY = 0;
+              }
+
+              const lateralAccel = 600;
+              const lateralMax = 240;
+              const lateralDrag = 320;
+              if (this.keys.left) {
+                this.landerVelocityX -= lateralAccel * deltaSec;
+              } else if (this.keys.right) {
+                this.landerVelocityX += lateralAccel * deltaSec;
+              } else {
+                if (this.landerVelocityX > 0) this.landerVelocityX = Math.max(0, this.landerVelocityX - lateralDrag * deltaSec);
+                if (this.landerVelocityX < 0) this.landerVelocityX = Math.min(0, this.landerVelocityX + lateralDrag * deltaSec);
+              }
+              this.landerVelocityX = Math.max(-lateralMax, Math.min(lateralMax, this.landerVelocityX));
+              this.landerX += this.landerVelocityX * deltaSec;
+              if (this.landerX < LanderGame.LANDER_WIDTH / 2) { this.landerX = LanderGame.LANDER_WIDTH / 2; this.landerVelocityX = 0; }
+              if (this.landerX > this.width - LanderGame.LANDER_WIDTH / 2) { this.landerX = this.width - LanderGame.LANDER_WIDTH / 2; this.landerVelocityX = 0; }
+
+              const landerFootY = this.landerY + LanderGame.LANDER_HEIGHT / 2;
+              const finalGroundYHere = this._terrainHeightAt(this.landerX, this.height * LanderGame.TERRAIN_PAD_FINAL_RATIO);
+              const groundYHere = this._terrainHeightAt(this.landerX, this.terrainPadY);
+              if (landerFootY > finalGroundYHere) {
+                this.landerVelocityY = 0;
+                this.landerVelocityX = 0;
+                this.landingFrozen = true;
+                this.playBtn.style.display = 'block';
+              } else if (landerFootY >= groundYHere && this.landerVelocityY >= 0) {
+                this.landerY = groundYHere - LanderGame.LANDER_HEIGHT / 2;
+                this.landerVelocityY = 0;
+                this.landerVelocityX = 0;
+                this.landerRotation = this._terrainSlopeAt(this.landerX);
+                this.state = 'landed';
+                this.playBtn.style.display = 'block';
+              }
+
+              if (thrusting && Math.random() < 0.6) {
+                this.particles.push({
+                  x: this.landerX + (Math.random() - 0.5) * 8,
+                  y: this.landerY + LanderGame.LANDER_HEIGHT / 2,
+                  vx: (Math.random() - 0.5) * 60,
+                  vy: Math.random() * 80 + 40,
+                  life: 0.8,
+                });
+              }
+
+              this._updateCoins(deltaSec);
+            }
+
+            for (let i = this.particles.length - 1; i >= 0; i--) {
+              const p = this.particles[i];
+              p.x += p.vx * deltaSec;
+              p.y += p.vy * deltaSec;
+              p.life -= deltaSec * 2;
+              if (p.life <= 0) {
+                this.particles.splice(i, 1);
+              }
+            }
+          }
+
+          _draw() {
+            const ctx = this.ctx;
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, this.width, this.height);
+
+            for (const star of this.stars) {
+              ctx.fillStyle = `rgba(255, 255, 255, ${star.brightness})`;
+              ctx.fillRect(star.x, star.y, 1, 1);
+            }
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '16px monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(`SCORE: ${this.score.toString().padStart(4, '0')}`, 20, 30);
+
+            if (this.state === 'falling') {
+              ctx.textAlign = 'center';
+              ctx.font = '20px monospace';
+              ctx.fillText('APPROACHING', this.width / 2, 30);
+              ctx.font = '12px monospace';
+              ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+              ctx.fillText('SPACE / CLICK = THRUST   |   A / D OR SWIPE MOUSE = STEER', this.width / 2, 52);
+              ctx.fillStyle = '#ffffff';
+            }
+
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            for (const coin of this.coins) {
+              ctx.beginPath();
+              ctx.moveTo(coin.x, coin.y - 6);
+              ctx.lineTo(coin.x + 6, coin.y);
+              ctx.lineTo(coin.x, coin.y + 6);
+              ctx.lineTo(coin.x - 6, coin.y);
+              ctx.closePath();
+              ctx.stroke();
+            }
+
+            ctx.fillStyle = '#ffffff';
+            for (const p of this.particles) {
+              ctx.globalAlpha = p.life;
+              ctx.fillRect(p.x, p.y, 2, 2);
+            }
+            ctx.globalAlpha = 1.0;
+
+            if (this.terrainVisible && (this.state === 'landing' || this.state === 'landed')) {
+              const padY = this.state === 'landed' ? this.height * LanderGame.TERRAIN_PAD_FINAL_RATIO : this.terrainPadY;
+              ctx.strokeStyle = '#ffffff';
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              for (let i = 0; i < LanderGame.TERRAIN_POINTS.length; i++) {
+                const [xr, yr] = LanderGame.TERRAIN_POINTS[i];
+                const px = xr * this.width;
+                const py = padY + yr * this.height;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+              }
+              ctx.stroke();
+            }
+
+            ctx.save();
+            ctx.translate(this.landerX, this.landerY);
+            if (this.landerRotation !== 0) ctx.rotate(this.landerRotation);
+
+            ctx.scale(0.7, 0.7);
+            ctx.translate(-50, -50);
+
+            ctx.translate(50, 57.5);
+            ctx.scale(0.835, 0.835);
+            ctx.translate(-50, -57.5);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fill(this.landerPath1);
+
+            if (this.state === 'falling' || this.state === 'landing') {
+              ctx.globalAlpha = 0.5 + Math.random() * 0.5;
+              ctx.fillStyle = '#38bdf8';
+              ctx.fill(this.landerPath2);
+              ctx.globalAlpha = 1.0;
+            }
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fill(this.landerPath3);
+
+            ctx.restore();
+          }
+        }
+
+        // Lander tuning constants. Pulled into static fields so the class is self-contained.
+        LanderGame.LANDER_WIDTH = 24;
+        LanderGame.LANDER_HEIGHT = 32;
+        LanderGame.COIN_SPAWN_RATE = 700;
+        LanderGame.GRAVITY = 320;
+        LanderGame.THRUST = 700;
+        LanderGame.MAX_FALL_SPEED = 380;
+        LanderGame.MAX_RISE_SPEED = 260;
+        LanderGame.MIN_FALLING_MS = 4500;
+        LanderGame.MOUSE_STEER_GAIN = 3.0;
+        LanderGame.STAR_COUNT = 50;
+        LanderGame.TERRAIN_PAD_FINAL_RATIO = 0.8;
+        LanderGame.TERRAIN_RISE_MS = 2500;
+        LanderGame.LANDING_GRAVITY_SCALE = 0.55;
+        // Terrain ridge as (xRatio, yOffsetRatio) pairs. Pad spans 0.4–0.6 (yOffset = 0).
+        // Y on screen = terrainPadY + yOffsetRatio * height.
+        LanderGame.TERRAIN_POINTS = [
           [0.0, 0.05],
           [0.2, 0.02],
           [0.3, 0.05],
@@ -133,512 +632,678 @@
           [1.0, 0.06],
         ];
 
-        function terrainSegmentAt(x) {
-          const xr = x / width;
-          for (let i = 0; i < TERRAIN_POINTS.length - 1; i++) {
-            if (xr >= TERRAIN_POINTS[i][0] && xr <= TERRAIN_POINTS[i + 1][0]) {
-              return i;
+        // Shuttle prelude — used while the host is loading the /level route.
+        // For now, just draws the shuttle SVG centered with a gentle bob — no gameplay yet.
+        class ShuttleGame extends PreludeGame {
+          constructor(elements, mode = 'outbound') {
+            super(elements);
+
+            // 'outbound' = travelling to a mission (full finale with the
+            // big asteroid). 'return' = coming back from /level (no
+            // asteroid finale; just shoot rocks until the map's ready).
+            this.mode = mode;
+
+            // Three layers from docs/inspo/shuttle.svg. Each path in the source SVG
+            // carries the SAME rotation matrix (~48°) but a DIFFERENT transform-origin,
+            // so canvas-side we have to pivot the matrix per-path or the small detail
+            // pieces drift away from the body.
+            this.shuttleParts = [
+              {
+                origin: [45.561, 65.629],
+                path: new Path2D("M 6.78 45.31 C 7.873 47.595 9.393 49.65 11.26 51.361 L 20.748 60.095 C 21.6 61.451 27.991 72.208 25.608 85.56 C 24.26 93.107 24.83 100.22 27.08 105.705 C 27.116 105.854 27.174 105.998 27.248 106.131 C 27.998 107.904 29.002 109.557 30.225 111.037 C 30.69 111.592 31.467 111.768 32.123 111.463 C 32.483 111.299 40.944 107.287 55.685 91.959 L 58.01 94.389 L 58.01 94.385 C 58.31 94.701 58.732 94.881 59.17 94.881 L 59.185 94.881 C 59.627 94.877 60.049 94.689 60.35 94.361 L 60.799 93.873 L 64.189 96.451 C 64.682 96.826 65.381 96.764 65.799 96.307 L 67.857 94.068 L 69.924 91.83 C 70.342 91.373 70.346 90.674 69.932 90.213 L 67.084 87.045 L 67.533 86.556 C 67.666 86.412 67.767 86.244 67.838 86.06 L 68.709 86.861 C 69.361 87.463 70.377 87.42 70.978 86.767 C 71.264 86.455 71.416 86.041 71.4 85.615 C 71.381 85.189 71.197 84.791 70.881 84.502 L 70.01 83.697 C 70.189 83.611 70.349 83.494 70.482 83.353 L 70.931 82.865 L 74.326 85.439 C 74.818 85.814 75.517 85.752 75.935 85.299 L 80.053 80.822 L 80.057 80.818 C 80.478 80.361 80.482 79.662 80.068 79.201 L 77.221 76.033 L 77.67 75.545 L 77.666 75.545 C 77.967 75.22 78.119 74.783 78.088 74.342 C 78.053 73.9 77.842 73.494 77.498 73.213 L 74.885 71.099 C 88.944 55.142 92.24 46.38 92.373 46.005 C 92.623 45.326 92.384 44.564 91.794 44.146 C 90.216 43.052 88.486 42.189 86.658 41.587 C 86.521 41.525 86.369 41.478 86.216 41.455 C 80.564 39.669 73.427 39.689 66.021 41.654 C 52.951 45.123 41.732 39.689 40.251 38.923 L 30.755 30.181 C 28.892 28.458 26.716 27.115 24.341 26.22 L 7.806 20.095 C 5.466 19.22 3.123 19.646 1.685 21.208 L -0.092 23.138 C -0.831 23.951 -1.268 24.99 -1.338 26.083 C -1.405 27.201 -1.186 28.318 -0.698 29.326 L 6.78 45.31 Z M 28.768 86.122 C 29.936 79.313 29.314 72.317 26.971 65.821 L 46.397 83.7 L 29.264 102.313 C 27.865 97.024 27.693 91.485 28.768 86.122 Z M 31.893 107.946 C 31.385 107.215 30.939 106.446 30.553 105.649 L 48.756 85.872 L 52.182 89.024 L 52.185 89.024 C 52.514 89.329 52.869 89.61 53.248 89.86 C 42.064 101.462 34.58 106.38 31.893 107.946 Z M 56.303 87.962 L 56.299 87.958 L 51.744 83.2 C 51.209 82.661 50.396 81.852 52.318 79.763 C 53.236 78.763 53.896 78.415 54.463 78.415 C 54.939 78.45 55.392 78.642 55.756 78.954 L 63.138 84.931 L 63.142 84.935 C 63.15 84.942 63.158 84.946 63.166 84.95 L 64.017 85.642 L 59.146 90.931 L 56.303 87.962 Z M 65.892 67.946 L 74.15 74.629 L 69.279 79.919 L 61.881 72.188 C 61.345 71.649 60.533 70.84 62.455 68.751 C 63.373 67.751 64.033 67.403 64.599 67.403 C 65.076 67.442 65.529 67.629 65.892 67.946 Z M 64.771 93.872 L 62.431 92.095 L 63.123 91.341 L 65.275 93.321 L 64.771 93.872 Z M 67.412 91.005 L 66.908 91.555 L 64.756 89.575 L 65.447 88.821 L 67.412 91.005 Z M 74.908 82.86 L 72.568 81.087 L 73.26 80.333 L 75.412 82.313 L 74.908 82.86 Z M 77.549 79.993 L 77.045 80.544 L 74.888 78.563 L 75.58 77.809 L 77.549 79.993 Z M 72.595 68.837 L 72.595 68.841 C 72.314 68.485 72.01 68.153 71.677 67.849 L 68.252 64.692 L 86.451 44.919 C 87.279 45.24 88.083 45.623 88.853 46.064 C 87.529 48.865 83.283 56.681 72.595 68.841 L 72.595 68.837 Z M 66.842 44.755 C 72.099 43.243 77.635 42.954 83.022 43.911 L 65.889 62.52 L 46.471 44.645 L 46.471 44.649 C 53.139 46.442 60.159 46.481 66.842 44.755 Z M 28.584 32.54 L 38.228 41.415 C 38.244 41.431 38.263 41.446 38.279 41.462 L 63.213 64.415 C 62.002 64.852 60.928 65.598 60.092 66.579 C 57.396 69.509 57.865 71.86 58.709 73.294 L 55.025 69.903 L 55.025 69.907 C 54.377 69.306 53.361 69.348 52.76 70.001 C 52.162 70.653 52.201 71.665 52.853 72.266 L 56.65 75.763 C 54.373 74.626 52.127 75.235 49.959 77.591 C 49.053 78.501 48.396 79.63 48.053 80.864 L 13.432 48.997 L 13.436 49.001 C 11.869 47.571 10.596 45.856 9.682 43.946 L 4.424 32.704 C 6.186 32.2 7.776 31.216 9.01 29.86 C 10.291 28.47 11.166 26.751 11.545 24.9 L 23.229 29.228 L 23.233 29.228 C 25.213 29.978 27.03 31.103 28.585 32.54 L 28.584 32.54 Z M 2.268 25.309 L 4.049 23.372 C 4.799 22.77 5.83 22.665 6.685 23.099 L 8.498 23.77 C 8.295 25.235 7.65 26.602 6.65 27.688 C 5.697 28.743 4.431 29.462 3.041 29.747 L 2.209 27.97 C 1.955 27.462 1.834 26.899 1.861 26.333 C 1.877 25.954 2.021 25.595 2.267 25.31 L 2.268 25.309 Z"),
+              },
+              {
+                origin: [47.541, 26.411],
+                path: new Path2D("M 41.689 20.751 L 39.428 23.208 L 39.428 23.211 C 39.236 23.422 39.1 23.676 39.041 23.958 L 38.447 26.68 L 38.447 26.676 C 38.369 27.051 38.42 27.438 38.6 27.774 L 42.404 34.88 C 42.682 35.399 43.225 35.727 43.818 35.727 C 43.928 35.727 44.033 35.715 44.143 35.692 C 44.834 35.551 45.353 34.969 45.416 34.262 L 45.924 28.446 L 47.689 26.528 L 47.693 26.524 L 49.584 24.469 L 55.338 23.485 L 55.338 23.481 C 56.037 23.364 56.576 22.797 56.658 22.094 C 56.744 21.387 56.357 20.712 55.705 20.43 L 48.31 17.227 C 47.959 17.075 47.568 17.055 47.201 17.165 L 44.541 17.981 C 44.267 18.063 44.021 18.219 43.83 18.426 L 41.693 20.751 L 41.689 20.751 Z M 45.896 20.918 L 47.576 20.403 L 49.482 21.227 L 48.502 21.395 L 48.502 21.399 C 48.154 21.458 47.834 21.633 47.596 21.891 L 45.459 24.211 L 45.455 24.215 L 43.193 26.672 L 43.193 26.676 C 42.951 26.938 42.807 27.27 42.775 27.622 L 42.689 28.614 L 41.709 26.782 L 42.084 25.063 L 43.928 23.059 L 45.896 20.918 Z"),
+              },
+              {
+                origin: [47.37, 52.03],
+                path: new Path2D("M 26.801 45.928 C 26.821 46.35 27.004 46.752 27.317 47.041 L 32.336 51.662 L 54 71.6 C 54.313 71.889 54.727 72.042 55.153 72.022 C 55.579 72.007 55.981 71.819 56.266 71.507 L 67.516 59.283 C 68.114 58.631 68.075 57.619 67.422 57.018 L 62.403 52.401 L 40.739 32.46 C 40.426 32.171 40.012 32.018 39.587 32.038 C 39.161 32.053 38.762 32.241 38.473 32.553 L 27.223 44.776 L 27.223 44.773 C 26.934 45.089 26.786 45.503 26.801 45.929 L 26.801 45.928 Z M 50.727 46.014 L 41.653 55.873 L 35.688 50.385 L 44.766 40.522 L 50.727 46.014 Z M 59.052 53.674 L 49.973 63.537 L 44.013 58.045 L 53.091 48.182 L 59.052 53.674 Z M 54.993 68.154 L 52.333 65.705 L 61.411 55.841 L 64.071 58.291 L 54.993 68.154 Z M 39.747 35.904 L 42.407 38.353 L 33.329 48.216 L 30.669 45.763 L 39.747 35.904 Z"),
+              },
+            ];
+
+            this.starLayers = []; // [{ stars: [{x,y,size,brightness}], speed }]
+            this.elapsed = 0;
+            this.readyPending = false;
+
+            this.state = 'cruising'; // 'cruising' | 'finale' | 'exit'
+
+            this.shipX = 0;
+            this.shipY = 0;
+            this.shipVX = 0;
+            this.shipVY = 0;
+
+            this.keys = { left: false, right: false, fire: false };
+
+            this.particles = [];
+
+            this.asteroids = [];
+            this.lastAsteroidSpawn = 0;
+
+            this.bullets = [];
+            this.lastFireTime = -Infinity;
+            this.score = 0;
+            this.invulnerableUntil = 0;
+            this.destination = null;
+            this.exitStartTime = 0;
+            this.finaleStartTime = 0;
+            this.shipAlpha = 1;
+            this.bgScale = 1;
+            this.fallingStartTime = performance.now();
+
+            this._boundKeyDown = this._handleKeyDown.bind(this);
+            this._boundKeyUp = this._handleKeyUp.bind(this);
+          }
+
+          ready() {
+            this.readyPending = true;
+          }
+
+          _onCanvasInit() {
+            this.shipX = this.width / 2;
+            this.shipY = this.height * ShuttleGame.SHIP_SPAWN_Y_RATIO;
+            this.shipVX = 0;
+            this.shipVY = 0;
+
+            this.starLayers = [];
+            for (let layer = 0; layer < ShuttleGame.STAR_LAYERS; layer++) {
+              const stars = [];
+              for (let i = 0; i < ShuttleGame.STAR_COUNT_PER_LAYER[layer]; i++) {
+                stars.push({
+                  x: Math.random() * this.width,
+                  y: Math.random() * this.height,
+                  size: ShuttleGame.STAR_LAYER_SIZES[layer],
+                  brightness: Math.random() * 0.7 + 0.3,
+                });
+              }
+              this.starLayers.push({
+                stars,
+                speed: ShuttleGame.STAR_LAYER_SPEEDS[layer],
+              });
             }
           }
-          return TERRAIN_POINTS.length - 2;
-        }
 
-        function terrainHeightAt(x, padY) {
-          const i = terrainSegmentAt(x);
-          const [x0r, y0r] = TERRAIN_POINTS[i];
-          const [x1r, y1r] = TERRAIN_POINTS[i + 1];
-          const x0 = x0r * width;
-          const x1 = x1r * width;
-          const y0 = padY + y0r * height;
-          const y1 = padY + y1r * height;
-          const t = (x - x0) / (x1 - x0);
-          return y0 + (y1 - y0) * t;
-        }
-
-        function terrainSlopeAt(x) {
-          const i = terrainSegmentAt(x);
-          const [x0r, y0r] = TERRAIN_POINTS[i];
-          const [x1r, y1r] = TERRAIN_POINTS[i + 1];
-          // Slope is independent of padY (vertical offset cancels), so we can
-          // compute it from the offset ratios directly.
-          const dx = (x1r - x0r) * width;
-          const dy = (y1r - y0r) * height;
-          return Math.atan2(dy, dx);
-        }
-        let terrainPadY = 0; // current Y of the landing pad (height * 0.8 once terrain has fully risen)
-        const TERRAIN_PAD_FINAL_RATIO = 0.8; // resting Y of the pad relative to canvas height
-        const TERRAIN_RISE_MS = 2500;        // how long the terrain takes to scroll up into view
-        const LANDING_GRAVITY_SCALE = 0.55;  // gentler descent during the landing beat
-
-        let animationFrameId = 0;
-        let lastTime = 0;
-        let width = 0;
-        let height = 0;
-
-        const keys = { left: false, right: false, thrust: false };
-        let isPointerDown = false;
-        let lastMouseX = null;
-        // How much each pixel of mouse movement adds to lateral velocity (px/s per px moved).
-        // Picked so a quick flick saturates the lander, while small movements give fine nudges.
-        const MOUSE_STEER_GAIN = 3.0;
-
-        const LANDER_WIDTH = 24;
-        const LANDER_HEIGHT = 32;
-        const COIN_SPAWN_RATE = 700;
-        let lastCoinSpawn = 0;
-
-        // Vertical physics
-        const GRAVITY = 320;        // px/s^2 down
-        const THRUST = 700;         // px/s^2 up while active
-        const MAX_FALL_SPEED = 380;
-        const MAX_RISE_SPEED = 260;
-
-        // Minimum time the player must spend falling, even if .ready() is called instantly.
-        const MIN_FALLING_MS = 4500;
-        let fallingStartTime = 0;
-        let readyPending = false;
-
-        const landerPath1 = new Path2D("m79.863 77.492h-1.1328l-6.1094-12.168v-7.7266c0-0.58594-0.23438-1.1484-0.64844-1.5625-0.41406-0.41406-0.97656-0.64453-1.5625-0.64453h-40.82c-0.58594 0-1.1484 0.23047-1.5625 0.64453-0.41406 0.41406-0.64844 0.97656-0.64844 1.5625v7.7266l-6.1094 12.168h-1.1328c-0.84766-0.015626-1.5586 0.625-1.6328 1.4648-0.023437 0.42578 0.12891 0.83984 0.42188 1.1484 0.28906 0.30859 0.69531 0.48047 1.1211 0.48047h5.7344c0.84375 0.019531 1.5586-0.62109 1.6328-1.4609 0.023438-0.42578-0.12891-0.83984-0.42187-1.1484-0.29297-0.30859-0.69922-0.48437-1.125-0.48437h-1.0469l5.7812-8.5859-0.003906 0.003906c0.26953 1.5938 1.6484 2.7617 3.2656 2.7617h11.293l-0.30859-2.6875c-0.17188-1.4727 0.29688-2.9453 1.2812-4.0469 0.98438-1.1055 2.3945-1.7383 3.8711-1.7383 1.4805 0 2.8906 0.63281 3.875 1.7383 0.98438 1.1016 1.4531 2.5742 1.2812 4.0469l-0.30859 2.6875h11.293-0.003906c1.6172 0 2.9961-1.168 3.2656-2.7617l5.7773 8.582h-0.96094c-0.84375-0.015626-1.5586 0.625-1.6328 1.4648-0.023438 0.42578 0.12891 0.83984 0.42187 1.1484 0.29297 0.30859 0.69922 0.48047 1.125 0.48047h5.8203c0.42578 0 0.83203-0.17188 1.1211-0.48047 0.29297-0.30859 0.44531-0.72266 0.42188-1.1484-0.074219-0.83984-0.78516-1.4805-1.6328-1.4648z");
-        const landerPath2 = new Path2D("m52.91 77.492h-1.1836l1.0156-8.7891h-0.003907c0.09375-0.78125-0.15625-1.5625-0.67969-2.1484-0.52344-0.58984-1.2734-0.92578-2.0586-0.92578s-1.5352 0.33594-2.0586 0.92578c-0.52344 0.58594-0.77344 1.3672-0.67969 2.1484l1.0156 8.7891h-1.1875c-0.41016 0-0.80469 0.16406-1.0977 0.45312-0.28906 0.28906-0.45313 0.68359-0.45313 1.0938 0 0.41016 0.16406 0.80469 0.45313 1.0977 0.29297 0.28906 0.6875 0.45312 1.0977 0.44922h5.8203c0.41016 0.003906 0.80469-0.16016 1.0977-0.44922 0.28906-0.29297 0.45313-0.6875 0.45313-1.0977 0-0.41016-0.16406-0.80469-0.45313-1.0938-0.29297-0.28906-0.6875-0.45312-1.0977-0.45312z");
-        const landerPath3 = new Path2D("m35.879 52.586h28.246-0.003906c0.53125 0 1.0352-0.23828 1.3711-0.64844 0.33594-0.41016 0.46875-0.94922 0.36328-1.4688l-0.51172-2.5352h0.003906c-0.13672-0.67188 0.12891-1.3594 0.67578-1.7695l0.86328-0.64062h0.003906c0.54688-0.41016 0.8125-1.0977 0.67578-1.7695l-1.1602-5.7422c-0.13281-0.67188-0.64453-1.207-1.3125-1.3711l-1.0352-0.25391v0.003906c-0.66406-0.16406-1.1797-0.69922-1.3125-1.3711l-0.44922-2.2344c-0.16406-0.82422-0.89062-1.4219-1.7344-1.4219h-9.5312v-6.5c0.98047-0.41406 1.6445-1.3438 1.7227-2.4023 0.039063-0.77734-0.23438-1.5352-0.75781-2.1055-0.52344-0.57422-1.2539-0.91406-2.0273-0.94141-1.3594-0.019531-2.5391 0.92578-2.8203 2.25-0.27734 1.3281 0.42187 2.668 1.6719 3.1992v6.5h-9.3828c-0.84375 0-1.5703 0.59766-1.7344 1.4219l-3.5586 17.684c-0.10547 0.51953 0.027344 1.0586 0.36328 1.4688 0.33594 0.41016 0.83984 0.64844 1.3711 0.64844zm14.121-15.031c2.0859 0 3.9688 1.2578 4.7656 3.1836 0.79688 1.9297 0.35547 4.1484-1.1172 5.6211-1.4766 1.4766-3.6953 1.918-5.6211 1.1211-1.9297-0.80078-3.1836-2.6797-3.1836-4.7656 0-2.8477 2.3086-5.1602 5.1562-5.1602z");
-
-        function initCanvas() {
-          const dpr = window.devicePixelRatio || 1;
-          const rect = wrapper.getBoundingClientRect();
-          width = rect.width;
-          height = rect.height;
-
-          canvas.width = width * dpr;
-          canvas.height = height * dpr;
-          ctx.scale(dpr, dpr);
-
-          resetRun();
-          fallingStartTime = performance.now();
-
-          stars = [];
-          for (let i = 0; i < 50; i++) {
-            stars.push({
-              x: Math.random() * width,
-              y: Math.random() * height,
-              brightness: Math.random() * 0.8 + 0.2,
-            });
-          }
-        }
-
-        function handleResize() {
-          initCanvas();
-        }
-
-        function resetRun() {
-          landerX = width / 2;
-          landerY = LANDER_HEIGHT;
-          landerVelocityX = 0;
-          landerVelocityY = 0;
-          score = 0;
-          coins = [];
-          lastCoinSpawn = 0;
-          terrainVisible = false;
-          landingFrozen = false;
-          landerRotation = 0;
-        }
-
-        function handleKeyDown(e) {
-          if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
-          if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
-          if (e.key === ' ' || e.code === 'Space') {
-            keys.thrust = true;
-            e.preventDefault();
-          }
-        }
-
-        function handleKeyUp(e) {
-          if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
-          if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
-          if (e.key === ' ' || e.code === 'Space') keys.thrust = false;
-        }
-
-        function handlePointerDown() {
-          isPointerDown = true;
-        }
-
-        function handlePointerUp() {
-          isPointerDown = false;
-        }
-
-        function handleMouseMove(e) {
-          if (state !== 'falling' && state !== 'landing') return;
-          if (lastMouseX !== null) {
-            // Nudge lateral velocity by the cursor delta. Drag and the velocity
-            // clamp in update() will tame it; this gives an analog feel where
-            // fast swipes accelerate hard and slow drifts barely move you.
-            landerVelocityX += (e.clientX - lastMouseX) * MOUSE_STEER_GAIN;
-          }
-          lastMouseX = e.clientX;
-        }
-
-        function handleMouseLeaveCanvas() {
-          lastMouseX = null;
-          isPointerDown = false;
-        }
-
-        function updateCoins(deltaSec) {
-          if (lastTime - lastCoinSpawn > COIN_SPAWN_RATE) {
-            coins.push({
-              x: Math.random() * (width - 40) + 20,
-              y: height + 20,
-              collected: false,
-            });
-            lastCoinSpawn = lastTime;
-          }
-
-          for (let i = coins.length - 1; i >= 0; i--) {
-            const coin = coins[i];
-            coin.y -= 150 * deltaSec;
-
-            if (!coin.collected) {
-              const dx = coin.x - landerX;
-              const dy = coin.y - landerY;
-              const dist = Math.sqrt(dx * dx + dy * dy);
-              if (dist < 24) {
-                coin.collected = true;
-                score += 10;
+          _updateStarfield(deltaSec) {
+            for (const layer of this.starLayers) {
+              for (const s of layer.stars) {
+                s.y += layer.speed * this.bgScale * deltaSec;
+                if (s.y > this.height) {
+                  s.y -= this.height + Math.random() * 20;
+                  s.x = Math.random() * this.width;
+                  s.brightness = Math.random() * 0.7 + 0.3;
+                }
               }
             }
+          }
 
-            if (coin.y < -20 || coin.collected) {
-              coins.splice(i, 1);
+          _attachInput() {
+            window.addEventListener('keydown', this._boundKeyDown);
+            window.addEventListener('keyup', this._boundKeyUp);
+          }
+
+          _detachInput() {
+            window.removeEventListener('keydown', this._boundKeyDown);
+            window.removeEventListener('keyup', this._boundKeyUp);
+          }
+
+          _handleKeyDown(e) {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') this.keys.left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this.keys.right = true;
+            if (e.key === ' ' || e.code === 'Space') {
+              this.keys.fire = true;
+              e.preventDefault();
             }
           }
-        }
 
-        function update(dt) {
-          const deltaSec = dt / 1000;
+          _handleKeyUp(e) {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') this.keys.left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this.keys.right = false;
+            if (e.key === ' ' || e.code === 'Space') this.keys.fire = false;
+          }
 
-          if (state === 'falling') {
-            // Lateral: A/D keys OR mouse half (left half = A, right half = D).
-            const lateralAccel = 600;
-            const lateralMax = 240;
-            const lateralDrag = 320;
-            if (keys.left) {
-              landerVelocityX -= lateralAccel * deltaSec;
-            } else if (keys.right) {
-              landerVelocityX += lateralAccel * deltaSec;
-            } else {
-              if (landerVelocityX > 0) landerVelocityX = Math.max(0, landerVelocityX - lateralDrag * deltaSec);
-              if (landerVelocityX < 0) landerVelocityX = Math.min(0, landerVelocityX + lateralDrag * deltaSec);
+          _updateShuttle(deltaSec) {
+            if (this.keys.left) {
+              this.shipVX -= ShuttleGame.SHUTTLE_ACCEL * deltaSec;
+            } else if (this.keys.right) {
+              this.shipVX += ShuttleGame.SHUTTLE_ACCEL * deltaSec;
+            } else if (this.shipVX > 0) {
+              this.shipVX = Math.max(0, this.shipVX - ShuttleGame.SHUTTLE_DRAG * deltaSec);
+            } else if (this.shipVX < 0) {
+              this.shipVX = Math.min(0, this.shipVX + ShuttleGame.SHUTTLE_DRAG * deltaSec);
             }
 
-            landerVelocityX = Math.max(-lateralMax, Math.min(lateralMax, landerVelocityX));
-            landerX += landerVelocityX * deltaSec;
+            this.shipVX = Math.max(-ShuttleGame.SHUTTLE_MAX_SPEED, Math.min(ShuttleGame.SHUTTLE_MAX_SPEED, this.shipVX));
 
-            if (landerX < LANDER_WIDTH / 2) {
-              landerX = LANDER_WIDTH / 2;
-              landerVelocityX = 0;
-            }
-            if (landerX > width - LANDER_WIDTH / 2) {
-              landerX = width - LANDER_WIDTH / 2;
-              landerVelocityX = 0;
-            }
+            this.shipX += this.shipVX * deltaSec;
 
-            // Vertical: gravity always pulls; SPACE / click / touch fires upward thrust.
-            const thrusting = keys.thrust || isPointerDown;
-            landerVelocityY += GRAVITY * deltaSec;
-            if (thrusting) landerVelocityY -= THRUST * deltaSec;
-            landerVelocityY = Math.max(-MAX_RISE_SPEED, Math.min(MAX_FALL_SPEED, landerVelocityY));
-            landerY += landerVelocityY * deltaSec;
+            const inset = ShuttleGame.SHIP_EDGE_INSET;
+            if (this.shipX < inset) { this.shipX = inset; this.shipVX = 0; }
+            if (this.shipX > this.width - inset) { this.shipX = this.width - inset; this.shipVX = 0; }
 
-            if (landerY < LANDER_HEIGHT / 2) {
-              landerY = LANDER_HEIGHT / 2;
-              landerVelocityY = 0;
-            }
-
-            // Missed the landing: fell past the bottom before host signalled ready.
-            if (landerY > height + LANDER_HEIGHT) {
-              resetRun();
-            }
-
-            // Thruster exhaust
-            if (thrusting && Math.random() < 0.6) {
-              particles.push({
-                x: landerX + (Math.random() - 0.5) * 8,
-                y: landerY + LANDER_HEIGHT / 2,
-                vx: (Math.random() - 0.5) * 60,
-                vy: Math.random() * 80 + 40,
-                life: 0.8,
+            if (Math.random() < ShuttleGame.REAR_THRUSTER_SPAWN_CHANCE) {
+              this.particles.push({
+                x: this.shipX + (Math.random() - 0.5) * 8,
+                y: this.shipY + ShuttleGame.PARTICLE_OFFSET + (Math.random() - 0.5) * 4,
+                vx: -this.shipVX * 0.2 + (Math.random() - 0.5) * 30,
+                vy: ShuttleGame.REAR_THRUSTER_VY + (Math.random() - 0.5) * 40,
+                life: ShuttleGame.PARTICLE_LIFE_S,
               });
             }
 
-            // Hand off to landing only once:
-            //  - the host has signalled ready,
-            //  - the player has had time to feel gravity, and
-            //  - the lander is in a sane mid-air position (not freshly respawned at the top).
-            if (
-              readyPending &&
-              performance.now() - fallingStartTime >= MIN_FALLING_MS &&
-              landerY > height * 0.25
-            ) {
-              const padFinalY = height * TERRAIN_PAD_FINAL_RATIO;
-              if (landerY + LANDER_HEIGHT / 2 > padFinalY - LANDER_HEIGHT) {
-                // Lander is already below where the pad would settle — skip the
-                // rising-terrain landing beat entirely so we don't snap the ship
-                // up onto the pad. Just unlock the PLAY button and leave the
-                // ship where the player flew it. Terrain stays hidden.
-                state = 'landed';
-                playBtn.style.display = 'block';
-              } else {
-                state = 'landing';
-                landingTime = 0;
-                terrainVisible = true;
-                // Seed the pad off-screen below so the first draw of the new state
-                // doesn't read the stale terrainPadY (would flash at the top of the canvas).
-                terrainPadY = height + 80;
-              }
+            const sideThrusting = this.keys.left || this.keys.right;
+            if (sideThrusting && Math.random() < ShuttleGame.PARTICLE_SPAWN_CHANCE) {
+              let px = 0;
+              if (this.keys.left)  { px =  ShuttleGame.PARTICLE_OFFSET; }
+              if (this.keys.right) { px = -ShuttleGame.PARTICLE_OFFSET; }
+              this.particles.push({
+                x: this.shipX + px + (Math.random() - 0.5) * 6,
+                y: this.shipY + ShuttleGame.PARTICLE_SIDE_Y_OFFSET + (Math.random() - 0.5) * 6,
+                vx: -this.shipVX * 0.3 + (Math.random() - 0.5) * 40,
+                vy: (Math.random() - 0.5) * 40,
+                life: ShuttleGame.PARTICLE_LIFE_S,
+              });
             }
 
-            updateCoins(deltaSec);
-          } else if (state === 'landing') {
-            landingTime += dt;
+            for (let i = this.particles.length - 1; i >= 0; i--) {
+              const p = this.particles[i];
+              p.x += p.vx * deltaSec;
+              p.y += p.vy * deltaSec;
+              p.life -= deltaSec;
+              if (p.life <= 0) this.particles.splice(i, 1);
+            }
+          }
 
-            // Terrain scrolls up from below. Pad rests at height * TERRAIN_PAD_FINAL_RATIO.
-            const t = Math.min(1, landingTime / TERRAIN_RISE_MS);
-            const easeT = 1 - Math.pow(1 - t, 3);
-            const padStart = height + 80;
-            const padEnd = height * TERRAIN_PAD_FINAL_RATIO;
-            terrainPadY = padStart + (padEnd - padStart) * easeT;
+          _makeAsteroidVertices(radius) {
+            const count = ShuttleGame.ASTEROID_VERTEX_MIN
+              + Math.floor(Math.random() * (ShuttleGame.ASTEROID_VERTEX_MAX - ShuttleGame.ASTEROID_VERTEX_MIN + 1));
+            const verts = [];
+            for (let i = 0; i < count; i++) {
+              const angle = (i / count) * Math.PI * 2;
+              const jitter = 1 + (Math.random() * 2 - 1) * ShuttleGame.ASTEROID_VERTEX_JITTER;
+              verts.push({ angle, distance: radius * jitter });
+            }
+            return verts;
+          }
 
-            if (landingFrozen) {
-              // Ship already fell past the pad — skip ship physics, but if the
-              // rising terrain catches up to the frozen feet, ride it up so the
-              // lander always sits flush on the ridge instead of floating above
-              // it. Rotation tracks the segment slope at the current X so the
-              // body conforms to the surface as it settles.
-              const ridingGroundY = terrainHeightAt(landerX, terrainPadY);
-              if (ridingGroundY <= landerY + LANDER_HEIGHT / 2) {
-                landerY = ridingGroundY - LANDER_HEIGHT / 2;
-                landerRotation = terrainSlopeAt(landerX);
+          _spawnAsteroid(size) {
+            const radius = ShuttleGame.ASTEROID_RADII[size];
+            const x = Math.random() * (this.width - radius * 2) + radius;
+            const y = -radius - 10;
+            const vy = ShuttleGame.ASTEROID_VY_MIN + Math.random() * (ShuttleGame.ASTEROID_VY_MAX - ShuttleGame.ASTEROID_VY_MIN);
+            const vx = (Math.random() * 2 - 1) * ShuttleGame.ASTEROID_VX_RANGE;
+            this.asteroids.push({
+              x, y, vx, vy,
+              size,
+              radius,
+              vertices: this._makeAsteroidVertices(radius),
+              rotation: Math.random() * Math.PI * 2,
+              rotationVel: (Math.random() * 2 - 1) * ShuttleGame.ASTEROID_ROT_VEL_RANGE,
+            });
+          }
+
+          _currentSpawnInterval() {
+            const t = Math.min(1, this.elapsed / ShuttleGame.ASTEROID_RAMP_MS);
+            return ShuttleGame.ASTEROID_BASE_SPAWN_MS
+              + (ShuttleGame.ASTEROID_MIN_SPAWN_MS - ShuttleGame.ASTEROID_BASE_SPAWN_MS) * t;
+          }
+
+          _pickSpawnSize() {
+            const r = Math.random();
+            if (r < ShuttleGame.ASTEROID_SPAWN_BIG_PROB) return 'big';
+            if (r < ShuttleGame.ASTEROID_SPAWN_BIG_PROB + ShuttleGame.ASTEROID_SPAWN_MED_PROB) return 'med';
+            return 'small';
+          }
+
+          _updateAsteroids(deltaSec) {
+            if (this.state === 'cruising' && this.elapsed - this.lastAsteroidSpawn >= this._currentSpawnInterval()) {
+              this._spawnAsteroid(this._pickSpawnSize());
+              this.lastAsteroidSpawn = this.elapsed;
+            }
+            for (let i = this.asteroids.length - 1; i >= 0; i--) {
+              const a = this.asteroids[i];
+              a.x += a.vx * this.bgScale * deltaSec;
+              a.y += a.vy * this.bgScale * deltaSec;
+              a.rotation += a.rotationVel * deltaSec;
+              if (a.x < -a.radius) a.x = this.width + a.radius;
+              if (a.x > this.width + a.radius) a.x = -a.radius;
+              if (a.y > this.height + a.radius) this.asteroids.splice(i, 1);
+            }
+          }
+
+          _drawAsteroids() {
+            const ctx = this.ctx;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            for (const a of this.asteroids) {
+              ctx.save();
+              ctx.translate(a.x, a.y);
+              ctx.rotate(a.rotation);
+              ctx.beginPath();
+              for (let i = 0; i < a.vertices.length; i++) {
+                const v = a.vertices[i];
+                const px = Math.cos(v.angle) * v.distance;
+                const py = Math.sin(v.angle) * v.distance;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
               }
+              ctx.closePath();
+              ctx.stroke();
+              ctx.restore();
+            }
+          }
+
+          _tryFire() {
+            if (this.state !== 'cruising' && this.state !== 'finale') return;
+            if (!this.keys.fire) return;
+            if (this.bullets.length >= ShuttleGame.MAX_BULLETS) return;
+            if (this.elapsed - this.lastFireTime < ShuttleGame.BULLET_COOLDOWN_MS) return;
+            this.bullets.push({
+              x: this.shipX,
+              y: this.shipY - ShuttleGame.BULLET_NOSE_OFFSET,
+              vy: -ShuttleGame.BULLET_SPEED,
+              life: ShuttleGame.BULLET_LIFETIME_S,
+            });
+            this.lastFireTime = this.elapsed;
+          }
+
+          _updateBullets(deltaSec) {
+            this._tryFire();
+            for (let i = this.bullets.length - 1; i >= 0; i--) {
+              const b = this.bullets[i];
+              b.y += b.vy * deltaSec;
+              b.life -= deltaSec;
+              if (b.life <= 0 || b.y < -10) this.bullets.splice(i, 1);
+            }
+          }
+
+          _splitAsteroid(parent) {
+            const childSize = parent.size === 'big' ? 'med' : parent.size === 'med' ? 'small' : null;
+            if (childSize === null) return;
+            const radius = ShuttleGame.ASTEROID_RADII[childSize];
+            for (let i = 0; i < 2; i++) {
+              const angle = (i === 0 ? -1 : 1) * (Math.PI / 4) + (Math.random() - 0.5) * 0.4;
+              const speed = ShuttleGame.SPLIT_SPEED;
+              this.asteroids.push({
+                x: parent.x,
+                y: parent.y,
+                vx: parent.vx + Math.sin(angle) * speed,
+                vy: Math.max(ShuttleGame.ASTEROID_VY_MIN, parent.vy + Math.cos(angle) * speed * 0.3),
+                size: childSize,
+                radius,
+                vertices: this._makeAsteroidVertices(radius),
+                rotation: Math.random() * Math.PI * 2,
+                rotationVel: (Math.random() * 2 - 1) * ShuttleGame.ASTEROID_ROT_VEL_RANGE,
+              });
+            }
+          }
+
+          _updateBulletAsteroidCollisions() {
+            for (let bi = this.bullets.length - 1; bi >= 0; bi--) {
+              const b = this.bullets[bi];
+              let consumed = false;
+              for (let ai = this.asteroids.length - 1; ai >= 0; ai--) {
+                const a = this.asteroids[ai];
+                const dx = a.x - b.x;
+                const dy = a.y - b.y;
+                if (dx * dx + dy * dy <= a.radius * a.radius) {
+                  this.score += ShuttleGame.SCORE[a.size];
+                  this._splitAsteroid(a);
+                  this.asteroids.splice(ai, 1);
+                  consumed = true;
+                  break;
+                }
+              }
+              if (!consumed && this.destination) {
+                const dx = this.destination.x - b.x;
+                const dy = this.destination.y - b.y;
+                if (dx * dx + dy * dy <= this.destination.radius * this.destination.radius) {
+                  for (let k = 0; k < 4; k++) {
+                    this.particles.push({
+                      x: b.x, y: b.y,
+                      vx: (Math.random() - 0.5) * 120,
+                      vy: (Math.random() - 0.5) * 120,
+                      life: ShuttleGame.PARTICLE_LIFE_S * 0.5,
+                    });
+                  }
+                  consumed = true;
+                }
+              }
+              if (consumed) this.bullets.splice(bi, 1);
+            }
+          }
+
+          _tryEnterFinale() {
+            if (this.state !== 'cruising') return;
+            if (!this.readyPending) return;
+            if (performance.now() - this.fallingStartTime < ShuttleGame.MIN_RUN_MS) return;
+            this.keys.left = false;
+            this.keys.right = false;
+            this.keys.fire = false;
+            // Return-from-mission flow has no destination asteroid — once
+            // the map is ready, just freeze the field and exit upward.
+            if (this.mode === 'return') {
+              this.state = 'exit';
+              this.exitStartTime = this.elapsed;
+              this.bgScale = 0;
               return;
             }
-
-            // Lander still feels gravity (gentler) and still responds to thrust + lateral input.
-            const thrusting = keys.thrust || isPointerDown;
-            landerVelocityY += GRAVITY * LANDING_GRAVITY_SCALE * deltaSec;
-            if (thrusting) landerVelocityY -= THRUST * deltaSec;
-            landerVelocityY = Math.max(-MAX_RISE_SPEED, Math.min(MAX_FALL_SPEED, landerVelocityY));
-            landerY += landerVelocityY * deltaSec;
-            if (landerY < LANDER_HEIGHT / 2) {
-              landerY = LANDER_HEIGHT / 2;
-              landerVelocityY = 0;
-            }
-
-            // Lateral steering (same as falling).
-            const lateralAccel = 600;
-            const lateralMax = 240;
-            const lateralDrag = 320;
-            if (keys.left) {
-              landerVelocityX -= lateralAccel * deltaSec;
-            } else if (keys.right) {
-              landerVelocityX += lateralAccel * deltaSec;
-            } else {
-              if (landerVelocityX > 0) landerVelocityX = Math.max(0, landerVelocityX - lateralDrag * deltaSec);
-              if (landerVelocityX < 0) landerVelocityX = Math.min(0, landerVelocityX + lateralDrag * deltaSec);
-            }
-            landerVelocityX = Math.max(-lateralMax, Math.min(lateralMax, landerVelocityX));
-            landerX += landerVelocityX * deltaSec;
-            if (landerX < LANDER_WIDTH / 2) { landerX = LANDER_WIDTH / 2; landerVelocityX = 0; }
-            if (landerX > width - LANDER_WIDTH / 2) { landerX = width - LANDER_WIDTH / 2; landerVelocityX = 0; }
-
-            // Touchdown: only snap up onto the pad if the lander's foot is still
-            // above where the pad will finally rest. If the ship has already
-            // fallen below the pad's final Y, we hide the terrain and unlock
-            // PLAY without teleporting — the player keeps the ship wherever
-            // they let it drift.
-            const landerFootY = landerY + LANDER_HEIGHT / 2;
-            // Sample the terrain right under the lander — this lets the ship
-            // land on slope segments at the correct height (and lets us read
-            // the slope angle for the touchdown rotation snap). We compare
-            // against the *final* ground Y to decide between freeze-vs-snap,
-            // because the rising terrain may not have caught up yet.
-            const finalGroundYHere = terrainHeightAt(landerX, height * TERRAIN_PAD_FINAL_RATIO);
-            const groundYHere = terrainHeightAt(landerX, terrainPadY);
-            if (landerFootY > finalGroundYHere) {
-              // Ship fell past where the ground will rest — freeze it in
-              // place, unlock PLAY, but stay in 'landing' so the terrain
-              // keeps animating in behind it. No snap, no teleport.
-              landerVelocityY = 0;
-              landerVelocityX = 0;
-              landingFrozen = true;
-              playBtn.style.display = 'block';
-            } else if (landerFootY >= groundYHere && landerVelocityY >= 0) {
-              landerY = groundYHere - LANDER_HEIGHT / 2;
-              landerVelocityY = 0;
-              landerVelocityX = 0;
-              landerRotation = terrainSlopeAt(landerX);
-              state = 'landed';
-              playBtn.style.display = 'block';
-            }
-
-            // Thruster exhaust
-            if (thrusting && Math.random() < 0.6) {
-              particles.push({
-                x: landerX + (Math.random() - 0.5) * 8,
-                y: landerY + LANDER_HEIGHT / 2,
-                vx: (Math.random() - 0.5) * 60,
-                vy: Math.random() * 80 + 40,
-                life: 0.8,
-              });
-            }
-
-            // Coins keep spawning + remain collectible during the landing beat
-            // — the fantasy is that the prelude IS the game, so nothing should
-            // suddenly be taken from the player when terrain rises.
-            updateCoins(deltaSec);
+            this.state = 'finale';
+            this.finaleStartTime = this.elapsed;
+            const radius = Math.max(this.width, this.height) * ShuttleGame.DESTINATION_RADIUS_SCALE;
+            this.destination = {
+              x: this.width / 2,
+              y: -radius * 1.5,
+              targetY: -radius * ShuttleGame.DESTINATION_TARGET_OFFSET,
+              vy: ShuttleGame.DESTINATION_DRIFT_SPEED,
+              radius,
+              settledAt: 0,
+            };
           }
 
-          for (let i = particles.length - 1; i >= 0; i--) {
-            const p = particles[i];
-            p.x += p.vx * deltaSec;
-            p.y += p.vy * deltaSec;
-            p.life -= deltaSec * 2;
-            if (p.life <= 0) {
-              particles.splice(i, 1);
+          _updateFinale(deltaSec) {
+            if (this.state !== 'finale') return;
+
+            if (this.destination.y < this.destination.targetY) {
+              this.destination.y += this.destination.vy * deltaSec;
+              if (this.destination.y >= this.destination.targetY) {
+                this.destination.y = this.destination.targetY;
+                this.destination.settledAt = this.elapsed;
+              }
+            }
+
+            // Background freeze starts the instant the asteroid is on-screen,
+            // not on a fixed timer. Bottom edge of the rock = y + radius.
+            const visible = this.destination.y + this.destination.radius > 0;
+            if (visible) {
+              this.bgScale = Math.max(0, this.bgScale - deltaSec / (ShuttleGame.FINALE_BG_FREEZE_MS / 1000));
+              this.shipVY = Math.max(
+                -ShuttleGame.EXIT_MAX_SPEED,
+                this.shipVY - ShuttleGame.EXIT_ACCEL * deltaSec
+              );
+              this.shipY += this.shipVY * deltaSec;
+            }
+
+            if (
+              this.destination.settledAt > 0 &&
+              this.elapsed - this.destination.settledAt >= ShuttleGame.DESTINATION_LINGER_MS
+            ) {
+              this.state = 'exit';
+              this.exitStartTime = this.elapsed;
             }
           }
-        }
 
-        function draw() {
-          ctx.fillStyle = '#000000';
-          ctx.fillRect(0, 0, width, height);
-
-          for (const star of stars) {
-            ctx.fillStyle = `rgba(255, 255, 255, ${star.brightness})`;
-            ctx.fillRect(star.x, star.y, 1, 1);
+          _updateExit(deltaSec) {
+            if (this.state !== 'exit') return;
+            this.bgScale = 0;
+            this.shipVY = Math.max(
+              -ShuttleGame.EXIT_MAX_SPEED,
+              this.shipVY - ShuttleGame.EXIT_ACCEL * deltaSec
+            );
+            this.shipY += this.shipVY * deltaSec;
+            if (this.shipY < -ShuttleGame.SHIP_EDGE_INSET * 2) {
+              this.stop();
+              window.dispatchEvent(new Event('prelude-play'));
+            }
           }
 
-          ctx.fillStyle = '#ffffff';
-          ctx.font = '16px monospace';
-          ctx.textAlign = 'left';
-          ctx.fillText(`SCORE: ${score.toString().padStart(4, '0')}`, 20, 30);
-
-          if (state === 'falling') {
-            ctx.textAlign = 'center';
-            ctx.font = '20px monospace';
-            ctx.fillText('APPROACHING', width / 2, 30);
-            ctx.font = '12px monospace';
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-            ctx.fillText('SPACE / CLICK = THRUST   |   A / D OR SWIPE MOUSE = STEER', width / 2, 52);
-            ctx.fillStyle = '#ffffff';
+          _isInvulnerable() {
+            return this.elapsed < this.invulnerableUntil;
           }
 
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 1.5;
-          for (const coin of coins) {
+          _respawnShuttle() {
+            this.shipX = this.width / 2;
+            this.shipY = this.height * ShuttleGame.SHIP_SPAWN_Y_RATIO;
+            this.shipVX = 0;
+            this.shipVY = 0;
+            this.score = 0;
+            this.invulnerableUntil = this.elapsed + ShuttleGame.RESPAWN_BLINK_MS;
+
+            const r2 = ShuttleGame.RESPAWN_CLEAR_RADIUS * ShuttleGame.RESPAWN_CLEAR_RADIUS;
+            for (let i = this.asteroids.length - 1; i >= 0; i--) {
+              const a = this.asteroids[i];
+              const dx = a.x - this.shipX;
+              const dy = a.y - this.shipY;
+              if (dx * dx + dy * dy <= r2) this.asteroids.splice(i, 1);
+            }
+          }
+
+          _updateShuttleAsteroidCollisions() {
+            if (this._isInvulnerable()) return;
+            for (const a of this.asteroids) {
+              const dx = a.x - this.shipX;
+              const dy = a.y - this.shipY;
+              const hitR = a.radius + ShuttleGame.SHIP_COLLIDER_RADIUS;
+              if (dx * dx + dy * dy <= hitR * hitR) {
+                this._respawnShuttle();
+                return;
+              }
+            }
+          }
+
+          _update(dt) {
+            this.elapsed += dt;
+            const deltaSec = dt / 1000;
+            this._updateStarfield(deltaSec);
+            if (this.state !== 'exit') this._updateShuttle(deltaSec);
+            this._updateAsteroids(deltaSec);
+            this._updateBullets(deltaSec);
+            this._updateBulletAsteroidCollisions();
+            this._updateShuttleAsteroidCollisions();
+            this._tryEnterFinale();
+            this._updateFinale(deltaSec);
+            this._updateExit(deltaSec);
+          }
+
+          _drawDestination() {
+            if (!this.destination) return;
+            const ctx = this.ctx;
+            ctx.save();
+            ctx.translate(this.destination.x, this.destination.y);
             ctx.beginPath();
-            ctx.moveTo(coin.x, coin.y - 6);
-            ctx.lineTo(coin.x + 6, coin.y);
-            ctx.lineTo(coin.x, coin.y + 6);
-            ctx.lineTo(coin.x - 6, coin.y);
-            ctx.closePath();
-            ctx.stroke();
-          }
-
-          ctx.fillStyle = '#ffffff';
-          for (const p of particles) {
-            ctx.globalAlpha = p.life;
-            ctx.fillRect(p.x, p.y, 2, 2);
-          }
-          ctx.globalAlpha = 1.0;
-
-          if (terrainVisible && (state === 'landing' || state === 'landed')) {
-            // Pad currently sits at terrainPadY; the rest of the ridge offsets relative to it.
-            const padY = state === 'landed' ? height * TERRAIN_PAD_FINAL_RATIO : terrainPadY;
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            for (let i = 0; i < TERRAIN_POINTS.length; i++) {
-              const [xr, yr] = TERRAIN_POINTS[i];
-              const px = xr * width;
-              const py = padY + yr * height;
+            const verts = 48;
+            for (let i = 0; i < verts; i++) {
+              const angle = (i / verts) * Math.PI * 2;
+              const r = this.destination.radius * (
+                0.96
+                + 0.025 * Math.sin(angle * 7)
+                + 0.015 * Math.sin(angle * 13 + 1.3)
+              );
+              const px = Math.cos(angle) * r;
+              const py = Math.sin(angle) * r;
               if (i === 0) ctx.moveTo(px, py);
               else ctx.lineTo(px, py);
             }
+            ctx.closePath();
+            ctx.fillStyle = '#000';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
             ctx.stroke();
+            ctx.restore();
           }
 
-          ctx.save();
-          ctx.translate(landerX, landerY);
-          if (landerRotation !== 0) ctx.rotate(landerRotation);
+          _draw() {
+            const ctx = this.ctx;
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, this.width, this.height);
 
-          ctx.scale(0.7, 0.7);
-          ctx.translate(-50, -50);
+            for (const layer of this.starLayers) {
+              for (const s of layer.stars) {
+                ctx.fillStyle = `rgba(255, 255, 255, ${s.brightness})`;
+                ctx.fillRect(s.x, s.y, s.size, s.size);
+              }
+            }
 
-          ctx.translate(50, 57.5);
-          ctx.scale(0.835, 0.835);
-          ctx.translate(-50, -57.5);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '16px monospace';
+            ctx.textAlign = 'left';
+            const headerText = this.mode === 'return'
+              ? 'RETURNING FROM MISSION'
+              : (this.state === 'finale' || this.state === 'exit')
+                ? 'DESTINATION REACHED'
+                : 'TRAVELLING TO MISSION DESTINATION';
+            ctx.fillText(headerText, 20, 30);
+            if (this.state === 'cruising') {
+              ctx.font = '12px monospace';
+              ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+              ctx.fillText('A / D MOVE   SPACE SHOOT   AVOID THE ROCKS', 20, 50);
+              ctx.font = '16px monospace';
+              ctx.fillStyle = '#ffffff';
+            }
+            ctx.textAlign = 'right';
+            ctx.fillText(`SCORE ${this.score.toString().padStart(5, '0')}`, this.width - 20, 30);
 
-          ctx.fillStyle = '#ffffff';
-          ctx.fill(landerPath1);
-          
-          if (state === 'falling' || state === 'landing') {
-            ctx.globalAlpha = 0.5 + Math.random() * 0.5;
-            ctx.fillStyle = '#38bdf8';
-            ctx.fill(landerPath2);
+            ctx.fillStyle = '#ffffff';
+            for (const p of this.particles) {
+              ctx.globalAlpha = Math.max(0, p.life / ShuttleGame.PARTICLE_LIFE_S);
+              ctx.fillRect(p.x, p.y, 2, 2);
+            }
+            ctx.globalAlpha = 1.0;
+
+            this._drawDestination();
+            this._drawAsteroids();
+
+            ctx.fillStyle = '#ffffff';
+            for (const b of this.bullets) {
+              ctx.fillRect(b.x - 1, b.y - 5, 2, 6);
+            }
+
+            const scale = Math.min(this.width, this.height) / ShuttleGame.SHUTTLE_FIT_DIVISOR;
+            const sourceCenterX = (ShuttleGame.SOURCE_BBOX_MIN_X + ShuttleGame.SOURCE_BBOX_MAX_X) / 2;
+            const sourceCenterY = (ShuttleGame.SOURCE_BBOX_MIN_Y + ShuttleGame.SOURCE_BBOX_MAX_Y) / 2;
+
+            const blinkAlpha = this._isInvulnerable()
+              ? (Math.floor(this.elapsed / ShuttleGame.BLINK_PERIOD_MS) % 2 === 0 ? 0.3 : 0.8)
+              : 1.0;
+            ctx.globalAlpha = blinkAlpha * this.shipAlpha;
+            ctx.save();
+            ctx.translate(this.shipX, this.shipY);
+            ctx.scale(scale, scale);
+            ctx.translate(-sourceCenterX, -sourceCenterY);
+            ctx.fillStyle = '#ffffff';
+            for (const part of this.shuttleParts) {
+              const [ox, oy] = part.origin;
+              ctx.save();
+              ctx.translate(ox, oy);
+              ctx.transform(0.669131, 0.743145, -0.743145, 0.669131, 0, 0);
+              ctx.translate(-ox, -oy);
+              ctx.fill(part.path);
+              ctx.restore();
+            }
+            ctx.restore();
             ctx.globalAlpha = 1.0;
           }
-
-          ctx.fillStyle = '#ffffff';
-          ctx.fill(landerPath3);
-
-          ctx.restore();
         }
 
-        function loop(time) {
-          if (!lastTime) lastTime = time;
-          const dt = time - lastTime;
-          lastTime = time;
+        ShuttleGame.STAR_LAYERS = 3;
+        ShuttleGame.STAR_COUNT_PER_LAYER = [60, 40, 25];
+        ShuttleGame.STAR_LAYER_SPEEDS = [640, 320, 120];
+        ShuttleGame.STAR_LAYER_SIZES = [2, 1, 1];
+        ShuttleGame.ASTEROID_RADII = { big: 38, med: 24, small: 14 };
+        ShuttleGame.ASTEROID_VERTEX_MIN = 8;
+        ShuttleGame.ASTEROID_VERTEX_MAX = 12;
+        ShuttleGame.ASTEROID_VERTEX_JITTER = 0.25;
+        ShuttleGame.ASTEROID_VY_MIN = 450;
+        ShuttleGame.ASTEROID_VY_MAX = 950;
+        ShuttleGame.ASTEROID_VX_RANGE = 40;
+        ShuttleGame.ASTEROID_ROT_VEL_RANGE = 1.2;
+        ShuttleGame.ASTEROID_BASE_SPAWN_MS = 550;
+        ShuttleGame.ASTEROID_MIN_SPAWN_MS = 160;
+        ShuttleGame.ASTEROID_RAMP_MS = 25000;
+        ShuttleGame.ASTEROID_SPAWN_BIG_PROB = 0.35;
+        ShuttleGame.ASTEROID_SPAWN_MED_PROB = 0.40;
+        ShuttleGame.BULLET_SPEED = 1500;
+        ShuttleGame.BULLET_LIFETIME_S = 0.6;
+        ShuttleGame.BULLET_COOLDOWN_MS = 180;
+        ShuttleGame.MAX_BULLETS = 4;
+        ShuttleGame.BULLET_NOSE_OFFSET = 22;
+        ShuttleGame.SPLIT_SPEED = 80;
+        ShuttleGame.SCORE = { big: 20, med: 50, small: 100 };
+        ShuttleGame.SHIP_COLLIDER_RADIUS = 18;
+        ShuttleGame.RESPAWN_BLINK_MS = 1500;
+        ShuttleGame.RESPAWN_CLEAR_RADIUS = 110;
+        ShuttleGame.BLINK_PERIOD_MS = 120;
+        ShuttleGame.MIN_RUN_MS = 4500;
+        // Destination asteroid is intentionally huge — diameter ~= max(w,h)
+        // so it spans the full screen width. Center settles above the top
+        // edge so only a thin crescent of the bottom curve peeks in — just
+        // enough to read as "we've arrived" without dragging the handoff.
+        ShuttleGame.DESTINATION_RADIUS_SCALE = 0.95;
+        ShuttleGame.DESTINATION_TARGET_OFFSET = 0.85;
+        ShuttleGame.DESTINATION_DRIFT_SPEED = 700;
+        ShuttleGame.DESTINATION_LINGER_MS = 250;
+        ShuttleGame.FINALE_BG_FREEZE_MS = 500;
+        ShuttleGame.EXIT_ACCEL = 2200;
+        ShuttleGame.EXIT_MAX_SPEED = 2400;
+        // Source-space bbox of the shuttle paths AFTER per-part transform-origin
+        // pivots are applied. Pulled from the SVG bounds; close enough for centering.
+        ShuttleGame.SOURCE_BBOX_MIN_X = -2;
+        ShuttleGame.SOURCE_BBOX_MAX_X = 93;
+        ShuttleGame.SOURCE_BBOX_MIN_Y = 17;
+        ShuttleGame.SOURCE_BBOX_MAX_Y = 112;
+        // Larger = smaller shuttle on screen. ~min(w,h)/this controls fit.
+        ShuttleGame.SHUTTLE_FIT_DIVISOR = 1400;
+        ShuttleGame.SHIP_SPAWN_Y_RATIO = 0.7;
+        ShuttleGame.SHIP_EDGE_INSET = 40;
+        ShuttleGame.SHUTTLE_ACCEL = 900;
+        ShuttleGame.SHUTTLE_MAX_SPEED = 320;
+        ShuttleGame.SHUTTLE_DRAG = 600;
+        ShuttleGame.PARTICLE_SPAWN_CHANCE = 0.7;
+        ShuttleGame.PARTICLE_OFFSET = 24;
+        ShuttleGame.PARTICLE_SIDE_Y_OFFSET = 14;
+        ShuttleGame.PARTICLE_LIFE_S = 0.6;
+        ShuttleGame.REAR_THRUSTER_SPAWN_CHANCE = 0.9;
+        ShuttleGame.REAR_THRUSTER_VY = 220;
 
-          update(dt);
-          draw();
-
-          animationFrameId = requestAnimationFrame(loop);
+        // Route gateway. /level → outbound ShuttleGame (full asteroid finale).
+        // /map with a pending mission-return handoff in localStorage →
+        // return-flow ShuttleGame (no big asteroid, "RETURNING FROM MISSION"
+        // header). Everything else → LanderGame.
+        // We check both pathname and hash so it works whether router is in
+        // history or hash mode (Vue Router default is history, but hash
+        // routes still match). The localStorage peek does NOT consume the
+        // key — MapViewController.consumePendingMapReturnWorld() owns that.
+        function isLevelRoute() {
+          const path = window.location.pathname || '';
+          const hash = window.location.hash || '';
+          return path.includes('/level') || hash.includes('/level');
         }
-
-        initCanvas();
-        window.addEventListener('resize', handleResize);
-        window.addEventListener('keydown', handleKeyDown);
-        window.addEventListener('keyup', handleKeyUp);
-        
-        container.addEventListener('mousedown', handlePointerDown);
-        container.addEventListener('mouseup', handlePointerUp);
-        container.addEventListener('mousemove', handleMouseMove);
-        container.addEventListener('mouseleave', handleMouseLeaveCanvas);
-        container.addEventListener('touchstart', function (e) { e.preventDefault(); handlePointerDown(); }, { passive: false });
-        container.addEventListener('touchend', handlePointerUp);
-        container.addEventListener('touchcancel', handlePointerUp);
-
-        animationFrameId = requestAnimationFrame(loop);
-
-        // Global API for Vue to call
-        window.Prelude = {
-          ready: function() {
-            // Defer the actual transition until MIN_FALLING_MS has elapsed,
-            // so the player always gets a real falling beat.
-            readyPending = true;
-          },
-          play: function() {
-            container.style.display = 'none';
-            cancelAnimationFrame(animationFrameId);
-            window.removeEventListener('resize', handleResize);
-            window.removeEventListener('keydown', handleKeyDown);
-            window.removeEventListener('keyup', handleKeyUp);
+        function isReturningFromLevel() {
+          try {
+            return localStorage.getItem('asteroid-lander-map-return-world-v1') !== null;
+          } catch (_e) {
+            return false;
           }
+        }
+
+        const elements = {
+          container: document.getElementById('prelude-container'),
+          wrapper: document.getElementById('prelude-canvas-wrapper'),
+          canvas: document.getElementById('prelude-canvas'),
+          playBtn: document.getElementById('prelude-play-btn'),
         };
 
-        playBtn.addEventListener('click', () => {
-          window.Prelude.play();
-          // Dispatch a custom event so Vue can listen to it if needed
+        let game;
+        if (isLevelRoute()) {
+          game = new ShuttleGame(elements, 'outbound');
+        } else if (isReturningFromLevel()) {
+          game = new ShuttleGame(elements, 'return');
+        } else {
+          game = new LanderGame(elements);
+        }
+        game.start();
+
+        elements.playBtn.addEventListener('click', () => {
+          game.stop();
           window.dispatchEvent(new Event('prelude-play'));
         });
+
+        // Public API consumed by Vue. Surface stays the same regardless of which
+        // game is running underneath.
+        window.Prelude = {
+          ready: () => game.ready(),
+          play: () => game.stop(),
+        };
       })();
     </script>
     <div id="app"></div>
