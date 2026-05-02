@@ -1091,6 +1091,13 @@
               ? 'DESTINATION REACHED'
               : 'TRAVELLING TO MISSION DESTINATION';
             ctx.fillText(headerText, 20, 30);
+            if (this.state === 'cruising') {
+              ctx.font = '12px monospace';
+              ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+              ctx.fillText('A / D MOVE   SPACE SHOOT   AVOID THE ROCKS', 20, 50);
+              ctx.font = '16px monospace';
+              ctx.fillStyle = '#ffffff';
+            }
             ctx.textAlign = 'right';
             ctx.fillText(`SCORE ${this.score.toString().padStart(5, '0')}`, this.width - 20, 30);
 
