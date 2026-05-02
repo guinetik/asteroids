@@ -668,6 +668,10 @@
             this.asteroids = [];
             this.lastAsteroidSpawn = 0;
 
+            this.bullets = [];
+            this.lastFireTime = -Infinity;
+            this.score = 0;
+
             this._boundKeyDown = this._handleKeyDown.bind(this);
             this._boundKeyUp = this._handleKeyUp.bind(this);
           }
@@ -880,12 +884,77 @@
             }
           }
 
+          _tryFire() {
+            if (this.state !== 'cruising' && this.state !== 'finale') return;
+            if (!this.keys.fire) return;
+            if (this.bullets.length >= ShuttleGame.MAX_BULLETS) return;
+            if (this.elapsed - this.lastFireTime < ShuttleGame.BULLET_COOLDOWN_MS) return;
+            this.bullets.push({
+              x: this.shipX,
+              y: this.shipY - ShuttleGame.BULLET_NOSE_OFFSET,
+              vy: -ShuttleGame.BULLET_SPEED,
+              life: ShuttleGame.BULLET_LIFETIME_S,
+            });
+            this.lastFireTime = this.elapsed;
+          }
+
+          _updateBullets(deltaSec) {
+            this._tryFire();
+            for (let i = this.bullets.length - 1; i >= 0; i--) {
+              const b = this.bullets[i];
+              b.y += b.vy * deltaSec;
+              b.life -= deltaSec;
+              if (b.life <= 0 || b.y < -10) this.bullets.splice(i, 1);
+            }
+          }
+
+          _splitAsteroid(parent) {
+            const childSize = parent.size === 'big' ? 'med' : parent.size === 'med' ? 'small' : null;
+            if (childSize === null) return;
+            const radius = ShuttleGame.ASTEROID_RADII[childSize];
+            for (let i = 0; i < 2; i++) {
+              const angle = (i === 0 ? -1 : 1) * (Math.PI / 4) + (Math.random() - 0.5) * 0.4;
+              const speed = ShuttleGame.SPLIT_SPEED;
+              this.asteroids.push({
+                x: parent.x,
+                y: parent.y,
+                vx: parent.vx + Math.sin(angle) * speed,
+                vy: Math.max(ShuttleGame.ASTEROID_VY_MIN, parent.vy + Math.cos(angle) * speed * 0.3),
+                size: childSize,
+                radius,
+                vertices: this._makeAsteroidVertices(radius),
+                rotation: Math.random() * Math.PI * 2,
+                rotationVel: (Math.random() * 2 - 1) * ShuttleGame.ASTEROID_ROT_VEL_RANGE,
+              });
+            }
+          }
+
+          _updateBulletAsteroidCollisions() {
+            for (let bi = this.bullets.length - 1; bi >= 0; bi--) {
+              const b = this.bullets[bi];
+              for (let ai = this.asteroids.length - 1; ai >= 0; ai--) {
+                const a = this.asteroids[ai];
+                const dx = a.x - b.x;
+                const dy = a.y - b.y;
+                if (dx * dx + dy * dy <= a.radius * a.radius) {
+                  this.score += ShuttleGame.SCORE[a.size];
+                  this._splitAsteroid(a);
+                  this.asteroids.splice(ai, 1);
+                  this.bullets.splice(bi, 1);
+                  break;
+                }
+              }
+            }
+          }
+
           _update(dt) {
             this.elapsed += dt;
             const deltaSec = dt / 1000;
             this._updateStarfield(deltaSec);
             this._updateShuttle(deltaSec);
             this._updateAsteroids(deltaSec);
+            this._updateBullets(deltaSec);
+            this._updateBulletAsteroidCollisions();
           }
 
           _draw() {
@@ -904,6 +973,8 @@
             ctx.font = '16px monospace';
             ctx.textAlign = 'left';
             ctx.fillText('TRAVELLING TO MISSION DESTINATION', 20, 30);
+            ctx.textAlign = 'right';
+            ctx.fillText(`SCORE ${this.score.toString().padStart(5, '0')}`, this.width - 20, 30);
 
             ctx.fillStyle = '#ffffff';
             for (const p of this.particles) {
@@ -913,6 +984,11 @@
             ctx.globalAlpha = 1.0;
 
             this._drawAsteroids();
+
+            ctx.fillStyle = '#ffffff';
+            for (const b of this.bullets) {
+              ctx.fillRect(b.x - 1, b.y - 5, 2, 6);
+            }
 
             const scale = Math.min(this.width, this.height) / ShuttleGame.SHUTTLE_FIT_DIVISOR;
             const sourceCenterX = (ShuttleGame.SOURCE_BBOX_MIN_X + ShuttleGame.SOURCE_BBOX_MAX_X) / 2;
@@ -953,6 +1029,13 @@
         ShuttleGame.ASTEROID_RAMP_MS = 25000;
         ShuttleGame.ASTEROID_SPAWN_BIG_PROB = 0.35;
         ShuttleGame.ASTEROID_SPAWN_MED_PROB = 0.40;
+        ShuttleGame.BULLET_SPEED = 700;
+        ShuttleGame.BULLET_LIFETIME_S = 0.9;
+        ShuttleGame.BULLET_COOLDOWN_MS = 180;
+        ShuttleGame.MAX_BULLETS = 4;
+        ShuttleGame.BULLET_NOSE_OFFSET = 22;
+        ShuttleGame.SPLIT_SPEED = 80;
+        ShuttleGame.SCORE = { big: 20, med: 50, small: 100 };
         // Source-space bbox of the shuttle paths AFTER per-part transform-origin
         // pivots are applied. Pulled from the SVG bounds; close enough for centering.
         ShuttleGame.SOURCE_BBOX_MIN_X = -2;
