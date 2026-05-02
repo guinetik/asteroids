@@ -1,0 +1,246 @@
+{
+  "firstRunLanderTip": {
+    "speaker": "Jay",
+    "channel": "LANDER REFRESH",
+    "view": "lander",
+    "tone": "logistics",
+    "message": "Hey you got Jay. Quick refresher: WASD fires maneuver thrusters, SPACE gives you main lift, and C kills horizontal momentum with descent thrusters. Every burn spends thruster charge that refills from fuel when you let off."
+  },
+  "runtimeTips": {
+    "landerDescentWarning": {
+      "speaker": "Jay",
+      "channel": "DESCENT ADVISORY",
+      "view": "lander",
+      "tone": "logistics",
+      "message": "Hey you got Jay. DESCENT RATE is hot. Hold SPACE for main lift, and if you need a harder correction, hold SHIFT + SPACE to stack the RCS boost on top of the main thrusters."
+    },
+    "landerAttitudeWarning": {
+      "speaker": "Jay",
+      "channel": "ATTITUDE ADVISORY",
+      "view": "lander",
+      "tone": "logistics",
+      "message": "Hey you got Jay. ATTITUDE warning means the hull is coming in crooked. Feather WASD to level out, then use short SPACE burns instead of holding a long correction."
+    },
+    "landerGroundBoost": {
+      "speaker": "Jay",
+      "channel": "LIFT REFRESH",
+      "view": "lander",
+      "tone": "logistics",
+      "message": "Hey you got Jay. Back in the seat. When the lander is on the ground, SPACE and SHIFT get extra bite for liftoff. Hold SPACE for main lift, or hold SHIFT + SPACE when you need to climb hard."
+    },
+    "landerObjectiveExfil": {
+      "speaker": "Jay",
+      "channel": "EXFIL ROUTE",
+      "view": "lander",
+      "tone": "logistics",
+      "message": "Hey you got Jay. Job's done, but the mission is not paid until you exfil. Fly the lander back to the shuttle marker and press F when EXFILTRATE comes up."
+    },
+    "gatherRocketScience": {
+      "speaker": "Jay",
+      "channel": "HAULER RELAY",
+      "view": "fps",
+      "tone": "science",
+      "message": "Hey you got Jay. If the rocks are hiding from you, switch the Multitool to SCIENCE mode by pressing 3 and shooting the delivery rocket. Those cans ship with a tracker package so miners can find the local field instead of wandering in circles."
+    },
+    "oxygenLow": {
+      "speaker": "SuitSys",
+      "channel": "O2 CAUTION",
+      "view": "fps",
+      "tone": "rescue",
+      "message": "Suit oxygen is below half. Start thinking like a professional: shorten the walk, grab an O2 cell if you see one, or return to the lander before the suit starts making decisions for you."
+    },
+    "rtgLow": {
+      "speaker": "SuitSys",
+      "channel": "RTG CAUTION",
+      "view": "fps",
+      "tone": "science",
+      "message": "Multitool RTG reserve is below half. Recharge timing is stochastic out here, so do not count on an instant refill. Ease off the trigger, watch the charge bars, and take RTG pickups when the field offers them."
+    },
+    "drillWalking": {
+      "speaker": "Jay",
+      "channel": "DRL INTERLOCK",
+      "view": "fps",
+      "tone": "mining",
+      "message": "Hey you got Jay. DRL has a stance interlock. It will not cut rock while you are walking, so plant your boots, hold still, and then burn the face."
+    },
+    "landerHullRepair": {
+      "speaker": "Jay",
+      "channel": "HULL PATCH",
+      "view": "fps",
+      "tone": "logistics",
+      "message": "Hey you got Jay. Lander hull took a hit. Once you are outside, switch the Multitool to SCIENCE mode by pressing 3 and shoot the lander hull to patch it. Weird tool, useful trick."
+    }
+  },
+  "objectiveTips": {
+    "gather": {
+      "speaker": "Jay",
+      "channel": "HAULER RELAY",
+      "view": "fps",
+      "tone": "mining",
+      "message": "Hey you got Jay. Simple mining gig: look around for surface rocks, switch the Multitool to DRILL mode by pressing 1, and cut them. If a rock looks promising, switch the Multitool to SCIENCE mode by pressing 3 and scan it first. Scanned rocks pay out cleaner."
+    },
+    "survey": {
+      "speaker": "Jay",
+      "channel": "SURVEY RELAY",
+      "view": "lander",
+      "tone": "science",
+      "message": "Jay here. Survey work is about clean passes, not heroics. Follow the marker, keep your approach tidy, and watch the timer. If you lose the target, check the tracker before burning fuel."
+    },
+    "exterminate": {
+      "speaker": "Colonial Guard",
+      "channel": "PEST CONTROL NET",
+      "view": "fps",
+      "tone": "combat",
+      "message": "Colonial Guard dispatch. Nest clearance is live. Switch the Multitool to LASER mode by pressing 2, destroy every nest at the marked site, and do not let crawlers pin you in place. Keep distance, keep firing, confirm the area clean."
+    },
+    "rescue": {
+      "speaker": "Frontier Rescue",
+      "channel": "RESCUE BAND",
+      "view": "fps",
+      "tone": "rescue",
+      "message": "Frontier Rescue to pilot. Distress timer is active. Move to the beacon, cut survivors free, and get them back to the lander before their oxygen runs out. Hostiles are secondary unless they block extraction."
+    },
+    "photometry": {
+      "speaker": "Vance",
+      "channel": "ASSET TELEMETRY",
+      "view": "lander",
+      "tone": "science",
+      "message": "Vance Hoyt, Asset Strategy. Photometry requires a controlled lander hold. Reach the standoff, keep drift inside the instrument envelope, and maintain the exposure until telemetry confirms a clean packet."
+    },
+    "dan": {
+      "speaker": "Vance",
+      "channel": "SUBSURFACE TELEMETRY",
+      "view": "fps",
+      "tone": "science",
+      "message": "Vance Hoyt. DAN protocol is simple: park at the scan site, switch the Multitool to SCIENCE mode by pressing 3, and hold the beam while the instrument gathers return particles. Elevated sensor noise is expected. Continue unless survival margins collapse."
+    },
+    "bunker": {
+      "speaker": "Mission Control",
+      "channel": "DESCENT RELAY",
+      "view": "fps",
+      "tone": "combat",
+      "message": "Surface hatch is your entry point. Descend, clear each interior wave, and watch your suit resources. The job is complete only when the room is secure and you walk back out."
+    },
+    "collect": {
+      "speaker": "Consortium Dispatch",
+      "channel": "PACKAGE TRACKER",
+      "view": "fps",
+      "tone": "logistics",
+      "message": "Consortium dispatch. Locate the marked package, approach until the collection prompt appears, and return with the cargo intact. This is a retrieval job; do not overcomplicate it."
+    },
+    "prospectus-terminal": {
+      "speaker": "Vance",
+      "channel": "ASSET REVIEW",
+      "view": "fps",
+      "tone": "science",
+      "message": "Vance Hoyt. The terminal contains the compiled prospectus. Approach the surface kiosk, open the report, and resolve the transmission choice. The Society requires a recorded decision."
+    }
+  },
+  "giverTips": {
+    "cinderline": {
+      "bunker": {
+        "speaker": "The Cinderline",
+        "channel": "ANVIL DESCENT",
+        "view": "fps",
+        "tone": "combat",
+        "message": "Cinderline standing order. The sealed room is not abandoned. Enter through the hatch, clear each wave with restraint, and return when the room is ours again."
+      },
+      "dan": {
+        "speaker": "The Cinderline",
+        "channel": "FIRST LISTENING",
+        "view": "fps",
+        "tone": "science",
+        "message": "Cinderline relay. Set the pulse into the regolith and hold the vigil. Switch the Multitool to SCIENCE mode by pressing 3 at the scan site, gather the stone's reply, and withdraw cleanly."
+      }
+    },
+    "frontier-rescue": {
+      "rescue": {
+        "speaker": "Frontier Rescue",
+        "channel": "RESCUE BAND",
+        "view": "fps",
+        "tone": "rescue",
+        "message": "Frontier Rescue to pilot. Survivors are on borrowed air. Sprint the short gaps, cut them loose, and bring them back to the lander alive. Every second you spend sightseeing costs oxygen."
+      }
+    },
+    "jay": {
+      "gather": {
+        "speaker": "Jay",
+        "channel": "HAULER RELAY",
+        "view": "fps",
+        "tone": "mining",
+        "message": "Hey you got Jay. Simple mining gig. Look around for rocks, switch the Multitool to DRILL mode by pressing 1, and shoot the rock. Switch the Multitool to SCIENCE mode by pressing 3 first if you want the better yield. Less work, more profit."
+      },
+      "survey": {
+        "speaker": "Jay",
+        "channel": "SURVEY RELAY",
+        "view": "lander",
+        "tone": "science",
+        "message": "Jay here. Survey jobs are just mining jobs with extra paperwork. Follow the marker, keep the timer in mind, and give the instrument a steady pass."
+      }
+    },
+    "jovian-society": {
+      "photometry": {
+        "speaker": "Vance",
+        "channel": "ASSET TELEMETRY",
+        "view": "lander",
+        "tone": "science",
+        "message": "Vance Hoyt, Asset Strategy. Deploy at the assigned standoff and keep the lander stable through the exposure. Signal quality is more valuable than shaving seconds off the pass."
+      },
+      "dan": {
+        "speaker": "Vance",
+        "channel": "SUBSURFACE TELEMETRY",
+        "view": "fps",
+        "tone": "science",
+        "message": "Vance Hoyt. Switch the Multitool to SCIENCE mode by pressing 3 at the scan site and hold the DAN return until the meter completes. If ambient disturbance appears, treat it as instrumentation noise unless it becomes a survival problem."
+      },
+      "bunker": {
+        "speaker": "Vance",
+        "channel": "ASSET RECOVERY",
+        "view": "fps",
+        "tone": "combat",
+        "message": "Vance Hoyt. The bunker asset has been compromised. Descend through the hatch, neutralize interior contamination, and recover the floor for portfolio review."
+      }
+    },
+    "lucas-maverick": {
+      "bunker": {
+        "speaker": "Lucas",
+        "channel": "SAFEHOUSE TABLE",
+        "view": "fps",
+        "tone": "combat",
+        "message": "Lucas here. Safehouse flipped ugly. Get through the hatch, clear the room wave by wave, and walk out with the ledger intact. House rule: do not lose the shuttle."
+      }
+    },
+    "martian-marines-bunker": {
+      "bunker": {
+        "speaker": "Cohort Ops",
+        "channel": "RECON NET",
+        "view": "fps",
+        "tone": "combat",
+        "message": "Cohort Operations. Forward bunker is dark. Descend, recon, neutralize viroids, and recover the position. Hold the door until the site is ours."
+      }
+    },
+    "mr-finch": {
+      "gather": {
+        "speaker": "Finch",
+        "channel": "SATURN HANDLER",
+        "view": "fps",
+        "tone": "mining",
+        "message": "Finch. Standard haul cycle, just farther out. Switch the Multitool to DRILL mode by pressing 1, fill the hold from surface rocks, and come back clean. Switch the Multitool to SCIENCE mode by pressing 3 when you want cleaner yields."
+      },
+      "survey": {
+        "speaker": "Finch",
+        "channel": "SATURN HANDLER",
+        "view": "lander",
+        "tone": "science",
+        "message": "Finch. Gravimetric pass. Follow the probe markers, keep your route tidy, and bring the telemetry back. The body is well-behaved; the clock is the hazard."
+      },
+      "photometry": {
+        "speaker": "Finch",
+        "channel": "SATURN HANDLER",
+        "view": "lander",
+        "tone": "science",
+        "message": "Finch. Certified photometric pass: get to standoff, hold stable through the exposure, and bring back clean data. Distance premium is already in the rate."
+      }
+    }
+  }
+}

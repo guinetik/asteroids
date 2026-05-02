@@ -10,6 +10,7 @@ import LanderHud from '@/components/LanderHud.vue'
 import MissionAnnouncement from '@/components/MissionAnnouncement.vue'
 import LevelLoadingOverlay from '@/components/LevelLoadingOverlay.vue'
 import type { LevelViewBootState } from './LevelViewController'
+import MissionTipMarquee from '@/components/MissionTipMarquee.vue'
 import ObjectiveTracker from '@/components/ObjectiveTracker.vue'
 import type { ObjectiveTrackerEntry } from '@/components/ObjectiveTracker.vue'
 import FpsHud from '@/components/FpsHud.vue'
@@ -32,6 +33,28 @@ import { getItemDefinition } from '@/lib/inventory/catalog'
 import { removeItem } from '@/lib/inventory/inventory'
 import type { LanderTelemetry } from '@/lib/ui/landerHudTypes'
 import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
+import type { MissionTipTransmission } from '@/lib/level/missionTips'
+import {
+  getMissionTipObjectiveType,
+  resolveFirstRunLanderTipTransmission,
+  resolveMissionTipTransmission,
+  resolveRuntimeMissionTipTransmission,
+} from '@/lib/level/missionTips'
+import {
+  getVisibleMissionTipsForView,
+  pushMissionTipQueue,
+  removeMissionTipQueueEntry,
+} from '@/lib/level/missionTipQueue'
+import {
+  shouldTriggerDrillWalkingTip,
+  shouldTriggerGatherRocketScienceTip,
+  shouldTriggerLanderHullRepairTip,
+  shouldTriggerLanderWarningTip,
+  shouldTriggerLowOxygenTip,
+  shouldTriggerLowRtgTip,
+} from '@/lib/level/levelRuntimeTipTriggers'
+import type { ObjectiveType } from '@/lib/missions/types'
+import { loadProfile } from '@/lib/player/profile'
 import { OBJECTIVE_LABELS } from '@/lib/minigame/MiniGame'
 import RescueSurvivorPanel from '@/components/RescueSurvivorPanel.vue'
 import DanScanPanel from '@/components/DanScanPanel.vue'
@@ -83,6 +106,12 @@ const objCompleteVisible = ref(false)
 const objCompleteLabel = ref('')
 const missionCompleteVisible = ref(false)
 const trackerVisible = ref(false)
+const missionTipQueue = ref<MissionTipTransmission[]>([])
+const activeMissionTipView = computed(() => (stateInfo.state === 'lander' ? 'lander' : 'fps'))
+const visibleMissionTips = computed(() =>
+  getVisibleMissionTipsForView(missionTipQueue.value, activeMissionTipView.value),
+)
+const activeMissionObjectiveType = ref<ObjectiveType | null>(null)
 const trackerObjectives = ref<ObjectiveTrackerEntry[]>([])
 const trackerAsteroid = ref('')
 const trackerMission = ref('')
@@ -256,6 +285,14 @@ const danInstruction = ref<string | null>(null)
 const danScanning = ref(false)
 const prospectusVisible = ref(false)
 let rescuePollHandle: ReturnType<typeof setInterval> | null = null
+let runtimeTipPollHandle: ReturnType<typeof setInterval> | null = null
+let gatherFpsIdleSeconds = 0
+let gatherFpsIdleLastMs: number | null = null
+let hasMinedRockThisMission = false
+let previousLanderHullHp: number | null = null
+let previousLevelState = ''
+const dispatchedRuntimeTipIds = new Set<string>()
+const NON_MINERAL_PICKUP_IDS = new Set(['health', 'oxygen', 'rtg', 'lander-fuel-cell'])
 
 /**
  * Sub-states that the {@link BunkerWaveHud} renders. The bunker FSM has more
@@ -331,6 +368,110 @@ function refreshRescueRefs(): void {
     }
   } else {
     bunkerHudProps.value = null
+  }
+}
+
+function resetMissionTipRuntimeState(): void {
+  missionTipQueue.value = []
+  activeMissionObjectiveType.value = null
+  gatherFpsIdleSeconds = 0
+  gatherFpsIdleLastMs = null
+  hasMinedRockThisMission = false
+  previousLanderHullHp = null
+  previousLevelState = ''
+  dispatchedRuntimeTipIds.clear()
+}
+
+function pushMissionTip(tip: MissionTipTransmission | null): void {
+  if (!tip) return
+  missionTipQueue.value = pushMissionTipQueue(missionTipQueue.value, tip)
+}
+
+function pushRuntimeMissionTip(id: string): void {
+  if (dispatchedRuntimeTipIds.has(id)) return
+  const objectiveType = activeMissionObjectiveType.value
+  if (!objectiveType) return
+  const tip = resolveRuntimeMissionTipTransmission(id, objectiveType)
+  if (!tip) return
+
+  dispatchedRuntimeTipIds.add(id)
+  if (id === 'gatherRocketScience') {
+    missionTipQueue.value = removeMissionTipQueueEntry(missionTipQueue.value, 'objective:gather')
+  }
+  pushMissionTip(tip)
+}
+
+function dismissTopMissionTip(): boolean {
+  const tipStackVisible = stateInfo.state === 'lander' || stateInfo.state === 'eva' || inBunker.value
+  if (!trackerVisible.value || !tipStackVisible) return false
+
+  const [tip] = visibleMissionTips.value
+  if (!tip) return false
+
+  missionTipQueue.value = removeMissionTipQueueEntry(missionTipQueue.value, tip.id)
+  return true
+}
+
+function areTrackerObjectivesComplete(): boolean {
+  return (
+    trackerObjectives.value.length > 0 &&
+    trackerObjectives.value.every((objective) => objective.complete)
+  )
+}
+
+function handleLanderEntryTips(previousState: string, nextState: string): void {
+  if (nextState !== 'lander' || previousState !== 'eva') return
+
+  if (areTrackerObjectivesComplete()) {
+    pushRuntimeMissionTip('landerObjectiveExfil')
+    return
+  }
+
+  pushRuntimeMissionTip('landerGroundBoost')
+}
+
+function tickGatherIdleTimer(): void {
+  if (
+    stateInfo.state !== 'eva' ||
+    activeMissionObjectiveType.value !== 'gather' ||
+    dispatchedRuntimeTipIds.has('gatherRocketScience') ||
+    hasMinedRockThisMission
+  ) {
+    gatherFpsIdleLastMs = null
+    return
+  }
+
+  const now = performance.now()
+  if (gatherFpsIdleLastMs === null) {
+    gatherFpsIdleLastMs = now
+    return
+  }
+
+  gatherFpsIdleSeconds += (now - gatherFpsIdleLastMs) / 1000
+  gatherFpsIdleLastMs = now
+  if (shouldTriggerGatherRocketScienceTip(gatherFpsIdleSeconds, hasMinedRockThisMission)) {
+    pushRuntimeMissionTip('gatherRocketScience')
+  }
+}
+
+function refreshRuntimeMissionTips(): void {
+  if (!trackerVisible.value) return
+
+  if (stateInfo.state === 'eva' || inBunker.value) {
+    tickGatherIdleTimer()
+    if (shouldTriggerLowOxygenTip(fpsTelemetry)) pushRuntimeMissionTip('oxygenLow')
+    if (shouldTriggerLowRtgTip(fpsTelemetry)) pushRuntimeMissionTip('rtgLow')
+    if (shouldTriggerDrillWalkingTip(fpsTelemetry)) pushRuntimeMissionTip('drillWalking')
+  } else if (stateInfo.state === 'lander') {
+    gatherFpsIdleLastMs = null
+    if (shouldTriggerLanderWarningTip(landerTelemetry.descentWarning)) {
+      pushRuntimeMissionTip('landerDescentWarning')
+    }
+    if (shouldTriggerLanderWarningTip(landerTelemetry.attitudeWarning)) {
+      pushRuntimeMissionTip('landerAttitudeWarning')
+    }
+  } else {
+    gatherFpsIdleLastMs = null
   }
 }
 
@@ -427,10 +568,16 @@ onMounted(async () => {
       letterboxVisible.value = visible
     }
     viewController.onStateInfo = (info) => {
+      handleLanderEntryTips(previousLevelState, info.state)
       Object.assign(stateInfo, info)
+      previousLevelState = info.state
     }
     viewController.onLanderTelemetry = (t) => {
       Object.assign(landerTelemetry, t)
+      if (shouldTriggerLanderHullRepairTip(previousLanderHullHp, t)) {
+        pushRuntimeMissionTip('landerHullRepair')
+      }
+      previousLanderHullHp = t.hp
     }
     viewController.onFpsTelemetry = (t) => {
       Object.assign(fpsTelemetry, t)
@@ -455,11 +602,20 @@ onMounted(async () => {
       }
     }
     viewController.onMissionAnnounce = (asteroid, mission) => {
+      resetMissionTipRuntimeState()
       announceAsteroid.value = asteroid
       announceMission.value = mission
       announceVisible.value = true
       trackerAsteroid.value = asteroid
       trackerMission.value = mission
+      const activeMission = viewController.getMission()
+      const profile = loadProfile()
+      activeMissionObjectiveType.value = activeMission ? getMissionTipObjectiveType(activeMission) : null
+      if (activeMission) {
+        pushMissionTip(resolveFirstRunLanderTipTransmission(activeMission, profile))
+        pushMissionTip(resolveMissionTipTransmission(activeMission, profile, 'fps'))
+        pushMissionTip(resolveMissionTipTransmission(activeMission, profile, 'lander'))
+      }
     }
     viewController.onStepChange = (index, steps) => {
       const obj = trackerObjectives.value.find((o) => o.id === `obj-${index}`)
@@ -472,6 +628,9 @@ onMounted(async () => {
       if (obj) {
         obj.complete = true
         objCompleteLabel.value = obj.label
+      }
+      if (stateInfo.state === 'lander' && areTrackerObjectivesComplete()) {
+        pushRuntimeMissionTip('landerObjectiveExfil')
       }
       objCompleteVisible.value = true
       Timer.after(5, () => {
@@ -507,6 +666,13 @@ onMounted(async () => {
     }
     viewController.onResourcePickup = (itemId, quantity, label) => {
       recordPickup(itemId, quantity, label)
+      if (!NON_MINERAL_PICKUP_IDS.has(itemId)) {
+        hasMinedRockThisMission = true
+        missionTipQueue.value = removeMissionTipQueueEntry(
+          missionTipQueue.value,
+          'runtime:gatherRocketScience',
+        )
+      }
       viewController.refreshLanderFuelCellCount()
       if (showInventory.value) refreshInventorySnapshot()
     }
@@ -584,6 +750,7 @@ onMounted(async () => {
     // 200ms is fast enough for the DAN scan timer to tick visibly without
     // adding meaningful overhead for rescue/bunker observers.
     rescuePollHandle = setInterval(refreshRescueRefs, 200)
+    runtimeTipPollHandle = setInterval(refreshRuntimeMissionTips, 500)
     window.addEventListener('keydown', handleGlobalKeydown)
   }
 })
@@ -673,6 +840,10 @@ function handleGlobalKeydown(e: KeyboardEvent): void {
     closeInventoryPanel()
     return
   }
+  if (e.code === 'Tab' && dismissTopMissionTip()) {
+    e.preventDefault()
+    return
+  }
   if (e.code === 'KeyM' && !showInventory.value && !inBunker.value) {
     showMap.value = !showMap.value
   }
@@ -682,6 +853,10 @@ onUnmounted(() => {
   if (rescuePollHandle !== null) {
     clearInterval(rescuePollHandle)
     rescuePollHandle = null
+  }
+  if (runtimeTipPollHandle !== null) {
+    clearInterval(runtimeTipPollHandle)
+    runtimeTipPollHandle = null
   }
   stopBackgroundMusic('level')
   clearPickups()
@@ -786,6 +961,14 @@ function handleToggleMusic(): void {
     :title="trackerMission"
     :objectives="trackerObjectives"
   />
+  <TransitionGroup name="mission-tip-stack" tag="div" class="mission-tip-stack">
+    <MissionTipMarquee
+      v-for="tip in visibleMissionTips"
+      v-show="trackerVisible && (stateInfo.state === 'lander' || stateInfo.state === 'eva' || inBunker)"
+      :key="tip.id"
+      :transmission="tip"
+    />
+  </TransitionGroup>
   <RescueSurvivorPanel
     v-if="rescueActive"
     :total="rescueTotal"
