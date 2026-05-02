@@ -674,7 +674,9 @@
             this.invulnerableUntil = 0;
             this.destination = null;
             this.exitStartTime = 0;
+            this.finaleStartTime = 0;
             this.shipAlpha = 1;
+            this.bgScale = 1;
             this.fallingStartTime = performance.now();
 
             this._boundKeyDown = this._handleKeyDown.bind(this);
@@ -712,7 +714,7 @@
           _updateStarfield(deltaSec) {
             for (const layer of this.starLayers) {
               for (const s of layer.stars) {
-                s.y += layer.speed * deltaSec;
+                s.y += layer.speed * this.bgScale * deltaSec;
                 if (s.y > this.height) {
                   s.y -= this.height + Math.random() * 20;
                   s.x = Math.random() * this.width;
@@ -847,8 +849,8 @@
             }
             for (let i = this.asteroids.length - 1; i >= 0; i--) {
               const a = this.asteroids[i];
-              a.x += a.vx * deltaSec;
-              a.y += a.vy * deltaSec;
+              a.x += a.vx * this.bgScale * deltaSec;
+              a.y += a.vy * this.bgScale * deltaSec;
               a.rotation += a.rotationVel * deltaSec;
               if (a.x < -a.radius) a.x = this.width + a.radius;
               if (a.x > this.width + a.radius) a.x = -a.radius;
@@ -963,7 +965,8 @@
             if (!this.readyPending) return;
             if (performance.now() - this.fallingStartTime < ShuttleGame.MIN_RUN_MS) return;
             this.state = 'finale';
-            const radius = ShuttleGame.DESTINATION_RADIUS;
+            this.finaleStartTime = this.elapsed;
+            const radius = ShuttleGame.DESTINATION_START_RADIUS;
             this.destination = {
               x: this.width / 2,
               y: -radius - 20,
@@ -971,10 +974,16 @@
               radius,
               settledAt: 0,
             };
+            this.keys.left = false;
+            this.keys.right = false;
+            this.keys.fire = false;
           }
 
           _updateFinale(deltaSec) {
             if (this.state !== 'finale') return;
+            const finaleT = Math.min(1, (this.elapsed - this.finaleStartTime) / ShuttleGame.FINALE_BG_FREEZE_MS);
+            this.bgScale = 1 - finaleT;
+
             const targetY = this.height * ShuttleGame.DESTINATION_TARGET_Y_RATIO;
             if (this.destination.y < targetY) {
               this.destination.y += this.destination.vy * deltaSec;
@@ -982,7 +991,16 @@
                 this.destination.y = targetY;
                 this.destination.settledAt = this.elapsed;
               }
-            } else if (
+            }
+
+            if (this.destination.radius < ShuttleGame.DESTINATION_FINAL_RADIUS) {
+              this.destination.radius = Math.min(
+                ShuttleGame.DESTINATION_FINAL_RADIUS,
+                this.destination.radius + ShuttleGame.DESTINATION_GROW_RATE * deltaSec
+              );
+            }
+
+            if (
               this.destination.settledAt > 0 &&
               this.elapsed - this.destination.settledAt >= ShuttleGame.DESTINATION_LINGER_MS
             ) {
@@ -995,6 +1013,7 @@
 
           _updateExit(deltaSec) {
             if (this.state !== 'exit') return;
+            this.bgScale = 0;
             this.shipVY -= ShuttleGame.EXIT_ACCEL * deltaSec;
             this.shipVY = Math.max(-ShuttleGame.EXIT_MAX_SPEED, this.shipVY);
             this.shipY += this.shipVY * deltaSec;
@@ -1002,9 +1021,7 @@
               const dx = this.destination.x - this.shipX;
               this.shipX += Math.sign(dx) * Math.min(Math.abs(dx), ShuttleGame.EXIT_MAX_SPEED * deltaSec * 0.5);
             }
-            const t = Math.min(1, (this.elapsed - this.exitStartTime) / ShuttleGame.EXIT_FADE_MS);
-            this.shipAlpha = 1 - t;
-            if (this.shipAlpha <= 0 || this.shipY < -ShuttleGame.SHIP_EDGE_INSET) {
+            if (this.shipY < -ShuttleGame.SHIP_EDGE_INSET * 2) {
               this.stop();
               window.dispatchEvent(new Event('prelude-play'));
             }
@@ -1182,12 +1199,15 @@
         ShuttleGame.BLINK_PERIOD_MS = 120;
         ShuttleGame.MIN_RUN_MS = 4500;
         ShuttleGame.DESTINATION_RADIUS = 110;
-        ShuttleGame.DESTINATION_TARGET_Y_RATIO = 0.45;
-        ShuttleGame.DESTINATION_DRIFT_SPEED = 50;
-        ShuttleGame.DESTINATION_LINGER_MS = 2000;
-        ShuttleGame.EXIT_ACCEL = 800;
-        ShuttleGame.EXIT_MAX_SPEED = 900;
-        ShuttleGame.EXIT_FADE_MS = 900;
+        ShuttleGame.DESTINATION_START_RADIUS = 40;
+        ShuttleGame.DESTINATION_FINAL_RADIUS = 260;
+        ShuttleGame.DESTINATION_GROW_RATE = 90;
+        ShuttleGame.DESTINATION_TARGET_Y_RATIO = 0.4;
+        ShuttleGame.DESTINATION_DRIFT_SPEED = 80;
+        ShuttleGame.DESTINATION_LINGER_MS = 1600;
+        ShuttleGame.FINALE_BG_FREEZE_MS = 1200;
+        ShuttleGame.EXIT_ACCEL = 1200;
+        ShuttleGame.EXIT_MAX_SPEED = 1400;
         // Source-space bbox of the shuttle paths AFTER per-part transform-origin
         // pivots are applied. Pulled from the SVG bounds; close enough for centering.
         ShuttleGame.SOURCE_BBOX_MIN_X = -2;
