@@ -72,6 +72,7 @@ import {
   toggleBackgroundMusic,
   useBackgroundMusicGlobalState,
 } from '@/audio/backgroundMusic'
+import { uiAudio } from '@/audio/UiAudioDirector'
 import { LEVEL_GRID_SIZE } from '@/lib/missions/asteroidMissionGenerator'
 
 const route = useRoute()
@@ -98,6 +99,8 @@ const deathOverlayCause = ref('')
 const showMap = ref(false)
 const showInventory = ref(false)
 const inventorySnapshot = ref<Inventory | null>(null)
+/** Positive deltas vs sortie baseline for cargo panel badges (catalog id → qty). */
+const inventoryRunGainsThisSortie = ref<Record<string, number>>({})
 const terminalPrompt = ref<string | null>(null)
 const announceVisible = ref(false)
 const announceAsteroid = ref('')
@@ -409,6 +412,7 @@ function dismissTopMissionTip(): boolean {
   if (!tip) return false
 
   missionTipQueue.value = removeMissionTipQueueEntry(missionTipQueue.value, tip.id)
+  uiAudio.notifyShuttleProgramClick()
   return true
 }
 
@@ -614,6 +618,7 @@ onMounted(async () => {
     viewController.onDeathOverlay = (visible, cause) => {
       deathOverlayVisible.value = visible
       deathOverlayCause.value = cause
+      if (visible && showInventory.value) refreshInventorySnapshot()
       // Death overlay needs a clickable Restart button — release pointer lock
       // so the cursor isn't captured by the FPS camera. Same pattern used by
       // the inventory open handler below.
@@ -695,6 +700,7 @@ onMounted(async () => {
       }
       viewController.refreshLanderFuelCellCount()
       if (showInventory.value) refreshInventorySnapshot()
+      else inventoryRunGainsThisSortie.value = viewController.getLevelRunInventoryGains()
     }
     viewController.onResourcePickupFailed = (label, reason) => {
       recordPickupFailed(label, reason)
@@ -793,6 +799,7 @@ function handleRestart() {
  */
 function refreshInventorySnapshot(): void {
   inventorySnapshot.value = loadInventory()
+  inventoryRunGainsThisSortie.value = viewController.getLevelRunInventoryGains()
 }
 
 /** Open the cargo panel and release pointer-lock so the player can use the mouse. */
@@ -826,6 +833,7 @@ function handleJettison(itemId: string, quantity: number): void {
   if (!result.ok) return
   saveInventory(result.inventory)
   inventorySnapshot.value = result.inventory
+  inventoryRunGainsThisSortie.value = viewController.getLevelRunInventoryGains()
   viewController.refreshLanderFuelCellCount()
 }
 
@@ -833,6 +841,7 @@ function handleJettison(itemId: string, quantity: number): void {
 function handleUseLanderFuelCell(): void {
   viewController.useLanderFuelCell()
   if (showInventory.value) refreshInventorySnapshot()
+  else inventoryRunGainsThisSortie.value = viewController.getLevelRunInventoryGains()
 }
 
 /**
@@ -1042,6 +1051,7 @@ function handleToggleMusic(): void {
   <LevelInventoryPanel
     :open="showInventory"
     :inventory="inventorySnapshot"
+    :run-gains-this-sortie="inventoryRunGainsThisSortie"
     @close="closeInventoryPanel"
     @jettison="handleJettison"
   />

@@ -30,6 +30,11 @@ const props = defineProps<{
   inventory: Inventory | null
   /** Whether the panel is visible. */
   open: boolean
+  /**
+   * Per-item quantities collected since this sortie's baseline (level entry or
+   * restart). Used for “this sortie” badges; omit rows with zero.
+   */
+  runGainsThisSortie?: Record<string, number>
 }>()
 
 const emit = defineEmits<{
@@ -50,6 +55,8 @@ interface DisplayRow {
   splitQty: number
   partialWeight: number
   unitNoun: string
+  /** Units above sortie baseline for this id (0 when none). */
+  runGainThisSortie: number
 }
 
 const totalWeight = computed(() => {
@@ -69,11 +76,14 @@ const slotPercent = computed(() => {
   return Math.min(100, (inv.stacks.length / inv.maxSlots) * 100)
 })
 
+const runGains = computed(() => props.runGainsThisSortie ?? {})
+
 const rows = computed<DisplayRow[]>(() => {
   if (!props.inventory) return []
   return props.inventory.stacks.map((stack: InventoryStack) => {
     const def = getItemDefinition(stack.itemId)
     const split = clamp(splitQty.value[stack.itemId] ?? 1, 1, stack.quantity)
+    const runGainThisSortie = Math.max(0, Math.floor(runGains.value[stack.itemId] ?? 0))
     return {
       itemId: stack.itemId,
       label: def?.label ?? stack.itemId,
@@ -84,6 +94,7 @@ const rows = computed<DisplayRow[]>(() => {
       splitQty: split,
       partialWeight: split * (def?.weightPerUnit ?? 0),
       unitNoun: stack.quantity === 1 ? 'unit' : 'units',
+      runGainThisSortie,
     }
   })
 })
@@ -141,7 +152,13 @@ function handleBackdropClick(event: MouseEvent): void {
           <header class="inventory-panel__header">
             <div>
               <h2 id="inventory-panel-title" class="inventory-panel__title">CARGO HOLD</h2>
-              <p class="inventory-panel__subtitle">Press <kbd>B</kbd> or <kbd>Esc</kbd> to close</p>
+              <p class="inventory-panel__subtitle">
+                <span class="inventory-panel__sortie-hint">THIS SORTIE</span> · badges show cargo
+                gained since drop or last restart
+              </p>
+              <p class="inventory-panel__subtitle inventory-panel__subtitle--keys">
+                Press <kbd>B</kbd> or <kbd>Esc</kbd> to close
+              </p>
             </div>
             <button
               type="button"
@@ -205,6 +222,13 @@ function handleBackdropClick(event: MouseEvent): void {
                     {{ row.quantity }} {{ row.unitNoun }} &middot;
                     {{ row.totalWeightKg.toFixed(0) }} kg &middot;
                     <span class="inventory-panel__category">{{ row.category }}</span>
+                    <span
+                      v-if="row.runGainThisSortie > 0"
+                      class="inventory-panel__run-gain"
+                      :title="`+${row.runGainThisSortie} collected this sortie`"
+                    >
+                      &middot; +{{ row.runGainThisSortie }} sortie
+                    </span>
                   </div>
                 </div>
                 <div class="inventory-panel__split">
@@ -328,6 +352,17 @@ function handleBackdropClick(event: MouseEvent): void {
   font-size: 0.7rem;
   text-transform: uppercase;
   color: rgba(178, 220, 230, 0.7);
+}
+.inventory-panel__subtitle--keys {
+  margin-top: 0.15rem;
+}
+.inventory-panel__sortie-hint {
+  color: rgba(102, 255, 238, 0.95);
+  letter-spacing: 0.14em;
+}
+.inventory-panel__run-gain {
+  color: rgba(170, 220, 255, 0.95);
+  font-variant-numeric: tabular-nums;
 }
 .inventory-panel__subtitle kbd {
   display: inline-block;

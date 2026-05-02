@@ -100,6 +100,12 @@ import {
 } from '@/lib/fps/lootSystem'
 import { TRADE_GOODS } from '@/lib/shop/tradeGoods'
 import { addItem } from '@/lib/inventory/inventory'
+import {
+  cloneInventory,
+  inventoryQuantitiesGainedSince,
+  stripInventoryGainedSinceBaseline,
+} from '@/lib/inventory/inventoryRunBaseline'
+import type { Inventory } from '@/lib/inventory/types'
 import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
 import { LootPickupController } from '@/three/LootPickupController'
 import { contractSystem } from '@/lib/contracts/runtime'
@@ -345,6 +351,11 @@ export class LevelViewController implements Tickable {
   // ── Exfil tracking ────────────────────────────────────────────
   private hasExitedVehicle = false
   private landerDestroyed = false
+  /**
+   * Persisted cargo snapshot for this sortie (or attempt after restart). Used
+   * to drop only run-earned quantities on failure while keeping pre-drop cargo.
+   */
+  private levelInventoryBaseline: Inventory | null = null
   private landerExplosion: LanderExplosion | null = null
 
   // ── Atmosphere ──────────────────────────────────────────────
@@ -439,6 +450,45 @@ export class LevelViewController implements Tickable {
   refreshLanderFuelCellCount(): void {
     const inventory = loadInventory()
     this.onLanderFuelCellCount?.(inventory ? countLanderFuelCells(inventory) : 0)
+  }
+
+  /**
+   * Quantities collected since the last sortie baseline (level entry or restart),
+   * keyed by catalog item id. Used by the in-mission cargo panel badges.
+   *
+   * @author guinetik
+   * @date 2026-05-02
+   * @spec docs/superpowers/specs/2026-05-02-level-run-inventory-baseline-design.md
+   *
+   * @returns Empty when no baseline is active; otherwise positive deltas only.
+   */
+  getLevelRunInventoryGains(): Record<string, number> {
+    if (!this.levelInventoryBaseline) return {}
+    const current = loadInventory()
+    if (!current) return {}
+    const gains = inventoryQuantitiesGainedSince(this.levelInventoryBaseline, current)
+    return Object.fromEntries(gains)
+  }
+
+  /**
+   * Snapshot persisted inventory for this sortie attempt.
+   */
+  private captureLevelInventoryBaseline(): void {
+    const inv = loadInventory()
+    this.levelInventoryBaseline = inv ? cloneInventory(inv) : null
+  }
+
+  /**
+   * On run failure, remove only quantities above {@link levelInventoryBaseline}
+   * and persist. Idempotent if already stripped.
+   */
+  private revertPersistedInventoryRunGains(): void {
+    if (!this.levelInventoryBaseline) return
+    const current = loadInventory()
+    if (!current) return
+    const stripped = stripInventoryGainedSinceBaseline(this.levelInventoryBaseline, current)
+    saveInventory(stripped)
+    this.refreshLanderFuelCellCount()
   }
 
   /**
@@ -1472,6 +1522,7 @@ export class LevelViewController implements Tickable {
     // this the shuttle prelude plays on top of an already-running arrival
     // sequence, so the cutscene is mid-flight when the prelude unmounts.
     await this.preludeGate
+    this.captureLevelInventoryBaseline()
     this.gameLoop.start()
     this.landerAudio.start()
   }
@@ -2060,6 +2111,7 @@ export class LevelViewController implements Tickable {
   // ═══════════════════════════════════════════════════════════════
 
   private enterDead(): void {
+    this.revertPersistedInventoryRunGains()
     // Notify the active DAN scan so its state machine flips to failed before
     // the death overlay routes through the existing fail UX.
     const active = this.minigames.getActive()
@@ -2116,6 +2168,7 @@ export class LevelViewController implements Tickable {
    * @param cause - Failure cause shown on the overlay.
    */
   private showDeathOverlay(cause: string): void {
+    this.revertPersistedInventoryRunGains()
     this.pointerLock.releaseLock()
     this.teardownPointerLock()
     this.fpsAudio.stop()
@@ -2271,6 +2324,7 @@ export class LevelViewController implements Tickable {
     }
 
     this.stateMachine?.setState('lander')
+    this.captureLevelInventoryBaseline()
   }
 
   private failLanderRun(
@@ -2279,6 +2333,7 @@ export class LevelViewController implements Tickable {
   ): void {
     if (!this.landerController || this.landerDestroyed) return
 
+    this.revertPersistedInventoryRunGains()
     this.landerDestroyed = true
 
     if (options.explode) {
@@ -3519,5 +3574,6 @@ export class LevelViewController implements Tickable {
     this.vehicleCamera?.dispose()
     this.sceneManager?.dispose()
     this.inputManager?.dispose()
+    this.levelInventoryBaseline = null
   }
 }
