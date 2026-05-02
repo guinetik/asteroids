@@ -767,14 +767,24 @@
             if (this.shipX < inset) { this.shipX = inset; this.shipVX = 0; }
             if (this.shipX > this.width - inset) { this.shipX = this.width - inset; this.shipVX = 0; }
 
-            const thrusting = this.keys.left || this.keys.right;
-            if (thrusting && Math.random() < ShuttleGame.PARTICLE_SPAWN_CHANCE) {
+            if (Math.random() < ShuttleGame.REAR_THRUSTER_SPAWN_CHANCE) {
+              this.particles.push({
+                x: this.shipX + (Math.random() - 0.5) * 8,
+                y: this.shipY + ShuttleGame.PARTICLE_OFFSET + (Math.random() - 0.5) * 4,
+                vx: -this.shipVX * 0.2 + (Math.random() - 0.5) * 30,
+                vy: ShuttleGame.REAR_THRUSTER_VY + (Math.random() - 0.5) * 40,
+                life: ShuttleGame.PARTICLE_LIFE_S,
+              });
+            }
+
+            const sideThrusting = this.keys.left || this.keys.right;
+            if (sideThrusting && Math.random() < ShuttleGame.PARTICLE_SPAWN_CHANCE) {
               let px = 0;
               if (this.keys.left)  { px =  ShuttleGame.PARTICLE_OFFSET; }
               if (this.keys.right) { px = -ShuttleGame.PARTICLE_OFFSET; }
               this.particles.push({
                 x: this.shipX + px + (Math.random() - 0.5) * 6,
-                y: this.shipY + (Math.random() - 0.5) * 6,
+                y: this.shipY + ShuttleGame.PARTICLE_SIDE_Y_OFFSET + (Math.random() - 0.5) * 6,
                 vx: -this.shipVX * 0.3 + (Math.random() - 0.5) * 40,
                 vy: (Math.random() - 0.5) * 40,
                 life: ShuttleGame.PARTICLE_LIFE_S,
@@ -1194,7 +1204,10 @@
         ShuttleGame.SHUTTLE_DRAG = 600;
         ShuttleGame.PARTICLE_SPAWN_CHANCE = 0.7;
         ShuttleGame.PARTICLE_OFFSET = 24;
+        ShuttleGame.PARTICLE_SIDE_Y_OFFSET = 14;
         ShuttleGame.PARTICLE_LIFE_S = 0.6;
+        ShuttleGame.REAR_THRUSTER_SPAWN_CHANCE = 0.9;
+        ShuttleGame.REAR_THRUSTER_VY = 220;
 
         // Route gateway. /level → ShuttleGame, everything else → LanderGame.
         // We check both pathname and hash so it works whether router is in history
