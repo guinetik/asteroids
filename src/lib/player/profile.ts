@@ -72,6 +72,7 @@ export function savePlayerDisplayName(raw: string): PlayerProfile {
   const existing = loadProfile()
   const profile = existing ? { ...existing, name } : createProfile(name)
   saveProfile(profile)
+  markPlayerNameConfirmed()
   return profile
 }
 
@@ -527,6 +528,25 @@ export function setBodyAccess(
 /** Serialize and save the profile to localStorage. */
 export function saveProfile(profile: PlayerProfile): void {
   localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile))
+}
+
+/** localStorage key set after the player submits their callsign in the name-entry dialog. */
+const NAME_CONFIRMED_STORAGE_KEY = 'asteroid-lander-name-confirmed'
+
+/**
+ * True once the player has submitted their callsign in the name-entry dialog. Returns
+ * false for fresh sessions, refreshes that landed on the dialog without submitting,
+ * and saves predating this flag (so legacy 'Pilot' placeholders re-prompt once).
+ */
+export function isPlayerNameConfirmed(): boolean {
+  if (typeof localStorage === 'undefined') return false
+  return localStorage.getItem(NAME_CONFIRMED_STORAGE_KEY) === 'true'
+}
+
+/** Mark the player's display name as confirmed so future loads skip the name-entry dialog. */
+export function markPlayerNameConfirmed(): void {
+  if (typeof localStorage === 'undefined') return
+  localStorage.setItem(NAME_CONFIRMED_STORAGE_KEY, 'true')
 }
 
 /** Load the profile from localStorage. Returns null if missing or corrupted. */
