@@ -403,7 +403,7 @@ const fpsTelemetry = reactive<FpsTelemetry>({
 onMounted(async () => {
   playBackgroundMusic('level')
   viewController.setNavigateToMap(() => {
-    void router.push('/map')
+    void router.push('/')
   })
   if (container.value) {
     viewController.onBootState = (state) => {

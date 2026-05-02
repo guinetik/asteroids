@@ -11,3 +11,10 @@ declare module '*.glsl?raw' {
   const src: string
   export default src
 }
+
+interface Window {
+  Prelude?: {
+    ready: () => void
+    play: () => void
+  }
+}

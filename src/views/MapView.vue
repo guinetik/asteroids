@@ -43,7 +43,13 @@ import type { PremiumTradeSession } from '@/lib/cosmetics/types'
 import type { PlayerProfile } from '@/lib/player/types'
 import type { Inventory } from '@/lib/inventory/types'
 import type { ShopSession } from '@/lib/shop/tradeTypes'
-import { createProfile, loadProfile, saveProfile } from '@/lib/player/profile'
+import {
+  createProfile,
+  loadProfile,
+  saveProfile,
+  savePlayerDisplayName,
+  MAX_PLAYER_DISPLAY_NAME_LENGTH,
+} from '@/lib/player/profile'
 import { createInventory } from '@/lib/inventory/inventory'
 import { shipMessageSystem, setShipMessageFollowUpDeliveryListener } from '@/lib/messages/runtime'
 import {
@@ -466,6 +472,12 @@ const mapHudTrackerStackVisible = computed(
       activeContractHudRows.value.length > 0),
 )
 const mapBootReady = computed(() => mapBootState.phase === 'ready')
+
+// First-time players have no profile yet. handlePlay defers startExperience and
+// shows a name-entry dialog instead. Returning players skip straight to the map.
+const nameEntryVisible = ref(false)
+const pilotNameInput = ref('')
+const pilotNameMaxLen = MAX_PLAYER_DISPLAY_NAME_LENGTH
 const turretTargetRatio = computed(() => {
   if (!turretTarget.value || turretTarget.value.totalKg <= 0) return 0
   return Math.max(0, Math.min(1, turretTarget.value.remainingKg / turretTarget.value.totalKg))
@@ -722,8 +734,29 @@ function syncPersistentProgressFromController(): void {
   playerCredits.value = playerProfileSnapshot.value.credits
 }
 
+/**
+ * When the tactical map opens (M), re-read the persisted profile so fast-travel
+ * unlocks and other contract rewards written by {@link saveProfile} are visible
+ * immediately. Avoids stale {@link playerProfileSnapshot} if the contract runtime
+ * updated storage after the last controller sync.
+ */
+watch(
+  () => mapOverlay.visible,
+  (visible) => {
+    if (!visible) return
+    viewController.refreshPlayerProfileFromStorage()
+    hydratePlayerUpgradeLevelsFromStorage()
+    syncPersistentProgressFromController()
+  },
+)
+
+function handlePreludePlay(): void {
+  handlePlay()
+}
+
 onMounted(async () => {
   window.addEventListener('keydown', handleWindowKeydown)
+  window.addEventListener('prelude-play', handlePreludePlay)
   if (container.value) {
     viewController.onTelemetry = (t) => {
       Object.assign(telemetry, t)
@@ -1010,17 +1043,22 @@ onMounted(async () => {
       )
     })
     unsubscribeContractStepCompleted = onContractStepCompleted((payload) => {
-      // Runtime already credited the wallet via `addCredits` + `saveProfile`;
-      // pull the persisted snapshot back into the controller so the credits HUD
-      // updates immediately, then surface the toast + audio cue.
-      viewController.refreshPlayerProfileFromStorage()
-      shopProfile.value = viewController.getPlayerProfileSnapshot()
-      if (payload.creditsReward > 0) {
-        showMissionNotification(
-          `Contract step complete — +${payload.creditsReward.toLocaleString()} CR`,
-        )
-        uiAudio.notifyCreditsAwarded()
-      }
+      // `onContractStepCompleted` runs inside `advanceStep` *before* completion
+      // rewards (`fast-travel`, shuttle upgrades, etc.) are applied. Deferring to a
+      // microtask lets `applyRewards` / `saveProfile` finish first so we do not
+      // snapshot a stale profile into the controller.
+      queueMicrotask(() => {
+        viewController.refreshPlayerProfileFromStorage()
+        hydratePlayerUpgradeLevelsFromStorage()
+        syncPersistentProgressFromController()
+        shopProfile.value = viewController.getPlayerProfileSnapshot()
+        if (payload.creditsReward > 0) {
+          showMissionNotification(
+            `Contract step complete — +${payload.creditsReward.toLocaleString()} CR`,
+          )
+          uiAudio.notifyCreditsAwarded()
+        }
+      })
     })
     syncPersistentProgressFromController()
     shopProfile.value = viewController.getPlayerProfileSnapshot()
@@ -1029,8 +1067,15 @@ onMounted(async () => {
   }
 })
 
+watch(mapBootReady, (isReady) => {
+  if (isReady && typeof window !== 'undefined' && window.Prelude) {
+    window.Prelude.ready()
+  }
+})
+
 onUnmounted(() => {
   window.removeEventListener('keydown', handleWindowKeydown)
+  window.removeEventListener('prelude-play', handlePreludePlay)
   clearPickupUi()
   setShipMessageFollowUpDeliveryListener(null)
   stopBackgroundMusic('map')
@@ -1049,9 +1094,33 @@ function handleRestart() {
 
 function handlePlay(): void {
   if (mapExperienceStarted.value || !mapBootReady.value) return
+  // First-time players (no saved profile, not arriving via portal) see the
+  // name-entry dialog before the experience actually starts. The portal flow
+  // already seeds a profile from the URL, so it skips the dialog.
+  const isPortalArrival =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('portal') === 'true'
+  if (loadProfile() === null && !isPortalArrival) {
+    nameEntryVisible.value = true
+    return
+  }
+  beginMapExperience()
+}
+
+function beginMapExperience(): void {
+  if (mapExperienceStarted.value) return
   mapExperienceStarted.value = true
   playBackgroundMusic('map')
   viewController.startExperience()
+}
+
+function handleNameEntrySubmit(): void {
+  const trimmed = pilotNameInput.value.trim()
+  if (trimmed.length === 0) return
+  savePlayerDisplayName(trimmed)
+  viewController.refreshPlayerProfileFromStorage()
+  nameEntryVisible.value = false
+  beginMapExperience()
 }
 
 function handlePortalWatchIntro(): void {
@@ -1382,18 +1451,40 @@ watch(
 
 <template>
   <div ref="container" class="scene-container"></div>
-  <div
+    <div
     v-if="mapBootOverlayVisible"
     class="map-boot-overlay"
     role="dialog"
     aria-modal="true"
-    aria-labelledby="map-boot-title"
+    aria-label="Loading Map"
   >
-    <div class="map-boot-card">
+    <div v-if="!nameEntryVisible" class="map-boot-card">
       <div v-if="!mapBootReady" class="map-boot-spinner" />
       <h1 v-if="!mapBootReady" id="map-boot-title" class="map-boot-title">Loading</h1>
       <button type="button" class="map-boot-play" :disabled="!mapBootReady" @click="handlePlay">
         PLAY
+      </button>
+    </div>
+    <div v-else class="map-boot-card map-boot-card--name-entry">
+      <h1 class="map-boot-title">Asteroids</h1>
+      <p class="map-boot-status">Pilot, identify yourself</p>
+      <input
+        id="pilot-name"
+        v-model="pilotNameInput"
+        type="text"
+        autocomplete="username"
+        :maxlength="pilotNameMaxLen"
+        class="map-boot-name-input"
+        placeholder="Enter your call sign"
+        @keydown.enter.prevent="handleNameEntrySubmit"
+      />
+      <button
+        type="button"
+        class="map-boot-play"
+        :disabled="pilotNameInput.trim().length === 0"
+        @click="handleNameEntrySubmit"
+      >
+        BEGIN
       </button>
     </div>
   </div>

@@ -1,15 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '@/views/HomeView.vue'
 import { canAccessLevelRoute } from '@/lib/level/levelRouteAccess'
-import { canAccessMapRoute } from '@/lib/map/mapRouteAccess'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
-      name: 'home',
-      component: HomeView,
+      name: 'map',
+      component: () => import('@/views/MapView.vue'),
     },
     {
       path: '/shuttle',
@@ -20,11 +18,6 @@ const router = createRouter({
       path: '/lander',
       name: 'lander',
       component: () => import('@/views/LanderView.vue'),
-    },
-    {
-      path: '/map',
-      name: 'map',
-      component: () => import('@/views/MapView.vue'),
     },
     {
       path: '/fps',
@@ -40,9 +33,6 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
-  if (to.name === 'map' && !canAccessMapRoute()) {
-    return { name: 'home' }
-  }
   if (to.name !== 'level') return true
   if (canAccessLevelRoute(to.query)) return true
   return { name: 'map' }

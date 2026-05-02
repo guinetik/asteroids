@@ -435,7 +435,7 @@ export class LevelViewController implements Tickable {
   }
 
   /**
-   * Wires navigation back to the solar map (typically `router.push('/map')`).
+   * Wires navigation back to the solar map (typically `router.push('/')`).
    * Called once from {@link LevelView} setup to avoid a circular import of
    * `router/index` from this file.
    *

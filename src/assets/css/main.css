@@ -17,12 +17,15 @@
 }
 
 html,
-body {
+body,
+#app {
   font-family: 'Datatype', ui-sans-serif, system-ui, sans-serif;
+  background-color: #000;
 }
 
 .scene-container {
   @apply w-screen h-screen overflow-hidden;
+  background-color: #000;
 }
 
 .map-boot-overlay {
@@ -39,6 +42,8 @@ body {
 }
 
 .map-boot-card {
+  position: relative;
+  z-index: 10;
   width: min(100%, 22rem);
   display: grid;
   justify-items: center;
@@ -102,6 +107,29 @@ body {
 .map-boot-play:disabled {
   opacity: 0.45;
   cursor: wait;
+}
+
+.map-boot-card--name-entry {
+  width: min(100%, 26rem);
+}
+
+.map-boot-name-input {
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid rgba(103, 232, 249, 0.35);
+  border-radius: 0.4rem;
+  background: rgba(2, 6, 23, 0.6);
+  color: rgba(236, 254, 255, 0.94);
+  font-family: inherit;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  outline: none;
+  transition: border-color 140ms ease;
+}
+
+.map-boot-name-input:focus {
+  border-color: rgba(165, 243, 252, 0.85);
+  box-shadow: 0 0 1rem rgba(34, 211, 238, 0.18);
 }
 
 @keyframes map-boot-spin {
