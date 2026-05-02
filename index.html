@@ -650,7 +650,7 @@
               },
             ];
 
-            this.stars = [];
+            this.starLayers = []; // [{ stars: [{x,y,size,brightness}], speed }]
             this.elapsed = 0;
             this.readyPending = false;
 
@@ -681,13 +681,34 @@
             this.shipVX = 0;
             this.shipVY = 0;
 
-            this.stars = [];
-            for (let i = 0; i < ShuttleGame.STAR_COUNT; i++) {
-              this.stars.push({
-                x: Math.random() * this.width,
-                y: Math.random() * this.height,
-                brightness: Math.random() * 0.8 + 0.2,
+            this.starLayers = [];
+            for (let layer = 0; layer < ShuttleGame.STAR_LAYERS; layer++) {
+              const stars = [];
+              for (let i = 0; i < ShuttleGame.STAR_COUNT_PER_LAYER[layer]; i++) {
+                stars.push({
+                  x: Math.random() * this.width,
+                  y: Math.random() * this.height,
+                  size: ShuttleGame.STAR_LAYER_SIZES[layer],
+                  brightness: Math.random() * 0.7 + 0.3,
+                });
+              }
+              this.starLayers.push({
+                stars,
+                speed: ShuttleGame.STAR_LAYER_SPEEDS[layer],
               });
+            }
+          }
+
+          _updateStarfield(deltaSec) {
+            for (const layer of this.starLayers) {
+              for (const s of layer.stars) {
+                s.y += layer.speed * deltaSec;
+                if (s.y > this.height) {
+                  s.y -= this.height + Math.random() * 20;
+                  s.x = Math.random() * this.width;
+                  s.brightness = Math.random() * 0.7 + 0.3;
+                }
+              }
             }
           }
 
@@ -780,6 +801,7 @@
           _update(dt) {
             this.elapsed += dt;
             const deltaSec = dt / 1000;
+            this._updateStarfield(deltaSec);
             this._updateShuttle(deltaSec);
           }
 
@@ -788,9 +810,11 @@
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, this.width, this.height);
 
-            for (const star of this.stars) {
-              ctx.fillStyle = `rgba(255, 255, 255, ${star.brightness})`;
-              ctx.fillRect(star.x, star.y, 1, 1);
+            for (const layer of this.starLayers) {
+              for (const s of layer.stars) {
+                ctx.fillStyle = `rgba(255, 255, 255, ${s.brightness})`;
+                ctx.fillRect(s.x, s.y, s.size, s.size);
+              }
             }
 
             ctx.fillStyle = '#ffffff';
@@ -827,7 +851,10 @@
           }
         }
 
-        ShuttleGame.STAR_COUNT = 80;
+        ShuttleGame.STAR_LAYERS = 3;
+        ShuttleGame.STAR_COUNT_PER_LAYER = [60, 40, 25];
+        ShuttleGame.STAR_LAYER_SPEEDS = [180, 90, 35];
+        ShuttleGame.STAR_LAYER_SIZES = [2, 1, 1];
         // Source-space bbox of the shuttle paths AFTER per-part transform-origin
         // pivots are applied. Pulled from the SVG bounds; close enough for centering.
         ShuttleGame.SOURCE_BBOX_MIN_X = -2;
