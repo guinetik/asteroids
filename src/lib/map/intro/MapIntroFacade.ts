@@ -58,9 +58,19 @@ export class MapIntroFacade {
   private readonly tempMidQuaternion = new THREE.Quaternion()
   private readonly tempMarsWorldPos = new THREE.Vector3()
 
-  static preload(): void {
-    VirusModel.preload()
-    CityModel.preload()
+  private static preloadPromise: Promise<void> | null = null
+
+  static preload(): Promise<void> {
+    if (!MapIntroFacade.preloadPromise) {
+      MapIntroFacade.preloadPromise = Promise.all([VirusModel.preload(), CityModel.preload()]).then(
+        () => undefined,
+      )
+    }
+    return MapIntroFacade.preloadPromise
+  }
+
+  static whenPreloaded(): Promise<void> {
+    return MapIntroFacade.preload()
   }
 
   private readonly introCamera: THREE.PerspectiveCamera

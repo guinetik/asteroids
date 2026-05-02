@@ -1095,12 +1095,9 @@ function handleRestart() {
 function handlePlay(): void {
   if (mapExperienceStarted.value || !mapBootReady.value) return
   // First-time players (no saved profile, not arriving via portal) see the
-  // name-entry dialog before the experience actually starts. The portal flow
-  // already seeds a profile from the URL, so it skips the dialog.
-  const isPortalArrival =
-    typeof window !== 'undefined' &&
-    new URLSearchParams(window.location.search).get('portal') === 'true'
-  if (loadProfile() === null && !isPortalArrival) {
+  // name-entry dialog before the experience actually starts. The controller
+  // raises this flag during init for fresh non-portal sessions.
+  if (viewController.requiresNameEntry()) {
     nameEntryVisible.value = true
     return
   }
@@ -1450,7 +1447,11 @@ watch(
 </script>
 
 <template>
-  <div ref="container" class="scene-container"></div>
+  <div
+    ref="container"
+    class="scene-container"
+    :class="{ 'scene-container--hidden': mapBootOverlayVisible }"
+  ></div>
     <div
     v-if="mapBootOverlayVisible"
     class="map-boot-overlay"

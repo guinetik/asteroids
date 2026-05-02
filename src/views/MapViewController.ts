@@ -410,6 +410,13 @@ export class MapViewController implements Tickable {
    * Starting placeholder matches fresh profile credits until init runs.
    */
   private playerProfile: PlayerProfile = createProfile('Pilot')
+  /**
+   * True when init created a fresh non-portal default profile and is awaiting a real
+   * display name from the name-entry dialog. While set, the controller skips persisting
+   * the placeholder 'Pilot' profile so MapView can detect "no saved profile" via
+   * {@link requiresNameEntry} instead of the empty localStorage entry.
+   */
+  private pendingNameEntry = false
   private playerInventory: Inventory = createInventoryForCargoBay(
     getCurrentUpgradeValue('shuttleCargoBay'),
   )
@@ -826,10 +833,12 @@ export class MapViewController implements Tickable {
       this.playerProfile = storedProfile
     } else {
       // No saved profile — check for portal arrival to seed the player name.
-      // If ?portal=true&username=Racer is present, use "Racer"; otherwise default to "Pilot".
+      // If ?portal=true&username=Racer is present, use "Racer"; otherwise defer to the
+      // name-entry dialog (placeholder 'Pilot' lives only in memory until then).
       const portalParams = new VibePortal()
-      const portalName = portalParams.arrival.username?.trim() || 'Pilot'
-      this.playerProfile = createProfile(portalName)
+      const portalName = portalParams.arrival.username?.trim() ?? ''
+      this.playerProfile = createProfile(portalName.length > 0 ? portalName : 'Pilot')
+      this.pendingNameEntry = portalName.length === 0
       resetPlayerUpgradesToDefaults()
       clearInventory()
       clearMissionBoard()
@@ -1391,6 +1400,11 @@ export class MapViewController implements Tickable {
 
     this.gameLoop = new GameLoop(this.tickHandler)
     this.emitBootState('preparing', 'Loading')
+    // Hold the loader until intro GLBs are cached AND the cinematic camera has rendered
+    // its first frame, so the canvas pixels behind the overlay are already the intro view.
+    // Without this, dismissing the overlay flashes the orbit-setup frame (velocity wedge,
+    // etc.) until the next requestAnimationFrame.
+    await MapIntroFacade.whenPreloaded()
     this.syncPreparedReadyFrame()
     this.sceneObjects.composer.render()
     this.emitBootState('ready', 'Ready')
@@ -2511,8 +2525,14 @@ export class MapViewController implements Tickable {
 
   /** Write current profile and shuttle inventory to localStorage. */
   private persistPlayerProfile(): void {
+    if (this.pendingNameEntry) return
     saveProfile(this.playerProfile)
     saveInventory(this.playerInventory)
+  }
+
+  /** True until a fresh non-portal player submits their display name. */
+  requiresNameEntry(): boolean {
+    return this.pendingNameEntry
   }
 
   /** Persist profile/inventory and refresh Vue achievement progress immediately. */
@@ -2779,6 +2799,7 @@ export class MapViewController implements Tickable {
     const stored = loadProfile()
     if (!stored) return false
     this.playerProfile = stored
+    this.pendingNameEntry = false
     this.onCreditsUpdate?.(this.playerProfile.credits)
     return true
   }
@@ -2879,6 +2900,8 @@ export class MapViewController implements Tickable {
     const result = purchaseCosmeticOption(this.playerProfile, optionId)
     if (!result.ok) return result
     this.playerProfile = result.profile
+    this.shuttleController?.applyShuttlePaintjobFromProfile(this.playerProfile)
+    this.shuttleController?.applyLanderPaintjobFromProfile(this.playerProfile)
     this.persistPlayerProfile()
     this.onCreditsUpdate?.(this.playerProfile.credits)
     this.emitShopState()
@@ -2894,6 +2917,8 @@ export class MapViewController implements Tickable {
     const result = applyOwnedCosmetic(this.playerProfile, optionId)
     if (!result.ok) return result
     this.playerProfile = result.profile
+    this.shuttleController?.applyShuttlePaintjobFromProfile(this.playerProfile)
+    this.shuttleController?.applyLanderPaintjobFromProfile(this.playerProfile)
     this.persistPlayerProfile()
     this.emitShopState()
     return result
@@ -4107,11 +4132,18 @@ export class MapViewController implements Tickable {
     }
 
     this.awaitingStartupCinematicOrbitHandoff = true
-    this.mapIntro.start({ skipBlockingMessageAfterCinematic: true })
     this.suppressIntroMapLayers()
     this.vehicleCamera.controls.enabled = false
     this.vehicleCamera.setConfig(MAP_ORBIT_CAMERA_CONFIG)
     this.introFacade?.resetCamera()
+    // Hold the cinematic until intro GLBs (virus, city) are ready so step-bound props
+    // are guaranteed in-cache before zoom_virus / zoom_city. Without this, slow networks
+    // race the step transitions and the prop never appears in-frame.
+    MapIntroFacade.whenPreloaded().then(() => {
+      if (!this.awaitingStartupCinematicOrbitHandoff) return
+      this.mapIntro.start({ skipBlockingMessageAfterCinematic: true })
+      this.emitIntroUiState()
+    })
     this.emitIntroUiState()
   }
 
@@ -4205,7 +4237,10 @@ export class MapViewController implements Tickable {
 
   /** Push the current intro UI state to Vue. */
   private emitIntroUiState(): void {
-    this.onMapIntro?.(this.mapIntro.uiState)
+    const state = this.mapIntro.uiState
+    const name = (this.playerProfile.name ?? '').trim() || 'PILOT'
+    const caption = state.cinematicCaption.replace('{name}', name.toUpperCase())
+    this.onMapIntro?.(caption === state.cinematicCaption ? state : { ...state, cinematicCaption: caption })
   }
 
   /**
