@@ -1384,7 +1384,6 @@ export class LevelViewController implements Tickable {
     await propPreloads
 
     this.emitBootState('ready', 'Ready for drop')
-    this.emitBootState('started', 'Running')
 
     // ── Arrival state starts with lander physics + cinematic cam ─
     this.enterArrival()
@@ -1447,6 +1446,10 @@ export class LevelViewController implements Tickable {
 
     // ── Start ───────────────────────────────────────────────────
     this.gameLoop = new GameLoop(this.tickHandler)
+    // Flip to 'started' only once the render loop is about to tick — emitting
+    // earlier kicks off the loader fade while the main thread is still blocked
+    // on shader precompile, so the user never sees the transition animate.
+    this.emitBootState('started', 'Running')
     this.gameLoop.start()
     this.landerAudio.start()
   }

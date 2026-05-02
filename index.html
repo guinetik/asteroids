@@ -107,6 +107,57 @@
         let particles = [];
 
         let landingTime = 0;
+        let landingFrozen = false; // true once the ship has fallen past the pad — skip physics
+        let terrainVisible = false; // true once we've started the rising-terrain landing beat
+        let landerRotation = 0; // radians, set on touchdown to match terrain slope
+
+        // Terrain ridge as (xRatio, yOffsetRatio) pairs. The pad spans 0.4–0.6
+        // (yOffset = 0). Y on screen = terrainPadY + yOffsetRatio * height.
+        // Used by both the draw pass and the slope/height query helpers so the
+        // visual and the physics agree on where the ground is at any X.
+        const TERRAIN_POINTS = [
+          [0.0, 0.05],
+          [0.2, 0.02],
+          [0.3, 0.05],
+          [0.4, 0.0],
+          [0.6, 0.0],
+          [0.7, 0.04],
+          [0.9, 0.01],
+          [1.0, 0.06],
+        ];
+
+        function terrainSegmentAt(x) {
+          const xr = x / width;
+          for (let i = 0; i < TERRAIN_POINTS.length - 1; i++) {
+            if (xr >= TERRAIN_POINTS[i][0] && xr <= TERRAIN_POINTS[i + 1][0]) {
+              return i;
+            }
+          }
+          return TERRAIN_POINTS.length - 2;
+        }
+
+        function terrainHeightAt(x, padY) {
+          const i = terrainSegmentAt(x);
+          const [x0r, y0r] = TERRAIN_POINTS[i];
+          const [x1r, y1r] = TERRAIN_POINTS[i + 1];
+          const x0 = x0r * width;
+          const x1 = x1r * width;
+          const y0 = padY + y0r * height;
+          const y1 = padY + y1r * height;
+          const t = (x - x0) / (x1 - x0);
+          return y0 + (y1 - y0) * t;
+        }
+
+        function terrainSlopeAt(x) {
+          const i = terrainSegmentAt(x);
+          const [x0r, y0r] = TERRAIN_POINTS[i];
+          const [x1r, y1r] = TERRAIN_POINTS[i + 1];
+          // Slope is independent of padY (vertical offset cancels), so we can
+          // compute it from the offset ratios directly.
+          const dx = (x1r - x0r) * width;
+          const dy = (y1r - y0r) * height;
+          return Math.atan2(dy, dx);
+        }
         let terrainPadY = 0; // current Y of the landing pad (height * 0.8 once terrain has fully risen)
         const TERRAIN_PAD_FINAL_RATIO = 0.8; // resting Y of the pad relative to canvas height
         const TERRAIN_RISE_MS = 2500;        // how long the terrain takes to scroll up into view
@@ -179,6 +230,9 @@
           score = 0;
           coins = [];
           lastCoinSpawn = 0;
+          terrainVisible = false;
+          landingFrozen = false;
+          landerRotation = 0;
         }
 
         function handleKeyDown(e) {
@@ -218,6 +272,36 @@
         function handleMouseLeaveCanvas() {
           lastMouseX = null;
           isPointerDown = false;
+        }
+
+        function updateCoins(deltaSec) {
+          if (lastTime - lastCoinSpawn > COIN_SPAWN_RATE) {
+            coins.push({
+              x: Math.random() * (width - 40) + 20,
+              y: height + 20,
+              collected: false,
+            });
+            lastCoinSpawn = lastTime;
+          }
+
+          for (let i = coins.length - 1; i >= 0; i--) {
+            const coin = coins[i];
+            coin.y -= 150 * deltaSec;
+
+            if (!coin.collected) {
+              const dx = coin.x - landerX;
+              const dy = coin.y - landerY;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist < 24) {
+                coin.collected = true;
+                score += 10;
+              }
+            }
+
+            if (coin.y < -20 || coin.collected) {
+              coins.splice(i, 1);
+            }
+          }
         }
 
         function update(dt) {
@@ -286,40 +370,25 @@
               performance.now() - fallingStartTime >= MIN_FALLING_MS &&
               landerY > height * 0.25
             ) {
-              state = 'landing';
-              landingTime = 0;
-              // Seed the pad off-screen below so the first draw of the new state
-              // doesn't read the stale terrainPadY (would flash at the top of the canvas).
-              terrainPadY = height + 80;
-            }
-
-            if (lastTime - lastCoinSpawn > COIN_SPAWN_RATE) {
-              coins.push({
-                x: Math.random() * (width - 40) + 20,
-                y: height + 20,
-                collected: false,
-              });
-              lastCoinSpawn = lastTime;
-            }
-
-            for (let i = coins.length - 1; i >= 0; i--) {
-              const coin = coins[i];
-              coin.y -= 150 * deltaSec;
-              
-              if (!coin.collected) {
-                const dx = coin.x - landerX;
-                const dy = coin.y - landerY;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < 24) {
-                  coin.collected = true;
-                  score += 10;
-                }
-              }
-
-              if (coin.y < -20 || coin.collected) {
-                coins.splice(i, 1);
+              const padFinalY = height * TERRAIN_PAD_FINAL_RATIO;
+              if (landerY + LANDER_HEIGHT / 2 > padFinalY - LANDER_HEIGHT) {
+                // Lander is already below where the pad would settle — skip the
+                // rising-terrain landing beat entirely so we don't snap the ship
+                // up onto the pad. Just unlock the PLAY button and leave the
+                // ship where the player flew it. Terrain stays hidden.
+                state = 'landed';
+                playBtn.style.display = 'block';
+              } else {
+                state = 'landing';
+                landingTime = 0;
+                terrainVisible = true;
+                // Seed the pad off-screen below so the first draw of the new state
+                // doesn't read the stale terrainPadY (would flash at the top of the canvas).
+                terrainPadY = height + 80;
               }
             }
+
+            updateCoins(deltaSec);
           } else if (state === 'landing') {
             landingTime += dt;
 
@@ -329,6 +398,20 @@
             const padStart = height + 80;
             const padEnd = height * TERRAIN_PAD_FINAL_RATIO;
             terrainPadY = padStart + (padEnd - padStart) * easeT;
+
+            if (landingFrozen) {
+              // Ship already fell past the pad — skip ship physics, but if the
+              // rising terrain catches up to the frozen feet, ride it up so the
+              // lander always sits flush on the ridge instead of floating above
+              // it. Rotation tracks the segment slope at the current X so the
+              // body conforms to the surface as it settles.
+              const ridingGroundY = terrainHeightAt(landerX, terrainPadY);
+              if (ridingGroundY <= landerY + LANDER_HEIGHT / 2) {
+                landerY = ridingGroundY - LANDER_HEIGHT / 2;
+                landerRotation = terrainSlopeAt(landerX);
+              }
+              return;
+            }
 
             // Lander still feels gravity (gentler) and still responds to thrust + lateral input.
             const thrusting = keys.thrust || isPointerDown;
@@ -358,12 +441,32 @@
             if (landerX < LANDER_WIDTH / 2) { landerX = LANDER_WIDTH / 2; landerVelocityX = 0; }
             if (landerX > width - LANDER_WIDTH / 2) { landerX = width - LANDER_WIDTH / 2; landerVelocityX = 0; }
 
-            // Touchdown: only count once the pad has finished rising and the lander reaches it.
+            // Touchdown: only snap up onto the pad if the lander's foot is still
+            // above where the pad will finally rest. If the ship has already
+            // fallen below the pad's final Y, we hide the terrain and unlock
+            // PLAY without teleporting — the player keeps the ship wherever
+            // they let it drift.
             const landerFootY = landerY + LANDER_HEIGHT / 2;
-            if (t >= 1 && landerFootY >= terrainPadY) {
-              landerY = terrainPadY - LANDER_HEIGHT / 2;
+            // Sample the terrain right under the lander — this lets the ship
+            // land on slope segments at the correct height (and lets us read
+            // the slope angle for the touchdown rotation snap). We compare
+            // against the *final* ground Y to decide between freeze-vs-snap,
+            // because the rising terrain may not have caught up yet.
+            const finalGroundYHere = terrainHeightAt(landerX, height * TERRAIN_PAD_FINAL_RATIO);
+            const groundYHere = terrainHeightAt(landerX, terrainPadY);
+            if (landerFootY > finalGroundYHere) {
+              // Ship fell past where the ground will rest — freeze it in
+              // place, unlock PLAY, but stay in 'landing' so the terrain
+              // keeps animating in behind it. No snap, no teleport.
               landerVelocityY = 0;
               landerVelocityX = 0;
+              landingFrozen = true;
+              playBtn.style.display = 'block';
+            } else if (landerFootY >= groundYHere && landerVelocityY >= 0) {
+              landerY = groundYHere - LANDER_HEIGHT / 2;
+              landerVelocityY = 0;
+              landerVelocityX = 0;
+              landerRotation = terrainSlopeAt(landerX);
               state = 'landed';
               playBtn.style.display = 'block';
             }
@@ -379,7 +482,10 @@
               });
             }
 
-            coins = [];
+            // Coins keep spawning + remain collectible during the landing beat
+            // — the fantasy is that the prelude IS the game, so nothing should
+            // suddenly be taken from the player when terrain rises.
+            updateCoins(deltaSec);
           }
 
           for (let i = particles.length - 1; i >= 0; i--) {
@@ -436,26 +542,26 @@
           }
           ctx.globalAlpha = 1.0;
 
-          if (state === 'landing' || state === 'landed') {
+          if (terrainVisible && (state === 'landing' || state === 'landed')) {
             // Pad currently sits at terrainPadY; the rest of the ridge offsets relative to it.
             const padY = state === 'landed' ? height * TERRAIN_PAD_FINAL_RATIO : terrainPadY;
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(0, padY + height * 0.05);
-            ctx.lineTo(width * 0.2, padY + height * 0.02);
-            ctx.lineTo(width * 0.3, padY + height * 0.05);
-            ctx.lineTo(width * 0.4, padY);
-            ctx.lineTo(width * 0.6, padY);
-            ctx.lineTo(width * 0.7, padY + height * 0.04);
-            ctx.lineTo(width * 0.9, padY + height * 0.01);
-            ctx.lineTo(width, padY + height * 0.06);
+            for (let i = 0; i < TERRAIN_POINTS.length; i++) {
+              const [xr, yr] = TERRAIN_POINTS[i];
+              const px = xr * width;
+              const py = padY + yr * height;
+              if (i === 0) ctx.moveTo(px, py);
+              else ctx.lineTo(px, py);
+            }
             ctx.stroke();
           }
 
           ctx.save();
           ctx.translate(landerX, landerY);
-          
+          if (landerRotation !== 0) ctx.rotate(landerRotation);
+
           ctx.scale(0.7, 0.7);
           ctx.translate(-50, -50);
 

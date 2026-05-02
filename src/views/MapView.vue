@@ -1012,6 +1012,10 @@ onMounted(async () => {
     }
     viewController.onPortalWelcome = () => {
       portalWelcomeIsFirstVisit.value = !viewController.getPlayerProfileSnapshot().hasSeenIntro
+      // Reveal the rest of the HUD template so PortalWelcomeDialog (nested under
+      // `v-if="!portalCinematicActive"`) actually mounts. Without this the dialog
+      // stays hidden forever and the player is stuck in a static cinematic frame.
+      portalCinematicActive.value = false
       portalWelcomeVisible.value = true
     }
     viewController.onJovianEpilogueDue = () => {

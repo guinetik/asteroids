@@ -1,6 +1,6 @@
 <!-- src/views/LevelView.vue -->
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Timer } from '@/lib/Timer'
 import DebugHud from '@/components/DebugHud.vue'
@@ -400,8 +400,19 @@ const fpsTelemetry = reactive<FpsTelemetry>({
   objectives: [],
 })
 
-onMounted(async () => {
+// /level uses the global Prelude as its loader: no PLAY button, no landing
+// minigame — once the controller signals 'started' we dismiss the prelude
+// directly and kick off the cinematic + music. Holding music until then
+// prevents the level audio from bleeding through the prelude game.
+watch(bootPhase, (phase) => {
+  if (phase !== 'started') return
+  if (typeof window !== 'undefined' && window.Prelude) {
+    window.Prelude.play()
+  }
   playBackgroundMusic('level')
+})
+
+onMounted(async () => {
   viewController.setNavigateToMap(() => {
     void router.push('/')
   })
