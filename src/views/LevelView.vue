@@ -541,16 +541,28 @@ const fpsTelemetry = reactive<FpsTelemetry>({
   objectives: [],
 })
 
-// /level uses the global Prelude as its loader: no PLAY button, no landing
-// minigame — once the controller signals 'started' we dismiss the prelude
-// directly and kick off the cinematic + music. Holding music until then
-// prevents the level audio from bleeding through the prelude game.
+// /level uses the global Prelude as its loader. When the 3D scene is ready
+// ('started' phase) we signal the shuttle prelude that it can play its
+// finale (big asteroid → orbital match → exit). The prelude dispatches
+// 'prelude-play' once the shuttle has flown off the top, and only then do
+// we kick the level music — otherwise audio would bleed under the finale.
 watch(bootPhase, (phase) => {
   if (phase !== 'started') return
   if (typeof window !== 'undefined' && window.Prelude) {
-    window.Prelude.play()
+    window.Prelude.ready()
   }
+})
+
+const handlePreludePlay = () => {
   playBackgroundMusic('level')
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('prelude-play', handlePreludePlay)
+}
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('prelude-play', handlePreludePlay)
+  }
 })
 
 onMounted(async () => {
