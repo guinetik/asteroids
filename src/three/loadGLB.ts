@@ -13,8 +13,8 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
 
-/** Draco decoder path (matches `ShuttleController` and Vite-served `three` package). */
-const DRACO_DECODER_PATH = '/node_modules/three/examples/jsm/libs/draco/'
+/** Draco decoder path — Google's CDN works in dev and production (no need to ship wasm). */
+const DRACO_DECODER_PATH = 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/'
 
 const dracoLoader = new DRACOLoader()
 dracoLoader.setDecoderPath(DRACO_DECODER_PATH)
