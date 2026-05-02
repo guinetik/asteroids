@@ -970,7 +970,7 @@
             this.destination = {
               x: this.width / 2,
               y: -radius * 1.5,
-              targetY: -radius * 0.5,
+              targetY: -radius * ShuttleGame.DESTINATION_TARGET_OFFSET,
               vy: ShuttleGame.DESTINATION_DRIFT_SPEED,
               radius,
               settledAt: 0,
@@ -1203,14 +1203,16 @@
         ShuttleGame.BLINK_PERIOD_MS = 120;
         ShuttleGame.MIN_RUN_MS = 4500;
         // Destination asteroid is intentionally huge — diameter ~= max(w,h)
-        // so it spans the full screen width. Center settles at -radius/2 so
-        // we only ever see its bottom half cresting over the top edge.
+        // so it spans the full screen width. Center settles above the top
+        // edge so only a thin crescent of the bottom curve peeks in — just
+        // enough to read as "we've arrived" without dragging the handoff.
         ShuttleGame.DESTINATION_RADIUS_SCALE = 0.95;
-        ShuttleGame.DESTINATION_DRIFT_SPEED = 220;
-        ShuttleGame.DESTINATION_LINGER_MS = 1400;
-        ShuttleGame.FINALE_BG_FREEZE_MS = 1000;
-        ShuttleGame.EXIT_ACCEL = 1400;
-        ShuttleGame.EXIT_MAX_SPEED = 1800;
+        ShuttleGame.DESTINATION_TARGET_OFFSET = 0.85;
+        ShuttleGame.DESTINATION_DRIFT_SPEED = 700;
+        ShuttleGame.DESTINATION_LINGER_MS = 250;
+        ShuttleGame.FINALE_BG_FREEZE_MS = 500;
+        ShuttleGame.EXIT_ACCEL = 2200;
+        ShuttleGame.EXIT_MAX_SPEED = 2400;
         // Source-space bbox of the shuttle paths AFTER per-part transform-origin
         // pivots are applied. Pulled from the SVG bounds; close enough for centering.
         ShuttleGame.SOURCE_BBOX_MIN_X = -2;
