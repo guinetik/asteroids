@@ -117,7 +117,7 @@ const SHUTTLE_VELOCITY_ALIGN_EPSILON = 1e-4
 const SLINGSHOT_PROTECT_SPEED_EPSILON = 0.02
 
 const SHUTTLE_MODEL_PATH = '/models/shuttle.glb'
-const DRACO_DECODER_PATH = '/node_modules/three/examples/jsm/libs/draco/'
+const DRACO_DECODER_PATH = 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/'
 
 /** NASA model is in centimeters (~1400 units across). Scale to meters. */
 const MODEL_SCALE = 0.01
