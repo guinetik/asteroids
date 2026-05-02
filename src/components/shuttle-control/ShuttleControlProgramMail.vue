@@ -28,6 +28,7 @@ import {
 } from '@/lib/contracts/runtime'
 import ShipMessageAudioPlayer from './ShipMessageAudioPlayer.vue'
 import ContractAcceptCard from './ContractAcceptCard.vue'
+import ScrambleText from './ScrambleText.vue'
 
 const emit = defineEmits<{
   mailChanged: []
@@ -329,7 +330,15 @@ watch(
           <header class="shuttle-mail-program__reader-header">
             <div class="shuttle-mail-program__reader-header-row">
               <div class="shuttle-mail-program__reader-header-text">
-                <h2 class="shuttle-mail-program__reader-subject">{{ readable.subject }}</h2>
+                <h2 class="shuttle-mail-program__reader-subject">
+                  <ScrambleText
+                    :key="`subject-${readable.id}`"
+                    :text="readable.subject"
+                    :speed="22"
+                    :scramble-frames="6"
+                    :stagger="1"
+                  />
+                </h2>
                 <div class="shuttle-mail-program__reader-meta">
                   <div class="shuttle-mail-program__reader-meta-row">
                     <span class="shuttle-mail-program__reader-label">From</span>
@@ -409,7 +418,14 @@ watch(
               </div>
             </div>
             <p v-for="(paragraph, index) in readable.body" :key="`${readable.id}-${index}`">
-              {{ paragraph }}
+              <ScrambleText
+                :text="paragraph"
+                :speed="20"
+                :scramble-frames="3"
+                :stagger="1"
+                :delay="index * 120"
+                :play-sound="!readable.audioUrl"
+              />
             </p>
           </div>
           <ContractAcceptCard
