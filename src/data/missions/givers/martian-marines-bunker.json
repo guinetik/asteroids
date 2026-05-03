@@ -1,15 +1,15 @@
 {
   "id": "martian-marines-bunker",
-  "name": "Martian Marines Corps",
-  "title": "Cohort Operations, Mars",
+  "name": "Martian Marine Corps",
+  "title": "Cohort Operations, Phobos Desk",
   "objectiveTypes": ["bunker"],
   "minDifficulty": 1,
   "maxDifficulty": 10,
   "missions": [
     {
       "id": "mmc_forward_bunker_recon",
-      "name": "Forward Bunker — Recon and Reclaim",
-      "briefing": "Operator. Forward bunker on the rock has gone dark. Viroid signature inside. Recon-and-reclaim: descend, neutralize, recover the position. Cohort cannot dispatch hard at distance — that's why we contract pilots like you. Hold the door. Make it ours.",
+      "name": "Reclaim — Forward Position, Asset 88-Mars",
+      "briefing": "Pilot. Forward position on the rock has gone dark. Viroid signature confirmed inside. Objective: descend, neutralize, recover the position. Deploy with F. Standoff distance ninety meters until signature clears. Cohort cannot dispatch hard at this range — that is why you are on contract. Hold the door. Make it ours.\n\n— Sampaio, MMC",
       "objectiveSlots": [
         {
           "type": "bunker",
