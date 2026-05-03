@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { MissionTipTransmission } from '@/lib/level/missionTips'
+import type { MissionTipTransmission, MissionTipView } from '@/lib/level/missionTips'
 import {
   getVisibleMissionTips,
   getVisibleMissionTipsForView,
@@ -57,5 +57,46 @@ describe('missionTipQueue', () => {
       'objective-gather',
       'rtg-low',
     ])
+  })
+})
+
+describe('priority ordering', () => {
+  function tipWith(id: string, view: MissionTipView = 'fps'): MissionTipTransmission {
+    return {
+      id,
+      speaker: 'Test',
+      channel: 'TEST',
+      view,
+      tone: 'mining',
+      message: '...',
+      objectiveType: 'gather',
+    }
+  }
+
+  it('places runtime ids ahead of objective ids in the visible window', () => {
+    const queue = [tipWith('objective:gather'), tipWith('runtime:landerHullRepair')]
+    const visible = getVisibleMissionTipsForView(queue, 'fps')
+    expect(visible.map((t) => t.id)).toEqual(['runtime:landerHullRepair', 'objective:gather'])
+  })
+
+  it('places runtime ids ahead of the first-run lander tip', () => {
+    const queue = [
+      tipWith('first-run-lander', 'lander'),
+      tipWith('runtime:landerDescentWarning', 'lander'),
+    ]
+    const visible = getVisibleMissionTipsForView(queue, 'lander')
+    expect(visible[0]?.id).toBe('runtime:landerDescentWarning')
+  })
+
+  it('preserves insertion order among runtime ids', () => {
+    const queue = [tipWith('runtime:oxygenLow'), tipWith('runtime:rtgLow')]
+    const visible = getVisibleMissionTipsForView(queue, 'fps')
+    expect(visible.map((t) => t.id)).toEqual(['runtime:oxygenLow', 'runtime:rtgLow'])
+  })
+
+  it('preserves insertion order among non-runtime ids', () => {
+    const queue = [tipWith('objective:gather'), tipWith('first-run-lander', 'fps')]
+    const visible = getVisibleMissionTipsForView(queue, 'fps')
+    expect(visible.map((t) => t.id)).toEqual(['objective:gather', 'first-run-lander'])
   })
 })
