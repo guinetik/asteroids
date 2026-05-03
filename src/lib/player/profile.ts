@@ -650,6 +650,34 @@ export function recordMissionObjectiveComplete(
 }
 
 /**
+ * Record a batch of runtime mission-tip ids that fired during one completed mission.
+ * Each id increments the tip's lifetime show count; blank ids are ignored.
+ *
+ * @param profile - Current profile.
+ * @param ids - Runtime tip ids dispatched in the just-completed mission.
+ * @returns Updated profile, or the same profile when nothing valid was passed.
+ */
+export function recordRuntimeTipsShown(
+  profile: PlayerProfile,
+  ids: readonly string[],
+): PlayerProfile {
+  const valid = ids.filter((id) => typeof id === 'string' && id.trim().length > 0)
+  if (valid.length === 0) return profile
+  const achievementStats = getAchievementStats(profile)
+  let runtimeTipsShownCount = achievementStats.runtimeTipsShownCount
+  for (const id of valid) {
+    runtimeTipsShownCount = incrementCountMap(runtimeTipsShownCount, id)
+  }
+  return {
+    ...profile,
+    achievementStats: {
+      ...achievementStats,
+      runtimeTipsShownCount,
+    },
+  }
+}
+
+/**
  * Record one successful slingshot launch around a gravity body.
  *
  * @param profile - Current profile.

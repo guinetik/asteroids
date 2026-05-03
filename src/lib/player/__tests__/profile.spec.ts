@@ -20,6 +20,7 @@ import {
   setBodyAccess,
   recordTradeCreditsEarned,
   recordMissionObjectiveComplete,
+  recordRuntimeTipsShown,
   recordSlingshotLaunch,
   recordGravitySurfStart,
   recordManifoldRide,
@@ -527,5 +528,37 @@ describe('runtimeTipsShownCount field', () => {
       oxygenLow: 1,
       drillWalking: 2,
     })
+  })
+})
+
+describe('recordRuntimeTipsShown', () => {
+  it('increments each id by one', () => {
+    const profile = createProfile('Pilot')
+    const updated = recordRuntimeTipsShown(profile, ['oxygenLow', 'drillWalking'])
+    expect(updated.achievementStats.runtimeTipsShownCount).toEqual({
+      oxygenLow: 1,
+      drillWalking: 1,
+    })
+  })
+
+  it('accumulates across calls', () => {
+    let profile = createProfile('Pilot')
+    profile = recordRuntimeTipsShown(profile, ['oxygenLow'])
+    profile = recordRuntimeTipsShown(profile, ['oxygenLow', 'rtgLow'])
+    expect(profile.achievementStats.runtimeTipsShownCount).toEqual({
+      oxygenLow: 2,
+      rtgLow: 1,
+    })
+  })
+
+  it('returns the same profile reference when ids is empty', () => {
+    const profile = createProfile('Pilot')
+    expect(recordRuntimeTipsShown(profile, [])).toBe(profile)
+  })
+
+  it('skips blank or non-string ids', () => {
+    const profile = createProfile('Pilot')
+    const updated = recordRuntimeTipsShown(profile, ['', '  '])
+    expect(updated.achievementStats.runtimeTipsShownCount).toEqual({})
   })
 })
