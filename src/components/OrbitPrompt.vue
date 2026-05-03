@@ -59,6 +59,38 @@ const details = computed(() => {
   }
   return lines
 })
+
+type OrbitKioskAction =
+  | 'openEngineeringBay'
+  | 'openMissionBoard'
+  | 'openShop'
+  | 'openCosmeticShop'
+  | 'openMission'
+
+function onOrbitKioskClick(action: OrbitKioskAction): void {
+  uiAudio.notifyButtonClick()
+  switch (action) {
+    case 'openEngineeringBay':
+      emit('openEngineeringBay')
+      break
+    case 'openMissionBoard':
+      emit('openMissionBoard')
+      break
+    case 'openShop':
+      emit('openShop')
+      break
+    case 'openCosmeticShop':
+      emit('openCosmeticShop')
+      break
+    case 'openMission':
+      emit('openMission')
+      break
+    default: {
+      const _exhaustive: never = action
+      void _exhaustive
+    }
+  }
+}
 </script>
 
 <template>
@@ -77,10 +109,7 @@ const details = computed(() => {
         v-if="!suppressKiosks && shopAvailable && orbitState.state === 'orbiting'"
         type="button"
         class="orbit-prompt-engineering-btn"
-        @click="
-          uiAudio.notifyButtonClick()
-          emit('openEngineeringBay')
-        "
+        @click="onOrbitKioskClick('openEngineeringBay')"
       >
         U Engineering Bay
       </button>
@@ -88,10 +117,7 @@ const details = computed(() => {
         v-if="!suppressKiosks && shopAvailable && orbitState.state === 'orbiting'"
         type="button"
         class="orbit-prompt-mission-board-btn"
-        @click="
-          uiAudio.notifyButtonClick()
-          emit('openMissionBoard')
-        "
+        @click="onOrbitKioskClick('openMissionBoard')"
       >
         J Mission Board
       </button>
@@ -99,10 +125,7 @@ const details = computed(() => {
         v-if="!suppressKiosks && shopAvailable && orbitState.state === 'orbiting'"
         type="button"
         class="orbit-prompt-shop-btn"
-        @click="
-          uiAudio.notifyButtonClick()
-          emit('openShop')
-        "
+        @click="onOrbitKioskClick('openShop')"
       >
         B Shop
       </button>
@@ -110,10 +133,7 @@ const details = computed(() => {
         v-if="!suppressKiosks && cosmeticShopAvailable && orbitState.state === 'orbiting'"
         type="button"
         class="orbit-prompt-cosmetic-btn"
-        @click="
-          uiAudio.notifyButtonClick()
-          emit('openCosmeticShop')
-        "
+        @click="onOrbitKioskClick('openCosmeticShop')"
       >
         P Pimp My Shuttle!
       </button>
@@ -121,10 +141,7 @@ const details = computed(() => {
         v-if="!suppressKiosks && missionAvailable && orbitState.state === 'orbiting'"
         type="button"
         class="orbit-prompt-mission-btn"
-        @click="
-          uiAudio.notifyButtonClick()
-          emit('openMission')
-        "
+        @click="onOrbitKioskClick('openMission')"
       >
         I Mission
       </button>

@@ -160,10 +160,20 @@ function emitPurchaseUpgrade(upgradeId: UpgradeId): void {
   emit('purchase-upgrade', upgradeId)
 }
 
-function onKeydown(e: KeyboardEvent) {
+function onKeydown(e: KeyboardEvent): void {
   if (e.key === 'Escape') {
-    emit('close')
+    requestClose()
   }
+}
+
+function requestClose(): void {
+  uiAudio.notifySwitch()
+  emit('close')
+}
+
+function onOpenShopFromControl(): void {
+  uiAudio.notifyButtonClick()
+  emit('openShop')
 }
 
 function cancelControlPanelHeightReset(): void {
@@ -226,14 +236,7 @@ onBeforeUnmount(releaseControlPanelHeight)
       <!-- Chrome bar -->
       <div class="shuttle-control-chrome">
         <span>Control Panel</span>
-        <button
-          type="button"
-          class="ship-message-card__button"
-          @click="
-            uiAudio.notifySwitch()
-            $emit('close')
-          "
-        >
+        <button type="button" class="ship-message-card__button" @click="requestClose">
           Close
         </button>
       </div>
@@ -280,10 +283,7 @@ onBeforeUnmount(releaseControlPanelHeight)
             v-if="dockedPlanet"
             type="button"
             class="shuttle-control-nav-btn shuttle-control-nav-btn--shop"
-            @click="
-              uiAudio.notifyButtonClick()
-              $emit('openShop')
-            "
+            @click="onOpenShopFromControl"
           >
             Shop
           </button>

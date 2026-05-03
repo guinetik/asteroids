@@ -32,6 +32,16 @@ const fuelPct = computed(() => Math.round(Math.max(0, Math.min(1, props.fuelRati
 const requiredPct = computed(() => Math.round(props.requiredFuelRatio * 100))
 const costPct = computed(() => Math.round(props.fuelCostRatio * 100))
 const fuelOk = computed(() => props.fuelRatio + 1e-6 >= props.requiredFuelRatio)
+
+function onConfirmFastTravel(): void {
+  uiAudio.notifyConfirm()
+  emit('confirm')
+}
+
+function onCancelFastTravel(): void {
+  uiAudio.notifyCancel()
+  emit('cancel')
+}
 </script>
 
 <template>
@@ -84,20 +94,14 @@ const fuelOk = computed(() => props.fuelRatio + 1e-6 >= props.requiredFuelRatio)
               type="button"
               class="fast-travel-card__btn fast-travel-card__btn--primary"
               :disabled="!fuelOk"
-              @click="
-                uiAudio.notifyConfirm()
-                emit('confirm')
-              "
+              @click="onConfirmFastTravel"
             >
               Confirm Jump
             </button>
             <button
               type="button"
               class="fast-travel-card__btn fast-travel-card__btn--secondary"
-              @click="
-                uiAudio.notifyCancel()
-                emit('cancel')
-              "
+              @click="onCancelFastTravel"
             >
               Cancel
             </button>

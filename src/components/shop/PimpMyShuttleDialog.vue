@@ -187,6 +187,36 @@ function onRenameSubmit(): void {
   emit('renameShuttle', titleDraft.value)
 }
 
+function requestClose(): void {
+  uiAudio.notifyCancel()
+  emit('close')
+}
+
+function onShopTabClick(tab: ShopTabId): void {
+  uiAudio.notifySwitch()
+  activeTab.value = tab
+}
+
+function onSaveTitleClick(): void {
+  uiAudio.notifyConfirm()
+  onRenameSubmit()
+}
+
+function onFlagPrimaryClick(optionId: string): void {
+  uiAudio.notifyButtonClick()
+  onPrimary(optionId, 'vehicle-flag')
+}
+
+function onPremiumSellOne(itemId: string): void {
+  uiAudio.notifyConfirm()
+  emit('sellPremium', itemId, 1)
+}
+
+function onPremiumSellAll(itemId: string, quantity: number): void {
+  uiAudio.notifyConfirm()
+  emit('sellPremium', itemId, quantity)
+}
+
 function pipRowPremium(itemId: string): boolean[] {
   return Array.from(
     { length: 5 },
@@ -196,8 +226,7 @@ function pipRowPremium(itemId: string): boolean[] {
 
 function onKeydown(e: KeyboardEvent): void {
   if (e.code === 'Escape') {
-    uiAudio.notifyCancel()
-    emit('close')
+    requestClose()
   }
 }
 
@@ -231,10 +260,7 @@ function normalizedTitleBlocked(): boolean {
             <button
               type="button"
               class="ship-message-card__button"
-              @click="
-                uiAudio.notifyCancel()
-                emit('close')
-              "
+              @click="requestClose"
             >
               Close
             </button>
@@ -250,10 +276,7 @@ function normalizedTitleBlocked(): boolean {
                   role="tab"
                   class="cosmetic-shop-tab"
                   :aria-selected="activeTab === tab"
-                  @click="
-                    uiAudio.notifySwitch()
-                    activeTab = tab
-                  "
+                  @click="onShopTabClick(tab)"
                 >
                   {{ tabLabel(tab) }}
                 </button>
@@ -318,10 +341,7 @@ function normalizedTitleBlocked(): boolean {
                           type="button"
                           class="cosmetic-option-row__action"
                           :disabled="!normalizedTitleCostOk() || normalizedTitleBlocked()"
-                          @click="
-                            uiAudio.notifyConfirm()
-                            onRenameSubmit()
-                          "
+                          @click="onSaveTitleClick"
                         >
                           Save Title
                         </button>
@@ -343,10 +363,7 @@ function normalizedTitleBlocked(): boolean {
                         :data-active="cosmetics.vehicleFlagId === flag.id ? 'true' : 'false'"
                         :disabled="isPrimaryDisabled(flag.id, 'vehicle-flag', flag.price)"
                         :title="flag.label"
-                        @click="
-                          uiAudio.notifyButtonClick()
-                          onPrimary(flag.id, 'vehicle-flag')
-                        "
+                        @click="onFlagPrimaryClick(flag.id)"
                       >
                         <span class="cosmetic-flag-btn__emoji" aria-hidden="true">{{
                           flag.emoji ?? '—'
@@ -410,20 +427,14 @@ function normalizedTitleBlocked(): boolean {
                       <button
                         type="button"
                         class="cosmetic-premium-row__sell-btn"
-                        @click="
-                          uiAudio.notifyConfirm()
-                          emit('sellPremium', stack.itemId, 1)
-                        "
+                        @click="onPremiumSellOne(stack.itemId)"
                       >
                         Sell
                       </button>
                       <button
                         type="button"
                         class="cosmetic-premium-row__sell-btn"
-                        @click="
-                          uiAudio.notifyConfirm()
-                          emit('sellPremium', stack.itemId, stack.quantity)
-                        "
+                        @click="onPremiumSellAll(stack.itemId, stack.quantity)"
                       >
                         All
                       </button>
