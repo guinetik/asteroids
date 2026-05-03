@@ -32,6 +32,14 @@ import {
   cloneAndCollectLanderPaintMaterials,
   type LanderPaintMaterialTarget,
 } from '@/three/cosmetics/landerPaintMaterials'
+import {
+  applyPaintRampShader,
+  buildPaintRampTexture,
+  computeMeshToVehicleLocal,
+  computePaintRampBounds,
+  updatePaintRampTexture,
+  type PaintRampBounds,
+} from '@/three/cosmetics/paintRampShader'
 /** Any object that can exert gravity on the shuttle */
 export interface GravityWell {
   getGravityAt(position: THREE.Vector3): THREE.Vector3
@@ -206,6 +214,10 @@ const SHUTTLE_PAINT_ACCENT_MATERIALS = new Set([
   'bay stb doorlatc',
 ])
 const SHUTTLE_PAINT_COLOR_STRENGTH = 0.88
+/** Shuttle gradient ramp flows nose→tail along the raw GLB X axis. */
+const SHUTTLE_PAINT_RAMP_AXIS = 'x' as const
+/** Tint mix strength for the shuttle ramp on top of the per-channel paint. */
+const SHUTTLE_PAINT_RAMP_STRENGTH = 0.2
 
 /**
  * Controls the shuttle model — loading, door animation, movement, and nozzle placement.
@@ -362,6 +374,13 @@ export class ShuttleController implements Tickable, PortalVehicle {
   /** Hull-only materials for the green science-heal emissive pulse (map EVA). */
   private readonly hullHealFeedbackMaterials: THREE.MeshStandardMaterial[] = []
   private readonly paintableMaterialBaseColors = new Map<THREE.Material, THREE.Color>()
+  /** Per-material ramp data captured at clone time. Mirrors the standalone shuttle paint module. */
+  private readonly paintableMaterialRampData = new Map<
+    THREE.Material,
+    { readonly geometry: THREE.BufferGeometry; readonly meshToVehicleLocal: THREE.Matrix4 }
+  >()
+  /** Cached axis bounds across all paintable shuttle meshes (vehicle-local space). */
+  private shuttleRampBounds: PaintRampBounds | null = null
   private cargoLanderPaintMaterials: LanderPaintMaterialTarget[] = []
   private hullHealFeedbackTimer = 0
   private landerFuelTank: FuelTank | null = null
@@ -576,6 +595,33 @@ export class ShuttleController implements Tickable, PortalVehicle {
       })
       if (!zoneColor) continue
       this.applyMaterialPaintColor(material, baseColor, zoneColor)
+    }
+    this.applyShuttlePaintRamp(option.gradientStops)
+  }
+
+  /**
+   * Wire (or refresh) the gradient ramp shader on every shuttle paint material.
+   * Mirrors `shuttlePaintMaterials.ts` so direct-controller paint stays in sync
+   * with the standalone module used by the arrival sequence preview.
+   *
+   * @param gradientStops - Hex stops from the active cosmetic option.
+   */
+  private applyShuttlePaintRamp(gradientStops: readonly string[]): void {
+    if (!this.shuttleRampBounds || this.paintableMaterialRampData.size === 0) return
+    const rampTexture = buildPaintRampTexture(gradientStops)
+    for (const [material, rampData] of this.paintableMaterialRampData) {
+      const userData = material.userData as { paintRampUniforms?: unknown }
+      if (userData.paintRampUniforms) {
+        updatePaintRampTexture(material, rampTexture)
+        continue
+      }
+      applyPaintRampShader(material, {
+        rampTexture,
+        axis: SHUTTLE_PAINT_RAMP_AXIS,
+        axisBounds: this.shuttleRampBounds,
+        strength: SHUTTLE_PAINT_RAMP_STRENGTH,
+        meshToVehicleLocal: rampData.meshToVehicleLocal,
+      })
     }
   }
 
@@ -1124,25 +1170,48 @@ export class ShuttleController implements Tickable, PortalVehicle {
 
   private preparePaintableMaterials(root: THREE.Object3D): void {
     this.paintableMaterialBaseColors.clear()
+    this.paintableMaterialRampData.clear()
+    this.shuttleRampBounds = null
+    root.updateMatrixWorld(true)
     root.traverse((child) => {
       if (!(child instanceof THREE.Mesh) || !child.material) return
 
       if (Array.isArray(child.material)) {
-        child.material = child.material.map((material) => this.preparePaintableMaterial(material))
+        child.material = child.material.map((material) =>
+          this.preparePaintableMaterial(material, child, root),
+        )
         return
       }
-      child.material = this.preparePaintableMaterial(child.material)
+      child.material = this.preparePaintableMaterial(child.material, child, root)
     })
+    this.computeShuttleRampBounds()
   }
 
-  private preparePaintableMaterial(material: THREE.Material): THREE.Material {
+  private preparePaintableMaterial(
+    material: THREE.Material,
+    mesh: THREE.Mesh,
+    vehicleRoot: THREE.Object3D,
+  ): THREE.Material {
     if (!this.getPaintChannelForMaterialName(material.name)) return material
     const cloned = material.clone()
     const baseColor = this.getMaterialColor(cloned)
     if (baseColor) {
       this.paintableMaterialBaseColors.set(cloned, baseColor.clone())
+      this.paintableMaterialRampData.set(cloned, {
+        geometry: mesh.geometry,
+        meshToVehicleLocal: computeMeshToVehicleLocal(mesh, vehicleRoot),
+      })
     }
     return cloned
+  }
+
+  private computeShuttleRampBounds(): void {
+    const entries = Array.from(this.paintableMaterialRampData.values())
+    if (entries.length === 0) {
+      this.shuttleRampBounds = null
+      return
+    }
+    this.shuttleRampBounds = computePaintRampBounds(entries, SHUTTLE_PAINT_RAMP_AXIS)
   }
 
   private getPaintChannelForMaterialName(

@@ -10,6 +10,14 @@ import { findCosmeticOptionById } from '@/lib/cosmetics/catalog'
 import { getPlayerCosmetics } from '@/lib/cosmetics/profileCosmetics'
 import type { PlayerProfile } from '@/lib/player/types'
 import * as THREE from 'three'
+import {
+  applyPaintRampShader,
+  buildPaintRampTexture,
+  computeMeshToVehicleLocal,
+  computePaintRampBounds,
+  updatePaintRampTexture,
+  type PaintRampBounds,
+} from './paintRampShader'
 
 /** Shuttle paint channel inferred from GLB material names. */
 export type ShuttlePaintChannel = 'primary' | 'secondary' | 'trim' | 'accent'
@@ -24,6 +32,10 @@ export interface ShuttlePaintMaterialTarget {
   readonly baseColor: THREE.Color
   /** Shader channel selected from the source material name. */
   readonly channel: ShuttlePaintChannel
+  /** Mesh geometry — used to compute ramp axis bounds. */
+  readonly geometry: THREE.BufferGeometry
+  /** Mesh-local → vehicle-local transform captured at collection time. */
+  readonly meshToVehicleLocal: THREE.Matrix4
 }
 
 const SHUTTLE_PAINT_PRIMARY_MATERIALS = new Set([
@@ -67,6 +79,15 @@ const SHUTTLE_PAINT_ACCENT_MATERIALS = new Set([
 ])
 const SHUTTLE_PAINT_COLOR_STRENGTH = 0.88
 const SHUTTLE_HULL_COLOR_SCALE = 0.7
+/** Shuttle gradient ramp flows nose→tail along the raw GLB X axis. */
+const SHUTTLE_PAINT_RAMP_AXIS = 'x' as const
+/** Tint mix strength for the shuttle ramp on top of the per-channel paint. */
+const SHUTTLE_PAINT_RAMP_STRENGTH = 0.2
+/** Cached ramp bounds per shuttle target list. */
+const shuttleRampBoundsCache = new WeakMap<
+  ReadonlyArray<ShuttlePaintMaterialTarget>,
+  PaintRampBounds
+>()
 
 /**
  * Clone each paintable material on a shuttle scene and collect paint targets.
@@ -76,18 +97,19 @@ const SHUTTLE_HULL_COLOR_SCALE = 0.7
 export function cloneAndCollectShuttlePaintMaterials(
   root: THREE.Object3D,
 ): ShuttlePaintMaterialTarget[] {
+  root.updateMatrixWorld(true)
   const targets: ShuttlePaintMaterialTarget[] = []
   root.traverse((child) => {
     if (!(child instanceof THREE.Mesh) || !child.material) return
 
     if (Array.isArray(child.material)) {
       child.material = child.material.map((material) =>
-        cloneAndCollectShuttlePaintMaterial(material, targets),
+        cloneAndCollectShuttlePaintMaterial(material, child, root, targets),
       )
       return
     }
 
-    child.material = cloneAndCollectShuttlePaintMaterial(child.material, targets)
+    child.material = cloneAndCollectShuttlePaintMaterial(child.material, child, root, targets)
   })
   return targets
 }
@@ -125,6 +147,58 @@ export function applyShuttlePaintMaterials(
       }[target.channel],
     )
   }
+
+  applyShuttlePaintRamp(targets, option.gradientStops)
+}
+
+/**
+ * Wire (or refresh) the gradient ramp shader on every shuttle paint target.
+ *
+ * @param targets - Shuttle paint targets.
+ * @param gradientStops - Hex stops from the active cosmetic option.
+ */
+function applyShuttlePaintRamp(
+  targets: readonly ShuttlePaintMaterialTarget[],
+  gradientStops: readonly string[],
+): void {
+  if (targets.length === 0) return
+  const rampTexture = buildPaintRampTexture(gradientStops)
+  const bounds = getOrComputeShuttleRampBounds(targets)
+  for (const target of targets) {
+    const userData = target.material.userData as { paintRampUniforms?: unknown }
+    if (userData.paintRampUniforms) {
+      updatePaintRampTexture(target.material, rampTexture)
+      continue
+    }
+    applyPaintRampShader(target.material, {
+      rampTexture,
+      axis: SHUTTLE_PAINT_RAMP_AXIS,
+      axisBounds: bounds,
+      strength: SHUTTLE_PAINT_RAMP_STRENGTH,
+      meshToVehicleLocal: target.meshToVehicleLocal,
+    })
+  }
+}
+
+/**
+ * Lazily compute and cache the shuttle's vehicle-local X bounds.
+ *
+ * @param targets - Shuttle paint targets.
+ */
+function getOrComputeShuttleRampBounds(
+  targets: readonly ShuttlePaintMaterialTarget[],
+): PaintRampBounds {
+  const cached = shuttleRampBoundsCache.get(targets)
+  if (cached) return cached
+  const bounds = computePaintRampBounds(
+    targets.map((target) => ({
+      geometry: target.geometry,
+      meshToVehicleLocal: target.meshToVehicleLocal,
+    })),
+    SHUTTLE_PAINT_RAMP_AXIS,
+  )
+  shuttleRampBoundsCache.set(targets, bounds)
+  return bounds
 }
 
 /**
@@ -177,10 +251,14 @@ export function getShuttleMaterialColor(material: THREE.Material): THREE.Color |
  * Clone one shuttle material and append it to the paint target list when paintable.
  *
  * @param material - Source GLB material.
+ * @param mesh - Mesh that owns the material (used for ramp transform + geometry).
+ * @param vehicleRoot - Loaded shuttle scene root used as the ramp reference frame.
  * @param targets - Mutable target list owned by the caller.
  */
 function cloneAndCollectShuttlePaintMaterial(
   material: THREE.Material,
+  mesh: THREE.Mesh,
+  vehicleRoot: THREE.Object3D,
   targets: ShuttlePaintMaterialTarget[],
 ): THREE.Material {
   const channel = getShuttlePaintChannelForMaterialName(material.name)
@@ -188,7 +266,13 @@ function cloneAndCollectShuttlePaintMaterial(
   const cloned = material.clone()
   const baseColor = getShuttleMaterialColor(cloned)
   if (baseColor) {
-    targets.push({ material: cloned, baseColor: baseColor.clone(), channel })
+    targets.push({
+      material: cloned,
+      baseColor: baseColor.clone(),
+      channel,
+      geometry: mesh.geometry,
+      meshToVehicleLocal: computeMeshToVehicleLocal(mesh, vehicleRoot),
+    })
   }
   return cloned
 }

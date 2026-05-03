@@ -615,7 +615,7 @@ export class LanderController implements Tickable {
         engineNode.material = cloned
         const paintChannel = getLanderPaintChannelForObjectName(engineNode.name)
         if (paintChannel) {
-          collectLanderPaintMaterial(cloned, paintChannel, this.paintMaterials)
+          collectLanderPaintMaterial(cloned, engineNode, scene, paintChannel, this.paintMaterials)
         }
         this.engineMesh = engineNode
       } else {
@@ -625,7 +625,7 @@ export class LanderController implements Tickable {
             child.material = cloned
             const paintChannel = getLanderPaintChannelForObjectName(child.name)
             if (paintChannel) {
-              collectLanderPaintMaterial(cloned, paintChannel, this.paintMaterials)
+              collectLanderPaintMaterial(cloned, child, scene, paintChannel, this.paintMaterials)
             }
             this.engineMesh = child
           }
@@ -1557,6 +1557,7 @@ export class LanderController implements Tickable {
   }
 
   private tuneLanderMaterials(scene: THREE.Object3D): void {
+    scene.updateMatrixWorld(true)
     scene.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return
       child.castShadow = true
@@ -1586,7 +1587,7 @@ export class LanderController implements Tickable {
           clonedMats.push(cloned)
           this.feedbackMaterials.push(cloned)
           if (paintChannel) {
-            collectLanderPaintMaterial(cloned, paintChannel, this.paintMaterials)
+            collectLanderPaintMaterial(cloned, child, scene, paintChannel, this.paintMaterials)
           }
         } else {
           clonedMats.push(m)

@@ -10,6 +10,14 @@ import { findCosmeticOptionById } from '@/lib/cosmetics/catalog'
 import { getPlayerCosmetics } from '@/lib/cosmetics/profileCosmetics'
 import type { PlayerProfile } from '@/lib/player/types'
 import * as THREE from 'three'
+import {
+  applyPaintRampShader,
+  buildPaintRampTexture,
+  computeMeshToVehicleLocal,
+  computePaintRampBounds,
+  updatePaintRampTexture,
+  type PaintRampBounds,
+} from './paintRampShader'
 
 /** Lander paint channel inferred from GLB mesh names. */
 export type LanderPaintChannel = 'primary' | 'secondary' | 'trim' | 'engine'
@@ -24,10 +32,25 @@ export interface LanderPaintMaterialTarget {
   readonly baseColor: THREE.Color
   /** Shader channel selected from the source mesh/object name. */
   readonly channel: LanderPaintChannel
+  /** Mesh geometry — used to compute ramp axis bounds at first apply. */
+  readonly geometry: THREE.BufferGeometry
+  /** Mesh-local → vehicle-local transform captured at collection time for ramp sampling. */
+  readonly meshToVehicleLocal: THREE.Matrix4
 }
 
 /** Cosmetic color mix strength over the authored lander albedo. */
 const LANDER_PAINT_COLOR_STRENGTH = 0.86
+
+/** Lander gradient ramp flows top→bottom along the model's Y axis. */
+const LANDER_PAINT_RAMP_AXIS = 'y' as const
+/** How strongly the gradient ramp tints over the per-channel paint (0 = off, 1 = full). */
+const LANDER_PAINT_RAMP_STRENGTH = 0.22
+
+/** Ramp bounds depend only on the mesh hierarchy, so cache per target list. */
+const landerRampBoundsCache = new WeakMap<
+  ReadonlyArray<LanderPaintMaterialTarget>,
+  PaintRampBounds
+>()
 
 /**
  * Match the authoring names from `public/models/lander.glb`, tolerating
@@ -79,6 +102,7 @@ export function getLanderPaintChannelForObjectName(objectName: string): LanderPa
 export function cloneAndCollectLanderPaintMaterials(
   root: THREE.Object3D,
 ): LanderPaintMaterialTarget[] {
+  root.updateMatrixWorld(true)
   const targets: LanderPaintMaterialTarget[] = []
   root.traverse((child) => {
     if (!(child instanceof THREE.Mesh) || !child.material) return
@@ -87,12 +111,18 @@ export function cloneAndCollectLanderPaintMaterials(
 
     if (Array.isArray(child.material)) {
       child.material = child.material.map((material) =>
-        cloneAndCollectLanderPaintMaterial(material, channel, targets),
+        cloneAndCollectLanderPaintMaterial(material, child, root, channel, targets),
       )
       return
     }
 
-    child.material = cloneAndCollectLanderPaintMaterial(child.material, channel, targets)
+    child.material = cloneAndCollectLanderPaintMaterial(
+      child.material,
+      child,
+      root,
+      channel,
+      targets,
+    )
   })
   return targets
 }
@@ -101,17 +131,27 @@ export function cloneAndCollectLanderPaintMaterials(
  * Record one already-cloned material as a lander paint target.
  *
  * @param material - Material instance assigned to the mesh.
+ * @param mesh - Mesh that owns the material (used to capture transform + geometry).
+ * @param vehicleRoot - Loaded lander scene root used as the ramp reference frame.
  * @param channel - Paint channel selected from the mesh name.
  * @param targets - Mutable target list owned by the caller.
  */
 export function collectLanderPaintMaterial(
   material: THREE.Material,
+  mesh: THREE.Mesh,
+  vehicleRoot: THREE.Object3D,
   channel: LanderPaintChannel,
   targets: LanderPaintMaterialTarget[],
 ): void {
   const baseColor = getMaterialColor(material)
   if (!baseColor) return
-  targets.push({ material, baseColor: baseColor.clone(), channel })
+  targets.push({
+    material,
+    baseColor: baseColor.clone(),
+    channel,
+    geometry: mesh.geometry,
+    meshToVehicleLocal: computeMeshToVehicleLocal(mesh, vehicleRoot),
+  })
 }
 
 /**
@@ -152,6 +192,62 @@ export function applyLanderPaintMaterials(
       }[target.channel],
     )
   }
+
+  applyLanderPaintRamp(targets, option.gradientStops)
+}
+
+/**
+ * Build (or reuse) a gradient ramp from the option stops and wire it into every
+ * paint target's shader. Subsequent calls just swap the texture without
+ * recompiling the shaders.
+ *
+ * @param targets - Lander paint targets prepared by `cloneAndCollectLanderPaintMaterials`.
+ * @param gradientStops - Hex color stops from the active cosmetic option.
+ */
+function applyLanderPaintRamp(
+  targets: readonly LanderPaintMaterialTarget[],
+  gradientStops: readonly string[],
+): void {
+  if (targets.length === 0) return
+  const rampTexture = buildPaintRampTexture(gradientStops)
+  const bounds = getOrComputeLanderRampBounds(targets)
+  for (const target of targets) {
+    const userData = target.material.userData as { paintRampUniforms?: unknown }
+    if (userData.paintRampUniforms) {
+      updatePaintRampTexture(target.material, rampTexture)
+      continue
+    }
+    applyPaintRampShader(target.material, {
+      rampTexture,
+      axis: LANDER_PAINT_RAMP_AXIS,
+      axisBounds: bounds,
+      strength: LANDER_PAINT_RAMP_STRENGTH,
+      meshToVehicleLocal: target.meshToVehicleLocal,
+    })
+  }
+}
+
+/**
+ * Lazily compute and cache the lander's vehicle-local Y bounds across all
+ * painted meshes. Cached per target array — the bounds don't change once the
+ * mesh hierarchy is fixed.
+ *
+ * @param targets - Lander paint targets.
+ */
+function getOrComputeLanderRampBounds(
+  targets: readonly LanderPaintMaterialTarget[],
+): PaintRampBounds {
+  const cached = landerRampBoundsCache.get(targets)
+  if (cached) return cached
+  const bounds = computePaintRampBounds(
+    targets.map((target) => ({
+      geometry: target.geometry,
+      meshToVehicleLocal: target.meshToVehicleLocal,
+    })),
+    LANDER_PAINT_RAMP_AXIS,
+  )
+  landerRampBoundsCache.set(targets, bounds)
+  return bounds
 }
 
 /**
@@ -183,16 +279,20 @@ export function getMaterialColor(material: THREE.Material): THREE.Color | null {
  * Clone one material and append it to the paint target list when it exposes color.
  *
  * @param material - Source GLB material.
+ * @param mesh - Mesh that owns the material (used to capture transform + geometry).
+ * @param vehicleRoot - Loaded lander scene root used as the ramp reference frame.
  * @param channel - Lander paint channel selected from the mesh name.
  * @param targets - Mutable target list owned by the caller.
  */
 function cloneAndCollectLanderPaintMaterial(
   material: THREE.Material,
+  mesh: THREE.Mesh,
+  vehicleRoot: THREE.Object3D,
   channel: LanderPaintChannel,
   targets: LanderPaintMaterialTarget[],
 ): THREE.Material {
   const cloned = material.clone()
-  collectLanderPaintMaterial(cloned, channel, targets)
+  collectLanderPaintMaterial(cloned, mesh, vehicleRoot, channel, targets)
   return cloned
 }
 
