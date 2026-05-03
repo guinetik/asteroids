@@ -207,9 +207,9 @@ Example data entries:
       "id": "shuttle-paintjob-neon-comet",
       "category": "shuttle-paintjob",
       "label": "Neon Comet",
-      "description": "Hot magenta, electric cyan, and deep graphite.",
+      "description": "Hot magenta bleeding into electric cobalt with ink-deep underbelly.",
       "price": 20000,
-      "gradientStops": ["#ff2bd6", "#22d3ee", "#111827"]
+      "gradientStops": ["#ff2bd6", "#3b82f6", "#0f172a"]
     },
     {
       "id": "vehicle-flag-canada",
@@ -229,7 +229,7 @@ Recommended starting names:
 
 | Category           | Option labels                                                                    |
 | ------------------ | -------------------------------------------------------------------------------- |
-| Shuttle paintjob   | Neon Comet, Europa Velvet, Solar Vice, Void Chrome, Cinderline Gold, Saturn Club |
+| Shuttle paintjob   | Neon Comet, Red Sparrow, The Space Time Matrix, Void Chrome, Cinderline Gold, Saturn Club |
 | Lander paintjob    | Dust Angel, Frostbite Safety, Mariner Red, Hazard Bloom                          |
 | Shuttle trail      | Plasma Kiss, Blue Shift, Ember Wake                                              |
 | Lander trail       | Cyan RCS, Magenta RCS, Amber RCS                                                 |

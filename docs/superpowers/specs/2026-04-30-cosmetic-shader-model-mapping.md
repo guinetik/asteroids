@@ -90,9 +90,9 @@ deterministic and keeps the catalog data-driven.
 | Option | Stops | Model treatment |
 | --- | --- | --- |
 | `Factory Stock` | `#f1f5f9`, `#cbd5e1`, `#475569` | Mostly white ceramic primary, pale slate secondary, graphite trim. Preserve original texture contrast. |
-| `Neon Comet` | `#ff2bd6`, `#22d3ee`, `#111827` | Magenta main hull, cyan secondary panels, near-black trim / belly hardware. Add very low magenta/cyan accent glow only on small details if emissive is available. |
-| `Europa Velvet` | `#0d9488`, `#e0f2fe`, `#5b21b6` | Teal body, icy secondary panels, violet trim. Works well if glass picks up a faint ice-blue tint. |
-| `Solar Vice` | `#fbbf24`, `#f97316`, `#e5e7eb` | Gold primary, orange secondary, chrome/silver trim. Needs higher metalness only if a future finish field says chrome; color alone should not force metal. |
+| `Neon Comet` | `#ff2bd6`, `#3b82f6`, `#0f172a` | Magenta main hull, royal-cobalt secondary panels, ink-deep trim / belly hardware. Magenta accent emissive on small details; rim glow tinted blue (`#60a5fa`) so the silhouette reads cool against the warm primary. |
+| `Red Sparrow` (id `shuttle-paintjob-europa-velvet`) | `#ef4444`, `#991b1b`, `#1c1917` | Carmine primary, deep blood-bay secondary, ash-black trim. High metalness + low roughness = automotive carmine clearcoat; red emissive on accents reads like taillights; bright ember rim (`#f87171`). Flavor text tags this as Mr. Finch's favorite. Keep the legacy id so existing player profiles don't lose this paintjob. |
+| `The Space Time Matrix` (id `shuttle-paintjob-solar-vice`) | `#86efac`, `#16a34a`, `#052e16` | Phosphor-mint primary, matrix-green core panels, deep-void trim. High metalness + low roughness = mirrored data plates; matrix-green emissive on accents; phosphor-green (`#4ade80`) rim. Keep the legacy id so existing player profiles don't lose this paintjob. |
 | `Void Chrome` | `#020617`, `#4c1d95`, `#94a3b8` | Near-black primary, violet secondary edge panels, cool slate trim. Keep roughness lower than stock in a future finish recipe to sell chrome. |
 | `Cinderline Gold` | `#78350f`, `#f59e0b`, `#1c1917` | Burnt brass primary, amber secondary, blackened trim. The dark stop should land on belly / edges so it reads like ash, not mud. |
 | `Saturn Club` | `#faf7e8`, `#a8a29e`, `#0f172a` | Champagne primary, ring-dust secondary, deep ink trim. Best Fantasia signature option because it preserves shuttle readability while feeling premium. |
@@ -205,7 +205,7 @@ usable material names. Upgrade when one of these becomes important:
 - A shader needs stripes, decals, split panels, or asymmetry.
 - A baked texture marking must stay neutral while only paint changes.
 - `Hazard Bloom` needs actual hazard stripes.
-- `Void Chrome` and `Solar Vice` need real finish behavior, not just color.
+- `Void Chrome` and `The Space Time Matrix` need real finish behavior, not just color.
 - Flags and shuttle titles need placement instead of UI-only persistence.
 
 At that point the better model path is either paint mask textures or deliberately named material

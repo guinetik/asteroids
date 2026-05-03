@@ -8,7 +8,10 @@
 
 import type {
   CosmeticCategory,
+  CosmeticFinishChannel,
+  CosmeticFinishProfile,
   CosmeticOptionData,
+  CosmeticRim,
   CosmeticShopCatalog,
   CosmeticShopConfig,
 } from './types'
@@ -27,6 +30,15 @@ const COSMETIC_CATEGORY_SET: ReadonlySet<string> = new Set<string>([
 
 /** Legal CSS hex color `#rrggbb` (validation is case-insensitive). */
 const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/
+
+/** Channel keys recognised inside a {@link CosmeticFinishProfile}. */
+const FINISH_CHANNEL_KEYS = ['default', 'primary', 'secondary', 'trim', 'accent'] as const
+
+/** Numeric finish fields with `0..1` clamping (`metalness`, `roughness`). */
+const FINISH_UNIT_FIELDS = ['metalness', 'roughness'] as const
+
+/** Numeric finish fields that only need to be `>= 0` (`envMapIntensity`, `emissiveIntensity`). */
+const FINISH_NON_NEGATIVE_FIELDS = ['envMapIntensity', 'emissiveIntensity'] as const
 
 let cachedCatalog: CosmeticShopCatalog | null = null
 
@@ -144,6 +156,8 @@ function parseOption(raw: unknown, ids: Set<string>): CosmeticOptionData {
     throw new Error(`cosmetics catalog: emoji on '${id}' must be a string when set`)
   }
 
+  const finish = parseFinishProfile(row['finish'], id)
+
   return {
     id,
     category,
@@ -152,7 +166,113 @@ function parseOption(raw: unknown, ids: Set<string>): CosmeticOptionData {
     price,
     gradientStops,
     ...(emoji !== undefined ? { emoji } : {}),
+    ...(finish !== undefined ? { finish } : {}),
   }
+}
+
+/**
+ * Validate the optional `finish` block on a paint row. Returns `undefined` when
+ * the field is absent or empty; throws on malformed shape so the catalog import
+ * fails loudly during boot.
+ *
+ * @param raw - Raw `finish` value from JSON.
+ * @param optionId - Owning option id (used in error messages).
+ */
+function parseFinishProfile(
+  raw: unknown,
+  optionId: string,
+): CosmeticFinishProfile | undefined {
+  if (raw === undefined) return undefined
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error(`cosmetics catalog: finish on '${optionId}' must be an object`)
+  }
+  const obj = raw as Record<string, unknown>
+  const out: { -readonly [K in keyof CosmeticFinishProfile]: CosmeticFinishProfile[K] } = {}
+  for (const key of FINISH_CHANNEL_KEYS) {
+    const channelRaw = obj[key]
+    if (channelRaw === undefined) continue
+    out[key] = parseFinishChannel(channelRaw, `${optionId}.finish.${key}`)
+  }
+  if (obj['rim'] !== undefined) {
+    out.rim = parseFinishRim(obj['rim'], `${optionId}.finish.rim`)
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
+/**
+ * Validate the optional `rim` block on a finish profile. Strength + power use
+ * `>= 0`; bias is `[-1, 1]`; color must be `#rrggbb`.
+ *
+ * @param raw - Raw rim value from JSON.
+ * @param path - Dot path used in error messages.
+ */
+function parseFinishRim(raw: unknown, path: string): CosmeticRim {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error(`cosmetics catalog: ${path} must be an object`)
+  }
+  const rim = raw as Record<string, unknown>
+  const out: { -readonly [K in keyof CosmeticRim]: CosmeticRim[K] } = {}
+  if (rim['color'] !== undefined) {
+    const color = rim['color']
+    if (typeof color !== 'string' || !HEX_COLOR_RE.test(color)) {
+      throw new Error(`cosmetics catalog: ${path}.color must match #rrggbb`)
+    }
+    out.color = color
+  }
+  for (const key of ['intensity', 'power'] as const) {
+    const value = rim[key]
+    if (value === undefined) continue
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+      throw new Error(`cosmetics catalog: ${path}.${key} must be a non-negative number`)
+    }
+    out[key] = value
+  }
+  const bias = rim['bias']
+  if (bias !== undefined) {
+    if (typeof bias !== 'number' || !Number.isFinite(bias) || bias < -1 || bias > 1) {
+      throw new Error(`cosmetics catalog: ${path}.bias must be a number in [-1, 1]`)
+    }
+    out.bias = bias
+  }
+  return out
+}
+
+/**
+ * Validate one channel block inside a finish profile.
+ *
+ * @param raw - Raw channel value from JSON.
+ * @param path - Dot path used in error messages (`<id>.finish.<channel>`).
+ */
+function parseFinishChannel(raw: unknown, path: string): CosmeticFinishChannel {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error(`cosmetics catalog: ${path} must be an object`)
+  }
+  const channel = raw as Record<string, unknown>
+  const out: { -readonly [K in keyof CosmeticFinishChannel]: CosmeticFinishChannel[K] } = {}
+  for (const key of FINISH_UNIT_FIELDS) {
+    const value = channel[key]
+    if (value === undefined) continue
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+      throw new Error(`cosmetics catalog: ${path}.${key} must be a number in [0, 1]`)
+    }
+    out[key] = value
+  }
+  for (const key of FINISH_NON_NEGATIVE_FIELDS) {
+    const value = channel[key]
+    if (value === undefined) continue
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+      throw new Error(`cosmetics catalog: ${path}.${key} must be a non-negative number`)
+    }
+    out[key] = value
+  }
+  const emissive = channel['emissive']
+  if (emissive !== undefined) {
+    if (typeof emissive !== 'string' || !HEX_COLOR_RE.test(emissive)) {
+      throw new Error(`cosmetics catalog: ${path}.emissive must match #rrggbb`)
+    }
+    out.emissive = emissive
+  }
+  return out
 }
 
 /**

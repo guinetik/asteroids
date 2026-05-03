@@ -103,6 +103,141 @@ describe('cosmetics catalog', () => {
     expect(isPimpMyShuttleAvailable('earth')).toBe(false)
     expect(isPimpMyShuttleAvailable('venus')).toBe(false)
   })
+
+  it('parses optional finish profile blocks on shuttle paintjobs', () => {
+    const catalog = parseCosmeticShopCatalog(shippedCatalog as unknown)
+    const neonComet = catalog.options.find((o) => o.id === 'shuttle-paintjob-neon-comet')
+    expect(neonComet?.finish?.default?.metalness).toBeCloseTo(0.65, 3)
+    expect(neonComet?.finish?.trim?.roughness).toBeCloseTo(0.18, 3)
+    expect(neonComet?.finish?.accent?.emissive).toBe('#ff44ff')
+    const factoryStock = catalog.options.find(
+      (o) => o.id === 'shuttle-paintjob-factory-stock',
+    )
+    expect(factoryStock?.finish).toBeUndefined()
+  })
+
+  it('rejects out-of-range metalness in finish profile', () => {
+    expect(() =>
+      parseCosmeticShopCatalog({
+        id: 'x',
+        label: 'x',
+        theme: 'magenta',
+        availablePlanetIds: ['mars'],
+        premiumTrade: {
+          acceptedCategories: ['trade-good'],
+          minimumPipBonus: 2,
+          visitMargin: { minMultiplier: 1.1, maxMultiplier: 1.2 },
+        },
+        options: [
+          {
+            id: 'bad-finish',
+            category: 'shuttle-paintjob',
+            label: 'Bad',
+            description: 'x',
+            price: 1,
+            gradientStops: ['#ffffff', '#000000'],
+            finish: { default: { metalness: 1.5 } },
+          },
+        ],
+      }),
+    ).toThrow(/finish\.default\.metalness must be a number in \[0, 1\]/)
+  })
+
+  it('rejects malformed emissive hex in finish profile', () => {
+    expect(() =>
+      parseCosmeticShopCatalog({
+        id: 'x',
+        label: 'x',
+        theme: 'magenta',
+        availablePlanetIds: ['mars'],
+        premiumTrade: {
+          acceptedCategories: ['trade-good'],
+          minimumPipBonus: 2,
+          visitMargin: { minMultiplier: 1.1, maxMultiplier: 1.2 },
+        },
+        options: [
+          {
+            id: 'bad-emissive',
+            category: 'shuttle-paintjob',
+            label: 'Bad',
+            description: 'x',
+            price: 1,
+            gradientStops: ['#ffffff', '#000000'],
+            finish: { accent: { emissive: 'not-hex' } },
+          },
+        ],
+      }),
+    ).toThrow(/finish\.accent\.emissive must match #rrggbb/)
+  })
+
+  it('parses optional rim block on shuttle paintjobs', () => {
+    const catalog = parseCosmeticShopCatalog(shippedCatalog as unknown)
+    const voidChrome = catalog.options.find(
+      (o) => o.id === 'shuttle-paintjob-void-chrome',
+    )
+    expect(voidChrome?.finish?.rim?.color).toBe('#a78bfa')
+    expect(typeof voidChrome?.finish?.rim?.intensity).toBe('number')
+    expect((voidChrome?.finish?.rim?.intensity ?? -1) >= 0).toBe(true)
+    expect((voidChrome?.finish?.rim?.power ?? 0) > 0).toBe(true)
+    const factoryStock = catalog.options.find(
+      (o) => o.id === 'shuttle-paintjob-factory-stock',
+    )
+    expect(factoryStock?.finish?.rim).toBeUndefined()
+  })
+
+  it('rejects out-of-range rim bias', () => {
+    expect(() =>
+      parseCosmeticShopCatalog({
+        id: 'x',
+        label: 'x',
+        theme: 'magenta',
+        availablePlanetIds: ['mars'],
+        premiumTrade: {
+          acceptedCategories: ['trade-good'],
+          minimumPipBonus: 2,
+          visitMargin: { minMultiplier: 1.1, maxMultiplier: 1.2 },
+        },
+        options: [
+          {
+            id: 'bad-rim',
+            category: 'shuttle-paintjob',
+            label: 'Bad',
+            description: 'x',
+            price: 1,
+            gradientStops: ['#ffffff', '#000000'],
+            finish: { rim: { bias: 1.5 } },
+          },
+        ],
+      }),
+    ).toThrow(/finish\.rim\.bias must be a number in \[-1, 1\]/)
+  })
+
+  it('rejects negative rim intensity', () => {
+    expect(() =>
+      parseCosmeticShopCatalog({
+        id: 'x',
+        label: 'x',
+        theme: 'magenta',
+        availablePlanetIds: ['mars'],
+        premiumTrade: {
+          acceptedCategories: ['trade-good'],
+          minimumPipBonus: 2,
+          visitMargin: { minMultiplier: 1.1, maxMultiplier: 1.2 },
+        },
+        options: [
+          {
+            id: 'bad-rim-intensity',
+            category: 'shuttle-paintjob',
+            label: 'Bad',
+            description: 'x',
+            price: 1,
+            gradientStops: ['#ffffff', '#000000'],
+            finish: { rim: { intensity: -0.1 } },
+          },
+        ],
+      }),
+    ).toThrow(/finish\.rim\.intensity must be a non-negative number/)
+  })
 })
 
 describe('getCosmeticOptions', () => {

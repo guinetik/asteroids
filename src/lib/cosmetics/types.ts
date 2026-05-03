@@ -25,6 +25,77 @@ export type CosmeticCategory =
   | 'multitool-paintjob'
 
 /**
+ * Per-channel paint finish for a {@link CosmeticOptionData}. Every field is
+ * optional — omitted fields fall back to the catalog `default` block first,
+ * then to the engine defaults applied by the paint material pipeline.
+ */
+export interface CosmeticFinishChannel {
+  /** PBR metalness (0 = dielectric / 1 = pure metal). Range: 0–1. */
+  readonly metalness?: number
+  /**
+   * PBR microfacet roughness (0 = mirror / 1 = chalk). Range: 0–1. Lower
+   * values let the environment map punch through; higher values diffuse the
+   * gradient ramp + procedural detail more softly.
+   */
+  readonly roughness?: number
+  /**
+   * Multiplier applied to whatever environment map is bound to the material.
+   * Useful for chrome paints — bumping above `1.0` makes reflections pop on
+   * top of high `metalness`. Range: 0+.
+   */
+  readonly envMapIntensity?: number
+  /** Emissive tint as a CSS hex color (`#rrggbb`). Used together with `emissiveIntensity`. */
+  readonly emissive?: string
+  /** Emissive multiplier. Range: 0+. Values around 0.3–0.7 read as soft glow at our scene exposure. */
+  readonly emissiveIntensity?: number
+}
+
+/**
+ * Optional rim / silhouette glow tuning for a paint. Drives a Fresnel-based
+ * emissive contribution in the paint shader so the ship reads against deep
+ * space when sun-side faces the camera away from the player. NFS Underground
+ * underglow energy, but on the silhouette of the hull.
+ */
+export interface CosmeticRim {
+  /** Rim tint as a CSS hex color (`#rrggbb`). Defaults to white when omitted. */
+  readonly color?: string
+  /** Glow strength. `0` disables the rim entirely. Typical: 0.5–1.5. */
+  readonly intensity?: number
+  /**
+   * Fresnel exponent (`pow(1 - dot(N, V), power)`). Higher = thinner halo,
+   * lower = blooming wash. Default `2.5`.
+   */
+  readonly power?: number
+  /**
+   * Additive bias on the Fresnel before `pow`. Range: `-1..1`. Negative trims
+   * the rim to true silhouette grazing; positive lifts the whole hull a bit.
+   * Default `0`.
+   */
+  readonly bias?: number
+}
+
+/**
+ * Finish profile for one paint catalog row. The `default` block applies to
+ * every paint channel; per-channel blocks override individual fields. The
+ * top-level `rim` block (when present) drives a per-paint silhouette glow
+ * shared across every channel. All blocks are optional.
+ */
+export interface CosmeticFinishProfile {
+  /** Default finish merged into every channel before per-channel overrides. */
+  readonly default?: CosmeticFinishChannel
+  /** Override applied to materials in the `primary` paint channel. */
+  readonly primary?: CosmeticFinishChannel
+  /** Override applied to materials in the `secondary` paint channel. */
+  readonly secondary?: CosmeticFinishChannel
+  /** Override applied to materials in the `trim` paint channel. */
+  readonly trim?: CosmeticFinishChannel
+  /** Override applied to materials in the `accent` paint channel. */
+  readonly accent?: CosmeticFinishChannel
+  /** Optional silhouette rim-light tuning (shared across all channels). */
+  readonly rim?: CosmeticRim
+}
+
+/**
  * One purchasable cosmetics row (shader-like preview via {@link CosmeticOptionData.gradientStops}).
  */
 export interface CosmeticOptionData {
@@ -42,6 +113,12 @@ export interface CosmeticOptionData {
   readonly gradientStops: readonly string[]
   /** Optional emoji used for curated flag selections. */
   readonly emoji?: string
+  /**
+   * Optional per-channel PBR finish overrides. Currently consumed by the
+   * shuttle replace-mode paint pipeline. Other vehicles ignore unknown blocks
+   * for now.
+   */
+  readonly finish?: CosmeticFinishProfile
 }
 
 /**
