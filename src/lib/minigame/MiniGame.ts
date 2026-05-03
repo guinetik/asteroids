@@ -13,6 +13,7 @@
 import type { Enemy } from '@/lib/fps/enemy'
 import type { WorldCollider } from '@/lib/physics/worldCollision'
 import type { BunkerWaveTier } from '@/lib/bunker/bunkerWaveSchedule'
+import type { ObjectiveType } from '@/lib/missions/types'
 
 /** Minigame lifecycle status. */
 export type MiniGameStatus = 'idle' | 'active' | 'completed' | 'failed'
@@ -86,6 +87,24 @@ export interface MiniGameStep {
   progress?: MiniGameStepProgress
 }
 
+/**
+ * Lightweight world POI exposed by a minigame so HUD overlays (compass strip
+ * and tactical minimap) can render dynamic markers in addition to the static
+ * mission waypoint. Used by rescue to surface live hostage positions.
+ */
+export interface MiniGameMapMarker {
+  /** Stable id used as a Vue list key — must remain consistent across polls. */
+  id: string
+  /** World X anchor in level coordinates. */
+  x: number
+  /** World Z anchor in level coordinates. */
+  z: number
+  /** Color/label tag — matches the existing compass + map color tables. */
+  type: ObjectiveType
+  /** Optional short label rendered as a marker tooltip. */
+  label?: string
+}
+
 /** Shared fallback labels for objective-driven HUD/tracker views. */
 export const OBJECTIVE_LABELS: Record<string, string> = {
   gather: 'Gather',
@@ -123,6 +142,12 @@ export interface MiniGame {
   readonly missionInstruction?: string | null
   /** Optional static colliders owned by this minigame's scene props. */
   readonly worldColliders?: readonly WorldCollider[]
+  /**
+   * Optional dynamic POIs surfaced to HUD compass + map overlays. Distinct from
+   * the mission's static waypoint — these update as live entities (e.g.
+   * hostages) move or die, so the player can find them in rough terrain.
+   */
+  readonly compassMarkers?: readonly MiniGameMapMarker[]
   /**
    * Optional live enemy count owned by this minigame. Combat minigames
    * (exterminate, rescue) override; non-combat objectives leave it

@@ -126,6 +126,11 @@ export interface LevelMinigameBindings {
   onSurvivorLost: ((aliveRemaining: number) => void) | null
   /** Fired by RescueMinigame when a recruited walker boards the lander. */
   onSurvivorAboard: ((aboardCount: number) => void) | null
+  /**
+   * Fired by RescueMinigame when an incapacitated hostage is revived by a SCI
+   * heal bolt. Argument: alive-not-aboard count after the revive.
+   */
+  onSurvivorRevived: ((aliveRemaining: number) => void) | null
   /** Install the combat loot/drop observer on a newly created combat minigame. */
   onInstallCombatDropObserver:
     | ((minigame: ExterminateMinigame | RescueMinigame | BunkerMinigame) => void)
@@ -297,6 +302,7 @@ export class LevelMinigameFacade {
         minigame.onFail = bindings.onRescueFail
         minigame.onSurvivorLost = bindings.onSurvivorLost
         minigame.onSurvivorAboard = bindings.onSurvivorAboard
+        minigame.onSurvivorRevived = bindings.onSurvivorRevived
         bindings.onInstallCombatDropObserver?.(minigame)
         this.add(minigame)
       } else if (objective.type === 'bunker') {

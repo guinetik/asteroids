@@ -5,7 +5,7 @@
  * @date 2026-04-24
  * @spec docs/superpowers/specs/2026-04-04-level-state-machine-design.md
  */
-import { OBJECTIVE_LABELS } from '@/lib/minigame/MiniGame'
+import { OBJECTIVE_LABELS, type MiniGameMapMarker } from '@/lib/minigame/MiniGame'
 import type { ConcreteObjective } from '@/lib/missions/types'
 import {
   headingRadToCompassDeg,
@@ -87,6 +87,12 @@ export interface LevelFpsTelemetrySnapshot {
   z: number
   /** Concrete mission objectives used to build compass markers. */
   missionObjectives: readonly ConcreteObjective[]
+  /**
+   * Optional dynamic POI markers from the active minigame (e.g. live hostage
+   * positions during a rescue). Appended to the static mission objectives
+   * before bearings are computed.
+   */
+  extraCompassMarkers?: readonly MiniGameMapMarker[]
   /** Current drill-target readout (or null when none). */
   rockTarget: RockTargetInfo | null
 }
@@ -176,6 +182,19 @@ export class LevelTelemetryFacade {
       ),
       type: objective.type,
     }))
+    if (fps.extraCompassMarkers) {
+      for (const marker of fps.extraCompassMarkers) {
+        objectives.push({
+          id: marker.id,
+          label: (marker.label ?? OBJECTIVE_LABELS[marker.type] ?? marker.type).toUpperCase(),
+          relativeDeg: signedRelativeBearingDeg(
+            compassHeading,
+            worldBearingDegTo(fps.x, fps.z, marker.x, marker.z),
+          ),
+          type: marker.type,
+        })
+      }
+    }
 
     callbacks.onFpsTelemetry?.({
       ...fps.telemetry,

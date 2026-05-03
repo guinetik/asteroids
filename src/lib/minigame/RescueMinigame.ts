@@ -15,6 +15,7 @@ import type {
   MiniGame,
   MiniGameContext,
   MiniGameEvents,
+  MiniGameMapMarker,
   MiniGameStatus,
   MiniGameStep,
 } from './MiniGame'
@@ -36,6 +37,10 @@ import { BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/Bacteriopha
 import { SpireController, SPIRE_HIT_CENTER_Y } from '@/three/SpireController'
 import { ChimeraWalkerController, CHIMERA_HIT_CENTER_Y } from '@/three/ChimeraWalkerController'
 import { EnemyProjectileMeshPool } from '@/three/EnemyProjectileMeshPool'
+import {
+  enemyVisualTierForDifficulty,
+  type EnemyVisualTier,
+} from '@/three/enemyVisualPalette'
 import type { Enemy } from '@/lib/fps/enemy'
 
 const VIRUS_SCALE = 600
@@ -47,6 +52,54 @@ const VIRUS_INTERACT_RANGE = 18
 const LANDING_SITE_RADIUS = FLAT_ZONE_RADIUS * 0.88
 const HOSTAGE_RING_MIN_RADIUS = 24
 const HOSTAGE_RING_MAX_RADIUS = FLAT_ZONE_RADIUS * 0.82 * 0.72
+
+/**
+ * Maximum heightmap slope at which a hostage may spawn or that the path back to
+ * the objective may cross. Mirrors `LEVEL_OBJECTIVE_CONFIG.maxSlope` so survivors
+ * are always on terrain the objective placement system already trusts as walkable.
+ */
+const HOSTAGE_MAX_TERRAIN_SLOPE = 0.6
+
+/**
+ * Maximum vertical delta (world units) between a hostage and the rescue objective.
+ * Rejects spawns sitting on plateaus or in pits the survivor could never traverse
+ * back to the lander even with a flat path.
+ */
+const HOSTAGE_MAX_ELEVATION_DELTA = 18
+
+/** Number of intermediate terrain samples taken between hostage and objective. */
+const HOSTAGE_PATH_SAMPLES = 4
+
+/** Random samples attempted at each ring radius before shrinking the band. */
+const HOSTAGE_SAMPLES_PER_RING = 6
+
+/** Number of times the outer radius is shrunk when no candidate is reachable. */
+const HOSTAGE_RING_SHRINK_STEPS = 4
+
+/** Multiplier applied to the outer radius each shrink step (0..1). */
+const HOSTAGE_RING_SHRINK_FACTOR = 0.78
+
+/**
+ * Player-only enemy damage multiplier, banded to match the visual tier ramp
+ * (default → medium → hard). Hostages always take base damage so survivors are
+ * not massacred before the player can engage.
+ */
+const PLAYER_DAMAGE_MULTIPLIER_DEFAULT = 1
+const PLAYER_DAMAGE_MULTIPLIER_MEDIUM = 1.5
+const PLAYER_DAMAGE_MULTIPLIER_HARD = 2
+
+/**
+ * Resolve the player damage multiplier for the given visual tier. Mirrors the
+ * enemy palette banding so yellow/medium enemies hit harder and magenta/hard
+ * enemies hit hardest, matching the visual cue.
+ *
+ * @param tier - Visual tier resolved from mission difficulty.
+ */
+function playerDamageMultiplierForTier(tier: EnemyVisualTier): number {
+  if (tier === 'hard') return PLAYER_DAMAGE_MULTIPLIER_HARD
+  if (tier === 'medium') return PLAYER_DAMAGE_MULTIPLIER_MEDIUM
+  return PLAYER_DAMAGE_MULTIPLIER_DEFAULT
+}
 const CONTAINED_HOSTAGE_RADIUS = 26
 const CONTAINED_HOSTAGE_BOB_AMPLITUDE = 5
 const CONTAINED_HOSTAGE_BOB_SPEED = 1.1
@@ -77,6 +130,29 @@ const CHASE_SPAWN_DISTANCE = 18
 
 /** Cap on simultaneously-alive chase enemies during extraction. */
 const CHASE_MAX_ACTIVE = 2
+
+/**
+ * Seconds the FPS scene gets to warm up after the player exits the lander
+ * before the first attacker pulse spawns. Without this delay, enemies are on
+ * top of the player before the FPS overlay finishes loading.
+ */
+const ENCOUNTER_INITIAL_DELAY = 2
+
+/** Number of enemies released per scheduled encounter pulse. */
+const ENCOUNTER_PULSE_SIZE = 3
+
+/** Minimum total seconds across which the encounter roster is dribbled in. */
+const ENCOUNTER_MIN_DURATION = 8
+
+/** Maximum total seconds across which the encounter roster is dribbled in. */
+const ENCOUNTER_MAX_DURATION = 40
+
+/**
+ * Seconds added to the encounter dribble window for every queued enemy. Larger
+ * rosters spread over longer windows so high-difficulty levels don't dump the
+ * whole pool on the player at once.
+ */
+const ENCOUNTER_SECONDS_PER_ENEMY = 3
 
 /** How long the "VIROID HIVE RESISTS" alert stays on screen (s). */
 const CHASE_ALERT_DURATION = 4.0
@@ -119,6 +195,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
   private readonly heightmap: Heightmap
   private readonly projectileSystem: ProjectileSystem
   private readonly missionDifficulty: number
+  private readonly enemyVisualTier: EnemyVisualTier
   private readonly virus: VirusModel
   private readonly virusPosition = new THREE.Vector3()
   private readonly enemyDirector = new EnemyDirector()
@@ -149,6 +226,10 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
   private readonly enemyLodApplier = new EnemyLodApplier()
   private readonly enemyByHandleId = new Map<number, Enemy>()
   private readonly encounterEnemies: Enemy[] = []
+  /** Total enemies the encounter plans to spawn — set by `spawnEncounter`. */
+  private encounterTotalPlanned = 0
+  /** Sequence handle for paced encounter spawns; cancelled on dispose/fail. */
+  private encounterSpawnTimer: TimerHandle | null = null
   private readonly containedHostages: ContainedHostageVisual[] = []
   private readonly explosionFlash = new THREE.Mesh(explosionFlashGeo, explosionFlashMat)
   private readonly explosionLight = new THREE.PointLight(0x66ffcc, 0, EXPLOSION_LIGHT_DISTANCE)
@@ -207,6 +288,15 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
   onSurvivorLost: ((aliveRemaining: number) => void) | null = null
   /** Fired when a recruited walker boards the lander. Argument: cumulative aboard count. */
   onSurvivorAboard: ((aboardCount: number) => void) | null = null
+  /**
+   * Fired when an incapacitated hostage is revived by a SCI bolt heal.
+   * Argument: alive-not-aboard count after revive — HUD survivor counters can
+   * re-render. The minigame also auto-recruits the revived survivor (sends them
+   * walking to the lander) so the player isn't forced through the kneel +
+   * [E] release flow a second time; the count reported here is post-revive
+   * but pre-board, so it briefly bumps before the walker fires its board event.
+   */
+  onSurvivorRevived: ((aliveRemaining: number) => void) | null = null
 
   get status(): MiniGameStatus {
     return this._status
@@ -222,12 +312,12 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
 
   get progressCurrent(): number | null {
     if (!this.activated) return 0
-    const total = this.encounterEnemies.length
-    if (total === 0) return 0
-    return total - this.liveEnemyCount()
+    if (this.encounterEnemies.length === 0) return 0
+    return this.encounterEnemies.length - this.liveEnemyCount()
   }
 
   get progressTotal(): number | null {
+    if (this.encounterTotalPlanned > 0) return this.encounterTotalPlanned
     return this.encounterEnemies.length
   }
 
@@ -248,6 +338,21 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
   /** Survivors who have walked into the lander. Monotonic. */
   get aboardSurvivors(): number {
     return this.hostages.aboardCount
+  }
+
+  /**
+   * Live POI markers exposed to the HUD compass + tactical map so the player
+   * can find survivors on broken terrain. One marker per active (alive, not
+   * yet aboard) hostage, tagged with the rescue color.
+   */
+  get compassMarkers(): readonly MiniGameMapMarker[] {
+    const anchors = this.hostages.getHostageMarkers()
+    const out: MiniGameMapMarker[] = []
+    for (let i = 0; i < anchors.length; i++) {
+      const a = anchors[i]!
+      out.push({ id: `rescue-hostage-${i}`, x: a.x, z: a.z, type: 'rescue', label: 'SURVIVOR' })
+    }
+    return out
   }
 
   /**
@@ -279,6 +384,10 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     this.heightmap = heightmap
     this.projectileSystem = projectileSystem
     this.missionDifficulty = missionDifficulty
+    this.enemyVisualTier = enemyVisualTierForDifficulty(missionDifficulty)
+    const playerDamageMultiplier = playerDamageMultiplierForTier(this.enemyVisualTier)
+    this.enemyDirector.setPlayerDamageMultiplier(playerDamageMultiplier)
+    this.enemyProjectileSystem.setPlayerDamageMultiplier(playerDamageMultiplier)
     this.virus = virus
     this.previousHostageBoltHandler = projectileSystem.onHostageBolt
     this.hostages = new FpsHostageController(scene, heightmap)
@@ -362,15 +471,9 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
       return
     }
 
-    // Only fail when no one was alive AND no one was rescued. With extraction,
-    // a successful last-survivor board momentarily reports getAliveCount() === 0
-    // (because mid-fade boarders are excluded from isActive); guard on aboardCount
-    // so that path completes step 3 cleanly instead of failing.
-    if (this.hostages.getAliveCount() === 0 && this.hostages.aboardCount === 0) {
-      this.fail('All Survivors Lost')
-      return
-    }
-
+    // Losing every survivor no longer ends the run — the player can still
+    // clear the enemies, arm the virus, and evacuate. The heal/extract gates
+    // below short-circuit vacuously when `aliveSurvivors === 0`.
     const allEnemiesDead = this.liveEnemyCount() === 0
     if (allEnemiesDead) {
       this.advanceStep(1)
@@ -386,11 +489,20 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     }
 
     // Once the heal step is complete, never re-run the heal gate. Otherwise
-    // the moment the last survivor boards (living === 0 → areAllLiving returns
-    // false), the early return below would fire forever and step 3 → step 4
-    // would never advance.
+    // the moment the last survivor boards (counted === 0 → areAllTracked
+    // returns false), the early return below would fire forever and step 3 →
+    // step 4 would never advance.
+    //
+    // Gate uses `areAllTrackedHostagesAtFullHealth` (NOT `areAllLiving…`) so
+    // the player has to revive every incapacitated hostage with the SCI bolt
+    // before the step auto-completes. Otherwise the heal step would skip past
+    // unconscious bodies and the player would land on the extract step with
+    // corpses they can no longer (per design) leave behind.
     const healStepAlreadyDone = this._steps[2]?.complete === true
-    const survivorsStable = healStepAlreadyDone || this.hostages.areAllLivingHostagesAtFullHealth()
+    const survivorsStable =
+      healStepAlreadyDone ||
+      this.totalSurvivors === 0 ||
+      this.hostages.areAllTrackedHostagesAtFullHealth()
     if (!survivorsStable) {
       this.updateHealPrompt(ctx)
       return
@@ -530,6 +642,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
       Timer.cancel(this.releaseTimerHandle)
       this.releaseTimerHandle = null
     }
+    this.cancelEncounterSpawnTimer()
     this.clearEncounter()
     this.clearEnemyProjectiles()
     this.clearContainedHostageVisuals()
@@ -584,6 +697,17 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     }
     this.hostages.onSurvivorAboard = (aboardCount) => {
       this.onSurvivorAboard?.(aboardCount)
+    }
+    this.hostages.onSurvivorRevived = (hostage, aliveRemaining) => {
+      // Auto-recruit the revived survivor — dead → walking, no praying loop,
+      // no [E] release prompt. The walker reads `lastLanderPosition` every tick
+      // so the survivor tracks the lander even if it shifts before they board.
+      const captured = this.lastLanderPosition.clone()
+      this.hostages.recruit(hostage, () => {
+        captured.copy(this.lastLanderPosition)
+        return captured
+      })
+      this.onSurvivorRevived?.(aliveRemaining)
     }
   }
 
@@ -667,14 +791,13 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
       2,
       this.objective.colonistCount ?? Math.min(6, 2 + Math.floor(this.missionDifficulty / 2)),
     )
+    const objY = this.heightmap.heightAt(this.objective.x, this.objective.z)
     const positions: Array<{ x: number; z: number; yaw: number }> = []
     for (let i = 0; i < colonistCount; i++) {
-      const angle = (i / colonistCount) * Math.PI * 2 + Math.random() * 0.7
-      const minR = Math.min(HOSTAGE_RING_MIN_RADIUS, HOSTAGE_RING_MAX_RADIUS * 0.55)
-      const span = Math.max(0.01, HOSTAGE_RING_MAX_RADIUS - minR)
-      const r = minR + Math.sqrt(Math.random()) * span
-      const x = this.objective.x + Math.cos(angle) * r
-      const z = this.objective.z + Math.sin(angle) * r
+      const baseAngle = (i / colonistCount) * Math.PI * 2
+      const placement = this.sampleReachableHostagePosition(baseAngle, objY)
+      const x = this.objective.x + Math.cos(placement.angle) * placement.radius
+      const z = this.objective.z + Math.sin(placement.angle) * placement.radius
       positions.push({
         x,
         z,
@@ -682,6 +805,69 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
       })
     }
     await this.hostages.spawnAtPositions(positions)
+  }
+
+  /**
+   * Pick a hostage spawn offset (angle + radius) that lies on walkable terrain
+   * and has a passable path back to the objective. Tries the preferred outer
+   * band first, then progressively shrinks the outer radius so survivors stay
+   * relatively far from the lander on flat asteroids but tuck in close when
+   * the local terrain rules out distant ground.
+   *
+   * @param baseAngle - Even-spacing angle for this colonist (radians).
+   * @param objY - Heightmap height at the rescue objective.
+   */
+  private sampleReachableHostagePosition(
+    baseAngle: number,
+    objY: number,
+  ): { angle: number; radius: number } {
+    const minR = Math.min(HOSTAGE_RING_MIN_RADIUS, HOSTAGE_RING_MAX_RADIUS * 0.55)
+    let outerR = HOSTAGE_RING_MAX_RADIUS
+    let bestFallback: { angle: number; radius: number } | null = null
+
+    for (let shrink = 0; shrink <= HOSTAGE_RING_SHRINK_STEPS; shrink++) {
+      const span = Math.max(0.01, outerR - minR)
+      for (let attempt = 0; attempt < HOSTAGE_SAMPLES_PER_RING; attempt++) {
+        const angle = baseAngle + (Math.random() - 0.5) * 0.7
+        const radius = minR + Math.sqrt(Math.random()) * span
+        const x = this.objective.x + Math.cos(angle) * radius
+        const z = this.objective.z + Math.sin(angle) * radius
+        if (this.isHostageReachable(x, z, objY)) {
+          return { angle, radius }
+        }
+        if (bestFallback === null) bestFallback = { angle, radius }
+      }
+      outerR *= HOSTAGE_RING_SHRINK_FACTOR
+      if (outerR <= minR) break
+    }
+
+    return bestFallback ?? { angle: baseAngle, radius: minR }
+  }
+
+  /**
+   * Whether a hostage spawned at `(x, z)` could realistically walk back to the
+   * objective. Rejects spawns sitting off-map, on steep slopes, far above/below
+   * the objective, or separated from it by a steep ridge.
+   *
+   * @param x    - Candidate world X.
+   * @param z    - Candidate world Z.
+   * @param objY - Heightmap height at the objective center.
+   */
+  private isHostageReachable(x: number, z: number, objY: number): boolean {
+    if (!this.heightmap.isValidAt(x, z)) return false
+    if (this.heightmap.slopeAt(x, z) > HOSTAGE_MAX_TERRAIN_SLOPE) return false
+    const yHere = this.heightmap.heightAt(x, z)
+    if (Math.abs(yHere - objY) > HOSTAGE_MAX_ELEVATION_DELTA) return false
+    for (let s = 1; s < HOSTAGE_PATH_SAMPLES; s++) {
+      const t = s / HOSTAGE_PATH_SAMPLES
+      const sx = this.objective.x + (x - this.objective.x) * t
+      const sz = this.objective.z + (z - this.objective.z) * t
+      if (!this.heightmap.isValidAt(sx, sz)) return false
+      if (this.heightmap.slopeAt(sx, sz) > HOSTAGE_MAX_TERRAIN_SLOPE) return false
+      const sy = this.heightmap.heightAt(sx, sz)
+      if (Math.abs(sy - objY) > HOSTAGE_MAX_ELEVATION_DELTA) return false
+    }
+    return true
   }
 
   private async createContainedHostageVisuals(): Promise<void> {
@@ -733,9 +919,95 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
       Math.floor(this.missionDifficulty / 2) + Math.ceil(colonistCount / 2) + guardedBonus,
     )
 
-    this.spawnEnemiesOfType('bacteriophage', phageCount)
-    this.spawnEnemiesOfType('chimera', chimeraCount)
-    this.spawnEnemiesOfType('spire', spireCount)
+    const queue = this.buildEncounterQueue(phageCount, chimeraCount, spireCount)
+    this.encounterTotalPlanned = queue.length
+    this.scheduleEncounterPulses(queue)
+  }
+
+  /**
+   * Build the spawn queue by interleaving the three enemy archetypes so each
+   * pulse mixes types when the roster includes more than one. Phage-heavy
+   * rosters still front-load phages, but chimera and spires are sprinkled
+   * through the list rather than dumped at the end.
+   *
+   * @param phages   - Number of bacteriophage enemies to queue.
+   * @param chimeras - Number of chimera walkers to queue.
+   * @param spires   - Number of spire enemies to queue.
+   */
+  private buildEncounterQueue(
+    phages: number,
+    chimeras: number,
+    spires: number,
+  ): Array<'bacteriophage' | 'chimera' | 'spire'> {
+    const buckets: Array<{ type: 'bacteriophage' | 'chimera' | 'spire'; left: number }> = [
+      { type: 'bacteriophage', left: phages },
+      { type: 'chimera', left: chimeras },
+      { type: 'spire', left: spires },
+    ]
+    const queue: Array<'bacteriophage' | 'chimera' | 'spire'> = []
+    while (buckets.some((b) => b.left > 0)) {
+      for (const bucket of buckets) {
+        if (bucket.left <= 0) continue
+        queue.push(bucket.type)
+        bucket.left--
+      }
+    }
+    return queue
+  }
+
+  /**
+   * Schedule the encounter roster as paced pulses through {@link Timer.sequence}.
+   * Begins after {@link ENCOUNTER_INITIAL_DELAY} so the FPS scene has a moment
+   * to load, then dribbles {@link ENCOUNTER_PULSE_SIZE} enemies per pulse over a
+   * window scaled by roster size (capped between
+   * {@link ENCOUNTER_MIN_DURATION} and {@link ENCOUNTER_MAX_DURATION}).
+   *
+   * @param queue - Ordered enemy types to spawn.
+   */
+  private scheduleEncounterPulses(
+    queue: ReadonlyArray<'bacteriophage' | 'chimera' | 'spire'>,
+  ): void {
+    if (queue.length === 0) return
+    const pulseCount = Math.ceil(queue.length / ENCOUNTER_PULSE_SIZE)
+    const totalDuration = Math.max(
+      ENCOUNTER_MIN_DURATION,
+      Math.min(ENCOUNTER_MAX_DURATION, queue.length * ENCOUNTER_SECONDS_PER_ENEMY),
+    )
+    const interval = pulseCount > 1 ? totalDuration / (pulseCount - 1) : 0
+    const steps: Array<{ delay: number; fn: () => void }> = []
+    let cursor = 0
+    for (let i = 0; i < pulseCount; i++) {
+      const start = cursor
+      const end = Math.min(queue.length, cursor + ENCOUNTER_PULSE_SIZE)
+      const slice = queue.slice(start, end)
+      cursor = end
+      steps.push({
+        delay: i === 0 ? ENCOUNTER_INITIAL_DELAY : interval,
+        fn: () => this.firePulse(slice),
+      })
+    }
+    this.encounterSpawnTimer = Timer.sequence(steps)
+  }
+
+  /**
+   * Spawn one queued pulse if the encounter is still active. Bails when the
+   * minigame has already failed or completed so a late-firing pulse doesn't
+   * resurrect enemies after teardown.
+   *
+   * @param slice - Pulse roster to spawn.
+   */
+  private firePulse(slice: ReadonlyArray<'bacteriophage' | 'chimera' | 'spire'>): void {
+    if (this._status !== 'active' || !this.encounterStarted) return
+    const counts: Record<'bacteriophage' | 'chimera' | 'spire', number> = {
+      bacteriophage: 0,
+      chimera: 0,
+      spire: 0,
+    }
+    for (const type of slice) counts[type]++
+    if (counts.bacteriophage > 0) this.spawnEnemiesOfType('bacteriophage', counts.bacteriophage)
+    if (counts.chimera > 0) this.spawnEnemiesOfType('chimera', counts.chimera)
+    if (counts.spire > 0) this.spawnEnemiesOfType('spire', counts.spire)
+    this.enemyDirector.setHostageTargets(this.hostages.getHostageEntitiesForDirector())
   }
 
   private spawnEnemiesOfType(
@@ -755,17 +1027,23 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
       this.projectileSystem.addEnemy(handle.enemy)
 
       if (type === 'bacteriophage') {
-        const ctrl = new BacteriophageController(handle.enemy)
+        const ctrl = new BacteriophageController(handle.enemy, {
+          visualTier: this.enemyVisualTier,
+        })
         ctrl.group.position.set(x, groundY, z)
         this.scene.add(ctrl.group)
         this.groundControllers.set(handle.id, ctrl)
       } else if (type === 'chimera') {
-        const ctrl = new ChimeraWalkerController(handle.enemy)
+        const ctrl = new ChimeraWalkerController(handle.enemy, {
+          visualTier: this.enemyVisualTier,
+        })
         ctrl.group.position.set(x, groundY, z)
         this.scene.add(ctrl.group)
         this.chimeraControllers.set(handle.id, ctrl)
       } else {
-        const ctrl = new SpireController(handle.enemy)
+        const ctrl = new SpireController(handle.enemy, {
+          visualTier: this.enemyVisualTier,
+        })
         ctrl.group.position.set(x, groundY + handle.config.floatHeight, z)
         ctrl.targetPosition.set(x, groundY + handle.config.floatHeight, z)
         this.scene.add(ctrl.group)
@@ -1196,6 +1474,15 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     this.enemyByHandleId.clear()
     this.enemyTiltCache.clear()
     this.enemyDirector.setHostageTargets([])
+    this.encounterTotalPlanned = 0
+  }
+
+  /** Cancel any pending paced encounter spawn pulses, if scheduled. */
+  private cancelEncounterSpawnTimer(): void {
+    if (this.encounterSpawnTimer !== null) {
+      Timer.cancel(this.encounterSpawnTimer)
+      this.encounterSpawnTimer = null
+    }
   }
 
   private clearEnemyProjectiles(): void {
@@ -1210,6 +1497,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
       Timer.cancel(this.releaseTimerHandle)
       this.releaseTimerHandle = null
     }
+    this.cancelEncounterSpawnTimer()
     this.onPrompt?.(cause.toUpperCase())
     this.clearEncounter()
     this.clearEnemyProjectiles()

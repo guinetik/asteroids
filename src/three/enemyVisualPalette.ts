@@ -61,3 +61,22 @@ export function enemyVisualPaletteForTier(tier: EnemyVisualTier = 'default'): En
   if (tier === 'hard') return HARD_ENEMY_VISUAL_PALETTE
   return DEFAULT_ENEMY_VISUAL_PALETTE
 }
+
+/** Upper-inclusive mission difficulty for the `'default'` enemy palette. */
+const DEFAULT_VISUAL_TIER_MAX_DIFFICULTY = 4
+
+/** Upper-inclusive mission difficulty for the `'medium'` enemy palette. */
+const MEDIUM_VISUAL_TIER_MAX_DIFFICULTY = 7
+
+/**
+ * Map a rolled mission difficulty (1–10) to the enemy visual tier used by
+ * procedural enemy controllers. Mirrors the bunker palette banding so combat
+ * encounters across mission types share the same difficulty → color rules.
+ *
+ * @param difficulty - Mission difficulty in the 1–10 range.
+ */
+export function enemyVisualTierForDifficulty(difficulty: number): EnemyVisualTier {
+  if (difficulty <= DEFAULT_VISUAL_TIER_MAX_DIFFICULTY) return 'default'
+  if (difficulty <= MEDIUM_VISUAL_TIER_MAX_DIFFICULTY) return 'medium'
+  return 'hard'
+}
