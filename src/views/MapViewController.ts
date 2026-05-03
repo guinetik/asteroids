@@ -1015,6 +1015,7 @@ export class MapViewController implements Tickable {
     this.tickHandler.register(this.shuttleController, TICK_PRIORITY_PHYSICS)
 
     this.shuttleEffects = new MapShuttleEffects(this.sceneObjects, this.shuttleController)
+    this.shuttleEffects.applyShuttleThrusterTrailFromProfile(this.playerProfile)
     for (const tickable of this.shuttleEffects.getTickables()) {
       this.tickHandler.register(tickable, TICK_PRIORITY_ANIMATION)
     }
@@ -2878,6 +2879,196 @@ export class MapViewController implements Tickable {
     this.cosmeticShopFacade.open(this.onCosmeticShopState, this.playerProfile, this.playerInventory)
   }
 
+  /**
+   * Render the currently painted shuttle into an isolated thumbnail for Vue shop UI.
+   *
+   * The map renderer is reused for a single offscreen render target. The cloned
+   * shuttle is rendered in a tiny preview scene, so the paused solar-system scene
+   * stays untouched while the dialog gets a cheap bitmap.
+   */
+  captureShuttleCosmeticPreviewDataUrl(): string | null {
+    if (!this.shuttleController) return null
+    return this.captureCosmeticPreviewDataUrl(this.shuttleController.group, {
+      ambientIntensity: MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_AMBIENT_INTENSITY,
+      background: MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_BACKGROUND,
+      cameraDistanceMultiplier: MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_CAMERA_DISTANCE_MULTIPLIER,
+      cameraOffset: MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_CAMERA_OFFSET,
+      far: MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_FAR,
+      fovDeg: MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_FOV_DEG,
+      keyIntensity: MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_KEY_INTENSITY,
+      mimeType: MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_MIME_TYPE,
+      minRadius: MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_MIN_CAMERA_DISTANCE,
+      near: MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_NEAR,
+      rimIntensity: MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_RIM_INTENSITY,
+      sizePx: MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_SIZE_PX,
+      target: MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_TARGET,
+    })
+  }
+
+  /**
+   * Render the currently painted cargo lander into an isolated thumbnail for Vue shop UI.
+   */
+  captureLanderCosmeticPreviewDataUrl(): string | null {
+    const landerRoot = this.shuttleController?.getCargoLanderPreviewRoot()
+    if (!landerRoot) return null
+    return this.captureCosmeticPreviewDataUrl(landerRoot, {
+      ambientIntensity: MAP_CONFIG.LANDER_COSMETIC_PREVIEW_AMBIENT_INTENSITY,
+      background: MAP_CONFIG.LANDER_COSMETIC_PREVIEW_BACKGROUND,
+      cameraDistanceMultiplier: MAP_CONFIG.LANDER_COSMETIC_PREVIEW_CAMERA_DISTANCE_MULTIPLIER,
+      cameraOffset: MAP_CONFIG.LANDER_COSMETIC_PREVIEW_CAMERA_OFFSET,
+      far: MAP_CONFIG.LANDER_COSMETIC_PREVIEW_FAR,
+      fovDeg: MAP_CONFIG.LANDER_COSMETIC_PREVIEW_FOV_DEG,
+      keyIntensity: MAP_CONFIG.LANDER_COSMETIC_PREVIEW_KEY_INTENSITY,
+      mimeType: MAP_CONFIG.LANDER_COSMETIC_PREVIEW_MIME_TYPE,
+      minRadius: MAP_CONFIG.LANDER_COSMETIC_PREVIEW_MIN_CAMERA_DISTANCE,
+      near: MAP_CONFIG.LANDER_COSMETIC_PREVIEW_NEAR,
+      rimIntensity: MAP_CONFIG.LANDER_COSMETIC_PREVIEW_RIM_INTENSITY,
+      sizePx: MAP_CONFIG.LANDER_COSMETIC_PREVIEW_SIZE_PX,
+      target: MAP_CONFIG.LANDER_COSMETIC_PREVIEW_TARGET,
+    })
+  }
+
+  /**
+   * Ensure the map-owned EVA multitool has a model available for shop preview capture.
+   */
+  async preloadMultitoolCosmeticPreview(): Promise<void> {
+    await this.evaMapMultitoolFacade.loadCosmeticPreviewModel(this.playerProfile)
+  }
+
+  /**
+   * Render the currently painted multitool into an isolated thumbnail for Vue shop UI.
+   */
+  captureMultitoolCosmeticPreviewDataUrl(): string | null {
+    this.evaMapMultitoolFacade.applyMultitoolPaintjobFromProfile(this.playerProfile)
+    const multitoolRoot = this.evaMapMultitoolFacade.getCosmeticPreviewRoot()
+    if (!multitoolRoot) return null
+    return this.captureCosmeticPreviewDataUrl(multitoolRoot, {
+      ambientIntensity: MAP_CONFIG.MULTITOOL_COSMETIC_PREVIEW_AMBIENT_INTENSITY,
+      background: MAP_CONFIG.MULTITOOL_COSMETIC_PREVIEW_BACKGROUND,
+      cameraDistanceMultiplier: MAP_CONFIG.MULTITOOL_COSMETIC_PREVIEW_CAMERA_DISTANCE_MULTIPLIER,
+      cameraOffset: MAP_CONFIG.MULTITOOL_COSMETIC_PREVIEW_CAMERA_OFFSET,
+      far: MAP_CONFIG.MULTITOOL_COSMETIC_PREVIEW_FAR,
+      fovDeg: MAP_CONFIG.MULTITOOL_COSMETIC_PREVIEW_FOV_DEG,
+      keyIntensity: MAP_CONFIG.MULTITOOL_COSMETIC_PREVIEW_KEY_INTENSITY,
+      mimeType: MAP_CONFIG.MULTITOOL_COSMETIC_PREVIEW_MIME_TYPE,
+      minRadius: MAP_CONFIG.MULTITOOL_COSMETIC_PREVIEW_MIN_CAMERA_DISTANCE,
+      near: MAP_CONFIG.MULTITOOL_COSMETIC_PREVIEW_NEAR,
+      rimIntensity: MAP_CONFIG.MULTITOOL_COSMETIC_PREVIEW_RIM_INTENSITY,
+      sizePx: MAP_CONFIG.MULTITOOL_COSMETIC_PREVIEW_SIZE_PX,
+      target: MAP_CONFIG.MULTITOOL_COSMETIC_PREVIEW_TARGET,
+    })
+  }
+
+  private captureCosmeticPreviewDataUrl(
+    source: THREE.Object3D,
+    config: {
+      readonly ambientIntensity: number
+      readonly background: string
+      readonly cameraDistanceMultiplier: number
+      readonly cameraOffset: THREE.Vector3
+      readonly far: number
+      readonly fovDeg: number
+      readonly keyIntensity: number
+      readonly mimeType: string
+      readonly minRadius: number
+      readonly near: number
+      readonly rimIntensity: number
+      readonly sizePx: number
+      readonly target: THREE.Vector3
+    },
+  ): string | null {
+    if (!this.sceneObjects || typeof document === 'undefined') return null
+
+    const renderer = this.sceneObjects.renderer
+    const previewScene = new THREE.Scene()
+    previewScene.background = new THREE.Color(config.background)
+
+    const previewVehicle = source.clone(true)
+    previewVehicle.position.set(0, 0, 0)
+    previewVehicle.rotation.set(0, 0, 0)
+    previewVehicle.scale.setScalar(1)
+    previewVehicle.visible = true
+    previewVehicle.traverse((child) => {
+      child.layers.set(0)
+    })
+    previewVehicle.updateMatrixWorld(true)
+
+    const bounds = this.computeVisibleMeshBounds(previewVehicle)
+    if (!bounds) return null
+
+    const center = bounds.getCenter(new THREE.Vector3())
+    previewVehicle.position.sub(center)
+    previewVehicle.updateMatrixWorld(true)
+    previewScene.add(previewVehicle)
+
+    const sphere = bounds.getBoundingSphere(new THREE.Sphere())
+    const radius = Math.max(sphere.radius, config.minRadius)
+    const cameraDistance = radius * config.cameraDistanceMultiplier
+    const camera = new THREE.PerspectiveCamera(config.fovDeg, 1, config.near, config.far)
+    camera.position.copy(config.cameraOffset).normalize().multiplyScalar(cameraDistance)
+    camera.lookAt(config.target)
+
+    previewScene.add(new THREE.AmbientLight(0xffffff, config.ambientIntensity))
+    const keyLight = new THREE.DirectionalLight(0xffffff, config.keyIntensity)
+    keyLight.position.copy(camera.position)
+    previewScene.add(keyLight)
+    const rimLight = new THREE.DirectionalLight(0x88ccff, config.rimIntensity)
+    rimLight.position.set(-camera.position.x, camera.position.y * 0.5, -camera.position.z)
+    previewScene.add(rimLight)
+
+    const size = config.sizePx
+    const target = new THREE.WebGLRenderTarget(size, size)
+    target.texture.colorSpace = renderer.outputColorSpace
+    const previousTarget = renderer.getRenderTarget()
+    const previousClearColor = renderer.getClearColor(new THREE.Color())
+    const previousClearAlpha = renderer.getClearAlpha()
+
+    renderer.setRenderTarget(target)
+    renderer.setClearColor(config.background, 1)
+    renderer.clear()
+    renderer.render(previewScene, camera)
+
+    const pixels = new Uint8Array(size * size * 4)
+    renderer.readRenderTargetPixels(target, 0, 0, size, size, pixels)
+
+    renderer.setRenderTarget(previousTarget)
+    renderer.setClearColor(previousClearColor, previousClearAlpha)
+    target.dispose()
+
+    const rowStride = size * 4
+    const flipped = new Uint8ClampedArray(pixels.length)
+    for (let y = 0; y < size; y += 1) {
+      const sourceOffset = y * rowStride
+      const targetOffset = (size - y - 1) * rowStride
+      flipped.set(pixels.subarray(sourceOffset, sourceOffset + rowStride), targetOffset)
+    }
+
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const context = canvas.getContext('2d')
+    if (!context) return null
+    context.putImageData(new ImageData(flipped, size, size), 0, 0)
+    return canvas.toDataURL(config.mimeType)
+  }
+
+  private computeVisibleMeshBounds(root: THREE.Object3D): THREE.Box3 | null {
+    const bounds = new THREE.Box3()
+    let hasBounds = false
+
+    root.traverseVisible((child) => {
+      if (!(child instanceof THREE.Mesh)) return
+      const geometry = child.geometry
+      geometry.computeBoundingBox()
+      const meshBounds = geometry.boundingBox
+      if (!meshBounds) return
+      bounds.union(meshBounds.clone().applyMatrix4(child.matrixWorld))
+      hasBounds = true
+    })
+
+    return hasBounds ? bounds : null
+  }
+
   /** Close the magenta dialog without clearing the underlying premium visit roll. */
   closeCosmeticShop(): void {
     this.cosmeticShopFacade.close()
@@ -2895,6 +3086,8 @@ export class MapViewController implements Tickable {
     this.playerProfile = result.profile
     this.shuttleController?.applyShuttlePaintjobFromProfile(this.playerProfile)
     this.shuttleController?.applyLanderPaintjobFromProfile(this.playerProfile)
+    this.shuttleEffects?.applyShuttleThrusterTrailFromProfile(this.playerProfile)
+    this.evaMapMultitoolFacade.applyMultitoolPaintjobFromProfile(this.playerProfile)
     this.persistPlayerProfile()
     this.onCreditsUpdate?.(this.playerProfile.credits)
     this.emitShopState()
@@ -2912,6 +3105,8 @@ export class MapViewController implements Tickable {
     this.playerProfile = result.profile
     this.shuttleController?.applyShuttlePaintjobFromProfile(this.playerProfile)
     this.shuttleController?.applyLanderPaintjobFromProfile(this.playerProfile)
+    this.shuttleEffects?.applyShuttleThrusterTrailFromProfile(this.playerProfile)
+    this.evaMapMultitoolFacade.applyMultitoolPaintjobFromProfile(this.playerProfile)
     this.persistPlayerProfile()
     this.emitShopState()
     return result
@@ -4575,9 +4770,14 @@ export class MapViewController implements Tickable {
     return this.turretSessionController
   }
 
-  /** True whenever either a map-level sequence or turret mode has paused the solar-system sim. */
+  /**
+   * True whenever a map-level sequence or overlay has paused the solar-system sim.
+   *
+   * The magenta cosmetic kiosk is a Vue overlay like the tactical map; while it is
+   * open, the orrery should stop advancing planet and belt positions behind it.
+   */
   private isSimulationFrozen(): boolean {
-    return this.simFrozen || this.turretSimFrozen
+    return this.simFrozen || this.turretSimFrozen || this.cosmeticShopFacade.dialogOpen
   }
 
   /**
@@ -4979,7 +5179,7 @@ export class MapViewController implements Tickable {
     this.unsubscribeContractStepActivated?.()
     this.unsubscribeContractStepActivated = null
     this.journeyFacade.dispose()
-    this.evaMapMultitoolFacade.disposeEvaFiring()
+    this.evaMapMultitoolFacade.dispose()
     this.tickHandler?.unregister(this.evaMapMultitoolFacade.frameSync)
     this.evaSession?.dispose()
     this.evaSession = null

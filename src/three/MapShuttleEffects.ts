@@ -7,6 +7,7 @@ import { TemperatureEffectController } from '@/three/TemperatureEffectController
 import { ThrusterEffectController } from '@/three/ThrusterEffectController'
 import { ShuttleController } from '@/three/ShuttleController'
 import type { MapSceneObjects } from '@/three/MapSceneSetup'
+import type { PlayerProfile } from '@/lib/player/types'
 import * as THREE from 'three'
 
 /** Aggregates thruster, thermal, manifold, and explosion VFX for the shuttle. */
@@ -65,6 +66,17 @@ export class MapShuttleEffects {
   /** Activate or deactivate the dark-sector manifold bubble. */
   setManifoldSurfing(active: boolean): void {
     this.manifoldBubble.setActive(active)
+  }
+
+  /**
+   * Forward the active `shuttle-thruster-trail` cosmetic into the shuttle's
+   * particle emitters so the map view repaints to match the player's active
+   * trail row.
+   *
+   * @param profile - Active player profile.
+   */
+  applyShuttleThrusterTrailFromProfile(profile: PlayerProfile): void {
+    this.thrusterController.applyShuttleThrusterTrailFromProfile(profile)
   }
 
   emitExplosion(position: THREE.Vector3, count: number = 150): void {

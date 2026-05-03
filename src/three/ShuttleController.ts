@@ -26,12 +26,27 @@ import {
 } from '@/lib/upgrades'
 import { findCosmeticOptionById } from '@/lib/cosmetics/catalog'
 import { getPlayerCosmetics } from '@/lib/cosmetics/profileCosmetics'
+import type {
+  CosmeticFinishChannel,
+  CosmeticFinishProfile,
+  CosmeticRim,
+} from '@/lib/cosmetics/types'
 import type { PlayerProfile } from '@/lib/player/types'
 import {
   applyLanderPaintMaterialsFromProfile,
   cloneAndCollectLanderPaintMaterials,
   type LanderPaintMaterialTarget,
 } from '@/three/cosmetics/landerPaintMaterials'
+import {
+  applyPaintRampShader,
+  buildPaintRampTexture,
+  computeMeshToVehicleLocal,
+  computePaintRampBounds,
+  setPaintRampRim,
+  setPaintRampStrength,
+  updatePaintRampTexture,
+  type PaintRampBounds,
+} from '@/three/cosmetics/paintRampShader'
 /** Any object that can exert gravity on the shuttle */
 export interface GravityWell {
   getGravityAt(position: THREE.Vector3): THREE.Vector3
@@ -184,6 +199,7 @@ const SHUTTLE_PAINT_SECONDARY_MATERIALS = new Set([
   'fusolage aft eng',
   'OMS pod prt back',
   'OMS pod stb back',
+  'OMS pods side',
   'RCS aft stb',
   'RCS aft prt',
 ])
@@ -204,8 +220,66 @@ const SHUTTLE_PAINT_ACCENT_MATERIALS = new Set([
   'bay stb evarail',
   'bay prt doorlatc',
   'bay stb doorlatc',
+  'eng out',
 ])
-const SHUTTLE_PAINT_COLOR_STRENGTH = 0.88
+/**
+ * Multiplier applied to per-channel paint colors before they replace the GLB
+ * albedo. `1.0` keeps the catalog hex value as-is; lower values dim it. Tuned
+ * up from the legacy `0.88` so paid paints read at full chroma now that the
+ * stock diffuse map no longer competes with them.
+ */
+const SHUTTLE_PAINT_COLOR_STRENGTH = 1.0
+/** Shuttle gradient ramp flows nose→tail along the raw GLB X axis. */
+const SHUTTLE_PAINT_RAMP_AXIS = 'x' as const
+/**
+ * Ramp tint strength used in REPLACE mode (paid paints, where the GLB diffuse
+ * map has been dropped). Higher than the legacy tint-mode value because the
+ * stock panel-line texture is no longer competing with the gradient.
+ */
+const SHUTTLE_PAINT_RAMP_STRENGTH_REPLACE = 0.35
+/**
+ * Procedural panel-seam + scuff overlay strength in REPLACE mode. Drives the
+ * `paintDetail` branch of the ramp shader, simulating the panel detail that
+ * the dropped diffuse map used to provide.
+ */
+const SHUTTLE_PAINT_DETAIL_STRENGTH_REPLACE = 0.55
+/**
+ * Self-illumination strength used in REPLACE mode. Adds `paintColor * this`
+ * to `totalEmissiveRadiance` so even unlit faces (dark side of a planet) keep
+ * a faint pulse of the paint color. Tuned high enough to compensate for the
+ * brightness lost when the GLB diffuse map is dropped.
+ */
+const SHUTTLE_PAINT_BASE_GLOW_REPLACE = 0.2
+/**
+ * Saturation push (additive HSL S) applied to per-channel paint colors in
+ * REPLACE mode. Helps GLB albedos that were authored greyer than their JSON
+ * gradient stops actually pop on the hull.
+ */
+const SHUTTLE_PAINT_SATURATION_BOOST = 0.12
+/**
+ * Default finish merged into every paid paint when the catalog row leaves
+ * `finish` blank or only specifies some channels. Tuned slightly more metallic
+ * than the legacy GLB defaults so paints feel like a fresh coat.
+ */
+const SHUTTLE_PAINT_FINISH_FALLBACK: Required<
+  Pick<CosmeticFinishChannel, 'metalness' | 'roughness' | 'envMapIntensity'>
+> = {
+  metalness: 0.55,
+  roughness: 0.4,
+  envMapIntensity: 1.2,
+}
+/** Reusable HSL bag — avoid allocating one per material per paint apply. */
+const SHUTTLE_PAINT_HSL_BAG = { h: 0, s: 0, l: 0 }
+/** Reusable scratch color used when resolving rim configs to runtime uniforms. */
+const SHUTTLE_PAINT_RIM_SCRATCH = new THREE.Color()
+/** Default rim Fresnel exponent when a paint omits `rim.power`. */
+const SHUTTLE_PAINT_RIM_DEFAULT_POWER = 2.5
+/**
+ * Catalog id of the bundled "Factory Stock" shuttle paint row. Selecting this
+ * option restores the authored GLB albedo + diffuse map and disables the ramp
+ * + detail overlay.
+ */
+const SHUTTLE_FACTORY_STOCK_OPTION_ID = 'shuttle-paintjob-factory-stock'
 
 /**
  * Controls the shuttle model — loading, door animation, movement, and nozzle placement.
@@ -361,7 +435,45 @@ export class ShuttleController implements Tickable, PortalVehicle {
   private readonly hullNodes: THREE.Object3D[] = []
   /** Hull-only materials for the green science-heal emissive pulse (map EVA). */
   private readonly hullHealFeedbackMaterials: THREE.MeshStandardMaterial[] = []
-  private readonly paintableMaterialBaseColors = new Map<THREE.Material, THREE.Color>()
+  /**
+   * Per-material ramp + stock data captured at clone time. Mirrors the
+   * standalone shuttle paint module. `stockColor`, `stockMap`, and `stockPbr`
+   * are used to restore the authored GLB finish when Factory Stock is selected
+   * (and as fall-through values for any finish-profile field a paid catalog
+   * row leaves unspecified).
+   */
+  private readonly paintableMaterialRampData = new Map<
+    THREE.Material,
+    {
+      /** Mesh geometry — used to compute ramp axis bounds. */
+      readonly geometry: THREE.BufferGeometry
+      /** Mesh-local → vehicle-local transform for the ramp shader. */
+      readonly meshToVehicleLocal: THREE.Matrix4
+      /** Paint channel inferred from material name — keys finish-profile lookup. */
+      readonly channel: 'primary' | 'secondary' | 'trim' | 'accent'
+      /** Authored GLB albedo color before any paint replacement. */
+      readonly stockColor: THREE.Color
+      /** Authored GLB diffuse map (panel lines / decals); `null` when none. */
+      readonly stockMap: THREE.Texture | null
+      /** Authored PBR scalars + emissive captured at clone time. */
+      readonly stockPbr: {
+        /** Authored `metalness` (`MeshStandardMaterial` only). */
+        readonly metalness: number | null
+        /** Authored `roughness` (`MeshStandardMaterial` only). */
+        readonly roughness: number | null
+        /** Authored `envMapIntensity` (`MeshStandardMaterial` only). */
+        readonly envMapIntensity: number | null
+        /** Cloned authored `emissive` color, when the material has one. */
+        readonly emissive: THREE.Color | null
+        /** Authored `emissiveIntensity`, when the material has one. */
+        readonly emissiveIntensity: number | null
+      }
+    }
+  >()
+  /** Cached axis bounds across all paintable shuttle meshes (vehicle-local space). */
+  private shuttleRampBounds: PaintRampBounds | null = null
+  /** Loaded cargo-bay lander scene used for live display and cosmetic previews. */
+  private cargoLanderScene: THREE.Object3D | null = null
   private cargoLanderPaintMaterials: LanderPaintMaterialTarget[] = []
   private hullHealFeedbackTimer = 0
   private landerFuelTank: FuelTank | null = null
@@ -492,6 +604,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
     landerScene.scale.setScalar(CARGO_LANDER_SCALE)
     landerScene.position.copy(CARGO_LANDER_OFFSET)
     landerScene.rotation.set(0, 0, -Math.PI / 2)
+    this.cargoLanderScene = landerScene
     this.cargoLanderPaintMaterials = cloneAndCollectLanderPaintMaterials(landerScene)
     this.applySavedLanderPaintjob()
     gltf.scene.add(landerScene)
@@ -549,13 +662,31 @@ export class ShuttleController implements Tickable, PortalVehicle {
   }
 
   /**
+   * Return the loaded cargo-bay lander subtree for static cosmetic preview capture.
+   */
+  getCargoLanderPreviewRoot(): THREE.Object3D | null {
+    return this.cargoLanderScene
+  }
+
+  /**
    * Apply a shuttle paint catalog option directly.
+   *
+   * Factory Stock restores the authored GLB albedo + diffuse map and disables
+   * the ramp + detail overlay. Paid paints drop the diffuse map, replace the
+   * albedo with the per-channel paint color, and enable the ramp + procedural
+   * panel-seam / scuff overlay.
    *
    * @param optionId - `shuttle-paintjob` catalog row id.
    */
   applyShuttlePaintjob(optionId: string): void {
     const option = findCosmeticOptionById(optionId)
     if (!option || option.category !== 'shuttle-paintjob') return
+
+    if (optionId === SHUTTLE_FACTORY_STOCK_OPTION_ID) {
+      this.restoreShuttleStockPaint()
+      return
+    }
+
     const primary = new THREE.Color(option.gradientStops[0] ?? '#ffffff')
     const secondary = new THREE.Color(
       option.gradientStops[1] ?? option.gradientStops[0] ?? '#ffffff',
@@ -567,15 +698,268 @@ export class ShuttleController implements Tickable, PortalVehicle {
       option.gradientStops[2] ?? option.gradientStops[1] ?? option.gradientStops[0] ?? '#ffffff',
     )
 
-    for (const [material, baseColor] of this.paintableMaterialBaseColors) {
-      const zoneColor = this.getPaintColorForMaterialName(material.name, {
+    for (const [material, rampData] of this.paintableMaterialRampData) {
+      const zoneColor = {
         primary,
         secondary,
         trim,
         accent,
+      }[rampData.channel]
+      this.setMaterialDiffuseMap(material, null)
+      this.applyMaterialPaintColorReplace(material, zoneColor)
+      this.applyChannelFinish(material, rampData, option.finish)
+    }
+    this.applyShuttlePaintRamp(
+      option.gradientStops,
+      SHUTTLE_PAINT_RAMP_STRENGTH_REPLACE,
+      SHUTTLE_PAINT_DETAIL_STRENGTH_REPLACE,
+      SHUTTLE_PAINT_BASE_GLOW_REPLACE,
+      this.resolveRim(option.finish?.rim),
+    )
+  }
+
+  /**
+   * Restore the authored GLB diffuse map + albedo + PBR scalars for every
+   * paintable shuttle material, and zero out the ramp / detail / rim uniforms
+   * so the shader injection becomes a no-op.
+   */
+  private restoreShuttleStockPaint(): void {
+    for (const [material, rampData] of this.paintableMaterialRampData) {
+      const materialColor = this.getMaterialColor(material)
+      if (materialColor) {
+        materialColor.copy(rampData.stockColor)
+      }
+      this.setMaterialDiffuseMap(material, rampData.stockMap)
+      this.restoreMaterialStockPbr(material, rampData.stockPbr)
+      setPaintRampStrength(material, 0, 0, 0)
+      setPaintRampRim(
+        material,
+        SHUTTLE_PAINT_RIM_SCRATCH.setRGB(1, 1, 1),
+        0,
+        SHUTTLE_PAINT_RIM_DEFAULT_POWER,
+        0,
+      )
+      material.needsUpdate = true
+    }
+  }
+
+  /**
+   * Resolve a `CosmeticRim` block into the concrete uniform values the shader
+   * expects, or `null` when rim is undefined / disabled (`intensity = 0`).
+   *
+   * @param rim - Optional rim block from the active paint catalog row.
+   */
+  private resolveRim(rim: CosmeticRim | undefined): {
+    /** Rim color (mutated in place from a shared scratch instance). */
+    color: THREE.Color
+    /** Rim glow strength multiplier. */
+    intensity: number
+    /** Fresnel exponent. */
+    power: number
+    /** Fresnel additive bias. */
+    bias: number
+  } | null {
+    if (!rim || (rim.intensity ?? 0) <= 0) return null
+    const color = SHUTTLE_PAINT_RIM_SCRATCH
+    if (rim.color !== undefined) {
+      color.set(rim.color)
+    } else {
+      color.setRGB(1, 1, 1)
+    }
+    return {
+      color,
+      intensity: rim.intensity ?? 0,
+      power: rim.power ?? SHUTTLE_PAINT_RIM_DEFAULT_POWER,
+      bias: rim.bias ?? 0,
+    }
+  }
+
+  /**
+   * Apply the finish profile for a paint catalog row to one paintable material.
+   *
+   * @param material - Cloned paintable material.
+   * @param rampData - Stock + ramp data captured at clone time.
+   * @param profile - Optional finish profile from the catalog row.
+   */
+  private applyChannelFinish(
+    material: THREE.Material,
+    rampData: NonNullable<ReturnType<typeof this.paintableMaterialRampData.get>>,
+    profile: CosmeticFinishProfile | undefined,
+  ): void {
+    const channelBlock = profile?.[rampData.channel]
+    const defaultBlock = profile?.default
+    const merged: CosmeticFinishChannel = { ...defaultBlock, ...channelBlock }
+    this.applyStandardPbr(material, merged)
+    this.applyEmissive(material, rampData.stockPbr, merged)
+  }
+
+  /**
+   * Apply `metalness` / `roughness` / `envMapIntensity` to materials whose class
+   * exposes those fields. Falls back to {@link SHUTTLE_PAINT_FINISH_FALLBACK}
+   * for unspecified scalars.
+   *
+   * @param material - Material to mutate.
+   * @param finish - Resolved (default + channel) finish block.
+   */
+  private applyStandardPbr(material: THREE.Material, finish: CosmeticFinishChannel): void {
+    if (
+      !(
+        material instanceof THREE.MeshStandardMaterial ||
+        material instanceof THREE.MeshPhysicalMaterial
+      )
+    ) {
+      return
+    }
+    material.metalness = finish.metalness ?? SHUTTLE_PAINT_FINISH_FALLBACK.metalness
+    material.roughness = finish.roughness ?? SHUTTLE_PAINT_FINISH_FALLBACK.roughness
+    material.envMapIntensity =
+      finish.envMapIntensity ?? SHUTTLE_PAINT_FINISH_FALLBACK.envMapIntensity
+    material.needsUpdate = true
+  }
+
+  /**
+   * Apply or clear the emissive channel for a paintable material. When the
+   * finish specifies neither `emissive` nor `emissiveIntensity`, the authored
+   * GLB emissive is restored so we never accidentally trim a baked glow.
+   *
+   * @param material - Material to mutate.
+   * @param stock - Stock PBR snapshot captured at clone time.
+   * @param finish - Resolved (default + channel) finish block.
+   */
+  private applyEmissive(
+    material: THREE.Material,
+    stock: {
+      readonly emissive: THREE.Color | null
+      readonly emissiveIntensity: number | null
+    },
+    finish: CosmeticFinishChannel,
+  ): void {
+    if (
+      !(
+        material instanceof THREE.MeshStandardMaterial ||
+        material instanceof THREE.MeshPhysicalMaterial ||
+        material instanceof THREE.MeshPhongMaterial ||
+        material instanceof THREE.MeshLambertMaterial
+      )
+    ) {
+      return
+    }
+    if (finish.emissive === undefined && finish.emissiveIntensity === undefined) {
+      if (stock.emissive) material.emissive.copy(stock.emissive)
+      if (
+        stock.emissiveIntensity !== null &&
+        'emissiveIntensity' in material &&
+        typeof material.emissiveIntensity === 'number'
+      ) {
+        material.emissiveIntensity = stock.emissiveIntensity
+      }
+      return
+    }
+    if (finish.emissive !== undefined) {
+      material.emissive.set(finish.emissive)
+    } else if (stock.emissive) {
+      material.emissive.copy(stock.emissive)
+    }
+    if (
+      finish.emissiveIntensity !== undefined &&
+      'emissiveIntensity' in material &&
+      typeof material.emissiveIntensity === 'number'
+    ) {
+      material.emissiveIntensity = finish.emissiveIntensity
+    }
+    material.needsUpdate = true
+  }
+
+  /**
+   * Restore every authored PBR field captured at clone time. Used by Factory
+   * Stock.
+   *
+   * @param material - Material to mutate.
+   * @param stock - Stock PBR snapshot captured at clone time.
+   */
+  private restoreMaterialStockPbr(
+    material: THREE.Material,
+    stock: {
+      readonly metalness: number | null
+      readonly roughness: number | null
+      readonly envMapIntensity: number | null
+      readonly emissive: THREE.Color | null
+      readonly emissiveIntensity: number | null
+    },
+  ): void {
+    if (
+      material instanceof THREE.MeshStandardMaterial ||
+      material instanceof THREE.MeshPhysicalMaterial
+    ) {
+      if (stock.metalness !== null) material.metalness = stock.metalness
+      if (stock.roughness !== null) material.roughness = stock.roughness
+      if (stock.envMapIntensity !== null) material.envMapIntensity = stock.envMapIntensity
+    }
+    if (
+      material instanceof THREE.MeshStandardMaterial ||
+      material instanceof THREE.MeshPhysicalMaterial ||
+      material instanceof THREE.MeshPhongMaterial ||
+      material instanceof THREE.MeshLambertMaterial
+    ) {
+      if (stock.emissive) material.emissive.copy(stock.emissive)
+      if (
+        stock.emissiveIntensity !== null &&
+        'emissiveIntensity' in material &&
+        typeof material.emissiveIntensity === 'number'
+      ) {
+        material.emissiveIntensity = stock.emissiveIntensity
+      }
+    }
+  }
+
+  /**
+   * Wire (or refresh) the gradient ramp shader on every shuttle paint material.
+   * Mirrors `shuttlePaintMaterials.ts` so direct-controller paint stays in sync
+   * with the standalone module used by the arrival sequence preview.
+   *
+   * @param gradientStops - Hex stops from the active cosmetic option.
+   * @param rampStrength - Tint mix strength for the ramp uniform.
+   * @param detailStrength - Procedural panel-seam / scuff overlay strength.
+   */
+  private applyShuttlePaintRamp(
+    gradientStops: readonly string[],
+    rampStrength: number,
+    detailStrength: number,
+    baseGlow: number,
+    rim: {
+      readonly color: THREE.Color
+      readonly intensity: number
+      readonly power: number
+      readonly bias: number
+    } | null,
+  ): void {
+    if (!this.shuttleRampBounds || this.paintableMaterialRampData.size === 0) return
+    const rampTexture = buildPaintRampTexture(gradientStops)
+    const rimColor = rim?.color ?? SHUTTLE_PAINT_RIM_SCRATCH.setRGB(1, 1, 1)
+    const rimIntensity = rim?.intensity ?? 0
+    const rimPower = rim?.power ?? SHUTTLE_PAINT_RIM_DEFAULT_POWER
+    const rimBias = rim?.bias ?? 0
+    for (const [material, rampData] of this.paintableMaterialRampData) {
+      const userData = material.userData as { paintRampUniforms?: unknown }
+      if (userData.paintRampUniforms) {
+        updatePaintRampTexture(material, rampTexture)
+        setPaintRampStrength(material, rampStrength, detailStrength, baseGlow)
+        setPaintRampRim(material, rimColor, rimIntensity, rimPower, rimBias)
+        continue
+      }
+      applyPaintRampShader(material, {
+        rampTexture,
+        axis: SHUTTLE_PAINT_RAMP_AXIS,
+        axisBounds: this.shuttleRampBounds,
+        strength: rampStrength,
+        meshToVehicleLocal: rampData.meshToVehicleLocal,
+        detailStrength,
+        baseGlow,
+        rimColor,
+        rimIntensity,
+        rimPower,
+        rimBias,
       })
-      if (!zoneColor) continue
-      this.applyMaterialPaintColor(material, baseColor, zoneColor)
     }
   }
 
@@ -1123,26 +1507,135 @@ export class ShuttleController implements Tickable, PortalVehicle {
   }
 
   private preparePaintableMaterials(root: THREE.Object3D): void {
-    this.paintableMaterialBaseColors.clear()
+    this.paintableMaterialRampData.clear()
+    this.shuttleRampBounds = null
+    root.updateMatrixWorld(true)
     root.traverse((child) => {
       if (!(child instanceof THREE.Mesh) || !child.material) return
 
       if (Array.isArray(child.material)) {
-        child.material = child.material.map((material) => this.preparePaintableMaterial(material))
+        child.material = child.material.map((material) =>
+          this.preparePaintableMaterial(material, child, root),
+        )
         return
       }
-      child.material = this.preparePaintableMaterial(child.material)
+      child.material = this.preparePaintableMaterial(child.material, child, root)
     })
+    this.computeShuttleRampBounds()
   }
 
-  private preparePaintableMaterial(material: THREE.Material): THREE.Material {
-    if (!this.getPaintChannelForMaterialName(material.name)) return material
+  private preparePaintableMaterial(
+    material: THREE.Material,
+    mesh: THREE.Mesh,
+    vehicleRoot: THREE.Object3D,
+  ): THREE.Material {
+    const channel = this.getPaintChannelForMaterialName(material.name)
+    if (!channel) return material
     const cloned = material.clone()
     const baseColor = this.getMaterialColor(cloned)
     if (baseColor) {
-      this.paintableMaterialBaseColors.set(cloned, baseColor.clone())
+      this.paintableMaterialRampData.set(cloned, {
+        geometry: mesh.geometry,
+        meshToVehicleLocal: computeMeshToVehicleLocal(mesh, vehicleRoot),
+        channel,
+        stockColor: baseColor.clone(),
+        stockMap: this.getMaterialDiffuseMap(cloned),
+        stockPbr: this.captureMaterialStockPbr(cloned),
+      })
     }
     return cloned
+  }
+
+  /**
+   * Capture the authored PBR scalars + emissive from a freshly cloned material.
+   *
+   * @param material - Cloned shuttle paint material.
+   */
+  private captureMaterialStockPbr(material: THREE.Material): {
+    /** Authored `metalness`, when the material exposes one. */
+    metalness: number | null
+    /** Authored `roughness`, when the material exposes one. */
+    roughness: number | null
+    /** Authored `envMapIntensity`, when the material exposes one. */
+    envMapIntensity: number | null
+    /** Cloned authored emissive color, when the material has one. */
+    emissive: THREE.Color | null
+    /** Authored `emissiveIntensity`, when the material has one. */
+    emissiveIntensity: number | null
+  } {
+    const isStandard =
+      material instanceof THREE.MeshStandardMaterial ||
+      material instanceof THREE.MeshPhysicalMaterial
+    const supportsEmissive =
+      isStandard ||
+      material instanceof THREE.MeshPhongMaterial ||
+      material instanceof THREE.MeshLambertMaterial
+    return {
+      metalness: isStandard ? material.metalness : null,
+      roughness: isStandard ? material.roughness : null,
+      envMapIntensity: isStandard ? material.envMapIntensity : null,
+      emissive: supportsEmissive ? material.emissive.clone() : null,
+      emissiveIntensity:
+        supportsEmissive &&
+        'emissiveIntensity' in material &&
+        typeof material.emissiveIntensity === 'number'
+          ? material.emissiveIntensity
+          : null,
+    }
+  }
+
+  /**
+   * Read the diffuse / albedo map (`.map`) from a paintable shuttle material,
+   * or `null` when the material's class doesn't carry one.
+   *
+   * @param material - Material to inspect.
+   */
+  private getMaterialDiffuseMap(material: THREE.Material): THREE.Texture | null {
+    if (
+      material instanceof THREE.MeshStandardMaterial ||
+      material instanceof THREE.MeshPhysicalMaterial ||
+      material instanceof THREE.MeshPhongMaterial ||
+      material instanceof THREE.MeshLambertMaterial ||
+      material instanceof THREE.MeshBasicMaterial
+    ) {
+      return material.map ?? null
+    }
+    return null
+  }
+
+  /**
+   * Replace or restore the diffuse / albedo map on a paintable shuttle
+   * material. When the value changes, marks the material for recompile so the
+   * `USE_MAP` define toggles correctly between paid and stock paints.
+   *
+   * @param material - Material to mutate.
+   * @param map - Replacement texture, or `null` to drop the map entirely.
+   */
+  private setMaterialDiffuseMap(material: THREE.Material, map: THREE.Texture | null): void {
+    if (
+      !(
+        material instanceof THREE.MeshStandardMaterial ||
+        material instanceof THREE.MeshPhysicalMaterial ||
+        material instanceof THREE.MeshPhongMaterial ||
+        material instanceof THREE.MeshLambertMaterial ||
+        material instanceof THREE.MeshBasicMaterial
+      )
+    ) {
+      return
+    }
+    const current = material.map ?? null
+    if (current === map) return
+    material.map = map
+    material.needsUpdate = true
+  }
+
+  private computeShuttleRampBounds(): void {
+    const entries = Array.from(this.paintableMaterialRampData.values())
+    if (entries.length === 0) {
+      this.shuttleRampBounds = null
+      return
+    }
+    this.shuttleRampBounds = computePaintRampBounds(entries, SHUTTLE_PAINT_RAMP_AXIS)
   }
 
   private getPaintChannelForMaterialName(
@@ -1153,19 +1646,6 @@ export class ShuttleController implements Tickable, PortalVehicle {
     if (SHUTTLE_PAINT_TRIM_MATERIALS.has(materialName)) return 'trim'
     if (SHUTTLE_PAINT_ACCENT_MATERIALS.has(materialName)) return 'accent'
     return null
-  }
-
-  private getPaintColorForMaterialName(
-    materialName: string,
-    colors: {
-      primary: THREE.Color
-      secondary: THREE.Color
-      trim: THREE.Color
-      accent: THREE.Color
-    },
-  ): THREE.Color | null {
-    const channel = this.getPaintChannelForMaterialName(materialName)
-    return channel ? colors[channel] : null
   }
 
   private getMaterialColor(material: THREE.Material): THREE.Color | null {
@@ -1181,21 +1661,38 @@ export class ShuttleController implements Tickable, PortalVehicle {
     return null
   }
 
-  private applyMaterialPaintColor(
-    material: THREE.Material,
-    baseColor: THREE.Color,
-    paintColor: THREE.Color,
-  ): void {
+  /**
+   * Replace the material albedo with the per-channel paint color (replace
+   * mode). Used for paid paints where the GLB diffuse map has been dropped
+   * and surface color comes entirely from `material.color * paintRamp *
+   * detail`. The strength scalar tames brightness to match the rest of the
+   * game's lighting; a saturation push compensates for slightly desaturated
+   * authored GLB albedos.
+   *
+   * @param material - Material to mutate.
+   * @param paintColor - Cosmetic shader color for the material's channel.
+   */
+  private applyMaterialPaintColorReplace(material: THREE.Material, paintColor: THREE.Color): void {
     const materialColor = this.getMaterialColor(material)
     if (!materialColor) return
-    materialColor.copy(baseColor).lerp(
-      baseColor
-        .clone()
-        .multiply(paintColor)
-        .multiplyScalar(1 / SHUTTLE_HULL_COLOR_SCALE),
-      SHUTTLE_PAINT_COLOR_STRENGTH,
-    )
+    const boosted = paintColor.clone()
+    this.pushColorSaturation(boosted, SHUTTLE_PAINT_SATURATION_BOOST)
+    materialColor.copy(boosted).multiplyScalar(SHUTTLE_PAINT_COLOR_STRENGTH)
     material.needsUpdate = true
+  }
+
+  /**
+   * Push a color's HSL saturation by `amount` (clamped to `[0, 1]`). No-op for
+   * pure greys (`s = 0`) so neutral hull elements like silver / graphite stay
+   * unbiased.
+   *
+   * @param color - Color mutated in place.
+   * @param amount - Additive saturation delta in `[0, 1]`.
+   */
+  private pushColorSaturation(color: THREE.Color, amount: number): void {
+    const hsl = color.getHSL(SHUTTLE_PAINT_HSL_BAG)
+    if (hsl.s <= 0) return
+    color.setHSL(hsl.h, Math.min(1, hsl.s + amount), hsl.l)
   }
 
   /**

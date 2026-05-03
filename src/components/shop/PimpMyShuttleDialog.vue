@@ -28,6 +28,9 @@ const props = defineProps<{
   profile: PlayerProfile
   inventory: Inventory
   premiumSession: PremiumTradeSession
+  shuttlePreviewUrl?: string | null
+  landerPreviewUrl?: string | null
+  multitoolPreviewUrl?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -55,11 +58,11 @@ const tabOrder = computed(() => {
     [
       'shuttle-paintjob',
       'lander-paintjob',
+      'multitool-paintjob',
       'shuttle-title',
       'vehicle-flag',
       'shuttle-thruster-trail',
       'lander-thruster-trail',
-      'multitool-paintjob',
     ] as unknown as CosmeticCategory[]
   ).forEach((id, index) => {
     order.set(id, index)
@@ -145,10 +148,41 @@ function formatSkuCredits(price: number): string {
   return price <= 0 ? 'Free' : `${price.toLocaleString()} CR`
 }
 
-function gradientStyle(stops: readonly string[]): Record<string, string> {
+/** Channel chip labels in render order (matches the in-game paint channel mapping). */
+const SHADER_SHARD_CHIP_LABELS = ['P', 'S', 'T'] as const
+
+/** Soft highlight position inside the metallic shard (CSS vars for the gloss layer). */
+const SHADER_SHARD_HIGHLIGHT_X = '28%'
+const SHADER_SHARD_HIGHLIGHT_Y = '22%'
+
+/**
+ * Build CSS variables that drive the painted-metal shard backgrounds. The shop swatch
+ * mirrors the in-game gradient ramp — same stops, same dominant flow direction.
+ */
+function shaderShardStyle(stops: readonly string[]): Record<string, string> {
+  const ribbon = `linear-gradient(105deg, ${stops.join(', ')})`
+  const tail = stops[stops.length - 1] ?? '#1a1a1a'
+  const head = stops[0] ?? '#ffffff'
   return {
-    background: `linear-gradient(135deg, ${stops.join(', ')})`,
+    '--shard-ribbon': ribbon,
+    '--shard-head': head,
+    '--shard-tail': tail,
+    '--shard-highlight-x': SHADER_SHARD_HIGHLIGHT_X,
+    '--shard-highlight-y': SHADER_SHARD_HIGHLIGHT_Y,
   }
+}
+
+/** Pick the chip color for a channel index, falling back to the previous stop. */
+function shaderShardChipColor(stops: readonly string[], index: number): string {
+  const direct = stops[index]
+  if (direct) return direct
+  const fallback = stops[stops.length - 1]
+  return fallback ?? '#ffffff'
+}
+
+/** Number of channel chips to render — capped at the available stop count and 3. */
+function shaderShardChipCount(stops: readonly string[]): number {
+  return Math.min(SHADER_SHARD_CHIP_LABELS.length, Math.max(1, stops.length))
 }
 
 function canAffordPrice(price: number): boolean {
@@ -257,11 +291,7 @@ function normalizedTitleBlocked(): boolean {
             <span class="cosmetic-shop-header__credits"
               >CR {{ profile.credits.toLocaleString() }}</span
             >
-            <button
-              type="button"
-              class="ship-message-card__button"
-              @click="requestClose"
-            >
+            <button type="button" class="ship-message-card__button" @click="requestClose">
               Close
             </button>
           </div>
@@ -289,6 +319,57 @@ function normalizedTitleBlocked(): boolean {
                 :key="'cat-' + String(activeTab)"
                 class="cosmetic-shop-panel cosmetic-shop-panel--category"
               >
+                <div
+                  v-if="activeTab === 'shuttle-paintjob' && shuttlePreviewUrl"
+                  class="cosmetic-vehicle-preview"
+                >
+                  <img
+                    class="cosmetic-vehicle-preview__image"
+                    :src="shuttlePreviewUrl"
+                    alt="Current shuttle paint preview"
+                  />
+                  <div class="cosmetic-vehicle-preview__meta">
+                    <span class="cosmetic-vehicle-preview__label">Current Shuttle Finish</span>
+                    <span class="cosmetic-vehicle-preview__name">{{
+                      findCosmeticOptionById(cosmetics.shuttlePaintjobId)?.label ??
+                      cosmetics.shuttlePaintjobId
+                    }}</span>
+                  </div>
+                </div>
+                <div
+                  v-if="activeTab === 'lander-paintjob' && landerPreviewUrl"
+                  class="cosmetic-vehicle-preview"
+                >
+                  <img
+                    class="cosmetic-vehicle-preview__image"
+                    :src="landerPreviewUrl"
+                    alt="Current lander paint preview"
+                  />
+                  <div class="cosmetic-vehicle-preview__meta">
+                    <span class="cosmetic-vehicle-preview__label">Current Lander Finish</span>
+                    <span class="cosmetic-vehicle-preview__name">{{
+                      findCosmeticOptionById(cosmetics.landerPaintjobId)?.label ??
+                      cosmetics.landerPaintjobId
+                    }}</span>
+                  </div>
+                </div>
+                <div
+                  v-if="activeTab === 'multitool-paintjob' && multitoolPreviewUrl"
+                  class="cosmetic-vehicle-preview"
+                >
+                  <img
+                    class="cosmetic-vehicle-preview__image"
+                    :src="multitoolPreviewUrl"
+                    alt="Current multitool paint preview"
+                  />
+                  <div class="cosmetic-vehicle-preview__meta">
+                    <span class="cosmetic-vehicle-preview__label">Current Multitool Finish</span>
+                    <span class="cosmetic-vehicle-preview__name">{{
+                      findCosmeticOptionById(cosmetics.multitoolPaintjobId)?.label ??
+                      cosmetics.multitoolPaintjobId
+                    }}</span>
+                  </div>
+                </div>
                 <div class="cosmetic-shop-panel__scroll">
                   <p v-if="activePanelIntro.length > 0" class="cosmetic-shop-panel__intro">
                     {{ activePanelIntro }}
@@ -300,9 +381,26 @@ function normalizedTitleBlocked(): boolean {
                       class="cosmetic-option-row"
                     >
                       <div
-                        class="cosmetic-option-row__swatch"
-                        :style="gradientStyle(option.gradientStops)"
-                      />
+                        class="cosmetic-shader-shard cosmetic-option-row__swatch"
+                        :style="shaderShardStyle(option.gradientStops)"
+                        aria-hidden="true"
+                      >
+                        <div class="cosmetic-shader-shard__ribbon" />
+                        <div class="cosmetic-shader-shard__sheen" />
+                        <div class="cosmetic-shader-shard__highlight" />
+                        <div class="cosmetic-shader-shard__chips">
+                          <span
+                            v-for="i in shaderShardChipCount(option.gradientStops)"
+                            :key="'chip-' + option.id + '-' + i"
+                            class="cosmetic-shader-shard__chip"
+                            :style="{
+                              background: shaderShardChipColor(option.gradientStops, i - 1),
+                            }"
+                          >
+                            {{ SHADER_SHARD_CHIP_LABELS[i - 1] }}
+                          </span>
+                        </div>
+                      </div>
                       <div class="cosmetic-option-row__meta">
                         <span class="cosmetic-option-row__name">{{ option.label }}</span>
                         <span class="cosmetic-option-row__desc">{{ option.description }}</span>

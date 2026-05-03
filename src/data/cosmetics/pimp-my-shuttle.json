@@ -24,25 +24,58 @@
       "id": "shuttle-paintjob-neon-comet",
       "category": "shuttle-paintjob",
       "label": "Neon Comet",
-      "description": "Hot magenta, electric cyan, and deep graphite.",
+      "description": "Hot magenta bleeding into electric cobalt with ink-deep underbelly.",
       "price": 20000,
-      "gradientStops": ["#ff2bd6", "#22d3ee", "#111827"]
+      "gradientStops": ["#ff2bd6", "#3b82f6", "#0f172a"],
+      "finish": {
+        "default": { "metalness": 0.65, "roughness": 0.3, "envMapIntensity": 1.5 },
+        "trim": { "metalness": 0.9, "roughness": 0.18 },
+        "accent": {
+          "metalness": 0.4,
+          "roughness": 0.55,
+          "emissive": "#ff44ff",
+          "emissiveIntensity": 0.55
+        },
+        "rim": { "color": "#60a5fa", "intensity": 2.8, "power": 1.4, "bias": 0.08 }
+      }
     },
     {
       "id": "shuttle-paintjob-europa-velvet",
       "category": "shuttle-paintjob",
-      "label": "Europa Velvet",
-      "description": "Teal depth, frosted ice, and a whisper of royal violet.",
+      "label": "Red Sparrow",
+      "description": "Carmine arterial gloss over deep blood-bay panels and ash trim. Mr. Finch's favorite.",
       "price": 20000,
-      "gradientStops": ["#0d9488", "#e0f2fe", "#5b21b6"]
+      "gradientStops": ["#ef4444", "#991b1b", "#1c1917"],
+      "finish": {
+        "default": { "metalness": 0.7, "roughness": 0.25, "envMapIntensity": 1.5 },
+        "secondary": { "metalness": 0.85, "roughness": 0.18 },
+        "accent": {
+          "metalness": 0.55,
+          "roughness": 0.4,
+          "emissive": "#dc2626",
+          "emissiveIntensity": 0.55
+        },
+        "rim": { "color": "#f87171", "intensity": 2.4, "power": 1.4, "bias": 0.08 }
+      }
     },
     {
       "id": "shuttle-paintjob-solar-vice",
       "category": "shuttle-paintjob",
-      "label": "Solar Vice",
-      "description": "Sunrise gold bleeding into chrome and blood orange.",
+      "label": "The Space Time Matrix",
+      "description": "Cathode-green phosphor cascading down deep-void chrome panels.",
       "price": 20000,
-      "gradientStops": ["#fbbf24", "#f97316", "#e5e7eb"]
+      "gradientStops": ["#86efac", "#16a34a", "#052e16"],
+      "finish": {
+        "default": { "metalness": 0.85, "roughness": 0.25, "envMapIntensity": 1.5 },
+        "trim": { "metalness": 0.95, "roughness": 0.12 },
+        "accent": {
+          "metalness": 0.6,
+          "roughness": 0.35,
+          "emissive": "#22c55e",
+          "emissiveIntensity": 0.6
+        },
+        "rim": { "color": "#4ade80", "intensity": 2.7, "power": 1.4, "bias": 0.08 }
+      }
     },
     {
       "id": "shuttle-paintjob-void-chrome",
@@ -50,7 +83,18 @@
       "label": "Void Chrome",
       "description": "Near-black metal with a single violet edge light.",
       "price": 20000,
-      "gradientStops": ["#020617", "#4c1d95", "#94a3b8"]
+      "gradientStops": ["#020617", "#4c1d95", "#94a3b8"],
+      "finish": {
+        "default": { "metalness": 0.95, "roughness": 0.18, "envMapIntensity": 1.7 },
+        "trim": { "metalness": 1, "roughness": 0.06 },
+        "accent": {
+          "metalness": 0.6,
+          "roughness": 0.5,
+          "emissive": "#7c3aed",
+          "emissiveIntensity": 0.5
+        },
+        "rim": { "color": "#a78bfa", "intensity": 0.5, "power": 3.5, "bias": 0.1 }
+      }
     },
     {
       "id": "shuttle-paintjob-cinderline-gold",
@@ -58,7 +102,18 @@
       "label": "Cinderline Gold",
       "description": "Brushed brass over ash with ember undertones.",
       "price": 20000,
-      "gradientStops": ["#78350f", "#f59e0b", "#1c1917"]
+      "gradientStops": ["#78350f", "#f59e0b", "#1c1917"],
+      "finish": {
+        "default": { "metalness": 0.9, "roughness": 0.28, "envMapIntensity": 1.4 },
+        "secondary": { "metalness": 0.85, "roughness": 0.4 },
+        "accent": {
+          "metalness": 0.5,
+          "roughness": 0.5,
+          "emissive": "#f59e0b",
+          "emissiveIntensity": 0.6
+        },
+        "rim": { "color": "#f59e0b", "intensity": 3, "power": 1.4, "bias": 0.08 }
+      }
     },
     {
       "id": "shuttle-paintjob-saturn-club",
@@ -66,7 +121,13 @@
       "label": "Saturn Club",
       "description": "Champagne panels, ring-dust silver, deep space ink.",
       "price": 20000,
-      "gradientStops": ["#faf7e8", "#a8a29e", "#0f172a"]
+      "gradientStops": ["#faf7e8", "#a8a29e", "#0f172a"],
+      "finish": {
+        "default": { "metalness": 0.75, "roughness": 0.2, "envMapIntensity": 1.3 },
+        "trim": { "metalness": 0.85, "roughness": 0.15 },
+        "accent": { "metalness": 0.45, "roughness": 0.5 },
+        "rim": { "color": "#fef3c7", "intensity": 1.8, "power": 1.8, "bias": 0.05 }
+      }
     },
     {
       "id": "lander-paintjob-factory-stock",
@@ -80,9 +141,21 @@
       "id": "lander-paintjob-dust-angel",
       "category": "lander-paintjob",
       "label": "Dust Angel",
-      "description": "Soft bone white with rose dust weathering.",
+      "description": "Cream aeroshell with bubblegum-pink hardware and a cotton-candy halo.",
       "price": 20000,
-      "gradientStops": ["#fef3c7", "#fda4af", "#d6d3d1"]
+      "gradientStops": ["#fef3c7", "#ec4899", "#fdf2f8"],
+      "finish": {
+        "default": { "metalness": 0.25, "roughness": 0.55, "envMapIntensity": 0.9 },
+        "secondary": { "metalness": 0.4, "roughness": 0.5 },
+        "trim": { "metalness": 0.55, "roughness": 0.4 },
+        "engine": {
+          "metalness": 0.35,
+          "roughness": 0.55,
+          "emissive": "#f472b6",
+          "emissiveIntensity": 0.5
+        },
+        "rim": { "color": "#f9a8d4", "intensity": 1.8, "power": 1.7, "bias": 0.06 }
+      }
     },
     {
       "id": "lander-paintjob-frostbite-safety",
@@ -90,7 +163,19 @@
       "label": "Frostbite Safety",
       "description": "High-vis arctic cyan and safety yellow trim.",
       "price": 20000,
-      "gradientStops": ["#22d3ee", "#fef08a", "#0ea5e9"]
+      "gradientStops": ["#22d3ee", "#fef08a", "#0ea5e9"],
+      "finish": {
+        "default": { "metalness": 0.55, "roughness": 0.35, "envMapIntensity": 1.4 },
+        "secondary": { "metalness": 0.7, "roughness": 0.3 },
+        "trim": { "metalness": 0.85, "roughness": 0.2 },
+        "engine": {
+          "metalness": 0.6,
+          "roughness": 0.4,
+          "emissive": "#fef08a",
+          "emissiveIntensity": 0.55
+        },
+        "rim": { "color": "#67e8f9", "intensity": 2.2, "power": 1.5, "bias": 0.07 }
+      }
     },
     {
       "id": "lander-paintjob-mariner-red",
@@ -98,7 +183,19 @@
       "label": "Mariner Red",
       "description": "Heritage crimson with graphite panel breaks.",
       "price": 20000,
-      "gradientStops": ["#b91c1c", "#7f1d1d", "#1f2937"]
+      "gradientStops": ["#b91c1c", "#7f1d1d", "#1f2937"],
+      "finish": {
+        "default": { "metalness": 0.7, "roughness": 0.25, "envMapIntensity": 1.4 },
+        "secondary": { "metalness": 0.85, "roughness": 0.18 },
+        "trim": { "metalness": 0.95, "roughness": 0.12 },
+        "engine": {
+          "metalness": 0.6,
+          "roughness": 0.35,
+          "emissive": "#dc2626",
+          "emissiveIntensity": 0.5
+        },
+        "rim": { "color": "#f87171", "intensity": 2.4, "power": 1.5, "bias": 0.08 }
+      }
     },
     {
       "id": "lander-paintjob-hazard-bloom",
@@ -106,7 +203,19 @@
       "label": "Hazard Bloom",
       "description": "Striped hazard tape energy with acid green bloom.",
       "price": 20000,
-      "gradientStops": ["#eab308", "#000000", "#84cc16"]
+      "gradientStops": ["#eab308", "#000000", "#84cc16"],
+      "finish": {
+        "default": { "metalness": 0.5, "roughness": 0.45, "envMapIntensity": 1.1 },
+        "secondary": { "metalness": 0.4, "roughness": 0.55 },
+        "trim": { "metalness": 0.8, "roughness": 0.25 },
+        "engine": {
+          "metalness": 0.55,
+          "roughness": 0.4,
+          "emissive": "#84cc16",
+          "emissiveIntensity": 0.7
+        },
+        "rim": { "color": "#bef264", "intensity": 2.6, "power": 1.4, "bias": 0.08 }
+      }
     },
     {
       "id": "shuttle-thruster-trail-factory-stock",
@@ -184,25 +293,46 @@
       "id": "multitool-paint-arcade-relic",
       "category": "multitool-paintjob",
       "label": "Arcade Relic",
-      "description": "Bezel purple, CRT green glass, worn plastic cream.",
+      "description": "Bezel purple cabinet vinyl, CRT-green glass trigger, worn cream lock.",
       "price": 5000,
-      "gradientStops": ["#7c3aed", "#22c55e", "#fef9c3"]
+      "gradientStops": ["#7c3aed", "#22c55e", "#fef9c3"],
+      "finish": {
+        "default": { "metalness": 0.05, "roughness": 0.7, "envMapIntensity": 0.6 },
+        "secondary": {
+          "metalness": 0.0,
+          "roughness": 0.2,
+          "envMapIntensity": 1.4,
+          "emissive": "#22c55e",
+          "emissiveIntensity": 0.35
+        },
+        "trim": { "metalness": 0.0, "roughness": 0.85, "envMapIntensity": 0.5 }
+      }
     },
     {
       "id": "multitool-paint-surgical-pink",
       "category": "multitool-paintjob",
       "label": "Surgical Pink",
-      "description": "Clinic sterile white with shock pink grip panels.",
+      "description": "Soft ceramic-pink chassis, shock-pink lacquer trigger, near-white sterile lock.",
       "price": 5000,
-      "gradientStops": ["#ffffff", "#f472b6", "#fda4af"]
+      "gradientStops": ["#fbcfe8", "#ec4899", "#fdf2f8"],
+      "finish": {
+        "default": { "metalness": 0.1, "roughness": 0.3, "envMapIntensity": 1.2 },
+        "secondary": { "metalness": 0.15, "roughness": 0.25, "envMapIntensity": 1.4 },
+        "trim": { "metalness": 0.05, "roughness": 0.35, "envMapIntensity": 1.1 }
+      }
     },
     {
       "id": "multitool-paint-graphite-bloom",
       "category": "multitool-paintjob",
       "label": "Graphite Bloom",
-      "description": "Matte graphite with thin oil-slick highlights.",
+      "description": "Brushed graphite frame, polished slate trigger, iridescent lavender chrome lock.",
       "price": 5000,
-      "gradientStops": ["#111827", "#64748b", "#c084fc"]
+      "gradientStops": ["#111827", "#64748b", "#c084fc"],
+      "finish": {
+        "default": { "metalness": 0.7, "roughness": 0.45, "envMapIntensity": 1.0 },
+        "secondary": { "metalness": 0.85, "roughness": 0.3, "envMapIntensity": 1.3 },
+        "trim": { "metalness": 0.95, "roughness": 0.18, "envMapIntensity": 1.6 }
+      }
     },
     {
       "id": "shuttle-title-registry",

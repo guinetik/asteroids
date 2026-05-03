@@ -29,6 +29,7 @@ import { PortalArrivalSequence } from '@/three/PortalArrivalSequence'
 import { PortalBoundarySystem } from '@/three/PortalBoundarySystem'
 import { VibePortal } from '@/lib/portal'
 import { computeShuttleBaseFuelDrain } from '@/lib/shuttleBaseFuelDrain'
+import { loadProfile } from '@/lib/player/profile'
 
 const ONE_SHOT_PRIORITY = TICK_PRIORITY_INPUT + 1
 const AMBIENT_LIGHT_INTENSITY = 0.3
@@ -266,6 +267,10 @@ export class ShuttleViewController implements Tickable {
     this.sceneManager.addToScene(this.thrusterController.thrustPoints)
     this.sceneManager.addToScene(this.thrusterController.brakePoints)
     this.sceneManager.addToScene(this.thrusterController.rcsPoints)
+    const savedShuttleProfile = typeof localStorage !== 'undefined' ? loadProfile() : null
+    if (savedShuttleProfile) {
+      this.thrusterController.applyShuttleThrusterTrailFromProfile(savedShuttleProfile)
+    }
     this.tickHandler.register(this.thrusterController, TICK_PRIORITY_ANIMATION)
 
     // One-shot action bridge (runs just after input)

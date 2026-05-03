@@ -90,9 +90,9 @@ deterministic and keeps the catalog data-driven.
 | Option | Stops | Model treatment |
 | --- | --- | --- |
 | `Factory Stock` | `#f1f5f9`, `#cbd5e1`, `#475569` | Mostly white ceramic primary, pale slate secondary, graphite trim. Preserve original texture contrast. |
-| `Neon Comet` | `#ff2bd6`, `#22d3ee`, `#111827` | Magenta main hull, cyan secondary panels, near-black trim / belly hardware. Add very low magenta/cyan accent glow only on small details if emissive is available. |
-| `Europa Velvet` | `#0d9488`, `#e0f2fe`, `#5b21b6` | Teal body, icy secondary panels, violet trim. Works well if glass picks up a faint ice-blue tint. |
-| `Solar Vice` | `#fbbf24`, `#f97316`, `#e5e7eb` | Gold primary, orange secondary, chrome/silver trim. Needs higher metalness only if a future finish field says chrome; color alone should not force metal. |
+| `Neon Comet` | `#ff2bd6`, `#3b82f6`, `#0f172a` | Magenta main hull, royal-cobalt secondary panels, ink-deep trim / belly hardware. Magenta accent emissive on small details; rim glow tinted blue (`#60a5fa`) so the silhouette reads cool against the warm primary. |
+| `Red Sparrow` (id `shuttle-paintjob-europa-velvet`) | `#ef4444`, `#991b1b`, `#1c1917` | Carmine primary, deep blood-bay secondary, ash-black trim. High metalness + low roughness = automotive carmine clearcoat; red emissive on accents reads like taillights; bright ember rim (`#f87171`). Flavor text tags this as Mr. Finch's favorite. Keep the legacy id so existing player profiles don't lose this paintjob. |
+| `The Space Time Matrix` (id `shuttle-paintjob-solar-vice`) | `#86efac`, `#16a34a`, `#052e16` | Phosphor-mint primary, matrix-green core panels, deep-void trim. High metalness + low roughness = mirrored data plates; matrix-green emissive on accents; phosphor-green (`#4ade80`) rim. Keep the legacy id so existing player profiles don't lose this paintjob. |
 | `Void Chrome` | `#020617`, `#4c1d95`, `#94a3b8` | Near-black primary, violet secondary edge panels, cool slate trim. Keep roughness lower than stock in a future finish recipe to sell chrome. |
 | `Cinderline Gold` | `#78350f`, `#f59e0b`, `#1c1917` | Burnt brass primary, amber secondary, blackened trim. The dark stop should land on belly / edges so it reads like ash, not mud. |
 | `Saturn Club` | `#faf7e8`, `#a8a29e`, `#0f172a` | Champagne primary, ring-dust secondary, deep ink trim. Best Fantasia signature option because it preserves shuttle readability while feeling premium. |
@@ -102,7 +102,7 @@ deterministic and keeps the catalog data-driven.
 | Option | Stops | Model treatment |
 | --- | --- | --- |
 | `Factory Stock` | `#fafaf9`, `#d6d3d1`, `#57534e` | Bone epoxy body, stone hardware, dark warm trim. |
-| `Dust Angel` | `#fef3c7`, `#fda4af`, `#d6d3d1` | Cream body, rose landing gear / panels, pale neutral trim. Subtle weathering would make this option match the description better later. |
+| `Dust Angel` | `#fef3c7`, `#ec4899`, `#fdf2f8` | Cream body, bubblegum-pink landing gear / panels, ultra-pale pink trim. Bubblegum-pink emissive bells and a cotton-candy rim glow give it its own girly identity, well clear of Mariner Red. |
 | `Frostbite Safety` | `#22d3ee`, `#fef08a`, `#0ea5e9` | Cyan shell, yellow legs / secondary hardware, blue trim. Reads as safety livery from distance. |
 | `Mariner Red` | `#b91c1c`, `#7f1d1d`, `#1f2937` | Crimson body, dark red lower hardware, graphite trim and thrusters. |
 | `Hazard Bloom` | `#eab308`, `#000000`, `#84cc16` | Yellow body, black legs / ladder / breaks, acid green antennae or small trim. True hazard stripes need decals or a mask later. |
@@ -152,10 +152,10 @@ Catalog treatment:
 
 | Option | Stops | Model treatment |
 | --- | --- | --- |
-| `Fleet Issue` | `#e7e5e4`, `#78716c`, `#292524` | Light stock chassis, stone trigger/lock, dark subdued indicators. |
-| `Arcade Relic` | `#7c3aed`, `#22c55e`, `#fef9c3` | Purple chassis, green trigger/lock or display-adjacent hardware, warm cream LEDs / labels. If cream reads too flat on emissive nodes, use green for emissive and cream for small trim. |
-| `Surgical Pink` | `#ffffff`, `#f472b6`, `#fda4af` | White chassis, shock-pink trigger/lock, rose LED tint. This is the cleanest match for the current single-body mesh. |
-| `Graphite Bloom` | `#111827`, `#64748b`, `#c084fc` | Dark graphite chassis, slate trigger/lock, violet emissive indicators. Best candidate for an oil-slick feel if a later finish recipe can lower roughness and add a small purple rim. |
+| `Fleet Issue` | `#e7e5e4`, `#78716c`, `#292524` | Tint mode (legacy LERP) — light stock chassis, stone trigger/lock, dark subdued indicators. Authored finish preserved. |
+| `Arcade Relic` | `#7c3aed`, `#22c55e`, `#fef9c3` | Replace mode — matte purple cabinet vinyl body (`metal 0.05 / rough 0.70`), CRT-green emissive glass trigger (`metal 0 / rough 0.20`, emissive `#22c55e` @ 0.35), worn cream plastic lock (`metal 0 / rough 0.85`). |
+| `Surgical Pink` | `#fbcfe8`, `#ec4899`, `#fdf2f8` | Replace mode — soft pink ceramic chassis (`metal 0.10 / rough 0.30`), shock-pink lacquer trigger (`metal 0.15 / rough 0.25`), near-white sterile lock (`metal 0.05 / rough 0.35`). Body color shifted off pure white so the saturation boost actually engages (greys are skipped by the boost guard). |
+| `Graphite Bloom` | `#111827`, `#64748b`, `#c084fc` | Replace mode — brushed graphite frame (`metal 0.70 / rough 0.45`), polished slate steel trigger (`metal 0.85 / rough 0.30`), iridescent lavender chrome lock (`metal 0.95 / rough 0.18`). |
 
 Multitool caveat: because the main body is one baked mesh and one material, we cannot isolate grip
 panels, muzzle casing, rails, or decals by name today. The later high-quality path is to split the
@@ -205,7 +205,7 @@ usable material names. Upgrade when one of these becomes important:
 - A shader needs stripes, decals, split panels, or asymmetry.
 - A baked texture marking must stay neutral while only paint changes.
 - `Hazard Bloom` needs actual hazard stripes.
-- `Void Chrome` and `Solar Vice` need real finish behavior, not just color.
+- `Void Chrome` and `The Space Time Matrix` need real finish behavior, not just color.
 - Flags and shuttle titles need placement instead of UI-only persistence.
 
 At that point the better model path is either paint mask textures or deliberately named material

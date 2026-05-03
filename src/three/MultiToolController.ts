@@ -195,6 +195,15 @@ export class MultiToolController implements Tickable {
     applyMultitoolPaintMaterials(this.paintMaterials, optionId)
   }
 
+  /**
+   * Root object suitable for isolated cosmetic preview capture.
+   *
+   * @returns Loaded multitool scene root, or null before the GLB is ready.
+   */
+  getCosmeticPreviewRoot(): THREE.Object3D | null {
+    return this.model
+  }
+
   /** Show or hide the multi-tool model. */
   setVisible(visible: boolean): void {
     if (this.model) this.model.visible = visible

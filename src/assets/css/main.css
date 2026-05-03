@@ -3841,17 +3841,103 @@ body,
          text-slate-300 backdrop-blur-sm shadow-[inset_0_1px_0_rgb(255_255_255/0.05)];
 }
 
+.cosmetic-vehicle-preview {
+  @apply grid shrink-0 items-center gap-3 rounded-xl border border-fuchsia-400/25 bg-slate-950/75 p-3
+         shadow-[inset_0_1px_0_rgb(255_255_255/0.06)] backdrop-blur-sm;
+  grid-template-columns: minmax(160px, 240px) minmax(0, 1fr);
+}
+
+.cosmetic-vehicle-preview__image {
+  @apply block w-full rounded-lg border border-white/10 bg-slate-950 object-cover;
+  aspect-ratio: 1;
+}
+
+.cosmetic-vehicle-preview__meta {
+  @apply flex min-w-0 flex-col gap-1;
+}
+
+.cosmetic-vehicle-preview__label {
+  @apply font-mono text-[10px] uppercase tracking-[0.18em] text-fuchsia-200/70;
+}
+
+.cosmetic-vehicle-preview__name {
+  @apply text-base text-slate-100;
+}
+
 .cosmetic-option-row {
   @apply flex items-start gap-3 rounded-xl border border-white/10 bg-slate-950/45 px-3 py-2.5
          shadow-[inset_0_1px_0_rgb(255_255_255/0.05)] backdrop-blur-[2px];
 }
 
 .cosmetic-option-row__swatch {
-  @apply shrink-0 rounded-md border border-white/10 shadow-inner;
-  width: 100px;
+  @apply shrink-0;
+  width: 116px;
   height: 100px;
-  min-width: 100px;
+  min-width: 116px;
   min-height: 100px;
+}
+
+.cosmetic-shader-shard {
+  @apply relative overflow-hidden rounded-md border border-white/10;
+  background: var(--shard-tail, #111);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    inset 0 -2px 6px rgb(0 0 0 / 0.45),
+    0 1px 2px rgb(0 0 0 / 0.45);
+  isolation: isolate;
+}
+
+.cosmetic-shader-shard__ribbon {
+  @apply absolute inset-0;
+  background: var(--shard-ribbon);
+  z-index: 0;
+}
+
+.cosmetic-shader-shard__sheen {
+  @apply pointer-events-none absolute inset-0;
+  background: linear-gradient(
+    65deg,
+    rgb(255 255 255 / 0) 35%,
+    rgb(255 255 255 / 0.22) 50%,
+    rgb(255 255 255 / 0) 65%
+  );
+  mix-blend-mode: screen;
+  z-index: 1;
+}
+
+.cosmetic-shader-shard__highlight {
+  @apply pointer-events-none absolute inset-0;
+  background:
+    radial-gradient(
+      circle at var(--shard-highlight-x, 30%) var(--shard-highlight-y, 25%),
+      rgb(255 255 255 / 0.32),
+      rgb(255 255 255 / 0) 55%
+    ),
+    radial-gradient(circle at 80% 90%, rgb(0 0 0 / 0.35), rgb(0 0 0 / 0) 60%);
+  mix-blend-mode: soft-light;
+  z-index: 2;
+}
+
+.cosmetic-shader-shard__chips {
+  @apply pointer-events-none absolute flex flex-col gap-[2px];
+  right: 6px;
+  bottom: 6px;
+  z-index: 3;
+}
+
+.cosmetic-shader-shard__chip {
+  @apply flex items-center justify-center rounded-[3px] font-mono uppercase tracking-tight;
+  width: 16px;
+  height: 16px;
+  font-size: 9px;
+  line-height: 1;
+  color: rgb(15 23 42 / 0.85);
+  text-shadow: 0 0 1px rgb(255 255 255 / 0.6);
+  border: 1px solid rgb(0 0 0 / 0.45);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.4),
+    inset 0 -1px 0 rgb(0 0 0 / 0.3),
+    0 1px 1px rgb(0 0 0 / 0.5);
 }
 
 .cosmetic-option-row__meta {

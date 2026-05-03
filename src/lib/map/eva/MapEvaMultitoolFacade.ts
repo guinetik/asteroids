@@ -31,6 +31,7 @@ import type { MapSceneObjects } from '@/three/MapSceneSetup'
 import multiToolConfigJson from '@/data/fps/multitool-config.json'
 import { createEvaMapProjectileHeightmap } from '@/lib/map/eva/evaMapProjectileHeightmap'
 import type { Heightmap } from '@/lib/terrain/heightmap'
+import type { PlayerProfile } from '@/lib/player/types'
 
 /** Pool size for map EVA bolt impact sparks. */
 const EVA_MAP_IMPACT_EMITTER_POOL = 64
@@ -70,6 +71,10 @@ export interface MapEvaMultitoolFacadeDeps {
 export class MapEvaMultitoolFacade {
   private deps: MapEvaMultitoolFacadeDeps | null = null
   private evaViewModel: MultiToolController | null = null
+  private cosmeticPreviewViewModel: MultiToolController | null = null
+  private cosmeticPreviewLoadPromise: Promise<void> | null = null
+  private readonly cosmeticPreviewScene = new THREE.Scene()
+  private readonly cosmeticPreviewCamera = new THREE.PerspectiveCamera()
   private viewModelLoadGeneration = 0
   private readonly pointerLock = new FpsPointerLockSession()
   private multiToolState: MultiToolState | null = null
@@ -110,6 +115,55 @@ export class MapEvaMultitoolFacade {
    */
   setEvaSatelliteServicingScience(target: EvaSatelliteServicingScienceBoltTarget | null): void {
     this.projectileSystem?.setEvaSatelliteServicingScience(target)
+  }
+
+  /**
+   * Keep the loaded cosmetic preview model in sync with the active profile.
+   *
+   * @param profile - Player profile carrying active multitool cosmetics.
+   */
+  applyMultitoolPaintjobFromProfile(profile: PlayerProfile): void {
+    this.evaViewModel?.applyMultitoolPaintjobFromProfile(profile)
+    this.cosmeticPreviewViewModel?.applyMultitoolPaintjobFromProfile(profile)
+  }
+
+  /**
+   * Loads a reusable multitool model for shop thumbnails when the EVA viewmodel is not live.
+   *
+   * @param profile - Player profile carrying active multitool cosmetics.
+   */
+  async loadCosmeticPreviewModel(profile: PlayerProfile): Promise<void> {
+    if (this.evaViewModel) {
+      this.evaViewModel.applyMultitoolPaintjobFromProfile(profile)
+      return
+    }
+    if (this.cosmeticPreviewViewModel) {
+      this.cosmeticPreviewViewModel.applyMultitoolPaintjobFromProfile(profile)
+      return
+    }
+    if (!this.cosmeticPreviewLoadPromise) {
+      this.cosmeticPreviewLoadPromise = this.loadCosmeticPreviewModelOnce(profile).finally(() => {
+        this.cosmeticPreviewLoadPromise = null
+      })
+    }
+    await this.cosmeticPreviewLoadPromise
+    const previewViewModel = this.cosmeticPreviewViewModel as MultiToolController | null
+    if (previewViewModel) {
+      previewViewModel.applyMultitoolPaintjobFromProfile(profile)
+    }
+  }
+
+  /**
+   * Current multitool root for an isolated cosmetic thumbnail render.
+   *
+   * @returns Live EVA viewmodel root first, then the reusable shop preview model.
+   */
+  getCosmeticPreviewRoot(): THREE.Object3D | null {
+    return (
+      this.evaViewModel?.getCosmeticPreviewRoot() ??
+      this.cosmeticPreviewViewModel?.getCosmeticPreviewRoot() ??
+      null
+    )
   }
 
   mergeToolTelemetry(base: FpsTelemetry): FpsTelemetry {
@@ -352,6 +406,25 @@ export class MapEvaMultitoolFacade {
     if (this.evaViewModel) {
       this.evaViewModel.dispose()
       this.evaViewModel = null
+    }
+  }
+
+  private async loadCosmeticPreviewModelOnce(profile: PlayerProfile): Promise<void> {
+    const tool = new MultiToolController()
+    await tool.load(this.cosmeticPreviewCamera, this.cosmeticPreviewScene)
+    tool.setVisible(false)
+    tool.applyMultitoolPaintjobFromProfile(profile)
+    this.cosmeticPreviewViewModel = tool
+  }
+
+  /**
+   * Dispose all multitool resources owned by the map facade.
+   */
+  dispose(): void {
+    this.disposeEvaFiring()
+    if (this.cosmeticPreviewViewModel) {
+      this.cosmeticPreviewViewModel.dispose()
+      this.cosmeticPreviewViewModel = null
     }
   }
 }
