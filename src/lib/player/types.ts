@@ -24,6 +24,12 @@ export interface PlayerAchievementStats {
   lifetimeTradeCreditsEarned: number
   /** Mission objective type → completion count, e.g. `{ survey: 2 }` after two survey objectives. */
   missionObjectivesCompletedByType: Record<string, number>
+  /**
+   * Runtime mission-tip id → number of completed missions in which this tip was shown,
+   * for example `{ oxygenLow: 1 }` after one completed mission where O2 dipped below half.
+   * Used to retire each runtime tip after a fixed completed-mission budget.
+   */
+  runtimeTipsShownCount: Record<string, number>
   /** Total successful slingshot launches across all gravity bodies, e.g. `3`. */
   slingshotLaunches: number
   /** Gravity body id → slingshot launch count, e.g. `{ sun: 1 }`. */

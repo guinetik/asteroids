@@ -73,6 +73,7 @@ describe('createProfile', () => {
       lifetimeCreditsSpent: 0,
       lifetimeTradeCreditsEarned: 0,
       missionObjectivesCompletedByType: {},
+      runtimeTipsShownCount: {},
       slingshotLaunches: 0,
       slingshotLaunchesByBody: {},
       gravitySurfStarts: 0,
@@ -490,5 +491,41 @@ describe('story flags', () => {
   it('seenJovianEpilogue defaults to false', () => {
     const p = createProfile('Pilot')
     expect(p.seenJovianEpilogue).toBeFalsy()
+  })
+})
+
+describe('runtimeTipsShownCount field', () => {
+  it('defaults to an empty map on a fresh profile', () => {
+    const profile = createProfile('Pilot')
+    expect(profile.achievementStats.runtimeTipsShownCount).toEqual({})
+  })
+
+  it('seeds an empty map when loading legacy stats without the field', () => {
+    localStorage.setItem(
+      PROFILE_STORAGE_KEY,
+      JSON.stringify({
+        name: 'Pilot',
+        credits: 0,
+        achievementStats: { lifetimeCreditsEarned: 0 },
+      }),
+    )
+    const loaded = loadProfile()
+    expect(loaded?.achievementStats.runtimeTipsShownCount).toEqual({})
+  })
+
+  it('round-trips show counts through save/load', () => {
+    const profile = {
+      ...createProfile('Pilot'),
+      achievementStats: {
+        ...createProfile('Pilot').achievementStats,
+        runtimeTipsShownCount: { oxygenLow: 1, drillWalking: 2 },
+      },
+    }
+    saveProfile(profile)
+    const loaded = loadProfile()
+    expect(loaded?.achievementStats.runtimeTipsShownCount).toEqual({
+      oxygenLow: 1,
+      drillWalking: 2,
+    })
   })
 })

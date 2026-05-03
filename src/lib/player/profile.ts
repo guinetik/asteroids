@@ -90,6 +90,7 @@ function createDefaultAchievementStats(): PlayerAchievementStats {
     lifetimeCreditsSpent: 0,
     lifetimeTradeCreditsEarned: 0,
     missionObjectivesCompletedByType: {},
+    runtimeTipsShownCount: {},
     slingshotLaunches: 0,
     slingshotLaunchesByBody: {},
     gravitySurfStarts: 0,
@@ -124,6 +125,7 @@ function normalizeAchievementStats(raw: unknown): PlayerAchievementStats {
     missionObjectivesCompletedByType: normalizeNumericMap(
       stats['missionObjectivesCompletedByType'],
     ),
+    runtimeTipsShownCount: normalizeNumericMap(stats['runtimeTipsShownCount']),
     slingshotLaunches:
       normalizeNonNegativeNumber(stats['slingshotLaunches']) ?? defaults.slingshotLaunches,
     slingshotLaunchesByBody: normalizeNumericMap(stats['slingshotLaunchesByBody']),
