@@ -1015,6 +1015,7 @@ export class MapViewController implements Tickable {
     this.tickHandler.register(this.shuttleController, TICK_PRIORITY_PHYSICS)
 
     this.shuttleEffects = new MapShuttleEffects(this.sceneObjects, this.shuttleController)
+    this.shuttleEffects.applyShuttleThrusterTrailFromProfile(this.playerProfile)
     for (const tickable of this.shuttleEffects.getTickables()) {
       this.tickHandler.register(tickable, TICK_PRIORITY_ANIMATION)
     }
@@ -3085,6 +3086,7 @@ export class MapViewController implements Tickable {
     this.playerProfile = result.profile
     this.shuttleController?.applyShuttlePaintjobFromProfile(this.playerProfile)
     this.shuttleController?.applyLanderPaintjobFromProfile(this.playerProfile)
+    this.shuttleEffects?.applyShuttleThrusterTrailFromProfile(this.playerProfile)
     this.evaMapMultitoolFacade.applyMultitoolPaintjobFromProfile(this.playerProfile)
     this.persistPlayerProfile()
     this.onCreditsUpdate?.(this.playerProfile.credits)
@@ -3103,6 +3105,7 @@ export class MapViewController implements Tickable {
     this.playerProfile = result.profile
     this.shuttleController?.applyShuttlePaintjobFromProfile(this.playerProfile)
     this.shuttleController?.applyLanderPaintjobFromProfile(this.playerProfile)
+    this.shuttleEffects?.applyShuttleThrusterTrailFromProfile(this.playerProfile)
     this.evaMapMultitoolFacade.applyMultitoolPaintjobFromProfile(this.playerProfile)
     this.persistPlayerProfile()
     this.emitShopState()

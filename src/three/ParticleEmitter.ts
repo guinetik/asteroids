@@ -217,6 +217,23 @@ export class ParticleEmitter implements Tickable {
     this.lifeAttr.needsUpdate = true
   }
 
+  /**
+   * Replace the per-particle color uniform without recompiling the shader.
+   *
+   * Drives the cosmetic thruster-trail pipeline: callers pass in a stop from
+   * the active trail catalog row and the additive-blended particles repaint
+   * on the next render. The Color is copied into the uniform vec3 so the
+   * caller can safely reuse / mutate the source instance afterwards.
+   *
+   * @param color - Replacement particle tint (linear-space, sRGB hex via `THREE.Color`).
+   */
+  setColor(color: THREE.Color): void {
+    const material = this.points.material as THREE.ShaderMaterial
+    const uniform = material.uniforms['uColor']?.value as THREE.Vector3 | undefined
+    if (!uniform) return
+    uniform.set(color.r, color.g, color.b)
+  }
+
   /** Kill all live particles immediately — moves them off-screen. */
   reset(): void {
     const posAttr = this.points.geometry.getAttribute('position') as THREE.BufferAttribute

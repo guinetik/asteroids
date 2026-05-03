@@ -40,6 +40,8 @@ import {
   getLanderPaintChannelForObjectName,
   type LanderPaintMaterialTarget,
 } from '@/three/cosmetics/landerPaintMaterials'
+import { resolveThrusterTrailColors } from '@/three/cosmetics/thrusterTrailColors'
+import { getPlayerCosmetics } from '@/lib/cosmetics/profileCosmetics'
 import type { PlayerProfile } from '@/lib/player/types'
 
 import { applyBunkerMeshStandardSpecularSoften } from '@/three/bunker/bunkerMeshStandardSpecularSoften'
@@ -645,6 +647,7 @@ export class LanderController implements Tickable {
       }
     }
     this.applySavedLanderPaintjob()
+    this.applySavedLanderThrusterTrail()
   }
 
   /** Apply damage to the lander. Fires onDeath when HP reaches 0. */
@@ -717,6 +720,45 @@ export class LanderController implements Tickable {
    */
   applyLanderPaintjob(optionId: string): void {
     applyLanderPaintMaterials(this.paintMaterials, optionId)
+  }
+
+  /**
+   * Apply a `lander-thruster-trail` catalog row to every emitter + sprite on
+   * the lander. Every plume (main flame, all 16 RCS quads, nozzle glow
+   * sprite) shares the themed midtone `core` slot — the SKU names ("Cyan
+   * RCS", "Magenta RCS", "Amber RCS") refer to the *midtone*, and routing
+   * RCS through `gradientStops[0]` bleached the puffs back to nearly white.
+   * The smoky cold-gas quality is preserved because the lander RCS emitters
+   * use the soft radial particle texture — color is only a tint multiplier
+   * on top of the falloff gradient.
+   *
+   * The lander has no separate brake emitter (descent gravity is its retro),
+   * so the `wake` slot is intentionally unused here. Unknown / mismatched
+   * ids no-op so this is safe to call straight from a profile snapshot.
+   *
+   * @param optionId - `lander-thruster-trail` catalog row id.
+   */
+  applyLanderThrusterTrail(optionId: string): void {
+    const colors = resolveThrusterTrailColors(optionId, 'lander-thruster-trail')
+    if (!colors) return
+    this.flameEmitter.setColor(colors.core)
+    for (const emitter of this.rcsEmitters.values()) {
+      emitter.setColor(colors.core)
+    }
+    const nozzleMaterial = this.nozzleGlow.material as THREE.SpriteMaterial
+    nozzleMaterial.color.copy(colors.core)
+    nozzleMaterial.needsUpdate = true
+  }
+
+  /**
+   * Convenience wrapper that reads the active `lander-thruster-trail` id out
+   * of the profile cosmetics block and forwards it to
+   * {@link applyLanderThrusterTrail}.
+   *
+   * @param profile - Active player profile.
+   */
+  applyLanderThrusterTrailFromProfile(profile: PlayerProfile): void {
+    this.applyLanderThrusterTrail(getPlayerCosmetics(profile).landerThrusterTrailId)
   }
 
   private notifyHullHpChangedIfNeeded(previousHp: number): void {
@@ -1606,6 +1648,13 @@ export class LanderController implements Tickable {
     const profile = loadProfile()
     if (!profile) return
     this.applyLanderPaintjobFromProfile(profile)
+  }
+
+  private applySavedLanderThrusterTrail(): void {
+    if (typeof localStorage === 'undefined') return
+    const profile = loadProfile()
+    if (!profile) return
+    this.applyLanderThrusterTrailFromProfile(profile)
   }
 
   private findNode(root: THREE.Object3D, name: string): THREE.Object3D | null {
