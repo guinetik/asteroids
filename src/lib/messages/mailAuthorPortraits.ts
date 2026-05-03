@@ -20,7 +20,7 @@ export const MAIL_AUTHOR_PORTRAIT_BY_FROM: Readonly<Record<string, string>> = {
   'Col. Hélder Sampaio, MMC (Engineering & Mining Liaison)': `${MAIL_AUTHOR_PORTRAIT_BASE_PATH}/sampaio.webp`,
   'Space Consortium — Logistics Division': `${MAIL_AUTHOR_PORTRAIT_BASE_PATH}/usc.webp`,
   'USC — Operator Relations': `${MAIL_AUTHOR_PORTRAIT_BASE_PATH}/usc.webp`,
-  'Vance Hoyt, Senior Asset Officer (Cloud City)': `${MAIL_AUTHOR_PORTRAIT_BASE_PATH}/hoyt.webp`,
+  'Vance Holroyd, Senior Asset Officer (Cloud City)': `${MAIL_AUTHOR_PORTRAIT_BASE_PATH}/hoyt.webp`,
   'Lucas Maverick, Exchange Floor Boss': `${MAIL_AUTHOR_PORTRAIT_BASE_PATH}/maverick.webp`,
   'The Cinderline, at The Anvil': `${MAIL_AUTHOR_PORTRAIT_BASE_PATH}/cinderline.webp`,
   'Mr. Finch, Saturn Ringside Estate': `${MAIL_AUTHOR_PORTRAIT_BASE_PATH}/finch.webp`,

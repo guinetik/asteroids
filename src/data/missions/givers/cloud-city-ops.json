@@ -1,7 +1,7 @@
 {
   "id": "cloud-city-ops",
   "name": "Cloud City Operations",
-  "title": "Operations Bureau",
+  "title": "Operations Bureau, Jupiter Spaceport",
   "objectiveTypes": ["gather", "survey"],
   "minDifficulty": 3,
   "maxDifficulty": 7,
@@ -9,8 +9,8 @@
   "missions": [
     {
       "id": "cco_anchor_maintenance",
-      "name": "Lower-Band Anchor Maintenance",
-      "briefing": "Cloud City Operations Bureau, contractor desk. Standing call: maintenance pass on lower-band atmospheric anchors, low-priority. Standard cycle. Collect the listed supply manifest from the designated body, deliver to anchor grid on approach. File the receipt at any kiosk. — Operations.",
+      "name": "Cloud City lift — anchor maintenance manifest 3309",
+      "briefing": "Operations Bureau, contractor desk. Standing work order: maintenance pass on lower-band atmospheric anchors. Collect listed supply manifest from designated co-orbital body, deliver to anchor grid on approach, file receipt at kiosk on return. Low-complexity. Standard rate. — Operations.",
       "objectiveSlots": [
         {
           "type": "gather",
@@ -27,8 +27,8 @@
     },
     {
       "id": "cco_upper_band_survey",
-      "name": "Upper-Band Atmospheric Survey",
-      "briefing": "Operations, contractor desk. Survey pass requested on upper-band atmospheric strata. Deploy probes at prescribed hold altitudes, recover telemetry packet before return. Standard rate. No special handling required. — Operations.",
+      "name": "Outbound burn — upper-band atmospheric survey",
+      "briefing": "Operations Bureau. Survey pass, upper-band atmospheric strata. Deploy probes at prescribed hold altitudes, recover telemetry packet before return window closes. No special handling. Standard rate. — Operations.",
       "objectiveSlots": [
         {
           "type": "survey",
@@ -46,8 +46,8 @@
     },
     {
       "id": "cco_anchor_resupply",
-      "name": "Anchor Grid Resupply Run",
-      "briefing": "Operations. Atmospheric anchor maintenance. Standard cycle. Resupply run to co-orbital body, materials listed in manifest. Return with confirmation receipt. Rated low-complexity. — Operations.",
+      "name": "Cloud City lift — anchor grid resupply 4471",
+      "briefing": "Operations Bureau. Atmospheric anchor resupply. Co-orbital body, materials per manifest. Return with confirmation receipt. Low-complexity. Rated standard. — Operations.",
       "objectiveSlots": [
         {
           "type": "gather",

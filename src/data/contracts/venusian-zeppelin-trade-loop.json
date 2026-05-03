@@ -2,18 +2,20 @@
   "id": "venusian-zeppelin-trade-loop",
   "homePlanet": "venus",
   "inboxName": "Venusian Zeppelin Exchange",
-  "from": "Lucas Maverick, Exchange Floor Boss",
+  "from": "Lucas Maverick, Owner — Venusian Zeppelin Exchange",
   "sentAt": "2306-04-14 18:20 UTC",
   "triggerOnPlanetVisited": "venus",
-  "introSubject": "Contract - Venusian Zeppelin Market Table",
+  "introSubject": "Contract — The Trade Loop",
   "introBody": [
-    "Pilot, welcome to the Venusian Zeppelin Exchange. Name is Lucas Maverick. Used to burn nights at poker tables, now I run the biggest interplanetary retail floor in the inner system.",
-    "Around here we play the percentages: no Viroid checkpoints, no Earth tax bite, just clean spreads and faster turns. You want real credits, you learn to move cargo where demand pays premium.",
-    "Your hand is simple and sharp. Run a full loop: buy in Venus, cash out on Earth, rebuy on Earth, cash out on Mars, rebuy on Mars, close the table back on Venus.",
-    "You complete the circuit, I mark you as a house-trusted trader. That means permanent jump clearance back to Venus and a doubled payout lane on all Venus-issued contracts.",
-    "House rule before you ante: lose your shuttle on the route, you lose the cargo with it. The Exchange does not insure freight that does not make it to a counter. Fly clean.",
-    "Ante up and follow the cards exactly.",
-    "- Lucas Maverick"
+    "Lucas Maverick. Owner, Venusian Zeppelin Exchange. You found us — or the floor found you. Either way, sit down.",
+    "The Exchange is the only real multi-vendor market in the inner system. Everybody else is a kiosk. We are the table. And the table rewards pilots who know how supply and demand move between planets — not pilots who fly in circles hoping the math works out.",
+    "Before we go further. [pause] Tell me you have at least one fast-travel route already open. Open your map — M — and look at it. If those lanes are dark, friend, you are not ready for this. The route I am about to give you runs Venus to Earth to Mars and back. You are doing that on thrusters every leg, you are paying for your education twice — and I do not like watching people pay twice. Go open up some routes. Come back when the map shows you can move.",
+    "Still here? Good. That tells me something.",
+    "Here is how the hand plays. Venus is paying well on industrial goods right now — she always does when the outer-belt rigs are running hot. Earth is sitting on luxury stock she cannot sell fast enough. Mars is hungry for Earth's table scraps and will overpay for them every cycle. You buy low, you sell high, you move fast, you close the loop back here.",
+    "Most haulers buy fuel where they refuel. That tells me everything I need to know about most haulers. You are going to be smarter than that.",
+    "Complete the circuit and I mark you as a house-trusted trader. The Exchange does not hand out lane clearance. You will have earned it.",
+    "House rule: lose your shuttle mid-route, you lose the cargo with it. The Exchange does not insure freight that does not reach a counter. Fly clean.",
+    "— Maverick"
   ],
   "steps": [
     {
@@ -23,9 +25,9 @@
       "itemId": "acid-resistant-coatings",
       "count": 10,
       "creditsReward": 3000,
-      "subject": "Hand One - Buy Coatings on Venus",
+      "subject": "Hand 1 — Read the Floor",
       "flavor": [
-        "First card: buy 10 units of Acid-Resistant Coatings at Venus. House rule says you start where the stack is hottest."
+        "Venus is paying. Buy ten units of Acid-Resistant Coatings here. [smooth] The floor always tells you what it wants. Learn to listen."
       ]
     },
     {
@@ -35,9 +37,9 @@
       "itemId": "acid-resistant-coatings",
       "count": 10,
       "creditsReward": 3000,
-      "subject": "Hand Two - Cash Out Coatings on Earth",
+      "subject": "Hand 2 — Call the Earth",
       "flavor": [
-        "Second card: move those 10 coating units to Earth and sell the lot. You do not leave chips stranded on the table."
+        "Earth is dumping water again — predictable — but she is buying coatings this cycle. Move your ten units to Earth and sell. You do not leave chips stranded on the table."
       ]
     },
     {
@@ -47,9 +49,9 @@
       "itemId": "luxury-foods",
       "count": 10,
       "creditsReward": 3000,
-      "subject": "Hand Three - Buy Luxury Foods on Earth",
+      "subject": "Hand 3 — Buy the Dip",
       "flavor": [
-        "Third card: buy 10 units of Luxury Foods on Earth. Premium stock, steady spread, no hero plays."
+        "Earth has luxury stock sitting idle. Buy ten units. Premium goods, steady spread. No hero plays here — just the percentage."
       ]
     },
     {
@@ -59,9 +61,9 @@
       "itemId": "luxury-foods",
       "count": 10,
       "creditsReward": 3000,
-      "subject": "Hand Four - Sell Luxury Foods on Mars",
+      "subject": "Hand 4 — Mars Pays",
       "flavor": [
-        "Fourth card: take those 10 units to Mars and sell clean. Mars pays when you bring comfort and timing."
+        "Mars is hungry. She will always overpay for Earth's comfort. Bring your ten units in and sell clean. Timing and cargo — that is the whole game."
       ]
     },
     {
@@ -71,9 +73,9 @@
       "itemId": "drill-bits",
       "count": 10,
       "creditsReward": 3000,
-      "subject": "Hand Five - Buy Drill Bits on Mars",
+      "subject": "Hand 5 — The Stable Suit",
       "flavor": [
-        "Fifth card: buy 10 Drill Bits on Mars. Industrial goods are your stable suit for the close."
+        "Mars moves drill bits the way Earth moves air — constantly, without thinking about it. Buy ten units. Industrial goods are the steady suit. Not glamorous. Reliable."
       ]
     },
     {
@@ -83,18 +85,19 @@
       "itemId": "drill-bits",
       "count": 10,
       "creditsReward": 3000,
-      "subject": "Final Hand - Close the Loop at Venus",
+      "subject": "Final Hand — Close the Table",
       "flavor": [
-        "Last card: bring those 10 Drill Bits back to Venus and sell. Close the loop, rake the pot, and walk away with market cred."
+        "Bring those drill bits home to Venus and sell. [smooth] Full circuit. Rake the pot. This is what separates operators from gamblers — the clean close."
       ]
     }
   ],
-  "completionSubject": "Table Cleared - Venus Lane Granted",
+  "completionSubject": "Table Cleared — Venus is Yours",
   "completionBody": [
-    "You played the route like a pro: disciplined buys, clean exits, full loop closure. That is the difference between gamblers and operators.",
-    "I have tagged your transponder for permanent fast-travel return to Venus. Also filing a 2x payout multiplier on every Venus-issued contract in your ledger.",
-    "The house likes winners. Keep your odds sharp.",
-    "- Lucas Maverick"
+    "You ran it clean. Disciplined buys, no deviation, full loop closure. [laughs softly] I did not expect you to be this good. I am sorry — and not — for saying so.",
+    "Venus is yours after this. The lane, the market, the seat at the table. We do not ceremony it. The map will simply say so.",
+    "The Exchange also files a doubled payout on every contract issued out of this floor. That is not a courtesy. You earned the rate.",
+    "The table is open, friend. Come back when you have more to move.",
+    "— Maverick"
   ],
   "rewards": [
     { "type": "fast-travel", "planetId": "venus" },

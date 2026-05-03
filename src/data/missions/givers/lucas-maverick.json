@@ -1,15 +1,15 @@
 {
   "id": "lucas-maverick",
   "name": "Lucas Maverick",
-  "title": "Exchange Floor Boss, Venus",
+  "title": "Owner, Venusian Zeppelin Exchange",
   "objectiveTypes": ["bunker"],
   "minDifficulty": 1,
   "maxDifficulty": 10,
   "missions": [
     {
       "id": "maverick_safehouse_ledger",
-      "name": "Safehouse Ledger Recovery",
-      "briefing": "Pilot — got a private safehouse on a rock that just flipped on me. Viroids in the vault, ledger inside the viroids. Standard hand: descend, clear the table, walk out. House rule: lose your shuttle and you lose the cargo with it. Ante up clean and you get the doubled lane on the way back. — Lucas",
+      "name": "The Safehouse Hand",
+      "briefing": "Friend — got a private safehouse on a rock that just flipped on me. Viroids in the vault, ledger inside the viroids. Standard hand: descend, clear the floor, walk out with what belongs to me. House rule still applies: lose your shuttle, you lose the cargo with it. Ante up clean and the doubled lane is yours on the close. — Maverick",
       "objectiveSlots": [
         {
           "type": "bunker",

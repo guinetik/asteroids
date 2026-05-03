@@ -9,13 +9,17 @@
     "minGiverPlanetCompletions": { "planetId": "mars", "min": 1 }
   },
   "headsUpInboxMessageId": "sampaio-mmc-contract-heads-up",
-  "introSubject": "MMC Turret Cohort — Read Before You Throttle",
+  "introSubject": "MMC TURRET COHORT — ENROLLMENT BRIEF",
   "introBody": [
-    "This is Sampaio. Phobos desk, Engineering & Mining. We are not writing sonnets. You already proved you can work with Jay's outfit and you bled a Mars giver line once — that is enough to put you in our queue, not in my good graces.",
-    "The Corps is short turret hands who can haul main-belt ore without cooking the hull. You want on that roster, you will take this contract, you will do the steps in order, and you will not improvise the spec. First: your bird carries a turret. Then: you use it on our boards.",
-    "You finish clean: you get double pay on our Mars-issued lines and we file your manifold cert so you can ride the orbital highways like a person who read the manual. You tap Decline, you do not get a second whiny text from me.",
-    "Accept below or walk. Your shuttle, your choice — my patience is shorter than your fuel.",
-    "— Sampaio, MMC. Out."
+    "Pilot. Sampaio. Phobos desk, Engineering & Mining.",
+    "Cowboys handler vouched. Recorded. Mars line logged. Enough to open the door — not enough to hand you keys.",
+    "Contract terms follow:",
+    "1. Mount is first. No turret, no Corps board access. Engineering bay on Mars — B at the terminal.",
+    "2. You work our giver lines, not tourist runs. MMC board only.",
+    "3. Stack builds in order. Each op unlocks the next. Do not skip the sequence.",
+    "4. Finish clean: double pay on Mars-issued work, manifold certification filed. Map opens Phobos fast travel — M to navigate.",
+    "Tap Accept or Decline. No follow-up from me either way.",
+    "— Sampaio, MMC"
   ],
   "steps": [
     {
@@ -23,9 +27,9 @@
       "upgradeId": "turretMiningUnlock",
       "minLevel": 1,
       "creditsReward": 1000,
-      "subject": "OP 1 — Mount the turret",
+      "subject": "OP 1 — TURRET MOUNT, ENGINEERING CERT",
       "flavor": [
-        "I do not hand out belt hours to shuttles with empty cheekbones. You get a mining turret mount installed in an engineering bay before the Corps posts turret work on your log. If your bird cannot carry the tool, you are not in my detachment. Full stop. Already got it installed? Good — file shows green and we keep moving."
+        "Pilot. Turret mount before anything else. Engineering bay, Mars spaceport — B at the terminal. No mount, no Corps board access. File already shows green? Good. We keep moving."
       ]
     },
     {
@@ -34,9 +38,9 @@
       "missionType": "mining",
       "giverId": "martian-marines",
       "creditsReward": 4000,
-      "subject": "OP 2 — Corps belt haul",
+      "subject": "OP 2 — TURRET LIVE, MMC BOARD",
       "flavor": [
-        "Second evolution: turret job off our board, not a tourist run. The mining board on Mars will not list Corps belt work until that mount is live — you pick a Martian Marine Corps mining run off the spaceport, you fill the belt, you come home and you close with a clean receipt. Giver line says Martian Marine Corps. One delivery."
+        "Mount is live. Now use it. Pull one mining run off the MMC board — giver line reads Martian Marine Corps. Not a tourist run. Come back with a clean receipt."
       ]
     },
     {
@@ -44,9 +48,9 @@
       "upgradeId": "shuttleCargoBay",
       "minLevel": 3,
       "creditsReward": 1000,
-      "subject": "OP 3 — Cargo bay, tier III",
+      "subject": "OP 3 — CARGO BAY, TIER III",
       "flavor": [
-        "You want drill-grade work, you carry drill-grade loads. Upgrade your cargo bay to tier three before we continue. No room, no contract."
+        "Drill-grade work needs drill-grade capacity. Cargo bay to tier three. No room in the hold, no room in the cohort."
       ]
     },
     {
@@ -55,9 +59,9 @@
       "missionType": "mining",
       "giverPlanetId": "mars",
       "creditsReward": 4000,
-      "subject": "OP 4 — Verify cargo run",
+      "subject": "OP 4 — CARGO PROOF, MARS RUN",
       "flavor": [
-        "Now prove that bigger hold does actual work. Run one mining mission posted from Mars and close it clean."
+        "Bigger hold means nothing without a receipt. One Mars-posted mining mission. Full load. Clean close."
       ]
     },
     {
@@ -65,9 +69,9 @@
       "upgradeId": "turretMiningYield",
       "minLevel": 3,
       "creditsReward": 1000,
-      "subject": "OP 5 — Focus array, tier III",
+      "subject": "OP 5 — FOCUS ARRAY, TIER III",
       "flavor": [
-        "Focus array to three. I want that beam where I put it, not wobbling off a grain of dust. Belt debris is not a suggestion. Fit the tier and prove it in the next receipt."
+        "Focus array to tier three. Beam goes where you put it. Belt debris is not a suggestion. Install and prove it."
       ]
     },
     {
@@ -76,9 +80,9 @@
       "missionType": "mining",
       "giverPlanetId": "mars",
       "creditsReward": 4000,
-      "subject": "OP 6 — Focus array field proof",
+      "subject": "OP 6 — FOCUS ARRAY, FIELD PROOF",
       "flavor": [
-        "Take the tuned focus array to the belt and show me one clean Mars-posted mining closeout. Hardware means nothing without receipts."
+        "Array is installed. Now earn it. One clean Mars mining closeout with the tuned beam. Hardware is nothing without receipts."
       ]
     },
     {
@@ -86,9 +90,9 @@
       "upgradeId": "turretMiningCharge",
       "minLevel": 3,
       "creditsReward": 1000,
-      "subject": "OP 7 — Cooling loop, tier III",
+      "subject": "OP 7 — COOLING LOOP, TIER III",
       "flavor": [
-        "Cooling to three. You cook your emitter in a hot zone, you are a flare for every pirate board from here to the Kuiper. I will not be the one explaining your slag to next of kin. Install. Test. Fly."
+        "Cooling to tier three. Cook your emitter in a hot zone, you are a beacon for every pirate board from here to Kuiper. Install. Test. Fly."
       ]
     },
     {
@@ -97,9 +101,9 @@
       "missionType": "mining",
       "giverPlanetId": "mars",
       "creditsReward": 4000,
-      "subject": "OP 8 — Cooling loop field proof",
+      "subject": "OP 8 — COOLING LOOP, FIELD PROOF",
       "flavor": [
-        "Run another Mars mining job and come back with the emitter intact. Cooling upgrade is approved only after a live-cycle proof."
+        "Emitter stays cold under load or it does not count. One Mars mining run. Come back intact."
       ]
     },
     {
@@ -107,9 +111,9 @@
       "upgradeId": "turretMiningEfficiency",
       "minLevel": 3,
       "creditsReward": 1000,
-      "subject": "OP 9 — Power regulator, tier III",
+      "subject": "OP 9 — POWER REGULATOR, TIER III",
       "flavor": [
-        "Regulator to three. We sit on target longer than a tourist cruise. You burn like an amateur, you go home on a tender. I want discipline in the bus and in the tank. Last box — do not get cute."
+        "Regulator to tier three. Discipline in the bus, discipline in the tank. Last hardware box. Do not get clever."
       ]
     },
     {
@@ -118,17 +122,17 @@
       "missionType": "mining",
       "giverPlanetId": "mars",
       "creditsReward": 4000,
-      "subject": "OP 10 — Final Mars qualification run",
+      "subject": "OP 10 — MANIFOLD QUALIFICATION RUN",
       "flavor": [
-        "Final evolution. One last Mars-posted mining mission with the full stack installed. Deliver clean and I sign the cohort file."
+        "Final evolution. Full stack. One Mars mining mission, clean close. Deliver and I sign the cohort file. Deploy the lander with F if the target needs surface work."
       ]
     }
   ],
-  "completionSubject": "Cleared — Mars pay band & manifold (do not get cocky)",
+  "completionSubject": "COHORT FILED — MANIFOLD CERT ISSUED",
   "completionBody": [
-    "Sampaio. You are recorded as MMC turret partner. Phobos has your double pay on Mars-issued work — do not make me read your ledger; I am not your accountant. Your avionics got the manifold package: ride the posted corridors, do not guess the line.",
-    "You are not a Marine. You are a contractor we can use. That is harder to earn. Keep the hull in one piece or we strip the flag next contract.",
-    "Dismissed. Fly straight.",
+    "Pilot. Good work. Cohort is yours.",
+    "MMC ledger shows you cleared every op in sequence. Double pay on Mars-issued work is live. Manifold certification filed — ride the posted corridors, do not guess the line. Phobos is on your map now.",
+    "You are a contractor the Corps can use. Keep the hull in one piece.",
     "— Sampaio, MMC"
   ],
   "rewards": [

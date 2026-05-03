@@ -1,15 +1,15 @@
 {
   "id": "colonial-guard",
   "name": "Colonial Guard",
-  "title": "Pest Control Division",
+  "title": "Dispatch — Viroid Containment",
   "objectiveTypes": ["exterminate"],
   "minDifficulty": 1,
   "maxDifficulty": 10,
   "missions": [
     {
       "id": "cg_nest_clearance",
-      "name": "Nest Clearance",
-      "briefing": "Bug infestation confirmed. Clear the nests before they spread to the shipping lanes.",
+      "name": "Nest sweep — sector clearance",
+      "briefing": "Viroid nests confirmed on target rock. Shipping lane proximity is marginal. Clear before threshold breach. RoE standard. Close the ticket when done.",
       "objectiveSlots": [
         {
           "type": "exterminate",
@@ -32,8 +32,8 @@
     },
     {
       "id": "cg_hive_assault",
-      "name": "Hive Assault",
-      "briefing": "This one is serious. Multiple nests, spitter escorts, the whole party. Colonial Guard wants it scorched. Hazard pay included.",
+      "name": "Hostile sweep — multi-nest, spitter escort",
+      "briefing": "Elevated contact count. Spitter presence confirmed. Multiple nests, full swarm. Hazard classification active — pay reflects it. Approach vector matters. Do not get surrounded.",
       "objectiveSlots": [
         {
           "type": "exterminate",

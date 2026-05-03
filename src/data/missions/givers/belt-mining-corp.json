@@ -1,15 +1,15 @@
 {
   "id": "belt-mining",
   "name": "Belt Mining Corp",
-  "title": "Mining Contractor",
+  "title": "Extraction & Logistics Dispatch",
   "objectiveTypes": ["gather"],
   "minDifficulty": 3,
   "maxDifficulty": 10,
   "missions": [
     {
       "id": "bmc_standard_extraction",
-      "name": "Standard Extraction",
-      "briefing": "Contract #4471. Target asteroid tagged for mineral extraction. Standard rates apply. Fill your hold and return to any station.",
+      "name": "Iron pull — sector 88-Mars",
+      "briefing": "Belt Mining Corp. Target asteroid logged for mineral extraction, iron-class yield. Standard contract rates. Fill your hold, return to any registered station. Contract ID on file.",
       "objectiveSlots": [
         {
           "type": "gather",
@@ -23,8 +23,8 @@
     },
     {
       "id": "bmc_deep_belt_haul",
-      "name": "Deep Belt Haul",
-      "briefing": "Long-range extraction job. The ore is rich but the rock is far. Fuel up and bring a full hold back.",
+      "name": "Nickel haul — outer belt",
+      "briefing": "Belt Mining Corp. Long-range extraction, nickel-class ore. Rock is deep but the yield justifies the burn. Fuel budget accordingly. Full hold required for bonus tier.",
       "objectiveSlots": [
         {
           "type": "gather",

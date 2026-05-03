@@ -1,15 +1,15 @@
 {
   "id": "jay",
   "name": "Jay Mercer",
-  "title": "Senior Hauler",
+  "title": "Space Cowboys, Inc. (founder, sole employee until further notice)",
   "objectiveTypes": ["gather", "survey"],
   "minDifficulty": 1,
   "maxDifficulty": 8,
   "missions": [
     {
       "id": "jay_mineral_survey",
-      "name": "Mineral Survey",
-      "briefing": "There is a rock out near the belt tagged for survey. Grab samples and bring them back. Easy money.",
+      "name": "Quick Run — Pays Dirt",
+      "briefing": "Hey, you got Jay. Rock out near the belt, tagged for samples. Grab what it has and bring it back. Close to home, not much drama. Good for the ledger, good for the coffee fund. — Jay",
       "objectiveSlots": [
         {
           "type": "gather",
@@ -23,8 +23,8 @@
     },
     {
       "id": "jay_deep_core_sample",
-      "name": "Deep Core Sample",
-      "briefing": "Science division wants a heavy extraction. Drill deep, fill the hold. The rock is further out this time.",
+      "name": "Belt Loop — Pick Something That Pays",
+      "briefing": "Hey, you got Jay. Science people want a heavy extraction. The rock is further out, the payout is better, and the hold is going to come back full if you fly it right. Open the bay with F when you are on the surface, fill it, and do not leave early. — Jay",
       "objectiveSlots": [
         {
           "type": "gather",
@@ -38,8 +38,8 @@
     },
     {
       "id": "jay_grav_survey",
-      "name": "Gravitometric Survey",
-      "briefing": "Science division needs gravitometric readings from the surface. Land near the beacon, calibrate the probes they drop, and bring back the data. Quick job if you fly clean.",
+      "name": "Surface Read — Science Wants Numbers",
+      "briefing": "Hey, you got Jay. Science division needs gravitometric readings off the surface. Land near the beacon, calibrate the probes as they drop, and bring back the data. Quick job if you fly clean. Habitat is H if you need a minute before the burn back. — Jay",
       "objectiveSlots": [
         {
           "type": "survey",
@@ -57,8 +57,8 @@
     },
     {
       "id": "jay_jupiter_belt_cycle",
-      "name": "Jupiter Belt Cycle",
-      "briefing": "Hey — we're running on Jupiter now too, did you hear? Got a belt cycle queued up if you're up for it. Higher cuts than the Earth runs. — Jay.",
+      "name": "Jupiter Side — Higher Cuts Out Here",
+      "briefing": "Hey, you got Jay. We are running on Jupiter now too. Belt cycle queued up if you are up for it — higher margins than the Earth runs, which honestly was not hard to beat. Hit the Space Cowboys board, grab the job. — Jay",
       "requiresFlag": "jovianContractTampered",
       "objectiveSlots": [
         {
@@ -73,8 +73,8 @@
     },
     {
       "id": "jay_jupiter_asteroid_listing",
-      "name": "Jupiter Asteroid Listing",
-      "briefing": "Jay here. Picked up a Jupiter listing this week, asteroid-side. Standard gather, but the rates jumped. Take a look. — Jay.",
+      "name": "Jupiter Listing — Rates Jumped",
+      "briefing": "Hey, you got Jay. Picked up a Jupiter listing this week, asteroid-side. Standard gather but the rates are up. No notes on why. I have learned not to ask when the number is good. — Jay",
       "requiresFlag": "jovianContractTampered",
       "objectiveSlots": [
         {
@@ -89,8 +89,8 @@
     },
     {
       "id": "jay_jupiter_grav_sweep",
-      "name": "Jupiter Gravity Sweep",
-      "briefing": "We've got Jupiter on the board now. New territory, same approach. Survey work this time — your kind of run. Hit me up. — Jay.",
+      "name": "Jupiter Survey — New Territory, Same Approach",
+      "briefing": "Hey, you got Jay. Jupiter board is open now. Survey work this time — your kind of run. New territory but the slingshot windows out here are honest once you learn to read them. Habitat is H if you need a rest between burns. — Jay",
       "requiresFlag": "jovianContractTampered",
       "objectiveSlots": [
         {

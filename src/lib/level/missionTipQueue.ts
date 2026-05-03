@@ -46,11 +46,23 @@ export function getVisibleMissionTips(
   return queue.slice(0, MISSION_TIP_VISIBLE_COUNT)
 }
 
+/** Prefix used by the runtime resolver to mark reactive guidance ids. */
+const RUNTIME_TIP_ID_PREFIX = 'runtime:'
+
 /**
- * Return visible transmissions for the current gameplay view.
+ * Return whether a transmission id was produced by the runtime resolver.
  *
- * View filtering happens before the two-card limit so lander-only guidance
- * cannot occupy an FPS visor slot and hide an urgent suit warning.
+ * @param id - Tip id, for example `runtime:oxygenLow` or `objective:gather`.
+ * @returns True when the id starts with the runtime prefix.
+ */
+function isRuntimeTipId(id: string): boolean {
+  return id.startsWith(RUNTIME_TIP_ID_PREFIX)
+}
+
+/**
+ * Return visible transmissions for the current gameplay view, with runtime tips
+ * promoted ahead of objective/first-run tips so reactive guidance always wins
+ * the top slot. Order is otherwise stable (insertion order within each tier).
  *
  * @param queue - Full queue ordered oldest to newest.
  * @param view - Current gameplay view, for example `fps` during EVA.
@@ -60,7 +72,10 @@ export function getVisibleMissionTipsForView(
   queue: readonly MissionTipTransmission[],
   view: MissionTipView,
 ): MissionTipTransmission[] {
-  return getVisibleMissionTips(queue.filter((entry) => entry.view === view))
+  const matching = queue.filter((entry) => entry.view === view)
+  const runtimeTips = matching.filter((entry) => isRuntimeTipId(entry.id))
+  const otherTips = matching.filter((entry) => !isRuntimeTipId(entry.id))
+  return [...runtimeTips, ...otherTips].slice(0, MISSION_TIP_VISIBLE_COUNT)
 }
 
 /**

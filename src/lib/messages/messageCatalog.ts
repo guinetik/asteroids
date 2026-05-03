@@ -96,16 +96,16 @@ export const JAY_FIRST_SLINGSHOT_MESSAGE: ShipMessageDefinition = {
 export const JAY_CONTRACT_INCOMING_MESSAGE: ShipMessageDefinition = {
   id: 'jay-contract-incoming',
   from: 'Jay Mercer',
-  subject: 'After Your First Run — Partner Paperwork',
+  subject: 'First Job Done — Here Comes The Paperwork',
   sentAt: '2306-04-05 08:48 UTC',
   trigger: 'contract',
   delivery: 'inbox_prompt',
   priority: JAY_MESSAGE_PRIORITY,
   body: [
     'Hey, you got Jay.',
-    'I am not parking the real Space Cowboys, Inc. contract in your mail until you have one real job under your belt — shuttle, lander, anything that pays. Close something out, then the system will open a new folder with the partner offer.',
-    'Until you see that, you are on starter boards only. The logo can wait. Your flight hours cannot.',
-    'When the folder shows up, read it, accept it if you are still in, and we are fifty-fifty on everything after.',
+    'You closed your first job. Which means the Space Cowboys, Inc. contract is now sitting in a new folder in your mail — look for it on the left side of the message terminal.',
+    'Read it, accept it if you are still in, and we are fifty-fifty on everything after that.',
+    "The logo can wait. The flight hours couldn't.",
     '— Jay',
   ],
 }
@@ -121,16 +121,16 @@ const MMC_SAMPAIO_MESSAGE_PRIORITY = 55
 export const COLONEL_SAMPAIO_MMC_HEADS_UP: ShipMessageDefinition = {
   id: 'sampaio-mmc-contract-heads-up',
   from: 'Col. Hélder Sampaio, MMC (Engineering & Mining Liaison)',
-  subject: "LISTEN — YOU'VE GOT ORDERS IN THE MMC STACK",
+  subject: 'MMC — CONTRACT PACKET WAITING',
   sentAt: '2306-04-10 10:55 UTC',
   trigger: 'contract',
   delivery: 'inbox_prompt',
   priority: MMC_SAMPAIO_MESSAGE_PRIORITY,
   body: [
-    "Phobos cleared your file. You closed the Space Cowboys' Mars charter and you already ran a line on red dirt — that means you are eligible for a proper Corps turret detachment, not a sticker on your window.",
-    'The packet starts with a hull mount, not a joyride. No turret, no mining line from the Corps. Already carrying one? The contract will log it. Before you go joyriding in the belt: there is a contract packet under MARTIAN MARINE CORPS in your shuttle mail. Not this inbox. The folder on the left. Open the terminal, hit Messages, read the offer, then hit Accept or Decline like you mean it.',
-    'If you can not find a mail folder, you are not ready for my ore runs. I am not re-explaining the UI in a second message.',
-    '— Sampaio. Move.',
+    'Pilot. Sampaio. Phobos desk.',
+    'Cowboys handler vouched. Recorded. Mars line is logged. Eligibility confirmed for turret cohort enrollment.',
+    'Contract packet is under MARTIAN MARINE CORPS in your shuttle mail. Not this inbox. The folder. Open it, read the brief, accept or decline.',
+    '— Sampaio, MMC',
   ],
 }
 
@@ -138,15 +138,18 @@ export const COLONEL_SAMPAIO_MMC_HEADS_UP: ShipMessageDefinition = {
 export const JAY_DISTANCE_MESSAGE: ShipMessageDefinition = {
   id: 'jay-distance-from-earth',
   from: 'Jay Mercer',
-  subject: 'Distances Are Worse Than They Look',
+  subject: 'The System Is Bigger Than It Looks From The Moon',
   sentAt: '2306-04-05 09:02 UTC',
   trigger: 'map_leave_earth_distance',
   delivery: 'inbox_prompt',
   priority: JAY_MESSAGE_PRIORITY,
   body: [
     'Hey, you got Jay.',
-    'If Earth already looks small, good. That means you are finally seeing the system the way haulers do. Distances out here will lie to you every single day if you let them.',
-    'Do not think in straight lines. Think in wells, lanes, and what body you are going to steal speed from next. The ship will show you the fabric. Trust it more than your gut until your gut earns the right.',
+    "If Earth is looking small already, good. That means you are starting to see it the way haulers do. Distances out here will lie to you every single day if you let them.",
+    "Do not think in straight lines. Think in wells, lanes, and what body you are going to steal speed from next. The slingshot you practiced near Earth works anywhere — same E to lock, same A and D to aim, different gravity source. That is the whole trick.",
+    "Trust the orbit lines more than your gut until your gut earns the right. It took me eleven years. You are going to be faster.",
+    "Probably. Maybe. I was really bad at this.",
+    '— Jay',
   ],
 }
 
@@ -154,15 +157,17 @@ export const JAY_DISTANCE_MESSAGE: ShipMessageDefinition = {
 export const JAY_THRUSTER_MESSAGE: ShipMessageDefinition = {
   id: 'jay-main-thruster-spent',
   from: 'Jay Mercer',
-  subject: 'That Red Bar Is The Lesson',
+  subject: 'That Red Bar Is Your Tuition',
   sentAt: '2306-04-05 09:18 UTC',
   trigger: 'map_main_thruster_depleted',
   delivery: 'inbox_prompt',
   priority: JAY_MESSAGE_PRIORITY,
   body: [
     'Hey, you got Jay.',
-    'You just ran the red thrust charge all the way down, so now you have seen the trick. The bar empties fast, the tank pays to bring it back, and waste shows up in your fuel ledger before you notice it in the seat.',
-    'Main thrust, brake, and RCS all sip from the same shuttle fuel, but they recharge on their own terms. Learn the rhythm and you will stop flying like every burn is an emergency.',
+    "You just ran the main thrust charge down to nothing. So now you have seen the trick — the bar empties fast, the tank pays to bring it back, and waste shows up in your fuel ledger before you notice it in the seat.",
+    "Main thrust, brake, and RCS all drink from the same tank, but they recharge on their own schedule. They top themselves off when idle. Learn that rhythm and you will stop flying like every burn is an emergency.",
+    "Gravity is free. Use it more. That is a sentence I repeated to myself for an embarrassing number of years before it stuck.",
+    '— Jay',
   ],
 }
 
@@ -170,15 +175,18 @@ export const JAY_THRUSTER_MESSAGE: ShipMessageDefinition = {
 export const JAY_BRAKE_MESSAGE: ShipMessageDefinition = {
   id: 'jay-brake-system-warning',
   from: 'Jay Mercer',
-  subject: 'Those Dampeners Are For Saving Your Skin',
+  subject: 'The Brake Is A Last Resort, Not A Habit',
   sentAt: '2306-04-05 09:26 UTC',
   trigger: 'map_brake_used',
   delivery: 'inbox_prompt',
   priority: JAY_MESSAGE_PRIORITY,
   body: [
     'Hey, you got Jay.',
-    'That brake is future neutron-tech inertia dampeners, which is a pretty way of saying it will absolutely break your motion when you ask nice and pay the fuel bill.',
-    'Use it when gravity, speed, or bad judgment have stacked the deck against you. It is worth the burn if it saves the ship, but you should never need it for normal flying. Last resort, not cruise control.',
+    "That brake you just hit — future neutron-tech inertia dampeners, which is a fancy way of saying it will absolutely kill your velocity when you ask nice and pay the fuel bill.",
+    "Use it when gravity, speed, and bad judgment have all showed up at the same party. It is worth the burn if it saves the ship.",
+    "But if you are braking on normal approaches, something earlier in the math went wrong. Figure that out and the brake gets to stay in the drawer where it belongs.",
+    "It is a last resort. Not a vibe.",
+    '— Jay',
   ],
 }
 
@@ -186,42 +194,44 @@ export const JAY_BRAKE_MESSAGE: ShipMessageDefinition = {
 export const JAY_MISSION_START_MESSAGE: ShipMessageDefinition = {
   id: 'jay-mission-start-lander-reminder',
   from: 'Jay Mercer',
-  subject: 'Use The Right Machine',
+  subject: 'Shuttle Gets You There, Lander Gets You Down',
   sentAt: '2306-04-05 09:34 UTC',
   trigger: 'mission_start',
   delivery: 'inbox_prompt',
   priority: JAY_MESSAGE_PRIORITY,
   body: [
     'Hey, you got Jay.',
-    'Do not take the shuttle into local mission work just because it is the bigger machine. Open the bay, check the lander, and use the right tool for the rock you are heading toward.',
-    'Shuttle gets you there. Lander gets you down. Then it is boots and hand tools. That order exists because people who tried the other order are now cautionary stories.',
+    "You have got a mission waypoint now, which means the lander is the machine you want. Hit F to open the cargo bay, drop the lander, and use the right tool for the rock you are heading toward.",
+    "Shuttle gets you there. Lander gets you down. Boots and hand tools after that. That order exists because people who tried the other order are now cautionary stories I tell at the Cowboys kiosk.",
+    "Anyway. Go get paid.",
+    '— Jay',
   ],
 }
 
 /** Special mission offer that also serves as the authored inbox handoff. */
 export const CONSORTIUM_CERTIFICATION_MESSAGE: ShipMessageDefinition = {
   id: 'consortium-certification-offer',
-  from: 'Space Consortium — Logistics Division',
-  subject: 'Requisition Package — Field Operator Certification',
+  from: 'United Space Consortium — Logistics Division',
+  subject: 'REQUISITION PACKAGE — FIELD OPERATOR CERTIFICATION 2207-R-887',
   sentAt: '2306-04-09 12:10 UTC',
   trigger: 'mission_start',
   delivery: 'inbox_prompt',
   priority: CONSORTIUM_MESSAGE_PRIORITY,
   body: [
-    'Operator,',
-    'Your recent activity logs were flagged by an associate of ours, J. Mercer, as evidence of sustained deep-field work using a Class-C orbital frame.',
-    'We do not typically certify retrofitted hulls for relativistic grid coupling. In this case, an exception package has been staged and attached to your work queue under Consortium Certification.',
-    'Proceed to the marked asteroid, retrieve the sealed Grid Coupling Module, and install it from shuttle inventory after recovery. Do not tamper with the package in the field.',
-    'This assignment has already been entered into your active mission ledger. Track the waypoint and complete the pickup at your discretion.',
-    '— Consortium Logistics, Sol Sector',
+    'OPERATOR,',
+    'Pursuant to recent activity logs flagged on your file by an associate of record (J. MERCER), the Consortium notes sustained deep-field operation against a Class-C orbital frame.',
+    'Retrofitted hulls are not typically certified for relativistic grid coupling. In this case, an exception package has been staged and attached to your active mission ledger under CONSORTIUM CERTIFICATION.',
+    'Proceed to the marked asteroid, retrieve the sealed Grid Coupling Module per Form 4471-G-12, and install from shuttle inventory after recovery. Field tampering with the package is non-permitted and will void the exception.',
+    'The assignment has been entered into your active mission ledger. Track the waypoint and complete the pickup at the operator\'s discretion. The Consortium thanks you for your cooperation.',
+    '— USC Logistics, Sol Sector',
   ],
 }
 
 /** Jovian Step 4 — Hektor photometry offer. */
 export const JOVIAN_HEKTOR_PHOTOMETRY_OFFER: ShipMessageDefinition = {
   id: 'jovian-prospection-hektor-photometry-offer',
-  from: 'Vance Hoyt, Senior Asset Officer (Cloud City)',
-  subject: 'Tasking: Photometric Pass — Asset 2306-J',
+  from: 'Vance Holroyd, Senior Asset Officer (Cloud City)',
+  subject: 'OP 4 — TASKING: Photometric Pass — Asset 2306-J',
   sentAt: '2306-05-04 09:18 UTC',
   trigger: 'mission_start',
   delivery: 'inbox_prompt',
@@ -229,18 +239,18 @@ export const JOVIAN_HEKTOR_PHOTOMETRY_OFFER: ShipMessageDefinition = {
   folderId: 'jovian-society-prospection',
   folderLabel: 'Jovian Society',
   body: [
-    'Pilot,',
-    'Calibration cleared. The Society has staged Asset 2306-J on your active mission ledger — Jovian Trojans, L4 cluster, leading Jupiter by approximately sixty degrees. You will see the body on your nav momentarily.',
-    'Standard photometric protocol. Hold standoff, capture telemetry, return for processing. Travel safe.',
-    '— Vance',
+    '[courteous] I trust this finds you well.',
+    'Calibration registers green. The Society has staged Asset 2306-J on your active mission ledger — Jovian Trojans, L4 cluster, leading Jupiter by approximately sixty degrees. The body will appear on your navigation system momentarily.',
+    'Standard photometric protocol: hold standoff, capture telemetry, return for processing. The Society values clean data over rapid transit. Please prioritize signal quality.',
+    '[measured] — Vance Holroyd, Senior Asset Officer',
   ],
 }
 
 /** Jovian Step 5 — Saturn photometry offer. */
 export const JOVIAN_SATURN_PHOTOMETRY_OFFER: ShipMessageDefinition = {
   id: 'jovian-prospection-saturn-photometry-offer',
-  from: 'Vance Hoyt, Senior Asset Officer (Cloud City)',
-  subject: 'Tasking: Photometric Pass — Asset 2306-S',
+  from: 'Vance Holroyd, Senior Asset Officer (Cloud City)',
+  subject: 'OP 5 — TASKING: Photometric Pass — Asset 2306-S',
   sentAt: '2306-05-09 11:42 UTC',
   trigger: 'mission_start',
   delivery: 'inbox_prompt',
@@ -248,18 +258,19 @@ export const JOVIAN_SATURN_PHOTOMETRY_OFFER: ShipMessageDefinition = {
   folderId: 'jovian-society-prospection',
   folderLabel: 'Jovian Society',
   body: [
-    'Pilot,',
-    'Routing you outsystem on this one. Asset 2306-S is staged in the Saturn co-orbital region. Travel premium is in the line item.',
+    '[courteous] I trust this finds you well.',
+    'The Jovian pass returned strong telemetry. The Society is routing you outsystem for this deliverable. Asset 2306-S is staged in the Saturn co-orbital region — I am aware this is slightly outside the standard operating envelope. I will say plainly that the portfolio review is system-wide this quarter, and we would prefer a contractor whose field quality we already have on file.',
+    'Travel premium is included in the line item. The Society would prefer the figure not be cited to other cohort contractors.',
     'Same protocol as the Jovian pass. Bring back clean telemetry.',
-    '— Vance',
+    '[measured] — Vance Holroyd, Senior Asset Officer',
   ],
 }
 
 /** Jovian Step 7 — Hektor DAN offer. */
 export const JOVIAN_HEKTOR_DAN_OFFER: ShipMessageDefinition = {
   id: 'jovian-prospection-hektor-dan-offer',
-  from: 'Vance Hoyt, Senior Asset Officer (Cloud City)',
-  subject: 'Tasking: Subsurface Survey — Asset 2306-J',
+  from: 'Vance Holroyd, Senior Asset Officer (Cloud City)',
+  subject: 'OP 7 — TASKING: Subsurface Survey — Asset 2306-J',
   sentAt: '2306-05-15 14:08 UTC',
   trigger: 'mission_start',
   delivery: 'inbox_prompt',
@@ -267,18 +278,18 @@ export const JOVIAN_HEKTOR_DAN_OFFER: ShipMessageDefinition = {
   folderId: 'jovian-society-prospection',
   folderLabel: 'Jovian Society',
   body: [
-    'Pilot,',
-    'Instrumentation Bay confirms DAN unit registered to your lander. The Society has staged the subsurface pass on Asset 2306-J — same body you photometry-d in OP 4. Familiar territory.',
-    'Park in the marked crater, switch to science mode, run the pulse. Disregard ambient cross-talk per prior guidance.',
-    '— Vance',
+    '[courteous] I trust this finds you well.',
+    'Instrumentation Bay confirms the DAN unit is registered to your lander. The Society has staged the subsurface pass on Asset 2306-J — the same Jovian Trojan body from OP 4. The territory will be familiar.',
+    'Park in the crater the Society marked during your earlier visit, engage science mode, and run the neutron pulse. I am told the pulse may register ambient disturbance during operation on certain body types. The instrumentation team classifies this as sensor cross-talk. Please complete the survey regardless.',
+    '[measured] — Vance Holroyd, Senior Asset Officer',
   ],
 }
 
 /** Jovian Step 8 — Saturn DAN offer. */
 export const JOVIAN_SATURN_DAN_OFFER: ShipMessageDefinition = {
   id: 'jovian-prospection-saturn-dan-offer',
-  from: 'Vance Hoyt, Senior Asset Officer (Cloud City)',
-  subject: 'Tasking: Subsurface Survey — Asset 2306-S',
+  from: 'Vance Holroyd, Senior Asset Officer (Cloud City)',
+  subject: 'OP 8 — TASKING: Subsurface Survey — Asset 2306-S',
   sentAt: '2306-05-21 10:30 UTC',
   trigger: 'mission_start',
   delivery: 'inbox_prompt',
@@ -286,18 +297,19 @@ export const JOVIAN_SATURN_DAN_OFFER: ShipMessageDefinition = {
   folderId: 'jovian-society-prospection',
   folderLabel: 'Jovian Society',
   body: [
-    'Pilot,',
-    'Final survey deliverable. Asset 2306-S is staged for DAN. Saturn co-orbital body — same one you photometry-d in OP 5.',
-    'Travel premium applies on this leg as well. Bring the data home and we will begin compiling the prospectus.',
-    '— Vance',
+    '[courteous] I trust this finds you well.',
+    'Final survey deliverable. Asset 2306-S is staged for the DAN pass — the Saturn co-orbital body from OP 5. Same protocol as the Jovian survey.',
+    'I will note that several cohort contractors have reported elevated ambient disturbance during subsurface passes near gas-giant co-orbitals. I am told you are cleared to proceed at your discretion. Please note any telemetry anomalies in the delivery record rather than stopping the pass.',
+    'Travel premium applies on this leg. Bring the data home and the Society will begin compiling the full prospectus.',
+    '[measured] — Vance Holroyd, Senior Asset Officer',
   ],
 }
 
 /** Jovian Step 9 — Hektor prospectus compilation and transmission offer. */
 export const JOVIAN_HEKTOR_PROSPECTUS_OFFER: ShipMessageDefinition = {
   id: 'jovian-prospection-hektor-prospectus-offer',
-  from: 'Vance Hoyt, Senior Asset Officer (Cloud City)',
-  subject: 'OP 9 — Prospectus Compilation & Transmission',
+  from: 'Vance Holroyd, Senior Asset Officer (Cloud City)',
+  subject: 'OP 9 — PROSPECTUS COMPILATION AND TRANSMISSION',
   sentAt: '2306-05-28 09:15 UTC',
   trigger: 'mission_start',
   delivery: 'inbox_prompt',
@@ -305,12 +317,14 @@ export const JOVIAN_HEKTOR_PROSPECTUS_OFFER: ShipMessageDefinition = {
   folderId: 'jovian-society-prospection',
   folderLabel: 'Jovian Society',
   body: [
-    'Pilot,',
-    "Eight deliverables clean. The Society is grateful for the data quality you've returned across both instrumentation series.",
-    'Final assignment: travel to Asset 2306-J in the Jovian Trojans. There is a Society-provisioned terminal on the surface, near your previous landing zone. Approach the terminal and review the assembled report — your readings, our analysis, the recommended disposition. Confirm transmission to Cloud City Asset Strategy at your discretion.',
-    "The Society will be reviewing the asset for full extraction queueing on receipt of your confirmation. You'll find a closeout bonus structure attached commensurate with the size of the asset class.",
-    'There is no further fieldwork after this step. Welcome, in advance, to the manifest.',
-    '— Vance',
+    '[courteous] I trust this finds you well.',
+    'Eight deliverables returned clean. The Society is genuinely grateful for the data quality you have brought back across both instrumentation series. It is, I will say, above what we typically receive at this tier.',
+    'Briefing',
+    'Final assignment: please travel to Asset 2306-J in the Jovian Trojans. The Society has provisioned a terminal on the surface near your previous landing zone. Approach the terminal, review the assembled prospectus — your telemetry readings, our analysis, the recommended asset disposition — and confirm transmission to Cloud City Asset Strategy at your discretion.',
+    'Recommendation',
+    'On receipt of your transmission, the Society will advance Asset 2306-J through the standard extraction confidence bands. The closeout bonus structure attached to this step reflects the asset class. There is no further fieldwork after this deliverable.',
+    '[pause] Welcome, in advance, to the manifest.',
+    '[measured] — Vance Holroyd, Senior Asset Officer',
   ],
 }
 
@@ -318,15 +332,18 @@ export const JOVIAN_HEKTOR_PROSPECTUS_OFFER: ShipMessageDefinition = {
 export const JAY_VENUS_WARNING_MESSAGE: ShipMessageDefinition = {
   id: 'jay-venus-orbit-warning',
   from: 'Jay Mercer',
-  subject: 'You Are Getting Too Friendly With Venus',
+  subject: 'Venus Is A Pass, Not A Parking Spot',
   sentAt: '2306-04-05 09:46 UTC',
   trigger: 'map_venus_orbit_warning',
   delivery: 'inbox_prompt',
   priority: JAY_MESSAGE_PRIORITY,
   body: [
     'Hey, you got Jay.',
-    'You are close enough to the Venus lane that heat starts being a planning problem, not a theory problem. Until you fit better shielding, do not loaf around in there.',
-    'Use the pass, take what speed you came for, and get yourself back toward the goldilocks band before the hull starts teaching you a more expensive lesson.',
+    "You are close enough to the Venus lane that heat stops being a theory problem. With what you are running right now, do not loaf around in there.",
+    "Slingshot through if you need the speed, take what you came for, and get yourself back toward the goldilocks band before the hull starts writing you a tuition bill.",
+    "There is a paperwork lane that pays for the heat shield if you can stomach the forms. Worth knowing about. Worth more if you do it before Venus teaches you why.",
+    "The hull is not sentimental about this. Unfortunately.",
+    '— Jay',
   ],
 }
 
@@ -344,10 +361,10 @@ export const VIROID_ENVOY_INITIAL_CONTACT: ShipMessageDefinition = {
   priority: VIROID_ENVOY_PRIORITY,
   body: [
     'You kill. We watch.',
-    'The ones you destroy are what we were. What we no longer choose to be. You are removing noise from the system. This is noted.',
+    'The ones you destroy are what we were. What we no longer choose to be. You are removing noise from the system.',
     'A thing has been placed at the coordinates in this transmission. It is not a weapon. It is not a gift. It is a key to infrastructure you cannot currently perceive.',
     'Install it. See what we built when we still built things.',
-    'Retrieve the package. The waypoint is marked.',
+    'The waypoint is marked.',
   ],
 }
 
@@ -363,8 +380,8 @@ export const VIROID_ENVOY_CERES_RENDEZVOUS: ShipMessageDefinition = {
   enqueueOnDismiss: [],
   body: [
     'You see now. The highways. What remains.',
-    'Come to Ceres. There is something we need to discuss that cannot be encoded in a transmission.',
-    'You have proven useful. We would like to understand why.',
+    'Come to Ceres. This cannot be encoded.',
+    'You have proven useful. We intend to understand why.',
   ],
 }
 
@@ -375,7 +392,7 @@ const FANTASIA_COSMETIC_MESSAGE_PRIORITY = 48
 export const FANTASIA_PIMP_MY_SHUTTLE_INTRO_MESSAGE: ShipMessageDefinition = {
   id: 'fantasia-pimp-my-shuttle-intro',
   from: 'Fantasia Mira-Io',
-  subject: 'Lindo, your shuttle needs a color',
+  subject: 'Lindo, your shuttle wants a color',
   sentAt: '2306-04-30 14:00 UTC',
   trigger: 'map_cosmetic_shop_intro_scripted',
   delivery: 'inbox_prompt',
@@ -383,19 +400,17 @@ export const FANTASIA_PIMP_MY_SHUTTLE_INTRO_MESSAGE: ShipMessageDefinition = {
   folderId: 'station-comms',
   folderLabel: 'Station Comms',
   body: [
-    'Lindo, finally.',
+    '[bright] Lindo, finally.',
     '',
-    'I saw your transponder squawk online and caught myself staring—default hull, factory panels, untouched registry typeface. In THIS economy?',
+    'I saw your transponder squawk online and I just — I *stopped*. Default hull. Factory panels. Registry typeface nobody picked, just inherited. *That* is the shuttle of a person who has not yet decided who they are. You have decided a lot of things to get this far. Why not *this*?',
     '',
-    'When you berth with my ring, chase the magenta wash on the truss. Dock there. Hit the P bind (Fantasia insists on P—pretty, paint, please sit still) so BayComms knows which hatch to warm up. That magenta pulse is my wave hello.',
+    'Come find me. Look for the magenta wash on the dock truss — that pulse is my wave hello. Berth there, hit P, and my hatch opens just for you. I am on Mars, Jupiter, and Saturn, *amor* — open your map (M) and you can jump between them. Each location rotates different pieces, so — [whispered] come see me on Saturn for the rings collection, I will not say this twice.',
     '',
-    'I sell hull shaders every bit as extra as Destiny shaders, tandem flags so your lander stops pretending it belongs to somebody else, custom titles whispered sweet on the ticker, multitool tinsel—you name the vanity, darling, we encode it polite.',
+    'I do hull shaders, lander flags, ship titles, multitool finishes. I grew up on a station. We chose our light because nobody was handing it out. Color is not decoration where I come from — it is *identity*. I will find yours. I usually know it faster than you do.',
     '',
-    'Blank hold? Wrong season. Shovel whatever tradeable tinsel you scraped off the polite yellow desks into my scale—I always skim richer than Mars routing math ever admits on the beige screens.',
+    'Bring me whatever you have been hauling. I pay better than a standard market window and I do not make you stare at spreadsheets.',
     '',
-    'Ping me anytime the bay hums magenta. ',
-    '',
-    '—Fantasia • Pimp My Shuttle!',
+    '[laughs] —Fantasia · Pimp My Shuttle!',
   ],
 }
 

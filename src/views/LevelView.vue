@@ -36,6 +36,7 @@ import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 import type { MissionTipTransmission } from '@/lib/level/missionTips'
 import {
   getMissionTipObjectiveType,
+  isRuntimeTipShowable,
   resolveFirstRunLanderTipTransmission,
   resolveMissionTipTransmission,
   resolveRuntimeMissionTipTransmission,
@@ -54,7 +55,7 @@ import {
   shouldTriggerLowRtgTip,
 } from '@/lib/level/levelRuntimeTipTriggers'
 import type { ObjectiveType } from '@/lib/missions/types'
-import { loadProfile } from '@/lib/player/profile'
+import { loadProfile, recordRuntimeTipsShown, saveProfile } from '@/lib/player/profile'
 import { OBJECTIVE_LABELS } from '@/lib/minigame/MiniGame'
 import RescueSurvivorPanel from '@/components/RescueSurvivorPanel.vue'
 import DanScanPanel from '@/components/DanScanPanel.vue'
@@ -409,6 +410,7 @@ function pushMissionTip(tip: MissionTipTransmission | null): void {
 
 function pushRuntimeMissionTip(id: string): void {
   if (dispatchedRuntimeTipIds.has(id)) return
+  if (!isRuntimeTipShowable(loadProfile(), id)) return
   const objectiveType = activeMissionObjectiveType.value
   if (!objectiveType) return
   const tip = resolveRuntimeMissionTipTransmission(id, objectiveType)
@@ -692,6 +694,12 @@ onMounted(async () => {
       })
     }
     viewController.onMissionComplete = () => {
+      if (dispatchedRuntimeTipIds.size > 0) {
+        const existing = loadProfile()
+        if (existing !== null) {
+          saveProfile(recordRuntimeTipsShown(existing, [...dispatchedRuntimeTipIds]))
+        }
+      }
       missionCompleteVisible.value = true
     }
     viewController.onTerminalPrompt = (text) => {

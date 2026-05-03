@@ -1,15 +1,15 @@
 {
   "id": "cinderline",
-  "name": "The Cinderline, at The Anvil",
-  "title": "Standing Order, Mercury",
+  "name": "The Cinderline",
+  "title": "Sun-Worshippers, Mercury Vigil",
   "objectiveTypes": ["bunker", "dan"],
   "minDifficulty": 1,
   "maxDifficulty": 10,
   "missions": [
     {
       "id": "cinderline_anvil_substation",
-      "name": "Anvil Substation, Sealed",
-      "briefing": "Pilot, an Anvil substation has gone quiet. Viroids inside the door, the work inside the viroids. We do not abandon a sealed room. Take the descent. Walk the work. Return when the room is ours again. A seat will be kept.",
+      "name": "The room has gone quiet",
+      "briefing": "Pilot, an Anvil substation has gone quiet. The wakeful are inside. We do not abandon a sealed room. Take the descent. Walk the work. Return when the room is ours again. A seat will be kept.",
       "objectiveSlots": [
         {
           "type": "bunker",
@@ -28,8 +28,8 @@
     },
     {
       "id": "cinderline_first_listening",
-      "name": "The First Listening",
-      "briefing": "Pilot, the body has been listened to before from a distance. It is time to listen again. Set the pulse into the regolith and gather what reply the stone chooses to give. Hold your vigil until the answer is complete. A seat will be kept.",
+      "name": "The body has not yet spoken",
+      "briefing": "Pilot, the body has been listened to before, from a distance. It is time to listen again. Set the pulse into the regolith and gather what reply the body chooses to give. Hold your vigil until the answer is complete. A seat will be kept.",
       "objectiveSlots": [
         {
           "type": "dan",
@@ -50,8 +50,8 @@
     },
     {
       "id": "cinderline_vigil_threshold",
-      "name": "Vigil at the Threshold",
-      "briefing": "Pilot, this body is close to waking without our call. We do not require speed. We require attention. What replies will reply; meet it with restraint, and withdraw cleanly when the listening is done. Walk in the light.",
+      "name": "Vigil — the body is close to waking",
+      "briefing": "Pilot, this body is close to waking without our call. We do not require speed. We require attention. What replies will reply. Meet it with restraint, and withdraw cleanly when the listening is done. Walk in the light.",
       "objectiveSlots": [
         {
           "type": "dan",

@@ -1,7 +1,7 @@
 {
   "id": "mr-finch",
   "name": "Mr. Finch",
-  "title": "Saturn's Handler",
+  "title": "Saturn aristocrat, semi-retired.",
   "objectiveTypes": ["gather", "survey", "photometry"],
   "minDifficulty": 4,
   "maxDifficulty": 9,
@@ -9,8 +9,8 @@
   "missions": [
     {
       "id": "finch_saturn_gather",
-      "name": "Saturn Haul Cycle",
-      "briefing": "Pilot. Got a standard gather cycle out in the Saturn co-orbitals — heavy regolith, routine volume, good rates if you move clean. Not a complicated job. Land, fill the hold, come back. Comm me when you dock. — Finch",
+      "name": "She Has Been Seen at the Co-orbitals",
+      "briefing": "Young pilot. A standard gather cycle — heavy regolith, Saturn co-orbitals, routine volume. The rates are good if you move clean and I am told you generally do. Land, fill the hold, come back. I shall not take up more of your time than the work requires. — Finch",
       "objectiveSlots": [
         {
           "type": "gather",
@@ -27,8 +27,8 @@
     },
     {
       "id": "finch_saturn_survey",
-      "name": "Gravimetric Pass, Saturn Trojans",
-      "briefing": "Pilot. Three-stage gravimetric pass on a candidate body in the Saturn co-orbitals. Probe calibration, standard hold times. The rock's well-behaved — good surface, clean approach. If the data comes back clean I've got more of the same. Standard rate plus travel. — Finch",
+      "name": "A Note at the Trojans",
+      "briefing": "Young pilot. A three-stage gravimetric pass on a candidate body in the Saturn co-orbitals — probe calibration, standard hold times. The body is well-behaved; the surface is clean and the approach is clean. If the data comes back without incident I have more of the same at the same rate. Standard pay plus travel. I do not expect surprises. — Finch",
       "objectiveSlots": [
         {
           "type": "survey",
@@ -46,8 +46,8 @@
     },
     {
       "id": "finch_saturn_photometry",
-      "name": "Photometric Certification Run",
-      "briefing": "Pilot. Buyer wants a certified photometric pass before they commit to extraction. Standoff approach, probe deploy, hold the lander stable through the exposure. Nothing unusual about the body — just needs a clean telemetry packet. Pays above standard because of the distance. Come back with good data. — Finch",
+      "name": "The Trail Goes Cold Near Saturn",
+      "briefing": "Young pilot. A buyer wants certified photometric data before committing to extraction. Standoff approach, probe deploy, hold the lander stable through the exposure. Nothing unusual about the body — it simply needs a clean telemetry packet before anyone signs anything. Pays above standard because of the distance. Return with good data. — Finch",
       "objectiveSlots": [
         {
           "type": "photometry",

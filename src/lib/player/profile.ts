@@ -90,6 +90,7 @@ function createDefaultAchievementStats(): PlayerAchievementStats {
     lifetimeCreditsSpent: 0,
     lifetimeTradeCreditsEarned: 0,
     missionObjectivesCompletedByType: {},
+    runtimeTipsShownCount: {},
     slingshotLaunches: 0,
     slingshotLaunchesByBody: {},
     gravitySurfStarts: 0,
@@ -124,6 +125,7 @@ function normalizeAchievementStats(raw: unknown): PlayerAchievementStats {
     missionObjectivesCompletedByType: normalizeNumericMap(
       stats['missionObjectivesCompletedByType'],
     ),
+    runtimeTipsShownCount: normalizeNumericMap(stats['runtimeTipsShownCount']),
     slingshotLaunches:
       normalizeNonNegativeNumber(stats['slingshotLaunches']) ?? defaults.slingshotLaunches,
     slingshotLaunchesByBody: normalizeNumericMap(stats['slingshotLaunchesByBody']),
@@ -643,6 +645,34 @@ export function recordMissionObjectiveComplete(
         achievementStats.missionObjectivesCompletedByType,
         objectiveType,
       ),
+    },
+  }
+}
+
+/**
+ * Record a batch of runtime mission-tip ids that fired during one completed mission.
+ * Each id increments the tip's lifetime show count; blank ids are ignored.
+ *
+ * @param profile - Current profile.
+ * @param ids - Runtime tip ids dispatched in the just-completed mission.
+ * @returns Updated profile, or the same profile when nothing valid was passed.
+ */
+export function recordRuntimeTipsShown(
+  profile: PlayerProfile,
+  ids: readonly string[],
+): PlayerProfile {
+  const valid = ids.filter((id) => typeof id === 'string' && id.trim().length > 0)
+  if (valid.length === 0) return profile
+  const achievementStats = getAchievementStats(profile)
+  let runtimeTipsShownCount = achievementStats.runtimeTipsShownCount
+  for (const id of valid) {
+    runtimeTipsShownCount = incrementCountMap(runtimeTipsShownCount, id)
+  }
+  return {
+    ...profile,
+    achievementStats: {
+      ...achievementStats,
+      runtimeTipsShownCount,
     },
   }
 }
