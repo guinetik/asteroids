@@ -65,6 +65,9 @@ disturbance meter. Normal actions slowly raise hidden attention:
   larger relief wedges (`bacteriophage < spire < chimera`), multiplied by mission
   `difficultyFactor`, so Chimera kills on hard contracts pull the meter down more than scouts on
   easy runs.
+- Clearing the whole ambient pack awards a lengthening calm window (~26s–51s on difficulty 1→10):
+  patrol reinforcements stay paused during that countdown and disturbance passively drains so high
+  tiers still breathe before replacements can reopen the tap.
 
 At first, nothing obvious happens. As disturbance crosses thresholds, viroids
 begin arriving from the landscape. The first response should feel like a scout.

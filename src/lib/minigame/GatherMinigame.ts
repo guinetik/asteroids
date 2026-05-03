@@ -260,19 +260,6 @@ export class GatherMinigame implements MiniGame, MiniGameEvents {
       })
       this._steps.push({ label: 'Deposit at the delivery rocket', complete: false, active: true })
     } else {
-      if (import.meta.env.DEV) {
-        console.info('[gather-minigame]', {
-          difficulty: options.difficulty,
-          totalKg,
-          mineralCount,
-          perMineralKg: perMineral,
-          quotas: required.map((entry) => ({
-            itemId: entry.itemId,
-            availableRocks: options.rockYieldSystem.countRolls(entry.itemId),
-            activeRocksWithKg: options.rockYieldSystem.findActiveRocksByItemId(entry.itemId).length,
-          })),
-        })
-      }
       this.quotas = required.map((entry) => ({
         itemId: entry.itemId,
         label: entry.label,

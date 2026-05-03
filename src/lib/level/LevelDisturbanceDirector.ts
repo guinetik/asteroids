@@ -17,6 +17,7 @@ import { EnemyProjectileSystem } from '@/lib/fps/enemyProjectileSystem'
 import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import {
   createLevelDisturbanceState,
+  grantAmbientWaveClearReprieve,
   recordLevelDisturbance,
   relieveLevelDisturbanceForAmbientKill,
   resetLevelDisturbance,
@@ -165,6 +166,14 @@ export class LevelDisturbanceDirector {
   private readonly chimeraLaserMuzzleScratch = new THREE.Vector3()
   /** Unsubscribe handles for ambient kill-relief observers (cleared with enemies). */
   private readonly ambientDeathUnsubs = new Map<number, () => void>()
+  /** True once at least one ambient viroid actually attached this level run (spawn position hit). */
+  private ambientWaveEverSpawnedSuccessfully = false
+  /** Prior frame live ambient headcount — detects wipes that earn calm windows. */
+  private previousAmbientLiveResponders = 0
+  /**
+   * When true we skip awarding calm timers (liftoff/programmatic teardown is not a player wipe).
+   */
+  private suppressAmbientWaveGrant = false
 
   private readonly state: LevelDisturbanceState
   private readonly enemyVisualTier: EnemyVisualTier
@@ -246,6 +255,7 @@ export class LevelDisturbanceDirector {
    */
   resetForLiftoff(): void {
     resetLevelDisturbance(this.state)
+    this.ambientWaveEverSpawnedSuccessfully = false
     this.clearAmbientEnemies()
   }
 
@@ -306,6 +316,25 @@ export class LevelDisturbanceDirector {
 
     this.syncVisualControllers(dt)
 
+    const aliveRespondersNow = this.countLiveEnemies()
+    const shouldAwardCalmGrant =
+      !this.suppressAmbientWaveGrant &&
+      this.ambientWaveEverSpawnedSuccessfully &&
+      this.previousAmbientLiveResponders > 0 &&
+      aliveRespondersNow === 0
+
+    if (shouldAwardCalmGrant) {
+      grantAmbientWaveClearReprieve(this.state)
+    }
+
+    if (!this.suppressAmbientWaveGrant) {
+      this.previousAmbientLiveResponders = aliveRespondersNow
+    } else {
+      this.previousAmbientLiveResponders = 0
+    }
+
+    this.suppressAmbientWaveGrant = false
+
     this.enemyProjectileSystem.tick(dt)
   }
 
@@ -334,10 +363,13 @@ export class LevelDisturbanceDirector {
 
     const visualTierArg = this.enemyVisualTier
 
+    let placedAnyRespondersThisRequest = false
+
     for (let i = 0; i < spawnCount; i++) {
       const position = this.findSpawnPosition(playerPosition, landerPosition)
       if (!position) continue
 
+      placedAnyRespondersThisRequest = true
       const groundY = this.heightmap.heightAt(position.x, position.z)
       const kinds = this.ambientViroidKinds
       const kind = kinds[Math.floor(this.rng() * kinds.length)] ?? 'bacteriophage'
@@ -363,6 +395,10 @@ export class LevelDisturbanceDirector {
         this.scene.add(ctrl.group)
         this.spireControllers.set(handle.id, ctrl)
       }
+    }
+
+    if (placedAnyRespondersThisRequest) {
+      this.ambientWaveEverSpawnedSuccessfully = true
     }
   }
 
@@ -643,6 +679,8 @@ export class LevelDisturbanceDirector {
    * Remove every ambient enemy owned by this director.
    */
   private clearAmbientEnemies(): void {
+    this.suppressAmbientWaveGrant = true
+    this.previousAmbientLiveResponders = 0
     this.clearAmbientDeathSubscriptions()
 
     for (const handle of this.enemyDirector.enemies) {

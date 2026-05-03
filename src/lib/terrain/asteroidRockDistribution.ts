@@ -36,30 +36,6 @@ interface EjectaCrater {
   rimAbundance: number
 }
 
-/** Diagnostic counters emitted at the end of a generation run. */
-export interface RockDistributionDiagnostics {
-  /** World-square edge length (units) used for area scaling. */
-  worldSize: number
-  /** Target rock count derived from `worldSize` × abundance. */
-  targetCount: number
-  /** Rocks actually placed (≤ `targetCount`). */
-  accepted: number
-  /** Total sampling attempts consumed. */
-  attempts: number
-  /** Hard cap on attempts (`targetCount × MAX_ATTEMPTS_FACTOR`). */
-  maxAttempts: number
-  /** Samples rejected because `isValidGround` returned false. */
-  rejectedByValidGround: number
-  /** Samples rejected by an exclusion disc (pad / POI). */
-  rejectedByExclusion: number
-  /** Samples rejected because slope at sample exceeded `maxSlope`. */
-  rejectedBySlope: number
-  /** Samples rejected because they overlap an already-accepted rock. */
-  rejectedByOverlap: number
-  /** Samples rejected by the composition-driven acceptance Bernoulli draw. */
-  rejectedByAcceptRate: number
-}
-
 /** Knobs for {@link generateAsteroidRockDistribution}. */
 export interface AsteroidRockDistributionOptions {
   seed: number
@@ -73,12 +49,6 @@ export interface AsteroidRockDistributionOptions {
    * mesh-backed asteroid terrain doesn't spawn rocks floating in the void.
    */
   isValidGround?: (x: number, z: number) => boolean
-  /**
-   * Optional sink for per-run rejection counters. Called once after generation
-   * completes; useful for tuning the `targetCount` vs `maxAttempts` ratio when
-   * mesh-backed asteroids leave large fractions of the world square void.
-   */
-  onDiagnostics?: (diag: RockDistributionDiagnostics) => void
 }
 
 const REFERENCE_WORLD_SIZE = 8000
@@ -272,7 +242,7 @@ function overlapsExisting(
 export function generateAsteroidRockDistribution(
   options: AsteroidRockDistributionOptions,
 ): AsteroidRockSpawn[] {
-  const { seed, worldSize, surface, slopeAt, isValidGround, onDiagnostics } = options
+  const { seed, worldSize, surface, slopeAt, isValidGround } = options
   const exclusions = options.exclusions ?? []
   const rng = seededRandom(seed + 4813)
   const noise = new SimplexNoise(seed + 777)
@@ -285,15 +255,8 @@ export function generateAsteroidRockDistribution(
   const accepted: AsteroidRockSpawn[] = []
   const baseHeightRatio = 0.28 + surface.roughness * 0.22 + surface.boulderDensity * 0.08
   const maxSlope = 0.9 + (1 - surface.roughness) * 1.6 + surface.dustCoverage * 1.1
-  let rejectedByValidGround = 0
-  let rejectedByExclusion = 0
-  let rejectedBySlope = 0
-  let rejectedByOverlap = 0
-  let rejectedByAcceptRate = 0
-  let attempts = 0
 
   for (let attempt = 0; accepted.length < targetCount && attempt < maxAttempts; attempt++) {
-    attempts = attempt + 1
     const nx = rng() * 2 - 1
     const nz = rng() * 2 - 1
     const jitterX = noise.n2(attempt * 0.17, 11.3) * worldSize * 0.015
@@ -306,10 +269,7 @@ export function generateAsteroidRockDistribution(
     const acceptRate = isEjecta
       ? 1
       : clamp(localK / ACCEPT_RATE_K_SCALE, MIN_NON_EJECTA_ACCEPT_RATE, 1)
-    if (rng() > acceptRate) {
-      rejectedByAcceptRate++
-      continue
-    }
+    if (rng() > acceptRate) continue
 
     let diameter = sampleBoulderDiameter(surface, boost, rng)
     if (isEjecta) {
@@ -317,22 +277,10 @@ export function generateAsteroidRockDistribution(
     }
 
     const radius = diameter * 0.5
-    if (isValidGround && !isValidGround(x, z)) {
-      rejectedByValidGround++
-      continue
-    }
-    if (isInsideExclusion(x, z, radius, exclusions)) {
-      rejectedByExclusion++
-      continue
-    }
-    if (slopeAt && slopeAt(x, z) > maxSlope) {
-      rejectedBySlope++
-      continue
-    }
-    if (overlapsExisting(x, z, radius, accepted)) {
-      rejectedByOverlap++
-      continue
-    }
+    if (isValidGround && !isValidGround(x, z)) continue
+    if (isInsideExclusion(x, z, radius, exclusions)) continue
+    if (slopeAt && slopeAt(x, z) > maxSlope) continue
+    if (overlapsExisting(x, z, radius, accepted)) continue
 
     const tiltStrength = 0.04 + surface.roughness * 0.12
     const hdNoise = noise.n2(attempt * 0.11, attempt * 0.07)
@@ -364,19 +312,6 @@ export function generateAsteroidRockDistribution(
       isEjecta,
     })
   }
-
-  onDiagnostics?.({
-    worldSize,
-    targetCount,
-    accepted: accepted.length,
-    attempts,
-    maxAttempts,
-    rejectedByValidGround,
-    rejectedByExclusion,
-    rejectedBySlope,
-    rejectedByOverlap,
-    rejectedByAcceptRate,
-  })
 
   return accepted
 }

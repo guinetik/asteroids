@@ -106,6 +106,11 @@ export interface LevelDisturbanceState {
   triggeredTiers: Set<LevelDisturbanceResponseTier>
   /** Seconds in `[0, Infinity)` until another patrol can fire, for example `8`. */
   patrolCooldownRemaining: number
+  /**
+   * Seconds left of post-wave calm (no patrol reinforcements) while disturbance bleeds off.
+   * Example: `41` shortly after wiping the disturbance pack on a difficulty‑`10` asteroid.
+   */
+  ambientClearReprieveRemainingSeconds: number
 }
 
 /** Static tuning for one hidden disturbance response threshold. */
@@ -156,6 +161,16 @@ const PATROL_ENEMY_COUNT = 4
 const BASE_PATROL_COOLDOWN_SECONDS = 10
 /** Minimum patrol cooldown after difficulty scaling. */
 const MIN_PATROL_COOLDOWN_SECONDS = 6
+/** Base calm window seconds after wiping an ambient responder wave (`last kill → timers start`). */
+const AMBIENT_WAVE_CLEAR_REPRIEVE_BASE_SECONDS = 24
+/**
+ * Extra calm seconds appended for each mission-difficulty bracket above trivial.
+ *
+ * Difficulty `10` therefore adds `(10 - 1) *` this step on top of the base duration.
+ */
+const AMBIENT_WAVE_CLEAR_REPRIEVE_SECONDS_PER_DIFFICULTY_STEP = 2.95
+/** Passive disturbance bleed while calm persists — higher values burn heat faster (`points/s`). */
+const AMBIENT_REPRIEVE_DISTURBANCE_DECAY_PER_SECOND = 9
 /** Movement action base disturbance gain. */
 const MOVEMENT_BASE_GAIN = 0.35
 /** Sprint action base disturbance gain. */
@@ -261,6 +276,7 @@ export function createLevelDisturbanceState(params: {
     disturbance: DISTURBANCE_MIN,
     triggeredTiers: new Set(),
     patrolCooldownRemaining: DISTURBANCE_MIN,
+    ambientClearReprieveRemainingSeconds: DISTURBANCE_MIN,
   }
 }
 
@@ -285,11 +301,11 @@ export function recordLevelDisturbance(
 }
 
 /** Walker-class ambient viroid silhouette — weakest kill relief wedge. */
-const KILL_RELIEF_POINTS_BACTERIOPHAGE = 6
+const KILL_RELIEF_POINTS_BACTERIOPHAGE = 9
 /** Hovering ranger silhouette — intermediate relief wedge. */
-const KILL_RELIEF_POINTS_SPIRE = 15
+const KILL_RELIEF_POINTS_SPIRE = 20
 /** Heavy walker silhouette — largest single-kill meter trim. */
-const KILL_RELIEF_POINTS_CHIMERA = 28
+const KILL_RELIEF_POINTS_CHIMERA = 38
 
 /** Archetypes supported by ambient kill relief wedges. */
 export type AmbientViroidKillArchetype = 'bacteriophage' | 'spire' | 'chimera'
@@ -311,7 +327,7 @@ const RELIEF_BASE_KILL_POINTS: Record<AmbientViroidKillArchetype, number> = {
  * @param state - Disturbance state to mutate downward.
  * @param archetype - Viroid responder archetype that was destroyed (`bacteriophage`, `spire`, or `chimera`).
  *
- * @example `relieve(state, 'chimera')` trims roughly `≈35` points when `difficultyFactor` is `1.25`.
+ * @example `relieve(state, 'chimera')` trims substantially more disturbance than scouts at the same tier.
  */
 export function relieveLevelDisturbanceForAmbientKill(
   state: LevelDisturbanceState,
@@ -324,6 +340,29 @@ export function relieveLevelDisturbanceForAmbientKill(
 
   state.disturbance = clampDisturbance(
     sanitizeDisturbanceValue(state.disturbance) - relief,
+  )
+}
+
+/**
+ * Extend the ambient wave clear calm window whenever the disturbance pack wipes.
+ *
+ * Harder missions stash longer timeouts so wiping `MAX_LIVE_AMBIENT_ENEMIES` on tier‑`10`
+ * buys nearly a minute without patrol reinforcements; easier runs still nap fewer seconds.
+ *
+ * @param state - Disturbance state whose {@link LevelDisturbanceState.missionDifficulty} drives timers.
+ *
+ * @example Difficulty ten lands roughly `51` cumulative seconds assuming the player keeps clearing waves.
+ */
+export function grantAmbientWaveClearReprieve(state: LevelDisturbanceState): void {
+  const clampedDifficulty = clampMissionDifficulty(state.missionDifficulty)
+  const spanAboveMin = sanitizeNonNegativeFinite(clampedDifficulty - MIN_MISSION_DIFFICULTY)
+  const refreshedDuration = sanitizeNonNegativeFinite(
+    AMBIENT_WAVE_CLEAR_REPRIEVE_BASE_SECONDS +
+      AMBIENT_WAVE_CLEAR_REPRIEVE_SECONDS_PER_DIFFICULTY_STEP * spanAboveMin,
+  )
+  state.ambientClearReprieveRemainingSeconds = Math.max(
+    sanitizeNonNegativeFinite(state.ambientClearReprieveRemainingSeconds),
+    refreshedDuration,
   )
 }
 
@@ -343,6 +382,22 @@ export function tickLevelDisturbance(
   dt: number,
 ): LevelDisturbanceResponseEvent[] {
   const elapsedSeconds = sanitizeNonNegativeFinite(dt)
+  const ambientReprieveBeforeTick = sanitizeNonNegativeFinite(state.ambientClearReprieveRemainingSeconds)
+
+  state.ambientClearReprieveRemainingSeconds = Math.max(
+    DISTURBANCE_MIN,
+    ambientReprieveBeforeTick - elapsedSeconds,
+  )
+
+  if (ambientReprieveBeforeTick > DISTURBANCE_MIN && elapsedSeconds > DISTURBANCE_MIN) {
+    const driftUnits = sanitizeNonNegativeFinite(
+      AMBIENT_REPRIEVE_DISTURBANCE_DECAY_PER_SECOND * elapsedSeconds,
+    )
+    state.disturbance = clampDisturbance(
+      sanitizeDisturbanceValue(state.disturbance) - driftUnits,
+    )
+  }
+
   state.patrolCooldownRemaining = Math.max(
     DISTURBANCE_MIN,
     sanitizeNonNegativeFinite(state.patrolCooldownRemaining) - elapsedSeconds,
@@ -365,7 +420,10 @@ export function tickLevelDisturbance(
     }
   }
 
+  const reinforcementAllowedDuringCalmBreak = ambientReprieveBeforeTick <= DISTURBANCE_MIN
+
   if (
+    reinforcementAllowedDuringCalmBreak &&
     state.disturbance >= DISTURBANCE_MAX * PATROL_REINFORCEMENT_DISTURBANCE_RATIO &&
     state.triggeredTiers.has('patrol') &&
     state.patrolCooldownRemaining <= DISTURBANCE_MIN
@@ -394,6 +452,7 @@ export function resetLevelDisturbance(state: LevelDisturbanceState): void {
   state.disturbance = DISTURBANCE_MIN
   state.triggeredTiers.clear()
   state.patrolCooldownRemaining = DISTURBANCE_MIN
+  state.ambientClearReprieveRemainingSeconds = DISTURBANCE_MIN
 }
 
 /**

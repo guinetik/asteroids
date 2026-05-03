@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createLevelDisturbanceState,
   getLevelDisturbanceDifficultyFactor,
+  grantAmbientWaveClearReprieve,
   recordLevelDisturbance,
   relieveLevelDisturbanceForAmbientKill,
   resetLevelDisturbance,
@@ -159,5 +160,69 @@ describe('levelDisturbance', () => {
     relieveLevelDisturbanceForAmbientKill(state, 'spire')
 
     expect(state.disturbance).toBe(0)
+  })
+
+  it('suppresses patrol reinforcements until the ambient clear calm expires', () => {
+    const state = createLevelDisturbanceState({ missionDifficulty: 10 })
+
+    recordLevelDisturbance(state, { type: 'explosion', amount: 100 })
+    tickLevelDisturbance(state, 0)
+
+    expect(state.triggeredTiers.has('patrol')).toBe(true)
+
+    state.patrolCooldownRemaining = 0
+    state.disturbance = 100
+
+    grantAmbientWaveClearReprieve(state)
+
+    expect(state.ambientClearReprieveRemainingSeconds).toBeGreaterThan(40)
+
+    const calmTick = tickLevelDisturbance(state, 1)
+
+    expect(calmTick).toEqual([])
+    expect(state.ambientClearReprieveRemainingSeconds).toBeGreaterThan(39)
+    expect(state.disturbance).toBeLessThan(100)
+  })
+
+  it('resumes patrol reinforcements only after ambient calm drains', () => {
+    const state = createLevelDisturbanceState({ missionDifficulty: 10 })
+
+    recordLevelDisturbance(state, { type: 'explosion', amount: 100 })
+    tickLevelDisturbance(state, 0)
+
+    state.patrolCooldownRemaining = 0
+    state.disturbance = 100
+
+    grantAmbientWaveClearReprieve(state)
+
+    tickLevelDisturbance(state, 60)
+
+    expect(state.ambientClearReprieveRemainingSeconds).toBe(0)
+
+    state.disturbance = 100
+
+    const resume = tickLevelDisturbance(state, 8)
+
+    expect(resume).toEqual([{ tier: 'patrol', enemyCount: 4, alert: 'VIROID SIGNAL CLOSING' }])
+  })
+
+  it('extends ambient calm grants instead of overwriting a longer countdown', () => {
+    const state = createLevelDisturbanceState({ missionDifficulty: 5 })
+
+    state.ambientClearReprieveRemainingSeconds = 999
+    grantAmbientWaveClearReprieve(state)
+
+    expect(state.ambientClearReprieveRemainingSeconds).toBe(999)
+  })
+
+  it('clears ambient calm timers whenever the cycle resets after liftoff', () => {
+    const state = createLevelDisturbanceState({ missionDifficulty: 10 })
+
+    grantAmbientWaveClearReprieve(state)
+    expect(state.ambientClearReprieveRemainingSeconds).toBeGreaterThan(0)
+
+    resetLevelDisturbance(state)
+
+    expect(state.ambientClearReprieveRemainingSeconds).toBe(0)
   })
 })

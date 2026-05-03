@@ -412,15 +412,6 @@ export class SurfaceRockController implements Tickable {
       exclusions: options.exclusions,
       slopeAt: (x, z) => options.heightmap.slopeAt(x, z),
       isValidGround: (x, z) => options.heightmap.isValidAt(x, z),
-      onDiagnostics: import.meta.env.DEV
-        ? (diag) => {
-            console.info('[rock-distribution]', {
-              ...diag,
-              fillFraction: diag.targetCount > 0 ? diag.accepted / diag.targetCount : 0,
-              attemptsUsedFraction: diag.maxAttempts > 0 ? diag.attempts / diag.maxAttempts : 0,
-            })
-          }
-        : undefined,
     })
 
     const controller = new SurfaceRockController(spawns)
