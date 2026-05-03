@@ -1296,6 +1296,10 @@
         window.Prelude = {
           ready: () => game.ready(),
           play: () => game.stop(),
+          // False once `stop()` has hidden the container — i.e. on every SPA
+          // nav after the first prelude run. Vue uses this to bypass the
+          // prelude gate when the minigame can no longer fire `prelude-play`.
+          isActive: () => elements.container.style.display !== 'none',
         };
       })();
     </script>

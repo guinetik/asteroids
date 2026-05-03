@@ -24,14 +24,24 @@ const RESTOCK_MIN_S = 120
 /** Maximum restock timer duration in seconds. */
 const RESTOCK_MAX_S = 240
 
-/** Minimum stock for expensive goods. */
-const STOCK_MIN = 5
+/** Minimum stock for trade goods at or above {@link TRADE_GOOD_CHEAP_PRICE_THRESHOLD} base price. */
+export const TRADE_GOOD_MIN_STOCK_EXPENSIVE = 5
+
+/**
+ * Minimum stock for trade goods below {@link TRADE_GOOD_CHEAP_PRICE_THRESHOLD} base price.
+ * Must be at least the largest single-step buy count in authored `trade-goods` contract steps
+ * (see `src/data/contracts/venusian-zeppelin-trade-loop.json`, 10 units per buy).
+ */
+export const TRADE_GOOD_MIN_STOCK_CHEAP = 10
 
 /** Maximum stock for cheap goods. */
 const STOCK_MAX = 20
 
-/** Price threshold: goods below this get higher stock. */
-const CHEAP_THRESHOLD = 50
+/**
+ * Base-price cutoff: goods below this roll {@link TRADE_GOOD_MIN_STOCK_CHEAP}–{@link STOCK_MAX} stock;
+ * goods at or above roll a tighter expensive range.
+ */
+export const TRADE_GOOD_CHEAP_PRICE_THRESHOLD = 50
 
 /**
  * Fraction of each good's catalog {@link TradeGoodDefinition.basePrice} charged when buying at its
@@ -94,9 +104,11 @@ function pickTradeSlots(planetId: string): TradeGoodSlot[] {
  */
 function buildSlot(tg: TradeGoodDefinition, isImported: boolean): TradeGoodSlot {
   const stock =
-    tg.basePrice < CHEAP_THRESHOLD
-      ? STOCK_MIN + Math.floor(Math.random() * (STOCK_MAX - STOCK_MIN + 1))
-      : STOCK_MIN + Math.floor(Math.random() * (STOCK_MAX / 2 - STOCK_MIN + 1))
+    tg.basePrice < TRADE_GOOD_CHEAP_PRICE_THRESHOLD
+      ? TRADE_GOOD_MIN_STOCK_CHEAP +
+        Math.floor(Math.random() * (STOCK_MAX - TRADE_GOOD_MIN_STOCK_CHEAP + 1))
+      : TRADE_GOOD_MIN_STOCK_EXPENSIVE +
+        Math.floor(Math.random() * (STOCK_MAX / 2 - TRADE_GOOD_MIN_STOCK_EXPENSIVE + 1))
   const price = Math.round(
     tg.basePrice *
       (isImported ? TRADE_GOOD_IMPORTED_BUY_PRICE_FRACTION : TRADE_GOOD_SOURCE_BUY_PRICE_FRACTION),

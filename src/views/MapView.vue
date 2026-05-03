@@ -1072,8 +1072,14 @@ onMounted(async () => {
 })
 
 watch(mapBootReady, (isReady) => {
-  if (isReady && typeof window !== 'undefined' && window.Prelude) {
+  if (!isReady || typeof window === 'undefined' || !window.Prelude) return
+  if (window.Prelude.isActive?.()) {
     window.Prelude.ready()
+  } else {
+    // SPA nav: prelude IIFE already stopped on a previous visit and won't
+    // fire `prelude-play` again. Synthesize the event so map music starts
+    // and `beginMapExperience()` runs.
+    window.dispatchEvent(new Event('prelude-play'))
   }
 })
 

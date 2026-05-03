@@ -1,9 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { createShopSession, tickShopSession, buyTradeGood, sellTradeGood } from '../shopSession'
+import {
+  createShopSession,
+  tickShopSession,
+  buyTradeGood,
+  sellTradeGood,
+  TRADE_GOOD_CHEAP_PRICE_THRESHOLD,
+  TRADE_GOOD_MIN_STOCK_CHEAP,
+  TRADE_GOOD_MIN_STOCK_EXPENSIVE,
+} from '../shopSession'
+import { getTradeGood, getTradeGoodsByPlanet } from '../tradeGoods'
 import { createProfile } from '@/lib/player/profile'
 import { createInventory, addItem } from '@/lib/inventory/inventory'
 import { resetDemand } from '../planetDemand'
-import { getTradeGoodsByPlanet } from '../tradeGoods'
 // Side-effect: register trade goods into item catalog
 import '../tradeGoods'
 
@@ -26,6 +34,23 @@ describe('createShopSession', () => {
     const session = createShopSession('jupiter')
     for (const slot of session.tradeSlots) {
       expect(slot.stock).toBeGreaterThan(0)
+    }
+  })
+
+  it('stocks cheap trade goods with at least 10 units (zeppelin contract bulk buys)', () => {
+    for (let i = 0; i < 30; i += 1) {
+      for (const planetId of ['venus', 'earth', 'mars'] as const) {
+        const session = createShopSession(planetId)
+        for (const slot of session.tradeSlots) {
+          const def = getTradeGood(slot.itemId)
+          expect(def).toBeDefined()
+          const minAllowed =
+            def!.basePrice < TRADE_GOOD_CHEAP_PRICE_THRESHOLD
+              ? TRADE_GOOD_MIN_STOCK_CHEAP
+              : TRADE_GOOD_MIN_STOCK_EXPENSIVE
+          expect(slot.stock).toBeGreaterThanOrEqual(minAllowed)
+        }
+      }
     }
   })
 

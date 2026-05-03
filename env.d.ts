@@ -16,5 +16,7 @@ interface Window {
   Prelude?: {
     ready: () => void
     play: () => void
+    /** False once the prelude has stopped (e.g. after the first SPA visit). */
+    isActive: () => boolean
   }
 }

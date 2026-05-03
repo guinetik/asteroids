@@ -576,8 +576,14 @@ viewController.setPreludeGate(preludeGate)
 
 watch(bootPhase, (phase) => {
   if (phase !== 'started') return
-  if (typeof window !== 'undefined' && window.Prelude) {
+  if (typeof window === 'undefined' || !window.Prelude) return
+  if (window.Prelude.isActive?.()) {
     window.Prelude.ready()
+  } else {
+    // SPA nav: the prelude IIFE already ran and stopped on a previous visit,
+    // so it can no longer fire `prelude-play`. Synthesize the event so music
+    // kicks in and the level audio/cinematic gate releases.
+    window.dispatchEvent(new Event('prelude-play'))
   }
 })
 
