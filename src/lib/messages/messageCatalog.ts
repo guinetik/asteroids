@@ -96,16 +96,16 @@ export const JAY_FIRST_SLINGSHOT_MESSAGE: ShipMessageDefinition = {
 export const JAY_CONTRACT_INCOMING_MESSAGE: ShipMessageDefinition = {
   id: 'jay-contract-incoming',
   from: 'Jay Mercer',
-  subject: 'After Your First Run — Partner Paperwork',
+  subject: 'First Job Done — Here Comes The Paperwork',
   sentAt: '2306-04-05 08:48 UTC',
   trigger: 'contract',
   delivery: 'inbox_prompt',
   priority: JAY_MESSAGE_PRIORITY,
   body: [
     'Hey, you got Jay.',
-    'I am not parking the real Space Cowboys, Inc. contract in your mail until you have one real job under your belt — shuttle, lander, anything that pays. Close something out, then the system will open a new folder with the partner offer.',
-    'Until you see that, you are on starter boards only. The logo can wait. Your flight hours cannot.',
-    'When the folder shows up, read it, accept it if you are still in, and we are fifty-fifty on everything after.',
+    'You closed your first job. Which means the Space Cowboys, Inc. contract is now sitting in a new folder in your mail — look for it on the left side of the message terminal.',
+    'Read it, accept it if you are still in, and we are fifty-fifty on everything after that.',
+    "The logo can wait. The flight hours couldn't.",
     '— Jay',
   ],
 }
@@ -138,15 +138,18 @@ export const COLONEL_SAMPAIO_MMC_HEADS_UP: ShipMessageDefinition = {
 export const JAY_DISTANCE_MESSAGE: ShipMessageDefinition = {
   id: 'jay-distance-from-earth',
   from: 'Jay Mercer',
-  subject: 'Distances Are Worse Than They Look',
+  subject: 'The System Is Bigger Than It Looks From The Moon',
   sentAt: '2306-04-05 09:02 UTC',
   trigger: 'map_leave_earth_distance',
   delivery: 'inbox_prompt',
   priority: JAY_MESSAGE_PRIORITY,
   body: [
     'Hey, you got Jay.',
-    'If Earth already looks small, good. That means you are finally seeing the system the way haulers do. Distances out here will lie to you every single day if you let them.',
-    'Do not think in straight lines. Think in wells, lanes, and what body you are going to steal speed from next. The ship will show you the fabric. Trust it more than your gut until your gut earns the right.',
+    "If Earth is looking small already, good. That means you are starting to see it the way haulers do. Distances out here will lie to you every single day if you let them.",
+    "Do not think in straight lines. Think in wells, lanes, and what body you are going to steal speed from next. The slingshot you practiced near Earth works anywhere — same E to lock, same A and D to aim, different gravity source. That is the whole trick.",
+    "Trust the orbit lines more than your gut until your gut earns the right. It took me eleven years. You are going to be faster.",
+    "Probably. Maybe. I was really bad at this.",
+    '— Jay',
   ],
 }
 
@@ -154,15 +157,17 @@ export const JAY_DISTANCE_MESSAGE: ShipMessageDefinition = {
 export const JAY_THRUSTER_MESSAGE: ShipMessageDefinition = {
   id: 'jay-main-thruster-spent',
   from: 'Jay Mercer',
-  subject: 'That Red Bar Is The Lesson',
+  subject: 'That Red Bar Is Your Tuition',
   sentAt: '2306-04-05 09:18 UTC',
   trigger: 'map_main_thruster_depleted',
   delivery: 'inbox_prompt',
   priority: JAY_MESSAGE_PRIORITY,
   body: [
     'Hey, you got Jay.',
-    'You just ran the red thrust charge all the way down, so now you have seen the trick. The bar empties fast, the tank pays to bring it back, and waste shows up in your fuel ledger before you notice it in the seat.',
-    'Main thrust, brake, and RCS all sip from the same shuttle fuel, but they recharge on their own terms. Learn the rhythm and you will stop flying like every burn is an emergency.',
+    "You just ran the main thrust charge down to nothing. So now you have seen the trick — the bar empties fast, the tank pays to bring it back, and waste shows up in your fuel ledger before you notice it in the seat.",
+    "Main thrust, brake, and RCS all drink from the same tank, but they recharge on their own schedule. They top themselves off when idle. Learn that rhythm and you will stop flying like every burn is an emergency.",
+    "Gravity is free. Use it more. That is a sentence I repeated to myself for an embarrassing number of years before it stuck.",
+    '— Jay',
   ],
 }
 
@@ -170,15 +175,18 @@ export const JAY_THRUSTER_MESSAGE: ShipMessageDefinition = {
 export const JAY_BRAKE_MESSAGE: ShipMessageDefinition = {
   id: 'jay-brake-system-warning',
   from: 'Jay Mercer',
-  subject: 'Those Dampeners Are For Saving Your Skin',
+  subject: 'The Brake Is A Last Resort, Not A Habit',
   sentAt: '2306-04-05 09:26 UTC',
   trigger: 'map_brake_used',
   delivery: 'inbox_prompt',
   priority: JAY_MESSAGE_PRIORITY,
   body: [
     'Hey, you got Jay.',
-    'That brake is future neutron-tech inertia dampeners, which is a pretty way of saying it will absolutely break your motion when you ask nice and pay the fuel bill.',
-    'Use it when gravity, speed, or bad judgment have stacked the deck against you. It is worth the burn if it saves the ship, but you should never need it for normal flying. Last resort, not cruise control.',
+    "That brake you just hit — future neutron-tech inertia dampeners, which is a fancy way of saying it will absolutely kill your velocity when you ask nice and pay the fuel bill.",
+    "Use it when gravity, speed, and bad judgment have all showed up at the same party. It is worth the burn if it saves the ship.",
+    "But if you are braking on normal approaches, something earlier in the math went wrong. Figure that out and the brake gets to stay in the drawer where it belongs.",
+    "It is a last resort. Not a vibe.",
+    '— Jay',
   ],
 }
 
@@ -186,15 +194,17 @@ export const JAY_BRAKE_MESSAGE: ShipMessageDefinition = {
 export const JAY_MISSION_START_MESSAGE: ShipMessageDefinition = {
   id: 'jay-mission-start-lander-reminder',
   from: 'Jay Mercer',
-  subject: 'Use The Right Machine',
+  subject: 'Shuttle Gets You There, Lander Gets You Down',
   sentAt: '2306-04-05 09:34 UTC',
   trigger: 'mission_start',
   delivery: 'inbox_prompt',
   priority: JAY_MESSAGE_PRIORITY,
   body: [
     'Hey, you got Jay.',
-    'Do not take the shuttle into local mission work just because it is the bigger machine. Open the bay, check the lander, and use the right tool for the rock you are heading toward.',
-    'Shuttle gets you there. Lander gets you down. Then it is boots and hand tools. That order exists because people who tried the other order are now cautionary stories.',
+    "You have got a mission waypoint now, which means the lander is the machine you want. Hit F to open the cargo bay, drop the lander, and use the right tool for the rock you are heading toward.",
+    "Shuttle gets you there. Lander gets you down. Boots and hand tools after that. That order exists because people who tried the other order are now cautionary stories I tell at the Cowboys kiosk.",
+    "Anyway. Go get paid.",
+    '— Jay',
   ],
 }
 
@@ -318,15 +328,18 @@ export const JOVIAN_HEKTOR_PROSPECTUS_OFFER: ShipMessageDefinition = {
 export const JAY_VENUS_WARNING_MESSAGE: ShipMessageDefinition = {
   id: 'jay-venus-orbit-warning',
   from: 'Jay Mercer',
-  subject: 'You Are Getting Too Friendly With Venus',
+  subject: 'Venus Is A Pass, Not A Parking Spot',
   sentAt: '2306-04-05 09:46 UTC',
   trigger: 'map_venus_orbit_warning',
   delivery: 'inbox_prompt',
   priority: JAY_MESSAGE_PRIORITY,
   body: [
     'Hey, you got Jay.',
-    'You are close enough to the Venus lane that heat starts being a planning problem, not a theory problem. Until you fit better shielding, do not loaf around in there.',
-    'Use the pass, take what speed you came for, and get yourself back toward the goldilocks band before the hull starts teaching you a more expensive lesson.',
+    "You are close enough to the Venus lane that heat stops being a theory problem. With what you are running right now, do not loaf around in there.",
+    "Slingshot through if you need the speed, take what you came for, and get yourself back toward the goldilocks band before the hull starts writing you a tuition bill.",
+    "There is a paperwork lane that pays for the heat shield if you can stomach the forms. Worth knowing about. Worth more if you do it before Venus teaches you why.",
+    "The hull is not sentimental about this. Unfortunately.",
+    '— Jay',
   ],
 }
 

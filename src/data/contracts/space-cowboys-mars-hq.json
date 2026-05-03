@@ -5,17 +5,18 @@
   "from": "Jay Mercer",
   "sentAt": "2306-04-05 09:12 UTC",
   "triggerOnMissionCompletedNth": 1,
-  "introSubject": "Contract — Mars HQ",
+  "introSubject": "Partner Paperwork — The Part Where We Make It Official",
   "introBody": [
     "Hey, you got Jay.",
-    "Alright, paperwork. We are calling this thing Space Cowboys, Inc. You and me, partners, fifty-fifty. The HQ goes on Mars — cheap dust, decent gravity, nobody breathing down our necks.",
-    "Before we drop a pin on the rust planet we need a little street cred. People only talk to operators who have logged hours. So here is the run, in order:",
-    "1) Knock out an EVA contract — proves you can suit up and clock out clean.",
-    "2) Pick up two asteroid jobs off my board, so the lander log reads Mercer twice.",
-    "3) Bolt on Cryo Insulation Lvl 1 — Mars gets cold the second the sun drops.",
-    "4) Then come visit me at Mars. We open the office.",
-    "5) Sign the welcome paperwork by running an orbital out of Mars — first delivery as a real Cowboys office.",
-    "Accept and I will start ringing your inbox with the next move every time you finish one.",
+    "[warm] Alright. So you went and did the first job. Which means it is time for the paperwork I have been putting off for eleven years.",
+    "Space Cowboys, Inc. You and me, fifty-fifty, Mars as the home base. Cheap dust, decent gravity, nobody breathing down our necks. Marta thinks you're ready. I told her she was high. She said she only sells to handsome men with stable orbits, so.",
+    "Here is what we need to do before we drop the pin on the rust planet:",
+    "1) One EVA contract — proves you can suit up and clock out clean.",
+    "2) Two asteroid jobs off my board — lander log reads Mercer twice, which starts to look like a pattern.",
+    "3) Cryo Insulation Lvl 1 fitted at any engineering bay — Mars nights bite and I am not explaining frostbite to your next of kin.",
+    "4) Burn for Mars and dock. I will be standing there looking insufferably pleased with myself.",
+    "5) Pick up one orbital from our new kiosk and run it. First job as a real Cowboys office. The ribbon-cutting.",
+    "Accept and I will walk you through it one step at a time.",
     "— Jay"
   ],
   "steps": [
@@ -24,11 +25,12 @@
       "count": 1,
       "missionType": "eva",
       "creditsReward": 500,
-      "subject": "Suit Up — One EVA",
+      "subject": "One EVA — Suit Up, Clock Out Clean",
       "flavor": [
         "Hey, you got Jay.",
-        "First one's the suit job. Pick any EVA contract off the board, get out there, finish it without losing a glove or a tether. Easy money for a guy with hands.",
-        "Close it out clean and the dispatch ledger ticks over. One down.",
+        "First one is the suit job. Grab any EVA contract off the board, get out there, and finish it without losing a glove or a tether.",
+        "Easy money for a guy with hands. You are a guy with hands. I have it on good authority.",
+        "Close it out clean and we tick the first box. Go.",
         "— Jay"
       ]
     },
@@ -38,11 +40,12 @@
       "missionType": "asteroid",
       "giverId": "jay",
       "creditsReward": 500,
-      "subject": "Two Rocks With My Name On Them",
+      "subject": "Two Rocks Off My Board — The Mercer Stamp",
       "flavor": [
         "Hey, you got Jay.",
-        "Now we put a Mercer stamp on the lander logs. Take two asteroid contracts off my list specifically — not the consortium boards, mine — boots on the rock both times.",
-        "I am the dispatcher and the pilot and the guy who buys you a beer when it's done. Welcome to early-stage equity. Two of mine and we read like a real outfit on paper.",
+        "[laughs] I am the dispatcher and the pilot and the guy who is buying you a beer when this is done. Welcome to early-stage equity.",
+        "Take two asteroid contracts off my list specifically — not anyone else's, mine. Boots on the rock both times. Lander out, cargo bay open with F, bring something home.",
+        "Two of mine and we start reading like a real outfit on paper. The ledger does not lie, even when everything else does.",
         "— Jay"
       ]
     },
@@ -51,11 +54,11 @@
       "upgradeId": "shuttleFreezeResistance",
       "minLevel": 1,
       "creditsReward": 500,
-      "subject": "Bolt On Cryo Insulation",
+      "subject": "Cryo Insulation Lvl 1 — Mars Nights Bite",
       "flavor": [
         "Hey, you got Jay.",
-        "Mars is not Venus, but the long nights bite. Get Cryo Insulation Lvl 1 fitted at any spaceport engineering bay before you head out.",
-        "Trust me. The first time the cabin frost crawls up the inside of the canopy you will wish you had paid the credits.",
+        "Mars is not Venus, but the long nights have a way of finding every gap in a hull. Get Cryo Insulation Lvl 1 at any spaceport engineering bay before you head out.",
+        "First time cabin frost crawls up the inside of the canopy you will wish you had paid the credits. I paid the credits. Took me two cold nights to learn that. You get to learn it for free.",
         "— Jay"
       ]
     },
@@ -63,11 +66,11 @@
       "kind": "visit-planet",
       "planetId": "mars",
       "creditsReward": 500,
-      "subject": "Come To Mars",
+      "subject": "Come To Mars — I Have Two Coffees",
       "flavor": [
         "Hey, you got Jay.",
-        "Burn for Mars. Park in orbit, dock at the spaceport, walk into the engineering bay — I'll be the guy holding two coffees and a key card.",
-        "Welcome to HQ, partner. The kiosk is yours. Anytime you wanna come home, you point the nose at Mars and we will leave the lights on.",
+        "Burn for Mars. Aim prograde off whatever rock you are near, let gravity do the coasting, and dock at the spaceport when the nav says you are in.",
+        "I will be the guy holding two coffees and a key card. There is a Marines bunker on Phobos — Cmdte. Sampaio runs it. He will find you when he wants you. For now: park, drink the coffee, and welcome to HQ.",
         "— Jay"
       ]
     },
@@ -75,21 +78,22 @@
       "kind": "orbital-mission",
       "giverPlanetId": "mars",
       "creditsReward": 500,
-      "subject": "First Job From The Mars Desk",
+      "subject": "First Job From The Cowboys Desk",
       "flavor": [
         "Hey, you got Jay.",
-        "Welcome aboard, partner. First order of business — pick up an orbital contract from our own kiosk here at Mars and run it. Doesn't matter where the cargo is parked; what matters is the slip says Space Cowboys, Inc. on the giver line.",
-        "Walk into the Mars spaceport mission board, grab the planetary shuttle job on offer, fly the orbital pickup, and ring me when the cargo is in the hold. That is the official ribbon-cutting.",
+        "Welcome aboard, partner. Now make it official. Walk into the Mars spaceport, pull up the mission board, grab the planetary shuttle job on offer, and run the orbital pickup.",
+        "The slip says Space Cowboys, Inc. on the giver line. That is the ribbon-cutting. Do not overthink it.",
+        "[sighs] Eleven years I have been out here. Would have done this a lot sooner if I had known the partner was just sitting on the Moon.",
         "— Jay"
       ]
     }
   ],
-  "completionSubject": "Welcome To HQ",
+  "completionSubject": "We Are Official — Welcome Home, Partner",
   "completionBody": [
     "Hey, you got Jay.",
-    "We're official. Space Cowboys, Inc. has a permanent kiosk in the Mars spaceport. Your name is on the door, sort of — I drew it in marker, it'll outlast the hull plating.",
-    "From now on you can fast-travel home to Mars from the star map any time you want. Click the planet, confirm, and the orbital traffic controllers will pretend they slotted you in legitimately.",
-    "Drinks at the kiosk. On me.",
+    "Space Cowboys, Inc. has a permanent kiosk in the Mars spaceport. Your name is on the door. I wrote it in marker — should outlast the hull plating, definitely outlasts the warranty.",
+    "From here on, Mars is home base. Open your star map and click the planet anytime you want to fast-travel back. The orbital traffic controllers will pretend they slotted you in legitimately.",
+    "Drinks at the kiosk. On me. I have been waiting eleven years for an excuse to say that.",
     "— Jay"
   ],
   "rewards": [{ "type": "fast-travel", "planetId": "mars" }]

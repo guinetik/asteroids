@@ -1,15 +1,15 @@
 {
   "id": "frontier-rescue",
   "name": "Frontier Rescue",
-  "title": "Emergency Services",
+  "title": "Colonial Emergency Response",
   "objectiveTypes": ["rescue"],
   "minDifficulty": 3,
   "maxDifficulty": 10,
   "missions": [
     {
       "id": "fr_distress_signal",
-      "name": "Distress Signal",
-      "briefing": "We are picking up a distress beacon. Colonists are trapped. Clock is ticking — get in there and pull them out.",
+      "name": "Distress beacon — colonists, clock running",
+      "briefing": "Frontier Rescue dispatch. Beacon active, colonists trapped, oxygen window closing. Lander required. Accept and the waypoint is yours. Extract and return.",
       "objectiveSlots": [
         {
           "type": "rescue",
@@ -32,8 +32,8 @@
     },
     {
       "id": "fr_cocoon_extraction",
-      "name": "Cocoon Extraction",
-      "briefing": "Multiple colonists cocooned in a deep nest. Hostiles confirmed. Move fast, shoot straight, bring them home alive.",
+      "name": "Hull breach — nest activity confirmed",
+      "briefing": "Frontier Rescue dispatch. Multiple colonists cocooned, hostiles confirmed on site. High-priority extract. Arm before entry. Get them out alive.",
       "objectiveSlots": [
         {
           "type": "rescue",
