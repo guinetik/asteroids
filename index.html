@@ -77,13 +77,13 @@
         box-shadow: 0 0 1.5rem rgba(34, 211, 238, 0.18);
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-Dd1Iijxu.js"></script>
+    <script type="module" crossorigin src="/assets/index-CXqgluY3.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/specialMissions-DjSPLIre.js">
     <link rel="modulepreload" crossorigin href="/assets/vendor-pinia-DSmCRyVf.js">
     <link rel="modulepreload" crossorigin href="/assets/vendor-vue-iVKUiCKN.js">
     <link rel="modulepreload" crossorigin href="/assets/vendor-vue-router-BzB1D7NX.js">
     <link rel="modulepreload" crossorigin href="/assets/profile-BXvo8esA.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-CD98d31Z.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-B2eOvl20.css">
   </head>
   <body>
     <div id="prelude-container">
@@ -1303,6 +1303,10 @@
         window.Prelude = {
           ready: () => game.ready(),
           play: () => game.stop(),
+          // False once `stop()` has hidden the container — i.e. on every SPA
+          // nav after the first prelude run. Vue uses this to bypass the
+          // prelude gate when the minigame can no longer fire `prelude-play`.
+          isActive: () => elements.container.style.display !== 'none',
         };
       })();
     </script>
