@@ -201,19 +201,19 @@ export const JAY_MISSION_START_MESSAGE: ShipMessageDefinition = {
 /** Special mission offer that also serves as the authored inbox handoff. */
 export const CONSORTIUM_CERTIFICATION_MESSAGE: ShipMessageDefinition = {
   id: 'consortium-certification-offer',
-  from: 'Space Consortium — Logistics Division',
-  subject: 'Requisition Package — Field Operator Certification',
+  from: 'United Space Consortium — Logistics Division',
+  subject: 'REQUISITION PACKAGE — FIELD OPERATOR CERTIFICATION 2207-R-887',
   sentAt: '2306-04-09 12:10 UTC',
   trigger: 'mission_start',
   delivery: 'inbox_prompt',
   priority: CONSORTIUM_MESSAGE_PRIORITY,
   body: [
-    'Operator,',
-    'Your recent activity logs were flagged by an associate of ours, J. Mercer, as evidence of sustained deep-field work using a Class-C orbital frame.',
-    'We do not typically certify retrofitted hulls for relativistic grid coupling. In this case, an exception package has been staged and attached to your work queue under Consortium Certification.',
-    'Proceed to the marked asteroid, retrieve the sealed Grid Coupling Module, and install it from shuttle inventory after recovery. Do not tamper with the package in the field.',
-    'This assignment has already been entered into your active mission ledger. Track the waypoint and complete the pickup at your discretion.',
-    '— Consortium Logistics, Sol Sector',
+    'OPERATOR,',
+    'Pursuant to recent activity logs flagged on your file by an associate of record (J. MERCER), the Consortium notes sustained deep-field operation against a Class-C orbital frame.',
+    'Retrofitted hulls are not typically certified for relativistic grid coupling. In this case, an exception package has been staged and attached to your active mission ledger under CONSORTIUM CERTIFICATION.',
+    'Proceed to the marked asteroid, retrieve the sealed Grid Coupling Module per Form 4471-G-12, and install from shuttle inventory after recovery. Field tampering with the package is non-permitted and will void the exception.',
+    'The assignment has been entered into your active mission ledger. Track the waypoint and complete the pickup at the operator\'s discretion. The Consortium thanks you for your cooperation.',
+    '— USC Logistics, Sol Sector',
   ],
 }
 

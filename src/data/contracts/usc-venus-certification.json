@@ -2,20 +2,21 @@
   "id": "usc-venus-certification",
   "homePlanet": "venus",
   "inboxName": "United Space Consortium",
-  "from": "USC — Operator Relations",
+  "from": "USC — Operator Relations, Sol Sector",
   "sentAt": "2306-04-06 15:30 UTC",
   "triggerOnMissionOfKind": { "n": 1, "missionType": "asteroid" },
-  "introSubject": "Contract — Venus Lane Certification",
+  "introSubject": "RE: CERTIFICATION REQUEST 4471-V-CERT — VENUS LANE",
   "introBody": [
-    "Operator,",
-    "A completed asteroid-belt run has been logged in your Sol Sector file. The United Space Consortium is extending a partnership offer to qualifying independent pilots. We are short on certified Venus-lane operators; belt experience was one of the screening parameters.",
-    "Completion of the following work qualifies you for a permanent Earth orbital kiosk and a 2x payout multiplier on all Earth-issued contracts:",
-    "1) Complete one shuttle EVA contract.",
-    "2) Complete one asteroid contract.",
-    "3) Install Heat Shield Lvl 1 — non-negotiable for inner-system work.",
-    "4) Complete one orbital mission of any kind to demonstrate dispatch handling.",
-    "5) Establish Venus orbit to close out the certification.",
-    "Accept and your terminal will receive Consortium dispatch updates as you progress.",
+    "HANDLER,",
+    "Pursuant to the logging of a completed asteroid-belt run against your Sol Sector file, the United Space Consortium hereby extends a partnership offer to qualifying independent operators. Belt experience appears among the screening parameters; certified Venus-lane handlers remain in short supply.",
+    "Completion of the schedule below qualifies the bearer for a permanent operator kiosk in EARTH orbit and a 2x payout multiplier on all EARTH-issued contracts, effective on receipt of this notice.",
+    "SCHEDULE OF QUALIFYING WORK:",
+    "1) Submit one (1) shuttle EVA contract close-out.",
+    "2) Submit one (1) asteroid contract close-out.",
+    "3) Install Heat Shield Lvl 1, hull-side, non-negotiable for inner-system operation.",
+    "4) Submit one (1) orbital mission close-out demonstrating dispatch handling.",
+    "5) Establish stable Venus orbit to close out the certification.",
+    "On acceptance, your terminal will receive Consortium dispatch updates against the schedule. The Consortium thanks you for your cooperation.",
     "— USC Operator Relations, Sol Sector"
   ],
   "steps": [
@@ -24,11 +25,11 @@
       "count": 1,
       "missionType": "eva",
       "creditsReward": 666.69,
-      "subject": "Step 1 — Shuttle EVA",
+      "subject": "STEP 1 — SHUTTLE EVA, CLOSE-OUT REQUIRED",
       "flavor": [
-        "Operator,",
-        "Take any shuttle EVA contract from a planetary spaceport. Repair work, satellite servicing, hardpoint inspection — any qualifying EVA file your terminal lists.",
-        "Submit the close-out and the Consortium will log the credit toward your certification.",
+        "HANDLER,",
+        "Accept any qualifying shuttle EVA contract from a planetary spaceport. Repair work, satellite servicing, hardpoint inspection — any file your terminal lists under shuttle-EVA categorization is acceptable.",
+        "Submit the close-out and the Consortium will log the credit against your certification schedule.",
         "— USC Operator Relations"
       ]
     },
@@ -37,11 +38,11 @@
       "count": 1,
       "missionType": "asteroid",
       "creditsReward": 666.69,
-      "subject": "Step 2 — Asteroid Operation",
+      "subject": "STEP 2 — ASTEROID CONTRACT, LANDER QUALIFICATION",
       "flavor": [
-        "Operator,",
-        "Lander qualification next. Accept any asteroid contract, deploy the lander, complete the field objectives and exfil cleanly.",
-        "We are not looking for heroics. We are looking for a clean log.",
+        "HANDLER,",
+        "Lander qualification next. Accept any asteroid-class contract, deploy the lander, complete the field objectives, and exfil cleanly.",
+        "The Consortium does not require heroics. The Consortium requires a clean log.",
         "— USC Operator Relations"
       ]
     },
@@ -50,22 +51,22 @@
       "upgradeId": "shuttleHeatResistance",
       "minLevel": 1,
       "creditsReward": 666.69,
-      "subject": "Step 3 — Heat Shield Lvl 1",
+      "subject": "STEP 3 — HEAT SHIELD LVL 1, HULL-SIDE",
       "flavor": [
-        "Operator,",
-        "Inner-system work without a Heat Shield is a closed coffin. Have your shuttle outfitted with Heat Shield Level 1 at any spaceport engineering bay.",
-        "Confirmation pings to your file the moment it is installed.",
+        "HANDLER,",
+        "Inner-system operation absent a Heat Shield is non-compliant with current Consortium safety standards. Have the shuttle outfitted with Heat Shield Lvl 1 at any spaceport engineering bay.",
+        "Confirmation will ping to your file the moment installation is logged.",
         "— USC Operator Relations"
       ]
     },
     {
       "kind": "orbital-mission",
       "creditsReward": 666.69,
-      "subject": "Step 4 — Orbital Dispatch Handling",
+      "subject": "STEP 4 — ORBITAL DISPATCH HANDLING",
       "flavor": [
-        "Operator,",
-        "Take any planetary shuttle contract and run the orbital task end to end. Pickup, orbital minigame, delivery — we want the full dispatch loop on file.",
-        "It does not matter which planet writes the contract. Earth is the obvious source while you build heat tolerance. Submit a clean close-out and the Consortium will log the credit.",
+        "HANDLER,",
+        "Accept any planetary shuttle contract and execute the orbital task end-to-end: pickup, orbital task, delivery. The Consortium requires the full dispatch loop on file.",
+        "Originating planet is at the handler's discretion. EARTH-issued work is the standard source while heat tolerance is being established. Submit a clean close-out and the credit will log.",
         "— USC Operator Relations"
       ]
     },
@@ -73,21 +74,21 @@
       "kind": "visit-planet",
       "planetId": "venus",
       "creditsReward": 666.69,
-      "subject": "Step 5 — Venus Orbital Insertion",
+      "subject": "STEP 5 — VENUS ORBITAL INSERTION, CERTIFICATION CLOSE",
       "flavor": [
-        "Operator,",
-        "Final objective. Burn for Venus and hold a stable orbit. Confirm thermal limits are within the Heat Shield envelope. The Consortium will log your insertion the moment your transponder pings inside the lane.",
-        "Establish orbit and your file is closed in your favor.",
+        "HANDLER,",
+        "Final qualifying objective. Burn for VENUS and hold a stable insertion. Confirm thermal margins are within the Heat Shield envelope. The Consortium will log insertion the moment your transponder pings inside the lane.",
+        "Establish orbit and the file is closed in your favor.",
         "— USC Operator Relations"
       ]
     }
   ],
-  "completionSubject": "Certified — Earth Kiosk Granted",
+  "completionSubject": "CERTIFIED — EARTH KIOSK GRANTED, FILE 4471-V-CERT CLOSED",
   "completionBody": [
-    "Operator,",
-    "Certification logged. The United Space Consortium has unlocked a permanent operator kiosk for you in Earth orbit. Your transponder will be recognized by traffic control on inbound approach from anywhere in the system.",
-    "Per the partnership agreement, all Earth-issued contracts now pay at a 2x rate. We expect this incentive will keep you in the inner system for the foreseeable future.",
-    "Welcome to the lane.",
+    "HANDLER,",
+    "Certification logged. The United Space Consortium has unlocked a permanent operator kiosk on your behalf in EARTH orbit. Your transponder shall be recognized by traffic control on inbound approach from any point in the system.",
+    "Per the partnership agreement, all EARTH-issued contracts shall pay at the certified handler rate (2x base) effective immediately. The Consortium expects this incentive will keep the bearer in the inner system for the foreseeable future.",
+    "The Consortium thanks you for your cooperation.",
     "— USC Operator Relations, Sol Sector"
   ],
   "rewards": [
