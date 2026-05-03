@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest'
 import {
   hasCompletedMissionObjectiveType,
   isFirstMissionRun,
+  isRuntimeTipShowable,
+  MISSION_TIP_RUNTIME_SHOW_LIMIT,
   resolveFirstRunLanderTipTransmission,
   resolveMissionTipTransmission,
   resolveRuntimeMissionTipTransmission,
 } from '@/lib/level/missionTips'
+import { createProfile } from '@/lib/player/profile'
 import type { GeneratedAsteroidMission } from '@/lib/missions/types'
 import type { PlayerProfile } from '@/lib/player/types'
 
@@ -42,6 +45,7 @@ function profile(completed: Record<string, number>): PlayerProfile {
       lifetimeCreditsSpent: 0,
       lifetimeTradeCreditsEarned: 0,
       missionObjectivesCompletedByType: completed,
+      runtimeTipsShownCount: {},
       slingshotLaunches: 0,
       slingshotLaunchesByBody: {},
       gravitySurfStarts: 0,
@@ -173,5 +177,39 @@ describe('missionTips', () => {
     expect(exfil?.view).toBe('lander')
     expect(exfil?.message).toContain('EXFILTRATE')
     expect(exfil?.message).toContain('tap F')
+  })
+})
+
+describe('isRuntimeTipShowable', () => {
+  function profileWithCounts(counts: Record<string, number>): PlayerProfile {
+    const base = createProfile('Pilot')
+    return {
+      ...base,
+      achievementStats: {
+        ...base.achievementStats,
+        runtimeTipsShownCount: counts,
+      },
+    }
+  }
+
+  it('allows a tip with no recorded shows', () => {
+    expect(isRuntimeTipShowable(profileWithCounts({}), 'oxygenLow')).toBe(true)
+  })
+
+  it('allows a tip below the limit', () => {
+    expect(isRuntimeTipShowable(profileWithCounts({ oxygenLow: 1 }), 'oxygenLow')).toBe(true)
+  })
+
+  it('blocks a tip that has reached the limit', () => {
+    expect(
+      isRuntimeTipShowable(
+        profileWithCounts({ oxygenLow: MISSION_TIP_RUNTIME_SHOW_LIMIT }),
+        'oxygenLow',
+      ),
+    ).toBe(false)
+  })
+
+  it('treats a null profile as showable (fresh save)', () => {
+    expect(isRuntimeTipShowable(null, 'oxygenLow')).toBe(true)
   })
 })

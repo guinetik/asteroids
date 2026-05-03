@@ -170,3 +170,18 @@ export function resolveRuntimeMissionTipTransmission(
     objectiveType,
   }
 }
+
+/** Maximum number of completed missions that may show the same runtime tip before it retires. */
+export const MISSION_TIP_RUNTIME_SHOW_LIMIT = 2
+
+/**
+ * Check if a runtime tip can still be shown given persisted profile counts.
+ *
+ * @param profile - Current player profile, or `null` for a fresh save.
+ * @param id - Runtime tip id, for example `oxygenLow`.
+ * @returns True when the tip has appeared in fewer than the budget of completed missions.
+ */
+export function isRuntimeTipShowable(profile: PlayerProfile | null, id: string): boolean {
+  const shown = profile?.achievementStats.runtimeTipsShownCount[id] ?? 0
+  return shown < MISSION_TIP_RUNTIME_SHOW_LIMIT
+}
