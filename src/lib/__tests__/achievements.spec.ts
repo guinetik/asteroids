@@ -226,7 +226,9 @@ describe('achievements', () => {
     expect(act1Hint).toContain('Inner System')
 
     const act2Hint = getAchievementLockedHint(
-      ACHIEVEMENT_DEFINITIONS.find((definition) => definition.id === 'journey-act-2-jovian-arrival')!,
+      ACHIEVEMENT_DEFINITIONS.find(
+        (definition) => definition.id === 'journey-act-2-jovian-arrival',
+      )!,
       progress(),
     )
 

@@ -233,8 +233,14 @@ describe('act-1-inner-system journey', () => {
 describe('act-2-jovian-arrival journey', () => {
   it('is hidden until first_orbit:jupiter even when contract steps have fired', () => {
     let profile = profileAfterAct1Complete()
-    profile = applyJourneyTrigger(profile, 'contract_completed:venusian-zeppelin-trade-loop').profile
-    profile = applyJourneyTrigger(profile, 'contract_completed:cinderline-mercury-consecration').profile
+    profile = applyJourneyTrigger(
+      profile,
+      'contract_completed:venusian-zeppelin-trade-loop',
+    ).profile
+    profile = applyJourneyTrigger(
+      profile,
+      'contract_completed:cinderline-mercury-consecration',
+    ).profile
     expect(profile.journeyStepProgress['act-2-jovian-arrival']).toBeDefined()
     expect(buildActiveJourneyTracker(profile)).toBeNull()
 
@@ -248,8 +254,14 @@ describe('act-2-jovian-arrival journey', () => {
 
   it('completes instantly when all contracts finished before the Jupiter gate opens', () => {
     let profile = profileAfterAct1Complete()
-    profile = applyJourneyTrigger(profile, 'contract_completed:venusian-zeppelin-trade-loop').profile
-    profile = applyJourneyTrigger(profile, 'contract_completed:cinderline-mercury-consecration').profile
+    profile = applyJourneyTrigger(
+      profile,
+      'contract_completed:venusian-zeppelin-trade-loop',
+    ).profile
+    profile = applyJourneyTrigger(
+      profile,
+      'contract_completed:cinderline-mercury-consecration',
+    ).profile
     profile = applyJourneyTrigger(profile, 'contract_completed:jovian-society-prospection').profile
     expect(profile.completedJourneyIds).not.toContain('act-2-jovian-arrival')
 
@@ -260,8 +272,14 @@ describe('act-2-jovian-arrival journey', () => {
   it('completes when the last contract closes after the gate is open', () => {
     let profile = profileAfterAct1Complete()
     profile = applyJourneyTrigger(profile, 'first_orbit:jupiter').profile
-    profile = applyJourneyTrigger(profile, 'contract_completed:venusian-zeppelin-trade-loop').profile
-    profile = applyJourneyTrigger(profile, 'contract_completed:cinderline-mercury-consecration').profile
+    profile = applyJourneyTrigger(
+      profile,
+      'contract_completed:venusian-zeppelin-trade-loop',
+    ).profile
+    profile = applyJourneyTrigger(
+      profile,
+      'contract_completed:cinderline-mercury-consecration',
+    ).profile
     profile = applyJourneyTrigger(profile, 'contract_completed:jovian-society-prospection').profile
     expect(profile.completedJourneyIds).toContain('act-2-jovian-arrival')
   })
@@ -270,8 +288,14 @@ describe('act-2-jovian-arrival journey', () => {
     let profile = profileAfterAct1Complete()
     profile = applyJourneyTrigger(profile, 'first_orbit:jupiter').profile
     profile = applyJourneyTrigger(profile, 'contract_completed:jovian-society-prospection').profile
-    profile = applyJourneyTrigger(profile, 'contract_completed:cinderline-mercury-consecration').profile
-    profile = applyJourneyTrigger(profile, 'contract_completed:venusian-zeppelin-trade-loop').profile
+    profile = applyJourneyTrigger(
+      profile,
+      'contract_completed:cinderline-mercury-consecration',
+    ).profile
+    profile = applyJourneyTrigger(
+      profile,
+      'contract_completed:venusian-zeppelin-trade-loop',
+    ).profile
     expect(profile.completedJourneyIds).toContain('act-2-jovian-arrival')
   })
 })

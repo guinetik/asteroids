@@ -90,13 +90,7 @@ describe('premium trade tuning', () => {
     )
     expect(sale.inventory.stacks.find((s) => s.itemId === TRADE_SAMPLE_ID)).toBeUndefined()
 
-    const rejectsMineral = sellPremiumTradeGood(
-      session,
-      profile,
-      createInventory(),
-      'olivine',
-      1,
-    )
+    const rejectsMineral = sellPremiumTradeGood(session, profile, createInventory(), 'olivine', 1)
     expect(rejectsMineral.ok).toBe(false)
   })
 })

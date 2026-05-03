@@ -25,10 +25,7 @@ function minimalContract(id: string, inboxName: string, steps: Contract['steps']
   }
 }
 
-function instance(
-  contractId: string,
-  overrides: Partial<ContractInstance> = {},
-): ContractInstance {
+function instance(contractId: string, overrides: Partial<ContractInstance> = {}): ContractInstance {
   return {
     contractId,
     status: 'active',
@@ -46,9 +43,10 @@ describe('buildActiveContractHudRows', () => {
   it('returns empty array when no qualifying instances', () => {
     expect(buildActiveContractHudRows([], () => null)).toEqual([])
     expect(
-      buildActiveContractHudRows(
-        [instance('a', { status: 'completed' })],
-        () => minimalContract('a', 'A', [{ kind: 'visit-planet', planetId: 'x', subject: 'S', flavor: [] }]),
+      buildActiveContractHudRows([instance('a', { status: 'completed' })], () =>
+        minimalContract('a', 'A', [
+          { kind: 'visit-planet', planetId: 'x', subject: 'S', flavor: [] },
+        ]),
       ),
     ).toEqual([])
   })

@@ -33,12 +33,7 @@ onMounted(() => {
       </div>
       <p class="mission-tip__message">
         <span class="mission-tip__speaker">{{ transmission.speaker }}:</span>
-        <ScrambleText
-          :text="transmission.message"
-          :speed="24"
-          :scramble-frames="7"
-          :stagger="1"
-        />
+        <ScrambleText :text="transmission.message" :speed="24" :scramble-frames="7" :stagger="1" />
       </p>
     </div>
   </aside>

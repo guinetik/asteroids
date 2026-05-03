@@ -162,7 +162,9 @@ describe('Jay Mercer expansion missions', () => {
     ({ ...overrides }) as unknown as PlayerProfile
 
   it('Jay surfaces always (giver-level always-on)', () => {
-    expect(getGiversForDifficulty(3, createProfile('test-pilot')).find((g) => g.id === 'jay')).toBeDefined()
+    expect(
+      getGiversForDifficulty(3, createProfile('test-pilot')).find((g) => g.id === 'jay'),
+    ).toBeDefined()
   })
 
   it('Jays existing missions surface without the flag', () => {

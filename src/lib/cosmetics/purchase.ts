@@ -6,11 +6,7 @@
  * @spec docs/superpowers/specs/2026-04-30-pimp-my-shuttle-shop-design.md
  */
 
-import type {
-  CosmeticPurchaseResult,
-  PlayerCosmetics,
-  ShuttleTitlePurchaseResult,
-} from './types'
+import type { CosmeticPurchaseResult, PlayerCosmetics, ShuttleTitlePurchaseResult } from './types'
 import type { PlayerProfile } from '@/lib/player/types'
 import { findCosmeticOptionById, SHUTTLE_TITLE_SERVICE_OPTION_ID } from './catalog'
 import {
@@ -103,8 +99,7 @@ export function purchaseCosmeticOption(
       return { ok: true, profile: applyOptionToProfile(profile, optionId) }
     }
 
-    const wallet =
-      option.price === 0 ? profile : spendCredits(profile, option.price)
+    const wallet = option.price === 0 ? profile : spendCredits(profile, option.price)
     if (!wallet) {
       return { ok: false, profile, reason: 'insufficient-credits' }
     }
@@ -126,7 +121,10 @@ export function purchaseCosmeticOption(
  * @param profile - Current profile.
  * @param optionId - Cosmetic row id (`multitool-paint-graphite-bloom`, …).
  */
-export function applyOwnedCosmetic(profile: PlayerProfile, optionId: string): CosmeticPurchaseResult {
+export function applyOwnedCosmetic(
+  profile: PlayerProfile,
+  optionId: string,
+): CosmeticPurchaseResult {
   const option = findCosmeticOptionById(optionId)
   if (!option) return { ok: false, profile, reason: 'unknown-option' }
   if (option.category === 'shuttle-title') {

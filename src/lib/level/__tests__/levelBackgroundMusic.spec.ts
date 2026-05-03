@@ -35,7 +35,9 @@ describe('resolveLevelBackgroundMusicSoundId', () => {
   it('returns gravity for survey photometry prospectus-terminal', () => {
     expect(resolveLevelBackgroundMusicSoundId(objs('survey'))).toBe('music.levelGravity')
     expect(resolveLevelBackgroundMusicSoundId(objs('photometry'))).toBe('music.levelGravity')
-    expect(resolveLevelBackgroundMusicSoundId(objs('prospectus-terminal'))).toBe('music.levelGravity')
+    expect(resolveLevelBackgroundMusicSoundId(objs('prospectus-terminal'))).toBe(
+      'music.levelGravity',
+    )
   })
 
   it('defaults to combat when list is empty', () => {

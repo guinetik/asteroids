@@ -178,7 +178,10 @@ const BUNKER_OPERATOR_DEATH_CAUSE = 'Operator KIA'
 /** Seconds a hidden disturbance alert stays on the terminal prompt line. */
 const DISTURBANCE_ALERT_DURATION_SECONDS = 3
 /** Objective types that already provide their own authored viroid pressure. */
-const DISTURBANCE_DISABLED_OBJECTIVE_TYPES = new Set<ConcreteObjective['type']>(['bunker', 'rescue'])
+const DISTURBANCE_DISABLED_OBJECTIVE_TYPES = new Set<ConcreteObjective['type']>([
+  'bunker',
+  'rescue',
+])
 
 /**
  * Boot / preload status emitted to {@link LevelView} while the level scene
@@ -1278,7 +1281,11 @@ export class LevelViewController implements Tickable {
 
     // ── Objective minigames ──────────────────────────────────────
     const missionSeed = hashLevelSeed(mission.id)
-    if (!mission.objectives.some((objective) => DISTURBANCE_DISABLED_OBJECTIVE_TYPES.has(objective.type))) {
+    if (
+      !mission.objectives.some((objective) =>
+        DISTURBANCE_DISABLED_OBJECTIVE_TYPES.has(objective.type),
+      )
+    ) {
       this.disturbanceDirector = new LevelDisturbanceDirector({
         scene: this.sceneManager.scene,
         heightmap: this.heightmap,
@@ -3458,9 +3465,7 @@ export class LevelViewController implements Tickable {
    */
   private isEligibleForExfil(): boolean {
     return (
-      this.hasExitedVehicle ||
-      this.minigames.areAllComplete() ||
-      this.prospectusObjectiveComplete
+      this.hasExitedVehicle || this.minigames.areAllComplete() || this.prospectusObjectiveComplete
     )
   }
 

@@ -7,7 +7,11 @@
  */
 import { describe, expect, it } from 'vitest'
 import { addCredits, createProfile } from '@/lib/player/profile'
-import { applyOwnedCosmetic, purchaseCosmeticOption, purchaseShuttleTitle } from '@/lib/cosmetics/purchase'
+import {
+  applyOwnedCosmetic,
+  purchaseCosmeticOption,
+  purchaseShuttleTitle,
+} from '@/lib/cosmetics/purchase'
 import { getCosmeticOptions, SHUTTLE_TITLE_SERVICE_OPTION_ID } from '@/lib/cosmetics/catalog'
 import type { CosmeticPurchaseResult, ShuttleTitlePurchaseResult } from '@/lib/cosmetics/types'
 import { getPlayerCosmetics } from '@/lib/cosmetics/profileCosmetics'

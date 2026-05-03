@@ -230,7 +230,7 @@ onBeforeUnmount(releaseControlPanelHeight)
           type="button"
           class="ship-message-card__button"
           @click="
-            uiAudio.notifySwitch();
+            uiAudio.notifySwitch()
             $emit('close')
           "
         >
@@ -281,7 +281,7 @@ onBeforeUnmount(releaseControlPanelHeight)
             type="button"
             class="shuttle-control-nav-btn shuttle-control-nav-btn--shop"
             @click="
-              uiAudio.notifyButtonClick();
+              uiAudio.notifyButtonClick()
               $emit('openShop')
             "
           >

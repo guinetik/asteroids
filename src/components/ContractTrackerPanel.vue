@@ -46,11 +46,7 @@ function emitOpen(row: ActiveContractHudRow): void {
 </script>
 
 <template>
-  <section
-    class="contract-tracker-panel"
-    :aria-label="CONTRACT_TRACKER_ARIA_LABEL"
-    role="region"
-  >
+  <section class="contract-tracker-panel" :aria-label="CONTRACT_TRACKER_ARIA_LABEL" role="region">
     <header class="contract-tracker-panel__header">
       <span class="contract-tracker-panel__eyebrow">Contracts</span>
     </header>
@@ -68,7 +64,11 @@ function emitOpen(row: ActiveContractHudRow): void {
           }}</span>
         </button>
         <div v-if="expandedContractId === row.contractId" class="contract-tracker-panel__detail">
-          <button type="button" class="contract-tracker-panel__objective-btn" @click="emitOpen(row)">
+          <button
+            type="button"
+            class="contract-tracker-panel__objective-btn"
+            @click="emitOpen(row)"
+          >
             {{ row.objectiveSubject }}
           </button>
           <p v-if="row.progressRequired > 1" class="contract-tracker-panel__progress">

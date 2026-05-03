@@ -1465,12 +1465,7 @@ body,
       rgb(2 6 23 / 0.72) 72%,
       rgb(2 6 23 / 1) 100%
     ),
-    linear-gradient(
-      90deg,
-      rgb(2 6 23 / 0.72) 0%,
-      rgb(2 6 23 / 0.22) 52%,
-      rgb(2 6 23 / 0.06) 100%
-    ),
+    linear-gradient(90deg, rgb(2 6 23 / 0.72) 0%, rgb(2 6 23 / 0.22) 52%, rgb(2 6 23 / 0.06) 100%),
     url('/inventory.webp');
 }
 
@@ -1483,12 +1478,7 @@ body,
       rgb(2 6 23 / 0.72) 72%,
       rgb(2 6 23 / 1) 100%
     ),
-    linear-gradient(
-      90deg,
-      rgb(2 6 23 / 0.72) 0%,
-      rgb(2 6 23 / 0.22) 52%,
-      rgb(2 6 23 / 0.06) 100%
-    ),
+    linear-gradient(90deg, rgb(2 6 23 / 0.72) 0%, rgb(2 6 23 / 0.22) 52%, rgb(2 6 23 / 0.06) 100%),
     url('/missions.webp');
 }
 
@@ -1501,12 +1491,7 @@ body,
       rgb(2 6 23 / 0.72) 72%,
       rgb(2 6 23 / 1) 100%
     ),
-    linear-gradient(
-      90deg,
-      rgb(2 6 23 / 0.72) 0%,
-      rgb(2 6 23 / 0.22) 52%,
-      rgb(2 6 23 / 0.06) 100%
-    ),
+    linear-gradient(90deg, rgb(2 6 23 / 0.72) 0%, rgb(2 6 23 / 0.22) 52%, rgb(2 6 23 / 0.06) 100%),
     url('/engineering-bay.webp');
 }
 
@@ -2829,7 +2814,10 @@ body,
   pointer-events: none;
   background-repeat: no-repeat;
   background-size: cover, cover, cover;
-  background-position: center top, center, center top;
+  background-position:
+    center top,
+    center,
+    center top;
   background-image:
     linear-gradient(
       180deg,
@@ -2840,12 +2828,7 @@ body,
       rgb(2 6 23 / 0.82) 76%,
       rgb(2 6 23 / 0.92) 100%
     ),
-    linear-gradient(
-      90deg,
-      rgb(2 6 23 / 0.72) 0%,
-      rgb(2 6 23 / 0.22) 52%,
-      rgb(2 6 23 / 0.06) 100%
-    ),
+    linear-gradient(90deg, rgb(2 6 23 / 0.72) 0%, rgb(2 6 23 / 0.22) 52%, rgb(2 6 23 / 0.06) 100%),
     url('/shop.webp');
 }
 
@@ -3693,7 +3676,9 @@ body,
   pointer-events: none;
   background-repeat: no-repeat;
   background-size: cover, cover;
-  background-position: center top, center;
+  background-position:
+    center top,
+    center;
   background-image:
     linear-gradient(
       115deg,
@@ -3757,7 +3742,12 @@ body,
 
 .cosmetic-shop-tab[aria-selected='true'] {
   @apply relative z-[1] border-fuchsia-400/65 text-fuchsia-50;
-  background: linear-gradient(165deg, rgb(192 38 211 / 0.42) 0%, rgb(88 28 135 / 0.55) 48%, rgb(15 23 42 / 0.92) 100%);
+  background: linear-gradient(
+    165deg,
+    rgb(192 38 211 / 0.42) 0%,
+    rgb(88 28 135 / 0.55) 48%,
+    rgb(15 23 42 / 0.92) 100%
+  );
   box-shadow:
     0 0 0 1px rgb(251 207 232 / 0.12),
     inset 0 1px 0 rgb(255 255 255 / 0.14);

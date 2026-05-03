@@ -422,7 +422,8 @@ function pushRuntimeMissionTip(id: string): void {
 }
 
 function dismissTopMissionTip(): boolean {
-  const tipStackVisible = stateInfo.state === 'lander' || stateInfo.state === 'eva' || inBunker.value
+  const tipStackVisible =
+    stateInfo.state === 'lander' || stateInfo.state === 'eva' || inBunker.value
   if (!trackerVisible.value || !tipStackVisible) return false
 
   const [tip] = visibleMissionTips.value
@@ -655,7 +656,9 @@ onMounted(async () => {
       trackerMission.value = mission
       const activeMission = viewController.getMission()
       const profile = loadProfile()
-      activeMissionObjectiveType.value = activeMission ? getMissionTipObjectiveType(activeMission) : null
+      activeMissionObjectiveType.value = activeMission
+        ? getMissionTipObjectiveType(activeMission)
+        : null
       if (activeMission) {
         pushMissionTip(resolveFirstRunLanderTipTransmission(activeMission, profile))
         pushMissionTip(resolveMissionTipTransmission(activeMission, profile, 'fps'))
@@ -1025,7 +1028,9 @@ function handleToggleMusic(): void {
   <TransitionGroup name="mission-tip-stack" tag="div" class="mission-tip-stack">
     <MissionTipMarquee
       v-for="tip in visibleMissionTips"
-      v-show="trackerVisible && (stateInfo.state === 'lander' || stateInfo.state === 'eva' || inBunker)"
+      v-show="
+        trackerVisible && (stateInfo.state === 'lander' || stateInfo.state === 'eva' || inBunker)
+      "
       :key="tip.id"
       :transmission="tip"
     />

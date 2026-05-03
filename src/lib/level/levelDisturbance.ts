@@ -2,7 +2,8 @@
  * Hidden asteroid-level disturbance model.
  *
  * Surface EVA actions add hidden viroid attention. Threshold crossings emit
- * response events that the scene-facing director turns into ambient enemies.
+ * response events that the scene-facing director turns into ambient enemies,
+ * while destroying those responders trims attention proportionally by silhouette tier.
  *
  * @author guinetik
  * @date 2026-05-02
@@ -40,7 +41,12 @@ export type LevelDisturbanceEventType =
  * @date 2026-05-02
  * @spec docs/superpowers/specs/2026-05-02-level-disturbance-system-design.md
  */
-export type LevelDisturbanceResponseTier = 'scout' | 'second-contact' | 'pair' | 'cluster' | 'patrol'
+export type LevelDisturbanceResponseTier =
+  | 'scout'
+  | 'second-contact'
+  | 'pair'
+  | 'cluster'
+  | 'patrol'
 
 /**
  * One action contribution to the hidden disturbance meter.
@@ -278,6 +284,49 @@ export function recordLevelDisturbance(
   )
 }
 
+/** Walker-class ambient viroid silhouette — weakest kill relief wedge. */
+const KILL_RELIEF_POINTS_BACTERIOPHAGE = 6
+/** Hovering ranger silhouette — intermediate relief wedge. */
+const KILL_RELIEF_POINTS_SPIRE = 15
+/** Heavy walker silhouette — largest single-kill meter trim. */
+const KILL_RELIEF_POINTS_CHIMERA = 28
+
+/** Archetypes supported by ambient kill relief wedges. */
+export type AmbientViroidKillArchetype = 'bacteriophage' | 'spire' | 'chimera'
+
+const RELIEF_BASE_KILL_POINTS: Record<AmbientViroidKillArchetype, number> = {
+  bacteriophage: KILL_RELIEF_POINTS_BACTERIOPHAGE,
+  spire: KILL_RELIEF_POINTS_SPIRE,
+  chimera: KILL_RELIEF_POINTS_CHIMERA,
+}
+
+/**
+ * Trim hidden disturbance when the player defeats an ambient viroid responder.
+ *
+ * Eliminating heavier silhouettes trims more absolute meter than scouts. Relief is multiplied by
+ * `difficultyFactor` stored on {@link LevelDisturbanceState} — the same scaler applied when raising
+ * attention — so Chimera clears on difficulty `10` pull more disturbance off the meter than
+ * scouts do on relaxed contracts.
+ *
+ * @param state - Disturbance state to mutate downward.
+ * @param archetype - Viroid responder archetype that was destroyed (`bacteriophage`, `spire`, or `chimera`).
+ *
+ * @example `relieve(state, 'chimera')` trims roughly `≈35` points when `difficultyFactor` is `1.25`.
+ */
+export function relieveLevelDisturbanceForAmbientKill(
+  state: LevelDisturbanceState,
+  archetype: AmbientViroidKillArchetype,
+): void {
+  const baseline = RELIEF_BASE_KILL_POINTS[archetype]
+  const baseKillPoints = sanitizeNonNegativeFinite(baseline)
+  const gainScale = sanitizeNonNegativeFinite(state.difficultyFactor)
+  const relief = sanitizeNonNegativeFinite(baseKillPoints * gainScale)
+
+  state.disturbance = clampDisturbance(
+    sanitizeDisturbanceValue(state.disturbance) - relief,
+  )
+}
+
 /**
  * Advance cooldowns and emit newly crossed response thresholds.
  *
@@ -400,5 +449,8 @@ function sanitizeNonNegativeFinite(value: number): number {
  * @returns Cooldown in seconds before another patrol can be emitted.
  */
 function getPatrolCooldownSeconds(state: LevelDisturbanceState): number {
-  return Math.max(MIN_PATROL_COOLDOWN_SECONDS, BASE_PATROL_COOLDOWN_SECONDS / state.difficultyFactor)
+  return Math.max(
+    MIN_PATROL_COOLDOWN_SECONDS,
+    BASE_PATROL_COOLDOWN_SECONDS / state.difficultyFactor,
+  )
 }

@@ -114,12 +114,16 @@ export function applyShuttlePaintMaterials(
   )
 
   for (const target of targets) {
-    applyMaterialPaintColor(target.material, target.baseColor, {
-      primary,
-      secondary,
-      trim,
-      accent,
-    }[target.channel])
+    applyMaterialPaintColor(
+      target.material,
+      target.baseColor,
+      {
+        primary,
+        secondary,
+        trim,
+        accent,
+      }[target.channel],
+    )
   }
 }
 
@@ -203,11 +207,12 @@ function applyMaterialPaintColor(
 ): void {
   const materialColor = getShuttleMaterialColor(material)
   if (!materialColor) return
-  materialColor
-    .copy(baseColor)
-    .lerp(
-      baseColor.clone().multiply(paintColor).multiplyScalar(1 / SHUTTLE_HULL_COLOR_SCALE),
-      SHUTTLE_PAINT_COLOR_STRENGTH,
-    )
+  materialColor.copy(baseColor).lerp(
+    baseColor
+      .clone()
+      .multiply(paintColor)
+      .multiplyScalar(1 / SHUTTLE_HULL_COLOR_SCALE),
+    SHUTTLE_PAINT_COLOR_STRENGTH,
+  )
   material.needsUpdate = true
 }

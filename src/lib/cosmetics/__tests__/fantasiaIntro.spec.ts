@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { createProfile } from '@/lib/player/profile'
-import { FANTASIA_INTRO_MESSAGE_ID, markFantasiaCosmeticIntroIfNeeded } from '@/lib/cosmetics/fantasiaIntro'
+import {
+  FANTASIA_INTRO_MESSAGE_ID,
+  markFantasiaCosmeticIntroIfNeeded,
+} from '@/lib/cosmetics/fantasiaIntro'
 
 describe('fantasia cosmetic intro', () => {
   it('marks Fantasia intro only once after eligible orbital arrivals', () => {

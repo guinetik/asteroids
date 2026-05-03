@@ -343,7 +343,8 @@ function evaTypeLabel(poiType: EvaMissionPoiType): string {
         allotments,
         <span class="shuttle-program-intro-em">asteroid</span>
         contracts, and rare
-        <span class="shuttle-program-intro-em">planetary haulage</span>. Each card lists issuer, theater, reward, and whether your hold can swallow the cargo clause.
+        <span class="shuttle-program-intro-em">planetary haulage</span>. Each card lists issuer,
+        theater, reward, and whether your hold can swallow the cargo clause.
         <span class="shuttle-program-intro-em">Accept</span>
         moves work into
         <span class="shuttle-program-intro-em">Active</span>
@@ -351,267 +352,273 @@ function evaTypeLabel(poiType: EvaMissionPoiType): string {
       </p>
 
       <!-- Shuttle EVA Missions (first — quick local spacewalk jobs) -->
-    <div v-if="evaSectionVisible" class="mission-board-section">
-      <h3 class="mission-board-section__heading">Shuttle EVA Missions</h3>
-      <p class="mission-board-section__descriptor">
-        Fly to a waypoint in deep space, exit the shuttle, and spacewalk to a relay or probe to
-        service it.
-      </p>
-
-      <div
-        v-if="board?.offeredEvaMission && board.offeringEvaPlanet === dockedPlanet"
-        class="mission-board-offer"
-      >
-        <div class="mission-board-offer__name">{{ board.offeredEvaMission.name }}</div>
-        <div v-if="evaGiverName(board.offeringEvaPlanet)" class="mission-board-offer__giver">
-          From: {{ evaGiverName(board.offeringEvaPlanet) }}
-        </div>
-        <div class="mission-board-offer__desc">{{ board.offeredEvaMission.description }}</div>
-        <div class="mission-board-offer__meta">
-          <span>Type: {{ evaTypeLabel(board.offeredEvaMission.poiType) }}</span>
-          <span>Waypoint: near {{ targetPlanetName(dockedPlanet ?? '') }}</span>
-          <span>Reward: {{ board.offeredEvaMission.reward }} CR</span>
-        </div>
-        <button
-          type="button"
-          class="mission-board-offer__accept-btn"
-          @click="emit('acceptEvaMission')"
-        >
-          Accept
-        </button>
-      </div>
-
-      <div v-else-if="board?.evaRestockTimer" class="mission-board-empty">
-        Restocking in {{ formatTime(board.evaRestockTimer.remaining) }}
-      </div>
-    </div>
-
-    <!-- Turret Mining Missions (second — bulk ore collection via the map turret) -->
-    <div v-if="miningSectionVisible" class="mission-board-section">
-      <h3 class="mission-board-section__heading">Turret Mining Missions</h3>
-      <p class="mission-board-section__descriptor">
-        Dock at a planet with a mining contract to accept it, then extract ore in the asteroid belt
-        using the map turret. Return to deliver when the target quantity is reached.
-      </p>
-
-      <div
-        v-if="board?.offeredMiningMission && board.offeringMiningPlanet === dockedPlanet"
-        class="mission-board-offer"
-      >
-        <div class="mission-board-offer__name">{{ board.offeredMiningMission.name }}</div>
-        <div v-if="miningGiverName(board.offeringMiningPlanet)" class="mission-board-offer__giver">
-          From: {{ miningGiverName(board.offeringMiningPlanet) }}
-        </div>
-        <div class="mission-board-offer__desc">{{ board.offeredMiningMission.description }}</div>
-        <div class="mission-board-offer__meta">
-          <span>Ore: {{ oreLabelFor(board.offeredMiningMission.oreCategory) }}</span>
-          <span>Quantity: {{ board.offeredMiningMission.targetKg }} kg</span>
-          <span>Reward: {{ board.offeredMiningMission.reward }} CR</span>
-        </div>
-        <button
-          type="button"
-          class="mission-board-offer__accept-btn"
-          @click="emit('acceptMiningMission')"
-        >
-          Accept
-        </button>
-      </div>
-
-      <div v-else-if="board?.miningRestockTimer" class="mission-board-empty">
-        Restocking in {{ formatTime(board.miningRestockTimer.remaining) }}
-      </div>
-    </div>
-
-    <!-- Asteroid Missions (third — local lander jobs near the posting station) -->
-    <div v-if="asteroidSectionVisible" class="mission-board-section">
-      <h3 class="mission-board-section__heading">Asteroid Missions</h3>
-      <p class="mission-board-section__descriptor">
-        Contracts send you to a waypoint near your posting station's orbit; difficulty scales with
-        your upgrades.
-      </p>
-
-      <div
-        v-if="
-          board?.offeredAsteroidMission &&
-          board.offeringAsteroidPlanet === dockedPlanet &&
-          !board.activeAsteroidMission
-        "
-        class="mission-board-offer"
-      >
-        <div class="mission-board-offer__name">{{ board.offeredAsteroidMission.name }}</div>
-        <div class="mission-board-offer__giver">
-          From: {{ board.offeredAsteroidMission.giverName }}
-        </div>
-        <div class="mission-board-offer__desc">{{ board.offeredAsteroidMission.briefing }}</div>
-        <div class="mission-board-offer__meta">
-          <span>Zone: {{ asteroidOperatingLabel(board.offeredAsteroidMission) }}</span>
-          <span
-            >Reward: {{ buffedAsteroidRewardCr(board.offeredAsteroidMission.totalReward) }} CR</span
-          >
-        </div>
-        <div class="mission-board-offer__objective">
-          {{ objectiveSummary(board.offeredAsteroidMission) }}
-        </div>
-        <button
-          type="button"
-          class="mission-board-offer__accept-btn"
-          @click="emit('acceptAsteroidMission')"
-        >
-          Accept
-        </button>
-      </div>
-
-      <div v-else-if="board?.asteroidRestockTimer" class="mission-board-empty">
-        Restocking in {{ formatTime(board.asteroidRestockTimer.remaining) }}
-      </div>
-    </div>
-
-    <!-- Planetary Missions (fourth — advanced: requires interplanetary travel) -->
-    <div v-if="planetarySectionVisible" class="mission-board-section">
-      <h3 class="mission-board-section__heading">Planetary Missions</h3>
-      <p class="mission-board-section__descriptor">
-        Advanced contracts that send you to <em>another</em> planet: match orbit from the shuttle,
-        secure the orbital pickup in your cargo hold, then return to the posting station for your
-        payout.
-      </p>
-
-      <div
-        v-if="board?.offeredMission && board.offeringPlanet === dockedPlanet"
-        class="mission-board-offer"
-      >
-        <div class="mission-board-offer__name">{{ board.offeredMission.name }}</div>
-        <div v-if="planetaryGiverName(board.offeringPlanet)" class="mission-board-offer__giver">
-          From: {{ planetaryGiverName(board.offeringPlanet) }}
-        </div>
-        <div class="mission-board-offer__desc">{{ board.offeredMission.description }}</div>
-        <div class="mission-board-offer__meta">
-          <span>Target: {{ targetPlanetName(board.offeredMission.targetPlanet) }}</span>
-          <span>Reward: {{ board.offeredMission.reward }} CR</span>
-        </div>
-        <button
-          type="button"
-          class="mission-board-offer__accept-btn"
-          :disabled="!canAcceptPlanetaryOffer"
-          @click="emit('acceptMission')"
-        >
-          Accept
-        </button>
-        <p v-if="!canAcceptPlanetaryOffer" class="mission-board-offer__inventory-hint">
-          Cargo hold full — sell items at the station shop (sidebar) to make room for this pickup.
+      <div v-if="evaSectionVisible" class="mission-board-section">
+        <h3 class="mission-board-section__heading">Shuttle EVA Missions</h3>
+        <p class="mission-board-section__descriptor">
+          Fly to a waypoint in deep space, exit the shuttle, and spacewalk to a relay or probe to
+          service it.
         </p>
-      </div>
 
-      <div v-else-if="board?.restockTimer" class="mission-board-empty">
-        Restocking in {{ formatTime(board.restockTimer.remaining) }}
-      </div>
-    </div>
-
-    <!-- Active Missions — consolidated view across every mission kind -->
-    <div class="mission-board-section">
-      <h3 class="mission-board-section__heading">Active Missions</h3>
-
-      <div v-if="!hasAnyActiveMission" class="mission-board-empty">No active missions</div>
-
-      <!-- Planetary actives -->
-      <div
-        v-for="mission in board?.activeMissions"
-        :key="`planetary-${mission.template.id}`"
-        class="mission-board-active"
-      >
-        <div class="mission-board-active__name">{{ mission.template.name }}</div>
-        <div v-if="planetaryGiverName(mission.giverPlanet)" class="mission-board-active__giver">
-          {{ planetaryGiverName(mission.giverPlanet) }}
-        </div>
-        <div class="mission-board-active__route">
-          {{ targetPlanetName(mission.giverPlanet) }} &rarr;
-          {{ targetPlanetName(mission.template.targetPlanet) }}
-        </div>
-        <div class="mission-board-active__status">
-          {{ statusLabel(mission) }}
-        </div>
-        <div class="mission-board-active__cargo">
-          {{ mission.template.gatherQuantity }}x {{ gatherItemLabel(mission) }} &middot;
-          {{ mission.template.reward }} CR
-        </div>
-        <button
-          v-if="canDeliver(mission)"
-          type="button"
-          class="mission-board-active__deliver-btn"
-          @click="emit('deliverMission', mission.template.id)"
+        <div
+          v-if="board?.offeredEvaMission && board.offeringEvaPlanet === dockedPlanet"
+          class="mission-board-offer"
         >
-          Deliver
-        </button>
+          <div class="mission-board-offer__name">{{ board.offeredEvaMission.name }}</div>
+          <div v-if="evaGiverName(board.offeringEvaPlanet)" class="mission-board-offer__giver">
+            From: {{ evaGiverName(board.offeringEvaPlanet) }}
+          </div>
+          <div class="mission-board-offer__desc">{{ board.offeredEvaMission.description }}</div>
+          <div class="mission-board-offer__meta">
+            <span>Type: {{ evaTypeLabel(board.offeredEvaMission.poiType) }}</span>
+            <span>Waypoint: near {{ targetPlanetName(dockedPlanet ?? '') }}</span>
+            <span>Reward: {{ board.offeredEvaMission.reward }} CR</span>
+          </div>
+          <button
+            type="button"
+            class="mission-board-offer__accept-btn"
+            @click="emit('acceptEvaMission')"
+          >
+            Accept
+          </button>
+        </div>
+
+        <div v-else-if="board?.evaRestockTimer" class="mission-board-empty">
+          Restocking in {{ formatTime(board.evaRestockTimer.remaining) }}
+        </div>
       </div>
 
-      <!-- EVA actives -->
-      <div
-        v-for="mission in board?.activeEvaMissions"
-        :key="`eva-${mission.template.id}`"
-        class="mission-board-active"
-      >
-        <div class="mission-board-active__name">{{ mission.template.name }}</div>
-        <div v-if="evaGiverName(mission.giverPlanet)" class="mission-board-active__giver">
-          {{ evaGiverName(mission.giverPlanet) }}
-        </div>
-        <div class="mission-board-active__route">
-          {{ targetPlanetName(mission.giverPlanet) }} &rarr; deep-space waypoint
-        </div>
-        <div class="mission-board-active__status">
-          {{ evaMissionStatusLabel(mission) }}
-        </div>
-        <div class="mission-board-active__cargo">
-          {{ evaTypeLabel(mission.template.poiType) }} &middot; {{ mission.template.reward }} CR on
-          delivery
-        </div>
-      </div>
+      <!-- Turret Mining Missions (second — bulk ore collection via the map turret) -->
+      <div v-if="miningSectionVisible" class="mission-board-section">
+        <h3 class="mission-board-section__heading">Turret Mining Missions</h3>
+        <p class="mission-board-section__descriptor">
+          Dock at a planet with a mining contract to accept it, then extract ore in the asteroid
+          belt using the map turret. Return to deliver when the target quantity is reached.
+        </p>
 
-      <!-- Turret mining actives -->
-      <div
-        v-for="mission in activeMiningMissions"
-        :key="`mining-${mission.template.id}`"
-        class="mission-board-active"
-      >
-        <div class="mission-board-active__name">{{ mission.template.name }}</div>
-        <div v-if="miningGiverName(mission.giverPlanet)" class="mission-board-active__giver">
-          {{ miningGiverName(mission.giverPlanet) }}
-        </div>
-        <div class="mission-board-active__route">
-          {{ miningProgressLabel(mission) }}
-        </div>
-        <div class="mission-board-active__status">
-          {{ miningStatusLabel(mission) }}
-        </div>
-        <div class="mission-board-active__cargo">{{ mission.template.reward }} CR on delivery</div>
-        <button
-          v-if="canDeliverMining(mission)"
-          type="button"
-          class="mission-board-active__deliver-btn"
-          @click="emit('deliverMiningMission', mission.template.id)"
+        <div
+          v-if="board?.offeredMiningMission && board.offeringMiningPlanet === dockedPlanet"
+          class="mission-board-offer"
         >
-          Deliver
-        </button>
+          <div class="mission-board-offer__name">{{ board.offeredMiningMission.name }}</div>
+          <div
+            v-if="miningGiverName(board.offeringMiningPlanet)"
+            class="mission-board-offer__giver"
+          >
+            From: {{ miningGiverName(board.offeringMiningPlanet) }}
+          </div>
+          <div class="mission-board-offer__desc">{{ board.offeredMiningMission.description }}</div>
+          <div class="mission-board-offer__meta">
+            <span>Ore: {{ oreLabelFor(board.offeredMiningMission.oreCategory) }}</span>
+            <span>Quantity: {{ board.offeredMiningMission.targetKg }} kg</span>
+            <span>Reward: {{ board.offeredMiningMission.reward }} CR</span>
+          </div>
+          <button
+            type="button"
+            class="mission-board-offer__accept-btn"
+            @click="emit('acceptMiningMission')"
+          >
+            Accept
+          </button>
+        </div>
+
+        <div v-else-if="board?.miningRestockTimer" class="mission-board-empty">
+          Restocking in {{ formatTime(board.miningRestockTimer.remaining) }}
+        </div>
       </div>
 
-      <!-- Asteroid active (single, may be null) -->
-      <div v-if="board?.activeAsteroidMission" class="mission-board-active">
-        <div class="mission-board-active__name">{{ board.activeAsteroidMission.name }}</div>
-        <div class="mission-board-active__route">
-          {{ board.activeAsteroidMission.giverName }} &middot;
-          {{ asteroidOperatingLabel(board.activeAsteroidMission) }}
+      <!-- Asteroid Missions (third — local lander jobs near the posting station) -->
+      <div v-if="asteroidSectionVisible" class="mission-board-section">
+        <h3 class="mission-board-section__heading">Asteroid Missions</h3>
+        <p class="mission-board-section__descriptor">
+          Contracts send you to a waypoint near your posting station's orbit; difficulty scales with
+          your upgrades.
+        </p>
+
+        <div
+          v-if="
+            board?.offeredAsteroidMission &&
+            board.offeringAsteroidPlanet === dockedPlanet &&
+            !board.activeAsteroidMission
+          "
+          class="mission-board-offer"
+        >
+          <div class="mission-board-offer__name">{{ board.offeredAsteroidMission.name }}</div>
+          <div class="mission-board-offer__giver">
+            From: {{ board.offeredAsteroidMission.giverName }}
+          </div>
+          <div class="mission-board-offer__desc">{{ board.offeredAsteroidMission.briefing }}</div>
+          <div class="mission-board-offer__meta">
+            <span>Zone: {{ asteroidOperatingLabel(board.offeredAsteroidMission) }}</span>
+            <span
+              >Reward:
+              {{ buffedAsteroidRewardCr(board.offeredAsteroidMission.totalReward) }} CR</span
+            >
+          </div>
+          <div class="mission-board-offer__objective">
+            {{ objectiveSummary(board.offeredAsteroidMission) }}
+          </div>
+          <button
+            type="button"
+            class="mission-board-offer__accept-btn"
+            @click="emit('acceptAsteroidMission')"
+          >
+            Accept
+          </button>
         </div>
-        <div class="mission-board-active__status">
-          {{
-            board.activeAsteroidMission.status === 'accepted'
-              ? 'Navigate to waypoint'
-              : 'In transit'
-          }}
-        </div>
-        <div class="mission-board-active__cargo">
-          {{ objectiveSummary(board.activeAsteroidMission) }}
-          &middot; {{ buffedAsteroidRewardCr(board.activeAsteroidMission.totalReward) }} CR
+
+        <div v-else-if="board?.asteroidRestockTimer" class="mission-board-empty">
+          Restocking in {{ formatTime(board.asteroidRestockTimer.remaining) }}
         </div>
       </div>
-    </div>
+
+      <!-- Planetary Missions (fourth — advanced: requires interplanetary travel) -->
+      <div v-if="planetarySectionVisible" class="mission-board-section">
+        <h3 class="mission-board-section__heading">Planetary Missions</h3>
+        <p class="mission-board-section__descriptor">
+          Advanced contracts that send you to <em>another</em> planet: match orbit from the shuttle,
+          secure the orbital pickup in your cargo hold, then return to the posting station for your
+          payout.
+        </p>
+
+        <div
+          v-if="board?.offeredMission && board.offeringPlanet === dockedPlanet"
+          class="mission-board-offer"
+        >
+          <div class="mission-board-offer__name">{{ board.offeredMission.name }}</div>
+          <div v-if="planetaryGiverName(board.offeringPlanet)" class="mission-board-offer__giver">
+            From: {{ planetaryGiverName(board.offeringPlanet) }}
+          </div>
+          <div class="mission-board-offer__desc">{{ board.offeredMission.description }}</div>
+          <div class="mission-board-offer__meta">
+            <span>Target: {{ targetPlanetName(board.offeredMission.targetPlanet) }}</span>
+            <span>Reward: {{ board.offeredMission.reward }} CR</span>
+          </div>
+          <button
+            type="button"
+            class="mission-board-offer__accept-btn"
+            :disabled="!canAcceptPlanetaryOffer"
+            @click="emit('acceptMission')"
+          >
+            Accept
+          </button>
+          <p v-if="!canAcceptPlanetaryOffer" class="mission-board-offer__inventory-hint">
+            Cargo hold full — sell items at the station shop (sidebar) to make room for this pickup.
+          </p>
+        </div>
+
+        <div v-else-if="board?.restockTimer" class="mission-board-empty">
+          Restocking in {{ formatTime(board.restockTimer.remaining) }}
+        </div>
+      </div>
+
+      <!-- Active Missions — consolidated view across every mission kind -->
+      <div class="mission-board-section">
+        <h3 class="mission-board-section__heading">Active Missions</h3>
+
+        <div v-if="!hasAnyActiveMission" class="mission-board-empty">No active missions</div>
+
+        <!-- Planetary actives -->
+        <div
+          v-for="mission in board?.activeMissions"
+          :key="`planetary-${mission.template.id}`"
+          class="mission-board-active"
+        >
+          <div class="mission-board-active__name">{{ mission.template.name }}</div>
+          <div v-if="planetaryGiverName(mission.giverPlanet)" class="mission-board-active__giver">
+            {{ planetaryGiverName(mission.giverPlanet) }}
+          </div>
+          <div class="mission-board-active__route">
+            {{ targetPlanetName(mission.giverPlanet) }} &rarr;
+            {{ targetPlanetName(mission.template.targetPlanet) }}
+          </div>
+          <div class="mission-board-active__status">
+            {{ statusLabel(mission) }}
+          </div>
+          <div class="mission-board-active__cargo">
+            {{ mission.template.gatherQuantity }}x {{ gatherItemLabel(mission) }} &middot;
+            {{ mission.template.reward }} CR
+          </div>
+          <button
+            v-if="canDeliver(mission)"
+            type="button"
+            class="mission-board-active__deliver-btn"
+            @click="emit('deliverMission', mission.template.id)"
+          >
+            Deliver
+          </button>
+        </div>
+
+        <!-- EVA actives -->
+        <div
+          v-for="mission in board?.activeEvaMissions"
+          :key="`eva-${mission.template.id}`"
+          class="mission-board-active"
+        >
+          <div class="mission-board-active__name">{{ mission.template.name }}</div>
+          <div v-if="evaGiverName(mission.giverPlanet)" class="mission-board-active__giver">
+            {{ evaGiverName(mission.giverPlanet) }}
+          </div>
+          <div class="mission-board-active__route">
+            {{ targetPlanetName(mission.giverPlanet) }} &rarr; deep-space waypoint
+          </div>
+          <div class="mission-board-active__status">
+            {{ evaMissionStatusLabel(mission) }}
+          </div>
+          <div class="mission-board-active__cargo">
+            {{ evaTypeLabel(mission.template.poiType) }} &middot; {{ mission.template.reward }} CR
+            on delivery
+          </div>
+        </div>
+
+        <!-- Turret mining actives -->
+        <div
+          v-for="mission in activeMiningMissions"
+          :key="`mining-${mission.template.id}`"
+          class="mission-board-active"
+        >
+          <div class="mission-board-active__name">{{ mission.template.name }}</div>
+          <div v-if="miningGiverName(mission.giverPlanet)" class="mission-board-active__giver">
+            {{ miningGiverName(mission.giverPlanet) }}
+          </div>
+          <div class="mission-board-active__route">
+            {{ miningProgressLabel(mission) }}
+          </div>
+          <div class="mission-board-active__status">
+            {{ miningStatusLabel(mission) }}
+          </div>
+          <div class="mission-board-active__cargo">
+            {{ mission.template.reward }} CR on delivery
+          </div>
+          <button
+            v-if="canDeliverMining(mission)"
+            type="button"
+            class="mission-board-active__deliver-btn"
+            @click="emit('deliverMiningMission', mission.template.id)"
+          >
+            Deliver
+          </button>
+        </div>
+
+        <!-- Asteroid active (single, may be null) -->
+        <div v-if="board?.activeAsteroidMission" class="mission-board-active">
+          <div class="mission-board-active__name">{{ board.activeAsteroidMission.name }}</div>
+          <div class="mission-board-active__route">
+            {{ board.activeAsteroidMission.giverName }} &middot;
+            {{ asteroidOperatingLabel(board.activeAsteroidMission) }}
+          </div>
+          <div class="mission-board-active__status">
+            {{
+              board.activeAsteroidMission.status === 'accepted'
+                ? 'Navigate to waypoint'
+                : 'In transit'
+            }}
+          </div>
+          <div class="mission-board-active__cargo">
+            {{ objectiveSummary(board.activeAsteroidMission) }}
+            &middot; {{ buffedAsteroidRewardCr(board.activeAsteroidMission.totalReward) }} CR
+          </div>
+        </div>
+      </div>
     </ShuttleProgramCover>
   </div>
 </template>

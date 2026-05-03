@@ -28,11 +28,7 @@ export const LEVEL_TIP_DRILL_WALKING_SPEED = 0.35
  * @param threshold - Fraction threshold in `[0, 1]`.
  * @returns True when capacity is positive and level/capacity is below the threshold.
  */
-export function isResourceBelowRatio(
-  level: number,
-  capacity: number,
-  threshold: number,
-): boolean {
+export function isResourceBelowRatio(level: number, capacity: number, threshold: number): boolean {
   return capacity > 0 && level / capacity < threshold
 }
 
@@ -43,11 +39,7 @@ export function isResourceBelowRatio(
  * @returns True when O2 is below half.
  */
 export function shouldTriggerLowOxygenTip(telemetry: FpsTelemetry): boolean {
-  return isResourceBelowRatio(
-    telemetry.o2Level,
-    telemetry.o2Capacity,
-    LEVEL_TIP_LOW_OXYGEN_RATIO,
-  )
+  return isResourceBelowRatio(telemetry.o2Level, telemetry.o2Capacity, LEVEL_TIP_LOW_OXYGEN_RATIO)
 }
 
 /**

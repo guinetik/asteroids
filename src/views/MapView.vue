@@ -1456,7 +1456,7 @@ watch(
     class="scene-container"
     :class="{ 'scene-container--hidden': mapBootOverlayVisible }"
   ></div>
-    <div
+  <div
     v-if="mapBootOverlayVisible"
     class="map-boot-overlay"
     role="dialog"
@@ -1656,9 +1656,17 @@ watch(
         !evaActive
       "
       :orbitState="orbitState"
-      :shop-available="shopButtonVisible && !shopDialogVisible && !cosmeticShopDialogVisible && !shuttleControlVisible"
+      :shop-available="
+        shopButtonVisible &&
+        !shopDialogVisible &&
+        !cosmeticShopDialogVisible &&
+        !shuttleControlVisible
+      "
       :cosmetic-shop-available="
-        cosmeticShopButtonVisible && !shopDialogVisible && !cosmeticShopDialogVisible && !shuttleControlVisible
+        cosmeticShopButtonVisible &&
+        !shopDialogVisible &&
+        !cosmeticShopDialogVisible &&
+        !shuttleControlVisible
       "
       :mission-available="missionButtonVisible && !missionOverlayVisible && !shuttleControlVisible"
       :suppress-kiosks="suppressOrbitKiosks"
@@ -2110,10 +2118,7 @@ watch(
       @watch-intro="handlePortalWatchIntro"
       @skip="handlePortalSkip"
     />
-    <JovianEpilogueOverlay
-      v-if="epilogueVisible"
-      :on-continue="handleEpilogueContinue"
-    />
+    <JovianEpilogueOverlay v-if="epilogueVisible" :on-continue="handleEpilogueContinue" />
   </template>
   <DebugHud v-if="debugHudVisible" />
 </template>

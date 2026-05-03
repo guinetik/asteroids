@@ -24,7 +24,7 @@ vi.mock('@/three/BacteriophageController', async () => {
       isMoving = false
       isAgitated = false
 
-      constructor(enemy: Enemy) {
+      constructor(enemy: Enemy, _visualOptions?: unknown) {
         this.enemy = enemy
       }
 
@@ -37,9 +37,29 @@ vi.mock('@/three/BacteriophageController', async () => {
   }
 })
 
+vi.mock('@/three/EnemyProjectileMeshPool', () => ({
+  EnemyProjectileMeshPool: class MockEnemyProjectileMeshPool {
+    /**
+     * @param _scene - Unused stub prevents warm-up meshes from attaching to Vitest THREE scenes.
+     */
+    constructor(_scene: unknown) {}
+
+    /** No-op — real pool attaches hidden meshes counted by `scene.children.length` tests below. */
+    prewarm(): void {}
+
+    acquire = (): void => {}
+
+    release = (): void => {}
+
+    disposeAll(): void {}
+  },
+}))
+
 const TEST_SEED = 4813
-const TEST_DIFFICULTY = 10
-const SCOUT_TRIGGER_AMOUNT = 8
+/** Low tier mission — disturbance rolls bacteriophage only (stable unit harness). */
+const TEST_DIFFICULTY_FOR_PHAGE_ONLY = 1
+/** Crosses scout threshold even when difficulty‑1 lowers disturbance gain multiplication. */
+const SCOUT_EXPLOSION_AMOUNT = 18
 const MAX_LIVE_AMBIENT_ENEMIES = 5
 const PATROL_COOLDOWN_SECONDS = 8
 const ZERO_SECONDS = 0
@@ -57,7 +77,7 @@ describe('LevelDisturbanceDirector', () => {
   it('registers spawned response enemies and adds scene controllers', () => {
     const harness = createDirectorHarness()
 
-    harness.director.record({ type: 'jump', amount: SCOUT_TRIGGER_AMOUNT })
+    harness.director.record({ type: 'explosion', amount: SCOUT_EXPLOSION_AMOUNT })
     harness.director.tick(ZERO_SECONDS, createActiveFrameContext())
 
     expect(harness.projectiles.addCalls).toHaveLength(1)
@@ -115,7 +135,7 @@ function createDirectorHarness(): {
     scene,
     heightmap,
     projectileSystem: projectiles.system,
-    missionDifficulty: TEST_DIFFICULTY,
+    missionDifficulty: TEST_DIFFICULTY_FOR_PHAGE_ONLY,
     seed: TEST_SEED,
   })
 

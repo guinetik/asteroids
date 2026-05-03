@@ -83,11 +83,15 @@ export function applyMultitoolPaintMaterials(
   )
 
   for (const target of targets) {
-    applyMaterialPaintColor(target.material, target.baseColor, {
-      primary,
-      secondary,
-      trim,
-    }[target.channel])
+    applyMaterialPaintColor(
+      target.material,
+      target.baseColor,
+      {
+        primary,
+        secondary,
+        trim,
+      }[target.channel],
+    )
   }
 }
 

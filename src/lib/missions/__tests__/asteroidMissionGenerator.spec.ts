@@ -855,7 +855,10 @@ describe('mission-level requiresFlag filtering', () => {
   }
 
   /** Minimal gather template fixture. */
-  function makeGatherTemplate(id: string, overrides: Partial<MissionGiverTemplate> = {}): MissionGiverTemplate {
+  function makeGatherTemplate(
+    id: string,
+    overrides: Partial<MissionGiverTemplate> = {},
+  ): MissionGiverTemplate {
     return {
       id,
       name: `Template ${id}`,

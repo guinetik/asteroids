@@ -122,12 +122,14 @@ function onKeydown(e: KeyboardEvent) {
         <div class="planet-shop-ambient__stack">
           <div class="planet-shop-header">
             <span class="planet-shop-header__title">{{ planetName }} Trading Post</span>
-            <span class="planet-shop-header__credits">CR {{ profile.credits.toLocaleString() }}</span>
+            <span class="planet-shop-header__credits"
+              >CR {{ profile.credits.toLocaleString() }}</span
+            >
             <button
               type="button"
               class="ship-message-card__button"
               @click="
-                uiAudio.notifyCancel();
+                uiAudio.notifyCancel()
                 $emit('close')
               "
             >
@@ -137,283 +139,289 @@ function onKeydown(e: KeyboardEvent) {
 
           <!-- Body: buy + sell columns (scroll layer sits over faded cover art) -->
           <div class="planet-shop-body">
-        <!-- Buy column -->
-        <div class="planet-shop-column planet-shop-column--buy">
-          <h3 class="planet-shop-column__title">Buy</h3>
+            <!-- Buy column -->
+            <div class="planet-shop-column planet-shop-column--buy">
+              <h3 class="planet-shop-column__title">Buy</h3>
 
-          <!-- Services group -->
-          <div class="planet-shop-group planet-shop-group--services">
-            <button
-              type="button"
-              class="planet-shop-group__header"
-              :aria-expanded="servicesOpen ? 'true' : 'false'"
-              @click="toggleServices"
-            >
-              <span class="planet-shop-group__label">Services</span>
-              <span class="planet-shop-group__chevron" :data-open="servicesOpen">▾</span>
-            </button>
-
-            <div v-show="servicesOpen" class="planet-shop-group__content">
-              <div class="planet-shop-item planet-shop-item--service">
-                <div class="planet-shop-item__icon-placeholder planet-shop-icon--service">F</div>
-                <div class="planet-shop-item__info">
-                  <span class="planet-shop-item__name">Refuel</span>
-                  <span class="planet-shop-item__desc"
-                    >Instantly fill fuel tank and recharge all thrusters.</span
-                  >
-                </div>
-                <span class="planet-shop-item__price">{{ REFUEL_COST }} CR</span>
+              <!-- Services group -->
+              <div class="planet-shop-group planet-shop-group--services">
                 <button
                   type="button"
-                  class="planet-shop-item__buy-btn planet-shop-btn--service"
-                  :disabled="!canAfford(REFUEL_COST) || fuelFull"
-                  @click="
-                    uiAudio.notifyConfirm();
-                    $emit('refuel')
-                  "
+                  class="planet-shop-group__header"
+                  :aria-expanded="servicesOpen ? 'true' : 'false'"
+                  @click="toggleServices"
                 >
-                  {{ fuelFull ? 'Full' : 'Buy' }}
+                  <span class="planet-shop-group__label">Services</span>
+                  <span class="planet-shop-group__chevron" :data-open="servicesOpen">▾</span>
                 </button>
+
+                <div v-show="servicesOpen" class="planet-shop-group__content">
+                  <div class="planet-shop-item planet-shop-item--service">
+                    <div class="planet-shop-item__icon-placeholder planet-shop-icon--service">
+                      F
+                    </div>
+                    <div class="planet-shop-item__info">
+                      <span class="planet-shop-item__name">Refuel</span>
+                      <span class="planet-shop-item__desc"
+                        >Instantly fill fuel tank and recharge all thrusters.</span
+                      >
+                    </div>
+                    <span class="planet-shop-item__price">{{ REFUEL_COST }} CR</span>
+                    <button
+                      type="button"
+                      class="planet-shop-item__buy-btn planet-shop-btn--service"
+                      :disabled="!canAfford(REFUEL_COST) || fuelFull"
+                      @click="
+                        uiAudio.notifyConfirm()
+                        $emit('refuel')
+                      "
+                    >
+                      {{ fuelFull ? 'Full' : 'Buy' }}
+                    </button>
+                  </div>
+
+                  <div class="planet-shop-item planet-shop-item--service">
+                    <div class="planet-shop-item__icon-placeholder planet-shop-icon--service">
+                      S
+                    </div>
+                    <div class="planet-shop-item__info">
+                      <span class="planet-shop-item__name">Shuttle Hull Repair</span>
+                      <span class="planet-shop-item__desc"
+                        >Restores your orbiter’s hull to 100% (radiation, thermal, and impact
+                        damage).</span
+                      >
+                    </div>
+                    <span class="planet-shop-item__price">{{ REPAIR_COST }} CR</span>
+                    <button
+                      type="button"
+                      class="planet-shop-item__buy-btn planet-shop-btn--service"
+                      :disabled="!canAfford(REPAIR_COST) || hullFull"
+                      @click="
+                        uiAudio.notifyConfirm()
+                        $emit('repairHull')
+                      "
+                    >
+                      {{ hullFull ? 'Full' : 'Buy' }}
+                    </button>
+                  </div>
+
+                  <div class="planet-shop-item planet-shop-item--service">
+                    <div class="planet-shop-item__icon-placeholder planet-shop-icon--service">
+                      P
+                    </div>
+                    <div class="planet-shop-item__info">
+                      <span class="planet-shop-item__name">Lander Hull Repair</span>
+                      <span class="planet-shop-item__desc"
+                        >Structural service for the surface lander. Restores hull to 100% for your
+                        next deployment.</span
+                      >
+                    </div>
+                    <span class="planet-shop-item__price">{{ LANDER_REPAIR_COST }} CR</span>
+                    <button
+                      type="button"
+                      class="planet-shop-item__buy-btn planet-shop-btn--service"
+                      :disabled="!canAfford(LANDER_REPAIR_COST) || landerHullFull"
+                      @click="
+                        uiAudio.notifyConfirm()
+                        $emit('repairLander')
+                      "
+                    >
+                      {{ landerHullFull ? 'Full' : 'Buy' }}
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div class="planet-shop-item planet-shop-item--service">
-                <div class="planet-shop-item__icon-placeholder planet-shop-icon--service">S</div>
-                <div class="planet-shop-item__info">
-                  <span class="planet-shop-item__name">Shuttle Hull Repair</span>
-                  <span class="planet-shop-item__desc"
-                    >Restores your orbiter’s hull to 100% (radiation, thermal, and impact
-                    damage).</span
-                  >
-                </div>
-                <span class="planet-shop-item__price">{{ REPAIR_COST }} CR</span>
+              <!-- Fuel group -->
+              <div class="planet-shop-group planet-shop-group--fuel">
                 <button
                   type="button"
-                  class="planet-shop-item__buy-btn planet-shop-btn--service"
-                  :disabled="!canAfford(REPAIR_COST) || hullFull"
-                  @click="
-                    uiAudio.notifyConfirm();
-                    $emit('repairHull')
-                  "
+                  class="planet-shop-group__header"
+                  :aria-expanded="fuelOpen ? 'true' : 'false'"
+                  @click="toggleFuel"
                 >
-                  {{ hullFull ? 'Full' : 'Buy' }}
+                  <span class="planet-shop-group__label">Fuel Supplies</span>
+                  <span class="planet-shop-group__chevron" :data-open="fuelOpen">▾</span>
                 </button>
+
+                <div v-show="fuelOpen" class="planet-shop-group__content">
+                  <div class="planet-shop-item planet-shop-item--fuel">
+                    <div class="planet-shop-item__icon-placeholder planet-shop-icon--fuel">S</div>
+                    <div class="planet-shop-item__info">
+                      <span class="planet-shop-item__name">Shuttle Fuel Cell</span>
+                      <span class="planet-shop-item__desc"
+                        >Compact fusion cell. Restores half the shuttle fuel tank when consumed in
+                        flight.</span
+                      >
+                    </div>
+                    <span class="planet-shop-item__price">{{ RESERVE_FUEL_COST }} CR</span>
+                    <button
+                      type="button"
+                      class="planet-shop-item__buy-btn planet-shop-btn--fuel"
+                      :disabled="!canAfford(RESERVE_FUEL_COST)"
+                      @click="
+                        uiAudio.notifyConfirm()
+                        $emit('buyReserveFuel')
+                      "
+                    >
+                      Buy
+                    </button>
+                  </div>
+
+                  <div class="planet-shop-item planet-shop-item--fuel">
+                    <div class="planet-shop-item__icon-placeholder planet-shop-icon--fuel">L</div>
+                    <div class="planet-shop-item__info">
+                      <span class="planet-shop-item__name">Lander Fuel Cell</span>
+                      <span class="planet-shop-item__desc"
+                        >Hydrogen fuel cell for the lander's neutron thrusters. One full burn cycle
+                        per cell.</span
+                      >
+                    </div>
+                    <span class="planet-shop-item__price">{{ LANDER_FUEL_COST }} CR</span>
+                    <button
+                      type="button"
+                      class="planet-shop-item__buy-btn planet-shop-btn--fuel"
+                      :disabled="!canAfford(LANDER_FUEL_COST)"
+                      @click="
+                        uiAudio.notifyConfirm()
+                        $emit('buyLanderFuel')
+                      "
+                    >
+                      Buy
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div class="planet-shop-item planet-shop-item--service">
-                <div class="planet-shop-item__icon-placeholder planet-shop-icon--service">P</div>
-                <div class="planet-shop-item__info">
-                  <span class="planet-shop-item__name">Lander Hull Repair</span>
-                  <span class="planet-shop-item__desc"
-                    >Structural service for the surface lander. Restores hull to 100% for your next
-                    deployment.</span
-                  >
-                </div>
-                <span class="planet-shop-item__price">{{ LANDER_REPAIR_COST }} CR</span>
+              <!-- Trade goods group -->
+              <div class="planet-shop-group planet-shop-group--trade">
                 <button
                   type="button"
-                  class="planet-shop-item__buy-btn planet-shop-btn--service"
-                  :disabled="!canAfford(LANDER_REPAIR_COST) || landerHullFull"
-                  @click="
-                    uiAudio.notifyConfirm();
-                    $emit('repairLander')
-                  "
+                  class="planet-shop-group__header"
+                  :aria-expanded="tradeOpen ? 'true' : 'false'"
+                  @click="toggleTrade"
                 >
-                  {{ landerHullFull ? 'Full' : 'Buy' }}
+                  <span class="planet-shop-group__label">{{ tradeGroupLabel }}</span>
+                  <span class="planet-shop-group__chevron" :data-open="tradeOpen">▾</span>
                 </button>
+
+                <div v-show="tradeOpen" class="planet-shop-group__content">
+                  <div v-if="restockRemaining" class="planet-shop-restock">
+                    Restocking in {{ restockRemaining }}
+                  </div>
+
+                  <template v-if="session.planetId === 'venus'">
+                    <div class="planet-shop-subgroup-label">VENUS GOODS</div>
+                    <div
+                      v-for="slot in venusLocalSlots"
+                      :key="slot.itemId"
+                      class="planet-shop-item planet-shop-item--trade"
+                      :class="{ 'planet-shop-item--sold-out': slot.stock <= 0 }"
+                    >
+                      <div class="planet-shop-item__icon-placeholder planet-shop-icon--trade">
+                        {{ slotIcon(slot) }}
+                      </div>
+                      <div class="planet-shop-item__info">
+                        <span class="planet-shop-item__name">{{ slotLabel(slot) }}</span>
+                        <span class="planet-shop-item__desc">{{ slotDescription(slot) }}</span>
+                        <span class="planet-shop-item__stock">
+                          {{ slot.stock > 0 ? `${slot.stock} in stock` : 'Sold out' }}
+                        </span>
+                      </div>
+                      <span class="planet-shop-item__price">{{ slot.price }} CR</span>
+                      <button
+                        type="button"
+                        class="planet-shop-item__buy-btn planet-shop-btn--trade"
+                        :disabled="slot.stock <= 0 || !canAfford(slot.price)"
+                        @click="
+                          uiAudio.notifyConfirm()
+                          $emit('buyTradeGood', session.tradeSlots.indexOf(slot), 1)
+                        "
+                      >
+                        Buy
+                      </button>
+                    </div>
+
+                    <div class="planet-shop-subgroup-label">IMPORTS</div>
+                    <div
+                      v-for="slot in venusImportSlots"
+                      :key="slot.itemId"
+                      class="planet-shop-item planet-shop-item--trade planet-shop-item--import"
+                      :class="{ 'planet-shop-item--sold-out': slot.stock <= 0 }"
+                    >
+                      <div class="planet-shop-item__icon-placeholder planet-shop-icon--import">
+                        {{ slotIcon(slot) }}
+                      </div>
+                      <div class="planet-shop-item__info">
+                        <span class="planet-shop-item__name">{{ slotLabel(slot) }}</span>
+                        <span v-if="slotOriginLabel(slot)" class="planet-shop-item__origin">
+                          {{ slotOriginLabel(slot) }}
+                        </span>
+                        <span class="planet-shop-item__desc">{{ slotDescription(slot) }}</span>
+                        <span class="planet-shop-item__stock">
+                          {{ slot.stock > 0 ? `${slot.stock} in stock` : 'Sold out' }}
+                        </span>
+                      </div>
+                      <span class="planet-shop-item__price">{{ slot.price }} CR</span>
+                      <button
+                        type="button"
+                        class="planet-shop-item__buy-btn planet-shop-btn--trade"
+                        :disabled="slot.stock <= 0 || !canAfford(slot.price)"
+                        @click="
+                          uiAudio.notifyConfirm()
+                          $emit('buyTradeGood', session.tradeSlots.indexOf(slot), 1)
+                        "
+                      >
+                        Buy
+                      </button>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <!-- Trade goods -->
+                    <div
+                      v-for="(slot, index) in session.tradeSlots"
+                      :key="slot.itemId"
+                      class="planet-shop-item planet-shop-item--trade"
+                      :class="{ 'planet-shop-item--sold-out': slot.stock <= 0 }"
+                    >
+                      <div class="planet-shop-item__icon-placeholder planet-shop-icon--trade">
+                        {{ slotIcon(slot) }}
+                      </div>
+                      <div class="planet-shop-item__info">
+                        <span class="planet-shop-item__name">{{ slotLabel(slot) }}</span>
+                        <span class="planet-shop-item__desc">{{ slotDescription(slot) }}</span>
+                        <span class="planet-shop-item__stock">
+                          {{ slot.stock > 0 ? `${slot.stock} in stock` : 'Sold out' }}
+                        </span>
+                      </div>
+                      <span class="planet-shop-item__price">{{ slot.price }} CR</span>
+                      <button
+                        type="button"
+                        class="planet-shop-item__buy-btn planet-shop-btn--trade"
+                        :disabled="slot.stock <= 0 || !canAfford(slot.price)"
+                        @click="
+                          uiAudio.notifyConfirm()
+                          $emit('buyTradeGood', index, 1)
+                        "
+                      >
+                        Buy
+                      </button>
+                    </div>
+                  </template>
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- Fuel group -->
-          <div class="planet-shop-group planet-shop-group--fuel">
-            <button
-              type="button"
-              class="planet-shop-group__header"
-              :aria-expanded="fuelOpen ? 'true' : 'false'"
-              @click="toggleFuel"
-            >
-              <span class="planet-shop-group__label">Fuel Supplies</span>
-              <span class="planet-shop-group__chevron" :data-open="fuelOpen">▾</span>
-            </button>
-
-            <div v-show="fuelOpen" class="planet-shop-group__content">
-              <div class="planet-shop-item planet-shop-item--fuel">
-                <div class="planet-shop-item__icon-placeholder planet-shop-icon--fuel">S</div>
-                <div class="planet-shop-item__info">
-                  <span class="planet-shop-item__name">Shuttle Fuel Cell</span>
-                  <span class="planet-shop-item__desc"
-                    >Compact fusion cell. Restores half the shuttle fuel tank when consumed in
-                    flight.</span
-                  >
-                </div>
-                <span class="planet-shop-item__price">{{ RESERVE_FUEL_COST }} CR</span>
-                <button
-                  type="button"
-                  class="planet-shop-item__buy-btn planet-shop-btn--fuel"
-                  :disabled="!canAfford(RESERVE_FUEL_COST)"
-                  @click="
-                    uiAudio.notifyConfirm();
-                    $emit('buyReserveFuel')
-                  "
-                >
-                  Buy
-                </button>
-              </div>
-
-              <div class="planet-shop-item planet-shop-item--fuel">
-                <div class="planet-shop-item__icon-placeholder planet-shop-icon--fuel">L</div>
-                <div class="planet-shop-item__info">
-                  <span class="planet-shop-item__name">Lander Fuel Cell</span>
-                  <span class="planet-shop-item__desc"
-                    >Hydrogen fuel cell for the lander's neutron thrusters. One full burn cycle per
-                    cell.</span
-                  >
-                </div>
-                <span class="planet-shop-item__price">{{ LANDER_FUEL_COST }} CR</span>
-                <button
-                  type="button"
-                  class="planet-shop-item__buy-btn planet-shop-btn--fuel"
-                  :disabled="!canAfford(LANDER_FUEL_COST)"
-                  @click="
-                    uiAudio.notifyConfirm();
-                    $emit('buyLanderFuel')
-                  "
-                >
-                  Buy
-                </button>
-              </div>
+            <!-- Sell column -->
+            <div class="planet-shop-column">
+              <h3 class="planet-shop-column__title">Sell</h3>
+              <InventoryTable
+                :items="inventory.stacks"
+                mode="sell"
+                :planet-id="session.planetId"
+                @sell="(itemId, qty) => $emit('sellItem', itemId, qty)"
+              />
             </div>
-          </div>
-
-          <!-- Trade goods group -->
-          <div class="planet-shop-group planet-shop-group--trade">
-            <button
-              type="button"
-              class="planet-shop-group__header"
-              :aria-expanded="tradeOpen ? 'true' : 'false'"
-              @click="toggleTrade"
-            >
-              <span class="planet-shop-group__label">{{ tradeGroupLabel }}</span>
-              <span class="planet-shop-group__chevron" :data-open="tradeOpen">▾</span>
-            </button>
-
-            <div v-show="tradeOpen" class="planet-shop-group__content">
-              <div v-if="restockRemaining" class="planet-shop-restock">
-                Restocking in {{ restockRemaining }}
-              </div>
-
-              <template v-if="session.planetId === 'venus'">
-                <div class="planet-shop-subgroup-label">VENUS GOODS</div>
-                <div
-                  v-for="slot in venusLocalSlots"
-                  :key="slot.itemId"
-                  class="planet-shop-item planet-shop-item--trade"
-                  :class="{ 'planet-shop-item--sold-out': slot.stock <= 0 }"
-                >
-                  <div class="planet-shop-item__icon-placeholder planet-shop-icon--trade">
-                    {{ slotIcon(slot) }}
-                  </div>
-                  <div class="planet-shop-item__info">
-                    <span class="planet-shop-item__name">{{ slotLabel(slot) }}</span>
-                    <span class="planet-shop-item__desc">{{ slotDescription(slot) }}</span>
-                    <span class="planet-shop-item__stock">
-                      {{ slot.stock > 0 ? `${slot.stock} in stock` : 'Sold out' }}
-                    </span>
-                  </div>
-                  <span class="planet-shop-item__price">{{ slot.price }} CR</span>
-                  <button
-                    type="button"
-                    class="planet-shop-item__buy-btn planet-shop-btn--trade"
-                    :disabled="slot.stock <= 0 || !canAfford(slot.price)"
-                    @click="
-                      uiAudio.notifyConfirm();
-                      $emit('buyTradeGood', session.tradeSlots.indexOf(slot), 1)
-                    "
-                  >
-                    Buy
-                  </button>
-                </div>
-
-                <div class="planet-shop-subgroup-label">IMPORTS</div>
-                <div
-                  v-for="slot in venusImportSlots"
-                  :key="slot.itemId"
-                  class="planet-shop-item planet-shop-item--trade planet-shop-item--import"
-                  :class="{ 'planet-shop-item--sold-out': slot.stock <= 0 }"
-                >
-                  <div class="planet-shop-item__icon-placeholder planet-shop-icon--import">
-                    {{ slotIcon(slot) }}
-                  </div>
-                  <div class="planet-shop-item__info">
-                    <span class="planet-shop-item__name">{{ slotLabel(slot) }}</span>
-                    <span v-if="slotOriginLabel(slot)" class="planet-shop-item__origin">
-                      {{ slotOriginLabel(slot) }}
-                    </span>
-                    <span class="planet-shop-item__desc">{{ slotDescription(slot) }}</span>
-                    <span class="planet-shop-item__stock">
-                      {{ slot.stock > 0 ? `${slot.stock} in stock` : 'Sold out' }}
-                    </span>
-                  </div>
-                  <span class="planet-shop-item__price">{{ slot.price }} CR</span>
-                  <button
-                    type="button"
-                    class="planet-shop-item__buy-btn planet-shop-btn--trade"
-                    :disabled="slot.stock <= 0 || !canAfford(slot.price)"
-                    @click="
-                      uiAudio.notifyConfirm();
-                      $emit('buyTradeGood', session.tradeSlots.indexOf(slot), 1)
-                    "
-                  >
-                    Buy
-                  </button>
-                </div>
-              </template>
-              <template v-else>
-                <!-- Trade goods -->
-                <div
-                  v-for="(slot, index) in session.tradeSlots"
-                  :key="slot.itemId"
-                  class="planet-shop-item planet-shop-item--trade"
-                  :class="{ 'planet-shop-item--sold-out': slot.stock <= 0 }"
-                >
-                  <div class="planet-shop-item__icon-placeholder planet-shop-icon--trade">
-                    {{ slotIcon(slot) }}
-                  </div>
-                  <div class="planet-shop-item__info">
-                    <span class="planet-shop-item__name">{{ slotLabel(slot) }}</span>
-                    <span class="planet-shop-item__desc">{{ slotDescription(slot) }}</span>
-                    <span class="planet-shop-item__stock">
-                      {{ slot.stock > 0 ? `${slot.stock} in stock` : 'Sold out' }}
-                    </span>
-                  </div>
-                  <span class="planet-shop-item__price">{{ slot.price }} CR</span>
-                  <button
-                    type="button"
-                    class="planet-shop-item__buy-btn planet-shop-btn--trade"
-                    :disabled="slot.stock <= 0 || !canAfford(slot.price)"
-                    @click="
-                      uiAudio.notifyConfirm();
-                      $emit('buyTradeGood', index, 1)
-                    "
-                  >
-                    Buy
-                  </button>
-                </div>
-              </template>
-            </div>
-          </div>
-        </div>
-
-        <!-- Sell column -->
-        <div class="planet-shop-column">
-          <h3 class="planet-shop-column__title">Sell</h3>
-          <InventoryTable
-            :items="inventory.stacks"
-            mode="sell"
-            :planet-id="session.planetId"
-            @sell="(itemId, qty) => $emit('sellItem', itemId, qty)"
-          />
-        </div>
           </div>
 
           <div class="shuttle-control-footer planet-shop-ambient__footer">

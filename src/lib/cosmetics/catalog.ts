@@ -73,7 +73,9 @@ function parsePremiumTrade(raw: unknown): CosmeticShopCatalog['premiumTrade'] {
   }
   const pipBonus = p['minimumPipBonus']
   if (typeof pipBonus !== 'number' || !Number.isInteger(pipBonus) || pipBonus < 0) {
-    throw new Error('cosmetics catalog: premiumTrade.minimumPipBonus must be a non-negative integer')
+    throw new Error(
+      'cosmetics catalog: premiumTrade.minimumPipBonus must be a non-negative integer',
+    )
   }
   const margin = p['visitMargin']
   if (margin === null || typeof margin !== 'object' || Array.isArray(margin)) {
@@ -122,9 +124,11 @@ function parseOption(raw: unknown, ids: Set<string>): CosmeticOptionData {
   if (typeof category !== 'string' || !isCosmeticCategory(category)) {
     throw new Error(`cosmetics catalog: invalid category on '${id}'`)
   }
-  if (typeof label !== 'string' || label.trim() === '') throw new Error(`cosmetics catalog: label on '${id}'`)
+  if (typeof label !== 'string' || label.trim() === '')
+    throw new Error(`cosmetics catalog: label on '${id}'`)
   if (typeof description !== 'string') throw new Error(`cosmetics catalog: description on '${id}'`)
-  if (!isNonNegativeFiniteCatalogPrice(price)) throw new Error(`cosmetics catalog: price on '${id}'`)
+  if (!isNonNegativeFiniteCatalogPrice(price))
+    throw new Error(`cosmetics catalog: price on '${id}'`)
   if (!Array.isArray(stopsRaw) || stopsRaw.length < 2) {
     throw new Error(`cosmetics catalog: gradientStops on '${id}' need at least two colors`)
   }

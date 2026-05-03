@@ -12,7 +12,10 @@
  */
 import type { BodyAccessState, PlayerAchievementStats, PlayerProfile } from './types'
 import { SLINGSHOT_JOURNEY_FEATURE_ID, WELCOME_JOURNEY_ID } from '@/lib/journeys'
-import { createDefaultPlayerCosmetics, normalizePlayerCosmetics } from '@/lib/cosmetics/profileCosmetics'
+import {
+  createDefaultPlayerCosmetics,
+  normalizePlayerCosmetics,
+} from '@/lib/cosmetics/profileCosmetics'
 import { PINNED_BODIES } from '@/lib/planets/catalog'
 
 /** localStorage key for the player profile. */

@@ -36,6 +36,30 @@ interface EjectaCrater {
   rimAbundance: number
 }
 
+/** Diagnostic counters emitted at the end of a generation run. */
+export interface RockDistributionDiagnostics {
+  /** World-square edge length (units) used for area scaling. */
+  worldSize: number
+  /** Target rock count derived from `worldSize` × abundance. */
+  targetCount: number
+  /** Rocks actually placed (≤ `targetCount`). */
+  accepted: number
+  /** Total sampling attempts consumed. */
+  attempts: number
+  /** Hard cap on attempts (`targetCount × MAX_ATTEMPTS_FACTOR`). */
+  maxAttempts: number
+  /** Samples rejected because `isValidGround` returned false. */
+  rejectedByValidGround: number
+  /** Samples rejected by an exclusion disc (pad / POI). */
+  rejectedByExclusion: number
+  /** Samples rejected because slope at sample exceeded `maxSlope`. */
+  rejectedBySlope: number
+  /** Samples rejected because they overlap an already-accepted rock. */
+  rejectedByOverlap: number
+  /** Samples rejected by the composition-driven acceptance Bernoulli draw. */
+  rejectedByAcceptRate: number
+}
+
 /** Knobs for {@link generateAsteroidRockDistribution}. */
 export interface AsteroidRockDistributionOptions {
   seed: number
@@ -49,6 +73,12 @@ export interface AsteroidRockDistributionOptions {
    * mesh-backed asteroid terrain doesn't spawn rocks floating in the void.
    */
   isValidGround?: (x: number, z: number) => boolean
+  /**
+   * Optional sink for per-run rejection counters. Called once after generation
+   * completes; useful for tuning the `targetCount` vs `maxAttempts` ratio when
+   * mesh-backed asteroids leave large fractions of the world square void.
+   */
+  onDiagnostics?: (diag: RockDistributionDiagnostics) => void
 }
 
 const REFERENCE_WORLD_SIZE = 8000
@@ -62,7 +92,22 @@ const MIN_ROCKS = 200
 /** Rock count when `targetRockCount` interpolation hits its dense extreme (`densityT === 1`). */
 const MAX_ROCKS = 785
 const MIN_SPACING_FACTOR = 0.58
-const MAX_ATTEMPTS_FACTOR = 12
+const MAX_ATTEMPTS_FACTOR = 20
+/**
+ * Floor on the area scaling factor used by {@link targetRockCount}. Small
+ * asteroids still need enough rocks to make gather missions playable, so
+ * we don't let `(worldSize/REFERENCE)²` shrink the target below half.
+ */
+const MIN_AREA_SCALE = 0.5
+/**
+ * Floor on the per-cell acceptance probability for non-ejecta samples.
+ * `targetCount` already encodes density; the sieve only adds spatial
+ * variation around ejecta. Keeping this high means we don't waste the
+ * attempts budget on a redundant rate-limiter.
+ */
+const MIN_NON_EJECTA_ACCEPT_RATE = 0.6
+/** Denominator that maps `localK` to a 0→1 acceptance probability. */
+const ACCEPT_RATE_K_SCALE = 0.1
 const MIN_BURIAL_FRACTION = 0.14
 const MAX_BURIAL_FRACTION = 0.38
 const BASE_BURIAL_FRACTION = 0.16
@@ -130,7 +175,10 @@ function effectiveRockAbundance(surface: SurfaceFeatures): number {
 /** Target number of rocks scaled by world area and abundance. */
 function targetRockCount(worldSize: number, k: number): number {
   const densityT = clamp((k - 0.02) / 0.26, 0, 1)
-  const areaScale = Math.pow(worldSize / REFERENCE_WORLD_SIZE, 2)
+  const areaScale = Math.max(
+    MIN_AREA_SCALE,
+    Math.pow(worldSize / REFERENCE_WORLD_SIZE, 2),
+  )
   return Math.round((MIN_ROCKS + (MAX_ROCKS - MIN_ROCKS) * densityT) * areaScale)
 }
 
@@ -224,7 +272,7 @@ function overlapsExisting(
 export function generateAsteroidRockDistribution(
   options: AsteroidRockDistributionOptions,
 ): AsteroidRockSpawn[] {
-  const { seed, worldSize, surface, slopeAt, isValidGround } = options
+  const { seed, worldSize, surface, slopeAt, isValidGround, onDiagnostics } = options
   const exclusions = options.exclusions ?? []
   const rng = seededRandom(seed + 4813)
   const noise = new SimplexNoise(seed + 777)
@@ -237,8 +285,15 @@ export function generateAsteroidRockDistribution(
   const accepted: AsteroidRockSpawn[] = []
   const baseHeightRatio = 0.28 + surface.roughness * 0.22 + surface.boulderDensity * 0.08
   const maxSlope = 0.9 + (1 - surface.roughness) * 1.6 + surface.dustCoverage * 1.1
+  let rejectedByValidGround = 0
+  let rejectedByExclusion = 0
+  let rejectedBySlope = 0
+  let rejectedByOverlap = 0
+  let rejectedByAcceptRate = 0
+  let attempts = 0
 
   for (let attempt = 0; accepted.length < targetCount && attempt < maxAttempts; attempt++) {
+    attempts = attempt + 1
     const nx = rng() * 2 - 1
     const nz = rng() * 2 - 1
     const jitterX = noise.n2(attempt * 0.17, 11.3) * worldSize * 0.015
@@ -248,8 +303,13 @@ export function generateAsteroidRockDistribution(
 
     const { boost, isEjecta } = ejectaBoost(x, z, craters)
     const localK = clamp(k + boost, 0.02, 0.35)
-    const acceptRate = clamp(localK / 0.35, 0.1, 1)
-    if (!isEjecta && rng() > acceptRate) continue
+    const acceptRate = isEjecta
+      ? 1
+      : clamp(localK / ACCEPT_RATE_K_SCALE, MIN_NON_EJECTA_ACCEPT_RATE, 1)
+    if (rng() > acceptRate) {
+      rejectedByAcceptRate++
+      continue
+    }
 
     let diameter = sampleBoulderDiameter(surface, boost, rng)
     if (isEjecta) {
@@ -257,10 +317,22 @@ export function generateAsteroidRockDistribution(
     }
 
     const radius = diameter * 0.5
-    if (isValidGround && !isValidGround(x, z)) continue
-    if (isInsideExclusion(x, z, radius, exclusions)) continue
-    if (slopeAt && slopeAt(x, z) > maxSlope) continue
-    if (overlapsExisting(x, z, radius, accepted)) continue
+    if (isValidGround && !isValidGround(x, z)) {
+      rejectedByValidGround++
+      continue
+    }
+    if (isInsideExclusion(x, z, radius, exclusions)) {
+      rejectedByExclusion++
+      continue
+    }
+    if (slopeAt && slopeAt(x, z) > maxSlope) {
+      rejectedBySlope++
+      continue
+    }
+    if (overlapsExisting(x, z, radius, accepted)) {
+      rejectedByOverlap++
+      continue
+    }
 
     const tiltStrength = 0.04 + surface.roughness * 0.12
     const hdNoise = noise.n2(attempt * 0.11, attempt * 0.07)
@@ -292,6 +364,19 @@ export function generateAsteroidRockDistribution(
       isEjecta,
     })
   }
+
+  onDiagnostics?.({
+    worldSize,
+    targetCount,
+    accepted: accepted.length,
+    attempts,
+    maxAttempts,
+    rejectedByValidGround,
+    rejectedByExclusion,
+    rejectedBySlope,
+    rejectedByOverlap,
+    rejectedByAcceptRate,
+  })
 
   return accepted
 }

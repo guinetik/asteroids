@@ -1188,12 +1188,13 @@ export class ShuttleController implements Tickable, PortalVehicle {
   ): void {
     const materialColor = this.getMaterialColor(material)
     if (!materialColor) return
-    materialColor
-      .copy(baseColor)
-      .lerp(
-        baseColor.clone().multiply(paintColor).multiplyScalar(1 / SHUTTLE_HULL_COLOR_SCALE),
-        SHUTTLE_PAINT_COLOR_STRENGTH,
-      )
+    materialColor.copy(baseColor).lerp(
+      baseColor
+        .clone()
+        .multiply(paintColor)
+        .multiplyScalar(1 / SHUTTLE_HULL_COLOR_SCALE),
+      SHUTTLE_PAINT_COLOR_STRENGTH,
+    )
     material.needsUpdate = true
   }
 

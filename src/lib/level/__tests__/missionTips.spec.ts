@@ -66,7 +66,11 @@ function profile(completed: Record<string, number>): PlayerProfile {
 
 describe('missionTips', () => {
   it('returns a contextual giver-specific transmission for first-time rescue missions', () => {
-    const tip = resolveMissionTipTransmission(mission('frontier-rescue', 'rescue'), profile({}), 'fps')
+    const tip = resolveMissionTipTransmission(
+      mission('frontier-rescue', 'rescue'),
+      profile({}),
+      'fps',
+    )
 
     expect(tip?.speaker).toBe('Frontier Rescue')
     expect(tip?.tone).toBe('rescue')
@@ -84,14 +88,22 @@ describe('missionTips', () => {
   })
 
   it('falls back to objective copy when the giver has no override', () => {
-    const tip = resolveMissionTipTransmission(mission('unknown-giver', 'exterminate'), profile({}), 'fps')
+    const tip = resolveMissionTipTransmission(
+      mission('unknown-giver', 'exterminate'),
+      profile({}),
+      'fps',
+    )
 
     expect(tip?.speaker).toBe('Colonial Guard')
     expect(tip?.channel).toBe('PEST CONTROL NET')
   })
 
   it('does not resolve lander-oriented guidance for the FPS visor channel', () => {
-    const tip = resolveMissionTipTransmission(mission('jovian-society', 'photometry'), profile({}), 'fps')
+    const tip = resolveMissionTipTransmission(
+      mission('jovian-society', 'photometry'),
+      profile({}),
+      'fps',
+    )
 
     expect(tip).toBeNull()
   })
@@ -123,7 +135,10 @@ describe('missionTips', () => {
   })
 
   it('hides the lander refresher once the player has completed a mission', () => {
-    const tip = resolveFirstRunLanderTipTransmission(mission('jay', 'gather'), profile({ gather: 1 }))
+    const tip = resolveFirstRunLanderTipTransmission(
+      mission('jay', 'gather'),
+      profile({ gather: 1 }),
+    )
 
     expect(tip).toBeNull()
   })

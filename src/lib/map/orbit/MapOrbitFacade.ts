@@ -253,7 +253,8 @@ export class MapOrbitFacade {
       }
       this._slingshotCharge = Math.min(
         1,
-        this._slingshotCharge + (dt * this._slingshotBuffMultiplier) / MAP_CONFIG.SLINGSHOT_CHARGE_TIME,
+        this._slingshotCharge +
+          (dt * this._slingshotBuffMultiplier) / MAP_CONFIG.SLINGSHOT_CHARGE_TIME,
       )
       vehicleCamera?.applyConfigTuning(buildSlingshotChargeCameraConfig(this._slingshotCharge))
       this.updateLaunchArrow(shuttleController, sceneVisuals)

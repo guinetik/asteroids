@@ -48,7 +48,11 @@ describe('generateProbePositions', () => {
 })
 
 /** Valid cylindrical column used to mimic mesh peanuts: terrain only inside radius R of the hub. */
-function diskMockHeightfield(hubX: number, hubZ: number, validRadius: number): HeightmapSurfaceQuery {
+function diskMockHeightfield(
+  hubX: number,
+  hubZ: number,
+  validRadius: number,
+): HeightmapSurfaceQuery {
   return {
     tryHeightAt(x: number, z: number): number | null {
       const dx = x - hubX

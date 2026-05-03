@@ -33,11 +33,7 @@ describe('MapCosmeticShopFacade', () => {
       targetPlanetId: 'mars',
       onCosmeticShopButton: (_visible: boolean, _planetName: string): void => {},
       onCosmeticShopState: null as
-        | ((
-            session: PremiumTradeSession | null,
-            snapshot: PlayerProfile,
-            cargo: Inventory,
-          ) => void)
+        | ((session: PremiumTradeSession | null, snapshot: PlayerProfile, cargo: Inventory) => void)
         | null,
       profile,
       inventory,
@@ -92,22 +88,34 @@ describe('MapCosmeticShopFacade', () => {
 
     let emitted: PremiumTradeSession | null | undefined
 
-    facade.emitState((session) => {
-      emitted = session
-    }, profile, inventory)
+    facade.emitState(
+      (session) => {
+        emitted = session
+      },
+      profile,
+      inventory,
+    )
     expect(emitted ?? null).toBeNull()
 
-    facade.open((session) => {
-      emitted = session
-    }, profile, inventory)
+    facade.open(
+      (session) => {
+        emitted = session
+      },
+      profile,
+      inventory,
+    )
 
     expect(emitted?.premiumMultiplier).toBe(ROLL_EMIT_DIALOG)
 
     facade.close()
 
-    facade.emitState((session) => {
-      emitted = session
-    }, profile, inventory)
+    facade.emitState(
+      (session) => {
+        emitted = session
+      },
+      profile,
+      inventory,
+    )
     expect(emitted ?? null).toBeNull()
   })
 

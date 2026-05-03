@@ -78,7 +78,9 @@ export function isFirstMissionRun(profile: PlayerProfile | null): boolean {
  * @param mission - Active asteroid mission.
  * @returns The first objective type, or `null` when the mission has no objectives.
  */
-export function getMissionTipObjectiveType(mission: GeneratedAsteroidMission): ObjectiveType | null {
+export function getMissionTipObjectiveType(
+  mission: GeneratedAsteroidMission,
+): ObjectiveType | null {
   return mission.objectives[0]?.type ?? null
 }
 

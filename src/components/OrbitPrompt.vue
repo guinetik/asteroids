@@ -78,7 +78,7 @@ const details = computed(() => {
         type="button"
         class="orbit-prompt-engineering-btn"
         @click="
-          uiAudio.notifyButtonClick();
+          uiAudio.notifyButtonClick()
           emit('openEngineeringBay')
         "
       >
@@ -89,7 +89,7 @@ const details = computed(() => {
         type="button"
         class="orbit-prompt-mission-board-btn"
         @click="
-          uiAudio.notifyButtonClick();
+          uiAudio.notifyButtonClick()
           emit('openMissionBoard')
         "
       >
@@ -100,20 +100,18 @@ const details = computed(() => {
         type="button"
         class="orbit-prompt-shop-btn"
         @click="
-          uiAudio.notifyButtonClick();
+          uiAudio.notifyButtonClick()
           emit('openShop')
         "
       >
         B Shop
       </button>
       <button
-        v-if="
-          !suppressKiosks && cosmeticShopAvailable && orbitState.state === 'orbiting'
-        "
+        v-if="!suppressKiosks && cosmeticShopAvailable && orbitState.state === 'orbiting'"
         type="button"
         class="orbit-prompt-cosmetic-btn"
         @click="
-          uiAudio.notifyButtonClick();
+          uiAudio.notifyButtonClick()
           emit('openCosmeticShop')
         "
       >
@@ -124,7 +122,7 @@ const details = computed(() => {
         type="button"
         class="orbit-prompt-mission-btn"
         @click="
-          uiAudio.notifyButtonClick();
+          uiAudio.notifyButtonClick()
           emit('openMission')
         "
       >

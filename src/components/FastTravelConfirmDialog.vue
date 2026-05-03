@@ -85,7 +85,7 @@ const fuelOk = computed(() => props.fuelRatio + 1e-6 >= props.requiredFuelRatio)
               class="fast-travel-card__btn fast-travel-card__btn--primary"
               :disabled="!fuelOk"
               @click="
-                uiAudio.notifyConfirm();
+                uiAudio.notifyConfirm()
                 emit('confirm')
               "
             >
@@ -95,7 +95,7 @@ const fuelOk = computed(() => props.fuelRatio + 1e-6 >= props.requiredFuelRatio)
               type="button"
               class="fast-travel-card__btn fast-travel-card__btn--secondary"
               @click="
-                uiAudio.notifyCancel();
+                uiAudio.notifyCancel()
                 emit('cancel')
               "
             >

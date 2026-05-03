@@ -10,6 +10,7 @@ import {
   createLevelDisturbanceState,
   getLevelDisturbanceDifficultyFactor,
   recordLevelDisturbance,
+  relieveLevelDisturbanceForAmbientKill,
   resetLevelDisturbance,
   tickLevelDisturbance,
 } from '@/lib/level/levelDisturbance'
@@ -64,9 +65,7 @@ describe('levelDisturbance', () => {
 
     recordLevelDisturbance(state, { type: 'explosion', amount: 100 })
 
-    expect(tickLevelDisturbance(state, 0).map((event) => event.enemyCount)).toEqual([
-      1, 1, 2, 3, 4,
-    ])
+    expect(tickLevelDisturbance(state, 0).map((event) => event.enemyCount)).toEqual([1, 1, 2, 3, 4])
   })
 
   it('reset clears disturbance and response history', () => {
@@ -118,5 +117,47 @@ describe('levelDisturbance', () => {
     tickLevelDisturbance(state, Number.POSITIVE_INFINITY)
 
     expect(state.patrolCooldownRemaining).toBe(cooldown)
+  })
+
+  it('pulls escalating relief wedges when defeating ambient viroids on the same baseline', () => {
+    const state = createLevelDisturbanceState({ missionDifficulty: 10 })
+
+    state.disturbance = 92
+    relieveLevelDisturbanceForAmbientKill(state, 'chimera')
+    const chimeraRemaining = state.disturbance
+
+    state.disturbance = 92
+    relieveLevelDisturbanceForAmbientKill(state, 'spire')
+    const spireRemaining = state.disturbance
+
+    state.disturbance = 92
+    relieveLevelDisturbanceForAmbientKill(state, 'bacteriophage')
+    const walkerRemaining = state.disturbance
+
+    expect(walkerRemaining).toBeGreaterThan(spireRemaining)
+    expect(spireRemaining).toBeGreaterThan(chimeraRemaining)
+  })
+
+  it('scales ambient kill relief with mission difficulty multiplier', () => {
+    const easyState = createLevelDisturbanceState({ missionDifficulty: 1 })
+    const toughState = createLevelDisturbanceState({ missionDifficulty: 10 })
+
+    easyState.disturbance = 95
+    toughState.disturbance = 95
+
+    relieveLevelDisturbanceForAmbientKill(easyState, 'bacteriophage')
+    relieveLevelDisturbanceForAmbientKill(toughState, 'bacteriophage')
+
+    expect(getLevelDisturbanceDifficultyFactor(1)).toBeLessThan(getLevelDisturbanceDifficultyFactor(10))
+    expect(easyState.disturbance).toBeGreaterThan(toughState.disturbance)
+  })
+
+  it('clamps disturbance to zero when ambient kill relief overdraws remaining meter', () => {
+    const state = createLevelDisturbanceState({ missionDifficulty: 10 })
+
+    state.disturbance = 6
+    relieveLevelDisturbanceForAmbientKill(state, 'spire')
+
+    expect(state.disturbance).toBe(0)
   })
 })

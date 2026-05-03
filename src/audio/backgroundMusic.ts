@@ -96,8 +96,7 @@ export function playBackgroundMusic(
   const redundantContinuance =
     activeScene === scene &&
     currentHandle !== null &&
-    (scene === 'map' ||
-      (scene === 'level' && nextLevelMusicId === activeLevelMusicSoundId))
+    (scene === 'map' || (scene === 'level' && nextLevelMusicId === activeLevelMusicSoundId))
 
   if (redundantContinuance) {
     return

@@ -88,8 +88,7 @@ watch(
   },
 )
 
-const titleRenamePrice =
-  findCosmeticOptionById(SHUTTLE_TITLE_SERVICE_OPTION_ID)?.price ?? 5000
+const titleRenamePrice = findCosmeticOptionById(SHUTTLE_TITLE_SERVICE_OPTION_ID)?.price ?? 5000
 
 const premiumStacks = computed(() =>
   props.inventory.stacks.filter((s) => s.quantity > 0 && isPremiumBuyerItem(s.itemId)),
@@ -156,7 +155,10 @@ function canAffordPrice(price: number): boolean {
   return props.profile.credits >= price
 }
 
-function primaryActionLabel(optionId: string, category: CosmeticCategory): 'Active' | 'Apply' | 'Buy' {
+function primaryActionLabel(
+  optionId: string,
+  category: CosmeticCategory,
+): 'Active' | 'Apply' | 'Buy' {
   const activeId = getActiveCosmeticOptionId(cosmetics.value, category)
   if (activeId === optionId) return 'Active'
   if (playerOwnsCosmeticOption(cosmetics.value, optionId)) return 'Apply'
@@ -186,8 +188,9 @@ function onRenameSubmit(): void {
 }
 
 function pipRowPremium(itemId: string): boolean[] {
-  return Array.from({ length: 5 }, (_, index) =>
-    index < getPremiumDesirabilityPips(props.premiumSession, itemId),
+  return Array.from(
+    { length: 5 },
+    (_, index) => index < getPremiumDesirabilityPips(props.premiumSession, itemId),
   )
 }
 
@@ -229,7 +232,7 @@ function normalizedTitleBlocked(): boolean {
               type="button"
               class="ship-message-card__button"
               @click="
-                uiAudio.notifyCancel();
+                uiAudio.notifyCancel()
                 emit('close')
               "
             >
@@ -248,7 +251,7 @@ function normalizedTitleBlocked(): boolean {
                   class="cosmetic-shop-tab"
                   :aria-selected="activeTab === tab"
                   @click="
-                    uiAudio.notifySwitch();
+                    uiAudio.notifySwitch()
                     activeTab = tab
                   "
                 >
@@ -281,7 +284,9 @@ function normalizedTitleBlocked(): boolean {
                         <span class="cosmetic-option-row__name">{{ option.label }}</span>
                         <span class="cosmetic-option-row__desc">{{ option.description }}</span>
                       </div>
-                      <span class="cosmetic-option-row__price">{{ formatSkuCredits(option.price) }}</span>
+                      <span class="cosmetic-option-row__price">{{
+                        formatSkuCredits(option.price)
+                      }}</span>
                       <button
                         type="button"
                         class="cosmetic-option-row__action"
@@ -314,7 +319,7 @@ function normalizedTitleBlocked(): boolean {
                           class="cosmetic-option-row__action"
                           :disabled="!normalizedTitleCostOk() || normalizedTitleBlocked()"
                           @click="
-                            uiAudio.notifyConfirm();
+                            uiAudio.notifyConfirm()
                             onRenameSubmit()
                           "
                         >
@@ -322,7 +327,8 @@ function normalizedTitleBlocked(): boolean {
                         </button>
                       </div>
                       <p class="cosmetic-title-editor__hint">
-                        Blank saves are refused. Duplicates matching your current banner are free rejects.
+                        Blank saves are refused. Duplicates matching your current banner are free
+                        rejects.
                       </p>
                     </div>
                   </template>
@@ -338,13 +344,17 @@ function normalizedTitleBlocked(): boolean {
                         :disabled="isPrimaryDisabled(flag.id, 'vehicle-flag', flag.price)"
                         :title="flag.label"
                         @click="
-                          uiAudio.notifyButtonClick();
+                          uiAudio.notifyButtonClick()
                           onPrimary(flag.id, 'vehicle-flag')
                         "
                       >
-                        <span class="cosmetic-flag-btn__emoji" aria-hidden="true">{{ flag.emoji ?? '—' }}</span>
+                        <span class="cosmetic-flag-btn__emoji" aria-hidden="true">{{
+                          flag.emoji ?? '—'
+                        }}</span>
                         <span class="cosmetic-flag-btn__label">{{ flag.label }}</span>
-                        <span class="cosmetic-flag-btn__price">{{ formatSkuCredits(flag.price) }}</span>
+                        <span class="cosmetic-flag-btn__price">{{
+                          formatSkuCredits(flag.price)
+                        }}</span>
                       </button>
                     </div>
                   </template>
@@ -356,61 +366,71 @@ function normalizedTitleBlocked(): boolean {
                 key="premium-cargo"
                 class="cosmetic-shop-panel cosmetic-shop-panel--premium"
               >
-              <h3 class="cosmetic-premium-heading">Cargo Intake (Premium Buyer)</h3>
-              <p class="cosmetic-premium-copy">
-                Fantasia pays hotter than polite yellow desks. Magenta glow on demand pips = extra love.
-              </p>
-              <div v-if="premiumStacks.length === 0" class="cosmetic-premium-empty">No trade goods</div>
-              <div v-else class="cosmetic-premium-rows">
-                <div v-for="stack in premiumStacks" :key="stack.itemId" class="cosmetic-premium-row">
-                  <div class="cosmetic-premium-row__lead">
-                    <span class="cosmetic-premium-row__title">{{
-                      getItemDefinition(stack.itemId)?.label ?? stack.itemId
-                    }}</span>
-                    <span class="cosmetic-premium-row__meta"
-                      >{{ stack.quantity }}u · {{ stack.totalWeightKg.toFixed(0) }}kg</span
-                    >
-                  </div>
-                  <div class="cosmetic-premium-row__pips">
-                    <span
-                      v-for="(active, pipIndex) in pipRowPremium(stack.itemId)"
-                      :key="stack.itemId + '-pip-' + pipIndex"
-                      class="inventory-table__pip cosmetic-premium-pip"
-                      :class="
-                        active
-                          ? 'inventory-table__pip--active cosmetic-premium-pip--hot'
-                          : 'inventory-table__pip--inactive'
-                      "
-                    />
-                  </div>
-                  <span class="cosmetic-premium-row__price"
-                    >{{ computePremiumSellPrice(premiumSession, stack.itemId).toLocaleString() }} CR</span
+                <h3 class="cosmetic-premium-heading">Cargo Intake (Premium Buyer)</h3>
+                <p class="cosmetic-premium-copy">
+                  Fantasia pays hotter than polite yellow desks. Magenta glow on demand pips = extra
+                  love.
+                </p>
+                <div v-if="premiumStacks.length === 0" class="cosmetic-premium-empty">
+                  No trade goods
+                </div>
+                <div v-else class="cosmetic-premium-rows">
+                  <div
+                    v-for="stack in premiumStacks"
+                    :key="stack.itemId"
+                    class="cosmetic-premium-row"
                   >
-                  <div class="cosmetic-premium-row__sell">
-                    <button
-                      type="button"
-                      class="cosmetic-premium-row__sell-btn"
-                      @click="
-                        uiAudio.notifyConfirm();
-                        emit('sellPremium', stack.itemId, 1)
-                      "
+                    <div class="cosmetic-premium-row__lead">
+                      <span class="cosmetic-premium-row__title">{{
+                        getItemDefinition(stack.itemId)?.label ?? stack.itemId
+                      }}</span>
+                      <span class="cosmetic-premium-row__meta"
+                        >{{ stack.quantity }}u · {{ stack.totalWeightKg.toFixed(0) }}kg</span
+                      >
+                    </div>
+                    <div class="cosmetic-premium-row__pips">
+                      <span
+                        v-for="(active, pipIndex) in pipRowPremium(stack.itemId)"
+                        :key="stack.itemId + '-pip-' + pipIndex"
+                        class="inventory-table__pip cosmetic-premium-pip"
+                        :class="
+                          active
+                            ? 'inventory-table__pip--active cosmetic-premium-pip--hot'
+                            : 'inventory-table__pip--inactive'
+                        "
+                      />
+                    </div>
+                    <span class="cosmetic-premium-row__price"
+                      >{{
+                        computePremiumSellPrice(premiumSession, stack.itemId).toLocaleString()
+                      }}
+                      CR</span
                     >
-                      Sell
-                    </button>
-                    <button
-                      type="button"
-                      class="cosmetic-premium-row__sell-btn"
-                      @click="
-                        uiAudio.notifyConfirm();
-                        emit('sellPremium', stack.itemId, stack.quantity)
-                      "
-                    >
-                      All
-                    </button>
+                    <div class="cosmetic-premium-row__sell">
+                      <button
+                        type="button"
+                        class="cosmetic-premium-row__sell-btn"
+                        @click="
+                          uiAudio.notifyConfirm()
+                          emit('sellPremium', stack.itemId, 1)
+                        "
+                      >
+                        Sell
+                      </button>
+                      <button
+                        type="button"
+                        class="cosmetic-premium-row__sell-btn"
+                        @click="
+                          uiAudio.notifyConfirm()
+                          emit('sellPremium', stack.itemId, stack.quantity)
+                        "
+                      >
+                        All
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
             </Transition>
           </div>
         </div>

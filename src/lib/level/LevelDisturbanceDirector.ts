@@ -1,20 +1,24 @@
 /**
  * Scene-facing adapter for hidden level disturbance responses.
  *
- * Converts pure disturbance response events into deterministic ambient
- * bacteriophage enemies without coupling the hidden model to Three.js.
+ * Converts pure disturbance response events into deterministic ambient viroids
+ * (`bacteriophage`, `spire`, `chimera`) without coupling the hidden model to Three.js.
+ * Mission difficulty selects both palette tiers and which archetypes may spawn.
  *
  * @author guinetik
  * @date 2026-05-02
  * @spec docs/superpowers/specs/2026-05-02-level-disturbance-system-design.md
  */
 import * as THREE from 'three'
+import { spawnChimeraProjectileBurst } from '@/lib/fps/chimeraProjectileBurst'
 import type { Enemy } from '@/lib/fps/enemy'
 import { EnemyDirector, type EnemyHandle } from '@/lib/fps/enemyDirector'
+import { EnemyProjectileSystem } from '@/lib/fps/enemyProjectileSystem'
 import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
 import {
   createLevelDisturbanceState,
   recordLevelDisturbance,
+  relieveLevelDisturbanceForAmbientKill,
   resetLevelDisturbance,
   tickLevelDisturbance,
   type LevelDisturbanceEvent,
@@ -22,6 +26,17 @@ import {
 } from '@/lib/level/levelDisturbance'
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import { BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/BacteriophageController'
+import { ChimeraWalkerController, CHIMERA_HIT_CENTER_Y } from '@/three/ChimeraWalkerController'
+import { EnemyProjectileMeshPool } from '@/three/EnemyProjectileMeshPool'
+import { SpireController, SPIRE_HIT_CENTER_Y } from '@/three/SpireController'
+import {
+  disturbanceAmbientViroidKindsForMissionDifficulty,
+  clampMissionDifficultyForEnemyRules,
+  enemyPlayerDamageMultiplierForVisualTier,
+  enemyVisualTierForDifficulty,
+  type DisturbanceAmbientViroidKind,
+  type EnemyVisualTier,
+} from '@/three/enemyVisualPalette'
 
 /** Maximum live hidden-system ambient enemies allowed at once. */
 const MAX_LIVE_AMBIENT_ENEMIES = 5
@@ -51,6 +66,15 @@ const MULBERRY_MASK_A = 1
 const MULBERRY_MASK_B = 61
 /** Unsigned 32-bit divisor used to convert PRNG output to `[0, 1)`. */
 const UINT32_FLOAT_DIVISOR = 4294967296
+/**
+ * World X/Z coordinate used while the EVA avatar is inactive so dormant enemies
+ * do not collide with cockpit coordinates (mirrors rescue “far chase” sentinel).
+ */
+const IDLE_PLAYER_FOCUS_XZ = 99999
+/** Prewarmed enemy projectile mesh instances for disturbance combat. */
+const ENEMY_PROJECTILE_MESH_PREWARM = 24
+/** Treat nearly-zero directional vectors from aim math as degenerate aim. */
+const PROJECTILE_DIRECTION_EPSILON_SQ = 0.000_1
 
 /**
  * Dependencies required by the runtime disturbance director.
@@ -61,7 +85,7 @@ const UINT32_FLOAT_DIVISOR = 4294967296
  */
 export interface LevelDisturbanceDirectorDeps {
   /**
-   * Three.js scene that receives bacteriophage controller groups.
+   * Three.js scene that receives viroid controller groups.
    *
    * Example: `sceneManager.scene` for the active level scene.
    */
@@ -81,7 +105,7 @@ export interface LevelDisturbanceDirectorDeps {
   /**
    * Mission difficulty in `[1, 10]`; invalid values are clamped by the pure model.
    *
-   * Example: `10` produces the fastest hidden disturbance escalation.
+   * Example: `10` produces the hardest palette plus access to Chimera arrivals.
    */
   missionDifficulty: number
   /**
@@ -132,8 +156,19 @@ export class LevelDisturbanceDirector {
   private readonly heightmap: Heightmap
   private readonly projectileSystem: ProjectileSystem
   private readonly enemyDirector = new EnemyDirector()
-  private readonly controllers = new Map<number, BacteriophageController>()
+  private readonly enemyProjectileSystem = new EnemyProjectileSystem()
+  private readonly enemyProjectileMeshPool: EnemyProjectileMeshPool
+
+  private readonly phageControllers = new Map<number, BacteriophageController>()
+  private readonly spireControllers = new Map<number, SpireController>()
+  private readonly chimeraControllers = new Map<number, ChimeraWalkerController>()
+  private readonly chimeraLaserMuzzleScratch = new THREE.Vector3()
+  /** Unsubscribe handles for ambient kill-relief observers (cleared with enemies). */
+  private readonly ambientDeathUnsubs = new Map<number, () => void>()
+
   private readonly state: LevelDisturbanceState
+  private readonly enemyVisualTier: EnemyVisualTier
+  private readonly ambientViroidKinds: readonly DisturbanceAmbientViroidKind[]
   private rngState: number
 
   /**
@@ -166,6 +201,29 @@ export class LevelDisturbanceDirector {
     this.scene = deps.scene
     this.heightmap = deps.heightmap
     this.projectileSystem = deps.projectileSystem
+
+    const tierDifficulty = clampMissionDifficultyForEnemyRules(deps.missionDifficulty)
+    this.enemyVisualTier = enemyVisualTierForDifficulty(tierDifficulty)
+    this.ambientViroidKinds = disturbanceAmbientViroidKindsForMissionDifficulty(
+      deps.missionDifficulty,
+    )
+
+    const playerDamageMultiplier = enemyPlayerDamageMultiplierForVisualTier(this.enemyVisualTier)
+    this.enemyDirector.setPlayerDamageMultiplier(playerDamageMultiplier)
+    this.enemyProjectileSystem.setPlayerDamageMultiplier(playerDamageMultiplier)
+    this.enemyProjectileSystem.onPlayerHit = (damage, sourceX, sourceZ) => {
+      this.onDamagePlayer?.(damage, sourceX, sourceZ, 'projectile')
+    }
+
+    this.enemyProjectileMeshPool = new EnemyProjectileMeshPool(deps.scene)
+    this.enemyProjectileMeshPool.prewarm(ENEMY_PROJECTILE_MESH_PREWARM)
+    this.enemyProjectileSystem.onProjectileMove = this.enemyProjectileMeshPool.acquire.bind(
+      this.enemyProjectileMeshPool,
+    )
+    this.enemyProjectileSystem.onProjectileRemoved = this.enemyProjectileMeshPool.release.bind(
+      this.enemyProjectileMeshPool,
+    )
+
     this.state = createLevelDisturbanceState({ missionDifficulty: deps.missionDifficulty })
     this.rngState = deps.seed >>> 0
 
@@ -197,49 +255,72 @@ export class LevelDisturbanceDirector {
    * @param enemy - Enemy entity reported by the projectile system.
    */
   notifyEnemyHit(enemy: Enemy): void {
-    for (const ctrl of this.controllers.values()) {
+    for (const ctrl of this.phageControllers.values()) {
       if (ctrl.enemy !== enemy) continue
+      ctrl.flash()
+      return
+    }
 
+    for (const ctrl of this.spireControllers.values()) {
+      if (ctrl.enemy !== enemy) continue
+      ctrl.flash()
+      return
+    }
+
+    for (const ctrl of this.chimeraControllers.values()) {
+      if (ctrl.enemy !== enemy) continue
       ctrl.flash()
       break
     }
   }
 
   /**
-   * Advance hidden responses, ambient enemy AI, and visual controllers.
+   * Advance hidden responses, ambient enemy AI, combat projectiles, and visuals.
    *
    * @param dt - Delta time in seconds.
    * @param ctx - Current surface EVA context.
    */
   tick(dt: number, ctx: LevelDisturbanceFrameContext): void {
-    const player = ctx.evaActive ? ctx.playerPosition : null
+    const activePlayer = ctx.evaActive && ctx.playerPosition
 
-    if (player) {
+    if (activePlayer) {
+      const playerPosition = ctx.playerPosition!
       const responseEvents = tickLevelDisturbance(this.state, dt)
 
       for (const event of responseEvents) {
         this.onAlert?.(event.alert)
-        this.spawnAmbientEnemies(event.enemyCount, player, ctx.landerPosition)
+        this.spawnAmbientEnemies(event.enemyCount, playerPosition, ctx.landerPosition)
       }
 
-      this.enemyDirector.setPlayerPosition(player.x, player.y, player.z)
+      this.enemyDirector.setPlayerPosition(playerPosition.x, playerPosition.y, playerPosition.z)
+      this.enemyProjectileSystem.setPlayerPosition(
+        playerPosition.x,
+        playerPosition.y,
+        playerPosition.z,
+      )
       this.enemyDirector.tick(dt)
+    } else {
+      this.enemyDirector.setPlayerPosition(IDLE_PLAYER_FOCUS_XZ, 0, IDLE_PLAYER_FOCUS_XZ)
+      this.enemyProjectileSystem.setPlayerPosition(IDLE_PLAYER_FOCUS_XZ, 0, IDLE_PLAYER_FOCUS_XZ)
     }
 
     this.syncVisualControllers(dt)
+
+    this.enemyProjectileSystem.tick(dt)
   }
 
   /**
-   * Remove all owned controllers and unregister all owned enemies.
+   * Remove all owned controllers, pools, projectile registrations, and meshes.
    */
   dispose(): void {
     this.clearAmbientEnemies()
+    this.enemyProjectileMeshPool.disposeAll()
   }
 
   /**
    * Spawn up to the requested count while respecting the live ambient cap.
    *
-   * @param requestedCount - Number of bacteriophages requested by the pure response model.
+   * @param requestedCount - Number of viroids requested by the pure response model.
    * @param playerPosition - Radial spawn center around the EVA player.
    * @param landerPosition - Optional lander clearance center.
    */
@@ -251,18 +332,37 @@ export class LevelDisturbanceDirector {
     const availableSlots = Math.max(0, MAX_LIVE_AMBIENT_ENEMIES - this.countLiveEnemies())
     const spawnCount = Math.min(requestedCount, availableSlots)
 
+    const visualTierArg = this.enemyVisualTier
+
     for (let i = 0; i < spawnCount; i++) {
       const position = this.findSpawnPosition(playerPosition, landerPosition)
       if (!position) continue
 
       const groundY = this.heightmap.heightAt(position.x, position.z)
-      const handle = this.enemyDirector.spawn('bacteriophage', position.x, groundY, position.z)
-      this.projectileSystem.addEnemy(handle.enemy)
+      const kinds = this.ambientViroidKinds
+      const kind = kinds[Math.floor(this.rng() * kinds.length)] ?? 'bacteriophage'
+      const handle = this.enemyDirector.spawn(kind, position.x, groundY, position.z)
 
-      const ctrl = new BacteriophageController(handle.enemy)
-      ctrl.group.position.set(position.x, groundY, position.z)
-      this.scene.add(ctrl.group)
-      this.controllers.set(handle.id, ctrl)
+      this.projectileSystem.addEnemy(handle.enemy)
+      this.attachAmbientKillRelief(handle, kind)
+
+      if (kind === 'bacteriophage') {
+        const ctrl = new BacteriophageController(handle.enemy, { visualTier: visualTierArg })
+        ctrl.group.position.set(position.x, groundY, position.z)
+        this.scene.add(ctrl.group)
+        this.phageControllers.set(handle.id, ctrl)
+      } else if (kind === 'chimera') {
+        const ctrl = new ChimeraWalkerController(handle.enemy, { visualTier: visualTierArg })
+        ctrl.group.position.set(position.x, groundY, position.z)
+        this.scene.add(ctrl.group)
+        this.chimeraControllers.set(handle.id, ctrl)
+      } else {
+        const ctrl = new SpireController(handle.enemy, { visualTier: visualTierArg })
+        ctrl.group.position.set(position.x, groundY + handle.config.floatHeight, position.z)
+        ctrl.targetPosition.set(position.x, groundY + handle.config.floatHeight, position.z)
+        this.scene.add(ctrl.group)
+        this.spireControllers.set(handle.id, ctrl)
+      }
     }
   }
 
@@ -312,64 +412,264 @@ export class LevelDisturbanceDirector {
   }
 
   /**
-   * Mirror enemy director state into bacteriophage controllers and clean up deaths.
+   * Mirror enemy director state into viroid controllers and clean up deaths.
    *
    * @param dt - Delta time in seconds.
    */
   private syncVisualControllers(dt: number): void {
     for (const handle of this.enemyDirector.enemies.slice()) {
-      const ctrl = this.controllers.get(handle.id)
-      if (!ctrl) continue
-
-      if (ctrl.deathComplete) {
-        this.removeController(handle, ctrl)
-        continue
+      switch (handle.type) {
+        case 'bacteriophage':
+          this.syncPhageGroundController(handle, this.phageControllers.get(handle.id), dt)
+          break
+        case 'chimera':
+          this.syncChimeraGroundController(handle, this.chimeraControllers.get(handle.id), dt)
+          break
+        case 'spire':
+          this.syncSpireController(handle, this.spireControllers.get(handle.id), dt)
+          break
+        default:
+          break
       }
-
-      if (handle.enemy.alive) {
-        ctrl.isMoving = handle.lastOutput.isMoving
-        ctrl.isAgitated = handle.lastOutput.isAgitated
-        ctrl.group.position.x = handle.enemy.position.x
-        ctrl.group.position.z = handle.enemy.position.z
-
-        const groundY = this.heightmap.heightAt(handle.enemy.position.x, handle.enemy.position.z)
-        ctrl.group.position.y = groundY
-        handle.enemy.position.y = groundY + PHAGE_HIT_CENTER_Y
-      }
-
-      ctrl.tick(dt)
     }
   }
 
   /**
-   * Remove one completed controller and its projectile/director registrations.
-   *
-   * @param handle - Enemy handle owned by this director.
-   * @param ctrl - Visual controller owned by this director.
+   * Sync walker mesh while alive; remove registrations when death playback ends.
    */
-  private removeController(handle: EnemyHandle, ctrl: BacteriophageController): void {
-    ctrl.group.removeFromParent()
-    ctrl.dispose()
+  private syncPhageGroundController(
+    handle: EnemyHandle,
+    ctrl: BacteriophageController | undefined,
+    dt: number,
+  ): void {
+    if (!ctrl) return
+
+    if (ctrl.deathComplete) {
+      this.removeDeadEnemy(handle, ctrl.group, () => ctrl.dispose())
+      this.phageControllers.delete(handle.id)
+      return
+    }
+
+    if (handle.enemy.alive) {
+      ctrl.isMoving = handle.lastOutput.isMoving
+      ctrl.isAgitated = handle.lastOutput.isAgitated
+      ctrl.group.position.x = handle.enemy.position.x
+      ctrl.group.position.z = handle.enemy.position.z
+
+      const groundY = this.heightmap.heightAt(handle.enemy.position.x, handle.enemy.position.z)
+      ctrl.group.position.y = groundY
+      handle.enemy.position.y = groundY + PHAGE_HIT_CENTER_Y
+
+      if (handle.lastOutput.isMoving) {
+        const dir = handle.lastOutput.moveDir
+        ctrl.group.rotation.y = Math.atan2(dir.x, dir.z)
+      }
+    }
+
+    ctrl.tick(dt)
+  }
+
+  /**
+   * Sync chimera torso height, melee aim, burst eye lasers toward the pursuit target.
+   */
+  private syncChimeraGroundController(
+    handle: EnemyHandle,
+    ctrl: ChimeraWalkerController | undefined,
+    dt: number,
+  ): void {
+    if (!ctrl) return
+
+    if (ctrl.deathComplete) {
+      this.removeDeadEnemy(handle, ctrl.group, () => ctrl.dispose())
+      this.chimeraControllers.delete(handle.id)
+      return
+    }
+
+    if (handle.enemy.alive) {
+      ctrl.isMoving = handle.lastOutput.isMoving
+      ctrl.isAgitated = handle.lastOutput.isAgitated
+      ctrl.group.position.x = handle.enemy.position.x
+      ctrl.group.position.z = handle.enemy.position.z
+
+      const groundY = this.heightmap.heightAt(handle.enemy.position.x, handle.enemy.position.z)
+      ctrl.group.position.y = groundY
+      handle.enemy.position.y = groundY + CHIMERA_HIT_CENTER_Y
+
+      if (handle.lastOutput.isChasing) {
+        const ax = handle.lastOutput.aimTargetX
+        const az = handle.lastOutput.aimTargetZ
+        const adx = ax - handle.enemy.position.x
+        const adz = az - handle.enemy.position.z
+        ctrl.group.rotation.y = Math.atan2(adx, adz)
+      } else if (handle.lastOutput.isMoving) {
+        const dir = handle.lastOutput.moveDir
+        ctrl.group.rotation.y = Math.atan2(dir.x, dir.z)
+      }
+    }
+
+    ctrl.tick(dt)
+
+    if (handle.enemy.alive && handle.lastOutput.wantsToFire) {
+      ctrl.group.updateMatrixWorld(true)
+      const muzzle = this.chimeraLaserMuzzleScratch
+      ctrl.getEyeLaserMuzzle(muzzle)
+      const spawnedCount = spawnChimeraProjectileBurst({
+        originX: muzzle.x,
+        originY: muzzle.y,
+        originZ: muzzle.z,
+        targetX: handle.lastOutput.aimTargetX,
+        targetY: handle.lastOutput.aimTargetY,
+        targetZ: handle.lastOutput.aimTargetZ,
+        projectileSpeed: handle.config.projectileSpeed,
+        projectileDamage: handle.config.projectileDamage,
+        spawnBurst: this.enemyProjectileSystem.spawnBurst.bind(this.enemyProjectileSystem),
+      })
+      if (spawnedCount > 0) {
+        ctrl.pulseEyeLaser()
+      }
+    }
+  }
+
+  /**
+   * Bob and fire Spire blobs along the ranger behavior output.
+   */
+  private syncSpireController(
+    handle: EnemyHandle,
+    ctrl: SpireController | undefined,
+    dt: number,
+  ): void {
+    if (!ctrl) return
+
+    if (ctrl.deathComplete) {
+      this.removeDeadEnemy(handle, ctrl.group, () => ctrl.dispose())
+      this.spireControllers.delete(handle.id)
+      return
+    }
+
+    if (handle.enemy.alive) {
+      ctrl.isMoving = handle.lastOutput.isMoving
+      ctrl.isAgitated = handle.lastOutput.isAgitated
+
+      const groundY = this.heightmap.heightAt(handle.enemy.position.x, handle.enemy.position.z)
+      ctrl.targetPosition.set(
+        handle.enemy.position.x,
+        groundY + handle.config.floatHeight,
+        handle.enemy.position.z,
+      )
+      handle.enemy.position.y = ctrl.group.position.y + SPIRE_HIT_CENTER_Y
+
+      const aimX = handle.lastOutput.aimTargetX
+      const aimY = handle.lastOutput.aimTargetY
+      const aimZ = handle.lastOutput.aimTargetZ
+
+      if (handle.lastOutput.isChasing) {
+        const dx = aimX - handle.enemy.position.x
+        const dz = aimZ - handle.enemy.position.z
+        ctrl.group.rotation.y = Math.atan2(dx, dz)
+      }
+
+      if (handle.lastOutput.wantsToFire) {
+        const ep = handle.enemy.position
+        const dx = aimX - ep.x
+        const dy = aimY - ep.y
+        const dz = aimZ - ep.z
+        const distSq = dx * dx + dy * dy + dz * dz
+        if (distSq > PROJECTILE_DIRECTION_EPSILON_SQ) {
+          const dist = Math.sqrt(distSq)
+          this.enemyProjectileSystem.spawn(
+            ep.x,
+            ep.y,
+            ep.z,
+            dx / dist,
+            dy / dist,
+            dz / dist,
+            handle.config.projectileSpeed,
+            handle.config.projectileDamage,
+          )
+          ctrl.fireFlash(aimX, aimZ)
+        }
+      }
+    }
+
+    ctrl.tick(dt)
+  }
+
+  private removeDeadEnemy(
+    handle: EnemyHandle,
+    group: THREE.Object3D,
+    disposeCtrl: () => void,
+  ): void {
+    this.detachAmbientKillRelief(handle.id)
+    group.removeFromParent()
+    disposeCtrl()
     this.projectileSystem.removeEnemy(handle.enemy)
     this.enemyDirector.despawn(handle)
-    this.controllers.delete(handle.id)
+  }
+
+  /**
+   * Subscribe once-per-life kill relief so defeating harder silhouettes trims more meter.
+   *
+   * @param handle - Enemy handle spawned for this disturbance responder.
+   * @param archetype - Walker / Floater / Chimera variant used when computing relief wedges.
+   */
+  private attachAmbientKillRelief(
+    handle: EnemyHandle,
+    archetype: DisturbanceAmbientViroidKind,
+  ): void {
+    const stopListening = handle.enemy.addDeathListener(() => {
+      relieveLevelDisturbanceForAmbientKill(this.state, archetype)
+      stopListening()
+      this.ambientDeathUnsubs.delete(handle.id)
+    })
+
+    this.ambientDeathUnsubs.set(handle.id, stopListening)
+  }
+
+  private detachAmbientKillRelief(id: number): void {
+    const off = this.ambientDeathUnsubs.get(id)
+    if (!off) return
+
+    off()
+    this.ambientDeathUnsubs.delete(id)
+  }
+
+  private clearAmbientDeathSubscriptions(): void {
+    for (const off of this.ambientDeathUnsubs.values()) off()
+
+    this.ambientDeathUnsubs.clear()
   }
 
   /**
    * Remove every ambient enemy owned by this director.
    */
   private clearAmbientEnemies(): void {
+    this.clearAmbientDeathSubscriptions()
+
     for (const handle of this.enemyDirector.enemies) {
       this.projectileSystem.removeEnemy(handle.enemy)
     }
 
-    for (const ctrl of this.controllers.values()) {
+    for (const ctrl of this.phageControllers.values()) {
       ctrl.group.removeFromParent()
       ctrl.dispose()
     }
+    this.phageControllers.clear()
 
-    this.controllers.clear()
+    for (const ctrl of this.spireControllers.values()) {
+      ctrl.group.removeFromParent()
+      ctrl.dispose()
+    }
+    this.spireControllers.clear()
+
+    for (const ctrl of this.chimeraControllers.values()) {
+      ctrl.group.removeFromParent()
+      ctrl.dispose()
+    }
+    this.chimeraControllers.clear()
+
     this.enemyDirector.despawnAll()
+
+    this.enemyProjectileSystem.dispose()
   }
 
   /**

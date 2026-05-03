@@ -37,10 +37,7 @@ import { BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/Bacteriopha
 import { SpireController, SPIRE_HIT_CENTER_Y } from '@/three/SpireController'
 import { ChimeraWalkerController, CHIMERA_HIT_CENTER_Y } from '@/three/ChimeraWalkerController'
 import { EnemyProjectileMeshPool } from '@/three/EnemyProjectileMeshPool'
-import {
-  enemyVisualTierForDifficulty,
-  type EnemyVisualTier,
-} from '@/three/enemyVisualPalette'
+import { enemyVisualTierForDifficulty, type EnemyVisualTier } from '@/three/enemyVisualPalette'
 import type { Enemy } from '@/lib/fps/enemy'
 
 const VIRUS_SCALE = 600

@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { FANTASIA_INTRO_MESSAGE_ID } from '@/lib/cosmetics/fantasiaIntro'
-import {
-  FANTASIA_PIMP_MY_SHUTTLE_INTRO_MESSAGE,
-  SHIP_MESSAGE_CATALOG,
-} from '../messageCatalog'
+import { FANTASIA_PIMP_MY_SHUTTLE_INTRO_MESSAGE, SHIP_MESSAGE_CATALOG } from '../messageCatalog'
 import { MessageSystem } from '../messageSystem'
 
 describe('SHIP_MESSAGE_CATALOG', () => {

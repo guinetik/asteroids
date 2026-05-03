@@ -99,8 +99,8 @@ const cargoBands = computed<CargoBand[]>(() => {
         <span class="shuttle-program-intro-em">mass headroom</span>. Telemetry matches intake locks;
         exceed either and fresh pickups bounce at the collar. The
         <span class="shuttle-program-intro-em">Use</span>
-        action spends certified consumables when you're flight-ready. Need clearance? Lighten the stack
-        from the station
+        action spends certified consumables when you're flight-ready. Need clearance? Lighten the
+        stack from the station
         <span class="shuttle-program-intro-em">Shop</span>
         before the next contract closes intake.
       </p>

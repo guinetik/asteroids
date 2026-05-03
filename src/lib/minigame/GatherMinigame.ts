@@ -111,12 +111,18 @@ function pickRequiredMinerals(
 }
 
 /**
- * Minimum number of rocks that must yield a required mineral. Below
- * this we top up by overriding additional rocks via
- * {@link RockYieldSystem.forceRockMineral} so the quota is reachable
- * even on small maps with sparse low-percentage minerals.
+ * Absolute floor on rocks per required mineral. When topping up obtainable
+ * rocks, the quota-to-rock conversion uses {@link APPROX_KG_PER_ROCK} so large
+ * kg targets still expose enough miners on cramped maps.
  */
 const MIN_ROCKS_PER_REQUIRED_MINERAL = 3
+/**
+ * Approximate kilograms a mid-sized rock yields. Used to convert a kg
+ * quota into a rock-count floor — `ceil(perMineralKg / 30)` lands at 4
+ * rocks for a 100kg quota and 7 rocks for a 200kg quota, both well
+ * within the {@link RockYieldSystem.forceRockMineral} budget.
+ */
+const APPROX_KG_PER_ROCK = 30
 
 /** Deterministic 0→1 PRNG for rock placement from a level seed. */
 function seededRng(seed: number): () => number {
@@ -230,14 +236,17 @@ export class GatherMinigame implements MiniGame, MiniGameEvents {
       options.objectiveIndex,
       obtainable,
     )
+    const perMineral =
+      required.length > 0 ? Math.max(1, Math.ceil(totalKg / required.length)) : 1
     if (obtainable) {
+      const minPerMineral = Math.max(
+        MIN_ROCKS_PER_REQUIRED_MINERAL,
+        Math.ceil(perMineral / APPROX_KG_PER_ROCK),
+      )
       for (const entry of required) {
         const have = options.rockYieldSystem.countRolls(entry.itemId)
-        if (have < MIN_ROCKS_PER_REQUIRED_MINERAL) {
-          options.rockYieldSystem.forceRockMineral(
-            entry.itemId,
-            MIN_ROCKS_PER_REQUIRED_MINERAL - have,
-          )
+        if (have < minPerMineral) {
+          options.rockYieldSystem.forceRockMineral(entry.itemId, minPerMineral - have)
         }
       }
     }
@@ -251,7 +260,19 @@ export class GatherMinigame implements MiniGame, MiniGameEvents {
       })
       this._steps.push({ label: 'Deposit at the delivery rocket', complete: false, active: true })
     } else {
-      const perMineral = Math.max(1, Math.ceil(totalKg / required.length))
+      if (import.meta.env.DEV) {
+        console.info('[gather-minigame]', {
+          difficulty: options.difficulty,
+          totalKg,
+          mineralCount,
+          perMineralKg: perMineral,
+          quotas: required.map((entry) => ({
+            itemId: entry.itemId,
+            availableRocks: options.rockYieldSystem.countRolls(entry.itemId),
+            activeRocksWithKg: options.rockYieldSystem.findActiveRocksByItemId(entry.itemId).length,
+          })),
+        })
+      }
       this.quotas = required.map((entry) => ({
         itemId: entry.itemId,
         label: entry.label,

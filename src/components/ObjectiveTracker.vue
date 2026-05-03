@@ -59,7 +59,10 @@ withDefaults(
 <template>
   <div
     class="mission-tracker"
-    :class="[`mission-tracker--${variant}`, dock === 'inline' ? 'mission-tracker--dock-inline' : '']"
+    :class="[
+      `mission-tracker--${variant}`,
+      dock === 'inline' ? 'mission-tracker--dock-inline' : '',
+    ]"
   >
     <div class="tracker-header">
       <div class="tracker-asteroid">{{ eyebrow }}</div>

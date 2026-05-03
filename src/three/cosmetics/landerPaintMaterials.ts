@@ -35,9 +35,7 @@ const LANDER_PAINT_COLOR_STRENGTH = 0.86
  *
  * @param objectName - Mesh or node name from the loaded GLB.
  */
-export function getLanderPaintChannelForObjectName(
-  objectName: string,
-): LanderPaintChannel | null {
+export function getLanderPaintChannelForObjectName(objectName: string): LanderPaintChannel | null {
   const normalized = objectName.replace(/_/g, ' ').replace(/\s+/g, ' ').toLowerCase()
 
   if (
@@ -143,12 +141,16 @@ export function applyLanderPaintMaterials(
   )
 
   for (const target of targets) {
-    applyMaterialPaintColor(target.material, target.baseColor, {
-      primary,
-      secondary,
-      trim,
-      engine,
-    }[target.channel])
+    applyMaterialPaintColor(
+      target.material,
+      target.baseColor,
+      {
+        primary,
+        secondary,
+        trim,
+        engine,
+      }[target.channel],
+    )
   }
 }
 

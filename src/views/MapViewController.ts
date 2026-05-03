@@ -594,11 +594,7 @@ export class MapViewController implements Tickable {
    * When non-null premium session accompanies an open magenta dialog; callers mirror yellow shop HUD sync.
    */
   onCosmeticShopState:
-    | ((
-        session: PremiumTradeSession | null,
-        profile: PlayerProfile,
-        inventory: Inventory,
-      ) => void)
+    | ((session: PremiumTradeSession | null, profile: PlayerProfile, inventory: Inventory) => void)
     | null = null
   /**
    * While orbiting a planet with port services, the player used the Engineering Bay
@@ -2592,7 +2588,9 @@ export class MapViewController implements Tickable {
    *
    * @param profileBeforeOrbitRecord - Snapshot immediately before the first-orbit write.
    */
-  private maybeNotifyFirstJupiterOrbitJourneyTrigger(profileBeforeOrbitRecord: PlayerProfile): void {
+  private maybeNotifyFirstJupiterOrbitJourneyTrigger(
+    profileBeforeOrbitRecord: PlayerProfile,
+  ): void {
     if ((profileBeforeOrbitRecord.orbitedSolarBodies['jupiter'] ?? 0) > 0) return
     if ((this.playerProfile.orbitedSolarBodies['jupiter'] ?? 0) === 0) return
     this.notifyJourneyTrigger('first_orbit:jupiter')
@@ -2877,11 +2875,7 @@ export class MapViewController implements Tickable {
 
   /** Open the magenta cosmetic kiosk while Fantasia's premium multiplier is armed. */
   openCosmeticShop(): void {
-    this.cosmeticShopFacade.open(
-      this.onCosmeticShopState,
-      this.playerProfile,
-      this.playerInventory,
-    )
+    this.cosmeticShopFacade.open(this.onCosmeticShopState, this.playerProfile, this.playerInventory)
   }
 
   /** Close the magenta dialog without clearing the underlying premium visit roll. */
@@ -4239,7 +4233,9 @@ export class MapViewController implements Tickable {
     const state = this.mapIntro.uiState
     const name = (this.playerProfile.name ?? '').trim() || 'PILOT'
     const caption = state.cinematicCaption.replace('{name}', name.toUpperCase())
-    this.onMapIntro?.(caption === state.cinematicCaption ? state : { ...state, cinematicCaption: caption })
+    this.onMapIntro?.(
+      caption === state.cinematicCaption ? state : { ...state, cinematicCaption: caption },
+    )
   }
 
   /**
@@ -4390,8 +4386,7 @@ export class MapViewController implements Tickable {
    * the player has not yet seen the video. Idempotent — safe to call repeatedly.
    */
   shouldFireJovianEpilogue(): boolean {
-    const profile =
-      typeof localStorage === 'undefined' ? null : loadProfile()
+    const profile = typeof localStorage === 'undefined' ? null : loadProfile()
     if (!profile) return false
     if (profile.seenJovianEpilogue === true) return false
     const instance = contractSystem.getInstance('jovian-society-prospection')

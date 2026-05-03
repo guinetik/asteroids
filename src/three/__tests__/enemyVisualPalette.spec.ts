@@ -11,6 +11,12 @@ import { Enemy } from '@/lib/fps/enemy'
 import { BacteriophageController } from '@/three/BacteriophageController'
 import { ChimeraWalkerController } from '@/three/ChimeraWalkerController'
 import { SpireController } from '@/three/SpireController'
+import {
+  clampMissionDifficultyForEnemyRules,
+  disturbanceAmbientViroidKindsForMissionDifficulty,
+  enemyPlayerDamageMultiplierForVisualTier,
+  enemyVisualTierForDifficulty,
+} from '@/three/enemyVisualPalette'
 
 const CYAN_SILHOUETTE = 0x00d8f0
 const MAGENTA_FEATURE = 0xff3dad
@@ -19,6 +25,43 @@ const MEDIUM_CYAN_FEATURE = 0x00ffcc
 const HARD_MAGENTA_SILHOUETTE = 0xb000ff
 const HARD_AMBER_FEATURE = 0xff9d00
 const RED_FEATURE = 0xff2200
+
+describe('mission difficulty branching', () => {
+  it('clamps malformed difficulty inputs to usable integer difficulty', () => {
+    expect(clampMissionDifficultyForEnemyRules(Number.NaN)).toBe(1)
+    expect(clampMissionDifficultyForEnemyRules(0)).toBe(1)
+    expect(clampMissionDifficultyForEnemyRules(-4)).toBe(1)
+    expect(clampMissionDifficultyForEnemyRules(42)).toBe(10)
+  })
+
+  it('gates ambient disturbance archetypes exactly like bunker palette bands', () => {
+    expect(disturbanceAmbientViroidKindsForMissionDifficulty(1)).toEqual(['bacteriophage'])
+    expect(disturbanceAmbientViroidKindsForMissionDifficulty(4)).toEqual(['bacteriophage'])
+    expect(disturbanceAmbientViroidKindsForMissionDifficulty(5)).toEqual(['bacteriophage', 'spire'])
+    expect(disturbanceAmbientViroidKindsForMissionDifficulty(7)).toEqual(['bacteriophage', 'spire'])
+    expect(disturbanceAmbientViroidKindsForMissionDifficulty(8)).toEqual([
+      'bacteriophage',
+      'spire',
+      'chimera',
+    ])
+    expect(disturbanceAmbientViroidKindsForMissionDifficulty(10)).toEqual([
+      'bacteriophage',
+      'spire',
+      'chimera',
+    ])
+  })
+
+  it('maps difficulty to visual tiers and escalating player damage scalars', () => {
+    expect(enemyVisualTierForDifficulty(3)).toBe('default')
+    expect(enemyPlayerDamageMultiplierForVisualTier(enemyVisualTierForDifficulty(3))).toBe(1)
+
+    expect(enemyVisualTierForDifficulty(6)).toBe('medium')
+    expect(enemyPlayerDamageMultiplierForVisualTier(enemyVisualTierForDifficulty(6))).toBe(1.5)
+
+    expect(enemyVisualTierForDifficulty(9)).toBe('hard')
+    expect(enemyPlayerDamageMultiplierForVisualTier(enemyVisualTierForDifficulty(9))).toBe(2)
+  })
+})
 
 describe('enemy visual palettes', () => {
   it('uses cyan silhouettes with magenta features for default corona enemies', () => {
