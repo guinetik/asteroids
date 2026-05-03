@@ -845,13 +845,12 @@ const manifestById: ManifestById = {
   },
   'sfx.laserFire': {
     id: 'sfx.laserFire',
-    src: SILENT_STATIC_WAV_DATA_URI,
+    src: '/sound/sfx.laserFire.mp3',
     category: 'sfx',
     load: 'lazy',
     playback: 'overlap',
     volume: 0.55,
     effect: 'none',
-    procedural: 'laser-fire',
   },
   'sfx.tool.heal': {
     id: 'sfx.tool.heal',
