@@ -127,11 +127,11 @@ describe('missionTips', () => {
     const tip = resolveFirstRunLanderTipTransmission(mission('jay', 'gather'), profile({}))
 
     expect(tip?.view).toBe('lander')
-    expect(tip?.message).toContain('Hey you got Jay')
+    expect(tip?.message).toContain('Hey, you got Jay')
     expect(tip?.message).toContain('WASD')
     expect(tip?.message).toContain('SPACE')
-    expect(tip?.message).toContain('C kills horizontal momentum')
-    expect(tip?.message).toContain('thruster charge')
+    expect(tip?.message).toContain('C kills lateral drift')
+    expect(tip?.message).toContain('charge bar')
   })
 
   it('hides the lander refresher once the player has completed a mission', () => {
@@ -151,7 +151,7 @@ describe('missionTips', () => {
     const tip = resolveRuntimeMissionTipTransmission('gatherRocketScience', 'gather')
 
     expect(tip?.id).toBe('runtime:gatherRocketScience')
-    expect(tip?.message).toContain('Multitool to SCIENCE mode by pressing 3')
+    expect(tip?.message).toContain('press 3 for SCIENCE')
   })
 
   it('resolves lander warning runtime tips with stacked SHIFT lift guidance', () => {
@@ -159,8 +159,8 @@ describe('missionTips', () => {
 
     expect(tip?.id).toBe('runtime:landerDescentWarning')
     expect(tip?.view).toBe('lander')
-    expect(tip?.message).toContain('SHIFT + SPACE')
-    expect(tip?.message).toContain('RCS boost')
+    expect(tip?.message).toContain('hold SHIFT alongside')
+    expect(tip?.message).toContain('ascent RCS')
   })
 
   it('resolves return-to-lander ground boost and exfil runtime tips', () => {
@@ -168,10 +168,10 @@ describe('missionTips', () => {
     const exfil = resolveRuntimeMissionTipTransmission('landerObjectiveExfil', 'gather')
 
     expect(boost?.view).toBe('lander')
-    expect(boost?.message).toContain('SPACE and SHIFT')
+    expect(boost?.message).toContain('SPACE punches four times')
     expect(boost?.message).toContain('SHIFT + SPACE')
     expect(exfil?.view).toBe('lander')
     expect(exfil?.message).toContain('EXFILTRATE')
-    expect(exfil?.message).toContain('press F')
+    expect(exfil?.message).toContain('tap F')
   })
 })
