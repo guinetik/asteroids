@@ -89,8 +89,10 @@ export interface CosmeticFinishProfile {
   readonly secondary?: CosmeticFinishChannel
   /** Override applied to materials in the `trim` paint channel. */
   readonly trim?: CosmeticFinishChannel
-  /** Override applied to materials in the `accent` paint channel. */
+  /** Override applied to materials in the `accent` paint channel (shuttle hardware). */
   readonly accent?: CosmeticFinishChannel
+  /** Override applied to materials in the `engine` paint channel (lander thruster bells / RCS). */
+  readonly engine?: CosmeticFinishChannel
   /** Optional silhouette rim-light tuning (shared across all channels). */
   readonly rim?: CosmeticRim
 }

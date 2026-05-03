@@ -34,6 +34,23 @@ node *after* `preparePaintableMaterials` has already prepared its materials,
 all three nozzles share the same prepared material reference and therefore
 repaint together when the player swaps shaders.
 
+Channel-to-mesh mapping for the lander GLB (one shared `Lunar_Lander` material
+cloned per painted mesh — channel is selected by mesh node name, normalized
+case-insensitively with `_` → ` `):
+
+| Channel    | GLB mesh names                                                                                       |
+| ---------- | ---------------------------------------------------------------------------------------------------- |
+| primary    | `Top Section`, `Bottom Section`, `Door`                                                              |
+| secondary  | `Landing Legs`, `Ladder`, `Extras`, `RCS_Scaffolding`                                                |
+| trim       | `Antennas`, `Antennas Side`, `Antenna Front`                                                         |
+| engine     | `Thruster`, all 16 `RCS_<quadrant>_<dir>` quad clusters (`RCS_BL_Aft`, `RCS_FR_Up`, …)               |
+
+The original mapping only covered 10 meshes; 17 (the front antenna, the 16 RCS
+quads, and the RCS scaffolding) were falling through and rendering stock. The
+RCS scaffolding is matched on the secondary branch *before* the looser `rcs `
+prefix on the engine branch, so it doesn't get vacuumed up by the engine
+match.
+
 The result: a buttery gradient on the shop card, three flat color bands on the
 ship. The store thumbnail never matched the actual ship paint.
 
@@ -84,12 +101,22 @@ updatePaintRampTexture(material, tex)      ← swap on subsequent paint applies
 
 ## Per-vehicle wiring
 
-| Vehicle    | Ramp axis | Mode    | Ramp str | Detail str | Diffuse map     |
-| ---------- | --------- | ------- | -------- | ---------- | --------------- |
-| Shuttle (Factory Stock)  | `x` | bypass | 0     | 0          | restored (GLB)  |
-| Shuttle (paid paints)    | `x` | replace | 0.35  | 0.55       | dropped (`null`) |
-| Lander                   | `y` | tint    | 0.22  | 0          | preserved       |
-| Multitool                | `y` | tint    | 0.26  | 0          | preserved       |
+| Vehicle                 | Ramp axis | Mode    | Ramp str | Detail str | Diffuse map      |
+| ----------------------- | --------- | ------- | -------- | ---------- | ---------------- |
+| Shuttle (Factory Stock) | `x`       | bypass  | 0        | 0          | restored (GLB)   |
+| Shuttle (paid paints)   | `x`       | replace | 0.35     | 0.55       | dropped (`null`) |
+| Lander (Factory Stock)  | `y`       | tint    | 0.22     | 0          | preserved        |
+| Lander (paid paints)    | `y`       | replace | 0.30     | 0          | preserved (none in GLB) |
+| Multitool               | `y`       | tint    | 0.26     | 0          | preserved        |
+
+Lander paid paints reuse the shuttle's replace-mode pipeline (full color
+override + saturation boost + finish profile + Fresnel rim → bloom + base
+glow) but do **not** activate the procedural panel-seam overlay — the lander
+mesh is small enough that the geometric panel breaks already give it surface
+variety, and procedural seams at lander scale would compete with the real
+geometry rather than add to it. Lander Factory Stock keeps the legacy LERP
+path so the bundled lander stays subtle (otherwise everyone would feel pushed
+to buy a paint just to see chroma on the hull).
 
 ## Per-paint finish profile (shuttle, replace mode)
 
@@ -103,6 +130,8 @@ through the chain channel block → default block → `SHUTTLE_PAINT_FINISH_FALL
 specifies neither `emissive` nor `emissiveIntensity` so we never accidentally
 trim a baked glow.
 
+Shuttle paid paints:
+
 | Paint                 | default metal/rough | trim metal/rough | accent           |
 | --------------------- | ------------------- | ---------------- | ---------------- |
 | Neon Comet            | 0.65 / 0.30         | 0.90 / 0.18      | magenta emissive |
@@ -111,6 +140,15 @@ trim a baked glow.
 | Void Chrome           | 0.95 / 0.18         | 1.00 / 0.06      | violet emissive  |
 | Cinderline Gold       | 0.90 / 0.28         | (default)        | amber emissive   |
 | Saturn Club           | 0.75 / 0.20         | 0.85 / 0.15      | (no glow)        |
+
+Lander paid paints (channels: primary / secondary / trim / **engine**):
+
+| Paint            | default metal/rough | trim metal/rough | engine emissive          |
+| ---------------- | ------------------- | ---------------- | ------------------------ |
+| Dust Angel       | 0.25 / 0.55         | 0.55 / 0.40      | bubblegum pink `#f472b6` |
+| Frostbite Safety | 0.55 / 0.35         | 0.85 / 0.20      | safety yellow `#fef08a`  |
+| Mariner Red      | 0.70 / 0.25         | 0.95 / 0.12      | red `#dc2626`            |
+| Hazard Bloom     | 0.50 / 0.45         | 0.80 / 0.25      | acid green `#84cc16`     |
 
 Per-channel paint colors are also pushed through an HSL saturation boost of
 `+0.12` so they read more vividly against the GLB lighting (greys are skipped
@@ -140,6 +178,8 @@ totalEmissiveRadiance += uPaintRimColor * (rim * uPaintRimIntensity);
 
 Rim values per paid shuttle paint:
 
+Shuttle paid paints:
+
 | Paint                 | Rim color  | Intensity | Power | Bias  |
 | --------------------- | ---------- | --------- | ----- | ----- |
 | Neon Comet            | `#60a5fa`  | 2.8       | 1.4   | 0.08  |
@@ -148,6 +188,17 @@ Rim values per paid shuttle paint:
 | Void Chrome           | `#a78bfa`  | 4.0       | 1.2   | 0.10  |
 | Cinderline Gold       | `#f59e0b`  | 3.0       | 1.4   | 0.08  |
 | Saturn Club           | `#fef3c7`  | 1.8       | 1.8   | 0.05  |
+
+Lander paid paints (rim intensities tuned a touch lower because the lander is
+a smaller silhouette — same HDR spillover at shuttle intensities would over-
+bloom the small ship):
+
+| Paint            | Rim color  | Intensity | Power | Bias  |
+| ---------------- | ---------- | --------- | ----- | ----- |
+| Dust Angel       | `#f9a8d4`  | 1.8       | 1.7   | 0.06  |
+| Frostbite Safety | `#67e8f9`  | 2.2       | 1.5   | 0.07  |
+| Mariner Red      | `#f87171`  | 2.4       | 1.5   | 0.08  |
+| Hazard Bloom     | `#bef264`  | 2.6       | 1.4   | 0.08  |
 
 Tuning rationale:
 
@@ -184,10 +235,12 @@ if (uPaintBaseGlow > 0.0) {
 
 Because `diffuseColor` already carries the per-channel paint × ramp × detail at
 this point, every paint glows in its own color at a constant fraction of its
-shaded value. Tuned at `0.20` for replace mode (20% of paint color baseline) —
-high enough to compensate for the mid-tone brightness lost when the GLB
-diffuse map was dropped. Set to `0` for Factory Stock alongside ramp + detail
-+ rim, so the bypass remains a true no-op.
+shaded value. Tuned at `0.20` for shuttle replace mode (20% of paint color
+baseline) — high enough to compensate for the mid-tone brightness lost when
+the GLB diffuse map was dropped. Lander replace mode uses `0.15` because the
+lander is small enough that `0.20` makes it feel like a lantern hanging off
+the dark side of a planet rather than a hull. Set to `0` for Factory Stock
+alongside ramp + detail + rim, so the bypass remains a true no-op.
 
 Procedural detail floors were also dialed back to keep panel seams from
 gouging into the paint:
@@ -200,12 +253,16 @@ Paint color strength was also bumped from the legacy `0.88` to `1.0` so paid
 paints read at full chroma now that the stock diffuse map no longer competes
 with them.
 
-- **Tint mode** layers the ramp on top of the GLB diffuse map. Used by lander +
-  multitool (no detail overlay).
-- **Replace mode** drops the diffuse map (`material.map = null`) and lets
-  `material.color * paintRamp * paintDetail` carry all surface color. Procedural
-  panel seams + scuffs + grain in the fragment shader simulate the panel detail
-  the dropped diffuse texture used to provide.
+- **Tint mode** layers the ramp on top of the authored albedo and lerps the
+  per-channel paint color into it at low strength. Used by multitool, and by
+  the lander's Factory Stock (paid lander paints now use replace mode).
+- **Replace mode** drops the diffuse map when the GLB has one
+  (`material.map = null`) and lets `material.color * paintRamp * paintDetail`
+  carry all surface color. Procedural panel seams + scuffs + grain in the
+  fragment shader simulate the panel detail the dropped texture used to
+  provide. The lander GLB carries no diffuse map to begin with so there's
+  nothing to drop, and the procedural detail is left at `0` because the
+  lander's geometric panel breaks already supply visual variety at its scale.
 - **Bypass mode** sets ramp + detail strengths to 0 so the OBC chunk multiplies
   by `1.0` and `1.0` — the material renders identically to its authored GLB
   pipeline (no shader recompile required).

@@ -32,7 +32,14 @@ const COSMETIC_CATEGORY_SET: ReadonlySet<string> = new Set<string>([
 const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/
 
 /** Channel keys recognised inside a {@link CosmeticFinishProfile}. */
-const FINISH_CHANNEL_KEYS = ['default', 'primary', 'secondary', 'trim', 'accent'] as const
+const FINISH_CHANNEL_KEYS = [
+  'default',
+  'primary',
+  'secondary',
+  'trim',
+  'accent',
+  'engine',
+] as const
 
 /** Numeric finish fields with `0..1` clamping (`metalness`, `roughness`). */
 const FINISH_UNIT_FIELDS = ['metalness', 'roughness'] as const

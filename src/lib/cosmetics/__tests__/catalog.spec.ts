@@ -116,6 +116,19 @@ describe('cosmetics catalog', () => {
     expect(factoryStock?.finish).toBeUndefined()
   })
 
+  it('parses engine-channel finish blocks on lander paintjobs', () => {
+    const catalog = parseCosmeticShopCatalog(shippedCatalog as unknown)
+    const dustAngel = catalog.options.find((o) => o.id === 'lander-paintjob-dust-angel')
+    expect(dustAngel?.finish?.default?.roughness).toBeGreaterThan(0)
+    expect(dustAngel?.finish?.engine?.emissive).toMatch(/^#[0-9a-f]{6}$/i)
+    expect((dustAngel?.finish?.engine?.emissiveIntensity ?? 0) > 0).toBe(true)
+    expect(dustAngel?.finish?.rim?.color).toMatch(/^#[0-9a-f]{6}$/i)
+    const landerFactoryStock = catalog.options.find(
+      (o) => o.id === 'lander-paintjob-factory-stock',
+    )
+    expect(landerFactoryStock?.finish).toBeUndefined()
+  })
+
   it('rejects out-of-range metalness in finish profile', () => {
     expect(() =>
       parseCosmeticShopCatalog({

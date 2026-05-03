@@ -102,7 +102,7 @@ deterministic and keeps the catalog data-driven.
 | Option | Stops | Model treatment |
 | --- | --- | --- |
 | `Factory Stock` | `#fafaf9`, `#d6d3d1`, `#57534e` | Bone epoxy body, stone hardware, dark warm trim. |
-| `Dust Angel` | `#fef3c7`, `#fda4af`, `#d6d3d1` | Cream body, rose landing gear / panels, pale neutral trim. Subtle weathering would make this option match the description better later. |
+| `Dust Angel` | `#fef3c7`, `#ec4899`, `#fdf2f8` | Cream body, bubblegum-pink landing gear / panels, ultra-pale pink trim. Bubblegum-pink emissive bells and a cotton-candy rim glow give it its own girly identity, well clear of Mariner Red. |
 | `Frostbite Safety` | `#22d3ee`, `#fef08a`, `#0ea5e9` | Cyan shell, yellow legs / secondary hardware, blue trim. Reads as safety livery from distance. |
 | `Mariner Red` | `#b91c1c`, `#7f1d1d`, `#1f2937` | Crimson body, dark red lower hardware, graphite trim and thrusters. |
 | `Hazard Bloom` | `#eab308`, `#000000`, `#84cc16` | Yellow body, black legs / ladder / breaks, acid green antennae or small trim. True hazard stripes need decals or a mask later. |

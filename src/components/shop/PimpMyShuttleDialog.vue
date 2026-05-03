@@ -28,6 +28,7 @@ const props = defineProps<{
   profile: PlayerProfile
   inventory: Inventory
   premiumSession: PremiumTradeSession
+  shuttlePreviewUrl?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -321,6 +322,23 @@ function normalizedTitleBlocked(): boolean {
                 class="cosmetic-shop-panel cosmetic-shop-panel--category"
               >
                 <div class="cosmetic-shop-panel__scroll">
+                  <div
+                    v-if="activeTab === 'shuttle-paintjob' && shuttlePreviewUrl"
+                    class="cosmetic-shuttle-preview"
+                  >
+                    <img
+                      class="cosmetic-shuttle-preview__image"
+                      :src="shuttlePreviewUrl"
+                      alt="Current shuttle paint preview"
+                    />
+                    <div class="cosmetic-shuttle-preview__meta">
+                      <span class="cosmetic-shuttle-preview__label">Current Shuttle Finish</span>
+                      <span class="cosmetic-shuttle-preview__name">{{
+                        findCosmeticOptionById(cosmetics.shuttlePaintjobId)?.label ??
+                        cosmetics.shuttlePaintjobId
+                      }}</span>
+                    </div>
+                  </div>
                   <p v-if="activePanelIntro.length > 0" class="cosmetic-shop-panel__intro">
                     {{ activePanelIntro }}
                   </p>

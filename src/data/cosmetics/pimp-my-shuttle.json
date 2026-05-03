@@ -141,9 +141,21 @@
       "id": "lander-paintjob-dust-angel",
       "category": "lander-paintjob",
       "label": "Dust Angel",
-      "description": "Soft bone white with rose dust weathering.",
+      "description": "Cream aeroshell with bubblegum-pink hardware and a cotton-candy halo.",
       "price": 20000,
-      "gradientStops": ["#fef3c7", "#fda4af", "#d6d3d1"]
+      "gradientStops": ["#fef3c7", "#ec4899", "#fdf2f8"],
+      "finish": {
+        "default": { "metalness": 0.25, "roughness": 0.55, "envMapIntensity": 0.9 },
+        "secondary": { "metalness": 0.4, "roughness": 0.5 },
+        "trim": { "metalness": 0.55, "roughness": 0.4 },
+        "engine": {
+          "metalness": 0.35,
+          "roughness": 0.55,
+          "emissive": "#f472b6",
+          "emissiveIntensity": 0.5
+        },
+        "rim": { "color": "#f9a8d4", "intensity": 1.8, "power": 1.7, "bias": 0.06 }
+      }
     },
     {
       "id": "lander-paintjob-frostbite-safety",
@@ -151,7 +163,19 @@
       "label": "Frostbite Safety",
       "description": "High-vis arctic cyan and safety yellow trim.",
       "price": 20000,
-      "gradientStops": ["#22d3ee", "#fef08a", "#0ea5e9"]
+      "gradientStops": ["#22d3ee", "#fef08a", "#0ea5e9"],
+      "finish": {
+        "default": { "metalness": 0.55, "roughness": 0.35, "envMapIntensity": 1.4 },
+        "secondary": { "metalness": 0.7, "roughness": 0.3 },
+        "trim": { "metalness": 0.85, "roughness": 0.2 },
+        "engine": {
+          "metalness": 0.6,
+          "roughness": 0.4,
+          "emissive": "#fef08a",
+          "emissiveIntensity": 0.55
+        },
+        "rim": { "color": "#67e8f9", "intensity": 2.2, "power": 1.5, "bias": 0.07 }
+      }
     },
     {
       "id": "lander-paintjob-mariner-red",
@@ -159,7 +183,19 @@
       "label": "Mariner Red",
       "description": "Heritage crimson with graphite panel breaks.",
       "price": 20000,
-      "gradientStops": ["#b91c1c", "#7f1d1d", "#1f2937"]
+      "gradientStops": ["#b91c1c", "#7f1d1d", "#1f2937"],
+      "finish": {
+        "default": { "metalness": 0.7, "roughness": 0.25, "envMapIntensity": 1.4 },
+        "secondary": { "metalness": 0.85, "roughness": 0.18 },
+        "trim": { "metalness": 0.95, "roughness": 0.12 },
+        "engine": {
+          "metalness": 0.6,
+          "roughness": 0.35,
+          "emissive": "#dc2626",
+          "emissiveIntensity": 0.5
+        },
+        "rim": { "color": "#f87171", "intensity": 2.4, "power": 1.5, "bias": 0.08 }
+      }
     },
     {
       "id": "lander-paintjob-hazard-bloom",
@@ -167,7 +203,19 @@
       "label": "Hazard Bloom",
       "description": "Striped hazard tape energy with acid green bloom.",
       "price": 20000,
-      "gradientStops": ["#eab308", "#000000", "#84cc16"]
+      "gradientStops": ["#eab308", "#000000", "#84cc16"],
+      "finish": {
+        "default": { "metalness": 0.5, "roughness": 0.45, "envMapIntensity": 1.1 },
+        "secondary": { "metalness": 0.4, "roughness": 0.55 },
+        "trim": { "metalness": 0.8, "roughness": 0.25 },
+        "engine": {
+          "metalness": 0.55,
+          "roughness": 0.4,
+          "emissive": "#84cc16",
+          "emissiveIntensity": 0.7
+        },
+        "rim": { "color": "#bef264", "intensity": 2.6, "power": 1.4, "bias": 0.08 }
+      }
     },
     {
       "id": "shuttle-thruster-trail-factory-stock",

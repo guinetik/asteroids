@@ -2878,6 +2878,101 @@ export class MapViewController implements Tickable {
     this.cosmeticShopFacade.open(this.onCosmeticShopState, this.playerProfile, this.playerInventory)
   }
 
+  /**
+   * Render the currently painted shuttle into an isolated thumbnail for Vue shop UI.
+   *
+   * The map renderer is reused for a single offscreen render target. The cloned
+   * shuttle is rendered in a tiny preview scene, so the paused solar-system scene
+   * stays untouched while the dialog gets a cheap bitmap.
+   */
+  captureShuttleCosmeticPreviewDataUrl(): string | null {
+    if (!this.sceneObjects || !this.shuttleController || typeof document === 'undefined') {
+      return null
+    }
+
+    const renderer = this.sceneObjects.renderer
+    const previewScene = new THREE.Scene()
+    previewScene.background = new THREE.Color(MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_BACKGROUND)
+
+    const previewShuttle = this.shuttleController.group.clone(true)
+    previewShuttle.position.set(0, 0, 0)
+    previewShuttle.rotation.set(0, 0, 0)
+    previewShuttle.updateMatrixWorld(true)
+
+    const bounds = new THREE.Box3().setFromObject(previewShuttle)
+    if (bounds.isEmpty()) return null
+
+    const center = bounds.getCenter(new THREE.Vector3())
+    previewShuttle.position.sub(center)
+    previewShuttle.updateMatrixWorld(true)
+    previewScene.add(previewShuttle)
+
+    const sphere = bounds.getBoundingSphere(new THREE.Sphere())
+    const radius = Math.max(sphere.radius, MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_MIN_CAMERA_DISTANCE)
+    const cameraDistance = radius * MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_CAMERA_DISTANCE_MULTIPLIER
+    const camera = new THREE.PerspectiveCamera(
+      MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_FOV_DEG,
+      1,
+      MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_NEAR,
+      MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_FAR,
+    )
+    camera.position
+      .copy(MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_CAMERA_OFFSET)
+      .normalize()
+      .multiplyScalar(cameraDistance)
+    camera.lookAt(MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_TARGET)
+
+    previewScene.add(
+      new THREE.AmbientLight(0xffffff, MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_AMBIENT_INTENSITY),
+    )
+    const keyLight = new THREE.DirectionalLight(
+      0xffffff,
+      MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_KEY_INTENSITY,
+    )
+    keyLight.position.copy(camera.position)
+    previewScene.add(keyLight)
+    const rimLight = new THREE.DirectionalLight(
+      0x88ccff,
+      MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_RIM_INTENSITY,
+    )
+    rimLight.position.set(-camera.position.x, camera.position.y * 0.5, -camera.position.z)
+    previewScene.add(rimLight)
+
+    const size = MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_SIZE_PX
+    const target = new THREE.WebGLRenderTarget(size, size, { samples: 4 })
+    const previousTarget = renderer.getRenderTarget()
+    const previousClearColor = renderer.getClearColor(new THREE.Color())
+    const previousClearAlpha = renderer.getClearAlpha()
+
+    renderer.setRenderTarget(target)
+    renderer.setClearColor(MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_BACKGROUND, 1)
+    renderer.clear()
+    renderer.render(previewScene, camera)
+
+    const pixels = new Uint8Array(size * size * 4)
+    renderer.readRenderTargetPixels(target, 0, 0, size, size, pixels)
+
+    renderer.setRenderTarget(previousTarget)
+    renderer.setClearColor(previousClearColor, previousClearAlpha)
+    target.dispose()
+
+    const rowStride = size * 4
+    const flipped = new Uint8ClampedArray(pixels.length)
+    for (let y = 0; y < size; y += 1) {
+      const sourceOffset = y * rowStride
+      const targetOffset = (size - y - 1) * rowStride
+      flipped.set(pixels.subarray(sourceOffset, sourceOffset + rowStride), targetOffset)
+    }
+
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const context = canvas.getContext('2d')
+    if (!context) return null
+    context.putImageData(new ImageData(flipped, size, size), 0, 0)
+    return canvas.toDataURL(MAP_CONFIG.SHUTTLE_COSMETIC_PREVIEW_MIME_TYPE)
+  }
+
   /** Close the magenta dialog without clearing the underlying premium visit roll. */
   closeCosmeticShop(): void {
     this.cosmeticShopFacade.close()
@@ -4575,9 +4670,14 @@ export class MapViewController implements Tickable {
     return this.turretSessionController
   }
 
-  /** True whenever either a map-level sequence or turret mode has paused the solar-system sim. */
+  /**
+   * True whenever a map-level sequence or overlay has paused the solar-system sim.
+   *
+   * The magenta cosmetic kiosk is a Vue overlay like the tactical map; while it is
+   * open, the orrery should stop advancing planet and belt positions behind it.
+   */
   private isSimulationFrozen(): boolean {
-    return this.simFrozen || this.turretSimFrozen
+    return this.simFrozen || this.turretSimFrozen || this.cosmeticShopFacade.dialogOpen
   }
 
   /**

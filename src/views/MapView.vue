@@ -401,6 +401,7 @@ const shopDialogVisible = ref(false)
 const cosmeticShopDialogVisible = ref(false)
 const cosmeticPremiumSession = shallowRef<PremiumTradeSession | null>(null)
 const cosmeticShopButtonVisible = ref(false)
+const cosmeticShuttlePreviewUrl = ref<string | null>(null)
 const shopSession = ref<ShopSession | null>(null)
 const shopProfile = ref<PlayerProfile>(createProfile('Pilot'))
 const playerProfileSnapshot = ref<PlayerProfile>(createProfile('Pilot'))
@@ -943,9 +944,11 @@ onMounted(async () => {
       if (session) {
         cosmeticPremiumSession.value = session
         cosmeticShopDialogVisible.value = true
+        cosmeticShuttlePreviewUrl.value = viewController.captureShuttleCosmeticPreviewDataUrl()
       } else {
         cosmeticPremiumSession.value = null
         cosmeticShopDialogVisible.value = false
+        cosmeticShuttlePreviewUrl.value = null
       }
     }
     viewController.onCreditsUpdate = (credits) => {
@@ -1271,6 +1274,7 @@ function openCosmeticShop(): void {
 
 function closeCosmeticShop(): void {
   cosmeticShopDialogVisible.value = false
+  cosmeticShuttlePreviewUrl.value = null
   viewController.closeCosmeticShop()
 }
 
@@ -2006,6 +2010,7 @@ watch(
       :profile="shopProfile"
       :inventory="shopInventory"
       :premium-session="cosmeticPremiumSession"
+      :shuttle-preview-url="cosmeticShuttlePreviewUrl"
       @close="closeCosmeticShop"
       @purchase-option="handleCosmeticPurchaseOption"
       @apply-option="handleCosmeticApplyOption"
