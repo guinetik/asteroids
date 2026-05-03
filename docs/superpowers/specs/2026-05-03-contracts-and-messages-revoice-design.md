@@ -52,17 +52,20 @@ A grep check at the acceptance gate confirms their bodies are untouched.
 ## Scope of Edits
 
 ### Contracts (full depth — D3)
-All 7 files in `src/data/contracts/*.json`. Every layer:
-- `introBody[]` — briefing on accept.
-- `steps[].subject` — title shown during each objective phase.
-- `steps[].flavor[]` — paragraphs shown during each objective phase.
-- `completionBody[]` — outro message on completion.
+All 7 files in `src/data/contracts/*.json`. Every player-visible copy field:
+- **Inbox/header strip** — `inboxName`, `from`, `introSubject`, `completionSubject`. These are read in inbox lists and headers without the body ever being opened, so they carry the same voice load as the body.
+- **Body** — `introBody[]` (briefing on accept), `completionBody[]` (outro on completion).
+- **Per-step** — `steps[].subject` (title shown during each objective phase), `steps[].flavor[]` (paragraphs shown during each objective phase).
 
 ### Messages
-16 of the 19 entries in `src/lib/messages/messageCatalog.ts` (the three voiced ones excluded). Every `subject` and `body[]`.
+16 of the 19 entries in `src/lib/messages/messageCatalog.ts` (the three voiced ones excluded). Every `subject` and `body[]`. Subjects are revoiced alongside bodies — they are the first impression in the message tray.
 
-### Giver briefings
-All 10 files in `src/data/missions/givers/*.json`. Every `briefing` string and any speaker-prose fields (taglines, descriptions if shown to the player).
+### Giver briefings + mission titles
+All 10 files in `src/data/missions/givers/*.json`. Every player-visible string:
+- **Giver-level** — `name`, `title`/`tagline`/`description` if present (shown on the giver picker / dispatch HUD).
+- **Per-mission** — `name` (shown on the mission card and the map waypoint label), `briefing` (the body), and any per-mission flavor/tagline fields discovered at plan-write time.
+
+Mission `name` strings are particularly important: they are the first hit of voice the player sees when picking a job, and many of them today are generic (e.g. "Standard Extraction", "Deep Belt Haul"). Each task should give them the same character treatment as the briefing prose.
 
 ---
 
