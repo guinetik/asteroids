@@ -133,6 +133,7 @@ import {
 import { DanMinigame } from '@/lib/minigame/DanMinigame'
 import { LevelCollisionFacade } from '@/lib/level/LevelCollisionFacade'
 import { LevelCombatMiningFacade } from '@/lib/level/LevelCombatMiningFacade'
+import { LevelDisturbanceDirector } from '@/lib/level/LevelDisturbanceDirector'
 import { RocketSurveyFacade } from '@/lib/level/RocketSurveyFacade'
 import { GatherMinigame } from '@/lib/minigame/GatherMinigame'
 import { RescueMinigame } from '@/lib/minigame/RescueMinigame'
@@ -174,6 +175,10 @@ const BUNKER_SWAP_FADE_OUT_SECONDS = 0.5
 const BUNKER_SWAP_FADE_IN_SECONDS = 0.5
 /** Cause shown after the normal dead-state presentation finishes in the bunker. */
 const BUNKER_OPERATOR_DEATH_CAUSE = 'Operator KIA'
+/** Seconds a hidden disturbance alert stays on the terminal prompt line. */
+const DISTURBANCE_ALERT_DURATION_SECONDS = 3
+/** Objective types that already provide their own authored viroid pressure. */
+const DISTURBANCE_DISABLED_OBJECTIVE_TYPES = new Set<ConcreteObjective['type']>(['bunker', 'rescue'])
 
 /**
  * Boot / preload status emitted to {@link LevelView} while the level scene
@@ -379,6 +384,15 @@ export class LevelViewController implements Tickable {
 
   /** Runtime owner for objective minigame sessions in this level. */
   private readonly minigames = new LevelMinigameFacade()
+
+  /** Hidden level-wide viroid disturbance system for surface EVA. */
+  private disturbanceDirector: LevelDisturbanceDirector | null = null
+  /** Previous grounded state used to detect actual lift-off reset edges. */
+  private previousDisturbanceLanderGrounded = false
+  /** Seconds remaining for hidden disturbance alert prompt. */
+  private disturbanceAlertRemaining = 0
+  /** Active hidden disturbance alert text, re-applied after minigame prompt clears. */
+  private disturbanceAlertMessage: string | null = null
 
   /**
    * Loot drop system shared across all minigames in the current run. Created
@@ -587,6 +601,8 @@ export class LevelViewController implements Tickable {
   onSurvivorLost: ((aliveRemaining: number) => void) | null = null
   /** Vue layer subscribes to fire the green survivor-aboard toast + counter refresh. */
   onSurvivorAboard: ((aboardCount: number) => void) | null = null
+  /** Vue layer subscribes to fire the cyan SCI-revive toast + counter refresh. */
+  onSurvivorRevived: ((aliveRemaining: number) => void) | null = null
 
   private readonly initialLanderSpawn = new Vector3()
 
@@ -1159,6 +1175,8 @@ export class LevelViewController implements Tickable {
       // `FpsViewController` where a single `onEnemyHit` callback dispatches
       // to all controller maps.
       this.minigames.notifyEnemyHit(enemy)
+      this.disturbanceDirector?.notifyEnemyHit(enemy)
+      this.disturbanceDirector?.record({ type: 'combat-hit' })
       if (boltKind === 'science' && firstScienceHit) {
         this.playerController?.heal(SCIENCE_ENEMY_HEAL_AMOUNT)
       }
@@ -1228,6 +1246,8 @@ export class LevelViewController implements Tickable {
             }
             this.onProspect?.(itemId)
           },
+          onMiningHit: () => this.disturbanceDirector?.record({ type: 'mining-hit' }),
+          onRockBreak: () => this.disturbanceDirector?.record({ type: 'rock-break' }),
         },
       )
       this.combatMining.registerRocks()
@@ -1258,6 +1278,23 @@ export class LevelViewController implements Tickable {
 
     // ── Objective minigames ──────────────────────────────────────
     const missionSeed = hashLevelSeed(mission.id)
+    if (!mission.objectives.some((objective) => DISTURBANCE_DISABLED_OBJECTIVE_TYPES.has(objective.type))) {
+      this.disturbanceDirector = new LevelDisturbanceDirector({
+        scene: this.sceneManager.scene,
+        heightmap: this.heightmap,
+        projectileSystem: this.projectileSystem,
+        missionDifficulty: mission.difficulty,
+        seed: missionSeed,
+      })
+      this.disturbanceDirector.onDamagePlayer = (damage, sourceX, sourceZ, source) => {
+        this.applyPlayerDamageFeedback(damage, sourceX, sourceZ, source)
+      }
+      this.disturbanceDirector.onAlert = (message) => {
+        this.disturbanceAlertRemaining = DISTURBANCE_ALERT_DURATION_SECONDS
+        this.disturbanceAlertMessage = message
+        this.onTerminalPrompt?.(message)
+      }
+    }
     await this.minigames.initializeObjectives({
       mission,
       scene: this.sceneManager!.scene,
@@ -1326,6 +1363,9 @@ export class LevelViewController implements Tickable {
         },
         onSurvivorAboard: (aboardCount: number) => {
           this.onSurvivorAboard?.(aboardCount)
+        },
+        onSurvivorRevived: (aliveRemaining: number) => {
+          this.onSurvivorRevived?.(aliveRemaining)
         },
         onInstallCombatDropObserver: (minigame) => {
           this.installDropObserver(minigame)
@@ -1453,9 +1493,6 @@ export class LevelViewController implements Tickable {
 
     this.emitBootState('ready', 'Ready for drop')
 
-    // ── Arrival state starts with lander physics + cinematic cam ─
-    this.enterArrival()
-
     // ── Dev tools ────────────────────────────────────────────────
     DevConsole.register('LevelView', {
       takeDamage: (amount = 10) => this.playerController?.takeDamage(amount),
@@ -1520,11 +1557,19 @@ export class LevelViewController implements Tickable {
     this.emitBootState('started', 'Running')
     // Hold the cinematic + audio until the prelude has finished. Without
     // this the shuttle prelude plays on top of an already-running arrival
-    // sequence, so the cutscene is mid-flight when the prelude unmounts.
+    // sequence, so the cutscene is mid-flight when the prelude unmounts —
+    // and `enterArrival` fires `notifyArrivalCinematicStart` (cockpit
+    // ambient), which would otherwise start ~4.5s before the user sees the
+    // cinematic, leaving the audio out of sync.
     await this.preludeGate
     this.captureLevelInventoryBaseline()
-    this.gameLoop.start()
+    // Audio first, so notifications fired during enterArrival find the
+    // director already started and play in lockstep with the visuals.
     this.landerAudio.start()
+    // Arrival cinematic camera, lighting, letterbox, and the cockpit
+    // ambient cue. Deferred to here so it lines up with the visible cutscene.
+    this.enterArrival()
+    this.gameLoop.start()
   }
 
   /**
@@ -2491,6 +2536,8 @@ export class LevelViewController implements Tickable {
     this.enforceLanderAltitudeCeiling()
     this.tickBunkerSwapFade(dt)
     this.tickMinigames(dt)
+    this.tickDisturbance(dt)
+    this.tickDisturbanceAlert(dt)
 
     // Damage flash decay — same shape as `FpsViewController.tick`. The Vue
     // overlay reads this every frame so we always emit (0 once cleared) to
@@ -2696,6 +2743,7 @@ export class LevelViewController implements Tickable {
                   x: this.playerController.group.position.x,
                   z: this.playerController.group.position.z,
                   missionObjectives: this.missionObjectives,
+                  extraCompassMarkers: this.minigames.getActive()?.compassMarkers,
                   rockTarget: this.currentRockTarget,
                 }
               : null,
@@ -2725,6 +2773,10 @@ export class LevelViewController implements Tickable {
       this.multiToolState.setSpeed(this.playerController?.speed ?? 0)
     }
 
+    if (this.inputManager?.wasActionPressed('jump') && this.stateMachine?.is('eva')) {
+      this.disturbanceDirector?.record({ type: 'jump' })
+    }
+
     // Sync tool visuals
     if (this.multiToolState && this.multiTool) {
       this.multiTool.setMode(this.multiToolState.modeConfig.color, this.multiToolState.mode)
@@ -2736,6 +2788,7 @@ export class LevelViewController implements Tickable {
       this.playerController?.setAiming(this.multiToolState.aiming)
       if (this.multiToolState.isFiring) {
         this.multiTool.fire()
+        this.disturbanceDirector?.record({ type: 'tool-fire' })
       }
     }
 
@@ -2767,6 +2820,12 @@ export class LevelViewController implements Tickable {
       )
 
       const grounded = this.playerController.grounded
+      if (grounded && this.playerController.speed > 0.5) {
+        this.disturbanceDirector?.record({
+          type: sprintingNow ? 'sprint' : 'movement',
+          amount: this.playerController.speed * dt * 0.08,
+        })
+      }
       const physicsGrounded = this.playerController.physicsGrounded
 
       // Fall damage — only on the airborne → grounded transition. The
@@ -2775,6 +2834,7 @@ export class LevelViewController implements Tickable {
       // priority ordering), so it's safe to read here.
       if (physicsGrounded && !this._prevGrounded) {
         this.applyEvaFallDamage()
+        this.disturbanceDirector?.record({ type: 'hard-landing' })
       }
 
       this._prevGrounded = physicsGrounded
@@ -2923,6 +2983,41 @@ export class LevelViewController implements Tickable {
       }
     } else if (this.landerController) {
       this.landerController.setLiftoffBlocked(false)
+    }
+  }
+
+  /** Tick hidden surface disturbance and reset it when the lander actually lifts off. */
+  private tickDisturbance(dt: number): void {
+    const lander = this.landerController
+    const player = this.playerController
+    const currentState = this.stateMachine?.state ?? ''
+    const landerGrounded = lander?.body.grounded ?? false
+
+    if (currentState === 'lander' && this.previousDisturbanceLanderGrounded && !landerGrounded) {
+      this.disturbanceDirector?.resetForLiftoff()
+    }
+    this.previousDisturbanceLanderGrounded = landerGrounded
+
+    this.disturbanceDirector?.tick(dt, {
+      evaActive: currentState === 'eva',
+      playerPosition: currentState === 'eva' && player ? player.group.position : null,
+      landerPosition: lander ? lander.position : null,
+    })
+  }
+
+  /** Clear hidden disturbance alert text after its short diegetic flash window. */
+  private tickDisturbanceAlert(dt: number): void {
+    if (this.disturbanceAlertRemaining <= 0) return
+
+    this.disturbanceAlertRemaining = Math.max(0, this.disturbanceAlertRemaining - dt)
+    if (this.disturbanceAlertRemaining <= 0) {
+      this.disturbanceAlertMessage = null
+      this.onTerminalPrompt?.(null)
+      return
+    }
+
+    if (this.disturbanceAlertMessage) {
+      this.onTerminalPrompt?.(this.disturbanceAlertMessage)
     }
   }
 
@@ -3530,6 +3625,8 @@ export class LevelViewController implements Tickable {
     }
     this.debugMetricsTracker?.dispose()
     this.debugMetricsTracker = null
+    this.disturbanceDirector?.dispose()
+    this.disturbanceDirector = null
     this.projectileSystem?.dispose()
     if (this.rockYieldSystem) {
       this.rockYieldSystem.onMineralExtracted = null

@@ -6,9 +6,6 @@
  * @spec docs/superpowers/specs/2026-04-27-bunker-mission-design.md
  */
 
-/** Failure cause fragment emitted when all rescue hostages are lost. */
-const RESCUE_FAIL_CAUSE_FRAGMENT = 'survivors lost'
-
 /** Failure cause fragment emitted when the bunker operator dies inside the interior. */
 const BUNKER_FAIL_CAUSE_FRAGMENT = 'operator kia'
 
@@ -24,8 +21,5 @@ const BUNKER_FAIL_CAUSE_FRAGMENT = 'operator kia'
  */
 export function shouldHardReloadLevelRestart(cause: string): boolean {
   const normalized = cause.toLowerCase()
-  return (
-    normalized.includes(RESCUE_FAIL_CAUSE_FRAGMENT) ||
-    normalized.includes(BUNKER_FAIL_CAUSE_FRAGMENT)
-  )
+  return normalized.includes(BUNKER_FAIL_CAUSE_FRAGMENT)
 }

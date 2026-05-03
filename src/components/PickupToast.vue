@@ -53,13 +53,19 @@ export interface SurveyEntry {
   label: string
 }
 
-/** A rescue-survivor event (lost or aboard) shown in the same toast stack. */
+/** A rescue-survivor event (lost, revived, or aboard) shown in the same toast stack. */
 export interface SurvivorEventEntry {
   /** Stable v-for key. */
   id: string
-  /** `'lost'` = red death toast; `'aboard'` = green board toast. */
-  kind: 'lost' | 'aboard'
-  /** Display label, e.g. `'Survivor Lost'` or `'Survivor Aboard'`. */
+  /**
+   * `'lost'` = red incapacitated toast; `'revived'` = cyan SCI-revive toast;
+   * `'aboard'` = green board toast.
+   */
+  kind: 'lost' | 'revived' | 'aboard'
+  /**
+   * Display label, e.g. `'Survivor Incapacitated'`, `'Survivor Recovered'`,
+   * or `'Survivor Aboard'`.
+   */
   label: string
 }
 
@@ -153,10 +159,14 @@ const getPowerupClass = (label: string): string => {
           'pickup-toast__entry',
           entry.kind === 'lost'
             ? 'pickup-toast__entry--survivor-lost'
-            : 'pickup-toast__entry--survivor-aboard',
+            : entry.kind === 'revived'
+              ? 'pickup-toast__entry--survivor-revived'
+              : 'pickup-toast__entry--survivor-aboard',
         ]"
       >
-        <span class="pickup-toast__check">{{ entry.kind === 'lost' ? '✕' : '✓' }}</span>
+        <span class="pickup-toast__check">{{
+          entry.kind === 'lost' ? '✕' : entry.kind === 'revived' ? '✚' : '✓'
+        }}</span>
         <span class="pickup-toast__survivor-label">{{ entry.label }}</span>
       </div>
     </transition-group>
@@ -253,6 +263,14 @@ const getPowerupClass = (label: string): string => {
   box-shadow:
     0 0 14px rgba(34, 197, 94, 0.22),
     inset 0 0 8px rgba(34, 197, 94, 0.08);
+}
+.pickup-toast__entry--survivor-revived {
+  color: rgba(56, 189, 248, 0.95);
+  border-color: rgba(56, 189, 248, 0.55);
+  background: rgba(2, 23, 41, 0.62);
+  box-shadow:
+    0 0 14px rgba(56, 189, 248, 0.22),
+    inset 0 0 8px rgba(56, 189, 248, 0.08);
 }
 .pickup-toast__survivor-label {
   letter-spacing: 0.18em;

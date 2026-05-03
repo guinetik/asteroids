@@ -43,6 +43,7 @@ interface MockRescueMinigame extends MockCombatMinigame {
   onFail: unknown
   onSurvivorLost: unknown
   onSurvivorAboard: unknown
+  onSurvivorRevived: unknown
 }
 
 const stores = vi.hoisted(() => ({
@@ -149,6 +150,7 @@ vi.mock('@/lib/minigame/RescueMinigame', () => ({
     onFail = null
     onSurvivorLost = null
     onSurvivorAboard = null
+    onSurvivorRevived = null
     onPrompt = null
     onComplete = null
     onStepChange = null
@@ -245,6 +247,7 @@ describe('LevelMinigameFacade initialization', () => {
     const onRescueFail = vi.fn()
     const onSurvivorLost = vi.fn()
     const onSurvivorAboard = vi.fn()
+    const onSurvivorRevived = vi.fn()
     const onInstallCombatDropObserver = vi.fn()
     const onRegisterObjectiveColliders = vi.fn()
 
@@ -285,6 +288,7 @@ describe('LevelMinigameFacade initialization', () => {
         onRescueFail,
         onSurvivorLost,
         onSurvivorAboard,
+        onSurvivorRevived,
         onInstallCombatDropObserver,
         onRegisterObjectiveColliders,
         onLootChest: vi.fn(),
@@ -327,6 +331,7 @@ describe('LevelMinigameFacade initialization', () => {
     expect(rescue.onFail).toBe(onRescueFail)
     expect(rescue.onSurvivorLost).toBe(onSurvivorLost)
     expect(rescue.onSurvivorAboard).toBe(onSurvivorAboard)
+    expect(rescue.onSurvivorRevived).toBe(onSurvivorRevived)
     expect(onInstallCombatDropObserver).toHaveBeenCalledTimes(2)
     expect(onRegisterObjectiveColliders).toHaveBeenCalledWith([
       { id: 'survey-terminal', kind: 'aabb' },
@@ -378,6 +383,7 @@ describe('LevelMinigameFacade initialization', () => {
         onRescueFail: null,
         onSurvivorLost: null,
         onSurvivorAboard: null,
+        onSurvivorRevived: null,
         onInstallCombatDropObserver: null,
         onRegisterObjectiveColliders: null,
         onLootChest: null,

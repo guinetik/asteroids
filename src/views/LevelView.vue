@@ -122,7 +122,9 @@ const trackerMission = ref('')
 const mapCanvas = ref<HTMLCanvasElement | null>(null)
 const playerX = ref(0)
 const playerZ = ref(0)
-const mapMarkers = ref<MapMarker[]>([])
+const objectiveMarkers = ref<MapMarker[]>([])
+const hostageMarkers = ref<MapMarker[]>([])
+const mapMarkers = computed<MapMarker[]>(() => [...objectiveMarkers.value, ...hostageMarkers.value])
 const damageFlash = ref(0)
 const damageFeedback = ref<InstanceType<typeof DamageFeedback> | null>(null)
 const pickups = ref<PickupEntry[]>([])
@@ -215,13 +217,18 @@ const survivorTimers = new Map<string, ReturnType<typeof Timer.after>>()
 let survivorSeq = 0
 
 /**
- * Push a survivor event toast (lost or aboard) and auto-remove it after
- * {@link SURVIVOR_TOAST_LIFETIME_SEC}. Each call gets its own timer so
+ * Push a survivor event toast (lost / revived / aboard) and auto-remove it
+ * after {@link SURVIVOR_TOAST_LIFETIME_SEC}. Each call gets its own timer so
  * back-to-back events don't clobber each other.
  */
-function recordSurvivor(kind: 'lost' | 'aboard'): void {
+function recordSurvivor(kind: 'lost' | 'revived' | 'aboard'): void {
   survivorSeq += 1
-  const label = kind === 'lost' ? 'Survivor Lost' : 'Survivor Aboard'
+  const label =
+    kind === 'lost'
+      ? 'Survivor Incapacitated'
+      : kind === 'revived'
+        ? 'Survivor Recovered'
+        : 'Survivor Aboard'
   const entry: SurvivorEventEntry = { id: `survivor-${survivorSeq}`, kind, label }
   survivorEntries.value.push(entry)
   const handle = Timer.after(SURVIVOR_TOAST_LIFETIME_SEC, () => {
@@ -345,8 +352,17 @@ function refreshRescueRefs(): void {
     rescueTotal.value = active.totalSurvivors
     rescueAlive.value = active.aliveSurvivors
     rescueAboard.value = active.aboardSurvivors
+    const rescueColor = OBJECTIVE_COLORS['rescue'] ?? '#ffcc44'
+    hostageMarkers.value = active.compassMarkers.map((m) => ({
+      id: m.id,
+      x: m.x,
+      z: m.z,
+      color: rescueColor,
+      label: m.label,
+    }))
   } else {
     rescueActive.value = false
+    if (hostageMarkers.value.length > 0) hostageMarkers.value = []
   }
   if (active instanceof DanMinigame) {
     danActive.value = true
@@ -745,13 +761,25 @@ onMounted(async () => {
         rescueActive.value = false
       }
     }
+    viewController.onSurvivorRevived = () => {
+      recordSurvivor('revived')
+      const active = viewController.getActiveMinigame()
+      if (active instanceof RescueMinigame) {
+        rescueActive.value = true
+        rescueTotal.value = active.totalSurvivors
+        rescueAlive.value = active.aliveSurvivors
+        rescueAboard.value = active.aboardSurvivors
+      } else {
+        rescueActive.value = false
+      }
+    }
     await viewController.init(container.value)
     viewController.refreshLanderFuelCellCount()
 
     // Map markers + tracker from mission objectives
     const mission = viewController.getMission()
     if (mission) {
-      mapMarkers.value = mission.objectives.map((obj, i) => ({
+      objectiveMarkers.value = mission.objectives.map((obj, i) => ({
         id: `obj-${i}`,
         x: obj.x,
         z: obj.z,
