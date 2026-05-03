@@ -26,7 +26,7 @@ import { resolveThrusterTrailColors } from './cosmetics/thrusterTrailColors'
 
 const THRUST_SPAWN_RATE = 2000
 const BRAKE_SPAWN_RATE = 1500
-const RCS_SPAWN_RATE = 250
+const RCS_SPAWN_RATE = 600
 
 /**
  * 3 nozzle emit points matching ShuttleController ENG_POSITIONS * MODEL_SCALE.
@@ -59,9 +59,13 @@ const SHUTTLE_TELEPORT_DISTANCE_THRESHOLD = 200
 
 /** Reusable scratch — interpolated shuttle world position for one particle. */
 const SPAWN_INTERP_POS_SCRATCH = /* @__PURE__ */ new THREE.Vector3()
+/** Reusable scratch — slerped shuttle world quaternion for one particle. */
+const SPAWN_INTERP_QUAT_SCRATCH = /* @__PURE__ */ new THREE.Quaternion()
 /** Reusable scratch — final world spawn position handed to {@link ParticleEmitter.emit}. */
 const SPAWN_WORLD_POS_SCRATCH = /* @__PURE__ */ new THREE.Vector3()
-/** Reusable scratch — push direction recomputed once per frame per emitter. */
+/** Reusable scratch — push direction in *shuttle-local* space, set once per spawn batch. */
+const SPAWN_LOCAL_PUSH_SCRATCH = /* @__PURE__ */ new THREE.Vector3()
+/** Reusable scratch — push direction in *world* space after slerped-quat rotation. */
 const SPAWN_PUSH_DIR_SCRATCH = /* @__PURE__ */ new THREE.Vector3()
 
 /**
@@ -98,6 +102,15 @@ export class ThrusterEffectController implements Tickable {
    * was zoomed out. `null` until the first tick captures it.
    */
   private prevShuttleWorldPos: THREE.Vector3 | null = null
+  /**
+   * Shuttle world quaternion at the *start* of this frame. Slerped to the
+   * current quaternion sub-frame so wingtip RCS puffs trace the wingtip's
+   * actual rotational arc instead of collapsing onto the post-yaw wingtip
+   * world position — fixes the "puff comes from where the ship was a clock
+   * cycle ago" perception when toggling A/D rapidly. `null` mirrors
+   * {@link prevShuttleWorldPos} until first capture.
+   */
+  private prevShuttleQuaternion: THREE.Quaternion | null = null
   private readonly shuttle: ShuttleController
   private readonly thrusterSound = new ShuttleThrusterSound()
   private readonly inertialDampenerSound = new InertialDampenerSound()
@@ -149,9 +162,9 @@ export class ThrusterEffectController implements Tickable {
     })
 
     this.rcsEmitter = new ParticleEmitter({
-      poolSize: 400,
+      poolSize: 800,
       color: new THREE.Color(0xddeeff),
-      size: Math.max(3, 2.5 * s),
+      size: Math.max(5, 4 * s),
       lifetime: 0.5,
       spread: 1.5 * s,
       opacity: 0.6,
@@ -328,21 +341,24 @@ export class ThrusterEffectController implements Tickable {
       this.brakeInitialVelocity = 0
     }
 
-    this.captureFrameStartShuttlePos()
+    this.captureFrameStartShuttleTransform()
 
     if (effectState.emitThrust) {
       this.thrustSpawnAccumulator += THRUST_SPAWN_RATE * dt
       const count = Math.floor(this.thrustSpawnAccumulator)
       this.thrustSpawnAccumulator -= count
       if (count > 0) {
-        SPAWN_PUSH_DIR_SCRATCH.set(-PUSH_FORCE * scale, 0, 0).applyQuaternion(
-          this.shuttle.group.quaternion,
-        )
+        SPAWN_LOCAL_PUSH_SCRATCH.set(-PUSH_FORCE * scale, 0, 0)
         for (let i = 0; i < count; i++) {
-          const t = i / count
+          const t = (i + 1) / count
           const nozzle = NOZZLE_OFFSETS[Math.floor(Math.random() * NOZZLE_OFFSETS.length)]!
-          this.computeInterpolatedNozzleWorldPos(nozzle, scale, t, SPAWN_WORLD_POS_SCRATCH)
-          this.thrustEmitter.emit(SPAWN_WORLD_POS_SCRATCH, SPAWN_PUSH_DIR_SCRATCH)
+          this.emitInterpolatedParticle(
+            this.thrustEmitter,
+            nozzle,
+            SPAWN_LOCAL_PUSH_SCRATCH,
+            scale,
+            t,
+          )
         }
       }
     } else {
@@ -354,14 +370,17 @@ export class ThrusterEffectController implements Tickable {
       const count = Math.floor(this.brakeSpawnAccumulator)
       this.brakeSpawnAccumulator -= count
       if (count > 0) {
-        SPAWN_PUSH_DIR_SCRATCH.set(-PUSH_FORCE * scale, 0, 0).applyQuaternion(
-          this.shuttle.group.quaternion,
-        )
+        SPAWN_LOCAL_PUSH_SCRATCH.set(-PUSH_FORCE * scale, 0, 0)
         for (let i = 0; i < count; i++) {
-          const t = i / count
+          const t = (i + 1) / count
           const nozzle = NOZZLE_OFFSETS[Math.floor(Math.random() * NOZZLE_OFFSETS.length)]!
-          this.computeInterpolatedNozzleWorldPos(nozzle, scale, t, SPAWN_WORLD_POS_SCRATCH)
-          this.brakeEmitter.emit(SPAWN_WORLD_POS_SCRATCH, SPAWN_PUSH_DIR_SCRATCH)
+          this.emitInterpolatedParticle(
+            this.brakeEmitter,
+            nozzle,
+            SPAWN_LOCAL_PUSH_SCRATCH,
+            scale,
+            t,
+          )
         }
       }
     } else {
@@ -377,20 +396,23 @@ export class ThrusterEffectController implements Tickable {
       if (count > 0) {
         const wingtip = isYawingLeft ? RIGHT_WINGTIP : LEFT_WINGTIP
         const pushForce = RCS_PUSH_FORCE * scale
-        SPAWN_PUSH_DIR_SCRATCH.set(0, 0, isYawingLeft ? pushForce : -pushForce).applyQuaternion(
-          this.shuttle.group.quaternion,
-        )
+        SPAWN_LOCAL_PUSH_SCRATCH.set(0, 0, isYawingLeft ? pushForce : -pushForce)
         for (let i = 0; i < count; i++) {
-          const t = i / count
-          this.computeInterpolatedNozzleWorldPos(wingtip, scale, t, SPAWN_WORLD_POS_SCRATCH)
-          this.rcsEmitter.emit(SPAWN_WORLD_POS_SCRATCH, SPAWN_PUSH_DIR_SCRATCH)
+          const t = (i + 1) / count
+          this.emitInterpolatedParticle(
+            this.rcsEmitter,
+            wingtip,
+            SPAWN_LOCAL_PUSH_SCRATCH,
+            scale,
+            t,
+          )
         }
       }
     } else {
       this.rcsSpawnAccumulator = 0
     }
 
-    this.commitFrameEndShuttlePos()
+    this.commitFrameEndShuttleTransform()
 
     this.updateIdleThrusterSprites(effectState.emitIdleThrust)
     this.thrustEmitter.tick(dt)
@@ -399,14 +421,15 @@ export class ThrusterEffectController implements Tickable {
   }
 
   /**
-   * Lazily initialize {@link prevShuttleWorldPos} on the first tick that runs
-   * with a placed shuttle, and treat sudden large jumps (portals, respawns,
-   * slingshot warps) as teleports so we don't smear a frame's worth of
-   * particles across the warp gap.
+   * Lazily initialize {@link prevShuttleWorldPos} / {@link prevShuttleQuaternion}
+   * on the first tick that runs with a placed shuttle, and treat sudden large
+   * jumps (portals, respawns, slingshot warps) as teleports so we don't smear
+   * a frame's worth of particles across the warp gap.
    */
-  private captureFrameStartShuttlePos(): void {
-    if (!this.prevShuttleWorldPos) {
+  private captureFrameStartShuttleTransform(): void {
+    if (!this.prevShuttleWorldPos || !this.prevShuttleQuaternion) {
       this.prevShuttleWorldPos = this.shuttle.position.clone()
+      this.prevShuttleQuaternion = this.shuttle.group.quaternion.clone()
       return
     }
     if (
@@ -414,45 +437,60 @@ export class ThrusterEffectController implements Tickable {
       SHUTTLE_TELEPORT_DISTANCE_THRESHOLD * SHUTTLE_TELEPORT_DISTANCE_THRESHOLD
     ) {
       this.prevShuttleWorldPos.copy(this.shuttle.position)
+      this.prevShuttleQuaternion.copy(this.shuttle.group.quaternion)
     }
   }
 
-  /** Snapshot the shuttle's end-of-frame world position for next tick's interpolation. */
-  private commitFrameEndShuttlePos(): void {
-    if (!this.prevShuttleWorldPos) return
-    this.prevShuttleWorldPos.copy(this.shuttle.position)
+  /** Snapshot the shuttle's end-of-frame transform for next tick's interpolation. */
+  private commitFrameEndShuttleTransform(): void {
+    this.prevShuttleWorldPos?.copy(this.shuttle.position)
+    this.prevShuttleQuaternion?.copy(this.shuttle.group.quaternion)
   }
 
   /**
-   * Build the world-space spawn position for one particle, distributing the
-   * frame's batched spawns evenly between the shuttle's previous and current
-   * world positions. Quaternion is taken at the current frame on the
-   * assumption that per-frame rotation is small (acceptable approximation
-   * for a continuous plume; if the shuttle is mid-spin the trail still reads
-   * correctly because the quaternion differs only by a few degrees per
-   * frame).
+   * Emit one particle into `emitter`, distributing the frame's batched spawns
+   * evenly between the shuttle's previous and current world transform. Both
+   * translation (lerp) and rotation (slerp) are interpolated, so wingtip
+   * RCS puffs trace the wingtip's actual rotational arc during yaw rather
+   * than collapsing onto the post-yaw wingtip world point. The push velocity
+   * is rotated by the same slerped quaternion so each particle's exhaust
+   * direction matches the orientation of the ship at its sub-frame moment of
+   * emission — preserving "angular momentum" in the visual trail.
    *
-   * Result is written into `out` to avoid allocating a fresh `Vector3` per
-   * particle.
+   * Caller passes `localPush` in shuttle-local space (e.g. `(-PUSH_FORCE * scale, 0, 0)`
+   * for rear thrust, `(0, 0, ±RCS_PUSH_FORCE * scale)` for yaw RCS); the helper
+   * rotates it into world space sub-frame.
    *
+   * @param emitter - Target {@link ParticleEmitter}.
    * @param localOffset - Nozzle / wingtip offset in shuttle-local space.
+   * @param localPush - Push velocity in shuttle-local space, magnitude already
+   *   scaled by the shuttle's group scale.
    * @param scale - Shuttle group scale (uniform across axes).
-   * @param t - Interpolation parameter `i / count` for this particle.
-   * @param out - Reusable destination vector populated in place.
+   * @param t - Interpolation parameter in `(0, 1]` — the fraction through
+   *   the current frame at which this particle is emitted. We use
+   *   `(i + 1) / count` so the *last* particle of every frame spawns at the
+   *   shuttle's *current* transform, eliminating the one-frame staleness
+   *   that made short RCS bursts read as "puff comes from where the ship
+   *   was a clock cycle ago".
    */
-  private computeInterpolatedNozzleWorldPos(
+  private emitInterpolatedParticle(
+    emitter: ParticleEmitter,
     localOffset: THREE.Vector3,
+    localPush: THREE.Vector3,
     scale: number,
     t: number,
-    out: THREE.Vector3,
   ): void {
-    const prev = this.prevShuttleWorldPos ?? this.shuttle.position
-    SPAWN_INTERP_POS_SCRATCH.copy(prev).lerp(this.shuttle.position, t)
-    out
+    const prevPos = this.prevShuttleWorldPos ?? this.shuttle.position
+    const prevQuat = this.prevShuttleQuaternion ?? this.shuttle.group.quaternion
+    SPAWN_INTERP_POS_SCRATCH.copy(prevPos).lerp(this.shuttle.position, t)
+    SPAWN_INTERP_QUAT_SCRATCH.slerpQuaternions(prevQuat, this.shuttle.group.quaternion, t)
+    SPAWN_WORLD_POS_SCRATCH
       .copy(localOffset)
       .multiplyScalar(scale)
-      .applyQuaternion(this.shuttle.group.quaternion)
+      .applyQuaternion(SPAWN_INTERP_QUAT_SCRATCH)
       .add(SPAWN_INTERP_POS_SCRATCH)
+    SPAWN_PUSH_DIR_SCRATCH.copy(localPush).applyQuaternion(SPAWN_INTERP_QUAT_SCRATCH)
+    emitter.emit(SPAWN_WORLD_POS_SCRATCH, SPAWN_PUSH_DIR_SCRATCH)
   }
 
   dispose(): void {
