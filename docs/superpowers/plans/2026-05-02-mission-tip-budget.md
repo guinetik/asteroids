@@ -17,6 +17,7 @@
 **Create:** none.
 
 **Modify:**
+- `src/data/level/mission-tips.json` — rewrite runtime + objective copy for accuracy and tone; fix three mechanically-wrong giver tips.
 - `src/lib/player/types.ts` — add `runtimeTipsShownCount` to `PlayerAchievementStats`.
 - `src/lib/player/profile.ts` — default/normalize the new field, add `recordRuntimeTipsShown` mutator.
 - `src/lib/level/missionTips.ts` — add `MISSION_TIP_RUNTIME_SHOW_LIMIT` and `isRuntimeTipShowable` helpers.
@@ -27,6 +28,237 @@
 - `src/lib/player/__tests__/profile.spec.ts` — extend with cases for the new field + recorder.
 - `src/lib/level/__tests__/missionTips.spec.ts` — extend with cases for `isRuntimeTipShowable`.
 - `src/lib/level/__tests__/missionTipQueue.spec.ts` — extend with priority-ordering cases.
+
+---
+
+## Task 0: Rewrite mission tip copy for accuracy and tone
+
+**Why this is Task 0:** Pure data change with no code dependency on later tasks. Ships independently and lets QA validate the new copy before the budget logic lands.
+
+**Voice authority:** All copy below is written against `docs/inspo/npc-voice-bible.md`. Canonical bindings used in this task:
+- **Jay (Texas-coded space stoner):** opens "Hey, you got Jay." Closes every message with a joke. Casual contractions, gravity-and-physics-as-second-nature, no textbook tone.
+- **Vance Holroyd, Senior Asset Officer (Jovian Society):** corporate-bureaucratic, courteous, distancing tics ("I'm told"), refers to "the Society", says "sensor cross-talk" for viroid hazards. Note: previous data used "Vance Hoyt, Asset Strategy" — that conflated him with a separate concept-art character. Bible says Holroyd / Senior Asset Officer is canonical.
+- **Finch (alias used by Mr. Halloran):** long, em-dash-laden, slightly archaic, addresses the player as *young pilot*, signs as Finch.
+- **Frontier Rescue / Mission Control / Consortium Dispatch / Colonial Guard:** institutional dispatch voices (not in the bible's named cast); keep them clipped, role-coded, no character quirks.
+- **SuitSys:** suit telemetry, not a person — terse, sterile, third-person clinical.
+
+**Scope of edits:**
+- **Runtime tips (all 9):** rewrite for mechanical accuracy (concrete thresholds, key bindings, what each control actually does), drop patronizing phrasing, and align Jay's lines with the bible (voicemail open + closing joke).
+- **Objective tips (all 9):** rewrite to convey the actual minigame flow. The current `rescue` copy is the canonical bug — it says "destroy the infestation" without explaining that the player has to defend hostages, heal them, free tethers, walk under the virus, plant charges with E, and evacuate. Voice each tip per its speaker (Jay / Vance / institutional).
+- **Giver tips:** keep the rest untouched. Fix only the three that are mechanically wrong — `frontier-rescue.rescue`, `jay.gather`, `mr-finch.gather`. The Finch override switches to Halloran's voice per bible (Finch = Halloran alias).
+
+**Files:**
+- Modify: `src/data/level/mission-tips.json`
+
+- [ ] **Step 1: Replace `firstRunLanderTip` and the `runtimeTips` block**
+
+In `src/data/level/mission-tips.json`, replace the existing `firstRunLanderTip` and `runtimeTips` keys (lines 2-73) with:
+
+```json
+  "firstRunLanderTip": {
+    "speaker": "Jay",
+    "channel": "LANDER REFRESH",
+    "view": "lander",
+    "tone": "logistics",
+    "message": "Hey, you got Jay. Lander refresher before you scratch the paint: SPACE is your main lift, WASD nudges with the side RCS, SHIFT is a separate ascent thruster you can ride alongside SPACE, and C kills lateral drift. Every thruster has its own charge bar — drains while firing, refills from the shared tank when you let off. Don't burn 'em both flat at the same time. Or do, I'm not your dad."
+  },
+  "runtimeTips": {
+    "landerDescentWarning": {
+      "speaker": "Jay",
+      "channel": "DESCENT ADVISORY",
+      "view": "lander",
+      "tone": "logistics",
+      "message": "Hey, you got Jay. DESCENT RATE is hot. Past 7 m/s the warning lights up; past 12 the hull starts paying out of your wallet. Hold SPACE for main lift, and if it's not catching, hold SHIFT alongside it so the ascent RCS stacks on top. Soft hands, partner."
+    },
+    "landerAttitudeWarning": {
+      "speaker": "Jay",
+      "channel": "ATTITUDE ADVISORY",
+      "view": "lander",
+      "tone": "logistics",
+      "message": "Hey, you got Jay. ATTITUDE band — past about 10 degrees of tilt the hull's coming in crooked, 15 is the danger zone. Feather WASD to level out, then short SPACE bursts instead of one long correction. Ground doesn't care how you meant to land."
+    },
+    "landerGroundBoost": {
+      "speaker": "Jay",
+      "channel": "LIFT REFRESH",
+      "view": "lander",
+      "tone": "logistics",
+      "message": "Hey, you got Jay, back in your ear. First two seconds off the deck, SPACE punches four times normal thrust and SHIFT triples — half that boost on slopes. Hold SPACE to pop off, or SHIFT + SPACE if you're climbing out of a hole. Good news for impatient pilots, which is most pilots."
+    },
+    "landerObjectiveExfil": {
+      "speaker": "Jay",
+      "channel": "EXFIL ROUTE",
+      "view": "lander",
+      "tone": "logistics",
+      "message": "Hey, you got Jay. Job's done — but the job ain't paid till you exfil. Fly into the shuttle's recovery cone and tap F when EXFILTRATE lights up. Has to come from the cockpit. Walk-on extraction is something you do in the movies."
+    },
+    "gatherRocketScience": {
+      "speaker": "Jay",
+      "channel": "HAULER RELAY",
+      "view": "fps",
+      "tone": "science",
+      "message": "Hey, you got Jay. If the rocks are hiding from you, press 3 for SCIENCE and put a bolt into the delivery rocket. The can pings a waypoint on the nearest unmined rock that matches your haul list. Trick I picked up from a guy who never paid me back. Trick still works."
+    },
+    "oxygenLow": {
+      "speaker": "SuitSys",
+      "channel": "O2 CAUTION",
+      "view": "fps",
+      "tone": "rescue",
+      "message": "Suit oxygen below half. At zero, hypoxia bleeds 12 HP per second; consciousness window approximately ten seconds. Return to lander, or recover an O2 cell if one is in range."
+    },
+    "rtgLow": {
+      "speaker": "SuitSys",
+      "channel": "RTG CAUTION",
+      "view": "fps",
+      "tone": "science",
+      "message": "Multitool RTG below half. Cell regeneration is stochastic; instant refill not guaranteed. Reduce trigger discipline. Monitor charge bars. RTG pickups available in the field."
+    },
+    "drillWalking": {
+      "speaker": "Jay",
+      "channel": "DRL INTERLOCK",
+      "view": "fps",
+      "tone": "mining",
+      "message": "Hey, you got Jay. DRL won't cut while you're moving — interlock kicks in at about a half-step of speed. Plant your boots, hold still, then burn the face. Rock's not going anywhere. Probably."
+    },
+    "landerHullRepair": {
+      "speaker": "Jay",
+      "channel": "HULL PATCH",
+      "view": "fps",
+      "tone": "logistics",
+      "message": "Hey, you got Jay. Lander hull's taken a hit. Outside the cockpit, press 3 for SCIENCE and shoot the hull — each bolt patches 25 HP. A full SCI charge buys you a few shots. Weird trick. Worked the first time, kept doing it."
+    }
+  },
+```
+
+- [ ] **Step 2: Replace the `objectiveTips` block**
+
+Replace the existing `objectiveTips` block (lines 74-138) with:
+
+```json
+  "objectiveTips": {
+    "gather": {
+      "speaker": "Jay",
+      "channel": "HAULER RELAY",
+      "view": "fps",
+      "tone": "mining",
+      "message": "Hey, you got Jay. Mining run. Press 1 for DRILL and cut surface rocks; press 3 for SCIENCE to prospect first — keep hits on a rock until the wireframe locks, then drill it for a guaranteed bonus mineral. Deposit the haul at the delivery rocket when you're full. Easy money, assuming you don't trip over your own boots."
+    },
+    "survey": {
+      "speaker": "Jay",
+      "channel": "SURVEY RELAY",
+      "view": "lander",
+      "tone": "science",
+      "message": "Hey, you got Jay. Survey run. E at the terminal launches the probes, then fly the lander through each waypoint before the timer expires. Back to the terminal, tap E to deliver. Glorified mining, but the science folks like to feel important."
+    },
+    "exterminate": {
+      "speaker": "Colonial Guard",
+      "channel": "PEST CONTROL NET",
+      "view": "fps",
+      "tone": "combat",
+      "message": "Colonial Guard dispatch. Eliminate defenders around the nest. Approach within sixteen meters. E to plant charges. Sprint clear inside the five-second countdown. Blast radius twenty-four meters — collateral lethal to pilot and lander."
+    },
+    "rescue": {
+      "speaker": "Frontier Rescue",
+      "channel": "RESCUE BAND",
+      "view": "fps",
+      "tone": "rescue",
+      "message": "Frontier Rescue, pilot. Five steps: land, defend the hostages from incoming hostiles, heal them, cut their tethers loose, then walk under the floating virus and press E to plant charges before evacuating. Survivors die when their oxygen runs out. Move fast."
+    },
+    "photometry": {
+      "speaker": "Vance",
+      "channel": "ASSET TELEMETRY",
+      "view": "lander",
+      "tone": "science",
+      "message": "Vance Holroyd, Senior Asset Officer. I'm told the survey window is open. Open the terminal to launch the probe, fly the lander to the standoff marker, and hold inside the seventy-meter envelope under eighty meters per second for the eight-second exposure. Return to the terminal at completion. The Society appreciates clean telemetry."
+    },
+    "dan": {
+      "speaker": "Vance",
+      "channel": "SUBSURFACE TELEMETRY",
+      "view": "fps",
+      "tone": "science",
+      "message": "Vance Holroyd. DAN attunement at the terminal — E to start, lander within fifty meters. Press 3 for SCIENCE and collect twenty-five returning neutrons inside forty-five seconds. Sensor cross-talk may appear after a nine-second grace; the instrumentation handles it. Return to the terminal to deliver."
+    },
+    "bunker": {
+      "speaker": "Mission Control",
+      "channel": "DESCENT RELAY",
+      "view": "fps",
+      "tone": "combat",
+      "message": "Mission Control. Surface hatch is your entry. Descend, clear each interior wave, then hold E at the data terminal within five meters to extract. Walk back to the hatch and E to leave when the room is secure. Confirm clear before exfil."
+    },
+    "collect": {
+      "speaker": "Consortium Dispatch",
+      "channel": "PACKAGE TRACKER",
+      "view": "fps",
+      "tone": "logistics",
+      "message": "Consortium dispatch. Locate the marked package. Approach. E to collect. Cargo retrieval — no haul-back required."
+    },
+    "prospectus-terminal": {
+      "speaker": "Vance",
+      "channel": "ASSET REVIEW",
+      "view": "fps",
+      "tone": "science",
+      "message": "Vance Holroyd. The surface kiosk holds the compiled prospectus. Approach, open the report, resolve the transmission choice. The Society requires a recorded decision either way."
+    }
+  },
+```
+
+- [ ] **Step 3: Patch the three mechanically-wrong giver tips**
+
+Inside the existing `giverTips` block, replace **only** these three entries — leave every other giver tip intact.
+
+`giverTips.frontier-rescue.rescue`:
+
+```json
+      "rescue": {
+        "speaker": "Frontier Rescue",
+        "channel": "RESCUE BAND",
+        "view": "fps",
+        "tone": "rescue",
+        "message": "Frontier Rescue to pilot. Five steps: land, defend the hostages, heal them, free their tethers, then walk under the floating virus and press E to plant charges before the evacuation timer expires. Survivors die when their O2 hits zero. Don't sightsee. Move."
+      }
+```
+
+`giverTips.jay.gather`:
+
+```json
+      "gather": {
+        "speaker": "Jay",
+        "channel": "HAULER RELAY",
+        "view": "fps",
+        "tone": "mining",
+        "message": "Hey, you got Jay. Mining gig — press 1 for DRILL and cut rock, press 3 for SCIENCE to prospect first. Keep SCI hits on a rock until the wireframe locks for a guaranteed bonus mineral. Deposit at the delivery rocket when you're full. Brought to you by people who've been doing this since before you owned a wrench."
+      }
+```
+
+`giverTips.mr-finch.gather` — Finch is Halloran's working alias per the voice bible (long, em-dashes, *young pilot*, slightly archaic, signs as Finch):
+
+```json
+      "gather": {
+        "speaker": "Finch",
+        "channel": "SATURN HANDLER",
+        "view": "fps",
+        "tone": "mining",
+        "message": "Young pilot. A standard haul cycle — but farther out, and farther tends to be where the price is. Press 1 for DRILL, fill the hold, deposit at the delivery rocket. If you have a moment for the SCIENCE side of the tool — that is 3 — prospect a rock first; the locked ones pay a guaranteed bonus mineral. A modest favor, a real return. — Finch"
+      }
+```
+
+- [ ] **Step 4: Validate JSON parses and the schema is intact**
+
+Run: `bun run type-check`
+Expected: 0 errors. (`mission-tips.json` is consumed by `missionTips.ts` via a typed import; a structural break would surface here.)
+
+Run: `bun test:unit src/lib/level/__tests__/missionTips.spec.ts`
+Expected: PASS — existing resolver tests assert speaker/channel/view shape only, so copy edits are safe.
+
+- [ ] **Step 5: Smoke-test the new copy**
+
+Run: `bun dev`. Start a fresh-profile rescue mission and confirm the new objective tip text fires. Trigger the runtime hull-repair tip by taking a hull hit and confirm the new wording shows. No need to exhaustively validate every tip — the JSON schema is unchanged, so this is a sanity check that the strings render.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/data/level/mission-tips.json
+git commit -m "feat(level): rewrite mission tip copy for accuracy and tone"
+```
 
 ---
 
@@ -602,6 +834,6 @@ If any cleanup edits were needed during Step 2, commit them with `chore(level): 
 
 ## Self-review notes
 
-- **Spec coverage:** show-count budget (Tasks 1-3, 5), persist-only-on-completion (Task 6), runtime priority (Task 4). All three explicit requirements covered.
+- **Spec coverage:** copy revision (Task 0), show-count budget (Tasks 1-3, 5), persist-only-on-completion (Task 6), runtime priority (Task 4). All four explicit requirements covered.
 - **Type consistency:** `runtimeTipsShownCount: Record<string, number>` is named identically across `types.ts`, `profile.ts`, the recorder, and `isRuntimeTipShowable`. Tip ids passed through `dispatchedRuntimeTipIds` are bare ids (e.g. `oxygenLow`), matching the keys used by `MISSION_TIPS.runtimeTips` and the persisted map. The priority sort keys off the `runtime:` prefix that `resolveRuntimeMissionTipTransmission` already produces (`missionTips.ts:166`), so no plumbing change is needed there.
 - **No placeholders:** every code step shows the literal code; every test step shows the assertions.
