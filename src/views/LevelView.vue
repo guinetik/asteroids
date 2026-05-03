@@ -36,6 +36,7 @@ import type { FpsTelemetry } from '@/lib/ui/fpsHudTypes'
 import type { MissionTipTransmission } from '@/lib/level/missionTips'
 import {
   getMissionTipObjectiveType,
+  isRuntimeTipShowable,
   resolveFirstRunLanderTipTransmission,
   resolveMissionTipTransmission,
   resolveRuntimeMissionTipTransmission,
@@ -409,6 +410,7 @@ function pushMissionTip(tip: MissionTipTransmission | null): void {
 
 function pushRuntimeMissionTip(id: string): void {
   if (dispatchedRuntimeTipIds.has(id)) return
+  if (!isRuntimeTipShowable(loadProfile(), id)) return
   const objectiveType = activeMissionObjectiveType.value
   if (!objectiveType) return
   const tip = resolveRuntimeMissionTipTransmission(id, objectiveType)
