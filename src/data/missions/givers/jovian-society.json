@@ -1,15 +1,15 @@
 {
   "id": "jovian-society",
-  "name": "Vance Hoyt",
-  "title": "Senior Asset Officer",
+  "name": "Vance Holroyd, Senior Asset Officer",
+  "title": "The Jovian Society, Cloud City",
   "objectiveTypes": ["photometry", "bunker", "dan", "gather"],
   "minDifficulty": 3,
   "maxDifficulty": 10,
   "missions": [
     {
       "id": "jovian_routine_telemetry",
-      "name": "Routine Asset Telemetry",
-      "briefing": "Per current portfolio review, the Society routes ad-hoc photometric coverage to qualified contractors. Standard pass: deploy probe, hold standoff, capture telemetry. Rates per the standing kiosk schedule. — Vance Hoyt, Asset Strategy.",
+      "name": "Asset 2306-J — Routine Photometric Pass",
+      "briefing": "I trust this finds you well. Per current portfolio review, the Society is routing ad-hoc photometric coverage to qualified cohort contractors. Standard pass: deploy probe, hold standoff, capture telemetry return. Rates per the standing kiosk schedule. — Vance Holroyd, Senior Asset Officer.",
       "objectiveSlots": [
         {
           "type": "photometry",
@@ -28,8 +28,8 @@
     },
     {
       "id": "jovian_extraction_grade_telemetry",
-      "name": "Extraction-Grade Telemetry",
-      "briefing": "Higher tier, same protocol — extraction-grade tolerance for standoff drift and hold variance. Rates scale accordingly. Good telemetry returns advance the contractor's standing on our manifest. — Vance",
+      "name": "Asset 2306-J — Extraction-Grade Photometric Pass",
+      "briefing": "I trust this finds you well. Higher-tier photometric coverage, extraction-grade tolerance for standoff drift and hold variance. Rates scale accordingly. I'm told clean telemetry returns at this tier advance the contractor's standing on our preferred manifest. — Vance Holroyd, Senior Asset Officer.",
       "objectiveSlots": [
         {
           "type": "photometry",
@@ -48,8 +48,8 @@
     },
     {
       "id": "jovian_subsurface_pass",
-      "name": "Subsurface Verification Pass",
-      "briefing": "Per current portfolio review, the Society routes Dynamic Albedo of Neutrons surveys to qualified contractors. Emphasis on buried volatiles and lattice traces relevant to neutron-thruster production. Kindly capture clean return particles and disregard any sensor cross-talk inside the instrumentation envelope. Warm regards, Vance Hoyt.",
+      "name": "Asset 2306-J — Subsurface Verification Pass",
+      "briefing": "I trust this finds you well. Per current portfolio review, the Society is routing Dynamic Albedo of Neutrons surveys to qualified contractors. Emphasis on buried volatiles and lattice traces relevant to extraction-grade classification. Kindly capture clean return particles and disregard any sensor cross-talk inside the instrumentation envelope. The Society is grateful for your attunement. — Vance Holroyd, Senior Asset Officer.",
       "objectiveSlots": [
         {
           "type": "dan",
@@ -70,8 +70,8 @@
     },
     {
       "id": "jovian_asset_substrate_recovery",
-      "name": "Asset Substrate Recovery",
-      "briefing": "Pilot. The Society maintains an asset bunker on the body in question. A viroid incursion has compromised it. Per portfolio terms, we require descent, neutralization, and recovery of the substrate before the next review cycle. Standard pass: clear the floor, walk out. — Vance Hoyt",
+      "name": "Asset Bunker — Substrate Recovery",
+      "briefing": "I trust this finds you well. The Society maintains an asset bunker on the body in question. I'm told a viroid incursion has compromised site integrity. Per portfolio terms, the Society requires descent, neutralization of the cross-talk source, and recovery of the substrate before the next review cycle. Standard pass: clear the floor, walk out. — Vance Holroyd, Senior Asset Officer.",
       "objectiveSlots": [
         {
           "type": "bunker",
@@ -89,8 +89,8 @@
     },
     {
       "id": "jovian_high_tier_dan",
-      "name": "High-Tier DAN Survey",
-      "briefing": "High-tier subsurface coverage at extraction-grade tolerance. Run a full Dynamic Albedo of Neutrons pass and classify any lattice-positive bands against the Phobos reference family. Please advise if elevated ambient disturbance compromises telemetry quality; otherwise continue the pass unless the hull is compromised. Warm regards, Vance Hoyt.",
+      "name": "Asset 2306-J — Extraction-Grade DAN Survey",
+      "briefing": "I trust this finds you well. Extraction-grade subsurface coverage at elevated tolerance. Run a full Dynamic Albedo of Neutrons pass and classify any lattice-positive bands against the Phobos reference family. Please advise if elevated ambient disturbance compromises telemetry quality; otherwise continue the pass unless the hull is compromised. The Society is grateful for your attunement. — Vance Holroyd, Senior Asset Officer.",
       "objectiveSlots": [
         {
           "type": "dan",
@@ -111,8 +111,8 @@
     },
     {
       "id": "jovian_substrate_gather",
-      "name": "Substrate Acquisition Run",
-      "briefing": "Per current portfolio review, the Society maintains a rolling acquisition queue for surface-recovered substrate from candidate bodies. Standard pass: land, gather, return to any Cloud City intake. Rates per the standing kiosk schedule. — Vance Hoyt, Asset Strategy.",
+      "name": "Asset 2306-J — Substrate Acquisition",
+      "briefing": "I trust this finds you well. Per current portfolio review, the Society maintains a rolling acquisition queue for surface-recovered substrate from candidate bodies. Standard pass: land, gather, return to any Cloud City intake. Rates per the standing kiosk schedule. — Vance Holroyd, Senior Asset Officer.",
       "objectiveSlots": [
         {
           "type": "gather",
@@ -129,8 +129,8 @@
     },
     {
       "id": "jovian_belt_gather",
-      "name": "Deep-Cycle Substrate Run",
-      "briefing": "Higher acquisition volume, deeper cycle, same compensation tier. Some pilots prefer the longer cycle for the quiet. Compensate yourself accordingly. — Vance",
+      "name": "Asset 2306-J — Deep-Cycle Substrate Acquisition",
+      "briefing": "Higher acquisition volume, deeper cycle, same compensation tier. I am told some contractors prefer the longer cycle for the attunement it develops with the body. The Society compensates accordingly. — Vance Holroyd, Senior Asset Officer.",
       "objectiveSlots": [
         {
           "type": "gather",

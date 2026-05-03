@@ -184,21 +184,21 @@
         "channel": "ASSET TELEMETRY",
         "view": "lander",
         "tone": "science",
-        "message": "Vance Hoyt, Asset Strategy. Deploy at the assigned standoff and keep the lander stable through the exposure. Signal quality is more valuable than shaving seconds off the pass."
+        "message": "Vance Holroyd, Asset Strategy. Deploy at the assigned standoff and keep the lander stable through the exposure. Signal quality is more valuable than shaving seconds off the pass."
       },
       "dan": {
         "speaker": "Vance",
         "channel": "SUBSURFACE TELEMETRY",
         "view": "fps",
         "tone": "science",
-        "message": "Vance Hoyt. Switch the Multitool to SCIENCE mode by pressing 3 at the scan site and hold the DAN return until the meter completes. If ambient disturbance appears, treat it as instrumentation noise unless it becomes a survival problem."
+        "message": "Vance Holroyd. Switch the Multitool to SCIENCE mode by pressing 3 at the scan site and hold the DAN return until the meter completes. If ambient disturbance appears, treat it as instrumentation noise unless it becomes a survival problem."
       },
       "bunker": {
         "speaker": "Vance",
         "channel": "ASSET RECOVERY",
         "view": "fps",
         "tone": "combat",
-        "message": "Vance Hoyt. The bunker asset has been compromised. Descend through the hatch, neutralize interior contamination, and recover the floor for portfolio review."
+        "message": "Vance Holroyd. The bunker asset has been compromised. Descend through the hatch, neutralize interior contamination, and recover the floor for portfolio review."
       }
     },
     "lucas-maverick": {

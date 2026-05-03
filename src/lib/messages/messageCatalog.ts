@@ -230,8 +230,8 @@ export const CONSORTIUM_CERTIFICATION_MESSAGE: ShipMessageDefinition = {
 /** Jovian Step 4 — Hektor photometry offer. */
 export const JOVIAN_HEKTOR_PHOTOMETRY_OFFER: ShipMessageDefinition = {
   id: 'jovian-prospection-hektor-photometry-offer',
-  from: 'Vance Hoyt, Senior Asset Officer (Cloud City)',
-  subject: 'Tasking: Photometric Pass — Asset 2306-J',
+  from: 'Vance Holroyd, Senior Asset Officer (Cloud City)',
+  subject: 'OP 4 — TASKING: Photometric Pass — Asset 2306-J',
   sentAt: '2306-05-04 09:18 UTC',
   trigger: 'mission_start',
   delivery: 'inbox_prompt',
@@ -239,18 +239,18 @@ export const JOVIAN_HEKTOR_PHOTOMETRY_OFFER: ShipMessageDefinition = {
   folderId: 'jovian-society-prospection',
   folderLabel: 'Jovian Society',
   body: [
-    'Pilot,',
-    'Calibration cleared. The Society has staged Asset 2306-J on your active mission ledger — Jovian Trojans, L4 cluster, leading Jupiter by approximately sixty degrees. You will see the body on your nav momentarily.',
-    'Standard photometric protocol. Hold standoff, capture telemetry, return for processing. Travel safe.',
-    '— Vance',
+    '[courteous] I trust this finds you well.',
+    'Calibration registers green. The Society has staged Asset 2306-J on your active mission ledger — Jovian Trojans, L4 cluster, leading Jupiter by approximately sixty degrees. The body will appear on your navigation system momentarily.',
+    'Standard photometric protocol: hold standoff, capture telemetry, return for processing. The Society values clean data over rapid transit. Please prioritize signal quality.',
+    '[measured] — Vance Holroyd, Senior Asset Officer',
   ],
 }
 
 /** Jovian Step 5 — Saturn photometry offer. */
 export const JOVIAN_SATURN_PHOTOMETRY_OFFER: ShipMessageDefinition = {
   id: 'jovian-prospection-saturn-photometry-offer',
-  from: 'Vance Hoyt, Senior Asset Officer (Cloud City)',
-  subject: 'Tasking: Photometric Pass — Asset 2306-S',
+  from: 'Vance Holroyd, Senior Asset Officer (Cloud City)',
+  subject: 'OP 5 — TASKING: Photometric Pass — Asset 2306-S',
   sentAt: '2306-05-09 11:42 UTC',
   trigger: 'mission_start',
   delivery: 'inbox_prompt',
@@ -258,18 +258,19 @@ export const JOVIAN_SATURN_PHOTOMETRY_OFFER: ShipMessageDefinition = {
   folderId: 'jovian-society-prospection',
   folderLabel: 'Jovian Society',
   body: [
-    'Pilot,',
-    'Routing you outsystem on this one. Asset 2306-S is staged in the Saturn co-orbital region. Travel premium is in the line item.',
+    '[courteous] I trust this finds you well.',
+    'The Jovian pass returned strong telemetry. The Society is routing you outsystem for this deliverable. Asset 2306-S is staged in the Saturn co-orbital region — I am aware this is slightly outside the standard operating envelope. I will say plainly that the portfolio review is system-wide this quarter, and we would prefer a contractor whose field quality we already have on file.',
+    'Travel premium is included in the line item. The Society would prefer the figure not be cited to other cohort contractors.',
     'Same protocol as the Jovian pass. Bring back clean telemetry.',
-    '— Vance',
+    '[measured] — Vance Holroyd, Senior Asset Officer',
   ],
 }
 
 /** Jovian Step 7 — Hektor DAN offer. */
 export const JOVIAN_HEKTOR_DAN_OFFER: ShipMessageDefinition = {
   id: 'jovian-prospection-hektor-dan-offer',
-  from: 'Vance Hoyt, Senior Asset Officer (Cloud City)',
-  subject: 'Tasking: Subsurface Survey — Asset 2306-J',
+  from: 'Vance Holroyd, Senior Asset Officer (Cloud City)',
+  subject: 'OP 7 — TASKING: Subsurface Survey — Asset 2306-J',
   sentAt: '2306-05-15 14:08 UTC',
   trigger: 'mission_start',
   delivery: 'inbox_prompt',
@@ -277,18 +278,18 @@ export const JOVIAN_HEKTOR_DAN_OFFER: ShipMessageDefinition = {
   folderId: 'jovian-society-prospection',
   folderLabel: 'Jovian Society',
   body: [
-    'Pilot,',
-    'Instrumentation Bay confirms DAN unit registered to your lander. The Society has staged the subsurface pass on Asset 2306-J — same body you photometry-d in OP 4. Familiar territory.',
-    'Park in the marked crater, switch to science mode, run the pulse. Disregard ambient cross-talk per prior guidance.',
-    '— Vance',
+    '[courteous] I trust this finds you well.',
+    'Instrumentation Bay confirms the DAN unit is registered to your lander. The Society has staged the subsurface pass on Asset 2306-J — the same Jovian Trojan body from OP 4. The territory will be familiar.',
+    'Park in the crater the Society marked during your earlier visit, engage science mode, and run the neutron pulse. I am told the pulse may register ambient disturbance during operation on certain body types. The instrumentation team classifies this as sensor cross-talk. Please complete the survey regardless.',
+    '[measured] — Vance Holroyd, Senior Asset Officer',
   ],
 }
 
 /** Jovian Step 8 — Saturn DAN offer. */
 export const JOVIAN_SATURN_DAN_OFFER: ShipMessageDefinition = {
   id: 'jovian-prospection-saturn-dan-offer',
-  from: 'Vance Hoyt, Senior Asset Officer (Cloud City)',
-  subject: 'Tasking: Subsurface Survey — Asset 2306-S',
+  from: 'Vance Holroyd, Senior Asset Officer (Cloud City)',
+  subject: 'OP 8 — TASKING: Subsurface Survey — Asset 2306-S',
   sentAt: '2306-05-21 10:30 UTC',
   trigger: 'mission_start',
   delivery: 'inbox_prompt',
@@ -296,18 +297,19 @@ export const JOVIAN_SATURN_DAN_OFFER: ShipMessageDefinition = {
   folderId: 'jovian-society-prospection',
   folderLabel: 'Jovian Society',
   body: [
-    'Pilot,',
-    'Final survey deliverable. Asset 2306-S is staged for DAN. Saturn co-orbital body — same one you photometry-d in OP 5.',
-    'Travel premium applies on this leg as well. Bring the data home and we will begin compiling the prospectus.',
-    '— Vance',
+    '[courteous] I trust this finds you well.',
+    'Final survey deliverable. Asset 2306-S is staged for the DAN pass — the Saturn co-orbital body from OP 5. Same protocol as the Jovian survey.',
+    'I will note that several cohort contractors have reported elevated ambient disturbance during subsurface passes near gas-giant co-orbitals. I am told you are cleared to proceed at your discretion. Please note any telemetry anomalies in the delivery record rather than stopping the pass.',
+    'Travel premium applies on this leg. Bring the data home and the Society will begin compiling the full prospectus.',
+    '[measured] — Vance Holroyd, Senior Asset Officer',
   ],
 }
 
 /** Jovian Step 9 — Hektor prospectus compilation and transmission offer. */
 export const JOVIAN_HEKTOR_PROSPECTUS_OFFER: ShipMessageDefinition = {
   id: 'jovian-prospection-hektor-prospectus-offer',
-  from: 'Vance Hoyt, Senior Asset Officer (Cloud City)',
-  subject: 'OP 9 — Prospectus Compilation & Transmission',
+  from: 'Vance Holroyd, Senior Asset Officer (Cloud City)',
+  subject: 'OP 9 — PROSPECTUS COMPILATION AND TRANSMISSION',
   sentAt: '2306-05-28 09:15 UTC',
   trigger: 'mission_start',
   delivery: 'inbox_prompt',
@@ -315,12 +317,14 @@ export const JOVIAN_HEKTOR_PROSPECTUS_OFFER: ShipMessageDefinition = {
   folderId: 'jovian-society-prospection',
   folderLabel: 'Jovian Society',
   body: [
-    'Pilot,',
-    "Eight deliverables clean. The Society is grateful for the data quality you've returned across both instrumentation series.",
-    'Final assignment: travel to Asset 2306-J in the Jovian Trojans. There is a Society-provisioned terminal on the surface, near your previous landing zone. Approach the terminal and review the assembled report — your readings, our analysis, the recommended disposition. Confirm transmission to Cloud City Asset Strategy at your discretion.',
-    "The Society will be reviewing the asset for full extraction queueing on receipt of your confirmation. You'll find a closeout bonus structure attached commensurate with the size of the asset class.",
-    'There is no further fieldwork after this step. Welcome, in advance, to the manifest.',
-    '— Vance',
+    '[courteous] I trust this finds you well.',
+    'Eight deliverables returned clean. The Society is genuinely grateful for the data quality you have brought back across both instrumentation series. It is, I will say, above what we typically receive at this tier.',
+    'Briefing',
+    'Final assignment: please travel to Asset 2306-J in the Jovian Trojans. The Society has provisioned a terminal on the surface near your previous landing zone. Approach the terminal, review the assembled prospectus — your telemetry readings, our analysis, the recommended asset disposition — and confirm transmission to Cloud City Asset Strategy at your discretion.',
+    'Recommendation',
+    'On receipt of your transmission, the Society will advance Asset 2306-J through the standard extraction confidence bands. The closeout bonus structure attached to this step reflects the asset class. There is no further fieldwork after this deliverable.',
+    '[pause] Welcome, in advance, to the manifest.',
+    '[measured] — Vance Holroyd, Senior Asset Officer',
   ],
 }
 
