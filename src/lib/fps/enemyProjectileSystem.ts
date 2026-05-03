@@ -91,6 +91,23 @@ export class EnemyProjectileSystem implements Tickable {
   private playerY = 0
   private playerZ = 0
   private readonly hostages: Hostage[] = []
+  /**
+   * Multiplier applied to projectile damage on **player** hits only. Hostages
+   * always take the unscaled base damage so high-difficulty rescue missions
+   * don't massacre the survivors before the player can engage.
+   */
+  private playerDamageMultiplier = 1
+
+  /**
+   * Set the player-only damage multiplier. Use values >= 1 to make enemies
+   * hit the player harder (e.g. mission difficulty scaling) without changing
+   * the damage they deal to friendly targets.
+   *
+   * @param multiplier - Scale applied at hit time on the player code path only.
+   */
+  setPlayerDamageMultiplier(multiplier: number): void {
+    this.playerDamageMultiplier = Math.max(0, multiplier)
+  }
 
   /** Fired when a projectile hits the player. Args: damage, sourceX, sourceZ. */
   onPlayerHit: ((damage: number, sourceX: number, sourceZ: number) => void) | null = null
@@ -274,7 +291,7 @@ export class EnemyProjectileSystem implements Tickable {
       p.z += segZ
 
       if (hitPlayer) {
-        this.onPlayerHit?.(p.damage, p.sourceX, p.sourceZ)
+        this.onPlayerHit?.(p.damage * this.playerDamageMultiplier, p.sourceX, p.sourceZ)
         this.onProjectileRemoved?.(p.id)
         this.projectiles.splice(i, 1)
         continue

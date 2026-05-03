@@ -181,6 +181,24 @@ export class EnemyDirector implements Tickable {
    */
   private readonly assignedHostage = new Map<number, Hostage>()
 
+  /**
+   * Multiplier applied to **player** contact damage only. Hostages always take
+   * the unscaled base damage so high-difficulty rescue missions don't massacre
+   * survivors before the player can engage.
+   */
+  private playerDamageMultiplier = 1
+
+  /**
+   * Set the player-only contact damage multiplier. Use values >= 1 to make
+   * enemies hit the player harder (e.g. mission difficulty scaling) without
+   * changing the damage they deal to friendly targets.
+   *
+   * @param multiplier - Scale applied at hit time on the player code path only.
+   */
+  setPlayerDamageMultiplier(multiplier: number): void {
+    this.playerDamageMultiplier = Math.max(0, multiplier)
+  }
+
   /** Fired when an enemy touches the player. */
   onContactDamage: ((handle: EnemyHandle, damage: number) => void) | null = null
 
@@ -436,7 +454,7 @@ export class EnemyDirector implements Tickable {
         const cz = handle.enemy.position.z - this.playerZ
         const contactDist = Math.sqrt(cx * cx + cy * cy + cz * cz)
         if (contactDist <= handle.config.contactRadius) {
-          this.onContactDamage?.(handle, handle.config.contactDamage)
+          this.onContactDamage?.(handle, handle.config.contactDamage * this.playerDamageMultiplier)
           handle.contactCooldown = handle.config.contactCooldown
         } else {
           for (const hostage of this.hostageEntities) {

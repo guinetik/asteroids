@@ -516,7 +516,11 @@ export class ProjectileSystem implements Tickable {
       if (p.boltKind === 'science') {
         const hostageHit = this.closestHostageHealHit(this._prevPos, pos)
         if (hostageHit) {
-          hostageHit.hostage.heal(HEAL_BOLT_AMOUNT)
+          if (hostageHit.hostage.alive) {
+            hostageHit.hostage.heal(HEAL_BOLT_AMOUNT)
+          } else {
+            hostageHit.hostage.revive()
+          }
           this._callbackPos.copy(pos)
           this.onHostageBolt?.(hostageHit.hostage, this._callbackPos, 'heal')
           hitHostage = true
@@ -817,7 +821,10 @@ export class ProjectileSystem implements Tickable {
   }
 
   /**
-   * Closest hostage along the segment for a science bolt (heal effect).
+   * Closest hostage along the segment for a science bolt (heal / revive effect).
+   *
+   * Includes incapacitated hostages so a SCI bolt can revive a downed survivor —
+   * the caller branches on `hostage.alive` to choose between heal and revive.
    *
    * @param from - Segment start (previous projectile position)
    * @param to - Segment end (current projectile position)
@@ -828,7 +835,6 @@ export class ProjectileSystem implements Tickable {
   ): { hostage: Hostage; t: number } | null {
     let best: { hostage: Hostage; t: number } | null = null
     for (const hostage of this.hostages) {
-      if (!hostage.alive) continue
       hostage.hitCenter(this._hostageCenter)
       const t = this.segmentEnterSphereT(
         from,

@@ -60,6 +60,13 @@ export class Hostage {
   onDeath: (() => void) | null = null
 
   /**
+   * Fired when {@link revive} restores HP to an incapacitated hostage. Drives
+   * the visual transition (cancel dying clip, replay praying, re-show HP bar)
+   * inside `HostageInstance`.
+   */
+  onRevive: (() => void) | null = null
+
+  /**
    * @param config - HP pool, hit volume (defaults match player-scale 100 HP demo)
    */
   constructor(config: Partial<HostageConfig> = {}) {
@@ -102,12 +109,24 @@ export class Hostage {
   }
 
   /**
-   * Restore health (e.g. med bolt). Does not exceed {@link maxHp}.
+   * Restore health (e.g. med bolt). Does not exceed {@link maxHp}. No-op while
+   * incapacitated — use {@link revive} to bring a downed hostage back.
    *
    * @param amount - HP to add
    */
   heal(amount: number): void {
     if (!this.alive) return
     this.hp = Math.min(this.maxHp, this.hp + amount)
+  }
+
+  /**
+   * Bring an incapacitated hostage back online at full HP and fire
+   * {@link onRevive}. No-op when the hostage is already alive — heal increments
+   * for the alive case live in {@link heal}.
+   */
+  revive(): void {
+    if (this.alive) return
+    this.hp = this.maxHp
+    this.onRevive?.()
   }
 }

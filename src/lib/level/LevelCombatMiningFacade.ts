@@ -42,6 +42,10 @@ export interface LevelCombatMiningBindings {
   onProspectProgress: (spawnIndex: number, scienceHp: number, initialScienceHp: number) => void
   /** Called exactly once when a rock has been fully analysed. */
   onProspectComplete: (spawnIndex: number, itemId: string) => void
+  /** Optional hidden disturbance hook for every successful drill hit. */
+  onMiningHit?: (spawnIndex: number) => void
+  /** Optional hidden disturbance hook for a fully depleted rock. */
+  onRockBreak?: (spawnIndex: number) => void
 }
 
 /**
@@ -150,6 +154,7 @@ export class LevelCombatMiningFacade {
       this.deps.surfaceRocks.hideRock(spawnIndex)
       this.bindings.onRemoveRockCollider(spawnIndex)
       this.deps.projectileSystem.removeRock(spawnIndex)
+      this.bindings.onRockBreak?.(spawnIndex)
     }
 
     this.deps.rockYieldSystem.onMineralExtracted = (itemId, kg) => {
@@ -166,6 +171,7 @@ export class LevelCombatMiningFacade {
     this.deps.projectileSystem.onRockHit = (spawnIndex, impactPos) => {
       const result = this.deps.rockYieldSystem.mineRock(spawnIndex)
       if (!result) return
+      this.bindings.onMiningHit?.(spawnIndex)
       if (!result.depleted) {
         this.deps.levelAudio.keepMiningSizzleAlive(this.bindings.getElapsedSeconds())
       }
