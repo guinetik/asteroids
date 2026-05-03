@@ -184,7 +184,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
 
   private readonly _steps: MiniGameStep[] = [
     { label: 'Land in the outbreak zone', complete: false, active: true },
-    { label: 'Eliminate the attackers', complete: false, active: false },
+    { label: 'Defend the Hostages', complete: false, active: false },
     { label: 'Heal the survivors', complete: false, active: false },
     { label: 'Release the hostages', complete: false, active: false },
     { label: 'Destroy the virus infestation', complete: false, active: false },
@@ -228,7 +228,11 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
   private readonly encounterEnemies: Enemy[] = []
   /** Total enemies the encounter plans to spawn — set by `spawnEncounter`. */
   private encounterTotalPlanned = 0
-  /** Sequence handle for paced encounter spawns; cancelled on dispose/fail. */
+  /** Pending pulse roster — front is the next slice to spawn. */
+  private readonly pendingPulses: Array<ReadonlyArray<'bacteriophage' | 'chimera' | 'spire'>> = []
+  /** Max delay (s) between consecutive pulses when the player doesn't clear early. */
+  private encounterPulseInterval = 0
+  /** Timer handle for the next scheduled pulse; cancelled when fired early or on dispose/fail. */
   private encounterSpawnTimer: TimerHandle | null = null
   private readonly containedHostages: ContainedHostageVisual[] = []
   private readonly explosionFlash = new THREE.Mesh(explosionFlashGeo, explosionFlashMat)
@@ -474,13 +478,26 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
     // Losing every survivor no longer ends the run — the player can still
     // clear the enemies, arm the virus, and evacuate. The heal/extract gates
     // below short-circuit vacuously when `aliveSurvivors === 0`.
-    const allEnemiesDead = this.liveEnemyCount() === 0
+    //
+    // Step 1 ("Defend the Hostages") only completes once the FULL planned
+    // roster has spawned AND every spawned enemy is dead. The encounter
+    // dribbles enemies in pulses (see `scheduleEncounterPulses`), so an early
+    // `liveEnemyCount() === 0` check would advance the step in the gap before
+    // the first pulse fires.
+    // Player paced the wave — fire the next pulse early instead of waiting
+    // out the scheduled interval. No-op when there's still a live enemy or no
+    // pending pulses, so this is cheap to call every frame.
+    this.tryAdvancePulseIfClear()
+
+    const allEnemiesSpawned = this.encounterEnemies.length >= this.encounterTotalPlanned
+    const allEnemiesDead = allEnemiesSpawned && this.liveEnemyCount() === 0
     if (allEnemiesDead) {
       this.advanceStep(1)
     }
 
-    // Combat prompt only during the initial Eliminate phase. Once step 1 has
-    // completed, chase enemies spawned during extraction are alive but the
+    // Combat prompt while the initial Defend phase is still resolving — both
+    // while enemies are still spawning and while any are alive. Once step 1
+    // has completed, chase enemies spawned during extraction are alive but the
     // player should still see the recruit reticle / chase alert — not the
     // generic "PROTECT THE SURVIVORS" combat text every frame.
     if (!allEnemiesDead && this._steps[1]?.complete !== true) {
@@ -956,11 +973,13 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
   }
 
   /**
-   * Schedule the encounter roster as paced pulses through {@link Timer.sequence}.
-   * Begins after {@link ENCOUNTER_INITIAL_DELAY} so the FPS scene has a moment
-   * to load, then dribbles {@link ENCOUNTER_PULSE_SIZE} enemies per pulse over a
-   * window scaled by roster size (capped between
-   * {@link ENCOUNTER_MIN_DURATION} and {@link ENCOUNTER_MAX_DURATION}).
+   * Schedule the encounter roster as paced pulses. Starts after
+   * {@link ENCOUNTER_INITIAL_DELAY} so the FPS scene has a moment to load, then
+   * fires one pulse of {@link ENCOUNTER_PULSE_SIZE} enemies at a time. The
+   * inter-pulse interval is the upper bound — `tick()` calls
+   * {@link tryAdvancePulseIfClear} every frame, so if the player wipes the
+   * current wave fast the next pulse fires immediately rather than waiting
+   * out the timer.
    *
    * @param queue - Ordered enemy types to spawn.
    */
@@ -973,20 +992,63 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
       ENCOUNTER_MIN_DURATION,
       Math.min(ENCOUNTER_MAX_DURATION, queue.length * ENCOUNTER_SECONDS_PER_ENEMY),
     )
-    const interval = pulseCount > 1 ? totalDuration / (pulseCount - 1) : 0
-    const steps: Array<{ delay: number; fn: () => void }> = []
+    this.encounterPulseInterval = pulseCount > 1 ? totalDuration / (pulseCount - 1) : 0
     let cursor = 0
     for (let i = 0; i < pulseCount; i++) {
       const start = cursor
       const end = Math.min(queue.length, cursor + ENCOUNTER_PULSE_SIZE)
-      const slice = queue.slice(start, end)
+      this.pendingPulses.push(queue.slice(start, end))
       cursor = end
-      steps.push({
-        delay: i === 0 ? ENCOUNTER_INITIAL_DELAY : interval,
-        fn: () => this.firePulse(slice),
-      })
     }
-    this.encounterSpawnTimer = Timer.sequence(steps)
+    this.scheduleNextPulse(ENCOUNTER_INITIAL_DELAY)
+  }
+
+  /**
+   * Arm the next pending pulse with a max-delay timer. The pulse may also fire
+   * earlier via {@link tryAdvancePulseIfClear} when the live encounter is
+   * cleared. Idempotent — if a timer is already armed it stays armed.
+   *
+   * @param delay - Seconds to wait before firing if not interrupted by an early-clear.
+   */
+  private scheduleNextPulse(delay: number): void {
+    if (this.encounterSpawnTimer !== null) return
+    if (this.pendingPulses.length === 0) return
+    this.encounterSpawnTimer = Timer.after(delay, () => {
+      this.encounterSpawnTimer = null
+      this.fireNextPendingPulse()
+    })
+  }
+
+  /**
+   * Fire the next pending pulse if the live wave is already cleared. Lets the
+   * player pace the encounter — clear the current pulse fast and the next one
+   * arrives immediately rather than ticking out the scheduled interval.
+   * Called from {@link tick} every frame while the encounter is active.
+   */
+  private tryAdvancePulseIfClear(): void {
+    if (this.pendingPulses.length === 0) return
+    if (this.encounterEnemies.length === 0) return // initial pulse hasn't fired yet — let the boot delay run
+    if (this.liveEnemyCount() > 0) return
+    if (this.encounterSpawnTimer !== null) {
+      Timer.cancel(this.encounterSpawnTimer)
+      this.encounterSpawnTimer = null
+    }
+    this.fireNextPendingPulse()
+  }
+
+  /**
+   * Pop and fire the next queued pulse, then arm the timer for the one after.
+   * Bails when the encounter has been torn down so a late call can't resurrect
+   * enemies past failure / completion.
+   */
+  private fireNextPendingPulse(): void {
+    if (this._status !== 'active' || !this.encounterStarted) return
+    const slice = this.pendingPulses.shift()
+    if (!slice) return
+    this.firePulse(slice)
+    if (this.pendingPulses.length > 0) {
+      this.scheduleNextPulse(this.encounterPulseInterval)
+    }
   }
 
   /**
@@ -1483,6 +1545,7 @@ export class RescueMinigame implements MiniGame, MiniGameEvents {
       Timer.cancel(this.encounterSpawnTimer)
       this.encounterSpawnTimer = null
     }
+    this.pendingPulses.length = 0
   }
 
   private clearEnemyProjectiles(): void {

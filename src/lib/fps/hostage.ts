@@ -20,6 +20,22 @@ export const HOSTAGE_DEFAULT_HIT_RADIUS = 1.2
  */
 export const HOSTAGE_HIT_CENTER_Y = 0.95
 
+/**
+ * Vertical offset applied while incapacitated. The dying clip collapses the
+ * rig flat on the ground, so the kneeling-pose offset (~0.95m) puts the hit
+ * sphere above the visible body and forces the player to jump or shoot from
+ * above to revive. Anchoring near ground level keeps the sphere on the corpse.
+ */
+export const HOSTAGE_DEAD_HIT_CENTER_Y = 0.35
+
+/**
+ * Multiplier applied to {@link Hostage.hitRadius} while incapacitated. A
+ * horizontal corpse is wider than a kneeling rig is tall, so widening the
+ * sphere makes the SCI heal bolt connect with the silhouette without
+ * requiring a precise vertical-down shot.
+ */
+export const HOSTAGE_DEAD_HIT_RADIUS_SCALE = 1.45
+
 /** Configuration for constructing a {@link Hostage}. */
 export interface HostageConfig {
   /** Maximum health points (default {@link HOSTAGE_DEFAULT_MAX_HP}). */
@@ -50,11 +66,27 @@ export class Hostage {
   /** Maximum health points. */
   readonly maxHp: number
 
-  /** Collision radius for projectile hit checks. */
-  readonly hitRadius: number
+  /**
+   * Collision radius for projectile hit checks. Mutable: enlarged by
+   * {@link HOSTAGE_DEAD_HIT_RADIUS_SCALE} while incapacitated so the SCI heal
+   * bolt can connect with the horizontal corpse silhouette; restored on
+   * {@link revive}.
+   */
+  hitRadius: number
 
-  /** Meters above {@link position} for projectile / contact sphere center. */
-  readonly hitCenterOffsetY: number
+  /**
+   * Meters above {@link position} for projectile / contact sphere center.
+   * Mutable: dropped to {@link HOSTAGE_DEAD_HIT_CENTER_Y} while incapacitated
+   * so the hit sphere sits on the body lying on the ground rather than
+   * floating where the kneeling rig used to be; restored on {@link revive}.
+   */
+  hitCenterOffsetY: number
+
+  /** Alive-pose hit radius — preserved so {@link revive} can restore it. */
+  private readonly aliveHitRadius: number
+
+  /** Alive-pose hit center offset — preserved so {@link revive} can restore it. */
+  private readonly aliveHitCenterOffsetY: number
 
   /** Fired when HP reaches zero after damage. */
   onDeath: (() => void) | null = null
@@ -72,8 +104,10 @@ export class Hostage {
   constructor(config: Partial<HostageConfig> = {}) {
     this.maxHp = config.maxHp ?? HOSTAGE_DEFAULT_MAX_HP
     this.hp = this.maxHp
-    this.hitRadius = config.hitRadius ?? HOSTAGE_DEFAULT_HIT_RADIUS
-    this.hitCenterOffsetY = config.hitCenterOffsetY ?? HOSTAGE_HIT_CENTER_Y
+    this.aliveHitRadius = config.hitRadius ?? HOSTAGE_DEFAULT_HIT_RADIUS
+    this.aliveHitCenterOffsetY = config.hitCenterOffsetY ?? HOSTAGE_HIT_CENTER_Y
+    this.hitRadius = this.aliveHitRadius
+    this.hitCenterOffsetY = this.aliveHitCenterOffsetY
   }
 
   /** World Y of the projectile hit sphere center. */
@@ -104,6 +138,8 @@ export class Hostage {
     if (!this.alive) return
     this.hp = Math.max(0, this.hp - amount)
     if (this.hp <= 0) {
+      this.hitCenterOffsetY = HOSTAGE_DEAD_HIT_CENTER_Y
+      this.hitRadius = this.aliveHitRadius * HOSTAGE_DEAD_HIT_RADIUS_SCALE
       this.onDeath?.()
     }
   }
@@ -127,6 +163,8 @@ export class Hostage {
   revive(): void {
     if (this.alive) return
     this.hp = this.maxHp
+    this.hitCenterOffsetY = this.aliveHitCenterOffsetY
+    this.hitRadius = this.aliveHitRadius
     this.onRevive?.()
   }
 }

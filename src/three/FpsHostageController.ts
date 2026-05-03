@@ -171,12 +171,21 @@ export class HostageInstance {
   /**
    * @param hostage - Shared HP state
    * @param model - GLB instance
-   * @param onRemoveFromSystems - Unregister from projectile systems
+   * @param onIncapacitated - Controller-side cleanup when the hostage drops
+   *                         (walker teardown + survivor-lost event). Does NOT
+   *                         unregister the hostage from projectile systems —
+   *                         the corpse stays registered so a SCI bolt can
+   *                         revive it. Combat / enemy paths already skip
+   *                         `!hostage.alive`.
+   * @param onRevived - Controller-side cleanup when {@link revive} restores
+   *                    the hostage. Re-arms walker eligibility and emits the
+   *                    revive event so HUDs can refresh counts.
    */
   constructor(
     hostage: Hostage,
     model: HostageModel,
-    private readonly onRemoveFromSystems: (h: Hostage) => void,
+    private readonly onIncapacitated: (h: Hostage) => void,
+    private readonly onRevived: (h: Hostage) => void,
   ) {
     this.hostage = hostage
     this.model = model
@@ -207,6 +216,9 @@ export class HostageInstance {
     this.hostage.onDeath = () => {
       this.markDead()
     }
+    this.hostage.onRevive = () => {
+      this.revive()
+    }
   }
 
   /**
@@ -231,16 +243,34 @@ export class HostageInstance {
   }
 
   /**
-   * Mark the instance as dead: drop projectile collisions and HP bar, then play
-   * the dying clip. The model itself stays visible so the corpse remains in the
-   * scene (the dying clip clamps on its last frame).
+   * Mark the instance as incapacitated: hide the HP bar, play the dying clip,
+   * and notify the controller for walker teardown + survivor-lost event. The
+   * corpse stays visible (the dying clip clamps on its last frame) and stays
+   * registered with the projectile systems so a SCI bolt can revive it via
+   * {@link revive} — combat paths already skip `!hostage.alive`.
    */
   markDead(): void {
     if (this.dead) return
     this.dead = true
-    this.onRemoveFromSystems(this.hostage)
     this.sprite.visible = false
     void this.model.playDying()
+    this.onIncapacitated(this.hostage)
+  }
+
+  /**
+   * Bring an incapacitated hostage back online: re-show the HP bar and notify
+   * the controller so HUDs can refresh the alive count. The model stays in its
+   * dying-clip clamped pose until the controller auto-recruits the survivor;
+   * `recruit()` will then trigger `playStandUp` → `playWalking`, so the visual
+   * goes straight from collapsed-on-ground to walking to the lander, skipping
+   * the praying loop and the player [E] release prompt.
+   */
+  revive(): void {
+    if (!this.dead) return
+    this.dead = false
+    this.sprite.visible = true
+    this.syncHpBarIfNeeded(true)
+    this.onRevived(this.hostage)
   }
 
   /** @returns Whether this instance is still an active rescue target (excludes mid-board fade) */
@@ -345,6 +375,13 @@ export class FpsHostageController implements Tickable {
   private readonly scene: THREE.Scene
   private readonly heightmap: Heightmap
   private readonly instances: HostageInstance[] = []
+  /**
+   * Mirror of {@link instances} flattened to the underlying {@link Hostage}
+   * domain entities. Maintained alongside `instances` mutations so
+   * {@link getHostageEntitiesForDirector} can return a stable reference
+   * without allocating a new array each frame.
+   */
+  private readonly hostageRefs: Hostage[] = []
   private readonly walkers = new Map<Hostage, HostageWalker>()
   private projectileSystem: ProjectileSystem | null = null
   private enemyProjectileSystem: EnemyProjectileSystem | null = null
@@ -359,6 +396,16 @@ export class FpsHostageController implements Tickable {
 
   /** Fired when a recruited walker boards the lander. */
   onSurvivorAboard: ((aboardCount: number) => void) | null = null
+
+  /**
+   * Fired when an incapacitated hostage is revived (e.g. SCI bolt heal).
+   * Receives the revived domain entity plus the post-revive count of hostages
+   * currently alive AND not yet aboard. The hostage handle lets the consuming
+   * minigame auto-recruit the revived survivor (skipping the kneel-and-press-E
+   * release flow) so the player isn't forced to round-trip through the heal
+   * step a second time.
+   */
+  onSurvivorRevived: ((hostage: Hostage, aliveRemaining: number) => void) | null = null
 
   /**
    * @param scene - Scene the hostage groups are added to
@@ -432,6 +479,23 @@ export class FpsHostageController implements Tickable {
   }
 
   /**
+   * Whether every tracked hostage — alive AND incapacitated — has full HP.
+   * Used by the rescue heal-step gate so the player must revive every downed
+   * survivor (SCI heal bolt → revive at maxHp) before the step auto-completes,
+   * instead of letting the gate clear on the living count alone and skipping
+   * the dead. Walkers mid-board are excluded (they're already extracted).
+   */
+  areAllTrackedHostagesAtFullHealth(): boolean {
+    let counted = 0
+    for (const inst of this.instances) {
+      if (inst.isBoarding) continue
+      counted++
+      if (inst.hostage.hp < inst.hostage.maxHp) return false
+    }
+    return counted > 0
+  }
+
+  /**
    * Alive {@link Hostage} entities for {@link EnemyDirector.setHostageTargets}.
    */
   getHostages(): readonly Hostage[] {
@@ -441,9 +505,13 @@ export class FpsHostageController implements Tickable {
   /**
    * All hostage entities (including dead) for {@link EnemyDirector} — the director
    * skips `!alive` each tick while positions are still updated from visuals.
+   *
+   * Returns the cached `hostageRefs` mirror so per-frame consumers
+   * (e.g. `RescueMinigame.syncEnemySimulation`) get a stable reference without
+   * allocating a fresh array each tick.
    */
   getHostageEntitiesForDirector(): readonly Hostage[] {
-    return this.instances.map((i) => i.hostage)
+    return this.hostageRefs
   }
 
   /**
@@ -453,6 +521,22 @@ export class FpsHostageController implements Tickable {
    */
   getInstanceFor(hostage: Hostage): HostageInstance | undefined {
     return this.instances.find((i) => i.hostage === hostage)
+  }
+
+  /**
+   * World-space (X, Z) anchors for active (alive, not-aboard) hostages. Used by
+   * the level HUD to mark survivors on the compass strip and tactical map so
+   * the player can find them in rough terrain. Allocates a fresh array per
+   * call — only call from low-rate UI polls, not the per-frame sim loop.
+   */
+  getHostageMarkers(): readonly { x: number; z: number }[] {
+    const out: { x: number; z: number }[] = []
+    for (const inst of this.instances) {
+      if (!inst.isActive()) continue
+      const p = inst.hostage.position
+      out.push({ x: p.x, z: p.z })
+    }
+    return out
   }
 
   /**
@@ -480,6 +564,7 @@ export class FpsHostageController implements Tickable {
       this.scene.remove(inst.model.group)
     }
     this.instances.length = 0
+    this.hostageRefs.length = 0
     this.walkers.clear()
     this._aboardCount = 0
   }
@@ -592,6 +677,7 @@ export class FpsHostageController implements Tickable {
           inst.dispose()
           this.scene.remove(inst.model.group)
           this.instances.splice(idx, 1)
+          this.hostageRefs.splice(idx, 1)
           this.walkers.delete(hostage)
         }
       } else {
@@ -619,22 +705,32 @@ export class FpsHostageController implements Tickable {
 
     const { hitCenterOffsetY, hitRadius } = computeHostageHitFromMeshRoot(model)
     const hostage = new Hostage({ hitCenterOffsetY, hitRadius })
-    const inst = new HostageInstance(hostage, model, (h) => {
-      this.projectileSystem?.removeHostage(h)
-      this.enemyProjectileSystem?.removeHostage(h)
-      const walker = this.walkers.get(h)
-      if (walker) {
-        walker.finished = true
-        this.walkers.delete(h)
-      }
-      this.onSurvivorLost?.(this.aliveCountNotAboard)
-    })
+    const inst = new HostageInstance(
+      hostage,
+      model,
+      (h) => {
+        // Tear down any in-progress extraction so the corpse stops walking,
+        // but keep the hostage registered with projectile systems so a SCI
+        // heal bolt can still find and revive it. Combat paths skip
+        // `!hostage.alive` already, so the corpse is safe from further damage.
+        const walker = this.walkers.get(h)
+        if (walker) {
+          walker.finished = true
+          this.walkers.delete(h)
+        }
+        this.onSurvivorLost?.(this.aliveCountNotAboard)
+      },
+      (h) => {
+        this.onSurvivorRevived?.(h, this.aliveCountNotAboard)
+      },
+    )
     inst.syncAnchorToGroup()
 
     this.projectileSystem?.addHostage(hostage)
     this.enemyProjectileSystem?.addHostage(hostage)
 
     this.instances.push(inst)
+    this.hostageRefs.push(hostage)
     this.scene.add(model.group)
 
     if (animateReveal) {
