@@ -24,6 +24,7 @@ const EMPTY_ACHIEVEMENT_STATS: PlayerAchievementStats = {
   lifetimeCreditsSpent: 0,
   lifetimeTradeCreditsEarned: 0,
   missionObjectivesCompletedByType: {},
+  runtimeTipsShownCount: {},
   slingshotLaunches: 0,
   slingshotLaunchesByBody: {},
   gravitySurfStarts: 0,
