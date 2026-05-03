@@ -402,6 +402,8 @@ const cosmeticShopDialogVisible = ref(false)
 const cosmeticPremiumSession = shallowRef<PremiumTradeSession | null>(null)
 const cosmeticShopButtonVisible = ref(false)
 const cosmeticShuttlePreviewUrl = ref<string | null>(null)
+const cosmeticLanderPreviewUrl = ref<string | null>(null)
+const cosmeticMultitoolPreviewUrl = ref<string | null>(null)
 const shopSession = ref<ShopSession | null>(null)
 const shopProfile = ref<PlayerProfile>(createProfile('Pilot'))
 const playerProfileSnapshot = ref<PlayerProfile>(createProfile('Pilot'))
@@ -944,11 +946,11 @@ onMounted(async () => {
       if (session) {
         cosmeticPremiumSession.value = session
         cosmeticShopDialogVisible.value = true
-        cosmeticShuttlePreviewUrl.value = viewController.captureShuttleCosmeticPreviewDataUrl()
+        void refreshCosmeticVehiclePreviews()
       } else {
         cosmeticPremiumSession.value = null
         cosmeticShopDialogVisible.value = false
-        cosmeticShuttlePreviewUrl.value = null
+        clearCosmeticVehiclePreviews()
       }
     }
     viewController.onCreditsUpdate = (credits) => {
@@ -1272,20 +1274,35 @@ function openCosmeticShop(): void {
   viewController.openCosmeticShop()
 }
 
+async function refreshCosmeticVehiclePreviews(): Promise<void> {
+  cosmeticShuttlePreviewUrl.value = viewController.captureShuttleCosmeticPreviewDataUrl()
+  cosmeticLanderPreviewUrl.value = viewController.captureLanderCosmeticPreviewDataUrl()
+  await viewController.preloadMultitoolCosmeticPreview()
+  cosmeticMultitoolPreviewUrl.value = viewController.captureMultitoolCosmeticPreviewDataUrl()
+}
+
+function clearCosmeticVehiclePreviews(): void {
+  cosmeticShuttlePreviewUrl.value = null
+  cosmeticLanderPreviewUrl.value = null
+  cosmeticMultitoolPreviewUrl.value = null
+}
+
 function closeCosmeticShop(): void {
   cosmeticShopDialogVisible.value = false
-  cosmeticShuttlePreviewUrl.value = null
+  clearCosmeticVehiclePreviews()
   viewController.closeCosmeticShop()
 }
 
 function handleCosmeticPurchaseOption(optionId: string): void {
   viewController.cosmeticPurchaseOption(optionId)
   syncPersistentProgressFromController()
+  void refreshCosmeticVehiclePreviews()
 }
 
 function handleCosmeticApplyOption(optionId: string): void {
   viewController.cosmeticApplyOption(optionId)
   syncPersistentProgressFromController()
+  void refreshCosmeticVehiclePreviews()
 }
 
 function handleCosmeticRenameShuttle(rawTitle: string): void {
@@ -2011,6 +2028,8 @@ watch(
       :inventory="shopInventory"
       :premium-session="cosmeticPremiumSession"
       :shuttle-preview-url="cosmeticShuttlePreviewUrl"
+      :lander-preview-url="cosmeticLanderPreviewUrl"
+      :multitool-preview-url="cosmeticMultitoolPreviewUrl"
       @close="closeCosmeticShop"
       @purchase-option="handleCosmeticPurchaseOption"
       @apply-option="handleCosmeticApplyOption"

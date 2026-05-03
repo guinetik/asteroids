@@ -152,10 +152,10 @@ Catalog treatment:
 
 | Option | Stops | Model treatment |
 | --- | --- | --- |
-| `Fleet Issue` | `#e7e5e4`, `#78716c`, `#292524` | Light stock chassis, stone trigger/lock, dark subdued indicators. |
-| `Arcade Relic` | `#7c3aed`, `#22c55e`, `#fef9c3` | Purple chassis, green trigger/lock or display-adjacent hardware, warm cream LEDs / labels. If cream reads too flat on emissive nodes, use green for emissive and cream for small trim. |
-| `Surgical Pink` | `#ffffff`, `#f472b6`, `#fda4af` | White chassis, shock-pink trigger/lock, rose LED tint. This is the cleanest match for the current single-body mesh. |
-| `Graphite Bloom` | `#111827`, `#64748b`, `#c084fc` | Dark graphite chassis, slate trigger/lock, violet emissive indicators. Best candidate for an oil-slick feel if a later finish recipe can lower roughness and add a small purple rim. |
+| `Fleet Issue` | `#e7e5e4`, `#78716c`, `#292524` | Tint mode (legacy LERP) — light stock chassis, stone trigger/lock, dark subdued indicators. Authored finish preserved. |
+| `Arcade Relic` | `#7c3aed`, `#22c55e`, `#fef9c3` | Replace mode — matte purple cabinet vinyl body (`metal 0.05 / rough 0.70`), CRT-green emissive glass trigger (`metal 0 / rough 0.20`, emissive `#22c55e` @ 0.35), worn cream plastic lock (`metal 0 / rough 0.85`). |
+| `Surgical Pink` | `#fbcfe8`, `#ec4899`, `#fdf2f8` | Replace mode — soft pink ceramic chassis (`metal 0.10 / rough 0.30`), shock-pink lacquer trigger (`metal 0.15 / rough 0.25`), near-white sterile lock (`metal 0.05 / rough 0.35`). Body color shifted off pure white so the saturation boost actually engages (greys are skipped by the boost guard). |
+| `Graphite Bloom` | `#111827`, `#64748b`, `#c084fc` | Replace mode — brushed graphite frame (`metal 0.70 / rough 0.45`), polished slate steel trigger (`metal 0.85 / rough 0.30`), iridescent lavender chrome lock (`metal 0.95 / rough 0.18`). |
 
 Multitool caveat: because the main body is one baked mesh and one material, we cannot isolate grip
 panels, muzzle casing, rails, or decals by name today. The later high-quality path is to split the

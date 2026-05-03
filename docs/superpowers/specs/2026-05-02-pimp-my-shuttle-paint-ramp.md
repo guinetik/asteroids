@@ -51,6 +51,16 @@ RCS scaffolding is matched on the secondary branch *before* the looser `rcs `
 prefix on the engine branch, so it doesn't get vacuumed up by the engine
 match.
 
+Channel-to-node mapping for the multitool GLB (named nodes from
+`src/data/multitool/identified-parts.json`; LEDs and power indicators are
+explicitly excluded so functional readouts never receive paint):
+
+| Channel    | GLB node name            | Real-world part         |
+| ---------- | ------------------------ | ----------------------- |
+| primary    | `pistol_body`            | Main grip + frame       |
+| secondary  | `pistol_trigger`         | Trigger                 |
+| trim       | `pistol_trigger_lock`    | Trigger lock / safety   |
+
 The result: a buttery gradient on the shop card, three flat color bands on the
 ship. The store thumbnail never matched the actual ship paint.
 
@@ -101,13 +111,14 @@ updatePaintRampTexture(material, tex)      ← swap on subsequent paint applies
 
 ## Per-vehicle wiring
 
-| Vehicle                 | Ramp axis | Mode    | Ramp str | Detail str | Diffuse map      |
-| ----------------------- | --------- | ------- | -------- | ---------- | ---------------- |
-| Shuttle (Factory Stock) | `x`       | bypass  | 0        | 0          | restored (GLB)   |
-| Shuttle (paid paints)   | `x`       | replace | 0.35     | 0.55       | dropped (`null`) |
-| Lander (Factory Stock)  | `y`       | tint    | 0.22     | 0          | preserved        |
-| Lander (paid paints)    | `y`       | replace | 0.30     | 0          | preserved (none in GLB) |
-| Multitool               | `y`       | tint    | 0.26     | 0          | preserved        |
+| Vehicle                  | Ramp axis | Mode    | Ramp str | Detail str | Detail weights | Diffuse map      |
+| ------------------------ | --------- | ------- | -------- | ---------- | -------------- | ---------------- |
+| Shuttle (Factory Stock)  | `x`       | bypass  | 0        | 0          | (1, 1, 1)      | restored (GLB)   |
+| Shuttle (paid paints)    | `x`       | replace | 0.35     | 0.55       | (1, 1, 1)      | dropped (`null`) |
+| Lander (Factory Stock)   | `y`       | tint    | 0.22     | 0          | (1, 1, 1)      | preserved        |
+| Lander (paid paints)     | `y`       | replace | 0.30     | 0          | (1, 1, 1)      | preserved (none in GLB) |
+| Multitool (Fleet Issue)  | `y`       | tint    | 0.26     | 0          | (0, 0, 0)      | preserved        |
+| Multitool (paid paints)  | `y`       | replace | 0.32     | 0.50       | (0, 0, 1)      | preserved (none in GLB) |
 
 Lander paid paints reuse the shuttle's replace-mode pipeline (full color
 override + saturation boost + finish profile + Fresnel rim → bloom + base
@@ -117,6 +128,20 @@ variety, and procedural seams at lander scale would compete with the real
 geometry rather than add to it. Lander Factory Stock keeps the legacy LERP
 path so the bundled lander stays subtle (otherwise everyone would feel pushed
 to buy a paint just to see chroma on the hull).
+
+Multitool paid paints reuse the same replace-mode pipeline (full color
+override + saturation boost + per-paint PBR finish) but skip rim glow and
+base glow entirely: the multitool lives on the dedicated FPS view-model layer
+with its own three-light rig (sun + fill + rim — see `LevelLightingRig`), is
+parented ~0.7 units from the camera, and is never silhouetted against dark
+space. A Fresnel rim at HDR levels at that distance would just over-bloom the
+viewport, and base glow is unnecessary because viewmodel lighting already
+prevents the prop from going dark. Procedural detail is restricted to **grain
+only** — no panel seams, no scuff cells — because the multitool is a
+mechanical injection-mould prop, not a panelled hull, and adding seams to a
+seamless prop would lie about its construction. Fleet Issue keeps the legacy
+LERP path with detail weights `(0, 0, 0)` so swapping back from a paid paint
+fully restores the authored finish without leaking grain.
 
 ## Per-paint finish profile (shuttle, replace mode)
 
@@ -149,6 +174,21 @@ Lander paid paints (channels: primary / secondary / trim / **engine**):
 | Frostbite Safety | 0.55 / 0.35         | 0.85 / 0.20      | safety yellow `#fef08a`  |
 | Mariner Red      | 0.70 / 0.25         | 0.95 / 0.12      | red `#dc2626`            |
 | Hazard Bloom     | 0.50 / 0.45         | 0.80 / 0.25      | acid green `#84cc16`     |
+
+Multitool paid paints (channels: primary / secondary / trim — no engine, no
+rim, no base glow):
+
+| Paint           | default metal/rough/env  | secondary metal/rough/env  | trim metal/rough/env       | secondary emissive       |
+| --------------- | ------------------------ | -------------------------- | -------------------------- | ------------------------ |
+| Arcade Relic    | 0.05 / 0.70 / 0.6 (matte plastic) | 0.00 / 0.20 / 1.4 (CRT glass)    | 0.00 / 0.85 / 0.5 (worn cream) | CRT green `#22c55e` @ 0.35 |
+| Surgical Pink   | 0.10 / 0.30 / 1.2 (ceramic)       | 0.15 / 0.25 / 1.4 (lacquer)      | 0.05 / 0.35 / 1.1 (sterile)    | (none — clinical)        |
+| Graphite Bloom  | 0.70 / 0.45 / 1.0 (brushed metal) | 0.85 / 0.30 / 1.3 (polished steel) | 0.95 / 0.18 / 1.6 (chrome)   | (none — iridescent)      |
+
+The multitool's finish chain (`channel block → default block → fallback →
+authored stock`) is identical to the shuttle/lander, but the fallback is
+"mid-grade plastic" (`metalness 0.4, roughness 0.5, envMap 1.0`) rather than
+the lander's "aluminum panel" because most multitool paints sit closer to
+plastic than to metal aerospace skin.
 
 Per-channel paint colors are also pushed through an HSL saturation boost of
 `+0.12` so they read more vividly against the GLB lighting (greys are skipped
@@ -254,8 +294,8 @@ paints read at full chroma now that the stock diffuse map no longer competes
 with them.
 
 - **Tint mode** layers the ramp on top of the authored albedo and lerps the
-  per-channel paint color into it at low strength. Used by multitool, and by
-  the lander's Factory Stock (paid lander paints now use replace mode).
+  per-channel paint color into it at low strength. Used by Fleet Issue
+  (multitool) and Factory Stock (lander).
 - **Replace mode** drops the diffuse map when the GLB has one
   (`material.map = null`) and lets `material.color * paintRamp * paintDetail`
   carry all surface color. Procedural panel seams + scuffs + grain in the
@@ -263,6 +303,9 @@ with them.
   provide. The lander GLB carries no diffuse map to begin with so there's
   nothing to drop, and the procedural detail is left at `0` because the
   lander's geometric panel breaks already supply visual variety at its scale.
+  The multitool replace mode dials `detailWeights` to `(0, 0, 1)` to keep
+  grain only — seams and scuff cells would lie on top of injection-mould
+  geometry that has none.
 - **Bypass mode** sets ramp + detail strengths to 0 so the OBC chunk multiplies
   by `1.0` and `1.0` — the material renders identically to its authored GLB
   pipeline (no shader recompile required).
@@ -277,11 +320,16 @@ ramp shader doesn't need access to the live scene graph.
 ## Files
 
 - `src/three/cosmetics/paintRampShader.ts` — texture builder + OBC injector,
-  optional `detailStrength` for procedural panel seams + scuffs.
+  optional `detailStrength` master plus per-component `detailWeights`
+  (`seam`, `scuff`, `grain`) so non-panelled props can opt out of seams while
+  keeping grain.
 - `src/three/cosmetics/shuttlePaintMaterials.ts` — replace mode + Factory Stock
   branch (used by the arrival sequence preview).
-- `src/three/cosmetics/landerPaintMaterials.ts` — lander paint + ramp (tint mode).
-- `src/three/cosmetics/multitoolPaintMaterials.ts` — multitool paint + ramp (tint mode).
+- `src/three/cosmetics/landerPaintMaterials.ts` — lander paint + ramp
+  (tint for Factory Stock, replace for paid).
+- `src/three/cosmetics/multitoolPaintMaterials.ts` — multitool paint + ramp
+  (tint for Fleet Issue, replace + grain-only detail for paid; no rim, no base
+  glow).
 - `src/three/ShuttleController.ts` — mirrors the replace-mode pipeline for the
   in-flight shuttle (the controller has its own per-material book-keeping
   separate from the standalone module).

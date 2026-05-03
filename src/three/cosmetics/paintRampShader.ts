@@ -31,6 +31,13 @@ const rampTextureCache = new Map<string, THREE.CanvasTexture>()
 const PAINT_RIM_DEFAULT_COLOR = /* @__PURE__ */ new THREE.Color(0xffffff)
 /** Default Fresnel exponent — sharp halo at silhouette edges, dim across hull faces. */
 const PAINT_RIM_POWER_DEFAULT = 2.5
+/**
+ * Default per-component detail weights `(seam, scuff, grain)`. All on means
+ * "ship hull" character (panelled metal). Multitool / lander callers can dial
+ * components to zero to skip them — e.g. a held mechanical prop wants grain
+ * only, no panel seams.
+ */
+const PAINT_DETAIL_WEIGHTS_DEFAULT = /* @__PURE__ */ new THREE.Vector3(1, 1, 1)
 
 /** Local-space axis the ramp samples along. */
 export type PaintRampAxis = 'x' | 'y' | 'z'
@@ -71,6 +78,13 @@ export interface PaintRampShaderConfig {
    * detail must come from the shader instead of baked artwork.
    */
   readonly detailStrength?: number
+  /**
+   * Per-component detail weights `(seam, scuff, grain)` multiplied on top of
+   * `detailStrength`. Default `(1, 1, 1)` keeps the original ship-hull look.
+   * Setting a component to zero turns just that component off — e.g. the
+   * multitool sets `(0, 0, 1)` for grain-only on a non-panelled prop. Optional.
+   */
+  readonly detailWeights?: THREE.Vector3
   /**
    * Optional rim-light tint (added to `totalEmissiveRadiance`). When omitted or
    * `rimIntensity` is zero, the rim contribution is short-circuited to zero so
@@ -113,6 +127,8 @@ interface PaintRampUniformBag {
   readonly uPaintRampMatrix: { value: THREE.Matrix4 }
   /** Procedural detail overlay strength (0 = off). */
   readonly uPaintDetailStrength: { value: number }
+  /** Per-component detail weights `(seam, scuff, grain)`. Default `(1, 1, 1)`. */
+  readonly uPaintDetailWeights: { value: THREE.Vector3 }
   /** Rim-light color added to `totalEmissiveRadiance`. */
   readonly uPaintRimColor: { value: THREE.Color }
   /** Rim-light strength. 0 = off (multiplied with the Fresnel term). */
@@ -254,6 +270,7 @@ export function applyPaintRampShader(
   const existing = userData.paintRampUniforms
   const axisChanged = userData.paintRampAxis !== undefined && userData.paintRampAxis !== config.axis
   const detailStrength = config.detailStrength ?? 0
+  const detailWeights = config.detailWeights ?? PAINT_DETAIL_WEIGHTS_DEFAULT
   const rimIntensity = config.rimIntensity ?? 0
   const rimPower = config.rimPower ?? PAINT_RIM_POWER_DEFAULT
   const rimBias = config.rimBias ?? 0
@@ -266,6 +283,7 @@ export function applyPaintRampShader(
     existing.uPaintRampStrength.value = config.strength
     existing.uPaintRampMatrix.value.copy(config.meshToVehicleLocal)
     existing.uPaintDetailStrength.value = detailStrength
+    existing.uPaintDetailWeights.value.copy(detailWeights)
     existing.uPaintRimColor.value.copy(rimColor)
     existing.uPaintRimIntensity.value = rimIntensity
     existing.uPaintRimPower.value = rimPower
@@ -282,6 +300,7 @@ export function applyPaintRampShader(
     uPaintRampStrength: { value: config.strength },
     uPaintRampMatrix: { value: config.meshToVehicleLocal.clone() },
     uPaintDetailStrength: { value: detailStrength },
+    uPaintDetailWeights: { value: detailWeights.clone() },
     uPaintRimColor: { value: rimColor.clone() },
     uPaintRimIntensity: { value: rimIntensity },
     uPaintRimPower: { value: rimPower },
@@ -299,6 +318,7 @@ export function applyPaintRampShader(
     shader.uniforms.uPaintRampStrength = uniforms.uPaintRampStrength
     shader.uniforms.uPaintRampMatrix = uniforms.uPaintRampMatrix
     shader.uniforms.uPaintDetailStrength = uniforms.uPaintDetailStrength
+    shader.uniforms.uPaintDetailWeights = uniforms.uPaintDetailWeights
     shader.uniforms.uPaintRimColor = uniforms.uPaintRimColor
     shader.uniforms.uPaintRimIntensity = uniforms.uPaintRimIntensity
     shader.uniforms.uPaintRimPower = uniforms.uPaintRimPower
@@ -333,6 +353,7 @@ export function applyPaintRampShader(
           'uniform vec2 uPaintRampBounds;',
           'uniform float uPaintRampStrength;',
           'uniform float uPaintDetailStrength;',
+          'uniform vec3 uPaintDetailWeights;',
           'uniform vec3 uPaintRimColor;',
           'uniform float uPaintRimIntensity;',
           'uniform float uPaintRimPower;',
@@ -360,13 +381,16 @@ export function applyPaintRampShader(
           '    float seamCount = 8.0;',
           '    float seam = abs(fract(t * seamCount + 0.5) - 0.5);',
           '    float seamMask = smoothstep(0.0, 0.012, seam);',
-          '    float seamShade = mix(0.78, 1.0, seamMask);',
+          '    float seamShadeRaw = mix(0.78, 1.0, seamMask);',
+          '    float seamShade = mix(1.0, seamShadeRaw, uPaintDetailWeights.x);',
           '    vec2 scuffCell = floor(vPaintLocalPos.xy * 0.06);',
           '    float scuffNoise = paintHash21(scuffCell);',
-          '    float scuffShade = mix(0.94, 1.0, smoothstep(0.4, 0.78, scuffNoise));',
+          '    float scuffShadeRaw = mix(0.94, 1.0, smoothstep(0.4, 0.78, scuffNoise));',
+          '    float scuffShade = mix(1.0, scuffShadeRaw, uPaintDetailWeights.y);',
           '    vec2 grainCell = floor(vPaintLocalPos.xy * 0.4 + vPaintLocalPos.zz * 0.4);',
           '    float grainNoise = paintHash21(grainCell);',
-          '    float grainShade = mix(0.97, 1.0, grainNoise);',
+          '    float grainShadeRaw = mix(0.97, 1.0, grainNoise);',
+          '    float grainShade = mix(1.0, grainShadeRaw, uPaintDetailWeights.z);',
           '    paintDetail = vec3(seamShade * scuffShade * grainShade);',
           '    paintDetail = mix(vec3(1.0), paintDetail, uPaintDetailStrength);',
           '  }',
@@ -440,6 +464,26 @@ export function setPaintRampStrength(
   uniforms.uPaintRampStrength.value = strength
   uniforms.uPaintDetailStrength.value = detailStrength
   uniforms.uPaintBaseGlow.value = baseGlow
+}
+
+/**
+ * Update the per-component detail weights on an already-prepared material.
+ * Each component (`x`=seam, `y`=scuff, `z`=grain) is multiplied on top of the
+ * master `detailStrength`, so setting a component to zero kills only that
+ * component while leaving the others active. Used by the multitool to request
+ * grain-only detail (no panel seams on a non-panelled mechanical prop).
+ *
+ * @param material - Material previously prepared by {@link applyPaintRampShader}.
+ * @param weights - `(seam, scuff, grain)` weights — typically each in `[0, 1]`.
+ */
+export function setPaintRampDetailWeights(
+  material: THREE.Material,
+  weights: THREE.Vector3,
+): void {
+  const userData = material.userData as PaintRampUserData
+  const uniforms = userData.paintRampUniforms
+  if (!uniforms) return
+  uniforms.uPaintDetailWeights.value.copy(weights)
 }
 
 /**

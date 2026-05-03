@@ -472,6 +472,8 @@ export class ShuttleController implements Tickable, PortalVehicle {
   >()
   /** Cached axis bounds across all paintable shuttle meshes (vehicle-local space). */
   private shuttleRampBounds: PaintRampBounds | null = null
+  /** Loaded cargo-bay lander scene used for live display and cosmetic previews. */
+  private cargoLanderScene: THREE.Object3D | null = null
   private cargoLanderPaintMaterials: LanderPaintMaterialTarget[] = []
   private hullHealFeedbackTimer = 0
   private landerFuelTank: FuelTank | null = null
@@ -602,6 +604,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
     landerScene.scale.setScalar(CARGO_LANDER_SCALE)
     landerScene.position.copy(CARGO_LANDER_OFFSET)
     landerScene.rotation.set(0, 0, -Math.PI / 2)
+    this.cargoLanderScene = landerScene
     this.cargoLanderPaintMaterials = cloneAndCollectLanderPaintMaterials(landerScene)
     this.applySavedLanderPaintjob()
     gltf.scene.add(landerScene)
@@ -656,6 +659,13 @@ export class ShuttleController implements Tickable, PortalVehicle {
   applyShuttlePaintjobFromProfile(profile: PlayerProfile): void {
     const optionId = getPlayerCosmetics(profile).shuttlePaintjobId
     this.applyShuttlePaintjob(optionId)
+  }
+
+  /**
+   * Return the loaded cargo-bay lander subtree for static cosmetic preview capture.
+   */
+  getCargoLanderPreviewRoot(): THREE.Object3D | null {
+    return this.cargoLanderScene
   }
 
   /**
@@ -791,10 +801,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
    * @param material - Material to mutate.
    * @param finish - Resolved (default + channel) finish block.
    */
-  private applyStandardPbr(
-    material: THREE.Material,
-    finish: CosmeticFinishChannel,
-  ): void {
+  private applyStandardPbr(material: THREE.Material, finish: CosmeticFinishChannel): void {
     if (
       !(
         material instanceof THREE.MeshStandardMaterial ||
@@ -1604,10 +1611,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
    * @param material - Material to mutate.
    * @param map - Replacement texture, or `null` to drop the map entirely.
    */
-  private setMaterialDiffuseMap(
-    material: THREE.Material,
-    map: THREE.Texture | null,
-  ): void {
+  private setMaterialDiffuseMap(material: THREE.Material, map: THREE.Texture | null): void {
     if (
       !(
         material instanceof THREE.MeshStandardMaterial ||
@@ -1668,10 +1672,7 @@ export class ShuttleController implements Tickable, PortalVehicle {
    * @param material - Material to mutate.
    * @param paintColor - Cosmetic shader color for the material's channel.
    */
-  private applyMaterialPaintColorReplace(
-    material: THREE.Material,
-    paintColor: THREE.Color,
-  ): void {
+  private applyMaterialPaintColorReplace(material: THREE.Material, paintColor: THREE.Color): void {
     const materialColor = this.getMaterialColor(material)
     if (!materialColor) return
     const boosted = paintColor.clone()

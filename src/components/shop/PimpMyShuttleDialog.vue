@@ -29,6 +29,8 @@ const props = defineProps<{
   inventory: Inventory
   premiumSession: PremiumTradeSession
   shuttlePreviewUrl?: string | null
+  landerPreviewUrl?: string | null
+  multitoolPreviewUrl?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -56,11 +58,11 @@ const tabOrder = computed(() => {
     [
       'shuttle-paintjob',
       'lander-paintjob',
+      'multitool-paintjob',
       'shuttle-title',
       'vehicle-flag',
       'shuttle-thruster-trail',
       'lander-thruster-trail',
-      'multitool-paintjob',
     ] as unknown as CosmeticCategory[]
   ).forEach((id, index) => {
     order.set(id, index)
@@ -289,11 +291,7 @@ function normalizedTitleBlocked(): boolean {
             <span class="cosmetic-shop-header__credits"
               >CR {{ profile.credits.toLocaleString() }}</span
             >
-            <button
-              type="button"
-              class="ship-message-card__button"
-              @click="requestClose"
-            >
+            <button type="button" class="ship-message-card__button" @click="requestClose">
               Close
             </button>
           </div>
@@ -321,24 +319,58 @@ function normalizedTitleBlocked(): boolean {
                 :key="'cat-' + String(activeTab)"
                 class="cosmetic-shop-panel cosmetic-shop-panel--category"
               >
-                <div class="cosmetic-shop-panel__scroll">
-                  <div
-                    v-if="activeTab === 'shuttle-paintjob' && shuttlePreviewUrl"
-                    class="cosmetic-shuttle-preview"
-                  >
-                    <img
-                      class="cosmetic-shuttle-preview__image"
-                      :src="shuttlePreviewUrl"
-                      alt="Current shuttle paint preview"
-                    />
-                    <div class="cosmetic-shuttle-preview__meta">
-                      <span class="cosmetic-shuttle-preview__label">Current Shuttle Finish</span>
-                      <span class="cosmetic-shuttle-preview__name">{{
-                        findCosmeticOptionById(cosmetics.shuttlePaintjobId)?.label ??
-                        cosmetics.shuttlePaintjobId
-                      }}</span>
-                    </div>
+                <div
+                  v-if="activeTab === 'shuttle-paintjob' && shuttlePreviewUrl"
+                  class="cosmetic-vehicle-preview"
+                >
+                  <img
+                    class="cosmetic-vehicle-preview__image"
+                    :src="shuttlePreviewUrl"
+                    alt="Current shuttle paint preview"
+                  />
+                  <div class="cosmetic-vehicle-preview__meta">
+                    <span class="cosmetic-vehicle-preview__label">Current Shuttle Finish</span>
+                    <span class="cosmetic-vehicle-preview__name">{{
+                      findCosmeticOptionById(cosmetics.shuttlePaintjobId)?.label ??
+                      cosmetics.shuttlePaintjobId
+                    }}</span>
                   </div>
+                </div>
+                <div
+                  v-if="activeTab === 'lander-paintjob' && landerPreviewUrl"
+                  class="cosmetic-vehicle-preview"
+                >
+                  <img
+                    class="cosmetic-vehicle-preview__image"
+                    :src="landerPreviewUrl"
+                    alt="Current lander paint preview"
+                  />
+                  <div class="cosmetic-vehicle-preview__meta">
+                    <span class="cosmetic-vehicle-preview__label">Current Lander Finish</span>
+                    <span class="cosmetic-vehicle-preview__name">{{
+                      findCosmeticOptionById(cosmetics.landerPaintjobId)?.label ??
+                      cosmetics.landerPaintjobId
+                    }}</span>
+                  </div>
+                </div>
+                <div
+                  v-if="activeTab === 'multitool-paintjob' && multitoolPreviewUrl"
+                  class="cosmetic-vehicle-preview"
+                >
+                  <img
+                    class="cosmetic-vehicle-preview__image"
+                    :src="multitoolPreviewUrl"
+                    alt="Current multitool paint preview"
+                  />
+                  <div class="cosmetic-vehicle-preview__meta">
+                    <span class="cosmetic-vehicle-preview__label">Current Multitool Finish</span>
+                    <span class="cosmetic-vehicle-preview__name">{{
+                      findCosmeticOptionById(cosmetics.multitoolPaintjobId)?.label ??
+                      cosmetics.multitoolPaintjobId
+                    }}</span>
+                  </div>
+                </div>
+                <div class="cosmetic-shop-panel__scroll">
                   <p v-if="activePanelIntro.length > 0" class="cosmetic-shop-panel__intro">
                     {{ activePanelIntro }}
                   </p>

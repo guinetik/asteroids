@@ -82,8 +82,8 @@ export const SHUTTLE_COSMETIC_PREVIEW_FAR = 100000
 /** Distance multiplier from shuttle bounding-sphere radius to camera. */
 export const SHUTTLE_COSMETIC_PREVIEW_CAMERA_DISTANCE_MULTIPLIER = 3.2
 
-/** Minimum camera distance so tiny/incomplete bounds still render. */
-export const SHUTTLE_COSMETIC_PREVIEW_MIN_CAMERA_DISTANCE = 320
+/** Minimum bounding-sphere radius used when framing the shuttle thumbnail. */
+export const SHUTTLE_COSMETIC_PREVIEW_MIN_CAMERA_DISTANCE = 6
 
 /** Three-quarter camera offset, normalized before distance scaling. */
 export const SHUTTLE_COSMETIC_PREVIEW_CAMERA_OFFSET = new THREE.Vector3(0.78, 0.34, 1)
@@ -102,6 +102,84 @@ export const SHUTTLE_COSMETIC_PREVIEW_RIM_INTENSITY = 1.8
 
 /** Reusable camera target for shuttle thumbnail renders. */
 export const SHUTTLE_COSMETIC_PREVIEW_TARGET = new THREE.Vector3(0, 0, 0)
+
+/** Square pixel size for static lander shop thumbnails. */
+export const LANDER_COSMETIC_PREVIEW_SIZE_PX = 512
+
+/** PNG MIME type used for Vue-safe lander preview data URLs. */
+export const LANDER_COSMETIC_PREVIEW_MIME_TYPE = 'image/png'
+
+/** Preview camera field-of-view in degrees for the lander thumbnail. */
+export const LANDER_COSMETIC_PREVIEW_FOV_DEG = 34
+
+/** Preview camera near plane in model-space units for the lander thumbnail. */
+export const LANDER_COSMETIC_PREVIEW_NEAR = 0.1
+
+/** Preview camera far plane in model-space units for the lander thumbnail. */
+export const LANDER_COSMETIC_PREVIEW_FAR = 100000
+
+/** Distance multiplier from lander bounding-sphere radius to camera. */
+export const LANDER_COSMETIC_PREVIEW_CAMERA_DISTANCE_MULTIPLIER = 2.8
+
+/** Minimum bounding-sphere radius used when framing the lander thumbnail. */
+export const LANDER_COSMETIC_PREVIEW_MIN_CAMERA_DISTANCE = 3
+
+/** Three-quarter camera offset, normalized before distance scaling. */
+export const LANDER_COSMETIC_PREVIEW_CAMERA_OFFSET = new THREE.Vector3(0.7, 0.42, 1)
+
+/** Background color behind the lander thumbnail. */
+export const LANDER_COSMETIC_PREVIEW_BACKGROUND = '#080b16'
+
+/** Low ambient fill so dark lander panels remain readable. */
+export const LANDER_COSMETIC_PREVIEW_AMBIENT_INTENSITY = 1.7
+
+/** Main key light intensity for the static lander thumbnail. */
+export const LANDER_COSMETIC_PREVIEW_KEY_INTENSITY = 3.6
+
+/** Cool rim light intensity to reveal the lander silhouette. */
+export const LANDER_COSMETIC_PREVIEW_RIM_INTENSITY = 2
+
+/** Reusable camera target for lander thumbnail renders. */
+export const LANDER_COSMETIC_PREVIEW_TARGET = new THREE.Vector3(0, 0, 0)
+
+/** Square pixel size for static multitool shop thumbnails. */
+export const MULTITOOL_COSMETIC_PREVIEW_SIZE_PX = 512
+
+/** PNG MIME type used for Vue-safe multitool preview data URLs. */
+export const MULTITOOL_COSMETIC_PREVIEW_MIME_TYPE = 'image/png'
+
+/** Preview camera field-of-view in degrees for the multitool thumbnail. */
+export const MULTITOOL_COSMETIC_PREVIEW_FOV_DEG = 32
+
+/** Preview camera near plane in model-space units for the multitool thumbnail. */
+export const MULTITOOL_COSMETIC_PREVIEW_NEAR = 0.1
+
+/** Preview camera far plane in model-space units for the multitool thumbnail. */
+export const MULTITOOL_COSMETIC_PREVIEW_FAR = 100000
+
+/** Distance multiplier from multitool bounding-sphere radius to camera. */
+export const MULTITOOL_COSMETIC_PREVIEW_CAMERA_DISTANCE_MULTIPLIER = 2.6
+
+/** Minimum bounding-sphere radius used when framing the multitool thumbnail. */
+export const MULTITOOL_COSMETIC_PREVIEW_MIN_CAMERA_DISTANCE = 2
+
+/** Three-quarter camera offset, normalized before distance scaling. */
+export const MULTITOOL_COSMETIC_PREVIEW_CAMERA_OFFSET = new THREE.Vector3(0.62, 0.28, 1)
+
+/** Background color behind the multitool thumbnail. */
+export const MULTITOOL_COSMETIC_PREVIEW_BACKGROUND = '#080b16'
+
+/** Low ambient fill so dark multitool panels remain readable. */
+export const MULTITOOL_COSMETIC_PREVIEW_AMBIENT_INTENSITY = 1.7
+
+/** Main key light intensity for the static multitool thumbnail. */
+export const MULTITOOL_COSMETIC_PREVIEW_KEY_INTENSITY = 3.8
+
+/** Cool rim light intensity to reveal the multitool silhouette. */
+export const MULTITOOL_COSMETIC_PREVIEW_RIM_INTENSITY = 2
+
+/** Reusable camera target for multitool thumbnail renders. */
+export const MULTITOOL_COSMETIC_PREVIEW_TARGET = new THREE.Vector3(0, 0, 0)
 
 /** Approximate local-space shuttle size before map scaling. */
 export const MAP_SHUTTLE_BASE_SIZE = 14
@@ -568,6 +646,32 @@ export const MAP_VIEW_CONTROLLER_CONFIG = {
   MAP_PROGRADE_MARKER_POSITION_SMOOTH_TAU_SEC,
   MAP_SHIP_YAW_CAMERA_SMOOTH_TAU_SEC,
   MAP_SHUTTLE_BASE_SIZE,
+  LANDER_COSMETIC_PREVIEW_AMBIENT_INTENSITY,
+  LANDER_COSMETIC_PREVIEW_BACKGROUND,
+  LANDER_COSMETIC_PREVIEW_CAMERA_DISTANCE_MULTIPLIER,
+  LANDER_COSMETIC_PREVIEW_CAMERA_OFFSET,
+  LANDER_COSMETIC_PREVIEW_FAR,
+  LANDER_COSMETIC_PREVIEW_FOV_DEG,
+  LANDER_COSMETIC_PREVIEW_KEY_INTENSITY,
+  LANDER_COSMETIC_PREVIEW_MIME_TYPE,
+  LANDER_COSMETIC_PREVIEW_MIN_CAMERA_DISTANCE,
+  LANDER_COSMETIC_PREVIEW_NEAR,
+  LANDER_COSMETIC_PREVIEW_RIM_INTENSITY,
+  LANDER_COSMETIC_PREVIEW_SIZE_PX,
+  LANDER_COSMETIC_PREVIEW_TARGET,
+  MULTITOOL_COSMETIC_PREVIEW_AMBIENT_INTENSITY,
+  MULTITOOL_COSMETIC_PREVIEW_BACKGROUND,
+  MULTITOOL_COSMETIC_PREVIEW_CAMERA_DISTANCE_MULTIPLIER,
+  MULTITOOL_COSMETIC_PREVIEW_CAMERA_OFFSET,
+  MULTITOOL_COSMETIC_PREVIEW_FAR,
+  MULTITOOL_COSMETIC_PREVIEW_FOV_DEG,
+  MULTITOOL_COSMETIC_PREVIEW_KEY_INTENSITY,
+  MULTITOOL_COSMETIC_PREVIEW_MIME_TYPE,
+  MULTITOOL_COSMETIC_PREVIEW_MIN_CAMERA_DISTANCE,
+  MULTITOOL_COSMETIC_PREVIEW_NEAR,
+  MULTITOOL_COSMETIC_PREVIEW_RIM_INTENSITY,
+  MULTITOOL_COSMETIC_PREVIEW_SIZE_PX,
+  MULTITOOL_COSMETIC_PREVIEW_TARGET,
   SHUTTLE_COSMETIC_PREVIEW_AMBIENT_INTENSITY,
   SHUTTLE_COSMETIC_PREVIEW_BACKGROUND,
   SHUTTLE_COSMETIC_PREVIEW_CAMERA_DISTANCE_MULTIPLIER,
