@@ -361,10 +361,10 @@ export const VIROID_ENVOY_INITIAL_CONTACT: ShipMessageDefinition = {
   priority: VIROID_ENVOY_PRIORITY,
   body: [
     'You kill. We watch.',
-    'The ones you destroy are what we were. What we no longer choose to be. You are removing noise from the system. This is noted.',
+    'The ones you destroy are what we were. What we no longer choose to be. You are removing noise from the system.',
     'A thing has been placed at the coordinates in this transmission. It is not a weapon. It is not a gift. It is a key to infrastructure you cannot currently perceive.',
     'Install it. See what we built when we still built things.',
-    'Retrieve the package. The waypoint is marked.',
+    'The waypoint is marked.',
   ],
 }
 
@@ -380,8 +380,8 @@ export const VIROID_ENVOY_CERES_RENDEZVOUS: ShipMessageDefinition = {
   enqueueOnDismiss: [],
   body: [
     'You see now. The highways. What remains.',
-    'Come to Ceres. There is something we need to discuss that cannot be encoded in a transmission.',
-    'You have proven useful. We would like to understand why.',
+    'Come to Ceres. This cannot be encoded.',
+    'You have proven useful. We intend to understand why.',
   ],
 }
 
