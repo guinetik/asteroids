@@ -14,6 +14,9 @@ import type {
   GeneratedAsteroidMission,
   ConcreteObjective,
   ObjectiveType,
+  ActiveVisitRelayMission,
+  EvaMissionPoiType,
+  VisitRelayShuttleMissionTemplate,
 } from '@/lib/missions/types'
 
 function emptyBoard(): ShuttleMissionBoard {
@@ -157,5 +160,52 @@ describe('buildMissionTrackerGroups', () => {
       expect(row.objectiveType).toBeTypeOf('string')
       expect(row.objectiveType!.length).toBeGreaterThan(0)
     }
+  })
+
+  function evaTemplate(
+    overrides: Partial<VisitRelayShuttleMissionTemplate> = {},
+  ): VisitRelayShuttleMissionTemplate {
+    return {
+      id: 'earth_relay_tx4',
+      name: 'TX-4 Reboot',
+      description: '',
+      poiType: 'relay_antenna',
+      minigameType: 'relay_repair',
+      reward: 200,
+      ...overrides,
+    }
+  }
+
+  function evaActive(
+    overrides: Partial<ActiveVisitRelayMission> = {},
+  ): ActiveVisitRelayMission {
+    return {
+      template: evaTemplate(),
+      giverPlanet: 'earth',
+      waypoint: { worldX: 50, worldZ: 75, poiLocalY: 5 },
+      status: 'active',
+      ...overrides,
+    }
+  }
+
+  it('produces an EVA row with waypoint focus and poiType label', () => {
+    const board = emptyBoard()
+    board.activeEvaMissions = [evaActive()]
+    const group = buildMissionTrackerGroups(board)[0]!
+    expect(group.key).toBe('eva')
+    const row = group.rows[0]!
+    expect(row.title).toBe('TX-4 Reboot')
+    expect(row.objectiveType).toBe('Relay Repair')
+    expect(row.focus).toEqual({ kind: 'world', worldX: 50, worldZ: 75 })
+  })
+
+  it.each<[EvaMissionPoiType, string]>([
+    ['satellite', 'Satellite Servicing'],
+    ['relay_antenna', 'Relay Repair'],
+    ['telescope', 'Telescope'],
+  ])('maps EVA poiType %s to label %s', (poiType, label) => {
+    const board = emptyBoard()
+    board.activeEvaMissions = [evaActive({ template: evaTemplate({ poiType }) })]
+    expect(buildMissionTrackerGroups(board)[0]!.rows[0]!.objectiveType).toBe(label)
   })
 })

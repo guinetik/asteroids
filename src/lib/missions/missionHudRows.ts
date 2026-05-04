@@ -13,6 +13,8 @@ import type {
   ShuttleMissionBoard,
   GeneratedAsteroidMission,
   ObjectiveType,
+  ActiveVisitRelayMission,
+  EvaMissionPoiType,
 } from '@/lib/missions/types'
 
 /** Group key — drives section header and row palette. */
@@ -50,6 +52,16 @@ const DELIVERY_GROUP_TITLE = 'Deliveries'
 
 /** Section title for the asteroid group. */
 const ASTEROID_GROUP_TITLE = 'Asteroid'
+
+/** Section title for the EVA group. */
+const EVA_GROUP_TITLE = 'EVA'
+
+/** Display labels for each EVA POI type. */
+const EVA_POI_LABELS: Record<EvaMissionPoiType, string> = {
+  satellite: 'Satellite Servicing',
+  relay_antenna: 'Relay Repair',
+  telescope: 'Telescope',
+}
 
 /** Display labels for each asteroid objective discriminant. */
 const ASTEROID_OBJECTIVE_LABELS: Record<ObjectiveType, string> = {
@@ -89,6 +101,11 @@ export function buildMissionTrackerGroups(
     })
   }
 
+  const evaRows = board.activeEvaMissions.map(buildEvaRow)
+  if (evaRows.length > 0) {
+    groups.push({ key: 'eva', title: EVA_GROUP_TITLE, rows: evaRows })
+  }
+
   return groups
 }
 
@@ -122,6 +139,24 @@ function buildAsteroidRow(mission: GeneratedAsteroidMission): MissionTrackerRow 
     id: `asteroid:${mission.id}`,
     title: mission.name,
     objectiveType,
+    focus: {
+      kind: 'world',
+      worldX: mission.waypoint.worldX,
+      worldZ: mission.waypoint.worldZ,
+    },
+  }
+}
+
+/**
+ * Build a tracker row for one active EVA visit-relay mission. Camera focus
+ * uses the snapshotted XZ waypoint (the Y-axis offset only matters during
+ * EVA egress, not for the orbital map view).
+ */
+function buildEvaRow(mission: ActiveVisitRelayMission, index: number): MissionTrackerRow {
+  return {
+    id: `eva:${mission.template.id}:${index}`,
+    title: mission.template.name,
+    objectiveType: EVA_POI_LABELS[mission.template.poiType],
     focus: {
       kind: 'world',
       worldX: mission.waypoint.worldX,
