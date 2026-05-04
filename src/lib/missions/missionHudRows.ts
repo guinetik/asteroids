@@ -15,6 +15,7 @@ import type {
   ObjectiveType,
   ActiveVisitRelayMission,
   EvaMissionPoiType,
+  ActiveTurretMiningMission,
 } from '@/lib/missions/types'
 
 /** Group key — drives section header and row palette. */
@@ -55,6 +56,9 @@ const ASTEROID_GROUP_TITLE = 'Asteroid'
 
 /** Section title for the EVA group. */
 const EVA_GROUP_TITLE = 'EVA'
+
+/** Section title for the mining group. */
+const MINING_GROUP_TITLE = 'Mining'
 
 /** Display labels for each EVA POI type. */
 const EVA_POI_LABELS: Record<EvaMissionPoiType, string> = {
@@ -104,6 +108,11 @@ export function buildMissionTrackerGroups(
   const evaRows = board.activeEvaMissions.map(buildEvaRow)
   if (evaRows.length > 0) {
     groups.push({ key: 'eva', title: EVA_GROUP_TITLE, rows: evaRows })
+  }
+
+  const miningRows = board.activeMiningMissions.map(buildMiningRow)
+  if (miningRows.length > 0) {
+    groups.push({ key: 'mining', title: MINING_GROUP_TITLE, rows: miningRows })
   }
 
   return groups
@@ -162,5 +171,22 @@ function buildEvaRow(mission: ActiveVisitRelayMission, index: number): MissionTr
       worldX: mission.waypoint.worldX,
       worldZ: mission.waypoint.worldZ,
     },
+  }
+}
+
+/**
+ * Build a tracker row for one active turret mining mission. Mining missions
+ * have no spatial waypoint — the player roams the belt with a turret-equipped
+ * shuttle and returns to the giver to deliver — so focus targets the giver
+ * planet itself.
+ */
+function buildMiningRow(
+  mission: ActiveTurretMiningMission,
+  index: number,
+): MissionTrackerRow {
+  return {
+    id: `mining:${mission.template.id}:${index}`,
+    title: mission.template.name,
+    focus: { kind: 'planet', planetId: mission.giverPlanet },
   }
 }

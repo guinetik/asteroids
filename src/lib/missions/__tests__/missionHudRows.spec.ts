@@ -17,6 +17,8 @@ import type {
   ActiveVisitRelayMission,
   EvaMissionPoiType,
   VisitRelayShuttleMissionTemplate,
+  ActiveTurretMiningMission,
+  TurretMiningMissionTemplate,
 } from '@/lib/missions/types'
 
 function emptyBoard(): ShuttleMissionBoard {
@@ -188,6 +190,27 @@ describe('buildMissionTrackerGroups', () => {
     }
   }
 
+  function miningTemplate(
+    overrides: Partial<TurretMiningMissionTemplate> = {},
+  ): TurretMiningMissionTemplate {
+    return {
+      id: 'mars_olivine_plating',
+      name: 'Olivine Plating',
+      description: '',
+      difficulty: 'easy',
+      oreCategory: 'olivine',
+      targetKg: 100,
+      reward: 500,
+      ...overrides,
+    }
+  }
+
+  function miningActive(
+    overrides: Partial<ActiveTurretMiningMission> = {},
+  ): ActiveTurretMiningMission {
+    return { template: miningTemplate(), giverPlanet: 'mars', ...overrides }
+  }
+
   it('produces an EVA row with waypoint focus and poiType label', () => {
     const board = emptyBoard()
     board.activeEvaMissions = [evaActive()]
@@ -207,5 +230,37 @@ describe('buildMissionTrackerGroups', () => {
     const board = emptyBoard()
     board.activeEvaMissions = [evaActive({ template: evaTemplate({ poiType }) })]
     expect(buildMissionTrackerGroups(board)[0]!.rows[0]!.objectiveType).toBe(label)
+  })
+
+  it('produces a mining row that focuses the giver planet (no waypoint, no objective label)', () => {
+    const board = emptyBoard()
+    board.activeMiningMissions = [miningActive()]
+    const group = buildMissionTrackerGroups(board)[0]!
+    expect(group.key).toBe('mining')
+    expect(group.title).toBe('Mining')
+    const row = group.rows[0]!
+    expect(row.title).toBe('Olivine Plating')
+    expect(row.objectiveType).toBeUndefined()
+    expect(row.focus).toEqual({ kind: 'planet', planetId: 'mars' })
+  })
+
+  it('returns groups in fixed order delivery → asteroid → eva → mining', () => {
+    const board = emptyBoard()
+    board.activeMissions = [deliveryActive()]
+    board.activeAsteroidMission = asteroidMission()
+    board.activeEvaMissions = [evaActive()]
+    board.activeMiningMissions = [miningActive()]
+    expect(buildMissionTrackerGroups(board).map((g) => g.key)).toEqual([
+      'delivery',
+      'asteroid',
+      'eva',
+      'mining',
+    ])
+  })
+
+  it('hides empty groups (only EVA active → only EVA group returned)', () => {
+    const board = emptyBoard()
+    board.activeEvaMissions = [evaActive()]
+    expect(buildMissionTrackerGroups(board).map((g) => g.key)).toEqual(['eva'])
   })
 })
