@@ -7,12 +7,13 @@
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Asteroid Lander</title>
           <style>
-            body { background: #000; color: #fff; font-family: system-ui, sans-serif; text-align: center; padding: 2rem 1rem; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
-            h1 { color: #22d3ee; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 300; margin-bottom: 1rem; }
-            p { color: rgba(255,255,255,0.8); line-height: 1.5; margin-bottom: 2rem; max-width: 400px; }
-            .video-container { position: relative; width: 100%; max-width: 500px; padding-bottom: 56.25%; height: 0; overflow: hidden; background: #111; border-radius: 8px; margin-bottom: 2rem; border: 1px solid rgba(255,255,255,0.1); }
-            .video-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
-            button { background: linear-gradient(180deg, rgba(34, 211, 238, 0.16), rgba(8, 47, 73, 0.7)); border: 1px solid rgba(103, 232, 249, 0.28); color: #ecfecf; padding: 1rem 2rem; border-radius: 999px; font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; cursor: pointer; }
+            html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background: #000; }
+            body { color: #fff; font-family: system-ui, sans-serif; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; padding: 1rem; }
+            h1 { color: #22d3ee; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 300; margin-bottom: 1rem; font-size: 1.8rem; }
+            p { color: rgba(255,255,255,0.8); line-height: 1.5; margin-bottom: 2rem; max-width: 400px; font-size: 0.9rem; }
+            .video-container { position: relative; width: 100%; max-width: 500px; padding-bottom: 56.25%; height: 0; background: #111; border-radius: 8px; margin-bottom: 2rem; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
+            .video-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; border-radius: 8px; }
+            button { background: linear-gradient(180deg, rgba(34, 211, 238, 0.16), rgba(8, 47, 73, 0.7)); border: 1px solid rgba(103, 232, 249, 0.28); color: #ecfecf; padding: 1rem 2rem; border-radius: 999px; font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; cursor: pointer; flex-shrink: 0; }
           </style>
           <body>
             <h1>Asteroid Lander</h1>
@@ -23,7 +24,14 @@
             <button onclick="if(navigator.share) { navigator.share({title: 'Asteroid Lander', text: 'Check out Asteroid Lander on your desktop!', url: window.location.href}).catch(console.error) } else { alert('Copy this link: ' + window.location.href) }">Share Game</button>
           </body>
         `);
-        window.stop();
+        // Instead of window.stop() which kills the iframe loading, we just 
+        // prevent the rest of the DOM from showing by hiding the body once it loads
+        window.addEventListener('DOMContentLoaded', () => {
+          const app = document.getElementById('app');
+          const prelude = document.getElementById('prelude-container');
+          if (app) app.style.display = 'none';
+          if (prelude) prelude.style.display = 'none';
+        });
       }
     </script>
     <meta charset="UTF-8">
