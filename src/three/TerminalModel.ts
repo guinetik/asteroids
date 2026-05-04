@@ -10,82 +10,85 @@ import * as THREE from 'three'
 import type { WorldCollider } from '@/lib/physics/worldCollision'
 
 /** Terminal body width in world units on the X axis. */
-const TERMINAL_WIDTH = 2.4
+const TERMINAL_WIDTH = 6.0
 
 /** Terminal body height in world units on the Y axis. */
-export const TERMINAL_BODY_HEIGHT = 6.45
+export const TERMINAL_BODY_HEIGHT = 16.0
 
 /** Terminal body depth in world units on the Z axis. */
-const TERMINAL_DEPTH = 0.75
+const TERMINAL_DEPTH = 1.5
 
 /** Pedestal width in world units on the X axis. */
-const TERMINAL_BASE_WIDTH = 3.05
+const TERMINAL_BASE_WIDTH = 7.5
 
 /** Pedestal height in world units on the Y axis. */
-const TERMINAL_BASE_HEIGHT = 0.34
+const TERMINAL_BASE_HEIGHT = 0.68
 
 /** Pedestal depth in world units on the Z axis. */
-const TERMINAL_BASE_DEPTH = 1.35
+const TERMINAL_BASE_DEPTH = 2.7
+
+/** How far the terminal extends below its placement Y to survive uneven terrain. */
+const TERMINAL_BURIED_DEPTH = 4
 
 /** Screen panel width in world units on the X axis. */
-const SCREEN_WIDTH = 1.52
+const SCREEN_WIDTH = 3.8
 
 /** Screen panel height in world units on the Y axis. */
-const SCREEN_HEIGHT = 1.72
+const SCREEN_HEIGHT = 4.3
 
 /** Screen frame width in world units on the X axis. */
-const SCREEN_FRAME_WIDTH = 1.78
+const SCREEN_FRAME_WIDTH = 4.45
 
 /** Screen frame height in world units on the Y axis. */
-const SCREEN_FRAME_HEIGHT = 1.98
+const SCREEN_FRAME_HEIGHT = 4.95
 
 /** Screen frame depth in world units on the Z axis. */
-const SCREEN_FRAME_DEPTH = 0.1
+const SCREEN_FRAME_DEPTH = 0.2
 
 /** Status lamp strip width in world units on the X axis. */
-const STATUS_STRIP_WIDTH = 1.55
+const STATUS_STRIP_WIDTH = 3.9
 
 /** Status lamp strip height in world units on the Y axis. */
-const STATUS_STRIP_HEIGHT = 0.16
+const STATUS_STRIP_HEIGHT = 0.32
 
 /** Decorative side rail width in world units on the X axis. */
-const SIDE_RAIL_WIDTH = 0.12
+const SIDE_RAIL_WIDTH = 0.24
 
 /** Decorative side rail height in world units on the Y axis. */
-const SIDE_RAIL_HEIGHT = 5.75
+const SIDE_RAIL_HEIGHT = 14.5
 
 /** Decorative side rail depth in world units on the Z axis. */
-const SIDE_RAIL_DEPTH = 0.12
+const SIDE_RAIL_DEPTH = 0.24
 
 /** Side rail horizontal offset from terminal center. */
-const SIDE_RAIL_X_OFFSET = 1.08
+const SIDE_RAIL_X_OFFSET = 2.7
 
 /** Vertical screen center as a fraction of terminal body height. */
 const SCREEN_CENTER_HEIGHT_FRACTION = 0.69
 
 /** Screen surface offset in front of the body. */
-const SCREEN_FRONT_OFFSET = 0.02
+const SCREEN_FRONT_OFFSET = 0.04
 
 /** Frame surface offset in front of the body. */
-const FRAME_FRONT_OFFSET = 0.005
+const FRAME_FRONT_OFFSET = 0.01
 
 /** Status strip vertical offset below the screen center. */
-const STATUS_STRIP_Y_OFFSET = 1.62
+const STATUS_STRIP_Y_OFFSET = 4.0
 
 /** Status strip surface offset in front of the body. */
-const STATUS_STRIP_FRONT_OFFSET = 0.035
+const STATUS_STRIP_FRONT_OFFSET = 0.07
 
 /** Cycling glyph offset in front of the emissive screen plane. */
-const GLYPH_FRONT_OFFSET = 0.06
+const GLYPH_FRONT_OFFSET = 0.12
 
 /** Outer radius of the central terminal glyph. */
-const GLYPH_OUTER_RADIUS = 0.46
+const GLYPH_OUTER_RADIUS = 0.92
 
 /** Inner radius used by the central terminal glyph spokes. */
-const GLYPH_INNER_RADIUS = 0.17
+const GLYPH_INNER_RADIUS = 0.34
 
 /** Radius of the small side ticks that make the glyph read like alien UI. */
-const GLYPH_TICK_RADIUS = 0.3
+const GLYPH_TICK_RADIUS = 0.6
 
 /** Number of segments used for the outer glyph ring. */
 const GLYPH_RING_SEGMENTS = 48
@@ -94,7 +97,7 @@ const GLYPH_RING_SEGMENTS = 48
 const GLYPH_STROKE_RADIAL_SEGMENTS = 8
 
 /** Stroke thickness for terminal screen symbols in world units. */
-const GLYPH_STROKE_RADIUS = 0.035
+const GLYPH_STROKE_RADIUS = 0.07
 
 /** Number of points consumed by each glyph stroke segment. */
 const GLYPH_SEGMENT_POINT_COUNT = 2
@@ -151,7 +154,7 @@ const FRAME_METALNESS = 0.18
 const FRAME_ROUGHNESS = 0.82
 
 /** Interaction range — EVA player must be within this distance (world units). */
-export const TERMINAL_INTERACT_RANGE = 8
+export const TERMINAL_INTERACT_RANGE = 16
 
 /** Collider height includes the base plus upright kiosk body. */
 const TERMINAL_COLLIDER_HEIGHT = TERMINAL_BASE_HEIGHT + TERMINAL_BODY_HEIGHT
@@ -299,7 +302,7 @@ export class TerminalModel {
 
     const baseGeo = new THREE.BoxGeometry(
       TERMINAL_BASE_WIDTH,
-      TERMINAL_BASE_HEIGHT,
+      TERMINAL_BASE_HEIGHT + TERMINAL_BURIED_DEPTH,
       TERMINAL_BASE_DEPTH,
     )
     const bodyGeo = new THREE.BoxGeometry(TERMINAL_WIDTH, TERMINAL_BODY_HEIGHT, TERMINAL_DEPTH)
@@ -351,7 +354,7 @@ export class TerminalModel {
 
     const base = new THREE.Mesh(baseGeo, baseMat)
     base.name = 'survey-terminal-base'
-    base.position.y = TERMINAL_BASE_HEIGHT / 2
+    base.position.y = (TERMINAL_BASE_HEIGHT + TERMINAL_BURIED_DEPTH) / 2 - TERMINAL_BURIED_DEPTH
     base.castShadow = true
     base.receiveShadow = true
     this.group.add(base)
@@ -455,7 +458,7 @@ export class TerminalModel {
       kind: 'aabb',
       min: () => ({
         x: this.group.position.x - TERMINAL_BASE_WIDTH / 2,
-        y: this.group.position.y,
+        y: this.group.position.y - TERMINAL_BURIED_DEPTH,
         z: this.group.position.z - TERMINAL_BASE_DEPTH / 2,
       }),
       max: () => ({
