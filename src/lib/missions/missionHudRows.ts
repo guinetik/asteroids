@@ -11,6 +11,8 @@
 import type {
   ActiveShuttleMission,
   ShuttleMissionBoard,
+  GeneratedAsteroidMission,
+  ObjectiveType,
 } from '@/lib/missions/types'
 
 /** Group key — drives section header and row palette. */
@@ -46,6 +48,23 @@ export interface MissionTrackerGroup {
 /** Section title for the delivery group. */
 const DELIVERY_GROUP_TITLE = 'Deliveries'
 
+/** Section title for the asteroid group. */
+const ASTEROID_GROUP_TITLE = 'Asteroid'
+
+/** Display labels for each asteroid objective discriminant. */
+const ASTEROID_OBJECTIVE_LABELS: Record<ObjectiveType, string> = {
+  gather: 'Gather',
+  exterminate: 'Exterminate',
+  rescue: 'Rescue',
+  survey: 'Survey',
+  photometry: 'Photometry',
+  dan: 'DAN Survey',
+  collect: 'Collect',
+  bunker: 'Bunker Defense',
+  'mineral-analysis': 'Mineral Analysis',
+  'prospectus-terminal': 'Prospectus',
+}
+
 /**
  * Build the ordered list of non-empty mission groups for the HUD tracker.
  *
@@ -60,6 +79,14 @@ export function buildMissionTrackerGroups(
   const deliveryRows = board.activeMissions.map(buildDeliveryRow)
   if (deliveryRows.length > 0) {
     groups.push({ key: 'delivery', title: DELIVERY_GROUP_TITLE, rows: deliveryRows })
+  }
+
+  if (board.activeAsteroidMission) {
+    groups.push({
+      key: 'asteroid',
+      title: ASTEROID_GROUP_TITLE,
+      rows: [buildAsteroidRow(board.activeAsteroidMission)],
+    })
   }
 
   return groups
@@ -80,5 +107,25 @@ function buildDeliveryRow(
     id: `delivery:${mission.template.id}:${index}`,
     title: mission.template.name,
     focus: { kind: 'planet', planetId },
+  }
+}
+
+/**
+ * Build a tracker row for the active asteroid mission. The first objective's
+ * type drives the display label — multi-objective missions surface their
+ * leading objective for the at-a-glance HUD.
+ */
+function buildAsteroidRow(mission: GeneratedAsteroidMission): MissionTrackerRow {
+  const first = mission.objectives[0]
+  const objectiveType = first ? ASTEROID_OBJECTIVE_LABELS[first.type] : undefined
+  return {
+    id: `asteroid:${mission.id}`,
+    title: mission.name,
+    objectiveType,
+    focus: {
+      kind: 'world',
+      worldX: mission.waypoint.worldX,
+      worldZ: mission.waypoint.worldZ,
+    },
   }
 }

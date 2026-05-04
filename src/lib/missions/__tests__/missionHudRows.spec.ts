@@ -11,6 +11,9 @@ import type {
   ShuttleMissionBoard,
   ActiveShuttleMission,
   ShuttleMissionTemplate,
+  GeneratedAsteroidMission,
+  ConcreteObjective,
+  ObjectiveType,
 } from '@/lib/missions/types'
 
 function emptyBoard(): ShuttleMissionBoard {
@@ -59,6 +62,32 @@ function deliveryActive(
   }
 }
 
+function objective(type: ObjectiveType): ConcreteObjective {
+  return { type, x: 0, z: 0, reward: 0 }
+}
+
+function asteroidMission(
+  overrides: Partial<GeneratedAsteroidMission> = {},
+): GeneratedAsteroidMission {
+  return {
+    kind: 'standard',
+    id: 'belt-survey-001',
+    asteroidId: 'bennu',
+    giverId: 'jay',
+    giverName: 'Jay Mercer',
+    templateId: 'mineral_survey',
+    name: 'Belt Survey 4A',
+    briefing: '',
+    difficulty: 3,
+    region: 'asteroid-belt',
+    objectives: [objective('photometry')],
+    totalReward: 0,
+    waypoint: { worldX: 1234, worldZ: -567 },
+    status: 'accepted',
+    ...overrides,
+  }
+}
+
 describe('buildMissionTrackerGroups', () => {
   it('returns no groups for an empty board', () => {
     expect(buildMissionTrackerGroups(emptyBoard())).toEqual([])
@@ -95,5 +124,38 @@ describe('buildMissionTrackerGroups', () => {
     const rows = buildMissionTrackerGroups(board)[0]!.rows
     expect(rows.map((r) => r.title)).toEqual(['A', 'B'])
     expect(new Set(rows.map((r) => r.id)).size).toBe(2)
+  })
+
+  it('produces an asteroid group when one mission is active', () => {
+    const board = emptyBoard()
+    board.activeAsteroidMission = asteroidMission()
+    const groups = buildMissionTrackerGroups(board)
+    expect(groups.map((g) => g.key)).toEqual(['asteroid'])
+    const row = groups[0]!.rows[0]!
+    expect(row.title).toBe('Belt Survey 4A')
+    expect(row.objectiveType).toBe('Photometry')
+    expect(row.focus).toEqual({ kind: 'world', worldX: 1234, worldZ: -567 })
+  })
+
+  it('maps every asteroid objective type to a display label', () => {
+    const types: ObjectiveType[] = [
+      'gather',
+      'exterminate',
+      'rescue',
+      'survey',
+      'photometry',
+      'dan',
+      'collect',
+      'bunker',
+      'mineral-analysis',
+      'prospectus-terminal',
+    ]
+    for (const t of types) {
+      const board = emptyBoard()
+      board.activeAsteroidMission = asteroidMission({ objectives: [objective(t)] })
+      const row = buildMissionTrackerGroups(board)[0]!.rows[0]!
+      expect(row.objectiveType, `label for ${t}`).toBeTypeOf('string')
+      expect(row.objectiveType!.length).toBeGreaterThan(0)
+    }
   })
 })
