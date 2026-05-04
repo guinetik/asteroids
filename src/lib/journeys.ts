@@ -22,6 +22,11 @@ export type JourneyTriggerId =
   | 'accepted_eva_mission'
   | 'left_habitat'
   /**
+   * One manifold highway run finished: orbital surf coupling/dive completed and destination orbit
+   * engaged. Pairs with the same code path that increments profile achievement stats `manifoldRides`.
+   */
+  | 'orbital_surf_completed'
+  /**
    * First persisted orbit at a catalog body key (`jupiter`, `mars`, …).
    * Emitted from the map when solar first-orbit persistence newly records that body.
    */
@@ -199,8 +204,8 @@ const JOURNEY_DEFINITIONS: readonly JourneyDefinition[] = [
       },
       {
         id: 'grid-coupling',
-        label: 'Install the USC Module',
-        trigger: 'upgrade_installed:gravitySurfing',
+        label: 'Complete an orbital surf (manifold highway)',
+        trigger: 'orbital_surf_completed',
       },
     ],
   },
@@ -382,7 +387,7 @@ export function applyJourneyTrigger(
   // Pass 3: mark complete any journey that is both start-ready AND step-complete.
   // Two firing points converge here: pass 2 (last step just landed) and pass 1
   // (gate just opened on a journey whose steps were all already done — the Jay
-  // / MMC / gravitySurfing path without a prior USC accept).
+  // / MMC / orbital-surf path without a prior USC accept).
   for (const journey of JOURNEY_DEFINITIONS) {
     if (isJourneyComplete(nextProfile, journey.id)) continue
     if (!isJourneyStartReady(nextProfile, journey)) continue

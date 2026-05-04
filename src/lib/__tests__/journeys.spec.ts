@@ -30,7 +30,7 @@ function profileAfterAct1Complete(profile: PlayerProfile = createProfile('Pilot'
   p = applyJourneyTrigger(p, 'contract_completed:usc-venus-certification').profile
   p = applyJourneyTrigger(p, 'contract_completed:space-cowboys-mars-hq').profile
   p = applyJourneyTrigger(p, 'contract_completed:martian-marine-corps-cohort').profile
-  return applyJourneyTrigger(p, 'upgrade_installed:gravitySurfing').profile
+  return applyJourneyTrigger(p, 'orbital_surf_completed').profile
 }
 
 describe('journeys', () => {
@@ -152,7 +152,7 @@ describe('act-1-inner-system journey', () => {
     profile = applyJourneyTrigger(profile, 'contract_completed:usc-venus-certification').profile
     profile = applyJourneyTrigger(profile, 'contract_completed:space-cowboys-mars-hq').profile
     profile = applyJourneyTrigger(profile, 'contract_completed:martian-marine-corps-cohort').profile
-    profile = applyJourneyTrigger(profile, 'upgrade_installed:gravitySurfing').profile
+    profile = applyJourneyTrigger(profile, 'orbital_surf_completed').profile
 
     expect(profile.completedJourneyIds).not.toContain('act-1-inner-system')
 
@@ -162,7 +162,7 @@ describe('act-1-inner-system journey', () => {
     expect(result.completedJourneyIds).toContain('act-1-inner-system')
   })
 
-  it('completes when all three contracts are done and gravitySurfing installs', () => {
+  it('completes when all three contracts are done and the player finishes an orbital surf', () => {
     let profile = createProfile('Pilot')
 
     // Walk Welcome to completion so Act 1 becomes the only incomplete journey,
@@ -185,15 +185,15 @@ describe('act-1-inner-system journey', () => {
     profile = applyJourneyTrigger(profile, 'contract_completed:space-cowboys-mars-hq').profile
     profile = applyJourneyTrigger(profile, 'contract_completed:martian-marine-corps-cohort').profile
 
-    // Before the final upgrade install, Act 1 is active with step 4 pending.
+    // Before the orbital surf, Act 1 is active with step 4 pending.
     const beforeInstall = buildActiveJourneyTracker(profile)
     expect(beforeInstall?.title).toBe('Inner System')
     const step4 = beforeInstall?.objectives[0]?.steps[3]
-    expect(step4?.label).toBe('Install the USC Module')
+    expect(step4?.label).toBe('Complete an orbital surf (manifold highway)')
     expect(step4?.active).toBe(true)
     expect(step4?.complete).toBe(false)
 
-    profile = applyJourneyTrigger(profile, 'upgrade_installed:gravitySurfing').profile
+    profile = applyJourneyTrigger(profile, 'orbital_surf_completed').profile
 
     expect(profile.completedJourneyIds).toContain('act-1-inner-system')
     expect(buildActiveJourneyTracker(profile)).toBeNull()
@@ -205,19 +205,23 @@ describe('act-1-inner-system journey', () => {
     profile = applyJourneyTrigger(profile, 'contract_completed:martian-marine-corps-cohort').profile
     profile = applyJourneyTrigger(profile, 'contract_completed:usc-venus-certification').profile
     profile = applyJourneyTrigger(profile, 'contract_completed:space-cowboys-mars-hq').profile
-    profile = applyJourneyTrigger(profile, 'upgrade_installed:gravitySurfing').profile
+    profile = applyJourneyTrigger(profile, 'orbital_surf_completed').profile
     expect(profile.completedJourneyIds).toContain('act-1-inner-system')
   })
 
-  it('does not tick step 4 on a non-gravitySurfing install', () => {
+  it('does not tick step 4 on a non-orbital-surf trigger', () => {
     let profile = createProfile('Pilot')
     profile = applyJourneyTrigger(profile, 'contract_accepted:usc-venus-certification').profile
     profile = applyJourneyTrigger(profile, 'contract_completed:usc-venus-certification').profile
     profile = applyJourneyTrigger(profile, 'contract_completed:space-cowboys-mars-hq').profile
     profile = applyJourneyTrigger(profile, 'contract_completed:martian-marine-corps-cohort').profile
-    const result = applyJourneyTrigger(profile, 'upgrade_installed:shuttleHull')
-    expect(result.changed).toBe(false)
-    expect(result.profile.completedJourneyIds).not.toContain('act-1-inner-system')
+    const installResult = applyJourneyTrigger(profile, 'upgrade_installed:shuttleHull')
+    expect(installResult.changed).toBe(false)
+    expect(installResult.profile.completedJourneyIds).not.toContain('act-1-inner-system')
+
+    const gravityResult = applyJourneyTrigger(profile, 'upgrade_installed:gravitySurfing')
+    expect(gravityResult.changed).toBe(false)
+    expect(gravityResult.profile.completedJourneyIds).not.toContain('act-1-inner-system')
   })
 
   it('is idempotent — re-firing the same trigger does not double-advance', () => {
