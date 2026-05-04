@@ -1785,10 +1785,14 @@ export class LevelViewController implements Tickable {
   }
 
   /**
-   * Bunker EVA reuses the level composer; drop bloom/CA/vignette there only.
+   * Bunker EVA reuses the level composer; drop bloom/CA/vignette there only,
+   * and force the default `/lut.CUBE` grade so an orange/red asteroid LUT
+   * does not bleed onto bunker interior PBR.
    */
   private syncBunkerInteriorPostProcessing(levelState: LevelState): void {
-    this.postProcessing?.setBunkerInteriorReducedPipeline(levelState === 'bunker-interior')
+    const inBunker = levelState === 'bunker-interior'
+    this.postProcessing?.setBunkerInteriorReducedPipeline(inBunker)
+    this.postProcessing?.setBunkerLutOverride(inBunker)
   }
 
   // ═══════════════════════════════════════════════════════════════

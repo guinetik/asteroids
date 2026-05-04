@@ -77,6 +77,18 @@ export class LevelPostProcessing {
   private currentCamera: THREE.Camera
   private disposed = false
   private readonly lutUrl: string
+  /** Loaded asteroid/contract LUT — driven by level surface state. */
+  private levelLutTexture: THREE.Texture | null = null
+  /**
+   * Loaded default LUT (`/lut.CUBE`). Preloaded only when the level's LUT
+   * URL differs from the default so {@link setBunkerLutOverride} can swap
+   * synchronously without a load hitch on bunker entry. When the level is
+   * already on the default LUT this stays `null` and the override is a
+   * cheap no-op.
+   */
+  private defaultLutTexture: THREE.Texture | null = null
+  /** Whether {@link setBunkerLutOverride} is currently active. */
+  private bunkerLutOverrideActive = false
 
   constructor(
     renderer: THREE.WebGLRenderer,
@@ -134,18 +146,34 @@ export class LevelPostProcessing {
   }
 
   /**
-   * Loads the 3D LUT and rebuilds the effect pass with it spliced in after
-   * the tonemap. Failures are non-fatal — the pipeline keeps running with
-   * the un-LUT'd look.
+   * Load the level LUT (and the default LUT, if different) and splice the
+   * `LUT3DEffect` into the fused pass. Bunker entry can then hot-swap to
+   * the default LUT via {@link setBunkerLutOverride} without re-loading.
+   *
+   * Failures are non-fatal — the pipeline keeps running un-LUT'd.
    */
   private async loadLUT(): Promise<void> {
     try {
-      const lutTexture = await new LUTCubeLoader().loadAsync(this.lutUrl)
+      const loader = new LUTCubeLoader()
+      this.levelLutTexture = await loader.loadAsync(this.lutUrl)
       if (this.disposed) return
+
+      // Preload default LUT alongside the level LUT so bunker entry can
+      // override synchronously. Skip when the level is already using the
+      // default — the override path will fall back to `levelLutTexture`
+      // (same instance) so no extra fetch is needed.
+      if (this.lutUrl !== DEFAULT_LUT_URL) {
+        this.defaultLutTexture = await loader.loadAsync(DEFAULT_LUT_URL)
+        if (this.disposed) return
+      }
+
+      const initialTexture = this.bunkerLutOverrideActive
+        ? (this.defaultLutTexture ?? this.levelLutTexture)
+        : this.levelLutTexture
       // Tetrahedral interpolation gives smoother transitions between LUT
       // cells — subtle LUT character shows through instead of being averaged
       // out by trilinear sampling.
-      this.lut = new LUT3DEffect(lutTexture, { tetrahedralInterpolation: true })
+      this.lut = new LUT3DEffect(initialTexture, { tetrahedralInterpolation: true })
       this.composer.removePass(this.effectPass)
       this.effectPass.dispose()
       this.effectPass = this.buildEffectPass()
@@ -153,6 +181,29 @@ export class LevelPostProcessing {
       console.info('[LevelPostProcessing] LUT applied:', this.lutUrl)
     } catch (err) {
       console.warn('[LevelPostProcessing] LUT load failed', err)
+    }
+  }
+
+  /**
+   * While the player is inside a bunker, force the default `/lut.CUBE`
+   * grade regardless of the asteroid/contract LUT chosen for the surface.
+   * Bunker interiors are dark technical spaces — orange/red asteroid LUTs
+   * make them read as if they were still lit by the surface.
+   *
+   * Hot-swaps the texture on the existing {@link LUT3DEffect}, so the
+   * fused effect-pass shader does not recompile (provided both LUTs share
+   * the same size, which is the case for all `.CUBE` files in `public/`).
+   *
+   * @param active - `true` to force default LUT, `false` to restore level LUT.
+   */
+  setBunkerLutOverride(active: boolean): void {
+    this.bunkerLutOverrideActive = active
+    if (!this.lut) return
+    const target = active
+      ? (this.defaultLutTexture ?? this.levelLutTexture)
+      : this.levelLutTexture
+    if (target) {
+      this.lut.setLUT(target)
     }
   }
 
