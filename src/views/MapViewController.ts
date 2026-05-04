@@ -242,6 +242,7 @@ import {
   type PlanetCollisionSample,
 } from '@/lib/map/collisions/planetCollision'
 import {
+  EVA_MAP_CAMERA_FAR,
   EVA_MAP_HELMET_LIGHT_SCALE,
   EVA_MAP_HUGE_POI_BY_TYPE,
   EVA_MAP_HUGE_SHUTTLE,
@@ -472,6 +473,12 @@ export class MapViewController implements Tickable {
 
   /** Saved layer toggles while EVA forces orbit lines / fabric / labels off (ambient debris unchanged). */
   private evaLayerRestore: MapViewLayerToggleState | null = null
+
+  /**
+   * Saved EVA fps camera far plane while EVA temporarily widens it to keep the map's
+   * 40k-radius starfield visible. Restored on EVA exit.
+   */
+  private evaCameraFarRestore: number | null = null
 
   /** Current shuttle display scale, lerped each frame toward the screen-size target. */
   private currentShuttleScale: number = MAP_CONFIG.MAP_SHUTTLE_SCALE
@@ -1080,6 +1087,7 @@ export class MapViewController implements Tickable {
 
       this.playerProfile = recordManifoldRide(this.playerProfile)
       this.persistPlayerProfileAndSyncProgress()
+      this.notifyJourneyTrigger('orbital_surf_completed')
 
       // Position the shuttle near the planet so normal E-key capture can engage
       const bx = controller.getWorldX()
@@ -4640,7 +4648,7 @@ export class MapViewController implements Tickable {
 
   /**
    * Replay journey triggers for saves loaded mid-progress: contract accept/completion,
-   * first Jupiter orbit (Act II gate), and Act 1's gravity-surfing climax key.
+   * first Jupiter orbit (Act II gate), and Act 1's orbital-surf climax key.
    *
    * `contract_accepted` is fired before `contract_completed` so the Act 1
    * `startTrigger` gate opens before any step-advance triggers run.
@@ -4667,8 +4675,8 @@ export class MapViewController implements Tickable {
         this.notifyJourneyTrigger(`contract_completed:${instance.contractId}`)
       }
     }
-    if ((CURRENT_PLAYER_UPGRADE_LEVELS.gravitySurfing ?? 0) >= 1) {
-      this.notifyJourneyTrigger('upgrade_installed:gravitySurfing')
+    if ((this.playerProfile.achievementStats.manifoldRides ?? 0) >= 1) {
+      this.notifyJourneyTrigger('orbital_surf_completed')
     }
     this.maybeStageAct1Climax()
     // Returning from /level remounts MapView and constructs a fresh controller:
@@ -4899,11 +4907,23 @@ export class MapViewController implements Tickable {
    * @param active - True when EVA is starting; false when it is ending.
    */
   private handleEvaModeChange(active: boolean): void {
-    if (!active) {
+    if (active) {
+      const evaCamera = this.evaSession?.getEvaFpsCamera() ?? null
+      if (evaCamera && this.evaCameraFarRestore === null) {
+        this.evaCameraFarRestore = evaCamera.far
+        evaCamera.far = EVA_MAP_CAMERA_FAR
+        evaCamera.updateProjectionMatrix()
+      }
+      this.beginEvaMapLayerSuppression()
+    } else {
       this.evaMapMultitoolFacade.disposeEvaFiring()
       this.endEvaMapLayerSuppression()
-    } else {
-      this.beginEvaMapLayerSuppression()
+      const evaCamera = this.evaSession?.getEvaFpsCamera() ?? null
+      if (evaCamera && this.evaCameraFarRestore !== null) {
+        evaCamera.far = this.evaCameraFarRestore
+        evaCamera.updateProjectionMatrix()
+      }
+      this.evaCameraFarRestore = null
     }
     this.bloomController.setEvaOverride(active)
     // Mirror the active-POI huge-scale onto completed-site POI containers, so a mission
