@@ -12,6 +12,7 @@ import { Enemy } from '@/lib/fps/enemy'
 import { BacteriophageController } from '@/three/BacteriophageController'
 import { ChimeraWalkerController } from '@/three/ChimeraWalkerController'
 import { SpireController } from '@/three/SpireController'
+import type { EnemyLightPool } from '@/three/EnemyLightPool'
 
 const WARMUP_ENEMY_MAX_HP = 1
 const WARMUP_ENEMY_HIT_RADIUS = 1
@@ -38,9 +39,16 @@ export interface EnemyVisualWarmup {
 /**
  * Create one visual controller for each procedural enemy type.
  *
+ * @param lightPool - Optional enemy light pool. When provided, warmup enemies
+ *   borrow point-light slots from it so the precompile pass sees the same
+ *   `NUM_POINT_LIGHTS` count as runtime spawns will. Without it, warmup
+ *   enemies allocate fresh lights — the program key compiled at warmup will
+ *   not match runtime, partially defeating the warmup.
  * @returns Warmup bundle to add to the scene before renderer compilation.
  */
-export function createEnemyVisualWarmup(): EnemyVisualWarmup {
+export function createEnemyVisualWarmup(
+  lightPool: EnemyLightPool | null = null,
+): EnemyVisualWarmup {
   const group = new THREE.Group()
   group.name = 'EnemyVisualWarmup'
 
@@ -48,15 +56,15 @@ export function createEnemyVisualWarmup(): EnemyVisualWarmup {
   const chimeraEnemy = createWarmupEnemy(0, 0, 0)
   const spireEnemy = createWarmupEnemy(WARMUP_ENEMY_SPACING, WARMUP_ENEMY_FLOAT_HEIGHT, 0)
 
-  const phage = new BacteriophageController(phageEnemy)
+  const phage = new BacteriophageController(phageEnemy, { lightPool })
   phage.group.position.copy(phageEnemy.position)
   group.add(phage.group)
 
-  const chimera = new ChimeraWalkerController(chimeraEnemy)
+  const chimera = new ChimeraWalkerController(chimeraEnemy, { lightPool })
   chimera.group.position.copy(chimeraEnemy.position)
   group.add(chimera.group)
 
-  const spire = new SpireController(spireEnemy)
+  const spire = new SpireController(spireEnemy, { lightPool })
   spire.group.position.copy(spireEnemy.position)
   spire.targetPosition.copy(spireEnemy.position)
   group.add(spire.group)

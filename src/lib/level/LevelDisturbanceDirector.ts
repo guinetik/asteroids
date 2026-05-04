@@ -28,6 +28,7 @@ import {
 import type { Heightmap } from '@/lib/terrain/heightmap'
 import { BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/BacteriophageController'
 import { ChimeraWalkerController, CHIMERA_HIT_CENTER_Y } from '@/three/ChimeraWalkerController'
+import type { EnemyLightPool } from '@/three/EnemyLightPool'
 import { EnemyProjectileMeshPool } from '@/three/EnemyProjectileMeshPool'
 import { SpireController, SPIRE_HIT_CENTER_Y } from '@/three/SpireController'
 import {
@@ -115,6 +116,14 @@ export interface LevelDisturbanceDirectorDeps {
    * Finite integer-like values such as `4813` reproduce the same spawn sequence.
    */
   seed: number
+  /**
+   * Optional shared point-light pool. When supplied, ambient viroids borrow
+   * their `THREE.PointLight`s from the pool instead of allocating new lights —
+   * keeping `NUM_POINT_LIGHTS` pinned across the level lifetime so spawns
+   * never trigger a lit-material recompile. `null` falls back to per-enemy
+   * lights (legacy behavior).
+   */
+  lightPool?: EnemyLightPool | null
 }
 
 /**
@@ -156,6 +165,8 @@ export class LevelDisturbanceDirector {
   private readonly scene: THREE.Scene
   private readonly heightmap: Heightmap
   private readonly projectileSystem: ProjectileSystem
+  /** Shared point-light pool for ambient viroid lights, or `null` to self-allocate. */
+  private readonly lightPool: EnemyLightPool | null
   private readonly enemyDirector = new EnemyDirector()
   private readonly enemyProjectileSystem = new EnemyProjectileSystem()
   private readonly enemyProjectileMeshPool: EnemyProjectileMeshPool
@@ -210,6 +221,7 @@ export class LevelDisturbanceDirector {
     this.scene = deps.scene
     this.heightmap = deps.heightmap
     this.projectileSystem = deps.projectileSystem
+    this.lightPool = deps.lightPool ?? null
 
     const tierDifficulty = clampMissionDifficultyForEnemyRules(deps.missionDifficulty)
     this.enemyVisualTier = enemyVisualTierForDifficulty(tierDifficulty)
@@ -379,17 +391,26 @@ export class LevelDisturbanceDirector {
       this.attachAmbientKillRelief(handle, kind)
 
       if (kind === 'bacteriophage') {
-        const ctrl = new BacteriophageController(handle.enemy, { visualTier: visualTierArg })
+        const ctrl = new BacteriophageController(handle.enemy, {
+          visualTier: visualTierArg,
+          lightPool: this.lightPool,
+        })
         ctrl.group.position.set(position.x, groundY, position.z)
         this.scene.add(ctrl.group)
         this.phageControllers.set(handle.id, ctrl)
       } else if (kind === 'chimera') {
-        const ctrl = new ChimeraWalkerController(handle.enemy, { visualTier: visualTierArg })
+        const ctrl = new ChimeraWalkerController(handle.enemy, {
+          visualTier: visualTierArg,
+          lightPool: this.lightPool,
+        })
         ctrl.group.position.set(position.x, groundY, position.z)
         this.scene.add(ctrl.group)
         this.chimeraControllers.set(handle.id, ctrl)
       } else {
-        const ctrl = new SpireController(handle.enemy, { visualTier: visualTierArg })
+        const ctrl = new SpireController(handle.enemy, {
+          visualTier: visualTierArg,
+          lightPool: this.lightPool,
+        })
         ctrl.group.position.set(position.x, groundY + handle.config.floatHeight, position.z)
         ctrl.targetPosition.set(position.x, groundY + handle.config.floatHeight, position.z)
         this.scene.add(ctrl.group)

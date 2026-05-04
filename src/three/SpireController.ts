@@ -26,6 +26,7 @@ import {
   type EnemyVisualControllerOptions,
   type EnemyVisualPalette,
 } from '@/three/enemyVisualPalette'
+import type { EnemyLightPool } from '@/three/EnemyLightPool'
 
 // ── Visual constants ────────────────────────────────────────────
 const SPIRE_SCALE = 2.0
@@ -140,6 +141,10 @@ export class SpireController implements Tickable {
   private core!: THREE.Mesh
   private rna!: THREE.Mesh
   private light!: THREE.PointLight
+  /** Pool the {@link light} was borrowed from; `null` when self-owned. */
+  private readonly lightPool: EnemyLightPool | null
+  /** True when the inner light should contribute this frame; gated in tick(). */
+  private lightsEnabled = true
   /** Membrane shader restored after hit flash. */
   private membraneTronMat!: THREE.ShaderMaterial
   /** Shared spike bulb shader for fire-flash restore. */
@@ -175,7 +180,9 @@ export class SpireController implements Tickable {
    * @param enabled Whether the inner light contributes this frame.
    */
   setLightsEnabled(enabled: boolean): void {
-    this.light.visible = enabled
+    // Toggling `.visible` would mutate `NUM_POINT_LIGHTS` and recompile every
+    // lit material in the scene. Track via flag and gate intensity in tick().
+    this.lightsEnabled = enabled
   }
 
   /** True once the death animation has fully completed. */
@@ -186,6 +193,7 @@ export class SpireController implements Tickable {
   constructor(enemy: Enemy, options: EnemyVisualControllerOptions = {}) {
     this.enemy = enemy
     this.visualPalette = enemyVisualPaletteForTier(options.visualTier)
+    this.lightPool = options.lightPool ?? null
     this.timeOffset = Math.random() * 10
 
     this.group.add(this.bodyGroup)
@@ -236,8 +244,17 @@ export class SpireController implements Tickable {
     this.rna = new THREE.Mesh(rnaGeo, rnaTron)
     this.bodyGroup.add(this.rna)
 
-    // Inner point light (orange/red glow)
-    this.light = new THREE.PointLight(0xff4400, 0.6, 4)
+    // Inner point light (orange/red glow) — borrow a pool slot when available
+    // so spawning a Spire never grows scene-wide `NUM_POINT_LIGHTS`.
+    const pooled = this.lightPool?.acquire() ?? null
+    if (pooled) {
+      pooled.color.setHex(0xff4400)
+      pooled.distance = 4
+      pooled.intensity = 0.6
+      this.light = pooled
+    } else {
+      this.light = new THREE.PointLight(0xff4400, 0.6, 4)
+    }
     this.bodyGroup.add(this.light)
   }
 
@@ -339,9 +356,11 @@ export class SpireController implements Tickable {
     this.rna.rotation.z += 0.005
 
     // --- Light pulse ---
-    this.light.intensity = this.isAgitated
-      ? 0.8 + Math.sin(t * 5) * 0.5
-      : 0.4 + Math.sin(t * 1.5) * 0.2
+    this.light.intensity = !this.lightsEnabled
+      ? 0
+      : this.isAgitated
+        ? 0.8 + Math.sin(t * 5) * 0.5
+        : 0.4 + Math.sin(t * 1.5) * 0.2
 
     // --- Spike animation ---
     const scratch = this.spikePosScratch
@@ -418,7 +437,7 @@ export class SpireController implements Tickable {
     // --- Core flickers and dies ---
     const flicker = Math.random() > progress ? 1 : 0
     this.core.scale.setScalar(shrink * 0.7 * flicker)
-    this.light.intensity = (1 - ease) * 3 * flicker
+    this.light.intensity = this.lightsEnabled ? (1 - ease) * 3 * flicker : 0
 
     // --- Whole group shrinks in the final third ---
     if (progress > 0.6) {
@@ -502,7 +521,7 @@ export class SpireController implements Tickable {
 
     // Flash RNA white and boost light for initial death burst
     this.rna.material = fireFlashMat
-    this.light.intensity = 3
+    this.light.intensity = this.lightsEnabled ? 3 : 0
   }
 
   /** Clean up all geometry and instance-owned materials. */
@@ -515,5 +534,8 @@ export class SpireController implements Tickable {
         child.geometry.dispose()
       }
     })
+    if (this.lightPool) {
+      this.lightPool.release(this.light)
+    }
   }
 }

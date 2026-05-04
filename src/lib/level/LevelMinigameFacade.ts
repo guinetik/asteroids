@@ -171,6 +171,14 @@ export interface LevelMinigameInitParams {
    * has no DAN objective.
    */
   danCraterPlacement?: DanCraterPlacement | null
+  /**
+   * Shared enemy point-light pool from {@link LevelViewController}. Threaded
+   * to combat minigames so spawned enemies borrow pre-allocated slots and
+   * never grow scene-wide `NUM_POINT_LIGHTS` (which would recompile every
+   * lit material in the scene). Optional — minigames that have not been
+   * migrated fall back to per-enemy lights.
+   */
+  enemyLightPool?: import('@/three/EnemyLightPool').EnemyLightPool | null
   /** Controller-owned callback bindings. */
   bindings: LevelMinigameBindings
 }
@@ -207,6 +215,7 @@ export class LevelMinigameFacade {
       composition,
       missionSeed,
       danCraterPlacement,
+      enemyLightPool,
       bindings,
     } = params
     const objectiveColliders: WorldCollider[] = []
@@ -254,6 +263,7 @@ export class LevelMinigameFacade {
           craterPlacement: danCraterPlacement,
           projectileSystem,
           seed: missionSeed,
+          lightPool: enemyLightPool ?? null,
         })
         this.applySharedBindings(minigame, bindings)
         minigame.onRefuel = bindings.onSurveyRefuel

@@ -49,6 +49,15 @@ export const HARD_ENEMY_VISUAL_PALETTE: EnemyVisualPalette = {
 export interface EnemyVisualControllerOptions {
   /** Difficulty-driven visual tier. Defaults to the normal surface palette. */
   visualTier?: EnemyVisualTier
+  /**
+   * Optional shared {@link EnemyLightPool} the controller borrows its
+   * `THREE.PointLight`s from. When provided, the controller acquires slots
+   * instead of allocating fresh lights, keeping `NUM_POINT_LIGHTS` pinned
+   * at the pool size and avoiding lit-material recompiles on enemy spawn.
+   * When `null`/omitted, the controller falls back to creating its own
+   * lights (legacy paths that have not been wired through the pool).
+   */
+  lightPool?: import('@/three/EnemyLightPool').EnemyLightPool | null
 }
 
 /**

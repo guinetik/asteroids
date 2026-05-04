@@ -30,6 +30,7 @@ import { TerminalModel, TERMINAL_INTERACT_RANGE } from '@/three/TerminalModel'
 import { DanScanController } from '@/three/DanScanController'
 import { EnemyDirector, type EnemyHandle } from '@/lib/fps/enemyDirector'
 import { BacteriophageController, PHAGE_HIT_CENTER_Y } from '@/three/BacteriophageController'
+import type { EnemyLightPool } from '@/three/EnemyLightPool'
 
 /** Default DAN scan duration when the objective omits it. Seconds. */
 const DEFAULT_DAN_SCAN_DURATION_SECONDS = 45
@@ -262,6 +263,13 @@ export interface DanMinigameInitParams {
   projectileSystem: ProjectileSystem
   /** Deterministic mission seed for spawn jitter. */
   seed: number
+  /**
+   * Optional shared enemy point-light pool. When supplied, spawned viroids
+   * borrow point-light slots from the level pool instead of allocating new
+   * lights — keeping `NUM_POINT_LIGHTS` pinned and avoiding the lit-material
+   * recompile stall that otherwise hits on every viroid spawn.
+   */
+  lightPool?: EnemyLightPool | null
 }
 
 /**
@@ -301,6 +309,12 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
   private readonly placement: DanCraterPlacement
   private readonly tuning: DanTierTuning
   private readonly terminal: TerminalModel
+  /**
+   * Shared point-light pool spawned viroids borrow from. `null` falls back
+   * to per-enemy lights — preserves backward compatibility for callers that
+   * have not threaded the level pool through.
+   */
+  private readonly lightPool: EnemyLightPool | null
   /** Static collision volumes owned by this DAN objective. */
   readonly worldColliders: readonly WorldCollider[]
 
@@ -360,6 +374,7 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
     this.placement = params.craterPlacement
     this.projectileSystem = params.projectileSystem
     this.seed = params.seed
+    this.lightPool = params.lightPool ?? null
     const particleTier: DanPressureTier = params.objective.particleTier ?? 'medium'
     this.tuning = DAN_TIER_TUNING[particleTier]
     this.scanDuration = params.objective.scanDurationSeconds ?? DEFAULT_DAN_SCAN_DURATION_SECONDS
@@ -702,7 +717,7 @@ export class DanMinigame implements MiniGame, MiniGameEvents {
     const groundY = this.heightmap.heightAt(x, z)
     const handle = this.enemyDirector.spawn('bacteriophage', x, groundY, z)
     this.projectileSystem.addEnemy(handle.enemy)
-    const ctrl = new BacteriophageController(handle.enemy)
+    const ctrl = new BacteriophageController(handle.enemy, { lightPool: this.lightPool })
     ctrl.group.position.set(x, groundY, z)
     this.scene.add(ctrl.group)
     this.viroidControllers.set(handle.id, ctrl)

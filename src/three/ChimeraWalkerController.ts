@@ -27,6 +27,7 @@ import {
   type EnemyVisualControllerOptions,
   type EnemyVisualPalette,
 } from '@/three/enemyVisualPalette'
+import type { EnemyLightPool } from '@/three/EnemyLightPool'
 
 const CHIMERA_SCALE = 0.9
 /** Axial segments per leg tube — lower = cheaper {@link THREE.TubeGeometry} rebuilds. */
@@ -153,6 +154,10 @@ export class ChimeraWalkerController implements Tickable {
   private rnaCore!: THREE.Mesh
   private bodyLight!: THREE.PointLight
   private headLight!: THREE.PointLight
+  /** Pool the lights were borrowed from; `null` when self-owned. */
+  private readonly lightPool: EnemyLightPool | null
+  /** True when the chimera's lights should contribute this frame; gated in tick(). */
+  private lightsEnabled = true
   /** Restores head shell after hit / death flash (shared TRON shader). */
   private headMembraneMat!: THREE.ShaderMaterial
   private readonly tronMaterials: THREE.ShaderMaterial[] = []
@@ -196,6 +201,7 @@ export class ChimeraWalkerController implements Tickable {
 
   constructor(enemy: Enemy, options: EnemyVisualControllerOptions = {}) {
     this.enemy = enemy
+    this.lightPool = options.lightPool ?? null
     const palette = enemyVisualPaletteForTier(options.visualTier)
     this.visualPalette =
       options.visualTier === undefined || options.visualTier === 'default'
@@ -303,10 +309,12 @@ export class ChimeraWalkerController implements Tickable {
     this.dnaCore.scale.setScalar(1 + Math.sin(t * 2) * 0.1)
     this.rnaCore.scale.setScalar(1 + Math.sin(t * 2.5 + 1) * 0.08)
 
-    this.bodyLight.intensity = 0.3 + Math.sin(t * 2) * 0.2
-    this.headLight.intensity = this.isAgitated
-      ? 1 + Math.sin(t * 5) * 0.5
-      : 0.5 + Math.sin(t * 1.5) * 0.2
+    this.bodyLight.intensity = this.lightsEnabled ? 0.3 + Math.sin(t * 2) * 0.2 : 0
+    this.headLight.intensity = !this.lightsEnabled
+      ? 0
+      : this.isAgitated
+        ? 1 + Math.sin(t * 5) * 0.5
+        : 0.5 + Math.sin(t * 1.5) * 0.2
 
     // LOD: skip the rebake entirely for distant chimeras — caller sets
     // `lodSkipGeometry` when this enemy is too far for limb wiggle to be
@@ -368,6 +376,10 @@ export class ChimeraWalkerController implements Tickable {
         }
       }
     })
+    if (this.lightPool) {
+      this.lightPool.release(this.bodyLight)
+      this.lightPool.release(this.headLight)
+    }
   }
 
   private buildBody(): void {
@@ -402,7 +414,17 @@ export class ChimeraWalkerController implements Tickable {
     this.rnaCore.position.y = BODY_HEIGHT
     this.bodyGroup.add(this.rnaCore)
 
-    this.bodyLight = new THREE.PointLight(0x00ffcc, 0.4, 6)
+    // Borrow a pool slot when available so spawn/despawn does not change
+    // scene-wide `NUM_POINT_LIGHTS` and trigger lit-material recompiles.
+    const pooledBody = this.lightPool?.acquire() ?? null
+    if (pooledBody) {
+      pooledBody.color.setHex(0x00ffcc)
+      pooledBody.distance = 6
+      pooledBody.intensity = 0.4
+      this.bodyLight = pooledBody
+    } else {
+      this.bodyLight = new THREE.PointLight(0x00ffcc, 0.4, 6)
+    }
     this.bodyLight.position.y = BODY_HEIGHT
     this.bodyGroup.add(this.bodyLight)
   }
@@ -417,7 +439,16 @@ export class ChimeraWalkerController implements Tickable {
     this.headCore.position.y = HEAD_HEIGHT
     this.headGroup.add(this.headCore)
 
-    this.headLight = new THREE.PointLight(0xff4400, 0.8, 8)
+    // Pooled head light — same rationale as bodyLight in {@link buildBody}.
+    const pooledHead = this.lightPool?.acquire() ?? null
+    if (pooledHead) {
+      pooledHead.color.setHex(0xff4400)
+      pooledHead.distance = 8
+      pooledHead.intensity = 0.8
+      this.headLight = pooledHead
+    } else {
+      this.headLight = new THREE.PointLight(0xff4400, 0.8, 8)
+    }
     this.headLight.position.y = HEAD_HEIGHT
     this.headGroup.add(this.headLight)
 
@@ -696,8 +727,8 @@ export class ChimeraWalkerController implements Tickable {
     this.headCore.scale.setScalar((1 - ease * 0.8) * flicker)
     this.dnaCore.scale.setScalar((1 - ease) * flicker)
     this.rnaCore.scale.setScalar((1 - ease) * flicker)
-    this.bodyLight.intensity = (1 - ease) * flicker
-    this.headLight.intensity = (1 - ease) * 2 * flicker
+    this.bodyLight.intensity = this.lightsEnabled ? (1 - ease) * flicker : 0
+    this.headLight.intensity = this.lightsEnabled ? (1 - ease) * 2 * flicker : 0
 
     if (progress > 0.6) {
       const shrinkProgress = (progress - 0.6) / 0.4
@@ -733,8 +764,10 @@ export class ChimeraWalkerController implements Tickable {
    * @param enabled Whether the chimera's two point lights contribute this frame.
    */
   setLightsEnabled(enabled: boolean): void {
-    this.bodyLight.visible = enabled
-    this.headLight.visible = enabled
+    // Toggling `.visible` on point lights would change `NUM_POINT_LIGHTS` and
+    // recompile every lit material in the scene. Track the LOD state on a
+    // flag and gate intensity in tick() instead.
+    this.lightsEnabled = enabled
   }
 
   private refreshTentacleGeometry(time: number, isAgitated: boolean): void {

@@ -26,6 +26,7 @@ import {
   type EnemyVisualControllerOptions,
   type EnemyVisualPalette,
 } from '@/three/enemyVisualPalette'
+import type { EnemyLightPool } from '@/three/EnemyLightPool'
 
 // ── Visual constants ────────────────────────────────────────────
 const PHAGE_SCALE = 2.0
@@ -88,6 +89,10 @@ export class BacteriophageController implements Tickable {
   private head!: THREE.Mesh
   private core!: THREE.Mesh
   private light!: THREE.PointLight
+  /** Pool the {@link light} was borrowed from; `null` when the controller owns it. */
+  private readonly lightPool: EnemyLightPool | null
+  /** True when the inner light should contribute this frame; gated in tick(). */
+  private lightsEnabled = true
   /** Capsid material restored after hit flash. */
   private headTronMat!: THREE.ShaderMaterial
   private readonly tronMaterials: THREE.ShaderMaterial[] = []
@@ -120,6 +125,7 @@ export class BacteriophageController implements Tickable {
   constructor(enemy: Enemy, options: EnemyVisualControllerOptions = {}) {
     this.enemy = enemy
     this.visualPalette = enemyVisualPaletteForTier(options.visualTier)
+    this.lightPool = options.lightPool ?? null
     this.timeOffset = Math.random() * 10
 
     this.group.add(this.bodyGroup)
@@ -210,8 +216,18 @@ export class BacteriophageController implements Tickable {
     this.core.position.y = 0.75
     this.bodyGroup.add(this.core)
 
-    // Inner point light
-    this.light = new THREE.PointLight(0x00ffcc, 0.8, 3)
+    // Inner point light — borrow a pool slot when available so the scene's
+    // total `NUM_POINT_LIGHTS` does not change at spawn time. Falls back to
+    // a fresh light for legacy callers that have not threaded a pool through.
+    const pooled = this.lightPool?.acquire() ?? null
+    if (pooled) {
+      pooled.color.setHex(0x00ffcc)
+      pooled.distance = 3
+      pooled.intensity = 0.8
+      this.light = pooled
+    } else {
+      this.light = new THREE.PointLight(0x00ffcc, 0.8, 3)
+    }
     this.light.position.y = 0.75
     this.bodyGroup.add(this.light)
   }
@@ -337,7 +353,10 @@ export class BacteriophageController implements Tickable {
     this.core.scale.setScalar(coreScale)
 
     // --- Light pulse ---
-    this.light.intensity = 0.6 + Math.sin(t * 2) * 0.3
+    // Toggling `.visible` to LOD-out the light would change `NUM_POINT_LIGHTS`
+    // and recompile every lit material in the scene. Gate via intensity so
+    // the program cache key stays stable.
+    this.light.intensity = this.lightsEnabled ? 0.6 + Math.sin(t * 2) * 0.3 : 0
 
     // --- Legs ---
     // Skip the rebake entirely when LODed out — caller (minigame VC) sets
@@ -412,7 +431,7 @@ export class BacteriophageController implements Tickable {
     // --- Core flickers and dies ---
     const flicker = Math.random() > progress ? 1 : 0
     this.core.scale.setScalar((1 - ease) * flicker)
-    this.light.intensity = (1 - ease) * 2 * flicker
+    this.light.intensity = this.lightsEnabled ? (1 - ease) * 2 * flicker : 0
 
     // --- Whole group shrinks in the final third ---
     if (progress > 0.6) {
@@ -462,7 +481,7 @@ export class BacteriophageController implements Tickable {
    * @param enabled Whether the body light should contribute this frame.
    */
   setLightsEnabled(enabled: boolean): void {
-    this.light.visible = enabled
+    this.lightsEnabled = enabled
   }
 
   /** Clean up all geometry and materials. */
@@ -475,5 +494,8 @@ export class BacteriophageController implements Tickable {
         child.geometry.dispose()
       }
     })
+    if (this.lightPool) {
+      this.lightPool.release(this.light)
+    }
   }
 }

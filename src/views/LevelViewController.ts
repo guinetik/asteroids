@@ -89,6 +89,7 @@ import { buildFpsPlayerConfig } from '@/lib/fps/buildFpsPlayerConfig'
 import { buildMultiToolConfig } from '@/lib/fps/buildMultiToolConfig'
 import { SurfaceRockController } from '@/three/controllers/SurfaceRockController'
 import { createEnemyVisualWarmup, type EnemyVisualWarmup } from '@/three/EnemyVisualWarmup'
+import { EnemyLightPool } from '@/three/EnemyLightPool'
 import { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
 import { loadProfile } from '@/lib/player/profile'
 import { getItemDefinition } from '@/lib/inventory/catalog'
@@ -163,6 +164,24 @@ const LEVEL_FALL_DAMAGE_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.fallDamage
 const LEVEL_ATMOSPHERE_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.atmosphere
 const LEVEL_BOUNDS_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.bounds
 const LEVEL_COLLISION_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.collision
+/**
+ * Number of slots pre-allocated in the level's shared enemy point-light pool.
+ *
+ * Sized for the worst-case simultaneous lit-enemy population on a level:
+ *   - DAN minigame: up to 4 viroids (1 light each) = 4
+ *   - Disturbance director: cap of 5 ambient enemies; chimera takes 2 lights
+ *     each, so worst case 5 chimeras × 2 = 10
+ * Combined peak ≈ 14. Pool 16 leaves a small cushion. Warmup uses 4 slots
+ * (1 phage + 2 chimera + 1 spire) but releases before the game loop starts,
+ * so warmup demand does not stack with runtime demand.
+ *
+ * Note: program cache keys depend on `NUM_POINT_LIGHTS`. Resizing this
+ * constant invalidates the warmed program cache for that boot, so changes
+ * here cost a one-time precompile delta — keep the value generous enough
+ * that the pool does not need to grow mid-development.
+ */
+const ENEMY_LIGHT_POOL_SIZE = 16
+
 /** Dev-console `landNearObjective`: offset from waypoint toward ship (along ground XZ). */
 const DEV_LAND_NEAR_OBJECTIVE_OFFSET_M = 16
 /** Terrain clearance above the height sample so physics settles rather than spawning inside dirt. */
@@ -263,6 +282,14 @@ export class LevelViewController implements Tickable {
   private surfacePlayerSnapshot: THREE.Vector3 | null = null
   private prospectOverlay: ProspectOverlayController | null = null
   private enemyVisualWarmup: EnemyVisualWarmup | null = null
+  /**
+   * Pool of pre-allocated `THREE.PointLight` slots shared across procedural
+   * enemy controllers. Created once per level and added to the scene before
+   * shader precompile so `NUM_POINT_LIGHTS` is pinned at the pool size for
+   * the entire level lifetime — preventing the multi-second main-thread stall
+   * caused by lit-material program recompiles when an enemy spawns.
+   */
+  private enemyLightPool: EnemyLightPool | null = null
   private readonly collision = new LevelCollisionFacade()
   private rockYieldSystem: RockYieldSystem | null = null
   private stateMachine: StateMachine<LevelState> | null = null
@@ -767,6 +794,15 @@ export class LevelViewController implements Tickable {
     // ── Scene ───────────────────────────────────────────────────
     this.sceneManager = new SceneManager()
     this.sceneManager.mount(container)
+
+    // ── Enemy light pool ────────────────────────────────────────
+    // Allocate the shared enemy point-light pool *before* any other system
+    // that runs shader precompile so the pool's slots are part of the
+    // scene's `NUM_POINT_LIGHTS` from the very first compile pass. Sized
+    // for warmup (1 phage + 2 chimera + 1 spire = 4) plus runtime spawns
+    // (DAN tops out at 4 simultaneous viroids). 8 covers both phases with
+    // headroom; warmup lights are released before any runtime spawn.
+    this.enemyLightPool = new EnemyLightPool(this.sceneManager.scene, ENEMY_LIGHT_POOL_SIZE)
 
     // ── Asteroid data ────────────────────────────────────────────
     const { asteroid, seed, mission, persistCompletionRewards } = resolveLevelContext(
@@ -1292,6 +1328,7 @@ export class LevelViewController implements Tickable {
         projectileSystem: this.projectileSystem,
         missionDifficulty: mission.difficulty,
         seed: missionSeed,
+        lightPool: this.enemyLightPool,
       })
       this.disturbanceDirector.onDamagePlayer = (damage, sourceX, sourceZ, source) => {
         this.applyPlayerDamageFeedback(damage, sourceX, sourceZ, source)
@@ -1312,6 +1349,7 @@ export class LevelViewController implements Tickable {
       composition: asteroid.composition,
       missionSeed,
       danCraterPlacement: this.danPlacement,
+      enemyLightPool: this.enemyLightPool,
       bindings: {
         onPrompt: this.onTerminalPrompt,
         onComplete: this.onObjectiveComplete,
@@ -1652,7 +1690,7 @@ export class LevelViewController implements Tickable {
     // disappears for the rest of the bunker run.
     const multiToolWasVisible = this.multiTool?.getVisible() ?? false
     this.multiTool?.setVisible(true)
-    this.enemyVisualWarmup ??= createEnemyVisualWarmup()
+    this.enemyVisualWarmup ??= createEnemyVisualWarmup(this.enemyLightPool)
     scene.add(this.enemyVisualWarmup.group)
     this.enemyVisualWarmup.stageForCamera(camera)
     stageVisible(this.enemyVisualWarmup.group)
@@ -3657,6 +3695,10 @@ export class LevelViewController implements Tickable {
     this.landerController?.dispose()
     this.enemyVisualWarmup?.dispose()
     this.enemyVisualWarmup = null
+    // Dispose pool *after* warmup + minigames so any in-flight controllers
+    // have already released their slots back to it.
+    this.enemyLightPool?.dispose()
+    this.enemyLightPool = null
     if (this.surfaceBunkerHatch) {
       this.surfaceBunkerHatch.group.removeFromParent()
       this.surfaceBunkerHatch.dispose()
