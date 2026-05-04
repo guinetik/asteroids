@@ -154,7 +154,7 @@ describe('buildMissionTrackerGroups', () => {
       const board = emptyBoard()
       board.activeAsteroidMission = asteroidMission({ objectives: [objective(t)] })
       const row = buildMissionTrackerGroups(board)[0]!.rows[0]!
-      expect(row.objectiveType, `label for ${t}`).toBeTypeOf('string')
+      expect(row.objectiveType).toBeTypeOf('string')
       expect(row.objectiveType!.length).toBeGreaterThan(0)
     }
   })
