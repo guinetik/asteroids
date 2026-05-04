@@ -662,12 +662,24 @@ export class LevelViewController implements Tickable {
    * forward each frame from {@link tick}.
    */
   private bunkerSwapFade: {
-    /** Total seconds elapsed since the fade started. */
+    /**
+     * Current phase. `fading-out` ramps the overlay 0→1; at peak black we
+     * run `swap` and (for descent) hold on `compiling` until the precompile
+     * settles; `fading-in` ramps 1→0 once the held work resolves.
+     */
+    phase: 'fading-out' | 'compiling' | 'fading-in'
+    /** Seconds elapsed within the current phase (resets at every phase boundary). */
     elapsed: number
-    /** Whether the mid-swap callback has fired yet. */
-    swapped: boolean
     /** One-shot callback fired at peak black to perform the actual swap. */
     swap: () => void
+    /**
+     * Async work to await while held at peak black before fading in. Used by
+     * descent to compile bunker materials before the player sees the scene.
+     * `null` skips the hold (e.g. extract — surface materials are already warm).
+     */
+    holdBlackUntil: (() => Promise<void>) | null
+    /** True once `holdBlackUntil` has settled or was `null`. */
+    ready: boolean
   } | null = null
 
   /**
@@ -2085,41 +2097,45 @@ export class LevelViewController implements Tickable {
 
     this.surfacePlayerSnapshot = this.playerController.group.position.clone()
     const descentPos = this.surfacePlayerSnapshot
-    this.startBunkerSwapFade(() => {
-      // Swap scenes at peak black.
-      if (this.asteroidSurface) this.asteroidSurface.group.visible = false
-      if (this.surfaceRocks) this.surfaceRocks.group.visible = false
-      // Hide surface props the player shouldn't see while inside the bunker:
-      // the lander, the orbital shuttle, and the objective waypoint beam.
-      if (this.landerController) this.landerController.group.visible = false
-      if (this.arrivalSequence) this.arrivalSequence.shuttleGroup.visible = false
-      if (this.surfaceBunkerHatch) this.surfaceBunkerHatch.group.visible = false
-      this.projectileSystem?.setTerrainCollisionEnabled(false)
-      setWaypointMarkersVisible(false)
-      minigame.setSceneRootWorldPosition(descentPos.x, descentPos.y, descentPos.z)
-      minigame.notifyDescended()
-      // Bunker `activate()` adds five arena PointLights that were not in the scene at initial
-      // `precompileShaders` — without a second pass, Three.js recompiles PBR the first time that
-      // light count hits materials (often on look-strafe), matching multi-frame stalls in
-      // docs/superpowers/specs/2026-04-18-fps-perf-fixes-design.md (v3).
-      void this.precompileShaders()
-      // The bunker antechamber's floor sits at the bunker root, which equals
-      // `descentPos.y`. Override the player's ground sampler so the asteroid
-      // heightmap (which doesn't model the interior) doesn't leak through.
-      this.playerController?.setGroundYOverride(descentPos.y)
-      const spawn = minigame.playerSpawn
-      if (spawn && this.playerController) {
-        // playerSpawn is in bunker-local coords; adding the descent position
-        // (which is now the bunker root's world position) gives the world spawn.
-        this.playerController.group.position.set(
-          descentPos.x + spawn.x,
-          descentPos.y + spawn.y,
-          descentPos.z + spawn.z,
-        )
-        this.playerController.body.velocityY = 0
-      }
-      this.stateMachine?.trigger('enterBunker')
-    })
+    this.startBunkerSwapFade(
+      () => {
+        // Swap scenes at peak black.
+        if (this.asteroidSurface) this.asteroidSurface.group.visible = false
+        if (this.surfaceRocks) this.surfaceRocks.group.visible = false
+        // Hide surface props the player shouldn't see while inside the bunker:
+        // the lander, the orbital shuttle, and the objective waypoint beam.
+        if (this.landerController) this.landerController.group.visible = false
+        if (this.arrivalSequence) this.arrivalSequence.shuttleGroup.visible = false
+        if (this.surfaceBunkerHatch) this.surfaceBunkerHatch.group.visible = false
+        this.projectileSystem?.setTerrainCollisionEnabled(false)
+        setWaypointMarkersVisible(false)
+        minigame.setSceneRootWorldPosition(descentPos.x, descentPos.y, descentPos.z)
+        minigame.notifyDescended()
+        // The bunker antechamber's floor sits at the bunker root, which equals
+        // `descentPos.y`. Override the player's ground sampler so the asteroid
+        // heightmap (which doesn't model the interior) doesn't leak through.
+        this.playerController?.setGroundYOverride(descentPos.y)
+        const spawn = minigame.playerSpawn
+        if (spawn && this.playerController) {
+          // playerSpawn is in bunker-local coords; adding the descent position
+          // (which is now the bunker root's world position) gives the world spawn.
+          this.playerController.group.position.set(
+            descentPos.x + spawn.x,
+            descentPos.y + spawn.y,
+            descentPos.z + spawn.z,
+          )
+          this.playerController.body.velocityY = 0
+        }
+        this.stateMachine?.trigger('enterBunker')
+      },
+      // Hold the screen at full black while bunker materials compile. The
+      // bunker geometry, walls, doors, chests, and arena lights only enter
+      // the scene on `notifyDescended` (above), so the level-boot
+      // `precompileShaders` pass never saw them. Without this hold the
+      // fade-in races the compile and the player sees the multi-second main-
+      // thread stall mid-fade. Awaiting here keeps the swap graceful.
+      () => this.precompileShaders(),
+    )
   }
 
   /**
@@ -2162,42 +2178,82 @@ export class LevelViewController implements Tickable {
    * supplied `swap` callback fires once at peak black. Subsequent descent /
    * exit requests are ignored while a swap is already in flight.
    *
-   * @param swap - Function to run while the screen is fully black
+   * @param swap - Function to run while the screen is fully black.
+   * @param holdBlackUntil - Optional async work to await while held at full
+   *   black before the fade-in starts. When provided, the overlay sits at
+   *   alpha 1 until the returned promise settles (resolve or reject), which
+   *   lets descent compile bunker shaders without the player seeing the
+   *   main-thread stall. `null`/omitted means fade-in starts immediately.
    */
-  private startBunkerSwapFade(swap: () => void): void {
-    this.bunkerSwapFade = { elapsed: 0, swapped: false, swap }
+  private startBunkerSwapFade(
+    swap: () => void,
+    holdBlackUntil: (() => Promise<void>) | null = null,
+  ): void {
+    this.bunkerSwapFade = {
+      phase: 'fading-out',
+      elapsed: 0,
+      swap,
+      holdBlackUntil,
+      ready: holdBlackUntil === null,
+    }
     this.onArrivalFade?.(0)
   }
 
   /**
-   * Per-frame driver for the bunker descent / extract fade. Runs the
-   * 0→1→0 ramp on the shared arrival-fade overlay and fires the swap
-   * callback at peak black.
+   * Per-frame driver for the bunker descent / extract fade. Three-phase ramp:
+   * `fading-out` 0→1, `compiling` held at 1 until any `holdBlackUntil` work
+   * resolves, `fading-in` 1→0.
    *
-   * @param dt - Frame delta in seconds
+   * @param dt - Frame delta in seconds.
    */
   private tickBunkerSwapFade(dt: number): void {
     const fade = this.bunkerSwapFade
     if (!fade) return
     fade.elapsed += dt
-    if (fade.elapsed < BUNKER_SWAP_FADE_OUT_SECONDS) {
+
+    if (fade.phase === 'fading-out') {
       const t = fade.elapsed / BUNKER_SWAP_FADE_OUT_SECONDS
-      this.onArrivalFade?.(Math.min(1, t))
-      return
-    }
-    if (!fade.swapped) {
+      if (t < 1) {
+        this.onArrivalFade?.(Math.min(1, t))
+        return
+      }
+      // Reached peak black — run the swap, then either kick off the held
+      // async work or advance straight to fade-in.
       this.onArrivalFade?.(1)
       fade.swap()
-      fade.swapped = true
+      fade.phase = 'compiling'
+      fade.elapsed = 0
+      const work = fade.holdBlackUntil
+      if (work) {
+        // Capture the current fade so a level teardown that nullifies
+        // `bunkerSwapFade` cannot flip `ready` on a later, unrelated fade.
+        const owner = fade
+        work().finally(() => {
+          if (this.bunkerSwapFade === owner) {
+            owner.ready = true
+          }
+        })
+      }
       return
     }
-    const inT = (fade.elapsed - BUNKER_SWAP_FADE_OUT_SECONDS) / BUNKER_SWAP_FADE_IN_SECONDS
-    if (inT >= 1) {
+
+    if (fade.phase === 'compiling') {
+      this.onArrivalFade?.(1)
+      if (fade.ready) {
+        fade.phase = 'fading-in'
+        fade.elapsed = 0
+      }
+      return
+    }
+
+    // fading-in
+    const t = fade.elapsed / BUNKER_SWAP_FADE_IN_SECONDS
+    if (t >= 1) {
       this.onArrivalFade?.(0)
       this.bunkerSwapFade = null
       return
     }
-    this.onArrivalFade?.(Math.max(0, 1 - inT))
+    this.onArrivalFade?.(Math.max(0, 1 - t))
   }
 
   // ═══════════════════════════════════════════════════════════════
