@@ -364,6 +364,17 @@
             this.landerRotation = 0;
           }
 
+          // Preserve pad + score if the pilot falls off-screen after landing.
+          _respawnSkyKeepTerrain() {
+            this.landerX = this.width / 2;
+            this.landerY = LanderGame.LANDER_HEIGHT;
+            this.landerVelocityX = 0;
+            this.landerVelocityY = 0;
+            this.landerRotation = 0;
+            this.coins = [];
+            this.lastCoinSpawn = this.lastTime;
+          }
+
           _handleKeyDown(e) {
             if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') this.keys.left = true;
             if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this.keys.right = true;
@@ -388,7 +399,7 @@
           }
 
           _handleMouseMove(e) {
-            if (this.state !== 'falling' && this.state !== 'landing') return;
+            if (this.state !== 'falling' && this.state !== 'landing' && this.state !== 'landed') return;
             if (this.lastMouseX !== null) {
               // Nudge lateral velocity by the cursor delta. Drag and the velocity
               // clamp tame it; gives an analog feel where fast swipes accelerate
@@ -545,16 +556,23 @@
               const padEnd = this.height * LanderGame.TERRAIN_PAD_FINAL_RATIO;
               this.terrainPadY = padStart + (padEnd - padStart) * easeT;
 
+              const thrustingLanding = this.keys.thrust || this.isPointerDown;
+              let skipLandingDynamics = false;
               if (this.landingFrozen) {
-                const ridingGroundY = this._terrainHeightAt(this.landerX, this.terrainPadY);
-                if (ridingGroundY <= this.landerY + LanderGame.LANDER_HEIGHT / 2) {
-                  this.landerY = ridingGroundY - LanderGame.LANDER_HEIGHT / 2;
-                  this.landerRotation = this._terrainSlopeAt(this.landerX);
+                if (thrustingLanding) {
+                  this.landingFrozen = false;
+                } else {
+                  const ridingGroundY = this._terrainHeightAt(this.landerX, this.terrainPadY);
+                  if (ridingGroundY <= this.landerY + LanderGame.LANDER_HEIGHT / 2) {
+                    this.landerY = ridingGroundY - LanderGame.LANDER_HEIGHT / 2;
+                    this.landerRotation = this._terrainSlopeAt(this.landerX);
+                  }
+                  skipLandingDynamics = true;
                 }
-                return;
               }
 
-              const thrusting = this.keys.thrust || this.isPointerDown;
+              const thrusting = thrustingLanding;
+              if (!skipLandingDynamics) {
               this.landerVelocityY += LanderGame.GRAVITY * LanderGame.LANDING_GRAVITY_SCALE * deltaSec;
               if (thrusting) this.landerVelocityY -= LanderGame.THRUST * deltaSec;
               this.landerVelocityY = Math.max(-LanderGame.MAX_RISE_SPEED, Math.min(LanderGame.MAX_FALL_SPEED, this.landerVelocityY));
@@ -597,6 +615,75 @@
                 this.state = 'landed';
                 this.playBtn.style.display = 'block';
                 if (this.title) this.title.style.display = 'block';
+              }
+
+              }
+
+              if (thrusting && Math.random() < 0.6) {
+                this.particles.push({
+                  x: this.landerX + (Math.random() - 0.5) * 8,
+                  y: this.landerY + LanderGame.LANDER_HEIGHT / 2,
+                  vx: (Math.random() - 0.5) * 60,
+                  vy: Math.random() * 80 + 40,
+                  life: 0.8,
+                });
+              }
+
+              this._updateCoins(deltaSec);
+            } else if (this.state === 'landed') {
+              const padFinalY = this.height * LanderGame.TERRAIN_PAD_FINAL_RATIO;
+              const thrusting = this.keys.thrust || this.isPointerDown;
+
+              const lateralAccelLand = 600;
+              const lateralMaxLand = 240;
+              const lateralDragLand = 320;
+              if (this.keys.left) {
+                this.landerVelocityX -= lateralAccelLand * deltaSec;
+              } else if (this.keys.right) {
+                this.landerVelocityX += lateralAccelLand * deltaSec;
+              } else {
+                if (this.landerVelocityX > 0) {
+                  this.landerVelocityX = Math.max(0, this.landerVelocityX - lateralDragLand * deltaSec);
+                }
+                if (this.landerVelocityX < 0) {
+                  this.landerVelocityX = Math.min(0, this.landerVelocityX + lateralDragLand * deltaSec);
+                }
+              }
+              this.landerVelocityX = Math.max(-lateralMaxLand, Math.min(lateralMaxLand, this.landerVelocityX));
+              this.landerX += this.landerVelocityX * deltaSec;
+
+              if (this.landerX < LanderGame.LANDER_WIDTH / 2) {
+                this.landerX = LanderGame.LANDER_WIDTH / 2;
+                this.landerVelocityX = 0;
+              }
+              if (this.landerX > this.width - LanderGame.LANDER_WIDTH / 2) {
+                this.landerX = this.width - LanderGame.LANDER_WIDTH / 2;
+                this.landerVelocityX = 0;
+              }
+
+              this.landerVelocityY += LanderGame.GRAVITY * deltaSec;
+              if (thrusting) this.landerVelocityY -= LanderGame.THRUST * deltaSec;
+              this.landerVelocityY = Math.max(
+                -LanderGame.MAX_RISE_SPEED,
+                Math.min(LanderGame.MAX_FALL_SPEED, this.landerVelocityY)
+              );
+              this.landerY += this.landerVelocityY * deltaSec;
+
+              if (this.landerY < LanderGame.LANDER_HEIGHT / 2) {
+                this.landerY = LanderGame.LANDER_HEIGHT / 2;
+                this.landerVelocityY = 0;
+              }
+
+              const landerFootYPost = this.landerY + LanderGame.LANDER_HEIGHT / 2;
+              const settledGroundHere = this._terrainHeightAt(this.landerX, padFinalY);
+              if (landerFootYPost >= settledGroundHere && !thrusting && this.landerVelocityY >= 0) {
+                this.landerY = settledGroundHere - LanderGame.LANDER_HEIGHT / 2;
+                this.landerVelocityY = 0;
+                this.landerRotation = this._terrainSlopeAt(this.landerX);
+              }
+
+              if (this.landerY > this.height + LanderGame.LANDER_HEIGHT) {
+                this._respawnSkyKeepTerrain();
               }
 
               if (thrusting && Math.random() < 0.6) {
@@ -752,7 +839,7 @@
             ctx.fillStyle = '#ffffff';
             ctx.fill(this.landerPath1);
 
-            if (this.state === 'falling' || this.state === 'landing') {
+            if (this.state === 'falling' || this.state === 'landing' || this.state === 'landed') {
               ctx.globalAlpha = 0.5 + Math.random() * 0.5;
               ctx.fillStyle = '#38bdf8';
               ctx.fill(this.landerPath2);
