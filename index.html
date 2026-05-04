@@ -1,6 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <script>
+      if (/Mobi|Android/i.test(navigator.userAgent) || window.innerWidth <= 768) {
+        document.write(`
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Asteroid Lander</title>
+          <style>
+            html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background: #000; }
+            body { color: #fff; font-family: system-ui, sans-serif; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; padding: 1rem; }
+            h1 { color: #22d3ee; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 300; margin-bottom: 1rem; font-size: 1.8rem; }
+            p { color: rgba(255,255,255,0.8); line-height: 1.5; margin-bottom: 2rem; max-width: 400px; font-size: 0.9rem; }
+            .video-container { position: relative; width: 100%; max-width: 500px; padding-bottom: 56.25%; height: 0; background: #111; border-radius: 8px; margin-bottom: 2rem; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
+            .video-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; border-radius: 8px; }
+            button { background: linear-gradient(180deg, rgba(34, 211, 238, 0.16), rgba(8, 47, 73, 0.7)); border: 1px solid rgba(103, 232, 249, 0.28); color: #ecfecf; padding: 1rem 2rem; border-radius: 999px; font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; cursor: pointer; flex-shrink: 0; }
+          </style>
+          <body>
+            <h1>Asteroid Lander</h1>
+            <p>A mobile version is coming soon!<br><br>The game currently requires a desktop browser to play. Check out the trailer and share it with your friends to play on desktop.</p>
+            <div class="video-container">
+              <iframe src="https://www.youtube.com/embed/yzzz8QrxZnM" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+            </div>
+            <button onclick="if(navigator.share) { navigator.share({title: 'Asteroid Lander', text: 'Check out Asteroid Lander on your desktop!', url: window.location.href}).catch(console.error) } else { alert('Copy this link: ' + window.location.href) }">Share Game</button>
+          </body>
+        `);
+        // Instead of window.stop() which kills the iframe loading, we just 
+        // prevent the rest of the DOM from showing by hiding the body once it loads
+        window.addEventListener('DOMContentLoaded', () => {
+          const app = document.getElementById('app');
+          const prelude = document.getElementById('prelude-container');
+          if (app) app.style.display = 'none';
+          if (prelude) prelude.style.display = 'none';
+        });
+      }
+    </script>
     <meta charset="UTF-8">
     <link rel="icon" href="/favicon.ico" sizes="any" type="image/x-icon">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -99,11 +132,43 @@
         letter-spacing: 0.22em;
         text-transform: uppercase;
         cursor: pointer;
-        transition: border-color 140ms ease, opacity 140ms ease;
+        transition: border-color 140ms ease, box-shadow 140ms ease;
+        animation: btnFadeIn 2s ease-out 2.5s both;
       }
       #prelude-play-btn:hover {
         border-color: rgba(165, 243, 252, 0.72);
         box-shadow: 0 0 1.5rem rgba(34, 211, 238, 0.18);
+      }
+      #prelude-title {
+        display: none;
+        color: rgba(236, 254, 255, 0.9);
+        font-family: 'Datatype', ui-sans-serif, system-ui, sans-serif;
+        font-size: 2.2rem;
+        font-weight: 300;
+        text-transform: uppercase;
+        margin-bottom: 3rem;
+        margin-right: -0.8em;
+        animation: alienTitle 5s cubic-bezier(0.2, 0, 0.2, 1) forwards;
+      }
+      @keyframes alienTitle {
+        0% {
+          opacity: 0;
+          letter-spacing: 0.1em;
+          filter: blur(12px);
+        }
+        40% {
+          opacity: 0.8;
+          filter: blur(2px);
+        }
+        100% {
+          opacity: 1;
+          letter-spacing: 0.8em;
+          filter: blur(0);
+        }
+      }
+      @keyframes btnFadeIn {
+        0% { opacity: 0; }
+        100% { opacity: 1; }
       }
     </style>
   </head>
@@ -113,6 +178,7 @@
         <canvas id="prelude-canvas"></canvas>
       </div>
       <div id="prelude-ui">
+        <div id="prelude-title">ASTEROID LANDER</div>
         <button id="prelude-play-btn">PLAY</button>
       </div>
     </div>
@@ -127,6 +193,7 @@
             this.wrapper = elements.wrapper;
             this.canvas = elements.canvas;
             this.playBtn = elements.playBtn;
+            this.title = elements.title;
             this.ctx = this.canvas.getContext('2d');
             this.width = 0;
             this.height = 0;
@@ -217,6 +284,19 @@
             this.landerPath1 = new Path2D("m79.863 77.492h-1.1328l-6.1094-12.168v-7.7266c0-0.58594-0.23438-1.1484-0.64844-1.5625-0.41406-0.41406-0.97656-0.64453-1.5625-0.64453h-40.82c-0.58594 0-1.1484 0.23047-1.5625 0.64453-0.41406 0.41406-0.64844 0.97656-0.64844 1.5625v7.7266l-6.1094 12.168h-1.1328c-0.84766-0.015626-1.5586 0.625-1.6328 1.4648-0.023437 0.42578 0.12891 0.83984 0.42188 1.1484 0.28906 0.30859 0.69531 0.48047 1.1211 0.48047h5.7344c0.84375 0.019531 1.5586-0.62109 1.6328-1.4609 0.023438-0.42578-0.12891-0.83984-0.42187-1.1484-0.29297-0.30859-0.69922-0.48437-1.125-0.48437h-1.0469l5.7812-8.5859-0.003906 0.003906c0.26953 1.5938 1.6484 2.7617 3.2656 2.7617h11.293l-0.30859-2.6875c-0.17188-1.4727 0.29688-2.9453 1.2812-4.0469 0.98438-1.1055 2.3945-1.7383 3.8711-1.7383 1.4805 0 2.8906 0.63281 3.875 1.7383 0.98438 1.1016 1.4531 2.5742 1.2812 4.0469l-0.30859 2.6875h11.293-0.003906c1.6172 0 2.9961-1.168 3.2656-2.7617l5.7773 8.582h-0.96094c-0.84375-0.015626-1.5586 0.625-1.6328 1.4648-0.023438 0.42578 0.12891 0.83984 0.42187 1.1484 0.29297 0.30859 0.69922 0.48047 1.125 0.48047h5.8203c0.42578 0 0.83203-0.17188 1.1211-0.48047 0.29297-0.30859 0.44531-0.72266 0.42188-1.1484-0.074219-0.83984-0.78516-1.4805-1.6328-1.4648z");
             this.landerPath2 = new Path2D("m52.91 77.492h-1.1836l1.0156-8.7891h-0.003907c0.09375-0.78125-0.15625-1.5625-0.67969-2.1484-0.52344-0.58984-1.2734-0.92578-2.0586-0.92578s-1.5352 0.33594-2.0586 0.92578c-0.52344 0.58594-0.77344 1.3672-0.67969 2.1484l1.0156 8.7891h-1.1875c-0.41016 0-0.80469 0.16406-1.0977 0.45312-0.28906 0.28906-0.45313 0.68359-0.45313 1.0938 0 0.41016 0.16406 0.80469 0.45313 1.0977 0.29297 0.28906 0.6875 0.45312 1.0977 0.44922h5.8203c0.41016 0.003906 0.80469-0.16016 1.0977-0.44922 0.28906-0.29297 0.45313-0.6875 0.45313-1.0977 0-0.41016-0.16406-0.80469-0.45313-1.0938-0.29297-0.28906-0.6875-0.45312-1.0977-0.45312z");
             this.landerPath3 = new Path2D("m35.879 52.586h28.246-0.003906c0.53125 0 1.0352-0.23828 1.3711-0.64844 0.33594-0.41016 0.46875-0.94922 0.36328-1.4688l-0.51172-2.5352h0.003906c-0.13672-0.67188 0.12891-1.3594 0.67578-1.7695l0.86328-0.64062h0.003906c0.54688-0.41016 0.8125-1.0977 0.67578-1.7695l-1.1602-5.7422c-0.13281-0.67188-0.64453-1.207-1.3125-1.3711l-1.0352-0.25391v0.003906c-0.66406-0.16406-1.1797-0.69922-1.3125-1.3711l-0.44922-2.2344c-0.16406-0.82422-0.89062-1.4219-1.7344-1.4219h-9.5312v-6.5c0.98047-0.41406 1.6445-1.3438 1.7227-2.4023 0.039063-0.77734-0.23438-1.5352-0.75781-2.1055-0.52344-0.57422-1.2539-0.91406-2.0273-0.94141-1.3594-0.019531-2.5391 0.92578-2.8203 2.25-0.27734 1.3281 0.42187 2.668 1.6719 3.1992v6.5h-9.3828c-0.84375 0-1.5703 0.59766-1.7344 1.4219l-3.5586 17.684c-0.10547 0.51953 0.027344 1.0586 0.36328 1.4688 0.33594 0.41016 0.83984 0.64844 1.3711 0.64844zm14.121-15.031c2.0859 0 3.9688 1.2578 4.7656 3.1836 0.79688 1.9297 0.35547 4.1484-1.1172 5.6211-1.4766 1.4766-3.6953 1.918-5.6211 1.1211-1.9297-0.80078-3.1836-2.6797-3.1836-4.7656 0-2.8477 2.3086-5.1602 5.1562-5.1602z");
+            
+            this.shopPath1 = new Path2D("M 230.698 162.975 C 229.472 161.846 227.987 162.295 224.53 162.229 C 224.53 162.112 224.585 156.174 224.503 155.467 C 224.479 155.256 224.44 155.038 224.3 154.87 C 223.808 154.588 222.976 154.737 222.413 154.741 C 222.413 154.721 222.417 115.753 222.421 115.362 C 225.612 115.299 226.007 115.455 226.694 115.303 C 227.413 115.147 227.811 114.674 227.905 114.123 C 228.003 113.561 227.975 108.096 227.936 107.491 C 227.921 107.272 227.897 107.108 227.804 106.905 C 227.483 106.217 227.018 105.565 226.636 104.909 C 226.202 104.162 225.393 102.491 224.85 101.94 C 221.827 101.955 144.639 101.905 143.53 101.975 C 143.276 102.272 140.687 106.936 140.624 107.237 C 140.503 107.83 140.589 109.209 140.589 109.866 C 140.589 111.17 140.503 112.701 140.609 113.983 C 140.636 114.334 140.812 114.662 141.077 114.893 C 141.327 115.108 141.659 115.241 141.984 115.295 C 142.484 115.381 143.038 115.338 143.546 115.338 C 144.464 115.33 145.382 115.334 146.3 115.35 C 146.335 119.069 146.292 152.862 146.292 154.764 C 145.882 154.76 144.62 154.639 144.366 154.936 C 144.23 155.092 144.198 155.412 144.183 155.612 C 144.171 155.752 144.163 162.174 144.163 162.19 C 143.331 162.194 142.503 162.186 141.671 162.17 C 139.132 162.127 137.034 162.334 137.101 164.99 C 137.132 166.471 138.374 167.612 139.726 167.705 C 139.745 167.705 228.785 167.76 229.453 167.592 C 230.531 167.322 231.386 166.428 231.527 165.291 C 231.644 164.432 231.312 163.537 230.699 162.975 L 230.698 162.975 Z M 223.464 155.819 L 223.468 162.213 C 218.194 162.213 216.667 162.217 216.292 162.217 L 216.288 162.217 L 216.257 162.217 L 216.268 162.217 L 216.226 162.217 L 216.233 162.217 L 216.214 162.217 L 216.218 162.217 L 216.198 162.217 L 216.202 162.217 L 216.194 162.217 L 216.186 162.217 C 216.175 160.088 216.179 157.959 216.194 155.831 C 218.585 155.819 220.397 155.792 223.464 155.819 L 223.464 155.819 Z M 208.566 118.846 C 208.113 118.701 185.613 121.561 184.937 121.658 C 184.863 119.569 184.921 117.455 184.949 115.365 C 186.089 115.365 215.758 115.334 216.902 115.361 L 216.933 154.713 C 216.554 154.702 215.523 154.585 215.241 154.885 C 215.124 155.01 215.101 155.35 215.089 155.514 C 215.089 155.534 215.081 162.186 215.081 162.206 C 213.757 162.206 213.073 162.21 208.823 162.253 C 208.82 162.233 208.933 119.226 208.566 118.847 L 208.566 118.846 Z M 207.749 120.045 C 207.765 120.303 207.722 162.19 207.722 162.209 C 183.734 162.232 185.183 162.248 184.999 162.201 C 184.866 161.947 184.913 164.365 184.929 122.732 C 185.175 122.678 207.554 119.885 207.749 120.045 L 207.749 120.045 Z M 217.983 115.377 C 219.105 115.365 220.226 115.365 221.347 115.369 C 221.366 116.865 221.374 154.689 221.374 154.717 C 220.249 154.741 219.12 154.713 217.995 154.706 L 217.983 115.377 Z M 141.71 107.514 C 141.8 107.182 143.949 103.354 144.171 102.99 C 144.398 102.986 224.273 103.01 224.308 103.01 C 224.668 103.537 226.746 107.057 226.84 107.455 C 226.957 107.951 226.882 108.584 226.875 109.1 C 226.316 109.108 142.227 109.115 141.672 109.115 C 141.668 108.623 141.586 107.983 141.711 107.514 L 141.71 107.514 Z M 142.957 114.295 C 142.707 114.295 142.035 114.354 141.867 114.166 C 141.734 114.022 141.683 113.791 141.656 113.604 C 141.542 112.807 141.636 111.049 141.64 110.158 C 231.37 110.135 224.175 110.123 226.87 110.166 C 226.89 110.881 227.019 113.744 226.769 114.256 C 226.698 114.275 146.609 114.295 142.957 114.295 L 142.957 114.295 Z M 179.926 131.736 C 179.883 131.396 179.687 131.08 179.461 130.83 C 178.968 130.287 178.324 130.111 177.613 130.095 C 176.574 130.072 165.511 130.068 165.211 130.111 C 163.77 130.326 163.508 131.341 163.535 132.607 L 163.543 162.216 C 162.66 162.255 161.773 162.236 160.891 162.228 C 160.867 160.892 160.883 125.662 160.883 125.634 C 161.723 125.587 183.102 122.895 183.801 122.829 C 183.875 122.997 183.863 162.095 183.863 162.114 L 179.981 162.114 C 179.981 162.095 179.953 131.973 179.926 131.735 L 179.926 131.736 Z M 178.879 162.213 L 178.871 162.213 L 178.863 162.213 L 178.855 162.213 L 178.859 162.213 L 178.84 162.213 L 178.851 162.213 L 178.785 162.213 C 178.445 162.213 177.062 162.217 172.269 162.229 C 172.238 161.26 172.238 132.116 172.238 131.202 C 173.976 131.174 175.719 131.194 177.457 131.19 C 178.183 131.178 178.789 131.182 178.863 132.135 C 178.91 132.768 178.902 141.295 178.879 162.213 C 178.883 162.213 178.883 162.213 178.879 162.213 L 178.879 162.213 Z M 164.609 135.756 C 164.609 134.561 164.554 133.346 164.589 132.154 C 164.609 131.51 164.866 131.299 165.249 131.186 C 167.226 131.115 169.214 131.17 171.191 131.178 C 171.046 141.518 171.257 151.869 171.171 162.209 C 170.187 162.217 166.038 162.244 164.616 162.228 L 164.632 144.396 L 164.609 135.756 Z M 183.836 121.811 C 182.277 121.858 160.18 124.666 160.047 124.745 C 160.015 124.764 159.949 124.811 159.926 124.842 C 159.808 125.014 159.82 125.448 159.812 125.655 C 159.812 125.674 159.781 162.065 159.777 162.214 C 157.695 162.237 155.609 162.245 153.527 162.237 C 153.527 162.218 153.543 155.921 153.496 155.46 C 153.476 155.253 153.453 155.054 153.336 154.878 C 152.894 154.628 152.152 154.729 151.644 154.733 L 151.648 115.366 C 181.054 115.362 183.66 115.362 183.839 115.362 L 183.851 115.362 L 183.836 121.811 Z M 150.582 115.362 L 150.574 154.76 L 147.378 154.76 L 147.363 115.373 C 148.429 115.334 149.511 115.345 150.582 115.361 L 150.582 115.362 Z M 145.226 155.893 L 145.308 155.819 C 147.671 155.737 150.082 155.772 152.445 155.834 C 152.445 155.854 152.425 161.979 152.406 162.209 L 145.226 162.209 C 145.23 162.19 145.203 156.428 145.226 155.893 L 145.226 155.893 Z M 228.831 166.612 C 228.667 166.62 140.472 166.635 140.069 166.623 C 138.827 166.592 138.272 165.952 138.179 165.213 C 138.073 164.354 138.612 163.432 139.768 163.299 C 139.948 163.291 228.463 163.33 228.483 163.33 C 229.511 163.354 230.269 163.612 230.468 164.858 C 230.581 165.596 230.011 166.483 228.831 166.612 L 228.831 166.612 Z");
+            this.shopPath2 = new Path2D("M 170.737 148.9 C 170.792 147.838 170.784 146.756 170.768 145.693 L 165.104 145.685 C 165.097 146.759 165.093 147.834 165.093 148.912 C 166.964 148.92 168.874 149.01 170.737 148.9 L 170.737 148.9 Z M 166.226 146.814 C 167.374 146.791 168.526 146.806 169.675 146.806 C 169.698 147.142 169.694 147.478 169.694 147.814 L 166.183 147.802 C 166.179 147.47 166.194 147.146 166.226 146.814 L 166.226 146.814 Z");
+            this.shopPath3 = new Path2D("M 172.62 145.689 C 172.609 146.763 172.577 147.845 172.605 148.916 C 174.503 148.904 176.402 148.908 178.296 148.923 C 178.308 147.857 178.355 146.748 178.276 145.685 C 176.398 145.658 174.503 145.646 172.62 145.689 L 172.62 145.689 Z M 173.687 147.779 L 173.683 146.814 C 174.859 146.794 176.038 146.771 177.218 146.806 C 177.226 147.134 177.222 147.462 177.226 147.791 C 176.05 147.826 174.862 147.783 173.687 147.779 L 173.687 147.779 Z");
+            this.shopPath4 = new Path2D("M 199.3 145.322 C 199.773 145.369 204.839 145.349 205.144 145.342 C 206.148 145.174 206.625 144.603 206.707 143.904 C 206.796 143.146 206.812 133.869 206.726 133.388 C 206.414 131.654 205.285 131.708 199.152 131.853 C 198.55 132.025 198.078 132.302 197.761 132.865 C 197.597 133.154 197.566 133.466 197.543 133.794 C 197.531 133.958 197.5 143.572 197.628 144.032 C 197.875 144.923 198.421 145.235 199.3 145.321 L 199.3 145.322 Z M 198.644 133.529 C 198.699 133.248 198.855 133.123 199.085 132.97 C 199.554 132.92 204.812 132.963 205.167 132.967 C 205.308 133.053 205.472 133.142 205.566 133.283 C 205.746 133.549 205.691 143.654 205.652 143.822 C 205.601 144.045 205.374 144.162 205.191 144.263 C 205.171 144.263 199.46 144.228 199.363 144.22 C 198.753 144.174 198.663 144.123 198.624 143.201 C 198.581 142.256 198.585 133.834 198.644 133.529 L 198.644 133.529 Z");
+
+            this.parkPath1 = new Path2D("M 195.935 163.672 h 4.8 v 76.6 h -4.8 Z");
+            this.parkPath2 = new Path2D("M 237.435 160.172 C 237.235 158.572 236.735 155.972 235.335 153.172 C 233.735 150.172 231.735 148.172 230.235 146.972 C 230.035 146.772 229.635 146.772 229.435 146.972 C 228.035 148.172 225.935 150.172 224.335 153.172 C 222.835 155.972 222.335 158.572 222.235 160.172 L 222.235 228.072 L 225.335 228.072 L 225.335 233.072 L 225.335 234.272 L 226.435 234.272 L 233.135 234.272 L 234.335 234.272 L 234.335 233.072 L 234.335 228.072 L 237.435 228.072 L 237.435 160.172 Z M 228.335 169.872 L 229.535 166.772 C 229.635 166.472 230.035 166.472 230.135 166.772 L 231.335 169.872 L 233.235 173.272 L 226.435 173.272 L 228.335 169.872 Z M 226.435 218.872 L 226.435 208.872 L 233.135 208.872 L 233.135 218.872 L 226.435 218.872 Z M 233.235 184.972 L 233.235 194.972 L 226.435 194.972 L 226.435 184.972 L 233.235 184.972 Z M 226.435 183.072 L 226.435 175.072 L 233.135 175.072 L 233.135 183.072 L 226.435 183.072 Z M 233.235 196.872 L 233.235 206.872 L 226.435 206.872 L 226.435 196.872 L 233.235 196.872 Z M 233.235 233.072 L 226.435 233.072 L 226.435 228.072 L 226.235 220.872 L 232.935 220.872 L 233.135 228.072 L 233.135 233.072 L 233.235 233.072 Z");
+            this.parkPath3 = new Path2D("M 234.335 240.272 L 225.435 240.272 L 226.535 236.572 L 233.135 236.572 Z");
+            this.parkPath4 = new Path2D("M 247.83483 232.572125 L 241.93483 232.572125 L 243.43483 229.372125 L 246.33483 229.372125 Z");
+            this.parkPath5 = new Path2D("M 262.53483 232.572125 L 249.53483 227.972125 L 249.53483 219.672125 L 262.53483 230.072125 Z");
+            this.parkPath6 = new Path2D("M 246.435 182.172 L 241.435 172.772 C 241.135 172.172 240.135 172.372 240.135 173.072 L 240.135 227.972 L 249.535 227.972 L 249.535 185.972 C 249.535 184.072 248.235 182.472 246.435 182.172 Z M 248.135 187.972 L 246.035 187.972 L 246.035 184.272 L 246.235 184.272 C 247.335 184.272 248.235 185.172 248.235 186.272 L 248.235 187.972 L 248.135 187.972 Z");
+            this.parkPath7 = new Path2D("M 198.335 167.172 h 27.1 v 9 h -27.1 Z");
 
             this._boundKeyDown = this._handleKeyDown.bind(this);
             this._boundKeyUp = this._handleKeyUp.bind(this);
@@ -446,6 +526,7 @@
                 if (this.landerY + LanderGame.LANDER_HEIGHT / 2 > padFinalY - LanderGame.LANDER_HEIGHT) {
                   this.state = 'landed';
                   this.playBtn.style.display = 'block';
+                  if (this.title) this.title.style.display = 'block';
                 } else {
                   this.state = 'landing';
                   this.landingTime = 0;
@@ -507,6 +588,7 @@
                 this.landerVelocityX = 0;
                 this.landingFrozen = true;
                 this.playBtn.style.display = 'block';
+                if (this.title) this.title.style.display = 'block';
               } else if (landerFootY >= groundYHere && this.landerVelocityY >= 0) {
                 this.landerY = groundYHere - LanderGame.LANDER_HEIGHT / 2;
                 this.landerVelocityY = 0;
@@ -514,6 +596,7 @@
                 this.landerRotation = this._terrainSlopeAt(this.landerX);
                 this.state = 'landed';
                 this.playBtn.style.display = 'block';
+                if (this.title) this.title.style.display = 'block';
               }
 
               if (thrusting && Math.random() < 0.6) {
@@ -558,10 +641,18 @@
             if (this.state === 'falling') {
               ctx.textAlign = 'center';
               ctx.font = '20px monospace';
-              ctx.fillText('APPROACHING', this.width / 2, 30);
+              ctx.fillText('APPROACHING VALE ORBITAL REFURB. @ LUNA', this.width / 2, 30);
               ctx.font = '12px monospace';
               ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
               ctx.fillText('SPACE / CLICK = THRUST   |   A / D OR SWIPE MOUSE = STEER', this.width / 2, 52);
+              ctx.fillStyle = '#ffffff';
+            } else if (this.state === 'landing' && this.playBtn.style.display !== 'block') {
+              ctx.textAlign = 'center';
+              ctx.font = '20px monospace';
+              ctx.fillText('WITHIN LANDING DISTANCE', this.width / 2, 30);
+              ctx.font = '12px monospace';
+              ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+              ctx.fillText('LAND TO BUY A SHUTTLE', this.width / 2, 52);
               ctx.fillStyle = '#ffffff';
             }
 
@@ -597,6 +688,54 @@
                 else ctx.lineTo(px, py);
               }
               ctx.stroke();
+
+              const shopX = 0.5 * this.width;
+              const shopY = padY;
+              
+              ctx.save();
+              ctx.translate(shopX, shopY);
+              ctx.scale(1.8, 1.8);
+              ctx.translate(-184, -167.7);
+              
+              ctx.fillStyle = '#000000';
+              ctx.fill(this.shopPath1);
+              ctx.fill(this.shopPath2);
+              ctx.fill(this.shopPath3);
+              ctx.fill(this.shopPath4);
+              
+              ctx.strokeStyle = '#ffffff';
+              ctx.lineWidth = 1 / 1.8; // Scale down the stroke width so it matches the 1px look
+              ctx.stroke(this.shopPath1);
+              ctx.stroke(this.shopPath2);
+              ctx.stroke(this.shopPath3);
+              ctx.stroke(this.shopPath4);
+              
+              // Draw the parked shuttle slightly to the right of the shop
+              ctx.save();
+              // The parked shuttle's SVG bottom is at Y ~240.3, while the shop's is at ~167.7.
+              // We shift it up by the difference (-72.6) so it sits on the same ground line.
+              ctx.translate(50, -72.6); 
+              
+              ctx.fillStyle = '#000000';
+              ctx.fill(this.parkPath1);
+              ctx.fill(this.parkPath2);
+              ctx.fill(this.parkPath3);
+              ctx.fill(this.parkPath4);
+              ctx.fill(this.parkPath5);
+              ctx.fill(this.parkPath6);
+              ctx.fill(this.parkPath7);
+              
+              ctx.stroke(this.parkPath1);
+              ctx.stroke(this.parkPath2);
+              ctx.stroke(this.parkPath3);
+              ctx.stroke(this.parkPath4);
+              ctx.stroke(this.parkPath5);
+              ctx.stroke(this.parkPath6);
+              ctx.stroke(this.parkPath7);
+              
+              ctx.restore();
+              
+              ctx.restore();
             }
 
             ctx.save();
@@ -1303,6 +1442,7 @@
           wrapper: document.getElementById('prelude-canvas-wrapper'),
           canvas: document.getElementById('prelude-canvas'),
           playBtn: document.getElementById('prelude-play-btn'),
+          title: document.getElementById('prelude-title'),
         };
 
         let game;
