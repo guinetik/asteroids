@@ -134,10 +134,10 @@ export function buildMissionTrackerGroups(
 
 | Group | Source array on `ShuttleMissionBoard` | Title | Objective type | Focus |
 |---|---|---|---|---|
-| `delivery` | `activeMissions` | `template.name` | — | `planet` = `giverPlanet` if `status === 'active'`, else destination planet from `template` |
-| `asteroid` | `activeAsteroidMission` (single, wrapped in array if present) | `template.name` (or generated mission name) | objective field on the generated mission, mapped to display label | `world` = `template.waypoint` |
-| `eva` | `activeEvaMissions` | `template.name` | `template.poiType` mapped to label (`satellite` → "Satellite Servicing", `relay_antenna` → "Relay Repair", `telescope` → "Telescope") | `world` = `mission.waypoint` |
-| `mining` | `activeMiningMissions` | `template.name` | — | `world` = mining waypoint from the active mission |
+| `delivery` | `activeMissions` | `template.name` | — | `planet` = `template.targetPlanet` when `status === 'active'`, `giverPlanet` when `status === 'ready-to-deliver'` |
+| `asteroid` | `activeAsteroidMission` (single, wrapped in a one-element array if present) | mission `name` | first objective's `type`, mapped to display label | `world` = `mission.waypoint` |
+| `eva` | `activeEvaMissions` | `template.name` | `template.poiType` mapped to label (`satellite` → "Satellite Servicing", `relay_antenna` → "Relay Repair", `telescope` → "Telescope") | `world` = `mission.waypoint` (XZ only) |
+| `mining` | `activeMiningMissions` | `template.name` | — | `planet` = `giverPlanet` (mining missions have no waypoint; player delivers to giver) |
 
 `objectiveType` mapping for asteroid missions follows the existing
 generator's objective discriminant (`gather`, `photometry`,
