@@ -27,6 +27,12 @@ import PortalWelcomeDialog from '@/components/PortalWelcomeDialog.vue'
 import JovianEpilogueOverlay from '@/components/JovianEpilogueOverlay.vue'
 import ObjectiveTracker from '@/components/ObjectiveTracker.vue'
 import ContractTrackerPanel from '@/components/ContractTrackerPanel.vue'
+import MissionTrackerPanel from '@/components/MissionTrackerPanel.vue'
+import MissionFocusPrompt from '@/components/MissionFocusPrompt.vue'
+import {
+  buildMissionTrackerGroups,
+  type MissionTrackerRow,
+} from '@/lib/missions/missionHudRows'
 import PickupToast from '@/components/PickupToast.vue'
 import type { PickupEntry } from '@/components/PickupToast.vue'
 import type {
@@ -257,6 +263,24 @@ function handleContractTrackerObjective(payload: { contractId: string; stepIndex
   openContractStepMessage(payload.contractId, payload.stepIndex)
 }
 
+/**
+ * Park the map camera on the row's focus target. Audio cue mirrors other
+ * tracker click affordances on the HUD.
+ */
+function handleMissionTrackerFocus(row: MissionTrackerRow): void {
+  uiAudio.notifyButtonClick()
+  viewController.focusOnMissionTarget(row.focus)
+}
+
+/**
+ * Return the camera to follow the shuttle and dismiss the ESC prompt.
+ * Triggered by both the on-screen prompt button and the global Esc key.
+ */
+function handleMissionFocusDismiss(): void {
+  uiAudio.notifyCancel()
+  viewController.clearMissionFocus()
+}
+
 const telemetry = reactive<ShuttleTelemetry>({
   speed: 0,
   heading: 0,
@@ -467,6 +491,19 @@ const activeContractHudRows = computed(() =>
     contractSystem.getContract(id),
   ),
 )
+
+/**
+ * Reactive groups feeding {@link MissionTrackerPanel}. Rebuilt whenever the
+ * controller pushes a new {@link ShuttleMissionBoard} snapshot.
+ */
+const missionTrackerGroups = computed(() => {
+  const board = missionBoard.value
+  if (!board) return []
+  return buildMissionTrackerGroups(board)
+})
+
+/** Mirrors the controller's reactive flag so the ESC prompt can react to it. */
+const missionFocusActive = viewController.missionFocusActive
 
 const mapHudTrackerStackVisible = computed(
   () =>
@@ -1158,6 +1195,11 @@ function handleEpilogueContinue(): void {
 
 function handleWindowKeydown(event: KeyboardEvent): void {
   if (event.key !== 'Escape') return
+  if (missionFocusActive.value) {
+    event.preventDefault()
+    handleMissionFocusDismiss()
+    return
+  }
   if (
     mapIntro.phase !== 'cinematic_zoom' &&
     mapIntro.phase !== 'awaiting_message_open' &&
@@ -1838,6 +1880,11 @@ watch(
         :objectives="journeyTracker.objectives"
         variant="journey"
       />
+      <MissionTrackerPanel
+        v-if="missionTrackerGroups.length > 0"
+        :groups="missionTrackerGroups"
+        @focus-mission="handleMissionTrackerFocus"
+      />
       <ContractTrackerPanel
         v-if="activeContractHudRows.length > 0"
         :contracts="activeContractHudRows"
@@ -2177,6 +2224,7 @@ watch(
       @skip="handlePortalSkip"
     />
     <JovianEpilogueOverlay v-if="epilogueVisible" :on-continue="handleEpilogueContinue" />
+    <MissionFocusPrompt v-if="missionFocusActive" @dismiss="handleMissionFocusDismiss" />
   </template>
   <DebugHud v-if="debugHudVisible" />
 </template>
