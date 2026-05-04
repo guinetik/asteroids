@@ -542,6 +542,8 @@
               ) {
                 const padFinalY = this.height * LanderGame.TERRAIN_PAD_FINAL_RATIO;
                 if (this.landerY + LanderGame.LANDER_HEIGHT / 2 > padFinalY - LanderGame.LANDER_HEIGHT) {
+                  this.terrainVisible = true;
+                  this.terrainPadY = padFinalY;
                   this.state = 'landed';
                   this.playBtn.style.display = 'block';
                   if (this.title) this.title.style.display = 'block';
