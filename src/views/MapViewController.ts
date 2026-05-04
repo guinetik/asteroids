@@ -146,6 +146,8 @@ import type {
   GeneratedAsteroidMission,
 } from '@/lib/missions/types'
 import { getSpecialMissionById } from '@/lib/missions/specialMissions'
+import type { MissionTrackerFocus } from '@/lib/missions/missionHudRows'
+import { ref, type Ref } from 'vue'
 import {
   resolveSpecialMissionWaypoint,
   type WorldPositionXZ,
@@ -294,6 +296,12 @@ const SPECIAL_MISSION_OFFER_IDS: Record<string, string> = {
   'jovian-prospection-saturn-dan': 'jovian-prospection-saturn-dan-offer',
 }
 
+/** Vertical offset (world units) used when parking the camera on a mission focus target. */
+const MISSION_FOCUS_CAMERA_HEIGHT = 600
+
+/** Diagonal offset (world units) along XZ used so the parked camera sees the target at an angle. */
+const MISSION_FOCUS_CAMERA_DISTANCE = 600
+
 /**
  * Bridges Vue lifecycle to the map scene with player shuttle.
  *
@@ -308,6 +316,8 @@ export class MapViewController implements Tickable {
   private inputManager: InputManager | null = null
   private sceneObjects: MapSceneObjects | null = null
   private vehicleCamera: VehicleCamera | null = null
+  /** True while the camera is parked on a mission focus target — drives the ESC prompt. */
+  public readonly missionFocusActive: Ref<boolean> = ref(false)
   private introFacade: MapIntroFacade | null = null
 
   private shuttleController: ShuttleController | null = null
@@ -1018,6 +1028,7 @@ export class MapViewController implements Tickable {
       child.renderOrder = 10
     })
     scene.add(this.shuttleController.group)
+    this.missionFocusActive.value = false
     this.vehicleCamera.setTarget(this.shuttleController.group)
     this.tickHandler.register(this.shuttleController, TICK_PRIORITY_PHYSICS)
 
@@ -1170,6 +1181,7 @@ export class MapViewController implements Tickable {
         // Camera is offset to the side and slightly above the midpoint so both
         // bodies sit comfortably inside the frame.
         const mid = wy * 0.5
+        this.missionFocusActive.value = false
         this.vehicleCamera.parkAt(
           new THREE.Vector3(ex + wy * 1.8, mid, ez + wy * 1.2),
           new THREE.Vector3(ex, mid, ez),
@@ -1182,6 +1194,7 @@ export class MapViewController implements Tickable {
         // Reveal ship as it exits the portal
         this.shuttleController.group.visible = true
         this.vehicleCamera.setConfig(MAP_PORTAL_ARRIVAL_CAMERA_CONFIG)
+        this.missionFocusActive.value = false
         this.vehicleCamera.setTarget(this.shuttleController.group)
       }
 
@@ -4758,6 +4771,57 @@ export class MapViewController implements Tickable {
   private getPlanetControllerById(planetId: string): PlanetSystemController | null {
     const index = PLANETS.findIndex((planet) => planet.id === planetId)
     return index >= 0 ? (this.planetControllers[index] ?? null) : null
+  }
+
+  /**
+   * Park the map camera on a mission focus target. Planet focuses resolve
+   * the live world position at call time so movement/orbit doesn't matter.
+   *
+   * @param focus - The {@link MissionTrackerFocus} from a clicked tracker row.
+   */
+  public focusOnMissionTarget(focus: MissionTrackerFocus): void {
+    if (!this.vehicleCamera) return
+    const lookAt = this.resolveMissionFocusWorldPosition(focus)
+    if (!lookAt) return
+    const cameraPos = lookAt
+      .clone()
+      .add(
+        new THREE.Vector3(
+          MISSION_FOCUS_CAMERA_DISTANCE,
+          MISSION_FOCUS_CAMERA_HEIGHT,
+          MISSION_FOCUS_CAMERA_DISTANCE,
+        ),
+      )
+    this.vehicleCamera.parkAt(cameraPos, lookAt)
+    this.missionFocusActive.value = true
+  }
+
+  /**
+   * Return the camera to follow the shuttle. Safe to call when no focus
+   * is active (becomes a no-op).
+   */
+  public clearMissionFocus(): void {
+    if (!this.missionFocusActive.value) return
+    this.missionFocusActive.value = false
+    if (this.vehicleCamera && this.shuttleController) {
+      this.vehicleCamera.setTarget(this.shuttleController.group)
+    }
+  }
+
+  /**
+   * Resolve a {@link MissionTrackerFocus} to a world-space {@link THREE.Vector3}
+   * (Y=0 plane). Returns `null` if a planet id can't be resolved.
+   *
+   * @param focus - The {@link MissionTrackerFocus} to resolve.
+   * @returns Live world position on the Y=0 plane, or `null` if unresolvable.
+   */
+  private resolveMissionFocusWorldPosition(focus: MissionTrackerFocus): THREE.Vector3 | null {
+    if (focus.kind === 'world') {
+      return new THREE.Vector3(focus.worldX, 0, focus.worldZ)
+    }
+    const controller = this.getPlanetControllerById(focus.planetId)
+    if (!controller) return null
+    return new THREE.Vector3(controller.getWorldX(), 0, controller.getWorldZ())
   }
 
   /** Lazy-init the turret session controller on first T press. Reuses the EVA scene-host adapter for camera swapping. */
