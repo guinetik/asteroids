@@ -30,6 +30,14 @@
         "poiType": "satellite",
         "minigameType": "satellite_servicing",
         "reward": 1500
+      },
+      {
+        "id": "venus_solar_heliometer_realign",
+        "name": "Solar Heliometer Realignment",
+        "description": "Venus's orbital heliometer has drifted out of calibration from thermal stress near the Sun. EVA out, realign the optical axis against the solar corona, and lock in the calibration reference.",
+        "poiType": "telescope",
+        "minigameType": "telescope_alignment",
+        "reward": 1500
       }
     ]
   },
@@ -158,6 +166,14 @@
         "description": "The axial-tilt monitoring probe took a gyro hit — one reaction wheel is frozen solid. EVA to the bus and swap the whole momentum stack. No rush. Nobody else is out here.",
         "poiType": "satellite",
         "minigameType": "satellite_servicing",
+        "reward": 2400
+      },
+      {
+        "id": "uranus_outer_survey_array_focus",
+        "name": "Outer Survey Array Focus Calibration",
+        "description": "The Uranus-orbit deep survey telescope lost focus during the last cosmic ray strike. EVA to the primary, recalibrate the focus motor, and establish baseline on a distant reference star.",
+        "poiType": "telescope",
+        "minigameType": "telescope_alignment",
         "reward": 2400
       }
     ]
