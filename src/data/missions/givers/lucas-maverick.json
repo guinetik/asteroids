@@ -2,7 +2,7 @@
   "id": "lucas-maverick",
   "name": "Lucas Maverick",
   "title": "Owner, Venusian Zeppelin Exchange",
-  "objectiveTypes": ["bunker"],
+  "objectiveTypes": ["bunker", "mineral-analysis"],
   "minDifficulty": 1,
   "maxDifficulty": 10,
   "missions": [
@@ -19,6 +19,30 @@
         }
       ],
       "completionBonus": { "min": 2000, "max": 3500 },
+      "regionByDifficulty": {
+        "near-earth": [1, 4],
+        "asteroid-belt": [4, 7],
+        "kuiper-belt": [7, 10]
+      },
+      "planetIds": ["venus"]
+    },
+    {
+      "id": "maverick_table_read",
+      "name": "The Table Wants a Tell",
+      "briefing": "Friend, I have a buyer asking what the rock is really holding. Not what the brochure says. Sit at the terminal, read a few tells with the SCI gun, then bring back the sample the table calls for. Clean read, clean hand. — Maverick",
+      "objectiveSlots": [
+        {
+          "type": "mineral-analysis",
+          "weight": 1.0,
+          "params": {
+            "type": "mineral-analysis",
+            "analysisRockCount": { "min": 2, "max": 5 },
+            "sampleKg": { "min": 10, "max": 50 }
+          },
+          "reward": { "min": 1100, "max": 3400 }
+        }
+      ],
+      "completionBonus": { "min": 500, "max": 1500 },
       "regionByDifficulty": {
         "near-earth": [1, 4],
         "asteroid-belt": [4, 7],

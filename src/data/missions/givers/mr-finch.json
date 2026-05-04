@@ -2,7 +2,7 @@
   "id": "mr-finch",
   "name": "Mr. Finch",
   "title": "Saturn aristocrat, semi-retired.",
-  "objectiveTypes": ["gather", "survey", "photometry"],
+  "objectiveTypes": ["gather", "survey", "photometry", "mineral-analysis"],
   "minDifficulty": 4,
   "maxDifficulty": 9,
   "requiresFlag": "jovianContractTampered",
@@ -43,6 +43,25 @@
       ],
       "completionBonus": { "min": 800, "max": 1500 },
       "regionByDifficulty": { "saturn-trojans": [5, 9] }
+    },
+    {
+      "id": "finch_saturn_composition_note",
+      "name": "A Compositional Note",
+      "briefing": "Young pilot. A buyer wants a compositional note before committing to the body. Nothing theatrical: read several rocks, return the report, and recover the sample the report indicates. The distance premium is already included. — Finch",
+      "objectiveSlots": [
+        {
+          "type": "mineral-analysis",
+          "weight": 1.0,
+          "params": {
+            "type": "mineral-analysis",
+            "analysisRockCount": { "min": 3, "max": 6 },
+            "sampleKg": { "min": 20, "max": 60 }
+          },
+          "reward": { "min": 4200, "max": 7600 }
+        }
+      ],
+      "completionBonus": { "min": 900, "max": 1800 },
+      "regionByDifficulty": { "saturn-trojans": [4, 9] }
     },
     {
       "id": "finch_saturn_photometry",

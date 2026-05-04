@@ -2,7 +2,7 @@
   "id": "cloud-city-ops",
   "name": "Cloud City Operations",
   "title": "Operations Bureau, Jupiter Spaceport",
-  "objectiveTypes": ["gather", "survey"],
+  "objectiveTypes": ["gather", "survey", "mineral-analysis"],
   "minDifficulty": 3,
   "maxDifficulty": 7,
   "requiresFlag": "jovianContractTampered",
@@ -43,6 +43,25 @@
       ],
       "completionBonus": { "min": 500, "max": 1100 },
       "regionByDifficulty": { "jovian-trojans": [4, 7] }
+    },
+    {
+      "id": "cco_mineral_certification",
+      "name": "Mineral certification — intake validation",
+      "briefing": "Operations Bureau. Routine mineral certification request. Analyze local rock samples, file terminal report, recover requested sample for intake validation. Low-complexity. Standard rate. — Operations.",
+      "objectiveSlots": [
+        {
+          "type": "mineral-analysis",
+          "weight": 1.0,
+          "params": {
+            "type": "mineral-analysis",
+            "analysisRockCount": { "min": 2, "max": 5 },
+            "sampleKg": { "min": 15, "max": 45 }
+          },
+          "reward": { "min": 2600, "max": 5600 }
+        }
+      ],
+      "completionBonus": { "min": 500, "max": 1200 },
+      "regionByDifficulty": { "jovian-trojans": [3, 7] }
     },
     {
       "id": "cco_anchor_resupply",

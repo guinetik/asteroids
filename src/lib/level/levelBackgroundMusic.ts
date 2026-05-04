@@ -18,6 +18,7 @@ const OBJECTIVES_GATHER_MUSIC = new Set<ObjectiveType>(['gather', 'collect'])
 const OBJECTIVES_GRAVITY_MUSIC = new Set<ObjectiveType>([
   'survey',
   'photometry',
+  'mineral-analysis',
   'prospectus-terminal',
 ])
 

@@ -509,6 +509,7 @@ const OBJECTIVE_COLORS: Record<string, string> = {
   survey: '#00ffcc',
   photometry: '#b388ff',
   collect: '#66d9ff',
+  'mineral-analysis': '#7cffb2',
 }
 
 const descentWarning = computed(() =>

@@ -200,7 +200,7 @@ export function resolveLevelContext(search: string): LevelContext {
       throw new Error(
         '[Level] No active mission in storage. Use /map to launch one, or open /level with ' +
           '?mission=<special-id>, ?asteroidId=…, or both ?difficulty=1-10&mission=' +
-          'gather|exterminate|rescue|survey|photometry|dan|collect',
+          'gather|exterminate|rescue|survey|photometry|dan|collect|mineral-analysis',
       )
     }
     mission = stored

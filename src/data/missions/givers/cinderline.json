@@ -2,7 +2,7 @@
   "id": "cinderline",
   "name": "The Cinderline",
   "title": "Sun-Worshippers, Mercury Vigil",
-  "objectiveTypes": ["bunker", "dan"],
+  "objectiveTypes": ["bunker", "dan", "mineral-analysis"],
   "minDifficulty": 1,
   "maxDifficulty": 10,
   "missions": [
@@ -47,6 +47,30 @@
       ],
       "completionBonus": { "min": 500, "max": 1500 },
       "regionByDifficulty": { "jovian-trojans": [4, 7] }
+    },
+    {
+      "id": "cinderline_stone_reply",
+      "name": "The stone will answer",
+      "briefing": "Pilot, the body will answer in stone before it answers in fire. Set the light into several rocks. Bring the terminal what they say. When it names the piece it needs, cut that piece free. A seat will be kept.",
+      "objectiveSlots": [
+        {
+          "type": "mineral-analysis",
+          "weight": 1.0,
+          "params": {
+            "type": "mineral-analysis",
+            "analysisRockCount": { "min": 2, "max": 6 },
+            "sampleKg": { "min": 10, "max": 55 }
+          },
+          "reward": { "min": 1200, "max": 3600 }
+        }
+      ],
+      "completionBonus": { "min": 500, "max": 1500 },
+      "regionByDifficulty": {
+        "near-earth": [1, 4],
+        "asteroid-belt": [4, 7],
+        "kuiper-belt": [7, 10]
+      },
+      "planetIds": ["mercury"]
     },
     {
       "id": "cinderline_vigil_threshold",

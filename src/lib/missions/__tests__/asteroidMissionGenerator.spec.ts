@@ -26,6 +26,13 @@ import type { PlayerProfile } from '@/lib/player/types'
 const SELECT_FIRST_ASTEROID_RANDOM = 0.25
 const SELECT_SECOND_ASTEROID_RANDOM = 0.5
 
+const RESTRICTED_HOST_OBJECTIVE_TYPES = new Set([
+  'exterminate',
+  'rescue',
+  'bunker',
+  'mineral-analysis',
+])
+
 afterEach(() => {
   vi.restoreAllMocks()
 })
@@ -196,6 +203,29 @@ describe('rollObjective', () => {
     expect(obj.enemyTier).toBe('medium')
     expect(obj.reward).toBeGreaterThanOrEqual(3000)
     expect(obj.reward).toBeLessThanOrEqual(6500)
+  })
+
+  it('rolls mineral analysis objective with concrete rock count and sample kg', () => {
+    const slot = {
+      type: 'mineral-analysis' as const,
+      weight: 1,
+      params: {
+        type: 'mineral-analysis' as const,
+        analysisRockCount: { min: 2, max: 6 },
+        sampleKg: { min: 10, max: 60 },
+      },
+      reward: { min: 900, max: 2400 },
+    }
+
+    const obj = rollObjective(slot, 5)
+
+    expect(obj.type).toBe('mineral-analysis')
+    expect(obj.analysisRockCount).toBeGreaterThanOrEqual(2)
+    expect(obj.analysisRockCount).toBeLessThanOrEqual(6)
+    expect(obj.sampleKg).toBeGreaterThanOrEqual(10)
+    expect(obj.sampleKg).toBeLessThanOrEqual(60)
+    expect(obj.reward).toBeGreaterThanOrEqual(900)
+    expect(obj.reward).toBeLessThanOrEqual(2400)
   })
 })
 
@@ -523,7 +553,7 @@ describe('generateAsteroidMission', () => {
     expect(hard.objectives.length).toBeLessThanOrEqual(objectiveCountForDifficulty(8))
   })
 
-  it('Saturn host only offers exterminate, rescue, or bunker asteroid objectives', () => {
+  it('Saturn host only offers combat, rescue, bunker, or mineral-analysis objectives', () => {
     const saturn = getPlanet('saturn')
     const hostR = saturn.orbit.semiMajorAxis * ORBIT_SCALE
     const host = { planetId: 'saturn' as const, worldX: hostR, worldZ: 0 }
@@ -532,28 +562,24 @@ describe('generateAsteroidMission', () => {
         const mission = generateAsteroidMission(d, host)
         expect(mission.originPlanetId).toBe('saturn')
         for (const obj of mission.objectives) {
-          expect(obj.type === 'exterminate' || obj.type === 'rescue' || obj.type === 'bunker').toBe(
-            true,
-          )
+          expect(RESTRICTED_HOST_OBJECTIVE_TYPES.has(obj.type)).toBe(true)
         }
       }
     }
   })
 
-  it('Saturn host posts a combat contract from difficulty 1 once Colonial Guard covers the band', () => {
+  it('Saturn host posts a restricted-board contract from difficulty 1', () => {
     const saturn = getPlanet('saturn')
     const hostR = saturn.orbit.semiMajorAxis * ORBIT_SCALE
     const host = { planetId: 'saturn' as const, worldX: hostR, worldZ: 0 }
     const mission = generateAsteroidMission(1, host)
     expect(mission.originPlanetId).toBe('saturn')
     for (const obj of mission.objectives) {
-      expect(obj.type === 'exterminate' || obj.type === 'rescue' || obj.type === 'bunker').toBe(
-        true,
-      )
+      expect(RESTRICTED_HOST_OBJECTIVE_TYPES.has(obj.type)).toBe(true)
     }
   })
 
-  it('Mercury host only offers exterminate, rescue, or bunker asteroid objectives', () => {
+  it('Mercury host only offers combat, rescue, bunker, or mineral-analysis objectives', () => {
     const mercury = getPlanet('mercury')
     const hostR = mercury.orbit.semiMajorAxis * ORBIT_SCALE
     const host = { planetId: 'mercury' as const, worldX: hostR, worldZ: 0 }
@@ -562,24 +588,39 @@ describe('generateAsteroidMission', () => {
         const mission = generateAsteroidMission(d, host)
         expect(mission.originPlanetId).toBe('mercury')
         for (const obj of mission.objectives) {
-          expect(obj.type === 'exterminate' || obj.type === 'rescue' || obj.type === 'bunker').toBe(
-            true,
-          )
+          expect(RESTRICTED_HOST_OBJECTIVE_TYPES.has(obj.type)).toBe(true)
         }
       }
     }
   })
 
-  it('Mercury host posts a combat contract from difficulty 1 (Cinderline narrative requirement)', () => {
+  it('Mercury host posts a restricted-board contract from difficulty 1', () => {
     const mercury = getPlanet('mercury')
     const hostR = mercury.orbit.semiMajorAxis * ORBIT_SCALE
     const host = { planetId: 'mercury' as const, worldX: hostR, worldZ: 0 }
     const mission = generateAsteroidMission(1, host)
     expect(mission.originPlanetId).toBe('mercury')
     for (const obj of mission.objectives) {
-      expect(obj.type === 'exterminate' || obj.type === 'rescue' || obj.type === 'bunker').toBe(
-        true,
-      )
+      expect(RESTRICTED_HOST_OBJECTIVE_TYPES.has(obj.type)).toBe(true)
+    }
+  })
+
+  it('can generate mineral-analysis missions for every planet at every difficulty', () => {
+    for (const planetId of ['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn'] as const) {
+      const planet = getPlanet(planetId)
+      const hostR = planet.orbit.semiMajorAxis * ORBIT_SCALE
+      const host = { planetId, worldX: hostR, worldZ: 0 }
+      for (let difficulty = 1; difficulty <= 10; difficulty++) {
+        const mission = generateAsteroidMission(
+          difficulty,
+          host,
+          Math.random,
+          'mineral-analysis',
+        )
+
+        expect(mission.originPlanetId).toBe(planetId)
+        expect(mission.objectives.some((obj) => obj.type === 'mineral-analysis')).toBe(true)
+      }
     }
   })
 

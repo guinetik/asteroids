@@ -79,6 +79,13 @@
       "tone": "mining",
       "message": "Hey, you got Jay. Mining run. Press 1 for DRILL and cut surface rocks; press 3 for SCIENCE to prospect first — keep hits on a rock until the wireframe locks, then drill it for a guaranteed bonus mineral. Deposit the haul at the delivery rocket when you're full. Easy money, assuming you don't trip over your own boots."
     },
+    "mineral-analysis": {
+      "speaker": "Jay",
+      "channel": "FIELD ASSAY",
+      "view": "fps",
+      "tone": "science",
+      "message": "Hey, you got Jay. Analysis run. Start at the terminal, press 3 for SCIENCE, and keep the beam on different rocks until each one locks its composition. Bring the report back, then press 1 for DRILL and cut whatever sample the terminal asks for. Paperwork with a drill bit. Could be worse."
+    },
     "survey": {
       "speaker": "Jay",
       "channel": "SURVEY RELAY",
@@ -138,6 +145,13 @@
   },
   "giverTips": {
     "cinderline": {
+      "mineral-analysis": {
+        "speaker": "The Cinderline",
+        "channel": "STONE LISTENING",
+        "view": "fps",
+        "tone": "science",
+        "message": "Cinderline relay. The body answers in stone. Wake the terminal, set SCIENCE light into several rocks, and return with what they say. When the terminal names the piece it needs, cut it free with the DRILL. A seat will be kept."
+      },
       "bunker": {
         "speaker": "The Cinderline",
         "channel": "ANVIL DESCENT",
@@ -179,6 +193,13 @@
       }
     },
     "jovian-society": {
+      "mineral-analysis": {
+        "speaker": "Vance",
+        "channel": "ASSET ASSAY",
+        "view": "fps",
+        "tone": "science",
+        "message": "Vance Holroyd. Begin at the surface kiosk, then use SCIENCE mode to certify several local rock compositions. File the report at the kiosk, recover the requested substrate sample with the DRILL, and submit it for portfolio review."
+      },
       "photometry": {
         "speaker": "Vance",
         "channel": "ASSET TELEMETRY",
@@ -220,6 +241,13 @@
       }
     },
     "mr-finch": {
+      "mineral-analysis": {
+        "speaker": "Finch",
+        "channel": "SATURN HANDLER",
+        "view": "fps",
+        "tone": "science",
+        "message": "Finch. Start at the terminal and take several SCIENCE readings from the local stone. Return the note, then recover the sample it asks for with the DRILL. Nothing theatrical; a buyer simply wants the body to introduce itself before money changes hands."
+      },
       "gather": {
         "speaker": "Finch",
         "channel": "SATURN HANDLER",

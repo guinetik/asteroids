@@ -2,7 +2,7 @@
   "id": "jovian-society",
   "name": "Vance Holroyd, Senior Asset Officer",
   "title": "The Jovian Society, Cloud City",
-  "objectiveTypes": ["photometry", "bunker", "dan", "gather"],
+  "objectiveTypes": ["photometry", "bunker", "dan", "gather", "mineral-analysis"],
   "minDifficulty": 3,
   "maxDifficulty": 10,
   "missions": [
@@ -67,6 +67,25 @@
       ],
       "completionBonus": { "min": 500, "max": 1500 },
       "regionByDifficulty": { "jovian-trojans": [4, 7] }
+    },
+    {
+      "id": "jovian_surface_composition_confidence",
+      "name": "Asset 2306-J — Surface Composition Confidence",
+      "briefing": "I trust this finds you well. The Society requires a surface composition confidence pass before adjusting asset classification. Kindly submit a mineral report at the kiosk, then recover the requested substrate sample for portfolio review. — Vance Holroyd, Senior Asset Officer.",
+      "objectiveSlots": [
+        {
+          "type": "mineral-analysis",
+          "weight": 1.0,
+          "params": {
+            "type": "mineral-analysis",
+            "analysisRockCount": { "min": 3, "max": 6 },
+            "sampleKg": { "min": 20, "max": 60 }
+          },
+          "reward": { "min": 2800, "max": 7600 }
+        }
+      ],
+      "completionBonus": { "min": 900, "max": 2400 },
+      "regionByDifficulty": { "jovian-trojans": [4, 10] }
     },
     {
       "id": "jovian_asset_substrate_recovery",

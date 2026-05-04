@@ -2,10 +2,33 @@
   "id": "belt-mining",
   "name": "Belt Mining Corp",
   "title": "Extraction & Logistics Dispatch",
-  "objectiveTypes": ["gather"],
-  "minDifficulty": 3,
+  "objectiveTypes": ["gather", "mineral-analysis"],
+  "minDifficulty": 1,
   "maxDifficulty": 10,
   "missions": [
+    {
+      "id": "bmc_pre_extraction_assay",
+      "name": "Pre-extraction assay — open classification",
+      "briefing": "Belt Mining Corp. Pre-extraction assay required. Analyze surface rocks with SCI tool, submit report at terminal, recover requested sample mass. Standard classification rates. Contract ID on file.",
+      "objectiveSlots": [
+        {
+          "type": "mineral-analysis",
+          "weight": 1.0,
+          "params": {
+            "type": "mineral-analysis",
+            "analysisRockCount": { "min": 2, "max": 6 },
+            "sampleKg": { "min": 10, "max": 60 }
+          },
+          "reward": { "min": 700, "max": 2600 }
+        }
+      ],
+      "completionBonus": { "min": 250, "max": 1000 },
+      "regionByDifficulty": {
+        "near-earth": [1, 3],
+        "asteroid-belt": [4, 7],
+        "kuiper-belt": [8, 10]
+      }
+    },
     {
       "id": "bmc_standard_extraction",
       "name": "Iron pull — sector 88-Mars",

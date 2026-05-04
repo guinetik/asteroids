@@ -23,6 +23,7 @@ export type ObjectiveType =
   | 'dan'
   | 'collect'
   | 'bunker'
+  | 'mineral-analysis'
   | 'prospectus-terminal'
 
 /** Solar system region where missions spawn. Determines fuel cost and distance. */
@@ -132,6 +133,16 @@ export interface BunkerScalableParams {
   type: 'bunker'
 }
 
+/** Scalable params for MINERAL ANALYSIS objectives. */
+export interface MineralAnalysisScalableParams {
+  /** Discriminator for the union type. */
+  type: 'mineral-analysis'
+  /** Number of distinct rocks the pilot must fully analyze with the SCI gun. */
+  analysisRockCount: NumberRange
+  /** Kilograms of the terminal-selected mineral sample the pilot must mine and deliver. */
+  sampleKg: NumberRange
+}
+
 /** Union of all objective-specific scalable parameters. */
 export type ScalableParams =
   | GatherScalableParams
@@ -142,6 +153,7 @@ export type ScalableParams =
   | DanScalableParams
   | CollectScalableParams
   | BunkerScalableParams
+  | MineralAnalysisScalableParams
 
 /** A slot in a mission template that the generator fills with a concrete objective. */
 export interface ObjectiveSlot {
@@ -512,6 +524,10 @@ export interface ConcreteObjective {
   interactionLabel?: string
   /** For bunker: number of waves to clear, stamped from the rolled difficulty band (3 / 5 / 7). */
   waveCount?: number
+  /** For mineral analysis: number of distinct rocks to fully analyze with the SCI gun. */
+  analysisRockCount?: number
+  /** For mineral analysis: kilograms of the selected mineral sample to mine and deliver. */
+  sampleKg?: number
   /** Credit reward for this objective. */
   reward: number
   /**

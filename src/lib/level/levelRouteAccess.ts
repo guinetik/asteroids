@@ -21,6 +21,7 @@ const LEVEL_ROUTE_OBJECTIVE_TYPES: readonly ObjectiveType[] = [
   'photometry',
   'dan',
   'collect',
+  'mineral-analysis',
 ]
 
 /** Minimum valid `difficulty` query value for bypass (inclusive). */

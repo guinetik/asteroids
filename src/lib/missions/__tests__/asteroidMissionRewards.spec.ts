@@ -63,8 +63,16 @@ describe('persistCompletedAsteroidMissionRewards', () => {
         { type: 'gather', x: 0, z: 0, resourceAmount: 100, reward: 100 },
         { type: 'survey', x: 0, z: 0, probeCount: 3, timeLimit: 60, reward: 100 },
         { type: 'photometry', x: 0, z: 0, reward: 100 },
+        {
+          type: 'mineral-analysis',
+          x: 0,
+          z: 0,
+          analysisRockCount: 2,
+          sampleKg: 25,
+          reward: 100,
+        },
       ],
-      totalReward: 300,
+      totalReward: 400,
     }
     localStorage.setItem(ACTIVE_MISSION_KEY, JSON.stringify(mission))
 
@@ -74,6 +82,7 @@ describe('persistCompletedAsteroidMissionRewards', () => {
       gather: 1,
       survey: 1,
       photometry: 1,
+      'mineral-analysis': 1,
     })
   })
 

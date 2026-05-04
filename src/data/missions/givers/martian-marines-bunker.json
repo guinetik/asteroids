@@ -2,7 +2,7 @@
   "id": "martian-marines-bunker",
   "name": "Martian Marine Corps",
   "title": "Cohort Operations, Phobos Desk",
-  "objectiveTypes": ["bunker"],
+  "objectiveTypes": ["bunker", "mineral-analysis"],
   "minDifficulty": 1,
   "maxDifficulty": 10,
   "missions": [
@@ -19,6 +19,30 @@
         }
       ],
       "completionBonus": { "min": 2000, "max": 4000 },
+      "regionByDifficulty": {
+        "near-earth": [1, 4],
+        "asteroid-belt": [4, 7],
+        "kuiper-belt": [7, 10]
+      },
+      "planetIds": ["mars"]
+    },
+    {
+      "id": "mmc_field_assay",
+      "name": "Field Assay — Cohort Sample Request",
+      "briefing": "Pilot. Cohort needs field assay on target body. Start terminal. Analyze rocks with SCI tool. Return report. Recover requested sample mass. No speculation, no delay. Make the data usable. — Sampaio, MMC",
+      "objectiveSlots": [
+        {
+          "type": "mineral-analysis",
+          "weight": 1.0,
+          "params": {
+            "type": "mineral-analysis",
+            "analysisRockCount": { "min": 2, "max": 6 },
+            "sampleKg": { "min": 10, "max": 60 }
+          },
+          "reward": { "min": 1000, "max": 3200 }
+        }
+      ],
+      "completionBonus": { "min": 400, "max": 1400 },
       "regionByDifficulty": {
         "near-earth": [1, 4],
         "asteroid-belt": [4, 7],

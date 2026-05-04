@@ -26,6 +26,7 @@ import { RescueMinigame } from '@/lib/minigame/RescueMinigame'
 import { BunkerMinigame } from '@/lib/minigame/BunkerMinigame'
 import { CollectMinigame } from '@/lib/minigame/CollectMinigame'
 import { GatherMinigame } from '@/lib/minigame/GatherMinigame'
+import { MineralAnalysisMinigame } from '@/lib/minigame/MineralAnalysisMinigame'
 import type { Tickable } from '@/lib/Tickable'
 import type { RockYieldSystem } from '@/lib/mining/rockYieldSystem'
 import type { Object3D, Scene } from 'three'
@@ -347,6 +348,16 @@ export class LevelMinigameFacade {
           composition,
           difficulty: mission.difficulty,
           seed: missionSeed,
+          rockYieldSystem,
+        })
+        this.applySharedBindings(minigame, bindings)
+        this.add(minigame)
+      } else if (objective.type === 'mineral-analysis' && rockYieldSystem) {
+        const minigame = new MineralAnalysisMinigame({
+          objectiveIndex: i,
+          objective,
+          scene,
+          heightmap,
           rockYieldSystem,
         })
         this.applySharedBindings(minigame, bindings)

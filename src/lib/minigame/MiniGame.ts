@@ -115,6 +115,7 @@ export const OBJECTIVE_LABELS: Record<string, string> = {
   dan: 'DAN',
   collect: 'Collect',
   bunker: 'Bunker',
+  'mineral-analysis': 'Mineral Analysis',
 }
 
 /**

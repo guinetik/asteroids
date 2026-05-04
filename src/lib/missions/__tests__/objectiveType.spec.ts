@@ -5,4 +5,8 @@ describe('ObjectiveType', () => {
   it('includes prospectus-terminal', () => {
     expectTypeOf<'prospectus-terminal'>().toMatchTypeOf<ObjectiveType>()
   })
+
+  it('includes mineral-analysis', () => {
+    expectTypeOf<'mineral-analysis'>().toMatchTypeOf<ObjectiveType>()
+  })
 })

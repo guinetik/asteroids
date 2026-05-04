@@ -315,6 +315,7 @@ describe('achievements', () => {
           bunker: 1,
           dan: 1,
           gather: 5,
+          'mineral-analysis': 5,
           photometry: 1,
           'prospectus-terminal': 1,
           survey: 1,
@@ -330,6 +331,8 @@ describe('achievements', () => {
     expect(ids).toContain('missions-bunker-first')
     expect(ids).toContain('missions-prospectus-terminal-first')
     expect(ids).toContain('missions-gather-five')
+    expect(ids).toContain('missions-mineral-analysis-first')
+    expect(ids).toContain('missions-mineral-analysis-five')
   })
 
   it('unlocks navigation and portal achievements from profile stats', () => {

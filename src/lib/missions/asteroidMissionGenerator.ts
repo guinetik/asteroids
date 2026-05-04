@@ -482,6 +482,15 @@ export function rollObjective(slot: ObjectiveSlot, difficulty: number): Concrete
         reward,
       }
     }
+    case 'mineral-analysis':
+      return {
+        type: 'mineral-analysis',
+        x: 0,
+        z: 0,
+        analysisRockCount: interpolateRange(slot.params.analysisRockCount, difficulty),
+        sampleKg: interpolateRange(slot.params.sampleKg, difficulty),
+        reward,
+      }
   }
 }
 
@@ -506,15 +515,20 @@ function findRegionForTemplate(
 
 /**
  * Whether a template is eligible to roll at a combat-only host planet — i.e. its slots are
- * all combat-flavored types (exterminate / rescue / bunker). Bunker missions stage waves of
- * viroid enemies inside an arena, so combat-host gating permits them alongside SAR work.
+ * all compatible with the host's restricted board flavor. Bunker missions stage waves of
+ * viroid enemies inside an arena, while mineral-analysis missions are neutral field assay
+ * work that every station can justify posting.
  *
  * @param template - Giver mission entry from JSON.
  * @returns Whether the template is restricted to combat-flavored objective types.
  */
 function isCombatHostEligibleTemplate(template: MissionGiverTemplate): boolean {
   return template.objectiveSlots.every(
-    (s) => s.type === 'exterminate' || s.type === 'rescue' || s.type === 'bunker',
+    (s) =>
+      s.type === 'exterminate' ||
+      s.type === 'rescue' ||
+      s.type === 'bunker' ||
+      s.type === 'mineral-analysis',
   )
 }
 

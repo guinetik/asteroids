@@ -2,7 +2,7 @@
   "id": "jay",
   "name": "Jay Mercer",
   "title": "Space Cowboys, Inc. (founder, sole employee until further notice)",
-  "objectiveTypes": ["gather", "survey"],
+  "objectiveTypes": ["gather", "survey", "mineral-analysis"],
   "minDifficulty": 1,
   "maxDifficulty": 8,
   "missions": [
@@ -54,6 +54,28 @@
       ],
       "completionBonus": { "min": 100, "max": 300 },
       "regionByDifficulty": { "near-earth": [1, 2], "asteroid-belt": [3, 5] }
+    },
+    {
+      "id": "jay_field_assay",
+      "name": "Rock Read — Science Wants Receipts",
+      "briefing": "Hey, you got Jay. Science division wants a composition report before they pay haul rates. Land, wake the terminal, tag a few rocks with SCIENCE, then bring back a sample from whatever the report likes best. Paperwork with a drill bit. Could be worse. — Jay",
+      "objectiveSlots": [
+        {
+          "type": "mineral-analysis",
+          "weight": 1.0,
+          "params": {
+            "type": "mineral-analysis",
+            "analysisRockCount": { "min": 2, "max": 5 },
+            "sampleKg": { "min": 10, "max": 45 }
+          },
+          "reward": { "min": 450, "max": 1300 }
+        }
+      ],
+      "completionBonus": { "min": 150, "max": 450 },
+      "regionByDifficulty": {
+        "near-earth": [1, 3],
+        "asteroid-belt": [4, 8]
+      }
     },
     {
       "id": "jay_jupiter_belt_cycle",
