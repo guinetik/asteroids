@@ -212,8 +212,7 @@ body,
 }
 
 .hud-top-cluster__line--action {
-  @apply rounded border border-cyan-300/35 bg-cyan-300/10 px-2 py-0.5 text-[11px] tracking-[0.18em] text-cyan-200;
-  text-shadow: 0 0 8px rgba(127, 232, 255, 0.55);
+  @apply rounded-full border border-cyan-300/45 bg-slate-950/70 px-5 py-2 font-mono text-xs uppercase tracking-[0.28em] text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.18)] backdrop-blur-sm;
 }
 
 .hud-top-cluster__adrift {

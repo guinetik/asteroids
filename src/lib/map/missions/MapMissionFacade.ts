@@ -835,6 +835,24 @@ export class MapMissionFacade {
     return this.evaPoiContainer ? this.evaPoiContainer.position : null
   }
 
+  /**
+   * Force the active EVA POI onto the opposite side of the parked shuttle's Y so the
+   * "satellite stacks visually on top of the cargo bay" case can't happen regardless
+   * of where the player stopped on the spacetime grid. Magnitude is preserved (the
+   * waypoint distance from the orbital plane is intentional); only the sign flips when
+   * needed to keep the POI clear of the shuttle.
+   *
+   * @param shuttleY - Current shuttle world Y at EVA enter.
+   */
+  ensureEvaPoiOppositeShuttle(shuttleY: number): void {
+    const container = this.evaPoiContainer
+    if (!container) return
+    const poiY = container.position.y
+    const desiredSign = shuttleY >= 0 ? -1 : 1
+    if (Math.sign(poiY) === desiredSign) return
+    container.position.y = Math.abs(poiY) * desiredSign
+  }
+
   /** The scene root holding the EVA POI prop (for optional EVA huge-scale targeting). */
   getEvaPoiGroup(): THREE.Group | null {
     return this.evaPoiContainer

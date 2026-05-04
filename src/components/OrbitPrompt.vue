@@ -108,18 +108,18 @@ function onOrbitKioskClick(action: OrbitKioskAction): void {
       <button
         v-if="!suppressKiosks && shopAvailable && orbitState.state === 'orbiting'"
         type="button"
-        class="orbit-prompt-engineering-btn"
-        @click="onOrbitKioskClick('openEngineeringBay')"
-      >
-        U Engineering Bay
-      </button>
-      <button
-        v-if="!suppressKiosks && shopAvailable && orbitState.state === 'orbiting'"
-        type="button"
         class="orbit-prompt-mission-board-btn"
         @click="onOrbitKioskClick('openMissionBoard')"
       >
         J Mission Board
+      </button>
+      <button
+        v-if="!suppressKiosks && shopAvailable && orbitState.state === 'orbiting'"
+        type="button"
+        class="orbit-prompt-engineering-btn"
+        @click="onOrbitKioskClick('openEngineeringBay')"
+      >
+        U Engineering Bay
       </button>
       <button
         v-if="!suppressKiosks && shopAvailable && orbitState.state === 'orbiting'"

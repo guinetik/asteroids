@@ -37,6 +37,14 @@ const MAP_POI_SATELLITE_SCALE = 0.005
 const MAP_POI_RELAY_ANTENNA_SCALE = 0.005
 
 /**
+ * Euler rotation applied to the Voyager GLB. `x: -π/2` tips the dish from the GLB's
+ * native +Y "up" to face the EVA camera (+Z). `z: π` then rolls the spacecraft 180°
+ * around the dish-forward axis so the bus/RTG arm sits below the dish instead of on
+ * top — i.e. right-side up from the player's POV.
+ */
+const MAP_POI_RELAY_ANTENNA_ROTATION = { x: -Math.PI / 2, z: Math.PI }
+
+/**
  * Uniform scale on the Hubble telescope GLB in map world units. Kept small so the prop
  * stays a speck from the /map AU-scale camera; EVA huge-scale (see
  * `EVA_MAP_HUGE_POI_BY_TYPE.telescope`) boosts it to real-Hubble size in close-up. Tune
@@ -92,6 +100,7 @@ async function createRelayAntennaPoi(
 ): Promise<EvaMissionPoiInstance> {
   const model = await VoyagerModel.create({
     scale: MAP_POI_RELAY_ANTENNA_SCALE,
+    rotation: MAP_POI_RELAY_ANTENNA_ROTATION,
     maintenanceState,
   })
   model.group.position.set(MAP_POI_LOCAL_OFFSET_X, localY, 0)

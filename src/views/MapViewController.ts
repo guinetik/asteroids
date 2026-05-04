@@ -3431,6 +3431,20 @@ export class MapViewController implements Tickable {
     })
   }
 
+  /**
+   * Open the tactical map overlay from a UI button. Mirrors the M-key path so the
+   * nav-bar Map button uses the same gating (no map while habitat is active, dead,
+   * intro-locked, or already approaching an orbit).
+   */
+  requestOpenMap(): void {
+    if (this.mapState.isOpen) return
+    if (this.habitatState.isActive) return
+    if (this.shuttleController?.dead) return
+    if (this.orbitSystem?.state === 'approaching') return
+    this.mapState.open()
+    this.onOpenMap()
+  }
+
   /** Enter the habitat interior (called from map nav “H Habitat” / startup handoff). */
   enterHabitat(): void {
     this.cancelPostStartupIntroHabitatTimer()
@@ -4908,6 +4922,12 @@ export class MapViewController implements Tickable {
    */
   private handleEvaModeChange(active: boolean): void {
     if (active) {
+      // Spacetime-grid bumps mean the parked shuttle's Y can be on the same side of
+      // the orbital plane as a randomly-generated POI Y, collapsing the intended
+      // vertical separation. Flip the POI to the opposite side at EVA enter so the
+      // satellite is reliably above-or-below the ship, never visually stacked.
+      const shuttleY = this.shuttleController?.group.position.y ?? 0
+      this.missionFacade.ensureEvaPoiOppositeShuttle(shuttleY)
       const evaCamera = this.evaSession?.getEvaFpsCamera() ?? null
       if (evaCamera && this.evaCameraFarRestore === null) {
         this.evaCameraFarRestore = evaCamera.far

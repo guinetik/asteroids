@@ -74,16 +74,6 @@ export interface VoyagerModelCreateOptions {
 }
 
 /**
- * Beacon offset in the voyager GLB's native (pre-scale) frame. The old constant
- * `(0, -0.18, 0.25)` was tuned for the old 0.1 base scale, so ÷0.1 gives its native
- * equivalent. At use-time this is multiplied by the current `scale`, which keeps the
- * bulb/light inside the model hull at any base scale — otherwise `model.group.scale`
- * stays at 1 while the visible `sceneClone` shrinks, leaving the beacon floating
- * outside the (now tiny) voyager.
- */
-const VOYAGER_MAINTENANCE_BEACON_OFFSET_NATIVE = new THREE.Vector3(0, -1.8, 2.5)
-
-/**
  * Beacon `PointLight.distance` (world-space, unscaled by parent) per unit of model
  * `scale`. Picked to match the halo/body ratio the beacon had at the original 0.1
  * voyager scale (7 world-unit distance ÷ 0.1 scale).
@@ -92,6 +82,40 @@ const VOYAGER_BEACON_DISTANCE_PER_SCALE = 70
 
 /** Matching per-scale bulb radius so the emissive bulb mesh stays body-proportional. */
 const VOYAGER_BEACON_RADIUS_PER_SCALE = 0.3
+
+/**
+ * Max longest-axis : shortest-axis ratio for a mesh to count as a "body" candidate
+ * when picking the beacon anchor. Anything more elongated (booms, magnetometer mast,
+ * RTG truss) is excluded so the beacon doesn't land on a stick.
+ */
+const VOYAGER_BODY_MAX_ELONGATION = 4
+
+/** Pick the center of the largest non-elongated mesh under `root` — the dish or bus. */
+function computeBodyCenter(root: THREE.Object3D): THREE.Vector3 {
+  let bestVolume = -1
+  const bestCenter = new THREE.Vector3()
+  const size = new THREE.Vector3()
+  const box = new THREE.Box3()
+  root.traverse((child) => {
+    const mesh = child as THREE.Mesh
+    if (!mesh.isMesh) return
+    box.setFromObject(mesh)
+    if (box.isEmpty()) return
+    box.getSize(size)
+    const longest = Math.max(size.x, size.y, size.z)
+    const shortest = Math.max(Math.min(size.x, size.y, size.z), 1e-6)
+    if (longest / shortest > VOYAGER_BODY_MAX_ELONGATION) return
+    const volume = size.x * size.y * size.z
+    if (volume > bestVolume) {
+      bestVolume = volume
+      box.getCenter(bestCenter)
+    }
+  })
+  if (bestVolume < 0) {
+    new THREE.Box3().setFromObject(root).getCenter(bestCenter)
+  }
+  return bestCenter
+}
 
 /**
  * Decorative Voyager relay GLB — add {@link group} to your scene after
@@ -139,12 +163,14 @@ export class VoyagerModel {
 
     const group = new THREE.Group()
     group.add(sceneClone)
+    // Whole-model bbox center is biased upward by the long booms / cradle truss, so
+    // the beacon lands in empty space above the bus. Instead pick the center of the
+    // largest non-elongated mesh — the dish or bus — which is reliably "inside" the
+    // hull regardless of GLB origin.
+    const beaconOffset = computeBodyCenter(sceneClone)
     const beacon = options?.maintenanceState
       ? new MaintenanceBeacon(group, {
-          // Offset lives in `model.group` (scale 1) so it's in world units at attach time;
-          // multiply by `scale` so the beacon sits inside the (scaled) sceneClone rather
-          // than floating out in space when the model shrinks.
-          offset: VOYAGER_MAINTENANCE_BEACON_OFFSET_NATIVE.clone().multiplyScalar(scale),
+          offset: beaconOffset,
           initialState: options.maintenanceState,
           // PointLight.distance is in world units and is NOT scaled by the parent; tie
           // it to `scale` so the halo stays body-proportional at any model size.

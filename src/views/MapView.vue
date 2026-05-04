@@ -1225,6 +1225,14 @@ function openHabitatFromMap(): void {
   viewController.enterHabitat()
 }
 
+function openMapOverlayFromNav(): void {
+  uiAudio.notifyButtonClick()
+  if (shuttleControlVisible.value) {
+    shuttleControlVisible.value = false
+  }
+  viewController.requestOpenMap()
+}
+
 function openShopFromTerminal() {
   viewController.notifyJourneyTrigger('shop_opened')
   shuttleControlVisible.value = false
@@ -1560,8 +1568,8 @@ watch(
         <button
           type="button"
           class="map-screen-nav__icon-btn"
-          title="Habitat (H)"
-          @click="openHabitatFromMap"
+          title="Map (M)"
+          @click="openMapOverlayFromNav"
         >
           <svg
             viewBox="0 0 24 24"
@@ -1572,27 +1580,9 @@ watch(
             stroke-linejoin="round"
             class="map-screen-nav__icon"
           >
-            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-            <polyline points="9 22 9 12 15 12 15 22" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          class="map-screen-nav__icon-btn"
-          title="Mail"
-          @click="openProgramFromMap('mail')"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="map-screen-nav__icon"
-          >
-            <rect width="20" height="16" x="2" y="4" rx="2" />
-            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+            <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21 3 6" />
+            <line x1="9" y1="3" x2="9" y2="18" />
+            <line x1="15" y1="6" x2="15" y2="21" />
           </svg>
         </button>
         <button
@@ -1612,6 +1602,44 @@ watch(
           >
             <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="map-screen-nav__icon-btn"
+          title="Inbox"
+          @click="openProgramFromMap('mail')"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="map-screen-nav__icon"
+          >
+            <rect width="20" height="16" x="2" y="4" rx="2" />
+            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="map-screen-nav__icon-btn"
+          title="Habitat (H)"
+          @click="openHabitatFromMap"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="map-screen-nav__icon"
+          >
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
           </svg>
         </button>
         <button
