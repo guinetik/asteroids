@@ -77,6 +77,13 @@ export interface BunkerMinigameCreateOptions {
   projectileSystem: ProjectileSystem
   /** Rolled mission difficulty (1-10) — used to pick the bunker tier. */
   difficulty: number
+  /**
+   * Optional shared enemy point-light pool from the level controller. When
+   * present, spawned bunker wave enemies borrow lights from it instead of
+   * allocating per-enemy `THREE.PointLight`s — preventing the lit-material
+   * recompile stall that otherwise hits on every wave spawn.
+   */
+  lightPool?: import('@/three/EnemyLightPool').EnemyLightPool | null
 }
 
 /** Bunker minigame implementation. */
@@ -163,6 +170,7 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
       projectileSystem: params.projectileSystem,
       difficulty: params.difficulty,
       interiorMaterials,
+      lightPool: params.lightPool ?? null,
     })
     return new BunkerMinigame(
       params.objectiveIndex,

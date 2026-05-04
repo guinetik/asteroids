@@ -26,7 +26,7 @@ import { resolveThrusterTrailColors } from './cosmetics/thrusterTrailColors'
 
 const THRUST_SPAWN_RATE = 2000
 const BRAKE_SPAWN_RATE = 1500
-const RCS_SPAWN_RATE = 600
+const RCS_SPAWN_RATE = 800
 
 /**
  * 3 nozzle emit points matching ShuttleController ENG_POSITIONS * MODEL_SCALE.
@@ -67,6 +67,50 @@ const SPAWN_WORLD_POS_SCRATCH = /* @__PURE__ */ new THREE.Vector3()
 const SPAWN_LOCAL_PUSH_SCRATCH = /* @__PURE__ */ new THREE.Vector3()
 /** Reusable scratch — push direction in *world* space after slerped-quat rotation. */
 const SPAWN_PUSH_DIR_SCRATCH = /* @__PURE__ */ new THREE.Vector3()
+/**
+ * Reusable scratch — shuttle's bulk world velocity derived this frame from
+ * `(currentPos - prevPos) / dt`. Computing it from the prev/current snapshot
+ * (rather than reading {@link ShuttleController.currentVelocity}) is what
+ * makes RCS look right while *orbiting*: the orbit facade warps the shuttle
+ * along the orbital path via `group.position.set(...)` without ever updating
+ * the controller's internal `velocity`, so any code that reads `velocity`
+ * sees `(0, 0, 0)` mid-orbit even though the ship is moving fast in world
+ * space. The position delta does not lie.
+ */
+const SHUTTLE_BULK_VEL_SCRATCH = /* @__PURE__ */ new THREE.Vector3()
+
+/**
+ * Per-particle sub-frame interpolation parameter `t ∈ (0, 1]` with random
+ * jitter inside each particle's `1/count` slot.
+ *
+ * Quantizing to `(i + 1) / count` (the previous schedule) places every
+ * batch's particles at the *exact same* fractions through the prev→current
+ * segment. With bulk-velocity inheritance enabled (RCS), every particle in
+ * a batch then shares an identical velocity, and they march in lockstep
+ * forever — adjacent batches end up parallel-shifted by `push * dt`,
+ * producing the textbook striped-trail artifact ("thruster lines parallel"
+ * the player reported). The same artifact exists at lower amplitude on
+ * thrust + brake any time within-batch and inter-batch directions diverge
+ * (e.g. yawing while thrusting), where the 3-nozzle offset acts like an
+ * inter-batch perpendicular axis.
+ *
+ * Jittering inside each slot — `(i + Math.random()) / count` — preserves
+ * the per-frame *count* and average cadence (mean is still `(i + 0.5)/count`)
+ * but breaks the lock-step: particles within a batch sit at random
+ * fractions through the segment, so over the lifetime they form a fluffy
+ * column rather than a stack of mathematically-aligned strands.
+ *
+ * @param i - Particle index within the frame's spawn batch (`0..count-1`).
+ * @param count - Total particles spawning this frame.
+ * @returns Sub-frame fraction in `[i/count, (i+1)/count)` with uniform
+ *   distribution inside the slot. The whole-batch range is `[0, 1)`,
+ *   matching how spawns are continuously distributed across the frame
+ *   delta — no particle is ever exactly at `prev` or `curr`, but both are
+ *   approached arbitrarily closely with low probability.
+ */
+function jitteredFrameT(i: number, count: number): number {
+  return (i + Math.random()) / count
+}
 
 /**
  * Shuttle-specific thruster VFX controller.
@@ -166,7 +210,7 @@ export class ThrusterEffectController implements Tickable {
       color: new THREE.Color(0xddeeff),
       size: Math.max(5, 4 * s),
       lifetime: 0.5,
-      spread: 1.5 * s,
+      spread: 4.5 * s,
       opacity: 0.6,
       soft: true,
       sizeGrowth: 2.5,
@@ -342,6 +386,7 @@ export class ThrusterEffectController implements Tickable {
     }
 
     this.captureFrameStartShuttleTransform()
+    this.computeShuttleBulkVelocity(dt)
 
     if (effectState.emitThrust) {
       this.thrustSpawnAccumulator += THRUST_SPAWN_RATE * dt
@@ -350,7 +395,7 @@ export class ThrusterEffectController implements Tickable {
       if (count > 0) {
         SPAWN_LOCAL_PUSH_SCRATCH.set(-PUSH_FORCE * scale, 0, 0)
         for (let i = 0; i < count; i++) {
-          const t = (i + 1) / count
+          const t = jitteredFrameT(i, count)
           const nozzle = NOZZLE_OFFSETS[Math.floor(Math.random() * NOZZLE_OFFSETS.length)]!
           this.emitInterpolatedParticle(
             this.thrustEmitter,
@@ -358,6 +403,7 @@ export class ThrusterEffectController implements Tickable {
             SPAWN_LOCAL_PUSH_SCRATCH,
             scale,
             t,
+            false,
           )
         }
       }
@@ -372,7 +418,7 @@ export class ThrusterEffectController implements Tickable {
       if (count > 0) {
         SPAWN_LOCAL_PUSH_SCRATCH.set(-PUSH_FORCE * scale, 0, 0)
         for (let i = 0; i < count; i++) {
-          const t = (i + 1) / count
+          const t = jitteredFrameT(i, count)
           const nozzle = NOZZLE_OFFSETS[Math.floor(Math.random() * NOZZLE_OFFSETS.length)]!
           this.emitInterpolatedParticle(
             this.brakeEmitter,
@@ -380,6 +426,7 @@ export class ThrusterEffectController implements Tickable {
             SPAWN_LOCAL_PUSH_SCRATCH,
             scale,
             t,
+            false,
           )
         }
       }
@@ -398,13 +445,14 @@ export class ThrusterEffectController implements Tickable {
         const pushForce = RCS_PUSH_FORCE * scale
         SPAWN_LOCAL_PUSH_SCRATCH.set(0, 0, isYawingLeft ? pushForce : -pushForce)
         for (let i = 0; i < count; i++) {
-          const t = (i + 1) / count
+          const t = jitteredFrameT(i, count)
           this.emitInterpolatedParticle(
             this.rcsEmitter,
             wingtip,
             SPAWN_LOCAL_PUSH_SCRATCH,
             scale,
             t,
+            true,
           )
         }
       }
@@ -448,6 +496,35 @@ export class ThrusterEffectController implements Tickable {
   }
 
   /**
+   * Derive the shuttle's bulk world velocity for *this* frame from the
+   * captured prev/current world positions. Written into
+   * {@link SHUTTLE_BULK_VEL_SCRATCH}.
+   *
+   * Critical for orbital RCS: the orbit facade warps the shuttle along the
+   * orbital path via `group.position.set(...)` *without* updating the
+   * controller's internal `velocity`, so reading
+   * {@link ShuttleController.currentVelocity} returns `(0, 0, 0)` while the
+   * ship is moving fast in world space. The position delta tells the truth
+   * regardless of motion source — physics integration, orbit warp, slingshot
+   * launch, or portal arrival.
+   *
+   * Zeroed on the first tick (no prev yet) and on teleports (prev is force-
+   * snapped to current by {@link captureFrameStartShuttleTransform}, so the
+   * delta is naturally zero), so we never emit a frame's worth of particles
+   * with a phantom warp velocity.
+   *
+   * @param dt - Frame delta in seconds.
+   */
+  private computeShuttleBulkVelocity(dt: number): void {
+    if (!this.prevShuttleWorldPos || dt <= 0) {
+      SHUTTLE_BULK_VEL_SCRATCH.set(0, 0, 0)
+      return
+    }
+    SHUTTLE_BULK_VEL_SCRATCH.subVectors(this.shuttle.position, this.prevShuttleWorldPos)
+    SHUTTLE_BULK_VEL_SCRATCH.divideScalar(dt)
+  }
+
+  /**
    * Emit one particle into `emitter`, distributing the frame's batched spawns
    * evenly between the shuttle's previous and current world transform. Both
    * translation (lerp) and rotation (slerp) are interpolated, so wingtip
@@ -461,6 +538,15 @@ export class ThrusterEffectController implements Tickable {
    * for rear thrust, `(0, 0, ±RCS_PUSH_FORCE * scale)` for yaw RCS); the helper
    * rotates it into world space sub-frame.
    *
+   * When `inheritBulkVelocity` is true, the shuttle's bulk world velocity
+   * (precomputed by {@link computeShuttleBulkVelocity}) is *added* to the
+   * particle's exhaust velocity. This matters when the shuttle is in orbit:
+   * the orbital tangent speed dominates over the small RCS push, and without
+   * inheritance the particles "stick" in inertial space while the shuttle
+   * whisks past — producing a long thin streak instead of a wingtip puff.
+   * Main thrust and brake leave it `false` to keep the iconic long trail
+   * regardless of speed.
+   *
    * @param emitter - Target {@link ParticleEmitter}.
    * @param localOffset - Nozzle / wingtip offset in shuttle-local space.
    * @param localPush - Push velocity in shuttle-local space, magnitude already
@@ -472,6 +558,10 @@ export class ThrusterEffectController implements Tickable {
    *   shuttle's *current* transform, eliminating the one-frame staleness
    *   that made short RCS bursts read as "puff comes from where the ship
    *   was a clock cycle ago".
+   * @param inheritBulkVelocity - When true, the shuttle's per-frame bulk
+   *   world velocity is added to the particle's exhaust velocity so the
+   *   puff stays anchored to the wingtip even while the ship is being
+   *   warped along an orbital path. RCS only.
    */
   private emitInterpolatedParticle(
     emitter: ParticleEmitter,
@@ -479,6 +569,7 @@ export class ThrusterEffectController implements Tickable {
     localPush: THREE.Vector3,
     scale: number,
     t: number,
+    inheritBulkVelocity: boolean,
   ): void {
     const prevPos = this.prevShuttleWorldPos ?? this.shuttle.position
     const prevQuat = this.prevShuttleQuaternion ?? this.shuttle.group.quaternion
@@ -490,6 +581,9 @@ export class ThrusterEffectController implements Tickable {
       .applyQuaternion(SPAWN_INTERP_QUAT_SCRATCH)
       .add(SPAWN_INTERP_POS_SCRATCH)
     SPAWN_PUSH_DIR_SCRATCH.copy(localPush).applyQuaternion(SPAWN_INTERP_QUAT_SCRATCH)
+    if (inheritBulkVelocity) {
+      SPAWN_PUSH_DIR_SCRATCH.add(SHUTTLE_BULK_VEL_SCRATCH)
+    }
     emitter.emit(SPAWN_WORLD_POS_SCRATCH, SPAWN_PUSH_DIR_SCRATCH)
   }
 

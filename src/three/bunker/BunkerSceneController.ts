@@ -128,6 +128,14 @@ export interface BunkerSceneControllerOptions {
    * or {@link createTestBunkerInteriorMaterialSet} for tests).
    */
   interiorMaterials: BunkerInteriorMaterialSet
+  /**
+   * Optional shared point-light pool spawned wave enemies borrow lights from.
+   * The level scene's pool keeps `NUM_POINT_LIGHTS` pinned across the whole
+   * level so a fresh wave does not recompile every lit material. When `null`
+   * or omitted, controllers fall back to per-enemy lights (legacy behavior
+   * — first wave will hitch on every spawn).
+   */
+  lightPool?: import('@/three/EnemyLightPool').EnemyLightPool | null
 }
 
 /** Interior scene wrapper — the level view treats this as a black box. */
@@ -158,6 +166,8 @@ export class BunkerSceneController {
   private readonly enemyHealthMultiplier: number
   private readonly enemyVisualTier: EnemyVisualTier
   private readonly enemyProjectileMeshPool: EnemyProjectileMeshPool
+  /** Shared point-light pool for spawned wave enemies, or `null` to self-allocate. */
+  private readonly lightPool: import('@/three/EnemyLightPool').EnemyLightPool | null
   private readonly interiorMaterials: BunkerInteriorMaterialSet
   private readonly geometry: BunkerGeometry
   private readonly phageControllers = new Map<number, BacteriophageController>()
@@ -181,6 +191,7 @@ export class BunkerSceneController {
       opts.difficulty ?? BUNKER_MIN_DIFFICULTY,
     )
     this.enemyVisualTier = bunkerEnemyVisualTier(opts.difficulty ?? BUNKER_MIN_DIFFICULTY)
+    this.lightPool = opts.lightPool ?? null
     this.enemyProjectileMeshPool = new EnemyProjectileMeshPool(opts.scene)
     this.enemyProjectileMeshPool.prewarm()
     this.interiorMaterials = opts.interiorMaterials
@@ -546,15 +557,24 @@ export class BunkerSceneController {
    */
   private createEnemyController(handle: EnemyHandle): void {
     if (handle.type === 'bacteriophage') {
-      const ctrl = new BacteriophageController(handle.enemy, { visualTier: this.enemyVisualTier })
+      const ctrl = new BacteriophageController(handle.enemy, {
+        visualTier: this.enemyVisualTier,
+        lightPool: this.lightPool,
+      })
       this.geometry.root.add(ctrl.group)
       this.phageControllers.set(handle.id, ctrl)
     } else if (handle.type === 'chimera') {
-      const ctrl = new ChimeraWalkerController(handle.enemy, { visualTier: this.enemyVisualTier })
+      const ctrl = new ChimeraWalkerController(handle.enemy, {
+        visualTier: this.enemyVisualTier,
+        lightPool: this.lightPool,
+      })
       this.geometry.root.add(ctrl.group)
       this.chimeraControllers.set(handle.id, ctrl)
     } else {
-      const ctrl = new SpireController(handle.enemy, { visualTier: this.enemyVisualTier })
+      const ctrl = new SpireController(handle.enemy, {
+        visualTier: this.enemyVisualTier,
+        lightPool: this.lightPool,
+      })
       this.geometry.root.add(ctrl.group)
       this.spireControllers.set(handle.id, ctrl)
     }

@@ -35,6 +35,14 @@ export const EVA_MAP_HUGE_POI_BY_TYPE: Record<string, number> = {
 export const EVA_MAP_HUGE_SUN = 4
 
 /**
+ * Far plane applied to the EVA fps camera while EVA is active on the map. The default
+ * `FpsCamera` far is 5000 (tuned for the level scene), but the map's starfield sits at
+ * radius ~40000, so the stars get clipped the moment the EVA camera takes over. Match
+ * `MapSceneSetup`'s 50000 so the starfield stays visible during shuttle EVA.
+ */
+export const EVA_MAP_CAMERA_FAR = 50000
+
+/**
  * Helmet light intensity scale during EVA on the map. Default FPS intensity is tuned
  * for the dim level scene; on the sunlit map the helmet flashlight blows out nearby
  * props. 0.08 keeps the visor authentic (there is *some* forward spill) without

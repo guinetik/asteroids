@@ -169,18 +169,22 @@ const LEVEL_COLLISION_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.collision
  *
  * Sized for the worst-case simultaneous lit-enemy population on a level:
  *   - DAN minigame: up to 4 viroids (1 light each) = 4
- *   - Disturbance director: cap of 5 ambient enemies; chimera takes 2 lights
- *     each, so worst case 5 chimeras × 2 = 10
- * Combined peak ≈ 14. Pool 16 leaves a small cushion. Warmup uses 4 slots
- * (1 phage + 2 chimera + 1 spire) but releases before the game loop starts,
- * so warmup demand does not stack with runtime demand.
+ *   - Disturbance director: cap of 5 ambient enemies; chimera takes 2 lights,
+ *     so 5 chimeras × 2 = 10
+ *   - Bunker hard-tier final wave: up to ~2 chimera + ~3 spire + ~6 phage +
+ *     up to 3 chimera fills = ~19 lights worst case
+ *
+ * DAN/disturbance and bunker do not run on the same level, so peak demand is
+ * `max(DAN+disturbance, bunker)` ≈ 19. Pool of 24 leaves a small cushion.
+ * Warmup uses 4 slots (1 phage + 2 chimera + 1 spire) and releases before the
+ * game loop starts, so warmup demand does not stack with runtime demand.
  *
  * Note: program cache keys depend on `NUM_POINT_LIGHTS`. Resizing this
  * constant invalidates the warmed program cache for that boot, so changes
  * here cost a one-time precompile delta — keep the value generous enough
  * that the pool does not need to grow mid-development.
  */
-const ENEMY_LIGHT_POOL_SIZE = 16
+const ENEMY_LIGHT_POOL_SIZE = 24
 
 /** Dev-console `landNearObjective`: offset from waypoint toward ship (along ground XZ). */
 const DEV_LAND_NEAR_OBJECTIVE_OFFSET_M = 16
