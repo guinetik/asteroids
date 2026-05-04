@@ -129,13 +129,18 @@ export class ThrusterWashController {
     // ── Wash spotlight ──
     this.washLight = new THREE.SpotLight(
       WASH_LIGHT_COLOR,
-      0, // starts off
+      0, // starts at intensity 0 (off); never toggle `.visible` (see below).
       WASH_LIGHT_DISTANCE,
       WASH_LIGHT_ANGLE,
       WASH_LIGHT_PENUMBRA,
     )
     this.washLight.castShadow = false
-    this.washLight.visible = false
+    // Keep the spotlight in the visible-light list at all times — modulating
+    // `.visible` would change `NUM_SPOT_LIGHTS` for every lit material, which
+    // re-keys their programs and forces Three.js to recompile shader code on
+    // the first frame the wash activates (the precise touchdown hitch the
+    // user reported). Intensity-gating keeps the program cache stable.
+    this.washLight.visible = true
 
     // ── Scorch disc ──
     const scorchGeo = new THREE.CircleGeometry(SCORCH_RADIUS, SCORCH_SEGMENTS)
@@ -218,9 +223,11 @@ export class ThrusterWashController {
     }
 
     // ── Wash light ──
-    this.washLight.visible = intensity > 0.01
+    // Intensity-gate (not visibility-gate) so `NUM_SPOT_LIGHTS` stays
+    // constant and lit-material programs never re-key. Keep updating
+    // position whenever there is any contribution to render.
     this.washLight.intensity = intensity * WASH_LIGHT_MAX_INTENSITY
-    if (this.washLight.visible) {
+    if (this.washLight.intensity > 0) {
       this.washLight.position.set(landerPosition.x, landerPosition.y, landerPosition.z)
       this.washLight.target.position.set(landerPosition.x, groundY, landerPosition.z)
     }

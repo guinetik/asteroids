@@ -165,6 +165,19 @@ const LEVEL_ATMOSPHERE_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.atmosphere
 const LEVEL_BOUNDS_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.bounds
 const LEVEL_COLLISION_CONFIG = LEVEL_VIEW_CONTROLLER_CONFIG.collision
 /**
+ * Trade-good quantity awarded by a single bunker loot chest, keyed by wave
+ * tier. Bunker rewards scale linearly with difficulty: easy = base, medium =
+ * 2× base, hard = 3× base. Doubled-up so the time investment of a hard
+ * bunker run matches the inventory bump expected from a higher-difficulty
+ * mission slot.
+ */
+const BUNKER_LOOT_CHEST_QUANTITY_BY_TIER = {
+  easy: 10,
+  medium: 20,
+  hard: 30,
+} as const
+
+/**
  * Number of slots pre-allocated in the level's shared enemy point-light pool.
  *
  * Sized for the worst-case simultaneous lit-enemy population on a level:
@@ -1711,11 +1724,89 @@ export class LevelViewController implements Tickable {
     this.enemyVisualWarmup.stageForCamera(camera)
     stageVisible(this.enemyVisualWarmup.group)
 
+    // ── Thruster wash prewarm ────────────────────────────────────
+    // `compileAsync` only links shader programs — it does not actually
+    // render anything, so per-(material, geometry) WebGL VAOs and any
+    // first-draw bookkeeping are still deferred until the renderer
+    // genuinely draws the object. Wash dust + scorch + spotlight are
+    // hidden at level boot and only flip on when the lander descends —
+    // exactly the precision moment where a hitch hurts most.
+    //
+    // Stage them visible *and* emit one dummy dust particle so the
+    // followup `postProcessing.render()` below traverses all three
+    // layers, building VAOs and warming any other lazy GPU state.
+    const washStaged = this.thrusterWash
+    let washStashSpotVisible = false
+    if (washStaged) {
+      washStashSpotVisible = washStaged.washLight.visible
+      stageVisible(washStaged.scorchMesh)
+      washStaged.scorchMesh.material.uniforms['intensity']!.value = 0.5
+      washStaged.washLight.visible = true
+      washStaged.dustEmitter.emit(camera.position, new THREE.Vector3(0, 1, 0))
+    }
+
     try {
       if (typeof renderer.compileAsync === 'function') {
         await renderer.compileAsync(scene, camera)
       } else if (typeof renderer.compile === 'function') {
         renderer.compile(scene, camera)
+      }
+      // Force `WebGLProgram.onFirstUse` (the call that issues
+      // `getProgramInfoLog` to pull uniform locations from the GPU — a
+      // synchronous driver stall of ~100–400ms per program) for every
+      // material in the scene, regardless of whether it would be drawn
+      // by the prewarm render passes below.
+      //
+      // `compileAsync` links programs but never calls `onFirstUse`; that
+      // cost is normally paid the first time `setProgram(material)` runs
+      // inside a real frame. Materials whose owning object is invisible,
+      // frustum-culled, or whose vertex buffer has not yet had a live
+      // particle (`ParticleEmitter` before its first `tick()` flush)
+      // therefore slip through render-based prewarms — exactly what bit
+      // the lander main-thrust + ground wash combo: the nozzle glow
+      // sprite (`THREE.SpriteMaterial`), the wash dust points, and the
+      // scorch shader were each first-drawn on the same frame the player
+      // closes on the surface, paying three `onFirstUse` stalls in a row.
+      //
+      // Calling `program.getUniforms()` directly triggers `onFirstUse`
+      // without needing an actual draw, so every scene material pays
+      // that cost here under the loading overlay.
+      const rendererInternal = renderer as unknown as {
+        properties?: {
+          get(material: THREE.Material): { currentProgram?: { getUniforms?: () => unknown } } | undefined
+        }
+      }
+      const seenMaterials = new WeakSet<THREE.Material>()
+      scene.traverse((obj) => {
+        const matRef = (obj as THREE.Mesh).material
+        if (!matRef) return
+        const mats = Array.isArray(matRef) ? matRef : [matRef]
+        for (const mat of mats) {
+          if (!mat || seenMaterials.has(mat)) continue
+          seenMaterials.add(mat)
+          const props = rendererInternal.properties?.get(mat)
+          props?.currentProgram?.getUniforms?.()
+        }
+      })
+      // Two prewarm renders so post-processing's own materials (bloom
+      // mip pyramid, tonemap, LUT, EffectPass fused shader) also pay
+      // their first-draw cost here — those live in `EffectComposer` and
+      // are not part of `scene.traverse`.
+      //   1. Vehicle camera — follows the lander, so its hull, glass,
+      //      thruster meshes, and nozzle glow sprite are in-frustum.
+      //   2. FPS camera — covers EVA player + multi-tool + warmup enemies
+      //      and the wash/scorch staging from above.
+      if (this.postProcessing) {
+        const fpsCam = this.fpsCamera?.camera ?? null
+        const vehicleCam = this.vehicleCamera?.camera ?? null
+        if (vehicleCam && vehicleCam !== camera) {
+          this.postProcessing.setCamera(vehicleCam)
+          this.postProcessing.render()
+        }
+        if (fpsCam) {
+          this.postProcessing.setCamera(fpsCam)
+        }
+        this.postProcessing.render()
       }
     } catch (err) {
       console.warn(
@@ -1734,6 +1825,11 @@ export class LevelViewController implements Tickable {
         this.enemyVisualWarmup.group.visible = false
       }
       this.multiTool?.setVisible(multiToolWasVisible)
+      if (washStaged) {
+        washStaged.scorchMesh.material.uniforms['intensity']!.value = 0
+        washStaged.washLight.visible = washStashSpotVisible
+        washStaged.dustEmitter.reset()
+      }
     }
   }
 
@@ -3241,9 +3337,9 @@ export class LevelViewController implements Tickable {
     const tradeGood = TRADE_GOODS[randomKey]
     if (!tradeGood) return false
 
-    let quantity = 1
-    if (tier === 'medium') quantity = 2
-    if (tier === 'hard') quantity = 3
+    const quantity =
+      BUNKER_LOOT_CHEST_QUANTITY_BY_TIER[tier as keyof typeof BUNKER_LOOT_CHEST_QUANTITY_BY_TIER] ??
+      BUNKER_LOOT_CHEST_QUANTITY_BY_TIER.easy
 
     const inventory = loadInventory()
     if (!inventory) return false

@@ -50,6 +50,26 @@ const SHAKE_VOL_MIN = 0.08
 /** Shake-loop volume at full vibration (liftoff at ground level). */
 const SHAKE_VOL_MAX = 0.55
 
+/**
+ * Lander descent / touchdown audio cues that are flagged `load: 'lazy'`
+ * in {@link audioManifest.ts}. Without preload, Howler fetches the MP3
+ * and decodes it on the main thread the first time each plays — landing
+ * on a fresh asteroid would stall the frame on the wash hum, the
+ * touchdown thud, the landing chirp, and the collision boom in quick
+ * succession (a multi-hundred-ms hitch right at the moment the player
+ * is making the most precision-critical inputs of the run).
+ *
+ * Listed in priority order: anything fired during the descent itself
+ * (wash hum, thrust loop) precedes anything that fires *at* touchdown.
+ */
+const LANDER_TOUCHDOWN_PRELOAD_IDS = [
+  'sfx.lander.thruster.ground',
+  'sfx.touchdown',
+  'sfx.landing',
+  'sfx.collision',
+  'sfx.explosion',
+] as const
+
 /** Per-frame state pushed by the host view. */
 export interface LanderAudioState {
   /**
@@ -95,6 +115,10 @@ export class LanderAudioDirector {
   start(): void {
     if (this.active) return
     this.active = true
+    // Warm the lazy descent / touchdown cues so the first lander touchdown
+    // does not block on MP3 decode mid-precision-input. Idempotent — the
+    // AudioManager skips ids already loaded.
+    this.audio.preload(LANDER_TOUCHDOWN_PRELOAD_IDS)
     this.windAmbient = this.audio.play('ambient.asteroid', { loop: true })
   }
 
