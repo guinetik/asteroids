@@ -575,6 +575,7 @@
 
               const thrusting = thrustingLanding;
               if (!skipLandingDynamics) {
+              this.landerRotation = 0;
               this.landerVelocityY += LanderGame.GRAVITY * LanderGame.LANDING_GRAVITY_SCALE * deltaSec;
               if (thrusting) this.landerVelocityY -= LanderGame.THRUST * deltaSec;
               this.landerVelocityY = Math.max(-LanderGame.MAX_RISE_SPEED, Math.min(LanderGame.MAX_FALL_SPEED, this.landerVelocityY));
@@ -682,6 +683,8 @@
                 this.landerY = settledGroundHere - LanderGame.LANDER_HEIGHT / 2;
                 this.landerVelocityY = 0;
                 this.landerRotation = this._terrainSlopeAt(this.landerX);
+              } else {
+                this.landerRotation = 0;
               }
 
               if (this.landerY > this.height + LanderGame.LANDER_HEIGHT) {
