@@ -40,6 +40,8 @@ export type AchievementKind =
   | 'solar_body_orbit'
   | 'contract_completed_count'
   | 'specific_contract_completed'
+  | 'specific_contract_accepted'
+  | 'specific_contract_step_completed'
   | 'mission_kind_completed'
   | 'mission_objective_completed'
   | 'slingshot_launches'
@@ -79,8 +81,20 @@ export interface AchievementDefinition {
   journeyId?: JourneyId
   /** Planet id or `"sun"` — must match keys in {@link PlayerProfile.orbitedSolarBodies}. */
   orbitBodyKey?: string
-  /** Contract id used by `specific_contract_completed` achievements. */
+  /** Contract id used by `specific_contract_completed`, `specific_contract_accepted`, and `specific_contract_step_completed` achievements. */
   contractId?: string
+  /**
+   * Required outcome id for `specific_contract_completed` achievements that gate on a
+   * specific choice-mission resolution (e.g. `'transmit'` or `'sabotage'`). When absent
+   * the achievement fires for any successful completion of the contract.
+   */
+  requiredOutcomeId?: string
+  /**
+   * Zero-based step index for `specific_contract_step_completed` achievements.
+   * Fires once `instance.currentStepIndex` has advanced past this index,
+   * meaning the step at this index has been completed. Valid range: `>= 0`.
+   */
+  requiredStepIndex?: number
   /** Mission family counted by `mission_kind_completed` achievements. */
   missionKind?: ContractMissionType
   /** Mission objective type counted by `mission_objective_completed` achievements. */
@@ -524,6 +538,70 @@ export const ACHIEVEMENT_DEFINITIONS: readonly AchievementDefinition[] = [
     rewardCredits: REWARD_CAPSTONE,
     kind: 'specific_contract_completed',
     contractId: 'jovian-society-prospection',
+  },
+  {
+    id: 'ceres-institute-accepted',
+    category: 'contracts',
+    icon: '\u{1F393}',
+    title: 'ACADEMIC-GRADE COMPENSATION',
+    subtitle: "Accepted Dean Porter's standing invitation.",
+    description: 'Accept the Ceres Institute Eternal Biology contract.',
+    type: 'CONTRACTS',
+    rewardCredits: REWARD_STANDARD,
+    kind: 'specific_contract_accepted',
+    contractId: 'ceres-institute-eternal-biology',
+  },
+  {
+    id: 'ceres-first-psychosphere',
+    category: 'contracts',
+    icon: '\u{1F9EC}',
+    title: 'PROMISING MATERIAL',
+    subtitle: 'Collected your first unit of psychosphere for the Institute.',
+    description: 'Complete the first rescue step of the Ceres Institute contract.',
+    type: 'CONTRACTS',
+    rewardCredits: REWARD_NOTABLE,
+    kind: 'specific_contract_step_completed',
+    contractId: 'ceres-institute-eternal-biology',
+    requiredStepIndex: 2,
+  },
+  {
+    id: 'ceres-rescue-pattern',
+    category: 'contracts',
+    icon: '\u{1F91D}',
+    title: 'I AM SORRY TO ASK TWICE',
+    subtitle: 'Extracted a second Institute team.',
+    description: 'Complete the second rescue step of the Ceres Institute contract.',
+    type: 'CONTRACTS',
+    rewardCredits: REWARD_NOTABLE,
+    kind: 'specific_contract_step_completed',
+    contractId: 'ceres-institute-eternal-biology',
+    requiredStepIndex: 5,
+  },
+  {
+    id: 'ceres-archive-transmitted',
+    category: 'contracts',
+    icon: '\u{1F4E1}',
+    title: 'THE FOUNDATION WILL REMEMBER',
+    subtitle: 'Transmitted the archive to the Institute.',
+    description: 'Complete the Ceres Institute contract via the transmit outcome.',
+    type: 'CONTRACTS',
+    rewardCredits: REWARD_CAPSTONE,
+    kind: 'specific_contract_completed',
+    contractId: 'ceres-institute-eternal-biology',
+    requiredOutcomeId: 'transmit',
+  },
+  {
+    id: 'ceres-archive-sabotaged',
+    category: 'contracts',
+    icon: '\u{1F4A5}',
+    title: 'FILE CLOSURE',
+    subtitle: 'Sabotaged the archive transmission.',
+    description: 'Complete the Ceres Institute contract via the sabotage outcome.',
+    type: 'CONTRACTS',
+    rewardCredits: REWARD_CAPSTONE,
+    kind: 'specific_contract_completed',
+    contractId: 'ceres-institute-eternal-biology',
+    requiredOutcomeId: 'sabotage',
   },
   {
     id: 'contracts-hektor-liberated',
@@ -1052,6 +1130,13 @@ function getAchievementDefinitionError(definition: AchievementDefinition): strin
       return hasNonEmptyString(definition.orbitBodyKey) ? null : 'missing orbitBodyKey'
     case 'specific_contract_completed':
       return hasNonEmptyString(definition.contractId) ? null : 'missing contractId'
+    case 'specific_contract_accepted':
+      return hasNonEmptyString(definition.contractId) ? null : 'missing contractId'
+    case 'specific_contract_step_completed':
+      if (!hasNonEmptyString(definition.contractId)) return 'missing contractId'
+      return typeof definition.requiredStepIndex === 'number' && definition.requiredStepIndex >= 0
+        ? null
+        : 'missing non-negative requiredStepIndex'
     case 'mission_kind_completed':
       if (!definition.missionKind) return 'missing missionKind'
       return hasPositiveThreshold(definition) ? null : 'missing positive threshold'

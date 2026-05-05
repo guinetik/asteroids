@@ -416,4 +416,151 @@ describe('achievements', () => {
     )
     expect(entry?.kind).toBe('journey_completed')
   })
+
+  it('unlocks ceres-institute-accepted when the contract is accepted', () => {
+    const snapshot = emptyContractSnapshot()
+    snapshot.instances['ceres-institute-eternal-biology'] = {
+      contractId: 'ceres-institute-eternal-biology',
+      status: 'active',
+      currentStepIndex: 0,
+      stepCounters: [0, 0, 0, 0, 0, 0, 0],
+      offeredAt: '2306-05-04T00:00:00.000Z',
+      acceptedAt: '2306-05-04T01:00:00.000Z',
+      completedAt: null,
+      resolvedOutcomeId: null,
+    }
+
+    const ids = evaluateAchievementUnlocks(progress(createProfile('Pilot'), snapshot), [])
+      .newlyUnlocked.map((a) => a.id)
+
+    expect(ids).toContain('ceres-institute-accepted')
+  })
+
+  it('does not unlock ceres-institute-accepted when the contract is only offered (not accepted)', () => {
+    const snapshot = emptyContractSnapshot()
+    snapshot.instances['ceres-institute-eternal-biology'] = {
+      contractId: 'ceres-institute-eternal-biology',
+      status: 'available',
+      currentStepIndex: 0,
+      stepCounters: [],
+      offeredAt: '2306-05-04T00:00:00.000Z',
+      acceptedAt: null,
+      completedAt: null,
+      resolvedOutcomeId: null,
+    }
+
+    const ids = evaluateAchievementUnlocks(progress(createProfile('Pilot'), snapshot), [])
+      .newlyUnlocked.map((a) => a.id)
+
+    expect(ids).not.toContain('ceres-institute-accepted')
+  })
+
+  it('unlocks ceres-first-psychosphere when step 2 (first rescue) is completed', () => {
+    const snapshot = emptyContractSnapshot()
+    snapshot.instances['ceres-institute-eternal-biology'] = {
+      contractId: 'ceres-institute-eternal-biology',
+      status: 'active',
+      currentStepIndex: 3,
+      stepCounters: [1, 1, 1, 0, 0, 0, 0],
+      offeredAt: '2306-05-04T00:00:00.000Z',
+      acceptedAt: '2306-05-04T01:00:00.000Z',
+      completedAt: null,
+      resolvedOutcomeId: null,
+    }
+
+    const ids = evaluateAchievementUnlocks(progress(createProfile('Pilot'), snapshot), [])
+      .newlyUnlocked.map((a) => a.id)
+
+    expect(ids).toContain('ceres-first-psychosphere')
+    expect(ids).not.toContain('ceres-rescue-pattern')
+  })
+
+  it('unlocks ceres-rescue-pattern when step 5 (second rescue) is completed', () => {
+    const snapshot = emptyContractSnapshot()
+    snapshot.instances['ceres-institute-eternal-biology'] = {
+      contractId: 'ceres-institute-eternal-biology',
+      status: 'active',
+      currentStepIndex: 6,
+      stepCounters: [1, 1, 1, 1, 1, 1, 0],
+      offeredAt: '2306-05-04T00:00:00.000Z',
+      acceptedAt: '2306-05-04T01:00:00.000Z',
+      completedAt: null,
+      resolvedOutcomeId: null,
+    }
+
+    const ids = evaluateAchievementUnlocks(progress(createProfile('Pilot'), snapshot), [])
+      .newlyUnlocked.map((a) => a.id)
+
+    expect(ids).toContain('ceres-first-psychosphere')
+    expect(ids).toContain('ceres-rescue-pattern')
+  })
+
+  it('unlocks ceres-archive-transmitted only when contract completes with transmit outcome', () => {
+    const makeSnapshot = (outcomeId: string): ContractStoreSnapshot => {
+      const s = emptyContractSnapshot()
+      s.instances['ceres-institute-eternal-biology'] = {
+        contractId: 'ceres-institute-eternal-biology',
+        status: 'completed',
+        currentStepIndex: 7,
+        stepCounters: [1, 1, 1, 1, 1, 1, 1],
+        offeredAt: '2306-05-04T00:00:00.000Z',
+        acceptedAt: '2306-05-04T01:00:00.000Z',
+        completedAt: '2306-05-05T00:00:00.000Z',
+        resolvedOutcomeId: outcomeId,
+      }
+      return s
+    }
+
+    const transmitIds = evaluateAchievementUnlocks(
+      progress(createProfile('Pilot'), makeSnapshot('transmit')),
+      [],
+    ).newlyUnlocked.map((a) => a.id)
+
+    const sabotageIds = evaluateAchievementUnlocks(
+      progress(createProfile('Pilot'), makeSnapshot('sabotage')),
+      [],
+    ).newlyUnlocked.map((a) => a.id)
+
+    expect(transmitIds).toContain('ceres-archive-transmitted')
+    expect(transmitIds).not.toContain('ceres-archive-sabotaged')
+    expect(sabotageIds).toContain('ceres-archive-sabotaged')
+    expect(sabotageIds).not.toContain('ceres-archive-transmitted')
+  })
+
+  it('unlocks all five ceres achievements on a full transmit playthrough', () => {
+    const snapshot = emptyContractSnapshot()
+    snapshot.instances['ceres-institute-eternal-biology'] = {
+      contractId: 'ceres-institute-eternal-biology',
+      status: 'completed',
+      currentStepIndex: 7,
+      stepCounters: [1, 1, 1, 1, 1, 1, 1],
+      offeredAt: '2306-05-04T00:00:00.000Z',
+      acceptedAt: '2306-05-04T01:00:00.000Z',
+      completedAt: '2306-05-05T00:00:00.000Z',
+      resolvedOutcomeId: 'transmit',
+    }
+
+    const ids = evaluateAchievementUnlocks(progress(createProfile('Pilot'), snapshot), [])
+      .newlyUnlocked.map((a) => a.id)
+
+    expect(ids).toContain('ceres-institute-accepted')
+    expect(ids).toContain('ceres-first-psychosphere')
+    expect(ids).toContain('ceres-rescue-pattern')
+    expect(ids).toContain('ceres-archive-transmitted')
+    expect(ids).not.toContain('ceres-archive-sabotaged')
+  })
+
+  it('registers all five ceres achievements in the catalog with correct kinds', () => {
+    const byId = (id: string) => ACHIEVEMENT_DEFINITIONS.find((d) => d.id === id)
+
+    expect(byId('ceres-institute-accepted')?.kind).toBe('specific_contract_accepted')
+    expect(byId('ceres-first-psychosphere')?.kind).toBe('specific_contract_step_completed')
+    expect(byId('ceres-first-psychosphere')?.requiredStepIndex).toBe(2)
+    expect(byId('ceres-rescue-pattern')?.kind).toBe('specific_contract_step_completed')
+    expect(byId('ceres-rescue-pattern')?.requiredStepIndex).toBe(5)
+    expect(byId('ceres-archive-transmitted')?.kind).toBe('specific_contract_completed')
+    expect(byId('ceres-archive-transmitted')?.requiredOutcomeId).toBe('transmit')
+    expect(byId('ceres-archive-sabotaged')?.kind).toBe('specific_contract_completed')
+    expect(byId('ceres-archive-sabotaged')?.requiredOutcomeId).toBe('sabotage')
+  })
 })
