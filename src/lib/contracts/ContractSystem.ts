@@ -294,6 +294,19 @@ export class ContractSystem {
   }
 
   /**
+   * Snapshot list of every active contract instance. Used by
+   * `hasActiveDeliveryWaitingFor` to close the `replenishWhileStepOpen` loop
+   * once a paired delivery step has advanced past its `itemId`.
+   *
+   * @returns Shallow-cloned array of instances with `status === 'active'`.
+   */
+  listActiveInstances(): ContractInstance[] {
+    return Object.values(this.snapshot.instances)
+      .filter((i) => i.status === 'active')
+      .map((entry) => structuredClone(entry))
+  }
+
+  /**
    * Full persisted contract snapshot for read-only consumers such as achievement evaluators.
    *
    * @returns Defensive copy of the current contract store snapshot.

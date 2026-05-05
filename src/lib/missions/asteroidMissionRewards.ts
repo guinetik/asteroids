@@ -10,7 +10,7 @@
  * @spec docs/superpowers/specs/2026-04-06-asteroid-missions-design.md
  */
 import type { GeneratedAsteroidMission } from '@/lib/missions/types'
-import { addItem, createInventory } from '@/lib/inventory/inventory'
+import { addItem, createInventory, getStack } from '@/lib/inventory/inventory'
 import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
 import {
   clearActiveMission,
@@ -84,6 +84,26 @@ export function persistCompletedAsteroidMissionRewards(
     }
     inventory = result.inventory
   }
+  if (mission.grantsItemOnComplete) {
+    const { itemId, count, replenishWhileStepOpen } = mission.grantsItemOnComplete
+    let shouldGrant = true
+    if (replenishWhileStepOpen) {
+      const heldCount = getStack(inventory, itemId)?.quantity ?? 0
+      if (heldCount >= count) shouldGrant = false
+      if (!hasActiveDeliveryWaitingFor(itemId)) shouldGrant = false
+    }
+    if (shouldGrant) {
+      const result = addItem(inventory, itemId, count)
+      if (!result.ok) {
+        console.warn(
+          `[asteroidMissionRewards] grantsItemOnComplete failed: ${result.reason ?? 'unknown'}`,
+        )
+      } else {
+        inventory = result.inventory
+      }
+    }
+  }
+
   saveInventory(inventory)
 
   savePendingMapReturnWorld({
@@ -126,4 +146,23 @@ export function persistCompletedAsteroidMissionRewards(
 function pinnedAssetRefForAsteroid(asteroidId: string): string | undefined {
   if (asteroidId === 'hektor') return 'hektor'
   return undefined
+}
+
+/**
+ * True when at least one active contract has a `deliver-to-asset` or
+ * `deliver-items` step still expecting `itemId`. Used to close the
+ * `replenishWhileStepOpen` loop once the chain has moved on.
+ *
+ * @param itemId - Inventory item id to search for in active delivery steps.
+ * @returns Whether a matching open delivery step exists.
+ */
+function hasActiveDeliveryWaitingFor(itemId: string): boolean {
+  for (const inst of contractSystem.listActiveInstances()) {
+    const c = contractSystem.getContract(inst.contractId)
+    const step = c?.steps[inst.currentStepIndex]
+    if (!step) continue
+    if (step.kind === 'deliver-to-asset' && step.itemId === itemId) return true
+    if (step.kind === 'deliver-items' && step.itemId === itemId) return true
+  }
+  return false
 }

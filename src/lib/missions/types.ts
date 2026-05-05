@@ -640,4 +640,21 @@ export interface GeneratedAsteroidMission {
    * specials (e.g. Finch telescope-EVA missions) declare `{ kind: 'planet-eva', ... }`.
    */
   target?: SpecialMissionTarget
+  /**
+   * Optional inventory grant on successful completion. When
+   * `replenishWhileStepOpen` is true, the grant is suppressed if the player
+   * already holds at least `count` of `itemId` (no duplicates), and is
+   * suppressed entirely once any paired delivery step in any active contract
+   * has already advanced past the matching `itemId`. Softlock-prevention
+   * rule: lost-crate-on-death triggers a re-grant; the loop closes when the
+   * deliver step advances.
+   */
+  grantsItemOnComplete?: {
+    /** Inventory item id to grant on success. */
+    itemId: string
+    /** Units to grant. */
+    count: number
+    /** When true, applies the dedup + close-on-deliver-advance rules. */
+    replenishWhileStepOpen?: boolean
+  }
 }
