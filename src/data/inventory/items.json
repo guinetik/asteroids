@@ -328,5 +328,35 @@
     "weightPerUnit": 0.01,
     "maxStack": 99,
     "sellable": false
+  },
+  {
+    "id": "ceres-institute-canister",
+    "category": "consumable",
+    "label": "Sealed Ampoule Case",
+    "description": "Biostable case from the Ceres Institute. Outer shell sealed; do not handle inner cassettes without equipment you do not have.",
+    "icon": "ceres-canister.png",
+    "weightPerUnit": 1,
+    "maxStack": 1,
+    "sellable": false
+  },
+  {
+    "id": "ceres-mineral-results-crate",
+    "category": "consumable",
+    "label": "Sealed Sample Crate · Mineral Survey",
+    "description": "Hand-readable crate of substrate cores and DAN-cross-referenced mineral readings, sealed for return to the Institute.",
+    "icon": "ceres-mineral-crate.png",
+    "weightPerUnit": 1,
+    "maxStack": 1,
+    "sellable": false
+  },
+  {
+    "id": "ceres-dan-results-crate",
+    "category": "consumable",
+    "label": "Sealed Sample Crate · DAN",
+    "description": "Particle capture cassettes and field-stamped DAN albedo logs, sealed for return to the Institute.",
+    "icon": "ceres-dan-crate.png",
+    "weightPerUnit": 1,
+    "maxStack": 1,
+    "sellable": false
   }
 ]
