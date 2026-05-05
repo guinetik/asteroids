@@ -2264,7 +2264,7 @@ watch(
     <KeyPrompt
       v-if="dockPromptState && !dockedAssetRef"
       key-label="F"
-      :action="dockPromptState.label"
+      :action="`Dock at ${dockPromptState.label}`"
       tone="green"
       variant="split"
       position="bottom"
