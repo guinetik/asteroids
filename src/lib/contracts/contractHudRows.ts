@@ -7,6 +7,7 @@
  */
 import type { Contract, ContractInstance } from './contractTypes'
 import { contractStepRequiredCount } from './contractStepProgress'
+import { formatContractStepLabel } from './contractStepLabel'
 
 /**
  * One active contract summarized for the solar-map contract HUD panel.
@@ -20,6 +21,13 @@ export interface ActiveContractHudRow {
   currentStepIndex: number
   /** Authored subject line for the current step flavor message. */
   objectiveSubject: string
+  /**
+   * Imperative one-liner action label for the current step (e.g.
+   * "Complete 1 asteroid mission for jovian-society from jupiter"). Same
+   * wording the briefing card lists per step — mirrored here so the HUD and
+   * mail reader can show it without re-formatting from the step union.
+   */
+  objectiveSummary: string
   /** Progress numerator clamped to the step threshold. */
   progressCurrent: number
   /** Progress denominator from {@link contractStepRequiredCount}. */
@@ -54,6 +62,7 @@ export function buildActiveContractHudRows(
       inboxName: contract.inboxName,
       currentStepIndex: idx,
       objectiveSubject: step.subject,
+      objectiveSummary: formatContractStepLabel(step),
       progressCurrent,
       progressRequired,
     })

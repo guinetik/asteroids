@@ -89,6 +89,7 @@ describe('buildActiveContractHudRows', () => {
       inboxName: 'Multi Org',
       currentStepIndex: 0,
       objectiveSubject: 'Finish five gigs',
+      objectiveSummary: 'Complete 5 missions',
       progressCurrent: 5,
       progressRequired: 5,
     })

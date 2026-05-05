@@ -9,6 +9,7 @@
  */
 import { computed } from 'vue'
 import type { Contract, ContractInstance, ContractStep } from '@/lib/contracts/contractTypes'
+import { formatContractStepLabel } from '@/lib/contracts/contractStepLabel'
 
 const props = defineProps<{
   /** Contract definition the message belongs to. */
@@ -27,44 +28,6 @@ const STEP_MARKER_CURRENT = '\u25B8'
 const STEP_MARKER_PENDING = '\u00B7'
 
 const status = computed(() => props.instance?.status ?? 'available')
-
-function stepLabel(step: ContractStep): string {
-  if (step.kind === 'complete-missions') {
-    const filterBits: string[] = []
-    filterBits.push(step.missionType ? `${step.missionType} mission` : 'mission')
-    if (step.giverId) filterBits.push(`for ${step.giverId}`)
-    if (step.giverPlanetId) filterBits.push(`from ${step.giverPlanetId}`)
-    const filterLabel = filterBits.join(' ')
-    return `Complete ${step.count} ${filterLabel}${step.count === 1 ? '' : 's'}`
-  }
-  if (step.kind === 'install-upgrade') {
-    return `Install ${step.upgradeId} (Lvl ${step.minLevel}+)`
-  }
-  if (step.kind === 'visit-planet') {
-    return `Enter orbit at ${step.planetId}`
-  }
-  if (step.kind === 'trade-goods') {
-    const action = step.action === 'buy' ? 'Buy' : 'Sell'
-    return `${action} ${step.count} ${step.itemId} at ${step.planetId}`
-  }
-  if (step.kind === 'collect-drops') {
-    return `Collect ${step.count} ${step.itemId}`
-  }
-  if (step.kind === 'deliver-items') {
-    return `Deliver ${step.count} ${step.itemId} to ${step.planetId}`
-  }
-  if (step.kind === 'launch-from-body') {
-    return `Launch from ${step.planetId}`
-  }
-  if (step.kind === 'choice-mission') {
-    return `Complete Mission: ${step.missionId}`
-  }
-  const orbitalBits: string[] = []
-  if (step.giverPlanetId) orbitalBits.push(`from ${step.giverPlanetId}`)
-  if (step.targetPlanetId) orbitalBits.push(`at ${step.targetPlanetId}`)
-  const suffix = orbitalBits.length > 0 ? ` ${orbitalBits.join(' ')}` : ''
-  return `Complete an orbital mission${suffix}`
-}
 
 function requiredCount(step: ContractStep): number {
   if (step.kind === 'complete-missions') return step.count
@@ -85,7 +48,7 @@ const stepEntries = computed<StepEntry[]>(() =>
   props.contract.steps.map((step, index) => {
     const instance = props.instance
     const required = requiredCount(step)
-    const label = stepLabel(step)
+    const label = formatContractStepLabel(step)
 
     if (!instance || instance.status === 'available' || instance.status === 'declined') {
       return {
