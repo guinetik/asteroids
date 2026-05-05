@@ -562,7 +562,7 @@ export const ACHIEVEMENT_DEFINITIONS: readonly AchievementDefinition[] = [
     rewardCredits: REWARD_NOTABLE,
     kind: 'specific_contract_step_completed',
     contractId: 'ceres-institute-eternal-biology',
-    requiredStepIndex: 2,
+    requiredStepIndex: 3,
   },
   {
     id: 'ceres-rescue-pattern',
@@ -575,7 +575,7 @@ export const ACHIEVEMENT_DEFINITIONS: readonly AchievementDefinition[] = [
     rewardCredits: REWARD_NOTABLE,
     kind: 'specific_contract_step_completed',
     contractId: 'ceres-institute-eternal-biology',
-    requiredStepIndex: 5,
+    requiredStepIndex: 8,
   },
   {
     id: 'ceres-archive-transmitted',

@@ -455,13 +455,13 @@ describe('achievements', () => {
     expect(ids).not.toContain('ceres-institute-accepted')
   })
 
-  it('unlocks ceres-first-psychosphere when step 2 (first rescue) is completed', () => {
+  it('unlocks ceres-first-psychosphere when step 3 (first rescue) is completed', () => {
     const snapshot = emptyContractSnapshot()
     snapshot.instances['ceres-institute-eternal-biology'] = {
       contractId: 'ceres-institute-eternal-biology',
       status: 'active',
-      currentStepIndex: 3,
-      stepCounters: [1, 1, 1, 0, 0, 0, 0],
+      currentStepIndex: 4,
+      stepCounters: [1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
       offeredAt: '2306-05-04T00:00:00.000Z',
       acceptedAt: '2306-05-04T01:00:00.000Z',
       completedAt: null,
@@ -475,13 +475,13 @@ describe('achievements', () => {
     expect(ids).not.toContain('ceres-rescue-pattern')
   })
 
-  it('unlocks ceres-rescue-pattern when step 5 (second rescue) is completed', () => {
+  it('unlocks ceres-rescue-pattern when step 8 (second rescue) is completed', () => {
     const snapshot = emptyContractSnapshot()
     snapshot.instances['ceres-institute-eternal-biology'] = {
       contractId: 'ceres-institute-eternal-biology',
       status: 'active',
-      currentStepIndex: 6,
-      stepCounters: [1, 1, 1, 1, 1, 1, 0],
+      currentStepIndex: 9,
+      stepCounters: [1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
       offeredAt: '2306-05-04T00:00:00.000Z',
       acceptedAt: '2306-05-04T01:00:00.000Z',
       completedAt: null,
@@ -501,8 +501,8 @@ describe('achievements', () => {
       s.instances['ceres-institute-eternal-biology'] = {
         contractId: 'ceres-institute-eternal-biology',
         status: 'completed',
-        currentStepIndex: 7,
-        stepCounters: [1, 1, 1, 1, 1, 1, 1],
+        currentStepIndex: 10,
+        stepCounters: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         offeredAt: '2306-05-04T00:00:00.000Z',
         acceptedAt: '2306-05-04T01:00:00.000Z',
         completedAt: '2306-05-05T00:00:00.000Z',
@@ -532,8 +532,8 @@ describe('achievements', () => {
     snapshot.instances['ceres-institute-eternal-biology'] = {
       contractId: 'ceres-institute-eternal-biology',
       status: 'completed',
-      currentStepIndex: 7,
-      stepCounters: [1, 1, 1, 1, 1, 1, 1],
+      currentStepIndex: 10,
+      stepCounters: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       offeredAt: '2306-05-04T00:00:00.000Z',
       acceptedAt: '2306-05-04T01:00:00.000Z',
       completedAt: '2306-05-05T00:00:00.000Z',
@@ -555,9 +555,9 @@ describe('achievements', () => {
 
     expect(byId('ceres-institute-accepted')?.kind).toBe('specific_contract_accepted')
     expect(byId('ceres-first-psychosphere')?.kind).toBe('specific_contract_step_completed')
-    expect(byId('ceres-first-psychosphere')?.requiredStepIndex).toBe(2)
+    expect(byId('ceres-first-psychosphere')?.requiredStepIndex).toBe(3)
     expect(byId('ceres-rescue-pattern')?.kind).toBe('specific_contract_step_completed')
-    expect(byId('ceres-rescue-pattern')?.requiredStepIndex).toBe(5)
+    expect(byId('ceres-rescue-pattern')?.requiredStepIndex).toBe(8)
     expect(byId('ceres-archive-transmitted')?.kind).toBe('specific_contract_completed')
     expect(byId('ceres-archive-transmitted')?.requiredOutcomeId).toBe('transmit')
     expect(byId('ceres-archive-sabotaged')?.kind).toBe('specific_contract_completed')
