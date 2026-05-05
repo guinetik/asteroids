@@ -774,7 +774,7 @@
         "inclination": 10.59,
         "longitudeOfAscendingNode": 80.329,
         "argumentOfPeriapsis": 73.597,
-        "meanAnomalyOffset": 3,
+        "meanAnomalyOffset": 0.15,
         "period": 1682
       },
       "displayRadius": 0.00015,

@@ -124,6 +124,16 @@ export interface CollectScalableParams {
 }
 
 /**
+ * Catalog of bunker enemy variants. Default `'standard'` is the viroid swarm;
+ * `'astronaut-chimera'` is the Ceres Institute reveal at Site CIB-7.
+ *
+ * @author guinetik
+ * @date 2026-05-04
+ * @spec docs/superpowers/specs/2026-05-04-ceres-institute-contract-design.md
+ */
+export type BunkerEnemyVariant = 'standard' | 'astronaut-chimera'
+
+/**
  * Scalable params for BUNKER objectives. Wave count is not authored per
  * template — the generator picks 3 / 5 / 7 waves from the rolled mission
  * difficulty band (1–4 / 5–7 / 8–10). Slice 1 has no other knobs.
@@ -136,7 +146,7 @@ export interface BunkerScalableParams {
    * spawns this specific variant instead of the default viroid swarm.
    * Example: `"astronaut-chimera"`. Wired to the spawn factory in Phase 4.
    */
-  enemyVariant?: string
+  enemyVariant?: BunkerEnemyVariant
 }
 
 /** Scalable params for MINERAL ANALYSIS objectives. */
@@ -539,10 +549,10 @@ export interface ConcreteObjective {
   waveCount?: number
   /**
    * For bunker: optional enemy variant override. When set, the runtime spawns this specific
-   * enemy variant instead of the default viroid swarm. Example: `"astronaut-chimera"`.
+   * enemy variant instead of the default viroid swarm. See {@link BunkerEnemyVariant} for valid options.
    * Wired to the spawn factory in Phase 4.
    */
-  enemyVariant?: string
+  enemyVariant?: BunkerEnemyVariant
   /** For mineral analysis: number of distinct rocks to fully analyze with the SCI gun. */
   analysisRockCount?: number
   /** For mineral analysis: kilograms of the selected mineral sample to mine and deliver. */
