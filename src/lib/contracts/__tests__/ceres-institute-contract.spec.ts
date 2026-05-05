@@ -104,6 +104,11 @@ describe('ceres-institute-eternal-biology schema', () => {
       .reduce((acc, step) => acc + ('creditsReward' in step ? (step.creditsReward ?? 0) : 0), 0)
     expect(sum).toBe(37_000)
   })
+
+  it('lists gravitySurfing and orbitalSurfing as required upgrades', () => {
+    const ids = ceres.offerWhenPrerequisites?.requiredUpgrades?.map((u) => u.upgradeId)
+    expect(ids).toEqual(['gravitySurfing', 'orbitalSurfing'])
+  })
 })
 
 describe('ceres-institute-eternal-biology walkability', () => {
@@ -148,6 +153,11 @@ describe('ceres-institute-eternal-biology walkability', () => {
     expect(types).toContain('fast-travel')
     expect(types).toContain('mission-pay-multiplier')
     expect(types).toContain('set-story-flag')
+    expect(types).not.toContain('disable-giver')
+    const flags = granted
+      .filter((e) => e.type === 'set-story-flag')
+      .map((e) => (e as { flag: string }).flag)
+    expect(flags).toEqual(['ceres-archive-transmitted'])
   })
 
   it('drives sabotage arm end-to-end with disable-giver and exposed flag', () => {
@@ -161,5 +171,12 @@ describe('ceres-institute-eternal-biology walkability', () => {
     expect(types).toContain('disable-giver')
     expect(types).toContain('fast-travel')
     expect(granted.filter((e) => e.type === 'set-story-flag').length).toBe(2)
+    expect(types).not.toContain('mission-pay-multiplier')
+    const flags = granted
+      .filter((e) => e.type === 'set-story-flag')
+      .map((e) => (e as { flag: string }).flag)
+    expect(flags).toEqual(
+      expect.arrayContaining(['ceres-archive-sabotaged', 'ceres-cult-exposed']),
+    )
   })
 })
