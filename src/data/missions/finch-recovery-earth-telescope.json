@@ -1,0 +1,19 @@
+{
+  "kind": "special",
+  "id": "finch-recovery-earth-telescope",
+  "asteroidId": "",
+  "giverId": "mr-finch",
+  "giverName": "Mr. Finch",
+  "templateId": "finch-recovery-earth-telescope",
+  "name": "A Posed Photograph at Earth",
+  "briefing": "A private gallery shot, posed and aware. Tune the telescope. The destination is in the photograph; she placed it there.",
+  "difficulty": 5,
+  "region": "near-earth",
+  "target": { "kind": "planet-eva", "planetId": "earth", "poiType": "telescope" },
+  "objectives": [
+    { "type": "collect", "x": 0, "z": 0, "reward": 3000 }
+  ],
+  "totalReward": 3000,
+  "waypoint": { "worldX": 0, "worldZ": 0 },
+  "status": "available"
+}

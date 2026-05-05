@@ -1,0 +1,19 @@
+{
+  "kind": "special",
+  "id": "finch-recovery-ceres-bunker",
+  "asteroidId": "vesta",
+  "giverId": "mr-finch",
+  "giverName": "Mr. Finch",
+  "templateId": "finch-recovery-ceres-bunker",
+  "name": "A Letter at Ceres",
+  "briefing": "Exhausted nickel-platinum operation, decommissioned in the early colonization era and never properly sealed. Survive what she left for you.",
+  "difficulty": 6,
+  "region": "asteroid-belt",
+  "originPlanetId": "ceres",
+  "objectives": [
+    { "type": "bunker", "x": 0, "z": 0, "waveCount": 5, "reward": 4000 }
+  ],
+  "totalReward": 4000,
+  "waypoint": { "worldX": 0, "worldZ": 0 },
+  "status": "available"
+}

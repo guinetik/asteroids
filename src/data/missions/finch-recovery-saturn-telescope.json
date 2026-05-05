@@ -1,0 +1,19 @@
+{
+  "kind": "special",
+  "id": "finch-recovery-saturn-telescope",
+  "asteroidId": "",
+  "giverId": "mr-finch",
+  "giverName": "Mr. Finch",
+  "templateId": "finch-recovery-saturn-telescope",
+  "name": "She Has Not Yet Been Seen",
+  "briefing": "Tune the long-baseline telescope on the Saturn ringside platform until the still resolves. Mr. Finch is paying for the horizon, not the foreground.",
+  "difficulty": 3,
+  "region": "saturn-trojans",
+  "target": { "kind": "planet-eva", "planetId": "saturn", "poiType": "telescope" },
+  "objectives": [
+    { "type": "collect", "x": 0, "z": 0, "reward": 1500 }
+  ],
+  "totalReward": 1500,
+  "waypoint": { "worldX": 0, "worldZ": 0 },
+  "status": "available"
+}

@@ -3305,6 +3305,14 @@ export class MapViewController implements Tickable {
   private static readonly EVA_WAYPOINT_PLANET_LEAD_SECONDS = 3
 
   /**
+   * Radial offset (world units) used when placing an asteroid special mission's
+   * waypoint near its `originPlanetId`. Mirrors the Saturn co-orbital placement
+   * radius — a few dozen world units so the asteroid reads as "near this
+   * planet" without sitting directly on top of it.
+   */
+  private static readonly ORIGIN_PLANET_WAYPOINT_OFFSET = 60
+
+  /**
    * Launch an overlay-presentation EVA minigame for the POI the player is near.
    * Called by `EvaSession.beginMinigame` via `onStartEvaMinigame`, which only
    * fires when `isInSceneMinigameActive()` returns false — i.e. for overlay-
@@ -4535,6 +4543,25 @@ export class MapViewController implements Tickable {
     return map
   }
 
+  /**
+   * Place an asteroid mission waypoint at a small random angular offset around the
+   * giver planet's current world position. Used when an asteroid special mission
+   * carries `originPlanetId` and the asteroid id has no dedicated branch in
+   * {@link resolveSpecialMissionWaypoint}. Same shape as the Saturn co-orbital
+   * resolver — a few dozen world units of offset so the asteroid reads as
+   * "near this planet" without sitting on top of it.
+   */
+  private resolveOriginPlanetWaypoint(planetPos: WorldPositionXZ): {
+    worldX: number
+    worldZ: number
+  } {
+    const angle = Math.random() * Math.PI * 2
+    return {
+      worldX: planetPos.x + Math.cos(angle) * MapViewController.ORIGIN_PLANET_WAYPOINT_OFFSET,
+      worldZ: planetPos.z + Math.sin(angle) * MapViewController.ORIGIN_PLANET_WAYPOINT_OFFSET,
+    }
+  }
+
   private stageSpecialMission(missionId: string, offerMessageId: string | null): void {
     const mission = getSpecialMissionById(missionId)
     if (!mission) {
@@ -4562,11 +4589,17 @@ export class MapViewController implements Tickable {
    */
   private stageAsteroidSpecialMission(mission: GeneratedAsteroidMission): void {
     const positions = this.snapshotBodyWorldPositions()
-    const resolvedWaypoint = resolveSpecialMissionWaypoint(
+    const baseWaypoint = resolveSpecialMissionWaypoint(
       mission.asteroidId,
       positions,
       mission.waypoint,
     )
+    const resolvedWaypoint =
+      mission.originPlanetId !== undefined &&
+      baseWaypoint === mission.waypoint &&
+      positions.has(mission.originPlanetId)
+        ? this.resolveOriginPlanetWaypoint(positions.get(mission.originPlanetId)!)
+        : baseWaypoint
 
     const acceptedMission: GeneratedAsteroidMission = {
       ...mission,
