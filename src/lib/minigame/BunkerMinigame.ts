@@ -171,6 +171,7 @@ export class BunkerMinigame implements MiniGame, MiniGameEvents {
       difficulty: params.difficulty,
       interiorMaterials,
       lightPool: params.lightPool ?? null,
+      enemyVariant: params.objective.enemyVariant,
     })
     return new BunkerMinigame(
       params.objectiveIndex,

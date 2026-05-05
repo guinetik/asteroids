@@ -303,6 +303,11 @@ const SPECIAL_MISSION_OFFER_IDS: Record<string, string> = {
   'finch-recovery-earth-telescope': 'finch-recovery-earth-telescope-offer',
   'finch-recovery-ceres-bunker': 'finch-recovery-ceres-bunker-offer',
   'finch-recovery-neptune-bunker': 'finch-recovery-neptune-bunker-offer',
+  'ceres-institute-rescue-1': 'ceres-institute-rescue-1-offer',
+  'ceres-institute-mineral-analysis': 'ceres-institute-mineral-analysis-offer',
+  'ceres-institute-dan': 'ceres-institute-dan-offer',
+  'ceres-institute-rescue-2': 'ceres-institute-rescue-2-offer',
+  'ceres-institute-archive-bunker': 'ceres-institute-archive-bunker-offer',
 }
 
 /** Vertical offset (world units) used when parking the camera on a mission focus target. */

@@ -1,0 +1,25 @@
+{
+  "kind": "special",
+  "id": "ceres-institute-mineral-analysis",
+  "asteroidId": "ceres-mineral-site",
+  "giverId": "ceres-institute",
+  "giverName": "Ceres Institute",
+  "templateId": "ceres-institute-mineral-analysis",
+  "name": "Step 4 — Surface Composition Pass",
+  "briefing": "Young pilot — Ceres's eccentric orbit puts certain rare-earth resonances within reach nowhere else in the system. Run the mineral analysis and submit clean readings at the kiosk. — Porter",
+  "difficulty": 6,
+  "region": "asteroid-belt",
+  "objectives": [
+    {
+      "type": "mineral-analysis",
+      "x": 0,
+      "z": 0,
+      "analysisRockCount": 5,
+      "sampleKg": 60,
+      "reward": 6000
+    }
+  ],
+  "totalReward": 6000,
+  "waypoint": { "worldX": 0, "worldZ": 0 },
+  "status": "available"
+}

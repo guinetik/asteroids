@@ -19,6 +19,12 @@ import finchEarthTelescope from '@/data/missions/finch-recovery-earth-telescope.
 import finchMarsBunker from '@/data/missions/finch-recovery-mars-bunker.json'
 import finchCeresBunker from '@/data/missions/finch-recovery-ceres-bunker.json'
 import finchNeptuneBunker from '@/data/missions/finch-recovery-neptune-bunker.json'
+import ceresEarthSupplies from '@/data/missions/ceres-institute-earth-supplies.json'
+import ceresRescue1 from '@/data/missions/ceres-institute-rescue-1.json'
+import ceresRescue2 from '@/data/missions/ceres-institute-rescue-2.json'
+import ceresMineralAnalysis from '@/data/missions/ceres-institute-mineral-analysis.json'
+import ceresDan from '@/data/missions/ceres-institute-dan.json'
+import ceresArchiveBunker from '@/data/missions/ceres-institute-archive-bunker.json'
 
 export const SPECIAL_MISSIONS: GeneratedAsteroidMission[] = [
   consortiumCertificationData,
@@ -33,6 +39,12 @@ export const SPECIAL_MISSIONS: GeneratedAsteroidMission[] = [
   finchMarsBunker,
   finchCeresBunker,
   finchNeptuneBunker,
+  ceresEarthSupplies,
+  ceresRescue1,
+  ceresRescue2,
+  ceresMineralAnalysis,
+  ceresDan,
+  ceresArchiveBunker,
 ] as unknown as GeneratedAsteroidMission[]
 
 const SPECIAL_MISSIONS_BY_ID = new Map(

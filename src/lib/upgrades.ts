@@ -85,6 +85,12 @@ export type UpgradeId =
 /** Runtime player upgrade levels keyed by upgrade id. */
 export type UpgradeLevels = Partial<Record<UpgradeId, number>>
 
+/**
+ * Minimum credits charged for any purchasable upgrade level (catalog `baseCost × level`
+ * may be lower for early tiers — shop clamps up to this floor).
+ */
+export const MIN_UPGRADE_PURCHASE_PRICE_CR = 2000
+
 /** Build the keyed catalog from the JSON array. */
 const definitions = upgradesData as unknown as NumericUpgradeDefinition[]
 
@@ -251,7 +257,8 @@ export function getCurrentUpgradeValue(upgradeId: UpgradeId): number {
  */
 export function getUpgradeCost(upgradeId: UpgradeId, level: number): number {
   if (level <= 0) return 0
-  return UPGRADE_DEFINITIONS[upgradeId].baseCost * level
+  const raw = UPGRADE_DEFINITIONS[upgradeId].baseCost * level
+  return Math.max(MIN_UPGRADE_PURCHASE_PRICE_CR, raw)
 }
 
 /**

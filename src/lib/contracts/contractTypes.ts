@@ -391,6 +391,12 @@ export interface Contract {
     minGiverPlanetCompletions?: { planetId: string; min: number }
     /** Optional — fires when the player orbits this planet, with all other gates met. */
     triggerOnPlanetVisited?: string
+    /**
+     * Optional — every listed upgrade must be installed at >= minLevel for the
+     * offer to fire. Read via {@link ContractSystemHooks.getInstalledUpgradeLevel}
+     * at evaluation time. AND-ed against every other present sub-field.
+     */
+    requiredUpgrades?: Array<{ upgradeId: UpgradeId; minLevel: number }>
   }
   /**
    * When set, {@link ContractSystem} enqueues this catalog id into the main inbox

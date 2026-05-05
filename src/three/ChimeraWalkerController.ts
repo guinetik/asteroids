@@ -52,6 +52,37 @@ const BODY_HEIGHT = 6.5
 const HIP_HEIGHT = 5.3
 const HEAD_HEIGHT = 8.8
 
+// --- Astronaut rider constants (used when variant === 'astronaut-chimera') ---
+/**
+ * Y offset of the rider's root above the chimera's group origin (world units, pre-scale).
+ * Places the astronaut figure just above the head membrane sphere.
+ */
+const RIDER_ROOT_Y = HEAD_HEIGHT + 1.2
+/** Height of the astronaut torso capsule (world units, pre-scale). */
+const RIDER_TORSO_HEIGHT = 1.6
+/** Radius of the astronaut torso capsule. */
+const RIDER_TORSO_RADIUS = 0.28
+/** Radius of the astronaut helmet sphere. */
+const RIDER_HEAD_RADIUS = 0.32
+/** Y offset of the helmet centre above the rider root. */
+const RIDER_HEAD_Y = RIDER_TORSO_HEIGHT * 0.5 + RIDER_HEAD_RADIUS + 0.06
+/** Half-length of each arm (extends left and right from shoulders). */
+const RIDER_ARM_HALF_LENGTH = 0.55
+/** Radius of the arm cylinder. */
+const RIDER_ARM_RADIUS = 0.1
+/** Y offset of the arms from the rider root (shoulder line). */
+const RIDER_ARM_Y = RIDER_TORSO_HEIGHT * 0.3
+/** Arm separation from body centre (X offset to the arm centre). */
+const RIDER_ARM_X = RIDER_TORSO_RADIUS + RIDER_ARM_HALF_LENGTH
+/** Max T-pose sway amplitude (radians) applied to each arm each tick. */
+const RIDER_ARM_SWAY_AMPLITUDE = 0.22
+/** Angular frequency of the idle arm flailing (rad/s). */
+const RIDER_ARM_SWAY_FREQ = 1.8
+/** Colour of the astronaut suit (off-white). */
+const RIDER_SUIT_COLOR = 0xe8e8e0
+/** Colour of the helmet visor (dark tinted glass). */
+const RIDER_VISOR_COLOR = 0x112233
+
 const CHIMERA_EYE_LASER_FLASH_DURATION = 0.085
 
 const HIT_FLASH_DURATION = 0.08
@@ -173,6 +204,17 @@ export class ChimeraWalkerController implements Tickable {
   /** Restores red eye materials after a laser pulse. */
   private eyeLaserFlashTimer = 0
 
+  /**
+   * Left arm mesh of the astronaut rider; `null` when variant is `'standard'`.
+   * Animated each tick with a mild flailing sway.
+   */
+  private riderArmLeft: THREE.Mesh | null = null
+  /**
+   * Right arm mesh of the astronaut rider; `null` when variant is `'standard'`.
+   * Animated each tick with a mild flailing sway (phase-offset from left).
+   */
+  private riderArmRight: THREE.Mesh | null = null
+
   private elapsed = 0
   private readonly timeOffset = Math.random() * 10
   private flashTimer = 0
@@ -224,6 +266,10 @@ export class ChimeraWalkerController implements Tickable {
     this.buildTentacles()
     this.refreshLegGeometry(0, false)
     this.refreshTentacleGeometry(0, false)
+
+    if (options.variant === 'astronaut-chimera') {
+      this.buildAstronautRider()
+    }
 
     this.enemy.onDeath = () => this.die()
   }
@@ -351,6 +397,8 @@ export class ChimeraWalkerController implements Tickable {
         this.rightEye.material = this.rightEyeMat
       }
     }
+
+    this.tickAstronautRider(t)
   }
 
   /** Flash the head membrane magenta and apply recoil. */
@@ -774,5 +822,86 @@ export class ChimeraWalkerController implements Tickable {
     for (const tentacle of this.tentacles) {
       this.updateTentacle(tentacle, time, isAgitated)
     }
+  }
+
+  /**
+   * Build a procedural astronaut-rider figure parented to the chimera root group.
+   *
+   * The rider sits above the chimera head in a T-pose. All geometry is created
+   * inline — no async GLB load — so it is immediately visible on spawn. Combat
+   * colliders are UNCHANGED; the rider is purely cosmetic.
+   *
+   * Called once from the constructor when `variant === 'astronaut-chimera'`.
+   */
+  private buildAstronautRider(): void {
+    const suitMat = new THREE.MeshBasicMaterial({ color: RIDER_SUIT_COLOR })
+    const visorMat = new THREE.MeshBasicMaterial({ color: RIDER_VISOR_COLOR })
+    // Track for disposal
+    this.disposableBasicMaterials.push(suitMat, visorMat)
+
+    const riderGroup = new THREE.Group()
+    riderGroup.position.y = RIDER_ROOT_Y
+
+    // Torso — capsule (cylinder + two half-spheres via CapsuleGeometry)
+    const torsoGeo = new THREE.CapsuleGeometry(
+      RIDER_TORSO_RADIUS,
+      RIDER_TORSO_HEIGHT,
+      4,
+      8,
+    )
+    const torso = new THREE.Mesh(torsoGeo, suitMat)
+    torso.position.y = 0
+    riderGroup.add(torso)
+
+    // Helmet — sphere
+    const helmetGeo = new THREE.SphereGeometry(RIDER_HEAD_RADIUS, 8, 6)
+    const helmet = new THREE.Mesh(helmetGeo, suitMat)
+    helmet.position.y = RIDER_HEAD_Y
+    riderGroup.add(helmet)
+
+    // Visor plate — slightly smaller sphere inset into the front of the helmet
+    const visorGeo = new THREE.SphereGeometry(RIDER_HEAD_RADIUS * 0.68, 6, 5)
+    const visor = new THREE.Mesh(visorGeo, visorMat)
+    visor.position.set(0, RIDER_HEAD_Y, RIDER_HEAD_RADIUS * 0.52)
+    riderGroup.add(visor)
+
+    // Arms — cylinders rotated horizontal (T-pose)
+    const armGeo = new THREE.CylinderGeometry(
+      RIDER_ARM_RADIUS,
+      RIDER_ARM_RADIUS,
+      RIDER_ARM_HALF_LENGTH * 2,
+      6,
+    )
+    const leftArm = new THREE.Mesh(armGeo, suitMat)
+    leftArm.rotation.z = Math.PI / 2
+    leftArm.position.set(-RIDER_ARM_X, RIDER_ARM_Y, 0)
+    riderGroup.add(leftArm)
+
+    const rightArm = new THREE.Mesh(armGeo, suitMat)
+    rightArm.rotation.z = Math.PI / 2
+    rightArm.position.set(RIDER_ARM_X, RIDER_ARM_Y, 0)
+    riderGroup.add(rightArm)
+
+    this.riderArmLeft = leftArm
+    this.riderArmRight = rightArm
+
+    // Parent to the chimera root (not a sub-group) so the rider inherits
+    // the full chimera transform without double-scaling issues.
+    this.group.add(riderGroup)
+  }
+
+  /**
+   * Animate the astronaut rider arms with mild out-of-phase flailing.
+   * No-op when there is no rider (`riderArmLeft === null`).
+   *
+   * @param time - Running elapsed time (seconds + per-instance offset).
+   */
+  private tickAstronautRider(time: number): void {
+    if (!this.riderArmLeft || !this.riderArmRight) return
+    // Left arm flails slightly forward/back around the default T-pose z-rotation.
+    this.riderArmLeft.rotation.x = Math.sin(time * RIDER_ARM_SWAY_FREQ) * RIDER_ARM_SWAY_AMPLITUDE
+    // Right arm flails in the opposite phase for an asymmetric, disturbing look.
+    this.riderArmRight.rotation.x =
+      Math.sin(time * RIDER_ARM_SWAY_FREQ + Math.PI) * RIDER_ARM_SWAY_AMPLITUDE
   }
 }

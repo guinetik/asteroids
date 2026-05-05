@@ -271,6 +271,37 @@ body,
   @apply h-full transition-all duration-200;
 }
 
+.hud-hull-debuffs {
+  @apply mb-1 flex w-full flex-col items-stretch gap-0.5;
+}
+
+.hud-hull-debuff {
+  @apply w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-sm border px-1.5 py-0.5
+         text-[8px] font-bold uppercase tracking-wider;
+  background: rgba(2, 6, 23, 0.72);
+  text-shadow: 0 0 6px currentColor;
+}
+
+.hud-hull-debuff--radiation {
+  @apply border-yellow-300/35 text-yellow-300;
+  animation: radiation-pulse 1.1s ease-in-out infinite;
+}
+
+.hud-hull-debuff--gravity {
+  @apply border-orange-400/35 text-orange-300;
+  animation: gravity-pulse 1.2s ease-in-out infinite;
+}
+
+.hud-hull-debuff--heat {
+  @apply border-red-500/35 text-red-400;
+  animation: gravity-pulse 1.2s ease-in-out infinite;
+}
+
+.hud-hull-debuff--freeze {
+  @apply border-blue-400/35 text-blue-300;
+  animation: gravity-pulse 1.4s ease-in-out infinite;
+}
+
 .hud-dock-refuel-btn {
   @apply mt-1 self-start rounded border border-amber-400/30 bg-amber-400/10 px-2 py-0.5
          text-[10px] font-mono text-amber-300 transition-colors cursor-pointer pointer-events-auto;
@@ -989,14 +1020,10 @@ body,
   @apply border-cyan-200/50 bg-cyan-200/15 text-white;
 }
 
-/* Above .habitat-fade (z-50) so pending-mail strip stays visible inside the habitat (shuttle HUD stays hidden there). */
-.map-message-notice {
-  @apply pointer-events-auto fixed inset-x-0 z-[55] flex justify-center px-6;
-  top: 5.25rem;
-}
-
 .map-message-notice__button {
-  @apply rounded-full border border-cyan-300/25 bg-slate-950/80 px-4 py-2 font-mono text-xs uppercase tracking-[0.22em] text-cyan-100 transition-colors;
+  @apply inline-flex h-10 items-center rounded-full border border-cyan-300/25 bg-slate-950/80 px-4
+         font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-100 transition-colors
+         sm:text-xs;
   box-shadow:
     0 0 0 1px rgba(34, 211, 238, 0.08),
     0 10px 24px rgba(2, 6, 23, 0.45);

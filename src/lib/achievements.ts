@@ -90,9 +90,41 @@ function getCompletedContractCount(snapshot: ContractStoreSnapshot): number {
     .length
 }
 
-/** Checks whether one specific contract instance has completed. */
-function hasCompletedContract(snapshot: ContractStoreSnapshot, contractId: string): boolean {
-  return snapshot.instances[contractId]?.status === 'completed'
+/**
+ * Checks whether a specific contract instance has completed with a specific outcome id.
+ * When `requiredOutcomeId` is absent, any completion satisfies the check.
+ */
+function hasCompletedContractWithOutcome(
+  snapshot: ContractStoreSnapshot,
+  contractId: string,
+  requiredOutcomeId: string | undefined,
+): boolean {
+  const instance = snapshot.instances[contractId]
+  if (!instance || instance.status !== 'completed') return false
+  if (!requiredOutcomeId) return true
+  return instance.resolvedOutcomeId === requiredOutcomeId
+}
+
+/** Checks whether a specific contract instance has been accepted (acceptedAt is set). */
+function hasAcceptedContract(snapshot: ContractStoreSnapshot, contractId: string): boolean {
+  return snapshot.instances[contractId]?.acceptedAt !== null &&
+    snapshot.instances[contractId]?.acceptedAt !== undefined
+}
+
+/**
+ * Checks whether a step at `stepIndex` has been completed in a contract instance.
+ * A step is considered completed when `currentStepIndex` has advanced past it,
+ * i.e. `currentStepIndex > stepIndex`, or when the contract is completed.
+ */
+function hasCompletedContractStep(
+  snapshot: ContractStoreSnapshot,
+  contractId: string,
+  stepIndex: number,
+): boolean {
+  const instance = snapshot.instances[contractId]
+  if (!instance) return false
+  if (instance.status === 'completed') return true
+  return instance.currentStepIndex > stepIndex
 }
 
 /** Reads the completed mission count for one contract mission family. */
@@ -207,7 +239,24 @@ export function isAchievementUnlocked(
       )
     case 'specific_contract_completed':
       return hasRequiredString(definition.contractId)
-        ? hasCompletedContract(progress.contractSnapshot, definition.contractId)
+        ? hasCompletedContractWithOutcome(
+            progress.contractSnapshot,
+            definition.contractId,
+            definition.requiredOutcomeId,
+          )
+        : false
+    case 'specific_contract_accepted':
+      return hasRequiredString(definition.contractId)
+        ? hasAcceptedContract(progress.contractSnapshot, definition.contractId)
+        : false
+    case 'specific_contract_step_completed':
+      return hasRequiredString(definition.contractId) &&
+        typeof definition.requiredStepIndex === 'number'
+        ? hasCompletedContractStep(
+            progress.contractSnapshot,
+            definition.contractId,
+            definition.requiredStepIndex,
+          )
         : false
     case 'mission_kind_completed':
       return definition.missionKind
@@ -379,6 +428,10 @@ export function getAchievementLockedHint(
     }
     case 'specific_contract_completed':
       return 'Complete the required faction contract.'
+    case 'specific_contract_accepted':
+      return 'Accept the required faction contract.'
+    case 'specific_contract_step_completed':
+      return 'Complete the required contract step.'
     case 'mission_kind_completed': {
       if (!definition.missionKind) return 'Complete the required mission family.'
       const kind = definition.missionKind

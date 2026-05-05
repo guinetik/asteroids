@@ -948,6 +948,17 @@ export class ContractSystem {
       if (p.triggerOnPlanetVisited !== undefined) {
         if (this.snapshot.visitedPlanetIds?.[p.triggerOnPlanetVisited] !== true) continue
       }
+      if (p.requiredUpgrades !== undefined) {
+        let allInstalled = true
+        for (const required of p.requiredUpgrades) {
+          const level = this.hooks.getInstalledUpgradeLevel?.(required.upgradeId) ?? 0
+          if (level < required.minLevel) {
+            allInstalled = false
+            break
+          }
+        }
+        if (!allInstalled) continue
+      }
       this.offerContract(contract)
       offered = true
     }

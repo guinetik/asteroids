@@ -11,13 +11,13 @@ import { tryPurchaseNextUpgradeLevel } from '../upgradePurchase'
 
 describe('tryPurchaseNextUpgradeLevel', () => {
   it('buys level 1 when at 0 with enough credits', () => {
-    const profile = createProfile('Test')
+    const profile = { ...createProfile('Test'), credits: 5000 }
     const result = tryPurchaseNextUpgradeLevel(profile, 'shuttleThrusterEfficiency', 0)
     expect(result).toEqual({
       ok: true,
       newLevel: 1,
-      creditsSpent: 1000,
-      profile: expect.objectContaining({ credits: profile.credits - 1000 }),
+      creditsSpent: 2000,
+      profile: expect.objectContaining({ credits: 3000 }),
     })
   })
 

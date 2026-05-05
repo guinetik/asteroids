@@ -1,0 +1,28 @@
+{
+  "kind": "special",
+  "id": "ceres-institute-dan",
+  "asteroidId": "ceres-dan-site",
+  "giverId": "ceres-institute",
+  "giverName": "Ceres Institute",
+  "templateId": "ceres-institute-dan",
+  "name": "Step 5 — DAN Albedo Survey",
+  "briefing": "Young pilot — neutron-rich materials seem to attract viroid attention. Run a Dynamic Albedo of Neutrons pass and capture the particle return cleanly. Disregard any sensor cross-talk during operation. — Porter",
+  "difficulty": 6,
+  "region": "asteroid-belt",
+  "objectives": [
+    {
+      "type": "dan",
+      "x": 0,
+      "z": 0,
+      "scanDurationSeconds": 65,
+      "requiredParticleHits": 28,
+      "enemyGraceSeconds": 9,
+      "particleTier": "medium",
+      "enemyTier": "medium",
+      "reward": 7500
+    }
+  ],
+  "totalReward": 7500,
+  "waypoint": { "worldX": 0, "worldZ": 0 },
+  "status": "available"
+}

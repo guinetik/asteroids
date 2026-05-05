@@ -123,12 +123,21 @@ describe('PINNED_BODIES', () => {
   it('contains Hektor as a pinned GLB-backed body', () => {
     const hektor = getPinnedBody('hektor')
 
-    expect(PINNED_BODIES).toHaveLength(1)
-    expect(PINNED_BODY_IDS).toEqual(['hektor'])
+    expect(PINNED_BODIES).toHaveLength(2)
+    expect(PINNED_BODY_IDS).toContain('hektor')
+    expect(PINNED_BODY_IDS).toContain('ceres-research-station')
     expect(hektor.name).toBe('624 Hektor')
     expect(hektor.type).toBe('Jupiter Trojan')
     expect(hektor.modelUrl).toBe('/models/hektor.glb')
     expect(hektor.noKiosks).toBe(true)
+  })
+
+  it('contains ceres-research-station as a pinned body near Ceres orbit', () => {
+    const station = getPinnedBody('ceres-research-station')
+
+    expect(station.name).toBe('Ceres Research Station')
+    expect(station.noKiosks).toBe(true)
+    expect(station.orbit.semiMajorAxis).toBeCloseTo(2.767)
   })
 
   it('sizes Hektor smaller than Ceres', () => {

@@ -28,7 +28,7 @@ import { generateFlatZones } from '@/lib/terrain/terrainGenerator'
 import difficultyMap from '@/data/asteroids/difficulty-map.json'
 import shipHealthData from '@/data/shuttle/ship-health.json'
 import hostGiverOverridesData from '@/data/missions/host-giver-overrides.json'
-import { MIN_ASTEROID_MISSION_REWARD } from './missionEconomy'
+import { GLOBAL_MISSION_PAY_MULTIPLIER, MIN_ASTEROID_MISSION_REWARD } from './missionEconomy'
 
 /** Simple string hash to derive a numeric seed. */
 export function hashSeed(str: string): number {
@@ -911,7 +911,9 @@ export function generateAsteroidMission(
 
   const completionBonus = interpolateRange(pick.template.completionBonus, difficulty)
   const rawReward = objectives.reduce((sum, o) => sum + o.reward, 0) + completionBonus
-  const totalReward = Math.max(MIN_ASTEROID_MISSION_REWARD, rawReward)
+  const totalReward = Math.round(
+    Math.max(MIN_ASTEROID_MISSION_REWARD, rawReward) * GLOBAL_MISSION_PAY_MULTIPLIER,
+  )
 
   const waypoint = generateAsteroidWaypointNearHostPlanet(
     anchor.worldX,

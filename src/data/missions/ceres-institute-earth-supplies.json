@@ -1,0 +1,16 @@
+{
+  "kind": "special",
+  "id": "ceres-institute-earth-supplies",
+  "asteroidId": "earth",
+  "giverId": "ceres-institute",
+  "giverName": "Ceres Institute",
+  "templateId": "ceres-institute-earth-supplies",
+  "name": "Step 1 — Calibration Standards from Earth",
+  "briefing": "Young pilot — fetch the spectrometry calibration standards case from the ESA stockpile on Earth. Bring it home in one piece. — Porter",
+  "difficulty": 3,
+  "region": "near-earth",
+  "objectives": [],
+  "totalReward": 2500,
+  "waypoint": { "worldX": 0, "worldZ": 0 },
+  "status": "available"
+}

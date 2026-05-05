@@ -1,0 +1,71 @@
+{
+  "id": "ceres-institute",
+  "name": "Dean Bernard Porter",
+  "title": "Ceres Institute for Eternal Biology",
+  "objectiveTypes": ["rescue", "mineral-analysis", "dan", "bunker", "gather"],
+  "minDifficulty": 4,
+  "maxDifficulty": 9,
+  "missions": [
+    {
+      "id": "ceres_field_team_extraction",
+      "name": "Field Team Extraction — Standing Tasking",
+      "briefing": "Young pilot — periodic teams go quiet during sample runs. The Institute keeps an open contract for extraction; rates are above the standard rescue tier in recognition of the hazard. Bring our people home. — Porter",
+      "objectiveSlots": [
+        {
+          "type": "rescue",
+          "weight": 1.0,
+          "params": {
+            "type": "rescue",
+            "colonistCount": { "min": 3, "max": 5 },
+            "oxygenTime": { "min": 240, "max": 180 },
+            "guardedChance": 1.0
+          },
+          "reward": { "min": 3500, "max": 7500 }
+        }
+      ],
+      "completionBonus": { "min": 800, "max": 1800 },
+      "regionByDifficulty": { "asteroid-belt": [4, 7], "kuiper-belt": [7, 9] }
+    },
+    {
+      "id": "ceres_mineral_resonance_pass",
+      "name": "Resonance Survey — Mineral Composition",
+      "briefing": "Young pilot — Ceres's eccentric orbit puts certain rare-earth resonances within reach nowhere else. We need a clean mineral analysis pass on a candidate body. Submit the report at the kiosk. — Porter",
+      "objectiveSlots": [
+        {
+          "type": "mineral-analysis",
+          "weight": 1.0,
+          "params": {
+            "type": "mineral-analysis",
+            "analysisRockCount": { "min": 3, "max": 6 },
+            "sampleKg": { "min": 30, "max": 80 }
+          },
+          "reward": { "min": 2800, "max": 6500 }
+        }
+      ],
+      "completionBonus": { "min": 800, "max": 2200 },
+      "regionByDifficulty": { "asteroid-belt": [4, 8] }
+    },
+    {
+      "id": "ceres_dan_albedo_survey",
+      "name": "DAN Albedo Survey",
+      "briefing": "Young pilot — neutron-rich materials seem to attract viroid attention. We are studying why. Please run a clean Dynamic Albedo of Neutrons pass and disregard any cross-talk during operation. — Porter",
+      "objectiveSlots": [
+        {
+          "type": "dan",
+          "weight": 1.0,
+          "params": {
+            "type": "dan",
+            "scanDurationSeconds": { "min": 50, "max": 75 },
+            "requiredParticleHits": { "min": 24, "max": 32 },
+            "enemyGraceSeconds": { "min": 10, "max": 7 },
+            "particleTier": "medium",
+            "enemyTier": "medium"
+          },
+          "reward": { "min": 3200, "max": 6800 }
+        }
+      ],
+      "completionBonus": { "min": 700, "max": 1600 },
+      "regionByDifficulty": { "asteroid-belt": [4, 7], "kuiper-belt": [7, 9] }
+    }
+  ]
+}

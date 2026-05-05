@@ -22,7 +22,7 @@ import {
 import { MISSION_GIVERS } from '../giverCatalog'
 import type { MissionGiver, MissionGiverTemplate, ObjectiveSlot } from '../types'
 import type { PlayerProfile } from '@/lib/player/types'
-
+import { GLOBAL_MISSION_PAY_MULTIPLIER } from '../missionEconomy'
 const SELECT_FIRST_ASTEROID_RANDOM = 0.25
 const SELECT_SECOND_ASTEROID_RANDOM = 0.5
 
@@ -465,7 +465,9 @@ describe('generateAsteroidMission', () => {
     expect(mission.briefing).toBeTruthy()
     expect(mission.difficulty).toBe(1)
     expect(mission.objectives.length).toBeGreaterThan(0)
-    expect(mission.totalReward).toBeGreaterThanOrEqual(MIN_ASTEROID_MISSION_REWARD)
+    expect(mission.totalReward).toBeGreaterThanOrEqual(
+      Math.round(MIN_ASTEROID_MISSION_REWARD * GLOBAL_MISSION_PAY_MULTIPLIER),
+    )
     expect(mission.waypoint.worldX).toBeDefined()
     expect(mission.waypoint.worldZ).toBeDefined()
     expect(mission.status).toBe('available')
@@ -499,8 +501,8 @@ describe('generateAsteroidMission', () => {
   it('can force a DAN mission for DAN-capable givers', () => {
     const mission = generateAsteroidMission(6, null, () => 0, 'dan')
 
-    expect(['jovian-society', 'cinderline']).toContain(mission.giverId)
-    expect(mission.region).toBe('jovian-trojans')
+    expect(['jovian-society', 'cinderline', 'ceres-institute']).toContain(mission.giverId)
+    expect(['jovian-trojans', 'asteroid-belt']).toContain(mission.region)
     expect(mission.objectives.some((objective) => objective.type === 'dan')).toBe(true)
   })
 
@@ -508,7 +510,7 @@ describe('generateAsteroidMission', () => {
     for (const difficulty of [4, 7, 8, 10]) {
       const mission = generateAsteroidMission(difficulty, null, () => 0, 'dan')
 
-      expect(['jovian-society', 'cinderline']).toContain(mission.giverId)
+      expect(['jovian-society', 'cinderline', 'ceres-institute']).toContain(mission.giverId)
       expect(mission.difficulty).toBe(difficulty)
       expect(mission.objectives.some((objective) => objective.type === 'dan')).toBe(true)
     }

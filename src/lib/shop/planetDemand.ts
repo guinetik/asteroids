@@ -37,10 +37,10 @@ const MINERAL_BASELINE_MULTIPLIER = 1.0
 const MINERAL_PIP_NEUTRAL_THRESHOLD = 1.05
 
 /**
- * Extra payout on trade-good sales after demand is applied. Shop buys use a sub-1 fraction of
- * catalog base price, so this widens route profit margins.
+ * Extra payout on trade-good and mineral sales after demand is applied. Shop buys use a sub-1
+ * fraction of catalog base price, so this widens route profit margins.
  */
-const TRADE_ROUTE_SELL_PREMIUM_MULTIPLIER = 1.22
+export const TRADE_ROUTE_SELL_PREMIUM_MULTIPLIER = 1.42
 
 // ─── Internal state ─────────────────────────────────────────────────────────
 

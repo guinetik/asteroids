@@ -34,11 +34,22 @@ export const TRADE_GOOD_MIN_STOCK_EXPENSIVE = 5
  */
 export const TRADE_GOOD_MIN_STOCK_CHEAP = 10
 
-/** Maximum stock for cheap goods. */
-const STOCK_MAX = 20
+/** Maximum units stocked per cheap-priced trade-good slot (zeppelin-scale bulk). */
+export const TRADE_GOOD_STOCK_MAX_CHEAP = 50
 
 /**
- * Base-price cutoff: goods below this roll {@link TRADE_GOOD_MIN_STOCK_CHEAP}–{@link STOCK_MAX} stock;
+ * Maximum units stocked per expensive trade-good slot — half of {@link TRADE_GOOD_STOCK_MAX_CHEAP}
+ * so rare goods stay scarcer than bulk commodities.
+ */
+export const TRADE_GOOD_STOCK_MAX_EXPENSIVE = 25
+
+/**
+ * Cap on distinct trade-good lines offered per station visit (pool size may be smaller).
+ */
+export const TRADE_GOODS_OFFER_SLOT_CAP = 50
+
+/**
+ * Base-price cutoff: goods below this roll {@link TRADE_GOOD_MIN_STOCK_CHEAP}–{@link TRADE_GOOD_STOCK_MAX_CHEAP} stock;
  * goods at or above roll a tighter expensive range.
  */
 export const TRADE_GOOD_CHEAP_PRICE_THRESHOLD = 50
@@ -47,11 +58,9 @@ export const TRADE_GOOD_CHEAP_PRICE_THRESHOLD = 50
  * Fraction of each good's catalog {@link TradeGoodDefinition.basePrice} charged when buying at its
  * source planet. Lower than 1 widens profit on resale where demand is high.
  */
-const TRADE_GOOD_SOURCE_BUY_PRICE_FRACTION = 0.85
+const TRADE_GOOD_SOURCE_BUY_PRICE_FRACTION = 0.78
 /** Fraction used for imported goods sold through the Venus marketplace. */
-const TRADE_GOOD_IMPORTED_BUY_PRICE_FRACTION = 1.05
-/** Number of random off-world imports added to Venus inventory. */
-const VENUS_IMPORT_SLOT_COUNT = 3
+const TRADE_GOOD_IMPORTED_BUY_PRICE_FRACTION = 0.98
 
 /** Refuel cost in credits. */
 export const REFUEL_COST = 100
@@ -87,9 +96,10 @@ export const BRIBE_BASE_COST = 1000
 /**
  * Pick trade-good slots for a planet.
  *
- * Most planets: 3 random goods from the local pool.
- * Venus special-case: include the full local pool to support the
- * Venusian Zeppelin market loop visibility.
+ * Non-Venus: shuffle the local production pool and take up to {@link TRADE_GOODS_OFFER_SLOT_CAP}
+ * lines (typically every local good).
+ *
+ * Venus: full local pool plus random imports until {@link TRADE_GOODS_OFFER_SLOT_CAP} slots total.
  *
  * @param planetId - The planet whose trade goods pool to draw from.
  * @returns Trade good slots with randomized stock.
@@ -99,12 +109,13 @@ function pickTradeSlots(planetId: string): TradeGoodSlot[] {
   const localSlots = allGoods.map((tg) => buildSlot(tg, false))
   if (planetId !== 'venus') {
     const shuffled = [...localSlots].sort(() => Math.random() - 0.5)
-    return shuffled.slice(0, 3)
+    return shuffled.slice(0, Math.min(TRADE_GOODS_OFFER_SLOT_CAP, shuffled.length))
   }
   const importPool = getTradeGoodsExcludingPlanet('venus')
+  const importBudget = Math.max(0, TRADE_GOODS_OFFER_SLOT_CAP - localSlots.length)
   const importSlots = [...importPool]
     .sort(() => Math.random() - 0.5)
-    .slice(0, VENUS_IMPORT_SLOT_COUNT)
+    .slice(0, Math.min(importBudget, importPool.length))
     .map((tg) => buildSlot(tg, true))
   return [...localSlots, ...importSlots]
 }
@@ -116,9 +127,14 @@ function buildSlot(tg: TradeGoodDefinition, isImported: boolean): TradeGoodSlot 
   const stock =
     tg.basePrice < TRADE_GOOD_CHEAP_PRICE_THRESHOLD
       ? TRADE_GOOD_MIN_STOCK_CHEAP +
-        Math.floor(Math.random() * (STOCK_MAX - TRADE_GOOD_MIN_STOCK_CHEAP + 1))
+        Math.floor(
+          Math.random() * (TRADE_GOOD_STOCK_MAX_CHEAP - TRADE_GOOD_MIN_STOCK_CHEAP + 1),
+        )
       : TRADE_GOOD_MIN_STOCK_EXPENSIVE +
-        Math.floor(Math.random() * (STOCK_MAX / 2 - TRADE_GOOD_MIN_STOCK_EXPENSIVE + 1))
+        Math.floor(
+          Math.random() *
+            (TRADE_GOOD_STOCK_MAX_EXPENSIVE - TRADE_GOOD_MIN_STOCK_EXPENSIVE + 1),
+        )
   const price = Math.round(
     tg.basePrice *
       (isImported ? TRADE_GOOD_IMPORTED_BUY_PRICE_FRACTION : TRADE_GOOD_SOURCE_BUY_PRICE_FRACTION),

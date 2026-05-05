@@ -1,37 +1,29 @@
 <script setup lang="ts">
-import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
+import type {
+  GravityWarningState,
+  RadiationWarningState,
+  ShuttleTelemetry,
+} from '@/lib/ShuttleTelemetry'
 import { ORBIT_SCALE } from '@/lib/planets/constants'
 import ShuttleCompass from '@/components/ShuttleCompass.vue'
 import KeyPrompt from '@/components/KeyPrompt.vue'
+import { parseKeyPrompt } from '@/lib/ui/parseKeyPrompt'
+import { buildShuttleHullDebuffs } from '@/lib/ui/shuttleHullDebuffs'
 import { computed } from 'vue'
 
 const props = defineProps<{
   telemetry: ShuttleTelemetry
   fuelCellCount?: number
+  radiationWarning?: RadiationWarningState
+  gravityWarning?: GravityWarningState
 }>()
 
 const emit = defineEmits<{
   useFuelCell: []
 }>()
 
-/**
- * Parse a free-form `actionPrompt` string into a `{key, label}` tuple
- * suitable for {@link KeyPrompt}. Mirrors the parser in MapView so the
- * shuttle-mode HUD prompt and the EVA-mode bottom prompt render with
- * the same standardized keycap chrome.
- */
-const actionPromptParsed = computed<{ key: string; label: string } | null>(() => {
-  const raw = props.telemetry.actionPrompt
-  if (!raw) return null
-  const trimmed = raw.trim()
-  const prefix = trimmed.match(/^\[([^\]]+)\]\s*(.+)$/)
-  if (prefix) return { key: prefix[1]!.trim(), label: prefix[2]!.trim() }
-  const suffix = trimmed.match(/^(.+?)\s*\[([^\]]+)\]\s*$/)
-  if (suffix) return { key: suffix[2]!.trim(), label: suffix[1]!.trim() }
-  const spaced = trimmed.match(/^(\S{1,4})\s{2,}(.+)$/)
-  if (spaced) return { key: spaced[1]!.trim(), label: spaced[2]!.trim() }
-  return { key: '?', label: trimmed }
-})
+/** Parsed `{key, label}` for the shuttle-mode top action prompt. */
+const actionPromptParsed = computed(() => parseKeyPrompt(props.telemetry.actionPrompt))
 
 function pct(value: number, max: number): number {
   return max > 0 ? (value / max) * 100 : 0
@@ -55,13 +47,14 @@ function adriftSeconds(): string {
   return Math.ceil(props.telemetry.adriftCountdown).toString()
 }
 
-function tempLabel(): string {
-  return props.telemetry.temperature > 0 ? 'OVERHEATING' : 'FREEZING'
-}
-
-function tempLabelClass(): string {
-  return props.telemetry.temperature > 0 ? 'text-red-500' : 'text-blue-400'
-}
+const hullDebuffs = computed(() =>
+  buildShuttleHullDebuffs({
+    temperature: props.telemetry.temperature,
+    temperatureVisible: props.telemetry.temperatureVisible,
+    radiation: props.radiationWarning,
+    gravity: props.gravityWarning,
+  }),
+)
 </script>
 
 <template>
@@ -91,9 +84,6 @@ function tempLabelClass(): string {
     </div>
 
     <div v-if="props.telemetry.temperatureVisible" class="hud-temp-gauge">
-      <span class="hud-temp-label" :class="tempLabelClass()">
-        {{ tempLabel() }} {{ Math.abs(props.telemetry.temperature).toFixed(0) }}&deg;
-      </span>
       <div class="hud-temp-track">
         <div
           v-if="props.telemetry.temperature > 0"
@@ -115,6 +105,16 @@ function tempLabelClass(): string {
     <!-- Bottom center: hull | thruster bars | fuel (mirrors FPS HP | tools | RTG). -->
     <div class="hud-bottom-dock">
       <div class="hud-bottom-dock__column hud-bottom-dock__column--hull">
+        <div v-if="hullDebuffs.length > 0" class="hud-hull-debuffs">
+          <span
+            v-for="debuff in hullDebuffs"
+            :key="debuff.id"
+            class="hud-hull-debuff"
+            :class="'hud-hull-debuff--' + debuff.tone"
+          >
+            {{ debuff.label }}
+          </span>
+        </div>
         <span class="hud-hull-label">HULL</span>
         <div class="hud-hull-track">
           <div

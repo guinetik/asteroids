@@ -565,6 +565,97 @@ export const CARMEN_FINCH_FOLLOWUP_MESSAGE: ShipMessageDefinition = {
   ],
 }
 
+/** Priority for Ceres Institute messages — academic / institutional, mid-tier. */
+const CERES_INSTITUTE_MESSAGE_PRIORITY = 70
+
+/** Ceres Institute contract step 1 — field team rescue, first tasking. */
+export const CERES_INSTITUTE_RESCUE_1_OFFER: ShipMessageDefinition = {
+  id: 'ceres-institute-rescue-1-offer',
+  from: 'Dean Bernard Porter, Ceres Institute',
+  subject: 'Field Team Extraction — Tasking Active',
+  sentAt: '2306-05-04 10:00 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: CERES_INSTITUTE_MESSAGE_PRIORITY,
+  folderId: 'ceres-institute-contract',
+  folderLabel: 'Ceres Institute',
+  body: [
+    'Young pilot — the rescue listing is on the kiosk. Bring them in; we will see them recovered at the station.',
+    'Psychosphere collection is paid out of the Institute discretionary line.',
+    '— Porter',
+  ],
+}
+
+/** Ceres Institute contract step 2 — mineral resonance survey tasking. */
+export const CERES_INSTITUTE_MINERAL_ANALYSIS_OFFER: ShipMessageDefinition = {
+  id: 'ceres-institute-mineral-analysis-offer',
+  from: 'Dean Bernard Porter, Ceres Institute',
+  subject: 'Resonance Survey — Mineral Composition',
+  sentAt: '2306-05-06 09:15 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: CERES_INSTITUTE_MESSAGE_PRIORITY,
+  folderId: 'ceres-institute-contract',
+  folderLabel: 'Ceres Institute',
+  body: [
+    'Young pilot — mineral analysis tasking is on the board. Submit clean readings; we prefer signal quality over speed.',
+    '— Porter',
+  ],
+}
+
+/** Ceres Institute contract step 3 — DAN albedo survey tasking. */
+export const CERES_INSTITUTE_DAN_OFFER: ShipMessageDefinition = {
+  id: 'ceres-institute-dan-offer',
+  from: 'Dean Bernard Porter, Ceres Institute',
+  subject: 'DAN Albedo Survey — Tasking Active',
+  sentAt: '2306-05-08 11:30 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: CERES_INSTITUTE_MESSAGE_PRIORITY,
+  folderId: 'ceres-institute-contract',
+  folderLabel: 'Ceres Institute',
+  body: [
+    'Young pilot — the DAN run is on the kiosk. Capture the particle return cleanly; ignore any sensor cross-talk during the pass.',
+    '— Porter',
+  ],
+}
+
+/** Ceres Institute contract step 4 — second field team rescue tasking. */
+export const CERES_INSTITUTE_RESCUE_2_OFFER: ShipMessageDefinition = {
+  id: 'ceres-institute-rescue-2-offer',
+  from: 'Dean Bernard Porter, Ceres Institute',
+  subject: 'Field Team Extraction — Second Tasking',
+  sentAt: '2306-05-10 08:45 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: CERES_INSTITUTE_MESSAGE_PRIORITY,
+  folderId: 'ceres-institute-contract',
+  folderLabel: 'Ceres Institute',
+  body: [
+    'Young pilot — another team. We do not abandon our own. They will be in our care from the moment you bring them in.',
+    'More psychosphere if your cargo allows.',
+    '— Porter',
+  ],
+}
+
+/** Ceres Institute contract step 5 — archive bunker final tasking. */
+export const CERES_INSTITUTE_ARCHIVE_BUNKER_OFFER: ShipMessageDefinition = {
+  id: 'ceres-institute-archive-bunker-offer',
+  from: 'Dean Bernard Porter, Ceres Institute',
+  subject: 'Archive Transmission — Final Tasking',
+  sentAt: '2306-05-12 14:20 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: CERES_INSTITUTE_MESSAGE_PRIORITY,
+  folderId: 'ceres-institute-contract',
+  folderLabel: 'Ceres Institute',
+  body: [
+    'Young pilot — the bunker tasking is active. Site CIB-7. Specimens are on the floor; their designations are on file. Clear them, then approach the terminal.',
+    'Please don\'t read the archive. It would only confuse you.',
+    '— Porter',
+  ],
+}
+
 /** Full message catalog for the current build. */
 export const SHIP_MESSAGE_CATALOG: ShipMessageDefinition[] = [
   STARTUP_SELLER_MESSAGE,
@@ -593,4 +684,9 @@ export const SHIP_MESSAGE_CATALOG: ShipMessageDefinition[] = [
   VIROID_ENVOY_CERES_RENDEZVOUS,
   FANTASIA_PIMP_MY_SHUTTLE_INTRO_MESSAGE,
   CARMEN_FINCH_FOLLOWUP_MESSAGE,
+  CERES_INSTITUTE_RESCUE_1_OFFER,
+  CERES_INSTITUTE_MINERAL_ANALYSIS_OFFER,
+  CERES_INSTITUTE_DAN_OFFER,
+  CERES_INSTITUTE_RESCUE_2_OFFER,
+  CERES_INSTITUTE_ARCHIVE_BUNKER_OFFER,
 ]
