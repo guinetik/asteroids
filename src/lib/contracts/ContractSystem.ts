@@ -15,11 +15,13 @@ import type { ShipMessageDefinition } from '@/lib/messages/messageTypes'
 import type {
   Contract,
   ContractInstance,
+  ContractStep,
   ContractStoreSnapshot,
   DropCollectedEvent,
   MissionCompletedEvent,
   OrbitalLaunchEvent,
   OrbitalMissionCompletedEvent,
+  PinnedAsset,
   RewardEffect,
   TradeTransactionEvent,
 } from './contractTypes'
@@ -118,6 +120,31 @@ export interface ContractSystemHooks {
    */
   consumeItemsForDelivery?: (itemId: string, count: number) => boolean
   /**
+   * Asked by the engine when the player confirms a pickup at a docked
+   * station-kind pinned asset. Hosts (typically the inventory bridge) MUST
+   * grant `count` units of `itemId` to the player's inventory and persist.
+   *
+   * @param itemId - Inventory item id to grant.
+   * @param count - Units to grant on a successful pickup.
+   */
+  grantItemsForPickup?: (itemId: string, count: number) => void
+  /**
+   * Fired when a station-kind pinned asset becomes active (contract
+   * accepted with that asset, or any later asset toggle). Hosts spawn the
+   * matching world geometry / waypoint.
+   *
+   * @param payload - Asset metadata for the spawner.
+   */
+  onPinnedAssetActivated?: (payload: PinnedAssetLifecyclePayload) => void
+  /**
+   * Fired when a previously activated station-kind pinned asset should be
+   * despawned (contract reaches a terminal state). Hosts dispose world
+   * geometry.
+   *
+   * @param payload - Identifies the asset to despawn.
+   */
+  onPinnedAssetDeactivated?: (payload: { assetRef: string }) => void
+  /**
    * Asked by the engine after a contract advances into (or is accepted on)
    * an `install-upgrade` step, to check whether the player already owns the
    * required upgrade level. When the answer is `>= step.minLevel` the engine
@@ -173,6 +200,22 @@ export interface ChoiceOutcomeResolvedPayload {
   outcomeId: string
   /** Authored CR payout for this outcome. Fractional preserved. */
   creditsReward: number
+}
+
+/** Payload for {@link ContractSystemHooks.onPinnedAssetActivated}. */
+export interface PinnedAssetLifecyclePayload {
+  /** The asset ref. */
+  assetRef: string
+  /** The asset kind (only `'station'` activates a Three controller today). */
+  kind: 'station' | 'asteroid'
+  /** Region for the spawner (e.g. `'kuiper-belt'`). */
+  region: string
+  /** Display label for the F-prompt. */
+  label: string
+  /** GLB path under `public/` (only present when `kind === 'station'`). */
+  modelPath?: string
+  /** Stable seed hashed to a deterministic position (only when `kind === 'station'`). */
+  positionSeed?: string
 }
 
 /** Payload for {@link ContractSystemHooks.onStepActivated}. */
@@ -487,6 +530,91 @@ export class ContractSystem {
   }
 
   /**
+   * Notify the system that the player has just confirmed a dock-and-act at a
+   * pinned station-kind asset. Advances any active `pickup-from-asset` /
+   * `deliver-to-asset` step whose `assetRef` matches.
+   *
+   * @param assetRef - Stable asset ref the player docked at.
+   */
+  notifyDockedAtAsset(assetRef: string): void {
+    let changed = false
+    for (const instance of Object.values(this.snapshot.instances)) {
+      if (instance.status !== 'active') continue
+      const contract = this.contracts.get(instance.contractId)
+      if (!contract) continue
+      const step = contract.steps[instance.currentStepIndex]
+      if (!step) continue
+      if (step.kind === 'pickup-from-asset') {
+        if (step.assetRef !== assetRef) continue
+        this.hooks.grantItemsForPickup?.(step.itemId, step.count)
+        this.advanceStep(contract, instance, 1)
+        changed = true
+      } else if (step.kind === 'deliver-to-asset') {
+        if (step.assetRef !== assetRef) continue
+        const consumed = this.hooks.consumeItemsForDelivery?.(step.itemId, step.count) ?? false
+        if (!consumed) continue
+        this.advanceStep(contract, instance, 1)
+        changed = true
+      }
+    }
+    this.persist()
+    if (changed) this.afterChange()
+  }
+
+  /**
+   * Return the active step on any contract whose pinned-station `assetRef`
+   * matches. Used by the dock panel to decide what action button to show.
+   * Returns `null` when no contract has the asset active or the current step
+   * does not target it.
+   *
+   * @param assetRef - Asset ref the player is docked at.
+   * @returns Match descriptor or `null`.
+   */
+  getActiveStepForAsset(
+    assetRef: string,
+  ): { contractId: string; step: ContractStep; stepIndex: number } | null {
+    for (const instance of Object.values(this.snapshot.instances)) {
+      if (instance.status !== 'active') continue
+      const contract = this.contracts.get(instance.contractId)
+      if (!contract) continue
+      const step = contract.steps[instance.currentStepIndex]
+      if (!step) continue
+      if (step.kind !== 'pickup-from-asset' && step.kind !== 'deliver-to-asset') continue
+      if (step.assetRef !== assetRef) continue
+      return { contractId: contract.id, step, stepIndex: instance.currentStepIndex }
+    }
+    return null
+  }
+
+  /**
+   * Flat list of station-kind pinned assets across every currently-active
+   * contract instance. Map runtime calls this each tick to diff against the
+   * spawned world controllers.
+   *
+   * @returns Array of station lifecycle payloads for active contracts.
+   */
+  getActivePinnedAssets(): PinnedAssetLifecyclePayload[] {
+    const out: PinnedAssetLifecyclePayload[] = []
+    for (const inst of Object.values(this.snapshot.instances)) {
+      if (inst.status !== 'active') continue
+      const c = this.contracts.get(inst.contractId)
+      if (!c?.pinnedAssets) continue
+      for (const a of c.pinnedAssets) {
+        if (a.kind !== 'station') continue
+        out.push({
+          assetRef: a.assetRef,
+          kind: 'station',
+          region: a.region,
+          label: a.label,
+          modelPath: a.modelPath,
+          positionSeed: a.positionSeed,
+        })
+      }
+    }
+    return out
+  }
+
+  /**
    * Notify the system that the player completed the orbital pickup phase of a
    * planetary shuttle mission. Both the giver (posting station) and target
    * (orbital body) planet ids are passed so steps can filter on either side.
@@ -645,6 +773,11 @@ export class ContractSystem {
     this.notifyStepActivated(contract, 0)
     this.deliverStepMessage(contract, 0)
     this.evaluatePassiveCurrentStep(contract)
+    if (contract.pinnedAssets) {
+      for (const a of contract.pinnedAssets) {
+        this.hooks.onPinnedAssetActivated?.(buildPinnedAssetLifecyclePayload(a))
+      }
+    }
     this.persist()
     this.hooks.onContractAccepted?.(contractId)
     this.afterChange()
@@ -733,6 +866,11 @@ export class ContractSystem {
         this.deliverCompletionMessage(contract, updated)
         this.applyRewards(contract, updated)
         this.hooks.onContractCompleted?.(contract.id)
+        if (contract.pinnedAssets) {
+          for (const a of contract.pinnedAssets) {
+            this.hooks.onPinnedAssetDeactivated?.({ assetRef: a.assetRef })
+          }
+        }
         this.evaluatePrerequisiteContractOffers()
       } else {
         updated = { ...updated, currentStepIndex: nextIndex }
@@ -1022,6 +1160,32 @@ function matchesTradeTransaction(
   if (step.planetId !== event.planetId) return false
   if (step.itemId !== event.itemId) return false
   return true
+}
+
+/**
+ * Build a {@link PinnedAssetLifecyclePayload} from a raw {@link PinnedAsset} entry.
+ * Station fields (`modelPath`, `positionSeed`) are forwarded when present.
+ *
+ * @param a - Pinned asset entry from the contract definition.
+ * @returns Lifecycle payload suitable for `onPinnedAssetActivated`.
+ */
+function buildPinnedAssetLifecyclePayload(a: PinnedAsset): PinnedAssetLifecyclePayload {
+  if (a.kind === 'station') {
+    return {
+      assetRef: a.assetRef,
+      kind: 'station',
+      region: a.region,
+      label: a.label,
+      modelPath: a.modelPath,
+      positionSeed: a.positionSeed,
+    }
+  }
+  return {
+    assetRef: a.assetRef,
+    kind: 'asteroid',
+    region: a.region,
+    label: a.label ?? a.assetRef,
+  }
 }
 
 /** Stable id for a contract's intro/offer message. */
