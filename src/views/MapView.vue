@@ -30,6 +30,7 @@ import ContractTrackerPanel from '@/components/ContractTrackerPanel.vue'
 import MissionTrackerPanel from '@/components/MissionTrackerPanel.vue'
 import MissionFocusPrompt from '@/components/MissionFocusPrompt.vue'
 import KeyPrompt from '@/components/KeyPrompt.vue'
+import { parseKeyPrompt } from '@/lib/ui/parseKeyPrompt'
 import {
   buildMissionTrackerGroups,
   type MissionTrackerRow,
@@ -388,26 +389,6 @@ const journeyStartedTitle = ref('')
 const journeyStartedMeta = ref('')
 const journeyTrackerVisible = ref(false)
 const habitatPrompt = ref<string | null>(null)
-/**
- * Parse a free-form prompt string into a `{key, label}` tuple suitable
- * for {@link KeyPrompt}. Supports three formats:
- *   1. `[X] LABEL` — bracketed key prefix
- *   2. `LABEL [X]` — bracketed key suffix
- *   3. `X  LABEL` — single-token key followed by ≥2 spaces
- * Falls back to `{key: '?', label: raw}` so the prompt still renders
- * with a placeholder keycap rather than vanishing silently.
- */
-function parseKeyPrompt(raw: string | null): { key: string; label: string } | null {
-  if (!raw) return null
-  const trimmed = raw.trim()
-  const prefix = trimmed.match(/^\[([^\]]+)\]\s*(.+)$/)
-  if (prefix) return { key: prefix[1]!.trim(), label: prefix[2]!.trim() }
-  const suffix = trimmed.match(/^(.+?)\s*\[([^\]]+)\]\s*$/)
-  if (suffix) return { key: suffix[2]!.trim(), label: suffix[1]!.trim() }
-  const spaced = trimmed.match(/^(\S{1,4})\s{2,}(.+)$/)
-  if (spaced) return { key: spaced[1]!.trim(), label: spaced[2]!.trim() }
-  return { key: '?', label: trimmed }
-}
 const evaActionPromptParsed = computed(() => parseKeyPrompt(telemetry.actionPrompt))
 const habitatPromptParsed = computed(() => parseKeyPrompt(habitatPrompt.value))
 const habitatFadeOpacity = ref(0)

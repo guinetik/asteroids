@@ -3,6 +3,7 @@ import type { ShuttleTelemetry } from '@/lib/ShuttleTelemetry'
 import { ORBIT_SCALE } from '@/lib/planets/constants'
 import ShuttleCompass from '@/components/ShuttleCompass.vue'
 import KeyPrompt from '@/components/KeyPrompt.vue'
+import { parseKeyPrompt } from '@/lib/ui/parseKeyPrompt'
 import { computed } from 'vue'
 
 const props = defineProps<{
@@ -14,24 +15,8 @@ const emit = defineEmits<{
   useFuelCell: []
 }>()
 
-/**
- * Parse a free-form `actionPrompt` string into a `{key, label}` tuple
- * suitable for {@link KeyPrompt}. Mirrors the parser in MapView so the
- * shuttle-mode HUD prompt and the EVA-mode bottom prompt render with
- * the same standardized keycap chrome.
- */
-const actionPromptParsed = computed<{ key: string; label: string } | null>(() => {
-  const raw = props.telemetry.actionPrompt
-  if (!raw) return null
-  const trimmed = raw.trim()
-  const prefix = trimmed.match(/^\[([^\]]+)\]\s*(.+)$/)
-  if (prefix) return { key: prefix[1]!.trim(), label: prefix[2]!.trim() }
-  const suffix = trimmed.match(/^(.+?)\s*\[([^\]]+)\]\s*$/)
-  if (suffix) return { key: suffix[2]!.trim(), label: suffix[1]!.trim() }
-  const spaced = trimmed.match(/^(\S{1,4})\s{2,}(.+)$/)
-  if (spaced) return { key: spaced[1]!.trim(), label: spaced[2]!.trim() }
-  return { key: '?', label: trimmed }
-})
+/** Parsed `{key, label}` for the shuttle-mode top action prompt. */
+const actionPromptParsed = computed(() => parseKeyPrompt(props.telemetry.actionPrompt))
 
 function pct(value: number, max: number): number {
   return max > 0 ? (value / max) * 100 : 0

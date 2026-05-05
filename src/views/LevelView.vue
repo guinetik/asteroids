@@ -21,6 +21,7 @@ import LevelMinimap from '@/components/LevelMinimap.vue'
 import type { MapMarker } from '@/components/LevelMinimap.vue'
 import PickupToast from '@/components/PickupToast.vue'
 import KeyPrompt from '@/components/KeyPrompt.vue'
+import { parseKeyPrompt } from '@/lib/ui/parseKeyPrompt'
 import type {
   PickupEntry,
   ProspectEntry,
@@ -105,18 +106,7 @@ const inventorySnapshot = ref<Inventory | null>(null)
 /** Positive deltas vs sortie baseline for cargo panel badges (catalog id → qty). */
 const inventoryRunGainsThisSortie = ref<Record<string, number>>({})
 const terminalPrompt = ref<string | null>(null)
-/**
- * Parse a `[X] LABEL` style prompt string into {key, label}. Falls back
- * to a generic `E` keycap and the raw string when no bracket prefix is
- * present (used by disturbance alerts which are free-form).
- */
-const terminalPromptParsed = computed<{ key: string; label: string } | null>(() => {
-  const raw = terminalPrompt.value
-  if (!raw) return null
-  const match = raw.match(/^\s*\[([^\]]+)\]\s*(.+)$/)
-  if (match) return { key: match[1]!.trim(), label: match[2]!.trim() }
-  return { key: 'ALERT', label: raw }
-})
+const terminalPromptParsed = computed(() => parseKeyPrompt(terminalPrompt.value))
 const announceVisible = ref(false)
 const announceAsteroid = ref('')
 const announceMission = ref('')

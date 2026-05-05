@@ -32,8 +32,12 @@ export type KeyPromptVariant = 'inline' | 'split'
 
 /** Props accepted by {@link KeyPrompt}. */
 interface Props {
-  /** Key cap text, e.g. `V`, `F`, `ESC`, `Hold E`. */
-  keyLabel: string
+  /**
+   * Key cap text, e.g. `V`, `F`, `ESC`, `Hold E`. Pass `''` (or omit)
+   * to render a label-only pill — used for status banners that come
+   * through the same prompt channel but have no key binding.
+   */
+  keyLabel?: string
   /** Human-readable action label, e.g. `START MAINTENANCE`. */
   action: string
   /** Context tone — defaults to cyan (EVA / suit). */
@@ -47,11 +51,15 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  keyLabel: '',
   tone: 'cyan',
   position: 'bottom',
   variant: 'inline',
   clickable: false,
 })
+
+/** True when the prompt has no key — render the label only. */
+const hasKey = computed(() => props.keyLabel.trim().length > 0)
 
 const emit = defineEmits<{
   /** Emitted when the prompt is clicked (only fires when `clickable`). */
@@ -75,7 +83,10 @@ function onClick(): void {
 <template>
   <button v-if="clickable" type="button" :class="classes" @click="onClick">
     <span class="key-prompt__pill">
-      <template v-if="variant === 'split'">
+      <template v-if="!hasKey">
+        <span class="key-prompt__label">{{ action }}</span>
+      </template>
+      <template v-else-if="variant === 'split'">
         <span class="key-prompt__cap">{{ keyLabel }}</span>
         <span class="key-prompt__label">{{ action }}</span>
       </template>
@@ -87,7 +98,10 @@ function onClick(): void {
   </button>
   <div v-else :class="classes">
     <span class="key-prompt__pill">
-      <template v-if="variant === 'split'">
+      <template v-if="!hasKey">
+        <span class="key-prompt__label">{{ action }}</span>
+      </template>
+      <template v-else-if="variant === 'split'">
         <span class="key-prompt__cap">{{ keyLabel }}</span>
         <span class="key-prompt__label">{{ action }}</span>
       </template>
