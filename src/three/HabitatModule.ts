@@ -10,7 +10,7 @@
  * @spec docs/asteroid-lander-gdd.md
  */
 import * as THREE from 'three'
-import { loadGLB } from './loadGLB'
+import { loadGLB, wrapSceneAtBoundingBoxCenter } from './loadGLB'
 
 /** Configuration for the habitat module. */
 export interface HabitatConfig {
@@ -26,6 +26,10 @@ export interface HabitatConfig {
 const FURNITURE_TARGET_HEIGHT = 110
 /** Vertical offset — sits on the "floor" of the cylinder. */
 const FURNITURE_FLOOR_Y = -55
+/**
+ * Shift the table pivot toward the fuel tanks along shuttle −X (from habitat centre).
+ */
+const TABLE_TANKWARD_OFFSET_MODEL_UNITS = 118
 
 const GLASS_COLOR = 0x88ccff
 const GLASS_OPACITY = 0.15
@@ -136,8 +140,8 @@ export class HabitatModule {
     const { position } = config
 
     const [bedModel, tableModel] = await Promise.all([
-      loadGLB('/models/bed.glb'),
-      loadGLB('/models/table.glb'),
+      wrapSceneAtBoundingBoxCenter(await loadGLB('/models/bed.glb')),
+      wrapSceneAtBoundingBoxCenter(await loadGLB('/models/table.glb')),
     ])
 
     // --- Bed: center of the cylinder (statement piece) ---
@@ -164,7 +168,7 @@ export class HabitatModule {
     bedPivot.rotation.z = Math.PI / 2 // match cylinder rotation
     this.group.add(bedPivot)
 
-    // --- Table: back wall (tank side, negative along axis) ---
+    // --- Table: tank bulkhead (−X in shuttle space; interior scene uses +Z at walkable scale) ---
     const tableBox = new THREE.Box3().setFromObject(tableModel)
     const tableSize = tableBox.getSize(new THREE.Vector3())
     const tableMaxDim = Math.max(tableSize.x, tableSize.y, tableSize.z)
@@ -183,8 +187,8 @@ export class HabitatModule {
     const tablePivot = new THREE.Group()
     tablePivot.add(tableModel)
     tablePivot.position.copy(position)
-    tablePivot.position.x -= 100 // this moves it closer to the fuel tank
-    tablePivot.position.y += 0 // near tank wall
+    tablePivot.position.x -= TABLE_TANKWARD_OFFSET_MODEL_UNITS
+    tablePivot.position.y += 0
     tableModel.position.z = FURNITURE_FLOOR_Y // floor of cross-section
     tablePivot.rotation.z = Math.PI / 2 // match cylinder rotation
     this.group.add(tablePivot)

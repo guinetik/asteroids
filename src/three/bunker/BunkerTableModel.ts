@@ -2,7 +2,7 @@
  * Bunker table prop (extract terminal).
  */
 import * as THREE from 'three'
-import { loadGLB } from '@/three/loadGLB'
+import { loadGLB, wrapSceneAtBoundingBoxCenter } from '@/three/loadGLB'
 
 /**
  * Model for the extraction terminal table.
@@ -13,7 +13,8 @@ export class BunkerTableModel {
 
   constructor() {
     loadGLB('/models/table.glb')
-      .then((scene) => {
+      .then((root) => {
+        const scene = wrapSceneAtBoundingBoxCenter(root)
         this.scene = scene
 
         const tableBox = new THREE.Box3().setFromObject(scene)
