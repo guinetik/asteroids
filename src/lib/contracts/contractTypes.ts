@@ -257,6 +257,46 @@ export interface DeliverItemsStep extends ContractStepRewardMixin {
   flavor: string[]
 }
 
+/**
+ * Step that requires the player to dock at a pinned station-kind asset and
+ * confirm a pickup. The engine grants `count` units of `itemId` via the
+ * `grantItemsForPickup` hook on confirm and advances the step.
+ */
+export interface PickupFromAssetStep extends ContractStepRewardMixin {
+  /** Discriminator. */
+  kind: 'pickup-from-asset'
+  /** Pinned asset ref the player must dock at (matches `pinnedAssets[].assetRef`). */
+  assetRef: string
+  /** Inventory item id to grant on confirm. */
+  itemId: string
+  /** Units to grant on confirm. */
+  count: number
+  /** Authored summary for the step's flavor message subject. */
+  subject: string
+  /** Authored body paragraphs for the step's flavor message. */
+  flavor: string[]
+}
+
+/**
+ * Step that requires the player to dock at a pinned station-kind asset and
+ * hand over `count` units of `itemId`. The engine consumes inventory via the
+ * existing `consumeItemsForDelivery` hook on confirm and advances on success.
+ */
+export interface DeliverToAssetStep extends ContractStepRewardMixin {
+  /** Discriminator. */
+  kind: 'deliver-to-asset'
+  /** Pinned asset ref the player must dock at. */
+  assetRef: string
+  /** Inventory item id to consume on confirm. */
+  itemId: string
+  /** Units to consume on confirm. */
+  count: number
+  /** Authored summary for the step's flavor message subject. */
+  subject: string
+  /** Authored body paragraphs for the step's flavor message. */
+  flavor: string[]
+}
+
 /** Event payload emitted when the player collects a drop pickup in the FPS layer. */
 export interface DropCollectedEvent {
   /** Inventory item id that was picked up (matches {@link CollectDropsStep.itemId}). */
@@ -319,6 +359,8 @@ export type ContractStep =
   | CollectDropsStep
   | LaunchFromBodyStep
   | DeliverItemsStep
+  | PickupFromAssetStep
+  | DeliverToAssetStep
   | ChoiceMissionStep
 
 /** Reward applied when a contract is completed. */

@@ -53,6 +53,12 @@ export function formatContractStepLabel(step: ContractStep): string {
   if (step.kind === 'choice-mission') {
     return `Complete Mission: ${step.missionId}`
   }
+  if (step.kind === 'pickup-from-asset') {
+    return `Take package at ${step.assetRef}`
+  }
+  if (step.kind === 'deliver-to-asset') {
+    return `Deliver at ${step.assetRef}`
+  }
   const orbitalBits: string[] = []
   if (step.giverPlanetId) orbitalBits.push(`from ${step.giverPlanetId}`)
   if (step.targetPlanetId) orbitalBits.push(`at ${step.targetPlanetId}`)
