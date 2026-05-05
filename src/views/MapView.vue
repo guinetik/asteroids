@@ -9,8 +9,6 @@ import ShuttleHud from '@/components/ShuttleHud.vue'
 import FpsHud from '@/components/FpsHud.vue'
 import HelmetVisor from '@/components/HelmetVisor.vue'
 import OrbitPrompt from '@/components/OrbitPrompt.vue'
-import GravityWarning from '@/components/GravityWarning.vue'
-import RadiationWarning from '@/components/RadiationWarning.vue'
 import GravitationalAnomalyHud from '@/components/GravitationalAnomalyHud.vue'
 import DeathOverlay from '@/components/DeathOverlay.vue'
 import DamageVignette from '@/components/DamageVignette.vue'
@@ -1627,6 +1625,19 @@ watch(
           @click="openContractMessage"
         />
         <button
+          v-if="
+            pendingInboxCount > 0 &&
+            activeInboxMessage &&
+            !messageDialogVisible &&
+            !mapIntro.messageDialogVisible
+          "
+          type="button"
+          class="map-message-notice__button"
+          @click="openMessage"
+        >
+          {{ messagePromptLabel() }}
+        </button>
+        <button
           type="button"
           class="map-screen-nav__icon-btn"
           title="Map (M)"
@@ -1758,6 +1769,8 @@ watch(
       "
       :telemetry="telemetry"
       :fuel-cell-count="fuelCellCount"
+      :radiation-warning="radiationWarning"
+      :gravity-warning="gravityWarning"
       @use-fuel-cell="handleUseFuelCell"
     />
     <HelmetVisor v-if="evaActive" />
@@ -1791,28 +1804,6 @@ watch(
       @open-shop="openShop"
       @open-cosmetic-shop="openCosmeticShop"
       @open-mission="openMissionOverlay"
-    />
-    <GravityWarning
-      v-show="
-        !mapOverlay.visible &&
-        !mapIntro.controlsLocked &&
-        !habitatActive &&
-        !earthStartupOrbitHudSuppressed &&
-        !deathVisible &&
-        !evaActive
-      "
-      :warning="gravityWarning"
-    />
-    <RadiationWarning
-      v-show="
-        !mapOverlay.visible &&
-        !mapIntro.controlsLocked &&
-        !habitatActive &&
-        !earthStartupOrbitHudSuppressed &&
-        !deathVisible &&
-        !evaActive
-      "
-      :warning="radiationWarning"
     />
     <GravitationalAnomalyHud
       v-show="
@@ -1866,21 +1857,6 @@ watch(
       class="map-intro-message-prompt"
     >
       <button type="button" class="map-intro-message-prompt__button" @click="openMessage">
-        {{ messagePromptLabel() }}
-      </button>
-    </div>
-    <div
-      v-else-if="
-        !mapOverlay.visible &&
-        !mapIntro.controlsLocked &&
-        !earthStartupOrbitHudSuppressed &&
-        pendingInboxCount > 0 &&
-        activeInboxMessage &&
-        !messageDialogVisible
-      "
-      class="map-message-notice"
-    >
-      <button type="button" class="map-message-notice__button" @click="openMessage">
         {{ messagePromptLabel() }}
       </button>
     </div>
