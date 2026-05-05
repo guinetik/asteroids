@@ -328,6 +328,120 @@ export const JOVIAN_HEKTOR_PROSPECTUS_OFFER: ShipMessageDefinition = {
   ],
 }
 
+/** Finch Step 1 — Saturn telescope offer. */
+export const FINCH_SATURN_TELESCOPE_OFFER: ShipMessageDefinition = {
+  id: 'finch-recovery-saturn-telescope-offer',
+  from: 'Mr. Finch, Saturn Ringside Estate',
+  subject: 'Step 1 — She Has Not Yet Been Seen',
+  sentAt: '2306-05-19 09:00 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: 80,
+  folderId: 'finch-recovery',
+  folderLabel: 'Mr. Finch',
+  body: [
+    '[bored] Young pilot,',
+    "The photograph is in your secure inbox; the EVA listing is on the Saturn ringside spaceport board, posted under my name. The telescope — long-baseline, calibrated for horizon detail — is at the listed site.",
+    "Tune the long-baseline telescope until our Madame's surroundings resolve. I am told the relevant detail is the horizon. I am told you will know it when you see it.",
+    '— Finch',
+  ],
+}
+
+/** Finch Step 3 — Mars bunker offer. */
+export const FINCH_MARS_BUNKER_OFFER: ShipMessageDefinition = {
+  id: 'finch-recovery-mars-bunker-offer',
+  from: 'Mr. Finch, Saturn Ringside Estate',
+  subject: 'Step 3 — A Trail at Mars',
+  sentAt: '2306-05-22 11:30 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: 80,
+  folderId: 'finch-recovery',
+  folderLabel: 'Mr. Finch',
+  body: [
+    'Young pilot,',
+    'Mars confirms the trail. Our Madame appears to have used an abandoned Marines training bunker as a transfer point — local intelligence indicates the site is overrun and effectively forgotten by the Corps.',
+    'Clear what is in the bunker. Recover what she left in it.',
+    '— Finch',
+  ],
+}
+
+/** Finch Step 5 — Venus telescope offer. */
+export const FINCH_VENUS_TELESCOPE_OFFER: ShipMessageDefinition = {
+  id: 'finch-recovery-venus-telescope-offer',
+  from: 'Mr. Finch, Saturn Ringside Estate',
+  subject: 'Step 5 — A Floor Camera at Venus',
+  sentAt: '2306-05-26 13:18 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: 80,
+  folderId: 'finch-recovery',
+  folderLabel: 'Mr. Finch',
+  body: [
+    '[amused] Young pilot,',
+    'The fence — was — at the Zeppelin Exchange. The floor cameras at that establishment are real and they captured a transaction. The horizon, again, is the matter of interest.',
+    'Tune your knobs.',
+    '— Finch',
+  ],
+}
+
+/** Finch Step 7 — Earth telescope offer. */
+export const FINCH_EARTH_TELESCOPE_OFFER: ShipMessageDefinition = {
+  id: 'finch-recovery-earth-telescope-offer',
+  from: 'Mr. Finch, Saturn Ringside Estate',
+  subject: 'Step 7 — A Posed Photograph at Earth',
+  sentAt: '2306-05-30 16:42 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: 80,
+  folderId: 'finch-recovery',
+  folderLabel: 'Mr. Finch',
+  body: [
+    '[amused] Young pilot,',
+    'The Earth image is from a private gallery. The composition is the composition of someone who is now aware she is being followed and has decided to make a study of the matter.',
+    'Tune the image. The destination is in the photograph. She placed it there.',
+    '— Finch',
+  ],
+}
+
+/** Finch Step 9 — Ceres bunker offer. */
+export const FINCH_CERES_BUNKER_OFFER: ShipMessageDefinition = {
+  id: 'finch-recovery-ceres-bunker-offer',
+  from: 'Mr. Finch, Saturn Ringside Estate',
+  subject: 'Step 9 — A Letter at Ceres',
+  sentAt: '2306-06-04 08:50 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: 80,
+  folderId: 'finch-recovery',
+  folderLabel: 'Mr. Finch',
+  body: [
+    'Young pilot,',
+    'Ceres. An exhausted nickel-platinum operation, decommissioned in the early colonization era, never properly sealed. Our Madame appears to favor the sites that no one is paying to remember.',
+    'What you find at the end is for you. I have asked for nothing from this stop except that you survive it.',
+    '— Finch',
+  ],
+}
+
+/** Finch Step 11 — Neptune bunker offer (final). */
+export const FINCH_NEPTUNE_BUNKER_OFFER: ShipMessageDefinition = {
+  id: 'finch-recovery-neptune-bunker-offer',
+  from: 'Mr. Finch, Saturn Ringside Estate',
+  subject: 'Step 11 — Neptune, End of the Trail',
+  sentAt: '2306-06-09 19:24 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: 80,
+  folderId: 'finch-recovery',
+  folderLabel: 'Mr. Finch',
+  body: [
+    'Young pilot,',
+    'Neptune. The end of the trail. The brief, again, is recovery. Anything beyond that is between you and her.',
+    'When you are finished, return to Saturn. I shall have the closeout ready.',
+    '— Finch',
+  ],
+}
+
 /** Jay's warning when the player starts flirting with Venus' orbital lane. */
 export const JAY_VENUS_WARNING_MESSAGE: ShipMessageDefinition = {
   id: 'jay-venus-orbit-warning',
@@ -423,6 +537,12 @@ export const SHIP_MESSAGE_CATALOG: ShipMessageDefinition[] = [
   JOVIAN_HEKTOR_DAN_OFFER,
   JOVIAN_SATURN_DAN_OFFER,
   JOVIAN_HEKTOR_PROSPECTUS_OFFER,
+  FINCH_SATURN_TELESCOPE_OFFER,
+  FINCH_MARS_BUNKER_OFFER,
+  FINCH_VENUS_TELESCOPE_OFFER,
+  FINCH_EARTH_TELESCOPE_OFFER,
+  FINCH_CERES_BUNKER_OFFER,
+  FINCH_NEPTUNE_BUNKER_OFFER,
   JAY_STARTUP_FOLLOW_UP_MESSAGE,
   JAY_FIRST_SLINGSHOT_MESSAGE,
   JAY_CONTRACT_INCOMING_MESSAGE,

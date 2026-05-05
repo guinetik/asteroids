@@ -297,6 +297,12 @@ const SPECIAL_MISSION_OFFER_IDS: Record<string, string> = {
   'jovian-prospection-hektor-prospectus': 'jovian-prospection-hektor-prospectus-offer',
   'jovian-prospection-saturn-photometry': 'jovian-prospection-saturn-photometry-offer',
   'jovian-prospection-saturn-dan': 'jovian-prospection-saturn-dan-offer',
+  'finch-recovery-saturn-telescope': 'finch-recovery-saturn-telescope-offer',
+  'finch-recovery-mars-bunker': 'finch-recovery-mars-bunker-offer',
+  'finch-recovery-venus-telescope': 'finch-recovery-venus-telescope-offer',
+  'finch-recovery-earth-telescope': 'finch-recovery-earth-telescope-offer',
+  'finch-recovery-ceres-bunker': 'finch-recovery-ceres-bunker-offer',
+  'finch-recovery-neptune-bunker': 'finch-recovery-neptune-bunker-offer',
 }
 
 /** Vertical offset (world units) used when parking the camera on a mission focus target. */
