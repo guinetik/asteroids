@@ -346,7 +346,11 @@ onUnmounted(() => {
       <span class="telescope-status__state">{{ statusText }}</span>
     </div>
 
-    <div class="telescope-eyepiece" aria-label="Telescope eyepiece">
+    <div
+      class="telescope-eyepiece"
+      :class="{ 'telescope-eyepiece--wide': target.image.startsWith('carmen-') }"
+      aria-label="Telescope eyepiece"
+    >
       <img
         class="telescope-eyepiece__img telescope-eyepiece__img--r"
         :src="`/telescope/${target.image}`"

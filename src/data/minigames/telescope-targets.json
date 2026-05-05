@@ -28,5 +28,20 @@
     "image": "exoplanet_field.webp",
     "label": "TRITON \u2014 TRANSIT FIELD",
     "caption": "HAT-P-7 analog \u00b7 TESS cadence \u00b7 2 min"
+  },
+  "finch-recovery-saturn-telescope": {
+    "image": "carmen-001.webp",
+    "label": "PERIMETER STILL \u2014 RINGSIDE ESTATE",
+    "caption": "long-baseline pull \u00b7 horizon detail \u00b7 subject in red, foreground"
+  },
+  "finch-recovery-venus-telescope": {
+    "image": "carmen-002.webp",
+    "label": "FLOOR CAMERA \u2014 ZEPPELIN EXCHANGE",
+    "caption": "fence-side capture \u00b7 transaction in frame \u00b7 horizon is the matter of interest"
+  },
+  "finch-recovery-earth-telescope": {
+    "image": "carmen-003.webp",
+    "label": "PRIVATE GALLERY \u2014 POSED",
+    "caption": "composition by the subject \u00b7 destination placed in frame \u00b7 she knows"
   }
 }

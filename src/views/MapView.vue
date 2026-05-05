@@ -887,6 +887,7 @@ onMounted(async () => {
         giverId: null,
         targetPlanetId: null,
         objectiveType: '',
+        specialMissionId: mission.template.id,
       })
       syncPersistentProgressFromController()
     }
