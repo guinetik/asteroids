@@ -42,7 +42,8 @@
     "models:satellite:build": "node scripts/build-satellite-glb.mjs",
     "models:heavy-runtime:build": "run-s models:bootstrap-heavy-sources models:bed:build models:table:build models:city:build models:asteroid:build models:hubble:build models:voyager:build models:satellite:build models:virus:build",
     "models:virus:build": "node scripts/optimize-virus-glb.mjs",
-    "models:virus:center": "node scripts/center-virus-glb.mjs"
+    "models:virus:center": "node scripts/center-virus-glb.mjs",
+    "models:table:center": "node scripts/center-table-glb.mjs"
   },
   "dependencies": {
     "howler": "^2.2.4",
