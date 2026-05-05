@@ -18,6 +18,8 @@ import type {
 defineProps<{
   /** Groups produced by {@link buildMissionTrackerGroups}. */
   groups: readonly MissionTrackerGroup[]
+  /** Row id currently selected/highlighted; matching row renders in selected state. */
+  selectedRowId?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -46,6 +48,9 @@ function emitFocus(row: MissionTrackerRow): void {
   >
     <header class="mission-tracker-panel__header">
       <span class="mission-tracker-panel__eyebrow">Missions</span>
+      <span class="mission-tracker-panel__hint">
+        click to <span class="mission-tracker-panel__hint-accent">TRACK</span> a waypoint
+      </span>
     </header>
     <div
       v-for="group in groups"
@@ -62,6 +67,7 @@ function emitFocus(row: MissionTrackerRow): void {
           <button
             type="button"
             class="mission-tracker-panel__row-btn"
+            :class="{ 'mission-tracker-panel__row-btn--selected': row.id === selectedRowId }"
             @click="emitFocus(row)"
           >
             <span class="mission-tracker-panel__row-title">{{ row.title }}</span>
@@ -88,6 +94,8 @@ function emitFocus(row: MissionTrackerRow): void {
   --tracker-text-bright: rgba(255, 255, 255, 0.85);
   --tracker-accent: rgba(0, 255, 204, 0.5);
   --tracker-accent-strong: rgba(0, 255, 204, 0.95);
+  --tracker-selected: rgba(255, 238, 102, 0.95);
+  --tracker-selected-soft: rgba(255, 238, 102, 0.7);
 
   pointer-events: auto;
   display: flex;
@@ -102,8 +110,24 @@ function emitFocus(row: MissionTrackerRow): void {
 }
 
 .mission-tracker-panel__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
   border-bottom: 1px solid var(--tracker-border);
   padding-bottom: 0.35rem;
+}
+
+.mission-tracker-panel__hint {
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--tracker-eyebrow);
+}
+
+.mission-tracker-panel__hint-accent {
+  color: var(--tracker-selected);
 }
 
 .mission-tracker-panel__eyebrow {
@@ -156,6 +180,14 @@ function emitFocus(row: MissionTrackerRow): void {
 
 .mission-tracker-panel__row-btn:hover .mission-tracker-panel__row-title {
   color: var(--tracker-accent-strong);
+}
+
+.mission-tracker-panel__row-btn--selected .mission-tracker-panel__row-title {
+  color: var(--tracker-selected);
+}
+
+.mission-tracker-panel__row-btn--selected .mission-tracker-panel__row-objective {
+  color: var(--tracker-selected-soft);
 }
 
 .mission-tracker-panel__row-title {

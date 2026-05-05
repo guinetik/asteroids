@@ -403,7 +403,13 @@ export class VehicleCamera implements Tickable {
   }
 
   tick(dt: number): void {
-    if (!this.target) return
+    if (!this.target) {
+      // Parked (e.g. mission tracker focus): no vehicle to follow, but
+      // OrbitControls still needs per-frame update() so rotate/zoom around
+      // the parked lookAt actually moves the camera.
+      this.controls.update()
+      return
+    }
 
     const targetPos = this.target.position
 

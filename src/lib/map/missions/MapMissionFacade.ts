@@ -57,9 +57,13 @@ import {
   createWaypointMarkerGroup,
   disposeWaypointMarkerGroup,
   ORBIT_MAP_WAYPOINT_SCALE_REFERENCE,
+  setWaypointMarkerColor,
   tickWaypointMarkerGroup,
   WAYPOINT_MARKER_DEFAULT_COLOR,
 } from '@/three/WaypointMarkers'
+
+/** Highlight color applied to the waypoint marker of the selected tracker row. */
+const WAYPOINT_MARKER_SELECTED_COLOR = 0xffee66
 import {
   createMapMissionAsteroidPreviewMesh,
   disposeMapMissionAsteroidPreviewMesh,
@@ -150,6 +154,13 @@ export class MapMissionFacade {
    * move further away at the instant the light turns green.
    */
   private evaPoiScaleByType: Readonly<Record<string, number>> | null = null
+
+  /**
+   * Tracker row id of the mission whose waypoint is currently selected/highlighted.
+   * Set by {@link setSelectedMissionRowId}; consumed in {@link tickWaypointVisuals}
+   * to recolor the matching marker. Null when no row is selected.
+   */
+  private selectedMissionRowId: string | null = null
 
   tick(dt: number): void {
     this.board = tickMissionBoard(this.board, dt)
@@ -694,6 +705,13 @@ export class MapMissionFacade {
         this.missionWaypointRoot.scale.setScalar(uniformScale)
       }
 
+      const asteroidRowId = `asteroid:${this.board.activeAsteroidMission.id}`
+      setWaypointMarkerColor(
+        this.missionOrbitWaypointMarker,
+        this.selectedMissionRowId === asteroidRowId
+          ? WAYPOINT_MARKER_SELECTED_COLOR
+          : WAYPOINT_MARKER_DEFAULT_COLOR,
+      )
       tickWaypointMarkerGroup(
         this.missionOrbitWaypointMarker,
         params.simTime,
@@ -709,6 +727,13 @@ export class MapMissionFacade {
       const uniformScale = targetScreenHeight / ORBIT_MAP_WAYPOINT_SCALE_REFERENCE
       this.evaWaypointRoot.scale.setScalar(uniformScale)
 
+      const evaRowId = this.activeEvaPoiRowId()
+      setWaypointMarkerColor(
+        this.evaWaypointMarker,
+        evaRowId !== null && this.selectedMissionRowId === evaRowId
+          ? WAYPOINT_MARKER_SELECTED_COLOR
+          : WAYPOINT_MARKER_DEFAULT_COLOR,
+      )
       tickWaypointMarkerGroup(
         this.evaWaypointMarker,
         params.simTime,
@@ -938,6 +963,65 @@ export class MapMissionFacade {
       const factor = scaleByType?.[site.poiType] ?? 1
       container.scale.setScalar(factor)
     }
+  }
+
+  /**
+   * Set (or clear) the tracker row id whose waypoint marker should render in the
+   * selected color. Re-tinting happens on the next {@link tickWaypointVisuals}
+   * pass — no immediate scene mutation here.
+   *
+   * @param rowId - Tracker row id (`asteroid:<id>` / `eva:<templateId>:<index>`),
+   *   or null to clear.
+   */
+  setSelectedMissionRowId(rowId: string | null): void {
+    this.selectedMissionRowId = rowId
+    this.applyMarkerSelectionColors()
+  }
+
+  /**
+   * Recolor both singleton waypoint markers based on the current selection.
+   * Called whenever {@link selectedMissionRowId} changes so the highlight
+   * appears immediately, even when the gameplay tick is paused (mission
+   * focus / map overlay).
+   */
+  private applyMarkerSelectionColors(): void {
+    if (this.missionOrbitWaypointMarker && this.board.activeAsteroidMission) {
+      const asteroidRowId = `asteroid:${this.board.activeAsteroidMission.id}`
+      setWaypointMarkerColor(
+        this.missionOrbitWaypointMarker,
+        this.selectedMissionRowId === asteroidRowId
+          ? WAYPOINT_MARKER_SELECTED_COLOR
+          : WAYPOINT_MARKER_DEFAULT_COLOR,
+      )
+    }
+    if (this.evaWaypointMarker) {
+      const evaRowId = this.activeEvaPoiRowId()
+      setWaypointMarkerColor(
+        this.evaWaypointMarker,
+        evaRowId !== null && this.selectedMissionRowId === evaRowId
+          ? WAYPOINT_MARKER_SELECTED_COLOR
+          : WAYPOINT_MARKER_DEFAULT_COLOR,
+      )
+    }
+  }
+
+  /** Currently highlighted tracker row id, or null. */
+  getSelectedMissionRowId(): string | null {
+    return this.selectedMissionRowId
+  }
+
+  /**
+   * Row id of the EVA mission currently rendered at {@link evaWaypointMarker},
+   * matching the format produced by `buildEvaRow` in `missionHudRows.ts`.
+   * Returns null when no POI is rendered.
+   */
+  private activeEvaPoiRowId(): string | null {
+    if (this.evaPoiRenderedMissionId === null) return null
+    const index = this.board.activeEvaMissions.findIndex(
+      (mission) => mission.template.id === this.evaPoiRenderedMissionId,
+    )
+    if (index < 0) return null
+    return `eva:${this.evaPoiRenderedMissionId}:${index}`
   }
 
   armCompletedEvaSiteCleanup(): void {

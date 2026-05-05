@@ -29,6 +29,7 @@ import ObjectiveTracker from '@/components/ObjectiveTracker.vue'
 import ContractTrackerPanel from '@/components/ContractTrackerPanel.vue'
 import MissionTrackerPanel from '@/components/MissionTrackerPanel.vue'
 import MissionFocusPrompt from '@/components/MissionFocusPrompt.vue'
+import KeyPrompt from '@/components/KeyPrompt.vue'
 import {
   buildMissionTrackerGroups,
   type MissionTrackerRow,
@@ -269,7 +270,7 @@ function handleContractTrackerObjective(payload: { contractId: string; stepIndex
  */
 function handleMissionTrackerFocus(row: MissionTrackerRow): void {
   uiAudio.notifyButtonClick()
-  viewController.focusOnMissionTarget(row.focus)
+  viewController.focusOnMissionTarget(row)
 }
 
 /**
@@ -387,6 +388,28 @@ const journeyStartedTitle = ref('')
 const journeyStartedMeta = ref('')
 const journeyTrackerVisible = ref(false)
 const habitatPrompt = ref<string | null>(null)
+/**
+ * Parse a free-form prompt string into a `{key, label}` tuple suitable
+ * for {@link KeyPrompt}. Supports three formats:
+ *   1. `[X] LABEL` — bracketed key prefix
+ *   2. `LABEL [X]` — bracketed key suffix
+ *   3. `X  LABEL` — single-token key followed by ≥2 spaces
+ * Falls back to `{key: '?', label: raw}` so the prompt still renders
+ * with a placeholder keycap rather than vanishing silently.
+ */
+function parseKeyPrompt(raw: string | null): { key: string; label: string } | null {
+  if (!raw) return null
+  const trimmed = raw.trim()
+  const prefix = trimmed.match(/^\[([^\]]+)\]\s*(.+)$/)
+  if (prefix) return { key: prefix[1]!.trim(), label: prefix[2]!.trim() }
+  const suffix = trimmed.match(/^(.+?)\s*\[([^\]]+)\]\s*$/)
+  if (suffix) return { key: suffix[2]!.trim(), label: suffix[1]!.trim() }
+  const spaced = trimmed.match(/^(\S{1,4})\s{2,}(.+)$/)
+  if (spaced) return { key: spaced[1]!.trim(), label: spaced[2]!.trim() }
+  return { key: '?', label: trimmed }
+}
+const evaActionPromptParsed = computed(() => parseKeyPrompt(telemetry.actionPrompt))
+const habitatPromptParsed = computed(() => parseKeyPrompt(habitatPrompt.value))
 const habitatFadeOpacity = ref(0)
 const turretFadeOpacity = ref(0)
 const turretHudPhase = ref<'idle' | 'opening' | 'active' | 'closing'>('idle')
@@ -505,11 +528,26 @@ const missionTrackerGroups = computed(() => {
 /** Mirrors the controller's reactive flag so the ESC prompt can react to it. */
 const missionFocusActive = viewController.missionFocusActive
 
+/** Mirrors the selected tracker row id so the panel can highlight the matching row. */
+const selectedMissionRowId = viewController.selectedMissionRowId
+
+// Auto-clear the selection when the selected mission no longer appears in the
+// board (mission completed/cancelled while the row was highlighted).
+watch(missionTrackerGroups, (groups) => {
+  const id = selectedMissionRowId.value
+  if (id === null) return
+  const stillPresent = groups.some((group) => group.rows.some((row) => row.id === id))
+  if (!stillPresent) {
+    viewController.clearSelectedMissionRow()
+  }
+})
+
 const mapHudTrackerStackVisible = computed(
   () =>
     !mapBootOverlayVisible.value &&
     (Boolean(journeyTracker.value && journeyTrackerVisible.value) ||
-      activeContractHudRows.value.length > 0),
+      activeContractHudRows.value.length > 0 ||
+      missionTrackerGroups.value.length > 0),
 )
 const mapBootReady = computed(() => mapBootState.phase === 'ready')
 
@@ -1883,6 +1921,7 @@ watch(
       <MissionTrackerPanel
         v-if="missionTrackerGroups.length > 0"
         :groups="missionTrackerGroups"
+        :selected-row-id="selectedMissionRowId"
         @focus-mission="handleMissionTrackerFocus"
       />
       <ContractTrackerPanel
@@ -2126,26 +2165,27 @@ watch(
       @complete="handleEvaMinigameComplete"
       @close="handleEvaMinigameClose"
     />
-    <div
+    <KeyPrompt
       v-if="
         evaActive &&
-        telemetry.actionPrompt &&
+        evaActionPromptParsed &&
         !evaMinigameMission &&
         !evaMinigameInstance &&
         !shuttleControlVisible &&
         !deathVisible
       "
-      class="pointer-events-none fixed inset-x-0 bottom-48 z-30 flex justify-center px-6"
-    >
-      <div
-        class="rounded-full border border-cyan-300/45 bg-slate-950/68 px-5 py-2 font-mono text-xs uppercase tracking-[0.28em] text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.18)] backdrop-blur-sm"
-      >
-        {{ telemetry.actionPrompt }}
-      </div>
-    </div>
-    <div v-if="habitatActive && habitatPrompt && !shuttleControlVisible" class="habitat-prompt">
-      <span class="orbit-prompt-action">{{ habitatPrompt }}</span>
-    </div>
+      :key-label="evaActionPromptParsed.key"
+      :action="evaActionPromptParsed.label"
+      tone="cyan"
+      position="bottom"
+    />
+    <KeyPrompt
+      v-if="habitatActive && habitatPromptParsed && !shuttleControlVisible"
+      :key-label="habitatPromptParsed.key"
+      :action="habitatPromptParsed.label"
+      tone="cyan"
+      position="bottom-low"
+    />
     <div
       v-if="habitatFadeOpacity > 0"
       class="habitat-fade"

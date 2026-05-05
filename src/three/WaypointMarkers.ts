@@ -255,6 +255,25 @@ export function tickWaypointMarkerGroup(
   }
 }
 
+/** Names of the child meshes whose materials carry the marker color. */
+const WAYPOINT_MARKER_COLORED_CHILDREN = ['beamCore', 'beamGlow', 'ring', 'diamond'] as const
+
+/**
+ * Recolor a marker group in place. Used by the solar map to highlight
+ * the currently selected mission's waypoint without rebuilding meshes.
+ *
+ * @param group - Group from {@link createWaypointMarkerGroup}.
+ * @param color - Hex color to apply to every colored child.
+ */
+export function setWaypointMarkerColor(group: THREE.Group, color: number): void {
+  for (const name of WAYPOINT_MARKER_COLORED_CHILDREN) {
+    const mesh = group.getObjectByName(name) as THREE.Mesh | undefined
+    if (!mesh) continue
+    const mat = mesh.material as THREE.MeshBasicMaterial
+    mat.color.setHex(color)
+  }
+}
+
 /**
  * Dispose all geometries and materials under a marker group, then remove from parent.
  *

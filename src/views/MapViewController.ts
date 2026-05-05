@@ -146,7 +146,7 @@ import type {
   GeneratedAsteroidMission,
 } from '@/lib/missions/types'
 import { getSpecialMissionById } from '@/lib/missions/specialMissions'
-import type { MissionTrackerFocus } from '@/lib/missions/missionHudRows'
+import type { MissionTrackerFocus, MissionTrackerRow } from '@/lib/missions/missionHudRows'
 import { ref, type Ref } from 'vue'
 import {
   resolveSpecialMissionWaypoint,
@@ -297,10 +297,10 @@ const SPECIAL_MISSION_OFFER_IDS: Record<string, string> = {
 }
 
 /** Vertical offset (world units) used when parking the camera on a mission focus target. */
-const MISSION_FOCUS_CAMERA_HEIGHT = 600
+const MISSION_FOCUS_CAMERA_HEIGHT = 15
 
 /** Diagonal offset (world units) along XZ used so the parked camera sees the target at an angle. */
-const MISSION_FOCUS_CAMERA_DISTANCE = 600
+const MISSION_FOCUS_CAMERA_DISTANCE = 15
 
 /**
  * Bridges Vue lifecycle to the map scene with player shuttle.
@@ -318,6 +318,13 @@ export class MapViewController implements Tickable {
   private vehicleCamera: VehicleCamera | null = null
   /** True while the camera is parked on a mission focus target — drives the ESC prompt. */
   public readonly missionFocusActive: Ref<boolean> = ref(false)
+  /**
+   * Tracker row id of the currently selected mission. Reactive so the panel
+   * highlights the matching row; mirrored into {@link MapMissionFacade} so the
+   * world-space waypoint marker recolors. Auto-cleared when the row vanishes
+   * from the board (mission completed or focus dismissed).
+   */
+  public readonly selectedMissionRowId: Ref<string | null> = ref(null)
   private introFacade: MapIntroFacade | null = null
 
   private shuttleController: ShuttleController | null = null
@@ -1504,6 +1511,9 @@ export class MapViewController implements Tickable {
       // Skip all gameplay logic while map is open
       return
     }
+
+    // Mission tracker focus pauses the simulation, like the M overlay.
+    if (this.missionFocusActive.value) return
 
     // Habitat state machine
     if (this.habitatState.isActive) {
@@ -4774,14 +4784,16 @@ export class MapViewController implements Tickable {
   }
 
   /**
-   * Park the map camera on a mission focus target. Planet focuses resolve
-   * the live world position at call time so movement/orbit doesn't matter.
+   * Park the perspective {@link VehicleCamera} on the mission focus target.
+   * Planet focuses resolve the live world position at call time. While
+   * parked, OrbitControls rotates/zooms around the waypoint (lookAt), not
+   * the shuttle.
    *
-   * @param focus - The {@link MissionTrackerFocus} from a clicked tracker row.
+   * @param row - The clicked tracker row (drives both camera focus and selection).
    */
-  public focusOnMissionTarget(focus: MissionTrackerFocus): void {
+  public focusOnMissionTarget(row: MissionTrackerRow): void {
     if (!this.vehicleCamera) return
-    const lookAt = this.resolveMissionFocusWorldPosition(focus)
+    const lookAt = this.resolveMissionFocusWorldPosition(row.focus)
     if (!lookAt) return
     const cameraPos = lookAt
       .clone()
@@ -4793,16 +4805,37 @@ export class MapViewController implements Tickable {
         ),
       )
     this.vehicleCamera.parkAt(cameraPos, lookAt)
+    if (this.shuttleController) {
+      this.shuttleController.freeze()
+      this.shuttleController.setInputEnabled(false)
+    }
     this.missionFocusActive.value = true
+    this.selectedMissionRowId.value = row.id
+    this.missionFacade.setSelectedMissionRowId(row.id)
   }
 
   /**
-   * Return the camera to follow the shuttle. Safe to call when no focus
-   * is active (becomes a no-op).
+   * Clear the highlighted tracker row (and re-tint the world-space waypoint
+   * back to the default color). Called when the selected mission disappears
+   * from the board.
+   */
+  public clearSelectedMissionRow(): void {
+    if (this.selectedMissionRowId.value === null) return
+    this.selectedMissionRowId.value = null
+    this.missionFacade.setSelectedMissionRowId(null)
+  }
+
+  /**
+   * Return the camera to follow the shuttle and resume the simulation. Safe
+   * to call when no focus is active (becomes a no-op).
    */
   public clearMissionFocus(): void {
     if (!this.missionFocusActive.value) return
     this.missionFocusActive.value = false
+    if (this.shuttleController) {
+      this.shuttleController.unfreeze()
+      this.shuttleController.setInputEnabled(true)
+    }
     if (this.vehicleCamera && this.shuttleController) {
       this.vehicleCamera.setTarget(this.shuttleController.group)
     }
@@ -4863,7 +4896,12 @@ export class MapViewController implements Tickable {
    * open, the orrery should stop advancing planet and belt positions behind it.
    */
   private isSimulationFrozen(): boolean {
-    return this.simFrozen || this.turretSimFrozen || this.cosmeticShopFacade.dialogOpen
+    return (
+      this.simFrozen ||
+      this.turretSimFrozen ||
+      this.cosmeticShopFacade.dialogOpen ||
+      this.missionFocusActive.value
+    )
   }
 
   /**
