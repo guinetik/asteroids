@@ -17,6 +17,22 @@
       "poiType": "relay_antenna",
       "minigameType": "relay_repair",
       "reward": 400
+    },
+    {
+      "id": "uranus_orbital_asset_servicing",
+      "name": "Orbital Asset Servicing",
+      "description": "On-orbit asset is throwing faults across multiple subsystems. Diagnostics inconclusive — EVA out, find the broken parts, patch them in place.",
+      "poiType": "satellite",
+      "minigameType": "satellite_servicing",
+      "reward": 450
+    },
+    {
+      "id": "uranus_polar_telescope_phasing",
+      "name": "Polar Telescope Phasing",
+      "description": "Polar-axis observatory's mirror segments drifted after a thermal shock. EVA, read the wavefront sensor, walk each segment in by hand.",
+      "poiType": "telescope",
+      "minigameType": "telescope_alignment",
+      "reward": 500
     }
   ]
 }

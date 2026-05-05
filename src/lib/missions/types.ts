@@ -353,6 +353,13 @@ export interface ActiveVisitRelayMission {
    * at accept time so retries see the same damage.
    */
   brokenComponents?: string[]
+  /**
+   * For `satellite_servicing` missions only: the POI variant rolled at accept time
+   * from the variant pool (satellite/voyager/hubble). Overrides {@link template.poiType}
+   * at spawn so the same generic mission template can present any of the three models.
+   * Omitted on legacy missions or non-servicing flows — callers fall back to template.
+   */
+  rolledPoiType?: EvaMissionPoiType
 }
 
 // ---------------------------------------------------------------------------

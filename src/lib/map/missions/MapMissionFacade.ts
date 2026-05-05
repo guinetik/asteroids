@@ -932,7 +932,7 @@ export class MapMissionFacade {
     if (completedMission) {
       const repairedSite: CompletedEvaSite = {
         key: this.makeCompletedEvaSiteKey(completedMission),
-        poiType: completedMission.template.poiType,
+        poiType: completedMission.rolledPoiType ?? completedMission.template.poiType,
         waypoint: completedMission.waypoint,
         cleanupArmed: false,
       }
@@ -1061,7 +1061,10 @@ export class MapMissionFacade {
   ): Promise<void> {
     try {
       // POI container already carries the Y offset; factory places the prop at origin.
-      const instance = await createEvaMissionPoi(mission.template.poiType, 0)
+      // Servicing missions roll a variant from the pool at accept time; honor it
+      // so the same generic mission can present satellite/voyager/hubble.
+      const poiType = mission.rolledPoiType ?? mission.template.poiType
+      const instance = await createEvaMissionPoi(poiType, 0)
       if (
         this.evaPoiContainer !== container ||
         this.evaPoiRenderedMissionId !== mission.template.id

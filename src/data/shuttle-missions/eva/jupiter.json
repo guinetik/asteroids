@@ -17,6 +17,22 @@
       "poiType": "satellite",
       "minigameType": "relay_repair",
       "reward": 350
+    },
+    {
+      "id": "jupiter_orbital_asset_servicing",
+      "name": "Orbital Asset Servicing",
+      "description": "On-orbit asset is throwing faults across multiple subsystems. Diagnostics inconclusive — EVA out, find the broken parts, patch them in place.",
+      "poiType": "satellite",
+      "minigameType": "satellite_servicing",
+      "reward": 400
+    },
+    {
+      "id": "jupiter_galilean_telescope_phasing",
+      "name": "Galilean Telescope Phasing",
+      "description": "The moon-watching telescope is out of phase after a radiation flush of the actuators. EVA, read the wavefront sensor, walk each segment in by hand.",
+      "poiType": "telescope",
+      "minigameType": "telescope_alignment",
+      "reward": 450
     }
   ]
 }

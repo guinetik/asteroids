@@ -64,10 +64,19 @@ describe('acceptEvaMission damage roll', () => {
     expect(result.activeEvaMissions[0]!.brokenComponents).toBeUndefined()
   })
 
-  it('does not roll damage when no manifest is registered for the poiType', () => {
-    const tmpl = template('mars_weird_1', 'telescope', 'satellite_servicing')
+  it('rolls a poi variant from the pool for satellite_servicing missions', () => {
+    const tmpl = template('mars_servicing_1', 'satellite', 'satellite_servicing')
     const board = boardWithOffer(tmpl, 'mars')
     const result = acceptEvaMission(board, WAYPOINT)
-    expect(result.activeEvaMissions[0]!.brokenComponents).toBeUndefined()
+    const active = result.activeEvaMissions[0]!
+    expect(active.rolledPoiType).toBeDefined()
+    expect(['satellite', 'relay_antenna', 'telescope']).toContain(active.rolledPoiType)
+  })
+
+  it('does not roll a poi variant for non-servicing minigames', () => {
+    const tmpl = template('earth_relay_2', 'relay_antenna', 'relay_repair')
+    const board = boardWithOffer(tmpl, 'earth')
+    const result = acceptEvaMission(board, WAYPOINT)
+    expect(result.activeEvaMissions[0]!.rolledPoiType).toBeUndefined()
   })
 })

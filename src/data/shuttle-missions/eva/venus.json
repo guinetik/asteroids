@@ -17,6 +17,22 @@
       "poiType": "relay_antenna",
       "minigameType": "relay_repair",
       "reward": 300
+    },
+    {
+      "id": "venus_orbital_asset_servicing",
+      "name": "Orbital Asset Servicing",
+      "description": "On-orbit asset is throwing faults across multiple subsystems. Diagnostics inconclusive — EVA out, find the broken parts, patch them in place.",
+      "poiType": "satellite",
+      "minigameType": "satellite_servicing",
+      "reward": 350
+    },
+    {
+      "id": "venus_uv_telescope_phasing",
+      "name": "UV Cloud-Tracker Phasing",
+      "description": "The UV cloud-motion telescope drifted out of phase from sustained thermal cycling. EVA, read the wavefront sensor, walk each segment in by hand.",
+      "poiType": "telescope",
+      "minigameType": "telescope_alignment",
+      "reward": 400
     }
   ]
 }

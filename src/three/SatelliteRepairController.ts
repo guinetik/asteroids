@@ -129,6 +129,11 @@ export class SatelliteRepairController {
    */
   attach(cfg: SatelliteRepairControllerConfig): void {
     this.cfg = cfg
+    // EvaSession applies the POI huge-scale immediately before invoking the
+    // onEvaModeChange callback that lands us here, so the container's
+    // matrixWorld is stale until the next render pass. Force-refresh up and
+    // down so AABB snapshots reflect the on-screen huge-scaled size.
+    cfg.poiObject.updateWorldMatrix(true, true)
     const brokenList = cfg.minigame.brokenComponents
     const validation = validateManifest(cfg.poiObject, brokenList)
     if (!validation.ok) {
@@ -190,7 +195,7 @@ export class SatelliteRepairController {
    */
   private buildWorldBoundsForRepair(source: THREE.Object3D): THREE.Box3 {
     const box = new THREE.Box3()
-    source.updateMatrixWorld(true)
+    source.updateWorldMatrix(true, true)
     box.setFromObject(source)
     if (box.isEmpty()) {
       console.warn('[SatelliteRepairController] Empty AABB for part', source.name)

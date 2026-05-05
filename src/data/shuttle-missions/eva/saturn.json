@@ -17,6 +17,22 @@
       "poiType": "relay_antenna",
       "minigameType": "relay_repair",
       "reward": 400
+    },
+    {
+      "id": "saturn_orbital_asset_servicing",
+      "name": "Orbital Asset Servicing",
+      "description": "On-orbit asset is throwing faults across multiple subsystems. Diagnostics inconclusive — EVA out, find the broken parts, patch them in place.",
+      "poiType": "satellite",
+      "minigameType": "satellite_servicing",
+      "reward": 400
+    },
+    {
+      "id": "saturn_ring_telescope_phasing",
+      "name": "Ring-Plane Telescope Phasing",
+      "description": "The ring-plane survey telescope is out of phase after a micrometeoroid impact. EVA, read the wavefront sensor, walk each segment back in.",
+      "poiType": "telescope",
+      "minigameType": "telescope_alignment",
+      "reward": 500
     }
   ]
 }

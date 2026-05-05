@@ -10,13 +10,20 @@ describe('satelliteManifests', () => {
   })
 
   it('returns null for an unknown manifest key', () => {
-    expect(getSatelliteManifest('telescope')).toBeNull()
-    expect(getSatelliteManifest('relay_antenna')).toBeNull()
+    expect(getSatelliteManifest('not_a_real_poi_type')).toBeNull()
+  })
+
+  it('returns component lists for every pooled servicing variant', () => {
+    expect(getSatelliteManifest('satellite')).not.toBeNull()
+    expect(getSatelliteManifest('relay_antenna')).not.toBeNull()
+    expect(getSatelliteManifest('telescope')).not.toBeNull()
   })
 
   it('reports presence via hasSatelliteManifest', () => {
     expect(hasSatelliteManifest('satellite')).toBe(true)
-    expect(hasSatelliteManifest('telescope')).toBe(false)
+    expect(hasSatelliteManifest('relay_antenna')).toBe(true)
+    expect(hasSatelliteManifest('telescope')).toBe(true)
+    expect(hasSatelliteManifest('not_a_real_poi_type')).toBe(false)
   })
 
   it('validateManifest returns missing components absent from the object tree', () => {

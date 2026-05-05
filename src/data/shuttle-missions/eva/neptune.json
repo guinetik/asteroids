@@ -17,6 +17,22 @@
       "poiType": "satellite",
       "minigameType": "relay_repair",
       "reward": 400
+    },
+    {
+      "id": "neptune_orbital_asset_servicing",
+      "name": "Orbital Asset Servicing",
+      "description": "On-orbit asset is throwing faults across multiple subsystems. Diagnostics inconclusive — EVA out, find the broken parts, patch them in place.",
+      "poiType": "satellite",
+      "minigameType": "satellite_servicing",
+      "reward": 500
+    },
+    {
+      "id": "neptune_kuiper_edge_telescope_phasing",
+      "name": "Kuiper-Edge Telescope Phasing",
+      "description": "The Kuiper-edge survey scope drifted out of phase from cosmic-ray bombardment. EVA, read the wavefront sensor, walk each segment in by hand.",
+      "poiType": "telescope",
+      "minigameType": "telescope_alignment",
+      "reward": 550
     }
   ]
 }

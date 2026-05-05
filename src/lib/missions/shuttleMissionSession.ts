@@ -14,6 +14,7 @@ import type {
   ActiveShuttleMission,
   GeneratedAsteroidMission,
   ActiveVisitRelayMission,
+  EvaMissionPoiType,
   VisitRelayShuttleMissionTemplate,
 } from './types'
 import { getEvaMissionPool } from './evaMissionPools'
@@ -542,6 +543,33 @@ function mulberry32(seed: number): () => number {
 }
 
 /**
+ * POI variants eligible for a `satellite_servicing` mission. The mission template's
+ * `poiType` is ignored for servicing flows — one of these is rolled at accept time
+ * so the same generic mission can present any of the three models. Other minigame
+ * types (relay_repair, telescope_alignment) stay locked to their authored poiType.
+ */
+const SATELLITE_SERVICING_POI_POOL: readonly EvaMissionPoiType[] = [
+  'satellite',
+  'relay_antenna',
+  'telescope',
+]
+
+/** Salt mixed into the variant-pick rng so it doesn't collide with the broken-parts rng. */
+const SATELLITE_SERVICING_POOL_SEED_SALT = 0x9e3779b1
+
+/**
+ * Pick a POI variant for a satellite_servicing mission, deterministic on mission id.
+ *
+ * @param missionId - Mission template id; same id always picks the same variant.
+ * @returns One entry from {@link SATELLITE_SERVICING_POI_POOL}.
+ */
+function pickSatelliteServicingPoi(missionId: string): EvaMissionPoiType {
+  const rng = mulberry32(hashMissionId(missionId) ^ SATELLITE_SERVICING_POOL_SEED_SALT)
+  const idx = Math.floor(rng() * SATELLITE_SERVICING_POI_POOL.length)
+  return SATELLITE_SERVICING_POI_POOL[idx] ?? 'satellite'
+}
+
+/**
  * Roll the broken-component list for a satellite-servicing mission.
  *
  * Deterministic given (missionId, manifest). Returns `undefined` for missions
@@ -551,14 +579,17 @@ function mulberry32(seed: number): () => number {
  *
  * @param tmpl - Mission template.
  * @param planetId - Giver planet id — drives the damage tier count.
+ * @param poiType - POI variant to roll against (overrides `tmpl.poiType`); used so
+ *   servicing missions roll components from the variant pool instead of the template.
  * @returns Broken component names, or `undefined` when damage does not apply.
  */
 function rollBrokenComponents(
   tmpl: VisitRelayShuttleMissionTemplate,
   planetId: string,
+  poiType: EvaMissionPoiType = tmpl.poiType,
 ): string[] | undefined {
   if (tmpl.minigameType !== 'satellite_servicing') return undefined
-  const manifest = getSatelliteManifest(tmpl.poiType)
+  const manifest = getSatelliteManifest(poiType)
   if (!manifest || manifest.components.length === 0) return undefined
   const tierCount = Math.min(
     DAMAGE_COUNT_BY_PLANET[planetId] ?? DEFAULT_DAMAGE_COUNT,
@@ -595,13 +626,22 @@ export function acceptEvaMission(
 ): ShuttleMissionBoard {
   if (!board.offeredEvaMission || !board.offeringEvaPlanet) return board
 
-  const rolled = rollBrokenComponents(board.offeredEvaMission, board.offeringEvaPlanet)
+  const rolledPoiType =
+    board.offeredEvaMission.minigameType === 'satellite_servicing'
+      ? pickSatelliteServicingPoi(board.offeredEvaMission.id)
+      : undefined
+  const rolled = rollBrokenComponents(
+    board.offeredEvaMission,
+    board.offeringEvaPlanet,
+    rolledPoiType,
+  )
   const newActive: ActiveVisitRelayMission = {
     template: board.offeredEvaMission,
     giverPlanet: board.offeringEvaPlanet,
     waypoint,
     status: 'active',
     ...(rolled !== undefined ? { brokenComponents: rolled } : {}),
+    ...(rolledPoiType !== undefined ? { rolledPoiType } : {}),
   }
 
   return {

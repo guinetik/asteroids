@@ -51,11 +51,11 @@ export const EVA_MAP_CAMERA_FAR = 50000
 export const EVA_MAP_HELMET_LIGHT_SCALE = 0.08
 
 /**
- * Multiplier on the EVA spawn offset. The shuttle scene uses the shuttle huge factor
- * (ship-scale coords), but here the shuttle is only stretched back to ~1 world unit,
- * so the default offset `(0, 2.5, 6)` is already close to correct.
+ * Multiplier on the EVA spawn offset. Default offset `(0, 2.5, 6)` lands inside
+ * the ×100 huge-scaled shuttle hull (the model extends past 6 units behind the
+ * group origin), so we push the spawn further out to clear the cargo bay.
  */
-export const EVA_MAP_SPAWN_OFFSET_SCALE = 1
+export const EVA_MAP_SPAWN_OFFSET_SCALE = 2.5
 
 /**
  * Buffer (world units) added to the POI's largest half-extent when computing the

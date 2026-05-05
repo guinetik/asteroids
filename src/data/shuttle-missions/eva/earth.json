@@ -11,9 +11,9 @@
       "reward": 250
     },
     {
-      "id": "earth_cubesat_cluster_patch",
-      "name": "Cubesat Cluster Firmware Patch",
-      "description": "Three-bird cubesat cluster in sun-synch missed the last OTA window. Dock with the master node, push the patch by hand, verify the other two sync up before you head home.",
+      "id": "earth_orbital_asset_servicing",
+      "name": "Orbital Asset Servicing",
+      "description": "On-orbit asset is throwing faults across multiple subsystems. Diagnostics inconclusive — EVA out, find the broken parts, patch them in place.",
       "poiType": "satellite",
       "minigameType": "satellite_servicing",
       "reward": 300

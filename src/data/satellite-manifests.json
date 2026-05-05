@@ -7,5 +7,30 @@
       "satellite_solar_B",
       "satellite_thruster"
     ]
+  },
+  "relay_antenna": {
+    "components": [
+      "voyager_antenna",
+      "voyager_chassis",
+      "voyager_rtg",
+      "voyager_science_A",
+      "voyager_science_B",
+      "voyager_sensors_A",
+      "voyager_sensors_B",
+      "voyager_sensors_C"
+    ]
+  },
+  "telescope": {
+    "components": [
+      "hubble_antenna_A",
+      "hubble_antenna_B",
+      "hubble_apperture_cover",
+      "hubble_circuits",
+      "hubble_instrument_A",
+      "hubble_instrument_B",
+      "hubble_lens",
+      "hubble_solar_panel_A",
+      "hubble_solar_panel_B"
+    ]
   }
 }
