@@ -53,6 +53,29 @@ export const LEVEL_MISSION_TYPE_RETRY_LIMIT = 20
 const BUNKER_HOST_PLANETS: ReadonlyArray<string> = ['mercury', 'venus', 'mars', 'jupiter']
 
 /**
+ * Host planets whose boards surface pure exterminate contracts — the same set as the mission
+ * generator's combat-only hosts (Mercury / Saturn). URL-launched `?mission=exterminate` must
+ * anchor here; Earth's civilian board filters those templates out entirely, which previously
+ * yielded zero candidates at any difficulty.
+ */
+const COMBAT_EXTERMINATE_HOST_PLANETS: ReadonlyArray<string> = ['mercury', 'saturn']
+
+/**
+ * Pick a synthetic host anchor for URL/dev exterminate missions. World XZ are
+ * placeholders like {@link pickBunkerHostAnchor}; `?asteroidId=` overrides the play body.
+ *
+ * @param rand - RNG in `[0, 1)`; injectable for deterministic tests.
+ * @returns Host anchor on Mercury or Saturn (combat-only exterminate boards).
+ */
+function pickCombatExterminateHostAnchor(
+  rand: () => number = Math.random,
+): AsteroidMissionHostAnchor {
+  const planetId =
+    COMBAT_EXTERMINATE_HOST_PLANETS[Math.floor(rand() * COMBAT_EXTERMINATE_HOST_PLANETS.length)]!
+  return { planetId, worldX: 0, worldZ: 0 }
+}
+
+/**
  * Pick a synthetic host anchor for a URL-launched bunker mission. World XZ
  * are best-effort defaults — the URL launch typically also forces an
  * `?asteroidId=…`, so the generated waypoint is decorative rather than
@@ -156,7 +179,11 @@ export function generateMissionWithType(
 
   const requiredType = type as ObjectiveType
   const host: AsteroidMissionHostAnchor | null =
-    requiredType === 'bunker' ? pickBunkerHostAnchor() : null
+    requiredType === 'bunker'
+      ? pickBunkerHostAnchor()
+      : requiredType === 'exterminate'
+        ? pickCombatExterminateHostAnchor()
+        : null
 
   for (let i = 0; i < LEVEL_MISSION_TYPE_RETRY_LIMIT; i++) {
     const mission = generateAsteroidMission(difficulty, host, Math.random, requiredType)

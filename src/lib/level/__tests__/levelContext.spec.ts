@@ -83,6 +83,24 @@ describe('levelContext', () => {
     expect(['mercury', 'venus', 'mars', 'jupiter']).toContain(hostArg!.planetId)
   })
 
+  it('generateMissionWithType passes a combat host when type is exterminate', async () => {
+    const { generateAsteroidMission } = await import('@/lib/missions/asteroidMissionGenerator')
+    vi.mocked(generateAsteroidMission).mockReturnValueOnce({
+      id: 'pest-mission',
+      asteroidId: 'asteroid-pest',
+      objectives: [{ type: 'exterminate', x: 0, z: 0 }],
+      originPlanetId: 'mercury',
+    } as unknown as GeneratedAsteroidMission)
+
+    const mission = generateMissionWithType(3, 'exterminate')
+
+    expect(mission.objectives.some((o) => o.type === 'exterminate')).toBe(true)
+    const firstCall = vi.mocked(generateAsteroidMission).mock.calls[0]!
+    const hostArg = firstCall[1] as { planetId: string } | null
+    expect(hostArg).not.toBeNull()
+    expect(['mercury', 'saturn']).toContain(hostArg!.planetId)
+  })
+
   it('generateMissionWithType returns a DAN mission when type is dan', async () => {
     const { generateAsteroidMission } = await import('@/lib/missions/asteroidMissionGenerator')
     vi.mocked(generateAsteroidMission).mockReturnValueOnce({

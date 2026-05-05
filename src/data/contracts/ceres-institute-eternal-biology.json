@@ -21,8 +21,11 @@
   "introSubject": "An Introduction, and a Standing Invitation",
   "introBody": [
     "Young pilot —",
-    "Your work for our funders — the Saturnine endowment that keeps our lights on — has not gone unnoticed. The Institute would be honored to retain you for a sequence of small services. Nothing taxing. Largely errands, with a few calibrations toward the end. Compensation is academic-grade, which is to say generous.",
-    "We do not advertise our work. Most of what we publish is in journals you would not have heard of, and most of what we do is, regrettably, the kind of patient laboratory science that does not photograph well. We study, primarily, persistence. The colonies have a — patience — about them that the literature does not adequately convey. We have not yet observed a state we would call death. It is, frankly, the most interesting biological question in the system.",
+    "Your work for our funders — the Saturnine endowment that keeps our lights on — has not gone unnoticed. The Institute would be honored to retain you for a sequence of small services. Errands, mostly, with a few calibrations toward the end. Compensation is academic-grade, which is to say generous; the endowment is not, in the present moment, embarrassed for funds.",
+    "You have, by now, met them. You have fought them. You have, I suspect, never had one *explained*. The Institute is, to a reasonable approximation, the only laboratory in the system that has.",
+    "A précis, since you will be working on our behalf. What your gunnery refers to as viroids are colonial assemblies on a silicate substrate — the closest terrestrial analogue is a lichen, though the comparison flatters the lichen. They are not native to this system. They are older than its inner planets in any meaningful sense, and they were, until our drilling on Phobos, asleep. They are, biologically, a single problem dressed up as many: the substrate is mineral, the metabolism is electrical, the boundaries between individuals are — situational. A viroid colony is more like a *weather* than a creature.",
+    "They communicate, if you'll allow the word — we prefer *resonate* — through a soluble fraction we collect under field conditions and call the *psychosphere*. The Jovian Society's people will tell you it is sensor calibration residue. It is not. It is the part of them that does the talking, and we will be paying you a fair price per unit because we will be running every drop of it through our assays.",
+    "Our methodology is unglamorous. We culture small colonies in neutron-rich media; we interrogate them with low-flux DAN sweeps and watch the psychosphere they shed in response; we record. We have, in the course of this, observed many states we did not predict. We have not, in two decades of culture, observed a state we would call death. The literature understates the point — the colonies have a *patience* about them that has to be sat with to be believed. It is, frankly, the most interesting biological question in the system, and its answer is going to come from us or it is going to come from no one.",
     "Acceptance below. Please read at your leisure.",
     "— Dean Bernard Porter, Ceres Institute for Eternal Biology"
   ],
@@ -37,7 +40,8 @@
       "subject": "Step 1 — Calibration Standards from Earth",
       "flavor": [
         "Young pilot —",
-        "We need spectrometry calibration standards from the ESA stockpile on Earth. Our equipment is finicky; the standards drift if they are sourced from anywhere closer to the sun, and the Earth lab is willing to release a set under our standing requisition. Treat it as a paid familiarization run.",
+        "We need spectrometry calibration standards from the ESA stockpile on Earth. The standards drift if they are sourced from anywhere closer to the sun — proximity to active colony fronts contaminates the substrate before it can be sealed. Earth is, at present, the quietest reference frame in the system. We use it because there is nothing else.",
+        "A note on the choice of vessel: take a shuttle, not the lander. The shuttle's small thruster is — to put it the way one would in a paper — *quiet*. The lander's full assembly is loud in the band that matters. We will explain what that band is when you arrive at the station.",
         "Pickup details are on your kiosk. Bring the case home in one piece.",
         "— Porter"
       ]
@@ -49,8 +53,9 @@
       "subject": "Step 2 — Welcome to the Station",
       "flavor": [
         "Young pilot —",
-        "Ceres orbit is a beast even with both packages installed. You'll need both your gravity surfing and orbital surfing rigs to make the corotating insertion — there is no other way to get to us cleanly. Come up. Have a look around. The lab tour is short; the coffee, if you'll forgive the indulgence, is from a private supplier.",
-        "We keep the heavier work elsewhere.",
+        "Ceres orbit is a beast even with both packages installed. You will need both your gravity surfing and your orbital surfing rigs to make the corotating insertion — there is no other way to get to us cleanly. Come up. Have a look around. The lab tour is short; the coffee, if you will forgive the indulgence, is from a private supplier.",
+        "A small confession, while you are still in approach. What carries you up here — the neutron thruster, the manifold, the surfing rigs that hang off it — is, in a sense, borrowed. The lattice that produces your thrust is a viroid lattice. We did not invent the physics. We *recognized* it, on Phobos, after the drilling. Every ship in the system is flying on a piece of their biology dressed up in a pressure vessel. Keep that in mind during the tour. It will save me having to bring it up over coffee.",
+        "We keep the heavier work elsewhere. We will get to that.",
         "— Porter"
       ]
     },
@@ -65,9 +70,9 @@
       "subject": "Step 3 — A Field Team, Silent",
       "flavor": [
         "Young pilot —",
-        "A field team went silent on a viroid sample run. Extract who you can. The viroids are a known hazard of the work, but a hazard worth braving — the data their samples produce is, frankly, irreplaceable.",
-        "While you are out there: collect a few units of psychosphere for us. The research is promising, and the material is harmless in handled quantities. The Institute pays the going rate per unit.",
-        "Bring them in. We will see them recovered at the station. Cases like these have a long road ahead, and the Institute is — among other virtues — patient.",
+        "A field team went silent on a viroid sample run. You will find them inside what your gunnery handbook calls a cocoon. It is not a cocoon. It is a *resonance trap* — a standing field the colony braids around a host that has stopped resisting. The spikes are not matter. They are the shape the field takes when it is holding itself together by listening. This is why your sidearm passes through them and why a localized charge knocks them out of phase. Use the charge. There is no other way in.",
+        "A point of clinical honesty, since you will be the one looking at them: the trap forms around someone who has gone *quiet* first. By the time the field closes, the host is no longer in a state we would call resisting. Bring the team in regardless. The Institute does not abandon its own, and the question of what to do with them is — emphatically — ours, not yours.",
+        "While you are inside the field: collect every unit of psychosphere you can. The soluble fraction shed inside an active trap is more concentrated than anything we can produce in vitro. It is, for our purposes, the sample. The Institute pays the going rate per unit and I would, in candor, pay more.",
         "— Porter"
       ]
     },
@@ -82,8 +87,9 @@
       "subject": "Step 4 — Surface Composition Pass",
       "flavor": [
         "Young pilot —",
-        "Ceres's eccentric orbit puts certain rare-earth resonances within reach nowhere else in the system. The readings refine our theoretical model. The model is — well. You'll hear about the model when there is something to hear.",
-        "Run the mineral analysis. Submit clean readings. The Institute prefers signal quality over speed.",
+        "Time for some unglamorous map-making. We need a clean mineral assay of the asset on file — specifically the rare-earth and neutron-rich fractions. The colonies do not live *on* rock; they live *in* rock with the right lattice, the same way a lichen does not live on bark, it lives in it. The substrate you will be reading is, in our terminology, their *soil*. We are mapping where they can grow.",
+        "The eccentric Cerean orbit puts resonances within reach that no other observation post can resolve. This is one of the actual reasons the station is parked where it is. The coffee is the cover story.",
+        "Run the analysis. Submit clean readings. The Institute prefers signal quality over speed.",
         "— Porter"
       ]
     },
@@ -98,8 +104,9 @@
       "subject": "Step 5 — DAN Albedo Survey",
       "flavor": [
         "Young pilot —",
-        "There is a phenomenon we call DAN albedo. Neutron-rich materials seem to *attract* viroid attention — the readings spike as the colonies approach. We are studying why. We have hypotheses.",
-        "Run a Dynamic Albedo of Neutrons pass on the asset on file. Capture the particle return cleanly; ignore any sensor cross-talk you may register during the pass. The instrumentation team is, I am told, certain that the cross-talk is harmless.",
+        "A confession, before you go. Our primary instrument at the station is a high-flux DAN array. What you will be running in the field is the same instrument scaled down to a sidearm. You are doing an Institute assay with Institute methodology. Every survey you have done for the Society — every one — has been an Institute assay too. They simply did not tell you.",
+        "Now, two related facts you have probably guessed and that I will simply confirm. First: the *cross-talk* you have been told to ignore is the colony returning the signal. They are answering. The DAN array is the only field-deployable way humans have to *talk* to them, and they are extremely interested in talking. Second, since I owe you the truth on it: yes — they come for you because of your ship. Your thruster is their lattice, vibrating at the loudest frequency a human craft can produce. You are, in their language, *shouting*. There is no quieter way to fly. We are sorry. The literature understates how sorry one comes to feel about this.",
+        "Run the DAN pass on the asset on file. Capture the particle return cleanly. The cross-talk you can let through; we will sort it at the station.",
         "— Porter"
       ]
     },
@@ -111,12 +118,13 @@
       "objectiveType": "rescue",
       "specialMissionId": "ceres-institute-rescue-2",
       "creditsReward": 10500,
-      "subject": "Step 6 — Another Team",
+      "subject": "Step 6 — Another Team, and a Word on the Pylons",
       "flavor": [
         "Young pilot —",
-        "Another team. The viroids do not discriminate, and we do not abandon our own. I am sorry to ask twice.",
-        "The first team is stable, in the sense that matters to the Institute, and we expect the second to be the same with your help. They will be in our care from the moment you bring them in.",
-        "More psychosphere if your cargo allows. The DAN series is recalibrating and the instrumentation team is on a tight schedule.",
+        "Another team. I am sorry to ask twice. The first team is *stable*, in the sense that matters to the Institute, and we expect the second to be the same with your help. They will be in our care from the moment you bring them in.",
+        "While I have your attention: the red pylons you have been clearing on extermination work — the ones that look like a stem and a fruiting cap. Those are not weapons. Those are not nests. Those are *extraction columns*. The colony body is not on the surface. The colony body is *under* the asteroid, threaded through the substrate, and the pylons pull rare-earth lattice up into it the way a tree pulls water. The things your gunnery has been killing — the bacteriophages, the spires, the chimerae — are limbs. You have never killed a viroid. Nobody has. You have been pruning.",
+        "Why does this matter on a rescue? Because the trap that catches a field team is grown from the same column. The rescue and the extermination are the same biology seen from two ends. We pay for both because we are studying both.",
+        "Bring more psychosphere if your cargo allows. The DAN series is recalibrating against your last pass and the instrumentation team is on a tight schedule.",
         "What we are paid to want from this work, and what we have come to want for ourselves, is hard to separate after enough years. Forgive an old man's rambling. The point is the rescue.",
         "— Porter"
       ]
@@ -134,9 +142,9 @@
       "subject": "Step 7 — Archive Transmission",
       "flavor": [
         "Young pilot —",
-        "One last matter. We have prepared an archive — a culmination of the past several months of your work. The terminal at the Kuiper site, Site CIB-7, is the secure transmit point. Reach it the same way you reached the station.",
+        "One last matter. We have prepared an archive — every assay, every DAN return, every psychosphere reading you have brought us, compiled into a coherent message in the colonies' own resonance band. The terminal at the Kuiper site, Site CIB-7, is the secure transmit point. Reach it the same way you reached the station.",
         "Site CIB-7 currently houses several specimens. Their designations are on file. They are not in a state to recognize you, and we do not advise attempting communication. Please clear the floor and approach the terminal.",
-        "Please don't read the archive. It would only confuse you. We study, after all, what they are. And — this is in confidence, between an old man and a young pilot — what we might yet become.",
+        "Please do not read the archive. It would only confuse you. We study, after all, what they are. And — this is in confidence, between an old man and a young pilot — what we might yet become.",
         "— Porter"
       ]
     }

@@ -784,15 +784,9 @@ describe('per-template planetIds filter', () => {
       const venus = getPlanet('venus')
       const hostR = venus.orbit.semiMajorAxis * ORBIT_SCALE
       const host = { planetId: 'venus' as const, worldX: hostR, worldZ: 0 }
-      let sawUnrestricted = false
-      for (let i = 0; i < 80; i++) {
-        const mission = generateAsteroidMission(5, host)
-        if (mission.templateId === unrestrictedId) {
-          sawUnrestricted = true
-          break
-        }
-      }
-      expect(sawUnrestricted).toBe(true)
+      // Narrow to this giver so we do not probabilistically lose against the full catalog.
+      const mission = generateAsteroidMission(5, host, Math.random, null, giver.id)
+      expect(mission.templateId).toBe(unrestrictedId)
     })
   })
 
