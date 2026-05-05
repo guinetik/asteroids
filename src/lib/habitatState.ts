@@ -21,8 +21,12 @@ export type HabitatPhase =
 /** Duration in seconds for the fade-out transition (map → interior). */
 const ENTER_DURATION = 0.8
 
-/** Duration in seconds for the wake-up camera animation (lying → standing). */
-const WAKEUP_DURATION = 1.5
+/**
+ * Duration in seconds for the wake-up camera animation (lying → standing). Tuned to feel
+ * cinematic — long enough that the player registers the ceiling, the head-tilt, and the
+ * stand-up as separate beats rather than a single hurried pan.
+ */
+const WAKEUP_DURATION = 3.0
 
 /** Duration in seconds for the exit transition (habitat → map). */
 const EXIT_DURATION = 0.5

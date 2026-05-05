@@ -31,11 +31,34 @@ import { uiAudio } from '@/audio/UiAudioDirector'
 import { FpsPointerLockSession } from '@/lib/fps/FpsPointerLockSession'
 import type { JourneyTriggerId } from '@/lib/journeys'
 
-/** Starting pitch for the wake-up cinematic (looking straight down at the bed). */
-const WAKE_UP_START_PITCH = -Math.PI / 2
+/**
+ * Starting pitch for the wake-up cinematic — looking straight up at the ceiling, as if you
+ * just opened your eyes lying flat on the bunk.
+ */
+const WAKE_UP_START_PITCH = Math.PI / 2
 
 /** Camera Y position while lying in bed — lerped up to the standing height during wake-up. */
 const WAKE_UP_LYING_HEIGHT = 0.5
+
+/**
+ * Eased progress at which the head-tilt phase **starts**. Until this point the camera holds
+ * the {@link WAKE_UP_START_PITCH} (ceiling) so the player has time to register where they
+ * are before the head moves.
+ */
+const WAKE_UP_PITCH_PHASE_START = 0.25
+
+/**
+ * Eased progress at which the head-tilt phase finishes (pitch reaches `0`). Combined with
+ * {@link WAKE_UP_PITCH_PHASE_START} this defines a slow, deliberate head rotation rather
+ * than a snap-down.
+ */
+const WAKE_UP_PITCH_PHASE_END = 0.85
+
+/**
+ * Eased progress at which the stand-up phase begins (camera Y starts lerping). Overlaps
+ * the back half of the pitch window so head-tilt finishing and body rising blend together.
+ */
+const WAKE_UP_STAND_PHASE_START = 0.55
 
 /** Callbacks the facade fires out to the Vue HUD. */
 export interface MapHabitatCallbacks {
@@ -138,8 +161,29 @@ export class MapHabitatFacade {
       const cam = this.scene.fpsCamera
       const spawn = this.scene.getSpawnPosition()
       cam.yaw = spawn.yaw
-      cam.pitch = WAKE_UP_START_PITCH * (1 - t)
-      cam.camera.position.y = WAKE_UP_LYING_HEIGHT + (spawn.position.y - WAKE_UP_LYING_HEIGHT) * t
+
+      // Pitch: hold at ceiling (`+π/2`) until {@link WAKE_UP_PITCH_PHASE_START}, then lerp
+      // down to forward (`0`) by {@link WAKE_UP_PITCH_PHASE_END}. The leading hold gives the
+      // player a beat to register the ceiling before the head begins to tilt.
+      const pitchT = Math.max(
+        0,
+        Math.min(
+          1,
+          (t - WAKE_UP_PITCH_PHASE_START) / (WAKE_UP_PITCH_PHASE_END - WAKE_UP_PITCH_PHASE_START),
+        ),
+      )
+      cam.pitch = WAKE_UP_START_PITCH * (1 - pitchT)
+
+      // Stand-up: hold lying height until {@link WAKE_UP_STAND_PHASE_START}, then lerp up to
+      // standing eye height by the end of the timeline. The pitch + stand windows overlap
+      // intentionally so head-tilt finishing and body rising blend together.
+      const standT = Math.max(
+        0,
+        Math.min(1, (t - WAKE_UP_STAND_PHASE_START) / (1 - WAKE_UP_STAND_PHASE_START)),
+      )
+      cam.camera.position.y =
+        WAKE_UP_LYING_HEIGHT + (spawn.position.y - WAKE_UP_LYING_HEIGHT) * standT
+
       cam.tick(0)
     }
   }
@@ -201,6 +245,9 @@ export class MapHabitatFacade {
 
   /** Advance the interior scene one frame. Safe no-op when the scene hasn't loaded yet. */
   tickScene(dt: number): void {
+    if (this.scene && this.pointerLockAttached && this.pointerLock.consumeLeftMouseJustPressed()) {
+      this.scene.onPrimaryClick()
+    }
     this.scene?.tick(dt)
   }
 

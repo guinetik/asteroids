@@ -40,17 +40,17 @@ describe('HabitatState', () => {
     expect(state.phase).toBe('waking_up')
   })
 
-  it('tick() advances waking_up to habitat after 1.5s', () => {
+  it('tick() advances waking_up to habitat after 3.0s', () => {
     state.enter()
     state.tick(0.8) // → waking_up
     expect(state.phase).toBe('waking_up')
     expect(state.progress).toBeCloseTo(0, 5)
 
-    state.tick(0.75)
+    state.tick(1.5)
     expect(state.progress).toBeCloseTo(0.5, 5)
     expect(state.phase).toBe('waking_up')
 
-    state.tick(0.75)
+    state.tick(1.5)
     expect(state.phase).toBe('habitat')
     expect(state.progress).toBe(1)
   })
@@ -58,7 +58,7 @@ describe('HabitatState', () => {
   it('leave() transitions habitat to transitioning_out, returns true', () => {
     state.enter()
     state.tick(0.8) // → waking_up
-    state.tick(1.5) // → habitat
+    state.tick(3.0) // → habitat
     expect(state.phase).toBe('habitat')
 
     const result = state.leave()
@@ -75,7 +75,7 @@ describe('HabitatState', () => {
   it('tick() advances transitioning_out to map after 0.5s, progress goes 1→0', () => {
     state.enter()
     state.tick(0.8) // → waking_up
-    state.tick(1.5) // → habitat
+    state.tick(3.0) // → habitat
     state.leave()
     expect(state.progress).toBeCloseTo(1, 5)
 
