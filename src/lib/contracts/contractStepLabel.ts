@@ -17,6 +17,12 @@ import type { ContractStep } from './contractTypes'
  * @returns Single-line action sentence; never empty.
  */
 export function formatContractStepLabel(step: ContractStep): string {
+  // Authored flavor label takes precedence so contracts can hide
+  // planet/mission ids from the player when the storyline depends on
+  // discovery (e.g. the Finch detective arc).
+  if ('briefingLabel' in step && typeof step.briefingLabel === 'string' && step.briefingLabel) {
+    return step.briefingLabel
+  }
   if (step.kind === 'complete-missions') {
     const filterBits: string[] = []
     filterBits.push(step.missionType ? `${step.missionType} mission` : 'mission')

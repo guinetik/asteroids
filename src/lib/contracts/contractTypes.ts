@@ -65,6 +65,14 @@ export interface MissionCompletedEvent {
 export interface ContractStepRewardMixin {
   /** CR paid the moment this step transitions from incomplete to complete (default 0). */
   creditsReward?: number
+  /**
+   * Optional authored flavor label rendered in the briefing card and contract
+   * tracker in place of the auto-generated "Enter orbit at mars" /
+   * "Complete 1 mission" summary. Use when the contract intentionally hides
+   * the next planet/mission from the player (e.g. detective arcs where the
+   * route is discovered, not pre-disclosed).
+   */
+  briefingLabel?: string
 }
 
 /** Step that requires N completed missions matching optional filters. */
@@ -279,6 +287,8 @@ export interface ChoiceMissionOutcome extends ContractStepRewardMixin {
 export interface ChoiceMissionStep {
   /** Discriminator. */
   kind: 'choice-mission'
+  /** See {@link ContractStepRewardMixin.briefingLabel}. */
+  briefingLabel?: string
   /** Mission id presented to the choice-mission runner. */
   missionId: string
   /** Authored kind name for the runner (e.g. `'terminal-prospectus'`). */
@@ -398,6 +408,15 @@ export interface Contract {
   introAudioUrl?: string
   /** Ordered list of steps. */
   steps: ContractStep[]
+  /**
+   * When true, the briefing card and contract tracker hide every step beyond
+   * the current one — the player only sees done steps and the live step.
+   * The total step count and final reward count are also redacted from the
+   * UI, so the contract reads as an unfolding investigation rather than a
+   * pre-disclosed checklist. Use for detective / discovery arcs (e.g.
+   * `finch-recovery`).
+   */
+  hideFutureSteps?: boolean
   /** Subject for the contract-completion message (legacy single-arm). */
   completionSubject?: string
   /** Body paragraphs for the contract-completion message (legacy single-arm). */

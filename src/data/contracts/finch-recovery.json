@@ -4,6 +4,7 @@
   "from": "Mr. Finch, Saturn Ringside Estate",
   "sentAt": "2306-05-18 22:14 UTC",
   "homePlanet": "saturn",
+  "hideFutureSteps": true,
   "offerWhenPrerequisites": {
     "minGiverPlanetCompletions": { "planetId": "saturn", "min": 1 },
     "triggerOnPlanetVisited": "saturn"
@@ -14,9 +15,9 @@
     "I have been stolen from. I had not been stolen from in some time. It is, I confess, refreshing.",
     "The party responsible is a young woman who calls herself Madame Sedna-Deimos — Carmen, professionally. She removed a small hardware wallet from my study. The contents are of considerable size, financially speaking, and there are also certain personal records on the device to which I am, for reasons I shall not bore you with, attached. I would like the device returned. Intact, if possible. As-found, if not.",
     "I have a still photograph from the estate's perimeter cameras. The horizon behind her, regrettably, is not clear. I am told a properly tuned long-baseline telescope can extract the relevant detail.",
-    "Six stops, I should think. The compensation is correspondingly serious.",
+    "I cannot tell you how many stops this will take. She is actively moving, and I am told she is good at it. The compensation will be correspondingly serious.",
     "Two notes. First — Madame Sedna-Deimos is, by her conduct, not a violent person. Recovery is the brief. The brief is recovery. Second — the authorities are not to be involved at any stage, on any pretext.",
-    "— Halloran"
+    "— Finch"
   ],
   "steps": [
     {
@@ -25,6 +26,7 @@
       "specialMissionId": "finch-recovery-saturn-telescope",
       "revealsBody": "mars",
       "creditsReward": 1500,
+      "briefingLabel": "Tune the long-baseline telescope",
       "subject": "Step 1 — She Has Not Yet Been Seen",
       "flavor": [
         "[bored] Young pilot,",
@@ -36,6 +38,7 @@
     {
       "kind": "visit-planet",
       "planetId": "mars",
+      "briefingLabel": "Pursue Carmen's next stop",
       "subject": "Step 2 — The Trail Points to Mars",
       "flavor": [
         "Young pilot,",
@@ -49,6 +52,7 @@
       "specialMissionId": "finch-recovery-mars-bunker",
       "revealsBody": "venus",
       "creditsReward": 2000,
+      "briefingLabel": "Sweep the abandoned bunker",
       "subject": "Step 3 — A Trail at Mars",
       "flavor": [
         "Young pilot,",
@@ -60,6 +64,7 @@
     {
       "kind": "visit-planet",
       "planetId": "venus",
+      "briefingLabel": "Pursue Carmen's next stop",
       "subject": "Step 4 — On to Venus",
       "flavor": [
         "Young pilot,",
@@ -73,6 +78,7 @@
       "specialMissionId": "finch-recovery-venus-telescope",
       "revealsBody": "earth",
       "creditsReward": 2500,
+      "briefingLabel": "Tune the floor-camera image",
       "subject": "Step 5 — A Floor Camera at Venus",
       "flavor": [
         "[amused] Young pilot,",
@@ -84,6 +90,7 @@
     {
       "kind": "visit-planet",
       "planetId": "earth",
+      "briefingLabel": "Pursue Carmen's next stop",
       "subject": "Step 6 — Earth, Then",
       "flavor": [
         "Young pilot,",
@@ -97,6 +104,7 @@
       "specialMissionId": "finch-recovery-earth-telescope",
       "revealsBody": "ceres",
       "creditsReward": 3000,
+      "briefingLabel": "Tune the posed photograph",
       "subject": "Step 7 — A Posed Photograph at Earth",
       "flavor": [
         "[amused] Young pilot,",
@@ -108,6 +116,7 @@
     {
       "kind": "visit-planet",
       "planetId": "ceres",
+      "briefingLabel": "Pursue Carmen's next stop",
       "subject": "Step 8 — Ceres, the Forgotten",
       "flavor": [
         "Young pilot,",
@@ -121,6 +130,7 @@
       "specialMissionId": "finch-recovery-ceres-bunker",
       "revealsBody": "neptune",
       "creditsReward": 4000,
+      "briefingLabel": "Sweep the next forgotten site",
       "subject": "Step 9 — A Letter at Ceres",
       "flavor": [
         "Young pilot,",
@@ -132,6 +142,7 @@
     {
       "kind": "visit-planet",
       "planetId": "neptune",
+      "briefingLabel": "Pursue Carmen to the end of the trail",
       "subject": "Step 10 — Neptune, the End of the Trail",
       "flavor": [
         "Young pilot,",
@@ -144,6 +155,7 @@
       "count": 1,
       "specialMissionId": "finch-recovery-neptune-bunker",
       "creditsReward": 8000,
+      "briefingLabel": "Recover the wallet",
       "subject": "Step 11 — Neptune, End of the Trail",
       "flavor": [
         "Young pilot,",
@@ -159,7 +171,7 @@
     "It is in my hand. It has been in my hand for an hour. I have not opened it yet. I shall, in my own time.",
     "Your closeout has been credited. The Saturn pay multiplier is now in effect on contracts posted from this estate; the spaceport's traffic control has been instructed to extend you fast-travel return privileges in perpetuity.",
     "[long pause] With thanks.",
-    "— Halloran"
+    "— Finch"
   ],
   "rewards": [
     { "type": "fast-travel", "planetId": "saturn" },

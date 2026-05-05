@@ -44,7 +44,7 @@ interface StepEntry {
   progressLabel: string | null
 }
 
-const stepEntries = computed<StepEntry[]>(() =>
+const allStepEntries = computed<StepEntry[]>(() =>
   props.contract.steps.map((step, index) => {
     const instance = props.instance
     const required = requiredCount(step)
@@ -91,9 +91,29 @@ const stepEntries = computed<StepEntry[]>(() =>
   }),
 )
 
+/**
+ * Filtered step list rendered in the briefing card. When the contract is
+ * authored with `hideFutureSteps` the briefing only reveals what the player
+ * has earned to know:
+ *   - `available` / `declined`: just the first step as a teaser ask;
+ *   - `active`: done steps and the live step;
+ *   - `completed`: every step (post-mortem reveal).
+ * Total step count stays hidden in the header until unlocked.
+ */
+const stepEntries = computed<StepEntry[]>(() => {
+  if (!props.contract.hideFutureSteps) return allStepEntries.value
+  if (status.value === 'completed') return allStepEntries.value
+  if (status.value === 'available' || status.value === 'declined') {
+    return allStepEntries.value.slice(0, 1)
+  }
+  return allStepEntries.value.filter(
+    (entry) => entry.state === 'done' || entry.state === 'current',
+  )
+})
+
 const progressSummary = computed(() => {
   const total = props.contract.steps.length
-  const done = stepEntries.value.filter((entry) => entry.state === 'done').length
+  const done = allStepEntries.value.filter((entry) => entry.state === 'done').length
   return { done, total }
 })
 
@@ -110,7 +130,7 @@ const headerLabel = computed(() => {
     <header class="contract-accept-card__header">
       <span class="contract-accept-card__chrome">
         {{ headerLabel }} · {{ props.contract.inboxName }}
-        <template v-if="status === 'active'">
+        <template v-if="status === 'active' && !props.contract.hideFutureSteps">
           · {{ progressSummary.done }}/{{ progressSummary.total }}
         </template>
       </span>
