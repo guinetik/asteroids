@@ -191,24 +191,36 @@ export class MapJourneyFacade {
   }
 
   /**
-   * Whether the habitat exit action is allowed right now. Blocks exits when the active
-   * journey's next step is anything other than "Leave the Habitat".
+   * Whether the habitat exit action is allowed right now.
+   *
+   * The journey-driven exit gate is **onboarding-only** — the {@link WELCOME_JOURNEY_ID}
+   * journey ends with a "Leave the Habitat" step, so during onboarding the exit is held
+   * back until the player has worked through the prior steps. Every other journey
+   * (Act 1, Act 2, …) is mid-game progress and must **never** block leaving the habitat,
+   * even when their next step is something like "Complete Jovian Society Prospection".
    */
   canLeaveHabitat(): boolean {
     const deps = this.deps
     if (!deps) return true
-    const nextLabel = getActiveJourneyNextStepLabel(deps.getProfile())
+    const profile = deps.getProfile()
+    if (hasCompletedJourney(profile, WELCOME_JOURNEY_ID)) return true
+    const nextLabel = getActiveJourneyNextStepLabel(profile)
     return nextLabel === null || nextLabel === 'Leave the Habitat'
   }
 
   /**
    * Build the habitat-exit-blocked prompt string. Returns `null` when there is no active
-   * journey step to display. Caller forwards to the habitat prompt HUD.
+   * onboarding step to display. Caller forwards to the habitat prompt HUD.
+   *
+   * Mirrors the gating in {@link canLeaveHabitat}: post-welcome journeys never produce a
+   * blocked prompt because they never block the exit.
    */
   buildLeaveBlockedPrompt(): string | null {
     const deps = this.deps
     if (!deps) return null
-    const nextLabel = getActiveJourneyNextStepLabel(deps.getProfile())
+    const profile = deps.getProfile()
+    if (hasCompletedJourney(profile, WELCOME_JOURNEY_ID)) return null
+    const nextLabel = getActiveJourneyNextStepLabel(profile)
     if (!nextLabel) return null
     return `Complete Journey first: ${nextLabel}`
   }

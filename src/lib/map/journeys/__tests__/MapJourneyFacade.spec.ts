@@ -5,7 +5,11 @@ import {
   type MapJourneyFacadeDeps,
 } from '../MapJourneyFacade'
 import { createProfile } from '@/lib/player/profile'
-import { WELCOME_JOURNEY_ID, ACT_1_JOURNEY_ID } from '@/lib/journeys'
+import {
+  ACT_1_JOURNEY_ID,
+  ACT_2_JOURNEY_ID,
+  WELCOME_JOURNEY_ID,
+} from '@/lib/journeys'
 import type { PlayerProfile } from '@/lib/player/types'
 
 /** Profile with the welcome journey completed + announced so the tracker is quiet. */
@@ -95,12 +99,72 @@ describe('MapJourneyFacade.canLeaveHabitat', () => {
     const { facade } = buildFacade()
     expect(facade.canLeaveHabitat()).toBe(true)
   })
+
+  it('blocks exit during onboarding when a non-terminal welcome step is pending', () => {
+    const base = createProfile('Onboarding')
+    const profile: PlayerProfile = {
+      ...base,
+      // Welcome NOT in completedJourneyIds → still active.
+      completedJourneyIds: [],
+      // No completed steps → next label = 'Read the message from Marta'.
+      journeyStepProgress: { ...base.journeyStepProgress, [WELCOME_JOURNEY_ID]: [] },
+    }
+    const { facade } = buildFacade(profile)
+    expect(facade.canLeaveHabitat()).toBe(false)
+  })
+
+  it('allows exit while on Act 2 even if its next step is mid-arc (regression)', () => {
+    const base = createProfile('Act2Player')
+    const profile: PlayerProfile = {
+      ...base,
+      completedJourneyIds: [WELCOME_JOURNEY_ID, ACT_1_JOURNEY_ID],
+      announcedJourneyStartIds: [
+        WELCOME_JOURNEY_ID,
+        ACT_1_JOURNEY_ID,
+        ACT_2_JOURNEY_ID,
+      ],
+      // Act 2 is start-ready but no steps complete → next label is something like
+      // "Complete Venusian Zeppelin Trade Loop", which is NOT 'Leave the Habitat'.
+      journeyStartReadyIds: [ACT_2_JOURNEY_ID],
+    }
+    const { facade } = buildFacade(profile)
+    expect(facade.canLeaveHabitat()).toBe(true)
+  })
 })
 
 describe('MapJourneyFacade.buildLeaveBlockedPrompt', () => {
   it('returns null when there is no active step label', () => {
     const { facade } = buildFacade()
     expect(facade.buildLeaveBlockedPrompt()).toBeNull()
+  })
+
+  it('returns null on a post-welcome journey even if a step is pending (regression)', () => {
+    const base = createProfile('Act2Player')
+    const profile: PlayerProfile = {
+      ...base,
+      completedJourneyIds: [WELCOME_JOURNEY_ID, ACT_1_JOURNEY_ID],
+      announcedJourneyStartIds: [
+        WELCOME_JOURNEY_ID,
+        ACT_1_JOURNEY_ID,
+        ACT_2_JOURNEY_ID,
+      ],
+      journeyStartReadyIds: [ACT_2_JOURNEY_ID],
+    }
+    const { facade } = buildFacade(profile)
+    expect(facade.buildLeaveBlockedPrompt()).toBeNull()
+  })
+
+  it('still surfaces an onboarding step in the blocked prompt', () => {
+    const base = createProfile('Onboarding')
+    const profile: PlayerProfile = {
+      ...base,
+      completedJourneyIds: [],
+      journeyStepProgress: { ...base.journeyStepProgress, [WELCOME_JOURNEY_ID]: [] },
+    }
+    const { facade } = buildFacade(profile)
+    expect(facade.buildLeaveBlockedPrompt()).toBe(
+      'Complete Journey first: Read the message from Marta',
+    )
   })
 })
 
