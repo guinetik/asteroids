@@ -7,8 +7,8 @@
     "acceptedCategories": ["trade-good"],
     "minimumPipBonus": 2,
     "visitMargin": {
-      "minMultiplier": 1.08,
-      "maxMultiplier": 1.65
+      "minMultiplier": 1.18,
+      "maxMultiplier": 1.92
     }
   },
   "options": [

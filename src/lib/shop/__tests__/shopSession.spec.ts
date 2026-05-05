@@ -7,8 +7,15 @@ import {
   TRADE_GOOD_CHEAP_PRICE_THRESHOLD,
   TRADE_GOOD_MIN_STOCK_CHEAP,
   TRADE_GOOD_MIN_STOCK_EXPENSIVE,
+  TRADE_GOODS_OFFER_SLOT_CAP,
+  TRADE_GOOD_STOCK_MAX_CHEAP,
+  TRADE_GOOD_STOCK_MAX_EXPENSIVE,
 } from '../shopSession'
-import { getTradeGood, getTradeGoodsByPlanet } from '../tradeGoods'
+import {
+  getTradeGood,
+  getTradeGoodsByPlanet,
+  getTradeGoodsExcludingPlanet,
+} from '../tradeGoods'
 import { createProfile } from '@/lib/player/profile'
 import { createInventory, addItem } from '@/lib/inventory/inventory'
 import { resetDemand } from '../planetDemand'
@@ -16,18 +23,21 @@ import { resetDemand } from '../planetDemand'
 import '../tradeGoods'
 
 describe('createShopSession', () => {
-  it('creates a session with 3 trade slots for Earth', () => {
+  it('creates a session with up to the offer cap of trade slots for Earth (full local pool)', () => {
+    const earthPool = getTradeGoodsByPlanet('earth')
     const session = createShopSession('earth')
     expect(session.planetId).toBe('earth')
-    expect(session.tradeSlots).toHaveLength(3)
+    expect(session.tradeSlots).toHaveLength(
+      Math.min(TRADE_GOODS_OFFER_SLOT_CAP, earthPool.length),
+    )
     expect(session.restockTimer).toBeNull()
     expect(session.allSoldOut).toBe(false)
   })
 
-  it('all 3 slots have distinct item ids', () => {
+  it('all slots have distinct item ids', () => {
     const session = createShopSession('earth')
     const ids = session.tradeSlots.map((s) => s.itemId)
-    expect(new Set(ids).size).toBe(3)
+    expect(new Set(ids).size).toBe(session.tradeSlots.length)
   })
 
   it('all slots have stock > 0', () => {
@@ -48,19 +58,30 @@ describe('createShopSession', () => {
             def!.basePrice < TRADE_GOOD_CHEAP_PRICE_THRESHOLD
               ? TRADE_GOOD_MIN_STOCK_CHEAP
               : TRADE_GOOD_MIN_STOCK_EXPENSIVE
+          const maxAllowed =
+            def!.basePrice < TRADE_GOOD_CHEAP_PRICE_THRESHOLD
+              ? TRADE_GOOD_STOCK_MAX_CHEAP
+              : TRADE_GOOD_STOCK_MAX_EXPENSIVE
           expect(slot.stock).toBeGreaterThanOrEqual(minAllowed)
+          expect(slot.stock).toBeLessThanOrEqual(maxAllowed)
         }
       }
     }
   })
 
-  it('venus shows full local pool plus 3 imported goods', () => {
+  it('venus shows full local pool plus imports up to the global offer cap', () => {
     const venusPool = getTradeGoodsByPlanet('venus')
+    const importPool = getTradeGoodsExcludingPlanet('venus')
     const session = createShopSession('venus')
     const local = session.tradeSlots.filter((slot) => !slot.isImported)
     const imported = session.tradeSlots.filter((slot) => slot.isImported)
     expect(local).toHaveLength(venusPool.length)
-    expect(imported).toHaveLength(3)
+    const expectedImports = Math.min(
+      TRADE_GOODS_OFFER_SLOT_CAP - venusPool.length,
+      importPool.length,
+    )
+    expect(imported).toHaveLength(expectedImports)
+    expect(session.tradeSlots).toHaveLength(venusPool.length + expectedImports)
     expect(new Set(session.tradeSlots.map((slot) => slot.itemId)).size).toBe(
       session.tradeSlots.length,
     )
@@ -115,7 +136,7 @@ describe('buyTradeGood', () => {
     const profile = createProfile('Joe')
     const inventory = createInventory()
 
-    const result = buyTradeGood(session, profile, inventory, 5, 1)
+    const result = buyTradeGood(session, profile, inventory, session.tradeSlots.length, 1)
     expect(result.ok).toBe(false)
   })
 })

@@ -28,7 +28,11 @@ import { getGatherItemForPlanet } from './planetOrbitalConfig'
 import { canAccessPlanet } from './planetAccessRequirements'
 import { addItem, removeItem, canFitItem } from '@/lib/inventory/inventory'
 import { addCredits } from '@/lib/player/profile'
-import { EVA_MAX_PAYOUT_CR } from './missionEconomy'
+import {
+  EVA_MAX_PAYOUT_CR,
+  EVA_MISSION_PAY_MULTIPLIER,
+  GLOBAL_MISSION_PAY_MULTIPLIER,
+} from './missionEconomy'
 
 /** Duration (seconds) for planetary mission board restock after accepting a contract. */
 const RESTOCK_DURATION_S = 180
@@ -71,7 +75,12 @@ function computeScaledEvaReward(baseReward: number, planetId: string): number {
   const scaled = baseReward * planetRewardMultiplier(planetId)
   const floored = Math.max(EVA_MIN_REWARD, scaled)
   const capped = Math.min(floored, EVA_MAX_PAYOUT_CR)
-  return Math.round(capped / EVA_REWARD_ROUND_STEP) * EVA_REWARD_ROUND_STEP
+  const rounded = Math.round(capped / EVA_REWARD_ROUND_STEP) * EVA_REWARD_ROUND_STEP
+  const tuned =
+    rounded *
+    GLOBAL_MISSION_PAY_MULTIPLIER *
+    EVA_MISSION_PAY_MULTIPLIER
+  return Math.round(tuned / EVA_REWARD_ROUND_STEP) * EVA_REWARD_ROUND_STEP
 }
 
 /**
@@ -134,10 +143,14 @@ export function offerMission(
 
   const index = Math.floor(Math.random() * accessible.length)
   const mission = accessible[index]!
+  const tunedMission = {
+    ...mission,
+    reward: Math.round(mission.reward * GLOBAL_MISSION_PAY_MULTIPLIER),
+  }
 
   return {
     ...board,
-    offeredMission: mission,
+    offeredMission: tunedMission,
     offeringPlanet: planetId,
   }
 }

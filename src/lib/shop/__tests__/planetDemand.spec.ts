@@ -6,6 +6,7 @@ import {
   resetDemand,
   tickDemandTimer,
   DEMAND_REFRESH_INTERVAL_S,
+  TRADE_ROUTE_SELL_PREMIUM_MULTIPLIER,
 } from '../planetDemand'
 // Ensure trade goods are loaded (side-effect import)
 import '../tradeGoods'
@@ -34,14 +35,14 @@ describe('computeSellPrice', () => {
 
   it('returns base × multiplier × route sell premium for a demanded item', () => {
     const price = computeSellPrice('mercury', 'cryogenic-coolants')
-    const premium = 1.22
+    const premium = TRADE_ROUTE_SELL_PREMIUM_MULTIPLIER
     expect(price).toBeGreaterThanOrEqual(Math.round(80 * 3.0 * 0.8 * premium))
     expect(price).toBeLessThanOrEqual(Math.round(80 * 3.0 * 1.2 * premium))
   })
 
   it('returns junk price for non-demanded trade goods', () => {
     const price = computeSellPrice('mercury', 'entertainment-media')
-    expect(price).toBe(Math.round(15 * 0.5 * 1.22))
+    expect(price).toBe(Math.round(15 * 0.5 * TRADE_ROUTE_SELL_PREMIUM_MULTIPLIER))
   })
 
   it('returns 0 for unknown items', () => {
@@ -52,7 +53,7 @@ describe('computeSellPrice', () => {
     const ceresNiFe = computeSellPrice('ceres', 'iron-nickel-alloy')
     const marsNiFe = computeSellPrice('mars', 'iron-nickel-alloy')
     expect(ceresNiFe).toBeGreaterThan(marsNiFe)
-    const premium = 1.22
+    const premium = TRADE_ROUTE_SELL_PREMIUM_MULTIPLIER
     expect(marsNiFe).toBe(Math.round(34 * 1.0 * premium))
   })
 

@@ -141,10 +141,13 @@ describe('hasOrbitalSurfingUnlock', () => {
 })
 
 describe('getUpgradeCost', () => {
-  it('returns baseCost * level', () => {
-    expect(getUpgradeCost('shuttleThrusterEfficiency', 1)).toBe(1000)
+  it('returns baseCost × level when above the purchase floor', () => {
     expect(getUpgradeCost('shuttleThrusterEfficiency', 2)).toBe(2000)
     expect(getUpgradeCost('shuttleThrusterEfficiency', 3)).toBe(3000)
+  })
+
+  it('clamps low catalog prices up to the minimum purchase tier', () => {
+    expect(getUpgradeCost('shuttleThrusterEfficiency', 1)).toBe(2000)
   })
 
   it('returns 0 for level 0', () => {

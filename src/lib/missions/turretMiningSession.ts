@@ -15,6 +15,7 @@ import type { Inventory } from '@/lib/inventory/types'
 import { getStack } from '@/lib/inventory/inventory'
 import type { ActiveTurretMiningMission, MiningOreCategory, ShuttleMissionBoard } from './types'
 import { getTurretMiningPool } from './turretMiningPools'
+import { GLOBAL_MISSION_PAY_MULTIPLIER } from './missionEconomy'
 
 /** Main-belt ore ids that count toward an `'any'` mining mission. */
 export const MAIN_BELT_ORE_IDS: readonly string[] = [
@@ -129,10 +130,14 @@ export function offerTurretMiningMission(
 
   const idx = Math.floor(Math.random() * candidates.length)
   const chosen = candidates[idx]!
+  const tunedMission = {
+    ...chosen,
+    reward: Math.round(chosen.reward * GLOBAL_MISSION_PAY_MULTIPLIER),
+  }
 
   return {
     ...board,
-    offeredMiningMission: chosen,
+    offeredMiningMission: tunedMission,
     offeringMiningPlanet: planetId,
   }
 }
