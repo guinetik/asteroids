@@ -19,7 +19,13 @@ import { computed } from 'vue'
 export type KeyPromptTone = 'cyan' | 'amber' | 'magenta' | 'green' | 'slate'
 
 /** Where on the screen the prompt anchors. */
-export type KeyPromptPosition = 'bottom' | 'bottom-low' | 'bottom-mid' | 'bottom-high' | 'top'
+export type KeyPromptPosition =
+  | 'inline'
+  | 'bottom'
+  | 'bottom-low'
+  | 'bottom-mid'
+  | 'bottom-high'
+  | 'top'
 
 /** Layout of the key vs label inside the pill. */
 export type KeyPromptVariant = 'inline' | 'split'

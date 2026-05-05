@@ -32,6 +32,12 @@
   border: 0;
 }
 
+.key-prompt--inline {
+  position: static;
+  left: auto;
+  transform: none;
+  padding: 0;
+}
 .key-prompt--bottom {
   bottom: 12rem;
 }
