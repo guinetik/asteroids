@@ -234,6 +234,7 @@ import {
 } from '@/lib/contracts/runtime'
 import type { ContractStoreSnapshot } from '@/lib/contracts/contractTypes'
 import type { ContractStepActivatedPayload } from '@/lib/contracts/ContractSystem'
+import { PinnedStationController } from '@/three/PinnedStationController'
 import {
   COMPASS_LABELS,
   computeCompassBearings,
@@ -317,6 +318,13 @@ const MISSION_FOCUS_CAMERA_HEIGHT = 15
 const MISSION_FOCUS_CAMERA_DISTANCE = 15
 
 /**
+ * Maximum distance (world units) between shuttle and a pinned station at which
+ * the dock F-prompt appears. Matches the order of magnitude of
+ * {@link MAP_ASTEROID_MISSION_APPROACH_RADIUS_WORLD} (~20 wu).
+ */
+const DOCK_PROXIMITY_M = 20
+
+/**
  * Bridges Vue lifecycle to the map scene with player shuttle.
  *
  * @author guinetik
@@ -343,6 +351,8 @@ export class MapViewController implements Tickable {
 
   private shuttleController: ShuttleController | null = null
   private shuttleEffects: MapShuttleEffects | null = null
+  /** Active Three.js controllers for contract-pinned station assets, keyed by assetRef. */
+  private pinnedStationControllers = new Map<string, PinnedStationController>()
   private evaSession: EvaSession | null = null
   private currentEvaPrompt: string | null = null
   /** Owns the UnrealBloomPass tweaks for EVA override, inspect swaps, and orbit clamp. */
@@ -753,6 +763,19 @@ export class MapViewController implements Tickable {
 
   /** Called when the player begins an asteroid mission (E at waypoint). */
   onBeginAsteroidMission: ((mission: GeneratedAsteroidMission) => void) | null = null
+
+  /**
+   * Reactive dock-prompt state. Non-null when the shuttle is within
+   * {@link DOCK_PROXIMITY_M} of a pinned station; null otherwise.
+   * Vue binds this to show the F-prompt and station label.
+   */
+  public readonly dockPromptState: Ref<{ assetRef: string; label: string } | null> = ref(null)
+
+  /**
+   * Callback fired when the player presses `beginMission` near a pinned station.
+   * Receives the asset ref of the nearest station. Vue uses this to open the dock panel.
+   */
+  public onRequestDock: ((assetRef: string) => void) | null = null
 
   /**
    * Called after a portal arrival docks to Earth orbit. Vue should show the
@@ -2212,15 +2235,49 @@ export class MapViewController implements Tickable {
       })
     }
 
+    // Sync pinned station Three.js controllers against active contracts.
+    this.syncPinnedStations()
+
     if (this.shuttleController && !this.shuttleController.dead) {
+      const beginMissionPressed =
+        this.inputManager?.wasActionPressed('beginMission') ?? false
       const mission = this.missionFacade.tryBeginAsteroidMission({
         shuttlePosition: this.shuttleController.position,
         orbitSystem: this.orbitSystem,
-        beginMissionPressed: this.inputManager?.wasActionPressed('beginMission') ?? false,
+        beginMissionPressed,
         cancelOrbitApproachFromMap: () => this.cancelOrbitApproachFromMap(),
       })
       if (mission) {
         this.onBeginAsteroidMission?.(mission)
+      }
+
+      // Dock proximity — sibling to mission proximity. Shows the F-prompt and opens the
+      // dock panel. Only runs when the asteroid-mission block did not consume the press
+      // (mission is null), to prevent a double-fire in the same frame.
+      if (!mission) {
+        const shuttlePos = this.shuttleController.position
+        let nearestRef: string | null = null
+        let nearestLabel = ''
+        let nearestDist = DOCK_PROXIMITY_M
+        for (const [ref, controller] of this.pinnedStationControllers) {
+          const d = shuttlePos.distanceTo(controller.getWorldPosition())
+          if (d < nearestDist) {
+            nearestDist = d
+            nearestRef = ref
+            const meta = contractSystem.getActivePinnedAssets().find((a) => a.assetRef === ref)
+            nearestLabel = meta?.label ?? 'STATION'
+          }
+        }
+        if (nearestRef) {
+          this.dockPromptState.value = { assetRef: nearestRef, label: nearestLabel }
+          if (beginMissionPressed) {
+            this.onRequestDock?.(nearestRef)
+          }
+        } else {
+          this.dockPromptState.value = null
+        }
+      } else {
+        this.dockPromptState.value = null
       }
     }
 
@@ -2545,6 +2602,36 @@ export class MapViewController implements Tickable {
       cullHalfExtentX: halfViewX,
       cullHalfExtentZ: halfViewZ,
     })
+  }
+
+  /**
+   * Diff the set of contract-pinned stations against the live Three.js registry.
+   * Spawns a {@link PinnedStationController} for each newly-active station asset and
+   * disposes controllers whose contracts are no longer active. Called once per tick.
+   */
+  private syncPinnedStations(): void {
+    const scene = this.sceneObjects?.scene
+    if (!scene) return
+    const desired = contractSystem.getActivePinnedAssets()
+    const desiredRefs = new Set(desired.map((a) => a.assetRef))
+    for (const [ref, controller] of this.pinnedStationControllers) {
+      if (!desiredRefs.has(ref)) {
+        controller.dispose()
+        this.pinnedStationControllers.delete(ref)
+      }
+    }
+    for (const a of desired) {
+      if (this.pinnedStationControllers.has(a.assetRef)) continue
+      if (!a.modelPath || !a.positionSeed) continue
+      this.pinnedStationControllers.set(
+        a.assetRef,
+        new PinnedStationController({
+          scene,
+          modelPath: a.modelPath,
+          positionSeed: a.positionSeed,
+        }),
+      )
+    }
   }
 
   /**
@@ -5479,6 +5566,10 @@ export class MapViewController implements Tickable {
       this.pendingModuleInstallTimer = null
     }
     this.shuttleController?.dispose()
+    for (const controller of this.pinnedStationControllers.values()) {
+      controller.dispose()
+    }
+    this.pinnedStationControllers.clear()
     this.beltControllers = []
     this.planetControllers = []
     this.gravitationalEventManager?.setNearbyHudCallbacks(null)

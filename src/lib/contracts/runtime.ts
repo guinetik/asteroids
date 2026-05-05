@@ -12,7 +12,7 @@
  */
 import { DevConsole } from '@/lib/devConsole'
 import { shipMessageSystem } from '@/lib/messages/runtime'
-import { removeItem } from '@/lib/inventory/inventory'
+import { addItem, removeItem, createInventory } from '@/lib/inventory/inventory'
 import { loadInventory, saveInventory } from '@/lib/inventory/inventoryStorage'
 import {
   addCredits,
@@ -227,6 +227,15 @@ export const contractSystem = new ContractSystem(CONTRACT_CATALOG, shipMessageSy
     }
   },
   consumeItemsForDelivery: (itemId, count) => consumeInventoryItems(itemId, count),
+  grantItemsForPickup: (itemId, count) => {
+    const inv = loadInventory() ?? createInventory()
+    const result = addItem(inv, itemId, count)
+    if (!result.ok) {
+      console.warn(`[contracts] grantItemsForPickup failed: ${result.reason ?? 'unknown reason'}`)
+      return
+    }
+    saveInventory(result.inventory)
+  },
   getInstalledUpgradeLevel: (upgradeId) => getInstalledUpgradeLevelForContracts(upgradeId),
   hasOrbitedPlanet: (planetId) => hasOrbitedPlanetForContracts(planetId),
 })
