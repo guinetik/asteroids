@@ -47,19 +47,6 @@
       ]
     },
     {
-      "kind": "visit-planet",
-      "planetId": "ceres-research-station",
-      "creditsReward": 4000,
-      "subject": "Step 2 — Welcome to the Station",
-      "flavor": [
-        "Young pilot —",
-        "Ceres orbit is a beast even with both packages installed. You will need both your gravity surfing and your orbital surfing rigs to make the corotating insertion — there is no other way to get to us cleanly. Come up. Have a look around. The lab tour is short; the coffee, if you will forgive the indulgence, is from a private supplier.",
-        "A small confession, while you are still in approach. What carries you up here — the neutron thruster, the manifold, the surfing rigs that hang off it — is, in a sense, borrowed. The lattice that produces your thrust is a viroid lattice. We did not invent the physics. We *recognized* it, on Phobos, after the drilling. Every ship in the system is flying on a piece of their biology dressed up in a pressure vessel. Keep that in mind during the tour. It will save me having to bring it up over coffee.",
-        "We keep the heavier work elsewhere. We will get to that.",
-        "— Porter"
-      ]
-    },
-    {
       "kind": "complete-missions",
       "count": 1,
       "missionType": "asteroid",

@@ -763,36 +763,6 @@
   ],
   "pinnedBodies": [
     {
-      "id": "ceres-research-station",
-      "name": "Ceres Research Station",
-      "order": 5.1,
-      "type": "Dwarf Planet",
-      "accentColor": "#A0B0C0",
-      "orbit": {
-        "semiMajorAxis": 2.767,
-        "eccentricity": 0.076,
-        "inclination": 10.59,
-        "longitudeOfAscendingNode": 80.329,
-        "argumentOfPeriapsis": 73.597,
-        "meanAnomalyOffset": 0.15,
-        "period": 1682
-      },
-      "displayRadius": 0.00015,
-      "axialTilt": 4,
-      "rotationSpeed": 2.654,
-      "noKiosks": true,
-      "shader": {
-        "type": "rockyPlanet",
-        "uniforms": {
-          "uBaseColor": [0.6, 0.65, 0.7],
-          "uHasAtmosphere": 0,
-          "uSeed": 501
-        }
-      },
-      "moons": [],
-      "mass": 1e-14
-    },
-    {
       "id": "hektor",
       "name": "624 Hektor",
       "order": 6.1,

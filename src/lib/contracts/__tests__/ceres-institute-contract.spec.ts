@@ -81,9 +81,9 @@ const rescue2Event: MissionCompletedEvent = {
 }
 
 describe('ceres-institute-eternal-biology schema', () => {
-  it('parses with 7 steps, completionByOutcome, pinnedAssets, requiredUpgrades', () => {
+  it('parses with 6 steps, completionByOutcome, pinnedAssets, requiredUpgrades', () => {
     expect(ceres.id).toBe('ceres-institute-eternal-biology')
-    expect(ceres.steps.length).toBe(7)
+    expect(ceres.steps.length).toBe(6) // TODO(plan): becomes 10 in Task 11
     expect(ceres.completionByOutcome).toBeTruthy()
     expect(ceres.completionByOutcome?.transmit).toBeTruthy()
     expect(ceres.completionByOutcome?.sabotage).toBeTruthy()
@@ -92,18 +92,18 @@ describe('ceres-institute-eternal-biology schema', () => {
     expect(ceres.homePlanet).toBe('ceres')
   })
 
-  it('step 7 is a choice-mission with transmit/sabotage outcomes', () => {
-    const step = ceres.steps[6] as ChoiceMissionStep
+  it('step 6 is a choice-mission with transmit/sabotage outcomes', () => {
+    const step = ceres.steps[5] as ChoiceMissionStep
     expect(step.kind).toBe('choice-mission')
     expect(step.outcomes.map((o) => o.outcomeId)).toEqual(['transmit', 'sabotage'])
     expect(step.specialMissionId).toBe('ceres-institute-archive-bunker')
   })
 
-  it('step credits sum to 37,000 across the six non-choice steps (50,000 total includes the 13,000 outcome)', () => {
+  it('step credits sum to 33,000 across the five non-choice steps (46,000 total includes the 13,000 outcome)', () => {
     const sum = ceres.steps
-      .slice(0, 6)
+      .slice(0, 5)
       .reduce((acc, step) => acc + ('creditsReward' in step ? (step.creditsReward ?? 0) : 0), 0)
-    expect(sum).toBe(37_000)
+    expect(sum).toBe(33_000)
   })
 
   it('lists gravitySurfing and orbitalSurfing as required upgrades', () => {
@@ -159,8 +159,8 @@ describe('ceres-institute-eternal-biology walkability', () => {
     const { contracts, granted, completed, credits } = buildSystem()
     driveToChoice(contracts)
     const inst = contracts.getInstance(ceres.id)
-    expect(inst?.currentStepIndex).toBe(6)
-    const step = ceres.steps[6] as ChoiceMissionStep
+    expect(inst?.currentStepIndex).toBe(5)
+    const step = ceres.steps[5] as ChoiceMissionStep
     const ok = contracts.notifyChoiceResolved(step.missionId, 'transmit')
     expect(ok).toBe(true)
     expect(contracts.getInstance(ceres.id)?.status).toBe('completed')
@@ -181,7 +181,7 @@ describe('ceres-institute-eternal-biology walkability', () => {
   it('drives sabotage arm end-to-end with disable-giver and exposed flag', () => {
     const { contracts, granted, credits } = buildSystem()
     driveToChoice(contracts)
-    const step = ceres.steps[6] as ChoiceMissionStep
+    const step = ceres.steps[5] as ChoiceMissionStep
     contracts.notifyChoiceResolved(step.missionId, 'sabotage')
     expect(contracts.getInstance(ceres.id)?.resolvedOutcomeId).toBe('sabotage')
     expect(credits).toEqual([13_000])
