@@ -2259,13 +2259,13 @@ export class MapViewController implements Tickable {
         let nearestRef: string | null = null
         let nearestLabel = ''
         let nearestDist = DOCK_PROXIMITY_M
+        const activeMeta = contractSystem.getActivePinnedAssets()
         for (const [ref, controller] of this.pinnedStationControllers) {
           const d = shuttlePos.distanceTo(controller.getWorldPosition())
           if (d < nearestDist) {
             nearestDist = d
             nearestRef = ref
-            const meta = contractSystem.getActivePinnedAssets().find((a) => a.assetRef === ref)
-            nearestLabel = meta?.label ?? 'STATION'
+            nearestLabel = activeMeta.find((a) => a.assetRef === ref)?.label ?? 'STATION'
           }
         }
         if (nearestRef) {
@@ -2279,6 +2279,8 @@ export class MapViewController implements Tickable {
       } else {
         this.dockPromptState.value = null
       }
+    } else {
+      this.dockPromptState.value = null
     }
 
     // Shop session restock tick
