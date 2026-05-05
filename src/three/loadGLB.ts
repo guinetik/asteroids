@@ -63,6 +63,37 @@ export function loadGLB(url: string): Promise<THREE.Group> {
 }
 
 /**
+ * Parents the loaded GLB root under a new group and offsets the inner root so the
+ * wrapper's origin sits at the asset's world-space bounding-box centre.
+ *
+ * Many third-party GLBs (e.g. Sketchfab) leave mesh data far from the root transform;
+ * rotations then orbit the wrong point and placement math breaks. Consumers should
+ * apply scale, rotation, and world position to the **returned** group, not the inner scene.
+ *
+ * The bounding box is taken **after** parenting so world matrices match the hierarchy;
+ * the centre is converted with {@link THREE.Group.worldToLocal} before subtracting from
+ * the inner scene position.
+ *
+ * @param scene - Root group returned by {@link loadGLB} (must not already have a parent)
+ * @returns A new parent group whose local origin is the content's bounding-box centre
+ */
+export function wrapSceneAtBoundingBoxCenter(scene: THREE.Group): THREE.Group {
+  const pivot = new THREE.Group()
+  pivot.name = scene.name ? `${scene.name}_pivot` : 'gltf_bbox_pivot'
+  pivot.add(scene)
+  pivot.updateMatrixWorld(true)
+
+  const box = new THREE.Box3().setFromObject(pivot)
+  if (!box.isEmpty()) {
+    const center = box.getCenter(new THREE.Vector3())
+    pivot.worldToLocal(center)
+    scene.position.sub(center)
+    scene.updateMatrixWorld(true)
+  }
+  return pivot
+}
+
+/**
  * Fix common GLB material issues for asteroid rendering.
  *
  * Forces double-sided rendering and softens specular response

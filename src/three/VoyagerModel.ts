@@ -24,7 +24,6 @@ const DEFAULT_RECEIVE_SHADOW = true
 
 let voyagerTemplate: THREE.Group | null = null
 let voyagerTemplatePromise: Promise<THREE.Group> | null = null
-let loggedTemplateStructure = false
 
 /**
  * Load the Voyager GLB once and cache the root group for cloning.
@@ -35,24 +34,33 @@ async function ensureVoyagerTemplate(): Promise<THREE.Group> {
     voyagerTemplatePromise = loadGLB(VOYAGER_MODEL_PUBLIC_PATH).then((scene) => {
       fixMaterials(scene)
       voyagerTemplate = scene
-      if (!loggedTemplateStructure) {
-        loggedTemplateStructure = true
-        const parts: string[] = []
-        scene.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            const mesh = child as THREE.Mesh
-            const mat = mesh.material as THREE.Material | undefined
-            parts.push(`• mesh="${mesh.name}" material="${mat?.name ?? '<unnamed>'}"`)
-          }
-        })
-        const box = new THREE.Box3().setFromObject(scene)
-        const size = new THREE.Vector3()
-        box.getSize(size)
-        console.info(
-          `[VoyagerModel] loaded mesh list (raw size ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}):\n` +
-            parts.join('\n'),
-        )
-      }
+      // Debug mesh-list dump — re-enable when diagnosing beacon anchor or scale issues.
+      // if (!loggedTemplateStructure) {
+      //   loggedTemplateStructure = true
+      //   const parts: string[] = []
+      //   scene.traverse((child) => {
+      //     if ((child as THREE.Mesh).isMesh) {
+      //       const mesh = child as THREE.Mesh
+      //       const mat = mesh.material as THREE.Material | undefined
+      //       const geom = mesh.geometry
+      //       if (!geom.boundingBox) geom.computeBoundingBox()
+      //       const sz = new THREE.Vector3()
+      //       geom.boundingBox!.getSize(sz)
+      //       const ctr = new THREE.Vector3()
+      //       geom.boundingBox!.getCenter(ctr)
+      //       parts.push(
+      //         `• mesh="${mesh.name}" material="${mat?.name ?? '<unnamed>'}" size=${sz.x.toFixed(2)}x${sz.y.toFixed(2)}x${sz.z.toFixed(2)} center=${ctr.x.toFixed(2)},${ctr.y.toFixed(2)},${ctr.z.toFixed(2)}`,
+      //       )
+      //     }
+      //   })
+      //   const box = new THREE.Box3().setFromObject(scene)
+      //   const size = new THREE.Vector3()
+      //   box.getSize(size)
+      //   console.info(
+      //     `[VoyagerModel] loaded mesh list (raw size ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}):\n` +
+      //       parts.join('\n'),
+      //   )
+      // }
       return scene
     })
   }
@@ -83,38 +91,48 @@ const VOYAGER_BEACON_DISTANCE_PER_SCALE = 70
 /** Matching per-scale bulb radius so the emissive bulb mesh stays body-proportional. */
 const VOYAGER_BEACON_RADIUS_PER_SCALE = 0.3
 
-/**
- * Max longest-axis : shortest-axis ratio for a mesh to count as a "body" candidate
- * when picking the beacon anchor. Anything more elongated (booms, magnetometer mast,
- * RTG truss) is excluded so the beacon doesn't land on a stick.
- */
-const VOYAGER_BODY_MAX_ELONGATION = 4
+/** Mesh name in `voyager.glb` that the beacon anchors to (high-gain antenna dish). */
+const VOYAGER_ANTENNA_MESH_NAME = 'voyager_antenna'
 
-/** Pick the center of the largest non-elongated mesh under `root` — the dish or bus. */
-function computeBodyCenter(root: THREE.Object3D): THREE.Vector3 {
-  let bestVolume = -1
-  const bestCenter = new THREE.Vector3()
-  const size = new THREE.Vector3()
-  const box = new THREE.Box3()
+/**
+ * Anchor the beacon at the geometric center of the named antenna mesh, computed in
+ * the mesh's LOCAL geometry space and then transformed to world. The world-AABB
+ * approach is unreliable here — the antenna mesh's rotated AABB picks up boom/strut
+ * extents and shifts the "center" off the dish; the geometry bbox is just the dish
+ * itself, so its center is reliably inside the parabolic bowl.
+ */
+function computeAntennaBeaconAnchor(root: THREE.Object3D): THREE.Vector3 {
+  let antennaNode: THREE.Object3D | null = null
   root.traverse((child) => {
-    const mesh = child as THREE.Mesh
-    if (!mesh.isMesh) return
-    box.setFromObject(mesh)
-    if (box.isEmpty()) return
-    box.getSize(size)
-    const longest = Math.max(size.x, size.y, size.z)
-    const shortest = Math.max(Math.min(size.x, size.y, size.z), 1e-6)
-    if (longest / shortest > VOYAGER_BODY_MAX_ELONGATION) return
-    const volume = size.x * size.y * size.z
-    if (volume > bestVolume) {
-      bestVolume = volume
-      box.getCenter(bestCenter)
-    }
+    if (antennaNode) return
+    if (child.name === VOYAGER_ANTENNA_MESH_NAME) antennaNode = child
   })
-  if (bestVolume < 0) {
-    new THREE.Box3().setFromObject(root).getCenter(bestCenter)
+  let antennaMesh: THREE.Mesh | null = null
+  if (antennaNode) {
+    ;(antennaNode as THREE.Object3D).traverse((child) => {
+      if (antennaMesh) return
+      const mesh = child as THREE.Mesh
+      if (mesh.isMesh) antennaMesh = mesh
+    })
   }
-  return bestCenter
+  const anchor = new THREE.Vector3()
+  if (!antennaMesh) {
+    new THREE.Box3().setFromObject(root).getCenter(anchor)
+    // console.warn(
+    //   `[VoyagerModel] antenna mesh "${VOYAGER_ANTENNA_MESH_NAME}" not found — beacon falling back to root center ${anchor.toArray().map((v) => v.toFixed(2)).join(',')}`,
+    // )
+    return anchor
+  }
+  const mesh = antennaMesh as THREE.Mesh
+  const geom = mesh.geometry
+  if (!geom.boundingBox) geom.computeBoundingBox()
+  geom.boundingBox!.getCenter(anchor)
+  mesh.updateWorldMatrix(true, false)
+  anchor.applyMatrix4(mesh.matrixWorld)
+  // console.info(
+  //   `[VoyagerModel] beacon anchor on "${mesh.name}" → ${anchor.toArray().map((v) => v.toFixed(2)).join(',')}`,
+  // )
+  return anchor
 }
 
 /**
@@ -163,11 +181,10 @@ export class VoyagerModel {
 
     const group = new THREE.Group()
     group.add(sceneClone)
-    // Whole-model bbox center is biased upward by the long booms / cradle truss, so
-    // the beacon lands in empty space above the bus. Instead pick the center of the
-    // largest non-elongated mesh — the dish or bus — which is reliably "inside" the
-    // hull regardless of GLB origin.
-    const beaconOffset = computeBodyCenter(sceneClone)
+    // Anchor on the named `voyager_antenna` mesh and nudge along world +Z so the bulb
+    // sits at the dish's outer face — the GLB is solid so a beacon at the geometric
+    // center would be hidden inside the hull.
+    const beaconOffset = computeAntennaBeaconAnchor(sceneClone)
     const beacon = options?.maintenanceState
       ? new MaintenanceBeacon(group, {
           offset: beaconOffset,
