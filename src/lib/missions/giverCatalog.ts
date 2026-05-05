@@ -22,6 +22,7 @@ import lucasMaverickData from '@/data/missions/givers/lucas-maverick.json'
 import martianMarinesBunkerData from '@/data/missions/givers/martian-marines-bunker.json'
 import mrFinchData from '@/data/missions/givers/mr-finch.json'
 import cloudCityOpsData from '@/data/missions/givers/cloud-city-ops.json'
+import ceresInstituteData from '@/data/missions/givers/ceres-institute.json'
 
 /** All mission givers loaded from JSON. */
 export const MISSION_GIVERS: MissionGiver[] = [
@@ -35,6 +36,7 @@ export const MISSION_GIVERS: MissionGiver[] = [
   martianMarinesBunkerData,
   mrFinchData,
   cloudCityOpsData,
+  ceresInstituteData,
 ] as unknown as MissionGiver[]
 
 /** Mission givers keyed by id. */
