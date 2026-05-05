@@ -556,6 +556,23 @@ export type AsteroidMissionStatus = 'available' | 'accepted' | 'in-transit'
 /** Standard procedural content or an authored special mission. */
 export type AsteroidMissionKind = 'standard' | 'special'
 
+/**
+ * Where a `kind: 'special'` mission is staged.
+ *
+ * - `'asteroid'` (implicit when omitted) — mission is placed on the asteroid mission slot
+ *   and pinned to `asteroidId`. This is the default for legacy specials
+ *   (`consortium-certification`, `jovian-prospection-*`).
+ * - `'planet-eva'` — mission is placed on the EVA mission board for `planetId`,
+ *   spawning a single POI of `poiType` (currently `'telescope'`).
+ *
+ * @author guinetik
+ * @date 2026-05-04
+ * @spec docs/superpowers/plans/2026-05-04-finch-recovery-contract-loop.md
+ */
+export type SpecialMissionTarget =
+  | { kind: 'asteroid' }
+  | { kind: 'planet-eva'; planetId: string; poiType: 'telescope' }
+
 /** A fully generated asteroid mission ready for play. */
 export interface GeneratedAsteroidMission {
   /** Whether the mission is procedural or authored special content. */
@@ -594,4 +611,11 @@ export interface GeneratedAsteroidMission {
   waypoint: { worldX: number; worldZ: number }
   /** Current status. */
   status: AsteroidMissionStatus
+  /**
+   * For `kind: 'special'` missions only — declares whether the mission is staged on
+   * the asteroid mission slot (default / omitted) or routed to the EVA mission board.
+   * Procedural missions and legacy asteroid specials leave this undefined; planet-EVA
+   * specials (e.g. Finch telescope-EVA missions) declare `{ kind: 'planet-eva', ... }`.
+   */
+  target?: SpecialMissionTarget
 }

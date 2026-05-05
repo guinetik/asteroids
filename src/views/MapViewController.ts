@@ -172,7 +172,10 @@ import type { OrbitalMiniGame, OrbitalMiniGameEvents } from '@/lib/minigame/Orbi
 import { createOrbitalMiniGame } from '@/lib/minigame/orbitalMiniGameFactory'
 import { SatelliteRepairController } from '@/three/SatelliteRepairController'
 import { SatelliteServicingMiniGame } from '@/lib/minigame/satelliteServicing/SatelliteServicingMiniGame'
-import type { ActiveVisitRelayMission } from '@/lib/missions/types'
+import type {
+  ActiveVisitRelayMission,
+  VisitRelayShuttleMissionTemplate,
+} from '@/lib/missions/types'
 import { PLANET_ORBITAL_CONFIGS } from '@/lib/missions/planetOrbitalConfig'
 import { MapModeCoordinator } from '@/lib/map/mode/MapModeCoordinator'
 import { MapOrbitFacade } from '@/lib/map/orbit/MapOrbitFacade'
@@ -4537,6 +4540,21 @@ export class MapViewController implements Tickable {
       this.messageFacade.enqueueById(offerMessageId, this.onMessageUpdate)
     }
 
+    if (mission.target?.kind === 'planet-eva') {
+      this.stagePlanetEvaSpecialMission(mission, mission.target)
+      return
+    }
+
+    this.stageAsteroidSpecialMission(mission)
+  }
+
+  /**
+   * Stage an asteroid-targeted special mission onto the asteroid mission slot
+   * (`activeAsteroidMission`). Used by legacy specials (Consortium, Jovian) and
+   * by Finch bunker missions whose `originPlanetId` places them near a target
+   * planet's orbit.
+   */
+  private stageAsteroidSpecialMission(mission: GeneratedAsteroidMission): void {
     const positions = this.snapshotBodyWorldPositions()
     const resolvedWaypoint = resolveSpecialMissionWaypoint(
       mission.asteroidId,
@@ -4555,6 +4573,49 @@ export class MapViewController implements Tickable {
       activeAsteroidMission: acceptedMission,
     }
     saveActiveMission(acceptedMission)
+    saveMissionBoard(this.missionBoard)
+    this.onMissionBoardUpdate?.(this.missionBoard)
+  }
+
+  /**
+   * Stage a planet-targeted EVA special mission onto the EVA mission board.
+   * Synthesizes a `VisitRelayShuttleMissionTemplate` from the special mission's
+   * name/briefing/reward and a fresh waypoint generated near the target planet.
+   * Used by Finch telescope EVAs (Saturn / Venus / Earth).
+   */
+  private stagePlanetEvaSpecialMission(
+    mission: GeneratedAsteroidMission,
+    target: { kind: 'planet-eva'; planetId: string; poiType: 'telescope' },
+  ): void {
+    const positions = this.snapshotBodyWorldPositions()
+    const planetPos = positions.get(target.planetId)
+    if (!planetPos) {
+      console.warn(
+        `[MapView] Planet position not available for planet-eva special mission: ${mission.id} → ${target.planetId}`,
+      )
+      return
+    }
+
+    const waypoint = generateEvaWaypoint(planetPos.x, planetPos.z, target.planetId)
+    const template: VisitRelayShuttleMissionTemplate = {
+      id: mission.id,
+      name: mission.name,
+      description: mission.briefing,
+      poiType: target.poiType,
+      minigameType: 'telescope_alignment',
+      reward: mission.totalReward,
+    }
+    const active: ActiveVisitRelayMission = {
+      template,
+      giverPlanet: target.planetId,
+      waypoint,
+      status: 'active',
+    }
+
+    this.missionBoard = {
+      ...this.missionBoard,
+      activeEvaMissions: [...this.missionBoard.activeEvaMissions, active],
+    }
     saveMissionBoard(this.missionBoard)
     this.onMissionBoardUpdate?.(this.missionBoard)
   }
@@ -4586,6 +4647,8 @@ export class MapViewController implements Tickable {
     if (activeId === missionId) return
     const stored = loadActiveMission()
     if (stored?.id === missionId) return
+    const inEvaBoard = this.missionBoard.activeEvaMissions.some((m) => m.template.id === missionId)
+    if (inEvaBoard) return
 
     this.stageSpecialMission(missionId, offerMessageId)
   }
@@ -4615,6 +4678,10 @@ export class MapViewController implements Tickable {
 
       const activeId = this.missionBoard.activeAsteroidMission?.id
       if (activeId === missionId) continue
+      const inEvaBoard = this.missionBoard.activeEvaMissions.some(
+        (m) => m.template.id === missionId,
+      )
+      if (inEvaBoard) continue
 
       this.stageSpecialMission(missionId, null)
     }
