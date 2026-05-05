@@ -1,0 +1,174 @@
+{
+  "id": "ceres-institute-eternal-biology",
+  "homePlanet": "ceres",
+  "inboxName": "Ceres Institute",
+  "from": "Dean Bernard Porter, Ceres Institute for Eternal Biology",
+  "sentAt": "2306-05-04 09:12 UTC",
+  "offerWhenPrerequisites": {
+    "requiredUpgrades": [
+      { "upgradeId": "gravitySurfing", "minLevel": 1 },
+      { "upgradeId": "orbitalSurfing", "minLevel": 1 }
+    ],
+    "triggerOnPlanetVisited": "ceres"
+  },
+  "pinnedAssets": [
+    {
+      "assetRef": "ceres-archive-site",
+      "region": "kuiper-belt",
+      "label": "Site CIB-7"
+    }
+  ],
+  "introSubject": "An Introduction, and a Standing Invitation",
+  "introBody": [
+    "Young pilot —",
+    "Your work for our funders has not gone unnoticed. The Institute would be honored to retain you for a sequence of small services. Nothing taxing. Largely errands, with a few calibrations toward the end. Compensation is academic-grade, which is to say generous.",
+    "We do not advertise our work. Most of what we publish is in journals you would not have heard of, and most of what we do is, regrettably, the kind of patient laboratory science that does not photograph well. But it is good science. And it is well-funded.",
+    "Acceptance below. Please read at your leisure.",
+    "— Dean Bernard Porter, Ceres Institute for Eternal Biology"
+  ],
+  "steps": [
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "missionType": "shuttle",
+      "giverPlanetId": "ceres",
+      "specialMissionId": "ceres-institute-earth-supplies",
+      "creditsReward": 2500,
+      "subject": "Step 1 — Calibration Standards from Earth",
+      "flavor": [
+        "Young pilot —",
+        "We need spectrometry calibration standards from the ESA stockpile on Earth. Our equipment is finicky; the standards drift if they are sourced from anywhere closer to the sun, and the Earth lab is willing to release a set under our standing requisition. Treat it as a paid familiarization run.",
+        "Pickup details are on your kiosk. Bring the case home in one piece.",
+        "— Porter"
+      ]
+    },
+    {
+      "kind": "visit-planet",
+      "planetId": "ceres-research-station",
+      "creditsReward": 4000,
+      "subject": "Step 2 — Welcome to the Station",
+      "flavor": [
+        "Young pilot —",
+        "Ceres orbit is a beast even with both packages installed. You'll need both your gravity surfing and orbital surfing rigs to make the corotating insertion — there is no other way to get to us cleanly. Come up. Have a look around. The lab tour is short; the coffee, if you'll forgive the indulgence, is from a private supplier.",
+        "We keep the heavier work elsewhere.",
+        "— Porter"
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "missionType": "asteroid",
+      "giverPlanetId": "ceres",
+      "objectiveType": "rescue",
+      "specialMissionId": "ceres-institute-rescue-1",
+      "creditsReward": 6500,
+      "subject": "Step 3 — A Field Team, Silent",
+      "flavor": [
+        "Young pilot —",
+        "A field team went silent on a viroid sample run. Extract who you can. The viroids are a known hazard of the work, but a hazard worth braving — the data their samples produce is, frankly, irreplaceable.",
+        "While you are out there: collect a few units of psychosphere for us. The research is promising, and the material is harmless in handled quantities. The Institute pays the going rate per unit.",
+        "Bring our people home.",
+        "— Porter"
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "missionType": "asteroid",
+      "giverPlanetId": "ceres",
+      "objectiveType": "mineral-analysis",
+      "specialMissionId": "ceres-institute-mineral-analysis",
+      "creditsReward": 6000,
+      "subject": "Step 4 — Surface Composition Pass",
+      "flavor": [
+        "Young pilot —",
+        "Ceres's eccentric orbit puts certain rare-earth resonances within reach nowhere else in the system. The readings refine our theoretical model. The model is — well. You'll hear about the model when there is something to hear.",
+        "Run the mineral analysis. Submit clean readings. The Institute prefers signal quality over speed.",
+        "— Porter"
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "missionType": "asteroid",
+      "giverPlanetId": "ceres",
+      "objectiveType": "dan",
+      "specialMissionId": "ceres-institute-dan",
+      "creditsReward": 7500,
+      "subject": "Step 5 — DAN Albedo Survey",
+      "flavor": [
+        "Young pilot —",
+        "There is a phenomenon we call DAN albedo. Neutron-rich materials seem to *attract* viroid attention — the readings spike as the colonies approach. We are studying why. We have hypotheses.",
+        "Run a Dynamic Albedo of Neutrons pass on the asset on file. Capture the particle return cleanly; ignore any sensor cross-talk you may register during the pass. The instrumentation team is, I am told, certain that the cross-talk is harmless.",
+        "— Porter"
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "missionType": "asteroid",
+      "giverPlanetId": "ceres",
+      "objectiveType": "rescue",
+      "specialMissionId": "ceres-institute-rescue-2",
+      "creditsReward": 10500,
+      "subject": "Step 6 — Another Team",
+      "flavor": [
+        "Young pilot —",
+        "Another team. The viroids do not discriminate, and we do not abandon our own. I am sorry to ask twice.",
+        "More psychosphere if your cargo allows. The DAN series is recalibrating and the instrumentation team is on a tight schedule.",
+        "Bring them home.",
+        "— Porter"
+      ]
+    },
+    {
+      "kind": "choice-mission",
+      "missionId": "ceres_archive_transmission",
+      "minigameType": "terminal-prospectus",
+      "pinnedAssetRef": "ceres-archive-site",
+      "specialMissionId": "ceres-institute-archive-bunker",
+      "outcomes": [
+        { "outcomeId": "transmit", "label": "Transmit Archive", "creditsReward": 13000 },
+        { "outcomeId": "sabotage", "label": "Sabotage Archive", "creditsReward": 13000 }
+      ],
+      "subject": "Step 7 — Archive Transmission",
+      "flavor": [
+        "Young pilot —",
+        "One last matter. We have prepared an archive — a culmination of the past several months of your work. The terminal at the Kuiper site, Site CIB-7, is the secure transmit point. Reach it the same way you reached the station.",
+        "There is a chimera presence at the site. Please clear it. After transmission, walk away with our full thanks.",
+        "Please don't read the archive. It would only confuse you.",
+        "— Porter"
+      ]
+    }
+  ],
+  "completionByOutcome": {
+    "transmit": {
+      "completionSubject": "Concluded — With the Institute's Thanks",
+      "completionBody": [
+        "Young pilot —",
+        "You have helped us cross a threshold. The Foundation will remember.",
+        "Your retainer is paid in full, with the Institute's gratitude. Cerean traffic control has been instructed to extend you fast-travel privileges in perpetuity, and your future work with us — should you choose it — will be compensated at our partner rate.",
+        "We hope to see you again soon.",
+        "— Porter"
+      ],
+      "rewards": [
+        { "type": "fast-travel", "planetId": "ceres" },
+        { "type": "mission-pay-multiplier", "planetId": "ceres", "multiplier": 2 },
+        { "type": "set-story-flag", "flag": "ceres-archive-transmitted" }
+      ]
+    },
+    "sabotage": {
+      "completionSubject": "File Closure",
+      "completionBody": [
+        "You are, of course, no longer welcome at the Institute.",
+        "Your retainer has been settled. We will not be in contact again.",
+        "— Porter"
+      ],
+      "rewards": [
+        { "type": "fast-travel", "planetId": "ceres" },
+        { "type": "disable-giver", "giverId": "ceres-institute" },
+        { "type": "set-story-flag", "flag": "ceres-archive-sabotaged" },
+        { "type": "set-story-flag", "flag": "ceres-cult-exposed" }
+      ]
+    }
+  }
+}
