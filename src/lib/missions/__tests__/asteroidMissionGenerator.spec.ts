@@ -499,8 +499,8 @@ describe('generateAsteroidMission', () => {
   it('can force a DAN mission for DAN-capable givers', () => {
     const mission = generateAsteroidMission(6, null, () => 0, 'dan')
 
-    expect(['jovian-society', 'cinderline']).toContain(mission.giverId)
-    expect(mission.region).toBe('jovian-trojans')
+    expect(['jovian-society', 'cinderline', 'ceres-institute']).toContain(mission.giverId)
+    expect(['jovian-trojans', 'asteroid-belt']).toContain(mission.region)
     expect(mission.objectives.some((objective) => objective.type === 'dan')).toBe(true)
   })
 
@@ -508,7 +508,7 @@ describe('generateAsteroidMission', () => {
     for (const difficulty of [4, 7, 8, 10]) {
       const mission = generateAsteroidMission(difficulty, null, () => 0, 'dan')
 
-      expect(['jovian-society', 'cinderline']).toContain(mission.giverId)
+      expect(['jovian-society', 'cinderline', 'ceres-institute']).toContain(mission.giverId)
       expect(mission.difficulty).toBe(difficulty)
       expect(mission.objectives.some((objective) => objective.type === 'dan')).toBe(true)
     }

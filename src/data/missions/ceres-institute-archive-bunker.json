@@ -1,0 +1,24 @@
+{
+  "kind": "special",
+  "id": "ceres-institute-archive-bunker",
+  "asteroidId": "ceres-archive-site",
+  "giverId": "ceres-institute",
+  "giverName": "Ceres Institute",
+  "templateId": "ceres-institute-archive-bunker",
+  "name": "Step 7 — Archive Transmission",
+  "briefing": "Young pilot — clear the chimera presence at the Kuiper site, then approach the terminal and choose: transmit the archive to the Institute, or sabotage it. — Porter",
+  "difficulty": 8,
+  "region": "kuiper-belt",
+  "objectives": [
+    {
+      "type": "bunker",
+      "x": 0,
+      "z": 0,
+      "enemyVariant": "astronaut-chimera",
+      "reward": 0
+    }
+  ],
+  "totalReward": 0,
+  "waypoint": { "worldX": 0, "worldZ": 0 },
+  "status": "available"
+}

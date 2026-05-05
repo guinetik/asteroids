@@ -13,6 +13,12 @@ import jovianHektorDan from '@/data/missions/jovian-prospection-hektor-dan.json'
 import jovianHektorProspectus from '@/data/missions/jovian-prospection-hektor-prospectus.json'
 import jovianSaturnPhotometry from '@/data/missions/jovian-prospection-saturn-photometry.json'
 import jovianSaturnDan from '@/data/missions/jovian-prospection-saturn-dan.json'
+import ceresEarthSupplies from '@/data/missions/ceres-institute-earth-supplies.json'
+import ceresRescue1 from '@/data/missions/ceres-institute-rescue-1.json'
+import ceresRescue2 from '@/data/missions/ceres-institute-rescue-2.json'
+import ceresMineralAnalysis from '@/data/missions/ceres-institute-mineral-analysis.json'
+import ceresDan from '@/data/missions/ceres-institute-dan.json'
+import ceresArchiveBunker from '@/data/missions/ceres-institute-archive-bunker.json'
 
 export const SPECIAL_MISSIONS: GeneratedAsteroidMission[] = [
   consortiumCertificationData,
@@ -21,6 +27,12 @@ export const SPECIAL_MISSIONS: GeneratedAsteroidMission[] = [
   jovianHektorProspectus,
   jovianSaturnPhotometry,
   jovianSaturnDan,
+  ceresEarthSupplies,
+  ceresRescue1,
+  ceresRescue2,
+  ceresMineralAnalysis,
+  ceresDan,
+  ceresArchiveBunker,
 ] as unknown as GeneratedAsteroidMission[]
 
 const SPECIAL_MISSIONS_BY_ID = new Map(

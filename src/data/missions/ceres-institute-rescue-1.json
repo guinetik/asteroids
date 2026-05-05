@@ -1,0 +1,26 @@
+{
+  "kind": "special",
+  "id": "ceres-institute-rescue-1",
+  "asteroidId": "ceres-rescue-site-1",
+  "giverId": "ceres-institute",
+  "giverName": "Ceres Institute",
+  "templateId": "ceres-institute-rescue-1",
+  "name": "Step 3 — A Field Team, Silent",
+  "briefing": "Young pilot — extract the Institute field team that went silent on a viroid sample run. Bring our people home. While you're out there, collect a few units of psychosphere for the lab. — Porter",
+  "difficulty": 5,
+  "region": "asteroid-belt",
+  "objectives": [
+    {
+      "type": "rescue",
+      "x": 0,
+      "z": 0,
+      "colonistCount": 4,
+      "oxygenTime": 220,
+      "isGuarded": true,
+      "reward": 6500
+    }
+  ],
+  "totalReward": 6500,
+  "waypoint": { "worldX": 0, "worldZ": 0 },
+  "status": "available"
+}

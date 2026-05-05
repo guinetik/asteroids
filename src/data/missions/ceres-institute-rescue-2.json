@@ -1,0 +1,26 @@
+{
+  "kind": "special",
+  "id": "ceres-institute-rescue-2",
+  "asteroidId": "ceres-rescue-site-2",
+  "giverId": "ceres-institute",
+  "giverName": "Ceres Institute",
+  "templateId": "ceres-institute-rescue-2",
+  "name": "Step 6 — Another Team",
+  "briefing": "Young pilot — another team has gone silent. The viroids do not discriminate, and we do not abandon our own. Extract the field team and collect more psychosphere if your cargo allows. — Porter",
+  "difficulty": 7,
+  "region": "asteroid-belt",
+  "objectives": [
+    {
+      "type": "rescue",
+      "x": 0,
+      "z": 0,
+      "colonistCount": 5,
+      "oxygenTime": 200,
+      "isGuarded": true,
+      "reward": 10500
+    }
+  ],
+  "totalReward": 10500,
+  "waypoint": { "worldX": 0, "worldZ": 0 },
+  "status": "available"
+}
