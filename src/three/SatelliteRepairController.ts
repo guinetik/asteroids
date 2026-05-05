@@ -41,13 +41,13 @@ const REPAIR_HOLD_SECONDS = 2
 const REPAIR_COMPLETE_COLOR = 0x4ade80
 
 /** How many successful science-bolt hits on a part are required to finish it. */
-const SCIENCE_REPAIR_HITS_PER_COMPONENT = 3
+const SCIENCE_REPAIR_HITS_PER_COMPONENT = 8
 
 /**
  * Inflates each part’s AABB for hit tests so thin solar meshes (paper-thin in
  * world space) still register against the science bolt step.
  */
-const SATELLITE_REPAIR_AABB_SLACK_UNITS = 14
+const SATELLITE_REPAIR_AABB_SLACK_UNITS = 30
 
 /**
  * When two overlapping AABBs share the same segment entry (common for nested
@@ -283,9 +283,10 @@ export class SatelliteRepairController {
    * Wireframe tint from remaining science hits (3=red, 2=orange, 1=lime).
    */
   private setWireframeProgressColor(wireframe: THREE.Object3D, hitsRemaining: number): void {
-    if (hitsRemaining >= 3) {
+    const frac = hitsRemaining / SCIENCE_REPAIR_HITS_PER_COMPONENT
+    if (frac > 2 / 3) {
       this.setWireframeColor(wireframe, DAMAGE_WIREFRAME_COLOR)
-    } else if (hitsRemaining === 2) {
+    } else if (frac > 1 / 3) {
       this.setWireframeColor(wireframe, AIM_ORANGE)
     } else {
       this.setWireframeColor(wireframe, ALMOST_REPAIRED_WIREFRAME_COLOR)
