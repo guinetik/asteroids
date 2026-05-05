@@ -20,6 +20,7 @@ import DamageFeedback from '@/components/DamageFeedback.vue'
 import LevelMinimap from '@/components/LevelMinimap.vue'
 import type { MapMarker } from '@/components/LevelMinimap.vue'
 import PickupToast from '@/components/PickupToast.vue'
+import KeyPrompt from '@/components/KeyPrompt.vue'
 import type {
   PickupEntry,
   ProspectEntry,
@@ -104,6 +105,18 @@ const inventorySnapshot = ref<Inventory | null>(null)
 /** Positive deltas vs sortie baseline for cargo panel badges (catalog id → qty). */
 const inventoryRunGainsThisSortie = ref<Record<string, number>>({})
 const terminalPrompt = ref<string | null>(null)
+/**
+ * Parse a `[X] LABEL` style prompt string into {key, label}. Falls back
+ * to a generic `E` keycap and the raw string when no bracket prefix is
+ * present (used by disturbance alerts which are free-form).
+ */
+const terminalPromptParsed = computed<{ key: string; label: string } | null>(() => {
+  const raw = terminalPrompt.value
+  if (!raw) return null
+  const match = raw.match(/^\s*\[([^\]]+)\]\s*(.+)$/)
+  if (match) return { key: match[1]!.trim(), label: match[2]!.trim() }
+  return { key: 'ALERT', label: raw }
+})
 const announceVisible = ref(false)
 const announceAsteroid = ref('')
 const announceMission = ref('')
@@ -1124,21 +1137,34 @@ function handleToggleMusic(): void {
       ATTITUDE
     </div>
   </div>
-  <div
+  <KeyPrompt
     v-if="stateInfo.state === 'lander' && stateInfo.grounded"
-    class="exit-prompt exit-prompt--vehicle"
-  >
-    <span class="exit-prompt__text">EXIT (F)</span>
-  </div>
-  <div v-if="stateInfo.canEnterLander && !inBunker" class="exit-prompt exit-prompt--vehicle">
-    <span class="exit-prompt__text">ENTER (F)</span>
-  </div>
-  <div v-if="terminalPrompt" class="exit-prompt">
-    <span class="exit-prompt__text exit-prompt__text--terminal">{{ terminalPrompt }}</span>
-  </div>
-  <div v-if="stateInfo.canExfil && !inBunker" class="exit-prompt exit-prompt--vehicle">
-    <span class="exit-prompt__text">EXFILTRATE (F)</span>
-  </div>
+    key-label="F"
+    action="EXIT"
+    tone="amber"
+    position="bottom-mid"
+  />
+  <KeyPrompt
+    v-if="stateInfo.canEnterLander && !inBunker"
+    key-label="F"
+    action="ENTER"
+    tone="amber"
+    position="bottom-mid"
+  />
+  <KeyPrompt
+    v-if="terminalPromptParsed"
+    :key-label="terminalPromptParsed.key"
+    :action="terminalPromptParsed.label"
+    tone="green"
+    position="bottom-high"
+  />
+  <KeyPrompt
+    v-if="stateInfo.canExfil && !inBunker"
+    key-label="F"
+    action="EXFILTRATE"
+    tone="magenta"
+    position="bottom-mid"
+  />
   <div v-if="arrivalFade > 0" class="death-fade" :style="{ opacity: arrivalFade }" />
   <div v-if="deathFade > 0" class="death-fade" :style="{ opacity: deathFade }" />
   <div v-if="deathMessage" class="death-message">
@@ -1294,37 +1320,6 @@ function handleToggleMusic(): void {
 }
 .letterbox-bar--hidden {
   height: 0;
-}
-.exit-prompt {
-  position: fixed;
-  /* Cyan terminal/mission-context prompt anchor — sits in the upper-middle
-     band so it's clearly readable above the action prompt. */
-  bottom: 22%;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 30;
-  pointer-events: none;
-}
-.exit-prompt__text {
-  font-family: 'Datatype', ui-monospace, monospace;
-  font-size: 1.1rem;
-  color: rgba(255, 255, 255, 0.8);
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  background: rgba(0, 0, 0, 0.5);
-  padding: 0.4rem 1.2rem;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-.exit-prompt--vehicle {
-  /* Vehicle action prompts sit just above the EVA O2/STA numeric labels
-     (the O2 reading sits ~15% from bottom) and the lander thruster dock,
-     while still leaving the cyan mission-context prompt readable above. */
-  bottom: 18%;
-}
-.exit-prompt__text--terminal {
-  border-color: rgba(0, 255, 204, 0.5);
-  color: rgba(0, 255, 204, 0.9);
-  text-shadow: 0 0 8px rgba(0, 255, 204, 0.5);
 }
 .death-fade {
   position: fixed;

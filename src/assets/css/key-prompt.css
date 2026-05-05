@@ -1,0 +1,109 @@
+/*
+ * Standardized on-screen key prompt — used for every "press X to do Y"
+ * UI string in the game. Tones color-code context:
+ *   cyan    — EVA / suit actions
+ *   amber   — vehicle ingress/egress
+ *   magenta — risky / one-way commits (exfil)
+ *   green   — terminals, data, mission-focus interactions
+ *   slate   — low-stakes navigation hints
+ */
+
+.key-prompt {
+  --prompt-accent: 34, 211, 238;
+  --prompt-glow: rgba(var(--prompt-accent), 0.18);
+  --prompt-border: rgba(var(--prompt-accent), 0.45);
+  --prompt-text: rgba(var(--prompt-accent), 0.95);
+
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1.5rem;
+}
+
+.key-prompt--clickable {
+  pointer-events: auto;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+.key-prompt--bottom {
+  bottom: 12rem;
+}
+.key-prompt--bottom-low {
+  bottom: 6rem;
+}
+.key-prompt--bottom-mid {
+  bottom: 18%;
+}
+.key-prompt--bottom-high {
+  bottom: 22%;
+}
+.key-prompt--top {
+  top: 6rem;
+}
+
+.key-prompt__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 1.1rem;
+  border-radius: 9999px;
+  border: 1px solid var(--prompt-border);
+  background: rgba(8, 12, 20, 0.68);
+  color: var(--prompt-text);
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  box-shadow: 0 0 24px var(--prompt-glow);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.key-prompt--clickable:hover .key-prompt__pill {
+  border-color: rgba(var(--prompt-accent), 0.85);
+  box-shadow: 0 0 28px rgba(var(--prompt-accent), 0.35);
+}
+
+.key-prompt__cap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid rgba(var(--prompt-accent), 0.55);
+  border-radius: 0.25rem;
+  background: rgba(var(--prompt-accent), 0.08);
+  font-size: 0.7rem;
+  letter-spacing: 0.22em;
+  color: rgba(var(--prompt-accent), 1);
+  text-shadow: 0 0 6px rgba(var(--prompt-accent), 0.45);
+}
+
+.key-prompt__label {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+/* Tones */
+.key-prompt--cyan {
+  --prompt-accent: 34, 211, 238;
+}
+.key-prompt--amber {
+  --prompt-accent: 251, 191, 36;
+}
+.key-prompt--magenta {
+  --prompt-accent: 236, 72, 153;
+}
+.key-prompt--green {
+  --prompt-accent: 16, 235, 170;
+}
+.key-prompt--slate {
+  --prompt-accent: 148, 163, 184;
+}
