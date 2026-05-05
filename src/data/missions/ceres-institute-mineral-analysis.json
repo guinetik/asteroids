@@ -20,6 +20,11 @@
     }
   ],
   "totalReward": 6000,
+  "grantsItemOnComplete": {
+    "itemId": "ceres-mineral-results-crate",
+    "count": 1,
+    "replenishWhileStepOpen": true
+  },
   "waypoint": { "worldX": 0, "worldZ": 0 },
   "status": "available"
 }

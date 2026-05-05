@@ -23,6 +23,11 @@
     }
   ],
   "totalReward": 7500,
+  "grantsItemOnComplete": {
+    "itemId": "ceres-dan-results-crate",
+    "count": 1,
+    "replenishWhileStepOpen": true
+  },
   "waypoint": { "worldX": 0, "worldZ": 0 },
   "status": "available"
 }
