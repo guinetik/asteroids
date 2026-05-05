@@ -10,6 +10,7 @@
 import { describe, expect, it } from 'vitest'
 import { MessageSystem } from '@/lib/messages/messageSystem'
 import ceresRaw from '@/data/contracts/ceres-institute-eternal-biology.json'
+import ceresArchiveBunker from '@/data/missions/ceres-institute-archive-bunker.json'
 import { ContractSystem } from '../ContractSystem'
 import { emptyContractSnapshot } from '../contractStorage'
 import type {
@@ -108,6 +109,23 @@ describe('ceres-institute-eternal-biology schema', () => {
   it('lists gravitySurfing and orbitalSurfing as required upgrades', () => {
     const ids = ceres.offerWhenPrerequisites?.requiredUpgrades?.map((u) => u.upgradeId)
     expect(ids).toEqual(['gravitySurfing', 'orbitalSurfing'])
+  })
+})
+
+describe('ceres-institute-archive-bunker mission JSON drift guard', () => {
+  it('carries enemyVariant: astronaut-chimera on the bunker objective', () => {
+    const bunker = ceresArchiveBunker as {
+      objectives: ReadonlyArray<{ type: string; enemyVariant?: string }>
+    }
+    const bunkerObjective = bunker.objectives.find((o) => o.type === 'bunker')
+    expect(bunkerObjective).toBeDefined()
+    expect(bunkerObjective?.enemyVariant).toBe('astronaut-chimera')
+  })
+
+  it('references the ceres-archive-site asteroid and ceres-institute giver', () => {
+    const mission = ceresArchiveBunker as { asteroidId: string; giverId: string }
+    expect(mission.asteroidId).toBe('ceres-archive-site')
+    expect(mission.giverId).toBe('ceres-institute')
   })
 })
 

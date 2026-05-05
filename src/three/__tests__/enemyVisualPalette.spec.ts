@@ -104,6 +104,59 @@ describe('enemy visual palettes', () => {
   })
 })
 
+describe('astronaut-chimera variant', () => {
+  it('adds child meshes to the group when variant is astronaut-chimera', () => {
+    const standard = new ChimeraWalkerController(createEnemy(), { visualTier: 'default' })
+    const withRider = new ChimeraWalkerController(createEnemy(), {
+      visualTier: 'default',
+      variant: 'astronaut-chimera',
+    })
+
+    const countMeshes = (root: THREE.Object3D): number => {
+      let n = 0
+      root.traverse((c) => {
+        if (c instanceof THREE.Mesh) n++
+      })
+      return n
+    }
+
+    // The astronaut rider adds torso + helmet + visor + 2 arms = 5 extra meshes.
+    expect(countMeshes(withRider.group)).toBeGreaterThan(countMeshes(standard.group))
+
+    standard.dispose()
+    withRider.dispose()
+  })
+
+  it('does not add a rider when variant is standard or omitted', () => {
+    const implicit = new ChimeraWalkerController(createEnemy())
+    const explicit = new ChimeraWalkerController(createEnemy(), { variant: 'standard' })
+
+    const countMeshes = (root: THREE.Object3D): number => {
+      let n = 0
+      root.traverse((c) => {
+        if (c instanceof THREE.Mesh) n++
+      })
+      return n
+    }
+
+    expect(countMeshes(implicit.group)).toBe(countMeshes(explicit.group))
+
+    implicit.dispose()
+    explicit.dispose()
+  })
+
+  it('includes off-white suit material in the rider mesh set', () => {
+    const chimera = new ChimeraWalkerController(createEnemy(), {
+      variant: 'astronaut-chimera',
+    })
+
+    const SUIT_WHITE = 0xe8e8e0
+    expect(basicMaterialColors(chimera.group)).toEqual(expect.arrayContaining([SUIT_WHITE]))
+
+    chimera.dispose()
+  })
+})
+
 /**
  * Create a bare enemy entity for visual-controller tests.
  */

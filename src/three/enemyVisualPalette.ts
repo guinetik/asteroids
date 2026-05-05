@@ -58,6 +58,13 @@ export interface EnemyVisualControllerOptions {
    * lights (legacy paths that have not been wired through the pool).
    */
   lightPool?: import('@/three/EnemyLightPool').EnemyLightPool | null
+  /**
+   * Optional visual variant for this enemy instance. When `'astronaut-chimera'`,
+   * the chimera controller parents a T-pose astronaut figure on top of its body —
+   * used exclusively for the Ceres Institute archive-bunker finale.
+   * All other controllers ignore this field. Defaults to `'standard'` (no rider).
+   */
+  variant?: import('@/lib/missions/types').BunkerEnemyVariant
 }
 
 /**

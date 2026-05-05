@@ -136,6 +136,12 @@ export interface BunkerSceneControllerOptions {
    * — first wave will hitch on every spawn).
    */
   lightPool?: import('@/three/EnemyLightPool').EnemyLightPool | null
+  /**
+   * Optional enemy variant applied to all chimera spawns in this bunker.
+   * When `'astronaut-chimera'`, each chimera carries a procedural T-pose
+   * astronaut rider. Combat stats are unchanged. Defaults to `'standard'`.
+   */
+  enemyVariant?: import('@/lib/missions/types').BunkerEnemyVariant
 }
 
 /** Interior scene wrapper — the level view treats this as a black box. */
@@ -168,6 +174,12 @@ export class BunkerSceneController {
   private readonly enemyProjectileMeshPool: EnemyProjectileMeshPool
   /** Shared point-light pool for spawned wave enemies, or `null` to self-allocate. */
   private readonly lightPool: import('@/three/EnemyLightPool').EnemyLightPool | null
+  /**
+   * Enemy visual variant applied to all chimera spawns in this bunker scene.
+   * `'standard'` (default) produces the normal chimera. `'astronaut-chimera'`
+   * parents a procedural T-pose astronaut figure on each chimera's body.
+   */
+  private readonly enemyVariant: import('@/lib/missions/types').BunkerEnemyVariant
   private readonly interiorMaterials: BunkerInteriorMaterialSet
   private readonly geometry: BunkerGeometry
   private readonly phageControllers = new Map<number, BacteriophageController>()
@@ -192,6 +204,7 @@ export class BunkerSceneController {
     )
     this.enemyVisualTier = bunkerEnemyVisualTier(opts.difficulty ?? BUNKER_MIN_DIFFICULTY)
     this.lightPool = opts.lightPool ?? null
+    this.enemyVariant = opts.enemyVariant ?? 'standard'
     this.enemyProjectileMeshPool = new EnemyProjectileMeshPool(opts.scene)
     this.enemyProjectileMeshPool.prewarm()
     this.interiorMaterials = opts.interiorMaterials
@@ -567,6 +580,7 @@ export class BunkerSceneController {
       const ctrl = new ChimeraWalkerController(handle.enemy, {
         visualTier: this.enemyVisualTier,
         lightPool: this.lightPool,
+        variant: this.enemyVariant,
       })
       this.geometry.root.add(ctrl.group)
       this.chimeraControllers.set(handle.id, ctrl)
