@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
+  BRIBE_BASE_COST,
+  bribeRestockShop,
   createShopSession,
+  getBribeCost,
   tickShopSession,
   buyTradeGood,
   sellTradeGood,
@@ -223,5 +226,71 @@ describe('tickShopSession', () => {
     const session = createShopSession('earth')
     const updated = tickShopSession(session, 10)
     expect(updated).toBe(session)
+  })
+})
+
+describe('bribeRestockShop', () => {
+  it('starts at the base cost on a fresh session', () => {
+    const session = createShopSession('mars')
+    expect(session.bribeCount).toBe(0)
+    expect(getBribeCost(session)).toBe(BRIBE_BASE_COST)
+  })
+
+  it('doubles cost each successful bribe', () => {
+    let session = createShopSession('mars')
+    let profile = createProfile('Pilot')
+    profile = { ...profile, credits: 100_000 }
+
+    expect(getBribeCost(session)).toBe(1000)
+    let result = bribeRestockShop(session, profile)
+    expect(result.ok).toBe(true)
+    session = result.session
+    profile = result.profile
+    expect(session.bribeCount).toBe(1)
+    expect(getBribeCost(session)).toBe(2000)
+
+    result = bribeRestockShop(session, profile)
+    session = result.session
+    profile = result.profile
+    expect(getBribeCost(session)).toBe(4000)
+
+    result = bribeRestockShop(session, profile)
+    session = result.session
+    expect(getBribeCost(session)).toBe(8000)
+  })
+
+  it('spends the bribe cost from profile credits', () => {
+    const session = createShopSession('mars')
+    const profile = { ...createProfile('Pilot'), credits: 5000 }
+    const result = bribeRestockShop(session, profile)
+    expect(result.ok).toBe(true)
+    expect(result.profile.credits).toBe(4000)
+  })
+
+  it('rerolls trade slots and clears restock timer', () => {
+    let session = createShopSession('mars')
+    session = {
+      ...session,
+      restockTimer: { remaining: 30, total: 60 },
+      allSoldOut: true,
+    }
+    const profile = { ...createProfile('Pilot'), credits: 5000 }
+    const result = bribeRestockShop(session, profile)
+    expect(result.ok).toBe(true)
+    expect(result.session.restockTimer).toBeNull()
+    expect(result.session.allSoldOut).toBe(false)
+    for (const slot of result.session.tradeSlots) {
+      expect(slot.stock).toBeGreaterThan(0)
+    }
+  })
+
+  it('fails when player cannot afford the bribe', () => {
+    const session = createShopSession('mars')
+    const profile = { ...createProfile('Pilot'), credits: 500 }
+    const result = bribeRestockShop(session, profile)
+    expect(result.ok).toBe(false)
+    expect(result.profile.credits).toBe(500)
+    expect(result.session).toBe(session)
+    expect(result.reason).toBe('Insufficient credits')
   })
 })

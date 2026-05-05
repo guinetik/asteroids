@@ -1460,6 +1460,10 @@ function handleRepairLander() {
   viewController.shopRepairLander()
 }
 
+function handleShopBribeRestock() {
+  viewController.shopBribeRestock()
+}
+
 function handleUseFuelCell() {
   viewController.useFuelCell()
 }
@@ -2135,6 +2139,7 @@ watch(
       @buy-lander-fuel="handleShopBuyLanderFuel"
       @repair-hull="handleRepairHull"
       @repair-lander="handleRepairLander"
+      @bribe-restock="handleShopBribeRestock"
     />
     <PimpMyShuttleDialog
       v-if="cosmeticShopDialogVisible && cosmeticPremiumSession"

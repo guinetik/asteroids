@@ -1,6 +1,8 @@
 import {
+  bribeRestockShop,
   buyTradeGood,
   createShopSession,
+  getBribeCost,
   LANDER_FUEL_COST,
   LANDER_FUEL_ID,
   LANDER_REPAIR_COST,
@@ -116,6 +118,20 @@ export class MapShopFacade {
     if (!result.ok) return { ok: false, profile, inventory }
     this.session = result.session
     return { ok: true, profile: result.profile, inventory: result.inventory }
+  }
+
+  /** Current bribe-restock cost for the active session, or 0 when no session. */
+  get bribeCost(): number {
+    return this.session ? getBribeCost(this.session) : 0
+  }
+
+  /** Bribe the dock master to reroll trade goods. Doubles in cost per bribe per port. */
+  bribeRestock(profile: PlayerProfile): { ok: boolean; profile: PlayerProfile } {
+    if (!this.session) return { ok: false, profile }
+    const result = bribeRestockShop(this.session, profile)
+    if (!result.ok) return { ok: false, profile }
+    this.session = result.session
+    return { ok: true, profile: result.profile }
   }
 
   sellTradeGood(

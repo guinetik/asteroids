@@ -3525,6 +3525,16 @@ export class MapViewController implements Tickable {
     }
   }
 
+  /** Bribe the dock master to reroll trade goods (doubling cost per bribe per port). */
+  shopBribeRestock(): void {
+    const result = this.shopFacade.bribeRestock(this.playerProfile)
+    if (!result.ok) return
+    this.playerProfile = result.profile
+    this.persistPlayerProfile()
+    this.emitShopState()
+    this.onCreditsUpdate?.(this.playerProfile.credits)
+  }
+
   /** Sell an item from inventory at the current planet. */
   shopSellItem(itemId: string, quantity: number): void {
     const session = this.shopFacade.session
