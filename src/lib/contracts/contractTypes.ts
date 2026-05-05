@@ -336,17 +336,35 @@ export type RewardEffect =
   | { type: 'set-story-flag'; flag: string }
 
 /**
- * Body the contract pins for its duration. Plan 2 stores; later plans route
- * mission generation to it.
+ * Body or object the contract pins for its duration. `'asteroid'` (default)
+ * is a catalog body referenced by mission generation; `'station'` is a
+ * mission-spawned interactable that supports the dock subsystem.
  */
-export interface PinnedAsset {
-  /** Stable ref used by step `pinnedAssetRef` lookups (e.g. `'hektor'`). */
-  assetRef: string
-  /** Region the body lives in (e.g. `'jovian-trojans'`). */
-  region: string
-  /** Display label for inbox flavor and asset cards (e.g. `'Asset 2306-J'`). */
-  label: string
-}
+export type PinnedAsset =
+  | {
+      /** Stable ref used by step `pinnedAssetRef` lookups (e.g. `'hektor'`). */
+      assetRef: string
+      /** Discriminator. Omitted means asteroid. */
+      kind?: 'asteroid'
+      /** Region the body lives in (e.g. `'jovian-trojans'`). */
+      region: string
+      /** Display label for inbox flavor and asset cards. */
+      label: string
+    }
+  | {
+      /** Stable ref the dock subsystem keys off. */
+      assetRef: string
+      /** Discriminator. */
+      kind: 'station'
+      /** Region the station orbits in (e.g. `'kuiper-belt'`). */
+      region: string
+      /** Display label for the dock prompt. */
+      label: string
+      /** Path under `public/` to the GLB (e.g. `'models/station.glb'`). */
+      modelPath: string
+      /** Stable string hashed to a deterministic Kuiper-belt position. */
+      positionSeed: string
+    }
 
 /** One completion arm per outcome id of a contained `'choice-mission'` step. */
 export interface ContractCompletionArm {
