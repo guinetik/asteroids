@@ -103,7 +103,7 @@ export function persistCompletedAsteroidMissionRewards(
 
   contractSystem.notifyMissionCompleted({
     kind: 'asteroid',
-    giverPlanetId: null,
+    giverPlanetId: mission.originPlanetId ?? null,
     giverId: mission.giverId ?? null,
     targetPlanetId: null,
     objectiveType: mission.objectives[0]?.type ?? '',

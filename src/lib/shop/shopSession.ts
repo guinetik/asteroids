@@ -84,6 +84,16 @@ export const REPAIR_COST = 250
 export const LANDER_REPAIR_COST = 200
 
 /**
+ * Base cost in credits for the first bribe-restock at any port. Each
+ * subsequent bribe doubles the cost — see {@link getBribeCost}.
+ *
+ * Lucas's signature move from the Venusian Zeppelin loop: when the kiosk
+ * is rolling the wrong goods (no drill bits, etc.), grease the dock
+ * master to force a fresh inventory rotation.
+ */
+export const BRIBE_BASE_COST = 1000
+
+/**
  * Pick trade-good slots for a planet.
  *
  * Non-Venus: shuffle the local production pool and take up to {@link TRADE_GOODS_OFFER_SLOT_CAP}
@@ -159,7 +169,62 @@ export function createShopSession(planetId: string): ShopSession {
     tradeSlots,
     restockTimer: null,
     allSoldOut: false,
+    bribeCount: 0,
   }
+}
+
+/**
+ * Cost in credits of the *next* bribe-restock for the given session.
+ *
+ * Doubles each time: 1000, 2000, 4000, 8000, … (`BRIBE_BASE_COST * 2^bribeCount`).
+ *
+ * @param session - Current shop session.
+ * @returns Credits required to bribe-restock right now.
+ */
+export function getBribeCost(session: ShopSession): number {
+  return BRIBE_BASE_COST * 2 ** session.bribeCount
+}
+
+/**
+ * Bribe the dock master to force-reroll trade goods. Spends the bribe
+ * cost from the player's wallet, replaces the trade slots with a fresh
+ * `pickTradeSlots` roll, increments `bribeCount` (so the next bribe
+ * doubles), and clears any active restock timer.
+ *
+ * Per-port-arrival semantics: `bribeCount` lives on the session and is
+ * reset to 0 by the next {@link createShopSession} when the player
+ * re-enters orbit at a planet.
+ *
+ * @param session - Current shop session.
+ * @param profile - Player profile (for credit spend).
+ * @returns Result with updated session and profile, or `ok: false` with
+ *   a reason when the player can't afford the bribe.
+ */
+export function bribeRestockShop(
+  session: ShopSession,
+  profile: PlayerProfile,
+): {
+  ok: boolean
+  session: ShopSession
+  profile: PlayerProfile
+  reason?: string
+} {
+  const cost = getBribeCost(session)
+  const updatedProfile = spendCredits(profile, cost)
+  if (!updatedProfile) {
+    return { ok: false, session, profile, reason: 'Insufficient credits' }
+  }
+
+  const tradeSlots = pickTradeSlots(session.planetId)
+  const updatedSession: ShopSession = {
+    ...session,
+    tradeSlots,
+    restockTimer: null,
+    allSoldOut: false,
+    bribeCount: session.bribeCount + 1,
+  }
+
+  return { ok: true, session: updatedSession, profile: updatedProfile }
 }
 
 /**

@@ -34,6 +34,7 @@
       "missionType": "asteroid",
       "objectiveType": "gather",
       "giverId": "jovian-society",
+      "giverPlanetId": "jupiter",
       "creditsReward": 1500,
       "subject": "OP 1 — BASELINE ASSESSMENT, SURFACE GATHER",
       "flavor": [

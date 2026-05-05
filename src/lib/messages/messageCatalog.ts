@@ -328,6 +328,120 @@ export const JOVIAN_HEKTOR_PROSPECTUS_OFFER: ShipMessageDefinition = {
   ],
 }
 
+/** Finch Step 1 — Saturn telescope offer. */
+export const FINCH_SATURN_TELESCOPE_OFFER: ShipMessageDefinition = {
+  id: 'finch-recovery-saturn-telescope-offer',
+  from: 'Mr. Finch, Saturn Ringside Estate',
+  subject: 'Step 1 — She Has Not Yet Been Seen',
+  sentAt: '2306-05-19 09:00 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: 80,
+  folderId: 'finch-recovery',
+  folderLabel: 'Mr. Finch',
+  body: [
+    '[bored] Young pilot,',
+    "The photograph is in your secure inbox; the EVA listing is on the Saturn ringside spaceport board, posted under my name. The telescope — long-baseline, calibrated for horizon detail — is at the listed site.",
+    "Tune the long-baseline telescope until our Madame's surroundings resolve. I am told the relevant detail is the horizon. I am told you will know it when you see it.",
+    '— Finch',
+  ],
+}
+
+/** Finch Step 3 — Mars bunker offer. */
+export const FINCH_MARS_BUNKER_OFFER: ShipMessageDefinition = {
+  id: 'finch-recovery-mars-bunker-offer',
+  from: 'Mr. Finch, Saturn Ringside Estate',
+  subject: 'Step 3 — A Trail at Mars',
+  sentAt: '2306-05-22 11:30 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: 80,
+  folderId: 'finch-recovery',
+  folderLabel: 'Mr. Finch',
+  body: [
+    'Young pilot,',
+    'Mars confirms the trail. Our Madame appears to have used an abandoned Marines training bunker as a transfer point — local intelligence indicates the site is overrun and effectively forgotten by the Corps.',
+    'Clear what is in the bunker. Recover what she left in it.',
+    '— Finch',
+  ],
+}
+
+/** Finch Step 5 — Venus telescope offer. */
+export const FINCH_VENUS_TELESCOPE_OFFER: ShipMessageDefinition = {
+  id: 'finch-recovery-venus-telescope-offer',
+  from: 'Mr. Finch, Saturn Ringside Estate',
+  subject: 'Step 5 — A Floor Camera at Venus',
+  sentAt: '2306-05-26 13:18 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: 80,
+  folderId: 'finch-recovery',
+  folderLabel: 'Mr. Finch',
+  body: [
+    '[amused] Young pilot,',
+    'The fence — was — at the Zeppelin Exchange. The floor cameras at that establishment are real and they captured a transaction. The horizon, again, is the matter of interest.',
+    'Tune your knobs.',
+    '— Finch',
+  ],
+}
+
+/** Finch Step 7 — Earth telescope offer. */
+export const FINCH_EARTH_TELESCOPE_OFFER: ShipMessageDefinition = {
+  id: 'finch-recovery-earth-telescope-offer',
+  from: 'Mr. Finch, Saturn Ringside Estate',
+  subject: 'Step 7 — A Posed Photograph at Earth',
+  sentAt: '2306-05-30 16:42 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: 80,
+  folderId: 'finch-recovery',
+  folderLabel: 'Mr. Finch',
+  body: [
+    '[amused] Young pilot,',
+    'The Earth image is from a private gallery. The composition is the composition of someone who is now aware she is being followed and has decided to make a study of the matter.',
+    'Tune the image. The destination is in the photograph. She placed it there.',
+    '— Finch',
+  ],
+}
+
+/** Finch Step 9 — Ceres bunker offer. */
+export const FINCH_CERES_BUNKER_OFFER: ShipMessageDefinition = {
+  id: 'finch-recovery-ceres-bunker-offer',
+  from: 'Mr. Finch, Saturn Ringside Estate',
+  subject: 'Step 9 — A Letter at Ceres',
+  sentAt: '2306-06-04 08:50 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: 80,
+  folderId: 'finch-recovery',
+  folderLabel: 'Mr. Finch',
+  body: [
+    'Young pilot,',
+    'Ceres. An exhausted nickel-platinum operation, decommissioned in the early colonization era, never properly sealed. Our Madame appears to favor the sites that no one is paying to remember.',
+    'What you find at the end is for you. I have asked for nothing from this stop except that you survive it.',
+    '— Finch',
+  ],
+}
+
+/** Finch Step 11 — Neptune bunker offer (final). */
+export const FINCH_NEPTUNE_BUNKER_OFFER: ShipMessageDefinition = {
+  id: 'finch-recovery-neptune-bunker-offer',
+  from: 'Mr. Finch, Saturn Ringside Estate',
+  subject: 'Step 11 — Neptune, End of the Trail',
+  sentAt: '2306-06-09 19:24 UTC',
+  trigger: 'mission_start',
+  delivery: 'inbox_prompt',
+  priority: 80,
+  folderId: 'finch-recovery',
+  folderLabel: 'Mr. Finch',
+  body: [
+    'Young pilot,',
+    'Neptune. The end of the trail. The brief, again, is recovery. Anything beyond that is between you and her.',
+    'When you are finished, return to Saturn. I shall have the closeout ready.',
+    '— Finch',
+  ],
+}
+
 /** Jay's warning when the player starts flirting with Venus' orbital lane. */
 export const JAY_VENUS_WARNING_MESSAGE: ShipMessageDefinition = {
   id: 'jay-venus-orbit-warning',
@@ -411,6 +525,43 @@ export const FANTASIA_PIMP_MY_SHUTTLE_INTRO_MESSAGE: ShipMessageDefinition = {
     'Bring me whatever you have been hauling. I pay better than a standard market window and I do not make you stare at spreadsheets.',
     '',
     '[laughs] —Fantasia · Pimp My Shuttle!',
+  ],
+}
+
+/** Carmen's recruitment letter, delivered ~10s after returning to /map post-Finch. */
+const CARMEN_FOLLOWUP_PRIORITY = 47
+
+/** Stable id for Carmen's first post-Finch letter, used by the scripted dispatcher. */
+export const CARMEN_FINCH_FOLLOWUP_MESSAGE_ID = 'carmen-finch-followup-001'
+
+/**
+ * Carmen's first message after the Finch contract closes. Apologizes for the
+ * theft, names the Neptune commune, invites the player up, lets slip that
+ * Mr. Finch has more to say through the network if the player keeps listening.
+ *
+ * Delivered via {@link MessageSystem.enqueueById} ~10s after the player
+ * returns to the map screen with the Finch contract complete and this
+ * message not yet sent.
+ */
+export const CARMEN_FINCH_FOLLOWUP_MESSAGE: ShipMessageDefinition = {
+  id: CARMEN_FINCH_FOLLOWUP_MESSAGE_ID,
+  from: 'Carmen Sedna-Deimos · Neptune Commune',
+  subject: 'Sorry About The Bunker',
+  sentAt: '2306-06-02 09:41 UTC',
+  trigger: 'carmen_finch_followup_scripted',
+  delivery: 'inbox_prompt',
+  priority: CARMEN_FOLLOWUP_PRIORITY,
+  body: [
+    "Hi. I'd say it's nice to finally meet you, except — we haven't, technically. I was on a couch eating dumplings while you were doing the cardio.",
+    "First — sorry about the bunker. The wave count was for me, not you. I needed to know whether the pilot Mr. Finch picked was the kind who quits at Mars, the kind who flips at Venus when Lucas waves money around, or the kind who just keeps showing up. You kept showing up. I owe you a drink for that. Possibly several.",
+    "Second — I kept the cash. Recovery fee. He can afford it; he's been compounding for two centuries and he still buys the same brand of tea. The device is whole. He'll know.",
+    "Now the awkward part. I run procurement for a research commune on Neptune. We grow vegetables that have never seen Earth and print proteins from feedstock the inner system would throw away. I steal from people who can spare it so the council doesn't have to ask Jupiter for anything. That's the whole pitch. We're nice. We're tired. We could use someone with your reflexes.",
+    "Come up to Neptune when you've got time. There's work. There's also a piece of mobility tech in storage I think you'd enjoy — I'll send the coordinates separately so it doesn't read like a bribe. (It is a bribe. A small one.)",
+    "Last thing, and you didn't hear this from me. Mr. Finch is older than he looks. A lot older. Long before he was Mr. Finch he wrote things down — letters, notes, journal pages — and he tucked those into encrypted caches on Deep Space Network satellites. They've been drifting out there for a century plus. They just *exist*, on the relays, dormant.",
+    "I hooked a small piece of software into your suit on the way out. Call it malware if it makes you feel better — I do. Next time you take an EVA contract that puts you on a DSN satellite, it'll quietly scan the cache and pull whatever entry it finds back to your inbox. One signal per satellite. No subscription, no opt-in form. If you don't service any satellites, you won't see any of it, and that's fine. He'll never know either way.",
+    "I won't tell you what's in them. I read enough to know I'd rather not be the one introducing him. He'll do that himself, in pieces, in his own voices. Just — if you do start picking up the signals, read them slowly. The earliest ones especially.",
+    "You're fun. That's not nothing. Come find me.",
+    "— C.",
   ],
 }
 
@@ -514,6 +665,12 @@ export const SHIP_MESSAGE_CATALOG: ShipMessageDefinition[] = [
   JOVIAN_HEKTOR_DAN_OFFER,
   JOVIAN_SATURN_DAN_OFFER,
   JOVIAN_HEKTOR_PROSPECTUS_OFFER,
+  FINCH_SATURN_TELESCOPE_OFFER,
+  FINCH_MARS_BUNKER_OFFER,
+  FINCH_VENUS_TELESCOPE_OFFER,
+  FINCH_EARTH_TELESCOPE_OFFER,
+  FINCH_CERES_BUNKER_OFFER,
+  FINCH_NEPTUNE_BUNKER_OFFER,
   JAY_STARTUP_FOLLOW_UP_MESSAGE,
   JAY_FIRST_SLINGSHOT_MESSAGE,
   JAY_CONTRACT_INCOMING_MESSAGE,
@@ -526,6 +683,7 @@ export const SHIP_MESSAGE_CATALOG: ShipMessageDefinition[] = [
   VIROID_ENVOY_INITIAL_CONTACT,
   VIROID_ENVOY_CERES_RENDEZVOUS,
   FANTASIA_PIMP_MY_SHUTTLE_INTRO_MESSAGE,
+  CARMEN_FINCH_FOLLOWUP_MESSAGE,
   CERES_INSTITUTE_RESCUE_1_OFFER,
   CERES_INSTITUTE_MINERAL_ANALYSIS_OFFER,
   CERES_INSTITUTE_DAN_OFFER,

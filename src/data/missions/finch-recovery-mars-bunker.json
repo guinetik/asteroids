@@ -1,0 +1,19 @@
+{
+  "kind": "special",
+  "id": "finch-recovery-mars-bunker",
+  "asteroidId": "eros",
+  "giverId": "mr-finch",
+  "giverName": "Mr. Finch",
+  "templateId": "finch-recovery-mars-bunker",
+  "name": "A Trail at Mars",
+  "briefing": "Abandoned Marines training bunker, overrun and forgotten. Clear it. Recover what she left.",
+  "difficulty": 4,
+  "region": "near-earth",
+  "originPlanetId": "mars",
+  "objectives": [
+    { "type": "bunker", "x": 0, "z": 0, "waveCount": 3, "reward": 2000 }
+  ],
+  "totalReward": 2000,
+  "waypoint": { "worldX": 0, "worldZ": 0 },
+  "status": "available"
+}

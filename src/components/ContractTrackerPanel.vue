@@ -58,7 +58,12 @@ function emitOpen(row: ActiveContractHudRow): void {
           :aria-expanded="expandedContractId === row.contractId"
           @click="toggleContract(row.contractId)"
         >
-          <span class="contract-tracker-panel__contract-label">{{ row.inboxName }}</span>
+          <span class="contract-tracker-panel__contract-main">
+            <span class="contract-tracker-panel__contract-label">{{ row.inboxName }}</span>
+            <span class="contract-tracker-panel__objective-summary">
+              {{ row.objectiveSummary }}
+            </span>
+          </span>
           <span class="contract-tracker-panel__chevron" aria-hidden="true">{{
             expandedContractId === row.contractId ? '\u2212' : '+'
           }}</span>
@@ -147,12 +152,28 @@ function emitOpen(row: ActiveContractHudRow): void {
   text-align: left;
 }
 
+.contract-tracker-panel__contract-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
 .contract-tracker-panel__contract-label {
   font-family: 'Datatype', ui-monospace, monospace;
   font-size: 0.7rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--tracker-title);
+}
+
+.contract-tracker-panel__objective-summary {
+  font-family: 'Datatype', ui-monospace, monospace;
+  font-size: 0.6rem;
+  line-height: 1.3;
+  letter-spacing: 0.06em;
+  color: var(--tracker-text);
+  text-transform: none;
 }
 
 .contract-tracker-panel__chevron {

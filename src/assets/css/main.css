@@ -3043,6 +3043,19 @@ body,
   @apply bg-cyan-900/50 text-cyan-300;
 }
 
+.planet-shop-icon--bribe {
+  @apply bg-fuchsia-900/50 text-fuchsia-200;
+}
+
+.planet-shop-btn--bribe {
+  @apply border-fuchsia-400/40 bg-fuchsia-500/10 text-fuchsia-200
+         hover:bg-fuchsia-500/20;
+}
+
+.planet-shop-item--bribe {
+  @apply mt-2 border-t border-fuchsia-400/20 pt-2;
+}
+
 .planet-shop-subgroup-label {
   @apply mt-1 px-1 font-mono text-[10px] uppercase tracking-wider text-cyan-300/80;
 }
@@ -3331,13 +3344,21 @@ body,
          px-4 py-2 text-sm tracking-widest;
 }
 .telescope-eyepiece {
-  @apply relative self-center rounded-full overflow-hidden
+  @apply relative self-center overflow-hidden
          border border-cyan-400/25;
   width: 480px;
   height: 480px;
   max-width: 60vmin;
   max-height: 60vmin;
   aspect-ratio: 1 / 1;
+}
+.telescope-eyepiece--wide {
+  @apply w-full;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  max-height: 60vh;
+  aspect-ratio: 16 / 9;
 }
 .telescope-eyepiece__img {
   @apply absolute inset-0 w-full h-full object-cover pointer-events-none;

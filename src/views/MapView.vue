@@ -58,6 +58,7 @@ import {
 } from '@/lib/player/profile'
 import { createInventory } from '@/lib/inventory/inventory'
 import { shipMessageSystem, setShipMessageFollowUpDeliveryListener } from '@/lib/messages/runtime'
+import { CARMEN_FINCH_FOLLOWUP_MESSAGE_ID } from '@/lib/messages/messageCatalog'
 import {
   contractSystem,
   onContractShuttleUpgradeGranted,
@@ -617,6 +618,10 @@ const fastTravelTargetPlanetLabel = ref<string>('')
 let unsubscribeContracts: (() => void) | null = null
 let unsubscribeContractShuttleUpgrade: (() => void) | null = null
 let unsubscribeContractStepCompleted: (() => void) | null = null
+/** Pending Timer handle for Carmen's post-Finch recruitment letter; cleared on unmount. */
+let carmenFollowupTimer: TimerHandle | null = null
+/** Delay (seconds) before Carmen's letter is enqueued after the player lands on /map. */
+const CARMEN_FOLLOWUP_DELAY_SEC = 10
 /** Drives the fade-to-black overlay used during the fast travel jump. */
 const fastTravelFadeOpacity = ref(0)
 const FAST_TRAVEL_FADE_MS = 600
@@ -866,6 +871,7 @@ onMounted(async () => {
         giverId: null,
         targetPlanetId: null,
         objectiveType: '',
+        specialMissionId: mission.template.id,
       })
       syncPersistentProgressFromController()
     }
@@ -1140,11 +1146,28 @@ watch(mapBootReady, (isReady) => {
     // and `beginMapExperience()` runs.
     window.dispatchEvent(new Event('prelude-play'))
   }
+
+  // Carmen's recruitment letter — fires ~10s after the player lands on /map
+  // if the Finch recovery contract is complete and the letter hasn't been
+  // delivered yet. `enqueueById` is a no-op for already-delivered messages,
+  // so the gate is just the contract status.
+  carmenFollowupTimer = Timer.after(CARMEN_FOLLOWUP_DELAY_SEC, () => {
+    carmenFollowupTimer = null
+    const finch = contractSystem.getInstance('finch-recovery')
+    if (finch?.status !== 'completed') return
+    if (shipMessageSystem.enqueueById(CARMEN_FINCH_FOLLOWUP_MESSAGE_ID)) {
+      refreshActiveMessage()
+    }
+  })
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleWindowKeydown)
   window.removeEventListener('prelude-play', handlePreludePlay)
+  if (carmenFollowupTimer !== null) {
+    Timer.cancel(carmenFollowupTimer)
+    carmenFollowupTimer = null
+  }
   clearPickupUi()
   setShipMessageFollowUpDeliveryListener(null)
   stopBackgroundMusic('map')
@@ -1437,6 +1460,10 @@ function handleRepairHull() {
 
 function handleRepairLander() {
   viewController.shopRepairLander()
+}
+
+function handleShopBribeRestock() {
+  viewController.shopBribeRestock()
 }
 
 function handleUseFuelCell() {
@@ -2092,6 +2119,7 @@ watch(
       @buy-lander-fuel="handleShopBuyLanderFuel"
       @repair-hull="handleRepairHull"
       @repair-lander="handleRepairLander"
+      @bribe-restock="handleShopBribeRestock"
     />
     <PimpMyShuttleDialog
       v-if="cosmeticShopDialogVisible && cosmeticPremiumSession"

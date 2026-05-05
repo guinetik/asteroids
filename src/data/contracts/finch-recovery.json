@@ -4,6 +4,7 @@
   "from": "Mr. Finch, Saturn Ringside Estate",
   "sentAt": "2306-05-18 22:14 UTC",
   "homePlanet": "saturn",
+  "hideFutureSteps": true,
   "offerWhenPrerequisites": {
     "minGiverPlanetCompletions": { "planetId": "saturn", "min": 1 },
     "triggerOnPlanetVisited": "saturn"
@@ -11,123 +12,155 @@
   "introSubject": "A Quiet Inquiry, At Some Length",
   "introBody": [
     "[bored] Young pilot,",
-    "I have a problem — a small one, in the cosmic sense, but pressing in the personal — and you come to me well-recommended by a mutual acquaintance whose judgment I have trusted for the better part of forty years. Your handler — Mercer, I believe — is well-spoken-of in circles I no longer travel in. That will serve as introduction enough.",
-    "I have been stolen from. I had not been stolen from in some time. It is, I confess, refreshing. The experience has — how shall I put this — clarified the calendar. It is the first thing of any consequence to have happened to me in approximately the span of one colonization era, and I find I am not as displeased about that as I would have predicted.",
-    "The party responsible is a young woman who calls herself Madame Sedna-Deimos — Carmen, professionally, though I doubt she considers that the distinction it is meant to be. The object she removed from my study is a small hardware wallet — chrome and glass, the sort of device one held onto for two generations because the keys still worked. The contents are of considerable size, financially speaking, and I shall not insult you by naming figures; the closeouts will speak for themselves. There are also certain personal records on the device that carry no commercial value and to which I am, for reasons I shall not bore you with, attached. I would like the device returned. Intact, if possible. As-found, if not.",
-    "Cloud City has — I am told — a man named Holroyd who would describe Madame Sedna-Deimos as a cohort-management problem. I find his vocabulary tiresome and his judgment broadly correct.",
-    "I have a still photograph from the estate's own perimeter cameras, captured as our Madame departed. The resolution is, as one would expect of a photograph taken by a man who has not thought about security apparatus in forty years, regrettable. Her face is clear. The horizon behind her, considerably less so. I am told a properly tuned long-baseline telescope can extract the relevant detail, and I am told a contractor of your standing can operate one without supervision. I trust this is correct. The map — M, if your terminal has not already told you — will carry you between the stops faster than the trail assumes you cannot move.",
-    "Six stops, I should think. Six is what the trail is. The compensation is correspondingly serious.",
-    "Two notes, and then I shall release you.",
-    "First — Madame Sedna-Deimos is, by her conduct, not a violent person. I should be displeased to learn the matter was resolved violently. Recovery is the brief. The brief is recovery.",
-    "Second — the authorities are not to be involved at any stage, on any pretext. I will not insult either of us by explaining why. You will, I suspect, be able to construct several plausible reasons by the end of the contract; you are welcome to choose whichever flatters me least.",
-    "Accept below or do not. The offer is open through the end of the season. I am not, at the moment, going anywhere.",
-    "— Halloran"
+    "I have been stolen from. I had not been stolen from in some time. It is, I confess, refreshing.",
+    "The party responsible is a young woman who calls herself Madame Sedna-Deimos — Carmen, professionally. She removed a small hardware wallet from my study. The contents are of considerable size, financially speaking, and there are also certain personal records on the device to which I am, for reasons I shall not bore you with, attached. I would like the device returned. Intact, if possible. As-found, if not.",
+    "I have a still photograph from the estate's perimeter cameras. The horizon behind her, regrettably, is not clear. I am told a properly tuned long-baseline telescope can extract the relevant detail.",
+    "I cannot tell you how many stops this will take. She is actively moving, and I am told she is good at it. The compensation will be correspondingly serious.",
+    "Two notes. First — Madame Sedna-Deimos is, by her conduct, not a violent person. Recovery is the brief. The brief is recovery. Second — the authorities are not to be involved at any stage, on any pretext.",
+    "— Finch"
   ],
   "steps": [
     {
-      "kind": "contract-mission",
-      "missionType": "eva",
-      "variant": "telescope-clue",
-      "planetId": "saturn",
-      "clueImageId": "carmen-saturn-mars",
-      "revealsLocation": "mars",
+      "kind": "complete-missions",
+      "count": 1,
+      "specialMissionId": "finch-recovery-saturn-telescope",
+      "revealsBody": "mars",
       "creditsReward": 1500,
+      "briefingLabel": "Tune the long-baseline telescope",
       "subject": "Step 1 — She Has Not Yet Been Seen",
       "flavor": [
         "[bored] Young pilot,",
-        "Welcome to the work. The photograph is in your secure inbox; the EVA listing is on the Saturn ringside spaceport board, posted under my name. The telescope — long-baseline, calibrated for horizon detail — is at the listed site. You will know the relevant controls when you see them.",
-        "The procedure, as I understand it: you will tune the long-baseline telescope until our Madame's surroundings resolve. I am told the relevant detail is the horizon. I am told you will know it when you see it.",
-        "I should mention — for the avoidance of any later confusion — that Madame Sedna-Deimos was perfectly aware of the cameras when she crossed their field. She did not look at them. She did not need to. I have lived among confident people for the better part of two generations and I recognize the particular shape of that gesture.",
-        "Begin when you are ready.",
+        "The photograph is in your secure inbox; the EVA listing is on the Saturn ringside spaceport board, posted under my name. The telescope — long-baseline, calibrated for horizon detail — is at the listed site.",
+        "Tune the long-baseline telescope until our Madame's surroundings resolve. I am told the relevant detail is the horizon. I am told you will know it when you see it.",
         "— Finch"
       ]
     },
     {
-      "kind": "contract-mission",
-      "missionType": "bunker",
-      "variant": "carmen-clue-bunker",
+      "kind": "visit-planet",
       "planetId": "mars",
-      "datapadTextId": "carmen-mars-datapad",
-      "revealsLocation": "venus",
-      "creditsReward": 2000,
-      "subject": "Step 2 — A Trail at Mars",
+      "briefingLabel": "Pursue Carmen's next stop",
+      "subject": "Step 2 — The Trail Points to Mars",
       "flavor": [
         "Young pilot,",
-        "Mars confirms the trail. Our Madame appears to have used an abandoned Marines training bunker as a transfer point — local intelligence indicates the site is overrun and effectively forgotten by the Corps. She left in a hurry, by the timestamps. That is a small surprise. She did not strike me as the kind who hurries.",
-        "Clear what is in the bunker. Recover what she left in it. The Corps will not require restitution; I have already paid them not to require restitution. If the map shows the route dark for any reason, I would suggest resolving that before proceeding — the chase will be slower than I had hoped if you are burning thrusters between every stop.",
-        "Forensic detail is what we want at this stop. Her own notes, if she was sloppy enough to leave any. I doubt she was. We shall see.",
+        "The horizon resolves. Mars. Approach when ready — I shall have the next listing posted by the time you are in orbit.",
         "— Finch"
       ]
     },
     {
-      "kind": "contract-mission",
-      "missionType": "eva",
-      "variant": "telescope-clue",
+      "kind": "complete-missions",
+      "count": 1,
+      "specialMissionId": "finch-recovery-mars-bunker",
+      "revealsBody": "venus",
+      "creditsReward": 2000,
+      "briefingLabel": "Sweep the abandoned bunker",
+      "subject": "Step 3 — A Trail at Mars",
+      "flavor": [
+        "Young pilot,",
+        "Mars confirms the trail. Our Madame appears to have used an abandoned Marines training bunker as a transfer point — local intelligence indicates the site is overrun and effectively forgotten by the Corps.",
+        "Clear what is in the bunker. Recover what she left in it.",
+        "— Finch"
+      ]
+    },
+    {
+      "kind": "visit-planet",
       "planetId": "venus",
-      "clueImageId": "carmen-venus-earth",
-      "revealsLocation": "earth",
+      "briefingLabel": "Pursue Carmen's next stop",
+      "subject": "Step 4 — On to Venus",
+      "flavor": [
+        "Young pilot,",
+        "What you recovered points us inward. Venus next. I shall be brief.",
+        "— Finch"
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "specialMissionId": "finch-recovery-venus-telescope",
+      "revealsBody": "earth",
       "creditsReward": 2500,
-      "subject": "Step 3 — A Floor Camera at Venus",
+      "briefingLabel": "Tune the floor-camera image",
+      "subject": "Step 5 — A Floor Camera at Venus",
       "flavor": [
         "[amused] Young pilot,",
-        "Venus is going to feel like progress and I would caution you against believing it.",
-        "The fence — was — at the Zeppelin Exchange. The floor cameras at that establishment are real and they captured a transaction. The image quality is what one would expect from a man whose security budget is theoretical. The horizon, again, is the matter of interest.",
-        "I should note — and you may mark this for later — that our Madame appears, in this image, to be entirely unaware she is being photographed. That is the last image of her in this contract that will be true of.",
+        "The fence — was — at the Zeppelin Exchange. The floor cameras at that establishment are real and they captured a transaction. The horizon, again, is the matter of interest.",
         "Tune your knobs.",
         "— Finch"
       ]
     },
     {
-      "kind": "contract-mission",
-      "missionType": "eva",
-      "variant": "telescope-clue",
+      "kind": "visit-planet",
       "planetId": "earth",
-      "clueImageId": "carmen-earth-ceres",
-      "revealsLocation": "ceres",
+      "briefingLabel": "Pursue Carmen's next stop",
+      "subject": "Step 6 — Earth, Then",
+      "flavor": [
+        "Young pilot,",
+        "Earth. Of course Earth. Make orbit and the next listing will be on your board.",
+        "— Finch"
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "specialMissionId": "finch-recovery-earth-telescope",
+      "revealsBody": "ceres",
       "creditsReward": 3000,
-      "subject": "Step 4 — A Posed Photograph at Earth",
+      "briefingLabel": "Tune the posed photograph",
+      "subject": "Step 7 — A Posed Photograph at Earth",
       "flavor": [
         "[amused] Young pilot,",
-        "I am writing this with a degree of amusement that I have not been able to suppress for the staff and I do apologize for the tone.",
-        "The Earth image is from a private gallery on the south face of what used to be Geneva. The composition is — well. You will see it. The composition is the composition of someone who is now aware she is being followed and has decided to make a study of the matter. The reference behind her is, I believe, deliberate. The lighting is, I would stake some non-trivial sum, also deliberate.",
-        "She has noticed you. Whatever you did between Mars and Venus was sufficient to register. I would say congratulations except I am not certain it is. You are, it occurs to me, playing chess against someone who plays chess. I find that satisfying in a way I had not anticipated.",
+        "The Earth image is from a private gallery. The composition is the composition of someone who is now aware she is being followed and has decided to make a study of the matter.",
         "Tune the image. The destination is in the photograph. She placed it there.",
         "— Finch"
       ]
     },
     {
-      "kind": "contract-mission",
-      "missionType": "bunker",
-      "variant": "carmen-clue-bunker",
+      "kind": "visit-planet",
       "planetId": "ceres",
-      "datapadTextId": "carmen-ceres-datapad",
-      "revealsLocation": "neptune",
-      "creditsReward": 4000,
-      "subject": "Step 5 — A Letter at Ceres",
+      "briefingLabel": "Pursue Carmen's next stop",
+      "subject": "Step 8 — Ceres, the Forgotten",
       "flavor": [
         "Young pilot,",
-        "Ceres. An exhausted nickel-platinum operation, decommissioned in the early colonization era, never properly sealed. Our Madame appears to favor the sites that no one is paying to remember — that is, I will note, a rather refined aesthetic for a thief.",
-        "The bunker is, as you will discover, prepared. I do not mean trapped — she has not done anything so crass as that — I mean prepared. She knew you would arrive in approximately the window in which you will arrive. The arrangement of viroids is, frankly, hers.",
-        "What you find in the chest at the end is for you. I have asked for nothing from this stop except that you survive it.",
+        "Ceres. Approach. The bunker will be on the board by the time you arrive.",
         "— Finch"
       ]
     },
     {
-      "kind": "contract-mission",
-      "missionType": "bunker",
-      "variant": "carmen-boss-bunker",
-      "planetId": "neptune",
-      "bossEnemyId": "carmen",
-      "thresholdBreakHpRatio": 0.18,
-      "creditsReward": 8000,
-      "subject": "Step 6 — Neptune, End of the Trail",
+      "kind": "complete-missions",
+      "count": 1,
+      "specialMissionId": "finch-recovery-ceres-bunker",
+      "revealsBody": "neptune",
+      "creditsReward": 4000,
+      "briefingLabel": "Sweep the next forgotten site",
+      "subject": "Step 9 — A Letter at Ceres",
       "flavor": [
         "Young pilot,",
-        "Neptune. The end of the trail and, I suspect, the start of a separate matter that does not concern me.",
-        "Madame Sedna-Deimos will be there. She has, I would venture, prepared for you specifically — by this stage, I imagine she has been preparing for you for some time. I will not insult either of you by speculating on the form that preparation takes.",
-        "The brief, again, is recovery. The brief is recovery. The wallet, intact if possible, as-found if not. Anything beyond that — and there will be something beyond that — is between you and her.",
+        "Ceres. An exhausted nickel-platinum operation, decommissioned in the early colonization era, never properly sealed. Our Madame appears to favor the sites that no one is paying to remember.",
+        "What you find at the end is for you. I have asked for nothing from this stop except that you survive it.",
+        "— Finch"
+      ]
+    },
+    {
+      "kind": "visit-planet",
+      "planetId": "neptune",
+      "briefingLabel": "Pursue Carmen to the end of the trail",
+      "subject": "Step 10 — Neptune, the End of the Trail",
+      "flavor": [
+        "Young pilot,",
+        "Neptune. Make orbit. The last listing will post under my name.",
+        "— Finch"
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "specialMissionId": "finch-recovery-neptune-bunker",
+      "creditsReward": 8000,
+      "briefingLabel": "Recover the wallet",
+      "subject": "Step 11 — Neptune, End of the Trail",
+      "flavor": [
+        "Young pilot,",
+        "Neptune. The end of the trail. The brief, again, is recovery. Anything beyond that is between you and her.",
         "When you are finished, return to Saturn. I shall have the closeout ready.",
-        "I do thank you, in advance, for the courtesy of doing this without making a mess.",
         "— Finch"
       ]
     }
@@ -136,79 +169,12 @@
   "completionBody": [
     "[soft] Young pilot,",
     "It is in my hand. It has been in my hand for an hour. I have not opened it yet. I shall, in my own time.",
-    "Your closeout has been credited. The Saturn pay multiplier is now in effect on contracts posted from this estate and elsewhere on the ring; the spaceport's traffic control has been instructed to extend you fast-travel return privileges in perpetuity. Both are standard.",
-    "I will say one thing, and then I shall not write to you again about this matter, as I think the matter is closed.",
-    "You have done a kind thing, young pilot, by a man who does not deserve as much.",
-    "The young woman — Madame Sedna-Deimos. If you should encounter her again — and I suspect you will — please do not mention me. We have, I think, concluded our business. I trust her to have understood what was on the device. I trust you to have not. That is, in its way, the correct arrangement.",
+    "Your closeout has been credited. The Saturn pay multiplier is now in effect on contracts posted from this estate; the spaceport's traffic control has been instructed to extend you fast-travel return privileges in perpetuity.",
     "[long pause] With thanks.",
-    "— Halloran"
+    "— Finch"
   ],
   "rewards": [
-    { "type": "set-story-flag", "flag": "finchRecovered" },
-    {
-      "type": "delayed-inbox",
-      "messageId": "carmen-recruitment",
-      "delayDays": 1,
-      "message": {
-        "inboxName": "Carmen Sedna-Deimos",
-        "from": "Carmen Sedna-Deimos · Neptune Commune",
-        "subject": "Hello, Properly This Time",
-        "body": [
-          "Hi.",
-          "Carmen. Properly, this time. Thanks for not making me kill anyone at Neptune — I was prepared to and I would have hated it. The bunker was a lot of fun to set up. I hope it was a little fun to clear.",
-          "I would offer you context about what was on the wallet. He asked me not to and I think he was right to. So I won't.",
-          "What I will offer is work.",
-          "I run procurement for a research commune at Neptune — food crops, vegetable cloning, 3D-printed protein, closed-loop thermodynamics. Boring, beautiful work. Tomatoes, mostly. The aristocracy thinks we are charming. The Jovian Society thinks we are a tax problem. The Cinderline does not think about us at all. We are, in the way that matters, building.",
-          "I do the procurement. I am, professionally, a thief. The commune does not love this about me. They do appreciate the funding.",
-          "We have work for you, if you want it. Different work than you have been doing. The pay is honest, the briefings are short, and the people you will be helping cannot afford anyone else. I argued the council into authorizing this offer. They argued back. I won. Small credit gift attached; I sent it before the council could vote on the gesture.",
-          "If you accept, the giver line opens at Neptune. Mission board posts under my name.",
-          "See you around either way.",
-          "— C."
-        ],
-        "rewards": [
-          { "type": "open-giver-line", "giverId": "neptune-commune" },
-          { "type": "credits", "amount": 3000 }
-        ]
-      }
-    },
-    {
-      "type": "delayed-inbox",
-      "messageId": "carmen-grappling-hook",
-      "delayDays": 3,
-      "message": {
-        "inboxName": "Carmen Sedna-Deimos",
-        "from": "Carmen Sedna-Deimos · Neptune Commune",
-        "subject": "A Small Demonstration",
-        "body": [
-          "Hi again.",
-          "Thinking about you and a question I assume you have not asked yet but should: how was I as quick around corners as I was. You watched me through six bunkers and never quite caught me getting through a wall, around a wall, or off a roof. The polite assumption would be parkour. I am okay at parkour. The bigger answer is I have a piece of Neptune tech that is not, currently, available to anyone outside the commune.",
-          "If you would like one of your own, there is a unit our techs left in storage. Bunker. Overrun, as bunkers are. The unit is in the chest at the end. The bunker is yours if you want it; the listing is on your board under my name.",
-          "Consider it an enticement. Neptune tech is worth seeing. Come up sometime.",
-          "— C."
-        ],
-        "rewards": [
-          { "type": "offer-special-mission", "missionId": "carmen-grappling-hook-bunker" }
-        ]
-      }
-    },
-    {
-      "type": "delayed-inbox",
-      "messageId": "carmen-archive-tool",
-      "delayDays": 14,
-      "message": {
-        "inboxName": "Carmen Sedna-Deimos",
-        "from": "Carmen Sedna-Deimos · Neptune Commune",
-        "subject": "Something Else, While We're Talking",
-        "body": [
-          "Hi.",
-          "Separate matter. Possibly unrelated. I have a habit of thinking about people for a long time after I have finished thinking about them.",
-          "The man you helped — Mr. Finch — has more history available than what was on the wallet. He had distributed an archive across satellite networks over a long time, encrypted. I found the caches in my research and chose not to look at most of them. The pieces I did look at were enough.",
-          "If you ever wanted to understand who you helped, the caches are still there. I have installed a decryption tool on your suit, dormant, optional. The next five EVA missions you run targeting satellites will return one of his archive entries each. Reverse-chronological, the order I found him. He is, in his own voice, in five pieces.",
-          "If you do not want this, do not service satellites. He will not know either way.",
-          "— C."
-        ],
-        "rewards": [{ "type": "install-suit-tool", "toolId": "deep-archive-decrypt" }]
-      }
-    }
+    { "type": "fast-travel", "planetId": "saturn" },
+    { "type": "mission-pay-multiplier", "planetId": "saturn", "multiplier": 2 }
   ]
 }

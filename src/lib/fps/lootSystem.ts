@@ -29,7 +29,16 @@ const EMPTY_LOOT_PICKUPS: readonly LootPickup[] = []
  * is split across `health` / `oxygen` / `rtg` proportional to their original
  * shares. Tuned so an 8-pickup contract step closes in a single combat run.
  */
-const PSYCHOSPHERE_ARMED_WEIGHT = 0.7
+const PSYCHOSPHERE_ARMED_WEIGHT = 0.85
+
+/**
+ * Minimum per-kill drop chance enforced when psychosphere is armed by an
+ * active contract step. The natural `baseChance` (0.35–0.45) means most kills
+ * drop nothing at all — which makes a 3- or 8-unit psychosphere step grind
+ * through 3-wave bunker runs. Floor it so most kills drop *something* while
+ * the contract is live; powerups still get their share via {@link armedDropWeights}.
+ */
+const PSYCHOSPHERE_ARMED_MIN_CHANCE = 0.75
 
 /** All supported loot/powerup types. Psychosphere remains contract-driven. */
 export type LootType = 'health' | 'oxygen' | 'rtg' | 'psychosphere'
@@ -164,15 +173,24 @@ export class LootSystem {
     const table = DROP_TABLES.tables[enemyType]
     if (!table) return null
 
-    // Chance scales with difficulty, clamped [0,1]. No magic numbers.
-    const chance = Math.min(1, table.baseChance + (difficulty - 1) * table.difficultyMultiplier)
+    // Decide armed status before rolling so we can floor the drop chance.
+    const psychosphereArmed = this.policy.isItemArmed(PSYCHOSPHERE_ITEM_ID)
+
+    // Chance scales with difficulty, clamped [0,1]. When the psychosphere
+    // contract is armed, floor the chance so most kills drop something —
+    // otherwise a 3-wave bunker run can yield zero psychosphere.
+    const naturalChance =
+      table.baseChance + (difficulty - 1) * table.difficultyMultiplier
+    const chance = Math.min(
+      1,
+      psychosphereArmed ? Math.max(naturalChance, PSYCHOSPHERE_ARMED_MIN_CHANCE) : naturalChance,
+    )
     if (Math.random() > chance) return null
 
     // Pick the active weights table. When the contract policy arms
     // psychosphere, override the table's psychosphere weight to
     // PSYCHOSPHERE_ARMED_WEIGHT and renormalize the remaining powerups so the
     // total stays at 1.
-    const psychosphereArmed = this.policy.isItemArmed(PSYCHOSPHERE_ITEM_ID)
     const weights = psychosphereArmed ? armedDropWeights(table.biasedDrops) : table.biasedDrops
 
     // Weighted random selection using cumulative probabilities

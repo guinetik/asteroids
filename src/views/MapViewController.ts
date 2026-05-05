@@ -172,7 +172,10 @@ import type { OrbitalMiniGame, OrbitalMiniGameEvents } from '@/lib/minigame/Orbi
 import { createOrbitalMiniGame } from '@/lib/minigame/orbitalMiniGameFactory'
 import { SatelliteRepairController } from '@/three/SatelliteRepairController'
 import { SatelliteServicingMiniGame } from '@/lib/minigame/satelliteServicing/SatelliteServicingMiniGame'
-import type { ActiveVisitRelayMission } from '@/lib/missions/types'
+import type {
+  ActiveVisitRelayMission,
+  VisitRelayShuttleMissionTemplate,
+} from '@/lib/missions/types'
 import { PLANET_ORBITAL_CONFIGS } from '@/lib/missions/planetOrbitalConfig'
 import { MapModeCoordinator } from '@/lib/map/mode/MapModeCoordinator'
 import { MapOrbitFacade } from '@/lib/map/orbit/MapOrbitFacade'
@@ -294,6 +297,12 @@ const SPECIAL_MISSION_OFFER_IDS: Record<string, string> = {
   'jovian-prospection-hektor-prospectus': 'jovian-prospection-hektor-prospectus-offer',
   'jovian-prospection-saturn-photometry': 'jovian-prospection-saturn-photometry-offer',
   'jovian-prospection-saturn-dan': 'jovian-prospection-saturn-dan-offer',
+  'finch-recovery-saturn-telescope': 'finch-recovery-saturn-telescope-offer',
+  'finch-recovery-mars-bunker': 'finch-recovery-mars-bunker-offer',
+  'finch-recovery-venus-telescope': 'finch-recovery-venus-telescope-offer',
+  'finch-recovery-earth-telescope': 'finch-recovery-earth-telescope-offer',
+  'finch-recovery-ceres-bunker': 'finch-recovery-ceres-bunker-offer',
+  'finch-recovery-neptune-bunker': 'finch-recovery-neptune-bunker-offer',
   'ceres-institute-rescue-1': 'ceres-institute-rescue-1-offer',
   'ceres-institute-mineral-analysis': 'ceres-institute-mineral-analysis-offer',
   'ceres-institute-dan': 'ceres-institute-dan-offer',
@@ -3301,6 +3310,14 @@ export class MapViewController implements Tickable {
   private static readonly EVA_WAYPOINT_PLANET_LEAD_SECONDS = 3
 
   /**
+   * Radial offset (world units) used when placing an asteroid special mission's
+   * waypoint near its `originPlanetId`. Mirrors the Saturn co-orbital placement
+   * radius — a few dozen world units so the asteroid reads as "near this
+   * planet" without sitting directly on top of it.
+   */
+  private static readonly ORIGIN_PLANET_WAYPOINT_OFFSET = 60
+
+  /**
    * Launch an overlay-presentation EVA minigame for the POI the player is near.
    * Called by `EvaSession.beginMinigame` via `onStartEvaMinigame`, which only
    * fires when `isInSceneMinigameActive()` returns false — i.e. for overlay-
@@ -3511,6 +3528,16 @@ export class MapViewController implements Tickable {
         })
       }
     }
+  }
+
+  /** Bribe the dock master to reroll trade goods (doubling cost per bribe per port). */
+  shopBribeRestock(): void {
+    const result = this.shopFacade.bribeRestock(this.playerProfile)
+    if (!result.ok) return
+    this.playerProfile = result.profile
+    this.persistPlayerProfile()
+    this.emitShopState()
+    this.onCreditsUpdate?.(this.playerProfile.credits)
   }
 
   /** Sell an item from inventory at the current planet. */
@@ -4531,6 +4558,25 @@ export class MapViewController implements Tickable {
     return map
   }
 
+  /**
+   * Place an asteroid mission waypoint at a small random angular offset around the
+   * giver planet's current world position. Used when an asteroid special mission
+   * carries `originPlanetId` and the asteroid id has no dedicated branch in
+   * {@link resolveSpecialMissionWaypoint}. Same shape as the Saturn co-orbital
+   * resolver — a few dozen world units of offset so the asteroid reads as
+   * "near this planet" without sitting on top of it.
+   */
+  private resolveOriginPlanetWaypoint(planetPos: WorldPositionXZ): {
+    worldX: number
+    worldZ: number
+  } {
+    const angle = Math.random() * Math.PI * 2
+    return {
+      worldX: planetPos.x + Math.cos(angle) * MapViewController.ORIGIN_PLANET_WAYPOINT_OFFSET,
+      worldZ: planetPos.z + Math.sin(angle) * MapViewController.ORIGIN_PLANET_WAYPOINT_OFFSET,
+    }
+  }
+
   private stageSpecialMission(missionId: string, offerMessageId: string | null): void {
     const mission = getSpecialMissionById(missionId)
     if (!mission) {
@@ -4542,12 +4588,33 @@ export class MapViewController implements Tickable {
       this.messageFacade.enqueueById(offerMessageId, this.onMessageUpdate)
     }
 
+    if (mission.target?.kind === 'planet-eva') {
+      this.stagePlanetEvaSpecialMission(mission, mission.target)
+      return
+    }
+
+    this.stageAsteroidSpecialMission(mission)
+  }
+
+  /**
+   * Stage an asteroid-targeted special mission onto the asteroid mission slot
+   * (`activeAsteroidMission`). Used by legacy specials (Consortium, Jovian) and
+   * by Finch bunker missions whose `originPlanetId` places them near a target
+   * planet's orbit.
+   */
+  private stageAsteroidSpecialMission(mission: GeneratedAsteroidMission): void {
     const positions = this.snapshotBodyWorldPositions()
-    const resolvedWaypoint = resolveSpecialMissionWaypoint(
+    const baseWaypoint = resolveSpecialMissionWaypoint(
       mission.asteroidId,
       positions,
       mission.waypoint,
     )
+    const resolvedWaypoint =
+      mission.originPlanetId !== undefined &&
+      baseWaypoint === mission.waypoint &&
+      positions.has(mission.originPlanetId)
+        ? this.resolveOriginPlanetWaypoint(positions.get(mission.originPlanetId)!)
+        : baseWaypoint
 
     const acceptedMission: GeneratedAsteroidMission = {
       ...mission,
@@ -4560,6 +4627,49 @@ export class MapViewController implements Tickable {
       activeAsteroidMission: acceptedMission,
     }
     saveActiveMission(acceptedMission)
+    saveMissionBoard(this.missionBoard)
+    this.onMissionBoardUpdate?.(this.missionBoard)
+  }
+
+  /**
+   * Stage a planet-targeted EVA special mission onto the EVA mission board.
+   * Synthesizes a `VisitRelayShuttleMissionTemplate` from the special mission's
+   * name/briefing/reward and a fresh waypoint generated near the target planet.
+   * Used by Finch telescope EVAs (Saturn / Venus / Earth).
+   */
+  private stagePlanetEvaSpecialMission(
+    mission: GeneratedAsteroidMission,
+    target: { kind: 'planet-eva'; planetId: string; poiType: 'telescope' },
+  ): void {
+    const positions = this.snapshotBodyWorldPositions()
+    const planetPos = positions.get(target.planetId)
+    if (!planetPos) {
+      console.warn(
+        `[MapView] Planet position not available for planet-eva special mission: ${mission.id} → ${target.planetId}`,
+      )
+      return
+    }
+
+    const waypoint = generateEvaWaypoint(planetPos.x, planetPos.z, target.planetId)
+    const template: VisitRelayShuttleMissionTemplate = {
+      id: mission.id,
+      name: mission.name,
+      description: mission.briefing,
+      poiType: target.poiType,
+      minigameType: 'telescope_alignment',
+      reward: mission.totalReward,
+    }
+    const active: ActiveVisitRelayMission = {
+      template,
+      giverPlanet: target.planetId,
+      waypoint,
+      status: 'active',
+    }
+
+    this.missionBoard = {
+      ...this.missionBoard,
+      activeEvaMissions: [...this.missionBoard.activeEvaMissions, active],
+    }
     saveMissionBoard(this.missionBoard)
     this.onMissionBoardUpdate?.(this.missionBoard)
   }
@@ -4591,6 +4701,8 @@ export class MapViewController implements Tickable {
     if (activeId === missionId) return
     const stored = loadActiveMission()
     if (stored?.id === missionId) return
+    const inEvaBoard = this.missionBoard.activeEvaMissions.some((m) => m.template.id === missionId)
+    if (inEvaBoard) return
 
     this.stageSpecialMission(missionId, offerMessageId)
   }
@@ -4620,6 +4732,10 @@ export class MapViewController implements Tickable {
 
       const activeId = this.missionBoard.activeAsteroidMission?.id
       if (activeId === missionId) continue
+      const inEvaBoard = this.missionBoard.activeEvaMissions.some(
+        (m) => m.template.id === missionId,
+      )
+      if (inEvaBoard) continue
 
       this.stageSpecialMission(missionId, null)
     }

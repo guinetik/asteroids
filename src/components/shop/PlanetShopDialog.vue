@@ -10,6 +10,7 @@ import {
   LANDER_FUEL_COST,
   LANDER_REPAIR_COST,
   REPAIR_COST,
+  getBribeCost,
 } from '@/lib/shop/shopSession'
 import InventoryTable from './InventoryTable.vue'
 import { uiAudio } from '@/audio/UiAudioDirector'
@@ -32,7 +33,10 @@ const emit = defineEmits<{
   buyLanderFuel: []
   repairHull: []
   repairLander: []
+  bribeRestock: []
 }>()
+
+const bribeCost = computed(() => getBribeCost(props.session))
 
 const planetName = computed(() => {
   const id = props.session.planetId
@@ -140,6 +144,11 @@ function onBuyLanderFuelClick(): void {
 function onBuyTradeGoodClick(slotIndex: number): void {
   uiAudio.notifyConfirm()
   emit('buyTradeGood', slotIndex, 1)
+}
+
+function onBribeRestockClick(): void {
+  uiAudio.notifyConfirm()
+  emit('bribeRestock')
 }
 
 function onKeydown(e: KeyboardEvent): void {
@@ -412,6 +421,29 @@ function onKeydown(e: KeyboardEvent): void {
                       </button>
                     </div>
                   </template>
+
+                  <!-- Lucas's signature: bribe the dock master to reroll trade goods. -->
+                  <div class="planet-shop-item planet-shop-item--bribe">
+                    <div class="planet-shop-item__icon-placeholder planet-shop-icon--bribe">
+                      &#127183;
+                    </div>
+                    <div class="planet-shop-item__info">
+                      <span class="planet-shop-item__name">Bribe to Restock</span>
+                      <span class="planet-shop-item__desc"
+                        >Slip the dock master a courtesy stipend. Forces a fresh trade-goods
+                        rotation. Each bribe at this port doubles in cost.</span
+                      >
+                    </div>
+                    <span class="planet-shop-item__price">{{ bribeCost }} CR</span>
+                    <button
+                      type="button"
+                      class="planet-shop-item__buy-btn planet-shop-btn--bribe"
+                      :disabled="!canAfford(bribeCost)"
+                      @click="onBribeRestockClick"
+                    >
+                      Bribe
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

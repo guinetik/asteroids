@@ -78,6 +78,12 @@ export interface ShopSession {
   restockTimer: RestockTimer | null
   /** Whether all currently displayed trade slots are sold out. */
   allSoldOut: boolean
+  /**
+   * Number of bribe-restocks performed this session (per port arrival).
+   * Drives the doubling cost: `BRIBE_BASE_COST * 2^bribeCount`.
+   * Resets to 0 when a fresh session is created on the next orbit entry.
+   */
+  bribeCount: number
 }
 
 /** Result of a shop refuel action. */

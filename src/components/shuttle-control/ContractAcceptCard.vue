@@ -9,6 +9,7 @@
  */
 import { computed } from 'vue'
 import type { Contract, ContractInstance, ContractStep } from '@/lib/contracts/contractTypes'
+import { formatContractStepLabel } from '@/lib/contracts/contractStepLabel'
 
 const props = defineProps<{
   /** Contract definition the message belongs to. */
@@ -28,44 +29,6 @@ const STEP_MARKER_PENDING = '\u00B7'
 
 const status = computed(() => props.instance?.status ?? 'available')
 
-function stepLabel(step: ContractStep): string {
-  if (step.kind === 'complete-missions') {
-    const filterBits: string[] = []
-    filterBits.push(step.missionType ? `${step.missionType} mission` : 'mission')
-    if (step.giverId) filterBits.push(`for ${step.giverId}`)
-    if (step.giverPlanetId) filterBits.push(`from ${step.giverPlanetId}`)
-    const filterLabel = filterBits.join(' ')
-    return `Complete ${step.count} ${filterLabel}${step.count === 1 ? '' : 's'}`
-  }
-  if (step.kind === 'install-upgrade') {
-    return `Install ${step.upgradeId} (Lvl ${step.minLevel}+)`
-  }
-  if (step.kind === 'visit-planet') {
-    return `Enter orbit at ${step.planetId}`
-  }
-  if (step.kind === 'trade-goods') {
-    const action = step.action === 'buy' ? 'Buy' : 'Sell'
-    return `${action} ${step.count} ${step.itemId} at ${step.planetId}`
-  }
-  if (step.kind === 'collect-drops') {
-    return `Collect ${step.count} ${step.itemId}`
-  }
-  if (step.kind === 'deliver-items') {
-    return `Deliver ${step.count} ${step.itemId} to ${step.planetId}`
-  }
-  if (step.kind === 'launch-from-body') {
-    return `Launch from ${step.planetId}`
-  }
-  if (step.kind === 'choice-mission') {
-    return `Complete Mission: ${step.missionId}`
-  }
-  const orbitalBits: string[] = []
-  if (step.giverPlanetId) orbitalBits.push(`from ${step.giverPlanetId}`)
-  if (step.targetPlanetId) orbitalBits.push(`at ${step.targetPlanetId}`)
-  const suffix = orbitalBits.length > 0 ? ` ${orbitalBits.join(' ')}` : ''
-  return `Complete an orbital mission${suffix}`
-}
-
 function requiredCount(step: ContractStep): number {
   if (step.kind === 'complete-missions') return step.count
   if (step.kind === 'trade-goods') return step.count
@@ -81,11 +44,11 @@ interface StepEntry {
   progressLabel: string | null
 }
 
-const stepEntries = computed<StepEntry[]>(() =>
+const allStepEntries = computed<StepEntry[]>(() =>
   props.contract.steps.map((step, index) => {
     const instance = props.instance
     const required = requiredCount(step)
-    const label = stepLabel(step)
+    const label = formatContractStepLabel(step)
 
     if (!instance || instance.status === 'available' || instance.status === 'declined') {
       return {
@@ -128,9 +91,29 @@ const stepEntries = computed<StepEntry[]>(() =>
   }),
 )
 
+/**
+ * Filtered step list rendered in the briefing card. When the contract is
+ * authored with `hideFutureSteps` the briefing only reveals what the player
+ * has earned to know:
+ *   - `available` / `declined`: just the first step as a teaser ask;
+ *   - `active`: done steps and the live step;
+ *   - `completed`: every step (post-mortem reveal).
+ * Total step count stays hidden in the header until unlocked.
+ */
+const stepEntries = computed<StepEntry[]>(() => {
+  if (!props.contract.hideFutureSteps) return allStepEntries.value
+  if (status.value === 'completed') return allStepEntries.value
+  if (status.value === 'available' || status.value === 'declined') {
+    return allStepEntries.value.slice(0, 1)
+  }
+  return allStepEntries.value.filter(
+    (entry) => entry.state === 'done' || entry.state === 'current',
+  )
+})
+
 const progressSummary = computed(() => {
   const total = props.contract.steps.length
-  const done = stepEntries.value.filter((entry) => entry.state === 'done').length
+  const done = allStepEntries.value.filter((entry) => entry.state === 'done').length
   return { done, total }
 })
 
@@ -147,7 +130,7 @@ const headerLabel = computed(() => {
     <header class="contract-accept-card__header">
       <span class="contract-accept-card__chrome">
         {{ headerLabel }} · {{ props.contract.inboxName }}
-        <template v-if="status === 'active'">
+        <template v-if="status === 'active' && !props.contract.hideFutureSteps">
           · {{ progressSummary.done }}/{{ progressSummary.total }}
         </template>
       </span>

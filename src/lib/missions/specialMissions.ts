@@ -13,6 +13,12 @@ import jovianHektorDan from '@/data/missions/jovian-prospection-hektor-dan.json'
 import jovianHektorProspectus from '@/data/missions/jovian-prospection-hektor-prospectus.json'
 import jovianSaturnPhotometry from '@/data/missions/jovian-prospection-saturn-photometry.json'
 import jovianSaturnDan from '@/data/missions/jovian-prospection-saturn-dan.json'
+import finchSaturnTelescope from '@/data/missions/finch-recovery-saturn-telescope.json'
+import finchVenusTelescope from '@/data/missions/finch-recovery-venus-telescope.json'
+import finchEarthTelescope from '@/data/missions/finch-recovery-earth-telescope.json'
+import finchMarsBunker from '@/data/missions/finch-recovery-mars-bunker.json'
+import finchCeresBunker from '@/data/missions/finch-recovery-ceres-bunker.json'
+import finchNeptuneBunker from '@/data/missions/finch-recovery-neptune-bunker.json'
 import ceresEarthSupplies from '@/data/missions/ceres-institute-earth-supplies.json'
 import ceresRescue1 from '@/data/missions/ceres-institute-rescue-1.json'
 import ceresRescue2 from '@/data/missions/ceres-institute-rescue-2.json'
@@ -27,6 +33,12 @@ export const SPECIAL_MISSIONS: GeneratedAsteroidMission[] = [
   jovianHektorProspectus,
   jovianSaturnPhotometry,
   jovianSaturnDan,
+  finchSaturnTelescope,
+  finchVenusTelescope,
+  finchEarthTelescope,
+  finchMarsBunker,
+  finchCeresBunker,
+  finchNeptuneBunker,
   ceresEarthSupplies,
   ceresRescue1,
   ceresRescue2,

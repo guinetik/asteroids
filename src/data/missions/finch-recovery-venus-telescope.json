@@ -1,0 +1,19 @@
+{
+  "kind": "special",
+  "id": "finch-recovery-venus-telescope",
+  "asteroidId": "",
+  "giverId": "mr-finch",
+  "giverName": "Mr. Finch",
+  "templateId": "finch-recovery-venus-telescope",
+  "name": "A Floor Camera at Venus",
+  "briefing": "Floor cameras at the Zeppelin Exchange caught the transaction. Tune the telescope until the horizon behind the floor resolves.",
+  "difficulty": 4,
+  "region": "near-earth",
+  "target": { "kind": "planet-eva", "planetId": "venus", "poiType": "telescope" },
+  "objectives": [
+    { "type": "collect", "x": 0, "z": 0, "reward": 2500 }
+  ],
+  "totalReward": 2500,
+  "waypoint": { "worldX": 0, "worldZ": 0 },
+  "status": "available"
+}

@@ -1,0 +1,19 @@
+{
+  "kind": "special",
+  "id": "finch-recovery-neptune-bunker",
+  "asteroidId": "2019-xg7",
+  "giverId": "mr-finch",
+  "giverName": "Mr. Finch",
+  "templateId": "finch-recovery-neptune-bunker",
+  "name": "Neptune, End of the Trail",
+  "briefing": "End of the trail. The brief, again, is recovery. Anything beyond that is between you and her.",
+  "difficulty": 8,
+  "region": "kuiper-belt",
+  "originPlanetId": "neptune",
+  "objectives": [
+    { "type": "bunker", "x": 0, "z": 0, "waveCount": 7, "reward": 8000 }
+  ],
+  "totalReward": 8000,
+  "waypoint": { "worldX": 0, "worldZ": 0 },
+  "status": "available"
+}

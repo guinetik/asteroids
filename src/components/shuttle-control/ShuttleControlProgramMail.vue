@@ -26,6 +26,7 @@ import {
   contractSystem,
   onContractsChanged,
 } from '@/lib/contracts/runtime'
+import { formatContractStepLabel } from '@/lib/contracts/contractStepLabel'
 import ShipMessageAudioPlayer from './ShipMessageAudioPlayer.vue'
 import ContractAcceptCard from './ContractAcceptCard.vue'
 import ScrambleText from './ScrambleText.vue'
@@ -116,6 +117,34 @@ const sections = computed(() =>
  * progress card on top of every step retread visually duplicates the
  * pinned brief that's always one click away.
  */
+/**
+ * Picks the {@link ContractStep} the open mail message should summarize at the
+ * top of the reader so the player sees the imperative one-liner before the
+ * lore body. `step` flavor messages point at their `contractStepIndex`; the
+ * pinned `brief` falls back to the instance's `currentStepIndex`; an `intro`
+ * (still `available`) shows the first authored step. `completion` returns
+ * null because the contract is over and there is nothing left to do.
+ */
+const contractObjectiveSummary = computed<string | null>(() => {
+  const r = readable.value
+  if (!r || !r.contractId || r.contractMessageKind === undefined) return null
+  if (r.contractMessageKind === 'completion') return null
+  const contract = contractSystem.getContract(r.contractId)
+  if (!contract) return null
+  const instance = contractSystem.getInstance(r.contractId)
+  let stepIndex: number
+  if (r.contractMessageKind === 'step') {
+    stepIndex = r.contractStepIndex ?? 0
+  } else if (r.contractMessageKind === 'brief') {
+    stepIndex = instance?.currentStepIndex ?? 0
+  } else {
+    stepIndex = 0
+  }
+  const step = contract.steps[stepIndex]
+  if (!step) return null
+  return formatContractStepLabel(step)
+})
+
 const showContractCardAbove = computed(() => {
   if (!activeContract.value) return false
   return readable.value?.contractMessageKind === 'brief'
@@ -375,6 +404,12 @@ watch(
               >
                 <span aria-hidden="true">📌</span> Pinned brief
               </div>
+            </div>
+            <div v-if="contractObjectiveSummary" class="shuttle-mail-program__reader-objective">
+              <span class="shuttle-mail-program__reader-objective-label">Objective</span>
+              <span class="shuttle-mail-program__reader-objective-value">
+                {{ contractObjectiveSummary }}
+              </span>
             </div>
           </header>
           <ShipMessageAudioPlayer
@@ -815,6 +850,31 @@ watch(
   max-width: calc(150px * var(--mail-type-scale));
   text-align: right;
   line-height: 1.3;
+}
+
+.shuttle-mail-program__reader-objective {
+  margin-top: calc(12px * var(--mail-type-scale));
+  padding: calc(8px * var(--mail-type-scale)) calc(12px * var(--mail-type-scale));
+  border: 1px solid rgba(106, 232, 196, 0.25);
+  background: rgba(106, 232, 196, 0.06);
+  border-radius: calc(2px * var(--mail-type-scale));
+  display: flex;
+  align-items: baseline;
+  gap: calc(10px * var(--mail-type-scale));
+  font-size: calc(12px * var(--mail-type-scale));
+}
+
+.shuttle-mail-program__reader-objective-label {
+  color: rgba(106, 232, 196, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: calc(10px * var(--mail-type-scale));
+  flex-shrink: 0;
+}
+
+.shuttle-mail-program__reader-objective-value {
+  color: #dcf8f0;
+  line-height: 1.4;
 }
 
 .shuttle-mail-program__audio-divider {

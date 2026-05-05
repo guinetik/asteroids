@@ -11,6 +11,7 @@
  * @spec docs/superpowers/specs/2026-04-20-contracts-design.md
  */
 import ceresInstituteEternalBiology from '@/data/contracts/ceres-institute-eternal-biology.json'
+import finchRecovery from '@/data/contracts/finch-recovery.json'
 import jovianSocietyProspection from '@/data/contracts/jovian-society-prospection.json'
 import martianMarineCorpsCohort from '@/data/contracts/martian-marine-corps-cohort.json'
 import spaceCowboysMarsHq from '@/data/contracts/space-cowboys-mars-hq.json'
@@ -28,6 +29,7 @@ export const CONTRACT_CATALOG: Contract[] = [
   theCinderline as Contract,
   jovianSocietyProspection as Contract,
   ceresInstituteEternalBiology as Contract,
+  finchRecovery as Contract,
 ]
 
 /**
