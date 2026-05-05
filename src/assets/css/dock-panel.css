@@ -1,0 +1,26 @@
+/*
+ * Dock panel — shown when the player docks at a pinned station asset.
+ * Displays contract step flavor text and a confirm / close action.
+ */
+
+.dock-panel {
+  @apply fixed inset-0 m-auto w-[640px] h-[420px] bg-zinc-900/95 border border-zinc-700 text-zinc-100 p-6 flex flex-col gap-4 z-50;
+}
+.dock-panel-header {
+  @apply text-sm tracking-widest uppercase text-emerald-400;
+}
+.dock-panel-body {
+  @apply flex-1 overflow-y-auto text-sm leading-relaxed;
+}
+.dock-panel-body p + p {
+  @apply mt-3;
+}
+.dock-panel-footer {
+  @apply flex justify-end gap-3;
+}
+.dock-panel-confirm {
+  @apply px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs tracking-wider uppercase;
+}
+.dock-panel-close {
+  @apply px-4 py-2 border border-zinc-600 hover:border-zinc-400 text-xs tracking-wider uppercase;
+}

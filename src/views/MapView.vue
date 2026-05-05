@@ -28,6 +28,7 @@ import ContractTrackerPanel from '@/components/ContractTrackerPanel.vue'
 import MissionTrackerPanel from '@/components/MissionTrackerPanel.vue'
 import MissionFocusPrompt from '@/components/MissionFocusPrompt.vue'
 import KeyPrompt from '@/components/KeyPrompt.vue'
+import DockPanel from '@/components/DockPanel.vue'
 import { parseKeyPrompt } from '@/lib/ui/parseKeyPrompt'
 import {
   buildMissionTrackerGroups,
@@ -507,6 +508,12 @@ const missionTrackerGroups = computed(() => {
 
 /** Mirrors the controller's reactive flag so the ESC prompt can react to it. */
 const missionFocusActive = viewController.missionFocusActive
+
+/** Mirrors the controller's dock-prompt state: non-null when the player is near a pinned station. */
+const dockPromptState = viewController.dockPromptState
+
+/** Asset ref of the station whose dock panel is open; null when closed. */
+const dockedAssetRef = ref<string | null>(null)
 
 /** Mirrors the selected tracker row id so the panel can highlight the matching row. */
 const selectedMissionRowId = viewController.selectedMissionRowId
@@ -1074,6 +1081,9 @@ onMounted(async () => {
     }
     viewController.onBeginAsteroidMission = () => {
       void router.push('/level')
+    }
+    viewController.onRequestDock = (assetRef: string) => {
+      dockedAssetRef.value = assetRef
     }
     viewController.onPortalWelcome = () => {
       portalWelcomeIsFirstVisit.value = !viewController.getPlayerProfileSnapshot().hasSeenIntro
@@ -2250,6 +2260,15 @@ watch(
     />
     <JovianEpilogueOverlay v-if="epilogueVisible" :on-continue="handleEpilogueContinue" />
     <MissionFocusPrompt v-if="missionFocusActive" @dismiss="handleMissionFocusDismiss" />
+    <DockPanel :asset-ref="dockedAssetRef" @close="dockedAssetRef = null" />
+    <KeyPrompt
+      v-if="dockPromptState && !dockedAssetRef"
+      key-label="F"
+      :action="dockPromptState.label"
+      tone="green"
+      variant="split"
+      position="bottom"
+    />
   </template>
   <DebugHud v-if="debugHudVisible" />
 </template>
