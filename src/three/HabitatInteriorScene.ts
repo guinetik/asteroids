@@ -158,12 +158,20 @@ function round4(n: number): number {
 }
 
 /**
- * Whether LMB grab/place for the habitat table is enabled (development builds only).
+ * Compile-time feature flag for the LMB grab/place tool used to author the table's resting
+ * pose. The code path stays compiled in (re-enable by flipping this constant to `true` and
+ * running a `bun dev` session); it's gated to `false` by default so dev builds don't expose
+ * the dev-only LMB binding to playtesters.
+ */
+const TABLE_PLACEMENT_DEBUG_ENABLED = false
+
+/**
+ * Whether LMB grab/place for the habitat table is enabled.
  *
- * @returns `true` when `import.meta.env.DEV` is set by Vite.
+ * @returns The current value of {@link TABLE_PLACEMENT_DEBUG_ENABLED}.
  */
 function isTablePlacementDebugEnabled(): boolean {
-  return import.meta.env.DEV
+  return TABLE_PLACEMENT_DEBUG_ENABLED
 }
 
 /** FPS camera configuration for the habitat interior. */
