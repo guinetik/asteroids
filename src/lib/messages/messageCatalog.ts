@@ -429,7 +429,7 @@ export const CERES_INSTITUTE_RESCUE_1_OFFER: ShipMessageDefinition = {
   folderId: 'ceres-institute-contract',
   folderLabel: 'Ceres Institute',
   body: [
-    'Young pilot — the rescue listing is on the kiosk. Bring our people home.',
+    'Young pilot — the rescue listing is on the kiosk. Bring them in; we will see them recovered at the station.',
     'Psychosphere collection is paid out of the Institute discretionary line.',
     '— Porter',
   ],
@@ -481,7 +481,7 @@ export const CERES_INSTITUTE_RESCUE_2_OFFER: ShipMessageDefinition = {
   folderId: 'ceres-institute-contract',
   folderLabel: 'Ceres Institute',
   body: [
-    'Young pilot — another team. We do not abandon our own. The listing is on the kiosk.',
+    'Young pilot — another team. We do not abandon our own. They will be in our care from the moment you bring them in.',
     'More psychosphere if your cargo allows.',
     '— Porter',
   ],
@@ -499,7 +499,7 @@ export const CERES_INSTITUTE_ARCHIVE_BUNKER_OFFER: ShipMessageDefinition = {
   folderId: 'ceres-institute-contract',
   folderLabel: 'Ceres Institute',
   body: [
-    'Young pilot — the bunker tasking is active. Site CIB-7. Clear the chimera presence, then approach the terminal.',
+    'Young pilot — the bunker tasking is active. Site CIB-7. Specimens are on the floor; their designations are on file. Clear them, then approach the terminal.',
     'Please don\'t read the archive. It would only confuse you.',
     '— Porter',
   ],

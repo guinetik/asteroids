@@ -21,8 +21,8 @@
   "introSubject": "An Introduction, and a Standing Invitation",
   "introBody": [
     "Young pilot —",
-    "Your work for our funders has not gone unnoticed. The Institute would be honored to retain you for a sequence of small services. Nothing taxing. Largely errands, with a few calibrations toward the end. Compensation is academic-grade, which is to say generous.",
-    "We do not advertise our work. Most of what we publish is in journals you would not have heard of, and most of what we do is, regrettably, the kind of patient laboratory science that does not photograph well. But it is good science. And it is well-funded.",
+    "Your work for our funders — the Saturnine endowment that keeps our lights on — has not gone unnoticed. The Institute would be honored to retain you for a sequence of small services. Nothing taxing. Largely errands, with a few calibrations toward the end. Compensation is academic-grade, which is to say generous.",
+    "We do not advertise our work. Most of what we publish is in journals you would not have heard of, and most of what we do is, regrettably, the kind of patient laboratory science that does not photograph well. We study, primarily, persistence. The colonies have a — patience — about them that the literature does not adequately convey. We have not yet observed a state we would call death. It is, frankly, the most interesting biological question in the system.",
     "Acceptance below. Please read at your leisure.",
     "— Dean Bernard Porter, Ceres Institute for Eternal Biology"
   ],
@@ -67,7 +67,7 @@
         "Young pilot —",
         "A field team went silent on a viroid sample run. Extract who you can. The viroids are a known hazard of the work, but a hazard worth braving — the data their samples produce is, frankly, irreplaceable.",
         "While you are out there: collect a few units of psychosphere for us. The research is promising, and the material is harmless in handled quantities. The Institute pays the going rate per unit.",
-        "Bring our people home.",
+        "Bring them in. We will see them recovered at the station. Cases like these have a long road ahead, and the Institute is — among other virtues — patient.",
         "— Porter"
       ]
     },
@@ -115,8 +115,9 @@
       "flavor": [
         "Young pilot —",
         "Another team. The viroids do not discriminate, and we do not abandon our own. I am sorry to ask twice.",
+        "The first team is stable, in the sense that matters to the Institute, and we expect the second to be the same with your help. They will be in our care from the moment you bring them in.",
         "More psychosphere if your cargo allows. The DAN series is recalibrating and the instrumentation team is on a tight schedule.",
-        "Bring them home.",
+        "What we are paid to want from this work, and what we have come to want for ourselves, is hard to separate after enough years. Forgive an old man's rambling. The point is the rescue.",
         "— Porter"
       ]
     },
@@ -134,8 +135,8 @@
       "flavor": [
         "Young pilot —",
         "One last matter. We have prepared an archive — a culmination of the past several months of your work. The terminal at the Kuiper site, Site CIB-7, is the secure transmit point. Reach it the same way you reached the station.",
-        "There is a chimera presence at the site. Please clear it. After transmission, walk away with our full thanks.",
-        "Please don't read the archive. It would only confuse you.",
+        "Site CIB-7 currently houses several specimens. Their designations are on file. They are not in a state to recognize you, and we do not advise attempting communication. Please clear the floor and approach the terminal.",
+        "Please don't read the archive. It would only confuse you. We study, after all, what they are. And — this is in confidence, between an old man and a young pilot — what we might yet become.",
         "— Porter"
       ]
     }
