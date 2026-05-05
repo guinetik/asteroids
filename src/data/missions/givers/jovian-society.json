@@ -144,7 +144,7 @@
         }
       ],
       "completionBonus": { "min": 400, "max": 800 },
-      "regionByDifficulty": { "jovian-trojans": [4, 7] }
+      "regionByDifficulty": { "jovian-trojans": [3, 7] }
     },
     {
       "id": "jovian_belt_gather",
