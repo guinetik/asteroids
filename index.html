@@ -171,13 +171,13 @@
         100% { opacity: 1; }
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-B0OItQE1.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/specialMissions-DjSPLIre.js">
+    <script type="module" crossorigin src="/assets/index-ds8iPTfP.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/specialMissions-CWMLgSSX.js">
     <link rel="modulepreload" crossorigin href="/assets/vendor-pinia-DSmCRyVf.js">
     <link rel="modulepreload" crossorigin href="/assets/vendor-vue-iVKUiCKN.js">
     <link rel="modulepreload" crossorigin href="/assets/vendor-vue-router-BzB1D7NX.js">
-    <link rel="modulepreload" crossorigin href="/assets/profile-CmaaKd6k.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-D7dTanLi.css">
+    <link rel="modulepreload" crossorigin href="/assets/profile-D2Zzt22g.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-Blhh8kKi.css">
   </head>
   <body>
     <div id="prelude-container">
@@ -582,6 +582,7 @@
 
               const thrusting = thrustingLanding;
               if (!skipLandingDynamics) {
+              this.landerRotation = 0;
               this.landerVelocityY += LanderGame.GRAVITY * LanderGame.LANDING_GRAVITY_SCALE * deltaSec;
               if (thrusting) this.landerVelocityY -= LanderGame.THRUST * deltaSec;
               this.landerVelocityY = Math.max(-LanderGame.MAX_RISE_SPEED, Math.min(LanderGame.MAX_FALL_SPEED, this.landerVelocityY));
@@ -689,6 +690,8 @@
                 this.landerY = settledGroundHere - LanderGame.LANDER_HEIGHT / 2;
                 this.landerVelocityY = 0;
                 this.landerRotation = this._terrainSlopeAt(this.landerX);
+              } else {
+                this.landerRotation = 0;
               }
 
               if (this.landerY > this.height + LanderGame.LANDER_HEIGHT) {
