@@ -5,6 +5,9 @@
  * FPS movement, and table interaction. Designed to be swapped into an
  * EffectComposer renderPass by MapViewController.
  *
+ * **Dev (`import.meta.env.DEV`):** LMB near the table grabs it (floats in front of the camera);
+ * LMB again places it and logs world pose to the browser console.
+ *
  * @author guinetik
  * @date 2026-04-06
  * @spec docs/superpowers/specs/2026-04-06-habitat-interior-design.md
@@ -73,8 +76,95 @@ const GIRDER_INSET = 0.05
 const STAR_POINT_SIZE = 0.8
 /** Floor width as a multiple of the cylinder radius. */
 const FLOOR_WIDTH_FACTOR = 1.8
-/** Distance between the table and the cylinder end-cap (world units). */
-const TABLE_WALL_INSET = 5
+/**
+ * Clearance between the table's pivot and the **front** (cockpit-side, +Z) end-cap of the
+ * habitat cylinder, in world units. Picked from the dev grab tool output (LMB-place log)
+ * so the prop sits flush against the cockpit wall without clipping the cap geometry.
+ */
+const TABLE_FRONT_CAP_CLEARANCE = 0.7526
+
+// --- Cockpit hatch (back cap, -Z) ------------------------------------------
+// Submarine-style pressure hatch: a grey metallic ring frame around a white
+// circular door, with a yellow wheel-knob (torus + crossed spokes) at the
+// center. Geometry-only, no textures.
+
+/** Radius of the white circular door disc (world units). */
+const HATCH_DOOR_RADIUS = 1.0
+/** Thickness of the door disc (world units). */
+const HATCH_DOOR_THICKNESS = 0.06
+/** Radial segment count for the door disc and frame. */
+const HATCH_DOOR_SEGMENTS = 48
+/** Radius from the centre of the frame torus to the centre of its tube. */
+const HATCH_FRAME_RING_RADIUS = HATCH_DOOR_RADIUS + 0.12
+/** Tube radius of the frame torus (world units). */
+const HATCH_FRAME_TUBE_RADIUS = 0.12
+/** Major radius of the wheel-knob torus (world units). */
+const HATCH_KNOB_RING_RADIUS = 0.28
+/** Tube radius of the wheel-knob torus (world units). */
+const HATCH_KNOB_TUBE_RADIUS = 0.045
+/** Length of each crossed spoke through the wheel-knob (world units). */
+const HATCH_KNOB_SPOKE_LENGTH = HATCH_KNOB_RING_RADIUS * 2
+/** Thickness (square cross-section) of each crossed spoke (world units). */
+const HATCH_KNOB_SPOKE_THICKNESS = 0.045
+/** Floor-relative Y of the hatch centre (world units). Roughly at eye height. */
+const HATCH_CENTRE_Y = FLOOR_Y + 1.6
+/** Offset from the back-cap surface so the door doesn't z-fight with the disc. */
+const HATCH_DOOR_SURFACE_OFFSET = 0.05
+/** Tiny offset that keeps the wheel-knob in front of the door panel (world units). */
+const HATCH_KNOB_Z_BIAS = HATCH_DOOR_THICKNESS / 2 + 0.02
+/** White circular door panel colour. */
+const HATCH_DOOR_COLOR = 0xeaeaea
+/** Grey metallic frame ring colour. */
+const HATCH_FRAME_COLOR = 0x9aa3ad
+/** Yellow wheel-knob colour. */
+const HATCH_KNOB_COLOR = 0xf2c438
+/**
+ * Author-corrective rotation applied to the table model so the Sketchfab mesh reads the
+ * right way up after import. The pre-centered GLB
+ * (see `scripts/center-table-glb.mjs`) has its origin at the floor-center, so this
+ * rotation now orbits the correct pivot.
+ */
+const TABLE_LAYOUT_ROT_X = Math.PI
+/**
+ * 180° yaw so the table's authored front faces back into the cabin (−Z) instead of into the
+ * cockpit cap (+Z). Without this you spawn looking at the back panel.
+ */
+const TABLE_LAYOUT_ROT_Y = Math.PI
+const TABLE_LAYOUT_ROT_Z = Math.PI
+/**
+ * How far in front of the camera (along its yaw forward, on the XZ plane) the table sits
+ * while grabbed (dev tool, world units).
+ */
+const TABLE_DEBUG_HOLD_DISTANCE = 2.75
+/**
+ * Vertical offset relative to the camera eye while grabbed (world units, negative = below
+ * the lens). Keeps the prop in frame instead of floating into the ceiling.
+ */
+const TABLE_DEBUG_HOLD_BELOW_EYE = 0.55
+/**
+ * Minimum clearance above {@link FLOOR_Y} for the hold position so the table never clips
+ * through the floor when the player looks down.
+ */
+const TABLE_DEBUG_HOLD_MIN_ABOVE_FLOOR = 0.35
+/**
+ * Grab reach multiplier on {@link INTERACT_DISTANCE} — slightly forgiving so LMB grab works
+ * from the same ring as F Shuttle Control.
+ */
+const TABLE_DEBUG_GRAB_REACH_MULT = 1.35
+
+/** Rounds to 4 decimal places for devtools pose logs. */
+function round4(n: number): number {
+  return Math.round(n * 10000) / 10000
+}
+
+/**
+ * Whether LMB grab/place for the habitat table is enabled (development builds only).
+ *
+ * @returns `true` when `import.meta.env.DEV` is set by Vite.
+ */
+function isTablePlacementDebugEnabled(): boolean {
+  return import.meta.env.DEV
+}
 
 /** FPS camera configuration for the habitat interior. */
 const HABITAT_CAMERA_CONFIG: FpsCameraConfig = {
@@ -132,11 +222,26 @@ export class HabitatInteriorScene {
   /** Guards against calling load() more than once. */
   private loaded = false
 
-  /** Cached spawn for {@link getSpawnPosition}. */
-  private spawnYaw = 0
+  /**
+   * Cached spawn yaw for {@link getSpawnPosition}. `Math.PI` so the player wakes up facing
+   * the **table** (+Z, cockpit-side cap) rather than the cockpit hatch (−Z, back cap). At
+   * yaw=0 the FPS forward is (0, 0, -1); flipping by π puts forward at (0, 0, +1) toward
+   * the table.
+   */
+  private spawnYaw = Math.PI
 
   /** Footstep audio for the flat habitat floor. */
   private readonly footsteps = new FootstepSystem('habitat')
+
+  /** Loaded table root — moved when using the dev grab/place tool. */
+  private tableRoot: THREE.Object3D | null = null
+
+  /** When true, table follows the camera until the next LMB releases it. */
+  private tablePlacementGrabbed = false
+
+  private readonly _tmpWorldPos = new THREE.Vector3()
+  private readonly _tmpWorldQuat = new THREE.Quaternion()
+  private readonly _tmpEuler = new THREE.Euler()
 
   constructor() {
     this.scene = new THREE.Scene()
@@ -151,6 +256,7 @@ export class HabitatInteriorScene {
     this.fpsCamera.yaw = this.spawnYaw
 
     this.buildCylinder()
+    this.buildCockpitHatch()
     this.buildLighting()
     this.buildStarfield()
     this.buildFloor()
@@ -178,6 +284,27 @@ export class HabitatInteriorScene {
     return {
       position: new THREE.Vector3(0, FLOOR_Y + HABITAT_CAMERA_CONFIG.eyeHeight, 0),
       yaw: this.spawnYaw,
+    }
+  }
+
+  /**
+   * Primary mouse button while pointer-locked. In dev, grab/release the table for manual pose
+   * tuning: first LMB near the table attaches it in front of the view; second LMB places it
+   * and logs world {@link THREE.Vector3 | position} + {@link THREE.Quaternion | quaternion}
+   * to the browser console.
+   */
+  onPrimaryClick(): void {
+    if (!isTablePlacementDebugEnabled() || !this.tableRoot) return
+    if (this.tablePlacementGrabbed) {
+      this.commitTablePlacementFromDebug()
+      return
+    }
+    const px = this.player.position.x - this.tablePosition.x
+    const pz = this.player.position.z - this.tablePosition.z
+    const distXZ = Math.hypot(px, pz)
+    if (distXZ < INTERACT_DISTANCE * TABLE_DEBUG_GRAB_REACH_MULT) {
+      this.tablePlacementGrabbed = true
+      this.onPrompt?.('LMB place table → devtools console')
     }
   }
 
@@ -216,26 +343,25 @@ export class HabitatInteriorScene {
     this.scene.add(bedModel)
 
     // --- Table --------------------------------------------------------------
+    // The GLB ships with its origin at the floor-center thanks to
+    // `scripts/center-table-glb.mjs` (runs `@gltf-transform/functions`'s
+    // `center({ pivot: 'below' })`). That means we only need scale + author
+    // rotation + final XZ placement; no runtime re-centering needed.
     const tableBox = new THREE.Box3().setFromObject(tableModel)
     const tableSize = tableBox.getSize(new THREE.Vector3())
     const tableMaxDim = Math.max(tableSize.x, tableSize.y, tableSize.z)
     const TABLE_TARGET_SIZE = 3.5
     tableModel.scale.setScalar(TABLE_TARGET_SIZE / tableMaxDim)
-    tableModel.rotation.set(Math.PI, 0, Math.PI) // X flips front, Z flips upright
+    tableModel.rotation.set(TABLE_LAYOUT_ROT_X, TABLE_LAYOUT_ROT_Y, TABLE_LAYOUT_ROT_Z)
 
-    // Re-centre after scale + rotation
+    const TABLE_Z = CYLINDER_LENGTH / 2 - TABLE_FRONT_CAP_CLEARANCE
+    tableModel.position.set(0, FLOOR_Y, TABLE_Z)
+
+    // Defensive drop-to-floor in case the layout rotation flipped Y past zero.
     tableBox.setFromObject(tableModel)
-    const tableCenter = tableBox.getCenter(new THREE.Vector3())
-    tableModel.position.sub(tableCenter)
-
-    // Place near the back wall (negative Z end of the cylinder)
-    const TABLE_Z = -CYLINDER_LENGTH / 2 + TABLE_WALL_INSET
-    tableModel.position.z = TABLE_Z
-
-    // Drop to floor
-    tableBox.setFromObject(tableModel)
-    const tableMin = tableBox.min.y
-    tableModel.position.y -= tableMin - FLOOR_Y
+    if (tableBox.min.y < FLOOR_Y) {
+      tableModel.position.y -= tableBox.min.y - FLOOR_Y
+    }
 
     // Tame the emissive LEDs on the table model
     tableModel.traverse((child) => {
@@ -250,9 +376,10 @@ export class HabitatInteriorScene {
     })
 
     this.scene.add(tableModel)
-
-    // Store the world position for interaction checks
-    this.tablePosition.set(0, FLOOR_Y, TABLE_Z)
+    this.tableRoot = tableModel
+    tableModel.updateMatrixWorld(true)
+    new THREE.Box3().setFromObject(tableModel).getCenter(this.tablePosition)
+    this.tablePosition.y = FLOOR_Y
   }
 
   /**
@@ -265,6 +392,7 @@ export class HabitatInteriorScene {
     this.tickMovement(dt)
     this.tickInteraction()
     this.fpsCamera.tick(dt)
+    this.tickTablePlacementHold()
   }
 
   /** Release GPU resources and event listeners. */
@@ -405,6 +533,91 @@ export class HabitatInteriorScene {
     this.scene.add(girder)
   }
 
+  /**
+   * Build a submarine-style pressure hatch on the **back** end-cap (−Z): grey metallic
+   * frame ring, white circular door, yellow wheel-knob with crossed spokes. Geometry
+   * only — no textures, no animation — purely a visual hint that the back wall is the
+   * way to the cockpit.
+   *
+   * Everything is parented to a single group so XZ position is centralised. The group's
+   * local +Z faces back into the cabin, matching the back cap which sits at z = −L/2.
+   */
+  private buildCockpitHatch(): void {
+    const capZ = -CYLINDER_LENGTH / 2
+    const hatch = new THREE.Group()
+    hatch.name = 'habitatCockpitHatch'
+    hatch.position.set(0, HATCH_CENTRE_Y, capZ + HATCH_DOOR_SURFACE_OFFSET)
+
+    // Door — flat white disc made from a low cylinder (Y axis), rotated so its
+    // circular faces look down ±Z.
+    const doorMat = new THREE.MeshStandardMaterial({
+      color: HATCH_DOOR_COLOR,
+      metalness: 0.18,
+      roughness: 0.55,
+    })
+    const doorGeo = new THREE.CylinderGeometry(
+      HATCH_DOOR_RADIUS,
+      HATCH_DOOR_RADIUS,
+      HATCH_DOOR_THICKNESS,
+      HATCH_DOOR_SEGMENTS,
+    )
+    const door = new THREE.Mesh(doorGeo, doorMat)
+    door.name = 'habitatCockpitHatchDoor'
+    door.rotation.x = Math.PI / 2
+    hatch.add(door)
+
+    // Frame — torus around the door. Default torus lies in the XY plane (axis
+    // along Z), which is exactly the orientation we want against the back cap.
+    const frameMat = new THREE.MeshStandardMaterial({
+      color: HATCH_FRAME_COLOR,
+      metalness: 0.7,
+      roughness: 0.4,
+    })
+    const frameGeo = new THREE.TorusGeometry(
+      HATCH_FRAME_RING_RADIUS,
+      HATCH_FRAME_TUBE_RADIUS,
+      16,
+      HATCH_DOOR_SEGMENTS,
+    )
+    const frame = new THREE.Mesh(frameGeo, frameMat)
+    frame.name = 'habitatCockpitHatchFrame'
+    hatch.add(frame)
+
+    // Wheel-knob — small torus + two crossed spoke bars at the door centre.
+    const knobMat = new THREE.MeshStandardMaterial({
+      color: HATCH_KNOB_COLOR,
+      metalness: 0.45,
+      roughness: 0.45,
+    })
+    const knobRingGeo = new THREE.TorusGeometry(
+      HATCH_KNOB_RING_RADIUS,
+      HATCH_KNOB_TUBE_RADIUS,
+      12,
+      HATCH_DOOR_SEGMENTS,
+    )
+    const knobRing = new THREE.Mesh(knobRingGeo, knobMat)
+    knobRing.position.z = HATCH_KNOB_Z_BIAS
+    hatch.add(knobRing)
+
+    const horizontalSpokeGeo = new THREE.BoxGeometry(
+      HATCH_KNOB_SPOKE_LENGTH,
+      HATCH_KNOB_SPOKE_THICKNESS,
+      HATCH_KNOB_SPOKE_THICKNESS,
+    )
+    const verticalSpokeGeo = new THREE.BoxGeometry(
+      HATCH_KNOB_SPOKE_THICKNESS,
+      HATCH_KNOB_SPOKE_LENGTH,
+      HATCH_KNOB_SPOKE_THICKNESS,
+    )
+    const horizontalSpoke = new THREE.Mesh(horizontalSpokeGeo, knobMat)
+    const verticalSpoke = new THREE.Mesh(verticalSpokeGeo, knobMat)
+    horizontalSpoke.position.z = HATCH_KNOB_Z_BIAS
+    verticalSpoke.position.z = HATCH_KNOB_Z_BIAS
+    hatch.add(horizontalSpoke, verticalSpoke)
+
+    this.scene.add(hatch)
+  }
+
   /** Set up interior lighting: warm point near bed, ambient fill, cool rim from cockpit end. */
   private buildLighting(): void {
     // Main light — centered over the bed area (+Z side)
@@ -528,17 +741,103 @@ export class HabitatInteriorScene {
    * Compares XZ distance only so the check works regardless of camera pitch.
    */
   private tickInteraction(): void {
+    if (this.tablePlacementGrabbed) {
+      this.onPrompt?.('LMB place table → devtools console')
+      return
+    }
+
     const px = this.player.position.x - this.tablePosition.x
     const pz = this.player.position.z - this.tablePosition.z
-    const distXZ = Math.sqrt(px * px + pz * pz)
+    const distXZ = Math.hypot(px, pz)
+    const near = distXZ < INTERACT_DISTANCE * TABLE_DEBUG_GRAB_REACH_MULT
 
     if (distXZ < INTERACT_DISTANCE) {
-      this.onPrompt?.('F  Shuttle Control')
+      this.onPrompt?.(
+        isTablePlacementDebugEnabled()
+          ? 'LMB grab table (dev)  ·  F  Shuttle Control'
+          : 'F  Shuttle Control',
+      )
       if (this.inputManager.wasActionPressed('interact')) {
         this.onInteract?.('table')
       }
+    } else if (near && isTablePlacementDebugEnabled()) {
+      this.onPrompt?.('LMB grab table (dev, closer)')
     } else {
       this.onPrompt?.(null)
     }
+  }
+
+  /**
+   * While grabbed, write the table's **world** transform directly each frame, keeping it as a
+   * direct child of {@link scene}. The FPS camera is intentionally **not** part of the scene
+   * graph (only {@link FpsCamera.tick} sets its pose), so reparenting the table to the camera
+   * removes it from the rendered hierarchy entirely — the previous attempt did exactly that
+   * which is why the model "disappeared" the instant it was grabbed.
+   *
+   * Forward direction comes from {@link FpsCamera.yaw} (no pitch) so looking up/down does not
+   * lift or sink the prop. Y is anchored to the camera eye minus a small offset and clamped
+   * above the floor so it never clips when the player looks straight down.
+   */
+  private tickTablePlacementHold(): void {
+    if (!this.tablePlacementGrabbed || !this.tableRoot) return
+    const cam = this.fpsCamera.camera
+    const yaw = this.fpsCamera.yaw
+    const fwdX = -Math.sin(yaw)
+    const fwdZ = -Math.cos(yaw)
+    const eyeY = cam.position.y
+    this.tableRoot.position.set(
+      cam.position.x + fwdX * TABLE_DEBUG_HOLD_DISTANCE,
+      Math.max(FLOOR_Y + TABLE_DEBUG_HOLD_MIN_ABOVE_FLOOR, eyeY - TABLE_DEBUG_HOLD_BELOW_EYE),
+      cam.position.z + fwdZ * TABLE_DEBUG_HOLD_DISTANCE,
+    )
+    this.tableRoot.rotation.set(TABLE_LAYOUT_ROT_X, yaw, TABLE_LAYOUT_ROT_Z)
+  }
+
+  /**
+   * Drop the table back onto the floor at its current XZ + yaw and log the resulting world
+   * pose for pasting into {@link load}. We deliberately overwrite the held Y so the released
+   * table never floats — `tickTablePlacementHold` parks it at eye-height while grabbed for
+   * visibility, but the placement workflow always wants it sitting on the deck.
+   */
+  private commitTablePlacementFromDebug(): void {
+    const root = this.tableRoot
+    if (!root) return
+    this.tablePlacementGrabbed = false
+
+    // Snap to floor: keep XZ + rotation, then offset Y so the post-rotation bbox.min sits at
+    // FLOOR_Y. Mirrors the `load()` defensive drop-to-floor step.
+    root.position.y = FLOOR_Y
+    root.updateMatrixWorld(true)
+    const grounded = new THREE.Box3().setFromObject(root)
+    if (grounded.min.y !== FLOOR_Y) {
+      root.position.y -= grounded.min.y - FLOOR_Y
+      root.updateMatrixWorld(true)
+    }
+
+    root.getWorldPosition(this._tmpWorldPos)
+    root.getWorldQuaternion(this._tmpWorldQuat)
+    this._tmpEuler.setFromQuaternion(this._tmpWorldQuat, 'YXZ')
+    const wp = this._tmpWorldPos
+    const wq = this._tmpWorldQuat
+    const e = this._tmpEuler
+    const payload = {
+      position: { x: round4(wp.x), y: round4(wp.y), z: round4(wp.z) },
+      rotationYXZ: {
+        x: round4(e.x),
+        y: round4(e.y),
+        z: round4(e.z),
+        order: e.order,
+      },
+      quaternion: {
+        x: round4(wq.x),
+        y: round4(wq.y),
+        z: round4(wq.z),
+        w: round4(wq.w),
+      },
+      snippet: `tableModel.position.set(${round4(wp.x)}, ${round4(wp.y)}, ${round4(wp.z)})\ntableModel.quaternion.set(${round4(wq.x)}, ${round4(wq.y)}, ${round4(wq.z)}, ${round4(wq.w)})`,
+    }
+    console.log('[HabitatInteriorScene] Table world pose (paste into load() after layout):')
+    console.log(JSON.stringify(payload, null, 2))
+    this.tablePosition.set(wp.x, FLOOR_Y, wp.z)
   }
 }
