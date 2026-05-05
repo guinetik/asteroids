@@ -8,13 +8,15 @@
  * @date 2026-05-05
  * @spec docs/superpowers/specs/2026-05-05-ceres-station-dock-system-design.md
  */
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { contractSystem } from '@/lib/contracts/runtime'
 
 /** Props accepted by {@link DockPanel}. */
 interface Props {
   /** Asset ref the player docked at; null when panel is closed. */
   assetRef: string | null
+  /** Optional station label shown in the header; defaults to 'STATION'. */
+  label?: string
 }
 
 const props = defineProps<Props>()
@@ -23,6 +25,9 @@ const emit = defineEmits<{
   /** Emitted when the panel should close (cancel or post-action). */
   close: []
 }>()
+
+/** True while a confirm action is in flight; prevents double-clicks. */
+const confirming = ref(false)
 
 /** Active contract step targeting this asset, or null if none. */
 const active = computed(() =>
@@ -49,9 +54,15 @@ const flavor = computed(() => {
   ]
 })
 
+/** Header text built from the optional label prop. */
+const headerText = computed(() =>
+  props.label ? `${props.label} · DOCK` : 'STATION · DOCK',
+)
+
 /** Confirm the docking action and close the panel. */
 function onConfirm(): void {
-  if (!props.assetRef) return
+  if (!props.assetRef || confirming.value) return
+  confirming.value = true
   contractSystem.notifyDockedAtAsset(props.assetRef)
   emit('close')
 }
@@ -59,13 +70,19 @@ function onConfirm(): void {
 
 <template>
   <div v-if="assetRef" class="dock-panel">
-    <header class="dock-panel-header">CERES INSTITUTE STATION · DOCK</header>
+    <header class="dock-panel-header">{{ headerText }}</header>
     <section class="dock-panel-body">
       <p v-for="(p, i) in flavor" :key="i">{{ p }}</p>
     </section>
     <footer class="dock-panel-footer">
-      <button v-if="verb" class="dock-panel-confirm" @click="onConfirm">{{ verb }}</button>
-      <button class="dock-panel-close" @click="emit('close')">CLOSE</button>
+      <button
+        v-if="verb"
+        type="button"
+        class="dock-panel-confirm"
+        :disabled="confirming"
+        @click="onConfirm"
+      >{{ verb }}</button>
+      <button type="button" class="dock-panel-close" @click="emit('close')">CLOSE</button>
     </footer>
   </div>
 </template>

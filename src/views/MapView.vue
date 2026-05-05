@@ -512,8 +512,8 @@ const missionFocusActive = viewController.missionFocusActive
 /** Mirrors the controller's dock-prompt state: non-null when the player is near a pinned station. */
 const dockPromptState = viewController.dockPromptState
 
-/** Asset ref of the station whose dock panel is open; null when closed. */
-const dockedAssetRef = ref<string | null>(null)
+/** Asset ref and label of the station whose dock panel is open; null when closed. */
+const dockedAsset = ref<{ assetRef: string; label: string } | null>(null)
 
 /** Mirrors the selected tracker row id so the panel can highlight the matching row. */
 const selectedMissionRowId = viewController.selectedMissionRowId
@@ -1083,7 +1083,7 @@ onMounted(async () => {
       void router.push('/level')
     }
     viewController.onRequestDock = (assetRef: string) => {
-      dockedAssetRef.value = assetRef
+      dockedAsset.value = { assetRef, label: dockPromptState.value?.label ?? 'STATION' }
     }
     viewController.onPortalWelcome = () => {
       portalWelcomeIsFirstVisit.value = !viewController.getPlayerProfileSnapshot().hasSeenIntro
@@ -2260,9 +2260,9 @@ watch(
     />
     <JovianEpilogueOverlay v-if="epilogueVisible" :on-continue="handleEpilogueContinue" />
     <MissionFocusPrompt v-if="missionFocusActive" @dismiss="handleMissionFocusDismiss" />
-    <DockPanel :asset-ref="dockedAssetRef" @close="dockedAssetRef = null" />
+    <DockPanel :asset-ref="dockedAsset?.assetRef ?? null" :label="dockedAsset?.label" @close="dockedAsset = null" />
     <KeyPrompt
-      v-if="dockPromptState && !dockedAssetRef"
+      v-if="dockPromptState && !dockedAsset"
       key-label="F"
       :action="`Dock at ${dockPromptState.label}`"
       tone="green"

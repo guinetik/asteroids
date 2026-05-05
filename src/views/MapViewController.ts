@@ -5544,6 +5544,7 @@ export class MapViewController implements Tickable {
     this.habitatFacade.dispose()
     unregisterMapDevCommands()
     this.onUpgradeHudRefresh = null
+    this.onRequestDock = null
     this.sceneEnvironment?.dispose()
     this.sceneEnvironment = null
     this.sceneVisuals?.dispose()
