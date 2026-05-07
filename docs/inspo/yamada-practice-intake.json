@@ -1,0 +1,157 @@
+{
+  "id": "yamada-practice-intake",
+  "homePlanet": "uranus",
+  "inboxName": "Yamada Farms",
+  "from": "Sumiko Yamada, Yamada Farms",
+  "sentAt": "2306-05-04 17:43 UTC",
+  "offerWhenPrerequisites": {
+    "requiredUpgrades": [
+      { "upgradeId": "gravitySurfing", "minLevel": 1 },
+      { "upgradeId": "orbitalSurfing", "minLevel": 1 }
+    ],
+    "triggerOnPlanetVisited": "uranus"
+  },
+  "pinnedAssets": [
+    {
+      "assetRef": "yamada-titania-compound",
+      "kind": "compound",
+      "region": "uranus-titania",
+      "label": "Yamada Farms — Titania",
+      "modelPath": "models/yamada-compound.glb",
+      "positionSeed": "yamada-titania-compound"
+    }
+  ],
+  "introSubject": "An Invitation, and Some Tea",
+  "introBody": [
+    "Pilot —",
+    "The practice has been watching your work. We do not say this to flatter — we say it because it is the polite way to begin a letter that asks for a favor. Several favors, in fact. The compensation is generous, because we are not embarrassed for funds and because the work matters to us.",
+    "[soft] A short introduction. The practice has been in our family since 1996. The first Yamada to do this work was my great-great-grandmother — a farmer in Hokkaido who was given a sheep to keep alive past every reason it had to die. She kept it. Her daughter kept the next one, and so on. Somewhere along the way the work became clinical. The pigs came in 2034. We came to Uranus when the moons could hold the cold without us spending the practice's whole income on coolant. We have been here since.",
+    "[warm] What we offer our patients is, in plain language, time. We do this with stem cells, with cultured organs, with neural baselines, with — when the work is permitted to go that far — replacement. The detail you will find on a brochure, if you ask for one. The detail you will find in the field is that we keep a pig for every patient. The pig lives next to them. The pig is named. The pig is, in a sense that some pilots find difficult, theirs.",
+    "[a small smile in her voice] Most pilots who hear this for the first time go quiet. You may go quiet. Please do not feel bad about it. The practice has had two and a half centuries to get used to itself.",
+    "We will need from you, in order: an Earth errand; a small ship outfit; some local fieldwork; two satellite installs. After which, if you would like to visit the family compound on Titania, the door is open. The tea is on. I have put on a kettle in advance, which is a habit I learned from my grandmother and which the practice does not, on the whole, approve of as patient-care methodology.",
+    "Acceptance below.",
+    "— Sumiko Yamada"
+  ],
+  "steps": [
+    {
+      "kind": "complete-missions",
+      "count": 1,
+      "missionType": "shuttle",
+      "giverPlanetId": "uranus",
+      "specialMissionId": "yamada-roslin-archive",
+      "creditsReward": 3000,
+      "subject": "Step 1 — A Standing Order from Roslin",
+      "flavor": [
+        "Pilot —",
+        "We need a small case from Earth. The Roslin archive in Midlothian holds reference standards from the lineage our work descends from — the original sheep, and her daughters, and the daughters' daughters, kept on file for three centuries because the practice that began there has not yet ended. The standards drift if they are sourced from anywhere else. The Roslin archive is the only honest reference frame the practice has.",
+        "Take the shuttle, please, not the lander. The case is small and the shuttle is gentle on it. The lander vibrates in a band our cassettes do not appreciate.",
+        "The dock crew at Edinburgh will know you. They have known a Yamada once a decade for two hundred years.",
+        "— Sumiko"
+      ]
+    },
+    {
+      "kind": "install-upgrades",
+      "requiredUpgrades": [
+        { "upgradeId": "heatProtection", "minLevel": 3 },
+        { "upgradeId": "freezeProtection", "minLevel": 3 },
+        { "upgradeId": "radiationProtection", "minLevel": 3 },
+        { "upgradeId": "hull", "minLevel": 3 }
+      ],
+      "creditsReward": 0,
+      "subject": "Step 2 — Outfit",
+      "flavor": [
+        "Pilot —",
+        "Before fieldwork. I think it is time to bring your shuttle to tier three across heat, freeze, radiation, and hull. The cargo we will be asking you to move is biological. It will not survive a leak. I will not ask you to move it under any other condition.",
+        "[a pause that might be apology] If you have already done this, the kiosk will recognize it and we will move on. If you have not, the kiosk will tell you which yards in the system are nearest. The practice does not pay for the upgrades — we pay for the work that follows them.",
+        "— Sumiko"
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 3,
+      "missionType": "asteroid",
+      "giverPlanetId": "uranus",
+      "creditsReward": 18000,
+      "subject": "Step 3 — Practice Work",
+      "flavor": [
+        "Pilot —",
+        "Three contracts from the practice's standing pool, in any order. Take the ones that suit your day. The kiosk will list them.",
+        "*Bunker Protect.* The asteroid bunkers we keep for our patients are quiet places. Sometimes they stop being quiet — the colonies on a neighboring rock have a way of taking an interest in our hardware. The patient-pig in the cylinder cannot defend itself. You can. The work is to clear the bunker and reboot the cylinder before the suspension lapses. Treat the pig with the dignity you would treat a person who is asleep, because the difference between the two is, in our practice, smaller than the literature will tell you.",
+        "*Bunker Extract.* Sometimes the cylinder has done its work and the pig is ready to come home. You will collect the cylinder, mount it on the lander, and bring it to the patient's receiving asteroid before the suspension window closes. There will be a clock. Do not race it. The cargo is fragile in ways racing does not respect. One of these deliveries will be to an old patient of ours — their receiving asteroid is in a strange orbit, and you may find the place quieter than you expect. You do not need to talk to them. They will not be in a state to talk back.",
+        "*Patient Rescue.* Occasionally a patient is caught on a viroid run they should not have been on. You will recognize them by their suit color — they are the one in yellow. The other operators on the asteroid are also worth saving, but the patient is the one we are paid to bring back. If they die, the file closes. Please do not let the file close.",
+        "[soft] If you are wondering whether all of this is normal — yes. The practice has been doing it for a very long time.",
+        "— Sumiko"
+      ]
+    },
+    {
+      "kind": "complete-missions",
+      "count": 2,
+      "missionType": "eva",
+      "giverPlanetId": "uranus",
+      "objectiveType": "neuron-install",
+      "creditsReward": 14000,
+      "subject": "Step 4 — Two Quiet Installs",
+      "flavor": [
+        "Pilot —",
+        "Two EVA jobs. The kiosk will pin satellites that need a baseline interface installed in the housing — small board, neat connectors, the practice's logo on the underside which I am told some pilots like.",
+        "I will not lie to you about whose hardware this is. The satellites belong to patients of ours who have, for one reason or another, no body to come back to. Some of them ordered a clone and chose not to wake it. Some of them did not have the means. They are, for the moment, listening — to deep space, mostly, on instruments the practice maintains for them in exchange for their attention. They are some of our oldest patients. They have been listening longer than your country has existed.",
+        "[a pause that might be apology] You will not see them. They will not see you. The work is mechanical; the satellite will reboot when the board is seated. They will know you were there because the diagnostics will tell them in the morning.",
+        "Some of them write back. We pass the messages on, when they are addressed to a person who can read.",
+        "— Sumiko"
+      ]
+    },
+    {
+      "kind": "choice-mission",
+      "missionId": "yamada_titania_intake",
+      "minigameType": "intake-interview",
+      "pinnedAssetRef": "yamada-titania-compound",
+      "specialMissionId": "yamada-titania-intake",
+      "outcomes": [
+        { "outcomeId": "enroll", "label": "Enroll", "creditsReward": 12000 },
+        { "outcomeId": "decline", "label": "Decline, with thanks", "creditsReward": 12000 }
+      ],
+      "subject": "Step 5 — A Visit",
+      "flavor": [
+        "Pilot —",
+        "Come to Titania. The compound is on the southern face — the kiosk has the coordinates. Bring nothing. Wear what you are wearing.",
+        "I will give you the tour. You will meet Margaret — she is the first sheep, kept past every reason she had to leave us, and she is the answer to every question you have not yet asked. You will see the pig ward, which is the part most pilots find difficult; we will not rush through it. And you will see the listening ward, where the satellite people you have been working for live in jars and listen to a sky no one else can hear. My grandmother will not come down. She is two hundred and forty and she has met enough strangers for one lifetime. She sends her regards.",
+        "[warm] At the end of the visit I will offer you the practice's care. You may take it or you may not. I will not press you either way. We have had patients in our keeping for two centuries and we have had pilots decline the offer for almost as long. The door does not close. The tea stays on.",
+        "If you accept, we will fit you for the glasses before you leave. If you do not, I will see you to the dock myself.",
+        "— Sumiko"
+      ]
+    }
+  ],
+  "completionByOutcome": {
+    "enroll": {
+      "completionSubject": "Welcome",
+      "completionBody": [
+        "Pilot —",
+        "[warm] Welcome to the practice. Your file is open. Beatrice — I think you will like her — is yours, technically; the practice will, in time, ask you to admit she is also ours, and that you are also hers. We have this conversation with every pilot. Most of them sit down for it.",
+        "Your glasses will be ready at the Titania dispensary by the time you return. Wear them when you remember. They will adjust themselves the first night. The hat is offered separately and the practice does not push it.",
+        "Uranus traffic control has been informed of your status; fast-travel privileges are extended in perpetuity. The practice's contract rate is now your contract rate. The next time you are on Titania, the kettle will be on.",
+        "[soft] Oh — and one practical matter. Some patients of ours, on seeing the glasses, will treat you differently. Mr. Finch in particular has a fondness for the frames. I do not know him personally; I know him as a file. The practice has had his file for some time.",
+        "— Sumiko"
+      ],
+      "rewards": [
+        { "type": "fast-travel", "planetId": "uranus" },
+        { "type": "mission-pay-multiplier", "planetId": "uranus", "multiplier": 2 },
+        { "type": "set-cosmetic", "cosmeticId": "yamada-glasses" },
+        { "type": "set-story-flag", "flag": "yamada-enrolled" }
+      ]
+    },
+    "decline": {
+      "completionSubject": "With the Practice's Thanks",
+      "completionBody": [
+        "Pilot —",
+        "Thank you for the visit. I am glad you came. The practice is not in the business of pressing pilots into care they have not asked for; you have not asked, and so we will not press.",
+        "Uranus traffic control has been informed; fast-travel privileges are extended. Standing contracts remain available to you at our standard rate. If you change your mind, the kiosk will tell us. If you do not, that is also fine.",
+        "[soft] The kettle stays on either way. Safe flying.",
+        "— Sumiko"
+      ],
+      "rewards": [
+        { "type": "fast-travel", "planetId": "uranus" },
+        { "type": "set-story-flag", "flag": "yamada-declined" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "id": "yamada-farms",
+  "name": "Sumiko Yamada",
+  "title": "Yamada Farms — Titania intake",
+  "objectiveTypes": ["bunker", "rescue"],
+  "minDifficulty": 4,
+  "maxDifficulty": 9,
+  "missions": [
+    {
+      "id": "yamada_bunker_protect",
+      "name": "Bunker Protect — Patient Cylinder",
+      "briefing": "Pilot — one of our asteroid bunkers has stopped being quiet. The colonies on a neighbouring rock take an interest in our hardware sometimes; the patient-pig in the cylinder cannot defend itself, and you can. Clear the bunker and reboot the suspension before the cycle lapses. Treat the pig with the dignity you would treat a person who is asleep — the difference between the two is, in our practice, smaller than the literature will tell you. — Sumiko",
+      "archetype": "bunker-protect",
+      "objectiveSlots": [
+        {
+          "type": "bunker",
+          "weight": 1.0,
+          "params": { "type": "bunker" },
+          "reward": { "min": 4000, "max": 8500 }
+        }
+      ],
+      "completionBonus": { "min": 1200, "max": 2400 },
+      "regionByDifficulty": {
+        "asteroid-belt": [4, 7],
+        "kuiper-belt": [7, 9]
+      },
+      "planetIds": ["uranus"]
+    },
+    {
+      "id": "yamada_bunker_extract",
+      "name": "Bunker Extract — Cylinder Recovery",
+      "briefing": "Pilot — the cylinder has done its work and the pig is ready to come home. Collect it, mount it on the lander, bring it to the patient's receiving asteroid. There will be a clock. Do not race it; the cargo is fragile in ways racing does not respect. One of these deliveries goes to an old patient of ours — the orbit is strange, and you may find the place quieter than you expect. They will not be in a state to talk back. — Sumiko",
+      "archetype": "bunker-extract",
+      "objectiveSlots": [
+        {
+          "type": "bunker",
+          "weight": 1.0,
+          "params": { "type": "bunker" },
+          "reward": { "min": 4500, "max": 9000 }
+        }
+      ],
+      "completionBonus": { "min": 1400, "max": 2800 },
+      "regionByDifficulty": {
+        "asteroid-belt": [4, 7],
+        "kuiper-belt": [7, 9]
+      },
+      "planetIds": ["uranus"]
+    },
+    {
+      "id": "yamada_patient_rescue",
+      "name": "Patient Rescue — Field Recovery",
+      "briefing": "Pilot — a patient of ours is caught on a viroid run they should not have been on. You will recognize them by their suit colour; the others on the asteroid are also worth saving, but the patient is the one we are paid to bring back. If the file closes, please let it not be on a day we asked you to keep it open. — Sumiko",
+      "archetype": "patient-rescue",
+      "objectiveSlots": [
+        {
+          "type": "rescue",
+          "weight": 1.0,
+          "params": {
+            "type": "rescue",
+            "colonistCount": { "min": 3, "max": 5 },
+            "oxygenTime": { "min": 240, "max": 180 },
+            "guardedChance": 1.0
+          },
+          "reward": { "min": 3800, "max": 7500 }
+        }
+      ],
+      "completionBonus": { "min": 1000, "max": 2200 },
+      "regionByDifficulty": {
+        "asteroid-belt": [4, 7],
+        "kuiper-belt": [7, 9]
+      },
+      "planetIds": ["uranus"]
+    }
+  ]
+}

@@ -1,38 +1,46 @@
 {
   "planetId": "uranus",
-  "giverName": "Uranus Outpost Authority",
+  "giverName": "Yamada Farms",
   "missions": [
     {
-      "id": "uranus_tilt_anomaly_probe",
-      "name": "Tilt-Anomaly Probe Refit",
-      "description": "The axial-tilt monitoring probe suffered a gyro failure. EVA out to the satellite bus and swap the RCS reaction wheel stack.",
-      "poiType": "satellite",
-      "minigameType": "relay_repair",
-      "reward": 300
-    },
-    {
-      "id": "uranus_cryo_storage_inspection",
-      "name": "Cryogenic Storage Inspection",
-      "description": "Cryogenic fuel depot shows a slow helium boil-off. Spacewalk around the tank array, identify the leak, seal it with cold-patch.",
+      "id": "yamada_eva_cryo_seal",
+      "name": "Cryo Seal Inspection",
+      "description": "A cryogenic store on a patient asteroid is throwing a slow boil-off warning. Spacewalk the tank array, find the seam, cold-patch it. The practice is in no hurry; the patient is in less.",
       "poiType": "relay_antenna",
       "minigameType": "relay_repair",
       "reward": 400
     },
     {
-      "id": "uranus_orbital_asset_servicing",
+      "id": "yamada_eva_cylinder_telemetry",
+      "name": "Suspension Cylinder Telemetry",
+      "description": "A patient-pig cylinder's telemetry has gone vague. EVA out to the bus, swap the reaction wheel stack, bring the readings back into spec. Treat the cylinder gently.",
+      "poiType": "satellite",
+      "minigameType": "relay_repair",
+      "reward": 350
+    },
+    {
+      "id": "yamada_eva_listening_array_phasing",
+      "name": "Listening Ward — Mirror Phasing",
+      "description": "One of the deep-sky telescopes the practice maintains for our older patients drifted in a thermal shock. Read the wavefront sensor, walk the segments in by hand. Quiet job.",
+      "poiType": "telescope",
+      "minigameType": "telescope_alignment",
+      "reward": 500
+    },
+    {
+      "id": "yamada_eva_orbital_asset_servicing",
       "name": "Orbital Asset Servicing",
-      "description": "On-orbit asset is throwing faults across multiple subsystems. Diagnostics inconclusive — EVA out, find the broken parts, patch them in place.",
+      "description": "An on-orbit asset of ours is throwing faults across multiple subsystems. Diagnostics inconclusive. EVA out, find the broken parts, patch them in place.",
       "poiType": "satellite",
       "minigameType": "satellite_servicing",
       "reward": 450
     },
     {
-      "id": "uranus_polar_telescope_phasing",
-      "name": "Polar Telescope Phasing",
-      "description": "Polar-axis observatory's mirror segments drifted after a thermal shock. EVA, read the wavefront sensor, walk each segment in by hand.",
-      "poiType": "telescope",
-      "minigameType": "telescope_alignment",
-      "reward": 500
+      "id": "yamada_eva_neuron_install",
+      "name": "Baseline Interface Install",
+      "description": "A patient satellite needs a baseline-interface board seated in its housing — small board, neat connectors, the practice's logo on the underside. The diagnostics will tell them in the morning.",
+      "poiType": "satellite",
+      "minigameType": "satellite_servicing",
+      "reward": 550
     }
   ]
 }

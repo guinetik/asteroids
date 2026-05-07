@@ -1,0 +1,90 @@
+[
+  {
+    "id": "sun",
+    "bodyKey": "sun",
+    "label": "Sun",
+    "assetPath": "/posters/001.jpg",
+    "achievementId": "exploration-orbit-sun",
+    "defaultUnlocked": false
+  },
+  {
+    "id": "mercury",
+    "bodyKey": "mercury",
+    "label": "Mercury",
+    "assetPath": "/posters/mercury.jpg",
+    "achievementId": "exploration-orbit-mercury",
+    "defaultUnlocked": false
+  },
+  {
+    "id": "venus",
+    "bodyKey": "venus",
+    "label": "Venus",
+    "assetPath": "/posters/venus.jpg",
+    "achievementId": "exploration-orbit-venus",
+    "defaultUnlocked": false
+  },
+  {
+    "id": "earth",
+    "bodyKey": "earth",
+    "label": "Earth",
+    "assetPath": "/posters/earth.jpg",
+    "achievementId": null,
+    "defaultUnlocked": true
+  },
+  {
+    "id": "mars",
+    "bodyKey": "mars",
+    "label": "Mars",
+    "assetPath": "/posters/mars.jpg",
+    "achievementId": "exploration-orbit-mars",
+    "defaultUnlocked": false
+  },
+  {
+    "id": "ceres",
+    "bodyKey": "ceres",
+    "label": "Ceres",
+    "assetPath": "/posters/ceres.jpg",
+    "achievementId": "exploration-orbit-ceres",
+    "defaultUnlocked": false
+  },
+  {
+    "id": "jupiter",
+    "bodyKey": "jupiter",
+    "label": "Jupiter",
+    "assetPath": "/posters/jupiter.jpg",
+    "achievementId": "exploration-orbit-jupiter",
+    "defaultUnlocked": false
+  },
+  {
+    "id": "saturn",
+    "bodyKey": "saturn",
+    "label": "Saturn",
+    "assetPath": "/posters/saturn.jpg",
+    "achievementId": "exploration-orbit-saturn",
+    "defaultUnlocked": false
+  },
+  {
+    "id": "uranus",
+    "bodyKey": "uranus",
+    "label": "Uranus",
+    "assetPath": "/posters/uranus.jpg",
+    "achievementId": "exploration-orbit-uranus",
+    "defaultUnlocked": false
+  },
+  {
+    "id": "neptune",
+    "bodyKey": "neptune",
+    "label": "Neptune",
+    "assetPath": "/posters/neptune.jpg",
+    "achievementId": "exploration-orbit-neptune",
+    "defaultUnlocked": false
+  },
+  {
+    "id": "pluto",
+    "bodyKey": "pluto",
+    "label": "Pluto",
+    "assetPath": "/posters/pluto.jpg",
+    "achievementId": "exploration-orbit-pluto",
+    "defaultUnlocked": false
+  }
+]

@@ -725,8 +725,9 @@ watch(
   unlockedAchievementIds,
   (ids) => {
     persistUnlockedAchievementIds(ids)
+    viewController.setUnlockedAchievementIds(ids)
   },
-  { deep: true },
+  { deep: true, immediate: true },
 )
 
 watch(

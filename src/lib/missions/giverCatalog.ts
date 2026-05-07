@@ -23,6 +23,7 @@ import martianMarinesBunkerData from '@/data/missions/givers/martian-marines-bun
 import mrFinchData from '@/data/missions/givers/mr-finch.json'
 import cloudCityOpsData from '@/data/missions/givers/cloud-city-ops.json'
 import ceresInstituteData from '@/data/missions/givers/ceres-institute.json'
+import yamadaFarmsData from '@/data/missions/givers/yamada-farms.json'
 
 /** All mission givers loaded from JSON. */
 export const MISSION_GIVERS: MissionGiver[] = [
@@ -37,6 +38,7 @@ export const MISSION_GIVERS: MissionGiver[] = [
   mrFinchData,
   cloudCityOpsData,
   ceresInstituteData,
+  yamadaFarmsData,
 ] as unknown as MissionGiver[]
 
 /** Mission givers keyed by id. */

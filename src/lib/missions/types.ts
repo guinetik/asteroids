@@ -497,6 +497,16 @@ export interface MissionGiverTemplate {
    * (e.g. Jay Mercer's Jupiter expansion entries gated by `'jovianContractTampered'`).
    */
   requiresFlag?: string
+  /**
+   * Optional archetype tag — purely informational metadata for content-side
+   * differentiation when multiple templates share the same `objectiveType`
+   * but represent distinct narrative archetypes (e.g. Yamada Farms's
+   * `'bunker-protect'`, `'bunker-extract'`, `'patient-rescue'`). Reserved as
+   * the future branching knob for archetype-specific customization passes
+   * (model swaps, extra success/fail conditions, delivery loops). The
+   * generator and runtime ignore this field today.
+   */
+  archetype?: string
 }
 
 /** Concrete rolled objective values for a generated mission. */

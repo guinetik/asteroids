@@ -23,6 +23,8 @@ import {
   type CatObstacle,
   type CatWanderBounds,
 } from '@/three/CatController'
+import { HabitatCompletionPoster } from '@/three/HabitatCompletionPoster'
+import { HabitatPosterWall } from '@/three/HabitatPosterWall'
 
 // ---------------------------------------------------------------------------
 // Constants — no magic numbers
@@ -109,7 +111,7 @@ const BED_X = 3.6
 // center. Geometry-only, no textures.
 
 /** Radius of the white circular door disc (world units). */
-const HATCH_DOOR_RADIUS = 1.0
+const HATCH_DOOR_RADIUS = 0.66
 /** Thickness of the door disc (world units). */
 const HATCH_DOOR_THICKNESS = 0.06
 /** Radial segment count for the door disc and frame. */
@@ -119,7 +121,7 @@ const HATCH_FRAME_RING_RADIUS = HATCH_DOOR_RADIUS + 0.12
 /** Tube radius of the frame torus (world units). */
 const HATCH_FRAME_TUBE_RADIUS = 0.12
 /** Major radius of the wheel-knob torus (world units). */
-const HATCH_KNOB_RING_RADIUS = 0.28
+const HATCH_KNOB_RING_RADIUS = 0.19
 /** Tube radius of the wheel-knob torus (world units). */
 const HATCH_KNOB_TUBE_RADIUS = 0.045
 /** Length of each crossed spoke through the wheel-knob (world units). */
@@ -127,7 +129,7 @@ const HATCH_KNOB_SPOKE_LENGTH = HATCH_KNOB_RING_RADIUS * 2
 /** Thickness (square cross-section) of each crossed spoke (world units). */
 const HATCH_KNOB_SPOKE_THICKNESS = 0.045
 /** Floor-relative Y of the hatch centre (world units). Roughly at eye height. */
-const HATCH_CENTRE_Y = FLOOR_Y + 1.6
+const HATCH_CENTRE_Y = FLOOR_Y + 1.2
 /** Offset from the back-cap surface so the door doesn't z-fight with the disc. */
 const HATCH_DOOR_SURFACE_OFFSET = 0.05
 /** Tiny offset that keeps the wheel-knob in front of the door panel (world units). */
@@ -138,6 +140,18 @@ const HATCH_DOOR_COLOR = 0xeaeaea
 const HATCH_FRAME_COLOR = 0x9aa3ad
 /** Yellow wheel-knob colour. */
 const HATCH_KNOB_COLOR = 0xf2c438
+/** Scale applied to the poster wall so two rows fit above the back hatch. */
+const POSTER_WALL_SCALE = 0.78
+/** Back-cap offset that keeps the poster wall in front of the cap without z-fighting. */
+const POSTER_WALL_Z_OFFSET = 0.085
+/** Height of the poster wall centre above the hatch centre. */
+const POSTER_WALL_ABOVE_HATCH_Y = 2.06
+/** X offset for the large completion poster mounted left of the hatch. */
+const COMPLETION_POSTER_LEFT_OF_HATCH_X = -2.18
+/** Y offset for the large completion poster center relative to the hatch center. */
+const COMPLETION_POSTER_ABOVE_HATCH_Y = 0.55
+/** Back-cap offset that keeps the completion poster in front of the cap. */
+const COMPLETION_POSTER_Z_OFFSET = 0.09
 /**
  * Author-corrective rotation applied to the table model so the Sketchfab mesh reads the
  * right way up after import. The pre-centered GLB
@@ -235,9 +249,9 @@ const CAT_MODEL_URL = '/models/cat.glb'
 // it reads as "the cat's corner" without crowding the bed or interaction zone.
 
 /** World X of the food bowl (off-centre, port side of the cabin). */
-const CAT_BOWL_X = -1.85
+const CAT_BOWL_X = -3.85
 /** World X of the water fountain (next to the bowl). */
-const CAT_FOUNTAIN_X = -2.25
+const CAT_FOUNTAIN_X = -4.25
 /** Shared world Z of the feeding area — sits just shy of the +Z wall, beside the table. */
 const CAT_FEEDING_Z = 7.2
 /** Outer radius of the ceramic food bowl (world units). */
@@ -337,6 +351,12 @@ export class HabitatInteriorScene {
   /** Loaded table root — moved when using the dev grab/place tool. */
   private tableRoot: THREE.Object3D | null = null
 
+  /** Achievement poster wall mounted above the cockpit hatch. */
+  private readonly posterWall = new HabitatPosterWall()
+
+  /** Large completion poster mounted left of the cockpit hatch. */
+  private readonly completionPoster = new HabitatCompletionPoster()
+
   /**
    * Sushi the cat — roams the cabin once {@link load} resolves. Kept as a tribute
    * to the author's cat (R.I.P. 2026); load failures are non-fatal so the rest of
@@ -374,6 +394,8 @@ export class HabitatInteriorScene {
 
     this.buildCylinder()
     this.buildCockpitHatch()
+    this.buildPosterWall()
+    this.buildCompletionPoster()
     this.buildLighting()
     this.buildStarfield()
     this.buildFloor()
@@ -433,7 +455,9 @@ export class HabitatInteriorScene {
     if (this.loaded) return
     this.loaded = true
 
-    const [bedModel, tableModel] = await Promise.all([
+    const [, , bedModel, tableModel] = await Promise.all([
+      this.posterWall.load(),
+      this.completionPoster.load(),
       loadGLB('/models/bed.glb'),
       loadGLB('/models/table.glb'),
     ])
@@ -550,6 +574,10 @@ export class HabitatInteriorScene {
     this.fpsCamera.dispose()
     this.cat?.dispose()
     this.cat = null
+    this.scene.remove(this.posterWall.group)
+    this.posterWall.dispose()
+    this.scene.remove(this.completionPoster.group)
+    this.completionPoster.dispose()
     this.scene.traverse((child) => {
       if (
         child instanceof THREE.Mesh ||
@@ -561,6 +589,16 @@ export class HabitatInteriorScene {
         mats.forEach((m) => m.dispose())
       }
     })
+  }
+
+  /**
+   * Update poster visibility from persisted achievement ids.
+   *
+   * @param unlockedAchievementIds - Current unlocked achievement ids from the map UI.
+   */
+  setUnlockedAchievementIds(unlockedAchievementIds: readonly string[]): void {
+    this.posterWall.setUnlockedAchievementIds(unlockedAchievementIds)
+    this.completionPoster.setUnlockedAchievementIds(unlockedAchievementIds)
   }
 
   // -------------------------------------------------------------------------
@@ -761,6 +799,29 @@ export class HabitatInteriorScene {
     hatch.add(horizontalSpoke, verticalSpoke)
 
     this.scene.add(hatch)
+  }
+
+  /** Mount the fixed-order achievement poster wall above the cockpit hatch. */
+  private buildPosterWall(): void {
+    const capZ = -CYLINDER_LENGTH / 2
+    this.posterWall.group.position.set(
+      0,
+      HATCH_CENTRE_Y + POSTER_WALL_ABOVE_HATCH_Y,
+      capZ + POSTER_WALL_Z_OFFSET,
+    )
+    this.posterWall.group.scale.setScalar(POSTER_WALL_SCALE)
+    this.scene.add(this.posterWall.group)
+  }
+
+  /** Mount the large completion poster left of the cockpit hatch. */
+  private buildCompletionPoster(): void {
+    const capZ = -CYLINDER_LENGTH / 2
+    this.completionPoster.group.position.set(
+      COMPLETION_POSTER_LEFT_OF_HATCH_X,
+      HATCH_CENTRE_Y + COMPLETION_POSTER_ABOVE_HATCH_Y,
+      capZ + COMPLETION_POSTER_Z_OFFSET,
+    )
+    this.scene.add(this.completionPoster.group)
   }
 
   /** Set up interior lighting: warm point near bed, ambient fill, cool rim from cockpit end. */

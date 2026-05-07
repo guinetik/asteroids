@@ -444,6 +444,8 @@ export class MapViewController implements Tickable {
   private spaceTimeGridVisibleBeforeTacMap: boolean | null = null
   private habitatState = new HabitatState()
   private readonly habitatFacade = new MapHabitatFacade()
+  /** Persisted achievement ids mirrored from Vue for habitat visual rewards. */
+  private unlockedAchievementIds: readonly string[] = []
   private turretSessionController: TurretSessionController | null = null
   private shopFacade = new MapShopFacade()
   private cosmeticShopFacade = new MapCosmeticShopFacade()
@@ -729,6 +731,16 @@ export class MapViewController implements Tickable {
     this.shuttleAudio.notifyShuttleMissionBed(active)
   }
 
+  /**
+   * Mirror Vue's persisted achievement list into controller-owned scenes.
+   *
+   * @param unlockedAchievementIds - Current unlocked achievement ids.
+   */
+  setUnlockedAchievementIds(unlockedAchievementIds: readonly string[]): void {
+    this.unlockedAchievementIds = [...unlockedAchievementIds]
+    this.habitatFacade.setUnlockedAchievementIds(this.unlockedAchievementIds)
+  }
+
   /** Called when mission button visibility changes in OrbitPrompt. */
   onMissionButton: ((visible: boolean, planetName: string) => void) | null = null
 
@@ -969,6 +981,7 @@ export class MapViewController implements Tickable {
       setEarthStartupOrbitHudSuppressed: (suppressed) =>
         this.setEarthStartupOrbitHudSuppressed(suppressed),
       notifyJourneyTrigger: (trigger) => this.notifyJourneyTrigger(trigger),
+      getUnlockedAchievementIds: () => this.unlockedAchievementIds,
       callbacks: {
         onHabitatActive: (active) => this.onHabitatActive?.(active),
         onShuttleControl: (visible) => this.onShuttleControl?.(visible),

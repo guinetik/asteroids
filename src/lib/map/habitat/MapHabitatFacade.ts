@@ -93,6 +93,8 @@ export interface MapHabitatFacadeDeps {
   setEarthStartupOrbitHudSuppressed: (suppressed: boolean) => void
   /** Controller journey trigger dispatcher; facade forwards `shuttle_control_opened`. */
   notifyJourneyTrigger: (trigger: JourneyTriggerId) => void
+  /** Persisted achievement ids used by habitat visual rewards. */
+  getUnlockedAchievementIds: () => readonly string[]
   /** HUD callbacks. */
   callbacks: MapHabitatCallbacks
 }
@@ -121,6 +123,7 @@ export class MapHabitatFacade {
     if (this.scene) return this.scene
     const deps = this.deps
     const next = new HabitatInteriorScene()
+    next.setUnlockedAchievementIds(deps?.getUnlockedAchievementIds() ?? [])
     await next.load()
     next.onInteract = (target) => {
       if (target !== 'table') return
@@ -135,6 +138,15 @@ export class MapHabitatFacade {
     }
     this.scene = next
     return next
+  }
+
+  /**
+   * Push updated achievement ids into the live habitat scene.
+   *
+   * @param unlockedAchievementIds - Current persisted achievement ids.
+   */
+  setUnlockedAchievementIds(unlockedAchievementIds: readonly string[]): void {
+    this.scene?.setUnlockedAchievementIds(unlockedAchievementIds)
   }
 
   /** Per-frame transition tick — swaps composer scene + runs the wake-up animation. */

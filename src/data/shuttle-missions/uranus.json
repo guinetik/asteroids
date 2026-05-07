@@ -1,28 +1,28 @@
 {
   "planetId": "uranus",
-  "giverName": "Uranus Research Outpost",
+  "giverName": "Yamada Farms",
   "missions": [
     {
-      "id": "uranus_neptune_solar",
-      "name": "Neptune Mirror Maintenance",
-      "description": "Align and calibrate Neptune's orbital solar mirror array. Return alignment data.",
-      "targetPlanet": "neptune",
+      "id": "yamada_earth_roslin_resupply",
+      "name": "Roslin Standing Order",
+      "description": "Reference standards from the Roslin archive in Midlothian. The practice has reordered the same case once a decade for two centuries; this run is on schedule.",
+      "targetPlanet": "earth",
       "gatherQuantity": 2,
-      "reward": 6875
+      "reward": 7250
     },
     {
-      "id": "uranus_saturn_ice",
-      "name": "Saturn Ring Harvest",
-      "description": "Collect pristine ring ice from Saturn for Uranus cryo-lab experiments.",
+      "id": "yamada_saturn_curing_supplies",
+      "name": "Curing Supplies from Saturn",
+      "description": "Long-aged preservatives from the Saturnine endowment cellars. The practice sends a finished portion home with each patient; the cellars know what we like.",
       "targetPlanet": "saturn",
-      "gatherQuantity": 3,
-      "reward": 6000
+      "gatherQuantity": 2,
+      "reward": 6750
     },
     {
-      "id": "uranus_jupiter_hydrogen",
-      "name": "Jupiter Hydrogen Run",
-      "description": "Uranus outpost needs metallic hydrogen for emergency reactor fuel.",
-      "targetPlanet": "jupiter",
+      "id": "yamada_neptune_coolant",
+      "name": "Cryogenic Reagent Run",
+      "description": "Coolant chemistry from Neptune for the patient ward's suspension cylinders. The moons can hold the cold, but only if we keep the reagent fresh.",
+      "targetPlanet": "neptune",
       "gatherQuantity": 2,
       "reward": 6500
     }
