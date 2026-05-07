@@ -24,9 +24,11 @@ export const SUSHI_HUNGER_RISE_PER_MIN = 1
 
 /**
  * Love units removed per minute of elapsed real time. With a 0..100 meter this
- * means an idle Sushi drops from full affection to indifferent in ~200 minutes.
+ * means an idle Sushi drops from full affection to indifferent (love hits the
+ * needy threshold) in roughly 25 minutes — long enough to play through a few
+ * missions, short enough that he asks for attention each session.
  */
-export const SUSHI_LOVE_DECAY_PER_MIN = 0.5
+export const SUSHI_LOVE_DECAY_PER_MIN = 4
 
 /**
  * Advance Sushi's love and hunger meters by `dtSeconds` of real time. Hunger
