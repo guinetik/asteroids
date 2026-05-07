@@ -2716,6 +2716,7 @@ export class MapViewController implements Tickable {
     const next = tickSushiNeeds(this.playerProfile, dt)
     if (next === this.playerProfile) return
     this.playerProfile = next
+    this.onSushiCareUpdate?.()
     this.sushiNeedsSaveAccumS += dt
     if (this.sushiNeedsSaveAccumS >= SUSHI_NEEDS_SAVE_INTERVAL_S) {
       this.sushiNeedsSaveAccumS = 0

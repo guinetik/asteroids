@@ -191,4 +191,9 @@ export interface PlayerProfile {
    * routine; refilled by feeding the bowl with one bag of cat food (10 servings). Defaults to 0.
    */
   bowlServings: number
+  /**
+   * Sushi's bladder/litter need, clamped to [0, 100]. 0 means relieved; rises with time
+   * until Sushi visits the litterbox, then resets to 0. Defaults to 0.
+   */
+  sushiBladder: number
 }

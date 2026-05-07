@@ -906,6 +906,9 @@ onMounted(async () => {
     viewController.onPersistentProgressUpdate = () => {
       syncPersistentProgressFromController()
     }
+    viewController.onSushiCareUpdate = () => {
+      playerProfileSnapshot.value = viewController.getPlayerProfileSnapshot()
+    }
     viewController.onUpgradeInstalledAnnouncement = (
       headline,
       upgradeName,

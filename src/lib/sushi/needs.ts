@@ -11,16 +11,18 @@
  * @spec docs/superpowers/specs/2026-04-03-player-profile-design.md
  */
 import type { PlayerProfile } from '@/lib/player/types'
-import { addSushiHunger, addSushiLove } from '@/lib/player/profile'
+import { addSushiBladder, addSushiHunger, addSushiLove } from '@/lib/player/profile'
 
 /** Seconds per minute, used to convert per-minute decay rates to per-tick deltas. */
 export const SUSHI_SECONDS_PER_MINUTE = 60
 
 /**
- * Hunger units added per minute of elapsed real time. With a 0..100 hunger meter
- * this means a freshly-fed Sushi reaches starvation in ~100 minutes.
+ * Hunger units added per minute of elapsed real time. Twice the love decay rate so
+ * Sushi gets hungry roughly twice as fast as he gets needy — a freshly-fed cat
+ * reaches the eating threshold in well under 10 minutes, prompting the player to
+ * keep his bowl topped up between missions.
  */
-export const SUSHI_HUNGER_RISE_PER_MIN = 1
+export const SUSHI_HUNGER_RISE_PER_MIN = 8
 
 /**
  * Love units removed per minute of elapsed real time. With a 0..100 meter this
@@ -29,6 +31,13 @@ export const SUSHI_HUNGER_RISE_PER_MIN = 1
  * missions, short enough that he asks for attention each session.
  */
 export const SUSHI_LOVE_DECAY_PER_MIN = 4
+
+/**
+ * Bladder units added per minute of elapsed real time. With a 0..100 meter and a
+ * threshold of 70, this triggers a litterbox visit roughly every 35 minutes from
+ * empty — slower than hunger so the two needs don't always fire at once.
+ */
+export const SUSHI_BLADDER_RISE_PER_MIN = 2
 
 /**
  * Advance Sushi's love and hunger meters by `dtSeconds` of real time. Hunger
@@ -47,8 +56,10 @@ export function tickSushiNeeds(profile: PlayerProfile, dtSeconds: number): Playe
   const minutes = dtSeconds / SUSHI_SECONDS_PER_MINUTE
   const hungerDelta = SUSHI_HUNGER_RISE_PER_MIN * minutes
   const loveDelta = -SUSHI_LOVE_DECAY_PER_MIN * minutes
+  const bladderDelta = SUSHI_BLADDER_RISE_PER_MIN * minutes
   let next = profile
   next = addSushiHunger(next, hungerDelta)
   next = addSushiLove(next, loveDelta)
+  next = addSushiBladder(next, bladderDelta)
   return next
 }

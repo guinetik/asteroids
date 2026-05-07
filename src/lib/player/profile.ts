@@ -46,13 +46,16 @@ export const BOWL_SERVINGS_MIN = 0
 export const BOWL_SERVINGS_MAX = 10
 
 /** Default Sushi love value seeded into fresh and migrating profiles. */
-export const DEFAULT_SUSHI_LOVE = 75
+export const DEFAULT_SUSHI_LOVE = 25
 
 /** Default Sushi hunger value seeded into fresh and migrating profiles. */
-export const DEFAULT_SUSHI_HUNGER = 75
+export const DEFAULT_SUSHI_HUNGER = 25
 
 /** Default bowl serving count for fresh and migrating profiles (empty until first feed). */
 export const DEFAULT_BOWL_SERVINGS = 0
+
+/** Default bladder value seeded into fresh and migrating profiles (relieved). */
+export const DEFAULT_SUSHI_BLADDER = 0
 
 /** Clamp a numeric value into the inclusive `[min, max]` interval. */
 function clampNumber(value: number, min: number, max: number): number {
@@ -454,6 +457,12 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     BOWL_SERVINGS_MIN,
     BOWL_SERVINGS_MAX,
   )
+  const sushiBladder = normalizeClampedNumber(
+    p.sushiBladder,
+    DEFAULT_SUSHI_BLADDER,
+    SUSHI_NEEDS_MIN,
+    SUSHI_NEEDS_MAX,
+  )
 
   return {
     name: p.name,
@@ -480,6 +489,7 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     sushiLove,
     sushiHunger,
     bowlServings,
+    sushiBladder,
     ...(shuttleHullHp !== undefined ? { shuttleHullHp } : {}),
     ...(landerHullHp !== undefined ? { landerHullHp } : {}),
   }
@@ -545,6 +555,7 @@ export function createProfile(name: string): PlayerProfile {
     sushiLove: DEFAULT_SUSHI_LOVE,
     sushiHunger: DEFAULT_SUSHI_HUNGER,
     bowlServings: DEFAULT_BOWL_SERVINGS,
+    sushiBladder: DEFAULT_SUSHI_BLADDER,
   }
 }
 
@@ -576,6 +587,22 @@ export function addSushiHunger(profile: PlayerProfile, delta: number): PlayerPro
   const next = clampNumber(profile.sushiHunger + safeDelta, SUSHI_NEEDS_MIN, SUSHI_NEEDS_MAX)
   if (next === profile.sushiHunger) return profile
   return { ...profile, sushiHunger: next }
+}
+
+/**
+ * Return a copy of the profile with `sushiBladder` adjusted by `delta` and clamped to
+ * `[SUSHI_NEEDS_MIN, SUSHI_NEEDS_MAX]`. Non-finite deltas are treated as zero.
+ *
+ * @param profile - Current profile.
+ * @param delta - Signed amount to apply, e.g. `+2` for bladder rise or `-100` to relieve.
+ * @returns Updated profile (same reference when value is unchanged).
+ */
+export function addSushiBladder(profile: PlayerProfile, delta: number): PlayerProfile {
+  const safeDelta = Number.isFinite(delta) ? delta : 0
+  const current = profile.sushiBladder ?? DEFAULT_SUSHI_BLADDER
+  const next = clampNumber(current + safeDelta, SUSHI_NEEDS_MIN, SUSHI_NEEDS_MAX)
+  if (next === current) return profile
+  return { ...profile, sushiBladder: next }
 }
 
 /**

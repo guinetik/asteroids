@@ -23,12 +23,14 @@ import { HabitatInteriorScene } from '@/three/HabitatInteriorScene'
 import type { Inventory } from '@/lib/inventory/types'
 import type { PlayerProfile } from '@/lib/player/types'
 import {
+  addSushiBladder,
   addSushiHunger,
   addSushiLove,
   recordSushiBowlRefill,
   recordSushiPet,
   saveProfile,
   setBowlServings,
+  SUSHI_NEEDS_MAX,
 } from '@/lib/player/profile'
 import { removeItem } from '@/lib/inventory/inventory'
 import { STARTER_CAT_FOOD_ID } from '@/lib/map/player/playerInventoryHelpers'
@@ -171,6 +173,7 @@ export class MapHabitatFacade {
       getHunger: () => (deps ? deps.getProfile().sushiHunger : 0),
       getLove: () => (deps ? deps.getProfile().sushiLove : 0),
       getBowlServings: () => (deps ? deps.getProfile().bowlServings : 0),
+      getBladder: () => (deps ? deps.getProfile().sushiBladder : 0),
       canFillBowl: () => {
         if (!deps) return false
         const profile = deps.getProfile()
@@ -181,6 +184,7 @@ export class MapHabitatFacade {
       },
       onEatServing: () => this.handleSushiEatServing(),
       onPetted: () => this.handleSushiPetted(),
+      onUsedLitter: () => this.handleSushiUsedLitter(),
       onFillBowl: () => this.handleSushiFillBowl(),
     })
     this.scene = next
@@ -200,6 +204,7 @@ export class MapHabitatFacade {
     next = addSushiHunger(next, -SUSHI_HUNGER_RESTORE_PER_SERVING)
     deps.setProfile(next)
     saveProfile(next)
+    deps.evaluateAchievements()
   }
 
   /**
@@ -212,6 +217,22 @@ export class MapHabitatFacade {
     let next = deps.getProfile()
     next = addSushiLove(next, SUSHI_LOVE_PER_PET)
     next = recordSushiPet(next)
+    deps.setProfile(next)
+    saveProfile(next)
+    deps.evaluateAchievements()
+  }
+
+  /**
+   * Apply the side-effects of Sushi finishing a litterbox visit: drop bladder back to
+   * empty and persist the profile. No achievements wired off this for now — it's a
+   * pure care-loop reset.
+   */
+  private handleSushiUsedLitter(): void {
+    const deps = this.deps
+    if (!deps) return
+    const profile = deps.getProfile()
+    const next = addSushiBladder(profile, -SUSHI_NEEDS_MAX)
+    if (next === profile) return
     deps.setProfile(next)
     saveProfile(next)
     deps.evaluateAchievements()

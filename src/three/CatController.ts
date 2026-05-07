@@ -27,6 +27,8 @@ type CatState =
   | 'idleNearPlayer'
   | 'chase'
   | 'chaseRest'
+  | 'goToLitter'
+  | 'useLitter'
 
 /**
  * Live read-only handle the {@link CatController} uses to query Sushi's needs and signal
@@ -44,10 +46,14 @@ export interface CatNeedsBridge {
   getLove(): number
   /** Current bowl serving count (0..10). Read every frame. */
   getBowlServings(): number
+  /** Current bladder value (0..100). Read every frame. */
+  getBladder(): number
   /** Write the player's world-space position into `out` and return it for chaining. */
   getPlayerWorldPosition(out: THREE.Vector3): THREE.Vector3
   /** Write the bowl's world-space position into `out` and return it for chaining. */
   getBowlWorldPosition(out: THREE.Vector3): THREE.Vector3
+  /** Write the litterbox's world-space position into `out` and return it for chaining. */
+  getLitterWorldPosition(out: THREE.Vector3): THREE.Vector3
   /**
    * Cat just consumed one serving from the bowl. Implementer is responsible for
    * decrementing `bowlServings` by 1, restoring 25 hunger, and persisting profile.
@@ -58,18 +64,30 @@ export interface CatNeedsBridge {
    * pet counter, persisting profile, and re-evaluating achievements.
    */
   onPetted(): void
+  /**
+   * Cat finished using the litterbox. Implementer should reset `sushiBladder` to 0
+   * and persist the profile.
+   */
+  onUsedLitter(): void
 }
 
 /** Hunger threshold at or above which Sushi prioritises eating from the bowl. */
 const HUNGER_HUNGRY_THRESHOLD = 70
 /** Love threshold at or below which Sushi prioritises following the player. */
 const LOVE_NEEDY_THRESHOLD = 30
+/**
+ * Bladder threshold at or above which Sushi prioritises a litterbox visit. Highest
+ * priority among needs — overrides hunger and love.
+ */
+const BLADDER_FULL_THRESHOLD = 70
 /** Distance (XZ, world units) that counts as "next to the player" when following. */
 const FOLLOW_REACHED_DISTANCE = 1.0
 /** Seconds Sushi idles next to the player after catching up before re-evaluating priorities. */
 const IDLE_NEAR_PLAYER_DURATION_S = 4
 /** Seconds Sushi spends sitting at the bowl per consumed serving. */
 const EAT_DURATION_S = 2.5
+/** Seconds Sushi spends sitting in the litterbox per use. */
+const LITTER_USE_DURATION_S = 3.5
 
 /** Authored clip names embedded in `cat.glb`. */
 const CLIP_IDLE = 'Armature|4_Idle_Armature'
@@ -498,12 +516,19 @@ export class CatController {
       this.tickWalk(dt)
     } else if (this.state === 'goToBowl') {
       this.tickGoToBowl(dt)
+    } else if (this.state === 'goToLitter') {
+      this.tickGoToLitter(dt)
     } else if (this.state === 'follow') {
       this.tickFollow(dt)
     } else if (this.state === 'eat') {
       if (this.stateTimer >= this.stateDuration) {
         this.bridge?.onEatServing()
         // Decide what to do next based on fresh needs.
+        this.evaluateNeedsAndPickNextState()
+      }
+    } else if (this.state === 'useLitter') {
+      if (this.stateTimer >= this.stateDuration) {
+        this.bridge?.onUsedLitter()
         this.evaluateNeedsAndPickNextState()
       }
     } else if (this.state === 'idleNearPlayer') {
@@ -738,6 +763,24 @@ export class CatController {
   }
 
   /**
+   * Step the cat toward the litterbox. On arrival, drop into {@link 'useLitter'} —
+   * the same `sit` clip used for petting/eating, but timed to {@link LITTER_USE_DURATION_S}.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  private tickGoToLitter(dt: number): void {
+    if (!this.bridge) {
+      this.pickNextRestingState()
+      return
+    }
+    this.bridge.getLitterWorldPosition(this._bridgeTmp)
+    this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    if (this.stepTowardTarget(dt)) {
+      this.enterState('useLitter')
+    }
+  }
+
+  /**
    * Step the cat toward the player, reusing pivot-then-walk locomotion. Once within
    * {@link FOLLOW_REACHED_DISTANCE}, drop into {@link 'idleNearPlayer'} for a short stay.
    *
@@ -800,6 +843,10 @@ export class CatController {
   private evaluateNeedsAndPickNextState(): boolean {
     const bridge = this.bridge
     if (!bridge) return false
+    if (bridge.getBladder() >= BLADDER_FULL_THRESHOLD) {
+      this.enterState('goToLitter')
+      return true
+    }
     const hunger = bridge.getHunger()
     const bowl = bridge.getBowlServings()
     if (hunger >= HUNGER_HUNGRY_THRESHOLD && bowl > 0) {
@@ -818,6 +865,8 @@ export class CatController {
     return (
       this.state === 'goToBowl' ||
       this.state === 'eat' ||
+      this.state === 'goToLitter' ||
+      this.state === 'useLitter' ||
       this.state === 'follow' ||
       this.state === 'idleNearPlayer'
     )
@@ -872,6 +921,8 @@ export class CatController {
       this.stateDuration = IDLE_NEAR_PLAYER_DURATION_S
     } else if (next === 'eat') {
       this.stateDuration = EAT_DURATION_S
+    } else if (next === 'useLitter') {
+      this.stateDuration = LITTER_USE_DURATION_S
     } else {
       // walk / goToBowl / follow run until the waypoint is reached.
       this.stateDuration = Number.POSITIVE_INFINITY
@@ -894,9 +945,11 @@ export class CatController {
         return 'idle'
       case 'walk':
       case 'goToBowl':
+      case 'goToLitter':
       case 'follow':
         return 'walk'
       case 'sit':
+      case 'useLitter':
         return 'sit'
       case 'chase':
         return 'run'

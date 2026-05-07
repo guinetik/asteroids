@@ -573,8 +573,8 @@ describe('recordRuntimeTipsShown', () => {
 describe('Sushi cat needs on PlayerProfile', () => {
   it('seeds defaults on a fresh profile', () => {
     const profile = createProfile('Pilot')
-    expect(profile.sushiLove).toBe(75)
-    expect(profile.sushiHunger).toBe(75)
+    expect(profile.sushiLove).toBe(25)
+    expect(profile.sushiHunger).toBe(25)
     expect(profile.bowlServings).toBe(0)
   })
 
@@ -589,8 +589,8 @@ describe('Sushi cat needs on PlayerProfile', () => {
     mockStorage[PROFILE_STORAGE_KEY] = JSON.stringify(parsed)
 
     const loaded = loadProfile()
-    expect(loaded?.sushiLove).toBe(75)
-    expect(loaded?.sushiHunger).toBe(75)
+    expect(loaded?.sushiLove).toBe(25)
+    expect(loaded?.sushiHunger).toBe(25)
     expect(loaded?.bowlServings).toBe(0)
   })
 
@@ -613,7 +613,7 @@ describe('Sushi cat needs on PlayerProfile', () => {
 describe('addSushiLove / addSushiHunger / setBowlServings', () => {
   it('clamps love into [0, 100]', () => {
     let profile: PlayerProfile = createProfile('Pilot')
-    profile = addSushiLove(profile, +50)
+    profile = addSushiLove(profile, +500)
     expect(profile.sushiLove).toBe(100)
     profile = addSushiLove(profile, -250)
     expect(profile.sushiLove).toBe(0)

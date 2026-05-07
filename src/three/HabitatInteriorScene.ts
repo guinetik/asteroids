@@ -255,6 +255,21 @@ const CAT_BOWL_X = -3.85
 const CAT_FOUNTAIN_X = -4.25
 /** Shared world Z of the feeding area — sits just shy of the +Z wall, beside the table. */
 const CAT_FEEDING_Z = 7.2
+
+/** World X of the litterbox — mirror of the feeding bowl on the starboard (+X) side. */
+const CAT_LITTER_X = 3.85
+/** World Z of the litterbox, mirroring the feeding-area corner. */
+const CAT_LITTER_Z = 7.2
+/** Outer X half-extent of the litterbox tray (world units). */
+const CAT_LITTER_HALF_X = 0.32
+/** Outer Z half-extent of the litterbox tray (world units). */
+const CAT_LITTER_HALF_Z = 0.42
+/** Outer wall thickness of the litterbox tray (world units). */
+const CAT_LITTER_WALL_THICKNESS = 0.025
+/** Total wall height of the litterbox tray above {@link FLOOR_Y} (world units). */
+const CAT_LITTER_WALL_HEIGHT = 0.09
+/** Litter sand surface height above {@link FLOOR_Y} (world units). */
+const CAT_LITTER_SAND_HEIGHT = 0.04
 /** Outer radius of the ceramic food bowl (world units). */
 const CAT_BOWL_RADIUS = 0.14
 /** Total height of the food bowl (world units). */
@@ -272,9 +287,9 @@ const CAT_FOUNTAIN_HEIGHT = 0.2
 const CAT_OBSTACLE_PADDING = 0.35
 
 /** Distance (XZ, world units) the player ends up in front of Sushi during a pet. */
-const PET_APPROACH_DISTANCE = 0.1
+const PET_APPROACH_DISTANCE = 0.7
 /** XZ proximity (world units) at which the "Pet Sushi" prompt appears. */
-const PET_PROMPT_DISTANCE = 1.0
+const PET_PROMPT_DISTANCE = 1.6
 /** XZ distance beyond which a sitting Sushi gets up and resumes wandering. */
 const PET_SIT_CANCEL_DISTANCE = 3.0
 /** Total seconds the pet glide-to-front animation lasts. */
@@ -320,10 +335,14 @@ export interface SushiBridgeCallbacks {
   getLove(): number
   /** Read current bowl servings (0..10) from the player profile. */
   getBowlServings(): number
+  /** Read current bladder (0..100) from the player profile. */
+  getBladder(): number
   /** Cat consumed one serving — facade decrements bowl + restores hunger + saves. */
   onEatServing(): void
   /** Cat got pet — facade adds love + bumps stats + saves + evaluates achievements. */
   onPetted(): void
+  /** Cat finished using the litterbox — facade resets bladder + saves. */
+  onUsedLitter(): void
   /** True when the player can fill the bowl (≥1 cat-food in inventory AND bowl not full). */
   canFillBowl(): boolean
   /** Player pressed F at the bowl — facade fills bowl from inventory + saves. */
@@ -414,6 +433,9 @@ export class HabitatInteriorScene {
 
   /** Stored world-space position of the food bowl, populated by {@link buildCatFeedingArea}. */
   private readonly bowlWorldPosition = new THREE.Vector3()
+
+  /** Stored world-space position of the litterbox, populated by {@link buildCatLitterArea}. */
+  private readonly litterWorldPosition = new THREE.Vector3()
 
   /** Reference to the bowl mesh so the refill cue can punch its scale. */
   private bowlMesh: THREE.Mesh | null = null
@@ -616,6 +638,10 @@ export class HabitatInteriorScene {
     const feedingArea = this.buildCatFeedingArea()
     this.scene.add(feedingArea)
 
+    // --- Sushi's litterbox (mirror of feeding area on the +X side) ---------
+    const litterArea = this.buildCatLitterArea()
+    this.scene.add(litterArea)
+
     // --- Sushi (habitat cat) -----------------------------------------------
     // Tribute NPC. Loaded best-effort: a load failure should not break the
     // rest of the habitat scene, so we swallow the error and log it instead.
@@ -626,6 +652,7 @@ export class HabitatInteriorScene {
       footprintFromObject(bedModel, CAT_OBSTACLE_PADDING),
       footprintFromObject(tableModel, CAT_OBSTACLE_PADDING),
       footprintFromObject(feedingArea, CAT_OBSTACLE_PADDING),
+      footprintFromObject(litterArea, CAT_OBSTACLE_PADDING),
     ]
     try {
       this.cat = await CatController.create(CAT_MODEL_URL, {
@@ -797,10 +824,13 @@ export class HabitatInteriorScene {
       getHunger: () => callbacks.getHunger(),
       getLove: () => callbacks.getLove(),
       getBowlServings: () => callbacks.getBowlServings(),
+      getBladder: () => callbacks.getBladder(),
       getPlayerWorldPosition: (out) => out.copy(this.player.position),
       getBowlWorldPosition: (out) => out.copy(this.bowlWorldPosition),
+      getLitterWorldPosition: (out) => out.copy(this.litterWorldPosition),
       onEatServing: () => callbacks.onEatServing(),
       onPetted: () => callbacks.onPetted(),
+      onUsedLitter: () => callbacks.onUsedLitter(),
     }
     this.cat.setBridge(bridge)
   }
@@ -1159,6 +1189,67 @@ export class HabitatInteriorScene {
     )
     group.add(water)
 
+    return group
+  }
+
+  /**
+   * Build Sushi's litterbox: a low rectangular tray with four short walls and a
+   * sand-coloured disc inside. Sits on the +X side of the cabin, mirroring the
+   * feeding corner. Returns the {@link THREE.Group} so the caller can add it to
+   * the scene and harvest its world bbox for the cat's obstacle list.
+   *
+   * @returns Group containing the tray walls + sand surface, positioned in world space.
+   */
+  private buildCatLitterArea(): THREE.Group {
+    const group = new THREE.Group()
+    group.name = 'sushiLitterArea'
+
+    const trayMat = new THREE.MeshStandardMaterial({
+      color: 0x6a6f78,
+      roughness: 0.7,
+      metalness: 0.1,
+    })
+    const wallH = CAT_LITTER_WALL_HEIGHT
+    const t = CAT_LITTER_WALL_THICKNESS
+    const innerX = CAT_LITTER_HALF_X * 2 - t * 2
+    const innerZ = CAT_LITTER_HALF_Z * 2 - t * 2
+
+    // Floor of the tray (thin slab) sits flush with the cabin floor.
+    const trayFloor = new THREE.Mesh(
+      new THREE.BoxGeometry(CAT_LITTER_HALF_X * 2, t, CAT_LITTER_HALF_Z * 2),
+      trayMat,
+    )
+    trayFloor.position.set(CAT_LITTER_X, FLOOR_Y + t / 2, CAT_LITTER_Z)
+    group.add(trayFloor)
+
+    // Four short walls.
+    const wallNS = new THREE.BoxGeometry(CAT_LITTER_HALF_X * 2, wallH, t)
+    const wallEW = new THREE.BoxGeometry(t, wallH, CAT_LITTER_HALF_Z * 2)
+    const wallY = FLOOR_Y + wallH / 2
+    const north = new THREE.Mesh(wallNS, trayMat)
+    north.position.set(CAT_LITTER_X, wallY, CAT_LITTER_Z + CAT_LITTER_HALF_Z - t / 2)
+    group.add(north)
+    const south = new THREE.Mesh(wallNS, trayMat)
+    south.position.set(CAT_LITTER_X, wallY, CAT_LITTER_Z - CAT_LITTER_HALF_Z + t / 2)
+    group.add(south)
+    const east = new THREE.Mesh(wallEW, trayMat)
+    east.position.set(CAT_LITTER_X + CAT_LITTER_HALF_X - t / 2, wallY, CAT_LITTER_Z)
+    group.add(east)
+    const west = new THREE.Mesh(wallEW, trayMat)
+    west.position.set(CAT_LITTER_X - CAT_LITTER_HALF_X + t / 2, wallY, CAT_LITTER_Z)
+    group.add(west)
+
+    // Sand surface — sits inside the walls so it reads as filled litter.
+    const sandMat = new THREE.MeshStandardMaterial({
+      color: 0xd9c79a,
+      roughness: 1,
+      metalness: 0,
+    })
+    const sand = new THREE.Mesh(new THREE.BoxGeometry(innerX, CAT_LITTER_SAND_HEIGHT, innerZ), sandMat)
+    sand.position.set(CAT_LITTER_X, FLOOR_Y + CAT_LITTER_SAND_HEIGHT / 2 + t, CAT_LITTER_Z)
+    group.add(sand)
+
+    this.litterWorldPosition.set(CAT_LITTER_X, FLOOR_Y, CAT_LITTER_Z)
     return group
   }
 
