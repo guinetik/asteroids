@@ -32,6 +32,8 @@ const EMPTY_ACHIEVEMENT_STATS: PlayerAchievementStats = {
   portalDepartures: 0,
   lifetimeWorldLineDistance: 0,
   maxSingleRunWorldLineDistance: 0,
+  sushiPetCount: 0,
+  sushiBowlRefillCount: 0,
 }
 
 /** Result of comparing profile state against locked achievements. */
@@ -313,6 +315,16 @@ export function isAchievementUnlocked(
       return hasRequiredString(definition.bodyId) && definition.bodyAccessState
         ? progress.profile.bodyAccess[definition.bodyId] === definition.bodyAccessState
         : false
+    case 'sushi_pets':
+      return requiredThresholdReached(
+        getAchievementStats(progress.profile).sushiPetCount,
+        getRequiredThreshold(definition),
+      )
+    case 'sushi_bowl_refills':
+      return requiredThresholdReached(
+        getAchievementStats(progress.profile).sushiBowlRefillCount,
+        getRequiredThreshold(definition),
+      )
   }
 }
 
@@ -496,6 +508,18 @@ export function getAchievementLockedHint(
     }
     case 'body_access_state':
       return 'Resolve the Hektor prospectus outcome.'
+    case 'sushi_pets': {
+      const current = getAchievementStats(progress.profile).sushiPetCount
+      const needed = getRequiredThreshold(definition)
+      if (needed === null) return 'Pet Sushi the required number of times.'
+      return `Pet Sushi ${needed} time${needed === 1 ? '' : 's'} (${current}/${needed}).`
+    }
+    case 'sushi_bowl_refills': {
+      const current = getAchievementStats(progress.profile).sushiBowlRefillCount
+      const needed = getRequiredThreshold(definition)
+      if (needed === null) return 'Refill the empty bowl the required number of times.'
+      return `Refill the empty bowl ${needed} time${needed === 1 ? '' : 's'} (${current}/${needed}).`
+    }
   }
 }
 

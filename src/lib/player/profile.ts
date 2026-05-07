@@ -33,6 +33,46 @@ const DEFAULT_BODY_ACCESS_STATE: BodyAccessState = 'restricted'
 /** Display name used when the player submits empty whitespace (matches legacy map default). */
 export const DEFAULT_PLAYER_DISPLAY_NAME = 'Pilot'
 
+/** Lower bound of Sushi's love and hunger meters. */
+export const SUSHI_NEEDS_MIN = 0
+
+/** Upper bound of Sushi's love and hunger meters. */
+export const SUSHI_NEEDS_MAX = 100
+
+/** Lower bound of bowl servings (empty bowl). */
+export const BOWL_SERVINGS_MIN = 0
+
+/** Upper bound of bowl servings (one full bag). */
+export const BOWL_SERVINGS_MAX = 10
+
+/** Default Sushi love value seeded into fresh and migrating profiles. */
+export const DEFAULT_SUSHI_LOVE = 75
+
+/** Default Sushi hunger value seeded into fresh and migrating profiles. */
+export const DEFAULT_SUSHI_HUNGER = 75
+
+/** Default bowl serving count for fresh and migrating profiles (empty until first feed). */
+export const DEFAULT_BOWL_SERVINGS = 0
+
+/** Clamp a numeric value into the inclusive `[min, max]` interval. */
+function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min
+  if (value < min) return min
+  if (value > max) return max
+  return value
+}
+
+/** Read a finite numeric save field, falling back to a default and clamping into range. */
+function normalizeClampedNumber(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  return clampNumber(value, min, max)
+}
+
 /** Upper bound for saved display name length after {@link normalizePlayerDisplayName}. */
 export const MAX_PLAYER_DISPLAY_NAME_LENGTH = 48
 
@@ -98,6 +138,8 @@ function createDefaultAchievementStats(): PlayerAchievementStats {
     portalDepartures: 0,
     lifetimeWorldLineDistance: 0,
     maxSingleRunWorldLineDistance: 0,
+    sushiPetCount: 0,
+    sushiBowlRefillCount: 0,
   }
 }
 
@@ -140,6 +182,10 @@ function normalizeAchievementStats(raw: unknown): PlayerAchievementStats {
     maxSingleRunWorldLineDistance:
       normalizeNonNegativeNumber(stats['maxSingleRunWorldLineDistance']) ??
       defaults.maxSingleRunWorldLineDistance,
+    sushiPetCount:
+      normalizeNonNegativeNumber(stats['sushiPetCount']) ?? defaults.sushiPetCount,
+    sushiBowlRefillCount:
+      normalizeNonNegativeNumber(stats['sushiBowlRefillCount']) ?? defaults.sushiBowlRefillCount,
   }
 }
 
@@ -390,6 +436,25 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
   const fantasiaCosmeticIntroSent =
     typeof p.fantasiaCosmeticIntroSent === 'boolean' ? p.fantasiaCosmeticIntroSent : false
 
+  const sushiLove = normalizeClampedNumber(
+    p.sushiLove,
+    DEFAULT_SUSHI_LOVE,
+    SUSHI_NEEDS_MIN,
+    SUSHI_NEEDS_MAX,
+  )
+  const sushiHunger = normalizeClampedNumber(
+    p.sushiHunger,
+    DEFAULT_SUSHI_HUNGER,
+    SUSHI_NEEDS_MIN,
+    SUSHI_NEEDS_MAX,
+  )
+  const bowlServings = normalizeClampedNumber(
+    p.bowlServings,
+    DEFAULT_BOWL_SERVINGS,
+    BOWL_SERVINGS_MIN,
+    BOWL_SERVINGS_MAX,
+  )
+
   return {
     name: p.name,
     credits: p.credits,
@@ -412,6 +477,9 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     activeStoryFlags: Object.keys(activeStoryFlags).length > 0 ? activeStoryFlags : undefined,
     cosmetics,
     fantasiaCosmeticIntroSent,
+    sushiLove,
+    sushiHunger,
+    bowlServings,
     ...(shuttleHullHp !== undefined ? { shuttleHullHp } : {}),
     ...(landerHullHp !== undefined ? { landerHullHp } : {}),
   }
@@ -474,7 +542,54 @@ export function createProfile(name: string): PlayerProfile {
     disabledGiverIds: {},
     cosmetics: createDefaultPlayerCosmetics(),
     fantasiaCosmeticIntroSent: false,
+    sushiLove: DEFAULT_SUSHI_LOVE,
+    sushiHunger: DEFAULT_SUSHI_HUNGER,
+    bowlServings: DEFAULT_BOWL_SERVINGS,
   }
+}
+
+/**
+ * Return a copy of the profile with `sushiLove` adjusted by `delta` and clamped to
+ * `[SUSHI_NEEDS_MIN, SUSHI_NEEDS_MAX]`. Non-finite deltas are treated as zero.
+ *
+ * @param profile - Current profile.
+ * @param delta - Signed amount to apply, e.g. `+5` for petting Sushi or `-1` for decay.
+ * @returns Updated profile (same reference when value is unchanged).
+ */
+export function addSushiLove(profile: PlayerProfile, delta: number): PlayerProfile {
+  const safeDelta = Number.isFinite(delta) ? delta : 0
+  const next = clampNumber(profile.sushiLove + safeDelta, SUSHI_NEEDS_MIN, SUSHI_NEEDS_MAX)
+  if (next === profile.sushiLove) return profile
+  return { ...profile, sushiLove: next }
+}
+
+/**
+ * Return a copy of the profile with `sushiHunger` adjusted by `delta` and clamped to
+ * `[SUSHI_NEEDS_MIN, SUSHI_NEEDS_MAX]`. Non-finite deltas are treated as zero.
+ *
+ * @param profile - Current profile.
+ * @param delta - Signed amount to apply, e.g. `+1` for hunger rise or `-25` for feeding.
+ * @returns Updated profile (same reference when value is unchanged).
+ */
+export function addSushiHunger(profile: PlayerProfile, delta: number): PlayerProfile {
+  const safeDelta = Number.isFinite(delta) ? delta : 0
+  const next = clampNumber(profile.sushiHunger + safeDelta, SUSHI_NEEDS_MIN, SUSHI_NEEDS_MAX)
+  if (next === profile.sushiHunger) return profile
+  return { ...profile, sushiHunger: next }
+}
+
+/**
+ * Return a copy of the profile with `bowlServings` set to `n` and clamped to
+ * `[BOWL_SERVINGS_MIN, BOWL_SERVINGS_MAX]`. Non-finite values clamp to the minimum.
+ *
+ * @param profile - Current profile.
+ * @param n - Target serving count, e.g. `10` after feeding a fresh bag.
+ * @returns Updated profile (same reference when value is unchanged).
+ */
+export function setBowlServings(profile: PlayerProfile, n: number): PlayerProfile {
+  const next = clampNumber(n, BOWL_SERVINGS_MIN, BOWL_SERVINGS_MAX)
+  if (next === profile.bowlServings) return profile
+  return { ...profile, bowlServings: next }
 }
 
 /**
@@ -774,6 +889,43 @@ export function recordWorldLineDistance(
         achievementStats.maxSingleRunWorldLineDistance,
         currentRunDistance,
       ),
+    },
+  }
+}
+
+/**
+ * Record one successful pet of Sushi the cat. Increments the lifetime pet counter on
+ * the achievement stats block; the love meter delta is the caller's responsibility.
+ *
+ * @param profile - Current profile.
+ * @returns Updated profile with `achievementStats.sushiPetCount` incremented by one.
+ */
+export function recordSushiPet(profile: PlayerProfile): PlayerProfile {
+  const achievementStats = getAchievementStats(profile)
+  return {
+    ...profile,
+    achievementStats: {
+      ...achievementStats,
+      sushiPetCount: achievementStats.sushiPetCount + ACHIEVEMENT_COUNTER_INCREMENT,
+    },
+  }
+}
+
+/**
+ * Record one bowl refill performed while the bowl was empty. Top-offs while the bowl
+ * still has servings should not call this — only true empty-bowl rescues count toward
+ * the "Bowl-Filler" achievement.
+ *
+ * @param profile - Current profile.
+ * @returns Updated profile with `achievementStats.sushiBowlRefillCount` incremented by one.
+ */
+export function recordSushiBowlRefill(profile: PlayerProfile): PlayerProfile {
+  const achievementStats = getAchievementStats(profile)
+  return {
+    ...profile,
+    achievementStats: {
+      ...achievementStats,
+      sushiBowlRefillCount: achievementStats.sushiBowlRefillCount + ACHIEVEMENT_COUNTER_INCREMENT,
     },
   }
 }

@@ -50,4 +50,55 @@ describe('MapShopFacade', () => {
     })
     expect(facade.session?.planetId).toBe('mars')
   })
+
+  it('exposes cat-food listing only on Earth and Mars', () => {
+    const facade = new MapShopFacade()
+    const profile = createProfile('Test')
+    const inventory = createInventory()
+
+    const openAt = (planetId: string, name: string): readonly string[] => {
+      facade.updateOrbitState({
+        orbitState: 'free',
+        targetName: null,
+        targetPlanetId: null,
+        onShopButton: () => {},
+        onShopState: () => {},
+        profile,
+        inventory,
+      })
+      facade.updateOrbitState({
+        orbitState: 'orbiting',
+        targetName: name,
+        targetPlanetId: planetId,
+        onShopButton: () => {},
+        onShopState: () => {},
+        profile,
+        inventory,
+      })
+      return facade.availableListings.map((l) => l.itemId)
+    }
+
+    expect(openAt('earth', 'Earth')).toContain('cat-food')
+    expect(openAt('mars', 'Mars')).toContain('cat-food')
+    expect(openAt('jupiter', 'Jupiter')).not.toContain('cat-food')
+  })
+
+  it('keeps universal listings (no allowlist) available everywhere', () => {
+    const facade = new MapShopFacade()
+    const profile = createProfile('Test')
+    const inventory = createInventory()
+
+    facade.updateOrbitState({
+      orbitState: 'orbiting',
+      targetName: 'Jupiter',
+      targetPlanetId: 'jupiter',
+      onShopButton: () => {},
+      onShopState: () => {},
+      profile,
+      inventory,
+    })
+    const ids = facade.availableListings.map((l) => l.itemId)
+    expect(ids).toContain('shuttle-fuel-cell')
+    expect(ids).toContain('fuel-cell')
+  })
 })

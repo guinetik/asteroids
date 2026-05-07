@@ -1,0 +1,29 @@
+/*
+ * Layout for the SushiMetersOverlay HUD. Sits above the habitat KeyPrompt
+ * (which uses position: fixed; bottom: 6rem via .key-prompt--bottom-low),
+ * horizontally centered, with a small gap between them. Pointer-events are
+ * disabled so the overlay never intercepts clicks.
+ */
+
+.sushi-meters {
+  @apply pointer-events-none fixed left-1/2 z-30 flex -translate-x-1/2 items-end gap-3;
+  /* 6rem (key-prompt--bottom-low) + ~3rem prompt height + ~10px gap. */
+  bottom: 9.625rem;
+}
+
+.sushi-meters__cell {
+  @apply flex flex-col items-center gap-1;
+}
+
+.sushi-meters__canvas {
+  @apply block;
+  width: 56px;
+  height: 56px;
+}
+
+.sushi-meters__title {
+  @apply font-sans uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.6rem;
+  letter-spacing: 0.28em;
+}

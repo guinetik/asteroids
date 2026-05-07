@@ -119,6 +119,7 @@ import {
   setBodyAccess,
   setLastDockedPlanet,
 } from '@/lib/player/profile'
+import { tickSushiNeeds } from '@/lib/sushi/needs'
 import type { BodyAccessState, PlayerProfile } from '@/lib/player/types'
 import {
   hasCompletedJourney,
@@ -290,6 +291,14 @@ export interface MapViewBootState {
 /** Warm yellow used for the Sun tick on the compass strip. */
 const COMPASS_SUN_COLOR = '#FFF0B0'
 
+/**
+ * Throttle interval (seconds) for persisting Sushi-needs decay updates. The tick
+ * runs every frame to advance the meters, but `saveProfile` only fires once per
+ * window — once every five seconds is enough to survive a refresh without
+ * thrashing localStorage 60×/s.
+ */
+const SUSHI_NEEDS_SAVE_INTERVAL_S = 5
+
 /** Special mission id → offer-message id used for auto-staging. */
 const SPECIAL_MISSION_OFFER_IDS: Record<string, string> = {
   'consortium-certification': 'consortium-certification-offer',
@@ -459,6 +468,11 @@ export class MapViewController implements Tickable {
   private playerInventory: Inventory = createInventoryForCargoBay(
     getCurrentUpgradeValue('shuttleCargoBay'),
   )
+  /**
+   * Seconds elapsed since the last throttled `saveProfile` triggered by
+   * {@link tickSushiNeeds}. Reset to 0 when the throttle fires.
+   */
+  private sushiNeedsSaveAccumS = 0
   private portalArrival: PortalArrivalSequence | null = null
   private sceneEnvironment: MapSceneEnvironment | null = null
   private gravityPass: ShaderPass | null = null
@@ -620,6 +634,12 @@ export class MapViewController implements Tickable {
   onShuttleControl: ((visible: boolean) => void) | null = null
   /** Fired when the habitat interaction prompt changes. */
   onHabitatPrompt: ((prompt: string | null) => void) | null = null
+  /**
+   * Fired after a Sushi care event (pet, eat, fill bowl) mutates the player profile or
+   * inventory. The Vue layer rebinds `playerProfileSnapshot` so the achievement watcher
+   * picks up the new stat counters and emits the reward banner automatically.
+   */
+  onSushiCareUpdate: (() => void) | null = null
   /** Fired with fade opacity (0 = clear, 1 = black) during habitat transitions. */
   onHabitatFade: ((opacity: number) => void) | null = null
   /** Fired with fade opacity (0 = clear, 1 = black) during turret-mode transitions. */
@@ -982,6 +1002,15 @@ export class MapViewController implements Tickable {
         this.setEarthStartupOrbitHudSuppressed(suppressed),
       notifyJourneyTrigger: (trigger) => this.notifyJourneyTrigger(trigger),
       getUnlockedAchievementIds: () => this.unlockedAchievementIds,
+      getProfile: () => this.playerProfile,
+      setProfile: (profile) => {
+        this.playerProfile = profile
+      },
+      getInventory: () => this.playerInventory,
+      setInventory: (inventory) => {
+        this.playerInventory = inventory
+      },
+      evaluateAchievements: () => this.onSushiCareUpdate?.(),
       callbacks: {
         onHabitatActive: (active) => this.onHabitatActive?.(active),
         onShuttleControl: (visible) => this.onShuttleControl?.(visible),
@@ -1499,6 +1528,7 @@ export class MapViewController implements Tickable {
    * One-shot actions, orbit state machine, and telemetry emission (runs just after input).
    */
   tick(dt: number): void {
+    this.tickSushiNeedsDecay(dt)
     const mapIntroPhaseBeforeTick = this.mapIntro.phase
     this.mapIntro.tick(dt)
     if (
@@ -2672,6 +2702,25 @@ export class MapViewController implements Tickable {
   private persistPlayerProfile(): void {
     saveProfile(this.playerProfile)
     saveInventory(this.playerInventory)
+  }
+
+  /**
+   * Advance Sushi the cat's love and hunger meters with elapsed real time and
+   * persist the profile on a {@link SUSHI_NEEDS_SAVE_INTERVAL_S} cadence. Runs
+   * at the top of {@link MapViewController.tick} so map / habitat / EVA all share
+   * the same decay clock — the level scene runs in a separate route and is
+   * deliberately out of scope for Phase 1.
+   */
+  private tickSushiNeedsDecay(dt: number): void {
+    if (!Number.isFinite(dt) || dt <= 0) return
+    const next = tickSushiNeeds(this.playerProfile, dt)
+    if (next === this.playerProfile) return
+    this.playerProfile = next
+    this.sushiNeedsSaveAccumS += dt
+    if (this.sushiNeedsSaveAccumS >= SUSHI_NEEDS_SAVE_INTERVAL_S) {
+      this.sushiNeedsSaveAccumS = 0
+      saveProfile(this.playerProfile)
+    }
   }
 
   /** True until the player submits a real callsign in the name-entry dialog. */

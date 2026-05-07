@@ -22,6 +22,12 @@ import {
 import type { Inventory } from '@/lib/inventory/types'
 import { LANDER_FUEL_ID, RESERVE_FUEL_ID } from '@/lib/shop/shopSession'
 
+/** Item id of cat food bags seeded into fresh shuttle holds. */
+export const STARTER_CAT_FOOD_ID = 'cat-food'
+
+/** Number of cat food bags granted on a fresh shuttle hold (one full stack). */
+export const STARTER_CAT_FOOD_COUNT = 10
+
 /** Starter-fuel quantities the controller threads into the inventory helpers. */
 export interface StarterFuelCellCounts {
   /** Shuttle reserve fuel cell count applied to fresh holds. */
@@ -75,7 +81,9 @@ export function inventoryWithStarterFuelCells(
   if (!addReserve.ok) return inv
   inv = addReserve.inventory
   const addLander = addItem(inv, LANDER_FUEL_ID, counts.lander)
-  return addLander.ok ? addLander.inventory : inv
+  if (addLander.ok) inv = addLander.inventory
+  const addCatFood = addItem(inv, STARTER_CAT_FOOD_ID, STARTER_CAT_FOOD_COUNT)
+  return addCatFood.ok ? addCatFood.inventory : inv
 }
 
 /**

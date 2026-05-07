@@ -8,6 +8,7 @@
 @import './jovian-epilogue-overlay.css';
 @import './key-prompt.css';
 @import './dock-panel.css';
+@import '../../components/hud/SushiMetersOverlay.css';
 
 /*
  * Reusable utility classes via @apply.

@@ -20,6 +20,18 @@
 import * as THREE from 'three'
 import type { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { HabitatInteriorScene } from '@/three/HabitatInteriorScene'
+import type { Inventory } from '@/lib/inventory/types'
+import type { PlayerProfile } from '@/lib/player/types'
+import {
+  addSushiHunger,
+  addSushiLove,
+  recordSushiBowlRefill,
+  recordSushiPet,
+  saveProfile,
+  setBowlServings,
+} from '@/lib/player/profile'
+import { removeItem } from '@/lib/inventory/inventory'
+import { STARTER_CAT_FOOD_ID } from '@/lib/map/player/playerInventoryHelpers'
 import type { HabitatPhase } from '@/lib/habitatState'
 import type { MapSceneObjects } from '@/three/MapSceneSetup'
 import type { VehicleCamera } from '@/three/VehicleCamera'
@@ -39,6 +51,15 @@ const WAKE_UP_START_PITCH = Math.PI / 2
 
 /** Camera Y position while lying in bed — lerped up to the standing height during wake-up. */
 const WAKE_UP_LYING_HEIGHT = 0.5
+
+/** Hunger restored each time Sushi consumes one serving from the bowl (0..100 scale). */
+const SUSHI_HUNGER_RESTORE_PER_SERVING = 25
+/** Love granted each time the player pets Sushi (0..100 scale). */
+const SUSHI_LOVE_PER_PET = 50
+/** Bowl-fill brings the bowl to this serving count (one full bag). */
+const SUSHI_BOWL_FULL_SERVINGS = 10
+/** Cat food units removed from the player's inventory per bowl refill. */
+const SUSHI_CAT_FOOD_REFILL_COST = 1
 
 /**
  * Eased progress at which the head-tilt phase **starts**. Until this point the camera holds
@@ -95,6 +116,16 @@ export interface MapHabitatFacadeDeps {
   notifyJourneyTrigger: (trigger: JourneyTriggerId) => void
   /** Persisted achievement ids used by habitat visual rewards. */
   getUnlockedAchievementIds: () => readonly string[]
+  /** Read the live player profile (Pinia-backed). */
+  getProfile: () => PlayerProfile
+  /** Write a new profile back to the controller (the controller saves + emits). */
+  setProfile: (profile: PlayerProfile) => void
+  /** Read the live shuttle inventory. */
+  getInventory: () => Inventory
+  /** Write a new inventory back to the controller. */
+  setInventory: (inventory: Inventory) => void
+  /** Re-evaluate achievements after a Sushi care event mutates profile state. */
+  evaluateAchievements: () => void
   /** HUD callbacks. */
   callbacks: MapHabitatCallbacks
 }
@@ -136,8 +167,77 @@ export class MapHabitatFacade {
     next.onPrompt = (prompt) => {
       deps?.callbacks.onHabitatPrompt?.(prompt)
     }
+    next.setSushiBridgeCallbacks({
+      getHunger: () => (deps ? deps.getProfile().sushiHunger : 0),
+      getLove: () => (deps ? deps.getProfile().sushiLove : 0),
+      getBowlServings: () => (deps ? deps.getProfile().bowlServings : 0),
+      canFillBowl: () => {
+        if (!deps) return false
+        const profile = deps.getProfile()
+        if (profile.bowlServings >= SUSHI_BOWL_FULL_SERVINGS) return false
+        const inv = deps.getInventory()
+        const stack = inv.stacks.find((s) => s.itemId === STARTER_CAT_FOOD_ID)
+        return (stack?.quantity ?? 0) >= SUSHI_CAT_FOOD_REFILL_COST
+      },
+      onEatServing: () => this.handleSushiEatServing(),
+      onPetted: () => this.handleSushiPetted(),
+      onFillBowl: () => this.handleSushiFillBowl(),
+    })
     this.scene = next
     return next
+  }
+
+  /**
+   * Apply the side-effects of Sushi consuming one serving: decrement bowl servings,
+   * restore hunger, save, re-evaluate achievements.
+   */
+  private handleSushiEatServing(): void {
+    const deps = this.deps
+    if (!deps) return
+    const profile = deps.getProfile()
+    if (profile.bowlServings <= 0) return
+    let next = setBowlServings(profile, profile.bowlServings - 1)
+    next = addSushiHunger(next, -SUSHI_HUNGER_RESTORE_PER_SERVING)
+    deps.setProfile(next)
+    saveProfile(next)
+  }
+
+  /**
+   * Apply the side-effects of the player petting Sushi: add love, bump pet stat, save,
+   * re-evaluate achievements so the "Beloved" reward fires automatically at threshold.
+   */
+  private handleSushiPetted(): void {
+    const deps = this.deps
+    if (!deps) return
+    let next = deps.getProfile()
+    next = addSushiLove(next, SUSHI_LOVE_PER_PET)
+    next = recordSushiPet(next)
+    deps.setProfile(next)
+    saveProfile(next)
+    deps.evaluateAchievements()
+  }
+
+  /**
+   * Apply the side-effects of refilling the bowl. Only counts toward the achievement
+   * counter when the bowl was empty (zero servings) before this call — top-offs of a
+   * partially-full bowl still bring the bowl to {@link SUSHI_BOWL_FULL_SERVINGS} but do
+   * not bump the lifetime refill stat.
+   */
+  private handleSushiFillBowl(): void {
+    const deps = this.deps
+    if (!deps) return
+    const profile = deps.getProfile()
+    if (profile.bowlServings >= SUSHI_BOWL_FULL_SERVINGS) return
+    const inv = deps.getInventory()
+    const removed = removeItem(inv, STARTER_CAT_FOOD_ID, SUSHI_CAT_FOOD_REFILL_COST)
+    if (!removed.ok) return
+    deps.setInventory(removed.inventory)
+    const wasEmpty = profile.bowlServings <= 0
+    let nextProfile = setBowlServings(profile, SUSHI_BOWL_FULL_SERVINGS)
+    if (wasEmpty) nextProfile = recordSushiBowlRefill(nextProfile)
+    deps.setProfile(nextProfile)
+    saveProfile(nextProfile)
+    if (wasEmpty) deps.evaluateAchievements()
   }
 
   /**

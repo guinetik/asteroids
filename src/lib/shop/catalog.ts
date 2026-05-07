@@ -9,7 +9,7 @@
  * @date 2026-04-03
  * @spec docs/superpowers/specs/2026-04-03-shop-system-design.md
  */
-import type { ShopCatalog } from './types'
+import type { ShopCatalog, ShopListing } from './types'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 
 import shopData from '@/data/shop/shop.json'
@@ -47,6 +47,33 @@ export const SHOP_CATALOG: ShopCatalog = validateCatalog(shopData as unknown as 
 export function getBuyPrice(itemId: string): number | undefined {
   const listing = SHOP_CATALOG.listings.find((l) => l.itemId === itemId)
   return listing?.buyPrice
+}
+
+/**
+ * Whether a shop listing is available at the given planet id.
+ * Listings without an `availableOnPlanets` allowlist (or with an empty one) are
+ * considered universally available; listings with an allowlist must include
+ * `planetId` to be sold at that port.
+ *
+ * @param listing - Shop listing entry from the catalog.
+ * @param planetId - Planet id of the active shop session, e.g. `'earth'`.
+ * @returns True when the listing is available at this planet.
+ */
+export function isListingAvailableAtPlanet(listing: ShopListing, planetId: string): boolean {
+  const allow = listing.availableOnPlanets
+  if (allow === undefined || allow.length === 0) return true
+  return allow.includes(planetId)
+}
+
+/**
+ * Return the buy listings stocked at the given planet id, applying per-listing
+ * `availableOnPlanets` allowlists. Universal listings appear at every planet.
+ *
+ * @param planetId - Planet id of the active shop session, e.g. `'earth'`.
+ * @returns Listings the player can purchase at this port.
+ */
+export function getListingsForPlanet(planetId: string): readonly ShopListing[] {
+  return SHOP_CATALOG.listings.filter((l) => isListingAvailableAtPlanet(l, planetId))
 }
 
 /** Get the sell price for an item, or undefined if the shop doesn't buy it. */

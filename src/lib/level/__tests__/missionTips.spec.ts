@@ -53,6 +53,8 @@ function profile(completed: Record<string, number>): PlayerProfile {
       portalDepartures: 0,
       lifetimeWorldLineDistance: 0,
       maxSingleRunWorldLineDistance: 0,
+      sushiPetCount: 0,
+      sushiBowlRefillCount: 0,
     },
     orbitedSolarBodies: {},
     lastDockedPlanetId: 'earth',
@@ -65,6 +67,9 @@ function profile(completed: Record<string, number>): PlayerProfile {
     unlockedFeatureIds: [],
     announcedJourneyStartIds: [],
     journeyStartReadyIds: [],
+    sushiLove: 75,
+    sushiHunger: 75,
+    bowlServings: 0,
   }
 }
 

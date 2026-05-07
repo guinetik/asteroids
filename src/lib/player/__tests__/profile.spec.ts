@@ -28,6 +28,11 @@ import {
   recordWorldLineDistance,
   setStoryFlag,
   hasStoryFlag,
+  addSushiLove,
+  addSushiHunger,
+  setBowlServings,
+  recordSushiPet,
+  recordSushiBowlRefill,
 } from '../profile'
 import type { PlayerProfile } from '../types'
 
@@ -82,6 +87,8 @@ describe('createProfile', () => {
       portalDepartures: 0,
       lifetimeWorldLineDistance: 0,
       maxSingleRunWorldLineDistance: 0,
+      sushiPetCount: 0,
+      sushiBowlRefillCount: 0,
     })
   })
 
@@ -560,5 +567,100 @@ describe('recordRuntimeTipsShown', () => {
     const profile = createProfile('Pilot')
     const updated = recordRuntimeTipsShown(profile, ['', '  '])
     expect(updated.achievementStats.runtimeTipsShownCount).toEqual({})
+  })
+})
+
+describe('Sushi cat needs on PlayerProfile', () => {
+  it('seeds defaults on a fresh profile', () => {
+    const profile = createProfile('Pilot')
+    expect(profile.sushiLove).toBe(75)
+    expect(profile.sushiHunger).toBe(75)
+    expect(profile.bowlServings).toBe(0)
+  })
+
+  it('hydrates missing Sushi fields when loading legacy saves', () => {
+    const profile = createProfile('Pilot')
+    saveProfile(profile)
+    const raw = mockStorage[PROFILE_STORAGE_KEY] as string
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    delete parsed['sushiLove']
+    delete parsed['sushiHunger']
+    delete parsed['bowlServings']
+    mockStorage[PROFILE_STORAGE_KEY] = JSON.stringify(parsed)
+
+    const loaded = loadProfile()
+    expect(loaded?.sushiLove).toBe(75)
+    expect(loaded?.sushiHunger).toBe(75)
+    expect(loaded?.bowlServings).toBe(0)
+  })
+
+  it('clamps persisted Sushi fields to their valid ranges', () => {
+    const profile = createProfile('Pilot')
+    saveProfile(profile)
+    const parsed = JSON.parse(mockStorage[PROFILE_STORAGE_KEY] as string) as Record<string, unknown>
+    parsed['sushiLove'] = 9999
+    parsed['sushiHunger'] = -50
+    parsed['bowlServings'] = 200
+    mockStorage[PROFILE_STORAGE_KEY] = JSON.stringify(parsed)
+
+    const loaded = loadProfile()
+    expect(loaded?.sushiLove).toBe(100)
+    expect(loaded?.sushiHunger).toBe(0)
+    expect(loaded?.bowlServings).toBe(10)
+  })
+})
+
+describe('addSushiLove / addSushiHunger / setBowlServings', () => {
+  it('clamps love into [0, 100]', () => {
+    let profile: PlayerProfile = createProfile('Pilot')
+    profile = addSushiLove(profile, +50)
+    expect(profile.sushiLove).toBe(100)
+    profile = addSushiLove(profile, -250)
+    expect(profile.sushiLove).toBe(0)
+  })
+
+  it('clamps hunger into [0, 100]', () => {
+    let profile: PlayerProfile = createProfile('Pilot')
+    profile = addSushiHunger(profile, -100)
+    expect(profile.sushiHunger).toBe(0)
+    profile = addSushiHunger(profile, +9999)
+    expect(profile.sushiHunger).toBe(100)
+  })
+
+  it('clamps bowl servings into [0, 10] and ignores non-finite', () => {
+    let profile: PlayerProfile = createProfile('Pilot')
+    profile = setBowlServings(profile, 10)
+    expect(profile.bowlServings).toBe(10)
+    profile = setBowlServings(profile, 99)
+    expect(profile.bowlServings).toBe(10)
+    profile = setBowlServings(profile, -1)
+    expect(profile.bowlServings).toBe(0)
+    profile = setBowlServings(profile, Number.NaN)
+    expect(profile.bowlServings).toBe(0)
+  })
+
+  it('returns the same object reference when value is unchanged', () => {
+    const profile = createProfile('Pilot')
+    expect(addSushiLove(profile, 0)).toBe(profile)
+    expect(addSushiHunger(profile, 0)).toBe(profile)
+    expect(setBowlServings(profile, profile.bowlServings)).toBe(profile)
+  })
+})
+
+describe('recordSushiPet / recordSushiBowlRefill', () => {
+  it('increments lifetime sushi pet count', () => {
+    const profile = createProfile('Pilot')
+    expect(profile.achievementStats.sushiPetCount).toBe(0)
+    const next = recordSushiPet(profile)
+    expect(next.achievementStats.sushiPetCount).toBe(1)
+    expect(recordSushiPet(next).achievementStats.sushiPetCount).toBe(2)
+  })
+
+  it('increments lifetime bowl refill count', () => {
+    const profile = createProfile('Pilot')
+    expect(profile.achievementStats.sushiBowlRefillCount).toBe(0)
+    const next = recordSushiBowlRefill(profile)
+    expect(next.achievementStats.sushiBowlRefillCount).toBe(1)
+    expect(recordSushiBowlRefill(next).achievementStats.sushiBowlRefillCount).toBe(2)
   })
 })

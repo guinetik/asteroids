@@ -16,6 +16,8 @@ import {
 import type { ShopSession } from '@/lib/shop/tradeTypes'
 import type { PlayerProfile } from '@/lib/player/types'
 import type { Inventory } from '@/lib/inventory/types'
+import type { ShopListing } from '@/lib/shop/types'
+import { getListingsForPlanet } from '@/lib/shop/catalog'
 import { addItem } from '@/lib/inventory/inventory'
 import { spendCredits } from '@/lib/player/profile'
 
@@ -123,6 +125,18 @@ export class MapShopFacade {
   /** Current bribe-restock cost for the active session, or 0 when no session. */
   get bribeCost(): number {
     return this.session ? getBribeCost(this.session) : 0
+  }
+
+  /**
+   * Buy listings available at the current shop session's planet, filtered by each
+   * listing's optional `availableOnPlanets` allowlist. Returns an empty array when
+   * no session is active.
+   *
+   * @returns Listings stocked at the planet currently being orbited.
+   */
+  get availableListings(): readonly ShopListing[] {
+    if (!this.session) return []
+    return getListingsForPlanet(this.session.planetId)
   }
 
   /** Bribe the dock master to reroll trade goods. Doubles in cost per bribe per port. */

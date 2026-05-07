@@ -29,6 +29,7 @@ import MissionTrackerPanel from '@/components/MissionTrackerPanel.vue'
 import MissionFocusPrompt from '@/components/MissionFocusPrompt.vue'
 import KeyPrompt from '@/components/KeyPrompt.vue'
 import DockPanel from '@/components/DockPanel.vue'
+import SushiMetersOverlay from '@/components/hud/SushiMetersOverlay.vue'
 import { parseKeyPrompt } from '@/lib/ui/parseKeyPrompt'
 import {
   buildMissionTrackerGroups,
@@ -391,6 +392,10 @@ const journeyTrackerVisible = ref(false)
 const habitatPrompt = ref<string | null>(null)
 const evaActionPromptParsed = computed(() => parseKeyPrompt(telemetry.actionPrompt))
 const habitatPromptParsed = computed(() => parseKeyPrompt(habitatPrompt.value))
+const sushiPromptActive = computed(() => {
+  const label = habitatPromptParsed.value?.label?.toLowerCase() ?? ''
+  return label.includes('sushi') || label.includes('bowl')
+})
 const habitatFadeOpacity = ref(0)
 const turretFadeOpacity = ref(0)
 const turretHudPhase = ref<'idle' | 'opening' | 'active' | 'closing'>('idle')
@@ -2174,6 +2179,11 @@ watch(
       :action="evaActionPromptParsed.label"
       tone="cyan"
       position="bottom"
+    />
+    <SushiMetersOverlay
+      :visible="habitatActive && sushiPromptActive && !shuttleControlVisible"
+      :love="playerProfileSnapshot.sushiLove"
+      :hunger="playerProfileSnapshot.sushiHunger"
     />
     <KeyPrompt
       v-if="habitatActive && habitatPromptParsed && !shuttleControlVisible"

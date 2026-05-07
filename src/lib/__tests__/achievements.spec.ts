@@ -563,4 +563,48 @@ describe('achievements', () => {
     expect(byId('ceres-archive-sabotaged')?.kind).toBe('specific_contract_completed')
     expect(byId('ceres-archive-sabotaged')?.requiredOutcomeId).toBe('sabotage')
   })
+
+  it('keeps the Beloved cat achievement locked at 24 pets and unlocks at 25', () => {
+    const baseProfile = createProfile('Pilot')
+    const profileBelow = {
+      ...baseProfile,
+      achievementStats: { ...baseProfile.achievementStats, sushiPetCount: 24 },
+    }
+    const idsBelow = evaluateAchievementUnlocks(progress(profileBelow), []).newlyUnlocked.map(
+      (a) => a.id,
+    )
+    expect(idsBelow).not.toContain('cat-beloved')
+
+    const profileAt = {
+      ...baseProfile,
+      achievementStats: { ...baseProfile.achievementStats, sushiPetCount: 25 },
+    }
+    const result = evaluateAchievementUnlocks(progress(profileAt), [])
+    const beloved = result.newlyUnlocked.find((a) => a.id === 'cat-beloved')
+    expect(beloved).toBeDefined()
+    expect(beloved?.rewardCredits).toBe(2000)
+  })
+
+  it('unlocks the Bowl-Filler achievement at 3 from-empty refills with a 10000 CR reward', () => {
+    const baseProfile = createProfile('Pilot')
+    const profileBelow = {
+      ...baseProfile,
+      achievementStats: { ...baseProfile.achievementStats, sushiBowlRefillCount: 2 },
+    }
+    expect(
+      evaluateAchievementUnlocks(progress(profileBelow), []).newlyUnlocked.some(
+        (a) => a.id === 'cat-bowl-filler',
+      ),
+    ).toBe(false)
+
+    const profileAt = {
+      ...baseProfile,
+      achievementStats: { ...baseProfile.achievementStats, sushiBowlRefillCount: 3 },
+    }
+    const filler = evaluateAchievementUnlocks(progress(profileAt), []).newlyUnlocked.find(
+      (a) => a.id === 'cat-bowl-filler',
+    )
+    expect(filler).toBeDefined()
+    expect(filler?.rewardCredits).toBe(10000)
+  })
 })

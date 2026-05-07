@@ -24,6 +24,7 @@ export type AchievementCategory =
   | 'credits'
   | 'contracts'
   | 'upgrades'
+  | 'cat'
 
 /** Rule discriminator used by the achievement evaluator. */
 export type AchievementKind =
@@ -52,6 +53,8 @@ export type AchievementKind =
   | 'worldline_lifetime_distance'
   | 'worldline_single_run_distance'
   | 'body_access_state'
+  | 'sushi_pets'
+  | 'sushi_bowl_refills'
 
 /** Static row from `ACHIEVEMENT_DEFINITIONS` — copy, rule kind, and optional thresholds. */
 export interface AchievementDefinition {
@@ -179,6 +182,14 @@ const REWARD_SPECIAL_UPGRADE = 1_200
 const REWARD_CAPSTONE = 1_500
 /** Reward for generated planet orbit achievements. */
 const REWARD_PLANET_ORBIT = 220
+/** Pet threshold for the "Beloved" Sushi achievement. */
+const SUSHI_PET_THRESHOLD = 25
+/** Empty-bowl refill threshold for the "Bowl-Filler" Sushi achievement. */
+const SUSHI_BOWL_REFILL_THRESHOLD = 3
+/** Credits granted for unlocking the "Beloved" Sushi achievement. */
+const REWARD_SUSHI_BELOVED = 2_000
+/** Credits granted for unlocking the "Bowl-Filler" Sushi achievement. */
+const REWARD_SUSHI_BOWL_FILLER = 10_000
 
 /**
  * Creative title + subtitle for first orbit around each catalog body (Sun + planets).
@@ -1055,6 +1066,30 @@ export const ACHIEVEMENT_DEFINITIONS: readonly AchievementDefinition[] = [
     threshold: TEN_COUNT,
   },
   {
+    id: 'cat-beloved',
+    category: 'cat',
+    icon: '\u{1F408}',
+    title: 'BELOVED',
+    subtitle: 'Twenty-five pets · Sushi remembers your hand',
+    description: 'Pet Sushi 25 times.',
+    type: 'HABITAT',
+    rewardCredits: REWARD_SUSHI_BELOVED,
+    kind: 'sushi_pets',
+    threshold: SUSHI_PET_THRESHOLD,
+  },
+  {
+    id: 'cat-bowl-filler',
+    category: 'cat',
+    icon: '\u{1F963}',
+    title: 'BOWL-FILLER',
+    subtitle: 'Three empty bowls rescued · Sushi eats again',
+    description: 'Refill the empty bowl 3 times.',
+    type: 'HABITAT',
+    rewardCredits: REWARD_SUSHI_BOWL_FILLER,
+    kind: 'sushi_bowl_refills',
+    threshold: SUSHI_BOWL_REFILL_THRESHOLD,
+  },
+  {
     id: 'upgrades-twenty-tiers',
     category: 'upgrades',
     icon: '\u{1F6E0}',
@@ -1123,6 +1158,8 @@ function getAchievementDefinitionError(definition: AchievementDefinition): strin
     case 'portal_departures':
     case 'worldline_lifetime_distance':
     case 'worldline_single_run_distance':
+    case 'sushi_pets':
+    case 'sushi_bowl_refills':
       return hasPositiveThreshold(definition) ? null : 'missing positive threshold'
     case 'specific_upgrade':
       return definition.upgradeId ? null : 'missing upgradeId'
@@ -1173,4 +1210,5 @@ export const ACHIEVEMENT_CATEGORY_LABELS: Record<AchievementCategory, string> = 
   credits: 'Credits',
   contracts: 'Contracts',
   upgrades: 'Engineering',
+  cat: 'Habitat Cat',
 }

@@ -17,7 +17,57 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 
 /** Logical wander states for Sushi's behaviour FSM. */
-type CatState = 'idle' | 'walk' | 'sit'
+type CatState =
+  | 'idle'
+  | 'walk'
+  | 'sit'
+  | 'goToBowl'
+  | 'eat'
+  | 'follow'
+  | 'idleNearPlayer'
+
+/**
+ * Live read-only handle the {@link CatController} uses to query Sushi's needs and signal
+ * back to the world (Pinia, save game, achievements). The controller never imports stores
+ * directly — the host scene/facade owns Pinia access and wires this bridge in.
+ *
+ * @author guinetik
+ * @date 2026-05-07
+ * @spec docs/superpowers/specs/2026-05-07-sushi-care-design.md
+ */
+export interface CatNeedsBridge {
+  /** Current hunger value (0..100). Read every frame. */
+  getHunger(): number
+  /** Current love value (0..100). Read every frame. */
+  getLove(): number
+  /** Current bowl serving count (0..10). Read every frame. */
+  getBowlServings(): number
+  /** Write the player's world-space position into `out` and return it for chaining. */
+  getPlayerWorldPosition(out: THREE.Vector3): THREE.Vector3
+  /** Write the bowl's world-space position into `out` and return it for chaining. */
+  getBowlWorldPosition(out: THREE.Vector3): THREE.Vector3
+  /**
+   * Cat just consumed one serving from the bowl. Implementer is responsible for
+   * decrementing `bowlServings` by 1, restoring 25 hunger, and persisting profile.
+   */
+  onEatServing(): void
+  /**
+   * Cat got pet. Implementer is responsible for adding 50 love, bumping the lifetime
+   * pet counter, persisting profile, and re-evaluating achievements.
+   */
+  onPetted(): void
+}
+
+/** Hunger threshold at or above which Sushi prioritises eating from the bowl. */
+const HUNGER_HUNGRY_THRESHOLD = 70
+/** Love threshold at or below which Sushi prioritises following the player. */
+const LOVE_NEEDY_THRESHOLD = 30
+/** Distance (XZ, world units) that counts as "next to the player" when following. */
+const FOLLOW_REACHED_DISTANCE = 1.0
+/** Seconds Sushi idles next to the player after catching up before re-evaluating priorities. */
+const IDLE_NEAR_PLAYER_DURATION_S = 4
+/** Seconds Sushi spends sitting at the bowl per consumed serving. */
+const EAT_DURATION_S = 2.5
 
 /** Authored clip names embedded in `cat.glb`. */
 const CLIP_IDLE = 'Armature|4_Idle_Armature'
@@ -269,7 +319,9 @@ export class CatController {
   readonly group: THREE.Group
 
   private readonly mixer: THREE.AnimationMixer
-  private readonly actions: Record<CatState, THREE.AnimationAction>
+  private readonly actions: Record<'idle' | 'walk' | 'sit', THREE.AnimationAction>
+  private bridge: CatNeedsBridge | null = null
+  private readonly _bridgeTmp = new THREE.Vector3()
   private readonly bounds: CatWanderBounds
   private readonly obstacles: readonly CatObstacle[]
   private readonly target = new THREE.Vector3()
@@ -389,8 +441,25 @@ export class CatController {
 
     if (this.state === 'walk') {
       this.tickWalk(dt)
+    } else if (this.state === 'goToBowl') {
+      this.tickGoToBowl(dt)
+    } else if (this.state === 'follow') {
+      this.tickFollow(dt)
+    } else if (this.state === 'eat') {
+      if (this.stateTimer >= this.stateDuration) {
+        this.bridge?.onEatServing()
+        // Decide what to do next based on fresh needs.
+        this.evaluateNeedsAndPickNextState()
+      }
+    } else if (this.state === 'idleNearPlayer') {
+      if (this.stateTimer >= this.stateDuration) {
+        this.evaluateNeedsAndPickNextState()
+      }
     } else if (this.stateTimer >= this.stateDuration) {
-      this.pickNextRestingState()
+      // Free state (idle expired, or sit expired naturally) — re-check needs first.
+      if (!this.evaluateNeedsAndPickNextState()) {
+        this.pickNextRestingState()
+      }
     }
     // Note: while sitting we deliberately do NOT yaw the body toward the petter —
     // Sushi stays planted exactly where he sat down; only the head bone tilts up
@@ -496,6 +565,7 @@ export class CatController {
    * flight.
    */
   pet(): void {
+    this.bridge?.onPetted()
     this.enterState('sit')
     // Override the default sit duration so a pet keeps Sushi sitting a beat longer.
     this.stateDuration = randRange(SIT_MIN_S * PET_SIT_DURATION_MULT, SIT_MAX_S * PET_SIT_DURATION_MULT)
@@ -594,6 +664,110 @@ export class CatController {
     this.group.position.z += Math.cos(yaw) * step
   }
 
+  /**
+   * Step the cat toward the bowl, reusing the same pivot-then-walk locomotion. On
+   * arrival within {@link WAYPOINT_REACHED_EPS}, drop into the {@link 'eat'} state.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  private tickGoToBowl(dt: number): void {
+    if (!this.bridge) {
+      this.pickNextRestingState()
+      return
+    }
+    this.bridge.getBowlWorldPosition(this._bridgeTmp)
+    this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    if (this.stepTowardTarget(dt)) {
+      this.enterState('eat')
+    }
+  }
+
+  /**
+   * Step the cat toward the player, reusing pivot-then-walk locomotion. Once within
+   * {@link FOLLOW_REACHED_DISTANCE}, drop into {@link 'idleNearPlayer'} for a short stay.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  private tickFollow(dt: number): void {
+    if (!this.bridge) {
+      this.pickNextRestingState()
+      return
+    }
+    this.bridge.getPlayerWorldPosition(this._bridgeTmp)
+    this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    const dx = this.target.x - this.group.position.x
+    const dz = this.target.z - this.group.position.z
+    if (Math.hypot(dx, dz) < FOLLOW_REACHED_DISTANCE) {
+      this.enterState('idleNearPlayer')
+      return
+    }
+    this.stepTowardTarget(dt)
+  }
+
+  /**
+   * Shared pivot-then-walk locomotion used by `walk`, `goToBowl`, and `follow`. Yaws
+   * toward {@link target} and only marches forward once heading error is within
+   * {@link WALK_HEADING_TOLERANCE}.
+   *
+   * @param dt - Delta time in seconds.
+   * @returns True when the cat has arrived within {@link WAYPOINT_REACHED_EPS}.
+   */
+  private stepTowardTarget(dt: number): boolean {
+    const dx = this.target.x - this.group.position.x
+    const dz = this.target.z - this.group.position.z
+    const dist = Math.hypot(dx, dz)
+    if (dist < WAYPOINT_REACHED_EPS) return true
+
+    const desiredYaw = Math.atan2(dx, dz)
+    const currentYaw = this.group.rotation.y
+    const delta = wrapAngle(desiredYaw - currentYaw)
+    const turnStep = Math.sign(delta) * Math.min(Math.abs(delta), TURN_RATE * dt)
+    this.group.rotation.y = currentYaw + turnStep
+
+    if (Math.abs(delta) > WALK_HEADING_TOLERANCE) return false
+
+    const step = Math.min(WALK_SPEED * dt, dist)
+    const yaw = this.group.rotation.y
+    this.group.position.x += Math.sin(yaw) * step
+    this.group.position.z += Math.cos(yaw) * step
+    return false
+  }
+
+  /**
+   * Highest-priority needs check. Returns true if a needs-driven state was entered.
+   * Order: hungry+food → goToBowl, needy → follow, otherwise nothing (caller falls
+   * back to wander). Never interrupts a sit triggered by {@link pet} — `pet()` calls
+   * `enterState('sit')` itself and the FSM clears it via the timer; this method is
+   * only invoked from "free" branches in {@link tick}.
+   *
+   * @returns Whether the cat is now in a needs-driven state.
+   */
+  private evaluateNeedsAndPickNextState(): boolean {
+    const bridge = this.bridge
+    if (!bridge) return false
+    const hunger = bridge.getHunger()
+    const bowl = bridge.getBowlServings()
+    if (hunger >= HUNGER_HUNGRY_THRESHOLD && bowl > 0) {
+      this.enterState('goToBowl')
+      return true
+    }
+    if (bridge.getLove() <= LOVE_NEEDY_THRESHOLD) {
+      this.enterState('follow')
+      return true
+    }
+    return false
+  }
+
+  /** Whether the cat is currently busy with a needs-driven errand (suppresses pet prompt). */
+  get isBusyWithNeeds(): boolean {
+    return (
+      this.state === 'goToBowl' ||
+      this.state === 'eat' ||
+      this.state === 'follow' ||
+      this.state === 'idleNearPlayer'
+    )
+  }
+
   /** After idling/sitting expires, decide whether to sit longer or set a new walk target. */
   private pickNextRestingState(): void {
     if (this.state === 'idle' && Math.random() < SIT_CHANCE) {
@@ -619,12 +793,16 @@ export class CatController {
    */
   private enterState(next: CatState): void {
     if (this.state !== next) {
-      const from = this.actions[this.state]
-      const to = this.actions[next]
-      to.reset()
-      to.setEffectiveWeight(1)
-      to.fadeIn(CROSSFADE_S)
-      from.fadeOut(CROSSFADE_S)
+      const fromClip = this.clipForState(this.state)
+      const toClip = this.clipForState(next)
+      if (fromClip !== toClip) {
+        const from = this.actions[fromClip]
+        const to = this.actions[toClip]
+        to.reset()
+        to.setEffectiveWeight(1)
+        to.fadeIn(CROSSFADE_S)
+        from.fadeOut(CROSSFADE_S)
+      }
       this.state = next
       // Leaving sit drops the petter-facing override so the next walk uses its
       // normal heading toward the chosen waypoint.
@@ -635,10 +813,48 @@ export class CatController {
       this.stateDuration = randRange(IDLE_MIN_S, IDLE_MAX_S)
     } else if (next === 'sit') {
       this.stateDuration = randRange(SIT_MIN_S, SIT_MAX_S)
+    } else if (next === 'idleNearPlayer') {
+      this.stateDuration = IDLE_NEAR_PLAYER_DURATION_S
+    } else if (next === 'eat') {
+      this.stateDuration = EAT_DURATION_S
     } else {
-      // Walk runs until the waypoint is reached.
+      // walk / goToBowl / follow run until the waypoint is reached.
       this.stateDuration = Number.POSITIVE_INFINITY
     }
+  }
+
+  /**
+   * Map every logical state — including the four needs-driven layers — onto the three
+   * animation clips embedded in `cat.glb`. New states reuse the existing clips:
+   * `goToBowl` and `follow` both walk; `eat` and `idleNearPlayer` both idle.
+   *
+   * @param state - Logical FSM state.
+   * @returns The clip key whose action should play in {@link state}.
+   */
+  private clipForState(state: CatState): 'idle' | 'walk' | 'sit' {
+    switch (state) {
+      case 'idle':
+      case 'idleNearPlayer':
+      case 'eat':
+        return 'idle'
+      case 'walk':
+      case 'goToBowl':
+      case 'follow':
+        return 'walk'
+      case 'sit':
+        return 'sit'
+    }
+  }
+
+  /**
+   * Install (or replace) the live needs bridge. Pass `null` to detach — the controller
+   * falls back to its baseline wander behaviour when there is no bridge, which keeps
+   * unit tests and degraded loads simple.
+   *
+   * @param bridge - Bridge implementation, or `null` to detach.
+   */
+  setBridge(bridge: CatNeedsBridge | null): void {
+    this.bridge = bridge
   }
 
   /**

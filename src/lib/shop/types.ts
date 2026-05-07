@@ -18,6 +18,12 @@ export interface ShopListing {
   itemId: string
   /** Credits the player pays to purchase 1 unit. */
   buyPrice: number
+  /**
+   * Optional allowlist of planet ids that stock this listing. When omitted or empty,
+   * the listing is universal (available everywhere). Example: `['earth', 'mars']`
+   * restricts cat food to inner-system pet supply chains.
+   */
+  availableOnPlanets?: string[]
 }
 
 /** A price the shop pays for an item the player sells. */

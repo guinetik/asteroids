@@ -44,6 +44,18 @@ export interface PlayerAchievementStats {
   lifetimeWorldLineDistance: number
   /** Longest finite positive single-run world-line distance reached, e.g. `250`. */
   maxSingleRunWorldLineDistance: number
+  /**
+   * Total times the player has pet Sushi the cat across the lifetime of this profile,
+   * e.g. `25` after twenty-five pets. Drives the "Beloved" achievement.
+   */
+  sushiPetCount: number
+  /**
+   * Total times the player has refilled Sushi's bowl from empty (zero servings) across
+   * the lifetime of this profile, e.g. `3` after three from-empty refills. Topping off a
+   * non-empty bowl does not increment this counter — the achievement only counts true
+   * empty-bowl rescues.
+   */
+  sushiBowlRefillCount: number
 }
 
 /** Owned + active cosmetic selections for Pimp My Shuttle! (persisted on {@link PlayerProfile}). */
@@ -164,4 +176,19 @@ export interface PlayerProfile {
    * Cleared only by profile resets — prevents duplicate transmissions on later eligible orbits.
    */
   fantasiaCosmeticIntroSent?: boolean
+  /**
+   * Sushi the cat's affection meter, clamped to [0, 100]. Decays slowly while the player
+   * is away from the habitat; replenished by interactions in later phases. Defaults to 75.
+   */
+  sushiLove: number
+  /**
+   * Sushi's hunger meter, clamped to [0, 100]. 0 means stuffed; 100 means famished.
+   * Rises continuously with time and is reduced when Sushi eats from the bowl. Defaults to 75.
+   */
+  sushiHunger: number
+  /**
+   * Servings remaining in Sushi's bowl, clamped to [0, 10]. Decremented by Sushi's eating
+   * routine; refilled by feeding the bowl with one bag of cat food (10 servings). Defaults to 0.
+   */
+  bowlServings: number
 }

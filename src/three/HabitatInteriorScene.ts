@@ -20,6 +20,7 @@ import { loadGLB } from '@/three/loadGLB'
 import { FootstepSystem } from '@/lib/fps/footstepSystem'
 import {
   CatController,
+  type CatNeedsBridge,
   type CatObstacle,
   type CatWanderBounds,
 } from '@/three/CatController'
@@ -281,12 +282,45 @@ const PET_APPROACH_DURATION_S = 0.55
 /** Lerp factor (per second) for camera tracking onto Sushi during the pet sequence. */
 const PET_CAMERA_TURN_RATE = 8
 
+/** XZ proximity (world units) at which the "Fill Bowl" prompt appears. */
+const BOWL_FILL_PROMPT_DISTANCE = 1.4
+/** Total seconds the bowl scale-punch cue plays after a refill. */
+const BOWL_FILL_CUE_DURATION_S = 0.45
+/** Peak scale multiplier applied to the bowl mesh during the refill cue. */
+const BOWL_FILL_CUE_SCALE_PEAK = 1.35
+
 /** FPS camera configuration for the habitat interior. */
 const HABITAT_CAMERA_CONFIG: FpsCameraConfig = {
   eyeHeight: HABITAT_EYE_HEIGHT,
   sensitivity: HABITAT_SENSITIVITY,
   pitchClamp: HABITAT_PITCH_CLAMP,
   fov: HABITAT_FOV,
+}
+
+/**
+ * Host-supplied callbacks that bridge the {@link HabitatInteriorScene} to Pinia-backed
+ * profile state. The scene never reads stores directly; the facade owns persistence and
+ * achievement evaluation.
+ *
+ * @author guinetik
+ * @date 2026-05-07
+ * @spec docs/superpowers/specs/2026-05-07-sushi-care-design.md
+ */
+export interface SushiBridgeCallbacks {
+  /** Read current hunger (0..100) from the player profile. */
+  getHunger(): number
+  /** Read current love (0..100) from the player profile. */
+  getLove(): number
+  /** Read current bowl servings (0..10) from the player profile. */
+  getBowlServings(): number
+  /** Cat consumed one serving — facade decrements bowl + restores hunger + saves. */
+  onEatServing(): void
+  /** Cat got pet — facade adds love + bumps stats + saves + evaluates achievements. */
+  onPetted(): void
+  /** True when the player can fill the bowl (≥1 cat-food in inventory AND bowl not full). */
+  canFillBowl(): boolean
+  /** Player pressed F at the bowl — facade fills bowl from inventory + saves. */
+  onFillBowl(): void
 }
 
 // ---------------------------------------------------------------------------
@@ -370,6 +404,18 @@ export class HabitatInteriorScene {
   private readonly _tmpWorldPos = new THREE.Vector3()
   private readonly _tmpWorldQuat = new THREE.Quaternion()
   private readonly _tmpEuler = new THREE.Euler()
+
+  /** Stored world-space position of the food bowl, populated by {@link buildCatFeedingArea}. */
+  private readonly bowlWorldPosition = new THREE.Vector3()
+
+  /** Reference to the bowl mesh so the refill cue can punch its scale. */
+  private bowlMesh: THREE.Mesh | null = null
+
+  /** Seconds remaining on the active bowl-fill scale-punch cue (0 when idle). */
+  private bowlFillCueTimer = 0
+
+  /** Optional sushi care callbacks installed via {@link setSushiBridgeCallbacks}. */
+  private sushiCallbacks: SushiBridgeCallbacks | null = null
 
   /** True while the player is being glided into petting position in front of Sushi. */
   private petSequenceActive = false
@@ -547,6 +593,7 @@ export class HabitatInteriorScene {
       // Hearts emit in world space — add as a sibling so they stay where spawned
       // even if Sushi walks off mid-burst.
       this.scene.add(this.cat.hearts)
+      this.applySushiBridgeToCat()
     } catch (err) {
       console.warn('[HabitatInteriorScene] failed to load cat model:', err)
     }
@@ -566,6 +613,22 @@ export class HabitatInteriorScene {
     this.fpsCamera.tick(dt)
     this.tickTablePlacementHold()
     this.cat?.tick(dt)
+    this.tickBowlFillCue(dt)
+  }
+
+  /**
+   * Advance the bowl scale-punch cue. Uses a half-sine envelope so the bowl puffs up
+   * and settles back to neutral over {@link BOWL_FILL_CUE_DURATION_S}.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  private tickBowlFillCue(dt: number): void {
+    if (this.bowlFillCueTimer <= 0 || !this.bowlMesh) return
+    this.bowlFillCueTimer = Math.max(0, this.bowlFillCueTimer - dt)
+    const t = 1 - this.bowlFillCueTimer / BOWL_FILL_CUE_DURATION_S
+    const env = Math.sin(Math.min(1, t) * Math.PI)
+    const scale = 1 + (BOWL_FILL_CUE_SCALE_PEAK - 1) * env
+    this.bowlMesh.scale.setScalar(scale)
   }
 
   /** Release GPU resources and event listeners. */
@@ -599,6 +662,41 @@ export class HabitatInteriorScene {
   setUnlockedAchievementIds(unlockedAchievementIds: readonly string[]): void {
     this.posterWall.setUnlockedAchievementIds(unlockedAchievementIds)
     this.completionPoster.setUnlockedAchievementIds(unlockedAchievementIds)
+  }
+
+  /**
+   * Install (or replace) the Sushi care callbacks. Safe to call before or after the cat
+   * model finishes loading — the scene stores the callbacks and applies them once the
+   * cat exists.
+   *
+   * @param callbacks - Host-supplied callbacks. Pass `null` to detach.
+   */
+  setSushiBridgeCallbacks(callbacks: SushiBridgeCallbacks | null): void {
+    this.sushiCallbacks = callbacks
+    this.applySushiBridgeToCat()
+  }
+
+  /**
+   * Build a {@link CatNeedsBridge} from the current callbacks and hand it to the cat.
+   * No-op if either side is missing.
+   */
+  private applySushiBridgeToCat(): void {
+    if (!this.cat) return
+    const callbacks = this.sushiCallbacks
+    if (!callbacks) {
+      this.cat.setBridge(null)
+      return
+    }
+    const bridge: CatNeedsBridge = {
+      getHunger: () => callbacks.getHunger(),
+      getLove: () => callbacks.getLove(),
+      getBowlServings: () => callbacks.getBowlServings(),
+      getPlayerWorldPosition: (out) => out.copy(this.player.position),
+      getBowlWorldPosition: (out) => out.copy(this.bowlWorldPosition),
+      onEatServing: () => callbacks.onEatServing(),
+      onPetted: () => callbacks.onPetted(),
+    }
+    this.cat.setBridge(bridge)
   }
 
   // -------------------------------------------------------------------------
@@ -891,6 +989,8 @@ export class HabitatInteriorScene {
     )
     bowl.position.set(CAT_BOWL_X, FLOOR_Y + CAT_BOWL_HEIGHT / 2, CAT_FEEDING_Z)
     group.add(bowl)
+    this.bowlMesh = bowl
+    this.bowlWorldPosition.set(CAT_BOWL_X, FLOOR_Y, CAT_FEEDING_Z)
 
     const kibbleMat = new THREE.MeshStandardMaterial({
       color: 0x8b5a2b,
@@ -1140,6 +1240,14 @@ export class HabitatInteriorScene {
       return
     }
 
+    // Distance to the shuttle-control table — used both to gate the cat/bowl prompts
+    // (so a cat sitting near the table doesn't steal the F slot from Shuttle Control)
+    // and below for the table prompt itself.
+    const tableDx = this.player.position.x - this.tablePosition.x
+    const tableDz = this.player.position.z - this.tablePosition.z
+    const tableDistXZ = Math.hypot(tableDx, tableDz)
+    const tableInRange = tableDistXZ < INTERACT_DISTANCE
+
     // --- Cat (pet) — takes priority when in range ---------------------------
     if (this.cat) {
       const cx = this.player.position.x - this.cat.group.position.x
@@ -1155,7 +1263,11 @@ export class HabitatInteriorScene {
       ) {
         this.cat.endSit()
       }
-      if (distCat < PET_PROMPT_DISTANCE) {
+      // Pet prompt is suppressed when Sushi is mid-errand (eating, going to the
+      // bowl, following the player, etc.) — interrupting those reads as buggy.
+      // Also suppressed when the player is in shuttle-control range so the table
+      // prompt always wins at the cockpit (cat napping nearby doesn't hijack F).
+      if (distCat < PET_PROMPT_DISTANCE && !this.cat.isBusyWithNeeds && !tableInRange) {
         this.onPrompt?.('F  Pet Sushi')
         if (this.inputManager.wasActionPressed('interact')) {
           this.cat.pet()
@@ -1166,13 +1278,28 @@ export class HabitatInteriorScene {
       }
     }
 
+    // --- Bowl (fill) -------------------------------------------------------
+    const bowlDx = this.player.position.x - this.bowlWorldPosition.x
+    const bowlDz = this.player.position.z - this.bowlWorldPosition.z
+    const bowlDist = Math.hypot(bowlDx, bowlDz)
+    if (
+      bowlDist < BOWL_FILL_PROMPT_DISTANCE &&
+      this.sushiCallbacks?.canFillBowl() &&
+      !tableInRange
+    ) {
+      this.onPrompt?.('F  Fill Bowl')
+      if (this.inputManager.wasActionPressed('interact')) {
+        this.sushiCallbacks.onFillBowl()
+        this.bowlFillCueTimer = BOWL_FILL_CUE_DURATION_S
+      }
+      return
+    }
+
     // --- Table -------------------------------------------------------------
-    const px = this.player.position.x - this.tablePosition.x
-    const pz = this.player.position.z - this.tablePosition.z
-    const distXZ = Math.hypot(px, pz)
+    const distXZ = tableDistXZ
     const near = distXZ < INTERACT_DISTANCE * TABLE_DEBUG_GRAB_REACH_MULT
 
-    if (distXZ < INTERACT_DISTANCE) {
+    if (tableInRange) {
       this.onPrompt?.(
         isTablePlacementDebugEnabled()
           ? 'LMB grab table (dev)  ·  F  Shuttle Control'

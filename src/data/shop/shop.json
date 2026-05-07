@@ -1,7 +1,8 @@
 {
   "listings": [
     { "itemId": "shuttle-fuel-cell", "buyPrice": 50 },
-    { "itemId": "fuel-cell", "buyPrice": 75 }
+    { "itemId": "fuel-cell", "buyPrice": 75 },
+    { "itemId": "cat-food", "buyPrice": 1000, "availableOnPlanets": ["earth", "mars"] }
   ],
   "sellPrices": [
     { "itemId": "olivine", "sellPrice": 4 },
