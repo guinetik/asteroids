@@ -18,6 +18,11 @@ import { InputManager } from '@/lib/InputManager'
 import { HABITAT_BINDINGS } from '@/lib/defaultBindings'
 import { loadGLB } from '@/three/loadGLB'
 import { FootstepSystem } from '@/lib/fps/footstepSystem'
+import {
+  CatController,
+  type CatObstacle,
+  type CatWanderBounds,
+} from '@/three/CatController'
 
 // ---------------------------------------------------------------------------
 // Constants — no magic numbers
@@ -74,14 +79,29 @@ const EXTERIOR_LIGHT_INTENSITY = 0.3
 const GIRDER_INSET = 0.05
 /** Render size of each star point (world units, with sizeAttenuation). */
 const STAR_POINT_SIZE = 0.8
-/** Floor width as a multiple of the cylinder radius. */
-const FLOOR_WIDTH_FACTOR = 1.8
+/**
+ * Floor width as a multiple of the cylinder radius. With the canopy lowered to floor level
+ * (axis at {@link FLOOR_Y}), the deck needs to span the full diameter so its edges meet the
+ * curved walls instead of leaving a gap that exposes the curved hull underside.
+ */
+const FLOOR_WIDTH_FACTOR = 2
+/** Vertical thickness of the deck (world units). Top sits at {@link FLOOR_Y}. */
+const FLOOR_THICKNESS = 0.12
 /**
  * Clearance between the table's pivot and the **front** (cockpit-side, +Z) end-cap of the
  * habitat cylinder, in world units. Picked from the dev grab tool output (LMB-place log)
  * so the prop sits flush against the cockpit wall without clipping the cap geometry.
  */
 const TABLE_FRONT_CAP_CLEARANCE = 0.7526
+
+/**
+ * World X position the bed is shoved to so its long edge sits against the +X wall (the
+ * player's left when facing the cockpit at spawn) instead of dominating the centre of the
+ * cabin. The canopy curves inward as Y rises, so pushing the bed too far hits the arch —
+ * +2.6 puts the bed's outer edge near X≈+3.6, which clears the half-cylinder ceiling at
+ * bed height comfortably.
+ */
+const BED_X = 3.6
 
 // --- Cockpit hatch (back cap, -Z) ------------------------------------------
 // Submarine-style pressure hatch: a grey metallic ring frame around a white
@@ -158,6 +178,26 @@ function round4(n: number): number {
 }
 
 /**
+ * Compute the XZ footprint of a placed Object3D as an axis-aligned obstacle rectangle,
+ * padded outward on every side. Used to feed the cat's pathing the live world-space
+ * extents of furniture without hardcoding magic placement numbers.
+ *
+ * @param obj - The placed object (must already be in the scene graph for accurate bbox).
+ * @param padding - World-units to expand the rectangle on each side.
+ * @returns A {@link CatObstacle} rectangle in world XZ.
+ */
+function footprintFromObject(obj: THREE.Object3D, padding: number): CatObstacle {
+  obj.updateMatrixWorld(true)
+  const box = new THREE.Box3().setFromObject(obj)
+  return {
+    minX: box.min.x - padding,
+    maxX: box.max.x + padding,
+    minZ: box.min.z - padding,
+    maxZ: box.max.z + padding,
+  }
+}
+
+/**
  * Compile-time feature flag for the LMB grab/place tool used to author the table's resting
  * pose. The code path stays compiled in (re-enable by flipping this constant to `true` and
  * running a `bun dev` session); it's gated to `false` by default so dev builds don't expose
@@ -173,6 +213,59 @@ const TABLE_PLACEMENT_DEBUG_ENABLED = false
 function isTablePlacementDebugEnabled(): boolean {
   return TABLE_PLACEMENT_DEBUG_ENABLED
 }
+
+/**
+ * World-space rectangle Sushi (the habitat cat) is allowed to wander within.
+ * Kept inside the cylinder collision envelope and clear of the table at +Z so
+ * the cat doesn't path-find through furniture.
+ */
+const CAT_WANDER_BOUNDS: CatWanderBounds = {
+  minX: -2.5,
+  maxX: 2.5,
+  minZ: -6,
+  maxZ: 5,
+  floorY: FLOOR_Y,
+}
+
+/** Path to the cat GLB asset (rigged Persian cat with idle/walk/sit/run clips). */
+const CAT_MODEL_URL = '/models/cat.glb'
+
+// --- Sushi feeding area (food bowl + water fountain) -----------------------
+// Procedural geometry — no GLB needed. Sits beside the table at the +Z end so
+// it reads as "the cat's corner" without crowding the bed or interaction zone.
+
+/** World X of the food bowl (off-centre, port side of the cabin). */
+const CAT_BOWL_X = -1.85
+/** World X of the water fountain (next to the bowl). */
+const CAT_FOUNTAIN_X = -2.25
+/** Shared world Z of the feeding area — sits just shy of the +Z wall, beside the table. */
+const CAT_FEEDING_Z = 7.2
+/** Outer radius of the ceramic food bowl (world units). */
+const CAT_BOWL_RADIUS = 0.14
+/** Total height of the food bowl (world units). */
+const CAT_BOWL_HEIGHT = 0.05
+/** Outer radius of the water fountain base (world units). */
+const CAT_FOUNTAIN_RADIUS = 0.13
+/** Total height of the water fountain (base cylinder + top dish), world units. */
+const CAT_FOUNTAIN_HEIGHT = 0.2
+
+/**
+ * Padding (world units) added to each side of every furniture obstacle handed to the cat.
+ * Slightly larger than the cat's body radius so paths skirt furniture instead of clipping
+ * through corners.
+ */
+const CAT_OBSTACLE_PADDING = 0.35
+
+/** Distance (XZ, world units) the player ends up in front of Sushi during a pet. */
+const PET_APPROACH_DISTANCE = 0.1
+/** XZ proximity (world units) at which the "Pet Sushi" prompt appears. */
+const PET_PROMPT_DISTANCE = 1.0
+/** XZ distance beyond which a sitting Sushi gets up and resumes wandering. */
+const PET_SIT_CANCEL_DISTANCE = 3.0
+/** Total seconds the pet glide-to-front animation lasts. */
+const PET_APPROACH_DURATION_S = 0.55
+/** Lerp factor (per second) for camera tracking onto Sushi during the pet sequence. */
+const PET_CAMERA_TURN_RATE = 8
 
 /** FPS camera configuration for the habitat interior. */
 const HABITAT_CAMERA_CONFIG: FpsCameraConfig = {
@@ -244,12 +337,28 @@ export class HabitatInteriorScene {
   /** Loaded table root — moved when using the dev grab/place tool. */
   private tableRoot: THREE.Object3D | null = null
 
+  /**
+   * Sushi the cat — roams the cabin once {@link load} resolves. Kept as a tribute
+   * to the author's cat (R.I.P. 2026); load failures are non-fatal so the rest of
+   * the habitat still works without the model.
+   */
+  private cat: CatController | null = null
+
   /** When true, table follows the camera until the next LMB releases it. */
   private tablePlacementGrabbed = false
 
   private readonly _tmpWorldPos = new THREE.Vector3()
   private readonly _tmpWorldQuat = new THREE.Quaternion()
   private readonly _tmpEuler = new THREE.Euler()
+
+  /** True while the player is being glided into petting position in front of Sushi. */
+  private petSequenceActive = false
+  /** Seconds elapsed in the current pet glide-to-front sequence. */
+  private petSequenceTime = 0
+  /** XZ start of the pet glide; Y reused as floor. */
+  private readonly _petStartXZ = new THREE.Vector2()
+  /** XZ end of the pet glide — a point in front of Sushi. */
+  private readonly _petTargetXZ = new THREE.Vector2()
 
   constructor() {
     this.scene = new THREE.Scene()
@@ -338,10 +447,11 @@ export class HabitatInteriorScene {
     bedModel.scale.setScalar(BED_TARGET_SIZE / bedMaxDim)
     bedModel.rotation.y = Math.PI // face toward the base
 
-    // Re-centre after scale + rotation
+    // Re-centre after scale + rotation, then shove against the −X wall.
     bedBox.setFromObject(bedModel)
     const bedCenter = bedBox.getCenter(new THREE.Vector3())
     bedModel.position.sub(bedCenter)
+    bedModel.position.x += BED_X
 
     // Drop to floor
     bedBox.setFromObject(bedModel)
@@ -388,6 +498,34 @@ export class HabitatInteriorScene {
     tableModel.updateMatrixWorld(true)
     new THREE.Box3().setFromObject(tableModel).getCenter(this.tablePosition)
     this.tablePosition.y = FLOOR_Y
+
+    // --- Sushi's feeding area ----------------------------------------------
+    const feedingArea = this.buildCatFeedingArea()
+    this.scene.add(feedingArea)
+
+    // --- Sushi (habitat cat) -----------------------------------------------
+    // Tribute NPC. Loaded best-effort: a load failure should not break the
+    // rest of the habitat scene, so we swallow the error and log it instead.
+    // Obstacle rectangles are computed from the *current* world bbox of each
+    // piece of furniture so the avoidance follows the actual placement, not
+    // hardcoded numbers that would drift if layout constants change.
+    const obstacles: CatObstacle[] = [
+      footprintFromObject(bedModel, CAT_OBSTACLE_PADDING),
+      footprintFromObject(tableModel, CAT_OBSTACLE_PADDING),
+      footprintFromObject(feedingArea, CAT_OBSTACLE_PADDING),
+    ]
+    try {
+      this.cat = await CatController.create(CAT_MODEL_URL, {
+        ...CAT_WANDER_BOUNDS,
+        obstacles,
+      })
+      this.scene.add(this.cat.group)
+      // Hearts emit in world space — add as a sibling so they stay where spawned
+      // even if Sushi walks off mid-burst.
+      this.scene.add(this.cat.hearts)
+    } catch (err) {
+      console.warn('[HabitatInteriorScene] failed to load cat model:', err)
+    }
   }
 
   /**
@@ -397,16 +535,21 @@ export class HabitatInteriorScene {
    */
   tick(dt: number): void {
     this.inputManager.tick(dt)
-    this.tickMovement(dt)
+    if (!this.tickPetSequence(dt)) {
+      this.tickMovement(dt)
+    }
     this.tickInteraction()
     this.fpsCamera.tick(dt)
     this.tickTablePlacementHold()
+    this.cat?.tick(dt)
   }
 
   /** Release GPU resources and event listeners. */
   dispose(): void {
     this.inputManager.dispose()
     this.fpsCamera.dispose()
+    this.cat?.dispose()
+    this.cat = null
     this.scene.traverse((child) => {
       if (
         child instanceof THREE.Mesh ||
@@ -424,9 +567,15 @@ export class HabitatInteriorScene {
   // Private builders
   // -------------------------------------------------------------------------
 
-  /** Build the cylinder shell: glass top half, metallic bottom half, end-caps, and girders. */
+  /**
+   * Build the cabin shell: a half-cylinder glass canopy whose base sits exactly on the
+   * deck floor, plus matching half-disc end-caps. The cylinder axis is at world Y=0
+   * (the floor plane) so the visible geometry is a tunnel cross-section — flat deck
+   * underfoot, glass arch overhead — instead of a full cylinder where the bottom curve
+   * dips below the floor.
+   */
   private buildCylinder(): void {
-    // Top half — transparent glass canopy
+    // Half-cylinder canopy spanning the upper semicircle (Y >= 0).
     const glassGeo = new THREE.CylinderGeometry(
       CYLINDER_RADIUS,
       CYLINDER_RADIUS,
@@ -448,85 +597,73 @@ export class HabitatInteriorScene {
     })
     const glass = new THREE.Mesh(glassGeo, glassMat)
     glass.rotation.x = Math.PI / 2
-    glass.position.y = CYLINDER_RADIUS
+    glass.position.y = FLOOR_Y
     this.scene.add(glass)
 
-    // Bottom half — opaque metallic hull
-    const hullGeo = new THREE.CylinderGeometry(
-      CYLINDER_RADIUS,
-      CYLINDER_RADIUS,
-      CYLINDER_LENGTH,
-      CYLINDER_RADIAL_SEGMENTS,
-      1,
-      true,
-      -Math.PI / 2,
-      Math.PI,
-    )
-    const hullMat = new THREE.MeshStandardMaterial({
-      color: 0xcccccc,
-      metalness: 0.5,
-      roughness: 0.3,
-      side: THREE.DoubleSide,
-    })
-    const hull = new THREE.Mesh(hullGeo, hullMat)
-    hull.rotation.x = Math.PI / 2
-    hull.position.y = CYLINDER_RADIUS
-    this.scene.add(hull)
-
-    // End-cap (back wall at negative Z)
-    const capGeo = new THREE.CircleGeometry(CYLINDER_RADIUS, CYLINDER_RADIAL_SEGMENTS)
+    // Half-disc end caps (D-shape, flat side resting on the deck).
+    const capShape = new THREE.Shape()
+    capShape.moveTo(-CYLINDER_RADIUS, 0)
+    capShape.absarc(0, 0, CYLINDER_RADIUS, Math.PI, 0, true)
+    capShape.lineTo(-CYLINDER_RADIUS, 0)
+    const capGeo = new THREE.ShapeGeometry(capShape, CYLINDER_RADIAL_SEGMENTS)
     const capMat = new THREE.MeshStandardMaterial({
       color: CAP_COLOR,
       metalness: 0.6,
       roughness: 0.4,
       side: THREE.DoubleSide,
     })
-    // Back cap (tank side, -Z)
     const capBack = new THREE.Mesh(capGeo, capMat)
-    capBack.position.set(0, CYLINDER_RADIUS, -CYLINDER_LENGTH / 2)
+    capBack.position.set(0, FLOOR_Y, -CYLINDER_LENGTH / 2)
     this.scene.add(capBack)
 
-    // Front cap (cockpit side, +Z)
     const capFront = new THREE.Mesh(capGeo.clone(), capMat.clone())
-    capFront.position.set(0, CYLINDER_RADIUS, CYLINDER_LENGTH / 2)
+    capFront.position.set(0, FLOOR_Y, CYLINDER_LENGTH / 2)
     capFront.rotation.y = Math.PI
     this.scene.add(capFront)
 
     this.buildGirders()
   }
 
-  /** Build full-circle wireframe girder rings inside the cylinder. */
+  /**
+   * Build wireframe girder rings inside the **upper** half of the cylinder only.
+   *
+   * The girders frame the glass canopy on top. Drawing them full-circle (the original
+   * implementation) sweeps lines across the floor — visible as bright X marks on the
+   * deck from any low camera angle (and from a wandering cat's eye view). Restricting
+   * the radial range to the top semicircle (0…π) keeps the structural look without
+   * crawling lines on the floor.
+   */
   private buildGirders(): void {
     const verts: number[] = []
     // Slightly inside the glass shell
     const r = CYLINDER_RADIUS - GIRDER_INSET
     const halfLen = CYLINDER_LENGTH / 2
 
-    // Horizontal full-circle arcs at each height step
+    // Horizontal half-circle arcs at each height step (top half only)
     for (let h = 0; h <= GIRDER_SEGMENTS_HEIGHT; h++) {
       // In pre-rotation coords CylinderGeometry Y runs along the axis
       // After rotation.x = PI/2 the cylinder axis maps to world Z.
       // We build verts in world space directly.
       const z = -halfLen + (h / GIRDER_SEGMENTS_HEIGHT) * CYLINDER_LENGTH
       for (let s = 0; s < GIRDER_SEGMENTS_RADIAL; s++) {
-        const a1 = (s / GIRDER_SEGMENTS_RADIAL) * Math.PI * 2
-        const a2 = ((s + 1) / GIRDER_SEGMENTS_RADIAL) * Math.PI * 2
+        const a1 = (s / GIRDER_SEGMENTS_RADIAL) * Math.PI
+        const a2 = ((s + 1) / GIRDER_SEGMENTS_RADIAL) * Math.PI
         verts.push(
           Math.cos(a1) * r,
-          CYLINDER_RADIUS + Math.sin(a1) * r,
+          FLOOR_Y + Math.sin(a1) * r,
           z,
           Math.cos(a2) * r,
-          CYLINDER_RADIUS + Math.sin(a2) * r,
+          FLOOR_Y + Math.sin(a2) * r,
           z,
         )
       }
     }
 
-    // Vertical bars along the length at each radial step
+    // Vertical bars along the length at each radial step (top half only)
     for (let s = 0; s <= GIRDER_SEGMENTS_RADIAL; s++) {
-      const a = (s / GIRDER_SEGMENTS_RADIAL) * Math.PI * 2
+      const a = (s / GIRDER_SEGMENTS_RADIAL) * Math.PI
       const cx = Math.cos(a) * r
-      const cy = CYLINDER_RADIUS + Math.sin(a) * r
+      const cy = FLOOR_Y + Math.sin(a) * r
       for (let h = 0; h < GIRDER_SEGMENTS_HEIGHT; h++) {
         const z1 = -halfLen + (h / GIRDER_SEGMENTS_HEIGHT) * CYLINDER_LENGTH
         const z2 = -halfLen + ((h + 1) / GIRDER_SEGMENTS_HEIGHT) * CYLINDER_LENGTH
@@ -630,7 +767,7 @@ export class HabitatInteriorScene {
   private buildLighting(): void {
     // Main light — centered over the bed area (+Z side)
     const point = new THREE.PointLight(0xffeedd, INTERIOR_LIGHT_INTENSITY, INTERIOR_LIGHT_RANGE)
-    point.position.set(0, CYLINDER_RADIUS * 1.5, CYLINDER_LENGTH / 6)
+    point.position.set(0, CYLINDER_RADIUS * 0.7, CYLINDER_LENGTH / 6)
     this.scene.add(point)
 
     const ambient = new THREE.AmbientLight(0x334466, AMBIENT_INTENSITY)
@@ -650,10 +787,10 @@ export class HabitatInteriorScene {
       const theta = Math.random() * Math.PI * 2
       const phi = Math.acos(2 * Math.random() - 1)
       const x = STAR_SPHERE_RADIUS * Math.sin(phi) * Math.cos(theta)
-      const y = CYLINDER_RADIUS + STAR_SPHERE_RADIUS * Math.cos(phi)
+      const y = FLOOR_Y + STAR_SPHERE_RADIUS * Math.cos(phi)
       const z = STAR_SPHERE_RADIUS * Math.sin(phi) * Math.sin(theta)
-      // Skip stars too close to the cylinder center
-      const distXY = Math.sqrt(x * x + (y - CYLINDER_RADIUS) * (y - CYLINDER_RADIUS))
+      // Skip stars too close to the cabin centre (now at floor level).
+      const distXY = Math.sqrt(x * x + (y - FLOOR_Y) * (y - FLOOR_Y))
       if (distXY < minDist && Math.abs(z) < CYLINDER_LENGTH) continue
       verts.push(x, y, z)
     }
@@ -668,17 +805,113 @@ export class HabitatInteriorScene {
     this.scene.add(new THREE.Points(starGeo, starMat))
   }
 
-  /** Add a dark floor plane along the bottom of the cylinder. */
+  /**
+   * Build Sushi's feeding corner: a ceramic food bowl with a small mound of kibble next to
+   * a small chrome water fountain with a translucent water disc on top. Pure procedural
+   * geometry — no GLB asset — so the tribute is self-contained. Returns the parent group
+   * so the caller can compute its world bbox for the cat's obstacle list.
+   *
+   * @returns The feeding-area group, already positioned at floor level.
+   */
+  private buildCatFeedingArea(): THREE.Group {
+    const group = new THREE.Group()
+    group.name = 'sushiFeedingArea'
+
+    // --- Food bowl: ceramic dish + brown kibble disc ------------------------
+    const bowlMat = new THREE.MeshStandardMaterial({
+      color: 0xeae3d2,
+      roughness: 0.55,
+      metalness: 0.05,
+    })
+    const bowl = new THREE.Mesh(
+      // Slightly tapered cylinder so the rim is wider than the foot — reads as a dish.
+      new THREE.CylinderGeometry(CAT_BOWL_RADIUS, CAT_BOWL_RADIUS * 0.85, CAT_BOWL_HEIGHT, 24),
+      bowlMat,
+    )
+    bowl.position.set(CAT_BOWL_X, FLOOR_Y + CAT_BOWL_HEIGHT / 2, CAT_FEEDING_Z)
+    group.add(bowl)
+
+    const kibbleMat = new THREE.MeshStandardMaterial({
+      color: 0x8b5a2b,
+      roughness: 0.95,
+      metalness: 0,
+    })
+    const kibble = new THREE.Mesh(
+      new THREE.CylinderGeometry(CAT_BOWL_RADIUS * 0.8, CAT_BOWL_RADIUS * 0.65, 0.018, 20),
+      kibbleMat,
+    )
+    kibble.position.set(CAT_BOWL_X, FLOOR_Y + CAT_BOWL_HEIGHT + 0.005, CAT_FEEDING_Z)
+    group.add(kibble)
+
+    // --- Water fountain: chrome base + dish + translucent water disc --------
+    const fountainMat = new THREE.MeshStandardMaterial({
+      color: 0xc9d2da,
+      roughness: 0.35,
+      metalness: 0.7,
+    })
+    const fountainBaseHeight = CAT_FOUNTAIN_HEIGHT * 0.85
+    const fountainBase = new THREE.Mesh(
+      new THREE.CylinderGeometry(
+        CAT_FOUNTAIN_RADIUS,
+        CAT_FOUNTAIN_RADIUS,
+        fountainBaseHeight,
+        24,
+      ),
+      fountainMat,
+    )
+    fountainBase.position.set(
+      CAT_FOUNTAIN_X,
+      FLOOR_Y + fountainBaseHeight / 2,
+      CAT_FEEDING_Z,
+    )
+    group.add(fountainBase)
+
+    // Lip at the top — torus reads as the rim of the drinking dish.
+    const lip = new THREE.Mesh(
+      new THREE.TorusGeometry(CAT_FOUNTAIN_RADIUS * 0.85, 0.018, 8, 24),
+      fountainMat,
+    )
+    lip.rotation.x = Math.PI / 2
+    lip.position.set(CAT_FOUNTAIN_X, FLOOR_Y + fountainBaseHeight, CAT_FEEDING_Z)
+    group.add(lip)
+
+    // Water surface — translucent blue disc just below the lip line.
+    const waterMat = new THREE.MeshPhysicalMaterial({
+      color: 0x4a90c2,
+      transparent: true,
+      opacity: 0.7,
+      roughness: 0.05,
+      metalness: 0,
+    })
+    const water = new THREE.Mesh(new THREE.CircleGeometry(CAT_FOUNTAIN_RADIUS * 0.82, 24), waterMat)
+    water.rotation.x = -Math.PI / 2
+    water.position.set(
+      CAT_FOUNTAIN_X,
+      FLOOR_Y + fountainBaseHeight - 0.005,
+      CAT_FEEDING_Z,
+    )
+    group.add(water)
+
+    return group
+  }
+
+  /**
+   * Add a flat deck floor running the length of the cylinder. Modelled as a thin box
+   * (rather than a single-sided plane) so it reads as a solid surface from grazing
+   * angles and props/NPCs cannot peek through the underside when their bbox dips a
+   * few millimetres on an animation frame.
+   */
   private buildFloor(): void {
-    const floorGeo = new THREE.PlaneGeometry(CYLINDER_RADIUS * FLOOR_WIDTH_FACTOR, CYLINDER_LENGTH)
+    const floorWidth = CYLINDER_RADIUS * FLOOR_WIDTH_FACTOR
+    const floorGeo = new THREE.BoxGeometry(floorWidth, FLOOR_THICKNESS, CYLINDER_LENGTH)
     const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x1a2233,
-      roughness: 0.9,
-      metalness: 0.1,
+      color: 0xdadbd8,
+      roughness: 0.4,
+      metalness: 0.85,
     })
     const floor = new THREE.Mesh(floorGeo, floorMat)
-    floor.rotation.x = -Math.PI / 2
-    floor.position.y = FLOOR_Y
+    // Top face flush with FLOOR_Y so all walking math (player + NPCs) stays unchanged.
+    floor.position.y = FLOOR_Y - FLOOR_THICKNESS / 2
     this.scene.add(floor)
   }
 
@@ -745,15 +978,134 @@ export class HabitatInteriorScene {
   }
 
   /**
-   * Check proximity to the table and fire prompt / interact callbacks.
-   * Compares XZ distance only so the check works regardless of camera pitch.
+   * Check proximity to nearby interactables (cat, then table) and fire prompt /
+   * interact callbacks. Cat takes priority when the player is in petting range so a
+   * cat napping next to the table doesn't get hidden behind the Shuttle Control
+   * prompt. Compares XZ distance only so the check works regardless of camera pitch.
    */
+  /**
+   * Begin a short scripted glide that takes the player into petting position —
+   * standing just in front of Sushi, facing him. WASD input is ignored while the
+   * sequence is active; both the body slide and the camera turn are handled by
+   * {@link tickPetSequence}.
+   *
+   * The target XZ is `cat.position + APPROACH_DISTANCE * catForward`, where the
+   * cat's forward vector matches the same `(sin(yaw), cos(yaw))` convention used
+   * inside {@link CatController.tickWalk}. The point is clamped into the cabin
+   * envelope so a cat sitting against a wall doesn't push the player through it.
+   */
+  private startPetSequence(): void {
+    if (!this.cat) return
+    const catYaw = this.cat.group.rotation.y
+    const fx = Math.sin(catYaw)
+    const fz = Math.cos(catYaw)
+    let tx = this.cat.group.position.x + fx * PET_APPROACH_DISTANCE
+    let tz = this.cat.group.position.z + fz * PET_APPROACH_DISTANCE
+    const maxX = CYLINDER_RADIUS - COLLISION_MARGIN
+    const maxZ = CYLINDER_LENGTH / 2 - COLLISION_MARGIN
+    tx = Math.max(-maxX, Math.min(maxX, tx))
+    tz = Math.max(-maxZ, Math.min(maxZ, tz))
+    this._petStartXZ.set(this.player.position.x, this.player.position.z)
+    this._petTargetXZ.set(tx, tz)
+    this.petSequenceActive = true
+    this.petSequenceTime = 0
+    // Tell Sushi to swivel toward where the player will end up so they meet
+    // eyes through the glide. Y is the player's eye height so the head-tilt
+    // override actually angles his face upward at us, not at the floor.
+    this._tmpWorldPos.set(tx, FLOOR_Y + HABITAT_EYE_HEIGHT, tz)
+    this.cat.lookAt(this._tmpWorldPos)
+  }
+
+  /**
+   * Advance the pet glide-to-front sequence. Eases the player from its starting
+   * XZ to the target spot in front of Sushi, while the camera continually lerps
+   * its yaw/pitch toward Sushi's head. Returns true while the sequence owns the
+   * player, telling {@link tick} to skip the normal movement step.
+   *
+   * @param dt - Delta time in seconds.
+   * @returns Whether the sequence consumed control this frame.
+   */
+  private tickPetSequence(dt: number): boolean {
+    if (!this.petSequenceActive) return false
+    if (!this.cat) {
+      this.petSequenceActive = false
+      return false
+    }
+    // Keep Sushi's face target locked on the petter's head throughout the sequence
+    // so he tracks them rather than the static glide endpoint. Use the player body
+    // + fixed eye height (NOT camera.position) — the camera Y wobbles with the
+    // walk-bob, and feeding that into atan2 turns Sushi's head into a horror-movie
+    // up-down jitter at this short range.
+    this._tmpWorldPos.set(
+      this.player.position.x,
+      this.player.position.y + HABITAT_EYE_HEIGHT,
+      this.player.position.z,
+    )
+    this.cat.lookAt(this._tmpWorldPos)
+    this.petSequenceTime += dt
+    const t = Math.min(1, this.petSequenceTime / PET_APPROACH_DURATION_S)
+    const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
+    this.player.position.x = this._petStartXZ.x + (this._petTargetXZ.x - this._petStartXZ.x) * e
+    this.player.position.z = this._petStartXZ.y + (this._petTargetXZ.y - this._petStartXZ.y) * e
+    this.player.position.y = FLOOR_Y
+
+    // Camera tracks Sushi: lerp yaw/pitch toward the head point each frame.
+    this.cat.getLookAtPoint(this._tmpWorldPos)
+    const cam = this.fpsCamera.camera
+    const dx = this._tmpWorldPos.x - cam.position.x
+    const dy = this._tmpWorldPos.y - cam.position.y
+    const dz = this._tmpWorldPos.z - cam.position.z
+    const horiz = Math.hypot(dx, dz)
+    if (horiz > 1e-4) {
+      const desiredYaw = Math.atan2(-dx, -dz)
+      const desiredPitch = Math.atan2(dy, horiz)
+      const k = Math.min(1, PET_CAMERA_TURN_RATE * dt)
+      let yawErr = desiredYaw - this.fpsCamera.yaw
+      while (yawErr > Math.PI) yawErr -= Math.PI * 2
+      while (yawErr < -Math.PI) yawErr += Math.PI * 2
+      this.fpsCamera.yaw += yawErr * k
+      this.fpsCamera.pitch += (desiredPitch - this.fpsCamera.pitch) * k
+      const clamp = HABITAT_PITCH_CLAMP
+      this.fpsCamera.pitch = Math.max(-clamp, Math.min(clamp, this.fpsCamera.pitch))
+    }
+
+    if (t >= 1) this.petSequenceActive = false
+    return true
+  }
+
   private tickInteraction(): void {
     if (this.tablePlacementGrabbed) {
       this.onPrompt?.('LMB place table → devtools console')
       return
     }
 
+    // --- Cat (pet) — takes priority when in range ---------------------------
+    if (this.cat) {
+      const cx = this.player.position.x - this.cat.group.position.x
+      const cz = this.player.position.z - this.cat.group.position.z
+      const distCat = Math.hypot(cx, cz)
+      // If Sushi is sitting (post-pet) and the player has wandered off, end the
+      // sit so he doesn't stay parked staring at empty air — he'll pick a new
+      // waypoint and resume his normal roam.
+      if (
+        !this.petSequenceActive &&
+        this.cat.isSitting &&
+        distCat > PET_SIT_CANCEL_DISTANCE
+      ) {
+        this.cat.endSit()
+      }
+      if (distCat < PET_PROMPT_DISTANCE) {
+        this.onPrompt?.('F  Pet Sushi')
+        if (this.inputManager.wasActionPressed('interact')) {
+          this.cat.pet()
+          this.startPetSequence()
+          this.onInteract?.('cat')
+        }
+        return
+      }
+    }
+
+    // --- Table -------------------------------------------------------------
     const px = this.player.position.x - this.tablePosition.x
     const pz = this.player.position.z - this.tablePosition.z
     const distXZ = Math.hypot(px, pz)
