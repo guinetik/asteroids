@@ -25,6 +25,8 @@ type CatState =
   | 'eat'
   | 'follow'
   | 'idleNearPlayer'
+  | 'chase'
+  | 'chaseRest'
 
 /**
  * Live read-only handle the {@link CatController} uses to query Sushi's needs and signal
@@ -73,6 +75,21 @@ const EAT_DURATION_S = 2.5
 const CLIP_IDLE = 'Armature|4_Idle_Armature'
 const CLIP_WALK = 'Armature|3_Walk_Armature'
 const CLIP_SIT = 'Armature|2_Sit_Armature'
+const CLIP_RUN = 'Armature|1_Run_Armature'
+
+/** Sprint speed (world units per second) Sushi uses while chasing the laser dot. */
+const CHASE_SPEED = 1.6
+/** Distance (XZ) from the dot below which Sushi settles into idle on top of it. */
+const CHASE_REACHED_EPS = 0.06
+/**
+ * How far the laser dot must move from its position at settle-time before Sushi
+ * stands back up and re-engages the sprint. Compared against an anchor captured
+ * the moment he switched to `chaseRest`, so a hair of mouse jitter doesn't
+ * flicker him back into the run animation.
+ */
+const CHASE_RESUME_HYSTERESIS = 0.18
+/** Seconds Sushi sits in `idle` after the laser dot vanishes before resuming wander. */
+const POST_CHASE_IDLE_S = 2.5
 
 /** Target world height of the model along its tallest axis (metres). */
 const TARGET_HEIGHT = 0.55
@@ -319,7 +336,10 @@ export class CatController {
   readonly group: THREE.Group
 
   private readonly mixer: THREE.AnimationMixer
-  private readonly actions: Record<'idle' | 'walk' | 'sit', THREE.AnimationAction>
+  private readonly actions: Record<'idle' | 'walk' | 'sit' | 'run', THREE.AnimationAction>
+  private readonly laserTarget = new THREE.Vector3()
+  private readonly chaseRestAnchor = new THREE.Vector3()
+  private laserActive = false
   private bridge: CatNeedsBridge | null = null
   private readonly _bridgeTmp = new THREE.Vector3()
   private readonly bounds: CatWanderBounds
@@ -365,9 +385,18 @@ export class CatController {
       root.scale.setScalar(s)
     }
 
-    // Drop feet to floor.
+    // Re-pivot the rig so the visible bounding-box centre sits at the group origin
+    // on every axis. The source GLB authors the cat off-origin in XZ, so before
+    // this step a `group.rotation.y` orbited the cat *around an empty point* —
+    // rotation visibly translated the model and the chase target stopped with the
+    // body trailing behind the laser dot. Translating the inner mesh inside the
+    // group fixes both at once without touching skin/inverse-bind matrices (which
+    // is why we don't run `gltf-transform center()` on this rigged asset).
     root.updateMatrixWorld(true)
     const grounded = new THREE.Box3().setFromObject(root)
+    const groundedCenter = grounded.getCenter(new THREE.Vector3())
+    root.position.x -= groundedCenter.x
+    root.position.z -= groundedCenter.z
     root.position.y -= grounded.min.y
 
     // Spawn at a random waypoint in bounds.
@@ -385,6 +414,7 @@ export class CatController {
       idle: this.mixer.clipAction(findClip(CLIP_IDLE)),
       walk: this.mixer.clipAction(findClip(CLIP_WALK)),
       sit: this.mixer.clipAction(findClip(CLIP_SIT)),
+      run: this.mixer.clipAction(findClip(CLIP_RUN)),
     }
     this.headBone = findHeadBone(root)
     if (this.headBone) {
@@ -439,7 +469,32 @@ export class CatController {
     this.heartParticles.tick(dt)
     this.stateTimer += dt
 
-    if (this.state === 'walk') {
+    if (this.laserActive) {
+      // Laser dot has top priority and preempts every wander/needs branch. The
+      // host scene is responsible for *not* pushing a laser target while the
+      // pet glide sequence is active, so we don't have to special-case it here.
+      if (this.state === 'chaseRest') {
+        // Settled on the dot — only resume the sprint if the dot moved
+        // meaningfully far from where Sushi sat down. Comparing against the
+        // anchor (not against origin distance) lets the body-forward overshoot
+        // not immediately re-trigger the chase.
+        const dxA = this.laserTarget.x - this.chaseRestAnchor.x
+        const dzA = this.laserTarget.z - this.chaseRestAnchor.z
+        if (Math.hypot(dxA, dzA) > CHASE_RESUME_HYSTERESIS) {
+          this.enterState('chase')
+          this.tickChase(dt)
+        } else {
+          this.faceTowardLaser(dt)
+        }
+      } else {
+        if (this.state !== 'chase') this.enterState('chase')
+        this.tickChase(dt)
+      }
+    } else if (this.state === 'chase' || this.state === 'chaseRest') {
+      // Laser just cleared — drop into a short idle, then resume normal roam.
+      this.enterState('idle')
+      this.stateDuration = POST_CHASE_IDLE_S
+    } else if (this.state === 'walk') {
       this.tickWalk(dt)
     } else if (this.state === 'goToBowl') {
       this.tickGoToBowl(dt)
@@ -831,7 +886,7 @@ export class CatController {
    * @param state - Logical FSM state.
    * @returns The clip key whose action should play in {@link state}.
    */
-  private clipForState(state: CatState): 'idle' | 'walk' | 'sit' {
+  private clipForState(state: CatState): 'idle' | 'walk' | 'sit' | 'run' {
     switch (state) {
       case 'idle':
       case 'idleNearPlayer':
@@ -843,7 +898,82 @@ export class CatController {
         return 'walk'
       case 'sit':
         return 'sit'
+      case 'chase':
+        return 'run'
+      case 'chaseRest':
+        return 'idle'
     }
+  }
+
+  /**
+   * Push (or clear) the world-space point Sushi should sprint toward in laser-pointer
+   * mode. While a target is set, the FSM forces the `chase` state and runs at
+   * {@link CHASE_SPEED}. Pass `null` to release — Sushi drops into a short post-chase
+   * idle and then resumes wandering on his own.
+   *
+   * @param point - World position of the laser dot, or `null` to release.
+   */
+  setLaserTarget(point: THREE.Vector3 | null): void {
+    if (point === null) {
+      this.laserActive = false
+      return
+    }
+    this.laserActive = true
+    this.laserTarget.copy(point)
+  }
+
+  /**
+   * Sprint locomotion used while {@link laserActive} is true. Same pivot-then-march
+   * shape as {@link tickWalk} but at {@link CHASE_SPEED}. Crucially, on arrival we do
+   * **not** change state — the run animation keeps playing in place so it reads as
+   * "Sushi pouncing on the dot" until the player either moves the dot or releases.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  private tickChase(dt: number): void {
+    const dx = this.laserTarget.x - this.group.position.x
+    const dz = this.laserTarget.z - this.group.position.z
+    const dist = Math.hypot(dx, dz)
+
+    if (dist < CHASE_REACHED_EPS) {
+      // Pounce complete — flip to the idle clip so Sushi doesn't run in place
+      // on top of the dot. He'll re-enter `chase` automatically if the laser
+      // moves past the resume hysteresis from where he settled.
+      this.chaseRestAnchor.copy(this.laserTarget)
+      this.enterState('chaseRest')
+      return
+    }
+
+    const desiredYaw = Math.atan2(dx, dz)
+    const currentYaw = this.group.rotation.y
+    const delta = wrapAngle(desiredYaw - currentYaw)
+    const turnStep = Math.sign(delta) * Math.min(Math.abs(delta), TURN_RATE * dt)
+    this.group.rotation.y = currentYaw + turnStep
+
+    if (Math.abs(delta) > WALK_HEADING_TOLERANCE) return
+
+    const step = Math.min(CHASE_SPEED * dt, dist)
+    const yaw = this.group.rotation.y
+    this.group.position.x += Math.sin(yaw) * step
+    this.group.position.z += Math.cos(yaw) * step
+  }
+
+  /**
+   * Smoothly yaw toward the laser dot without translating. Used while in
+   * {@link 'chaseRest'} so Sushi keeps watching the dot while sitting on it,
+   * instead of staring off in his last running direction.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  private faceTowardLaser(dt: number): void {
+    const dx = this.laserTarget.x - this.group.position.x
+    const dz = this.laserTarget.z - this.group.position.z
+    if (Math.hypot(dx, dz) < 1e-4) return
+    const desiredYaw = Math.atan2(dx, dz)
+    const currentYaw = this.group.rotation.y
+    const delta = wrapAngle(desiredYaw - currentYaw)
+    const turnStep = Math.sign(delta) * Math.min(Math.abs(delta), TURN_RATE * dt)
+    this.group.rotation.y = currentYaw + turnStep
   }
 
   /**

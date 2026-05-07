@@ -289,6 +289,13 @@ const BOWL_FILL_CUE_DURATION_S = 0.45
 /** Peak scale multiplier applied to the bowl mesh during the refill cue. */
 const BOWL_FILL_CUE_SCALE_PEAK = 1.35
 
+/** Radius (world units) of the red laser-pointer dot drawn on the floor. */
+const LASER_DOT_RADIUS = 0.06
+/** Vertical offset above {@link FLOOR_Y} so the dot doesn't z-fight the deck. */
+const LASER_DOT_Y_BIAS = 0.005
+/** Hex colour of the laser-pointer dot. */
+const LASER_DOT_COLOR = 0xff2233
+
 /** FPS camera configuration for the habitat interior. */
 const HABITAT_CAMERA_CONFIG: FpsCameraConfig = {
   eyeHeight: HABITAT_EYE_HEIGHT,
@@ -417,6 +424,19 @@ export class HabitatInteriorScene {
   /** Optional sushi care callbacks installed via {@link setSushiBridgeCallbacks}. */
   private sushiCallbacks: SushiBridgeCallbacks | null = null
 
+  /** Red dot drawn on the floor while the player holds LMB to drive Sushi's chase. */
+  private laserDot: THREE.Mesh | null = null
+  /** Whether the host facade reports LMB is currently held this frame. */
+  private laserPointerHeld = false
+  /** Reused raycaster for the camera-forward → floor query. */
+  private readonly laserRaycaster = new THREE.Raycaster()
+  /** Reused floor plane (Y = FLOOR_Y) for laser raycasting. */
+  private readonly laserFloorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -FLOOR_Y)
+  /** Scratch vector for the laser ray direction. */
+  private readonly _laserDir = new THREE.Vector3()
+  /** Scratch vector for the laser hit point. */
+  private readonly _laserHit = new THREE.Vector3()
+
   /** True while the player is being glided into petting position in front of Sushi. */
   private petSequenceActive = false
   /** Seconds elapsed in the current pet glide-to-front sequence. */
@@ -445,6 +465,29 @@ export class HabitatInteriorScene {
     this.buildLighting()
     this.buildStarfield()
     this.buildFloor()
+    this.buildLaserDot()
+  }
+
+  /**
+   * Build the floor-hugging red dot used for the laser-pointer chase. Hidden by
+   * default; {@link tickLaserPointer} flips its visibility on the frames the
+   * player is holding LMB and the ray hits the deck.
+   */
+  private buildLaserDot(): void {
+    const geo = new THREE.CircleGeometry(LASER_DOT_RADIUS, 24)
+    const mat = new THREE.MeshBasicMaterial({
+      color: LASER_DOT_COLOR,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
+      toneMapped: false,
+    })
+    const dot = new THREE.Mesh(geo, mat)
+    dot.rotation.x = -Math.PI / 2
+    dot.position.y = FLOOR_Y + LASER_DOT_Y_BIAS
+    dot.visible = false
+    this.scene.add(dot)
+    this.laserDot = dot
   }
 
   // -------------------------------------------------------------------------
@@ -612,8 +655,71 @@ export class HabitatInteriorScene {
     this.tickInteraction()
     this.fpsCamera.tick(dt)
     this.tickTablePlacementHold()
+    this.tickLaserPointer()
     this.cat?.tick(dt)
     this.tickBowlFillCue(dt)
+  }
+
+  /**
+   * Report the current LMB-held state from the host pointer-lock session. Called
+   * once per frame *before* {@link tick} so {@link tickLaserPointer} can consume
+   * the latest value when deciding whether to project a laser dot onto the floor.
+   *
+   * @param held - Whether the primary mouse button is currently down.
+   */
+  setLaserPointerHeld(held: boolean): void {
+    this.laserPointerHeld = held
+  }
+
+  /**
+   * Project a ray straight forward from the FPS camera onto the floor plane while
+   * the player is holding LMB. On a hit, position the visible red dot there and
+   * push the world-space target into the cat so it sprints toward it. On release
+   * (or if any gate fails — dev table-grab mode, pet sequence, or table reach),
+   * hide the dot and clear the cat's laser target so it falls back to wander.
+   */
+  private tickLaserPointer(): void {
+    const dot = this.laserDot
+    if (!dot) return
+
+    // Gate: dev table-grab tool owns LMB, pet glide sequence shouldn't be
+    // interrupted, and we don't want laser activation while the player is at
+    // the cockpit table reaching for shuttle controls.
+    const gateOpen =
+      this.laserPointerHeld &&
+      !isTablePlacementDebugEnabled() &&
+      !this.petSequenceActive &&
+      !this.tablePlacementGrabbed
+
+    if (!gateOpen) {
+      if (dot.visible) dot.visible = false
+      this.cat?.setLaserTarget(null)
+      return
+    }
+
+    const cam = this.fpsCamera.camera
+    cam.getWorldDirection(this._laserDir)
+    // Looking up — no floor hit possible, treat as no laser this frame.
+    if (this._laserDir.y >= 0) {
+      if (dot.visible) dot.visible = false
+      this.cat?.setLaserTarget(null)
+      return
+    }
+    this.laserRaycaster.set(cam.position, this._laserDir)
+    const hit = this.laserRaycaster.ray.intersectPlane(this.laserFloorPlane, this._laserHit)
+    if (!hit) {
+      if (dot.visible) dot.visible = false
+      this.cat?.setLaserTarget(null)
+      return
+    }
+    // Clamp into the cabin envelope so the dot can't appear outside the walls.
+    const maxX = CYLINDER_RADIUS - COLLISION_MARGIN * 0.6
+    const maxZ = CYLINDER_LENGTH / 2 - COLLISION_MARGIN * 0.6
+    hit.x = Math.max(-maxX, Math.min(maxX, hit.x))
+    hit.z = Math.max(-maxZ, Math.min(maxZ, hit.z))
+    dot.position.set(hit.x, FLOOR_Y + LASER_DOT_Y_BIAS, hit.z)
+    dot.visible = true
+    this.cat?.setLaserTarget(hit)
   }
 
   /**

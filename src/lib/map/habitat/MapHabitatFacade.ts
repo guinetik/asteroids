@@ -357,8 +357,14 @@ export class MapHabitatFacade {
 
   /** Advance the interior scene one frame. Safe no-op when the scene hasn't loaded yet. */
   tickScene(dt: number): void {
-    if (this.scene && this.pointerLockAttached && this.pointerLock.consumeLeftMouseJustPressed()) {
-      this.scene.onPrimaryClick()
+    if (this.scene && this.pointerLockAttached) {
+      if (this.pointerLock.consumeLeftMouseJustPressed()) {
+        this.scene.onPrimaryClick()
+      }
+      // Forward LMB-held each frame so the scene can drive the laser-pointer
+      // chase: dot position is raycast against the floor plane and the cat's
+      // chase target is updated for as long as the button is held.
+      this.scene.setLaserPointerHeld(this.pointerLock.isLeftMouseDown)
     }
     this.scene?.tick(dt)
   }
