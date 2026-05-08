@@ -574,7 +574,7 @@ describe('Sushi cat needs on PlayerProfile', () => {
   it('seeds defaults on a fresh profile', () => {
     const profile = createProfile('Pilot')
     expect(profile.sushiLove).toBe(25)
-    expect(profile.sushiHunger).toBe(25)
+    expect(profile.sushiHunger).toBe(75)
     expect(profile.bowlServings).toBe(0)
   })
 
@@ -590,7 +590,7 @@ describe('Sushi cat needs on PlayerProfile', () => {
 
     const loaded = loadProfile()
     expect(loaded?.sushiLove).toBe(25)
-    expect(loaded?.sushiHunger).toBe(25)
+    expect(loaded?.sushiHunger).toBe(75)
     expect(loaded?.bowlServings).toBe(0)
   })
 

@@ -502,6 +502,7 @@ export class MapHabitatFacade {
 
   private detachPointerLock(): void {
     if (!this.pointerLockAttached) return
+    this.pointerLock.releaseLock()
     this.pointerLock.detach()
     this.pointerLockAttached = false
   }

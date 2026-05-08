@@ -1,18 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { createProfile, addSushiHunger, addSushiLove } from '@/lib/player/profile'
 import {
-  SUSHI_HUNGER_RISE_PER_MIN,
+  SUSHI_HUNGER_DECAY_PER_MIN,
   SUSHI_LOVE_DECAY_PER_MIN,
   SUSHI_SECONDS_PER_MINUTE,
+  SUSHI_TIRED_RISE_PER_MIN,
   tickSushiNeeds,
 } from '../needs'
 
 describe('tickSushiNeeds', () => {
-  it('one minute reduces love by the per-minute rate and raises hunger by the per-minute rate', () => {
+  it('one minute decays love and hunger and raises tired by their per-minute rates', () => {
     const profile = createProfile('Pilot')
     const updated = tickSushiNeeds(profile, SUSHI_SECONDS_PER_MINUTE)
     expect(updated.sushiLove).toBeCloseTo(profile.sushiLove - SUSHI_LOVE_DECAY_PER_MIN, 6)
-    expect(updated.sushiHunger).toBeCloseTo(profile.sushiHunger + SUSHI_HUNGER_RISE_PER_MIN, 6)
+    expect(updated.sushiHunger).toBeCloseTo(profile.sushiHunger - SUSHI_HUNGER_DECAY_PER_MIN, 6)
+    expect(updated.sushiTired).toBeCloseTo(profile.sushiTired + SUSHI_TIRED_RISE_PER_MIN, 6)
   })
 
   it('returns the same profile reference for non-positive or non-finite dt', () => {
@@ -30,17 +32,17 @@ describe('tickSushiNeeds', () => {
     expect(updated.sushiLove).toBe(0)
   })
 
-  it('clamps hunger at one hundred when fully starved', () => {
+  it('clamps hunger at zero when fully starved', () => {
     let profile = createProfile('Pilot')
-    profile = addSushiHunger(profile, 100 - profile.sushiHunger)
+    profile = addSushiHunger(profile, -profile.sushiHunger)
     const updated = tickSushiNeeds(profile, SUSHI_SECONDS_PER_MINUTE * 1000)
-    expect(updated.sushiHunger).toBe(100)
+    expect(updated.sushiHunger).toBe(0)
   })
 
   it('scales linearly with elapsed time', () => {
     const profile = createProfile('Pilot')
     const half = tickSushiNeeds(profile, SUSHI_SECONDS_PER_MINUTE / 2)
     expect(profile.sushiLove - half.sushiLove).toBeCloseTo(SUSHI_LOVE_DECAY_PER_MIN / 2, 6)
-    expect(half.sushiHunger - profile.sushiHunger).toBeCloseTo(SUSHI_HUNGER_RISE_PER_MIN / 2, 6)
+    expect(profile.sushiHunger - half.sushiHunger).toBeCloseTo(SUSHI_HUNGER_DECAY_PER_MIN / 2, 6)
   })
 })

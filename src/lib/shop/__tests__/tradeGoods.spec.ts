@@ -4,15 +4,21 @@ import { PLANET_IDS } from '@/lib/planets/catalog'
 import { getItemDefinition } from '@/lib/inventory/catalog'
 
 describe('TRADE_GOODS', () => {
-  it('has 50 trade goods total', () => {
-    expect(Object.keys(TRADE_GOODS).length).toBe(50)
+  it('has 51 trade goods total', () => {
+    expect(Object.keys(TRADE_GOODS).length).toBe(51)
   })
 
-  it('every planet has exactly 5 goods', () => {
+  it('every planet has at least 5 goods', () => {
     for (const planetId of PLANET_IDS) {
       const goods = getTradeGoodsByPlanet(planetId)
-      expect(goods.length).toBe(5)
+      expect(goods.length).toBeGreaterThanOrEqual(5)
     }
+  })
+
+  it('cat-food is produced on Earth', () => {
+    const tg = getTradeGood('cat-food')
+    expect(tg).toBeDefined()
+    expect(tg!.producedBy).toBe('earth')
   })
 
   it('all trade goods have positive base prices', () => {

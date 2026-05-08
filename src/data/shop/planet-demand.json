@@ -89,7 +89,8 @@
       { "itemId": "water-ice", "multiplier": 3.6 },
       { "itemId": "organic-compounds", "multiplier": 3.0 },
       { "itemId": "ammonia-hydrate", "multiplier": 3.2 },
-      { "itemId": "enstatite", "multiplier": 2.4 }
+      { "itemId": "enstatite", "multiplier": 2.4 },
+      { "itemId": "cat-food", "multiplier": 4.0 }
     ]
   },
   "uranus": {
@@ -102,7 +103,8 @@
       { "itemId": "ammonia-hydrate", "multiplier": 3.8 },
       { "itemId": "water-ice", "multiplier": 3.2 },
       { "itemId": "carbon-dioxide-ice", "multiplier": 3.0 },
-      { "itemId": "hydrated-silicates", "multiplier": 2.6 }
+      { "itemId": "hydrated-silicates", "multiplier": 2.6 },
+      { "itemId": "cat-food", "multiplier": 4.5 }
     ]
   },
   "neptune": {
@@ -115,7 +117,8 @@
       { "itemId": "water-ice", "multiplier": 3.8 },
       { "itemId": "carbon-dioxide-ice", "multiplier": 3.4 },
       { "itemId": "organic-compounds", "multiplier": 3.2 },
-      { "itemId": "troilite", "multiplier": 2.5 }
+      { "itemId": "troilite", "multiplier": 2.5 },
+      { "itemId": "cat-food", "multiplier": 5.0 }
     ]
   },
   "pluto": {
@@ -128,7 +131,8 @@
       { "itemId": "organic-compounds", "multiplier": 4.0 },
       { "itemId": "water-ice", "multiplier": 3.8 },
       { "itemId": "carbon-dioxide-ice", "multiplier": 3.6 },
-      { "itemId": "ammonia-hydrate", "multiplier": 3.5 }
+      { "itemId": "ammonia-hydrate", "multiplier": 3.5 },
+      { "itemId": "cat-food", "multiplier": 5.5 }
     ]
   }
 }

@@ -48,8 +48,10 @@ export const BOWL_SERVINGS_MAX = 10
 /** Default Sushi love value seeded into fresh and migrating profiles. */
 export const DEFAULT_SUSHI_LOVE = 25
 
-/** Default Sushi hunger value seeded into fresh and migrating profiles. */
-export const DEFAULT_SUSHI_HUNGER = 25
+/** Default Sushi hunger value seeded into fresh and migrating profiles.
+ * Hunger semantics match love: 100 = freshly fed, 0 = starving. The needs
+ * tick decays this over time and eating from the bowl restores it. */
+export const DEFAULT_SUSHI_HUNGER = 75
 
 /** Default bowl serving count for fresh and migrating profiles (empty until first feed). */
 export const DEFAULT_BOWL_SERVINGS = 0

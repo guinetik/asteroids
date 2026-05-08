@@ -16,6 +16,7 @@ import * as THREE from 'three'
 import { FpsCamera, type FpsCameraConfig } from '@/three/FpsCamera'
 import { InputManager } from '@/lib/InputManager'
 import { HABITAT_BINDINGS } from '@/lib/defaultBindings'
+import { BOWL_SERVINGS_MAX } from '@/lib/player/profile'
 import { loadGLB } from '@/three/loadGLB'
 import { FootstepSystem } from '@/lib/fps/footstepSystem'
 import {
@@ -2039,17 +2040,22 @@ export class HabitatInteriorScene {
     if (bowlDist < BOWL_FILL_PROMPT_DISTANCE && !tableInRange && this.sushiCallbacks) {
       const servings = this.sushiCallbacks.getBowlServings()
       const canFill = this.sushiCallbacks.canFillBowl()
+      const servingsLabel = `${servings}/${BOWL_SERVINGS_MAX} Servings`
       if (canFill) {
-        this.onPrompt?.('F  Fill Bowl')
+        this.onPrompt?.(`${servingsLabel}  ·  F  Fill Bowl`)
         if (this.inputManager.wasActionPressed('interact')) {
           this.sushiCallbacks.onFillBowl()
           this.bowlFillCueTimer = BOWL_FILL_CUE_DURATION_S
         }
         return
       }
+      if (servings > 0) {
+        this.onPrompt?.(servingsLabel)
+        return
+      }
       // Bowl needs food but the player has none — surface that explicitly so
       // they understand why the bowl is empty and the cat is harassing them.
-      if (servings <= 0 && !this.sushiCallbacks.hasCatFood()) {
+      if (!this.sushiCallbacks.hasCatFood()) {
         this.onPrompt?.('No Cat Food In Bag')
         return
       }

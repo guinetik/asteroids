@@ -358,15 +358,5 @@
     "weightPerUnit": 1,
     "maxStack": 1,
     "sellable": false
-  },
-  {
-    "id": "cat-food",
-    "category": "consumable",
-    "label": "Cat Food",
-    "description": "Sushi's favorite. One bag fills the bowl with 10 servings.",
-    "icon": "cat-food.png",
-    "weightPerUnit": 0.5,
-    "maxStack": 10,
-    "sellable": false
   }
 ]

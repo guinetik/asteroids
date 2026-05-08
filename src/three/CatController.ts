@@ -55,6 +55,8 @@ export interface CatNeedsBridge {
   getTired(): number
   /** Apply a tiredness delta (positive while chasing, ignored when result clamps). */
   addTired(delta: number): void
+  /** Apply a hunger delta (positive while chasing the laser to burn calories). */
+  addHunger(delta: number): void
   /** Write the player's world-space position into `out` and return it for chaining. */
   getPlayerWorldPosition(out: THREE.Vector3): THREE.Vector3
   /** Write the bowl's world-space position into `out` and return it for chaining. */
@@ -99,8 +101,9 @@ export interface CatNeedsBridge {
   onSleepExit?(): void
 }
 
-/** Hunger threshold at or above which Sushi prioritises eating from the bowl. */
-const HUNGER_HUNGRY_THRESHOLD = 70
+/** Hunger threshold at or below which Sushi prioritises eating from the bowl
+ * (matches love semantics: 100 = full, 0 = starving). */
+const HUNGER_HUNGRY_THRESHOLD = 30
 /** Love threshold at or below which Sushi prioritises following the player. */
 const LOVE_NEEDY_THRESHOLD = 30
 /**
@@ -115,6 +118,9 @@ const BLADDER_FULL_THRESHOLD = 70
 const TIRED_FULL_THRESHOLD = 80
 /** Tired units added per second of laser-pointer chase (≈ 12s of sprinting fills the meter). */
 const TIRED_RISE_PER_CHASE_SEC = 8
+/** Hunger units burned per second of laser-pointer chase — sprinting drops the
+ * meter toward zero (semantics: 100 = full, 0 = starving). */
+const HUNGER_BURN_PER_CHASE_SEC = 2
 /** Seconds between independent wake-up rolls while Sushi is sleeping in the cat house. */
 const SLEEP_WAKE_POLL_INTERVAL_S = 2
 /**
@@ -969,8 +975,14 @@ export class CatController {
     }
     const hunger = bridge.getHunger()
     const bowl = bridge.getBowlServings()
-    if (hunger >= HUNGER_HUNGRY_THRESHOLD && bowl > 0) {
-      this.enterState('goToBowl')
+    if (hunger <= HUNGER_HUNGRY_THRESHOLD) {
+      if (bowl > 0) {
+        this.enterState('goToBowl')
+        return true
+      }
+      // Hungry but the bowl is empty — fall through to "follow" so Sushi pesters
+      // the player for a refill instead of obliviously wandering past empty bowls.
+      this.enterState('follow')
       return true
     }
     if (bridge.getLove() <= LOVE_NEEDY_THRESHOLD) {
@@ -1134,6 +1146,7 @@ export class CatController {
     // here, not in `chaseRest`, so a player who keeps the dot still doesn't
     // accidentally drain the cat. Faceplant naps are earned by chasing.
     this.bridge?.addTired(TIRED_RISE_PER_CHASE_SEC * dt)
+    this.bridge?.addHunger(-HUNGER_BURN_PER_CHASE_SEC * dt)
 
     const dx = this.laserTarget.x - this.group.position.x
     const dz = this.laserTarget.z - this.group.position.z

@@ -150,6 +150,16 @@
     "producedBy": "earth"
   },
   {
+    "id": "cat-food",
+    "label": "Cat Food",
+    "description": "Bagged kibble milled from real Earth fish and grain. Every lonely cat orbiting the outer worlds is desperate for a proper meal — their humans will pay anything.",
+    "icon": "cat-food.png",
+    "weightPerUnit": 0.5,
+    "maxStack": 50,
+    "basePrice": 1280,
+    "producedBy": "earth"
+  },
+  {
     "id": "construction-prefabs",
     "label": "Construction Prefabs",
     "description": "Modular habitat sections milled from Martian iron. Expanding colonies across the system snap these together like building blocks.",
