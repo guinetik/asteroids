@@ -142,8 +142,8 @@ export class PhotometryMinigame implements MiniGame, MiniGameEvents {
   /** Unregister a tickable from the level tick handler. */
   onUnregisterTickable: ((tickable: Tickable) => void) | null = null
 
-  /** Called when the lander collects the photometry probe. */
-  onProbeCollect: (() => void) | null = null
+  /** Called when the lander collects the photometry probe. Receives probes collected so far and total. */
+  onProbeCollect: ((collected: number, total: number) => void) | null = null
 
   /** Called when photometry scan audio visibility, lock, or progress changes. */
   onScanAudioState: ((state: PhotometryScanAudioState) => void) | null = null
@@ -378,7 +378,8 @@ export class PhotometryMinigame implements MiniGame, MiniGameEvents {
     this.computeScanTarget()
 
     this.probeController = new PhotometryProbeController(this.scene, this.asteroidRoot)
-    this.probeController.onCollect = () => this.onProbeCollect?.()
+    this.probeController.onCollect = () =>
+      this.onProbeCollect?.(this.probeController!.collected, this.probeController!.total)
     this.probeController.spawn({
       terminalPosition: this.terminal.position,
       targetPosition: this.probeTarget,

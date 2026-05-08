@@ -129,7 +129,20 @@ Sourcing and wiring reference for all sound effects, music, ambient beds, and vo
 
 ---
 
-## 8. Game Flow & Meta
+## 8. Survey Probe Melody (Procedural)
+
+| ID | Trigger | Playback | Status |
+|----|---------|----------|--------|
+| *(procedural)* `survey.probe.note` | Each probe collected — ascending pentatonic note (C5→E6 scale, 1-based index) | one-shot procedural via `playSurveyProbeNote()` | ✅ wired in `LevelAudioDirector.notifySurveyProbeCollect` |
+| *(procedural)* `survey.probe.chord` | Final probe collected — C major resolution chord (C5+E5+A5+C6 shimmer) | one-shot procedural via `playSurveyProbeNote()` | ✅ wired in `LevelAudioDirector.notifySurveyProbeCollect` |
+
+**Scale:** C5, D5, E5, G5, A5, C6, D6, E6 (pentatonic major). Non-final probes play one ascending note; the note index is `min(collected − 1, 7)` so it caps at the top of the scale on long surveys. Final probe plays a C-E-A chord plus C6 shimmer.
+
+**Layering:** Plays on top of the existing `sfx.collect` pickup chime — both fire on every probe collection.
+
+---
+
+## 10. Game Flow & Meta
 
 | ID | Trigger | Playback | Status |
 |----|---------|----------|--------|
@@ -140,7 +153,7 @@ Sourcing and wiring reference for all sound effects, music, ambient beds, and vo
 
 ---
 
-## 9. Voice / Comms
+## 11. Voice / Comms
 
 | ID | Trigger | Playback | Status |
 |----|---------|----------|--------|
@@ -152,7 +165,7 @@ Sourcing and wiring reference for all sound effects, music, ambient beds, and vo
 
 ---
 
-## 10. Audio Effects (DSP Presets)
+## 12. Audio Effects (DSP Presets)
 
 | Preset | Applied To | Description |
 |--------|-----------|-------------|
@@ -164,7 +177,7 @@ Sourcing and wiring reference for all sound effects, music, ambient beds, and vo
 
 ---
 
-## 11. Orphan Assets
+## 13. Orphan Assets
 
 | File | Status |
 |------|--------|
@@ -173,7 +186,7 @@ Sourcing and wiring reference for all sound effects, music, ambient beds, and vo
 
 ---
 
-## 12. Files on Disk vs. Manifest
+## 14. Files on Disk vs. Manifest
 
 | File | Manifest ID | Hooked |
 |------|-------------|--------|

@@ -96,8 +96,8 @@ export interface LevelMinigameBindings {
   onRegisterTickable: ((tickable: Tickable) => void) | null
   /** Unregister a transient tickable owned by a minigame. */
   onUnregisterTickable: ((tickable: Tickable) => void) | null
-  /** Resource pickup cue used when a survey probe is collected. */
-  onSurveyProbeCollect: (() => void) | null
+  /** Resource pickup cue used when a survey probe is collected. Receives probes collected so far and total. */
+  onSurveyProbeCollect: ((collected: number, total: number) => void) | null
   /** Photometry scan audio state sink used while the X-ray beam is active. */
   onPhotometryScanAudioState: ((state: PhotometryScanAudioState) => void) | null
   /** DAN scan audio state sink used while the neutron scan beam is active. */

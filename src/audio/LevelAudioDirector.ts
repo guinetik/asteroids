@@ -34,6 +34,7 @@ import { getAudioDefinition } from './audioManifest'
 import { worldPointToHearing } from '@/lib/audio/worldHearing'
 import { Timer, type TimerHandle } from '@/lib/Timer'
 import type { AudioPlaybackHandle } from './audioTypes'
+import { playSurveyProbeNote } from './proceduralAudio'
 import type { PerspectiveCamera, Vector3 } from 'three'
 
 /** Resource pickup chime volume (constant; pickups don't scale by yield). */
@@ -95,6 +96,20 @@ export class LevelAudioDirector {
    */
   notifyResourcePickup(): void {
     this.audio.play('sfx.collect', { volume: PICKUP_VOLUME })
+  }
+
+  /**
+   * The lander just collected a gravitometric survey probe. Plays the
+   * generic pickup chime plus a melodic note that ascends through a
+   * pentatonic scale as more probes are collected. The final probe
+   * plays a brief resolution chord.
+   *
+   * @param collected - Probes collected so far (1-based, after this collection).
+   * @param total - Total probes in this survey.
+   */
+  notifySurveyProbeCollect(collected: number, total: number): void {
+    this.audio.play('sfx.collect', { volume: PICKUP_VOLUME })
+    playSurveyProbeNote(collected, total)
   }
 
   /**

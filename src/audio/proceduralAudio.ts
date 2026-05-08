@@ -405,6 +405,124 @@ function applyHeldEnvelope(
   gain.exponentialRampToValueAtTime(0.0001, startTime + duration)
 }
 
+/**
+ * Pentatonic major scale frequencies (C5 root, two octaves) for the survey melody.
+ * Each collected probe advances one step up the scale; the final probe plays a chord.
+ */
+const SURVEY_SCALE_HZ = [
+  523.25, // C5
+  587.33, // D5
+  659.26, // E5
+  784.0, // G5
+  880.0, // A5
+  1046.5, // C6
+  1174.66, // D6
+  1318.51, // E6
+] as const
+
+/** Volume for the melodic note layer (layered on top of the generic collect cue). */
+const SURVEY_NOTE_VOLUME = 0.65
+
+/**
+ * Play a melodic note for a gravitometric survey probe collection event.
+ *
+ * Non-final probes play a single ascending bell tone through a pentatonic major scale.
+ * The final probe plays a brief three-note resolution chord.
+ *
+ * Called directly rather than via {@link playProceduralSound} because the pitch
+ * varies per invocation and cannot be represented as a static preset.
+ *
+ * @param collected - Probes collected so far (1-based, after this collection).
+ * @param total - Total probes in this survey.
+ */
+export function playSurveyProbeNote(collected: number, total: number): void {
+  if (Howler.noAudio) return
+  const ctx = Howler.ctx
+  const masterGain = (Howler as unknown as { masterGain?: AudioNode }).masterGain
+  if (!ctx || !masterGain) return
+
+  const output = ctx.createGain()
+  output.connect(masterGain)
+  output.gain.setValueAtTime(1, ctx.currentTime)
+
+  const now = ctx.currentTime
+  const sources: StoppableNode[] = []
+  let duration: number
+
+  if (collected >= total) {
+    // Final probe — resolution chord: root, major third, fifth of C major
+    const chordHz = [
+      SURVEY_SCALE_HZ[0], // C5
+      SURVEY_SCALE_HZ[2], // E5
+      SURVEY_SCALE_HZ[4], // A5
+    ] as const
+    duration = 0.75
+
+    for (const freq of chordHz) {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(freq, now)
+      applyPluckEnvelope(gain.gain, now, duration, SURVEY_NOTE_VOLUME * 0.32)
+      osc.connect(gain)
+      gain.connect(output)
+      scheduleSource(osc, now, duration + 0.02, sources)
+    }
+
+    // Sparkle shimmer an octave above the root
+    const shimmer = ctx.createOscillator()
+    const shimmerGain = ctx.createGain()
+    shimmer.type = 'triangle'
+    shimmer.frequency.setValueAtTime(SURVEY_SCALE_HZ[5], now) // C6
+    applyPluckEnvelope(shimmerGain.gain, now, duration * 0.8, SURVEY_NOTE_VOLUME * 0.15)
+    shimmer.connect(shimmerGain)
+    shimmerGain.connect(output)
+    scheduleSource(shimmer, now, duration * 0.8 + 0.02, sources)
+  } else {
+    // Ascending single note through the scale; noteIndex is always in bounds — clamped above
+    const noteIndex = Math.min(collected - 1, SURVEY_SCALE_HZ.length - 1)
+    const freq = SURVEY_SCALE_HZ[noteIndex]!
+    duration = 0.22
+
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(freq, now)
+    applyPluckEnvelope(gain.gain, now, duration, SURVEY_NOTE_VOLUME)
+    osc.connect(gain)
+    gain.connect(output)
+    scheduleSource(osc, now, duration + 0.02, sources)
+
+    // Subtle bell overtone at double frequency
+    const overtone = ctx.createOscillator()
+    const overtoneGain = ctx.createGain()
+    overtone.type = 'triangle'
+    overtone.frequency.setValueAtTime(freq * 2, now)
+    applyPluckEnvelope(overtoneGain.gain, now, duration * 0.55, SURVEY_NOTE_VOLUME * 0.12)
+    overtone.connect(overtoneGain)
+    overtoneGain.connect(output)
+    scheduleSource(overtone, now, duration * 0.55 + 0.02, sources)
+  }
+
+  globalThis.setTimeout(
+    () => {
+      for (const source of sources) {
+        try {
+          source.disconnect()
+        } catch {
+          /* ignore disconnect races */
+        }
+      }
+      try {
+        output.disconnect()
+      } catch {
+        /* ignore disconnect races */
+      }
+    },
+    duration * 1000 + 100,
+  )
+}
+
 /** Finite-length white or brown noise buffer for one-shot layers. */
 function createNoiseSource(
   ctx: AudioContext,

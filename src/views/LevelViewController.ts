@@ -1387,7 +1387,8 @@ export class LevelViewController implements Tickable {
         onRegisterTickable: (tickable) =>
           this.tickHandler!.register(tickable, TICK_PRIORITY_PHYSICS + 4),
         onUnregisterTickable: (tickable) => this.tickHandler?.unregister(tickable),
-        onSurveyProbeCollect: () => this.levelAudio.notifyResourcePickup(),
+        onSurveyProbeCollect: (collected, total) =>
+          this.levelAudio.notifySurveyProbeCollect(collected, total),
         onPhotometryScanAudioState: (state) =>
           this.photometryScanAudio.update({ ...state, sfxVolume: 1 }, 0),
         onDanScanAudioState: (state) => {

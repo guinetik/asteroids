@@ -91,7 +91,7 @@
       "channel": "SURVEY RELAY",
       "view": "lander",
       "tone": "science",
-      "message": "Hey, you got Jay. Survey run. E at the terminal launches the probes, then fly the lander through each waypoint before the timer expires. Back to the terminal, tap E to deliver. Glorified mining, but the science folks like to feel important."
+      "message": "Hey, you got Jay. Grav survey. Before anyone commits a mining rig to a new body, science needs a mass map — where the ore pockets are, where it's hollow, whether the rock is worth the contract. That's what you're building. E at the terminal drops the probes, fly the route through each waypoint before the timer runs, back to terminal, E to deliver. The data you bring back decides if this rock ever gets drilled."
     },
     "exterminate": {
       "speaker": "Colonial Guard",
@@ -189,7 +189,7 @@
         "channel": "SURVEY RELAY",
         "view": "lander",
         "tone": "science",
-        "message": "Jay here. Survey jobs are just mining jobs with extra paperwork. Follow the marker, keep the timer in mind, and give the instrument a steady pass."
+        "message": "Hey, you got Jay. Client needs a gravity read on the body — mass distribution, ore clustering, whether the thing's solid enough to bother with. You're the advance run before the heavy equipment shows up. E at terminal to drop probes, fly the waypoints clean before the clock runs out, back to terminal to hand off. Good data here means somebody gets a payday later. Maybe even you, if they come back with a haul contract."
       }
     },
     "jovian-society": {
