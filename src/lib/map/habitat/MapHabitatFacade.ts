@@ -23,6 +23,7 @@ import { HabitatInteriorScene } from '@/three/HabitatInteriorScene'
 import type { Inventory } from '@/lib/inventory/types'
 import type { PlayerProfile } from '@/lib/player/types'
 import {
+  addLitterPollution,
   addSushiBladder,
   addSushiTired,
   addSushiHunger,
@@ -31,6 +32,7 @@ import {
   recordSushiPet,
   saveProfile,
   setBowlServings,
+  setLitterPollution,
   SUSHI_NEEDS_MAX,
 } from '@/lib/player/profile'
 import { removeItem } from '@/lib/inventory/inventory'
@@ -189,6 +191,7 @@ export class MapHabitatFacade {
       getLove: () => (deps ? deps.getProfile().sushiLove : 0),
       getBowlServings: () => (deps ? deps.getProfile().bowlServings : 0),
       getBladder: () => (deps ? deps.getProfile().sushiBladder : 0),
+      getLitterPollution: () => (deps ? deps.getProfile().litterPollution : 0),
       getTired: () => (deps ? deps.getProfile().sushiTired : 0),
       addTired: (delta) => this.handleSushiAddTired(delta),
       addHunger: (delta) => this.handleSushiAddHunger(delta),
@@ -210,6 +213,7 @@ export class MapHabitatFacade {
       onEatServing: () => this.handleSushiEatServing(),
       onPetted: () => this.handleSushiPetted(),
       onUsedLitter: () => this.handleSushiUsedLitter(),
+      onEmptyLitter: () => this.handleEmptyLitter(),
       onFillBowl: () => this.handleSushiFillBowl(),
     })
     this.scene = next
@@ -302,11 +306,26 @@ export class MapHabitatFacade {
     const deps = this.deps
     if (!deps) return
     const profile = deps.getProfile()
-    const next = addSushiBladder(profile, -SUSHI_NEEDS_MAX)
+    let next = addSushiBladder(profile, -SUSHI_NEEDS_MAX)
+    next = addLitterPollution(next, 1)
     if (next === profile) return
     deps.setProfile(next)
     saveProfile(next)
     deps.evaluateAchievements()
+  }
+
+  /**
+   * Player cleaned the litterbox — reset pollution to zero and persist.
+   */
+  private handleEmptyLitter(): void {
+    const deps = this.deps
+    if (!deps) return
+    const profile = deps.getProfile()
+    if (profile.litterPollution <= 0) return
+    const next = setLitterPollution(profile, 0)
+    if (next === profile) return
+    deps.setProfile(next)
+    saveProfile(next)
   }
 
   /**

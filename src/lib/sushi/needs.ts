@@ -39,10 +39,11 @@ export const SUSHI_LOVE_DECAY_PER_MIN = 4
 
 /**
  * Bladder units added per minute of elapsed real time. With a 0..100 meter and a
- * threshold of 70, this triggers a litterbox visit roughly every 35 minutes from
- * empty — slower than hunger so the two needs don't always fire at once.
+ * threshold of 70, this triggers a litterbox visit roughly every 12 minutes from
+ * empty — fast enough that the player actually catches Sushi using the box in a
+ * normal habitat session.
  */
-export const SUSHI_BLADDER_RISE_PER_MIN = 2
+export const SUSHI_BLADDER_RISE_PER_MIN = 6
 
 /**
  * Tiredness units added per minute of passive elapsed time. Tuned so a fully-rested

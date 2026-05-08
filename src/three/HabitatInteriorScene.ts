@@ -16,7 +16,7 @@ import * as THREE from 'three'
 import { FpsCamera, type FpsCameraConfig } from '@/three/FpsCamera'
 import { InputManager } from '@/lib/InputManager'
 import { HABITAT_BINDINGS } from '@/lib/defaultBindings'
-import { BOWL_SERVINGS_MAX } from '@/lib/player/profile'
+import { BOWL_SERVINGS_MAX, LITTER_POLLUTION_MAX } from '@/lib/player/profile'
 import { loadGLB } from '@/three/loadGLB'
 import { FootstepSystem } from '@/lib/fps/footstepSystem'
 import {
@@ -360,6 +360,23 @@ const CAT_LITTER_WALL_THICKNESS = 0.025
 const CAT_LITTER_WALL_HEIGHT = 0.09
 /** Litter sand surface height above {@link FLOOR_Y} (world units). */
 const CAT_LITTER_SAND_HEIGHT = 0.04
+/** Radius of each waste-chunk sphere (world units). */
+const LITTER_CHUNK_RADIUS = 0.018
+/** Padding (world units) keeping chunks away from the inner tray walls. */
+const LITTER_CHUNK_PAD = 0.04
+/**
+ * Normalized scatter pattern (each axis in `[-1, 1]`) for waste chunks inside the
+ * litter sand. Indexed up to `LITTER_POLLUTION_MAX`; offsets are scaled by the inner
+ * half-extents so chunks always sit inside the walls regardless of tray size.
+ */
+const LITTER_CHUNK_OFFSETS: ReadonlyArray<{ x: number; z: number }> = [
+  { x: -0.5, z: -0.4 },
+  { x: 0.4, z: -0.55 },
+  { x: -0.2, z: 0.2 },
+  { x: 0.55, z: 0.35 },
+  { x: -0.6, z: 0.55 },
+  { x: 0.15, z: -0.15 },
+]
 /** Outer radius of the ceramic food bowl (world units). */
 const CAT_BOWL_RADIUS = 0.14
 /** Total height of the food bowl (world units). */
@@ -399,6 +416,8 @@ const TABLE_LOOK_TARGET_Y_OFFSET = 0.9
 
 /** XZ proximity (world units) at which the "Fill Bowl" prompt appears. */
 const BOWL_FILL_PROMPT_DISTANCE = 1.4
+/** Distance (world units) within which the litterbox cleaning prompt appears. */
+const LITTER_PROMPT_DISTANCE = 1.4
 /** Total seconds the bowl scale-punch cue plays after a refill. */
 const BOWL_FILL_CUE_DURATION_S = 0.45
 /** Peak scale multiplier applied to the bowl mesh during the refill cue. */
@@ -456,6 +475,10 @@ export interface SushiBridgeCallbacks {
   onPetted(): void
   /** Cat finished using the litterbox — facade resets bladder + saves. */
   onUsedLitter(): void
+  /** Read the current waste-chunk count in the litterbox (0..LITTER_POLLUTION_MAX). */
+  getLitterPollution(): number
+  /** Player pressed F at the litterbox while it had chunks — facade clears pollution. */
+  onEmptyLitter(): void
   /** Cat woke up from a nap — facade resets tiredness + saves. */
   onWoke(): void
   /** True when the player can fill the bowl (≥1 cat-food in inventory AND bowl not full). */
@@ -587,6 +610,11 @@ export class HabitatInteriorScene {
 
   /** Stored world-space position of the litterbox, populated by {@link buildCatLitterArea}. */
   private readonly litterWorldPosition = new THREE.Vector3()
+  /**
+   * Waste chunk meshes inside the litterbox sand. Visibility per index is driven by
+   * `litterPollution` from the player profile — index `i` is visible when `i < pollution`.
+   */
+  private readonly litterChunkMeshes: THREE.Mesh[] = []
 
   /** Stored world-space position of the cat house, populated by {@link buildCatHouse}. */
   private readonly houseWorldPosition = new THREE.Vector3()
@@ -909,6 +937,7 @@ export class HabitatInteriorScene {
     this.cat?.tick(dt)
     this.tickBowlFillCue(dt)
     this.tickKibbleVisual()
+    this.tickLitterChunkVisual()
     this.tickHatchKnob(dt)
   }
 
@@ -1087,6 +1116,7 @@ export class HabitatInteriorScene {
       getLove: () => callbacks.getLove(),
       getBowlServings: () => callbacks.getBowlServings(),
       getBladder: () => callbacks.getBladder(),
+      getLitterPollution: () => callbacks.getLitterPollution(),
       getTired: () => callbacks.getTired(),
       addTired: (delta) => callbacks.addTired(delta),
       addHunger: (delta) => callbacks.addHunger(delta),
@@ -1587,7 +1617,44 @@ export class HabitatInteriorScene {
     group.add(sand)
 
     this.litterWorldPosition.set(CAT_LITTER_X, FLOOR_Y, CAT_LITTER_Z)
+
+    // Waste chunks — small dark pellets scattered across the sand. Hidden by default;
+    // visibility is driven by `litterPollution` in `tickLitterChunkVisual`.
+    const chunkMat = new THREE.MeshStandardMaterial({
+      color: 0x4a3a2a,
+      roughness: 0.95,
+      metalness: 0,
+    })
+    const innerHalfX = innerX / 2 - LITTER_CHUNK_PAD
+    const innerHalfZ = innerZ / 2 - LITTER_CHUNK_PAD
+    const chunkY = FLOOR_Y + t + CAT_LITTER_SAND_HEIGHT + LITTER_CHUNK_RADIUS * 0.4
+    for (let i = 0; i < LITTER_POLLUTION_MAX; i++) {
+      const layout = LITTER_CHUNK_OFFSETS[i] ?? { x: 0, z: 0 }
+      const chunk = new THREE.Mesh(new THREE.SphereGeometry(LITTER_CHUNK_RADIUS, 8, 6), chunkMat)
+      chunk.position.set(
+        CAT_LITTER_X + layout.x * innerHalfX,
+        chunkY,
+        CAT_LITTER_Z + layout.z * innerHalfZ,
+      )
+      chunk.scale.set(1, 0.55, 1)
+      chunk.visible = false
+      group.add(chunk)
+      this.litterChunkMeshes.push(chunk)
+    }
     return group
+  }
+
+  /**
+   * Update waste-chunk visibility against the current pollution count. Chunk index
+   * `i` is shown when `i < pollution` (from {@link SushiBridgeCallbacks.getLitterPollution}).
+   */
+  private tickLitterChunkVisual(): void {
+    if (this.litterChunkMeshes.length === 0) return
+    const count = this.sushiCallbacks?.getLitterPollution() ?? 0
+    for (let i = 0; i < this.litterChunkMeshes.length; i++) {
+      const mesh = this.litterChunkMeshes[i]
+      if (mesh) mesh.visible = i < count
+    }
   }
 
   /**
@@ -2059,6 +2126,23 @@ export class HabitatInteriorScene {
         this.onPrompt?.('No Cat Food In Bag')
         return
       }
+    }
+
+    // --- Litterbox (clean) -------------------------------------------------
+    const litterDx = this.player.position.x - this.litterWorldPosition.x
+    const litterDz = this.player.position.z - this.litterWorldPosition.z
+    const litterDist = Math.hypot(litterDx, litterDz)
+    if (litterDist < LITTER_PROMPT_DISTANCE && !tableInRange && this.sushiCallbacks) {
+      const pollution = this.sushiCallbacks.getLitterPollution()
+      if (pollution > 0) {
+        this.onPrompt?.(`${pollution}/${LITTER_POLLUTION_MAX} Dirty  ·  F  Empty Litterbox`)
+        if (this.inputManager.wasActionPressed('interact')) {
+          this.sushiCallbacks.onEmptyLitter()
+        }
+        return
+      }
+      this.onPrompt?.('Litterbox Clean')
+      return
     }
 
     // --- Table -------------------------------------------------------------

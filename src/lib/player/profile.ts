@@ -62,6 +62,16 @@ export const DEFAULT_SUSHI_BLADDER = 0
 /** Default tiredness value seeded into fresh and migrating profiles (rested). */
 export const DEFAULT_SUSHI_TIRED = 0
 
+/** Lower bound of the litterbox pollution counter (clean). */
+export const LITTER_POLLUTION_MIN = 0
+
+/** Upper bound of the litterbox pollution counter — chunk count at which Sushi refuses
+ * to use the box and begs the player to clean it. */
+export const LITTER_POLLUTION_MAX = 6
+
+/** Default litterbox pollution seeded into fresh and migrating profiles (clean). */
+export const DEFAULT_LITTER_POLLUTION = 0
+
 /** Clamp a numeric value into the inclusive `[min, max]` interval. */
 function clampNumber(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min
@@ -474,6 +484,14 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     SUSHI_NEEDS_MIN,
     SUSHI_NEEDS_MAX,
   )
+  const litterPollution = Math.round(
+    normalizeClampedNumber(
+      p.litterPollution,
+      DEFAULT_LITTER_POLLUTION,
+      LITTER_POLLUTION_MIN,
+      LITTER_POLLUTION_MAX,
+    ),
+  )
 
   return {
     name: p.name,
@@ -502,6 +520,7 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     bowlServings,
     sushiBladder,
     sushiTired,
+    litterPollution,
     ...(shuttleHullHp !== undefined ? { shuttleHullHp } : {}),
     ...(landerHullHp !== undefined ? { landerHullHp } : {}),
   }
@@ -569,6 +588,7 @@ export function createProfile(name: string): PlayerProfile {
     bowlServings: DEFAULT_BOWL_SERVINGS,
     sushiBladder: DEFAULT_SUSHI_BLADDER,
     sushiTired: DEFAULT_SUSHI_TIRED,
+    litterPollution: DEFAULT_LITTER_POLLUTION,
   }
 }
 
@@ -632,6 +652,39 @@ export function addSushiTired(profile: PlayerProfile, delta: number): PlayerProf
   const next = clampNumber(current + safeDelta, SUSHI_NEEDS_MIN, SUSHI_NEEDS_MAX)
   if (next === current) return profile
   return { ...profile, sushiTired: next }
+}
+
+/**
+ * Return a copy of the profile with `litterPollution` adjusted by `delta` and clamped
+ * to `[LITTER_POLLUTION_MIN, LITTER_POLLUTION_MAX]`. Non-finite deltas are treated as
+ * zero. Result is rounded to integer chunks.
+ *
+ * @param profile - Current profile.
+ * @param delta - Signed amount, e.g. `+1` after Sushi uses the litter or `-6` to empty.
+ * @returns Updated profile (same reference when value is unchanged).
+ */
+export function addLitterPollution(profile: PlayerProfile, delta: number): PlayerProfile {
+  const safeDelta = Number.isFinite(delta) ? delta : 0
+  const current = profile.litterPollution ?? DEFAULT_LITTER_POLLUTION
+  const next = Math.round(
+    clampNumber(current + safeDelta, LITTER_POLLUTION_MIN, LITTER_POLLUTION_MAX),
+  )
+  if (next === current) return profile
+  return { ...profile, litterPollution: next }
+}
+
+/**
+ * Return a copy of the profile with `litterPollution` set to `n` and clamped/rounded
+ * into `[LITTER_POLLUTION_MIN, LITTER_POLLUTION_MAX]`.
+ *
+ * @param profile - Current profile.
+ * @param n - Target chunk count, e.g. `0` after the player empties the box.
+ * @returns Updated profile (same reference when value is unchanged).
+ */
+export function setLitterPollution(profile: PlayerProfile, n: number): PlayerProfile {
+  const next = Math.round(clampNumber(n, LITTER_POLLUTION_MIN, LITTER_POLLUTION_MAX))
+  if (next === profile.litterPollution) return profile
+  return { ...profile, litterPollution: next }
 }
 
 /**

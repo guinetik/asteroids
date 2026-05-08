@@ -51,6 +51,9 @@ export interface CatNeedsBridge {
   getBowlServings(): number
   /** Current bladder value (0..100). Read every frame. */
   getBladder(): number
+  /** Current litterbox waste-chunk count (0..LITTER_POLLUTION_MAX). When at the cap,
+   * Sushi refuses to use the box and begs the player to clean it. */
+  getLitterPollution(): number
   /** Current tiredness value (0..100). Read every frame. */
   getTired(): number
   /** Apply a tiredness delta (positive while chasing, ignored when result clamps). */
@@ -111,6 +114,12 @@ const LOVE_NEEDY_THRESHOLD = 30
  * priority among needs — overrides hunger and love.
  */
 const BLADDER_FULL_THRESHOLD = 70
+/**
+ * Litter pollution chunk count at or above which Sushi refuses to enter the box and
+ * follows the player instead, begging for it to be emptied. Matches
+ * `LITTER_POLLUTION_MAX` in the player profile so the box visually appears full.
+ */
+const LITTER_POLLUTION_REFUSE_THRESHOLD = 6
 /**
  * Tiredness threshold at or above which Sushi heads back to the cat house and naps,
  * preempting the laser pointer chase as well as every non-sleep need.
@@ -180,6 +189,12 @@ const WALK_HEADING_TOLERANCE = 0.18
 
 /** Distance (XZ) at which a waypoint counts as reached. */
 const WAYPOINT_REACHED_EPS = 0.15
+/**
+ * Stop radius (world units) when approaching the food bowl. Larger than
+ * {@link WAYPOINT_REACHED_EPS} so Sushi halts beside the bowl with his head
+ * over it rather than standing on top of the rim.
+ */
+const BOWL_APPROACH_STOP_DISTANCE = 0.35
 
 /** Min / max seconds spent in the idle state before picking a new target. */
 const IDLE_MIN_S = 3
@@ -600,13 +615,19 @@ export class CatController {
     } else if (this.state === 'eat') {
       if (this.stateTimer >= this.stateDuration) {
         this.bridge?.onEatServing()
-        // Decide what to do next based on fresh needs.
-        this.evaluateNeedsAndPickNextState()
+        // Decide what to do next based on fresh needs. If no other need is
+        // pressing, fall back to a resting state so we don't sit in `eat`
+        // re-firing onEatServing every frame.
+        if (!this.evaluateNeedsAndPickNextState()) {
+          this.pickNextRestingState()
+        }
       }
     } else if (this.state === 'useLitter') {
       if (this.stateTimer >= this.stateDuration) {
         this.bridge?.onUsedLitter()
-        this.evaluateNeedsAndPickNextState()
+        if (!this.evaluateNeedsAndPickNextState()) {
+          this.pickNextRestingState()
+        }
       }
     } else if (this.state === 'idleNearPlayer') {
       if (this.stateTimer >= this.stateDuration) {
@@ -834,9 +855,15 @@ export class CatController {
     }
     this.bridge.getBowlWorldPosition(this._bridgeTmp)
     this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
-    if (this.stepTowardTarget(dt)) {
+    // Stop short of the bowl so the cat eats next to it rather than standing on
+    // top — distance from current position to bowl ≤ BOWL_APPROACH_STOP_DISTANCE.
+    const dx = this._bridgeTmp.x - this.group.position.x
+    const dz = this._bridgeTmp.z - this.group.position.z
+    if (Math.hypot(dx, dz) <= BOWL_APPROACH_STOP_DISTANCE) {
       this.enterState('eat')
+      return
     }
+    this.stepTowardTarget(dt)
   }
 
   /**
@@ -899,7 +926,21 @@ export class CatController {
     this.wakePollTimer = 0
     if (Math.random() >= SLEEP_WAKE_PROBABILITY) return
     this.bridge?.onWoke()
-    this.enterState('idle')
+    // Snap the live cat to the cat-house entry waypoint and yaw him away from
+    // the door so he reads as stepping out of the house, then walk to a fresh
+    // wander target. Without this snap he reappears wherever the live group
+    // happened to be when sleep started (e.g. his initial spawn point), which
+    // looks like he teleported across the room.
+    if (this.bridge) {
+      this.bridge.getHouseApproachWorldPosition(this._bridgeTmp)
+      this.group.position.x = this._bridgeTmp.x
+      this.group.position.z = this._bridgeTmp.z
+      this.bridge.getHouseWorldPosition(this._bridgeTmp)
+      const awayDx = this.group.position.x - this._bridgeTmp.x
+      const awayDz = this.group.position.z - this._bridgeTmp.z
+      this.group.rotation.y = Math.atan2(awayDx, awayDz)
+    }
+    this.pickNextRestingState()
   }
 
   /**
@@ -970,6 +1011,11 @@ export class CatController {
       return true
     }
     if (bridge.getBladder() >= BLADDER_FULL_THRESHOLD) {
+      // Litter is too full — refuse to use it and pester the player to empty it.
+      if (bridge.getLitterPollution() >= LITTER_POLLUTION_REFUSE_THRESHOLD) {
+        this.enterState('follow')
+        return true
+      }
       this.enterState('goToLitter')
       return true
     }

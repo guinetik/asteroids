@@ -202,4 +202,10 @@ export interface PlayerProfile {
    * the cat house. Defaults to 0.
    */
   sushiTired: number
+  /**
+   * Number of waste chunks accumulated in the litterbox, clamped to [0, 6]. Increments
+   * each time Sushi visits the litter; resets to 0 when the player empties it. When at
+   * the cap, Sushi refuses to use the box and begs the player to clean it. Defaults to 0.
+   */
+  litterPollution: number
 }
