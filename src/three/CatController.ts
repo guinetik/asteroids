@@ -15,6 +15,7 @@
  */
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { clone as cloneSkinnedScene } from 'three/addons/utils/SkeletonUtils.js'
 
 /** Logical wander states for Sushi's behaviour FSM. */
 type CatState =
@@ -29,6 +30,8 @@ type CatState =
   | 'chaseRest'
   | 'goToLitter'
   | 'useLitter'
+  | 'goToHouse'
+  | 'sleeping'
 
 /**
  * Live read-only handle the {@link CatController} uses to query Sushi's needs and signal
@@ -48,12 +51,24 @@ export interface CatNeedsBridge {
   getBowlServings(): number
   /** Current bladder value (0..100). Read every frame. */
   getBladder(): number
+  /** Current tiredness value (0..100). Read every frame. */
+  getTired(): number
+  /** Apply a tiredness delta (positive while chasing, ignored when result clamps). */
+  addTired(delta: number): void
   /** Write the player's world-space position into `out` and return it for chaining. */
   getPlayerWorldPosition(out: THREE.Vector3): THREE.Vector3
   /** Write the bowl's world-space position into `out` and return it for chaining. */
   getBowlWorldPosition(out: THREE.Vector3): THREE.Vector3
   /** Write the litterbox's world-space position into `out` and return it for chaining. */
   getLitterWorldPosition(out: THREE.Vector3): THREE.Vector3
+  /** Write the cat house's world-space position into `out` and return it for chaining. */
+  getHouseWorldPosition(out: THREE.Vector3): THREE.Vector3
+  /**
+   * Write the world-space "approach" point directly in front of the cat house entry
+   * into `out` and return it. Used by {@link tickGoToHouse} as a two-phase waypoint
+   * so Sushi lines up perpendicular to the entry instead of cutting in diagonally.
+   */
+  getHouseApproachWorldPosition(out: THREE.Vector3): THREE.Vector3
   /**
    * Cat just consumed one serving from the bowl. Implementer is responsible for
    * decrementing `bowlServings` by 1, restoring 25 hunger, and persisting profile.
@@ -69,6 +84,19 @@ export interface CatNeedsBridge {
    * and persist the profile.
    */
   onUsedLitter(): void
+  /** Cat just woke up from a nap — implementer resets `sushiTired` to 0 and saves. */
+  onWoke(): void
+  /**
+   * Cat just entered the sleeping state. Implementer should swap the live cat for the
+   * baked sleeping clone (hide the live group, show the static curled-up mesh inside
+   * the cat house). Called both for organic sleep transitions and for `rollInitialSleep`.
+   */
+  onSleepEnter?(): void
+  /**
+   * Cat just left the sleeping state. Implementer reverses the swap — hide the baked
+   * sleeping clone and show the live, animated cat at its current world position.
+   */
+  onSleepExit?(): void
 }
 
 /** Hunger threshold at or above which Sushi prioritises eating from the bowl. */
@@ -80,6 +108,26 @@ const LOVE_NEEDY_THRESHOLD = 30
  * priority among needs — overrides hunger and love.
  */
 const BLADDER_FULL_THRESHOLD = 70
+/**
+ * Tiredness threshold at or above which Sushi heads back to the cat house and naps,
+ * preempting the laser pointer chase as well as every non-sleep need.
+ */
+const TIRED_FULL_THRESHOLD = 80
+/** Tired units added per second of laser-pointer chase (≈ 12s of sprinting fills the meter). */
+const TIRED_RISE_PER_CHASE_SEC = 8
+/** Seconds between independent wake-up rolls while Sushi is sleeping in the cat house. */
+const SLEEP_WAKE_POLL_INTERVAL_S = 2
+/**
+ * Probability per {@link SLEEP_WAKE_POLL_INTERVAL_S} of waking up. With a 2 s
+ * poll and 0.04 chance, the expected nap length is ~50 s — long enough that the
+ * player actually catches Sushi sleeping if they walk in mid-nap.
+ */
+const SLEEP_WAKE_PROBABILITY = 0.04
+/** Probability that Sushi starts a fresh habitat session already asleep in the cat house. */
+const SLEEP_INITIAL_PROBABILITY = 0.5
+/** Mesh-name fragment used to identify the eyeball mesh on the sleeping clone so we
+ * can hide it (the surrounding eyelid bones already form a closed-lid silhouette). */
+const SLEEPING_EYE_MESH_NAME_FRAGMENT = 'eye'
 /** Distance (XZ, world units) that counts as "next to the player" when following. */
 const FOLLOW_REACHED_DISTANCE = 1.0
 /** Seconds Sushi idles next to the player after catching up before re-evaluating priorities. */
@@ -370,6 +418,7 @@ export class CatController {
   private state: CatState = 'idle'
   private stateTimer = 0
   private stateDuration = 0
+  private wakePollTimer = 0
   private readonly faceTarget = new THREE.Vector3()
   private faceTargetActive = false
   private headBone: THREE.Bone | null = null
@@ -483,11 +532,31 @@ export class CatController {
    * @param dt - Delta time in seconds since the last frame.
    */
   tick(dt: number): void {
-    this.mixer.update(dt)
     this.heartParticles.tick(dt)
+
+    // Sleeping is its own self-contained branch: animation is paused (so the
+    // mixer update would just re-render the same frame), tiredness preempts
+    // laser, and we don't want the floor anchor to fight with the tipped pose.
+    // We exit early after running the wake-up poll.
+    if (this.state === 'sleeping') {
+      this.tickSleeping(dt)
+      return
+    }
+
+    this.mixer.update(dt)
     this.stateTimer += dt
 
-    if (this.laserActive) {
+    // Tiredness preempts the laser pointer — once Sushi is wiped out he heads
+    // for the cat house regardless of where the dot is pointing.
+    if (
+      this.bridge &&
+      this.state !== 'goToHouse' &&
+      this.bridge.getTired() >= TIRED_FULL_THRESHOLD
+    ) {
+      this.enterState('goToHouse')
+    }
+
+    if (this.laserActive && this.state !== 'goToHouse') {
       // Laser dot has top priority and preempts every wander/needs branch. The
       // host scene is responsible for *not* pushing a laser target while the
       // pet glide sequence is active, so we don't have to special-case it here.
@@ -518,6 +587,8 @@ export class CatController {
       this.tickGoToBowl(dt)
     } else if (this.state === 'goToLitter') {
       this.tickGoToLitter(dt)
+    } else if (this.state === 'goToHouse') {
+      this.tickGoToHouse(dt)
     } else if (this.state === 'follow') {
       this.tickFollow(dt)
     } else if (this.state === 'eat') {
@@ -781,6 +852,51 @@ export class CatController {
   }
 
   /**
+   * Step Sushi toward the cat house when tiredness has crossed
+   * {@link TIRED_FULL_THRESHOLD}. On arrival within {@link WAYPOINT_REACHED_EPS},
+   * drop into {@link 'sleeping'} — the controller pauses the walk clip and tips
+   * the inner mesh forward so the pose reads as "flopped napping inside the
+   * dark hut". A wake-up roll runs once per second from {@link tickSleeping}.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  private tickGoToHouse(dt: number): void {
+    if (!this.bridge) {
+      this.pickNextRestingState()
+      return
+    }
+    // Walk only as far as the entry-aligned approach waypoint — the obstacle
+    // padding around the cat house makes a straight march into the centre
+    // unreliable, so as soon as Sushi is right in front of the door we trigger
+    // {@link enterState} for `sleeping`, which snaps him to the house centre and
+    // pins the napping pose. The visual reads as "he ducks inside the moment he
+    // arrives at the threshold".
+    this.bridge.getHouseApproachWorldPosition(this._bridgeTmp)
+    this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    if (this.stepTowardTarget(dt)) {
+      this.enterState('sleeping')
+    }
+  }
+
+  /**
+   * Run the sleeping wake-up poll. Animation is already paused at the first walk
+   * frame and the inner mesh is pitched forward inside the cat house, so the
+   * visible pose doesn't need per-frame work — we just count seconds and roll a
+   * weighted coin once per {@link SLEEP_WAKE_POLL_INTERVAL_S}. On wake we hand
+   * control back to {@link onWoke} (which resets tired) and pop into idle.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  private tickSleeping(dt: number): void {
+    this.wakePollTimer += dt
+    if (this.wakePollTimer < SLEEP_WAKE_POLL_INTERVAL_S) return
+    this.wakePollTimer = 0
+    if (Math.random() >= SLEEP_WAKE_PROBABILITY) return
+    this.bridge?.onWoke()
+    this.enterState('idle')
+  }
+
+  /**
    * Step the cat toward the player, reusing pivot-then-walk locomotion. Once within
    * {@link FOLLOW_REACHED_DISTANCE}, drop into {@link 'idleNearPlayer'} for a short stay.
    *
@@ -843,6 +959,10 @@ export class CatController {
   private evaluateNeedsAndPickNextState(): boolean {
     const bridge = this.bridge
     if (!bridge) return false
+    if (bridge.getTired() >= TIRED_FULL_THRESHOLD) {
+      this.enterState('goToHouse')
+      return true
+    }
     if (bridge.getBladder() >= BLADDER_FULL_THRESHOLD) {
       this.enterState('goToLitter')
       return true
@@ -867,6 +987,8 @@ export class CatController {
       this.state === 'eat' ||
       this.state === 'goToLitter' ||
       this.state === 'useLitter' ||
+      this.state === 'goToHouse' ||
+      this.state === 'sleeping' ||
       this.state === 'follow' ||
       this.state === 'idleNearPlayer'
     )
@@ -896,6 +1018,7 @@ export class CatController {
    * @param next - State to enter.
    */
   private enterState(next: CatState): void {
+    const wasSleeping = this.state === 'sleeping'
     if (this.state !== next) {
       const fromClip = this.clipForState(this.state)
       const toClip = this.clipForState(next)
@@ -912,6 +1035,14 @@ export class CatController {
       // normal heading toward the chosen waypoint.
       if (next !== 'sit') this.faceTargetActive = false
     }
+    if (wasSleeping && next !== 'sleeping') {
+      // Wake up: re-enable the live walk action and re-show the live cat — the
+      // host had hidden the live group and shown the baked sleeping clone via
+      // {@link CatNeedsBridge.onSleepEnter}, and now reverses both swaps.
+      this.actions.walk.paused = false
+      this.group.visible = true
+      this.bridge?.onSleepExit?.()
+    }
     this.stateTimer = 0
     if (next === 'idle') {
       this.stateDuration = randRange(IDLE_MIN_S, IDLE_MAX_S)
@@ -923,6 +1054,16 @@ export class CatController {
       this.stateDuration = EAT_DURATION_S
     } else if (next === 'useLitter') {
       this.stateDuration = LITTER_USE_DURATION_S
+    } else if (next === 'sleeping') {
+      // The visible "asleep" pose is a separate, baked clone owned by the host
+      // (parented inside the cat house with tunable rotation/scale). Hide the
+      // live cat group entirely and let the bridge swap in the clone — that
+      // means we no longer have to do any rotation/anchor/pose math here.
+      this.actions.walk.paused = true
+      this.group.visible = false
+      this.bridge?.onSleepEnter?.()
+      this.wakePollTimer = 0
+      this.stateDuration = Number.POSITIVE_INFINITY
     } else {
       // walk / goToBowl / follow run until the waypoint is reached.
       this.stateDuration = Number.POSITIVE_INFINITY
@@ -946,6 +1087,7 @@ export class CatController {
       case 'walk':
       case 'goToBowl':
       case 'goToLitter':
+      case 'goToHouse':
       case 'follow':
         return 'walk'
       case 'sit':
@@ -955,6 +1097,10 @@ export class CatController {
         return 'run'
       case 'chaseRest':
         return 'idle'
+      case 'sleeping':
+        // Walk action is paused at frame 0 — the cat is tipped onto its face
+        // inside the house so the visible pose is whatever bind+frame-0 gives.
+        return 'walk'
     }
   }
 
@@ -984,6 +1130,11 @@ export class CatController {
    * @param dt - Delta time in seconds.
    */
   private tickChase(dt: number): void {
+    // Sprinting after the dot is what tires Sushi out — the meter only rises
+    // here, not in `chaseRest`, so a player who keeps the dot still doesn't
+    // accidentally drain the cat. Faceplant naps are earned by chasing.
+    this.bridge?.addTired(TIRED_RISE_PER_CHASE_SEC * dt)
+
     const dx = this.laserTarget.x - this.group.position.x
     const dz = this.laserTarget.z - this.group.position.z
     const dist = Math.hypot(dx, dz)
@@ -1038,6 +1189,69 @@ export class CatController {
    */
   setBridge(bridge: CatNeedsBridge | null): void {
     this.bridge = bridge
+  }
+
+  /**
+   * Roll once for whether Sushi should already be sleeping in the cat house when
+   * the habitat scene first opens. Hits with probability
+   * {@link SLEEP_INITIAL_PROBABILITY}; on a hit, snaps the cat into the
+   * `sleeping` state (which positions him at the house and pauses the walk
+   * clip). Misses are a no-op so the regular wander spawn from the constructor
+   * stands.
+   *
+   * @returns Whether the cat was placed asleep.
+   */
+  rollInitialSleep(): boolean {
+    if (Math.random() >= SLEEP_INITIAL_PROBABILITY) return false
+    this.enterState('sleeping')
+    return true
+  }
+
+  /** True while Sushi is in the {@link 'sleeping'} state — used by hosts to gate input. */
+  isSleeping(): boolean {
+    return this.state === 'sleeping'
+  }
+
+  /**
+   * Build a static visual clone of the cat suitable for use as a baked "asleep in
+   * the cat house" pose. Uses {@link SkeletonUtils.clone} so the skinned mesh keeps
+   * its bind pose and shares no animation state with the live cat. The caller owns
+   * the returned object and is free to parent, transform, and toggle visibility on
+   * it; we never read from or write to it after handing it back.
+   *
+   * The clone is wrapped in a {@link THREE.Group} whose local origin sits at the
+   * cloned cat's bounding-box centre, so rotations applied by callers pivot around
+   * the body centre instead of the feet. The wrapper's position is left at (0, 0, 0)
+   * — callers parent it wherever they like and apply their own tunable offsets.
+   *
+   * @returns A fresh group containing a skinned-mesh clone matching the cat's bind pose.
+   */
+  createSleepingClone(): THREE.Object3D {
+    const clone = cloneSkinnedScene(this.inner)
+    const wrapper = new THREE.Group()
+    wrapper.name = 'sushiSleepingClone'
+    wrapper.add(clone)
+    // Re-pivot the clone so the wrapper's local origin sits at the cat's bbox
+    // centre. This makes downstream rotation/scale knobs behave intuitively
+    // (rotate around the body, not the feet).
+    clone.updateMatrixWorld(true)
+    const cloneBox = new THREE.Box3().setFromObject(clone)
+    const cloneCentre = cloneBox.getCenter(new THREE.Vector3())
+    clone.position.x -= cloneCentre.x
+    clone.position.y -= cloneCentre.y
+    clone.position.z -= cloneCentre.z
+    // Close Sushi's eyes: the GLB ships with a dedicated `Persian Cat_Eyes_0`
+    // mesh sitting between the eyelid bones, so hiding it leaves the eyelid
+    // geometry as a closed-lid silhouette without touching skinning or bones.
+    // Match by name fragment (case-insensitive) and skip the
+    // "Eyelid"/"Eyebrow" siblings so we only kill the eyeball mesh itself.
+    clone.traverse((child) => {
+      const name = child.name?.toLowerCase() ?? ''
+      if (!name.includes(SLEEPING_EYE_MESH_NAME_FRAGMENT)) return
+      if (name.includes('lid') || name.includes('brow') || name.includes('lash')) return
+      child.visible = false
+    })
+    return wrapper
   }
 
   /**

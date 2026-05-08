@@ -57,6 +57,9 @@ export const DEFAULT_BOWL_SERVINGS = 0
 /** Default bladder value seeded into fresh and migrating profiles (relieved). */
 export const DEFAULT_SUSHI_BLADDER = 0
 
+/** Default tiredness value seeded into fresh and migrating profiles (rested). */
+export const DEFAULT_SUSHI_TIRED = 0
+
 /** Clamp a numeric value into the inclusive `[min, max]` interval. */
 function clampNumber(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min
@@ -463,6 +466,12 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     SUSHI_NEEDS_MIN,
     SUSHI_NEEDS_MAX,
   )
+  const sushiTired = normalizeClampedNumber(
+    p.sushiTired,
+    DEFAULT_SUSHI_TIRED,
+    SUSHI_NEEDS_MIN,
+    SUSHI_NEEDS_MAX,
+  )
 
   return {
     name: p.name,
@@ -490,6 +499,7 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     sushiHunger,
     bowlServings,
     sushiBladder,
+    sushiTired,
     ...(shuttleHullHp !== undefined ? { shuttleHullHp } : {}),
     ...(landerHullHp !== undefined ? { landerHullHp } : {}),
   }
@@ -556,6 +566,7 @@ export function createProfile(name: string): PlayerProfile {
     sushiHunger: DEFAULT_SUSHI_HUNGER,
     bowlServings: DEFAULT_BOWL_SERVINGS,
     sushiBladder: DEFAULT_SUSHI_BLADDER,
+    sushiTired: DEFAULT_SUSHI_TIRED,
   }
 }
 
@@ -603,6 +614,22 @@ export function addSushiBladder(profile: PlayerProfile, delta: number): PlayerPr
   const next = clampNumber(current + safeDelta, SUSHI_NEEDS_MIN, SUSHI_NEEDS_MAX)
   if (next === current) return profile
   return { ...profile, sushiBladder: next }
+}
+
+/**
+ * Return a copy of the profile with `sushiTired` adjusted by `delta` and clamped to
+ * `[SUSHI_NEEDS_MIN, SUSHI_NEEDS_MAX]`. Non-finite deltas are treated as zero.
+ *
+ * @param profile - Current profile.
+ * @param delta - Signed amount, e.g. `+8 * dt` while chasing the laser or `-100` on wake.
+ * @returns Updated profile (same reference when value is unchanged).
+ */
+export function addSushiTired(profile: PlayerProfile, delta: number): PlayerProfile {
+  const safeDelta = Number.isFinite(delta) ? delta : 0
+  const current = profile.sushiTired ?? DEFAULT_SUSHI_TIRED
+  const next = clampNumber(current + safeDelta, SUSHI_NEEDS_MIN, SUSHI_NEEDS_MAX)
+  if (next === current) return profile
+  return { ...profile, sushiTired: next }
 }
 
 /**

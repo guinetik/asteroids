@@ -24,6 +24,7 @@ import type { Inventory } from '@/lib/inventory/types'
 import type { PlayerProfile } from '@/lib/player/types'
 import {
   addSushiBladder,
+  addSushiTired,
   addSushiHunger,
   addSushiLove,
   recordSushiBowlRefill,
@@ -174,6 +175,9 @@ export class MapHabitatFacade {
       getLove: () => (deps ? deps.getProfile().sushiLove : 0),
       getBowlServings: () => (deps ? deps.getProfile().bowlServings : 0),
       getBladder: () => (deps ? deps.getProfile().sushiBladder : 0),
+      getTired: () => (deps ? deps.getProfile().sushiTired : 0),
+      addTired: (delta) => this.handleSushiAddTired(delta),
+      onWoke: () => this.handleSushiWoke(),
       canFillBowl: () => {
         if (!deps) return false
         const profile = deps.getProfile()
@@ -227,6 +231,36 @@ export class MapHabitatFacade {
    * empty and persist the profile. No achievements wired off this for now — it's a
    * pure care-loop reset.
    */
+  /**
+   * Apply an in-memory tiredness delta from the cat (called per chase frame). To avoid
+   * thrashing localStorage, this only mutates the working profile — the periodic decay
+   * tick in {@link MapViewController} captures the latest state on its save cadence.
+   *
+   * @param delta - Tiredness delta in points; positive while chasing the laser.
+   */
+  private handleSushiAddTired(delta: number): void {
+    const deps = this.deps
+    if (!deps) return
+    const profile = deps.getProfile()
+    const next = addSushiTired(profile, delta)
+    if (next === profile) return
+    deps.setProfile(next)
+  }
+
+  /**
+   * Sushi just woke from a nap. Reset tiredness to zero and persist immediately so a
+   * tab refresh during the wake transition can't strand him at full tired.
+   */
+  private handleSushiWoke(): void {
+    const deps = this.deps
+    if (!deps) return
+    const profile = deps.getProfile()
+    const next = addSushiTired(profile, -SUSHI_NEEDS_MAX)
+    if (next === profile) return
+    deps.setProfile(next)
+    saveProfile(next)
+  }
+
   private handleSushiUsedLitter(): void {
     const deps = this.deps
     if (!deps) return

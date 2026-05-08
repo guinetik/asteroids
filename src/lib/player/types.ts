@@ -196,4 +196,10 @@ export interface PlayerProfile {
    * until Sushi visits the litterbox, then resets to 0. Defaults to 0.
    */
   sushiBladder: number
+  /**
+   * Sushi's tiredness meter, clamped to [0, 100]. 0 means rested; rises while Sushi
+   * sprints after the laser pointer and resets to 0 when he wakes from a nap inside
+   * the cat house. Defaults to 0.
+   */
+  sushiTired: number
 }

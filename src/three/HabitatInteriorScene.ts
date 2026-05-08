@@ -256,6 +256,62 @@ const CAT_FOUNTAIN_X = -4.25
 /** Shared world Z of the feeding area — sits just shy of the +Z wall, beside the table. */
 const CAT_FEEDING_Z = 7.2
 
+// --- Sushi cat house (sleeps when tired) ----------------------------------
+/** World X of Sushi's wooden cat house — tucked beside the bed on the +X side. */
+const CAT_HOUSE_X = 4.25
+/** World Z of Sushi's cat house — pushed back near the -Z end cap so it hugs the wall. */
+const CAT_HOUSE_Z = -1.75
+/** Yaw applied to the cat house group so the entry hole faces -X (toward the cabin centre). */
+const CAT_HOUSE_YAW_RADIANS = Math.PI / 2
+/**
+ * Distance (world units) from the house centre at which Sushi lines up directly
+ * in front of the entry before marching straight in. Far enough that the final
+ * segment is unmistakably perpendicular to the door (no diagonal cut), close
+ * enough that the line-up doesn't read as an extra detour.
+ */
+const CAT_HOUSE_APPROACH_DISTANCE = 0.55
+/** Outer width (along X) of the cat house body, world units. */
+const CAT_HOUSE_WIDTH = 0.8
+/** Outer depth (along Z) of the cat house body, world units. */
+const CAT_HOUSE_DEPTH = 0.8
+/** Wall height of the cat house (under the pitched roof), world units. */
+const CAT_HOUSE_WALL_HEIGHT = 0.55
+/** Wall + floor + roof panel thickness, world units. */
+const CAT_HOUSE_THICKNESS = 0.025
+/** Radius of the round entry hole on the front face (–Z), world units. */
+const CAT_HOUSE_ENTRY_RADIUS = 0.18
+/** Vertical centre of the entry hole above the cabin floor, world units. */
+const CAT_HOUSE_ENTRY_CENTRE_Y = 0.22
+/** Roof peak height above the wall top, world units. */
+const CAT_HOUSE_ROOF_PEAK = 0.22
+/** Eaves overhang (X+Z) past the wall plane, world units. */
+const CAT_HOUSE_ROOF_OVERHANG = 0.05
+/** ShapeGeometry sweep — 0..2π — used when carving the round entry hole. */
+const TWO_PI = Math.PI * 2
+
+// --- Sleeping cat clone tunables ------------------------------------------
+// The "asleep" visual is a separate baked clone of the live cat, parented to
+// the cat house group so it inherits the house transform. These knobs let us
+// dial in the curled-up pose by hand without touching the rig.
+
+/** Local X position offset of the sleeping clone relative to the cat house origin. */
+const CAT_SLEEP_OFFSET_X = 0
+/** Local Y position offset of the sleeping clone relative to the cat house floor.
+ * Wrapper origin sits at the cat's bbox centre, so we lift it ~half the cat's
+ * lateral thickness so the body rests on the floor when rolled onto a side. */
+const CAT_SLEEP_OFFSET_Y = 0.08
+/** Local Z position offset of the sleeping clone relative to the cat house origin. */
+const CAT_SLEEP_OFFSET_Z = 0
+/** Local pitch (radians) applied to the sleeping clone — tips the body forward. */
+const CAT_SLEEP_ROTATION_X = 0
+/** Local yaw (radians) applied to the sleeping clone — spins the body about vertical.
+ * π flips the cat so its face points out the door (-Z local) instead of the back wall. */
+const CAT_SLEEP_ROTATION_Y = Math.PI
+/** Local roll (radians) applied to the sleeping clone — rolls onto a side. */
+const CAT_SLEEP_ROTATION_Z = Math.PI / 2
+/** Uniform scale multiplier applied to the sleeping clone (1 = identical to live cat). */
+const CAT_SLEEP_SCALE = 1
+
 /** World X of the litterbox — mirror of the feeding bowl on the starboard (+X) side. */
 const CAT_LITTER_X = 3.85
 /** World Z of the litterbox, mirroring the feeding-area corner. */
@@ -337,12 +393,18 @@ export interface SushiBridgeCallbacks {
   getBowlServings(): number
   /** Read current bladder (0..100) from the player profile. */
   getBladder(): number
+  /** Read current tiredness (0..100) from the player profile. */
+  getTired(): number
+  /** Apply a tiredness delta — facade clamps + persists on its own throttle. */
+  addTired(delta: number): void
   /** Cat consumed one serving — facade decrements bowl + restores hunger + saves. */
   onEatServing(): void
   /** Cat got pet — facade adds love + bumps stats + saves + evaluates achievements. */
   onPetted(): void
   /** Cat finished using the litterbox — facade resets bladder + saves. */
   onUsedLitter(): void
+  /** Cat woke up from a nap — facade resets tiredness + saves. */
+  onWoke(): void
   /** True when the player can fill the bowl (≥1 cat-food in inventory AND bowl not full). */
   canFillBowl(): boolean
   /** Player pressed F at the bowl — facade fills bowl from inventory + saves. */
@@ -423,6 +485,19 @@ export class HabitatInteriorScene {
    * the habitat still works without the model.
    */
   private cat: CatController | null = null
+  /**
+   * Cat-house group reference (built in {@link buildCatHouse}) — kept so the
+   * sleeping-cat clone can be parented inside the house and inherit the house
+   * yaw/position automatically.
+   */
+  private catHouseGroup: THREE.Group | null = null
+  /**
+   * Baked "asleep in the cat house" visual — a static {@link SkeletonUtils.clone}
+   * of the live cat's bind pose, parented inside the house with tunable
+   * rotation/scale. Hidden by default; the bridge toggles its visibility in
+   * lockstep with the live cat's `sleeping` state.
+   */
+  private sleepingCatClone: THREE.Object3D | null = null
 
   /** When true, table follows the camera until the next LMB releases it. */
   private tablePlacementGrabbed = false
@@ -436,6 +511,16 @@ export class HabitatInteriorScene {
 
   /** Stored world-space position of the litterbox, populated by {@link buildCatLitterArea}. */
   private readonly litterWorldPosition = new THREE.Vector3()
+
+  /** Stored world-space position of the cat house, populated by {@link buildCatHouse}. */
+  private readonly houseWorldPosition = new THREE.Vector3()
+  /**
+   * World-space waypoint sitting {@link CAT_HOUSE_APPROACH_DISTANCE} directly in front
+   * of the cat-house entry. Populated by {@link buildCatHouse} and read by the cat
+   * controller through `getHouseApproachWorldPosition` so it lines up perpendicular
+   * to the door before walking straight in.
+   */
+  private readonly houseApproachWorldPosition = new THREE.Vector3()
 
   /** Reference to the bowl mesh so the refill cue can punch its scale. */
   private bowlMesh: THREE.Mesh | null = null
@@ -642,6 +727,11 @@ export class HabitatInteriorScene {
     const litterArea = this.buildCatLitterArea()
     this.scene.add(litterArea)
 
+    // --- Sushi's cat house (sleeps when tired) -----------------------------
+    const catHouse = this.buildCatHouse()
+    this.scene.add(catHouse)
+    this.catHouseGroup = catHouse
+
     // --- Sushi (habitat cat) -----------------------------------------------
     // Tribute NPC. Loaded best-effort: a load failure should not break the
     // rest of the habitat scene, so we swallow the error and log it instead.
@@ -653,6 +743,7 @@ export class HabitatInteriorScene {
       footprintFromObject(tableModel, CAT_OBSTACLE_PADDING),
       footprintFromObject(feedingArea, CAT_OBSTACLE_PADDING),
       footprintFromObject(litterArea, CAT_OBSTACLE_PADDING),
+      footprintFromObject(catHouse, CAT_OBSTACLE_PADDING),
     ]
     try {
       this.cat = await CatController.create(CAT_MODEL_URL, {
@@ -663,7 +754,27 @@ export class HabitatInteriorScene {
       // Hearts emit in world space — add as a sibling so they stay where spawned
       // even if Sushi walks off mid-burst.
       this.scene.add(this.cat.hearts)
+      // Bake a static sleeping clone parented inside the cat house so it
+      // inherits the house yaw/position. Sleep-state visibility is driven by
+      // the bridge — see {@link applySushiBridgeToCat}.
+      this.sleepingCatClone = this.cat.createSleepingClone()
+      this.sleepingCatClone.position.set(
+        CAT_SLEEP_OFFSET_X,
+        CAT_SLEEP_OFFSET_Y,
+        CAT_SLEEP_OFFSET_Z,
+      )
+      this.sleepingCatClone.rotation.set(
+        CAT_SLEEP_ROTATION_X,
+        CAT_SLEEP_ROTATION_Y,
+        CAT_SLEEP_ROTATION_Z,
+      )
+      this.sleepingCatClone.scale.multiplyScalar(CAT_SLEEP_SCALE)
+      this.sleepingCatClone.visible = false
+      this.catHouseGroup.add(this.sleepingCatClone)
       this.applySushiBridgeToCat()
+      // 50% chance Sushi greets you mid-nap inside the house. Roll happens
+      // after the bridge is wired so the cat can read tiredness and onWoke.
+      this.cat.rollInitialSleep()
     } catch (err) {
       console.warn('[HabitatInteriorScene] failed to load cat model:', err)
     }
@@ -716,7 +827,8 @@ export class HabitatInteriorScene {
       this.laserPointerHeld &&
       !isTablePlacementDebugEnabled() &&
       !this.petSequenceActive &&
-      !this.tablePlacementGrabbed
+      !this.tablePlacementGrabbed &&
+      !(this.cat?.isSleeping() ?? false)
 
     if (!gateOpen) {
       if (dot.visible) dot.visible = false
@@ -810,6 +922,18 @@ export class HabitatInteriorScene {
   }
 
   /**
+   * Toggle the baked sleeping-cat clone parented inside the cat house. The live
+   * cat's visibility is owned by {@link CatController}; this method only flips
+   * the static asleep visual that lives in scene space.
+   *
+   * @param visible - Whether the sleeping clone should be drawn.
+   */
+  private setSleepingVisualVisible(visible: boolean): void {
+    if (!this.sleepingCatClone) return
+    this.sleepingCatClone.visible = visible
+  }
+
+  /**
    * Build a {@link CatNeedsBridge} from the current callbacks and hand it to the cat.
    * No-op if either side is missing.
    */
@@ -825,14 +949,25 @@ export class HabitatInteriorScene {
       getLove: () => callbacks.getLove(),
       getBowlServings: () => callbacks.getBowlServings(),
       getBladder: () => callbacks.getBladder(),
+      getTired: () => callbacks.getTired(),
+      addTired: (delta) => callbacks.addTired(delta),
       getPlayerWorldPosition: (out) => out.copy(this.player.position),
       getBowlWorldPosition: (out) => out.copy(this.bowlWorldPosition),
       getLitterWorldPosition: (out) => out.copy(this.litterWorldPosition),
+      getHouseWorldPosition: (out) => out.copy(this.houseWorldPosition),
+      getHouseApproachWorldPosition: (out) => out.copy(this.houseApproachWorldPosition),
       onEatServing: () => callbacks.onEatServing(),
       onPetted: () => callbacks.onPetted(),
       onUsedLitter: () => callbacks.onUsedLitter(),
+      onWoke: () => callbacks.onWoke(),
+      onSleepEnter: () => this.setSleepingVisualVisible(true),
+      onSleepExit: () => this.setSleepingVisualVisible(false),
     }
     this.cat.setBridge(bridge)
+    // Re-sync the sleeping clone in case the cat was already in the sleeping
+    // state when the bridge was installed (e.g. {@link rollInitialSleep} fired
+    // during {@link load} before host callbacks were wired).
+    this.setSleepingVisualVisible(this.cat.isSleeping())
   }
 
   // -------------------------------------------------------------------------
@@ -1250,6 +1385,138 @@ export class HabitatInteriorScene {
     group.add(sand)
 
     this.litterWorldPosition.set(CAT_LITTER_X, FLOOR_Y, CAT_LITTER_Z)
+    return group
+  }
+
+  /**
+   * Build Sushi's wooden cat house. Three solid walls + floor + a front wall with
+   * a circular entry hole carved out (via {@link THREE.Shape} + {@link THREE.Path.absellipse}
+   * extruded) so the cat can slip inside. A pitched roof (two angled panels) sits on top.
+   * Materials are dim and unlit-feeling so the interior reads as vignetted — the player
+   * can barely see Sushi when he's curled up inside.
+   *
+   * Origin: house centre at (CAT_HOUSE_X, FLOOR_Y, CAT_HOUSE_Z); entry faces -Z.
+   *
+   * @returns Three.js group containing the assembled cat house.
+   */
+  private buildCatHouse(): THREE.Group {
+    const group = new THREE.Group()
+    group.name = 'sushiCatHouse'
+
+    const woodMat = new THREE.MeshStandardMaterial({
+      color: 0xd9b785,
+      roughness: 0.85,
+      metalness: 0,
+    })
+    const innerMat = new THREE.MeshStandardMaterial({
+      color: 0x6b5238,
+      roughness: 1,
+      metalness: 0,
+    })
+    const roofMat = new THREE.MeshStandardMaterial({
+      color: 0xb87a4a,
+      roughness: 0.9,
+      metalness: 0,
+    })
+
+    const w = CAT_HOUSE_WIDTH
+    const d = CAT_HOUSE_DEPTH
+    const h = CAT_HOUSE_WALL_HEIGHT
+    const t = CAT_HOUSE_THICKNESS
+    const halfW = w / 2
+    const halfD = d / 2
+
+    // Floor slab — sits flush with the cabin floor (group is positioned later).
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(w, t, d), woodMat)
+    floor.position.set(0, t / 2, 0)
+    group.add(floor)
+
+    // Back wall (+Z face).
+    const back = new THREE.Mesh(new THREE.BoxGeometry(w, h, t), woodMat)
+    back.position.set(0, h / 2, halfD - t / 2)
+    group.add(back)
+
+    // Side walls.
+    const sideGeo = new THREE.BoxGeometry(t, h, d)
+    const left = new THREE.Mesh(sideGeo, woodMat)
+    left.position.set(-halfW + t / 2, h / 2, 0)
+    group.add(left)
+    const right = new THREE.Mesh(sideGeo, woodMat)
+    right.position.set(halfW - t / 2, h / 2, 0)
+    group.add(right)
+
+    // Front wall (-Z) with circular entry hole. Build a 2D rectangle Shape and
+    // subtract a circular Path so ExtrudeGeometry produces a wall-with-hole.
+    // The shape is authored in local XY (centred on the wall centre) then placed
+    // at the front face with thickness running along Z.
+    const frontShape = new THREE.Shape()
+    frontShape.moveTo(-halfW, 0)
+    frontShape.lineTo(halfW, 0)
+    frontShape.lineTo(halfW, h)
+    frontShape.lineTo(-halfW, h)
+    frontShape.lineTo(-halfW, 0)
+    const hole = new THREE.Path()
+    hole.absellipse(0, CAT_HOUSE_ENTRY_CENTRE_Y, CAT_HOUSE_ENTRY_RADIUS, CAT_HOUSE_ENTRY_RADIUS, 0, TWO_PI, false, 0)
+    frontShape.holes.push(hole)
+    const frontGeo = new THREE.ExtrudeGeometry(frontShape, {
+      depth: t,
+      bevelEnabled: false,
+    })
+    const front = new THREE.Mesh(frontGeo, woodMat)
+    // Place at front face (–Z side); extrudes along +Z so push back by t to keep
+    // outer face on -halfD line.
+    front.position.set(0, 0, -halfD)
+    group.add(front)
+
+    // Inner shadow card — a dark plate just inside the entry to vignette the
+    // interior so Sushi reads as silhouette/barely visible when sleeping.
+    const shadowCard = new THREE.Mesh(
+      new THREE.PlaneGeometry(w - t * 2, h - t),
+      innerMat,
+    )
+    shadowCard.position.set(0, (h - t) / 2 + t, halfD - t * 1.5)
+    shadowCard.rotation.y = Math.PI
+    group.add(shadowCard)
+
+    // Pitched roof — two angled panels meeting at a peak running along X.
+    // Each panel spans (halfD + overhang) × (panelWidth) and tilts so the high
+    // edge sits at peak height and the low edge at the eaves.
+    const overhang = CAT_HOUSE_ROOF_OVERHANG
+    const peak = CAT_HOUSE_ROOF_PEAK
+    const panelLen = w + overhang * 2
+    const slopeRun = halfD + overhang
+    const panelWidth = Math.sqrt(slopeRun * slopeRun + peak * peak)
+    const tiltAngle = Math.atan2(peak, slopeRun)
+    const panelGeo = new THREE.BoxGeometry(panelLen, t, panelWidth)
+    const roofLocalY = h
+    const peakLocalY = roofLocalY + peak
+
+    const panelFront = new THREE.Mesh(panelGeo, roofMat)
+    panelFront.position.set(0, (peakLocalY + roofLocalY) / 2, -slopeRun / 2)
+    panelFront.rotation.x = -tiltAngle
+    group.add(panelFront)
+
+    const panelBack = new THREE.Mesh(panelGeo, roofMat)
+    panelBack.position.set(0, (peakLocalY + roofLocalY) / 2, slopeRun / 2)
+    panelBack.rotation.x = tiltAngle
+    group.add(panelBack)
+
+    // Place + orient the assembled house. Built with entry on local -Z; rotating by
+    // CAT_HOUSE_YAW_RADIANS swings the entry to face -X (toward the cabin centre).
+    group.position.set(CAT_HOUSE_X, FLOOR_Y, CAT_HOUSE_Z)
+    group.rotation.y = CAT_HOUSE_YAW_RADIANS
+    this.houseWorldPosition.set(CAT_HOUSE_X, FLOOR_Y, CAT_HOUSE_Z)
+    // Entry-approach waypoint = house centre + outward entry normal *
+    // CAT_HOUSE_APPROACH_DISTANCE. The house was authored with the entry on
+    // local -Z; rotating the group by `CAT_HOUSE_YAW_RADIANS` around Y maps
+    // that to a world-space outward normal of (-sin(yaw), 0, -cos(yaw)).
+    const entryNx = -Math.sin(CAT_HOUSE_YAW_RADIANS)
+    const entryNz = -Math.cos(CAT_HOUSE_YAW_RADIANS)
+    this.houseApproachWorldPosition.set(
+      CAT_HOUSE_X + entryNx * CAT_HOUSE_APPROACH_DISTANCE,
+      FLOOR_Y,
+      CAT_HOUSE_Z + entryNz * CAT_HOUSE_APPROACH_DISTANCE,
+    )
     return group
   }
 

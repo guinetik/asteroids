@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * Twin canvas-backed donut HUD that surfaces Sushi the cat's `sushiLove`
- * and `sushiHunger` meters from the player profile while the player is
+ * Canvas-backed donut HUD that surfaces Sushi the cat's `sushiLove`,
+ * `sushiHunger`, and `sushiTired` meters from the player profile while the player is
  * inside the habitat scene and a habitat key-prompt is on screen.
  *
  * Mounted alongside the habitat `KeyPrompt` in {@link MapView}; pointer
@@ -23,6 +23,8 @@ interface Props {
   love: number
   /** Hunger meter, expected range [0, 100]. */
   hunger: number
+  /** Tiredness meter, expected range [0, 100]. */
+  tired: number
 }
 
 const props = defineProps<Props>()
@@ -47,6 +49,8 @@ const TRACK_COLOR = 'rgba(255, 255, 255, 0.18)'
 const LOVE_FILL_COLOR = '#ff5577'
 /** Filled-arc color for the hunger donut. */
 const HUNGER_FILL_COLOR = '#f2a83a'
+/** Filled-arc color for the tired donut — cool indigo so it reads as "needs sleep". */
+const TIRED_FILL_COLOR = '#8b7dff'
 /** Center percentage label color. */
 const CENTER_TEXT_COLOR = 'rgba(255, 255, 255, 0.92)'
 /** Font family stack used by the canvas labels (matches global Datatype). */
@@ -68,16 +72,21 @@ function clampMeter(value: number): number {
 
 const loveCanvasRef = ref<HTMLCanvasElement | null>(null)
 const hungerCanvasRef = ref<HTMLCanvasElement | null>(null)
+const tiredCanvasRef = ref<HTMLCanvasElement | null>(null)
 
 /** Currently-rendered love percentage (lerps toward `props.love`). */
 const displayedLove = ref(clampMeter(props.love))
 /** Currently-rendered hunger percentage (lerps toward `props.hunger`). */
 const displayedHunger = ref(clampMeter(props.hunger))
+/** Currently-rendered tiredness percentage (lerps toward `props.tired`). */
+const displayedTired = ref(clampMeter(props.tired))
 
 /** Integer percentage shown at the center of the love donut. */
 const loveCenterLabel = computed(() => Math.round(displayedLove.value).toString())
 /** Integer percentage shown at the center of the hunger donut. */
 const hungerCenterLabel = computed(() => Math.round(displayedHunger.value).toString())
+/** Integer percentage shown at the center of the tired donut. */
+const tiredCenterLabel = computed(() => Math.round(displayedTired.value).toString())
 
 let rafHandle = 0
 
@@ -165,6 +174,12 @@ function repaint(): void {
     HUNGER_FILL_COLOR,
     hungerCenterLabel.value,
   )
+  drawDonut(
+    tiredCanvasRef.value,
+    displayedTired.value / METER_MAX,
+    TIRED_FILL_COLOR,
+    tiredCenterLabel.value,
+  )
 }
 
 /**
@@ -174,8 +189,10 @@ function repaint(): void {
 function stepLerp(): boolean {
   const targetLove = clampMeter(props.love)
   const targetHunger = clampMeter(props.hunger)
+  const targetTired = clampMeter(props.tired)
   const dLove = targetLove - displayedLove.value
   const dHunger = targetHunger - displayedHunger.value
+  const dTired = targetTired - displayedTired.value
   let moving = false
   if (Math.abs(dLove) > ARC_SETTLE_EPSILON) {
     displayedLove.value += dLove * ARC_LERP_RATE
@@ -188,6 +205,12 @@ function stepLerp(): boolean {
     moving = true
   } else if (displayedHunger.value !== targetHunger) {
     displayedHunger.value = targetHunger
+  }
+  if (Math.abs(dTired) > ARC_SETTLE_EPSILON) {
+    displayedTired.value += dTired * ARC_LERP_RATE
+    moving = true
+  } else if (displayedTired.value !== targetTired) {
+    displayedTired.value = targetTired
   }
   return moving
 }
@@ -211,7 +234,7 @@ function ensureLoop(): void {
 }
 
 watch(
-  () => [props.love, props.hunger],
+  () => [props.love, props.hunger, props.tired],
   () => {
     ensureLoop()
   },
@@ -257,6 +280,14 @@ onBeforeUnmount(() => {
         :aria-label="`Sushi hunger ${hungerCenterLabel}%`"
       ></canvas>
       <span class="sushi-meters__title">HUNGER</span>
+    </div>
+    <div class="sushi-meters__cell">
+      <canvas
+        ref="tiredCanvasRef"
+        class="sushi-meters__canvas"
+        :aria-label="`Sushi tired ${tiredCenterLabel}%`"
+      ></canvas>
+      <span class="sushi-meters__title">TIRED</span>
     </div>
   </div>
 </template>

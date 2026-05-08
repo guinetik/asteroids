@@ -30,20 +30,21 @@ beforeAll(() => {
 })
 
 describe('SushiMetersOverlay', () => {
-  it('renders both donut canvases and the LOVE / HUNGER labels when visible', () => {
+  it('renders all donut canvases and the LOVE / HUNGER / TIRED labels when visible', () => {
     const wrapper = mount(SushiMetersOverlay, {
-      props: { visible: true, love: 75, hunger: 40 },
+      props: { visible: true, love: 75, hunger: 40, tired: 20 },
     })
     const canvases = wrapper.findAll('canvas')
-    expect(canvases).toHaveLength(2)
+    expect(canvases).toHaveLength(3)
     const html = wrapper.html()
     expect(html).toContain('LOVE')
     expect(html).toContain('HUNGER')
+    expect(html).toContain('TIRED')
   })
 
   it('renders nothing when visible is false', () => {
     const wrapper = mount(SushiMetersOverlay, {
-      props: { visible: false, love: 50, hunger: 50 },
+      props: { visible: false, love: 50, hunger: 50, tired: 50 },
     })
     expect(wrapper.find('canvas').exists()).toBe(false)
     expect(wrapper.html()).not.toContain('LOVE')

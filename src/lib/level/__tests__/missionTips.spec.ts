@@ -71,6 +71,7 @@ function profile(completed: Record<string, number>): PlayerProfile {
     sushiHunger: 75,
     bowlServings: 0,
     sushiBladder: 0,
+    sushiTired: 0,
   }
 }
 

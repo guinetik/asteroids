@@ -2187,6 +2187,7 @@ watch(
       :visible="habitatActive && sushiPromptActive && !shuttleControlVisible"
       :love="playerProfileSnapshot.sushiLove"
       :hunger="playerProfileSnapshot.sushiHunger"
+      :tired="playerProfileSnapshot.sushiTired"
     />
     <KeyPrompt
       v-if="habitatActive && habitatPromptParsed && !shuttleControlVisible"
