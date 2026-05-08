@@ -260,6 +260,117 @@ function footprintFromObject(obj: THREE.Object3D, padding: number): CatObstacle 
 }
 
 /**
+ * Reset the locker GLB's authored open door orientation to match the cabinet body.
+ *
+ * @param locker - Loaded locker scene root.
+ */
+function closeLockerDoor(locker: THREE.Object3D): void {
+  const door = locker.getObjectByName(LOCKER_DOOR_NODE_NAME)
+  const body = locker.getObjectByName(LOCKER_BODY_NODE_NAME)
+  if (!door || !body) return
+  door.quaternion.copy(body.quaternion)
+  door.updateMatrixWorld(true)
+}
+
+/**
+ * Add a subtle local fill to the locker so its dark material stays readable in the bedroom.
+ *
+ * @param locker - Placed locker scene root.
+ */
+function addLockerFillLight(locker: THREE.Object3D): void {
+  const fill = new THREE.PointLight(
+    LOCKER_FILL_LIGHT_COLOR,
+    LOCKER_FILL_LIGHT_INTENSITY,
+    LOCKER_FILL_LIGHT_RANGE,
+  )
+  fill.position.set(
+    LOCKER_FILL_LIGHT_OFFSET_X,
+    LOCKER_FILL_LIGHT_OFFSET_Y,
+    LOCKER_FILL_LIGHT_OFFSET_Z,
+  )
+  locker.add(fill)
+}
+
+/**
+ * Mildly lifts the locker material response so the prop is not crushed to black indoors.
+ *
+ * @param locker - Loaded locker scene root.
+ */
+function tuneLockerMaterials(locker: THREE.Object3D): void {
+  locker.traverse((child) => {
+    if (!(child instanceof THREE.Mesh) || !child.material) return
+    const mats = Array.isArray(child.material) ? child.material : [child.material]
+    for (const mat of mats) {
+      if (!(mat instanceof THREE.MeshStandardMaterial)) continue
+      mat.roughness = Math.max(mat.roughness, LOCKER_MIN_ROUGHNESS)
+      mat.metalness = Math.min(mat.metalness, LOCKER_MAX_METALNESS)
+      mat.envMapIntensity = Math.max(mat.envMapIntensity, LOCKER_MIN_ENV_MAP_INTENSITY)
+      mat.emissive.setHex(LOCKER_MATERIAL_EMISSIVE_COLOR)
+      mat.emissiveIntensity = Math.max(mat.emissiveIntensity, LOCKER_MATERIAL_EMISSIVE_INTENSITY)
+      mat.needsUpdate = true
+    }
+  })
+}
+
+/**
+ * Place the centered locker model against the bed wall at the opposite end from the cat house.
+ *
+ * @param locker - Loaded locker scene root.
+ */
+function placeLocker(locker: THREE.Object3D): void {
+  locker.rotation.y = LOCKER_YAW_RADIANS
+  locker.position.set(LOCKER_X, FLOOR_Y, LOCKER_Z)
+  locker.updateMatrixWorld(true)
+}
+
+/**
+ * Compute a uniform scale that makes a centered locker asset match the target world height.
+ *
+ * @param locker - Loaded locker scene root.
+ * @returns Uniform scale multiplier.
+ */
+function computeLockerScale(locker: THREE.Object3D): number {
+  const lockerBox = new THREE.Box3().setFromObject(locker)
+  const lockerSize = lockerBox.getSize(new THREE.Vector3())
+  return LOCKER_TARGET_HEIGHT / lockerSize.y
+}
+
+/**
+ * Scale the centered locker asset once its runtime bbox is known.
+ *
+ * @param locker - Loaded locker scene root.
+ */
+function applyLockerScale(locker: THREE.Object3D): void {
+  locker.scale.setScalar(computeLockerScale(locker))
+  locker.updateMatrixWorld(true)
+}
+
+/**
+ * Drop the locker to the habitat floor after its scale and rotation are applied.
+ *
+ * @param locker - Loaded locker scene root.
+ */
+function groundLocker(locker: THREE.Object3D): void {
+  const box = new THREE.Box3().setFromObject(locker)
+  locker.position.y -= box.min.y - FLOOR_Y
+  locker.updateMatrixWorld(true)
+}
+
+/**
+ * Prepare locker geometry, closed-door pose, materials, lighting, and final placement.
+ *
+ * @param locker - Loaded locker scene root.
+ */
+function configureLocker(locker: THREE.Object3D): void {
+  applyLockerScale(locker)
+  closeLockerDoor(locker)
+  tuneLockerMaterials(locker)
+  placeLocker(locker)
+  groundLocker(locker)
+  addLockerFillLight(locker)
+}
+
+/**
  * Compile-time feature flag for the LMB grab/place tool used to author the table's resting
  * pose. The code path stays compiled in (re-enable by flipping this constant to `true` and
  * running a `bun dev` session); it's gated to `false` by default so dev builds don't expose
@@ -335,6 +446,44 @@ const CAT_HOUSE_ROOF_PEAK = 0.22
 const CAT_HOUSE_ROOF_OVERHANG = 0.05
 /** ShapeGeometry sweep — 0..2π — used when carving the round entry hole. */
 const TWO_PI = Math.PI * 2
+
+// --- Bedside locker --------------------------------------------------------
+/** Path to the bedroom locker GLB asset. */
+const LOCKER_MODEL_URL = '/models/locker.glb'
+/** World X of the locker, pressed close to the same +X wall as the bed. */
+const LOCKER_X = 4.42
+/** World Z of the locker, placed at the bed end opposite Sushi's cat house. */
+const LOCKER_Z = 1.35
+/** Target world height of the locker after GLB normalization. */
+const LOCKER_TARGET_HEIGHT = 1.45
+/** Yaw applied to the locker so its front faces back into the walkable cabin. */
+const LOCKER_YAW_RADIANS = -Math.PI / 2
+/** Node name of the locker body transform in `locker.glb`. */
+const LOCKER_BODY_NODE_NAME = 'body'
+/** Node name of the locker door mesh pivot in `locker.glb`. */
+const LOCKER_DOOR_NODE_NAME = 'door'
+/** Minimum locker material roughness so local fill light reads softly. */
+const LOCKER_MIN_ROUGHNESS = 0.72
+/** Maximum locker material metalness so it does not crush to black under habitat light. */
+const LOCKER_MAX_METALNESS = 0.28
+/** Minimum environment-map intensity for the locker materials. */
+const LOCKER_MIN_ENV_MAP_INTENSITY = 0.85
+/** Low neutral emissive color that lifts the dark locker material without glowing. */
+const LOCKER_MATERIAL_EMISSIVE_COLOR = 0x111820
+/** Low neutral emissive intensity that keeps the locker readable in the bedroom corner. */
+const LOCKER_MATERIAL_EMISSIVE_INTENSITY = 0.18
+/** Color of the small locker-local visibility fill light. */
+const LOCKER_FILL_LIGHT_COLOR = 0xb8d8ff
+/** Intensity of the small locker-local visibility fill light. */
+const LOCKER_FILL_LIGHT_INTENSITY = 0.65
+/** Range of the small locker-local visibility fill light. */
+const LOCKER_FILL_LIGHT_RANGE = 2.2
+/** Local X offset of the locker fill light. */
+const LOCKER_FILL_LIGHT_OFFSET_X = -0.28
+/** Local Y offset of the locker fill light. */
+const LOCKER_FILL_LIGHT_OFFSET_Y = 1.12
+/** Local Z offset of the locker fill light. */
+const LOCKER_FILL_LIGHT_OFFSET_Z = 0.35
 
 // --- Sleeping cat clone tunables ------------------------------------------
 // The "asleep" visual is a separate baked clone of the live cat, parented to
@@ -843,7 +992,7 @@ export class HabitatInteriorScene {
     if (this.loaded) return
     this.loaded = true
 
-    const [, , , , , , bedModel, tableModel] = await Promise.all([
+    const [, , , , , , bedModel, tableModel, lockerModel] = await Promise.all([
       this.posterWall.load(),
       this.completionPoster.load(),
       this.journeyAct1Wall.load(),
@@ -852,6 +1001,7 @@ export class HabitatInteriorScene {
       this.tablePosterRow.load(),
       loadGLB('/models/bed.glb'),
       loadGLB('/models/table.glb'),
+      loadGLB(LOCKER_MODEL_URL),
     ])
 
     // --- Bed ----------------------------------------------------------------
@@ -932,6 +1082,10 @@ export class HabitatInteriorScene {
     this.scene.add(catHouse)
     this.catHouseGroup = catHouse
 
+    // --- Bedside locker -----------------------------------------------------
+    configureLocker(lockerModel)
+    this.scene.add(lockerModel)
+
     // --- Sushi (habitat cat) -----------------------------------------------
     // Tribute NPC. Loaded best-effort: a load failure should not break the
     // rest of the habitat scene, so we swallow the error and log it instead.
@@ -944,6 +1098,7 @@ export class HabitatInteriorScene {
       footprintFromObject(feedingArea, CAT_OBSTACLE_PADDING),
       footprintFromObject(litterArea, CAT_OBSTACLE_PADDING),
       footprintFromObject(catHouse, CAT_OBSTACLE_PADDING),
+      footprintFromObject(lockerModel, CAT_OBSTACLE_PADDING),
     ]
     // Fire-and-forget: the GLB takes a few hundred ms to fetch + parse, and we
     // don't want the cabin to appear blank while we wait. The cat will pop in
