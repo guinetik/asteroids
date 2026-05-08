@@ -3351,16 +3351,19 @@ body,
          px-4 py-2 text-sm tracking-widest;
 }
 .telescope-eyepiece {
-  @apply relative self-center overflow-hidden
+  @apply relative self-center overflow-hidden rounded-full
          border border-cyan-400/25;
   width: 480px;
   height: 480px;
   max-width: 60vmin;
   max-height: 60vmin;
   aspect-ratio: 1 / 1;
+  box-shadow:
+    inset 0 0 40px rgba(34, 211, 238, 0.08),
+    0 0 20px rgba(34, 211, 238, 0.1);
 }
 .telescope-eyepiece--wide {
-  @apply w-full;
+  @apply w-full rounded-none;
   width: 100%;
   max-width: 100%;
   height: auto;

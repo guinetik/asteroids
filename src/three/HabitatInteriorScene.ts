@@ -110,6 +110,19 @@ const TABLE_FRONT_CAP_CLEARANCE = 0.7526
  */
 const BED_X = 3.6
 
+/**
+ * Distance (world units) the cat parks himself away from the bed edge before leaping
+ * up. Picked so the lerp from approach → mattress reads as a single hop instead of a
+ * long glide, while still clearing the bed obstacle padding.
+ */
+const BED_APPROACH_OFFSET = 0.45
+/**
+ * Vertical inset (world units) under the bed's bbox top where the cat sits while
+ * "on the bed". A small inset sinks his paws into the visible mattress instead of
+ * floating on the duvet.
+ */
+const BED_TOP_Y_INSET = 0.04
+
 // --- Cockpit hatch (back cap, -Z) ------------------------------------------
 // Submarine-style pressure hatch: a grey metallic ring frame around a white
 // circular door, with a yellow wheel-knob (torus + crossed spokes) at the
@@ -616,6 +629,19 @@ export class HabitatInteriorScene {
    */
   private readonly litterChunkMeshes: THREE.Mesh[] = []
 
+  /**
+   * World-space sit point on top of the bed (XZ at mattress centre, Y at mattress top
+   * minus {@link BED_TOP_Y_INSET}). Populated after the bed mesh lands during
+   * {@link load}; consumed by the bed-jumping bridge so the cat lerps onto the duvet.
+   */
+  private readonly bedTopWorldPosition = new THREE.Vector3()
+  /**
+   * Approach waypoints on the floor next to the bed (foot, long side, head). The cat
+   * walks to one of these before leaping up — populated during {@link load} from the
+   * bed's runtime bbox so the points follow the mesh wherever it lands.
+   */
+  private readonly bedApproachWorldPositions: THREE.Vector3[] = []
+
   /** Stored world-space position of the cat house, populated by {@link buildCatHouse}. */
   private readonly houseWorldPosition = new THREE.Vector3()
   /**
@@ -819,6 +845,10 @@ export class HabitatInteriorScene {
     bedModel.position.y -= bedMin - FLOOR_Y
 
     this.scene.add(bedModel)
+
+    // Cache bed approach + mattress-top waypoints from the live bbox so the cat's
+    // bed-jumping behaviour follows the mesh without any hardcoded offsets.
+    this.computeBedJumpWaypoints(bedModel)
 
     // --- Table --------------------------------------------------------------
     // The GLB ships with its origin at the floor-center thanks to
@@ -1089,6 +1119,35 @@ export class HabitatInteriorScene {
   }
 
   /**
+   * Derive the mattress-top sit point and three floor approach waypoints (foot, long
+   * side facing the cabin, head) from the placed bed's runtime bounding box. Cached
+   * once at load time and read every frame via the cat bridge — keeping the source
+   * of truth on the live mesh means the cat tracks the bed if its placement changes.
+   *
+   * @param bedModel - Bed root after final scale/rotation/translation have settled.
+   */
+  private computeBedJumpWaypoints(bedModel: THREE.Object3D): void {
+    bedModel.updateMatrixWorld(true)
+    const box = new THREE.Box3().setFromObject(bedModel)
+    const cx = (box.min.x + box.max.x) / 2
+    const cz = (box.min.z + box.max.z) / 2
+    this.bedTopWorldPosition.set(cx, box.max.y - BED_TOP_Y_INSET, cz)
+    this.bedApproachWorldPositions.length = 0
+    // Foot of bed (-Z short end) — approach from the cabin centre.
+    this.bedApproachWorldPositions.push(
+      new THREE.Vector3(cx, FLOOR_Y, box.min.z - BED_APPROACH_OFFSET),
+    )
+    // Long side facing the cabin (-X) — the most accessible approach in this layout.
+    this.bedApproachWorldPositions.push(
+      new THREE.Vector3(box.min.x - BED_APPROACH_OFFSET, FLOOR_Y, cz),
+    )
+    // Head of bed (+Z short end).
+    this.bedApproachWorldPositions.push(
+      new THREE.Vector3(cx, FLOOR_Y, box.max.z + BED_APPROACH_OFFSET),
+    )
+  }
+
+  /**
    * Toggle the baked sleeping-cat clone parented inside the cat house. The live
    * cat's visibility is owned by {@link CatController}; this method only flips
    * the static asleep visual that lives in scene space.
@@ -1125,6 +1184,20 @@ export class HabitatInteriorScene {
       getLitterWorldPosition: (out) => out.copy(this.litterWorldPosition),
       getHouseWorldPosition: (out) => out.copy(this.houseWorldPosition),
       getHouseApproachWorldPosition: (out) => out.copy(this.houseApproachWorldPosition),
+      getBedSideCount: () => this.bedApproachWorldPositions.length,
+      getBedApproachWorldPosition: (sideIndex, out) => {
+        // Clamp the index defensively — the controller only ever asks for indices it
+        // received from getBedSideCount, but a stale index would otherwise read past
+        // the end of the array and produce a NaN approach position.
+        const i = Math.max(
+          0,
+          Math.min(this.bedApproachWorldPositions.length - 1, sideIndex),
+        )
+        const wp = this.bedApproachWorldPositions[i]
+        if (wp) out.copy(wp)
+        return out
+      },
+      getBedTopWorldPosition: (out) => out.copy(this.bedTopWorldPosition),
       onEatServing: () => callbacks.onEatServing(),
       onPetted: () => callbacks.onPetted(),
       onUsedLitter: () => callbacks.onUsedLitter(),

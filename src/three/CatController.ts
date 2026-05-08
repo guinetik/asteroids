@@ -32,6 +32,10 @@ type CatState =
   | 'useLitter'
   | 'goToHouse'
   | 'sleeping'
+  | 'goToBedSide'
+  | 'jumpOnBed'
+  | 'sitOnBed'
+  | 'jumpOffBed'
 
 /**
  * Live read-only handle the {@link CatController} uses to query Sushi's needs and signal
@@ -92,6 +96,21 @@ export interface CatNeedsBridge {
   /** Cat just woke up from a nap — implementer resets `sushiTired` to 0 and saves. */
   onWoke(): void
   /**
+   * Number of distinct approach waypoints around the bed (e.g. foot, long side, head).
+   * Zero or omitted disables bed-jumping behaviour.
+   */
+  getBedSideCount?(): number
+  /**
+   * Write the world-space approach point for a given bed side index into `out` and
+   * return it. The cat walks here before leaping onto the mattress.
+   */
+  getBedApproachWorldPosition?(sideIndex: number, out: THREE.Vector3): THREE.Vector3
+  /**
+   * Write the world-space mattress-top centre into `out` and return it. The cat
+   * lerps onto this point during {@link 'jumpOnBed'} and sits here.
+   */
+  getBedTopWorldPosition?(out: THREE.Vector3): THREE.Vector3
+  /**
    * Cat just entered the sleeping state. Implementer should swap the live cat for the
    * baked sleeping clone (hide the live group, show the static curled-up mesh inside
    * the cat house). Called both for organic sleep transitions and for `rollInitialSleep`.
@@ -151,6 +170,25 @@ const IDLE_NEAR_PLAYER_DURATION_S = 4
 const EAT_DURATION_S = 2.5
 /** Seconds Sushi spends sitting in the litterbox per use. */
 const LITTER_USE_DURATION_S = 3.5
+
+/**
+ * Probability that {@link pickNextRestingState} picks "jump on the bed" instead of a
+ * regular wander walk. Tuned so the player catches Sushi on the bed every few minutes
+ * of habitat time without it dominating his roam pattern.
+ */
+const BED_JUMP_CHANCE = 0.18
+/**
+ * Seconds the leap-up and leap-down lerps take. Short enough to read as a hop rather
+ * than a glide, long enough that the parabolic arc is visible.
+ */
+const BED_JUMP_DURATION_S = 0.45
+/** Peak height (world units) added on top of the linear Y lerp during a bed jump arc. */
+const BED_JUMP_ARC_HEIGHT = 0.18
+/**
+ * Seconds Sushi sits on top of the bed before hopping back down. Long enough that the
+ * player can grab a screenshot but short enough that he cycles through other behaviours.
+ */
+const SIT_ON_BED_DURATION_S = 10
 
 /** Authored clip names embedded in `cat.glb`. */
 const CLIP_IDLE = 'Armature|4_Idle_Armature'
@@ -450,6 +488,12 @@ export class CatController {
   private readonly _tmpQuat = new THREE.Quaternion()
   private readonly _tmpQuatTarget = new THREE.Quaternion()
   private readonly _tmpDir = new THREE.Vector3()
+  /** World-space start position of the active bed jump (snapped on enter). */
+  private readonly bedJumpStart = new THREE.Vector3()
+  /** World-space end position of the active bed jump (snapped on enter). */
+  private readonly bedJumpEnd = new THREE.Vector3()
+  /** Index of the bed approach side currently in use (0..bedSideCount-1). */
+  private bedSideIndex = 0
 
   private constructor(
     root: THREE.Group,
@@ -610,6 +654,14 @@ export class CatController {
       this.tickGoToLitter(dt)
     } else if (this.state === 'goToHouse') {
       this.tickGoToHouse(dt)
+    } else if (this.state === 'goToBedSide') {
+      this.tickGoToBedSide(dt)
+    } else if (this.state === 'jumpOnBed' || this.state === 'jumpOffBed') {
+      this.tickBedJumpLerp()
+    } else if (this.state === 'sitOnBed') {
+      if (this.stateTimer >= this.stateDuration) {
+        this.enterState('jumpOffBed')
+      }
     } else if (this.state === 'follow') {
       this.tickFollow(dt)
     } else if (this.state === 'eat') {
@@ -646,12 +698,19 @@ export class CatController {
     // Re-anchor to floor every frame. Some clips animate the armature's local Y, which
     // can push the visible feet below the bind-pose offset we set on load. Measuring the
     // inner mesh's current world bbox and pulling its lowest point back to floorY keeps
-    // Sushi planted no matter which clip is playing.
-    this.inner.updateMatrixWorld(true)
-    this._tmpBox.setFromObject(this.inner)
-    const minY = this._tmpBox.min.y
-    if (Number.isFinite(minY)) {
-      this.group.position.y += this.bounds.floorY - minY
+    // Sushi planted no matter which clip is playing. Skipped while the cat is mid-leap or
+    // sitting on top of the bed — those states own his Y directly.
+    if (
+      this.state !== 'jumpOnBed' &&
+      this.state !== 'sitOnBed' &&
+      this.state !== 'jumpOffBed'
+    ) {
+      this.inner.updateMatrixWorld(true)
+      this._tmpBox.setFromObject(this.inner)
+      const minY = this._tmpBox.min.y
+      if (Number.isFinite(minY)) {
+        this.group.position.y += this.bounds.floorY - minY
+      }
     }
 
     this.tickHeadLook(dt)
@@ -944,6 +1003,47 @@ export class CatController {
   }
 
   /**
+   * Walk Sushi toward the chosen bed approach point. On arrival, capture the start /
+   * end positions for the leap and switch to {@link 'jumpOnBed'} — the lerp tick then
+   * arcs him onto the mattress without any per-frame floor anchoring.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  private tickGoToBedSide(dt: number): void {
+    if (!this.bridge?.getBedApproachWorldPosition) {
+      this.pickNextRestingState()
+      return
+    }
+    this.bridge.getBedApproachWorldPosition(this.bedSideIndex, this._bridgeTmp)
+    this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    if (this.stepTowardTarget(dt)) {
+      this.enterState('jumpOnBed')
+    }
+  }
+
+  /**
+   * Per-frame lerp used by both {@link 'jumpOnBed'} and {@link 'jumpOffBed'}. Linearly
+   * interpolates X/Z between {@link bedJumpStart} and {@link bedJumpEnd}, and adds a
+   * sin-arc on top of the linear Y lerp so the leap reads as a hop. When the timer
+   * exceeds {@link BED_JUMP_DURATION_S}, snaps to the end pose and advances the FSM.
+   */
+  private tickBedJumpLerp(): void {
+    const t = Math.min(1, this.stateTimer / BED_JUMP_DURATION_S)
+    this.group.position.x = this.bedJumpStart.x + (this.bedJumpEnd.x - this.bedJumpStart.x) * t
+    this.group.position.z = this.bedJumpStart.z + (this.bedJumpEnd.z - this.bedJumpStart.z) * t
+    const baseY = this.bedJumpStart.y + (this.bedJumpEnd.y - this.bedJumpStart.y) * t
+    this.group.position.y = baseY + Math.sin(Math.PI * t) * BED_JUMP_ARC_HEIGHT
+    if (t >= 1) {
+      this.group.position.set(this.bedJumpEnd.x, this.bedJumpEnd.y, this.bedJumpEnd.z)
+      if (this.state === 'jumpOnBed') {
+        this.enterState('sitOnBed')
+      } else {
+        this.pickNextRestingState()
+      }
+    }
+  }
+
+  /**
    * Step the cat toward the player, reusing pivot-then-walk locomotion. Once within
    * {@link FOLLOW_REACHED_DISTANCE}, drop into {@link 'idleNearPlayer'} for a short stay.
    *
@@ -1048,7 +1148,11 @@ export class CatController {
       this.state === 'goToHouse' ||
       this.state === 'sleeping' ||
       this.state === 'follow' ||
-      this.state === 'idleNearPlayer'
+      this.state === 'idleNearPlayer' ||
+      this.state === 'goToBedSide' ||
+      this.state === 'jumpOnBed' ||
+      this.state === 'sitOnBed' ||
+      this.state === 'jumpOffBed'
     )
   }
 
@@ -1058,6 +1162,10 @@ export class CatController {
       this.enterState('sit')
       return
     }
+    // Occasionally divert to a "jump on the bed and chill" routine instead of a
+    // plain wander walk. Only available when the host wired bed metadata onto the
+    // bridge — otherwise `getBedSideCount` is undefined and we fall through.
+    if (this.tryStartBedJump()) return
     // Pick a fresh waypoint whose straight-line path doesn't cut through any obstacle.
     const fromX = this.group.position.x
     const fromZ = this.group.position.z
@@ -1068,6 +1176,27 @@ export class CatController {
     }
     this.target.copy(wp)
     this.enterState('walk')
+  }
+
+  /**
+   * Roll for the bed-jumping diversion. When the host wired bed approach points and a
+   * mattress-top onto the bridge, this picks one side at random, snaps the walk
+   * target to its approach waypoint, and enters {@link 'goToBedSide'}. Returns false
+   * when no bed is available so the caller can fall back to a wander walk.
+   *
+   * @returns Whether a bed-jumping run was started.
+   */
+  private tryStartBedJump(): boolean {
+    const bridge = this.bridge
+    if (!bridge?.getBedSideCount || !bridge.getBedApproachWorldPosition) return false
+    const sideCount = bridge.getBedSideCount()
+    if (sideCount <= 0) return false
+    if (Math.random() >= BED_JUMP_CHANCE) return false
+    this.bedSideIndex = Math.floor(Math.random() * sideCount)
+    bridge.getBedApproachWorldPosition(this.bedSideIndex, this._bridgeTmp)
+    this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    this.enterState('goToBedSide')
+    return true
   }
 
   /**
@@ -1112,6 +1241,27 @@ export class CatController {
       this.stateDuration = EAT_DURATION_S
     } else if (next === 'useLitter') {
       this.stateDuration = LITTER_USE_DURATION_S
+    } else if (next === 'sitOnBed') {
+      this.stateDuration = SIT_ON_BED_DURATION_S
+    } else if (next === 'jumpOnBed') {
+      // Capture the lerp endpoints the moment we leap. Start = current world pose
+      // (cat just arrived at the approach point), end = mattress-top centre.
+      this.bedJumpStart.copy(this.group.position)
+      this.bedJumpEnd.copy(this.bedJumpStart)
+      this.bridge?.getBedTopWorldPosition?.(this._bridgeTmp)
+      this.bedJumpEnd.set(this._bridgeTmp.x, this._bridgeTmp.y, this._bridgeTmp.z)
+      this.stateDuration = BED_JUMP_DURATION_S
+    } else if (next === 'jumpOffBed') {
+      // Reverse leap — start from current on-bed pose, land on the same approach
+      // point the cat used to climb up so he doesn't teleport across the room.
+      this.bedJumpStart.copy(this.group.position)
+      if (this.bridge?.getBedApproachWorldPosition) {
+        this.bridge.getBedApproachWorldPosition(this.bedSideIndex, this._bridgeTmp)
+        this.bedJumpEnd.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+      } else {
+        this.bedJumpEnd.set(this.bedJumpStart.x, this.bounds.floorY, this.bedJumpStart.z)
+      }
+      this.stateDuration = BED_JUMP_DURATION_S
     } else if (next === 'sleeping') {
       // The visible "asleep" pose is a separate, baked clone owned by the host
       // (parented inside the cat house with tunable rotation/scale). Hide the
@@ -1146,10 +1296,17 @@ export class CatController {
       case 'goToBowl':
       case 'goToLitter':
       case 'goToHouse':
+      case 'goToBedSide':
       case 'follow':
         return 'walk'
+      case 'jumpOnBed':
+      case 'jumpOffBed':
+        // No jump animation in the rig — keep the idle pose during the brief arc so
+        // the body reads as briefly airborne instead of mid-stride.
+        return 'idle'
       case 'sit':
       case 'useLitter':
+      case 'sitOnBed':
         return 'sit'
       case 'chase':
         return 'run'
