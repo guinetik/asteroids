@@ -105,13 +105,15 @@ export class HabitatCompletionPoster {
   }
 
   /**
-   * Update completion image visibility from persisted achievement ids.
+   * Hides the entire completion poster when solar grid completion is not met.
    *
    * @param unlockedAchievementIds - Current unlocked achievement ids from the map UI.
    */
   setUnlockedAchievementIds(unlockedAchievementIds: readonly string[]): void {
-    this.image.visible = isSolarCompletionPosterUnlocked(unlockedAchievementIds, this.posters)
-    this.backing.visible = true
+    const unlocked = isSolarCompletionPosterUnlocked(unlockedAchievementIds, this.posters)
+    this.group.visible = unlocked
+    this.image.visible = unlocked
+    this.backing.visible = unlocked
   }
 
   /**

@@ -1,6 +1,6 @@
 /**
- * Large journey posters — Act I on the hatch wall (−Z), Act II on the mess bulkhead (+Z).
- * Same scale as the solar completion frame.
+ * Large journey posters — Act I on the hatch wall (−Z); Act II and Act III flank the mess console
+ * on the +Z bulkhead. Same scale as the solar completion frame.
  *
  * @author guinetik
  * @date 2026-05-08
@@ -14,7 +14,7 @@ import {
   type SolarPosterId,
 } from '@/lib/posters/solarPosterUnlocks'
 
-/** Authored rows for {@link JOURNEY_LARGE_POSTER_CATALOG} (Act I then Act II display order). */
+/** Authored rows for {@link JOURNEY_LARGE_POSTER_CATALOG} (Act I → III display order in data). */
 export interface JourneyLargePosterVisibility {
   /** Poster definition for one wall-mounted journey frame. */
   readonly poster: SolarPosterDefinition
@@ -25,13 +25,13 @@ export interface JourneyLargePosterVisibility {
 const raw = rawJourneyLargePosters as readonly SolarPosterDefinition[]
 
 /**
- * Act I journey art beside the solar grid on the −Z hatch wall; Act II flanking the mess console
- * on the +Z bulkhead (large format, same baseline Y as the solar completion frame).
+ * Act I beside the solar grid on the −Z hatch wall; Act II and Act III on the +Z bulkhead
+ * (large format, same baseline Y as the solar completion frame).
  */
 export const JOURNEY_LARGE_POSTER_CATALOG: readonly SolarPosterDefinition[] = raw
 
 /**
- * Visibility for journey wall posters in Act I → Act II catalog order.
+ * Visibility for journey wall posters in Act I → Act III catalog order.
  *
  * @param unlockedAchievementIds - Persisted achievement ids from profile storage.
  * @param posters - Catalog, defaulting to {@link JOURNEY_LARGE_POSTER_CATALOG}.
@@ -47,7 +47,7 @@ export function getJourneyLargePosterVisibility(
 }
 
 /**
- * Returns visible journey wall poster ids in port → starboard order.
+ * Returns visible journey wall poster ids in Act I → Act III catalog order.
  *
  * @param unlockedAchievementIds - Persisted achievement ids.
  * @param posters - Catalog, defaulting to {@link JOURNEY_LARGE_POSTER_CATALOG}.
@@ -62,6 +62,8 @@ export function getUnlockedJourneyLargePosterIds(
 }
 
 validatePosterCatalog(JOURNEY_LARGE_POSTER_CATALOG)
-if (JOURNEY_LARGE_POSTER_CATALOG.length !== 2) {
-  throw new Error('journey large posters: expected exactly two rows (port Act I, starboard Act II)')
+if (JOURNEY_LARGE_POSTER_CATALOG.length !== 3) {
+  throw new Error(
+    'journey large posters: expected exactly three rows (Act I hatch, Act II + Act III bulkhead)',
+  )
 }

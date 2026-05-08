@@ -1,9 +1,10 @@
 /**
  * Standalone Three.js poster wall for habitat achievement posters.
  *
- * Builds framed solar-body poster slots in fixed Sun-outward order. The wall is
- * intentionally unplaced: local +Z is the viewing side, so habitat integration can
- * position and rotate the returned group wherever the wall belongs.
+ * Builds framed solar-body poster slots in fixed Sun-outward order. Locked slots are fully hidden
+ * (no empty frames); unlocked slots show frame, backing, and art. The wall is intentionally
+ * unplaced: local +Z is the viewing side, so habitat integration can position and rotate the
+ * returned group wherever the wall belongs.
  *
  * @author guinetik
  * @date 2026-05-07
@@ -47,7 +48,7 @@ const POSTER_WALL_ROUGHNESS = 0.62
 const FRAME_METALNESS = 0.42
 /** Texture anisotropy requested for angled poster viewing. */
 const POSTER_TEXTURE_ANISOTROPY = 4
-/** Poster slot backer opacity when no poster image is visible. */
+/** Poster slot backer opacity when the slot is visible (locked slots are hidden entirely). */
 const BACKING_OPACITY = 0.72
 /** Default texture repeat value before fitting a loaded poster texture. */
 const FULL_TEXTURE_REPEAT = 1
@@ -65,12 +66,14 @@ export interface HabitatPosterWallOptions {
 }
 
 /**
- * Meshes whose visibility changes when a poster unlocks.
+ * Per-slot objects; locked slots hide {@link PosterSlotMeshes.root} (frame + backing + image).
  */
 interface PosterSlotMeshes {
-  /** Textured poster image plane that is hidden until unlocked. */
+  /** Slot root — hidden until this poster unlocks (wall layout keeps fixed positions). */
+  readonly root: THREE.Group
+  /** Textured poster image plane; gated with {@link root}. */
   readonly image: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>
-  /** Dim backing plate that remains visible even while the poster image is locked. */
+  /** Backing plate behind the image; gated with {@link root}. */
   readonly backing: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>
 }
 
@@ -122,7 +125,7 @@ export class HabitatPosterWall {
   }
 
   /**
-   * Update visible poster images from persisted achievement ids.
+   * Show or hide each framed slot entirely from achievement ids (no empty frames when locked).
    *
    * @param unlockedAchievementIds - Persisted achievement ids, e.g. achievement store state.
    */
@@ -138,9 +141,9 @@ export class HabitatPosterWall {
   }
 
   /**
-   * Update visible poster images directly by poster id.
+   * Show or hide each framed slot entirely by poster id (testing / tooling).
    *
-   * @param unlockedPosterIds - Poster ids whose image planes should be visible.
+   * @param unlockedPosterIds - Poster ids whose slots should be visible.
    */
   setUnlockedPosterIds(unlockedPosterIds: readonly SolarPosterId[]): void {
     const unlocked = new Set(unlockedPosterIds)

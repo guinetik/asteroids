@@ -14,5 +14,13 @@
     "assetPath": "/posters/003.webp",
     "achievementId": "journey-act-2-jovian-arrival",
     "defaultUnlocked": false
+  },
+  {
+    "id": "journey-act3-wall",
+    "bodyKey": "journey-act3",
+    "label": "Act III",
+    "assetPath": "/posters/004.webp",
+    "achievementId": "journey-act-3-outer-reaches",
+    "defaultUnlocked": false
   }
 ]

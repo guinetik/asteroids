@@ -34,7 +34,7 @@ const IMAGE_Z_OFFSET = 0.027
 const BACKING_Z_OFFSET = -0.008
 /** Dark metal frame color. */
 const FRAME_COLOR = 0xb0b8c0
-/** Dim backing visible when a poster is locked. */
+/** Dim backing behind unlocked table posters (locked slots hide entirely). */
 const BACKING_COLOR = 0x121820
 /** Roughness used by poster wall metal materials. */
 const POSTER_WALL_ROUGHNESS = 0.62
@@ -42,7 +42,7 @@ const POSTER_WALL_ROUGHNESS = 0.62
 const FRAME_METALNESS = 0.42
 /** Texture anisotropy requested for angled poster viewing. */
 const POSTER_TEXTURE_ANISOTROPY = 4
-/** Poster slot backer opacity when no poster image is visible. */
+/** Poster slot backer opacity when the slot is visible (locked slots are hidden entirely). */
 const BACKING_OPACITY = 0.72
 /** Default texture repeat value before fitting a loaded poster texture. */
 const FULL_TEXTURE_REPEAT = 1
@@ -63,6 +63,8 @@ export interface HabitatTablePosterRowOptions {
  * Meshes whose visibility changes when a table poster unlocks.
  */
 interface PosterSlotMeshes {
+  /** Slot root — hidden until this poster achievement unlocks (layout keeps fixed transforms). */
+  readonly root: THREE.Group
   readonly image: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>
   readonly backing: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>
 }
@@ -115,7 +117,7 @@ export class HabitatTablePosterRow {
   }
 
   /**
-   * Update visible poster images from persisted achievement ids.
+   * Show or hide each table slot entirely from achievement ids (no empty frames when locked).
    *
    * @param unlockedAchievementIds - Persisted achievement ids.
    */
@@ -127,8 +129,9 @@ export class HabitatTablePosterRow {
     for (const row of visibility) {
       const slot = this.slots.get(row.poster.id)
       if (!slot) continue
+      slot.root.visible = row.unlocked
       slot.image.visible = row.unlocked
-      slot.backing.visible = true
+      slot.backing.visible = row.unlocked
     }
   }
 
@@ -165,7 +168,7 @@ export class HabitatTablePosterRow {
     const image = this.createImage(poster)
 
     slot.add(backing, frame, image)
-    this.slots.set(poster.id, { image, backing })
+    this.slots.set(poster.id, { root: slot, image, backing })
     return slot
   }
 

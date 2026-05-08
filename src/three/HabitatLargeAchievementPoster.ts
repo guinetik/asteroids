@@ -86,11 +86,15 @@ export class HabitatLargeAchievementPoster {
   }
 
   /**
+   * Hides the entire poster (frame + backing) when locked; shows it when unlocked.
+   *
    * @param unlockedAchievementIds - Persisted achievement ids.
    */
   setUnlockedAchievementIds(unlockedAchievementIds: readonly string[]): void {
-    this.image.visible = isSolarPosterUnlocked(this.poster, unlockedAchievementIds)
-    this.backing.visible = true
+    const unlocked = isSolarPosterUnlocked(this.poster, unlockedAchievementIds)
+    this.group.visible = unlocked
+    this.image.visible = unlocked
+    this.backing.visible = unlocked
   }
 
   /**

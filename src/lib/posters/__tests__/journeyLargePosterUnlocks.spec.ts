@@ -5,10 +5,11 @@ import {
 } from '@/lib/posters/journeyLargePosterUnlocks'
 
 describe('journeyLargePosterUnlocks', () => {
-  it('authors Act I then Act II journey frames', () => {
+  it('authors Act I, Act II, and Act III journey frames', () => {
     expect(JOURNEY_LARGE_POSTER_CATALOG.map((p) => p.id)).toEqual([
       'journey-act1-wall',
       'journey-act2-wall',
+      'journey-act3-wall',
     ])
   })
 
@@ -18,6 +19,7 @@ describe('journeyLargePosterUnlocks', () => {
     expect(visibility.map((row) => [row.poster.id, row.unlocked])).toEqual([
       ['journey-act1-wall', true],
       ['journey-act2-wall', false],
+      ['journey-act3-wall', false],
     ])
   })
 })
