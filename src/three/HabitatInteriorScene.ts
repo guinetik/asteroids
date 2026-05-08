@@ -25,6 +25,7 @@ import {
   type CatObstacle,
   type CatWanderBounds,
 } from '@/three/CatController'
+import { CatAudioDirector, type CatAudioState } from '@/audio/CatAudioDirector'
 import { JOURNEY_LARGE_POSTER_CATALOG } from '@/lib/posters/journeyLargePosterUnlocks'
 import { HabitatCompletionPoster } from '@/three/HabitatCompletionPoster'
 import { HabitatLargeAchievementPoster } from '@/three/HabitatLargeAchievementPoster'
@@ -118,10 +119,11 @@ const BED_X = 3.6
 const BED_APPROACH_OFFSET = 0.45
 /**
  * Vertical inset (world units) under the bed's bbox top where the cat sits while
- * "on the bed". A small inset sinks his paws into the visible mattress instead of
- * floating on the duvet.
+ * "on the bed". The bbox includes the pillows at the head of the bed, so the inset
+ * has to drop the perch back down to the mattress surface — otherwise Sushi floats
+ * a pillow's height above the duvet.
  */
-const BED_TOP_Y_INSET = 0.04
+const BED_TOP_Y_INSET = 0.45
 
 // --- Cockpit hatch (back cap, -Z) ------------------------------------------
 // Submarine-style pressure hatch: a grey metallic ring frame around a white
@@ -599,6 +601,32 @@ export class HabitatInteriorScene {
    * the habitat still works without the model.
    */
   private cat: CatController | null = null
+
+  /**
+   * Set to true the moment {@link dispose} runs so the deferred cat load can bail out
+   * before mutating a tear-down scene. The cat GLB resolves a frame or two after the
+   * cabin is mounted; without this guard, a quick enter→exit could let the cat's
+   * group land in a disposed scene and leak.
+   */
+  private disposed = false
+
+  /**
+   * 3D positional audio director for Sushi (purr / sleep loops + idle one-shot meows).
+   * Started after the cat model loads in {@link load}, ticked each frame in {@link tick},
+   * disposed alongside the rest of the scene.
+   */
+  private readonly catAudio = new CatAudioDirector()
+  /** Reused snapshot fed into {@link CatAudioDirector.update} every frame. */
+  private readonly _catAudioState: CatAudioState = {
+    catState: 'idle',
+    isSleeping: false,
+    love: 0,
+    hunger: 0,
+    bladder: 0,
+    tired: 0,
+    catWorldPos: new THREE.Vector3(),
+    houseWorldPos: new THREE.Vector3(),
+  }
   /**
    * Cat-house group reference (built in {@link buildCatHouse}) — kept so the
    * sleeping-cat clone can be parented inside the house and inherit the house
@@ -917,19 +945,39 @@ export class HabitatInteriorScene {
       footprintFromObject(litterArea, CAT_OBSTACLE_PADDING),
       footprintFromObject(catHouse, CAT_OBSTACLE_PADDING),
     ]
+    // Fire-and-forget: the GLB takes a few hundred ms to fetch + parse, and we
+    // don't want the cabin to appear blank while we wait. The cat will pop in
+    // and start its FSM the frame this promise resolves. `tick()` already guards
+    // every cat read with `?.`, so the scene runs cleanly without him.
+    void this.loadCatAsync(obstacles)
+  }
+
+  /**
+   * Deferred cat-model load. Kicked off without `await` from {@link load} so the
+   * cabin mounts immediately. Bails out if {@link dispose} ran while the GLB was
+   * still in flight.
+   *
+   * @param obstacles - Footprint rectangles the cat's wander uses for avoidance.
+   */
+  private async loadCatAsync(obstacles: CatObstacle[]): Promise<void> {
     try {
-      this.cat = await CatController.create(CAT_MODEL_URL, {
+      const cat = await CatController.create(CAT_MODEL_URL, {
         ...CAT_WANDER_BOUNDS,
         obstacles,
       })
-      this.scene.add(this.cat.group)
+      if (this.disposed) {
+        cat.dispose()
+        return
+      }
+      this.cat = cat
+      this.scene.add(cat.group)
       // Hearts emit in world space — add as a sibling so they stay where spawned
       // even if Sushi walks off mid-burst.
-      this.scene.add(this.cat.hearts)
+      this.scene.add(cat.hearts)
       // Bake a static sleeping clone parented inside the cat house so it
       // inherits the house yaw/position. Sleep-state visibility is driven by
       // the bridge — see {@link applySushiBridgeToCat}.
-      this.sleepingCatClone = this.cat.createSleepingClone()
+      this.sleepingCatClone = cat.createSleepingClone()
       this.sleepingCatClone.position.set(
         CAT_SLEEP_OFFSET_X,
         CAT_SLEEP_OFFSET_Y,
@@ -942,11 +990,12 @@ export class HabitatInteriorScene {
       )
       this.sleepingCatClone.scale.multiplyScalar(CAT_SLEEP_SCALE)
       this.sleepingCatClone.visible = false
-      this.catHouseGroup.add(this.sleepingCatClone)
+      this.catHouseGroup?.add(this.sleepingCatClone)
       this.applySushiBridgeToCat()
       // 50% chance Sushi greets you mid-nap inside the house. Roll happens
       // after the bridge is wired so the cat can read tiredness and onWoke.
-      this.cat.rollInitialSleep()
+      cat.rollInitialSleep()
+      this.catAudio.start()
     } catch (err) {
       console.warn('[HabitatInteriorScene] failed to load cat model:', err)
     }
@@ -967,6 +1016,7 @@ export class HabitatInteriorScene {
     this.tickTablePlacementHold()
     this.tickLaserPointer()
     this.cat?.tick(dt)
+    this.tickCatAudio()
     this.tickBowlFillCue(dt)
     this.tickKibbleVisual()
     this.tickLitterChunkVisual()
@@ -1042,6 +1092,28 @@ export class HabitatInteriorScene {
    *
    * @param dt - Delta time in seconds.
    */
+  /**
+   * Build a {@link CatAudioState} snapshot from the live cat + profile bridge and feed
+   * it to the audio director so the purr/sleep loops and idle meows pan + fade with
+   * the cat's position relative to the FPS camera. No-op when the cat hasn't loaded
+   * yet or no Sushi bridge is wired.
+   */
+  private tickCatAudio(): void {
+    const cat = this.cat
+    const cb = this.sushiCallbacks
+    if (!cat || !cb) return
+    const snap = this._catAudioState
+    snap.catState = cat.currentState
+    snap.isSleeping = cat.isSleeping()
+    snap.love = cb.getLove()
+    snap.hunger = cb.getHunger()
+    snap.bladder = cb.getBladder()
+    snap.tired = cb.getTired()
+    snap.catWorldPos.copy(cat.group.position)
+    snap.houseWorldPos.copy(this.houseWorldPosition)
+    this.catAudio.update(snap, this.fpsCamera.camera)
+  }
+
   private tickBowlFillCue(dt: number): void {
     if (this.bowlFillCueTimer <= 0 || !this.bowlMesh) return
     this.bowlFillCueTimer = Math.max(0, this.bowlFillCueTimer - dt)
@@ -1065,8 +1137,10 @@ export class HabitatInteriorScene {
 
   /** Release GPU resources and event listeners. */
   dispose(): void {
+    this.disposed = true
     this.inputManager.dispose()
     this.fpsCamera.dispose()
+    this.catAudio.dispose()
     this.cat?.dispose()
     this.cat = null
     this.scene.remove(this.posterWall.group)
@@ -2169,6 +2243,7 @@ export class HabitatInteriorScene {
         this.onPrompt?.('F  Pet Sushi')
         if (this.inputManager.wasActionPressed('interact')) {
           this.cat.pet()
+          this.catAudio.playPet()
           this.startPetSequence()
           this.onInteract?.('cat')
         }

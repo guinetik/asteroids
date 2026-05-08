@@ -113,6 +113,12 @@ describe('audioManifest', () => {
       'sfx.breathing.run',
       'sfx.breathing.hard',
       'sfx.oxygen.low',
+      // sushi the cat
+      'sfx.cat.purr',
+      'sfx.cat.sleep',
+      'sfx.cat.pet',
+      'sfx.meow.happy',
+      'sfx.meow.alert',
       // music
       'music.menu',
       'music.levelCombat',

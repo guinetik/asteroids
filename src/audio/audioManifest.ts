@@ -125,6 +125,12 @@ export const AUDIO_SOUND_IDS = [
   'sfx.breathing.run',
   'sfx.breathing.hard',
   'sfx.oxygen.low',
+  // SFX — Sushi the cat (3D positional)
+  'sfx.cat.purr',
+  'sfx.cat.sleep',
+  'sfx.cat.pet',
+  'sfx.meow.happy',
+  'sfx.meow.alert',
   // Music
   'music.menu',
   'music.levelCombat',
@@ -1087,6 +1093,55 @@ const manifestById: ManifestById = {
     load: 'lazy',
     playback: 'single-instance',
     volume: 0.5,
+    effect: 'none',
+  },
+
+  // ── SFX — Sushi the cat (3D positional) ─────────────────────────────
+  // Volumes are baseline maxes; CatAudioDirector multiplies in distance
+  // falloff per frame via setVolume() and pans via setStereo().
+  'sfx.cat.purr': {
+    id: 'sfx.cat.purr',
+    src: '/sound/sfx.cat.purr.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'single-instance',
+    volume: 0.55,
+    effect: 'none',
+  },
+  'sfx.cat.sleep': {
+    id: 'sfx.cat.sleep',
+    src: '/sound/sfx.cat.sleep.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'single-instance',
+    volume: 0.5,
+    effect: 'none',
+  },
+  'sfx.meow.happy': {
+    id: 'sfx.meow.happy',
+    src: '/sound/sfx.meow.happy.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'restart',
+    volume: 0.7,
+    effect: 'none',
+  },
+  'sfx.meow.alert': {
+    id: 'sfx.meow.alert',
+    src: '/sound/sfx.meow.alert.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'restart',
+    volume: 0.7,
+    effect: 'none',
+  },
+  'sfx.cat.pet': {
+    id: 'sfx.cat.pet',
+    src: '/sound/sfx.cat.pet.mp3',
+    category: 'sfx',
+    load: 'lazy',
+    playback: 'restart',
+    volume: 0.75,
     effect: 'none',
   },
 

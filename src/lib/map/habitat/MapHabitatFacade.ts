@@ -153,6 +153,15 @@ export interface MapHabitatFacadeDeps {
  */
 export class MapHabitatFacade {
   private scene: HabitatInteriorScene | null = null
+
+  /**
+   * Promise of the current in-flight {@link ensureScene} call. Stashed so concurrent
+   * callers (e.g. the controller hitting {@link ensureScene} every tick during the
+   * habitat-entry transition) all await the same load instead of constructing
+   * duplicate scenes that race to assign {@link scene}. Cleared on success and on
+   * failure so a later entry can retry from scratch.
+   */
+  private scenePending: Promise<HabitatInteriorScene> | null = null
   private readonly pointerLock = new FpsPointerLockSession()
   private pointerLockAttached = false
   private deps: MapHabitatFacadeDeps | null = null
@@ -168,8 +177,17 @@ export class MapHabitatFacade {
   }
 
   /** Lazy-load the interior scene on first entry. Safe to call repeatedly. */
-  async ensureScene(): Promise<HabitatInteriorScene> {
-    if (this.scene) return this.scene
+  ensureScene(): Promise<HabitatInteriorScene> {
+    if (this.scene) return Promise.resolve(this.scene)
+    if (this.scenePending) return this.scenePending
+    this.scenePending = this.buildScene().finally(() => {
+      this.scenePending = null
+    })
+    return this.scenePending
+  }
+
+  /** Internal: actual scene construction wrapped by {@link ensureScene}'s in-flight cache. */
+  private async buildScene(): Promise<HabitatInteriorScene> {
     const deps = this.deps
     const next = new HabitatInteriorScene()
     next.setUnlockedAchievementIds(deps?.getUnlockedAchievementIds() ?? [])

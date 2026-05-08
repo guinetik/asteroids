@@ -18,7 +18,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { clone as cloneSkinnedScene } from 'three/addons/utils/SkeletonUtils.js'
 
 /** Logical wander states for Sushi's behaviour FSM. */
-type CatState =
+export type CatState =
   | 'idle'
   | 'walk'
   | 'sit'
@@ -181,7 +181,7 @@ const LITTER_USE_DURATION_S = 3.5
  * regular wander walk. Tuned so the player catches Sushi on the bed every few minutes
  * of habitat time without it dominating his roam pattern.
  */
-const BED_JUMP_CHANCE = 0.18
+const BED_JUMP_CHANCE = 0.45
 /**
  * Seconds the leap-up and leap-down lerps take. Short enough to read as a hop rather
  * than a glide, long enough that the parabolic arc is visible.
@@ -856,6 +856,15 @@ export class CatController {
     return this.state === 'sit'
   }
 
+  /**
+   * Read-only view of the current FSM state. Audio + UI hosts use this for edge
+   * detection (e.g. "fire a meow once per idle entry") without needing to know
+   * the internal state union otherwise.
+   */
+  get currentState(): CatState {
+    return this.state
+  }
+
   /** Release GPU + animation resources. */
   dispose(): void {
     this.mixer.stopAllAction()
@@ -1255,6 +1264,14 @@ export class CatController {
       this.bedJumpEnd.copy(this.bedJumpStart)
       this.bridge?.getBedTopWorldPosition?.(this._bridgeTmp)
       this.bedJumpEnd.set(this._bridgeTmp.x, this._bridgeTmp.y, this._bridgeTmp.z)
+      // Snap yaw to face the mattress so the leap reads as a forward pounce
+      // instead of a backward shuffle. Same `atan2(dx, dz)` convention used by
+      // tickWalk — the approach waypoint hands us a clean facing direction.
+      const jumpDx = this.bedJumpEnd.x - this.bedJumpStart.x
+      const jumpDz = this.bedJumpEnd.z - this.bedJumpStart.z
+      if (jumpDx * jumpDx + jumpDz * jumpDz > 1e-6) {
+        this.group.rotation.y = Math.atan2(jumpDx, jumpDz)
+      }
       this.stateDuration = BED_JUMP_DURATION_S
     } else if (next === 'jumpOffBed') {
       // Reverse leap — start from current on-bed pose, land on the same approach
@@ -1265,6 +1282,14 @@ export class CatController {
         this.bedJumpEnd.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
       } else {
         this.bedJumpEnd.set(this.bedJumpStart.x, this.bounds.floorY, this.bedJumpStart.z)
+      }
+      // After sitOnBed his yaw still points into the mattress (set on jumpOn);
+      // re-snap to the dismount direction so the leap-off reads forward instead
+      // of as a tail-first shuffle.
+      const offDx = this.bedJumpEnd.x - this.bedJumpStart.x
+      const offDz = this.bedJumpEnd.z - this.bedJumpStart.z
+      if (offDx * offDx + offDz * offDz > 1e-6) {
+        this.group.rotation.y = Math.atan2(offDx, offDz)
       }
       this.stateDuration = BED_JUMP_DURATION_S
     } else if (next === 'sleeping') {
