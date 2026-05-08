@@ -20,8 +20,12 @@ import {
 
 /** Height of each poster image in local wall units. */
 const POSTER_HEIGHT = 1.08
-/** Width-to-height ratio for the in-cabin poster frames. */
-const POSTER_ASPECT_RATIO = 1 / 2
+/**
+ * Width-to-height ratio for the in-cabin poster frames. Matches the source travel-poster
+ * artwork (≈1024×1528 = 2:3) so {@link fitTextureToPosterFrame} doesn't crop the title
+ * bar lettering off the sides.
+ */
+const POSTER_ASPECT_RATIO = 2 / 3
 /** Width of each poster image in local wall units. */
 const POSTER_WIDTH = POSTER_HEIGHT * POSTER_ASPECT_RATIO
 /** Width of the frame border around the image plane. */
@@ -38,14 +42,14 @@ const IMAGE_Z_OFFSET = 0.027
 const BACKING_Z_OFFSET = -0.008
 /** Vertical distance between poster row centers. */
 const ROW_GAP = 1.48
-/** Dark metal frame color. */
-const FRAME_COLOR = 0xb0b8c0
+/** White-plastic frame colour — bright, matte, slightly off-white so it reads as a moulded edge. */
+const FRAME_COLOR = 0xeef0f2
 /** Dim backing colour for unlocked poster slots (locked slots hide entirely). */
 const BACKING_COLOR = 0x121820
-/** Roughness used by poster wall metal materials. */
-const POSTER_WALL_ROUGHNESS = 0.62
-/** Metalness used by the poster frames. */
-const FRAME_METALNESS = 0.42
+/** Roughness used by poster wall materials — high so the frames look like matte plastic. */
+const POSTER_WALL_ROUGHNESS = 0.85
+/** Metalness of the poster frames — near zero for plastic (not brushed metal). */
+const FRAME_METALNESS = 0.05
 /** Texture anisotropy requested for angled poster viewing. */
 const POSTER_TEXTURE_ANISOTROPY = 4
 /** Poster slot backer opacity when the slot is visible (locked slots are hidden entirely). */
