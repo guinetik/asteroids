@@ -2668,6 +2668,10 @@ export class LevelViewController implements Tickable {
       this.failLanderRun('Adrift')
     }
 
+    if (this.inputManager?.wasActionPressed('resetCamera') && this.stateMachine?.is('lander')) {
+      this.vehicleCamera?.resetToIdle()
+    }
+
     // F key → state triggers (only one can succeed per press)
     if (
       this.inputManager?.wasActionPressed('interact') &&

@@ -4,7 +4,7 @@
  * Extracted from SceneManager so each scene can define its own camera
  * behavior. Orbit target stays locked to the vehicle; in free flight,
  * ship yaw swings the camera offset so the view turns with heading (optional).
- * After idle time without orbit-drag the camera eases to the default chase offset.
+ * Manual orbit framing persists until gameplay explicitly requests a reset.
  *
  * @author guinetik
  * @date 2026-04-04
@@ -18,13 +18,11 @@ import type { Tickable } from '@/lib/Tickable'
 export interface VehicleCameraConfig {
   /** 3rd-person offset relative to the vehicle's local space */
   idleOffset: THREE.Vector3
-  /** How fast the camera lerps back to idle (units/s) */
+  /** Legacy chase-return speed; retained for preset compatibility. */
   lerpSpeed: number
   /**
-   * Seconds without orbit-drag before lerping to the default {@link idleOffset} chase framing.
-   * While below this threshold, manual orbit angle is kept; ship-yaw coupling is controlled by
-   * {@link VehicleCamera.setShipYawCoupling}.
-   * Use `0` to always use chase framing whenever not dragging.
+   * Legacy idle-return delay; manual camera framing now persists until
+   * {@link VehicleCamera.resetToIdle} is called.
    */
   idleTimeout: number
   /** Camera never goes below this Y (absolute world-space). Ignored when {@link minYRelativeToTarget} is set. */
@@ -68,22 +66,14 @@ export interface VehicleCameraConfig {
 }
 
 /**
- * After orbit-drag ends, wait this many seconds (camera-only idle) before easing back to
- * default behind-ship framing. Ship yaw still swings the view during this window.
+ * Legacy shuttle camera idle seconds retained in presets for compatibility with older tuning docs.
  */
 const SHUTTLE_MAP_CHASE_RETURN_IDLE_SECONDS = 10
 
 /**
- * Map hub free flight: return to default chase sooner than the full shuttle scene so manual
- * orbit does not fight thrust for as long while driving.
+ * Legacy map camera idle seconds retained in presets for compatibility with older tuning docs.
  */
 const MAP_FREE_FLIGHT_CAMERA_CHASE_IDLE_SECONDS = 3
-
-/**
- * When the player scroll-zooms closer than default chase distance, skip chase lerp so the view is
- * not pulled back out (matches cargo-bay inspect closeness in free flight).
- */
-const MAP_FREE_FLIGHT_CHASE_DISTANCE_EPSILON = 0.02
 
 /**
  * Distance from shuttle to camera in cargo-bay inspect framing ({@link MAP_INSPECT_CAMERA_CONFIG}
@@ -213,9 +203,8 @@ export const MAP_PORTAL_ARRIVAL_CAMERA_CONFIG: VehicleCameraConfig = {
 
 /**
  * 3rd-person camera that tracks a vehicle with orbit controls.
- * Manual orbit is kept until the player stops dragging for {@link VehicleCameraConfig.idleTimeout}
- * seconds, then the camera eases to the default chase offset. When {@link setShipYawCoupling} is
- * enabled (default), the camera–target offset rotates with the target's full orientation delta each
+ * Manual orbit is kept until code calls {@link resetToIdle}. When {@link setShipYawCoupling} is
+ * enabled (default), the camera-target offset rotates with the target's full orientation delta each
  * frame (not only Euler Y), matching chase framing. Orbit drag inertia is cleared on pointer end so
  * damped azimuth/polar deltas do not keep drifting while the ship accelerates.
  *
@@ -229,8 +218,6 @@ export class VehicleCamera implements Tickable {
 
   private config: VehicleCameraConfig
   private target: THREE.Object3D | null = null
-  private mouseIdleTimer = 0
-  private isMouseActive = false
   private lastTargetPos = new THREE.Vector3()
   /** Previous target orientation — drives camera-offset rotation when coupling is on. */
   private readonly lastTargetQuat = new THREE.Quaternion()
@@ -252,9 +239,6 @@ export class VehicleCamera implements Tickable {
   private readonly yawCouplingSmoothedQuat = new THREE.Quaternion()
   /** Previous smoothed orientation — builds a partial delta for the camera offset. */
   private readonly yawCouplingPrevSmoothedQuat = new THREE.Quaternion()
-  /** When true, map view is intentionally zoomed out and idle chase recenter is suspended. */
-  private idleRecenterSuppressed = false
-
   /** Camera shake state. */
   private shakeIntensity = 0
   private shakeDecay = 0
@@ -277,7 +261,6 @@ export class VehicleCamera implements Tickable {
       this.controls.minPolarAngle = config.minPolarAngle
     }
 
-    this.controls.addEventListener('start', this.onControlStart)
     this.controls.addEventListener('end', this.onControlEnd)
   }
 
@@ -341,19 +324,17 @@ export class VehicleCamera implements Tickable {
   }
 
   /**
-   * Suspend or resume the idle chase recenter behavior without affecting manual orbit drag state.
+   * Legacy no-op kept for callers that used to suppress timed idle recentering.
    *
-   * When suppression is active, the idle timer is held at zero so zooming back in does not
-   * immediately snap the camera to chase framing.
+   * Manual camera framing now persists by default, so suppression is always effectively active.
+   *
+   * @param suppressed - Ignored legacy flag.
    */
   setIdleRecenterSuppressed(suppressed: boolean): void {
-    this.idleRecenterSuppressed = suppressed
-    if (suppressed) {
-      this.mouseIdleTimer = 0
-    }
+    void suppressed
   }
 
-  /** Transition to a new camera config. Resets idle timer so the offset lerps immediately. */
+  /** Transition to a new camera config and reset to that config's chase framing. */
   setConfig(config: VehicleCameraConfig): void {
     this.config = config
     this.camera.fov = config.fov
@@ -361,14 +342,12 @@ export class VehicleCamera implements Tickable {
     this.controls.minDistance = config.minDistance ?? 0
     this.controls.maxDistance = config.maxDistance ?? Infinity
     this.controls.dampingFactor = config.dampingFactor ?? 0.1
-    // Force idle lerp to start immediately
-    this.mouseIdleTimer = config.idleTimeout + 1
-    this.isMouseActive = false
     if (this.target) {
       const q = this.target.quaternion
       this.lastTargetQuat.copy(q)
       this.yawCouplingSmoothedQuat.copy(q)
       this.yawCouplingPrevSmoothedQuat.copy(q)
+      this.resetToIdle()
     }
   }
 
@@ -376,11 +355,9 @@ export class VehicleCamera implements Tickable {
    * Applies orbit/zoom/FOV tuning without resetting manual orbit-drag state.
    *
    * Used when a value (e.g. slingshot charge) updates every frame: a full {@link setConfig} would
-   * clear `isMouseActive` and force the chase lerp, which fights OrbitControls pitch and feels
-   * like vertical look is disabled.
+   * update the controls tuning while preserving the player's manual orbit framing.
    *
-   * @param config - New tuning values; {@link idleOffset} and {@link idleTimeout} still affect
-   *   chase behavior when the player is not dragging, but ongoing drags are preserved.
+   * @param config - New tuning values to apply while preserving manual orbit framing.
    */
   applyConfigTuning(config: VehicleCameraConfig): void {
     this.config = config
@@ -400,6 +377,22 @@ export class VehicleCamera implements Tickable {
   shake(intensity: number, duration: number): void {
     this.shakeIntensity = intensity
     this.shakeDecay = duration > 0 ? intensity / duration : 0
+  }
+
+  /** Reset the camera to the configured chase framing around the current target. */
+  resetToIdle(): void {
+    if (!this.target) return
+    const targetPos = this.target.position
+    const effectiveMinY =
+      this.config.minYRelativeToTarget !== undefined
+        ? targetPos.y + this.config.minYRelativeToTarget
+        : this.config.minY
+    const idleOffset = this.config.idleOffset.clone().applyQuaternion(this.target.quaternion)
+    this.camera.position.copy(targetPos).add(idleOffset)
+    this.camera.position.y = Math.max(this.camera.position.y, effectiveMinY)
+    this.controls.target.copy(targetPos)
+    this.clearOrbitInternalInertia()
+    this.controls.update()
   }
 
   tick(dt: number): void {
@@ -456,29 +449,6 @@ export class VehicleCamera implements Tickable {
         ? targetPos.y + this.config.minYRelativeToTarget
         : this.config.minY
 
-    // After enough time without orbit-drag, ease to default chase framing
-    if (!this.isMouseActive && !this.idleRecenterSuppressed) {
-      this.mouseIdleTimer += dt
-
-      if (this.mouseIdleTimer > this.config.idleTimeout) {
-        const idleChaseDistance = this.config.idleOffset.length()
-        const camDist = this.camera.position.distanceTo(targetPos)
-        const preserveCloseZoom =
-          this.config.minDistance !== undefined &&
-          camDist + MAP_FREE_FLIGHT_CHASE_DISTANCE_EPSILON < idleChaseDistance
-
-        if (!preserveCloseZoom) {
-          const idleOffset = this.config.idleOffset.clone().applyQuaternion(this.target.quaternion)
-          const targetCamPos = targetPos.clone().add(idleOffset)
-          targetCamPos.y = Math.max(targetCamPos.y, effectiveMinY)
-
-          this.camera.position.lerp(targetCamPos, this.config.lerpSpeed * dt)
-        }
-      }
-    } else if (this.idleRecenterSuppressed) {
-      this.mouseIdleTimer = 0
-    }
-
     // Always clamp
     if (this.camera.position.y < effectiveMinY) {
       this.camera.position.y = effectiveMinY
@@ -502,19 +472,11 @@ export class VehicleCamera implements Tickable {
   }
 
   dispose(): void {
-    this.controls.removeEventListener('start', this.onControlStart)
     this.controls.removeEventListener('end', this.onControlEnd)
     this.controls.dispose()
   }
 
-  private onControlStart = (): void => {
-    this.isMouseActive = true
-    this.mouseIdleTimer = 0
-  }
-
   private onControlEnd = (): void => {
-    this.isMouseActive = false
-    this.mouseIdleTimer = 0
     if (!this.config.preserveDragInertia) {
       this.clearOrbitInternalInertia()
     }

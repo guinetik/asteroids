@@ -117,6 +117,10 @@ export class LanderViewController implements Tickable {
   }
 
   tick(_dt: number): void {
+    if (this.inputManager?.wasActionPressed('resetCamera')) {
+      this.vehicleCamera?.resetToIdle()
+    }
+
     if (this.landerController && this.onTelemetry) {
       const ts = this.landerController.thrusterSystem
       this.onTelemetry({

@@ -21,6 +21,7 @@ import PimpMyShuttleDialog from '@/components/shop/PimpMyShuttleDialog.vue'
 import CreditsBadge from '@/components/hud/CreditsBadge.vue'
 import AchievementBanner from '@/components/AchievementBanner.vue'
 import AchievementsDialog from '@/components/AchievementsDialog.vue'
+import KeybindingsDialog from '@/components/KeybindingsDialog.vue'
 import PortalWelcomeDialog from '@/components/PortalWelcomeDialog.vue'
 import JovianEpilogueOverlay from '@/components/JovianEpilogueOverlay.vue'
 import ObjectiveTracker from '@/components/ObjectiveTracker.vue'
@@ -410,6 +411,7 @@ const turretTarget = ref<{
 const deathVisible = ref(false)
 const deathCause = ref('')
 const achievementsOpen = ref(false)
+const keybindingsOpen = ref(false)
 const portalWelcomeVisible = ref(false)
 const portalWelcomeIsFirstVisit = ref(false)
 /** True while the Jovian transmit epilogue overlay is mounted. */
@@ -1322,6 +1324,11 @@ function handleToggleMusic(): void {
   toggleBackgroundMusic()
 }
 
+function openKeybindings(): void {
+  uiAudio.notifyButtonClick()
+  keybindingsOpen.value = true
+}
+
 function openHabitatFromMap(): void {
   uiAudio.notifyButtonClick()
   shuttleControlVisible.value = false
@@ -2039,7 +2046,43 @@ watch(
       :unlocked-ids="unlockedAchievementIds"
       @close="achievementsOpen = false"
     />
+    <KeybindingsDialog screen="map" :open="keybindingsOpen" @close="keybindingsOpen = false" />
     <AchievementBanner ref="achievementBannerRef" />
+    <button
+      v-show="
+        !mapOverlay.visible &&
+        !mapIntro.controlsLocked &&
+        !habitatActive &&
+        !earthStartupOrbitHudSuppressed &&
+        !deathVisible &&
+        !evaActive
+      "
+      type="button"
+      class="keybindings-toggle-btn map-screen-nav__icon-btn"
+      aria-label="Open keybindings"
+      title="Keybindings"
+      @click="openKeybindings"
+    >
+      <svg viewBox="0 0 24 24" class="map-screen-nav__icon" aria-hidden="true">
+        <rect
+          x="3"
+          y="5"
+          width="18"
+          height="14"
+          rx="2"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.7"
+        />
+        <path
+          d="M6.5 9h1.5M10 9h1.5M13.5 9H15M17 9h.5M6.5 12h1.5M10 12h4M16 12h1.5M8 15h8"
+          fill="none"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-width="1.7"
+        />
+      </svg>
+    </button>
     <button
       v-show="
         !mapOverlay.visible &&

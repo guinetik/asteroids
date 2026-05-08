@@ -2477,6 +2477,11 @@ body,
   @apply fixed bottom-[calc(1rem+88px)] left-4 z-30;
 }
 
+/* Keybindings toggle — sits above the music button in the bottom-left stack. */
+.keybindings-toggle-btn {
+  @apply fixed bottom-[calc(1rem+136px)] left-4 z-30;
+}
+
 .credits-badge__icon {
   @apply text-cyan-500 font-bold text-xs;
 }

@@ -21,6 +21,7 @@ import LevelMinimap from '@/components/LevelMinimap.vue'
 import type { MapMarker } from '@/components/LevelMinimap.vue'
 import PickupToast from '@/components/PickupToast.vue'
 import KeyPrompt from '@/components/KeyPrompt.vue'
+import KeybindingsDialog from '@/components/KeybindingsDialog.vue'
 import { parseKeyPrompt } from '@/lib/ui/parseKeyPrompt'
 import type {
   PickupEntry,
@@ -102,6 +103,7 @@ const deathOverlayVisible = ref(false)
 const deathOverlayCause = ref('')
 const showMap = ref(false)
 const showInventory = ref(false)
+const keybindingsOpen = ref(false)
 const inventorySnapshot = ref<Inventory | null>(null)
 /** Positive deltas vs sortie baseline for cargo panel badges (catalog id → qty). */
 const inventoryRunGainsThisSortie = ref<Record<string, number>>({})
@@ -873,6 +875,20 @@ function toggleInventoryPanel(): void {
   else openInventoryPanel()
 }
 
+/** Open the controls reference overlay and release pointer-lock for mouse interaction. */
+function openKeybindingsPanel(): void {
+  uiAudio.notifyButtonClick()
+  keybindingsOpen.value = true
+  if (typeof document !== 'undefined' && document.pointerLockElement) {
+    document.exitPointerLock()
+  }
+}
+
+/** Close the controls reference overlay. */
+function closeKeybindingsPanel(): void {
+  keybindingsOpen.value = false
+}
+
 /**
  * Handle a jettison request from the panel: drop `quantity` of `itemId`
  * from the persisted inventory and refresh the snapshot. No-op when
@@ -911,6 +927,11 @@ function handleProspectusResolve(outcomeId: 'transmit' | 'tamper'): void {
 }
 
 function handleGlobalKeydown(e: KeyboardEvent): void {
+  if ((e.code === 'Escape' || e.key === 'Escape') && keybindingsOpen.value) {
+    e.preventDefault()
+    closeKeybindingsPanel()
+    return
+  }
   if (e.code === 'KeyB') {
     if (stateInfo.state !== 'eva' && stateInfo.state !== 'lander') return
     e.preventDefault()
@@ -954,49 +975,78 @@ function handleToggleMusic(): void {
 <template>
   <div ref="container" class="scene-container"></div>
   <div class="level-topbar">
-    <button
-      type="button"
-      class="level-topbar__music-btn"
-      :aria-label="musicEnabled ? 'Mute music' : 'Unmute music'"
-      :title="musicEnabled ? 'Mute music' : 'Unmute music'"
-      @click="handleToggleMusic"
-    >
-      <svg viewBox="0 0 24 24" class="level-topbar__music-icon" aria-hidden="true">
-        <path d="M5 9v6h4l5 4V5L9 9H5Z" fill="currentColor" />
-        <path
-          v-if="musicEnabled"
-          d="M17 9.5a4 4 0 0 1 0 5"
-          fill="none"
-          stroke="currentColor"
-          stroke-linecap="round"
-          stroke-width="1.8"
-        />
-        <path
-          v-if="musicEnabled"
-          d="M19.5 7a7.5 7.5 0 0 1 0 10"
-          fill="none"
-          stroke="currentColor"
-          stroke-linecap="round"
-          stroke-width="1.8"
-        />
-        <path
-          v-if="!musicEnabled"
-          d="m17 8 4 8"
-          fill="none"
-          stroke="currentColor"
-          stroke-linecap="round"
-          stroke-width="2"
-        />
-        <path
-          v-if="!musicEnabled"
-          d="m21 8-4 8"
-          fill="none"
-          stroke="currentColor"
-          stroke-linecap="round"
-          stroke-width="2"
-        />
-      </svg>
-    </button>
+    <div class="level-topbar__audio-controls">
+      <button
+        type="button"
+        class="level-topbar__keybindings-btn"
+        aria-label="Open keybindings"
+        title="Keybindings"
+        @click="openKeybindingsPanel"
+      >
+        <svg viewBox="0 0 24 24" class="level-topbar__icon" aria-hidden="true">
+          <rect
+            x="3"
+            y="5"
+            width="18"
+            height="14"
+            rx="2"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.7"
+          />
+          <path
+            d="M6.5 9h1.5M10 9h1.5M13.5 9H15M17 9h.5M6.5 12h1.5M10 12h4M16 12h1.5M8 15h8"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-width="1.7"
+          />
+        </svg>
+      </button>
+      <button
+        type="button"
+        class="level-topbar__music-btn"
+        :aria-label="musicEnabled ? 'Mute music' : 'Unmute music'"
+        :title="musicEnabled ? 'Mute music' : 'Unmute music'"
+        @click="handleToggleMusic"
+      >
+        <svg viewBox="0 0 24 24" class="level-topbar__icon" aria-hidden="true">
+          <path d="M5 9v6h4l5 4V5L9 9H5Z" fill="currentColor" />
+          <path
+            v-if="musicEnabled"
+            d="M17 9.5a4 4 0 0 1 0 5"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-width="1.8"
+          />
+          <path
+            v-if="musicEnabled"
+            d="M19.5 7a7.5 7.5 0 0 1 0 10"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-width="1.8"
+          />
+          <path
+            v-if="!musicEnabled"
+            d="m17 8 4 8"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-width="2"
+          />
+          <path
+            v-if="!musicEnabled"
+            d="m21 8-4 8"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-width="2"
+          />
+        </svg>
+      </button>
+    </div>
     <button
       v-if="stateInfo.state === 'eva' || stateInfo.state === 'lander'"
       type="button"
@@ -1110,6 +1160,7 @@ function handleToggleMusic(): void {
     @close="closeInventoryPanel"
     @jettison="handleJettison"
   />
+  <KeybindingsDialog screen="level" :open="keybindingsOpen" @close="closeKeybindingsPanel" />
   <!-- Landing warnings — center screen, impossible to miss -->
   <div v-if="descentWarning !== 'safe' || attitudeWarning !== 'safe'" class="landing-warnings">
     <div
@@ -1207,6 +1258,15 @@ function handleToggleMusic(): void {
   z-index: 35;
   pointer-events: none;
 }
+.level-topbar__audio-controls {
+  position: absolute;
+  top: max(1rem, env(safe-area-inset-top, 0px) + 0.5rem);
+  right: max(1rem, env(safe-area-inset-right, 0px) + 0.5rem);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  pointer-events: auto;
+}
 .level-topbar__cargo-btn {
   position: absolute;
   bottom: max(1rem, env(safe-area-inset-bottom, 0px) + 0.5rem);
@@ -1258,10 +1318,8 @@ function handleToggleMusic(): void {
   font-weight: 600;
   color: rgba(102, 255, 238, 0.95);
 }
-.level-topbar__music-btn {
-  position: absolute;
-  top: max(1rem, env(safe-area-inset-top, 0px) + 0.5rem);
-  right: max(1rem, env(safe-area-inset-right, 0px) + 0.5rem);
+.level-topbar__music-btn,
+.level-topbar__keybindings-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1282,13 +1340,14 @@ function handleToggleMusic(): void {
     color 0.2s ease,
     transform 0.2s ease;
 }
-.level-topbar__music-btn:hover {
+.level-topbar__music-btn:hover,
+.level-topbar__keybindings-btn:hover {
   transform: translateY(-1px);
   border-color: rgba(125, 211, 252, 0.5);
   background: rgba(8, 47, 73, 0.8);
   color: white;
 }
-.level-topbar__music-icon {
+.level-topbar__icon {
   width: 1.3rem;
   height: 1.3rem;
 }
