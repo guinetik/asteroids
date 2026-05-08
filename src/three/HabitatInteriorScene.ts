@@ -568,6 +568,13 @@ const PET_SIT_CANCEL_DISTANCE = 3.0
 const PET_APPROACH_DURATION_S = 0.55
 /** Lerp factor (per second) for camera tracking onto Sushi during the pet sequence. */
 const PET_CAMERA_TURN_RATE = 8
+/**
+ * Cooldown (seconds) between consecutive pets. Stops the player from spam-grinding
+ * love by mashing F at zero love — Sushi needs a beat to re-warm-up before the next
+ * scratch lands. Tuned so a polite cadence feels natural and a button-mash feels
+ * blocked.
+ */
+const PET_COOLDOWN_S = 5
 
 /** Lerp factor (per second) for the camera turn when interacting with the shuttle controls. */
 const TABLE_CAMERA_TURN_RATE = 5
@@ -864,6 +871,12 @@ export class HabitatInteriorScene {
   private petSequenceActive = false
   /** Seconds elapsed in the current pet glide-to-front sequence. */
   private petSequenceTime = 0
+  /**
+   * Seconds remaining on the no-pet cooldown after a successful F-press. Counts
+   * down in {@link tick}; while > 0 the prompt swaps to a "needs a moment" hint
+   * and the F-press is ignored. See {@link PET_COOLDOWN_S}.
+   */
+  private petCooldownTimer = 0
   /** XZ start of the pet glide; Y reused as floor. */
   private readonly _petStartXZ = new THREE.Vector2()
   /** XZ end of the pet glide — a point in front of Sushi. */
@@ -1176,6 +1189,9 @@ export class HabitatInteriorScene {
     this.tickLaserPointer()
     this.cat?.tick(dt)
     this.tickCatAudio()
+    if (this.petCooldownTimer > 0) {
+      this.petCooldownTimer = Math.max(0, this.petCooldownTimer - dt)
+    }
     this.tickBowlFillCue(dt)
     this.tickKibbleVisual()
     this.tickLitterChunkVisual()
@@ -2391,12 +2407,17 @@ export class HabitatInteriorScene {
       // Also suppressed when the player is in shuttle-control range so the table
       // prompt always wins at the cockpit (cat napping nearby doesn't hijack F).
       if (distCat < PET_PROMPT_DISTANCE && !this.cat.isBusyWithNeeds && !tableInRange) {
-        this.onPrompt?.('F  Pet Sushi')
-        if (this.inputManager.wasActionPressed('interact')) {
-          this.cat.pet()
-          this.catAudio.playPet()
-          this.startPetSequence()
-          this.onInteract?.('cat')
+        if (this.petCooldownTimer > 0) {
+          this.onPrompt?.('Sushi needs a moment...')
+        } else {
+          this.onPrompt?.('F  Pet Sushi')
+          if (this.inputManager.wasActionPressed('interact')) {
+            this.cat.pet()
+            this.catAudio.playPet()
+            this.startPetSequence()
+            this.petCooldownTimer = PET_COOLDOWN_S
+            this.onInteract?.('cat')
+          }
         }
         return
       }
