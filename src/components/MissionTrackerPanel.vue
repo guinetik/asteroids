@@ -85,15 +85,26 @@ function emitFocus(row: MissionTrackerRow): void {
 </template>
 
 <style>
+/**
+ * Cyan-forward accent (Tailwind cyan-300/400 family) so this panel reads as
+ * navigation / active missions; {@link ContractTrackerPanel} keeps mint/spring
+ * RGB(0,255,204) for contract offers.
+ */
 .mission-tracker-panel {
+  --mission-tracker-cyan-border: 34 211 238;
+  --mission-tracker-cyan-muted: 103 232 249;
+  --mission-tracker-cyan-title: 165 243 252;
+  --mission-tracker-cyan-accent: 34 211 238;
+  --mission-tracker-cyan-hover: 207 250 254;
+
   --tracker-bg: rgba(0, 10, 15, 0.5);
-  --tracker-border: rgba(0, 255, 204, 0.15);
-  --tracker-border-soft: rgba(0, 255, 204, 0.1);
-  --tracker-eyebrow: rgba(0, 255, 204, 0.4);
-  --tracker-title: rgba(0, 255, 204, 0.8);
+  --tracker-border: rgb(var(--mission-tracker-cyan-border) / 0.18);
+  --tracker-border-soft: rgb(var(--mission-tracker-cyan-border) / 0.12);
+  --tracker-eyebrow: rgb(var(--mission-tracker-cyan-muted) / 0.55);
+  --tracker-title: rgb(var(--mission-tracker-cyan-title) / 0.92);
   --tracker-text-bright: rgba(255, 255, 255, 0.85);
-  --tracker-accent: rgba(0, 255, 204, 0.5);
-  --tracker-accent-strong: rgba(0, 255, 204, 0.95);
+  --tracker-accent: rgb(var(--mission-tracker-cyan-accent) / 0.55);
+  --tracker-accent-strong: rgb(var(--mission-tracker-cyan-hover) / 0.97);
   --tracker-selected: rgba(255, 238, 102, 0.95);
   --tracker-selected-soft: rgba(255, 238, 102, 0.7);
 
