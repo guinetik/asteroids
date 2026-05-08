@@ -2,7 +2,11 @@ import type { PlayerProfile } from '@/lib/player/types'
 import type { UpgradeId } from '@/lib/upgrades'
 
 /** Stable ids for journey definitions persisted on the player profile. */
-export type JourneyId = 'welcome' | 'act-1-inner-system' | 'act-2-jovian-arrival'
+export type JourneyId =
+  | 'welcome'
+  | 'act-1-inner-system'
+  | 'act-2-jovian-arrival'
+  | 'act-3-outer-reaches'
 /** Feature unlock ids granted by completing journeys. */
 export type JourneyFeatureId = 'slingshot'
 /** Runtime trigger ids that can advance one or more journey steps. */
@@ -92,6 +96,8 @@ export const WELCOME_JOURNEY_ID: JourneyId = 'welcome'
 export const ACT_1_JOURNEY_ID: JourneyId = 'act-1-inner-system'
 /** Canonical id for the Act 2 three-contract Jupiter gate arc. */
 export const ACT_2_JOURNEY_ID: JourneyId = 'act-2-jovian-arrival'
+/** Canonical id for the Act 3 ice-giant / outer-reaches arc (poster + milestone). */
+export const ACT_3_JOURNEY_ID: JourneyId = 'act-3-outer-reaches'
 
 /** Contract ids that must all complete to unlock the Act 1 climax (Consortium Certification). */
 export const ACT_1_CONTRACT_IDS = [
@@ -233,6 +239,16 @@ const JOURNEY_DEFINITIONS: readonly JourneyDefinition[] = [
         trigger: `contract_completed:${ACT_2_CONTRACT_IDS[2]}`,
       },
     ],
+  },
+  {
+    id: ACT_3_JOURNEY_ID,
+    eyebrow: 'Act III',
+    title: 'Outer Reaches',
+    objectiveLabel: 'First orbit beyond the Jovian wall',
+    unlocks: [],
+    /** Opens once Saturn orbit is newly persisted — capstone beats are authored later. */
+    startTrigger: 'first_orbit:saturn',
+    steps: [],
   },
 ]
 

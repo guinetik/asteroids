@@ -177,6 +177,7 @@ export class MapHabitatFacade {
       getBladder: () => (deps ? deps.getProfile().sushiBladder : 0),
       getTired: () => (deps ? deps.getProfile().sushiTired : 0),
       addTired: (delta) => this.handleSushiAddTired(delta),
+      addHunger: (delta) => this.handleSushiAddHunger(delta),
       onWoke: () => this.handleSushiWoke(),
       canFillBowl: () => {
         if (!deps) return false
@@ -243,6 +244,22 @@ export class MapHabitatFacade {
     if (!deps) return
     const profile = deps.getProfile()
     const next = addSushiTired(profile, delta)
+    if (next === profile) return
+    deps.setProfile(next)
+  }
+
+  /**
+   * Mirror of {@link handleSushiAddTired} for hunger, called by the cat controller
+   * each frame while sprinting after the laser pointer. In-memory only — the
+   * regular passive needs tick is what persists the field to localStorage.
+   *
+   * @param delta - Hunger delta in points; positive while chasing the laser.
+   */
+  private handleSushiAddHunger(delta: number): void {
+    const deps = this.deps
+    if (!deps) return
+    const profile = deps.getProfile()
+    const next = addSushiHunger(profile, delta)
     if (next === profile) return
     deps.setProfile(next)
   }

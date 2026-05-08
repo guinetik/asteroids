@@ -2780,18 +2780,19 @@ export class MapViewController implements Tickable {
   }
 
   /**
-   * When Jupiter is newly written into {@link PlayerProfile.orbitedSolarBodies}, notifies
-   * `first_orbit:jupiter` for the journey system. No-op when Jupiter was already counted or still
-   * uncounted after the preceding write.
+   * When a solar body is newly written into {@link PlayerProfile.orbitedSolarBodies}, notifies
+   * `first_orbit:<bodyKey>` so journey start gates (Jupiter, Saturn, …) can open.
    *
    * @param profileBeforeOrbitRecord - Snapshot immediately before the first-orbit write.
+   * @param bodyKey - Canonical orbit key, e.g. `'jupiter'` or `'saturn'`.
    */
-  private maybeNotifyFirstJupiterOrbitJourneyTrigger(
+  private maybeNotifyFirstSolarBodyOrbitJourneyTrigger(
     profileBeforeOrbitRecord: PlayerProfile,
+    bodyKey: string,
   ): void {
-    if ((profileBeforeOrbitRecord.orbitedSolarBodies['jupiter'] ?? 0) > 0) return
-    if ((this.playerProfile.orbitedSolarBodies['jupiter'] ?? 0) === 0) return
-    this.notifyJourneyTrigger('first_orbit:jupiter')
+    if ((profileBeforeOrbitRecord.orbitedSolarBodies[bodyKey] ?? 0) > 0) return
+    if ((this.playerProfile.orbitedSolarBodies[bodyKey] ?? 0) === 0) return
+    this.notifyJourneyTrigger(`first_orbit:${bodyKey}` as JourneyTriggerId)
   }
 
   private emitJourneyTracker(): void {
@@ -2849,7 +2850,7 @@ export class MapViewController implements Tickable {
     this.playerProfile = next
     this.persistPlayerProfile()
     this.emitShopState()
-    this.maybeNotifyFirstJupiterOrbitJourneyTrigger(profileBeforeOrbitRecord)
+    this.maybeNotifyFirstSolarBodyOrbitJourneyTrigger(profileBeforeOrbitRecord, key)
   }
 
   /**
@@ -4312,7 +4313,7 @@ export class MapViewController implements Tickable {
       this.persistPlayerProfile()
       this.emitShopState()
     }
-    this.maybeNotifyFirstJupiterOrbitJourneyTrigger(profileBeforeOrbitRecord)
+    this.maybeNotifyFirstSolarBodyOrbitJourneyTrigger(profileBeforeOrbitRecord, key)
     this.tryEnqueueFantasiaIntroMail(key)
     return true
   }

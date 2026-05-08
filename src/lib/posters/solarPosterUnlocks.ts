@@ -26,11 +26,15 @@ export interface SolarPosterDefinition {
   /** Public poster image URL served by Vite, e.g. `'/posters/venus.webp'`. */
   readonly assetPath: string
   /**
-   * Achievement id that unlocks this poster, e.g. `'exploration-orbit-neptune'`.
-   * `null` means the poster is available by default.
+   * Achievement id that unlocks this poster when {@link defaultUnlocked} is false,
+   * e.g. `'exploration-orbit-neptune'`.
+   * Use `null` only for posters that should stay hidden unless {@link defaultUnlocked} is true.
    */
   readonly achievementId: string | null
-  /** Whether this poster is visible before checking achievements, e.g. Earth starts visible. */
+  /**
+   * When true, the poster image shows even if {@link achievementId} is missing from the
+   * unlocked set. When false, the player must have {@link achievementId} (non-null) unlocked.
+   */
   readonly defaultUnlocked: boolean
 }
 
@@ -58,6 +62,9 @@ export interface SolarCompletionPosterDefinition {
 
 const rawCatalog = rawSolarPosterCatalog as readonly SolarPosterDefinition[]
 
+/** Canonical art for the large completion poster (starboard of the hatch when facing the −Z wall). */
+const SOLAR_COMPLETION_POSTER_ASSET_PATH = '/posters/001.webp' as const
+
 /** Solar poster slots in display order from the Sun outward. */
 export const SOLAR_POSTER_CATALOG: readonly SolarPosterDefinition[] = rawCatalog
 
@@ -65,32 +72,32 @@ export const SOLAR_POSTER_CATALOG: readonly SolarPosterDefinition[] = rawCatalog
 export const SOLAR_COMPLETION_POSTER: SolarCompletionPosterDefinition = {
   id: 'solar-completion',
   label: 'Solar Completion',
-  assetPath: getCompletionPosterAssetPath(rawCatalog),
+  assetPath: SOLAR_COMPLETION_POSTER_ASSET_PATH,
 }
 
 /**
- * Validate the authored poster catalog when this module loads.
+ * Validate authored habitat poster rows (solar wall, table row, etc.).
  *
  * @param posters - Poster definitions to validate.
  * @throws {Error} When duplicate ids or malformed rows are detected.
  */
-function validateSolarPosterCatalog(posters: readonly SolarPosterDefinition[]): void {
+export function validatePosterCatalog(posters: readonly SolarPosterDefinition[]): void {
   const ids = new Set<string>()
   for (const poster of posters) {
-    if (!poster.id.trim()) throw new Error('solar posters: missing poster id')
-    if (ids.has(poster.id)) throw new Error(`solar posters: duplicate poster id "${poster.id}"`)
+    if (!poster.id.trim()) throw new Error('posters: missing poster id')
+    if (ids.has(poster.id)) throw new Error(`posters: duplicate poster id "${poster.id}"`)
     ids.add(poster.id)
     if (!poster.bodyKey.trim()) {
-      throw new Error(`solar posters: "${poster.id}" missing bodyKey`)
+      throw new Error(`posters: "${poster.id}" missing bodyKey`)
     }
     if (!poster.label.trim()) {
-      throw new Error(`solar posters: "${poster.id}" missing label`)
+      throw new Error(`posters: "${poster.id}" missing label`)
     }
     if (!poster.assetPath.startsWith('/posters/')) {
-      throw new Error(`solar posters: "${poster.id}" assetPath must point at /posters/`)
+      throw new Error(`posters: "${poster.id}" assetPath must point at /posters/`)
     }
     if (poster.achievementId !== null && !poster.achievementId.trim()) {
-      throw new Error(`solar posters: "${poster.id}" has blank achievementId`)
+      throw new Error(`posters: "${poster.id}" has blank achievementId`)
     }
   }
 }
@@ -173,17 +180,4 @@ export function getSolarPosterById(
   return posters.find((poster) => poster.id === id) ?? null
 }
 
-/**
- * Select the authored source art for the completion poster.
- *
- * @param posters - Poster definitions to search.
- * @returns Asset path for the Sun preview poster, e.g. `'/posters/001.webp'`.
- * @throws {Error} When the Sun poster is missing from the catalog.
- */
-function getCompletionPosterAssetPath(posters: readonly SolarPosterDefinition[]): string {
-  const sunPoster = posters.find((poster) => poster.id === 'sun')
-  if (!sunPoster) throw new Error('solar posters: missing sun poster for completion art')
-  return sunPoster.assetPath
-}
-
-validateSolarPosterCatalog(SOLAR_POSTER_CATALOG)
+validatePosterCatalog(SOLAR_POSTER_CATALOG)

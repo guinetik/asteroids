@@ -1,8 +1,6 @@
 /**
- * Standalone Three.js completion poster for the habitat back wall.
- *
- * The poster uses the authored completion art and only reveals its image after
- * every achievement-backed solar poster has unlocked.
+ * Standalone Three.js completion poster for the habitat hatch wall (−Z): solar "all planets" art
+ * revealed after every achievement-backed solar slot unlocks.
  *
  * @author guinetik
  * @date 2026-05-07

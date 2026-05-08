@@ -1,6 +1,11 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { createProfile } from '@/lib/player/profile'
-import { ACT_1_JOURNEY_ID, ACT_2_JOURNEY_ID, WELCOME_JOURNEY_ID } from '@/lib/journeys'
+import {
+  ACT_1_JOURNEY_ID,
+  ACT_2_JOURNEY_ID,
+  ACT_3_JOURNEY_ID,
+  WELCOME_JOURNEY_ID,
+} from '@/lib/journeys'
 import { ACHIEVEMENT_DEFINITIONS, type AchievementProgress } from '@/data/achievements'
 import { emptyContractSnapshot } from '@/lib/contracts/contractStorage'
 import type { ContractStoreSnapshot } from '@/lib/contracts/contractTypes'
@@ -234,6 +239,16 @@ describe('achievements', () => {
 
     expect(act2Hint).toContain('Act II')
     expect(act2Hint).toContain('Jovian Arrival')
+
+    const act3Hint = getAchievementLockedHint(
+      ACHIEVEMENT_DEFINITIONS.find(
+        (definition) => definition.id === 'journey-act-3-outer-reaches',
+      )!,
+      progress(),
+    )
+
+    expect(act3Hint).toContain('Act III')
+    expect(act3Hint).toContain('Outer Reaches')
   })
 
   it('unlocks expanded economy achievements from profile stats', () => {
@@ -303,6 +318,17 @@ describe('achievements', () => {
     const ids = evaluateAchievementUnlocks(progress(profile), []).newlyUnlocked.map((a) => a.id)
 
     expect(ids).toContain('journey-act-2-jovian-arrival')
+  })
+
+  it('unlocks Act III from the completed Act III journey', () => {
+    const profile = {
+      ...createProfile('Pilot'),
+      completedJourneyIds: [ACT_3_JOURNEY_ID],
+    }
+
+    const ids = evaluateAchievementUnlocks(progress(profile), []).newlyUnlocked.map((a) => a.id)
+
+    expect(ids).toContain('journey-act-3-outer-reaches')
   })
 
   it('unlocks mission objective achievements from profile stats', () => {
@@ -413,6 +439,13 @@ describe('achievements', () => {
   it('registers the Act II journey achievement in the catalog', () => {
     const entry = ACHIEVEMENT_DEFINITIONS.find(
       (definition) => definition.id === 'journey-act-2-jovian-arrival',
+    )
+    expect(entry?.kind).toBe('journey_completed')
+  })
+
+  it('registers the Act III journey achievement in the catalog', () => {
+    const entry = ACHIEVEMENT_DEFINITIONS.find(
+      (definition) => definition.id === 'journey-act-3-outer-reaches',
     )
     expect(entry?.kind).toBe('journey_completed')
   })

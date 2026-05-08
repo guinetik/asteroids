@@ -1,0 +1,18 @@
+[
+  {
+    "id": "journey-act1-wall",
+    "bodyKey": "journey-act1",
+    "label": "Act I",
+    "assetPath": "/posters/002.webp",
+    "achievementId": "journey-act-1-inner-system",
+    "defaultUnlocked": false
+  },
+  {
+    "id": "journey-act2-wall",
+    "bodyKey": "journey-act2",
+    "label": "Act II",
+    "assetPath": "/posters/003.webp",
+    "achievementId": "journey-act-2-jovian-arrival",
+    "defaultUnlocked": false
+  }
+]

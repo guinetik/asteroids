@@ -3,7 +3,7 @@
     "id": "sun",
     "bodyKey": "sun",
     "label": "Sun",
-    "assetPath": "/posters/001.webp",
+    "assetPath": "/posters/sun.webp",
     "achievementId": "exploration-orbit-sun",
     "defaultUnlocked": false
   },
@@ -28,8 +28,8 @@
     "bodyKey": "earth",
     "label": "Earth",
     "assetPath": "/posters/earth.webp",
-    "achievementId": null,
-    "defaultUnlocked": true
+    "achievementId": "flight-first-launch",
+    "defaultUnlocked": false
   },
   {
     "id": "mars",

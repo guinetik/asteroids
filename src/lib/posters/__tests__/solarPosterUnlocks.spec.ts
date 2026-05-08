@@ -35,7 +35,7 @@ describe('solarPosterUnlocks', () => {
       ['sun', false],
       ['mercury', false],
       ['venus', false],
-      ['earth', true],
+      ['earth', false],
       ['mars', true],
       ['ceres', false],
       ['jupiter', true],
@@ -46,11 +46,14 @@ describe('solarPosterUnlocks', () => {
     ])
   })
 
-  it('returns unlocked poster ids including default visible posters', () => {
-    expect(getUnlockedSolarPosterIds(['exploration-orbit-sun'])).toEqual(['sun', 'earth'])
+  it('returns unlocked solar ids for sun orbit and first launch', () => {
+    expect(getUnlockedSolarPosterIds(['exploration-orbit-sun', 'flight-first-launch'])).toEqual([
+      'sun',
+      'earth',
+    ])
   })
 
-  it('unlocks the completion poster after every achievement-backed poster is visible', () => {
+  it('unlocks the completion poster after every achievement-backed solar poster is visible', () => {
     const achievementIds = SOLAR_POSTER_CATALOG.flatMap((poster) =>
       poster.achievementId === null ? [] : [poster.achievementId],
     )
@@ -59,6 +62,15 @@ describe('solarPosterUnlocks', () => {
     expect(SOLAR_COMPLETION_POSTER.assetPath).toBe('/posters/001.webp')
     expect(isSolarCompletionPosterUnlocked(missingLastAchievement)).toBe(false)
     expect(isSolarCompletionPosterUnlocked(achievementIds)).toBe(true)
+  })
+
+  it('ties the first solar slot to sun orbit art', () => {
+    expect(getSolarPosterById('sun')?.assetPath).toBe('/posters/sun.webp')
+    expect(getSolarPosterById('sun')?.achievementId).toBe('exploration-orbit-sun')
+  })
+
+  it('ties Earth to the first launch achievement', () => {
+    expect(getSolarPosterById('earth')?.achievementId).toBe('flight-first-launch')
   })
 
   it('looks up poster definitions by id', () => {

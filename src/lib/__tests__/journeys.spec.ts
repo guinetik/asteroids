@@ -303,3 +303,15 @@ describe('act-2-jovian-arrival journey', () => {
     expect(profile.completedJourneyIds).toContain('act-2-jovian-arrival')
   })
 })
+
+describe('act-3-outer-reaches journey', () => {
+  it('opens and completes when Saturn first-orbit is recorded (no authored steps yet)', () => {
+    const profile = createProfile('Pilot')
+    expect(profile.completedJourneyIds).not.toContain('act-3-outer-reaches')
+
+    const result = applyJourneyTrigger(profile, 'first_orbit:saturn')
+
+    expect(result.profile.journeyStartReadyIds).toContain('act-3-outer-reaches')
+    expect(result.completedJourneyIds).toContain('act-3-outer-reaches')
+  })
+})

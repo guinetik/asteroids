@@ -1,0 +1,26 @@
+[
+  {
+    "id": "lander",
+    "bodyKey": "lander",
+    "label": "Lander",
+    "assetPath": "/posters/lander.webp",
+    "achievementId": "exploration-three-asteroids",
+    "defaultUnlocked": false
+  },
+  {
+    "id": "eva",
+    "bodyKey": "eva",
+    "label": "EVA",
+    "assetPath": "/posters/eva.webp",
+    "achievementId": "missions-eva-five",
+    "defaultUnlocked": false
+  },
+  {
+    "id": "shuttle",
+    "bodyKey": "shuttle",
+    "label": "Shuttle",
+    "assetPath": "/posters/shuttle.webp",
+    "achievementId": "missions-shuttle-five",
+    "defaultUnlocked": false
+  }
+]

@@ -1,21 +1,20 @@
 /**
- * Standalone Three.js poster wall for habitat achievement posters.
+ * Three framed achievement posters on the habitat front wall, above the mess table.
  *
- * Builds framed solar-body poster slots in fixed Sun-outward order. The wall is
- * intentionally unplaced: local +Z is the viewing side, so habitat integration can
- * position and rotate the returned group wherever the wall belongs.
+ * Local +Z faces into the cabin; mount this group on the +Z end-cap with a Y rotation
+ * of π so frames read correctly from the deck.
  *
  * @author guinetik
- * @date 2026-05-07
+ * @date 2026-05-08
  * @spec docs/superpowers/specs/2026-04-06-habitat-interior-design.md
  */
 import * as THREE from 'three'
 import {
-  getSolarPosterVisibility,
-  SOLAR_POSTER_CATALOG,
-  type SolarPosterDefinition,
-  type SolarPosterId,
-} from '@/lib/posters/solarPosterUnlocks'
+  TABLE_POSTER_CATALOG,
+  getTablePosterVisibility,
+  type TablePosterVisibility,
+} from '@/lib/posters/tablePosterUnlocks'
+import type { SolarPosterDefinition, SolarPosterId } from '@/lib/posters/solarPosterUnlocks'
 
 /** Height of each poster image in local wall units. */
 const POSTER_HEIGHT = 1.08
@@ -29,17 +28,13 @@ const FRAME_BORDER = 0.055
 const FRAME_DEPTH = 0.045
 /** Gap between neighboring poster slots. */
 const POSTER_GAP = 0.2
-/** Number of poster slots in the top row. */
-const TOP_ROW_SLOT_COUNT = 6
 /** Slight forward offset to prevent image/backing z-fighting. */
 const IMAGE_Z_OFFSET = 0.027
 /** Slight backing offset to sit behind the image plane. */
 const BACKING_Z_OFFSET = -0.008
-/** Vertical distance between poster row centers. */
-const ROW_GAP = 1.48
 /** Dark metal frame color. */
 const FRAME_COLOR = 0xb0b8c0
-/** Dim backing colour for unlocked poster slots (locked slots hide entirely). */
+/** Dim backing visible when a poster is locked. */
 const BACKING_COLOR = 0x121820
 /** Roughness used by poster wall metal materials. */
 const POSTER_WALL_ROUGHNESS = 0.62
@@ -55,30 +50,28 @@ const FULL_TEXTURE_REPEAT = 1
 const NO_TEXTURE_OFFSET = 0
 
 /**
- * Optional construction settings for the standalone poster wall.
+ * Optional construction settings for the table poster row.
  */
-export interface HabitatPosterWallOptions {
-  /** Poster definitions in fixed display order. Defaults to the solar poster catalog. */
+export interface HabitatTablePosterRowOptions {
+  /** Poster definitions in display order (left → right). Defaults to {@link TABLE_POSTER_CATALOG}. */
   readonly posters?: readonly SolarPosterDefinition[]
   /** Achievement ids that should unlock matching poster image planes. */
   readonly unlockedAchievementIds?: readonly string[]
 }
 
 /**
- * Meshes whose visibility changes when a poster unlocks.
+ * Meshes whose visibility changes when a table poster unlocks.
  */
 interface PosterSlotMeshes {
-  /** Textured poster image plane that is hidden until unlocked. */
   readonly image: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>
-  /** Dim backing plate that remains visible even while the poster image is locked. */
   readonly backing: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>
 }
 
 /**
- * Reusable framed poster wall object.
+ * Single-row framed poster group for the table wall.
  */
-export class HabitatPosterWall {
-  /** Root object to add to a scene. Local +Z is the viewing side. */
+export class HabitatTablePosterRow {
+  /** Root object to add to a scene. Local +Z is the viewing side from inside the group. */
   readonly group = new THREE.Group()
 
   private readonly posters: readonly SolarPosterDefinition[]
@@ -89,21 +82,21 @@ export class HabitatPosterWall {
   private readonly textureLoader = new THREE.TextureLoader()
 
   /**
-   * Build poster frames and apply initial visibility.
+   * Build framed slots and apply initial visibility.
    *
-   * @param options - Optional poster catalog and unlocked achievement state.
+   * @param options - Optional catalog and unlocked achievement state.
    */
-  constructor(options: HabitatPosterWallOptions = {}) {
-    this.posters = options.posters ?? SOLAR_POSTER_CATALOG
-    this.group.name = 'habitatPosterWall'
-    this.buildWall()
+  constructor(options: HabitatTablePosterRowOptions = {}) {
+    this.posters = options.posters ?? TABLE_POSTER_CATALOG
+    this.group.name = 'habitatTablePosterRow'
+    this.buildRow()
     this.setUnlockedAchievementIds(options.unlockedAchievementIds ?? [])
   }
 
   /**
    * Load poster textures into their image planes.
    *
-   * @returns Promise that settles after all currently authored poster images have loaded.
+   * @returns Promise that settles after all poster images have loaded.
    */
   async load(): Promise<void> {
     await Promise.all(
@@ -124,36 +117,23 @@ export class HabitatPosterWall {
   /**
    * Update visible poster images from persisted achievement ids.
    *
-   * @param unlockedAchievementIds - Persisted achievement ids, e.g. achievement store state.
+   * @param unlockedAchievementIds - Persisted achievement ids.
    */
   setUnlockedAchievementIds(unlockedAchievementIds: readonly string[]): void {
-    const visibility = getSolarPosterVisibility(unlockedAchievementIds, this.posters)
+    const visibility: readonly TablePosterVisibility[] = getTablePosterVisibility(
+      unlockedAchievementIds,
+      this.posters,
+    )
     for (const row of visibility) {
       const slot = this.slots.get(row.poster.id)
       if (!slot) continue
-      slot.root.visible = row.unlocked
       slot.image.visible = row.unlocked
-      slot.backing.visible = row.unlocked
+      slot.backing.visible = true
     }
   }
 
   /**
-   * Update visible poster images directly by poster id.
-   *
-   * @param unlockedPosterIds - Poster ids whose image planes should be visible.
-   */
-  setUnlockedPosterIds(unlockedPosterIds: readonly SolarPosterId[]): void {
-    const unlocked = new Set(unlockedPosterIds)
-    for (const [posterId, slot] of this.slots.entries()) {
-      const show = unlocked.has(posterId)
-      slot.root.visible = show
-      slot.image.visible = show
-      slot.backing.visible = show
-    }
-  }
-
-  /**
-   * Release all geometries, materials, and textures owned by this wall.
+   * Release all geometries, materials, and textures owned by this row.
    */
   dispose(): void {
     for (const texture of this.textures) texture.dispose()
@@ -166,29 +146,26 @@ export class HabitatPosterWall {
     this.group.clear()
   }
 
-  private buildWall(): void {
+  private buildRow(): void {
+    const rowSlotCount = this.posters.length
     for (const [index, poster] of this.posters.entries()) {
       const slot = this.buildPosterSlot(poster)
-      const rowIndex = index < TOP_ROW_SLOT_COUNT ? 0 : 1
-      const columnIndex = rowIndex === 0 ? index : index - TOP_ROW_SLOT_COUNT
-      const rowSlotCount = rowIndex === 0 ? TOP_ROW_SLOT_COUNT : this.posters.length - TOP_ROW_SLOT_COUNT
-      const x = this.getColumnX(columnIndex, rowSlotCount)
-      const y = rowIndex === 0 ? ROW_GAP / 2 : -ROW_GAP / 2
-      slot.position.set(x, y, 0)
+      const x = this.getColumnX(index, rowSlotCount)
+      slot.position.set(x, 0, 0)
       this.group.add(slot)
     }
   }
 
   private buildPosterSlot(poster: SolarPosterDefinition): THREE.Group {
     const slot = new THREE.Group()
-    slot.name = `habitatPosterSlot.${poster.id}`
+    slot.name = `habitatTablePosterSlot.${poster.id}`
 
     const backing = this.createBacking(poster)
     const frame = this.createFrame(poster)
     const image = this.createImage(poster)
 
     slot.add(backing, frame, image)
-    this.slots.set(poster.id, { root: slot, image, backing })
+    this.slots.set(poster.id, { image, backing })
     return slot
   }
 
@@ -207,7 +184,7 @@ export class HabitatPosterWall {
       opacity: BACKING_OPACITY,
     })
     const mesh = new THREE.Mesh(geometry, material)
-    mesh.name = `habitatPosterBacking.${poster.id}`
+    mesh.name = `habitatTablePosterBacking.${poster.id}`
     mesh.position.z = BACKING_Z_OFFSET
     this.geometries.add(geometry)
     this.materials.add(material)
@@ -216,7 +193,7 @@ export class HabitatPosterWall {
 
   private createFrame(poster: SolarPosterDefinition): THREE.Group {
     const frame = new THREE.Group()
-    frame.name = `habitatPosterFrame.${poster.id}`
+    frame.name = `habitatTablePosterFrame.${poster.id}`
 
     const horizontalGeometry = new THREE.BoxGeometry(
       POSTER_WIDTH + FRAME_BORDER * 2,
@@ -252,7 +229,7 @@ export class HabitatPosterWall {
     const geometry = new THREE.PlaneGeometry(POSTER_WIDTH, POSTER_HEIGHT)
     const material = new THREE.MeshBasicMaterial({ toneMapped: false })
     const mesh = new THREE.Mesh(geometry, material)
-    mesh.name = `habitatPosterImage.${poster.id}`
+    mesh.name = `habitatTablePosterImage.${poster.id}`
     mesh.position.z = IMAGE_Z_OFFSET
     mesh.visible = false
     this.geometries.add(geometry)

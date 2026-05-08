@@ -24,8 +24,11 @@ import {
   type CatObstacle,
   type CatWanderBounds,
 } from '@/three/CatController'
+import { JOURNEY_LARGE_POSTER_CATALOG } from '@/lib/posters/journeyLargePosterUnlocks'
 import { HabitatCompletionPoster } from '@/three/HabitatCompletionPoster'
+import { HabitatLargeAchievementPoster } from '@/three/HabitatLargeAchievementPoster'
 import { HabitatPosterWall } from '@/three/HabitatPosterWall'
+import { HabitatTablePosterRow } from '@/three/HabitatTablePosterRow'
 
 // ---------------------------------------------------------------------------
 // Constants — no magic numbers
@@ -147,12 +150,33 @@ const POSTER_WALL_SCALE = 0.78
 const POSTER_WALL_Z_OFFSET = 0.085
 /** Height of the poster wall centre above the hatch centre. */
 const POSTER_WALL_ABOVE_HATCH_Y = 2.06
-/** X offset for the large completion poster mounted left of the hatch. */
-const COMPLETION_POSTER_LEFT_OF_HATCH_X = -2.18
-/** Y offset for the large completion poster center relative to the hatch center. */
+/**
+ * Horizontal distance from hatch centre for large framed posters on the −Z back cap — Act I
+ * journey at −X (port side when facing the hatch) and solar completion (all planets) at +X.
+ */
+const HATCH_WALL_SIDE_LARGE_POSTER_OFFSET_X = 2.18
+/** Y offset for large hatch-wall frames relative to the hatch centre (Act I + solar completion). */
 const COMPLETION_POSTER_ABOVE_HATCH_Y = 0.55
-/** Back-cap offset that keeps the completion poster in front of the cap. */
+/** Back-cap offset that keeps large hatch-wall frames in front of the cap. */
 const COMPLETION_POSTER_Z_OFFSET = 0.09
+/**
+ * World X offset from center for large journey posters on the front (+Z) bulkhead — flanks the
+ * mess console; magnitude keeps frames on the flat cap (clear of the cylindrical canopy).
+ */
+const JOURNEY_LARGE_POSTER_BULKHEAD_OFFSET_X = 2.85
+/**
+ * Scale for the three mission posters above the mess table (full width of three slots).
+ */
+const TABLE_POSTER_ROW_SCALE = 0.5
+/**
+ * Front-cap inset matching {@link POSTER_WALL_Z_OFFSET} logic so frames sit just inside
+ * the cockpit bulkhead without z-fighting.
+ */
+const TABLE_POSTER_ROW_Z_OFFSET = 0.085
+/**
+ * World Y of the table poster row center — above the mess table/console, below the canopy.
+ */
+const TABLE_POSTER_ROW_CENTER_Y = FLOOR_Y + 3.05
 /**
  * Author-corrective rotation applied to the table model so the Sketchfab mesh reads the
  * right way up after import. The pre-centered GLB
@@ -305,8 +329,10 @@ const CAT_SLEEP_OFFSET_Z = 0
 /** Local pitch (radians) applied to the sleeping clone — tips the body forward. */
 const CAT_SLEEP_ROTATION_X = 0
 /** Local yaw (radians) applied to the sleeping clone — spins the body about vertical.
- * π flips the cat so its face points out the door (-Z local) instead of the back wall. */
-const CAT_SLEEP_ROTATION_Y = Math.PI
+ * 0 leaves the head pointed at the back wall so the player sees Sushi's back/side
+ * through the doorway instead of staring straight at his face (which read as
+ * unsettling without closed-eye morphs in the rig). */
+const CAT_SLEEP_ROTATION_Y = 1.50
 /** Local roll (radians) applied to the sleeping clone — rolls onto a side. */
 const CAT_SLEEP_ROTATION_Z = Math.PI / 2
 /** Uniform scale multiplier applied to the sleeping clone (1 = identical to live cat). */
@@ -397,6 +423,8 @@ export interface SushiBridgeCallbacks {
   getTired(): number
   /** Apply a tiredness delta — facade clamps + persists on its own throttle. */
   addTired(delta: number): void
+  /** Apply a hunger delta — used by the cat controller while sprinting after the laser. */
+  addHunger(delta: number): void
   /** Cat consumed one serving — facade decrements bowl + restores hunger + saves. */
   onEatServing(): void
   /** Cat got pet — facade adds love + bumps stats + saves + evaluates achievements. */
@@ -476,8 +504,29 @@ export class HabitatInteriorScene {
   /** Achievement poster wall mounted above the cockpit hatch. */
   private readonly posterWall = new HabitatPosterWall()
 
-  /** Large completion poster mounted left of the cockpit hatch. */
+  /**
+   * Large solar completion poster (all achievement-backed planet slots) — starboard side of the
+   * hatch on the −Z back cap.
+   */
   private readonly completionPoster = new HabitatCompletionPoster()
+
+  /** Three mission-line posters centered on the front bulkhead above the mess table. */
+  private readonly tablePosterRow = new HabitatTablePosterRow()
+
+  /** Act I journey art — large frame port of the hatch grid on the −Z back cap (viewer −X). */
+  private readonly journeyAct1Wall = new HabitatLargeAchievementPoster({
+    poster: JOURNEY_LARGE_POSTER_CATALOG[0]!,
+  })
+
+  /** Act II journey art — port of the mess console on the +Z bulkhead (viewer −X). */
+  private readonly journeyAct2Wall = new HabitatLargeAchievementPoster({
+    poster: JOURNEY_LARGE_POSTER_CATALOG[1]!,
+  })
+
+  /** Act III journey art — starboard of the mess console on the +Z bulkhead (viewer +X). */
+  private readonly journeyAct3Wall = new HabitatLargeAchievementPoster({
+    poster: JOURNEY_LARGE_POSTER_CATALOG[2]!,
+  })
 
   /**
    * Sushi the cat — roams the cabin once {@link load} resolves. Kept as a tribute
@@ -569,6 +618,9 @@ export class HabitatInteriorScene {
     this.buildCockpitHatch()
     this.buildPosterWall()
     this.buildCompletionPoster()
+    this.buildJourneyAct1HatchPoster()
+    this.buildJourneyAct2And3TableBulkheadPosters()
+    this.buildTablePosterRow()
     this.buildLighting()
     this.buildStarfield()
     this.buildFloor()
@@ -651,9 +703,13 @@ export class HabitatInteriorScene {
     if (this.loaded) return
     this.loaded = true
 
-    const [, , bedModel, tableModel] = await Promise.all([
+    const [, , , , , , bedModel, tableModel] = await Promise.all([
       this.posterWall.load(),
       this.completionPoster.load(),
+      this.journeyAct1Wall.load(),
+      this.journeyAct2Wall.load(),
+      this.journeyAct3Wall.load(),
+      this.tablePosterRow.load(),
       loadGLB('/models/bed.glb'),
       loadGLB('/models/table.glb'),
     ])
@@ -886,6 +942,14 @@ export class HabitatInteriorScene {
     this.posterWall.dispose()
     this.scene.remove(this.completionPoster.group)
     this.completionPoster.dispose()
+    this.scene.remove(this.journeyAct1Wall.group)
+    this.journeyAct1Wall.dispose()
+    this.scene.remove(this.journeyAct2Wall.group)
+    this.journeyAct2Wall.dispose()
+    this.scene.remove(this.journeyAct3Wall.group)
+    this.journeyAct3Wall.dispose()
+    this.scene.remove(this.tablePosterRow.group)
+    this.tablePosterRow.dispose()
     this.scene.traverse((child) => {
       if (
         child instanceof THREE.Mesh ||
@@ -907,6 +971,10 @@ export class HabitatInteriorScene {
   setUnlockedAchievementIds(unlockedAchievementIds: readonly string[]): void {
     this.posterWall.setUnlockedAchievementIds(unlockedAchievementIds)
     this.completionPoster.setUnlockedAchievementIds(unlockedAchievementIds)
+    this.journeyAct1Wall.setUnlockedAchievementIds(unlockedAchievementIds)
+    this.journeyAct2Wall.setUnlockedAchievementIds(unlockedAchievementIds)
+    this.journeyAct3Wall.setUnlockedAchievementIds(unlockedAchievementIds)
+    this.tablePosterRow.setUnlockedAchievementIds(unlockedAchievementIds)
   }
 
   /**
@@ -951,6 +1019,7 @@ export class HabitatInteriorScene {
       getBladder: () => callbacks.getBladder(),
       getTired: () => callbacks.getTired(),
       addTired: (delta) => callbacks.addTired(delta),
+      addHunger: (delta) => callbacks.addHunger(delta),
       getPlayerWorldPosition: (out) => out.copy(this.player.position),
       getBowlWorldPosition: (out) => out.copy(this.bowlWorldPosition),
       getLitterWorldPosition: (out) => out.copy(this.litterWorldPosition),
@@ -1182,15 +1251,71 @@ export class HabitatInteriorScene {
     this.scene.add(this.posterWall.group)
   }
 
-  /** Mount the large completion poster left of the cockpit hatch. */
+  /**
+   * Mount the solar completion poster (all planets) to starboard of the hatch grid on the −Z back
+   * cap — mirrors Act I journey on the port side.
+   */
   private buildCompletionPoster(): void {
     const capZ = -CYLINDER_LENGTH / 2
     this.completionPoster.group.position.set(
-      COMPLETION_POSTER_LEFT_OF_HATCH_X,
+      HATCH_WALL_SIDE_LARGE_POSTER_OFFSET_X,
       HATCH_CENTRE_Y + COMPLETION_POSTER_ABOVE_HATCH_Y,
       capZ + COMPLETION_POSTER_Z_OFFSET,
     )
     this.scene.add(this.completionPoster.group)
+  }
+
+  /**
+   * Mount Act I journey art on the −Z hatch wall (flat cap), port of the solar grid — same Y as
+   * {@link buildCompletionPoster}.
+   */
+  private buildJourneyAct1HatchPoster(): void {
+    const y = HATCH_CENTRE_Y + COMPLETION_POSTER_ABOVE_HATCH_Y
+    const capZ = -CYLINDER_LENGTH / 2
+    const z = capZ + COMPLETION_POSTER_Z_OFFSET
+
+    this.journeyAct1Wall.group.position.set(-HATCH_WALL_SIDE_LARGE_POSTER_OFFSET_X, y, z)
+    this.journeyAct1Wall.group.rotation.set(0, 0, 0)
+
+    this.scene.add(this.journeyAct1Wall.group)
+  }
+
+  /**
+   * Mount Act II and Act III journey art on the front (+Z) bulkhead, port and starboard of the
+   * mess console. Same world {@link HATCH_CENTRE_Y} baseline and
+   * {@link COMPLETION_POSTER_ABOVE_HATCH_Y} as hatch-wall large frames; uses the same cap inset and
+   * inward yaw as {@link buildTablePosterRow}.
+   */
+  private buildJourneyAct2And3TableBulkheadPosters(): void {
+    const y = HATCH_CENTRE_Y + COMPLETION_POSTER_ABOVE_HATCH_Y
+    const capZ = CYLINDER_LENGTH / 2
+    const z = capZ - TABLE_POSTER_ROW_Z_OFFSET
+    const xMag = JOURNEY_LARGE_POSTER_BULKHEAD_OFFSET_X
+
+    this.journeyAct2Wall.group.position.set(-xMag, y, z)
+    this.journeyAct2Wall.group.rotation.y = Math.PI
+
+    this.journeyAct3Wall.group.position.set(xMag, y, z)
+    this.journeyAct3Wall.group.rotation.y = Math.PI
+
+    this.scene.add(this.journeyAct2Wall.group)
+    this.scene.add(this.journeyAct3Wall.group)
+  }
+
+  /**
+   * Mount three framed mission posters on the front (+Z) bulkhead, centered above the mess table —
+   * opposite the solar wall on the back hatch.
+   */
+  private buildTablePosterRow(): void {
+    const capZ = CYLINDER_LENGTH / 2
+    this.tablePosterRow.group.position.set(
+      0,
+      TABLE_POSTER_ROW_CENTER_Y,
+      capZ - TABLE_POSTER_ROW_Z_OFFSET,
+    )
+    this.tablePosterRow.group.rotation.y = Math.PI
+    this.tablePosterRow.group.scale.setScalar(TABLE_POSTER_ROW_SCALE)
+    this.scene.add(this.tablePosterRow.group)
   }
 
   /** Set up interior lighting: warm point near bed, ambient fill, cool rim from cockpit end. */

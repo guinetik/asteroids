@@ -11,6 +11,7 @@ import { PLANETS } from '@/lib/planets/catalog'
 import {
   ACT_1_JOURNEY_ID,
   ACT_2_JOURNEY_ID,
+  ACT_3_JOURNEY_ID,
   WELCOME_JOURNEY_ID,
   type JourneyId,
 } from '@/lib/journeys'
@@ -663,6 +664,18 @@ export const ACHIEVEMENT_DEFINITIONS: readonly AchievementDefinition[] = [
     rewardCredits: REWARD_MAJOR,
     kind: 'journey_completed',
     journeyId: ACT_2_JOURNEY_ID,
+  },
+  {
+    id: 'journey-act-3-outer-reaches',
+    category: 'contracts',
+    icon: '\u{1F319}',
+    title: 'ACT III: OUTER REACHES',
+    subtitle: 'Saturn rang · the long ice opened',
+    description: 'Complete the Act III Outer Reaches journey.',
+    type: 'JOURNEY',
+    rewardCredits: REWARD_MAJOR,
+    kind: 'journey_completed',
+    journeyId: ACT_3_JOURNEY_ID,
   },
   {
     id: 'flight-first-slingshot',
