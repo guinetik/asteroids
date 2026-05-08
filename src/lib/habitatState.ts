@@ -45,9 +45,24 @@ export class HabitatState {
   /** Elapsed time in the current transition phase. */
   private elapsed = 0
 
+  /**
+   * Set to `true` after the first `transitioning_in` completes. Subsequent entries
+   * skip the `waking_up` cinematic and jump straight to `habitat` so the player
+   * feels like they're stepping through the hatch rather than waking up in bed.
+   */
+  private visited = false
+
   /** Whether the habitat interior is active (any phase except map). */
   get isActive(): boolean {
     return this.phase !== 'map'
+  }
+
+  /**
+   * True only on the very first entry this session — used by the facade to decide
+   * whether to run the bed wake-up camera animation or snap to the hatch spawn.
+   */
+  get isFirstEntry(): boolean {
+    return !this.visited
   }
 
   /**
@@ -105,13 +120,22 @@ export class HabitatState {
     if (this.phase === 'transitioning_in') {
       this.elapsed += dt
       if (this.elapsed >= ENTER_DURATION) {
-        this.phase = 'waking_up'
+        if (!this.visited) {
+          // First ever entry — run the bed wake-up cinematic.
+          this.phase = 'waking_up'
+          // visited stays false until waking_up finishes so handleEnter can
+          // still read isFirstEntry = true when giving the player control.
+        } else {
+          // Return visit — skip straight to playable habitat; facade snaps to hatch spawn.
+          this.phase = 'habitat'
+        }
         this.elapsed = 0
       }
     } else if (this.phase === 'waking_up') {
       this.elapsed += dt
       if (this.elapsed >= WAKEUP_DURATION) {
         this.phase = 'habitat'
+        this.visited = true // mark after cinematic completes so handleEnter sees isFirstEntry = true
         this.elapsed = 0
       }
     } else if (this.phase === 'transitioning_out') {

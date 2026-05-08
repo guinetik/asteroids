@@ -92,6 +92,11 @@ export interface MapHabitatCallbacks {
   onShuttleControl?: (visible: boolean) => void
   /** Prompt text shown while the player is looking at an interactable. */
   onHabitatPrompt?: (prompt: string | null) => void
+  /**
+   * Fired when the hatch wheel-knob animation completes — the controller should
+   * initiate the journey-gated habitat exit (fade out + FSM leave).
+   */
+  onHatchExit?: () => void
 }
 
 /** Deps the facade needs to read/mutate controller state. */
@@ -113,6 +118,11 @@ export interface MapHabitatFacadeDeps {
   modeCoordinator: MapModeCoordinator
   /** Controller hook called after first habitat entry completes — arms journey UI. */
   armJourneyUiFromHabitatEntry: () => void
+  /**
+   * Whether this is the player's first entry into the habitat this session. The facade uses
+   * this to decide between the bed wake-up cinematic (first entry) and the hatch snap (return).
+   */
+  isFirstHabitatEntry: () => boolean
   /** Clears the Earth startup HUD suppression flag on entry/exit. */
   setEarthStartupOrbitHudSuppressed: (suppressed: boolean) => void
   /** Controller journey trigger dispatcher; facade forwards `shuttle_control_opened`. */
@@ -160,12 +170,16 @@ export class MapHabitatFacade {
     next.setUnlockedAchievementIds(deps?.getUnlockedAchievementIds() ?? [])
     await next.load()
     next.onInteract = (target) => {
-      if (target !== 'table') return
-      uiAudio.notifyType()
-      deps?.notifyJourneyTrigger('shuttle_control_opened')
-      deps?.callbacks.onShuttleControl?.(true)
-      // Release pointer lock so the shuttle-control UI can receive clicks.
-      this.pointerLock.releaseLock()
+      if (target === 'table') {
+        uiAudio.notifyType()
+        deps?.notifyJourneyTrigger('shuttle_control_opened')
+        deps?.callbacks.onShuttleControl?.(true)
+        // Release pointer lock so the shuttle-control UI can receive clicks.
+        this.pointerLock.releaseLock()
+      } else if (target === 'hatch') {
+        // Knob animation finished — hand off to the controller for journey-gated exit.
+        deps?.callbacks.onHatchExit?.()
+      }
     }
     next.onPrompt = (prompt) => {
       deps?.callbacks.onHabitatPrompt?.(prompt)
@@ -183,6 +197,12 @@ export class MapHabitatFacade {
         if (!deps) return false
         const profile = deps.getProfile()
         if (profile.bowlServings >= SUSHI_BOWL_FULL_SERVINGS) return false
+        const inv = deps.getInventory()
+        const stack = inv.stacks.find((s) => s.itemId === STARTER_CAT_FOOD_ID)
+        return (stack?.quantity ?? 0) >= SUSHI_CAT_FOOD_REFILL_COST
+      },
+      hasCatFood: () => {
+        if (!deps) return false
         const inv = deps.getInventory()
         const stack = inv.stacks.find((s) => s.itemId === STARTER_CAT_FOOD_ID)
         return (stack?.quantity ?? 0) >= SUSHI_CAT_FOOD_REFILL_COST
@@ -206,7 +226,7 @@ export class MapHabitatFacade {
     const profile = deps.getProfile()
     if (profile.bowlServings <= 0) return
     let next = setBowlServings(profile, profile.bowlServings - 1)
-    next = addSushiHunger(next, -SUSHI_HUNGER_RESTORE_PER_SERVING)
+    next = addSushiHunger(next, SUSHI_HUNGER_RESTORE_PER_SERVING)
     deps.setProfile(next)
     saveProfile(next)
     deps.evaluateAchievements()
@@ -391,6 +411,11 @@ export class MapHabitatFacade {
     deps.setEarthStartupOrbitHudSuppressed(false)
     deps.getShuttleEffects()?.thrusterController.setAudioEnabled(false)
     deps.shuttleAudio.notifyEnterHabitat()
+    // On return visits the waking_up cinematic is skipped — snap the player to the hatch
+    // entry position so it feels like stepping through the door rather than waking in bed.
+    if (!deps.isFirstHabitatEntry() && this.scene) {
+      this.scene.setHatchSpawn()
+    }
     this.attachPointerLock()
   }
 
@@ -439,6 +464,18 @@ export class MapHabitatFacade {
       this.scene.setLaserPointerHeld(this.pointerLock.isLeftMouseDown)
     }
     this.scene?.tick(dt)
+  }
+
+  /**
+   * Re-request pointer lock using the session's tracked canvas element.
+   *
+   * Must be called from within a user-gesture context (click/keydown handler) so the browser
+   * grants the lock without a security error. Safe to call while already locked — the session
+   * guards against a redundant `requestPointerLock()` call.
+   */
+  reRequestLock(): void {
+    if (!this.pointerLockAttached) return
+    this.pointerLock.requestLock()
   }
 
   /** Release the interior scene + listeners. */

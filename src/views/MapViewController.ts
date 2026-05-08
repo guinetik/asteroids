@@ -998,6 +998,7 @@ export class MapViewController implements Tickable {
       shuttleAudio: this.shuttleAudio,
       modeCoordinator: this.modeCoordinator,
       armJourneyUiFromHabitatEntry: () => this.armJourneyUiFromHabitatEntry(),
+      isFirstHabitatEntry: () => this.habitatState.isFirstEntry,
       setEarthStartupOrbitHudSuppressed: (suppressed) =>
         this.setEarthStartupOrbitHudSuppressed(suppressed),
       notifyJourneyTrigger: (trigger) => this.notifyJourneyTrigger(trigger),
@@ -1015,6 +1016,14 @@ export class MapViewController implements Tickable {
         onHabitatActive: (active) => this.onHabitatActive?.(active),
         onShuttleControl: (visible) => this.onShuttleControl?.(visible),
         onHabitatPrompt: (prompt) => this.onHabitatPrompt?.(prompt),
+        onHatchExit: () => {
+          if (this.canLeaveHabitatJourney()) {
+            this.notifyJourneyTrigger('left_habitat')
+            this.habitatState.leave()
+          } else {
+            this.showJourneyLeaveBlockedPrompt()
+          }
+        },
       },
     })
 
@@ -1608,7 +1617,10 @@ export class MapViewController implements Tickable {
       this.habitatFacade.tickTransition(this.habitatState.phase, this.habitatState.progress)
 
       // Detect waking_up → habitat (wake-up complete, give player control)
-      if (prevPhase === 'waking_up' && this.habitatState.phase === 'habitat') {
+      if (
+        (prevPhase === 'waking_up' || prevPhase === 'transitioning_in') &&
+        this.habitatState.phase === 'habitat'
+      ) {
         this.habitatFacade.handleEnter()
       }
 
@@ -3642,6 +3654,17 @@ export class MapViewController implements Tickable {
     this.mapState.open()
     this.onOpenMap()
   }
+
+    /**
+   * Re-request pointer lock for the habitat interior after the shuttle-control overlay closes.
+   *
+   * Must be called from within a user-gesture handler (e.g. the Close button click) so the
+   * browser grants the lock. Delegates to {@link MapHabitatFacade.reRequestLock} which uses
+   * the session's correctly-tracked canvas element rather than a fresh DOM query.
+   */
+    reRequestHabitatPointerLock(): void {
+      this.habitatFacade.reRequestLock()
+    }
 
   /** Enter the habitat interior (called from map nav “H Habitat” / startup handoff). */
   enterHabitat(): void {

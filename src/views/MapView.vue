@@ -1,6 +1,6 @@
 <!-- src/views/MapView.vue -->
 <script setup lang="ts">
-import { ref, shallowRef, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, shallowRef, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import DebugHud from '@/components/DebugHud.vue'
 import { isDebugHudEnabled } from '@/lib/debug/debugMetrics'
@@ -1280,13 +1280,15 @@ function handleToggleGrid() {
   gridVisible.value = viewController.toggleSpaceTimeGrid()
 }
 
-function closeShuttleControl() {
+async function closeShuttleControl() {
   uiAudio.notifyCancel()
   shuttleControlVisible.value = false
-  // Habitat opens the terminal after `exitPointerLock`; map mode uses orbit drag without lock.
+  // Wait for Vue to remove the overlay DOM before requesting lock — prevents a race
+  // between the dialog unmount and the async pointer-lock acquisition.
+  // nextTick runs as a microtask so the browser user-gesture activation is still valid.
   if (habitatActive.value) {
-    const canvas = document.querySelector('canvas')
-    canvas?.requestPointerLock()
+    await nextTick()
+    viewController.reRequestHabitatPointerLock()
   }
 }
 

@@ -108,5 +108,5 @@ export const HABITAT_BINDINGS: Record<string, string[]> = {
   moveLeft: ['KeyA'],
   moveRight: ['KeyD'],
   interact: ['KeyF'],
-  exitHabitat: ['KeyH', 'Escape'],
+  exitHabitat: ['KeyH'],
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch, nextTick } from 'vue'
 import type { Inventory, InventoryStack } from '@/lib/inventory/types'
 import type { ShuttleMissionBoard } from '@/lib/missions/types'
 import { shipMessageSystem } from '@/lib/messages/runtime'
@@ -85,6 +85,7 @@ const activeScreen = ref<ControlScreen>('mail')
 const controlPanelCard = ref<HTMLElement | null>(null)
 let controlPanelHeightFrame: number | null = null
 let controlPanelHeightResetTimer: number | null = null
+const overlayEl = ref<HTMLElement | null>(null)
 
 const programByScreen: Record<ControlScreen, Component> = {
   shuttle: ShuttleControlProgramShuttle,
@@ -131,6 +132,15 @@ watch(activeScreen, (screen, previous) => {
   if (screen === previous) return
   emit('screen-change', screen)
 })
+
+watch(
+  () => props.visible,
+  async (visible) => {
+    if (!visible) return
+    await nextTick()
+    overlayEl.value?.focus()
+  },
+)
 
 const navItems = computed<readonly ControlNavItem[]>(() => {
   const mailLabel = mailPendingCount.value > 0 ? `Mail (${mailPendingCount.value})` : 'Mail'
@@ -231,7 +241,7 @@ onBeforeUnmount(releaseControlPanelHeight)
 </script>
 
 <template>
-  <div v-if="visible" class="shuttle-control-overlay" @keydown="onKeydown" tabindex="0">
+  <div v-if="visible" ref="overlayEl" class="shuttle-control-overlay" @keydown="onKeydown" tabindex="0">
     <div ref="controlPanelCard" class="shuttle-control-card">
       <!-- Chrome bar -->
       <div class="shuttle-control-chrome">

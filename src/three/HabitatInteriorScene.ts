@@ -144,6 +144,13 @@ const HATCH_DOOR_COLOR = 0xeaeaea
 const HATCH_FRAME_COLOR = 0x9aa3ad
 /** Yellow wheel-knob colour. */
 const HATCH_KNOB_COLOR = 0xf2c438
+/** XZ proximity (world units) at which the "F Exit" hatch prompt appears. */
+const HATCH_INTERACT_DISTANCE = 1.8
+/** Seconds the wheel-knob spin animation lasts when the player opens the hatch. */
+const HATCH_KNOB_SPIN_DURATION_S = 0.7
+/** Total Z-axis rotation applied to the knob group during the exit animation (1.5 full turns). */
+const HATCH_KNOB_SPIN_RADIANS = Math.PI * 3
+
 /** Scale applied to the poster wall so two rows fit above the back hatch. */
 const POSTER_WALL_SCALE = 0.78
 /** Back-cap offset that keeps the poster wall in front of the cap without z-fighting. */
@@ -379,6 +386,16 @@ const PET_APPROACH_DURATION_S = 0.55
 /** Lerp factor (per second) for camera tracking onto Sushi during the pet sequence. */
 const PET_CAMERA_TURN_RATE = 8
 
+/** Lerp factor (per second) for the camera turn when interacting with the shuttle controls. */
+const TABLE_CAMERA_TURN_RATE = 5
+/** Total seconds the shuttle-controls camera-turn sequence lasts. */
+const TABLE_CAMERA_TURN_DURATION_S = 0.65
+/**
+ * Vertical offset above {@link FLOOR_Y} used as the Y component of the table look-at target
+ * so the camera tilts down toward the console surface rather than the floor beneath it.
+ */
+const TABLE_LOOK_TARGET_Y_OFFSET = 0.9
+
 /** XZ proximity (world units) at which the "Fill Bowl" prompt appears. */
 const BOWL_FILL_PROMPT_DISTANCE = 1.4
 /** Total seconds the bowl scale-punch cue plays after a refill. */
@@ -392,6 +409,13 @@ const LASER_DOT_RADIUS = 0.06
 const LASER_DOT_Y_BIAS = 0.005
 /** Hex colour of the laser-pointer dot. */
 const LASER_DOT_COLOR = 0xff2233
+
+/**
+ * How far from the back cap (-Z) the player stands when entering through the hatch on a
+ * return visit. Set to {@link COLLISION_MARGIN} + a small buffer so the player is clearly
+ * inside the cabin and not clipping the wall geometry.
+ */
+const HATCH_SPAWN_INSET = COLLISION_MARGIN + 0.5
 
 /** FPS camera configuration for the habitat interior. */
 const HABITAT_CAMERA_CONFIG: FpsCameraConfig = {
@@ -435,6 +459,8 @@ export interface SushiBridgeCallbacks {
   onWoke(): void
   /** True when the player can fill the bowl (≥1 cat-food in inventory AND bowl not full). */
   canFillBowl(): boolean
+  /** True when the player has at least one cat-food unit available in the shuttle inventory. */
+  hasCatFood(): boolean
   /** Player pressed F at the bowl — facade fills bowl from inventory + saves. */
   onFillBowl(): void
 }
@@ -574,6 +600,9 @@ export class HabitatInteriorScene {
   /** Reference to the bowl mesh so the refill cue can punch its scale. */
   private bowlMesh: THREE.Mesh | null = null
 
+  /** Reference to the kibble disc rendered inside the bowl — hidden when bowl is empty. */
+  private kibbleMesh: THREE.Mesh | null = null
+
   /** Seconds remaining on the active bowl-fill scale-punch cue (0 when idle). */
   private bowlFillCueTimer = 0
 
@@ -601,6 +630,21 @@ export class HabitatInteriorScene {
   private readonly _petStartXZ = new THREE.Vector2()
   /** XZ end of the pet glide — a point in front of Sushi. */
   private readonly _petTargetXZ = new THREE.Vector2()
+
+  /** True while the camera is turning to look at the shuttle controls table after F is pressed. */
+  private tableSequenceActive = false
+  /** Seconds elapsed in the current shuttle-controls camera-turn sequence. */
+  private tableSequenceTime = 0
+
+  /**
+   * The sub-group containing the hatch wheel-knob ring and crossed spokes. Parented inside
+   * the hatch group; rotating this around Z spins the handle without moving the door or frame.
+   */
+  private hatchKnobPivot: THREE.Group | null = null
+  /** True while the knob spin animation is playing after the player presses F at the hatch. */
+  private hatchExitActive = false
+  /** Seconds elapsed in the current hatch knob-spin animation. */
+  private hatchExitTime = 0
 
   constructor() {
     this.scene = new THREE.Scene()
@@ -661,6 +705,17 @@ export class HabitatInteriorScene {
   /** Returns the scene graph. */
   getScene(): THREE.Scene {
     return this.scene
+  }
+
+  /**
+   * Snap the player and camera to the hatch entry spawn — standing just inside the back cap,
+   * facing into the cabin (+Z toward the table). Called by the facade on return habitat entries
+   * to replace the bed wake-up cinematic with a "stepping through the hatch" feel.
+   */
+  setHatchSpawn(): void {
+    this.player.position.set(0, FLOOR_Y, -CYLINDER_LENGTH / 2 + HATCH_SPAWN_INSET)
+    this.fpsCamera.yaw = Math.PI // facing +Z, into the cabin
+    this.fpsCamera.pitch = 0
   }
 
   /**
@@ -843,7 +898,7 @@ export class HabitatInteriorScene {
    */
   tick(dt: number): void {
     this.inputManager.tick(dt)
-    if (!this.tickPetSequence(dt)) {
+    if (!this.tickPetSequence(dt) && !this.tickTableLookSequence(dt) && !this.hatchExitActive) {
       this.tickMovement(dt)
     }
     this.tickInteraction()
@@ -852,6 +907,8 @@ export class HabitatInteriorScene {
     this.tickLaserPointer()
     this.cat?.tick(dt)
     this.tickBowlFillCue(dt)
+    this.tickKibbleVisual()
+    this.tickHatchKnob(dt)
   }
 
   /**
@@ -930,6 +987,18 @@ export class HabitatInteriorScene {
     const env = Math.sin(Math.min(1, t) * Math.PI)
     const scale = 1 + (BOWL_FILL_CUE_SCALE_PEAK - 1) * env
     this.bowlMesh.scale.setScalar(scale)
+  }
+
+  /**
+   * Sync the kibble disc's visibility with the persisted bowl-servings count so the
+   * dish doesn't keep showing food after Sushi has eaten his way through it. Hidden
+   * outright at zero servings; visible otherwise (the disc represents "there is at
+   * least some food in the bowl" — we don't model individual kibble pieces).
+   */
+  private tickKibbleVisual(): void {
+    if (!this.kibbleMesh) return
+    const servings = this.sushiCallbacks?.getBowlServings() ?? 0
+    this.kibbleMesh.visible = servings > 0
   }
 
   /** Release GPU resources and event listeners. */
@@ -1234,7 +1303,13 @@ export class HabitatInteriorScene {
     const verticalSpoke = new THREE.Mesh(verticalSpokeGeo, knobMat)
     horizontalSpoke.position.z = HATCH_KNOB_Z_BIAS
     verticalSpoke.position.z = HATCH_KNOB_Z_BIAS
-    hatch.add(horizontalSpoke, verticalSpoke)
+
+    // Wrap the ring + spokes in a pivot group so we can spin them around Z as one unit.
+    const knobPivot = new THREE.Group()
+    knobPivot.name = 'hatchKnobPivot'
+    knobPivot.add(knobRing, horizontalSpoke, verticalSpoke)
+    hatch.add(knobPivot)
+    this.hatchKnobPivot = knobPivot
 
     this.scene.add(hatch)
   }
@@ -1399,6 +1474,7 @@ export class HabitatInteriorScene {
     )
     kibble.position.set(CAT_BOWL_X, FLOOR_Y + CAT_BOWL_HEIGHT + 0.005, CAT_FEEDING_Z)
     group.add(kibble)
+    this.kibbleMesh = kibble
 
     // --- Water fountain: chrome base + dish + translucent water disc --------
     const fountainMat = new THREE.MeshStandardMaterial({
@@ -1823,7 +1899,96 @@ export class HabitatInteriorScene {
     return true
   }
 
+  /**
+   * Begin the shuttle-controls cinematic: smoothly turn the FPS camera to face the
+   * mess table console over {@link TABLE_CAMERA_TURN_DURATION_S} seconds. Player
+   * movement is suppressed while this sequence is active (same policy as the pet
+   * glide) so a quick F-press doesn't leave the player walking away mid-turn.
+   *
+   * Called from {@link tickInteraction} immediately after `onInteract?.('table')` so
+   * the camera punch plays in sync with whatever the host ViewController does on that
+   * signal (e.g. opening the shuttle-control overlay).
+   */
+  private startTableLookSequence(): void {
+    this.tableSequenceActive = true
+    this.tableSequenceTime = 0
+  }
+
+  /**
+   * Advance the shuttle-controls camera-turn sequence. Lerps the FPS camera yaw and
+   * pitch toward the table's XZ position at a fixed Y offset above the floor
+   * ({@link TABLE_LOOK_TARGET_Y_OFFSET}) — so the camera tilts down to the console
+   * surface rather than landing flat on the deck. Returns true while the sequence is
+   * active to let {@link tick} suppress normal WASD input.
+   *
+   * @param dt - Delta time in seconds.
+   * @returns Whether the sequence consumed control this frame.
+   */
+  private tickTableLookSequence(dt: number): boolean {
+    if (!this.tableSequenceActive) return false
+    this.tableSequenceTime += dt
+
+    const cam = this.fpsCamera.camera
+    const dx = this.tablePosition.x - cam.position.x
+    const dy = FLOOR_Y + TABLE_LOOK_TARGET_Y_OFFSET - cam.position.y
+    const dz = this.tablePosition.z - cam.position.z
+    const horiz = Math.hypot(dx, dz)
+    if (horiz > 1e-4) {
+      const desiredYaw = Math.atan2(-dx, -dz)
+      const desiredPitch = Math.atan2(dy, horiz)
+      const k = Math.min(1, TABLE_CAMERA_TURN_RATE * dt)
+      let yawErr = desiredYaw - this.fpsCamera.yaw
+      while (yawErr > Math.PI) yawErr -= Math.PI * 2
+      while (yawErr < -Math.PI) yawErr += Math.PI * 2
+      this.fpsCamera.yaw += yawErr * k
+      this.fpsCamera.pitch += (desiredPitch - this.fpsCamera.pitch) * k
+      const clamp = HABITAT_PITCH_CLAMP
+      this.fpsCamera.pitch = Math.max(-clamp, Math.min(clamp, this.fpsCamera.pitch))
+    }
+
+    if (this.tableSequenceTime >= TABLE_CAMERA_TURN_DURATION_S) {
+      this.tableSequenceActive = false
+    }
+    return true
+  }
+
+  /**
+   * Begin the hatch exit sequence: start spinning the wheel-knob. Movement and
+   * interaction are suppressed for the duration so the player can't walk away
+   * mid-animation. {@link tickHatchKnob} fires {@link onInteract} with `'hatch'`
+   * once the spin completes, signalling the facade to leave the habitat.
+   */
+  private startHatchExitSequence(): void {
+    this.hatchExitActive = true
+    this.hatchExitTime = 0
+  }
+
+  /**
+   * Advance the hatch wheel-knob spin animation. Uses a quadratic ease-in-out envelope
+   * so the knob accelerates into the turn and decelerates to a stop rather than snapping.
+   * Fires {@link onInteract} with `'hatch'` exactly once when the animation completes.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  private tickHatchKnob(dt: number): void {
+    if (!this.hatchExitActive || !this.hatchKnobPivot) return
+    this.hatchExitTime += dt
+    const t = Math.min(1, this.hatchExitTime / HATCH_KNOB_SPIN_DURATION_S)
+    const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
+    this.hatchKnobPivot.rotation.z = e * HATCH_KNOB_SPIN_RADIANS
+    if (t >= 1) {
+      this.hatchExitActive = false
+      this.onInteract?.('hatch')
+    }
+  }
+
   private tickInteraction(): void {
+    // Suppress all prompts + input while the hatch spin is playing.
+    if (this.hatchExitActive) {
+      this.onPrompt?.(null)
+      return
+    }
+
     if (this.tablePlacementGrabbed) {
       this.onPrompt?.('LMB place table → devtools console')
       return
@@ -1871,17 +2036,23 @@ export class HabitatInteriorScene {
     const bowlDx = this.player.position.x - this.bowlWorldPosition.x
     const bowlDz = this.player.position.z - this.bowlWorldPosition.z
     const bowlDist = Math.hypot(bowlDx, bowlDz)
-    if (
-      bowlDist < BOWL_FILL_PROMPT_DISTANCE &&
-      this.sushiCallbacks?.canFillBowl() &&
-      !tableInRange
-    ) {
-      this.onPrompt?.('F  Fill Bowl')
-      if (this.inputManager.wasActionPressed('interact')) {
-        this.sushiCallbacks.onFillBowl()
-        this.bowlFillCueTimer = BOWL_FILL_CUE_DURATION_S
+    if (bowlDist < BOWL_FILL_PROMPT_DISTANCE && !tableInRange && this.sushiCallbacks) {
+      const servings = this.sushiCallbacks.getBowlServings()
+      const canFill = this.sushiCallbacks.canFillBowl()
+      if (canFill) {
+        this.onPrompt?.('F  Fill Bowl')
+        if (this.inputManager.wasActionPressed('interact')) {
+          this.sushiCallbacks.onFillBowl()
+          this.bowlFillCueTimer = BOWL_FILL_CUE_DURATION_S
+        }
+        return
       }
-      return
+      // Bowl needs food but the player has none — surface that explicitly so
+      // they understand why the bowl is empty and the cat is harassing them.
+      if (servings <= 0 && !this.sushiCallbacks.hasCatFood()) {
+        this.onPrompt?.('No Cat Food In Bag')
+        return
+      }
     }
 
     // --- Table -------------------------------------------------------------
@@ -1895,12 +2066,23 @@ export class HabitatInteriorScene {
           : 'F  Shuttle Control',
       )
       if (this.inputManager.wasActionPressed('interact')) {
+        this.startTableLookSequence()
         this.onInteract?.('table')
       }
     } else if (near && isTablePlacementDebugEnabled()) {
       this.onPrompt?.('LMB grab table (dev, closer)')
     } else {
-      this.onPrompt?.(null)
+      // --- Hatch (exit) -------------------------------------------------------
+      const hatchDx = this.player.position.x
+      const hatchDz = this.player.position.z - (-CYLINDER_LENGTH / 2)
+      if (Math.hypot(hatchDx, hatchDz) < HATCH_INTERACT_DISTANCE) {
+        this.onPrompt?.('F  Exit')
+        if (this.inputManager.wasActionPressed('interact')) {
+          this.startHatchExitSequence()
+        }
+      } else {
+        this.onPrompt?.(null)
+      }
     }
   }
 
