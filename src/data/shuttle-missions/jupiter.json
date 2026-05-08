@@ -23,7 +23,7 @@
       "name": "Earth Resupply Mission",
       "description": "Long-haul cargo pickup from Earth. The crew needs fresh supplies.",
       "targetPlanet": "earth",
-      "gatherQuantity": 3,
+      "gatherQuantity": 10,
       "reward": 6875
     }
   ]

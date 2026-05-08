@@ -23,7 +23,7 @@
       "name": "Earth Supply Run",
       "description": "Pick up a shipment of bioculture starters from Earth's orbital warehouse.",
       "targetPlanet": "earth",
-      "gatherQuantity": 2,
+      "gatherQuantity": 10,
       "reward": 2500
     },
     {

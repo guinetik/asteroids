@@ -23,7 +23,7 @@
       "name": "Deep Space Resupply",
       "description": "Maximum-range supply run to Earth. The longest haul in the system.",
       "targetPlanet": "earth",
-      "gatherQuantity": 2,
+      "gatherQuantity": 10,
       "reward": 9375
     }
   ]

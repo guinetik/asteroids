@@ -15,7 +15,7 @@
       "name": "Earth Equipment Pickup",
       "description": "New solar furnace components are waiting at Earth's orbital dock.",
       "targetPlanet": "earth",
-      "gatherQuantity": 2,
+      "gatherQuantity": 10,
       "reward": 3125
     },
     {

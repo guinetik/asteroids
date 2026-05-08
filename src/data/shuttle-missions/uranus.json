@@ -7,7 +7,7 @@
       "name": "Roslin Standing Order",
       "description": "Reference standards from the Roslin archive in Midlothian. The practice has reordered the same case once a decade for two centuries; this run is on schedule.",
       "targetPlanet": "earth",
-      "gatherQuantity": 2,
+      "gatherQuantity": 10,
       "reward": 7250
     },
     {

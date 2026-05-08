@@ -7,7 +7,7 @@
       "name": "Earth Resupply Pickup",
       "description": "Venus station needs medical supplies from Earth orbit. Standard logistics run.",
       "targetPlanet": "earth",
-      "gatherQuantity": 3,
+      "gatherQuantity": 10,
       "reward": 2750
     },
     {

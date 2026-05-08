@@ -23,7 +23,7 @@
       "name": "Earth Supply Chain",
       "description": "Long-range supply run to Earth orbit. Premium pay for the distance.",
       "targetPlanet": "earth",
-      "gatherQuantity": 2,
+      "gatherQuantity": 10,
       "reward": 7500
     }
   ]
