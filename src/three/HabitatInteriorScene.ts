@@ -486,6 +486,8 @@ export interface SushiBridgeCallbacks {
   onEatServing(): void
   /** Cat got pet — facade adds love + bumps stats + saves + evaluates achievements. */
   onPetted(): void
+  /** Cat just pounced on the laser dot — facade adds a small love bump per catch. */
+  onCaughtLaser(): void
   /** Cat finished using the litterbox — facade resets bladder + saves. */
   onUsedLitter(): void
   /** Read the current waste-chunk count in the litterbox (0..LITTER_POLLUTION_MAX). */
@@ -1200,6 +1202,7 @@ export class HabitatInteriorScene {
       getBedTopWorldPosition: (out) => out.copy(this.bedTopWorldPosition),
       onEatServing: () => callbacks.onEatServing(),
       onPetted: () => callbacks.onPetted(),
+      onCaughtLaser: () => callbacks.onCaughtLaser(),
       onUsedLitter: () => callbacks.onUsedLitter(),
       onWoke: () => callbacks.onWoke(),
       onSleepEnter: () => this.setSleepingVisualVisible(true),

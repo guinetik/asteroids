@@ -84,10 +84,15 @@ export interface CatNeedsBridge {
    */
   onEatServing(): void
   /**
-   * Cat got pet. Implementer is responsible for adding 50 love, bumping the lifetime
-   * pet counter, persisting profile, and re-evaluating achievements.
+   * Cat got pet. Implementer is responsible for adding the per-pet love bump, bumping
+   * the lifetime pet counter, persisting profile, and re-evaluating achievements.
    */
   onPetted(): void
+  /**
+   * Cat just pounced on the laser dot (transitioned into `chaseRest`). Implementer adds
+   * a small love bump per catch and persists. Fires once per pounce, not per frame.
+   */
+  onCaughtLaser?(): void
   /**
    * Cat finished using the litterbox. Implementer should reset `sushiBladder` to 0
    * and persist the profile.
@@ -1361,6 +1366,8 @@ export class CatController {
       // moves past the resume hysteresis from where he settled.
       this.chaseRestAnchor.copy(this.laserTarget)
       this.enterState('chaseRest')
+      // Reward the player for a successful pounce — small love bump per catch.
+      this.bridge?.onCaughtLaser?.()
       return
     }
 

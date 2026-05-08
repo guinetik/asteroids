@@ -60,7 +60,10 @@ const WAKE_UP_LYING_HEIGHT = 0.5
 /** Hunger restored each time Sushi consumes one serving from the bowl (0..100 scale). */
 const SUSHI_HUNGER_RESTORE_PER_SERVING = 25
 /** Love granted each time the player pets Sushi (0..100 scale). */
-const SUSHI_LOVE_PER_PET = 50
+const SUSHI_LOVE_PER_PET = 10
+/** Love granted each time Sushi pounces on the laser dot (0..100 scale). Smaller than a
+ * pet but stacks per catch, so a long laser session is comparable to a pet. */
+const SUSHI_LOVE_PER_LASER_CATCH = 5
 /** Bowl-fill brings the bowl to this serving count (one full bag). */
 const SUSHI_BOWL_FULL_SERVINGS = 10
 /** Cat food units removed from the player's inventory per bowl refill. */
@@ -212,6 +215,7 @@ export class MapHabitatFacade {
       },
       onEatServing: () => this.handleSushiEatServing(),
       onPetted: () => this.handleSushiPetted(),
+      onCaughtLaser: () => this.handleSushiCaughtLaser(),
       onUsedLitter: () => this.handleSushiUsedLitter(),
       onEmptyLitter: () => this.handleEmptyLitter(),
       onFillBowl: () => this.handleSushiFillBowl(),
@@ -246,6 +250,22 @@ export class MapHabitatFacade {
     let next = deps.getProfile()
     next = addSushiLove(next, SUSHI_LOVE_PER_PET)
     next = recordSushiPet(next)
+    deps.setProfile(next)
+    saveProfile(next)
+    deps.evaluateAchievements()
+  }
+
+  /**
+   * Apply the side-effects of Sushi pouncing on the laser dot: add a small love bump and
+   * persist. Fires once per pounce (each `chaseRest` entry), so a long laser session can
+   * stack to the same total as a single pet without short-circuiting the chase fun.
+   */
+  private handleSushiCaughtLaser(): void {
+    const deps = this.deps
+    if (!deps) return
+    const profile = deps.getProfile()
+    const next = addSushiLove(profile, SUSHI_LOVE_PER_LASER_CATCH)
+    if (next === profile) return
     deps.setProfile(next)
     saveProfile(next)
     deps.evaluateAchievements()
