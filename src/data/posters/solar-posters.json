@@ -3,7 +3,7 @@
     "id": "sun",
     "bodyKey": "sun",
     "label": "Sun",
-    "assetPath": "/posters/001.jpg",
+    "assetPath": "/posters/001.webp",
     "achievementId": "exploration-orbit-sun",
     "defaultUnlocked": false
   },
@@ -11,7 +11,7 @@
     "id": "mercury",
     "bodyKey": "mercury",
     "label": "Mercury",
-    "assetPath": "/posters/mercury.jpg",
+    "assetPath": "/posters/mercury.webp",
     "achievementId": "exploration-orbit-mercury",
     "defaultUnlocked": false
   },
@@ -19,7 +19,7 @@
     "id": "venus",
     "bodyKey": "venus",
     "label": "Venus",
-    "assetPath": "/posters/venus.jpg",
+    "assetPath": "/posters/venus.webp",
     "achievementId": "exploration-orbit-venus",
     "defaultUnlocked": false
   },
@@ -27,7 +27,7 @@
     "id": "earth",
     "bodyKey": "earth",
     "label": "Earth",
-    "assetPath": "/posters/earth.jpg",
+    "assetPath": "/posters/earth.webp",
     "achievementId": null,
     "defaultUnlocked": true
   },
@@ -35,7 +35,7 @@
     "id": "mars",
     "bodyKey": "mars",
     "label": "Mars",
-    "assetPath": "/posters/mars.jpg",
+    "assetPath": "/posters/mars.webp",
     "achievementId": "exploration-orbit-mars",
     "defaultUnlocked": false
   },
@@ -43,7 +43,7 @@
     "id": "ceres",
     "bodyKey": "ceres",
     "label": "Ceres",
-    "assetPath": "/posters/ceres.jpg",
+    "assetPath": "/posters/ceres.webp",
     "achievementId": "exploration-orbit-ceres",
     "defaultUnlocked": false
   },
@@ -51,7 +51,7 @@
     "id": "jupiter",
     "bodyKey": "jupiter",
     "label": "Jupiter",
-    "assetPath": "/posters/jupiter.jpg",
+    "assetPath": "/posters/jupiter.webp",
     "achievementId": "exploration-orbit-jupiter",
     "defaultUnlocked": false
   },
@@ -59,7 +59,7 @@
     "id": "saturn",
     "bodyKey": "saturn",
     "label": "Saturn",
-    "assetPath": "/posters/saturn.jpg",
+    "assetPath": "/posters/saturn.webp",
     "achievementId": "exploration-orbit-saturn",
     "defaultUnlocked": false
   },
@@ -67,7 +67,7 @@
     "id": "uranus",
     "bodyKey": "uranus",
     "label": "Uranus",
-    "assetPath": "/posters/uranus.jpg",
+    "assetPath": "/posters/uranus.webp",
     "achievementId": "exploration-orbit-uranus",
     "defaultUnlocked": false
   },
@@ -75,7 +75,7 @@
     "id": "neptune",
     "bodyKey": "neptune",
     "label": "Neptune",
-    "assetPath": "/posters/neptune.jpg",
+    "assetPath": "/posters/neptune.webp",
     "achievementId": "exploration-orbit-neptune",
     "defaultUnlocked": false
   },
@@ -83,7 +83,7 @@
     "id": "pluto",
     "bodyKey": "pluto",
     "label": "Pluto",
-    "assetPath": "/posters/pluto.jpg",
+    "assetPath": "/posters/pluto.webp",
     "achievementId": "exploration-orbit-pluto",
     "defaultUnlocked": false
   }

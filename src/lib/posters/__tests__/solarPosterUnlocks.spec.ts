@@ -56,13 +56,13 @@ describe('solarPosterUnlocks', () => {
     )
     const missingLastAchievement = achievementIds.slice(0, -1)
 
-    expect(SOLAR_COMPLETION_POSTER.assetPath).toBe('/posters/001.jpg')
+    expect(SOLAR_COMPLETION_POSTER.assetPath).toBe('/posters/001.webp')
     expect(isSolarCompletionPosterUnlocked(missingLastAchievement)).toBe(false)
     expect(isSolarCompletionPosterUnlocked(achievementIds)).toBe(true)
   })
 
   it('looks up poster definitions by id', () => {
-    expect(getSolarPosterById('neptune')?.assetPath).toBe('/posters/neptune.jpg')
+    expect(getSolarPosterById('neptune')?.assetPath).toBe('/posters/neptune.webp')
     expect(getSolarPosterById('missing')).toBeNull()
   })
 })

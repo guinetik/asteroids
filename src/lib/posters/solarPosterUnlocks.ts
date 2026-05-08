@@ -23,7 +23,7 @@ export interface SolarPosterDefinition {
   readonly bodyKey: string
   /** Human-readable body name used for object names and debugging, e.g. `'Mercury'`. */
   readonly label: string
-  /** Public poster image URL served by Vite, e.g. `'/posters/venus.jpg'`. */
+  /** Public poster image URL served by Vite, e.g. `'/posters/venus.webp'`. */
   readonly assetPath: string
   /**
    * Achievement id that unlocks this poster, e.g. `'exploration-orbit-neptune'`.
@@ -52,7 +52,7 @@ export interface SolarCompletionPosterDefinition {
   readonly id: string
   /** Human-readable poster name used for object names and debugging. */
   readonly label: string
-  /** Public poster image URL served by Vite, e.g. `'/posters/001.jpg'`. */
+  /** Public poster image URL served by Vite, e.g. `'/posters/001.webp'`. */
   readonly assetPath: string
 }
 
@@ -177,7 +177,7 @@ export function getSolarPosterById(
  * Select the authored source art for the completion poster.
  *
  * @param posters - Poster definitions to search.
- * @returns Asset path for the Sun preview poster, e.g. `'/posters/001.jpg'`.
+ * @returns Asset path for the Sun preview poster, e.g. `'/posters/001.webp'`.
  * @throws {Error} When the Sun poster is missing from the catalog.
  */
 function getCompletionPosterAssetPath(posters: readonly SolarPosterDefinition[]): string {

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Raster sources under `image/textures/`, `image/telescope/`, `image/portraits/`, and
- * any top-level raster files directly in `image/` (e.g. `image/texture.jpg`,
- * `image/jovian-ending.png`) are converted into lossy or lossless WebPs under matching
- * paths under `public/`.
+ * Raster sources under `image/textures/`, `image/telescope/`, `image/portraits/`,
+ * `image/posters/`, and any top-level raster files directly in `image/`
+ * (e.g. `image/texture.jpg`, `image/jovian-ending.png`) are converted into lossy or
+ * lossless WebPs under matching paths under `public/`.
  *
  * Skips an asset when the destination `.webp` already exists and its modification time is
  * greater than or equal to the chosen source raster (incremental runs). Set environment variable
@@ -33,8 +33,11 @@ const IMAGE_ROOT = join(REPO_ROOT, 'image')
 const PUBLIC_ROOT = join(REPO_ROOT, 'public')
 const MAGICK_BIN = 'magick'
 
-/** When both `asset.jpg` and `asset.png` exist, pick in this extension order (lower wins). */
-const RASTER_EXTENSIONS = /** @type {const} */ (['.jpg', '.jpeg', '.png'])
+/**
+ * When multiple rasters share a basename, pick in this extension order (lower index wins).
+ * JPEG/PNG preferred over WebP/AVIF so authored lossless or high-quality sources win.
+ */
+const RASTER_EXTENSIONS = /** @type {const} */ (['.jpg', '.jpeg', '.png', '.webp', '.avif'])
 
 /**
  * Largest allowed written `.webp` size. Lossy `-quality` steps down toward
@@ -72,7 +75,7 @@ const BYTE_UNIT = 1024
  */
 export function rasterExtensionRank(ext) {
   const lowered = ext.toLowerCase()
-  const index = RASTER_EXTENSIONS.indexOf(lowered)
+  const index = RASTER_EXTENSIONS.indexOf(/** @type {typeof RASTER_EXTENSIONS[number]} */ (lowered))
   return index === -1 ? RASTER_EXTENSIONS.length + 10 : index
 }
 
@@ -80,7 +83,7 @@ export function rasterExtensionRank(ext) {
  * Picks exactly one raster file from a duplicate group (same basename, same directory).
  *
  * @param {string[]} absolutePaths - Two or more full paths differing only by extension.
- * @returns {string} Highest-priority path (`.jpg` over `.jpeg` over `.png`).
+ * @returns {string} Highest-priority path (JPEG before PNG before WebP/AVIF).
  */
 export function pickPreferredRasterPath(absolutePaths) {
   if (absolutePaths.length === 0) {
@@ -184,7 +187,7 @@ export function lossyWebpQualityLadder(
 }
 
 /**
- * Walks subtree for `jpg/jpeg/png` files recursively.
+ * Walks subtree for raster files ({@link RASTER_EXTENSIONS}) recursively.
  *
  * @param {string} rootDir - Directory to descend.
  * @returns {string[]} Sorted absolute paths.
@@ -208,8 +211,9 @@ function listRasterSources(rootDir) {
 
       const lowerExt = extname(entry.name).toLowerCase()
 
-      const isRaster =
-        lowerExt === '.jpg' || lowerExt === '.jpeg' || lowerExt === '.png'
+      const isRaster = RASTER_EXTENSIONS.includes(
+        /** @type {typeof RASTER_EXTENSIONS[number]} */ (lowerExt),
+      )
 
       if (isRaster) {
         collected.push(entryPath)
@@ -232,10 +236,9 @@ function groupRasterSources(filePaths) {
   for (const filePath of filePaths) {
     const directory = dirname(filePath)
     const extension = extname(filePath).toLowerCase()
-    const isRaster =
-      extension === '.jpg' ||
-      extension === '.jpeg' ||
-      extension === '.png'
+    const isRaster = RASTER_EXTENSIONS.includes(
+      /** @type {typeof RASTER_EXTENSIONS[number]} */ (extension),
+    )
     if (!isRaster) continue
     const fileBase = basename(filePath).slice(
       0,
@@ -293,7 +296,7 @@ async function spawnMagick(magickArgs) {
 /**
  * Writes `outputPath` once at the given WebP encoder mode/size target.
  *
- * @param {string} inputPath - Source raster absolute path (jpg/jpeg/png).
+ * @param {string} inputPath - Source raster absolute path (jpg/jpeg/png/webp/avif).
  * @param {string} outputPath - Destination `.webp` path (parent dirs created).
  * @param {'lossless' | 'lossy'} mode - Encoder mode.
  * @param {number} [lossyQuality] - Required when `mode === 'lossy'` (1–100).
@@ -476,7 +479,7 @@ async function encodeWebpUntilUnderCap(inputPath, outputPath) {
 }
 
 /**
- * Deletes legacy `.jpg`/`.jpeg`/`.png` siblings when a sibling `.webp` was just written.
+ * Deletes legacy raster siblings (`jpg`/`jpeg`/`png`/`avif`) when a sibling `.webp` was just written.
  *
  * @param {string} outputDirectory - Directory containing emitted `*.webp`.
  * @param {string} baseWithoutExt - File base name excluding extension.
@@ -484,7 +487,7 @@ async function encodeWebpUntilUnderCap(inputPath, outputPath) {
  */
 function removeStaleRastersSameBase(outputDirectory, baseWithoutExt) {
   /** @type {readonly string[]} */
-  const suffixes = ['.jpg', '.jpeg', '.png']
+  const suffixes = ['.jpg', '.jpeg', '.png', '.avif']
   const webpCandidate = join(outputDirectory, `${baseWithoutExt}.webp`)
   try {
     if (!statSync(webpCandidate).isFile()) {
@@ -521,6 +524,7 @@ async function main() {
     join(IMAGE_ROOT, 'textures'),
     join(IMAGE_ROOT, 'telescope'),
     join(IMAGE_ROOT, 'portraits'),
+    join(IMAGE_ROOT, 'posters'),
   ]
 
   /** @type {string[]} */
@@ -545,7 +549,9 @@ async function main() {
     for (const entry of readdirSync(IMAGE_ROOT, { withFileTypes: true })) {
       if (!entry.isFile()) continue
       const ext = extname(entry.name).toLowerCase()
-      if (!RASTER_EXTENSIONS.includes(ext)) continue
+      if (!RASTER_EXTENSIONS.includes(/** @type {typeof RASTER_EXTENSIONS[number]} */ (ext))) {
+        continue
+      }
       allFiles.push(join(IMAGE_ROOT, entry.name))
     }
   } catch {

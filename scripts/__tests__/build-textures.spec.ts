@@ -24,7 +24,12 @@ describe('texture webp helpers', () => {
     expect(pickPreferredRasterPath([join(dir, 'a.jpeg'), join(dir, 'a.jpg')])).toBe(
       join(dir, 'a.jpg'),
     )
+    expect(pickPreferredRasterPath([join(dir, 'x.avif'), join(dir, 'x.jpg')])).toBe(
+      join(dir, 'x.jpg'),
+    )
     expect(rasterExtensionRank('.jpg')).toBeLessThan(rasterExtensionRank('.png'))
+    expect(rasterExtensionRank('.png')).toBeLessThan(rasterExtensionRank('.webp'))
+    expect(rasterExtensionRank('.webp')).toBeLessThan(rasterExtensionRank('.avif'))
   })
 
   it('maps source image paths onto mirrored public `.webp` paths', () => {
