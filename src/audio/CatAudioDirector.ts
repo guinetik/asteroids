@@ -119,6 +119,10 @@ export class CatAudioDirector {
   private purr: AudioHandle | null = null
   /** Looping snore handle (null when not asleep or player too far from house). */
   private sleep: AudioHandle | null = null
+  /** Looping crunch handle (null when Sushi is not in the `'eat'` state). */
+  private eat: AudioHandle | null = null
+  /** Looping litter-scratch handle (null when Sushi is not in the `'useLitter'` state). */
+  private litter: AudioHandle | null = null
   /** Cached previous-frame state used to edge-detect "just entered idle". */
   private prevCatState: CatState | null = null
   /** True between {@link start} and {@link stop}. */
@@ -182,6 +186,8 @@ export class CatAudioDirector {
 
     this.tickPurrLoop(state, catPan, catFalloff)
     this.tickSleepLoop(state, camera, catPan)
+    this.tickEatLoop(state, catPan, catFalloff)
+    this.tickLitterLoop(state, catPan, catFalloff)
     this.tickIdleMeows(state, catPan, catFalloff)
 
     this.prevCatState = state.catState
@@ -257,9 +263,14 @@ export class CatAudioDirector {
       state.bladder >= CAT_BLADDER_FULL_THRESHOLD ||
       state.tired >= CAT_TIRED_FULL_THRESHOLD
 
-    let cue: 'sfx.meow.alert' | 'sfx.meow.happy' | null = null
+    // Two happy-meow takes; flip a coin so back-to-back idle entries don't sound
+    // like a stuck sample. Alert keeps a single cue — it's a "needs attention"
+    // signal, varying it muddles the read.
+    let cue: 'sfx.meow.alert' | 'sfx.meow.happy' | 'sfx.cat.meow.variant' | null = null
     if (needsUnmet) cue = 'sfx.meow.alert'
-    else if (state.love >= CAT_PURR_LOVE_THRESHOLD) cue = 'sfx.meow.happy'
+    else if (state.love >= CAT_PURR_LOVE_THRESHOLD) {
+      cue = Math.random() < 0.5 ? 'sfx.meow.happy' : 'sfx.cat.meow.variant'
+    }
     if (!cue) return
 
     const handle = this.audio.play(cue, { volume: falloff })
@@ -267,14 +278,68 @@ export class CatAudioDirector {
   }
 
   /**
-   * Fire the pet-melody one-shot at Sushi's last computed stereo pan + falloff.
-   * Called by the host scene the same frame the player presses F to pet — the
-   * pan/falloff cached during the most recent {@link update} are accurate to
-   * ~one frame of cat motion, which is well within the cue's attack envelope.
+   * Maintain the eat loop: starts on entry to the `'eat'` state, stops as soon as
+   * Sushi moves on. The cue is short crunches looped over {@link EAT_DURATION_S}
+   * so it sounds continuous regardless of how long the eat state lasts.
+   */
+  private tickEatLoop(state: CatAudioState, pan: number, falloff: number): void {
+    if (state.catState !== 'eat') {
+      this.eat?.stop()
+      this.eat = null
+      return
+    }
+    if (this.eat === null) {
+      this.eat = this.audio.play('sfx.cat.eat', { loop: true, volume: falloff })
+    } else {
+      this.eat.setVolume(falloff)
+    }
+    this.eat?.setStereo(pan)
+  }
+
+  /**
+   * Maintain the litter loop: looping scratch sound while Sushi is using the box.
+   * Mirrors {@link tickEatLoop} — gates strictly on the `'useLitter'` state so
+   * the loop can't bleed into goToLitter or the post-litter walk-out.
+   */
+  private tickLitterLoop(state: CatAudioState, pan: number, falloff: number): void {
+    if (state.catState !== 'useLitter') {
+      this.litter?.stop()
+      this.litter = null
+      return
+    }
+    if (this.litter === null) {
+      this.litter = this.audio.play('sfx.litter.use', { loop: true, volume: falloff })
+    } else {
+      this.litter.setVolume(falloff)
+    }
+    this.litter?.setStereo(pan)
+  }
+
+  /**
+   * Fire the pet-reaction one-shots at Sushi's last computed stereo pan + falloff.
+   * Plays both the warm melody bed (`sfx.cat.pet`) and a vocal acknowledgement
+   * meow (`sfx.cat.meow.pet`) — the melody is the ambient "good interaction"
+   * cue, the meow is Sushi's direct reaction, and stacking them reads as one
+   * blended response. Called by the host scene the same frame the player
+   * presses F to pet.
    */
   playPet(): void {
     if (!this.active) return
-    const handle = this.audio.play('sfx.cat.pet', { volume: this.lastFalloff })
+    const melody = this.audio.play('sfx.cat.pet', { volume: this.lastFalloff })
+    melody?.setStereo(this.lastPan)
+    const meow = this.audio.play('sfx.cat.meow.pet', { volume: this.lastFalloff })
+    meow?.setStereo(this.lastPan)
+  }
+
+  /**
+   * Fire the litterbox-scoop one-shot at Sushi's last computed stereo pan +
+   * falloff. The litterbox is fixed in space, but using the cat-side pan still
+   * reads correctly because the player has to be standing right next to it to
+   * trigger the scoop — pan ≈ 0, falloff ≈ 1 in practice.
+   */
+  playLitterScoop(): void {
+    if (!this.active) return
+    const handle = this.audio.play('sfx.litter.scoop', { volume: this.lastFalloff })
     handle?.setStereo(this.lastPan)
   }
 
@@ -289,6 +354,10 @@ export class CatAudioDirector {
     this.purr = null
     this.sleep?.stop()
     this.sleep = null
+    this.eat?.stop()
+    this.eat = null
+    this.litter?.stop()
+    this.litter = null
     this.prevCatState = null
   }
 }

@@ -117,6 +117,11 @@ describe('audioManifest', () => {
       'sfx.cat.purr',
       'sfx.cat.sleep',
       'sfx.cat.pet',
+      'sfx.cat.eat',
+      'sfx.cat.meow.pet',
+      'sfx.cat.meow.variant',
+      'sfx.litter.scoop',
+      'sfx.litter.use',
       'sfx.meow.happy',
       'sfx.meow.alert',
       // music

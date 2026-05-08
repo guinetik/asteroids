@@ -31,6 +31,7 @@ import { HabitatCompletionPoster } from '@/three/HabitatCompletionPoster'
 import { HabitatLargeAchievementPoster } from '@/three/HabitatLargeAchievementPoster'
 import { HabitatPosterWall } from '@/three/HabitatPosterWall'
 import { HabitatTablePosterRow } from '@/three/HabitatTablePosterRow'
+import { LavaLampModel } from '@/three/LavaLampModel'
 
 // ---------------------------------------------------------------------------
 // Constants — no magic numbers
@@ -504,7 +505,7 @@ const CAT_SLEEP_ROTATION_X = 0
  * 0 leaves the head pointed at the back wall so the player sees Sushi's back/side
  * through the doorway instead of staring straight at his face (which read as
  * unsettling without closed-eye morphs in the rig). */
-const CAT_SLEEP_ROTATION_Y = 1.50
+const CAT_SLEEP_ROTATION_Y = 1.5
 /** Local roll (radians) applied to the sleeping clone — rolls onto a side. */
 const CAT_SLEEP_ROTATION_Z = Math.PI / 2
 /** Uniform scale multiplier applied to the sleeping clone (1 = identical to live cat). */
@@ -728,6 +729,9 @@ export class HabitatInteriorScene {
 
   /** Three mission-line posters centered on the front bulkhead above the mess table. */
   private readonly tablePosterRow = new HabitatTablePosterRow()
+
+  /** Procedural animated lava lamp placed on the raised bed rail. */
+  private readonly lavaLamp = new LavaLampModel()
 
   /** Act I journey art — large frame port of the hatch grid on the −Z back cap (viewer −X). */
   private readonly journeyAct1Wall = new HabitatLargeAchievementPoster({
@@ -1030,6 +1034,10 @@ export class HabitatInteriorScene {
     // bed-jumping behaviour follows the mesh without any hardcoded offsets.
     this.computeBedJumpWaypoints(bedModel)
 
+    // --- Bed lava lamp ------------------------------------------------------
+    this.lavaLamp.placeOnBed(bedModel)
+    this.scene.add(this.lavaLamp.group)
+
     // --- Table --------------------------------------------------------------
     // The GLB ships with its origin at the floor-center thanks to
     // `scripts/center-table-glb.mjs` (runs `@gltf-transform/functions`'s
@@ -1133,11 +1141,7 @@ export class HabitatInteriorScene {
       // inherits the house yaw/position. Sleep-state visibility is driven by
       // the bridge — see {@link applySushiBridgeToCat}.
       this.sleepingCatClone = cat.createSleepingClone()
-      this.sleepingCatClone.position.set(
-        CAT_SLEEP_OFFSET_X,
-        CAT_SLEEP_OFFSET_Y,
-        CAT_SLEEP_OFFSET_Z,
-      )
+      this.sleepingCatClone.position.set(CAT_SLEEP_OFFSET_X, CAT_SLEEP_OFFSET_Y, CAT_SLEEP_OFFSET_Z)
       this.sleepingCatClone.rotation.set(
         CAT_SLEEP_ROTATION_X,
         CAT_SLEEP_ROTATION_Y,
@@ -1176,6 +1180,7 @@ export class HabitatInteriorScene {
     this.tickKibbleVisual()
     this.tickLitterChunkVisual()
     this.tickHatchKnob(dt)
+    this.lavaLamp.tick(dt)
   }
 
   /**
@@ -1310,6 +1315,8 @@ export class HabitatInteriorScene {
     this.journeyAct3Wall.dispose()
     this.scene.remove(this.tablePosterRow.group)
     this.tablePosterRow.dispose()
+    this.scene.remove(this.lavaLamp.group)
+    this.lavaLamp.dispose()
     this.scene.traverse((child) => {
       if (
         child instanceof THREE.Mesh ||
@@ -1420,10 +1427,7 @@ export class HabitatInteriorScene {
         // Clamp the index defensively — the controller only ever asks for indices it
         // received from getBedSideCount, but a stale index would otherwise read past
         // the end of the array and produce a NaN approach position.
-        const i = Math.max(
-          0,
-          Math.min(this.bedApproachWorldPositions.length - 1, sideIndex),
-        )
+        const i = Math.max(0, Math.min(this.bedApproachWorldPositions.length - 1, sideIndex))
         const wp = this.bedApproachWorldPositions[i]
         if (wp) out.copy(wp)
         return out
@@ -1820,19 +1824,10 @@ export class HabitatInteriorScene {
     })
     const fountainBaseHeight = CAT_FOUNTAIN_HEIGHT * 0.85
     const fountainBase = new THREE.Mesh(
-      new THREE.CylinderGeometry(
-        CAT_FOUNTAIN_RADIUS,
-        CAT_FOUNTAIN_RADIUS,
-        fountainBaseHeight,
-        24,
-      ),
+      new THREE.CylinderGeometry(CAT_FOUNTAIN_RADIUS, CAT_FOUNTAIN_RADIUS, fountainBaseHeight, 24),
       fountainMat,
     )
-    fountainBase.position.set(
-      CAT_FOUNTAIN_X,
-      FLOOR_Y + fountainBaseHeight / 2,
-      CAT_FEEDING_Z,
-    )
+    fountainBase.position.set(CAT_FOUNTAIN_X, FLOOR_Y + fountainBaseHeight / 2, CAT_FEEDING_Z)
     group.add(fountainBase)
 
     // Lip at the top — torus reads as the rim of the drinking dish.
@@ -1854,11 +1849,7 @@ export class HabitatInteriorScene {
     })
     const water = new THREE.Mesh(new THREE.CircleGeometry(CAT_FOUNTAIN_RADIUS * 0.82, 24), waterMat)
     water.rotation.x = -Math.PI / 2
-    water.position.set(
-      CAT_FOUNTAIN_X,
-      FLOOR_Y + fountainBaseHeight - 0.005,
-      CAT_FEEDING_Z,
-    )
+    water.position.set(CAT_FOUNTAIN_X, FLOOR_Y + fountainBaseHeight - 0.005, CAT_FEEDING_Z)
     group.add(water)
 
     return group
@@ -1917,7 +1908,10 @@ export class HabitatInteriorScene {
       roughness: 1,
       metalness: 0,
     })
-    const sand = new THREE.Mesh(new THREE.BoxGeometry(innerX, CAT_LITTER_SAND_HEIGHT, innerZ), sandMat)
+    const sand = new THREE.Mesh(
+      new THREE.BoxGeometry(innerX, CAT_LITTER_SAND_HEIGHT, innerZ),
+      sandMat,
+    )
     sand.position.set(CAT_LITTER_X, FLOOR_Y + CAT_LITTER_SAND_HEIGHT / 2 + t, CAT_LITTER_Z)
     group.add(sand)
 
@@ -2030,7 +2024,16 @@ export class HabitatInteriorScene {
     frontShape.lineTo(-halfW, h)
     frontShape.lineTo(-halfW, 0)
     const hole = new THREE.Path()
-    hole.absellipse(0, CAT_HOUSE_ENTRY_CENTRE_Y, CAT_HOUSE_ENTRY_RADIUS, CAT_HOUSE_ENTRY_RADIUS, 0, TWO_PI, false, 0)
+    hole.absellipse(
+      0,
+      CAT_HOUSE_ENTRY_CENTRE_Y,
+      CAT_HOUSE_ENTRY_RADIUS,
+      CAT_HOUSE_ENTRY_RADIUS,
+      0,
+      TWO_PI,
+      false,
+      0,
+    )
     frontShape.holes.push(hole)
     const frontGeo = new THREE.ExtrudeGeometry(frontShape, {
       depth: t,
@@ -2044,10 +2047,7 @@ export class HabitatInteriorScene {
 
     // Inner shadow card — a dark plate just inside the entry to vignette the
     // interior so Sushi reads as silhouette/barely visible when sleeping.
-    const shadowCard = new THREE.Mesh(
-      new THREE.PlaneGeometry(w - t * 2, h - t),
-      innerMat,
-    )
+    const shadowCard = new THREE.Mesh(new THREE.PlaneGeometry(w - t * 2, h - t), innerMat)
     shadowCard.position.set(0, (h - t) / 2 + t, halfD - t * 1.5)
     shadowCard.rotation.y = Math.PI
     group.add(shadowCard)
@@ -2383,11 +2383,7 @@ export class HabitatInteriorScene {
       // If Sushi is sitting (post-pet) and the player has wandered off, end the
       // sit so he doesn't stay parked staring at empty air — he'll pick a new
       // waypoint and resume his normal roam.
-      if (
-        !this.petSequenceActive &&
-        this.cat.isSitting &&
-        distCat > PET_SIT_CANCEL_DISTANCE
-      ) {
+      if (!this.petSequenceActive && this.cat.isSitting && distCat > PET_SIT_CANCEL_DISTANCE) {
         this.cat.endSit()
       }
       // Pet prompt is suppressed when Sushi is mid-errand (eating, going to the
@@ -2444,6 +2440,7 @@ export class HabitatInteriorScene {
         this.onPrompt?.(`${pollution}/${LITTER_POLLUTION_MAX} Dirty  ·  F  Empty Litterbox`)
         if (this.inputManager.wasActionPressed('interact')) {
           this.sushiCallbacks.onEmptyLitter()
+          this.catAudio.playLitterScoop()
         }
         return
       }
@@ -2470,7 +2467,7 @@ export class HabitatInteriorScene {
     } else {
       // --- Hatch (exit) -------------------------------------------------------
       const hatchDx = this.player.position.x
-      const hatchDz = this.player.position.z - (-CYLINDER_LENGTH / 2)
+      const hatchDz = this.player.position.z - -CYLINDER_LENGTH / 2
       if (Math.hypot(hatchDx, hatchDz) < HATCH_INTERACT_DISTANCE) {
         this.onPrompt?.('F  Exit')
         if (this.inputManager.wasActionPressed('interact')) {

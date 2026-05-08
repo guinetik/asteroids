@@ -172,16 +172,16 @@ const FOLLOW_REACHED_DISTANCE = 1.0
 /** Seconds Sushi idles next to the player after catching up before re-evaluating priorities. */
 const IDLE_NEAR_PLAYER_DURATION_S = 4
 /** Seconds Sushi spends sitting at the bowl per consumed serving. */
-const EAT_DURATION_S = 2.5
+const EAT_DURATION_S = 5
 /** Seconds Sushi spends sitting in the litterbox per use. */
-const LITTER_USE_DURATION_S = 3.5
+const LITTER_USE_DURATION_S = 4
 
 /**
  * Probability that {@link pickNextRestingState} picks "jump on the bed" instead of a
  * regular wander walk. Tuned so the player catches Sushi on the bed every few minutes
  * of habitat time without it dominating his roam pattern.
  */
-const BED_JUMP_CHANCE = 0.45
+const BED_JUMP_CHANCE = 0.25
 /**
  * Seconds the leap-up and leap-down lerps take. Short enough to read as a hop rather
  * than a glide, long enough that the parabolic arc is visible.

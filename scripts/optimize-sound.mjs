@@ -9,7 +9,15 @@
  */
 
 import { spawn } from 'node:child_process'
-import { copyFileSync, mkdirSync, readdirSync, renameSync, statSync, unlinkSync } from 'node:fs'
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+} from 'node:fs'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -216,12 +224,25 @@ export async function main(sourceDir = SOURCE_DIR, outputDir = OUTPUT_DIR) {
     return
   }
 
+  let processed = 0
+  let skipped = 0
   for (const inputPath of inputPaths) {
     const outputPath = outputPathForInput(inputPath, sourceDir, outputDir)
     const preset = presetForFileName(inputPath)
     const beforeBytes = statSync(inputPath).size
 
+    // Skip when the optimized output already exists and is at least as new as the
+    // source — the encoding is deterministic per (source bytes, preset), so the
+    // cached file is byte-identical to what we'd write next. Lets the pipeline
+    // become a fast no-op on re-runs and only re-encode whichever sources the
+    // author actually touched.
+    if (existsSync(outputPath) && statSync(outputPath).mtimeMs >= statSync(inputPath).mtimeMs) {
+      skipped += 1
+      continue
+    }
+
     await optimizeMp3(inputPath, outputPath, preset)
+    processed += 1
 
     const afterBytes = statSync(outputPath).size
     const savings = beforeBytes > 0 ? ((beforeBytes - afterBytes) / beforeBytes) * PERCENT_SCALE : 0
@@ -230,6 +251,7 @@ export async function main(sourceDir = SOURCE_DIR, outputDir = OUTPUT_DIR) {
         + `(${savings.toFixed(1)}%)`,
     )
   }
+  console.info(`Done. ${processed} processed, ${skipped} up-to-date.`)
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
