@@ -337,6 +337,11 @@ const ARCADE_MACHINE_Z = 7.5
  */
 const ARCADE_MACHINE_ROTATION_Y = -Math.PI / 2
 /**
+ * XZ distance from the player at which the `F  Play Asteroids` prompt appears
+ * next to the arcade cabinet. Matches the telescope's close-use feel.
+ */
+const ARCADE_PROMPT_RADIUS = 1.45
+/**
  * Distance (world units) Sushi waits beside the arcade cabinet before hopping
  * onto the top. Uses the +X side as the approach lane (cabin-facing flank).
  */
@@ -3571,6 +3576,20 @@ export class HabitatInteriorScene {
         this.onPrompt?.('F  Observe')
         if (this.inputManager.wasActionPressed('interact')) {
           this.onInteract?.('observatory')
+        }
+        return
+      }
+    }
+
+    // --- Arcade cabinet (Classic Asteroids) -------------------------------
+    if (this.arcadeMachine.isLoaded()) {
+      const ax = this.player.position.x - ARCADE_MACHINE_X
+      const az = this.player.position.z - ARCADE_MACHINE_Z
+      const arcadeDist = Math.hypot(ax, az)
+      if (arcadeDist < ARCADE_PROMPT_RADIUS) {
+        this.onPrompt?.('F  Play Asteroids')
+        if (this.inputManager.wasActionPressed('interact')) {
+          this.onInteract?.('arcade')
         }
         return
       }

@@ -98,6 +98,11 @@ export class HabitatArcadeMachineModel {
     return this.worldAabb
   }
 
+  /** True once the arcade machine GLB has been successfully requested for this wrapper. */
+  isLoaded(): boolean {
+    return this.loaded && this.inner !== null
+  }
+
   /** Release the inner GLB geometries and materials. */
   dispose(): void {
     if (!this.inner) return
