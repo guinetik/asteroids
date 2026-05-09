@@ -225,6 +225,9 @@ export class MapHabitatFacade {
         deps?.callbacks.onHatchExit?.()
       } else if (target === 'observatory') {
         deps?.callbacks.onObservatory?.(true)
+        // Release pointer lock so the observatory overlay can receive clicks
+        // and the FPS controller stops consuming WASD / mouse input.
+        this.pointerLock.releaseLock()
       }
     }
     next.onPrompt = (prompt) => {
