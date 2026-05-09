@@ -131,6 +131,9 @@ export interface CatNeedsBridge {
 /** Hunger threshold at or below which Sushi prioritises eating from the bowl
  * (matches love semantics: 100 = full, 0 = starving). */
 const HUNGER_HUNGRY_THRESHOLD = 30
+/** Hunger threshold at or above which Sushi stops chaining servings and walks off.
+ * While at the bowl with food remaining, he keeps eating until hunger ≥ this. */
+const HUNGER_SATISFIED_THRESHOLD = 95
 /** Love threshold at or below which Sushi prioritises following the player. */
 const LOVE_NEEDY_THRESHOLD = 30
 /**
@@ -149,8 +152,8 @@ const LITTER_POLLUTION_REFUSE_THRESHOLD = 6
  * preempting the laser pointer chase as well as every non-sleep need.
  */
 const TIRED_FULL_THRESHOLD = 80
-/** Tired units added per second of laser-pointer chase (≈ 12s of sprinting fills the meter). */
-const TIRED_RISE_PER_CHASE_SEC = 8
+/** Tired units added per second of laser-pointer chase (≈ 25s of sprinting fills the meter). */
+const TIRED_RISE_PER_CHASE_SEC = 4
 /** Hunger units burned per second of laser-pointer chase — sprinting drops the
  * meter toward zero (semantics: 100 = full, 0 = starving). */
 const HUNGER_BURN_PER_CHASE_SEC = 2
@@ -672,10 +675,16 @@ export class CatController {
     } else if (this.state === 'eat') {
       if (this.stateTimer >= this.stateDuration) {
         this.bridge?.onEatServing()
-        // Decide what to do next based on fresh needs. If no other need is
-        // pressing, fall back to a resting state so we don't sit in `eat`
-        // re-firing onEatServing every frame.
-        if (!this.evaluateNeedsAndPickNextState()) {
+        // Chain servings while still hungry and food remains — Sushi tops up to
+        // ~full instead of walking off after one bite.
+        const bridge = this.bridge
+        if (
+          bridge &&
+          bridge.getBowlServings() > 0 &&
+          bridge.getHunger() < HUNGER_SATISFIED_THRESHOLD
+        ) {
+          this.enterState('eat')
+        } else if (!this.evaluateNeedsAndPickNextState()) {
           this.pickNextRestingState()
         }
       }

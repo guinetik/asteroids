@@ -118,6 +118,8 @@ describe('audioManifest', () => {
       'sfx.cat.sleep',
       'sfx.cat.pet',
       'sfx.cat.eat',
+      'sfx.cat.run',
+      'sfx.cat.catch',
       'sfx.cat.meow.pet',
       'sfx.cat.meow.variant',
       'sfx.litter.scoop',

@@ -123,6 +123,8 @@ export class CatAudioDirector {
   private eat: AudioHandle | null = null
   /** Looping litter-scratch handle (null when Sushi is not in the `'useLitter'` state). */
   private litter: AudioHandle | null = null
+  /** Looping sprint handle (null when Sushi is not in the `'chase'` state). */
+  private run: AudioHandle | null = null
   /** Cached previous-frame state used to edge-detect "just entered idle". */
   private prevCatState: CatState | null = null
   /** True between {@link start} and {@link stop}. */
@@ -188,6 +190,8 @@ export class CatAudioDirector {
     this.tickSleepLoop(state, camera, catPan)
     this.tickEatLoop(state, catPan, catFalloff)
     this.tickLitterLoop(state, catPan, catFalloff)
+    this.tickRunLoop(state, catPan, catFalloff)
+    this.tickCatchOneShot(state, catPan, catFalloff)
     this.tickIdleMeows(state, catPan, catFalloff)
 
     this.prevCatState = state.catState
@@ -316,6 +320,37 @@ export class CatAudioDirector {
   }
 
   /**
+   * Maintain the run loop: looping sprint sound while Sushi is in the `'chase'`
+   * state. Stops on entry to `'chaseRest'` (the pounce) and on any other state
+   * change so it doesn't bleed into walking or idle.
+   */
+  private tickRunLoop(state: CatAudioState, pan: number, falloff: number): void {
+    if (state.catState !== 'chase') {
+      this.run?.stop()
+      this.run = null
+      return
+    }
+    if (this.run === null) {
+      this.run = this.audio.play('sfx.cat.run', { loop: true, volume: falloff })
+    } else {
+      this.run.setVolume(falloff)
+    }
+    this.run?.setStereo(pan)
+  }
+
+  /**
+   * Fire the catch one-shot on the rising edge of `'chaseRest'` from `'chase'`
+   * — the moment Sushi pounces on the laser dot. Edge-detected against the
+   * previous-frame state so a player who keeps the dot still doesn't retrigger.
+   */
+  private tickCatchOneShot(state: CatAudioState, pan: number, falloff: number): void {
+    const caughtLaser = state.catState === 'chaseRest' && this.prevCatState === 'chase'
+    if (!caughtLaser) return
+    const handle = this.audio.play('sfx.cat.catch', { volume: falloff })
+    handle?.setStereo(pan)
+  }
+
+  /**
    * Fire the pet-reaction one-shots at Sushi's last computed stereo pan + falloff.
    * Plays both the warm melody bed (`sfx.cat.pet`) and a vocal acknowledgement
    * meow (`sfx.cat.meow.pet`) — the melody is the ambient "good interaction"
@@ -358,6 +393,8 @@ export class CatAudioDirector {
     this.eat = null
     this.litter?.stop()
     this.litter = null
+    this.run?.stop()
+    this.run = null
     this.prevCatState = null
   }
 }
