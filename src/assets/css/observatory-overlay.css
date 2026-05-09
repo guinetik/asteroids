@@ -1,0 +1,87 @@
+.observatory-overlay {
+  @apply fixed inset-0 z-50 flex items-center justify-center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  outline: none;
+}
+
+.observatory-card {
+  @apply flex flex-col gap-0 rounded-md border;
+  width: min(96vw, 1280px);
+  height: min(90vh, 820px);
+  border-color: rgba(123, 220, 255, 0.35);
+  background: linear-gradient(180deg, rgba(8, 18, 28, 0.95), rgba(4, 10, 18, 0.95));
+  color: #c8e9ff;
+  box-shadow: 0 0 32px rgba(123, 220, 255, 0.18);
+}
+
+.observatory-chrome {
+  @apply flex items-center justify-between px-4 py-2 border-b text-xs uppercase tracking-widest;
+  border-color: rgba(123, 220, 255, 0.25);
+  letter-spacing: 0.18em;
+}
+
+.observatory-header {
+  @apply flex items-center gap-6 px-4 py-2 text-[10px] uppercase tracking-widest;
+  border-bottom: 1px solid rgba(123, 220, 255, 0.18);
+  color: rgba(200, 233, 255, 0.7);
+}
+
+.observatory-header__value {
+  @apply ml-1;
+  color: #7bdcff;
+}
+
+.observatory-body {
+  @apply flex flex-1 min-h-0;
+}
+
+.observatory-sidebar {
+  @apply flex flex-col gap-1 px-3 py-3;
+  width: 220px;
+  border-right: 1px solid rgba(123, 220, 255, 0.18);
+}
+
+.observatory-nav-btn {
+  @apply text-left rounded px-3 py-2 text-sm transition;
+  background: transparent;
+  color: #c8e9ff;
+  border: 1px solid transparent;
+}
+
+.observatory-nav-btn:hover {
+  border-color: rgba(123, 220, 255, 0.35);
+  background: rgba(123, 220, 255, 0.07);
+}
+
+.observatory-nav-btn--active {
+  border-color: rgba(123, 220, 255, 0.6);
+  background: rgba(123, 220, 255, 0.14);
+}
+
+.observatory-content {
+  @apply relative flex-1 min-w-0 min-h-0;
+}
+
+.observatory-viewport {
+  @apply absolute inset-0;
+  background: #000;
+}
+
+.observatory-blurb {
+  @apply px-4 py-3 text-sm leading-relaxed border-t;
+  border-color: rgba(123, 220, 255, 0.18);
+  color: rgba(200, 233, 255, 0.85);
+}
+
+.observatory-status {
+  @apply absolute inset-0 flex flex-col items-center justify-center gap-2 text-sm;
+  color: rgba(200, 233, 255, 0.85);
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.observatory-footer {
+  @apply flex items-center justify-end px-4 py-2 text-[10px] uppercase tracking-widest;
+  border-top: 1px solid rgba(123, 220, 255, 0.18);
+  color: rgba(200, 233, 255, 0.6);
+}

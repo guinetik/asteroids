@@ -6,6 +6,7 @@
 @import './mapTacOverlay.css';
 @import './prospectus-overlay.css';
 @import './jovian-epilogue-overlay.css';
+@import './observatory-overlay.css';
 @import './key-prompt.css';
 @import './dock-panel.css';
 @import '../../components/hud/SushiMetersOverlay.css';
