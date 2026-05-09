@@ -32,6 +32,10 @@ import { HabitatLargeAchievementPoster } from '@/three/HabitatLargeAchievementPo
 import { HabitatPosterWall } from '@/three/HabitatPosterWall'
 import { HabitatTablePosterRow } from '@/three/HabitatTablePosterRow'
 import { LavaLampModel } from '@/three/LavaLampModel'
+import { HabitatSideboardModel } from '@/three/HabitatSideboardModel'
+import { HabitatCoffeeMachineModel } from '@/three/HabitatCoffeeMachineModel'
+import { HabitatRecordPlayerModel } from '@/three/HabitatRecordPlayerModel'
+import { HabitatMoonLampModel } from '@/three/HabitatMoonLampModel'
 import { HabitatBackdrop, type HabitatBackdropContext } from '@/three/HabitatBackdrop'
 import { findCosmeticOptionById } from '@/lib/cosmetics/catalog'
 import { getPlayerCosmetics } from '@/lib/cosmetics/profileCosmetics'
@@ -193,6 +197,43 @@ const BED_APPROACH_OFFSET = 0.45
  * a pillow's height above the duvet.
  */
 const BED_TOP_Y_INSET = 0.45
+
+/**
+ * World X of the sideboard centre. Pushed close to the +X wall so the unit hugs
+ * the same side as the bed, leaving the area in front of the achievement posters
+ * clear for the player to read them.
+ */
+const SIDEBOARD_X = 3.0
+/**
+ * Tiny gap (world units) between the back of the sideboard and the −Z hatch wall.
+ * Prevents Z-fighting on the painted cap material.
+ */
+const SIDEBOARD_WALL_CLEARANCE = 0.05
+/**
+ * Fraction of the sideboard's local-X half-width that the coffee machine sits
+ * away from centre. Positive offsets toward +X (further from the hatch) so the
+ * record player and coffee machine read as a duet on the same flat surface.
+ */
+const SIDEBOARD_COFFEE_OFFSET_FRAC = 0.6
+/**
+ * Fraction of the sideboard's local-X half-width that the record player sits
+ * away from centre on the −X side (closer to the hatch).
+ */
+const SIDEBOARD_RECORD_PLAYER_OFFSET_FRAC = -0.05
+/**
+ * Fraction of the sideboard's local-X half-width that the moon lamp sits on the
+ * opposite (-X) side from the coffee + record player duo, so it lights the
+ * darker corner near the hatch grid.
+ */
+const SIDEBOARD_MOON_LAMP_OFFSET_FRAC = -0.7
+/** Tiny vertical clearance above the sideboard top so toppings don't z-fight. */
+const SIDEBOARD_TOP_CLEARANCE = 0.005
+/**
+ * Player capsule radius (world units) used when resolving against furniture
+ * obstacle AABBs. Tuned to feel like a person in a cabin without snagging on
+ * corners. The cylindrical wall clamp uses {@link COLLISION_MARGIN} separately.
+ */
+const PLAYER_OBSTACLE_RADIUS = 0.35
 
 // --- Cockpit hatch (back cap, -Z) ------------------------------------------
 // Submarine-style pressure hatch: a grey metallic ring frame around a white
@@ -850,6 +891,21 @@ export class HabitatInteriorScene {
   /** Procedural animated lava lamp placed on the raised bed rail. */
   private readonly lavaLamp = new LavaLampModel()
 
+  /** Wall-mounted sideboard on the +X corner of the back hatch wall. */
+  private readonly sideboard = new HabitatSideboardModel()
+
+  /** Coffee machine prop sitting on top of the sideboard. */
+  private readonly coffeeMachine = new HabitatCoffeeMachineModel()
+
+  /** Record player prop sitting on top of the sideboard. */
+  private readonly recordPlayer = new HabitatRecordPlayerModel()
+
+  /** Moon lamp sitting on the opposite end of the sideboard, lighting the corner. */
+  private readonly moonLamp = new HabitatMoonLampModel()
+
+  /** World-space AABBs the player movement resolver pushes the player out of. */
+  private readonly playerObstacles: THREE.Box3[] = []
+
   /** Paintable habitat floor material. */
   private habitatFloorMaterial: THREE.MeshStandardMaterial | null = null
 
@@ -1399,7 +1455,10 @@ export class HabitatInteriorScene {
     // rest of the habitat scene, so we swallow the error and log it instead.
     // Obstacle rectangles are computed from the *current* world bbox of each
     // piece of furniture so the avoidance follows the actual placement, not
-    // hardcoded numbers that would drift if layout constants change.
+    // hardcoded numbers that would drift if layout constants change. The
+    // hatch-wall sideboard is loaded async (see {@link loadHatchWallFurnitureAsync});
+    // it sits in a corner outside the cat's wander rectangle so its absence here
+    // is harmless.
     const obstacles: CatObstacle[] = [
       footprintFromObject(bedModel, CAT_OBSTACLE_PADDING),
       footprintFromObject(tableModel, CAT_OBSTACLE_PADDING),
@@ -1413,6 +1472,78 @@ export class HabitatInteriorScene {
     // and start its FSM the frame this promise resolves. `tick()` already guards
     // every cat read with `?.`, so the scene runs cleanly without him.
     void this.loadCatAsync(obstacles)
+
+    // Same fire-and-forget rule for the hatch-wall sideboard plus the coffee
+    // machine and record player that mount on top. None of these block the
+    // cabin from appearing; the player can move around while they stream in.
+    void this.loadHatchWallFurnitureAsync()
+  }
+
+  /**
+   * Deferred load of the hatch-wall sideboard, plus the coffee machine and
+   * record player that mount on top. Mirrors {@link loadCatAsync} so the cabin
+   * appears immediately while heavy GLBs stream in.
+   *
+   * Bails silently on load errors — a missing prop shouldn't kill the scene.
+   * Re-checks {@link loaded} between awaits so a {@link dispose} that races
+   * the in-flight load doesn't add stale meshes to a torn-down scene.
+   */
+  private async loadHatchWallFurnitureAsync(): Promise<void> {
+    try {
+      await this.sideboard.load()
+      if (this.disposed) return
+
+      // Place the sideboard against the −Z hatch wall on the +X (bed) side.
+      // The wrapper drops its base to local Y=0 so it sits flush on the floor.
+      this.sideboard.group.position.set(SIDEBOARD_X, FLOOR_Y, -CYLINDER_LENGTH / 2)
+      this.sideboard.group.rotation.y = 0
+      this.sideboard.group.updateMatrixWorld(true)
+      const sideboardBox = new THREE.Box3().setFromObject(this.sideboard.group)
+      const sideboardDepth = sideboardBox.max.z - sideboardBox.min.z
+      this.sideboard.group.position.z =
+        -CYLINDER_LENGTH / 2 + sideboardDepth / 2 + SIDEBOARD_WALL_CLEARANCE
+      this.sideboard.refreshAabb()
+      this.scene.add(this.sideboard.group)
+      this.playerObstacles.push(this.sideboard.getCollisionAabb().clone())
+
+      // Load the countertop props in parallel — they're tiny but there's
+      // no reason to serialize them.
+      await Promise.all([
+        this.coffeeMachine.load(),
+        this.recordPlayer.load(),
+        this.moonLamp.load(),
+      ])
+      if (this.disposed) return
+
+      const aabb = this.sideboard.getCollisionAabb()
+      const sideboardTopY = aabb.max.y
+      const sideboardCentreX = (aabb.min.x + aabb.max.x) / 2
+      const sideboardCentreZ = (aabb.min.z + aabb.max.z) / 2
+      const sideboardHalfWidthX = (aabb.max.x - aabb.min.x) / 2
+
+      this.coffeeMachine.group.position.set(
+        sideboardCentreX + sideboardHalfWidthX * SIDEBOARD_COFFEE_OFFSET_FRAC,
+        sideboardTopY + SIDEBOARD_TOP_CLEARANCE,
+        sideboardCentreZ,
+      )
+      this.scene.add(this.coffeeMachine.group)
+
+      this.recordPlayer.group.position.set(
+        sideboardCentreX + sideboardHalfWidthX * SIDEBOARD_RECORD_PLAYER_OFFSET_FRAC,
+        sideboardTopY + SIDEBOARD_TOP_CLEARANCE,
+        sideboardCentreZ,
+      )
+      this.scene.add(this.recordPlayer.group)
+
+      this.moonLamp.group.position.set(
+        sideboardCentreX + sideboardHalfWidthX * SIDEBOARD_MOON_LAMP_OFFSET_FRAC,
+        sideboardTopY + SIDEBOARD_TOP_CLEARANCE,
+        sideboardCentreZ,
+      )
+      this.scene.add(this.moonLamp.group)
+    } catch (err) {
+      console.warn('[HabitatInteriorScene] Hatch-wall furniture load failed:', err)
+    }
   }
 
   /**
@@ -1621,6 +1752,15 @@ export class HabitatInteriorScene {
     this.tablePosterRow.dispose()
     this.scene.remove(this.lavaLamp.group)
     this.lavaLamp.dispose()
+    this.scene.remove(this.sideboard.group)
+    this.sideboard.dispose()
+    this.scene.remove(this.coffeeMachine.group)
+    this.coffeeMachine.dispose()
+    this.scene.remove(this.recordPlayer.group)
+    this.recordPlayer.dispose()
+    this.scene.remove(this.moonLamp.group)
+    this.moonLamp.dispose()
+    this.playerObstacles.length = 0
     this.scene.remove(this.backdrop.group)
     this.backdrop.dispose()
     this.scene.traverse((child) => {
@@ -2518,11 +2658,48 @@ export class HabitatInteriorScene {
     this.player.position.x = Math.max(-maxX, Math.min(maxX, this.player.position.x))
     this.player.position.z = Math.max(-maxZ, Math.min(maxZ, this.player.position.z))
 
+    // Furniture obstacle resolution — push the player out of any AABB they have
+    // entered along the shorter penetration axis.
+    this.resolvePlayerObstacles()
+
     // Keep player glued to floor
     this.player.position.y = FLOOR_Y
 
     // Footsteps — always grounded on the flat habitat floor
     this.footsteps.update(dt, len > 0, true)
+  }
+
+  /**
+   * Push the player out of any registered furniture obstacle AABB along the
+   * shortest penetration axis. AABBs in {@link playerObstacles} are inflated by
+   * {@link PLAYER_OBSTACLE_RADIUS} so the resolver behaves like a small XZ-plane
+   * capsule instead of a point. Y is ignored — the player is glued to the floor.
+   */
+  private resolvePlayerObstacles(): void {
+    if (this.playerObstacles.length === 0) return
+    const px = this.player.position.x
+    const pz = this.player.position.z
+    let nx = px
+    let nz = pz
+    for (const aabb of this.playerObstacles) {
+      const minX = aabb.min.x - PLAYER_OBSTACLE_RADIUS
+      const maxX = aabb.max.x + PLAYER_OBSTACLE_RADIUS
+      const minZ = aabb.min.z - PLAYER_OBSTACLE_RADIUS
+      const maxZ = aabb.max.z + PLAYER_OBSTACLE_RADIUS
+      if (nx <= minX || nx >= maxX || nz <= minZ || nz >= maxZ) continue
+      // Penetration depth on each axis — pick the smallest to minimise visual snap.
+      const overlapLeft = nx - minX
+      const overlapRight = maxX - nx
+      const overlapBack = nz - minZ
+      const overlapFront = maxZ - nz
+      const minOverlap = Math.min(overlapLeft, overlapRight, overlapBack, overlapFront)
+      if (minOverlap === overlapLeft) nx = minX
+      else if (minOverlap === overlapRight) nx = maxX
+      else if (minOverlap === overlapBack) nz = minZ
+      else nz = maxZ
+    }
+    this.player.position.x = nx
+    this.player.position.z = nz
   }
 
   /**

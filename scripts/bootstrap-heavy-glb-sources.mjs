@@ -21,6 +21,13 @@ const SOURCES = [
   'city.glb',
   'asteroid.glb',
   'virus.glb',
+  'arcade_machine.glb',
+  'cat_tower.glb',
+  'coffee_machine.glb',
+  'lounge_chair.glb',
+  'record_player.glb',
+  'refractor_telescope.glb',
+  'lamp.glb',
 ]
 
 /**

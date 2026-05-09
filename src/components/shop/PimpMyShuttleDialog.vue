@@ -107,7 +107,7 @@ function tabLabel(tab: ShopTabId): string {
   if (tab === 'shuttle-thruster-trail') return 'Shuttle Trails'
   if (tab === 'lander-thruster-trail') return 'Lander Trails'
   if (tab === 'multitool-paintjob') return 'Multitool'
-  if (tab === 'habitat-interior') return 'Habitat'
+  if (tab === 'habitat-interior') return 'Habitat Paintjob'
   return tab
 }
 
