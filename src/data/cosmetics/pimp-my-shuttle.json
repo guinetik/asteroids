@@ -340,15 +340,31 @@
       "label": "Factory Cabin",
       "description": "Plain service-bay deck, cool hatch wall, warm table bulkhead, and regulation lava-lamp glow.",
       "price": 0,
-      "gradientStops": ["#dadbd8", "#aaaaaa", "#b8c0ca", "#ff3f88", "#ffb347"]
+      "gradientStops": [
+        "#dadbd8",
+        "#aaaaaa",
+        "#b8c0ca",
+        "#ff3f88",
+        "#ffb347",
+        "#ffeedd",
+        "#334466"
+      ]
     },
     {
       "id": "habitat-interior-neon-nocturne",
       "category": "habitat-interior",
       "label": "Neon Nocturne",
-      "description": "Dark studio deck, violet hatch wall, cobalt mess bulkhead, hot-pink lamp wax, arcade-blue bounce.",
+      "description": "Black studio deck, violet hatch wall, cobalt mess bulkhead, hot-pink lamp wax, arcade-blue bounce.",
       "price": 25000,
-      "gradientStops": ["#111827", "#4c1d95", "#1d4ed8", "#f472b6", "#38bdf8"]
+      "gradientStops": [
+        "#0b0a1a",
+        "#7c3aed",
+        "#1d4ed8",
+        "#ec4899",
+        "#22d3ee",
+        "#f472b6",
+        "#1e1b4b"
+      ]
     },
     {
       "id": "habitat-interior-mars-motel",
@@ -356,15 +372,31 @@
       "label": "Mars Motel",
       "description": "Dust-red deck, clay hatch wall, sun-faded table bulkhead, amber lamp fluid, peach wax blobs.",
       "price": 25000,
-      "gradientStops": ["#7f1d1d", "#b45309", "#f59e0b", "#fb923c", "#fed7aa"]
+      "gradientStops": [
+        "#9a1f1f",
+        "#c2410c",
+        "#ea580c",
+        "#fb923c",
+        "#fed7aa",
+        "#ff8c42",
+        "#3b0a0a"
+      ]
     },
     {
       "id": "habitat-interior-europa-sleeper",
       "category": "habitat-interior",
       "label": "Europa Sleeper",
-      "description": "Icy rubber flooring, pale cyan hatch wall, deep teal table wall, glacier lamp liquid, white-hot wax.",
+      "description": "Glacier rubber flooring, pale cyan hatch wall, deep teal table wall, ice-blue lamp liquid, white-hot wax.",
       "price": 25000,
-      "gradientStops": ["#e0f2fe", "#67e8f9", "#0f766e", "#22d3ee", "#f8fafc"]
+      "gradientStops": [
+        "#155e75",
+        "#22d3ee",
+        "#0d9488",
+        "#67e8f9",
+        "#f8fafc",
+        "#bae6fd",
+        "#0c2541"
+      ]
     },
     {
       "id": "habitat-interior-saturn-salon",
@@ -372,7 +404,15 @@
       "label": "Saturn Salon",
       "description": "Champagne deck, ring-dust hatch wall, midnight table bulkhead, gold lamp glow, pearl wax beads.",
       "price": 25000,
-      "gradientStops": ["#fef3c7", "#a8a29e", "#1e293b", "#facc15", "#fff7ed"]
+      "gradientStops": [
+        "#facc15",
+        "#92400e",
+        "#1e1b4b",
+        "#fde047",
+        "#fff7ed",
+        "#fbbf24",
+        "#312e81"
+      ]
     },
     {
       "id": "habitat-interior-green-room",
@@ -380,7 +420,15 @@
       "label": "Green Room",
       "description": "Black rubber stage floor, bottle-green hatch wall, ivory table wall, acid lamp fluid, mint wax sparks.",
       "price": 25000,
-      "gradientStops": ["#18181b", "#14532d", "#fefce8", "#84cc16", "#bbf7d0"]
+      "gradientStops": [
+        "#0a0a0a",
+        "#166534",
+        "#fef3c7",
+        "#84cc16",
+        "#bbf7d0",
+        "#a3e635",
+        "#052e16"
+      ]
     },
     {
       "id": "shuttle-title-registry",

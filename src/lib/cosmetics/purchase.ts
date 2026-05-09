@@ -10,6 +10,7 @@ import type { CosmeticPurchaseResult, PlayerCosmetics, ShuttleTitlePurchaseResul
 import type { PlayerProfile } from '@/lib/player/types'
 import { findCosmeticOptionById, SHUTTLE_TITLE_SERVICE_OPTION_ID } from './catalog'
 import {
+  COSMETIC_CATEGORY_TO_FIELD,
   getPlayerCosmetics,
   normalizeShuttleTitle,
   playerOwnsCosmeticOption,
@@ -34,31 +35,10 @@ function withCosmetics(profile: PlayerProfile, cosmetics: PlayerCosmetics): Play
  */
 function applyOptionToProfile(profile: PlayerProfile, optionId: string): PlayerProfile {
   const option = findCosmeticOptionById(optionId)
-  if (!option) return profile
+  if (!option || option.category === 'shuttle-title') return profile
   const cosmetics = getPlayerCosmetics(profile)
-  const next: typeof cosmetics = { ...cosmetics }
-  if (option.category === 'shuttle-paintjob') {
-    return withCosmetics(profile, { ...next, shuttlePaintjobId: optionId })
-  }
-  if (option.category === 'lander-paintjob') {
-    return withCosmetics(profile, { ...next, landerPaintjobId: optionId })
-  }
-  if (option.category === 'vehicle-flag') {
-    return withCosmetics(profile, { ...next, vehicleFlagId: optionId })
-  }
-  if (option.category === 'shuttle-thruster-trail') {
-    return withCosmetics(profile, { ...next, shuttleThrusterTrailId: optionId })
-  }
-  if (option.category === 'lander-thruster-trail') {
-    return withCosmetics(profile, { ...next, landerThrusterTrailId: optionId })
-  }
-  if (option.category === 'multitool-paintjob') {
-    return withCosmetics(profile, { ...next, multitoolPaintjobId: optionId })
-  }
-  if (option.category === 'habitat-interior') {
-    return withCosmetics(profile, { ...next, habitatInteriorId: optionId })
-  }
-  return profile
+  const field = COSMETIC_CATEGORY_TO_FIELD[option.category]
+  return withCosmetics(profile, { ...cosmetics, [field]: optionId })
 }
 
 /**
@@ -81,20 +61,7 @@ export function purchaseCosmeticOption(
     }
 
     const cosmetics = getPlayerCosmetics(profile)
-    const activeId =
-      option.category === 'shuttle-paintjob'
-        ? cosmetics.shuttlePaintjobId
-        : option.category === 'lander-paintjob'
-          ? cosmetics.landerPaintjobId
-          : option.category === 'vehicle-flag'
-            ? cosmetics.vehicleFlagId
-            : option.category === 'shuttle-thruster-trail'
-              ? cosmetics.shuttleThrusterTrailId
-              : option.category === 'lander-thruster-trail'
-                ? cosmetics.landerThrusterTrailId
-                : option.category === 'multitool-paintjob'
-                  ? cosmetics.multitoolPaintjobId
-                  : cosmetics.habitatInteriorId
+    const activeId = cosmetics[COSMETIC_CATEGORY_TO_FIELD[option.category]]
 
     if (activeId === optionId) {
       return { ok: false, profile, reason: 'already-active' }
@@ -138,20 +105,7 @@ export function applyOwnedCosmetic(
 
   const cosmetics = getPlayerCosmetics(profile)
 
-  const activeId =
-    option.category === 'shuttle-paintjob'
-      ? cosmetics.shuttlePaintjobId
-      : option.category === 'lander-paintjob'
-        ? cosmetics.landerPaintjobId
-        : option.category === 'vehicle-flag'
-          ? cosmetics.vehicleFlagId
-          : option.category === 'shuttle-thruster-trail'
-            ? cosmetics.shuttleThrusterTrailId
-            : option.category === 'lander-thruster-trail'
-              ? cosmetics.landerThrusterTrailId
-              : option.category === 'multitool-paintjob'
-                ? cosmetics.multitoolPaintjobId
-                : cosmetics.habitatInteriorId
+  const activeId = cosmetics[COSMETIC_CATEGORY_TO_FIELD[option.category]]
 
   if (activeId === optionId) {
     return { ok: false, profile, reason: 'already-active' }

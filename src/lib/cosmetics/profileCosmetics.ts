@@ -13,6 +13,30 @@ import { findCosmeticOptionById, getCosmeticOptions, listAllCosmeticOptions } fr
 /** Maximum visible characters persisted for a custom shuttle title. */
 export const SHUTTLE_TITLE_MAX_VISIBLE_CHARS = 24
 
+/**
+ * Cosmetic categories whose active selection persists as a single id field on
+ * {@link PlayerCosmetics}. Excludes `'shuttle-title'`, which uses the string field
+ * {@link PlayerCosmetics.shuttleTitle}.
+ */
+export type CosmeticOptionCategory = Exclude<CosmeticCategory, 'shuttle-title'>
+
+/**
+ * Map from selection-bearing category id to its {@link PlayerCosmetics} field name.
+ * Adding a new cosmetic category is one entry here plus one new field on
+ * {@link PlayerCosmetics} — purchase / apply / read paths all dispatch through this map.
+ */
+export const COSMETIC_CATEGORY_TO_FIELD: Readonly<
+  Record<CosmeticOptionCategory, keyof PlayerCosmetics>
+> = {
+  'shuttle-paintjob': 'shuttlePaintjobId',
+  'lander-paintjob': 'landerPaintjobId',
+  'vehicle-flag': 'vehicleFlagId',
+  'shuttle-thruster-trail': 'shuttleThrusterTrailId',
+  'lander-thruster-trail': 'landerThrusterTrailId',
+  'multitool-paintjob': 'multitoolPaintjobId',
+  'habitat-interior': 'habitatInteriorId',
+}
+
 /** Collapse internal whitespace to single spaces when trimming titles. */
 const TITLE_WHITESPACE_COLLAPSE = /\s+/g
 
@@ -198,12 +222,8 @@ export function getActiveCosmeticOptionId(
   cosmetics: PlayerCosmetics,
   category: CosmeticCategory,
 ): string | undefined {
-  if (category === 'shuttle-paintjob') return cosmetics.shuttlePaintjobId
-  if (category === 'lander-paintjob') return cosmetics.landerPaintjobId
-  if (category === 'vehicle-flag') return cosmetics.vehicleFlagId
-  if (category === 'shuttle-thruster-trail') return cosmetics.shuttleThrusterTrailId
-  if (category === 'lander-thruster-trail') return cosmetics.landerThrusterTrailId
-  if (category === 'multitool-paintjob') return cosmetics.multitoolPaintjobId
-  if (category === 'habitat-interior') return cosmetics.habitatInteriorId
-  return undefined
+  if (category === 'shuttle-title') return undefined
+  const field = COSMETIC_CATEGORY_TO_FIELD[category]
+  const value = cosmetics[field]
+  return typeof value === 'string' ? value : undefined
 }
