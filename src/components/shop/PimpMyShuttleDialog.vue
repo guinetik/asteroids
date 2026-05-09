@@ -59,6 +59,7 @@ const tabOrder = computed(() => {
       'shuttle-paintjob',
       'lander-paintjob',
       'multitool-paintjob',
+      'habitat-interior',
       'shuttle-title',
       'vehicle-flag',
       'shuttle-thruster-trail',
@@ -106,6 +107,7 @@ function tabLabel(tab: ShopTabId): string {
   if (tab === 'shuttle-thruster-trail') return 'Shuttle Trails'
   if (tab === 'lander-thruster-trail') return 'Lander Trails'
   if (tab === 'multitool-paintjob') return 'Multitool'
+  if (tab === 'habitat-interior') return 'Habitat'
   return tab
 }
 
@@ -116,7 +118,8 @@ const COSMETIC_PANEL_INTROS: Record<
   | 'vehicle-flag'
   | 'shuttle-thruster-trail'
   | 'lander-thruster-trail'
-  | 'multitool-paintjob',
+  | 'multitool-paintjob'
+  | 'habitat-interior',
   string
 > = {
   'shuttle-paintjob':
@@ -131,6 +134,8 @@ const COSMETIC_PANEL_INTROS: Record<
     'RCS puff aesthetics for butter-soft touchdowns. OEM defaults whisper compliance; tinted micro-thrust screams personality.',
   'multitool-paintjob':
     'Multitool tinsel stays with you EVA-side. Fleet issue hides coffee stains—garish tinsel broadcasts that you wrench with intent.',
+  'habitat-interior':
+    'Cabin paint is a one-time vanity bill for the walls you wake up inside. Buy a theme once, then repaint the hatch wall, table wall, floor, and lamp whenever the mood changes.',
 }
 
 /** Shuttle title tab narration above the rename field. */
@@ -183,6 +188,43 @@ function shaderShardChipColor(stops: readonly string[], index: number): string {
 /** Number of channel chips to render — capped at the available stop count and 3. */
 function shaderShardChipCount(stops: readonly string[]): number {
   return Math.min(SHADER_SHARD_CHIP_LABELS.length, Math.max(1, stops.length))
+}
+
+/** Fallback color for missing habitat interior preview stops. */
+const HABITAT_SWATCH_FALLBACK_COLOR = '#dadbd8'
+
+/** Floor stop index for habitat interior previews and runtime paint application. */
+const HABITAT_SWATCH_FLOOR_INDEX = 0
+
+/** Hatch wall stop index for habitat interior previews and runtime paint application. */
+const HABITAT_SWATCH_HATCH_WALL_INDEX = 1
+
+/** Table wall stop index for habitat interior previews and runtime paint application. */
+const HABITAT_SWATCH_TABLE_WALL_INDEX = 2
+
+/** Lava lamp liquid stop index for habitat interior previews and runtime paint application. */
+const HABITAT_SWATCH_LAMP_INDEX = 3
+
+/** Lava lamp wax blob stop index for habitat interior previews and runtime paint application. */
+const HABITAT_SWATCH_BLOB_INDEX = 4
+
+/**
+ * Build CSS variables for the habitat theme swatch. Stop order is floor, hatch wall,
+ * table wall, lamp liquid, and wax blobs.
+ */
+function habitatInteriorSwatchStyle(stops: readonly string[]): Record<string, string> {
+  const floor = stops[HABITAT_SWATCH_FLOOR_INDEX] ?? HABITAT_SWATCH_FALLBACK_COLOR
+  const hatchWall = stops[HABITAT_SWATCH_HATCH_WALL_INDEX] ?? floor
+  const tableWall = stops[HABITAT_SWATCH_TABLE_WALL_INDEX] ?? hatchWall
+  const lamp = stops[HABITAT_SWATCH_LAMP_INDEX] ?? tableWall
+  const blob = stops[HABITAT_SWATCH_BLOB_INDEX] ?? lamp
+  return {
+    '--habitat-floor': floor,
+    '--habitat-hatch-wall': hatchWall,
+    '--habitat-table-wall': tableWall,
+    '--habitat-lamp': lamp,
+    '--habitat-blob': blob,
+  }
 }
 
 function canAffordPrice(price: number): boolean {
@@ -381,6 +423,21 @@ function normalizedTitleBlocked(): boolean {
                       class="cosmetic-option-row"
                     >
                       <div
+                        v-if="activeTab === 'habitat-interior'"
+                        class="cosmetic-habitat-swatch cosmetic-option-row__swatch"
+                        :style="habitatInteriorSwatchStyle(option.gradientStops)"
+                        aria-hidden="true"
+                      >
+                        <div class="cosmetic-habitat-swatch__wall cosmetic-habitat-swatch__wall--hatch" />
+                        <div class="cosmetic-habitat-swatch__wall cosmetic-habitat-swatch__wall--table" />
+                        <div class="cosmetic-habitat-swatch__floor" />
+                        <div class="cosmetic-habitat-swatch__lamp">
+                          <span class="cosmetic-habitat-swatch__lamp-glow" />
+                          <span class="cosmetic-habitat-swatch__lamp-blob" />
+                        </div>
+                      </div>
+                      <div
+                        v-else
                         class="cosmetic-shader-shard cosmetic-option-row__swatch"
                         :style="shaderShardStyle(option.gradientStops)"
                         aria-hidden="true"

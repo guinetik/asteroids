@@ -26,6 +26,7 @@ const COSMETIC_CATEGORY_SET: ReadonlySet<string> = new Set<string>([
   'shuttle-thruster-trail',
   'lander-thruster-trail',
   'multitool-paintjob',
+  'habitat-interior',
 ])
 
 /** Legal CSS hex color `#rrggbb` (validation is case-insensitive). */

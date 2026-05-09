@@ -99,6 +99,18 @@ const LAVA_LAMP_BLOB_SCALE_Y_PULSE = 0.16
 /** Blob horizontal stretch amplitude. */
 const LAVA_LAMP_BLOB_SCALE_XZ_PULSE = 0.08
 
+/** Runtime recolor parameters for a purchased habitat interior theme. */
+export interface LavaLampTheme {
+  /** Transparent glass shell tint from the active habitat interior theme. */
+  readonly glassColor: THREE.ColorRepresentation
+  /** Emissive liquid core and pool color from the active habitat interior theme. */
+  readonly liquidColor: THREE.ColorRepresentation
+  /** Secondary wax blob color from the active habitat interior theme. */
+  readonly hotBlobColor: THREE.ColorRepresentation
+  /** Point-light color emitted by the lamp. */
+  readonly lightColor: THREE.ColorRepresentation
+}
+
 /** Runtime state for one animated wax blob inside the procedural lava lamp. */
 interface LavaLampBlob {
   /** Mesh being animated inside the glass chamber. */
@@ -128,6 +140,15 @@ export class LavaLampModel {
 
   /** Animated wax blob meshes and their motion parameters. */
   private readonly blobs: LavaLampBlob[] = []
+
+  /** Transparent shell materials recolored by habitat interior themes. */
+  private readonly glassMaterials: THREE.MeshPhysicalMaterial[] = []
+
+  /** Liquid core and pool materials recolored by habitat interior themes. */
+  private readonly liquidMaterials: THREE.MeshBasicMaterial[] = []
+
+  /** Wax blob materials recolored by habitat interior themes. */
+  private readonly blobMaterials: THREE.MeshBasicMaterial[] = []
 
   /** Local point light that sells the lamp as an active glowing prop. */
   private readonly glowLight: THREE.PointLight
@@ -168,6 +189,29 @@ export class LavaLampModel {
       box.max.y + LAVA_LAMP_BED_TOP_CLEARANCE,
       center.z + LAVA_LAMP_BED_OFFSET_Z,
     )
+  }
+
+  /**
+   * Recolor the glass shell, liquid core, wax blobs, and glow light from a habitat theme.
+   *
+   * @param theme - Runtime lava lamp colors derived from the active habitat paintjob.
+   */
+  applyTheme(theme: LavaLampTheme): void {
+    for (const material of this.glassMaterials) {
+      material.color.set(theme.glassColor)
+      material.needsUpdate = true
+    }
+    for (const material of this.liquidMaterials) {
+      material.color.set(theme.liquidColor)
+      material.needsUpdate = true
+    }
+    for (let i = 0; i < this.blobMaterials.length; i += 1) {
+      const material = this.blobMaterials[i]
+      if (!material) continue
+      material.color.set(i % 2 === 0 ? theme.hotBlobColor : theme.liquidColor)
+      material.needsUpdate = true
+    }
+    this.glowLight.color.set(theme.lightColor)
   }
 
   /**
@@ -259,19 +303,18 @@ export class LavaLampModel {
       new THREE.Vector2(0.092, LAVA_LAMP_GLASS_BOTTOM_Y + LAVA_LAMP_GLASS_HEIGHT * 0.5),
       new THREE.Vector2(0.072, LAVA_LAMP_GLASS_TOP_Y),
     ]
-    const glass = new THREE.Mesh(
-      new THREE.LatheGeometry(points, LAVA_LAMP_LATHE_SEGMENTS),
-      new THREE.MeshPhysicalMaterial({
-        color: LAVA_LAMP_GLASS_COLOR,
-        transparent: true,
-        opacity: LAVA_LAMP_GLASS_OPACITY,
-        roughness: LAVA_LAMP_GLASS_ROUGHNESS,
-        metalness: 0,
-        transmission: 0.35,
-        envMapIntensity: LAVA_LAMP_GLASS_ENV_MAP_INTENSITY,
-        depthWrite: false,
-      }),
-    )
+    const material = new THREE.MeshPhysicalMaterial({
+      color: LAVA_LAMP_GLASS_COLOR,
+      transparent: true,
+      opacity: LAVA_LAMP_GLASS_OPACITY,
+      roughness: LAVA_LAMP_GLASS_ROUGHNESS,
+      metalness: 0,
+      transmission: 0.35,
+      envMapIntensity: LAVA_LAMP_GLASS_ENV_MAP_INTENSITY,
+      depthWrite: false,
+    })
+    this.glassMaterials.push(material)
+    const glass = new THREE.Mesh(new THREE.LatheGeometry(points, LAVA_LAMP_LATHE_SEGMENTS), material)
     this.group.add(glass)
   }
 
@@ -284,6 +327,7 @@ export class LavaLampModel {
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
+    this.liquidMaterials.push(material)
     const core = new THREE.Mesh(
       new THREE.CylinderGeometry(
         LAVA_LAMP_POOL_RADIUS * 0.78,
@@ -296,6 +340,8 @@ export class LavaLampModel {
     core.position.y = LAVA_LAMP_GLASS_BOTTOM_Y + LAVA_LAMP_GLASS_HEIGHT * 0.5
     this.group.add(core)
 
+    const poolMaterial = material.clone()
+    this.liquidMaterials.push(poolMaterial)
     const pool = new THREE.Mesh(
       new THREE.CylinderGeometry(
         LAVA_LAMP_POOL_RADIUS,
@@ -303,7 +349,7 @@ export class LavaLampModel {
         LAVA_LAMP_POOL_HEIGHT,
         LAVA_LAMP_RADIAL_SEGMENTS,
       ),
-      material.clone(),
+      poolMaterial,
     )
     pool.position.y = LAVA_LAMP_POOL_Y
     this.group.add(pool)
@@ -314,19 +360,21 @@ export class LavaLampModel {
     for (let i = 0; i < LAVA_LAMP_BLOB_COUNT; i += 1) {
       const phase = i * LAVA_LAMP_BLOB_PHASE_STEP
       const warm = i % 2 === 0
+      const material = new THREE.MeshBasicMaterial({
+        color: warm ? LAVA_LAMP_HOT_BLOB_COLOR : LAVA_LAMP_LIQUID_COLOR,
+        transparent: true,
+        opacity: 0.86,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+      this.blobMaterials.push(material)
       const mesh = new THREE.Mesh(
         new THREE.SphereGeometry(
           LAVA_LAMP_BLOB_RADIUS,
           LAVA_LAMP_BLOB_SEGMENTS,
           LAVA_LAMP_BLOB_SEGMENTS,
         ),
-        new THREE.MeshBasicMaterial({
-          color: warm ? LAVA_LAMP_HOT_BLOB_COLOR : LAVA_LAMP_LIQUID_COLOR,
-          transparent: true,
-          opacity: 0.86,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        }),
+        material,
       )
       const baseY = LAVA_LAMP_BLOB_MIN_Y + (i / (LAVA_LAMP_BLOB_COUNT - 1)) * LAVA_LAMP_BLOB_Y_RANGE
       const baseX = Math.sin(phase) * LAVA_LAMP_BLOB_HORIZONTAL_DRIFT

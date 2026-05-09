@@ -107,6 +107,28 @@ describe('cosmetic purchases', () => {
     expect(profile.cosmetics!.ownedOptionIds).toContain(factoryId!)
   })
 
+  it('charges 25k once for habitat interior paint and free-applies owned themes', () => {
+    let profile = addCredits(createProfile('Decorator'), 100_000)
+    const defaultId = profile.cosmetics!.habitatInteriorId
+    const target = getCosmeticOptions('habitat-interior').find((row) => row.id !== defaultId)
+    expect(target).toBeTruthy()
+    expect(target!.price).toBe(25_000)
+
+    const baseline = profile.credits
+    const bought = purchaseCosmeticOption(profile, target!.id)
+    expect(bought.ok).toBe(true)
+    profile = (bought as PurchasedCosmetic).profile
+    expect(profile.credits).toBe(baseline - target!.price)
+    expect(profile.cosmetics!.habitatInteriorId).toBe(target!.id)
+
+    const creditsAfterBuy = profile.credits
+    const reverted = applyOwnedCosmetic(profile, defaultId)
+    expect(reverted.ok).toBe(true)
+    profile = (reverted as PurchasedCosmetic).profile
+    expect(profile.credits).toBe(creditsAfterBuy)
+    expect(profile.cosmetics!.habitatInteriorId).toBe(defaultId)
+  })
+
   it('routes title registry rows away from generic cosmetic purchase', () => {
     const blocked = purchaseCosmeticOption(createProfile('X'), SHUTTLE_TITLE_SERVICE_OPTION_ID)
     expect(blocked).toMatchObject({ ok: false, reason: 'shuttle-title-use-rename' })

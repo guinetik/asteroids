@@ -33,6 +33,9 @@ import { HabitatPosterWall } from '@/three/HabitatPosterWall'
 import { HabitatTablePosterRow } from '@/three/HabitatTablePosterRow'
 import { LavaLampModel } from '@/three/LavaLampModel'
 import { HabitatBackdrop, type HabitatBackdropContext } from '@/three/HabitatBackdrop'
+import { findCosmeticOptionById } from '@/lib/cosmetics/catalog'
+import { getPlayerCosmetics } from '@/lib/cosmetics/profileCosmetics'
+import type { PlayerProfile } from '@/lib/player/types'
 
 // ---------------------------------------------------------------------------
 // Constants — no magic numbers
@@ -56,6 +59,60 @@ const GLASS_OPACITY = 0.15
 const GIRDER_COLOR = 0x888888
 /** Colour of the end-cap disc. */
 const CAP_COLOR = 0xaaaaaa
+/** Fallback CSS color for missing habitat theme stops. */
+const HABITAT_THEME_FALLBACK_COLOR = '#dadbd8'
+/** Gradient stop index for the habitat floor color. */
+const HABITAT_THEME_FLOOR_STOP_INDEX = 0
+/** Gradient stop index for the cockpit-hatch wall color. */
+const HABITAT_THEME_HATCH_WALL_STOP_INDEX = 1
+/** Gradient stop index for the table wall color. */
+const HABITAT_THEME_TABLE_WALL_STOP_INDEX = 2
+/** Gradient stop index for the lava lamp liquid color. */
+const HABITAT_THEME_LAMP_STOP_INDEX = 3
+/** Gradient stop index for the lava lamp wax blob color. */
+const HABITAT_THEME_BLOB_STOP_INDEX = 4
+/** Painted interior floor metalness; lower than stock so theme color is not washed into grey. */
+const HABITAT_PAINT_FLOOR_METALNESS = 0.28
+/** Painted interior wall metalness; high enough for plate maps to catch cabin highlights. */
+const HABITAT_PAINT_WALL_METALNESS = 0.42
+/** Painted interior roughness; higher values hold diffuse color instead of mirror-like glare. */
+const HABITAT_PAINT_ROUGHNESS = 0.76
+/** Subtle emissive lift for painted walls so theme colors survive the cool ambient pass. */
+const HABITAT_PAINT_WALL_EMISSIVE_INTENSITY = 0.06
+/** Subtle emissive lift for the deck, kept below the walls so the floor remains grounded. */
+const HABITAT_PAINT_FLOOR_EMISSIVE_INTENSITY = 0.12
+/** Paintable floor albedo map generated from image/textures/checkers/color.jpg. */
+const HABITAT_FLOOR_COLOR_TEXTURE_URL = '/textures/checkers/color.webp'
+/** Paintable floor normal map generated from image/textures/checkers/normal.jpg. */
+const HABITAT_FLOOR_NORMAL_TEXTURE_URL = '/textures/checkers/normal.webp'
+/** Paintable floor roughness map generated from image/textures/checkers/roughness.jpg. */
+const HABITAT_FLOOR_ROUGHNESS_TEXTURE_URL = '/textures/checkers/roughness.webp'
+/** Paintable wall albedo map generated from image/textures/plates/color.jpg. */
+const HABITAT_WALL_COLOR_TEXTURE_URL = '/textures/plates/color.webp'
+/** Paintable wall normal map generated from image/textures/plates/normal.jpg. */
+const HABITAT_WALL_NORMAL_TEXTURE_URL = '/textures/plates/normal.webp'
+/** Paintable wall roughness map generated from image/textures/plates/roughness.jpg. */
+const HABITAT_WALL_ROUGHNESS_TEXTURE_URL = '/textures/plates/roughness.webp'
+/** Paintable wall metalness map generated from image/textures/plates/metalness.jpg. */
+const HABITAT_WALL_METALNESS_TEXTURE_URL = '/textures/plates/metalness.webp'
+/** Paintable wall height map generated from image/textures/plates/displacement.jpg. */
+const HABITAT_WALL_DISPLACEMENT_TEXTURE_URL = '/textures/plates/displacement.webp'
+/** Number of checker repeats across the habitat floor width. */
+const HABITAT_FLOOR_TEXTURE_REPEAT_X = 5
+/** Number of checker repeats down the habitat floor length. */
+const HABITAT_FLOOR_TEXTURE_REPEAT_Y = 8
+/** Number of wall-plate repeats across each end-cap wall. */
+const HABITAT_WALL_TEXTURE_REPEAT_X = 1.35
+/** Number of wall-plate repeats up each end-cap wall. */
+const HABITAT_WALL_TEXTURE_REPEAT_Y = 0.9
+/** Floor normal-map strength in tangent space. */
+const HABITAT_FLOOR_NORMAL_SCALE = 0.28
+/** Wall normal-map strength in tangent space. */
+const HABITAT_WALL_NORMAL_SCALE = 0.85
+/** Wall bump-map strength from the plates displacement source. */
+const HABITAT_WALL_BUMP_SCALE = 0.12
+/** Small anisotropy lift for shallow floor viewing angles. */
+const HABITAT_PAINT_TEXTURE_ANISOTROPY = 4
 /** Number of star points in the background starfield. */
 const STAR_COUNT = 2000
 /** Radius of the sphere on which stars are placed. */
@@ -747,6 +804,21 @@ export class HabitatInteriorScene {
   /** Procedural animated lava lamp placed on the raised bed rail. */
   private readonly lavaLamp = new LavaLampModel()
 
+  /** Loader for paintable habitat interior PBR texture maps. */
+  private readonly habitatTextureLoader = new THREE.TextureLoader()
+
+  /** Texture maps owned by this scene and released on dispose. */
+  private readonly habitatTextureMaps: THREE.Texture[] = []
+
+  /** Paintable habitat floor material. */
+  private habitatFloorMaterial: THREE.MeshStandardMaterial | null = null
+
+  /** Paintable cockpit-hatch wall material on the back cap. */
+  private habitatHatchWallMaterial: THREE.MeshStandardMaterial | null = null
+
+  /** Paintable table wall material on the front cap. */
+  private habitatTableWallMaterial: THREE.MeshStandardMaterial | null = null
+
   /**
    * Backdrop celestial body visible through the canopy. Smoke-test stage:
    * Earth is hardcoded; future patches will route the docked / nearest-orbit
@@ -971,6 +1043,158 @@ export class HabitatInteriorScene {
   /** Returns the scene graph. */
   getScene(): THREE.Scene {
     return this.scene
+  }
+
+  /**
+   * Apply the active habitat interior cosmetic from a player profile. Theme stop order:
+   * floor, hatch wall, table wall, lava lamp liquid, lava lamp wax.
+   *
+   * @param profile - Active player profile containing persisted cosmetics.
+   */
+  applyHabitatInteriorFromProfile(profile: PlayerProfile): void {
+    const cosmetics = getPlayerCosmetics(profile)
+    const option = findCosmeticOptionById(cosmetics.habitatInteriorId)
+    if (!option || option.category !== 'habitat-interior') return
+    const stops = option.gradientStops
+    const floor = stops[HABITAT_THEME_FLOOR_STOP_INDEX] ?? HABITAT_THEME_FALLBACK_COLOR
+    const hatchWall = stops[HABITAT_THEME_HATCH_WALL_STOP_INDEX] ?? floor
+    const tableWall = stops[HABITAT_THEME_TABLE_WALL_STOP_INDEX] ?? hatchWall
+    const lamp = stops[HABITAT_THEME_LAMP_STOP_INDEX] ?? tableWall
+    const blob = stops[HABITAT_THEME_BLOB_STOP_INDEX] ?? lamp
+
+    this.applyHabitatPaintMaterial(this.habitatFloorMaterial, floor, {
+      emissiveIntensity: HABITAT_PAINT_FLOOR_EMISSIVE_INTENSITY,
+      metalness: HABITAT_PAINT_FLOOR_METALNESS,
+    })
+    this.applyHabitatPaintMaterial(this.habitatHatchWallMaterial, hatchWall, {
+      emissiveIntensity: HABITAT_PAINT_WALL_EMISSIVE_INTENSITY,
+      metalness: HABITAT_PAINT_WALL_METALNESS,
+    })
+    this.applyHabitatPaintMaterial(this.habitatTableWallMaterial, tableWall, {
+      emissiveIntensity: HABITAT_PAINT_WALL_EMISSIVE_INTENSITY,
+      metalness: HABITAT_PAINT_WALL_METALNESS,
+    })
+    this.lavaLamp.applyTheme({
+      glassColor: lamp,
+      liquidColor: lamp,
+      hotBlobColor: blob,
+      lightColor: lamp,
+    })
+  }
+
+  /**
+   * Re-tune a paintable habitat material so catalog colors remain visible under cabin lighting.
+   *
+   * @param material - Paintable material reference captured during scene construction.
+   * @param color - CSS hex color from the active habitat interior cosmetic.
+   * @param finish - Small finish override used to keep walls/floor readable.
+   */
+  private applyHabitatPaintMaterial(
+    material: THREE.MeshStandardMaterial | null,
+    color: string,
+    finish: { readonly emissiveIntensity: number; readonly metalness: number },
+  ): void {
+    if (!material) return
+    material.color.set(color)
+    material.emissive.set(color)
+    material.emissiveIntensity = finish.emissiveIntensity
+    material.metalness = finish.metalness
+    material.roughness = HABITAT_PAINT_ROUGHNESS
+    material.needsUpdate = true
+  }
+
+  /**
+   * Load and configure a tiled habitat texture.
+   *
+   * @param url - Public texture URL generated by the texture build pipeline.
+   * @param colorSpace - Color-space hint for color maps vs data maps.
+   * @param repeatX - Horizontal repeat count.
+   * @param repeatY - Vertical repeat count.
+   * @returns The configured texture, owned by this scene.
+   */
+  private loadHabitatTexture(
+    url: string,
+    colorSpace: THREE.ColorSpace,
+    repeatX: number,
+    repeatY: number,
+  ): THREE.Texture {
+    const texture = this.habitatTextureLoader.load(url)
+    texture.colorSpace = colorSpace
+    texture.wrapS = THREE.RepeatWrapping
+    texture.wrapT = THREE.RepeatWrapping
+    texture.repeat.set(repeatX, repeatY)
+    texture.anisotropy = HABITAT_PAINT_TEXTURE_ANISOTROPY
+    this.habitatTextureMaps.push(texture)
+    return texture
+  }
+
+  /**
+   * Add checker PBR maps to the deck while leaving catalog theme color as a tint.
+   *
+   * @param material - Paintable floor material created by {@link buildFloor}.
+   */
+  private applyHabitatFloorTextureMaps(material: THREE.MeshStandardMaterial): void {
+    material.map = this.loadHabitatTexture(
+      HABITAT_FLOOR_COLOR_TEXTURE_URL,
+      THREE.SRGBColorSpace,
+      HABITAT_FLOOR_TEXTURE_REPEAT_X,
+      HABITAT_FLOOR_TEXTURE_REPEAT_Y,
+    )
+    material.normalMap = this.loadHabitatTexture(
+      HABITAT_FLOOR_NORMAL_TEXTURE_URL,
+      THREE.NoColorSpace,
+      HABITAT_FLOOR_TEXTURE_REPEAT_X,
+      HABITAT_FLOOR_TEXTURE_REPEAT_Y,
+    )
+    material.roughnessMap = this.loadHabitatTexture(
+      HABITAT_FLOOR_ROUGHNESS_TEXTURE_URL,
+      THREE.NoColorSpace,
+      HABITAT_FLOOR_TEXTURE_REPEAT_X,
+      HABITAT_FLOOR_TEXTURE_REPEAT_Y,
+    )
+    material.normalScale.set(HABITAT_FLOOR_NORMAL_SCALE, HABITAT_FLOOR_NORMAL_SCALE)
+    material.needsUpdate = true
+  }
+
+  /**
+   * Add plate PBR maps to an end-cap wall while leaving catalog theme color as a tint.
+   *
+   * @param material - Paintable wall material created by {@link buildCylinder}.
+   */
+  private applyHabitatWallTextureMaps(material: THREE.MeshStandardMaterial): void {
+    material.map = this.loadHabitatTexture(
+      HABITAT_WALL_COLOR_TEXTURE_URL,
+      THREE.SRGBColorSpace,
+      HABITAT_WALL_TEXTURE_REPEAT_X,
+      HABITAT_WALL_TEXTURE_REPEAT_Y,
+    )
+    material.normalMap = this.loadHabitatTexture(
+      HABITAT_WALL_NORMAL_TEXTURE_URL,
+      THREE.NoColorSpace,
+      HABITAT_WALL_TEXTURE_REPEAT_X,
+      HABITAT_WALL_TEXTURE_REPEAT_Y,
+    )
+    material.roughnessMap = this.loadHabitatTexture(
+      HABITAT_WALL_ROUGHNESS_TEXTURE_URL,
+      THREE.NoColorSpace,
+      HABITAT_WALL_TEXTURE_REPEAT_X,
+      HABITAT_WALL_TEXTURE_REPEAT_Y,
+    )
+    material.metalnessMap = this.loadHabitatTexture(
+      HABITAT_WALL_METALNESS_TEXTURE_URL,
+      THREE.NoColorSpace,
+      HABITAT_WALL_TEXTURE_REPEAT_X,
+      HABITAT_WALL_TEXTURE_REPEAT_Y,
+    )
+    material.bumpMap = this.loadHabitatTexture(
+      HABITAT_WALL_DISPLACEMENT_TEXTURE_URL,
+      THREE.NoColorSpace,
+      HABITAT_WALL_TEXTURE_REPEAT_X,
+      HABITAT_WALL_TEXTURE_REPEAT_Y,
+    )
+    material.bumpScale = HABITAT_WALL_BUMP_SCALE
+    material.normalScale.set(HABITAT_WALL_NORMAL_SCALE, HABITAT_WALL_NORMAL_SCALE)
+    material.needsUpdate = true
   }
 
   /**
@@ -1362,6 +1586,8 @@ export class HabitatInteriorScene {
         mats.forEach((m) => m.dispose())
       }
     })
+    this.habitatTextureMaps.forEach((texture) => texture.dispose())
+    this.habitatTextureMaps.length = 0
   }
 
   /**
@@ -1542,15 +1768,19 @@ export class HabitatInteriorScene {
     const capGeo = new THREE.ShapeGeometry(capShape, CYLINDER_RADIAL_SEGMENTS)
     const capMat = new THREE.MeshStandardMaterial({
       color: CAP_COLOR,
-      metalness: 0.6,
-      roughness: 0.4,
+      metalness: HABITAT_PAINT_WALL_METALNESS,
+      roughness: HABITAT_PAINT_ROUGHNESS,
       side: THREE.DoubleSide,
     })
+    this.applyHabitatWallTextureMaps(capMat)
+    this.habitatHatchWallMaterial = capMat
     const capBack = new THREE.Mesh(capGeo, capMat)
     capBack.position.set(0, FLOOR_Y, -CYLINDER_LENGTH / 2)
     this.scene.add(capBack)
 
-    const capFront = new THREE.Mesh(capGeo.clone(), capMat.clone())
+    const capFrontMat = capMat.clone()
+    this.habitatTableWallMaterial = capFrontMat
+    const capFront = new THREE.Mesh(capGeo.clone(), capFrontMat)
     capFront.position.set(0, FLOOR_Y, CYLINDER_LENGTH / 2)
     capFront.rotation.y = Math.PI
     this.scene.add(capFront)
@@ -2163,9 +2393,11 @@ export class HabitatInteriorScene {
     const floorGeo = new THREE.BoxGeometry(floorWidth, FLOOR_THICKNESS, CYLINDER_LENGTH)
     const floorMat = new THREE.MeshStandardMaterial({
       color: 0xdadbd8,
-      roughness: 0.4,
-      metalness: 0.85,
+      roughness: HABITAT_PAINT_ROUGHNESS,
+      metalness: HABITAT_PAINT_FLOOR_METALNESS,
     })
+    this.applyHabitatFloorTextureMaps(floorMat)
+    this.habitatFloorMaterial = floorMat
     const floor = new THREE.Mesh(floorGeo, floorMat)
     // Top face flush with FLOOR_Y so all walking math (player + NPCs) stays unchanged.
     floor.position.y = FLOOR_Y - FLOOR_THICKNESS / 2

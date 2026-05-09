@@ -55,6 +55,9 @@ function applyOptionToProfile(profile: PlayerProfile, optionId: string): PlayerP
   if (option.category === 'multitool-paintjob') {
     return withCosmetics(profile, { ...next, multitoolPaintjobId: optionId })
   }
+  if (option.category === 'habitat-interior') {
+    return withCosmetics(profile, { ...next, habitatInteriorId: optionId })
+  }
   return profile
 }
 
@@ -89,7 +92,9 @@ export function purchaseCosmeticOption(
               ? cosmetics.shuttleThrusterTrailId
               : option.category === 'lander-thruster-trail'
                 ? cosmetics.landerThrusterTrailId
-                : cosmetics.multitoolPaintjobId
+                : option.category === 'multitool-paintjob'
+                  ? cosmetics.multitoolPaintjobId
+                  : cosmetics.habitatInteriorId
 
     if (activeId === optionId) {
       return { ok: false, profile, reason: 'already-active' }
@@ -144,7 +149,9 @@ export function applyOwnedCosmetic(
             ? cosmetics.shuttleThrusterTrailId
             : option.category === 'lander-thruster-trail'
               ? cosmetics.landerThrusterTrailId
-              : cosmetics.multitoolPaintjobId
+              : option.category === 'multitool-paintjob'
+                ? cosmetics.multitoolPaintjobId
+                : cosmetics.habitatInteriorId
 
   if (activeId === optionId) {
     return { ok: false, profile, reason: 'already-active' }

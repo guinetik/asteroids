@@ -199,6 +199,7 @@ export class MapHabitatFacade {
     const next = new HabitatInteriorScene()
     next.setUnlockedAchievementIds(deps?.getUnlockedAchievementIds() ?? [])
     next.setBackdropContext(deps?.getHabitatBackdropContext() ?? null)
+    if (deps) next.applyHabitatInteriorFromProfile(deps.getProfile())
     await next.load()
     next.onInteract = (target) => {
       if (target === 'table') {
@@ -404,6 +405,15 @@ export class MapHabitatFacade {
    */
   setUnlockedAchievementIds(unlockedAchievementIds: readonly string[]): void {
     this.scene?.setUnlockedAchievementIds(unlockedAchievementIds)
+  }
+
+  /**
+   * Push the active habitat interior paintjob into the live scene, when it has been loaded.
+   *
+   * @param profile - Active player profile after a cosmetic purchase or apply action.
+   */
+  applyHabitatInteriorFromProfile(profile: PlayerProfile): void {
+    this.scene?.applyHabitatInteriorFromProfile(profile)
   }
 
   /** Per-frame transition tick — swaps composer scene + runs the wake-up animation. */

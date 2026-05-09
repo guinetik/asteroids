@@ -23,6 +23,7 @@ export type CosmeticCategory =
   | 'shuttle-thruster-trail'
   | 'lander-thruster-trail'
   | 'multitool-paintjob'
+  | 'habitat-interior'
 
 /**
  * Per-channel paint finish for a {@link CosmeticOptionData}. Every field is

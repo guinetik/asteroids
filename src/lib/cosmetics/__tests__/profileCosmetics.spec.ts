@@ -25,10 +25,13 @@ describe('profile cosmetics helpers', () => {
     const defaults = createDefaultPlayerCosmetics()
     expect(defaults.ownedOptionIds.length).toBeGreaterThan(0)
     expect(defaults.shuttlePaintjobId).toContain('shuttle-paintjob')
+    expect(defaults.habitatInteriorId).toContain('habitat-interior')
+    expect(defaults.ownedOptionIds).toContain(defaults.habitatInteriorId)
   })
 
   it('salvages malformed owned lists by restoring catalog defaults', () => {
     const partial = normalizePlayerCosmetics({ ownedOptionIds: ['not-a-real-option'] })
     expect(partial.shuttlePaintjobId).toContain('shuttle')
+    expect(partial.ownedOptionIds).toContain(partial.habitatInteriorId)
   })
 })

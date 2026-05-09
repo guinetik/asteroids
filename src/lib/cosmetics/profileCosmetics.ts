@@ -40,6 +40,7 @@ export function createDefaultPlayerCosmetics(): PlayerCosmetics {
   const shuttleThrusterTrailId = firstOptionIdForCategory('shuttle-thruster-trail')
   const landerThrusterTrailId = firstOptionIdForCategory('lander-thruster-trail')
   const multitoolPaintjobId = firstOptionIdForCategory('multitool-paintjob')
+  const habitatInteriorId = firstOptionIdForCategory('habitat-interior')
 
   const starterOwned = [
     shuttlePaintjobId,
@@ -48,6 +49,7 @@ export function createDefaultPlayerCosmetics(): PlayerCosmetics {
     shuttleThrusterTrailId,
     landerThrusterTrailId,
     multitoolPaintjobId,
+    habitatInteriorId,
   ]
 
   return {
@@ -59,6 +61,7 @@ export function createDefaultPlayerCosmetics(): PlayerCosmetics {
     shuttleThrusterTrailId,
     landerThrusterTrailId,
     multitoolPaintjobId,
+    habitatInteriorId,
   }
 }
 
@@ -149,6 +152,7 @@ export function normalizePlayerCosmetics(cosmetics: unknown): PlayerCosmetics {
     shuttleThrusterTrailId: readId('shuttleThrusterTrailId', defaults.shuttleThrusterTrailId),
     landerThrusterTrailId: readId('landerThrusterTrailId', defaults.landerThrusterTrailId),
     multitoolPaintjobId: readId('multitoolPaintjobId', defaults.multitoolPaintjobId),
+    habitatInteriorId: readId('habitatInteriorId', defaults.habitatInteriorId),
   }
 
   /**
@@ -162,6 +166,7 @@ export function normalizePlayerCosmetics(cosmetics: unknown): PlayerCosmetics {
     merged.shuttleThrusterTrailId,
     merged.landerThrusterTrailId,
     merged.multitoolPaintjobId,
+    merged.habitatInteriorId,
   ]
 
   let nextOwned = merged.ownedOptionIds
@@ -199,5 +204,6 @@ export function getActiveCosmeticOptionId(
   if (category === 'shuttle-thruster-trail') return cosmetics.shuttleThrusterTrailId
   if (category === 'lander-thruster-trail') return cosmetics.landerThrusterTrailId
   if (category === 'multitool-paintjob') return cosmetics.multitoolPaintjobId
+  if (category === 'habitat-interior') return cosmetics.habitatInteriorId
   return undefined
 }

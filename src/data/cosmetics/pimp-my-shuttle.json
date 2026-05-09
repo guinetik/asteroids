@@ -335,6 +335,54 @@
       }
     },
     {
+      "id": "habitat-interior-factory-stock",
+      "category": "habitat-interior",
+      "label": "Factory Cabin",
+      "description": "Plain service-bay deck, cool hatch wall, warm table bulkhead, and regulation lava-lamp glow.",
+      "price": 0,
+      "gradientStops": ["#dadbd8", "#aaaaaa", "#b8c0ca", "#ff3f88", "#ffb347"]
+    },
+    {
+      "id": "habitat-interior-neon-nocturne",
+      "category": "habitat-interior",
+      "label": "Neon Nocturne",
+      "description": "Dark studio deck, violet hatch wall, cobalt mess bulkhead, hot-pink lamp wax, arcade-blue bounce.",
+      "price": 25000,
+      "gradientStops": ["#111827", "#4c1d95", "#1d4ed8", "#f472b6", "#38bdf8"]
+    },
+    {
+      "id": "habitat-interior-mars-motel",
+      "category": "habitat-interior",
+      "label": "Mars Motel",
+      "description": "Dust-red deck, clay hatch wall, sun-faded table bulkhead, amber lamp fluid, peach wax blobs.",
+      "price": 25000,
+      "gradientStops": ["#7f1d1d", "#b45309", "#f59e0b", "#fb923c", "#fed7aa"]
+    },
+    {
+      "id": "habitat-interior-europa-sleeper",
+      "category": "habitat-interior",
+      "label": "Europa Sleeper",
+      "description": "Icy rubber flooring, pale cyan hatch wall, deep teal table wall, glacier lamp liquid, white-hot wax.",
+      "price": 25000,
+      "gradientStops": ["#e0f2fe", "#67e8f9", "#0f766e", "#22d3ee", "#f8fafc"]
+    },
+    {
+      "id": "habitat-interior-saturn-salon",
+      "category": "habitat-interior",
+      "label": "Saturn Salon",
+      "description": "Champagne deck, ring-dust hatch wall, midnight table bulkhead, gold lamp glow, pearl wax beads.",
+      "price": 25000,
+      "gradientStops": ["#fef3c7", "#a8a29e", "#1e293b", "#facc15", "#fff7ed"]
+    },
+    {
+      "id": "habitat-interior-green-room",
+      "category": "habitat-interior",
+      "label": "Green Room",
+      "description": "Black rubber stage floor, bottle-green hatch wall, ivory table wall, acid lamp fluid, mint wax sparks.",
+      "price": 25000,
+      "gradientStops": ["#18181b", "#14532d", "#fefce8", "#84cc16", "#bbf7d0"]
+    },
+    {
       "id": "shuttle-title-registry",
       "category": "shuttle-title",
       "label": "Hull Title Registry",

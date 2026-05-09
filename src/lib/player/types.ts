@@ -81,6 +81,8 @@ export interface PlayerCosmetics {
   readonly landerThrusterTrailId: string
   /** Active multitool paint row id (future binding). */
   readonly multitoolPaintjobId: string
+  /** Active habitat interior paint row id. */
+  readonly habitatInteriorId: string
 }
 
 /** Player save data persisted to localStorage. */
