@@ -89,6 +89,8 @@ const HIT_FLASH_DURATION = 0.08
 const HIT_RECOIL_DURATION = 0.25
 const HIT_RECOIL_INTENSITY = 0.14
 const DEATH_ANIM_DURATION = 1.35
+/** World Y where retired controllers park so their meshes frustum-cull. */
+const RETIRE_PARK_Y = -10_000
 /** Default walker eye/hair feature color. */
 const CHIMERA_DEFAULT_FEATURE = 0xff2200
 /** Brighter default walker hair-tip feature color. */
@@ -169,7 +171,12 @@ interface ChimeraTentacle {
  */
 export class ChimeraWalkerController implements Tickable {
   readonly group = new THREE.Group()
-  readonly enemy: Enemy
+  /**
+   * Domain enemy entity this controller visualizes. Mutable so the
+   * controller can be retired into a pool and recycled with a freshly
+   * spawned enemy.
+   */
+  enemy: Enemy
 
   private readonly bodyGroup = new THREE.Group()
   private readonly legsGroup = new THREE.Group()
@@ -399,6 +406,53 @@ export class ChimeraWalkerController implements Tickable {
     }
 
     this.tickAstronautRider(t)
+  }
+
+  /**
+   * Retire this controller into a pool slot. Hides the visual group and
+   * resets transient animation state so a future {@link recycle} can rebind
+   * a fresh enemy without re-running the constructor (which allocates ~68
+   * THREE objects — the source of disturbance spawn hitches).
+   */
+  retire(): void {
+    this.enemy.onDeath = null
+    this.dead = false
+    this.deathTimer = 0
+    this.flashTimer = 0
+    this.recoilTimer = 0
+    this.eyeLaserFlashTimer = 0
+    this.legGeometryTimer = 0
+    this.tentacleGeometryTimer = 0
+    this.elapsed = 0
+    this.isMoving = false
+    this.isAgitated = false
+    this.lodSkipGeometry = false
+    this.headMembrane.material = this.headMembraneMat
+    this.headMembrane.scale.setScalar(1)
+    this.leftEye.material = this.leftEyeMat
+    this.rightEye.material = this.rightEyeMat
+    this.headCore.scale.setScalar(1)
+    this.dnaCore.scale.setScalar(1)
+    this.rnaCore.scale.setScalar(1)
+    this.bodyGroup.position.set(0, 0, 0)
+    this.bodyGroup.rotation.set(0, 0, 0)
+    this.headGroup.position.set(0, 0, 0)
+    this.headGroup.rotation.set(0, 0, 0)
+    this.group.scale.setScalar(CHIMERA_SCALE)
+    this.group.rotation.set(0, 0, 0)
+    // See BacteriophageController.retire — toggling `visible` would mutate
+    // `NUM_POINT_LIGHTS` and recompile every lit material. Park instead.
+    this.group.position.set(0, RETIRE_PARK_Y, 0)
+  }
+
+  /**
+   * Bind a freshly spawned enemy to this pooled controller.
+   *
+   * @param enemy - New domain enemy to drive this controller.
+   */
+  recycle(enemy: Enemy): void {
+    this.enemy = enemy
+    this.enemy.onDeath = () => this.die()
   }
 
   /** Flash the head membrane magenta and apply recoil. */

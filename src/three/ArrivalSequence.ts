@@ -1066,11 +1066,26 @@ export class ArrivalSequence {
     this.exfilFloodlight?.target.updateMatrixWorld()
   }
 
+  /**
+   * Toggle floodlight emission via intensity rather than `visible`. Flipping
+   * the light's visibility changes Three.js's active-light count, which forces
+   * every lit material in the scene to recompile its shader on the next
+   * frame — a multi-hundred-millisecond hitch each time the cargo doors
+   * open or close. Keeping the light permanently in the scene with intensity
+   * scaled by the door progress preserves the cone fade-in without the
+   * recompile spike. The cone mesh is a plain transparent mesh, so its
+   * visibility flip is free.
+   */
   private updateExfilFloodlightVisibility(): void {
-    const visible = this.doorProgress > 0.02
-    if (this.exfilFloodlight) this.exfilFloodlight.visible = visible
-    if (this.exfilFloodlightTarget) this.exfilFloodlightTarget.visible = visible
-    if (this.exfilFloodlightCone) this.exfilFloodlightCone.visible = visible
+    const lit = Math.max(0, Math.min(1, (this.doorProgress - 0.02) / (1 - 0.02)))
+    if (this.exfilFloodlight) {
+      this.exfilFloodlight.intensity = EXFIL_FLOODLIGHT_INTENSITY * lit
+    }
+    if (this.exfilFloodlightCone) {
+      this.exfilFloodlightCone.visible = lit > 0
+      const material = this.exfilFloodlightCone.material as THREE.MeshBasicMaterial
+      material.opacity = EXFIL_FLOODLIGHT_CONE_OPACITY * lit
+    }
   }
 
   private createThrusterTexture(): THREE.CanvasTexture {

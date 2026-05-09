@@ -441,11 +441,34 @@ function dismissTopMissionTip(): boolean {
   return true
 }
 
+const EXFIL_TRACKER_ID = 'exfil'
+
+function getMissionTrackerObjectives(): ObjectiveTrackerEntry[] {
+  return trackerObjectives.value.filter((o) => o.id !== EXFIL_TRACKER_ID)
+}
+
 function areTrackerObjectivesComplete(): boolean {
-  return (
-    trackerObjectives.value.length > 0 &&
-    trackerObjectives.value.every((objective) => objective.complete)
-  )
+  const mission = getMissionTrackerObjectives()
+  return mission.length > 0 && mission.every((objective) => objective.complete)
+}
+
+function ensureExfilTrackerEntry(): void {
+  if (trackerObjectives.value.some((o) => o.id === EXFIL_TRACKER_ID)) return
+  trackerObjectives.value = [
+    ...trackerObjectives.value,
+    {
+      id: EXFIL_TRACKER_ID,
+      label: 'EXFILTRATE',
+      complete: false,
+      steps: [
+        {
+          label: 'Board lander, fly to shuttle, dock with F',
+          complete: false,
+          active: true,
+        },
+      ],
+    },
+  ]
 }
 
 function handleLanderEntryTips(previousState: string, nextState: string): void {
@@ -691,8 +714,11 @@ onMounted(async () => {
         obj.complete = true
         objCompleteLabel.value = obj.label
       }
-      if (stateInfo.state === 'lander' && areTrackerObjectivesComplete()) {
-        pushRuntimeMissionTip('landerObjectiveExfil')
+      if (areTrackerObjectivesComplete()) {
+        ensureExfilTrackerEntry()
+        if (stateInfo.state === 'lander') {
+          pushRuntimeMissionTip('landerObjectiveExfil')
+        }
       }
       objCompleteVisible.value = true
       Timer.after(5, () => {

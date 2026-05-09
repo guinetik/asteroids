@@ -44,6 +44,8 @@ const HIT_FLASH_DURATION = 0.08
 const HIT_RECOIL_DURATION = 0.25
 const HIT_RECOIL_INTENSITY = 0.15
 const DEATH_ANIM_DURATION = 1.2
+/** World Y where retired controllers park so their meshes frustum-cull. */
+const RETIRE_PARK_Y = -10_000
 
 /**
  * Y offset from group origin to body center (in world units).
@@ -81,7 +83,12 @@ interface LegData {
  */
 export class BacteriophageController implements Tickable {
   readonly group = new THREE.Group()
-  readonly enemy: Enemy
+  /**
+   * Domain enemy entity this controller visualizes. Mutable so the
+   * controller can be retired into a pool and recycled with a freshly
+   * spawned enemy without re-running the full constructor.
+   */
+  enemy: Enemy
 
   private readonly bodyGroup = new THREE.Group()
   private readonly legsGroup = new THREE.Group()
@@ -471,6 +478,49 @@ export class BacteriophageController implements Tickable {
       const curve = this.makeLegCurve(leg.angle, leg.phase, time, isMoving)
       leg.tube.update(curve)
     }
+  }
+
+  /**
+   * Retire this controller into a pool slot. Hides the visual group, clears
+   * the death callback on the bound enemy, and resets transient animation
+   * state so a future {@link recycle} call can rebind a fresh enemy without
+   * re-running the constructor (which would allocate fresh materials,
+   * geometries, and VAOs — the source of disturbance spawn hitches).
+   */
+  retire(): void {
+    this.enemy.onDeath = null
+    this.dead = false
+    this.deathTimer = 0
+    this.flashTimer = 0
+    this.recoilTimer = 0
+    this.legGeometryTimer = 0
+    this.elapsed = 0
+    this.isMoving = false
+    this.isAgitated = false
+    this.lodSkipGeometry = false
+    this.head.material = this.headTronMat
+    this.bodyGroup.position.set(0, 0.8, 0)
+    this.bodyGroup.rotation.set(0, 0, 0)
+    this.core.scale.setScalar(1)
+    this.group.scale.setScalar(PHAGE_SCALE)
+    this.group.rotation.set(0, 0, 0)
+    // Toggling `group.visible` would mutate `NUM_POINT_LIGHTS` (the pooled
+    // body light becomes uncounted), forcing a scene-wide lit-material
+    // recompile on the next spawn. Park the group far below ground instead
+    // so frustum culling drops draw calls while the light stays pinned.
+    this.group.position.set(0, RETIRE_PARK_Y, 0)
+  }
+
+  /**
+   * Bind a freshly spawned enemy to this pooled controller and re-arm it
+   * for the scene. Caller still re-positions {@link group} and re-adds it
+   * to the scene; this method only restores controller-internal state.
+   *
+   * @param enemy - New domain enemy to drive this controller.
+   */
+  recycle(enemy: Enemy): void {
+    this.enemy = enemy
+    this.enemy.onDeath = () => this.die()
   }
 
   /**

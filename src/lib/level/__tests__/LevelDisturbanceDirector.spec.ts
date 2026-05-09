@@ -19,7 +19,7 @@ vi.mock('@/three/BacteriophageController', async () => {
     PHAGE_HIT_CENTER_Y: 1.6,
     BacteriophageController: class MockBacteriophageController {
       readonly group = new THREE.Group()
-      readonly enemy: Enemy
+      enemy: Enemy
       deathComplete = false
       isMoving = false
       isAgitated = false
@@ -31,6 +31,12 @@ vi.mock('@/three/BacteriophageController', async () => {
       flash(): void {}
 
       tick(): void {}
+
+      retire(): void {}
+
+      recycle(enemy: Enemy): void {
+        this.enemy = enemy
+      }
 
       dispose(): void {}
     },
@@ -81,7 +87,9 @@ describe('LevelDisturbanceDirector', () => {
     harness.director.tick(ZERO_SECONDS, createActiveFrameContext())
 
     expect(harness.projectiles.addCalls).toHaveLength(1)
-    expect(harness.scene.children).toHaveLength(1)
+    // Pool prewarms MAX_LIVE_AMBIENT_ENEMIES controllers per archetype at
+    // construction; spawning reuses one of those slots, no scene growth.
+    expect(harness.scene.children).toHaveLength(MAX_LIVE_AMBIENT_ENEMIES)
     expect(harness.projectiles.addCalls[0]?.position.y).toBe(SURFACE_Y + 1.6)
   })
 
@@ -94,10 +102,11 @@ describe('LevelDisturbanceDirector', () => {
     harness.director.tick(PATROL_COOLDOWN_SECONDS, createActiveFrameContext())
 
     expect(harness.projectiles.addCalls).toHaveLength(MAX_LIVE_AMBIENT_ENEMIES)
+    // Scene already holds the prewarmed pool; spawns reuse those slots.
     expect(harness.scene.children).toHaveLength(MAX_LIVE_AMBIENT_ENEMIES)
   })
 
-  it('unregisters spawned enemies and removes scene controllers on liftoff reset', () => {
+  it('unregisters spawned enemies and retires controllers on liftoff reset', () => {
     const harness = createDirectorHarness()
 
     spawnFullResponse(harness.director)
@@ -106,7 +115,9 @@ describe('LevelDisturbanceDirector', () => {
     harness.director.resetForLiftoff()
 
     expect(harness.projectiles.removeCalls).toEqual(spawnedEnemies)
-    expect(harness.scene.children).toHaveLength(0)
+    // Liftoff retires controllers back to the pool (still in scene tree
+    // for warm reuse on the next disturbance event).
+    expect(harness.scene.children).toHaveLength(MAX_LIVE_AMBIENT_ENEMIES)
   })
 
   it('unregisters spawned enemies and clears scene controllers on dispose', () => {

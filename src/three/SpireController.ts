@@ -47,6 +47,8 @@ const HIT_RECOIL_INTENSITY = 0.15
 const DEATH_ANIM_DURATION = 1.2
 const FIRE_FLASH_DURATION = 0.1
 const SPIKE_GRAVITY = 0.003
+/** World Y where retired controllers park so their meshes frustum-cull. */
+const RETIRE_PARK_Y = -10_000
 
 // ── Floaty drift constants ──────────────────────────────────────
 /** How fast the spire lerps toward its target position (lower = floatier). */
@@ -110,6 +112,8 @@ interface SpikeData {
   dir: THREE.Vector3
   /** Rest position on the membrane surface. */
   basePos: THREE.Vector3
+  /** Initial outward-facing rotation set by `lookAt`; cached for pool reset. */
+  baseQuaternion: THREE.Quaternion
   /** Random phase offset for animation variety. */
   phase: number
   /** Bulb mesh — flashed white when firing. */
@@ -131,8 +135,12 @@ interface SpikeData {
 export class SpireController implements Tickable {
   /** Root group — add to scene. Scaled by {@link SPIRE_SCALE}. */
   readonly group = new THREE.Group()
-  /** Domain enemy entity this controller visualizes. */
-  readonly enemy: Enemy
+  /**
+   * Domain enemy entity this controller visualizes. Mutable so the
+   * controller can be retired into a pool and recycled with a freshly
+   * spawned enemy.
+   */
+  enemy: Enemy
 
   private readonly bodyGroup = new THREE.Group()
   private readonly spikesGroup = new THREE.Group()
@@ -147,6 +155,8 @@ export class SpireController implements Tickable {
   private lightsEnabled = true
   /** Membrane shader restored after hit flash. */
   private membraneTronMat!: THREE.ShaderMaterial
+  /** RNA shader restored after death-flash (die() swaps to fireFlashMat). */
+  private rnaTronMat!: THREE.ShaderMaterial
   /** Shared spike bulb shader for fire-flash restore. */
   private bulbTronMat!: THREE.ShaderMaterial
   private readonly tronMaterials: THREE.ShaderMaterial[] = []
@@ -231,7 +241,7 @@ export class SpireController implements Tickable {
   private buildBody(): void {
     this.membraneTronMat = this.makeTron(this.visualPalette.silhouette)
     const coreTron = this.makeTron(SPIRE_TRON_CORE)
-    const rnaTron = this.makeTron(SPIRE_TRON_RNA)
+    this.rnaTronMat = this.makeTron(SPIRE_TRON_RNA)
 
     this.membrane = new THREE.Mesh(membraneGeo, this.membraneTronMat)
     this.bodyGroup.add(this.membrane)
@@ -241,7 +251,7 @@ export class SpireController implements Tickable {
     this.bodyGroup.add(this.core)
 
     // RNA strand inside
-    this.rna = new THREE.Mesh(rnaGeo, rnaTron)
+    this.rna = new THREE.Mesh(rnaGeo, this.rnaTronMat)
     this.bodyGroup.add(this.rna)
 
     // Inner point light (orange/red glow) — borrow a pool slot when available
@@ -290,6 +300,7 @@ export class SpireController implements Tickable {
         group: spikeGroup,
         dir: dir.clone(),
         basePos: surfacePos.clone(),
+        baseQuaternion: spikeGroup.quaternion.clone(),
         phase: Math.random() * Math.PI * 2,
         bulb,
       })
@@ -522,6 +533,56 @@ export class SpireController implements Tickable {
     // Flash RNA white and boost light for initial death burst
     this.rna.material = fireFlashMat
     this.light.intensity = this.lightsEnabled ? 3 : 0
+  }
+
+  /**
+   * Retire this controller into a pool slot. Hides the visual group and
+   * resets transient animation state (death/flash/spike velocities) so a
+   * future {@link recycle} call can rebind a fresh enemy without
+   * reallocating shader materials, geometries, or VAOs.
+   */
+  retire(): void {
+    this.enemy.onDeath = null
+    this.dead = false
+    this.deathTimer = 0
+    this.flashTimer = 0
+    this.recoilTimer = 0
+    this.fireFlashTimer = 0
+    this.fireFlashSpike = null
+    this.elapsed = 0
+    this.isMoving = false
+    this.isAgitated = false
+    this.membrane.material = this.membraneTronMat
+    this.membrane.scale.setScalar(1)
+    this.core.scale.setScalar(0.7)
+    this.rna.material = this.rnaTronMat
+    this.rna.scale.setScalar(1)
+    this.bodyGroup.position.set(0, 0, 0)
+    this.bodyGroup.rotation.set(0, 0, 0)
+    this.group.scale.setScalar(SPIRE_SCALE)
+    this.group.rotation.set(0, 0, 0)
+    for (const spike of this.spikeData) {
+      spike.group.position.copy(spike.basePos)
+      spike.group.quaternion.copy(spike.baseQuaternion)
+      spike.bulb.material = this.bulbTronMat
+      spike.bulb.position.set(0, 0.44, 0)
+      spike.velocity = undefined
+      spike.rotSpeed = undefined
+    }
+    this.targetPosition.set(0, RETIRE_PARK_Y, 0)
+    // See BacteriophageController.retire — toggling `visible` would mutate
+    // `NUM_POINT_LIGHTS` and recompile every lit material. Park instead.
+    this.group.position.set(0, RETIRE_PARK_Y, 0)
+  }
+
+  /**
+   * Bind a freshly spawned enemy to this pooled controller.
+   *
+   * @param enemy - New domain enemy to drive this controller.
+   */
+  recycle(enemy: Enemy): void {
+    this.enemy = enemy
+    this.enemy.onDeath = () => this.die()
   }
 
   /** Clean up all geometry and instance-owned materials. */

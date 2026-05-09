@@ -11,7 +11,7 @@
  */
 import * as THREE from 'three'
 import { spawnChimeraProjectileBurst } from '@/lib/fps/chimeraProjectileBurst'
-import type { Enemy } from '@/lib/fps/enemy'
+import { Enemy } from '@/lib/fps/enemy'
 import { EnemyDirector, type EnemyHandle } from '@/lib/fps/enemyDirector'
 import { EnemyProjectileSystem } from '@/lib/fps/enemyProjectileSystem'
 import type { ProjectileSystem } from '@/lib/fps/projectileSystem'
@@ -174,6 +174,23 @@ export class LevelDisturbanceDirector {
   private readonly phageControllers = new Map<number, BacteriophageController>()
   private readonly spireControllers = new Map<number, SpireController>()
   private readonly chimeraControllers = new Map<number, ChimeraWalkerController>()
+  /**
+   * Prewarmed free-list pools per archetype. Building a Bacteriophage/Spire/
+   * Chimera controller allocates dozens of fresh ShaderMaterials, geometries,
+   * and (on first draw) VAOs — that one-time cost shows up as a frame hitch
+   * the first time disturbance spawns each archetype on a non-combat mission.
+   * Combat missions don't hitch because their encounter (minigame) builds all
+   * controllers up front. We mirror that by pre-building
+   * {@link MAX_LIVE_AMBIENT_ENEMIES} controllers per allowed archetype, then
+   * pulling from these lists on spawn and retiring back on death/clear.
+   */
+  private readonly phagePool: BacteriophageController[] = []
+  private readonly spirePool: SpireController[] = []
+  private readonly chimeraPool: ChimeraWalkerController[] = []
+  /** Live retained set for full disposal on director teardown. */
+  private readonly allPooledControllers: Array<
+    BacteriophageController | SpireController | ChimeraWalkerController
+  > = []
   private readonly chimeraLaserMuzzleScratch = new THREE.Vector3()
   /** Unsubscribe handles for ambient kill-relief observers (cleared with enemies). */
   private readonly ambientDeathUnsubs = new Map<number, () => void>()
@@ -251,6 +268,64 @@ export class LevelDisturbanceDirector {
     this.enemyDirector.onContactDamage = (handle, damage) => {
       this.onDamagePlayer?.(damage, handle.enemy.position.x, handle.enemy.position.z, 'contact')
     }
+
+    this.prewarmControllerPools()
+  }
+
+  /**
+   * Build {@link MAX_LIVE_AMBIENT_ENEMIES} controllers per allowed archetype
+   * up-front and stash them retired (hidden) in the scene. Spawning later
+   * pulls from these pools instead of allocating fresh THREE materials and
+   * geometries — eliminating the spawn-time hitch on non-combat missions
+   * (mining, gravitometry, photometric survey).
+   */
+  private prewarmControllerPools(): void {
+    const visualTier = this.enemyVisualTier
+    for (const kind of this.ambientViroidKinds) {
+      for (let i = 0; i < MAX_LIVE_AMBIENT_ENEMIES; i++) {
+        const stub = new Enemy({ maxHp: 1, hitRadius: 1 })
+        if (kind === 'bacteriophage') {
+          const ctrl = new BacteriophageController(stub, {
+            visualTier,
+            lightPool: this.lightPool,
+          })
+          ctrl.retire()
+          this.scene.add(ctrl.group)
+          this.phagePool.push(ctrl)
+          this.allPooledControllers.push(ctrl)
+        } else if (kind === 'chimera') {
+          const ctrl = new ChimeraWalkerController(stub, {
+            visualTier,
+            lightPool: this.lightPool,
+          })
+          ctrl.retire()
+          this.scene.add(ctrl.group)
+          this.chimeraPool.push(ctrl)
+          this.allPooledControllers.push(ctrl)
+        } else {
+          const ctrl = new SpireController(stub, {
+            visualTier,
+            lightPool: this.lightPool,
+          })
+          ctrl.retire()
+          this.scene.add(ctrl.group)
+          this.spirePool.push(ctrl)
+          this.allPooledControllers.push(ctrl)
+        }
+      }
+    }
+  }
+
+  /**
+   * Subscribe an observer to every ambient viroid this director spawns.
+   * Mirrors the minigame-side hook so the level VC can wire the loot drop
+   * system into disturbance kills without exposing the enemy director.
+   *
+   * @param listener - Receives each freshly created {@link EnemyHandle}.
+   * @returns Unsubscribe function.
+   */
+  installEnemySpawnObserver(listener: (handle: EnemyHandle) => void): () => void {
+    return this.enemyDirector.addSpawnListener(listener)
   }
 
   /**
@@ -355,6 +430,14 @@ export class LevelDisturbanceDirector {
    */
   dispose(): void {
     this.clearAmbientEnemies()
+    for (const ctrl of this.allPooledControllers) {
+      ctrl.group.removeFromParent()
+      ctrl.dispose()
+    }
+    this.allPooledControllers.length = 0
+    this.phagePool.length = 0
+    this.spirePool.length = 0
+    this.chimeraPool.length = 0
     this.enemyProjectileMeshPool.disposeAll()
   }
 
@@ -391,30 +474,57 @@ export class LevelDisturbanceDirector {
       this.attachAmbientKillRelief(handle, kind)
 
       if (kind === 'bacteriophage') {
-        const ctrl = new BacteriophageController(handle.enemy, {
-          visualTier: visualTierArg,
-          lightPool: this.lightPool,
-        })
-        ctrl.group.position.set(position.x, groundY, position.z)
-        this.scene.add(ctrl.group)
-        this.phageControllers.set(handle.id, ctrl)
+        const ctrl = this.phagePool.pop()
+        if (!ctrl) {
+          // Pool exhaustion shouldn't happen — sized to MAX_LIVE_AMBIENT_ENEMIES.
+          // Fall back to a fresh allocation rather than dropping the spawn.
+          const fresh = new BacteriophageController(handle.enemy, {
+            visualTier: visualTierArg,
+            lightPool: this.lightPool,
+          })
+          fresh.group.position.set(position.x, groundY, position.z)
+          this.scene.add(fresh.group)
+          this.phageControllers.set(handle.id, fresh)
+          this.allPooledControllers.push(fresh)
+        } else {
+          ctrl.recycle(handle.enemy)
+          ctrl.group.position.set(position.x, groundY, position.z)
+          this.phageControllers.set(handle.id, ctrl)
+        }
       } else if (kind === 'chimera') {
-        const ctrl = new ChimeraWalkerController(handle.enemy, {
-          visualTier: visualTierArg,
-          lightPool: this.lightPool,
-        })
-        ctrl.group.position.set(position.x, groundY, position.z)
-        this.scene.add(ctrl.group)
-        this.chimeraControllers.set(handle.id, ctrl)
+        const ctrl = this.chimeraPool.pop()
+        if (!ctrl) {
+          const fresh = new ChimeraWalkerController(handle.enemy, {
+            visualTier: visualTierArg,
+            lightPool: this.lightPool,
+          })
+          fresh.group.position.set(position.x, groundY, position.z)
+          this.scene.add(fresh.group)
+          this.chimeraControllers.set(handle.id, fresh)
+          this.allPooledControllers.push(fresh)
+        } else {
+          ctrl.recycle(handle.enemy)
+          ctrl.group.position.set(position.x, groundY, position.z)
+          this.chimeraControllers.set(handle.id, ctrl)
+        }
       } else {
-        const ctrl = new SpireController(handle.enemy, {
-          visualTier: visualTierArg,
-          lightPool: this.lightPool,
-        })
-        ctrl.group.position.set(position.x, groundY + handle.config.floatHeight, position.z)
-        ctrl.targetPosition.set(position.x, groundY + handle.config.floatHeight, position.z)
-        this.scene.add(ctrl.group)
-        this.spireControllers.set(handle.id, ctrl)
+        const ctrl = this.spirePool.pop()
+        if (!ctrl) {
+          const fresh = new SpireController(handle.enemy, {
+            visualTier: visualTierArg,
+            lightPool: this.lightPool,
+          })
+          fresh.group.position.set(position.x, groundY + handle.config.floatHeight, position.z)
+          fresh.targetPosition.set(position.x, groundY + handle.config.floatHeight, position.z)
+          this.scene.add(fresh.group)
+          this.spireControllers.set(handle.id, fresh)
+          this.allPooledControllers.push(fresh)
+        } else {
+          ctrl.recycle(handle.enemy)
+          ctrl.group.position.set(position.x, groundY + handle.config.floatHeight, position.z)
+          ctrl.targetPosition.set(position.x, groundY + handle.config.floatHeight, position.z)
+          this.spireControllers.set(handle.id, ctrl)
+        }
       }
     }
 
@@ -502,7 +612,7 @@ export class LevelDisturbanceDirector {
     if (!ctrl) return
 
     if (ctrl.deathComplete) {
-      this.removeDeadEnemy(handle, ctrl.group, () => ctrl.dispose())
+      this.retireDeadEnemy(handle, ctrl, this.phagePool)
       this.phageControllers.delete(handle.id)
       return
     }
@@ -537,7 +647,7 @@ export class LevelDisturbanceDirector {
     if (!ctrl) return
 
     if (ctrl.deathComplete) {
-      this.removeDeadEnemy(handle, ctrl.group, () => ctrl.dispose())
+      this.retireDeadEnemy(handle, ctrl, this.chimeraPool)
       this.chimeraControllers.delete(handle.id)
       return
     }
@@ -598,7 +708,7 @@ export class LevelDisturbanceDirector {
     if (!ctrl) return
 
     if (ctrl.deathComplete) {
-      this.removeDeadEnemy(handle, ctrl.group, () => ctrl.dispose())
+      this.retireDeadEnemy(handle, ctrl, this.spirePool)
       this.spireControllers.delete(handle.id)
       return
     }
@@ -651,16 +761,26 @@ export class LevelDisturbanceDirector {
     ctrl.tick(dt)
   }
 
-  private removeDeadEnemy(
-    handle: EnemyHandle,
-    group: THREE.Object3D,
-    disposeCtrl: () => void,
-  ): void {
+  /**
+   * Retire a controller back to its archetype pool when its death animation
+   * has played out. The death anim already detached the group from the
+   * scene; re-add it (hidden) so the next pool pop can position it.
+   *
+   * @param handle - Domain handle whose enemy just finished dying.
+   * @param ctrl - Visual controller now ready for reuse.
+   * @param pool - Per-archetype free list to push the controller onto.
+   */
+  private retireDeadEnemy<
+    T extends BacteriophageController | SpireController | ChimeraWalkerController,
+  >(handle: EnemyHandle, ctrl: T, pool: T[]): void {
     this.detachAmbientKillRelief(handle.id)
-    group.removeFromParent()
-    disposeCtrl()
+    ctrl.retire()
+    if (!ctrl.group.parent) {
+      this.scene.add(ctrl.group)
+    }
     this.projectileSystem.removeEnemy(handle.enemy)
     this.enemyDirector.despawn(handle)
+    pool.push(ctrl)
   }
 
   /**
@@ -708,21 +828,27 @@ export class LevelDisturbanceDirector {
       this.projectileSystem.removeEnemy(handle.enemy)
     }
 
+    // Retire live controllers back to their pools instead of disposing —
+    // pool stays warm across liftoff so subsequent disturbance spawns reuse
+    // the same materials and geometries (no fresh shader compiles).
     for (const ctrl of this.phageControllers.values()) {
-      ctrl.group.removeFromParent()
-      ctrl.dispose()
+      ctrl.retire()
+      if (!ctrl.group.parent) this.scene.add(ctrl.group)
+      this.phagePool.push(ctrl)
     }
     this.phageControllers.clear()
 
     for (const ctrl of this.spireControllers.values()) {
-      ctrl.group.removeFromParent()
-      ctrl.dispose()
+      ctrl.retire()
+      if (!ctrl.group.parent) this.scene.add(ctrl.group)
+      this.spirePool.push(ctrl)
     }
     this.spireControllers.clear()
 
     for (const ctrl of this.chimeraControllers.values()) {
-      ctrl.group.removeFromParent()
-      ctrl.dispose()
+      ctrl.retire()
+      if (!ctrl.group.parent) this.scene.add(ctrl.group)
+      this.chimeraPool.push(ctrl)
     }
     this.chimeraControllers.clear()
 
