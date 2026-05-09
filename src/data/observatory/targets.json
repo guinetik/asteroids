@@ -14,7 +14,7 @@
     "ra": "00 42 44.30",
     "dec": "+41 16 09",
     "fovDeg": 3.0,
-    "survey": "P/DSS2/color",
+    "survey": "https://alasky.cds.unistra.fr/DSS/DSSColor",
     "blurb": "Andromeda Galaxy. Two and a half million light-years away, and closing. In about four billion years it will collide with the Milky Way and the night sky will, briefly, have two cores. You will not be there. Neither, statistically, will anyone you know."
   },
   {
@@ -23,7 +23,7 @@
     "ra": "05 35 17.3",
     "dec": "-05 23 28",
     "fovDeg": 1.5,
-    "survey": "P/DSS2/color",
+    "survey": "https://alasky.cds.unistra.fr/DSS/DSSColor",
     "blurb": "Orion Nebula. A stellar nursery, the closest one to Earth, twenty-four light-years across and visible to the naked eye. Hot young stars are still igniting in there. The pink is hydrogen being kicked into emission by ultraviolet light. The blue is dust scattering everything else."
   },
   {
@@ -41,7 +41,7 @@
     "ra": "03 47 24",
     "dec": "+24 07 00",
     "fovDeg": 2.0,
-    "survey": "P/DSS2/color",
+    "survey": "https://alasky.cds.unistra.fr/DSS/DSSColor",
     "blurb": "The Seven Sisters. An open cluster of hot blue stars about 444 light-years away, drifting through a cloud of unrelated dust the cluster happens to be passing through. The reflection nebulae you see are a coincidence of timing. In a hundred million years they will be apart."
   }
 ]

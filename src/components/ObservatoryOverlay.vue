@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { ObservatoryOverlayController } from './ObservatoryOverlayController'
 import { uiAudio } from '@/audio/UiAudioDirector'
+import { Timer } from '@/lib/Timer'
 
 const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ close: [] }>()
@@ -18,6 +19,9 @@ watch(
     if (!visible) return
     await nextTick()
     overlayEl.value?.focus()
+    // Wait one RAF frame so the Aladin host has its real size before init —
+    // otherwise Aladin measures a 0x0 element and renders a 1px canvas.
+    await new Promise<void>((resolve) => Timer.after(0, resolve))
     if (aladinHost.value) {
       await controller.onOpen(aladinHost.value)
     }
