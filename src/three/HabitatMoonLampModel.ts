@@ -36,10 +36,19 @@ const MOON_LAMP_EMISSIVE_TINT = 0xffd9a8
 const MOON_LAMP_LIGHT_COLOR = 0xffe2bd
 
 /** Point-light intensity — strong enough to fill the back-right corner. */
-const MOON_LAMP_LIGHT_INTENSITY = 3.6
+const MOON_LAMP_LIGHT_INTENSITY = 5.5
 
 /** Effective range (world units) of the lamp's point light. */
-const MOON_LAMP_LIGHT_RANGE = 9
+const MOON_LAMP_LIGHT_RANGE = 13
+
+/**
+ * Forward (+Z) bias in lamp-local space applied to the point light. Without
+ * this the light sits centred inside the moon shell with the −Z hatch wall
+ * inches away, so most of the energy lands on the wall. Pushing the light
+ * forward toward the cabin centre keeps the lamp body where it is but biases
+ * radiance toward the room rather than the wall behind it.
+ */
+const MOON_LAMP_LIGHT_FORWARD_BIAS = 0.45
 
 /** Vertical offset of the light relative to the lamp's local Y origin. */
 const MOON_LAMP_LIGHT_LOCAL_Y = 0.28
@@ -104,9 +113,21 @@ export class HabitatMoonLampModel {
     this.inner = inner
 
     // Re-centre the light on the visual moon shell now that the inner has scaled.
+    // Bias it forward in lamp-local +Z so radiance favours the cabin instead of
+    // the wall the lamp's back is pressed against.
     const innerBox = new THREE.Box3().setFromObject(inner)
     const innerCentre = innerBox.getCenter(new THREE.Vector3())
-    this.light.position.set(0, innerCentre.y, 0)
+    this.light.position.set(0, innerCentre.y, MOON_LAMP_LIGHT_FORWARD_BIAS)
+  }
+
+  /**
+   * Recolor the lamp's local point light from a habitat theme stop. Idempotent;
+   * keeps the configured intensity and range.
+   *
+   * @param color - CSS hex color sourced from the active habitat interior theme.
+   */
+  setLightColor(color: THREE.ColorRepresentation): void {
+    this.light.color.set(color)
   }
 
   /** Release the inner GLB geometries and materials. */

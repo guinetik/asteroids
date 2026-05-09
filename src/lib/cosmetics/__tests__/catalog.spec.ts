@@ -38,7 +38,7 @@ describe('cosmetics catalog', () => {
     expect(countCategory(catalog, 'shuttle-thruster-trail')).toBe(4)
     expect(countCategory(catalog, 'lander-thruster-trail')).toBe(4)
     expect(countCategory(catalog, 'multitool-paintjob')).toBe(4)
-    expect(countCategory(catalog, 'habitat-interior')).toBe(6)
+    expect(countCategory(catalog, 'habitat-interior')).toBe(7)
     expect(countCategory(catalog, 'shuttle-title')).toBe(1)
     expect(countCategory(catalog, 'vehicle-flag')).toBeGreaterThanOrEqual(13)
 

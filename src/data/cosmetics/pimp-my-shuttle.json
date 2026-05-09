@@ -354,80 +354,102 @@
       "id": "habitat-interior-neon-nocturne",
       "category": "habitat-interior",
       "label": "Neon Nocturne",
-      "description": "Black studio deck, violet hatch wall, cobalt mess bulkhead, hot-pink lamp wax, arcade-blue bounce.",
+      "description": "Red key, blue fill — the air between them mixes to violet. Slate-grey cabin lit by clashing tungsten + cobalt, moon lamp burning magenta in the corner.",
       "price": 25000,
       "gradientStops": [
-        "#0b0a1a",
-        "#7c3aed",
-        "#1d4ed8",
+        "#2c2730",
+        "#34303d",
+        "#2f2c3a",
+        "#a855f7",
         "#ec4899",
-        "#22d3ee",
-        "#f472b6",
-        "#1e1b4b"
+        "#dc2626",
+        "#1d4ed8",
+        "#c026d3"
       ]
     },
     {
       "id": "habitat-interior-mars-motel",
       "category": "habitat-interior",
       "label": "Mars Motel",
-      "description": "Dust-red deck, clay hatch wall, sun-faded table bulkhead, amber lamp fluid, peach wax blobs.",
+      "description": "Warm taupe deck, clay-tinted bulkheads, amber lamp fluid, peach wax blobs. Walls warm, lamp bright.",
       "price": 25000,
       "gradientStops": [
-        "#9a1f1f",
-        "#c2410c",
-        "#ea580c",
+        "#6a4a3a",
+        "#7a4a35",
+        "#7d5a45",
         "#fb923c",
         "#fed7aa",
         "#ff8c42",
-        "#3b0a0a"
+        "#3a261c",
+        "#fb923c"
       ]
     },
     {
       "id": "habitat-interior-europa-sleeper",
       "category": "habitat-interior",
       "label": "Europa Sleeper",
-      "description": "Glacier rubber flooring, pale cyan hatch wall, deep teal table wall, ice-blue lamp liquid, white-hot wax.",
+      "description": "Steel-grey rubber deck, glacier-tinted walls, ice-blue lamp liquid, white-hot wax. Cool-neutral cabin lit by the lamp.",
       "price": 25000,
       "gradientStops": [
-        "#155e75",
-        "#22d3ee",
-        "#0d9488",
+        "#3a4a55",
+        "#46606a",
+        "#3d5258",
         "#67e8f9",
         "#f8fafc",
         "#bae6fd",
-        "#0c2541"
+        "#1a2c38",
+        "#7dd3fc"
       ]
     },
     {
       "id": "habitat-interior-saturn-salon",
       "category": "habitat-interior",
       "label": "Saturn Salon",
-      "description": "Champagne deck, ring-dust hatch wall, midnight table bulkhead, gold lamp glow, pearl wax beads.",
+      "description": "Champagne-grey deck, sand-tinted walls, gold lamp glow, pearl wax beads. Lamp gold pops against neutral greys.",
       "price": 25000,
       "gradientStops": [
-        "#facc15",
-        "#92400e",
-        "#1e1b4b",
+        "#5a4f3a",
+        "#62553e",
+        "#4f4738",
         "#fde047",
         "#fff7ed",
         "#fbbf24",
-        "#312e81"
+        "#322a1f",
+        "#fde047"
       ]
     },
     {
       "id": "habitat-interior-green-room",
       "category": "habitat-interior",
       "label": "Green Room",
-      "description": "Black rubber stage floor, bottle-green hatch wall, ivory table wall, acid lamp fluid, mint wax sparks.",
+      "description": "Mossy-grey rubber floor, sage-tinted walls, acid lamp fluid, mint wax sparks. Walls hint at green; the lamp is the show.",
       "price": 25000,
       "gradientStops": [
-        "#0a0a0a",
-        "#166534",
-        "#fef3c7",
+        "#3a4438",
+        "#3f4d3a",
+        "#4a5440",
         "#84cc16",
         "#bbf7d0",
         "#a3e635",
-        "#052e16"
+        "#1f2a1d",
+        "#a3e635"
+      ]
+    },
+    {
+      "id": "habitat-interior-cobalt-watch",
+      "category": "habitat-interior",
+      "label": "Cobalt Watch",
+      "description": "Submarine night-watch palette — deep navy bulkheads, midnight ambient, warm chartroom amber on the bed, electric cyan moon lamp burning in the corner like a sonar ping.",
+      "price": 25000,
+      "gradientStops": [
+        "#1e2a4a",
+        "#1a2348",
+        "#243456",
+        "#06b6d4",
+        "#67e8f9",
+        "#fde68a",
+        "#0c1a3a",
+        "#22d3ee"
       ]
     },
     {
