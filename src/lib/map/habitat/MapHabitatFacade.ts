@@ -102,6 +102,8 @@ export interface MapHabitatCallbacks {
   onHabitatActive?: (active: boolean) => void
   /** Open/close the shuttle-control dialog. */
   onShuttleControl?: (visible: boolean) => void
+  /** Open/close the observatory dialog (refractor telescope F-prompt). */
+  onObservatory?: (visible: boolean) => void
   /** Prompt text shown while the player is looking at an interactable. */
   onHabitatPrompt?: (prompt: string | null) => void
   /**
@@ -221,6 +223,8 @@ export class MapHabitatFacade {
       } else if (target === 'hatch') {
         // Knob animation finished — hand off to the controller for journey-gated exit.
         deps?.callbacks.onHatchExit?.()
+      } else if (target === 'observatory') {
+        deps?.callbacks.onObservatory?.(true)
       }
     }
     next.onPrompt = (prompt) => {
