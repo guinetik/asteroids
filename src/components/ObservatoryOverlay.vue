@@ -50,7 +50,7 @@ onBeforeUnmount(() => controller.dispose())
 
 <template>
   <div
-    v-if="visible"
+    v-show="visible"
     ref="overlayEl"
     class="observatory-overlay"
     tabindex="0"
