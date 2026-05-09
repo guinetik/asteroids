@@ -36,6 +36,11 @@ export type CatState =
   | 'jumpOnBed'
   | 'sitOnBed'
   | 'jumpOffBed'
+  | 'goToSideboard'
+  | 'jumpOnSideboard'
+  | 'walkSideboardTop'
+  | 'sitOnSideboard'
+  | 'jumpOffSideboard'
 
 /**
  * Live read-only handle the {@link CatController} uses to query Sushi's needs and signal
@@ -115,6 +120,24 @@ export interface CatNeedsBridge {
    * lerps onto this point during {@link 'jumpOnBed'} and sits here.
    */
   getBedTopWorldPosition?(out: THREE.Vector3): THREE.Vector3
+  /** Number of sideboard approach points available for the "jump beside lamp" perch beat. */
+  getSideboardSideCount?(): number
+  /**
+   * Write the world-space approach point for the sideboard perch into `out`.
+   * Sushi walks here before hopping onto the sideboard top.
+   */
+  getSideboardApproachWorldPosition?(sideIndex: number, out: THREE.Vector3): THREE.Vector3
+  /**
+   * Write the world-space sideboard-top perch point beside the moon lamp into `out`.
+   * Sushi lerps here during {@link 'jumpOnSideboard'}, then pads farther along the
+   * top before sitting.
+   */
+  getSideboardTopWorldPosition?(out: THREE.Vector3): THREE.Vector3
+  /**
+   * Write the sideboard-top final sitting point into `out`. Sushi pads here after
+   * hopping up, so he ends on the opposite side of the moon lamp before sitting.
+   */
+  getSideboardSitWorldPosition?(out: THREE.Vector3): THREE.Vector3
   /**
    * Cat just entered the sleeping state. Implementer should swap the live cat for the
    * baked sleeping clone (hide the live group, show the static curled-up mesh inside
@@ -186,6 +209,17 @@ const LITTER_USE_DURATION_S = 4
  */
 const BED_JUMP_CHANCE = 0.25
 /**
+ * Probability that {@link pickNextRestingState} picks the sideboard lamp perch.
+ * Kept lower than the bed beat because the sideboard is a narrower, more special
+ * staging spot and should read as a treat when the player catches it.
+ */
+const SIDEBOARD_JUMP_CHANCE = 0.16
+/**
+ * Final sideboard sit yaw (radians). `0` faces +Z, toward the cabin/player side
+ * of the hatch-wall furniture run, after Sushi pads past the lamp.
+ */
+const SIDEBOARD_SIT_YAW = 0
+/**
  * Seconds the leap-up and leap-down lerps take. Short enough to read as a hop rather
  * than a glide, long enough that the parabolic arc is visible.
  */
@@ -197,6 +231,8 @@ const BED_JUMP_ARC_HEIGHT = 0.18
  * player can grab a screenshot but short enough that he cycles through other behaviours.
  */
 const SIT_ON_BED_DURATION_S = 10
+/** Seconds Sushi sits beside the moon lamp on the sideboard before hopping down. */
+const SIT_ON_SIDEBOARD_DURATION_S = 8
 
 /** Authored clip names embedded in `cat.glb`. */
 const CLIP_IDLE = 'Armature|4_Idle_Armature'
@@ -502,6 +538,14 @@ export class CatController {
   private readonly bedJumpEnd = new THREE.Vector3()
   /** Index of the bed approach side currently in use (0..bedSideCount-1). */
   private bedSideIndex = 0
+  /** World-space start position of the active sideboard jump (snapped on enter). */
+  private readonly sideboardJumpStart = new THREE.Vector3()
+  /** World-space end position of the active sideboard jump (snapped on enter). */
+  private readonly sideboardJumpEnd = new THREE.Vector3()
+  /** Index of the sideboard approach side currently in use. */
+  private sideboardSideIndex = 0
+  /** World-space sideboard-top point Sushi walks to after the landing hop. */
+  private readonly sideboardTopWalkTarget = new THREE.Vector3()
 
   private constructor(
     root: THREE.Group,
@@ -664,11 +708,25 @@ export class CatController {
       this.tickGoToHouse(dt)
     } else if (this.state === 'goToBedSide') {
       this.tickGoToBedSide(dt)
+    } else if (this.state === 'goToSideboard') {
+      this.tickGoToSideboard(dt)
     } else if (this.state === 'jumpOnBed' || this.state === 'jumpOffBed') {
-      this.tickBedJumpLerp()
+      this.tickPerchJumpLerp(this.bedJumpStart, this.bedJumpEnd, 'sitOnBed')
+    } else if (this.state === 'jumpOnSideboard' || this.state === 'jumpOffSideboard') {
+      this.tickPerchJumpLerp(
+        this.sideboardJumpStart,
+        this.sideboardJumpEnd,
+        'walkSideboardTop',
+      )
+    } else if (this.state === 'walkSideboardTop') {
+      this.tickWalkSideboardTop(dt)
     } else if (this.state === 'sitOnBed') {
       if (this.stateTimer >= this.stateDuration) {
         this.enterState('jumpOffBed')
+      }
+    } else if (this.state === 'sitOnSideboard') {
+      if (this.stateTimer >= this.stateDuration) {
+        this.enterState('jumpOffSideboard')
       }
     } else if (this.state === 'follow') {
       this.tickFollow(dt)
@@ -717,7 +775,11 @@ export class CatController {
     if (
       this.state !== 'jumpOnBed' &&
       this.state !== 'sitOnBed' &&
-      this.state !== 'jumpOffBed'
+      this.state !== 'jumpOffBed' &&
+      this.state !== 'jumpOnSideboard' &&
+      this.state !== 'walkSideboardTop' &&
+      this.state !== 'sitOnSideboard' &&
+      this.state !== 'jumpOffSideboard'
     ) {
       this.inner.updateMatrixWorld(true)
       this._tmpBox.setFromObject(this.inner)
@@ -1045,25 +1107,84 @@ export class CatController {
   }
 
   /**
-   * Per-frame lerp used by both {@link 'jumpOnBed'} and {@link 'jumpOffBed'}. Linearly
-   * interpolates X/Z between {@link bedJumpStart} and {@link bedJumpEnd}, and adds a
+   * Walk Sushi toward the sideboard approach point. On arrival, switch to the
+   * sideboard jump so he hops onto the top beside the moon lamp.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  private tickGoToSideboard(dt: number): void {
+    if (!this.bridge?.getSideboardApproachWorldPosition) {
+      this.pickNextRestingState()
+      return
+    }
+    this.bridge.getSideboardApproachWorldPosition(this.sideboardSideIndex, this._bridgeTmp)
+    this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    if (this.stepTowardTarget(dt)) {
+      this.enterState('jumpOnSideboard')
+    }
+  }
+
+  /**
+   * Per-frame lerp used by furniture perch jumps. Linearly
+   * interpolates X/Z between the given start/end points, and adds a
    * sin-arc on top of the linear Y lerp so the leap reads as a hop. When the timer
    * exceeds {@link BED_JUMP_DURATION_S}, snaps to the end pose and advances the FSM.
+   *
+   * @param start - Captured world-space jump start.
+   * @param end - Captured world-space jump end.
+   * @param afterJumpOnState - State to enter after a jump-on completes.
    */
-  private tickBedJumpLerp(): void {
+  private tickPerchJumpLerp(
+    start: THREE.Vector3,
+    end: THREE.Vector3,
+    afterJumpOnState: 'sitOnBed' | 'walkSideboardTop',
+  ): void {
     const t = Math.min(1, this.stateTimer / BED_JUMP_DURATION_S)
-    this.group.position.x = this.bedJumpStart.x + (this.bedJumpEnd.x - this.bedJumpStart.x) * t
-    this.group.position.z = this.bedJumpStart.z + (this.bedJumpEnd.z - this.bedJumpStart.z) * t
-    const baseY = this.bedJumpStart.y + (this.bedJumpEnd.y - this.bedJumpStart.y) * t
+    this.group.position.x = start.x + (end.x - start.x) * t
+    this.group.position.z = start.z + (end.z - start.z) * t
+    const baseY = start.y + (end.y - start.y) * t
     this.group.position.y = baseY + Math.sin(Math.PI * t) * BED_JUMP_ARC_HEIGHT
     if (t >= 1) {
-      this.group.position.set(this.bedJumpEnd.x, this.bedJumpEnd.y, this.bedJumpEnd.z)
-      if (this.state === 'jumpOnBed') {
-        this.enterState('sitOnBed')
+      this.group.position.set(end.x, end.y, end.z)
+      if (this.state === 'jumpOnBed' || this.state === 'jumpOnSideboard') {
+        this.enterState(afterJumpOnState)
       } else {
         this.pickNextRestingState()
       }
     }
+  }
+
+  /**
+   * Walk Sushi along the sideboard top from the landing point to the final sit point
+   * on the far side of the moon lamp. The normal floor anchoring is disabled for this
+   * state, so Y is pinned to the authored tabletop height while the existing
+   * pivot-then-walk code handles X/Z motion.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  private tickWalkSideboardTop(dt: number): void {
+    if (!this.bridge?.getSideboardSitWorldPosition) {
+      this.enterState('sitOnSideboard')
+      return
+    }
+
+    this.bridge.getSideboardSitWorldPosition(this.sideboardTopWalkTarget)
+    this.target.set(
+      this.sideboardTopWalkTarget.x,
+      this.group.position.y,
+      this.sideboardTopWalkTarget.z,
+    )
+    this.group.position.y = this.sideboardTopWalkTarget.y
+
+    if (!this.stepTowardTarget(dt)) return
+
+    this.group.position.set(
+      this.sideboardTopWalkTarget.x,
+      this.sideboardTopWalkTarget.y,
+      this.sideboardTopWalkTarget.z,
+    )
+    this.group.rotation.y = SIDEBOARD_SIT_YAW
+    this.enterState('sitOnSideboard')
   }
 
   /**
@@ -1175,7 +1296,12 @@ export class CatController {
       this.state === 'goToBedSide' ||
       this.state === 'jumpOnBed' ||
       this.state === 'sitOnBed' ||
-      this.state === 'jumpOffBed'
+      this.state === 'jumpOffBed' ||
+      this.state === 'goToSideboard' ||
+      this.state === 'jumpOnSideboard' ||
+      this.state === 'walkSideboardTop' ||
+      this.state === 'sitOnSideboard' ||
+      this.state === 'jumpOffSideboard'
     )
   }
 
@@ -1189,6 +1315,9 @@ export class CatController {
     // plain wander walk. Only available when the host wired bed metadata onto the
     // bridge — otherwise `getBedSideCount` is undefined and we fall through.
     if (this.tryStartBedJump()) return
+    // The sideboard lamp perch is a second rare ambient beat. It is host-gated,
+    // because the sideboard loads asynchronously after the main cabin scene.
+    if (this.tryStartSideboardJump()) return
     // Pick a fresh waypoint whose straight-line path doesn't cut through any obstacle.
     const fromX = this.group.position.x
     const fromZ = this.group.position.z
@@ -1219,6 +1348,28 @@ export class CatController {
     bridge.getBedApproachWorldPosition(this.bedSideIndex, this._bridgeTmp)
     this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
     this.enterState('goToBedSide')
+    return true
+  }
+
+  /**
+   * Roll for the sideboard lamp-perch diversion. When available, this sends Sushi
+   * to an approach point below the sideboard and then hops him onto the top beside
+   * the moon lamp.
+   *
+   * @returns Whether a sideboard perch run was started.
+   */
+  private tryStartSideboardJump(): boolean {
+    const bridge = this.bridge
+    if (!bridge?.getSideboardSideCount || !bridge.getSideboardApproachWorldPosition) {
+      return false
+    }
+    const sideCount = bridge.getSideboardSideCount()
+    if (sideCount <= 0) return false
+    if (Math.random() >= SIDEBOARD_JUMP_CHANCE) return false
+    this.sideboardSideIndex = Math.floor(Math.random() * sideCount)
+    bridge.getSideboardApproachWorldPosition(this.sideboardSideIndex, this._bridgeTmp)
+    this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    this.enterState('goToSideboard')
     return true
   }
 
@@ -1266,6 +1417,9 @@ export class CatController {
       this.stateDuration = LITTER_USE_DURATION_S
     } else if (next === 'sitOnBed') {
       this.stateDuration = SIT_ON_BED_DURATION_S
+    } else if (next === 'sitOnSideboard') {
+      this.group.rotation.y = SIDEBOARD_SIT_YAW
+      this.stateDuration = SIT_ON_SIDEBOARD_DURATION_S
     } else if (next === 'jumpOnBed') {
       // Capture the lerp endpoints the moment we leap. Start = current world pose
       // (cat just arrived at the approach point), end = mattress-top centre.
@@ -1278,6 +1432,17 @@ export class CatController {
       // tickWalk — the approach waypoint hands us a clean facing direction.
       const jumpDx = this.bedJumpEnd.x - this.bedJumpStart.x
       const jumpDz = this.bedJumpEnd.z - this.bedJumpStart.z
+      if (jumpDx * jumpDx + jumpDz * jumpDz > 1e-6) {
+        this.group.rotation.y = Math.atan2(jumpDx, jumpDz)
+      }
+      this.stateDuration = BED_JUMP_DURATION_S
+    } else if (next === 'jumpOnSideboard') {
+      this.sideboardJumpStart.copy(this.group.position)
+      this.sideboardJumpEnd.copy(this.sideboardJumpStart)
+      this.bridge?.getSideboardTopWorldPosition?.(this._bridgeTmp)
+      this.sideboardJumpEnd.set(this._bridgeTmp.x, this._bridgeTmp.y, this._bridgeTmp.z)
+      const jumpDx = this.sideboardJumpEnd.x - this.sideboardJumpStart.x
+      const jumpDz = this.sideboardJumpEnd.z - this.sideboardJumpStart.z
       if (jumpDx * jumpDx + jumpDz * jumpDz > 1e-6) {
         this.group.rotation.y = Math.atan2(jumpDx, jumpDz)
       }
@@ -1297,6 +1462,24 @@ export class CatController {
       // of as a tail-first shuffle.
       const offDx = this.bedJumpEnd.x - this.bedJumpStart.x
       const offDz = this.bedJumpEnd.z - this.bedJumpStart.z
+      if (offDx * offDx + offDz * offDz > 1e-6) {
+        this.group.rotation.y = Math.atan2(offDx, offDz)
+      }
+      this.stateDuration = BED_JUMP_DURATION_S
+    } else if (next === 'jumpOffSideboard') {
+      this.sideboardJumpStart.copy(this.group.position)
+      if (this.bridge?.getSideboardApproachWorldPosition) {
+        this.bridge.getSideboardApproachWorldPosition(this.sideboardSideIndex, this._bridgeTmp)
+        this.sideboardJumpEnd.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+      } else {
+        this.sideboardJumpEnd.set(
+          this.sideboardJumpStart.x,
+          this.bounds.floorY,
+          this.sideboardJumpStart.z,
+        )
+      }
+      const offDx = this.sideboardJumpEnd.x - this.sideboardJumpStart.x
+      const offDz = this.sideboardJumpEnd.z - this.sideboardJumpStart.z
       if (offDx * offDx + offDz * offDz > 1e-6) {
         this.group.rotation.y = Math.atan2(offDx, offDz)
       }
@@ -1336,16 +1519,21 @@ export class CatController {
       case 'goToLitter':
       case 'goToHouse':
       case 'goToBedSide':
+      case 'goToSideboard':
+      case 'walkSideboardTop':
       case 'follow':
         return 'walk'
       case 'jumpOnBed':
       case 'jumpOffBed':
+      case 'jumpOnSideboard':
+      case 'jumpOffSideboard':
         // No jump animation in the rig — keep the idle pose during the brief arc so
         // the body reads as briefly airborne instead of mid-stride.
         return 'idle'
       case 'sit':
       case 'useLitter':
       case 'sitOnBed':
+      case 'sitOnSideboard':
         return 'sit'
       case 'chase':
         return 'run'

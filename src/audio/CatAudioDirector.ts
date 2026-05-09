@@ -82,6 +82,7 @@ const PURR_ALLOWED_STATES: ReadonlySet<CatState> = new Set<CatState>([
   'follow',
   'idleNearPlayer',
   'sitOnBed',
+  'sitOnSideboard',
   'chaseRest',
 ])
 

@@ -26,6 +26,7 @@ import {
   type CatWanderBounds,
 } from '@/three/CatController'
 import { CatAudioDirector, type CatAudioState } from '@/audio/CatAudioDirector'
+import { useAudio } from '@/audio/useAudio'
 import { JOURNEY_LARGE_POSTER_CATALOG } from '@/lib/posters/journeyLargePosterUnlocks'
 import { HabitatCompletionPoster } from '@/three/HabitatCompletionPoster'
 import { HabitatLargeAchievementPoster } from '@/three/HabitatLargeAchievementPoster'
@@ -215,10 +216,10 @@ const SIDEBOARD_X = 3.0
 const SIDEBOARD_WALL_CLEARANCE = 0.05
 /**
  * Fraction of the sideboard's local-X half-width that the coffee machine sits
- * away from centre. Positive offsets toward +X (further from the hatch) so the
- * record player and coffee machine read as a duet on the same flat surface.
+ * away from centre. Kept near the record player so the +X end remains open for
+ * Sushi's sideboard sit beat.
  */
-const SIDEBOARD_COFFEE_OFFSET_FRAC = 0.85
+const SIDEBOARD_COFFEE_OFFSET_FRAC = 0.45
 /**
  * Fraction of the sideboard's local-X half-width that the record player sits
  * away from centre on the −X side (closer to the hatch).
@@ -232,6 +233,30 @@ const SIDEBOARD_RECORD_PLAYER_OFFSET_FRAC = -0.05
 const SIDEBOARD_MOON_LAMP_OFFSET_FRAC = -0.7
 /** Tiny vertical clearance above the sideboard top so toppings don't z-fight. */
 const SIDEBOARD_TOP_CLEARANCE = 0.005
+/**
+ * Distance (world units) Sushi waits away from the sideboard front before
+ * hopping onto the top. Mirrors the bed approach spacing so the jump reads as
+ * a short hop, not a long glide.
+ */
+const SIDEBOARD_CAT_APPROACH_OFFSET = 0.45
+/**
+ * Fraction of the sideboard half-width where Sushi perches. This sits beside
+ * the moon lamp toward the centre of the sideboard, leaving the lamp visible
+ * while avoiding the coffee-machine end.
+ */
+const SIDEBOARD_CAT_PERCH_OFFSET_FRAC = -0.38
+/**
+ * Fraction of the sideboard half-width where Sushi finishes the lamp beat. This
+ * places him on the former coffee-machine end, opposite the moon lamp.
+ */
+const SIDEBOARD_CAT_SIT_OFFSET_FRAC = 0.85
+/**
+ * Inset from the cabin-facing sideboard edge for Sushi's top-walk lane. Keeping the
+ * lane slightly forward lets him pass in front of the moon lamp instead of through it.
+ */
+const SIDEBOARD_CAT_TOP_FRONT_INSET = 0.24
+/** Tiny lift above the sideboard bbox top for Sushi's feet while perched. */
+const SIDEBOARD_CAT_TOP_Y_OFFSET = 0.01455
 
 /**
  * World X of the refractor telescope, mirrored across the cabin from the bed
@@ -1112,6 +1137,13 @@ export class HabitatInteriorScene {
    */
   private readonly bedApproachWorldPositions: THREE.Vector3[] = []
 
+  /** World-space sideboard-top landing point beside the moon lamp. Populated after load. */
+  private readonly sideboardTopWorldPosition = new THREE.Vector3()
+  /** World-space sideboard-top final sit point on the far side of the moon lamp. */
+  private readonly sideboardSitWorldPosition = new THREE.Vector3()
+  /** Floor approach waypoints that let Sushi hop onto the sideboard from the cabin side. */
+  private readonly sideboardApproachWorldPositions: THREE.Vector3[] = []
+
   /** Stored world-space position of the cat house, populated by {@link buildCatHouse}. */
   private readonly houseWorldPosition = new THREE.Vector3()
   /**
@@ -1736,6 +1768,7 @@ export class HabitatInteriorScene {
       const sideboardCentreX = (aabb.min.x + aabb.max.x) / 2
       const sideboardCentreZ = (aabb.min.z + aabb.max.z) / 2
       const sideboardHalfWidthX = (aabb.max.x - aabb.min.x) / 2
+      this.computeSideboardJumpWaypoints(aabb)
 
       if (coffeeFlag) {
         this.coffeeMachine.group.position.set(
@@ -2075,6 +2108,33 @@ export class HabitatInteriorScene {
   }
 
   /**
+   * Cache sideboard approach + top waypoints for Sushi's moon-lamp perch beat.
+   * The perch uses the live sideboard AABB so it follows the asynchronous model
+   * placement. The top lane sits toward the cabin-facing edge so Sushi can cross
+   * in front of the lamp before sitting on its far side.
+   *
+   * @param sideboardBox - World-space sideboard bounds after final placement.
+   */
+  private computeSideboardJumpWaypoints(sideboardBox: Readonly<THREE.Box3>): void {
+    const cx = (sideboardBox.min.x + sideboardBox.max.x) / 2
+    const halfWidthX = (sideboardBox.max.x - sideboardBox.min.x) / 2
+    const perchX = cx + halfWidthX * SIDEBOARD_CAT_PERCH_OFFSET_FRAC
+    const sitX = cx + halfWidthX * SIDEBOARD_CAT_SIT_OFFSET_FRAC
+    const topY = sideboardBox.max.y + SIDEBOARD_CAT_TOP_Y_OFFSET
+    const catTopZ = sideboardBox.max.z - SIDEBOARD_CAT_TOP_FRONT_INSET
+    this.sideboardTopWorldPosition.set(perchX, topY, catTopZ)
+    this.sideboardSitWorldPosition.set(sitX, topY, catTopZ)
+    this.sideboardApproachWorldPositions.length = 0
+    this.sideboardApproachWorldPositions.push(
+      new THREE.Vector3(
+        perchX,
+        FLOOR_Y,
+        sideboardBox.max.z + SIDEBOARD_CAT_APPROACH_OFFSET,
+      ),
+    )
+  }
+
+  /**
    * Toggle the baked sleeping-cat clone parented inside the cat house. The live
    * cat's visibility is owned by {@link CatController}; this method only flips
    * the static asleep visual that lives in scene space.
@@ -2122,6 +2182,15 @@ export class HabitatInteriorScene {
         return out
       },
       getBedTopWorldPosition: (out) => out.copy(this.bedTopWorldPosition),
+      getSideboardSideCount: () => this.sideboardApproachWorldPositions.length,
+      getSideboardApproachWorldPosition: (sideIndex, out) => {
+        const i = Math.max(0, Math.min(this.sideboardApproachWorldPositions.length - 1, sideIndex))
+        const wp = this.sideboardApproachWorldPositions[i]
+        if (wp) out.copy(wp)
+        return out
+      },
+      getSideboardTopWorldPosition: (out) => out.copy(this.sideboardTopWorldPosition),
+      getSideboardSitWorldPosition: (out) => out.copy(this.sideboardSitWorldPosition),
       onEatServing: () => callbacks.onEatServing(),
       onPetted: () => callbacks.onPetted(),
       onCaughtLaser: () => callbacks.onCaughtLaser(),
@@ -3086,6 +3155,7 @@ export class HabitatInteriorScene {
    * once the spin completes, signalling the facade to leave the habitat.
    */
   private startHatchExitSequence(): void {
+    useAudio().play('sfx.hatch.open')
     this.hatchExitActive = true
     this.hatchExitTime = 0
   }
