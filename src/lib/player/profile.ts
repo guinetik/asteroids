@@ -10,7 +10,12 @@
  * @date 2026-04-03
  * @spec docs/superpowers/specs/2026-04-03-player-profile-design.md
  */
-import type { BodyAccessState, PlayerAchievementStats, PlayerProfile } from './types'
+import type {
+  BodyAccessState,
+  PlayerAchievementStats,
+  PlayerHabitatAppliances,
+  PlayerProfile,
+} from './types'
 import { SLINGSHOT_JOURNEY_FEATURE_ID, WELCOME_JOURNEY_ID } from '@/lib/journeys'
 import {
   createDefaultPlayerCosmetics,
@@ -457,6 +462,7 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
   const cosmetics = normalizePlayerCosmetics(p.cosmetics)
   const fantasiaCosmeticIntroSent =
     typeof p.fantasiaCosmeticIntroSent === 'boolean' ? p.fantasiaCosmeticIntroSent : false
+  const habitatAppliances = normalizeHabitatAppliances(p.habitatAppliances)
 
   const sushiLove = normalizeClampedNumber(
     p.sushiLove,
@@ -519,6 +525,7 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     activeStoryFlags: Object.keys(activeStoryFlags).length > 0 ? activeStoryFlags : undefined,
     cosmetics,
     fantasiaCosmeticIntroSent,
+    habitatAppliances,
     sushiLove,
     sushiHunger,
     bowlServings,
@@ -527,6 +534,36 @@ function normalizeLoadedProfile(data: unknown): PlayerProfile | null {
     litterPollution,
     ...(shuttleHullHp !== undefined ? { shuttleHullHp } : {}),
     ...(landerHullHp !== undefined ? { landerHullHp } : {}),
+  }
+}
+
+/**
+ * Default habitat-appliance unlock flags assigned to every fresh and migrated profile.
+ * Both optional counter-top props start locked — gameplay events flip them on later.
+ */
+function createDefaultHabitatAppliances(): PlayerHabitatAppliances {
+  return { coffeeMachine: false, recordPlayer: false, refractorTelescope: false }
+}
+
+/**
+ * Validate and migrate a persisted habitat-appliances block. Unknown shapes (and
+ * legacy saves missing the field entirely) fall back to {@link createDefaultHabitatAppliances}.
+ *
+ * @param raw - Unknown save field from localStorage.
+ */
+function normalizeHabitatAppliances(raw: unknown): PlayerHabitatAppliances {
+  const defaults = createDefaultHabitatAppliances()
+  if (raw === undefined || raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    return defaults
+  }
+  const r = raw as Record<string, unknown>
+  return {
+    coffeeMachine: typeof r.coffeeMachine === 'boolean' ? r.coffeeMachine : defaults.coffeeMachine,
+    recordPlayer: typeof r.recordPlayer === 'boolean' ? r.recordPlayer : defaults.recordPlayer,
+    refractorTelescope:
+      typeof r.refractorTelescope === 'boolean'
+        ? r.refractorTelescope
+        : defaults.refractorTelescope,
   }
 }
 
@@ -587,6 +624,7 @@ export function createProfile(name: string): PlayerProfile {
     disabledGiverIds: {},
     cosmetics: createDefaultPlayerCosmetics(),
     fantasiaCosmeticIntroSent: false,
+    habitatAppliances: createDefaultHabitatAppliances(),
     sushiLove: DEFAULT_SUSHI_LOVE,
     sushiHunger: DEFAULT_SUSHI_HUNGER,
     bowlServings: DEFAULT_BOWL_SERVINGS,

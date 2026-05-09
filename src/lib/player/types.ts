@@ -85,6 +85,20 @@ export interface PlayerCosmetics {
   readonly habitatInteriorId: string
 }
 
+/**
+ * Optional habitat appliance unlock flags. Each flag gates a counter-top prop on
+ * the hatch-wall sideboard — when `false`, the corresponding GLB is not fetched
+ * and the model is not added to the scene.
+ */
+export interface PlayerHabitatAppliances {
+  /** When true, the counter-top coffee machine GLB loads and renders on the sideboard. */
+  readonly coffeeMachine: boolean
+  /** When true, the counter-top record player GLB loads and renders on the sideboard. */
+  readonly recordPlayer: boolean
+  /** When true, the free-standing refractor telescope GLB loads in the −X "sun corner" of the cabin. */
+  readonly refractorTelescope: boolean
+}
+
 /** Player save data persisted to localStorage. */
 export interface PlayerProfile {
   /** Player display name. Set at profile creation. */
@@ -215,4 +229,11 @@ export interface PlayerProfile {
    * the cap, Sushi refuses to use the box and begs the player to clean it. Defaults to 0.
    */
   litterPollution: number
+  /**
+   * Habitat appliance unlock flags. Sideboard + moon lamp are baseline cabin furniture
+   * and always present — these flags only gate optional counter-top props (coffee
+   * machine, record player) so their GLBs are not fetched until unlocked. Optional in
+   * the type because legacy saves are migrated by {@link normalizeLoadedProfile}.
+   */
+  habitatAppliances?: PlayerHabitatAppliances
 }

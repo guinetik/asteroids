@@ -199,7 +199,11 @@ export class MapHabitatFacade {
     const next = new HabitatInteriorScene()
     next.setUnlockedAchievementIds(deps?.getUnlockedAchievementIds() ?? [])
     next.setBackdropContext(deps?.getHabitatBackdropContext() ?? null)
-    if (deps) next.applyHabitatInteriorFromProfile(deps.getProfile())
+    if (deps) {
+      const profile = deps.getProfile()
+      next.applyHabitatInteriorFromProfile(profile)
+      next.setHabitatAppliances(profile.habitatAppliances)
+    }
     await next.load()
     next.onInteract = (target) => {
       if (target === 'table') {

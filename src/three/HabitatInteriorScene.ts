@@ -36,6 +36,7 @@ import { HabitatSideboardModel } from '@/three/HabitatSideboardModel'
 import { HabitatCoffeeMachineModel } from '@/three/HabitatCoffeeMachineModel'
 import { HabitatRecordPlayerModel } from '@/three/HabitatRecordPlayerModel'
 import { HabitatMoonLampModel } from '@/three/HabitatMoonLampModel'
+import { HabitatRefractorTelescopeModel } from '@/three/HabitatRefractorTelescopeModel'
 import { HabitatBackdrop, type HabitatBackdropContext } from '@/three/HabitatBackdrop'
 import { findCosmeticOptionById } from '@/lib/cosmetics/catalog'
 import { getPlayerCosmetics } from '@/lib/cosmetics/profileCosmetics'
@@ -214,7 +215,7 @@ const SIDEBOARD_WALL_CLEARANCE = 0.05
  * away from centre. Positive offsets toward +X (further from the hatch) so the
  * record player and coffee machine read as a duet on the same flat surface.
  */
-const SIDEBOARD_COFFEE_OFFSET_FRAC = 0.6
+const SIDEBOARD_COFFEE_OFFSET_FRAC = 0.85
 /**
  * Fraction of the sideboard's local-X half-width that the record player sits
  * away from centre on the −X side (closer to the hatch).
@@ -228,6 +229,21 @@ const SIDEBOARD_RECORD_PLAYER_OFFSET_FRAC = -0.05
 const SIDEBOARD_MOON_LAMP_OFFSET_FRAC = -0.7
 /** Tiny vertical clearance above the sideboard top so toppings don't z-fight. */
 const SIDEBOARD_TOP_CLEARANCE = 0.005
+
+/**
+ * World X of the refractor telescope, mirrored across the cabin from the bed
+ * (which sits at +{@link BED_X}). Negative so it lands in the −X "sun corner",
+ * opposite the bed and clear of the +Z table.
+ */
+const REFRACTOR_TELESCOPE_X = -4.0
+/**
+ * World Z of the refractor telescope. Pulled forward toward the cockpit canopy
+ * so the eyepiece sits where the player would lean in to use it; clear of the
+ * cat feeding area further +Z.
+ */
+const REFRACTOR_TELESCOPE_Z = 0.0
+/** Y-axis rotation (radians) so the telescope lens points east (3 o'clock) instead of south. */
+const REFRACTOR_TELESCOPE_ROTATION_Y = Math.PI / 2
 /**
  * Player capsule radius (world units) used when resolving against furniture
  * obstacle AABBs. Tuned to feel like a person in a cabin without snagging on
@@ -903,6 +919,20 @@ export class HabitatInteriorScene {
   /** Moon lamp sitting on the opposite end of the sideboard, lighting the corner. */
   private readonly moonLamp = new HabitatMoonLampModel()
 
+  /** Free-standing refractor telescope in the −X sun corner. Optional appliance. */
+  private readonly refractorTelescope = new HabitatRefractorTelescopeModel()
+
+  /**
+   * Conditional appliance unlocks consulted before fetching optional GLBs.
+   * Default everything off — facade pushes the live profile flags in via
+   * {@link setHabitatAppliances} before {@link load} runs.
+   */
+  private habitatAppliances = {
+    coffeeMachine: false,
+    recordPlayer: false,
+    refractorTelescope: false,
+  }
+
   /** World-space AABBs the player movement resolver pushes the player out of. */
   private readonly playerObstacles: THREE.Box3[] = []
 
@@ -1151,6 +1181,26 @@ export class HabitatInteriorScene {
   /** Returns the scene graph. */
   getScene(): THREE.Scene {
     return this.scene
+  }
+
+  /**
+   * Push the player's habitat-appliance unlock flags into the scene before
+   * {@link load} runs. Conditional GLBs (coffee machine, record player) are
+   * skipped entirely when their flag is false — the network request is never
+   * made and no scene node is created.
+   *
+   * @param flags - Live flags from `profile.habitatAppliances` (or `undefined` for legacy saves).
+   */
+  setHabitatAppliances(
+    flags:
+      | { coffeeMachine: boolean; recordPlayer: boolean; refractorTelescope: boolean }
+      | undefined,
+  ): void {
+    this.habitatAppliances = {
+      coffeeMachine: flags?.coffeeMachine === true,
+      recordPlayer: flags?.recordPlayer === true,
+      refractorTelescope: flags?.refractorTelescope === true,
+    }
   }
 
   /**
@@ -1477,6 +1527,34 @@ export class HabitatInteriorScene {
     // machine and record player that mount on top. None of these block the
     // cabin from appearing; the player can move around while they stream in.
     void this.loadHatchWallFurnitureAsync()
+
+    // Optional refractor telescope in the −X sun corner. Conditional on its
+    // own profile flag — when locked, the GLB is never fetched.
+    void this.loadRefractorTelescopeAsync()
+  }
+
+  /**
+   * Deferred conditional load of the refractor telescope. Skipped entirely
+   * when {@link habitatAppliances.refractorTelescope} is false. Bails silently
+   * on load errors so a missing prop doesn't kill the scene.
+   */
+  private async loadRefractorTelescopeAsync(): Promise<void> {
+    if (!this.habitatAppliances.refractorTelescope) return
+    try {
+      await this.refractorTelescope.load()
+      if (this.disposed) return
+      this.refractorTelescope.group.position.set(
+        REFRACTOR_TELESCOPE_X,
+        FLOOR_Y,
+        REFRACTOR_TELESCOPE_Z,
+      )
+      this.refractorTelescope.group.rotation.y = REFRACTOR_TELESCOPE_ROTATION_Y
+      this.refractorTelescope.refreshAabb()
+      this.scene.add(this.refractorTelescope.group)
+      this.playerObstacles.push(this.refractorTelescope.getCollisionAabb().clone())
+    } catch (err) {
+      console.warn('[HabitatInteriorScene] Refractor telescope load failed:', err)
+    }
   }
 
   /**
@@ -1506,12 +1584,15 @@ export class HabitatInteriorScene {
       this.scene.add(this.sideboard.group)
       this.playerObstacles.push(this.sideboard.getCollisionAabb().clone())
 
-      // Load the countertop props in parallel — they're tiny but there's
-      // no reason to serialize them.
+      // Baseline cabin furniture: moon lamp (Marta's gift) always loads with the
+      // sideboard. Optional appliances are gated behind profile flags so locked
+      // ones never trigger a GLB fetch.
+      const coffeeFlag = this.habitatAppliances.coffeeMachine
+      const recordFlag = this.habitatAppliances.recordPlayer
       await Promise.all([
-        this.coffeeMachine.load(),
-        this.recordPlayer.load(),
         this.moonLamp.load(),
+        coffeeFlag ? this.coffeeMachine.load() : Promise.resolve(),
+        recordFlag ? this.recordPlayer.load() : Promise.resolve(),
       ])
       if (this.disposed) return
 
@@ -1521,19 +1602,23 @@ export class HabitatInteriorScene {
       const sideboardCentreZ = (aabb.min.z + aabb.max.z) / 2
       const sideboardHalfWidthX = (aabb.max.x - aabb.min.x) / 2
 
-      this.coffeeMachine.group.position.set(
-        sideboardCentreX + sideboardHalfWidthX * SIDEBOARD_COFFEE_OFFSET_FRAC,
-        sideboardTopY + SIDEBOARD_TOP_CLEARANCE,
-        sideboardCentreZ,
-      )
-      this.scene.add(this.coffeeMachine.group)
+      if (coffeeFlag) {
+        this.coffeeMachine.group.position.set(
+          sideboardCentreX + sideboardHalfWidthX * SIDEBOARD_COFFEE_OFFSET_FRAC,
+          sideboardTopY + SIDEBOARD_TOP_CLEARANCE,
+          sideboardCentreZ,
+        )
+        this.scene.add(this.coffeeMachine.group)
+      }
 
-      this.recordPlayer.group.position.set(
-        sideboardCentreX + sideboardHalfWidthX * SIDEBOARD_RECORD_PLAYER_OFFSET_FRAC,
-        sideboardTopY + SIDEBOARD_TOP_CLEARANCE,
-        sideboardCentreZ,
-      )
-      this.scene.add(this.recordPlayer.group)
+      if (recordFlag) {
+        this.recordPlayer.group.position.set(
+          sideboardCentreX + sideboardHalfWidthX * SIDEBOARD_RECORD_PLAYER_OFFSET_FRAC,
+          sideboardTopY + SIDEBOARD_TOP_CLEARANCE,
+          sideboardCentreZ,
+        )
+        this.scene.add(this.recordPlayer.group)
+      }
 
       this.moonLamp.group.position.set(
         sideboardCentreX + sideboardHalfWidthX * SIDEBOARD_MOON_LAMP_OFFSET_FRAC,
@@ -1760,6 +1845,8 @@ export class HabitatInteriorScene {
     this.recordPlayer.dispose()
     this.scene.remove(this.moonLamp.group)
     this.moonLamp.dispose()
+    this.scene.remove(this.refractorTelescope.group)
+    this.refractorTelescope.dispose()
     this.playerObstacles.length = 0
     this.scene.remove(this.backdrop.group)
     this.backdrop.dispose()
