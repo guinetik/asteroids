@@ -45,6 +45,10 @@ export type CatState =
   | 'jumpOnLocker'
   | 'sitOnLocker'
   | 'jumpOffLocker'
+  | 'goToTable'
+  | 'jumpOnTable'
+  | 'sitOnTable'
+  | 'jumpOffTable'
 
 /**
  * Live read-only handle the {@link CatController} uses to query Sushi's needs and signal
@@ -154,6 +158,18 @@ export interface CatNeedsBridge {
    * here, rotates toward the cabin, and sits without a top-walk phase.
    */
   getLockerTopWorldPosition?(out: THREE.Vector3): THREE.Vector3
+  /** Number of shuttle-control table approach points available for the table-top perch. */
+  getTableSideCount?(): number
+  /**
+   * Write the world-space approach point in front of the shuttle-control table into `out`.
+   * Sushi walks here before hopping onto the table top.
+   */
+  getTableApproachWorldPosition?(sideIndex: number, out: THREE.Vector3): THREE.Vector3
+  /**
+   * Write the world-space table-top sit point into `out`. Sushi jumps here,
+   * rotates back toward the cabin, and sits above the shuttle controls.
+   */
+  getTableTopWorldPosition?(out: THREE.Vector3): THREE.Vector3
   /**
    * Cat just entered the sleeping state. Implementer should swap the live cat for the
    * baked sleeping clone (hide the live group, show the static curled-up mesh inside
@@ -246,6 +262,15 @@ const LOCKER_JUMP_CHANCE = 0.14
  */
 const LOCKER_SIT_YAW = -Math.PI / 2
 /**
+ * Probability that {@link pickNextRestingState} picks the shuttle-control table perch.
+ * Kept as a rare cockpit beat because the shuttle-control table is visually busy.
+ */
+const TABLE_JUMP_CHANCE = 0.12
+/**
+ * Final table sit yaw (radians). `π` faces -Z, back into the cabin from the cockpit table.
+ */
+const TABLE_SIT_YAW = Math.PI
+/**
  * Seconds the leap-up and leap-down lerps take. Short enough to read as a hop rather
  * than a glide, long enough that the parabolic arc is visible.
  */
@@ -261,6 +286,8 @@ const SIT_ON_BED_DURATION_S = 10
 const SIT_ON_SIDEBOARD_DURATION_S = 8
 /** Seconds Sushi sits on top of the locker before hopping down. */
 const SIT_ON_LOCKER_DURATION_S = 7
+/** Seconds Sushi sits above the shuttle-control table before hopping down. */
+const SIT_ON_TABLE_DURATION_S = 7
 
 /** Authored clip names embedded in `cat.glb`. */
 const CLIP_IDLE = 'Armature|4_Idle_Armature'
@@ -580,6 +607,12 @@ export class CatController {
   private readonly lockerJumpEnd = new THREE.Vector3()
   /** Index of the locker approach side currently in use. */
   private lockerSideIndex = 0
+  /** World-space start position of the active table jump (snapped on enter). */
+  private readonly tableJumpStart = new THREE.Vector3()
+  /** World-space end position of the active table jump (snapped on enter). */
+  private readonly tableJumpEnd = new THREE.Vector3()
+  /** Index of the table approach side currently in use. */
+  private tableSideIndex = 0
 
   private constructor(
     root: THREE.Group,
@@ -746,6 +779,8 @@ export class CatController {
       this.tickGoToSideboard(dt)
     } else if (this.state === 'goToLocker') {
       this.tickGoToLocker(dt)
+    } else if (this.state === 'goToTable') {
+      this.tickGoToTable(dt)
     } else if (this.state === 'jumpOnBed' || this.state === 'jumpOffBed') {
       this.tickPerchJumpLerp(this.bedJumpStart, this.bedJumpEnd, 'sitOnBed')
     } else if (this.state === 'jumpOnSideboard' || this.state === 'jumpOffSideboard') {
@@ -758,6 +793,8 @@ export class CatController {
       this.tickWalkSideboardTop(dt)
     } else if (this.state === 'jumpOnLocker' || this.state === 'jumpOffLocker') {
       this.tickPerchJumpLerp(this.lockerJumpStart, this.lockerJumpEnd, 'sitOnLocker')
+    } else if (this.state === 'jumpOnTable' || this.state === 'jumpOffTable') {
+      this.tickPerchJumpLerp(this.tableJumpStart, this.tableJumpEnd, 'sitOnTable')
     } else if (this.state === 'sitOnBed') {
       if (this.stateTimer >= this.stateDuration) {
         this.enterState('jumpOffBed')
@@ -769,6 +806,10 @@ export class CatController {
     } else if (this.state === 'sitOnLocker') {
       if (this.stateTimer >= this.stateDuration) {
         this.enterState('jumpOffLocker')
+      }
+    } else if (this.state === 'sitOnTable') {
+      if (this.stateTimer >= this.stateDuration) {
+        this.enterState('jumpOffTable')
       }
     } else if (this.state === 'follow') {
       this.tickFollow(dt)
@@ -824,7 +865,10 @@ export class CatController {
       this.state !== 'jumpOffSideboard' &&
       this.state !== 'jumpOnLocker' &&
       this.state !== 'sitOnLocker' &&
-      this.state !== 'jumpOffLocker'
+      this.state !== 'jumpOffLocker' &&
+      this.state !== 'jumpOnTable' &&
+      this.state !== 'sitOnTable' &&
+      this.state !== 'jumpOffTable'
     ) {
       this.inner.updateMatrixWorld(true)
       this._tmpBox.setFromObject(this.inner)
@@ -1188,6 +1232,24 @@ export class CatController {
   }
 
   /**
+   * Walk Sushi toward the shuttle-control table approach point. On arrival,
+   * switch to the table jump so he hops onto the top and sits above the console.
+   *
+   * @param dt - Delta time in seconds.
+   */
+  private tickGoToTable(dt: number): void {
+    if (!this.bridge?.getTableApproachWorldPosition) {
+      this.pickNextRestingState()
+      return
+    }
+    this.bridge.getTableApproachWorldPosition(this.tableSideIndex, this._bridgeTmp)
+    this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    if (this.stepTowardTarget(dt)) {
+      this.enterState('jumpOnTable')
+    }
+  }
+
+  /**
    * Per-frame lerp used by furniture perch jumps. Linearly
    * interpolates X/Z between the given start/end points, and adds a
    * sin-arc on top of the linear Y lerp so the leap reads as a hop. When the timer
@@ -1200,7 +1262,7 @@ export class CatController {
   private tickPerchJumpLerp(
     start: THREE.Vector3,
     end: THREE.Vector3,
-    afterJumpOnState: 'sitOnBed' | 'walkSideboardTop' | 'sitOnLocker',
+    afterJumpOnState: 'sitOnBed' | 'walkSideboardTop' | 'sitOnLocker' | 'sitOnTable',
   ): void {
     const t = Math.min(1, this.stateTimer / BED_JUMP_DURATION_S)
     this.group.position.x = start.x + (end.x - start.x) * t
@@ -1212,7 +1274,8 @@ export class CatController {
       if (
         this.state === 'jumpOnBed' ||
         this.state === 'jumpOnSideboard' ||
-        this.state === 'jumpOnLocker'
+        this.state === 'jumpOnLocker' ||
+        this.state === 'jumpOnTable'
       ) {
         this.enterState(afterJumpOnState)
       } else {
@@ -1372,7 +1435,11 @@ export class CatController {
       this.state === 'goToLocker' ||
       this.state === 'jumpOnLocker' ||
       this.state === 'sitOnLocker' ||
-      this.state === 'jumpOffLocker'
+      this.state === 'jumpOffLocker' ||
+      this.state === 'goToTable' ||
+      this.state === 'jumpOnTable' ||
+      this.state === 'sitOnTable' ||
+      this.state === 'jumpOffTable'
     )
   }
 
@@ -1391,6 +1458,8 @@ export class CatController {
     if (this.tryStartSideboardJump()) return
     // The locker is a compact one-pose perch: hop up, turn toward the cabin, sit.
     if (this.tryStartLockerJump()) return
+    // The shuttle-control table perch is another rare furniture beat in the cockpit.
+    if (this.tryStartTableJump()) return
     // Pick a fresh waypoint whose straight-line path doesn't cut through any obstacle.
     const fromX = this.group.position.x
     const fromZ = this.group.position.z
@@ -1468,6 +1537,27 @@ export class CatController {
   }
 
   /**
+   * Roll for the shuttle-control table perch diversion. When available, this sends
+   * Sushi to the cabin-facing edge of the table and hops him onto the top rail.
+   *
+   * @returns Whether a table perch run was started.
+   */
+  private tryStartTableJump(): boolean {
+    const bridge = this.bridge
+    if (!bridge?.getTableSideCount || !bridge.getTableApproachWorldPosition) {
+      return false
+    }
+    const sideCount = bridge.getTableSideCount()
+    if (sideCount <= 0) return false
+    if (Math.random() >= TABLE_JUMP_CHANCE) return false
+    this.tableSideIndex = Math.floor(Math.random() * sideCount)
+    bridge.getTableApproachWorldPosition(this.tableSideIndex, this._bridgeTmp)
+    this.target.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+    this.enterState('goToTable')
+    return true
+  }
+
+  /**
    * Switch to a new state, crossfading the animation and resetting the timer.
    *
    * @param next - State to enter.
@@ -1517,6 +1607,9 @@ export class CatController {
     } else if (next === 'sitOnLocker') {
       this.group.rotation.y = LOCKER_SIT_YAW
       this.stateDuration = SIT_ON_LOCKER_DURATION_S
+    } else if (next === 'sitOnTable') {
+      this.group.rotation.y = TABLE_SIT_YAW
+      this.stateDuration = SIT_ON_TABLE_DURATION_S
     } else if (next === 'jumpOnBed') {
       // Capture the lerp endpoints the moment we leap. Start = current world pose
       // (cat just arrived at the approach point), end = mattress-top centre.
@@ -1540,6 +1633,17 @@ export class CatController {
       this.lockerJumpEnd.set(this._bridgeTmp.x, this._bridgeTmp.y, this._bridgeTmp.z)
       const jumpDx = this.lockerJumpEnd.x - this.lockerJumpStart.x
       const jumpDz = this.lockerJumpEnd.z - this.lockerJumpStart.z
+      if (jumpDx * jumpDx + jumpDz * jumpDz > 1e-6) {
+        this.group.rotation.y = Math.atan2(jumpDx, jumpDz)
+      }
+      this.stateDuration = BED_JUMP_DURATION_S
+    } else if (next === 'jumpOnTable') {
+      this.tableJumpStart.copy(this.group.position)
+      this.tableJumpEnd.copy(this.tableJumpStart)
+      this.bridge?.getTableTopWorldPosition?.(this._bridgeTmp)
+      this.tableJumpEnd.set(this._bridgeTmp.x, this._bridgeTmp.y, this._bridgeTmp.z)
+      const jumpDx = this.tableJumpEnd.x - this.tableJumpStart.x
+      const jumpDz = this.tableJumpEnd.z - this.tableJumpStart.z
       if (jumpDx * jumpDx + jumpDz * jumpDz > 1e-6) {
         this.group.rotation.y = Math.atan2(jumpDx, jumpDz)
       }
@@ -1588,6 +1692,24 @@ export class CatController {
       }
       const offDx = this.lockerJumpEnd.x - this.lockerJumpStart.x
       const offDz = this.lockerJumpEnd.z - this.lockerJumpStart.z
+      if (offDx * offDx + offDz * offDz > 1e-6) {
+        this.group.rotation.y = Math.atan2(offDx, offDz)
+      }
+      this.stateDuration = BED_JUMP_DURATION_S
+    } else if (next === 'jumpOffTable') {
+      this.tableJumpStart.copy(this.group.position)
+      if (this.bridge?.getTableApproachWorldPosition) {
+        this.bridge.getTableApproachWorldPosition(this.tableSideIndex, this._bridgeTmp)
+        this.tableJumpEnd.set(this._bridgeTmp.x, this.bounds.floorY, this._bridgeTmp.z)
+      } else {
+        this.tableJumpEnd.set(
+          this.tableJumpStart.x,
+          this.bounds.floorY,
+          this.tableJumpStart.z,
+        )
+      }
+      const offDx = this.tableJumpEnd.x - this.tableJumpStart.x
+      const offDz = this.tableJumpEnd.z - this.tableJumpStart.z
       if (offDx * offDx + offDz * offDz > 1e-6) {
         this.group.rotation.y = Math.atan2(offDx, offDz)
       }
@@ -1647,6 +1769,7 @@ export class CatController {
       case 'goToBedSide':
       case 'goToSideboard':
       case 'goToLocker':
+      case 'goToTable':
       case 'walkSideboardTop':
       case 'follow':
         return 'walk'
@@ -1656,6 +1779,8 @@ export class CatController {
       case 'jumpOffSideboard':
       case 'jumpOnLocker':
       case 'jumpOffLocker':
+      case 'jumpOnTable':
+      case 'jumpOffTable':
         // No jump animation in the rig — keep the idle pose during the brief arc so
         // the body reads as briefly airborne instead of mid-stride.
         return 'idle'
@@ -1664,6 +1789,7 @@ export class CatController {
       case 'sitOnBed':
       case 'sitOnSideboard':
       case 'sitOnLocker':
+      case 'sitOnTable':
         return 'sit'
       case 'chase':
         return 'run'

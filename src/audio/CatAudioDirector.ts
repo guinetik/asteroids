@@ -84,6 +84,7 @@ const PURR_ALLOWED_STATES: ReadonlySet<CatState> = new Set<CatState>([
   'sitOnBed',
   'sitOnSideboard',
   'sitOnLocker',
+  'sitOnTable',
   'chaseRest',
 ])
 

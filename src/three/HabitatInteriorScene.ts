@@ -434,6 +434,16 @@ const TABLE_DEBUG_HOLD_MIN_ABOVE_FLOOR = 0.35
  * from the same ring as F Shuttle Control.
  */
 const TABLE_DEBUG_GRAB_REACH_MULT = 1.35
+/**
+ * Distance (world units) Sushi waits in front of the shuttle-control table before hopping up.
+ */
+const TABLE_CAT_APPROACH_OFFSET = 0.58
+/** Drop below the table bbox top for Sushi's feet while perched. */
+const TABLE_CAT_TOP_Y_DROP = 0.12
+/** Fraction of table half-width that biases Sushi onto the roomier left side. */
+const TABLE_CAT_TOP_SIDE_OFFSET_FRAC = -0.56
+/** Fraction of table half-depth that biases Sushi's perch toward the +Z cockpit wall. */
+const TABLE_CAT_TOP_WALL_OFFSET_FRAC = 0.28
 
 /** Rounds to 4 decimal places for devtools pose logs. */
 function round4(n: number): number {
@@ -1158,6 +1168,10 @@ export class HabitatInteriorScene {
   private readonly lockerTopWorldPosition = new THREE.Vector3()
   /** Floor approach waypoints that let Sushi hop onto the bedside locker. */
   private readonly lockerApproachWorldPositions: THREE.Vector3[] = []
+  /** World-space shuttle-control table-top sit point. Populated after table placement. */
+  private readonly tableTopWorldPosition = new THREE.Vector3()
+  /** Floor approach waypoints that let Sushi hop onto the shuttle-control table. */
+  private readonly tableApproachWorldPositions: THREE.Vector3[] = []
 
   /** Stored world-space position of the cat house, populated by {@link buildCatHouse}. */
   private readonly houseWorldPosition = new THREE.Vector3()
@@ -1595,6 +1609,7 @@ export class HabitatInteriorScene {
     tableModel.updateMatrixWorld(true)
     new THREE.Box3().setFromObject(tableModel).getCenter(this.tablePosition)
     this.tablePosition.y = FLOOR_Y
+    this.computeTableJumpWaypoints(tableModel)
 
     // --- Sushi's feeding area ----------------------------------------------
     const feedingArea = this.buildCatFeedingArea()
@@ -2174,6 +2189,29 @@ export class HabitatInteriorScene {
   }
 
   /**
+   * Cache shuttle-control table approach + top waypoints for Sushi's cockpit perch beat.
+   * The table sits at the +Z cockpit cap, so the approach point uses the cabin-facing
+   * -Z edge and the top point shifts onto the roomier left side panel.
+   *
+   * @param table - Placed table root after final scale/rotation/translation.
+   */
+  private computeTableJumpWaypoints(table: THREE.Object3D): void {
+    table.updateMatrixWorld(true)
+    const box = new THREE.Box3().setFromObject(table)
+    const cx = (box.min.x + box.max.x) / 2
+    const cz = (box.min.z + box.max.z) / 2
+    const halfWidthX = (box.max.x - box.min.x) / 2
+    const halfDepthZ = (box.max.z - box.min.z) / 2
+    const perchX = cx + halfWidthX * TABLE_CAT_TOP_SIDE_OFFSET_FRAC
+    const perchZ = cz + halfDepthZ * TABLE_CAT_TOP_WALL_OFFSET_FRAC
+    this.tableTopWorldPosition.set(perchX, box.max.y - TABLE_CAT_TOP_Y_DROP, perchZ)
+    this.tableApproachWorldPositions.length = 0
+    this.tableApproachWorldPositions.push(
+      new THREE.Vector3(perchX, FLOOR_Y, box.min.z - TABLE_CAT_APPROACH_OFFSET),
+    )
+  }
+
+  /**
    * Toggle the baked sleeping-cat clone parented inside the cat house. The live
    * cat's visibility is owned by {@link CatController}; this method only flips
    * the static asleep visual that lives in scene space.
@@ -2238,6 +2276,14 @@ export class HabitatInteriorScene {
         return out
       },
       getLockerTopWorldPosition: (out) => out.copy(this.lockerTopWorldPosition),
+      getTableSideCount: () => this.tableApproachWorldPositions.length,
+      getTableApproachWorldPosition: (sideIndex, out) => {
+        const i = Math.max(0, Math.min(this.tableApproachWorldPositions.length - 1, sideIndex))
+        const wp = this.tableApproachWorldPositions[i]
+        if (wp) out.copy(wp)
+        return out
+      },
+      getTableTopWorldPosition: (out) => out.copy(this.tableTopWorldPosition),
       onEatServing: () => callbacks.onEatServing(),
       onPetted: () => callbacks.onPetted(),
       onCaughtLaser: () => callbacks.onCaughtLaser(),
